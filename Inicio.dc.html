@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet">
+  <style>
+    html,body{margin:0;padding:0}
+    a{color:#7ab8ff;text-decoration:none}
+    a:hover{color:#a8cfff}
+  </style>
+</helmet>
+<div style="min-height:100vh;background:#0d1117;color:#e6edf3;font-family:'IBM Plex Sans',sans-serif;display:flex;flex-direction:column" data-screen-label="Menu principal">
+  <header style="display:flex;align-items:center;gap:14px;padding:26px 48px;border-bottom:1px solid #1c2530">
+    <div style="width:34px;height:34px;border-radius:8px;background:linear-gradient(135deg,#0f62fe,#0d9488);display:grid;place-items:center;font-weight:700;font-size:15px;color:#ffffff">L</div>
+    <div style="display:flex;flex-direction:column">
+      <span style="font-weight:700;font-size:16px;letter-spacing:0.02em">Laboratorio</span>
+      <span style="font-size:11.5px;color:#7d8896">estación de trabajo local · aplicaciones</span>
+    </div>
+  </header>
+
+  <main style="flex:1;display:flex;flex-direction:column;justify-content:center;padding:48px;max-width:1060px;width:100%;margin:0 auto;box-sizing:border-box">
+    <h1 style="font-size:26px;font-weight:600;margin:0 0 6px">Aplicaciones</h1>
+    <p style="font-size:13.5px;color:#8b96a5;margin:0 0 30px">Elige una herramienta para empezar a trabajar.</p>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:20px">
+
+      <a href="CSV Oscilloscope.dc.html" style="display:flex;flex-direction:column;gap:14px;padding:24px;background:#131a23;border:1px solid #202b38;border-radius:12px;color:#e6edf3;transition:border-color 0.15s, transform 0.15s" style-hover="border-color:#0f62fe;transform:translateY(-2px);color:#e6edf3">
+        <div style="width:44px;height:44px;border-radius:10px;background:#0f62fe1a;border:1px solid #0f62fe40;display:grid;place-items:center">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M2 12h4l2-7 4 14 3-10 2 3h5" stroke="#4d8dff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <span style="font-size:16px;font-weight:600">CSV·Scope</span>
+          <span style="font-size:12.5px;color:#8b96a5;line-height:1.5">Osciloscopio offline para capturas CSV: cursores, trigger, FFT y análisis de armónicos, canales matemáticos, XY.</span>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:auto">
+          <span style="font-size:10.5px;font-weight:600;letter-spacing:0.04em;color:#4d8dff;background:#0f62fe14;border:1px solid #0f62fe33;border-radius:99px;padding:3px 9px">OPERATIVO</span>
+          <span style="font-size:10.5px;color:#7d8896;border:1px solid #202b38;border-radius:99px;padding:3px 9px">CSV · FFT · XY</span>
+        </div>
+      </a>
+
+      <a href="colabtex.html" style="display:flex;flex-direction:column;gap:14px;padding:24px;background:#131a23;border:1px solid #202b38;border-radius:12px;color:#e6edf3;transition:border-color 0.15s, transform 0.15s" style-hover="border-color:#0d9488;transform:translateY(-2px);color:#e6edf3">
+        <div style="width:44px;height:44px;border-radius:10px;background:#0d94881a;border:1px solid #0d948840;display:grid;place-items:center">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:19px;font-weight:500;color:#2dd4bf">Σ</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <span style="font-size:16px;font-weight:600">ColabTeX</span>
+          <span style="font-size:12.5px;color:#8b96a5;line-height:1.5">Editor LaTeX colaborativo: proyectos, edición en tiempo real, compilación a PDF y control de versiones.</span>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:auto">
+          <span style="font-size:10.5px;font-weight:600;letter-spacing:0.04em;color:#2dd4bf;background:#0d948814;border:1px solid #0d948833;border-radius:99px;padding:3px 9px">OPERATIVO</span>
+          <span style="font-size:10.5px;color:#7d8896;border:1px solid #202b38;border-radius:99px;padding:3px 9px">LaTeX · PDF · Colaboración</span>
+        </div>
+      </a>
+
+      <sc-if value="{{ showGhost }}" hint-placeholder-val="{{ true }}">
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:24px;border:1px dashed #2a3644;border-radius:12px;color:#5c6875;min-height:180px" style-hover="border-color:#3d4c5e;color:#8b96a5">
+          <span style="font-size:26px;font-weight:300;line-height:1">+</span>
+          <span style="font-size:12.5px">Nueva aplicación</span>
+        </div>
+      </sc-if>
+    </div>
+  </main>
+
+  <footer style="padding:18px 48px;border-top:1px solid #1c2530;font-size:11px;color:#5c6875;display:flex;justify-content:space-between">
+    <span>Laboratorio · entorno local</span>
+    <span style="font-family:'IBM Plex Mono',monospace">v0.1</span>
+  </footer>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;showGhost&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Menú&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    return { showGhost: this.props.showGhost ?? true };
+  }
+}
+</script>
+</body>
+</html>

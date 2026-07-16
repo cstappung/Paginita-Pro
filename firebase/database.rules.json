@@ -1,0 +1,75 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+
+    "users": {
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+
+    "userProjects": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        "$pid": {
+          ".write": "auth != null && (auth.uid === $uid || root.child('projects').child($pid).child('members').child(auth.uid).child('role').val() === 'owner')"
+        }
+      }
+    },
+
+    "tokenIndex": {
+      "$token": {
+        ".read": "auth != null",
+        ".write": "auth != null && ((!data.exists() && newData.exists() && root.child('projects').child(newData.child('pid').val()).child('members').child(auth.uid).child('role').val() !== 'view' && root.child('projects').child(newData.child('pid').val()).child('members').child(auth.uid).exists()) || (data.exists() && root.child('projects').child(data.child('pid').val()).child('members').child(auth.uid).child('role').val() === 'owner') || (data.exists() && !root.child('projects').child(data.child('pid').val()).exists()))"
+      }
+    },
+
+    "projects": {
+      "$pid": {
+        ".write": "auth != null && (data.child('members').child(auth.uid).child('role').val() === 'owner' || (!data.exists() && newData.child('members').child(auth.uid).child('role').val() === 'owner'))",
+
+        "meta": {
+          ".read": "auth != null && data.parent().child('members').child(auth.uid).exists()",
+          ".write": "auth != null && data.parent().child('members').child(auth.uid).child('role').val() !== 'view' && data.parent().child('members').child(auth.uid).exists()"
+        },
+
+        "members": {
+          ".read": "auth != null && data.child(auth.uid).exists()",
+          "$member": {
+            ".write": "auth != null && auth.uid === $member && newData.exists() && newData.child('viaToken').isString() && root.child('tokenIndex').child(newData.child('viaToken').val()).child('pid').val() === $pid && root.child('tokenIndex').child(newData.child('viaToken').val()).child('role').val() === newData.child('role').val()"
+          }
+        },
+
+        "tokens": {
+          ".read": "auth != null && data.parent().child('members').child(auth.uid).child('role').val() !== 'view' && data.parent().child('members').child(auth.uid).exists()"
+        },
+
+        "invites": {
+          ".read": "auth != null && data.parent().child('members').child(auth.uid).child('role').val() !== 'view' && data.parent().child('members').child(auth.uid).exists()",
+          ".write": "auth != null && data.parent().child('members').child(auth.uid).child('role').val() !== 'view' && data.parent().child('members').child(auth.uid).exists()"
+        },
+
+        "doc": {
+          ".read": "auth != null && data.parent().child('members').child(auth.uid).exists()",
+          ".write": "auth != null && data.parent().child('members').child(auth.uid).child('role').val() !== 'view' && data.parent().child('members').child(auth.uid).exists()"
+        },
+
+        "assetsIndex": {
+          ".read": "auth != null && data.parent().child('members').child(auth.uid).exists()",
+          ".write": "auth != null && data.parent().child('members').child(auth.uid).child('role').val() !== 'view' && data.parent().child('members').child(auth.uid).exists()"
+        }
+      }
+    },
+
+    "presence": {
+      "$pid": {
+        ".read": "auth != null && root.child('projects').child($pid).child('members').child(auth.uid).exists()",
+        "$client": {
+          ".write": "auth != null && root.child('projects').child($pid).child('members').child(auth.uid).exists()"
+        }
+      }
+    }
+  }
+}

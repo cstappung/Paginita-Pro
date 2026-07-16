@@ -1,0 +1,13 @@
+# dependencias
+node_modules/
+
+# datos locales de la versión anterior (no publicar)
+colabtex/data/
+colabtex/migracion-proyectos-locales/
+
+# contenido personal / temporal
+screenshots/
+uploads/
+*.log
+Thumbs.db
+desktop.ini

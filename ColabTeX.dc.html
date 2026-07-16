@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;family=STIX+Two+Text:ital,wght@0,400;0,600;1,400&amp;display=swap" rel="stylesheet">
+  <style>
+    html,body{margin:0;padding:0}
+    a{color:#0d9488;text-decoration:none}
+    a:hover{color:#0f766e;text-decoration:underline}
+    @keyframes ctxPulse{0%,100%{opacity:1}50%{opacity:0.25}}
+  </style>
+</helmet>
+<div style="height:100vh;display:flex;flex-direction:column;background:#f2f5f7;color:#1f2933;font-family:'IBM Plex Sans',sans-serif;overflow:hidden">
+
+  <!-- ================= DASHBOARD ================= -->
+  <sc-if value="{{ isDash }}" hint-placeholder-val="{{ true }}">
+    <div style="flex:1;display:flex;flex-direction:column;min-height:0" data-screen-label="ColabTeX - Proyectos">
+      <header style="display:flex;align-items:center;gap:22px;height:52px;padding:0 22px;background:#10201f;color:#e8f0ef;flex-shrink:0">
+        <a href="Inicio.dc.html" title="Volver al menú principal" style="display:flex;align-items:center;gap:8px;color:#e8f0ef" style-hover="color:#ffffff;text-decoration:none">
+          <span style="width:26px;height:26px;border-radius:6px;background:#0d9488;display:grid;place-items:center;font-family:'IBM Plex Mono',monospace;font-size:14px;font-weight:500;color:#ffffff">Σ</span>
+          <span style="font-weight:700;font-size:15px;letter-spacing:0.02em">ColabTeX</span>
+        </a>
+        <nav style="display:flex;gap:18px;font-size:12.5px;color:#9fb5b2">
+          <span style="color:#ffffff;font-weight:600;border-bottom:2px solid #0d9488;padding:16px 0 14px">Proyectos</span>
+          <span style="padding:16px 0 14px;cursor:pointer" style-hover="color:#ffffff">Plantillas</span>
+          <span style="padding:16px 0 14px;cursor:pointer" style-hover="color:#ffffff">Ayuda</span>
+        </nav>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:14px">
+          <span style="font-size:12px;color:#9fb5b2">ana.ramirez</span>
+          <span style="width:30px;height:30px;border-radius:50%;background:#0d9488;display:grid;place-items:center;font-size:12.5px;font-weight:600;color:#ffffff">A</span>
+        </div>
+      </header>
+
+      <div style="flex:1;display:flex;min-height:0">
+        <aside style="width:225px;flex-shrink:0;background:#ffffff;border-right:1px solid #e2e8ec;padding:18px 14px;display:flex;flex-direction:column;gap:4px;overflow:auto">
+          <button style="height:36px;border:none;border-radius:6px;background:#0d9488;color:#ffffff;font-family:'IBM Plex Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer;margin-bottom:14px" style-hover="background:#0f766e">Nuevo proyecto ▾</button>
+          <sc-for list="{{ navItems }}" as="nv" hint-placeholder-count="5">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-radius:6px;font-size:12.5px;cursor:pointer;background:{{ nv.bg }};color:{{ nv.color }};font-weight:{{ nv.weight }}" style-hover="background:#eef3f2">
+              <span>{{ nv.label }}</span>
+              <span style="font-size:11px;color:#8a97a3">{{ nv.count }}</span>
+            </div>
+          </sc-for>
+          <div style="margin-top:16px;padding:0 10px;font-size:10.5px;font-weight:700;letter-spacing:0.08em;color:#8a97a3">ETIQUETAS</div>
+          <sc-for list="{{ tags }}" as="tg" hint-placeholder-count="3">
+            <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:6px;font-size:12.5px;cursor:pointer;color:#42505c" style-hover="background:#eef3f2">
+              <span style="width:9px;height:9px;border-radius:50%;background:{{ tg.color }}"></span>
+              <span>{{ tg.name }}</span>
+            </div>
+          </sc-for>
+          <div style="padding:6px 10px;font-size:12px;color:#8a97a3;cursor:pointer" style-hover="color:#0d9488">+ Nueva etiqueta</div>
+        </aside>
+
+        <main style="flex:1;min-width:0;padding:22px 26px;overflow:auto">
+          <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+            <h1 style="font-size:19px;font-weight:600;margin:0">Todos los proyectos</h1>
+            <input placeholder="Buscar en todos los proyectos…" style="margin-left:auto;width:280px;height:32px;padding:0 12px;border:1px solid #d4dce2;border-radius:6px;background:#ffffff;font-family:'IBM Plex Sans',sans-serif;font-size:12.5px;color:#1f2933;outline:none" style-focus="border-color:#0d9488">
+          </div>
+          <div style="background:#ffffff;border:1px solid #e2e8ec;border-radius:10px;overflow:hidden">
+            <div style="display:grid;grid-template-columns:36px 1fr 160px 150px 110px;align-items:center;padding:9px 14px;border-bottom:1px solid #e9eef1;font-size:10.5px;font-weight:700;letter-spacing:0.07em;color:#8a97a3">
+              <input type="checkbox" style="width:14px;height:14px">
+              <span>TÍTULO</span><span>PROPIETARIO</span><span>MODIFICADO</span><span style="text-align:right">ACCIONES</span>
+            </div>
+            <sc-for list="{{ projects }}" as="p" hint-placeholder-count="6">
+              <div style="display:grid;grid-template-columns:36px 1fr 160px 150px 110px;align-items:center;padding:11px 14px;border-bottom:1px solid #f0f4f6;font-size:13px" style-hover="background:#f7fafb">
+                <input type="checkbox" style="width:14px;height:14px">
+                <div style="display:flex;align-items:center;gap:10px;min-width:0">
+                  <span onClick="{{ p.open }}" style="font-weight:600;color:#0d9488;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" style-hover="text-decoration:underline">{{ p.title }}</span>
+                  <sc-if value="{{ p.tag }}" hint-placeholder-val="{{ true }}">
+                    <span style="flex-shrink:0;font-size:10.5px;font-weight:600;color:#ffffff;background:{{ p.tagColor }};border-radius:99px;padding:2px 8px">{{ p.tag }}</span>
+                  </sc-if>
+                  <sc-if value="{{ p.shared }}" hint-placeholder-val="{{ false }}">
+                    <span title="Compartido" style="flex-shrink:0;font-size:11px;color:#8a97a3">⇄ {{ p.shared }}</span>
+                  </sc-if>
+                </div>
+                <span style="color:#5a6772;font-size:12.5px">{{ p.owner }}</span>
+                <span style="color:#8a97a3;font-size:12px">{{ p.modified }}</span>
+                <div style="display:flex;justify-content:flex-end;gap:4px">
+                  <button title="Duplicar" style="width:26px;height:26px;border:none;border-radius:5px;background:transparent;color:#8a97a3;cursor:pointer;font-size:13px" style-hover="background:#e9f4f2;color:#0d9488">⧉</button>
+                  <button title="Descargar ZIP" style="width:26px;height:26px;border:none;border-radius:5px;background:transparent;color:#8a97a3;cursor:pointer;font-size:13px" style-hover="background:#e9f4f2;color:#0d9488">↓</button>
+                  <button title="Archivar" style="width:26px;height:26px;border:none;border-radius:5px;background:transparent;color:#8a97a3;cursor:pointer;font-size:13px" style-hover="background:#e9f4f2;color:#0d9488">▣</button>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+          <div style="margin-top:12px;font-size:11.5px;color:#8a97a3">6 proyectos · almacenamiento local</div>
+        </main>
+      </div>
+    </div>
+  </sc-if>
+
+  <!-- ================= EDITOR ================= -->
+  <sc-if value="{{ isEditor }}" hint-placeholder-val="{{ false }}">
+    <div style="flex:1;display:flex;flex-direction:column;min-height:0;background:#141c24" data-screen-label="ColabTeX - Editor">
+      <header style="display:flex;align-items:center;gap:10px;height:46px;padding:0 12px;background:#10201f;color:#e8f0ef;flex-shrink:0">
+        <button onClick="{{ backToDash }}" title="Volver a proyectos" style="height:30px;padding:0 10px;border:none;border-radius:6px;background:transparent;color:#9fb5b2;font-family:'IBM Plex Sans',sans-serif;font-size:12.5px;cursor:pointer" style-hover="background:#1b312f;color:#ffffff">← Proyectos</button>
+        <span style="width:1px;height:20px;background:#2a403e"></span>
+        <span style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ projectTitle }}</span>
+        <span style="font-size:11px;color:#7e938f;background:#1b312f;border-radius:5px;padding:2px 7px;flex-shrink:0">Guardado</span>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:10px">
+          <sc-if value="{{ showPresence }}" hint-placeholder-val="{{ true }}">
+            <div style="display:flex;align-items:center">
+              <span title="Tú" style="width:26px;height:26px;border-radius:50%;background:#0d9488;border:2px solid #10201f;display:grid;place-items:center;font-size:11px;font-weight:600;color:#ffffff">A</span>
+              <span title="María Ortega — editando" style="width:26px;height:26px;border-radius:50%;background:#d97706;border:2px solid #10201f;display:grid;place-items:center;font-size:11px;font-weight:600;color:#ffffff;margin-left:-7px">M</span>
+              <span title="Javier Salas — viendo" style="width:26px;height:26px;border-radius:50%;background:#7c3aed;border:2px solid #10201f;display:grid;place-items:center;font-size:11px;font-weight:600;color:#ffffff;margin-left:-7px">J</span>
+            </div>
+          </sc-if>
+          <button title="Historial de versiones" style="height:30px;padding:0 10px;border:1px solid #2a403e;border-radius:6px;background:transparent;color:#c3d2cf;font-family:'IBM Plex Sans',sans-serif;font-size:12px;cursor:pointer" style-hover="background:#1b312f">⟲ Historial</button>
+          <button onClick="{{ toggleShare }}" style="height:30px;padding:0 12px;border:1px solid #2a403e;border-radius:6px;background:transparent;color:#c3d2cf;font-family:'IBM Plex Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer" style-hover="background:#1b312f">Compartir</button>
+          <button onClick="{{ compile }}" style="height:30px;padding:0 14px;border:none;border-radius:6px;background:#0d9488;color:#ffffff;font-family:'IBM Plex Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer" style-hover="background:#0f766e">{{ compileLabel }}</button>
+        </div>
+      </header>
+
+      <div style="flex:1;display:flex;min-height:0">
+        <!-- árbol de archivos -->
+        <aside style="width:200px;flex-shrink:0;background:#182430;border-right:1px solid #223140;display:flex;flex-direction:column;overflow:auto">
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px 6px;font-size:10.5px;font-weight:700;letter-spacing:0.07em;color:#5f7285">
+            <span>ARCHIVOS</span>
+            <div style="display:flex;gap:2px">
+              <button title="Nuevo archivo" style="width:20px;height:20px;border:none;border-radius:4px;background:transparent;color:#8fa3b8;cursor:pointer;font-size:12px" style-hover="background:#223140">+</button>
+              <button title="Subir" style="width:20px;height:20px;border:none;border-radius:4px;background:transparent;color:#8fa3b8;cursor:pointer;font-size:11px" style-hover="background:#223140">↑</button>
+            </div>
+          </div>
+          <sc-for list="{{ files }}" as="f" hint-placeholder-count="6">
+            <div onClick="{{ f.select }}" style="display:flex;align-items:center;gap:8px;padding:6px 12px 6px {{ f.pad }};font-size:12px;cursor:pointer;background:{{ f.bg }};color:{{ f.color }}" style-hover="background:#223140">
+              <span style="flex-shrink:0;font-family:'IBM Plex Mono',monospace;font-size:8.5px;font-weight:500;letter-spacing:0.03em;color:{{ f.badgeColor }};border:1px solid {{ f.badgeColor }};border-radius:3px;padding:1px 3px;opacity:0.85">{{ f.kind }}</span>
+              <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.name }}</span>
+            </div>
+          </sc-for>
+        </aside>
+
+        <!-- editor de código -->
+        <section style="flex:1.15;min-width:0;display:flex;flex-direction:column;background:#141c24;border-right:1px solid #223140">
+          <div style="display:flex;align-items:center;gap:10px;height:34px;padding:0 12px;border-bottom:1px solid #223140;flex-shrink:0">
+            <div style="display:flex;background:#182430;border-radius:6px;padding:2px">
+              <span style="font-size:11px;font-weight:600;color:#e2ecf5;background:#2a3a4c;border-radius:4px;padding:3px 10px">Código</span>
+              <span style="font-size:11px;color:#7488a0;padding:3px 10px;cursor:pointer" style-hover="color:#b7c6d6">Visual</span>
+            </div>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:11px;color:#7488a0">{{ activeFile }}</span>
+            <span style="margin-left:auto;font-size:11px;color:#5f7285;cursor:pointer" style-hover="color:#b7c6d6">Buscar ⌘F</span>
+          </div>
+          <div style="flex:1;overflow:auto;padding:10px 0;font-family:'IBM Plex Mono',monospace;font-size:12.5px;line-height:1.7;color:#d5dee8">
+            <div style="display:flex"><span style="width:42px;flex-shrink:0;text-align:right;padding-right:14px;color:#44546a;user-select:none">1</span><span style="white-space:pre"><span style="color:#5f7285;font-style:italic">% Informe — análisis espectral (CSV·Scope)</span></span></div>
+            <div style="display:flex"><span style="width:42px;flex-shrink:0;text-align:right;padding-right:14px;color:#44546a;user-select:none">2</span><span style="white-space:pre"><span style="color:#6cb6ff">\documentclass</span>[11pt,a4paper]{<span style="color:#7ee0c2">article</span>}</span></div>
+            <div style="display:flex"><span style="width:42px;flex-shrink:0;text-align:right;padding-right:14px;color:#44546a;user-select:none">3</span><span style="white-space:pre"><span style="color:#6cb6ff">\usepackage</span>[utf8]{<span style="color:#7ee0c2">inputenc</span>}</span></div>
+            <div style="display:flex"><span style="width:42px;flex-shrink:0;text-align:right;padding-right:14px;color:#44546a;user-select:none">4</span><span style="white-space:pre"><span style="color:#6cb6ff">\usepackage</span>[spanish]{<span style="color:#7ee0c2">babel</span>}</span></div>
+            <div style="display:flex"><span style="width:42px;flex-shrink:0;text-align:right;padding-right:14px;color:#44546a;user-select:none">5</span><span style="white-space:pre"><span style="color:#6cb6ff">\usepackage</span>{<span style="color:#7ee0c2">amsmath, graphicx, siunitx</span>}</span></div>
+            <div style="display:flex"><span style="width:42px;flex-shrink:0;text-align:right;padding-right:14px;color:#44546a;user-select:none">6</span><span style="white-space:pre"> </span></div>
+            <div style="display:flex"><span style="width:42px;flex-shrink:0;text-align:right;padding-right:14px;color:#44546a;user-select:none">7</span><span style="white-space:pre"><span style="color:#6cb6ff">\title</span>{Análisis espectral de señales distorsionadas}</span></div>
+            <div style="display:flex"><span style="width:42px;flex-shrink:0;text-align:right;padding-right:14px;color:#44546a;user-select:none">8</span><span style="white-space:pre"><span style="color:#6cb6ff">\author</span>{A. Ramírez <span style="color:#6cb6ff">\and</span> M. Ortega <span style="color:#6cb6ff">\and</span> J. Salas}</span></div>
+            <div style="display:flex"><span style="width:42px;flex-shrink:0;text-align:right;padding-right:14px;color:#44546a;user-select:none">9</span><span style="white-space:pre"><span style="color:#6cb6ff">\date</span>{<span style="color:#6cb6ff">\today</span>}</span></div>
+            <div style="display:flex"><span style="width:42px;flex-shrink:0;text-align:right;padding-right:14px;color:#44546a;user-select:none">10</span><span style="white-space:pre"> </span></div>
+            <div style="display:flex"><span style="width:42px;flex-shrink:0;text-align:right;padding-right:14px;color:#44546a;user-select:none">11</span><span style="white-space:pre"><span style="color:#6cb6ff">\begin</span>{<span style="color:#7ee0c2">document</span>}</span></div>
+            <div style="display:flex"><span style="width:42px;flex-shrink:0;text-align:right;padding-right:14px;color:#44546a;user-select:none">12</span><span style="white-space:pre"><span style="color:#6cb6ff">\maketitle</span></span></div>
+            <div style="display:flex"><span style="width:42px;flex-shrink:0;text-align:right;padding-right:14px;color:#44546a;user-select:none">13</span><span style="white-space:pre"> </span></div>
+            <div style="display:flex"><span style="width:42px;flex-shrink:0;text-align:right;padding-right:14px;color:#44546a;user-select:none">14</span><span style="white-space:pre"><span style="color:#6cb6ff">\begin</span>{<span style="color:#7ee0c2">abstract</span>}</span></div>
+            <div style="display:flex"><span style="width:42px;flex-shrink:0;text-align:right;padding-right:14px;color:#44546a;user-select:none">15</span><span style="white-space:pre">Se presenta un método de medida de distorsión armónica sobre</span></div>
+            <div style="display:flex"><span style="width:42px;flex-shrink:0;text-align:right;padding-right:14px;color:#44546a;user-select:none">16</span><span style="white-space:pre">capturas CSV de osciloscopio, con validación experimental.</span></div>
+            <div style="display:flex"><span style="width:42px;flex-shrink:0;text-align:right;padding-right:14px;color:#44546a;user-select:none">17</span><span style="white-space:pre"><span style="color:#6cb6ff">\end</span>{<span style="color:#7ee0c2">abstract</span>}</span></div>
+            <div style="display:flex"><span style="width:42px;flex-shrink:0;text-align:right;padding-right:14px;color:#44546a;user-select:none">18</span><span style="white-space:pre"> </span></div>
+            <div style="display:flex"><span style="width:42px;flex-shrink:0;text-align:right;padding-right:14px;color:#44546a;user-select:none">19</span><span style="white-space:pre"><span style="color:#6cb6ff">\section</span>{Introducción}</span></div>
+            <div style="display:flex"><span style="width:42px;flex-shrink:0;text-align:right;padding-right:14px;color:#44546a;user-select:none">20</span><span style="white-space:pre">La distorsión armónica total (THD) se define como</span></div>
+            <div style="display:flex"><span style="width:42px;flex-shrink:0;text-align:right;padding-right:14px;color:#44546a;user-select:none">21</span><span style="white-space:pre"><span style="color:#6cb6ff">\begin</span>{<span style="color:#7ee0c2">equation</span>}</span></div>
+            <div style="display:flex;background:rgba(13,148,136,0.10);position:relative"><span style="width:42px;flex-shrink:0;text-align:right;padding-right:14px;color:#44546a;user-select:none">22</span><span style="white-space:pre">  <span style="color:#e2c08d">\mathrm{THD} = \frac{\sqrt{\sum_{h=2}^{N} V_h^2}}{V_1}</span></span><sc-if value="{{ showPresence }}" hint-placeholder-val="{{ true }}"><span style="position:absolute;right:14px;top:-9px;display:flex;align-items:center;gap:4px"><span style="font-size:9px;font-weight:600;color:#ffffff;background:#d97706;border-radius:3px;padding:1px 5px">María</span><span style="width:2px;height:16px;background:#d97706;animation:ctxPulse 1.1s infinite"></span></span></sc-if></div>
+            <div style="display:flex"><span style="width:42px;flex-shrink:0;text-align:right;padding-right:14px;color:#44546a;user-select:none">23</span><span style="white-space:pre">  <span style="color:#6cb6ff">\label</span>{eq:thd}</span></div>
+            <div style="display:flex"><span style="width:42px;flex-shrink:0;text-align:right;padding-right:14px;color:#44546a;user-select:none">24</span><span style="white-space:pre"><span style="color:#6cb6ff">\end</span>{<span style="color:#7ee0c2">equation</span>}</span></div>
+            <div style="display:flex"><span style="width:42px;flex-shrink:0;text-align:right;padding-right:14px;color:#44546a;user-select:none">25</span><span style="white-space:pre">donde <span style="color:#e2c08d">$V_h$</span> es el valor eficaz del armónico <span style="color:#e2c08d">$h$</span>-ésimo.</span></div>
+            <div style="display:flex"><span style="width:42px;flex-shrink:0;text-align:right;padding-right:14px;color:#44546a;user-select:none">26</span><span style="white-space:pre"> </span></div>
+            <div style="display:flex"><span style="width:42px;flex-shrink:0;text-align:right;padding-right:14px;color:#44546a;user-select:none">27</span><span style="white-space:pre"><span style="color:#6cb6ff">\section</span>{Metodología}</span></div>
+            <div style="display:flex"><span style="width:42px;flex-shrink:0;text-align:right;padding-right:14px;color:#44546a;user-select:none">28</span><span style="white-space:pre">Las capturas se procesan con <span style="color:#6cb6ff">\texttt</span>{CSV·Scope} y se</span></div>
+            <div style="display:flex"><span style="width:42px;flex-shrink:0;text-align:right;padding-right:14px;color:#44546a;user-select:none">29</span><span style="white-space:pre">exportan las tablas de armónicos (véase <span style="color:#6cb6ff">\ref</span>{eq:thd}).</span></div>
+            <div style="display:flex"><span style="width:42px;flex-shrink:0;text-align:right;padding-right:14px;color:#44546a;user-select:none">30</span><span style="white-space:pre"> </span></div>
+            <div style="display:flex"><span style="width:42px;flex-shrink:0;text-align:right;padding-right:14px;color:#44546a;user-select:none">31</span><span style="white-space:pre"><span style="color:#6cb6ff">\end</span>{<span style="color:#7ee0c2">document</span>}</span></div>
+          </div>
+        </section>
+
+        <!-- vista PDF -->
+        <section style="flex:1;min-width:0;display:flex;flex-direction:column;background:#26303b">
+          <div style="display:flex;align-items:center;gap:8px;height:34px;padding:0 12px;border-bottom:1px solid #33404d;flex-shrink:0;color:#aab8c5">
+            <button onClick="{{ compile }}" title="Recompilar" style="width:24px;height:24px;border:none;border-radius:5px;background:transparent;color:#aab8c5;cursor:pointer;font-size:13px" style-hover="background:#33404d">⟳</button>
+            <span style="width:1px;height:16px;background:#33404d"></span>
+            <button onClick="{{ zoomOut }}" style="width:24px;height:24px;border:none;border-radius:5px;background:transparent;color:#aab8c5;cursor:pointer;font-size:14px" style-hover="background:#33404d">−</button>
+            <span style="font-size:11.5px;font-family:'IBM Plex Mono',monospace;min-width:38px;text-align:center">{{ zoomLabel }}</span>
+            <button onClick="{{ zoomIn }}" style="width:24px;height:24px;border:none;border-radius:5px;background:transparent;color:#aab8c5;cursor:pointer;font-size:14px" style-hover="background:#33404d">+</button>
+            <span style="margin-left:auto;font-size:11.5px">Página 1 / 3</span>
+            <button title="Descargar PDF" style="width:24px;height:24px;border:none;border-radius:5px;background:transparent;color:#aab8c5;cursor:pointer;font-size:13px" style-hover="background:#33404d">↓</button>
+            <button onClick="{{ toggleLog }}" title="Registro de compilación" style="height:24px;padding:0 8px;border:none;border-radius:5px;background:transparent;color:#aab8c5;cursor:pointer;font-size:11px" style-hover="background:#33404d">Registro · 2⚠</button>
+          </div>
+          <div style="flex:1;overflow:auto;display:flex;justify-content:center;padding:22px 16px">
+            <div style="width:470px;flex-shrink:0;background:#ffffff;box-shadow:0 4px 18px rgba(0,0,0,0.35);padding:52px 56px;box-sizing:border-box;font-family:'STIX Two Text',serif;color:#111111;height:fit-content;transform:scale({{ pdfScale }});transform-origin:top center">
+            <div style="text-align:center;font-size:19px;font-weight:600;line-height:1.3">Análisis espectral de señales distorsionadas</div>
+            <div style="text-align:center;font-size:12px;margin-top:12px">A. Ramírez&nbsp;&nbsp;&nbsp;&nbsp;M. Ortega&nbsp;&nbsp;&nbsp;&nbsp;J. Salas</div>
+            <div style="text-align:center;font-size:11px;margin-top:6px">15 de julio de 2026</div>
+            <div style="margin:22px 34px 0;font-size:10.5px;line-height:1.55;text-align:justify"><span style="font-weight:600">Resumen.</span> Se presenta un método de medida de distorsión armónica sobre capturas CSV de osciloscopio, con validación experimental.</div>
+            <div style="font-size:13px;font-weight:600;margin-top:24px">1&nbsp;&nbsp;&nbsp;Introducción</div>
+            <div style="font-size:11.5px;line-height:1.6;margin-top:8px;text-align:justify">La distorsión armónica total (THD) se define como</div>
+            <div style="display:flex;align-items:center;justify-content:center;gap:0;margin:14px 0;font-size:12.5px">
+              <span style="flex:1"></span>
+              <span style="font-style:normal">THD&nbsp;=&nbsp;</span>
+              <span style="display:inline-flex;flex-direction:column;text-align:center;vertical-align:middle">
+                <span style="padding:0 5px;border-bottom:1px solid #111111;font-style:italic">√(∑<span style="font-size:9px;vertical-align:sub">h=2</span><span style="font-size:9px;vertical-align:super">N</span> V<span style="font-size:9px;vertical-align:sub">h</span><span style="font-size:9px;vertical-align:super">2</span>)</span>
+                <span style="font-style:italic">V<span style="font-size:9px;vertical-align:sub">1</span></span>
+              </span>
+              <span style="flex:1;text-align:right">(1)</span>
+            </div>
+            <div style="font-size:11.5px;line-height:1.6;text-align:justify">donde <span style="font-style:italic">V<span style="font-size:9px;vertical-align:sub">h</span></span> es el valor eficaz del armónico <span style="font-style:italic">h</span>-ésimo.</div>
+            <div style="font-size:13px;font-weight:600;margin-top:22px">2&nbsp;&nbsp;&nbsp;Metodología</div>
+            <div style="font-size:11.5px;line-height:1.6;margin-top:8px;text-align:justify">Las capturas se procesan con <span style="font-family:'IBM Plex Mono',monospace;font-size:10.5px">CSV·Scope</span> y se exportan las tablas de armónicos (véase ecuación 1).</div>
+            <div style="text-align:center;font-size:10px;margin-top:56px;color:#555555">1</div>
+            </div>
+          </div>
+          <sc-if value="{{ logOpen }}" hint-placeholder-val="{{ false }}">
+            <div style="flex-shrink:0;max-height:170px;overflow:auto;background:#182430;border-top:1px solid #33404d;padding:10px 14px;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.7;color:#9fb0c0">
+              <div style="color:#7ee0c2;font-weight:500">✓ Compilación correcta — pdflatex · 1.8 s · 0 errores · 2 advertencias</div>
+              <div>latexmk -pdf -interaction=nonstopmode main.tex</div>
+              <div style="color:#e2c08d">⚠ Overfull \hbox (4.3pt too wide) in paragraph at lines 15–16</div>
+              <div style="color:#e2c08d">⚠ Package siunitx: locale 'spanish' loaded via babel</div>
+              <div>Output written on main.pdf (3 pages, 128 342 bytes)</div>
+            </div>
+          </sc-if>
+        </section>
+      </div>
+
+      <footer style="display:flex;align-items:center;gap:14px;height:26px;padding:0 12px;background:#10201f;color:#7e938f;font-size:11px;flex-shrink:0">
+        <span style="color:{{ statusColor }}">{{ statusText }}</span>
+        <span>UTF-8 · LaTeX</span>
+        <span style="margin-left:auto">Ln 22, Col 41</span>
+        <span>2 colaboradores en línea</span>
+      </footer>
+
+      <!-- modal compartir -->
+      <sc-if value="{{ shareOpen }}" hint-placeholder-val="{{ false }}">
+        <div onClick="{{ toggleShare }}" style="position:fixed;inset:0;background:rgba(8,14,18,0.55);display:grid;place-items:center;z-index:50">
+          <div onClick="{{ stop }}" style="width:440px;background:#ffffff;border-radius:12px;padding:22px 24px;color:#1f2933;box-shadow:0 20px 50px rgba(0,0,0,0.4)">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+              <span style="font-size:16px;font-weight:600">Compartir proyecto</span>
+              <button onClick="{{ toggleShare }}" style="width:26px;height:26px;border:none;border-radius:6px;background:transparent;color:#8a97a3;cursor:pointer;font-size:15px" style-hover="background:#eef3f2">✕</button>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:11px 12px;background:#f2f7f6;border:1px solid #dfe9e7;border-radius:8px;margin-bottom:16px">
+              <span style="font-size:12.5px;color:#42505c;flex:1">Cualquiera con el enlace <b>puede ver</b></span>
+              <button style="height:28px;padding:0 12px;border:1px solid #0d9488;border-radius:6px;background:#ffffff;color:#0d9488;font-family:'IBM Plex Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer" style-hover="background:#e9f4f2">Copiar enlace</button>
+            </div>
+            <div style="display:flex;gap:8px;margin-bottom:18px">
+              <input placeholder="Invitar por correo…" style="flex:1;height:34px;padding:0 12px;border:1px solid #d4dce2;border-radius:6px;font-family:'IBM Plex Sans',sans-serif;font-size:12.5px;outline:none" style-focus="border-color:#0d9488">
+              <select style="height:34px;border:1px solid #d4dce2;border-radius:6px;font-family:'IBM Plex Sans',sans-serif;font-size:12px;padding:0 6px;background:#ffffff">
+                <option>Puede editar</option><option>Solo lectura</option>
+              </select>
+              <button style="height:34px;padding:0 14px;border:none;border-radius:6px;background:#0d9488;color:#ffffff;font-family:'IBM Plex Sans',sans-serif;font-size:12.5px;font-weight:600;cursor:pointer" style-hover="background:#0f766e">Invitar</button>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:2px">
+              <sc-for list="{{ members }}" as="m" hint-placeholder-count="3">
+                <div style="display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid #f0f4f6">
+                  <span style="width:28px;height:28px;border-radius:50%;background:{{ m.color }};display:grid;place-items:center;font-size:11.5px;font-weight:600;color:#ffffff;flex-shrink:0">{{ m.initial }}</span>
+                  <div style="display:flex;flex-direction:column;min-width:0;flex:1">
+                    <span style="font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ m.name }}</span>
+                    <span style="font-size:11px;color:#8a97a3">{{ m.email }}</span>
+                  </div>
+                  <span style="font-size:11.5px;color:#5a6772">{{ m.role }}</span>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+      </sc-if>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;startView&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;dashboard&quot;,&quot;editor&quot;],&quot;default&quot;:&quot;dashboard&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Demo&quot;},&quot;showPresence&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Demo&quot;}}">
+class Component extends DCLogic {
+  state = { view: null, activeFile: 'main.tex', projectTitle: 'Análisis espectral de señales distorsionadas', shareOpen: false, logOpen: false, compiling: false, status: 'Compilado hace 2 min', zoom: 1 };
+  compileTimer = null;
+  componentWillUnmount() { clearTimeout(this.compileTimer); }
+  renderVals() {
+    const view = this.state.view ?? (this.props.startView ?? 'dashboard');
+    const projectsRaw = [
+      { title: 'Análisis espectral de señales distorsionadas', tag: 'Artículos', tagColor: '#0d9488', owner: 'Tú', modified: 'hace 2 minutos', shared: '3' },
+      { title: 'Tesis — Capítulo 3: Convertidores', tag: 'Tesis', tagColor: '#7c3aed', owner: 'Tú', modified: 'ayer', shared: '1' },
+      { title: 'Informe de prácticas — Electrónica de potencia', tag: 'Tareas', tagColor: '#d97706', owner: 'María Ortega', modified: 'hace 3 días', shared: '2' },
+      { title: 'Plantilla IEEE — borrador PES 2026', tag: 'Artículos', tagColor: '#0d9488', owner: 'Tú', modified: '12 jul 2026', shared: '' },
+      { title: 'Apuntes: transformada de Fourier discreta', tag: '', tagColor: '', owner: 'Javier Salas', modified: '8 jul 2026', shared: '2' },
+      { title: 'CV académico', tag: '', tagColor: '', owner: 'Tú', modified: '28 jun 2026', shared: '' }
+    ];
+    const filesRaw = [
+      { name: 'main.tex', kind: 'TEX', badgeColor: '#6cb6ff', pad: '12px' },
+      { name: 'preambulo.tex', kind: 'TEX', badgeColor: '#6cb6ff', pad: '12px' },
+      { name: 'secciones/', kind: 'DIR', badgeColor: '#8fa3b8', pad: '12px' },
+      { name: 'introduccion.tex', kind: 'TEX', badgeColor: '#6cb6ff', pad: '26px' },
+      { name: 'metodologia.tex', kind: 'TEX', badgeColor: '#6cb6ff', pad: '26px' },
+      { name: 'figuras/', kind: 'DIR', badgeColor: '#8fa3b8', pad: '12px' },
+      { name: 'espectro_60Hz.pdf', kind: 'PDF', badgeColor: '#e57373', pad: '26px' },
+      { name: 'referencias.bib', kind: 'BIB', badgeColor: '#e2c08d', pad: '12px' }
+    ];
+    return {
+      isDash: view === 'dashboard',
+      isEditor: view === 'editor',
+      showPresence: this.props.showPresence ?? true,
+      projectTitle: this.state.projectTitle,
+      activeFile: this.state.activeFile,
+      shareOpen: this.state.shareOpen,
+      logOpen: this.state.logOpen,
+      compileLabel: this.state.compiling ? 'Compilando…' : '▶ Compilar',
+      statusText: this.state.compiling ? '● Compilando…' : '● ' + this.state.status,
+      statusColor: this.state.compiling ? '#e2c08d' : '#7ee0c2',
+      zoomLabel: Math.round(this.state.zoom * 100) + '%',
+      pdfScale: this.state.zoom,
+      navItems: [
+        { label: 'Todos los proyectos', count: '6', bg: '#e9f4f2', color: '#0d9488', weight: 600 },
+        { label: 'Tus proyectos', count: '4', bg: 'transparent', color: '#42505c', weight: 400 },
+        { label: 'Compartidos contigo', count: '2', bg: 'transparent', color: '#42505c', weight: 400 },
+        { label: 'Archivados', count: '1', bg: 'transparent', color: '#42505c', weight: 400 },
+        { label: 'Papelera', count: '', bg: 'transparent', color: '#42505c', weight: 400 }
+      ],
+      tags: [
+        { name: 'Tesis', color: '#7c3aed' },
+        { name: 'Artículos', color: '#0d9488' },
+        { name: 'Tareas', color: '#d97706' }
+      ],
+      projects: projectsRaw.map(p => ({ ...p, open: () => this.setState({ view: 'editor', projectTitle: p.title }) })),
+      files: filesRaw.map(f => ({
+        ...f,
+        bg: f.name === this.state.activeFile ? '#243244' : 'transparent',
+        color: f.name === this.state.activeFile ? '#e2ecf5' : '#9fb0c0',
+        select: () => this.setState({ activeFile: f.name })
+      })),
+      members: [
+        { initial: 'A', color: '#0d9488', name: 'Ana Ramírez (tú)', email: 'ana.ramirez@uni.es', role: 'Propietaria' },
+        { initial: 'M', color: '#d97706', name: 'María Ortega', email: 'm.ortega@uni.es', role: 'Puede editar' },
+        { initial: 'J', color: '#7c3aed', name: 'Javier Salas', email: 'j.salas@uni.es', role: 'Solo lectura' }
+      ],
+      backToDash: () => this.setState({ view: 'dashboard' }),
+      toggleShare: () => this.setState(s => ({ shareOpen: !s.shareOpen })),
+      toggleLog: () => this.setState(s => ({ logOpen: !s.logOpen })),
+      stop: (e) => e.stopPropagation(),
+      zoomIn: () => this.setState(s => ({ zoom: Math.min(2, +(s.zoom + 0.1).toFixed(2)) })),
+      zoomOut: () => this.setState(s => ({ zoom: Math.max(0.5, +(s.zoom - 0.1).toFixed(2)) })),
+      compile: () => {
+        if (this.state.compiling) return;
+        this.setState({ compiling: true });
+        clearTimeout(this.compileTimer);
+        this.compileTimer = setTimeout(() => this.setState({ compiling: false, status: 'Compilado ahora mismo' }), 1200);
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>
