@@ -87,9 +87,13 @@ const state = {
   ydoc: null,
   provider: null,
   yFiles: null,
+  yFolders: null,        // Y.Map: ruta de carpeta → true (carpetas vacías)
+  collapsed: new Set(),  // carpetas plegadas (solo UI local)
+  uploadPrefix: "",      // carpeta destino de la próxima subida
   activeFile: null,
   editorView: null,
   assets: [],
+  assetCache: new Map(), // key+size → bytes (evita re-descargar al compilar)
   engine: null,
   pdfViewer: null,
   compiling: false,
@@ -235,6 +239,7 @@ async function openEditor(projectId, token) {
   $("readOnlyBadge").style.display = readOnly ? "" : "none";
   $("btnShare").style.display = readOnly ? "none" : "";
   $("btnNewFile").style.display = readOnly ? "none" : "";
+  $("btnNewFolder").style.display = readOnly ? "none" : "";
   $("btnUploadFile").style.display = readOnly ? "none" : "";
   setSyncBadge("Conectando…", "#e2c08d");
 
@@ -244,6 +249,9 @@ async function openEditor(projectId, token) {
   state.ydoc = ydoc;
   state.provider = provider;
   state.yFiles = ydoc.getMap("files");
+  state.yFolders = ydoc.getMap("folders");
+  state.collapsed = new Set();
+  state.uploadPrefix = "";
 
   provider.awareness.setLocalStateField("user", {
     name: state.user.name,
@@ -272,6 +280,7 @@ async function openEditor(projectId, token) {
     if (state.activeFile) mountEditor(state.activeFile);
   });
   state.yFiles.observe(() => renderFileTree());
+  state.yFolders.observe(() => renderFileTree());
 
   // ---- assets ----
   await refreshAssets();
@@ -303,8 +312,11 @@ function teardownEditor() {
   if (state.editorView) { state.editorView.destroy(); state.editorView = null; }
   if (state.provider) { state.provider.destroy(); state.provider = null; }
   if (state.ydoc) { state.ydoc.destroy(); state.ydoc = null; }
-  state.project = null; state.yFiles = null; state.activeFile = null;
+  state.project = null; state.yFiles = null; state.yFolders = null; state.activeFile = null;
   state.assets = [];
+  state.assetCache.clear();
+  state.collapsed = new Set();
+  state.uploadPrefix = "";
   $("logPanel").style.display = "none";
 }
 
@@ -324,8 +336,13 @@ function texFileNames() {
   return Array.from(state.yFiles ? state.yFiles.keys() : []).sort();
 }
 
+const fileExt = name => {
+  const base = name.split("/").pop();
+  return base.includes(".") ? base.split(".").pop().toLowerCase() : "";
+};
+
 const FILE_KIND = name => {
-  const ext = name.split(".").pop().toLowerCase();
+  const ext = fileExt(name);
   if (ext === "tex" || ext === "sty" || ext === "cls") return ["TEX", "#6cb6ff"];
   if (ext === "bib") return ["BIB", "#e2c08d"];
   if (["png", "jpg", "jpeg", "gif", "svg"].includes(ext)) return ["IMG", "#b58bf5"];
@@ -333,19 +350,56 @@ const FILE_KIND = name => {
   return ["TXT", "#8fa3b8"];
 };
 
+/* extensiones que pdfTeX puede insertar con \includegraphics */
+const INSERTABLE = ["png", "jpg", "jpeg", "pdf"];
+
+/* nombres válidos: sin ./.. ni barras sobrantes */
+function cleanPath(name) {
+  const parts = String(name).trim().replace(/\\/g, "/").split("/")
+    .map(p => p.trim()).filter(p => p && p !== "." && p !== "..");
+  return parts.join("/");
+}
+
 function renderFileTree() {
   const tree = $("fileTree");
   tree.innerHTML = "";
+  if (!state.yFiles) return;
   const readOnly = state.role === "view";
-  const entry = (name, asset) => {
+  const parentOf = p => p.includes("/") ? p.slice(0, p.lastIndexOf("/")) : "";
+
+  // carpetas explícitas (Y.Map "folders") + implícitas por las rutas
+  const folders = new Set(state.yFolders ? Array.from(state.yFolders.keys()) : []);
+  const addImplicit = name => {
+    const parts = name.split("/");
+    for (let i = 1; i < parts.length; i++) folders.add(parts.slice(0, i).join("/"));
+  };
+  const texNames = texFileNames();
+  for (const n of texNames) addImplicit(n);
+  for (const a of state.assets) addImplicit(a.name);
+
+  // hijos por carpeta ("" = raíz)
+  const childFolders = new Map(), childFiles = new Map();
+  const pushTo = (map, key, v) => { if (!map.has(key)) map.set(key, []); map.get(key).push(v); };
+  for (const f of folders) pushTo(childFolders, parentOf(f), f);
+  for (const n of texNames) pushTo(childFiles, parentOf(n), { name: n, asset: null });
+  for (const a of state.assets) pushTo(childFiles, parentOf(a.name), { name: a.name, asset: a });
+
+  const fileEntry = (name, asset, depth) => {
     const [kind, color] = FILE_KIND(name);
+    const base = name.split("/").pop();
+    const canInsert = asset && !readOnly && INSERTABLE.includes(fileExt(name));
     const div = document.createElement("div");
     div.className = "file-entry" + (name === state.activeFile && !asset ? " file-active" : "");
+    div.style.paddingLeft = (12 + depth * 14) + "px";
+    div.title = name;
     div.innerHTML = `<span class="file-badge" style="color:${color};border-color:${color}">${kind}</span>
-      <span class="file-name">${escapeHtml(name)}</span>
-      ${readOnly ? "" : '<button class="file-del" title="Eliminar archivo">✕</button>'}`;
-    div.onclick = () => { if (!asset) { mountEditor(name); } };
-    const del = div.querySelector(".file-del");
+      <span class="file-name">${escapeHtml(base)}</span>
+      ${canInsert ? '<button class="file-act" data-act="ins" title="Insertar en el archivo activo">⤷</button>' : ""}
+      ${readOnly ? "" : '<button class="file-act file-del" data-act="del" title="Eliminar archivo">✕</button>'}`;
+    div.onclick = () => { if (!asset) mountEditor(name); };
+    const ins = div.querySelector('[data-act="ins"]');
+    if (ins) ins.onclick = e => { e.stopPropagation(); insertAssetSnippet(asset); };
+    const del = div.querySelector('[data-act="del"]');
     if (del) del.onclick = async e => {
       e.stopPropagation();
       if (!confirm(`¿Eliminar "${name}" del proyecto?`)) return;
@@ -365,8 +419,104 @@ function renderFileTree() {
     };
     return div;
   };
-  for (const name of texFileNames()) tree.appendChild(entry(name, null));
-  for (const a of state.assets) tree.appendChild(entry(a.name, a));
+
+  const folderEntry = (path, depth) => {
+    const collapsed = state.collapsed.has(path);
+    const div = document.createElement("div");
+    div.className = "file-entry folder-entry";
+    div.style.paddingLeft = (12 + depth * 14) + "px";
+    div.title = path;
+    div.innerHTML = `<span class="folder-arrow">${collapsed ? "▸" : "▾"}</span>
+      <span class="file-name">${escapeHtml(path.split("/").pop())}</span>
+      ${readOnly ? "" : `<button class="file-act" data-act="new" title="Nuevo archivo aquí">＋</button>
+      <button class="file-act" data-act="up" title="Subir archivos aquí">↑</button>
+      <button class="file-act file-del" data-act="del" title="Eliminar carpeta">✕</button>`}`;
+    div.onclick = () => {
+      if (collapsed) state.collapsed.delete(path); else state.collapsed.add(path);
+      renderFileTree();
+    };
+    const stop = (act, fn) => {
+      const b = div.querySelector(`[data-act="${act}"]`);
+      if (b) b.onclick = e => { e.stopPropagation(); fn(); };
+    };
+    stop("new", () => newFileIn(path + "/"));
+    stop("up", () => { state.uploadPrefix = path + "/"; $("fileUploadInput").click(); });
+    stop("del", () => deleteFolder(path));
+    return div;
+  };
+
+  const renderLevel = (folder, depth) => {
+    for (const f of (childFolders.get(folder) || []).sort((a, b) => a.localeCompare(b))) {
+      tree.appendChild(folderEntry(f, depth));
+      if (!state.collapsed.has(f)) renderLevel(f, depth + 1);
+    }
+    for (const it of (childFiles.get(folder) || []).sort((a, b) => a.name.localeCompare(b.name)))
+      tree.appendChild(fileEntry(it.name, it.asset, depth));
+  };
+  renderLevel("", 0);
+}
+
+function newFileIn(prefix) {
+  let name = prompt("Nombre del nuevo archivo (p. ej. seccion1.tex):", "nuevo.tex");
+  if (!name) return;
+  name = cleanPath(prefix + name);
+  if (!name) return;
+  if (state.yFiles.has(name)) { alert("Ya existe un archivo con ese nombre."); return; }
+  const t = new Y.Text();
+  state.yFiles.set(name, t);
+  mountEditor(name);
+}
+
+function newFolderIn(prefix) {
+  let name = prompt("Nombre de la nueva carpeta (puede anidar: cap1/figuras):", "figuras");
+  if (!name) return;
+  name = cleanPath(prefix + name);
+  if (!name) return;
+  state.yFolders.set(name, true);
+  state.collapsed.delete(name);
+  renderFileTree();
+}
+
+async function deleteFolder(path) {
+  const prefix = path + "/";
+  const texToDelete = texFileNames().filter(n => n.startsWith(prefix));
+  const assetsToDelete = state.assets.filter(a => a.name.startsWith(prefix));
+  const total = texToDelete.length + assetsToDelete.length;
+  if (!confirm(`¿Eliminar la carpeta "${path}"${total ? ` y los ${total} archivo(s) que contiene` : ""}?`)) return;
+  state.ydoc.transact(() => {
+    for (const n of texToDelete) state.yFiles.delete(n);
+    for (const k of Array.from(state.yFolders.keys()))
+      if (k === path || k.startsWith(prefix)) state.yFolders.delete(k);
+  });
+  for (const a of assetsToDelete) {
+    try { await fb.deleteAsset(state.project.id, a); } catch (e) {}
+  }
+  if (state.activeFile && state.activeFile.startsWith(prefix)) {
+    const names = texFileNames();
+    state.activeFile = names[0] || null;
+    if (state.activeFile) mountEditor(state.activeFile);
+    else if (state.editorView) { state.editorView.destroy(); state.editorView = null; $("activeFileName").textContent = "—"; }
+  }
+  await refreshAssets();
+}
+
+/* inserta \includegraphics del asset en el punto del cursor */
+function insertAssetSnippet(asset) {
+  if (state.role === "view") return;
+  if (!state.editorView || !state.activeFile || !/\.(tex|sty|cls)$/i.test(state.activeFile)) {
+    alert("Abre un archivo .tex para insertar la referencia.");
+    return;
+  }
+  const ext = fileExt(asset.name);
+  let snippet;
+  if (ext === "pdf") {
+    snippet = `\\includegraphics[page=1,width=\\linewidth]{${asset.name}}\n`;
+  } else {
+    const label = asset.name.split("/").pop().replace(/\.[^.]+$/, "").replace(/[^\w-]/g, "");
+    snippet = `\\begin{figure}[htbp]\n  \\centering\n  \\includegraphics[width=0.8\\linewidth]{${asset.name}}\n  \\caption{Descripción de la figura}\n  \\label{fig:${label}}\n\\end{figure}\n`;
+  }
+  state.editorView.dispatch(state.editorView.state.replaceSelection(snippet));
+  state.editorView.focus();
 }
 
 async function refreshAssets() {
@@ -474,7 +624,9 @@ function appendLog(line) {
 async function compile() {
   if (state.compiling || !state.yFiles) return;
   const texNames = texFileNames();
-  let main = texNames.includes("main.tex") ? "main.tex" : null;
+  let main = null;
+  if (state.project.mainFile && texNames.includes(state.project.mainFile)) main = state.project.mainFile;
+  if (!main && texNames.includes("main.tex")) main = "main.tex";
   if (!main) {
     for (const n of texNames) {
       if (n.endsWith(".tex") && state.yFiles.get(n).toString().includes("\\documentclass")) { main = n; break; }
@@ -492,7 +644,17 @@ async function compile() {
     const files = [];
     for (const name of texNames) files.push({ path: name, contents: state.yFiles.get(name).toString() });
     for (const a of state.assets) {
-      const bytes = await fb.fetchAssetBytes(state.project.id, a);
+      const cacheKey = a.key + ":" + (a.size || 0);
+      let bytes = state.assetCache.get(cacheKey);
+      if (!bytes) {
+        try {
+          bytes = await fb.fetchAssetBytes(state.project.id, a);
+        } catch (err) {
+          throw new Error(`No se pudo descargar "${a.name}" (${err.code || err.message}). ` +
+            "Revisa que las reglas de Storage estén publicadas en la consola de Firebase.");
+        }
+        state.assetCache.set(cacheKey, bytes);
+      }
       files.push({ path: a.name, contents: bytes });
     }
 
@@ -572,6 +734,132 @@ function renderMembers() {
   }
 }
 
+/* ---------- configuración del proyecto ---------- */
+function openSettingsModal() {
+  $("settingsModal").style.display = "grid";
+  const readOnly = state.role === "view";
+  $("setTitle").value = state.project.title;
+  $("setTitle").disabled = readOnly;
+
+  const sel = $("setMainFile");
+  sel.innerHTML = "";
+  const texs = texFileNames().filter(n => n.endsWith(".tex"));
+  const auto = document.createElement("option");
+  auto.value = "";
+  auto.textContent = "Automático (main.tex o el primero con \\documentclass)";
+  sel.appendChild(auto);
+  for (const n of texs) {
+    const o = document.createElement("option");
+    o.value = n; o.textContent = n;
+    sel.appendChild(o);
+  }
+  sel.value = state.project.mainFile && texs.includes(state.project.mainFile) ? state.project.mainFile : "";
+  sel.disabled = readOnly;
+  $("btnSaveSettings").style.display = readOnly ? "none" : "";
+  $("setSavedMsg").textContent = "";
+
+  if (state.membersUnsub) state.membersUnsub();
+  state.membersUnsub = fb.watchMembers(state.project.id, members => {
+    state.project.members = members;
+    renderSettingsMembers();
+  });
+  renderSettingsMembers();
+  renderDangerZone();
+}
+
+function closeSettingsModal() {
+  $("settingsModal").style.display = "none";
+  if (state.membersUnsub) { state.membersUnsub(); state.membersUnsub = null; }
+}
+
+async function saveSettings() {
+  const title = $("setTitle").value.trim().slice(0, 140) || state.project.title;
+  const mainFile = $("setMainFile").value || null;
+  try {
+    await fb.updateProjectMeta(state.project.id, { title, mainFile });
+  } catch (e) {
+    $("setSavedMsg").textContent = "No se pudo guardar: " + (e.code || e.message);
+    $("setSavedMsg").style.color = "#c0392b";
+    return;
+  }
+  state.project.title = title;
+  state.project.mainFile = mainFile;
+  $("edTitle").textContent = title;
+  $("setSavedMsg").textContent = "✓ Cambios guardados";
+  $("setSavedMsg").style.color = "#0d9488";
+  setTimeout(() => { $("setSavedMsg").textContent = ""; }, 2500);
+}
+
+function renderSettingsMembers() {
+  const cont = $("setMembersList");
+  if (!cont || $("settingsModal").style.display === "none") return;
+  cont.innerHTML = "";
+  const iAmOwner = state.role === "owner";
+  for (const m of state.project.members || []) {
+    const row = document.createElement("div");
+    row.className = "member-row";
+    const manageable = iAmOwner && m.role !== "owner";
+    row.innerHTML = `
+      <span class="member-avatar" style="background:${colorForUid(m.uid)}">${escapeHtml((m.name || "?").charAt(0).toUpperCase())}</span>
+      <div class="member-info">
+        <span class="member-name">${escapeHtml(m.name)}${m.uid === state.user.uid ? " (tú)" : ""}</span>
+      </div>
+      ${manageable
+        ? `<select class="set-role">
+             <option value="edit"${m.role === "edit" ? " selected" : ""}>Puede editar</option>
+             <option value="view"${m.role === "view" ? " selected" : ""}>Solo lectura</option>
+           </select>
+           <button class="mini-btn set-kick">Quitar</button>`
+        : `<span class="member-role">${ROLE_LABEL[m.role] || m.role}</span>`}`;
+    const roleSel = row.querySelector(".set-role");
+    if (roleSel) roleSel.onchange = async () => {
+      try { await fb.setMemberRole(state.project.id, m.uid, roleSel.value); }
+      catch (e) { alert("No se pudo cambiar el rol: " + (e.code || e.message)); roleSel.value = m.role; }
+    };
+    const kick = row.querySelector(".set-kick");
+    if (kick) kick.onclick = async () => {
+      if (!confirm(`¿Quitar a ${m.name} del proyecto?`)) return;
+      try { await fb.removeMember(state.project.id, m.uid); }
+      catch (e) { alert("No se pudo quitar al miembro: " + (e.code || e.message)); }
+    };
+    cont.appendChild(row);
+  }
+}
+
+function renderDangerZone() {
+  const cont = $("setDanger");
+  cont.innerHTML = "";
+  const btn = document.createElement("button");
+  btn.className = "btn-danger";
+  if (state.role === "owner") {
+    btn.textContent = "Eliminar proyecto";
+    btn.onclick = async () => {
+      if (!confirm(`¿Eliminar el proyecto "${state.project.title}"? Esta acción no se puede deshacer.`)) return;
+      const pid = state.project.id;
+      closeSettingsModal();
+      try { await fb.deleteProject(pid); }
+      catch (e) { alert("No se pudo eliminar: " + (e.code || e.message)); return; }
+      history.pushState({}, "", location.pathname);
+      teardownEditor();
+      showDashboard();
+    };
+    cont.appendChild(btn);
+  } else {
+    btn.textContent = "Abandonar proyecto";
+    btn.onclick = async () => {
+      if (!confirm(`¿Salir del proyecto "${state.project.title}"? Perderás el acceso (podrás volver si te comparten un enlace).`)) return;
+      const pid = state.project.id;
+      closeSettingsModal();
+      try { await fb.leaveProject(pid, state.user.uid); }
+      catch (e) { alert("No se pudo abandonar el proyecto: " + (e.code || e.message)); return; }
+      history.pushState({}, "", location.pathname);
+      teardownEditor();
+      showDashboard();
+    };
+    cont.appendChild(btn);
+  }
+}
+
 function copyToClipboard(text, btn) {
   navigator.clipboard.writeText(text).then(() => {
     const orig = btn.textContent;
@@ -644,35 +932,33 @@ function wireEvents() {
   $("btnRecompile").onclick = compile;
   $("btnShare").onclick = openShareModal;
 
-  // editor: archivos
-  $("btnNewFile").onclick = () => {
-    let name = prompt("Nombre del nuevo archivo (p. ej. seccion1.tex):", "nuevo.tex");
-    if (!name) return;
-    name = name.trim();
-    if (state.yFiles.has(name)) { alert("Ya existe un archivo con ese nombre."); return; }
-    const t = new Y.Text();
-    state.yFiles.set(name, t);
-    mountEditor(name);
-  };
-  $("btnUploadFile").onclick = () => $("fileUploadInput").click();
+  // editor: archivos y carpetas
+  $("btnNewFile").onclick = () => newFileIn("");
+  $("btnNewFolder").onclick = () => newFolderIn("");
+  $("btnUploadFile").onclick = () => { state.uploadPrefix = ""; $("fileUploadInput").click(); };
   $("fileUploadInput").onchange = async e => {
     const TEXT_EXT = ["tex", "bib", "txt", "sty", "cls", "md", "csv", "dat"];
+    const prefix = state.uploadPrefix || "";
     for (const f of e.target.files) {
-      const ext = f.name.split(".").pop().toLowerCase();
+      // espacios → _ : LaTeX no acepta espacios en \includegraphics
+      const name = cleanPath(prefix + f.name.trim().replace(/\s+/g, "_"));
+      if (!name) continue;
+      const ext = fileExt(name);
       try {
         if (TEXT_EXT.includes(ext)) {
           const text = await f.text();
           const t = new Y.Text();
           t.insert(0, text);
-          state.yFiles.set(f.name, t);
+          state.yFiles.set(name, t);
         } else {
-          await fb.uploadAsset(state.project.id, f.name, await f.arrayBuffer());
+          await fb.uploadAsset(state.project.id, name, await f.arrayBuffer());
         }
       } catch (err) {
-        alert("Error al subir " + f.name + ": " + err.message);
+        alert("Error al subir " + name + ": " + err.message);
       }
     }
     e.target.value = "";
+    state.uploadPrefix = "";
     await refreshAssets();
   };
 
@@ -689,6 +975,12 @@ function wireEvents() {
   $("shareModal").onclick = e => { if (e.target === $("shareModal")) closeShareModal(); };
   $("btnCloseShare").onclick = closeShareModal;
   $("btnInvite").onclick = () => invite().catch(err => alert(err.message));
+
+  // modal configuración
+  $("btnSettings").onclick = openSettingsModal;
+  $("settingsModal").onclick = e => { if (e.target === $("settingsModal")) closeSettingsModal(); };
+  $("btnCloseSettings").onclick = closeSettingsModal;
+  $("btnSaveSettings").onclick = saveSettings;
 
   window.addEventListener("beforeunload", () => { if (state.provider) state.provider.destroy(); });
 }

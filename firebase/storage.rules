@@ -2,11 +2,16 @@ rules_version = '2';
 // Storage: binarios de proyectos (imágenes, PDFs incluidos).
 // El id de proyecto es aleatorio e inguessable; el control fino de
 // pertenencia vive en las reglas de Realtime Database.
+// {fileName=**} admite subcarpetas (p. ej. figuras/logo.png).
+// OJO: request.resource solo existe en escrituras — evaluarlo en una
+// lectura hace fallar la regla (storage/unauthorized), por eso read
+// y write van separados.
 service firebase.storage {
   match /b/{bucket}/o {
-    match /projects/{pid}/assets/{fileName} {
-      allow read, write: if request.auth != null
-                         && (request.resource == null || request.resource.size < 40 * 1024 * 1024);
+    match /projects/{pid}/assets/{fileName=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+                   && (request.resource == null || request.resource.size < 40 * 1024 * 1024);
     }
     match /{allPaths=**} {
       allow read, write: if false;

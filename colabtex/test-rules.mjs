@@ -86,6 +86,27 @@ await allowed("editor duplica el proyecto (como suyo)", async () => {
   await fb.deleteProject(dupId);
 });
 
+console.log("— Configuración y membresías —");
+await allowed("editor fija el archivo principal", () => fb.updateProjectMeta(pid, { mainFile: "main.tex" }));
+await denied("editor NO se autoasciende a owner", () =>
+  set(ref(db, `projects/${pid}/members/${userB.uid}/role`), "owner"));
+await allowed("editor abandona el proyecto", () => fb.leaveProject(pid, userB.uid));
+await denied("tras abandonar ya no lee meta", () => get(ref(db, `projects/${pid}/meta`)));
+await allowed("B se vuelve a unir con la invitación", async () => {
+  const r = await fb.joinWithToken(pid, invite.token, { uid: userB.uid, userName: "Beto" });
+  if (r !== "edit") throw new Error("rol inesperado: " + r);
+});
+
+await loginAs(A);
+await allowed("owner cambia el rol de B a view", () => fb.setMemberRole(pid, userB.uid, "view"));
+await allowed("owner devuelve el rol edit a B", () => fb.setMemberRole(pid, userB.uid, "edit"));
+await allowed("owner quita a B del proyecto", () => fb.removeMember(pid, userB.uid));
+
+await loginAs(B);
+await denied("B expulsado no lee el documento", () => get(ref(db, `projects/${pid}/doc/snapshot`)));
+await allowed("B se reincorpora con la invitación", () =>
+  fb.joinWithToken(pid, invite.token, { uid: userB.uid, userName: "Beto" }));
+
 console.log("— Sincronización Yjs completa entre A y B (con reglas) —");
 const docB = new Y.Doc();
 const provB = new RtdbProvider(pid, docB);

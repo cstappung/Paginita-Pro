@@ -124,7 +124,7 @@ export async function getProject(pid, uid) {
   }
   return {
     id: pid, title: meta.title, ownerId: meta.owner, ownerName: meta.ownerName,
-    updatedAt: meta.updatedAt, role, tokens,
+    updatedAt: meta.updatedAt, mainFile: meta.mainFile || null, role, tokens,
     members: Object.entries(members || {}).map(([id, m]) => ({ uid: id, name: m.name, role: m.role }))
   };
 }
@@ -135,6 +135,33 @@ export function touchProject(pid) {
 
 export function renameProject(pid, title) {
   return update(ref(db, `projects/${pid}/meta`), { title, updatedAt: serverTimestamp() });
+}
+
+/* title y/o mainFile (null borra la preferencia de archivo principal) */
+export function updateProjectMeta(pid, { title, mainFile }) {
+  const fields = { updatedAt: serverTimestamp() };
+  if (title !== undefined) fields.title = title;
+  if (mainFile !== undefined) fields.mainFile = mainFile;
+  return update(ref(db, `projects/${pid}/meta`), fields);
+}
+
+/* ---------- miembros (configuración) ---------- */
+export function setMemberRole(pid, memberUid, role) {
+  return set(ref(db, `projects/${pid}/members/${memberUid}/role`), role);
+}
+
+export function removeMember(pid, memberUid) {
+  return update(ref(db), {
+    [`projects/${pid}/members/${memberUid}`]: null,
+    [`userProjects/${memberUid}/${pid}`]: null
+  });
+}
+
+export function leaveProject(pid, uid) {
+  return update(ref(db), {
+    [`projects/${pid}/members/${uid}`]: null,
+    [`userProjects/${uid}/${pid}`]: null
+  });
 }
 
 export async function deleteProject(pid) {

@@ -3,6 +3,11 @@
 Pasos en la [consola de Firebase](https://console.firebase.google.com/project/mi-pagina-pro)
 (una sola vez). El inicio de sesión con Google ya está habilitado.
 
+> **IMPORTANTE:** cada vez que cambie un archivo de reglas en esta carpeta
+> (`database.rules.json` o `storage.rules`) hay que volver a pegarlo y
+> **Publicar** en la consola — el deploy en GitHub Pages NO actualiza las
+> reglas de Firebase.
+
 ## 1. Reglas de Realtime Database (IMPORTANTE)
 
 Tu base de datos está ahora en **modo de prueba** (abierta a cualquiera).

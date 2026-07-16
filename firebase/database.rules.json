@@ -39,7 +39,7 @@
           ".read": "auth != null && data.child(auth.uid).exists()",
           "$member": {
             ".read": "auth != null && auth.uid === $member",
-            ".write": "auth != null && auth.uid === $member && newData.exists() && newData.child('viaToken').isString() && root.child('tokenIndex').child(newData.child('viaToken').val()).child('pid').val() === $pid && root.child('tokenIndex').child(newData.child('viaToken').val()).child('role').val() === newData.child('role').val()"
+            ".write": "auth != null && auth.uid === $member && ((!newData.exists() && data.child('role').val() !== 'owner') || (newData.exists() && newData.child('viaToken').isString() && root.child('tokenIndex').child(newData.child('viaToken').val()).child('pid').val() === $pid && root.child('tokenIndex').child(newData.child('viaToken').val()).child('role').val() === newData.child('role').val()))"
           }
         },
 

@@ -79,9 +79,12 @@
   .file-entry.file-active{background:#243244;color:#e2ecf5}
   .file-badge{flex-shrink:0;font-family:'IBM Plex Mono',monospace;font-size:8.5px;font-weight:500;letter-spacing:0.03em;border:1px solid;border-radius:3px;padding:1px 3px;opacity:0.85}
   .file-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
-  .file-del{display:none;border:none;background:transparent;color:#8fa3b8;cursor:pointer;font-size:11px;padding:0 2px;flex-shrink:0}
-  .file-entry:hover .file-del{display:block}
+  .file-act{display:none;border:none;background:transparent;color:#8fa3b8;cursor:pointer;font-size:11px;padding:0 2px;flex-shrink:0}
+  .file-entry:hover .file-act{display:block}
+  .file-act:hover{color:#7ee0c2}
   .file-del:hover{color:#e57373}
+  .folder-entry{color:#c3d2cf;font-weight:600}
+  .folder-arrow{flex-shrink:0;width:12px;font-size:10px;color:#5f7285}
 
   /* editor de código */
   .ed-code{flex:1.15;min-width:0;display:flex;flex-direction:column;background:#141c24;border-right:1px solid #223140}
@@ -145,6 +148,18 @@
   .section-label{font-size:10.5px;font-weight:700;letter-spacing:0.08em;color:#8a97a3;margin:14px 0 4px}
   #nameInput{width:100%;height:36px;padding:0 12px;border:1px solid #d4dce2;border-radius:6px;font-family:'IBM Plex Sans',sans-serif;font-size:13px;outline:none;margin:10px 0 16px}
   #nameInput:focus{border-color:#0d9488}
+
+  /* configuración del proyecto */
+  .set-label{display:block;font-size:12px;font-weight:600;color:#42505c;margin:10px 0 4px}
+  .set-input{width:100%;height:34px;padding:0 12px;border:1px solid #d4dce2;border-radius:6px;background:#fff;font-family:'IBM Plex Sans',sans-serif;font-size:12.5px;color:#1f2933;outline:none}
+  .set-input:focus{border-color:#0d9488}
+  select.set-input{padding:0 8px}
+  #btnSaveSettings{height:32px;padding:0 16px;border:none;border-radius:6px;background:#0d9488;color:#fff;font-size:12.5px;font-weight:600;cursor:pointer;margin-top:12px}
+  #btnSaveSettings:hover{background:#0f766e}
+  #setSavedMsg{display:inline-block;margin-left:10px;font-size:12px}
+  .set-role{height:28px;border:1px solid #d4dce2;border-radius:6px;font-family:'IBM Plex Sans',sans-serif;font-size:11.5px;padding:0 4px;background:#fff;flex-shrink:0}
+  .btn-danger{height:32px;padding:0 16px;border:1px solid #e0b4b4;border-radius:6px;background:#fff;color:#c0392b;font-size:12.5px;font-weight:600;cursor:pointer;margin-top:6px}
+  .btn-danger:hover{background:#fdf2f2;border-color:#c0392b}
 </style>
 </head>
 <body>
@@ -216,6 +231,7 @@
       <span id="readOnlyBadge" style="display:none">Solo lectura</span>
       <div class="ed-right">
         <div id="presenceAvatars"></div>
+        <button id="btnSettings" class="btn-outline-dark" title="Configuración del proyecto">⚙ Configuración</button>
         <button id="btnShare" class="btn-outline-dark">Compartir</button>
         <button id="btnCompile">▶ Compilar</button>
       </div>
@@ -228,7 +244,8 @@
           <span>ARCHIVOS</span>
           <div style="display:flex;gap:2px">
             <button id="btnNewFile" class="tree-btn" title="Nuevo archivo">+</button>
-            <button id="btnUploadFile" class="tree-btn" title="Subir archivos">↑</button>
+            <button id="btnNewFolder" class="tree-btn" title="Nueva carpeta">📁</button>
+            <button id="btnUploadFile" class="tree-btn" title="Subir archivos (imágenes, PDF, .tex…)">↑</button>
             <input id="fileUploadInput" type="file" multiple style="display:none">
           </div>
         </div>
@@ -307,6 +324,29 @@
     <div id="inviteList"></div>
     <div class="section-label">MIEMBROS</div>
     <div id="membersList"></div>
+  </div>
+</div>
+
+<!-- modal configuración del proyecto -->
+<div id="settingsModal" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-head">
+      <span>Configuración del proyecto</span>
+      <button id="btnCloseSettings" class="modal-close">✕</button>
+    </div>
+    <div class="section-label">GENERAL</div>
+    <label class="set-label" for="setTitle">Nombre del proyecto</label>
+    <input id="setTitle" class="set-input" maxlength="140">
+    <label class="set-label" for="setMainFile">Archivo principal de compilación</label>
+    <select id="setMainFile" class="set-input"></select>
+    <div>
+      <button id="btnSaveSettings">Guardar cambios</button>
+      <span id="setSavedMsg"></span>
+    </div>
+    <div class="section-label">MIEMBROS</div>
+    <div id="setMembersList"></div>
+    <div class="section-label" style="color:#c0392b">ZONA DE PELIGRO</div>
+    <div id="setDanger"></div>
   </div>
 </div>
 

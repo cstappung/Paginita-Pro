@@ -55,12 +55,15 @@ npm run build      # re-empaqueta src/ → colabtex-app.js + colabtex-pdf-worker
 ```
 users/<uid>                      perfil (nombre, foto, color)
 userProjects/<uid>/<pid>: true   índice de proyectos del usuario
-projects/<pid>/meta              título, propietario, fechas
+projects/<pid>/meta              título, propietario, fechas, mainFile (archivo principal)
 projects/<pid>/members/<uid>     {name, role: owner|edit|view, viaToken}
 projects/<pid>/tokens            {edit, view}   (solo visibles para editores)
 projects/<pid>/invites/<token>   invitaciones por correo
 projects/<pid>/doc/snapshot      estado Yjs consolidado (base64)
 projects/<pid>/doc/updates/<k>   cambios incrementales (se compactan cada ~80)
+                                 (el Y.Doc guarda dos mapas: "files" ruta→texto
+                                  y "folders" ruta→true para carpetas vacías;
+                                  las rutas pueden llevar subcarpetas: cap1/intro.tex)
 projects/<pid>/assetsIndex/<k>   índice de binarios (storage o base64)
 tokenIndex/<token>               {pid, role} — unirse por enlace
 presence/<pid>/<clientID>        cursores y presencia (se limpia al desconectar)
