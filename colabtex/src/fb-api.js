@@ -61,18 +61,29 @@ export async function createProject({ title, uid, userName, files }) {
   const snapshot = b64FromBytes(Y.encodeStateAsUpdate(doc));
   doc.destroy();
 
-  const updates = {};
-  updates[`projects/${pid}/meta`] = {
-    title, owner: uid, ownerName: userName,
-    createdAt: serverTimestamp(), updatedAt: serverTimestamp()
-  };
-  updates[`projects/${pid}/members/${uid}`] = { name: userName, role: "owner", addedAt: serverTimestamp() };
-  updates[`projects/${pid}/tokens`] = tokens;
-  updates[`projects/${pid}/doc/snapshot`] = snapshot;
-  updates[`userProjects/${uid}/${pid}`] = true;
-  updates[`tokenIndex/${tokens.edit}`] = { pid, role: "edit" };
-  updates[`tokenIndex/${tokens.view}`] = { pid, role: "view" };
-  await update(ref(db), updates);
+  // 1) el proyecto completo en UNA sola escritura: las reglas ven al creador
+  //    como owner dentro del mismo newData (un update multi-ruta se valida
+  //    ruta por ruta y fallaría con permission_denied)
+  await set(ref(db, `projects/${pid}`), {
+    meta: {
+      title, owner: uid, ownerName: userName,
+      createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+    },
+    members: { [uid]: { name: userName, role: "owner", addedAt: serverTimestamp() } },
+    tokens,
+    doc: { snapshot }
+  });
+  // 2) índices (ya somos miembros, las reglas lo permiten)
+  try {
+    await update(ref(db), {
+      [`userProjects/${uid}/${pid}`]: true,
+      [`tokenIndex/${tokens.edit}`]: { pid, role: "edit" },
+      [`tokenIndex/${tokens.view}`]: { pid, role: "view" }
+    });
+  } catch (e) {
+    await remove(ref(db, `projects/${pid}`)).catch(() => {});
+    throw e;
+  }
   return pid;
 }
 
@@ -80,10 +91,15 @@ export async function listProjects(uid) {
   const idx = (await get(ref(db, "userProjects/" + uid))).val() || {};
   const out = [];
   await Promise.all(Object.keys(idx).map(async pid => {
-    const [meta, members] = await Promise.all([
-      get(ref(db, `projects/${pid}/meta`)).then(s => s.val()),
-      get(ref(db, `projects/${pid}/members`)).then(s => s.val())
-    ]);
+    let meta, members;
+    try {
+      [meta, members] = await Promise.all([
+        get(ref(db, `projects/${pid}/meta`)).then(s => s.val()),
+        get(ref(db, `projects/${pid}/members`)).then(s => s.val())
+      ]);
+    } catch (e) {
+      return; // proyecto borrado o acceso revocado: se omite del listado
+    }
     if (!meta) return;
     out.push({
       id: pid, title: meta.title, ownerId: meta.owner, ownerName: meta.ownerName,
@@ -157,18 +173,26 @@ export async function duplicateProject(pid, { uid, userName }) {
 
   const newPid = push(ref(db, "projects")).key;
   const tokens = { edit: randToken(), view: randToken() };
-  const updates = {};
-  updates[`projects/${newPid}/meta`] = {
-    title: (meta ? meta.title : "Proyecto") + " (copia)", owner: uid, ownerName: userName,
-    createdAt: serverTimestamp(), updatedAt: serverTimestamp()
-  };
-  updates[`projects/${newPid}/members/${uid}`] = { name: userName, role: "owner", addedAt: serverTimestamp() };
-  updates[`projects/${newPid}/tokens`] = tokens;
-  updates[`projects/${newPid}/doc/snapshot`] = snapshot;
-  updates[`userProjects/${uid}/${newPid}`] = true;
-  updates[`tokenIndex/${tokens.edit}`] = { pid: newPid, role: "edit" };
-  updates[`tokenIndex/${tokens.view}`] = { pid: newPid, role: "view" };
-  await update(ref(db), updates);
+  // igual que en createProject: primero el proyecto entero, luego los índices
+  await set(ref(db, `projects/${newPid}`), {
+    meta: {
+      title: (meta ? meta.title : "Proyecto") + " (copia)", owner: uid, ownerName: userName,
+      createdAt: serverTimestamp(), updatedAt: serverTimestamp()
+    },
+    members: { [uid]: { name: userName, role: "owner", addedAt: serverTimestamp() } },
+    tokens,
+    doc: { snapshot }
+  });
+  try {
+    await update(ref(db), {
+      [`userProjects/${uid}/${newPid}`]: true,
+      [`tokenIndex/${tokens.edit}`]: { pid: newPid, role: "edit" },
+      [`tokenIndex/${tokens.view}`]: { pid: newPid, role: "view" }
+    });
+  } catch (e) {
+    await remove(ref(db, `projects/${newPid}`)).catch(() => {});
+    throw e;
+  }
 
   // copiar assets
   const assetsIdx = (await get(ref(db, `projects/${pid}/assetsIndex`))).val() || {};

@@ -2,8 +2,8 @@
 /* Inicialización de Firebase: Auth (Google), Realtime Database,
    Storage y Analytics (opcional). */
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "firebase/auth";
-import { getDatabase } from "firebase/database";
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, connectAuthEmulator } from "firebase/auth";
+import { getDatabase, connectDatabaseEmulator } from "firebase/database";
 import { getStorage } from "firebase/storage";
 import { getAnalytics, isSupported as analyticsSupported } from "firebase/analytics";
 
@@ -22,6 +22,12 @@ export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getDatabase(app);
 export const storage = getStorage(app);
+
+// Para pruebas locales con el emulador (solo en Node, nunca en el navegador)
+if (typeof process !== "undefined" && process.env && process.env.FIREBASE_EMU) {
+  connectAuthEmulator(auth, "http://127.0.0.1:9099", { disableWarnings: true });
+  connectDatabaseEmulator(db, "127.0.0.1", 9000);
+}
 
 // Analytics solo donde el navegador lo soporta (no rompe en localhost/file)
 analyticsSupported().then(ok => { if (ok) getAnalytics(app); }).catch(() => {});

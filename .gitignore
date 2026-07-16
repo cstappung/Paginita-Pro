@@ -11,3 +11,9 @@ uploads/
 *.log
 Thumbs.db
 desktop.ini
+
+# emulador firebase
+.firebase/
+firebase-debug.log
+database-debug.log
+ui-debug.log

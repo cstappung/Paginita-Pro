@@ -38,6 +38,7 @@
         "members": {
           ".read": "auth != null && data.child(auth.uid).exists()",
           "$member": {
+            ".read": "auth != null && auth.uid === $member",
             ".write": "auth != null && auth.uid === $member && newData.exists() && newData.child('viaToken').isString() && root.child('tokenIndex').child(newData.child('viaToken').val()).child('pid').val() === $pid && root.child('tokenIndex').child(newData.child('viaToken').val()).child('role').val() === newData.child('role').val()"
           }
         },
@@ -66,6 +67,7 @@
     "presence": {
       "$pid": {
         ".read": "auth != null && root.child('projects').child($pid).child('members').child(auth.uid).exists()",
+        ".write": "auth != null && (root.child('projects').child($pid).child('members').child(auth.uid).child('role').val() === 'owner' || !root.child('projects').child($pid).exists())",
         "$client": {
           ".write": "auth != null && root.child('projects').child($pid).child('members').child(auth.uid).exists()"
         }
