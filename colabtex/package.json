@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "esbuild src/main.js --bundle --minify --format=iife --target=es2020 --outfile=../colabtex-app.js && esbuild node_modules/pdfjs-dist/build/pdf.worker.mjs --bundle --minify --format=esm --target=es2020 --outfile=../colabtex-pdf-worker.js",
+    "build": "esbuild src/main.js --bundle --minify --format=iife --target=es2020 --outfile=../colabtex-app.js && esbuild node_modules/pdfjs-dist/build/pdf.worker.mjs --bundle --minify --format=esm --target=es2020 --outfile=../colabtex-pdf-worker.js && node scripts/stamp-version.js",
     "start": "node server/static.js"
   },
   "keywords": [],
