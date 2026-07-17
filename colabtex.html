@@ -160,6 +160,45 @@
   .set-role{height:28px;border:1px solid #d4dce2;border-radius:6px;font-family:'IBM Plex Sans',sans-serif;font-size:11.5px;padding:0 4px;background:#fff;flex-shrink:0}
   .btn-danger{height:32px;padding:0 16px;border:1px solid #e0b4b4;border-radius:6px;background:#fff;color:#c0392b;font-size:12.5px;font-weight:600;cursor:pointer;margin-top:6px}
   .btn-danger:hover{background:#fdf2f2;border-color:#c0392b}
+
+  /* ============ ASISTENTE IA ============ */
+  .ed-ai{width:360px;flex-shrink:0;background:#141c24;border-left:1px solid #223140;display:flex;flex-direction:column;min-width:0}
+  .ai-head{display:flex;align-items:center;justify-content:space-between;gap:8px;height:38px;padding:0 10px 0 14px;border-bottom:1px solid #223140;flex-shrink:0}
+  .ai-title{font-size:12px;font-weight:700;color:#c9b8f5;letter-spacing:0.02em}
+  .ai-model{height:24px;max-width:130px;border:1px solid #2a3a4c;border-radius:5px;background:#182430;color:#aab8c5;font-family:'IBM Plex Sans',sans-serif;font-size:10.5px;padding:0 4px}
+  .ai-icon{width:24px;height:24px;border:none;border-radius:5px;background:transparent;color:#8fa3b8;cursor:pointer;font-size:12px}
+  .ai-icon:hover{background:#223140;color:#e2ecf5}
+
+  .ai-setup{padding:16px 16px;overflow:auto;color:#aab8c5;font-size:12px;line-height:1.6}
+  .ai-setup-lead{margin:0 0 12px}
+  .ai-setup-lead b{color:#d5dee8}
+  .ai-setup-steps{margin:0 0 14px;padding-left:18px;display:flex;flex-direction:column;gap:6px}
+  .ai-setup-steps code{font-family:'IBM Plex Mono',monospace;font-size:11px;color:#c9b8f5}
+  .ai-key-input{width:100%;height:34px;padding:0 10px;border:1px solid #2a3a4c;border-radius:6px;background:#182430;color:#e2ecf5;font-family:'IBM Plex Mono',monospace;font-size:12px;outline:none}
+  .ai-key-input:focus{border-color:#7c5cff}
+  .ai-setup-actions{display:flex;gap:8px;margin-top:10px}
+  .ai-save{flex:1;height:32px;border:none;border-radius:6px;background:#7c5cff;color:#fff;font-size:12px;font-weight:600;cursor:pointer}
+  .ai-save:hover{background:#6a49f0}
+  .ai-clear{height:32px;padding:0 10px;border:1px solid #2a3a4c;border-radius:6px;background:transparent;color:#8fa3b8;font-size:11.5px;cursor:pointer}
+  .ai-clear:hover{border-color:#e57373;color:#e57373}
+  .ai-setup-msg{margin-top:10px;font-size:11.5px;color:#e2c08d;min-height:16px}
+
+  .ai-messages{flex:1;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:10px}
+  .ai-msg{font-size:12.5px;line-height:1.65;border-radius:9px;padding:9px 11px;max-width:100%;word-break:break-word;overflow-wrap:anywhere}
+  .ai-user{background:#243244;color:#e2ecf5;align-self:flex-end;border-bottom-right-radius:3px;max-width:88%}
+  .ai-bot{background:#182430;color:#cdd8e3;align-self:flex-start;border:1px solid #223140;border-bottom-left-radius:3px}
+  .ai-thinking{background:transparent;color:#7488a0;font-style:italic;padding:2px 4px}
+  .ai-error{background:#2a1a1a;color:#f0a5a5;border:1px solid #5a3030;white-space:pre-wrap}
+  .ai-bot code,.ai-user code{font-family:'IBM Plex Mono',monospace;font-size:11px;background:rgba(124,92,255,0.16);color:#c9b8f5;padding:1px 4px;border-radius:3px}
+  .ai-code{font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.55;background:#0f151b;border:1px solid #223140;border-radius:6px;padding:8px 10px;margin:6px 0;overflow-x:auto;white-space:pre;color:#d5dee8}
+  .ai-chip{align-self:flex-start;font-size:11px;color:#8b9db0;background:#161f29;border:1px solid #223140;border-radius:20px;padding:3px 10px}
+
+  .ai-composer{flex-shrink:0;display:flex;align-items:flex-end;gap:8px;padding:10px 12px;border-top:1px solid #223140}
+  #aiInput{flex:1;resize:none;max-height:140px;min-height:36px;padding:8px 10px;border:1px solid #2a3a4c;border-radius:8px;background:#182430;color:#e2ecf5;font-family:'IBM Plex Sans',sans-serif;font-size:12.5px;line-height:1.5;outline:none}
+  #aiInput:focus{border-color:#7c5cff}
+  #aiSend{width:36px;height:36px;flex-shrink:0;border:none;border-radius:8px;background:#7c5cff;color:#fff;font-size:14px;cursor:pointer}
+  #aiSend:hover{background:#6a49f0}
+  #aiSend:disabled{background:#3a3550;color:#8b84a8;cursor:default}
 </style>
 </head>
 <body>
@@ -231,6 +270,7 @@
       <span id="readOnlyBadge" style="display:none">Solo lectura</span>
       <div class="ed-right">
         <div id="presenceAvatars"></div>
+        <button id="btnAiToggle" class="btn-outline-dark" title="Asistente IA (Claude)">✦ Asistente</button>
         <button id="btnSettings" class="btn-outline-dark" title="Configuración del proyecto">⚙ Configuración</button>
         <button id="btnShare" class="btn-outline-dark">Compartir</button>
         <button id="btnCompile">▶ Compilar</button>
@@ -286,6 +326,40 @@
           <div id="logContent"></div>
         </div>
       </section>
+
+      <!-- asistente IA -->
+      <aside id="aiPanel" class="ed-ai" style="display:none">
+        <div class="ai-head">
+          <span class="ai-title">✦ Asistente IA</span>
+          <div style="display:flex;gap:5px;align-items:center">
+            <select id="aiModel" class="ai-model" title="Modelo de Claude"></select>
+            <button id="aiSettings" class="ai-icon" title="Cambiar API key">⚙</button>
+            <button id="aiClose" class="ai-icon" title="Cerrar">✕</button>
+          </div>
+        </div>
+
+        <div id="aiSetup" class="ai-setup">
+          <p class="ai-setup-lead">Conecta tu cuenta de Claude con tu propia <b>API key</b>. El uso se cobra a tu cuenta de Anthropic; la clave se guarda solo en <b>este navegador</b> (nada pasa por el servidor de ColabTeX).</p>
+          <ol class="ai-setup-steps">
+            <li>Entra a <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com → API keys</a>.</li>
+            <li>Crea una clave y cópiala (empieza por <code>sk-ant-</code>).</li>
+            <li>Pégala aquí abajo.</li>
+          </ol>
+          <input id="aiKeyInput" type="password" class="ai-key-input" placeholder="sk-ant-…" autocomplete="off">
+          <div class="ai-setup-actions">
+            <button id="aiSaveKey" class="ai-save">Guardar y activar</button>
+            <button id="aiClearKey" class="ai-clear" title="Borrar la clave de este navegador">Borrar clave</button>
+          </div>
+          <div id="aiSetupMsg" class="ai-setup-msg"></div>
+        </div>
+
+        <div id="aiMessages" class="ai-messages" style="display:none"></div>
+
+        <div id="aiComposer" class="ai-composer" style="display:none">
+          <textarea id="aiInput" rows="1" placeholder="Pide algo… (Enter para enviar, Shift+Enter salto de línea)"></textarea>
+          <button id="aiSend" title="Enviar">➤</button>
+        </div>
+      </aside>
     </div>
 
     <footer class="ed-footer">
@@ -350,6 +424,6 @@
   </div>
 </div>
 
-<script src="colabtex-app.js?v=202607172309"></script>
+<script src="colabtex-app.js?v=202607172348"></script>
 </body>
 </html>

@@ -21,6 +21,7 @@ import { RtdbProvider } from "./y-rtdb.js";
 import { colorForUid, colorLight, timeAgo, escapeHtml } from "./util.js";
 import { LatexEngine, summarizeLog } from "./latex.js";
 import { PdfViewer } from "./pdfview.js";
+import { createAssistant } from "./ai-assistant.js";
 
 const $ = id => document.getElementById(id);
 const ROLE_LABEL = { owner: "Propietario", edit: "Puede editar", view: "Solo lectura" };
@@ -97,7 +98,9 @@ const state = {
   engine: null,
   pdfViewer: null,
   compiling: false,
-  membersUnsub: null
+  membersUnsub: null,
+  assistant: null,       // panel de IA (creado en boot)
+  lastCompile: null      // {ok, errors[], warnings[]} para el asistente
 };
 
 /* ================================================ enrutado */
@@ -241,6 +244,8 @@ async function openEditor(projectId, token) {
   $("btnNewFile").style.display = readOnly ? "none" : "";
   $("btnNewFolder").style.display = readOnly ? "none" : "";
   $("btnUploadFile").style.display = readOnly ? "none" : "";
+  state.lastCompile = null;
+  if (state.assistant) state.assistant.reset();
   setSyncBadge("Conectando…", "#e2c08d");
 
   // ---- Yjs sobre Firebase RTDB ----
@@ -317,6 +322,8 @@ function teardownEditor() {
   state.assetCache.clear();
   state.collapsed = new Set();
   state.uploadPrefix = "";
+  state.lastCompile = null;
+  if (state.assistant) state.assistant.close();
   $("logPanel").style.display = "none";
 }
 
@@ -334,6 +341,18 @@ function setStatus(text, color) {
 /* ---------- árbol de archivos ---------- */
 function texFileNames() {
   return Array.from(state.yFiles ? state.yFiles.keys() : []).sort();
+}
+
+/* archivo .tex que se compilará: preferencia del proyecto → main.tex →
+   primero con \documentclass */
+function resolveMainFile() {
+  const texNames = texFileNames();
+  if (state.project && state.project.mainFile && texNames.includes(state.project.mainFile)) return state.project.mainFile;
+  if (texNames.includes("main.tex")) return "main.tex";
+  for (const n of texNames) {
+    if (n.endsWith(".tex") && state.yFiles.get(n).toString().includes("\\documentclass")) return n;
+  }
+  return null;
 }
 
 const fileExt = name => {
@@ -526,6 +545,54 @@ async function refreshAssets() {
   renderFileTree();
 }
 
+/* ---------- puente para el asistente IA (edita el doc Yjs) ---------- */
+function aiWriteFile(path, content) {
+  path = cleanPath(path);
+  if (!path) throw new Error("ruta inválida");
+  if (!/\.(tex|bib|txt|sty|cls|md|csv|dat)$/i.test(path))
+    throw new Error("solo se pueden escribir archivos de texto (.tex, .bib, .sty…)");
+  let t = state.yFiles.get(path);
+  state.ydoc.transact(() => {
+    if (!t) { t = new Y.Text(); t.insert(0, content); state.yFiles.set(path, t); }
+    else { t.delete(0, t.length); t.insert(0, content); }
+  });
+  renderFileTree();
+  if (path === state.activeFile) mountEditor(path);
+  return true;
+}
+
+function aiStrReplace(path, oldStr, newStr) {
+  path = cleanPath(path);
+  const t = state.yFiles.get(path);
+  if (!t) throw new Error("no existe el archivo de texto: " + path);
+  const s = t.toString();
+  const i = s.indexOf(oldStr);
+  if (i < 0) throw new Error("no se encontró el texto a reemplazar en " + path);
+  if (s.indexOf(oldStr, i + 1) >= 0) throw new Error("el texto aparece más de una vez; añade más contexto para que sea único");
+  state.ydoc.transact(() => { t.delete(i, oldStr.length); t.insert(i, newStr); });
+  return true;
+}
+
+function aiCreateFolder(path) {
+  path = cleanPath(path);
+  if (!path) throw new Error("ruta inválida");
+  state.yFolders.set(path, true);
+  state.collapsed.delete(path);
+  renderFileTree();
+  return true;
+}
+
+const aiApi = {
+  isReadOnly: () => state.role === "view",
+  getMainFile: () => resolveMainFile() || "(sin definir)",
+  listFiles: () => ({ tex: texFileNames(), assets: state.assets.map(a => a.name) }),
+  readFile: path => { const t = state.yFiles.get(cleanPath(path)); return t ? t.toString() : null; },
+  writeFile: aiWriteFile,
+  strReplace: aiStrReplace,
+  createFolder: aiCreateFolder,
+  getLastLog: () => state.lastCompile
+};
+
 /* ---------- CodeMirror ---------- */
 const cmTheme = EditorView.theme({
   "&": { backgroundColor: "#141c24", color: "#d5dee8", fontSize: "12.5px", height: "100%" },
@@ -624,14 +691,7 @@ function appendLog(line) {
 async function compile() {
   if (state.compiling || !state.yFiles) return;
   const texNames = texFileNames();
-  let main = null;
-  if (state.project.mainFile && texNames.includes(state.project.mainFile)) main = state.project.mainFile;
-  if (!main && texNames.includes("main.tex")) main = "main.tex";
-  if (!main) {
-    for (const n of texNames) {
-      if (n.endsWith(".tex") && state.yFiles.get(n).toString().includes("\\documentclass")) { main = n; break; }
-    }
-  }
+  const main = resolveMainFile();
   if (!main) { alert("No hay ningún archivo .tex con \\documentclass en el proyecto."); return; }
 
   state.compiling = true;
@@ -669,6 +729,7 @@ async function compile() {
     const result = await state.engine.compile(files, main);
     const secs = ((performance.now() - t0) / 1000).toFixed(1);
     const sum = summarizeLog(result);
+    state.lastCompile = { ok: !!(result.pdf && result.pdf.length > 0), errors: sum.errors, warnings: sum.warnings };
 
     if (result.pdf && result.pdf.length > 0) {
       await state.pdfViewer.load(result.pdf);
@@ -688,6 +749,7 @@ async function compile() {
     setStatus("Error de compilación", "#e57373");
     appendLog("✗ " + err.message);
     $("logPanel").style.display = "flex";
+    state.lastCompile = { ok: false, errors: [err.message], warnings: [] };
   } finally {
     state.compiling = false;
     $("btnCompile").textContent = "▶ Compilar";
@@ -983,6 +1045,10 @@ function wireEvents() {
   $("shareModal").onclick = e => { if (e.target === $("shareModal")) closeShareModal(); };
   $("btnCloseShare").onclick = closeShareModal;
   $("btnInvite").onclick = () => invite().catch(err => alert(err.message));
+
+  // asistente IA
+  state.assistant = createAssistant(aiApi);
+  $("btnAiToggle").onclick = () => state.assistant.toggle();
 
   // modal configuración
   $("btnSettings").onclick = openSettingsModal;
