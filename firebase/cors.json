@@ -1,0 +1,12 @@
+[
+  {
+    "origin": [
+      "https://cstappung.github.io",
+      "http://localhost:8123",
+      "http://127.0.0.1:8123"
+    ],
+    "method": ["GET", "HEAD"],
+    "maxAgeSeconds": 3600,
+    "responseHeader": ["Content-Type", "Content-Range", "Accept-Ranges", "Content-Length"]
+  }
+]

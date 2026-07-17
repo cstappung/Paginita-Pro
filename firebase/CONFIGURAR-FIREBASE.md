@@ -34,6 +34,52 @@ de 2024 pueden no permitir activar Storage. **No pasa nada**: ColabTeX detecta
 el fallo y guarda los archivos binarios (imágenes ≤ 3 MB) dentro de Realtime
 Database automáticamente.
 
+## 2b. CORS de Storage (OBLIGATORIO para descargar imágenes/PDF)
+
+Si el sitio vive en un dominio distinto al de Firebase (p. ej.
+`cstappung.github.io`), el navegador bloquea las descargas de Storage con un
+error **CORS** (`No 'Access-Control-Allow-Origin' header…`). Esto pasa al
+compilar un proyecto que usa una imagen o PDF subido a Storage. Hay que
+autorizar el dominio en el bucket **una sola vez**:
+
+1. Abre [Cloud Shell](https://console.cloud.google.com/?project=mi-pagina-pro&cloudshell=true)
+   (el icono `>_` arriba a la derecha en la consola de Google Cloud). Ya viene
+   con `gcloud`/`gsutil` autenticado a tu proyecto.
+2. Sube el archivo [`cors.json`](cors.json) de esta carpeta (menú `⋮` → *Upload*
+   en Cloud Shell) **o** créalo pegando su contenido con:
+
+   ```
+   cat > cors.json <<'EOF'
+   [
+     {
+       "origin": ["https://cstappung.github.io", "http://localhost:8123", "http://127.0.0.1:8123"],
+       "method": ["GET", "HEAD"],
+       "maxAgeSeconds": 3600,
+       "responseHeader": ["Content-Type", "Content-Range", "Accept-Ranges", "Content-Length"]
+     }
+   ]
+   EOF
+   ```
+
+3. Aplícalo al bucket (ojo: el bucket es `firebasestorage.app`, el que aparece
+   en `storageBucket` de la config):
+
+   ```
+   gcloud storage buckets update gs://mi-pagina-pro.firebasestorage.app --cors-file=cors.json
+   ```
+
+   (Alternativa con la herramienta antigua: `gsutil cors set cors.json gs://mi-pagina-pro.firebasestorage.app`.)
+
+4. Verifica:
+
+   ```
+   gcloud storage buckets describe gs://mi-pagina-pro.firebasestorage.app --format="default(cors_config)"
+   ```
+
+Recarga la página (Ctrl+Shift+R) y vuelve a compilar: las imágenes/PDF ya se
+descargan. Si más adelante cambias de dominio, añádelo a `origin` y repite el
+paso 3.
+
 ## 3. Dominios autorizados para el login
 
 Consola → **Authentication** → **Settings** → **Authorized domains** → *Add domain*:

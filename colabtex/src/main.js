@@ -650,8 +650,16 @@ async function compile() {
         try {
           bytes = await fb.fetchAssetBytes(state.project.id, a);
         } catch (err) {
-          throw new Error(`No se pudo descargar "${a.name}" (${err.code || err.message}). ` +
-            "Revisa que las reglas de Storage estén publicadas en la consola de Firebase.");
+          const code = err.code || err.message || "";
+          // CORS/red: XHR bloqueado antes de recibir cabeceras → sin código útil
+          const isCors = /cors|network|retry-limit|unknown|Failed to fetch/i.test(code) || !err.code;
+          if (isCors && a.loc === "storage") {
+            throw new Error(`No se pudo descargar "${a.name}" de Firebase Storage (bloqueo CORS). ` +
+              "Falta autorizar tu dominio en el bucket: sigue el paso «2b. CORS de Storage» " +
+              "de firebase/CONFIGURAR-FIREBASE.md (una sola vez).");
+          }
+          throw new Error(`No se pudo descargar "${a.name}" (${code}). ` +
+            "Revisa las reglas de Storage en la consola de Firebase.");
         }
         state.assetCache.set(cacheKey, bytes);
       }
