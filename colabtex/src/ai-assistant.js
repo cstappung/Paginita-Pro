@@ -83,11 +83,12 @@ const PROVIDERS = {
     label: "Gemini (Google) — gratis",
     keyStore: "colabtex_key_google",
     keyUrl: "https://aistudio.google.com/apikey",
-    keyHint: "AIza…",
+    keyHint: "AIza… o AQ…",
     free: true,
     models: { "gemini-2.0-flash": "Gemini 2.0 Flash (gratis)", "gemini-1.5-flash": "Gemini 1.5 Flash (gratis)", "gemini-1.5-pro": "Gemini 1.5 Pro" },
     defaultModel: "gemini-2.0-flash",
-    validateKey: k => k.startsWith("AIza"),
+    // Google emite varios formatos de clave (AIza…, AQ.…); no encasillar
+    validateKey: k => k.trim().length >= 20,
     formatTools(defs) {
       const fns = defs.map(d => {
         const fd = { name: d.name, description: d.description };
