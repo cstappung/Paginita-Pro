@@ -165,7 +165,9 @@
   .ed-ai{width:360px;flex-shrink:0;background:#141c24;border-left:1px solid #223140;display:flex;flex-direction:column;min-width:0}
   .ai-head{display:flex;align-items:center;justify-content:space-between;gap:8px;height:38px;padding:0 10px 0 14px;border-bottom:1px solid #223140;flex-shrink:0}
   .ai-title{font-size:12px;font-weight:700;color:#c9b8f5;letter-spacing:0.02em}
-  .ai-model{height:24px;max-width:130px;border:1px solid #2a3a4c;border-radius:5px;background:#182430;color:#aab8c5;font-family:'IBM Plex Sans',sans-serif;font-size:10.5px;padding:0 4px}
+  .ai-subbar{display:flex;gap:6px;padding:6px 10px;border-bottom:1px solid #223140;flex-shrink:0}
+  .ai-provider{flex:1;min-width:0;height:26px;border:1px solid #2a3a4c;border-radius:5px;background:#182430;color:#c9b8f5;font-family:'IBM Plex Sans',sans-serif;font-size:11px;padding:0 4px}
+  .ai-model{flex:1;min-width:0;height:26px;border:1px solid #2a3a4c;border-radius:5px;background:#182430;color:#aab8c5;font-family:'IBM Plex Sans',sans-serif;font-size:11px;padding:0 4px}
   .ai-icon{width:24px;height:24px;border:none;border-radius:5px;background:transparent;color:#8fa3b8;cursor:pointer;font-size:12px}
   .ai-icon:hover{background:#223140;color:#e2ecf5}
 
@@ -332,20 +334,20 @@
         <div class="ai-head">
           <span class="ai-title">✦ Asistente IA</span>
           <div style="display:flex;gap:5px;align-items:center">
-            <select id="aiModel" class="ai-model" title="Modelo de Claude"></select>
-            <button id="aiSettings" class="ai-icon" title="Cambiar API key">⚙</button>
+            <button id="aiSettings" class="ai-icon" title="Cambiar proveedor / API key">⚙</button>
             <button id="aiClose" class="ai-icon" title="Cerrar">✕</button>
           </div>
         </div>
 
+        <div class="ai-subbar">
+          <select id="aiProvider" class="ai-provider" title="Proveedor de IA"></select>
+          <select id="aiModel" class="ai-model" title="Modelo"></select>
+        </div>
+
         <div id="aiSetup" class="ai-setup">
-          <p class="ai-setup-lead">Conecta tu cuenta de Claude con tu propia <b>API key</b>. El uso se cobra a tu cuenta de Anthropic; la clave se guarda solo en <b>este navegador</b> (nada pasa por el servidor de ColabTeX).</p>
-          <ol class="ai-setup-steps">
-            <li>Entra a <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com → API keys</a>.</li>
-            <li>Crea una clave y cópiala (empieza por <code>sk-ant-</code>).</li>
-            <li>Pégala aquí abajo.</li>
-          </ol>
-          <input id="aiKeyInput" type="password" class="ai-key-input" placeholder="sk-ant-…" autocomplete="off">
+          <p id="aiSetupLead" class="ai-setup-lead"></p>
+          <ol id="aiSetupSteps" class="ai-setup-steps"></ol>
+          <input id="aiKeyInput" type="password" class="ai-key-input" placeholder="…" autocomplete="off">
           <div class="ai-setup-actions">
             <button id="aiSaveKey" class="ai-save">Guardar y activar</button>
             <button id="aiClearKey" class="ai-clear" title="Borrar la clave de este navegador">Borrar clave</button>
@@ -424,6 +426,6 @@
   </div>
 </div>
 
-<script src="colabtex-app.js?v=202607172348"></script>
+<script src="colabtex-app.js?v=202607180000"></script>
 </body>
 </html>
