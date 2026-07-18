@@ -425,7 +425,11 @@ export function createAssistant(api) {
       }
     } catch (e) {
       if (e.status === 401 || e.status === 403) addError("Tu API key no es válida, expiró o no tiene permiso. Vuelve a configurarla con ⚙.");
-      else if (e.status === 429) addError("Límite de uso alcanzado (429). " + (adapter().free ? "Agotaste la cuota gratuita de hoy; vuelve mañana o usa otro proveedor." : "Revisa el saldo/límites de tu cuenta.") + "\n" + (e.message || ""));
+      else if (e.status === 429 && /limit:\s*0/.test(e.message || ""))
+        addError("La capa gratuita NO está activada para el proyecto de tu API key (limit: 0). No es que hayas agotado la cuota: ese proyecto no tiene cuota gratuita.\n\n" +
+          "Solución: crea la clave en AI Studio con una cuenta de Gmail PERSONAL (no institucional/UC) y elige «crear en un proyecto nuevo». " +
+          "Las cuentas de universidad suelen tener la capa gratuita bloqueada. También puedes probar el modelo gemini-1.5-flash.");
+      else if (e.status === 429) addError("Límite de uso alcanzado (429). " + (adapter().free ? "Agotaste la cuota gratuita del momento; espera unos minutos o vuelve más tarde." : "Revisa el saldo/límites de tu cuenta.") + "\n" + (e.message || ""));
       else if (e.status === 400 || e.status === 404) addError("La API rechazó la solicitud (" + e.status + "): " + e.message + "\nQuizá el nombre del modelo no está disponible en tu cuenta; prueba otro modelo.");
       else addError("No se pudo contactar al modelo: " + (e.message || String(e)) + "\nRevisa tu conexión y que la API key sea correcta.");
     } finally {
