@@ -29,6 +29,15 @@
   .btn-primary:hover{background:#0f766e}
   .btn-secondary{height:32px;border:1px solid #d4dce2;border-radius:6px;background:#fff;color:#42505c;font-size:12.5px;font-weight:600;cursor:pointer}
   .btn-secondary:hover{border-color:#0d9488;color:#0d9488;background:#f7fbfa}
+  .btn-secondary:disabled{opacity:0.5;cursor:default;border-color:#e2e8ec;color:#8a97a3;background:#fff}
+  .local-recents{display:flex;flex-direction:column;gap:2px;margin-bottom:14px}
+  .local-recent{display:flex;align-items:center;gap:4px;padding:4px 8px;border-radius:5px;font-size:11.5px;color:#5a6772}
+  .local-recent:hover{background:#eef3f2}
+  .local-recent-name{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+  .local-recent-name:hover{color:#0d9488}
+  .local-recent-x{border:none;background:transparent;color:#b3bec7;cursor:pointer;font-size:11px;padding:0 2px;flex-shrink:0}
+  .local-recent-x:hover{color:#c0392b}
+  .local-note{font-size:11px;color:#8a97a3;line-height:1.5;padding:4px 2px}
   .nav-item{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-radius:6px;font-size:12.5px;cursor:pointer;color:#42505c}
   .nav-item:hover{background:#eef3f2}
   .nav-item.nav-active{background:#e9f4f2;color:#0d9488;font-weight:600}
@@ -233,6 +242,9 @@
       </button>
       <div id="loginError" style="min-height:18px;font-size:12px;color:#c0392b;margin-top:12px"></div>
       <div style="font-size:11px;color:#8a97a3;margin-top:8px">Tu cuenta se crea automáticamente la primera vez que entras.</div>
+      <div style="display:flex;align-items:center;gap:10px;margin:18px 0 14px"><span style="flex:1;height:1px;background:#e2e8ec"></span><span style="font-size:11px;color:#8a97a3">o sin cuenta</span><span style="flex:1;height:1px;background:#e2e8ec"></span></div>
+      <button id="btnLocalNoAccount" class="btn-secondary" style="width:100%;height:38px" title="Editar una carpeta de tu disco, sin nube ni cuenta">📂 Abrir una carpeta local</button>
+      <div id="localLoginNote" style="font-size:11px;color:#8a97a3;margin-top:8px;line-height:1.5">Edita y compila en tu equipo. Sin colaboración ni respaldo en la nube.</div>
     </div>
   </div>
 
@@ -253,8 +265,10 @@
     <div class="dash-body">
       <aside class="dash-aside">
         <button id="btnNewProject" class="btn-primary" style="margin-bottom:8px">Nuevo proyecto +</button>
-        <button id="btnNewFromZip" class="btn-secondary" style="margin-bottom:14px" title="Crear un proyecto desde un .zip (p. ej. export de Overleaf)">📦 Importar .zip</button>
+        <button id="btnNewFromZip" class="btn-secondary" style="margin-bottom:6px" title="Crear un proyecto desde un .zip (p. ej. export de Overleaf)">📦 Importar .zip</button>
+        <button id="btnOpenLocal" class="btn-secondary" style="margin-bottom:6px" title="Editar una carpeta de tu disco, sin nube">📂 Abrir carpeta local</button>
         <input id="zipNewInput" type="file" accept=".zip,application/zip" style="display:none">
+        <div id="localRecents" class="local-recents"></div>
         <div id="navAll" class="nav-item nav-active"><span>Todos los proyectos</span><span id="cntAll" class="nav-count"></span></div>
         <div id="navMine" class="nav-item"><span>Tus proyectos</span><span id="cntMine" class="nav-count"></span></div>
         <div id="navShared" class="nav-item"><span>Compartidos contigo</span><span id="cntShared" class="nav-count"></span></div>
@@ -285,7 +299,8 @@
       <span id="readOnlyBadge" style="display:none">Solo lectura</span>
       <div class="ed-right">
         <div id="presenceAvatars"></div>
-        <button id="btnAiToggle" class="btn-outline-dark" title="Asistente IA (Claude)">✦ Asistente</button>
+        <button id="btnReloadLocal" class="btn-outline-dark" style="display:none" title="Volver a leer los archivos desde el disco">⟲ Recargar</button>
+        <button id="btnAiToggle" class="btn-outline-dark" title="Asistente IA (Claude, Gemini o ChatGPT)">✦ Asistente</button>
         <button id="btnSettings" class="btn-outline-dark" title="Configuración del proyecto">⚙ Configuración</button>
         <button id="btnShare" class="btn-outline-dark">Compartir</button>
         <button id="btnCompile">▶ Compilar</button>
@@ -447,6 +462,6 @@
   </div>
 </div>
 
-<script src="colabtex-app.js?v=202607210332"></script>
+<script src="colabtex-app.js?v=202607210351"></script>
 </body>
 </html>

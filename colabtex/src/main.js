@@ -24,6 +24,7 @@ import { PdfViewer } from "./pdfview.js";
 import { createAssistant } from "./ai-assistant.js";
 import { readZip, foldersOf, titleFromZip } from "./zip-import.js";
 import { initLayout } from "./layout.js";
+import * as lfs from "./local-fs.js";
 
 const $ = id => document.getElementById(id);
 const ROLE_LABEL = { owner: "Propietario", edit: "Puede editar", view: "Solo lectura" };
@@ -102,7 +103,15 @@ const state = {
   compiling: false,
   membersUnsub: null,
   assistant: null,       // panel de IA (creado en boot)
-  lastCompile: null      // {ok, errors[], warnings[]} para el asistente
+  lastCompile: null,     // {ok, errors[], warnings[]} para el asistente
+  // ---- modo LOCAL (carpeta del disco, sin nube) ----
+  mode: "cloud",         // "cloud" | "local"
+  dirHandle: null,       // FileSystemDirectoryHandle de la carpeta abierta
+  localContent: new Map(), // ruta → texto (espejo en memoria del disco)
+  localHandles: new Map(), // ruta → FileSystemFileHandle (archivos de texto)
+  localFolders: new Set(),
+  dirty: new Set(),      // rutas pendientes de escribir a disco
+  saveTimer: null
 };
 
 /* ================================================ enrutado */
@@ -110,6 +119,13 @@ function route() {
   const params = new URLSearchParams(location.search);
   const p = params.get("p");
   const t = params.get("t");
+  // ?local=1 solo es válido con una carpeta ya abierta (los handles no viven en la URL)
+  if (params.get("local")) {
+    if (state.mode === "local" && state.dirHandle) return;
+    history.replaceState({}, "", location.pathname);
+    showDashboard();
+    return;
+  }
   if (p) openEditor(p, t);
   else showDashboard();
 }
@@ -122,6 +138,10 @@ function showLogin() {
   $("viewEditor").style.display = "none";
   $("viewLogin").style.display = "grid";
   $("loginError").textContent = "";
+  if (!lfs.isSupported()) {
+    $("btnLocalNoAccount").disabled = true;
+    $("localLoginNote").textContent = "Abrir carpetas locales requiere Chrome, Edge u Opera de escritorio (tu navegador no lo permite).";
+  }
 }
 
 async function doLogin() {
@@ -145,6 +165,7 @@ async function showDashboard() {
   const av = $("dashUserAvatar");
   if (u.photo) av.innerHTML = `<img src="${escapeHtml(u.photo)}" alt="" referrerpolicy="no-referrer" style="width:100%;height:100%;border-radius:50%;object-fit:cover">`;
   else { av.textContent = (u.name || "?").charAt(0).toUpperCase(); av.style.background = u.color; }
+  renderLocalRecents();
   $("projectRows").innerHTML = '<div style="padding:16px;font-size:12.5px;color:#8a97a3">Cargando proyectos…</div>';
   try {
     state.projects = await fb.listProjects(u.uid);
@@ -247,6 +268,7 @@ async function openEditor(projectId, token) {
   $("btnNewFolder").style.display = readOnly ? "none" : "";
   $("btnUploadFile").style.display = readOnly ? "none" : "";
   $("btnImportZip").style.display = readOnly ? "none" : "";
+  $("btnReloadLocal").style.display = "none";
   state.lastCompile = null;
   if (state.assistant) state.assistant.reset();
   setSyncBadge("Conectando…", "#e2c08d");
@@ -293,14 +315,17 @@ async function openEditor(projectId, token) {
   // ---- assets ----
   await refreshAssets();
 
-  // ---- visor PDF ----
+  ensureViewerAndEngine();
+  renderPresence();
+}
+
+/* visor PDF + motor LaTeX (compartidos por el modo nube y el local) */
+function ensureViewerAndEngine() {
   if (!state.pdfViewer) {
     state.pdfViewer = new PdfViewer($("pdfScroll"), {
       onPageInfo: (cur, total) => { $("pageLabel").textContent = `Página ${cur} / ${total}`; }
     });
   }
-
-  // ---- motor LaTeX ----
   if (!state.engine) {
     state.engine = new LatexEngine({ onStatus: engineStatus });
     state.engine.init().then(() => {
@@ -311,8 +336,6 @@ async function openEditor(projectId, token) {
     });
     setStatus("Cargando motor LaTeX en tu navegador…", "#e2c08d");
   }
-
-  renderPresence();
 }
 
 function teardownEditor() {
@@ -326,6 +349,15 @@ function teardownEditor() {
   state.collapsed = new Set();
   state.uploadPrefix = "";
   state.lastCompile = null;
+  // modo local
+  clearTimeout(state.saveTimer);
+  state.mode = "cloud";
+  state.dirHandle = null;
+  state.localContent = new Map();
+  state.localHandles = new Map();
+  state.localFolders = new Set();
+  state.dirty = new Set();
+  $("btnSettings").style.display = "";
   if (state.assistant) state.assistant.close();
   $("logPanel").style.display = "none";
 }
@@ -343,7 +375,17 @@ function setStatus(text, color) {
 
 /* ---------- árbol de archivos ---------- */
 function texFileNames() {
+  if (state.mode === "local") return Array.from(state.localContent.keys()).sort();
   return Array.from(state.yFiles ? state.yFiles.keys() : []).sort();
+}
+
+/* contenido de un archivo de texto, sea nube (Yjs) o local (disco) */
+function fileText(name) {
+  if (state.mode === "local") {
+    return state.localContent.has(name) ? state.localContent.get(name) : null;
+  }
+  const t = state.yFiles ? state.yFiles.get(name) : null;
+  return t ? t.toString() : null;
 }
 
 /* archivo .tex que se compilará: preferencia del proyecto → main.tex →
@@ -353,7 +395,7 @@ function resolveMainFile() {
   if (state.project && state.project.mainFile && texNames.includes(state.project.mainFile)) return state.project.mainFile;
   if (texNames.includes("main.tex")) return "main.tex";
   for (const n of texNames) {
-    if (n.endsWith(".tex") && state.yFiles.get(n).toString().includes("\\documentclass")) return n;
+    if (n.endsWith(".tex") && (fileText(n) || "").includes("\\documentclass")) return n;
   }
   return null;
 }
@@ -385,12 +427,14 @@ function cleanPath(name) {
 function renderFileTree() {
   const tree = $("fileTree");
   tree.innerHTML = "";
-  if (!state.yFiles) return;
+  if (state.mode === "cloud" && !state.yFiles) return;
   const readOnly = state.role === "view";
   const parentOf = p => p.includes("/") ? p.slice(0, p.lastIndexOf("/")) : "";
 
-  // carpetas explícitas (Y.Map "folders") + implícitas por las rutas
-  const folders = new Set(state.yFolders ? Array.from(state.yFolders.keys()) : []);
+  // carpetas explícitas (Y.Map "folders" o disco) + implícitas por las rutas
+  const folders = state.mode === "local"
+    ? new Set(state.localFolders)
+    : new Set(state.yFolders ? Array.from(state.yFolders.keys()) : []);
   const addImplicit = name => {
     const parts = name.split("/");
     for (let i = 1; i < parts.length; i++) folders.add(parts.slice(0, i).join("/"));
@@ -424,7 +468,25 @@ function renderFileTree() {
     const del = div.querySelector('[data-act="del"]');
     if (del) del.onclick = async e => {
       e.stopPropagation();
-      if (!confirm(`¿Eliminar "${name}" del proyecto?`)) return;
+      if (!confirm(state.mode === "local"
+        ? `¿Eliminar "${name}" del DISCO? Esta acción no se puede deshacer.`
+        : `¿Eliminar "${name}" del proyecto?`)) return;
+      if (state.mode === "local") {
+        try { await lfs.deleteEntry(state.dirHandle, name); }
+        catch (err) { alert("No se pudo eliminar: " + (err.message || err)); return; }
+        state.localContent.delete(name);
+        state.localHandles.delete(name);
+        state.dirty.delete(name);
+        state.assets = state.assets.filter(a => a.name !== name);
+        if (state.activeFile === name) {
+          const names = texFileNames();
+          state.activeFile = names[0] || null;
+          if (state.activeFile) mountEditor(state.activeFile);
+          else if (state.editorView) { state.editorView.destroy(); state.editorView = null; $("activeFileName").textContent = "—"; }
+        }
+        renderFileTree();
+        return;
+      }
       if (asset) {
         await fb.deleteAsset(state.project.id, asset);
         await refreshAssets();
@@ -483,17 +545,33 @@ function newFileIn(prefix) {
   if (!name) return;
   name = cleanPath(prefix + name);
   if (!name) return;
+  if (state.mode === "local") {
+    if (state.localContent.has(name)) { alert("Ya existe un archivo con ese nombre."); return; }
+    state.localContent.set(name, "");
+    scheduleLocalSave(name);
+    renderFileTree();
+    mountEditor(name);
+    return;
+  }
   if (state.yFiles.has(name)) { alert("Ya existe un archivo con ese nombre."); return; }
   const t = new Y.Text();
   state.yFiles.set(name, t);
   mountEditor(name);
 }
 
-function newFolderIn(prefix) {
+async function newFolderIn(prefix) {
   let name = prompt("Nombre de la nueva carpeta (puede anidar: cap1/figuras):", "figuras");
   if (!name) return;
   name = cleanPath(prefix + name);
   if (!name) return;
+  if (state.mode === "local") {
+    try { await lfs.makeFolder(state.dirHandle, name); }
+    catch (e) { alert("No se pudo crear la carpeta: " + (e.message || e)); return; }
+    state.localFolders.add(name);
+    state.collapsed.delete(name);
+    renderFileTree();
+    return;
+  }
   state.yFolders.set(name, true);
   state.collapsed.delete(name);
   renderFileTree();
@@ -504,7 +582,27 @@ async function deleteFolder(path) {
   const texToDelete = texFileNames().filter(n => n.startsWith(prefix));
   const assetsToDelete = state.assets.filter(a => a.name.startsWith(prefix));
   const total = texToDelete.length + assetsToDelete.length;
-  if (!confirm(`¿Eliminar la carpeta "${path}"${total ? ` y los ${total} archivo(s) que contiene` : ""}?`)) return;
+  if (!confirm(state.mode === "local"
+    ? `¿Eliminar del DISCO la carpeta "${path}"${total ? ` y los ${total} archivo(s) que contiene` : ""}? No se puede deshacer.`
+    : `¿Eliminar la carpeta "${path}"${total ? ` y los ${total} archivo(s) que contiene` : ""}?`)) return;
+
+  if (state.mode === "local") {
+    try { await lfs.deleteEntry(state.dirHandle, path, true); }
+    catch (e) { alert("No se pudo eliminar la carpeta: " + (e.message || e)); return; }
+    for (const n of texToDelete) { state.localContent.delete(n); state.localHandles.delete(n); }
+    state.assets = state.assets.filter(a => !a.name.startsWith(prefix));
+    for (const f of Array.from(state.localFolders))
+      if (f === path || f.startsWith(prefix)) state.localFolders.delete(f);
+    if (state.activeFile && state.activeFile.startsWith(prefix)) {
+      const names = texFileNames();
+      state.activeFile = names[0] || null;
+      if (state.activeFile) mountEditor(state.activeFile);
+      else if (state.editorView) { state.editorView.destroy(); state.editorView = null; $("activeFileName").textContent = "—"; }
+    }
+    renderFileTree();
+    return;
+  }
+
   state.ydoc.transact(() => {
     for (const n of texToDelete) state.yFiles.delete(n);
     for (const k of Array.from(state.yFolders.keys()))
@@ -542,10 +640,155 @@ function insertAssetSnippet(asset) {
 }
 
 async function refreshAssets() {
+  if (state.mode === "local") { renderFileTree(); return; }
   try {
     state.assets = await fb.listAssets(state.project.id);
   } catch (e) { state.assets = []; }
   renderFileTree();
+}
+
+/* ============================================================
+   MODO LOCAL — editar una carpeta del disco (sin nube)
+   ============================================================ */
+
+/* abre el selector de carpeta y entra al editor en modo local */
+async function openLocalFolder(handle) {
+  if (!lfs.isSupported()) {
+    alert("Tu navegador no permite abrir carpetas locales.\n\n" +
+      "Esta función usa la File System Access API, disponible en Chrome, Edge y Opera de escritorio. " +
+      "Firefox y Safari todavía no la implementan.");
+    return;
+  }
+  let dir = handle;
+  try {
+    if (!dir) dir = await lfs.pickDirectory();
+  } catch (e) { return; }               // el usuario canceló el selector
+  if (!dir) return;
+
+  if (!(await lfs.ensurePermission(dir, "readwrite"))) {
+    alert("Sin permiso de lectura/escritura sobre la carpeta, no se puede editar.");
+    return;
+  }
+
+  let scan;
+  try { scan = await lfs.scanDirectory(dir); }
+  catch (e) { alert("No se pudo leer la carpeta: " + (e.message || e)); return; }
+
+  if (scan.contents.size === 0 && scan.assets.length === 0) {
+    if (!confirm(`La carpeta "${dir.name}" está vacía o no tiene archivos reconocibles.\n\n¿Abrirla de todos modos?`)) return;
+  }
+
+  teardownEditor();
+  lfs.saveRecent(dir).catch(() => {});
+
+  state.mode = "local";
+  state.dirHandle = dir;
+  state.localContent = scan.contents;
+  state.localHandles = scan.textHandles;
+  state.localFolders = scan.folders;
+  state.dirty = new Set();
+  state.collapsed = new Set();
+  state.assets = scan.assets.map(a => ({ name: a.name, key: a.name, size: a.size || 0, loc: "local", handle: a.handle }));
+  state.role = "owner";
+  state.project = { id: null, title: dir.name, ownerId: null, mainFile: null, role: "owner", members: [] };
+  state.lastCompile = null;
+
+  $("viewLogin").style.display = "none";
+  $("viewDash").style.display = "none";
+  $("viewEditor").style.display = "flex";
+  history.pushState({}, "", location.pathname + "?local=1");
+
+  $("edTitle").textContent = "📂 " + dir.name;
+  $("edTitle").title = "Carpeta local (el nombre no se puede cambiar aquí)";
+  $("readOnlyBadge").style.display = "none";
+  // en local no hay colaboración ni miembros
+  $("btnShare").style.display = "none";
+  $("btnSettings").style.display = "none";
+  $("btnNewFile").style.display = "";
+  $("btnNewFolder").style.display = "";
+  $("btnUploadFile").style.display = "";
+  $("btnImportZip").style.display = "";
+  setSyncBadge("Local · en tu disco", "#7ee0c2");
+  $("btnReloadLocal").style.display = "";
+  $("presenceAvatars").innerHTML = "";
+  $("onlineCount").textContent = "modo local (sin colaboración)";
+  if (state.assistant) state.assistant.reset();
+
+  renderFileTree();
+  const main = resolveMainFile();
+  state.activeFile = main || texFileNames()[0] || null;
+  if (state.activeFile) mountEditor(state.activeFile);
+  else if (state.editorView) { state.editorView.destroy(); state.editorView = null; $("activeFileName").textContent = "—"; }
+
+  ensureViewerAndEngine();
+}
+
+/* guardado en disco con retardo (autosave) */
+function scheduleLocalSave(path) {
+  state.dirty.add(path);
+  clearTimeout(state.saveTimer);
+  setSyncBadge("Guardando…", "#e2c08d");
+  state.saveTimer = setTimeout(flushLocalSaves, 700);
+}
+
+async function flushLocalSaves() {
+  if (state.mode !== "local" || !state.dirHandle) return;
+  const paths = Array.from(state.dirty);
+  state.dirty.clear();
+  try {
+    for (const p of paths) {
+      const h = await lfs.writeText(state.dirHandle, p, state.localContent.get(p) || "");
+      state.localHandles.set(p, h);
+    }
+    setSyncBadge("Guardado en disco", "#7ee0c2");
+  } catch (e) {
+    for (const p of paths) state.dirty.add(p);
+    setSyncBadge("Error al guardar", "#e57373");
+    appendLog("✗ No se pudo guardar en disco: " + (e.message || e));
+  }
+}
+
+/* recarga desde disco (por si editaste con otro programa) */
+async function reloadLocalFolder() {
+  if (state.mode !== "local" || !state.dirHandle) return;
+  await flushLocalSaves();
+  try {
+    const scan = await lfs.scanDirectory(state.dirHandle);
+    state.localContent = scan.contents;
+    state.localHandles = scan.textHandles;
+    state.localFolders = scan.folders;
+    state.assets = scan.assets.map(a => ({ name: a.name, key: a.name, size: a.size || 0, loc: "local", handle: a.handle }));
+    renderFileTree();
+    if (state.activeFile && state.localContent.has(state.activeFile)) mountEditor(state.activeFile);
+    setSyncBadge("Recargado desde disco", "#7ee0c2");
+  } catch (e) { alert("No se pudo recargar: " + (e.message || e)); }
+}
+
+/* lista de carpetas recientes en el dashboard */
+async function renderLocalRecents() {
+  const cont = $("localRecents");
+  if (!cont) return;
+  if (!lfs.isSupported()) {
+    cont.innerHTML = '<div class="local-note">Tu navegador no soporta abrir carpetas locales (usa Chrome, Edge u Opera de escritorio).</div>';
+    $("btnOpenLocal").disabled = true;
+    return;
+  }
+  let recents = [];
+  try { recents = await lfs.listRecents(); } catch (e) {}
+  cont.innerHTML = "";
+  for (const r of recents.slice(0, 5)) {
+    const row = document.createElement("div");
+    row.className = "local-recent";
+    row.innerHTML = `<span class="local-recent-name" title="${escapeHtml(r.name)}">📂 ${escapeHtml(r.name)}</span>
+      <button class="local-recent-x" title="Quitar de recientes">✕</button>`;
+    row.querySelector(".local-recent-name").onclick = () => openLocalFolder(r.handle);
+    row.querySelector(".local-recent-x").onclick = async e => {
+      e.stopPropagation();
+      await lfs.removeRecent(r.id);
+      renderLocalRecents();
+    };
+    cont.appendChild(row);
+  }
 }
 
 /* ---------- importar .zip (export de Overleaf) ---------- */
@@ -647,6 +890,13 @@ function aiWriteFile(path, content) {
   if (!path) throw new Error("ruta inválida");
   if (!/\.(tex|bib|txt|sty|cls|md|csv|dat)$/i.test(path))
     throw new Error("solo se pueden escribir archivos de texto (.tex, .bib, .sty…)");
+  if (state.mode === "local") {
+    state.localContent.set(path, content);
+    scheduleLocalSave(path);
+    renderFileTree();
+    if (path === state.activeFile) mountEditor(path);
+    return true;
+  }
   let t = state.yFiles.get(path);
   state.ydoc.transact(() => {
     if (!t) { t = new Y.Text(); t.insert(0, content); state.yFiles.set(path, t); }
@@ -659,12 +909,18 @@ function aiWriteFile(path, content) {
 
 function aiStrReplace(path, oldStr, newStr) {
   path = cleanPath(path);
-  const t = state.yFiles.get(path);
-  if (!t) throw new Error("no existe el archivo de texto: " + path);
-  const s = t.toString();
+  const s = fileText(path);
+  if (s == null) throw new Error("no existe el archivo de texto: " + path);
   const i = s.indexOf(oldStr);
   if (i < 0) throw new Error("no se encontró el texto a reemplazar en " + path);
   if (s.indexOf(oldStr, i + 1) >= 0) throw new Error("el texto aparece más de una vez; añade más contexto para que sea único");
+  if (state.mode === "local") {
+    state.localContent.set(path, s.slice(0, i) + newStr + s.slice(i + oldStr.length));
+    scheduleLocalSave(path);
+    if (path === state.activeFile) mountEditor(path);
+    return true;
+  }
+  const t = state.yFiles.get(path);
   state.ydoc.transact(() => { t.delete(i, oldStr.length); t.insert(i, newStr); });
   return true;
 }
@@ -672,6 +928,13 @@ function aiStrReplace(path, oldStr, newStr) {
 function aiCreateFolder(path) {
   path = cleanPath(path);
   if (!path) throw new Error("ruta inválida");
+  if (state.mode === "local") {
+    lfs.makeFolder(state.dirHandle, path).catch(() => {});
+    state.localFolders.add(path);
+    state.collapsed.delete(path);
+    renderFileTree();
+    return true;
+  }
   state.yFolders.set(path, true);
   state.collapsed.delete(path);
   renderFileTree();
@@ -682,7 +945,7 @@ const aiApi = {
   isReadOnly: () => state.role === "view",
   getMainFile: () => resolveMainFile() || "(sin definir)",
   listFiles: () => ({ tex: texFileNames(), assets: state.assets.map(a => a.name) }),
-  readFile: path => { const t = state.yFiles.get(cleanPath(path)); return t ? t.toString() : null; },
+  readFile: path => fileText(cleanPath(path)),
   writeFile: aiWriteFile,
   strReplace: aiStrReplace,
   createFolder: aiCreateFolder,
@@ -711,7 +974,43 @@ const cmHighlight = HighlightStyle.define([
   { tag: tags.bracket, color: "#8fa3b8" }
 ]);
 
+/* editor local: CodeMirror plano + autoguardado en disco */
+function mountLocalEditor(fileName) {
+  if (!state.localContent.has(fileName)) return;
+  state.activeFile = fileName;
+  $("activeFileName").textContent = fileName;
+  renderFileTree();
+
+  const extensions = [
+    lineNumbers(),
+    highlightActiveLine(),
+    highlightActiveLineGutter(),
+    drawSelection(),
+    highlightSelectionMatches(),
+    StreamLanguage.define(stex),
+    syntaxHighlighting(cmHighlight),
+    cmTheme,
+    EditorView.lineWrapping,
+    keymap.of([...defaultKeymap, ...searchKeymap]),
+    EditorView.updateListener.of(u => {
+      if (u.docChanged) {
+        state.localContent.set(fileName, u.state.doc.toString());
+        scheduleLocalSave(fileName);
+      }
+      if (u.selectionSet || u.docChanged) {
+        const head = u.state.selection.main.head;
+        const line = u.state.doc.lineAt(head);
+        $("lnCol").textContent = `Ln ${line.number}, Col ${head - line.from + 1}`;
+      }
+    })
+  ];
+  const stateCM = EditorState.create({ doc: state.localContent.get(fileName), extensions });
+  if (state.editorView) state.editorView.setState(stateCM);
+  else state.editorView = new EditorView({ state: stateCM, parent: $("cmHost") });
+}
+
 function mountEditor(fileName) {
+  if (state.mode === "local") return mountLocalEditor(fileName);
   const ytext = state.yFiles.get(fileName);
   if (!ytext) return;
   state.activeFile = fileName;
@@ -785,7 +1084,9 @@ function appendLog(line) {
 }
 
 async function compile() {
-  if (state.compiling || !state.yFiles) return;
+  if (state.compiling) return;
+  if (state.mode === "cloud" && !state.yFiles) return;
+  if (state.mode === "local") await flushLocalSaves();
   const texNames = texFileNames();
   const main = resolveMainFile();
   if (!main) { alert("No hay ningún archivo .tex con \\documentclass en el proyecto."); return; }
@@ -798,8 +1099,14 @@ async function compile() {
 
   try {
     const files = [];
-    for (const name of texNames) files.push({ path: name, contents: state.yFiles.get(name).toString() });
+    for (const name of texNames) files.push({ path: name, contents: fileText(name) || "" });
     for (const a of state.assets) {
+      // modo local: los binarios se leen del disco, sin caché ni red
+      if (a.loc === "local") {
+        try { files.push({ path: a.name, contents: await lfs.readBytes(a.handle) }); }
+        catch (err) { throw new Error(`No se pudo leer "${a.name}" del disco: ${err.message || err}`); }
+        continue;
+      }
       const cacheKey = a.key + ":" + (a.size || 0);
       let bytes = state.assetCache.get(cacheKey);
       if (!bytes) {
@@ -1063,6 +1370,7 @@ async function invite() {
 /* ================================================ eventos UI */
 function wireEvents() {
   $("btnGoogleLogin").onclick = doLogin;
+  $("btnLocalNoAccount").onclick = () => openLocalFolder(null);
   $("btnLogout").onclick = async () => { teardownEditor(); await logout(); };
 
   // dashboard
@@ -1079,6 +1387,8 @@ function wireEvents() {
     });
     openProject(pid);
   };
+  $("btnOpenLocal").onclick = () => openLocalFolder(null);
+  $("btnReloadLocal").onclick = reloadLocalFolder;
   $("btnNewFromZip").onclick = () => $("zipNewInput").click();
   $("zipNewInput").onchange = async e => {
     const f = e.target.files[0];
@@ -1091,7 +1401,12 @@ function wireEvents() {
   $("navShared").onclick = () => { state.filter = "shared"; renderProjects(); };
 
   // editor: header
-  $("btnBackDash").onclick = () => { history.pushState({}, "", location.pathname); teardownEditor(); showDashboard(); };
+  $("btnBackDash").onclick = () => {
+    history.pushState({}, "", location.pathname);
+    teardownEditor();
+    // en modo local se puede entrar sin cuenta: volver al login si no hay sesión
+    if (state.user) showDashboard(); else showLogin();
+  };
   $("edTitle").onclick = async () => {
     if (!state.project || state.role === "view") return;
     const t = prompt("Renombrar proyecto:", state.project.title);
@@ -1123,7 +1438,19 @@ function wireEvents() {
       if (!name) continue;
       const ext = fileExt(name);
       try {
-        if (TEXT_EXT.includes(ext)) {
+        if (state.mode === "local") {
+          if (TEXT_EXT.includes(ext)) {
+            const text = await f.text();
+            state.localContent.set(name, text);
+            const h = await lfs.writeText(state.dirHandle, name, text);
+            state.localHandles.set(name, h);
+          } else {
+            const bytes = new Uint8Array(await f.arrayBuffer());
+            const h = await lfs.writeBytes(state.dirHandle, name, bytes);
+            state.assets = state.assets.filter(a => a.name !== name)
+              .concat([{ name, key: name, size: bytes.length, loc: "local", handle: h }]);
+          }
+        } else if (TEXT_EXT.includes(ext)) {
           const text = await f.text();
           const t = new Y.Text();
           t.insert(0, text);
@@ -1164,7 +1491,14 @@ function wireEvents() {
   $("btnCloseSettings").onclick = closeSettingsModal;
   $("btnSaveSettings").onclick = saveSettings;
 
-  window.addEventListener("beforeunload", () => { if (state.provider) state.provider.destroy(); });
+  window.addEventListener("beforeunload", e => {
+    if (state.provider) state.provider.destroy();
+    if (state.mode === "local" && state.dirty.size) {
+      flushLocalSaves();
+      e.preventDefault();
+      e.returnValue = "";        // hay cambios sin escribir en disco
+    }
+  });
 }
 
 /* ================================================ arranque */
@@ -1172,6 +1506,11 @@ function wireEvents() {
   wireEvents();
   initLayout();
   watchAuth(async user => {
+    // si se está editando una carpeta local, no cambiar de vista por auth
+    if (state.mode === "local" && state.dirHandle) {
+      state.user = user ? { uid: user.uid, name: user.displayName || user.email || "Usuario", photo: user.photoURL || "", color: colorForUid(user.uid) } : null;
+      return;
+    }
     if (!user) {
       state.user = null;
       showLogin();
