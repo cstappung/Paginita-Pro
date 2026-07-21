@@ -69,6 +69,30 @@ export async function scanDirectory(dirHandle) {
   return out;
 }
 
+/**
+ * Escaneo BARATO: recorre la carpeta y devuelve solo los metadatos
+ * (mtime y tamaño) de cada archivo de texto, SIN leer su contenido.
+ * Lo usa el puente con VS Code, que sondea cada segundo: leer entero
+ * un proyecto de 30 archivos a ese ritmo sería un derroche, así que
+ * primero se mira la fecha y solo se lee lo que cambió.
+ */
+export async function scanTextMeta(dirHandle) {
+  const out = { textHandles: new Map(), contents: new Map(), assets: [], folders: new Set() };
+  await walk(dirHandle, "", out);              // walk() no lee contenidos
+  const meta = new Map();
+  for (const [path, h] of out.textHandles) {
+    try {
+      const f = await h.getFile();
+      meta.set(path, { handle: h, mtime: f.lastModified, size: f.size });
+    } catch (e) { /* archivo borrado entre el recorrido y la lectura */ }
+  }
+  return { meta, folders: out.folders, assets: out.assets };
+}
+
+export async function readText(handle) {
+  return (await handle.getFile()).text();
+}
+
 export async function readBytes(handle) {
   return new Uint8Array(await (await handle.getFile()).arrayBuffer());
 }
@@ -113,22 +137,30 @@ export async function deleteEntry(root, path, recursive = false) {
 
 /* ---------- carpetas recientes (IndexedDB guarda los handles) ---------- */
 const DB_NAME = "colabtex-local", STORE = "dirs";
+/* carpetas enlazadas a un proyecto de la nube (puente con VS Code), por id de
+   proyecto. Van en su propio almacén para no mezclarse con las «recientes»
+   del modo local, que son otra cosa. */
+const BRIDGE_STORE = "bridges";
 
 function openDb() {
   return new Promise((res, rej) => {
-    const r = indexedDB.open(DB_NAME, 1);
-    r.onupgradeneeded = () => { if (!r.result.objectStoreNames.contains(STORE)) r.result.createObjectStore(STORE, { keyPath: "id" }); };
+    const r = indexedDB.open(DB_NAME, 2);
+    r.onupgradeneeded = () => {
+      const db = r.result;
+      if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: "id" });
+      if (!db.objectStoreNames.contains(BRIDGE_STORE)) db.createObjectStore(BRIDGE_STORE, { keyPath: "id" });
+    };
     r.onsuccess = () => res(r.result);
     r.onerror = () => rej(r.error);
   });
 }
 
-async function tx(mode, fn) {
+async function tx(mode, fn, store = STORE) {
   try {
     const db = await openDb();
     return await new Promise((res, rej) => {
-      const t = db.transaction(STORE, mode);
-      const out = fn(t.objectStore(STORE));
+      const t = db.transaction(store, mode);
+      const out = fn(t.objectStore(store));
       t.oncomplete = () => res(out && out.result !== undefined ? out.result : out);
       t.onerror = () => rej(t.error);
     });
@@ -147,4 +179,19 @@ export async function listRecents() {
 
 export async function removeRecent(id) {
   return tx("readwrite", s => s.delete(id));
+}
+
+/* ---------- carpeta enlazada a un proyecto de la nube ---------- */
+export async function saveBridge(projectId, handle, absPath) {
+  return tx("readwrite", s => s.put({ id: projectId, handle, absPath: absPath || "", at: Date.now() }), BRIDGE_STORE);
+}
+
+export async function getBridge(projectId) {
+  const r = await tx("readonly", s => s.get(projectId), BRIDGE_STORE);
+  // tx() devuelve la propia IDBRequest cuando result es undefined (no hay fila)
+  return r && r.handle ? r : null;
+}
+
+export async function removeBridge(projectId) {
+  return tx("readwrite", s => s.delete(projectId), BRIDGE_STORE);
 }

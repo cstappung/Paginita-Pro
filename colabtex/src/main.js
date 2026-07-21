@@ -30,6 +30,7 @@ import { SyncTex } from "./synctex.js";
 import { parseTexLog, groupByFile } from "./texlog.js";
 import { THEMES, themeName, saveThemeName, cmThemeFor, cmHighlightFor, applyCssVars } from "./themes.js";
 import { loadKatex, visualExtensions } from "./visual.js";
+import { createBridge, vscodeUrl } from "./bridge.js";
 
 const $ = id => document.getElementById(id);
 const ROLE_LABEL = { owner: "Propietario", edit: "Puede editar", view: "Solo lectura" };
@@ -110,6 +111,7 @@ const state = {
   compiling: false,
   membersUnsub: null,
   assistant: null,       // panel de IA (creado en boot)
+  bridge: null,          // puente con una carpeta del disco (botón «VS Code»)
   lastCompile: null,     // {ok, errors[], warnings[]} para el asistente
   // ---- modo LOCAL (carpeta del disco, sin nube) ----
   mode: "cloud",         // "cloud" | "local"
@@ -280,6 +282,8 @@ async function openEditor(projectId, token) {
   $("btnUploadFile").style.display = readOnly ? "none" : "";
   $("btnImportZip").style.display = readOnly ? "none" : "";
   $("btnReloadLocal").style.display = "none";
+  $("btnVsCode").style.display = lfs.isSupported() ? "" : "none";
+  paintVsCodeButton();
   state.lastCompile = null;
   if (state.assistant) state.assistant.reset();
   setSyncBadge("Conectando…", "#e2c08d");
@@ -352,6 +356,8 @@ function ensureViewerAndEngine() {
 }
 
 function teardownEditor() {
+  // el puente apunta al Y.Doc que estamos a punto de destruir
+  if (state.bridge && state.bridge.running) state.bridge.stop();
   if (state.membersUnsub) { state.membersUnsub(); state.membersUnsub = null; }
   if (state.editorView) { state.editorView.destroy(); state.editorView = null; }
   if (state.provider) { state.provider.destroy(); state.provider = null; }
@@ -729,6 +735,8 @@ async function openLocalFolder(handle) {
   $("btnImportZip").style.display = "";
   setSyncBadge("Local · en tu disco", "#7ee0c2");
   $("btnReloadLocal").style.display = "";
+  // en modo local ya se edita el disco directamente: el puente no pinta nada
+  $("btnVsCode").style.display = "none";
   $("presenceAvatars").innerHTML = "";
   $("onlineCount").textContent = "modo local (sin colaboración)";
   if (state.assistant) state.assistant.reset();
@@ -808,6 +816,167 @@ async function renderLocalRecents() {
     };
     cont.appendChild(row);
   }
+}
+
+/* ============================================================
+   PUENTE CON VS CODE — proyecto de la nube ↔ carpeta del disco
+   ============================================================ */
+
+function ensureBridge() {
+  if (state.bridge) return state.bridge;
+  state.bridge = createBridge({
+    onStatus: (t, c) => setSyncBadge(t, c),
+    onLog: m => appendLog(m),
+    onTree: () => renderFileTree(),
+    canWrite: () => state.role !== "view",
+    newYText: () => new Y.Text()
+  });
+  return state.bridge;
+}
+
+function paintVsCodeButton() {
+  const b = $("btnVsCode");
+  if (!b) return;
+  const on = state.bridge && state.bridge.running;
+  b.textContent = on ? "💻 VS Code ●" : "💻 VS Code";
+  b.title = on
+    ? `Sincronizando con la carpeta «${state.bridge.folder}». Clic para abrir VS Code o detener.`
+    : "Sincronizar este proyecto con una carpeta de tu PC y editarlo en VS Code";
+  b.style.color = on ? "#7ee0c2" : "";
+}
+
+/* El navegador no revela la ruta absoluta de una carpeta (por diseño:
+   sería una fuga de datos sobre el disco del usuario). Para poder lanzar
+   vscode://file/… hay que preguntarla una vez; queda guardada junto al
+   handle. Quien no quiera pegarla tiene el .bat que dejamos en la carpeta. */
+async function askAbsPath(folderName, current) {
+  const p = prompt(
+    "¿Cuál es la ruta completa de la carpeta en tu PC?\n\n" +
+    "El navegador no puede averiguarla por seguridad, así que hace falta\n" +
+    "indicarla una sola vez. En el Explorador: clic derecho sobre la\n" +
+    "carpeta → «Copiar como ruta», y pégala aquí.\n\n" +
+    "Si prefieres saltarte esto, dentro de la carpeta te dejé\n" +
+    "«abrir-en-vscode.bat»: doble clic y VS Code se abre igual.",
+    current || ("D:\\ruta\\a\\" + folderName));
+  return p ? p.trim() : "";
+}
+
+function launchVsCode() {
+  const br = state.bridge;
+  if (!br || !br.running) return;
+  if (!br.absPath) {
+    appendLog("ℹ Sin ruta configurada: abre «abrir-en-vscode.bat» dentro de la carpeta " +
+      `«${br.folder}» o vuelve a pulsar el botón para indicarla.`);
+    return;
+  }
+  location.href = vscodeUrl(br.absPath);
+}
+
+async function linkVsCodeFolder() {
+  if (!lfs.isSupported()) {
+    alert("Tu navegador no permite enlazar carpetas del disco.\n\n" +
+      "Esta función usa la File System Access API, disponible en Chrome, Edge y " +
+      "Opera de escritorio. Firefox y Safari todavía no la implementan.");
+    return;
+  }
+  const br = ensureBridge();
+
+  /* ¿había ya una carpeta enlazada para este proyecto? El permiso se puede
+     volver a pedir aquí porque seguimos dentro del clic del usuario. */
+  let dir = null, path = "";
+  const saved = await lfs.getBridge(state.project.id);
+  if (saved) {
+    if (await lfs.ensurePermission(saved.handle, "readwrite")) {
+      dir = saved.handle;
+      path = saved.absPath || "";
+    }
+  }
+
+  if (!dir) {
+    alert("Elige (o crea) una carpeta vacía en tu PC.\n\n" +
+      "ColabTeX copiará ahí el proyecto y mantendrá las dos copias iguales:\n" +
+      "lo que guardes en VS Code aparece en la web y en la de tus colaboradores,\n" +
+      "y al revés — mientras esta pestaña siga abierta.");
+    try { dir = await lfs.pickDirectory(); }
+    catch (e) { return; }                       // el usuario canceló
+    if (!dir) return;
+    if (!(await lfs.ensurePermission(dir, "readwrite"))) {
+      alert("Sin permiso de lectura/escritura sobre la carpeta no se puede sincronizar.");
+      return;
+    }
+  }
+
+  /* Aviso si la carpeta ya tenía archivos: el espejo inicial va de la nube
+     al disco, así que sobrescribiría lo que hubiera con el mismo nombre. */
+  try {
+    const info = await br.inspect(dir);
+    if (info.existing.length) {
+      const lista = info.existing.slice(0, 6).join(", ") + (info.existing.length > 6 ? "…" : "");
+      if (!confirm(`La carpeta «${dir.name}» ya contiene ${info.existing.length} archivo(s) de texto:\n${lista}\n\n` +
+        "Se van a SOBRESCRIBIR con la versión de la nube.\n\n¿Continuar?")) return;
+    }
+  } catch (e) { /* si no se puede inspeccionar, seguimos igual */ }
+
+  if (!path) path = await askAbsPath(dir.name, "");
+
+  setSyncBadge("Copiando al disco…", "#e2c08d");
+  try {
+    await br.start({
+      dirHandle: dir,
+      yFiles: state.yFiles,
+      id: state.project.id,
+      path,
+      getAssets: () => state.assets,
+      fetchAsset: async a => {
+        const key = a.key + ":" + (a.size || 0);
+        let bytes = state.assetCache.get(key);
+        if (!bytes) {
+          bytes = await fb.fetchAssetBytes(state.project.id, a);
+          if (bytes) state.assetCache.set(key, bytes);
+        }
+        return bytes;
+      }
+    });
+  } catch (e) {
+    setSyncBadge("Error al enlazar", "#e57373");
+    alert("No se pudo enlazar la carpeta: " + (e.message || e));
+    return;
+  }
+
+  paintVsCodeButton();
+  if (state.role === "view") {
+    appendLog("ℹ Tienes permiso de solo lectura: los cambios bajan al disco, pero lo que edites ahí no sube.");
+  }
+  launchVsCode();
+}
+
+async function unlinkVsCode() {
+  if (!state.bridge) return;
+  const name = state.bridge.folder;
+  await state.bridge.stop();
+  if (state.project && state.project.id) lfs.removeBridge(state.project.id).catch(() => {});
+  paintVsCodeButton();
+  setSyncBadge("Sincronizado", "#7ee0c2");
+  appendLog(`💻 Sincronización con «${name}» detenida. Los archivos siguen en tu disco.`);
+}
+
+async function onVsCodeClick() {
+  if (state.mode !== "cloud" || !state.project || !state.yFiles) return;
+  const br = state.bridge;
+  if (br && br.running) {
+    const seguir = confirm(
+      `Este proyecto está sincronizado con la carpeta «${br.folder}».\n\n` +
+      "«Aceptar» abre VS Code.\n" +
+      "«Cancelar» detiene la sincronización.");
+    if (seguir) {
+      if (!br.absPath) br.setPath(await askAbsPath(br.folder, ""));
+      launchVsCode();
+    } else {
+      await unlinkVsCode();
+    }
+    return;
+  }
+  await linkVsCodeFolder();
 }
 
 /* ---------- importar .zip (export de Overleaf) ---------- */
@@ -1665,6 +1834,7 @@ function wireEvents() {
   };
   $("btnOpenLocal").onclick = () => openLocalFolder(null);
   $("btnReloadLocal").onclick = reloadLocalFolder;
+  $("btnVsCode").onclick = onVsCodeClick;
   $("btnNewFromZip").onclick = () => $("zipNewInput").click();
   $("zipNewInput").onchange = async e => {
     const f = e.target.files[0];
