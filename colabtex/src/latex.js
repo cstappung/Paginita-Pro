@@ -11,7 +11,12 @@ const ALL_PACKAGES = [
   "ubuntu-texlive-latex-recommended.js",
   "ubuntu-texlive-latex-extra.js",
   "ubuntu-texlive-science.js",
-  "ubuntu-texlive-fonts-recommended.js"
+  "ubuntu-texlive-fonts-recommended.js",
+  // PGF/TikZ: BusyTeX no lo distribuye (en Ubuntu vive en texlive-pictures,
+  // que no está compilado a wasm). Sin esto fallan tcolorbox, svg,
+  // transparent, pgfplots y tikz con «File `pgf.sty' not found».
+  // Se genera con scripts/build-pgf-package.js
+  "texlive-pgf.js"
 ];
 
 export class LatexEngine {
