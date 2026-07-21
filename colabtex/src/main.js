@@ -22,6 +22,8 @@ import { colorForUid, colorLight, timeAgo, escapeHtml } from "./util.js";
 import { LatexEngine, summarizeLog } from "./latex.js";
 import { PdfViewer } from "./pdfview.js";
 import { createAssistant } from "./ai-assistant.js";
+import { readZip, foldersOf, titleFromZip } from "./zip-import.js";
+import { initLayout } from "./layout.js";
 
 const $ = id => document.getElementById(id);
 const ROLE_LABEL = { owner: "Propietario", edit: "Puede editar", view: "Solo lectura" };
@@ -244,6 +246,7 @@ async function openEditor(projectId, token) {
   $("btnNewFile").style.display = readOnly ? "none" : "";
   $("btnNewFolder").style.display = readOnly ? "none" : "";
   $("btnUploadFile").style.display = readOnly ? "none" : "";
+  $("btnImportZip").style.display = readOnly ? "none" : "";
   state.lastCompile = null;
   if (state.assistant) state.assistant.reset();
   setSyncBadge("Conectando…", "#e2c08d");
@@ -543,6 +546,99 @@ async function refreshAssets() {
     state.assets = await fb.listAssets(state.project.id);
   } catch (e) { state.assets = []; }
   renderFileTree();
+}
+
+/* ---------- importar .zip (export de Overleaf) ---------- */
+
+/* elige el .tex principal de un conjunto importado */
+function pickMainFrom(texts) {
+  const names = Object.keys(texts);
+  if (names.includes("main.tex")) return "main.tex";
+  const withClass = names.filter(n => n.endsWith(".tex") && texts[n].includes("\\documentclass"));
+  if (withClass.length) return withClass.sort((a, b) => a.split("/").length - b.split("/").length)[0];
+  return names.find(n => n.endsWith(".tex")) || null;
+}
+
+/* importa dentro del proyecto abierto */
+async function importZipIntoProject(file) {
+  if (state.role === "view" || !state.yFiles) return;
+  let z;
+  try { z = await readZip(file); }
+  catch (e) { alert(e.message); return; }
+
+  const textNames = Object.keys(z.texts);
+  if (!textNames.length && !z.assets.length) {
+    alert("El .zip no contiene archivos utilizables (¿es un export de código fuente de Overleaf?).");
+    return;
+  }
+  const existing = new Set(texFileNames());
+  const clashes = textNames.filter(n => existing.has(n));
+  if (clashes.length && !confirm(
+    `Se sobrescribirán ${clashes.length} archivo(s) ya existente(s):\n\n` +
+    clashes.slice(0, 12).join("\n") + (clashes.length > 12 ? `\n…y ${clashes.length - 12} más` : "") +
+    "\n\n¿Continuar con la importación?")) return;
+
+  setStatus(`Importando ${file.name}…`, "#e2c08d");
+  state.ydoc.transact(() => {
+    for (const [path, content] of Object.entries(z.texts)) {
+      let t = state.yFiles.get(path);
+      if (t) { t.delete(0, t.length); t.insert(0, content); }
+      else { t = new Y.Text(); t.insert(0, content); state.yFiles.set(path, t); }
+    }
+    for (const f of foldersOf([...textNames, ...z.assets.map(a => a.path)])) state.yFolders.set(f, true);
+  });
+
+  const failed = [];
+  for (const a of z.assets) {
+    try { await fb.uploadAsset(state.project.id, a.path, a.bytes); }
+    catch (e) { failed.push(a.path + " — " + (e.message || e.code)); }
+  }
+  await refreshAssets();
+
+  const main = pickMainFrom(z.texts);
+  if (main && state.yFiles.get(main)) mountEditor(main);
+
+  const parts = [`${textNames.length} archivo(s) de texto`, `${z.assets.length - failed.length} recurso(s)`];
+  setStatus(`Importado: ${parts.join(" · ")}`, "#7ee0c2");
+  if (failed.length) alert("No se pudieron subir estos recursos:\n\n" + failed.slice(0, 10).join("\n"));
+}
+
+/* crea un proyecto nuevo a partir de un .zip (desde el dashboard) */
+async function createProjectFromZip(file, btn) {
+  let z;
+  try { z = await readZip(file); }
+  catch (e) { alert(e.message); return; }
+
+  const textNames = Object.keys(z.texts);
+  if (!textNames.length) {
+    alert("El .zip no contiene archivos .tex. Descarga de Overleaf el «Source» del proyecto, no el PDF.");
+    return;
+  }
+  const title = prompt("Nombre del proyecto:", titleFromZip(file.name));
+  if (!title) return;
+
+  const orig = btn ? btn.textContent : "";
+  if (btn) { btn.disabled = true; btn.textContent = "Importando…"; }
+  try {
+    const pid = await fb.createProject({
+      title: title.slice(0, 140), uid: state.user.uid, userName: state.user.name, files: z.texts
+    });
+    const failed = [];
+    for (const a of z.assets) {
+      try { await fb.uploadAsset(pid, a.path, a.bytes); }
+      catch (e) { failed.push(a.path); }
+    }
+    const main = pickMainFrom(z.texts);
+    if (main && main !== "main.tex") {
+      try { await fb.updateProjectMeta(pid, { mainFile: main }); } catch (e) {}
+    }
+    if (failed.length) alert(`El proyecto se creó, pero ${failed.length} recurso(s) no se pudieron subir:\n\n` + failed.slice(0, 10).join("\n"));
+    openProject(pid);
+  } catch (e) {
+    alert("No se pudo crear el proyecto desde el .zip: " + (e.message || e.code));
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = orig; }
+  }
 }
 
 /* ---------- puente para el asistente IA (edita el doc Yjs) ---------- */
@@ -983,6 +1079,12 @@ function wireEvents() {
     });
     openProject(pid);
   };
+  $("btnNewFromZip").onclick = () => $("zipNewInput").click();
+  $("zipNewInput").onchange = async e => {
+    const f = e.target.files[0];
+    e.target.value = "";
+    if (f) await createProjectFromZip(f, $("btnNewFromZip"));
+  };
   $("searchInput").oninput = e => { state.search = e.target.value; renderProjects(); };
   $("navAll").onclick = () => { state.filter = "all"; renderProjects(); };
   $("navMine").onclick = () => { state.filter = "mine"; renderProjects(); };
@@ -1006,6 +1108,12 @@ function wireEvents() {
   $("btnNewFile").onclick = () => newFileIn("");
   $("btnNewFolder").onclick = () => newFolderIn("");
   $("btnUploadFile").onclick = () => { state.uploadPrefix = ""; $("fileUploadInput").click(); };
+  $("btnImportZip").onclick = () => $("zipUploadInput").click();
+  $("zipUploadInput").onchange = async e => {
+    const f = e.target.files[0];
+    e.target.value = "";
+    if (f) await importZipIntoProject(f);
+  };
   $("fileUploadInput").onchange = async e => {
     const TEXT_EXT = ["tex", "bib", "txt", "sty", "cls", "md", "csv", "dat"];
     const prefix = state.uploadPrefix || "";
@@ -1062,6 +1170,7 @@ function wireEvents() {
 /* ================================================ arranque */
 (function boot() {
   wireEvents();
+  initLayout();
   watchAuth(async user => {
     if (!user) {
       state.user = null;

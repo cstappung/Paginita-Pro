@@ -459,8 +459,16 @@ export function createAssistant(api) {
   input.oninput = () => { input.style.height = "auto"; input.style.height = Math.min(input.scrollHeight, 140) + "px"; };
 
   /* ----- API pública ----- */
-  function open() { panel.style.display = "flex"; if (hasKey()) { hideSetup(); input.focus(); } else showSetup(""); }
-  function close() { panel.style.display = "none"; }
+  const splitAi = $("splitAi");
+  function open() {
+    panel.style.display = "flex";
+    if (splitAi) splitAi.style.display = "";
+    if (hasKey()) { hideSetup(); input.focus(); } else showSetup("");
+  }
+  function close() {
+    panel.style.display = "none";
+    if (splitAi) splitAi.style.display = "none";
+  }
   function toggle() { (panel.style.display === "none" || !panel.style.display) ? open() : close(); }
   function reset() { messages = []; msgBox.innerHTML = ""; if (hasKey()) hideSetup(); }
 
