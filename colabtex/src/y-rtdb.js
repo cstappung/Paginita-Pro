@@ -44,6 +44,7 @@ export class RtdbProvider {
     this._appliedKeys = new Set();
     this._unsubs = [];
     this._destroyed = false;
+    this._pending = 0;          // escrituras en vuelo hacia RTDB
 
     this.updatesRef = ref(db, `projects/${pid}/doc/updates`);
     this.snapshotRef = ref(db, `projects/${pid}/doc/snapshot`);
@@ -51,11 +52,20 @@ export class RtdbProvider {
     this.myPresenceRef = ref(db, `presence/${pid}/${ydoc.clientID}`);
 
     this._docUpdateHandler = (u, origin) => {
-      if (origin === this || this.readOnly || this._destroyed) return;
+      if (origin === this || this.readOnly) return;
+      /* Si el proveedor está cerrado, este cambio NO va a llegar a la nube.
+         Antes se descartaba en silencio y la sesión parecía normal hasta
+         que al recargar faltaba todo, así que ahora se avisa. */
+      if (this._destroyed) {
+        this.emit("error", [new Error("La conexión con la nube está cerrada: este cambio no se ha guardado.")]);
+        return;
+      }
       const p = push(this.updatesRef);
       this._appliedKeys.add(p.key);
+      this._pending++;
       set(p, { u: b64FromBytes(u), t: serverTimestamp(), by: this.awareness.clientID })
-        .catch(() => {});
+        .then(() => { this._pending--; if (!this._pending) this.emit("saved", []); })
+        .catch(err => { this._pending--; this.emit("error", [err]); });
       this._maybeCompact();
     };
 

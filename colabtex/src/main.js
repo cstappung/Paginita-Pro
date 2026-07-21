@@ -309,6 +309,16 @@ async function openEditor(projectId, token) {
     if (status === "connected") setSyncBadge("Guardado", "#7ee0c2");
     else setSyncBadge("Sin conexión", "#e57373");
   });
+  /* Perder la nube en silencio es lo peor que puede pasar: se edita
+     tranquilo durante una hora y al recargar no queda nada. */
+  provider.on("error", err => {
+    setSyncBadge("✗ SIN GUARDAR en la nube", "#e57373");
+    appendLog("✗ No se pudo guardar en la nube: " + ((err && err.message) || err));
+  });
+  provider.on("saved", () => {
+    if ($("syncBadge").textContent.startsWith("✗")) return;   // no tapar un error
+    setSyncBadge("Guardado", "#7ee0c2");
+  });
   let touchTimer = null;
   ydoc.on("update", (u, origin) => {
     if (origin !== provider) {
@@ -869,7 +879,19 @@ function launchVsCode() {
       `«${br.folder}» o vuelve a pulsar el botón para indicarla.`);
     return;
   }
-  location.href = vscodeUrl(br.absPath);
+  /* El protocolo se lanza desde un iframe oculto, NO con location.href.
+     Asignar location.href inicia una navegación de primer nivel: el
+     navegador la cancela al ver que es un protocolo externo, pero para
+     entonces ya ha disparado beforeunload, que cerraba el proveedor de
+     Firebase. La sesión seguía editándose en memoria —editor y disco
+     perfectos— pero sin guardar nada en la nube. Un <a>.click() tiene el
+     mismo problema; el iframe navega en su propio contexto y no toca el
+     documento principal. */
+  const f = document.createElement("iframe");
+  f.style.display = "none";
+  f.src = vscodeUrl(br.absPath);
+  document.body.appendChild(f);
+  setTimeout(() => f.remove(), 2000);
 }
 
 async function linkVsCodeFolder() {
@@ -1954,13 +1976,24 @@ function wireEvents() {
   $("btnCloseSettings").onclick = closeSettingsModal;
   $("btnSaveSettings").onclick = saveSettings;
 
+  /* beforeunload se dispara también en navegaciones que el navegador acaba
+     CANCELANDO (protocolos externos como vscode://, descargas, enlaces
+     bloqueados). Cerrar aquí el proveedor dejaba la pestaña editando en
+     memoria pero sin guardar en la nube, y sin ningún aviso. Aquí solo se
+     avisa de lo que falta por escribir en disco. */
   window.addEventListener("beforeunload", e => {
-    if (state.provider) state.provider.destroy();
     if (state.mode === "local" && state.dirty.size) {
       flushLocalSaves();
       e.preventDefault();
       e.returnValue = "";        // hay cambios sin escribir en disco
     }
+  });
+
+  /* La descarga real de la página sí cierra el proveedor, para que los
+     colaboradores te vean salir en el acto. Con persisted=true la página
+     va a la caché de retroceso y volverá a usarse: ahí no se toca. */
+  window.addEventListener("pagehide", e => {
+    if (!e.persisted && state.provider) state.provider.destroy();
   });
 }
 
