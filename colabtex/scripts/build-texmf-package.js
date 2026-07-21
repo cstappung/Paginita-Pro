@@ -49,6 +49,12 @@ const EXISTING = [
   "ubuntu-texlive-fonts-recommended.js"
 ];
 
+/* subárboles que se empaquetan: macros y lo que pdfTeX necesita de las
+   fuentes (métricas, Type1, virtuales, codificaciones y mapas).
+   Se excluye fonts/source (METAFONT: no se puede ejecutar aquí) y los
+   formatos que pdfTeX no usa (opentype/truetype). */
+const KEEP_TREES = ["tex/", "fonts/tfm/", "fonts/type1/", "fonts/vf/", "fonts/enc/", "fonts/map/"];
+
 /* motores que aquí no se usan (se compila con pdfTeX) */
 const SKIP_TREES = ["tex/context/", "tex/lualatex/"];
 const SKIP_DIRS = ["/graphdrawing/"];          // Lua, solo LuaTeX
@@ -73,11 +79,12 @@ function walk(dir, base, out) {
   }
 }
 
-const texDir = path.join(SRC, "tex");
-if (!fs.existsSync(texDir)) { console.error("No existe " + texDir); process.exit(1); }
-
 const all = [];
-walk(texDir, SRC, all);
+for (const tree of KEEP_TREES) {
+  const dir = path.join(SRC, tree);
+  if (fs.existsSync(dir)) walk(dir, SRC, all);
+}
+if (!all.length) { console.error("No se encontró ningún subárbol empaquetable en " + SRC); process.exit(1); }
 
 /* ---------- filtrado ---------- */
 const skipPkgRe = new RegExp("/(" + SKIP_PKGS.join("|") + ")/");

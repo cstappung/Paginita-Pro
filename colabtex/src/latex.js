@@ -17,7 +17,11 @@ const ALL_PACKAGES = [
   // texlive-pictures, que no está compilado a wasm. Sin ella fallan tcolorbox,
   // svg, transparent y overpic con «File `pgf.sty'/`epic.sty' not found».
   // Se genera con scripts/build-texmf-package.js
-  "texlive-pictures.js"
+  "texlive-pictures.js",
+  // Huecos sueltos de fonts-extra/publishers: fuentes matemáticas (bbold,
+  // bbm, dsfont, newtx, fourier…), biblatex y clases de revista (IEEEtran,
+  // elsarticle, revtex, acmart). Incluye métricas y Type1 para pdfTeX.
+  "texlive-extra.js"
 ];
 
 export class LatexEngine {
@@ -53,14 +57,23 @@ export class LatexEngine {
     return this.ready;
   }
 
-  /* Archivos de idioma que no vienen en los paquetes TeXLive de BusyTeX:
-     se inyectan en el directorio del proyecto cuando el documento los usa. */
+  /* Archivos que no vienen en los paquetes TeXLive de BusyTeX: se inyectan
+     en el directorio del proyecto (siempre, o si el documento los usa).
+
+     pdftex.map va siempre: pdfTeX solo incrusta una fuente Type1 si figura
+     en ese mapa, y el del paquete base no incluye las fuentes que añadimos
+     después (bbold, dsfont…) → «Font bbold10 at 600 not found». Como
+     texmf.cnf pone $TEXMFDOTDIR primero en TEXFONTMAPS, el del directorio
+     de trabajo tiene prioridad. Se genera con scripts/build-fontmap.js */
   async extraFiles(files) {
-    const EXTRA = [{ name: "spanish.ldf", url: BUSYTEX_DIR + "extra/spanish.ldf", trigger: /\\usepackage\s*\[[^\]]*spanish[^\]]*\]\s*\{babel\}/ }];
+    const EXTRA = [
+      { name: "pdftex.map", url: BUSYTEX_DIR + "extra/pdftex.map", always: true },
+      { name: "spanish.ldf", url: BUSYTEX_DIR + "extra/spanish.ldf", trigger: /\\usepackage\s*\[[^\]]*spanish[^\]]*\]\s*\{babel\}/ }
+    ];
     const out = [];
     for (const ex of EXTRA) {
       if (files.some(f => f.path === ex.name || f.path.endsWith("/" + ex.name))) continue;
-      const used = files.some(f => typeof f.contents === "string" && ex.trigger.test(f.contents));
+      const used = ex.always || files.some(f => typeof f.contents === "string" && ex.trigger.test(f.contents));
       if (!used) continue;
       if (!this._extraCache) this._extraCache = {};
       if (!this._extraCache[ex.name]) this._extraCache[ex.name] = await (await fetch(ex.url)).text();
