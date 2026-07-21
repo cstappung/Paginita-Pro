@@ -49,11 +49,15 @@ const EXISTING = [
   "ubuntu-texlive-fonts-recommended.js"
 ];
 
-/* subárboles que se empaquetan: macros y lo que pdfTeX necesita de las
-   fuentes (métricas, Type1, virtuales, codificaciones y mapas).
-   Se excluye fonts/source (METAFONT: no se puede ejecutar aquí) y los
-   formatos que pdfTeX no usa (opentype/truetype). */
-const KEEP_TREES = ["tex/", "fonts/tfm/", "fonts/type1/", "fonts/vf/", "fonts/enc/", "fonts/map/"];
+/* subárboles que se empaquetan: macros, estilos de bibliografía y lo que
+   pdfTeX necesita de las fuentes (métricas, Type1, virtuales, codificaciones
+   y mapas). Se excluye fonts/source (METAFONT: no se puede ejecutar aquí) y
+   los formatos que pdfTeX no usa (opentype/truetype).
+
+   bibtex/ estaba olvidado: sin él se empaquetaba IEEEtran.cls pero no
+   IEEEtran.bst, y BibTeX moría con «I couldn't open style file» dejando
+   todas las citas sin resolver. */
+const KEEP_TREES = ["tex/", "bibtex/", "fonts/tfm/", "fonts/type1/", "fonts/vf/", "fonts/enc/", "fonts/map/"];
 
 /* motores que aquí no se usan (se compila con pdfTeX) */
 const SKIP_TREES = ["tex/context/", "tex/lualatex/"];

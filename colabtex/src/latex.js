@@ -9,7 +9,7 @@ const BUSYTEX_DIR = "vendor/busytex/";
 /* Súbelo al tocar busytex_worker.js o busytex_pipeline.js: el worker y el
    pipeline se cachean aparte del bundle, y sin esto un navegador que ya
    compiló seguiría usando el motor anterior. */
-const ENGINE_VERSION = "2";
+const ENGINE_VERSION = "3";
 const ALL_PACKAGES = [
   "texlive-basic.js",
   "ubuntu-texlive-latex-recommended.js",
@@ -25,7 +25,12 @@ const ALL_PACKAGES = [
   // Huecos sueltos de fonts-extra/publishers: fuentes matemáticas (bbold,
   // bbm, dsfont, newtx, fourier…), biblatex y clases de revista (IEEEtran,
   // elsarticle, revtex, acmart). Incluye métricas y Type1 para pdfTeX.
-  "texlive-extra.js"
+  "texlive-extra.js",
+  // Estilos de bibliografía (.bst) de las clases de revista: BusyTeX trae 69
+  // .bst pero no IEEEtran.bst —solo IEEEtranM/MN—, y el generador de paquetes
+  // omitía el subárbol bibtex/. Sin esto BibTeX aborta con «I couldn't open
+  // style file» y TODAS las citas quedan sin resolver.
+  "texlive-bst.js"
 ];
 
 export class LatexEngine {
