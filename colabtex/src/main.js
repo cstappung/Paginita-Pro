@@ -28,6 +28,8 @@ import * as lfs from "./local-fs.js";
 
 const $ = id => document.getElementById(id);
 const ROLE_LABEL = { owner: "Propietario", edit: "Puede editar", view: "Solo lectura" };
+/* preferencia de archivo principal por carpeta local (no hay nube donde guardarla) */
+const LOCAL_MAIN_PREFIX = "colabtex_local_main_";
 
 /* ---------- plantilla de proyecto nuevo ---------- */
 const TEMPLATE_MAIN = `% Creado con ColabTeX
@@ -690,7 +692,13 @@ async function openLocalFolder(handle) {
   state.collapsed = new Set();
   state.assets = scan.assets.map(a => ({ name: a.name, key: a.name, size: a.size || 0, loc: "local", handle: a.handle }));
   state.role = "owner";
-  state.project = { id: null, title: dir.name, ownerId: null, mainFile: null, role: "owner", members: [] };
+  // recuperar el .tex principal elegido la última vez para esta carpeta
+  const savedMain = localStorage.getItem(LOCAL_MAIN_PREFIX + dir.name);
+  state.project = {
+    id: null, title: dir.name, ownerId: null,
+    mainFile: savedMain && scan.contents.has(savedMain) ? savedMain : null,
+    role: "owner", members: []
+  };
   state.lastCompile = null;
 
   $("viewLogin").style.display = "none";
@@ -701,9 +709,9 @@ async function openLocalFolder(handle) {
   $("edTitle").textContent = "📂 " + dir.name;
   $("edTitle").title = "Carpeta local (el nombre no se puede cambiar aquí)";
   $("readOnlyBadge").style.display = "none";
-  // en local no hay colaboración ni miembros
+  // en local no hay colaboración, pero sí configuración (archivo principal)
   $("btnShare").style.display = "none";
-  $("btnSettings").style.display = "none";
+  $("btnSettings").style.display = "";
   $("btnNewFile").style.display = "";
   $("btnNewFolder").style.display = "";
   $("btnUploadFile").style.display = "";
@@ -1211,8 +1219,10 @@ function renderMembers() {
 function openSettingsModal() {
   $("settingsModal").style.display = "grid";
   const readOnly = state.role === "view";
+  const isLocal = state.mode === "local";
   $("setTitle").value = state.project.title;
-  $("setTitle").disabled = readOnly;
+  // en local el "título" es el nombre de la carpeta en disco: no se renombra aquí
+  $("setTitle").disabled = readOnly || isLocal;
 
   const sel = $("setMainFile");
   sel.innerHTML = "";
@@ -1231,6 +1241,11 @@ function openSettingsModal() {
   $("btnSaveSettings").style.display = readOnly ? "none" : "";
   $("setSavedMsg").textContent = "";
 
+  // en modo local no hay miembros ni proyecto en la nube que borrar
+  for (const id of ["setMembersLabel", "setMembersList", "setDangerLabel", "setDanger"])
+    $(id).style.display = isLocal ? "none" : "";
+  if (isLocal) return;
+
   if (state.membersUnsub) state.membersUnsub();
   state.membersUnsub = fb.watchMembers(state.project.id, members => {
     state.project.members = members;
@@ -1248,6 +1263,19 @@ function closeSettingsModal() {
 async function saveSettings() {
   const title = $("setTitle").value.trim().slice(0, 140) || state.project.title;
   const mainFile = $("setMainFile").value || null;
+
+  // local: no hay nube; la preferencia se guarda en este navegador
+  if (state.mode === "local") {
+    state.project.mainFile = mainFile;
+    const key = LOCAL_MAIN_PREFIX + state.dirHandle.name;
+    if (mainFile) localStorage.setItem(key, mainFile);
+    else localStorage.removeItem(key);
+    $("setSavedMsg").textContent = "✓ Archivo principal: " + (mainFile || "automático");
+    $("setSavedMsg").style.color = "#0d9488";
+    setTimeout(() => { $("setSavedMsg").textContent = ""; }, 2500);
+    return;
+  }
+
   try {
     await fb.updateProjectMeta(state.project.id, { title, mainFile });
   } catch (e) {
