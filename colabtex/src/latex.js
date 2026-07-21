@@ -6,6 +6,10 @@
    ============================================================ */
 
 const BUSYTEX_DIR = "vendor/busytex/";
+/* Súbelo al tocar busytex_worker.js o busytex_pipeline.js: el worker y el
+   pipeline se cachean aparte del bundle, y sin esto un navegador que ya
+   compiló seguiría usando el motor anterior. */
+const ENGINE_VERSION = "2";
 const ALL_PACKAGES = [
   "texlive-basic.js",
   "ubuntu-texlive-latex-recommended.js",
@@ -35,7 +39,7 @@ export class LatexEngine {
   init() {
     if (this.ready) return this.ready;
     this.onStatus("Descargando motor LaTeX (solo la primera vez)…");
-    this.worker = new Worker(BUSYTEX_DIR + "busytex_worker.js");
+    this.worker = new Worker(BUSYTEX_DIR + "busytex_worker.js?v=" + ENGINE_VERSION);
     this.ready = new Promise((resolve, reject) => {
       const onmsg = ({ data }) => {
         if (data.print) this.onStatus(data.print);

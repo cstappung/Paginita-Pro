@@ -413,7 +413,13 @@ class BusytexPipeline
                 Module.output_stdout = '';
                 Module.output_stderr = '';
                 Module.setPrefix(args[0]);
-                const exit_code = Module.callMain(args);
+                /* callMain() hace args.unshift(thisProgram), es decir MUTA el array
+                   que recibe. Varias secuencias reutilizan el mismo array (pdflatex
+                   se invoca dos veces cuando hay bibliografía, xelatex tres), así que
+                   la segunda vez llegaba «/bin/busytex /bin/busytex pdflatex …»: un
+                   comando inválido que salía con código 1 y abortaba el resto de
+                   pasadas, dejando las citas sin resolver. Se le pasa una copia. */
+                const exit_code = Module.callMain(args.slice());
                 Module._flush_streams();
                 
                 return { exit_code : exit_code, stdout : Module.output_stdout, stderr : Module.output_stderr };
@@ -495,7 +501,13 @@ class BusytexPipeline
            sin --halt-on-error: LaTeX sigue tras el primer fallo y los reporta
                              TODOS, y suele producir PDF igualmente (como Overleaf) */
         const pdftex    = ['pdflatex',   '--no-shell-escape', '--interaction=nonstopmode', '--file-line-error', '--synctex=-1', '--output-format=pdf', '--fmt', this.fmt.pdftex, tex_path].concat((this.verbose_args[verbose] || this.verbose_args[BusytexPipeline.VerboseSilent]).pdftex);
-        const pdftex_not_final    = ['pdflatex',   '--no-shell-escape', '--interaction=batchmode', '--halt-on-error', '--fmt', this.fmt.pdftex, tex_path].concat((this.verbose_args[verbose] || this.verbose_args[BusytexPipeline.VerboseSilent]).pdftex);
+        /* Pasadas intermedias: existen solo para generar el .aux que alimenta a
+           BibTeX y para releer el .bbl. Con --halt-on-error, un error cualquiera
+           las cortaba a medias y el .aux salía truncado —sin los \citation{} del
+           cuerpo—, así que BibTeX no veía las citas y estas quedaban sin resolver
+           aunque el .bib estuviera perfecto. Se dejan en nonstopmode, como la
+           pasada final. */
+        const pdftex_not_final    = ['pdflatex',   '--no-shell-escape', '--interaction=nonstopmode', '--fmt', this.fmt.pdftex, tex_path].concat((this.verbose_args[verbose] || this.verbose_args[BusytexPipeline.VerboseSilent]).pdftex);
         
         const luahbtex  = ['luahblatex', '--no-shell-escape', '--interaction=nonstopmode', '--halt-on-error', '--output-format=pdf', '--fmt', this.fmt.luahbtex, '--nosocket', tex_path].concat((this.verbose_args[verbose] || this.verbose_args[BusytexPipeline.VerboseSilent]).luahbtex);
         const luahbtex_not_final  = ['luahblatex', '--no-shell-escape', '--interaction=nonstopmode', '--halt-on-error', '--no-pdf', '--fmt', this.fmt.luahbtex, '--nosocket', tex_path].concat((this.verbose_args[verbose] || this.verbose_args[BusytexPipeline.VerboseSilent]).luahbtex);

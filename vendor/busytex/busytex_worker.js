@@ -1,4 +1,6 @@
-importScripts('busytex_pipeline.js');
+/* Se arrastra el ?v=… con el que se cargó este worker para que el navegador
+   no sirva un busytex_pipeline.js viejo de la caché cuando se corrige el motor. */
+importScripts('busytex_pipeline.js' + (self.location.search || ''));
 
 self.pipeline = null;
 
