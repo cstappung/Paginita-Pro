@@ -8,11 +8,12 @@
 import * as Y from "yjs";
 import { yCollab, yUndoManagerKeymap } from "y-codemirror.next";
 import { EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection } from "@codemirror/view";
-import { EditorState } from "@codemirror/state";
+import { EditorState, Compartment, StateEffect, StateField } from "@codemirror/state";
+import { Decoration } from "@codemirror/view";
+import { setDiagnostics, lintGutter } from "@codemirror/lint";
 import { defaultKeymap } from "@codemirror/commands";
 import { searchKeymap, highlightSelectionMatches } from "@codemirror/search";
-import { StreamLanguage, syntaxHighlighting, HighlightStyle } from "@codemirror/language";
-import { tags } from "@lezer/highlight";
+import { StreamLanguage, syntaxHighlighting } from "@codemirror/language";
 import { stex } from "@codemirror/legacy-modes/mode/stex";
 
 import { watchAuth, loginGoogle, logout } from "./firebase.js";
@@ -25,6 +26,10 @@ import { createAssistant } from "./ai-assistant.js";
 import { readZip, foldersOf, titleFromZip } from "./zip-import.js";
 import { initLayout } from "./layout.js";
 import * as lfs from "./local-fs.js";
+import { SyncTex } from "./synctex.js";
+import { parseTexLog, groupByFile } from "./texlog.js";
+import { THEMES, themeName, saveThemeName, cmThemeFor, cmHighlightFor, applyCssVars } from "./themes.js";
+import { loadKatex, visualExtensions } from "./visual.js";
 
 const $ = id => document.getElementById(id);
 const ROLE_LABEL = { owner: "Propietario", edit: "Puede editar", view: "Solo lectura" };
@@ -113,7 +118,11 @@ const state = {
   localHandles: new Map(), // ruta → FileSystemFileHandle (archivos de texto)
   localFolders: new Set(),
   dirty: new Set(),      // rutas pendientes de escribir a disco
-  saveTimer: null
+  saveTimer: null,
+  // ---- sincronía código ↔ PDF y diagnósticos ----
+  syncTex: null,         // instancia de SyncTex de la última compilación
+  diagnostics: null,     // Map archivo → [items] del último log
+  suppressSync: false    // evita que el salto PDF→código dispare el inverso
 };
 
 /* ================================================ enrutado */
@@ -325,7 +334,9 @@ async function openEditor(projectId, token) {
 function ensureViewerAndEngine() {
   if (!state.pdfViewer) {
     state.pdfViewer = new PdfViewer($("pdfScroll"), {
-      onPageInfo: (cur, total) => { $("pageLabel").textContent = `Página ${cur} / ${total}`; }
+      onPageInfo: (cur, total) => { $("pageLabel").textContent = `Página ${cur} / ${total}`; },
+      // doble clic en el PDF → llevar el cursor a esa línea del código
+      onPointClick: (page, x, y) => syncPdfToCode(page, x, y)
     });
   }
   if (!state.engine) {
@@ -961,26 +972,71 @@ const aiApi = {
 };
 
 /* ---------- CodeMirror ---------- */
-const cmTheme = EditorView.theme({
-  "&": { backgroundColor: "#141c24", color: "#d5dee8", fontSize: "12.5px", height: "100%" },
-  ".cm-content": { fontFamily: "'IBM Plex Mono',monospace", caretColor: "#0d9488", lineHeight: "1.7" },
-  ".cm-cursor": { borderLeftColor: "#2dd4bf" },
-  ".cm-gutters": { backgroundColor: "#141c24", color: "#44546a", border: "none" },
-  ".cm-activeLine": { backgroundColor: "rgba(36,50,68,0.5)" },
-  ".cm-activeLineGutter": { backgroundColor: "rgba(36,50,68,0.5)" },
-  "&.cm-focused .cm-selectionBackground, .cm-selectionBackground": { backgroundColor: "#2a3a4c !important" },
-  ".cm-selectionMatch": { backgroundColor: "rgba(13,148,136,0.3)" }
-}, { dark: true });
+/* El tema vive en un «compartment» para poder cambiarlo en caliente sin
+   recrear el editor (y sin perder el estado ni la conexión de Yjs). */
+const themeComp = new Compartment();
+const visualComp = new Compartment();
 
-const cmHighlight = HighlightStyle.define([
-  { tag: tags.comment, color: "#5f7285", fontStyle: "italic" },
-  { tag: tags.tagName, color: "#6cb6ff" },
-  { tag: tags.keyword, color: "#6cb6ff" },
-  { tag: tags.atom, color: "#7ee0c2" },
-  { tag: tags.number, color: "#e2c08d" },
-  { tag: tags.string, color: "#e2c08d" },
-  { tag: tags.bracket, color: "#8fa3b8" }
-]);
+function themeExtensions(name) {
+  const p = THEMES[name] || THEMES[themeName()];
+  return [cmThemeFor(p), syntaxHighlighting(cmHighlightFor(p))];
+}
+
+/* ---- resalte temporal de una línea (al saltar desde el PDF) ---- */
+const setSyncLine = StateEffect.define();
+const syncLineField = StateField.define({
+  create: () => Decoration.none,
+  update(deco, tr) {
+    deco = deco.map(tr.changes);
+    for (const e of tr.effects) {
+      if (e.is(setSyncLine)) {
+        if (e.value == null) return Decoration.none;
+        const line = tr.state.doc.line(Math.min(e.value, tr.state.doc.lines));
+        deco = Decoration.set([
+          Decoration.line({ class: "cm-syncLine" }).range(line.from)
+        ]);
+      }
+    }
+    return deco;
+  },
+  provide: f => EditorView.decorations.from(f)
+});
+
+/* Extensiones comunes a los dos modos (nube y local). */
+function commonExtensions() {
+  return [
+    lineNumbers(),
+    highlightActiveLine(),
+    highlightActiveLineGutter(),
+    drawSelection(),
+    highlightSelectionMatches(),
+    StreamLanguage.define(stex),
+    lintGutter(),            // icono en el margen junto a la línea con error
+    themeComp.of(themeExtensions(themeName())),
+    visualComp.of([]),
+    syncLineField,
+    EditorView.lineWrapping,
+    /* doble clic en el código → ir a esa parte del PDF (funcionalidad 4) */
+    EditorView.domEventHandlers({
+      dblclick(ev, view) {
+        const pos = view.posAtCoords({ x: ev.clientX, y: ev.clientY });
+        if (pos == null) return false;
+        syncCodeToPdf(view.state.doc.lineAt(pos).number);
+        return false;   // no se cancela: el doble clic sigue seleccionando la palabra
+      }
+    })
+  ];
+}
+
+/* Atajos propios. Ctrl+S compila en vez de guardar la página (funcionalidad 2)
+   y Ctrl+Alt+J salta al PDF, como en TeXstudio/Overleaf. */
+const colabKeymap = [
+  { key: "Mod-s", preventDefault: true, run: () => { compile(); return true; } },
+  { key: "Mod-Alt-j", preventDefault: true, run: view => {
+      syncCodeToPdf(view.state.doc.lineAt(view.state.selection.main.head).number);
+      return true;
+    } }
+];
 
 /* editor local: CodeMirror plano + autoguardado en disco */
 function mountLocalEditor(fileName) {
@@ -990,16 +1046,8 @@ function mountLocalEditor(fileName) {
   renderFileTree();
 
   const extensions = [
-    lineNumbers(),
-    highlightActiveLine(),
-    highlightActiveLineGutter(),
-    drawSelection(),
-    highlightSelectionMatches(),
-    StreamLanguage.define(stex),
-    syntaxHighlighting(cmHighlight),
-    cmTheme,
-    EditorView.lineWrapping,
-    keymap.of([...defaultKeymap, ...searchKeymap]),
+    ...commonExtensions(),
+    keymap.of([...colabKeymap, ...defaultKeymap, ...searchKeymap]),
     EditorView.updateListener.of(u => {
       if (u.docChanged) {
         state.localContent.set(fileName, u.state.doc.toString());
@@ -1015,6 +1063,8 @@ function mountLocalEditor(fileName) {
   const stateCM = EditorState.create({ doc: state.localContent.get(fileName), extensions });
   if (state.editorView) state.editorView.setState(stateCM);
   else state.editorView = new EditorView({ state: stateCM, parent: $("cmHost") });
+  applyDiagnostics();
+  applyVisualMode();
 }
 
 function mountEditor(fileName) {
@@ -1028,16 +1078,8 @@ function mountEditor(fileName) {
   const undoManager = new Y.UndoManager(ytext);
   const readOnly = state.role === "view";
   const extensions = [
-    lineNumbers(),
-    highlightActiveLine(),
-    highlightActiveLineGutter(),
-    drawSelection(),
-    highlightSelectionMatches(),
-    StreamLanguage.define(stex),
-    syntaxHighlighting(cmHighlight),
-    cmTheme,
-    EditorView.lineWrapping,
-    keymap.of([...yUndoManagerKeymap, ...defaultKeymap, ...searchKeymap]),
+    ...commonExtensions(),
+    keymap.of([...colabKeymap, ...yUndoManagerKeymap, ...defaultKeymap, ...searchKeymap]),
     yCollab(ytext, state.provider.awareness, { undoManager }),
     EditorView.updateListener.of(u => {
       if (u.selectionSet || u.docChanged) {
@@ -1052,6 +1094,199 @@ function mountEditor(fileName) {
   const stateCM = EditorState.create({ doc: ytext.toString(), extensions });
   if (state.editorView) state.editorView.setState(stateCM);
   else state.editorView = new EditorView({ state: stateCM, parent: $("cmHost") });
+  applyDiagnostics();
+  applyVisualMode();
+}
+
+/* ============================================================
+   Sincronía código ↔ PDF (SyncTeX)
+   ============================================================ */
+
+/* código → PDF: dónde queda en el documento la línea indicada */
+function syncCodeToPdf(line, quiet) {
+  if (!state.syncTex || !state.syncTex.ok) {
+    if (!quiet) setStatus("Compila primero para poder sincronizar con el PDF", "#e2c08d");
+    return false;
+  }
+  const pos = state.syncTex.forward(state.activeFile, line);
+  if (!pos) {
+    if (!quiet) setStatus(`«${state.activeFile}» no aparece en el PDF compilado`, "#e2c08d");
+    return false;
+  }
+  const done = state.pdfViewer && state.pdfViewer.scrollTo(pos.page, pos.x, pos.y, pos.w, pos.h);
+  if (done && !quiet) {
+    setStatus(pos.exact
+      ? `Línea ${line} → página ${pos.page}`
+      : `Línea ${line} (sin marca exacta) → página ${pos.page}`, "#7ee0c2");
+  }
+  return done;
+}
+
+/* PDF → código: qué línea generó el punto donde se hizo doble clic */
+async function syncPdfToCode(page, xPt, yPt) {
+  if (!state.syncTex || !state.syncTex.ok) return;
+  const hit = state.syncTex.inverse(page, xPt, yPt);
+  if (!hit) return;
+
+  // si el fragmento pertenece a otro archivo del proyecto, abrirlo antes
+  if (hit.file !== state.activeFile) {
+    const exists = state.mode === "local"
+      ? state.localContent.has(hit.file)
+      : (state.yFiles && state.yFiles.has(hit.file));
+    if (!exists) { setStatus(`El PDF apunta a «${hit.file}», que no está en el proyecto`, "#e2c08d"); return; }
+    mountEditor(hit.file);
+  }
+
+  const view = state.editorView;
+  if (!view) return;
+  const n = Math.min(Math.max(1, hit.line), view.state.doc.lines);
+  const lineObj = view.state.doc.line(n);
+  view.dispatch({
+    selection: { anchor: lineObj.from },
+    effects: [EditorView.scrollIntoView(lineObj.from, { y: "center" }), setSyncLine.of(n)]
+  });
+  view.focus();
+  setStatus(`Página ${page} → ${hit.file}:${n}`, "#7ee0c2");
+  // el resalte se quita solo cuando acaba la animación
+  setTimeout(() => {
+    if (state.editorView === view) view.dispatch({ effects: setSyncLine.of(null) });
+  }, 1700);
+}
+
+/* ============================================================
+   Errores de compilación marcados en el editor
+   ============================================================ */
+function applyDiagnostics() {
+  const view = state.editorView;
+  if (!view) return;
+  const items = (state.diagnostics && state.diagnostics.get(state.activeFile)) || [];
+  const doc = view.state.doc;
+
+  const diags = [];
+  for (const it of items) {
+    const n = Math.min(Math.max(1, it.line), doc.lines);
+    const line = doc.line(n);
+    // subrayar el texto real de la línea, no el sangrado
+    const from = line.from + (line.text.match(/^\s*/) || [""])[0].length;
+    diags.push({
+      from: Math.min(from, line.to),
+      to: line.to,
+      severity: it.severity,
+      message: it.message + (it.detail ? "\n\n" + it.detail : "")
+    });
+  }
+  diags.sort((a, b) => a.from - b.from);
+  view.dispatch(setDiagnostics(view.state, diags));
+}
+
+/* Contador de errores en la barra del editor */
+function renderDiagChip() {
+  const chip = $("diagChip");
+  if (!state.diagnostics) { chip.style.display = "none"; return; }
+  let err = 0, warn = 0;
+  for (const arr of state.diagnostics.values())
+    for (const it of arr) (it.severity === "error" ? err++ : warn++);
+  if (!err && !warn) { chip.style.display = "none"; return; }
+  chip.style.display = "";
+  chip.className = "diag-chip " + (err ? "has-err" : "has-warn");
+  chip.textContent = err ? `${err} ✗${warn ? "  " + warn + " ⚠" : ""}` : `${warn} ⚠`;
+  chip.title = "Ir al primer problema";
+  chip.onclick = () => gotoFirstDiagnostic();
+}
+
+/* Salta al primer error, abriendo el archivo que lo contiene */
+function gotoFirstDiagnostic() {
+  if (!state.diagnostics) return;
+  let target = null;
+  for (const [file, arr] of state.diagnostics) {
+    for (const it of arr) {
+      if (it.severity !== "error") continue;
+      if (!target) target = { file, it };
+    }
+  }
+  if (!target) {
+    for (const [file, arr] of state.diagnostics) { if (arr.length) { target = { file, it: arr[0] }; break; } }
+  }
+  if (!target) return;
+
+  const exists = state.mode === "local"
+    ? state.localContent.has(target.file)
+    : (state.yFiles && state.yFiles.has(target.file));
+  if (exists && target.file !== state.activeFile) mountEditor(target.file);
+
+  const view = state.editorView;
+  if (!view) return;
+  const n = Math.min(Math.max(1, target.it.line), view.state.doc.lines);
+  const line = view.state.doc.line(n);
+  view.dispatch({
+    selection: { anchor: line.from },
+    effects: EditorView.scrollIntoView(line.from, { y: "center" })
+  });
+  view.focus();
+}
+
+/* ============================================================
+   Modo Visual (funcionalidad 1)
+   ============================================================ */
+const VISUAL_KEY = "colabtex_visual";
+
+function visualOn() { return localStorage.getItem(VISUAL_KEY) === "1"; }
+
+async function setVisualMode(on) {
+  localStorage.setItem(VISUAL_KEY, on ? "1" : "0");
+  $("tabCode").classList.toggle("code-tab-on", !on);
+  $("tabVisual").classList.toggle("code-tab-on", on);
+  if (on) {
+    try {
+      setStatus("Preparando la vista visual…", "#e2c08d");
+      await loadKatex();
+      setStatus("Vista visual activa", "#7ee0c2");
+    } catch (e) {
+      setStatus("No se pudo cargar KaTeX; se mantiene la vista de código", "#e57373");
+      localStorage.setItem(VISUAL_KEY, "0");
+      $("tabCode").classList.add("code-tab-on");
+      $("tabVisual").classList.remove("code-tab-on");
+      return;
+    }
+  }
+  applyVisualMode();
+}
+
+function applyVisualMode() {
+  const on = visualOn();
+  $("tabCode").classList.toggle("code-tab-on", !on);
+  $("tabVisual").classList.toggle("code-tab-on", on);
+  if (!state.editorView) return;
+  // solo tiene sentido en archivos LaTeX
+  const isTex = /\.tex$/i.test(state.activeFile || "");
+  state.editorView.dispatch({
+    effects: visualComp.reconfigure(on && isTex && window.katex ? visualExtensions() : [])
+  });
+}
+
+/* ============================================================
+   Temas
+   ============================================================ */
+function applyTheme(name) {
+  saveThemeName(name);
+  const p = THEMES[name];
+  applyCssVars(p);
+  if (state.editorView)
+    state.editorView.dispatch({ effects: themeComp.reconfigure(themeExtensions(name)) });
+}
+
+function initThemeSelector() {
+  const sel = $("themeSelect");
+  if (!sel) return;
+  sel.innerHTML = "";
+  for (const k in THEMES) {
+    const o = document.createElement("option");
+    o.value = k; o.textContent = THEMES[k].label;
+    sel.appendChild(o);
+  }
+  sel.value = themeName();
+  sel.onchange = () => applyTheme(sel.value);
+  applyCssVars(THEMES[themeName()]);
 }
 
 /* ---------- presencia ---------- */
@@ -1142,10 +1377,23 @@ async function compile() {
     const sum = summarizeLog(result);
     state.lastCompile = { ok: !!(result.pdf && result.pdf.length > 0), errors: sum.errors, warnings: sum.warnings };
 
+    // mapa de sincronía y errores por archivo/línea de esta compilación
+    state.syncTex = new SyncTex(result.synctex || "");
+    state.diagnostics = groupByFile(parseTexLog(sum.full, main));
+    applyDiagnostics();
+    renderDiagChip();
+
     if (result.pdf && result.pdf.length > 0) {
       await state.pdfViewer.load(result.pdf);
-      setStatus(`Compilado en ${secs} s`, "#7ee0c2");
-      $("logSummary").innerHTML = `<span style="color:#7ee0c2;font-weight:500">✓ Compilación correcta — pdflatex · ${secs} s · ${sum.errors.length} errores · ${sum.warnings.length} advertencias</span>`;
+      const nErr = sum.errors.length;
+      if (nErr) {
+        // sin --halt-on-error hay PDF aunque haya fallos: se avisa igualmente
+        setStatus(`Compilado con ${nErr} error${nErr === 1 ? "" : "es"} (${secs} s)`, "#e2c08d");
+        $("logSummary").innerHTML = `<span style="color:#e2c08d;font-weight:500">⚠ PDF generado, pero con ${nErr} error${nErr === 1 ? "" : "es"} — pdflatex · ${secs} s · ${sum.warnings.length} advertencias</span>`;
+      } else {
+        setStatus(`Compilado en ${secs} s`, "#7ee0c2");
+        $("logSummary").innerHTML = `<span style="color:#7ee0c2;font-weight:500">✓ Compilación correcta — pdflatex · ${secs} s · 0 errores · ${sum.warnings.length} advertencias</span>`;
+      }
     } else {
       setStatus("Error de compilación", "#e57373");
       $("logSummary").innerHTML = `<span style="color:#e57373;font-weight:500">✗ La compilación falló — revisa el registro (${sum.errors.length} error${sum.errors.length === 1 ? "" : "es"})</span>`;
@@ -1446,6 +1694,23 @@ function wireEvents() {
   $("btnCompile").onclick = compile;
   $("btnRecompile").onclick = compile;
   $("btnShare").onclick = openShareModal;
+  $("btnSyncToPdf").onclick = () => {
+    const v = state.editorView;
+    if (v) syncCodeToPdf(v.state.doc.lineAt(v.state.selection.main.head).number);
+  };
+  $("tabCode").onclick = () => setVisualMode(false);
+  $("tabVisual").onclick = () => setVisualMode(true);
+  initThemeSelector();
+
+  /* Ctrl+S compila (funcionalidad 2). El atajo de CodeMirror solo actúa con el
+     foco en el editor; este captura el resto de la página (PDF, árbol, etc.). */
+  window.addEventListener("keydown", e => {
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === "s" || e.key === "S")) {
+      if ($("viewEditor").style.display === "none") return;   // fuera del editor, no tocar
+      e.preventDefault();
+      compile();
+    }
+  });
 
   // editor: archivos y carpetas
   $("btnNewFile").onclick = () => newFileIn("");
@@ -1533,6 +1798,8 @@ function wireEvents() {
 (function boot() {
   wireEvents();
   initLayout();
+  // si la vista visual quedó activa, ir cargando KaTeX desde ya
+  if (visualOn()) loadKatex().then(applyVisualMode).catch(() => {});
   watchAuth(async user => {
     // si se está editando una carpeta local, no cambiar de vista por auth
     if (state.mode === "local" && state.dirHandle) {

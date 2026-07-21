@@ -485,10 +485,16 @@ class BusytexPipeline
 
         const tex_path = PATH.basename(main_tex_path), dirname = PATH.dirname(main_tex_path);
 
-        const [xdv_path, pdf_path, log_path, aux_path, blg_path, bbl_path] = ['.xdv', '.pdf', '.log', '.aux', '.blg', '.bbl'].map(ext => tex_path.replace('.tex', ext));
-        
+        const [xdv_path, pdf_path, log_path, aux_path, blg_path, bbl_path, synctex_path] = ['.xdv', '.pdf', '.log', '.aux', '.blg', '.bbl', '.synctex'].map(ext => tex_path.replace('.tex', ext));
+
         const xetex     = ['xelatex' ,   '--no-shell-escape', '--interaction=batchmode', '--halt-on-error', '--no-pdf'           , '--fmt', this.fmt.xetex , tex_path].concat((this.verbose_args[verbose] || this.verbose_args[BusytexPipeline.VerboseSilent]).xetex);
-        const pdftex    = ['pdflatex',   '--no-shell-escape', '--interaction=nonstopmode', '--halt-on-error', '--output-format=pdf', '--fmt', this.fmt.pdftex, tex_path].concat((this.verbose_args[verbose] || this.verbose_args[BusytexPipeline.VerboseSilent]).pdftex);
+        /* Pasada final:
+           --synctex=-1      mapa código↔PDF sin comprimir (con 1 sería .synctex.gz)
+           --file-line-error errores como «main.tex:41: mensaje» → se pueden
+                             marcar en el editor sin rastrear los paréntesis del log
+           sin --halt-on-error: LaTeX sigue tras el primer fallo y los reporta
+                             TODOS, y suele producir PDF igualmente (como Overleaf) */
+        const pdftex    = ['pdflatex',   '--no-shell-escape', '--interaction=nonstopmode', '--file-line-error', '--synctex=-1', '--output-format=pdf', '--fmt', this.fmt.pdftex, tex_path].concat((this.verbose_args[verbose] || this.verbose_args[BusytexPipeline.VerboseSilent]).pdftex);
         const pdftex_not_final    = ['pdflatex',   '--no-shell-escape', '--interaction=batchmode', '--halt-on-error', '--fmt', this.fmt.pdftex, tex_path].concat((this.verbose_args[verbose] || this.verbose_args[BusytexPipeline.VerboseSilent]).pdftex);
         
         const luahbtex  = ['luahblatex', '--no-shell-escape', '--interaction=nonstopmode', '--halt-on-error', '--output-format=pdf', '--fmt', this.fmt.luahbtex, '--nosocket', tex_path].concat((this.verbose_args[verbose] || this.verbose_args[BusytexPipeline.VerboseSilent]).luahbtex);
@@ -630,11 +636,17 @@ class BusytexPipeline
 
         console.log('LOGS', logs);
 
-        const pdf = exit_code == 0 ? this.read_all_bytes(FS, pdf_path) : null;
+        /* Se lee el PDF aunque exit_code != 0: sin --halt-on-error, LaTeX
+           produce salida utilizable pese a los errores, y es preferible
+           enseñarla (con los fallos marcados) a no enseñar nada. */
+        const pdf_bytes = this.read_all_bytes(FS, pdf_path);
+        const pdf = pdf_bytes && pdf_bytes.length ? pdf_bytes : null;
+        // mapa SyncTeX (código ↔ posición en el PDF); ausente si pdftex no lo generó
+        const synctex = this.read_all_text(FS, synctex_path);
         const logcat = logs.map(({cmd, texmflog, missfontlog, log, exit_code, stdout, stderr}) => ([`$ ${cmd}`, `EXITCODE: ${exit_code}`, '', 'TEXMFLOG:', texmflog, '==', 'MISSFONTLOG:', missfontlog, '==', 'LOG:', log, '==', 'STDOUT:', stdout, '==', 'STDERR:', stderr, '======'].join('\n'))).join('\n\n');
         
         this.Module = this.preload == false ? null : this.Module;
         
-        return {pdf : pdf, log : logcat, exit_code : exit_code, logs : logs};
+        return {pdf : pdf, log : logcat, exit_code : exit_code, logs : logs, synctex : synctex};
     }
 }
