@@ -7,7 +7,7 @@
 const $ = id => document.getElementById(id);
 const STORE = "colabtex_layout";
 
-const MIN = { files: 140, code: 220, pdf: 220, ai: 260 };
+const MIN = { files: 140, code: 220, pdf: 220, ai: 260, comments: 240 };
 
 function loadSizes() {
   try { return JSON.parse(localStorage.getItem(STORE)) || {}; } catch (e) { return {}; }
@@ -21,11 +21,13 @@ export function initLayout() {
   const code = document.querySelector(".ed-code");
   const pdf = document.querySelector(".ed-pdf");
   const ai = $("aiPanel");
+  const comments = $("commentsPanel");
   if (!files || !code || !pdf) return;
 
   const sizes = loadSizes();
   if (sizes.files) files.style.width = sizes.files + "px";
   if (sizes.ai && ai) ai.style.width = sizes.ai + "px";
+  if (sizes.comments && comments) comments.style.width = sizes.comments + "px";
   if (sizes.codeGrow && sizes.pdfGrow) {
     code.style.flexGrow = sizes.codeGrow;
     pdf.style.flexGrow = sizes.pdfGrow;
@@ -104,17 +106,19 @@ export function initLayout() {
   fixedSplitter($("splitFiles"), files, "files", "left");
   flexSplitter($("splitCode"), code, pdf);
   fixedSplitter($("splitAi"), ai, "ai", "right");
+  fixedSplitter($("splitComments"), comments, "comments", "right");
 
   /* doble clic en un divisor → restablecer proporciones por defecto */
   const reset = () => {
     files.style.width = "200px";
     if (ai) ai.style.width = "360px";
+    if (comments) comments.style.width = "340px";
     code.style.flexGrow = 1.15;
     pdf.style.flexGrow = 1;
     saveSizes({});
     settle();
   };
-  for (const id of ["splitFiles", "splitCode", "splitAi"]) {
+  for (const id of ["splitFiles", "splitCode", "splitAi", "splitComments"]) {
     const h = $(id);
     if (h) { h.ondblclick = reset; h.title = "Arrastra para redimensionar · doble clic para restablecer"; }
   }

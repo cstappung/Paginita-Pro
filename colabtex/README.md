@@ -36,6 +36,8 @@ colabtex/
   src/y-rtdb.js     Proveedor Yjs sobre Realtime Database + presencia
   src/latex.js      Motor BusyTeX (worker WASM) + resumen de log
   src/pdfview.js    Visor PDF (pdf.js)
+  src/comments.js   Comentarios sobre el texto (hilos anclados con
+                    posiciones relativas de Yjs; resalte, burbuja y panel)
   server/static.js  Servidor estático SOLO para desarrollo local
 firebase/           Reglas de seguridad + guía de configuración
 vendor/busytex/     Motor pdfTeX WASM + paquetes TeXLive (~217 MB)
@@ -61,9 +63,10 @@ projects/<pid>/tokens            {edit, view}   (solo visibles para editores)
 projects/<pid>/invites/<token>   invitaciones por correo
 projects/<pid>/doc/snapshot      estado Yjs consolidado (base64)
 projects/<pid>/doc/updates/<k>   cambios incrementales (se compactan cada ~80)
-                                 (el Y.Doc guarda dos mapas: "files" ruta→texto
-                                  y "folders" ruta→true para carpetas vacías;
-                                  las rutas pueden llevar subcarpetas: cap1/intro.tex)
+                                 (el Y.Doc guarda tres mapas: "files" ruta→texto,
+                                  "folders" ruta→true para carpetas vacías, y
+                                  "comments" id→hilo de comentario; las rutas
+                                  pueden llevar subcarpetas: cap1/intro.tex)
 projects/<pid>/assetsIndex/<k>   índice de binarios (storage o base64)
 tokenIndex/<token>               {pid, role} — unirse por enlace
 presence/<pid>/<clientID>        cursores y presencia (se limpia al desconectar)
@@ -79,3 +82,11 @@ presence/<pid>/<clientID>        cursores y presencia (se limpia al desconectar)
   bitmap en WASM); la plantilla ya lo hace.
 - `migracion-proyectos-locales/` contiene los .tex exportados de la
   versión anterior (cuando los proyectos vivían en el disco local).
+- **Comentarios** (`src/comments.js`): se selecciona texto y se le adjunta
+  un hilo que ven todos. Cada hilo es un `Y.Map` dentro del mapa `comments`
+  del Y.Doc: `{file, anchor, head, quote, author, createdAt, resolved,
+  resolvedBy, messages: Y.Array}`. `anchor`/`head` son posiciones RELATIVAS
+  de Yjs (`Y.relativePositionToJSON`), así el resalte sigue al texto aunque
+  otros editen encima. Solo funciona en la nube (los invitados de solo
+  lectura los ven pero no pueden escribir: lo impiden el proveedor y las
+  reglas de Firebase). En modo local (carpeta de disco) no hay comentarios.

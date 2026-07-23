@@ -263,6 +263,55 @@
   #aiSend{width:36px;height:36px;flex-shrink:0;border:none;border-radius:8px;background:#7c5cff;color:#fff;font-size:14px;cursor:pointer}
   #aiSend:hover{background:#6a49f0}
   #aiSend:disabled{background:#3a3550;color:#8b84a8;cursor:default}
+
+  /* ============ COMENTARIOS ============ */
+  .comments-badge{display:inline-grid;place-items:center;min-width:16px;height:16px;margin-left:6px;padding:0 4px;border-radius:9px;background:#e0a52b;color:#1a1400;font-size:10px;font-weight:700;vertical-align:middle}
+  /* resalte del fragmento comentado en el editor */
+  .cm-comment{background:rgba(224,165,43,0.20);border-bottom:2px solid rgba(224,165,43,0.75);cursor:pointer}
+  .cm-comment:hover{background:rgba(224,165,43,0.32)}
+  .cm-comment-active{background:rgba(224,165,43,0.40)}
+  /* burbuja flotante «Comentar» sobre la selección */
+  .comment-bubble{position:fixed;z-index:60;height:28px;padding:0 12px;border:none;border-radius:14px;
+    background:#e0a52b;color:#1a1400;font-family:'IBM Plex Sans',sans-serif;font-size:12px;font-weight:600;
+    cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,0.35)}
+  .comment-bubble:hover{background:#f0b53b}
+
+  .ed-comments{width:340px;flex-shrink:0;background:var(--ed-bg);border-left:1px solid var(--ed-border);display:flex;flex-direction:column;min-width:0}
+  .comments-head{display:flex;align-items:center;justify-content:space-between;gap:8px;height:38px;padding:0 8px 0 14px;border-bottom:1px solid var(--ed-border);flex-shrink:0}
+  .comments-title{font-size:12px;font-weight:700;color:#e0a52b;letter-spacing:0.02em}
+  .comments-filters{display:flex;align-items:center;gap:4px}
+  .comments-filter{height:24px;padding:0 9px;border:1px solid var(--ed-sel);border-radius:12px;background:transparent;color:var(--ed-muted);font-size:11px;cursor:pointer}
+  .comments-filter.on{background:var(--ed-panel);color:var(--ed-fg);border-color:var(--ed-accent)}
+  .comments-body{flex:1;overflow:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
+  .comments-empty{color:var(--ed-muted);font-size:12px;line-height:1.6;padding:8px 4px;text-align:center}
+
+  .comment-card{background:var(--ed-panel);border:1px solid var(--ed-border);border-radius:9px;padding:9px 10px;display:flex;flex-direction:column;gap:8px}
+  .comment-card-active{border-color:#e0a52b;box-shadow:0 0 0 1px rgba(224,165,43,0.4)}
+  .comment-card-resolved{opacity:0.65}
+  .comment-quote{display:flex;flex-direction:column;gap:2px;cursor:pointer;border-left:2px solid rgba(224,165,43,0.6);padding-left:8px}
+  .comment-file{font-family:'IBM Plex Mono',monospace;font-size:10px;color:var(--ed-muted)}
+  .comment-lost{font-size:10px;color:#e57373}
+  .comment-quote-text{font-size:11.5px;color:var(--ed-panel-fg);font-style:italic;line-height:1.45;max-height:3.2em;overflow:hidden}
+  .comment-msgs{display:flex;flex-direction:column;gap:8px}
+  .comment-msg{display:flex;gap:7px}
+  .comment-avatar{width:22px;height:22px;flex-shrink:0;border-radius:50%;display:grid;place-items:center;font-size:10px;font-weight:600;color:#fff}
+  .comment-msg-body{min-width:0;flex:1}
+  .comment-msg-head{display:flex;justify-content:space-between;gap:6px;font-size:11px;color:var(--ed-muted)}
+  .comment-msg-head b{color:var(--ed-fg);font-weight:600}
+  .comment-msg-text{font-size:12.5px;color:var(--ed-fg);line-height:1.5;word-break:break-word;overflow-wrap:anywhere;white-space:pre-wrap}
+  .comment-resolved-tag{font-size:11px;color:#7ec9a5}
+  .comment-actions{display:flex;align-items:center;gap:6px}
+  .comment-actions-col{flex-direction:column;align-items:stretch}
+  .comment-reply-input{flex:1;min-width:0;height:30px;padding:0 9px;border:1px solid var(--ed-sel);border-radius:15px;background:var(--ed-bg);color:var(--ed-fg);font-family:'IBM Plex Sans',sans-serif;font-size:12px;outline:none}
+  .comment-reply-input:focus{border-color:#e0a52b}
+  .comment-draft-input{width:100%;box-sizing:border-box;resize:vertical;min-height:52px;padding:7px 9px;border:1px solid var(--ed-sel);border-radius:8px;background:var(--ed-bg);color:var(--ed-fg);font-family:'IBM Plex Sans',sans-serif;font-size:12.5px;line-height:1.5;outline:none}
+  .comment-draft-input:focus{border-color:#e0a52b}
+  .comment-draft-btns{display:flex;justify-content:flex-end;gap:6px}
+  .comment-mini{height:28px;padding:0 11px;border:1px solid var(--ed-sel);border-radius:6px;background:transparent;color:var(--ed-panel-fg);font-size:11.5px;cursor:pointer;white-space:nowrap}
+  .comment-mini:hover{border-color:var(--ed-accent);color:var(--ed-fg)}
+  .comment-primary{background:#e0a52b;border-color:#e0a52b;color:#1a1400;font-weight:600}
+  .comment-primary:hover{background:#f0b53b;color:#1a1400}
+  .comment-del{padding:0 8px}
 </style>
 </head>
 <body>
@@ -343,6 +392,7 @@
         <div id="presenceAvatars"></div>
         <button id="btnReloadLocal" class="btn-outline-dark" style="display:none" title="Volver a leer los archivos desde el disco">⟲ Recargar</button>
         <button id="btnVsCode" class="btn-outline-dark" style="display:none" title="Sincronizar este proyecto con una carpeta de tu PC y editarlo en VS Code">💻 VS Code</button>
+        <button id="btnCommentsToggle" class="btn-outline-dark" title="Comentarios (selecciona texto y coméntalo)">💬 Comentarios<span id="commentsCount" class="comments-badge" style="display:none"></span></button>
         <button id="btnAiToggle" class="btn-outline-dark" title="Asistente IA (Claude, Gemini o ChatGPT)">✦ Asistente</button>
         <button id="btnSettings" class="btn-outline-dark" title="Configuración del proyecto">⚙ Configuración</button>
         <button id="btnShare" class="btn-outline-dark">Compartir</button>
@@ -446,6 +496,21 @@
           <button id="aiSend" title="Enviar">➤</button>
         </div>
       </aside>
+
+      <div id="splitComments" class="ed-split" style="display:none"></div>
+
+      <!-- comentarios sobre el texto -->
+      <aside id="commentsPanel" class="ed-comments" style="display:none">
+        <div class="comments-head">
+          <span class="comments-title">💬 Comentarios</span>
+          <div class="comments-filters">
+            <button id="commentsFilterOpen" class="comments-filter on">Sin resolver</button>
+            <button id="commentsFilterAll" class="comments-filter">Todos</button>
+            <button id="commentsClose" class="ai-icon" title="Cerrar">✕</button>
+          </div>
+        </div>
+        <div id="commentsBody" class="comments-body"></div>
+      </aside>
     </div>
 
     <footer class="ed-footer">
@@ -510,6 +575,6 @@
   </div>
 </div>
 
-<script src="colabtex-app.js?v=202607211830"></script>
+<script src="colabtex-app.js?v=202607231700"></script>
 </body>
 </html>

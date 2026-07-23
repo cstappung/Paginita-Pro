@@ -23,6 +23,7 @@ import { colorForUid, colorLight, timeAgo, escapeHtml } from "./util.js";
 import { LatexEngine, summarizeLog } from "./latex.js";
 import { PdfViewer } from "./pdfview.js";
 import { createAssistant } from "./ai-assistant.js";
+import { createComments } from "./comments.js";
 import { readZip, foldersOf, titleFromZip } from "./zip-import.js";
 import { initLayout } from "./layout.js";
 import * as lfs from "./local-fs.js";
@@ -100,6 +101,8 @@ const state = {
   provider: null,
   yFiles: null,
   yFolders: null,        // Y.Map: ruta de carpeta → true (carpetas vacías)
+  yComments: null,       // Y.Map: id → hilo de comentario (solo nube)
+  comments: null,        // panel/gestor de comentarios (creado en boot)
   collapsed: new Set(),  // carpetas plegadas (solo UI local)
   uploadPrefix: "",      // carpeta destino de la próxima subida
   activeFile: null,
@@ -283,6 +286,7 @@ async function openEditor(projectId, token) {
   $("btnImportZip").style.display = readOnly ? "none" : "";
   $("btnReloadLocal").style.display = "none";
   $("btnVsCode").style.display = lfs.isSupported() ? "" : "none";
+  $("btnCommentsToggle").style.display = "";   // comentarios: disponible en la nube
   paintVsCodeButton();
   state.lastCompile = null;
   if (state.assistant) state.assistant.reset();
@@ -295,6 +299,7 @@ async function openEditor(projectId, token) {
   state.provider = provider;
   state.yFiles = ydoc.getMap("files");
   state.yFolders = ydoc.getMap("folders");
+  state.yComments = ydoc.getMap("comments");
   state.collapsed = new Set();
   state.uploadPrefix = "";
 
@@ -333,6 +338,7 @@ async function openEditor(projectId, token) {
     state.activeFile = names.includes("main.tex") ? "main.tex" : (names[0] || null);
     renderFileTree();
     if (state.activeFile) mountEditor(state.activeFile);
+    if (state.comments) state.comments.mount();   // comentarios (solo nube)
   });
   state.yFiles.observe(() => renderFileTree());
   state.yFolders.observe(() => renderFileTree());
@@ -368,11 +374,12 @@ function ensureViewerAndEngine() {
 function teardownEditor() {
   // el puente apunta al Y.Doc que estamos a punto de destruir
   if (state.bridge && state.bridge.running) state.bridge.stop();
+  if (state.comments) state.comments.unmount();
   if (state.membersUnsub) { state.membersUnsub(); state.membersUnsub = null; }
   if (state.editorView) { state.editorView.destroy(); state.editorView = null; }
   if (state.provider) { state.provider.destroy(); state.provider = null; }
   if (state.ydoc) { state.ydoc.destroy(); state.ydoc = null; }
-  state.project = null; state.yFiles = null; state.yFolders = null; state.activeFile = null;
+  state.project = null; state.yFiles = null; state.yFolders = null; state.yComments = null; state.activeFile = null;
   state.assets = [];
   state.assetCache.clear();
   state.collapsed = new Set();
@@ -743,6 +750,7 @@ async function openLocalFolder(handle) {
   $("btnNewFolder").style.display = "";
   $("btnUploadFile").style.display = "";
   $("btnImportZip").style.display = "";
+  $("btnCommentsToggle").style.display = "none";   // comentarios: solo en la nube
   setSyncBadge("Local · en tu disco", "#7ee0c2");
   $("btnReloadLocal").style.display = "";
   // en modo local ya se edita el disco directamente: el puente no pinta nada
@@ -1226,6 +1234,10 @@ const colabKeymap = [
   { key: "Mod-Alt-j", preventDefault: true, run: view => {
       syncCodeToPdf(view.state.doc.lineAt(view.state.selection.main.head).number);
       return true;
+    } },
+  { key: "Mod-Alt-m", preventDefault: true, run: () => {
+      if (state.comments) state.comments.startCommentOnSelection();
+      return true;
     } }
 ];
 
@@ -1272,6 +1284,7 @@ function mountEditor(fileName) {
     ...commonExtensions(),
     keymap.of([...colabKeymap, ...yUndoManagerKeymap, ...defaultKeymap, ...searchKeymap]),
     yCollab(ytext, state.provider.awareness, { undoManager }),
+    ...(state.comments ? [state.comments.editorExtension()] : []),
     EditorView.updateListener.of(u => {
       if (u.selectionSet || u.docChanged) {
         const head = u.state.selection.main.head;
@@ -1287,6 +1300,7 @@ function mountEditor(fileName) {
   else state.editorView = new EditorView({ state: stateCM, parent: $("cmHost") });
   applyDiagnostics();
   applyVisualMode();
+  if (state.comments) state.comments.onFileChanged();   // repinta el resalte del archivo nuevo
 }
 
 /* ============================================================
@@ -1969,6 +1983,21 @@ function wireEvents() {
   // asistente IA
   state.assistant = createAssistant(aiApi);
   $("btnAiToggle").onclick = () => state.assistant.toggle();
+
+  // comentarios sobre el texto (solo proyectos en la nube)
+  state.comments = createComments({
+    getYComments: () => state.yComments,
+    getYdoc: () => state.ydoc,
+    getYFiles: () => state.yFiles,
+    getActiveFile: () => state.activeFile,
+    getView: () => state.editorView,
+    getUser: () => state.user,
+    canWrite: () => state.role !== "view",
+    isOwner: () => state.role === "owner",
+    isCloud: () => state.mode === "cloud",
+    openFile: name => { if (name && name !== state.activeFile) mountEditor(name); }
+  });
+  $("btnCommentsToggle").onclick = () => state.comments.toggle();
 
   // modal configuración
   $("btnSettings").onclick = openSettingsModal;
