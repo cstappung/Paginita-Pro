@@ -11,116 +11,119 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;display=swap">
   <style>
-    html, body { margin: 0; padding: 0; height: 100%; overflow: hidden; background: #e9edf2; }
+    /* Valores por defecto del tema. El motor los sobrescribe en
+       document.documentElement al cambiar de tema; estar aquí evita el
+       parpadeo claro/oscuro antes de que scope-engine.js arranque. */
+    :root{
+      --chassis:#0b0f14; --panel:#141b23; --panel2:#10161d; --line:#26333f;
+      --text:#dfe8f2; --dim:#7d8fa3; --accent:#2ea8ff;
+      --screen:#05090c; --grid1:#16242e; --grid2:#2c4655; --cursor:#d7e6f5;
+    }
+    html, body { margin:0; padding:0; height:100%; overflow:hidden; background:var(--chassis); }
     * { box-sizing: border-box; }
-    input[type="checkbox"] { accent-color: #0f62fe; }
-    input[type="range"] { accent-color: #0f62fe; }
+    input[type="checkbox"] { accent-color: var(--accent); }
+    input[type="range"] { accent-color: var(--accent); }
   </style>
   <script src="scope-engine.js"></script>
 </helmet>
 
-<div style="height:100vh;display:flex;flex-direction:column;background:#e9edf2;color:#1a232e;font-family:'IBM Plex Sans',sans-serif;overflow:hidden" data-screen-label="CSV Oscilloscope">
+<div class="osc" data-screen-label="CSV Oscilloscope">
 
-  <!-- ============ HEADER ============ -->
-  <header style="display:flex;align-items:center;gap:12px;height:48px;padding:0 14px;background:#ffffff;border-bottom:1px solid #d8dfe7;flex-shrink:0">
-    <a href="Inicio.dc.html" title="Menú principal" style="display:grid;place-items:center;width:26px;height:26px;border:1px solid #d8dfe7;border-radius:6px;color:#5a6772;font-size:13px;text-decoration:none;flex-shrink:0" style-hover="border-color:#0f62fe;color:#0f62fe">⌂</a>
-    <div style="display:flex;align-items:baseline;gap:8px;margin-right:4px">
-      <span style="font-weight:700;font-size:14px;letter-spacing:0.02em;color:#0f62fe">CSV·SCOPE</span>
-      <span style="font-size:10.5px;color:#8593a4;letter-spacing:0.03em">offline waveform &amp; harmonic analyzer</span>
+  <!-- ============ FRONT PANEL / HEADER ============ -->
+  <header class="hdr">
+    <a href="Inicio.dc.html" title="Menú principal" class="home">⌂</a>
+
+    <div class="brand">
+      <span class="pwr" title="Ready"></span>
+      <span class="mark">CSV·SCOPE</span>
+      <span class="model">DSO-CSV · offline waveform &amp; harmonic analyzer</span>
     </div>
 
-    <button id="btnLoad" style="height:28px;padding:0 14px;border:1px solid #0f62fe;border-radius:5px;background:#0f62fe;color:#ffffff;font-family:'IBM Plex Sans',sans-serif;font-size:11.5px;font-weight:600;cursor:pointer" style-hover="background:#0353e9;border-color:#0353e9">Load CSV</button>
-    <input id="fileInput" type="file" accept=".csv" multiple="" style="display:none">
+    <button id="btnLoad" class="btn pri">Load CSV</button>
+    <input id="fileInput" type="file" accept=".csv" multiple="true" style="display:none">
 
-    <div style="display:flex;align-items:center;gap:2px;background:#eceff3;border-radius:6px;padding:2px;margin:0 auto">
-      <button id="tabScope" style="height:26px;padding:0 16px;border:1px solid transparent;border-radius:5px;background:#ffffff;color:#0f62fe;font-family:'IBM Plex Sans',sans-serif;font-size:11.5px;font-weight:600;cursor:pointer">Scope</button>
-      <button id="tabFFT" style="height:26px;padding:0 16px;border:1px solid transparent;border-radius:5px;background:transparent;color:#65758a;font-family:'IBM Plex Sans',sans-serif;font-size:11.5px;font-weight:600;cursor:pointer">FFT · Harmonics</button>
-      <button id="tabXY" style="height:26px;padding:0 16px;border:1px solid transparent;border-radius:5px;background:transparent;color:#65758a;font-family:'IBM Plex Sans',sans-serif;font-size:11.5px;font-weight:600;cursor:pointer">XY</button>
+    <div class="tabs">
+      <button id="tabScope" class="tab">Scope</button>
+      <button id="tabFFT" class="tab">FFT · Harmonics</button>
+      <button id="tabXY" class="tab">XY</button>
     </div>
 
-    <div style="display:flex;align-items:center;gap:6px">
-      <button id="btnAutoset" style="height:28px;padding:0 12px;border:1px solid #c9d2da;border-radius:5px;background:#ffffff;color:#26303c;font-family:'IBM Plex Sans',sans-serif;font-size:11.5px;font-weight:600;cursor:pointer" style-hover="background:#f0f4f9">Autoset</button>
-      <button id="btnFit" style="height:28px;padding:0 12px;border:1px solid #c9d2da;border-radius:5px;background:#ffffff;color:#26303c;font-family:'IBM Plex Sans',sans-serif;font-size:11.5px;font-weight:600;cursor:pointer" style-hover="background:#f0f4f9">Fit</button>
-      <button id="btnReset" style="height:28px;padding:0 12px;border:1px solid #c9d2da;border-radius:5px;background:#ffffff;color:#26303c;font-family:'IBM Plex Sans',sans-serif;font-size:11.5px;font-weight:600;cursor:pointer" style-hover="background:#f0f4f9">Reset</button>
-      <div style="width:1px;height:20px;background:#dde3ea"></div>
-      <button id="btnShot" title="Save PNG of the active display" style="height:28px;padding:0 12px;border:1px solid #c9d2da;border-radius:5px;background:#ffffff;color:#26303c;font-family:'IBM Plex Sans',sans-serif;font-size:11.5px;font-weight:600;cursor:pointer" style-hover="background:#f0f4f9">PNG</button>
-      <button id="btnExportData" title="Export the visible time window of each file as CSV" style="height:28px;padding:0 12px;border:1px solid #c9d2da;border-radius:5px;background:#ffffff;color:#26303c;font-family:'IBM Plex Sans',sans-serif;font-size:11.5px;font-weight:600;cursor:pointer" style-hover="background:#f0f4f9">Export window</button>
+    <div class="tools">
+      <button id="btnAutoset" class="btn">Autoset</button>
+      <button id="btnFit" class="btn">Fit</button>
+      <button id="btnReset" class="btn">Reset</button>
+      <span class="sep"></span>
+      <button id="btnShot" class="btn" title="Save PNG of the active display">PNG</button>
+      <button id="btnExportData" class="btn" title="Export the visible time window of each file as CSV">Export window</button>
     </div>
   </header>
 
   <!-- ============ MAIN ============ -->
-  <div style="flex:1;display:grid;grid-template-columns:246px 1fr 282px;min-height:0">
+  <div class="body">
 
-    <!-- ---- LEFT SIDEBAR ---- -->
-    <aside style="background:#f6f8fa;border-right:1px solid #d8dfe7;display:flex;flex-direction:column;min-height:0;overflow-y:auto">
-      <section style="display:flex;flex-direction:column;gap:7px;padding:11px 12px;border-bottom:1px solid #e2e7ed">
-        <h3 style="margin:0;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#8593a4">Files</h3>
-        <div id="fileList" style="display:flex;flex-direction:column;gap:5px"></div>
-        <div id="loadStatus" style="font-size:10.5px;color:#0f62fe;min-height:0"></div>
+    <!-- ---- LEFT RACK ---- -->
+    <aside class="side">
+      <section class="grp">
+        <h3 class="ttl">Files</h3>
+        <div id="fileList" class="stack"></div>
+        <div id="loadStatus" class="note"></div>
       </section>
 
-      <section style="display:flex;flex-direction:column;gap:7px;padding:11px 12px;border-bottom:1px solid #e2e7ed;flex:1">
-        <h3 style="margin:0;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#8593a4">Channels</h3>
-        <div id="channelList" style="display:flex;flex-direction:column;gap:6px"></div>
+      <section class="grp fill">
+        <h3 class="ttl">Channels</h3>
+        <div id="channelList" class="stack"></div>
       </section>
 
-      <section style="display:flex;flex-direction:column;gap:7px;padding:11px 12px">
-        <h3 style="margin:0;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#8593a4">Math channel</h3>
-        <div style="display:flex;align-items:center;gap:6px">
-          <select id="mathA" style="flex:1;height:26px;padding:0 6px;border:1px solid #c9d2da;border-radius:4px;background:#ffffff;color:#1a232e;font-family:'IBM Plex Sans',sans-serif;font-size:11px;min-width:0"></select>
-          <select id="mathOp" style="width:44px;height:26px;padding:0 4px;border:1px solid #c9d2da;border-radius:4px;background:#ffffff;color:#1a232e;font-family:'IBM Plex Mono',monospace;font-size:12px;flex-shrink:0">
+      <section class="grp">
+        <h3 class="ttl">Math channel</h3>
+        <div class="row">
+          <select id="mathA" class="in grow"></select>
+          <select id="mathOp" class="in op">
             <option value="*">×</option>
             <option value="+">+</option>
             <option value="-">−</option>
             <option value="/">÷</option>
           </select>
-          <select id="mathB" style="flex:1;height:26px;padding:0 6px;border:1px solid #c9d2da;border-radius:4px;background:#ffffff;color:#1a232e;font-family:'IBM Plex Sans',sans-serif;font-size:11px;min-width:0"></select>
+          <select id="mathB" class="in grow"></select>
         </div>
-        <button id="btnMath" style="height:26px;border:1px solid #c9d2da;border-radius:4px;background:#ffffff;color:#26303c;font-family:'IBM Plex Sans',sans-serif;font-size:11px;font-weight:600;cursor:pointer" style-hover="background:#f0f4f9">Create channel (e.g. V × A = W)</button>
+        <button id="btnMath" class="btn wide">Create channel (e.g. V × A = W)</button>
       </section>
     </aside>
 
     <!-- ---- CENTER ---- -->
-    <main style="display:flex;flex-direction:column;min-width:0;min-height:0;padding:10px;overflow-y:auto">
+    <main class="center">
 
       <!-- SCOPE VIEW -->
-      <div id="viewScope" style="display:flex;flex-direction:column;gap:8px;flex:1;min-height:0">
-        <div id="scopeWrap" style="position:relative;flex:1;min-height:180px">
-          <canvas id="scopeCanvas" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>
-          <pre id="hoverReadout" style="display:none;position:absolute;top:8px;right:8px;margin:0;padding:6px 9px;background:rgba(255,255,255,0.92);border:1px solid #c9d2da;border-radius:4px;font-family:'IBM Plex Mono',monospace;font-size:10.5px;line-height:1.5;color:#26303c;pointer-events:none;z-index:2"></pre>
+      <div id="viewScope" class="view">
+        <div id="scopeWrap" class="scr">
+          <canvas id="scopeCanvas"></canvas>
+          <pre id="hoverReadout" class="hover"></pre>
         </div>
 
-        <div id="zoomWrap" style="display:none;position:relative;height:128px;flex-shrink:0">
-          <canvas id="zoomCanvas" style="position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab"></canvas>
+        <div id="zoomWrap" class="scr fixed h128 hide">
+          <canvas id="zoomCanvas" style="cursor:grab"></canvas>
         </div>
 
-        <div id="splitWrap" style="display:none;position:relative;height:160px;flex-shrink:0">
-          <canvas id="splitCanvas" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>
-          <div id="splitReadout" style="position:absolute;right:8px;top:6px;font-family:'IBM Plex Mono',monospace;font-size:10px;color:#65758a;pointer-events:none"></div>
+        <div id="splitWrap" class="scr fixed h160 hide">
+          <canvas id="splitCanvas"></canvas>
+          <div id="splitReadout" class="corner"></div>
         </div>
 
-        <div style="flex-shrink:0;height:148px;background:#ffffff;border:1px solid #c9d2da;border-radius:5px;display:flex;flex-direction:column;overflow:hidden">
-          <div style="display:flex;align-items:center;gap:10px;padding:6px 10px;border-bottom:1px solid #e8edf2;flex-shrink:0">
-            <span style="font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#8593a4">Measurements</span>
-            <select id="measureScopeSel" style="height:22px;padding:0 6px;border:1px solid #c9d2da;border-radius:4px;background:#ffffff;color:#1a232e;font-family:'IBM Plex Sans',sans-serif;font-size:10.5px">
+        <div class="card meas">
+          <div class="card-hd">
+            <span class="ttl">Measurements</span>
+            <select id="measureScopeSel" class="in xs">
               <option value="visible">Visible window</option>
               <option value="full">Full record</option>
             </select>
-            <button id="btnExportMeas" style="margin-left:auto;height:22px;padding:0 10px;border:1px solid #c9d2da;border-radius:4px;background:#ffffff;color:#26303c;font-family:'IBM Plex Sans',sans-serif;font-size:10.5px;font-weight:600;cursor:pointer" style-hover="background:#f0f4f9">Export CSV</button>
+            <button id="btnExportMeas" class="btn xs push">Export CSV</button>
           </div>
-          <div style="flex:1;overflow-y:auto;min-height:0">
-            <table style="width:100%;border-collapse:collapse">
+          <div class="card-bd">
+            <table class="tbl">
               <thead>
                 <tr>
-                  <th style="position:sticky;top:0;background:#f6f8fa;text-align:left;padding:4px 8px;font-size:9.5px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#8593a4;border-bottom:1px solid #e2e7ed">Channel</th>
-                  <th style="position:sticky;top:0;background:#f6f8fa;text-align:left;padding:4px 8px;font-size:9.5px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#8593a4;border-bottom:1px solid #e2e7ed">Min</th>
-                  <th style="position:sticky;top:0;background:#f6f8fa;text-align:left;padding:4px 8px;font-size:9.5px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#8593a4;border-bottom:1px solid #e2e7ed">Max</th>
-                  <th style="position:sticky;top:0;background:#f6f8fa;text-align:left;padding:4px 8px;font-size:9.5px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#8593a4;border-bottom:1px solid #e2e7ed">Pk-Pk</th>
-                  <th style="position:sticky;top:0;background:#f6f8fa;text-align:left;padding:4px 8px;font-size:9.5px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#8593a4;border-bottom:1px solid #e2e7ed">Mean</th>
-                  <th style="position:sticky;top:0;background:#f6f8fa;text-align:left;padding:4px 8px;font-size:9.5px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#8593a4;border-bottom:1px solid #e2e7ed">RMS</th>
-                  <th style="position:sticky;top:0;background:#f6f8fa;text-align:left;padding:4px 8px;font-size:9.5px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#8593a4;border-bottom:1px solid #e2e7ed">AC RMS</th>
-                  <th style="position:sticky;top:0;background:#f6f8fa;text-align:left;padding:4px 8px;font-size:9.5px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#8593a4;border-bottom:1px solid #e2e7ed">Freq</th>
-                  <th style="position:sticky;top:0;background:#f6f8fa;text-align:left;padding:4px 8px;font-size:9.5px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#8593a4;border-bottom:1px solid #e2e7ed">Period</th>
+                  <th>Channel</th><th>Min</th><th>Max</th><th>Pk-Pk</th>
+                  <th>Mean</th><th>RMS</th><th>AC RMS</th><th>Freq</th><th>Period</th>
                 </tr>
               </thead>
               <tbody id="measureBody"></tbody>
@@ -130,35 +133,33 @@
       </div>
 
       <!-- FFT / HARMONICS VIEW -->
-      <div id="viewFFT" style="display:none;grid-template-columns:1fr 300px;gap:8px;flex:1;min-height:0">
-        <div style="display:flex;flex-direction:column;gap:8px;min-width:0;min-height:0">
-          <div id="specWrap" style="position:relative;flex:4;min-height:0">
-            <canvas id="specCanvas" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>
-          </div>
-          <div id="harmWrap" style="position:relative;flex:4;min-height:0">
-            <canvas id="harmCanvas" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>
-          </div>
-          <div id="phaseWrap" style="position:relative;flex:3;min-height:0">
-            <canvas id="phaseCanvas" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>
-          </div>
+      <div id="viewFFT" class="view fft">
+        <div class="fft-plots">
+          <div id="specWrap" class="scr g4"><canvas id="specCanvas"></canvas></div>
+          <div id="harmWrap" class="scr g4"><canvas id="harmCanvas"></canvas></div>
+          <div id="phaseWrap" class="scr g3"><canvas id="phaseCanvas"></canvas></div>
         </div>
 
-        <div style="display:flex;flex-direction:column;gap:8px;min-height:0">
-          <div style="background:#ffffff;border:1px solid #c9d2da;border-radius:5px;padding:10px 12px;flex-shrink:0">
-            <div style="font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#8593a4">THD</div>
-            <div id="thdBig" style="font-family:'IBM Plex Mono',monospace;font-size:26px;font-weight:600;color:#0f62fe;line-height:1.3">—</div>
-            <div id="harmMeta" style="font-size:10.5px;color:#65758a;line-height:1.5;margin-top:2px">Run Compute to analyze harmonics.</div>
+        <div class="fft-rdo">
+          <div class="card">
+            <div class="rdo">
+              <div class="cell">
+                <div class="k">THD</div>
+                <div id="thdBig" class="v">—</div>
+                <div class="s">vs. fundamental</div>
+              </div>
+              <div class="cell">
+                <div class="k">TDD</div>
+                <div id="tddBig" class="v alt">—</div>
+                <div id="tddSub" class="s">set I<sub>L</sub> to enable</div>
+              </div>
+            </div>
+            <div id="harmMeta" class="meta">Run Compute to analyze harmonics.</div>
           </div>
-          <div style="flex:1;background:#ffffff;border:1px solid #c9d2da;border-radius:5px;overflow-y:auto;min-height:0">
-            <table style="width:100%;border-collapse:collapse">
+          <div class="card fill scroll">
+            <table class="tbl">
               <thead>
-                <tr>
-                  <th style="position:sticky;top:0;background:#f6f8fa;text-align:left;padding:4px 8px;font-size:9.5px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#8593a4;border-bottom:1px solid #e2e7ed">n</th>
-                  <th style="position:sticky;top:0;background:#f6f8fa;text-align:left;padding:4px 8px;font-size:9.5px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#8593a4;border-bottom:1px solid #e2e7ed">Freq</th>
-                  <th style="position:sticky;top:0;background:#f6f8fa;text-align:left;padding:4px 8px;font-size:9.5px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#8593a4;border-bottom:1px solid #e2e7ed">Mag</th>
-                  <th style="position:sticky;top:0;background:#f6f8fa;text-align:left;padding:4px 8px;font-size:9.5px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#8593a4;border-bottom:1px solid #e2e7ed">%f₁</th>
-                  <th style="position:sticky;top:0;background:#f6f8fa;text-align:left;padding:4px 8px;font-size:9.5px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#8593a4;border-bottom:1px solid #e2e7ed">φ °</th>
-                </tr>
+                <tr><th>n</th><th>Freq</th><th>Mag</th><th>%f₁</th><th>%I<sub>L</sub></th><th>φ °</th></tr>
               </thead>
               <tbody id="harmTableBody"></tbody>
             </table>
@@ -167,188 +168,141 @@
       </div>
 
       <!-- XY VIEW -->
-      <div id="viewXY" style="display:none;flex-direction:column;flex:1;min-height:0">
-        <div id="xyWrap" style="position:relative;flex:1;min-height:0">
-          <canvas id="xyCanvas" style="position:absolute;inset:0;width:100%;height:100%;display:block"></canvas>
-        </div>
+      <div id="viewXY" class="view">
+        <div id="xyWrap" class="scr"><canvas id="xyCanvas"></canvas></div>
       </div>
     </main>
 
-    <!-- ---- RIGHT SIDEBAR ---- -->
-    <aside style="background:#f6f8fa;border-left:1px solid #d8dfe7;display:flex;flex-direction:column;min-height:0;overflow-y:auto">
+    <!-- ---- RIGHT RACK ---- -->
+    <aside class="side r">
 
       <!-- Scope controls -->
-      <div id="sideScope" style="display:flex;flex-direction:column">
-        <section style="display:flex;flex-direction:column;gap:7px;padding:11px 12px;border-bottom:1px solid #e2e7ed">
-          <h3 style="margin:0;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#8593a4">Horizontal</h3>
-          <div style="display:flex;align-items:center;gap:8px">
-            <label style="width:62px;flex-shrink:0;font-size:11px;color:#65758a">Time/div</label>
-            <select id="timeDiv" style="flex:1;height:26px;padding:0 6px;border:1px solid #c9d2da;border-radius:4px;background:#ffffff;color:#1a232e;font-family:'IBM Plex Mono',monospace;font-size:11px;min-width:0"></select>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <label style="width:62px;flex-shrink:0;font-size:11px;color:#65758a">Center (ms)</label>
-            <input id="hOffsetIn" type="text" defaultValue="0" style="flex:1;height:26px;padding:0 8px;border:1px solid #c9d2da;border-radius:4px;background:#ffffff;color:#1a232e;font-family:'IBM Plex Mono',monospace;font-size:11px;min-width:0">
-          </div>
-          <div style="display:flex;align-items:center;gap:6px">
-            <button id="btnPanL" title="Pan left" style="flex:1;height:24px;border:1px solid #c9d2da;border-radius:4px;background:#ffffff;color:#26303c;font-size:11px;cursor:pointer" style-hover="background:#f0f4f9">◀</button>
-            <button id="btnPanR" title="Pan right" style="flex:1;height:24px;border:1px solid #c9d2da;border-radius:4px;background:#ffffff;color:#26303c;font-size:11px;cursor:pointer" style-hover="background:#f0f4f9">▶</button>
-            <button id="btnZinH" title="Zoom in (finer time/div)" style="flex:1;height:24px;border:1px solid #c9d2da;border-radius:4px;background:#ffffff;color:#26303c;font-size:11px;cursor:pointer" style-hover="background:#f0f4f9">＋</button>
-            <button id="btnZoutH" title="Zoom out (coarser time/div)" style="flex:1;height:24px;border:1px solid #c9d2da;border-radius:4px;background:#ffffff;color:#26303c;font-size:11px;cursor:pointer" style-hover="background:#f0f4f9">－</button>
+      <div id="sideScope" class="rack">
+        <section class="grp">
+          <h3 class="ttl">Horizontal</h3>
+          <div class="row"><label class="lab">Time/div</label><select id="timeDiv" class="in grow mono"></select></div>
+          <div class="row"><label class="lab">Center (ms)</label><input id="hOffsetIn" class="in grow mono" type="text" defaultValue="0"></div>
+          <div class="row pad">
+            <button id="btnPanL" class="btn key" title="Pan left">◀</button>
+            <button id="btnPanR" class="btn key" title="Pan right">▶</button>
+            <button id="btnZinH" class="btn key" title="Zoom in (finer time/div)">＋</button>
+            <button id="btnZoutH" class="btn key" title="Zoom out (coarser time/div)">－</button>
           </div>
         </section>
 
-        <section style="display:flex;flex-direction:column;gap:7px;padding:11px 12px;border-bottom:1px solid #e2e7ed">
-          <h3 style="margin:0;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#8593a4">Trigger</h3>
-          <div style="display:flex;align-items:center;gap:8px">
-            <label style="width:62px;flex-shrink:0;font-size:11px;color:#65758a">Source</label>
-            <select id="trigSource" style="flex:1;height:26px;padding:0 6px;border:1px solid #c9d2da;border-radius:4px;background:#ffffff;color:#1a232e;font-family:'IBM Plex Sans',sans-serif;font-size:11px;min-width:0"></select>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <label style="width:62px;flex-shrink:0;font-size:11px;color:#65758a">Level</label>
-            <input id="trigLevelIn" type="text" defaultValue="0" title="e.g. 1.5, 500m, 2k" style="flex:1;height:26px;padding:0 8px;border:1px solid #c9d2da;border-radius:4px;background:#ffffff;color:#1a232e;font-family:'IBM Plex Mono',monospace;font-size:11px;min-width:0">
-            <select id="trigSlope" style="width:58px;height:26px;padding:0 4px;border:1px solid #c9d2da;border-radius:4px;background:#ffffff;color:#1a232e;font-family:'IBM Plex Mono',monospace;font-size:11px;flex-shrink:0">
+        <section class="grp">
+          <h3 class="ttl">Trigger</h3>
+          <div class="row"><label class="lab">Source</label><select id="trigSource" class="in grow"></select></div>
+          <div class="row">
+            <label class="lab">Level</label>
+            <input id="trigLevelIn" class="in grow mono" type="text" defaultValue="0" title="e.g. 1.5, 500m, 2k">
+            <select id="trigSlope" class="in slope mono">
               <option value="rising">↗</option>
               <option value="falling">↘</option>
             </select>
           </div>
-          <div style="display:flex;align-items:center;gap:6px">
-            <button id="btnTrigPrev" style="flex:1;height:24px;border:1px solid #c9d2da;border-radius:4px;background:#ffffff;color:#26303c;font-size:10.5px;font-weight:600;cursor:pointer" style-hover="background:#f0f4f9">◀ Prev edge</button>
-            <button id="btnTrigNext" style="flex:1;height:24px;border:1px solid #c9d2da;border-radius:4px;background:#ffffff;color:#26303c;font-size:10.5px;font-weight:600;cursor:pointer" style-hover="background:#f0f4f9">Next edge ▶</button>
+          <div class="row pad">
+            <button id="btnTrigPrev" class="btn key">◀ Prev edge</button>
+            <button id="btnTrigNext" class="btn key">Next edge ▶</button>
           </div>
         </section>
 
-        <section style="display:flex;flex-direction:column;gap:7px;padding:11px 12px;border-bottom:1px solid #e2e7ed">
-          <h3 style="margin:0;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#8593a4">Cursors</h3>
-          <div style="display:flex;align-items:center;gap:8px">
-            <label style="width:62px;flex-shrink:0;font-size:11px;color:#65758a">Mode</label>
-            <select id="cursorMode" style="flex:1;height:26px;padding:0 6px;border:1px solid #c9d2da;border-radius:4px;background:#ffffff;color:#1a232e;font-family:'IBM Plex Sans',sans-serif;font-size:11px;min-width:0">
+        <section class="grp">
+          <h3 class="ttl">Cursors</h3>
+          <div class="row">
+            <label class="lab">Mode</label>
+            <select id="cursorMode" class="in grow">
               <option value="off">Off</option>
               <option value="time">Time</option>
               <option value="track">Track (follows traces)</option>
               <option value="value">Value</option>
             </select>
           </div>
-          <div id="cursorRefRow" style="display:none;align-items:center;gap:8px">
-            <label style="width:62px;flex-shrink:0;font-size:11px;color:#65758a">Reference</label>
-            <select id="cursorRef" style="flex:1;height:26px;padding:0 6px;border:1px solid #c9d2da;border-radius:4px;background:#ffffff;color:#1a232e;font-family:'IBM Plex Sans',sans-serif;font-size:11px;min-width:0"></select>
+          <div id="cursorRefRow" class="row hide">
+            <label class="lab">Reference</label>
+            <select id="cursorRef" class="in grow"></select>
           </div>
-          <div id="cursorReadout" style="display:none;background:#ffffff;border:1px solid #dde3ea;border-radius:4px;padding:6px 8px"></div>
+          <div id="cursorReadout" class="readout hide"></div>
         </section>
 
-        <section style="display:flex;flex-direction:column;gap:8px;padding:11px 12px">
-          <h3 style="margin:0;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#8593a4">Display</h3>
-          <label style="display:flex;align-items:center;gap:8px;font-size:11.5px;color:#26303c;cursor:pointer">
-            <input id="chkZoom" type="checkbox"> Zoom window (main + detail)
-          </label>
-          <label style="display:flex;align-items:center;gap:8px;font-size:11.5px;color:#26303c;cursor:pointer">
-            <input id="chkSplitFFT" type="checkbox"> Quick spectrum panel
-          </label>
-          <label style="display:flex;align-items:center;gap:8px;font-size:11.5px;color:#26303c;cursor:pointer">
-            <input id="chkPersist" type="checkbox"> Trace persistence (afterglow)
-          </label>
-          <div id="persistDecayRow" style="display:none;align-items:center;gap:8px">
-            <label style="width:62px;flex-shrink:0;font-size:11px;color:#65758a">Decay</label>
-            <input id="persistDecay" type="range" min="0.02" max="0.5" step="0.01" defaultValue="0.10" style="flex:1">
+        <section class="grp">
+          <h3 class="ttl">Display</h3>
+          <label class="chk"><input id="chkGlow" type="checkbox"> Phosphor glow</label>
+          <label class="chk"><input id="chkZoom" type="checkbox"> Zoom window (main + detail)</label>
+          <label class="chk"><input id="chkSplitFFT" type="checkbox"> Quick spectrum panel</label>
+          <label class="chk"><input id="chkPersist" type="checkbox"> Trace persistence (afterglow)</label>
+          <div id="persistDecayRow" class="row hide">
+            <label class="lab">Decay</label>
+            <input id="persistDecay" type="range" min="0.02" max="0.5" step="0.01" defaultValue="0.10" class="grow">
           </div>
         </section>
 
-        <section style="display:flex;flex-direction:column;gap:8px;padding:11px 12px;border-top:1px solid #e2e7ed">
-          <h3 style="margin:0;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#8593a4">Theme</h3>
-          <div style="display:flex;gap:6px">
-            <button id="btnThemeLight" style="flex:1;height:24px;border:1px solid #c9d2da;border-radius:4px;background:#ffffff;color:#26303c;font-family:'IBM Plex Sans',sans-serif;font-size:10.5px;font-weight:600;cursor:pointer" style-hover="background:#f0f4f9">Light</button>
-            <button id="btnThemeDark" style="flex:1;height:24px;border:1px solid #c9d2da;border-radius:4px;background:#ffffff;color:#26303c;font-family:'IBM Plex Sans',sans-serif;font-size:10.5px;font-weight:600;cursor:pointer" style-hover="background:#f0f4f9">Dark</button>
-            <button id="btnThemeReset" style="flex:1;height:24px;border:1px solid #c9d2da;border-radius:4px;background:#ffffff;color:#26303c;font-family:'IBM Plex Sans',sans-serif;font-size:10.5px;font-weight:600;cursor:pointer" style-hover="background:#f0f4f9">Default</button>
+        <section class="grp">
+          <h3 class="ttl">Theme</h3>
+          <div class="row pad">
+            <button id="btnThemeLight" class="btn key">Light</button>
+            <button id="btnThemeDark" class="btn key">Dark</button>
+            <button id="btnThemeReset" class="btn key">Default</button>
           </div>
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 10px">
-            <label style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:#65758a;cursor:pointer">
-              <input id="thApp" type="color" style="width:22px;height:18px;border:1px solid #c9d2da;border-radius:3px;padding:0;background:none;cursor:pointer;flex-shrink:0"> Background
-            </label>
-            <label style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:#65758a;cursor:pointer">
-              <input id="thSurface" type="color" style="width:22px;height:18px;border:1px solid #c9d2da;border-radius:3px;padding:0;background:none;cursor:pointer;flex-shrink:0"> Panels
-            </label>
-            <label style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:#65758a;cursor:pointer">
-              <input id="thText" type="color" style="width:22px;height:18px;border:1px solid #c9d2da;border-radius:3px;padding:0;background:none;cursor:pointer;flex-shrink:0"> Text
-            </label>
-            <label style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:#65758a;cursor:pointer">
-              <input id="thAccent" type="color" style="width:22px;height:18px;border:1px solid #c9d2da;border-radius:3px;padding:0;background:none;cursor:pointer;flex-shrink:0"> Accent
-            </label>
-            <label style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:#65758a;cursor:pointer">
-              <input id="thScopeBg" type="color" style="width:22px;height:18px;border:1px solid #c9d2da;border-radius:3px;padding:0;background:none;cursor:pointer;flex-shrink:0"> Scope bg
-            </label>
-            <label style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:#65758a;cursor:pointer">
-              <input id="thCursor" type="color" style="width:22px;height:18px;border:1px solid #c9d2da;border-radius:3px;padding:0;background:none;cursor:pointer;flex-shrink:0"> Cursor
-            </label>
-            <label style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:#65758a;cursor:pointer">
-              <input id="thGridMinor" type="color" style="width:22px;height:18px;border:1px solid #c9d2da;border-radius:3px;padding:0;background:none;cursor:pointer;flex-shrink:0"> Grid minor
-            </label>
-            <label style="display:flex;align-items:center;gap:6px;font-size:10.5px;color:#65758a;cursor:pointer">
-              <input id="thGridMajor" type="color" style="width:22px;height:18px;border:1px solid #c9d2da;border-radius:3px;padding:0;background:none;cursor:pointer;flex-shrink:0"> Grid major
-            </label>
+          <div class="swatches">
+            <label class="thsw"><input id="thApp" type="color"> Chassis</label>
+            <label class="thsw"><input id="thSurface" type="color"> Panels</label>
+            <label class="thsw"><input id="thText" type="color"> Text</label>
+            <label class="thsw"><input id="thAccent" type="color"> Accent</label>
+            <label class="thsw"><input id="thScopeBg" type="color"> Screen</label>
+            <label class="thsw"><input id="thCursor" type="color"> Cursor</label>
+            <label class="thsw"><input id="thGridMinor" type="color"> Grid minor</label>
+            <label class="thsw"><input id="thGridMajor" type="color"> Grid major</label>
           </div>
         </section>
       </div>
 
       <!-- FFT controls -->
-      <div id="sideFFT" style="display:none;flex-direction:column">
-        <section style="display:flex;flex-direction:column;gap:7px;padding:11px 12px;border-bottom:1px solid #e2e7ed">
-          <h3 style="margin:0;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#8593a4">FFT source</h3>
-          <div style="display:flex;align-items:center;gap:8px">
-            <label style="width:72px;flex-shrink:0;font-size:11px;color:#65758a">Channel</label>
-            <select id="fftSource" style="flex:1;height:26px;padding:0 6px;border:1px solid #c9d2da;border-radius:4px;background:#ffffff;color:#1a232e;font-family:'IBM Plex Sans',sans-serif;font-size:11px;min-width:0"></select>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <label style="width:72px;flex-shrink:0;font-size:11px;color:#65758a">Range</label>
-            <select id="fftRange" style="flex:1;height:26px;padding:0 6px;border:1px solid #c9d2da;border-radius:4px;background:#ffffff;color:#1a232e;font-family:'IBM Plex Sans',sans-serif;font-size:11px;min-width:0">
+      <div id="sideFFT" class="rack hide">
+        <section class="grp">
+          <h3 class="ttl">FFT source</h3>
+          <div class="row"><label class="lab w">Channel</label><select id="fftSource" class="in grow"></select></div>
+          <div class="row">
+            <label class="lab w">Range</label>
+            <select id="fftRange" class="in grow">
               <option value="visible">Visible window</option>
               <option value="full">Full record</option>
             </select>
           </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <label style="width:72px;flex-shrink:0;font-size:11px;color:#65758a">Window</label>
-            <select id="fftWindow" style="flex:1;height:26px;padding:0 6px;border:1px solid #c9d2da;border-radius:4px;background:#ffffff;color:#1a232e;font-family:'IBM Plex Sans',sans-serif;font-size:11px;min-width:0">
+          <div class="row">
+            <label class="lab w">Window</label>
+            <select id="fftWindow" class="in grow">
               <option value="rect">Rectangular</option>
               <option value="hann">Hann</option>
               <option value="hamming">Hamming</option>
               <option value="blackman">Blackman</option>
             </select>
           </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <label style="width:72px;flex-shrink:0;font-size:11px;color:#65758a">Scale</label>
-            <select id="fftScale" style="flex:1;height:26px;padding:0 6px;border:1px solid #c9d2da;border-radius:4px;background:#ffffff;color:#1a232e;font-family:'IBM Plex Sans',sans-serif;font-size:11px;min-width:0">
+          <div class="row">
+            <label class="lab w">Scale</label>
+            <select id="fftScale" class="in grow">
               <option value="linear">Linear</option>
               <option value="db">dB</option>
             </select>
           </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <label style="width:72px;flex-shrink:0;font-size:11px;color:#65758a">Max freq</label>
-            <input id="fftMaxIn" type="text" defaultValue="" placeholder="auto (e.g. 5k)" style="flex:1;height:26px;padding:0 8px;border:1px solid #c9d2da;border-radius:4px;background:#ffffff;color:#1a232e;font-family:'IBM Plex Mono',monospace;font-size:11px;min-width:0">
-          </div>
+          <div class="row"><label class="lab w">Max freq</label><input id="fftMaxIn" class="in grow mono" type="text" defaultValue="" placeholder="auto (e.g. 5k)"></div>
         </section>
 
-        <section style="display:flex;flex-direction:column;gap:7px;padding:11px 12px;border-bottom:1px solid #e2e7ed">
-          <h3 style="margin:0;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#8593a4">Harmonics</h3>
-          <div style="display:flex;align-items:center;gap:8px">
-            <label style="width:72px;flex-shrink:0;font-size:11px;color:#65758a">Fund. f₁ (Hz)</label>
-            <input id="f0In" type="text" defaultValue="60" title="Fundamental frequency, e.g. 50, 60, 20k" style="flex:1;height:26px;padding:0 8px;border:1px solid #c9d2da;border-radius:4px;background:#ffffff;color:#1a232e;font-family:'IBM Plex Mono',monospace;font-size:11px;min-width:0">
-          </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <label style="width:72px;flex-shrink:0;font-size:11px;color:#65758a">Harmonics</label>
-            <input id="nHarmIn" type="number" min="1" max="500" defaultValue="40" style="flex:1;height:26px;padding:0 8px;border:1px solid #c9d2da;border-radius:4px;background:#ffffff;color:#1a232e;font-family:'IBM Plex Mono',monospace;font-size:11px;min-width:0">
-          </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <label style="width:72px;flex-shrink:0;font-size:11px;color:#65758a">Show</label>
-            <select id="multMode" style="flex:1;height:26px;padding:0 6px;border:1px solid #c9d2da;border-radius:4px;background:#ffffff;color:#1a232e;font-family:'IBM Plex Sans',sans-serif;font-size:11px;min-width:0">
+        <section class="grp">
+          <h3 class="ttl">Harmonics</h3>
+          <div class="row"><label class="lab w">Fund. f₁ (Hz)</label><input id="f0In" class="in grow mono" type="text" defaultValue="50" title="Fundamental frequency, e.g. 50, 60, 20k"></div>
+          <div class="row"><label class="lab w">Harmonics</label><input id="nHarmIn" class="in grow mono" type="number" min="1" max="500" defaultValue="50"></div>
+          <div class="row">
+            <label class="lab w">Show</label>
+            <select id="multMode" class="in grow">
               <option value="all">All harmonics</option>
               <option value="mult">Only multiples of k</option>
             </select>
           </div>
-          <div id="multKRow" style="display:none;align-items:center;gap:8px">
-            <label style="width:72px;flex-shrink:0;font-size:11px;color:#65758a">k =</label>
-            <input id="multKIn" type="number" min="2" max="100" defaultValue="3" style="flex:1;height:26px;padding:0 8px;border:1px solid #c9d2da;border-radius:4px;background:#ffffff;color:#1a232e;font-family:'IBM Plex Mono',monospace;font-size:11px;min-width:0">
-          </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <label style="width:72px;flex-shrink:0;font-size:11px;color:#65758a">Magnitude</label>
-            <select id="harmUnit" style="flex:1;height:26px;padding:0 6px;border:1px solid #c9d2da;border-radius:4px;background:#ffffff;color:#1a232e;font-family:'IBM Plex Sans',sans-serif;font-size:11px;min-width:0">
+          <div id="multKRow" class="row hide"><label class="lab w">k =</label><input id="multKIn" class="in grow mono" type="number" min="2" max="100" defaultValue="3"></div>
+          <div class="row">
+            <label class="lab w">Magnitude</label>
+            <select id="harmUnit" class="in grow">
               <option value="peak">Peak</option>
               <option value="rms">RMS</option>
               <option value="pct">% of fundamental</option>
@@ -356,48 +310,52 @@
           </div>
         </section>
 
-        <section style="display:flex;flex-direction:column;gap:7px;padding:11px 12px">
-          <button id="btnCompute" style="height:30px;border:1px solid #0f62fe;border-radius:5px;background:#0f62fe;color:#ffffff;font-family:'IBM Plex Sans',sans-serif;font-size:12px;font-weight:600;cursor:pointer" style-hover="background:#0353e9;border-color:#0353e9">Compute</button>
-          <button id="btnExportHarm" style="height:26px;border:1px solid #c9d2da;border-radius:4px;background:#ffffff;color:#26303c;font-family:'IBM Plex Sans',sans-serif;font-size:11px;font-weight:600;cursor:pointer" style-hover="background:#f0f4f9">Export harmonics CSV</button>
-          <div id="fftSummary" style="font-size:10.5px;color:#65758a;line-height:1.5">Set the fundamental, then Compute. The analysis uses whole periods of f₁, like PLECS.</div>
+        <section class="grp accent">
+          <h3 class="ttl">Distortion · IEEE 519</h3>
+          <div class="row">
+            <label class="lab w" title="Maximum demand load current (rated current of the converter), rms">I<sub>L</sub> (rms)</label>
+            <input id="ilIn" class="in grow mono" type="text" defaultValue="" placeholder="e.g. 100 or 4.5">
+          </div>
+          <button id="btnIeee" class="btn wide" title="Sets the harmonic count to 50, the order used by IEEE 519">Preset IEEE 519 · n ≤ 50</button>
+          <div class="hint">TDD refers the harmonic content to the rated demand current I<sub>L</sub> instead of the fundamental, so a lightly loaded converter no longer looks distorted. Leave I<sub>L</sub> empty to show THD only.</div>
+        </section>
+
+        <section class="grp">
+          <button id="btnCompute" class="btn pri wide tall">Compute</button>
+          <button id="btnExportHarm" class="btn wide">Export harmonics CSV</button>
+          <div id="fftSummary" class="hint">Set the fundamental, then Compute. The analysis uses whole periods of f₁, like PLECS.</div>
         </section>
       </div>
 
       <!-- XY controls -->
-      <div id="sideXY" style="display:none;flex-direction:column">
-        <section style="display:flex;flex-direction:column;gap:7px;padding:11px 12px;border-bottom:1px solid #e2e7ed">
-          <h3 style="margin:0;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#8593a4">XY mode</h3>
-          <div style="display:flex;align-items:center;gap:8px">
-            <label style="width:62px;flex-shrink:0;font-size:11px;color:#65758a">X axis</label>
-            <select id="xySrcX" style="flex:1;height:26px;padding:0 6px;border:1px solid #c9d2da;border-radius:4px;background:#ffffff;color:#1a232e;font-family:'IBM Plex Sans',sans-serif;font-size:11px;min-width:0"></select>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <label style="width:62px;flex-shrink:0;font-size:11px;color:#65758a">Y axis</label>
-            <select id="xySrcY" style="flex:1;height:26px;padding:0 6px;border:1px solid #c9d2da;border-radius:4px;background:#ffffff;color:#1a232e;font-family:'IBM Plex Sans',sans-serif;font-size:11px;min-width:0"></select>
-          </div>
-          <div style="display:flex;align-items:center;gap:8px">
-            <label style="width:62px;flex-shrink:0;font-size:11px;color:#65758a">Range</label>
-            <select id="xyRange" style="flex:1;height:26px;padding:0 6px;border:1px solid #c9d2da;border-radius:4px;background:#ffffff;color:#1a232e;font-family:'IBM Plex Sans',sans-serif;font-size:11px;min-width:0">
+      <div id="sideXY" class="rack hide">
+        <section class="grp">
+          <h3 class="ttl">XY mode</h3>
+          <div class="row"><label class="lab">X axis</label><select id="xySrcX" class="in grow"></select></div>
+          <div class="row"><label class="lab">Y axis</label><select id="xySrcY" class="in grow"></select></div>
+          <div class="row">
+            <label class="lab">Range</label>
+            <select id="xyRange" class="in grow">
               <option value="visible">Visible window</option>
               <option value="full">Full record</option>
             </select>
           </div>
-          <button id="btnXYFit" style="height:26px;border:1px solid #c9d2da;border-radius:4px;background:#ffffff;color:#26303c;font-family:'IBM Plex Sans',sans-serif;font-size:11px;font-weight:600;cursor:pointer" style-hover="background:#f0f4f9">Autoscale X · Y</button>
-          <div style="font-size:10.5px;color:#65758a;line-height:1.5">Scales and positions come from each channel's Scale/div and Position — adjust them in the Channels panel.</div>
+          <button id="btnXYFit" class="btn wide">Autoscale X · Y</button>
+          <div class="hint">Scales and positions come from each channel's Scale/div and Position — adjust them in the Channels panel.</div>
         </section>
       </div>
     </aside>
   </div>
 
   <!-- ============ STATUS BAR ============ -->
-  <footer style="display:flex;align-items:center;gap:12px;height:26px;padding:0 14px;background:#ffffff;border-top:1px solid #d8dfe7;flex-shrink:0">
-    <span id="statusLeft" style="font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#65758a">No data loaded.</span>
-    <span id="statusRight" style="margin-left:auto;font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#8fa0b3"></span>
+  <footer class="stat">
+    <span id="statusLeft">No data loaded.</span>
+    <span id="statusRight"></span>
   </footer>
 </div>
 
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props="{&quot;scopeDark&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Display&quot;,&quot;description&quot;:&quot;Dark phosphor-style display background&quot;},&quot;traceWidth&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:1.5,&quot;min&quot;:1,&quot;max&quot;:3,&quot;step&quot;:0.1,&quot;unit&quot;:&quot;px&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Display&quot;,&quot;description&quot;:&quot;Trace line width&quot;},&quot;defaultFundamental&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:50,&quot;min&quot;:1,&quot;unit&quot;:&quot;Hz&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Analysis&quot;,&quot;description&quot;:&quot;Default fundamental frequency for harmonic analysis&quot;}}">
+<script type="text/x-dc" data-dc-script data-props="{&quot;scopeDark&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Display&quot;,&quot;description&quot;:&quot;Dark phosphor-style instrument look&quot;},&quot;traceWidth&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:1.6,&quot;min&quot;:1,&quot;max&quot;:3,&quot;step&quot;:0.1,&quot;unit&quot;:&quot;px&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Display&quot;,&quot;description&quot;:&quot;Trace line width&quot;},&quot;traceGlow&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Display&quot;,&quot;description&quot;:&quot;Phosphor glow around the traces&quot;},&quot;defaultFundamental&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:50,&quot;min&quot;:1,&quot;unit&quot;:&quot;Hz&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Analysis&quot;,&quot;description&quot;:&quot;Default fundamental frequency for harmonic analysis&quot;},&quot;ratedCurrent&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Analysis&quot;,&quot;description&quot;:&quot;Rated demand current I_L (rms) used for TDD&quot;}}">
 class Component extends DCLogic {
   componentDidMount() {
     this._tries = 0;
@@ -412,9 +370,11 @@ class Component extends DCLogic {
   }
   _opts() {
     return {
-      scopeDark: this.props.scopeDark ?? false,
-      traceWidth: this.props.traceWidth ?? 1.5,
-      fundamental: this.props.defaultFundamental ?? 60
+      scopeDark: this.props.scopeDark ?? true,
+      traceWidth: this.props.traceWidth ?? 1.6,
+      traceGlow: this.props.traceGlow ?? true,
+      fundamental: this.props.defaultFundamental ?? 50,
+      ratedCurrent: this.props.ratedCurrent ?? ""
     };
   }
   componentDidUpdate() {

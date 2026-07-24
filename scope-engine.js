@@ -6,13 +6,33 @@
    Views: Scope (main + zoom + quick spectrum), FFT/Harmonics
    (PLECS-style magnitude/phase per harmonic), XY.
    ============================================================ */
-window.ScopeApp = (function () {
+/* The design-doc runtime evaluates helmet <script> tags twice. Without this
+   guard the second pass overwrote window.ScopeApp with a fresh, uninitialised
+   module: the app kept working (the first instance owns the listeners) but
+   `ready` stayed false forever and every applyOptions() from the host landed on
+   an instance wired to nothing. */
+window.ScopeApp = window.ScopeApp || (function () {
 
   // ---------- utilities ----------
-  const PALETTE = ["#d62d2d", "#1f6fe0", "#1d9e4f", "#e0821f", "#8b46c8", "#0d9aa3", "#cc2f7b", "#7a5445"];
+  /* Trace colours follow the convention every bench scope uses — CH1 yellow,
+     CH2 cyan, CH3 magenta, CH4 green — because that is the single strongest
+     visual cue that this is an oscilloscope. Those hues are unreadable on a
+     white screen, so there is a muted set for the light theme; channels keep
+     an index instead of a fixed colour and are repainted when the theme
+     changes, unless the user picked a colour by hand (autoColor = false). */
+  const PALETTE_DARK = ["#ffd93d", "#3ad6f0", "#ff5fd2", "#5ce65c", "#ff9f45", "#a98bff", "#ff6b6b", "#8ad7ff"];
+  const PALETTE_LIGHT = ["#a97c00", "#0e7490", "#be185d", "#15803d", "#c2410c", "#6d28d9", "#b91c1c", "#0369a1"];
   let paletteIdx = 0;
-  const nextColor = () => PALETTE[(paletteIdx++) % PALETTE.length];
+  const nextColorIdx = () => paletteIdx++;
   const clamp = (v, lo, hi) => v < lo ? lo : (v > hi ? hi : v);
+  function luminance(hex) {
+    const m = String(hex).replace("#", "");
+    if (m.length < 6) return 1;
+    const r = parseInt(m.slice(0, 2), 16) / 255, g = parseInt(m.slice(2, 4), 16) / 255, b = parseInt(m.slice(4, 6), 16) / 255;
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  }
+  const screenIsDark = () => luminance((S.theme || THEME_DARK).scopeBg) < 0.5;
+  const colorFor = (idx) => (screenIsDark() ? PALETTE_DARK : PALETTE_LIGHT)[idx % PALETTE_DARK.length];
   let uidN = 1;
   const nextId = () => "id" + (uidN++);
 
@@ -142,35 +162,33 @@ self.onmessage = function(e) {
   }
 
   // ---------- theme ----------
-  const T = {
-    scopeBg: "#ffffff", gridMinor: "#e4e9ee", gridMajor: "#c3ccd6", gridTick: "#cdd6de",
-    border: "#94a2b1", text: "#1a232e", muted: "#65758a", accent: "#0f62fe",
-    cursor: "#374558", shade: "rgba(15,98,254,0.08)", shadeEdge: "rgba(15,98,254,0.45)"
-  };
-  const T_DARK = {
-    scopeBg: "#0c1116", gridMinor: "#1d2833", gridMajor: "#33455a", gridTick: "#27353f",
-    border: "#3c4d5e", text: "#dbe4ee", muted: "#8fa2b5", accent: "#4d9aff",
-    cursor: "#c8d4e2", shade: "rgba(77,154,255,0.10)", shadeEdge: "rgba(77,154,255,0.55)"
-  };
-
-  // ---------- user theme (chrome + canvas) ----------
-  const THEME_LIGHT = { app: "#e9edf2", surface: "#ffffff", surface2: "#f6f8fa", border: "#c9d2da", text: "#1a232e", muted: "#65758a", accent: "#0f62fe", scopeBg: "#ffffff", gridMinor: "#e4e9ee", gridMajor: "#c3ccd6", cursor: "#374558" };
-  const THEME_DARK = { app: "#0b0f14", surface: "#141a22", surface2: "#10161d", border: "#2c3a49", text: "#dbe4ee", muted: "#8fa2b5", accent: "#4d9aff", scopeBg: "#0c1116", gridMinor: "#1d2833", gridMajor: "#33455a", cursor: "#c8d4e2" };
-  const THEME_KEY = "csvscope_theme_v1";
+  /* One theme object drives everything: the CSS custom properties of the
+     chrome and the colours the canvases paint with. `--panel` and friends are
+     written straight onto documentElement, so there is no need for the old
+     trick of matching inline `style` attributes with CSS selectors. */
+  const THEME_LIGHT = { app: "#e7ecf1", surface: "#ffffff", surface2: "#f4f7fa", border: "#ccd6df", text: "#16202b", muted: "#61728a", accent: "#0f62fe", scopeBg: "#ffffff", gridMinor: "#e3e9ee", gridMajor: "#b9c6d2", cursor: "#3a4a5c" };
+  const THEME_DARK = { app: "#0b0f14", surface: "#141b23", surface2: "#10161d", border: "#26333f", text: "#dfe8f2", muted: "#7d8fa3", accent: "#2ea8ff", scopeBg: "#05090c", gridMinor: "#1e323f", gridMajor: "#3a5a6d", cursor: "#d7e6f5" };
+  const CSS_VARS = { app: "chassis", surface: "panel", surface2: "panel2", border: "line", text: "text", muted: "dim", accent: "accent", scopeBg: "screen", gridMinor: "grid1", gridMajor: "grid2", cursor: "cursor" };
+  const THEME_KEY = "csvscope_theme_v2";
   function hexA(hex, a) {
     const m = hex.replace("#", "");
     const r = parseInt(m.slice(0, 2), 16), g = parseInt(m.slice(2, 4), 16), b = parseInt(m.slice(4, 6), 16);
     return "rgba(" + r + "," + g + "," + b + "," + a + ")";
   }
   function themeCanvas(t) {
-    return { scopeBg: t.scopeBg, gridMinor: t.gridMinor, gridMajor: t.gridMajor, gridTick: t.gridMinor,
+    const dark = luminance(t.scopeBg) < 0.5;
+    return { scopeBg: t.scopeBg, gridMinor: t.gridMinor, gridMajor: t.gridMajor, gridTick: t.gridMajor,
       border: t.gridMajor, text: t.text, muted: t.muted, accent: t.accent, cursor: t.cursor,
-      shade: hexA(t.accent, 0.08), shadeEdge: hexA(t.accent, 0.45) };
+      dark,
+      // on-screen legend bar, drawn over the graticule like a real DSO
+      barBg: dark ? "rgba(8,14,19,0.82)" : "rgba(248,250,252,0.88)",
+      barLine: hexA(t.gridMajor, 0.75),
+      shade: hexA(t.accent, dark ? 0.12 : 0.08), shadeEdge: hexA(t.accent, dark ? 0.6 : 0.45) };
   }
 
   // ---------- state ----------
   const S = {
-    opts: { scopeDark: false, traceWidth: 1.5, fundamental: 60 },
+    opts: { scopeDark: true, traceWidth: 1.6, traceGlow: true, fundamental: 50, ratedCurrent: "" },
     files: [], channels: [],
     divsH: 10, divsV: 8,
     timePerDiv: 10e-3, hOffset: 0, timeDivOptions: [1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1],
@@ -182,16 +200,17 @@ self.onmessage = function(e) {
     persistOn: false, persistDecay: 0.10,
     tab: "scope",
     dragging: null,
+    glowOn: true,
     fft: null,          // last spectrum result
     harm: null,         // last harmonic analysis
     fftMaxFreq: null,
+    iL: null,           // rated demand current for TDD (rms, null = not set)
     xy: { xId: "", yId: "" },
     hoverHarm: -1,
     theme: null
   };
-  const th = () => S.theme ? themeCanvas(S.theme) : (S.opts.scopeDark ? T_DARK : T);
-  const uiTheme = () => S.theme || { surface: "#ffffff", border: "#c9d2da", accent: "#0f62fe", muted: "#65758a" };
-  const curTheme = () => S.theme ? Object.assign({}, S.theme) : Object.assign({}, S.opts.scopeDark ? THEME_DARK : THEME_LIGHT);
+  const th = () => themeCanvas(S.theme || THEME_DARK);
+  const curTheme = () => Object.assign({}, S.theme || THEME_DARK);
 
   // ---------- DOM refs ----------
   const $ = (id) => document.getElementById(id);
@@ -204,7 +223,7 @@ self.onmessage = function(e) {
     "timeDiv", "hOffsetIn", "btnPanL", "btnPanR", "btnZinH", "btnZoutH",
     "trigSource", "trigLevelIn", "trigSlope", "btnTrigPrev", "btnTrigNext",
     "cursorMode", "cursorRefRow", "cursorRef", "cursorReadout",
-    "chkZoom", "chkSplitFFT", "chkPersist", "persistDecay", "persistDecayRow",
+    "chkGlow", "chkZoom", "chkSplitFFT", "chkPersist", "persistDecay", "persistDecayRow",
     "btnThemeLight", "btnThemeDark", "btnThemeReset",
     "thApp", "thSurface", "thText", "thAccent", "thScopeBg", "thGridMinor", "thGridMajor", "thCursor",
     "scopeWrap", "scopeCanvas", "hoverReadout", "zoomWrap", "zoomCanvas",
@@ -212,9 +231,9 @@ self.onmessage = function(e) {
     "measureBody", "measureScopeSel", "btnExportMeas",
     "fftSource", "fftWindow", "fftScale", "fftRange", "fftMaxIn",
     "f0In", "nHarmIn", "multMode", "multKIn", "multKRow", "harmUnit",
-    "btnCompute", "btnExportHarm", "fftSummary",
+    "ilIn", "btnIeee", "btnCompute", "btnExportHarm", "fftSummary",
     "specWrap", "specCanvas", "harmWrap", "harmCanvas", "phaseWrap", "phaseCanvas",
-    "harmTableBody", "thdBig", "harmMeta",
+    "harmTableBody", "thdBig", "tddBig", "tddSub", "harmMeta",
     "xySrcX", "xySrcY", "xyRange", "btnXYFit", "xyWrap", "xyCanvas",
     "statusLeft", "statusRight"
   ];
@@ -236,78 +255,171 @@ self.onmessage = function(e) {
     return true;
   }
 
-  // ---------- injected CSS for dynamic UI ----------
+  // ---------- injected CSS ----------
+  /* The whole instrument skin lives here so there is exactly one place that
+     decides how the app looks. Everything is expressed against the CSS custom
+     properties written by applyTheme(), so switching or hand-tuning a theme
+     never needs a rule change. */
   function injectCSS() {
     const css = `
-    .osc-in{height:24px;padding:0 6px;border:1px solid #c9d2da;border-radius:4px;background:#fff;font:11px "IBM Plex Mono",monospace;color:#1a232e;min-width:0;box-sizing:border-box}
-    .osc-in:focus{border-color:#0f62fe;box-shadow:0 0 0 2px rgba(15,98,254,.14);outline:none}
-    .osc-in.invalid{border-color:#d92b2b;box-shadow:0 0 0 2px rgba(217,43,43,.2)}
-    .osc-file{display:flex;align-items:center;gap:6px;padding:5px 8px;border:1px solid #dde3ea;border-radius:5px;background:#fff;font-size:11px}
-    .osc-file .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;color:#1a232e}
-    .osc-file .mt{color:#65758a;font:10px "IBM Plex Mono",monospace;flex-shrink:0}
-    .osc-file button{border:none;background:none;color:#9aa7b6;cursor:pointer;font-size:12px;padding:0 2px;line-height:1}
-    .osc-file button:hover{color:#d92b2b}
-    .osc-ch{border:1px solid #dde3ea;border-radius:6px;background:#fff;padding:7px 8px;display:flex;flex-direction:column;gap:6px}
-    .osc-ch.off{opacity:.55}
+    /* ===== shell ===== */
+    .osc{height:100vh;display:flex;flex-direction:column;background:var(--chassis);color:var(--text);font-family:"IBM Plex Sans",sans-serif;overflow:hidden}
+    .osc .body{flex:1;display:grid;grid-template-columns:250px 1fr 296px;min-height:0}
+    .osc .grow{flex:1;min-width:0}
+    .osc .push{margin-left:auto}
+    .osc .stack{display:flex;flex-direction:column;gap:6px}
+    .osc .sep{width:1px;height:20px;background:var(--line);flex-shrink:0}
+    .osc ::-webkit-scrollbar{width:9px;height:9px}
+    .osc ::-webkit-scrollbar-thumb{background:var(--line);border-radius:5px}
+    .osc ::-webkit-scrollbar-thumb:hover{background:var(--dim)}
+    .osc ::-webkit-scrollbar-track{background:transparent}
+
+    /* ===== front panel ===== */
+    .osc .hdr{display:flex;align-items:center;gap:11px;height:52px;padding:0 14px;flex-shrink:0;background:linear-gradient(180deg,var(--panel),var(--panel2));border-bottom:1px solid var(--line);box-shadow:0 1px 0 var(--shadow-1)}
+    .osc .home{display:grid;place-items:center;width:28px;height:28px;border:1px solid var(--line);border-radius:7px;background:var(--panel2);color:var(--dim);font-size:14px;text-decoration:none;flex-shrink:0}
+    .osc .home:hover{border-color:var(--accent);color:var(--accent)}
+    .osc .brand{display:flex;align-items:center;gap:8px;margin-right:4px;flex-shrink:0}
+    .osc .pwr{width:7px;height:7px;border-radius:50%;background:var(--ok);box-shadow:0 0 8px var(--ok);flex-shrink:0}
+    .osc .mark{font-weight:700;font-size:14.5px;letter-spacing:.07em}
+    .osc .model{font-size:10px;color:var(--dim);letter-spacing:.04em;white-space:nowrap}
+    .osc .tools{display:flex;align-items:center;gap:6px;flex-shrink:0}
+    @media (max-width:1320px){.osc .model{display:none}}
+
+    /* ===== buttons ===== */
+    .osc .btn{height:28px;padding:0 12px;border:1px solid var(--line);border-radius:6px;background:linear-gradient(180deg,var(--panel),var(--panel2));color:var(--text);font:600 11.5px "IBM Plex Sans",sans-serif;cursor:pointer;white-space:nowrap;box-shadow:0 1px 0 var(--shadow-1),inset 0 1px 0 var(--sheen)}
+    .osc .btn:hover{border-color:var(--accent);color:var(--accent)}
+    .osc .btn:active{transform:translateY(1px);box-shadow:none}
+    .osc .btn.pri{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+    .osc .btn.pri:hover{filter:brightness(1.1);color:var(--on-accent)}
+    .osc .btn.xs{height:22px;padding:0 10px;font-size:10.5px}
+    .osc .btn.key{flex:1;height:25px;padding:0 6px;font-size:10.5px}
+    .osc .btn.wide{width:100%;height:27px}
+    .osc .btn.tall{height:32px;font-size:12.5px}
+
+    /* ===== softkey tabs ===== */
+    .osc .tabs{display:flex;gap:3px;padding:3px;margin:0 auto;background:var(--panel2);border:1px solid var(--line);border-radius:8px}
+    .osc .tab{height:26px;padding:0 16px;border:1px solid transparent;border-radius:6px;background:transparent;color:var(--dim);font:600 11.5px "IBM Plex Sans",sans-serif;cursor:pointer;white-space:nowrap}
+    .osc .tab:hover{color:var(--text)}
+    .osc .tab.on{background:var(--panel);border-color:var(--line);color:var(--accent);box-shadow:0 1px 3px var(--shadow-1)}
+
+    /* ===== side racks ===== */
+    .osc .side{background:var(--panel2);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;overflow-y:auto}
+    .osc .side.r{border-right:none;border-left:1px solid var(--line)}
+    .osc .rack{display:flex;flex-direction:column}
+    .osc .grp{display:flex;flex-direction:column;gap:7px;padding:11px 12px;border-bottom:1px solid var(--line)}
+    .osc .grp.fill{flex:1}
+    .osc .grp.accent{background:var(--accent-a1);box-shadow:inset 3px 0 0 var(--accent)}
+    .osc .grp.accent .ttl{color:var(--accent)}
+    .osc .ttl{margin:0;font:700 10px "IBM Plex Sans",sans-serif;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+    .osc .row{display:flex;align-items:center;gap:8px}
+    .osc .row.pad{gap:6px}
+    .osc .lab{width:66px;flex-shrink:0;font-size:11px;color:var(--dim)}
+    .osc .lab.w{width:80px}
+    .osc .chk{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--text);cursor:pointer}
+    .osc .hint{font-size:10.5px;color:var(--dim);line-height:1.55}
+    .osc .note{font-size:10.5px;color:var(--accent);min-height:0}
+    .osc .readout{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:6px 8px}
+    .osc .swatches{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px}
+    .osc .thsw{display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--dim);cursor:pointer}
+    .osc .thsw input[type="color"]{width:22px;height:18px;border:1px solid var(--line);border-radius:4px;padding:0;background:none;cursor:pointer;flex-shrink:0}
+    .osc .thsw input[type="color"]::-webkit-color-swatch-wrapper{padding:1px}
+    .osc .thsw input[type="color"]::-webkit-color-swatch{border:none;border-radius:2px}
+
+    /* ===== fields ===== */
+    .osc .in,.osc-in{height:26px;padding:0 8px;border:1px solid var(--line);border-radius:5px;background:var(--panel);color:var(--text);font:11px "IBM Plex Sans",sans-serif;min-width:0;box-sizing:border-box}
+    .osc .in.mono,.osc-in{font-family:"IBM Plex Mono",monospace}
+    .osc .in:focus,.osc-in:focus{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-a2);outline:none}
+    .osc-in.invalid{border-color:var(--bad);box-shadow:0 0 0 2px var(--bad-a)}
+    .osc .in.op{width:44px;padding:0 4px;text-align:center;flex-shrink:0;font-family:"IBM Plex Mono",monospace}
+    .osc .in.slope{width:56px;padding:0 4px;flex-shrink:0}
+    .osc .in.xs{height:22px;padding:0 6px;font-size:10.5px}
+
+    /* ===== screens ===== */
+    .osc .center{display:flex;flex-direction:column;min-width:0;min-height:0;padding:10px;overflow-y:auto}
+    .osc .view{display:flex;flex-direction:column;gap:8px;flex:1;min-height:0}
+    .osc .view.fft{grid-template-columns:1fr 340px;gap:8px}
+    .osc .fft-plots{display:flex;flex-direction:column;gap:8px;min-width:0;min-height:0}
+    .osc .fft-rdo{display:flex;flex-direction:column;gap:8px;min-height:0}
+    .osc .g4{flex:4}
+    .osc .g3{flex:3}
+    .osc .scr{position:relative;flex:1;min-height:150px;border-radius:7px;overflow:hidden;background:var(--screen);border:1px solid var(--line);box-shadow:var(--bezel)}
+    .osc .scr>canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+    .osc .scr.fixed{flex:none}
+    .osc .h128{height:128px}
+    .osc .h160{height:160px}
+    .osc .hover{display:none;position:absolute;top:8px;right:8px;margin:0;padding:6px 9px;background:var(--panel);border:1px solid var(--line);border-radius:5px;font:10.5px "IBM Plex Mono",monospace;line-height:1.5;color:var(--text);pointer-events:none;z-index:2;box-shadow:0 4px 14px var(--shadow-2)}
+    .osc .corner{position:absolute;right:8px;top:6px;font:10px "IBM Plex Mono",monospace;color:var(--dim);pointer-events:none}
+
+    /* ===== cards & tables ===== */
+    .osc .card{background:var(--panel);border:1px solid var(--line);border-radius:7px;display:flex;flex-direction:column;overflow:hidden;flex-shrink:0}
+    .osc .card.fill{flex:1;min-height:0}
+    .osc .card.scroll{overflow-y:auto}
+    .osc .card.meas{height:150px;margin-top:8px}
+    .osc .card-hd{display:flex;align-items:center;gap:10px;padding:6px 10px;border-bottom:1px solid var(--line);background:var(--panel2);flex-shrink:0}
+    .osc .card-bd{flex:1;overflow-y:auto;min-height:0}
+    .osc .tbl{width:100%;border-collapse:collapse}
+    .osc .tbl th{position:sticky;top:0;background:var(--panel2);text-align:left;padding:5px 8px;font:600 9.5px "IBM Plex Sans",sans-serif;letter-spacing:.07em;text-transform:uppercase;color:var(--dim);border-bottom:1px solid var(--line)}
+    /* the harmonics table carries six numeric columns in a 340px rail */
+    .osc .fft-rdo .tbl th{padding:5px 5px;letter-spacing:.03em}
+    .osc .fft-rdo .tbl td{padding:3px 5px;font-size:10.5px}
+
+    /* ===== THD / TDD readout ===== */
+    .osc .rdo{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line)}
+    .osc .rdo .cell{background:var(--panel);padding:9px 11px;min-width:0}
+    .osc .rdo .k{font:700 9.5px "IBM Plex Sans",sans-serif;letter-spacing:.1em;text-transform:uppercase;color:var(--dim)}
+    .osc .rdo .v{font:600 23px "IBM Plex Mono",monospace;line-height:1.3;color:var(--accent);overflow:hidden;text-overflow:ellipsis}
+    .osc .rdo .v.alt{color:var(--ok)}
+    .osc .rdo .s{font-size:9.5px;color:var(--dim);line-height:1.4}
+    .osc .meta{padding:8px 11px;border-top:1px solid var(--line);font-size:10.5px;color:var(--dim);line-height:1.55}
+
+    /* ===== status bar ===== */
+    .osc .stat{display:flex;align-items:center;gap:12px;height:28px;padding:0 14px;flex-shrink:0;background:linear-gradient(180deg,var(--panel2),var(--panel));border-top:1px solid var(--line);font:10.5px "IBM Plex Mono",monospace;color:var(--dim)}
+    .osc .stat span:last-child{margin-left:auto;opacity:.75}
+
+    /* ===== widgets built by the engine ===== */
+    .osc-file{display:flex;align-items:center;gap:6px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:var(--panel);font-size:11px}
+    .osc-file .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;color:var(--text)}
+    .osc-file .mt{color:var(--dim);font:10px "IBM Plex Mono",monospace;flex-shrink:0}
+    .osc-file button{border:none;background:none;color:var(--dim);cursor:pointer;font-size:12px;padding:0 2px;line-height:1}
+    .osc-file button:hover{color:var(--bad)}
+    .osc-ch{border:1px solid var(--line);border-radius:7px;background:var(--panel);padding:7px 8px;display:flex;flex-direction:column;gap:6px;border-left:3px solid var(--ch-color,var(--line))}
+    .osc-ch.off{opacity:.5}
     .osc-ch .hd{display:flex;align-items:center;gap:6px}
     .osc-ch .sw{width:14px;height:14px;border:none;border-radius:3px;padding:0;cursor:pointer;background:none;flex-shrink:0}
     .osc-ch .sw::-webkit-color-swatch-wrapper{padding:0}
-    .osc-ch .sw::-webkit-color-swatch{border:1px solid rgba(0,0,0,.2);border-radius:3px}
-    .osc-ch .lbl{flex:1;border:1px solid transparent;background:transparent;font:600 11.5px "IBM Plex Sans",sans-serif;color:#1a232e;border-radius:3px;padding:2px 3px;min-width:0}
-    .osc-ch .lbl:hover{border-color:#dde3ea}
-    .osc-ch .lbl:focus{border-color:#0f62fe;outline:none;background:#fff}
-    .osc-ch .eye,.osc-ch .rm{border:none;background:none;cursor:pointer;font-size:12px;padding:1px 3px;color:#65758a;line-height:1;border-radius:3px}
-    .osc-ch .eye:hover,.osc-ch .rm:hover{background:#eef2f6;color:#1a232e}
-    .osc-ch .rm:hover{color:#d92b2b}
+    .osc-ch .sw::-webkit-color-swatch{border:1px solid var(--line);border-radius:3px}
+    .osc-ch .lbl{flex:1;border:1px solid transparent;background:transparent;font:600 11.5px "IBM Plex Sans",sans-serif;color:var(--text);border-radius:4px;padding:2px 3px;min-width:0}
+    .osc-ch .lbl:hover{border-color:var(--line)}
+    .osc-ch .lbl:focus{border-color:var(--accent);outline:none;background:var(--panel2)}
+    .osc-ch .eye,.osc-ch .rm{border:none;background:none;cursor:pointer;font-size:12px;padding:1px 3px;color:var(--dim);line-height:1;border-radius:3px}
+    .osc-ch .eye:hover,.osc-ch .rm:hover{background:var(--panel2);color:var(--text)}
+    .osc-ch .rm:hover{color:var(--bad)}
     .osc-ch .ctl{display:grid;grid-template-columns:1fr 1fr;gap:5px}
     .osc-ch .fld{display:flex;flex-direction:column;gap:2px;min-width:0}
-    .osc-ch .fld .osc-in{width:100%}
-    .osc-pos-pop{position:fixed;z-index:9999;background:#ffffff;border:1px solid #c9d2da;border-radius:6px;box-shadow:0 6px 18px rgba(16,30,54,.18);padding:9px 11px;min-width:190px}
-    .osc-pos-pop .hd{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px}
-    .osc-pos-pop .hd span:first-child{font:9px "IBM Plex Sans",sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#8593a4}
-    .osc-pos-pop .hd span:last-child{font:11px "IBM Plex Mono",monospace;color:#1a232e;font-weight:600}
-    .osc-pos-pop input[type="range"]{width:100%;display:block}
-    .osc-pos-pop .sc{display:flex;justify-content:space-between;font:9.5px "IBM Plex Mono",monospace;color:#9aa7b6;margin-top:2px}
-    .osc-ch .fld span{font:9px "IBM Plex Sans",sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#8593a4}
-    .osc-ch .ft{display:flex;align-items:center;gap:8px;font-size:10.5px;color:#65758a}
+    .osc-ch .fld .osc-in{width:100%;height:24px;padding:0 6px}
+    .osc-ch .fld span{font:9px "IBM Plex Sans",sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}
+    .osc-ch .ft{display:flex;align-items:center;gap:8px;font-size:10.5px;color:var(--dim)}
     .osc-ch .ft label{display:flex;align-items:center;gap:4px;cursor:pointer}
     .osc-ch select.osc-in{font-family:"IBM Plex Sans",sans-serif}
-    .osc-tr td{padding:3px 8px;border-bottom:1px solid #eef1f5;font:11px "IBM Plex Mono",monospace;color:#26303c;white-space:nowrap}
+    .osc-pos-pop{position:fixed;z-index:9999;background:var(--panel);border:1px solid var(--line);border-radius:7px;box-shadow:0 8px 24px var(--shadow-2);padding:9px 11px;min-width:190px}
+    .osc-pos-pop .hd{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px}
+    .osc-pos-pop .hd span:first-child{font:9px "IBM Plex Sans",sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}
+    .osc-pos-pop .hd span:last-child{font:600 11px "IBM Plex Mono",monospace;color:var(--text)}
+    .osc-pos-pop input[type="range"]{width:100%;display:block}
+    .osc-pos-pop .sc{display:flex;justify-content:space-between;font:9.5px "IBM Plex Mono",monospace;color:var(--dim);margin-top:2px}
+    .osc-tr td{padding:3px 8px;border-bottom:1px solid var(--line);font:11px "IBM Plex Mono",monospace;color:var(--text);white-space:nowrap}
     .osc-tr td:first-child{font-family:"IBM Plex Sans",sans-serif;font-weight:600}
+    .osc-tr .dim{color:var(--dim)}
     .osc-htr{cursor:default}
-    .osc-htr:hover td{background:#f0f5ff}
-    .osc-htr.fund td{background:#f5f9ff}
-    .osc-empty{color:#8593a4;font-size:11px;padding:6px 2px;line-height:1.5}
-    body.osc-themed{background:var(--oscT-app)!important}
-    body.osc-themed [style*="background: rgb(233, 237, 242)"]{background:var(--oscT-app)!important}
-    body.osc-themed [style*="background: rgb(236, 239, 243)"]{background:var(--oscT-app)!important}
-    body.osc-themed [style*="background: rgb(255, 255, 255)"]{background:var(--oscT-surface)!important}
-    body.osc-themed [style*="background: rgba(255, 255, 255"]{background:var(--oscT-surface)!important}
-    body.osc-themed [style*="background: rgb(246, 248, 250)"]{background:var(--oscT-surface2)!important}
-    body.osc-themed [style*="background: rgb(240, 244, 249)"]{background:var(--oscT-surface2)!important}
-    body.osc-themed [style*="background: rgb(221, 227, 234)"]{background:var(--oscT-border)!important}
-    body.osc-themed [style*="background: rgb(15, 98, 254)"]{background:var(--oscT-accent)!important;border-color:var(--oscT-accent)!important}
-    body.osc-themed [style*="color: rgb(26, 35, 46)"]{color:var(--oscT-text)!important}
-    body.osc-themed [style*="color: rgb(38, 48, 60)"]{color:var(--oscT-text)!important}
-    body.osc-themed [style*="color: rgb(101, 117, 138)"]{color:var(--oscT-muted)!important}
-    body.osc-themed [style*="color: rgb(133, 147, 164)"]{color:var(--oscT-muted)!important}
-    body.osc-themed [style*="color: rgb(143, 160, 179)"]{color:var(--oscT-muted)!important}
-    body.osc-themed [style*="border: 1px solid rgb(216, 223, 231)"],body.osc-themed [style*="border-bottom: 1px solid rgb(216, 223, 231)"],body.osc-themed [style*="border-top: 1px solid rgb(216, 223, 231)"]{border-color:var(--oscT-border)!important}
-    body.osc-themed [style*="rgb(201, 210, 218)"]{border-color:var(--oscT-border)!important}
-    body.osc-themed [style*="border: 1px solid rgb(221, 227, 234)"]{border-color:var(--oscT-border)!important}
-    body.osc-themed [style*="rgb(226, 231, 237)"]{border-color:var(--oscT-border)!important}
-    body.osc-themed [style*="rgb(232, 237, 242)"]{border-color:var(--oscT-border)!important}
-    body.osc-themed .osc-in{background:var(--oscT-surface);color:var(--oscT-text);border-color:var(--oscT-border)}
-    body.osc-themed .osc-file,body.osc-themed .osc-ch{background:var(--oscT-surface);border-color:var(--oscT-border)}
-    body.osc-themed .osc-file .nm,body.osc-themed .osc-ch .lbl,body.osc-themed .osc-pos-pop .hd span:last-child{color:var(--oscT-text)}
-    body.osc-themed .osc-ch .lbl:hover,body.osc-themed .osc-ch .lbl:focus{border-color:var(--oscT-border)}
-    body.osc-themed .osc-ch .lbl:focus{background:var(--oscT-surface)}
-    body.osc-themed .osc-file .mt,body.osc-themed .osc-ch .ft,body.osc-themed .osc-ch .fld span,body.osc-themed .osc-empty,body.osc-themed .osc-pos-pop .hd span:first-child,body.osc-themed .osc-pos-pop .sc,body.osc-themed .osc-ch .eye,body.osc-themed .osc-ch .rm,body.osc-themed .osc-file button{color:var(--oscT-muted)}
-    body.osc-themed .osc-ch .eye:hover,body.osc-themed .osc-ch .rm:hover{background:var(--oscT-surface2);color:var(--oscT-text)}
-    body.osc-themed .osc-pos-pop{background:var(--oscT-surface);border-color:var(--oscT-border)}
-    body.osc-themed .osc-tr td{color:var(--oscT-text);border-bottom-color:var(--oscT-border)}
-    body.osc-themed .osc-htr:hover td{background:var(--oscT-surface2)}
-    body.osc-themed .osc-htr.fund td{background:var(--oscT-surface2)}
+    .osc-htr:hover td{background:var(--accent-a1)}
+    .osc-htr.fund td{background:var(--accent-a1)}
+    .osc-htr.over td{color:var(--bad)}
+    .osc-empty{color:var(--dim);font-size:11px;padding:6px 2px;line-height:1.5}
+
+    /* Last, so it beats the display value of any layout class it is combined
+       with. Deliberately not !important: the engine toggles these elements back
+       on with an inline style, which still wins. */
+    .osc .hide{display:none}
     `;
     const st = document.createElement("style");
     st.textContent = css;
@@ -353,10 +465,11 @@ self.onmessage = function(e) {
     msg.columns.forEach((c) => {
       const data = values[c.name];
       const stats = computeStats(data, 0, data.length - 1);
+      const colorIdx = nextColorIdx();
       const ch = {
         id: nextId(), isMath: false, fileId: fileObj.id, key: c.name,
         label: shortLabel + ":" + c.name, unit: c.unit || "",
-        color: nextColor(), visible: true, invert: false,
+        colorIdx: colorIdx, color: colorFor(colorIdx), autoColor: true, visible: true, invert: false,
         voltsPerDiv: 1, position: 0, avgN: 1, hiresN: 1, tOffset: 0, fullStats: stats
       };
       autoscaleChannel(ch);
@@ -532,6 +645,7 @@ self.onmessage = function(e) {
     S.channels.forEach(ch => {
       const card = document.createElement("div");
       card.className = "osc-ch" + (ch.visible ? "" : " off");
+      card.style.setProperty("--ch-color", ch.color);  // colour rail down the left edge
       const avgHtml = AVG_OPTS.map(n => '<option value="' + n + '"' + (ch.avgN === n ? " selected" : "") + '>' + (n === 1 ? "Off" : n + "×") + "</option>").join("");
       const hiresHtml = HIRES_OPTS.map(o => '<option value="' + o[0] + '"' + (ch.hiresN === o[0] ? " selected" : "") + '>' + o[1] + "</option>").join("");
       card.innerHTML =
@@ -552,7 +666,12 @@ self.onmessage = function(e) {
         '<label title="High Resolution: block-averages consecutive samples (boxcar decimation) for extra vertical resolution. Independent of Avg.">HiRes <select class="osc-in hires" style="height:20px;padding:0 2px">' + hiresHtml + '</select></label>' +
         '<span style="margin-left:auto;font:10px \'IBM Plex Mono\',monospace">' + (ch.unit || "·") + '</span>' +
         '</div>';
-      card.querySelector(".sw").addEventListener("input", e => { ch.color = e.target.value; renderAll(); });
+      card.querySelector(".sw").addEventListener("input", e => {
+        ch.color = e.target.value;
+        ch.autoColor = false;  // hand-picked: stop following the theme palette
+        card.style.setProperty("--ch-color", ch.color);
+        renderAll();
+      });
       card.querySelector(".lbl").addEventListener("change", e => { ch.label = e.target.value; rebuildSelects(); renderAll(); });
       card.querySelector(".eye").addEventListener("click", () => { ch.visible = !ch.visible; rebuildChannelList(); renderAll(); scheduleMeasure(); });
       const vdiv = card.querySelector(".vdiv");
@@ -695,36 +814,50 @@ self.onmessage = function(e) {
   }
 
   // ---------- drawing primitives ----------
+  /* A bench-scope graticule, not a chart grid: dotted division lines, solid
+     centre axes, and 5 fine ticks per division along both of them. */
   function drawGrid(c, divsH, divsV) {
     const t = th();
     const { ctx, w, h } = c;
     ctx.fillStyle = t.scopeBg;
     ctx.fillRect(0, 0, w, h);
+    if (t.dark) {
+      // faint lift towards the centre, the way a real display looks lit
+      const gr = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.75);
+      gr.addColorStop(0, "rgba(120,190,255,0.045)");
+      gr.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = gr;
+      ctx.fillRect(0, 0, w, h);
+    }
     const stepX = w / divsH, stepY = h / divsV;
-    ctx.strokeStyle = t.gridMinor;
+    const cx = Math.round(w / 2) + 0.5, cy = Math.round(h / 2) + 0.5;
     ctx.lineWidth = 1;
+    ctx.strokeStyle = t.gridMinor;
+    ctx.setLineDash([1, 3]);
     ctx.beginPath();
-    for (let i = 1; i < divsH; i++) { const x = Math.round(i * stepX) + 0.5; ctx.moveTo(x, 0); ctx.lineTo(x, h); }
-    for (let j = 1; j < divsV; j++) { const y = Math.round(j * stepY) + 0.5; ctx.moveTo(0, y); ctx.lineTo(w, y); }
+    for (let i = 1; i < divsH; i++) { const x = Math.round(i * stepX) + 0.5; if (x === cx) continue; ctx.moveTo(x, 0); ctx.lineTo(x, h); }
+    for (let j = 1; j < divsV; j++) { const y = Math.round(j * stepY) + 0.5; if (y === cy) continue; ctx.moveTo(0, y); ctx.lineTo(w, y); }
     ctx.stroke();
+    ctx.setLineDash([]);
     ctx.strokeStyle = t.gridMajor;
     ctx.beginPath();
-    ctx.moveTo(Math.round(w / 2) + 0.5, 0); ctx.lineTo(Math.round(w / 2) + 0.5, h);
-    ctx.moveTo(0, Math.round(h / 2) + 0.5); ctx.lineTo(w, Math.round(h / 2) + 0.5);
-    ctx.stroke();
-    ctx.strokeStyle = t.gridTick;
-    ctx.beginPath();
+    ctx.moveTo(cx, 0); ctx.lineTo(cx, h);
+    ctx.moveTo(0, cy); ctx.lineTo(w, cy);
+    // subdivision ticks on the centre axes and along the outer frame
     for (let i = 0; i < divsH; i++) for (let k = 1; k < 5; k++) {
       const x = Math.round(i * stepX + k * stepX / 5) + 0.5;
-      ctx.moveTo(x, h / 2 - 3); ctx.lineTo(x, h / 2 + 3);
+      ctx.moveTo(x, cy - 3); ctx.lineTo(x, cy + 3);
+      ctx.moveTo(x, 0); ctx.lineTo(x, 3);
+      ctx.moveTo(x, h); ctx.lineTo(x, h - 3);
     }
     for (let j = 0; j < divsV; j++) for (let k = 1; k < 5; k++) {
       const y = Math.round(j * stepY + k * stepY / 5) + 0.5;
-      ctx.moveTo(w / 2 - 3, y); ctx.lineTo(w / 2 + 3, y);
+      ctx.moveTo(cx - 3, y); ctx.lineTo(cx + 3, y);
+      ctx.moveTo(0, y); ctx.lineTo(3, y);
+      ctx.moveTo(w, y); ctx.lineTo(w - 3, y);
     }
     ctx.stroke();
     ctx.strokeStyle = t.border;
-    ctx.lineWidth = 1;
     ctx.strokeRect(0.5, 0.5, w - 1, h - 1);
   }
 
@@ -741,9 +874,14 @@ self.onmessage = function(e) {
     const count = iEnd - iStart + 1;
     if (count <= 1) return;
     const tToX = (tt) => ((tt - tA) / (tB - tA)) * w;
+    ctx2.save();
     ctx2.strokeStyle = ch.color;
     ctx2.lineWidth = S.opts.traceWidth;
     ctx2.lineJoin = "round";
+    ctx2.lineCap = "round";
+    // Phosphor bloom. One shadowed stroke over the whole path, so the cost is
+    // the same whether the trace is 100 or 100 000 points.
+    if (S.glowOn && th().dark) { ctx2.shadowColor = ch.color; ctx2.shadowBlur = 6; }
     ctx2.beginPath();
     const W = Math.max(1, Math.round(w));
     if (count <= W * 2) {
@@ -772,6 +910,7 @@ self.onmessage = function(e) {
       }
     }
     ctx2.stroke();
+    ctx2.restore();
   }
 
   // ---------- persistence buffer ----------
@@ -819,15 +958,22 @@ self.onmessage = function(e) {
       visCh.forEach(ch => traceInto(ctx, ch, tA, tB, w, valueToY));
     }
 
-    // zero markers
+    // ground markers on the left rail, numbered like a bench scope
+    ctx.font = "700 9px 'IBM Plex Sans', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
     visCh.forEach(ch => {
       const y = valueToY(ch, 0);
       if (y < -8 || y > h + 8) return;
       ctx.fillStyle = ch.color;
       ctx.beginPath();
-      ctx.moveTo(1, y); ctx.lineTo(11, y - 5); ctx.lineTo(11, y + 5);
+      ctx.moveTo(1, y); ctx.lineTo(15, y - 6); ctx.lineTo(15, y + 6);
       ctx.closePath(); ctx.fill();
+      ctx.fillStyle = luminance(ch.color) > 0.5 ? "#0b1118" : "#ffffff";
+      ctx.fillText(String(S.channels.indexOf(ch) + 1), 10, y);
     });
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
 
     // zoom region shade
     if (S.zoomOn && S.files.length) {
@@ -842,29 +988,17 @@ self.onmessage = function(e) {
     drawTrigger(ctx, w, h);
     drawCursors(ctx, w, h);
 
-    // channel badges (top-left)
-    ctx.font = "10px 'IBM Plex Mono', monospace";
-    let bx = 16;
-    visCh.forEach(ch => {
-      const txt = ch.label + " " + fmtScale(ch.voltsPerDiv, ch.unit) + "/div";
-      const tw = ctx.measureText(txt).width;
-      ctx.fillStyle = ch.color;
-      ctx.fillRect(bx, 8, 3, 10);
-      ctx.fillStyle = t.text;
-      ctx.fillText(txt, bx + 7, 17);
-      bx += tw + 22;
-    });
-
-    // time axis labels
+    // time axis labels, kept clear of the legend bar
     ctx.fillStyle = t.muted;
     ctx.font = "10px 'IBM Plex Mono', monospace";
     ctx.textAlign = "center";
     for (let d = 1; d < S.divsH; d += 2) {
       const tt = tA + (d / S.divsH) * (tB - tA);
-      ctx.fillText(fmt(tt, "s", 2), (d / S.divsH) * w, h - 6);
+      ctx.fillText(fmt(tt, "s", 2), (d / S.divsH) * w, h - LEGEND_H - 6);
     }
     ctx.textAlign = "left";
-    ctx.fillText(fmt(S.timePerDiv, "s", 0) + "/div", 16, h - 6);
+
+    drawLegendBar(ctx, w, h, t, visCh);
 
     if (S.files.length === 0) {
       ctx.fillStyle = t.muted;
@@ -879,6 +1013,53 @@ self.onmessage = function(e) {
     updateCursorReadout();
     renderZoom();
     updateStatus();
+  }
+
+  /* Legend strip across the bottom of the graticule: the channel scales on the
+     left and the horizontal + trigger settings on the right, exactly where a
+     bench scope puts them. */
+  const LEGEND_H = 22;
+  function drawLegendBar(ctx, w, h, t, visCh) {
+    const y0 = h - LEGEND_H;
+    ctx.fillStyle = t.barBg;
+    ctx.fillRect(0, y0, w, LEGEND_H);
+    ctx.strokeStyle = t.barLine;
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, y0 + 0.5); ctx.lineTo(w, y0 + 0.5); ctx.stroke();
+
+    const mid = y0 + LEGEND_H / 2;
+    ctx.textBaseline = "middle";
+
+    // right side first, so the channel list knows where it must stop
+    ctx.font = "10px 'IBM Plex Mono', monospace";
+    ctx.textAlign = "right";
+    let right = w - 8;
+    const trigCh = S.channels.find(c => c.id === S.trigger.sourceId);
+    if (trigCh) {
+      const txt = "T " + (S.trigger.slope === "rising" ? "↗" : "↘") + " " + fmt(S.trigger.level, trigCh.unit, 2);
+      ctx.fillStyle = trigCh.color;
+      ctx.fillText(txt, right, mid);
+      right -= ctx.measureText(txt).width + 14;
+    }
+    const hTxt = fmt(S.timePerDiv, "s", 0) + "/div  ⌖ " + fmt(S.hOffset, "s", 2);
+    ctx.fillStyle = t.text;
+    ctx.fillText(hTxt, right, mid);
+    right -= ctx.measureText(hTxt).width + 14;
+
+    // channel scales, left to right, truncated rather than overlapped
+    ctx.textAlign = "left";
+    let x = 8;
+    for (const ch of visCh) {
+      const txt = ch.label + "  " + fmtScale(ch.voltsPerDiv, ch.unit) + "/div";
+      const tw = ctx.measureText(txt).width + 11;
+      if (x + tw > right) { ctx.fillStyle = t.muted; ctx.fillText("…", x, mid); break; }
+      ctx.fillStyle = ch.color;
+      ctx.fillRect(x, mid - 5, 3, 10);
+      ctx.fillStyle = t.text;
+      ctx.fillText(txt, x + 8, mid);
+      x += tw + 12;
+    }
+    ctx.textBaseline = "alphabetic";
   }
 
   function drawTrigger(ctx, w, h) {
@@ -962,7 +1143,7 @@ self.onmessage = function(e) {
     const el = R.cursorReadout;
     if (mode === "off") { el.innerHTML = ""; el.style.display = "none"; return; }
     el.style.display = "block";
-    const mono = (s) => '<div style="font:11px \'IBM Plex Mono\',monospace;color:#26303c;padding:1px 0">' + s + "</div>";
+    const mono = (s) => '<div style="font:11px \'IBM Plex Mono\',monospace;color:var(--text);padding:1px 0">' + s + "</div>";
     let html = "";
     if (mode === "time" || mode === "track") {
       const dt = cu.t2 - cu.t1;
@@ -1124,9 +1305,11 @@ self.onmessage = function(e) {
     else if (op === "/") unit = (a.unit || "u1") + "/" + (b.unit || "u2");
     else unit = a.unit === b.unit ? a.unit : (a.unit || "?") + sym + (b.unit || "?");
     const stats = computeStats(out, 0, out.length - 1);
+    const colorIdx = nextColorIdx();
     const ch = {
       id: nextId(), isMath: true, mathA: a.id, mathB: b.id,
-      label: a.label + " " + sym + " " + b.label, unit, color: nextColor(),
+      label: a.label + " " + sym + " " + b.label, unit,
+      colorIdx: colorIdx, color: colorFor(colorIdx), autoColor: true,
       visible: true, invert: false, voltsPerDiv: 1, position: 0, avgN: 1, hiresN: 1, tOffset: 0,
       data: out, time: ta.length === out.length ? ta : tb, fullStats: stats
     };
@@ -1213,7 +1396,7 @@ self.onmessage = function(e) {
   }
 
   // ---------- harmonic analysis (PLECS-style Fourier at n·f0) ----------
-  function computeHarmonics(ch, f0, nHarm, rangeMode) {
+  function computeHarmonics(ch, f0, nHarm, rangeMode, iL) {
     const r = analysisRange(ch, rangeMode);
     if (!r || f0 <= 0) return null;
     const { data, time } = r;
@@ -1263,7 +1446,34 @@ self.onmessage = function(e) {
     let sumSq = 0;
     for (let i = 1; i < harms.length; i++) sumSq += harms[i].mag * harms[i].mag;
     const thd = fund > 0 ? Math.sqrt(sumSq) / fund : null;
-    return { channel: ch, f0, nHarm, dc, harms, thd, periods: P, samples: M, t0, rangeMode, fNyq, clipped };
+    /* TDD (IEEE 519): the same harmonic content, but referred to the maximum
+       demand load current I_L instead of to the fundamental. That is what makes
+       it usable as an acceptance criterion — THD blows up when the converter
+       runs lightly loaded even though the absolute harmonic current is tiny.
+       `mag` here is a peak amplitude while I_L is an rms current, so the
+       numerator is converted before dividing; skipping that would report a
+       value √2 too large. */
+    const harmRms = Math.sqrt(sumSq) / Math.SQRT2;
+    const tdd = (iL && iL > 0) ? harmRms / iL : null;
+    return { channel: ch, f0, nHarm, dc, harms, thd, tdd, iL: (iL && iL > 0) ? iL : null,
+      harmRms, fundRms: fund / Math.SQRT2, periods: P, samples: M, t0, rangeMode, fNyq, clipped };
+  }
+
+  /* I_L is the rated / maximum demand load current of the converter. It is
+     entered by hand because nothing in a CSV capture can tell us what the
+     equipment is rated for — the record only shows what it happened to draw. */
+  function readRatedCurrent() {
+    const raw = String(R.ilIn.value || "").trim();
+    if (!raw) { S.iL = null; R.ilIn.classList.remove("invalid"); return null; }
+    const v = parseScaleInput(raw);
+    if (v === null || v <= 0) {
+      R.ilIn.classList.add("invalid");
+      S.iL = null;
+      return null;
+    }
+    R.ilIn.classList.remove("invalid");
+    S.iL = v;
+    return v;
   }
 
   function displayedHarms() {
@@ -1292,11 +1502,12 @@ self.onmessage = function(e) {
     if (!ch) { R.fftSummary.textContent = "Load a CSV and pick a source channel."; return; }
     const f0 = parseScaleInput(R.f0In.value);
     if (!f0 || f0 <= 0) { R.fftSummary.textContent = "Enter a valid fundamental frequency."; return; }
-    const nHarm = clamp(Math.round(parseFloat(R.nHarmIn.value) || 40), 1, 500);
+    const nHarm = clamp(Math.round(parseFloat(R.nHarmIn.value) || 50), 1, 500);
+    readRatedCurrent();
     R.fftSummary.textContent = "Computing…";
     setTimeout(() => {
       S.fft = computeSpectrum(ch, R.fftWindow.value, R.fftRange.value);
-      S.harm = computeHarmonics(ch, f0, nHarm, R.fftRange.value);
+      S.harm = computeHarmonics(ch, f0, nHarm, R.fftRange.value, S.iL);
       if (S.fft && !S.fftMaxFreq) S.fftMaxFreq = clamp(f0 * (nHarm + 2), S.fft.freqStep * 10, S.fft.fs / 2);
       if (S.fft) {
         const wanted = parseScaleInput(R.fftMaxIn.value);
@@ -1304,6 +1515,12 @@ self.onmessage = function(e) {
         if (document.activeElement !== R.fftMaxIn) R.fftMaxIn.value = fmtScale(S.fftMaxFreq, "Hz");
       }
       renderFFTView();
+      // leaving "Computing…" on screen made a finished run look stuck
+      R.fftSummary.textContent = S.fft
+        ? "Done · " + (R.fftRange.value === "full" ? "full record" : "visible window") + " · "
+          + S.fft.usable.toLocaleString() + " samples · Δf " + fmt(S.fft.freqStep, "Hz", 2)
+          + " · Nyquist " + fmt(S.fft.fs / 2, "Hz", 1)
+        : "Not enough samples in the selected range.";
     }, 15);
   }
 
@@ -1361,8 +1578,10 @@ self.onmessage = function(e) {
       });
       ctx.setLineDash([]);
     }
+    ctx.save();
     ctx.strokeStyle = result.channel.color;
     ctx.lineWidth = 1.2;
+    if (S.glowOn && t.dark) { ctx.shadowColor = result.channel.color; ctx.shadowBlur = 4; }
     ctx.beginPath();
     const W = Math.max(1, Math.round(w));
     if (idxMax <= W * 2) {
@@ -1384,6 +1603,7 @@ self.onmessage = function(e) {
       }
     }
     ctx.stroke();
+    ctx.restore();
     // axis labels
     ctx.fillStyle = t.muted;
     ctx.font = "10px 'IBM Plex Mono', monospace";
@@ -1401,7 +1621,7 @@ self.onmessage = function(e) {
   }
 
   function barGeometry(c, list) {
-    const padL = 34, padR = 10, padT = 18, padB = 20;
+    const padL = 48, padR = 10, padT = 18, padB = 20;  // room for 5-char axis labels
     const iw = c.w - padL - padR;
     const bw = Math.max(2, Math.min(34, iw / Math.max(1, list.length) * 0.62));
     const step = iw / Math.max(1, list.length);
@@ -1514,35 +1734,65 @@ self.onmessage = function(e) {
     ctx.textAlign = "left";
   }
 
+  const IL_PROMPT = "set I<sub>L</sub> to enable";
+  function setDistortionReadout(H) {
+    if (!H || H.error) {
+      R.thdBig.textContent = "—";
+      R.tddBig.textContent = "—";
+      R.tddSub.innerHTML = S.iL ? "I<sub>L</sub> = " + fmt(S.iL, "A", 3) + " rms" : IL_PROMPT;
+      return;
+    }
+    R.thdBig.textContent = H.thd !== null ? (H.thd * 100).toFixed(2) + " %" : "—";
+    if (H.tdd !== null) {
+      R.tddBig.textContent = (H.tdd * 100).toFixed(2) + " %";
+      R.tddSub.innerHTML = "I<sub>L</sub> = " + fmt(H.iL, H.channel.unit || "A", 3) + " rms · n ≤ " + H.harms.length;
+    } else {
+      R.tddBig.textContent = "—";
+      R.tddSub.innerHTML = IL_PROMPT;
+    }
+  }
+
   function buildHarmTable() {
     const el = R.harmTableBody;
     el.innerHTML = "";
     if (!S.harm) {
-      R.thdBig.textContent = "—";
+      setDistortionReadout(null);
       R.harmMeta.textContent = "Run Compute to analyze harmonics.";
       return;
     }
     if (S.harm.error) {
-      R.thdBig.textContent = "—";
+      setDistortionReadout(null);
       R.harmMeta.textContent = S.harm.error;
       return;
     }
     const H = S.harm;
-    R.thdBig.textContent = H.thd !== null ? (H.thd * 100).toFixed(2) + " %" : "—";
-    R.harmMeta.innerHTML = H.channel.label + " · f₁ = " + fmt(H.f0, "Hz", 1) + " · " + H.periods + " period" + (H.periods > 1 ? "s" : "") + " · " + H.samples.toLocaleString() + " samples<br>DC = " + fmt(H.dc, H.channel.unit, 3) + " · fund = " + fmt(H.harms[0].mag, H.channel.unit, 3) + " pk ∠ " + H.harms[0].phase.toFixed(1) + "°" + (H.clipped ? '<br><span style="color:#b45309">⚠ ' + H.clipped + " harmonic" + (H.clipped > 1 ? "s" : "") + " above Nyquist (" + fmt(H.fNyq, "Hz", 1) + ") skipped — HiRes reduces bandwidth</span>" : "");
+    setDistortionReadout(H);
+    const u = H.channel.unit;
+    R.harmMeta.innerHTML = H.channel.label + " · f₁ = " + fmt(H.f0, "Hz", 1) + " · " + H.periods + " period" + (H.periods > 1 ? "s" : "") + " · " + H.samples.toLocaleString() + " samples"
+      + "<br>DC = " + fmt(H.dc, u, 3) + " · fund = " + fmt(H.harms[0].mag, u, 3) + " pk (" + fmt(H.fundRms, u, 3) + " rms) ∠ " + H.harms[0].phase.toFixed(1) + "°"
+      + "<br>harmonic content (n ≥ 2) = " + fmt(H.harmRms, u, 3) + " rms"
+      + (H.clipped ? '<br><span style="color:var(--bad)">⚠ ' + H.clipped + " harmonic" + (H.clipped > 1 ? "s" : "") + " above Nyquist (" + fmt(H.fNyq, "Hz", 1) + ") skipped — HiRes reduces bandwidth</span>" : "")
+      // I_L is a demand rating, so the measured fundamental should sit below it.
+      // Above it, either the run is an overload or I_L was typed in peak amps.
+      + (H.iL && H.fundRms > H.iL * 1.02
+        ? '<br><span style="color:var(--bad)">⚠ the measured fundamental (' + fmt(H.fundRms, u, 3) + " rms) exceeds I<sub>L</sub> — check that I<sub>L</sub> is the rated current in rms, not peak</span>"
+        : "");
     const list = displayedHarms();
     const fund = H.harms[0].mag;
     list.forEach((hh, i) => {
       const tr = document.createElement("tr");
       tr.className = "osc-tr osc-htr" + (hh.n === 1 ? " fund" : "");
       const pct = fund > 0 ? (hh.mag / fund * 100) : 0;
+      // per-order distortion against I_L: the form IEEE 519 states its limits in
+      const pctIL = H.iL ? (hh.mag / Math.SQRT2 / H.iL * 100) : null;
       const significant = fund > 0 && hh.mag >= fund * 0.001;
       tr.innerHTML =
         "<td>" + hh.n + "</td>" +
         "<td>" + fmt(hh.f, "Hz", 1) + "</td>" +
         "<td>" + fmt(harmDisplayMag(hh), R.harmUnit.value === "pct" ? "%" : "", 4) + "</td>" +
         "<td>" + pct.toFixed(2) + "</td>" +
-        '<td style="' + (significant ? "" : "color:#a9b4c2") + '">' + hh.phase.toFixed(1) + "</td>";
+        "<td" + (pctIL === null ? ' class="dim"' : "") + ">" + (pctIL === null ? "—" : pctIL.toFixed(2)) + "</td>" +
+        "<td" + (significant ? "" : ' class="dim"') + ">" + hh.phase.toFixed(1) + "</td>";
       tr.addEventListener("mouseenter", () => { S.hoverHarm = i; drawHarmBars(); drawPhaseBars(); });
       tr.addEventListener("mouseleave", () => { S.hoverHarm = -1; drawHarmBars(); drawPhaseBars(); });
       el.appendChild(tr);
@@ -1552,11 +1802,19 @@ self.onmessage = function(e) {
   function exportHarmonics() {
     if (!S.harm || S.harm.error) return;
     const H = S.harm;
-    let csv = "# channel," + H.channel.label + "\n# fundamental_Hz," + H.f0 + "\n# periods_used," + H.periods + "\n# DC," + H.dc + "\n# THD_pct," + (H.thd !== null ? (H.thd * 100).toFixed(4) : "") + "\n";
-    csv += "n,freq_Hz,mag_peak,mag_rms,pct_of_fundamental,phase_deg\n";
+    let csv = "# channel," + H.channel.label + "\n# fundamental_Hz," + H.f0 + "\n# periods_used," + H.periods
+      + "\n# harmonics_analyzed," + H.harms.length + "\n# DC," + H.dc
+      + "\n# fundamental_rms," + H.fundRms + "\n# harmonic_rms_n_ge_2," + H.harmRms
+      + "\n# THD_pct," + (H.thd !== null ? (H.thd * 100).toFixed(4) : "")
+      + "\n# I_L_rms," + (H.iL !== null ? H.iL : "")
+      + "\n# TDD_pct," + (H.tdd !== null ? (H.tdd * 100).toFixed(4) : "") + "\n";
+    csv += "n,freq_Hz,mag_peak,mag_rms,pct_of_fundamental,pct_of_IL,phase_deg\n";
     const fund = H.harms[0].mag;
     displayedHarms().forEach(hh => {
-      csv += [hh.n, hh.f, hh.mag, hh.mag / Math.SQRT2, fund > 0 ? (hh.mag / fund * 100) : 0, hh.phase].join(",") + "\n";
+      csv += [hh.n, hh.f, hh.mag, hh.mag / Math.SQRT2,
+        fund > 0 ? (hh.mag / fund * 100) : 0,
+        H.iL ? (hh.mag / Math.SQRT2 / H.iL * 100) : "",
+        hh.phase].join(",") + "\n";
     });
     downloadText("harmonics_" + H.channel.label.replace(/[^\w]+/g, "_") + ".csv", csv);
   }
@@ -1588,8 +1846,10 @@ self.onmessage = function(e) {
     const maxFreq = clamp(Math.max(peakFreq * 20, spec.freqStep * 50), spec.freqStep * 10, spec.fs / 2);
     const idxMax = clamp(Math.round(maxFreq / spec.freqStep), 1, mags.length - 1);
     const mToY = (m) => h - (m / (maxMag * 1.1)) * h;
+    ctx.save();
     ctx.strokeStyle = ch.color;
     ctx.lineWidth = 1.1;
+    if (S.glowOn && t.dark) { ctx.shadowColor = ch.color; ctx.shadowBlur = 4; }
     ctx.beginPath();
     const W = Math.max(1, Math.round(w));
     const per = idxMax / W;
@@ -1602,6 +1862,7 @@ self.onmessage = function(e) {
       if (px === 0) ctx.moveTo(px + 0.5, mToY(mx)); else ctx.lineTo(px + 0.5, mToY(mx));
     }
     ctx.stroke();
+    ctx.restore();
     const pX = (peakFreq / maxFreq) * w, pY = mToY(peakMag);
     ctx.fillStyle = t.cursor;
     ctx.beginPath(); ctx.arc(pX, pY, 3, 0, Math.PI * 2); ctx.fill();
@@ -1646,10 +1907,12 @@ self.onmessage = function(e) {
     const xOf = (v) => w / 2 + ((v * sx / chX.voltsPerDiv) + chX.position) * (w / S.divsH);
     const yOf = (v) => h / 2 - ((v * sy / chY.voltsPerDiv) + chY.position) * (h / S.divsV);
     const step = Math.max(1, Math.floor(count / 60000));
+    ctx.save();
     ctx.strokeStyle = chY.color;
-    ctx.globalAlpha = 0.8;
+    ctx.globalAlpha = 0.85;
     ctx.lineWidth = Math.max(1, S.opts.traceWidth - 0.3);
     ctx.lineJoin = "round";
+    if (S.glowOn && t.dark) { ctx.shadowColor = chY.color; ctx.shadowBlur = 5; }
     ctx.beginPath();
     let started = false;
     for (let i = iStart; i <= iEnd; i += step) {
@@ -1657,7 +1920,7 @@ self.onmessage = function(e) {
       if (!started) { ctx.moveTo(px, py); started = true; } else ctx.lineTo(px, py);
     }
     ctx.stroke();
-    ctx.globalAlpha = 1;
+    ctx.restore();
     ctx.fillStyle = t.text;
     ctx.font = "10px 'IBM Plex Mono', monospace";
     ctx.fillText("X: " + chX.label + " (" + fmtScale(chX.voltsPerDiv, chX.unit) + "/div)", 8, 14);
@@ -1824,22 +2087,40 @@ self.onmessage = function(e) {
     Object.keys(THEME_INPUTS).forEach(id => { if (R[id]) R[id].value = t[THEME_INPUTS[id]]; });
   }
   function applyTheme(t, save) {
+    const wasDark = screenIsDark();
     S.theme = t;
-    const st = document.body.style;
-    ["app", "surface", "surface2", "border", "text", "muted", "accent"].forEach(k => st.setProperty("--oscT-" + k, t[k]));
-    document.body.classList.add("osc-themed");
+    const st = document.documentElement.style;
+    Object.keys(CSS_VARS).forEach(k => st.setProperty("--" + CSS_VARS[k], t[k]));
+    // Derived tokens: readable text on the accent fill, tints for hovers and
+    // highlights, and a bezel whose depth matches how dark the screen is.
+    const dark = luminance(t.scopeBg) < 0.5;
+    const panelDark = luminance(t.surface) < 0.5;
+    st.setProperty("--on-accent", luminance(t.accent) > 0.55 ? "#0b1118" : "#ffffff");
+    st.setProperty("--accent-a1", hexA(t.accent, panelDark ? 0.13 : 0.08));
+    st.setProperty("--accent-a2", hexA(t.accent, 0.28));
+    st.setProperty("--ok", panelDark ? "#3ddc7f" : "#0f7a4a");
+    st.setProperty("--bad", panelDark ? "#ff6b6b" : "#d92b2b");
+    st.setProperty("--bad-a", hexA(panelDark ? "#ff6b6b" : "#d92b2b", 0.25));
+    st.setProperty("--sheen", panelDark ? "rgba(255,255,255,.05)" : "rgba(255,255,255,.85)");
+    st.setProperty("--shadow-1", panelDark ? "rgba(0,0,0,.35)" : "rgba(16,30,54,.09)");
+    st.setProperty("--shadow-2", panelDark ? "rgba(0,0,0,.5)" : "rgba(16,30,54,.18)");
+    st.setProperty("--bezel", dark
+      ? "inset 0 0 0 1px rgba(0,0,0,.6), inset 0 3px 26px rgba(0,0,0,.55)"
+      : "inset 0 1px 4px rgba(16,30,54,.10)");
+    // Traces the user never recoloured follow the theme, so the classic
+    // yellow/cyan set does not end up invisible on a white screen.
+    if (dark !== wasDark) {
+      S.channels.forEach(ch => { if (ch.autoColor) ch.color = colorFor(ch.colorIdx); });
+      rebuildChannelList();  // only on a real palette flip: this steals focus
+    }
     if (save !== false) { try { localStorage.setItem(THEME_KEY, JSON.stringify(t)); } catch (e) { /* no storage */ } }
     syncThemeInputs();
     clearPersist();
     setTab(S.tab);
   }
   function resetTheme() {
-    S.theme = null;
-    document.body.classList.remove("osc-themed");
     try { localStorage.removeItem(THEME_KEY); } catch (e) { /* no storage */ }
-    syncThemeInputs();
-    clearPersist();
-    setTab(S.tab);
+    applyTheme(Object.assign({}, S.opts.scopeDark === false ? THEME_LIGHT : THEME_DARK), false);
   }
   function wireTheme() {
     R.btnThemeLight.addEventListener("click", () => applyTheme(Object.assign({}, THEME_LIGHT)));
@@ -1858,15 +2139,8 @@ self.onmessage = function(e) {
   // ---------- tabs ----------
   function setTab(tab) {
     S.tab = tab;
-    const U = uiTheme();
     const tabs = { scope: R.tabScope, fft: R.tabFFT, xy: R.tabXY };
-    Object.entries(tabs).forEach(([k, btn]) => {
-      const active = k === tab;
-      btn.style.background = active ? U.surface : "transparent";
-      btn.style.borderColor = active ? U.border : "transparent";
-      btn.style.color = active ? U.accent : U.muted;
-      btn.style.boxShadow = active ? "0 1px 2px rgba(16,30,54,0.08)" : "none";
-    });
+    Object.entries(tabs).forEach(([k, btn]) => btn.classList.toggle("on", k === tab));
     R.viewScope.style.display = tab === "scope" ? "flex" : "none";
     R.viewFFT.style.display = tab === "fft" ? "grid" : "none";
     R.viewXY.style.display = tab === "xy" ? "flex" : "none";
@@ -1979,6 +2253,11 @@ self.onmessage = function(e) {
     });
     R.cursorRef.addEventListener("change", () => { S.cursors.refId = R.cursorRef.value; render(); });
 
+    R.chkGlow.addEventListener("change", () => {
+      S.glowOn = R.chkGlow.checked;
+      clearPersist();
+      renderAll();
+    });
     R.chkZoom.addEventListener("change", () => {
       S.zoomOn = R.chkZoom.checked;
       R.zoomWrap.style.display = S.zoomOn ? "block" : "none";
@@ -2009,8 +2288,16 @@ self.onmessage = function(e) {
 
     R.btnCompute.addEventListener("click", runAnalysis);
     R.btnExportHarm.addEventListener("click", exportHarmonics);
-    ["fftSource", "fftWindow", "fftRange", "f0In", "nHarmIn"].forEach(id => {
+    ["fftSource", "fftWindow", "fftRange", "f0In", "nHarmIn", "ilIn"].forEach(id => {
       R[id].addEventListener("change", scheduleAnalysis);
+    });
+    R.ilIn.addEventListener("keydown", e => { if (e.key === "Enter") R.ilIn.blur(); });
+    R.btnIeee.addEventListener("click", () => {
+      // IEEE 519 evaluates orders up to the 50th; TDD needs I_L, so ask for it
+      // right away rather than silently reporting a dash.
+      R.nHarmIn.value = "50";
+      if (S.harm || S.fft) runAnalysis();
+      if (!readRatedCurrent()) { R.ilIn.focus(); R.fftSummary.textContent = "Enter the rated demand current I_L to get TDD."; }
     });
     R.fftScale.addEventListener("change", () => drawSpectrumCanvas());
     R.fftMaxIn.addEventListener("change", () => {
@@ -2097,13 +2384,18 @@ self.onmessage = function(e) {
     bindCanvas("harm", "harmCanvas", "harmWrap");
     bindCanvas("phase", "phaseCanvas", "phaseWrap");
     bindCanvas("xy", "xyCanvas", "xyWrap");
-    R.f0In.value = String(S.opts.fundamental || 60);
+    R.f0In.value = String(S.opts.fundamental || 50);
+    if (S.opts.ratedCurrent) R.ilIn.value = String(S.opts.ratedCurrent);
+    S.glowOn = S.opts.traceGlow !== false;
+    R.chkGlow.checked = S.glowOn;
     wire();
     wireTheme();
     let savedTheme = null;
     try { savedTheme = JSON.parse(localStorage.getItem(THEME_KEY)); } catch (e) { /* ignore */ }
     if (savedTheme && savedTheme.app && savedTheme.scopeBg) applyTheme(savedTheme, false);
-    else syncThemeInputs();
+    else applyTheme(Object.assign({}, S.opts.scopeDark === false ? THEME_LIGHT : THEME_DARK), false);
+    readRatedCurrent();
+    setDistortionReadout(null);
     rebuildFileList();
     rebuildChannelList();
     setTab("scope");
@@ -2113,11 +2405,20 @@ self.onmessage = function(e) {
     window.ScopeApp.ready = true;
   }
   function applyOptions(opts) {
-    const prevF0 = S.opts.fundamental;
+    const prev = { f0: S.opts.fundamental, glow: S.opts.traceGlow, iL: S.opts.ratedCurrent };
     Object.assign(S.opts, opts || {});
     if (!ready) return;
-    if (opts && opts.fundamental !== prevF0 && document.activeElement !== R.f0In && !S.harm) {
+    if (opts && opts.fundamental !== prev.f0 && document.activeElement !== R.f0In && !S.harm) {
       R.f0In.value = String(opts.fundamental);
+    }
+    if (opts && opts.traceGlow !== prev.glow) {
+      S.glowOn = opts.traceGlow !== false;
+      R.chkGlow.checked = S.glowOn;
+    }
+    if (opts && opts.ratedCurrent !== prev.iL && document.activeElement !== R.ilIn) {
+      R.ilIn.value = String(opts.ratedCurrent || "");
+      readRatedCurrent();
+      setDistortionReadout(S.harm);
     }
     clearPersist();
     render(); renderFFTView(); renderXY(); scheduleSplit();
