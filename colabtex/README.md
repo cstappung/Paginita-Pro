@@ -38,6 +38,8 @@ colabtex/
   src/pdfview.js    Visor PDF (pdf.js)
   src/asset-preview.js  Vista previa de imágenes y PDF al pulsarlos en el
                     árbol de archivos (ocupa el sitio del editor)
+  src/format.js     Negrita, cursiva, subrayado y color del texto
+                    seleccionado (botones de la barra y Ctrl+B/I/U)
   src/comments.js   Comentarios sobre el texto (hilos anclados con
                     posiciones relativas de Yjs; resalte, burbuja y panel)
   server/static.js  Servidor estático SOLO para desarrollo local
@@ -84,6 +86,13 @@ presence/<pid>/<clientID>        cursores y presencia (se limpia al desconectar)
   bitmap en WASM); la plantilla ya lo hace.
 - `migracion-proyectos-locales/` contiene los .tex exportados de la
   versión anterior (cuando los proyectos vivían en el disco local).
+- **Formato del texto** (`src/format.js`): se selecciona y se pulsa **B / I /
+  U** o el botón de color en la barra del editor (o Ctrl+B / Ctrl+I / Ctrl+U).
+  Escribe `\textbf`, `\textit`, `\underline` y `\textcolor` en el propio .tex —
+  no hay estado oculto—, y los botones ALTERNAN: sobre un fragmento que ya
+  tiene el comando, se lo quitan. La primera vez que se usa un color se añade
+  `\usepackage{xcolor}` al preámbulo del archivo principal (y si estaba el
+  viejo `color`, se sustituye: son incompatibles).
 - **Comentarios** (`src/comments.js`): se selecciona texto y se le adjunta
   un hilo que ven todos. Cada hilo es un `Y.Map` dentro del mapa `comments`
   del Y.Doc: `{file, anchor, head, quote, author, createdAt, resolved,

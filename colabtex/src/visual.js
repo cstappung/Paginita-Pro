@@ -16,6 +16,8 @@
    ============================================================ */
 import { EditorView, Decoration, WidgetType } from "@codemirror/view";
 import { RangeSetBuilder, StateField } from "@codemirror/state";
+import { closingBrace } from "./util.js";
+import { cssOfTexColor } from "./format.js";
 
 const KATEX_DIR = "vendor/katex/";
 let katexPromise = null;
@@ -96,18 +98,6 @@ const CMD_STYLES = [
 const MATH_ENVS = ["equation", "equation*", "align", "align*", "gather", "gather*",
   "multline", "multline*", "eqnarray", "eqnarray*", "displaymath"];
 
-/* Busca la llave que cierra la abierta en `open` (índice de «{»). */
-function closingBrace(text, open) {
-  let depth = 0;
-  for (let i = open; i < text.length; i++) {
-    const c = text[i];
-    if (c === "\\") { i++; continue; }           // \{ escapada
-    if (c === "{") depth++;
-    else if (c === "}") { depth--; if (!depth) return i; }
-  }
-  return -1;
-}
-
 /* ¿el cursor está dentro (o pegado) al rango? → mostrar el fuente */
 function cursorTouches(state, from, to) {
   for (const r of state.selection.ranges)
@@ -137,6 +127,25 @@ function buildDecorations(state) {
       mark(open + 1, close, rule.cls);
       hide(close, close + 1);
     }
+  }
+
+  /* -- 1b. \textcolor{azul}{texto} → el texto pintado de ese color --
+     Va aparte de CMD_STYLES porque lleva DOS argumentos y el estilo depende
+     del primero; los modelos que no sabemos traducir (rgb, cmyk…) se dejan
+     como código, que es más honesto que pintarlos de un color inventado. */
+  const colorRe = /\\textcolor\s*(?:\[([^\]\n]*)\])?\s*\{([^{}\n]*)\}\s*\{/g;
+  let mcol;
+  while ((mcol = colorRe.exec(text))) {
+    const open = mcol.index + mcol[0].length - 1;
+    const close = closingBrace(text, open);
+    if (close < 0) continue;
+    if (cursorTouches(state, mcol.index, close + 1)) continue;
+    const css = cssOfTexColor(mcol[1] || "", mcol[2] || "");
+    if (!css) continue;
+    hide(mcol.index, open + 1);
+    if (close > open + 1)
+      b.push({ from: open + 1, to: close, deco: Decoration.mark({ attributes: { style: "color:" + css } }) });
+    hide(close, close + 1);
   }
 
   /* -- 2. matemáticas en línea: $...$ y \(...\) -- */

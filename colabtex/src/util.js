@@ -25,6 +25,20 @@ export function timeAgo(ts) {
   return new Date(ts).toLocaleDateString("es", { day: "numeric", month: "short", year: "numeric" });
 }
 
+/* Busca la llave que cierra la abierta en `open` (índice de «{»), contando
+   los niveles y saltándose las escapadas (\{). Devuelve -1 si no cierra.
+   La usan la vista visual y el formato del texto. */
+export function closingBrace(text, open) {
+  let depth = 0;
+  for (let i = open; i < text.length; i++) {
+    const c = text[i];
+    if (c === "\\") { i++; continue; }           // \{ escapada
+    if (c === "{") depth++;
+    else if (c === "}") { depth--; if (!depth) return i; }
+  }
+  return -1;
+}
+
 export function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }

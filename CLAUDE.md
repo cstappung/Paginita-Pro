@@ -84,6 +84,14 @@ Key modules in [colabtex/src/](colabtex/src/):
   place of the code editor (which is only hidden, never destroyed). Images go
   to an `<img>` with a blob URL; PDFs reuse `PdfViewer`. Formats the browser
   can't draw (`.eps`, `.tiff`) fall back to a file card with a download button.
+- `format.js` — **bold / italic / underline / colour** for the selection, the
+  way Overleaf's toolbar does it: buttons in the editor bar plus Ctrl+B/I/U
+  write `\textbf`, `\textit`, `\underline`, `\textcolor` straight into the
+  `.tex` (no hidden state), and **toggle off** when the selection is already
+  inside that command. Also exports `xcolorPatch(text)` — the pure preamble
+  edit that makes `\textcolor` compile — which `main.js` applies to the main
+  file (Yjs or disk) the first time a colour is used, and `cssOfTexColor`,
+  shared with the visual view.
 - `synctex.js` / `visual.js` — source↔PDF sync and the visual/rendered view.
 - `texlog.js` / `themes.js` — LaTeX log parsing, editor themes.
 - `local-fs.js` — File System Access API layer for local mode.

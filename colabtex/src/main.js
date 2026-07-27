@@ -33,6 +33,7 @@ import { THEMES, themeName, saveThemeName, cmThemeFor, cmHighlightFor, applyCssV
 import { loadKatex, visualExtensions } from "./visual.js";
 import { createBridge, vscodeUrl } from "./bridge.js";
 import { AssetPreview } from "./asset-preview.js";
+import { createFormatBar, xcolorPatch } from "./format.js";
 
 const $ = id => document.getElementById(id);
 const ROLE_LABEL = { owner: "Propietario", edit: "Puede editar", view: "Solo lectura" };
@@ -111,6 +112,7 @@ const state = {
   assets: [],
   assetCache: new Map(), // key+size → bytes (evita re-descargar al compilar)
   preview: null,         // vista previa de imágenes/PDF (creada en boot)
+  format: null,          // barra de negrita/cursiva/subrayado/color (creada en boot)
   engine: null,
   pdfViewer: null,
   compiling: false,
@@ -380,6 +382,7 @@ function teardownEditor() {
   if (state.membersUnsub) { state.membersUnsub(); state.membersUnsub = null; }
   if (state.preview) state.preview.close();
   if (state.editorView) { state.editorView.destroy(); state.editorView = null; }
+  if (state.format) state.format.refresh();   // sin editor no hay nada que dar formato
   if (state.provider) { state.provider.destroy(); state.provider = null; }
   if (state.ydoc) { state.ydoc.destroy(); state.ydoc = null; }
   state.project = null; state.yFiles = null; state.yFolders = null; state.yComments = null; state.activeFile = null;
@@ -684,6 +687,47 @@ function insertAssetSnippet(asset) {
   state.editorView.dispatch(state.editorView.state.replaceSelection(snippet));
   state.editorView.focus();
   return true;
+}
+
+/* Escribe un trozo de un archivo de texto, esté abierto o no y sea cual sea el
+   modo. En local con el archivo abierto se pasa por el editor: cambiar
+   state.localContent por debajo dejaría a CodeMirror con la versión vieja y la
+   siguiente tecla borraría lo escrito aquí. */
+function patchTextFile(name, from, to, insert) {
+  if (state.mode === "local") {
+    if (name === state.activeFile && state.editorView) {
+      state.editorView.dispatch({ changes: { from, to, insert } });
+      return;
+    }
+    const cur = state.localContent.get(name);
+    if (cur == null) return;
+    state.localContent.set(name, cur.slice(0, from) + insert + cur.slice(to));
+    scheduleLocalSave(name);
+    return;
+  }
+  const t = state.yFiles && state.yFiles.get(name);
+  if (!t) return;
+  state.ydoc.transact(() => {
+    if (to > from) t.delete(from, to - from);
+    if (insert) t.insert(from, insert);
+  });
+}
+
+/* \textcolor necesita el paquete xcolor. Se carga en el preámbulo del archivo
+   principal la primera vez que se usa un color, para que el documento siga
+   compilando sin que nadie tenga que acordarse de añadirlo. */
+function ensureColorPackage() {
+  const main = resolveMainFile();
+  if (!main) return;
+  const text = fileText(main);
+  if (text == null) return;
+  const p = xcolorPatch(text);
+  if (!p) return;                       // xcolor ya estaba
+  patchTextFile(main, p.from, p.to, p.insert);
+  setStatus(p.replaced
+    ? `En ${main} se cambió «color» por «xcolor» (lo necesita \\textcolor)`
+    : `Se añadió \\usepackage{xcolor} a ${main} (lo necesita \\textcolor)`,
+    p.replaced ? "#e2c08d" : "#7ee0c2");
 }
 
 /* Bytes de un recurso binario: del disco en modo local, de Firebase con caché
@@ -1285,7 +1329,12 @@ const colabKeymap = [
   { key: "Mod-Alt-m", preventDefault: true, run: () => {
       if (state.comments) state.comments.startCommentOnSelection();
       return true;
-    } }
+    } },
+  /* formato del texto seleccionado, con los atajos de siempre (src/format.js).
+     Van los primeros del keymap, así que ganan a cualquier otro uso. */
+  { key: "Mod-b", preventDefault: true, run: () => !!state.format && state.format.run("bold") },
+  { key: "Mod-i", preventDefault: true, run: () => !!state.format && state.format.run("italic") },
+  { key: "Mod-u", preventDefault: true, run: () => !!state.format && state.format.run("underline") }
 ];
 
 /* editor local: CodeMirror plano + autoguardado en disco */
@@ -1316,6 +1365,7 @@ function mountLocalEditor(fileName) {
   else state.editorView = new EditorView({ state: stateCM, parent: $("cmHost") });
   applyDiagnostics();
   applyVisualMode();
+  if (state.format) state.format.refresh();
 }
 
 function mountEditor(fileName) {
@@ -1349,6 +1399,7 @@ function mountEditor(fileName) {
   else state.editorView = new EditorView({ state: stateCM, parent: $("cmHost") });
   applyDiagnostics();
   applyVisualMode();
+  if (state.format) state.format.refresh();
   if (state.comments) state.comments.onFileChanged();   // repinta el resalte del archivo nuevo
 }
 
@@ -2020,6 +2071,17 @@ function wireEvents() {
     openFile: name => { if (name && name !== state.activeFile) mountEditor(name); }
   });
   $("btnCommentsToggle").onclick = () => state.comments.toggle();
+
+  /* formato del texto seleccionado: negrita, cursiva, subrayado y color.
+     Los botones solo aparecen sobre un archivo LaTeX y con permiso de
+     escritura; los atajos viven en colabKeymap. */
+  state.format = createFormatBar({
+    getView: () => state.editorView,
+    canWrite: () => state.role !== "view",
+    isTexFile: () => /\.(tex|sty|cls)$/i.test(state.activeFile || ""),
+    ensureColorPackage
+  });
+  state.format.wire();
 
   // vista previa de imágenes y PDF del árbol de archivos
   state.preview = new AssetPreview({
