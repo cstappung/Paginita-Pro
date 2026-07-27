@@ -36,6 +36,8 @@ colabtex/
   src/y-rtdb.js     Proveedor Yjs sobre Realtime Database + presencia
   src/latex.js      Motor BusyTeX (worker WASM) + resumen de log
   src/pdfview.js    Visor PDF (pdf.js)
+  src/asset-preview.js  Vista previa de imágenes y PDF al pulsarlos en el
+                    árbol de archivos (ocupa el sitio del editor)
   src/comments.js   Comentarios sobre el texto (hilos anclados con
                     posiciones relativas de Yjs; resalte, burbuja y panel)
   server/static.js  Servidor estático SOLO para desarrollo local

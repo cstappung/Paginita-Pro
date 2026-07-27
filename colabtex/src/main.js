@@ -32,6 +32,7 @@ import { parseTexLog, groupByFile } from "./texlog.js";
 import { THEMES, themeName, saveThemeName, cmThemeFor, cmHighlightFor, applyCssVars } from "./themes.js";
 import { loadKatex, visualExtensions } from "./visual.js";
 import { createBridge, vscodeUrl } from "./bridge.js";
+import { AssetPreview } from "./asset-preview.js";
 
 const $ = id => document.getElementById(id);
 const ROLE_LABEL = { owner: "Propietario", edit: "Puede editar", view: "Solo lectura" };
@@ -109,6 +110,7 @@ const state = {
   editorView: null,
   assets: [],
   assetCache: new Map(), // key+size → bytes (evita re-descargar al compilar)
+  preview: null,         // vista previa de imágenes/PDF (creada en boot)
   engine: null,
   pdfViewer: null,
   compiling: false,
@@ -376,6 +378,7 @@ function teardownEditor() {
   if (state.bridge && state.bridge.running) state.bridge.stop();
   if (state.comments) state.comments.unmount();
   if (state.membersUnsub) { state.membersUnsub(); state.membersUnsub = null; }
+  if (state.preview) state.preview.close();
   if (state.editorView) { state.editorView.destroy(); state.editorView = null; }
   if (state.provider) { state.provider.destroy(); state.provider = null; }
   if (state.ydoc) { state.ydoc.destroy(); state.ydoc = null; }
@@ -445,7 +448,7 @@ const FILE_KIND = name => {
   const ext = fileExt(name);
   if (ext === "tex" || ext === "sty" || ext === "cls") return ["TEX", "#6cb6ff"];
   if (ext === "bib") return ["BIB", "#e2c08d"];
-  if (["png", "jpg", "jpeg", "gif", "svg"].includes(ext)) return ["IMG", "#b58bf5"];
+  if (["png", "jpg", "jpeg", "gif", "svg", "webp", "bmp", "avif"].includes(ext)) return ["IMG", "#b58bf5"];
   if (ext === "pdf") return ["PDF", "#e57373"];
   return ["TXT", "#8fa3b8"];
 };
@@ -466,6 +469,12 @@ function renderFileTree() {
   if (state.mode === "cloud" && !state.yFiles) return;
   const readOnly = state.role === "view";
   const parentOf = p => p.includes("/") ? p.slice(0, p.lastIndexOf("/")) : "";
+
+  // el recurso en vista previa se resalta como si fuera el archivo abierto;
+  // si ha desaparecido (lo borró otro), la vista se cierra sola
+  if (state.preview && state.preview.isOpen() && !state.assets.some(a => a.name === state.preview.name()))
+    state.preview.close();
+  const previewing = state.preview && state.preview.isOpen() ? state.preview.name() : null;
 
   // carpetas explícitas (Y.Map "folders" o disco) + implícitas por las rutas
   const folders = state.mode === "local"
@@ -490,15 +499,16 @@ function renderFileTree() {
     const [kind, color] = FILE_KIND(name);
     const base = name.split("/").pop();
     const canInsert = asset && !readOnly && INSERTABLE.includes(fileExt(name));
+    const active = asset ? previewing === name : (!previewing && name === state.activeFile);
     const div = document.createElement("div");
-    div.className = "file-entry" + (name === state.activeFile && !asset ? " file-active" : "");
+    div.className = "file-entry" + (active ? " file-active" : "");
     div.style.paddingLeft = (12 + depth * 14) + "px";
-    div.title = name;
+    div.title = asset ? name + " — pulsa para verlo" : name;
     div.innerHTML = `<span class="file-badge" style="color:${color};border-color:${color}">${kind}</span>
       <span class="file-name">${escapeHtml(base)}</span>
       ${canInsert ? '<button class="file-act" data-act="ins" title="Insertar en el archivo activo">⤷</button>' : ""}
       ${readOnly ? "" : '<button class="file-act file-del" data-act="del" title="Eliminar archivo">✕</button>'}`;
-    div.onclick = () => { if (!asset) mountEditor(name); };
+    div.onclick = () => { if (asset) openAssetPreview(asset); else mountEditor(name); };
     const ins = div.querySelector('[data-act="ins"]');
     if (ins) ins.onclick = e => { e.stopPropagation(); insertAssetSnippet(asset); };
     const del = div.querySelector('[data-act="del"]');
@@ -656,12 +666,12 @@ async function deleteFolder(path) {
   await refreshAssets();
 }
 
-/* inserta \includegraphics del asset en el punto del cursor */
+/* inserta \includegraphics del asset en el punto del cursor; devuelve si pudo */
 function insertAssetSnippet(asset) {
-  if (state.role === "view") return;
+  if (state.role === "view") return false;
   if (!state.editorView || !state.activeFile || !/\.(tex|sty|cls)$/i.test(state.activeFile)) {
     alert("Abre un archivo .tex para insertar la referencia.");
-    return;
+    return false;
   }
   const ext = fileExt(asset.name);
   let snippet;
@@ -673,6 +683,51 @@ function insertAssetSnippet(asset) {
   }
   state.editorView.dispatch(state.editorView.state.replaceSelection(snippet));
   state.editorView.focus();
+  return true;
+}
+
+/* Bytes de un recurso binario: del disco en modo local, de Firebase con caché
+   en la nube. Lo usan la compilación y la vista previa, así que el aviso de
+   CORS —el fallo más habitual al empezar— se escribe en un solo sitio. */
+async function assetBytes(a) {
+  if (a.loc === "local") {
+    // modo local: se lee del disco, sin caché ni red
+    try { return await lfs.readBytes(a.handle); }
+    catch (err) { throw new Error(`No se pudo leer "${a.name}" del disco: ${err.message || err}`); }
+  }
+  const cacheKey = a.key + ":" + (a.size || 0);
+  const hit = state.assetCache.get(cacheKey);
+  if (hit) return hit;
+  let bytes;
+  try {
+    bytes = await fb.fetchAssetBytes(state.project.id, a);
+  } catch (err) {
+    const code = err.code || err.message || "";
+    // CORS/red: XHR bloqueado antes de recibir cabeceras → sin código útil
+    const isCors = /cors|network|retry-limit|unknown|Failed to fetch/i.test(code) || !err.code;
+    if (isCors && a.loc === "storage") {
+      throw new Error(`No se pudo descargar "${a.name}" de Firebase Storage (bloqueo CORS). ` +
+        "Falta autorizar tu dominio en el bucket: sigue el paso «2b. CORS de Storage» " +
+        "de firebase/CONFIGURAR-FIREBASE.md (una sola vez).");
+    }
+    throw new Error(`No se pudo descargar "${a.name}" (${code}). ` +
+      "Revisa las reglas de Storage en la consola de Firebase.");
+  }
+  state.assetCache.set(cacheKey, bytes);
+  return bytes;
+}
+
+/* clic en una imagen o un PDF del árbol → verlo sin salir del editor */
+function openAssetPreview(asset) {
+  if (!state.preview) return;
+  state.preview.open(asset).catch(err => console.error(err));
+  renderFileTree();
+}
+
+function closeAssetPreview() {
+  if (!state.preview || !state.preview.isOpen()) return;
+  state.preview.close();   // el editor sigue montado debajo: basta con volver a mostrarlo
+  renderFileTree();
 }
 
 async function refreshAssets() {
@@ -957,15 +1012,7 @@ async function linkVsCodeFolder() {
       id: state.project.id,
       path,
       getAssets: () => state.assets,
-      fetchAsset: async a => {
-        const key = a.key + ":" + (a.size || 0);
-        let bytes = state.assetCache.get(key);
-        if (!bytes) {
-          bytes = await fb.fetchAssetBytes(state.project.id, a);
-          if (bytes) state.assetCache.set(key, bytes);
-        }
-        return bytes;
-      }
+      fetchAsset: assetBytes
     });
   } catch (e) {
     setSyncBadge("Error al enlazar", "#e57373");
@@ -1244,6 +1291,7 @@ const colabKeymap = [
 /* editor local: CodeMirror plano + autoguardado en disco */
 function mountLocalEditor(fileName) {
   if (!state.localContent.has(fileName)) return;
+  if (state.preview) state.preview.close();   // abrir un .tex tapa la vista previa
   state.activeFile = fileName;
   $("activeFileName").textContent = fileName;
   renderFileTree();
@@ -1274,6 +1322,7 @@ function mountEditor(fileName) {
   if (state.mode === "local") return mountLocalEditor(fileName);
   const ytext = state.yFiles.get(fileName);
   if (!ytext) return;
+  if (state.preview) state.preview.close();   // abrir un .tex tapa la vista previa
   state.activeFile = fileName;
   $("activeFileName").textContent = fileName;
   renderFileTree();
@@ -1548,34 +1597,7 @@ async function compile() {
   try {
     const files = [];
     for (const name of texNames) files.push({ path: name, contents: fileText(name) || "" });
-    for (const a of state.assets) {
-      // modo local: los binarios se leen del disco, sin caché ni red
-      if (a.loc === "local") {
-        try { files.push({ path: a.name, contents: await lfs.readBytes(a.handle) }); }
-        catch (err) { throw new Error(`No se pudo leer "${a.name}" del disco: ${err.message || err}`); }
-        continue;
-      }
-      const cacheKey = a.key + ":" + (a.size || 0);
-      let bytes = state.assetCache.get(cacheKey);
-      if (!bytes) {
-        try {
-          bytes = await fb.fetchAssetBytes(state.project.id, a);
-        } catch (err) {
-          const code = err.code || err.message || "";
-          // CORS/red: XHR bloqueado antes de recibir cabeceras → sin código útil
-          const isCors = /cors|network|retry-limit|unknown|Failed to fetch/i.test(code) || !err.code;
-          if (isCors && a.loc === "storage") {
-            throw new Error(`No se pudo descargar "${a.name}" de Firebase Storage (bloqueo CORS). ` +
-              "Falta autorizar tu dominio en el bucket: sigue el paso «2b. CORS de Storage» " +
-              "de firebase/CONFIGURAR-FIREBASE.md (una sola vez).");
-          }
-          throw new Error(`No se pudo descargar "${a.name}" (${code}). ` +
-            "Revisa las reglas de Storage en la consola de Firebase.");
-        }
-        state.assetCache.set(cacheKey, bytes);
-      }
-      files.push({ path: a.name, contents: bytes });
-    }
+    for (const a of state.assets) files.push({ path: a.name, contents: await assetBytes(a) });
 
     const result = await state.engine.compile(files, main);
     const secs = ((performance.now() - t0) / 1000).toFixed(1);
@@ -1998,6 +2020,20 @@ function wireEvents() {
     openFile: name => { if (name && name !== state.activeFile) mountEditor(name); }
   });
   $("btnCommentsToggle").onclick = () => state.comments.toggle();
+
+  // vista previa de imágenes y PDF del árbol de archivos
+  state.preview = new AssetPreview({
+    fetchBytes: assetBytes,
+    canInsert: name => state.role !== "view" && INSERTABLE.includes(fileExt(name)),
+    // el editor está oculto tras la vista previa: primero insertar, luego
+    // volver a él y devolverle el foco para seguir escribiendo
+    onInsert: asset => {
+      if (!insertAssetSnippet(asset)) return;
+      closeAssetPreview();
+      state.editorView.focus();
+    },
+    onRequestClose: closeAssetPreview
+  });
 
   // modal configuración
   $("btnSettings").onclick = openSettingsModal;

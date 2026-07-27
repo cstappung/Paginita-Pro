@@ -80,6 +80,10 @@ Key modules in [colabtex/src/](colabtex/src/):
   the PDF and a parsed log summary. First compile downloads ~150 MB (cached);
   recompiles ≈ 4–5 s.
 - `pdfview.js` — pdf.js-based PDF viewer.
+- `asset-preview.js` — clicking an image/PDF in the file tree previews it in
+  place of the code editor (which is only hidden, never destroyed). Images go
+  to an `<img>` with a blob URL; PDFs reuse `PdfViewer`. Formats the browser
+  can't draw (`.eps`, `.tiff`) fall back to a file card with a download button.
 - `synctex.js` / `visual.js` — source↔PDF sync and the visual/rendered view.
 - `texlog.js` / `themes.js` — LaTeX log parsing, editor themes.
 - `local-fs.js` — File System Access API layer for local mode.

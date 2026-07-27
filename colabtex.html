@@ -133,6 +133,33 @@
   #cmHost .cm-editor{height:100%}
   #cmHost .cm-scroller{overflow:auto}
 
+  /* vista previa de recursos (imágenes y PDF) */
+  #assetView{flex:1;min-height:0;display:flex;flex-direction:column}
+  .asset-bar{display:flex;align-items:center;gap:8px;height:34px;padding:0 12px;border-bottom:1px solid var(--ed-border);flex-shrink:0;color:var(--ed-panel-fg)}
+  .asset-name{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:40px}
+  .asset-meta{font-size:11px;color:var(--ed-muted);font-family:'IBM Plex Mono',monospace;white-space:nowrap;flex-shrink:0}
+  .asset-actions{margin-left:auto;display:flex;align-items:center;gap:4px;flex-shrink:0}
+  .asset-btn{height:22px;padding:0 8px;border:1px solid var(--ed-border);border-radius:5px;background:transparent;color:var(--ed-panel-fg);font-size:10.5px;cursor:pointer;flex-shrink:0}
+  .asset-btn:hover{border-color:var(--ed-accent);color:var(--ed-accent)}
+  .asset-zoom{font-size:10.5px;font-family:'IBM Plex Mono',monospace;min-width:42px;text-align:center;color:var(--ed-muted)}
+  .asset-sep{width:1px;height:16px;background:var(--ed-border)}
+  /* La imagen se centra con margin:auto y no con justify-content: un hijo
+     flexible centrado que desborda se recorta por la izquierda y esa mitad
+     ya no se alcanza con la barra de desplazamiento. */
+  #assetBody{flex:1;min-height:0;overflow:auto;background:var(--ed-pdf-bg);padding:18px;display:flex}
+  /* damero bajo la imagen: así se distingue el fondo transparente de un PNG
+     o un SVG del propio panel */
+  /* flex-shrink:0 — sin él la imagen ampliada se encoge para caber en el
+     panel y el zoom no pasa del 100 % */
+  .asset-img{display:block;margin:auto;flex-shrink:0;background-color:#fff;
+    background-image:linear-gradient(45deg,#dfe3e6 25%,transparent 25%,transparent 75%,#dfe3e6 75%),
+                     linear-gradient(45deg,#dfe3e6 25%,transparent 25%,transparent 75%,#dfe3e6 75%);
+    background-size:16px 16px;background-position:0 0,8px 8px;
+    box-shadow:0 4px 18px rgba(0,0,0,0.35)}
+  .asset-pdf{flex:1;min-width:0;align-self:stretch;overflow:auto}
+  .asset-msg{margin:auto;max-width:420px;color:var(--ed-muted);font-size:12.5px;text-align:center;line-height:1.8;white-space:pre-line}
+  .asset-msg-err{color:#e57373}
+
   /* visor PDF */
   .ed-pdf{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--ed-pdf-bg)}
   .pdf-bar{display:flex;align-items:center;gap:8px;height:34px;padding:0 12px;border-bottom:1px solid var(--ed-border);flex-shrink:0;color:var(--ed-panel-fg)}
@@ -421,7 +448,7 @@
 
       <!-- editor de código -->
       <section class="ed-code">
-        <div class="ed-code-bar">
+        <div id="edCodeBar" class="ed-code-bar">
           <div class="code-tab-wrap">
             <span id="tabCode" class="code-tab code-tab-on">Código</span>
             <span id="tabVisual" class="code-tab" title="Vista con fórmulas y formato ya representados">Visual</span>
@@ -432,6 +459,27 @@
           <select id="themeSelect" class="code-mini-sel" title="Tema de color del editor"></select>
         </div>
         <div id="cmHost"></div>
+
+        <!-- vista previa de imágenes y PDF: ocupa el sitio del editor
+             mientras está abierta, sin destruirlo (src/asset-preview.js) -->
+        <div id="assetView" style="display:none">
+          <div class="asset-bar">
+            <span id="assetBadge" class="file-badge"></span>
+            <span id="assetName" class="asset-name"></span>
+            <span id="assetMeta" class="asset-meta"></span>
+            <div class="asset-actions">
+              <button id="assetZoomOut" class="asset-btn" title="Alejar (Ctrl + rueda)">−</button>
+              <span id="assetZoom" class="asset-zoom">100%</span>
+              <button id="assetZoomIn" class="asset-btn" title="Acercar (Ctrl + rueda)">+</button>
+              <button id="assetFit" class="asset-btn" title="Ajustar al panel">Ajustar</button>
+              <span class="asset-sep"></span>
+              <button id="assetInsert" class="asset-btn" title="Insertar en el archivo activo">⤷ Insertar</button>
+              <button id="assetDownload" class="asset-btn" title="Descargar el archivo">↓</button>
+              <button id="assetClose" class="asset-btn" title="Cerrar la vista previa">✕</button>
+            </div>
+          </div>
+          <div id="assetBody"></div>
+        </div>
       </section>
 
       <div id="splitCode" class="ed-split"></div>
@@ -575,6 +623,6 @@
   </div>
 </div>
 
-<script src="colabtex-app.js?v=202607231700"></script>
+<script src="colabtex-app.js?v=202607271929"></script>
 </body>
 </html>
