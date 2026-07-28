@@ -418,6 +418,40 @@ export function createComments(ctx) {
     });
   }
 
+  /* ------------------------------------------------ mover un archivo
+     Renombrar un .tex obliga a crear un Y.Text nuevo (un tipo de Yjs no se
+     puede reinsertar bajo otra clave) y con el viejo se van las posiciones
+     relativas: todos los hilos quedarían como «fragmento cambiado». Se
+     apuntan los desplazamientos ANTES de mover y se vuelven a anclar sobre
+     el texto nuevo después. */
+  function captureAnchors(file) {
+    const out = [];
+    const ydoc = ctx.getYdoc(), m = ctx.getYComments();
+    if (!ydoc || !m) return out;
+    for (const { id, t } of threads()) {
+      if (t.get("file") !== file) continue;
+      out.push({ id, from: indexFromRel(ydoc, t.get("anchor")), to: indexFromRel(ydoc, t.get("head")) });
+    }
+    return out;
+  }
+
+  function reanchor(file, list) {
+    const m = ctx.getYComments();
+    const ytext = ctx.getYFiles() && ctx.getYFiles().get(file);
+    if (!m || !ytext || !list || !list.length) return;
+    ctx.getYdoc().transact(() => {
+      for (const it of list) {
+        const t = m.get(it.id);
+        if (!t) continue;
+        t.set("file", file);
+        if (it.from == null || it.to == null) continue;      // ancla ya perdida antes de mover
+        const len = ytext.length;
+        t.set("anchor", relFromIndex(ytext, Math.min(it.from, len)));
+        t.set("head", relFromIndex(ytext, Math.min(it.to, len)));
+      }
+    });
+  }
+
   /* ------------------------------------------------ panel abrir/cerrar */
   const panel = () => $("commentsPanel");
   const split = () => $("splitComments");
@@ -469,6 +503,7 @@ export function createComments(ctx) {
     mount, unmount, onFileChanged,
     toggle, open: openPanel, close: closePanel, isOpen,
     startCommentOnSelection,
+    captureAnchors, reanchor,
     refreshBadge: () => render(),
   };
 }

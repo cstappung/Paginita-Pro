@@ -19,19 +19,20 @@ import { stex } from "@codemirror/legacy-modes/mode/stex";
 import { watchAuth, loginGoogle, logout } from "./firebase.js";
 import * as fb from "./fb-api.js";
 import { RtdbProvider } from "./y-rtdb.js";
-import { colorForUid, colorLight, timeAgo, escapeHtml } from "./util.js";
+import { colorForUid, colorLight, timeAgo, escapeHtml, minimalDiff } from "./util.js";
 import { LatexEngine, summarizeLog } from "./latex.js";
 import { PdfViewer } from "./pdfview.js";
 import { createAssistant } from "./ai-assistant.js";
 import { createComments } from "./comments.js";
-import { readZip, foldersOf, titleFromZip } from "./zip-import.js";
+import { readZip, foldersOf, titleFromZip, TEXT_EXT } from "./zip-import.js";
 import { initLayout } from "./layout.js";
 import * as lfs from "./local-fs.js";
 import { SyncTex } from "./synctex.js";
 import { parseTexLog, groupByFile } from "./texlog.js";
 import { THEMES, themeName, saveThemeName, cmThemeFor, cmHighlightFor, applyCssVars } from "./themes.js";
 import { loadKatex, visualExtensions } from "./visual.js";
-import { createBridge, vscodeUrl } from "./bridge.js";
+import { createBridge, vscodeUrl, applyTextToY } from "./bridge.js";
+import { baseName, parentOf, joinPath, isInside, movedPath, moveProblem, rewriteReferences, createTreeDnD } from "./file-move.js";
 import { AssetPreview } from "./asset-preview.js";
 import { createFormatBar, xcolorPatch } from "./format.js";
 
@@ -106,6 +107,7 @@ const state = {
   yComments: null,       // Y.Map: id → hilo de comentario (solo nube)
   comments: null,        // panel/gestor de comentarios (creado en boot)
   collapsed: new Set(),  // carpetas plegadas (solo UI local)
+  dnd: null,             // arrastrar y soltar del árbol (creado en boot)
   uploadPrefix: "",      // carpeta destino de la próxima subida
   activeFile: null,
   editorView: null,
@@ -471,7 +473,6 @@ function renderFileTree() {
   tree.innerHTML = "";
   if (state.mode === "cloud" && !state.yFiles) return;
   const readOnly = state.role === "view";
-  const parentOf = p => p.includes("/") ? p.slice(0, p.lastIndexOf("/")) : "";
 
   // el recurso en vista previa se resalta como si fuera el archivo abierto;
   // si ha desaparecido (lo borró otro), la vista se cierra sola
@@ -498,6 +499,21 @@ function renderFileTree() {
   for (const n of texNames) pushTo(childFiles, parentOf(n), { name: n, asset: null });
   for (const a of state.assets) pushTo(childFiles, parentOf(a.name), { name: a.name, asset: a });
 
+  /* ---- arrastrar y soltar (el cableado vive en src/file-move.js) ----
+     Se arrastran archivos y carpetas; se sueltan sobre una carpeta (entra
+     dentro), sobre un archivo (entra en la carpeta que lo contiene, que es
+     lo que hacen los exploradores y perdona la puntería) o sobre el hueco
+     del árbol, que saca a la raíz. */
+  const makeDraggable = (div, path, isFolder) => {
+    if (!readOnly) state.dnd.draggable(div, path, isFolder, tree);
+  };
+  const makeDropTarget = (div, folder) => {
+    if (!readOnly) state.dnd.dropTarget(div, folder, false);
+  };
+  // el árbol no se recrea entre proyectos: hay que desarmarlo si son de solo lectura
+  if (readOnly) state.dnd.unwire(tree);
+  else state.dnd.dropTarget(tree, "", true);
+
   const fileEntry = (name, asset, depth) => {
     const [kind, color] = FILE_KIND(name);
     const base = name.split("/").pop();
@@ -506,14 +522,19 @@ function renderFileTree() {
     const div = document.createElement("div");
     div.className = "file-entry" + (active ? " file-active" : "");
     div.style.paddingLeft = (12 + depth * 14) + "px";
-    div.title = asset ? name + " — pulsa para verlo" : name;
+    div.title = (asset ? name + " — pulsa para verlo" : name) + (readOnly ? "" : " · arrástralo para moverlo");
     div.innerHTML = `<span class="file-badge" style="color:${color};border-color:${color}">${kind}</span>
       <span class="file-name">${escapeHtml(base)}</span>
       ${canInsert ? '<button class="file-act" data-act="ins" title="Insertar en el archivo activo">⤷</button>' : ""}
-      ${readOnly ? "" : '<button class="file-act file-del" data-act="del" title="Eliminar archivo">✕</button>'}`;
+      ${readOnly ? "" : `<button class="file-act" data-act="ren" title="Renombrar o mover">✎</button>
+      <button class="file-act file-del" data-act="del" title="Eliminar archivo">✕</button>`}`;
     div.onclick = () => { if (asset) openAssetPreview(asset); else mountEditor(name); };
+    makeDraggable(div, name, false);
+    makeDropTarget(div, parentOf(name));   // soltar sobre un archivo = su carpeta
     const ins = div.querySelector('[data-act="ins"]');
     if (ins) ins.onclick = e => { e.stopPropagation(); insertAssetSnippet(asset); };
+    const ren = div.querySelector('[data-act="ren"]');
+    if (ren) ren.onclick = e => { e.stopPropagation(); renameEntry(name, false); };
     const del = div.querySelector('[data-act="del"]');
     if (del) del.onclick = async e => {
       e.stopPropagation();
@@ -558,22 +579,26 @@ function renderFileTree() {
     const div = document.createElement("div");
     div.className = "file-entry folder-entry";
     div.style.paddingLeft = (12 + depth * 14) + "px";
-    div.title = path;
+    div.title = path + (readOnly ? "" : " · suelta archivos aquí para meterlos dentro");
     div.innerHTML = `<span class="folder-arrow">${collapsed ? "▸" : "▾"}</span>
       <span class="file-name">${escapeHtml(path.split("/").pop())}</span>
       ${readOnly ? "" : `<button class="file-act" data-act="new" title="Nuevo archivo aquí">＋</button>
       <button class="file-act" data-act="up" title="Subir archivos aquí">↑</button>
+      <button class="file-act" data-act="ren" title="Renombrar o mover">✎</button>
       <button class="file-act file-del" data-act="del" title="Eliminar carpeta">✕</button>`}`;
     div.onclick = () => {
       if (collapsed) state.collapsed.delete(path); else state.collapsed.add(path);
       renderFileTree();
     };
+    makeDraggable(div, path, true);
+    makeDropTarget(div, path);
     const stop = (act, fn) => {
       const b = div.querySelector(`[data-act="${act}"]`);
       if (b) b.onclick = e => { e.stopPropagation(); fn(); };
     };
     stop("new", () => newFileIn(path + "/"));
     stop("up", () => { state.uploadPrefix = path + "/"; $("fileUploadInput").click(); });
+    stop("ren", () => renameEntry(path, true));
     stop("del", () => deleteFolder(path));
     return div;
   };
@@ -667,6 +692,217 @@ async function deleteFolder(path) {
     else if (state.editorView) { state.editorView.destroy(); state.editorView = null; $("activeFileName").textContent = "—"; }
   }
   await refreshAssets();
+}
+
+/* ============================================================
+   Mover y renombrar (src/file-move.js)
+
+   La ruta ES la identidad del archivo, así que renombrar y arrastrar a
+   otra carpeta son la misma operación. Vale para los dos modos: en la
+   nube se rehacen las claves del Y.Doc y el índice de Firebase; en local
+   se copia y se borra, porque el disco no ofrece «renombrar».
+   ============================================================ */
+
+/* ¿ya hay algo con esa ruta? Archivo, imagen o carpeta, y también las
+   carpetas implícitas (las que existen solo porque algo cuelga de ellas). */
+function pathTaken(p) {
+  if (texFileNames().includes(p)) return true;
+  if (state.assets.some(a => a.name === p)) return true;
+  const folders = state.mode === "local"
+    ? state.localFolders
+    : new Set(state.yFolders ? state.yFolders.keys() : []);
+  if (folders.has(p)) return true;
+  const pre = p + "/";
+  return texFileNames().some(n => n.startsWith(pre)) || state.assets.some(a => a.name.startsWith(pre));
+}
+
+/* Sustituye el contenido de un archivo de texto tocando solo lo que cambia:
+   en la nube para no pisar lo que otros escriben a la vez, y en local para
+   no mover el cursor de quien lo tenga abierto. */
+function setFileText(name, next) {
+  const cur = fileText(name);
+  if (cur == null || cur === next) return;
+  if (state.mode === "local") {
+    const d = minimalDiff(cur, next);
+    patchTextFile(name, d.from, d.to, d.insert);
+    return;
+  }
+  const t = state.yFiles.get(name);
+  // origen null (no el del puente): así baja al disco y se puede deshacer
+  if (t) applyTextToY(t, next, null);
+}
+
+/* Reescribe en los .tex las referencias a las rutas que acaban de moverse.
+   Devuelve cuántas cambiaron. */
+function rewriteRefsFor(pairs) {
+  let total = 0;
+  for (const name of texFileNames()) {
+    if (!/\.(tex|sty|cls)$/i.test(name)) continue;
+    let text = fileText(name);
+    if (text == null) continue;
+    let hits = 0;
+    for (const [from, to] of pairs) {
+      const r = rewriteReferences(text, from, to);
+      text = r.text;
+      hits += r.count;
+    }
+    if (!hits) continue;
+    setFileText(name, text);
+    total += hits;
+  }
+  return total;
+}
+
+/* el archivo principal se sigue llamando igual aunque cambie de sitio */
+async function setMainFilePath(name) {
+  state.project.mainFile = name;
+  if (state.mode === "local") {
+    if (state.dirHandle) localStorage.setItem(LOCAL_MAIN_PREFIX + state.dirHandle.name, name);
+    return;
+  }
+  try { await fb.updateProjectMeta(state.project.id, { mainFile: name }); } catch (e) {}
+}
+
+async function moveInCloud(texts, assets, oldPath, newPath, isFolder) {
+  /* Un Y.Text no se puede reinsertar bajo otra clave: hay que crear uno nuevo
+     con el mismo contenido. Con el viejo se irían las anclas de los
+     comentarios, así que se apuntan antes y se rehacen después. */
+  const anchors = [];
+  if (state.comments)
+    for (const n of texts)
+      anchors.push({ file: movedPath(n, oldPath, newPath), list: state.comments.captureAnchors(n) });
+
+  state.ydoc.transact(() => {
+    for (const n of texts) {
+      const old = state.yFiles.get(n);
+      if (!old) continue;
+      // integrar el Y.Text en el documento ANTES de escribir dentro
+      const t = state.yFiles.set(movedPath(n, oldPath, newPath), new Y.Text());
+      t.insert(0, old.toString());
+      state.yFiles.delete(n);
+    }
+    for (const k of Array.from(state.yFolders.keys())) {
+      if (!isInside(k, oldPath)) continue;
+      state.yFolders.delete(k);
+      state.yFolders.set(movedPath(k, oldPath, newPath), true);
+    }
+    if (isFolder) state.yFolders.set(newPath, true);   // por si era implícita
+  });
+  for (const a of anchors) state.comments.reanchor(a.file, a.list);
+
+  for (const a of assets) await fb.renameAsset(state.project.id, a, movedPath(a.name, oldPath, newPath));
+  if (assets.length) await refreshAssets();
+}
+
+async function moveOnDisk(pairs, oldPath, newPath, isFolder) {
+  for (const [from, to] of pairs) {
+    /* Windows no distingue mayúsculas: al cambiar solo la caja del nombre,
+       escribir primero y borrar después borraría el archivo recién escrito.
+       Con el contenido ya en memoria, ahí se borra antes. */
+    const sameFile = from.toLowerCase() === to.toLowerCase();
+    if (state.localContent.has(from)) {
+      const text = state.localContent.get(from);
+      if (sameFile) await lfs.deleteEntry(state.dirHandle, from);
+      const h = await lfs.writeText(state.dirHandle, to, text);
+      state.localContent.set(to, text);
+      state.localHandles.set(to, h);
+      state.localContent.delete(from);
+      state.localHandles.delete(from);
+      state.dirty.delete(from);
+    } else {
+      const a = state.assets.find(x => x.name === from);
+      if (!a) continue;
+      const bytes = await lfs.readBytes(a.handle);
+      if (sameFile) await lfs.deleteEntry(state.dirHandle, from);
+      const h = await lfs.writeBytes(state.dirHandle, to, bytes);
+      a.name = to; a.key = to; a.handle = h;
+    }
+    if (!sameFile) await lfs.deleteEntry(state.dirHandle, from);
+  }
+  if (isFolder) {
+    // lo que quedara dentro (subcarpetas vacías) se va con el borrado
+    try { await lfs.deleteEntry(state.dirHandle, oldPath, true); } catch (e) {}
+    for (const f of Array.from(state.localFolders)) {
+      if (!isInside(f, oldPath)) continue;
+      state.localFolders.delete(f);
+      state.localFolders.add(movedPath(f, oldPath, newPath));
+    }
+    try { await lfs.makeFolder(state.dirHandle, newPath); } catch (e) {}
+  }
+}
+
+/* Mueve una entrada del árbol (y todo lo que cuelga de ella si es carpeta)
+   a `newPath`, y deja apuntando bien las referencias de los .tex. */
+async function moveEntry(oldPath, newPath, isFolder) {
+  if (state.role === "view" || !oldPath) return;
+  newPath = cleanPath(newPath);
+  if (!newPath || newPath === oldPath) return;
+  const problem = moveProblem(oldPath, newPath, isFolder, pathTaken);
+  if (problem) { alert(problem); return; }
+  /* Cambiar la extensión no convierte un binario en texto ni al revés: una
+     imagen llamada «.tex» no se podría abrir ni compilar. */
+  if (!isFolder && texFileNames().includes(oldPath) !== TEXT_EXT.includes(fileExt(newPath))) {
+    alert(`«${baseName(oldPath)}» y «${baseName(newPath)}» no son del mismo tipo: ` +
+      "cambiar entre archivo de texto e imagen dejaría el archivo inservible.");
+    return;
+  }
+
+  const texts = texFileNames().filter(n => (isFolder ? isInside(n, oldPath) : n === oldPath));
+  const assets = state.assets.filter(a => (isFolder ? isInside(a.name, oldPath) : a.name === oldPath));
+  const pairs = texts.concat(assets.map(a => a.name)).map(p => [p, movedPath(p, oldPath, newPath)]);
+  if (!isFolder && !pairs.length) return;          // no era ni archivo ni imagen
+
+  const wasActive = !!state.activeFile &&
+    (isFolder ? isInside(state.activeFile, oldPath) : state.activeFile === oldPath);
+  const previewing = state.preview && state.preview.isOpen() ? state.preview.name() : null;
+  setStatus(`Moviendo «${oldPath}»…`, "#e2c08d");
+
+  try {
+    if (state.mode === "local") await moveOnDisk(pairs, oldPath, newPath, isFolder);
+    else await moveInCloud(texts, assets, oldPath, newPath, isFolder);
+  } catch (e) {
+    alert("No se pudo mover: " + (e.message || e));
+    await refreshAssets();                          // deja el árbol como esté de verdad
+    return;
+  }
+
+  // las carpetas plegadas siguen plegadas donde hayan quedado
+  for (const f of Array.from(state.collapsed)) {
+    if (!isInside(f, oldPath)) continue;
+    state.collapsed.delete(f);
+    state.collapsed.add(movedPath(f, oldPath, newPath));
+  }
+  const mainPair = pairs.find(([from]) => from === (state.project && state.project.mainFile));
+  if (mainPair) await setMainFilePath(mainPair[1]);
+
+  const refs = rewriteRefsFor(pairs);
+
+  if (wasActive) {
+    const next = movedPath(state.activeFile, oldPath, newPath);
+    state.activeFile = null;                        // el Y.Text de antes ya no existe
+    mountEditor(next);
+  }
+  renderFileTree();
+  if (previewing) {
+    const moved = pairs.find(([from]) => from === previewing);
+    const a = moved && state.assets.find(x => x.name === moved[1]);
+    if (a) openAssetPreview(a);
+    else if (moved) closeAssetPreview();
+  }
+  setStatus(`«${oldPath}» → «${newPath}»` +
+    (refs ? ` · ${refs} referencia(s) actualizada(s)` : ""), "#7ee0c2");
+}
+
+/* Renombrar es mover dentro de la misma carpeta. Si escriben barras, se
+   admite: es la forma rápida de mandarlo a otra carpeta sin arrastrar. */
+function renameEntry(path, isFolder) {
+  const typed = prompt(isFolder
+    ? "Nuevo nombre de la carpeta (puede llevar ruta):"
+    : "Nuevo nombre del archivo (puede llevar ruta):", baseName(path));
+  if (typed == null) return;
+  const next = cleanPath(joinPath(parentOf(path), typed.trim()));
+  if (!next || next === path) return;
+  moveEntry(path, next, isFolder).catch(err => alert("No se pudo renombrar: " + (err.message || err)));
 }
 
 /* inserta \includegraphics del asset en el punto del cursor; devuelve si pudo */
@@ -2002,7 +2238,6 @@ function wireEvents() {
     if (f) await importZipIntoProject(f);
   };
   $("fileUploadInput").onchange = async e => {
-    const TEXT_EXT = ["tex", "bib", "txt", "sty", "cls", "md", "csv", "dat"];
     const prefix = state.uploadPrefix || "";
     for (const f of e.target.files) {
       // espacios → _ : LaTeX no acepta espacios en \includegraphics
@@ -2071,6 +2306,10 @@ function wireEvents() {
     openFile: name => { if (name && name !== state.activeFile) mountEditor(name); }
   });
   $("btnCommentsToggle").onclick = () => state.comments.toggle();
+
+  // arrastrar archivos y carpetas dentro del árbol
+  state.dnd = createTreeDnD((from, to, isFolder) =>
+    moveEntry(from, to, isFolder).catch(err => alert("No se pudo mover: " + (err.message || err))));
 
   /* formato del texto seleccionado: negrita, cursiva, subrayado y color.
      Los botones solo aparecen sobre un archivo LaTeX y con permiso de

@@ -304,6 +304,28 @@ export async function fetchAssetBytes(pid, asset) {
   return new Uint8Array(buf);
 }
 
+/* Cambia la ruta de un binario. Storage no sabe renombrar objetos, así que
+   los suyos hay que copiarlos a la ruta nueva y borrar el viejo; los que
+   viven en base64 dentro de la base solo cambian de clave. */
+export async function renameAsset(pid, asset, newName) {
+  const newKey = encKey(newName);
+  if (newKey === asset.key) return;
+  const node = (await get(ref(db, `projects/${pid}/assetsIndex/${asset.key}`))).val();
+  if (!node) throw new Error(`«${asset.name}» ya no está en el proyecto.`);
+
+  if (node.loc === "storage") {
+    const buf = await getBytes(sRef(storage, `projects/${pid}/assets/${asset.name}`));
+    await uploadBytes(sRef(storage, `projects/${pid}/assets/${newName}`), buf);
+    await set(ref(db, `projects/${pid}/assetsIndex/${newKey}`),
+      { name: newName, size: node.size || buf.byteLength, loc: "storage" });
+    try { await deleteObject(sRef(storage, `projects/${pid}/assets/${asset.name}`)); } catch (e) {}
+  } else {
+    await set(ref(db, `projects/${pid}/assetsIndex/${newKey}`), Object.assign({}, node, { name: newName }));
+  }
+  await remove(ref(db, `projects/${pid}/assetsIndex/${asset.key}`));
+  touchProject(pid);
+}
+
 export async function deleteAsset(pid, asset) {
   if (asset.loc === "storage") {
     try { await deleteObject(sRef(storage, `projects/${pid}/assets/${asset.name}`)); } catch (e) {}

@@ -40,6 +40,8 @@ colabtex/
                     árbol de archivos (ocupa el sitio del editor)
   src/format.js     Negrita, cursiva, subrayado y color del texto
                     seleccionado (botones de la barra y Ctrl+B/I/U)
+  src/file-move.js  Renombrar y mover archivos: rutas, validación,
+                    reescritura de referencias y arrastrar/soltar
   src/comments.js   Comentarios sobre el texto (hilos anclados con
                     posiciones relativas de Yjs; resalte, burbuja y panel)
   server/static.js  Servidor estático SOLO para desarrollo local
@@ -86,6 +88,17 @@ presence/<pid>/<clientID>        cursores y presencia (se limpia al desconectar)
   bitmap en WASM); la plantilla ya lo hace.
 - `migracion-proyectos-locales/` contiene los .tex exportados de la
   versión anterior (cuando los proyectos vivían en el disco local).
+- **Renombrar y mover** (`src/file-move.js`): el botón ✎ de cada fila del
+  árbol renombra (admite escribir una ruta, que además lo mueve), y las filas
+  se pueden arrastrar: sobre una carpeta entra dentro, sobre un archivo entra
+  en la carpeta de ese archivo, y sobre el hueco del árbol sale a la raíz. La
+  ruta ES la identidad del archivo, así que las dos cosas son la misma
+  operación. Después se reescriben las referencias exactas de los .tex
+  (`\includegraphics`, `\input`, `\include`, `\bibliography`…, con extensión o
+  sin ella). En la nube hay que rehacer el Y.Text (un tipo de Yjs no se puede
+  reinsertar bajo otra clave), y por eso los comentarios se vuelven a anclar
+  por posición; las imágenes de Storage se copian y se borra la vieja, porque
+  Storage no sabe renombrar. En local se copia y se borra: el disco tampoco.
 - **Formato del texto** (`src/format.js`): se selecciona y se pulsa **B / I /
   U** o el botón de color en la barra del editor (o Ctrl+B / Ctrl+I / Ctrl+U).
   Escribe `\textbf`, `\textit`, `\underline` y `\textcolor` en el propio .tex —

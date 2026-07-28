@@ -25,6 +25,19 @@ export function timeAgo(ts) {
   return new Date(ts).toLocaleDateString("es", { day: "numeric", month: "short", year: "numeric" });
 }
 
+/* Trozo mínimo que cambia entre dos textos: {from, to, insert}, comparando el
+   prefijo y el sufijo comunes. Reescribir el documento entero destruiría lo
+   que otros estén escribiendo a la vez (Yjs es un CRDT) y haría saltar el
+   cursor de quien lo tenga abierto; con esto solo se toca lo que cambió. */
+export function minimalDiff(cur, next) {
+  const max = Math.min(cur.length, next.length);
+  let pre = 0;
+  while (pre < max && cur[pre] === next[pre]) pre++;
+  let suf = 0;
+  while (suf < max - pre && cur[cur.length - 1 - suf] === next[next.length - 1 - suf]) suf++;
+  return { from: pre, to: cur.length - suf, insert: next.slice(pre, next.length - suf) };
+}
+
 /* Busca la llave que cierra la abierta en `open` (índice de «{»), contando
    los niveles y saltándose las escapadas (\{). Devuelve -1 si no cierra.
    La usan la vista visual y el formato del texto. */

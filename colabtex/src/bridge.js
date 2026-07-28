@@ -27,6 +27,7 @@
    ============================================================ */
 import * as lfs from "./local-fs.js";
 import { TEXT_EXT } from "./zip-import.js";
+import { minimalDiff } from "./util.js";
 
 const POLL_MS = 1000;        // sondeo del disco
 const PUSH_MS = 300;         // retardo antes de volcar Yjs → disco
@@ -49,23 +50,19 @@ const isText = path => {
 /* Archivos que el puente genera o que LaTeX deja tirados: nunca suben. */
 const IGNORE = new Set([LAUNCHER]);
 
-/* ---------- diff mínimo sobre un Y.Text ---------- */
-export function applyTextToY(ytext, next) {
+/* ---------- diff mínimo sobre un Y.Text ----------
+   `origin` marca de dónde viene el cambio. Por omisión, del disco; main.js
+   lo llama con null cuando el cambio nace de la propia aplicación (reescribir
+   referencias al mover un archivo), para que sí se vuelque al disco y entre
+   en el historial de deshacer. */
+export function applyTextToY(ytext, next, origin = BRIDGE_ORIGIN) {
   const cur = ytext.toString();
   if (cur === next) return false;
-
-  const max = Math.min(cur.length, next.length);
-  let pre = 0;
-  while (pre < max && cur[pre] === next[pre]) pre++;
-  let suf = 0;
-  while (suf < max - pre && cur[cur.length - 1 - suf] === next[next.length - 1 - suf]) suf++;
-
-  const delLen = cur.length - pre - suf;
-  const ins = next.slice(pre, next.length - suf);
+  const d = minimalDiff(cur, next);
   ytext.doc.transact(() => {
-    if (delLen > 0) ytext.delete(pre, delLen);
-    if (ins) ytext.insert(pre, ins);
-  }, BRIDGE_ORIGIN);
+    if (d.to > d.from) ytext.delete(d.from, d.to - d.from);
+    if (d.insert) ytext.insert(d.from, d.insert);
+  }, origin);
   return true;
 }
 

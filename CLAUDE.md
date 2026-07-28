@@ -84,6 +84,16 @@ Key modules in [colabtex/src/](colabtex/src/):
   place of the code editor (which is only hidden, never destroyed). Images go
   to an `<img>` with a blob URL; PDFs reuse `PdfViewer`. Formats the browser
   can't draw (`.eps`, `.tiff`) fall back to a file card with a download button.
+- `file-move.js` — **renaming and drag-and-drop** in the file tree. A path is
+  the file's identity, so both are one operation: change the path. Holds the
+  pure parts (path arithmetic, `moveProblem` validation, `rewriteReferences`
+  for `\includegraphics`/`\input`/… and `createTreeDnD`, the drag wiring);
+  `main.js`'s `moveEntry()` applies it to Yjs + Storage or to disk. Notable
+  consequences, all handled there: a `Y.Text` cannot be re-inserted under
+  another key, so the text is copied into a new one and comment threads are
+  re-anchored by offset (`comments.captureAnchors`/`reanchor`); Storage has no
+  rename, so `fb.renameAsset` copies the object and deletes the old one; and
+  on Windows a case-only rename must delete before writing.
 - `format.js` — **bold / italic / underline / colour** for the selection, the
   way Overleaf's toolbar does it: buttons in the editor bar plus Ctrl+B/I/U
   write `\textbf`, `\textit`, `\underline`, `\textcolor` straight into the

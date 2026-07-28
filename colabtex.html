@@ -115,6 +115,12 @@
   .file-del:hover{color:#e57373}
   .folder-entry{color:var(--ed-panel-fg);font-weight:600}
   .folder-arrow{flex-shrink:0;width:12px;font-size:10px;color:var(--ed-com)}
+  /* arrastrar y soltar. #fileTree ocupa el resto del panel para que el hueco
+     de debajo también sirva de destino: soltar ahí saca a la raíz. */
+  #fileTree{flex:1;min-height:60px}
+  .file-entry.dragging{opacity:0.4}
+  .file-entry.drag-over{background:var(--ed-sel);box-shadow:inset 0 0 0 1px var(--ed-accent)}
+  #fileTree.drag-over-root{box-shadow:inset 0 0 0 1px var(--ed-accent);border-radius:4px}
 
   /* editor de código */
   .ed-code{flex:1.15;min-width:0;display:flex;flex-direction:column;background:var(--ed-bg);border-right:1px solid var(--ed-border)}
@@ -673,6 +679,6 @@
   </div>
 </div>
 
-<script src="colabtex-app.js?v=202607272355"></script>
+<script src="colabtex-app.js?v=202607280118"></script>
 </body>
 </html>
