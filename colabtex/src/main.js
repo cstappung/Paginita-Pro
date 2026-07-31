@@ -240,10 +240,15 @@ function renderProjects() {
       <span class="proj-owner">${p.ownerId === uid ? "Tú" : escapeHtml(p.ownerName || "—")}</span>
       <span class="proj-modified">${timeAgo(p.updatedAt)}</span>
       <div class="proj-actions">
+        <button class="icon-btn" data-act="zip" title="Descargar en .zip">⤓</button>
         <button class="icon-btn" data-act="dup" title="Duplicar">⧉</button>
         ${p.ownerId === uid ? '<button class="icon-btn" data-act="del" title="Eliminar">✕</button>' : ""}
       </div>`;
     row.querySelector(".proj-title").onclick = () => openProject(p.id);
+    row.querySelector('[data-act="zip"]').onclick = e => {
+      e.stopPropagation();
+      zipProjectById(p, e.currentTarget);
+    };
     row.querySelector('[data-act="dup"]').onclick = async e => {
       e.target.disabled = true;
       await fb.duplicateProject(p.id, { uid, userName: state.user.name });
@@ -1045,6 +1050,41 @@ async function assetBytes(a) {
   return bytes;
 }
 
+/* Lo mismo desde el panel de proyectos, SIN abrir el proyecto. El
+   documento no está cargado, así que se levanta uno de usar y tirar con
+   el mismo proveedor de siempre, se espera a que sincronice y se cierra.
+   Reutilizarlo es lo único razonable: escribir un lector aparte del
+   formato de Yjs en Realtime Database sería copiar y-rtdb.js entero. */
+async function zipProjectById(p, btn) {
+  if (btn) { btn.disabled = true; btn.textContent = "…"; }
+  const ydoc = new Y.Doc();
+  const provider = new RtdbProvider(p.id, ydoc, { readOnly: true });
+  try {
+    await new Promise((resolve, reject) => {
+      const t = setTimeout(() => reject(new Error("el proyecto tardó demasiado en cargar")), 25000);
+      provider.once("synced", () => { clearTimeout(t); resolve(); });
+      provider.on("error", err => { clearTimeout(t); reject(err); });
+    });
+    const files = ydoc.getMap("files");
+    const assets = await fb.listAssets(p.id).catch(() => []);
+    await downloadProjectZip(p.title, async () => {
+      const entries = [];
+      for (const [name, text] of files.entries()) entries.push({ path: name, bytes: String(text || "") });
+      for (const a of assets) {
+        try { entries.push({ path: a.name, bytes: await fb.fetchAssetBytes(p.id, a) }); }
+        catch (e) { console.warn("ColabTeX: no se pudo empaquetar " + a.name, e); }
+      }
+      return entries;
+    });
+  } catch (e) {
+    alert("No se pudo descargar el proyecto: " + (e.message || e));
+  } finally {
+    provider.destroy();
+    ydoc.destroy();
+    if (btn) { btn.disabled = false; btn.textContent = "⤓"; }
+  }
+}
+
 /* Todo el proyecto en un .zip: los .tex tal cual están en el documento
    —incluido lo que no se haya llegado a compilar— y los binarios. Vale
    como copia de seguridad y como forma de llevárselo a Overleaf, que
@@ -1166,7 +1206,7 @@ function unlinkDrawProject(pid) {
 async function openLinkModal() {
   if (state.mode !== "cloud") { alert("Las figuras vinculadas son cosa de los proyectos en la nube."); return; }
   $("linkMsg").textContent = "";
-  $("linkModal").classList.add("open");
+  $("linkModal").style.display = "grid";
   renderLinkList();
   const picker = $("linkPicker");
   picker.innerHTML = '<option value="">Cargando…</option>';
@@ -2449,8 +2489,8 @@ function wireEvents() {
   $("btnImportZip").onclick = () => $("zipUploadInput").click();
   $("btnZipProject").onclick = zipProject;
   $("btnLinkDraw").onclick = () => openLinkModal();
-  $("btnCloseLink").onclick = () => $("linkModal").classList.remove("open");
-  $("linkModal").onclick = e => { if (e.target === $("linkModal")) $("linkModal").classList.remove("open"); };
+  $("btnCloseLink").onclick = () => { $("linkModal").style.display = "none"; };
+  $("linkModal").onclick = e => { if (e.target === $("linkModal")) $("linkModal").style.display = "none"; };
   $("btnDoLink").onclick = doLink;
   $("zipUploadInput").onchange = async e => {
     const f = e.target.files[0];
