@@ -393,6 +393,15 @@ export class Canvas {
     return this._matrixToContent(dom.parentNode);
   }
 
+  /* La del propio elemento. Hace falta para meter una figura DENTRO de
+     otro nodo (cambiarla de capa): ahí el espacio de destino es el del
+     nodo, no el de su padre. */
+  selfMatrix(yEl) {
+    const dom = this.yToDom.get(yEl);
+    if (!dom) return null;
+    return this._matrixToContent(dom);
+  }
+
   /* ---------- selección por puntero ---------- */
 
   /* Elemento de más arriba bajo el punto. Se sube desde lo que hay bajo

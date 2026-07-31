@@ -22,6 +22,7 @@ import { svgToFragment } from "./draw/svgio.js";
 import { Canvas } from "./draw/canvas.js";
 import { Tools } from "./draw/tools.js";
 import { createStylePanel } from "./draw/style.js";
+import { createLayersPanel } from "./draw/layers.js";
 import { exportAll, download, outputName } from "./draw/export.js";
 
 const $ = id => document.getElementById(id);
@@ -42,6 +43,8 @@ const state = {
   canvas: null,
   tools: null,
   style: null,
+  layers: null,        // panel de capas (creado en ensureEditorParts)
+  activeLayerId: null, // capa donde va lo que se dibuje
   assets: [],
   membersUnsub: null,
   drawingsObserver: null
@@ -212,6 +215,8 @@ async function openEditor(projectId, token) {
   $("btnShare").style.display = readOnly ? "none" : "";
   $("btnNewDrawing").style.display = readOnly ? "none" : "";
   $("btnImportSvg").style.display = readOnly ? "none" : "";
+  for (const id of ["btnLayerAdd", "btnLayerDel", "btnLayerUp", "btnLayerDown", "btnLayerMoveSel"])
+    $(id).style.display = readOnly ? "none" : "";
   setSync("Conectando…", "#e2c08d");
 
   const ydoc = new Y.Doc();
@@ -286,6 +291,7 @@ function ensureEditorParts() {
     getDrawing: () => state.drawing,
     canWrite,
     onSelectionChange: () => { if (state.style) state.style.refresh(); },
+    getLayer: () => (state.drawing ? state.drawing.activeLayer(state.activeLayerId) : null),
     onStatus: msg => { $("statusMsg").textContent = msg || ""; },
     onToolChange: name => {
       document.querySelectorAll("#toolRail [data-tool]").forEach(b =>
@@ -300,6 +306,26 @@ function ensureEditorParts() {
     onApply: attrs => state.tools.applyStyle(attrs),
     onOrder: mode => state.tools.reorder(mode),
     onPage: (w, h) => { if (state.drawing) { state.drawing.setSize(w, h); state.style.refresh(); } }
+  });
+  state.layers = createLayersPanel($("layerPanel"), {
+    getDrawing: () => state.drawing,
+    getActiveId: () => state.activeLayerId,
+    setActiveId: id => { state.activeLayerId = id; },
+    canWrite,
+    getSelection: () => (state.tools ? state.tools.selection() : []),
+    getCanvas: () => state.canvas,
+    onStatus: msg => { $("statusMsg").textContent = msg || ""; },
+    /* Las operaciones de capa clonan y borran, así que la selección
+       apunta a nodos que ya no existen: se rehace por id igual que en
+       el orden Z. */
+    onChange: ids => {
+      if (state.tools) {
+        if (ids && ids.length) state.tools.reselectByIds(ids);
+        else state.tools.clear();
+      }
+      state.layers.render();
+      state.style.refresh();
+    }
   });
 }
 
@@ -413,7 +439,15 @@ function openDrawing(path) {
   state.tools.clear();
   state.tools.setTool("select");
   if (state.drawing.undoMgr) state.drawing.undoMgr.on("stack-item-added", paintUndoButtons);
+  /* Si otra persona añade, renombra u oculta una capa, el panel tiene
+     que enterarse igual que el lienzo. */
+  state.drawing.frag.observeDeep(() => {
+    clearTimeout(state.layerTimer);
+    state.layerTimer = setTimeout(() => state.layers.render(), 80);
+  });
   renderDrawingList();
+  state.activeLayerId = null;      // cada dibujo trae sus propias capas
+  state.layers.render();
   state.style.refresh();
   paintUndoButtons();
 }
@@ -587,6 +621,11 @@ function wireEvents() {
   $("btnRedo").onclick = () => { if (state.drawing) { state.drawing.redo(); state.tools.redrawOverlay(); paintUndoButtons(); } };
 
   $("btnNewDrawing").onclick = newDrawing;
+  $("btnLayerAdd").onclick = () => state.layers.add();
+  $("btnLayerDel").onclick = () => state.layers.removeActive();
+  $("btnLayerUp").onclick = () => state.layers.move("up");
+  $("btnLayerDown").onclick = () => state.layers.move("down");
+  $("btnLayerMoveSel").onclick = () => state.layers.moveSelection();
   $("btnImportSvg").onclick = () => $("svgImportInput").click();
   $("svgImportInput").onchange = e => {
     const f = e.target.files[0];

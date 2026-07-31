@@ -211,6 +211,95 @@ export class Drawing {
     });
   }
 
+  renameLayer(layer, name) {
+    const n = String(name || "").trim();
+    if (!layer || !n) return;
+    this.edit(() => layer.setAttribute("data-layer", n));
+  }
+
+  /* Ocultar usa el atributo `display`, no un estilo aparte: así la capa
+     sale oculta también en el SVG exportado, como en Inkscape. */
+  layerVisible(layer) {
+    return !layer || layer.getAttribute("display") !== "none";
+  }
+
+  setLayerVisible(layer, on) {
+    if (!layer) return;
+    this.edit(() => {
+      if (on) layer.removeAttribute("display");
+      else layer.setAttribute("display", "none");
+    });
+  }
+
+  layerLocked(layer) {
+    return !!layer && layer.getAttribute("data-locked") === "1";
+  }
+
+  setLayerLocked(layer, on) {
+    if (!layer) return;
+    this.edit(() => {
+      if (on) layer.setAttribute("data-locked", "1");
+      else layer.removeAttribute("data-locked");
+    });
+  }
+
+  /* La última capa de la lista es la que se pinta encima, así que subir
+     una capa en el panel es moverla hacia el final del <svg>. Un tipo de
+     Yjs ya integrado no se puede reinsertar, así que se clona y se borra
+     el original (igual que el orden Z de las figuras). */
+  moveLayer(layer, dir) {
+    const svg = this.root();
+    if (!svg || !layer) return null;
+    const ls = this.layers();
+    const i = ls.indexOf(layer);
+    const j = i + (dir === "up" ? 1 : -1);
+    if (i < 0 || j < 0 || j >= ls.length) return null;
+    return this.edit(() => {
+      const at = indexOf(svg, layer);
+      const target = indexOf(svg, ls[j]);
+      if (at < 0 || target < 0) return null;
+      const copy = cloneEl(layer);
+      svg.delete(at, 1);
+      svg.insert(target, [copy]);
+      return copy;
+    });
+  }
+
+  removeLayer(layer) {
+    const svg = this.root();
+    if (!svg || !layer) return false;
+    if (this.layers().length <= 1) return false;   // nunca dejar el dibujo sin capa
+    const at = indexOf(svg, layer);
+    if (at < 0) return false;
+    this.edit(() => svg.delete(at, 1));
+    return true;
+  }
+
+  /* Mueve figuras a otra capa conservando dónde se ven. `fixups` trae el
+     transform ya recalculado por quien sí conoce las matrices del lienzo
+     (mover entre capas con transform distinto cambiaría la posición). */
+  moveToLayer(els, layer, fixups = null) {
+    if (!layer || !els.length) return [];
+    return this.edit(() => {
+      const out = [];
+      for (const el of els) {
+        const parent = el.parent;
+        const at = parent ? indexOf(parent, el) : -1;
+        if (at < 0 || parent === layer) continue;
+        const copy = cloneEl(el);
+        const t = fixups && fixups.get(el);
+        if (t != null) {
+          if (t) copy.setAttribute("transform", t);
+          else copy.removeAttribute("transform");
+        }
+        parent.delete(at, 1);
+        layer.insert(childrenOf(layer).length, [copy]);
+        out.push(copy);
+      }
+      return out;
+    });
+  }
+
   /* ---------- tamaño de la página ---------- */
 
   size() {

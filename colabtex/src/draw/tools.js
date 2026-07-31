@@ -40,6 +40,9 @@ export class Tools {
     this.onStatus = opts.onStatus || (() => {});
     this.onToolChange = opts.onToolChange || (() => {});
     this.canWrite = opts.canWrite || (() => true);
+    /* Capa donde va lo que se dibuje. Sin panel de capas se deja en null
+       y el modelo elige la de más arriba, como antes. */
+    this.getLayer = opts.getLayer || (() => null);
     this.style = Object.assign({
       fill: "#cfe3ff", stroke: "#1f2933", "stroke-width": 0.4, opacity: 1
     }, opts.style || {});
@@ -184,51 +187,40 @@ export class Tools {
 
   /* ---------- transformaciones ----------
      Una transformación pensada en coordenadas del documento se lleva al
-     espacio del padre del elemento: M' = P⁻¹ · T · P · M. */
-  _applyDocMatrix(el, T, dom) {
-    const P = this.canvas.parentMatrix(el);
-    const node = dom || this.canvas.yToDom.get(el);
-    if (!node) return null;
-    const old = parseTransform(node.getAttribute("transform"));
-    let M;
-    if (P) {
-      const Pi = matInvert(P);
-      if (!Pi) return null;
-      M = matMul(matMul(Pi, matMul(T, P)), old);
-    } else {
-      M = matMul(T, old);
-    }
+     espacio del padre del elemento: M' = P⁻¹ · T · P · M.
+
+     Tanto `m0` (el transform que la figura tenía al empezar) como `pi0`
+     (la inversa de la matriz de su padre) se capturan UNA vez, al pulsar,
+     y no se vuelven a leer del DOM. Leerlos en cada movimiento del ratón
+     era el fallo que hacía que las figuras salieran disparadas mientras
+     se arrastraban: la vista previa se componía encima de la vista
+     previa anterior, así que el gesto se aplicaba otra vez en cada
+     mousemove (T·T·T…) y solo al soltar volvía a su sitio, porque el
+     commit sí partía del original. */
+  _matrixFor(item, T) {
+    const M = item.pi0
+      ? matMul(matMul(item.pi0, matMul(T, item.p0)), item.m0)
+      : matMul(T, item.m0);
     return matToString(M);
   }
 
   /* Vista previa: se escribe en el DOM del espejo, no en el documento. */
   _preview(T) {
     for (const item of this.drag.items) {
-      const s = this._applyDocMatrix(item.el, T, item.dom);
-      if (s === null) continue;
+      const s = this._matrixFor(item, T);
       if (s) item.dom.setAttribute("transform", s);
       else item.dom.removeAttribute("transform");
     }
   }
 
-  /* Al soltar: se calcula otra vez desde el transform ORIGINAL y se
-     escribe en Yjs de una vez. Recalcular desde el original evita que
-     los redondeos de la vista previa se acumulen. */
+  /* Al soltar se escribe en Yjs de una vez, con la misma cuenta que la
+     vista previa: lo que se guarda es exactamente lo que se veía. */
   _commit(T) {
     const d = this.getDrawing();
     if (!d) return;
     d.edit(() => {
       for (const item of this.drag.items) {
-        const P = this.canvas.parentMatrix(item.el);
-        let M;
-        if (P) {
-          const Pi = matInvert(P);
-          if (!Pi) continue;
-          M = matMul(matMul(Pi, matMul(T, P)), item.m0);
-        } else {
-          M = matMul(T, item.m0);
-        }
-        const s = matToString(M);
+        const s = this._matrixFor(item, T);
         if (s) item.el.setAttribute("transform", s);
         else item.el.removeAttribute("transform");
       }
@@ -238,7 +230,11 @@ export class Tools {
   _startTransform(mode, e, handle) {
     const items = this.sel.map(el => {
       const dom = this.canvas.yToDom.get(el);
-      return dom ? { el, dom, m0: parseTransform(dom.getAttribute("transform")) } : null;
+      if (!dom) return null;
+      const p0 = this.canvas.parentMatrix(el);
+      const pi0 = p0 ? matInvert(p0) : null;
+      if (p0 && !pi0) return null;          // padre degenerado (escala 0)
+      return { el, dom, p0, pi0, m0: parseTransform(dom.getAttribute("transform")) };
     }).filter(Boolean);
     if (!items.length) return;
     const box = this.canvas.boxOfMany(this.sel);
@@ -284,7 +280,17 @@ export class Tools {
       return;
     }
 
-    const hit = this.canvas.hitTest(e.clientX, e.clientY);
+    let hit = this.canvas.hitTest(e.clientX, e.clientY);
+    /* Una capa bloqueada no se selecciona ni se arrastra; si no, el
+       candado del panel no serviría de nada. (Las ocultas ni siquiera
+       llegan aquí: `display:none` las saca del sorteo del puntero.) */
+    if (hit) {
+      const d = this.getDrawing();
+      if (d && d.layerLocked(d.layerOf(hit))) {
+        this.onStatus("Esa capa está bloqueada.");
+        hit = null;
+      }
+    }
     const additive = e.shiftKey;
     if (hit) {
       if (additive) this.select(hit, { add: true });
@@ -473,13 +479,13 @@ export class Tools {
     };
     let el = null;
     if (tool === "rect") {
-      el = d.add(null, "rect", Object.assign({ x: fmt(b.x), y: fmt(b.y), width: fmt(b.w), height: fmt(b.h) }, common));
+      el = d.add(this.getLayer(), "rect", Object.assign({ x: fmt(b.x), y: fmt(b.y), width: fmt(b.w), height: fmt(b.h) }, common));
     } else if (tool === "ellipse") {
-      el = d.add(null, "ellipse", Object.assign({
+      el = d.add(this.getLayer(), "ellipse", Object.assign({
         cx: fmt(b.x + b.w / 2), cy: fmt(b.y + b.h / 2), rx: fmt(b.w / 2), ry: fmt(b.h / 2)
       }, common));
     } else if (tool === "line") {
-      el = d.add(null, "line", Object.assign({
+      el = d.add(this.getLayer(), "line", Object.assign({
         x1: fmt(p0.x), y1: fmt(p0.y), x2: fmt(p1.x), y2: fmt(p1.y)
       }, common, { fill: null, "stroke-linecap": "round" }));
     }

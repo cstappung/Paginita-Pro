@@ -101,6 +101,17 @@
   .dw-item:hover .file-act{visibility:visible}
   .dw-item .file-act:hover{color:#6c4bb6}
   .dw-item .file-del:hover{color:#c0392b}
+
+  /* --- capas --- */
+  #layerPanel{max-height:30%;overflow:auto;flex-shrink:0}
+  .layer-list{display:flex;flex-direction:column;padding:3px 0}
+  .layer-row{display:flex;align-items:center;gap:5px;padding:4px 10px;font-size:12.5px;color:#42505c;cursor:pointer}
+  .layer-row:hover{background:#f5f2fb}
+  .layer-row.layer-active{background:#f1ecfa;color:#6c4bb6;font-weight:600}
+  .layer-ico{border:none;background:transparent;cursor:pointer;font-size:11px;padding:0 1px;line-height:1;opacity:.75;flex-shrink:0}
+  .layer-ico:hover{opacity:1}
+  .layer-ico:disabled{opacity:.3;cursor:default}
+  .layer-name{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .aside-note{font-size:11px;color:#8a97a3;line-height:1.5;padding:8px 10px;border-top:1px solid #eef1f4}
 
   /* --- lienzo --- */
@@ -272,6 +283,15 @@
         </div>
         <div id="drawingList"></div>
         <input id="svgImportInput" type="file" accept=".svg,image/svg+xml" style="display:none">
+        <div class="aside-head" style="border-top:1px solid #eef1f4">
+          <span>CAPAS</span>
+          <button id="btnLayerMoveSel" class="icon-btn" title="Mover la selección a la capa activa">⇥</button>
+          <button id="btnLayerUp" class="icon-btn" title="Subir la capa">↑</button>
+          <button id="btnLayerDown" class="icon-btn" title="Bajar la capa">↓</button>
+          <button id="btnLayerDel" class="icon-btn" title="Eliminar la capa">✕</button>
+          <button id="btnLayerAdd" class="icon-btn" title="Nueva capa">＋</button>
+        </div>
+        <div id="layerPanel"></div>
         <div class="aside-head" style="border-top:1px solid #eef1f4"><span>GENERADOS</span></div>
         <div id="assetList" style="max-height:32%;overflow:auto"></div>
         <div class="aside-note">Lo exportado queda guardado en el proyecto y podrás vincularlo desde ColabTeX.</div>
@@ -341,6 +361,6 @@
   </div>
 </div>
 
-<script src="colabdraw-app.js?v=202607310605"></script>
+<script src="colabdraw-app.js?v=202607310629"></script>
 </body>
 </html>

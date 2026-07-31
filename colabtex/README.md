@@ -90,6 +90,13 @@ borrar son el mismo código y **las reglas de seguridad no cambian**.
 - **Durante un arrastre no se escribe en la nube**, solo en el DOM espejo; al
   soltar se escribe una vez. Un `mousemove` dispara 60 veces por segundo y cada
   escritura sería un envío a Realtime Database.
+- **Capas** (`draw/layers.js`): el panel las lista de arriba abajo tal y como
+  se ven. Lo que se dibuja va siempre a la capa activa. El ojo la oculta con el
+  atributo `display`, así que también sale oculta en el SVG exportado (como en
+  Inkscape), y el candado impide seleccionar sus figuras. Reordenar capas o
+  mover figuras entre ellas clona y borra, porque un tipo de Yjs ya integrado
+  no se puede reinsertar; al cambiar de capa se recompone el transform para que
+  la figura no se mueva de sitio.
 - **Exportar** (`draw/export.js`) genera SVG y PNG y los guarda como recursos
   normales del proyecto (`assetsIndex`), que es el gancho para vincularlos luego
   desde un proyecto de ColabTeX.

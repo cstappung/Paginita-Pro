@@ -197,7 +197,19 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
 - `tools.js` — selection and the tools. **During a drag nothing is written to
   Yjs**, only to the mirror DOM; one commit happens on release. A mousemove
   fires ~60×/s and every Yjs write is an RTDB push, so live-writing would hammer
-  the database and flood the undo stack.
+  the database and flood the undo stack. The starting matrix (`m0`) and the
+  parent's (`pi0`) are captured **once, on pointer-down**: re-reading them from
+  the DOM on every move made the preview compose onto itself (T·T·T…), so
+  shapes flew off while being dragged and only snapped back on release.
+- `layers.js` — the layers panel. A layer is a `<g data-layer>` child of the
+  `<svg>`; the panel lists them **top-down as they look**, i.e. reversed
+  relative to the document, where the last one paints on top. Whatever you draw
+  goes to the active layer. Hiding uses the `display` attribute, so a hidden
+  layer is also hidden in the exported SVG, like Inkscape; locking
+  (`data-locked`) blocks selecting its shapes. Reordering layers and moving
+  shapes between them **clone and delete** (an integrated Yjs type cannot be
+  re-inserted), and moving across layers recomposes the transform
+  (`relocateTransform`) so the shape doesn't shift.
 - `style.js` — the fill/stroke/opacity/order/page panel, built in JS. Shows
   "varios" when the selection disagrees rather than the first value, so touching
   a control can't silently overwrite the rest.
