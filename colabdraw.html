@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ColabDraw — Editor SVG colaborativo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;padding:0;height:100%}
+  *{box-sizing:border-box}
+  body{background:#f2f5f7;color:#1f2933;font-family:'IBM Plex Sans',sans-serif;overflow:hidden}
+  a{color:#6c4bb6;text-decoration:none}
+  a:hover{color:#5a3da0;text-decoration:underline}
+  button{font-family:'IBM Plex Sans',sans-serif}
+  #app{height:100vh;display:flex;flex-direction:column}
+
+  /* ============ COMUNES ============ */
+  .btn-primary{height:36px;border:none;border-radius:6px;background:#6c4bb6;color:#fff;font-size:13px;font-weight:600;cursor:pointer}
+  .btn-primary:hover{background:#5a3da0}
+  .btn-secondary{height:32px;border:1px solid #d4dce2;border-radius:6px;background:#fff;color:#42505c;font-size:12.5px;font-weight:600;cursor:pointer}
+  .btn-secondary:hover{border-color:#6c4bb6;color:#6c4bb6;background:#faf8fd}
+  .btn-secondary:disabled{opacity:.5;cursor:default;border-color:#e2e8ec;color:#8a97a3;background:#fff}
+  .btn-ghost-dark{border:none;background:transparent;color:#b7aed0;cursor:pointer;font-size:12px;padding:4px 6px;border-radius:5px}
+  .btn-ghost-dark:hover{background:#ffffff1a;color:#fff}
+  .btn-outline-dark{border:1px solid #ffffff33;background:transparent;color:#e4e0ee;cursor:pointer;font-size:12px;font-weight:600;padding:5px 10px;border-radius:6px}
+  .btn-outline-dark:hover{border-color:#a78bfa;color:#fff}
+  .btn-outline-dark:disabled{opacity:.45;cursor:default}
+  .icon-btn{border:none;background:transparent;color:#8a97a3;cursor:pointer;font-size:13px;padding:2px 5px;border-radius:4px}
+  .icon-btn:hover{background:#eef0f4;color:#42505c}
+
+  /* ============ LOGIN ============ */
+  #viewLogin{flex:1;display:none;place-items:center;background:linear-gradient(160deg,#1b1430 0%,#191c28 60%,#182430 100%)}
+  .login-card{width:400px;max-width:92vw;background:#fff;border-radius:14px;padding:34px 34px 28px;box-shadow:0 24px 60px rgba(0,0,0,.45);text-align:center}
+
+  /* ============ DASHBOARD ============ */
+  .dash-header{display:flex;align-items:center;gap:22px;height:52px;padding:0 22px;background:#1b1430;color:#eee9f7;flex-shrink:0}
+  .logo{display:flex;align-items:center;gap:8px;color:#eee9f7}
+  .logo:hover{color:#fff;text-decoration:none}
+  .logo-mark{width:26px;height:26px;border-radius:6px;background:#6c4bb6;display:grid;place-items:center;font-size:14px;color:#fff}
+  .dash-nav{display:flex;gap:18px;font-size:12.5px;color:#b0a5c8}
+  .dash-nav .active{color:#fff;font-weight:600;border-bottom:2px solid #6c4bb6;padding:16px 0 14px}
+  .user-avatar{width:30px;height:30px;border-radius:50%;background:#6c4bb6;display:grid;place-items:center;font-size:12.5px;font-weight:600;color:#fff;overflow:hidden}
+  .dash-body{flex:1;display:flex;min-height:0}
+  .dash-aside{width:225px;flex-shrink:0;background:#fff;border-right:1px solid #e2e8ec;padding:18px 14px;display:flex;flex-direction:column;gap:4px;overflow:auto}
+  .nav-item{display:flex;justify-content:space-between;align-items:center;padding:7px 10px;border-radius:6px;font-size:12.5px;color:#42505c;cursor:pointer}
+  .nav-item:hover{background:#f4f6f8}
+  .nav-active{background:#f1ecfa;color:#6c4bb6;font-weight:600}
+  .nav-count{font-size:11px;color:#8a97a3}
+  .dash-main{flex:1;padding:24px 30px;overflow:auto;min-width:0}
+  .dash-title-row{display:flex;align-items:center;gap:16px;margin-bottom:18px}
+  .dash-title-row h1{font-size:19px;font-weight:600;margin:0;flex:1}
+  .dash-title-row input{height:34px;width:280px;max-width:40vw;border:1px solid #d4dce2;border-radius:6px;padding:0 11px;font-size:12.5px;font-family:inherit}
+  .dash-title-row input:focus{outline:none;border-color:#6c4bb6}
+  .proj-table{background:#fff;border:1px solid #e2e8ec;border-radius:9px;overflow:hidden}
+  .proj-head,.proj-row{display:grid;grid-template-columns:34px 1fr 150px 140px 92px;align-items:center;gap:10px;padding:0 14px}
+  .proj-head{height:38px;background:#f7f9fa;border-bottom:1px solid #e2e8ec;font-size:10.5px;font-weight:600;letter-spacing:.05em;color:#8a97a3}
+  .proj-row{height:50px;border-bottom:1px solid #eef1f4;font-size:13px}
+  .proj-row:last-child{border-bottom:none}
+  .proj-row:hover{background:#faf9fd}
+  .proj-thumb{width:26px;height:26px;border-radius:5px;background:#f1ecfa;border:1px solid #ddd2f2;display:grid;place-items:center;color:#6c4bb6;font-size:12px}
+  .proj-title-cell{display:flex;align-items:center;gap:8px;min-width:0}
+  .proj-title{font-weight:600;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .proj-title:hover{color:#6c4bb6}
+  .proj-shared{font-size:10.5px;color:#6c4bb6;background:#f1ecfa;border-radius:99px;padding:2px 7px;flex-shrink:0}
+  .proj-owner,.proj-modified{font-size:12px;color:#6b7783}
+  .proj-actions{display:flex;justify-content:flex-end;gap:2px}
+  .dash-foot{font-size:11.5px;color:#8a97a3;margin-top:12px}
+
+  /* ============ EDITOR ============ */
+  #viewEditor{flex:1;display:none;flex-direction:column;min-height:0}
+  .ed-header{display:flex;align-items:center;gap:12px;height:46px;padding:0 14px;background:#1b1430;color:#eee9f7;flex-shrink:0}
+  .vsep{width:1px;height:20px;background:#ffffff26}
+  #edTitle{font-size:13.5px;font-weight:600;max-width:32vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+  #syncBadge{font-size:11px;padding:2px 8px;border-radius:99px;background:#ffffff14;color:#e2c08d}
+  #readOnlyBadge{font-size:11px;padding:2px 8px;border-radius:99px;background:#e2c08d22;color:#e2c08d}
+  .ed-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+  #presenceAvatars{display:flex;gap:-4px}
+  .pres-dot{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:600;color:#fff;border:2px solid #1b1430;margin-left:-6px}
+
+  .ed-body{flex:1;display:flex;min-height:0}
+
+  /* --- barra de herramientas --- */
+  .tool-rail{width:46px;flex-shrink:0;background:#fff;border-right:1px solid #e2e8ec;display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 0}
+  .tool-btn{width:34px;height:34px;border:1px solid transparent;border-radius:7px;background:transparent;cursor:pointer;display:grid;place-items:center;color:#5a6772;font-size:15px}
+  .tool-btn:hover{background:#f2eefb;color:#6c4bb6}
+  .tool-btn.tool-active{background:#6c4bb6;border-color:#6c4bb6;color:#fff}
+  .tool-btn:disabled{opacity:.4;cursor:default}
+  .rail-sep{width:24px;height:1px;background:#e2e8ec;margin:5px 0}
+
+  /* --- panel izquierdo: dibujos --- */
+  .ed-aside{width:210px;flex-shrink:0;background:#fff;border-right:1px solid #e2e8ec;display:flex;flex-direction:column;min-height:0}
+  .aside-head{display:flex;align-items:center;gap:4px;padding:9px 10px;border-bottom:1px solid #eef1f4;font-size:10.5px;font-weight:600;letter-spacing:.05em;color:#8a97a3}
+  .aside-head .icon-btn{margin-left:auto}
+  #drawingList{flex:1;overflow:auto;padding:4px 0;min-height:60px}
+  .dw-item{display:flex;align-items:center;gap:6px;padding:5px 10px;font-size:12.5px;color:#42505c;cursor:pointer}
+  .dw-item:hover{background:#f5f2fb}
+  .dw-item.dw-item-active{background:#f1ecfa;color:#6c4bb6;font-weight:600}
+  .dw-item-name{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .dw-item .file-act{border:none;background:transparent;color:#b3bec7;cursor:pointer;font-size:11px;padding:0 2px;visibility:hidden}
+  .dw-item:hover .file-act{visibility:visible}
+  .dw-item .file-act:hover{color:#6c4bb6}
+  .dw-item .file-del:hover{color:#c0392b}
+  .aside-note{font-size:11px;color:#8a97a3;line-height:1.5;padding:8px 10px;border-top:1px solid #eef1f4}
+
+  /* --- lienzo --- */
+  .canvas-wrap{flex:1;position:relative;min-width:0;background:#e9edf1;overflow:hidden}
+  #canvasHost{position:absolute;inset:0}
+  .dw-view{display:block;width:100%;height:100%;touch-action:none;user-select:none}
+  .dw-page{fill:#ffffff}
+  .dw-page-shadow{fill:#00000022}
+  /* Con vector-effect:non-scaling-stroke el grosor va en PÍXELES de
+     pantalla, no en milímetros del dibujo: por debajo de 1 la rejilla
+     no llega a verse. */
+  .dw-grid-minor{stroke:#b9c6d3;stroke-width:1;fill:none;vector-effect:non-scaling-stroke;opacity:.5}
+  .dw-grid-major{stroke:#8fa1b3;stroke-width:1;fill:none;vector-effect:non-scaling-stroke;opacity:.75}
+  .dw-overlay{pointer-events:none}
+  .dw-sel-frame{fill:none;stroke:#6c4bb6;stroke-width:1;stroke-dasharray:4 3;vector-effect:non-scaling-stroke}
+  .dw-sel-item{fill:none;stroke:#a78bfa;stroke-width:1;stroke-dasharray:2 2}
+  .dw-handle{fill:#fff;stroke:#6c4bb6;stroke-width:1.5;pointer-events:all}
+  .dw-handle:hover{fill:#ede9fe}
+  .dw-handle-rot{fill:#6c4bb6;stroke:#fff}
+  .dw-rot-stem{stroke:#6c4bb6;stroke-width:1;stroke-dasharray:2 2}
+  .dw-marquee{fill:#6c4bb61a;stroke:#6c4bb6;stroke-width:1;stroke-dasharray:3 2}
+  .dw-preview{fill:#6c4bb61a;stroke:#6c4bb6;stroke-width:1.5;stroke-dasharray:3 2}
+
+  .canvas-bar{position:absolute;left:0;right:0;bottom:0;height:30px;display:flex;align-items:center;gap:14px;padding:0 12px;background:#ffffffee;border-top:1px solid #e2e8ec;font-size:11.5px;color:#5a6772}
+  .canvas-bar label{display:flex;align-items:center;gap:5px;cursor:pointer}
+  .canvas-bar input[type=number]{width:52px;height:20px;border:1px solid #d4dce2;border-radius:4px;padding:0 4px;font-size:11.5px;font-family:inherit}
+  #statusMsg{margin-left:auto;color:#6c4bb6;font-weight:600}
+  .empty-canvas{position:absolute;inset:0;display:grid;place-items:center;color:#8a97a3;font-size:13px;text-align:center;pointer-events:none;padding:20px}
+
+  /* --- panel derecho: estilo --- */
+  .ed-panel{width:214px;flex-shrink:0;background:#fff;border-left:1px solid #e2e8ec;overflow:auto;padding:4px 0 20px}
+  .dw-sec{padding:10px 12px;border-bottom:1px solid #f0f2f5}
+  .dw-sec-title{font-size:10px;font-weight:600;letter-spacing:.06em;color:#8a97a3;margin-bottom:8px}
+  .dw-row{display:flex;align-items:center;gap:7px;margin-bottom:7px}
+  .dw-color{width:30px;height:24px;border:1px solid #d4dce2;border-radius:4px;padding:0;background:#fff;cursor:pointer}
+  .dw-val{font-size:11.5px;color:#5a6772;font-family:'IBM Plex Mono',monospace;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .dw-lbl{font-size:11.5px;color:#5a6772;width:52px;flex-shrink:0}
+  .dw-unit{font-size:11px;color:#8a97a3}
+  .dw-num{width:58px;height:24px;border:1px solid #d4dce2;border-radius:4px;padding:0 5px;font-size:12px;font-family:inherit}
+  .dw-num:focus,.dw-sel:focus{outline:none;border-color:#6c4bb6}
+  .dw-sel{flex:1;height:24px;border:1px solid #d4dce2;border-radius:4px;font-size:12px;font-family:inherit;background:#fff}
+  .dw-range{flex:1;accent-color:#6c4bb6}
+  .dw-swatches{display:grid;grid-template-columns:repeat(5,1fr);gap:4px}
+  .dw-swatch{height:19px;border:1px solid #00000022;border-radius:4px;cursor:pointer;padding:0}
+  .dw-swatch:hover{outline:2px solid #6c4bb6;outline-offset:1px}
+  .dw-swatch-none{background:linear-gradient(45deg,#fff 45%,#c0392b 45%,#c0392b 55%,#fff 55%)}
+  .dw-btns{display:flex;gap:4px}
+  .dw-btn{flex:1;height:26px;border:1px solid #d4dce2;border-radius:5px;background:#fff;color:#42505c;font-size:13px;cursor:pointer}
+  .dw-btn:hover{border-color:#6c4bb6;color:#6c4bb6}
+  .dw-btn:disabled{opacity:.45;cursor:default}
+
+  /* ============ MODALES ============ */
+  .modal-back{position:fixed;inset:0;background:#0d111799;display:none;place-items:center;z-index:50}
+  .modal-back.open{display:grid}
+  .modal{width:460px;max-width:94vw;max-height:88vh;overflow:auto;background:#fff;border-radius:12px;padding:22px 24px;box-shadow:0 24px 60px rgba(0,0,0,.4)}
+  .modal h2{font-size:16px;margin:0 0 14px}
+  .modal .section-label{font-size:10.5px;font-weight:600;letter-spacing:.05em;color:#8a97a3;margin:16px 0 8px}
+  .set-label{display:block;font-size:12px;color:#5a6772;margin:10px 0 4px}
+  .set-input{width:100%;height:32px;border:1px solid #d4dce2;border-radius:6px;padding:0 9px;font-size:12.5px;font-family:inherit}
+  .set-input:focus{outline:none;border-color:#6c4bb6}
+  .link-row{display:flex;gap:6px;margin-bottom:8px}
+  .link-row input{flex:1;height:30px;border:1px solid #d4dce2;border-radius:6px;padding:0 8px;font-size:11.5px;font-family:'IBM Plex Mono',monospace;background:#f7f9fa}
+  .modal-foot{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+  .member-row{display:flex;align-items:center;gap:8px;font-size:12.5px;padding:5px 0;border-bottom:1px solid #f0f2f5}
+  .exp-check{display:flex;align-items:center;gap:7px;font-size:12.5px;color:#42505c;margin-bottom:6px}
+  .exp-msg{font-size:12px;min-height:17px;margin-top:10px}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ================= LOGIN ================= -->
+  <div id="viewLogin">
+    <div class="login-card">
+      <div style="display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:6px">
+        <span style="width:38px;height:38px;border-radius:9px;background:#6c4bb6;display:grid;place-items:center;font-size:19px;color:#fff">✎</span>
+        <span style="font-weight:700;font-size:22px;letter-spacing:.02em;color:#1b1430">ColabDraw</span>
+      </div>
+      <div style="font-size:13px;color:#5a6772;line-height:1.6;margin:10px 0 24px">
+        Editor de dibujos vectoriales.<br>Figuras para tus artículos, exportables a SVG y PNG, con la misma cuenta de ColabTeX.
+      </div>
+      <button id="btnGoogleLogin" style="width:100%;height:44px;border:1px solid #d4dce2;border-radius:8px;background:#fff;color:#1f2933;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px" onmouseover="this.style.background='#f4f7f9'" onmouseout="this.style.background='#ffffff'">
+        <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.3 6.1 29.4 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.6-.4-3.9z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.1 18.9 12 24 12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.3 6.1 29.4 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.1H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C41 35.4 44 30.2 44 24c0-1.3-.1-2.6-.4-3.9z"/></svg>
+        Continuar con Google
+      </button>
+      <div id="loginError" style="min-height:18px;font-size:12px;color:#c0392b;margin-top:12px"></div>
+      <div style="font-size:11px;color:#8a97a3;margin-top:8px">Si ya has entrado en ColabTeX, es la misma cuenta.</div>
+    </div>
+  </div>
+
+  <!-- ================= DASHBOARD ================= -->
+  <div id="viewDash" style="flex:1;display:none;flex-direction:column;min-height:0">
+    <header class="dash-header">
+      <a href="Inicio.dc.html" class="logo" title="Volver al menú principal">
+        <span class="logo-mark">✎</span>
+        <span style="font-weight:700;font-size:15px;letter-spacing:.02em">ColabDraw</span>
+      </a>
+      <nav class="dash-nav"><span class="active">Dibujos</span></nav>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:14px">
+        <a href="colabtex.html" style="font-size:12px;color:#b0a5c8" title="Ir a ColabTeX">Σ ColabTeX</a>
+        <span id="dashUserName" style="font-size:12px;color:#b0a5c8"></span>
+        <span id="dashUserAvatar" class="user-avatar"></span>
+        <button id="btnLogout" class="btn-ghost-dark" title="Cerrar sesión">Salir</button>
+      </div>
+    </header>
+    <div class="dash-body">
+      <aside class="dash-aside">
+        <button id="btnNewProject" class="btn-primary" style="margin-bottom:8px">Nuevo proyecto +</button>
+        <button id="btnNewFromSvg" class="btn-secondary" style="margin-bottom:6px" title="Crear un proyecto a partir de un archivo .svg">📐 Importar .svg</button>
+        <input id="svgNewInput" type="file" accept=".svg,image/svg+xml" style="display:none">
+        <div id="navAll" class="nav-item nav-active"><span>Todos</span><span id="cntAll" class="nav-count"></span></div>
+        <div id="navMine" class="nav-item"><span>Tuyos</span><span id="cntMine" class="nav-count"></span></div>
+        <div id="navShared" class="nav-item"><span>Compartidos contigo</span><span id="cntShared" class="nav-count"></span></div>
+        <div class="aside-note" style="margin-top:auto;border:none">Los dibujos se guardan en la nube y se pueden vincular desde un proyecto de ColabTeX.</div>
+      </aside>
+      <main class="dash-main">
+        <div class="dash-title-row">
+          <h1>Proyectos de dibujo</h1>
+          <input id="searchInput" placeholder="Buscar…">
+        </div>
+        <div class="proj-table">
+          <div class="proj-head">
+            <span></span><span>TÍTULO</span><span>PROPIETARIO</span><span>MODIFICADO</span><span style="text-align:right">ACCIONES</span>
+          </div>
+          <div id="projectRows"></div>
+        </div>
+        <div id="projectCountLabel" class="dash-foot"></div>
+      </main>
+    </div>
+  </div>
+
+  <!-- ================= EDITOR ================= -->
+  <div id="viewEditor">
+    <header class="ed-header">
+      <button id="btnBackDash" class="btn-ghost-dark" title="Volver a los proyectos">← Proyectos</button>
+      <span class="vsep"></span>
+      <span id="edTitle"></span>
+      <span id="syncBadge">Conectando…</span>
+      <span id="readOnlyBadge" style="display:none">Solo lectura</span>
+      <div class="ed-right">
+        <div id="presenceAvatars"></div>
+        <button id="btnUndo" class="btn-outline-dark" title="Deshacer (Ctrl+Z)">↶</button>
+        <button id="btnRedo" class="btn-outline-dark" title="Rehacer (Ctrl+Mayús+Z)">↷</button>
+        <button id="btnExport" class="btn-outline-dark" title="Exportar a SVG o PNG">⤓ Exportar</button>
+        <button id="btnShare" class="btn-outline-dark" title="Compartir el proyecto">Compartir</button>
+      </div>
+    </header>
+
+    <div class="ed-body">
+      <div class="tool-rail" id="toolRail">
+        <button class="tool-btn tool-active" data-tool="select" title="Seleccionar y transformar (S)">↖</button>
+        <button class="tool-btn" data-tool="rect" title="Rectángulo (R)">▭</button>
+        <button class="tool-btn" data-tool="ellipse" title="Elipse (E)">◯</button>
+        <button class="tool-btn" data-tool="line" title="Línea (L)">╱</button>
+        <div class="rail-sep"></div>
+        <button class="tool-btn" id="btnGroup" title="Agrupar (Ctrl+G)">⧉</button>
+        <button class="tool-btn" id="btnUngroup" title="Desagrupar (Ctrl+Mayús+G)">⧈</button>
+        <button class="tool-btn" id="btnDuplicate" title="Duplicar (Ctrl+D)">⧅</button>
+        <button class="tool-btn" id="btnDelete" title="Eliminar (Supr)">🗑</button>
+        <div class="rail-sep"></div>
+        <button class="tool-btn" id="btnZoomFit" title="Ajustar la página a la ventana (3)">⤢</button>
+      </div>
+
+      <aside class="ed-aside">
+        <div class="aside-head">
+          <span>DIBUJOS</span>
+          <button id="btnImportSvg" class="icon-btn" title="Importar un .svg como dibujo nuevo">📐</button>
+          <button id="btnNewDrawing" class="icon-btn" title="Nuevo dibujo">＋</button>
+        </div>
+        <div id="drawingList"></div>
+        <input id="svgImportInput" type="file" accept=".svg,image/svg+xml" style="display:none">
+        <div class="aside-head" style="border-top:1px solid #eef1f4"><span>GENERADOS</span></div>
+        <div id="assetList" style="max-height:32%;overflow:auto"></div>
+        <div class="aside-note">Lo exportado queda guardado en el proyecto y podrás vincularlo desde ColabTeX.</div>
+      </aside>
+
+      <div class="canvas-wrap">
+        <div id="canvasHost"></div>
+        <div id="emptyCanvas" class="empty-canvas" style="display:none">Crea un dibujo con ＋ para empezar.</div>
+        <div class="canvas-bar">
+          <span id="zoomLabel">100%</span>
+          <label><input type="checkbox" id="gridToggle" checked> Rejilla</label>
+          <label><input type="checkbox" id="snapToggle" checked> Imán</label>
+          <label>Paso <input type="number" id="gridStep" min="0.5" step="0.5" value="5"> mm</label>
+          <span id="statusMsg"></span>
+        </div>
+      </div>
+
+      <aside class="ed-panel" id="stylePanel"></aside>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MODAL: EXPORTAR ================= -->
+<div class="modal-back" id="expModal">
+  <div class="modal">
+    <h2>Exportar dibujo</h2>
+    <div id="expName" style="font-size:12.5px;color:#5a6772;margin-bottom:14px"></div>
+    <div class="section-label">FORMATOS</div>
+    <label class="exp-check"><input type="checkbox" id="expSvg" checked> SVG — vectorial, el original</label>
+    <label class="exp-check"><input type="checkbox" id="expPng" checked> PNG — imagen, para \includegraphics</label>
+    <label class="set-label" for="expDpi">Resolución del PNG</label>
+    <select id="expDpi" class="set-input">
+      <option value="150">150 ppp — borrador</option>
+      <option value="300" selected>300 ppp — impresión (recomendado)</option>
+      <option value="600">600 ppp — máxima calidad</option>
+    </select>
+    <div class="section-label">DESTINO</div>
+    <label class="exp-check"><input type="checkbox" id="expSave" checked> Guardarlo en el proyecto (para vincularlo desde ColabTeX)</label>
+    <label class="exp-check"><input type="checkbox" id="expDownload"> Descargarlo a mi equipo</label>
+    <div id="expMsg" class="exp-msg"></div>
+    <div class="modal-foot">
+      <button id="btnExportClose" class="btn-secondary">Cerrar</button>
+      <button id="btnExportDo" class="btn-primary" style="padding:0 16px">Exportar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= MODAL: COMPARTIR ================= -->
+<div class="modal-back" id="shareModal">
+  <div class="modal">
+    <h2>Compartir proyecto</h2>
+    <div class="section-label">ENLACE PARA EDITAR</div>
+    <div class="link-row">
+      <input id="shareEditLink" readonly>
+      <button id="btnCopyEdit" class="btn-secondary" style="padding:0 12px">Copiar</button>
+    </div>
+    <div class="section-label">ENLACE DE SOLO LECTURA</div>
+    <div class="link-row">
+      <input id="shareViewLink" readonly>
+      <button id="btnCopyView" class="btn-secondary" style="padding:0 12px">Copiar</button>
+    </div>
+    <div class="section-label">MIEMBROS</div>
+    <div id="shareMembers"></div>
+    <div class="modal-foot">
+      <button id="btnShareClose" class="btn-secondary">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<script src="colabdraw-app.js?v=202607310605"></script>
+</body>
+</html>

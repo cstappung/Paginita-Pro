@@ -1,0 +1,615 @@
+"use strict";
+/* ============================================================
+   ColabDraw — herramientas y selección
+
+   Regla de oro del arrastre: mientras el ratón está abajo NO se toca
+   el documento Yjs, solo el DOM del espejo. Al soltar se escribe UNA
+   vez. Un mousemove escribe 60 veces por segundo, y cada escritura en
+   Yjs es un envío a Realtime Database: mandar eso sería castigar la
+   base de datos y llenar el historial de deshacer de basura. Quien
+   colabora ve la figura moverse al soltar; su posición en vivo viaja
+   por «presencia», que es efímera y no entra en el documento.
+   ============================================================ */
+import {
+  parseTransform, matToString, matMul, matInvert, matApplyVec,
+  translate, scaleAbout, rotateM, boxFromDrag, snapBoxDelta, snapValue,
+  angleOf, dist, clamp, fmt
+} from "./geom.js";
+import { SVG_NS, newId } from "./doc.js";
+
+const svgEl = tag => document.createElementNS(SVG_NS, tag);
+
+/* Tiradores de escala: nombre → posición relativa dentro de la caja. */
+const HANDLES = [
+  ["nw", 0, 0], ["n", 0.5, 0], ["ne", 1, 0],
+  ["e", 1, 0.5], ["se", 1, 1], ["s", 0.5, 1],
+  ["sw", 0, 1], ["w", 0, 0.5]
+];
+const CURSORS = {
+  nw: "nwse-resize", se: "nwse-resize", ne: "nesw-resize", sw: "nesw-resize",
+  n: "ns-resize", s: "ns-resize", e: "ew-resize", w: "ew-resize"
+};
+
+const MIN_SIZE = 0.2;      // mm: por debajo de esto un arrastre es un clic
+
+export class Tools {
+  constructor(canvas, opts = {}) {
+    this.canvas = canvas;
+    this.getDrawing = opts.getDrawing || (() => null);
+    this.onSelectionChange = opts.onSelectionChange || (() => {});
+    this.onStatus = opts.onStatus || (() => {});
+    this.onToolChange = opts.onToolChange || (() => {});
+    this.canWrite = opts.canWrite || (() => true);
+    this.style = Object.assign({
+      fill: "#cfe3ff", stroke: "#1f2933", "stroke-width": 0.4, opacity: 1
+    }, opts.style || {});
+
+    this.tool = "select";
+    this.sel = [];
+    this.drag = null;
+    this._spaceDown = false;
+
+    this._onDown = e => this._pointerDown(e);
+    this._onMove = e => this._pointerMove(e);
+    this._onUp = e => this._pointerUp(e);
+    this._onWheel = e => this._wheel(e);
+    this._onKey = e => this._keyDown(e);
+    this._onKeyUp = e => { if (e.code === "Space") this._spaceDown = false; };
+    this._onCtx = e => e.preventDefault();
+
+    const v = canvas.view;
+    v.addEventListener("pointerdown", this._onDown);
+    v.addEventListener("pointermove", this._onMove);
+    v.addEventListener("pointerup", this._onUp);
+    v.addEventListener("pointercancel", this._onUp);
+    v.addEventListener("wheel", this._onWheel, { passive: false });
+    v.addEventListener("contextmenu", this._onCtx);
+    document.addEventListener("keydown", this._onKey);
+    document.addEventListener("keyup", this._onKeyUp);
+  }
+
+  destroy() {
+    const v = this.canvas.view;
+    v.removeEventListener("pointerdown", this._onDown);
+    v.removeEventListener("pointermove", this._onMove);
+    v.removeEventListener("pointerup", this._onUp);
+    v.removeEventListener("pointercancel", this._onUp);
+    v.removeEventListener("wheel", this._onWheel);
+    v.removeEventListener("contextmenu", this._onCtx);
+    document.removeEventListener("keydown", this._onKey);
+    document.removeEventListener("keyup", this._onKeyUp);
+  }
+
+  /* ---------- selección ---------- */
+
+  selection() { return this.sel.slice(); }
+
+  setTool(name) {
+    this.tool = name;
+    this.canvas.view.style.cursor = name === "select" ? "default" : "crosshair";
+    this.onToolChange(name);
+  }
+
+  select(els, { add = false } = {}) {
+    const list = [].concat(els).filter(Boolean);
+    if (add) {
+      for (const el of list) {
+        const i = this.sel.indexOf(el);
+        if (i >= 0) this.sel.splice(i, 1); else this.sel.push(el);
+      }
+    } else {
+      this.sel = list;
+    }
+    this.redrawOverlay();
+    this.onSelectionChange(this.selection());
+  }
+
+  clear() { this.select([]); }
+
+  selectAll() {
+    const d = this.getDrawing();
+    if (d) this.select(d.shapes());
+  }
+
+  /* Tras clonar (orden Z, agrupar…) los elementos son otros: la
+     selección se rehace por id, que es lo que sobrevive al clonado. */
+  reselectByIds(ids) {
+    const d = this.getDrawing();
+    if (!d) return;
+    this.select(ids.map(id => d.byId(id)).filter(Boolean));
+  }
+
+  /* ---------- dibujo del recuadro y los tiradores ---------- */
+
+  redrawOverlay() {
+    const ov = this.canvas.overlay;
+    ov.textContent = "";
+    // se quitan de la selección los que ya no existen (los borró otra persona)
+    this.sel = this.sel.filter(el => el && el.parent);
+    if (!this.sel.length) return;
+
+    const box = this.canvas.boxOfMany(this.sel);
+    if (!box) return;
+    const a = this.canvas.toLocal({ x: box.x, y: box.y });
+    const b = this.canvas.toLocal({ x: box.x + box.w, y: box.y + box.h });
+    const r = { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(b.x - a.x), h: Math.abs(b.y - a.y) };
+
+    if (this.sel.length > 1) {
+      for (const el of this.sel) {
+        const eb = this.canvas.boxOf(el);
+        if (!eb) continue;
+        const p0 = this.canvas.toLocal({ x: eb.x, y: eb.y });
+        const p1 = this.canvas.toLocal({ x: eb.x + eb.w, y: eb.y + eb.h });
+        const m = svgEl("rect");
+        m.setAttribute("class", "dw-sel-item");
+        m.setAttribute("x", Math.min(p0.x, p1.x)); m.setAttribute("y", Math.min(p0.y, p1.y));
+        m.setAttribute("width", Math.abs(p1.x - p0.x)); m.setAttribute("height", Math.abs(p1.y - p0.y));
+        ov.appendChild(m);
+      }
+    }
+
+    const frame = svgEl("rect");
+    frame.setAttribute("class", "dw-sel-frame");
+    frame.setAttribute("x", r.x); frame.setAttribute("y", r.y);
+    frame.setAttribute("width", r.w); frame.setAttribute("height", r.h);
+    ov.appendChild(frame);
+
+    if (!this.canWrite()) return;
+
+    const stem = svgEl("line");
+    stem.setAttribute("class", "dw-rot-stem");
+    stem.setAttribute("x1", r.x + r.w / 2); stem.setAttribute("y1", r.y);
+    stem.setAttribute("x2", r.x + r.w / 2); stem.setAttribute("y2", r.y - 22);
+    ov.appendChild(stem);
+
+    const rot = svgEl("circle");
+    rot.setAttribute("class", "dw-handle dw-handle-rot");
+    rot.setAttribute("cx", r.x + r.w / 2); rot.setAttribute("cy", r.y - 22);
+    rot.setAttribute("r", 5);
+    rot.dataset.handle = "rotate";
+    rot.style.cursor = "grab";
+    ov.appendChild(rot);
+
+    for (const [name, fx, fy] of HANDLES) {
+      const h = svgEl("rect");
+      h.setAttribute("class", "dw-handle");
+      h.setAttribute("x", r.x + fx * r.w - 4);
+      h.setAttribute("y", r.y + fy * r.h - 4);
+      h.setAttribute("width", 8); h.setAttribute("height", 8);
+      h.dataset.handle = name;
+      h.style.cursor = CURSORS[name];
+      ov.appendChild(h);
+    }
+  }
+
+  /* ---------- transformaciones ----------
+     Una transformación pensada en coordenadas del documento se lleva al
+     espacio del padre del elemento: M' = P⁻¹ · T · P · M. */
+  _applyDocMatrix(el, T, dom) {
+    const P = this.canvas.parentMatrix(el);
+    const node = dom || this.canvas.yToDom.get(el);
+    if (!node) return null;
+    const old = parseTransform(node.getAttribute("transform"));
+    let M;
+    if (P) {
+      const Pi = matInvert(P);
+      if (!Pi) return null;
+      M = matMul(matMul(Pi, matMul(T, P)), old);
+    } else {
+      M = matMul(T, old);
+    }
+    return matToString(M);
+  }
+
+  /* Vista previa: se escribe en el DOM del espejo, no en el documento. */
+  _preview(T) {
+    for (const item of this.drag.items) {
+      const s = this._applyDocMatrix(item.el, T, item.dom);
+      if (s === null) continue;
+      if (s) item.dom.setAttribute("transform", s);
+      else item.dom.removeAttribute("transform");
+    }
+  }
+
+  /* Al soltar: se calcula otra vez desde el transform ORIGINAL y se
+     escribe en Yjs de una vez. Recalcular desde el original evita que
+     los redondeos de la vista previa se acumulen. */
+  _commit(T) {
+    const d = this.getDrawing();
+    if (!d) return;
+    d.edit(() => {
+      for (const item of this.drag.items) {
+        const P = this.canvas.parentMatrix(item.el);
+        let M;
+        if (P) {
+          const Pi = matInvert(P);
+          if (!Pi) continue;
+          M = matMul(matMul(Pi, matMul(T, P)), item.m0);
+        } else {
+          M = matMul(T, item.m0);
+        }
+        const s = matToString(M);
+        if (s) item.el.setAttribute("transform", s);
+        else item.el.removeAttribute("transform");
+      }
+    });
+  }
+
+  _startTransform(mode, e, handle) {
+    const items = this.sel.map(el => {
+      const dom = this.canvas.yToDom.get(el);
+      return dom ? { el, dom, m0: parseTransform(dom.getAttribute("transform")) } : null;
+    }).filter(Boolean);
+    if (!items.length) return;
+    const box = this.canvas.boxOfMany(this.sel);
+    if (!box) return;
+    this.drag = {
+      mode, handle, items, box,
+      start: this.canvas.toDoc(e.clientX, e.clientY),
+      moved: false
+    };
+    this.canvas.view.setPointerCapture(e.pointerId);
+  }
+
+  /* ---------- puntero ---------- */
+
+  _pointerDown(e) {
+    if (e.button === 1 || this._spaceDown || (e.button === 0 && this.tool === "pan")) {
+      this.drag = { mode: "pan", lastX: e.clientX, lastY: e.clientY };
+      this.canvas.view.setPointerCapture(e.pointerId);
+      this.canvas.view.style.cursor = "grabbing";
+      e.preventDefault();
+      return;
+    }
+    if (e.button !== 0) return;
+
+    const handle = e.target && e.target.dataset ? e.target.dataset.handle : null;
+    if (handle && this.canWrite()) {
+      e.preventDefault();
+      this._startTransform(handle === "rotate" ? "rotate" : "scale", e, handle);
+      return;
+    }
+
+    if (this.tool !== "select") {
+      if (!this.canWrite()) return;
+      e.preventDefault();
+      const p = this.canvas.toDoc(e.clientX, e.clientY);
+      const step = this.canvas.snapStep();
+      this.drag = {
+        mode: "create", tool: this.tool,
+        start: step ? { x: snapValue(p.x, step), y: snapValue(p.y, step) } : p,
+        moved: false
+      };
+      this.canvas.view.setPointerCapture(e.pointerId);
+      return;
+    }
+
+    const hit = this.canvas.hitTest(e.clientX, e.clientY);
+    const additive = e.shiftKey;
+    if (hit) {
+      if (additive) this.select(hit, { add: true });
+      else if (!this.sel.includes(hit)) this.select(hit);
+      if (this.canWrite() && this.sel.length) {
+        e.preventDefault();
+        this._startTransform("move", e);
+      }
+      return;
+    }
+    if (!additive) this.clear();
+    const p = this.canvas.toDoc(e.clientX, e.clientY);
+    this.drag = { mode: "marquee", start: p, additive, base: this.sel.slice(), moved: false };
+    this.canvas.view.setPointerCapture(e.pointerId);
+    e.preventDefault();
+  }
+
+  _pointerMove(e) {
+    const d = this.drag;
+    if (!d) return;
+
+    if (d.mode === "pan") {
+      this.canvas.panBy(e.clientX - d.lastX, e.clientY - d.lastY);
+      d.lastX = e.clientX; d.lastY = e.clientY;
+      this.redrawOverlay();
+      return;
+    }
+
+    const p = this.canvas.toDoc(e.clientX, e.clientY);
+    const step = this.canvas.snapStep();
+
+    if (d.mode === "move") {
+      let dx = p.x - d.start.x, dy = p.y - d.start.y;
+      if (e.shiftKey) { if (Math.abs(dx) > Math.abs(dy)) dy = 0; else dx = 0; }
+      if (step) {
+        const s = snapBoxDelta({ x: d.box.x + dx, y: d.box.y + dy, w: d.box.w, h: d.box.h }, step);
+        dx += s.dx; dy += s.dy;
+      }
+      if (Math.abs(dx) > 1e-9 || Math.abs(dy) > 1e-9) d.moved = true;
+      d.T = translate(dx, dy);
+      this._preview(d.T);
+      this.redrawOverlay();
+      return;
+    }
+
+    if (d.mode === "scale") {
+      d.T = this._scaleMatrix(d, p, e.shiftKey, step);
+      d.moved = true;
+      this._preview(d.T);
+      this.redrawOverlay();
+      return;
+    }
+
+    if (d.mode === "rotate") {
+      const c = { x: d.box.x + d.box.w / 2, y: d.box.y + d.box.h / 2 };
+      let ang = angleOf(c, p) - angleOf(c, d.start);
+      if (e.shiftKey) ang = Math.round(ang / 15) * 15;
+      d.T = rotateM(ang, c.x, c.y);
+      d.moved = true;
+      this.onStatus(`${fmt(((ang % 360) + 360) % 360, 1)}°`);
+      this._preview(d.T);
+      this.redrawOverlay();
+      return;
+    }
+
+    if (d.mode === "marquee") {
+      d.box = boxFromDrag(d.start, p);
+      d.moved = d.box.w > MIN_SIZE || d.box.h > MIN_SIZE;
+      this._drawMarquee(d.box);
+      return;
+    }
+
+    if (d.mode === "create") {
+      const end = step ? { x: snapValue(p.x, step), y: snapValue(p.y, step) } : p;
+      d.end = end;
+      d.moved = dist(d.start, end) > MIN_SIZE;
+      this._drawCreatePreview(d);
+      const b = boxFromDrag(d.start, end);
+      this.onStatus(`${fmt(b.w, 1)} × ${fmt(b.h, 1)} mm`);
+    }
+  }
+
+  _pointerUp(e) {
+    const d = this.drag;
+    this.drag = null;
+    if (!d) return;
+    try { this.canvas.view.releasePointerCapture(e.pointerId); } catch (err) {}
+
+    if (d.mode === "pan") {
+      this.canvas.view.style.cursor = this.tool === "select" ? "default" : "crosshair";
+      return;
+    }
+    if (d.mode === "marquee") {
+      this.canvas.overlay.querySelectorAll(".dw-marquee").forEach(n => n.remove());
+      if (d.moved) {
+        const found = this.canvas.elementsIn(d.box);
+        this.select(d.additive ? d.base.concat(found.filter(x => !d.base.includes(x))) : found);
+      }
+      return;
+    }
+    if (d.mode === "create") {
+      this.canvas.overlay.querySelectorAll(".dw-preview").forEach(n => n.remove());
+      this.onStatus("");
+      if (d.moved && d.end) this._createShape(d.tool, d.start, d.end);
+      return;
+    }
+    if (d.T && d.moved) {
+      this.drag = d;              // _commit lee this.drag.items
+      this._commit(d.T);
+      this.drag = null;
+      this.onStatus("");
+      this.redrawOverlay();
+    }
+  }
+
+  _scaleMatrix(d, p, keepRatio, step) {
+    const b = d.box;
+    const h = d.handle;
+    const left = h.includes("w"), right = h.includes("e");
+    const top = h.includes("n"), bottom = h.includes("s");
+
+    // punto fijo: la esquina o el borde de enfrente
+    const fx = left ? b.x + b.w : right ? b.x : b.x + b.w / 2;
+    const fy = top ? b.y + b.h : bottom ? b.y : b.y + b.h / 2;
+
+    let px = p.x, py = p.y;
+    if (step) { px = snapValue(px, step); py = snapValue(py, step); }
+
+    let sx = 1, sy = 1;
+    if ((left || right) && b.w > 1e-6) sx = (px - fx) / ((left ? b.x : b.x + b.w) - fx);
+    if ((top || bottom) && b.h > 1e-6) sy = (py - fy) / ((top ? b.y : b.y + b.h) - fy);
+
+    if (keepRatio) {
+      if (left || right) { if (top || bottom) { const s = Math.max(Math.abs(sx), Math.abs(sy)); sx = Math.sign(sx || 1) * s; sy = Math.sign(sy || 1) * s; } else sy = sx; }
+      else if (top || bottom) sx = sy;
+    }
+    // no dejar que colapse a cero: un factor 0 es una matriz sin vuelta atrás
+    const guard = v => (Math.abs(v) < 1e-3 ? (v < 0 ? -1e-3 : 1e-3) : v);
+    return scaleAbout(guard(sx), guard(sy), fx, fy);
+  }
+
+  _drawMarquee(box) {
+    const ov = this.canvas.overlay;
+    ov.querySelectorAll(".dw-marquee").forEach(n => n.remove());
+    const a = this.canvas.toLocal({ x: box.x, y: box.y });
+    const b = this.canvas.toLocal({ x: box.x + box.w, y: box.y + box.h });
+    const r = svgEl("rect");
+    r.setAttribute("class", "dw-marquee");
+    r.setAttribute("x", Math.min(a.x, b.x)); r.setAttribute("y", Math.min(a.y, b.y));
+    r.setAttribute("width", Math.abs(b.x - a.x)); r.setAttribute("height", Math.abs(b.y - a.y));
+    ov.appendChild(r);
+  }
+
+  _drawCreatePreview(d) {
+    const ov = this.canvas.overlay;
+    ov.querySelectorAll(".dw-preview").forEach(n => n.remove());
+    const a = this.canvas.toLocal(d.start);
+    const b = this.canvas.toLocal(d.end);
+    let node;
+    if (d.tool === "line") {
+      node = svgEl("line");
+      node.setAttribute("x1", a.x); node.setAttribute("y1", a.y);
+      node.setAttribute("x2", b.x); node.setAttribute("y2", b.y);
+    } else if (d.tool === "ellipse") {
+      node = svgEl("ellipse");
+      node.setAttribute("cx", (a.x + b.x) / 2); node.setAttribute("cy", (a.y + b.y) / 2);
+      node.setAttribute("rx", Math.abs(b.x - a.x) / 2); node.setAttribute("ry", Math.abs(b.y - a.y) / 2);
+    } else {
+      node = svgEl("rect");
+      node.setAttribute("x", Math.min(a.x, b.x)); node.setAttribute("y", Math.min(a.y, b.y));
+      node.setAttribute("width", Math.abs(b.x - a.x)); node.setAttribute("height", Math.abs(b.y - a.y));
+    }
+    node.setAttribute("class", "dw-preview");
+    ov.appendChild(node);
+  }
+
+  _createShape(tool, p0, p1) {
+    const d = this.getDrawing();
+    if (!d) return;
+    const b = boxFromDrag(p0, p1);
+    const st = this.style;
+    const common = {
+      fill: tool === "line" ? "none" : st.fill,
+      stroke: st.stroke,
+      "stroke-width": st["stroke-width"]
+    };
+    let el = null;
+    if (tool === "rect") {
+      el = d.add(null, "rect", Object.assign({ x: fmt(b.x), y: fmt(b.y), width: fmt(b.w), height: fmt(b.h) }, common));
+    } else if (tool === "ellipse") {
+      el = d.add(null, "ellipse", Object.assign({
+        cx: fmt(b.x + b.w / 2), cy: fmt(b.y + b.h / 2), rx: fmt(b.w / 2), ry: fmt(b.h / 2)
+      }, common));
+    } else if (tool === "line") {
+      el = d.add(null, "line", Object.assign({
+        x1: fmt(p0.x), y1: fmt(p0.y), x2: fmt(p1.x), y2: fmt(p1.y)
+      }, common, { fill: null, "stroke-linecap": "round" }));
+    }
+    if (el) {
+      this.select(el);
+      this.setTool("select");
+    }
+  }
+
+  _wheel(e) {
+    e.preventDefault();
+    if (e.ctrlKey || e.metaKey) {
+      // el pellizco del panel táctil llega justo así
+      const factor = Math.pow(0.995, e.deltaY);
+      this.canvas.zoomBy(factor, { x: e.clientX, y: e.clientY });
+    } else if (e.shiftKey) {
+      this.canvas.panBy(-e.deltaY - e.deltaX, 0);
+    } else {
+      this.canvas.panBy(-e.deltaX, -e.deltaY);
+    }
+    this.redrawOverlay();
+  }
+
+  /* ---------- acciones ---------- */
+
+  deleteSelection() {
+    const d = this.getDrawing();
+    if (!d || !this.sel.length || !this.canWrite()) return;
+    d.remove(this.sel);
+    this.clear();
+  }
+
+  duplicateSelection() {
+    const d = this.getDrawing();
+    if (!d || !this.sel.length || !this.canWrite()) return;
+    const copies = d.duplicate(this.sel);
+    if (copies && copies.length) this.select(copies);
+  }
+
+  reorder(mode) {
+    const d = this.getDrawing();
+    if (!d || !this.sel.length || !this.canWrite()) return;
+    const done = d.reorder(this.sel, mode);
+    if (done && done.length) this.select(done);
+  }
+
+  group() {
+    const d = this.getDrawing();
+    if (!d || this.sel.length < 2 || !this.canWrite()) return;
+    const g = d.group(this.sel);
+    if (g) this.select(g);
+    else this.onStatus("Solo se pueden agrupar figuras de la misma capa.");
+  }
+
+  ungroup() {
+    const d = this.getDrawing();
+    if (!d || !this.sel.length || !this.canWrite()) return;
+    const freed = d.ungroup(this.sel.filter(e => e.nodeName === "g"));
+    if (freed && freed.length) this.select(freed);
+  }
+
+  nudge(dx, dy) {
+    const d = this.getDrawing();
+    if (!d || !this.sel.length || !this.canWrite()) return;
+    this.drag = {
+      items: this.sel.map(el => {
+        const dom = this.canvas.yToDom.get(el);
+        return dom ? { el, dom, m0: parseTransform(dom.getAttribute("transform")) } : null;
+      }).filter(Boolean)
+    };
+    this._commit(translate(dx, dy));
+    this.drag = null;
+    this.redrawOverlay();
+  }
+
+  applyStyle(attrs) {
+    const d = this.getDrawing();
+    Object.assign(this.style, attrs);
+    if (!d || !this.sel.length || !this.canWrite()) return;
+    d.setAttrs(this.sel, attrs);
+    this.redrawOverlay();
+    // el panel enseña los valores de la selección: hay que repintarlo
+    this.onSelectionChange(this.selection());
+  }
+
+  /* ---------- teclado ---------- */
+
+  _keyDown(e) {
+    const t = e.target;
+    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+    if (e.code === "Space") { this._spaceDown = true; return; }
+
+    const d = this.getDrawing();
+    const mod = e.ctrlKey || e.metaKey;
+
+    if (mod && e.key.toLowerCase() === "z") {
+      e.preventDefault();
+      if (d) { if (e.shiftKey) d.redo(); else d.undo(); this.redrawOverlay(); }
+      return;
+    }
+    if (mod && e.key.toLowerCase() === "y") { e.preventDefault(); if (d) { d.redo(); this.redrawOverlay(); } return; }
+    if (mod && e.key.toLowerCase() === "a") { e.preventDefault(); this.selectAll(); return; }
+    if (mod && e.key.toLowerCase() === "d") { e.preventDefault(); this.duplicateSelection(); return; }
+    if (mod && e.key.toLowerCase() === "g") {
+      e.preventDefault();
+      if (e.shiftKey) this.ungroup(); else this.group();
+      return;
+    }
+
+    if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); this.deleteSelection(); return; }
+    if (e.key === "Escape") { this.clear(); this.setTool("select"); return; }
+    if (e.key === "PageUp") { e.preventDefault(); this.reorder(e.shiftKey ? "top" : "raise"); return; }
+    if (e.key === "PageDown") { e.preventDefault(); this.reorder(e.shiftKey ? "bottom" : "lower"); return; }
+
+    if (e.key.startsWith("Arrow")) {
+      if (!this.sel.length) return;
+      e.preventDefault();
+      const step = e.shiftKey ? (this.canvas.grid.step || 5) : (mod ? 0.1 : 1);
+      const dx = e.key === "ArrowRight" ? step : e.key === "ArrowLeft" ? -step : 0;
+      const dy = e.key === "ArrowDown" ? step : e.key === "ArrowUp" ? -step : 0;
+      this.nudge(dx, dy);
+      return;
+    }
+
+    // atajos de herramienta, como en Inkscape
+    if (!mod && !e.altKey) {
+      const map = { s: "select", r: "rect", e: "ellipse", l: "line" };
+      const name = map[e.key.toLowerCase()];
+      if (name) { this.setTool(name); return; }
+      if (e.key === "3") { this.canvas.fitPage(); this.redrawOverlay(); }
+    }
+  }
+}

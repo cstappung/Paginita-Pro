@@ -28,9 +28,15 @@ El login con Google funciona en localhost. Producción: ver
 
 ## Estructura
 
+Esta carpeta es además el **taller de compilación de las dos aplicaciones web**
+del sitio (ColabTeX y ColabDraw): es la única con `node_modules`, y duplicarla
+solo por Firebase y Yjs costaría unos 200 MB.
+
 ```
 colabtex/
   src/main.js       Aplicación (login, dashboard, editor, compartir)
+  src/draw-main.js  ColabDraw: aplicación de dibujo vectorial (bundle aparte)
+  src/draw/         Editor SVG: modelo, lienzo, herramientas, exportación
   src/firebase.js   Init de Firebase (config del proyecto mi-pagina-pro)
   src/fb-api.js     Capa de datos: proyectos, miembros, tokens, assets
   src/y-rtdb.js     Proveedor Yjs sobre Realtime Database + presencia
@@ -49,14 +55,44 @@ firebase/           Reglas de seguridad + guía de configuración
 vendor/busytex/     Motor pdfTeX WASM + paquetes TeXLive (~217 MB)
 colabtex.html       Interfaz
 colabtex-app.js     Bundle generado (npm run build)
+colabdraw.html      Interfaz de ColabDraw
+colabdraw-app.js    Bundle generado de ColabDraw
 ```
 
 ## Desarrollo
 
 ```
 cd colabtex
-npm run build      # re-empaqueta src/ → colabtex-app.js + colabtex-pdf-worker.js
+npm run build      # re-empaqueta las dos aplicaciones + el worker de pdf.js
 ```
+
+`scripts/stamp-version.js` sella el `?v=…` de **cada** página (tabla `PAGES`)
+para que el navegador no sirva un bundle viejo de la caché.
+
+## ColabDraw (editor SVG)
+
+Aplicación hermana, en `colabdraw.html`. Comparte proyecto de Firebase, sesión
+de Google (Auth persiste por origen: quien ha entrado en ColabTeX ya está
+dentro) y el mismo proveedor de Yjs. Un proyecto de dibujo **es un proyecto
+normal** con `meta.kind: "draw"`, así que miembros, roles, enlaces, duplicar y
+borrar son el mismo código y **las reglas de seguridad no cambian**.
+
+- **Documento**: `Y.Map "drawings"` de ruta → `Y.XmlFragment`, y dentro un
+  `<svg>` que es el archivo (tamaño, `<defs>` y capas `<g data-layer>`). Mover
+  una figura es una operación CRDT sobre atributos, no un reemplazo de texto.
+- **Unidad: el milímetro** (`width="160mm" viewBox="0 0 160 120"`), para que lo
+  que mide el panel sea lo que mide en el papel. Lo importado se normaliza.
+- **Un fragmento sin integrar no se puede leer**: `svgToFragment()` devuelve uno
+  así, hay que pasarlo por `DrawStore.put()`.
+- **Un tipo Yjs integrado no se reinserta** (lo mismo que con `Y.Text` al
+  renombrar en ColabTeX): orden Z, agrupar y renombrar clonan y borran; cada
+  elemento lleva un `id` estable para rehacer la selección.
+- **Durante un arrastre no se escribe en la nube**, solo en el DOM espejo; al
+  soltar se escribe una vez. Un `mousemove` dispara 60 veces por segundo y cada
+  escritura sería un envío a Realtime Database.
+- **Exportar** (`draw/export.js`) genera SVG y PNG y los guarda como recursos
+  normales del proyecto (`assetsIndex`), que es el gancho para vincularlos luego
+  desde un proyecto de ColabTeX.
 
 ## Esquema de datos (Realtime Database)
 

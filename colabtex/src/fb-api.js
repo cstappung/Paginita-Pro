@@ -43,21 +43,34 @@ export async function ensureUserRecord(user, color) {
   });
 }
 
-/* ---------- proyectos ---------- */
-export async function createProject({ title, uid, userName, files }) {
+/* ---------- proyectos ----------
+   `kind` distingue las dos aplicaciones que comparten esta base:
+   "tex" (ColabTeX) y "draw" (ColabDraw). Los proyectos creados antes de
+   que existiera ColabDraw no lo llevan, y se leen como "tex". */
+export const KIND_TEX = "tex";
+export const KIND_DRAW = "draw";
+export const kindOf = meta => (meta && meta.kind) || KIND_TEX;
+
+/* `files` crea el documento de ColabTeX; `init` deja que quien llama
+   monte el suyo (ColabDraw guarda dibujos, no texto). */
+export async function createProject({ title, uid, userName, files, kind, init }) {
   const pid = push(ref(db, "projects")).key;
   const tokens = { edit: randToken(), view: randToken() };
 
   // documento Yjs inicial → snapshot
   const doc = new Y.Doc();
-  const map = doc.getMap("files");
-  doc.transact(() => {
-    for (const [name, contents] of Object.entries(files)) {
-      const t = new Y.Text();
-      t.insert(0, contents);
-      map.set(name, t);
-    }
-  });
+  if (typeof init === "function") {
+    init(doc);
+  } else {
+    const map = doc.getMap("files");
+    doc.transact(() => {
+      for (const [name, contents] of Object.entries(files || {})) {
+        const t = new Y.Text();
+        t.insert(0, contents);
+        map.set(name, t);
+      }
+    });
+  }
   const snapshot = b64FromBytes(Y.encodeStateAsUpdate(doc));
   doc.destroy();
 
@@ -66,7 +79,7 @@ export async function createProject({ title, uid, userName, files }) {
   //    ruta por ruta y fallaría con permission_denied)
   await set(ref(db, `projects/${pid}`), {
     meta: {
-      title, owner: uid, ownerName: userName,
+      title, owner: uid, ownerName: userName, kind: kind || KIND_TEX,
       createdAt: serverTimestamp(), updatedAt: serverTimestamp()
     },
     members: { [uid]: { name: userName, role: "owner", addedAt: serverTimestamp() } },
@@ -103,6 +116,7 @@ export async function listProjects(uid) {
     if (!meta) return;
     out.push({
       id: pid, title: meta.title, ownerId: meta.owner, ownerName: meta.ownerName,
+      kind: kindOf(meta),
       updatedAt: meta.updatedAt || meta.createdAt || 0,
       memberCount: members ? Object.keys(members).length : 1,
       role: members && members[uid] ? members[uid].role : null
@@ -124,6 +138,7 @@ export async function getProject(pid, uid) {
   }
   return {
     id: pid, title: meta.title, ownerId: meta.owner, ownerName: meta.ownerName,
+    kind: kindOf(meta),
     updatedAt: meta.updatedAt, mainFile: meta.mainFile || null, role, tokens,
     members: Object.entries(members || {}).map(([id, m]) => ({ uid: id, name: m.name, role: m.role }))
   };
@@ -204,6 +219,7 @@ export async function duplicateProject(pid, { uid, userName }) {
   await set(ref(db, `projects/${newPid}`), {
     meta: {
       title: (meta ? meta.title : "Proyecto") + " (copia)", owner: uid, ownerName: userName,
+      kind: kindOf(meta),
       createdAt: serverTimestamp(), updatedAt: serverTimestamp()
     },
     members: { [uid]: { name: userName, role: "owner", addedAt: serverTimestamp() } },

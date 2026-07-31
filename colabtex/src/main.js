@@ -190,7 +190,9 @@ async function showDashboard() {
   renderLocalRecents();
   $("projectRows").innerHTML = '<div style="padding:16px;font-size:12.5px;color:#8a97a3">Cargando proyectos…</div>';
   try {
-    state.projects = await fb.listProjects(u.uid);
+    // cada aplicación lista los suyos: los dibujos viven en ColabDraw
+    const all = await fb.listProjects(u.uid);
+    state.projects = all.filter(p => p.kind !== fb.KIND_DRAW);
   } catch (e) {
     state.projects = [];
     $("projectRows").innerHTML = `<div style="padding:16px;font-size:12.5px;color:#c0392b">Error al cargar proyectos: ${escapeHtml(e.message)}</div>`;
@@ -276,6 +278,11 @@ async function openEditor(projectId, token) {
     alert("No tienes acceso a este proyecto (o el enlace no es válido).");
     history.pushState({}, "", location.pathname);
     showDashboard();
+    return;
+  }
+  if (project.kind === fb.KIND_DRAW) {
+    // un enlace compartido de ColabDraw abierto aquí: a su aplicación
+    location.href = "colabdraw.html?p=" + projectId + (token ? "&t=" + token : "");
     return;
   }
   state.project = project;

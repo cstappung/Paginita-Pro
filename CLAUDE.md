@@ -9,7 +9,7 @@ suite of browser-only tools. There is **no application backend**: everything
 runs client-side, and persistence for the collaborative tool lives in Firebase.
 `index.html` redirects to `Inicio.dc.html`, the landing menu.
 
-Two apps:
+Three apps:
 
 - **CSV·Scope** (`CSV Oscilloscope.dc.html` + `scope-engine.js`) — offline
   oscilloscope for CSV captures (cursors, trigger, FFT/harmonics, XY, math
@@ -18,28 +18,36 @@ Two apps:
   collaborative LaTeX editor. This is where nearly all the complexity is; its
   source lives in [colabtex/src/](colabtex/src/) and is bundled into the
   root-level `colabtex-app.js`.
+- **ColabDraw** (`colabdraw.html` + `colabdraw-app.js`) — an Inkscape-style
+  collaborative SVG editor for paper figures. Source in
+  [colabtex/src/draw/](colabtex/src/draw/) plus the entry
+  `colabtex/src/draw-main.js`. Shares Firebase, auth and the Yjs provider with
+  ColabTeX (see "ColabDraw" below).
 
 The UI is authored in Spanish; comments and identifiers are Spanish too. Match
 that when editing.
 
 ## Commands
 
-ColabTeX has the only build/dev tooling. Run everything from `colabtex/`:
+`colabtex/` is the build workspace for **both** web apps — it is the only
+folder with `node_modules`, and duplicating it just for Firebase + Yjs would
+cost ~200 MB. Run everything from there:
 
 ```
 cd colabtex
 npm install          # first time only
-npm run build        # bundle src/ → ../colabtex-app.js (+ pdf worker), then stamp version
+npm run build        # bundle both apps + pdf worker, then stamp versions
 npm start            # static preview server at http://localhost:8123
 ```
 
-- `npm run build` runs esbuild (IIFE bundle of `src/main.js`), builds the
-  pdf.js worker, then `scripts/stamp-version.js` rewrites the `?v=…` query on
-  the `<script>` tag in `colabtex.html` so GitHub Pages/browsers don't serve a
-  stale cached bundle. **After editing anything under `colabtex/src/`, you must
-  `npm run build`** — the root `colabtex-app.js` is generated and not
-  hand-edited. `Inicio.dc.html` from the repo root, or double-click
-  `Iniciar ColabTeX.cmd`, to preview the whole site.
+- `npm run build` runs esbuild three times (IIFE bundle of `src/main.js` →
+  `../colabtex-app.js`, of `src/draw-main.js` → `../colabdraw-app.js`, and the
+  pdf.js worker), then `scripts/stamp-version.js` rewrites the `?v=…` query on
+  the `<script>` tag of **each** page (its `PAGES` table) so GitHub
+  Pages/browsers don't serve a stale cached bundle. **After editing anything
+  under `colabtex/src/`, you must `npm run build`** — the root `*-app.js` files
+  are generated and not hand-edited. Open `Inicio.dc.html` from the repo root,
+  or double-click `Iniciar ColabTeX.cmd`, to preview the whole site.
 
 ### Security-rules test (Firebase emulator)
 
@@ -133,6 +141,69 @@ positions). Paths may include subfolders (`cap1/intro.tex`). In cloud mode this
 syncs through `y-rtdb.js`; the full RTDB schema (users, projects, members,
 roles, tokens, invites, doc snapshot/updates, assets, presence) is documented in
 [colabtex/README.md](colabtex/README.md).
+
+## ColabDraw architecture
+
+An Inkscape-style vector editor for figures, sharing everything it can with
+ColabTeX: same Firebase project, same Google session (Auth persists per origin,
+so being logged into one logs you into the other), same `RtdbProvider`.
+
+**A drawing project is a normal project.** It lives in the same
+`projects/<pid>` tree and is told apart by `meta.kind` — `"draw"` vs `"tex"`
+(`fb.KIND_DRAW` / `fb.KIND_TEX`; projects predating ColabDraw have no `kind`
+and read as `"tex"`). Members, roles, tokens, invites, share, duplicate, delete
+and presence are therefore **the exact same code**, and
+`firebase/database.rules.json` needed **no changes at all**. Each app filters
+`fb.listProjects()` by kind so the two lists stay separate.
+
+**The document is an SVG tree in Yjs.** `Y.Map "drawings"` maps path →
+`Y.XmlFragment`, and each fragment holds one `<svg>` element that *is* the
+file: size, `<defs>` and layers (`<g data-layer="…">`). Moving a shape or
+changing a `fill` are CRDT attribute ops, not text replacement. Two traps that
+shape the code:
+
+- **A prelim (not yet integrated) fragment cannot be read** — `toArray()`
+  returns empty and Yjs logs a warning. `svgToFragment()` returns one, so it
+  must go through `DrawStore.put()`, which integrates it and hands back the
+  usable version.
+- **An integrated Yjs type cannot be re-inserted elsewhere**, exactly as with
+  `Y.Text` in ColabTeX. Z-order, grouping and renaming therefore *clone and
+  delete*; every element carries a stable `id` attribute so the selection can be
+  rebuilt afterwards (`Tools.reselectByIds`).
+
+**Units are millimetres.** The `<svg>` is written `width="160mm"
+viewBox="0 0 160 120"`, so one user unit is one millimetre and a figure is the
+size the panel says on paper. Imported SVGs are normalised to that on the way in
+(`svgio.svgGeometry` + a `scale()` on the imported layer).
+
+Modules in [colabtex/src/draw/](colabtex/src/draw/):
+
+- `doc.js` — the model: `DrawStore` (the project's drawings), `Drawing` (one
+  open drawing: layers, add/remove, z-order, group/ungroup, undo). Every write
+  goes through `Drawing.edit()`, one transaction with the `LOCAL` origin. The
+  `UndoManager` uses `captureTimeout: 0` — one action, one undo step; the
+  default merges consecutive actions, which is right for typing and wrong for
+  drawing.
+- `geom.js` — pure geometry: matrices, `parseTransform`/`matToString`, bounding
+  boxes, snapping, align/distribute. All of it verifiable without a browser.
+- `svgio.js` — SVG in and out, **including the sanitiser**. An SVG is an
+  executable document: `<script>`, `<foreignObject>`, `on*` handlers,
+  `javascript:` and off-site `url(...)`/`href` are dropped on import, always.
+- `canvas.js` — mirrors the Yjs tree into real SVG DOM and **patches it
+  incrementally** (`observeDeep` → attribute sets and child deltas); a full
+  repaint per change would destroy the selection and the frame rate. Measures
+  come from the DOM itself (`getBBox` + `getScreenCTM`), so rotated groups and
+  stroked shapes report the box you actually see.
+- `tools.js` — selection and the tools. **During a drag nothing is written to
+  Yjs**, only to the mirror DOM; one commit happens on release. A mousemove
+  fires ~60×/s and every Yjs write is an RTDB push, so live-writing would hammer
+  the database and flood the undo stack.
+- `style.js` — the fill/stroke/opacity/order/page panel, built in JS. Shows
+  "varios" when the selection disagrees rather than the first value, so touching
+  a control can't silently overwrite the rest.
+- `export.js` — SVG and PNG (rasterised through a data: URL so the canvas is
+  never tainted). Exports are saved as **ordinary project assets** via
+  `fb.uploadAsset`, which is the hook the planned ColabTeX link will use.
 
 ## Deployment & Firebase
 
