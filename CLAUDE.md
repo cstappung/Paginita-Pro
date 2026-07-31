@@ -189,6 +189,17 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
 - `svgio.js` — SVG in and out, **including the sanitiser**. An SVG is an
   executable document: `<script>`, `<foreignObject>`, `on*` handlers,
   `javascript:` and off-site `url(...)`/`href` are dropped on import, always.
+  Import **keeps the file's own layers** (`layerInfo`): Inkscape has no layer
+  type — a layer there is a `<g inkscape:groupmode="layer">` named by
+  `inkscape:label`, hidden with `style="display:none"` and locked with
+  `sodipodi:insensitive` — so those are translated to ours, and the mm
+  normalisation is *prepended to each layer's transform* instead of wrapping
+  everything in one extra `<g>`. Foreign-namespace attributes are dropped: they
+  mean nothing here and would export with a prefix the file no longer declares.
+  Everything a layer needs is read from the **source DOM** in one go, because a
+  just-converted Yjs element is not integrated yet and returns nothing when
+  read — the same trap as `cloneEl` in `doc.js`, and why `<defs>` children are
+  copied one by one rather than through the converted `<defs>`.
 - `canvas.js` — mirrors the Yjs tree into real SVG DOM and **patches it
   incrementally** (`observeDeep` → attribute sets and child deltas); a full
   repaint per change would destroy the selection and the frame rate. Measures
@@ -201,6 +212,21 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
   parent's (`pi0`) are captured **once, on pointer-down**: re-reading them from
   the DOM on every move made the preview compose onto itself (T·T·T…), so
   shapes flew off while being dragged and only snapped back on release.
+  Selection follows Inkscape: a plain click takes the outermost shape (the
+  whole group), **Ctrl/Cmd+click** takes the actual leaf under the pointer
+  however deep it is nested, **Alt+click** does the same and repeating it walks
+  down the stack of overlapping shapes, and **double-click** enters the group
+  (or opens the text editor). The double-click is timed here rather than
+  listened for: selection calls `preventDefault()` on pointerdown, which can
+  suppress the derived mouse events `dblclick` is built from.
+- `text.js` — the text tool and its editor. A text is a `<text>` with one
+  `<tspan>` per line, each repeating the `x` (SVG text does not wrap back to
+  the margin by itself) and stepping down with `dy` **in `em`**, so changing
+  the size doesn't wreck the leading. Editing happens in a `<textarea>` floated
+  over the canvas, not in the SVG: `contentEditable` on a `<text>` is
+  browser-dependent and knows nothing about selections or dead keys. The
+  document is written **on close**, same rule as the drag. A text left empty is
+  deleted — it would be invisible and unclickable.
 - `layers.js` — the layers panel. A layer is a `<g data-layer>` child of the
   `<svg>`; the panel lists them **top-down as they look**, i.e. reversed
   relative to the document, where the last one paints on top. Whatever you draw
@@ -210,9 +236,13 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
   shapes between them **clone and delete** (an integrated Yjs type cannot be
   re-inserted), and moving across layers recomposes the transform
   (`relocateTransform`) so the shape doesn't shift.
-- `style.js` — the fill/stroke/opacity/order/page panel, built in JS. Shows
+- `style.js` — the fill/stroke/text/opacity/order/page panel, built in JS. Shows
   "varios" when the selection disagrees rather than the first value, so touching
-  a control can't silently overwrite the rest.
+  a control can't silently overwrite the rest. The TEXTO section only appears
+  with a text selected (or the text tool in hand), and its font list is limited
+  to the three generic families on purpose: exporting to PDF without embedding
+  fonts leaves only the fourteen standard ones, and these are the three with a
+  safe match (Helvetica, Times, Courier).
 - `export.js` — SVG and PNG (rasterised through a data: URL so the canvas is
   never tainted). Exports are saved as **ordinary project assets** via
   `fb.uploadAsset`, which is the hook the planned ColabTeX link will use.

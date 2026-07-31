@@ -23,6 +23,7 @@ import { Canvas } from "./draw/canvas.js";
 import { Tools } from "./draw/tools.js";
 import { createStylePanel } from "./draw/style.js";
 import { createLayersPanel } from "./draw/layers.js";
+import { createTextEditor } from "./draw/text.js";
 import { exportAll, download, outputName } from "./draw/export.js";
 
 const $ = id => document.getElementById(id);
@@ -44,6 +45,7 @@ const state = {
   tools: null,
   style: null,
   layers: null,        // panel de capas (creado en ensureEditorParts)
+  textEd: null,        // editor de texto flotante
   activeLayerId: null, // capa donde va lo que se dibuje
   assets: [],
   membersUnsub: null,
@@ -287,20 +289,37 @@ function teardownEditor() {
 function ensureEditorParts() {
   if (state.canvas) return;
   state.canvas = new Canvas($("canvasHost"), { onViewChange: onViewChange });
+  state.textEd = createTextEditor(state.canvas, {
+    getDrawing: () => state.drawing,
+    canWrite,
+    /* Al cerrar, el <text> puede haber desaparecido (se quedó vacío) o
+       haber cambiado de tamaño: hay que rehacer el recuadro. */
+    onDone: el => {
+      if (!state.tools) return;
+      if (el) state.tools.select(el); else state.tools.clear();
+      state.tools.redrawOverlay();
+      state.style.refresh();
+    }
+  });
   state.tools = new Tools(state.canvas, {
     getDrawing: () => state.drawing,
     canWrite,
     onSelectionChange: () => { if (state.style) state.style.refresh(); },
     getLayer: () => (state.drawing ? state.drawing.activeLayer(state.activeLayerId) : null),
+    onEditText: el => state.textEd.open(el),
     onStatus: msg => { $("statusMsg").textContent = msg || ""; },
     onToolChange: name => {
       document.querySelectorAll("#toolRail [data-tool]").forEach(b =>
         b.classList.toggle("tool-active", b.dataset.tool === name));
+      // la sección TEXTO del panel aparece con la herramienta en la mano
+      if (state.style) state.style.refresh();
     }
   });
   state.style = createStylePanel($("stylePanel"), {
     getSelection: () => (state.tools ? state.tools.selection() : []),
     getStyle: () => (state.tools ? state.tools.style : {}),
+    getTextStyle: () => (state.tools ? state.tools.textStyle : {}),
+    isTextTool: () => !!state.tools && state.tools.tool === "text",
     getPage: () => (state.drawing ? state.drawing.size() : { w: 0, h: 0 }),
     canWrite,
     onApply: attrs => state.tools.applyStyle(attrs),
@@ -331,6 +350,8 @@ function ensureEditorParts() {
 
 function onViewChange() {
   if (state.canvas) $("zoomLabel").textContent = Math.round(state.canvas.k / 3.7795 * 100) + "%";
+  // el editor de texto flota en píxeles: con el zoom o el encuadre se mueve
+  if (state.textEd && state.textEd.isOpen()) state.textEd.reposition();
   paintUndoButtons();
 }
 
@@ -423,6 +444,8 @@ const normalizeName = raw => {
 };
 
 function openDrawing(path) {
+  // lo que se estuviera escribiendo se guarda en SU dibujo, no en el otro
+  if (state.textEd && state.textEd.isOpen()) state.textEd.close();
   if (state.drawing) { state.drawing.destroy(); state.drawing = null; }
   state.path = path;
   if (!path || !state.store || !state.store.has(path)) {

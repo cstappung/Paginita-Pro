@@ -97,6 +97,24 @@ borrar son el mismo código y **las reglas de seguridad no cambian**.
   mover figuras entre ellas clona y borra, porque un tipo de Yjs ya integrado
   no se puede reinsertar; al cambiar de capa se recompone el transform para que
   la figura no se mueva de sitio.
+- **Importar respeta las capas del archivo** (`draw/svgio.js`). Inkscape no
+  tiene un tipo «capa»: es un `<g inkscape:groupmode="layer">` con el nombre en
+  `inkscape:label`, oculto con `style="display:none"` y bloqueado con
+  `sodipodi:insensitive`. Se traduce todo eso a lo nuestro y la conversión a
+  milímetros se antepone al transform de cada capa, en vez de envolver el
+  dibujo en un `<g>` de más. Lo que hace falta se lee del DOM de origen de una
+  vez, porque un elemento Yjs recién convertido aún no está integrado y no
+  devuelve nada al leerlo (por eso también los `<defs>` se copian hijo a hijo).
+- **Selección al estilo de Inkscape** (`draw/tools.js`): clic normal → el grupo
+  entero; **Ctrl+clic** → la figura concreta bajo el puntero, esté donde esté
+  anidada; **Alt+clic** → igual, y repetido va bajando por las figuras
+  superpuestas; **doble clic** → entra en el grupo (o abre el texto).
+- **Texto** (`draw/text.js`): un `<text>` con un `<tspan>` por línea; el salto
+  va en `em` para que cambiar el cuerpo no descoloque el interlineado. Se
+  escribe en un `<textarea>` encima del lienzo y se guarda al cerrar, no a cada
+  tecla. Un texto que se deja vacío se borra. La lista de fuentes son solo las
+  tres genéricas: al exportar a PDF sin incrustar tipografías únicamente
+  existen las catorce estándar.
 - **Exportar** (`draw/export.js`) genera SVG y PNG y los guarda como recursos
   normales del proyecto (`assetsIndex`), que es el gancho para vincularlos luego
   desde un proyecto de ColabTeX.

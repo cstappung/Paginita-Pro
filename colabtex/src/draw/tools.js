@@ -16,6 +16,7 @@ import {
   angleOf, dist, clamp, fmt
 } from "./geom.js";
 import { SVG_NS, newId } from "./doc.js";
+import { addText, isText, TEXT_ATTRS, DEFAULT_FONT, DEFAULT_SIZE } from "./text.js";
 
 const svgEl = tag => document.createElementNS(SVG_NS, tag);
 
@@ -43,14 +44,23 @@ export class Tools {
     /* Capa donde va lo que se dibuje. Sin panel de capas se deja en null
        y el modelo elige la de más arriba, como antes. */
     this.getLayer = opts.getLayer || (() => null);
+    /* Escribir un texto es abrir el editor de texto, que vive fuera de
+       aquí porque es un <textarea> encima del lienzo. */
+    this.onEditText = opts.onEditText || (() => {});
     this.style = Object.assign({
       fill: "#cfe3ff", stroke: "#1f2933", "stroke-width": 0.4, opacity: 1
     }, opts.style || {});
+    /* El texto lleva su propio estilo: su color es el RELLENO, y heredar
+       el de las figuras haría que el primer rótulo saliera azul claro. */
+    this.textStyle = Object.assign({
+      "font-family": DEFAULT_FONT, "font-size": DEFAULT_SIZE, fill: "#1f2933"
+    }, opts.textStyle || {});
 
     this.tool = "select";
     this.sel = [];
     this.drag = null;
     this._spaceDown = false;
+    this._lastClick = null;   // para detectar el doble clic sin depender del DOM
 
     this._onDown = e => this._pointerDown(e);
     this._onMove = e => this._pointerMove(e);
@@ -89,7 +99,8 @@ export class Tools {
 
   setTool(name) {
     this.tool = name;
-    this.canvas.view.style.cursor = name === "select" ? "default" : "crosshair";
+    this.canvas.view.style.cursor =
+      name === "select" ? "default" : name === "text" ? "text" : "crosshair";
     this.onToolChange(name);
   }
 
@@ -249,6 +260,31 @@ export class Tools {
 
   /* ---------- puntero ---------- */
 
+  /* El doble clic se mide aquí en vez de escuchar «dblclick»: el
+     pointerdown de la selección llama a preventDefault(), y eso puede
+     dejar sin disparar los eventos de ratón derivados —entre ellos
+     dblclick— según el navegador. Con el sello de tiempo no hay duda. */
+  _isDoubleClick(e) {
+    const t = e.timeStamp || Date.now();
+    const prev = this._lastClick;
+    const doble = !!prev && t - prev.t < 400 &&
+      Math.abs(e.clientX - prev.x) < 5 && Math.abs(e.clientY - prev.y) < 5;
+    this._lastClick = doble ? null : { t, x: e.clientX, y: e.clientY };
+    return doble;
+  }
+
+  _createText(p) {
+    const d = this.getDrawing();
+    if (!d) return;
+    const step = this.canvas.snapStep();
+    const pt = step ? { x: snapValue(p.x, step), y: snapValue(p.y, step) } : p;
+    const el = addText(d, this.getLayer(), pt, this.textStyle);
+    if (!el) return;
+    this.select(el);
+    this.setTool("select");
+    this.onEditText(el);
+  }
+
   _pointerDown(e) {
     if (e.button === 1 || this._spaceDown || (e.button === 0 && this.tool === "pan")) {
       this.drag = { mode: "pan", lastX: e.clientX, lastY: e.clientY };
@@ -266,6 +302,13 @@ export class Tools {
       return;
     }
 
+    if (this.tool === "text") {
+      if (!this.canWrite()) return;
+      e.preventDefault();
+      this._createText(this.canvas.toDoc(e.clientX, e.clientY));
+      return;
+    }
+
     if (this.tool !== "select") {
       if (!this.canWrite()) return;
       e.preventDefault();
@@ -280,7 +323,27 @@ export class Tools {
       return;
     }
 
-    let hit = this.canvas.hitTest(e.clientX, e.clientY);
+    /* Selección al estilo de Inkscape:
+         - clic normal   → la figura de más afuera (el grupo entero)
+         - Ctrl+clic     → la figura concreta que hay bajo el puntero,
+                           esté dentro de los grupos que esté
+         - Alt+clic      → igual, y repetido va bajando por el montón de
+                           figuras superpuestas
+         - doble clic    → entra en el grupo (y en un texto, lo edita) */
+    const profundo = e.ctrlKey || e.metaKey || e.altKey;
+    const doble = this._isDoubleClick(e);
+    let hit = profundo || doble
+      ? this.canvas.hitTest(e.clientX, e.clientY, { deep: true })
+      : this.canvas.hitTest(e.clientX, e.clientY);
+
+    if (e.altKey && hit) {
+      const pila = this.canvas.hitStack(e.clientX, e.clientY);
+      const i = pila.indexOf(hit);
+      // ya estaba elegida: se pasa a la de debajo, y del final al principio
+      if (i >= 0 && this.sel.includes(hit) && pila.length > 1)
+        hit = pila[(i + 1) % pila.length];
+    }
+
     /* Una capa bloqueada no se selecciona ni se arrastra; si no, el
        candado del panel no serviría de nada. (Las ocultas ni siquiera
        llegan aquí: `display:none` las saca del sorteo del puntero.) */
@@ -293,8 +356,14 @@ export class Tools {
     }
     const additive = e.shiftKey;
     if (hit) {
+      if (doble && isText(hit) && this.canWrite()) {
+        e.preventDefault();
+        this.select(hit);
+        this.onEditText(hit);
+        return;
+      }
       if (additive) this.select(hit, { add: true });
-      else if (!this.sel.includes(hit)) this.select(hit);
+      else if (doble || profundo || !this.sel.includes(hit)) this.select(hit);
       if (this.canWrite() && this.sel.length) {
         e.preventDefault();
         this._startTransform("move", e);
@@ -563,7 +632,14 @@ export class Tools {
 
   applyStyle(attrs) {
     const d = this.getDrawing();
-    Object.assign(this.style, attrs);
+    /* Los valores quedan de memoria para la próxima figura. Los de
+       tipografía —y el color, cuando lo que hay elegido es un texto— van
+       al estilo del texto; el resto, al de las figuras. */
+    const hayTexto = this.sel.some(isText);
+    for (const [k, v] of Object.entries(attrs)) {
+      if (TEXT_ATTRS.has(k) || (k === "fill" && hayTexto)) this.textStyle[k] = v;
+      else this.style[k] = v;
+    }
     if (!d || !this.sel.length || !this.canWrite()) return;
     d.setAttrs(this.sel, attrs);
     this.redrawOverlay();
@@ -595,6 +671,14 @@ export class Tools {
       return;
     }
 
+    // con un texto elegido, Intro (o F2) entra a escribirlo
+    if ((e.key === "Enter" || e.key === "F2") && this.sel.length === 1 &&
+        isText(this.sel[0]) && this.canWrite()) {
+      e.preventDefault();
+      this.onEditText(this.sel[0]);
+      return;
+    }
+
     if (e.key === "Delete" || e.key === "Backspace") { e.preventDefault(); this.deleteSelection(); return; }
     if (e.key === "Escape") { this.clear(); this.setTool("select"); return; }
     if (e.key === "PageUp") { e.preventDefault(); this.reorder(e.shiftKey ? "top" : "raise"); return; }
@@ -612,7 +696,7 @@ export class Tools {
 
     // atajos de herramienta, como en Inkscape
     if (!mod && !e.altKey) {
-      const map = { s: "select", r: "rect", e: "ellipse", l: "line" };
+      const map = { s: "select", r: "rect", e: "ellipse", l: "line", t: "text" };
       const name = map[e.key.toLowerCase()];
       if (name) { this.setTool(name); return; }
       if (e.key === "3") { this.canvas.fitPage(); this.redrawOverlay(); }

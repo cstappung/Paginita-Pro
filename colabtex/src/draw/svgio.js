@@ -14,6 +14,7 @@
    ============================================================ */
 import * as Y from "yjs";
 import { fmt } from "./geom.js";
+import { newId } from "./doc.js";
 
 /* ---------- unidades ----------
    El documento trabaja en milímetros (ver doc.js). Todo lo que entra
@@ -73,6 +74,19 @@ export function isSafeAttr(name, value) {
   return true;
 }
 
+/* Atributos de otros vocabularios (inkscape:*, sodipodi:*, y sus
+   declaraciones xmlns:*). No se copian por dos razones: no significan
+   nada para el editor, y al exportar saldrían con un prefijo que el
+   archivo ya no declara — un SVG que ningún visor abre. Lo que sí
+   importa de ellos (la capa, su nombre, si está oculta o bloqueada) se
+   lee ANTES, en `layerInfo`, y se traduce a nuestros atributos. */
+const KEEP_PREFIX = new Set(["xlink", "xml"]);
+export function keepAttr(name) {
+  const i = String(name).indexOf(":");
+  if (i < 0) return true;
+  return KEEP_PREFIX.has(name.slice(0, i).toLowerCase());
+}
+
 /* El CSS de dentro de <style> no ejecuta JavaScript en un navegador
    actual, pero sí puede traerse recursos de fuera. */
 export function sanitizeCss(css) {
@@ -101,6 +115,7 @@ function domToY(node) {
 
   const el = new Y.XmlElement(tag);
   for (const at of Array.from(node.attributes || [])) {
+    if (!keepAttr(at.name)) continue;
     if (!isSafeAttr(at.name, at.value)) continue;
     el.setAttribute(at.name, at.value);
   }
@@ -162,6 +177,67 @@ export function svgGeometry(svgEl) {
   return { vb, wmm, hmm, scale: wmm / vb.w };
 }
 
+/* ---------- capas de un archivo de fuera ----------
+
+   Inkscape no tiene un tipo «capa»: una capa suya es un <g> normal
+   marcado con inkscape:groupmode="layer", con el nombre en
+   inkscape:label, oculto con style="display:none" y bloqueado con
+   sodipodi:insensitive. Sin traducir eso, un dibujo de Inkscape entraba
+   entero dentro de una única capa «Importado» y sus capas quedaban
+   invisibles en el panel — que es exactamente lo que se veía. */
+const INK_NS = "http://www.inkscape.org/namespaces/inkscape";
+const SODI_NS = "http://sodipodi.sourceforge.net/DTD/sodipodi-0.0.dtd";
+
+/* getAttributeNS es lo fiable en un documento XML; getAttribute solo
+   acierta si el archivo usa justo el prefijo que esperamos. */
+const attrNs = (node, ns, local) =>
+  (node.getAttributeNS ? node.getAttributeNS(ns, local) : null) ||
+  node.getAttribute(`${ns === INK_NS ? "inkscape" : "sodipodi"}:${local}`) || null;
+
+const styleProp = (node, prop) => {
+  const m = String(node.getAttribute("style") || "").match(
+    new RegExp(`(?:^|;)\\s*${prop}\\s*:\\s*([^;]+)`, "i"));
+  return m ? m[1].trim() : null;
+};
+
+/* Qué es un <g> de fuera: si es capa, cómo se llama y cómo está. Todo
+   se lee del DOM de origen y se devuelve junto, porque después ya no hay
+   dónde leerlo: el elemento Yjs recién convertido todavía no está
+   integrado en ningún documento y NO devuelve sus atributos (la misma
+   trampa que obliga a clonar leyendo del original en doc.js). */
+export function layerInfo(node) {
+  if (!node || node.nodeType !== 1 || node.nodeName.toLowerCase() !== "g") return null;
+  const propio = node.getAttribute("data-layer");
+  const st = String(node.getAttribute("style") || "");
+  return {
+    esCapa: (propio != null && propio !== "") || attrNs(node, INK_NS, "groupmode") === "layer",
+    name: propio || attrNs(node, INK_NS, "label") || node.getAttribute("id") || "",
+    oculta: node.getAttribute("display") === "none" || styleProp(node, "display") === "none",
+    bloqueada: attrNs(node, SODI_NS, "insensitive") === "true" ||
+      node.getAttribute("data-locked") === "1",
+    id: node.getAttribute("id") || "",
+    // el display se saca del estilo: su sitio es el atributo (ver markLayer)
+    style: st.replace(/(?:^|;)\s*display\s*:[^;]*/gi, "").replace(/^;+|;+$/g, "").trim(),
+    transform: node.getAttribute("transform") || ""
+  };
+}
+
+/* Convierte un <g> ya pasado a Yjs en una capa nuestra. El `display` pasa
+   a ser atributo (no estilo) porque es donde lo busca el panel y donde
+   tiene que estar para que la capa salga oculta también al exportar; y la
+   normalización a milímetros se antepone al transform que ya traía, en
+   vez de envolverlo todo en un <g> de más. */
+function markLayer(g, info, norm, nombre) {
+  g.setAttribute("data-layer", nombre);
+  g.setAttribute("id", info.id || newId("capa"));
+  if (info.oculta) g.setAttribute("display", "none");
+  if (info.bloqueada) g.setAttribute("data-locked", "1");
+  if (info.style) g.setAttribute("style", info.style); else g.removeAttribute("style");
+  const t = norm ? (info.transform ? `${norm} ${info.transform}` : norm) : info.transform;
+  if (t) g.setAttribute("transform", t);
+  return g;
+}
+
 /* Un archivo .svg entero → fragmento listo para guardar como dibujo.
    Se normaliza a milímetros: el <svg> resultante siempre cumple
    1 unidad de usuario = 1 mm, que es lo que espera el resto del editor.
@@ -182,8 +258,6 @@ export function svgToFragment(text, { layerName = "Importado" } = {}) {
   svg.setAttribute("viewBox", `0 0 ${fmt(wmm)} ${fmt(hmm)}`);
 
   const defs = new Y.XmlElement("defs");
-  const layer = new Y.XmlElement("g");
-  layer.setAttribute("data-layer", layerName);
 
   /* Del sistema de coordenadas de origen al nuestro: primero se lleva
      la esquina del viewBox al cero, luego se escala a milímetros. */
@@ -191,37 +265,61 @@ export function svgToFragment(text, { layerName = "Importado" } = {}) {
   const parts = [];
   if (k !== 1) parts.push(`scale(${fmt(k, 6)})`);
   if (geo.vb.x || geo.vb.y) parts.push(`translate(${fmt(-geo.vb.x)},${fmt(-geo.vb.y)})`);
-  if (parts.length) layer.setAttribute("transform", parts.join(" "));
+  const norm = parts.join(" ");
 
-  /* Un archivo que YA viene organizado en capas y en nuestras
-     coordenadas se adopta tal cual, sin envolverlo. Es el caso de un
-     SVG exportado por ColabDraw: sin esto, exportar y volver a importar
-     iría metiendo una capa «Importado» dentro de otra cada vez. */
+  /* Las capas del archivo se conservan COMO CAPAS. La conversión a
+     milímetros no obliga a envolverlo todo en un <g> extra: basta con
+     anteponerla al transform de cada capa, así que un dibujo de Inkscape
+     entra con sus capas intactas aunque venga en otras unidades.
+
+     Sin ninguna capa marcada valen dos casos: si en la raíz solo hay
+     grupos, cada grupo pasa a ser una capa (es como se organiza un SVG
+     de Illustrator); si hay figuras sueltas, todo va a una capa nueva. */
   const elemHijos = Array.from(src.childNodes).filter(n => n.nodeType === 1);
   const noDefs = elemHijos.filter(n => n.nodeName.toLowerCase() !== "defs");
-  const adoptar = !parts.length && noDefs.length > 0 &&
-    noDefs.every(n => n.nodeName.toLowerCase() === "g" && n.hasAttribute("data-layer"));
+  const hayCapas = noDefs.some(n => { const i = layerInfo(n); return i && i.esCapa; });
+  const soloGrupos = noDefs.length > 0 && noDefs.every(n => n.nodeName.toLowerCase() === "g");
+  const adoptar = hayCapas || soloGrupos;
 
-  const capas = [];
-  const kids = [];
+  const capas = [];   // <g> que serán capas, en orden de pintado
+  const sueltos = []; // lo que no cabe en ninguna: irá a una capa aparte
+  let nCapa = 0;
+
   for (const child of Array.from(src.childNodes)) {
-    const y = domToY(child);
-    if (!y) continue;
-    // <defs> del original se funden con los nuestros
-    if (y instanceof Y.XmlElement && y.nodeName.toLowerCase() === "defs") {
-      const inner = y.toArray();
+    /* <defs> del original: se funden con los nuestros copiando sus hijos
+       UNO A UNO desde el DOM. Convertir el <defs> entero y leerlo después
+       no vale — sin integrar, `toArray()` devuelve vacío y el contenido
+       (degradados, marcadores) desaparecería sin avisar. */
+    if (child.nodeType === 1 && child.nodeName.toLowerCase() === "defs") {
+      const inner = [];
+      for (const g of Array.from(child.childNodes)) {
+        const y = domToY(g);
+        if (y) inner.push(y);
+      }
       if (inner.length) defs.insert(defs.length, inner);
       continue;
     }
-    if (adoptar) capas.push(y); else kids.push(y);
+
+    const y = domToY(child);
+    if (!y) continue;
+    const info = adoptar ? layerInfo(child) : null;
+    if (info && (info.esCapa || !hayCapas)) {
+      capas.push(markLayer(y, info, norm, info.name || `Capa ${++nCapa}`));
+    } else {
+      sueltos.push(y);
+    }
   }
 
-  if (adoptar) {
-    svg.insert(0, [defs].concat(capas));
-  } else {
-    if (kids.length) layer.insert(0, kids);
-    svg.insert(0, [defs, layer]);
+  if (sueltos.length || !capas.length) {
+    const extra = new Y.XmlElement("g");
+    extra.setAttribute("id", newId("capa"));
+    extra.setAttribute("data-layer", capas.length ? "Suelto" : layerName);
+    if (norm) extra.setAttribute("transform", norm);
+    if (sueltos.length) extra.insert(0, sueltos);
+    capas.push(extra);
   }
+
+  svg.insert(0, [defs].concat(capas));
   frag.insert(0, [svg]);
   return frag;
 }

@@ -411,23 +411,41 @@ export class Canvas {
      La subida PARA en la capa: una capa también es un <g>, así que sin
      este corte se acabaría seleccionando la capa entera y arrastrar una
      figura movería el dibujo completo. */
-  hitTest(clientX, clientY) {
-    const el = document.elementFromPoint(clientX, clientY);
+  hitTest(clientX, clientY, { deep = false } = {}) {
+    return this._pick(document.elementFromPoint(clientX, clientY), deep);
+  }
+
+  /* Sube desde un nodo del DOM hasta la capa, quedándose con la figura
+     que toque: la de más afuera (el grupo entero) o, con `deep`, la
+     hoja concreta que hay bajo el puntero. */
+  _pick(el, deep) {
     if (!el) return null;
-    let node = el;
-    let best = null;
-    let topped = false;
+    let node = el, fuera = null, dentro = null, topped = false;
     while (node && node !== this.content) {
       const y = this.domToY.get(node);
       if (y && isEl(y)) {
         if (y.getAttribute("data-layer") != null) { topped = true; break; }
-        if (SHAPE_TAGS.has(y.nodeName)) best = y;
+        if (SHAPE_TAGS.has(y.nodeName)) { if (!dentro) dentro = y; fuera = y; }
       }
       node = node.parentNode;
     }
     // sin capa (SVG importado suelto) hay que haber llegado al contenido
     if (!topped && node !== this.content) return null;
-    return best;
+    return deep ? dentro : fuera;
+  }
+
+  /* Todas las figuras bajo el punto, de la de encima a la del fondo. La
+     usa el alt+clic para ir bajando por el montón, como en Inkscape. */
+  hitStack(clientX, clientY, { deep = true } = {}) {
+    const out = [];
+    const nodes = document.elementsFromPoint
+      ? document.elementsFromPoint(clientX, clientY)
+      : [document.elementFromPoint(clientX, clientY)];
+    for (const n of nodes) {
+      const y = this._pick(n, deep);
+      if (y && !out.includes(y)) out.push(y);
+    }
+    return out;
   }
 
   /* Figuras cuya caja toca (o queda dentro de) el rectángulo dado. */

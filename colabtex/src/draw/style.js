@@ -12,6 +12,8 @@
    cualquier cosa pisara las demás sin querer.
    ============================================================ */
 
+import { FONTS, DEFAULT_FONT, DEFAULT_SIZE, isText } from "./text.js";
+
 export const PALETTE = [
   "none", "#000000", "#3d4c5e", "#8a97a3", "#ffffff",
   "#c0392b", "#e67e22", "#e2c08d", "#2e9e5b", "#0d9488",
@@ -53,6 +55,8 @@ export function createStylePanel(host, opts = {}) {
   const onPage = opts.onPage || (() => {});
   const getPage = opts.getPage || (() => ({ w: 0, h: 0 }));
   const canWrite = opts.canWrite || (() => true);
+  const getTextStyle = opts.getTextStyle || (() => ({}));
+  const isTextTool = opts.isTextTool || (() => false);
 
   host.textContent = "";
   host.classList.add("dw-style");
@@ -128,6 +132,64 @@ export function createStylePanel(host, opts = {}) {
 
   secStroke.append(strokeRow, swatches("stroke", c => apply({ stroke: c === "none" ? "none" : c })), widthRow, dashRow);
 
+  /* ---------- texto ----------
+     Solo aparece cuando hay un texto elegido (o cuando se va a escribir
+     uno): son cinco controles que no dicen nada sobre un rectángulo. */
+  const secText = section("TEXTO");
+  const fontRow = el("div", "dw-row");
+  fontRow.appendChild(el("label", "dw-lbl", "Fuente"));
+  const fontSel = el("select", "dw-sel");
+  fontSel.id = "dwFont";
+  for (const f of FONTS) {
+    const o = document.createElement("option");
+    o.value = f.value; o.textContent = f.label;
+    o.style.fontFamily = f.value;
+    fontSel.appendChild(o);
+  }
+  fontSel.onchange = () => apply({ "font-family": fontSel.value });
+  fontRow.appendChild(fontSel);
+
+  const sizeRow = el("div", "dw-row");
+  sizeRow.appendChild(el("label", "dw-lbl", "Cuerpo"));
+  const sizeInput = el("input", "dw-num");
+  sizeInput.type = "number";
+  sizeInput.id = "dwFontSize";
+  sizeInput.min = "0.5"; sizeInput.step = "0.5";
+  sizeInput.onchange = () => {
+    const v = parseFloat(sizeInput.value);
+    if (isFinite(v) && v > 0) apply({ "font-size": v });
+  };
+  sizeRow.append(sizeInput, el("span", "dw-unit", "mm"));
+
+  const fxRow = el("div", "dw-btns");
+  const mkToggle = (label, title, attr, on, off) => {
+    const b = el("button", "dw-btn", label);
+    b.type = "button";
+    b.title = title;
+    b.dataset.text = attr;
+    b.onclick = () => {
+      const activo = b.classList.contains("dw-btn-on");
+      apply({ [attr]: activo ? off : on });
+    };
+    return b;
+  };
+  const boldBtn = mkToggle("<b>N</b>", "Negrita", "font-weight", "bold", null);
+  const italBtn = mkToggle("<i>C</i>", "Cursiva", "font-style", "italic", null);
+  const alignBtns = [
+    ["start", "⇤", "Alinear a la izquierda"],
+    ["middle", "↔", "Centrar"],
+    ["end", "⇥", "Alinear a la derecha"]
+  ].map(([v, label, title]) => {
+    const b = el("button", "dw-btn", label);
+    b.type = "button";
+    b.title = title;
+    b.dataset.anchor = v;
+    b.onclick = () => apply({ "text-anchor": v === "start" ? null : v });
+    return b;
+  });
+  fxRow.append(boldBtn, italBtn, ...alignBtns);
+  secText.append(fontRow, sizeRow, fxRow);
+
   /* ---------- opacidad ---------- */
   const secOp = section("OPACIDAD");
   const opRow = el("div", "dw-row");
@@ -173,7 +235,7 @@ export function createStylePanel(host, opts = {}) {
   pageRow.append(pw, el("span", "dw-unit", "×"), ph, el("span", "dw-unit", "mm"));
   secPage.appendChild(pageRow);
 
-  host.append(secFill, secStroke, secOp, secOrder, secPage);
+  host.append(secFill, secStroke, secText, secOp, secOrder, secPage);
 
   function apply(attrs) {
     if (!canWrite()) return;
@@ -205,9 +267,43 @@ export function createStylePanel(host, opts = {}) {
     opInput.value = String(isFinite(pct) ? pct : 100);
     opLabel.textContent = op == null ? "varios" : `${isFinite(pct) ? pct : 100}%`;
 
+    refreshText(sel, ro);
+
     const page = getPage();
     if (document.activeElement !== pw) pw.value = String(Math.round(page.w * 10) / 10 || "");
     if (document.activeElement !== ph) ph.value = String(Math.round(page.h * 10) / 10 || "");
+  }
+
+  function refreshText(sel, ro) {
+    const textos = sel.filter(isText);
+    // con la herramienta de texto en la mano el panel también sirve:
+    // ahí enseña lo que se va a usar al escribir el siguiente
+    const mostrar = textos.length > 0 || isTextTool();
+    secText.style.display = mostrar ? "" : "none";
+    if (!mostrar) return;
+
+    const ts = getTextStyle();
+    const val = (name, porDefecto) =>
+      (textos.length ? commonAttr(textos, name, porDefecto)
+        : (ts[name] == null ? porDefecto : String(ts[name])));
+
+    const fam = val("font-family", DEFAULT_FONT);
+    fontSel.value = fam == null ? "" : String(fam);
+    if (!fontSel.value) fontSel.selectedIndex = -1;      // «varios»: ninguna marcada
+
+    const size = val("font-size", String(DEFAULT_SIZE));
+    sizeInput.value = size == null ? "" : String(parseFloat(size) || DEFAULT_SIZE);
+    sizeInput.placeholder = size == null ? "varios" : "";
+
+    const peso = val("font-weight", "normal");
+    const estilo = val("font-style", "normal");
+    const anclaje = val("text-anchor", "start");
+    boldBtn.classList.toggle("dw-btn-on", peso === "bold" || peso === "700");
+    italBtn.classList.toggle("dw-btn-on", estilo === "italic" || estilo === "oblique");
+    for (const b of alignBtns) b.classList.toggle("dw-btn-on", b.dataset.anchor === anclaje);
+
+    for (const n of [fontSel, sizeInput]) n.disabled = ro;
+    for (const b of [boldBtn, italBtn, ...alignBtns]) b.disabled = ro;
   }
 
   /* Un <input type=color> solo entiende #rrggbb: «none» y los colores
