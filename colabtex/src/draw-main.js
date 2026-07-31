@@ -25,7 +25,8 @@ import { createStylePanel } from "./draw/style.js";
 import { createObjectPanel } from "./draw/layers.js";
 import { createTextEditor } from "./draw/text.js";
 import { createAssetPreview, extOf } from "./draw/preview.js";
-import { exportAll, download, outputName } from "./draw/export.js";
+import { exportAll, download, outputName, exportSvg } from "./draw/export.js";
+import { downloadProjectZip } from "./zip-export.js";
 
 const $ = id => document.getElementById(id);
 
@@ -567,6 +568,36 @@ async function refreshAssets() {
   renderFileList();
 }
 
+/* ---------- todo el proyecto en un .zip ----------
+   Los dibujos se serializan en el momento (el .svg de verdad no existe
+   hasta que se pide) y lo generado se baja de Storage uno a uno. */
+async function zipProject() {
+  if (!state.store) return;
+  const btn = $("btnZipProject");
+  btn.disabled = true;
+  try {
+    const r = await downloadProjectZip(state.project.title, async () => {
+      const entries = [];
+      for (const path of state.store.list()) {
+        const d = new Drawing(state.ydoc, state.store.get(path), { readOnly: true });
+        try { entries.push({ path, bytes: exportSvg(d) }); } catch (e) {}
+        d.destroy();
+      }
+      for (const a of state.assets) {
+        try { entries.push({ path: "generados/" + a.name, bytes: await fb.fetchAssetBytes(state.project.id, a) }); }
+        catch (e) { console.warn("ColabDraw: no se pudo empaquetar " + a.name, e); }
+      }
+      return entries;
+    }, { onStep: m => { $("statusMsg").textContent = m; } });
+    $("statusMsg").textContent = `${r.count} archivos en el .zip.`;
+  } catch (e) {
+    $("statusMsg").textContent = "";
+    alert("No se pudo crear el .zip: " + (e.message || e));
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 /* ---------- exportar ---------- */
 function openExportModal() {
   if (!state.drawing) { alert("Abre un dibujo primero."); return; }
@@ -693,6 +724,7 @@ function wireEvents() {
   $("btnRedo").onclick = () => { if (state.drawing) { state.drawing.redo(); state.tools.redrawOverlay(); paintUndoButtons(); } };
 
   $("btnNewDrawing").onclick = newDrawing;
+  $("btnZipProject").onclick = zipProject;
   $("btnLayerAdd").onclick = () => state.layers.add();
   $("btnLayerDel").onclick = () => state.layers.removeActive();
   $("btnLayerUp").onclick = () => state.layers.move("up");

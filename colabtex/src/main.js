@@ -25,6 +25,7 @@ import { PdfViewer } from "./pdfview.js";
 import { createAssistant } from "./ai-assistant.js";
 import { createComments } from "./comments.js";
 import { readZip, foldersOf, titleFromZip, TEXT_EXT } from "./zip-import.js";
+import { downloadProjectZip } from "./zip-export.js";
 import { initLayout } from "./layout.js";
 import * as lfs from "./local-fs.js";
 import { SyncTex } from "./synctex.js";
@@ -1002,6 +1003,35 @@ async function assetBytes(a) {
   }
   state.assetCache.set(cacheKey, bytes);
   return bytes;
+}
+
+/* Todo el proyecto en un .zip: los .tex tal cual están en el documento
+   —incluido lo que no se haya llegado a compilar— y los binarios. Vale
+   como copia de seguridad y como forma de llevárselo a Overleaf, que
+   importa justo este formato. */
+async function zipProject() {
+  const btn = $("btnZipProject");
+  btn.disabled = true;
+  try {
+    const titulo = state.mode === "local"
+      ? (state.dirHandle && state.dirHandle.name) || "proyecto"
+      : (state.project && state.project.title) || "proyecto";
+    const r = await downloadProjectZip(titulo, async () => {
+      const entries = [];
+      for (const name of texFileNames()) entries.push({ path: name, bytes: fileText(name) || "" });
+      for (const a of state.assets) {
+        try { entries.push({ path: a.name, bytes: await assetBytes(a) }); }
+        catch (e) { console.warn("ColabTeX: no se pudo empaquetar " + a.name, e); }
+      }
+      return entries;
+    }, { onStep: m => { if (m) setStatus(m, "#e2c08d"); } });
+    setStatus(`${r.count} archivos en el .zip`, "#7ee0c2");
+  } catch (e) {
+    setStatus("No se pudo crear el .zip", "#e57373");
+    alert("No se pudo crear el .zip: " + (e.message || e));
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 /* clic en una imagen o un PDF del árbol → verlo sin salir del editor */
@@ -2239,6 +2269,7 @@ function wireEvents() {
   $("btnNewFolder").onclick = () => newFolderIn("");
   $("btnUploadFile").onclick = () => { state.uploadPrefix = ""; $("fileUploadInput").click(); };
   $("btnImportZip").onclick = () => $("zipUploadInput").click();
+  $("btnZipProject").onclick = zipProject;
   $("zipUploadInput").onchange = async e => {
     const f = e.target.files[0];
     e.target.value = "";

@@ -389,6 +389,85 @@ function serializeNode(node, indent, out) {
   out.push(`${pad}</${tag}>`);
 }
 
+/* ---------- portapapeles ----------
+   Copiar guarda TEXTO, no nodos de Yjs. Un clon sin integrar no se deja
+   leer, así que un portapapeles de nodos solo serviría para pegar una
+   vez; en texto se pega las veces que haga falta, en otro dibujo, en
+   otra pestaña y hasta en Inkscape. */
+export function nodesToText(nodes) {
+  const out = [];
+  for (const n of nodes || []) serializeNode(n, 0, out);
+  return out.join("\n");
+}
+
+/* Devuelve el marcado dentro de un <svg> con el tamaño del dibujo, que es
+   lo que esperan los programas de fuera al pegar. */
+export function clipboardSvg(nodes, { w = 0, h = 0 } = {}) {
+  const medida = w > 0 && h > 0
+    ? ` width="${fmt(w)}mm" height="${fmt(h)}mm" viewBox="0 0 ${fmt(w)} ${fmt(h)}"`
+    : "";
+  return `<svg xmlns="http://www.w3.org/2000/svg"${medida}>\n${nodesToText(nodes)}\n</svg>\n`;
+}
+
+const esBlanco = s => !String(s || "").trim();
+
+/* Texto pegado → nodos de Yjs listos para insertar, SANEADOS igual que
+   una importación: lo que llega del portapapeles es tan ajeno como un
+   archivo. Con `freshIds` se renuevan los identificadores, porque dos
+   figuras con el mismo id romperían la selección. */
+export function textToNodes(text, { freshIds = true } = {}) {
+  if (esBlanco(text)) return [];
+  const bruto = String(text).trim();
+  const envuelto = /^<svg[\s>]/i.test(bruto)
+    ? bruto
+    : `<svg xmlns="http://www.w3.org/2000/svg">${bruto}</svg>`;
+  const doc = new DOMParser().parseFromString(envuelto, "image/svg+xml");
+  if (doc.getElementsByTagName("parsererror").length) return [];
+  const root = doc.documentElement;
+  if (!root || root.nodeName.toLowerCase() !== "svg") return [];
+
+  /* Los id se cambian en el DOM, ANTES de convertir: un elemento de Yjs
+     recién creado todavía no devuelve sus atributos al leerlos. */
+  if (freshIds) {
+    const mapa = new Map();
+    for (const n of root.querySelectorAll("[id]")) {
+      const viejo = n.getAttribute("id");
+      const nuevo = newId();
+      mapa.set(viejo, nuevo);
+      n.setAttribute("id", nuevo);
+    }
+    // referencias internas (url(#x), href="#x") apuntando a lo copiado
+    for (const n of root.querySelectorAll("*")) {
+      for (const at of Array.from(n.attributes)) {
+        const v = at.value;
+        if (!v || v.indexOf("#") < 0) continue;
+        const sust = v.replace(/#([\w:.-]+)/g, (m, id) => (mapa.has(id) ? "#" + mapa.get(id) : m));
+        if (sust !== v) n.setAttribute(at.name, sust);
+      }
+    }
+  }
+
+  /* Junto a los nodos va una ficha de cada uno leída del DOM. Sin ella no
+     habría forma de saber si lo pegado es una capa ni cuál era su
+     transform: un elemento de Yjs sin integrar no devuelve nada. */
+  const nodes = [], info = [];
+  for (const child of Array.from(root.childNodes)) {
+    if (child.nodeType !== 1) continue;
+    if (child.nodeName.toLowerCase() === "defs") continue;
+    const y = domToY(child);
+    if (!(y instanceof Y.XmlElement)) continue;
+    const capa = layerInfo(child);
+    nodes.push(y);
+    info.push({
+      tag: child.nodeName,
+      layer: !!(capa && capa.esCapa),
+      label: (capa && capa.name) || child.getAttribute("data-label") || "",
+      transform: child.getAttribute("transform") || ""
+    });
+  }
+  return { nodes, info };
+}
+
 /* Texto .svg completo de un dibujo. `root` es el <svg> Y.XmlElement.
 
    Los atributos de la etiqueta de apertura se juntan en un objeto

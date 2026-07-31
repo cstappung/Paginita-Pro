@@ -20,7 +20,7 @@
    SIEMPRE a la capa activa.
    ============================================================ */
 import { matMul, matInvert, matToString, parseTransform } from "./geom.js";
-import { elChildren, indexOf } from "./doc.js";
+import { elChildren, indexOf, childrenOf } from "./doc.js";
 
 const el = (tag, cls, html) => {
   const n = document.createElement(tag);
@@ -77,6 +77,7 @@ export function createObjectPanel(host, ctx) {
 
   const abiertos = new Set();   // ramas desplegadas
   let sembrado = false;         // ¿ya se abrieron las capas de este dibujo?
+  let arrastrado = null;        // nodo que se está arrastrando por el árbol
 
   function drawingOrNull() {
     const d = getDrawing();
@@ -176,9 +177,100 @@ export function createObjectPanel(host, ctx) {
       setSelection(ev.shiftKey && !actual.includes(node) ? actual.concat([node]) : [node]);
       render();
     };
+    if (rw) arrastrable(row, node, esCapa, estado);
     list.appendChild(row);
 
     if (abierto) for (let i = hijos.length - 1; i >= 0; i--) fila(hijos[i], nivel + 1, estado);
+  }
+
+  /* ---------- arrastrar dentro del árbol ----------
+     Tres zonas por fila, como en cualquier explorador: el borde de
+     arriba y el de abajo colocan al lado, y el centro mete DENTRO del
+     grupo. Ojo con el orden: la lista va al revés que el documento
+     (arriba se pinta encima), así que soltar «encima de» es insertar
+     DESPUÉS en el documento. */
+  function zonaDe(ev, row, destinoAdmiteDentro) {
+    const r = row.getBoundingClientRect();
+    const f = (ev.clientY - r.top) / (r.height || 1);
+    if (!destinoAdmiteDentro) return f < 0.5 ? "antes" : "despues";
+    if (f < 0.3) return "antes";
+    if (f > 0.7) return "despues";
+    return "dentro";
+  }
+
+  /* Una capa solo vive colgando del <svg>; una figura, solo dentro de una
+     capa o de un grupo. Mezclarlo daría un SVG que no sabríamos pintar. */
+  function admite(d, node, parent) {
+    if (!parent || d.contains(node, parent)) return false;
+    const raiz = d.root();
+    const esCapaOrigen = node.getAttribute("data-layer") != null;
+    if (esCapaOrigen) return parent === raiz;
+    if (parent === raiz) return false;
+    return parent.nodeName === "g" || parent.nodeName === "svg";
+  }
+
+  function arrastrable(row, node, esCapa, estado) {
+    const { d } = estado;
+    row.draggable = true;
+
+    row.addEventListener("dragstart", ev => {
+      arrastrado = node;
+      ev.dataTransfer.effectAllowed = "move";
+      // algún navegador no arranca el arrastre sin datos
+      try { ev.dataTransfer.setData("text/plain", d.labelOf(node)); } catch (e) {}
+      row.classList.add("layer-dragging");
+    });
+    row.addEventListener("dragend", () => {
+      arrastrado = null;
+      list.querySelectorAll(".layer-row").forEach(r =>
+        r.classList.remove("layer-dragging", "drop-antes", "drop-despues", "drop-dentro"));
+    });
+
+    row.addEventListener("dragover", ev => {
+      if (!arrastrado || arrastrado === node) return;
+      const contenedor = esCapa || node.nodeName === "g";
+      const zona = zonaDe(ev, row, contenedor);
+      const parent = zona === "dentro" ? node : node.parent;
+      if (!admite(d, arrastrado, parent)) return;
+      ev.preventDefault();
+      ev.dataTransfer.dropEffect = "move";
+      row.classList.remove("drop-antes", "drop-despues", "drop-dentro");
+      row.classList.add("drop-" + zona);
+    });
+    row.addEventListener("dragleave", () => {
+      row.classList.remove("drop-antes", "drop-despues", "drop-dentro");
+    });
+
+    row.addEventListener("drop", ev => {
+      ev.preventDefault();
+      row.classList.remove("drop-antes", "drop-despues", "drop-dentro");
+      const movido = arrastrado;
+      arrastrado = null;
+      if (!movido || movido === node) return;
+      const contenedor = esCapa || node.nodeName === "g";
+      const zona = zonaDe(ev, row, contenedor);
+      const parent = zona === "dentro" ? node : node.parent;
+      if (!admite(d, movido, parent)) return;
+
+      let indice;
+      if (zona === "dentro") indice = childrenOf(node).length;      // encima de todo
+      else {
+        const at = indexOf(parent, node);
+        indice = zona === "antes" ? at + 1 : at;                    // lista al revés
+      }
+
+      /* Cambiar de padre cambia el sistema de coordenadas: se recompone
+         el transform o la figura saltaría de sitio. */
+      const t = parent === movido.parent ? undefined : relocateTransform(getCanvas(), movido, parent);
+      const copia = d.reparent(movido, parent, indice, t);
+      if (!copia) { onStatus("Ahí no se puede soltar."); return; }
+      const eraCapa = copia.getAttribute("data-layer") != null;
+      if (eraCapa) setActiveId(copia.getAttribute("id"));
+      abiertos.add(claveDe(parent));
+      // una capa no se «selecciona» como figura: solo pasa a ser la activa
+      onChange(eraCapa ? [] : [copia.getAttribute("id")].filter(Boolean));
+      onStatus(`«${d.labelOf(copia)}» movido.`);
+    });
   }
 
   /* ---------- botones de la cabecera ---------- */

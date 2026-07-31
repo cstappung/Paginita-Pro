@@ -17,6 +17,7 @@ import {
 } from "./geom.js";
 import { SVG_NS, newId } from "./doc.js";
 import { addText, isText, TEXT_ATTRS, DEFAULT_FONT, DEFAULT_SIZE } from "./text.js";
+import { clipboardSvg, textToNodes } from "./svgio.js";
 
 const svgEl = tag => document.createElementNS(SVG_NS, tag);
 
@@ -61,6 +62,7 @@ export class Tools {
     this.drag = null;
     this._spaceDown = false;
     this._lastClick = null;   // para detectar el doble clic sin depender del DOM
+    this.clip = null;         // portapapeles propio, por si el del sistema falla
 
     this._onDown = e => this._pointerDown(e);
     this._onMove = e => this._pointerMove(e);
@@ -69,6 +71,9 @@ export class Tools {
     this._onKey = e => this._keyDown(e);
     this._onKeyUp = e => { if (e.code === "Space") this._spaceDown = false; };
     this._onCtx = e => e.preventDefault();
+    this._onCopy = e => this._clipWrite(e, false);
+    this._onCut = e => this._clipWrite(e, true);
+    this._onPaste = e => this._clipRead(e);
 
     const v = canvas.view;
     v.addEventListener("pointerdown", this._onDown);
@@ -79,6 +84,14 @@ export class Tools {
     v.addEventListener("contextmenu", this._onCtx);
     document.addEventListener("keydown", this._onKey);
     document.addEventListener("keyup", this._onKeyUp);
+    /* Copiar y pegar se enganchan a los eventos del documento, no a
+       Ctrl+C/Ctrl+V en el teclado. Así llega el portapapeles DE VERDAD
+       sin pedir permisos (leerlo a mano exige autorización), y funciona
+       con el menú del botón derecho, con Cmd en un Mac y entre pestañas
+       o programas. */
+    document.addEventListener("copy", this._onCopy);
+    document.addEventListener("cut", this._onCut);
+    document.addEventListener("paste", this._onPaste);
   }
 
   destroy() {
@@ -91,6 +104,102 @@ export class Tools {
     v.removeEventListener("contextmenu", this._onCtx);
     document.removeEventListener("keydown", this._onKey);
     document.removeEventListener("keyup", this._onKeyUp);
+    document.removeEventListener("copy", this._onCopy);
+    document.removeEventListener("cut", this._onCut);
+    document.removeEventListener("paste", this._onPaste);
+  }
+
+  /* ---------- portapapeles ----------
+     Se guarda TEXTO, no nodos: un clon de Yjs sin integrar no se puede
+     leer, así que un portapapeles de nodos solo valdría para pegar una
+     vez. En texto se pega las veces que haga falta, en otro dibujo y en
+     otra pestaña. */
+
+  _enTexto(e) {
+    const t = e.target;
+    if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return true;
+    /* Si hay texto de la página marcado con el ratón, copiar es copiar
+       ESE texto: quedarnos el atajo se llevaría por delante algo tan
+       normal como copiar el enlace para compartir. */
+    const sel = window.getSelection && window.getSelection();
+    return !!(sel && !sel.isCollapsed && String(sel).trim());
+  }
+
+  _clipWrite(e, cortar) {
+    if (this._enTexto(e)) return;
+    const d = this.getDrawing();
+    if (!d) return;
+
+    /* Sin nada elegido se copia la CAPA ACTIVA entera, que es la otra
+       forma de copiar que se espera aquí. */
+    let nodos = this.sel.filter(n => n && n.parent);
+    const capa = !nodos.length ? this.getLayer() : null;
+    if (capa) nodos = [capa];
+    if (!nodos.length) return;
+
+    const { w, h } = d.size();
+    const texto = clipboardSvg(nodos, { w, h });
+    this.clip = texto;
+    if (e.clipboardData) {
+      e.clipboardData.setData("text/plain", texto);
+      e.clipboardData.setData("image/svg+xml", texto);
+      e.preventDefault();
+    }
+
+    if (cortar && this.canWrite()) {
+      if (capa) {
+        if (!d.removeLayer(capa)) { this.onStatus("Un dibujo no puede quedarse sin capas."); return; }
+      } else {
+        d.remove(nodos);
+      }
+      this.clear();
+    }
+    this.onStatus(capa
+      ? `Capa «${d.labelOf(capa)}» ${cortar ? "cortada" : "copiada"}.`
+      : `${nodos.length} objeto${nodos.length === 1 ? "" : "s"} ${cortar ? "cortado" : "copiado"}${nodos.length === 1 ? "" : "s"}.`);
+  }
+
+  _clipRead(e) {
+    if (this._enTexto(e) || !this.canWrite()) return;
+    const dt = e.clipboardData;
+    let texto = dt ? (dt.getData("image/svg+xml") || dt.getData("text/plain")) : "";
+    // lo de fuera solo sirve si de verdad es marcado SVG
+    if (!/<\s*(svg|g|path|rect|circle|ellipse|line|polyline|polygon|text|image|use)[\s>/]/i.test(texto))
+      texto = this.clip || "";
+    if (!texto) return;
+    e.preventDefault();
+    this.paste(texto);
+  }
+
+  /* Pega marcado SVG. Una capa entera se pega COMO capa; lo demás va a la
+     capa activa, un poco desplazado para que se vea que hay dos. */
+  paste(texto, { dx = 2, dy = 2 } = {}) {
+    const d = this.getDrawing();
+    if (!d || !this.canWrite()) return [];
+    let nodes, info;
+    try { ({ nodes, info } = textToNodes(texto)); }
+    catch (err) { this.onStatus("Eso no se puede pegar aquí."); return []; }
+    if (!nodes.length) { this.onStatus("No había nada que pegar."); return []; }
+
+    if (info.every(i => i.layer)) {
+      const puestas = d.pasteLayers(nodes, info.map(i => i.label));
+      this.clear();
+      this.onStatus(`${puestas.length} capa${puestas.length === 1 ? "" : "s"} pegada${puestas.length === 1 ? "" : "s"}.`);
+      return puestas;
+    }
+
+    /* El desplazamiento se compone con el transform que ya traía, leído
+       de la ficha: preguntárselo al nodo sin integrar no devuelve nada y
+       se perdería su giro o su escala. */
+    nodes.forEach((n, i) => {
+      const previo = info[i].transform;
+      const t = `translate(${fmt(dx)},${fmt(dy)}) ${previo}`.trim();
+      if (dx || dy || previo) n.setAttribute("transform", t);
+    });
+    const puestos = d.insertNodes(this.getLayer(), nodes);
+    this.select(puestos);
+    this.onStatus(`${puestos.length} objeto${puestos.length === 1 ? "" : "s"} pegado${puestos.length === 1 ? "" : "s"}.`);
+    return puestos;
   }
 
   /* ---------- selección ---------- */

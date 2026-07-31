@@ -119,6 +119,12 @@
   .layer-exp:disabled{opacity:0}
   .layer-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;font-family:'IBM Plex Mono',monospace;font-size:11px}
   .layer-name-capa{font-family:inherit;font-size:12px}
+  .layer-row[draggable=true]{cursor:grab}
+  .layer-dragging{opacity:.45}
+  /* dónde va a caer: una línea arriba o abajo, o el grupo entero marcado */
+  .drop-antes{box-shadow:inset 0 2px 0 #6c4bb6}
+  .drop-despues{box-shadow:inset 0 -2px 0 #6c4bb6}
+  .drop-dentro{background:#ddd0f7;box-shadow:inset 0 0 0 1px #6c4bb6}
   .aside-note{font-size:11px;color:#8a97a3;line-height:1.5;padding:8px 10px;border-top:1px solid #eef1f4}
 
   /* --- vista de un archivo generado --- */
@@ -126,8 +132,13 @@
   .asset-bar{display:flex;align-items:center;gap:10px;padding:7px 12px;background:#fff;border-bottom:1px solid #e2e8ec}
   .asset-name{flex:1;min-width:0;font-size:12.5px;font-weight:600;color:#42505c;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .asset-bar .btn-secondary{padding:0 12px}
-  .asset-body{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:18px;overflow:auto}
-  .asset-img{max-width:100%;max-height:100%;object-fit:contain;background:#fff;box-shadow:0 2px 14px #0002}
+  .asset-zoom{display:flex;align-items:center;gap:2px;flex-shrink:0}
+  .asset-pct{border:none;background:transparent;color:#5a6772;font-size:11.5px;font-family:'IBM Plex Mono',monospace;cursor:pointer;min-width:46px;padding:2px 4px;border-radius:4px}
+  .asset-pct:hover{background:#eef0f4;color:#42505c}
+  /* El zoom se hace con transform, asi que la caja NO desplaza: se
+     arrastra la imagen con el raton, como en el lienzo. */
+  .asset-body{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:18px;overflow:hidden;touch-action:none}
+  .asset-img{background:#fff;box-shadow:0 2px 14px #0002;transform-origin:0 0;user-select:none;flex-shrink:0}
   .asset-frame{width:100%;height:100%;border:none;background:#fff}
   .asset-card{background:#fff;border:1px solid #e2e8ec;border-radius:9px;padding:22px 26px;text-align:center;font-size:13px;color:#42505c}
   .asset-hint{margin-top:6px;font-size:11.5px;color:#8a97a3}
@@ -302,6 +313,7 @@
       <aside class="ed-aside">
         <div class="aside-head">
           <span>ARCHIVOS</span>
+          <button id="btnZipProject" class="icon-btn" title="Descargar todo el proyecto en un .zip">📦</button>
           <button id="btnImportSvg" class="icon-btn" title="Importar un .svg como dibujo nuevo">📐</button>
           <button id="btnNewDrawing" class="icon-btn" title="Nuevo dibujo">＋</button>
         </div>
@@ -382,6 +394,6 @@
   </div>
 </div>
 
-<script src="colabdraw-app.js?v=202607311708"></script>
+<script src="colabdraw-app.js?v=202607311757"></script>
 </body>
 </html>

@@ -330,6 +330,80 @@ export class Drawing {
     });
   }
 
+  /* ¿`node` está dentro de `ancestro` (o es él)? Hace falta antes de
+     mover nada: meter un grupo dentro de sí mismo rompe el árbol. */
+  contains(ancestro, node) {
+    for (let n = node; n; n = n.parent) if (n === ancestro) return true;
+    return false;
+  }
+
+  /* Nombre de capa que no choque con otro. */
+  freeLayerName(base) {
+    const usados = new Set(this.layers().map(l => l.getAttribute("data-layer")));
+    const raiz = String(base || "Capa").replace(/ \(copia( \d+)?\)$/, "");
+    if (!usados.has(raiz)) return raiz;
+    let n = 2, nombre = `${raiz} (copia)`;
+    while (usados.has(nombre)) nombre = `${raiz} (copia ${n++})`;
+    return nombre;
+  }
+
+  /* ---------- insertar y mover ---------- */
+
+  /* Mete nodos recién construidos (los de svgio.textToNodes) en una capa
+     o grupo. Devuelve los ya integrados, que son los que sirven para
+     seleccionar. */
+  insertNodes(parent, nodes, index = null) {
+    const host = parent || this.activeLayer();
+    if (!host || !nodes || !nodes.length) return [];
+    return this.edit(() => {
+      const n = childrenOf(host).length;
+      const at = index == null ? n : Math.max(0, Math.min(index, n));
+      host.insert(at, nodes);
+      return childrenOf(host).slice(at, at + nodes.length);
+    });
+  }
+
+  /* Pega capas enteras al final del <svg>: cada una con nombre libre e id
+     nuevo. Los nombres llegan de fuera porque un elemento sin integrar
+     todavía no devuelve sus atributos. */
+  pasteLayers(nodes, names = []) {
+    const svg = this.root();
+    if (!svg || !nodes || !nodes.length) return [];
+    return this.edit(() => {
+      nodes.forEach((n, i) => {
+        n.setAttribute("data-layer", this.freeLayerName(names[i]));
+        n.setAttribute("id", newId("capa"));
+      });
+      const at = childrenOf(svg).length;
+      svg.insert(at, nodes);
+      return childrenOf(svg).slice(at);
+    });
+  }
+
+  /* Cambia un nodo de padre y/o de posición conservando dónde se ve.
+     Clona y borra, como todo lo que «mueve» en Yjs; `transform` llega ya
+     recalculado por quien conoce las matrices del lienzo. */
+  reparent(node, parent, index, transform) {
+    if (!node || !parent || this.contains(node, parent)) return null;
+    const from = node.parent;
+    if (!from) return null;
+    return this.edit(() => {
+      const at = indexOf(from, node);
+      if (at < 0) return null;
+      const copy = cloneEl(node);
+      if (transform !== undefined) {
+        if (transform) copy.setAttribute("transform", transform);
+        else copy.removeAttribute("transform");
+      }
+      let target = Math.max(0, Math.min(index, childrenOf(parent).length));
+      from.delete(at, 1);
+      // al quitarlo, todo lo que venía detrás en ESE padre se corre uno
+      if (from === parent && at < target) target--;
+      parent.insert(Math.max(0, Math.min(target, childrenOf(parent).length)), [copy]);
+      return copy;
+    });
+  }
+
   /* ---------- tamaño de la página ---------- */
 
   size() {
