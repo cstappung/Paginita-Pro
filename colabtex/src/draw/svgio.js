@@ -120,6 +120,12 @@ function domToY(node) {
     el.setAttribute(at.name, at.value);
   }
 
+  /* El nombre que se ve en el panel de objetos de Inkscape vive en
+     inkscape:label. Se traduce a data-label antes de que el atributo
+     original se pierda, porque el árbol de objetos lo enseña. */
+  const etiqueta = node.getAttributeNS && node.getAttributeNS(INK_NS, "label");
+  if (etiqueta && !node.getAttribute("data-label")) el.setAttribute("data-label", etiqueta);
+
   if (lower === "style") {
     const css = sanitizeCss(node.textContent);
     if (css.trim()) {

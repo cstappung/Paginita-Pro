@@ -227,15 +227,28 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
   browser-dependent and knows nothing about selections or dead keys. The
   document is written **on close**, same rule as the drag. A text left empty is
   deleted — it would be invisible and unclickable.
-- `layers.js` — the layers panel. A layer is a `<g data-layer>` child of the
-  `<svg>`; the panel lists them **top-down as they look**, i.e. reversed
-  relative to the document, where the last one paints on top. Whatever you draw
-  goes to the active layer. Hiding uses the `display` attribute, so a hidden
-  layer is also hidden in the exported SVG, like Inkscape; locking
-  (`data-locked`) blocks selecting its shapes. Reordering layers and moving
-  shapes between them **clone and delete** (an integrated Yjs type cannot be
-  re-inserted), and moving across layers recomposes the transform
-  (`relocateTransform`) so the shape doesn't shift.
+- `layers.js` — the object tree, i.e. Inkscape's *Objetos* panel, plus the
+  layer operations. It shows the **whole tree**, not just the layers: an
+  imported file (a matplotlib figure, say) has no Inkscape layers, so a
+  layer-only list showed it as a single row with no way to reach anything
+  inside it. Only expanded branches are rendered — those files carry thousands
+  of nodes and painting them all on every change would freeze the panel and the
+  canvas with it. Each level lists **top-down as it looks**, reversed relative
+  to the document where the last child paints on top. Selection is shared with
+  the canvas both ways, and picking something on the canvas expands the branch
+  it lives in. The eye (`display`) and the padlock (`data-locked`) work on any
+  node, not only layers, and the padlock is inherited (`lockedAncestor`), so
+  locking a group locks its contents. Names come from `data-label` (Inkscape's
+  `inkscape:label`, kept on import), then `data-layer`, then the `id`.
+  Layers keep their one privilege: whatever you draw goes to the active layer.
+  Reordering layers and moving shapes between them **clone and delete** (an
+  integrated Yjs type cannot be re-inserted), and moving across layers
+  recomposes the transform (`relocateTransform`) so the shape doesn't shift.
+- `preview.js` — looking at an exported PNG/PDF in the canvas's place, with a
+  download **button**; clicking a generated file used to download it blind. The
+  canvas is covered, never destroyed (same reason as ColabTeX's asset preview).
+  PDFs go in an `<iframe>` with the browser's own viewer — pulling pdf.js in
+  would add more than a megabyte to show a one-page figure.
 - `style.js` — the fill/stroke/text/opacity/order/page panel, built in JS. Shows
   "varios" when the selection disagrees rather than the first value, so touching
   a control can't silently overwrite the rest. The TEXTO section only appears
@@ -245,7 +258,9 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
   safe match (Helvetica, Times, Courier).
 - `export.js` — SVG and PNG (rasterised through a data: URL so the canvas is
   never tainted). Exports are saved as **ordinary project assets** via
-  `fb.uploadAsset`, which is the hook the planned ColabTeX link will use.
+  `fb.uploadAsset`, which is the hook the planned ColabTeX link will use. They
+  are listed in the *same* sidebar list as the drawings — a generated PNG is a
+  project file just like the `.svg` it came from — and open in `preview.js`.
 
 ## Deployment & Firebase
 

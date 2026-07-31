@@ -235,6 +235,36 @@ export class Drawing {
     return !!layer && layer.getAttribute("data-locked") === "1";
   }
 
+  /* El candado se hereda: bloquear un grupo bloquea lo que lleva dentro,
+     como en Inkscape. Devuelve el nodo que lo impone, para poder decir
+     cuál es. */
+  lockedAncestor(el) {
+    let n = el;
+    while (n && typeof n.getAttribute === "function") {
+      if (n.getAttribute("data-locked") === "1") return n;
+      n = n.parent;
+    }
+    return null;
+  }
+
+  /* Nombre visible de un elemento en el árbol de objetos. `data-label` es
+     donde se guarda el de Inkscape (inkscape:label) al importar; si no
+     hay, el id, que es como los nombra también Inkscape. */
+  labelOf(el) {
+    if (!el || !el.getAttribute) return "";
+    return el.getAttribute("data-label") || el.getAttribute("data-layer") ||
+      el.getAttribute("id") || el.nodeName || "";
+  }
+
+  setLabel(el, name) {
+    const n = String(name || "").trim();
+    if (!el || !n) return;
+    this.edit(() => {
+      if (el.getAttribute("data-layer") != null) el.setAttribute("data-layer", n);
+      else el.setAttribute("data-label", n);
+    });
+  }
+
   setLayerLocked(layer, on) {
     if (!layer) return;
     this.edit(() => {

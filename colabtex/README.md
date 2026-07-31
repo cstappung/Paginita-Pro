@@ -90,13 +90,25 @@ borrar son el mismo código y **las reglas de seguridad no cambian**.
 - **Durante un arrastre no se escribe en la nube**, solo en el DOM espejo; al
   soltar se escribe una vez. Un `mousemove` dispara 60 veces por segundo y cada
   escritura sería un envío a Realtime Database.
-- **Capas** (`draw/layers.js`): el panel las lista de arriba abajo tal y como
-  se ven. Lo que se dibuja va siempre a la capa activa. El ojo la oculta con el
-  atributo `display`, así que también sale oculta en el SVG exportado (como en
-  Inkscape), y el candado impide seleccionar sus figuras. Reordenar capas o
-  mover figuras entre ellas clona y borra, porque un tipo de Yjs ya integrado
-  no se puede reinsertar; al cambiar de capa se recompone el transform para que
-  la figura no se mueva de sitio.
+- **Árbol de objetos** (`draw/layers.js`): es el panel «Objetos» de Inkscape, no
+  una lista de capas. Enseña el árbol entero, porque un archivo importado no
+  trae capas y con una lista de capas aparecía como una sola fila. Se pintan
+  solo las ramas desplegadas: esos archivos traen miles de nodos. Cada nivel se
+  lista de arriba abajo tal y como se ve. La selección va en los dos sentidos, y
+  lo que se elige en el lienzo abre la rama donde está. El ojo (`display`) y el
+  candado (`data-locked`) valen para cualquier nodo, y el candado se hereda: al
+  bloquear un grupo se bloquea lo que lleva dentro. El nombre sale de
+  `data-label` (el `inkscape:label` que se conserva al importar), `data-layer` o
+  el `id`. Lo que se dibuja va siempre a la capa activa. Reordenar capas o mover
+  figuras entre ellas clona y borra, porque un tipo de Yjs ya integrado no se
+  puede reinsertar; al cambiar de capa se recompone el transform para que la
+  figura no se mueva de sitio.
+- **Lo generado vive con los dibujos** (`draw/preview.js`): un PNG exportado es
+  un archivo del proyecto igual que el `.svg` del que salió, así que va en la
+  misma lista y se abre en el sitio del lienzo, con un botón para descargarlo.
+  Antes se bajaba de golpe al pulsarlo, sin poder mirarlo. El PDF se enseña en
+  un `<iframe>` con el visor del navegador: traer pdf.js sumaría más de un mega
+  para una figura de una página.
 - **Importar respeta las capas del archivo** (`draw/svgio.js`). Inkscape no
   tiene un tipo «capa»: es un `<g inkscape:groupmode="layer">` con el nombre en
   `inkscape:label`, oculto con `style="display:none"` y bloqueado con

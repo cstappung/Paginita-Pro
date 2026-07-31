@@ -22,8 +22,9 @@ import { svgToFragment } from "./draw/svgio.js";
 import { Canvas } from "./draw/canvas.js";
 import { Tools } from "./draw/tools.js";
 import { createStylePanel } from "./draw/style.js";
-import { createLayersPanel } from "./draw/layers.js";
+import { createObjectPanel } from "./draw/layers.js";
 import { createTextEditor } from "./draw/text.js";
+import { createAssetPreview, extOf } from "./draw/preview.js";
 import { exportAll, download, outputName } from "./draw/export.js";
 
 const $ = id => document.getElementById(id);
@@ -44,8 +45,10 @@ const state = {
   canvas: null,
   tools: null,
   style: null,
-  layers: null,        // panel de capas (creado en ensureEditorParts)
+  layers: null,        // árbol de objetos (creado en ensureEditorParts)
   textEd: null,        // editor de texto flotante
+  assetView: null,     // vista de un archivo generado
+  openAsset: null,     // nombre del archivo que se está mirando
   activeLayerId: null, // capa donde va lo que se dibuje
   assets: [],
   membersUnsub: null,
@@ -252,14 +255,14 @@ async function openEditor(projectId, token) {
 
   ensureEditorParts();
   state.drawingsObserver = () => {
-    renderDrawingList();
+    renderFileList();
     // si el dibujo abierto lo borró otra persona, se salta al siguiente
     if (state.path && !state.store.has(state.path)) openDrawing(state.store.list()[0] || null);
   };
   state.store.map.observe(state.drawingsObserver);
 
   provider.once("synced", () => {
-    renderDrawingList();
+    renderFileList();
     openDrawing(state.path || state.store.list()[0] || null);
   });
 
@@ -273,6 +276,8 @@ function teardownEditor() {
     try { state.store.map.unobserve(state.drawingsObserver); } catch (e) {}
   }
   state.drawingsObserver = null;
+  if (state.assetView) state.assetView.hide();
+  state.openAsset = null;
   if (state.canvas) state.canvas.detach();
   if (state.drawing) { state.drawing.destroy(); state.drawing = null; }
   if (state.provider) { state.provider.destroy(); state.provider = null; }
@@ -304,7 +309,12 @@ function ensureEditorParts() {
   state.tools = new Tools(state.canvas, {
     getDrawing: () => state.drawing,
     canWrite,
-    onSelectionChange: () => { if (state.style) state.style.refresh(); },
+    /* El árbol marca lo elegido y despliega la rama donde está, así que
+       también tiene que enterarse de lo que se selecciona en el lienzo. */
+    onSelectionChange: () => {
+      if (state.style) state.style.refresh();
+      if (state.layers) state.layers.render();
+    },
     getLayer: () => (state.drawing ? state.drawing.activeLayer(state.activeLayerId) : null),
     onEditText: el => state.textEd.open(el),
     onStatus: msg => { $("statusMsg").textContent = msg || ""; },
@@ -326,12 +336,17 @@ function ensureEditorParts() {
     onOrder: mode => state.tools.reorder(mode),
     onPage: (w, h) => { if (state.drawing) { state.drawing.setSize(w, h); state.style.refresh(); } }
   });
-  state.layers = createLayersPanel($("layerPanel"), {
+  state.assetView = createAssetPreview($("canvasHost").parentNode, {
+    onClose: () => { state.openAsset = null; renderFileList(); },
+    onDownload: a => download(a.bytes, a.name)
+  });
+  state.layers = createObjectPanel($("layerPanel"), {
     getDrawing: () => state.drawing,
     getActiveId: () => state.activeLayerId,
     setActiveId: id => { state.activeLayerId = id; },
     canWrite,
     getSelection: () => (state.tools ? state.tools.selection() : []),
+    setSelection: els => { if (state.tools) state.tools.select(els); },
     getCanvas: () => state.canvas,
     onStatus: msg => { $("statusMsg").textContent = msg || ""; },
     /* Las operaciones de capa clonan y borran, así que la selección
@@ -367,9 +382,12 @@ function setSync(text, color) {
   b.style.color = color;
 }
 
-/* ---------- lista de dibujos ---------- */
-function renderDrawingList() {
-  const host = $("drawingList");
+/* ---------- lista de archivos del proyecto ----------
+   Los dibujos y lo exportado van en la MISMA lista: un PNG generado es
+   un archivo del proyecto igual que el .svg del que salió, y tenerlo
+   apartado en una esquina obligaba a buscarlo. */
+function renderFileList() {
+  const host = $("fileList");
   host.innerHTML = "";
   if (!state.store) return;
   const readOnly = !canWrite();
@@ -379,9 +397,10 @@ function renderDrawingList() {
   }
   for (const path of list) {
     const div = document.createElement("div");
-    div.className = "dw-item" + (path === state.path ? " dw-item-active" : "");
+    div.className = "dw-item" + (path === state.path && !state.openAsset ? " dw-item-active" : "");
     div.title = path;
-    div.innerHTML = `<span class="dw-item-name">${escapeHtml(path)}</span>
+    div.innerHTML = `<span class="dw-ico">✎</span>
+      <span class="dw-item-name">${escapeHtml(path)}</span>
       ${readOnly ? "" : `<button class="file-act" data-act="ren" title="Renombrar">✎</button>
       <button class="file-act" data-act="dup" title="Duplicar">⧉</button>
       <button class="file-act file-del" data-act="del" title="Eliminar">✕</button>`}`;
@@ -396,7 +415,7 @@ function renderDrawingList() {
       if (state.store.has(next)) { alert("Ya existe un dibujo con ese nombre."); return; }
       const wasOpen = state.path === path;
       if (state.store.rename(path, next) && wasOpen) openDrawing(next);
-      renderDrawingList();
+      renderFileList();
     });
     act("dup", () => {
       const name = state.store.duplicate(path);
@@ -406,34 +425,54 @@ function renderDrawingList() {
       if (!confirm(`¿Eliminar el dibujo "${path}"? Esta acción no se puede deshacer.`)) return;
       state.store.delete(path);
       if (state.path === path) openDrawing(state.store.list()[0] || null);
-      renderDrawingList();
+      renderFileList();
     });
     host.appendChild(div);
   }
-  renderAssetList();
-}
 
-function renderAssetList() {
-  const host = $("assetList");
-  if (!host) return;
-  host.innerHTML = "";
-  if (!state.assets.length) {
-    host.innerHTML = '<div style="padding:6px 10px;font-size:11px;color:#8a97a3">Nada exportado todavía.</div>';
-    return;
-  }
+  if (!state.assets.length) return;
+  const sep = document.createElement("div");
+  sep.className = "dw-sep";
+  sep.textContent = "GENERADOS";
+  host.appendChild(sep);
+
   for (const a of state.assets) {
     const div = document.createElement("div");
-    div.className = "dw-item";
-    div.title = `${a.name} — pulsa para descargarlo`;
-    div.innerHTML = `<span class="dw-item-name">${escapeHtml(a.name)}</span>
-      <span style="font-size:10px;color:#8a97a3">${Math.max(1, Math.round((a.size || 0) / 1024))} kB</span>`;
-    div.onclick = async () => {
-      try {
-        const bytes = await fb.fetchAssetBytes(state.project.id, a);
-        download(bytes, a.name);
-      } catch (e) { alert("No se pudo descargar: " + (e.message || e)); }
+    div.className = "dw-item" + (state.openAsset === a.name ? " dw-item-active" : "");
+    div.title = `${a.name} — pulsa para verlo`;
+    div.innerHTML = `<span class="dw-ico">${ICONO[extOf(a.name)] || "📄"}</span>
+      <span class="dw-item-name">${escapeHtml(a.name)}</span>
+      <span class="dw-size">${Math.max(1, Math.round((a.size || 0) / 1024))} kB</span>
+      ${readOnly ? "" : '<button class="file-act file-del" data-act="del" title="Eliminar">✕</button>'}`;
+    div.onclick = () => showAsset(a);
+    const del = div.querySelector('[data-act="del"]');
+    if (del) del.onclick = async e => {
+      e.stopPropagation();
+      if (!confirm(`¿Eliminar "${a.name}" del proyecto?`)) return;
+      try { await fb.deleteAsset(state.project.id, a); } catch (err) { alert("No se pudo eliminar: " + (err.message || err)); }
+      if (state.openAsset === a.name) state.assetView.hide();
+      await refreshAssets();
     };
     host.appendChild(div);
+  }
+}
+
+const ICONO = { png: "🖼", jpg: "🖼", jpeg: "🖼", svg: "◇", pdf: "📕" };
+
+/* Mirar un archivo generado en el sitio del lienzo, en vez de bajarlo a
+   ciegas: la descarga es un botón de la propia vista. */
+async function showAsset(a) {
+  if (!state.project) return;
+  $("statusMsg").textContent = `Abriendo ${a.name}…`;
+  try {
+    const bytes = await fb.fetchAssetBytes(state.project.id, a);
+    state.openAsset = a.name;
+    state.assetView.show({ name: a.name, bytes });
+    renderFileList();
+    $("statusMsg").textContent = "";
+  } catch (e) {
+    $("statusMsg").textContent = "";
+    alert("No se pudo abrir: " + (e.message || e));
   }
 }
 
@@ -446,12 +485,14 @@ const normalizeName = raw => {
 function openDrawing(path) {
   // lo que se estuviera escribiendo se guarda en SU dibujo, no en el otro
   if (state.textEd && state.textEd.isOpen()) state.textEd.close();
+  if (state.assetView) state.assetView.hide();     // vuelve a verse el lienzo
+  if (state.layers) state.layers.reset();          // otro dibujo, otro árbol
   if (state.drawing) { state.drawing.destroy(); state.drawing = null; }
   state.path = path;
   if (!path || !state.store || !state.store.has(path)) {
     state.canvas.detach();
     $("emptyCanvas").style.display = "grid";
-    renderDrawingList();
+    renderFileList();
     paintUndoButtons();
     return;
   }
@@ -468,7 +509,7 @@ function openDrawing(path) {
     clearTimeout(state.layerTimer);
     state.layerTimer = setTimeout(() => state.layers.render(), 80);
   });
-  renderDrawingList();
+  renderFileList();
   state.activeLayerId = null;      // cada dibujo trae sus propias capas
   state.layers.render();
   state.style.refresh();
@@ -523,7 +564,7 @@ async function refreshAssets() {
   if (!state.project) return;
   try { state.assets = await fb.listAssets(state.project.id); }
   catch (e) { state.assets = []; }
-  renderAssetList();
+  renderFileList();
 }
 
 /* ---------- exportar ---------- */
@@ -558,6 +599,14 @@ async function doExport() {
     if (save) await refreshAssets();
     msg.style.color = "#0d9488";
     msg.textContent = `Listo: ${out.map(f => f.name).join(", ")}.`;
+    /* Se enseña lo recién generado sin tener que ir a buscarlo: es lo
+       primero que se quiere ver después de exportar. */
+    if (save && out.length) {
+      $("expModal").classList.remove("open");
+      state.openAsset = out[0].name;
+      state.assetView.show({ name: out[0].name, bytes: out[0].bytes });
+      renderFileList();
+    }
   } catch (e) {
     msg.style.color = "#c0392b";
     msg.textContent = "No se pudo exportar: " + (e.message || e);

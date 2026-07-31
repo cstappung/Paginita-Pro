@@ -349,8 +349,9 @@ export class Tools {
        llegan aquí: `display:none` las saca del sorteo del puntero.) */
     if (hit) {
       const d = this.getDrawing();
-      if (d && d.layerLocked(d.layerOf(hit))) {
-        this.onStatus("Esa capa está bloqueada.");
+      const preso = d && d.lockedAncestor(hit);
+      if (preso) {
+        this.onStatus(`«${d.labelOf(preso)}» está bloqueado.`);
         hit = null;
       }
     }
