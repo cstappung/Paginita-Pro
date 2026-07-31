@@ -26,6 +26,7 @@ import { createAssistant } from "./ai-assistant.js";
 import { createComments } from "./comments.js";
 import { readZip, foldersOf, titleFromZip, TEXT_EXT } from "./zip-import.js";
 import { downloadProjectZip } from "./zip-export.js";
+import { createLinks, linkedAssets, ensureAccess, isLinked, slugTitle, LINK_DIR } from "./draw-link.js";
 import { initLayout } from "./layout.js";
 import * as lfs from "./local-fs.js";
 import { SyncTex } from "./synctex.js";
@@ -112,7 +113,13 @@ const state = {
   uploadPrefix: "",      // carpeta destino de la próxima subida
   activeFile: null,
   editorView: null,
-  assets: [],
+  assets: [],           // propios + los de los proyectos de dibujo vinculados
+  ownAssets: [],        // solo los de ESTE proyecto
+  linked: [],           // solo los vinculados (loc: "link")
+  linkedInfo: [],       // los vínculos a los que de verdad hay acceso
+  links: null,          // Y.Map de vínculos (draw-link.js)
+  linksUnobserve: null,
+  linkWatchers: [],     // para dejar de escuchar los índices vinculados
   assetCache: new Map(), // key+size → bytes (evita re-descargar al compilar)
   preview: null,         // vista previa de imágenes/PDF (creada en boot)
   format: null,          // barra de negrita/cursiva/subrayado/color (creada en boot)
@@ -298,6 +305,8 @@ async function openEditor(projectId, token) {
   $("btnNewFolder").style.display = readOnly ? "none" : "";
   $("btnUploadFile").style.display = readOnly ? "none" : "";
   $("btnImportZip").style.display = readOnly ? "none" : "";
+  // el vínculo con ColabDraw solo tiene sentido en la nube
+  $("btnLinkDraw").style.display = "";
   $("btnReloadLocal").style.display = "none";
   $("btnVsCode").style.display = lfs.isSupported() ? "" : "none";
   $("btnCommentsToggle").style.display = "";   // comentarios: disponible en la nube
@@ -314,6 +323,7 @@ async function openEditor(projectId, token) {
   state.yFiles = ydoc.getMap("files");
   state.yFolders = ydoc.getMap("folders");
   state.yComments = ydoc.getMap("comments");
+  state.links = createLinks(ydoc);
   state.collapsed = new Set();
   state.uploadPrefix = "";
 
@@ -353,7 +363,11 @@ async function openEditor(projectId, token) {
     renderFileTree();
     if (state.activeFile) mountEditor(state.activeFile);
     if (state.comments) state.comments.mount();   // comentarios (solo nube)
+    refreshLinks();                                // figuras de ColabDraw
   });
+  /* Si otra persona vincula o desvincula un proyecto, el árbol de todos
+     tiene que enterarse: el vínculo viaja por el documento. */
+  state.linksUnobserve = state.links.observe(() => refreshLinks());
   state.yFiles.observe(() => renderFileTree());
   state.yFolders.observe(() => renderFileTree());
 
@@ -395,6 +409,12 @@ function teardownEditor() {
   if (state.format) state.format.refresh();   // sin editor no hay nada que dar formato
   if (state.provider) { state.provider.destroy(); state.provider = null; }
   if (state.ydoc) { state.ydoc.destroy(); state.ydoc = null; }
+  if (state.linksUnobserve) { state.linksUnobserve(); state.linksUnobserve = null; }
+  stopLinkWatchers();
+  state.links = null;
+  state.linked = [];
+  state.ownAssets = [];
+  state.linkedInfo = [];
   state.project = null; state.yFiles = null; state.yFolders = null; state.yComments = null; state.activeFile = null;
   state.assets = [];
   state.assetCache.clear();
@@ -527,17 +547,25 @@ function renderFileTree() {
     const base = name.split("/").pop();
     const canInsert = asset && !readOnly && INSERTABLE.includes(fileExt(name));
     const active = asset ? previewing === name : (!previewing && name === state.activeFile);
+    /* Una figura vinculada vive en OTRO proyecto: aquí solo se mira y se
+       inserta. Renombrarla o borrarla desde el .tex tocaría un proyecto
+       que no es este, así que ni se ofrece. */
+    const vinculado = isLinked(asset);
+    const editable = !readOnly && !vinculado;
     const div = document.createElement("div");
-    div.className = "file-entry" + (active ? " file-active" : "");
+    div.className = "file-entry" + (active ? " file-active" : "") + (vinculado ? " file-linked" : "");
     div.style.paddingLeft = (12 + depth * 14) + "px";
-    div.title = (asset ? name + " — pulsa para verlo" : name) + (readOnly ? "" : " · arrástralo para moverlo");
+    div.title = vinculado
+      ? `${name} — figura de «${asset.linkTitle}» en ColabDraw`
+      : (asset ? name + " — pulsa para verlo" : name) + (readOnly ? "" : " · arrástralo para moverlo");
     div.innerHTML = `<span class="file-badge" style="color:${color};border-color:${color}">${kind}</span>
       <span class="file-name">${escapeHtml(base)}</span>
+      ${vinculado ? '<span class="file-link-mark" title="Vinculada desde ColabDraw">🔗</span>' : ""}
       ${canInsert ? '<button class="file-act" data-act="ins" title="Insertar en el archivo activo">⤷</button>' : ""}
-      ${readOnly ? "" : `<button class="file-act" data-act="ren" title="Renombrar o mover">✎</button>
-      <button class="file-act file-del" data-act="del" title="Eliminar archivo">✕</button>`}`;
+      ${editable ? `<button class="file-act" data-act="ren" title="Renombrar o mover">✎</button>
+      <button class="file-act file-del" data-act="del" title="Eliminar archivo">✕</button>` : ""}`;
     div.onclick = () => { if (asset) openAssetPreview(asset); else mountEditor(name); };
-    makeDraggable(div, name, false);
+    if (!vinculado) makeDraggable(div, name, false);
     makeDropTarget(div, parentOf(name));   // soltar sobre un archivo = su carpeta
     const ins = div.querySelector('[data-act="ins"]');
     if (ins) ins.onclick = e => { e.stopPropagation(); insertAssetSnippet(asset); };
@@ -584,13 +612,18 @@ function renderFileTree() {
 
   const folderEntry = (path, depth) => {
     const collapsed = state.collapsed.has(path);
+    /* Una carpeta que solo contiene figuras vinculadas no es de este
+       proyecto: no se renombra, no se borra y no se le sueltan cosas. */
+    const dentro = state.assets.filter(x => isInside(x.name, path));
+    const soloVinculadas = dentro.length > 0 && dentro.every(isLinked) &&
+      !texFileNames().some(n => isInside(n, path));
     const div = document.createElement("div");
-    div.className = "file-entry folder-entry";
+    div.className = "file-entry folder-entry" + (soloVinculadas ? " file-linked" : "");
     div.style.paddingLeft = (12 + depth * 14) + "px";
     div.title = path + (readOnly ? "" : " · suelta archivos aquí para meterlos dentro");
     div.innerHTML = `<span class="folder-arrow">${collapsed ? "▸" : "▾"}</span>
       <span class="file-name">${escapeHtml(path.split("/").pop())}</span>
-      ${readOnly ? "" : `<button class="file-act" data-act="new" title="Nuevo archivo aquí">＋</button>
+      ${readOnly || soloVinculadas ? "" : `<button class="file-act" data-act="new" title="Nuevo archivo aquí">＋</button>
       <button class="file-act" data-act="up" title="Subir archivos aquí">↑</button>
       <button class="file-act" data-act="ren" title="Renombrar o mover">✎</button>
       <button class="file-act file-del" data-act="del" title="Eliminar carpeta">✕</button>`}`;
@@ -598,7 +631,7 @@ function renderFileTree() {
       if (collapsed) state.collapsed.delete(path); else state.collapsed.add(path);
       renderFileTree();
     };
-    makeDraggable(div, path, true);
+    if (!soloVinculadas) makeDraggable(div, path, true);
     makeDropTarget(div, path);
     const stop = (act, fn) => {
       const b = div.querySelector(`[data-act="${act}"]`);
@@ -662,7 +695,9 @@ async function newFolderIn(prefix) {
 async function deleteFolder(path) {
   const prefix = path + "/";
   const texToDelete = texFileNames().filter(n => n.startsWith(prefix));
-  const assetsToDelete = state.assets.filter(a => a.name.startsWith(prefix));
+  /* Las figuras vinculadas viven en otro proyecto: borrar aquí una
+     carpeta no puede llevárselas por delante. */
+  const assetsToDelete = state.assets.filter(a => !isLinked(a) && a.name.startsWith(prefix));
   const total = texToDelete.length + assetsToDelete.length;
   if (!confirm(state.mode === "local"
     ? `¿Eliminar del DISCO la carpeta "${path}"${total ? ` y los ${total} archivo(s) que contiene` : ""}? No se puede deshacer.`
@@ -856,7 +891,7 @@ async function moveEntry(oldPath, newPath, isFolder) {
   }
 
   const texts = texFileNames().filter(n => (isFolder ? isInside(n, oldPath) : n === oldPath));
-  const assets = state.assets.filter(a => (isFolder ? isInside(a.name, oldPath) : a.name === oldPath));
+  const assets = state.assets.filter(a => !isLinked(a) && (isFolder ? isInside(a.name, oldPath) : a.name === oldPath));
   const pairs = texts.concat(assets.map(a => a.name)).map(p => [p, movedPath(p, oldPath, newPath)]);
   if (!isFolder && !pairs.length) return;          // no era ni archivo ni imagen
 
@@ -988,7 +1023,12 @@ async function assetBytes(a) {
   if (hit) return hit;
   let bytes;
   try {
-    bytes = await fb.fetchAssetBytes(state.project.id, a);
+    /* Una figura vinculada se baja de SU proyecto, no de este. Por eso
+       el vínculo da acceso de verdad al proyecto de dibujo: sin eso las
+       reglas negarían la lectura a media plantilla. */
+    bytes = isLinked(a)
+      ? await fb.fetchAssetBytes(a.pid, a.asset)
+      : await fb.fetchAssetBytes(state.project.id, a);
   } catch (err) {
     const code = err.code || err.message || "";
     // CORS/red: XHR bloqueado antes de recibir cabeceras → sin código útil
@@ -1050,9 +1090,146 @@ function closeAssetPreview() {
 async function refreshAssets() {
   if (state.mode === "local") { renderFileTree(); return; }
   try {
-    state.assets = await fb.listAssets(state.project.id);
-  } catch (e) { state.assets = []; }
+    state.ownAssets = await fb.listAssets(state.project.id);
+  } catch (e) { state.ownAssets = []; }
+  mergeAssets();
+}
+
+/* Los recursos propios y los de los proyectos de dibujo vinculados van
+   en la MISMA lista: a partir de aquí nada distingue unos de otros, y
+   por eso la vista previa, insertar, compilar y el .zip funcionan con
+   las figuras vinculadas sin tocar una línea. */
+function mergeAssets() {
+  state.assets = (state.ownAssets || []).concat(state.linked || []);
   renderFileTree();
+}
+
+/* ============================================================
+   FIGURAS VINCULADAS (proyectos de ColabDraw)
+   ============================================================ */
+
+function stopLinkWatchers() {
+  for (const off of state.linkWatchers) { try { off(); } catch (e) {} }
+  state.linkWatchers = [];
+}
+
+/* Se apunta al equipo a los proyectos vinculados y trae sus figuras.
+   Cada vínculo se escucha en vivo: al exportar un PNG nuevo desde
+   ColabDraw aparece aquí sin recargar. */
+async function refreshLinks() {
+  if (state.mode !== "cloud" || !state.links || !state.project) return;
+  stopLinkWatchers();
+  const links = state.links.list();
+  if (!links.length) {
+    state.linked = [];
+    mergeAssets();
+    return;
+  }
+  const { ok, fallos } = await ensureAccess(links, { uid: state.user.uid, userName: state.user.name },
+    { getProject: fb.getProject, joinWithToken: fb.joinWithToken });
+  for (const f of fallos) console.warn(`ColabTeX: sin acceso al proyecto de dibujo «${f.title}»:`, f.error);
+  state.linkedInfo = ok;
+
+  const porProyecto = new Map();
+  const recomponer = () => {
+    state.linked = [].concat(...ok.map(l => porProyecto.get(l.pid) || []));
+    mergeAssets();
+  };
+  for (const link of ok) {
+    state.linkWatchers.push(fb.watchAssets(link.pid, assets => {
+      porProyecto.set(link.pid, linkedAssets(link, assets));
+      recomponer();
+    }));
+  }
+  recomponer();
+}
+
+async function linkDrawProject(pid, title, role) {
+  const p = await fb.getProject(pid, state.user.uid);
+  if (!p) throw new Error("Ese proyecto de dibujo ya no existe.");
+  /* Se guarda el token de invitación: es lo que deja que cada
+     colaborador del artículo se apunte solo al abrir el proyecto. */
+  const token = p.tokens ? (role === "view" ? p.tokens.view : p.tokens.edit) : "";
+  if (!token) throw new Error("Necesitas ser propietario o editor del proyecto de dibujo para vincularlo.");
+  state.links.add(pid, { title: p.title || title, token, role });
+  await refreshLinks();
+}
+
+function unlinkDrawProject(pid) {
+  if (!state.links) return;
+  state.links.remove(pid);
+  refreshLinks();
+}
+
+/* ---------- el modal ---------- */
+
+async function openLinkModal() {
+  if (state.mode !== "cloud") { alert("Las figuras vinculadas son cosa de los proyectos en la nube."); return; }
+  $("linkMsg").textContent = "";
+  $("linkModal").classList.add("open");
+  renderLinkList();
+  const picker = $("linkPicker");
+  picker.innerHTML = '<option value="">Cargando…</option>';
+  try {
+    const todos = await fb.listProjects(state.user.uid);
+    const dibujos = todos.filter(p => p.kind === fb.KIND_DRAW && !state.links.has(p.id));
+    picker.innerHTML = dibujos.length
+      ? dibujos.map(p => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.title)}</option>`).join("")
+      : '<option value="">No tienes proyectos de dibujo sin vincular</option>';
+    $("btnDoLink").disabled = !dibujos.length || state.role === "view";
+  } catch (e) {
+    picker.innerHTML = '<option value="">No se pudo cargar la lista</option>';
+    $("btnDoLink").disabled = true;
+  }
+}
+
+function renderLinkList() {
+  const host = $("linkList");
+  host.innerHTML = "";
+  const links = state.links ? state.links.list() : [];
+  if (!links.length) {
+    host.innerHTML = '<div class="modal-note">Todavía no hay ninguno.</div>';
+    return;
+  }
+  for (const l of links) {
+    const n = (state.linked || []).filter(a => a.pid === l.pid).length;
+    const row = document.createElement("div");
+    row.className = "link-row";
+    row.innerHTML = `<span class="link-title">${escapeHtml(l.title)}</span>
+      <span class="link-count">${n} figura${n === 1 ? "" : "s"}</span>
+      <a href="colabdraw.html?p=${encodeURIComponent(l.pid)}" target="_blank" rel="noopener">Abrir</a>
+      ${state.role === "view" ? "" : '<button data-act="off" title="Desvincular">✕</button>'}`;
+    const off = row.querySelector('[data-act="off"]');
+    if (off) off.onclick = () => {
+      if (!confirm(`¿Desvincular «${l.title}»? Sus figuras dejarán de aparecer en el árbol ` +
+        "(el proyecto de dibujo no se toca).")) return;
+      unlinkDrawProject(l.pid);
+      renderLinkList();
+    };
+    host.appendChild(row);
+  }
+}
+
+async function doLink() {
+  const pid = $("linkPicker").value;
+  if (!pid) return;
+  const btn = $("btnDoLink");
+  const msg = $("linkMsg");
+  btn.disabled = true;
+  msg.style.color = "#5a6772";
+  msg.textContent = "Vinculando…";
+  try {
+    await linkDrawProject(pid, $("linkPicker").selectedOptions[0].textContent, $("linkRole").value);
+    msg.style.color = "#0d9488";
+    msg.textContent = "Listo: sus figuras ya están en el árbol de archivos.";
+    renderLinkList();
+    openLinkModal();          // el vinculado sale de la lista de candidatos
+  } catch (e) {
+    msg.style.color = "#c0392b";
+    msg.textContent = "No se pudo vincular: " + (e.message || e);
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 /* ============================================================
@@ -1122,6 +1299,7 @@ async function openLocalFolder(handle) {
   $("btnNewFolder").style.display = "";
   $("btnUploadFile").style.display = "";
   $("btnImportZip").style.display = "";
+  $("btnLinkDraw").style.display = "none";         // vínculos: solo en la nube
   $("btnCommentsToggle").style.display = "none";   // comentarios: solo en la nube
   setSyncBadge("Local · en tu disco", "#7ee0c2");
   $("btnReloadLocal").style.display = "";
@@ -2270,6 +2448,10 @@ function wireEvents() {
   $("btnUploadFile").onclick = () => { state.uploadPrefix = ""; $("fileUploadInput").click(); };
   $("btnImportZip").onclick = () => $("zipUploadInput").click();
   $("btnZipProject").onclick = zipProject;
+  $("btnLinkDraw").onclick = () => openLinkModal();
+  $("btnCloseLink").onclick = () => $("linkModal").classList.remove("open");
+  $("linkModal").onclick = e => { if (e.target === $("linkModal")) $("linkModal").classList.remove("open"); };
+  $("btnDoLink").onclick = doLink;
   $("zipUploadInput").onchange = async e => {
     const f = e.target.files[0];
     e.target.value = "";

@@ -109,6 +109,24 @@ borrar son el mismo código y **las reglas de seguridad no cambian**.
   Antes se bajaba de golpe al pulsarlo, sin poder mirarlo. El PDF se enseña en
   un `<iframe>` con el visor del navegador: traer pdf.js sumaría más de un mega
   para una figura de una página.
+- **Vincular con ColabTeX** (`draw-link.js`): desde un proyecto de LaTeX se
+  vincula uno de dibujo y sus figuras exportadas aparecen en el árbol de
+  archivos, bajo `figuras/<nombre>/`, como recursos normales. El vínculo vive
+  en el **documento Yjs** (`Y.Map "links"`), así que se sincroniza con todo el
+  equipo y no hace falta publicar reglas nuevas a mano. Guarda el token de
+  invitación del proyecto de dibujo: cada colaborador del artículo se apunta
+  solo la primera vez que lo abre, por el mismo camino que un enlace para
+  compartir. No se copian los bytes — la figura del PDF es siempre la última
+  que se exportó — y `fb.watchAssets` mantiene la lista al día sin recargar.
+- **Copiar y pegar** (`draw/tools.js`): va por los eventos `copy`/`cut`/`paste`
+  del documento, no por Ctrl+C en el teclado, para tener el portapapeles de
+  verdad sin pedir permisos. Se guarda TEXTO SVG, no nodos: un clon de Yjs sin
+  integrar no se puede leer y solo valdría para pegar una vez. Sin nada elegido
+  se copia la capa activa entera.
+- **Arrastrar en el árbol de objetos**: tres zonas por fila; los bordes colocan
+  al lado y el centro mete dentro del grupo. Al cambiar de padre se recompone
+  el transform. Una capa solo cuelga del `<svg>`; una figura, solo de una capa
+  o un grupo.
 - **Importar respeta las capas del archivo** (`draw/svgio.js`). Inkscape no
   tiene un tipo «capa»: es un `<g inkscape:groupmode="layer">` con el nombre en
   `inkscape:label`, oculto con `style="display:none"` y bloqueado con

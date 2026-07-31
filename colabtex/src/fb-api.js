@@ -311,6 +311,18 @@ export async function listAssets(pid) {
   return Object.entries(idx).map(([key, a]) => ({ key, name: a.name || decKey(key), size: a.size || 0, loc: a.loc }));
 }
 
+/* Índice de recursos en vivo. Lo usan los proyectos vinculados: cuando
+   alguien exporta una figura nueva desde ColabDraw, el árbol del .tex se
+   entera sin recargar. Devuelve la función para dejar de escuchar. */
+export function watchAssets(pid, cb) {
+  const r = ref(db, `projects/${pid}/assetsIndex`);
+  const unsub = onValue(r, snap => {
+    const idx = snap.val() || {};
+    cb(Object.entries(idx).map(([key, a]) => ({ key, name: a.name || decKey(key), size: a.size || 0, loc: a.loc })));
+  }, () => cb([]));
+  return () => unsub();
+}
+
 export async function fetchAssetBytes(pid, asset) {
   if (asset.loc === "rtdb") {
     const a = (await get(ref(db, `projects/${pid}/assetsIndex/${asset.key}`))).val();

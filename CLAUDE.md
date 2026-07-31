@@ -131,6 +131,23 @@ Key modules in [colabtex/src/](colabtex/src/):
   **Cloud only** — disabled in local mode; view-only users see them read-only
   (both the provider and the Firebase rules block their writes).
 - `zip-import.js` — imports Overleaf `.zip` exports.
+- `zip-export.js` — the reverse, shared by both apps: the whole project in a
+  `.zip`. Uses fflate, already a dependency for reading them. Entry paths are
+  stripped of `..` — that is how a file escapes the folder on extraction.
+- `draw-link.js` — **linking a ColabDraw project to a `.tex` one**. The link
+  record lives in the **Yjs doc** (`Y.Map "links"`), not in a node of its own:
+  that way it syncs to the whole team for free and needs no new security rules
+  published by hand in the console. It stores the drawing project's *invite
+  token*, so every collaborator joins that project by themselves the first time
+  they open the article — the same path as a share link (`joinWithToken`), so
+  `database.rules.json` still needs no changes. The drawing's exported figures
+  then appear in the file tree as ordinary assets with `loc: "link"` under
+  `figuras/<slug>/`, and everything downstream (preview, `\includegraphics`,
+  compile, the `.zip`) works untouched because it all runs off `state.assets`.
+  `assetBytes` fetches those from *their* project, and `fb.watchAssets` keeps
+  them live, so a figure exported in ColabDraw shows up here without a reload.
+  The bytes are **not** copied: copying was only needed back when a
+  collaborator might not have access to the drawing: with the link they do.
 
 ### Collaborative document model
 
