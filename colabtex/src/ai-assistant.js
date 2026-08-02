@@ -479,6 +479,82 @@ export function createAssistant(api) {
     );
   }
 
+  /* Traduce el fallo de la API a algo accionable. Vive aparte del `catch`
+     porque la comprobación de la clave recién guardada usa exactamente el
+     mismo diagnóstico. */
+  function reportError(e) {
+    if (/denied access|project.*(?:blocked|suspended)/i.test(e.message || "")) {
+      /* «Your project has been denied access» (403). Ojo: NO es la clave.
+         Con una clave así, listar modelos y contar tokens responden 200 y
+         solo generateContent da 403 — es un bloqueo que Google pone sobre
+         el proyecto entero, y no se arregla creando otra clave dentro de
+         él. Decir «tu API key no es válida», que es lo que hacíamos, manda
+         al usuario a repetir en bucle el paso que no falla. */
+      addError("Google ha bloqueado el acceso del PROYECTO al que pertenece esta clave.\n\n" +
+        "No es un problema de la clave (con ella se pueden listar los modelos), ni tuyo, ni de esta página: " +
+        "es una decisión del lado de Google sobre ese proyecto. Suele pasar con cuentas recién creadas, " +
+        "con cuentas institucionales y con proyectos marcados automáticamente.\n\n" +
+        "Qué hacer: entra en aistudio.google.com/apikey con OTRA cuenta de Google (una de Gmail personal y con " +
+        "cierta antigüedad) y crea ahí la clave. Crear otra clave dentro del mismo proyecto no sirve. " +
+        "Si no tienes otra cuenta, usa Claude o ChatGPT en el desplegable de arriba.");
+    }
+    else if (e.status === 401 || e.status === 403) addError("Tu API key no es válida, expiró o no tiene permiso. Vuelve a configurarla con ⚙.");
+    else if (e.status === 404 || /not found|not supported|does not exist/i.test(e.message || "")) {
+      /* Un modelo retirado da esto. Refrescamos el catálogo para que el
+         desplegable vuelva a mostrar solo lo que existe hoy. */
+      addError("El modelo «" + model + "» ya no existe o tu cuenta no lo tiene.\n" +
+        "Estoy actualizando la lista de modelos: elígelo de nuevo arriba y vuelve a intentarlo.");
+      refreshModels(true);
+    } else if (/prepay|credits?\s+are\s+depleted|billing/i.test(e.message || "")) {
+      /* El proyecto de la clave TIENE facturación activada. En cuanto un
+         proyecto se vincula a una cuenta de facturación deja el nivel
+         gratuito, así que la capa gratuita ya no se le aplica y, sin
+         saldo, falla TODO — Flash incluido. No es un límite alcanzado ni
+         un problema del modelo: hay que usar una clave de un proyecto sin
+         facturación. */
+      addError("Tu clave pertenece a un proyecto de Google CON facturación activada y sin saldo.\n\n" +
+        "Eso no es haber agotado la cuota: al vincular una cuenta de facturación, el proyecto SALE del nivel gratuito, " +
+        "así que ya no hay capa gratuita que usar y fallan todos los modelos, incluidos los Flash.\n\n" +
+        "Arreglo (2 minutos): entra en aistudio.google.com/apikey, crea una clave nueva y elige «crear en un proyecto NUEVO». " +
+        "Un proyecto sin facturación sí tiene capa gratuita. Después pégala aquí con ⚙.");
+    } else if (e.status === 429 && /limit:\s*0/.test(e.message || "")) {
+      /* limit: 0 = ese proyecto NUNCA tuvo cuota para este modelo. Suele ser
+         un modelo sin capa gratuita (los Pro, desde abril de 2026) o una
+         cuenta institucional con la capa gratuita bloqueada. */
+      addError("Tu cuenta no tiene cuota gratuita para «" + model + "» (limit: 0). No es que la hayas agotado: nunca la tuvo.\n\n" +
+        "Prueba con un modelo Flash, que son los únicos gratuitos. Si tampoco funciona, crea la clave en AI Studio " +
+        "con una cuenta de Gmail PERSONAL (no institucional/UC) y elige «crear en un proyecto nuevo»: las cuentas de " +
+        "universidad suelen traer la capa gratuita bloqueada.");
+      refreshModels(true);
+    } else if (e.status === 429) addError("Límite de uso alcanzado (429). " + (adapter().free ? "Agotaste la cuota del momento. Ojo: una conversación con herramientas puede gastar varias peticiones, así que en la capa gratuita se toca antes el límite DIARIO que el de por minuto." : "Revisa el saldo/límites de tu cuenta.") + "\n" + (e.message || ""));
+    else if (e.status === 400) addError("La API rechazó la solicitud (400): " + e.message);
+    else addError("No se pudo contactar al modelo: " + (e.message || String(e)) + "\nRevisa tu conexión y que la API key sea correcta.");
+  }
+
+  /* Al guardar una clave se hace UNA petición de verdad. Listar modelos no
+     sirve como prueba: un proyecto bloqueado por Google, o sin capa
+     gratuita, contesta 200 a la lista y solo falla al generar — así que el
+     usuario se enteraba al primer mensaje y creía que la culpa era suya. */
+  async function probeKey() {
+    const a = adapter(), key = getKey();
+    if (!key) return;
+    const msgs = [];
+    a.pushUserText(msgs, "ok");
+    try {
+      const { url, headers, body } = a.buildRequest({
+        model, key, system: "Responde solo: ok.", tools: a.formatTools(toolDefs(true)), messages: msgs
+      });
+      const res = await fetch(url, { method: "POST", headers, body: JSON.stringify(body) });
+      if (res.ok) return true;
+      const err = new Error(await readError(res));
+      err.status = res.status;
+      throw err;
+    } catch (e) {
+      reportError(e);
+      return false;
+    }
+  }
+
   /* ----- turno completo con bucle de herramientas ----- */
   async function send() {
     if (running) return;
@@ -522,37 +598,7 @@ export function createAssistant(api) {
         a.pushToolResults(messages, results);
       }
     } catch (e) {
-      if (e.status === 401 || e.status === 403) addError("Tu API key no es válida, expiró o no tiene permiso. Vuelve a configurarla con ⚙.");
-      else if (e.status === 404 || /not found|not supported|does not exist/i.test(e.message || "")) {
-        /* Un modelo retirado da esto. Refrescamos el catálogo para que el
-           desplegable vuelva a mostrar solo lo que existe hoy. */
-        addError("El modelo «" + model + "» ya no existe o tu cuenta no lo tiene.\n" +
-          "Estoy actualizando la lista de modelos: elígelo de nuevo arriba y vuelve a intentarlo.");
-        refreshModels(true);
-      } else if (/prepay|credits?\s+are\s+depleted|billing/i.test(e.message || "")) {
-        /* El proyecto de la clave TIENE facturación activada. En cuanto un
-           proyecto se vincula a una cuenta de facturación deja el nivel
-           gratuito, así que la capa gratuita ya no se le aplica y, sin
-           saldo, falla TODO — Flash incluido. No es un límite alcanzado ni
-           un problema del modelo: hay que usar una clave de un proyecto sin
-           facturación. */
-        addError("Tu clave pertenece a un proyecto de Google CON facturación activada y sin saldo.\n\n" +
-          "Eso no es haber agotado la cuota: al vincular una cuenta de facturación, el proyecto SALE del nivel gratuito, " +
-          "así que ya no hay capa gratuita que usar y fallan todos los modelos, incluidos los Flash.\n\n" +
-          "Arreglo (2 minutos): entra en aistudio.google.com/apikey, crea una clave nueva y elige «crear en un proyecto NUEVO». " +
-          "Un proyecto sin facturación sí tiene capa gratuita. Después pégala aquí con ⚙.");
-      } else if (e.status === 429 && /limit:\s*0/.test(e.message || "")) {
-        /* limit: 0 = ese proyecto NUNCA tuvo cuota para este modelo. Suele ser
-           un modelo sin capa gratuita (los Pro, desde abril de 2026) o una
-           cuenta institucional con la capa gratuita bloqueada. */
-        addError("Tu cuenta no tiene cuota gratuita para «" + model + "» (limit: 0). No es que la hayas agotado: nunca la tuvo.\n\n" +
-          "Prueba con un modelo Flash, que son los únicos gratuitos. Si tampoco funciona, crea la clave en AI Studio " +
-          "con una cuenta de Gmail PERSONAL (no institucional/UC) y elige «crear en un proyecto nuevo»: las cuentas de " +
-          "universidad suelen traer la capa gratuita bloqueada.");
-        refreshModels(true);
-      } else if (e.status === 429) addError("Límite de uso alcanzado (429). " + (adapter().free ? "Agotaste la cuota del momento. Ojo: una conversación con herramientas puede gastar varias peticiones, así que en la capa gratuita se toca antes el límite DIARIO que el de por minuto." : "Revisa el saldo/límites de tu cuenta.") + "\n" + (e.message || ""));
-      else if (e.status === 400) addError("La API rechazó la solicitud (400): " + e.message);
-      else addError("No se pudo contactar al modelo: " + (e.message || String(e)) + "\nRevisa tu conexión y que la API key sea correcta.");
+      reportError(e);
     } finally {
       thinking.remove();
       running = false;
@@ -562,14 +608,17 @@ export function createAssistant(api) {
   }
 
   /* ----- eventos de configuración de la key ----- */
-  $("aiSaveKey").onclick = () => {
+  $("aiSaveKey").onclick = async () => {
     const v = $("aiKeyInput").value.trim();
     if (!adapter().validateKey(v)) { $("aiSetupMsg").textContent = "La clave no parece válida (debería empezar por «" + adapter().keyHint + "»)."; return; }
     localStorage.setItem(adapter().keyStore, v);
     $("aiKeyInput").value = "";
     hideSetup();
-    refreshModels(true);      // clave nueva: preguntar qué modelos acepta
-    if (messages.length === 0)
+    await refreshModels(true);      // clave nueva: preguntar qué modelos acepta
+    const esperando = addBubble("thinking", "Comprobando la clave…");
+    const sirve = await probeKey();
+    esperando.remove();
+    if (sirve && messages.length === 0)
       addBubble("bot", "¡Listo! Soy tu asistente de LaTeX (" + escapeHtml(adapter().label.split(" — ")[0]) +
         "). Puedo leer y editar los archivos de este proyecto. Prueba: <em>«resume la introducción»</em> o <em>«arregla los errores de compilación»</em>.");
   };

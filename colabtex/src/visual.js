@@ -111,8 +111,12 @@ function buildDecorations(state) {
   const text = doc.toString();
   const ready = !!window.katex;
 
-  const hide = (from, to) => { if (to > from) b.push({ from, to, deco: Decoration.replace({}) }); };
-  const mark = (from, to, cls) => { if (to > from) b.push({ from, to, deco: Decoration.mark({ class: cls }) }); };
+  /* `point` = sustituye texto (Decoration.replace); las sustituciones no
+     pueden solaparse entre sí y van ANTES que las marcas en la misma
+     posición (ver el ordenado del final). */
+  const push = (from, to, deco, point) => { if (to > from) b.push({ from, to, deco, point }); };
+  const hide = (from, to) => push(from, to, Decoration.replace({}), true);
+  const mark = (from, to, cls) => push(from, to, Decoration.mark({ class: cls }), false);
 
   /* -- 1. comandos con un argumento -- */
   for (const rule of CMD_STYLES) {
@@ -144,7 +148,7 @@ function buildDecorations(state) {
     if (!css) continue;
     hide(mcol.index, open + 1);
     if (close > open + 1)
-      b.push({ from: open + 1, to: close, deco: Decoration.mark({ attributes: { style: "color:" + css } }) });
+      push(open + 1, close, Decoration.mark({ attributes: { style: "color:" + css } }), false);
     hide(close, close + 1);
   }
 
@@ -157,7 +161,7 @@ function buildDecorations(state) {
       if (!tex || !tex.trim()) continue;
       const from = m.index, to = m.index + m[0].length;
       if (cursorTouches(state, from, to)) continue;
-      b.push({ from, to, deco: Decoration.replace({ widget: new MathWidget(tex, false) }) });
+      push(from, to, Decoration.replace({ widget: new MathWidget(tex, false) }), true);
     }
 
     /* -- 3. matemáticas en bloque: \[...\] y entornos -- */
@@ -165,7 +169,7 @@ function buildDecorations(state) {
     while ((m = dollars.exec(text))) {
       const from = m.index, to = m.index + m[0].length;
       if (cursorTouches(state, from, to)) continue;
-      b.push({ from, to, deco: Decoration.replace({ widget: new MathWidget(m[1], true), block: false }) });
+      push(from, to, Decoration.replace({ widget: new MathWidget(m[1], true), block: false }), true);
     }
 
     for (const env of MATH_ENVS) {
@@ -176,7 +180,7 @@ function buildDecorations(state) {
         if (cursorTouches(state, from, to)) continue;
         // se conserva el entorno para que KaTeX numere/alinee igual
         const body = env.startsWith("equation") ? m[1] : m[0];
-        b.push({ from, to, deco: Decoration.replace({ widget: new MathWidget(body, true) }) });
+        push(from, to, Decoration.replace({ widget: new MathWidget(body, true) }), true);
       }
     }
   }
@@ -187,7 +191,7 @@ function buildDecorations(state) {
   while ((m2 = items.exec(text))) {
     const from = m2.index + m2[1].length, to = m2.index + m2[0].length;
     if (cursorTouches(state, from, to)) continue;
-    b.push({ from, to, deco: Decoration.replace({ widget: new TextWidget("• ", "cm-vBullet") }) });
+    push(from, to, Decoration.replace({ widget: new TextWidget("• ", "cm-vBullet") }), true);
   }
 
   /* -- 5. \begin/\end de entornos no matemáticos: atenuar -- */
@@ -198,16 +202,28 @@ function buildDecorations(state) {
     mark(from, to, "cm-vEnvLine");
   }
 
-  /* CodeMirror exige los rangos ordenados; además hay que descartar los
-     solapados (p. ej. un \textbf dentro de una fórmula ya sustituida). */
-  b.sort((x, y) => x.from - y.from || y.to - x.to);
+  /* CodeMirror exige los rangos ordenados por posición Y, a igualdad de
+     posición, por `startSide`. Una sustitución vale 499999999 y una marca
+     500000000, así que en el mismo punto la sustitución va PRIMERO.
+     Ordenar solo por `from` bastó hasta que apareció un «\section{$f$…}»:
+     ahí la marca del título y la fórmula empiezan en el mismo carácter, la
+     marca salía antes por ser más larga y CodeMirror abortaba con
+     «Ranges must be added sorted by from position and startSide», que dejaba
+     el modo visual inservible en todo el documento. */
+  b.sort((x, y) => x.from - y.from || (y.point - x.point) || y.to - x.to);
+
   const builder = new RangeSetBuilder();
-  let last = -1;
+  let end = -1;                               // final de la última sustitución
   for (const r of b) {
-    if (r.from < last) continue;              // se solapa con uno ya emitido
+    /* Dos sustituciones no pueden solaparse (p. ej. un \textbf dentro de una
+       fórmula ya sustituida). Las marcas sí: se anidan y CodeMirror las
+       parte solas, así que nunca se descartan — es lo que permite que un
+       título con una fórmula dentro conserve su tamaño. */
+    if (r.point) {
+      if (r.from < end) continue;
+      end = Math.max(end, r.to);
+    }
     builder.add(r.from, r.to, r.deco);
-    if (r.deco.spec && r.deco.spec.widget !== undefined) last = r.to;
-    else last = Math.max(last, r.from);       // las marcas sí pueden anidarse
   }
   return builder.finish();
 }

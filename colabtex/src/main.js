@@ -313,10 +313,8 @@ async function openEditor(projectId, token) {
   // el vínculo con ColabDraw solo tiene sentido en la nube
   $("btnLinkDraw").style.display = "";
   $("btnReloadLocal").style.display = "none";
-  $("btnVsCode").style.display = lfs.isSupported() ? "" : "none";
-  $("btnClaude").style.display = lfs.isSupported() ? "" : "none";
   $("btnCommentsToggle").style.display = "";   // comentarios: disponible en la nube
-  paintVsCodeButton();
+  paintAiMenu();
   state.lastCompile = null;
   if (state.assistant) state.assistant.reset();
   setSyncBadge("Conectando…", "#e2c08d");
@@ -1345,8 +1343,7 @@ async function openLocalFolder(handle) {
   setSyncBadge("Local · en tu disco", "#7ee0c2");
   $("btnReloadLocal").style.display = "";
   // en modo local ya se edita el disco directamente: el puente no pinta nada
-  $("btnVsCode").style.display = "none";
-  $("btnClaude").style.display = "none";
+  paintAiMenu();
   $("presenceAvatars").innerHTML = "";
   $("onlineCount").textContent = "modo local (sin colaboración)";
   if (state.assistant) state.assistant.reset();
@@ -1441,7 +1438,7 @@ function ensureBridge() {
     /* Se aprendió la ruta: repintar para que el botón deje de anunciar el
        paso del .bat. NO se lanza el editor aquí — la ruta llega justamente
        porque el usuario acaba de abrirlo con el .bat, y abriríamos dos. */
-    onPath: () => paintVsCodeButton(),
+    onPath: () => paintAiMenu(),
     canWrite: () => state.role !== "view",
     newYText: () => new Y.Text()
   });
@@ -1451,25 +1448,52 @@ function ensureBridge() {
 /* Las dos aplicaciones que sabemos abrir sobre la carpeta enlazada. */
 const CLAUDE_PROMPT = "Esta carpeta es un artículo LaTeX sincronizado en vivo con ColabTeX. Lee CLAUDE.md antes de tocar nada.";
 const APPS = {
-  vscode: { id: "btnVsCode", label: "💻 VS Code", name: "VS Code", bat: LAUNCHER, url: p => vscodeUrl(p) },
-  claude: { id: "btnClaude", label: "🤖 Claude", name: "Claude Code", bat: LAUNCHER_CLAUDE, url: p => claudeUrl(p, CLAUDE_PROMPT) }
+  vscode: { id: "aiItemVsCode", label: "💻 VS Code", name: "VS Code", bat: LAUNCHER, url: p => vscodeUrl(p) },
+  claude: { id: "aiItemClaude", label: "🤖 Claude Code", name: "Claude Code", bat: LAUNCHER_CLAUDE, url: p => claudeUrl(p, CLAUDE_PROMPT) }
 };
 
-function paintVsCodeButton() {
+/* ---------- menú «✦ IA» ----------
+   El asistente y los dos editores de escritorio viven aquí: son tres cosas
+   que se usan de vez en cuando y ocupaban tres botones permanentes en una
+   barra que ya iba justa. De paso, desenlazar y escribir la ruta a mano
+   dejan de esconderse en un clic derecho que nadie descubría. */
+const aiMenuOpen = () => $("aiMenu") && $("aiMenu").style.display === "block";
+
+function showAiMenu(on) {
+  const m = $("aiMenu");
+  if (!m) return;
+  if (on) paintAiMenu();
+  m.style.display = on ? "block" : "none";
+}
+
+function paintAiMenu() {
   const br = state.bridge;
-  const on = br && br.running;
-  const lista = on && br.absPath;
+  const on = !!(br && br.running);
+  const lista = on && !!br.absPath;
+  /* El puente es de la nube: en modo local ya se está editando el disco. */
+  const puente = state.mode === "cloud" && lfs.isSupported();
+
   for (const app of Object.values(APPS)) {
-    const b = $(app.id);
-    if (!b) continue;
-    b.textContent = on ? app.label + " ●" : app.label;
-    b.title = !on
-      ? `Sincronizar este proyecto con una carpeta de tu PC y editarlo en ${app.name}`
+    const it = $(app.id);
+    if (!it) continue;
+    it.style.display = puente ? "" : "none";
+    it.querySelector("b").innerHTML = app.label + (on ? " <span class=\"ai-dot\">●</span>" : "");
+    it.querySelector("span").textContent = !on
+      ? `Copia el proyecto a una carpeta de tu PC y mantiene las dos copias iguales.`
       : (lista
-          ? `Abrir «${br.folder}» en ${app.name}`
-          : `Sincronizando con «${br.folder}». Falta abrir «${app.bat}» una vez.`
-        ) + "\nClic derecho: detener la sincronización.";
-    b.style.color = on ? "#7ee0c2" : "";
+          ? `Abrir «${br.folder}» en ${app.name}.`
+          : `Sincronizando con «${br.folder}». Falta abrir «${app.bat}» una vez.`);
+  }
+  const sep = $("aiItemSep"); if (sep) sep.style.display = puente ? "" : "none";
+  const extra = puente && on;
+  const sep2 = $("aiItemSep2"); if (sep2) sep2.style.display = extra ? "" : "none";
+  const unl = $("aiItemUnlink"); if (unl) unl.style.display = extra ? "" : "none";
+  const pth = $("aiItemPath"); if (pth) pth.style.display = extra && !lista ? "" : "none";
+
+  const b = $("btnAiMenu");
+  if (b) {
+    b.innerHTML = on ? "✦ IA <span class=\"ai-dot\">●</span> ▾" : "✦ IA ▾";
+    b.title = on ? `Asistente IA · sincronizando con «${br.folder}»` : "Asistente IA y editores de tu PC";
   }
 }
 
@@ -1496,7 +1520,7 @@ function explainLauncher(app) {
     `El proyecto ya está copiado en la carpeta «${br.folder}».\n\n` +
     `Solo esta primera vez, ábrela y haz doble clic en:\n\n        ${app.bat}\n\n` +
     `${app.name} se abrirá y, de paso, ColabTeX aprenderá dónde está la carpeta.\n` +
-    `A partir de entonces te bastará con pulsar el botón «${app.label}».`);
+    `A partir de entonces te bastará con elegir «${app.label}» en el menú ✦ IA.`);
   appendLog(`ℹ Abre «${app.bat}» dentro de «${br.folder}» una vez: después bastará el botón.`);
 }
 
@@ -1585,7 +1609,7 @@ async function linkVsCodeFolder(which = "vscode") {
     return;
   }
 
-  paintVsCodeButton();
+  paintAiMenu();
   if (state.role === "view") {
     appendLog("ℹ Tienes permiso de solo lectura: los cambios bajan al disco, pero lo que edites ahí no sube.");
   }
@@ -1599,7 +1623,7 @@ async function unlinkVsCode() {
   const name = state.bridge.folder;
   await state.bridge.stop();
   if (state.project && state.project.id) lfs.removeBridge(state.project.id).catch(() => {});
-  paintVsCodeButton();
+  paintAiMenu();
   setSyncBadge("Sincronizado", "#7ee0c2");
   appendLog(`💻 Sincronización con «${name}» detenida. Los archivos siguen en tu disco.`);
 }
@@ -1616,21 +1640,13 @@ async function onVsCodeClick(which = "vscode") {
   await linkVsCodeFolder(which);
 }
 
-/* Menú contextual del botón: desenlazar o pegar la ruta a mano, que son
-   acciones raras y no deben estorbar al clic normal. */
-async function onVsCodeMenu(ev) {
-  ev.preventDefault();
+/* Entrada «escribir la ruta» del menú: solo aparece mientras la carpeta esté
+   enlazada y aún no sepamos dónde está en el disco. */
+async function onPasteAbsPath() {
   const br = state.bridge;
   if (!br || !br.running) return;
-  const q = br.absPath
-    ? `Carpeta enlazada: «${br.folder}»\n\n«Aceptar» detiene la sincronización.\n«Cancelar» no hace nada.`
-    : `Carpeta enlazada: «${br.folder}», pero aún no sé dónde está en tu disco.\n\n` +
-      "«Aceptar» detiene la sincronización.\n«Cancelar» te deja escribir la ruta a mano.";
-  if (confirm(q)) { await unlinkVsCode(); return; }
-  if (!br.absPath) {
-    const p = await askAbsPath(br.folder, "");
-    if (p) { br.setPath(p); paintVsCodeButton(); appendLog("💻 Ruta indicada a mano: " + p); }
-  }
+  const p = await askAbsPath(br.folder, "");
+  if (p) { br.setPath(p); paintAiMenu(); appendLog("💻 Ruta indicada a mano: " + p); }
 }
 
 /* ---------- importar .zip (export de Overleaf) ---------- */
@@ -2476,10 +2492,19 @@ function wireEvents() {
   };
   $("btnOpenLocal").onclick = () => openLocalFolder(null);
   $("btnReloadLocal").onclick = reloadLocalFolder;
-  $("btnVsCode").onclick = () => onVsCodeClick("vscode");
-  $("btnVsCode").oncontextmenu = onVsCodeMenu;
-  $("btnClaude").onclick = () => onVsCodeClick("claude");
-  $("btnClaude").oncontextmenu = onVsCodeMenu;
+  /* menú ✦ IA */
+  $("btnAiMenu").onclick = ev => { ev.stopPropagation(); showAiMenu(!aiMenuOpen()); };
+  $("aiItemAssistant").onclick = () => { showAiMenu(false); if (state.assistant) state.assistant.toggle(); };
+  $("aiItemVsCode").onclick = () => { showAiMenu(false); onVsCodeClick("vscode"); };
+  $("aiItemClaude").onclick = () => { showAiMenu(false); onVsCodeClick("claude"); };
+  $("aiItemPath").onclick = () => { showAiMenu(false); onPasteAbsPath(); };
+  $("aiItemUnlink").onclick = () => { showAiMenu(false); unlinkVsCode(); };
+  document.addEventListener("click", ev => {
+    if (aiMenuOpen() && !$("aiMenuWrap").contains(ev.target)) showAiMenu(false);
+  });
+  document.addEventListener("keydown", ev => {
+    if (ev.key === "Escape" && aiMenuOpen()) showAiMenu(false);
+  });
   $("btnNewFromZip").onclick = () => $("zipNewInput").click();
   $("zipNewInput").onchange = async e => {
     const f = e.target.files[0];
@@ -2593,9 +2618,8 @@ function wireEvents() {
   $("btnCloseShare").onclick = closeShareModal;
   $("btnInvite").onclick = () => invite().catch(err => alert(err.message));
 
-  // asistente IA
+  // asistente IA (se abre desde el menú ✦ IA, cableado más arriba)
   state.assistant = createAssistant(aiApi);
-  $("btnAiToggle").onclick = () => state.assistant.toggle();
 
   // comentarios sobre el texto (solo proyectos en la nube)
   state.comments = createComments({

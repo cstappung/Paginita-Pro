@@ -110,10 +110,28 @@ Key modules in [colabtex/src/](colabtex/src/):
   edit that makes `\textcolor` compile — which `main.js` applies to the main
   file (Yjs or disk) the first time a colour is used, and `cssOfTexColor`,
   shared with the visual view.
-- `synctex.js` / `visual.js` — source↔PDF sync and the visual/rendered view.
+- `synctex.js` — source↔PDF sync.
+- `visual.js` — the visual/rendered view (KaTeX for formulas, real sizes for
+  headings). It only *decorates*: the document is never modified, so Yjs,
+  saving and compiling never see it. `buildDecorations` collects every range
+  first and emits them at the end, and that emission has two rules that a
+  `RangeSetBuilder` enforces on pain of throwing:
+  - Ranges go **sorted by `from` and, at the same `from`, by `startSide`** — a
+    `Decoration.replace` is 499999999 and a `Decoration.mark` 500000000, so a
+    replacement always goes *before* a mark that starts at the same character.
+    Sorting by `from` alone was enough until `\section{$f$-Factor}` appeared:
+    the heading's mark and the formula start on the same character, the mark
+    came first for being longer, and CodeMirror aborted with *"Ranges must be
+    added sorted by `from` position and `startSide`"* — which killed the visual
+    view for the whole document, not just that line.
+  - Two **replacements** may not overlap, so a later one is dropped; **marks**
+    may, and are never dropped — that is what lets a heading keep its size when
+    a formula is nested inside it.
 - `texlog.js` / `themes.js` — LaTeX log parsing, editor themes.
 - `local-fs.js` — File System Access API layer for local mode.
-- `bridge.js` — **"Abrir en VS Code" / "Abrir con Claude"**: links a *cloud*
+- `bridge.js` — **"Abrir en VS Code" / "Abrir con Claude"** (both inside the
+  **✦ IA** menu of the editor bar, together with the assistant — three
+  permanent buttons were more than the bar could hold): links a *cloud*
   project to a disk folder and keeps both in sync bidirectionally while the tab
   is open. Writes Yjs→disk on change; polls disk mtimes each second and applies
   a **minimal diff** to the `Y.Text` (never a full replace — that would destroy
@@ -150,7 +168,14 @@ Key modules in [colabtex/src/](colabtex/src/):
   answers a retired model with *"no free quota"*, which reads like a billing
   problem and had the assistant dead for every Gemini user. `chooseModel`
   drops a stored ID that no longer exists. Only Flash models are free — Gemini
-  Pro lost its free tier on 2026-04-01.
+  Pro lost its free tier on 2026-04-01. Saving a key fires **one real
+  generation** (`probeKey`) instead of trusting `listModels`: a Google project
+  that is out of the free tier, or one Google has blocked, answers **200** to
+  the model list and fails only when generating, so the user found out at their
+  first message and blamed themselves. `reportError` names the three failures
+  Google dresses up as quota — retired model (404), billing attached with no
+  balance (429 *prepay*), and project denied access (403) — because each one
+  has a different remedy and the API's own wording points at none of them.
 - `comments.js` — **text comments** (Overleaf-style). Select text → attach a
   thread everyone sees; anyone (editor/owner) can reply or mark resolved.
   Threads live in a Yjs `comments` map (see below) anchored with Yjs **relative
