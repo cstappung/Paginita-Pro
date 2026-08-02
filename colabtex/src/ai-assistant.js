@@ -382,6 +382,7 @@ export function createAssistant(api) {
     steps.innerHTML =
       `<li>Entra a <a href="${p.keyUrl}" target="_blank" rel="noopener">${escapeHtml(p.keyUrl.replace(/^https?:\/\//, ""))}</a>.</li>` +
       `<li>Crea una clave y cópiala (empieza por <code>${escapeHtml(p.keyHint)}</code>).</li>` +
+      (p.free ? "<li><b>Elige «crear en un proyecto nuevo»</b>. Un proyecto con facturación activada sale del nivel gratuito y fallará aunque uses modelos gratis.</li>" : "") +
       `<li>Pégala aquí abajo.</li>`;
     input && ($("aiKeyInput").placeholder = p.keyHint);
   }
@@ -528,6 +529,18 @@ export function createAssistant(api) {
         addError("El modelo «" + model + "» ya no existe o tu cuenta no lo tiene.\n" +
           "Estoy actualizando la lista de modelos: elígelo de nuevo arriba y vuelve a intentarlo.");
         refreshModels(true);
+      } else if (/prepay|credits?\s+are\s+depleted|billing/i.test(e.message || "")) {
+        /* El proyecto de la clave TIENE facturación activada. En cuanto un
+           proyecto se vincula a una cuenta de facturación deja el nivel
+           gratuito, así que la capa gratuita ya no se le aplica y, sin
+           saldo, falla TODO — Flash incluido. No es un límite alcanzado ni
+           un problema del modelo: hay que usar una clave de un proyecto sin
+           facturación. */
+        addError("Tu clave pertenece a un proyecto de Google CON facturación activada y sin saldo.\n\n" +
+          "Eso no es haber agotado la cuota: al vincular una cuenta de facturación, el proyecto SALE del nivel gratuito, " +
+          "así que ya no hay capa gratuita que usar y fallan todos los modelos, incluidos los Flash.\n\n" +
+          "Arreglo (2 minutos): entra en aistudio.google.com/apikey, crea una clave nueva y elige «crear en un proyecto NUEVO». " +
+          "Un proyecto sin facturación sí tiene capa gratuita. Después pégala aquí con ⚙.");
       } else if (e.status === 429 && /limit:\s*0/.test(e.message || "")) {
         /* limit: 0 = ese proyecto NUNCA tuvo cuota para este modelo. Suele ser
            un modelo sin capa gratuita (los Pro, desde abril de 2026) o una
