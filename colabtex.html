@@ -84,7 +84,10 @@
   .ed-right{margin-left:auto;display:flex;align-items:center;gap:10px}
   #presenceAvatars{display:flex;align-items:center}
   .presence-avatar{width:26px;height:26px;border-radius:50%;border:2px solid var(--ed-header);display:grid;place-items:center;font-size:11px;font-weight:600;color:#fff}
-  .btn-outline-dark{height:30px;padding:0 12px;border:1px solid rgba(127,127,127,0.4);border-radius:6px;background:transparent;color:var(--ed-header-fg);font-size:12px;font-weight:600;cursor:pointer}
+  /* nowrap: un rótulo con espacio («VS Code») se partía en dos líneas dentro
+     de un botón de 30px de alto, y el texto salía recortado por arriba y
+     por abajo. */
+  .btn-outline-dark{height:30px;padding:0 12px;border:1px solid rgba(127,127,127,0.4);border-radius:6px;background:transparent;color:var(--ed-header-fg);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;flex-shrink:0}
   .btn-outline-dark:hover{background:rgba(127,127,127,0.22)}
   #btnCompile{height:30px;padding:0 14px;border:none;border-radius:6px;background:var(--ed-accent);color:#fff;font-size:12px;font-weight:600;cursor:pointer}
   #btnCompile:hover{filter:brightness(1.15)}
@@ -465,6 +468,7 @@
         <div id="presenceAvatars"></div>
         <button id="btnReloadLocal" class="btn-outline-dark" style="display:none" title="Volver a leer los archivos desde el disco">⟲ Recargar</button>
         <button id="btnVsCode" class="btn-outline-dark" style="display:none" title="Sincronizar este proyecto con una carpeta de tu PC y editarlo en VS Code">💻 VS Code</button>
+        <button id="btnClaude" class="btn-outline-dark" style="display:none" title="Sincronizar este proyecto con una carpeta de tu PC y abrirlo con Claude Code">🤖 Claude</button>
         <button id="btnCommentsToggle" class="btn-outline-dark" title="Comentarios (selecciona texto y coméntalo)">💬 Comentarios<span id="commentsCount" class="comments-badge" style="display:none"></span></button>
         <button id="btnAiToggle" class="btn-outline-dark" title="Asistente IA (Claude, Gemini o ChatGPT)">✦ Asistente</button>
         <button id="btnSettings" class="btn-outline-dark" title="Configuración del proyecto">⚙ Configuración</button>
@@ -721,6 +725,6 @@
   </div>
 </div>
 
-<script src="colabtex-app.js?v=202607311839"></script>
+<script src="colabtex-app.js?v=202608022052"></script>
 </body>
 </html>

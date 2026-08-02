@@ -85,8 +85,25 @@ const PROVIDERS = {
     keyUrl: "https://aistudio.google.com/apikey",
     keyHint: "AIza… o AQ…",
     free: true,
-    models: { "gemini-2.0-flash": "Gemini 2.0 Flash (gratis)", "gemini-1.5-flash": "Gemini 1.5 Flash (gratis)", "gemini-1.5-pro": "Gemini 1.5 Pro" },
-    defaultModel: "gemini-2.0-flash",
+    /* Red de seguridad: la lista de verdad se pide a la API (listModels).
+       Solo Flash — desde abril de 2026 los Pro NO tienen capa gratuita. */
+    models: { "gemini-3.5-flash": "Gemini 3.5 Flash (gratis)", "gemini-3.5-flash-lite": "Gemini 3.5 Flash-Lite (gratis)", "gemini-2.5-flash": "Gemini 2.5 Flash (gratis)" },
+    defaultModel: "gemini-3.5-flash",
+    listModels: async key => {
+      const r = await fetch("https://generativelanguage.googleapis.com/v1beta/models?key=" + encodeURIComponent(key));
+      if (!r.ok) throw new Error(await readError(r));
+      const out = {};
+      for (const m of (await r.json()).models || []) {
+        const id = String(m.name || "").replace(/^models\//, "");
+        /* generateContent es lo que usamos; sin él el modelo no sirve aquí
+           (embeddings, TTS, imagen…). Fuera también los previews, que traen
+           límites aún más estrechos y desaparecen sin avisar. */
+        if (!(m.supportedGenerationMethods || []).includes("generateContent")) continue;
+        if (/preview|exp|embedding|aqa|image|tts|live/i.test(id)) continue;
+        out[id] = (m.displayName || id) + (/flash/i.test(id) ? " (gratis)" : " (de pago)");
+      }
+      return out;
+    },
     // Google emite varios formatos de clave (AIza…, AQ.…); no encasillar
     validateKey: k => k.trim().length >= 20,
     formatTools(defs) {
@@ -140,9 +157,18 @@ const PROVIDERS = {
     keyUrl: "https://console.anthropic.com/settings/keys",
     keyHint: "sk-ant-…",
     free: false,
-    models: { "claude-sonnet-5": "Sonnet 5 (equilibrado)", "claude-haiku-4-5-20251001": "Haiku 4.5 (barato)", "claude-opus-4-8": "Opus 4.8 (máx. capacidad)" },
+    models: { "claude-sonnet-5": "Sonnet 5 (equilibrado)", "claude-haiku-4-5-20251001": "Haiku 4.5 (barato)", "claude-opus-5": "Opus 5 (máx. capacidad)" },
     defaultModel: "claude-sonnet-5",
     validateKey: k => k.startsWith("sk-ant-"),
+    listModels: async key => {
+      const r = await fetch("https://api.anthropic.com/v1/models?limit=100", {
+        headers: { "x-api-key": key, "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" }
+      });
+      if (!r.ok) throw new Error(await readError(r));
+      const out = {};
+      for (const m of (await r.json()).data || []) if (m.id) out[m.id] = m.display_name || m.id;
+      return out;
+    },
     formatTools(defs) { return defs.map(d => ({ name: d.name, description: d.description, input_schema: d.parameters })); },
     buildRequest({ model, key, system, tools, messages }) {
       return {
@@ -175,6 +201,20 @@ const PROVIDERS = {
     models: { "gpt-4o-mini": "GPT-4o mini (barato)", "gpt-4o": "GPT-4o", "gpt-4.1-mini": "GPT-4.1 mini" },
     defaultModel: "gpt-4o-mini",
     validateKey: k => k.startsWith("sk-"),
+    listModels: async key => {
+      const r = await fetch("https://api.openai.com/v1/models", { headers: { authorization: "Bearer " + key } });
+      if (!r.ok) throw new Error(await readError(r));
+      const out = {};
+      /* /v1/models lo devuelve TODO (voz, imagen, embeddings…); aquí solo
+         sirven los de chat con function calling. */
+      for (const m of (await r.json()).data || []) {
+        const id = String(m.id || "");
+        if (!/^(gpt|o[134])/.test(id)) continue;
+        if (/instruct|audio|realtime|image|tts|transcribe|search|embedding|moderation|\d{4}-\d{2}-\d{2}$/.test(id)) continue;
+        out[id] = id;
+      }
+      return out;
+    },
     formatTools(defs) { return defs.map(d => ({ type: "function", function: { name: d.name, description: d.description, parameters: d.parameters } })); },
     buildRequest({ model, key, system, tools, messages }) {
       return {
@@ -221,6 +261,44 @@ function mdToHtml(src) {
   return out;
 }
 
+/* ============================================================
+   CATÁLOGO DE MODELOS
+
+   Los IDs se retiran cada pocos meses: «gemini-2.0-flash» se apagó el
+   1 de junio de 2026 y dejó al asistente pidiendo un modelo inexistente.
+   La API contesta entonces que no queda cuota gratuita — un mensaje que
+   parece de facturación y no lo es, así que nadie lo relaciona con el
+   modelo. Para que no vuelva a pasar, la lista de verdad se le pregunta
+   al proveedor; la escrita a mano queda solo de red, para que el
+   desplegable nunca aparezca vacío.
+   ============================================================ */
+const MODELS_TTL = 24 * 3600 * 1000;
+const modelsStore = prov => "colabtex_ai_models_" + prov;
+
+export function readModelCache(prov, now = Date.now()) {
+  try {
+    const c = JSON.parse(localStorage.getItem(modelsStore(prov)) || "null");
+    if (!c || !c.models || !Object.keys(c.models).length) return null;
+    return (now - (c.at || 0) < MODELS_TTL) ? c.models : null;
+  } catch (e) { return null; }
+}
+
+function writeModelCache(prov, models) {
+  try { localStorage.setItem(modelsStore(prov), JSON.stringify({ at: Date.now(), models })); } catch (e) {}
+}
+
+export const modelsOf = prov => readModelCache(prov) || PROVIDERS[prov].models;
+
+/* Un modelo guardado que ya no exista cae al de por defecto; y si el de
+   por defecto tampoco sigue vivo, al primero del catálogo. Nunca se
+   devuelve algo que el proveedor ya no acepte. */
+export function chooseModel(prov, stored, catalog) {
+  const list = catalog || modelsOf(prov);
+  if (stored && list[stored]) return stored;
+  const def = PROVIDERS[prov].defaultModel;
+  return list[def] ? def : (Object.keys(list)[0] || def);
+}
+
 export function createAssistant(api) {
   let provider = localStorage.getItem(PROVIDER_STORE) || "google";
   if (!PROVIDERS[provider]) provider = "google";
@@ -237,8 +315,7 @@ export function createAssistant(api) {
   const modelSel = $("aiModel");
 
   function pickModel(prov) {
-    const stored = localStorage.getItem("colabtex_ai_model_" + prov);
-    return (stored && PROVIDERS[prov].models[stored]) ? stored : PROVIDERS[prov].defaultModel;
+    return chooseModel(prov, localStorage.getItem("colabtex_ai_model_" + prov));
   }
   const adapter = () => PROVIDERS[provider];
   const getKey = () => localStorage.getItem(adapter().keyStore);
@@ -255,20 +332,40 @@ export function createAssistant(api) {
 
   function fillModels() {
     modelSel.innerHTML = "";
-    for (const [id, label] of Object.entries(adapter().models)) {
+    for (const [id, label] of Object.entries(modelsOf(provider))) {
       const o = document.createElement("option");
       o.value = id; o.textContent = label;
       modelSel.appendChild(o);
     }
     modelSel.value = model;
   }
+
+  /* Pide al proveedor qué modelos acepta esta clave. Silencioso a
+     propósito: si falla (sin red, clave recién pegada, endpoint caído) nos
+     quedamos con la lista fija y el asistente sigue funcionando. */
+  async function refreshModels(force) {
+    const p = adapter(), key = getKey(), prov = provider;
+    if (!p.listModels || !key) return;
+    if (!force && readModelCache(prov)) return;
+    try {
+      const list = await p.listModels(key);
+      if (!Object.keys(list).length) return;
+      writeModelCache(prov, list);
+      if (prov !== provider) return;            // cambió de proveedor mientras tanto
+      model = chooseModel(prov, model, list);
+      fillModels();
+    } catch (e) { /* nos quedamos con la lista de respaldo */ }
+  }
+
   fillModels();
+  refreshModels();
 
   providerSel.onchange = () => {
     provider = providerSel.value;
     localStorage.setItem(PROVIDER_STORE, provider);
     model = pickModel(provider);
     fillModels();
+    refreshModels();
     reset();
     if (!hasKey()) showSetup(""); else hideSetup();
     renderSetup();
@@ -425,12 +522,23 @@ export function createAssistant(api) {
       }
     } catch (e) {
       if (e.status === 401 || e.status === 403) addError("Tu API key no es válida, expiró o no tiene permiso. Vuelve a configurarla con ⚙.");
-      else if (e.status === 429 && /limit:\s*0/.test(e.message || ""))
-        addError("La capa gratuita NO está activada para el proyecto de tu API key (limit: 0). No es que hayas agotado la cuota: ese proyecto no tiene cuota gratuita.\n\n" +
-          "Solución: crea la clave en AI Studio con una cuenta de Gmail PERSONAL (no institucional/UC) y elige «crear en un proyecto nuevo». " +
-          "Las cuentas de universidad suelen tener la capa gratuita bloqueada. También puedes probar el modelo gemini-1.5-flash.");
-      else if (e.status === 429) addError("Límite de uso alcanzado (429). " + (adapter().free ? "Agotaste la cuota gratuita del momento; espera unos minutos o vuelve más tarde." : "Revisa el saldo/límites de tu cuenta.") + "\n" + (e.message || ""));
-      else if (e.status === 400 || e.status === 404) addError("La API rechazó la solicitud (" + e.status + "): " + e.message + "\nQuizá el nombre del modelo no está disponible en tu cuenta; prueba otro modelo.");
+      else if (e.status === 404 || /not found|not supported|does not exist/i.test(e.message || "")) {
+        /* Un modelo retirado da esto. Refrescamos el catálogo para que el
+           desplegable vuelva a mostrar solo lo que existe hoy. */
+        addError("El modelo «" + model + "» ya no existe o tu cuenta no lo tiene.\n" +
+          "Estoy actualizando la lista de modelos: elígelo de nuevo arriba y vuelve a intentarlo.");
+        refreshModels(true);
+      } else if (e.status === 429 && /limit:\s*0/.test(e.message || "")) {
+        /* limit: 0 = ese proyecto NUNCA tuvo cuota para este modelo. Suele ser
+           un modelo sin capa gratuita (los Pro, desde abril de 2026) o una
+           cuenta institucional con la capa gratuita bloqueada. */
+        addError("Tu cuenta no tiene cuota gratuita para «" + model + "» (limit: 0). No es que la hayas agotado: nunca la tuvo.\n\n" +
+          "Prueba con un modelo Flash, que son los únicos gratuitos. Si tampoco funciona, crea la clave en AI Studio " +
+          "con una cuenta de Gmail PERSONAL (no institucional/UC) y elige «crear en un proyecto nuevo»: las cuentas de " +
+          "universidad suelen traer la capa gratuita bloqueada.");
+        refreshModels(true);
+      } else if (e.status === 429) addError("Límite de uso alcanzado (429). " + (adapter().free ? "Agotaste la cuota del momento. Ojo: una conversación con herramientas puede gastar varias peticiones, así que en la capa gratuita se toca antes el límite DIARIO que el de por minuto." : "Revisa el saldo/límites de tu cuenta.") + "\n" + (e.message || ""));
+      else if (e.status === 400) addError("La API rechazó la solicitud (400): " + e.message);
       else addError("No se pudo contactar al modelo: " + (e.message || String(e)) + "\nRevisa tu conexión y que la API key sea correcta.");
     } finally {
       thinking.remove();
@@ -447,6 +555,7 @@ export function createAssistant(api) {
     localStorage.setItem(adapter().keyStore, v);
     $("aiKeyInput").value = "";
     hideSetup();
+    refreshModels(true);      // clave nueva: preguntar qué modelos acepta
     if (messages.length === 0)
       addBubble("bot", "¡Listo! Soy tu asistente de LaTeX (" + escapeHtml(adapter().label.split(" — ")[0]) +
         "). Puedo leer y editar los archivos de este proyecto. Prueba: <em>«resume la introducción»</em> o <em>«arregla los errores de compilación»</em>.");

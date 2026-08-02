@@ -37,18 +37,71 @@ const PUSH_MS = 300;         // retardo antes de volcar Yjs → disco
    deshacer del usuario ni se confunden con tecleo local. */
 export const BRIDGE_ORIGIN = "colabtex-bridge";
 
-/* Lanzador que no necesita saber la ruta absoluta: %~dp0 es la carpeta
-   donde vive el propio .bat. */
-const LAUNCHER = "abrir-en-vscode.bat";
-const LAUNCHER_BODY = "@echo off\r\nrem Creado por ColabTeX: abre esta carpeta en VS Code.\r\ncode \"%~dp0.\"\r\n";
+/* ---------- lanzadores y el archivo que enseña la ruta ----------
+
+   El navegador NUNCA revela la ruta absoluta de una carpeta (sería una
+   fuga de información sobre el disco del usuario), y sin ella no se puede
+   lanzar vscode://file/… ni claude://code/new?folder=…  Antes se le pedía
+   al usuario que la pegara a mano, que es justo lo que sobra para alguien
+   que sabe poco de computación.
+
+   La salida: no preguntársela a él, sino al .bat. Un .bat sí sabe dónde
+   vive (%~dp0), así que antes de abrir el editor deja su propia ruta
+   escrita en PATHFILE, y el sondeo —que ya recorre la carpeta cada
+   segundo— la recoge solo. Un doble clic, una vez en la vida de esa
+   carpeta; después el botón de la web abre el editor directamente,
+   también en sesiones futuras (la ruta se guarda junto al handle).
+
+   La redirección va DELANTE del echo a propósito: %~dp0 termina en «\» y,
+   pegado a «>», cmd lo parsea mal. Aun así el lado JS hace trim(). */
+export const PATHFILE = ".colabtex-ruta";
+export const LAUNCHER = "abrir-en-vscode.bat";
+const LAUNCHER_BODY =
+  "@echo off\r\nrem Creado por ColabTeX: abre esta carpeta en VS Code.\r\n" +
+  ">\"%~dp0" + PATHFILE + "\" echo %~dp0\r\ncode \"%~dp0.\"\r\n";
+
+export const LAUNCHER_CLAUDE = "abrir-en-claude.bat";
+/* `call` porque `claude` suele ser un .cmd de npm: sin él, el .bat cede el
+   control y no vuelve. */
+const LAUNCHER_CLAUDE_BODY =
+  "@echo off\r\nrem Creado por ColabTeX: abre esta carpeta con Claude Code.\r\n" +
+  ">\"%~dp0" + PATHFILE + "\" echo %~dp0\r\ncd /d \"%~dp0\"\r\ncall claude\r\n";
+
+/* Instrucciones para Claude Code. Se escriben una sola vez: si el usuario
+   las edita, se respetan. */
+const CLAUDE_MD = "CLAUDE.md";
+const CLAUDE_MD_BODY = mainFile => `# Artículo LaTeX (ColabTeX)
+
+Esta carpeta está sincronizada **en vivo** con ColabTeX, un editor
+colaborativo en el navegador. Lo que guardes aquí sube solo en unos
+segundos y lo ven los demás colaboradores; no hay ningún comando que
+ejecutar para publicar.
+
+- Archivo principal: \`${mainFile || "main.tex"}\`
+- Se compila con pdfLaTeX.
+
+## Reglas de esta carpeta
+
+- **Haz cambios pequeños y localizados.** Reescribir un archivo entero
+  destruye lo que otra persona esté escribiendo en ese mismo momento.
+- **Borrar o mover un archivo aquí lo borra o lo mueve para todo el
+  equipo.** Pregunta antes de hacerlo.
+- No toques \`.aux\`, \`.log\`, \`.out\`, \`.pdf\` ni el resto de la basura de
+  compilación: no se sincronizan y se regeneran solos.
+- \`${LAUNCHER}\`, \`${LAUNCHER_CLAUDE}\` y \`${PATHFILE}\` los genera
+  ColabTeX. Déjalos donde están.
+- El artículo está escrito en español; responde y comenta en español.
+`;
 
 const isText = path => {
   const base = path.split("/").pop();
   return base.includes(".") && TEXT_EXT.includes(base.split(".").pop().toLowerCase());
 };
 
-/* Archivos que el puente genera o que LaTeX deja tirados: nunca suben. */
-const IGNORE = new Set([LAUNCHER]);
+/* Archivos que el puente genera: nunca suben al proyecto. Ojo con
+   CLAUDE.md — «md» SÍ está en TEXT_EXT, así que sin esto aparecería en el
+   árbol de todos los colaboradores y dentro del .zip. */
+const IGNORE = new Set([LAUNCHER, LAUNCHER_CLAUDE, PATHFILE, CLAUDE_MD]);
 
 /* ---------- diff mínimo sobre un Y.Text ----------
    `origin` marca de dónde viene el cambio. Por omisión, del disco; main.js
@@ -66,18 +119,47 @@ export function applyTextToY(ytext, next, origin = BRIDGE_ORIGIN) {
   return true;
 }
 
-/* ---------- URL de VS Code a partir de una ruta absoluta ---------- */
+/* ---------- rutas absolutas ---------- */
+
+/* Normaliza lo que venga: comillas del «Copiar como ruta» de Windows, el
+   «\» final que deja %~dp0, el BOM y el salto de línea del echo. */
+export function cleanPath(raw) {
+  return String(raw || "")
+    .replace(/^\uFEFF/, "")
+    .split(/[\r\n]/)[0]
+    .trim()
+    .replace(/^["']|["']$/g, "")
+    .trim()
+    .replace(/[\\/]+$/, "");
+}
+
 export function vscodeUrl(absPath) {
-  let p = String(absPath || "").trim().replace(/^["']|["']$/g, "").replace(/\\/g, "/");
-  p = p.replace(/\/+$/, "");
+  let p = cleanPath(absPath).replace(/\\/g, "/");
   if (/^[a-zA-Z]:/.test(p)) p = "/" + p;      // D:/Tesis → /D:/Tesis
   if (!p.startsWith("/")) p = "/" + p;
   return "vscode://file" + encodeURI(p);
 }
 
+/* App de escritorio de Claude: abre una sesión de Code sobre la carpeta,
+   con el prompt ya escrito. La carpeta que llega por enlace se trata
+   siempre como no confiable, así que Claude pedirá confirmación — eso no
+   se puede evitar desde aquí. */
+export function claudeUrl(absPath, prompt) {
+  const p = cleanPath(absPath);
+  if (!p) return "";
+  /* encodeURIComponent y NO URLSearchParams: este último codifica los
+     espacios como «+» (formato de formulario), y quien lea el parámetro con
+     decodeURIComponent se encontraría un «+» literal en medio del prompt y
+     de la ruta. Con %20 no hay ambigüedad para ninguno de los dos lectores. */
+  let u = "claude://code/new?folder=" + encodeURIComponent(p);
+  if (prompt) u += "&q=" + encodeURIComponent(prompt);
+  return u;
+}
+
 export function createBridge(hooks) {
   const H = Object.assign({
     onStatus() {}, onLog() {}, onTree() {},
+    onPath() {},                    // se aprendió la ruta absoluta
     canWrite: () => true,           // rol «view» no debe subir nada
     newYText: () => null            // main.js provee el constructor de Y.Text
   }, hooks);
@@ -86,6 +168,7 @@ export function createBridge(hooks) {
   let yfiles = null;          // Y.Map ruta → Y.Text
   let projectId = null;
   let absPath = "";
+  let mainFile = "";
   let pollTimer = null, pushTimer = null, unobserve = null;
   let running = false, ticking = false;
 
@@ -152,11 +235,29 @@ export function createBridge(hooks) {
     } catch (e) { /* ya no estaba */ }
   }
 
+  /* ---------- aprender la ruta que dejó el .bat ----------
+     Solo mientras no la sepamos: en cuanto se aprende, se guarda junto al
+     handle y esto no vuelve a leerse. */
+  async function learnPath() {
+    if (absPath || !dir) return;
+    let txt = "";
+    try {
+      const h = await dir.getFileHandle(PATHFILE);
+      txt = cleanPath(await lfs.readText(h));
+    } catch (e) { return; }         // aún no lo han abierto: normal
+    if (!txt) return;
+    setPath(txt);
+    H.onLog("💻 Ruta de la carpeta aprendida: " + txt);
+    H.onStatus("VS Code · listo", "#7ee0c2");
+    H.onPath(txt);
+  }
+
   /* ---------- disco → Yjs ---------- */
   async function tick() {
     if (!running || ticking) return;
     ticking = true;
     try {
+      await learnPath();
       const scan = await lfs.scanTextMeta(dir);
       const live = new Map();
       for (const [p, m] of scan.meta) if (isText(p) && !IGNORE.has(p)) live.set(p, m);
@@ -249,6 +350,15 @@ export function createBridge(hooks) {
     }
 
     try { await lfs.writeText(dir, LAUNCHER, LAUNCHER_BODY); } catch (e) {}
+    try { await lfs.writeText(dir, LAUNCHER_CLAUDE, LAUNCHER_CLAUDE_BODY); } catch (e) {}
+
+    /* CLAUDE.md solo si no existe: si el usuario lo ha adaptado, es suyo. */
+    try {
+      let hay = false;
+      try { await dir.getFileHandle(CLAUDE_MD); hay = true; } catch (e) {}
+      if (!hay) await lfs.writeText(dir, CLAUDE_MD, CLAUDE_MD_BODY(mainFile));
+    } catch (e) {}
+
     return { texts: n, assets: a };
   }
 
@@ -271,11 +381,13 @@ export function createBridge(hooks) {
     if (running) await stop();
 
     dir = dirHandle; yfiles = yFiles; projectId = id; absPath = path || "";
+    mainFile = opts.mainFile || "";
     seen.clear(); outbox.clear();
     running = true;
 
     const counts = await mirrorDown(getAssets, fetchAsset);
     observe();
+    await learnPath();          // por si el .bat ya se usó en otra ocasión
     pollTimer = setInterval(tick, POLL_MS);
     H.onStatus("VS Code · sincronizado", "#7ee0c2");
     H.onLog("💻 Carpeta enlazada: " + dir.name + " (" + counts.texts + " archivos, " + counts.assets + " imágenes)");

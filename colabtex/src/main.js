@@ -33,7 +33,7 @@ import { SyncTex } from "./synctex.js";
 import { parseTexLog, groupByFile } from "./texlog.js";
 import { THEMES, themeName, saveThemeName, cmThemeFor, cmHighlightFor, applyCssVars } from "./themes.js";
 import { loadKatex, visualExtensions } from "./visual.js";
-import { createBridge, vscodeUrl, applyTextToY } from "./bridge.js";
+import { createBridge, vscodeUrl, claudeUrl, applyTextToY, LAUNCHER, LAUNCHER_CLAUDE } from "./bridge.js";
 import { baseName, parentOf, joinPath, isInside, movedPath, moveProblem, rewriteReferences, createTreeDnD } from "./file-move.js";
 import { AssetPreview } from "./asset-preview.js";
 import { createFormatBar, xcolorPatch } from "./format.js";
@@ -314,6 +314,7 @@ async function openEditor(projectId, token) {
   $("btnLinkDraw").style.display = "";
   $("btnReloadLocal").style.display = "none";
   $("btnVsCode").style.display = lfs.isSupported() ? "" : "none";
+  $("btnClaude").style.display = lfs.isSupported() ? "" : "none";
   $("btnCommentsToggle").style.display = "";   // comentarios: disponible en la nube
   paintVsCodeButton();
   state.lastCompile = null;
@@ -1345,6 +1346,7 @@ async function openLocalFolder(handle) {
   $("btnReloadLocal").style.display = "";
   // en modo local ya se edita el disco directamente: el puente no pinta nada
   $("btnVsCode").style.display = "none";
+  $("btnClaude").style.display = "none";
   $("presenceAvatars").innerHTML = "";
   $("onlineCount").textContent = "modo local (sin colaboración)";
   if (state.assistant) state.assistant.reset();
@@ -1436,47 +1438,74 @@ function ensureBridge() {
     onStatus: (t, c) => setSyncBadge(t, c),
     onLog: m => appendLog(m),
     onTree: () => renderFileTree(),
+    /* Se aprendió la ruta: repintar para que el botón deje de anunciar el
+       paso del .bat. NO se lanza el editor aquí — la ruta llega justamente
+       porque el usuario acaba de abrirlo con el .bat, y abriríamos dos. */
+    onPath: () => paintVsCodeButton(),
     canWrite: () => state.role !== "view",
     newYText: () => new Y.Text()
   });
   return state.bridge;
 }
 
+/* Las dos aplicaciones que sabemos abrir sobre la carpeta enlazada. */
+const CLAUDE_PROMPT = "Esta carpeta es un artículo LaTeX sincronizado en vivo con ColabTeX. Lee CLAUDE.md antes de tocar nada.";
+const APPS = {
+  vscode: { id: "btnVsCode", label: "💻 VS Code", name: "VS Code", bat: LAUNCHER, url: p => vscodeUrl(p) },
+  claude: { id: "btnClaude", label: "🤖 Claude", name: "Claude Code", bat: LAUNCHER_CLAUDE, url: p => claudeUrl(p, CLAUDE_PROMPT) }
+};
+
 function paintVsCodeButton() {
-  const b = $("btnVsCode");
-  if (!b) return;
-  const on = state.bridge && state.bridge.running;
-  b.textContent = on ? "💻 VS Code ●" : "💻 VS Code";
-  b.title = on
-    ? `Sincronizando con la carpeta «${state.bridge.folder}». Clic para abrir VS Code o detener.`
-    : "Sincronizar este proyecto con una carpeta de tu PC y editarlo en VS Code";
-  b.style.color = on ? "#7ee0c2" : "";
+  const br = state.bridge;
+  const on = br && br.running;
+  const lista = on && br.absPath;
+  for (const app of Object.values(APPS)) {
+    const b = $(app.id);
+    if (!b) continue;
+    b.textContent = on ? app.label + " ●" : app.label;
+    b.title = !on
+      ? `Sincronizar este proyecto con una carpeta de tu PC y editarlo en ${app.name}`
+      : (lista
+          ? `Abrir «${br.folder}» en ${app.name}`
+          : `Sincronizando con «${br.folder}». Falta abrir «${app.bat}» una vez.`
+        ) + "\nClic derecho: detener la sincronización.";
+    b.style.color = on ? "#7ee0c2" : "";
+  }
 }
 
-/* El navegador no revela la ruta absoluta de una carpeta (por diseño:
-   sería una fuga de datos sobre el disco del usuario). Para poder lanzar
-   vscode://file/… hay que preguntarla una vez; queda guardada junto al
-   handle. Quien no quiera pegarla tiene el .bat que dejamos en la carpeta. */
+/* Escape para quien prefiera teclear: el navegador no revela la ruta
+   absoluta de una carpeta (por diseño, sería una fuga sobre el disco del
+   usuario), pero se puede pegar. El camino normal ya no pasa por aquí —
+   la aprende el .bat. */
 async function askAbsPath(folderName, current) {
   const p = prompt(
     "¿Cuál es la ruta completa de la carpeta en tu PC?\n\n" +
-    "El navegador no puede averiguarla por seguridad, así que hace falta\n" +
-    "indicarla una sola vez. En el Explorador: clic derecho sobre la\n" +
-    "carpeta → «Copiar como ruta», y pégala aquí.\n\n" +
-    "Si prefieres saltarte esto, dentro de la carpeta te dejé\n" +
-    "«abrir-en-vscode.bat»: doble clic y VS Code se abre igual.",
+    "Normalmente no hace falta: basta con abrir una vez el .bat que dejamos\n" +
+    "dentro de la carpeta y ColabTeX la aprende sola.\n\n" +
+    "Si prefieres indicarla a mano: en el Explorador, clic derecho sobre la\n" +
+    "carpeta → «Copiar como ruta», y pégala aquí.",
     current || ("D:\\ruta\\a\\" + folderName));
   return p ? p.trim() : "";
 }
 
-function launchVsCode() {
+/* Primera vez con esta carpeta: todavía no sabemos dónde está en el disco,
+   así que el .bat hace el doble trabajo de abrir el editor y decírnoslo. */
+function explainLauncher(app) {
   const br = state.bridge;
-  if (!br || !br.running) return;
-  if (!br.absPath) {
-    appendLog("ℹ Sin ruta configurada: abre «abrir-en-vscode.bat» dentro de la carpeta " +
-      `«${br.folder}» o vuelve a pulsar el botón para indicarla.`);
-    return;
-  }
+  alert(
+    `El proyecto ya está copiado en la carpeta «${br.folder}».\n\n` +
+    `Solo esta primera vez, ábrela y haz doble clic en:\n\n        ${app.bat}\n\n` +
+    `${app.name} se abrirá y, de paso, ColabTeX aprenderá dónde está la carpeta.\n` +
+    `A partir de entonces te bastará con pulsar el botón «${app.label}».`);
+  appendLog(`ℹ Abre «${app.bat}» dentro de «${br.folder}» una vez: después bastará el botón.`);
+}
+
+function launchApp(which) {
+  const br = state.bridge, app = APPS[which];
+  if (!br || !br.running || !app) return;
+  if (!br.absPath) { explainLauncher(app); return; }
+  const url = app.url(br.absPath);
+  if (!url) return;
   /* El protocolo se lanza desde un iframe oculto, NO con location.href.
      Asignar location.href inicia una navegación de primer nivel: el
      navegador la cancela al ver que es un protocolo externo, pero para
@@ -1487,12 +1516,14 @@ function launchVsCode() {
      documento principal. */
   const f = document.createElement("iframe");
   f.style.display = "none";
-  f.src = vscodeUrl(br.absPath);
+  f.src = url;
   document.body.appendChild(f);
   setTimeout(() => f.remove(), 2000);
 }
 
-async function linkVsCodeFolder() {
+const launchVsCode = () => launchApp("vscode");
+
+async function linkVsCodeFolder(which = "vscode") {
   if (!lfs.isSupported()) {
     alert("Tu navegador no permite enlazar carpetas del disco.\n\n" +
       "Esta función usa la File System Access API, disponible en Chrome, Edge y " +
@@ -1537,8 +1568,6 @@ async function linkVsCodeFolder() {
     }
   } catch (e) { /* si no se puede inspeccionar, seguimos igual */ }
 
-  if (!path) path = await askAbsPath(dir.name, "");
-
   setSyncBadge("Copiando al disco…", "#e2c08d");
   try {
     await br.start({
@@ -1546,6 +1575,7 @@ async function linkVsCodeFolder() {
       yFiles: state.yFiles,
       id: state.project.id,
       path,
+      mainFile: resolveMainFile(),
       getAssets: () => state.assets,
       fetchAsset: assetBytes
     });
@@ -1559,7 +1589,9 @@ async function linkVsCodeFolder() {
   if (state.role === "view") {
     appendLog("ℹ Tienes permiso de solo lectura: los cambios bajan al disco, pero lo que edites ahí no sube.");
   }
-  launchVsCode();
+  /* Con la ruta ya sabida (carpeta reutilizada) se abre directo; si no, se
+     explica el doble clic al .bat, que la enseña de paso. */
+  launchApp(which);
 }
 
 async function unlinkVsCode() {
@@ -1572,23 +1604,33 @@ async function unlinkVsCode() {
   appendLog(`💻 Sincronización con «${name}» detenida. Los archivos siguen en tu disco.`);
 }
 
-async function onVsCodeClick() {
+async function onVsCodeClick(which = "vscode") {
   if (state.mode !== "cloud" || !state.project || !state.yFiles) return;
-  const br = state.bridge;
+  const br = state.bridge, app = APPS[which];
   if (br && br.running) {
-    const seguir = confirm(
-      `Este proyecto está sincronizado con la carpeta «${br.folder}».\n\n` +
-      "«Aceptar» abre VS Code.\n" +
-      "«Cancelar» detiene la sincronización.");
-    if (seguir) {
-      if (!br.absPath) br.setPath(await askAbsPath(br.folder, ""));
-      launchVsCode();
-    } else {
-      await unlinkVsCode();
-    }
+    /* Ya enlazado: el clic abre, sin preguntar nada. Detener la
+       sincronización pasa a ser el botón ✕ de la insignia. */
+    launchApp(which);
     return;
   }
-  await linkVsCodeFolder();
+  await linkVsCodeFolder(which);
+}
+
+/* Menú contextual del botón: desenlazar o pegar la ruta a mano, que son
+   acciones raras y no deben estorbar al clic normal. */
+async function onVsCodeMenu(ev) {
+  ev.preventDefault();
+  const br = state.bridge;
+  if (!br || !br.running) return;
+  const q = br.absPath
+    ? `Carpeta enlazada: «${br.folder}»\n\n«Aceptar» detiene la sincronización.\n«Cancelar» no hace nada.`
+    : `Carpeta enlazada: «${br.folder}», pero aún no sé dónde está en tu disco.\n\n` +
+      "«Aceptar» detiene la sincronización.\n«Cancelar» te deja escribir la ruta a mano.";
+  if (confirm(q)) { await unlinkVsCode(); return; }
+  if (!br.absPath) {
+    const p = await askAbsPath(br.folder, "");
+    if (p) { br.setPath(p); paintVsCodeButton(); appendLog("💻 Ruta indicada a mano: " + p); }
+  }
 }
 
 /* ---------- importar .zip (export de Overleaf) ---------- */
@@ -2434,7 +2476,10 @@ function wireEvents() {
   };
   $("btnOpenLocal").onclick = () => openLocalFolder(null);
   $("btnReloadLocal").onclick = reloadLocalFolder;
-  $("btnVsCode").onclick = onVsCodeClick;
+  $("btnVsCode").onclick = () => onVsCodeClick("vscode");
+  $("btnVsCode").oncontextmenu = onVsCodeMenu;
+  $("btnClaude").onclick = () => onVsCodeClick("claude");
+  $("btnClaude").oncontextmenu = onVsCodeMenu;
   $("btnNewFromZip").onclick = () => $("zipNewInput").click();
   $("zipNewInput").onchange = async e => {
     const f = e.target.files[0];

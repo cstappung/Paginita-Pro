@@ -113,16 +113,44 @@ Key modules in [colabtex/src/](colabtex/src/):
 - `synctex.js` / `visual.js` — source↔PDF sync and the visual/rendered view.
 - `texlog.js` / `themes.js` — LaTeX log parsing, editor themes.
 - `local-fs.js` — File System Access API layer for local mode.
-- `bridge.js` — **"Abrir en VS Code"**: links a *cloud* project to a disk
-  folder and keeps both in sync bidirectionally while the tab is open. Writes
-  Yjs→disk on change; polls disk mtimes each second and applies a **minimal
-  diff** to the `Y.Text` (never a full replace — that would destroy
+- `bridge.js` — **"Abrir en VS Code" / "Abrir con Claude"**: links a *cloud*
+  project to a disk folder and keeps both in sync bidirectionally while the tab
+  is open. Writes Yjs→disk on change; polls disk mtimes each second and applies
+  a **minimal diff** to the `Y.Text` (never a full replace — that would destroy
   collaborators' concurrent edits and jump their cursors). Echo is suppressed by
-  comparing content, not timestamps.
+  comparing content, not timestamps. Three things follow from the browser
+  **never revealing a folder's absolute path** (by design — it would leak the
+  shape of the user's disk), which `vscode://file/…` and
+  `claude://code/new?folder=…` both need:
+  - The launchers it drops in the folder (`abrir-en-vscode.bat`,
+    `abrir-en-claude.bat`) **write their own path** (`%~dp0`) into `PATHFILE`
+    before opening the editor, and the poll picks it up (`learnPath`). One
+    double-click, once per folder ever; afterwards `absPath` lives in IndexedDB
+    next to the handle and the web button opens the editor directly. Asking the
+    user to paste the path is now only an escape hatch (right-click the button).
+  - The redirection goes **before** the `echo` in the `.bat`: `%~dp0` ends in
+    `\` and `cmd` mis-parses it glued to `>`. `cleanPath` trims anyway (quotes,
+    BOM, newline, trailing slash).
+  - `claudeUrl` encodes with `encodeURIComponent`, **not** `URLSearchParams`:
+    the latter writes spaces as `+`, which a reader using `decodeURIComponent`
+    would leave literal.
+  It also writes a **`CLAUDE.md`** into the folder (only if absent) telling
+  Claude Code that the folder syncs live with a collaborative web editor, so it
+  makes small edits rather than whole-file rewrites. All four generated files
+  are in `IGNORE` so they never upload — note `md` **is** in `TEXT_EXT`, so
+  without that `CLAUDE.md` would appear in everyone's file tree and in the
+  `.zip`. Windows only; on macOS the path still has to be pasted.
 - `ai-assistant.js` — BYOK AI assistant (Gemini/Claude/OpenAI). The API key
   stays in the user's `localStorage`; calls go directly from the browser. The
   model edits files through tool-calling that operates on the Yjs doc, so its
-  edits are collaborative and live.
+  edits are collaborative and live. **Model IDs are asked to the provider**
+  (`listModels` per adapter, cached a day in `localStorage`); the hardcoded
+  `models` map is only a fallback so the dropdown is never empty. This is not
+  gold-plating: `gemini-2.0-flash` was shut down on 2026-06-01 and the API
+  answers a retired model with *"no free quota"*, which reads like a billing
+  problem and had the assistant dead for every Gemini user. `chooseModel`
+  drops a stored ID that no longer exists. Only Flash models are free — Gemini
+  Pro lost its free tier on 2026-04-01.
 - `comments.js` — **text comments** (Overleaf-style). Select text → attach a
   thread everyone sees; anyone (editor/owner) can reply or mark resolved.
   Threads live in a Yjs `comments` map (see below) anchored with Yjs **relative
