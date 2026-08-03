@@ -37,6 +37,9 @@ import { createBridge, vscodeUrl, claudeUrl, applyTextToY, LAUNCHER, LAUNCHER_CL
 import { baseName, parentOf, joinPath, isInside, movedPath, moveProblem, rewriteReferences, createTreeDnD } from "./file-move.js";
 import { AssetPreview } from "./asset-preview.js";
 import { createFormatBar, xcolorPatch } from "./format.js";
+import { installErrorCapture } from "./reports.js";
+import { createReportWidget } from "./report-widget.js";
+import * as rep from "./fb-reports.js";
 
 const $ = id => document.getElementById(id);
 const ROLE_LABEL = { owner: "Propietario", edit: "Puede editar", view: "Solo lectura" };
@@ -125,6 +128,7 @@ const state = {
   format: null,          // barra de negrita/cursiva/subrayado/color (creada en boot)
   engine: null,
   pdfViewer: null,
+  capture: null,        // recogida de errores para el informe (reports.js)
   compiling: false,
   membersUnsub: null,
   assistant: null,       // panel de IA (creado en boot)
@@ -2235,6 +2239,15 @@ async function compile() {
       $("logSummary").innerHTML = `<span style="color:#e57373;font-weight:500">✗ La compilación falló — revisa el registro (${sum.errors.length} error${sum.errors.length === 1 ? "" : "es"})</span>`;
       $("logPanel").style.display = "flex";
     }
+    /* Al informe solo van los fallos que son NUESTROS: un paquete que
+       falta, una fuente que no está, el motor sin memoria. Las erratas
+       del documento (un comando mal escrito, una llave de más) se
+       quedan fuera — ver el filtro de reports.js. */
+    if (state.capture) {
+      state.capture.noteTex(sum.errors, {
+        modo: state.mode, principal: main, archivos: texNames.length, figuras: state.assets.length
+      });
+    }
     const parts = [];
     for (const e of sum.errors) parts.push("✗ " + e);
     for (const w of sum.warnings) parts.push("⚠ " + w);
@@ -2245,6 +2258,14 @@ async function compile() {
     appendLog("✗ " + err.message);
     $("logPanel").style.display = "flex";
     state.lastCompile = { ok: false, errors: [err.message], warnings: [] };
+    /* Una compilación que revienta entera SÍ sube siempre: no es una
+       errata del documento, es que el motor se ha caído. */
+    if (state.capture) {
+      state.capture.note(err.message, {
+        error: err, donde: "compilar el documento",
+        ctx: { modo: state.mode, principal: main, archivos: texNames.length }
+      });
+    }
   } finally {
     state.compiling = false;
     $("btnCompile").textContent = "▶ Compilar";
@@ -2702,7 +2723,34 @@ function wireEvents() {
 }
 
 /* ================================================ arranque */
+/* ---------- informes ----------
+   La versión del paquete sale de la propia etiqueta <script> (?v=…):
+   sin ella, un error reportado no se puede atar a una versión concreta
+   del sitio y no hay forma de saber si ya está arreglado. */
+const VER_PAGINA = (document.currentScript && document.currentScript.src.split("?v=")[1]) || "";
+
+/* En qué anda la aplicación cuando algo revienta. Es el dato que de
+   verdad permite reproducir un fallo, más que la pila minificada. */
+function dondeEstamos() {
+  if (state.compiling) return "compilar el documento";
+  if (!state.project && !state.dirHandle) return "el panel de proyectos";
+  const modo = state.mode === "local" ? "carpeta local" : "proyecto en la nube";
+  return `editar (${modo}${state.activeFile ? ", " + state.activeFile.split("/").pop() : ""})`;
+}
+
 (function boot() {
+  state.capture = installErrorCapture({
+    app: "colabtex", ver: VER_PAGINA, getDonde: dondeEstamos,
+    publicar: rec => {
+      if (state.user) rep.publishError(rec, state.user.uid).catch(() => {});
+    }
+  });
+  createReportWidget({
+    app: "colabtex", ver: VER_PAGINA, capture: state.capture,
+    getUser: () => state.user,
+    enviar: (r, u) => rep.sendFeedback(r, { uid: u.uid, userName: u.name })
+  });
+
   wireEvents();
   initLayout();
   // si la vista visual quedó activa, ir cargando KaTeX desde ya

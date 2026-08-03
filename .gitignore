@@ -13,6 +13,7 @@ Thumbs.db
 desktop.ini
 
 # emulador firebase
+colabtex/.rules-run.mjs
 .firebase/
 firebase-debug.log
 database-debug.log

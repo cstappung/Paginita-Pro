@@ -27,6 +27,9 @@ import { createTextEditor } from "./draw/text.js";
 import { createAssetPreview, extOf } from "./draw/preview.js";
 import { exportAll, download, outputName, exportSvg } from "./draw/export.js";
 import { downloadProjectZip } from "./zip-export.js";
+import { installErrorCapture } from "./reports.js";
+import { createReportWidget } from "./report-widget.js";
+import * as rep from "./fb-reports.js";
 
 const $ = id => document.getElementById(id);
 
@@ -56,7 +59,8 @@ const state = {
   drawingsObserver: null,
   fragObserved: null,   // fragmento vigilado y su oyente, para poder soltarlos
   fragObserver: null,
-  layerTimer: null
+  layerTimer: null,
+  capture: null         // recogida de errores para el informe (reports.js)
 };
 
 const canWrite = () => state.role !== "view";
@@ -842,8 +846,29 @@ function wireEvents() {
   });
 }
 
+/* ================================================ informes */
+const VER_PAGINA = (document.currentScript && document.currentScript.src.split("?v=")[1]) || "";
+
+/* Qué se estaba haciendo cuando algo se rompió: es lo que permite
+   reproducirlo, más que la pila de un paquete minificado. */
+function dondeEstamos() {
+  if (!state.project) return "el panel de proyectos";
+  const t = state.tools ? state.tools.tool : "";
+  return `dibujar (${state.path || "sin dibujo"}${t ? ", herramienta " + t : ""})`;
+}
+
 /* ================================================ arranque */
 (function boot() {
+  state.capture = installErrorCapture({
+    app: "colabdraw", ver: VER_PAGINA, getDonde: dondeEstamos,
+    publicar: rec => { if (state.user) rep.publishError(rec, state.user.uid).catch(() => {}); }
+  });
+  createReportWidget({
+    app: "colabdraw", ver: VER_PAGINA, capture: state.capture,
+    getUser: () => state.user,
+    enviar: (r, u) => rep.sendFeedback(r, { uid: u.uid, userName: u.name })
+  });
+
   wireEvents();
   watchAuth(async user => {
     if (!user) { state.user = null; showLogin(); return; }

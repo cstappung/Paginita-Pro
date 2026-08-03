@@ -24,6 +24,27 @@ Qué garantizan estas reglas:
 - Unirse por enlace exige un token válido de ese proyecto (`tokenIndex`).
 - Los lectores no pueden ver el token de edición.
 
+### ⚠ Si vienes de una versión anterior: los informes
+
+La página **Informes** (errores recogidos, fallos y sugerencias) usa dos nodos
+nuevos, `errors` y `feedback`, que **no existían** en las reglas de antes.
+Mientras no vuelvas a pegar y publicar `database.rules.json`:
+
+- la página de informes se abre pero sale vacía, con un aviso amarillo
+  explicando justo esto;
+- el botón ⚑ deja escribir el reporte pero al enviarlo falla, y ofrece
+  descargarlo a un archivo para no perder lo escrito;
+- los errores se siguen guardando en el navegador de cada persona.
+
+O sea, no se rompe nada — simplemente no se comparte hasta que publiques las
+reglas. Lo que garantizan una vez publicadas:
+
+- cualquiera con sesión ve el informe entero (es del equipo, no de un proyecto);
+- nadie puede firmar un reporte con el `uid` de otra persona;
+- solo quien escribió un reporte puede editarlo o borrarlo, pero **cualquiera
+  puede marcarlo como resuelto**;
+- los textos tienen tope de tamaño, para que un error en bucle no llene la base.
+
 ## 2. Reglas de Storage
 
 1. Consola → **Storage** → pestaña **Reglas**.

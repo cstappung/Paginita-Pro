@@ -5,6 +5,7 @@ import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } f
 import { ref, get, set, push, remove } from "firebase/database";
 import * as Y from "yjs";
 import * as fb from "./src/fb-api.js";
+import * as rep from "./src/fb-reports.js";
 import { RtdbProvider, b64FromBytes } from "./src/y-rtdb.js";
 
 let pass = 0, fail = 0;
@@ -130,6 +131,49 @@ await loginAs(B);
 ok("índice de B limpio", (await get(ref(db, `userProjects/${userB.uid}/${pid}`))).val() === null);
 const listB = await fb.listProjects(userB.uid);
 ok("listado de B no revienta tras el borrado", Array.isArray(listB) && !listB.some(p => p.id === pid));
+
+console.log("— Informes: errores y sugerencias (nodos compartidos) —");
+/* Estos dos nodos están FUERA del árbol de proyectos a propósito: los ve
+   cualquiera con sesión, que es de lo que va un informe de equipo. Lo que
+   sí se acota es el tamaño y quién puede tocar lo ajeno. */
+const errRec = {
+  app: "colabtex", donde: "compilar el documento", huella: "epruebas1",
+  mensaje: "File `pgf.sty' not found", pila: ["f (colabtex-app.js:1:4)"],
+  nav: "Chrome 141 · Windows 10/11", ver: "202608030427", at: Date.now()
+};
+const userA2 = await loginAs(A);
+await allowed("A publica un error", () => rep.publishError(errRec, userA2.uid));
+await allowed("A vuelve a publicarlo (suma)", () => rep.publishError(errRec, userA2.uid));
+ok("el mismo error es UNA fila con contador 2",
+  (await get(ref(db, "errors/epruebas1/veces"))).val() === 2);
+await denied("nadie cuela un mensaje de 500 caracteres", () =>
+  set(ref(db, "errors/egordo"), { app: "colabtex", at: Date.now(), mensaje: "x".repeat(500) }));
+
+let fbId = null;
+await allowed("A escribe una sugerencia", async () => {
+  fbId = await rep.sendFeedback(
+    { tipo: "idea", app: "colabdraw", titulo: "Duplicar una capa entera", cuerpo: "Me ahorraría rehacerla." },
+    { uid: userA2.uid, userName: "Ana" });
+});
+await denied("A no puede firmar algo con el uid de otro", () =>
+  set(ref(db, "feedback/falso"), { tipo: "bug", titulo: "x", uid: "otro-uid", at: Date.now() }));
+
+const userB2 = await loginAs(B);
+const todo = await rep.readAll();
+ok("B ve el informe entero", todo.errores.length >= 1 && todo.feedback.some(f => f.id === fbId));
+await allowed("B marca como resuelto lo de A", () => rep.setFeedbackState(fbId, "hecho"));
+await denied("B NO puede reescribir el texto de A", () =>
+  set(ref(db, `feedback/${fbId}/titulo`), "secuestrado"));
+await denied("B NO puede borrar lo de A", () => rep.deleteFeedback(fbId));
+await denied("un estado inventado no cuela", () => set(ref(db, `feedback/${fbId}/estado`), "loquesea"));
+
+await loginAs(A);
+await allowed("A sí borra lo suyo", () => rep.deleteFeedback(fbId));
+await allowed("cualquiera puede quitar un error del informe", () => rep.deleteError("epruebas1"));
+
+await signOut(auth);
+await denied("sin sesión no se lee el informe", () => get(ref(db, "errors")));
+await denied("sin sesión no se escribe nada", () => set(ref(db, "feedback/x"), { tipo: "bug", titulo: "x", uid: "x" }));
 
 console.log(`\nRESULTADO: ${pass} correctas, ${fail} fallos`);
 process.exit(fail ? 1 : 0);

@@ -64,6 +64,41 @@
       }
     },
 
+    "errors": {
+      ".read": "auth != null",
+      "$fp": {
+        ".write": "auth != null",
+        ".validate": "newData.hasChildren(['app', 'mensaje', 'at']) && newData.child('mensaje').isString() && newData.child('mensaje').val().length <= 400 && newData.child('app').val().length <= 20",
+        "pila": { ".validate": "newData.isString() && newData.val().length <= 600" },
+        "donde": { ".validate": "newData.isString() && newData.val().length <= 120" },
+        "nav": { ".validate": "newData.isString() && newData.val().length <= 80" },
+        "ver": { ".validate": "newData.isString() && newData.val().length <= 40" },
+        "veces": { ".validate": "newData.isNumber()" },
+        "quien": {
+          "$uid": { ".validate": "newData.isBoolean()" }
+        },
+        "$otro": { ".validate": true }
+      }
+    },
+
+    "feedback": {
+      ".read": "auth != null",
+      "$id": {
+        ".write": "auth != null && ((!data.exists() && newData.child('uid').val() === auth.uid) || (data.exists() && data.child('uid').val() === auth.uid))",
+        ".validate": "newData.hasChildren(['tipo', 'titulo', 'uid']) && newData.child('titulo').isString() && newData.child('titulo').val().length <= 200",
+        "cuerpo": { ".validate": "newData.isString() && newData.val().length <= 4000" },
+        "pasos": { ".validate": "newData.isString() && newData.val().length <= 2000" },
+        "adjuntos": { ".validate": "newData.isString() && newData.val().length <= 4000" },
+        "titulo": { ".validate": "newData.isString() && newData.val().length <= 200" },
+        "uid": { ".validate": "newData.val() === auth.uid" },
+        "estado": {
+          ".write": "auth != null",
+          ".validate": "newData.val() === 'abierto' || newData.val() === 'hecho'"
+        },
+        "$otro": { ".validate": true }
+      }
+    },
+
     "presence": {
       "$pid": {
         ".read": "auth != null && root.child('projects').child($pid).child('members').child(auth.uid).exists()",

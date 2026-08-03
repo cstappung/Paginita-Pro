@@ -9,7 +9,7 @@ suite of browser-only tools. There is **no application backend**: everything
 runs client-side, and persistence for the collaborative tool lives in Firebase.
 `index.html` redirects to `Inicio.dc.html`, the landing menu.
 
-Three apps:
+Three apps plus a small shared **Informes** page:
 
 - **CSV·Scope** (`CSV Oscilloscope.dc.html` + `scope-engine.js`) — offline
   oscilloscope for CSV captures (cursors, trigger, FFT/harmonics, XY, math
@@ -23,6 +23,10 @@ Three apps:
   [colabtex/src/draw/](colabtex/src/draw/) plus the entry
   `colabtex/src/draw-main.js`. Shares Firebase, auth and the Yjs provider with
   ColabTeX (see "ColabDraw" below).
+- **Informes** (`informes.html` + `informes-app.js`, entry
+  `colabtex/src/reports-main.js`) — the shared bug tracker: errors the apps
+  collect by themselves, plus the bugs and ideas people write. See "Informes"
+  below.
 
 The UI is authored in Spanish; comments and identifiers are Spanish too. Match
 that when editing.
@@ -40,8 +44,9 @@ npm run build        # bundle both apps + pdf worker, then stamp versions
 npm start            # static preview server at http://localhost:8123
 ```
 
-- `npm run build` runs esbuild three times (IIFE bundle of `src/main.js` →
-  `../colabtex-app.js`, of `src/draw-main.js` → `../colabdraw-app.js`, and the
+- `npm run build` runs esbuild four times (IIFE bundles of `src/main.js` →
+  `../colabtex-app.js`, `src/draw-main.js` → `../colabdraw-app.js` and
+  `src/reports-main.js` → `../informes-app.js`, plus the
   pdf.js worker), then `scripts/stamp-version.js` rewrites the `?v=…` query on
   the `<script>` tag of **each** page (its `PAGES` table) so GitHub
   Pages/browsers don't serve a stale cached bundle. **After editing anything
@@ -54,9 +59,20 @@ npm start            # static preview server at http://localhost:8123
 `colabtex/test-rules.mjs` exercises **every** DB operation against the Realtime
 Database security rules using the Firebase emulators (ports in `firebase.json`:
 auth 9099, database 9000). `src/firebase.js` connects to the emulator only when
-`FIREBASE_EMU` is set and running under Node. Start the emulators, then run the
-file with that env var set (e.g. `FIREBASE_EMU=1 node test-rules.mjs`). Run this
-after changing `firebase/database.rules.json`.
+`FIREBASE_EMU` is set and running under Node. Run this after changing
+`firebase/database.rules.json`.
+
+It **cannot be run directly** any more: `package.json` says
+`"type": "commonjs"`, so Node reads `src/*.js` as CommonJS and an `.mjs` file
+importing named exports out of them fails before the first line runs. Bundle it
+first — relative imports get inlined, packages stay external (a plain ESM bundle
+trips over `faye-websocket`'s dynamic `require`):
+
+```
+firebase emulators:start --only auth,database --project mi-pagina-pro
+cd colabtex && npm run build:rules-test
+FIREBASE_EMU=1 node .rules-run.mjs          # PowerShell: $env:FIREBASE_EMU=1; node .rules-run.mjs
+```
 
 ### Vendor rebuild scripts (rarely needed)
 
@@ -429,6 +445,51 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
   with black labels vanishes on a dark slide), and `avoid` renames a generated
   file that would clash with a drawing's own name — `figura1.svg` exported from
   `figura1.svg` produced two identical rows in the sidebar.
+
+## Informes (shared bug tracker)
+
+Errors the apps collect on their own, plus the bugs and ideas people write, in
+one place that everyone with a session can read and that exports to a file.
+
+- `reports.js` — the **pure** part: filtering, trimming, fingerprinting, the
+  local buffer and the Markdown export. No DOM beyond the download, no
+  Firebase — verifiable in Node.
+- `fb-reports.js` — the two new RTDB nodes, `errors/<fingerprint>` and
+  `feedback/<id>`, deliberately **outside** `projects/`: a report belongs to the
+  team, not to a document.
+- `report-widget.js` — the ⚑ button and its modal, injected (CSS included) into
+  every page, so adding it to a fourth page is one import.
+- `reports-main.js` + `informes.html` — the page itself.
+
+Four decisions worth keeping:
+
+- **Half the value is in what gets thrown away.** A mistyped `\aling{}` is not
+  an app bug, and if those got in, the report would be an endless list of other
+  people's typos with the real faults buried in it. So from the LaTeX log only
+  *our* failures go up (a missing package or font, the engine aborting, memory
+  exhausted — `TEX_DE_LA_APP`), user typos are dropped explicitly
+  (`TEX_DEL_USUARIO`), and **anything unrecognised is dropped too**. A compile
+  that throws outright is the exception: that is always ours. From the browser,
+  known noise goes (`Script error.` with no origin, the ResizeObserver loop,
+  extensions, user-cancelled dialogs, network blips) — but a
+  `PERMISSION_DENIED` stays, because that is exactly how the ColabDraw link bug
+  would have surfaced.
+- **Nothing of anyone's document is stored.** Message trimmed to 300 chars,
+  three stack frames with the file name only, browser and OS by *family* (never
+  the full user-agent string), and a `ctx` whose values are capped and whose
+  object-valued entries are dropped — that last one is what stops a whole
+  document being smuggled in as "context". The `where` (what the app was doing)
+  is worth more for reproducing than the minified stack.
+- **Errors are keyed by fingerprint, not pushed.** The same fault seen a hundred
+  times is one row with a counter; otherwise the noisiest error hides the other
+  nine. The counter is bumped with `runTransaction` because several people write
+  it at once, and `quien/<uid>` is a map rather than a number so "how many
+  people" can actually be counted.
+- **It degrades instead of breaking.** `errors` and `feedback` are new nodes, so
+  until the rules are re-published by hand in the console everything fails with
+  `PERMISSION_DENIED`. The page then shows a plain-language warning naming that
+  exact cause, the ⚑ modal offers to download what you wrote so it isn't lost,
+  and errors keep piling up in `localStorage` regardless.
 
 ## Deployment & Firebase
 

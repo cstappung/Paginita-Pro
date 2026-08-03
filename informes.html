@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Informes — Laboratorio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  html,body{margin:0;padding:0;height:100%}
+  *{box-sizing:border-box}
+  body{background:#f2f5f7;color:#1f2933;font-family:'IBM Plex Sans',sans-serif}
+  a{color:#0d9488;text-decoration:none}
+  a:hover{text-decoration:underline}
+  button{font-family:'IBM Plex Sans',sans-serif}
+  #app{min-height:100vh;display:flex;flex-direction:column}
+
+  .head{display:flex;align-items:center;gap:16px;height:52px;padding:0 22px;background:#10201f;color:#e8f0ef;flex-shrink:0}
+  .logo{display:flex;align-items:center;gap:8px;color:#e8f0ef}
+  .logo:hover{color:#fff;text-decoration:none}
+  .logo-mark{width:26px;height:26px;border-radius:6px;background:linear-gradient(135deg,#0f62fe,#0d9488);display:grid;place-items:center;font-size:13px;font-weight:700;color:#fff}
+  .head-nav{display:flex;gap:16px;font-size:12.5px;color:#9fb5b2;margin-left:10px}
+  .head-nav a{color:#9fb5b2}
+  .head-nav a:hover{color:#fff;text-decoration:none}
+  .head-right{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:12.5px}
+  .avatar{width:28px;height:28px;border-radius:50%;background:#0d9488;display:grid;place-items:center;font-size:12px;font-weight:600;color:#fff;overflow:hidden}
+  .btn-ghost{border:none;background:transparent;color:#9fb5b2;cursor:pointer;font-size:12px;padding:5px 8px;border-radius:5px}
+  .btn-ghost:hover{background:#ffffff1a;color:#fff}
+
+  main{flex:1;width:100%;max-width:1080px;margin:0 auto;padding:24px 26px 60px}
+  h1{font-size:22px;font-weight:600;margin:0 0 5px}
+  .lead{font-size:13px;color:#5a6772;margin:0 0 20px;line-height:1.6;max-width:74ch}
+
+  .bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+  .tab{padding:8px 14px;border:1px solid #d4dce2;border-radius:8px;background:#fff;font-size:12.5px;font-weight:600;color:#42505c;cursor:pointer}
+  .tab.on{border-color:#0d9488;background:#e9f4f2;color:#0d9488}
+  .tab .n{opacity:.65;font-weight:500;margin-left:4px}
+  .grow{flex:1}
+  .inp{height:34px;padding:0 11px;border:1px solid #d4dce2;border-radius:6px;font-size:12.5px;font-family:inherit;background:#fff;color:#1f2933}
+  .inp:focus{outline:none;border-color:#0d9488}
+  .btn{height:34px;padding:0 14px;border:none;border-radius:6px;background:#0d9488;color:#fff;font-size:12.5px;font-weight:600;cursor:pointer}
+  .btn:hover{background:#0f766e}
+  .btn2{height:34px;padding:0 12px;border:1px solid #d4dce2;border-radius:6px;background:#fff;color:#42505c;font-size:12.5px;font-weight:600;cursor:pointer}
+  .btn2:hover{border-color:#0d9488;color:#0d9488}
+  .btn2:disabled,.btn:disabled{opacity:.5;cursor:default}
+
+  .card{background:#fff;border:1px solid #e2e8ec;border-radius:10px;overflow:hidden}
+  .row{padding:13px 16px;border-bottom:1px solid #f0f4f6}
+  .row:last-child{border-bottom:none}
+  .row-top{display:flex;align-items:flex-start;gap:10px}
+  .pill{flex-shrink:0;font-size:10px;font-weight:700;letter-spacing:.04em;border-radius:99px;padding:3px 8px}
+  .p-tex{background:#0d948814;color:#0d9488;border:1px solid #0d948833}
+  .p-draw{background:#6c4bb614;color:#6c4bb6;border:1px solid #6c4bb633}
+  .p-bug{background:#c0392b14;color:#c0392b;border:1px solid #c0392b33}
+  .p-idea{background:#0f62fe14;color:#0f62fe;border:1px solid #0f62fe33}
+  .p-done{background:#eef1f4;color:#8a97a3;border:1px solid #e2e8ec}
+  .p-veces{background:#e2c08d22;color:#8a6a2a;border:1px solid #e2c08d55}
+  .row-title{flex:1;min-width:0;font-size:13.5px;font-weight:600;line-height:1.45;word-break:break-word}
+  .row-meta{margin-top:5px;font-size:11.5px;color:#8a97a3;line-height:1.6}
+  .row-body{margin-top:8px;font-size:12.5px;color:#42505c;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+  .row-pre{margin-top:8px;padding:8px 10px;border-radius:6px;background:#f7f9fa;border:1px solid #eef1f4;font-family:'IBM Plex Mono',monospace;font-size:10.5px;color:#5a6772;white-space:pre-wrap;overflow-x:auto}
+  .row-acts{display:flex;gap:4px;flex-shrink:0}
+  .mini{border:none;background:transparent;color:#b3bec7;cursor:pointer;font-size:12px;padding:3px 6px;border-radius:5px}
+  .mini:hover{background:#f0f4f6;color:#42505c}
+  .mini.del:hover{color:#c0392b}
+  .hecho .row-title{text-decoration:line-through;color:#8a97a3}
+
+  .vacio{padding:34px 16px;text-align:center;font-size:12.5px;color:#8a97a3;line-height:1.7}
+  .aviso{padding:14px 16px;border-radius:9px;background:#fff8ec;border:1px solid #e2c08d66;font-size:12.5px;color:#6b5320;line-height:1.6;margin-bottom:16px}
+  .aviso code{font-family:'IBM Plex Mono',monospace;font-size:11.5px;background:#00000010;padding:1px 5px;border-radius:4px}
+  .nota{margin-top:22px;font-size:11.5px;color:#8a97a3;line-height:1.7;max-width:78ch}
+
+  #viewLogin{flex:1;display:none;place-items:center}
+  .login-card{width:400px;max-width:92vw;background:#fff;border:1px solid #e2e8ec;border-radius:12px;padding:30px;text-align:center}
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="head">
+    <a class="logo" href="Inicio.dc.html"><span class="logo-mark">L</span><b style="font-size:14px">Laboratorio</b></a>
+    <nav class="head-nav">
+      <a href="colabtex.html">ColabTeX</a>
+      <a href="colabdraw.html">ColabDraw</a>
+      <a href="informes.html" style="color:#fff;font-weight:600">Informes</a>
+    </nav>
+    <div class="head-right">
+      <span id="userName"></span>
+      <span class="avatar" id="userAvatar"></span>
+      <button class="btn-ghost" id="btnLogout">Salir</button>
+    </div>
+  </header>
+
+  <div id="viewLogin">
+    <div class="login-card">
+      <h2 style="margin:0 0 8px;font-size:18px">Informes del Laboratorio</h2>
+      <p style="font-size:12.5px;color:#5a6772;line-height:1.6;margin:0 0 20px">
+        Inicia sesión con la misma cuenta de Google que usas en ColabTeX para ver los fallos
+        y las sugerencias de todo el equipo.</p>
+      <button class="btn" id="btnLogin" style="width:100%;height:38px">Entrar con Google</button>
+      <div id="loginError" style="margin-top:12px;font-size:12px;color:#c0392b"></div>
+    </div>
+  </div>
+
+  <main id="viewMain" style="display:none">
+    <h1>Informes</h1>
+    <p class="lead">
+      Todo lo que se rompe y todo lo que pedís, en un sitio. Los errores los recoge la aplicación
+      sola y se agrupan por causa; los fallos y las sugerencias los escribís vosotros con el botón
+      <b>⚑</b> que hay abajo a la derecha en todas las páginas. Cuando quieras arreglarlo,
+      descarga el informe y pásalo entero.
+    </p>
+
+    <div id="aviso"></div>
+
+    <div class="bar">
+      <button class="tab on" id="tabErr" data-tab="err">Errores recogidos<span class="n" id="nErr">0</span></button>
+      <button class="tab" id="tabFb" data-tab="fb">Fallos y sugerencias<span class="n" id="nFb">0</span></button>
+      <span class="grow"></span>
+      <select class="inp" id="filtroApp">
+        <option value="">Todas las apps</option>
+        <option value="colabtex">ColabTeX</option>
+        <option value="colabdraw">ColabDraw</option>
+      </select>
+      <input class="inp" id="buscar" placeholder="Buscar…" style="width:190px">
+      <button class="btn2" id="btnMd" title="Un archivo .md legible, pensado para pasárselo a quien lo va a arreglar">⤓ Informe (.md)</button>
+      <button class="btn2" id="btnJson" title="Los mismos datos en crudo">⤓ .json</button>
+    </div>
+
+    <div class="card" id="lista"></div>
+
+    <p class="nota" id="nota"></p>
+  </main>
+</div>
+<script src="informes-app.js?v=202608030435"></script>
+</body>
+</html>
