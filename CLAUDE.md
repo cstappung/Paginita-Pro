@@ -13,7 +13,9 @@ Three apps plus a small shared **Informes** page:
 
 - **CSV·Scope** (`CSV Oscilloscope.dc.html` + `scope-engine.js`) — offline
   oscilloscope for CSV captures (cursors, trigger, FFT/harmonics, XY, math
-  channels). Self-contained, no build step, no backend.
+  channels, a plot grid, periodic repeat and a Fourier reconstruction overlay —
+  see "CSV·Scope" below). Self-contained, no build step, no backend: editing
+  `scope-engine.js` takes effect on reload, with no `npm run build`.
 - **ColabTeX** (`colabtex.html` + `colabtex-app.js`) — an Overleaf-style
   collaborative LaTeX editor. This is where nearly all the complexity is; its
   source lives in [colabtex/src/](colabtex/src/) and is bundled into the
@@ -28,8 +30,10 @@ Three apps plus a small shared **Informes** page:
   collect by themselves, plus the bugs and ideas people write. See "Informes"
   below.
 
-The UI is authored in Spanish; comments and identifiers are Spanish too. Match
-that when editing.
+ColabTeX, ColabDraw and Informes are authored in **Spanish** — UI text,
+comments and identifiers alike. **CSV·Scope is the exception: it is in
+English** ("Load CSV", "Measurements", "Trigger"), and its own comments follow.
+Match whichever app you are editing rather than the repo as a whole.
 
 ## Commands
 
@@ -51,8 +55,18 @@ npm start            # static preview server at http://localhost:8123
   the `<script>` tag of **each** page (its `PAGES` table) so GitHub
   Pages/browsers don't serve a stale cached bundle. **After editing anything
   under `colabtex/src/`, you must `npm run build`** — the root `*-app.js` files
-  are generated and not hand-edited. Open `Inicio.dc.html` from the repo root,
-  or double-click `Iniciar ColabTeX.cmd`, to preview the whole site.
+  are generated and not hand-edited.
+- Previewing goes **through the server**, never by opening the file: double-click
+  `Iniciar ColabTeX.cmd` (it starts `server/static.js` and opens
+  `http://localhost:8123/Inicio.dc.html`) or run `npm start` yourself. On
+  `file://` the origin is `null`, so Google login is refused and the BusyTeX
+  `vendor/` fetches are blocked — the site looks broken for reasons that have
+  nothing to do with the code.
+- **There is no unit-test suite**: `npm test` is the npm stub and exits 1. The
+  only automated check in the repo is the security-rules test below. The pure
+  modules (`reports.js`, `draw/geom.js`, and the path/format arithmetic in
+  `file-move.js` and `format.js`) are written to be exercisable from Node
+  without a browser, so ad-hoc checks are cheap — there is just no runner.
 
 ### Security-rules test (Firebase emulator)
 
@@ -81,6 +95,68 @@ assets under `vendor/busytex/` (the WASM TeX engine). Only touch these when
 adding LaTeX packages/fonts that BusyTeX doesn't ship — see their header
 comments.
 
+## CSV·Scope architecture
+
+One file, `scope-engine.js`, an IIFE on `window.ScopeApp` guarded against the
+`.dc.html` runtime evaluating helmet `<script>`s twice. The markup and the
+sidebar live in `CSV Oscilloscope.dc.html`; every id it declares must appear in
+`REF_IDS` or `init()` bails with a console error naming the missing ones. All
+of the skin is in `injectCSS()`.
+
+**The plot grid is one canvas, not many.** `S.layout = {rows, cols}` (up to
+6×6) and `paneRects()` cuts the scope canvas into pane rectangles in reading
+order. Separate canvases would have meant 36 backing stores to allocate and
+composite, and would have broken the persistence buffer, the drop zone, the
+PNG screenshot and the hit testing, all of which assume one surface.
+Consequences worth knowing:
+
+- **The coordinate helpers take the pane**: `timeToX(t, P)`, `xToTime(x, P)`,
+  `valueToY(ch, v, P)`, `yToValue(ch, y, P)`, `pxPerDivV(P)`. Omitting `P`
+  means the whole canvas, which is exactly the 1×1 case — that is what keeps
+  the single-plot path free of layout code, and what lets the zoom strip and
+  the quick spectrum go on ignoring that panes exist.
+- **The time base is shared across panes** — one Time/div, one centre. Panes
+  separate traces vertically; making each show a different slice of time would
+  defeat the point, which is comparing them at the same instant. `viewWindow()`
+  is therefore the authority on the visible window, derived from the time base
+  alone rather than from any canvas width.
+- **A hit carries its pane** (`hitTest` returns `{..., P}`) and the drag stores
+  it. Re-resolving the pane from the pointer mid-drag would reinterpret a grab
+  that started in pane 4 against pane 0 the moment it crossed a gutter.
+- **A channel names the panes it appears in** (`ch.panes`, an array, so it can
+  be in several). `panesOf()` falls back to pane 0 and the UI refuses to clear
+  the last one: a visible channel must always be drawn somewhere, or its eye
+  stays on while it is nowhere on screen. Shrinking the grid folds stranded
+  indices back with a modulo (`remapPanes`) instead of heaping them into pane 0.
+- **Chrome is dropped as panes shrink**, biggest first: the legend bar below
+  150 px, the time stamps below 105 px, the graticule's subdivision ticks when
+  a division is under 22 px. At 6×6 a pane is ~120 px, and legend plus stamps
+  would spend a third of it on labels.
+
+**Periodic repeat** (`ch.periodic`) redraws one period of the record over and
+over so the record can be scrolled past either end. `resolvePeriod` measures it
+with the *same* `findPeriod` the Measurements table uses, so the two can never
+disagree; `record` and `manual` are the other two modes. It repeats **one
+period, not the whole record** — tiling the whole capture at a period shorter
+than itself stacks overlapping copies instead of continuing the wave.
+Everything that reads the signal has to honour it or it contradicts what is
+drawn: `sampleAt` wraps (else hovering a repeated cycle reads "—" over a
+visible wave) and `visibleRange` folds the window back into the record (else
+the table reported Pk-Pk 0 V and Freq "—" while the screen plainly oscillated).
+
+**The Fourier reconstruction overlay** (`drawReconstruction`) rebuilds the wave
+from the FFT tab's harmonics, summing `k` of them, drawn over the very trace it
+approximates. Two things it depends on:
+
+- `computeHarmonics` has already folded `invert` into its coefficients (it
+  multiplies by `sgn`), so the series is in *displayed* value space. It is
+  pre-multiplied by `sgn` before `valueToY`, which inverts again — without
+  that, an inverted channel's reconstruction is mirrored about its own zero and
+  reads as a phase bug rather than a sign bug.
+- The overlay is on the Scope tab but its data comes from Compute on the FFT
+  tab, so `runAnalysis` calls `syncReconUI()`: a fresh analysis changes how many
+  harmonics exist, on a tab the user is not looking at.
+
 ## ColabTeX architecture
 
 Two persistence modes share the same editor, LaTeX engine, and PDF viewer:
@@ -91,12 +167,25 @@ Two persistence modes share the same editor, LaTeX engine, and PDF viewer:
 
 Key modules in [colabtex/src/](colabtex/src/):
 
-- `main.js` (~2k lines) — the whole app: routing, login, dashboard, editor,
+- `main.js` (~2.5k lines) — the whole app: routing, login, dashboard, editor,
   file tree, sharing, and wiring of everything below. Start here.
 - `firebase.js` — Firebase init (project `mi-pagina-pro`); Google auth, RTDB,
   Storage. Config/API key is public by design (client SDK).
 - `fb-api.js` — data layer over Realtime Database: projects, members, tokens,
-  invites, assets.
+  invites, assets. A binary has **three possible homes**, and its
+  `assetsIndex` entry says which in `loc`: `"storage"` (Firebase Storage, the
+  normal one), `"rtdb"` (base64 inside the database, capped at
+  `RTDB_ASSET_LIMIT` = 3 MB — the fallback for when Storage is unavailable or
+  CORS was never configured), and `"link"` (it belongs to a linked ColabDraw
+  project, see `draw-link.js`). Anything that reads bytes has to branch on it;
+  `assetBytes` and `renameAsset` already do.
+- `util.js` — the genuinely shared helpers, small but load-bearing:
+  `minimalDiff` (used by `bridge.js` and `main.js` — never replace a whole
+  `Y.Text`) and `closingBrace` (shared by `visual.js` and `format.js`, and it
+  skips `\{`).
+- `layout.js` — the draggable splitters between the editor panels (files │ code
+  │ PDF │ assistant/comments). Sizes persist in `localStorage`; releasing a
+  splitter fires a `resize` event so the PDF viewer and CodeMirror re-measure.
 - `y-rtdb.js` — **custom Yjs provider over Realtime Database** (not
   y-websocket). Persists the doc snapshot + incremental updates and drives
   presence/remote cursors.
@@ -381,6 +470,18 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
   - **Handles that cannot do anything are not drawn.** A straight line's frame
     has zero height, so `n`/`s` would multiply zero by something and stay zero;
     a handle that does nothing when you pull it reads as a broken app.
+
+  **Copy/paste lives here too**, and hangs off the document's `copy`/`cut`/
+  `paste` events rather than off Ctrl+C in the keydown handler: that is what
+  gets the real clipboard without asking for the permission the async
+  Clipboard API demands. What travels is **SVG text**, not nodes — an
+  unintegrated Yjs clone cannot be read (the same trap as everywhere else), so
+  storing nodes would give a clipboard good for exactly one paste. Pasting
+  accepts outside markup only if it really looks like SVG, otherwise it falls
+  back to the internal `clip`. With **nothing selected, copy takes the whole
+  active layer**, and a whole layer pastes back *as a layer*; anything else
+  lands on the active layer offset by 2 mm so it's visible that there are now
+  two.
 - `text.js` — the text tool and its editor. A text is a `<text>` with one
   `<tspan>` per line, each repeating the `x` (SVG text does not wrap back to
   the margin by itself) and stepping down with `dy` **in `em`**, so changing
@@ -417,6 +518,14 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
   Reordering layers and moving shapes between them **clone and delete** (an
   integrated Yjs type cannot be re-inserted), and moving across layers
   recomposes the transform (`relocateTransform`) so the shape doesn't shift.
+  Rows are also **draggable, with three zones each** (`zonaDe`), like any file
+  explorer: the top and bottom 30 % drop *beside* the target, the middle drops
+  *inside* it — and the middle only exists when the target can hold children,
+  otherwise the row splits 50/50 into before/after. Two structural rules are
+  enforced on the drop rather than left to the user: a **layer** may only hang
+  off the `<svg>`, and a **shape** only off a layer or a group. Since each level
+  is listed reversed, the insertion index is computed reversed too — the obvious
+  `at`/`at + 1` is the wrong way round here.
 - `preview.js` — looking at an exported PNG/PDF in the canvas's place, with a
   download **button**; clicking a generated file used to download it blind. The
   canvas is covered, never destroyed (same reason as ColabTeX's asset preview).
@@ -511,3 +620,7 @@ attributes like `style-hover`, `data-screen-label`) rendered by `support.js` at
 runtime via React. `support.js` is **generated** from an external `dc-runtime`
 project ("do not edit" — rebuild there); treat it as a vendored runtime.
 Plain `.html` files (`colabtex.html`, `index.html`) are ordinary pages.
+
+`ColabTeX.dc.html` at the root is **dead** — a landing page from the very first
+ColabTeX commit, never touched since, linked from nowhere and absent from
+`stamp-version.js`'s `PAGES`. The live editor is `colabtex.html`; edit that one.

@@ -191,6 +191,18 @@ self.onmessage = function(e) {
     opts: { scopeDark: true, traceWidth: 1.6, traceGlow: true, fundamental: 50, ratedCurrent: "" },
     files: [], channels: [],
     divsH: 10, divsV: 8,
+    /* Plot layout: the screen is ONE canvas subdivided into rows×cols panes,
+       not several canvases. Everything downstream (persistence buffer, drop
+       zone, hit testing, screenshot, dpr handling) already assumes a single
+       drawing surface, and 36 canvases would each carry their own backing
+       store — at device-pixel-ratio 2 that is 36 extra bitmaps to allocate and
+       composite every frame. Panes share the time base (see `paneRects`). */
+    layout: { rows: 1, cols: 1 },
+    /* Harmonic reconstruction overlay: rebuilds the wave from the harmonics
+       the FFT tab measured, adding them one at a time. `k` is how many are
+       summed so far. Lives here rather than in the FFT view because it is
+       drawn over the trace it approximates, which is the whole point. */
+    recon: { on: false, k: 1, components: false, playing: false },
     timePerDiv: 10e-3, hOffset: 0, timeDivOptions: [1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1],
     trigger: { sourceId: "", level: 0, slope: "rising" },
     cursors: { mode: "off", t1: 0, t2: 0, v1: 1, v2: -1, refId: "" },
@@ -224,6 +236,8 @@ self.onmessage = function(e) {
     "trigSource", "trigLevelIn", "trigSlope", "btnTrigPrev", "btnTrigNext",
     "cursorMode", "cursorRefRow", "cursorRef", "cursorReadout",
     "chkGlow", "chkZoom", "chkSplitFFT", "chkPersist", "persistDecay", "persistDecayRow",
+    "layoutPick", "layoutLabel", "btnLayoutSpread",
+    "chkRecon", "reconBody", "reconK", "reconKVal", "btnReconPlay", "btnReconAll", "chkReconParts", "reconNote",
     "btnThemeLight", "btnThemeDark", "btnThemeReset",
     "thApp", "thSurface", "thText", "thAccent", "thScopeBg", "thGridMinor", "thGridMajor", "thCursor",
     "scopeWrap", "scopeCanvas", "hoverReadout", "zoomWrap", "zoomCanvas",
@@ -249,6 +263,7 @@ self.onmessage = function(e) {
     if (w === 0 || h === 0) return false;
     if (c.w === w && c.h === h && c.canvas.width === Math.round(w * dpr)) return true;
     c.w = w; c.h = h;
+    if (key === "scope") invalidatePanes();   // pane rectangles are size-derived
     c.canvas.width = Math.round(w * dpr);
     c.canvas.height = Math.round(h * dpr);
     c.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -318,6 +333,13 @@ self.onmessage = function(e) {
     .osc .chk{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--text);cursor:pointer}
     .osc .hint{font-size:10.5px;color:var(--dim);line-height:1.55}
     .osc .note{font-size:10.5px;color:var(--accent);min-height:0}
+    /* Layout picker: a 6x6 of cells that highlights the rectangle from the
+       top-left to whatever is hovered, the way a table picker does. Choosing
+       "3 rows by 2 columns" is then one gesture instead of two dropdowns. */
+    .lgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:3px;flex:1}
+    .lgrid i{display:block;height:13px;border:1px solid var(--line);border-radius:2px;background:var(--panel2);cursor:pointer}
+    .lgrid i.in{background:var(--accent);border-color:var(--accent)}
+    .lgrid i.cur{box-shadow:0 0 0 1px var(--accent)}
     .osc .readout{background:var(--panel);border:1px solid var(--line);border-radius:5px;padding:6px 8px}
     .osc .swatches{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px}
     .osc .thsw{display:flex;align-items:center;gap:6px;font-size:10.5px;color:var(--dim);cursor:pointer}
@@ -401,6 +423,14 @@ self.onmessage = function(e) {
     .osc-ch .ft{display:flex;align-items:center;gap:8px;font-size:10.5px;color:var(--dim)}
     .osc-ch .ft label{display:flex;align-items:center;gap:4px;cursor:pointer}
     .osc-ch select.osc-in{font-family:"IBM Plex Sans",sans-serif}
+    .osc-ch .ft.panes,.osc-ch .ft.per{border-top:1px dashed var(--line);padding-top:5px}
+    .osc-ch .ft .pl{font:9px "IBM Plex Sans",sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);flex-shrink:0}
+    .pane-grid{display:grid;gap:2px;flex:1}
+    .pane-cell{border:1px solid var(--line);background:var(--panel2);color:var(--dim);border-radius:3px;
+      font:9px "IBM Plex Mono",monospace;line-height:1;padding:3px 0;cursor:pointer;min-width:0}
+    .pane-cell:hover{border-color:var(--accent);color:var(--text)}
+    .pane-cell.on{background:var(--ch-color,var(--accent));border-color:var(--ch-color,var(--accent));color:#0b1118;font-weight:700}
+    .osc-ch .perVal{font:9.5px "IBM Plex Mono",monospace;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
     .osc-pos-pop{position:fixed;z-index:9999;background:var(--panel);border:1px solid var(--line);border-radius:7px;box-shadow:0 8px 24px var(--shadow-2);padding:9px 11px;min-width:190px}
     .osc-pos-pop .hd{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px}
     .osc-pos-pop .hd span:first-child{font:9px "IBM Plex Sans",sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}
@@ -470,7 +500,8 @@ self.onmessage = function(e) {
         id: nextId(), isMath: false, fileId: fileObj.id, key: c.name,
         label: shortLabel + ":" + c.name, unit: c.unit || "",
         colorIdx: colorIdx, color: colorFor(colorIdx), autoColor: true, visible: true, invert: false,
-        voltsPerDiv: 1, position: 0, avgN: 1, hiresN: 1, tOffset: 0, fullStats: stats
+        voltsPerDiv: 1, position: 0, avgN: 1, hiresN: 1, tOffset: 0, fullStats: stats,
+        panes: [0], periodic: false, periodMode: "auto", periodT: 0
       };
       autoscaleChannel(ch);
       S.channels.push(ch);
@@ -636,6 +667,43 @@ self.onmessage = function(e) {
 
   const AVG_OPTS = [1, 2, 4, 8, 16, 32, 64, 128];
   const HIRES_OPTS = [[1, "Off"], [4, "+1 bit"], [16, "+2 bit"], [64, "+3 bit"], [256, "+4 bit"]];
+  /* Which panes a channel is drawn in, shown as a miniature of the layout
+     itself rather than as a list of numbers: with up to 36 panes, a
+     multi-select of "Pane 23" is unreadable, whereas a 6×6 of little cells is
+     the same shape as what is on screen. Hidden entirely at 1×1, where there
+     is nothing to choose. */
+  function panePickerHtml(ch) {
+    if (!isGrid()) return "";
+    const rows = clamp(S.layout.rows | 0, 1, MAX_GRID), cols = clamp(S.layout.cols | 0, 1, MAX_GRID);
+    const on = panesOf(ch);
+    let cells = "";
+    for (let i = 0; i < rows * cols; i++) {
+      cells += '<button class="pane-cell' + (on.indexOf(i) !== -1 ? " on" : "") + '" data-pane="' + i +
+        '" title="Plot ' + (i + 1) + '">' + (i + 1) + "</button>";
+    }
+    return '<div class="ft panes"><span class="pl">Plot</span>' +
+      '<div class="pane-grid" style="grid-template-columns:repeat(' + cols + ',1fr)">' + cells + "</div></div>";
+  }
+
+  /* Periodic repeat. The resolved period is spelled out next to the control
+     because "auto" is a measurement, and a number the user cannot see is a
+     number they cannot check against their own expectation. */
+  function periodicHtml(ch) {
+    const modes = [["auto", "auto"], ["record", "record"], ["manual", "manual"]];
+    const opts = modes.map(m => '<option value="' + m[0] + '"' + ((ch.periodMode || "auto") === m[0] ? " selected" : "") + ">" + m[1] + "</option>").join("");
+    const T = ch.periodic ? resolvePeriod(ch) : null;
+    const shown = ch.periodic ? (T ? fmtScale(T, "s") + (ch.periodMode === "auto" ? " (detected)" : "") : "no period found") : "";
+    return '<div class="ft per">' +
+      '<label title="Repeat the wave forwards and backwards without end, so the record can be scrolled past its own start and finish."><input type="checkbox" class="perOn"' + (ch.periodic ? " checked" : "") + '> Periodic</label>' +
+      (ch.periodic
+        ? '<select class="osc-in perMode" style="height:20px;padding:0 2px">' + opts + "</select>" +
+          (ch.periodMode === "manual"
+            ? '<input type="text" class="osc-in perT" style="height:20px;width:66px" value="' + fmtScale(ch.periodT || 0, "s") + '" title="e.g. 20m, 16.667m">'
+            : '<span class="perVal">' + shown + "</span>")
+        : "") +
+      "</div>";
+  }
+
   function rebuildChannelList() {
     R.channelList.innerHTML = "";
     if (S.channels.length === 0) {
@@ -665,7 +733,9 @@ self.onmessage = function(e) {
         '<label>Avg <select class="osc-in avg" style="height:20px;padding:0 2px">' + avgHtml + '</select></label>' +
         '<label title="High Resolution: block-averages consecutive samples (boxcar decimation) for extra vertical resolution. Independent of Avg.">HiRes <select class="osc-in hires" style="height:20px;padding:0 2px">' + hiresHtml + '</select></label>' +
         '<span style="margin-left:auto;font:10px \'IBM Plex Mono\',monospace">' + (ch.unit || "·") + '</span>' +
-        '</div>';
+        '</div>' +
+        panePickerHtml(ch) +
+        periodicHtml(ch);
       card.querySelector(".sw").addEventListener("input", e => {
         ch.color = e.target.value;
         ch.autoColor = false;  // hand-picked: stop following the theme palette
@@ -704,6 +774,46 @@ self.onmessage = function(e) {
       card.querySelector(".inv").addEventListener("change", e => { ch.invert = e.target.checked; renderAll(); scheduleMeasure(); });
       card.querySelector(".avg").addEventListener("change", e => { ch.avgN = parseInt(e.target.value, 10); renderAll(); scheduleMeasure(); });
       card.querySelector(".hires").addEventListener("change", e => { ch.hiresN = parseInt(e.target.value, 10); renderAll(); scheduleMeasure(); });
+      card.querySelectorAll(".pane-cell").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const i = parseInt(btn.dataset.pane, 10);
+          const cur = panesOf(ch).slice();
+          const at = cur.indexOf(i);
+          /* Refusing to remove the last one keeps the invariant panesOf()
+             relies on: a visible channel is always drawn somewhere. */
+          if (at === -1) cur.push(i);
+          else if (cur.length > 1) cur.splice(at, 1);
+          else return;
+          ch.panes = cur.sort((a, b) => a - b);
+          rebuildChannelList(); render();
+        });
+      });
+      /* Periodic changes what the visible window contains, so the measurements
+         have to be recomputed too — renderAll() alone only repaints. */
+      const perOn = card.querySelector(".perOn");
+      if (perOn) perOn.addEventListener("change", e => {
+        ch.periodic = e.target.checked;
+        ch.perCache = null;
+        rebuildChannelList(); renderAll(); scheduleMeasure();
+      });
+      const perMode = card.querySelector(".perMode");
+      if (perMode) perMode.addEventListener("change", e => {
+        ch.periodMode = e.target.value;
+        ch.perCache = null;
+        if (ch.periodMode === "manual" && !(ch.periodT > 0)) ch.periodT = resolvePeriod(ch) || 0;
+        rebuildChannelList(); renderAll(); scheduleMeasure();
+      });
+      const perT = card.querySelector(".perT");
+      if (perT) {
+        perT.addEventListener("change", () => {
+          const p = parseScaleInput(perT.value);
+          if (p !== null && p > 0) { ch.periodT = p; ch.perCache = null; }
+          else { perT.classList.add("invalid"); setTimeout(() => perT.classList.remove("invalid"), 700); }
+          perT.value = fmtScale(ch.periodT || 0, "s");
+          renderAll(); scheduleMeasure();
+        });
+        perT.addEventListener("keydown", e => { if (e.key === "Enter") perT.blur(); });
+      }
       const rm = card.querySelector(".rm");
       if (rm) rm.addEventListener("click", () => removeChannel(ch.id));
       R.channelList.appendChild(card);
@@ -793,88 +903,224 @@ self.onmessage = function(e) {
     syncTimeDivUI(); render(); scheduleMeasure();
   }
 
+  // ---------- pane layout ----------
+  /* The panes of the grid, in reading order, as rectangles on the scope
+     canvas. A 1×1 layout returns exactly one pane covering the whole canvas,
+     so every coordinate helper below collapses to what it did before the grid
+     existed — that is what keeps the single-plot path free of layout code.
+
+     Panes share the time base by design: one Time/div and one centre for the
+     whole screen. Splitting the traces apart vertically is the point; making
+     each pane show a different slice of time would break the one thing the
+     grid is for, which is comparing them at the same instant. */
+  const MAX_GRID = 6;
+  const PANE_GAP = 6;
+  let paneCache = null;
+  function invalidatePanes() { paneCache = null; }
+  function paneRects() {
+    const c = CV.scope;
+    const rows = clamp(S.layout.rows | 0, 1, MAX_GRID), cols = clamp(S.layout.cols | 0, 1, MAX_GRID);
+    if (paneCache && paneCache.w === c.w && paneCache.h === c.h && paneCache.rows === rows && paneCache.cols === cols)
+      return paneCache.list;
+    const gap = (rows === 1 && cols === 1) ? 0 : PANE_GAP;
+    const cw = (c.w - gap * (cols - 1)) / cols;
+    const chh = (c.h - gap * (rows - 1)) / rows;
+    const list = [];
+    for (let r = 0; r < rows; r++) for (let k = 0; k < cols; k++) {
+      list.push({ i: r * cols + k, row: r, col: k,
+        x: k * (cw + gap), y: r * (chh + gap), w: cw, h: chh });
+    }
+    paneCache = { w: c.w, h: c.h, rows, cols, list };
+    return list;
+  }
+  const paneCount = () => clamp(S.layout.rows | 0, 1, MAX_GRID) * clamp(S.layout.cols | 0, 1, MAX_GRID);
+  const isGrid = () => paneCount() > 1;
+  /* Pane 0 is the fallback everywhere: a channel must always be somewhere, or
+     it would silently vanish from the screen with its "visible" eye still on. */
+  function panesOf(ch) {
+    const n = paneCount();
+    const list = (ch.panes || []).filter(i => i >= 0 && i < n);
+    return list.length ? list : [0];
+  }
+  function chansOfPane(p) {
+    return S.channels.filter(ch => ch.visible && panesOf(ch).indexOf(p.i) !== -1);
+  }
+  /* Shrinking the grid (3×3 → 2×2) strands every channel assigned to a pane
+     that no longer exists. Folding them back with a modulo keeps them on
+     screen and keeps their relative spread, rather than dumping them all into
+     pane 0 in a heap. */
+  function remapPanes() {
+    const n = paneCount();
+    S.channels.forEach(ch => {
+      const src = (ch.panes && ch.panes.length) ? ch.panes : [0];
+      const out = [];
+      src.forEach(i => { const j = i < n ? i : i % n; if (out.indexOf(j) === -1) out.push(j); });
+      ch.panes = out.length ? out.sort((a, b) => a - b) : [0];
+    });
+  }
+  const paneAt = (x, y) => paneRects().find(p => x >= p.x && x <= p.x + p.w && y >= p.y && y <= p.y + p.h) || null;
+  const fullPane = () => ({ i: 0, row: 0, col: 0, x: 0, y: 0, w: CV.scope.w, h: CV.scope.h });
+  /* The visible time window. Shared by every pane, so it is a property of the
+     time base alone — asking a canvas how wide it is would give the same
+     answer and break when nothing has been laid out yet. */
+  function viewWindow() {
+    const span = S.timePerDiv * S.divsH;
+    return { tA: S.hOffset - span / 2, tB: S.hOffset + span / 2 };
+  }
+
   // ---------- coordinates ----------
-  function timeToX(t) {
+  /* All four take the pane they are measured in. The default keeps the callers
+     that are genuinely single-plot (the zoom strip, the quick spectrum) on the
+     whole canvas without having to know the grid exists. */
+  function timeToX(t, P) {
+    P = P || fullPane();
     const span = S.timePerDiv * S.divsH;
-    return ((t - (S.hOffset - span / 2)) / span) * CV.scope.w;
+    return P.x + ((t - (S.hOffset - span / 2)) / span) * P.w;
   }
-  function xToTime(x) {
+  function xToTime(x, P) {
+    P = P || fullPane();
     const span = S.timePerDiv * S.divsH;
-    return (S.hOffset - span / 2) + (x / CV.scope.w) * span;
+    return (S.hOffset - span / 2) + ((x - P.x) / P.w) * span;
   }
-  const pxPerDivV = () => CV.scope.h / S.divsV;
-  function valueToY(ch, v) {
-    const midY = CV.scope.h / 2 - ch.position * pxPerDivV();
-    return midY - ((ch.invert ? -v : v) / ch.voltsPerDiv) * pxPerDivV();
+  const pxPerDivV = (P) => (P || fullPane()).h / S.divsV;
+  function valueToY(ch, v, P) {
+    P = P || fullPane();
+    const ppd = P.h / S.divsV;
+    const midY = P.y + P.h / 2 - ch.position * ppd;
+    return midY - ((ch.invert ? -v : v) / ch.voltsPerDiv) * ppd;
   }
-  function yToValue(ch, y) {
-    const midY = CV.scope.h / 2 - ch.position * pxPerDivV();
-    const signed = -(y - midY) / pxPerDivV() * ch.voltsPerDiv;
+  function yToValue(ch, y, P) {
+    P = P || fullPane();
+    const ppd = P.h / S.divsV;
+    const midY = P.y + P.h / 2 - ch.position * ppd;
+    const signed = -(y - midY) / ppd * ch.voltsPerDiv;
     return ch.invert ? -signed : signed;
   }
 
   // ---------- drawing primitives ----------
   /* A bench-scope graticule, not a chart grid: dotted division lines, solid
      centre axes, and 5 fine ticks per division along both of them. */
-  function drawGrid(c, divsH, divsV) {
+  /* `P` is the rectangle to draw into; omitted means the whole canvas. The
+     subdivision ticks are skipped on a small pane — at 6×6 they merge into a
+     grey haze that reads as noise instead of as a scale. */
+  function drawGrid(c, divsH, divsV, P) {
     const t = th();
-    const { ctx, w, h } = c;
+    const ctx = c.ctx;
+    const ox = P ? P.x : 0, oy = P ? P.y : 0;
+    const w = P ? P.w : c.w, h = P ? P.h : c.h;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(ox, oy, w, h);
+    ctx.clip();
     ctx.fillStyle = t.scopeBg;
-    ctx.fillRect(0, 0, w, h);
+    ctx.fillRect(ox, oy, w, h);
     if (t.dark) {
       // faint lift towards the centre, the way a real display looks lit
-      const gr = ctx.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, Math.max(w, h) * 0.75);
+      const gr = ctx.createRadialGradient(ox + w / 2, oy + h / 2, 0, ox + w / 2, oy + h / 2, Math.max(w, h) * 0.75);
       gr.addColorStop(0, "rgba(120,190,255,0.045)");
       gr.addColorStop(1, "rgba(0,0,0,0)");
       ctx.fillStyle = gr;
-      ctx.fillRect(0, 0, w, h);
+      ctx.fillRect(ox, oy, w, h);
     }
     const stepX = w / divsH, stepY = h / divsV;
-    const cx = Math.round(w / 2) + 0.5, cy = Math.round(h / 2) + 0.5;
+    const cx = Math.round(ox + w / 2) + 0.5, cy = Math.round(oy + h / 2) + 0.5;
+    const ticks = Math.min(w / divsH, h / divsV) >= 22;   // room for 5 subdivisions?
     ctx.lineWidth = 1;
     ctx.strokeStyle = t.gridMinor;
     ctx.setLineDash([1, 3]);
     ctx.beginPath();
-    for (let i = 1; i < divsH; i++) { const x = Math.round(i * stepX) + 0.5; if (x === cx) continue; ctx.moveTo(x, 0); ctx.lineTo(x, h); }
-    for (let j = 1; j < divsV; j++) { const y = Math.round(j * stepY) + 0.5; if (y === cy) continue; ctx.moveTo(0, y); ctx.lineTo(w, y); }
+    for (let i = 1; i < divsH; i++) { const x = Math.round(ox + i * stepX) + 0.5; if (x === cx) continue; ctx.moveTo(x, oy); ctx.lineTo(x, oy + h); }
+    for (let j = 1; j < divsV; j++) { const y = Math.round(oy + j * stepY) + 0.5; if (y === cy) continue; ctx.moveTo(ox, y); ctx.lineTo(ox + w, y); }
     ctx.stroke();
     ctx.setLineDash([]);
     ctx.strokeStyle = t.gridMajor;
     ctx.beginPath();
-    ctx.moveTo(cx, 0); ctx.lineTo(cx, h);
-    ctx.moveTo(0, cy); ctx.lineTo(w, cy);
+    ctx.moveTo(cx, oy); ctx.lineTo(cx, oy + h);
+    ctx.moveTo(ox, cy); ctx.lineTo(ox + w, cy);
     // subdivision ticks on the centre axes and along the outer frame
-    for (let i = 0; i < divsH; i++) for (let k = 1; k < 5; k++) {
-      const x = Math.round(i * stepX + k * stepX / 5) + 0.5;
-      ctx.moveTo(x, cy - 3); ctx.lineTo(x, cy + 3);
-      ctx.moveTo(x, 0); ctx.lineTo(x, 3);
-      ctx.moveTo(x, h); ctx.lineTo(x, h - 3);
-    }
-    for (let j = 0; j < divsV; j++) for (let k = 1; k < 5; k++) {
-      const y = Math.round(j * stepY + k * stepY / 5) + 0.5;
-      ctx.moveTo(cx - 3, y); ctx.lineTo(cx + 3, y);
-      ctx.moveTo(0, y); ctx.lineTo(3, y);
-      ctx.moveTo(w, y); ctx.lineTo(w - 3, y);
+    if (ticks) {
+      for (let i = 0; i < divsH; i++) for (let k = 1; k < 5; k++) {
+        const x = Math.round(ox + i * stepX + k * stepX / 5) + 0.5;
+        ctx.moveTo(x, cy - 3); ctx.lineTo(x, cy + 3);
+        ctx.moveTo(x, oy); ctx.lineTo(x, oy + 3);
+        ctx.moveTo(x, oy + h); ctx.lineTo(x, oy + h - 3);
+      }
+      for (let j = 0; j < divsV; j++) for (let k = 1; k < 5; k++) {
+        const y = Math.round(oy + j * stepY + k * stepY / 5) + 0.5;
+        ctx.moveTo(cx - 3, y); ctx.lineTo(cx + 3, y);
+        ctx.moveTo(ox, y); ctx.lineTo(ox + 3, y);
+        ctx.moveTo(ox + w, y); ctx.lineTo(ox + w - 3, y);
+      }
     }
     ctx.stroke();
     ctx.strokeStyle = t.border;
-    ctx.strokeRect(0.5, 0.5, w - 1, h - 1);
+    ctx.strokeRect(ox + 0.5, oy + 0.5, w - 1, h - 1);
+    ctx.restore();
   }
 
+  /* The period one "Periodic" repetition is long, or null when the channel is
+     not periodic or nothing usable could be measured. `auto` reuses the very
+     same edge-to-edge estimator the Measurements table shows, so the two can
+     never disagree; `record` repeats the capture end to end; `manual` is
+     whatever was typed. Cached per channel because auto-detection walks the
+     whole record and the renderer asks on every frame. */
+  function resolvePeriod(ch) {
+    if (!ch.periodic) return null;
+    const mode = ch.periodMode || "auto";
+    if (mode === "manual") return (ch.periodT > 0) ? ch.periodT : null;
+    const time = getTime(ch), data = getData(ch);
+    if (!time || !data || time.length < 2) return null;
+    const span = time[time.length - 1] - time[0];
+    if (mode === "record") return span > 0 ? span : null;
+    const sig = (ch.avgN || 1) + "/" + (ch.hiresN || 1) + "/" + (ch.invert ? 1 : 0) + "/" + time.length;
+    if (ch.perCache && ch.perCache.sig === sig) return ch.perCache.T;
+    const st = ch.fullStats || computeStats(data, 0, data.length - 1);
+    const r = findPeriod(data, time, 0, Math.min(data.length, time.length) - 1, st.mean, st.min, st.max, ch.invert);
+    /* No detectable edge (a DC level, or fewer than two crossings) falls back
+       to the record length instead of switching the feature off silently. */
+    const T = (r && r.period > 0 && isFinite(r.period)) ? r.period : (span > 0 ? span : null);
+    ch.perCache = { sig, T };
+    return T;
+  }
+  const MAX_TILES = 4000;   // beyond this the repeats are sub-pixel: a solid band
+
   // draws a channel trace into arbitrary ctx given a time window and value mapping
-  function traceInto(ctx2, ch, tA, tB, w, valToY) {
+  function traceInto(ctx2, ch, tA, tB, w, valToY, P) {
     const time = getTime(ch), data = getData(ch);
     if (!time || !data || time.length === 0) return;
     const N = time.length;
     const tStart = time[0], tEnd = time[N - 1];
     const dt = N > 1 ? (tEnd - tStart) / (N - 1) : 1;
-    if (tB < tStart || tA > tEnd) return;
-    let iStart = clamp(Math.floor((Math.max(tA, tStart) - tStart) / dt), 0, N - 1);
-    let iEnd = clamp(Math.ceil((Math.min(tB, tEnd) - tStart) / dt), 0, N - 1);
-    const count = iEnd - iStart + 1;
-    if (count <= 1) return;
-    const tToX = (tt) => ((tt - tA) / (tB - tA)) * w;
+    const x0 = P ? P.x : 0;
+    const tToX = (tt) => x0 + ((tt - tA) / (tB - tA)) * w;
+    const W = Math.max(1, Math.round(w));
+
+    /* Periodic mode repeats ONE period, not the whole record: tiling the
+       entire capture at a period shorter than it would stack overlapping
+       copies on top of each other rather than continuing the wave. */
+    const T = resolvePeriod(ch);
+    let tiles;
+    if (T && T > 0) {
+      const iLast = clamp(Math.round((tStart + T - tStart) / dt), 1, N - 1);
+      const kA = Math.floor((tA - (tStart + T)) / T), kB = Math.ceil((tB - tStart) / T);
+      if (kB - kA > MAX_TILES) return;   // guard: nothing legible to draw anyway
+      tiles = [];
+      for (let k = kA; k <= kB; k++) {
+        const sh = k * T;
+        if (tStart + sh > tB || tStart + T + sh < tA) continue;
+        tiles.push({ i0: 0, i1: iLast, shift: sh });
+      }
+      if (!tiles.length) return;
+    } else {
+      if (tB < tStart || tA > tEnd) return;
+      const iStart = clamp(Math.floor((Math.max(tA, tStart) - tStart) / dt), 0, N - 1);
+      const iEnd = clamp(Math.ceil((Math.min(tB, tEnd) - tStart) / dt), 0, N - 1);
+      if (iEnd - iStart + 1 <= 1) return;
+      tiles = [{ i0: iStart, i1: iEnd, shift: 0 }];
+    }
+
     ctx2.save();
+    if (P) { ctx2.beginPath(); ctx2.rect(P.x, P.y, P.w, P.h); ctx2.clip(); }
     ctx2.strokeStyle = ch.color;
     ctx2.lineWidth = S.opts.traceWidth;
     ctx2.lineJoin = "round";
@@ -883,34 +1129,128 @@ self.onmessage = function(e) {
     // the same whether the trace is 100 or 100 000 points.
     if (S.glowOn && th().dark) { ctx2.shadowColor = ch.color; ctx2.shadowBlur = 6; }
     ctx2.beginPath();
-    const W = Math.max(1, Math.round(w));
-    if (count <= W * 2) {
-      for (let i = iStart; i <= iEnd; i++) {
-        const x = tToX(time[i]), y = valToY(ch, data[i]);
-        if (i === iStart) ctx2.moveTo(x, y); else ctx2.lineTo(x, y);
-      }
-    } else {
-      const xS = clamp(Math.floor(tToX(time[iStart])), 0, W);
-      const xE = clamp(Math.ceil(tToX(time[iEnd])), 0, W);
-      const pxCount = Math.max(1, xE - xS);
-      const perPixel = count / pxCount;
-      let started = false;
-      for (let pxi = 0; pxi < pxCount; pxi++) {
-        const a = iStart + Math.floor(pxi * perPixel);
-        let b = iStart + Math.floor((pxi + 1) * perPixel);
-        if (b <= a) b = a + 1;
-        if (b > iEnd + 1) b = iEnd + 1;
-        let mn = Infinity, mx = -Infinity;
-        for (let i = a; i < b; i++) { const v = data[i]; if (v < mn) mn = v; if (v > mx) mx = v; }
-        if (mn === Infinity) continue;
-        const x = xS + pxi + 0.5;
-        if (!started) { ctx2.moveTo(x, valToY(ch, mn)); started = true; }
-        ctx2.lineTo(x, valToY(ch, mn));
-        ctx2.lineTo(x, valToY(ch, mx));
+    for (const tile of tiles) {
+      const { i0, i1, shift } = tile;
+      const count = i1 - i0 + 1;
+      if (count <= 1) continue;
+      if (count <= W * 2) {
+        for (let i = i0; i <= i1; i++) {
+          const x = tToX(time[i] + shift), y = valToY(ch, data[i], P);
+          if (i === i0) ctx2.moveTo(x, y); else ctx2.lineTo(x, y);
+        }
+      } else {
+        /* min/max decimation: one vertical stroke per pixel column, so a
+           100 000-point record costs the same as the screen is wide. */
+        const xS = clamp(Math.floor(tToX(time[i0] + shift) - x0), 0, W);
+        const xE = clamp(Math.ceil(tToX(time[i1] + shift) - x0), 0, W);
+        const pxCount = Math.max(1, xE - xS);
+        const perPixel = count / pxCount;
+        let started = false;
+        for (let pxi = 0; pxi < pxCount; pxi++) {
+          const a = i0 + Math.floor(pxi * perPixel);
+          let b = i0 + Math.floor((pxi + 1) * perPixel);
+          if (b <= a) b = a + 1;
+          if (b > i1 + 1) b = i1 + 1;
+          let mn = Infinity, mx = -Infinity;
+          for (let i = a; i < b; i++) { const v = data[i]; if (v < mn) mn = v; if (v > mx) mx = v; }
+          if (mn === Infinity) continue;
+          const x = x0 + xS + pxi + 0.5;
+          if (!started) { ctx2.moveTo(x, valToY(ch, mn, P)); started = true; }
+          ctx2.lineTo(x, valToY(ch, mn, P));
+          ctx2.lineTo(x, valToY(ch, mx, P));
+        }
       }
     }
     ctx2.stroke();
     ctx2.restore();
+  }
+
+  // ---------- harmonic reconstruction ----------
+  /* Rebuilds the wave out of the harmonics measured in the FFT tab, summing
+     them one at a time: 1 harmonic is a bare sine, and as k climbs the curve
+     folds itself into the shape of the capture underneath. It is drawn over
+     the source channel's own trace, in the panes that channel lives in,
+     because the comparison IS the feature.
+
+     `computeHarmonics` already folded `invert` into its coefficients (it
+     multiplies by `sgn`), so the series is in *displayed* value space. Passing
+     it to valueToY, which inverts again, would flip it back — so the value is
+     pre-multiplied by sgn to cancel that second inversion. Without it the
+     reconstruction of an inverted channel appears mirrored about its own zero,
+     which looks like a phase bug rather than a sign bug. */
+  function reconValue(H, k, tt) {
+    let v = H.dc;
+    const w0 = 2 * Math.PI * H.f0, dtq = tt - H.t0;
+    for (let i = 0; i < k && i < H.harms.length; i++) {
+      const hh = H.harms[i];
+      v += hh.mag * Math.cos(hh.n * w0 * dtq + hh.phase * Math.PI / 180);
+    }
+    return v;
+  }
+  function reconChannel() {
+    const H = S.harm;
+    if (!H || H.error || !H.harms || !H.harms.length) return null;
+    // the analysis stored the channel object; it may have been deleted since
+    return S.channels.indexOf(H.channel) === -1 ? null : H.channel;
+  }
+  function drawReconstruction(ctx, P, visCh, tA, tB) {
+    if (!S.recon.on) return;
+    const ch = reconChannel();
+    if (!ch || visCh.indexOf(ch) === -1) return;
+    const H = S.harm;
+    const kMax = H.harms.length;
+    const k = clamp(Math.round(S.recon.k), 0, kMax);
+    const sgn = ch.invert ? -1 : 1;
+    const W = Math.max(2, Math.round(P.w));
+    const t = th();
+
+    ctx.save();
+    ctx.beginPath(); ctx.rect(P.x, P.y, P.w, P.h); ctx.clip();
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+
+    /* The individual harmonics, faint and underneath: they explain where the
+       shape comes from, but they must never compete with the sum. */
+    if (S.recon.components && k > 0) {
+      ctx.lineWidth = 1;
+      for (let i = 0; i < k; i++) {
+        const hh = H.harms[i];
+        ctx.strokeStyle = hexA(t.cursor, 0.22);
+        ctx.beginPath();
+        for (let px = 0; px <= W; px++) {
+          const tt = tA + (px / W) * (tB - tA);
+          const v = hh.mag * Math.cos(hh.n * 2 * Math.PI * H.f0 * (tt - H.t0) + hh.phase * Math.PI / 180) + H.dc;
+          const y = valueToY(ch, v * sgn, P);
+          if (px === 0) ctx.moveTo(P.x, y); else ctx.lineTo(P.x + px, y);
+        }
+        ctx.stroke();
+      }
+    }
+
+    // the partial sum
+    ctx.lineWidth = Math.max(1.4, S.opts.traceWidth + 0.3);
+    ctx.strokeStyle = t.dark ? "#ffffff" : "#111827";
+    ctx.setLineDash([6, 3]);
+    if (S.glowOn && t.dark) { ctx.shadowColor = "#ffffff"; ctx.shadowBlur = 5; }
+    ctx.beginPath();
+    for (let px = 0; px <= W; px++) {
+      const tt = tA + (px / W) * (tB - tA);
+      const y = valueToY(ch, reconValue(H, k, tt) * sgn, P);
+      if (px === 0) ctx.moveTo(P.x, y); else ctx.lineTo(P.x + px, y);
+    }
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.shadowBlur = 0;
+
+    if (P.h >= 90) {
+      const order = k === 0 ? "DC only" : ("Σ n = 1…" + k + (k === kMax ? " (all)" : ""));
+      ctx.font = "10px 'IBM Plex Mono', monospace";
+      ctx.fillStyle = t.dark ? "#ffffff" : "#111827";
+      ctx.textAlign = "right";
+      ctx.fillText("RECON " + order, P.x + P.w - 8, P.y + 14);
+      ctx.textAlign = "left";
+    }
+    ctx.restore();
   }
 
   // ---------- persistence buffer ----------
@@ -940,9 +1280,16 @@ self.onmessage = function(e) {
     if (!resizeCanvas("scope")) { renderZoom(); updateStatus(); return; }
     const { ctx, w, h } = c;
     const t = th();
-    drawGrid(c, S.divsH, S.divsV);
-    const tA = xToTime(0), tB = xToTime(w);
-    const visCh = S.channels.filter(ch => ch.visible);
+    const panes = paneRects();
+    const grid = panes.length > 1;
+
+    // the gutters between panes are chassis, not screen
+    if (grid) { ctx.fillStyle = t.barBg; ctx.fillRect(0, 0, w, h); }
+
+    /* Every pane shows the same time window — the time base is shared — so the
+       span is computed once and handed to each pane's own x mapping. */
+    const span = S.timePerDiv * S.divsH;
+    const tA = S.hOffset - span / 2, tB = S.hOffset + span / 2;
 
     if (S.persistOn) {
       ensurePersist();
@@ -952,53 +1299,76 @@ self.onmessage = function(e) {
       persistCtx.fillStyle = "rgba(0,0,0," + S.persistDecay + ")";
       persistCtx.fillRect(0, 0, c.w, c.h);
       persistCtx.restore();
-      visCh.forEach(ch => traceInto(persistCtx, ch, tA, tB, w, valueToY));
-      ctx.drawImage(persistCanvas, 0, 0, c.w, c.h);
-    } else {
-      visCh.forEach(ch => traceInto(ctx, ch, tA, tB, w, valueToY));
     }
 
-    // ground markers on the left rail, numbered like a bench scope
-    ctx.font = "700 9px 'IBM Plex Sans', sans-serif";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    visCh.forEach(ch => {
-      const y = valueToY(ch, 0);
-      if (y < -8 || y > h + 8) return;
-      ctx.fillStyle = ch.color;
-      ctx.beginPath();
-      ctx.moveTo(1, y); ctx.lineTo(15, y - 6); ctx.lineTo(15, y + 6);
-      ctx.closePath(); ctx.fill();
-      ctx.fillStyle = luminance(ch.color) > 0.5 ? "#0b1118" : "#ffffff";
-      ctx.fillText(String(S.channels.indexOf(ch) + 1), 10, y);
-    });
-    ctx.textAlign = "left";
-    ctx.textBaseline = "alphabetic";
-
-    // zoom region shade
-    if (S.zoomOn && S.files.length) {
-      const x1 = timeToX(S.zoomT - S.zoomSpan / 2), x2 = timeToX(S.zoomT + S.zoomSpan / 2);
-      ctx.fillStyle = t.shade;
-      ctx.fillRect(x1, 0, x2 - x1, h);
-      ctx.strokeStyle = t.shadeEdge;
-      ctx.lineWidth = 1;
-      ctx.strokeRect(Math.round(x1) + 0.5, 0.5, Math.round(x2 - x1) - 1, h - 1);
+    for (const P of panes) {
+      drawGrid(c, S.divsH, S.divsV, P);
+      const visCh = chansOfPane(P);
+      const target = S.persistOn ? persistCtx : ctx;
+      visCh.forEach(ch => traceInto(target, ch, tA, tB, P.w, valueToY, P));
+      if (S.persistOn) drawReconstruction(persistCtx, P, visCh, tA, tB);
     }
+    if (S.persistOn) ctx.drawImage(persistCanvas, 0, 0, c.w, c.h);
 
-    drawTrigger(ctx, w, h);
-    drawCursors(ctx, w, h);
+    for (const P of panes) {
+      const visCh = chansOfPane(P);
+      if (!S.persistOn) drawReconstruction(ctx, P, visCh, tA, tB);
+      ctx.save();
+      ctx.beginPath(); ctx.rect(P.x, P.y, P.w, P.h); ctx.clip();
 
-    // time axis labels, kept clear of the legend bar
-    ctx.fillStyle = t.muted;
-    ctx.font = "10px 'IBM Plex Mono', monospace";
-    ctx.textAlign = "center";
-    for (let d = 1; d < S.divsH; d += 2) {
-      const tt = tA + (d / S.divsH) * (tB - tA);
-      ctx.fillText(fmt(tt, "s", 2), (d / S.divsH) * w, h - LEGEND_H - 6);
+      // ground markers on the left rail, numbered like a bench scope
+      ctx.font = "700 9px 'IBM Plex Sans', sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      visCh.forEach(ch => {
+        const y = valueToY(ch, 0, P);
+        if (y < P.y - 8 || y > P.y + P.h + 8) return;
+        ctx.fillStyle = ch.color;
+        ctx.beginPath();
+        ctx.moveTo(P.x + 1, y); ctx.lineTo(P.x + 15, y - 6); ctx.lineTo(P.x + 15, y + 6);
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = luminance(ch.color) > 0.5 ? "#0b1118" : "#ffffff";
+        ctx.fillText(String(S.channels.indexOf(ch) + 1), P.x + 10, y);
+      });
+      ctx.textAlign = "left";
+      ctx.textBaseline = "alphabetic";
+
+      // zoom region shade
+      if (S.zoomOn && S.files.length) {
+        const x1 = timeToX(S.zoomT - S.zoomSpan / 2, P), x2 = timeToX(S.zoomT + S.zoomSpan / 2, P);
+        ctx.fillStyle = t.shade;
+        ctx.fillRect(x1, P.y, x2 - x1, P.h);
+        ctx.strokeStyle = t.shadeEdge;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(Math.round(x1) + 0.5, P.y + 0.5, Math.round(x2 - x1) - 1, P.h - 1);
+      }
+
+      drawTrigger(ctx, P, visCh);
+      drawCursors(ctx, P, visCh);
+
+      /* Chrome is dropped as the pane shrinks, biggest first. The legend plus a
+         row of time stamps is ~40 px; on a 6x6 pane (~120 px tall) that is a
+         third of the height spent on labels, leaving the trace squeezed into a
+         strip. Below these sizes the compact tag says which pane it is and the
+         numbers are read off the Horizontal panel instead. */
+      const legendH = P.h >= 150 ? LEGEND_H : 0;
+      // time axis labels, kept clear of the legend bar
+      if (P.h >= 105) {
+        ctx.fillStyle = t.muted;
+        ctx.font = "10px 'IBM Plex Mono', monospace";
+        ctx.textAlign = "center";
+        const stride = P.w < 320 ? 4 : 2;      // fewer stamps when the pane is narrow
+        for (let d = 1; d < S.divsH; d += stride) {
+          const tt = tA + (d / S.divsH) * (tB - tA);
+          ctx.fillText(fmt(tt, "s", 2), P.x + (d / S.divsH) * P.w, P.y + P.h - legendH - 6);
+        }
+        ctx.textAlign = "left";
+      }
+
+      if (legendH) drawLegendBar(ctx, P, t, visCh);
+      else if (grid) drawPaneTag(ctx, P, t, visCh);
+      ctx.restore();
     }
-    ctx.textAlign = "left";
-
-    drawLegendBar(ctx, w, h, t, visCh);
 
     if (S.files.length === 0) {
       ctx.fillStyle = t.muted;
@@ -1015,17 +1385,34 @@ self.onmessage = function(e) {
     updateStatus();
   }
 
+  /* A pane too short for the legend still has to say which pane it is and what
+     is in it, or a 6×6 grid is 36 anonymous boxes. */
+  function drawPaneTag(ctx, P, t, visCh) {
+    ctx.font = "9px 'IBM Plex Mono', monospace";
+    ctx.textBaseline = "top";
+    ctx.fillStyle = t.muted;
+    ctx.fillText(String(P.i + 1), P.x + 4, P.y + 3);
+    let x = P.x + 16;
+    for (const ch of visCh) {
+      if (x > P.x + P.w - 10) break;
+      ctx.fillStyle = ch.color;
+      ctx.fillRect(x, P.y + 4, 3, 7);
+      x += 6;
+    }
+    ctx.textBaseline = "alphabetic";
+  }
+
   /* Legend strip across the bottom of the graticule: the channel scales on the
      left and the horizontal + trigger settings on the right, exactly where a
      bench scope puts them. */
   const LEGEND_H = 22;
-  function drawLegendBar(ctx, w, h, t, visCh) {
-    const y0 = h - LEGEND_H;
+  function drawLegendBar(ctx, P, t, visCh) {
+    const y0 = P.y + P.h - LEGEND_H, w = P.w;
     ctx.fillStyle = t.barBg;
-    ctx.fillRect(0, y0, w, LEGEND_H);
+    ctx.fillRect(P.x, y0, w, LEGEND_H);
     ctx.strokeStyle = t.barLine;
     ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(0, y0 + 0.5); ctx.lineTo(w, y0 + 0.5); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(P.x, y0 + 0.5); ctx.lineTo(P.x + w, y0 + 0.5); ctx.stroke();
 
     const mid = y0 + LEGEND_H / 2;
     ctx.textBaseline = "middle";
@@ -1033,8 +1420,8 @@ self.onmessage = function(e) {
     // right side first, so the channel list knows where it must stop
     ctx.font = "10px 'IBM Plex Mono', monospace";
     ctx.textAlign = "right";
-    let right = w - 8;
-    const trigCh = S.channels.find(c => c.id === S.trigger.sourceId);
+    let right = P.x + w - 8;
+    const trigCh = visCh.find(c => c.id === S.trigger.sourceId);
     if (trigCh) {
       const txt = "T " + (S.trigger.slope === "rising" ? "↗" : "↘") + " " + fmt(S.trigger.level, trigCh.unit, 2);
       ctx.fillStyle = trigCh.color;
@@ -1048,9 +1435,14 @@ self.onmessage = function(e) {
 
     // channel scales, left to right, truncated rather than overlapped
     ctx.textAlign = "left";
-    let x = 8;
+    let x = P.x + 8;
+    if (isGrid()) {
+      ctx.fillStyle = t.muted;
+      ctx.fillText(String(P.i + 1), x, mid);
+      x += 14;
+    }
     for (const ch of visCh) {
-      const txt = ch.label + "  " + fmtScale(ch.voltsPerDiv, ch.unit) + "/div";
+      const txt = ch.label + "  " + fmtScale(ch.voltsPerDiv, ch.unit) + "/div" + (ch.periodic ? " ∞" : "");
       const tw = ctx.measureText(txt).width + 11;
       if (x + tw > right) { ctx.fillStyle = t.muted; ctx.fillText("…", x, mid); break; }
       ctx.fillStyle = ch.color;
@@ -1062,50 +1454,58 @@ self.onmessage = function(e) {
     ctx.textBaseline = "alphabetic";
   }
 
-  function drawTrigger(ctx, w, h) {
-    const ch = S.channels.find(c => c.id === S.trigger.sourceId);
+  /* Trigger and cursors are drawn per pane, and only where they mean
+     something: the trigger marker belongs in the panes that actually show its
+     source channel, not smeared across all 36. */
+  function drawTrigger(ctx, P, visCh) {
+    const ch = visCh.find(c => c.id === S.trigger.sourceId);
     if (!ch) return;
-    const y = valueToY(ch, S.trigger.level);
-    if (y < -10 || y > h + 10) return;
+    const y = valueToY(ch, S.trigger.level, P);
+    if (y < P.y - 10 || y > P.y + P.h + 10) return;
+    const w = P.w, xR = P.x + w;
     ctx.strokeStyle = ch.color;
     ctx.setLineDash([5, 4]);
     ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(P.x, y); ctx.lineTo(xR, y); ctx.stroke();
     ctx.setLineDash([]);
     ctx.fillStyle = ch.color;
     ctx.beginPath();
-    ctx.moveTo(w - 1, y); ctx.lineTo(w - 11, y - 5); ctx.lineTo(w - 11, y + 5);
+    ctx.moveTo(xR - 1, y); ctx.lineTo(xR - 11, y - 5); ctx.lineTo(xR - 11, y + 5);
     ctx.closePath(); ctx.fill();
+    if (P.h < 90) return;                      // no room for the caption
     ctx.fillStyle = th().cursor;
     ctx.font = "10px 'IBM Plex Mono', monospace";
     ctx.textAlign = "right";
-    ctx.fillText("T" + (S.trigger.slope === "rising" ? "↑" : "↓") + " " + fmt(S.trigger.level, ch.unit, 2), w - 15, y - 6);
+    ctx.fillText("T" + (S.trigger.slope === "rising" ? "↑" : "↓") + " " + fmt(S.trigger.level, ch.unit, 2), xR - 15, y - 6);
     ctx.textAlign = "left";
   }
 
-  function drawCursors(ctx, w, h) {
+  function drawCursors(ctx, P, visCh) {
     const t = th(), cu = S.cursors;
     const mode = cu.mode;
+    const yT = P.y, yB = P.y + P.h;
     if (mode === "time" || mode === "track") {
       ctx.strokeStyle = t.cursor;
       ctx.setLineDash([3, 3]);
       ctx.lineWidth = 1;
       [cu.t1, cu.t2].forEach((tt, i) => {
-        const x = timeToX(tt);
-        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+        const x = timeToX(tt, P);
+        ctx.beginPath(); ctx.moveTo(x, yT); ctx.lineTo(x, yB); ctx.stroke();
         ctx.setLineDash([]);
-        ctx.fillStyle = t.cursor;
-        ctx.font = "10px 'IBM Plex Mono', monospace";
-        ctx.fillText(i === 0 ? "①" : "②", x + 4, 26);
+        if (P.h >= 60) {
+          ctx.fillStyle = t.cursor;
+          ctx.font = "10px 'IBM Plex Mono', monospace";
+          ctx.fillText(i === 0 ? "①" : "②", x + 4, yT + 26);
+        }
         ctx.setLineDash([3, 3]);
       });
       ctx.setLineDash([]);
       if (mode === "track") {
-        S.channels.filter(c => c.visible).forEach(ch => {
+        visCh.forEach(ch => {
           [cu.t1, cu.t2].forEach(tt => {
             const v = sampleAt(ch, tt);
             if (v === null) return;
-            const x = timeToX(tt), y = valueToY(ch, ch.invert ? -v : v);
+            const x = timeToX(tt, P), y = valueToY(ch, ch.invert ? -v : v, P);
             ctx.fillStyle = ch.color;
             ctx.beginPath(); ctx.arc(x, y, 3.5, 0, Math.PI * 2); ctx.fill();
             ctx.strokeStyle = t.scopeBg;
@@ -1115,25 +1515,34 @@ self.onmessage = function(e) {
         });
       }
     } else if (mode === "value") {
-      const ref = S.channels.find(ch => ch.id === cu.refId) || S.channels[0];
+      const ref = visCh.find(ch => ch.id === cu.refId) || visCh[0];
       if (ref) {
         ctx.strokeStyle = t.cursor;
         ctx.setLineDash([3, 3]);
         [cu.v1, cu.v2].forEach(v => {
-          const y = valueToY(ref, v);
-          ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+          const y = valueToY(ref, v, P);
+          ctx.beginPath(); ctx.moveTo(P.x, y); ctx.lineTo(P.x + P.w, y); ctx.stroke();
         });
         ctx.setLineDash([]);
       }
     }
   }
 
+  /* Reading a sample honours Periodic: once a channel repeats, the readout and
+     the track cursors have to agree with the trace under them, or hovering
+     over a repeated cycle would report "—" over a perfectly visible wave. */
   function sampleAt(ch, tt) {
     const time = getTime(ch), data = getData(ch);
     if (!time || !data || time.length === 0) return null;
     const N = time.length;
     const dt = N > 1 ? (time[N - 1] - time[0]) / (N - 1) : 1;
-    const idx = Math.round((tt - time[0]) / dt);
+    const T = resolvePeriod(ch);
+    let q = tt;
+    if (T && T > 0) {
+      const k = Math.floor((tt - time[0]) / T);
+      q = tt - k * T;
+    }
+    const idx = Math.round((q - time[0]) / dt);
     if (idx < 0 || idx > N - 1) return null;
     return data[idx];
   }
@@ -1218,11 +1627,24 @@ self.onmessage = function(e) {
     const time = getTime(ch);
     if (!time || time.length === 0) return null;
     const N = time.length;
-    const t0v = xToTime(0), t1v = xToTime(CV.scope.w);
+    let { tA: t0v, tB: t1v } = viewWindow();
     const tStart = time[0], tEnd = time[N - 1];
     const dt = N > 1 ? (tEnd - tStart) / (N - 1) : 1;
-    let iStart = clamp(Math.floor((Math.max(t0v, tStart) - tStart) / dt), 0, N - 1);
-    let iEnd = clamp(Math.ceil((Math.min(t1v, tEnd) - tStart) / dt), 0, N - 1);
+    /* A periodic channel is drawn outside its own record, so the window has to
+       be folded back into it before measuring. Without this, scrolling into a
+       repeated cycle left the measurements clamped to the single last sample
+       and the table read Pk-Pk 0 V, Freq "—" under a wave plainly oscillating
+       on screen. Whatever the window is, at least one whole period is
+       measured, since that is what the repetition is made of. */
+    const T = resolvePeriod(ch);
+    if (T && T > 0 && (t0v > tEnd || t1v < tStart)) {
+      const span = Math.min(Math.max(t1v - t0v, T), tEnd - tStart);
+      t0v = tStart + ((t0v - tStart) % T + T) % T;
+      t1v = t0v + span;
+      if (t1v > tEnd) { t1v = tEnd; t0v = Math.max(tStart, tEnd - span); }
+    }
+    const iStart = clamp(Math.floor((Math.max(t0v, tStart) - tStart) / dt), 0, N - 1);
+    const iEnd = clamp(Math.ceil((Math.min(t1v, tEnd) - tStart) / dt), 0, N - 1);
     if (iEnd < iStart) return null;
     return { iStart, iEnd };
   }
@@ -1265,7 +1687,7 @@ self.onmessage = function(e) {
   function exportVisibleData() {
     if (!S.files.length) return;
     S.files.forEach(f => {
-      const t0v = xToTime(0), t1v = xToTime(CV.scope.w);
+      const { tA: t0v, tB: t1v } = viewWindow();
       const N = f.rowCount;
       let iStart = clamp(Math.floor((Math.max(t0v, f.t0) - f.t0) / f.dt), 0, N - 1);
       let iEnd = clamp(Math.ceil((Math.min(t1v, f.t1) - f.t0) / f.dt), 0, N - 1);
@@ -1311,7 +1733,10 @@ self.onmessage = function(e) {
       label: a.label + " " + sym + " " + b.label, unit,
       colorIdx: colorIdx, color: colorFor(colorIdx), autoColor: true,
       visible: true, invert: false, voltsPerDiv: 1, position: 0, avgN: 1, hiresN: 1, tOffset: 0,
-      data: out, time: ta.length === out.length ? ta : tb, fullStats: stats
+      data: out, time: ta.length === out.length ? ta : tb, fullStats: stats,
+      // a derived channel starts where its operands are, not stranded in pane 1
+      panes: Array.from(new Set(panesOf(a).concat(panesOf(b)))).sort((x, y) => x - y),
+      periodic: false, periodMode: "auto", periodT: 0
     };
     autoscaleChannel(ch);
     S.channels.push(ch);
@@ -1515,6 +1940,11 @@ self.onmessage = function(e) {
         if (document.activeElement !== R.fftMaxIn) R.fftMaxIn.value = fmtScale(S.fftMaxFreq, "Hz");
       }
       renderFFTView();
+      /* A fresh analysis changes how many harmonics exist, so the overlay's
+         slider has to follow — and the overlay itself is on the scope tab,
+         which is not the one being looked at when Compute is pressed. */
+      syncReconUI();
+      if (S.recon.on) render();
       // leaving "Computing…" on screen made a finished run look stuck
       R.fftSummary.textContent = S.fft
         ? "Done · " + (R.fftRange.value === "full" ? "full record" : "visible window") + " · "
@@ -1930,31 +2360,38 @@ self.onmessage = function(e) {
   }
 
   // ---------- interactions ----------
+  /* Every hit is resolved inside the pane the pointer is over, and carries
+     that pane along so the drag that follows keeps using the same mapping.
+     A grab that started in pane 4 must not be interpreted against pane 0's
+     rectangle halfway through. */
   function hitTest(mx, my) {
+    const P = paneAt(mx, my);
+    if (!P) return null;                       // the gutter between panes
     const cu = S.cursors;
+    const visCh = chansOfPane(P);
     if (cu.mode === "time" || cu.mode === "track") {
       for (const key of ["t1", "t2"]) {
-        if (Math.abs(mx - timeToX(cu[key])) <= 6) return { type: "cursorT", key };
+        if (Math.abs(mx - timeToX(cu[key], P)) <= 6) return { type: "cursorT", key, P };
       }
     }
     if (cu.mode === "value") {
-      const ref = S.channels.find(ch => ch.id === cu.refId) || S.channels[0];
+      const ref = visCh.find(ch => ch.id === cu.refId) || visCh[0];
       if (ref) for (const key of ["v1", "v2"]) {
-        if (Math.abs(my - valueToY(ref, cu[key])) <= 6) return { type: "cursorV", key, ref };
+        if (Math.abs(my - valueToY(ref, cu[key], P)) <= 6) return { type: "cursorV", key, ref, P };
       }
     }
-    for (const ch of S.channels.filter(c => c.visible)) {
-      const y = valueToY(ch, 0);
-      if (mx >= 0 && mx <= 14 && Math.abs(my - y) <= 8) return { type: "chpos", ch };
+    for (const ch of visCh) {
+      const y = valueToY(ch, 0, P);
+      if (mx >= P.x && mx <= P.x + 14 && Math.abs(my - y) <= 8) return { type: "chpos", ch, P };
     }
-    const trig = S.channels.find(c => c.id === S.trigger.sourceId);
+    const trig = visCh.find(c => c.id === S.trigger.sourceId);
     if (trig) {
-      const y = valueToY(trig, S.trigger.level);
-      if (mx >= CV.scope.w - 14 && Math.abs(my - y) <= 8) return { type: "trigger", ch: trig };
+      const y = valueToY(trig, S.trigger.level, P);
+      if (mx >= P.x + P.w - 14 && Math.abs(my - y) <= 8) return { type: "trigger", ch: trig, P };
     }
     if (S.zoomOn) {
-      const x1 = timeToX(S.zoomT - S.zoomSpan / 2), x2 = timeToX(S.zoomT + S.zoomSpan / 2);
-      if (mx >= x1 && mx <= x2) return { type: "zoomRegion" };
+      const x1 = timeToX(S.zoomT - S.zoomSpan / 2, P), x2 = timeToX(S.zoomT + S.zoomSpan / 2, P);
+      if (mx >= x1 && mx <= x2) return { type: "zoomRegion", P };
     }
     return null;
   }
@@ -1965,8 +2402,13 @@ self.onmessage = function(e) {
       e.preventDefault();
       if (S.files.length === 0) return;
       const rect = canvas.getBoundingClientRect();
-      const mx = e.clientX - rect.left;
-      const tAtMouse = xToTime(mx);
+      const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+      /* Zoom about the pointer, measured in the pane it is over. Using the
+         canvas-wide fraction instead would drag the window sideways whenever
+         the cursor was in any pane but the leftmost. */
+      const P = paneAt(mx, my) || fullPane();
+      const tAtMouse = xToTime(mx, P);
+      const frac = (mx - P.x) / Math.max(1, P.w);
       const steps = S.timeDivOptions;
       if (steps.length) {
         let idx = 0, bd = Infinity;
@@ -1974,7 +2416,7 @@ self.onmessage = function(e) {
         idx = clamp(idx + (e.deltaY > 0 ? 1 : -1), 0, steps.length - 1);
         S.timePerDiv = steps[idx];
       }
-      const newT0 = tAtMouse - (mx / CV.scope.w) * (S.timePerDiv * S.divsH);
+      const newT0 = tAtMouse - frac * (S.timePerDiv * S.divsH);
       S.hOffset = newT0 + (S.timePerDiv * S.divsH) / 2;
       if (S.persistOn) clearPersist();
       syncTimeDivUI(); render(); scheduleMeasure(); scheduleSplit();
@@ -1984,8 +2426,11 @@ self.onmessage = function(e) {
       const rect = canvas.getBoundingClientRect();
       const mx = e.clientX - rect.left, my = e.clientY - rect.top;
       const hit = hitTest(mx, my);
-      if (hit) S.dragging = { ...hit, startX: mx, startT: xToTime(mx), zoomT0: S.zoomT };
-      else if (S.files.length > 0) S.dragging = { type: "pan", startX: mx, startTime: xToTime(mx) };
+      if (hit) S.dragging = { ...hit, startX: mx, startT: xToTime(mx, hit.P), zoomT0: S.zoomT };
+      else if (S.files.length > 0) {
+        const P = paneAt(mx, my);
+        if (P) S.dragging = { type: "pan", P, startX: mx, startTime: xToTime(mx, P) };
+      }
     });
 
     window.addEventListener("mousemove", (e) => {
@@ -1995,21 +2440,22 @@ self.onmessage = function(e) {
 
       if (S.dragging) {
         const d = S.dragging;
+        const P = d.P || fullPane();
         if (d.type === "pan") {
-          S.hOffset -= (xToTime(mx) - d.startTime);
+          S.hOffset -= (xToTime(mx, P) - d.startTime);
           if (S.persistOn) clearPersist();
         } else if (d.type === "chpos") {
-          d.ch.position = (CV.scope.h / 2 - my) / pxPerDivV();
+          d.ch.position = (P.y + P.h / 2 - my) / pxPerDivV(P);
           syncChannelCard(d.ch);
         } else if (d.type === "trigger") {
-          S.trigger.level = yToValue(d.ch, my);
+          S.trigger.level = yToValue(d.ch, my, P);
           if (document.activeElement !== R.trigLevelIn) R.trigLevelIn.value = fmtScale(S.trigger.level, "");
         } else if (d.type === "cursorT") {
-          S.cursors[d.key] = xToTime(mx);
+          S.cursors[d.key] = xToTime(mx, P);
         } else if (d.type === "cursorV") {
-          S.cursors[d.key] = yToValue(d.ref, my);
+          S.cursors[d.key] = yToValue(d.ref, my, P);
         } else if (d.type === "zoomRegion") {
-          S.zoomT = d.zoomT0 + (xToTime(mx) - d.startT);
+          S.zoomT = d.zoomT0 + (xToTime(mx, P) - d.startT);
         }
         render();
         if (d.type === "pan" || d.type === "cursorT") scheduleMeasure();
@@ -2017,12 +2463,14 @@ self.onmessage = function(e) {
         return;
       }
 
-      if (inside && S.files.length > 0 && S.tab === "scope") {
+      const hoverPane = inside ? paneAt(mx, my) : null;
+      if (hoverPane && S.files.length > 0 && S.tab === "scope") {
         const hit = hitTest(mx, my);
         canvas.style.cursor = hit ? (hit.type === "cursorT" ? "ew-resize" : hit.type === "cursorV" ? "ns-resize" : hit.type === "zoomRegion" ? "grab" : "pointer") : "crosshair";
-        const t = xToTime(mx);
-        let lines = ["t = " + fmt(t, "s")];
-        S.channels.filter(c => c.visible).forEach(ch => {
+        const t = xToTime(mx, hoverPane);
+        // only what is actually plotted in the pane under the pointer
+        let lines = [(isGrid() ? "pane " + (hoverPane.i + 1) + "   " : "") + "t = " + fmt(t, "s")];
+        chansOfPane(hoverPane).forEach(ch => {
           const v = sampleAt(ch, t);
           if (v !== null) lines.push(ch.label + " = " + fmt(ch.invert ? -v : v, ch.unit, 2));
         });
@@ -2157,8 +2605,9 @@ self.onmessage = function(e) {
   // ---------- status ----------
   function updateStatus() {
     const nCh = S.channels.filter(c => c.visible).length;
+    const lay = isGrid() ? " · " + S.layout.rows + "x" + S.layout.cols + " grid" : "";
     R.statusLeft.textContent = S.files.length
-      ? S.files.length + " file" + (S.files.length > 1 ? "s" : "") + " · " + nCh + " visible channel" + (nCh !== 1 ? "s" : "") + " · " + fmt(S.timePerDiv, "s", 0) + "/div"
+      ? S.files.length + " file" + (S.files.length > 1 ? "s" : "") + " · " + nCh + " visible channel" + (nCh !== 1 ? "s" : "") + " · " + fmt(S.timePerDiv, "s", 0) + "/div" + lay
       : "No data loaded.";
     if (S.files.length) {
       const f = S.files[0];
@@ -2169,6 +2618,102 @@ self.onmessage = function(e) {
   }
 
   // ---------- wiring ----------
+  // ---------- plot layout UI ----------
+  function buildLayoutPicker() {
+    const g = R.layoutPick;
+    g.innerHTML = "";
+    for (let r = 0; r < MAX_GRID; r++) for (let k = 0; k < MAX_GRID; k++) {
+      const cell = document.createElement("i");
+      cell.dataset.r = r; cell.dataset.c = k;
+      cell.addEventListener("mouseenter", () => paintLayoutPicker(r + 1, k + 1));
+      cell.addEventListener("click", () => setLayout(r + 1, k + 1));
+      g.appendChild(cell);
+    }
+    g.addEventListener("mouseleave", () => paintLayoutPicker());
+    paintLayoutPicker();
+  }
+  /* Highlights the rectangle that would be chosen. With no argument it falls
+     back to the layout in force, which is what makes the picker show the
+     current state when the pointer leaves it. */
+  function paintLayoutPicker(rows, cols) {
+    const rr = rows || S.layout.rows, cc = cols || S.layout.cols;
+    R.layoutPick.querySelectorAll("i").forEach(cell => {
+      const r = +cell.dataset.r, k = +cell.dataset.c;
+      cell.classList.toggle("in", r < rr && k < cc);
+      cell.classList.toggle("cur", !rows && r === S.layout.rows - 1 && k === S.layout.cols - 1);
+    });
+    const n = rr * cc;
+    R.layoutLabel.textContent = rr + " x " + cc + (n === 1 ? " — single plot" : " — " + n + " plots");
+  }
+  function setLayout(rows, cols) {
+    S.layout.rows = clamp(rows, 1, MAX_GRID);
+    S.layout.cols = clamp(cols, 1, MAX_GRID);
+    invalidatePanes();
+    remapPanes();
+    if (S.persistOn) clearPersist();          // the old afterglow is in the wrong places now
+    paintLayoutPicker();
+    rebuildChannelList();
+    render();
+  }
+  /* One channel per plot, in order. The obvious thing to want after choosing a
+     grid, and doing it by hand is 36 clicks. */
+  function spreadChannels() {
+    const vis = S.channels.filter(c => c.visible);
+    if (!vis.length) return;
+    const n = paneCount();
+    vis.forEach((ch, i) => { ch.panes = [i % n]; });
+    rebuildChannelList();
+    render();
+  }
+
+  // ---------- reconstruction UI ----------
+  function syncReconUI() {
+    const H = S.harm;
+    const ok = !!(H && !H.error && H.harms && H.harms.length);
+    R.chkRecon.checked = S.recon.on;
+    R.reconBody.style.display = S.recon.on ? "block" : "none";
+    const kMax = ok ? H.harms.length : 1;
+    R.reconK.max = String(kMax);
+    S.recon.k = clamp(Math.round(S.recon.k), 0, kMax);
+    R.reconK.value = String(S.recon.k);
+    R.reconKVal.textContent = String(S.recon.k);
+    R.chkReconParts.checked = S.recon.components;
+    R.btnReconPlay.textContent = S.recon.playing ? "❚❚ Pause" : "▶ Build up";
+    if (!S.recon.on) { R.reconNote.textContent = ""; return; }
+    /* The overlay is drawn from the FFT tab's analysis, so when there is none
+       it has to say so — an empty screen with the box ticked reads as broken. */
+    if (!ok) {
+      R.reconNote.textContent = H && H.error
+        ? "Harmonic analysis failed: " + H.error
+        : "Run Compute in the FFT / Harmonics tab first — the overlay is built from that analysis.";
+      return;
+    }
+    const ch = reconChannel();
+    R.reconNote.textContent = ch
+      ? "From " + ch.label + " · f₀ " + fmt(H.f0, "Hz", 2) + " · " + H.harms.length + " harmonics available"
+      : "The analysed channel no longer exists — run Compute again.";
+  }
+  let reconTimer = null;
+  function startReconPlay() {
+    const H = S.harm;
+    if (!H || H.error || !H.harms || !H.harms.length) return;
+    stopReconPlay();
+    S.recon.playing = true;
+    if (S.recon.k >= H.harms.length) S.recon.k = 0;   // replay from the start
+    reconTimer = setInterval(() => {
+      S.recon.k++;
+      if (S.recon.k >= H.harms.length) { S.recon.k = H.harms.length; stopReconPlay(); }
+      syncReconUI(); render();
+    }, 320);
+    syncReconUI();
+  }
+  function stopReconPlay() {
+    clearInterval(reconTimer);
+    reconTimer = null;
+    S.recon.playing = false;
+    R.btnReconPlay.textContent = "▶ Build up";
+  }
+
   function wire() {
     R.btnLoad.addEventListener("click", () => R.fileInput.click());
     R.fileInput.addEventListener("change", () => {
@@ -2191,13 +2736,22 @@ self.onmessage = function(e) {
     });
     R.btnFit.addEventListener("click", fitAll);
     R.btnReset.addEventListener("click", () => {
-      S.channels.forEach(ch => { ch.invert = false; ch.avgN = 1; ch.avgCache = null; ch.hiresN = 1; ch.hiresCache = null; ch.tOffset = 0; ch.tOffCache = null; autoscaleChannel(ch); });
+      S.channels.forEach(ch => {
+        ch.invert = false; ch.avgN = 1; ch.avgCache = null; ch.hiresN = 1; ch.hiresCache = null;
+        ch.tOffset = 0; ch.tOffCache = null;
+        ch.panes = [0]; ch.periodic = false; ch.periodMode = "auto"; ch.periodT = 0; ch.perCache = null;
+        autoscaleChannel(ch);
+      });
       S.cursors.mode = "off"; R.cursorMode.value = "off";
       R.cursorRefRow.style.display = "none";
       S.trigger = { sourceId: "", level: 0, slope: "rising" };
       R.trigSource.value = "";
       S.persistOn = false; R.chkPersist.checked = false; R.persistDecayRow.style.display = "none";
+      stopReconPlay();
+      S.recon.on = false; S.recon.k = 1; S.recon.components = false;
+      syncReconUI();
       clearPersist();
+      setLayout(1, 1);
       fitAll();
       rebuildChannelList();
     });
@@ -2282,6 +2836,30 @@ self.onmessage = function(e) {
     });
     R.persistDecay.addEventListener("input", () => {
       S.persistDecay = parseFloat(R.persistDecay.value);
+    });
+
+    buildLayoutPicker();
+    R.btnLayoutSpread.addEventListener("click", spreadChannels);
+    R.chkRecon.addEventListener("change", () => {
+      S.recon.on = R.chkRecon.checked;
+      if (!S.recon.on) stopReconPlay();
+      syncReconUI(); render();
+    });
+    R.reconK.addEventListener("input", () => {
+      stopReconPlay();
+      S.recon.k = parseInt(R.reconK.value, 10) || 0;
+      R.reconKVal.textContent = String(S.recon.k);
+      render();
+    });
+    R.chkReconParts.addEventListener("change", () => {
+      S.recon.components = R.chkReconParts.checked;
+      render();
+    });
+    R.btnReconPlay.addEventListener("click", () => { S.recon.playing ? stopReconPlay() : startReconPlay(); });
+    R.btnReconAll.addEventListener("click", () => {
+      stopReconPlay();
+      S.recon.k = S.harm && S.harm.harms ? S.harm.harms.length : 1;
+      syncReconUI(); render();
     });
 
     R.btnMath.addEventListener("click", createMathChannel);
@@ -2398,6 +2976,7 @@ self.onmessage = function(e) {
     setDistortionReadout(null);
     rebuildFileList();
     rebuildChannelList();
+    syncReconUI();
     setTab("scope");
     resizeCanvas("scope");
     render();

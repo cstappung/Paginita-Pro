@@ -226,6 +226,35 @@
         </section>
 
         <section class="grp">
+          <h3 class="ttl">Plot layout</h3>
+          <div class="row pad">
+            <div id="layoutPick" class="lgrid" title="Click a cell to set the grid: top-left is 1x1, bottom-right 6x6"></div>
+          </div>
+          <div class="row">
+            <span id="layoutLabel" class="lab grow mono">1 x 1 — single plot</span>
+            <button id="btnLayoutSpread" class="btn xs" title="Give every visible channel a plot of its own, filling the grid in order">Spread</button>
+          </div>
+        </section>
+
+        <section class="grp">
+          <h3 class="ttl">Harmonic reconstruction</h3>
+          <label class="chk"><input id="chkRecon" type="checkbox"> Overlay Fourier sum</label>
+          <div id="reconBody" class="hide">
+            <div class="row">
+              <label class="lab">Harmonics</label>
+              <input id="reconK" type="range" min="0" max="1" step="1" defaultValue="1" class="grow">
+              <span id="reconKVal" class="lab mono">1</span>
+            </div>
+            <div class="row pad">
+              <button id="btnReconPlay" class="btn key" title="Add the harmonics one by one">▶ Build up</button>
+              <button id="btnReconAll" class="btn key" title="Jump to the complete sum">All</button>
+            </div>
+            <label class="chk"><input id="chkReconParts" type="checkbox"> Show each harmonic separately</label>
+            <div id="reconNote" class="note"></div>
+          </div>
+        </section>
+
+        <section class="grp">
           <h3 class="ttl">Display</h3>
           <label class="chk"><input id="chkGlow" type="checkbox"> Phosphor glow</label>
           <label class="chk"><input id="chkZoom" type="checkbox"> Zoom window (main + detail)</label>
