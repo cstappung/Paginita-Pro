@@ -202,7 +202,7 @@ self.onmessage = function(e) {
        the FFT tab measured, adding them one at a time. `k` is how many are
        summed so far. Lives here rather than in the FFT view because it is
        drawn over the trace it approximates, which is the whole point. */
-    recon: { on: false, k: 1, components: false, playing: false },
+    recon: { on: false, k: 1, components: false, playing: false, nHarm: 15 },
     timePerDiv: 10e-3, hOffset: 0, timeDivOptions: [1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1],
     trigger: { sourceId: "", level: 0, slope: "rising" },
     cursors: { mode: "off", t1: 0, t2: 0, v1: 1, v2: -1, refId: "" },
@@ -237,7 +237,8 @@ self.onmessage = function(e) {
     "cursorMode", "cursorRefRow", "cursorRef", "cursorReadout",
     "chkGlow", "chkZoom", "chkSplitFFT", "chkPersist", "persistDecay", "persistDecayRow",
     "layoutPick", "layoutLabel", "btnLayoutSpread",
-    "chkRecon", "reconBody", "reconK", "reconKVal", "btnReconPlay", "btnReconAll", "chkReconParts", "reconNote",
+    "chkRecon", "reconBody", "reconK", "reconKVal", "reconNharm", "btnReconPlay", "btnReconAll", "chkReconParts", "reconNote",
+    "btnF0Auto", "chkF0Auto",
     "btnThemeLight", "btnThemeDark", "btnThemeReset",
     "thApp", "thSurface", "thText", "thAccent", "thScopeBg", "thGridMinor", "thGridMajor", "thCursor",
     "scopeWrap", "scopeCanvas", "hoverReadout", "zoomWrap", "zoomCanvas",
@@ -423,7 +424,7 @@ self.onmessage = function(e) {
     .osc-ch .ft{display:flex;align-items:center;gap:8px;font-size:10.5px;color:var(--dim)}
     .osc-ch .ft label{display:flex;align-items:center;gap:4px;cursor:pointer}
     .osc-ch select.osc-in{font-family:"IBM Plex Sans",sans-serif}
-    .osc-ch .ft.panes,.osc-ch .ft.per{border-top:1px dashed var(--line);padding-top:5px}
+    .osc-ch .ft.panes,.osc-ch .ft.per,.osc-ch .ft.fou{border-top:1px dashed var(--line);padding-top:5px}
     .osc-ch .ft .pl{font:9px "IBM Plex Sans",sans-serif;letter-spacing:.06em;text-transform:uppercase;color:var(--dim);flex-shrink:0}
     .pane-grid{display:grid;gap:2px;flex:1}
     .pane-cell{border:1px solid var(--line);background:var(--panel2);color:var(--dim);border-radius:3px;
@@ -501,7 +502,8 @@ self.onmessage = function(e) {
         label: shortLabel + ":" + c.name, unit: c.unit || "",
         colorIdx: colorIdx, color: colorFor(colorIdx), autoColor: true, visible: true, invert: false,
         voltsPerDiv: 1, position: 0, avgN: 1, hiresN: 1, tOffset: 0, fullStats: stats,
-        panes: [0], periodic: false, periodMode: "auto", periodT: 0
+        panes: [0], periodic: false, periodMode: "auto", periodT: 0,
+        reconOn: true, f0Mode: "auto", f0: 0
       };
       autoscaleChannel(ch);
       S.channels.push(ch);
@@ -509,6 +511,7 @@ self.onmessage = function(e) {
     rebuildFileList();
     rebuildChannelList();
     rebuildSelects();
+    fillAutoF0(false);       // the box should already hold the right f₁ on arrival
     if (S.files.length === 1) fitAll(); else render();
     scheduleMeasure();
     scheduleSplit();
@@ -704,6 +707,27 @@ self.onmessage = function(e) {
       "</div>";
   }
 
+  /* The Fourier row only appears while the overlay is on: it is the one
+     control whose whole purpose is invisible otherwise, and three permanent
+     extra rows per card pushed everything else off the panel. */
+  function fourierHtml(ch) {
+    if (!S.recon.on) return "";
+    const auto = (ch.f0Mode || "auto") === "auto";
+    const det = autoFundamental(ch);
+    const f0 = channelF0(ch);
+    const H = f0 ? ensureHarm(ch) : null;
+    const bad = !f0 ? "no fundamental found" : (H && H.error ? H.error : "");
+    return '<div class="ft fou">' +
+      '<label title="Draw this channel\'s Fourier reconstruction over its trace."><input type="checkbox" class="recOn"' + (ch.reconOn === false ? "" : " checked") + '> Fourier</label>' +
+      '<select class="osc-in f0Mode" style="height:20px;padding:0 2px"><option value="auto"' + (auto ? " selected" : "") + ">auto</option><option value=\"manual\"" + (auto ? "" : " selected") + ">manual</option></select>" +
+      (auto
+        ? '<span class="perVal" title="' + (bad ? bad.replace(/"/g, "&quot;") : "Detected from the zero crossings of the whole record") + '">' +
+            (det ? fmtScale(det, "Hz") : "—") + "</span>"
+        : '<input type="text" class="osc-in f0In2" style="height:20px;width:70px" value="' + fmtScale(ch.f0 || 0, "Hz") + '" title="e.g. 50, 60, 1k">') +
+      (bad && !H ? '<span class="perVal" style="color:var(--bad)">!</span>' : "") +
+      "</div>";
+  }
+
   function rebuildChannelList() {
     R.channelList.innerHTML = "";
     if (S.channels.length === 0) {
@@ -735,7 +759,8 @@ self.onmessage = function(e) {
         '<span style="margin-left:auto;font:10px \'IBM Plex Mono\',monospace">' + (ch.unit || "·") + '</span>' +
         '</div>' +
         panePickerHtml(ch) +
-        periodicHtml(ch);
+        periodicHtml(ch) +
+        fourierHtml(ch);
       card.querySelector(".sw").addEventListener("input", e => {
         ch.color = e.target.value;
         ch.autoColor = false;  // hand-picked: stop following the theme palette
@@ -813,6 +838,28 @@ self.onmessage = function(e) {
           renderAll(); scheduleMeasure();
         });
         perT.addEventListener("keydown", e => { if (e.key === "Enter") perT.blur(); });
+      }
+      const recOn = card.querySelector(".recOn");
+      if (recOn) recOn.addEventListener("change", e => {
+        ch.reconOn = e.target.checked;
+        syncReconUI(); render();
+      });
+      const f0Mode = card.querySelector(".f0Mode");
+      if (f0Mode) f0Mode.addEventListener("change", e => {
+        ch.f0Mode = e.target.value;
+        if (ch.f0Mode === "manual" && !(ch.f0 > 0)) ch.f0 = autoFundamental(ch) || 50;
+        rebuildChannelList(); syncReconUI(); render();
+      });
+      const f0In2 = card.querySelector(".f0In2");
+      if (f0In2) {
+        f0In2.addEventListener("change", () => {
+          const p = parseScaleInput(f0In2.value);
+          if (p !== null && p > 0) ch.f0 = p;
+          else { f0In2.classList.add("invalid"); setTimeout(() => f0In2.classList.remove("invalid"), 700); }
+          f0In2.value = fmtScale(ch.f0 || 0, "Hz");
+          syncReconUI(); render();
+        });
+        f0In2.addEventListener("keydown", e => { if (e.key === "Enter") f0In2.blur(); });
       }
       const rm = card.querySelector(".rm");
       if (rm) rm.addEventListener("click", () => removeChannel(ch.id));
@@ -1097,26 +1144,42 @@ self.onmessage = function(e) {
 
     /* Periodic mode repeats ONE period, not the whole record: tiling the
        entire capture at a period shorter than it would stack overlapping
-       copies on top of each other rather than continuing the wave. */
+       copies on top of each other rather than continuing the wave.
+
+       Each tile is clipped to the visible window IN INDEX SPACE, not just by
+       the canvas clip rect. The decimator below spreads `count` samples over
+       `pxCount` pixels, so handing it a whole period while only a sliver of
+       that period is on screen squeezes the entire cycle into the sliver —
+       which is exactly how the edge tiles came out compressed. One sample of
+       padding keeps the line reaching the pane edge instead of stopping short
+       of it. */
     const T = resolvePeriod(ch);
     let tiles;
+    const clipTile = (lo, hi, shift, iMax) => {
+      const a = Math.max(tA, lo), b = Math.min(tB, hi);
+      if (b < a) return null;
+      let i0 = Math.floor((a - shift - tStart) / dt) - 1;
+      let i1 = Math.ceil((b - shift - tStart) / dt) + 1;
+      i0 = clamp(i0, 0, iMax); i1 = clamp(i1, 0, iMax);
+      return i1 - i0 + 1 > 1 ? { i0, i1, shift } : null;
+    };
     if (T && T > 0) {
-      const iLast = clamp(Math.round((tStart + T - tStart) / dt), 1, N - 1);
-      const kA = Math.floor((tA - (tStart + T)) / T), kB = Math.ceil((tB - tStart) / T);
+      const iLast = clamp(Math.round(T / dt), 1, N - 1);
+      const tileLen = iLast * dt;                       // what one tile really spans
+      const kA = Math.floor((tA - tStart - tileLen) / T), kB = Math.ceil((tB - tStart) / T);
       if (kB - kA > MAX_TILES) return;   // guard: nothing legible to draw anyway
       tiles = [];
       for (let k = kA; k <= kB; k++) {
         const sh = k * T;
-        if (tStart + sh > tB || tStart + T + sh < tA) continue;
-        tiles.push({ i0: 0, i1: iLast, shift: sh });
+        const tile = clipTile(tStart + sh, tStart + tileLen + sh, sh, iLast);
+        if (tile) tiles.push(tile);
       }
       if (!tiles.length) return;
     } else {
       if (tB < tStart || tA > tEnd) return;
-      const iStart = clamp(Math.floor((Math.max(tA, tStart) - tStart) / dt), 0, N - 1);
-      const iEnd = clamp(Math.ceil((Math.min(tB, tEnd) - tStart) / dt), 0, N - 1);
-      if (iEnd - iStart + 1 <= 1) return;
-      tiles = [{ i0: iStart, i1: iEnd, shift: 0 }];
+      const tile = clipTile(tStart, tEnd, 0, N - 1);
+      if (!tile) return;
+      tiles = [tile];
     }
 
     ctx2.save();
@@ -1140,7 +1203,11 @@ self.onmessage = function(e) {
         }
       } else {
         /* min/max decimation: one vertical stroke per pixel column, so a
-           100 000-point record costs the same as the screen is wide. */
+           100 000-point record costs the same as the screen is wide.
+           These are NOT clamped to the pane: the index range was already
+           clipped to the visible window, so the pixel span must be allowed to
+           match it exactly — clamping here is what compressed the tile. The
+           clip rect handles the sub-pixel overhang. */
         const xS = clamp(Math.floor(tToX(time[i0] + shift) - x0), 0, W);
         const xE = clamp(Math.ceil(tToX(time[i1] + shift) - x0), 0, W);
         const pxCount = Math.max(1, xE - xS);
@@ -1187,65 +1254,108 @@ self.onmessage = function(e) {
     }
     return v;
   }
-  function reconChannel() {
-    const H = S.harm;
-    if (!H || H.error || !H.harms || !H.harms.length) return null;
-    // the analysis stored the channel object; it may have been deleted since
-    return S.channels.indexOf(H.channel) === -1 ? null : H.channel;
+  /* Every channel carries its own harmonics, so every channel can show its own
+     fundamental. The FFT tab still analyses one channel in depth (THD, TDD, the
+     tables); this is the cheap per-channel version that feeds the overlay, and
+     it is cached because the renderer asks on every frame. */
+  function ensureHarm(ch) {
+    const data = getData(ch);
+    if (!data) return null;
+    const f0 = channelF0(ch);
+    if (!f0 || f0 <= 0) return null;
+    const n = S.recon.nHarm;
+    const sig = f0.toFixed(6) + "/" + n + "/" + (ch.avgN || 1) + "/" + (ch.hiresN || 1) +
+      "/" + (ch.invert ? 1 : 0) + "/" + data.length;
+    if (ch.harmCache && ch.harmCache.sig === sig) return ch.harmCache.H;
+    /* Always the FULL record, never the visible window: the overlay would
+       otherwise be recomputed on every pan and, worse, change shape as you
+       scrolled, which makes it useless as a reference. */
+    const H = computeHarmonics(ch, f0, n, "full", null);
+    ch.harmCache = { sig, H };
+    return H;
+  }
+  // the channels whose reconstruction is currently drawable
+  function reconChannels(list) {
+    if (!S.recon.on) return [];
+    return (list || S.channels.filter(c => c.visible)).filter(ch => {
+      if (ch.reconOn === false) return false;
+      const H = ensureHarm(ch);
+      return !!(H && !H.error && H.harms && H.harms.length);
+    });
+  }
+  const reconMaxK = () => reconChannels().reduce((m, ch) => Math.max(m, ch.harmCache.H.harms.length), 0);
+  // a lighter cast of the trace colour: same channel, plainly not the trace
+  function lighten(hex, amt) {
+    const m = hex.replace("#", "");
+    const r = parseInt(m.slice(0, 2), 16), g = parseInt(m.slice(2, 4), 16), b = parseInt(m.slice(4, 6), 16);
+    const mix = (c) => Math.round(c + (255 - c) * amt);
+    return "rgb(" + mix(r) + "," + mix(g) + "," + mix(b) + ")";
   }
   function drawReconstruction(ctx, P, visCh, tA, tB) {
-    if (!S.recon.on) return;
-    const ch = reconChannel();
-    if (!ch || visCh.indexOf(ch) === -1) return;
-    const H = S.harm;
-    const kMax = H.harms.length;
-    const k = clamp(Math.round(S.recon.k), 0, kMax);
-    const sgn = ch.invert ? -1 : 1;
+    const list = reconChannels(visCh);
+    if (!list.length) return;
     const W = Math.max(2, Math.round(P.w));
     const t = th();
+    let kShown = 0, kMaxShown = 0;
 
     ctx.save();
     ctx.beginPath(); ctx.rect(P.x, P.y, P.w, P.h); ctx.clip();
     ctx.lineJoin = "round";
     ctx.lineCap = "round";
 
-    /* The individual harmonics, faint and underneath: they explain where the
-       shape comes from, but they must never compete with the sum. */
-    if (S.recon.components && k > 0) {
-      ctx.lineWidth = 1;
-      for (let i = 0; i < k; i++) {
-        const hh = H.harms[i];
-        ctx.strokeStyle = hexA(t.cursor, 0.22);
-        ctx.beginPath();
-        for (let px = 0; px <= W; px++) {
-          const tt = tA + (px / W) * (tB - tA);
-          const v = hh.mag * Math.cos(hh.n * 2 * Math.PI * H.f0 * (tt - H.t0) + hh.phase * Math.PI / 180) + H.dc;
-          const y = valueToY(ch, v * sgn, P);
-          if (px === 0) ctx.moveTo(P.x, y); else ctx.lineTo(P.x + px, y);
-        }
-        ctx.stroke();
-      }
-    }
+    for (const ch of list) {
+      const H = ch.harmCache.H;
+      const kMax = H.harms.length;
+      const k = clamp(Math.round(S.recon.k), 0, kMax);
+      kShown = Math.max(kShown, k); kMaxShown = Math.max(kMaxShown, kMax);
+      const sgn = ch.invert ? -1 : 1;
+      /* Same hue as the trace so it is obvious WHICH channel is being
+         reconstructed — with several on screen a single white curve is
+         unattributable — but lightened and dashed so it is never mistaken for
+         the measured wave underneath it. */
+      const tint = lighten(ch.color, t.dark ? 0.55 : 0.0);
+      const dim = lighten(ch.color, t.dark ? 0.35 : 0.45);
 
-    // the partial sum
-    ctx.lineWidth = Math.max(1.4, S.opts.traceWidth + 0.3);
-    ctx.strokeStyle = t.dark ? "#ffffff" : "#111827";
-    ctx.setLineDash([6, 3]);
-    if (S.glowOn && t.dark) { ctx.shadowColor = "#ffffff"; ctx.shadowBlur = 5; }
-    ctx.beginPath();
-    for (let px = 0; px <= W; px++) {
-      const tt = tA + (px / W) * (tB - tA);
-      const y = valueToY(ch, reconValue(H, k, tt) * sgn, P);
-      if (px === 0) ctx.moveTo(P.x, y); else ctx.lineTo(P.x + px, y);
+      /* The individual harmonics, faint and underneath: they explain where the
+         shape comes from, but they must never compete with the sum. */
+      if (S.recon.components && k > 0) {
+        ctx.lineWidth = 1;
+        ctx.globalAlpha = 0.30;
+        ctx.strokeStyle = dim;
+        for (let i = 0; i < k; i++) {
+          const hh = H.harms[i];
+          ctx.beginPath();
+          for (let px = 0; px <= W; px++) {
+            const tt = tA + (px / W) * (tB - tA);
+            const v = hh.mag * Math.cos(hh.n * 2 * Math.PI * H.f0 * (tt - H.t0) + hh.phase * Math.PI / 180) + H.dc;
+            const y = valueToY(ch, v * sgn, P);
+            if (px === 0) ctx.moveTo(P.x, y); else ctx.lineTo(P.x + px, y);
+          }
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+      }
+
+      // the partial sum
+      ctx.lineWidth = Math.max(1.4, S.opts.traceWidth + 0.3);
+      ctx.strokeStyle = tint;
+      ctx.setLineDash([6, 3]);
+      if (S.glowOn && t.dark) { ctx.shadowColor = tint; ctx.shadowBlur = 5; }
+      ctx.beginPath();
+      for (let px = 0; px <= W; px++) {
+        const tt = tA + (px / W) * (tB - tA);
+        const y = valueToY(ch, reconValue(H, k, tt) * sgn, P);
+        if (px === 0) ctx.moveTo(P.x, y); else ctx.lineTo(P.x + px, y);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.shadowBlur = 0;
     }
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.shadowBlur = 0;
 
     if (P.h >= 90) {
-      const order = k === 0 ? "DC only" : ("Σ n = 1…" + k + (k === kMax ? " (all)" : ""));
+      const order = kShown === 0 ? "DC only" : ("Σ n = 1…" + kShown + (kShown >= kMaxShown ? " (all)" : ""));
       ctx.font = "10px 'IBM Plex Mono', monospace";
-      ctx.fillStyle = t.dark ? "#ffffff" : "#111827";
+      ctx.fillStyle = t.muted;
       ctx.textAlign = "right";
       ctx.fillText("RECON " + order, P.x + P.w - 8, P.y + 14);
       ctx.textAlign = "left";
@@ -1615,12 +1725,44 @@ self.onmessage = function(e) {
         st = "high";
       }
     }
-    if (crossings.length < 2) return { period: null, freq: null };
+    if (crossings.length < 2) return { period: null, freq: null, crossings };
     const periods = [];
     for (let i = 1; i < crossings.length; i++) periods.push(crossings[i] - crossings[i - 1]);
     periods.sort((a, b) => a - b);
     const period = periods[Math.floor(periods.length / 2)];
-    return { period, freq: 1 / period };
+    return { period, freq: 1 / period, crossings };
+  }
+
+  /* The fundamental, measured rather than typed. The median of the crossing
+     intervals (what `findPeriod` reports, and the right choice for the
+     Measurements column because it shrugs off one bad edge) is quantised to the
+     sample rate: at 20 kS/s a 50 Hz period lands on 20.00 or 20.05 ms, a 0.25 %
+     error. That is invisible in a table and ruinous in the reconstruction,
+     where it accumulates into a visible phase drift by the far side of the
+     screen. Spanning first-to-last crossing divides that error by the number of
+     cycles instead. The spectrum is no help here: its resolution is 1/record,
+     which over six cycles of 50 Hz is 8 Hz-wide bins. */
+  function autoFundamental(ch) {
+    const data = getData(ch), time = getTime(ch);
+    if (!data || !time || data.length < 4) return null;
+    const sig = (ch.avgN || 1) + "/" + (ch.hiresN || 1) + "/" + (ch.invert ? 1 : 0) + "/" + data.length;
+    if (ch.f0Cache && ch.f0Cache.sig === sig) return ch.f0Cache.f;
+    const st = ch.fullStats || computeStats(data, 0, data.length - 1);
+    const r = findPeriod(data, time, 0, Math.min(data.length, time.length) - 1, st.mean, st.min, st.max, ch.invert);
+    let f = null;
+    const cr = r.crossings;
+    if (cr && cr.length >= 2) {
+      const span = cr[cr.length - 1] - cr[0];
+      if (span > 0) f = (cr.length - 1) / span;
+    }
+    if (!f && r.freq && isFinite(r.freq)) f = r.freq;
+    ch.f0Cache = { sig, f: (f && isFinite(f) && f > 0) ? f : null };
+    return ch.f0Cache.f;
+  }
+  // what a channel's Fourier work should actually use
+  function channelF0(ch) {
+    if (ch.f0Mode === "manual" && ch.f0 > 0) return ch.f0;
+    return autoFundamental(ch);
   }
 
   function visibleRange(ch) {
@@ -1736,7 +1878,8 @@ self.onmessage = function(e) {
       data: out, time: ta.length === out.length ? ta : tb, fullStats: stats,
       // a derived channel starts where its operands are, not stranded in pane 1
       panes: Array.from(new Set(panesOf(a).concat(panesOf(b)))).sort((x, y) => x - y),
-      periodic: false, periodMode: "auto", periodT: 0
+      periodic: false, periodMode: "auto", periodT: 0,
+      reconOn: true, f0Mode: "auto", f0: 0
     };
     autoscaleChannel(ch);
     S.channels.push(ch);
@@ -1922,6 +2065,23 @@ self.onmessage = function(e) {
   }
 
   // ---------- FFT view rendering ----------
+  /* Writes the measured fundamental of the FFT source channel into the box.
+     `force` runs even when the automatic mode is off (the Auto button), so the
+     button is a one-shot "measure it for me" that does not change the mode. */
+  function fillAutoF0(force) {
+    if (!force && !R.chkF0Auto.checked) return false;
+    const ch = S.channels.find(c => c.id === R.fftSource.value);
+    if (!ch) return false;
+    const f = autoFundamental(ch);
+    if (!f || !isFinite(f) || f <= 0) {
+      R.fftSummary.textContent = "Could not measure a fundamental on " + ch.label + " — type it in.";
+      return false;
+    }
+    R.f0In.value = fmtScale(f, "");
+    if (force) R.chkF0Auto.checked = true;
+    return true;
+  }
+
   function runAnalysis() {
     const ch = S.channels.find(c => c.id === R.fftSource.value);
     if (!ch) { R.fftSummary.textContent = "Load a CSV and pick a source channel."; return; }
@@ -2668,41 +2828,41 @@ self.onmessage = function(e) {
 
   // ---------- reconstruction UI ----------
   function syncReconUI() {
-    const H = S.harm;
-    const ok = !!(H && !H.error && H.harms && H.harms.length);
     R.chkRecon.checked = S.recon.on;
     R.reconBody.style.display = S.recon.on ? "block" : "none";
-    const kMax = ok ? H.harms.length : 1;
+    R.chkReconParts.checked = S.recon.components;
+    R.btnReconPlay.textContent = S.recon.playing ? "❚❚ Pause" : "▶ Build up";
+    R.reconNharm.value = String(S.recon.nHarm);
+    const list = reconChannels();
+    const kMax = Math.max(1, reconMaxK());
     R.reconK.max = String(kMax);
     S.recon.k = clamp(Math.round(S.recon.k), 0, kMax);
     R.reconK.value = String(S.recon.k);
     R.reconKVal.textContent = String(S.recon.k);
-    R.chkReconParts.checked = S.recon.components;
-    R.btnReconPlay.textContent = S.recon.playing ? "❚❚ Pause" : "▶ Build up";
     if (!S.recon.on) { R.reconNote.textContent = ""; return; }
-    /* The overlay is drawn from the FFT tab's analysis, so when there is none
-       it has to say so — an empty screen with the box ticked reads as broken. */
-    if (!ok) {
-      R.reconNote.textContent = H && H.error
-        ? "Harmonic analysis failed: " + H.error
-        : "Run Compute in the FFT / Harmonics tab first — the overlay is built from that analysis.";
+    /* Silence would read as broken, so the note always says which channels are
+       being reconstructed — or why none are. */
+    if (!list.length) {
+      const vis = S.channels.filter(c => c.visible);
+      R.reconNote.textContent = !vis.length
+        ? "No visible channels."
+        : vis.every(c => c.reconOn === false)
+          ? "No channel has Fourier ticked — enable it on a channel card."
+          : "No fundamental could be measured. Set f₀ to manual on the channel card.";
       return;
     }
-    const ch = reconChannel();
-    R.reconNote.textContent = ch
-      ? "From " + ch.label + " · f₀ " + fmt(H.f0, "Hz", 2) + " · " + H.harms.length + " harmonics available"
-      : "The analysed channel no longer exists — run Compute again.";
+    R.reconNote.textContent = list.map(ch => ch.label + " f₀ " + fmt(ch.harmCache.H.f0, "Hz", 2)).join(" · ");
   }
   let reconTimer = null;
   function startReconPlay() {
-    const H = S.harm;
-    if (!H || H.error || !H.harms || !H.harms.length) return;
+    const kMax = reconMaxK();
+    if (!kMax) return;
     stopReconPlay();
     S.recon.playing = true;
-    if (S.recon.k >= H.harms.length) S.recon.k = 0;   // replay from the start
+    if (S.recon.k >= kMax) S.recon.k = 0;   // replay from the start
     reconTimer = setInterval(() => {
       S.recon.k++;
-      if (S.recon.k >= H.harms.length) { S.recon.k = H.harms.length; stopReconPlay(); }
+      if (S.recon.k >= kMax) { S.recon.k = kMax; stopReconPlay(); }
       syncReconUI(); render();
     }, 320);
     syncReconUI();
@@ -2740,6 +2900,7 @@ self.onmessage = function(e) {
         ch.invert = false; ch.avgN = 1; ch.avgCache = null; ch.hiresN = 1; ch.hiresCache = null;
         ch.tOffset = 0; ch.tOffCache = null;
         ch.panes = [0]; ch.periodic = false; ch.periodMode = "auto"; ch.periodT = 0; ch.perCache = null;
+        ch.reconOn = true; ch.f0Mode = "auto"; ch.f0 = 0; ch.harmCache = null;
         autoscaleChannel(ch);
       });
       S.cursors.mode = "off"; R.cursorMode.value = "off";
@@ -2843,7 +3004,13 @@ self.onmessage = function(e) {
     R.chkRecon.addEventListener("change", () => {
       S.recon.on = R.chkRecon.checked;
       if (!S.recon.on) stopReconPlay();
-      syncReconUI(); render();
+      // the Fourier row on each card only exists while the overlay is on
+      rebuildChannelList(); syncReconUI(); render();
+    });
+    R.reconNharm.addEventListener("change", () => {
+      S.recon.nHarm = clamp(Math.round(parseFloat(R.reconNharm.value) || 15), 1, 200);
+      R.reconNharm.value = String(S.recon.nHarm);
+      rebuildChannelList(); syncReconUI(); render();
     });
     R.reconK.addEventListener("input", () => {
       stopReconPlay();
@@ -2858,7 +3025,7 @@ self.onmessage = function(e) {
     R.btnReconPlay.addEventListener("click", () => { S.recon.playing ? stopReconPlay() : startReconPlay(); });
     R.btnReconAll.addEventListener("click", () => {
       stopReconPlay();
-      S.recon.k = S.harm && S.harm.harms ? S.harm.harms.length : 1;
+      S.recon.k = Math.max(1, reconMaxK());
       syncReconUI(); render();
     });
 
@@ -2866,6 +3033,15 @@ self.onmessage = function(e) {
 
     R.btnCompute.addEventListener("click", runAnalysis);
     R.btnExportHarm.addEventListener("click", exportHarmonics);
+    R.btnF0Auto.addEventListener("click", () => { if (fillAutoF0(true)) scheduleAnalysis(); });
+    R.chkF0Auto.addEventListener("change", () => {
+      if (R.chkF0Auto.checked && fillAutoF0(true)) scheduleAnalysis();
+    });
+    /* Typing a frequency is an override, so it turns the automatic mode off by
+       itself: leaving it ticked would silently overwrite what was just typed
+       the next time the source changed. */
+    R.f0In.addEventListener("input", () => { R.chkF0Auto.checked = false; });
+    R.fftSource.addEventListener("change", () => fillAutoF0(false));
     ["fftSource", "fftWindow", "fftRange", "f0In", "nHarmIn", "ilIn"].forEach(id => {
       R[id].addEventListener("change", scheduleAnalysis);
     });

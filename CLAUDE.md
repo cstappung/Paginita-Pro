@@ -144,18 +144,46 @@ drawn: `sampleAt` wraps (else hovering a repeated cycle reads "—" over a
 visible wave) and `visibleRange` folds the window back into the record (else
 the table reported Pk-Pk 0 V and Freq "—" while the screen plainly oscillated).
 
-**The Fourier reconstruction overlay** (`drawReconstruction`) rebuilds the wave
-from the FFT tab's harmonics, summing `k` of them, drawn over the very trace it
-approximates. Two things it depends on:
+**Every tile is clipped to the visible window in index space** (`clipTile`),
+not merely by the canvas clip rect. The min/max decimator spreads `count`
+samples across `pxCount` pixels, so handing it a whole period while only a
+sliver of that period is on screen squeezes the entire cycle into the sliver —
+which is exactly how the edge tiles came out visibly compressed. The pixel span
+(`xS`/`xE`) must then *not* be clamped to the pane, or the same mismatch comes
+back from the other side. The bug only shows when the window edge falls
+mid-period: with `hOffset` on an exact multiple of the period every tile is
+whole and nothing looks wrong, which is why it is easy to "fix" and still ship.
 
+**The Fourier reconstruction overlay** (`drawReconstruction`) rebuilds each
+wave from its own harmonics, summing `k` of them, drawn over the very trace it
+approximates. Four things it depends on:
+
+- **Harmonics are per channel** (`ensureHarm` → `ch.harmCache`), not the FFT
+  tab's single `S.harm`: channels in one capture routinely have different
+  fundamentals (a 50 Hz voltage beside a 120 Hz ripple), and one global f₀
+  cannot describe both. The FFT tab still owns the deep single-channel analysis
+  (THD, TDD, the tables); this is the cheap per-channel version.
+- Each curve is drawn in a **lightened, dashed cast of its own channel colour**.
+  A single white curve was unattributable the moment two channels were
+  reconstructed at once.
 - `computeHarmonics` has already folded `invert` into its coefficients (it
   multiplies by `sgn`), so the series is in *displayed* value space. It is
   pre-multiplied by `sgn` before `valueToY`, which inverts again — without
   that, an inverted channel's reconstruction is mirrored about its own zero and
   reads as a phase bug rather than a sign bug.
-- The overlay is on the Scope tab but its data comes from Compute on the FFT
-  tab, so `runAnalysis` calls `syncReconUI()`: a fresh analysis changes how many
-  harmonics exist, on a tab the user is not looking at.
+- It analyses the **full record, never the visible window**, so the overlay
+  does not change shape as you pan — a reference that moves is not a reference.
+
+**The fundamental is measured, not typed** (`autoFundamental`), both for the
+overlay and for the FFT tab's f₁ box. It spans first-to-last zero crossing
+rather than taking the median interval that `findPeriod` reports: the median is
+quantised to the sample rate, so at 20 kS/s a 50 Hz period lands on 20.00 or
+20.05 ms — invisible in the Measurements column, ruinous in a reconstruction
+where it accumulates into visible phase drift by the far side of the screen.
+The spectrum is no help: its resolution is 1/record, which over six cycles of
+50 Hz is 8 Hz-wide bins. Typing in the f₁ box clears the "detect automatically"
+tick by itself, or the next source change would silently overwrite what was
+just typed.
 
 ## ColabTeX architecture
 

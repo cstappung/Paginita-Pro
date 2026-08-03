@@ -245,6 +245,10 @@
               <input id="reconK" type="range" min="0" max="1" step="1" defaultValue="1" class="grow">
               <span id="reconKVal" class="lab mono">1</span>
             </div>
+            <div class="row">
+              <label class="lab" title="How many harmonics to measure per channel for the overlay">Compute up to</label>
+              <input id="reconNharm" class="in grow mono" type="number" min="1" max="200" defaultValue="15">
+            </div>
             <div class="row pad">
               <button id="btnReconPlay" class="btn key" title="Add the harmonics one by one">▶ Build up</button>
               <button id="btnReconAll" class="btn key" title="Jump to the complete sum">All</button>
@@ -319,7 +323,12 @@
 
         <section class="grp">
           <h3 class="ttl">Harmonics</h3>
-          <div class="row"><label class="lab w">Fund. f₁ (Hz)</label><input id="f0In" class="in grow mono" type="text" defaultValue="50" title="Fundamental frequency, e.g. 50, 60, 20k"></div>
+          <div class="row">
+            <label class="lab w">Fund. f₁ (Hz)</label>
+            <input id="f0In" class="in grow mono" type="text" defaultValue="50" title="Fundamental frequency, e.g. 50, 60, 20k">
+            <button id="btnF0Auto" class="btn xs" title="Measure the fundamental from the source channel">Auto</button>
+          </div>
+          <label class="chk" title="Re-measure the fundamental whenever the source channel changes. Untick, or type in the box, to set it by hand."><input id="chkF0Auto" type="checkbox" checked="true"> Detect f₁ automatically</label>
           <div class="row"><label class="lab w">Harmonics</label><input id="nHarmIn" class="in grow mono" type="number" min="1" max="500" defaultValue="50"></div>
           <div class="row">
             <label class="lab w">Show</label>
