@@ -387,6 +387,8 @@ function ensureViewerAndEngine() {
   if (!state.pdfViewer) {
     state.pdfViewer = new PdfViewer($("pdfScroll"), {
       onPageInfo: (cur, total) => { $("pageLabel").textContent = `Página ${cur} / ${total}`; },
+      // Ctrl+rueda cambia el zoom sin pasar por los botones: que el % lo diga
+      onZoom: s => { $("zoomLabel").textContent = Math.round(s * 100) + "%"; },
       // doble clic en el PDF → llevar el cursor a esa línea del código
       onPointClick: (page, x, y) => syncPdfToCode(page, x, y)
     });
@@ -1166,7 +1168,14 @@ async function refreshLinks() {
   }
   const { ok, fallos } = await ensureAccess(links, { uid: state.user.uid, userName: state.user.name },
     { getProject: fb.getProject, joinWithToken: fb.joinWithToken });
-  for (const f of fallos) console.warn(`ColabTeX: sin acceso al proyecto de dibujo «${f.title}»:`, f.error);
+  /* Un vínculo caído deja el documento sin sus figuras y la compilación
+     falla sin decir por qué: tiene que verse en el registro, no solo en
+     la consola del navegador. */
+  for (const f of fallos) {
+    console.warn(`ColabTeX: sin acceso al proyecto de dibujo «${f.title}»:`, f.error);
+    appendLog(`⚠ No se pudieron traer las figuras de «${f.title}»: ${f.error}. ` +
+      "Pide a quien lo vinculó que vuelva a hacerlo desde «Figuras».");
+  }
   state.linkedInfo = ok;
 
   const porProyecto = new Map();

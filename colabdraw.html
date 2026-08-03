@@ -161,6 +161,11 @@
   .dw-handle:hover{fill:#ede9fe}
   .dw-handle-rot{fill:#6c4bb6;stroke:#fff}
   .dw-rot-stem{stroke:#6c4bb6;stroke-width:1;stroke-dasharray:2 2}
+  /* Modo recorte: el marco del papel se distingue del de la selección
+     por el color, como el encuadre de una foto. */
+  .dw-page-frame{fill:none;stroke:#0d9488;stroke-width:1.5;stroke-dasharray:6 3;vector-effect:non-scaling-stroke}
+  .dw-handle-page{fill:#0d9488;stroke:#fff;stroke-width:1.5}
+  .dw-handle-page:hover{fill:#14b8a6}
   .dw-marquee{fill:#6c4bb61a;stroke:#6c4bb6;stroke-width:1;stroke-dasharray:3 2}
   .dw-preview{fill:#6c4bb61a;stroke:#6c4bb6;stroke-width:1.5;stroke-dasharray:3 2}
   /* Caja de escritura: va encima del lienzo, colocada sobre el propio
@@ -301,6 +306,7 @@
         <button class="tool-btn" data-tool="ellipse" title="Elipse (E)">◯</button>
         <button class="tool-btn" data-tool="line" title="Línea (L)">╱</button>
         <button class="tool-btn" data-tool="text" title="Texto (T) — pulsa en el lienzo y escribe">T</button>
+        <button class="tool-btn" data-tool="page" title="Tamaño del papel (P) — arrastra los bordes para recortar, como en una foto">⛶</button>
         <div class="rail-sep"></div>
         <button class="tool-btn" id="btnGroup" title="Agrupar (Ctrl+G)">⧉</button>
         <button class="tool-btn" id="btnUngroup" title="Desagrupar (Ctrl+Mayús+G)">⧈</button>
@@ -337,7 +343,7 @@
           <span id="zoomLabel">100%</span>
           <label><input type="checkbox" id="gridToggle" checked> Rejilla</label>
           <label><input type="checkbox" id="snapToggle" checked> Imán</label>
-          <label>Paso <input type="number" id="gridStep" min="0.5" step="0.5" value="5"> mm</label>
+          <label>Paso <input type="number" id="gridStep" min="0.1" step="0.5" value="1"> mm</label>
           <span id="statusMsg"></span>
         </div>
       </div>
@@ -361,6 +367,7 @@
       <option value="300" selected>300 ppp — impresión (recomendado)</option>
       <option value="600">600 ppp — máxima calidad</option>
     </select>
+    <label class="exp-check"><input type="checkbox" id="expWhite" checked> Fondo blanco en el PNG (sin marcar sale transparente)</label>
     <div class="section-label">DESTINO</div>
     <label class="exp-check"><input type="checkbox" id="expSave" checked> Guardarlo en el proyecto (para vincularlo desde ColabTeX)</label>
     <label class="exp-check"><input type="checkbox" id="expDownload"> Descargarlo a mi equipo</label>
@@ -394,6 +401,6 @@
   </div>
 </div>
 
-<script src="colabdraw-app.js?v=202608022140"></script>
+<script src="colabdraw-app.js?v=202608030401"></script>
 </body>
 </html>

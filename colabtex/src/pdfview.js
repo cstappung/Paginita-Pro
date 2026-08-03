@@ -5,18 +5,32 @@ import * as pdfjsLib from "pdfjs-dist";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = "colabtex-pdf-worker.js";
 
+const MIN_SCALE = 0.25;
+const MAX_SCALE = 5;
+const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
+
 export class PdfViewer {
-  constructor(container, { onPageInfo, onPointClick } = {}) {
+  constructor(container, { onPageInfo, onPointClick, onZoom } = {}) {
     this.container = container;   // div scrollable
     this.onPageInfo = onPageInfo || (() => {});
     this.onPointClick = onPointClick || null;
+    this.onZoom = onZoom || (() => {});
     this.doc = null;
     this.scale = 1.0;
     this.numPages = 0;
     this.rendering = false;
+    this.pending = null;          // repintado pedido mientras había otro en marcha
     this.lastData = null;
     this.flashEl = null;
+    this._zoomTimer = null;
+    this._zoomAnchor = null;
     container.addEventListener("scroll", () => this.reportPage());
+
+    /* Ctrl (o ⌘) + rueda = zoom, como en cualquier visor de PDF y como el
+       pellizco del panel táctil, que llega al navegador exactamente así.
+       Hay que llamar a preventDefault o el navegador hace SU zoom y
+       agranda la página entera. */
+    container.addEventListener("wheel", ev => this._wheel(ev), { passive: false });
 
     /* Doble clic sobre una página → avisar con la posición en PUNTOS desde
        la esquina superior izquierda, que es el sistema que usa SyncTeX. */
@@ -47,13 +61,60 @@ export class PdfViewer {
   }
 
   async setScale(scale) {
-    this.scale = Math.min(3, Math.max(0.4, scale));
+    this.scale = clamp(scale, MIN_SCALE, MAX_SCALE);
+    this.onZoom(this.scale);
     if (this.doc) await this.render(true);
     return this.scale;
   }
 
+  /* ---------- zoom con la rueda ----------
+     El número se actualiza al instante y el PDF se vuelve a pintar cuando
+     la rueda para: repintar todas las páginas cuesta bastante y la rueda
+     manda decenas de eventos por segundo. */
+  _wheel(ev) {
+    if (!ev.ctrlKey && !ev.metaKey) return;
+    ev.preventDefault();
+    if (!this.doc) return;
+    /* Una muesca de rueda son 120 unidades: con 0,999 eso es un 13 %, que
+       es un paso cómodo. Con una base más agresiva un solo golpe de rueda
+       casi duplicaba el tamaño y no había forma de encuadrar nada. El
+       pellizco del panel táctil manda incrementos pequeños y seguidos, así
+       que con la misma fórmula sale suave. */
+    const next = clamp(this.scale * Math.pow(0.999, ev.deltaY), MIN_SCALE, MAX_SCALE);
+    if (next === this.scale) return;
+    // el ancla es la del PRIMER evento de la ráfaga: es donde está mirando
+    if (!this._zoomAnchor) this._zoomAnchor = { x: ev.clientX, y: ev.clientY, prev: this.scale };
+    this.scale = next;
+    this.onZoom(this.scale);
+    clearTimeout(this._zoomTimer);
+    this._zoomTimer = setTimeout(() => this._renderZoom(), 110);
+  }
+
+  /* Repinta manteniendo quieto el punto que hay bajo el puntero. */
+  async _renderZoom() {
+    const a = this._zoomAnchor;
+    this._zoomAnchor = null;
+    if (!a || !this.doc) return;
+    const cont = this.container;
+    const r = cont.getBoundingClientRect();
+    const offX = a.x - r.left, offY = a.y - r.top;
+    const antesX = cont.scrollLeft, antesY = cont.scrollTop;
+    await this.render(true);
+    const k = this.scale / (a.prev || 1);
+    /* Aproximado, no exacto: los márgenes entre páginas van en píxeles y
+       no crecen con el zoom. La diferencia son unos pocos píxeles y se
+       nota muchísimo menos que saltar al principio del documento. */
+    cont.scrollLeft = Math.max(0, (antesX + offX) * k - offX);
+    cont.scrollTop = Math.max(0, (antesY + offY) * k - offY);
+    this.reportPage();
+  }
+
   async render(keepScroll) {
-    if (!this.doc || this.rendering) return;
+    if (!this.doc) return;
+    /* Un repintado que llega con otro en marcha NO se puede tirar: era la
+       forma de que un zoom pedido justo al terminar de compilar se
+       perdiera sin dejar rastro. Se apunta y se hace al acabar. */
+    if (this.rendering) { this.pending = keepScroll; return; }
     this.rendering = true;
     const cont = this.container;
     const prevScrollTop = cont.scrollTop, prevScrollLeft = cont.scrollLeft;
@@ -82,6 +143,11 @@ export class PdfViewer {
       this.reportPage();
     } finally {
       this.rendering = false;
+    }
+    if (this.pending !== null) {
+      const otra = this.pending;
+      this.pending = null;
+      await this.render(otra);
     }
   }
 

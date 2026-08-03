@@ -34,13 +34,29 @@ const el = (tag, cls, html) => {
   return n;
 };
 
+/* Valor efectivo de una propiedad en un elemento: manda el `style`, luego
+   el atributo. Leer solo el atributo era mentir — una figura importada
+   lleva el color en `style="fill:#ff0000"` y el panel enseñaba negro
+   encima de algo rojo, así que tocar cualquier control la repintaba sin
+   avisar. */
+export function attrOf(el, name) {
+  if (!el || !el.getAttribute) return null;
+  const st = el.getAttribute("style");
+  if (st) {
+    const m = String(st).match(new RegExp(`(?:^|;)\\s*${name.replace(/[-]/g, "\\-")}\\s*:\\s*([^;]+)`, "i"));
+    if (m) return m[1].trim();
+  }
+  const v = el.getAttribute(name);
+  return v == null || v === "" ? null : v;
+}
+
 /* Valor común de un atributo en la selección, o null si difieren. */
 export function commonAttr(els, name, fallback = null) {
   if (!els.length) return fallback;
   let out;
   for (let i = 0; i < els.length; i++) {
-    const v = els[i].getAttribute(name);
-    const norm = v == null || v === "" ? fallback : v;
+    const v = attrOf(els[i], name);
+    const norm = v == null ? fallback : v;
     if (i === 0) out = norm;
     else if (norm !== out) return null;
   }
@@ -57,6 +73,11 @@ export function createStylePanel(host, opts = {}) {
   const canWrite = opts.canWrite || (() => true);
   const getTextStyle = opts.getTextStyle || (() => ({}));
   const isTextTool = opts.isTextTool || (() => false);
+  /* Cuánto agranda el lienzo lo que hay elegido. Escalar una figura se
+     guarda en su `transform`, así que un trazo de 0,5 mm escalado al
+     doble se ve de 1 mm mientras el atributo sigue diciendo 0,5: el panel
+     enseña y acepta lo que se VE, y aquí se traduce. */
+  const getScale = opts.getScale || (() => 1);
 
   host.textContent = "";
   host.classList.add("dw-style");
@@ -114,7 +135,9 @@ export function createStylePanel(host, opts = {}) {
   widthInput.min = "0"; widthInput.step = "0.1";
   widthInput.onchange = () => {
     const v = parseFloat(widthInput.value);
-    if (isFinite(v) && v >= 0) apply({ "stroke-width": v });
+    if (!isFinite(v) || v < 0) return;
+    const k = getScale() || 1;
+    apply({ "stroke-width": Math.round((v / k) * 10000) / 10000 });
   };
   widthRow.append(widthInput, el("span", "dw-unit", "mm"));
 
@@ -260,7 +283,8 @@ export function createStylePanel(host, opts = {}) {
 
     paintColor(fillInput, fillLabel, fill);
     paintColor(strokeInput, strokeLabel, stroke);
-    widthInput.value = width == null ? "" : String(parseFloat(width) || 0);
+    const k = sel.length ? (getScale() || 1) : 1;
+    widthInput.value = width == null ? "" : String(Math.round((parseFloat(width) || 0) * k * 100) / 100);
     widthInput.placeholder = width == null ? "varios" : "";
     dashSel.value = dash == null ? "" : String(dash);
     const pct = op == null ? 100 : Math.round(parseFloat(op) * 100);

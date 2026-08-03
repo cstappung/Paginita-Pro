@@ -115,16 +115,26 @@ export const outputName = (drawingPath, ext) =>
 /* ---------- guardar en el proyecto ----------
    `upload` es fb.uploadAsset; se pasa desde fuera para que este módulo
    no dependa de Firebase y se pueda probar sin red. */
-export async function exportAll(drawing, path, { formats = ["svg", "png"], dpi = 300, upload = null } = {}) {
+export async function exportAll(drawing, path, {
+  formats = ["svg", "png"], dpi = 300, upload = null, background = null, avoid = null
+} = {}) {
   const done = [];
+  /* El .svg generado se llamaba igual que el dibujo del que salía, así
+     que en la lista de archivos aparecían dos «figura1.svg» y no había
+     forma de saber cuál era cuál. */
+  const libre = n => {
+    if (!avoid || !avoid.has || !avoid.has(n)) return n;
+    const punto = n.lastIndexOf(".");
+    return punto < 0 ? `${n}-export` : `${n.slice(0, punto)}-export${n.slice(punto)}`;
+  };
   for (const f of formats) {
     let bytes, name;
     if (f === "svg") {
-      name = outputName(path, "svg");
+      name = libre(outputName(path, "svg"));
       bytes = bytesOfString(exportSvg(drawing));
     } else if (f === "png") {
-      name = outputName(path, "png");
-      const { blob } = await exportPng(drawing, { dpi });
+      name = libre(outputName(path, "png"));
+      const { blob } = await exportPng(drawing, { dpi, background });
       bytes = await bytesOfBlob(blob);
     } else {
       continue;   // pdf: siguiente fase

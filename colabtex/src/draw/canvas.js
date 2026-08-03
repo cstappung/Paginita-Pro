@@ -28,6 +28,7 @@ import { boxOfPoints, transformBox, clamp } from "./geom.js";
 
 const MIN_ZOOM = 0.2;     // px de pantalla por mm
 const MAX_ZOOM = 80;
+const MAX_HOJAS = 600;    // nodos que se revisan al pinchar cerca (ver hitNear)
 
 const svgEl = tag => document.createElementNS(SVG_NS, tag);
 
@@ -39,7 +40,12 @@ export class Canvas {
     this.yToDom = new Map();
     this.domToY = new WeakMap();
     this._observer = null;
-    this.grid = { show: true, step: 5, snap: true };
+    /* Paso de 1 mm, no de 5. Con 5 el imán no afinaba: era un molde. Un
+       rectángulo de 12×7 salía de 10×5, una línea a (90,62) salía
+       horizontal y no se podía ajustar nada por debajo de medio
+       centímetro. Quien quiera media rejilla gruesa la escribe. */
+    this.grid = { show: true, step: 1, snap: true };
+    this.pagePreview = null;          // caja del recorte mientras se arrastra
     this.k = 3;                       // zoom: px de pantalla por mm
     this.tx = 0;
     this.ty = 0;
@@ -218,38 +224,52 @@ export class Canvas {
 
   /* ---------- página y rejilla ---------- */
 
+  /* Caja del papel. Con el recorte, el viewBox puede no empezar en (0,0):
+     el papel se mueve por debajo del dibujo y las figuras no se tocan. */
+  pageBox() {
+    if (!this.drawing) return { x: 0, y: 0, w: 0, h: 0 };
+    const s = this.drawing.size();
+    return { x: s.x || 0, y: s.y || 0, w: s.w, h: s.h };
+  }
+
+  /* Recorte en curso: se pinta sin escribir en el documento, igual que la
+     vista previa de un arrastre. */
+  previewPage(box) {
+    this.pagePreview = box || null;
+    this.refreshPage();
+  }
+
   refreshPage() {
     if (!this.drawing) return;
-    const { w, h } = this.drawing.size();
+    const b = this.pagePreview || this.pageBox();
     for (const r of [this.page, this.pageShadow]) {
-      r.setAttribute("x", 0); r.setAttribute("y", 0);
-      r.setAttribute("width", w); r.setAttribute("height", h);
+      r.setAttribute("x", b.x); r.setAttribute("y", b.y);
+      r.setAttribute("width", b.w); r.setAttribute("height", b.h);
     }
-    this.pageShadow.setAttribute("x", 0.6);
-    this.pageShadow.setAttribute("y", 0.6);
-    this._drawGrid(w, h);
+    this.pageShadow.setAttribute("x", b.x + 0.6);
+    this.pageShadow.setAttribute("y", b.y + 0.6);
+    this._drawGrid(b);
   }
 
   setGrid(opts) {
     Object.assign(this.grid, opts);
-    if (this.drawing) {
-      const { w, h } = this.drawing.size();
-      this._drawGrid(w, h);
-    }
+    if (this.drawing) this._drawGrid(this.pagePreview || this.pageBox());
   }
 
-  _drawGrid(w, h) {
+  _drawGrid(box) {
     this.gridG.textContent = "";
     const step = this.grid.step;
     if (!this.grid.show || !(step > 0)) return;
+    const { x: x0 = 0, y: y0 = 0, w, h } = box || this.pageBox();
+    const x1 = x0 + w, y1 = y0 + h;
     // a poco zoom la rejilla fina es una mancha gris: se salta
     const fine = this.k * step >= 4;
     const minor = [], major = [];
-    for (let i = 0, x = 0; x <= w + 1e-6; i++, x = i * step) {
-      (i % 5 === 0 ? major : minor).push(`M${x} 0V${h}`);
+    for (let i = 0, x = x0; x <= x1 + 1e-6; i++, x = x0 + i * step) {
+      (i % 5 === 0 ? major : minor).push(`M${x} ${y0}V${y1}`);
     }
-    for (let i = 0, y = 0; y <= h + 1e-6; i++, y = i * step) {
-      (i % 5 === 0 ? major : minor).push(`M0 ${y}H${w}`);
+    for (let i = 0, y = y0; y <= y1 + 1e-6; i++, y = y0 + i * step) {
+      (i % 5 === 0 ? major : minor).push(`M${x0} ${y}H${x1}`);
     }
     if (fine && minor.length) {
       const p = svgEl("path");
@@ -269,10 +289,7 @@ export class Canvas {
 
   _applyView() {
     this.scene.setAttribute("transform", `translate(${this.tx},${this.ty}) scale(${this.k})`);
-    if (this.grid.show && this.drawing) {
-      const { w, h } = this.drawing.size();
-      this._drawGrid(w, h);
-    }
+    if (this.grid.show && this.drawing) this._drawGrid(this.pagePreview || this.pageBox());
   }
 
   _emit() { if (this.onViewChange) this.onViewChange(); }
@@ -347,8 +364,7 @@ export class Canvas {
 
   fitPage() {
     if (!this.drawing) return;
-    const { w, h } = this.drawing.size();
-    this.fitBox({ x: 0, y: 0, w, h });
+    this.fitBox(this.pageBox());
   }
 
   /* ---------- medidas ---------- */
@@ -365,6 +381,19 @@ export class Canvas {
     const m = this._matrixToContent(dom);
     const box = { x: b.x, y: b.y, w: b.width, h: b.height };
     return m ? transformBox(box, m) : box;
+  }
+
+  /* Caja de un elemento EN SUS PROPIAS coordenadas (sin aplicar su
+     transform). Es lo que hace falta para escalar una figura girada en
+     sus ejes en vez de en los del documento. */
+  localBox(yEl) {
+    const dom = this.yToDom.get(yEl);
+    if (!dom || !dom.getBBox) return null;
+    try {
+      const b = dom.getBBox();
+      if (!b) return null;
+      return { x: b.x, y: b.y, w: b.width, h: b.height };
+    } catch (e) { return null; }
   }
 
   boxOfMany(yEls) {
@@ -432,6 +461,66 @@ export class Canvas {
     // sin capa (SVG importado suelto) hay que haber llegado al contenido
     if (!topped && node !== this.content) return null;
     return deep ? dentro : fuera;
+  }
+
+  /* ---------- pinchar cerca ----------
+
+     `elementFromPoint` exige caer DENTRO del trazo, y un trazo de 0,4 mm
+     mide menos de dos píxeles en pantalla: una línea recién dibujada era
+     casi imposible de volver a seleccionar. Aquí se busca lo que pase
+     cerca, en dos pasos para que salga barato incluso en una figura de
+     matplotlib con miles de nodos:
+
+       1. se descartan por su caja las figuras que ni de lejos tocan;
+       2. a las que quedan se les pregunta a ellas mismas, con
+          `isPointInStroke` sobre un trazo ensanchado a la tolerancia.
+
+     El segundo paso es lo que evita el falso positivo de una diagonal
+     larga, cuya caja envolvente ocupa media pantalla. */
+  hitNear(clientX, clientY, { deep = false, tolPx = 5 } = {}) {
+    if (!this.drawing) return null;
+    const p = this.toDoc(clientX, clientY);
+    const tol = tolPx / (this.k || 1);
+    let mejor = null;
+    for (const el of this.drawing.shapes()) {          // en orden de pintado
+      const b = this.boxOf(el);
+      if (!b) continue;
+      if (p.x < b.x - tol || p.x > b.x + b.w + tol) continue;
+      if (p.y < b.y - tol || p.y > b.y + b.h + tol) continue;
+      const hoja = this._hojaCerca(this.yToDom.get(el), clientX, clientY, tolPx);
+      if (hoja) mejor = deep ? (this.domToY.get(hoja) || el) : el;
+    }
+    return mejor;
+  }
+
+  /* Primera hoja dibujable de `dom` cuyo trazo (ensanchado) pilla el
+     punto. Devuelve el nodo del DOM espejo, o null. */
+  _hojaCerca(dom, clientX, clientY, tolPx) {
+    if (!dom) return null;
+    const nodos = dom.isPointInStroke
+      ? [dom]
+      // el tope es por si es un grupo importado con miles de nodos: un
+      // clic en el vacío no puede costar un repaso al archivo entero
+      : Array.from(dom.querySelectorAll("*")).slice(0, MAX_HOJAS);
+    for (const n of nodos) {
+      if (!n.isPointInStroke || !n.getScreenCTM) continue;
+      // sin trazo no hay nada cerca de lo que estar
+      const trazo = getComputedStyle(n).stroke;
+      if (!trazo || trazo === "none") continue;
+      const ctm = n.getScreenCTM();
+      if (!ctm) continue;
+      let pt;
+      try { pt = new DOMPoint(clientX, clientY).matrixTransform(ctm.inverse()); }
+      catch (e) { continue; }
+      const escala = Math.hypot(ctm.a, ctm.b) || 1;
+      const previo = n.style.strokeWidth;
+      n.style.strokeWidth = String((tolPx * 2) / escala);
+      let dentro = false;
+      try { dentro = n.isPointInStroke(pt); } catch (e) {}
+      if (previo) n.style.strokeWidth = previo; else n.style.removeProperty("stroke-width");
+      if (dentro) return n;
+    }
+    return null;
   }
 
   /* Todas las figuras bajo el punto, de la de encima a la del fondo. La

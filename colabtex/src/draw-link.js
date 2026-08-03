@@ -107,7 +107,15 @@ export async function ensureAccess(links, { uid, userName }, deps) {
   const ok = [], fallos = [];
   for (const link of links) {
     try {
-      let p = await getProject(link.pid, uid);
+      /* OJO: quien todavía no es miembro NO recibe null al preguntar por
+         el proyecto — las reglas le RECHAZAN la lectura de `meta`, así que
+         getProject LANZA con PERMISSION_DENIED. Tragarse ese error es lo
+         que hace falta para llegar al `joinWithToken` de abajo, que es
+         justo la línea por la que existe todo esto. Sin el catch, el
+         colaborador nunca se apuntaba: ni veía la carpeta de figuras en
+         el .tex ni el proyecto de dibujo en ColabDraw, y encima en
+         silencio. */
+      let p = await getProject(link.pid, uid).catch(() => null);
       if (!p || !p.role) {
         if (!link.token) throw new Error("el vínculo no trae invitación");
         await joinWithToken(link.pid, link.token, { uid, userName });

@@ -123,6 +123,9 @@ export function createTextEditor(canvas, ctx = {}) {
   const onDone = ctx.onDone || (() => {});
 
   let target = null;
+  /* Rótulo que todavía no existe: {pt, style, layer}. El <text> se crea al
+     cerrar y solo si se escribió algo (ver Tools._createText). */
+  let nuevo = null;
 
   const ta = document.createElement("textarea");
   ta.className = "dw-text-input";
@@ -141,26 +144,31 @@ export function createTextEditor(canvas, ctx = {}) {
     }
   });
   ta.addEventListener("input", place);
-  ta.addEventListener("blur", () => { if (target) close(); });
+  ta.addEventListener("blur", () => { if (target || nuevo) close(); });
 
+  /* Dónde y con qué aspecto va la caja de escribir. La posición NO puede
+     salir de los atributos x/y sin más: mover un rótulo se guarda en su
+     `transform` (la x no se toca), y un SVG importado cuelga de una capa
+     con `scale(...)`. Con solo x/y, el editor aparecía a 184 px del texto
+     tras moverlo y a 674 px —fuera de la pantalla— en un archivo
+     importado. La matriz de pantalla del propio nodo lo recoge todo:
+     transform propio, capas de por medio, encuadre y zoom. */
   function place() {
-    if (!target) return;
-    const fs = parseFloat(target.getAttribute("font-size")) || DEFAULT_SIZE;
-    const x = parseFloat(target.getAttribute("x")) || 0;
-    const y = parseFloat(target.getAttribute("y")) || 0;
-    const p = canvas.toLocal({ x, y });
-    const px = Math.max(9, fs * canvas.k);
+    const spec = datos();
+    if (!spec) return;
+    const { x, y, fs, anchor, escala } = spec;
+    const p = aPantalla(spec, x, y);
+    const px = Math.max(9, fs * escala);
     const lineas = Math.max(1, ta.value.split("\n").length);
-    const anchor = target.getAttribute("text-anchor");
 
-    ta.style.fontFamily = target.getAttribute("font-family") || DEFAULT_FONT;
-    ta.style.fontWeight = target.getAttribute("font-weight") || "normal";
-    ta.style.fontStyle = target.getAttribute("font-style") || "normal";
+    ta.style.fontFamily = spec.family;
+    ta.style.fontWeight = spec.weight;
+    ta.style.fontStyle = spec.style;
     ta.style.fontSize = `${px}px`;
     ta.style.lineHeight = String(LINE_EM);
     ta.style.textAlign = anchor === "middle" ? "center" : anchor === "end" ? "right" : "left";
 
-    const box = canvas.boxOf(target);
+    const box = target ? canvas.boxOf(target) : null;
     const ancho = Math.max(140, (box ? box.w * canvas.k : 0) + px * 2);
     ta.style.width = `${ancho}px`;
     ta.style.height = `${lineas * px * LINE_EM + 10}px`;
@@ -169,9 +177,59 @@ export function createTextEditor(canvas, ctx = {}) {
     ta.style.left = `${anchor === "middle" ? p.x - ancho / 2 : anchor === "end" ? p.x - ancho : p.x}px`;
   }
 
+  const num = (v, porDefecto) => {
+    const n = parseFloat(v);
+    return isFinite(n) ? n : porDefecto;
+  };
+
+  /* Todo lo que place() necesita, venga de un <text> que ya existe o del
+     rótulo que se está a punto de escribir. */
+  function datos() {
+    if (target) {
+      const dom = canvas.yToDom ? canvas.yToDom.get(target) : null;
+      const ctm = dom && dom.getScreenCTM ? dom.getScreenCTM() : null;
+      return {
+        dom, ctm,
+        escala: ctm ? Math.hypot(ctm.a, ctm.b) || canvas.k : canvas.k,
+        x: num(target.getAttribute("x"), 0),
+        y: num(target.getAttribute("y"), 0),
+        fs: num(target.getAttribute("font-size"), DEFAULT_SIZE),
+        anchor: target.getAttribute("text-anchor") || "start",
+        family: target.getAttribute("font-family") || DEFAULT_FONT,
+        weight: target.getAttribute("font-weight") || "normal",
+        style: target.getAttribute("font-style") || "normal"
+      };
+    }
+    if (nuevo) {
+      const st = nuevo.style || {};
+      return {
+        dom: null, ctm: null, escala: canvas.k,
+        x: nuevo.pt.x, y: nuevo.pt.y,
+        fs: num(st["font-size"], DEFAULT_SIZE),
+        anchor: st["text-anchor"] || "start",
+        family: st["font-family"] || DEFAULT_FONT,
+        weight: st["font-weight"] || "normal",
+        style: st["font-style"] || "normal"
+      };
+    }
+    return null;
+  }
+
+  /* Punto del espacio del texto → píxeles dentro del host del lienzo (que
+     es donde flota el <textarea>). */
+  function aPantalla(spec, x, y) {
+    if (!spec.ctm) return canvas.toLocal({ x, y });
+    const r = canvas.host.getBoundingClientRect();
+    return {
+      x: spec.ctm.a * x + spec.ctm.c * y + spec.ctm.e - r.left,
+      y: spec.ctm.b * x + spec.ctm.d * y + spec.ctm.f - r.top
+    };
+  }
+
   function open(yEl) {
     if (!yEl || !canWrite()) return;
-    if (target && target !== yEl) close();
+    if (target !== yEl || nuevo) close();
+    nuevo = null;
     target = yEl;
     ta.value = readLines(yEl).join("\n");
     ta.style.display = "block";
@@ -180,28 +238,54 @@ export function createTextEditor(canvas, ctx = {}) {
     ta.select();
   }
 
+  /* Abre el editor para un rótulo que aún no existe. */
+  function openNew(spec) {
+    if (!spec || !spec.pt || !canWrite()) return;
+    if (target || nuevo) close();
+    target = null;
+    nuevo = spec;
+    ta.value = "";
+    ta.style.display = "block";
+    place();
+    ta.focus();
+  }
+
   function close() {
     const el = target;
-    target = null;              // antes de nada: el blur no debe reentrar
+    const pend = nuevo;
+    target = null; nuevo = null;   // antes de nada: el blur no debe reentrar
     ta.style.display = "none";
-    if (!el) return;
+    if (!el && !pend) return;
     const lines = ta.value.replace(/\r/g, "").split("\n");
     const vacio = !lines.some(l => l.trim());
     const d = getDrawing();
+    let salida = vacio ? null : el;
     if (d) {
-      // un texto sin texto no se ve ni se puede volver a pinchar
-      if (vacio) d.remove([el]);
-      else d.edit(() => writeLines(el, lines));
+      if (pend) {
+        // un rótulo en blanco sencillamente no llega a existir
+        if (!vacio) {
+          salida = d.edit(() => {
+            const nel = addText(d, pend.layer || null, pend.pt, pend.style || {});
+            if (nel) writeLines(nel, lines);
+            return nel;
+          });
+        }
+      } else if (vacio) {
+        d.remove([el]);          // un texto sin texto no se ve ni se pincha
+      } else {
+        d.edit(() => writeLines(el, lines));
+      }
     }
-    onDone(vacio ? null : el);
+    onDone(salida || null);
   }
 
   return {
     open,
+    openNew,
     close,
-    isOpen: () => !!target,
+    isOpen: () => !!target || !!nuevo,
     target: () => target,
     reposition: place,
-    destroy() { target = null; if (ta.parentNode) ta.parentNode.removeChild(ta); }
+    destroy() { target = null; nuevo = null; if (ta.parentNode) ta.parentNode.removeChild(ta); }
   };
 }

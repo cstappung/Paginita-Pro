@@ -11,9 +11,9 @@
    por «presencia», que es efímera y no entra en el documento.
    ============================================================ */
 import {
-  parseTransform, matToString, matMul, matInvert, matApplyVec,
-  translate, scaleAbout, rotateM, boxFromDrag, snapBoxDelta, snapValue,
-  angleOf, dist, clamp, fmt
+  parseTransform, matToString, matMul, matInvert, matApply, matApplyVec,
+  translate, scaleAbout, rotateM, boxFromDrag, boxCorners, boxOfPoints,
+  snapBoxDelta, snapValue, angleOf, dist, clamp, fmt
 } from "./geom.js";
 import { SVG_NS, newId } from "./doc.js";
 import { addText, isText, TEXT_ATTRS, DEFAULT_FONT, DEFAULT_SIZE } from "./text.js";
@@ -33,6 +33,23 @@ const CURSORS = {
 };
 
 const MIN_SIZE = 0.2;      // mm: por debajo de esto un arrastre es un clic
+
+/* Píxeles de PANTALLA que hay que recorrer para que un gesto cuente como
+   arrastre. Sin este umbral, el imán se aplicaba ya en el primer
+   mousemove: pinchar una figura que no estuviera sobre la rejilla la
+   corría hasta ella —y lo escribía en el documento, o sea en la pantalla
+   de todo el equipo y en el historial de deshacer— con solo seleccionarla.
+   Se mide en píxeles y no en milímetros a propósito: el temblor de la
+   mano es del mismo tamaño con cualquier zoom. */
+const DRAG_PX = 3;
+
+/* Lo mínimo que puede medir la página al recortarla. */
+const MIN_PAGE = 5;        // mm
+
+const casiCero = v => Math.abs(v) < 1e-6;
+/* ¿La matriz lleva giro (o sesgo)? Si no, escalar en los ejes del
+   documento y en los de la figura es lo mismo. */
+const girada = m => !!m && (!casiCero(m.b) || !casiCero(m.c));
 
 export class Tools {
   constructor(canvas, opts = {}) {
@@ -209,7 +226,11 @@ export class Tools {
   setTool(name) {
     this.tool = name;
     this.canvas.view.style.cursor =
-      name === "select" ? "default" : name === "text" ? "text" : "crosshair";
+      name === "select" ? "default" : name === "text" ? "text" : name === "page" ? "move" : "crosshair";
+    /* El recuadro de recorte del papel sustituye al de la selección
+       mientras dure el modo, así que hay que repintar la capa de encima. */
+    if (name === "page") this.clear();
+    this.redrawOverlay();
     this.onToolChange(name);
   }
 
@@ -229,6 +250,23 @@ export class Tools {
 
   clear() { this.select([]); }
 
+  /* Cuánto agranda el lienzo lo que hay elegido (1 = tal cual). Lo usa el
+     panel para enseñar el grosor de trazo que de verdad se ve: escalar se
+     guarda en el `transform`, no en `stroke-width`. Si la selección no se
+     pone de acuerdo se devuelve 1 y no se traduce nada, que es mejor que
+     inventarse un número. */
+  selectionScale() {
+    let k = null;
+    for (const el of this.sel) {
+      const m = this.canvas.selfMatrix(el);
+      if (!m) continue;
+      const s = Math.sqrt(Math.abs(m.a * m.d - m.b * m.c)) || 1;
+      if (k == null) k = s;
+      else if (Math.abs(s - k) > k * 0.01) return 1;
+    }
+    return k || 1;
+  }
+
   selectAll() {
     const d = this.getDrawing();
     if (d) this.select(d.shapes());
@@ -242,20 +280,63 @@ export class Tools {
     this.select(ids.map(id => d.byId(id)).filter(Boolean));
   }
 
-  /* ---------- dibujo del recuadro y los tiradores ---------- */
+  /* ---------- dibujo del recuadro y los tiradores ----------
+
+     El marco de UNA figura girada se dibuja girado con ella, no como la
+     caja horizontal que la envuelve. No es cosmética: los tiradores
+     marcan en qué direcciones se va a escalar, y con una caja horizontal
+     alrededor de un rectángulo girado 30° tirar del lado derecho lo
+     convertía en un romboide. Con el marco pegado a la figura, escalar
+     ocurre en los ejes de la propia figura y sigue siendo un rectángulo.
+
+     `_marco()` devuelve las cuatro esquinas EN COORDENADAS DEL DOCUMENTO,
+     así que lo de abajo pinta igual en los dos casos. */
+
+  _marco() {
+    if (!this.sel.length) return null;
+    if (this.sel.length === 1) {
+      const el = this.sel[0];
+      const dom = this.canvas.yToDom.get(el);
+      const m = this.canvas.selfMatrix(el);
+      if (dom && m && girada(m)) {
+        const b = this.canvas.localBox(el);
+        if (b) return { pts: boxCorners(b).map(p => matApply(m, p)), local: true, m, box: b };
+      }
+    }
+    const box = this.canvas.boxOfMany(this.sel);
+    return box ? { pts: boxCorners(box), local: false, box } : null;
+  }
+
+  /* Los ocho tiradores del marco, en coordenadas del documento. Un lado
+     de longitud cero (una línea recta) se queda SIN sus dos tiradores
+     perpendiculares: por ahí no se puede escalar —multiplicar cero por
+     lo que sea sigue siendo cero— y unos tiradores que no hacen nada al
+     tirar de ellos parecen la aplicación rota. */
+  _tiradores(marco) {
+    const [nw, ne, se, sw] = marco.pts;
+    const med = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+    const anchoCero = dist(nw, ne) < 1e-4;
+    const altoCero = dist(ne, se) < 1e-4;
+    const out = [];
+    if (!anchoCero && !altoCero) out.push(["nw", nw], ["ne", ne], ["se", se], ["sw", sw]);
+    // n y s estiran en VERTICAL: hace falta que el marco tenga alto
+    if (!altoCero) out.push(["n", med(nw, ne)], ["s", med(sw, se)]);
+    // e y w estiran en HORIZONTAL: hace falta que tenga ancho
+    if (!anchoCero) out.push(["e", med(ne, se)], ["w", med(sw, nw)]);
+    return out;
+  }
 
   redrawOverlay() {
     const ov = this.canvas.overlay;
     ov.textContent = "";
+    if (this.tool === "page") { this._drawPageFrame(); return; }
     // se quitan de la selección los que ya no existen (los borró otra persona)
     this.sel = this.sel.filter(el => el && el.parent);
     if (!this.sel.length) return;
 
-    const box = this.canvas.boxOfMany(this.sel);
-    if (!box) return;
-    const a = this.canvas.toLocal({ x: box.x, y: box.y });
-    const b = this.canvas.toLocal({ x: box.x + box.w, y: box.y + box.h });
-    const r = { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(b.x - a.x), h: Math.abs(b.y - a.y) };
+    const marco = this._marco();
+    if (!marco) return;
+    const pl = marco.pts.map(p => this.canvas.toLocal(p));
 
     if (this.sel.length > 1) {
       for (const el of this.sel) {
@@ -271,38 +352,96 @@ export class Tools {
       }
     }
 
-    const frame = svgEl("rect");
+    const frame = svgEl("polygon");
     frame.setAttribute("class", "dw-sel-frame");
-    frame.setAttribute("x", r.x); frame.setAttribute("y", r.y);
-    frame.setAttribute("width", r.w); frame.setAttribute("height", r.h);
+    frame.setAttribute("points", pl.map(p => `${fmt(p.x, 2)},${fmt(p.y, 2)}`).join(" "));
     ov.appendChild(frame);
 
     if (!this.canWrite()) return;
 
+    /* El tirador de giro cuelga del lado de arriba del marco, o sea
+       también girado: si no, en una figura de lado quedaría dentro. */
+    const arriba = { x: (pl[0].x + pl[1].x) / 2, y: (pl[0].y + pl[1].y) / 2 };
+    const centro = { x: (pl[0].x + pl[2].x) / 2, y: (pl[0].y + pl[2].y) / 2 };
+    let nx = arriba.x - centro.x, ny = arriba.y - centro.y;
+    const len = Math.hypot(nx, ny) || 1;
+    nx /= len; ny /= len;
+    const rp = { x: arriba.x + nx * 22, y: arriba.y + ny * 22 };
+
     const stem = svgEl("line");
     stem.setAttribute("class", "dw-rot-stem");
-    stem.setAttribute("x1", r.x + r.w / 2); stem.setAttribute("y1", r.y);
-    stem.setAttribute("x2", r.x + r.w / 2); stem.setAttribute("y2", r.y - 22);
+    stem.setAttribute("x1", arriba.x); stem.setAttribute("y1", arriba.y);
+    stem.setAttribute("x2", rp.x); stem.setAttribute("y2", rp.y);
     ov.appendChild(stem);
 
     const rot = svgEl("circle");
     rot.setAttribute("class", "dw-handle dw-handle-rot");
-    rot.setAttribute("cx", r.x + r.w / 2); rot.setAttribute("cy", r.y - 22);
+    rot.setAttribute("cx", rp.x); rot.setAttribute("cy", rp.y);
     rot.setAttribute("r", 5);
     rot.dataset.handle = "rotate";
     rot.style.cursor = "grab";
     ov.appendChild(rot);
 
-    for (const [name, fx, fy] of HANDLES) {
+    for (const [name, pt] of this._tiradores(marco)) {
+      const p = this.canvas.toLocal(pt);
       const h = svgEl("rect");
       h.setAttribute("class", "dw-handle");
-      h.setAttribute("x", r.x + fx * r.w - 4);
-      h.setAttribute("y", r.y + fy * r.h - 4);
+      h.setAttribute("x", p.x - 4); h.setAttribute("y", p.y - 4);
       h.setAttribute("width", 8); h.setAttribute("height", 8);
       h.dataset.handle = name;
       h.style.cursor = CURSORS[name];
       ov.appendChild(h);
     }
+  }
+
+  /* ---------- modo recorte de la página ----------
+     Tirar de cualquiera de los cuatro bordes (o de las esquinas) mueve
+     ese lado del papel, como el recorte de una foto; arrastrar por dentro
+     mueve el papel entero bajo el dibujo. El dibujo NO se toca: lo que
+     cambia es el viewBox, así que las figuras se quedan donde están y lo
+     que entra o sale del papel es lo que se ve al exportar. */
+
+  _drawPageFrame() {
+    const d = this.getDrawing();
+    if (!d) return;
+    const ov = this.canvas.overlay;
+    const box = (this.drag && this.drag.mode === "page" && this.drag.box) || d.size();
+    const p0 = this.canvas.toLocal({ x: box.x || 0, y: box.y || 0 });
+    const p1 = this.canvas.toLocal({ x: (box.x || 0) + box.w, y: (box.y || 0) + box.h });
+    const r = { x: p0.x, y: p0.y, w: p1.x - p0.x, h: p1.y - p0.y };
+
+    const marco = svgEl("rect");
+    marco.setAttribute("class", "dw-page-frame");
+    marco.setAttribute("x", r.x); marco.setAttribute("y", r.y);
+    marco.setAttribute("width", r.w); marco.setAttribute("height", r.h);
+    ov.appendChild(marco);
+
+    if (!this.canWrite()) return;
+    for (const [name, fx, fy] of HANDLES) {
+      const h = svgEl("rect");
+      h.setAttribute("class", "dw-handle dw-handle-page");
+      h.setAttribute("x", r.x + fx * r.w - 5);
+      h.setAttribute("y", r.y + fy * r.h - 5);
+      h.setAttribute("width", 10); h.setAttribute("height", 10);
+      h.dataset.pageHandle = name;
+      h.style.cursor = CURSORS[name];
+      ov.appendChild(h);
+    }
+  }
+
+  /* Nueva caja de página al tirar de un tirador. Cada letra del nombre
+     mueve su borde y deja quieto el de enfrente. */
+  _pageBox(d, p) {
+    const b = d.box;
+    const h = d.handle;
+    const step = this.canvas.snapStep();
+    const q = step ? { x: snapValue(p.x, step), y: snapValue(p.y, step) } : p;
+    let x0 = b.x, y0 = b.y, x1 = b.x + b.w, y1 = b.y + b.h;
+    if (h.includes("w")) x0 = Math.min(q.x, x1 - MIN_PAGE);
+    if (h.includes("e")) x1 = Math.max(q.x, x0 + MIN_PAGE);
+    if (h.includes("n")) y0 = Math.min(q.y, y1 - MIN_PAGE);
+    if (h.includes("s")) y1 = Math.max(q.y, y0 + MIN_PAGE);
+    return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
   }
 
   /* ---------- transformaciones ----------
@@ -318,6 +457,11 @@ export class Tools {
      mousemove (T·T·T…) y solo al soltar volvía a su sitio, porque el
      commit sí partía del original. */
   _matrixFor(item, T) {
+    /* En «modo local» —una sola figura girada, escalándose— la
+       transformación viene expresada en los ejes de la propia figura, así
+       que se compone por la DERECHA: A' = A · T. Es lo que evita que un
+       rectángulo girado se convierta en un romboide al estirarlo. */
+    if (this.drag && this.drag.local) return matToString(matMul(item.m0, T));
     const M = item.pi0
       ? matMul(matMul(item.pi0, matMul(T, item.p0)), item.m0)
       : matMul(T, item.m0);
@@ -357,14 +501,30 @@ export class Tools {
       return { el, dom, p0, pi0, m0: parseTransform(dom.getAttribute("transform")) };
     }).filter(Boolean);
     if (!items.length) return;
-    const box = this.canvas.boxOfMany(this.sel);
-    if (!box) return;
+    const marco = this._marco();
+    if (!marco) return;
+    const local = mode === "scale" && marco.local;
     this.drag = {
-      mode, handle, items, box,
+      mode, handle, items,
+      box: boxOfPoints(marco.pts),          // en coordenadas del documento
+      local,
+      boxL: local ? marco.box : null,       // en los ejes de la figura
+      mInv: local ? matInvert(marco.m) : null,
       start: this.canvas.toDoc(e.clientX, e.clientY),
+      startClient: { x: e.clientX, y: e.clientY },
       moved: false
     };
+    if (local && !this.drag.mInv) { this.drag.local = false; this.drag.boxL = null; }
     this.canvas.view.setPointerCapture(e.pointerId);
+  }
+
+  /* ¿Se ha movido el ratón lo bastante como para que esto sea un arrastre
+     y no un clic? Ver DRAG_PX. */
+  _esArrastre(e) {
+    const d = this.drag;
+    if (!d || !d.startClient) return true;
+    if (d.moved) return true;               // una vez arrancado, ya no se para
+    return Math.hypot(e.clientX - d.startClient.x, e.clientY - d.startClient.y) >= DRAG_PX;
   }
 
   /* ---------- puntero ---------- */
@@ -382,16 +542,18 @@ export class Tools {
     return doble;
   }
 
+  /* Escribir un rótulo abre el editor SIN crear todavía el <text>: el
+     elemento nace al cerrar, y solo si se ha escrito algo. Antes se creaba
+     al pinchar, así que arrepentirse dejaba un <text> vacío —invisible y
+     sin caja, o sea imposible de volver a pinchar— al que un solo Ctrl+Z
+     devolvía la vida. */
   _createText(p) {
     const d = this.getDrawing();
     if (!d) return;
     const step = this.canvas.snapStep();
     const pt = step ? { x: snapValue(p.x, step), y: snapValue(p.y, step) } : p;
-    const el = addText(d, this.getLayer(), pt, this.textStyle);
-    if (!el) return;
-    this.select(el);
     this.setTool("select");
-    this.onEditText(el);
+    this.onEditText(null, { pt, style: this.textStyle, layer: this.getLayer() });
   }
 
   _pointerDown(e) {
@@ -403,6 +565,26 @@ export class Tools {
       return;
     }
     if (e.button !== 0) return;
+
+    /* ---- modo recorte: los tiradores del papel mandan sobre todo ---- */
+    if (this.tool === "page") {
+      if (!this.canWrite()) return;
+      const d = this.getDrawing();
+      if (!d) return;
+      e.preventDefault();
+      const ph = e.target && e.target.dataset ? e.target.dataset.pageHandle : null;
+      const box = d.size();
+      const b0 = { x: box.x || 0, y: box.y || 0, w: box.w, h: box.h };
+      const p = this.canvas.toDoc(e.clientX, e.clientY);
+      const dentro = p.x >= b0.x && p.x <= b0.x + b0.w && p.y >= b0.y && p.y <= b0.y + b0.h;
+      if (!ph && !dentro) return;
+      this.drag = {
+        mode: "page", handle: ph || "move", box: b0, box0: b0,
+        start: p, startClient: { x: e.clientX, y: e.clientY }, moved: false
+      };
+      this.canvas.view.setPointerCapture(e.pointerId);
+      return;
+    }
 
     const handle = e.target && e.target.dataset ? e.target.dataset.handle : null;
     if (handle && this.canWrite()) {
@@ -444,6 +626,12 @@ export class Tools {
     let hit = profundo || doble
       ? this.canvas.hitTest(e.clientX, e.clientY, { deep: true })
       : this.canvas.hitTest(e.clientX, e.clientY);
+
+    /* El navegador solo da por tocado un trazo si el puntero cae DENTRO de
+       él, y un trazo de 0,4 mm mide menos de dos píxeles en pantalla: una
+       línea recién dibujada era prácticamente imposible de volver a
+       pinchar. Si no se ha acertado nada, se busca lo que pase cerca. */
+    if (!hit) hit = this.canvas.hitNear(e.clientX, e.clientY, { deep: profundo || doble });
 
     if (e.altKey && hit) {
       const pila = this.canvas.hitStack(e.clientX, e.clientY);
@@ -501,14 +689,29 @@ export class Tools {
     const p = this.canvas.toDoc(e.clientX, e.clientY);
     const step = this.canvas.snapStep();
 
+    if (d.mode === "page") {
+      d.box = d.handle === "move"
+        ? this._pageMoved(d, p, step)
+        : this._pageBox(d, p);
+      d.moved = this._esArrastre(e);
+      this.canvas.previewPage(d.box);
+      this.redrawOverlay();
+      this.onStatus(`${fmt(d.box.w, 1)} × ${fmt(d.box.h, 1)} mm`);
+      return;
+    }
+
     if (d.mode === "move") {
+      /* Hasta que el gesto no es un arrastre de verdad no se toca nada:
+         ni vista previa, ni imán, ni `moved`. Es lo que hace que pinchar
+         para seleccionar sea solo eso. */
+      if (!this._esArrastre(e)) return;
       let dx = p.x - d.start.x, dy = p.y - d.start.y;
       if (e.shiftKey) { if (Math.abs(dx) > Math.abs(dy)) dy = 0; else dx = 0; }
       if (step) {
         const s = snapBoxDelta({ x: d.box.x + dx, y: d.box.y + dy, w: d.box.w, h: d.box.h }, step);
         dx += s.dx; dy += s.dy;
       }
-      if (Math.abs(dx) > 1e-9 || Math.abs(dy) > 1e-9) d.moved = true;
+      d.moved = true;
       d.T = translate(dx, dy);
       this._preview(d.T);
       this.redrawOverlay();
@@ -516,6 +719,7 @@ export class Tools {
     }
 
     if (d.mode === "scale") {
+      if (!this._esArrastre(e)) return;
       d.T = this._scaleMatrix(d, p, e.shiftKey, step);
       d.moved = true;
       this._preview(d.T);
@@ -524,6 +728,7 @@ export class Tools {
     }
 
     if (d.mode === "rotate") {
+      if (!this._esArrastre(e)) return;
       const c = { x: d.box.x + d.box.w / 2, y: d.box.y + d.box.h / 2 };
       let ang = angleOf(c, p) - angleOf(c, d.start);
       if (e.shiftKey) ang = Math.round(ang / 15) * 15;
@@ -562,6 +767,15 @@ export class Tools {
       this.canvas.view.style.cursor = this.tool === "select" ? "default" : "crosshair";
       return;
     }
+    if (d.mode === "page") {
+      this.canvas.previewPage(null);
+      this.onStatus("");
+      const dw = this.getDrawing();
+      if (d.moved && dw && d.box) dw.setBox(d.box.x, d.box.y, d.box.w, d.box.h);
+      this.canvas.refreshPage();
+      this.redrawOverlay();
+      return;
+    }
     if (d.mode === "marquee") {
       this.canvas.overlay.querySelectorAll(".dw-marquee").forEach(n => n.remove());
       if (d.moved) {
@@ -585,8 +799,24 @@ export class Tools {
     }
   }
 
+  /* Desplazamiento del papel entero al arrastrarlo por dentro. */
+  _pageMoved(d, p, step) {
+    let dx = p.x - d.start.x, dy = p.y - d.start.y;
+    if (step) {
+      dx = snapValue(d.box0.x + dx, step) - d.box0.x;
+      dy = snapValue(d.box0.y + dy, step) - d.box0.y;
+    }
+    return { x: d.box0.x + dx, y: d.box0.y + dy, w: d.box0.w, h: d.box0.h };
+  }
+
   _scaleMatrix(d, p, keepRatio, step) {
-    const b = d.box;
+    /* Con la figura girada se trabaja en SUS ejes: el puntero se lleva a
+       su espacio y la caja es la suya. El imán se queda fuera aquí a
+       propósito — la rejilla está en milímetros del documento y ajustar a
+       ella una coordenada girada daría saltos sin sentido. */
+    const local = !!d.local;
+    const b = local ? d.boxL : d.box;
+    if (local) { p = matApply(d.mInv, p); step = 0; }
     const h = d.handle;
     const left = h.includes("w"), right = h.includes("e");
     const top = h.includes("n"), bottom = h.includes("s");
@@ -806,7 +1036,7 @@ export class Tools {
 
     // atajos de herramienta, como en Inkscape
     if (!mod && !e.altKey) {
-      const map = { s: "select", r: "rect", e: "ellipse", l: "line", t: "text" };
+      const map = { s: "select", r: "rect", e: "ellipse", l: "line", t: "text", p: "page" };
       const name = map[e.key.toLowerCase()];
       if (name) { this.setTool(name); return; }
       if (e.key === "3") { this.canvas.fitPage(); this.redrawOverlay(); }

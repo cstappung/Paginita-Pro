@@ -38,6 +38,37 @@ export const SHAPE_TAGS = new Set([
   "path", "text", "image", "g", "use"
 ]);
 
+/* Redondeo corto para el viewBox: sin esto un recorte deja
+   «viewBox="12.000000000000002 …"» y el archivo se llena de ruido. */
+const fmtNum = n => {
+  const s = (Math.round(n * 10000) / 10000).toString();
+  return s === "-0" ? "0" : s;
+};
+
+/* ---------- estilo ----------
+
+   Un `style="fill:red"` gana SIEMPRE al atributo `fill`: es la cascada de
+   CSS, no un capricho. Casi todo lo que llega de Inkscape o de matplotlib
+   trae el color ahí, así que escribir el atributo y quedarse tan a gusto
+   no repintaba nada — el fallo de «algunos objetos no se recolorean». */
+export function dropStyleProp(el, prop) {
+  const st = el.getAttribute("style");
+  if (!st || st.toLowerCase().indexOf(prop.toLowerCase()) < 0) return;
+  const re = new RegExp(`(?:^|;)\\s*${prop.replace(/[-]/g, "\\-")}\\s*:[^;]*`, "gi");
+  const next = st.replace(re, ";").replace(/;{2,}/g, ";").replace(/^;+|;+$/g, "").trim();
+  if (next) el.setAttribute("style", next); else el.removeAttribute("style");
+}
+
+/* Propiedades que un grupo pasa a sus hijos por herencia CSS. Al pintar
+   un <g> hay que quitárselas a los descendientes que traigan la suya, o
+   el color del grupo no se ve por ninguna parte; y al DESAGRUPAR hay que
+   copiárselas a los hijos, o pierden el aspecto que tenían. */
+export const HEREDABLES = new Set([
+  "fill", "fill-opacity", "stroke", "stroke-width", "stroke-dasharray",
+  "stroke-linecap", "stroke-linejoin", "stroke-opacity",
+  "font-family", "font-size", "font-weight", "font-style", "text-anchor"
+]);
+
 let idCounter = 0;
 export function newId(prefix = "e") {
   const rnd = Math.random().toString(36).slice(2, 8);
@@ -416,13 +447,21 @@ export class Drawing {
   }
 
   setSize(w, h) {
+    const { x = 0, y = 0 } = this.size();
+    this.setBox(x, y, w, h);
+  }
+
+  /* Recorte: mueve y redimensiona el PAPEL sin tocar el dibujo. Las
+     figuras se quedan en sus coordenadas y lo que cambia es qué trozo
+     queda dentro, igual que el recorte de una foto. */
+  setBox(x, y, w, h) {
     const svg = this.root();
     if (!svg || !(w > 0) || !(h > 0)) return;
-    const { x = 0, y = 0 } = this.size();
+    const X = isFinite(x) ? x : 0, Y = isFinite(y) ? y : 0;
     this.edit(() => {
-      svg.setAttribute("width", `${w}mm`);
-      svg.setAttribute("height", `${h}mm`);
-      svg.setAttribute("viewBox", `${x} ${y} ${w} ${h}`);
+      svg.setAttribute("width", `${fmtNum(w)}mm`);
+      svg.setAttribute("height", `${fmtNum(h)}mm`);
+      svg.setAttribute("viewBox", `${fmtNum(X)} ${fmtNum(Y)} ${fmtNum(w)} ${fmtNum(h)}`);
     });
   }
 
@@ -510,6 +549,21 @@ export class Drawing {
         for (const [k, v] of Object.entries(attrs)) {
           if (v == null) el.removeAttribute(k);
           else el.setAttribute(k, String(v));
+          // el style del propio elemento taparía lo que acabamos de poner
+          dropStyleProp(el, k);
+          /* Pintar un grupo tiene que pintar lo que lleva dentro. Como el
+             clic normal selecciona el grupo entero (igual que Inkscape),
+             este es el caso HABITUAL, no el raro: sin esto, elegir una
+             figura importada y darle un color no hacía absolutamente
+             nada. Se les quita a los descendientes su valor propio para
+             que herede el del grupo; un Ctrl+Z lo devuelve todo, porque
+             va dentro de la misma transacción. */
+          if (HEREDABLES.has(k) && el.nodeName === "g") {
+            for (const kid of walk(el)) {
+              kid.removeAttribute(k);
+              dropStyleProp(kid, k);
+            }
+          }
         }
       }
     });
@@ -587,18 +641,37 @@ export class Drawing {
         const at = indexOf(parent, g);
         if (at < 0) continue;
         const gt = g.getAttribute("transform");
+        const gAttrs = g.getAttributes();
         /* El transform propio de cada hijo hay que leerlo del ORIGINAL,
            que está integrado: el clon todavía no devuelve sus atributos,
            y preguntárselo a él dejaría al hijo solo con el del grupo,
            perdiendo su giro o su escala. */
         const originales = elChildren(g);
         const kids = originales.map(k => cloneEl(k));
-        if (gt) {
-          originales.forEach((orig, i) => {
+        originales.forEach((orig, i) => {
+          if (gt) {
             const own = orig.getAttribute("transform");
             kids[i].setAttribute("transform", own ? `${gt} ${own}` : gt);
-          });
-        }
+          }
+          /* Lo que el grupo daba por herencia se lo queda cada hijo que
+             no traiga lo suyo; si no, desagrupar cambiaba el aspecto del
+             dibujo (un grupo al 30 % de opacidad soltaba hijos opacos). */
+          for (const k of HEREDABLES) {
+            if (gAttrs[k] == null) continue;
+            if (orig.getAttribute(k) != null) continue;
+            kids[i].setAttribute(k, String(gAttrs[k]));
+          }
+          /* La opacidad del grupo NO se hereda: se multiplica. */
+          if (gAttrs.opacity != null) {
+            const propia = parseFloat(orig.getAttribute("opacity"));
+            const base = parseFloat(gAttrs.opacity);
+            const total = (isFinite(base) ? base : 1) * (isFinite(propia) ? propia : 1);
+            kids[i].setAttribute("opacity", String(Math.round(total * 1000) / 1000));
+          }
+          // un recorte del grupo vale igual aplicado a cada hijo
+          if (gAttrs["clip-path"] != null && orig.getAttribute("clip-path") == null)
+            kids[i].setAttribute("clip-path", String(gAttrs["clip-path"]));
+        });
         parent.delete(at, 1);
         if (kids.length) parent.insert(at, kids);
         freed.push(...kids);

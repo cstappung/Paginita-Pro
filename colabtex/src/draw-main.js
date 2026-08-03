@@ -53,7 +53,10 @@ const state = {
   activeLayerId: null, // capa donde va lo que se dibuje
   assets: [],
   membersUnsub: null,
-  drawingsObserver: null
+  drawingsObserver: null,
+  fragObserved: null,   // fragmento vigilado y su oyente, para poder soltarlos
+  fragObserver: null,
+  layerTimer: null
 };
 
 const canWrite = () => state.role !== "view";
@@ -276,8 +279,18 @@ async function openEditor(projectId, token) {
   renderPresence();
 }
 
+function stopFragObserver() {
+  if (state.fragObserved && state.fragObserver) {
+    try { state.fragObserved.unobserveDeep(state.fragObserver); } catch (e) {}
+  }
+  clearTimeout(state.layerTimer);
+  state.fragObserved = null;
+  state.fragObserver = null;
+}
+
 function teardownEditor() {
   if (state.membersUnsub) { state.membersUnsub(); state.membersUnsub = null; }
+  stopFragObserver();
   if (state.store && state.drawingsObserver) {
     try { state.store.map.unobserve(state.drawingsObserver); } catch (e) {}
   }
@@ -322,25 +335,37 @@ function ensureEditorParts() {
       if (state.layers) state.layers.render();
     },
     getLayer: () => (state.drawing ? state.drawing.activeLayer(state.activeLayerId) : null),
-    onEditText: el => state.textEd.open(el),
+    /* Con elemento se edita ese rótulo; sin él viene la ficha de uno que
+       todavía no existe y que solo nacerá si se escribe algo. */
+    onEditText: (el, spec) => (el ? state.textEd.open(el) : state.textEd.openNew(spec)),
     onStatus: msg => { $("statusMsg").textContent = msg || ""; },
     onToolChange: name => {
       document.querySelectorAll("#toolRail [data-tool]").forEach(b =>
         b.classList.toggle("tool-active", b.dataset.tool === name));
       // la sección TEXTO del panel aparece con la herramienta en la mano
       if (state.style) state.style.refresh();
+      $("statusMsg").textContent = name === "page"
+        ? "Arrastra los bordes o las esquinas para recortar el papel; por dentro, para moverlo. Esc para salir."
+        : "";
     }
   });
   state.style = createStylePanel($("stylePanel"), {
     getSelection: () => (state.tools ? state.tools.selection() : []),
     getStyle: () => (state.tools ? state.tools.style : {}),
     getTextStyle: () => (state.tools ? state.tools.textStyle : {}),
+    getScale: () => (state.tools ? state.tools.selectionScale() : 1),
     isTextTool: () => !!state.tools && state.tools.tool === "text",
     getPage: () => (state.drawing ? state.drawing.size() : { w: 0, h: 0 }),
     canWrite,
     onApply: attrs => state.tools.applyStyle(attrs),
     onOrder: mode => state.tools.reorder(mode),
-    onPage: (w, h) => { if (state.drawing) { state.drawing.setSize(w, h); state.style.refresh(); } }
+    onPage: (w, h) => {
+      if (!state.drawing) return;
+      state.drawing.setSize(w, h);
+      state.canvas.refreshPage();
+      state.tools.redrawOverlay();     // el marco de recorte sigue al papel
+      state.style.refresh();
+    }
   });
   state.assetView = createAssetPreview($("canvasHost").parentNode, {
     onClose: () => { state.openAsset = null; renderFileList(); },
@@ -493,6 +518,7 @@ function openDrawing(path) {
   if (state.textEd && state.textEd.isOpen()) state.textEd.close();
   if (state.assetView) state.assetView.hide();     // vuelve a verse el lienzo
   if (state.layers) state.layers.reset();          // otro dibujo, otro árbol
+  stopFragObserver();
   if (state.drawing) { state.drawing.destroy(); state.drawing = null; }
   state.path = path;
   if (!path || !state.store || !state.store.has(path)) {
@@ -510,11 +536,16 @@ function openDrawing(path) {
   state.tools.setTool("select");
   if (state.drawing.undoMgr) state.drawing.undoMgr.on("stack-item-added", paintUndoButtons);
   /* Si otra persona añade, renombra u oculta una capa, el panel tiene
-     que enterarse igual que el lienzo. */
-  state.drawing.frag.observeDeep(() => {
+     que enterarse igual que el lienzo. Se guarda para poder quitarlo:
+     `drawing.destroy()` solo cierra el deshacer, así que sin esto cada
+     apertura dejaba un observador vivo sobre el MISMO fragmento y el
+     panel se repintaba una vez por dibujo abierto en toda la sesión. */
+  state.fragObserved = state.drawing.frag;
+  state.fragObserver = () => {
     clearTimeout(state.layerTimer);
     state.layerTimer = setTimeout(() => state.layers.render(), 80);
-  });
+  };
+  state.fragObserved.observeDeep(state.fragObserver);
   renderFileList();
   state.activeLayerId = null;      // cada dibujo trae sus propias capas
   state.layers.render();
@@ -668,6 +699,12 @@ async function doExport() {
     const out = await exportAll(state.drawing, state.path, {
       formats,
       dpi: parseInt($("expDpi").value, 10) || 300,
+      /* Sin fondo, un PNG con rótulos negros desaparece sobre cualquier
+         diapositiva oscura; en un artículo da igual, pero el que se lleva
+         la sorpresa no lo sabe hasta que la ve. */
+      background: $("expWhite").checked ? "#ffffff" : null,
+      // que el .svg generado no se llame igual que el dibujo del que sale
+      avoid: new Set(state.store ? state.store.list() : []),
       upload: save ? ((name, bytes) => fb.uploadAsset(state.project.id, name, bytes)) : null
     });
     if (grab) for (const f of out) download(f.bytes, f.name);
