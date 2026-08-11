@@ -482,6 +482,33 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
   (or opens the text editor). The double-click is timed here rather than
   listened for: selection calls `preventDefault()` on pointerdown, which can
   suppress the derived mouse events `dblclick` is built from.
+  **What is drawn is in document coordinates; what is stored is inside a
+  layer.** A layer carries its own `transform` — `svgio` *prepends* the mm
+  normalisation to it, so every imported layer has one (`scale(0.2646…)` for a
+  file in px) — so writing `canvas.toDoc()` coordinates straight into it asks
+  for them to be transformed a second time: the line landed far from where it
+  was drawn and at another size. `_espacioDeCapa()` computes the way back and
+  everything created goes through it — points, `stroke-width`, `stroke-dasharray`,
+  the rect's `rx`, and the text's `font-size`, because a length is as much in the
+  layer's space as a coordinate is. It returns `null` when there is nothing to
+  correct (a fresh layer has no transform), so the normal case pays nothing. A
+  **rotated** layer is the one case it cannot map — a straight rectangle of the
+  document is not a straight rectangle in there — so the shape keeps document
+  coordinates and wears the inverse matrix instead, which cancels the scale and
+  is why the width is *not* divided in that branch. `Tools._createText` splits
+  the spec in two for the same reason: `pt`/`font-size` already translated for
+  the layer, and `vista` in document space, which is what the floating
+  `<textarea>` needs to place itself.
+
+  **Mayús and Alt while drawing** (`_geoCrear`) give square/circle, 15° angles on
+  a line, and drawing from the centre. The resulting corners are stored in the
+  drag (`d.a`/`d.b`) and it is *those* that `_createShape` uses on release —
+  taking `start`/`end` again would create something different from what the
+  preview showed. The preview itself (`_drawCreatePreview`) is painted with the
+  **real style**, written inline because a CSS class beats a presentation
+  attribute; it lives in the overlay, which is in screen pixels, so widths and
+  dashes are multiplied by `canvas.k` by hand.
+
   Three rules the transforms depend on:
   - **A gesture is not a drag until the pointer has moved `DRAG_PX` screen
     pixels.** Measured in pixels, not millimetres — hand tremor is the same
@@ -510,6 +537,28 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
   active layer**, and a whole layer pastes back *as a layer*; anything else
   lands on the active layer offset by 2 mm so it's visible that there are now
   two.
+- `stroke.js` — the cap/join/dash tables and the SVG defaults, shared by the
+  three places that touch a stroke (`tools.js` creates, `style.js` edits,
+  `tool-options.js` chooses). It exists because the opposite happened:
+  `stroke-linecap: "round"` was hardcoded in `tools.js` with no control anywhere
+  to change it, so *every* line ever drawn came out rounded for good. `capAttr`
+  / `joinAttr` return `null` for a value that is already the SVG default, so the
+  file doesn't fill up with attributes that change nothing — but the panel
+  writes the default **explicitly**, because the selection may be inheriting
+  `round` from its group or from an imported file.
+- `tool-options.js` — the bar that floats over the canvas while a drawing tool
+  is in hand. It carries what has to be decided *before* dragging (colour,
+  width, dash, corner radius) plus the modifiers nobody discovers on their own,
+  and it is the only home of the options that are not SVG attributes
+  (`Tools.crear`: the next rect's `rx`, and "seguir dibujando", which keeps the
+  tool instead of snapping back to the arrow). It is **rebuilt only when the
+  tool changes** and otherwise just re-synced, skipping whatever control has
+  focus — a refresh mid-typing used to eat half of what was typed. Two layout
+  traps: the hint gets `flex-basis:100%` so the bar is deterministically two
+  rows rather than wrapping wherever it lands, and it is centred with
+  `left/right + margin:auto`, **not** `left:50%` + a translation — an absolutely
+  positioned box with `right:auto` is only offered half the width to lay out in,
+  so the bar broke into four rows where one was enough.
 - `text.js` — the text tool and its editor. A text is a `<text>` with one
   `<tspan>` per line, each repeating the `x` (SVG text does not wrap back to
   the margin by itself) and stepping down with `dy` **in `em`**, so changing

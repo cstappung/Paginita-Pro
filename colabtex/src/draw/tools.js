@@ -15,6 +15,7 @@ import {
   translate, scaleAbout, rotateM, boxFromDrag, boxCorners, boxOfPoints,
   snapBoxDelta, snapValue, angleOf, dist, clamp, fmt
 } from "./geom.js";
+import { DEFAULT_CAP, DEFAULT_JOIN, capAttr, joinAttr } from "./stroke.js";
 import { SVG_NS, newId } from "./doc.js";
 import { addText, isText, TEXT_ATTRS, DEFAULT_FONT, DEFAULT_SIZE } from "./text.js";
 import { clipboardSvg, textToNodes } from "./svgio.js";
@@ -50,6 +51,9 @@ const casiCero = v => Math.abs(v) < 1e-6;
 /* ¿La matriz lleva giro (o sesgo)? Si no, escalar en los ejes del
    documento y en los de la figura es lo mismo. */
 const girada = m => !!m && (!casiCero(m.b) || !casiCero(m.c));
+const casiIdentidad = m => !!m &&
+  casiCero(m.a - 1) && casiCero(m.d - 1) && casiCero(m.b) && casiCero(m.c) &&
+  casiCero(m.e) && casiCero(m.f);
 
 export class Tools {
   constructor(canvas, opts = {}) {
@@ -66,13 +70,21 @@ export class Tools {
        aquí porque es un <textarea> encima del lienzo. */
     this.onEditText = opts.onEditText || (() => {});
     this.style = Object.assign({
-      fill: "#cfe3ff", stroke: "#1f2933", "stroke-width": 0.4, opacity: 1
+      fill: "#cfe3ff", stroke: "#1f2933", "stroke-width": 0.4, opacity: 1,
+      "stroke-linecap": DEFAULT_CAP, "stroke-linejoin": DEFAULT_JOIN,
+      "stroke-dasharray": ""
     }, opts.style || {});
     /* El texto lleva su propio estilo: su color es el RELLENO, y heredar
        el de las figuras haría que el primer rótulo saliera azul claro. */
     this.textStyle = Object.assign({
       "font-family": DEFAULT_FONT, "font-size": DEFAULT_SIZE, fill: "#1f2933"
     }, opts.textStyle || {});
+
+    /* Opciones de DIBUJO, las que no son atributos del SVG y por eso no
+       caben en `style`: el redondeo de esquina que llevará el próximo
+       rectángulo y si la herramienta se queda en la mano al soltar.
+       Las lleva la barra de opciones (tool-options.js). */
+    this.crear = Object.assign({ rx: 0, mantener: false }, opts.crear || {});
 
     this.tool = "select";
     this.sel = [];
@@ -444,6 +456,41 @@ export class Tools {
     return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
   }
 
+  /* ---------- el espacio de la capa ----------
+
+     Lo que se dibuja se mide en coordenadas del DOCUMENTO (las que
+     devuelve `canvas.toDoc`), pero la figura no nace en el documento:
+     nace DENTRO de una capa, y una capa tiene su propio `transform`.
+     Las de un archivo importado lo llevan siempre — svgio antepone ahí
+     la normalización a milímetros (`scale(0.2646…)` en un SVG en
+     píxeles) — y cualquiera puede mover una capa entera.
+
+     Escribir las coordenadas del documento tal cual dentro de esa capa
+     es pedir que se vuelvan a transformar: la línea aparecía lejos de
+     donde se había trazado y con otro tamaño, que es exactamente lo
+     que describía el informe. Aquí se calcula la vuelta atrás.
+
+     Devuelve null cuando no hay nada que corregir (una capa recién
+     creada no tiene transform), y así el caso normal no paga nada. */
+  _espacioDeCapa(capa) {
+    if (!capa) return null;
+    const m = this.canvas.selfMatrix(capa);
+    if (!m || casiIdentidad(m)) return null;
+    const inv = matInvert(m);
+    if (!inv) return null;                  // capa degenerada (escala 0)
+    return {
+      inv,
+      escala: Math.sqrt(Math.abs(m.a * m.d - m.b * m.c)) || 1,
+      /* Sin giro ni sesgo, los puntos se pueden llevar a los ejes de la
+         capa y la figura queda limpia (un <rect> sigue siendo un <rect>
+         derecho). Con giro no: un rectángulo derecho del documento no
+         es un rectángulo derecho ahí dentro, así que se deja en
+         coordenadas del documento y se le cuelga la matriz inversa. */
+      mapear: !girada(m),
+      tr: matToString(inv)
+    };
+  }
+
   /* ---------- transformaciones ----------
      Una transformación pensada en coordenadas del documento se lleva al
      espacio del padre del elemento: M' = P⁻¹ · T · P · M.
@@ -552,8 +599,28 @@ export class Tools {
     if (!d) return;
     const step = this.canvas.snapStep();
     const pt = step ? { x: snapValue(p.x, step), y: snapValue(p.y, step) } : p;
+    const capa = this.getLayer();
+    const esp = this._espacioDeCapa(capa);
+    const style = Object.assign({}, this.textStyle);
+    const cuerpo = parseFloat(style["font-size"]) || DEFAULT_SIZE;
+    // mismo problema que con las figuras: el rótulo nace dentro de la capa
+    let punto = pt, tr = null;
+    if (esp) {
+      if (esp.mapear) {
+        punto = matApply(esp.inv, pt);
+        // NÚMERO, no texto: addText se lo pasa a fmt(), que llama a
+        // toFixed y revienta con una cadena
+        style["font-size"] = Math.round((cuerpo / esp.escala) * 1e5) / 1e5;
+      } else tr = esp.tr;
+    }
     this.setTool("select");
-    this.onEditText(null, { pt, style: this.textStyle, layer: this.getLayer() });
+    this.onEditText(null, {
+      pt: punto, style, layer: capa, transform: tr,
+      /* La caja de escribir flota sobre el LIENZO, así que se coloca con
+         las coordenadas del documento y el cuerpo de letra de verdad, no
+         con los ya traducidos al espacio de la capa. */
+      vista: { pt, fs: cuerpo }
+    });
   }
 
   _pointerDown(e) {
@@ -577,7 +644,11 @@ export class Tools {
       const b0 = { x: box.x || 0, y: box.y || 0, w: box.w, h: box.h };
       const p = this.canvas.toDoc(e.clientX, e.clientY);
       const dentro = p.x >= b0.x && p.x <= b0.x + b0.w && p.y >= b0.y && p.y <= b0.y + b0.h;
-      if (!ph && !dentro) return;
+      /* Pinchar FUERA del papel sale del recorte, como se sale de un
+         recorte en cualquier visor de fotos. Antes el clic no hacía
+         nada y para volver a la flecha había que ir al rail a buscarla,
+         que es justo lo que pedía la sugerencia. */
+      if (!ph && !dentro) { this.setTool("select"); this.onStatus(""); return; }
       this.drag = {
         mode: "page", handle: ph || "move", box: b0, box0: b0,
         start: p, startClient: { x: e.clientX, y: e.clientY }, moved: false
@@ -750,11 +821,52 @@ export class Tools {
     if (d.mode === "create") {
       const end = step ? { x: snapValue(p.x, step), y: snapValue(p.y, step) } : p;
       d.end = end;
+      /* Las esquinas efectivas se guardan en el arrastre: lo que se cree
+         al soltar tiene que ser EXACTAMENTE lo que se estaba viendo, y
+         con las teclas de por medio ya no coincide con start/end. */
+      const g = this._geoCrear(d, end, e);
+      d.a = g.a; d.b = g.b;
       d.moved = dist(d.start, end) > MIN_SIZE;
       this._drawCreatePreview(d);
-      const b = boxFromDrag(d.start, end);
-      this.onStatus(`${fmt(b.w, 1)} × ${fmt(b.h, 1)} mm`);
+      if (d.tool === "line") {
+        const ang = ((angleOf(g.a, g.b) % 360) + 360) % 360;
+        this.onStatus(`${fmt(dist(g.a, g.b), 1)} mm · ${fmt(ang, 1)}°`);
+      } else {
+        const b = boxFromDrag(g.a, g.b);
+        this.onStatus(`${fmt(b.w, 1)} × ${fmt(b.h, 1)} mm`);
+      }
     }
+  }
+
+  /* Esquinas de lo que se está dibujando, ya con las teclas aplicadas:
+
+       Mayús → cuadrado y círculo; en la línea, ángulos de 15°
+       Alt    → desde el CENTRO en vez de desde una esquina
+
+     Son las dos que tiene cualquier programa de dibujo y aquí no
+     estaban: un círculo había que sacarlo a ojo mirando la medida de la
+     barra de estado. */
+  _geoCrear(d, p, e) {
+    const c = d.start;
+    if (d.tool === "line") {
+      let b = p;
+      if (e.shiftKey) {
+        const r = dist(c, b);
+        const rad = (Math.round(angleOf(c, b) / 15) * 15) * Math.PI / 180;
+        b = { x: c.x + r * Math.sin(rad), y: c.y - r * Math.cos(rad) };
+      }
+      // desde el centro: el punto de partida pasa a ser el punto medio
+      return e.altKey ? { a: { x: 2 * c.x - b.x, y: 2 * c.y - b.y }, b } : { a: c, b };
+    }
+    let dx = p.x - c.x, dy = p.y - c.y;
+    if (e.shiftKey) {
+      const s = Math.max(Math.abs(dx), Math.abs(dy));
+      dx = (dx < 0 ? -1 : 1) * s;
+      dy = (dy < 0 ? -1 : 1) * s;
+    }
+    return e.altKey
+      ? { a: { x: c.x - dx, y: c.y - dy }, b: { x: c.x + dx, y: c.y + dy } }
+      : { a: c, b: { x: c.x + dx, y: c.y + dy } };
   }
 
   _pointerUp(e) {
@@ -785,9 +897,9 @@ export class Tools {
       return;
     }
     if (d.mode === "create") {
-      this.canvas.overlay.querySelectorAll(".dw-preview").forEach(n => n.remove());
+      this.canvas.overlay.querySelectorAll(".dw-preview,.dw-preview-guia").forEach(n => n.remove());
       this.onStatus("");
-      if (d.moved && d.end) this._createShape(d.tool, d.start, d.end);
+      if (d.moved && d.b) this._createShape(d.tool, d.a, d.b);
       return;
     }
     if (d.T && d.moved) {
@@ -853,11 +965,27 @@ export class Tools {
     ov.appendChild(r);
   }
 
+  /* Vista previa de lo que se está dibujando, CON SU ASPECTO REAL:
+     relleno, color, grosor, guiones y extremos. Un contorno morado a
+     rayas igual para las tres herramientas no decía lo que iba a salir
+     —ni si la figura llevaba relleno—, y la sorpresa llegaba al soltar.
+
+     Va en la capa de tiradores, que está en píxeles de pantalla y no
+     escala con el zoom: por eso el grosor y los guiones se multiplican
+     por `canvas.k` a mano. El estilo se escribe INLINE porque una clase
+     de CSS gana siempre a un atributo de presentación. */
   _drawCreatePreview(d) {
     const ov = this.canvas.overlay;
-    ov.querySelectorAll(".dw-preview").forEach(n => n.remove());
-    const a = this.canvas.toLocal(d.start);
-    const b = this.canvas.toLocal(d.end);
+    ov.querySelectorAll(".dw-preview,.dw-preview-guia").forEach(n => n.remove());
+    const a = this.canvas.toLocal(d.a || d.start);
+    const b = this.canvas.toLocal(d.b || d.end);
+    const k = this.canvas.k || 1;
+    const st = this.style;
+    const caja = {
+      x: Math.min(a.x, b.x), y: Math.min(a.y, b.y),
+      w: Math.abs(b.x - a.x), h: Math.abs(b.y - a.y)
+    };
+
     let node;
     if (d.tool === "line") {
       node = svgEl("line");
@@ -866,41 +994,88 @@ export class Tools {
     } else if (d.tool === "ellipse") {
       node = svgEl("ellipse");
       node.setAttribute("cx", (a.x + b.x) / 2); node.setAttribute("cy", (a.y + b.y) / 2);
-      node.setAttribute("rx", Math.abs(b.x - a.x) / 2); node.setAttribute("ry", Math.abs(b.y - a.y) / 2);
+      node.setAttribute("rx", caja.w / 2); node.setAttribute("ry", caja.h / 2);
+      /* Con la elipse sí ayuda el rectángulo de guía: al dibujarla se
+         está apuntando a dos esquinas que la propia elipse no toca. */
+      const guia = svgEl("rect");
+      guia.setAttribute("class", "dw-preview-guia");
+      guia.setAttribute("x", caja.x); guia.setAttribute("y", caja.y);
+      guia.setAttribute("width", caja.w); guia.setAttribute("height", caja.h);
+      ov.appendChild(guia);
     } else {
       node = svgEl("rect");
-      node.setAttribute("x", Math.min(a.x, b.x)); node.setAttribute("y", Math.min(a.y, b.y));
-      node.setAttribute("width", Math.abs(b.x - a.x)); node.setAttribute("height", Math.abs(b.y - a.y));
+      node.setAttribute("x", caja.x); node.setAttribute("y", caja.y);
+      node.setAttribute("width", caja.w); node.setAttribute("height", caja.h);
+      const r = parseFloat(this.crear.rx) || 0;
+      if (r > 0) node.setAttribute("rx", Math.min(r * k, Math.min(caja.w, caja.h) / 2));
     }
+
+    const grosor = Math.max(1, (parseFloat(st["stroke-width"]) || 0) * k);
     node.setAttribute("class", "dw-preview");
+    node.style.fill = d.tool === "line" ? "none" : (st.fill || "none");
+    node.style.stroke = st.stroke || "none";
+    node.style.strokeWidth = String(grosor);
+    node.style.strokeLinecap = st["stroke-linecap"] || DEFAULT_CAP;
+    node.style.strokeLinejoin = st["stroke-linejoin"] || DEFAULT_JOIN;
+    node.style.strokeDasharray = st["stroke-dasharray"]
+      ? String(st["stroke-dasharray"]).split(/[\s,]+/).filter(Boolean).map(v => (parseFloat(v) || 0) * k).join(" ")
+      : "none";
+    node.style.opacity = "0.85";
     ov.appendChild(node);
   }
 
   _createShape(tool, p0, p1) {
     const d = this.getDrawing();
     if (!d) return;
-    const b = boxFromDrag(p0, p1);
+    const capa = this.getLayer();
+    const esp = this._espacioDeCapa(capa);
+    const aCapa = p => (esp && esp.mapear ? matApply(esp.inv, p) : p);
+    const q0 = aCapa(p0), q1 = aCapa(p1);
+    const b = boxFromDrag(q0, q1);
     const st = this.style;
+
+    /* El grosor vive en el mismo espacio que las coordenadas: en una
+       capa escalada ×4, un atributo de 0,4 mm se ve de 1,6. Cuando la
+       figura lleva la matriz inversa colgada (capa girada) la escala se
+       cancela sola y no hay que tocar nada. */
+    const kEsc = esp && esp.mapear ? esp.escala : 1;
+    const largo = v => fmt((parseFloat(v) || 0) / kEsc, 5);
+    // los guiones son longitudes como cualquier otra: en una capa
+    // escalada, un «3,2» sin traducir sale de otro tamaño que en el panel
+    const guiones = v => (!v ? null : String(v).split(/[\s,]+/).filter(Boolean).map(largo).join(","));
+
     const common = {
       fill: tool === "line" ? "none" : st.fill,
       stroke: st.stroke,
-      "stroke-width": st["stroke-width"]
+      "stroke-width": largo(st["stroke-width"]),
+      "stroke-dasharray": guiones(st["stroke-dasharray"]),
+      "stroke-linecap": capAttr(st["stroke-linecap"]),
+      "stroke-linejoin": joinAttr(st["stroke-linejoin"]),
+      transform: esp && !esp.mapear ? esp.tr : null
     };
+
     let el = null;
     if (tool === "rect") {
-      el = d.add(this.getLayer(), "rect", Object.assign({ x: fmt(b.x), y: fmt(b.y), width: fmt(b.w), height: fmt(b.h) }, common));
+      // el redondeo de esquina se pide en mm de papel, como todo lo demás
+      const r = parseFloat(this.crear.rx) || 0;
+      el = d.add(capa, "rect", Object.assign({
+        x: fmt(b.x), y: fmt(b.y), width: fmt(b.w), height: fmt(b.h),
+        rx: r > 0 ? largo(Math.min(r, Math.min(b.w, b.h) * kEsc / 2)) : null
+      }, common));
     } else if (tool === "ellipse") {
-      el = d.add(this.getLayer(), "ellipse", Object.assign({
+      el = d.add(capa, "ellipse", Object.assign({
         cx: fmt(b.x + b.w / 2), cy: fmt(b.y + b.h / 2), rx: fmt(b.w / 2), ry: fmt(b.h / 2)
       }, common));
     } else if (tool === "line") {
-      el = d.add(this.getLayer(), "line", Object.assign({
-        x1: fmt(p0.x), y1: fmt(p0.y), x2: fmt(p1.x), y2: fmt(p1.y)
-      }, common, { fill: null, "stroke-linecap": "round" }));
+      el = d.add(capa, "line", Object.assign({
+        x1: fmt(q0.x), y1: fmt(q0.y), x2: fmt(q1.x), y2: fmt(q1.y)
+      }, common, { fill: null, "stroke-linejoin": null }));
     }
     if (el) {
       this.select(el);
-      this.setTool("select");
+      // con «seguir dibujando» la herramienta se queda en la mano, como
+      // en Inkscape; sin ello se vuelve a la flecha, que era lo de antes
+      if (!this.crear.mantener) this.setTool("select");
     }
   }
 
@@ -969,6 +1144,9 @@ export class Tools {
     this.drag = null;
     this.redrawOverlay();
   }
+
+  /* Opciones de dibujo que no son atributos del SVG (ver this.crear). */
+  setCrear(opts) { Object.assign(this.crear, opts || {}); }
 
   applyStyle(attrs) {
     const d = this.getDrawing();

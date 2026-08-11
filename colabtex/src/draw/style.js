@@ -13,18 +13,12 @@
    ============================================================ */
 
 import { FONTS, DEFAULT_FONT, DEFAULT_SIZE, isText } from "./text.js";
+import { CAPS, JOINS, DASHES, DEFAULT_CAP, DEFAULT_JOIN } from "./stroke.js";
 
 export const PALETTE = [
   "none", "#000000", "#3d4c5e", "#8a97a3", "#ffffff",
   "#c0392b", "#e67e22", "#e2c08d", "#2e9e5b", "#0d9488",
   "#0f62fe", "#6cb6ff", "#6c4bb6", "#b58bf5", "#d6336c"
-];
-
-const DASHES = [
-  { label: "———", value: "" },
-  { label: "– – –", value: "3,2" },
-  { label: "· · ·", value: "0.6,1.6" },
-  { label: "–·–·", value: "4,1.5,0.8,1.5" }
 ];
 
 const el = (tag, cls, html) => {
@@ -153,7 +147,34 @@ export function createStylePanel(host, opts = {}) {
   dashSel.onchange = () => apply({ "stroke-dasharray": dashSel.value || null });
   dashRow.appendChild(dashSel);
 
-  secStroke.append(strokeRow, swatches("stroke", c => apply({ stroke: c === "none" ? "none" : c })), widthRow, dashRow);
+  /* Extremos y uniones. Faltaban por completo, y como tools.js escribía
+     `stroke-linecap: round` a mano al crear una línea, todas salían
+     redondeadas y no había forma de cambiarlo desde ningún sitio.
+
+     Aquí SÍ se escribe el valor por defecto («plano», «en pico») en vez
+     de quitar el atributo: lo que hay elegido puede estar heredando un
+     `round` de su grupo o venir así de un archivo importado, y quitar el
+     atributo dejaría el redondeo puesto. */
+  const opciones = (id, lista, attr, etiqueta) => {
+    const row = el("div", "dw-row");
+    row.appendChild(el("label", "dw-lbl", etiqueta));
+    const sel = el("select", "dw-sel");
+    sel.id = id;
+    for (const o of lista) {
+      const op = document.createElement("option");
+      op.value = o.value; op.textContent = o.label;
+      if (o.title) op.title = o.title;
+      sel.appendChild(op);
+    }
+    sel.onchange = () => apply({ [attr]: sel.value });
+    row.appendChild(sel);
+    return { row, sel };
+  };
+  const cap = opciones("dwLinecap", CAPS, "stroke-linecap", "Extremos");
+  const join = opciones("dwLinejoin", JOINS, "stroke-linejoin", "Uniones");
+
+  secStroke.append(strokeRow, swatches("stroke", c => apply({ stroke: c === "none" ? "none" : c })),
+    widthRow, dashRow, cap.row, join.row);
 
   /* ---------- texto ----------
      Solo aparece cuando hay un texto elegido (o cuando se va a escribir
@@ -271,7 +292,7 @@ export function createStylePanel(host, opts = {}) {
     const sel = getSel();
     const st = getStyle();
     const ro = !canWrite();
-    for (const n of [fillInput, strokeInput, widthInput, dashSel, opInput, pw, ph])
+    for (const n of [fillInput, strokeInput, widthInput, dashSel, cap.sel, join.sel, opInput, pw, ph])
       n.disabled = ro;
     host.querySelectorAll(".dw-swatch,.dw-btn").forEach(b => { b.disabled = ro; });
 
@@ -287,6 +308,13 @@ export function createStylePanel(host, opts = {}) {
     widthInput.value = width == null ? "" : String(Math.round((parseFloat(width) || 0) * k * 100) / 100);
     widthInput.placeholder = width == null ? "varios" : "";
     dashSel.value = dash == null ? "" : String(dash);
+    // «varios»: ninguna opción marcada, en vez de mentir con la primera
+    const punta = sel.length ? commonAttr(sel, "stroke-linecap", DEFAULT_CAP) : (st["stroke-linecap"] || DEFAULT_CAP);
+    const union = sel.length ? commonAttr(sel, "stroke-linejoin", DEFAULT_JOIN) : (st["stroke-linejoin"] || DEFAULT_JOIN);
+    cap.sel.value = punta == null ? "" : String(punta);
+    if (!cap.sel.value) cap.sel.selectedIndex = -1;
+    join.sel.value = union == null ? "" : String(union);
+    if (!join.sel.value) join.sel.selectedIndex = -1;
     const pct = op == null ? 100 : Math.round(parseFloat(op) * 100);
     opInput.value = String(isFinite(pct) ? pct : 100);
     opLabel.textContent = op == null ? "varios" : `${isFinite(pct) ? pct : 100}%`;

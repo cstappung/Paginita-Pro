@@ -167,11 +167,62 @@
   .dw-handle-page{fill:#0d9488;stroke:#fff;stroke-width:1.5}
   .dw-handle-page:hover{fill:#14b8a6}
   .dw-marquee{fill:#6c4bb61a;stroke:#6c4bb6;stroke-width:1;stroke-dasharray:3 2}
-  .dw-preview{fill:#6c4bb61a;stroke:#6c4bb6;stroke-width:1.5;stroke-dasharray:3 2}
+  /* La figura que se está dibujando se pinta con SU aspecto de verdad
+     (tools.js lo escribe en el atributo style, que gana a esta clase);
+     aquí solo queda lo que no depende del estilo elegido. */
+  .dw-preview{pointer-events:none}
+  .dw-preview-guia{fill:none;stroke:#6c4bb6;stroke-width:1;stroke-dasharray:3 2;opacity:.6}
   /* Caja de escritura: va encima del lienzo, colocada sobre el propio
      texto, así que se deja casi transparente para ver dónde cae. */
   .dw-text-input{position:absolute;z-index:5;margin:0;padding:1px 3px;border:1px solid #6c4bb6;border-radius:3px;background:#ffffffe8;color:#1f2933;resize:none;overflow:hidden;white-space:pre;box-shadow:0 2px 10px #6c4bb655}
   .dw-text-input:focus{outline:none}
+  /* Confirmar / descartar, pegado a la caja de escribir. */
+  .dw-text-bar{position:absolute;z-index:6;display:flex;gap:4px;align-items:center}
+  .dw-text-btn{height:24px;padding:0 9px;border:1px solid #6c4bb6;border-radius:5px;background:#6c4bb6;color:#fff;font-family:inherit;font-size:11.5px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px #0000002e}
+  .dw-text-btn:hover{background:#5a3ea0}
+  .dw-text-no{background:#fff;color:#6c4bb6;padding:0 8px}
+  .dw-text-no:hover{background:#f1ecfa}
+
+  /* --- barra de opciones de la herramienta (draw/tool-options.js) ---
+     Flota sobre el lienzo, pegada arriba y centrada. No ocupa sitio en
+     la maquetación: con la flecha en la mano desaparece del todo. */
+  /* Centrada con left/right + margin auto, NO con left:50% y una
+     traslación: a una caja absoluta con `right:auto` el navegador solo
+     le ofrece la mitad del ancho para repartir, así que la barra se
+     partía en cuatro renglones cuando de sobra cabía en uno. */
+  .to-bar{position:absolute;z-index:4;top:8px;left:8px;right:8px;margin:0 auto;
+    width:max-content;max-width:calc(100% - 16px);
+    display:flex;align-items:center;flex-wrap:wrap;gap:4px 5px;padding:4px 7px;
+    background:#ffffffee;border:1px solid #e2e8ec;border-radius:9px;box-shadow:0 3px 14px #0d111726;
+    font-size:11.5px;color:#42505c;white-space:nowrap;backdrop-filter:blur(3px)}
+  .to-tool{display:flex;align-items:center;gap:6px;font-weight:600;color:#6c4bb6;padding-right:7px;border-right:1px solid #e6eaee}
+  .to-tool-ico{display:grid;place-items:center;width:21px;height:21px;border-radius:5px;background:#f1ecfa;font-size:12px}
+  .to-group{display:flex;align-items:center;gap:5px;padding-right:6px;border-right:1px solid #eef1f4}
+  .to-group:last-child{border-right:none;padding-right:0}
+  .to-lbl{color:#8a97a3}
+  .to-unit{color:#8a97a3;font-size:10.5px}
+  .to-color-box{display:flex;align-items:center;gap:2px}
+  .to-color{width:26px;height:22px;border:1px solid #d4dce2;border-radius:4px;padding:0;background:#fff;cursor:pointer}
+  /* Sin color: el cuadrito se tacha, como el muestrario del panel. */
+  .to-color-vacio .to-color{background:linear-gradient(45deg,#fff 45%,#c0392b 45%,#c0392b 55%,#fff 55%)}
+  .to-none{width:20px;height:22px;border:1px solid #d4dce2;border-radius:4px;background:#fff;color:#8a97a3;font-size:11px;cursor:pointer;padding:0}
+  .to-none:hover{border-color:#6c4bb6;color:#6c4bb6}
+  .to-num-box{display:flex;align-items:center;gap:3px}
+  .to-num{height:22px;border:1px solid #d4dce2;border-radius:4px;padding:0 4px;font-size:11.5px;font-family:inherit}
+  .to-num:focus,.to-sel:focus{outline:none;border-color:#6c4bb6}
+  .to-sel{height:22px;border:1px solid #d4dce2;border-radius:4px;font-size:11.5px;font-family:inherit;background:#fff;color:#42505c}
+  .to-chk{display:flex;align-items:center;gap:4px;cursor:pointer;user-select:none}
+  .to-chk input{accent-color:#6c4bb6;margin:0}
+  .to-on{background:#f1ecfa;border-color:#6c4bb6;color:#6c4bb6}
+  .to-done{height:23px;padding:0 10px;border:1px solid #0d9488;border-radius:5px;background:#0d9488;color:#fff;font-family:inherit;font-size:11.5px;font-weight:600;cursor:pointer}
+  .to-done:hover{background:#0b7c72}
+  /* La chuleta de teclas: es lo que nadie descubre solo. Va SIEMPRE en su
+     propio renglón (flex-basis:100%) en vez de dejar que la barra se
+     parta por donde caiga: así mide dos líneas y no tres, que sobre un
+     lienzo estrecho es la diferencia entre una ayuda y un estorbo. */
+  .to-hint{flex-basis:100%;color:#8a97a3;font-size:10.5px;line-height:1.25;white-space:normal;
+    border-top:1px solid #f2f4f7;padding-top:3px;margin-top:1px}
+  .to-bar button:disabled,.to-bar input:disabled,.to-bar select:disabled{opacity:.45;cursor:default}
 
   .canvas-bar{position:absolute;left:0;right:0;bottom:0;height:30px;display:flex;align-items:center;gap:14px;padding:0 12px;background:#ffffffee;border-top:1px solid #e2e8ec;font-size:11.5px;color:#5a6772}
   .canvas-bar label{display:flex;align-items:center;gap:5px;cursor:pointer}
@@ -307,9 +358,9 @@
     <div class="ed-body">
       <div class="tool-rail" id="toolRail">
         <button class="tool-btn tool-active" data-tool="select" title="Seleccionar y transformar (S) — Ctrl+clic entra en el grupo, Alt+clic va bajando por las figuras superpuestas">↖</button>
-        <button class="tool-btn" data-tool="rect" title="Rectángulo (R)">▭</button>
-        <button class="tool-btn" data-tool="ellipse" title="Elipse (E)">◯</button>
-        <button class="tool-btn" data-tool="line" title="Línea (L)">╱</button>
+        <button class="tool-btn" data-tool="rect" title="Rectángulo (R) — Mayús: cuadrado, Alt: desde el centro">▭</button>
+        <button class="tool-btn" data-tool="ellipse" title="Elipse (E) — Mayús: círculo, Alt: desde el centro">◯</button>
+        <button class="tool-btn" data-tool="line" title="Línea (L) — Mayús: ángulos de 15°, Alt: desde el centro">╱</button>
         <button class="tool-btn" data-tool="text" title="Texto (T) — pulsa en el lienzo y escribe">T</button>
         <button class="tool-btn" data-tool="page" title="Tamaño del papel (P) — arrastra los bordes para recortar, como en una foto">⛶</button>
         <div class="rail-sep"></div>
@@ -343,6 +394,9 @@
 
       <div class="canvas-wrap">
         <div id="canvasHost"></div>
+        <!-- Opciones de la herramienta activa: se construye en
+             draw/tool-options.js y solo se ve al dibujar. -->
+        <div id="toolOptions" class="to-bar" style="display:none"></div>
         <div id="emptyCanvas" class="empty-canvas" style="display:none">Crea un dibujo con ＋ para empezar.</div>
         <div class="canvas-bar">
           <span id="zoomLabel">100%</span>
@@ -406,6 +460,6 @@
   </div>
 </div>
 
-<script src="colabdraw-app.js?v=202608030435"></script>
+<script src="colabdraw-app.js?v=202608110318"></script>
 </body>
 </html>

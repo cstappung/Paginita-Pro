@@ -133,6 +133,37 @@ export function createTextEditor(canvas, ctx = {}) {
   ta.style.display = "none";
   canvas.host.appendChild(ta);
 
+  /* ---------- barra de confirmar / descartar ----------
+
+     Salir de la escritura era Esc, Ctrl+Intro o pinchar fuera, y
+     ninguna de las tres se ve en ninguna parte: el informe lo decía tal
+     cual («no hay cómo poner confirmar»). Con dos botones pegados a la
+     caja, la salida se ve; los atajos siguen funcionando igual.
+
+     El `pointerdown` se corta a propósito: si el <textarea> pierde el
+     foco, su propio `blur` cierra el editor ANTES de que llegue el
+     clic, y el botón acabaría pulsándose sobre algo que ya no existe
+     —descartar habría guardado igual—. Cortándolo, el foco no se mueve
+     y el clic llega entero. */
+  const bar = document.createElement("div");
+  bar.className = "dw-text-bar";
+  bar.style.display = "none";
+  for (const ev of ["pointerdown", "mousedown"]) bar.addEventListener(ev, e => e.preventDefault());
+
+  const boton = (cls, texto, title, fn) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "dw-text-btn " + cls;
+    b.textContent = texto;
+    b.title = title;
+    b.addEventListener("click", fn);
+    bar.appendChild(b);
+    return b;
+  };
+  boton("dw-text-ok", "✓ Listo", "Guardar el texto (Esc o Ctrl+Intro)", () => close());
+  boton("dw-text-no", "✕", "Descartar los cambios", () => close({ guardar: false }));
+  canvas.host.appendChild(bar);
+
   /* Los atajos del lienzo (Supr, flechas, S/R/E/L…) no deben llegar
      mientras se escribe. Tools ya ignora los eventos que vienen de un
      TEXTAREA, pero cortarlos aquí lo deja fuera de toda duda. */
@@ -173,8 +204,16 @@ export function createTextEditor(canvas, ctx = {}) {
     ta.style.width = `${ancho}px`;
     ta.style.height = `${lineas * px * LINE_EM + 10}px`;
     // `y` es la línea BASE de la primera línea, no su borde de arriba
-    ta.style.top = `${p.y - px * 0.85}px`;
-    ta.style.left = `${anchor === "middle" ? p.x - ancho / 2 : anchor === "end" ? p.x - ancho : p.x}px`;
+    const top = p.y - px * 0.85;
+    const left = anchor === "middle" ? p.x - ancho / 2 : anchor === "end" ? p.x - ancho : p.x;
+    ta.style.top = `${top}px`;
+    ta.style.left = `${left}px`;
+
+    /* La barra va encima de la caja; si ahí no cabe (un rótulo pegado al
+       borde de arriba del lienzo), debajo. */
+    const alto = lineas * px * LINE_EM + 10;
+    bar.style.left = `${Math.max(2, left)}px`;
+    bar.style.top = `${top - 28 > 2 ? top - 28 : top + alto + 6}px`;
   }
 
   const num = (v, porDefecto) => {
@@ -202,10 +241,15 @@ export function createTextEditor(canvas, ctx = {}) {
     }
     if (nuevo) {
       const st = nuevo.style || {};
+      /* `pt` y el cuerpo de letra del rótulo pendiente vienen ya
+         traducidos al espacio de SU CAPA (ver Tools._createText), que no
+         es el del lienzo: para colocar la caja de escribir hacen falta
+         los del documento, y esos viajan aparte en `vista`. */
+      const v = nuevo.vista || null;
       return {
         dom: null, ctm: null, escala: canvas.k,
-        x: nuevo.pt.x, y: nuevo.pt.y,
-        fs: num(st["font-size"], DEFAULT_SIZE),
+        x: v ? v.pt.x : nuevo.pt.x, y: v ? v.pt.y : nuevo.pt.y,
+        fs: v ? v.fs : num(st["font-size"], DEFAULT_SIZE),
         anchor: st["text-anchor"] || "start",
         family: st["font-family"] || DEFAULT_FONT,
         weight: st["font-weight"] || "normal",
@@ -233,6 +277,7 @@ export function createTextEditor(canvas, ctx = {}) {
     target = yEl;
     ta.value = readLines(yEl).join("\n");
     ta.style.display = "block";
+    bar.style.display = "flex";
     place();
     ta.focus();
     ta.select();
@@ -246,16 +291,23 @@ export function createTextEditor(canvas, ctx = {}) {
     nuevo = spec;
     ta.value = "";
     ta.style.display = "block";
+    bar.style.display = "flex";
     place();
     ta.focus();
   }
 
-  function close() {
+  /* Cerrar guardando es lo normal (Esc, Ctrl+Intro, pinchar fuera o el
+     botón ✓). Con `guardar: false` no se escribe nada: el rótulo nuevo
+     no llega a existir y el que se estaba editando se queda como
+     estaba. */
+  function close({ guardar = true } = {}) {
     const el = target;
     const pend = nuevo;
     target = null; nuevo = null;   // antes de nada: el blur no debe reentrar
     ta.style.display = "none";
+    bar.style.display = "none";
     if (!el && !pend) return;
+    if (!guardar) { onDone(el || null); return; }
     const lines = ta.value.replace(/\r/g, "").split("\n");
     const vacio = !lines.some(l => l.trim());
     const d = getDrawing();
@@ -266,7 +318,13 @@ export function createTextEditor(canvas, ctx = {}) {
         if (!vacio) {
           salida = d.edit(() => {
             const nel = addText(d, pend.layer || null, pend.pt, pend.style || {});
-            if (nel) writeLines(nel, lines);
+            if (nel) {
+              // capa girada: el rótulo lleva la matriz de vuelta (ver
+              // Tools._espacioDeCapa). Va dentro de la MISMA transacción
+              // que su creación, o serían dos pasos de deshacer.
+              if (pend.transform) nel.setAttribute("transform", pend.transform);
+              writeLines(nel, lines);
+            }
             return nel;
           });
         }
@@ -286,6 +344,10 @@ export function createTextEditor(canvas, ctx = {}) {
     isOpen: () => !!target || !!nuevo,
     target: () => target,
     reposition: place,
-    destroy() { target = null; nuevo = null; if (ta.parentNode) ta.parentNode.removeChild(ta); }
+    destroy() {
+      target = null; nuevo = null;
+      if (ta.parentNode) ta.parentNode.removeChild(ta);
+      if (bar.parentNode) bar.parentNode.removeChild(bar);
+    }
   };
 }

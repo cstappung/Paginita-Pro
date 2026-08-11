@@ -22,6 +22,7 @@ import { svgToFragment } from "./draw/svgio.js";
 import { Canvas } from "./draw/canvas.js";
 import { Tools } from "./draw/tools.js";
 import { createStylePanel } from "./draw/style.js";
+import { createToolOptions } from "./draw/tool-options.js";
 import { createObjectPanel } from "./draw/layers.js";
 import { createTextEditor } from "./draw/text.js";
 import { createAssetPreview, extOf } from "./draw/preview.js";
@@ -49,6 +50,7 @@ const state = {
   canvas: null,
   tools: null,
   style: null,
+  toolOpts: null,      // barra de opciones de la herramienta activa
   layers: null,        // árbol de objetos (creado en ensureEditorParts)
   textEd: null,        // editor de texto flotante
   assetView: null,     // vista de un archivo generado
@@ -336,6 +338,8 @@ function ensureEditorParts() {
        también tiene que enterarse de lo que se selecciona en el lienzo. */
     onSelectionChange: () => {
       if (state.style) state.style.refresh();
+      // pintar algo también cambia lo que usará la próxima figura
+      if (state.toolOpts) state.toolOpts.render();
       if (state.layers) state.layers.render();
     },
     getLayer: () => (state.drawing ? state.drawing.activeLayer(state.activeLayerId) : null),
@@ -348,9 +352,10 @@ function ensureEditorParts() {
         b.classList.toggle("tool-active", b.dataset.tool === name));
       // la sección TEXTO del panel aparece con la herramienta en la mano
       if (state.style) state.style.refresh();
-      $("statusMsg").textContent = name === "page"
-        ? "Arrastra los bordes o las esquinas para recortar el papel; por dentro, para moverlo. Esc para salir."
-        : "";
+      /* Lo que antes se explicaba en la barra de estado lo dice ahora la
+         barra de opciones, que está donde se mira: encima del lienzo. */
+      if (state.toolOpts) state.toolOpts.render();
+      $("statusMsg").textContent = "";
     }
   });
   state.style = createStylePanel($("stylePanel"), {
@@ -363,13 +368,22 @@ function ensureEditorParts() {
     canWrite,
     onApply: attrs => state.tools.applyStyle(attrs),
     onOrder: mode => state.tools.reorder(mode),
-    onPage: (w, h) => {
-      if (!state.drawing) return;
-      state.drawing.setSize(w, h);
-      state.canvas.refreshPage();
-      state.tools.redrawOverlay();     // el marco de recorte sigue al papel
-      state.style.refresh();
-    }
+    onPage: setPageSize
+  });
+  /* La barra de la herramienta activa: flota sobre el lienzo y solo
+     aparece con una herramienta de dibujo en la mano. */
+  state.toolOpts = createToolOptions($("toolOptions"), {
+    getTool: () => (state.tools ? state.tools.tool : "select"),
+    getStyle: () => (state.tools ? state.tools.style : {}),
+    getTextStyle: () => (state.tools ? state.tools.textStyle : {}),
+    getCrear: () => (state.tools ? state.tools.crear : {}),
+    setCrear: o => { if (state.tools) state.tools.setCrear(o); },
+    getScale: () => (state.tools ? state.tools.selectionScale() : 1),
+    canWrite,
+    onApply: attrs => state.tools.applyStyle(attrs),
+    getPage: () => (state.drawing ? state.drawing.size() : { w: 0, h: 0 }),
+    onPage: setPageSize,
+    onExit: () => { if (state.tools) state.tools.setTool("select"); }
   });
   state.assetView = createAssetPreview($("canvasHost").parentNode, {
     onClose: () => { state.openAsset = null; renderFileList(); },
@@ -396,6 +410,17 @@ function ensureEditorParts() {
       state.style.refresh();
     }
   });
+}
+
+/* El tamaño del papel se pide desde dos sitios (el panel de la derecha y
+   la barra de la herramienta ⛶) y las dos tienen que enterarse. */
+function setPageSize(w, h) {
+  if (!state.drawing) return;
+  state.drawing.setSize(w, h);
+  state.canvas.refreshPage();
+  state.tools.redrawOverlay();       // el marco de recorte sigue al papel
+  state.style.refresh();
+  if (state.toolOpts) state.toolOpts.render();
 }
 
 function onViewChange() {
@@ -554,6 +579,7 @@ function openDrawing(path) {
   state.activeLayerId = null;      // cada dibujo trae sus propias capas
   state.layers.render();
   state.style.refresh();
+  state.toolOpts.render();         // el papel de este dibujo, no el del anterior
   paintUndoButtons();
 }
 
