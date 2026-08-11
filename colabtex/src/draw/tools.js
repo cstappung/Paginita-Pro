@@ -18,6 +18,7 @@ import {
 import { DEFAULT_CAP, DEFAULT_JOIN, capAttr, joinAttr } from "./stroke.js";
 import { SVG_NS, newId } from "./doc.js";
 import { addText, isText, TEXT_ATTRS, DEFAULT_FONT, DEFAULT_SIZE } from "./text.js";
+import { esFormula } from "./latex.js";
 import { clipboardSvg, textToNodes } from "./svgio.js";
 
 const svgEl = tag => document.createElementNS(SVG_NS, tag);
@@ -69,6 +70,9 @@ export class Tools {
     /* Escribir un texto es abrir el editor de texto, que vive fuera de
        aquí porque es un <textarea> encima del lienzo. */
     this.onEditText = opts.onEditText || (() => {});
+    /* Una fórmula se escribe en su propio cuadro (draw-main lo abre):
+       con elemento se corrige la que hay, sin él se pone una nueva. */
+    this.onEditFormula = opts.onEditFormula || (() => {});
     this.style = Object.assign({
       fill: "#cfe3ff", stroke: "#1f2933", "stroke-width": 0.4, opacity: 1,
       "stroke-linecap": DEFAULT_CAP, "stroke-linejoin": DEFAULT_JOIN,
@@ -238,7 +242,8 @@ export class Tools {
   setTool(name) {
     this.tool = name;
     this.canvas.view.style.cursor =
-      name === "select" ? "default" : name === "text" ? "text" : name === "page" ? "move" : "crosshair";
+      name === "select" ? "default" : name === "text" ? "text"
+        : name === "page" ? "move" : "crosshair";
     /* El recuadro de recorte del papel sustituye al de la selección
        mientras dure el modo, así que hay que repintar la capa de encima. */
     if (name === "page") this.clear();
@@ -623,7 +628,28 @@ export class Tools {
     });
   }
 
+  /* Antes de nada, si el foco está en un campo de los paneles se le
+     quita. Parece un detalle y era EL fallo de «editar un texto ya
+     puesto no hace nada»: los campos de número (Cuerpo, Grosor…)
+     confirman con `change`, o sea al salir del campo, y el pointerdown
+     del lienzo llama a preventDefault(), que impide justamente eso. Así
+     que se escribía «12» en Cuerpo, se pinchaba en el dibujo para
+     verlo… y el campo ni confirmaba (seguía teniendo el foco) ni servía
+     ya de nada (la selección se acababa de vaciar): el rótulo se
+     quedaba igual y el panel parecía roto.
+
+     Soltar el foco aquí dispara su `change` MIENTRAS la selección sigue
+     puesta, y de propina devuelve el teclado al lienzo: con el cursor
+     dentro de un <input>, la S, la R o la L no llegaban a Tools. */
+  _soltarFoco() {
+    const a = document.activeElement;
+    if (!a || a === document.body) return;
+    const t = a.tagName;
+    if (t === "INPUT" || t === "SELECT" || t === "TEXTAREA") a.blur();
+  }
+
   _pointerDown(e) {
+    this._soltarFoco();
     if (e.button === 1 || this._spaceDown || (e.button === 0 && this.tool === "pan")) {
       this.drag = { mode: "pan", lastX: e.clientX, lastY: e.clientY };
       this.canvas.view.setPointerCapture(e.pointerId);
@@ -668,6 +694,18 @@ export class Tools {
       if (!this.canWrite()) return;
       e.preventDefault();
       this._createText(this.canvas.toDoc(e.clientX, e.clientY));
+      return;
+    }
+
+    /* La fórmula, igual que el rótulo, no se crea al pulsar: se abre su
+       cuadro y solo nace si se acepta con algo escrito. */
+    if (this.tool === "formula") {
+      if (!this.canWrite()) return;
+      e.preventDefault();
+      const p = this.canvas.toDoc(e.clientX, e.clientY);
+      const step = this.canvas.snapStep();
+      this.setTool("select");
+      this.onEditFormula(null, { pt: step ? { x: snapValue(p.x, step), y: snapValue(p.y, step) } : p });
       return;
     }
 
@@ -725,10 +763,10 @@ export class Tools {
     }
     const additive = e.shiftKey;
     if (hit) {
-      if (doble && isText(hit) && this.canWrite()) {
+      if (doble && this.canWrite() && (isText(hit) || esFormula(hit))) {
         e.preventDefault();
         this.select(hit);
-        this.onEditText(hit);
+        if (esFormula(hit)) this.onEditFormula(hit); else this.onEditText(hit);
         return;
       }
       if (additive) this.select(hit, { add: true });
@@ -1127,7 +1165,15 @@ export class Tools {
   ungroup() {
     const d = this.getDrawing();
     if (!d || !this.sel.length || !this.canWrite()) return;
-    const freed = d.ungroup(this.sel.filter(e => e.nodeName === "g"));
+    /* Una fórmula también es un <g>, pero desagruparla la convertiría en
+       un montón de trazos sueltos y se llevaría por delante su LaTeX:
+       dejaría de poder corregirse para siempre. */
+    const grupos = this.sel.filter(e => e.nodeName === "g" && !esFormula(e));
+    if (!grupos.length && this.sel.some(esFormula)) {
+      this.onStatus("Una fórmula no se desagrupa: ábrela con doble clic para corregirla.");
+      return;
+    }
+    const freed = d.ungroup(grupos);
     if (freed && freed.length) this.select(freed);
   }
 
@@ -1189,11 +1235,12 @@ export class Tools {
       return;
     }
 
-    // con un texto elegido, Intro (o F2) entra a escribirlo
-    if ((e.key === "Enter" || e.key === "F2") && this.sel.length === 1 &&
-        isText(this.sel[0]) && this.canWrite()) {
+    // con un texto (o una fórmula) elegido, Intro o F2 entra a escribirlo
+    if ((e.key === "Enter" || e.key === "F2") && this.sel.length === 1 && this.canWrite() &&
+        (isText(this.sel[0]) || esFormula(this.sel[0]))) {
       e.preventDefault();
-      this.onEditText(this.sel[0]);
+      if (esFormula(this.sel[0])) this.onEditFormula(this.sel[0]);
+      else this.onEditText(this.sel[0]);
       return;
     }
 
@@ -1214,7 +1261,7 @@ export class Tools {
 
     // atajos de herramienta, como en Inkscape
     if (!mod && !e.altKey) {
-      const map = { s: "select", r: "rect", e: "ellipse", l: "line", t: "text", p: "page" };
+      const map = { s: "select", r: "rect", e: "ellipse", l: "line", t: "text", f: "formula", p: "page" };
       const name = map[e.key.toLowerCase()];
       if (name) { this.setTool(name); return; }
       if (e.key === "3") { this.canvas.fitPage(); this.redrawOverlay(); }

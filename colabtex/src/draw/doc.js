@@ -266,6 +266,19 @@ export class Drawing {
     return !!layer && layer.getAttribute("data-locked") === "1";
   }
 
+  /* La invisibilidad se hereda igual que el candado: si la capa está
+     oculta, lo de dentro tampoco se ve aunque su propio `display` no
+     diga nada. Devuelve QUIÉN lo impone, que es lo que el panel de
+     objetos necesita para poder decirlo con nombre y apellidos. */
+  hiddenAncestor(el) {
+    let n = el;
+    while (n && typeof n.getAttribute === "function") {
+      if (n.getAttribute("display") === "none") return n;
+      n = n.parent;
+    }
+    return null;
+  }
+
   /* El candado se hereda: bloquear un grupo bloquea lo que lleva dentro,
      como en Inkscape. Devuelve el nodo que lo impone, para poder decir
      cuál es. */

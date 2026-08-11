@@ -28,6 +28,23 @@ const el = (tag, cls, html) => {
   return n;
 };
 
+/* ¿Está la persona escribiendo justo en este campo? Se usa para no
+   pisarle lo que teclea al refrescar el panel. */
+const enUso = n => document.activeElement === n;
+
+/* Un campo de número aplica al confirmar (`change`, o sea al salir) Y
+   sin salir, un poco después de dejar de teclear. Lo segundo no es
+   comodidad: el sitio natural al que se sale de este panel es el
+   dibujo, y el lienzo corta el pointerdown, así que el campo se quedaba
+   con el foco, no confirmaba nunca y encima la selección ya se había
+   vaciado — el cambio se perdía entero. Tools._soltarFoco() arregla ese
+   camino; esto hace que ni siquiera haga falta recorrerlo. */
+const alTeclear = (input, fn, ms = 350) => {
+  let t = null;
+  input.addEventListener("input", () => { clearTimeout(t); t = setTimeout(fn, ms); });
+  input.addEventListener("change", () => { clearTimeout(t); fn(); });
+};
+
 /* Valor efectivo de una propiedad en un elemento: manda el `style`, luego
    el atributo. Leer solo el atributo era mentir — una figura importada
    lleva el color en `style="fill:#ff0000"` y el panel enseñaba negro
@@ -127,12 +144,12 @@ export function createStylePanel(host, opts = {}) {
   widthInput.type = "number";
   widthInput.id = "dwStrokeWidth";
   widthInput.min = "0"; widthInput.step = "0.1";
-  widthInput.onchange = () => {
+  alTeclear(widthInput, () => {
     const v = parseFloat(widthInput.value);
     if (!isFinite(v) || v < 0) return;
     const k = getScale() || 1;
     apply({ "stroke-width": Math.round((v / k) * 10000) / 10000 });
-  };
+  });
   widthRow.append(widthInput, el("span", "dw-unit", "mm"));
 
   const dashRow = el("div", "dw-row");
@@ -199,10 +216,10 @@ export function createStylePanel(host, opts = {}) {
   sizeInput.type = "number";
   sizeInput.id = "dwFontSize";
   sizeInput.min = "0.5"; sizeInput.step = "0.5";
-  sizeInput.onchange = () => {
+  alTeclear(sizeInput, () => {
     const v = parseFloat(sizeInput.value);
     if (isFinite(v) && v > 0) apply({ "font-size": v });
-  };
+  });
   sizeRow.append(sizeInput, el("span", "dw-unit", "mm"));
 
   const fxRow = el("div", "dw-btns");
@@ -275,7 +292,7 @@ export function createStylePanel(host, opts = {}) {
     const w = parseFloat(pw.value), h = parseFloat(ph.value);
     if (w > 0 && h > 0) onPage(w, h);
   };
-  pw.onchange = commitPage; ph.onchange = commitPage;
+  alTeclear(pw, commitPage); alTeclear(ph, commitPage);
   pageRow.append(pw, el("span", "dw-unit", "×"), ph, el("span", "dw-unit", "mm"));
   secPage.appendChild(pageRow);
 
@@ -305,7 +322,9 @@ export function createStylePanel(host, opts = {}) {
     paintColor(fillInput, fillLabel, fill);
     paintColor(strokeInput, strokeLabel, stroke);
     const k = sel.length ? (getScale() || 1) : 1;
-    widthInput.value = width == null ? "" : String(Math.round((parseFloat(width) || 0) * k * 100) / 100);
+    // nunca se le pisa a nadie lo que está escribiendo
+    if (!enUso(widthInput))
+      widthInput.value = width == null ? "" : String(Math.round((parseFloat(width) || 0) * k * 100) / 100);
     widthInput.placeholder = width == null ? "varios" : "";
     dashSel.value = dash == null ? "" : String(dash);
     // «varios»: ninguna opción marcada, en vez de mentir con la primera
@@ -322,8 +341,8 @@ export function createStylePanel(host, opts = {}) {
     refreshText(sel, ro);
 
     const page = getPage();
-    if (document.activeElement !== pw) pw.value = String(Math.round(page.w * 10) / 10 || "");
-    if (document.activeElement !== ph) ph.value = String(Math.round(page.h * 10) / 10 || "");
+    if (!enUso(pw)) pw.value = String(Math.round(page.w * 10) / 10 || "");
+    if (!enUso(ph)) ph.value = String(Math.round(page.h * 10) / 10 || "");
   }
 
   function refreshText(sel, ro) {
@@ -344,7 +363,8 @@ export function createStylePanel(host, opts = {}) {
     if (!fontSel.value) fontSel.selectedIndex = -1;      // «varios»: ninguna marcada
 
     const size = val("font-size", String(DEFAULT_SIZE));
-    sizeInput.value = size == null ? "" : String(parseFloat(size) || DEFAULT_SIZE);
+    if (!enUso(sizeInput))
+      sizeInput.value = size == null ? "" : String(parseFloat(size) || DEFAULT_SIZE);
     sizeInput.placeholder = size == null ? "varios" : "";
 
     const peso = val("font-weight", "normal");

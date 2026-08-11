@@ -21,6 +21,8 @@
    ============================================================ */
 import { matMul, matInvert, matToString, parseTransform } from "./geom.js";
 import { elChildren, indexOf, childrenOf } from "./doc.js";
+import { esFormula } from "./latex.js";
+import { readLines } from "./text.js";
 
 const el = (tag, cls, html) => {
   const n = document.createElement(tag);
@@ -29,15 +31,104 @@ const el = (tag, cls, html) => {
   return n;
 };
 
+/* ---------- iconos ----------
+
+   Dibujados, no emoji. Un 👁 y un 🔒 los pinta cada sistema a su manera
+   —de colores, de otro tamaño y desalineados entre sí—, que es media
+   razón por la que este panel se veía casero. Estos son SVG de trazo
+   que heredan el color del texto, así que el ojo tachado se pone gris
+   con su fila y el candado cerrado se pone ámbar sin más CSS. */
+const ico = d =>
+  `<svg viewBox="0 0 16 16" class="li" aria-hidden="true">${d}</svg>`;
+
+const TRAZO = 'fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"';
+
+const ICONOS = {
+  desplegar: ico(`<path d="M6 3.5L10.5 8L6 12.5" ${TRAZO}/>`),
+  ojo: ico(`<path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z" ${TRAZO}/><circle cx="8" cy="8" r="2" ${TRAZO}/>`),
+  ojoTachado: ico(`<path d="M2.5 5.5C1.9 6.4 1.5 8 1.5 8S4 12.5 8 12.5c1 0 1.9-.2 2.7-.6M6.2 3.8C6.8 3.6 7.4 3.5 8 3.5c4 0 6.5 4.5 6.5 4.5s-.6 1.1-1.7 2.2" ${TRAZO}/><path d="M2 2l12 12" ${TRAZO}/>`),
+  candadoAbierto: ico(`<rect x="3.5" y="7.5" width="9" height="6.5" rx="1.2" ${TRAZO}/><path d="M5.8 7.5V5.2a2.2 2.2 0 014.4-.3" ${TRAZO}/>`),
+  candadoCerrado: ico(`<rect x="3.5" y="7.5" width="9" height="6.5" rx="1.2" ${TRAZO}/><path d="M5.8 7.5V5.2a2.2 2.2 0 014.4 0v2.3" ${TRAZO}/>`),
+  capa: ico(`<path d="M8 1.8l6 3-6 3-6-3 6-3z" ${TRAZO}/><path d="M2.4 8.2L8 11l5.6-2.8M2.4 11.2L8 14l5.6-2.8" ${TRAZO}/>`),
+  grupo: ico(`<rect x="1.8" y="1.8" width="12.4" height="12.4" rx="1.4" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2.6 2"/><rect x="4.2" y="4.2" width="4" height="4" rx=".6" ${TRAZO}/><rect x="8" y="8" width="4" height="4" rx=".6" ${TRAZO}/>`),
+  rect: ico(`<rect x="2.5" y="3.5" width="11" height="9" rx="1" ${TRAZO}/>`),
+  elipse: ico(`<ellipse cx="8" cy="8" rx="5.6" ry="4.4" ${TRAZO}/>`),
+  linea: ico(`<path d="M3 13L13 3" ${TRAZO}/><circle cx="3" cy="13" r="1.4" ${TRAZO}/><circle cx="13" cy="3" r="1.4" ${TRAZO}/>`),
+  curva: ico(`<path d="M2 12C4.5 4 11 12 14 4" ${TRAZO}/>`),
+  imagen: ico(`<rect x="2" y="3" width="12" height="10" rx="1.2" ${TRAZO}/><circle cx="5.8" cy="6.4" r="1.1" ${TRAZO}/><path d="M3 12l3.4-3.2 2.3 2 2.2-2.3L14 11.4" ${TRAZO}/>`),
+  otro: ico(`<circle cx="8" cy="8" r="3" ${TRAZO}/>`)
+};
+
+/* Un glifo para lo que se nombra mejor con una letra que con un dibujo. */
+const glifo = txt => `<span class="li-glifo">${txt}</span>`;
+
+const POR_ETIQUETA = {
+  rect: ICONOS.rect, circle: ICONOS.elipse, ellipse: ICONOS.elipse,
+  line: ICONOS.linea, polyline: ICONOS.curva, polygon: ICONOS.curva,
+  path: ICONOS.curva, image: ICONOS.imagen, use: ICONOS.otro
+};
+
+function iconoDe(node, esCapa) {
+  if (esCapa) return ICONOS.capa;
+  if (esFormula(node)) return glifo("∑");
+  const t = node.nodeName;
+  if (t === "text") return glifo("T");
+  if (t === "g") return ICONOS.grupo;
+  return POR_ETIQUETA[t] || ICONOS.otro;
+}
+
+/* ---------- cómo se llama cada fila ----------
+
+   `labelOf` acaba cayendo en el `id`, y un id es «ewxwgvzb»: una lista
+   de eso no dice absolutamente nada de lo que hay en el dibujo. Aquí se
+   nombra por lo que la cosa ES —«Rectángulo», «Grupo (3)»— y, cuando
+   tiene contenido, POR SU CONTENIDO: un rótulo se llama como lo que
+   pone en él y una fórmula como su LaTeX, que es como los enseña
+   Inkscape y como se buscan con la vista. */
+const NOMBRES = {
+  rect: "Rectángulo", circle: "Círculo", ellipse: "Elipse", line: "Línea",
+  polyline: "Polilínea", polygon: "Polígono", path: "Trazado",
+  image: "Imagen", use: "Copia", svg: "Dibujo"
+};
+
+const recorta = (s, n) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
+
+function nombreDe(node, esCapa) {
+  const propio = node.getAttribute("data-layer") || node.getAttribute("data-label");
+  if (propio) return esCapa ? propio : recorta(propio, 30);
+  const t = node.nodeName;
+  if (t === "text") {
+    const texto = readLines(node).join(" ").trim();
+    return texto ? recorta(texto, 30) : "Texto vacío";
+  }
+  if (t === "g") {
+    const n = hijosDe(node).length;
+    return `Grupo (${n})`;
+  }
+  return NOMBRES[t] || t;
+}
+
 /* Lo que no se dibuja no sale en el árbol: definiciones, estilos y
    metadatos llenarían la lista de filas que no se pueden ni ver ni
    seleccionar. */
 const OCULTOS = new Set([
   "defs", "style", "title", "desc", "metadata", "clipPath", "mask",
-  "marker", "linearGradient", "radialGradient", "pattern", "symbol"
+  "marker", "linearGradient", "radialGradient", "pattern", "symbol",
+  // un <tspan> es una línea de un rótulo, no un objeto que se pueda
+  // elegir ni mover: en la lista solo era una fila muerta por línea
+  "tspan", "textPath"
 ]);
 
 const pintable = n => n && n.nodeName && !OCULTOS.has(n.nodeName);
+
+/* Hay cosas que se cuentan como UNA. Una fórmula son decenas de <path>
+   y de grupos que MathJax organiza a su manera, y un rótulo son sus
+   líneas: abrir eso en el árbol es enterrar el dibujo entero bajo la
+   tripa de una sola figura, y ahí dentro no hay nada que se pueda
+   seleccionar por su cuenta. */
+const esHoja = n => !n || n.nodeName === "text" || esFormula(n);
+
+const hijosDe = node => (esHoja(node) ? [] : elChildren(node).filter(pintable));
 
 /* Clave estable de un nodo, para recordar qué ramas están desplegadas.
    El id es lo mejor (sobrevive a los clonados que hacen falta para
@@ -114,21 +205,43 @@ export function createObjectPanel(host, ctx) {
     if (estado.primera) estado.primera.scrollIntoView({ block: "nearest" });
   }
 
+  /* Una fila, al estilo del panel «Objetos» de Inkscape:
+
+       [sangría][▸][icono] Nombre ......................... [👁][🔒]
+
+     Lo que se ve tiene que decir el estado COMPLETO, no solo el propio:
+     una figura dentro de una capa oculta no se ve, y una dentro de un
+     grupo bloqueado no se puede tocar, aunque ellas no tengan puesto
+     nada. Antes esas filas se pintaban como cualquier otra y la única
+     manera de enterarse era pinchar y ver que no pasaba nada. Ahora el
+     icono heredado sale a media tinta y dice de quién viene. */
   function fila(node, nivel, estado) {
     const { d, sel, activa, rw } = estado;
     const clave = claveDe(node);
-    const hijos = elChildren(node).filter(pintable);
+    const hijos = hijosDe(node);
     const abierto = abiertos.has(clave);
     const esCapa = node.getAttribute("data-layer") != null;
     const elegido = sel.has(node);
 
+    const oculto = !d.layerVisible(node);
+    const bloq = d.layerLocked(node);
+    const ocultaOtro = oculto ? null : d.hiddenAncestor(node.parent);
+    const bloqueaOtro = bloq ? null : d.lockedAncestor(node.parent);
+
     const row = el("div", "layer-row" +
+      (esCapa ? " layer-capa" : "") +
       (esCapa && node === activa ? " layer-active" : "") +
-      (elegido ? " layer-sel" : ""));
-    row.style.paddingLeft = `${6 + nivel * 13}px`;
+      (elegido ? " layer-sel" : "") +
+      /* El estado PROPIO se marca fuerte y el heredado flojo: si no,
+         una capa bloqueada con veinte figuras dentro pinta veintiuna
+         filas a rayas y ya no se distingue quién manda. */
+      (oculto ? " layer-oculto" : ocultaOtro ? " layer-oculto-h" : "") +
+      (bloq ? " layer-bloqueado" : bloqueaOtro ? " layer-bloqueado-h" : ""));
+    row.style.paddingLeft = `${4 + nivel * 14}px`;
     if (elegido && !estado.primera) estado.primera = row;
 
-    const exp = el("button", "layer-ico layer-exp", hijos.length ? (abierto ? "▾" : "▸") : "");
+    const exp = el("button", "layer-exp" + (abierto ? " abierto" : ""),
+      hijos.length ? ICONOS.desplegar : "");
     exp.title = hijos.length ? (abierto ? "Plegar" : "Desplegar") : "";
     exp.disabled = !hijos.length;
     exp.onclick = ev => {
@@ -137,20 +250,11 @@ export function createObjectPanel(host, ctx) {
       render();
     };
 
-    const visible = d.layerVisible(node);
-    const eye = el("button", "layer-ico", visible ? "👁" : "🚫");
-    eye.title = visible ? "Ocultar" : "Mostrar";
-    eye.disabled = !rw;
-    eye.onclick = ev => { ev.stopPropagation(); d.setLayerVisible(node, !visible); onChange(); };
-
-    const bloq = d.layerLocked(node);
-    const lock = el("button", "layer-ico", bloq ? "🔒" : "🔓");
-    lock.title = bloq ? "Desbloquear" : "Bloquear";
-    lock.disabled = !rw;
-    lock.onclick = ev => { ev.stopPropagation(); d.setLayerLocked(node, !bloq); onChange(); };
+    const tipo = el("span", "layer-tipo", iconoDe(node, esCapa));
+    tipo.title = esCapa ? "Capa" : `<${node.nodeName}>`;
 
     const name = el("span", "layer-name" + (esCapa ? " layer-name-capa" : ""));
-    name.textContent = d.labelOf(node);
+    name.textContent = nombreDe(node, esCapa);
     name.title = `<${node.nodeName}> — doble clic para renombrar`;
     name.ondblclick = ev => {
       ev.stopPropagation();
@@ -161,7 +265,36 @@ export function createObjectPanel(host, ctx) {
       onChange();
     };
 
-    row.append(exp, eye, lock, name);
+    /* Marca de la capa donde caerá lo próximo que se dibuje. Va FUERA
+       del nombre: dentro se pegaba a él («Anotacionesactiva») y encima
+       se lo comía el recorte por puntos suspensivos. */
+    let chip = null;
+    if (esCapa && node === activa) {
+      chip = el("span", "layer-activa-chip", "activa");
+      chip.title = "Lo que dibujes irá a esta capa";
+    }
+
+    const eye = el("button", "layer-ico layer-ojo" +
+      (oculto ? " apagado" : "") + (ocultaOtro ? " heredado" : ""),
+      oculto || ocultaOtro ? ICONOS.ojoTachado : ICONOS.ojo);
+    eye.title = oculto ? "Está oculto — pulsa para mostrarlo"
+      : ocultaOtro ? `No se ve: «${nombreDe(ocultaOtro)}» está oculta`
+        : "Ocultar";
+    eye.disabled = !rw;
+    eye.onclick = ev => { ev.stopPropagation(); d.setLayerVisible(node, oculto); onChange(); };
+
+    const lock = el("button", "layer-ico layer-candado" +
+      (bloq ? " echado" : "") + (bloqueaOtro ? " heredado" : ""),
+      bloq || bloqueaOtro ? ICONOS.candadoCerrado : ICONOS.candadoAbierto);
+    lock.title = bloq ? "Está bloqueado — pulsa para desbloquearlo"
+      : bloqueaOtro ? `Bloqueado por «${nombreDe(bloqueaOtro)}»`
+        : "Bloquear";
+    lock.disabled = !rw;
+    lock.onclick = ev => { ev.stopPropagation(); d.setLayerLocked(node, !bloq); onChange(); };
+
+    row.append(exp, tipo, name);
+    if (chip) row.appendChild(chip);
+    row.append(eye, lock);
     /* Pulsar una capa la hace la activa (es donde irá lo que se dibuje);
        pulsar cualquier otra cosa la selecciona en el lienzo. */
     row.onclick = ev => {
@@ -206,8 +339,16 @@ export function createObjectPanel(host, ctx) {
     const esCapaOrigen = node.getAttribute("data-layer") != null;
     if (esCapaOrigen) return parent === raiz;
     if (parent === raiz) return false;
+    if (esFormula(parent)) return false;      // ver admiteHijos
     return parent.nodeName === "g" || parent.nodeName === "svg";
   }
+
+  /* Una fórmula ES un <g>, pero por dentro es de MathJax: meterle algo
+     ahí lo borraría la próxima vez que se corrija el LaTeX, porque
+     reescribirla sustituye el grupo entero. Se trata como una figura
+     cerrada, igual que en el árbol. */
+  const admiteHijos = (node, esCapa) =>
+    esCapa || (node.nodeName === "g" && !esFormula(node));
 
   function arrastrable(row, node, esCapa, estado) {
     const { d } = estado;
@@ -228,7 +369,7 @@ export function createObjectPanel(host, ctx) {
 
     row.addEventListener("dragover", ev => {
       if (!arrastrado || arrastrado === node) return;
-      const contenedor = esCapa || node.nodeName === "g";
+      const contenedor = admiteHijos(node, esCapa);
       const zona = zonaDe(ev, row, contenedor);
       const parent = zona === "dentro" ? node : node.parent;
       if (!admite(d, arrastrado, parent)) return;
@@ -247,7 +388,7 @@ export function createObjectPanel(host, ctx) {
       const movido = arrastrado;
       arrastrado = null;
       if (!movido || movido === node) return;
-      const contenedor = esCapa || node.nodeName === "g";
+      const contenedor = admiteHijos(node, esCapa);
       const zona = zonaDe(ev, row, contenedor);
       const parent = zona === "dentro" ? node : node.parent;
       if (!admite(d, movido, parent)) return;

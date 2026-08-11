@@ -105,20 +105,64 @@
   .dw-item .file-act:hover{color:#6c4bb6}
   .dw-item .file-del:hover{color:#c0392b}
 
-  /* --- árbol de objetos --- */
+  /* --- árbol de objetos (draw/layers.js) ---
+     Al estilo del panel «Objetos» de Inkscape: sangría por nivel, icono
+     del tipo, nombre, y el ojo y el candado alineados a la derecha en
+     su propia columna. Los iconos son SVG de trazo y heredan el color
+     del texto, así que basta con pintar la fila para que todo (icono
+     incluido) diga lo mismo. */
   #layerPanel{flex:1;overflow:auto;min-height:80px}
-  .layer-list{display:flex;flex-direction:column;padding:3px 0}
-  .layer-row{display:flex;align-items:center;gap:4px;padding:2px 8px 2px 6px;font-size:12px;color:#42505c;cursor:pointer;white-space:nowrap}
+  .layer-list{display:flex;flex-direction:column;padding:2px 0}
+  .layer-row{display:flex;align-items:center;gap:5px;padding:0 4px 0 6px;height:23px;
+    font-size:12px;color:#42505c;cursor:pointer;white-space:nowrap;position:relative}
   .layer-row:hover{background:#f5f2fb}
   .layer-row.layer-sel{background:#e9e0fb;color:#4f3a86}
-  .layer-row.layer-active{background:#f1ecfa;color:#6c4bb6;font-weight:600}
-  .layer-ico{border:none;background:transparent;cursor:pointer;font-size:10.5px;padding:0 1px;line-height:1;opacity:.75;flex-shrink:0}
-  .layer-ico:hover{opacity:1}
-  .layer-ico:disabled{opacity:.3;cursor:default}
-  .layer-exp{width:12px;color:#8a97a3;opacity:1}
-  .layer-exp:disabled{opacity:0}
-  .layer-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;font-family:'IBM Plex Mono',monospace;font-size:11px}
-  .layer-name-capa{font-family:inherit;font-size:12px}
+  .layer-row.layer-sel .layer-name{font-weight:600}
+  /* una capa pesa más que una figura: fondo propio y letra normal */
+  .layer-row.layer-capa{background:#fafbfc;border-top:1px solid #f0f2f5;height:25px}
+  .layer-row.layer-capa:hover{background:#f5f2fb}
+  /* la capa ACTIVA es donde caerá lo próximo que se dibuje: barra lateral
+     y color de marca, como el resaltado de Inkscape */
+  .layer-row.layer-active{background:#f1ecfa;color:#6c4bb6}
+  .layer-row.layer-active::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:#6c4bb6}
+  .layer-activa-chip{margin-left:6px;font-size:9px;font-weight:600;letter-spacing:.04em;
+    text-transform:uppercase;color:#6c4bb6;background:#e5dbf8;border-radius:99px;padding:1px 5px}
+
+  .li{width:14px;height:14px;display:block}
+  .layer-exp{width:14px;height:14px;flex-shrink:0;border:none;background:transparent;padding:0;
+    color:#98a4b0;cursor:pointer;display:grid;place-items:center;transition:transform .12s}
+  .layer-exp.abierto{transform:rotate(90deg)}
+  .layer-exp:disabled{opacity:0;cursor:default}
+  .layer-tipo{width:15px;flex-shrink:0;color:#7d8b99;display:grid;place-items:center}
+  .layer-row.layer-capa .layer-tipo{color:#6c4bb6}
+  .layer-glifo,.li-glifo{font-size:11px;font-weight:700;line-height:1;font-family:'IBM Plex Mono',monospace}
+  .layer-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;
+    font-family:'IBM Plex Mono',monospace;font-size:11px}
+  .layer-name-capa{font-family:inherit;font-size:12px;font-weight:600}
+  .layer-ico{border:none;background:transparent;cursor:pointer;padding:1px;border-radius:4px;
+    color:#aab4be;flex-shrink:0;display:grid;place-items:center}
+  .layer-ico:hover{background:#ffffffcc;color:#42505c}
+  .layer-ico:disabled{opacity:.35;cursor:default}
+  /* El ojo y el candado solo se ven de lejos cuando DICEN algo: apagados
+     casi no se notan, encendidos son inconfundibles. */
+  .layer-ojo.apagado{color:#c0392b}
+  .layer-candado.echado{color:#d98324}
+  /* Heredado: el estado no es suyo, viene de la capa o del grupo de
+     arriba. Media tinta y el título explica de quién. */
+  .layer-ico.heredado{color:#c8ced5;opacity:.9}
+
+  /* Oculto y bloqueado, con dos intensidades: la fuerte para quien lo
+     tiene puesto y la floja para quien solo lo hereda de su capa o de su
+     grupo. Las rayas en diagonal no se confunden con el resaltado de
+     «seleccionado», que es un fondo liso. */
+  .layer-row.layer-oculto,.layer-row.layer-oculto-h{color:#a9b3bd}
+  .layer-row.layer-oculto .layer-name{font-style:italic;text-decoration:line-through;text-decoration-color:#c8ced5}
+  .layer-row.layer-oculto-h .layer-name{font-style:italic}
+  .layer-row.layer-oculto .layer-tipo,.layer-row.layer-oculto-h .layer-tipo{opacity:.45}
+  .layer-row.layer-bloqueado{background-image:repeating-linear-gradient(135deg,#f8ecd9 0 5px,transparent 5px 11px)}
+  .layer-row.layer-bloqueado-h{background-color:#fdfaf5}
+  .layer-row.layer-bloqueado.layer-sel{background-image:repeating-linear-gradient(135deg,#efe1f4 0 5px,transparent 5px 11px)}
+
   .layer-row[draggable=true]{cursor:grab}
   .layer-dragging{opacity:.45}
   /* dónde va a caer: una línea arriba o abajo, o el grupo entero marcado */
@@ -268,6 +312,27 @@
   .member-row{display:flex;align-items:center;gap:8px;font-size:12.5px;padding:5px 0;border-bottom:1px solid #f0f2f5}
   .exp-check{display:flex;align-items:center;gap:7px;font-size:12.5px;color:#42505c;margin-bottom:6px}
   .exp-msg{font-size:12px;min-height:17px;margin-top:10px}
+
+  /* --- cuadro de fórmulas (draw/formula-modal.js) --- */
+  .fx-modal{width:560px}
+  .fx-sub{font-size:12px;color:#8a97a3;line-height:1.5;margin:-6px 0 14px}
+  .fx-atajos{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px}
+  .fx-atajo{height:26px;min-width:30px;padding:0 8px;border:1px solid #d4dce2;border-radius:5px;background:#fff;color:#42505c;font-size:12.5px;cursor:pointer}
+  .fx-atajo:hover{border-color:#6c4bb6;color:#6c4bb6;background:#faf8fd}
+  .fx-input{width:100%;border:1px solid #d4dce2;border-radius:6px;padding:8px 9px;font-family:'IBM Plex Mono',monospace;font-size:13px;line-height:1.5;resize:vertical}
+  .fx-input:focus{outline:none;border-color:#6c4bb6}
+  /* La vista previa se pinta con el mismo tablero de fondo que el papel
+     del lienzo: lo que se ve aquí es lo que va a caer allí. */
+  .fx-vista{min-height:64px;margin:10px 0 0;padding:10px;border:1px solid #eef1f4;border-radius:6px;background:#fbfcfd;display:flex;align-items:center;justify-content:center;overflow:auto}
+  .fx-vista svg{max-width:100%}
+  .fx-aviso{min-height:18px;font-size:11.5px;color:#8a97a3;margin-top:6px;font-family:'IBM Plex Mono',monospace}
+  .fx-mal{color:#c0392b}
+  .fx-espera{color:#0d9488}
+  .fx-fila{display:flex;align-items:center;gap:8px;margin-top:10px}
+  .fx-lbl{font-size:12px;color:#5a6772}
+  .fx-num{width:70px;height:28px;border:1px solid #d4dce2;border-radius:5px;padding:0 6px;font-size:12.5px;font-family:inherit}
+  .fx-num:focus{outline:none;border-color:#6c4bb6}
+  .fx-unidad{font-size:11.5px;color:#8a97a3}
 </style>
 </head>
 <body>
@@ -362,6 +427,7 @@
         <button class="tool-btn" data-tool="ellipse" title="Elipse (E) — Mayús: círculo, Alt: desde el centro">◯</button>
         <button class="tool-btn" data-tool="line" title="Línea (L) — Mayús: ángulos de 15°, Alt: desde el centro">╱</button>
         <button class="tool-btn" data-tool="text" title="Texto (T) — pulsa en el lienzo y escribe">T</button>
+        <button class="tool-btn" data-tool="formula" title="Fórmula LaTeX (F) — pulsa en el lienzo y escríbela; doble clic para corregirla">∑</button>
         <button class="tool-btn" data-tool="page" title="Tamaño del papel (P) — arrastra los bordes para recortar, como en una foto">⛶</button>
         <div class="rail-sep"></div>
         <button class="tool-btn" id="btnGroup" title="Agrupar (Ctrl+G)">⧉</button>
@@ -460,6 +526,6 @@
   </div>
 </div>
 
-<script src="colabdraw-app.js?v=202608110318"></script>
+<script src="colabdraw-app.js?v=202608110411"></script>
 </body>
 </html>

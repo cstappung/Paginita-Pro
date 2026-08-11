@@ -25,6 +25,8 @@ import { createStylePanel } from "./draw/style.js";
 import { createToolOptions } from "./draw/tool-options.js";
 import { createObjectPanel } from "./draw/layers.js";
 import { createTextEditor } from "./draw/text.js";
+import { createFormulaEditor } from "./draw/formula-modal.js";
+import { setMotorUrl } from "./draw/latex.js";
 import { createAssetPreview, extOf } from "./draw/preview.js";
 import { exportAll, download, outputName, exportSvg } from "./draw/export.js";
 import { downloadProjectZip } from "./zip-export.js";
@@ -53,6 +55,7 @@ const state = {
   toolOpts: null,      // barra de opciones de la herramienta activa
   layers: null,        // árbol de objetos (creado en ensureEditorParts)
   textEd: null,        // editor de texto flotante
+  formulaEd: null,     // cuadro de fórmulas LaTeX
   assetView: null,     // vista de un archivo generado
   openAsset: null,     // nombre del archivo que se está mirando
   activeLayerId: null, // capa donde va lo que se dibuje
@@ -331,6 +334,24 @@ function ensureEditorParts() {
       state.style.refresh();
     }
   });
+  /* El cuadro de fórmulas necesita saber en qué espacio nace la figura
+     (la capa activa puede venir escalada de un SVG importado), y de eso
+     ya sabe Tools: se le pregunta a él en vez de repetir la cuenta. */
+  state.formulaEd = createFormulaEditor({
+    getDrawing: () => state.drawing,
+    getLayer: () => (state.drawing ? state.drawing.activeLayer(state.activeLayerId) : null),
+    getEspacio: () => (state.tools
+      ? state.tools._espacioDeCapa(state.drawing ? state.drawing.activeLayer(state.activeLayerId) : null)
+      : null),
+    getFill: () => (state.tools ? state.tools.textStyle.fill : null),
+    canWrite,
+    onDone: el => {
+      if (!state.tools) return;
+      if (el) state.tools.select(el); else state.tools.redrawOverlay();
+      state.style.refresh();
+      state.layers.render();
+    }
+  });
   state.tools = new Tools(state.canvas, {
     getDrawing: () => state.drawing,
     canWrite,
@@ -346,6 +367,7 @@ function ensureEditorParts() {
     /* Con elemento se edita ese rótulo; sin él viene la ficha de uno que
        todavía no existe y que solo nacerá si se escribe algo. */
     onEditText: (el, spec) => (el ? state.textEd.open(el) : state.textEd.openNew(spec)),
+    onEditFormula: (el, spec) => (el ? state.formulaEd.open(el) : state.formulaEd.openNew(spec)),
     onStatus: msg => { $("statusMsg").textContent = msg || ""; },
     onToolChange: name => {
       document.querySelectorAll("#toolRail [data-tool]").forEach(b =>
@@ -545,6 +567,7 @@ const normalizeName = raw => {
 function openDrawing(path) {
   // lo que se estuviera escribiendo se guarda en SU dibujo, no en el otro
   if (state.textEd && state.textEd.isOpen()) state.textEd.close();
+  if (state.formulaEd && state.formulaEd.isOpen()) state.formulaEd.close();
   if (state.assetView) state.assetView.hide();     // vuelve a verse el lienzo
   if (state.layers) state.layers.reset();          // otro dibujo, otro árbol
   stopFragObserver();
@@ -885,6 +908,12 @@ function dondeEstamos() {
 
 /* ================================================ arranque */
 (function boot() {
+  /* El motor de fórmulas se sirve con la MISMA versión que la página:
+     es un archivo generado por la misma compilación, así que un `?v=`
+     distinto solo conseguiría que el navegador se guardara dos copias
+     —y una de ellas, vieja. */
+  setMotorUrl("colabdraw-math.js" + (VER_PAGINA ? "?v=" + VER_PAGINA : ""));
+
   state.capture = installErrorCapture({
     app: "colabdraw", ver: VER_PAGINA, getDonde: dondeEstamos,
     publicar: rec => { if (state.user) rep.publishError(rec, state.user.uid).catch(() => {}); }

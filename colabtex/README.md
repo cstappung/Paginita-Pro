@@ -57,6 +57,9 @@ colabtex.html       Interfaz
 colabtex-app.js     Bundle generado (npm run build)
 colabdraw.html      Interfaz de ColabDraw
 colabdraw-app.js    Bundle generado de ColabDraw
+colabdraw-math.js   Motor de fórmulas LaTeX (MathJax → SVG). Bundle APARTE:
+                    solo se descarga la primera vez que se escribe una
+                    fórmula, y lo pide draw/latex.js con el ?v= de la página
 ```
 
 ## Desarrollo

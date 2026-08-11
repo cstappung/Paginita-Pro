@@ -31,6 +31,7 @@ const CON_BARRA = {
   ellipse: { icono: "◯", nombre: "Elipse" },
   line: { icono: "╱", nombre: "Línea" },
   text: { icono: "T", nombre: "Texto" },
+  formula: { icono: "∑", nombre: "Fórmula" },
   page: { icono: "⛶", nombre: "Papel" }
 };
 
@@ -112,10 +113,16 @@ export function createToolOptions(host, opts = {}) {
     inp.min = String(min);
     inp.step = String(step);
     inp.style.width = `${ancho}px`;
-    inp.onchange = () => {
+    /* Aplica al confirmar y también sola, poco después de dejar de
+       teclear: de este panel se sale pinchando en el dibujo, y por ahí
+       el `change` no llegaba nunca (ver style.js). */
+    const commit = () => {
       const v = parseFloat(inp.value);
       if (isFinite(v) && v >= min) onChange(v);
     };
+    let temporizador = null;
+    inp.addEventListener("input", () => { clearTimeout(temporizador); temporizador = setTimeout(commit, 350); });
+    inp.addEventListener("change", () => { clearTimeout(temporizador); commit(); });
     const caja = el("span", "to-num-box");
     caja.appendChild(inp);
     if (unidad) caja.appendChild(el("span", "to-unit", unidad));
@@ -193,6 +200,11 @@ export function createToolOptions(host, opts = {}) {
         w.sync(Math.round(p.w * 10) / 10);
         h.sync(Math.round(p.h * 10) / 10);
       });
+      return partes;
+    }
+
+    if (tool === "formula") {
+      host.appendChild(pista("Pulsa en el lienzo y escribe la fórmula en LaTeX · doble clic sobre una fórmula puesta para corregirla"));
       return partes;
     }
 

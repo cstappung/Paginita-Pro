@@ -48,14 +48,19 @@ npm run build        # bundle both apps + pdf worker, then stamp versions
 npm start            # static preview server at http://localhost:8123
 ```
 
-- `npm run build` runs esbuild four times (IIFE bundles of `src/main.js` →
-  `../colabtex-app.js`, `src/draw-main.js` → `../colabdraw-app.js` and
-  `src/reports-main.js` → `../informes-app.js`, plus the
+- `npm run build` runs esbuild five times (IIFE bundles of `src/main.js` →
+  `../colabtex-app.js`, `src/draw-main.js` → `../colabdraw-app.js`,
+  `src/reports-main.js` → `../informes-app.js` and `src/draw/math-engine.js` →
+  `../colabdraw-math.js` via `build:math`, plus the
   pdf.js worker), then `scripts/stamp-version.js` rewrites the `?v=…` query on
   the `<script>` tag of **each** page (its `PAGES` table) so GitHub
   Pages/browsers don't serve a stale cached bundle. **After editing anything
   under `colabtex/src/`, you must `npm run build`** — the root `*-app.js` files
   are generated and not hand-edited.
+- `colabdraw-math.js` is **not** in `PAGES` and no page has a `<script>` tag for
+  it: it is loaded on demand by `draw/latex.js`, which appends the *page's* own
+  `?v=…` (see the ColabDraw "formulas" section). It is a build artifact all the
+  same and must be committed like the other bundles.
 - Previewing goes **through the server**, never by opening the file: double-click
   `Iniciar ColabTeX.cmd` (it starts `server/static.js` and opens
   `http://localhost:8123/Inicio.dc.html`) or run `npm start` yourself. On
@@ -522,6 +527,20 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
     parallelogram. The grid magnet is deliberately off in that mode: the grid
     is in document millimetres and snapping a rotated coordinate to it is
     meaningless.
+  - **The canvas takes focus away from panel fields before anything else**
+    (`_soltarFoco`, first line of `_pointerDown`). This looks like a detail and
+    was the whole of "editing a text that is already placed does nothing": the
+    number fields (Cuerpo, Grosor…) commit on `change`, i.e. on leaving the
+    field, and the canvas's `pointerdown` calls `preventDefault()`, which
+    prevents exactly that. Typing 12 in Cuerpo and clicking the drawing to see
+    it left the field *still focused* — so it never committed — with the
+    selection already cleared: the label stayed as it was and the panel looked
+    broken. Blurring here fires the `change` while the selection is still live,
+    and hands the keyboard back, since with the caret inside an `<input>` the
+    S/R/L shortcuts never reached Tools either. `style.js` and
+    `tool-options.js` additionally commit ~350 ms after the last keystroke so
+    that path need not be walked at all, and both skip refreshing a field that
+    has focus, so they cannot overwrite what is being typed.
   - **Handles that cannot do anything are not drawn.** A straight line's frame
     has zero height, so `n`/`s` would multiply zero by something and stay zero;
     a handle that does nothing when you pull it reads as a broken app.
@@ -559,6 +578,48 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
   `left/right + margin:auto`, **not** `left:50%` + a translation — an absolutely
   positioned box with `right:auto` is only offered half the width to lay out in,
   so the bar broke into four rows where one was enough.
+- `latex.js` + `math-engine.js` + `formula-modal.js` — **LaTeX formulas**. A
+  formula is a `<g data-latex="…">` holding MathJax's own `<path>`s: real vector
+  strokes, so it moves, rotates, recolours, exports to SVG/PNG and lands in a PDF
+  like any other shape, and the TeX travels with it so it can be reopened and
+  corrected. Decisions worth keeping:
+  - **MathJax, not KaTeX**, even though KaTeX is already a dependency for
+    ColabTeX: KaTeX only emits HTML positioned by CSS, and getting that into an
+    SVG needs a `<foreignObject>` — which the sanitiser drops, rightly, since it
+    is executable HTML inside the drawing.
+  - **The engine is a separate bundle** (`colabdraw-math.js`, ~1.6 MB — MathJax
+    plus its fonts) injected the first time someone writes a formula. Folding it
+    into `colabdraw-app.js` would quadruple what every visitor downloads to draw
+    a rectangle. It carries the *page's* `?v=`, so it can never be a stale copy
+    from cache. `--define:PACKAGE_VERSION` in `build:math` is not optional:
+    MathJax reads its own version through `eval("require")`, which esbuild
+    cannot see and which throws `require is not defined` in a browser.
+  - **1 em = 1000 viewBox units** (verified, not assumed: `\rule{1em}{1em}`
+    comes out 1000×1000), and MathJax's content already carries its own
+    `scale(1,-1)` with the baseline at y=0. So `translate(x,y) scale(mm/1000)`
+    puts the formula where it was clicked, at the millimetres asked for, with
+    the same semantics as a `<text>`'s `x`/`y`.
+  - **The size is not stored anywhere**: `tamañoDe()` reads it back out of the
+    transform. Storing it would leave it lying the moment someone scaled the
+    formula with the handles, and the edit box would show a number that isn't
+    the one on screen. Re-editing with a new size composes `T · scale(new/now)`,
+    which grows it about its own baseline and works on a rotated formula too.
+  - **MathJax paints with `currentColor`**, which resolves against the `color`
+    property, *not* the parent's `fill` — left alone, formulas were always black
+    and the fill panel did nothing to them. Those attributes are stripped on
+    insert so the wrapper's `fill` cascades normally.
+  - A bad formula **does not go in**: MathJax doesn't throw, it *draws* the
+    error (`data-mjx-error`), so `renderSvg` turns that into a real exception
+    and the modal shows the message with the button disabled.
+  - Rewriting a formula **replaces the whole `<g>`** (clone-and-delete, as
+    everywhere else) rather than swapping its children: the new strokes are not
+    integrated in the document yet, and an unintegrated node can't be read —
+    not even for its child list. The old `id`, `fill`, `opacity`, `display` and
+    lock are carried over so selection, the object tree and the look survive.
+  - A formula is a `<g>`, so both `layers.js` (drops) and `Tools.ungroup` treat
+    it as a **closed shape** on purpose: dropping something inside would be
+    erased by the next edit, and ungrouping would scatter it into paths and take
+    its LaTeX with it — losing the ability to correct it, permanently.
 - `text.js` — the text tool and its editor. A text is a `<text>` with one
   `<tspan>` per line, each repeating the `x` (SVG text does not wrap back to
   the margin by itself) and stepping down with `dy` **in `em`**, so changing
@@ -579,7 +640,28 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
     off-screen — in an imported file. The font size is scaled by that same
     matrix, for the same reason.
 - `layers.js` — the object tree, i.e. Inkscape's *Objetos* panel, plus the
-  layer operations. It shows the **whole tree**, not just the layers: an
+  layer operations. Its rows read
+  `[indent][▸][type icon] name … [eye][padlock]`, and four rules make it
+  legible rather than a list of ids:
+  - **Icons are drawn SVG, not emoji.** Every OS paints 👁 and 🔒 its own
+    size, colour and baseline; as inline strokes inheriting `currentColor`,
+    painting the row is enough to make the icon agree with it.
+  - **Rows are named after what they are or what they contain** (`nombreDe`):
+    "Rectángulo", "Grupo (3)", a text by its own words, a formula by its LaTeX.
+    `labelOf` ends up falling back to the `id`, and a list of `ewxwgvzb` says
+    nothing about the drawing.
+  - **A text and a formula are leaves** (`esHoja`/`hijosDe`, and `tspan` is in
+    `OCULTOS`): a formula is dozens of MathJax `<path>`s and groups, none of
+    them selectable on their own, and expanding one buried the whole drawing
+    under a single figure's guts.
+  - **Hidden and locked are shown at two strengths**: strong for the row that
+    carries it, faint for one that only *inherits* it from its layer or group
+    (`hiddenAncestor`/`lockedAncestor` name the culprit in the tooltip).
+    Otherwise a locked layer with twenty shapes paints twenty-one striped rows
+    and it stops being clear who is imposing what — while a shape that can't be
+    clicked looks identical to one that can.
+
+  It shows the **whole tree**, not just the layers: an
   imported file (a matplotlib figure, say) has no Inkscape layers, so a
   layer-only list showed it as a single row with no way to reach anything
   inside it. Only expanded branches are rendered — those files carry thousands
