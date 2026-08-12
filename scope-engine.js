@@ -1,8 +1,10 @@
 "use strict";
 /* ============================================================
    CSV Oscilloscope — engine
-   Offline waveform viewer for CSV files (Rigol-style:
-   "Time(s),CH1(V),CH2(A),..."). 100% in-browser.
+   Offline waveform viewer for CSV captures — Rigol-style
+   ("Time(s),CH1(V),CH2(A),…"), Tektronix exports with their
+   Model/Channel/Vertical Units preamble, and plain headerless
+   number grids (see the parser worker). 100% in-browser.
    Views: Scope (main + zoom + quick spectrum), FFT/Harmonics
    (PLECS-style magnitude/phase per harmonic), XY.
    ============================================================ */
@@ -93,22 +95,157 @@ window.ScopeApp = window.ScopeApp || (function () {
   }
 
   // ---------- CSV parser worker ----------
+  /* A capture out of a real bench scope is not "one header line and then
+     numbers". A Tektronix MSO/DPO writes a whole preamble first — Model, then
+     Channel / Waveform Type / Vertical Units / Sample Interval / Record Length
+     repeated once per channel in side-by-side blocks — a blank line and an
+     ANALOG_Thumbnail row, and only then the real "TIME,CH1,…,CH6" header.
+     Assuming line 1 is the header turned that file into one channel called
+     "Model" full of zeros.
+     So the header is not assumed: the *data* is located first — the first pair
+     of consecutive lines that both parse as numbers with the same field count —
+     and the nearest readable line above it supplies the names, if it has the
+     same number of fields. A file with no header at all therefore also loads,
+     with synthesised CH names, instead of eating its first sample.
+     The preamble is not thrown away either: it is the only place the per
+     channel units live ("Vertical Units,V" for CH1–CH4 and ",A" for CH5–CH6 in
+     a Tek ALL export), and those units are what let a math channel multiply a
+     volt by an amp and call the result a watt. Only the scan window
+     (SCAN_LINES) is split into lines — splitting a 250 k-row file to find its
+     header would allocate the whole capture twice over as strings. */
   const WORKER_SRC = `
+var SCAN_LINES = 400;
+/* Every separator/decimal pair worth trying, in order of preference. A comma
+   file scanned with ";" yields a single field and fails isDataRow, so at most
+   one of these ever matches — detection is by trial, not by counting. */
+var CONFIGS = [{ d: ",", dec: "." }, { d: ";", dec: "." }, { d: ";", dec: "," }, { d: "\\t", dec: "." }, { d: "\\t", dec: "," }];
+var META_KEYS = { "channel": 1, "source": 1, "vertical units": 1, "horizontal units": 1, "label": 1 };
+
+function toNum(f, dec) {
+  if (dec === ",") f = f.replace(",", ".");
+  return +f;
+}
+function isNum(f, dec) {
+  if (f === "") return false;
+  var v = toNum(f, dec);
+  return v === v && isFinite(v);
+}
+/* A data row: every non-empty field a number, at least two of them, and the
+   first one — the time stamp — present. */
+function isDataRow(fields, dec) {
+  if (fields.length < 2) return false;
+  if (!isNum(fields[0], dec)) return false;
+  var n = 1;
+  for (var i = 1; i < fields.length; i++) {
+    var f = fields[i];
+    if (f === "") continue;
+    if (!isNum(f, dec)) return false;
+    n++;
+  }
+  return n >= 2;
+}
+function takeLines(text, max) {
+  var lines = [], offs = [], pos = 0, len = text.length;
+  while (pos <= len && lines.length < max) {
+    var nl = text.indexOf("\\n", pos);
+    var end = nl === -1 ? len : nl;
+    var line = text.slice(pos, end);
+    if (line.length && line.charCodeAt(line.length - 1) === 13) line = line.slice(0, -1);
+    lines.push(line); offs.push(pos);
+    if (nl === -1) break;
+    pos = end + 1;
+  }
+  return { lines: lines, offs: offs };
+}
+/* First line from which the file is numbers. Two consecutive rows are required
+   so a stray numeric line inside the preamble (a bare "Record Length,250000"
+   split some other way) cannot be mistaken for the capture. */
+function findData(lines, cfg) {
+  for (var i = 0; i < lines.length - 1; i++) {
+    if (!lines[i]) continue;
+    var a = lines[i].split(cfg.d);
+    if (!isDataRow(a, cfg.dec)) continue;
+    var j = i + 1;
+    while (j < lines.length && !lines[j]) j++;
+    if (j >= lines.length) break;
+    var b = lines[j].split(cfg.d);
+    if (isDataRow(b, cfg.dec) && a.length === b.length) return { start: i, n: a.length };
+  }
+  for (var k = 0; k < lines.length; k++) {
+    if (lines[k] && isDataRow(lines[k].split(cfg.d), cfg.dec)) return { start: k, n: lines[k].split(cfg.d).length };
+  }
+  return null;
+}
+/* The preamble, as key -> list of values in file order. The keys repeat once
+   per channel across the same line ("Vertical Units,V,,Vertical Units,A"), so
+   the position in the list is the channel index. */
+function readMeta(lines, upTo, d) {
+  var meta = {};
+  for (var i = 0; i < upTo; i++) {
+    var f = lines[i].split(d);
+    for (var k = 0; k + 1 < f.length; k++) {
+      var key = f[k].trim().toLowerCase();
+      if (META_KEYS[key] !== 1) continue;
+      var val = f[k + 1].trim();
+      if (val === "") continue;
+      (meta[key] || (meta[key] = [])).push(val);
+    }
+  }
+  return meta;
+}
+var norm = function (s) { return String(s).trim().toLowerCase().replace(/[\\s_]/g, ""); };
+
 self.onmessage = function(e) {
   const { id, buffer } = e.data;
   try {
-    const text = new TextDecoder("utf-8").decode(buffer);
-    const firstNl = text.indexOf("\\n");
-    if (firstNl === -1) { self.postMessage({ type: "error", id, message: "Empty file." }); return; }
-    let headerLine = text.slice(0, firstNl);
-    if (headerLine.endsWith("\\r")) headerLine = headerLine.slice(0, -1);
-    const headers = headerLine.split(",");
-    const cols = headers.map(h => {
-      const m = h.trim().match(/^(.*?)\\(([^)]*)\\)\\s*$/);
-      if (m) return { name: m[1].trim(), unit: m[2].trim() };
-      return { name: h.trim(), unit: "" };
-    });
-    const body = text.slice(firstNl + 1);
+    let text = new TextDecoder("utf-8").decode(buffer);
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);   // Excel and some scopes write a BOM
+    if (!text.length) { self.postMessage({ type: "error", id, message: "Empty file." }); return; }
+    const scan = takeLines(text, SCAN_LINES);
+    let cfg = null, found = null;
+    for (const c of CONFIGS) {
+      const f = findData(scan.lines, c);
+      if (f && (!found || f.n > found.n)) { cfg = c; found = f; }
+    }
+    if (!found) { self.postMessage({ type: "error", id, message: "No numeric data found in the first " + SCAN_LINES + " lines." }); return; }
+    const DELIM = cfg.d.charCodeAt(0), DEC = cfg.dec;
+
+    /* Names: the nearest non-empty line above the data with the same field
+       count. Searching upwards (not downwards from line 0) is what keeps a
+       preamble row that happens to have the right width from winning over the
+       real header sitting right on top of the numbers. */
+    let headerIdx = -1;
+    for (let i = found.start - 1; i >= 0; i--) {
+      const line = scan.lines[i];
+      if (!line.trim()) continue;
+      const f = line.split(cfg.d);
+      if (f.length === found.n && !isDataRow(f, DEC)) headerIdx = i;
+      break;
+    }
+    const meta = readMeta(scan.lines, headerIdx === -1 ? found.start : headerIdx, cfg.d);
+    const chNames = meta["channel"] || meta["source"] || [];
+    const vUnits = meta["vertical units"] || [];
+    const hUnit = meta["horizontal units"] ? meta["horizontal units"][0] : "";
+    const raw = headerIdx === -1 ? [] : scan.lines[headerIdx].split(cfg.d);
+    const cols = [];
+    for (let c = 0; c < found.n; c++) {
+      let name = (raw[c] || "").trim(), unit = "";
+      const m = name.match(/^(.*?)\\(([^)]*)\\)\\s*$/);      // "CH1(V)", the Rigol style
+      if (m) { name = m[1].trim(); unit = m[2].trim(); }
+      if (!name) name = c === 0 ? "Time" : "CH" + c;
+      if (!unit && c > 0) {
+        /* Match the column to its preamble block by name when possible — the
+           blocks are in file order but a header may not list every channel. */
+        let idx = -1;
+        for (let k = 0; k < chNames.length; k++) if (norm(chNames[k]) === norm(name)) { idx = k; break; }
+        if (idx === -1) idx = c - 1;
+        unit = vUnits[idx] || "";
+      }
+      if (!unit && c === 0) unit = hUnit;
+      cols.push({ name: name, unit: unit });
+    }
+
+    const body = text.slice(scan.offs[found.start]);
     const len = body.length;
     const estRows = Math.max(16, Math.ceil(len / 8));
     const nCols = cols.length;
@@ -123,17 +260,21 @@ self.onmessage = function(e) {
       if (line.length && line.charCodeAt(line.length - 1) === 13) line = line.slice(0, -1);
       if (line.length > 0) {
         if (rowCount >= timeArr.length) { pos = lineEnd + 1; continue; }
-        let start = 0, colIdx = 0;
+        let start = 0, colIdx = 0, ok = true;
         const L = line.length;
         for (let k = 0; k <= L; k++) {
-          if (k === L || line.charCodeAt(k) === 44) {
+          if (k === L || line.charCodeAt(k) === DELIM) {
             const field = line.slice(start, k);
-            if (colIdx === 0) timeArr[rowCount] = +field;
-            else if (colIdx - 1 < valArrays.length) valArrays[colIdx - 1][rowCount] = +field;
+            const v = field === "" ? 0 : toNum(field, DEC);
+            /* A line whose time stamp is not a number is not a sample: a
+               footer, a repeated header of a concatenated export, a note. It
+               is skipped rather than stored as row 0 s = 0 V. */
+            if (colIdx === 0) { if (!(v === v && isFinite(v)) || field === "") { ok = false; break; } timeArr[rowCount] = v; }
+            else if (colIdx - 1 < valArrays.length) valArrays[colIdx - 1][rowCount] = v;
             colIdx++; start = k + 1;
           }
         }
-        rowCount++;
+        if (ok && colIdx > 1) rowCount++;
       }
       pos = lineEnd + 1;
       if (rowCount - lastProg > 25000) {

@@ -108,6 +108,23 @@ sidebar live in `CSV Oscilloscope.dc.html`; every id it declares must appear in
 `REF_IDS` or `init()` bails with a console error naming the missing ones. All
 of the skin is in `injectCSS()`.
 
+**The header is found, not assumed.** The parser worker locates the *data*
+first — the first pair of consecutive lines that parse as numbers with the same
+field count — and takes the nearest readable line above it as the names. A
+Tektronix export opens with a preamble (Model, then Channel / Waveform Type /
+Vertical Units / Sample Interval repeated per channel in side-by-side blocks, a
+blank line and `ANALOG_Thumbnail`) before its real `TIME,CH1,…` row, so reading
+line 1 as the header turned that file into a channel called "Model" full of
+zeros. The preamble is then read for **units**: `Vertical Units` appears once
+per channel in file order (V on CH1–CH4, A on CH5–CH6 in an MSO46 ALL export),
+and that is what lets a math channel multiply a volt by an amp and label the
+result W. Only the first `SCAN_LINES` (400) are split into lines — splitting a
+250 k-row capture to find its header would allocate the whole file again as
+strings. Separator and decimal are detected by trial (`,` / `;` / tab, decimal
+point or comma); a line whose *time* field is not a number is skipped rather
+than stored as a 0 s sample, which is what drops footers and the repeated
+header of a concatenated export.
+
 **The plot grid is one canvas, not many.** `S.layout = {rows, cols}` (up to
 6×6) and `paneRects()` cuts the scope canvas into pane rectangles in reading
 order. Separate canvases would have meant 36 backing stores to allocate and
