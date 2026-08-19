@@ -47,7 +47,13 @@ const ALLOWED_TAGS = new Set([
   "svg", "g", "defs", "symbol", "use", "title", "desc", "style",
   "rect", "circle", "ellipse", "line", "polyline", "polygon", "path",
   "text", "tspan", "textPath", "image", "a", "marker", "clipPath", "mask",
-  "pattern", "linearGradient", "radialGradient", "stop", "switch"
+  "pattern", "linearGradient", "radialGradient", "stop", "switch",
+  /* Filtros: hacen falta para la sombra, y un archivo importado puede
+     traer los suyos. Ninguno ejecuta nada. `feImage` se queda FUERA a
+     propósito: es el único que va a buscar contenido de otro sitio, y
+     abrir el dibujo no puede llamar a un servidor ajeno. */
+  "filter", "feDropShadow", "feGaussianBlur", "feOffset", "feFlood",
+  "feComposite", "feMerge", "feMergeNode", "feBlend", "feColorMatrix"
 ]);
 
 /* Se quitan por nombre aunque algún día alguien amplíe la lista de arriba. */

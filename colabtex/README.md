@@ -131,6 +131,19 @@ borrar son el mismo código y **las reglas de seguridad no cambian**.
   caja de la figura, así que la sigue al moverla, escalarla o girarla; las
   definiciones que dejan de usarse se recogen solas, y viajan con la figura al
   copiar y pegar.
+- **Sombra** (`draw/paint.js`): un `<filter>` con un `feDropShadow` en el
+  `<defs>`. Se enciende con una casilla en el panel y se ajusta el
+  desplazamiento, el difuminado, el color y la opacidad; se vuelve a leer del
+  propio filtro, así que se puede corregir cuantas veces haga falta. Un filtro
+  que venga de un archivo importado NO se enseña como sombra: el panel avisa
+  de que hay uno propio antes de sustituirlo.
+- **Esquinas del rectángulo**: el radio se elegía antes de dibujar y ya no se
+  podía tocar. Ahora la sección RECTÁNGULO del panel lo enseña y lo cambia
+  mientras todo lo elegido sean rectángulos.
+- **Varias líneas en una fórmula**: se separan con `\\` (botón «↵ salto» del
+  cuadro). El entorno lo pone el editor —`aligned` si hay `&`, `gathered` si
+  no—, porque un `\\` suelto en modo matemático es un error de LaTeX; en
+  `data-latex` se guarda lo que se escribió, no la envoltura.
 - **Encuadre y zoom** (`draw/canvas.js` + `draw/scrollbars.js`): el encuadre
   está en el `transform` de la escena, no en el scroll de una caja, así que las
   barras de desplazamiento se pintan a mano. Su recorrido es la página **más

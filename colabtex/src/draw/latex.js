@@ -85,6 +85,33 @@ export function tamañoDe(el) {
 
 const parser = new DOMParser();
 
+/* ---------- saltos de línea ----------
+
+   En TeX, `\\` solo significa «otra línea» DENTRO de un entorno que
+   tenga filas; suelto en modo matemático MathJax responde con un error
+   y la fórmula no entra. Pero escribir `\begin{gathered}…\end{gathered}`
+   a mano para partir un rótulo en dos es pedir demasiado, así que la
+   envoltura la pone el editor: lo que se guarda en `data-latex` sigue
+   siendo lo que se escribió, y al reabrirlo se ve eso mismo.
+
+   - Con `&` se usa `aligned`, que alinea las filas por ese punto, que es
+     lo que se quiere en `x &= 1 \\ y &= 2`.
+   - Sin `&`, `gathered`, que las centra.
+   - Si el texto YA empieza por `\begin{`, no se toca: quien escribe está
+     conduciendo, y meterle otro entorno alrededor rompería tanto un
+     `cases` como un `array` con su propia alineación.
+
+   Los dos entornos vienen del paquete `ams`, que math-engine.js ya
+   carga; no hace falta ninguno nuevo. */
+export function prepararTex(tex) {
+  const s = String(tex || "").trim();
+  if (!s) return s;
+  if (!/\\\\/.test(s)) return s;              // no hay ningún salto
+  if (/^\\begin\{/.test(s)) return s;         // ya trae su entorno
+  const entorno = /(?:^|[^\\])&/.test(s) ? "aligned" : "gathered";
+  return `\\begin{${entorno}}${s}\\end{${entorno}}`;
+}
+
 /* TeX → un <svg> del que solo interesa lo de dentro. Si MathJax no
    entiende algo no lanza: devuelve el error DIBUJADO en rojo dentro del
    propio SVG (`data-mjx-error`). Meter eso en el dibujo sería meter un
@@ -94,7 +121,7 @@ export async function renderSvg(tex) {
   const motor = await cargarMotor();
   const texto = String(tex || "").trim();
   if (!texto) throw new Error("La fórmula está vacía.");
-  const bruto = motor.tex2svg(texto);
+  const bruto = motor.tex2svg(prepararTex(texto));
   const doc = parser.parseFromString(bruto, "image/svg+xml");
   const svg = doc.documentElement;
   if (!svg || svg.nodeName.toLowerCase() !== "svg" || doc.getElementsByTagName("parsererror").length)
@@ -222,5 +249,9 @@ export const ATAJOS = [
   { label: "±", frag: "\\pm |" },
   { label: "≤", frag: "\\le |" },
   { label: "×10ⁿ", frag: "\\times 10^{|}" },
-  { label: "texto", frag: "\\text{|}" }
+  { label: "texto", frag: "\\text{|}" },
+  /* El salto va el último y con su nombre escrito al lado: es lo que
+     nadie adivina, porque en LaTeX suelto no funciona y hace falta un
+     entorno alrededor (lo pone `prepararTex`). */
+  { label: "↵ salto", frag: " \\\\ |" }
 ];

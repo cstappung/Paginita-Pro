@@ -655,6 +655,16 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
     it as a **closed shape** on purpose: dropping something inside would be
     erased by the next edit, and ungrouping would scatter it into paths and take
     its LaTeX with it — losing the ability to correct it, permanently.
+  - **A double backslash is wrapped, not passed through** (`prepararTex`). In
+    TeX it only means «next line» inside an environment with rows; loose in
+    maths mode MathJax answers with an error and the formula never goes in —
+    but typing `\begin{gathered}…\end{gathered}` by hand to split a caption
+    in two is too much to ask. So the editor adds the wrapper (`aligned` when
+    there is an unescaped `&`, `gathered` otherwise) while `data-latex` keeps
+    exactly what was typed, which is what reopening shows. Text that already
+    starts with `\begin{` is left alone: whoever wrote it is driving, and
+    another environment around a `cases` would break its alignment. Both
+    environments come from the `ams` package `math-engine.js` already loads.
   - Re-editing is on a **button in the style panel** (the FÓRMULA section, with
     the LaTeX itself above it), not only on double-click and Intro: both of
     those are invisible, and a formula placed days ago read as untouchable.
@@ -728,8 +738,8 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
   canvas is covered, never destroyed (same reason as ColabTeX's asset preview).
   PDFs go in an `<iframe>` with the browser's own viewer — pulling pdf.js in
   would add more than a megabyte to show a one-page figure.
-- `paint.js` + `color-popover.js` — **colour and gradients**. A `fill` or a
-  `stroke` is described by one *spec* (`none` / `solid` / `linear` / `radial`)
+- `paint.js` + `color-popover.js` — **colour, gradients and shadows**. A `fill`
+  or a `stroke` is described by one *spec* (`none` / `solid` / `linear` / `radial`)
   so the panel never branches on which it is. The top half of `paint.js` is
   pure arithmetic (angle↔vector, radius, CSS preview) and runs in Node; the
   bottom half writes to `<defs>`. Decisions worth keeping:
@@ -749,7 +759,7 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
   - **The radial's radius reaches the farthest corner.** With SVG's default
     `r = 0.5` a gradient centred on a corner left half the shape flat in the
     last stop's colour and read as "the editor didn't apply it".
-  - **Every apply makes a new `<defs>` entry and `gcGradients` collects the
+  - **Every apply makes a new `<defs>` entry and `gcDefs` collects the
     orphans**, which is what keeps a colour dragged around the picker from
     leaving one definition per keystroke. It only ever deletes entries carrying
     `data-dw-grad` — an imported file's gradients are not ours to remove — and
@@ -762,7 +772,29 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
     still match. Note this can only be checked by pasting for real — an
     unintegrated Yjs node returns nothing when read, the same trap as
     everywhere else.
-- `style.js` — the fill/stroke/text/opacity/order/page panel, built in JS. Shows
+  - **A shadow is a `<filter>` holding one `feDropShadow`**, not the long
+    recipe (`feGaussianBlur` + `feOffset` + `feFlood` + `feMerge`). One node
+    does the same thing, every current browser understands it, and — what
+    matters here — it can be *read back*: recovering the blur from a chain of
+    five primitives to refill the panel is a parser nobody wants to own.
+    `dx`/`dy`/`stdDeviation` are in the shape's own units (millimetres), since
+    that is what `primitiveUnits` defaults to; the filter *region* is in
+    bbox percentages and is opened to −60 %…220 %, because with SVG's own
+    −10 %…120 % a 3 mm shadow on a small shape came out sliced by a straight
+    edge that reads as a drawing bug rather than a clipped filter.
+    `readShadow` returns the string `"ajeno"` for a filter that is not ours —
+    an imported one can be anything — so the panel can say so instead of
+    presenting someone else's colour matrix as a shadow. The filter tags had
+    to be added to `svgio`'s allowlist; `feImage` was deliberately left out,
+    being the one primitive that fetches from another origin.
+- `style.js` — the fill/stroke/text/formula/rect/shadow/opacity/order/page
+  panel, built in JS. Sections that only describe one kind of thing (TEXTO,
+  FÓRMULA, RECTÁNGULO) appear only when the selection is that thing —
+  RECTÁNGULO needs *every* selected element to be a `<rect>`, since writing a
+  radius with a circle in the selection would set an attribute that draws
+  nothing and leave the panel lying. Its `rx` is converted through `getScale`
+  exactly like the stroke width, for the same reason: the radius lives in the
+  shape's coordinates and the panel shows what is on screen. Shows
   "varios" when the selection disagrees rather than the first value, so touching
   a control can't silently overwrite the rest. The TEXTO section only appears
   with a text selected (or the text tool in hand), and its font list is limited

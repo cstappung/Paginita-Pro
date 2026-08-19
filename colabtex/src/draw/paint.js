@@ -42,6 +42,12 @@ import { textToNodes } from "./svgio.js";
 import { newId, childrenOf, indexOf, isEl } from "./doc.js";
 
 export const GRAD_MARK = "data-dw-grad";
+export const SOMBRA_MARK = "data-dw-shadow";
+
+/* Marcas de lo que ha puesto el editor en el <defs>. Solo esto se
+   recoge cuando deja de usarse: un degradado o un filtro que venían
+   dentro de un SVG importado no son nuestros para borrarlos. */
+const MARCAS = [GRAD_MARK, SOMBRA_MARK];
 
 /* Direcciones con nombre, en el orden en que se pintan los botones.
    0° es de izquierda a derecha y el ángulo crece en el sentido de las
@@ -217,6 +223,78 @@ export function etiquetaPaint(spec) {
 
 
 /* ============================================================
+   Sombras
+
+   Una sombra es un `<filter>` con un solo `feDropShadow` en el <defs>,
+   y `filter="url(#…)"` en la figura. Se eligió esa primitiva y no la
+   receta larga (`feGaussianBlur` + `feOffset` + `feFlood` + `feMerge`)
+   porque hace exactamente lo mismo en un nodo, la entienden todos los
+   navegadores actuales y —lo que importa aquí— se vuelve a LEER sin
+   tener que reconocer una cadena de cinco primitivas para saber qué
+   desenfoque tenía.
+
+   Los valores van en las unidades de la figura, que aquí son
+   milímetros: `dx`, `dy` y `stdDeviation` se miden en el espacio de
+   usuario (es lo que hace `primitiveUnits` por defecto), no en la caja.
+
+   La REGIÓN del filtro sí va en tanto por ciento de la caja, y por eso
+   se abre mucho más de lo que trae SVG por defecto (−10 %…120 %): con
+   la región de serie, una sombra de 3 mm en una figura pequeña salía
+   cortada por un borde recto, que parece un fallo de dibujo y no un
+   recorte del filtro.
+   ============================================================ */
+
+export const SOMBRA_POR_DEFECTO = { dx: 0.8, dy: 0.8, blur: 0.8, color: "#000000", op: 35 };
+
+/* Cuánto se abre la región alrededor de la caja. 60 % a cada lado deja
+   sitio de sobra para el desplazamiento y el desenfoque que admite el
+   panel sin tener que saber cuánto mide la figura. */
+const MARGEN_FILTRO = 60;
+
+export function sombraMarkup(spec, id) {
+  const s = normSombra(spec);
+  const m = MARGEN_FILTRO, lado = 100 + m * 2;
+  return `<filter id="${esc(id)}" ${SOMBRA_MARK}="1" ` +
+    `x="-${m}%" y="-${m}%" width="${lado}%" height="${lado}%">` +
+    `<feDropShadow dx="${fmt(s.dx)}" dy="${fmt(s.dy)}" stdDeviation="${fmt(s.blur)}" ` +
+    `flood-color="${esc(s.color)}" flood-opacity="${fmt(s.op / 100)}"/></filter>`;
+}
+
+export function normSombra(spec) {
+  const s = spec || {};
+  const lim = (v, d, max) => {
+    const n = parseFloat(v);
+    return isFinite(n) ? Math.max(-max, Math.min(n, max)) : d;
+  };
+  return {
+    dx: lim(s.dx, SOMBRA_POR_DEFECTO.dx, 40),
+    dy: lim(s.dy, SOMBRA_POR_DEFECTO.dy, 40),
+    blur: Math.max(0, lim(s.blur, SOMBRA_POR_DEFECTO.blur, 40)),
+    color: /^#[0-9a-f]{6}$/i.test(String(s.color || "")) ? String(s.color) : SOMBRA_POR_DEFECTO.color,
+    op: Math.max(0, Math.min(100, lim(s.op, SOMBRA_POR_DEFECTO.op, 100)))
+  };
+}
+
+/* Ficha de un `<filter>` NUESTRO. Devuelve null para cualquier otro
+   filtro: uno importado puede ser un desenfoque, un mapa de color o
+   media docena de primitivas encadenadas, y enseñarlo como si fuera
+   una sombra invitaría a machacarlo sin saberlo. */
+export function sombraSpec(el, hijos) {
+  if (!el || !el.getAttribute) return null;
+  if (String(el.nodeName || "").toLowerCase() !== "filter") return null;
+  if (el.getAttribute(SOMBRA_MARK) == null) return null;
+  const fe = (hijos || []).find(n => String(n.nodeName || "").toLowerCase() === "fedropshadow");
+  if (!fe) return null;
+  return normSombra({
+    dx: fe.getAttribute("dx"),
+    dy: fe.getAttribute("dy"),
+    blur: fe.getAttribute("stdDeviation"),
+    color: fe.getAttribute("flood-color"),
+    op: num(fe.getAttribute("flood-opacity"), 1) * 100
+  });
+}
+
+/* ============================================================
    Lo de aquí abajo SÍ toca el documento: todo lo anterior es
    aritmética y se puede comprobar en Node sin navegador.
    ============================================================ */
@@ -231,20 +309,47 @@ function refsEn(value, out) {
   while ((m = re.exec(String(value || "")))) out.add(m[1]);
 }
 
+/* Mete un marcado en el <defs> del dibujo y devuelve su «url(#…)», o
+   null si no se pudo. Es el camino común del degradado y de la sombra:
+   los dos son una definición con nombre a la que apunta la figura. */
+function ponerEnDefs(drawing, marcado, id) {
+  const defs = drawing && drawing.defs();
+  if (!defs) return null;
+  const { nodes } = textToNodes(marcado, { freshIds: false });
+  if (!nodes.length) return null;
+  drawing.edit(() => defs.insert(childrenOf(defs).length, [nodes[0]]));
+  return `url(#${id})`;
+}
+
 /* Ficha → valor que se escribe en `fill`/`stroke`. Un degradado deja de
    paso su definición en el <defs> del dibujo. */
 export function paintValue(drawing, spec) {
   if (!spec || spec.tipo === "none") return "none";
   if (spec.tipo === "solid") return spec.color;
-  const primero = normStops(spec.stops)[0].c;     // si algo falla, al menos un color
-  if (!drawing) return primero;
-  const defs = drawing.defs();
-  if (!defs) return primero;
   const id = newId("grad");
-  const { nodes } = textToNodes(gradMarkup(spec, id), { freshIds: false });
-  if (!nodes.length) return primero;
-  drawing.edit(() => defs.insert(childrenOf(defs).length, [nodes[0]]));
-  return `url(#${id})`;
+  // si algo falla, al menos el primer color: mejor eso que dejarla negra
+  return ponerEnDefs(drawing, gradMarkup(spec, id), id) || normStops(spec.stops)[0].c;
+}
+
+/* Ficha de sombra → valor de `filter`. Sin ficha, «none», que es lo que
+   quita la sombra sin dejar el atributo apuntando a un filtro vacío. */
+export function shadowValue(drawing, spec) {
+  if (!spec) return null;
+  const id = newId("som");
+  return ponerEnDefs(drawing, sombraMarkup(spec, id), id);
+}
+
+/* Lo que dice un `filter`: la ficha si es una sombra nuestra, null si no
+   hay filtro, y la cadena «ajeno» si el archivo trae uno suyo — que no
+   es lo mismo y el panel tiene que poder decirlo. */
+export function readShadow(drawing, value) {
+  const v = String(value == null ? "" : value).trim();
+  if (!v || v === "none") return null;
+  const id = refId(v);
+  if (!id) return "ajeno";
+  const f = defById(drawing, id);
+  if (!f) return "ajeno";
+  return sombraSpec(f, childrenOf(f)) || "ajeno";
 }
 
 /* Ficha que describe lo que dice un atributo, mirando el <defs> si es
@@ -256,11 +361,11 @@ export function readPaint(drawing, value) {
   if (!v || v === "none") return { tipo: "none" };
   const id = refId(v);
   if (!id) return { tipo: "solid", color: v };
-  const g = gradById(drawing, id);
+  const g = defById(drawing, id);
   return g ? gradSpec(g, childrenOf(g)) : null;
 }
 
-export function gradById(drawing, id) {
+export function defById(drawing, id) {
   const defs = drawing && drawing.defs();
   if (!defs) return null;
   for (const n of childrenOf(defs)) {
@@ -269,7 +374,8 @@ export function gradById(drawing, id) {
   return null;
 }
 
-/* Recoge los degradados NUESTROS que ya no usa nadie. Cada cambio de
+/* Recoge las definiciones NUESTRAS (degradados y sombras) que ya no
+   usa nadie. Cada cambio de
    color crea uno nuevo, así que sin esto el <defs> crecería una entrada
    por tecleo. No se tocan los que venían dentro de un SVG importado: no
    llevan la marca y no son nuestros para borrarlos.
@@ -279,10 +385,10 @@ export function gradById(drawing, id) {
    dibuje. Sin ellos, elegir un degradado sin nada seleccionado lo
    borraba en el mismo gesto y la figura nacía apuntando a un <defs>
    vacío, es decir, negra. */
-export function gcGradients(drawing, enUso = []) {
+export function gcDefs(drawing, enUso = []) {
   const defs = drawing && drawing.defs();
   if (!defs) return;
-  const mios = childrenOf(defs).filter(n => isEl(n) && n.getAttribute(GRAD_MARK) != null);
+  const mios = childrenOf(defs).filter(n => isEl(n) && MARCAS.some(m => n.getAttribute(m) != null));
   if (!mios.length) return;
   const usados = new Set();
   for (const v of [].concat(enUso)) refsEn(v, usados);

@@ -16,7 +16,7 @@ import { FONTS, DEFAULT_FONT, DEFAULT_SIZE, isText } from "./text.js";
 import { CAPS, JOINS, DASHES, DEFAULT_CAP, DEFAULT_JOIN } from "./stroke.js";
 import { esFormula, latexDe } from "./latex.js";
 import { createChip, createColorPopover } from "./color-popover.js";
-import { etiquetaPaint, esGrad } from "./paint.js";
+import { etiquetaPaint, esGrad, SOMBRA_POR_DEFECTO, normSombra } from "./paint.js";
 
 const el = (tag, cls, html) => {
   const n = document.createElement(tag);
@@ -87,6 +87,10 @@ export function createStylePanel(host, opts = {}) {
      de atributo (y al revés) a través de quien lo creó. */
   const resolvePaint = opts.resolvePaint || (spec => (spec && spec.tipo === "solid" ? spec.color : "none"));
   const readPaint = opts.readPaint || (v => (v == null || v === "none" ? { tipo: "none" } : { tipo: "solid", color: v }));
+  /* La sombra es un <filter> del <defs>, igual que el degradado: el
+     panel maneja la ficha y quien lo creó la traduce. */
+  const resolveShadow = opts.resolveShadow || (() => null);
+  const readShadow = opts.readShadow || (() => null);
   /* Cuánto agranda el lienzo lo que hay elegido. Escalar una figura se
      guarda en su `transform`, así que un trazo de 0,5 mm escalado al
      doble se ve de 1 mm mientras el atributo sigue diciendo 0,5: el panel
@@ -263,6 +267,92 @@ export function createStylePanel(host, opts = {}) {
   };
   secFx.append(fxTex, fxBtn);
 
+  /* ---------- sombra ----------
+     Un `<filter>` con un feDropShadow. La casilla es la que manda: al
+     marcarla nace con los valores por defecto, y al quitarla se borra
+     el atributo entero en vez de dejar una sombra de cero, que sigue
+     costando un filtro por figura al dibujar y al exportar. */
+  const secShadow = section("SOMBRA");
+  const shOn = el("input");
+  shOn.type = "checkbox";
+  const shLabel = el("label", "dw-check");
+  shLabel.append(shOn, el("span", null, "Con sombra"));
+  const shBody = el("div", "dw-sh-body");
+  const shAviso = el("div", "dw-sh-aviso", "El archivo trae su propio filtro; marcar la casilla lo sustituye.");
+
+  /* Ficha actual, para poder cambiar un campo sin perder los demás. */
+  let shSpec = { ...SOMBRA_POR_DEFECTO };
+
+  const shNum = (etiqueta, campo, min, max, unidad) => {
+    const row = el("div", "dw-row");
+    row.appendChild(el("label", "dw-lbl", etiqueta));
+    const inp = el("input", "dw-num");
+    inp.type = "number";
+    inp.min = String(min); inp.max = String(max); inp.step = "0.2";
+    alTeclear(inp, () => {
+      const v = parseFloat(inp.value);
+      if (isFinite(v)) aplicarSombra({ [campo]: v });
+    });
+    row.append(inp, el("span", "dw-unit", unidad));
+    shBody.appendChild(row);
+    return inp;
+  };
+  const shX = shNum("Despl. X", "dx", -40, 40, "mm");
+  const shY = shNum("Despl. Y", "dy", -40, 40, "mm");
+  const shBlur = shNum("Difuminado", "blur", 0, 40, "mm");
+
+  const shColorRow = el("div", "dw-row");
+  shColorRow.appendChild(el("label", "dw-lbl", "Color"));
+  const shColor = el("input", "dw-color");
+  shColor.type = "color";
+  shColor.oninput = () => aplicarSombra({ color: shColor.value });
+  shColorRow.appendChild(shColor);
+  shBody.appendChild(shColorRow);
+
+  const shOpRow = el("div", "dw-row");
+  shOpRow.appendChild(el("label", "dw-lbl", "Opacidad"));
+  const shOp = el("input", "dw-range");
+  shOp.type = "range"; shOp.min = "0"; shOp.max = "100"; shOp.step = "1";
+  const shOpVal = el("span", "dw-val");
+  shOp.oninput = () => { shOpVal.textContent = shOp.value + "%"; };
+  shOp.onchange = () => aplicarSombra({ op: parseInt(shOp.value, 10) });
+  shOpRow.append(shOp, shOpVal);
+  shBody.appendChild(shOpRow);
+
+  shOn.onchange = () => {
+    if (!canWrite()) return;
+    if (!shOn.checked) { apply({ filter: null }); return; }
+    aplicarSombra({});
+  };
+  secShadow.append(shLabel, shAviso, shBody);
+
+  function aplicarSombra(cambios) {
+    if (!canWrite()) return;
+    shSpec = normSombra({ ...shSpec, ...cambios });
+    apply({ filter: resolveShadow(shSpec) });
+  }
+
+  /* ---------- rectángulo ----------
+     El radio de las esquinas se podía elegir ANTES de dibujar y nunca
+     después: una vez puesto el rectángulo, no había forma de
+     redondearlo ni de volver a dejarlo en pico. */
+  const secRect = section("RECTÁNGULO");
+  const rxRow = el("div", "dw-row");
+  rxRow.appendChild(el("label", "dw-lbl", "Esquinas"));
+  const rxInput = el("input", "dw-num");
+  rxInput.type = "number";
+  rxInput.min = "0"; rxInput.step = "0.5";
+  rxInput.title = "Radio de las esquinas; 0 las deja en pico";
+  alTeclear(rxInput, () => {
+    const v = parseFloat(rxInput.value);
+    if (!isFinite(v) || v < 0) return;
+    // el radio vive en las coordenadas de la figura, como el grosor
+    const k = getScale() || 1;
+    apply({ rx: v > 0 ? Math.round((v / k) * 10000) / 10000 : null });
+  });
+  rxRow.append(rxInput, el("span", "dw-unit", "mm"));
+  secRect.appendChild(rxRow);
+
   /* ---------- opacidad ---------- */
   const secOp = section("OPACIDAD");
   const opRow = el("div", "dw-row");
@@ -308,7 +398,7 @@ export function createStylePanel(host, opts = {}) {
   pageRow.append(pw, el("span", "dw-unit", "×"), ph, el("span", "dw-unit", "mm"));
   secPage.appendChild(pageRow);
 
-  host.append(secFill, secStroke, secText, secFx, secOp, secOrder, secPage);
+  host.append(secFill, secStroke, secText, secFx, secRect, secShadow, secOp, secOrder, secPage);
 
   function apply(attrs) {
     if (!canWrite()) return;
@@ -351,10 +441,57 @@ export function createStylePanel(host, opts = {}) {
 
     refreshText(sel, ro);
     refreshFormula(sel, ro);
+    refreshRect(sel, ro);
+    refreshShadow(sel, ro);
 
     const page = getPage();
     if (!enUso(pw)) pw.value = String(Math.round(page.w * 10) / 10 || "");
     if (!enUso(ph)) ph.value = String(Math.round(page.h * 10) / 10 || "");
+  }
+
+  /* El radio solo tiene sentido si TODO lo elegido son rectángulos: con
+     un círculo de por medio, escribir un número le pondría un atributo
+     que no pinta nada y el panel estaría mintiendo. */
+  function refreshRect(sel, ro) {
+    const rects = sel.filter(n => n && n.nodeName === "rect");
+    const mostrar = sel.length > 0 && rects.length === sel.length;
+    secRect.style.display = mostrar ? "" : "none";
+    if (!mostrar) return;
+    const k = getScale() || 1;
+    const r = commonAttr(rects, "rx", "0");
+    if (!enUso(rxInput))
+      rxInput.value = r == null ? "" : String(Math.round((parseFloat(r) || 0) * k * 100) / 100);
+    rxInput.placeholder = r == null ? "varios" : "";
+    rxInput.disabled = ro;
+  }
+
+  /* La sombra se enseña con algo elegido y nada más: sin selección no
+     hay a qué ponérsela, y a diferencia del color no se guarda para la
+     siguiente figura. */
+  function refreshShadow(sel, ro) {
+    secShadow.style.display = sel.length ? "" : "none";
+    if (!sel.length) return;
+    const v = commonAttr(sel, "filter", "none");
+    // «varios» (v == null) se trata como sin sombra: marcar la casilla
+    // se la pone a todas, que es lo que se esperaría al pulsarla
+    const spec = v == null ? null : readShadow(v);
+    const ajeno = spec === "ajeno";
+    const activa = !!spec && !ajeno;
+    shOn.checked = activa;
+    shOn.disabled = ro;
+    shAviso.style.display = ajeno ? "" : "none";
+    shBody.style.display = activa ? "" : "none";
+    if (!activa) return;
+    shSpec = spec;
+    for (const [inp, val] of [[shX, spec.dx], [shY, spec.dy], [shBlur, spec.blur]]) {
+      if (!enUso(inp)) inp.value = String(Math.round(val * 100) / 100);
+      inp.disabled = ro;
+    }
+    if (!enUso(shColor)) shColor.value = spec.color;
+    if (!enUso(shOp)) shOp.value = String(Math.round(spec.op));
+    shOpVal.textContent = Math.round(spec.op) + "%";
+    shColor.disabled = ro;
+    shOp.disabled = ro;
   }
 
   /* Sólo con UNA fórmula elegida: con dos, el botón tendría que decidir
