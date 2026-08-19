@@ -121,6 +121,16 @@ borrar son el mismo código y **las reglas de seguridad no cambian**.
   solo la primera vez que lo abre, por el mismo camino que un enlace para
   compartir. No se copian los bytes — la figura del PDF es siempre la última
   que se exportó — y `fb.watchAssets` mantiene la lista al día sin recargar.
+- **Color y degradados** (`draw/paint.js` + `draw/color-popover.js`): cada
+  canal (relleno y trazo) es UNA muestra que se pulsa y abre el cuadro, en vez
+  de las dos parrillas de quince colores siempre desplegadas. Dentro está la
+  paleta, el mapa de colores del sistema, el hexadecimal y el editor de
+  degradados: lineal con ocho direcciones y ángulo escrito, o radial con el
+  centro en cualquiera de nueve sitios, y tantas paradas de color como se
+  quieran. El degradado se guarda en el `<defs>` del dibujo en unidades de la
+  caja de la figura, así que la sigue al moverla, escalarla o girarla; las
+  definiciones que dejan de usarse se recogen solas, y viajan con la figura al
+  copiar y pegar.
 - **Encuadre y zoom** (`draw/canvas.js` + `draw/scrollbars.js`): el encuadre
   está en el `transform` de la escena, no en el scroll de una caja, así que las
   barras de desplazamiento se pintan a mano. Su recorrido es la página **más

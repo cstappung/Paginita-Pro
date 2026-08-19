@@ -312,6 +312,58 @@
   .dw-swatch{height:19px;border:1px solid #00000022;border-radius:4px;cursor:pointer;padding:0}
   .dw-swatch:hover{outline:2px solid #6c4bb6;outline-offset:1px}
   .dw-swatch-none{background:linear-gradient(45deg,#fff 45%,#c0392b 45%,#c0392b 55%,#fff 55%)}
+
+  /* --- muestra de color del panel (draw/color-popover.js) ---
+     Una sola por canal: las dos parrillas de quince siempre desplegadas
+     se comían media columna del panel para algo que se toca de vez en
+     cuando. Se pulsa y se abre el cuadro. */
+  .dw-row-color{margin-bottom:0}
+  .dw-chip{width:38px;height:26px;flex-shrink:0;border:1px solid #d4dce2;border-radius:5px;background:#fff;padding:2px;cursor:pointer;display:block}
+  .dw-chip:hover{border-color:#6c4bb6}
+  .dw-chip:disabled{opacity:.45;cursor:default}
+  .dw-chip-abierto{border-color:#6c4bb6;box-shadow:0 0 0 2px #6c4bb633}
+  /* El tablero de ajedrez se ve por debajo de un color traslúcido y
+     detrás de un degradado que empiece en transparente. */
+  .dw-chip-cara{display:block;width:100%;height:100%;border-radius:3px;
+    background-image:linear-gradient(45deg,#e4e8ee 25%,transparent 25%,transparent 75%,#e4e8ee 75%),
+                     linear-gradient(45deg,#e4e8ee 25%,transparent 25%,transparent 75%,#e4e8ee 75%);
+    background-size:8px 8px;background-position:0 0,4px 4px}
+  .dw-chip-none{background:linear-gradient(45deg,#fff 45%,#c0392b 45%,#c0392b 55%,#fff 55%)!important}
+  .dw-chip-varios{background:repeating-linear-gradient(45deg,#cbd4dd 0 4px,#eef1f5 4px 8px)!important}
+  .dw-val-grad{font-style:italic}
+
+  /* --- el cuadro de color ---
+     Cuelga del <body> y va en position:fixed: dentro del panel, que
+     tiene overflow:auto, quedaba recortado por su borde. */
+  .dw-pop{position:fixed;z-index:40;width:238px;background:#fff;border:1px solid #d4dce2;border-radius:9px;
+    box-shadow:0 8px 28px #0f172a2e;padding:0 0 10px;font-size:12px;color:#42505c}
+  .dw-pop-tabs{display:flex;border-bottom:1px solid #eef1f4;margin-bottom:9px}
+  .dw-pop-tab{flex:1;height:30px;border:none;background:none;color:#8a97a3;font-family:inherit;font-size:11.5px;font-weight:600;cursor:pointer;border-bottom:2px solid transparent}
+  .dw-pop-tab:hover{color:#6c4bb6}
+  .dw-pop-tab-on{color:#6c4bb6;border-bottom-color:#6c4bb6}
+  .dw-pop-body{padding:0 10px}
+  .dw-pop-row{display:flex;align-items:center;gap:6px;margin-top:7px}
+  .dw-pop-sub{margin-top:10px;padding-top:9px;border-top:1px solid #f2f4f7}
+  .dw-pop-lbl{font-size:10px;font-weight:600;letter-spacing:.05em;color:#8a97a3;margin-bottom:6px;display:block;width:auto}
+  .dw-hex{flex:1;min-width:0;height:24px;border:1px solid #d4dce2;border-radius:4px;padding:0 6px;font-size:11.5px;font-family:'IBM Plex Mono',monospace}
+  .dw-hex:focus{outline:none;border-color:#6c4bb6}
+  .dw-swatch-on{outline:2px solid #6c4bb6;outline-offset:1px}
+  /* Vista previa del degradado: la barra ancha de arriba del cuadro. */
+  .dw-grad-prev{height:34px;margin:0 10px 2px;border:1px solid #d4dce2;border-radius:5px}
+  /* Rejilla de 3×3 para la dirección (lineal) y el centro (radial). */
+  .dw-dirs{display:grid;grid-template-columns:repeat(3,1fr);gap:3px}
+  .dw-dir{height:24px;border:1px solid #d4dce2;border-radius:4px;background:#fff;color:#5a6772;font-size:12px;cursor:pointer;padding:0}
+  .dw-dir:hover{border-color:#6c4bb6;color:#6c4bb6}
+  .dw-dir-on{background:#f1ecfa;border-color:#6c4bb6;color:#6c4bb6;font-weight:700}
+  .dw-dir-hueco{display:block}
+  /* Una fila por parada: color, posición y el aspa de quitarla. */
+  .dw-stops{display:flex;flex-direction:column;gap:5px}
+  .dw-stop{display:flex;align-items:center;gap:5px}
+  .dw-color-sm{width:34px;height:22px}
+  .dw-num-sm{width:48px;height:22px;font-size:11.5px}
+  .dw-stop-x{width:22px;height:22px;flex-shrink:0;border:1px solid #d4dce2;border-radius:4px;background:#fff;color:#8a97a3;font-size:11px;cursor:pointer;padding:0}
+  .dw-stop-x:hover:not(:disabled){border-color:#c0392b;color:#c0392b}
+  .dw-stop-x:disabled{opacity:.35;cursor:default}
   .dw-btns{display:flex;gap:4px}
   .dw-btn{flex:1;height:26px;border:1px solid #d4dce2;border-radius:5px;background:#fff;color:#42505c;font-size:13px;cursor:pointer}
   .dw-btn:hover{border-color:#6c4bb6;color:#6c4bb6}
@@ -557,6 +609,6 @@
   </div>
 </div>
 
-<script src="colabdraw-app.js?v=202608192033"></script>
+<script src="colabdraw-app.js?v=202608192104"></script>
 </body>
 </html>

@@ -23,6 +23,7 @@ import { Canvas, PCT_MIN, PCT_MAX } from "./draw/canvas.js";
 import { createScrollbars } from "./draw/scrollbars.js";
 import { Tools } from "./draw/tools.js";
 import { createStylePanel } from "./draw/style.js";
+import { paintValue, readPaint, gcGradients } from "./draw/paint.js";
 import { createToolOptions } from "./draw/tool-options.js";
 import { createObjectPanel } from "./draw/layers.js";
 import { createTextEditor } from "./draw/text.js";
@@ -395,11 +396,16 @@ function ensureEditorParts() {
     isTextTool: () => !!state.tools && state.tools.tool === "text",
     getPage: () => (state.drawing ? state.drawing.size() : { w: 0, h: 0 }),
     canWrite,
-    onApply: attrs => state.tools.applyStyle(attrs),
+    onApply: aplicarEstilo,
     onOrder: mode => state.tools.reorder(mode),
     onPage: setPageSize,
     // el mismo cuadro que abren el doble clic y el Intro
-    onEditFormula: el => state.formulaEd.open(el)
+    onEditFormula: el => state.formulaEd.open(el),
+    /* Los degradados viven en el <defs> del dibujo, que el panel no
+       conoce: aquí se traduce la ficha a lo que se escribe en el
+       atributo, y al revés para poder volver a enseñarla. */
+    resolvePaint: spec => paintValue(state.drawing, spec),
+    readPaint: v => readPaint(state.drawing, v)
   });
   /* La barra de la herramienta activa: flota sobre el lienzo y solo
      aparece con una herramienta de dibujo en la mano. */
@@ -411,7 +417,7 @@ function ensureEditorParts() {
     setCrear: o => { if (state.tools) state.tools.setCrear(o); },
     getScale: () => (state.tools ? state.tools.selectionScale() : 1),
     canWrite,
-    onApply: attrs => state.tools.applyStyle(attrs),
+    onApply: aplicarEstilo,
     getPage: () => (state.drawing ? state.drawing.size() : { w: 0, h: 0 }),
     onPage: setPageSize,
     onExit: () => { if (state.tools) state.tools.setTool("select"); }
@@ -441,6 +447,18 @@ function ensureEditorParts() {
       state.style.refresh();
     }
   });
+}
+
+/* Todo cambio de estilo pasa por aquí para recoger de paso los
+   degradados que dejaron de usarse: cada retoque de color crea una
+   definición nueva en el <defs>, así que sin la recogida el archivo
+   engordaría una entrada por cada tecla pulsada en el cuadro de color. */
+function aplicarEstilo(attrs) {
+  if (!state.tools) return;
+  state.tools.applyStyle(attrs);
+  // lo que espera la próxima figura cuenta como en uso aunque no lo lleve nadie
+  const t = state.tools;
+  gcGradients(state.drawing, [t.style.fill, t.style.stroke, t.textStyle.fill]);
 }
 
 /* El tamaño del papel se pide desde dos sitios (el panel de la derecha y

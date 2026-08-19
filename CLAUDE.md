@@ -728,6 +728,40 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
   canvas is covered, never destroyed (same reason as ColabTeX's asset preview).
   PDFs go in an `<iframe>` with the browser's own viewer — pulling pdf.js in
   would add more than a megabyte to show a one-page figure.
+- `paint.js` + `color-popover.js` — **colour and gradients**. A `fill` or a
+  `stroke` is described by one *spec* (`none` / `solid` / `linear` / `radial`)
+  so the panel never branches on which it is. The top half of `paint.js` is
+  pure arithmetic (angle↔vector, radius, CSS preview) and runs in Node; the
+  bottom half writes to `<defs>`. Decisions worth keeping:
+  - **The panel shows one clickable chip per channel, not a grid.** Two
+    fifteen-swatch grids permanently open ate half the panel and pushed the
+    stroke width off screen, for something touched once in a while. Everything
+    else — palette, the native colour map, hex, the whole gradient editor —
+    lives in the popover, which hangs off `<body>` in `position:fixed` because
+    the panel is `overflow:auto` and would clip it.
+  - **`gradientUnits` stays at the default `objectBoundingBox`**: coordinates
+    run 0–1 over the shape's own box, so a gradient needs to know nothing about
+    millimetres and follows the shape through moves, scales and rotations. In
+    user units every drag would have to rewrite the `<defs>`.
+  - **The angle is stored as the vector SVG understands**, never as a
+    `data-ang` beside it — a second place saying the same thing is a second
+    place that can lie. It comes back out with `atan2`.
+  - **The radial's radius reaches the farthest corner.** With SVG's default
+    `r = 0.5` a gradient centred on a corner left half the shape flat in the
+    last stop's colour and read as "the editor didn't apply it".
+  - **Every apply makes a new `<defs>` entry and `gcGradients` collects the
+    orphans**, which is what keeps a colour dragged around the picker from
+    leaving one definition per keystroke. It only ever deletes entries carrying
+    `data-dw-grad` — an imported file's gradients are not ours to remove — and
+    takes an `enUso` list, because the colour waiting for the *next* shape is
+    referenced by nothing yet and was being collected mid-gesture.
+  - **A copied shape carries its definitions** (`clipboardSvg({defs})`,
+    `textToNodes` → `defs`): without them a paste into another drawing left
+    `fill="url(#…)"` pointing at nothing, i.e. a black shape. `textToNodes`
+    renumbers ids and rewrites the references in the same pass, so both halves
+    still match. Note this can only be checked by pasting for real — an
+    unintegrated Yjs node returns nothing when read, the same trap as
+    everywhere else.
 - `style.js` — the fill/stroke/text/opacity/order/page panel, built in JS. Shows
   "varios" when the selection disagrees rather than the first value, so touching
   a control can't silently overwrite the rest. The TEXTO section only appears

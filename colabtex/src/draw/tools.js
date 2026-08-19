@@ -16,7 +16,7 @@ import {
   snapBoxDelta, snapValue, angleOf, dist, clamp, fmt
 } from "./geom.js";
 import { DEFAULT_CAP, DEFAULT_JOIN, capAttr, joinAttr } from "./stroke.js";
-import { SVG_NS, newId } from "./doc.js";
+import { SVG_NS, newId, isEl, childrenOf } from "./doc.js";
 import { addText, isText, TEXT_ATTRS, DEFAULT_FONT, DEFAULT_SIZE } from "./text.js";
 import { esFormula } from "./latex.js";
 import { clipboardSvg, textToNodes } from "./svgio.js";
@@ -158,6 +158,29 @@ export class Tools {
     return !!(sel && !sel.isCollapsed && String(sel).trim());
   }
 
+  /* Las definiciones del <defs> a las que apunta lo que se va a copiar.
+     Se recorre el árbol de lo copiado buscando url(#…) y se cogen del
+     <defs> las que coincidan por id — no el <defs> entero, que en un
+     archivo importado puede pesar más que el dibujo. */
+  _defsDe(d, nodos) {
+    const defs = d.defs();
+    if (!defs) return [];
+    const usados = new Set();
+    const mirar = n => {
+      if (!isEl(n)) return;
+      const at = n.getAttributes ? n.getAttributes() : {};
+      for (const k of Object.keys(at)) {
+        const re = /url\(\s*['"]?#([^)'"\s]+)['"]?\s*\)/g;
+        let m;
+        while ((m = re.exec(String(at[k] || "")))) usados.add(m[1]);
+      }
+      for (const kid of childrenOf(n)) mirar(kid);
+    };
+    for (const n of nodos) mirar(n);
+    if (!usados.size) return [];
+    return childrenOf(defs).filter(n => isEl(n) && usados.has(n.getAttribute("id")));
+  }
+
   _clipWrite(e, cortar) {
     if (this._enTexto(e)) return;
     const d = this.getDrawing();
@@ -171,7 +194,9 @@ export class Tools {
     if (!nodos.length) return;
 
     const { w, h } = d.size();
-    const texto = clipboardSvg(nodos, { w, h });
+    /* Un degradado vive en el <defs>, no en la figura: si no viaja con
+       ella, al pegar queda un url(#…) apuntando a nada. */
+    const texto = clipboardSvg(nodos, { w, h, defs: this._defsDe(d, nodos) });
     this.clip = texto;
     if (e.clipboardData) {
       e.clipboardData.setData("text/plain", texto);
@@ -209,10 +234,18 @@ export class Tools {
   paste(texto, { dx = 2, dy = 2 } = {}) {
     const d = this.getDrawing();
     if (!d || !this.canWrite()) return [];
-    let nodes, info;
-    try { ({ nodes, info } = textToNodes(texto)); }
+    let nodes, info, defs;
+    try { ({ nodes, info, defs } = textToNodes(texto)); }
     catch (err) { this.onStatus("Eso no se puede pegar aquí."); return []; }
     if (!nodes.length) { this.onStatus("No había nada que pegar."); return []; }
+
+    /* Primero las definiciones: `textToNodes` ya les ha puesto id
+       nuevos y ha reescrito las referencias de las figuras para que
+       apunten a ellos, así que las dos mitades encajan. */
+    if (defs && defs.length) {
+      const dst = d.defs();
+      if (dst) d.edit(() => dst.insert(childrenOf(dst).length, defs));
+    }
 
     if (info.every(i => i.layer)) {
       const puestas = d.pasteLayers(nodes, info.map(i => i.label));

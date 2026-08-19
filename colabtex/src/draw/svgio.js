@@ -401,12 +401,18 @@ export function nodesToText(nodes) {
 }
 
 /* Devuelve el marcado dentro de un <svg> con el tamaño del dibujo, que es
-   lo que esperan los programas de fuera al pegar. */
-export function clipboardSvg(nodes, { w = 0, h = 0 } = {}) {
+   lo que esperan los programas de fuera al pegar.
+
+   `defs` son las definiciones a las que apunta lo copiado —un degradado,
+   por ejemplo—. Tienen que viajar CON la figura: sin ellas, pegar en
+   otro dibujo dejaba un fill="url(#…)" apuntando a la nada, o sea una
+   figura negra, y en otro programa ni eso. */
+export function clipboardSvg(nodes, { w = 0, h = 0, defs = [] } = {}) {
   const medida = w > 0 && h > 0
     ? ` width="${fmt(w)}mm" height="${fmt(h)}mm" viewBox="0 0 ${fmt(w)} ${fmt(h)}"`
     : "";
-  return `<svg xmlns="http://www.w3.org/2000/svg"${medida}>\n${nodesToText(nodes)}\n</svg>\n`;
+  const cabeza = defs && defs.length ? `<defs>\n${nodesToText(defs)}\n</defs>\n` : "";
+  return `<svg xmlns="http://www.w3.org/2000/svg"${medida}>\n${cabeza}${nodesToText(nodes)}\n</svg>\n`;
 }
 
 const esBlanco = s => !String(s || "").trim();
@@ -450,6 +456,18 @@ export function textToNodes(text, { freshIds = true } = {}) {
   /* Junto a los nodos va una ficha de cada uno leída del DOM. Sin ella no
      habría forma de saber si lo pegado es una capa ni cuál era su
      transform: un elemento de Yjs sin integrar no devuelve nada. */
+  /* Los <defs> no son figuras, pero tampoco se tiran: quien pega tiene
+     que meterlos en el <defs> del dibujo de destino, o las referencias
+     que se acaban de renumerar no apuntarían a nada. */
+  const defs = [];
+  for (const d of Array.from(root.getElementsByTagName("defs"))) {
+    for (const kid of Array.from(d.childNodes)) {
+      if (kid.nodeType !== 1) continue;
+      const y = domToY(kid);
+      if (y instanceof Y.XmlElement) defs.push(y);
+    }
+  }
+
   const nodes = [], info = [];
   for (const child of Array.from(root.childNodes)) {
     if (child.nodeType !== 1) continue;
@@ -465,7 +483,7 @@ export function textToNodes(text, { freshIds = true } = {}) {
       transform: child.getAttribute("transform") || ""
     });
   }
-  return { nodes, info };
+  return { nodes, info, defs };
 }
 
 /* Texto .svg completo de un dibujo. `root` es el <svg> Y.XmlElement.

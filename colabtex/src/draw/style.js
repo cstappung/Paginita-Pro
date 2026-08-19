@@ -15,12 +15,8 @@
 import { FONTS, DEFAULT_FONT, DEFAULT_SIZE, isText } from "./text.js";
 import { CAPS, JOINS, DASHES, DEFAULT_CAP, DEFAULT_JOIN } from "./stroke.js";
 import { esFormula, latexDe } from "./latex.js";
-
-export const PALETTE = [
-  "none", "#000000", "#3d4c5e", "#8a97a3", "#ffffff",
-  "#c0392b", "#e67e22", "#e2c08d", "#2e9e5b", "#0d9488",
-  "#0f62fe", "#6cb6ff", "#6c4bb6", "#b58bf5", "#d6336c"
-];
+import { createChip, createColorPopover } from "./color-popover.js";
+import { etiquetaPaint, esGrad } from "./paint.js";
 
 const el = (tag, cls, html) => {
   const n = document.createElement(tag);
@@ -86,6 +82,11 @@ export function createStylePanel(host, opts = {}) {
   const getTextStyle = opts.getTextStyle || (() => ({}));
   const isTextTool = opts.isTextTool || (() => false);
   const onEditFormula = opts.onEditFormula || (() => {});
+  /* El degradado necesita el documento: su definición vive en el <defs>
+     del dibujo. El panel no lo conoce, así que traduce la ficha a valor
+     de atributo (y al revés) a través de quien lo creó. */
+  const resolvePaint = opts.resolvePaint || (spec => (spec && spec.tipo === "solid" ? spec.color : "none"));
+  const readPaint = opts.readPaint || (v => (v == null || v === "none" ? { tipo: "none" } : { tipo: "solid", color: v }));
   /* Cuánto agranda el lienzo lo que hay elegido. Escalar una figura se
      guarda en su `transform`, así que un trazo de 0,5 mm escalado al
      doble se ve de 1 mm mientras el atributo sigue diciendo 0,5: el panel
@@ -95,20 +96,24 @@ export function createStylePanel(host, opts = {}) {
   host.textContent = "";
   host.classList.add("dw-style");
 
-  /* ---------- muestrario reutilizable ---------- */
-  const swatches = (name, onPick) => {
-    const wrap = el("div", "dw-swatches");
-    for (const c of PALETTE) {
-      const b = el("button", "dw-swatch" + (c === "none" ? " dw-swatch-none" : ""));
-      b.type = "button";
-      b.dataset.color = c;
-      b.dataset.for = name;
-      b.title = c === "none" ? "Sin color" : c;
-      if (c !== "none") b.style.background = c;
-      b.onclick = () => onPick(c);
-      wrap.appendChild(b);
-    }
-    return wrap;
+  /* ---------- el cuadro de color ----------
+     Uno para los dos canales: abrir el de trazo cierra el de relleno
+     sin tener que acordarse de hacerlo. */
+  const pop = createColorPopover();
+
+  /* Una muestra pulsable por canal. Al abrirla se le pasa la ficha que
+     describe lo que hay ahora, y cada cambio se aplica al vuelo. */
+  const canal = (attr, porDefecto) => {
+    const chip = createChip(botón => {
+      const sel = getSel();
+      const bruto = sel.length ? commonAttr(sel, attr, porDefecto) : (getStyle()[attr] || porDefecto);
+      pop.open(botón, bruto == null ? { tipo: "none" } : readPaint(bruto),
+        spec => apply({ [attr]: resolvePaint(spec) }));
+    });
+    const label = el("span", "dw-val");
+    const row = el("div", "dw-row dw-row-color");
+    row.append(chip, label);
+    return { chip, label, row };
   };
 
   const section = (title) => {
@@ -119,26 +124,16 @@ export function createStylePanel(host, opts = {}) {
 
   /* ---------- relleno ---------- */
   const secFill = section("RELLENO");
-  const fillRow = el("div", "dw-row");
-  const fillInput = el("input", "dw-color");
-  fillInput.type = "color";
-  fillInput.id = "dwFillColor";
-  const fillLabel = el("span", "dw-val");
-  fillLabel.id = "dwFillLabel";
-  fillRow.append(fillInput, fillLabel);
-  secFill.append(fillRow, swatches("fill", c => apply({ fill: c === "none" ? "none" : c })));
-  fillInput.oninput = () => apply({ fill: fillInput.value });
+  const fill = canal("fill", "#000000");
+  fill.chip.id = "dwFillColor";
+  fill.label.id = "dwFillLabel";
+  secFill.append(fill.row);
 
   /* ---------- trazo ---------- */
   const secStroke = section("TRAZO");
-  const strokeRow = el("div", "dw-row");
-  const strokeInput = el("input", "dw-color");
-  strokeInput.type = "color";
-  strokeInput.id = "dwStrokeColor";
-  const strokeLabel = el("span", "dw-val");
-  strokeLabel.id = "dwStrokeLabel";
-  strokeRow.append(strokeInput, strokeLabel);
-  strokeInput.oninput = () => apply({ stroke: strokeInput.value });
+  const stroke = canal("stroke", "none");
+  stroke.chip.id = "dwStrokeColor";
+  stroke.label.id = "dwStrokeLabel";
 
   const widthRow = el("div", "dw-row");
   widthRow.appendChild(el("label", "dw-lbl", "Grosor"));
@@ -192,8 +187,7 @@ export function createStylePanel(host, opts = {}) {
   const cap = opciones("dwLinecap", CAPS, "stroke-linecap", "Extremos");
   const join = opciones("dwLinejoin", JOINS, "stroke-linejoin", "Uniones");
 
-  secStroke.append(strokeRow, swatches("stroke", c => apply({ stroke: c === "none" ? "none" : c })),
-    widthRow, dashRow, cap.row, join.row);
+  secStroke.append(stroke.row, widthRow, dashRow, cap.row, join.row);
 
   /* ---------- texto ----------
      Solo aparece cuando hay un texto elegido (o cuando se va a escribir
@@ -327,18 +321,17 @@ export function createStylePanel(host, opts = {}) {
     const sel = getSel();
     const st = getStyle();
     const ro = !canWrite();
-    for (const n of [fillInput, strokeInput, widthInput, dashSel, cap.sel, join.sel, opInput, pw, ph])
-      n.disabled = ro;
-    host.querySelectorAll(".dw-swatch,.dw-btn").forEach(b => { b.disabled = ro; });
+    for (const n of [widthInput, dashSel, cap.sel, join.sel, opInput, pw, ph]) n.disabled = ro;
+    host.querySelectorAll(".dw-chip,.dw-btn").forEach(b => { b.disabled = ro; });
 
-    const fill = sel.length ? commonAttr(sel, "fill", "#000000") : st.fill;
-    const stroke = sel.length ? commonAttr(sel, "stroke", "none") : st.stroke;
+    const fillV = sel.length ? commonAttr(sel, "fill", "#000000") : st.fill;
+    const strokeV = sel.length ? commonAttr(sel, "stroke", "none") : st.stroke;
     const width = sel.length ? commonAttr(sel, "stroke-width", "1") : st["stroke-width"];
     const dash = sel.length ? commonAttr(sel, "stroke-dasharray", "") : "";
     const op = sel.length ? commonAttr(sel, "opacity", "1") : 1;
 
-    paintColor(fillInput, fillLabel, fill);
-    paintColor(strokeInput, strokeLabel, stroke);
+    pintarCanal(fill, fillV);
+    pintarCanal(stroke, strokeV);
     const k = sel.length ? (getScale() || 1) : 1;
     // nunca se le pisa a nadie lo que está escribiendo
     if (!enUso(widthInput))
@@ -410,16 +403,19 @@ export function createStylePanel(host, opts = {}) {
     for (const b of [boldBtn, italBtn, ...alignBtns]) b.disabled = ro;
   }
 
-  /* Un <input type=color> solo entiende #rrggbb: «none» y los colores
-     con nombre se enseñan en la etiqueta de al lado. */
-  function paintColor(input, label, value) {
-    if (value == null) { label.textContent = "varios"; return; }
-    const v = String(value).trim();
-    if (v === "none" || v === "") { label.textContent = "sin color"; return; }
-    label.textContent = v;
-    if (/^#[0-9a-f]{6}$/i.test(v)) input.value = v;
-    else if (/^#[0-9a-f]{3}$/i.test(v))
-      input.value = "#" + v.slice(1).split("").map(c => c + c).join("");
+  /* La muestra y su rótulo. Un valor null es «la selección no coincide»,
+     y entonces la muestra va a rayas: enseñar el color del primero
+     invitaba a pulsar y pisar el de los demás sin querer.
+
+     Si el cuadro está abierto sobre esta muestra también se le pasa la
+     ficha nueva: el documento puede haber cambiado por debajo (otra
+     persona, o un Ctrl+Z) y el cuadro estaría enseñando lo de antes. */
+  function pintarCanal(c, value) {
+    const spec = value == null ? null : readPaint(value);
+    c.chip.pintar(spec, spec ? etiquetaPaint(spec) : "varios");
+    c.label.textContent = etiquetaPaint(spec);
+    c.label.classList.toggle("dw-val-grad", !!spec && esGrad(spec));
+    if (pop.isOpen() && pop.anchorIs(c.chip) && spec) pop.setSpec(spec);
   }
 
   refresh();
