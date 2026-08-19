@@ -18,14 +18,19 @@ let failed = false;
 for (const page of PAGES) {
   const file = path.join(ROOT, page.html);
   const src = fs.readFileSync(file, "utf8");
-  const re = new RegExp(page.bundle.replace(/\./g, "\\.") + '(\\?v=[^"]*)?');
-  const out = src.replace(re, `${page.bundle}?v=${v}`);
-  if (out === src) {
+  const nombre = page.bundle.replace(/\./g, "\\.");
+  /* Se comprueba que la etiqueta ESTÉ, no que el texto cambie: dos
+     compilaciones dentro del mismo minuto dan la misma marca, el
+     reemplazo no altera nada y aquello se daba por «etiqueta no
+     encontrada» — con lo que `npm run build` salía con error después de
+     haber ido perfectamente. */
+  if (!new RegExp(nombre).test(src)) {
     console.error(`stamp-version: no se encontró la etiqueta de ${page.bundle} en ${page.html}`);
     failed = true;
     continue;
   }
-  fs.writeFileSync(file, out);
+  const out = src.replace(new RegExp(nombre + '(\\?v=[^"]*)?'), `${page.bundle}?v=${v}`);
+  if (out !== src) fs.writeFileSync(file, out);
   console.log(`stamp-version: ${page.bundle}?v=${v}`);
 }
 

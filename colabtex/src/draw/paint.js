@@ -43,11 +43,12 @@ import { newId, childrenOf, indexOf, isEl } from "./doc.js";
 
 export const GRAD_MARK = "data-dw-grad";
 export const SOMBRA_MARK = "data-dw-shadow";
+export const FLECHA_MARK = "data-dw-arrow";
 
 /* Marcas de lo que ha puesto el editor en el <defs>. Solo esto se
    recoge cuando deja de usarse: un degradado o un filtro que venían
    dentro de un SVG importado no son nuestros para borrarlos. */
-const MARCAS = [GRAD_MARK, SOMBRA_MARK];
+const MARCAS = [GRAD_MARK, SOMBRA_MARK, FLECHA_MARK];
 
 /* Direcciones con nombre, en el orden en que se pintan los botones.
    0° es de izquierda a derecha y el ángulo crece en el sentido de las
@@ -295,6 +296,70 @@ export function sombraSpec(el, hijos) {
 }
 
 /* ============================================================
+   Puntas de flecha
+
+   Una flecha es una línea con `marker-start` / `marker-end` apuntando a
+   un `<marker>` del <defs>. Tres decisiones:
+
+   - **Un solo marcador por dibujo.** La punta no tiene ajustes que
+     valga la pena inventar: `markerUnits="strokeWidth"` la hace crecer
+     con el grosor de la línea y `context-stroke` la pinta del color del
+     trazo, así que dos flechas distintas siguen necesitando la MISMA
+     definición. Una por línea habría llenado el <defs> de copias
+     idénticas.
+   - **`orient="auto-start-reverse"`**, que es lo que hace que la punta
+     del principio mire hacia fuera. Con el `auto` de toda la vida, la
+     flecha del extremo inicial apuntaba hacia dentro de la línea.
+   - **`context-stroke`** en vez de un color escrito: si se guardara el
+     color, cambiar el del trazo dejaría la punta del color de antes, y
+     habría que reescribir el <defs> desde el panel de estilo.
+   ============================================================ */
+
+export const PUNTAS = [
+  { value: "", label: "Sin punta" },
+  { value: "end", label: "Flecha al final" },
+  { value: "start", label: "Flecha al principio" },
+  { value: "both", label: "Flecha en los dos" }
+];
+
+/* Los dos atributos de la punta, y a qué figuras se les ponen.
+
+   Solo a las ABIERTAS. En un rectángulo o en un rótulo el atributo no
+   pinta nada y se queda ahí de adorno; en un polígono sí pinta —SVG
+   coloca la punta en el primer y el último vértice— y aparece una
+   flecha suelta en una esquina de la figura, que es peor que nada.
+   Como el color y el grosor pasan por el mismo camino que las puntas
+   (`Tools.applyStyle`), sin esta lista elegir «flecha» con un polígono
+   todavía seleccionado se lo marcaba a él. */
+export const PUNTA_ATTRS = ["marker-start", "marker-end"];
+const MARCABLES = new Set(["line", "polyline", "path"]);
+export const esMarcable = el => !!el && MARCABLES.has(el.nodeName);
+
+export function flechaMarkup(id) {
+  return `<marker id="${esc(id)}" ${FLECHA_MARK}="1" viewBox="0 0 10 10" ` +
+    `refX="9" refY="5" markerWidth="6" markerHeight="6" ` +
+    `markerUnits="strokeWidth" orient="auto-start-reverse">` +
+    `<path d="M0 0 L10 5 L0 10 z" fill="context-stroke"/></marker>`;
+}
+
+/* Qué punta tiene una figura, leído de sus dos atributos. */
+export function readArrow(inicio, fin) {
+  const hay = v => !!refId(v);
+  const a = hay(inicio), b = hay(fin);
+  if (a && b) return "both";
+  if (b) return "end";
+  if (a) return "start";
+  return "";
+}
+
+/* Los dos atributos que hay que escribir para un modo dado. `ref` es lo
+   que devuelve `flechaRef`. */
+export function atributosPunta(modo, ref) {
+  const usa = lado => (modo === lado || modo === "both") && ref ? ref : null;
+  return { "marker-start": usa("start"), "marker-end": usa("end") };
+}
+
+/* ============================================================
    Lo de aquí abajo SÍ toca el documento: todo lo anterior es
    aritmética y se puede comprobar en Node sin navegador.
    ============================================================ */
@@ -363,6 +428,21 @@ export function readPaint(drawing, value) {
   if (!id) return { tipo: "solid", color: v };
   const g = defById(drawing, id);
   return g ? gradSpec(g, childrenOf(g)) : null;
+}
+
+/* El marcador de flecha del dibujo, creándolo la primera vez. Se
+   REUTILIZA el que ya haya: ver el porqué arriba. */
+export function flechaRef(drawing) {
+  const defs = drawing && drawing.defs();
+  if (!defs) return null;
+  for (const n of childrenOf(defs)) {
+    if (isEl(n) && n.getAttribute(FLECHA_MARK) != null) {
+      const id = n.getAttribute("id");
+      if (id) return `url(#${id})`;
+    }
+  }
+  const id = newId("fle");
+  return ponerEnDefs(drawing, flechaMarkup(id), id);
 }
 
 export function defById(drawing, id) {

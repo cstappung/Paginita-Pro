@@ -13,15 +13,21 @@
 import {
   parseTransform, matToString, matMul, matInvert, matApply, matApplyVec,
   translate, scaleAbout, rotateM, boxFromDrag, boxCorners, boxOfPoints,
-  snapBoxDelta, snapValue, angleOf, dist, clamp, fmt
+  snapBoxDelta, snapValue, angleOf, dist, clamp, fmt, polygonPoints, pointsAttr
 } from "./geom.js";
 import { DEFAULT_CAP, DEFAULT_JOIN, capAttr, joinAttr } from "./stroke.js";
 import { SVG_NS, newId, isEl, childrenOf } from "./doc.js";
 import { addText, isText, TEXT_ATTRS, DEFAULT_FONT, DEFAULT_SIZE } from "./text.js";
 import { esFormula } from "./latex.js";
+import { PUNTA_ATTRS, esMarcable } from "./paint.js";
 import { clipboardSvg, textToNodes } from "./svgio.js";
 
 const svgEl = tag => document.createElementNS(SVG_NS, tag);
+
+/* Zoom con Ctrl+rueda: cuánto avanza cada muesca y cuánto
+   desplazamiento hace falta para contar una (ver _zoomRueda). */
+const PASO_ZOOM = 5;        // puntos de porcentaje
+const RUEDA_UMBRAL = 40;    // píxeles de deltaY normalizados
 
 /* Tiradores de escala: nombre → posición relativa dentro de la caja. */
 const HANDLES = [
@@ -88,7 +94,9 @@ export class Tools {
        caben en `style`: el redondeo de esquina que llevará el próximo
        rectángulo y si la herramienta se queda en la mano al soltar.
        Las lleva la barra de opciones (tool-options.js). */
-    this.crear = Object.assign({ rx: 0, mantener: false }, opts.crear || {});
+    this.crear = Object.assign(
+      { rx: 0, mantener: false, lados: 3, estrella: false, punta: 0.5 },
+      opts.crear || {});
 
     this.tool = "select";
     this.sel = [];
@@ -96,6 +104,7 @@ export class Tools {
     this._spaceDown = false;
     this._lastClick = null;   // para detectar el doble clic sin depender del DOM
     this.clip = null;         // portapapeles propio, por si el del sistema falla
+    this._zoomAcc = 0;        // rueda acumulada sin gastar (ver _zoomRueda)
 
     this._onDown = e => this._pointerDown(e);
     this._onMove = e => this._pointerMove(e);
@@ -1073,6 +1082,17 @@ export class Tools {
       guia.setAttribute("x", caja.x); guia.setAttribute("y", caja.y);
       guia.setAttribute("width", caja.w); guia.setAttribute("height", caja.h);
       ov.appendChild(guia);
+    } else if (d.tool === "poly") {
+      node = svgEl("polygon");
+      node.setAttribute("points", pointsAttr(polygonPoints(caja, this.crear.lados, {
+        estrella: !!this.crear.estrella, razon: this.crear.punta
+      })));
+      // igual que la elipse: los vértices no tocan las esquinas que se apuntan
+      const guia = svgEl("rect");
+      guia.setAttribute("class", "dw-preview-guia");
+      guia.setAttribute("x", caja.x); guia.setAttribute("y", caja.y);
+      guia.setAttribute("width", caja.w); guia.setAttribute("height", caja.h);
+      ov.appendChild(guia);
     } else {
       node = svgEl("rect");
       node.setAttribute("x", caja.x); node.setAttribute("y", caja.y);
@@ -1083,6 +1103,15 @@ export class Tools {
 
     const grosor = Math.max(1, (parseFloat(st["stroke-width"]) || 0) * k);
     node.setAttribute("class", "dw-preview");
+    /* El <defs> del documento está espejado dentro del MISMO <svg> que
+       la capa de encima, así que la punta se resuelve también aquí: la
+       vista previa enseña la flecha en vez de una línea pelada que
+       cambia al soltar. */
+    if (d.tool === "line") {
+      for (const at of ["marker-start", "marker-end"]) {
+        if (st[at]) node.setAttribute(at, st[at]);
+      }
+    }
     node.style.fill = d.tool === "line" ? "none" : (st.fill || "none");
     node.style.stroke = st.stroke || "none";
     node.style.strokeWidth = String(grosor);
@@ -1137,10 +1166,24 @@ export class Tools {
       el = d.add(capa, "ellipse", Object.assign({
         cx: fmt(b.x + b.w / 2), cy: fmt(b.y + b.h / 2), rx: fmt(b.w / 2), ry: fmt(b.h / 2)
       }, common));
+    } else if (tool === "poly") {
+      el = d.add(capa, "polygon", Object.assign({
+        points: pointsAttr(polygonPoints(b, this.crear.lados, {
+          estrella: !!this.crear.estrella, razon: this.crear.punta
+        }))
+      }, common));
     } else if (tool === "line") {
       el = d.add(capa, "line", Object.assign({
         x1: fmt(q0.x), y1: fmt(q0.y), x2: fmt(q1.x), y2: fmt(q1.y)
-      }, common, { fill: null, "stroke-linejoin": null }));
+      }, common, {
+        fill: null, "stroke-linejoin": null,
+        /* La punta se elige ANTES de arrastrar, igual que el color, y
+           vive en el mismo sitio: el estilo que espera la siguiente
+           figura. Sin esto, elegir «flecha» en la barra no hacía nada
+           hasta seleccionar la línea ya dibujada. */
+        "marker-start": st["marker-start"] || null,
+        "marker-end": st["marker-end"] || null
+      }));
     }
     if (el) {
       this.select(el);
@@ -1150,12 +1193,45 @@ export class Tools {
     }
   }
 
+  /* Ctrl+rueda: CINCO PUNTOS de porcentaje por muesca, ni más ni menos.
+
+     Antes era multiplicativo (0,995^deltaY), y eso daba un salto
+     distinto en cada sitio: la muesca de una rueda vale 100, 120 o 53
+     según el navegador y el ratón, así que el mismo gesto acercaba de
+     una forma en un equipo y de otra en el de al lado.
+
+     Se ACUMULA el desplazamiento y se da UN paso al pasar del umbral,
+     vaciando el contador. Así una muesca es siempre exactamente un
+     paso, venga con el delta que venga, y el pellizco del panel táctil
+     —que llega en trocitos de dos o tres— avanza suave en vez de
+     dispararse. El contador se vacía también al cambiar de sentido, o
+     al invertir la dirección habría que "gastar" antes lo acumulado.
+
+     El destino se redondea al múltiplo de 5 ANTES de dar el paso: así
+     el porcentaje acaba siempre en 0 o en 5 aunque se viniera de un
+     «ajustar a la página», que deja números como 78 %. */
+  _zoomRueda(e) {
+    const d = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaMode === 2 ? e.deltaY * 100 : e.deltaY;
+    if (!d) return;
+    if ((d > 0) !== (this._zoomAcc > 0)) this._zoomAcc = 0;
+    this._zoomAcc += d;
+    if (Math.abs(this._zoomAcc) < RUEDA_UMBRAL) return;
+    const sentido = this._zoomAcc > 0 ? -1 : 1;      // rueda hacia abajo = alejar
+    this._zoomAcc = 0;
+    const pct = this.canvas.zoomPercent();
+    const base = Math.round(pct / PASO_ZOOM) * PASO_ZOOM;
+    // si el redondeo ya mueve hacia donde se pide, ese es el primer paso
+    const destino = Math.abs(base - pct) > 0.01 && (base - pct) * sentido > 0
+      ? base
+      : base + sentido * PASO_ZOOM;
+    this.canvas.setZoomPercent(destino, { x: e.clientX, y: e.clientY });
+  }
+
   _wheel(e) {
     e.preventDefault();
     if (e.ctrlKey || e.metaKey) {
       // el pellizco del panel táctil llega justo así
-      const factor = Math.pow(0.995, e.deltaY);
-      this.canvas.zoomBy(factor, { x: e.clientX, y: e.clientY });
+      this._zoomRueda(e);
     } else if (e.shiftKey) {
       this.canvas.panBy(-e.deltaY - e.deltaX, 0);
     } else {
@@ -1238,7 +1314,17 @@ export class Tools {
       else this.style[k] = v;
     }
     if (!d || !this.sel.length || !this.canWrite()) return;
-    d.setAttrs(this.sel, attrs);
+    /* Las puntas de flecha van aparte: solo a lo que puede enseñarlas
+       (ver `esMarcable`). Todo lo demás, a la selección entera. */
+    const generales = {}, puntas = {};
+    for (const [k, v] of Object.entries(attrs)) {
+      (PUNTA_ATTRS.includes(k) ? puntas : generales)[k] = v;
+    }
+    if (Object.keys(generales).length) d.setAttrs(this.sel, generales);
+    if (Object.keys(puntas).length) {
+      const dianas = this.sel.filter(esMarcable);
+      if (dianas.length) d.setAttrs(dianas, puntas);
+    }
     this.redrawOverlay();
     // el panel enseña los valores de la selección: hay que repintarlo
     this.onSelectionChange(this.selection());
@@ -1294,7 +1380,10 @@ export class Tools {
 
     // atajos de herramienta, como en Inkscape
     if (!mod && !e.altKey) {
-      const map = { s: "select", r: "rect", e: "ellipse", l: "line", t: "text", f: "formula", p: "page" };
+      const map = {
+        s: "select", r: "rect", e: "ellipse", l: "line",
+        g: "poly", t: "text", f: "formula", p: "page"
+      };
       const name = map[e.key.toLowerCase()];
       if (name) { this.setTool(name); return; }
       if (e.key === "3") { this.canvas.fitPage(); this.redrawOverlay(); }

@@ -131,6 +131,21 @@ borrar son el mismo código y **las reglas de seguridad no cambian**.
   caja de la figura, así que la sigue al moverla, escalarla o girarla; las
   definiciones que dejan de usarse se recogen solas, y viajan con la figura al
   copiar y pegar.
+- **Polígonos y estrellas** (`draw/geom.js` + `draw/tools.js`): la herramienta △
+  del rail (G) dibuja un polígono de los lados que se pidan en la barra de
+  arriba, y con la casilla «Estrella» intercala un vértice más cerca del
+  centro. Se inscribe en la caja que se arrastra, como la elipse, así que un
+  triángulo puede salir alto y estrecho sin escalarlo después.
+- **Flechas** (`draw/paint.js`): la línea admite punta al principio, al final o
+  en los dos, elegida en la barra de la herramienta antes de dibujar o en la
+  sección TRAZO del panel para una que ya esté puesta. Es un `<marker>` único
+  por dibujo: crece con el grosor del trazo y se pinta de su color, así que no
+  hace falta uno por flecha. Solo se les pone a las figuras abiertas (línea,
+  polilínea, trazado): en un rectángulo no pintaría nada y en un polígono
+  saldría una flecha suelta en un vértice.
+- **Zoom con Ctrl+rueda**: de cinco en cinco puntos de porcentaje, una muesca
+  un paso, y redondeando al múltiplo de 5. Antes era multiplicativo y el mismo
+  gesto daba un salto distinto según el ratón y el navegador.
 - **Sombra** (`draw/paint.js`): un `<filter>` con un `feDropShadow` en el
   `<defs>`. Se enciende con una casilla en el panel y se ajusta el
   desplazamiento, el difuminado, el color y la opacidad; se vuelve a leer del

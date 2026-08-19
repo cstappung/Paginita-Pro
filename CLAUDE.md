@@ -461,7 +461,13 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
   inheriting it, and passes on `clip-path`; without that, ungrouping silently
   changed how the drawing looked.
 - `geom.js` — pure geometry: matrices, `parseTransform`/`matToString`, bounding
-  boxes, snapping, align/distribute. All of it verifiable without a browser.
+  boxes, snapping, align/distribute, and `polygonPoints` (the vertices of a
+  polygon or star). All of it verifiable without a browser. The polygon is
+  inscribed in the drag **box**, not in a circle, so it is drawn corner to
+  corner like the ellipse and a triangle can come out tall and narrow without
+  scaling it afterwards; it starts at −90° because that is where a triangle's
+  apex is expected — starting at 0° produced one lying on its side, which
+  reads as a bug.
 - `svgio.js` — SVG in and out, **including the sanitiser**. An SVG is an
   executable document: `<script>`, `<foreignObject>`, `on*` handlers,
   `javascript:` and off-site `url(...)`/`href` are dropped on import, always.
@@ -539,6 +545,16 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
   the spec in two for the same reason: `pt`/`font-size` already translated for
   the layer, and `vista` in document space, which is what the floating
   `<textarea>` needs to place itself.
+
+  **Ctrl+wheel steps five percentage points** (`_zoomRueda`), not a factor.
+  Multiplicative zoom (`0.995^deltaY`) made the same gesture do a different
+  thing on every machine, because a wheel notch reports 100, 120 or 53
+  depending on browser and mouse. The delta is accumulated and **one** step is
+  taken when it passes `RUEDA_UMBRAL`, emptying the counter — so a notch is
+  always exactly one step whatever it reports, and a trackpad pinch (which
+  arrives in slivers of two or three) advances smoothly instead of bolting.
+  The target is rounded to a multiple of 5 *before* stepping, so the percentage
+  always lands on 0 or 5 even coming from a fit-to-page that left it at 78 %.
 
   **Mayús and Alt while drawing** (`_geoCrear`) give square/circle, 15° angles on
   a line, and drawing from the centre. The resulting corners are stored in the
@@ -787,6 +803,19 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
     presenting someone else's colour matrix as a shadow. The filter tags had
     to be added to `svgio`'s allowlist; `feImage` was deliberately left out,
     being the one primitive that fetches from another origin.
+  - **An arrowhead is one `<marker>` per drawing, reused.** It has no settings
+    worth inventing — `markerUnits="strokeWidth"` grows it with the line and
+    `context-stroke` paints it the stroke's colour — so two different arrows
+    still need the same definition, and one per line would have filled `<defs>`
+    with identical copies. `orient="auto-start-reverse"` is what makes the
+    start-side head point outwards; plain `auto` had it aiming into the line.
+    Storing a colour instead of `context-stroke` would mean rewriting `<defs>`
+    from the style panel every time the stroke changed. `esMarcable` limits the
+    two `marker-*` attributes to open shapes (line/polyline/path): on a rect
+    the attribute is inert decoration, and on a **polygon** SVG really does
+    draw a head at the first and last vertex — so choosing "arrow" with a
+    polygon still selected used to stick one on its corner, because the panel,
+    the tool bar and the shape tools all funnel through `Tools.applyStyle`.
 - `style.js` — the fill/stroke/text/formula/rect/shadow/opacity/order/page
   panel, built in JS. Sections that only describe one kind of thing (TEXTO,
   FÓRMULA, RECTÁNGULO) appear only when the selection is that thing —

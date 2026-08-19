@@ -245,3 +245,34 @@ export const dist = (a, b) => Math.hypot(b.x - a.x, b.y - a.y);
 /* Ángulo en grados del vector centro→punto, con 0 arriba y creciendo en
    el sentido de las agujas del reloj (el eje Y de SVG va hacia abajo). */
 export const angleOf = (c, p) => (Math.atan2(p.x - c.x, c.y - p.y) * 180) / Math.PI;
+
+/* ---------- polígonos y estrellas ----------
+
+   Los vértices de un polígono de `lados` lados inscrito en la caja, y
+   los de una estrella de `lados` puntas si se pide. Se inscribe en la
+   CAJA y no en un círculo para que la figura se dibuje igual que la
+   elipse —arrastrando de esquina a esquina— y para que un triángulo
+   pueda salir alto y estrecho sin tener que escalarlo después.
+
+   Empieza arriba (−90°) porque es donde se espera la punta de un
+   triángulo: arrancando en 0° salía tumbado y parecía un error.
+
+   La estrella intercala un vértice a `razon` del radio entre cada dos:
+   con 5 puntas y 0,5 sale la estrella de toda la vida. */
+export function polygonPoints(box, lados, { estrella = false, razon = 0.5 } = {}) {
+  const n = Math.max(3, Math.min(Math.round(lados) || 3, 60));
+  const cx = box.x + box.w / 2, cy = box.y + box.h / 2;
+  const rx = box.w / 2, ry = box.h / 2;
+  const r2 = clamp(razon, 0.05, 0.95);
+  const total = estrella ? n * 2 : n;
+  const out = [];
+  for (let i = 0; i < total; i++) {
+    const a = (-Math.PI / 2) + (i * 2 * Math.PI) / total;
+    const k = estrella && i % 2 ? r2 : 1;
+    out.push({ x: cx + rx * k * Math.cos(a), y: cy + ry * k * Math.sin(a) });
+  }
+  return out;
+}
+
+/* Los mismos vértices en el formato que quiere el atributo `points`. */
+export const pointsAttr = pts => pts.map(p => `${fmt(p.x)},${fmt(p.y)}`).join(" ");

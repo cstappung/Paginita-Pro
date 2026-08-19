@@ -23,7 +23,7 @@ import { Canvas, PCT_MIN, PCT_MAX } from "./draw/canvas.js";
 import { createScrollbars } from "./draw/scrollbars.js";
 import { Tools } from "./draw/tools.js";
 import { createStylePanel } from "./draw/style.js";
-import { paintValue, readPaint, shadowValue, readShadow, gcDefs } from "./draw/paint.js";
+import { paintValue, readPaint, shadowValue, readShadow, flechaRef, gcDefs } from "./draw/paint.js";
 import { createToolOptions } from "./draw/tool-options.js";
 import { createObjectPanel } from "./draw/layers.js";
 import { createTextEditor } from "./draw/text.js";
@@ -407,7 +407,8 @@ function ensureEditorParts() {
     resolvePaint: spec => paintValue(state.drawing, spec),
     readPaint: v => readPaint(state.drawing, v),
     resolveShadow: spec => shadowValue(state.drawing, spec),
-    readShadow: v => readShadow(state.drawing, v)
+    readShadow: v => readShadow(state.drawing, v),
+    resolveArrow: () => flechaRef(state.drawing)
   });
   /* La barra de la herramienta activa: flota sobre el lienzo y solo
      aparece con una herramienta de dibujo en la mano. */
@@ -422,6 +423,7 @@ function ensureEditorParts() {
     onApply: aplicarEstilo,
     getPage: () => (state.drawing ? state.drawing.size() : { w: 0, h: 0 }),
     onPage: setPageSize,
+    getArrowRef: () => flechaRef(state.drawing),
     onExit: () => { if (state.tools) state.tools.setTool("select"); }
   });
   state.assetView = createAssetPreview($("canvasHost").parentNode, {
@@ -460,7 +462,8 @@ function aplicarEstilo(attrs) {
   state.tools.applyStyle(attrs);
   // lo que espera la próxima figura cuenta como en uso aunque no lo lleve nadie
   const t = state.tools;
-  gcDefs(state.drawing, [t.style.fill, t.style.stroke, t.textStyle.fill]);
+  gcDefs(state.drawing, [t.style.fill, t.style.stroke, t.textStyle.fill,
+    t.style["marker-start"], t.style["marker-end"]]);
 }
 
 /* El tamaño del papel se pide desde dos sitios (el panel de la derecha y

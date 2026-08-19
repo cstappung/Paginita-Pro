@@ -16,7 +16,8 @@ import { FONTS, DEFAULT_FONT, DEFAULT_SIZE, isText } from "./text.js";
 import { CAPS, JOINS, DASHES, DEFAULT_CAP, DEFAULT_JOIN } from "./stroke.js";
 import { esFormula, latexDe } from "./latex.js";
 import { createChip, createColorPopover } from "./color-popover.js";
-import { etiquetaPaint, esGrad, SOMBRA_POR_DEFECTO, normSombra } from "./paint.js";
+import { etiquetaPaint, esGrad, SOMBRA_POR_DEFECTO, normSombra,
+  PUNTAS, readArrow, atributosPunta, esMarcable } from "./paint.js";
 
 const el = (tag, cls, html) => {
   const n = document.createElement(tag);
@@ -91,6 +92,7 @@ export function createStylePanel(host, opts = {}) {
      panel maneja la ficha y quien lo creó la traduce. */
   const resolveShadow = opts.resolveShadow || (() => null);
   const readShadow = opts.readShadow || (() => null);
+  const resolveArrow = opts.resolveArrow || (() => null);
   /* Cuánto agranda el lienzo lo que hay elegido. Escalar una figura se
      guarda en su `transform`, así que un trazo de 0,5 mm escalado al
      doble se ve de 1 mm mientras el atributo sigue diciendo 0,5: el panel
@@ -191,7 +193,22 @@ export function createStylePanel(host, opts = {}) {
   const cap = opciones("dwLinecap", CAPS, "stroke-linecap", "Extremos");
   const join = opciones("dwLinejoin", JOINS, "stroke-linejoin", "Uniones");
 
-  secStroke.append(stroke.row, widthRow, dashRow, cap.row, join.row);
+  /* Puntas de flecha. Van en TRAZO porque son parte de la línea, y aquí
+     además se le pueden poner (o quitar) a una que ya está dibujada —
+     la barra de la herramienta solo decide la que viene. */
+  const puntaRow = el("div", "dw-row");
+  puntaRow.appendChild(el("label", "dw-lbl", "Puntas"));
+  const puntaSel = el("select", "dw-sel");
+  puntaSel.id = "dwArrow";
+  for (const o of PUNTAS) {
+    const op = document.createElement("option");
+    op.value = o.value; op.textContent = o.label;
+    puntaSel.appendChild(op);
+  }
+  puntaSel.onchange = () => apply(atributosPunta(puntaSel.value, resolveArrow()));
+  puntaRow.appendChild(puntaSel);
+
+  secStroke.append(stroke.row, widthRow, dashRow, cap.row, join.row, puntaRow);
 
   /* ---------- texto ----------
      Solo aparece cuando hay un texto elegido (o cuando se va a escribir
@@ -411,7 +428,7 @@ export function createStylePanel(host, opts = {}) {
     const sel = getSel();
     const st = getStyle();
     const ro = !canWrite();
-    for (const n of [widthInput, dashSel, cap.sel, join.sel, opInput, pw, ph]) n.disabled = ro;
+    for (const n of [widthInput, dashSel, cap.sel, join.sel, puntaSel, opInput, pw, ph]) n.disabled = ro;
     host.querySelectorAll(".dw-chip,.dw-btn").forEach(b => { b.disabled = ro; });
 
     const fillV = sel.length ? commonAttr(sel, "fill", "#000000") : st.fill;
@@ -435,6 +452,23 @@ export function createStylePanel(host, opts = {}) {
     if (!cap.sel.value) cap.sel.selectedIndex = -1;
     join.sel.value = union == null ? "" : String(union);
     if (!join.sel.value) join.sel.selectedIndex = -1;
+    /* La fila de puntas solo aparece con figuras que puedan enseñarlas:
+       en un rectángulo la lista no haría nada y en un polígono haría
+       algo indeseado (ver `esMarcable`).
+
+       «varios» en cualquiera de los dos extremos deja la lista sin
+       marcar, igual que los demás controles: elegir algo entonces se lo
+       pone a todo, que es lo que se espera al tocarla a propósito. */
+    const marcables = sel.filter(esMarcable);
+    puntaRow.style.display = marcables.length ? "" : "none";
+    if (marcables.length) {
+      const mi = commonAttr(marcables, "marker-start", "");
+      const mf = commonAttr(marcables, "marker-end", "");
+      const modo = mi == null || mf == null ? null : readArrow(mi, mf);
+      puntaSel.value = modo == null ? "" : modo;
+      if (modo == null) puntaSel.selectedIndex = -1;
+    }
+
     const pct = op == null ? 100 : Math.round(parseFloat(op) * 100);
     opInput.value = String(isFinite(pct) ? pct : 100);
     opLabel.textContent = op == null ? "varios" : `${isFinite(pct) ? pct : 100}%`;

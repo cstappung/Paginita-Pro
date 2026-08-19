@@ -22,6 +22,7 @@
 
 import { FONTS, DEFAULT_FONT, DEFAULT_SIZE } from "./text.js";
 import { CAPS, DASHES, DEFAULT_CAP } from "./stroke.js";
+import { PUNTAS, readArrow, atributosPunta } from "./paint.js";
 
 /* Herramientas que tienen algo que decir aquí. Con la flecha la barra
    se esconde: para transformar ya está el panel de la derecha, y una
@@ -30,12 +31,13 @@ const CON_BARRA = {
   rect: { icono: "▭", nombre: "Rectángulo" },
   ellipse: { icono: "◯", nombre: "Elipse" },
   line: { icono: "╱", nombre: "Línea" },
+  poly: { icono: "△", nombre: "Polígono" },
   text: { icono: "T", nombre: "Texto" },
   formula: { icono: "∑", nombre: "Fórmula" },
   page: { icono: "⛶", nombre: "Papel" }
 };
 
-const FIGURAS = new Set(["rect", "ellipse", "line"]);
+const FIGURAS = new Set(["rect", "ellipse", "line", "poly"]);
 
 const el = (tag, cls, texto) => {
   const n = document.createElement(tag);
@@ -60,6 +62,10 @@ export function createToolOptions(host, opts = {}) {
      el de su capa), así que 0,5 mm de atributo dentro de una capa al
      doble se ven de 1 mm. */
   const getScale = opts.getScale || (() => 1);
+  /* La punta de flecha es un <marker> del <defs> del dibujo, que esta
+     barra no conoce: se le pide a quien la creó, igual que el panel de
+     la derecha hace con los degradados. */
+  const getArrowRef = opts.getArrowRef || (() => null);
 
   host.classList.add("to-bar");
   let herramienta = null;      // la que está montada ahora mismo
@@ -224,7 +230,7 @@ export function createToolOptions(host, opts = {}) {
       return partes;
     }
 
-    /* --- figuras: rectángulo, elipse y línea --- */
+    /* --- figuras: rectángulo, elipse, línea y polígono --- */
     const relleno = tool === "line" ? null : color("fill", true);
     if (relleno) add(etiqueta("Relleno"), relleno);
 
@@ -242,10 +248,37 @@ export function createToolOptions(host, opts = {}) {
     if (extremos) add(guiones, extremos);
     else add(guiones);
 
+    /* La punta va con la línea y no en el panel de la derecha porque es
+       de las que hay que decidir ANTES de arrastrar: una flecha se
+       dibuja en el sentido en que se quiere que apunte. */
+    const puntas = tool === "line"
+      ? lista(PUNTAS, v => onApply(atributosPunta(v, getArrowRef())), "Puntas de flecha")
+      : null;
+    if (puntas) add(etiqueta("Punta"), puntas);
+
     let esquinas = null;
     if (tool === "rect") {
       esquinas = numero({ min: 0, step: 0.5, onChange: v => setCrear({ rx: v }) });
       add(etiqueta("Esquinas"), esquinas);
+    }
+
+    /* El polígono lleva sus lados AQUÍ, que es donde se decide cuántos
+       tiene la que se va a dibujar: en el panel de la derecha llegaría
+       tarde, porque los vértices ya estarían escritos. */
+    let lados = null, estrella = null, punta = null;
+    if (tool === "poly") {
+      lados = numero({
+        min: 3, step: 1, ancho: 46, unidad: "",
+        onChange: v => setCrear({ lados: Math.max(3, Math.round(v)) })
+      });
+      add(etiqueta("Lados"), lados);
+      estrella = casilla("Estrella", "Intercala un vértice más cerca del centro entre cada dos",
+        v => setCrear({ estrella: v }));
+      punta = numero({
+        min: 5, step: 5, ancho: 46, unidad: "%",
+        onChange: v => setCrear({ punta: Math.max(0.05, Math.min(v / 100, 0.95)) })
+      });
+      add(estrella, punta);
     }
 
     const seguir = casilla("Seguir dibujando",
@@ -253,9 +286,10 @@ export function createToolOptions(host, opts = {}) {
       v => setCrear({ mantener: v }));
     add(seguir);
 
+    const REGULAR = { rect: "cuadrado", ellipse: "círculo", poly: "regular" };
     host.appendChild(pista(tool === "line"
       ? "Mayús: ángulos de 15° · Alt: desde el centro"
-      : `Mayús: ${tool === "rect" ? "cuadrado" : "círculo"} · Alt: desde el centro`));
+      : `Mayús: ${REGULAR[tool]} · Alt: desde el centro`));
 
     partes.push(() => {
       const st = getStyle();
@@ -264,8 +298,15 @@ export function createToolOptions(host, opts = {}) {
       grosor.sync(Math.round((parseFloat(st["stroke-width"]) || 0) * (getScale() || 1) * 100) / 100);
       guiones.sync(st["stroke-dasharray"] || "");
       if (extremos) extremos.sync(st["stroke-linecap"] || DEFAULT_CAP);
+      if (puntas) puntas.sync(readArrow(st["marker-start"], st["marker-end"]));
       const cr = getCrear();
       if (esquinas) esquinas.sync(parseFloat(cr.rx) || 0);
+      if (lados) lados.sync(Math.max(3, Math.round(cr.lados) || 3));
+      if (estrella) estrella.sync(!!cr.estrella);
+      if (punta) {
+        punta.sync(Math.round((cr.punta == null ? 0.5 : cr.punta) * 100));
+        punta.nodo.style.display = cr.estrella ? "" : "none";
+      }
       seguir.sync(cr.mantener);
     });
     return partes;
