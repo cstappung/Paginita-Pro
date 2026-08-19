@@ -121,6 +121,13 @@ borrar son el mismo código y **las reglas de seguridad no cambian**.
   solo la primera vez que lo abre, por el mismo camino que un enlace para
   compartir. No se copian los bytes — la figura del PDF es siempre la última
   que se exportó — y `fb.watchAssets` mantiene la lista al día sin recargar.
+- **Encuadre y zoom** (`draw/canvas.js` + `draw/scrollbars.js`): el encuadre
+  está en el `transform` de la escena, no en el scroll de una caja, así que las
+  barras de desplazamiento se pintan a mano. Su recorrido es la página **más
+  todo lo dibujado** (una figura importada puede caer fuera del papel) con un
+  margen de un cuarto de su tamaño, y desaparecen cuando ya cabe todo. El zoom
+  se **escribe** en la barra de abajo («250», «250%» o «2,5x»), además de los
+  botones −/+/1:1, la rueda con Ctrl y el ⤢ de ajustar.
 - **Copiar y pegar** (`draw/tools.js`): va por los eventos `copy`/`cut`/`paste`
   del documento, no por Ctrl+C en el teclado, para tener el portapapeles de
   verdad sin pedir permisos. Se guarda TEXTO SVG, no nodos: un clon de Yjs sin
@@ -142,6 +149,10 @@ borrar son el mismo código y **las reglas de seguridad no cambian**.
   entero; **Ctrl+clic** → la figura concreta bajo el puntero, esté donde esté
   anidada; **Alt+clic** → igual, y repetido va bajando por las figuras
   superpuestas; **doble clic** → entra en el grupo (o abre el texto).
+- **Corregir una fórmula**: doble clic o Intro sobre ella, y también el botón
+  **Editar fórmula** de la sección FÓRMULA del panel derecho, que aparece con
+  una fórmula elegida y enseña su LaTeX. Los dos primeros no se ven por ningún
+  sitio: sin el botón, una fórmula puesta hace días parecía intocable.
 - **Texto** (`draw/text.js`): un `<text>` con un `<tspan>` por línea; el salto
   va en `em` para que cambiar el cuerpo no descoloque el interlineado. Se
   escribe en un `<textarea>` encima del lienzo y se guarda al cerrar, no a cada

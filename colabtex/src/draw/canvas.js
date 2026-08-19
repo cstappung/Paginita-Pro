@@ -28,6 +28,12 @@ import { boxOfPoints, transformBox, clamp } from "./geom.js";
 
 const MIN_ZOOM = 0.2;     // px de pantalla por mm
 const MAX_ZOOM = 80;
+/* A qué zoom un milímetro del dibujo mide un milímetro en pantalla: los
+   96 ppp que asume el navegador. Es la única cuenta que traduce `k` (px
+   por mm) al porcentaje que se enseña y se escribe en la barra. */
+const PX_MM = 96 / 25.4;
+const PCT_MIN = Math.round((MIN_ZOOM / PX_MM) * 100);   // ~5 %
+const PCT_MAX = Math.round((MAX_ZOOM / PX_MM) * 100);   // ~2117 %
 const MAX_HOJAS = 600;    // nodos que se revisan al pinchar cerca (ver hitNear)
 
 const svgEl = tag => document.createElementNS(SVG_NS, tag);
@@ -350,6 +356,46 @@ export class Canvas {
 
   zoomBy(factor, anchorClient) { this.zoomTo(this.k * factor, anchorClient); }
 
+  /* El zoom tal como se enseña y se escribe: 100 % = tamaño real. */
+  zoomPercent() { return (this.k / PX_MM) * 100; }
+  setZoomPercent(pct, anchorClient) { this.zoomTo((pct / 100) * PX_MM, anchorClient); }
+
+  /* ---------- lo que se está viendo ----------
+
+     Las barras de desplazamiento necesitan dos cajas: el trozo de
+     documento que cabe en pantalla y lo que hay que poder alcanzar. Las
+     dos en milímetros, para no mezclar espacios. */
+
+  /* Trozo del documento visible ahora mismo (mm). */
+  visibleBox() {
+    const r = this.rect();
+    if (!r.width || !r.height) return { x: 0, y: 0, w: 0, h: 0 };
+    const a = this.toDoc(r.left, r.top);
+    const b = this.toDoc(r.right, r.bottom);
+    return { x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y };
+  }
+
+  /* Caja de TODO lo dibujado (mm), o null si no hay nada. El grupo del
+     contenido no lleva transform propio, así que su getBBox ya viene en
+     coordenadas del documento. */
+  contentBox() {
+    try {
+      const b = this.content.getBBox();
+      if (!b || (!b.width && !b.height)) return null;
+      return { x: b.x, y: b.y, w: b.width, h: b.height };
+    } catch (e) { return null; }
+  }
+
+  /* Lleva la esquina superior izquierda de la vista al punto dado del
+     documento. Es la operación que hacen las barras: mover el encuadre
+     sin tocar el zoom. */
+  scrollTo(x, y) {
+    if (x != null && isFinite(x)) this.tx = -x * this.k;
+    if (y != null && isFinite(y)) this.ty = -y * this.k;
+    this._applyView();
+    this._emit();
+  }
+
   fitBox(box, margin = 24) {
     const r = this.rect();
     if (!box || !r.width || !box.w || !box.h) return;
@@ -553,4 +599,4 @@ export class Canvas {
   }
 }
 
-export { MIN_ZOOM, MAX_ZOOM };
+export { MIN_ZOOM, MAX_ZOOM, PX_MM, PCT_MIN, PCT_MAX };

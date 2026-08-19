@@ -19,7 +19,8 @@ import { RtdbProvider } from "./y-rtdb.js";
 import { colorForUid, timeAgo, escapeHtml } from "./util.js";
 import { DrawStore, Drawing, makeDrawing } from "./draw/doc.js";
 import { svgToFragment } from "./draw/svgio.js";
-import { Canvas } from "./draw/canvas.js";
+import { Canvas, PCT_MIN, PCT_MAX } from "./draw/canvas.js";
+import { createScrollbars } from "./draw/scrollbars.js";
 import { Tools } from "./draw/tools.js";
 import { createStylePanel } from "./draw/style.js";
 import { createToolOptions } from "./draw/tool-options.js";
@@ -322,6 +323,12 @@ function teardownEditor() {
 function ensureEditorParts() {
   if (state.canvas) return;
   state.canvas = new Canvas($("canvasHost"), { onViewChange: onViewChange });
+  /* Barras de desplazamiento: el encuadre está en el transform de la
+     escena, así que no las pone el navegador (ver draw/scrollbars.js).
+     Cuelgan de .canvas-wrap para quedar por encima del lienzo. */
+  state.scroll = createScrollbars($("canvasHost").parentNode, state.canvas, {
+    onScroll: () => { if (state.tools) state.tools.redrawOverlay(); }
+  });
   state.textEd = createTextEditor(state.canvas, {
     getDrawing: () => state.drawing,
     canWrite,
@@ -390,7 +397,9 @@ function ensureEditorParts() {
     canWrite,
     onApply: attrs => state.tools.applyStyle(attrs),
     onOrder: mode => state.tools.reorder(mode),
-    onPage: setPageSize
+    onPage: setPageSize,
+    // el mismo cuadro que abren el doble clic y el Intro
+    onEditFormula: el => state.formulaEd.open(el)
   });
   /* La barra de la herramienta activa: flota sobre el lienzo y solo
      aparece con una herramienta de dibujo en la mano. */
@@ -446,7 +455,12 @@ function setPageSize(w, h) {
 }
 
 function onViewChange() {
-  if (state.canvas) $("zoomLabel").textContent = Math.round(state.canvas.k / 3.7795 * 100) + "%";
+  /* El zoom se ESCRIBE, así que no se le pisa a nadie lo que está
+     tecleando: si el campo tiene el foco, se deja como está. */
+  const zi = $("zoomInput");
+  if (state.canvas && zi && document.activeElement !== zi)
+    zi.value = Math.round(state.canvas.zoomPercent()) + "%";
+  if (state.scroll) state.scroll.refresh();
   // el editor de texto flota en píxeles: con el zoom o el encuadre se mueve
   if (state.textEd && state.textEd.isOpen()) state.textEd.reposition();
   paintUndoButtons();
@@ -575,6 +589,7 @@ function openDrawing(path) {
   state.path = path;
   if (!path || !state.store || !state.store.has(path)) {
     state.canvas.detach();
+    onViewChange();                 // sin dibujo no hay nada que desplazar
     $("emptyCanvas").style.display = "grid";
     renderFileList();
     paintUndoButtons();
@@ -854,6 +869,45 @@ function wireEvents() {
   $("btnDuplicate").onclick = () => state.tools && state.tools.duplicateSelection();
   $("btnDelete").onclick = () => state.tools && state.tools.deleteSelection();
   $("btnZoomFit").onclick = () => { if (state.canvas) { state.canvas.fitPage(); state.tools.redrawOverlay(); } };
+
+  /* ---------- zoom escribible ----------
+     El porcentaje era sólo un rótulo: para llegar al 400 % había que
+     rodar la rueda a ojo. Ahora se teclea («250», «250%» o «2,5x») y se
+     confirma con Intro; al salir del campo sin Intro se recupera el
+     valor de verdad en vez de dejar escrito algo que no es el zoom. */
+  const zoomInput = $("zoomInput");
+  const applyZoom = () => {
+    if (!state.canvas) return;
+    const txt = String(zoomInput.value || "").replace(",", ".").trim();
+    let v = parseFloat(txt.replace(/[^0-9.\-]/g, ""));
+    if (!isFinite(v) || v <= 0) { onViewChange(); return; }
+    if (/x$/i.test(txt) && v <= 50) v *= 100;      // «2.5x» son 250 %
+    state.canvas.setZoomPercent(Math.max(PCT_MIN, Math.min(v, PCT_MAX)));
+    if (state.tools) state.tools.redrawOverlay();
+    onViewChange();
+  };
+  zoomInput.onkeydown = e => {
+    if (e.key === "Enter") { e.preventDefault(); applyZoom(); zoomInput.blur(); }
+    else if (e.key === "Escape") {
+      // recuperar lo que de verdad hay: onViewChange no pisa un campo con foco
+      if (state.canvas) zoomInput.value = Math.round(state.canvas.zoomPercent()) + "%";
+      zoomInput.blur();
+    }
+  };
+  zoomInput.onblur = applyZoom;
+  zoomInput.onfocus = () => zoomInput.select();
+  const stepZoom = f => {
+    if (!state.canvas) return;
+    state.canvas.zoomBy(f);
+    if (state.tools) state.tools.redrawOverlay();
+  };
+  $("btnZoomIn").onclick = () => stepZoom(1.25);
+  $("btnZoomOut").onclick = () => stepZoom(1 / 1.25);
+  $("btnZoom100").onclick = () => {
+    if (!state.canvas) return;
+    state.canvas.setZoomPercent(100);
+    if (state.tools) state.tools.redrawOverlay();
+  };
   $("btnUndo").onclick = () => { if (state.drawing) { state.drawing.undo(); state.tools.redrawOverlay(); paintUndoButtons(); } };
   $("btnRedo").onclick = () => { if (state.drawing) { state.drawing.redo(); state.tools.redrawOverlay(); paintUndoButtons(); } };
 

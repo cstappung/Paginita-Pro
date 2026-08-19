@@ -272,6 +272,27 @@
   .canvas-bar label{display:flex;align-items:center;gap:5px;cursor:pointer}
   .canvas-bar input[type=number]{width:52px;height:20px;border:1px solid #d4dce2;border-radius:4px;padding:0 4px;font-size:11.5px;font-family:inherit}
   #statusMsg{margin-left:auto;color:#6c4bb6;font-weight:600}
+  /* Zoom escribible: el porcentaje es un campo, no un rótulo, para poder
+     teclear 250 en vez de dar doce veces al más. */
+  .zoom-ctl{display:flex;align-items:center;gap:2px}
+  .zoom-btn{width:20px;height:20px;border:1px solid #d4dce2;border-radius:4px;background:#fff;color:#42505c;font-size:12px;line-height:1;cursor:pointer;padding:0;display:grid;place-items:center}
+  .zoom-btn:hover{background:#eef0f4}
+  .zoom-btn.zoom-wide{width:auto;padding:0 6px;font-size:10.5px;font-weight:600}
+  .zoom-input{width:52px;height:20px;border:1px solid #d4dce2;border-radius:4px;padding:0 4px;font-size:11.5px;font-family:'IBM Plex Mono',monospace;text-align:right;color:#42505c;background:#fff}
+  .zoom-input:focus{outline:none;border-color:#6c4bb6}
+
+  /* --- barras de desplazamiento del lienzo (draw/scrollbars.js) ---
+     La horizontal se detiene antes de la vertical, y la vertical antes
+     de la barra de estado: así no se pisan en la esquina. */
+  .dw-sb{position:absolute;z-index:3;background:#dde4ec99;display:none}
+  .dw-sb-h{left:0;right:12px;bottom:30px;height:12px;border-top:1px solid #dbe2e9}
+  .dw-sb-v{top:0;bottom:42px;right:0;width:12px;border-left:1px solid #dbe2e9}
+  .dw-sb-thumb{position:absolute;background:#9fb0c0;border-radius:6px;cursor:default}
+  .dw-sb-h .dw-sb-thumb{top:2px;bottom:2px;left:0;width:40px}
+  .dw-sb-v .dw-sb-thumb{left:2px;right:2px;top:0;height:40px}
+  .dw-sb-thumb:hover{background:#7d8fa1}
+  .dw-sb-thumb.dw-sb-on{background:#6c4bb6}
+
   .empty-canvas{position:absolute;inset:0;display:grid;place-items:center;color:#8a97a3;font-size:13px;text-align:center;pointer-events:none;padding:20px}
 
   /* --- panel derecho: estilo --- */
@@ -296,6 +317,10 @@
   .dw-btn:hover{border-color:#6c4bb6;color:#6c4bb6}
   .dw-btn:disabled{opacity:.45;cursor:default}
   .dw-btn-on{background:#f1ecfa;border-color:#6c4bb6;color:#6c4bb6;font-weight:600}
+  /* Botón a todo el ancho de la sección (FÓRMULA), y su LaTeX encima
+     en monoespaciada: es código, no prosa. */
+  .dw-btn-wide{width:100%;font-size:12px;font-weight:600}
+  .dw-fx-tex{font-family:'IBM Plex Mono',monospace;font-size:11px;color:#5a6772;background:#f5f7fa;border:1px solid #e9edf1;border-radius:5px;padding:5px 7px;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
   /* ============ MODALES ============ */
   .modal-back{position:fixed;inset:0;background:#0d111799;display:none;place-items:center;z-index:50}
@@ -465,7 +490,13 @@
         <div id="toolOptions" class="to-bar" style="display:none"></div>
         <div id="emptyCanvas" class="empty-canvas" style="display:none">Crea un dibujo con ＋ para empezar.</div>
         <div class="canvas-bar">
-          <span id="zoomLabel">100%</span>
+          <div class="zoom-ctl">
+            <button class="zoom-btn" id="btnZoomOut" title="Alejar">−</button>
+            <input id="zoomInput" class="zoom-input" type="text" inputmode="numeric" value="100%"
+                   title="Escribe el zoom (por ejemplo 250) y pulsa Intro">
+            <button class="zoom-btn" id="btnZoomIn" title="Acercar">+</button>
+            <button class="zoom-btn zoom-wide" id="btnZoom100" title="Tamaño real (100 %)">1:1</button>
+          </div>
           <label><input type="checkbox" id="gridToggle" checked> Rejilla</label>
           <label><input type="checkbox" id="snapToggle" checked> Imán</label>
           <label>Paso <input type="number" id="gridStep" min="0.1" step="0.5" value="1"> mm</label>
@@ -526,6 +557,6 @@
   </div>
 </div>
 
-<script src="colabdraw-app.js?v=202608110411"></script>
+<script src="colabdraw-app.js?v=202608192033"></script>
 </body>
 </html>

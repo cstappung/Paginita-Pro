@@ -490,6 +490,24 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
   the box alone would grab a long diagonal from half a screen away. The walk is
   capped at `MAX_HOJAS` nodes so a click on empty canvas can't traverse an
   entire matplotlib figure.
+
+  It also owns the **framing**: `k` is screen px per millimetre, and 100 % zoom
+  is `PX_MM` (96 ppp), which `zoomPercent`/`setZoomPercent` are the only place
+  to convert — the canvas bar's zoom box is a *field*, not a label, so a
+  drawing can be taken to 250 % without rolling the wheel there. `visibleBox`,
+  `contentBox` and `scrollTo` exist for the scrollbars below and are all in
+  millimetres, never pixels.
+- `scrollbars.js` — the canvas's own scrollbars. The framing lives in the
+  scene's `transform`, not in a scrolling box, so the browser never drew any
+  and the only way to move was the wheel or space-drag. Two things they get
+  right: the **reachable range is the page plus everything drawn** (an imported
+  figure can land off the sheet, and without counting it there is no way to
+  reach it) padded by a quarter of its own size — measured in *screens* the
+  range grew as fast as the view, so the bars never went away when everything
+  already fitted; and a hidden bar is measured **after** being shown, since a
+  `display:none` box measures 0. Showing one sets `display:block` explicitly:
+  clearing the inline style hands control back to the sheet, where `.dw-sb` is
+  born `display:none`, so the bar would never appear at all.
 - `tools.js` — selection and the tools. **During a drag nothing is written to
   Yjs**, only to the mirror DOM; one commit happens on release. A mousemove
   fires ~60×/s and every Yjs write is an RTDB push, so live-writing would hammer
@@ -637,6 +655,9 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
     it as a **closed shape** on purpose: dropping something inside would be
     erased by the next edit, and ungrouping would scatter it into paths and take
     its LaTeX with it — losing the ability to correct it, permanently.
+  - Re-editing is on a **button in the style panel** (the FÓRMULA section, with
+    the LaTeX itself above it), not only on double-click and Intro: both of
+    those are invisible, and a formula placed days ago read as untouchable.
 - `text.js` — the text tool and its editor. A text is a `<text>` with one
   `<tspan>` per line, each repeating the `x` (SVG text does not wrap back to
   the margin by itself) and stepping down with `dy` **in `em`**, so changing

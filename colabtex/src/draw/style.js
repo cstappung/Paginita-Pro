@@ -14,6 +14,7 @@
 
 import { FONTS, DEFAULT_FONT, DEFAULT_SIZE, isText } from "./text.js";
 import { CAPS, JOINS, DASHES, DEFAULT_CAP, DEFAULT_JOIN } from "./stroke.js";
+import { esFormula, latexDe } from "./latex.js";
 
 export const PALETTE = [
   "none", "#000000", "#3d4c5e", "#8a97a3", "#ffffff",
@@ -84,6 +85,7 @@ export function createStylePanel(host, opts = {}) {
   const canWrite = opts.canWrite || (() => true);
   const getTextStyle = opts.getTextStyle || (() => ({}));
   const isTextTool = opts.isTextTool || (() => false);
+  const onEditFormula = opts.onEditFormula || (() => {});
   /* Cuánto agranda el lienzo lo que hay elegido. Escalar una figura se
      guarda en su `transform`, así que un trazo de 0,5 mm escalado al
      doble se ve de 1 mm mientras el atributo sigue diciendo 0,5: el panel
@@ -251,6 +253,22 @@ export function createStylePanel(host, opts = {}) {
   fxRow.append(boldBtn, italBtn, ...alignBtns);
   secText.append(fontRow, sizeRow, fxRow);
 
+  /* ---------- fórmula ----------
+     Una fórmula ya se corregía con doble clic o con Intro, pero eso no
+     se ve por ninguna parte: quien la había puesto hacía días la daba
+     por intocable. Aquí queda el botón, con su propio LaTeX debajo para
+     saber cuál de las tres se va a abrir. */
+  const secFx = section("FÓRMULA");
+  const fxTex = el("div", "dw-fx-tex");
+  const fxBtn = el("button", "dw-btn dw-btn-wide", "✎ Editar fórmula");
+  fxBtn.type = "button";
+  fxBtn.title = "Corregir el LaTeX (también: doble clic sobre ella, o Intro)";
+  fxBtn.onclick = () => {
+    const f = getSel().filter(esFormula);
+    if (f.length === 1 && canWrite()) onEditFormula(f[0]);
+  };
+  secFx.append(fxTex, fxBtn);
+
   /* ---------- opacidad ---------- */
   const secOp = section("OPACIDAD");
   const opRow = el("div", "dw-row");
@@ -296,7 +314,7 @@ export function createStylePanel(host, opts = {}) {
   pageRow.append(pw, el("span", "dw-unit", "×"), ph, el("span", "dw-unit", "mm"));
   secPage.appendChild(pageRow);
 
-  host.append(secFill, secStroke, secText, secOp, secOrder, secPage);
+  host.append(secFill, secStroke, secText, secFx, secOp, secOrder, secPage);
 
   function apply(attrs) {
     if (!canWrite()) return;
@@ -339,10 +357,24 @@ export function createStylePanel(host, opts = {}) {
     opLabel.textContent = op == null ? "varios" : `${isFinite(pct) ? pct : 100}%`;
 
     refreshText(sel, ro);
+    refreshFormula(sel, ro);
 
     const page = getPage();
     if (!enUso(pw)) pw.value = String(Math.round(page.w * 10) / 10 || "");
     if (!enUso(ph)) ph.value = String(Math.round(page.h * 10) / 10 || "");
+  }
+
+  /* Sólo con UNA fórmula elegida: con dos, el botón tendría que decidir
+     cuál abre, y con un rectángulo no dice nada. */
+  function refreshFormula(sel, ro) {
+    const f = sel.filter(esFormula);
+    const mostrar = f.length === 1 && sel.length === 1;
+    secFx.style.display = mostrar ? "" : "none";
+    if (!mostrar) return;
+    const tex = latexDe(f[0]);
+    fxTex.textContent = tex.length > 60 ? tex.slice(0, 59) + "…" : tex;
+    fxTex.title = tex;
+    fxBtn.disabled = ro;
   }
 
   function refreshText(sel, ro) {
