@@ -404,6 +404,9 @@ function ensureEditorParts() {
     onApply: aplicarEstilo,
     onOrder: mode => state.tools.reorder(mode),
     onPage: setPageSize,
+    /* Curvar no es escribir un atributo: cada curva se rehace desde sus
+       propios extremos (ver `Tools.setCurva`). */
+    onCurva: c => { if (state.tools) state.tools.setCurva(c); },
     // el mismo cuadro que abren el doble clic y el Intro
     onEditFormula: el => state.formulaEd.open(el),
     /* Los degradados viven en el <defs> del dibujo, que el panel no
@@ -411,8 +414,8 @@ function ensureEditorParts() {
        atributo, y al revés para poder volver a enseñarla. */
     resolvePaint: spec => paintValue(state.drawing, spec),
     readPaint: v => readPaint(state.drawing, v),
-    resolveShadow: spec => shadowValue(state.drawing, spec),
-    readShadow: v => readShadow(state.drawing, v),
+    resolveShadow: (spec, k) => shadowValue(state.drawing, spec, k),
+    readShadow: (v, k) => readShadow(state.drawing, v, k),
     /* La punta es un <marker> del <defs>: el panel maneja la ficha
        (tipo y tamaño) y aquí se traduce a la referencia, y al revés. */
     resolveArrow: spec => flechaRef(state.drawing, spec),
@@ -435,6 +438,7 @@ function ensureEditorParts() {
     getPage: () => (state.drawing ? state.drawing.size() : { w: 0, h: 0 }),
     onPage: setPageSize,
     getArrowRef: spec => flechaRef(state.drawing, spec),
+    onCurva: c => { if (state.tools) state.tools.setCurva(c); },
     onExit: () => { if (state.tools) state.tools.setTool("select"); }
   });
   state.assetView = createAssetPreview($("canvasHost").parentNode, {

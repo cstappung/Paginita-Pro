@@ -276,3 +276,134 @@ export function polygonPoints(box, lados, { estrella = false, razon = 0.5 } = {}
 
 /* Los mismos vértices en el formato que quiere el atributo `points`. */
 export const pointsAttr = pts => pts.map(p => `${fmt(p.x)},${fmt(p.y)}`).join(" ");
+
+/* ---------- curvas ----------
+
+   Una curva es una línea que se abomba. Se guarda como un `<path>` con
+   dos datos propios —`data-curva`, cuánto se abomba, y `data-ondas`, en
+   cuántos arcos alternados se parte la cuerda— y el `d` se vuelve a
+   calcular a partir de sus DOS EXTREMOS cada vez que se toca uno de los
+   dos. Guardar la ficha y no solo el trazado es lo que deja corregir la
+   curvatura de una flecha dibujada la semana pasada; los extremos no
+   hace falta guardarlos aparte porque están en el propio `d`, y un
+   segundo sitio donde dicen dónde empieza la curva es un segundo sitio
+   que puede mentir.
+
+   **La curvatura es la flecha del arco en tanto por ciento de la media
+   cuerda**, así que 100 % es exactamente MEDIO CÍRCULO — que es el caso
+   que la gente pide por su nombre— y el signo dice hacia qué lado.
+   Con varias ondas cada arco se abomba al revés que el anterior: dos
+   ondas son una S, tres una ese con cola.
+
+   **Se dibuja con curvas de Bézier cúbicas, no con el comando `A`.** Dos
+   razones, las dos de este repositorio:
+
+     - al hornear el escalado (`reshape.js`) se reescribe el `d`, y ahí
+       un arco bajo una escala desigual habría que recalcularlo desde la
+       cónica —`transformPath` se niega, y con razón—; una cúbica se
+       transforma moviendo sus cuatro puntos y ya está;
+     - un semicírculo estirado tiene que salir elíptico, y transformar
+       los cuatro puntos hace eso solo.
+
+   Cada arco se parte en tramos de 90° o menos. Ahí la aproximación
+   cúbica de un arco de circunferencia (el factor 4/3·tan(δ/4)) yerra
+   menos de una diezmilésima del radio: a la vista, exacta. */
+export const CURVA_ATTR = "data-curva";
+export const ONDAS_ATTR = "data-ondas";
+export const CURVA_MAX = 100;
+export const ONDAS_MAX = 6;
+
+export const esCurva = el =>
+  !!el && el.nodeName === "path" && el.getAttribute &&
+  el.getAttribute(CURVA_ATTR) != null;
+
+/* Ficha de una curva ya dibujada, con los mismos límites que al
+   crearla: un `data-curva` a mano en el archivo no puede meter en el
+   panel un número que el panel no sepa volver a escribir. */
+export function curvaSpec(el) {
+  if (!esCurva(el)) return null;
+  return normCurva({
+    curvatura: el.getAttribute(CURVA_ATTR),
+    ondas: el.getAttribute(ONDAS_ATTR)
+  });
+}
+
+export function normCurva(spec) {
+  const s = spec || {};
+  const c = parseFloat(s.curvatura);
+  const n = parseInt(s.ondas, 10);
+  return {
+    curvatura: isFinite(c) ? clamp(c, -CURVA_MAX, CURVA_MAX) : 40,
+    ondas: isFinite(n) ? clamp(n, 1, ONDAS_MAX) : 1
+  };
+}
+
+/* Los dos extremos que tiene ahora mismo un trazado NUESTRO. Se leen
+   del `d`: como solo lleva `M`, `L` y `C` —nunca `A`, que trae banderas
+   que no son coordenadas—, los dos primeros números son el principio y
+   los dos últimos el final, y eso sigue siendo verdad después de
+   hornear un escalado. */
+export function curvaExtremos(d) {
+  const n = String(d || "").match(/-?\d*\.?\d+(?:e[-+]?\d+)?/gi);
+  if (!n || n.length < 4) return null;
+  return {
+    a: { x: parseFloat(n[0]), y: parseFloat(n[1]) },
+    b: { x: parseFloat(n[n.length - 2]), y: parseFloat(n[n.length - 1]) }
+  };
+}
+
+/* El `d` de una curva entre dos puntos. */
+export function curvaPath(a, b, spec) {
+  const { curvatura, ondas } = normCurva(spec);
+  const f = curvatura / 100;
+  const ux = (b.x - a.x) / ondas, uy = (b.y - a.y) / ondas;
+  const partes = [`M ${fmt(a.x)} ${fmt(a.y)}`];
+  for (let i = 0; i < ondas; i++) {
+    const p0 = { x: a.x + ux * i, y: a.y + uy * i };
+    const p1 = { x: a.x + ux * (i + 1), y: a.y + uy * (i + 1) };
+    partes.push(arcoCubicas(p0, p1, i % 2 ? -f : f));
+  }
+  return partes.join(" ");
+}
+
+/* Un arco de circunferencia de p0 a p1 cuya flecha es `f` veces la
+   media cuerda, en comandos `C`. Con f = 0 sale la recta, que es lo que
+   tiene que salir: una curva de curvatura cero es una línea. */
+function arcoCubicas(p0, p1, f) {
+  const dx = p1.x - p0.x, dy = p1.y - p0.y;
+  const L = Math.hypot(dx, dy);
+  const s = (f * L) / 2;
+  if (L < 1e-9 || Math.abs(s) < L * 1e-4) return `L ${fmt(p1.x)} ${fmt(p1.y)}`;
+
+  // normal unitaria: con la cuerda hacia la derecha, la curvatura
+  // positiva abomba hacia arriba
+  const nx = dy / L, ny = -dx / L;
+  const M = { x: (p0.x + p1.x) / 2, y: (p0.y + p1.y) / 2 };
+  const cima = { x: M.x + nx * s, y: M.y + ny * s };
+
+  const R = (L * L / 4 + s * s) / (2 * Math.abs(s));
+  const sg = s < 0 ? -1 : 1;
+  const C = { x: M.x - nx * sg * (R - Math.abs(s)), y: M.y - ny * sg * (R - Math.abs(s)) };
+
+  const a0 = Math.atan2(p0.y - C.y, p0.x - C.x);
+  const delta = 2 * Math.asin(clamp(L / 2 / R, -1, 1));
+  /* Con la flecha justo en la media cuerda el arco es medio círculo y
+     las dos direcciones son igual de válidas por el ángulo: se elige
+     mirando cuál de las dos pasa por la cima. */
+  const enMedio = g => ({ x: C.x + R * Math.cos(a0 + g / 2), y: C.y + R * Math.sin(a0 + g / 2) });
+  const barrido = dist(enMedio(delta), cima) <= dist(enMedio(-delta), cima) ? delta : -delta;
+
+  const tramos = Math.max(1, Math.ceil(Math.abs(barrido) / (Math.PI / 2)));
+  const paso = barrido / tramos;
+  const k = (4 / 3) * Math.tan(paso / 4);
+  let out = "";
+  for (let i = 0; i < tramos; i++) {
+    const t0 = a0 + paso * i, t1 = t0 + paso;
+    const q0 = { x: C.x + R * Math.cos(t0), y: C.y + R * Math.sin(t0) };
+    const q1 = { x: C.x + R * Math.cos(t1), y: C.y + R * Math.sin(t1) };
+    const c0 = { x: q0.x - k * R * Math.sin(t0), y: q0.y + k * R * Math.cos(t0) };
+    const c1 = { x: q1.x + k * R * Math.sin(t1), y: q1.y - k * R * Math.cos(t1) };
+    out += ` C ${fmt(c0.x)} ${fmt(c0.y)} ${fmt(c1.x)} ${fmt(c1.y)} ${fmt(q1.x)} ${fmt(q1.y)}`;
+  }
+  return out.trim();
+}

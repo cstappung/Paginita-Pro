@@ -19,7 +19,7 @@
    Las capas siguen siendo especiales en una cosa: lo que se dibuja va
    SIEMPRE a la capa activa.
    ============================================================ */
-import { matMul, matInvert, matToString, parseTransform } from "./geom.js";
+import { matMul, matInvert, matToString, parseTransform, esCurva } from "./geom.js";
 import { elChildren, indexOf, childrenOf } from "./doc.js";
 import { esFormula } from "./latex.js";
 import { readLines } from "./text.js";
@@ -105,6 +105,8 @@ function nombreDe(node, esCapa) {
     const n = hijosDe(node).length;
     return `Grupo (${n})`;
   }
+  // una curva nuestra es un <path>, pero llamarla «Trazado» no dice nada
+  if (esCurva(node)) return "Curva";
   return NOMBRES[t] || t;
 }
 

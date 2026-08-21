@@ -16,6 +16,7 @@ import { FONTS, DEFAULT_FONT, DEFAULT_SIZE, isText } from "./text.js";
 import { CAPS, JOINS, DASHES, DEFAULT_CAP, DEFAULT_JOIN } from "./stroke.js";
 import { esFormula, latexDe } from "./latex.js";
 import { createChip, createColorPopover } from "./color-popover.js";
+import { esCurva, curvaSpec, CURVA_MAX, ONDAS_MAX } from "./geom.js";
 import { etiquetaPaint, esGrad, SOMBRA_POR_DEFECTO, normSombra,
   PUNTAS, TIPOS_PUNTA, normPunta, readArrow, atributosPunta, esMarcable } from "./paint.js";
 
@@ -99,6 +100,10 @@ export function createStylePanel(host, opts = {}) {
      doble se ve de 1 mm mientras el atributo sigue diciendo 0,5: el panel
      enseña y acepta lo que se VE, y aquí se traduce. */
   const getScale = opts.getScale || (() => 1);
+  /* Volver a curvar no es escribir un atributo: hay que recalcular el
+     trazado a partir de los extremos de CADA curva, así que va por su
+     propio camino (`Tools.setCurva`) y no por `apply`. */
+  const onCurva = opts.onCurva || (() => {});
 
   host.textContent = "";
   host.classList.add("dw-style");
@@ -397,7 +402,7 @@ export function createStylePanel(host, opts = {}) {
   function aplicarSombra(cambios) {
     if (!canWrite()) return;
     shSpec = normSombra({ ...shSpec, ...cambios });
-    apply({ filter: resolveShadow(shSpec) });
+    apply({ filter: resolveShadow(shSpec, getScale() || 1) });
   }
 
   /* ---------- rectángulo ----------
@@ -420,6 +425,32 @@ export function createStylePanel(host, opts = {}) {
   });
   rxRow.append(rxInput, el("span", "dw-unit", "mm"));
   secRect.appendChild(rxRow);
+
+  /* ---------- curva ----------
+     Lo mismo que las esquinas del rectángulo: la curvatura se elegía
+     antes de arrastrar y ya no se podía tocar. Y es justo lo que se
+     quiere tocar después — una flecha se dibuja apuntando a donde tiene
+     que apuntar, y solo entonces se ve cuánto le falta de vuelo. */
+  const secCurve = section("CURVA");
+  const curvaNum = (etiqueta, titulo, campo, min, max, step) => {
+    const row = el("div", "dw-row");
+    row.appendChild(el("label", "dw-lbl", etiqueta));
+    const inp = el("input", "dw-num");
+    inp.type = "number";
+    inp.min = String(min); inp.max = String(max); inp.step = String(step);
+    inp.title = titulo;
+    inp.id = campo === "curvatura" ? "dwCurva" : "dwOndas";
+    alTeclear(inp, () => {
+      const v = parseFloat(inp.value);
+      if (isFinite(v) && v >= min && v <= max) onCurva({ [campo]: v });
+    });
+    row.appendChild(inp);
+    secCurve.appendChild(row);
+    return inp;
+  };
+  const curvaInput = curvaNum("Curvatura", "Lo que se abomba, en % de la media cuerda: 100 % es medio círculo y el signo cambia de lado", "curvatura", -CURVA_MAX, CURVA_MAX, 5);
+  curvaInput.parentNode.appendChild(el("span", "dw-unit", "%"));
+  const ondasInput = curvaNum("Curvas", "En cuántos arcos alternados se parte: 2 hace una ese", "ondas", 1, ONDAS_MAX, 1);
 
   /* ---------- opacidad ---------- */
   const secOp = section("OPACIDAD");
@@ -466,7 +497,7 @@ export function createStylePanel(host, opts = {}) {
   pageRow.append(pw, el("span", "dw-unit", "×"), ph, el("span", "dw-unit", "mm"));
   secPage.appendChild(pageRow);
 
-  host.append(secFill, secStroke, secText, secFx, secRect, secShadow, secOp, secOrder, secPage);
+  host.append(secFill, secStroke, secText, secFx, secRect, secCurve, secShadow, secOp, secOrder, secPage);
 
   function apply(attrs) {
     if (!canWrite()) return;
@@ -480,7 +511,7 @@ export function createStylePanel(host, opts = {}) {
     const st = getStyle();
     const ro = !canWrite();
     for (const n of [widthInput, dashSel, cap.sel, join.sel, puntaSel, tipoSel, tamInput,
-      opInput, pw, ph]) n.disabled = ro;
+      curvaInput, ondasInput, opInput, pw, ph]) n.disabled = ro;
     host.querySelectorAll(".dw-chip,.dw-btn").forEach(b => { b.disabled = ro; });
 
     const fillV = sel.length ? commonAttr(sel, "fill", "#000000") : st.fill;
@@ -539,6 +570,7 @@ export function createStylePanel(host, opts = {}) {
     refreshText(sel, ro);
     refreshFormula(sel, ro);
     refreshRect(sel, ro);
+    refreshCurva(sel, ro);
     refreshShadow(sel, ro);
 
     const page = getPage();
@@ -562,6 +594,23 @@ export function createStylePanel(host, opts = {}) {
     rxInput.disabled = ro;
   }
 
+  /* Igual que el rectángulo: solo si TODO lo elegido son curvas
+     nuestras. Un `<path>` importado no tiene ficha que enseñar, y
+     escribirle una curvatura le borraría el trazado que trae. */
+  function refreshCurva(sel, ro) {
+    const curvas = sel.filter(esCurva);
+    const mostrar = sel.length > 0 && curvas.length === sel.length;
+    secCurve.style.display = mostrar ? "" : "none";
+    if (!mostrar) return;
+    const fichas = curvas.map(curvaSpec);
+    const igual = campo => fichas.every(f => f[campo] === fichas[0][campo]) ? fichas[0][campo] : null;
+    for (const [inp, v] of [[curvaInput, igual("curvatura")], [ondasInput, igual("ondas")]]) {
+      if (!enUso(inp)) inp.value = v == null ? "" : String(v);
+      inp.placeholder = v == null ? "varios" : "";
+      inp.disabled = ro;
+    }
+  }
+
   /* La sombra se enseña con algo elegido y nada más: sin selección no
      hay a qué ponérsela, y a diferencia del color no se guarda para la
      siguiente figura. */
@@ -571,7 +620,9 @@ export function createStylePanel(host, opts = {}) {
     const v = commonAttr(sel, "filter", "none");
     // «varios» (v == null) se trata como sin sombra: marcar la casilla
     // se la pone a todas, que es lo que se esperaría al pulsarla
-    const spec = v == null ? null : readShadow(v);
+    // los valores del filtro están en el espacio de la figura, no en
+    // milímetros de papel: ver la cabecera de las sombras en paint.js
+    const spec = v == null ? null : readShadow(v, getScale() || 1);
     const ajeno = spec === "ajeno";
     const activa = !!spec && !ajeno;
     shOn.checked = activa;

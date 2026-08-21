@@ -234,9 +234,25 @@ export function etiquetaPaint(spec) {
    tener que reconocer una cadena de cinco primitivas para saber qué
    desenfoque tenía.
 
-   Los valores van en las unidades de la figura, que aquí son
-   milímetros: `dx`, `dy` y `stdDeviation` se miden en el espacio de
-   usuario (es lo que hace `primitiveUnits` por defecto), no en la caja.
+   **`dx`, `dy` y `stdDeviation` se miden en el espacio de usuario del
+   PROPIO elemento** —el de después de su `transform`, que es lo que
+   hace `primitiveUnits` por defecto—, no en milímetros de papel y no en
+   la caja. Comprobado midiendo tinta: la misma sombra de `dx="10"`
+   sobre una figura sin transformar se desplaza 10 unidades del
+   documento, y sobre la misma figura hecha con `scale(0.1)` se desplaza
+   1. Ahí estaba el fallo de «la sombra de las fórmulas no se desplaza,
+   parece un contorno»: una fórmula lleva `scale(tamaño/1000)`, o sea
+   una escala de 0,005 para un cuerpo de 5 mm, así que un desplazamiento
+   de 0,8 mm se convertía en 0,004 mm —la doscientosava parte— y lo
+   único que se veía era el desenfoque asomando por el borde de los
+   trazos. Le pasaba igual, aunque menos a la vista, a cualquier figura
+   dentro de una capa importada, que trae su propia escala.
+
+   Por eso la ficha se escribe y se lee DIVIDIDA por esa escala, la
+   misma que ya traduce el grosor del trazo en el panel
+   (`Tools.selectionScale`). El panel dice milímetros y son milímetros.
+   Cuando la selección no se pone de acuerdo, esa escala vale 1 y no se
+   traduce nada: misma regla que el grosor y que el radio de esquina.
 
    **La REGIÓN del filtro NO puede ir en tanto por ciento de la caja**, y
    ahí estaba el fallo de «a la línea le pongo sombra y desaparece». La
@@ -264,18 +280,23 @@ export function etiquetaPaint(spec) {
 
 export const SOMBRA_POR_DEFECTO = { dx: 0.8, dy: 0.8, blur: 0.8, color: "#000000", op: 35 };
 
-/* Media región, en unidades del elemento. Cien mil milímetros son cien
-   metros: más que cualquier dibujo, y más que las coordenadas en píxeles
-   de una figura importada dentro de una capa con escala. */
+/* Media región, en MILÍMETROS: cien metros, más que cualquier dibujo.
+   Se pasa al espacio del elemento como todo lo demás, así que sigue
+   tapando lo mismo dentro de una fórmula o de una capa importada. */
 const REGION = 100000;
 
-const REGION_ATTRS = `filterUnits="userSpaceOnUse" ` +
-  `x="${-REGION}" y="${-REGION}" width="${REGION * 2}" height="${REGION * 2}"`;
+const escalaValida = k => {
+  const n = parseFloat(k);
+  return isFinite(n) && Math.abs(n) > 1e-9 ? Math.abs(n) : 1;
+};
 
-export function sombraMarkup(spec, id) {
+export function sombraMarkup(spec, id, escala) {
   const s = normSombra(spec);
-  return `<filter id="${esc(id)}" ${SOMBRA_MARK}="1" ${REGION_ATTRS}>` +
-    `<feDropShadow dx="${fmt(s.dx)}" dy="${fmt(s.dy)}" stdDeviation="${fmt(s.blur)}" ` +
+  const k = escalaValida(escala);
+  const R = REGION / k;
+  return `<filter id="${esc(id)}" ${SOMBRA_MARK}="1" filterUnits="userSpaceOnUse" ` +
+    `x="${fmt(-R, 3)}" y="${fmt(-R, 3)}" width="${fmt(R * 2, 3)}" height="${fmt(R * 2, 3)}">` +
+    `<feDropShadow dx="${fmt(s.dx / k, 6)}" dy="${fmt(s.dy / k, 6)}" stdDeviation="${fmt(s.blur / k, 6)}" ` +
     `flood-color="${esc(s.color)}" flood-opacity="${fmt(s.op / 100)}"/></filter>`;
 }
 
@@ -355,16 +376,21 @@ export function normSombra(spec) {
    filtro: uno importado puede ser un desenfoque, un mapa de color o
    media docena de primitivas encadenadas, y enseñarlo como si fuera
    una sombra invitaría a machacarlo sin saberlo. */
-export function sombraSpec(el, hijos) {
+export function sombraSpec(el, hijos, escala) {
   if (!el || !el.getAttribute) return null;
   if (String(el.nodeName || "").toLowerCase() !== "filter") return null;
   if (el.getAttribute(SOMBRA_MARK) == null) return null;
   const fe = (hijos || []).find(n => String(n.nodeName || "").toLowerCase() === "fedropshadow");
   if (!fe) return null;
+  /* La vuelta a milímetros va ANTES de recortar a los límites: al revés,
+     una sombra de 40 mm dentro de una fórmula (8000 unidades suyas) se
+     recortaría a 40 y saldría del panel convertida en 0,2. */
+  const k = escalaValida(escala);
+  const mm = v => (v == null ? v : num(v, 0) * k);
   return normSombra({
-    dx: fe.getAttribute("dx"),
-    dy: fe.getAttribute("dy"),
-    blur: fe.getAttribute("stdDeviation"),
+    dx: mm(fe.getAttribute("dx")),
+    dy: mm(fe.getAttribute("dy")),
+    blur: mm(fe.getAttribute("stdDeviation")),
     color: fe.getAttribute("flood-color"),
     op: num(fe.getAttribute("flood-opacity"), 1) * 100
   });
@@ -551,23 +577,23 @@ export function paintValue(drawing, spec) {
 
 /* Ficha de sombra → valor de `filter`. Sin ficha, «none», que es lo que
    quita la sombra sin dejar el atributo apuntando a un filtro vacío. */
-export function shadowValue(drawing, spec) {
+export function shadowValue(drawing, spec, escala) {
   if (!spec) return null;
   const id = newId("som");
-  return ponerEnDefs(drawing, sombraMarkup(spec, id), id);
+  return ponerEnDefs(drawing, sombraMarkup(spec, id, escala), id);
 }
 
 /* Lo que dice un `filter`: la ficha si es una sombra nuestra, null si no
    hay filtro, y la cadena «ajeno» si el archivo trae uno suyo — que no
    es lo mismo y el panel tiene que poder decirlo. */
-export function readShadow(drawing, value) {
+export function readShadow(drawing, value, escala) {
   const v = String(value == null ? "" : value).trim();
   if (!v || v === "none") return null;
   const id = refId(v);
   if (!id) return "ajeno";
   const f = defById(drawing, id);
   if (!f) return "ajeno";
-  return sombraSpec(f, childrenOf(f)) || "ajeno";
+  return sombraSpec(f, childrenOf(f), escala) || "ajeno";
 }
 
 /* Ficha que describe lo que dice un atributo, mirando el <defs> si es

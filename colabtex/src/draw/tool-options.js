@@ -31,13 +31,18 @@ const CON_BARRA = {
   rect: { icono: "▭", nombre: "Rectángulo" },
   ellipse: { icono: "◯", nombre: "Elipse" },
   line: { icono: "╱", nombre: "Línea" },
+  curve: { icono: "⌒", nombre: "Curva" },
   poly: { icono: "△", nombre: "Polígono" },
   text: { icono: "T", nombre: "Texto" },
   formula: { icono: "∑", nombre: "Fórmula" },
   page: { icono: "⛶", nombre: "Papel" }
 };
 
-const FIGURAS = new Set(["rect", "ellipse", "line", "poly"]);
+const FIGURAS = new Set(["rect", "ellipse", "line", "curve", "poly"]);
+
+/* Línea y curva se arrastran de un extremo a otro: comparten relleno
+   (ninguno), extremos de trazo, puntas de flecha y teclas. */
+const esLineal = t => t === "line" || t === "curve";
 
 const el = (tag, cls, texto) => {
   const n = document.createElement(tag);
@@ -66,6 +71,10 @@ export function createToolOptions(host, opts = {}) {
      barra no conoce: se le pide a quien la creó, igual que el panel de
      la derecha hace con los degradados. */
   const getArrowRef = opts.getArrowRef || (() => null);
+  /* La curvatura no es un atributo del SVG (hay que recalcular el
+     trazado a partir de los extremos de CADA curva), así que va por su
+     propio camino en vez de por `onApply`. */
+  const onCurva = opts.onCurva || (c => setCrear(c));
 
   host.classList.add("to-bar");
   let herramienta = null;      // la que está montada ahora mismo
@@ -112,11 +121,12 @@ export function createToolOptions(host, opts = {}) {
     };
   }
 
-  function numero({ min = 0, step = 0.1, ancho = 54, unidad = "mm", onChange }) {
+  function numero({ min = 0, max = null, step = 0.1, ancho = 54, unidad = "mm", onChange }) {
     const inp = document.createElement("input");
     inp.type = "number";
     inp.className = "to-num";
     inp.min = String(min);
+    if (max != null) inp.max = String(max);
     inp.step = String(step);
     inp.style.width = `${ancho}px`;
     /* Aplica al confirmar y también sola, poco después de dejar de
@@ -124,7 +134,7 @@ export function createToolOptions(host, opts = {}) {
        el `change` no llegaba nunca (ver style.js). */
     const commit = () => {
       const v = parseFloat(inp.value);
-      if (isFinite(v) && v >= min) onChange(v);
+      if (isFinite(v) && v >= min && (max == null || v <= max)) onChange(v);
     };
     let temporizador = null;
     inp.addEventListener("input", () => { clearTimeout(temporizador); temporizador = setTimeout(commit, 350); });
@@ -231,7 +241,7 @@ export function createToolOptions(host, opts = {}) {
     }
 
     /* --- figuras: rectángulo, elipse, línea y polígono --- */
-    const relleno = tool === "line" ? null : color("fill", true);
+    const relleno = esLineal(tool) ? null : color("fill", true);
     if (relleno) add(etiqueta("Relleno"), relleno);
 
     const trazo = color("stroke", true);
@@ -242,7 +252,7 @@ export function createToolOptions(host, opts = {}) {
     add(etiqueta("Trazo"), trazo, grosor);
 
     const guiones = lista(DASHES, v => onApply({ "stroke-dasharray": v || null }), "Tipo de línea");
-    const extremos = tool === "line"
+    const extremos = esLineal(tool)
       ? lista(CAPS, v => onApply({ "stroke-linecap": v }), "Extremos de la línea")
       : null;
     if (extremos) add(guiones, extremos);
@@ -258,7 +268,7 @@ export function createToolOptions(host, opts = {}) {
        quitar la punta y volver a ponerla devolvía el triángulo de
        siempre. */
     let puntas = null, tipoPta = null, tamPta = null;
-    if (tool === "line") {
+    if (esLineal(tool)) {
       const ficha = () => {
         const cr = getCrear();
         return { tipo: cr.flechaTipo, tamaño: cr.flechaTam };
@@ -275,6 +285,25 @@ export function createToolOptions(host, opts = {}) {
         onChange: v => { setCrear({ flechaTam: v }); rehacer(); }
       });
       add(etiqueta("Punta"), puntas, tipoPta, tamPta);
+    }
+
+    /* La curvatura y las ondas se eligen antes de arrastrar, como los
+       lados del polígono, pero a diferencia de aquellos siguen siendo
+       corregibles después: `onCurva` se las pasa también a la curva que
+       haya elegida (ver `Tools.setCurva`), que es lo que hace falta con
+       «seguir dibujando» puesto. */
+    let curvatura = null, ondas = null;
+    if (tool === "curve") {
+      curvatura = numero({
+        min: -100, max: 100, step: 5, ancho: 56, unidad: "%",
+        onChange: v => onCurva({ curvatura: v })
+      });
+      add(etiqueta("Curvatura"), curvatura);
+      ondas = numero({
+        min: 1, max: 6, step: 1, ancho: 44, unidad: "",
+        onChange: v => onCurva({ ondas: Math.round(v) })
+      });
+      add(etiqueta("Curvas"), ondas);
     }
 
     let esquinas = null;
@@ -308,9 +337,11 @@ export function createToolOptions(host, opts = {}) {
     add(seguir);
 
     const REGULAR = { rect: "cuadrado", ellipse: "círculo", poly: "regular" };
-    host.appendChild(pista(tool === "line"
-      ? "Mayús: ángulos de 15° · Alt: desde el centro"
-      : `Mayús: ${REGULAR[tool]} · Alt: desde el centro`));
+    host.appendChild(pista(tool === "curve"
+      ? "100 % es medio círculo · signo negativo, hacia el otro lado · Mayús: ángulos de 15° · Alt: desde el centro"
+      : tool === "line"
+        ? "Mayús: ángulos de 15° · Alt: desde el centro"
+        : `Mayús: ${REGULAR[tool]} · Alt: desde el centro`));
 
     partes.push(() => {
       const st = getStyle();
@@ -321,6 +352,7 @@ export function createToolOptions(host, opts = {}) {
       if (extremos) extremos.sync(st["stroke-linecap"] || DEFAULT_CAP);
       if (puntas) puntas.sync(readArrow(st["marker-start"], st["marker-end"]));
       const cr = getCrear();
+      if (curvatura) { curvatura.sync(cr.curvatura); ondas.sync(cr.ondas); }
       if (tipoPta) {
         const p = normPunta({ tipo: cr.flechaTipo, tamaño: cr.flechaTam });
         tipoPta.sync(p.tipo);

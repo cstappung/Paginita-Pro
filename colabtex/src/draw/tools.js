@@ -13,7 +13,8 @@
 import {
   parseTransform, matToString, matMul, matInvert, matApply, matApplyVec,
   translate, scaleAbout, rotateM, boxFromDrag, boxCorners, boxOfPoints,
-  snapBoxDelta, snapValue, angleOf, dist, clamp, fmt, polygonPoints, pointsAttr
+  snapBoxDelta, snapValue, angleOf, dist, clamp, fmt, polygonPoints, pointsAttr,
+  curvaPath, curvaSpec, curvaExtremos, esCurva, normCurva, CURVA_ATTR, ONDAS_ATTR
 } from "./geom.js";
 import { DEFAULT_CAP, DEFAULT_JOIN, capAttr, joinAttr } from "./stroke.js";
 import { esRecta, expansion, bakeShape, bakeTrazo } from "./reshape.js";
@@ -24,6 +25,10 @@ import { PUNTA_ATTRS, esMarcable } from "./paint.js";
 import { clipboardSvg, textToNodes } from "./svgio.js";
 
 const svgEl = tag => document.createElementNS(SVG_NS, tag);
+
+/* Las dos herramientas que se arrastran de un extremo a otro en vez de
+   por una caja: comparten teclas, vista previa y puntas de flecha. */
+const esLineal = t => t === "line" || t === "curve";
 
 /* Zoom con Ctrl+rueda: cuánto avanza cada muesca y cuánto
    desplazamiento hace falta para contar una (ver _zoomRueda). */
@@ -121,7 +126,7 @@ export class Tools {
        siempre. `null` = lo que diga paint.js. */
     this.crear = Object.assign(
       { rx: 0, mantener: false, lados: 3, estrella: false, punta: 0.5,
-        flechaTipo: null, flechaTam: null },
+        flechaTipo: null, flechaTam: null, curvatura: 40, ondas: 1 },
       opts.crear || {});
 
     this.tool = "select";
@@ -787,6 +792,16 @@ export class Tools {
      escalado del gesto: ver reshape.js y _commit. */
   _planHornear(el, K, plan, kTrazo) {
     if (!isEl(el)) return false;
+    /* Una curva nuestra no se hornea, y por lo mismo que la fórmula: su
+       ficha dice cuánto se abomba EN PROPORCIÓN A SU CUERDA, y meter en
+       el trazado un estirón de solo un eje cambia esa proporción sin
+       cambiar el número — el panel se quedaría diciendo 70 % sobre una
+       curva que ya es del 35, y tocar la curvatura después enderezaría
+       el estirón de golpe. Con la matriz puesta, un semicírculo
+       estirado sigue siendo un semicírculo estirado y subirle la
+       curvatura lo deja estirado igual. El contorno lo compensa
+       `_compensarTrazo`, como en todo lo que no se puede hornear. */
+    if (esCurva(el)) return false;
     const tag = el.nodeName;
     const propio = nombre => propioDe(el, nombre);
     const trazo = bakeTrazo(propio, kTrazo);
@@ -1163,7 +1178,9 @@ export class Tools {
      barra de estado. */
   _geoCrear(d, p, e) {
     const c = d.start;
-    if (d.tool === "line") {
+    // la curva se arrastra igual que la línea: lo que se apunta son sus
+    // dos extremos, y el abombamiento lo pone la barra
+    if (esLineal(d.tool)) {
       let b = p;
       if (e.shiftKey) {
         const r = dist(c, b);
@@ -1334,6 +1351,13 @@ export class Tools {
       node = svgEl("line");
       node.setAttribute("x1", a.x); node.setAttribute("y1", a.y);
       node.setAttribute("x2", b.x); node.setAttribute("y2", b.y);
+    } else if (d.tool === "curve") {
+      /* La curva se calcula aquí en píxeles de pantalla, no se escala la
+         del documento: la capa de tiradores está en píxeles y una curva
+         no es una figura que se pueda estirar sin más — sus extremos son
+         los que son. */
+      node = svgEl("path");
+      node.setAttribute("d", curvaPath(a, b, this.crear));
     } else if (d.tool === "ellipse") {
       node = svgEl("ellipse");
       node.setAttribute("cx", (a.x + b.x) / 2); node.setAttribute("cy", (a.y + b.y) / 2);
@@ -1370,12 +1394,12 @@ export class Tools {
        la capa de encima, así que la punta se resuelve también aquí: la
        vista previa enseña la flecha en vez de una línea pelada que
        cambia al soltar. */
-    if (d.tool === "line") {
+    if (esLineal(d.tool)) {
       for (const at of ["marker-start", "marker-end"]) {
         if (st[at]) node.setAttribute(at, this._puntaPreview(st[at], k, ov));
       }
     }
-    node.style.fill = d.tool === "line" ? "none" : (st.fill || "none");
+    node.style.fill = esLineal(d.tool) ? "none" : (st.fill || "none");
     node.style.stroke = st.stroke || "none";
     node.style.strokeWidth = String(grosor);
     node.style.strokeLinecap = st["stroke-linecap"] || DEFAULT_CAP;
@@ -1435,6 +1459,21 @@ export class Tools {
           estrella: !!this.crear.estrella, razon: this.crear.punta
         }))
       }, common));
+    } else if (tool === "curve") {
+      /* La ficha (`data-curva`, `data-ondas`) se guarda junto al trazado
+         para poder volver a curvarla días después; los extremos no, que
+         ya están en el propio `d`. Ver la cabecera de las curvas en
+         geom.js. */
+      const c = normCurva(this.crear);
+      el = d.add(capa, "path", Object.assign({
+        d: curvaPath(q0, q1, c),
+        [CURVA_ATTR]: fmt(c.curvatura, 2),
+        [ONDAS_ATTR]: String(c.ondas)
+      }, common, {
+        fill: null,
+        "marker-start": st["marker-start"] || null,
+        "marker-end": st["marker-end"] || null
+      }));
     } else if (tool === "line") {
       el = d.add(capa, "line", Object.assign({
         x1: fmt(q0.x), y1: fmt(q0.y), x2: fmt(q1.x), y2: fmt(q1.y)
@@ -1566,6 +1605,36 @@ export class Tools {
   /* Opciones de dibujo que no son atributos del SVG (ver this.crear). */
   setCrear(opts) { Object.assign(this.crear, opts || {}); }
 
+  /* Vuelve a curvar las curvas elegidas. NO puede ir por `applyStyle`:
+     ahí se escribe el mismo valor en toda la selección, y aquí cada
+     figura tiene sus propios extremos y hay que recalcularle el trazado
+     a cada una. Todo en una transacción, para que un Ctrl+Z deshaga el
+     cambio entero y no curva a curva.
+
+     Es también lo que deja «añadir una segunda o tercera curvatura» a
+     una flecha ya dibujada: el trazado se rehace, la punta y el estilo
+     siguen colgando del mismo elemento. */
+  setCurva(cambios) {
+    const c = normCurva({ ...this.crear, ...cambios });
+    Object.assign(this.crear, c);   // queda de memoria para la siguiente
+    const d = this.getDrawing();
+    if (!d || !this.canWrite()) return;
+    const curvas = this.sel.filter(esCurva);
+    if (!curvas.length) return;
+    d.edit(() => {
+      for (const el of curvas) {
+        const ext = curvaExtremos(el.getAttribute("d"));
+        if (!ext) continue;
+        const spec = normCurva({ ...curvaSpec(el), ...cambios });
+        el.setAttribute("d", curvaPath(ext.a, ext.b, spec));
+        el.setAttribute(CURVA_ATTR, fmt(spec.curvatura, 2));
+        el.setAttribute(ONDAS_ATTR, String(spec.ondas));
+      }
+    });
+    this.redrawOverlay();
+    this.onSelectionChange(this.selection());
+  }
+
   applyStyle(attrs) {
     const d = this.getDrawing();
     /* Los valores quedan de memoria para la próxima figura. Los de
@@ -1644,7 +1713,7 @@ export class Tools {
     // atajos de herramienta, como en Inkscape
     if (!mod && !e.altKey) {
       const map = {
-        s: "select", r: "rect", e: "ellipse", l: "line",
+        s: "select", r: "rect", e: "ellipse", l: "line", c: "curve",
         g: "poly", t: "text", f: "formula", p: "page"
       };
       const name = map[e.key.toLowerCase()];

@@ -470,6 +470,29 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
   scaling it afterwards; it starts at −90° because that is where a triangle's
   apex is expected — starting at 0° produced one lying on its side, which
   reads as a bug.
+
+  It also owns the **curve** (`curvaPath`, `curvaSpec`, `curvaExtremos`,
+  `esCurva`), which is a `<path>` carrying `data-curva` and `data-ondas`.
+  Four decisions:
+  - **The stored thing is the recipe, not just the trace.** Curvature is the
+    arc's sagitta as a percentage of the half chord, so **100 % is exactly a
+    semicircle** — the case people ask for by name — and the sign picks the
+    side; `data-ondas` says into how many alternating arcs the chord is cut,
+    so 2 is an S. Keeping the recipe is what lets an arrow drawn last week be
+    re-curved, and "add a second or third curvature" is just that field.
+  - **The endpoints are not stored**: they are already the first and last
+    numbers of the `d`, and a second place saying where the curve starts is a
+    second place that can lie. That reading is only safe because the `d` never
+    contains an `A` (whose flags are not coordinates).
+  - **It is drawn with cubic Béziers, not with `A`.** `reshape.js` rewrites the
+    `d` when baking a scale and refuses an arc under an uneven one — a cubic
+    just needs its four points moved — and a stretched semicircle has to come
+    out elliptical, which is what transforming those points does by itself.
+    Each arc is split into pieces of 90° or less, where the 4/3·tan(δ/4)
+    approximation is off by under a ten-thousandth of the radius (measured:
+    2.7e-4; the 100 % arc traces a real circle exactly).
+  - **Curvature 0 emits a straight `L`**, because a curve with no curvature is
+    a line and nothing downstream should have to special-case a degenerate arc.
 - `svgio.js` — SVG in and out, **including the sanitiser**. An SVG is an
   executable document: `<script>`, `<foreignObject>`, `on*` handlers,
   `javascript:` and off-site `url(...)`/`href` are dropped on import, always.
@@ -581,6 +604,16 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
   attribute; it lives in the overlay, which is in screen pixels, so widths and
   dashes are multiplied by `canvas.k` by hand.
 
+  **The curve tool is the line tool with a bulge** (`esLineal`): same drag from
+  end to end, same Mayús/Alt, same arrowheads, no fill — what you point at are
+  its two ends, and how much it bows comes from the bar. Its preview is
+  computed in screen pixels rather than scaling the document's curve, because a
+  curve is not a box that can be stretched. Re-curving what is already drawn
+  goes through `Tools.setCurva`, **not** `applyStyle`: the latter writes one
+  value to the whole selection, and here each curve has its own endpoints and
+  its own `d` to recompute — all inside one `edit()`, so one Ctrl+Z undoes the
+  lot instead of one curve at a time.
+
   Three rules the transforms depend on:
   - **A gesture is not a drag until the pointer has moved `DRAG_PX` screen
     pixels.** Measured in pixels, not millimetres — hand tremor is the same
@@ -664,10 +697,17 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
     write before applying any): one `<text>`, one formula or one rotated child
     inside is enough to leave the group with its matrix, and baking it halfway
     would change how the drawing looks.
-  - **Text and formulas are never baked.** A font size is a single number and
-    can't stretch along one axis, and a formula's size is read back out of its
-    own transform (`latex.js: tamañoDe`), so baking would leave the panel
-    lying forever.
+  - **Text, formulas and curves are never baked.** A font size is a single
+    number and can't stretch along one axis, and a formula's size is read back
+    out of its own transform (`latex.js: tamañoDe`), so baking would leave the
+    panel lying forever. A curve is the same case: its `data-curva` is a
+    percentage *of its own chord*, so a one-axis stretch baked into the `d`
+    would change that proportion without changing the number — the panel would
+    say 70 % over a curve that is now 35, and touching the curvature afterwards
+    would straighten the stretch out in one go. Keeping the matrix, a stretched
+    semicircle stays a stretched semicircle and raising its curvature keeps it
+    stretched; `_compensarTrazo` pays for the stroke, as with everything else
+    that can't be baked.
   A path longer than `MAX_PATH` (20 000 chars) is left alone: rewriting a
   matplotlib figure's `d` on every drag would push that whole string through
   the database. `transformPath` also refuses an **arc rotated under a
@@ -701,8 +741,11 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
   is in hand. It carries what has to be decided *before* dragging (colour,
   width, dash, corner radius) plus the modifiers nobody discovers on their own,
   and it is the only home of the options that are not SVG attributes
-  (`Tools.crear`: the next rect's `rx`, and "seguir dibujando", which keeps the
-  tool instead of snapping back to the arrow). It is **rebuilt only when the
+  (`Tools.crear`: the next rect's `rx`, the next curve's curvature and number
+  of waves, and "seguir dibujando", which keeps the tool instead of snapping
+  back to the arrow). The curve's two go out through `onCurva`, not `setCrear`,
+  so they also reach a curve that is already selected — which is the normal
+  case with "seguir dibujando" on. It is **rebuilt only when the
   tool changes** and otherwise just re-synced, skipping whatever control has
   focus — a refresh mid-typing used to eat half of what was typed. Two layout
   traps: the hint gets `flex-basis:100%` so the bar is deterministically two
@@ -893,14 +936,30 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
     does the same thing, every current browser understands it, and — what
     matters here — it can be *read back*: recovering the blur from a chain of
     five primitives to refill the panel is a parser nobody wants to own.
-    `dx`/`dy`/`stdDeviation` are in the shape's own units (millimetres), since
-    that is what `primitiveUnits` defaults to. The filter **region**, on the
+    `dx`/`dy`/`stdDeviation` are in the **element's own user space** — the one
+    *after* its own `transform`, which is what `primitiveUnits` defaults to —
+    and that is not millimetres of paper. Verified by measuring ink: the same
+    `dx="10"` moves the shadow 10 document units on an untransformed shape and
+    1 on the same shape built with `scale(0.1)`. It was the bug behind "the
+    shadow of a formula doesn't offset, it looks like an outline": a formula
+    carries `scale(size/1000)`, i.e. 0.005 for a 5 mm one, so a 0.8 mm offset
+    became 0.004 mm and the only thing left was the blur peeking around the
+    strokes (measured: **zero** shadow pixels before, 0.75 mm of offset after).
+    Anything inside an imported layer had the same fault, scaled by the layer.
+    So the spec is written and read **divided by that scale** — the very one
+    that already converts stroke width in the panel (`Tools.selectionScale`),
+    and the conversion back happens *before* clamping, or a 40 mm shadow on a
+    formula (8000 of its units) would clamp to 40 and come back as 0.2. When
+    the selection disagrees that scale is 1 and nothing is converted: same rule
+    as stroke width and corner radius. The filter **region**, on the
     other hand, may *not* be in bbox percentages, and that was the bug behind
     "I put a shadow on a line and it disappears": a horizontal line's bbox is
     70 × 0, any percentage of that zero is still zero, and a filter region of
     zero area means the browser draws **nothing at all** — not the shadow and
     not the line (verified in Chrome: 0 ink). So it is `userSpaceOnUse` with
-    a fixed, enormous region (±100 000). Three things make that safe: the
+    a fixed, enormous region (±100 000 mm, through the same scale as the
+    offsets, so it covers as much inside a formula). Three things make that
+    safe: the
     region is read in the *element's own* space (verified: a shape with
     `transform="translate(60,0)"` still paints in full against a region
     written for its untranslated geometry), so no transform can ever leave it
@@ -963,12 +1022,18 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
     draw a head at the first and last vertex — so choosing "arrow" with a
     polygon still selected used to stick one on its corner, because the panel,
     the tool bar and the shape tools all funnel through `Tools.applyStyle`.
-- `style.js` — the fill/stroke/text/formula/rect/shadow/opacity/order/page
+- `style.js` — the fill/stroke/text/formula/rect/curve/shadow/opacity/order/page
   panel, built in JS. Sections that only describe one kind of thing (TEXTO,
-  FÓRMULA, RECTÁNGULO) appear only when the selection is that thing —
+  FÓRMULA, RECTÁNGULO, CURVA) appear only when the selection is that thing —
   RECTÁNGULO needs *every* selected element to be a `<rect>`, since writing a
   radius with a circle in the selection would set an attribute that draws
-  nothing and leave the panel lying. Its `rx` is converted through `getScale`
+  nothing and leave the panel lying, and CURVA the same with `esCurva` (an
+  imported `<path>` has no recipe to show, and writing one would replace the
+  trace it came with). Both exist for the same reason: the corner radius and
+  the curvature could be chosen *before* dragging and never afterwards, and
+  the curvature is precisely what you want to fix afterwards — an arrow is
+  drawn pointing where it must point, and only then is it clear how much flight
+  it needs. Its `rx` is converted through `getScale`
   exactly like the stroke width, for the same reason: the radius lives in the
   shape's coordinates and the panel shows what is on screen. Shows
   "varios" when the selection disagrees rather than the first value, so touching
