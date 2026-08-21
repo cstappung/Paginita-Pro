@@ -25,8 +25,9 @@
    ============================================================ */
 
 import {
-  DIRECCIONES, CENTROS, specPorDefecto, normStops, cssPaint, esGrad
+  DIRECCIONES, CENTROS, specPorDefecto, normStops, cssPaint, esGrad, etiquetaPaint
 } from "./paint.js";
+import { mismaPaint, normPaint } from "./palette.js";
 
 export const PALETTE = [
   "none", "#000000", "#3d4c5e", "#8a97a3", "#ffffff",
@@ -81,7 +82,13 @@ export function createChip(onOpen) {
    El cuadro. Uno solo para toda la aplicación.
    ============================================================ */
 
-export function createColorPopover() {
+export function createColorPopover(opts = {}) {
+  /* La paleta se pide cada vez en vez de guardarse: al cambiar de
+     proyecto hay un Y.Doc nuevo, y una referencia guardada apuntaría al
+     documento anterior. */
+  const getPaleta = opts.getPaleta || (() => null);
+  const puedeEscribir = opts.canWrite || (() => true);
+
   const pop = el("div", "dw-pop");
   pop.style.display = "none";
   document.body.appendChild(pop);
@@ -90,6 +97,76 @@ export function createColorPopover() {
   let onChange = () => {};
   let ancla = null;
   let abierto = false;
+  let dejarDeVer = null;   // baja de la paleta que se está escuchando
+  let vista = null;        // qué paleta se escucha, para no re-suscribirse
+
+  /* ---------- guardados ----------
+     Van ARRIBA y fuera de las pestañas: un degradado guardado se aplica
+     igual que un color plano, y esconderlo dentro de la pestaña de
+     degradados obligaría a saber de qué tipo era lo que se guardó. */
+  const secPal = el("div", "dw-pop-pal");
+  const palHead = el("div", "dw-pop-palhead");
+  palHead.appendChild(el("span", "dw-pop-lbl", "Guardados"));
+  const btnSave = el("button", "dw-btn dw-btn-save", "＋ Guardar");
+  btnSave.type = "button";
+  btnSave.title = "Guardar este color en la paleta del proyecto";
+  btnSave.onclick = () => {
+    const pal = getPaleta();
+    if (!pal || !puedeEscribir()) return;
+    pal.add(spec);
+    pintarPaleta();
+  };
+  palHead.appendChild(btnSave);
+  const palList = el("div", "dw-pal");
+  secPal.append(palHead, palList);
+
+  function pintarPaleta() {
+    const pal = getPaleta();
+    if (!pal) { secPal.style.display = "none"; return; }
+    secPal.style.display = "";
+
+    /* Suscribirse aquí y no al crear el cuadro: cuando se creó todavía
+       no había proyecto abierto. Se rehace solo si la paleta ha cambiado
+       de identidad, o cada repintado dejaría un oyente más. */
+    if (vista !== pal) {
+      if (dejarDeVer) dejarDeVer();
+      vista = pal;
+      dejarDeVer = pal.observe(() => { if (abierto) pintarPaleta(); });
+    }
+
+    const lista = pal.list();
+    const guardable = !!normPaint(spec) && puedeEscribir() && !lista.some(e => mismaPaint(e.spec, spec));
+    btnSave.disabled = !guardable;
+    btnSave.textContent = !normPaint(spec) ? "＋ Guardar"
+      : guardable ? "＋ Guardar" : "✓ Guardado";
+
+    palList.textContent = "";
+    if (!lista.length) {
+      palList.appendChild(el("div", "dw-pal-vacia",
+        "Aquí se quedan los colores y degradados que guardes."));
+      return;
+    }
+    for (const e of lista) {
+      const celda = el("div", "dw-pal-celda");
+      const b = el("button", "dw-swatch dw-pal-mue");
+      b.type = "button";
+      b.style.background = cssPaint(e.spec) || "";
+      b.title = e.nombre || etiquetaPaint(e.spec);
+      if (mismaPaint(e.spec, spec)) b.classList.add("dw-swatch-on");
+      b.onclick = () => emitir(JSON.parse(JSON.stringify(e.spec)));
+      celda.appendChild(b);
+      if (puedeEscribir()) {
+        const x = el("button", "dw-pal-x", "✕");
+        x.type = "button";
+        x.title = "Quitar de la paleta";
+        x.onclick = ev => { ev.stopPropagation(); getPaleta().remove(e.id); pintarPaleta(); };
+        celda.appendChild(x);
+      }
+      palList.appendChild(celda);
+    }
+  }
+
+  pop.appendChild(secPal);
 
   /* ---------- pestañas ---------- */
   const tabs = el("div", "dw-pop-tabs");
@@ -273,6 +350,7 @@ export function createColorPopover() {
   }
 
   function pintar(suave = false) {
+    pintarPaleta();
     const grad = esGrad(spec);
     tabPlano.classList.toggle("dw-pop-tab-on", !grad);
     tabGrad.classList.toggle("dw-pop-tab-on", grad);

@@ -621,6 +621,50 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
   active layer**, and a whole layer pastes back *as a layer*; anything else
   lands on the active layer offset by 2 mm so it's visible that there are now
   two.
+- `reshape.js` — **baking a scale into the geometry**, pure arithmetic. A
+  `scale(3,1)` stored in the `transform` scales the *stroke* too, per axis: the
+  vertical edges come out three times thicker than the horizontal ones and the
+  rounded corners turn into ovals. Measured on a 0.5 mm stroke stretched ×3:
+  the ink reached 0.75 px sideways and 0.25 px top-to-bottom. No SVG attribute
+  fixes that — a stroke has one width — so on release `Tools._commit` moves the
+  scale out of the matrix and into the coordinates (`bakeShape`: `rect`
+  `width`, `ellipse` `rx/ry`, `points`, the `d` of a path), the way Inkscape's
+  "optimized" transform storage does. Four rules:
+  - **Only a matrix with no rotation or skew** (`esRecta`) can be baked; a
+    rotated shape keeps its transform, which is exactly the case `_marco()`
+    already handles by scaling in the shape's own axes.
+  - **What is not geometry scales isotropically**, by √|det|: stroke width,
+    dashes and the corner radius. So a uniform scale behaves exactly as it
+    always did, and a non-uniform one stretches the shape without deforming
+    what decorates it.
+  - **A group bakes whole or not at all** (`Tools._planHornear` collects every
+    write before applying any): one `<text>`, one formula or one rotated child
+    inside is enough to leave the group with its matrix, and baking it halfway
+    would change how the drawing looks.
+  - **Text and formulas are never baked.** A font size is a single number and
+    can't stretch along one axis, and a formula's size is read back out of its
+    own transform (`latex.js: tamañoDe`), so baking would leave the panel
+    lying forever.
+  A path longer than `MAX_PATH` (20 000 chars) is left alone: rewriting a
+  matplotlib figure's `d` on every drag would push that whole string through
+  the database. `transformPath` also refuses an **arc rotated under a
+  non-uniform scale** — the radii would have to be recomputed from the conic.
+  One trap it depends on: after baking, `_commit` clears the preview transform
+  from the **mirror DOM by hand**, because removing an attribute the element
+  never had emits no Yjs event (verified) and the mirror would keep the
+  preview's matrix on top of the already-scaled geometry — the shape drawn
+  twice as large as it was released.
+- `palette.js` — the project's **saved colours and gradients**, offered at the
+  top of the colour popover. Composing a gradient is eight decisions, and
+  people were duplicating a whole shape just to inherit its fill. Three
+  decisions: it lives in the **same `Y.Doc` as the drawings** (`Y.Array
+  "paleta"`), so it syncs to the team, travels with the project and needs no
+  new security rules; it stores the **spec**, never the `url(#…)` — a
+  reference means nothing in another drawing and `gcDefs` would collect it the
+  moment nobody used it, whereas from the spec `paintValue` rebuilds the
+  definition wherever it is applied; and it **refuses duplicates**
+  (`mismaPaint` on normalised specs), returning the existing entry, because a
+  palette with the same colour six times stops being a palette.
 - `stroke.js` — the cap/join/dash tables and the SVG defaults, shared by the
   three places that touch a stroke (`tools.js` creates, `style.js` edits,
   `tool-options.js` chooses). It exists because the opposite happened:

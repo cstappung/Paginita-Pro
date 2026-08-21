@@ -16,7 +16,8 @@ import {
   snapBoxDelta, snapValue, angleOf, dist, clamp, fmt, polygonPoints, pointsAttr
 } from "./geom.js";
 import { DEFAULT_CAP, DEFAULT_JOIN, capAttr, joinAttr } from "./stroke.js";
-import { SVG_NS, newId, isEl, childrenOf } from "./doc.js";
+import { esRecta, expansion, bakeShape, bakeTrazo } from "./reshape.js";
+import { SVG_NS, newId, isEl, childrenOf, dropStyleProp } from "./doc.js";
 import { addText, isText, TEXT_ATTRS, DEFAULT_FONT, DEFAULT_SIZE } from "./text.js";
 import { esFormula } from "./latex.js";
 import { PUNTA_ATTRS, esMarcable } from "./paint.js";
@@ -555,34 +556,121 @@ export class Tools {
        transformación viene expresada en los ejes de la propia figura, así
        que se compone por la DERECHA: A' = A · T. Es lo que evita que un
        rectángulo girado se convierta en un romboide al estirarlo. */
-    if (this.drag && this.drag.local) return matToString(matMul(item.m0, T));
-    const M = item.pi0
+    if (this.drag && this.drag.local) return matMul(item.m0, T);
+    return item.pi0
       ? matMul(matMul(item.pi0, matMul(T, item.p0)), item.m0)
       : matMul(T, item.m0);
-    return matToString(M);
   }
 
   /* Vista previa: se escribe en el DOM del espejo, no en el documento. */
   _preview(T) {
     for (const item of this.drag.items) {
-      const s = this._matrixFor(item, T);
+      const s = matToString(this._matrixFor(item, T));
       if (s) item.dom.setAttribute("transform", s);
       else item.dom.removeAttribute("transform");
     }
   }
 
   /* Al soltar se escribe en Yjs de una vez, con la misma cuenta que la
-     vista previa: lo que se guarda es exactamente lo que se veía. */
+     vista previa: lo que se guarda es exactamente lo que se veía.
+
+     Al ESCALAR, además, se intenta hornear la matriz en las coordenadas
+     de la figura (ver reshape.js): un `scale(3,1)` guardado como matriz
+     engorda los lados verticales tres veces más que los horizontales y
+     ovala las esquinas, y no hay atributo que lo remedie porque un trazo
+     tiene un solo grosor. Si se puede hornear, la figura se queda con sus
+     medidas de verdad y SIN transform; si no —girada, un rótulo, una
+     fórmula—, se guarda la matriz como toda la vida. */
   _commit(T) {
     const d = this.getDrawing();
     if (!d) return;
+    const escalando = !!this.drag && this.drag.mode === "scale";
+    const horneados = [];
     d.edit(() => {
       for (const item of this.drag.items) {
-        const s = this._matrixFor(item, T);
+        const M = this._matrixFor(item, T);
+        if (escalando && this._hornear(item.el, M)) {
+          item.el.removeAttribute("transform");
+          horneados.push(item);
+          continue;
+        }
+        const s = matToString(M);
         if (s) item.el.setAttribute("transform", s);
         else item.el.removeAttribute("transform");
       }
     });
+
+    /* La vista previa dejó la matriz escrita en el DOM del espejo. Al
+       hornear, el elemento se queda SIN transform — y si tampoco lo
+       tenía antes, borrarlo no cambia nada en Yjs, así que no llega
+       ningún aviso al lienzo (comprobado: quitar una clave que no
+       existe no emite `attributesChanged`). El espejo se quedaría con la
+       matriz de la vista previa ENCIMA de la geometría ya escalada, o
+       sea la figura escalada dos veces hasta el siguiente repintado. */
+    for (const item of horneados) item.dom.removeAttribute("transform");
+  }
+
+  /* Mete la matriz en la geometría del elemento y devuelve si pudo. Se
+     recogen TODAS las escrituras antes de aplicar ninguna: dentro de un
+     grupo basta con que un solo hijo no sepa absorberla (un rótulo, una
+     fórmula, algo girado) para que el grupo entero tenga que quedarse
+     con su matriz, y a medio hornear el dibujo cambiaría de aspecto.
+
+     Debe llamarse DENTRO de un `edit()`: escribe atributos sueltos. */
+  _hornear(el, M) {
+    if (!esRecta(M)) return false;
+    const plan = [];
+    if (!this._planHornear(el, M, plan)) return false;
+    for (const [nodo, attrs] of plan) {
+      for (const [k, v] of Object.entries(attrs)) {
+        nodo.setAttribute(k, String(v));
+        // un style="stroke-width:2" del propio elemento taparía lo escrito
+        dropStyleProp(nodo, k);
+      }
+    }
+    return true;
+  }
+
+  /* El grosor y los guiones se leen del atributo o del `style` propio: si
+     el elemento no dice nada, los hereda de su grupo y no son suyos para
+     reescribirlos — se le habría clavado un valor que antes venía de
+     arriba, y pintar el grupo dejaría de afectarle. */
+  _planHornear(el, K, plan) {
+    if (!isEl(el)) return false;
+    const tag = el.nodeName;
+    const propio = nombre => {
+      const st = el.getAttribute("style");
+      if (st) {
+        const m = new RegExp(`(?:^|;)\\s*${nombre}\\s*:\\s*([^;]+)`, "i").exec(st);
+        if (m) return m[1].trim();
+      }
+      return el.getAttribute(nombre);
+    };
+    const trazo = bakeTrazo(propio, expansion(K));
+
+    if (tag === "g") {
+      /* Una fórmula es un <g> de trazos de MathJax, pero su tamaño se lee
+         de su propia matriz (latex.js: `tamañoDe`): hornearla dejaría la
+         fórmula bien y el número del panel mintiendo para siempre. */
+      if (el.getAttribute("data-latex") != null) return false;
+      const hijos = childrenOf(el).filter(isEl);
+      if (!hijos.length) return false;
+      for (const kid of hijos) {
+        const mc = parseTransform(kid.getAttribute("transform"));
+        if (!esRecta(mc)) return false;          // hijo girado: no hay vuelta
+        const inv = matInvert(mc);
+        if (!inv) return false;
+        // la misma transformación, vista desde dentro del hijo
+        if (!this._planHornear(kid, matMul(matMul(inv, K), mc), plan)) return false;
+      }
+      if (Object.keys(trazo).length) plan.push([el, trazo]);
+      return true;
+    }
+
+    const attrs = bakeShape(tag, propio, K);
+    if (!attrs) return false;
+    plan.push([el, Object.assign(attrs, trazo)]);
+    return true;
   }
 
   _startTransform(mode, e, handle) {

@@ -18,6 +18,7 @@ import * as fb from "./fb-api.js";
 import { RtdbProvider } from "./y-rtdb.js";
 import { colorForUid, timeAgo, escapeHtml } from "./util.js";
 import { DrawStore, Drawing, makeDrawing } from "./draw/doc.js";
+import { DrawPalette } from "./draw/palette.js";
 import { svgToFragment, svgToPieces } from "./draw/svgio.js";
 import { Canvas, PCT_MIN, PCT_MAX } from "./draw/canvas.js";
 import { createScrollbars } from "./draw/scrollbars.js";
@@ -49,6 +50,7 @@ const state = {
   ydoc: null,
   provider: null,
   store: null,
+  paleta: null,        // colores y degradados guardados del proyecto
   path: null,          // dibujo abierto
   drawing: null,       // instancia Drawing
   canvas: null,
@@ -249,6 +251,7 @@ async function openEditor(projectId, token) {
   state.ydoc = ydoc;
   state.provider = provider;
   state.store = new DrawStore(ydoc, { readOnly });
+  state.paleta = new DrawPalette(ydoc, { readOnly });
 
   provider.awareness.setLocalStateField("user", {
     name: state.user.name, color: state.user.color, uid: state.user.uid
@@ -313,6 +316,7 @@ function teardownEditor() {
   if (state.provider) { state.provider.destroy(); state.provider = null; }
   if (state.ydoc) { state.ydoc.destroy(); state.ydoc = null; }
   state.store = null;
+  state.paleta = null;   // la del proyecto siguiente cuelga de otro Y.Doc
   state.path = null;
   state.project = null;
   state.role = null;
@@ -408,7 +412,10 @@ function ensureEditorParts() {
     readPaint: v => readPaint(state.drawing, v),
     resolveShadow: spec => shadowValue(state.drawing, spec),
     readShadow: v => readShadow(state.drawing, v),
-    resolveArrow: () => flechaRef(state.drawing)
+    resolveArrow: () => flechaRef(state.drawing),
+    /* La paleta guardada es del PROYECTO: vive en el mismo Y.Doc que los
+       dibujos, así que se comparte con el equipo y se sincroniza sola. */
+    getPaleta: () => state.paleta
   });
   /* La barra de la herramienta activa: flota sobre el lienzo y solo
      aparece con una herramienta de dibujo en la mano. */

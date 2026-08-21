@@ -105,7 +105,12 @@ export function createStylePanel(host, opts = {}) {
   /* ---------- el cuadro de color ----------
      Uno para los dos canales: abrir el de trazo cierra el de relleno
      sin tener que acordarse de hacerlo. */
-  const pop = createColorPopover();
+  const pop = createColorPopover({
+    /* La paleta guardada del proyecto. Se pide al vuelo porque cambia
+       con el proyecto abierto, y el panel se construye una sola vez. */
+    getPaleta: opts.getPaleta || (() => null),
+    canWrite
+  });
 
   /* Una muestra pulsable por canal. Al abrirla se le pasa la ficha que
      describe lo que hay ahora, y cada cambio se aplica al vuelo. */
