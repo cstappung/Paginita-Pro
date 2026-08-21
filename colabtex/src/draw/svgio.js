@@ -250,31 +250,35 @@ function markLayer(g, info, norm, nombre) {
   return g;
 }
 
-/* Un archivo .svg entero → fragmento listo para guardar como dibujo.
-   Se normaliza a milímetros: el <svg> resultante siempre cumple
-   1 unidad de usuario = 1 mm, que es lo que espera el resto del editor.
+/* Un archivo .svg desmontado en sus piezas y ya en milímetros: las
+   definiciones y las capas, sin ningún <svg> que las envuelva. Es lo que
+   comparten las dos formas de importar —como dibujo nuevo
+   (`svgToFragment`) y dentro de uno ya abierto (draw-main)—, que solo se
+   diferencian en dónde acaban esas piezas.
 
-   El fragmento vuelve SIN INTEGRAR en ningún Y.Doc, así que todavía no
-   se puede leer (toArray() daría vacío y Yjs se queja por consola).
-   Hay que guardarlo antes con DrawStore.put(), que devuelve la versión
-   ya integrada. */
-export function svgToFragment(text, { layerName = "Importado" } = {}) {
+   `dx`/`dy` desplazan lo importado en milímetros: entrar por el (0,0) del
+   documento no vale cuando el papel de destino está recortado, porque ahí
+   no se vería. `freshIds` renueva los identificadores, que hace falta al
+   entrar en un dibujo que ya tiene contenido: dos figuras con el mismo id
+   rompen la selección, y las referencias internas (un degradado) dejarían
+   de apuntar a lo suyo.
+
+   Todo vuelve SIN INTEGRAR en ningún Y.Doc, así que todavía no se puede
+   leer: toArray() daría vacío y Yjs se queja por consola. Por eso los
+   nombres de las capas se devuelven aparte, ya leídos. */
+export function svgToPieces(text, { layerName = "Importado", dx = 0, dy = 0, freshIds = false } = {}) {
   const src = parseSvgDom(text);
+  if (freshIds) renumerarIds(src);
   const geo = svgGeometry(src);
   const wmm = Math.max(1, geo.wmm), hmm = Math.max(1, geo.hmm);
 
-  const frag = new Y.XmlFragment();
-  const svg = new Y.XmlElement("svg");
-  svg.setAttribute("width", `${fmt(wmm)}mm`);
-  svg.setAttribute("height", `${fmt(hmm)}mm`);
-  svg.setAttribute("viewBox", `0 0 ${fmt(wmm)} ${fmt(hmm)}`);
-
-  const defs = new Y.XmlElement("defs");
+  const defs = [];
 
   /* Del sistema de coordenadas de origen al nuestro: primero se lleva
      la esquina del viewBox al cero, luego se escala a milímetros. */
   const k = geo.scale;
   const parts = [];
+  if (dx || dy) parts.push(`translate(${fmt(dx)},${fmt(dy)})`);
   if (k !== 1) parts.push(`scale(${fmt(k, 6)})`);
   if (geo.vb.x || geo.vb.y) parts.push(`translate(${fmt(-geo.vb.x)},${fmt(-geo.vb.y)})`);
   const norm = parts.join(" ");
@@ -294,6 +298,7 @@ export function svgToFragment(text, { layerName = "Importado" } = {}) {
   const adoptar = hayCapas || soloGrupos;
 
   const capas = [];   // <g> que serán capas, en orden de pintado
+  const nombres = []; // el de cada una, leído del DOM mientras se puede
   const sueltos = []; // lo que no cabe en ninguna: irá a una capa aparte
   let nCapa = 0;
 
@@ -303,12 +308,10 @@ export function svgToFragment(text, { layerName = "Importado" } = {}) {
        no vale — sin integrar, `toArray()` devuelve vacío y el contenido
        (degradados, marcadores) desaparecería sin avisar. */
     if (child.nodeType === 1 && child.nodeName.toLowerCase() === "defs") {
-      const inner = [];
       for (const g of Array.from(child.childNodes)) {
         const y = domToY(g);
-        if (y) inner.push(y);
+        if (y) defs.push(y);
       }
-      if (inner.length) defs.insert(defs.length, inner);
       continue;
     }
 
@@ -316,22 +319,48 @@ export function svgToFragment(text, { layerName = "Importado" } = {}) {
     if (!y) continue;
     const info = adoptar ? layerInfo(child) : null;
     if (info && (info.esCapa || !hayCapas)) {
-      capas.push(markLayer(y, info, norm, info.name || `Capa ${++nCapa}`));
+      const nombre = info.name || `Capa ${++nCapa}`;
+      capas.push(markLayer(y, info, norm, nombre));
+      nombres.push(nombre);
     } else {
       sueltos.push(y);
     }
   }
 
   if (sueltos.length || !capas.length) {
+    const nombre = capas.length ? "Suelto" : layerName;
     const extra = new Y.XmlElement("g");
     extra.setAttribute("id", newId("capa"));
-    extra.setAttribute("data-layer", capas.length ? "Suelto" : layerName);
+    extra.setAttribute("data-layer", nombre);
     if (norm) extra.setAttribute("transform", norm);
     if (sueltos.length) extra.insert(0, sueltos);
     capas.push(extra);
+    nombres.push(nombre);
   }
 
-  svg.insert(0, [defs].concat(capas));
+  return { defs, capas, nombres, wmm, hmm };
+}
+
+/* Un archivo .svg entero → fragmento listo para guardar como dibujo.
+   Se normaliza a milímetros: el <svg> resultante siempre cumple
+   1 unidad de usuario = 1 mm, que es lo que espera el resto del editor.
+
+   El fragmento vuelve SIN INTEGRAR, igual que las piezas de las que sale.
+   Hay que guardarlo antes con DrawStore.put(), que devuelve la versión
+   ya integrada. */
+export function svgToFragment(text, { layerName = "Importado" } = {}) {
+  const { defs, capas, wmm, hmm } = svgToPieces(text, { layerName });
+
+  const frag = new Y.XmlFragment();
+  const svg = new Y.XmlElement("svg");
+  svg.setAttribute("width", `${fmt(wmm)}mm`);
+  svg.setAttribute("height", `${fmt(hmm)}mm`);
+  svg.setAttribute("viewBox", `0 0 ${fmt(wmm)} ${fmt(hmm)}`);
+
+  const defsEl = new Y.XmlElement("defs");
+  if (defs.length) defsEl.insert(0, defs);
+
+  svg.insert(0, [defsEl].concat(capas));
   frag.insert(0, [svg]);
   return frag;
 }
@@ -423,6 +452,31 @@ export function clipboardSvg(nodes, { w = 0, h = 0, defs = [] } = {}) {
 
 const esBlanco = s => !String(s || "").trim();
 
+/* Identificadores nuevos para todo un árbol, EN EL DOM y antes de
+   convertir a Yjs: un elemento de Yjs recién creado todavía no devuelve
+   sus atributos al leerlos. Las referencias internas (url(#x), href="#x")
+   se reescriben en la misma pasada, así que las dos mitades siguen
+   encajando; las que apuntaban fuera de lo copiado se quedan como
+   estaban. */
+function renumerarIds(root) {
+  const mapa = new Map();
+  for (const n of root.querySelectorAll("[id]")) {
+    const viejo = n.getAttribute("id");
+    const nuevo = newId();
+    mapa.set(viejo, nuevo);
+    n.setAttribute("id", nuevo);
+  }
+  if (!mapa.size) return;
+  for (const n of root.querySelectorAll("*")) {
+    for (const at of Array.from(n.attributes)) {
+      const v = at.value;
+      if (!v || v.indexOf("#") < 0) continue;
+      const sust = v.replace(/#([\w:.-]+)/g, (m, id) => (mapa.has(id) ? "#" + mapa.get(id) : m));
+      if (sust !== v) n.setAttribute(at.name, sust);
+    }
+  }
+}
+
 /* Texto pegado → nodos de Yjs listos para insertar, SANEADOS igual que
    una importación: lo que llega del portapapeles es tan ajeno como un
    archivo. Con `freshIds` se renuevan los identificadores, porque dos
@@ -438,26 +492,7 @@ export function textToNodes(text, { freshIds = true } = {}) {
   const root = doc.documentElement;
   if (!root || root.nodeName.toLowerCase() !== "svg") return [];
 
-  /* Los id se cambian en el DOM, ANTES de convertir: un elemento de Yjs
-     recién creado todavía no devuelve sus atributos al leerlos. */
-  if (freshIds) {
-    const mapa = new Map();
-    for (const n of root.querySelectorAll("[id]")) {
-      const viejo = n.getAttribute("id");
-      const nuevo = newId();
-      mapa.set(viejo, nuevo);
-      n.setAttribute("id", nuevo);
-    }
-    // referencias internas (url(#x), href="#x") apuntando a lo copiado
-    for (const n of root.querySelectorAll("*")) {
-      for (const at of Array.from(n.attributes)) {
-        const v = at.value;
-        if (!v || v.indexOf("#") < 0) continue;
-        const sust = v.replace(/#([\w:.-]+)/g, (m, id) => (mapa.has(id) ? "#" + mapa.get(id) : m));
-        if (sust !== v) n.setAttribute(at.name, sust);
-      }
-    }
-  }
+  if (freshIds) renumerarIds(root);
 
   /* Junto a los nodos va una ficha de cada uno leída del DOM. Sin ella no
      habría forma de saber si lo pegado es una capa ni cuál era su

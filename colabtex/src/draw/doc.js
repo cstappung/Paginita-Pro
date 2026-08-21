@@ -424,6 +424,25 @@ export class Drawing {
     });
   }
 
+  /* Un .svg de fuera dentro de ESTE dibujo: sus definiciones al <defs> y
+     sus capas al final, en UNA sola transacción. Si fueran dos, deshacer
+     una importación dejaría los degradados metidos y las figuras fuera —
+     y un Ctrl+Z tiene que devolver el dibujo a como estaba.
+
+     Las piezas llegan de `svgio.svgToPieces`, ya normalizadas a
+     milímetros y con los id renovados; los nombres van aparte porque un
+     nodo sin integrar todavía no devuelve sus atributos. */
+  importPieces({ defs = [], capas = [], nombres = [] } = {}) {
+    if (!capas.length) return [];
+    return this.edit(() => {
+      if (defs.length) {
+        const dst = this.defs();
+        if (dst) dst.insert(childrenOf(dst).length, defs);
+      }
+      return this.pasteLayers(capas, nombres);
+    }) || [];
+  }
+
   /* Cambia un nodo de padre y/o de posición conservando dónde se ve.
      Clona y borra, como todo lo que «mueve» en Yjs; `transform` llega ya
      recalculado por quien conoce las matrices del lienzo. */

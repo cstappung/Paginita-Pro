@@ -482,6 +482,20 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
   just-converted Yjs element is not integrated yet and returns nothing when
   read — the same trap as `cloneEl` in `doc.js`, and why `<defs>` children are
   copied one by one rather than through the converted `<defs>`.
+
+  An SVG can be imported **two ways**, and both come out of the same
+  `svgToPieces` (defs + layers + their names, already in mm): as a **new
+  drawing** (`svgToFragment` wraps the pieces in an `<svg>`) or **inside the
+  open one** (`Drawing.importPieces`, wired in `draw-main.js` to the 📥 button
+  and to dropping a file on the canvas). The second one needs two things the
+  first does not, because there it lands among content that already exists:
+  `freshIds` renumbers every id and rewrites the internal references in the
+  same pass — two shapes sharing an id break selection and a `url(#…)` would
+  resolve to the wrong gradient — and `dx`/`dy` place it at the corner of the
+  **paper**, since the page can be cropped (`viewBox` x/y ≠ 0) and importing
+  at the document origin drops it out of sight. `importPieces` writes the defs
+  and the layers in **one** transaction: as two, a single Ctrl+Z would leave
+  the gradients in and take the shapes out.
 - `canvas.js` — mirrors the Yjs tree into real SVG DOM and **patches it
   incrementally** (`observeDeep` → attribute sets and child deltas); a full
   repaint per change would destroy the selection and the frame rate. Measures

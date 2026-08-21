@@ -268,6 +268,10 @@
     border-top:1px solid #f2f4f7;padding-top:3px;margin-top:1px}
   .to-bar button:disabled,.to-bar input:disabled,.to-bar select:disabled{opacity:.45;cursor:default}
 
+  .drop-hint{position:absolute;inset:10px;display:none;align-items:center;justify-content:center;pointer-events:none;
+             border:2px dashed #6c4bb6;border-radius:10px;background:#6c4bb61a;z-index:6}
+  .drop-hint.on{display:flex}
+  .drop-hint span{background:#6c4bb6;color:#fff;border-radius:6px;padding:6px 12px;font-size:12.5px;font-weight:600}
   .canvas-bar{position:absolute;left:0;right:0;bottom:0;height:30px;display:flex;align-items:center;gap:14px;padding:0 12px;background:#ffffffee;border-top:1px solid #e2e8ec;font-size:11.5px;color:#5a6772}
   .canvas-bar label{display:flex;align-items:center;gap:5px;cursor:pointer}
   .canvas-bar input[type=number]{width:52px;height:20px;border:1px solid #d4dce2;border-radius:4px;padding:0 4px;font-size:11.5px;font-family:inherit}
@@ -527,10 +531,12 @@
           <span>ARCHIVOS</span>
           <button id="btnZipProject" class="icon-btn" title="Descargar todo el proyecto en un .zip">📦</button>
           <button id="btnImportSvg" class="icon-btn" title="Importar un .svg como dibujo nuevo">📐</button>
+          <button id="btnImportInto" class="icon-btn" title="Importar un .svg DENTRO del dibujo abierto: sus capas se añaden a las de este (también se puede soltar el archivo sobre el lienzo)">📥</button>
           <button id="btnNewDrawing" class="icon-btn" title="Nuevo dibujo">＋</button>
         </div>
         <div id="fileList"></div>
         <input id="svgImportInput" type="file" accept=".svg,image/svg+xml" style="display:none">
+        <input id="svgIntoInput" type="file" accept=".svg,image/svg+xml" style="display:none">
         <div class="aside-head" style="border-top:1px solid #eef1f4">
           <span>OBJETOS</span>
           <button id="btnLayerMoveSel" class="icon-btn" title="Mover la selección a la capa activa">⇥</button>
@@ -542,8 +548,12 @@
         <div id="layerPanel"></div>
       </aside>
 
-      <div class="canvas-wrap">
+      <div class="canvas-wrap" id="canvasWrap">
         <div id="canvasHost"></div>
+        <!-- Marco que aparece al arrastrar un .svg encima. Solo enseña que
+             se puede soltar; no captura el ratón (pointer-events:none), o
+             el propio dragover se dispararía sobre él y parpadearía. -->
+        <div id="dropHint" class="drop-hint"><span>Suelta el .svg para importarlo en este dibujo</span></div>
         <!-- Opciones de la herramienta activa: se construye en
              draw/tool-options.js y solo se ve al dibujar. -->
         <div id="toolOptions" class="to-bar" style="display:none"></div>
@@ -616,6 +626,6 @@
   </div>
 </div>
 
-<script src="colabdraw-app.js?v=202608192231"></script>
+<script src="colabdraw-app.js?v=202608210525"></script>
 </body>
 </html>

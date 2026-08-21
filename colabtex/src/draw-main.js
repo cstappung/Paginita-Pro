@@ -18,7 +18,7 @@ import * as fb from "./fb-api.js";
 import { RtdbProvider } from "./y-rtdb.js";
 import { colorForUid, timeAgo, escapeHtml } from "./util.js";
 import { DrawStore, Drawing, makeDrawing } from "./draw/doc.js";
-import { svgToFragment } from "./draw/svgio.js";
+import { svgToFragment, svgToPieces } from "./draw/svgio.js";
 import { Canvas, PCT_MIN, PCT_MAX } from "./draw/canvas.js";
 import { createScrollbars } from "./draw/scrollbars.js";
 import { Tools } from "./draw/tools.js";
@@ -668,6 +668,45 @@ async function importSvgAsDrawing(file) {
   openDrawing(name);
 }
 
+const esSvg = f => !!f && (/\.svg$/i.test(f.name || "") || f.type === "image/svg+xml");
+
+/* Un .svg de fuera DENTRO del dibujo abierto, en vez de como dibujo
+   aparte: es lo que hace falta para montar una figura con trozos de
+   otras. Entra con sus capas —las de Inkscape también, que `svgToPieces`
+   ya traduce— añadidas a las que ya hay, no fundido en una sola: si el
+   archivo venía organizado, esa organización es justo lo que se quiere
+   poder tocar aquí.
+
+   Dos cosas que no son opcionales: los id se renuevan (`freshIds`), o dos
+   figuras con el mismo id romperían la selección y un url(#…) apuntaría a
+   la definición equivocada; y entra por la esquina del PAPEL, no por el
+   (0,0) del documento, porque el papel puede estar recortado y allí lo
+   importado caería fuera de la vista sin que se note que llegó. */
+async function importSvgIntoDrawing(file) {
+  if (!file || !state.drawing || !canWrite()) return;
+  if (!esSvg(file)) { $("statusMsg").textContent = "Solo se pueden importar archivos .svg."; return; }
+  const d = state.drawing;
+  const { x = 0, y = 0 } = d.size();
+  const base = String(file.name || "").replace(/\.svg$/i, "").trim() || "Importado";
+
+  let piezas;
+  try { piezas = svgToPieces(await file.text(), { layerName: base, dx: x, dy: y, freshIds: true }); }
+  catch (e) { alert("No se pudo importar el SVG: " + (e.message || e)); return; }
+
+  const puestas = d.importPieces(piezas);
+  if (!puestas.length) { $("statusMsg").textContent = "El archivo no traía nada que importar."; return; }
+
+  // lo recién llegado pasa a ser la capa activa: lo siguiente que se dibuje
+  // va con ello, que es lo que se espera después de importar
+  state.activeLayerId = puestas[puestas.length - 1].getAttribute("id");
+  if (state.tools) state.tools.clear();
+  if (state.layers) state.layers.render();
+  paintUndoButtons();
+  $("statusMsg").textContent =
+    `«${base}» importado: ${puestas.length} capa${puestas.length === 1 ? "" : "s"}` +
+    ` (${Math.round(piezas.wmm)}×${Math.round(piezas.hmm)} mm).`;
+}
+
 /* ---------- presencia ---------- */
 function renderPresence() {
   const host = $("presenceAvatars");
@@ -947,6 +986,47 @@ function wireEvents() {
     e.target.value = "";
     importSvgAsDrawing(f);
   };
+  $("btnImportInto").onclick = () => {
+    if (!state.drawing) { $("statusMsg").textContent = "Abre un dibujo antes de importar dentro de él."; return; }
+    if (!canWrite()) return;
+    $("svgIntoInput").click();
+  };
+  $("svgIntoInput").onchange = e => {
+    const f = e.target.files[0];
+    e.target.value = "";    // el mismo archivo dos veces seguidas también cuenta
+    importSvgIntoDrawing(f);
+  };
+
+  /* Soltar un .svg sobre el lienzo lo importa en el dibujo abierto: es el
+     gesto que la gente prueba antes de buscar un botón. Se mira que el
+     arrastre traiga ARCHIVOS, porque las filas del panel de objetos
+     también se arrastran (layers.js) y pasarían por encima del lienzo. */
+  const wrap = $("canvasWrap"), hint = $("dropHint");
+  const traeSvg = dt => !!dt && Array.from(dt.types || []).includes("Files");
+  const marcar = on => hint.classList.toggle("on", on);
+  wrap.addEventListener("dragover", e => {
+    if (!traeSvg(e.dataTransfer) || !state.drawing || !canWrite()) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    marcar(true);
+  });
+  // dragleave salta también al pasar de un hijo a otro: solo cuenta salir del marco
+  wrap.addEventListener("dragleave", e => { if (!wrap.contains(e.relatedTarget)) marcar(false); });
+  wrap.addEventListener("drop", e => {
+    if (!traeSvg(e.dataTransfer) || !state.drawing || !canWrite()) return;
+    e.preventDefault();
+    marcar(false);
+    const f = e.dataTransfer.files[0];
+    if (f) importSvgIntoDrawing(f);
+  });
+  /* Fuera del lienzo, un archivo soltado en la página hace que el
+     navegador NAVEGUE a él: se pierde el editor entero por fallar la
+     puntería. Aquí no se importa nada, solo se ignora. */
+  for (const ev of ["dragover", "drop"]) {
+    window.addEventListener(ev, e => {
+      if (traeSvg(e.dataTransfer) && !wrap.contains(e.target)) { e.preventDefault(); marcar(false); }
+    });
+  }
 
   $("gridToggle").onchange = e => state.canvas && state.canvas.setGrid({ show: e.target.checked });
   $("snapToggle").onchange = e => state.canvas && state.canvas.setGrid({ snap: e.target.checked });
