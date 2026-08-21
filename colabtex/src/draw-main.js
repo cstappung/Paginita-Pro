@@ -24,7 +24,7 @@ import { Canvas, PCT_MIN, PCT_MAX } from "./draw/canvas.js";
 import { createScrollbars } from "./draw/scrollbars.js";
 import { Tools } from "./draw/tools.js";
 import { createStylePanel } from "./draw/style.js";
-import { paintValue, readPaint, shadowValue, readShadow, flechaRef, gcDefs } from "./draw/paint.js";
+import { paintValue, readPaint, shadowValue, readShadow, flechaRef, gcDefs, repararSombras } from "./draw/paint.js";
 import { createToolOptions } from "./draw/tool-options.js";
 import { createObjectPanel } from "./draw/layers.js";
 import { createTextEditor } from "./draw/text.js";
@@ -446,6 +446,10 @@ function ensureEditorParts() {
     setSelection: els => { if (state.tools) state.tools.select(els); },
     getCanvas: () => state.canvas,
     onStatus: msg => { $("statusMsg").textContent = msg || ""; },
+    // el portapapeles del menú del botón derecho es el mismo de Ctrl+C
+    copiar: nodos => (state.tools ? state.tools.copyNodes(nodos) : null),
+    pegar: () => (state.tools ? state.tools.pasteClip() : []),
+    hayCopia: () => !!(state.tools && state.tools.clip),
     /* Las operaciones de capa clonan y borran, así que la selección
        apunta a nodos que ya no existen: se rehace por id igual que en
        el orden Z. */
@@ -627,6 +631,12 @@ function openDrawing(path) {
   }
   $("emptyCanvas").style.display = "none";
   state.drawing = new Drawing(state.ydoc, state.store.get(path), { readOnly: !canWrite() });
+  /* Las sombras escritas por una versión anterior dejaban invisible a
+     cualquier figura sin área —una línea recta— porque su región iba en
+     porcentaje de la caja (ver paint.js). Se arreglan al abrir: la
+     alternativa era pedirle a la gente que buscara y volviera a marcar
+     una figura que justamente no se ve. */
+  repararSombras(state.drawing);
   state.canvas.attach(state.drawing);
   state.canvas.fitPage();
   state.tools.clear();

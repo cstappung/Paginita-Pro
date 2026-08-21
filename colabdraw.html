@@ -163,6 +163,20 @@
   .layer-row.layer-bloqueado-h{background-color:#fdfaf5}
   .layer-row.layer-bloqueado.layer-sel{background-image:repeating-linear-gradient(135deg,#efe1f4 0 5px,transparent 5px 11px)}
 
+  /* --- menú del botón derecho (draw/layers.js) ---
+     Igual que el cuadro de color: cuelga del <body> en position:fixed
+     porque el panel recorta lo que se sale de él. */
+  .dw-menu{position:fixed;z-index:60;min-width:186px;padding:5px;background:#fff;
+    border:1px solid #d4dce2;border-radius:9px;box-shadow:0 10px 30px #0f172a33;
+    font-size:12.5px;color:#42505c}
+  .dw-menu-op{display:flex;align-items:center;width:100%;height:27px;padding:0 9px;gap:10px;
+    border:none;border-radius:5px;background:none;font-family:inherit;font-size:12.5px;
+    color:inherit;text-align:left;cursor:pointer}
+  .dw-menu-op:hover:not(:disabled){background:#f1ecfa;color:#5b3fa0}
+  .dw-menu-op:disabled{color:#b6bfc8;cursor:default}
+  .dw-menu-hint{margin-left:auto;font-size:10.5px;color:#a9b3bd;font-family:'IBM Plex Mono',monospace}
+  .dw-menu-sep{height:1px;margin:4px 6px;background:#eef1f4}
+
   .layer-row[draggable=true]{cursor:grab}
   .layer-dragging{opacity:.45}
   /* dónde va a caer: una línea arriba o abajo, o el grupo entero marcado */
@@ -642,6 +656,6 @@
   </div>
 </div>
 
-<script src="colabdraw-app.js?v=202608210609"></script>
+<script src="colabdraw-app.js?v=202608211717"></script>
 </body>
 </html>

@@ -24,11 +24,21 @@
      coordenadas no pueden describirla; ahí se deja el `transform` como
      estaba, que es exactamente el caso que `Tools._marco()` ya resuelve
      escalando en los ejes de la propia figura.
-   - **Lo que no es geometría escala ISÓTROPO**, por la raíz del
-     determinante: grosor, guiones y el redondeo de esquina. Así un
-     escalado uniforme se comporta igual que siempre (todo crece a la
-     vez) y uno desigual estira la figura sin deformar lo que la
-     adorna, que es justo lo que se pedía.
+   - **El CONTORNO no se escala**: un trazo de 1 mm sigue midiendo 1 mm
+     cuando la figura se hace grande, y lo mismo sus guiones. Es lo que
+     se pidió, y es lo que hacen los programas de dibujo cuando se les
+     apaga «escalar el grosor». Ojo: eso no quiere decir que a
+     `bakeTrazo` se le pase siempre 1. La matriz que se hornea puede
+     traer un escalado ANTERIOR (una figura importada con `scale(…)`
+     propio), y ese sí tiene que acabar en el número, o al soltar el
+     trazo daría un salto: quien llama pasa el factor que ya estaba
+     puesto, no el del gesto. Cuando lo hay, escala ISÓTROPO —por la
+     raíz del determinante—, porque un grosor es un solo número y no
+     puede estirarse en un eje.
+   - **El redondeo de esquina sí escala**, isótropo también: es
+     geometría, forma parte de la figura y no de la tinta con la que se
+     dibuja. Isótropo y no por ejes, o un rectángulo alargado acabaría
+     con las esquinas ovaladas.
    - **Solo se hornea cuando hace falta**, es decir, cuando el escalado
      es desigual. Un `scale(2,2)` no deforma nada, y reescribir por
      gusto la `d` de un trazado de mil puntos en cada arrastre llenaría
@@ -78,7 +88,12 @@ const num = (v, porDefecto = 0) => {
 
 /* El grosor, los guiones y su desfase: todos son longitudes, y todos
    escalan por el mismo factor isótropo. Devuelve solo lo que hay que
-   escribir; un valor que no existe no se inventa. */
+   escribir; un valor que no existe no se inventa.
+
+   `k` NO es el escalado del gesto —el contorno no crece con la figura,
+   ver arriba—, sino el que la matriz ya traía y que la geometría se
+   acaba de tragar. Con la identidad, que es el caso normal, esto
+   devuelve un objeto vacío y no escribe nada. */
 export function bakeTrazo(get, k) {
   const out = {};
   if (!(k > 0) || Math.abs(k - 1) < 1e-6) return out;

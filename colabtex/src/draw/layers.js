@@ -157,14 +157,70 @@ export function relocateTransform(canvas, elm, targetLayer) {
   return matToString(matMul(matMul(ti, from), m0));
 }
 
+/* ---------- menú del botón derecho ----------
+
+   Cuelga del <body> y no del panel: el panel lleva `overflow:auto` y
+   recortaría el menú de una fila que esté abajo del todo, que es
+   exactamente donde más falta hace. Misma razón que el cuadro de color.
+
+   Se cierra solo con cualquier cosa que lo deje sin sentido: pulsar
+   fuera, Escape, la rueda o cambiar el tamaño de la ventana. Sin eso, un
+   menú abierto sobre un panel que se desplaza queda flotando sobre filas
+   que ya no son las suyas. */
+function crearMenu() {
+  const caja = el("div", "dw-menu");
+  caja.style.display = "none";
+  document.body.appendChild(caja);
+  let abierto = false;
+
+  const cerrar = () => {
+    if (!abierto) return;
+    abierto = false;
+    caja.style.display = "none";
+    caja.textContent = "";
+  };
+
+  const abrir = (x, y, opciones) => {
+    caja.textContent = "";
+    for (const op of opciones) {
+      if (op.separador) { caja.appendChild(el("div", "dw-menu-sep")); continue; }
+      const b = el("button", "dw-menu-op", op.label);
+      b.disabled = !!op.off;
+      if (op.hint) b.appendChild(el("span", "dw-menu-hint", op.hint));
+      b.onclick = () => { cerrar(); op.fn(); };
+      caja.appendChild(b);
+    }
+    caja.style.display = "block";
+    abierto = true;
+    /* Colocado DESPUÉS de enseñarlo: una caja con display:none mide 0 y
+       cabría siempre, así que el menú se salía por abajo. */
+    const r = caja.getBoundingClientRect();
+    caja.style.left = Math.max(4, Math.min(x, window.innerWidth - r.width - 4)) + "px";
+    caja.style.top = Math.max(4, Math.min(y, window.innerHeight - r.height - 4)) + "px";
+  };
+
+  const fuera = ev => { if (!caja.contains(ev.target)) cerrar(); };
+  document.addEventListener("pointerdown", fuera, true);
+  document.addEventListener("keydown", ev => { if (ev.key === "Escape") cerrar(); });
+  window.addEventListener("resize", cerrar);
+  window.addEventListener("wheel", cerrar, true);
+
+  return { abrir, cerrar };
+}
+
 export function createObjectPanel(host, ctx) {
   const {
     getDrawing, getActiveId, setActiveId, canWrite,
-    getSelection, setSelection, getCanvas, onChange, onStatus = () => {}
+    getSelection, setSelection, getCanvas, onChange, onStatus = () => {},
+    /* Copiar y pegar son lo único del menú que no puede resolverse aquí:
+       el portapapeles vive en las herramientas, que son las que saben
+       traducir figuras a marcado SVG y al revés. */
+    copiar = () => null, pegar = () => [], hayCopia = () => false
   } = ctx;
 
   const list = el("div", "layer-list");
   host.appendChild(list);
+  const menu = crearMenu();
 
   const abiertos = new Set();   // ramas desplegadas
   let sembrado = false;         // ¿ya se abrieron las capas de este dibujo?
@@ -258,11 +314,7 @@ export function createObjectPanel(host, ctx) {
     name.title = `<${node.nodeName}> — doble clic para renombrar`;
     name.ondblclick = ev => {
       ev.stopPropagation();
-      if (!rw) return;
-      const v = prompt("Nombre:", name.textContent);
-      if (v == null) return;
-      d.setLabel(node, v);
-      onChange();
+      renombrar(node, name.textContent);
     };
 
     /* Marca de la capa donde caerá lo próximo que se dibuje. Va FUERA
@@ -310,10 +362,109 @@ export function createObjectPanel(host, ctx) {
       setSelection(ev.shiftKey && !actual.includes(node) ? actual.concat([node]) : [node]);
       render();
     };
+    /* Botón derecho: lo mismo que ofrece cualquier explorador. Antes,
+       renombrar era un doble clic que nadie encuentra y borrar una capa
+       solo se podía hacer con el botón de la cabecera, y solo a la
+       activa. */
+    row.oncontextmenu = ev => {
+      ev.preventDefault();
+      // el menú actúa sobre la fila pulsada, así que primero se elige
+      if (!elegido) row.onclick(ev);
+      menu.abrir(ev.clientX, ev.clientY, opcionesDe(node, esCapa));
+    };
     if (rw) arrastrable(row, node, esCapa, estado);
     list.appendChild(row);
 
     if (abierto) for (let i = hijos.length - 1; i >= 0; i--) fila(hijos[i], nivel + 1, estado);
+  }
+
+  /* ---------- lo que ofrece el botón derecho ----------
+     Las mismas cinco acciones para una capa y para una figura, con la
+     diferencia de que en una capa se aplican a ELLA (y a lo que lleva
+     dentro), mientras que en una figura se aplican a toda la selección
+     si la fila pulsada forma parte de ella: es lo que se espera después
+     de haber elegido tres cosas con Mayús. */
+  function dianas(node) {
+    const sel = getSelection();
+    return sel.length > 1 && sel.includes(node) ? sel : [node];
+  }
+
+  function opcionesDe(node, esCapa) {
+    const d = drawingOrNull();
+    const rw = canWrite();
+    if (!d) return [];
+    const objetivos = esCapa ? [node] : dianas(node);
+    const varios = objetivos.length > 1;
+    const qué = esCapa ? "la capa" : varios ? `${objetivos.length} objetos` : "el objeto";
+    return [
+      { label: "Renombrar…", off: !rw || varios, fn: () => renombrar(node, nombreDe(node, esCapa)) },
+      { label: "Duplicar", hint: "Ctrl+D", off: !rw, fn: () => duplicarNodos(node, esCapa, objetivos) },
+      { separador: true },
+      { label: "Copiar", hint: "Ctrl+C", fn: () => copiarNodos(objetivos, qué) },
+      { label: "Pegar", hint: "Ctrl+V", off: !rw || !hayCopia(), fn: () => pegarEn(node, esCapa) },
+      { separador: true },
+      { label: "Eliminar", hint: "Supr", off: !rw, fn: () => eliminarNodos(node, esCapa, objetivos) }
+    ];
+  }
+
+  function renombrar(node, actual) {
+    const d = drawingOrNull();
+    if (!d || !canWrite()) return;
+    const v = prompt("Nombre:", actual);
+    if (v == null) return;
+    d.setLabel(node, v);
+    onChange();
+  }
+
+  function duplicarNodos(node, esCapa, objetivos) {
+    const d = drawingOrNull();
+    if (!d || !canWrite()) return;
+    if (esCapa) {
+      const copia = d.duplicateLayer(node);
+      if (!copia) return;
+      setActiveId(copia.getAttribute("id"));
+      abiertos.add(claveDe(copia));
+      onChange([]);                       // una capa no se selecciona como figura
+      onStatus(`Capa «${d.labelOf(copia)}» duplicada.`);
+      return;
+    }
+    const copias = d.duplicate(objetivos) || [];
+    // las copias son otros nodos: la selección se rehace por id
+    onChange(copias.map(c => c.getAttribute("id")).filter(Boolean));
+    onStatus(copias.length ? `${copias.length} objeto${copias.length === 1 ? "" : "s"} duplicado${copias.length === 1 ? "" : "s"}.` : "");
+  }
+
+  function copiarNodos(objetivos, qué) {
+    onStatus(copiar(objetivos) ? `Copiado ${qué}.` : "No se pudo copiar.");
+  }
+
+  /* Pegar «sobre» una fila es pegar en SU capa: lo que se pegue tiene que
+     acabar donde se ha pulsado, no en la capa que estuviera activa de
+     antes. Una capa entera pegada se pone al final, mande quien mande la
+     fila, porque una capa no cabe dentro de otra. */
+  function pegarEn(node, esCapa) {
+    const d = drawingOrNull();
+    if (!d || !canWrite()) return;
+    const capa = esCapa ? node : d.layerOf(node);
+    if (capa) setActiveId(capa.getAttribute("id"));
+    const puestos = pegar() || [];
+    if (puestos.length) abiertos.add(claveDe(capa || node));
+  }
+
+  function eliminarNodos(node, esCapa, objetivos) {
+    const d = drawingOrNull();
+    if (!d || !canWrite()) return;
+    if (esCapa) {
+      if (d.layers().length <= 1) { onStatus("Un dibujo no puede quedarse sin capas."); return; }
+      if (!confirm(`¿Eliminar la capa «${d.labelOf(node)}» y todo lo que contiene?`)) return;
+      d.removeLayer(node);
+      setActiveId(null);
+      onChange([]);
+      return;
+    }
+    d.remove(objetivos);
+    onChange([]);
+    onStatus(`${objetivos.length} objeto${objetivos.length === 1 ? "" : "s"} eliminado${objetivos.length === 1 ? "" : "s"}.`);
   }
 
   /* ---------- arrastrar dentro del árbol ----------

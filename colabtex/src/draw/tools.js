@@ -55,6 +55,24 @@ const DRAG_PX = 3;
 /* Lo mínimo que puede medir la página al recortarla. */
 const MIN_PAGE = 5;        // mm
 
+/* Cuántos nodos como mucho se les toca el grosor de una vez, tanto en la
+   vista previa como al soltar. Ver _recogerTrazos y _compensarTrazo. */
+const MAX_TRAZOS = 400;
+
+/* El valor PROPIO de una propiedad: primero el `style`, que gana al
+   atributo por la cascada, y luego el atributo. Si el elemento no dice
+   nada, devuelve null — lo hereda de su grupo y no es suyo para
+   reescribirlo: clavárselo aquí le quitaría para siempre el efecto de
+   pintar el grupo. */
+function propioDe(el, nombre) {
+  const st = el.getAttribute("style");
+  if (st) {
+    const m = new RegExp(`(?:^|;)\\s*${nombre}\\s*:\\s*([^;]+)`, "i").exec(st);
+    if (m) return m[1].trim();
+  }
+  return el.getAttribute(nombre);
+}
+
 const casiCero = v => Math.abs(v) < 1e-6;
 /* ¿La matriz lleva giro (o sesgo)? Si no, escalar en los ejes del
    documento y en los de la figura es lo mismo. */
@@ -191,6 +209,34 @@ export class Tools {
     return childrenOf(defs).filter(n => isEl(n) && usados.has(n.getAttribute("id")));
   }
 
+  /* El marcado de unos nodos, guardado para pegar. Es lo que usan tanto
+     el atajo de teclado como el menú del panel de objetos — y ese último
+     no tiene evento de portapapeles, así que se le ofrece al del sistema
+     por su cuenta: escribir sí lo deja hacer el navegador dentro de un
+     gesto del usuario (leer es lo que pide permiso, y por eso pegar
+     desde el menú tira de `this.clip`). */
+  copyNodes(nodos, { alSistema = true } = {}) {
+    const d = this.getDrawing();
+    const lista = [].concat(nodos || []).filter(n => n && n.parent);
+    if (!d || !lista.length) return null;
+    const { w, h } = d.size();
+    /* Un degradado vive en el <defs>, no en la figura: si no viaja con
+       ella, al pegar queda un url(#…) apuntando a nada. */
+    const texto = clipboardSvg(lista, { w, h, defs: this._defsDe(d, lista) });
+    this.clip = texto;
+    if (alSistema && navigator.clipboard && navigator.clipboard.writeText) {
+      try { navigator.clipboard.writeText(texto).catch(() => {}); } catch (err) {}
+    }
+    return texto;
+  }
+
+  /* Pega lo último que se copió aquí dentro, sin pasar por el
+     portapapeles del sistema (leerlo pide permiso). */
+  pasteClip(opts) {
+    if (!this.clip) return [];
+    return this.paste(this.clip, opts);
+  }
+
   _clipWrite(e, cortar) {
     if (this._enTexto(e)) return;
     const d = this.getDrawing();
@@ -203,11 +249,9 @@ export class Tools {
     if (capa) nodos = [capa];
     if (!nodos.length) return;
 
-    const { w, h } = d.size();
-    /* Un degradado vive en el <defs>, no en la figura: si no viaja con
-       ella, al pegar queda un url(#…) apuntando a nada. */
-    const texto = clipboardSvg(nodos, { w, h, defs: this._defsDe(d, nodos) });
-    this.clip = texto;
+    // dentro de un evento «copy» manda `clipboardData`, no el API asíncrono
+    const texto = this.copyNodes(nodos, { alSistema: false });
+    if (!texto) return;
     if (e.clipboardData) {
       e.clipboardData.setData("text/plain", texto);
       e.clipboardData.setData("image/svg+xml", texto);
@@ -569,6 +613,58 @@ export class Tools {
       if (s) item.dom.setAttribute("transform", s);
       else item.dom.removeAttribute("transform");
     }
+    this._previewTrazo(expansion(T));
+  }
+
+  /* El contorno no crece con la figura (ver reshape.js), pero la vista
+     previa es una matriz y una matriz SÍ engorda el trazo. Sin esto, al
+     estirar al triple la línea se veía tres veces más gorda durante todo
+     el arrastre y adelgazaba de golpe al soltar: el resultado sería el
+     bueno, pero el gesto parecería roto.
+
+     Se escribe en el `style` del espejo, que gana al atributo, y se
+     limpia antes de tocar el documento (ver _commit). */
+  _previewTrazo(k) {
+    const d = this.drag;
+    if (!d || d.mode !== "scale" || !d.trazos || !(k > 0)) return;
+    /* En «px» y no a secas: dentro de un SVG un píxel de CSS es una
+       unidad de usuario, que es justo lo que devolvió el estilo
+       calculado al medirlo. Así ida y vuelta son la misma unidad. */
+    for (const t of d.trazos) t.dom.style.setProperty("stroke-width", fmt(t.w / k, 5) + "px");
+  }
+
+  /* Devuelve el espejo a lo que decía el documento. Va ANTES de escribir
+     en Yjs a propósito: después, el espejo ya se ha puesto al día con lo
+     escrito y restaurar el valor de antes lo taparía. */
+  _limpiarTrazo(d = this.drag) {
+    if (!d || !d.trazos) return;
+    for (const t of d.trazos) {
+      if (t.previo) t.dom.style.setProperty("stroke-width", t.previo);
+      else t.dom.style.removeProperty("stroke-width");
+    }
+    d.trazos = null;
+  }
+
+  /* Los nodos del espejo cuyo grosor hay que compensar mientras dura el
+     arrastre: el propio (por si lo hereda de su capa) y los de dentro
+     que lleven grosor puesto. Se leen del ESTILO CALCULADO, que ya viene
+     en unidades del elemento.
+
+     Con más de MAX_TRAZOS no se compensa nada: una figura de matplotlib
+     trae miles de nodos y escribirles el estilo en cada mousemove sería
+     peor que el salto que se quiere evitar. */
+  _recogerTrazos(items) {
+    const out = [];
+    for (const item of items) {
+      const nodos = [item.dom].concat(
+        Array.from(item.dom.querySelectorAll("[stroke-width],[style*='stroke-width']")));
+      if (out.length + nodos.length > MAX_TRAZOS) return null;
+      for (const dom of nodos) {
+        const w = parseFloat(getComputedStyle(dom).strokeWidth);
+        if (isFinite(w) && w > 0) out.push({ dom, w, previo: dom.style.getPropertyValue("stroke-width") });
+      }
+    }
+    return out;
   }
 
   /* Al soltar se escribe en Yjs de una vez, con la misma cuenta que la
@@ -580,16 +676,31 @@ export class Tools {
      ovala las esquinas, y no hay atributo que lo remedie porque un trazo
      tiene un solo grosor. Si se puede hornear, la figura se queda con sus
      medidas de verdad y SIN transform; si no —girada, un rótulo, una
-     fórmula—, se guarda la matriz como toda la vida. */
+     fórmula—, se guarda la matriz como toda la vida.
+
+     Y en los dos casos el CONTORNO acaba viéndose igual que antes del
+     gesto: un trazo de 1 mm sigue siendo de 1 mm por grande que se haga
+     la figura. Se consigue por los dos lados —descontando el gesto del
+     factor que absorbe la geometría, o dividiendo el grosor guardado
+     cuando la matriz se queda—, así que el resultado no depende de si
+     la figura se pudo hornear o no. */
   _commit(T) {
     const d = this.getDrawing();
     if (!d) return;
     const escalando = !!this.drag && this.drag.mode === "scale";
+    /* Cuánto agranda ESTE gesto. El contorno tiene que acabar viéndose
+       igual que antes de empezar, así que se descuenta: de la geometría
+       horneada se descuenta dividiendo el factor que se le pasa a
+       `bakeTrazo`, y de lo que se queda con su matriz, dividiendo el
+       grosor. */
+    const kGesto = escalando ? expansion(T) : 1;
+    const compensar = Math.abs(kGesto - 1) > 1e-6;
+    this._limpiarTrazo();
     const horneados = [];
     d.edit(() => {
       for (const item of this.drag.items) {
         const M = this._matrixFor(item, T);
-        if (escalando && this._hornear(item.el, M)) {
+        if (escalando && this._hornear(item.el, M, expansion(M) / kGesto)) {
           item.el.removeAttribute("transform");
           horneados.push(item);
           continue;
@@ -597,6 +708,11 @@ export class Tools {
         const s = matToString(M);
         if (s) item.el.setAttribute("transform", s);
         else item.el.removeAttribute("transform");
+        /* Lo que no se ha podido hornear —girado, un rótulo, una
+           fórmula— conserva la matriz, y con ella el trazo engordaría.
+           Se compensa al revés: el grosor guardado se divide por lo que
+           el gesto va a multiplicarlo. */
+        if (compensar) this._compensarTrazo(item.el, 1 / kGesto);
       }
     });
 
@@ -617,10 +733,15 @@ export class Tools {
      con su matriz, y a medio hornear el dibujo cambiaría de aspecto.
 
      Debe llamarse DENTRO de un `edit()`: escribe atributos sueltos. */
-  _hornear(el, M) {
+  _hornear(el, M, kTrazo) {
     if (!esRecta(M)) return false;
     const plan = [];
-    if (!this._planHornear(el, M, plan)) return false;
+    if (!this._planHornear(el, M, plan, kTrazo)) return false;
+    this._aplicarPlan(plan);
+    return true;
+  }
+
+  _aplicarPlan(plan) {
     for (const [nodo, attrs] of plan) {
       for (const [k, v] of Object.entries(attrs)) {
         nodo.setAttribute(k, String(v));
@@ -628,25 +749,40 @@ export class Tools {
         dropStyleProp(nodo, k);
       }
     }
+  }
+
+  /* El grosor de un subárbol multiplicado por `k`, para que la figura se
+     siga viendo con el mismo contorno después de un gesto que no se ha
+     podido hornear. Solo se toca lo que tiene grosor PROPIO: lo que lo
+     hereda ya viene arreglado por su padre.
+
+     Se recogen todas las escrituras antes de aplicar ninguna, y con más
+     de MAX_TRAZOS no se hace nada: una figura importada de miles de
+     nodos mandaría esa reescritura entera por la red en cada arrastre.
+     Ahí el trazo vuelve a crecer con la figura, como antes. */
+  _compensarTrazo(el, k) {
+    const plan = [];
+    if (!this._planTrazo(el, k, plan)) return;
+    this._aplicarPlan(plan);
+  }
+
+  _planTrazo(el, k, plan) {
+    if (!isEl(el) || plan.length > MAX_TRAZOS) return false;
+    const trazo = bakeTrazo(nombre => propioDe(el, nombre), k);
+    if (Object.keys(trazo).length) plan.push([el, trazo]);
+    for (const kid of childrenOf(el)) {
+      if (isEl(kid) && !this._planTrazo(kid, k, plan)) return false;
+    }
     return true;
   }
 
-  /* El grosor y los guiones se leen del atributo o del `style` propio: si
-     el elemento no dice nada, los hereda de su grupo y no son suyos para
-     reescribirlos — se le habría clavado un valor que antes venía de
-     arriba, y pintar el grupo dejaría de afectarle. */
-  _planHornear(el, K, plan) {
+  /* `kTrazo` es lo que hay que multiplicar el contorno, que NO es el
+     escalado del gesto: ver reshape.js y _commit. */
+  _planHornear(el, K, plan, kTrazo) {
     if (!isEl(el)) return false;
     const tag = el.nodeName;
-    const propio = nombre => {
-      const st = el.getAttribute("style");
-      if (st) {
-        const m = new RegExp(`(?:^|;)\\s*${nombre}\\s*:\\s*([^;]+)`, "i").exec(st);
-        if (m) return m[1].trim();
-      }
-      return el.getAttribute(nombre);
-    };
-    const trazo = bakeTrazo(propio, expansion(K));
+    const propio = nombre => propioDe(el, nombre);
+    const trazo = bakeTrazo(propio, kTrazo);
 
     if (tag === "g") {
       /* Una fórmula es un <g> de trazos de MathJax, pero su tamaño se lee
@@ -660,8 +796,10 @@ export class Tools {
         if (!esRecta(mc)) return false;          // hijo girado: no hay vuelta
         const inv = matInvert(mc);
         if (!inv) return false;
-        // la misma transformación, vista desde dentro del hijo
-        if (!this._planHornear(kid, matMul(matMul(inv, K), mc), plan)) return false;
+        /* La misma transformación, vista desde dentro del hijo. El
+           factor del trazo no cambia: mc⁻¹·K·mc tiene el mismo
+           determinante que K, así que todo el grupo comparte el suyo. */
+        if (!this._planHornear(kid, matMul(matMul(inv, K), mc), plan, kTrazo)) return false;
       }
       if (Object.keys(trazo).length) plan.push([el, trazo]);
       return true;
@@ -694,7 +832,9 @@ export class Tools {
       mInv: local ? matInvert(marco.m) : null,
       start: this.canvas.toDoc(e.clientX, e.clientY),
       startClient: { x: e.clientX, y: e.clientY },
-      moved: false
+      moved: false,
+      // el grosor de partida, para que la vista previa no lo engorde
+      trazos: mode === "scale" ? this._recogerTrazos(items) : null
     };
     if (local && !this.drag.mInv) { this.drag.local = false; this.drag.boxL = null; }
     this.canvas.view.setPointerCapture(e.pointerId);
@@ -1041,6 +1181,8 @@ export class Tools {
     const d = this.drag;
     this.drag = null;
     if (!d) return;
+    // el espejo vuelve a su grosor de verdad tanto si se escribe como si no
+    this._limpiarTrazo(d);
     try { this.canvas.view.releasePointerCapture(e.pointerId); } catch (err) {}
 
     if (d.mode === "pan") {

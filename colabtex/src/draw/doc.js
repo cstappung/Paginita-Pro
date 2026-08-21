@@ -172,11 +172,17 @@ export class Drawing {
 
   /* Todas las escrituras pasan por aquí: una sola transacción con el
      origen local, que es lo que hace que deshacer agrupe bien y que el
-     proveedor de Firebase mande un único update. */
-  edit(fn) {
+     proveedor de Firebase mande un único update.
+
+     `origen` solo se cambia para lo que NO ha pedido nadie —arreglar al
+     abrir un filtro escrito por una versión anterior, por ejemplo—: el
+     gestor de deshacer únicamente sigue a LOCAL, así que con otro origen
+     el cambio se guarda y se sincroniza pero no ocupa un paso de
+     deshacer. */
+  edit(fn, origen = LOCAL) {
     if (this.readOnly) return null;
     let out = null;
-    this.ydoc.transact(() => { out = fn(); }, LOCAL);
+    this.ydoc.transact(() => { out = fn(); }, origen);
     return out;
   }
 
@@ -347,6 +353,20 @@ export class Drawing {
     if (at < 0) return false;
     this.edit(() => svg.delete(at, 1));
     return true;
+  }
+
+  /* Duplicar una CAPA no es duplicar una figura: no se desplaza —correr
+     una capa 2 mm movería de sitio todo lo que lleva dentro— y el nombre
+     tiene que quedar libre, o el panel enseñaría dos «Fondo» sin manera
+     de saber cuál es cuál. */
+  duplicateLayer(layer) {
+    if (!layer || layer.getAttribute("data-layer") == null) return null;
+    return this.edit(() => {
+      const nombre = this.freeLayerName(this.labelOf(layer));
+      const [copia] = this.duplicate([layer], 0, 0);
+      if (copia) copia.setAttribute("data-layer", nombre);
+      return copia || null;
+    });
   }
 
   /* Mueve figuras a otra capa conservando dónde se ven. `fixups` trae el

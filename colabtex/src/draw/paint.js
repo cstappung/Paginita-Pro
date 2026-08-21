@@ -238,27 +238,79 @@ export function etiquetaPaint(spec) {
    milímetros: `dx`, `dy` y `stdDeviation` se miden en el espacio de
    usuario (es lo que hace `primitiveUnits` por defecto), no en la caja.
 
-   La REGIÓN del filtro sí va en tanto por ciento de la caja, y por eso
-   se abre mucho más de lo que trae SVG por defecto (−10 %…120 %): con
-   la región de serie, una sombra de 3 mm en una figura pequeña salía
-   cortada por un borde recto, que parece un fallo de dibujo y no un
-   recorte del filtro.
+   **La REGIÓN del filtro NO puede ir en tanto por ciento de la caja**, y
+   ahí estaba el fallo de «a la línea le pongo sombra y desaparece». La
+   caja de una línea horizontal mide 70 × 0: con `objectBoundingBox`,
+   cualquier porcentaje de esa altura sigue siendo 0, la región queda
+   vacía y el navegador no dibuja NADA — ni la sombra ni la línea (así lo
+   manda la especificación y así se comprobó en Chrome: 0 píxeles de
+   tinta). Le pasa a cualquier figura sin área: una línea o un trazado
+   recto, vertical u horizontal, y un grupo que solo contenga eso.
+
+   Por eso la región va en `userSpaceOnUse` y es fija y enorme. Tres
+   cosas la hacen segura:
+
+   - Se lee en el espacio del PROPIO elemento (comprobado: una figura con
+     `transform="translate(60,0)"` se sale de una región escrita para su
+     geometría sin desplazar y aun así se pinta entera). O sea que mover,
+     girar o escalar con la matriz nunca la deja obsoleta.
+   - Es lo bastante grande para cualquier dibujo y para las capas
+     importadas, que traen su propia escala y numeran sus coordenadas en
+     píxeles.
+   - No cuesta nada: Chrome recorta la región a lo que se ve. Medido con
+     40 figuras con sombra, la región gigante pinta igual de rápido que
+     la de siempre (10,9 ms por cuadro contra 16,6).
    ============================================================ */
 
 export const SOMBRA_POR_DEFECTO = { dx: 0.8, dy: 0.8, blur: 0.8, color: "#000000", op: 35 };
 
-/* Cuánto se abre la región alrededor de la caja. 60 % a cada lado deja
-   sitio de sobra para el desplazamiento y el desenfoque que admite el
-   panel sin tener que saber cuánto mide la figura. */
-const MARGEN_FILTRO = 60;
+/* Media región, en unidades del elemento. Cien mil milímetros son cien
+   metros: más que cualquier dibujo, y más que las coordenadas en píxeles
+   de una figura importada dentro de una capa con escala. */
+const REGION = 100000;
+
+const REGION_ATTRS = `filterUnits="userSpaceOnUse" ` +
+  `x="${-REGION}" y="${-REGION}" width="${REGION * 2}" height="${REGION * 2}"`;
 
 export function sombraMarkup(spec, id) {
   const s = normSombra(spec);
-  const m = MARGEN_FILTRO, lado = 100 + m * 2;
-  return `<filter id="${esc(id)}" ${SOMBRA_MARK}="1" ` +
-    `x="-${m}%" y="-${m}%" width="${lado}%" height="${lado}%">` +
+  return `<filter id="${esc(id)}" ${SOMBRA_MARK}="1" ${REGION_ATTRS}>` +
     `<feDropShadow dx="${fmt(s.dx)}" dy="${fmt(s.dy)}" stdDeviation="${fmt(s.blur)}" ` +
     `flood-color="${esc(s.color)}" flood-opacity="${fmt(s.op / 100)}"/></filter>`;
+}
+
+/* Los dibujos hechos antes de esto llevan filtros con la región en
+   porcentaje, o sea con las líneas invisibles. Arreglarlos al abrir
+   cuesta una transacción y evita que haya que desmarcar y volver a
+   marcar «Con sombra» en cada figura — sabiendo que la figura que hay
+   que buscar para eso no se ve.
+
+   Va con origen propio para que no ocupe un paso de deshacer: el primer
+   Ctrl+Z tiene que deshacer lo que ha hecho quien dibuja, no una
+   reparación que no ha pedido. */
+export function repararSombras(drawing) {
+  const raiz = drawing && !drawing.readOnly && drawing.root();
+  if (!raiz) return 0;
+  /* El <defs> que YA haya, sin crearlo: `drawing.defs()` lo añade cuando
+     falta, y esto se llama al abrir cada dibujo — un dibujo importado sin
+     <defs> se habría encontrado con una escritura, y con un paso de
+     deshacer, sin que nadie hubiera tocado nada. */
+  const defs = childrenOf(raiz).find(n => isEl(n) && n.nodeName === "defs");
+  if (!defs) return 0;
+  const viejos = childrenOf(defs).filter(n =>
+    isEl(n) && n.getAttribute(SOMBRA_MARK) != null &&
+    n.getAttribute("filterUnits") !== "userSpaceOnUse");
+  if (!viejos.length) return 0;
+  drawing.edit(() => {
+    for (const f of viejos) {
+      f.setAttribute("filterUnits", "userSpaceOnUse");
+      f.setAttribute("x", String(-REGION));
+      f.setAttribute("y", String(-REGION));
+      f.setAttribute("width", String(REGION * 2));
+      f.setAttribute("height", String(REGION * 2));
+    }
+  }, "reparar");
+  return viejos.length;
 }
 
 export function normSombra(spec) {

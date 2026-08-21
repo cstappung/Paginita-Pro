@@ -444,7 +444,9 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
 
 - `doc.js` — the model: `DrawStore` (the project's drawings), `Drawing` (one
   open drawing: layers, add/remove, z-order, group/ungroup, undo). Every write
-  goes through `Drawing.edit()`, one transaction with the `LOCAL` origin. The
+  goes through `Drawing.edit()`, one transaction with the `LOCAL` origin —
+  the only calls that pass another origin are repairs nobody asked for
+  (`repararSombras`), which still sync but must not eat an undo step. The
   `UndoManager` uses `captureTimeout: 0` — one action, one undo step; the
   default merges consecutive actions, which is right for typing and wrong for
   drawing. Two things about **styling** live here because they are model, not
@@ -633,10 +635,31 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
   - **Only a matrix with no rotation or skew** (`esRecta`) can be baked; a
     rotated shape keeps its transform, which is exactly the case `_marco()`
     already handles by scaling in the shape's own axes.
-  - **What is not geometry scales isotropically**, by √|det|: stroke width,
-    dashes and the corner radius. So a uniform scale behaves exactly as it
-    always did, and a non-uniform one stretches the shape without deforming
-    what decorates it.
+  - **The outline does not scale at all.** A 1 mm stroke is still 1 mm after
+    the shape is made big, and so are its dashes — which is what was asked
+    for, and what any drawing program does with "scale stroke width" off.
+    That does *not* mean `bakeTrazo` is always handed 1: the matrix being
+    baked may carry an *earlier* scale (an imported shape with its own
+    `scale()`), and that one has to end up in the number or the stroke would
+    jump on release, so `_commit` passes `expansion(M) / expansion(T)` — what
+    was already there, without this gesture. What survives that is scaled
+    **isotropically**, by √|det|, because a stroke width is a single number
+    and cannot stretch along one axis. The corner radius is the exception
+    that proves the rule: it *is* geometry, so it grows with the shape (also
+    isotropically, or a stretched rectangle ends up with oval corners).
+  - **The same promise holds for what could not be baked.** A rotated shape,
+    a text or a group containing one keeps its matrix, and a matrix does
+    thicken the stroke — so `_commit` divides the stored width by the
+    gesture's factor instead (`Tools._compensarTrazo`, capped at
+    `MAX_TRAZOS` = 400 nodes so a matplotlib figure isn't rewritten whole on
+    every drag). The result on screen therefore does not depend on whether
+    the shape could be baked. The *preview* pays the same debt from the
+    other side: the mirror DOM gets an inline `stroke-width` while dragging
+    (`Tools._previewTrazo`), because otherwise a shape stretched ×3 would
+    show a triple-thick outline for the whole gesture and snap thin on
+    release. That inline style is cleared **before** the Yjs write, never
+    after: afterwards the mirror has already caught up with the document and
+    restoring the old value would cover it.
   - **A group bakes whole or not at all** (`Tools._planHornear` collects every
     write before applying any): one `<text>`, one formula or one rotated child
     inside is enough to leave the group with its matrix, and baking it halfway
@@ -807,6 +830,25 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
   off the `<svg>`, and a **shape** only off a layer or a group. Since each level
   is listed reversed, the insertion index is computed reversed too — the obvious
   `at`/`at + 1` is the wrong way round here.
+
+  **Right-click opens a menu** (rename, duplicate, copy, paste, delete) —
+  before it, renaming was a double-click nobody discovers and deleting a layer
+  could only be done from the header button, and only to the *active* one. Four
+  things it settles: the row is **selected first** unless it already was, so
+  the menu acts on what was clicked, and on the whole selection when the row is
+  part of it (which is what you expect after Shift-picking three shapes); a
+  layer's actions apply to the layer, so **Duplicar** goes through
+  `Drawing.duplicateLayer` — no 2 mm offset (that would move everything inside
+  it) and a free name, or the panel shows two «Fondo» with no way to tell them
+  apart; **Pegar** makes the clicked row's layer active first, so what is
+  pasted lands where you clicked and not in whatever layer was active before;
+  and the menu itself hangs off `<body>` in `position:fixed`, like the colour
+  popover, because the panel scrolls and would clip the menu of the bottom row
+  — the one that needs it most. Copy/paste are the only two it cannot do by
+  itself (the clipboard lives in `tools.js`, which knows how to turn shapes
+  into SVG markup and back), so they arrive as `ctx` callbacks; pasting reads
+  `Tools.clip` rather than the system clipboard, since *reading* that one asks
+  for a permission.
 - `preview.js` — looking at an exported PNG/PDF in the canvas's place, with a
   download **button**; clicking a generated file used to download it blind. The
   canvas is covered, never destroyed (same reason as ColabTeX's asset preview).
@@ -852,10 +894,24 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
     matters here — it can be *read back*: recovering the blur from a chain of
     five primitives to refill the panel is a parser nobody wants to own.
     `dx`/`dy`/`stdDeviation` are in the shape's own units (millimetres), since
-    that is what `primitiveUnits` defaults to; the filter *region* is in
-    bbox percentages and is opened to −60 %…220 %, because with SVG's own
-    −10 %…120 % a 3 mm shadow on a small shape came out sliced by a straight
-    edge that reads as a drawing bug rather than a clipped filter.
+    that is what `primitiveUnits` defaults to. The filter **region**, on the
+    other hand, may *not* be in bbox percentages, and that was the bug behind
+    "I put a shadow on a line and it disappears": a horizontal line's bbox is
+    70 × 0, any percentage of that zero is still zero, and a filter region of
+    zero area means the browser draws **nothing at all** — not the shadow and
+    not the line (verified in Chrome: 0 ink). So it is `userSpaceOnUse` with
+    a fixed, enormous region (±100 000). Three things make that safe: the
+    region is read in the *element's own* space (verified: a shape with
+    `transform="translate(60,0)"` still paints in full against a region
+    written for its untranslated geometry), so no transform can ever leave it
+    stale; it is numerically bigger than any drawing and than the pixel
+    coordinates of a layer imported with a `scale()`; and it costs nothing,
+    because Chrome clips the region to what is visible — 40 shadowed shapes
+    paint at 10.9 ms/frame with it against 16.6 ms with the old bbox region.
+    `repararSombras` rewrites the filters written by earlier versions when a
+    drawing opens (with a non-`LOCAL` origin, so it doesn't eat an undo
+    step): the alternative was asking people to find and re-tick a shape that
+    is precisely the one they cannot see.
     `readShadow` returns the string `"ajeno"` for a filter that is not ours —
     an imported one can be anything — so the panel can say so instead of
     presenting someone else's colour matrix as a shadow. The filter tags had
