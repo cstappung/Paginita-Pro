@@ -279,16 +279,21 @@ export function sombraMarkup(spec, id) {
     `flood-color="${esc(s.color)}" flood-opacity="${fmt(s.op / 100)}"/></filter>`;
 }
 
-/* Los dibujos hechos antes de esto llevan filtros con la región en
-   porcentaje, o sea con las líneas invisibles. Arreglarlos al abrir
-   cuesta una transacción y evita que haya que desmarcar y volver a
-   marcar «Con sombra» en cada figura — sabiendo que la figura que hay
-   que buscar para eso no se ve.
+/* Lo que dejaron escrito las versiones anteriores y hoy se ve mal:
+
+     - sombras con la región en porcentaje de la caja, o sea líneas
+       invisibles (arriba);
+     - puntas de flecha ancladas casi en el vértice, con el remate de la
+       línea asomando por encima de la punta (abajo).
+
+   Se arregla al abrir el dibujo. Es eso o pedirle a la gente que busque
+   y vuelva a marcar figura por figura — y en el caso de la sombra, una
+   figura que justamente no se ve.
 
    Va con origen propio para que no ocupe un paso de deshacer: el primer
    Ctrl+Z tiene que deshacer lo que ha hecho quien dibuja, no una
    reparación que no ha pedido. */
-export function repararSombras(drawing) {
+export function repararDefs(drawing) {
   const raiz = drawing && !drawing.readOnly && drawing.root();
   if (!raiz) return 0;
   /* El <defs> que YA haya, sin crearlo: `drawing.defs()` lo añade cuando
@@ -297,20 +302,38 @@ export function repararSombras(drawing) {
      deshacer, sin que nadie hubiera tocado nada. */
   const defs = childrenOf(raiz).find(n => isEl(n) && n.nodeName === "defs");
   if (!defs) return 0;
-  const viejos = childrenOf(defs).filter(n =>
-    isEl(n) && n.getAttribute(SOMBRA_MARK) != null &&
+  const hijos = childrenOf(defs).filter(isEl);
+  const sombras = hijos.filter(n =>
+    n.getAttribute(SOMBRA_MARK) != null &&
     n.getAttribute("filterUnits") !== "userSpaceOnUse");
-  if (!viejos.length) return 0;
+  const flechas = hijos.filter(n =>
+    n.getAttribute(FLECHA_MARK) != null &&
+    n.getAttribute("markerUnits") !== "userSpaceOnUse");
+  if (!sombras.length && !flechas.length) return 0;
+  const tri = tipoPunta("triangulo");
   drawing.edit(() => {
-    for (const f of viejos) {
+    for (const f of sombras) {
       f.setAttribute("filterUnits", "userSpaceOnUse");
       f.setAttribute("x", String(-REGION));
       f.setAttribute("y", String(-REGION));
       f.setAttribute("width", String(REGION * 2));
       f.setAttribute("height", String(REGION * 2));
     }
+    for (const m of flechas) {
+      /* Todas las viejas eran el mismo triángulo, así que basta con
+         reanclarlo y ponerle tamaño propio; el <path> que ya tiene solo
+         cambia de proporción. */
+      m.setAttribute(FLECHA_MARK, tri.value);
+      m.setAttribute("markerUnits", "userSpaceOnUse");
+      m.setAttribute("markerWidth", String(TAMAÑO_PUNTA));
+      m.setAttribute("markerHeight", String(TAMAÑO_PUNTA));
+      m.setAttribute("refX", String(tri.refX));
+      m.setAttribute("refY", "5");
+      const p = childrenOf(m).find(isEl);
+      if (p && p.nodeName === "path") p.setAttribute("d", tri.d);
+    }
   }, "reparar");
-  return viejos.length;
+  return sombras.length + flechas.length;
 }
 
 export function normSombra(spec) {
@@ -351,14 +374,34 @@ export function sombraSpec(el, hijos) {
    Puntas de flecha
 
    Una flecha es una línea con `marker-start` / `marker-end` apuntando a
-   un `<marker>` del <defs>. Tres decisiones:
+   un `<marker>` del <defs>. Cinco decisiones:
 
-   - **Un solo marcador por dibujo.** La punta no tiene ajustes que
-     valga la pena inventar: `markerUnits="strokeWidth"` la hace crecer
-     con el grosor de la línea y `context-stroke` la pinta del color del
-     trazo, así que dos flechas distintas siguen necesitando la MISMA
-     definición. Una por línea habría llenado el <defs> de copias
-     idénticas.
+   - **La línea acaba donde EMPIEZA la punta, no en su vértice.** Esto
+     era un fallo de verdad: con el punto de referencia casi en el
+     vértice (`refX="9"` de diez), la línea llegaba hasta ahí y su
+     remate —redondo, y por tanto medio grosor más largo que el
+     trazo— asomaba POR ENCIMA de la punta, como un pegote saliendo de
+     la flecha. Ahora `refX` va en la BASE de cada punta (o en la
+     muesca, en la aguda), así que el remate queda tapado por el
+     relleno y del vértice no sale nada. A cambio, la punta añade su
+     largo por delante del extremo que se arrastró — que es lo que hace
+     cualquier editor, porque SVG no sabe acortar una línea.
+   - **Cada punta decide dónde se ancla**: las que son «cabeza»
+     (triángulo, aguda, abierta) salen HACIA FUERA del extremo, y las
+     que son «marca» (círculo, rombo, barra) se centran EN el extremo,
+     que es donde se espera un punto o una marca de cota.
+   - **El tamaño es independiente del grosor** (`markerUnits` es
+     `userSpaceOnUse` y no `strokeWidth`), que es lo que se pedía: una
+     línea fina con una flecha grande, o al revés, sin tener que
+     engordar el trazo para que se vea la punta. El tamaño va en
+     unidades del dibujo, o sea en milímetros salvo dentro de una capa
+     importada con escala propia.
+   - **Un marcador por tipo y tamaño**, reutilizado (`data-dw-arrow`
+     guarda el tipo y `markerWidth` el tamaño, cada dato en un solo
+     sitio). Antes bastaba con uno por dibujo porque no había nada que
+     elegir; ahora dos flechas distintas necesitan definiciones
+     distintas, pero dos iguales siguen compartiendo la suya. La
+     recogida de basura se lleva las que dejan de usarse.
    - **`orient="auto-start-reverse"`**, que es lo que hace que la punta
      del principio mire hacia fuera. Con el `auto` de toda la vida, la
      flecha del extremo inicial apuntaba hacia dentro de la línea.
@@ -374,6 +417,49 @@ export const PUNTAS = [
   { value: "both", label: "Flecha en los dos" }
 ];
 
+/* Cada tipo, dibujado en una caja de 10 × 10 que apunta hacia la derecha
+   (el vértice en x = 10, el eje en y = 5).
+
+     refX  → qué punto de esa caja se pega al extremo de la línea
+     lleno → relleno con el color del trazo; si no, dibujado a trazo
+     grosor→ el del trazo interno de las que no van rellenas
+
+   No son 10 de ancho: una cabeza más larga que ancha (≈7,6) es la
+   proporción a la que se parece una flecha de verdad. */
+export const TIPOS_PUNTA = [
+  { value: "triangulo", label: "Triángulo", d: "M0 1.2 L10 5 L0 8.8 Z", refX: 0.4, lleno: true },
+  { value: "aguda", label: "Aguda", d: "M0 0.8 L10 5 L0 9.2 L2.6 5 Z", refX: 2.6, lleno: true },
+  /* La abierta se ancla ANTES del vértice, no en él. Sus dos brazos se
+     solapan a partir de x ≈ 7,4, así que ahí la punta es maciza: la
+     línea acaba dentro de esa parte y su remate redondo queda tapado en
+     vez de asomar por el vértice. Anclarla en el vértice mismo era el
+     fallo de siempre, con la diferencia de que aquí no hay relleno que
+     lo disimule. */
+  { value: "abierta", label: "Abierta", d: "M1 0.9 L9.3 5 L1 9.1", refX: 7.8, grosor: 1.9 },
+  { value: "circulo", label: "Círculo", circulo: 4.2, refX: 5, lleno: true },
+  { value: "rombo", label: "Rombo", d: "M0 5 L5 1 L10 5 L5 9 Z", refX: 5, lleno: true },
+  { value: "barra", label: "Barra", d: "M5 0.6 L5 9.4", refX: 5, grosor: 2.2 }
+];
+
+/* Milímetros de largo de la punta. Tres es lo que medía la de antes en
+   una línea normal (seis veces un trazo de 0,5 mm), así que lo que ya
+   estaba dibujado no cambia de tamaño al arreglarlo. */
+export const TAMAÑO_PUNTA = 3;
+
+export const tipoPunta = v => TIPOS_PUNTA.find(t => t.value === v) || TIPOS_PUNTA[0];
+
+/* Ficha de punta con los dos valores en su sitio. El tamaño se limita
+   por arriba y por abajo: una punta de 0 no se ve y una de un metro
+   tapa el dibujo entero. */
+export function normPunta(spec) {
+  const s = spec || {};
+  const n = parseFloat(s.tamaño);
+  return {
+    tipo: tipoPunta(s.tipo).value,
+    tamaño: isFinite(n) ? Math.max(0.3, Math.min(n, 60)) : TAMAÑO_PUNTA
+  };
+}
+
 /* Los dos atributos de la punta, y a qué figuras se les ponen.
 
    Solo a las ABIERTAS. En un rectángulo o en un rótulo el atributo no
@@ -387,11 +473,26 @@ export const PUNTA_ATTRS = ["marker-start", "marker-end"];
 const MARCABLES = new Set(["line", "polyline", "path"]);
 export const esMarcable = el => !!el && MARCABLES.has(el.nodeName);
 
-export function flechaMarkup(id) {
-  return `<marker id="${esc(id)}" ${FLECHA_MARK}="1" viewBox="0 0 10 10" ` +
-    `refX="9" refY="5" markerWidth="6" markerHeight="6" ` +
-    `markerUnits="strokeWidth" orient="auto-start-reverse">` +
-    `<path d="M0 0 L10 5 L0 10 z" fill="context-stroke"/></marker>`;
+/* Lo que va dentro del <marker>. `context-stroke` sirve igual de relleno
+   que de trazo, así que la punta se pinta del color de la línea sin
+   guardar ningún color. */
+export function puntaContenido(t) {
+  const pintura = t.lleno
+    ? `fill="context-stroke" stroke="none"`
+    : `fill="none" stroke="context-stroke" stroke-width="${t.grosor}" ` +
+      `stroke-linecap="round" stroke-linejoin="round"`;
+  return t.circulo
+    ? `<circle cx="5" cy="5" r="${t.circulo}" ${pintura}/>`
+    : `<path d="${t.d}" ${pintura}/>`;
+}
+
+export function flechaMarkup(id, spec) {
+  const p = normPunta(spec);
+  const t = tipoPunta(p.tipo);
+  return `<marker id="${esc(id)}" ${FLECHA_MARK}="${esc(t.value)}" viewBox="0 0 10 10" ` +
+    `refX="${t.refX}" refY="5" markerWidth="${fmt(p.tamaño, 4)}" markerHeight="${fmt(p.tamaño, 4)}" ` +
+    `markerUnits="userSpaceOnUse" orient="auto-start-reverse">` +
+    puntaContenido(t) + `</marker>`;
 }
 
 /* Qué punta tiene una figura, leído de sus dos atributos. */
@@ -482,19 +583,31 @@ export function readPaint(drawing, value) {
   return g ? gradSpec(g, childrenOf(g)) : null;
 }
 
-/* El marcador de flecha del dibujo, creándolo la primera vez. Se
-   REUTILIZA el que ya haya: ver el porqué arriba. */
-export function flechaRef(drawing) {
+/* El marcador para una punta dada, creándolo si hace falta. Se REUTILIZA
+   el que ya haya con el MISMO tipo y tamaño: ver el porqué arriba. */
+export function flechaRef(drawing, spec) {
+  const p = normPunta(spec);
   const defs = drawing && drawing.defs();
   if (!defs) return null;
   for (const n of childrenOf(defs)) {
-    if (isEl(n) && n.getAttribute(FLECHA_MARK) != null) {
-      const id = n.getAttribute("id");
-      if (id) return `url(#${id})`;
-    }
+    if (!isEl(n) || n.getAttribute(FLECHA_MARK) !== p.tipo) continue;
+    if (Math.abs(num(n.getAttribute("markerWidth"), -1) - p.tamaño) > 1e-4) continue;
+    const id = n.getAttribute("id");
+    if (id) return `url(#${id})`;
   }
   const id = newId("fle");
-  return ponerEnDefs(drawing, flechaMarkup(id), id);
+  return ponerEnDefs(drawing, flechaMarkup(id, p), id);
+}
+
+/* Qué punta es la que apunta un `marker-*`, para poder volver a
+   enseñarla en el panel. null si no es una nuestra. */
+export function readPunta(drawing, value) {
+  const id = refId(String(value == null ? "" : value));
+  if (!id) return null;
+  const m = defById(drawing, id);
+  const tipo = m && m.getAttribute(FLECHA_MARK);
+  if (!tipo) return null;
+  return normPunta({ tipo, tamaño: m.getAttribute("markerWidth") });
 }
 
 export function defById(drawing, id) {

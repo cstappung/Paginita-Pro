@@ -22,7 +22,7 @@
 
 import { FONTS, DEFAULT_FONT, DEFAULT_SIZE } from "./text.js";
 import { CAPS, DASHES, DEFAULT_CAP } from "./stroke.js";
-import { PUNTAS, readArrow, atributosPunta } from "./paint.js";
+import { PUNTAS, TIPOS_PUNTA, normPunta, readArrow, atributosPunta } from "./paint.js";
 
 /* Herramientas que tienen algo que decir aquí. Con la flecha la barra
    se esconde: para transformar ya está el panel de la derecha, y una
@@ -250,11 +250,32 @@ export function createToolOptions(host, opts = {}) {
 
     /* La punta va con la línea y no en el panel de la derecha porque es
        de las que hay que decidir ANTES de arrastrar: una flecha se
-       dibuja en el sentido en que se quiere que apunte. */
-    const puntas = tool === "line"
-      ? lista(PUNTAS, v => onApply(atributosPunta(v, getArrowRef())), "Puntas de flecha")
-      : null;
-    if (puntas) add(etiqueta("Punta"), puntas);
+       dibuja en el sentido en que se quiere que apunte.
+
+       El tipo y el tamaño se guardan en las opciones de dibujo
+       (`Tools.crear`) y no en el estilo: sin punta puesta no hay ningún
+       atributo donde apuntarlos, y sin eso elegir «rombo de 5 mm»,
+       quitar la punta y volver a ponerla devolvía el triángulo de
+       siempre. */
+    let puntas = null, tipoPta = null, tamPta = null;
+    if (tool === "line") {
+      const ficha = () => {
+        const cr = getCrear();
+        return { tipo: cr.flechaTipo, tamaño: cr.flechaTam };
+      };
+      const rehacer = () => {
+        const modo = readArrow(getStyle()["marker-start"], getStyle()["marker-end"]);
+        if (modo) onApply(atributosPunta(modo, getArrowRef(ficha())));
+      };
+      puntas = lista(PUNTAS, v => onApply(atributosPunta(v, v ? getArrowRef(ficha()) : null)),
+        "Puntas de flecha");
+      tipoPta = lista(TIPOS_PUNTA, v => { setCrear({ flechaTipo: v }); rehacer(); }, "Tipo de punta");
+      tamPta = numero({
+        min: 0.3, step: 0.5, ancho: 50,
+        onChange: v => { setCrear({ flechaTam: v }); rehacer(); }
+      });
+      add(etiqueta("Punta"), puntas, tipoPta, tamPta);
+    }
 
     let esquinas = null;
     if (tool === "rect") {
@@ -300,6 +321,15 @@ export function createToolOptions(host, opts = {}) {
       if (extremos) extremos.sync(st["stroke-linecap"] || DEFAULT_CAP);
       if (puntas) puntas.sync(readArrow(st["marker-start"], st["marker-end"]));
       const cr = getCrear();
+      if (tipoPta) {
+        const p = normPunta({ tipo: cr.flechaTipo, tamaño: cr.flechaTam });
+        tipoPta.sync(p.tipo);
+        tamPta.sync(p.tamaño);
+        // sin punta no hay nada que afinar
+        const hay = !!readArrow(st["marker-start"], st["marker-end"]);
+        tipoPta.nodo.style.display = hay ? "" : "none";
+        tamPta.nodo.style.display = hay ? "" : "none";
+      }
       if (esquinas) esquinas.sync(parseFloat(cr.rx) || 0);
       if (lados) lados.sync(Math.max(3, Math.round(cr.lados) || 3));
       if (estrella) estrella.sync(!!cr.estrella);

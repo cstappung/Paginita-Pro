@@ -446,7 +446,7 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
   open drawing: layers, add/remove, z-order, group/ungroup, undo). Every write
   goes through `Drawing.edit()`, one transaction with the `LOCAL` origin —
   the only calls that pass another origin are repairs nobody asked for
-  (`repararSombras`), which still sync but must not eat an undo step. The
+  (`repararDefs`), which still sync but must not eat an undo step. The
   `UndoManager` uses `captureTimeout: 0` — one action, one undo step; the
   default merges consecutive actions, which is right for typing and wrong for
   drawing. Two things about **styling** live here because they are model, not
@@ -908,20 +908,53 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
     coordinates of a layer imported with a `scale()`; and it costs nothing,
     because Chrome clips the region to what is visible — 40 shadowed shapes
     paint at 10.9 ms/frame with it against 16.6 ms with the old bbox region.
-    `repararSombras` rewrites the filters written by earlier versions when a
-    drawing opens (with a non-`LOCAL` origin, so it doesn't eat an undo
-    step): the alternative was asking people to find and re-tick a shape that
-    is precisely the one they cannot see.
+    `repararDefs` rewrites what earlier versions wrote — these filters and the
+    old arrowheads below — when a drawing opens (with a non-`LOCAL` origin, so
+    it doesn't eat an undo step): the alternative was asking people to find and
+    re-tick a shape that is precisely the one they cannot see. It reads the
+    `<defs>` that is already there rather than calling `drawing.defs()`, which
+    *creates* one — that would have written to every imported drawing that
+    lacks it, on open, for nothing.
     `readShadow` returns the string `"ajeno"` for a filter that is not ours —
     an imported one can be anything — so the panel can say so instead of
     presenting someone else's colour matrix as a shadow. The filter tags had
     to be added to `svgio`'s allowlist; `feImage` was deliberately left out,
     being the one primitive that fetches from another origin.
-  - **An arrowhead is one `<marker>` per drawing, reused.** It has no settings
-    worth inventing — `markerUnits="strokeWidth"` grows it with the line and
-    `context-stroke` paints it the stroke's colour — so two different arrows
-    still need the same definition, and one per line would have filled `<defs>`
-    with identical copies. `orient="auto-start-reverse"` is what makes the
+  - **An arrowhead ends where the line ends, not where the line's tip is.**
+    This was a real bug, and the one users reported: with the reference point
+    at the very vertex (`refX="9"` of ten), the line ran all the way there and
+    its cap — round, so half a stroke-width longer than the stroke itself —
+    stuck out *past* the head, like a blob growing out of the arrow. `refX` now
+    sits at each type's **base** (or at the notch, on the concave one), so the
+    cap is swallowed by the fill and nothing pokes through the tip. The price
+    is that the head adds its length beyond the endpoint you dragged, which is
+    what every editor does, because SVG cannot shorten a line. Types that read
+    as a *head* (triangle, concave, open) point outwards from the endpoint;
+    types that read as a *mark* (circle, diamond, bar) are centred **on** it.
+    The two stroked ones (open, bar) have nothing to hide a cap with, so the
+    open one is anchored short of its vertex, where its two arms already
+    overlap into solid ink; with a line as thick as half the arrowhead a nub
+    still shows, and that is inherent.
+  - **The size is independent of the stroke width** (`markerUnits` is
+    `userSpaceOnUse`, not `strokeWidth`) — a thin line with a big head, or the
+    reverse, without having to fatten the stroke to see the arrow. It is in
+    drawing units, i.e. millimetres except inside an imported layer with its
+    own scale, and it is deliberately *not* run through `getScale` like the
+    stroke width is: one marker is shared by shapes that may live in layers
+    with different scales, so there is no single right conversion.
+  - **One marker per type and size, reused** (`data-dw-arrow` holds the type,
+    `markerWidth` the size — each fact in one place). One per drawing was
+    enough while there was nothing to choose; now two different arrows need
+    two definitions, but two identical ones still share theirs, and `gcDefs`
+    collects what stops being used. The chosen type and size live in
+    `Tools.crear`, not in the style: with no arrowhead set there is no
+    `marker-*` attribute to keep them in, and picking "diamond, 5 mm",
+    removing the head and putting it back gave the default triangle again.
+    The **line preview** copies the marker into the handle layer at
+    `size × canvas.k` (`Tools._puntaPreview`): that layer is in screen pixels,
+    so pointing it straight at the document's marker drew a 3-pixel head under
+    an 11-pixel line.
+  - `orient="auto-start-reverse"` is what makes the
     start-side head point outwards; plain `auto` had it aiming into the line.
     Storing a colour instead of `context-stroke` would mean rewriting `<defs>`
     from the style panel every time the stroke changed. `esMarcable` limits the

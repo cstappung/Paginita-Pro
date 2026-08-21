@@ -112,9 +112,16 @@ export class Tools {
     /* Opciones de DIBUJO, las que no son atributos del SVG y por eso no
        caben en `style`: el redondeo de esquina que llevará el próximo
        rectángulo y si la herramienta se queda en la mano al soltar.
-       Las lleva la barra de opciones (tool-options.js). */
+       Las lleva la barra de opciones (tool-options.js).
+
+       El tipo y el tamaño de la punta de flecha también viven aquí,
+       aunque acaben en un atributo: sin punta puesta no hay ningún
+       `marker-*` donde apuntarlos, y sin esto elegir «rombo de 5 mm»,
+       quitar la punta y volver a ponerla devolvía el triángulo de
+       siempre. `null` = lo que diga paint.js. */
     this.crear = Object.assign(
-      { rx: 0, mantener: false, lados: 3, estrella: false, punta: 0.5 },
+      { rx: 0, mantener: false, lados: 3, estrella: false, punta: 0.5,
+        flechaTipo: null, flechaTam: null },
       opts.crear || {});
 
     this.tool = "select";
@@ -1207,7 +1214,8 @@ export class Tools {
       return;
     }
     if (d.mode === "create") {
-      this.canvas.overlay.querySelectorAll(".dw-preview,.dw-preview-guia").forEach(n => n.remove());
+      this.canvas.overlay.querySelectorAll(".dw-preview,.dw-preview-guia,.dw-preview-punta")
+        .forEach(n => n.remove());
       this.onStatus("");
       if (d.moved && d.b) this._createShape(d.tool, d.a, d.b);
       return;
@@ -1284,9 +1292,34 @@ export class Tools {
      escala con el zoom: por eso el grosor y los guiones se multiplican
      por `canvas.k` a mano. El estilo se escribe INLINE porque una clase
      de CSS gana siempre a un atributo de presentación. */
+  /* La punta de la vista previa, a escala de la pantalla.
+
+     El marcador del documento mide en unidades del DIBUJO (milímetros),
+     y la capa de tiradores está en píxeles: apuntar ahí directamente
+     enseñaba una flecha de tres píxeles bajo una línea de once. Así que
+     se copia el marcador, se le multiplica el tamaño por el zoom y la
+     copia vive en la propia capa de tiradores — un <marker> no se pinta
+     por sí mismo, solo cuando alguien lo apunta, así que puede estar en
+     cualquier sitio. Se va con el resto de la vista previa. */
+  _puntaPreview(ref, k, ov) {
+    const m = /url\(\s*['"]?#([^)'"\s]+)['"]?\s*\)/.exec(String(ref || ""));
+    const src = m && document.getElementById(m[1]);
+    if (!src || src.tagName !== "marker") return ref;
+    const tam = parseFloat(src.getAttribute("markerWidth"));
+    if (!isFinite(tam)) return ref;
+    const id = "dwprev-" + m[1];
+    const copia = src.cloneNode(true);
+    copia.setAttribute("id", id);
+    copia.setAttribute("class", "dw-preview-punta");
+    copia.setAttribute("markerWidth", String(tam * k));
+    copia.setAttribute("markerHeight", String(parseFloat(src.getAttribute("markerHeight")) * k || tam * k));
+    ov.appendChild(copia);
+    return `url(#${id})`;
+  }
+
   _drawCreatePreview(d) {
     const ov = this.canvas.overlay;
-    ov.querySelectorAll(".dw-preview,.dw-preview-guia").forEach(n => n.remove());
+    ov.querySelectorAll(".dw-preview,.dw-preview-guia,.dw-preview-punta").forEach(n => n.remove());
     const a = this.canvas.toLocal(d.a || d.start);
     const b = this.canvas.toLocal(d.b || d.end);
     const k = this.canvas.k || 1;
@@ -1339,7 +1372,7 @@ export class Tools {
        cambia al soltar. */
     if (d.tool === "line") {
       for (const at of ["marker-start", "marker-end"]) {
-        if (st[at]) node.setAttribute(at, st[at]);
+        if (st[at]) node.setAttribute(at, this._puntaPreview(st[at], k, ov));
       }
     }
     node.style.fill = d.tool === "line" ? "none" : (st.fill || "none");

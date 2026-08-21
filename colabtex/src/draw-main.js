@@ -24,7 +24,8 @@ import { Canvas, PCT_MIN, PCT_MAX } from "./draw/canvas.js";
 import { createScrollbars } from "./draw/scrollbars.js";
 import { Tools } from "./draw/tools.js";
 import { createStylePanel } from "./draw/style.js";
-import { paintValue, readPaint, shadowValue, readShadow, flechaRef, gcDefs, repararSombras } from "./draw/paint.js";
+import { paintValue, readPaint, shadowValue, readShadow, flechaRef, readPunta, gcDefs, repararDefs }
+  from "./draw/paint.js";
 import { createToolOptions } from "./draw/tool-options.js";
 import { createObjectPanel } from "./draw/layers.js";
 import { createTextEditor } from "./draw/text.js";
@@ -412,7 +413,10 @@ function ensureEditorParts() {
     readPaint: v => readPaint(state.drawing, v),
     resolveShadow: spec => shadowValue(state.drawing, spec),
     readShadow: v => readShadow(state.drawing, v),
-    resolveArrow: () => flechaRef(state.drawing),
+    /* La punta es un <marker> del <defs>: el panel maneja la ficha
+       (tipo y tamaño) y aquí se traduce a la referencia, y al revés. */
+    resolveArrow: spec => flechaRef(state.drawing, spec),
+    readArrowSpec: v => readPunta(state.drawing, v),
     /* La paleta guardada es del PROYECTO: vive en el mismo Y.Doc que los
        dibujos, así que se comparte con el equipo y se sincroniza sola. */
     getPaleta: () => state.paleta
@@ -430,7 +434,7 @@ function ensureEditorParts() {
     onApply: aplicarEstilo,
     getPage: () => (state.drawing ? state.drawing.size() : { w: 0, h: 0 }),
     onPage: setPageSize,
-    getArrowRef: () => flechaRef(state.drawing),
+    getArrowRef: spec => flechaRef(state.drawing, spec),
     onExit: () => { if (state.tools) state.tools.setTool("select"); }
   });
   state.assetView = createAssetPreview($("canvasHost").parentNode, {
@@ -631,12 +635,10 @@ function openDrawing(path) {
   }
   $("emptyCanvas").style.display = "none";
   state.drawing = new Drawing(state.ydoc, state.store.get(path), { readOnly: !canWrite() });
-  /* Las sombras escritas por una versión anterior dejaban invisible a
-     cualquier figura sin área —una línea recta— porque su región iba en
-     porcentaje de la caja (ver paint.js). Se arreglan al abrir: la
-     alternativa era pedirle a la gente que buscara y volviera a marcar
-     una figura que justamente no se ve. */
-  repararSombras(state.drawing);
+  /* Sombras que dejaban invisible a una línea recta y puntas de flecha
+     con la línea asomando por el vértice: las dos cosas las escribió una
+     versión anterior y las dos se arreglan al abrir (ver paint.js). */
+  repararDefs(state.drawing);
   state.canvas.attach(state.drawing);
   state.canvas.fitPage();
   state.tools.clear();

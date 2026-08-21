@@ -17,7 +17,7 @@ import { CAPS, JOINS, DASHES, DEFAULT_CAP, DEFAULT_JOIN } from "./stroke.js";
 import { esFormula, latexDe } from "./latex.js";
 import { createChip, createColorPopover } from "./color-popover.js";
 import { etiquetaPaint, esGrad, SOMBRA_POR_DEFECTO, normSombra,
-  PUNTAS, readArrow, atributosPunta, esMarcable } from "./paint.js";
+  PUNTAS, TIPOS_PUNTA, normPunta, readArrow, atributosPunta, esMarcable } from "./paint.js";
 
 const el = (tag, cls, html) => {
   const n = document.createElement(tag);
@@ -93,6 +93,7 @@ export function createStylePanel(host, opts = {}) {
   const resolveShadow = opts.resolveShadow || (() => null);
   const readShadow = opts.readShadow || (() => null);
   const resolveArrow = opts.resolveArrow || (() => null);
+  const readArrowSpec = opts.readArrowSpec || (() => null);
   /* Cuánto agranda el lienzo lo que hay elegido. Escalar una figura se
      guarda en su `transform`, así que un trazo de 0,5 mm escalado al
      doble se ve de 1 mm mientras el atributo sigue diciendo 0,5: el panel
@@ -210,10 +211,55 @@ export function createStylePanel(host, opts = {}) {
     op.value = o.value; op.textContent = o.label;
     puntaSel.appendChild(op);
   }
-  puntaSel.onchange = () => apply(atributosPunta(puntaSel.value, resolveArrow()));
   puntaRow.appendChild(puntaSel);
 
-  secStroke.append(stroke.row, widthRow, dashRow, cap.row, join.row, puntaRow);
+  /* Tipo y tamaño de la punta. Solo aparecen cuando hay punta: son dos
+     filas más en un panel que ya va justo, y sin flecha no dicen nada.
+
+     El tamaño va aparte del grosor a propósito — es justo lo que no se
+     podía hacer antes— y por eso NO pasa por `getScale()` como el
+     grosor: el marcador se comparte entre figuras que pueden estar en
+     capas con escalas distintas, así que se guarda y se enseña en
+     unidades del dibujo. */
+  const tipoRow = el("div", "dw-row");
+  tipoRow.appendChild(el("label", "dw-lbl", "Tipo"));
+  const tipoSel = el("select", "dw-sel");
+  tipoSel.id = "dwArrowType";
+  for (const t of TIPOS_PUNTA) {
+    const op = document.createElement("option");
+    op.value = t.value; op.textContent = t.label;
+    tipoSel.appendChild(op);
+  }
+  tipoRow.appendChild(tipoSel);
+
+  const tamRow = el("div", "dw-row");
+  tamRow.appendChild(el("label", "dw-lbl", "Tamaño"));
+  const tamInput = el("input", "dw-num");
+  tamInput.type = "number";
+  tamInput.id = "dwArrowSize";
+  tamInput.min = "0.3"; tamInput.step = "0.5";
+  tamRow.append(tamInput, el("span", "dw-unit", "mm"));
+
+  const verPunta = modo => {
+    tipoRow.style.display = modo ? "" : "none";
+    tamRow.style.display = modo ? "" : "none";
+  };
+
+  /* La ficha que enseñan los dos controles. Cuando la selección no tiene
+     punta todavía, valen como memoria de lo último elegido: poner
+     «flecha al final» usa el tipo y el tamaño que se estén viendo. */
+  const puntaSpec = () => normPunta({ tipo: tipoSel.value, tamaño: tamInput.value });
+  const aplicarPunta = () => {
+    const modo = puntaSel.value;
+    apply(atributosPunta(modo, modo ? resolveArrow(puntaSpec()) : null));
+    verPunta(modo);
+  };
+  puntaSel.onchange = aplicarPunta;
+  tipoSel.onchange = aplicarPunta;
+  // el tamaño se confirma solo poco después de teclear, como el grosor
+  alTeclear(tamInput, () => { if (puntaSel.value) aplicarPunta(); });
+
+  secStroke.append(stroke.row, widthRow, dashRow, cap.row, join.row, puntaRow, tipoRow, tamRow);
 
   /* ---------- texto ----------
      Solo aparece cuando hay un texto elegido (o cuando se va a escribir
@@ -433,7 +479,8 @@ export function createStylePanel(host, opts = {}) {
     const sel = getSel();
     const st = getStyle();
     const ro = !canWrite();
-    for (const n of [widthInput, dashSel, cap.sel, join.sel, puntaSel, opInput, pw, ph]) n.disabled = ro;
+    for (const n of [widthInput, dashSel, cap.sel, join.sel, puntaSel, tipoSel, tamInput,
+      opInput, pw, ph]) n.disabled = ro;
     host.querySelectorAll(".dw-chip,.dw-btn").forEach(b => { b.disabled = ro; });
 
     const fillV = sel.length ? commonAttr(sel, "fill", "#000000") : st.fill;
@@ -466,12 +513,23 @@ export function createStylePanel(host, opts = {}) {
        pone a todo, que es lo que se espera al tocarla a propósito. */
     const marcables = sel.filter(esMarcable);
     puntaRow.style.display = marcables.length ? "" : "none";
+    verPunta(false);
     if (marcables.length) {
       const mi = commonAttr(marcables, "marker-start", "");
       const mf = commonAttr(marcables, "marker-end", "");
       const modo = mi == null || mf == null ? null : readArrow(mi, mf);
       puntaSel.value = modo == null ? "" : modo;
       if (modo == null) puntaSel.selectedIndex = -1;
+      /* El tipo y el tamaño se leen del marcador al que apunta la
+         figura. Si la selección no se pone de acuerdo se dejan como
+         están: son la memoria de lo último elegido, y borrarlos haría
+         que tocar la lista de puntas pusiera cualquier cosa. */
+      verPunta(!!modo);
+      const spec = readArrowSpec(modo === "start" ? mi : mf);
+      if (spec) {
+        if (document.activeElement !== tipoSel) tipoSel.value = spec.tipo;
+        if (document.activeElement !== tamInput) tamInput.value = String(spec.tamaño);
+      }
     }
 
     const pct = op == null ? 100 : Math.round(parseFloat(op) * 100);
