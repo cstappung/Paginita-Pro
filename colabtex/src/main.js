@@ -2193,6 +2193,48 @@ function appendLog(line) {
   el.scrollTop = el.scrollHeight;
 }
 
+/* «File `figuras/x/y.png' not found» sobre una carpeta vinculada casi
+   nunca es una errata: la ruta de una figura vinculada se construye con
+   el TÍTULO ACTUAL del proyecto de dibujo (`figuras/<slug del título>/`),
+   así que renombrar ese proyecto en ColabDraw cambia la ruta de todas
+   sus figuras a la vez y deja los `\includegraphics` del artículo
+   apuntando al nombre viejo. Nada avisa: el árbol de archivos enseña la
+   carpeta nueva y el .tex sigue pidiendo la vieja.
+
+   No se toca el documento —cuál de las dos rutas es la buena lo decide
+   quien escribe—, pero el registro tiene que decirlo, porque desde el
+   mensaje de pdfTeX no hay forma de llegar hasta aquí. */
+function explicarFigurasVinculadas(errores) {
+  const avisos = [];
+  const enlaces = state.linkedInfo || [];
+  if (!enlaces.length) return avisos;
+  const carpetas = new Set(enlaces.map(l => `${LINK_DIR}/${slugTitle(l.title)}`));
+  const dichas = new Set();
+
+  for (const e of errores || []) {
+    const m = /File\s+[`'"]?([^`'"\s]*\/[^`'"\s]+)['"`]?\s+not found/i.exec(String(e));
+    if (!m) continue;
+    const ruta = m[1];
+    if (ruta.split("/")[0] !== LINK_DIR) continue;
+    const carpeta = ruta.split("/").slice(0, 2).join("/");
+    if (dichas.has(carpeta)) continue;
+    dichas.add(carpeta);
+
+    if (!carpetas.has(carpeta)) {
+      avisos.push(`⚠ «${ruta}» no existe: no hay ningún dibujo vinculado que se llame ` +
+        `«${carpeta.slice(LINK_DIR.length + 1)}». Las carpetas vinculadas ahora mismo son ` +
+        `${[...carpetas].map(c => `«${c}»`).join(", ")}. ` +
+        "Si renombraste el proyecto en ColabDraw, su carpeta cambió de nombre y hay que " +
+        "corregir la ruta en el .tex (o devolverle el título anterior).");
+    } else {
+      avisos.push(`⚠ «${ruta}» no existe todavía: la carpeta «${carpeta}» sí está vinculada, ` +
+        "pero ese archivo no está entre sus figuras. Expórtalo desde ColabDraw " +
+        "(el PNG/SVG se genera ahí) y vuelve a compilar.");
+    }
+  }
+  return avisos;
+}
+
 async function compile() {
   if (state.compiling) return;
   if (state.mode === "cloud" && !state.yFiles) return;
@@ -2210,7 +2252,23 @@ async function compile() {
   try {
     const files = [];
     for (const name of texNames) files.push({ path: name, contents: fileText(name) || "" });
-    for (const a of state.assets) files.push({ path: a.name, contents: await assetBytes(a) });
+    /* Una figura que no se puede bajar NO tumba la compilación entera.
+       Antes bastaba con que uno de los 59 recursos fallara —CORS, un
+       vínculo caído, un borrado a medias— para saltar al `catch` y
+       quedarse sin PDF, con un mensaje sobre esa figura y ninguna pista
+       de que el resto estaba bien. Ahora se compila sin ella: LaTeX dirá
+       «File not found» de esa sola y el motivo de verdad queda escrito
+       en el registro.
+
+       Los avisos se GUARDAN además de escribirse, porque más abajo el
+       registro se reasigna entero a partir de `sum`: lo que solo se haya
+       ido por `appendLog` se borra justo cuando hace falta leerlo. */
+    const avisos = [];
+    const anota = linea => { avisos.push(linea); appendLog(linea); };
+    for (const a of state.assets) {
+      try { files.push({ path: a.name, contents: await assetBytes(a) }); }
+      catch (err) { anota(`⚠ No se pudo traer «${a.name}»: ${err.message || err}`); }
+    }
 
     const result = await state.engine.compile(files, main);
     const secs = ((performance.now() - t0) / 1000).toFixed(1);
@@ -2222,6 +2280,7 @@ async function compile() {
     state.diagnostics = groupByFile(parseTexLog(sum.full, main));
     applyDiagnostics();
     renderDiagChip();
+    for (const linea of explicarFigurasVinculadas(sum.errors)) anota(linea);
 
     if (result.pdf && result.pdf.length > 0) {
       await state.pdfViewer.load(result.pdf);
@@ -2248,7 +2307,7 @@ async function compile() {
         modo: state.mode, principal: main, archivos: texNames.length, figuras: state.assets.length
       });
     }
-    const parts = [];
+    const parts = avisos.slice();
     for (const e of sum.errors) parts.push("✗ " + e);
     for (const w of sum.warnings) parts.push("⚠ " + w);
     $("logContent").textContent = parts.join("\n") + (parts.length ? "\n\n" : "") + "── registro completo ──\n" + sum.full.slice(-8000);

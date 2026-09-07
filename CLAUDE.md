@@ -362,7 +362,17 @@ Key modules in [colabtex/src/](colabtex/src/):
   presence/remote cursors.
 - `latex.js` — BusyTeX engine driver: runs pdfTeX (WASM) in a worker, returns
   the PDF and a parsed log summary. First compile downloads ~150 MB (cached);
-  recompiles ≈ 4–5 s.
+  recompiles ≈ 4–5 s. **A worker that failed is thrown away**
+  (`_descartarMotor`), and so is the `ready` promise. Once the WASM aborts —
+  `memory access out of bounds` on a heavy document — its heap is in a state it
+  can no longer describe, but `this.worker` was still there and `this.ready`
+  still resolved, so every later ▶ Compilar re-entered the same broken
+  instance: the bug tracker showed the *same* error 13 and 2 times running, not
+  15 different documents, and the only way out was reloading the page. A
+  *rejected* `ready` is a promise too, which is why it is cleared on the way
+  out: otherwise one network blip during the first init killed the engine for
+  the rest of the session. Restarting does not re-download the 150 MB — the
+  HTTP cache serves the packages and the `.wasm`.
 - `pdfview.js` — pdf.js-based PDF viewer. **Ctrl/⌘ + wheel zooms** (that is
   also how a trackpad pinch arrives), and it must `preventDefault()` or the
   browser zooms the whole page instead. The percentage updates on every wheel
@@ -614,7 +624,18 @@ Modules in [colabtex/src/draw/](colabtex/src/draw/):
     2.7e-4; the 100 % arc traces a real circle exactly).
   - **Curvature 0 emits a straight `L`**, because a curve with no curvature is
     a line and nothing downstream should have to special-case a degenerate arc.
-- `svgio.js` — SVG in and out, **including the sanitiser**. An SVG is an
+- `svgio.js` — SVG in and out, **including the sanitiser**. `textToNodes`
+  always returns the **shape** `{nodes, info, defs}`, never a bare `[]` on its
+  failure paths: its four callers (`tools.js: paste`, both in `latex.js`,
+  `ponerEnDefs` in `paint.js`) destructure it, and destructuring an array
+  leaves `nodes` `undefined` **without throwing** — the error then surfaces one
+  line later as `Cannot read properties of undefined (reading 'length')`, from
+  a `try/catch` that was standing right there ready to say "eso no se puede
+  pegar aquí". It was the most repeated fault in the tracker (35 times across
+  three versions, always on paste): `image/svg+xml` is strict XML, so anything
+  that passes the "looks like SVG" filter but is not well-formed — one unclosed
+  tag, one undeclared namespace prefix — is a `parsererror`, and that crashed
+  the app instead of being refused. An SVG is an
   executable document: `<script>`, `<foreignObject>`, `on*` handlers,
   `javascript:` and off-site `url(...)`/`href` are dropped on import, always.
   Import **keeps the file's own layers** (`layerInfo`): Inkscape has no layer
@@ -1197,6 +1218,16 @@ one place that everyone with a session can read and that exports to a file.
 
 Four decisions worth keeping:
 
+- **The death rattle is judged per compilation, not per line.**
+  `! Emergency stop.` and `! ==> Fatal error occurred, no output PDF file
+  produced!` always come out together and always *behind* something else, so on
+  their own they name no cause. In the tracker they were two entries of 8
+  repetitions each — 16 rows saying nothing — because the real cause of that
+  compile was a typo in the document and had been dropped, correctly. So
+  `fallosDeLaTeX` decides over the whole compile: a cause of ours wins and the
+  rattle is redundant; no cause but a user typo means the rattle is theirs and
+  nothing goes up; neither one means the rattle is the only evidence there is
+  and it does go up.
 - **Half the value is in what gets thrown away.** A mistyped `\aling{}` is not
   an app bug, and if those got in, the report would be an endless list of other
   people's typos with the real faults buried in it. So from the LaTeX log only
