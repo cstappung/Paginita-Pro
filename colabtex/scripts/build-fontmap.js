@@ -18,17 +18,43 @@
    LatexEngine.extraFiles) que contenga el mapa original más las
    entradas nuevas.
 
-   Uso: node scripts/build-fontmap.js <dir-con-fonts/map/ de los paquetes nuevos>
+   --- De dónde salen las entradas nuevas ---
+
+   De los propios .data de BusyTeX, no de un directorio del disco.
+   Esto es lo que faltaba y lo que costó el fallo «Font umvs at 600
+   not found» (umvs es marvosym): la fuente estaba empaquetada entera
+   —umvs.tfm, umvs.fd y marvosym.pfb— y hasta su marvosym.map viajaba
+   dentro de ubuntu-texlive-fonts-recommended.data, pero pdfTeX NO lee
+   los .map de cada paquete, solo el pdftex.map ya ensamblado. Y el
+   ensamblado lo hace updmap con las líneas de updmap.cfg, que aquí
+   son diecisiete: las de TeX Live basic. Todo lo que vino después en
+   los paquetes de Ubuntu quedó fuera del mapa, aunque estuviera en
+   el sistema de archivos virtual.
+
+   Así que se recorren los .data, se sacan de dentro los .map de
+   fonts/map/ y se añaden sus líneas. Marvosym era solo el que tocó
+   reportar: por el mismo agujero se caían eurosym, wasy, stmaryrd,
+   esint, manfnt y mflogo.
+
+   Una línea solo entra si los archivos que cita (.pfb, .enc…) están
+   de verdad en algún paquete. Sin esa comprobación, una entrada
+   huérfana cambia el error «Font X at 600 not found» por «cannot
+   open file for reading», que es igual de roto y más difícil de
+   entender.
+
+   Uso: node scripts/build-fontmap.js [dir-con-fonts/map/ adicional]
    ============================================================ */
 const fs = require("fs");
 const path = require("path");
 
-const SRC = process.argv[2];
-if (!SRC) { console.error("Uso: node scripts/build-fontmap.js <dir-con-fonts/map/>"); process.exit(1); }
+const SRC = process.argv[2] || null;   // opcional: un árbol suelto en el disco
 const VENDOR = path.resolve(__dirname, "../../vendor/busytex");
-const BASE_JS = path.join(VENDOR, "texlive-basic.js");
-const BASE_DATA = path.join(VENDOR, "texlive-basic.data");
+const BASE = "texlive-basic";
+const MAPA_BASE = "pdftex.map";
 const CHUNK_SIZE = 2048;
+/* Extensiones que una línea del mapa puede citar con «<». Si el archivo
+   no está en ningún paquete, la línea no sirve para nada. */
+const CITABLES = /\.(pfb|pfa|ttf|otf|enc|cmap)$/i;
 
 /* ---------- decodificador de bloque LZ4 ----------
    Los .data de BusyTeX van troceados y comprimidos con el formato de
@@ -52,8 +78,11 @@ function lz4DecodeBlock(src, expectedSize) {
   return dst;
 }
 
-/* lee un archivo del data package, descomprimiendo solo los chunks necesarios */
-function readFromPackage(jsPath, dataPath, filename) {
+/* Lee la metadata de un data package SIN tocar el .data (son hasta 100 MB;
+   para saber qué hay dentro basta el .js, que ronda el mega). */
+function abreManifiesto(nombre) {
+  const jsPath = path.join(VENDOR, nombre + ".js");
+  const dataPath = path.join(VENDOR, nombre + ".data");
   const js = fs.readFileSync(jsPath, "utf8");
 
   const cdAt = js.indexOf("var compressedData = ");
@@ -67,38 +96,72 @@ function readFromPackage(jsPath, dataPath, filename) {
     else if (c === "}") { depth--; if (!depth) { cdEnd = i + 1; break; } }
   }
   const cd = JSON.parse(js.slice(cdOpen, cdEnd));
-
   const meta = JSON.parse(js.slice(js.lastIndexOf("loadPackage(") + 12, js.lastIndexOf(");\n\n  })();")));
-  const entry = meta.files.find(f => f.filename === filename || f.filename.endsWith("/" + filename));
-  if (!entry) throw new Error("No se encontró " + filename + " en " + path.basename(jsPath));
 
   // OJO: cachedOffset es el tamaño COMPRIMIDO. El tamaño del flujo lógico
   // (descomprimido) es el final del último archivo de la metadata.
   const totalLogical = meta.files[meta.files.length - 1].end;
-
-  const data = fs.readFileSync(dataPath);
-  const first = Math.floor(entry.start / CHUNK_SIZE);
-  const last = Math.floor((entry.end - 1) / CHUNK_SIZE);
-  const parts = [];
-  for (let i = first; i <= last; i++) {
-    const cs = cd.offsets[i], sz = cd.sizes[i];
-    const raw = data.subarray(cs, cs + sz);
-    const plainSize = Math.min(CHUNK_SIZE, totalLogical - i * CHUNK_SIZE);
-    const plain = cd.successes[i] ? lz4DecodeBlock(raw, plainSize) : raw;
-    parts.push(plain);
-  }
-  const joined = Buffer.concat(parts);
-  return joined.subarray(entry.start - first * CHUNK_SIZE, entry.end - first * CHUNK_SIZE);
+  return { nombre, dataPath, cd, meta, totalLogical };
 }
 
+/* Saca un archivo del .data descomprimiendo solo los chunks que lo cubren, y
+   leyendo del disco solo esos bytes: cargar el .data entero por cada .map
+   serían gigabytes de lectura para unos pocos kilobytes de mapa. */
+function leeEntrada(man, entry) {
+  const fd = fs.openSync(man.dataPath, "r");
+  try {
+    const first = Math.floor(entry.start / CHUNK_SIZE);
+    const last = Math.floor((entry.end - 1) / CHUNK_SIZE);
+    const parts = [];
+    for (let i = first; i <= last; i++) {
+      const cs = man.cd.offsets[i], sz = man.cd.sizes[i];
+      const raw = Buffer.alloc(sz);
+      fs.readSync(fd, raw, 0, sz, cs);
+      const plainSize = Math.min(CHUNK_SIZE, man.totalLogical - i * CHUNK_SIZE);
+      parts.push(man.cd.successes[i] ? lz4DecodeBlock(raw, plainSize) : raw);
+    }
+    const joined = Buffer.concat(parts);
+    return joined.subarray(entry.start - first * CHUNK_SIZE, entry.end - first * CHUNK_SIZE);
+  } finally {
+    fs.closeSync(fd);
+  }
+}
+
+const base = (m, f) => (f.filename.split("/").pop());
+
+/* ---------- 1. el mapa original, del paquete base ---------- */
 console.log("Extrayendo pdftex.map del paquete base…");
-const original = readFromPackage(BASE_JS, BASE_DATA, "pdftex.map").toString("latin1");
+const manifiestos = fs.readdirSync(VENDOR)
+  .filter(f => f.endsWith(".data"))
+  .map(f => f.slice(0, -5))
+  .sort((a, b) => (a === BASE ? -1 : b === BASE ? 1 : a.localeCompare(b)))
+  .map(abreManifiesto);
+
+const manBase = manifiestos.find(m => m.nombre === BASE);
+const entradaBase = manBase.meta.files.find(f => base(manBase, f) === MAPA_BASE);
+if (!entradaBase) { console.error("No se encontró pdftex.map en " + BASE); process.exit(1); }
+const original = leeEntrada(manBase, entradaBase).toString("latin1");
 const origLines = original.split("\n").filter(l => l.trim() && !l.startsWith("%"));
 console.log(`  mapa original: ${origLines.length} entradas`);
 if (origLines.length < 100) { console.error("El mapa extraído parece incompleto; abortando."); process.exit(1); }
 if (!/cmr10/.test(original)) { console.error("El mapa extraído no contiene cmr10; la descompresión falló."); process.exit(1); }
 
-/* ---------- añadir los mapas de los paquetes nuevos ---------- */
+/* ---------- 2. inventario de archivos y de mapas de TODOS los paquetes ---------- */
+const disponibles = new Set();   // nombres de archivo que existen en el FS virtual
+const mapasEnPaquete = [];       // {man, entry, ruta}
+for (const man of manifiestos) {
+  for (const f of man.meta.files) {
+    const nombre = base(man, f);
+    disponibles.add(nombre.toLowerCase());
+    if (nombre === MAPA_BASE) continue;                 // el ya ensamblado, no un fragmento
+    if (!nombre.endsWith(".map")) continue;
+    if (!f.filename.includes("/fonts/map/")) continue;
+    mapasEnPaquete.push({ man, entry: f, ruta: f.filename });
+  }
+}
+console.log(`  paquetes: ${manifiestos.length} → ${disponibles.size} archivos, ${mapasEnPaquete.length} mapas dentro`);
+
+/* ---------- 3. mapas sueltos del disco (opcional) ---------- */
 function walk(dir, out) {
   if (!fs.existsSync(dir)) return;
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -107,27 +170,48 @@ function walk(dir, out) {
     else if (e.name.endsWith(".map")) out.push(full);
   }
 }
-const maps = [];
-walk(path.join(SRC, "fonts", "map"), maps);
+const mapasEnDisco = [];
+if (SRC) walk(path.join(SRC, "fonts", "map"), mapasEnDisco);
 
+/* ---------- 4. fundir ---------- */
 const known = new Set(origLines.map(l => l.trim().split(/\s+/)[0]));
 const added = [];
-for (const m of maps) {
-  for (const line of fs.readFileSync(m, "latin1").split("\n")) {
+let huerfanas = 0;
+const sinFuente = new Set();
+
+function absorbe(texto, etiqueta) {
+  let n = 0;
+  for (const line of texto.split("\n")) {
     const t = line.trim();
     if (!t || t.startsWith("%") || t.startsWith("#")) continue;
-    const name = t.split(/\s+/)[0];
+    const campos = t.split(/\s+/);
+    const name = campos[0];
     if (known.has(name)) continue;        // ya estaba: no duplicar
+    /* Una entrada que cita archivos que no viajan en ningún paquete no
+       arregla nada: cambia un error por otro. Fuera. */
+    const faltan = campos
+      .filter(c => c.startsWith("<"))
+      .map(c => c.replace(/^<+/, ""))
+      .filter(c => CITABLES.test(c) && !disponibles.has(c.toLowerCase()));
+    if (faltan.length) { huerfanas++; faltan.forEach(f => sinFuente.add(f)); continue; }
     known.add(name);
     added.push(t);
+    n++;
   }
+  return n;
 }
-console.log(`  mapas nuevos: ${maps.length} archivos → ${added.length} entradas añadidas`);
+
+for (const m of mapasEnPaquete) absorbe(leeEntrada(m.man, m.entry).toString("latin1"), m.ruta);
+for (const m of mapasEnDisco)   absorbe(fs.readFileSync(m, "latin1"), m);
+
+console.log(`  mapas leídos: ${mapasEnPaquete.length} de los .data` +
+  (SRC ? ` + ${mapasEnDisco.length} del disco` : "") + ` → ${added.length} entradas añadidas`);
+if (huerfanas) console.log(`  descartadas ${huerfanas} entradas por citar archivos que no están: ${[...sinFuente].slice(0, 8).join(" ")}${sinFuente.size > 8 ? " …" : ""}`);
 if (!added.length) console.warn("  (aviso: no se añadió ninguna entrada)");
 
 const outDir = path.join(VENDOR, "extra");
 fs.mkdirSync(outDir, { recursive: true });
 const out = original.replace(/\s*$/, "") + "\n% --- entradas añadidas por ColabTeX (paquetes de fuentes extra) ---\n" +
   added.join("\n") + "\n";
-fs.writeFileSync(path.join(outDir, "pdftex.map"), Buffer.from(out, "latin1"));
+fs.writeFileSync(path.join(outDir, MAPA_BASE), Buffer.from(out, "latin1"));
 console.log(`extra/pdftex.map → ${(out.length / 1024).toFixed(0)} KB (${origLines.length + added.length} entradas)`);
