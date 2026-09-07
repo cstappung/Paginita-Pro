@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;display=swap">
+  <style>
+    /* Mismos tokens que CSV·Scope en su tema oscuro: las dos herramientas se
+       ven como el mismo instrumento. Estar aquí (y no sólo en injectCSS)
+       evita el parpadeo blanco antes de que arranque filtros-engine.js. */
+    :root{
+      --chassis:#0b0f14; --panel:#141b23; --panel2:#10161d; --line:#26333f;
+      --text:#dfe8f2; --dim:#7d8fa3; --accent:#2ea8ff; --on-accent:#0b1118;
+      --accent-a1:rgba(46,168,255,.13); --accent-a2:rgba(46,168,255,.28);
+      --ok:#3ddc7f; --bad:#ff6b6b; --bad-a:rgba(255,107,107,.25);
+      --sheen:rgba(255,255,255,.05); --shadow-1:rgba(0,0,0,.35); --shadow-2:rgba(0,0,0,.5);
+      --screen:#05090c; --grid1:#1e323f; --grid2:#3a5a6d;
+      --bezel:inset 0 0 0 1px rgba(0,0,0,.6), inset 0 3px 26px rgba(0,0,0,.55);
+    }
+    html, body { margin:0; padding:0; height:100%; overflow:hidden; background:var(--chassis); }
+    * { box-sizing: border-box; }
+    input[type="checkbox"] { accent-color: var(--accent); }
+    input[type="range"] { accent-color: var(--accent); }
+  </style>
+  <script src="filtros-engine.js"></script>
+</helmet>
+
+<div class="flt" data-screen-label="Diseno de filtros">
+
+  <!-- ============ PANEL FRONTAL ============ -->
+  <header class="hdr">
+    <a href="Inicio.dc.html" title="Menú principal" class="home">⌂</a>
+
+    <div class="brand">
+      <span class="pwr" title="Listo"></span>
+      <span class="mark">FILTRO·LAB</span>
+      <span class="model">diseño y simulación de filtros activos · Butterworth · Chebyshev · Bessel</span>
+    </div>
+
+    <div class="tabs">
+      <button id="tabBode" class="tab">Bode</button>
+      <button id="tabSenal" class="tab">Señal</button>
+      <button id="tabEtapas" class="tab">Etapas</button>
+    </div>
+
+    <div class="tools">
+      <button id="btnPng" class="btn" title="Guardar la vista activa como PNG">PNG</button>
+      <button id="btnExport" class="btn" title="Descargar etapas, respuesta y señales en CSV">Exportar CSV</button>
+    </div>
+  </header>
+
+  <div class="body">
+
+    <!-- ---- RACK IZQUIERDO: EL FILTRO ---- -->
+    <aside class="side">
+
+      <section class="grp">
+        <h3 class="ttl">Tipo de filtro</h3>
+        <div class="seg" id="segTipo">
+          <button class="sgb" data-tipo="lp">Paso bajo</button>
+          <button class="sgb" data-tipo="hp">Paso alto</button>
+          <button class="sgb" data-tipo="bp">Paso banda</button>
+        </div>
+      </section>
+
+      <section class="grp">
+        <h3 class="ttl">Respuesta</h3>
+        <div class="seg" id="segResp">
+          <button class="sgb" data-resp="butter">Butterworth</button>
+          <button class="sgb" data-resp="cheby">Chebyshev</button>
+          <button class="sgb" data-resp="bessel">Bessel</button>
+        </div>
+        <div id="respNota" class="hint"></div>
+      </section>
+
+      <section class="grp">
+        <h3 class="ttl">Banda de paso</h3>
+        <div id="rowFp" class="row">
+          <label class="lab">f<sub>p</sub></label>
+          <input id="fpIn" class="in grow mono" type="text" defaultValue="1k" title="Límite de la banda de paso — se admite 1k, 2.5k, 20M…">
+          <span class="unit">Hz</span>
+        </div>
+        <div id="rowFpBP" class="row hide">
+          <label class="lab">f<sub>p1</sub>·f<sub>p2</sub></label>
+          <input id="fp1In" class="in grow mono" type="text" defaultValue="1k">
+          <input id="fp2In" class="in grow mono" type="text" defaultValue="10k">
+        </div>
+        <div class="row">
+          <label class="lab" id="labAmax">Aten. máx.</label>
+          <input id="amaxIn" class="in grow mono" type="text" defaultValue="3.01">
+          <span class="unit">dB</span>
+        </div>
+        <div id="hintAmax" class="hint"></div>
+      </section>
+
+      <section class="grp">
+        <h3 class="ttl">Banda eliminada</h3>
+        <div id="rowFs" class="row">
+          <label class="lab">f<sub>s</sub></label>
+          <input id="fsIn" class="in grow mono" type="text" defaultValue="4k">
+          <span class="unit">Hz</span>
+        </div>
+        <div id="rowFsBP" class="row hide">
+          <label class="lab">f<sub>s1</sub>·f<sub>s2</sub></label>
+          <input id="fs1In" class="in grow mono" type="text" defaultValue="200">
+          <input id="fs2In" class="in grow mono" type="text" defaultValue="50k">
+        </div>
+        <div class="row">
+          <label class="lab">Aten. mín.</label>
+          <input id="aminIn" class="in grow mono" type="text" defaultValue="40">
+          <span class="unit">dB</span>
+        </div>
+      </section>
+
+      <section class="grp">
+        <h3 class="ttl">Orden y ganancia</h3>
+        <label class="chk"><input id="chkOrdenAuto" type="checkbox"> Orden automático (el mínimo que cumple)</label>
+        <div class="row">
+          <label class="lab">Orden</label>
+          <input id="ordenIn" class="in grow mono" type="number" min="1" max="30" defaultValue="4">
+          <button id="btnOrdenMenos" class="btn xs" title="Bajar el orden">−</button>
+          <button id="btnOrdenMas" class="btn xs" title="Subir el orden">+</button>
+        </div>
+        <div class="row">
+          <label class="lab">Ganancia</label>
+          <input id="gananciaIn" class="in grow mono" type="text" defaultValue="0">
+          <span class="unit">dB</span>
+        </div>
+        <div class="hint">La ganancia total se reparte por igual entre las etapas.</div>
+      </section>
+
+      <section class="grp accent">
+        <h3 class="ttl">Resultado</h3>
+        <div class="rdo2">
+          <div class="cell"><div class="k">Orden</div><div id="resOrden" class="v">—</div></div>
+          <div class="cell"><div class="k">Etapas</div><div id="resEtapas" class="v alt">—</div></div>
+        </div>
+        <div id="resDet" class="readout mono"></div>
+        <div id="resAviso" class="warn hide"></div>
+      </section>
+
+      <section class="grp">
+        <h3 class="ttl">Ejemplos</h3>
+        <div class="row pad">
+          <button class="btn key" data-preset="audio">Antialias 20 k</button>
+          <button class="btn key" data-preset="red">Red 50 Hz</button>
+        </div>
+        <div class="row pad">
+          <button class="btn key" data-preset="banda">Banda 1–10 k</button>
+          <button class="btn key" data-preset="dc">Corta DC</button>
+        </div>
+      </section>
+    </aside>
+
+    <!-- ---- CENTRO ---- -->
+    <main class="center">
+
+      <!-- VISTA BODE -->
+      <div id="viewBode" class="view">
+        <div class="bar">
+          <span class="bl">Eje f</span>
+          <input id="bodeFminIn" class="in xs mono w74" type="text" defaultValue="" placeholder="auto">
+          <span class="bl">·</span>
+          <input id="bodeFmaxIn" class="in xs mono w74" type="text" defaultValue="" placeholder="auto">
+          <span class="sep"></span>
+          <label class="chk xs"><input id="chkMascara" type="checkbox"> Plantilla</label>
+          <label class="chk xs"><input id="chkEtapasBode" type="checkbox"> Etapas sueltas</label>
+          <label class="chk xs"><input id="chkArmonicos" type="checkbox"> Armónicos de la señal</label>
+          <label class="chk xs"><input id="chkRetardo" type="checkbox"> Retardo de grupo</label>
+        </div>
+        <div id="magWrap" class="scr"><canvas id="magCanvas"></canvas><pre id="bodeHover" class="hover"></pre></div>
+        <div id="phaseWrap" class="scr fixed h170"><canvas id="phaseCanvas"></canvas></div>
+        <div id="gdWrap" class="scr fixed h150 hide"><canvas id="gdCanvas"></canvas></div>
+      </div>
+
+      <!-- VISTA SEÑAL -->
+      <div id="viewSenal" class="view hide">
+        <div class="bar">
+          <span class="bl">Espectro</span>
+          <select id="selEjeX" class="in xs">
+            <option value="lin">Eje f lineal</option>
+            <option value="log">Eje f logarítmico</option>
+          </select>
+          <select id="selEjeY" class="in xs">
+            <option value="db">Eje Y en dB</option>
+            <option value="lin">Eje Y lineal</option>
+          </select>
+          <span class="bl">Hasta</span>
+          <input id="fftMaxIn" class="in xs mono w74" type="text" defaultValue="" placeholder="auto">
+          <span class="sep"></span>
+          <label class="chk xs"><input id="chkEnvolvente" type="checkbox"> Unir los armónicos</label>
+        </div>
+        <div id="timeWrap" class="scr"><canvas id="timeCanvas"></canvas><pre id="timeHover" class="hover"></pre></div>
+        <div id="fftWrap" class="scr"><canvas id="fftCanvas"></canvas></div>
+      </div>
+
+      <!-- VISTA ETAPAS -->
+      <div id="viewEtapas" class="view hide etapas">
+        <div class="card fill scroll">
+          <div class="card-hd">
+            <span class="ttl">Etapas en cascada · de menor a mayor Q</span>
+            <button id="btnCopiar" class="btn xs push">Copiar tabla</button>
+          </div>
+          <div class="card-bd">
+            <table class="tbl">
+              <thead>
+                <tr>
+                  <th>#</th><th>Sección</th><th>f<sub>0</sub></th><th>Q</th>
+                  <th>Ganancia</th><th>Polos σ ± jω (÷2π)</th><th>Ceros</th>
+                </tr>
+              </thead>
+              <tbody id="etapasBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="etapas-rd">
+          <div id="pzWrap" class="scr"><canvas id="pzCanvas"></canvas></div>
+          <div id="etapasNota" class="card note-card"></div>
+        </div>
+      </div>
+    </main>
+
+    <!-- ---- RACK DERECHO: LA SEÑAL ---- -->
+    <aside class="side r">
+      <section class="grp">
+        <h3 class="ttl">Señal de entrada</h3>
+        <div class="row">
+          <label class="lab">Forma</label>
+          <select id="selSenal" class="in grow">
+            <option value="seno">Senoidal</option>
+            <option value="tri">Triangular</option>
+            <option value="sierra">Diente de sierra</option>
+            <option value="cuad">Cuadrada</option>
+          </select>
+        </div>
+        <div class="row">
+          <label class="lab">Frecuencia</label>
+          <input id="freqIn" class="in grow mono" type="text" defaultValue="1k">
+          <span class="unit">Hz</span>
+        </div>
+        <div class="row">
+          <label class="lab">Amplitud</label>
+          <input id="ampIn" class="in grow mono" type="text" defaultValue="1">
+          <span class="unit">V<sub>p</sub></span>
+        </div>
+        <div class="row">
+          <label class="lab">Offset</label>
+          <input id="offIn" class="in grow mono" type="text" defaultValue="0">
+          <span class="unit">V</span>
+        </div>
+        <div id="rowDuty" class="row hide">
+          <label class="lab">Duty</label>
+          <input id="dutyIn" type="range" min="1" max="99" step="1" defaultValue="50" class="grow">
+          <span id="dutyVal" class="val mono">50 %</span>
+        </div>
+        <div id="rowSim" class="row hide">
+          <label class="lab">Simetría</label>
+          <input id="simIn" type="range" min="0" max="100" step="1" defaultValue="50" class="grow">
+          <span id="simVal" class="val mono">50 %</span>
+        </div>
+        <div class="row">
+          <label class="lab">Ciclos</label>
+          <input id="ciclosIn" type="range" min="1" max="20" step="1" defaultValue="4" class="grow">
+          <span id="ciclosVal" class="val mono">4</span>
+        </div>
+        <div class="row pad">
+          <button id="btnFreqPaso" class="btn key" title="Llevar la señal al centro de la banda de paso">f de paso</button>
+          <button id="btnFreqCorte" class="btn key" title="Llevar la señal justo al límite de la banda de paso">f de corte</button>
+          <button id="btnFreqStop" class="btn key" title="Llevar la señal a la banda eliminada">f eliminada</button>
+        </div>
+      </section>
+
+      <section class="grp accent">
+        <h3 class="ttl">Medidas</h3>
+        <table class="tbl med">
+          <thead><tr><th></th><th>Entrada</th><th>Salida</th></tr></thead>
+          <tbody>
+            <tr><td>V<sub>pp</sub></td><td id="medVppIn">—</td><td id="medVppOut">—</td></tr>
+            <tr><td>V<sub>rms</sub></td><td id="medRmsIn">—</td><td id="medRmsOut">—</td></tr>
+            <tr><td>V<sub>med</sub></td><td id="medDcIn">—</td><td id="medDcOut">—</td></tr>
+            <tr><td>THD</td><td id="medThdIn">—</td><td id="medThdOut">—</td></tr>
+          </tbody>
+        </table>
+        <div id="medFund" class="readout mono"></div>
+      </section>
+
+      <section class="grp">
+        <h3 class="ttl">Cómo se calcula</h3>
+        <div class="hint">La salida es el <b>régimen permanente</b>: cada
+        armónico de la entrada se multiplica por la H(jω) del diseño, sin
+        transitorio de arranque. La ventana abarca un número entero de ciclos,
+        así que el espectro no tiene fuga y sus rayas son los armónicos.</div>
+      </section>
+    </aside>
+  </div>
+
+  <div class="stat">
+    <span id="statusLeft">—</span>
+    <span id="statusRight">FiltroLab</span>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;tipo&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;lp&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Filtro&quot;,&quot;description&quot;:&quot;lp | hp | bp&quot;},&quot;respuesta&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;butter&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Filtro&quot;,&quot;description&quot;:&quot;butter | cheby | bessel&quot;},&quot;fPaso&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;1k&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Filtro&quot;,&quot;description&quot;:&quot;Frecuencia de la banda de paso&quot;},&quot;fRechazo&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;4k&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Filtro&quot;,&quot;description&quot;:&quot;Frecuencia de la banda eliminada&quot;},&quot;atenPaso&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;3.01&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Filtro&quot;,&quot;description&quot;:&quot;Atenuación máxima en la banda de paso (dB)&quot;},&quot;atenRechazo&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;40&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Filtro&quot;,&quot;description&quot;:&quot;Atenuación mínima en la banda eliminada (dB)&quot;},&quot;senal&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;seno&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Señal&quot;,&quot;description&quot;:&quot;seno | tri | sierra | cuad&quot;},&quot;fSenal&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;1k&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Señal&quot;,&quot;description&quot;:&quot;Frecuencia de la señal de prueba&quot;}}">
+class Component extends DCLogic {
+  componentDidMount() {
+    this._tries = 0;
+    this._boot();
+  }
+  _boot() {
+    if (window.FiltrosApp && document.getElementById("magCanvas")) {
+      window.FiltrosApp.init(this._opts());
+    } else if (this._tries++ < 100) {
+      setTimeout(() => this._boot(), 60);
+    }
+  }
+  _opts() {
+    return {
+      tipo: this.props.tipo ?? "lp",
+      respuesta: this.props.respuesta ?? "butter",
+      fPaso: this.props.fPaso ?? "1k",
+      fRechazo: this.props.fRechazo ?? "4k",
+      atenPaso: this.props.atenPaso ?? "3.01",
+      atenRechazo: this.props.atenRechazo ?? "40",
+      senal: this.props.senal ?? "seno",
+      fSenal: this.props.fSenal ?? "1k"
+    };
+  }
+  componentDidUpdate() {
+    if (window.FiltrosApp && window.FiltrosApp.ready) {
+      window.FiltrosApp.applyOptions(this._opts());
+    }
+  }
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>
