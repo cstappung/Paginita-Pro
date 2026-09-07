@@ -1083,6 +1083,175 @@ putro8r Utopia-Regular " .167 SlantFont TeXBase1Encoding ReEncodeFont " <8r.enc 
 % uzd.map
 uzdr Dingbats <uzdr.pfb
 % --- entradas añadidas por ColabTeX (paquetes de fuentes extra) ---
+omrml  UniJIS-UCS2-H Ryumin-Light
+omgbm  UniJIS-UCS2-H GothicBBB-Medium
+rml  H Ryumin-Light
+gbm  H GothicBBB-Medium
+rmlv V Ryumin-Light
+gbmv V GothicBBB-Medium
+rml-jis H Ryumin-Light
+gbm-jis H GothicBBB-Medium
+cmcscsl10 LMRomanCaps10-Oblique    "enclmrepcmsc ReEncodeFont"  <lm-rep-cmsc.enc <lmcsco10.pfb
+cmssbxo10 LMSans10-BoldOblique     "enclmrepcmrm ReEncodeFont"  <lm-rep-cmrm.enc <lmssbo10.pfb
+csb10    LMRomanDemi10-Regular    "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmb10.pfb
+csbx10   LMRoman10-Bold           "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmbx10.pfb
+csbx12   LMRoman12-Bold           "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmbx12.pfb
+csbx5    LMRoman5-Bold            "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmbx5.pfb
+csbx6    LMRoman6-Bold            "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmbx6.pfb
+csbx7    LMRoman7-Bold            "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmbx7.pfb
+csbx8    LMRoman8-Bold            "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmbx8.pfb
+csbx9    LMRoman9-Bold            "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmbx9.pfb
+csbxsl10 LMRomanSlant10-Bold      "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmbxo10.pfb
+csbxti10 LMRoman10-BoldItalic     "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmbxi10.pfb
+cscsc10  LMRomanCaps10-Regular    "enclmrepcssc ReEncodeFont" <lm-rep-cssc.enc <lmcsc10.pfb
+csdunh10 LMRomanDunh10-Regular    "enclmrepcsrm ReEncodeFont" <lm-rep-cssc.enc <lmdunh10.pfb
+csinch   LMSans10-Bold            "enclmrepcsin ReEncodeFont" <lm-rep-csin.enc <lmssbx10.pfb
+csitt10  LMMono10-Italic          "enclmrepcstt ReEncodeFont" <lm-rep-cstt.enc <lmtti10.pfb
+csr10    LMRoman10-Regular        "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmr10.pfb
+csr12    LMRoman12-Regular        "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmr12.pfb
+csr17    LMRoman17-Regular        "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmr17.pfb
+csr5     LMRoman5-Regular         "enclmrepcssc ReEncodeFont" <lm-rep-cssc.enc <lmr5.pfb
+csr6     LMRoman6-Regular         "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmr6.pfb
+csr7     LMRoman7-Regular         "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmr7.pfb
+csr8     LMRoman8-Regular         "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmr8.pfb
+csr9     LMRoman9-Regular         "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmr9.pfb
+cssl10   LMRomanSlant10-Regular   "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmro10.pfb
+cssl12   LMRomanSlant12-Regular   "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmro12.pfb
+cssl8    LMRomanSlant8-Regular    "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmro8.pfb
+cssl9    LMRomanSlant9-Regular    "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmro9.pfb
+cssltt10 LMMonoSlant10-Regular    "enclmrepcstt ReEncodeFont" <lm-rep-cstt.enc <lmtto10.pfb
+csss10   LMSans10-Regular         "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmss10.pfb
+csss12   LMSans12-Regular         "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmss12.pfb
+csss17   LMSans17-Regular         "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmss17.pfb
+csss8    LMSans8-Regular          "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmss8.pfb
+csss9    LMSans9-Regular          "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmss9.pfb
+csssbx10 LMSans10-Bold            "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmssbx10.pfb
+csssdc10 LMSansDemiCond10-Regular "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmssdc10.pfb
+csssi10  LMSans10-Oblique         "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmsso10.pfb
+csssi12  LMSans12-Oblique         "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmsso12.pfb
+csssi17  LMSans17-Oblique         "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmsso17.pfb
+csssi8   LMSans8-Oblique          "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmsso8.pfb
+csssi9   LMSans9-Oblique          "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmsso9.pfb
+csssq8   LMSansQuot8-Regular      "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmssq8.pfb
+csssqi8  LMSansQuot8-Oblique      "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmssqo8.pfb
+cstcsc10 LMMonoCaps10-Regular     "enclmrepcstt ReEncodeFont" <lm-rep-cstt.enc <lmtcsc10.pfb
+csti10   LMRoman10-Italic         "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmri10.pfb
+csti12   LMRoman12-Italic         "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmri12.pfb
+csti7    LMRoman7-Italic          "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmri7.pfb
+csti8    LMRoman8-Italic          "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmri8.pfb
+csti9    LMRoman9-Italic          "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmri9.pfb
+cstt10   LMMono10-Regular         "enclmrepcstt ReEncodeFont" <lm-rep-cstt.enc <lmtt10.pfb
+cstt12   LMMono12-Regular         "enclmrepcstt ReEncodeFont" <lm-rep-cstt.enc <lmtt12.pfb
+cstt8    LMMono8-Regular          "enclmrepcstt ReEncodeFont" <lm-rep-cstt.enc <lmtt8.pfb
+cstt9    LMMono9-Regular          "enclmrepcstt ReEncodeFont" <lm-rep-cstt.enc <lmtt9.pfb
+csu10    LMRomanUnsl10-Regular    "enclmrepcsrm ReEncodeFont" <lm-rep-csrm.enc <lmu10.pfb
+csvtt10  LMMonoProp10-Regular     "enclmrepcstt ReEncodeFont" <lm-rep-cstt.enc <lmvtt10.pfb
+plb10    LMRomanDemi10-Regular    "enclmrepplrm ReEncodeFont"  <lm-rep-plrm.enc  <lmb10.pfb
+plbx10   LMRoman10-Bold           "enclmrepplrm ReEncodeFont"  <lm-rep-plrm.enc  <lmbx10.pfb
+plbx12   LMRoman12-Bold           "enclmrepplrm ReEncodeFont"  <lm-rep-plrm.enc  <lmbx12.pfb
+plbx5    LMRoman5-Bold            "enclmrepplrm ReEncodeFont"  <lm-rep-plrm.enc  <lmbx5.pfb
+plbx6    LMRoman6-Bold            "enclmrepplrm ReEncodeFont"  <lm-rep-plrm.enc  <lmbx6.pfb
+plbx7    LMRoman7-Bold            "enclmrepplrm ReEncodeFont"  <lm-rep-plrm.enc  <lmbx7.pfb
+plbx8    LMRoman8-Bold            "enclmrepplrm ReEncodeFont"  <lm-rep-plrm.enc  <lmbx8.pfb
+plbx9    LMRoman9-Bold            "enclmrepplrm ReEncodeFont"  <lm-rep-plrm.enc  <lmbx9.pfb
+plbxsl10 LMRomanSlant10-Bold      "enclmrepplrm ReEncodeFont"  <lm-rep-plrm.enc  <lmbxo10.pfb
+plbxti10 LMRoman10-BoldItalic     "enclmrepplit ReEncodeFont"  <lm-rep-plit.enc  <lmbxi10.pfb
+plcsc10  LMRomanCaps10-Regular    "enclmrepplsc ReEncodeFont"  <lm-rep-plsc.enc  <lmcsc10.pfb
+pldunh10 LMRomanDunh10-Regular    "enclmrepplrm ReEncodeFont"  <lm-rep-plrm.enc  <lmdunh10.pfb
+plinch   LMSans10-Bold            "enclmrepplin ReEncodeFont"  <lm-rep-plin.enc  <lmssbx10.pfb
+plitt10  LMMono10-Italic          "enclmrepplitt ReEncodeFont" <lm-rep-plitt.enc <lmtti10.pfb
+plr10    LMRoman10-Regular        "enclmrepplrm ReEncodeFont"  <lm-rep-plrm.enc  <lmr10.pfb
+plr12    LMRoman12-Regular        "enclmrepplrm ReEncodeFont"  <lm-rep-plrm.enc  <lmr12.pfb
+plr17    LMRoman17-Regular        "enclmrepplrm ReEncodeFont"  <lm-rep-plrm.enc  <lmr17.pfb
+plr5     LMRoman5-Regular         "enclmrepplsc ReEncodeFont"  <lm-rep-plsc.enc  <lmr5.pfb
+plr6     LMRoman6-Regular         "enclmrepplrm ReEncodeFont"  <lm-rep-plrm.enc  <lmr6.pfb
+plr7     LMRoman7-Regular         "enclmrepplrm ReEncodeFont"  <lm-rep-plrm.enc  <lmr7.pfb
+plr8     LMRoman8-Regular         "enclmrepplrm ReEncodeFont"  <lm-rep-plrm.enc  <lmr8.pfb
+plr9     LMRoman9-Regular         "enclmrepplrm ReEncodeFont"  <lm-rep-plrm.enc  <lmr9.pfb
+plsl10   LMRomanSlant10-Regular   "enclmrepplrm ReEncodeFont"  <lm-rep-plrm.enc  <lmro10.pfb
+plsl12   LMRomanSlant12-Regular   "enclmrepplrm ReEncodeFont"  <lm-rep-plrm.enc  <lmro12.pfb
+plsl8    LMRomanSlant8-Regular    "enclmrepplrm ReEncodeFont"  <lm-rep-plrm.enc  <lmro8.pfb
+plsl9    LMRomanSlant9-Regular    "enclmrepplrm ReEncodeFont"  <lm-rep-plrm.enc  <lmro9.pfb
+plsltt10 LMMonoSlant10-Regular    "enclmreppltt ReEncodeFont"  <lm-rep-pltt.enc  <lmtto10.pfb
+plss10   LMSans10-Regular         "enclmrepplrm ReEncodeFont"  <lm-rep-plrm.enc  <lmss10.pfb
+plss12   LMSans12-Regular         "enclmrepplrm ReEncodeFont"  <lm-rep-plrm.enc  <lmss12.pfb
+plss17   LMSans17-Regular         "enclmrepplrm ReEncodeFont"  <lm-rep-plrm.enc  <lmss17.pfb
+plss8    LMSans8-Regular          "enclmrepplrm ReEncodeFont"  <lm-rep-plrm.enc  <lmss8.pfb
+plss9    LMSans9-Regular          "enclmrepplrm ReEncodeFont"  <lm-rep-plrm.enc  <lmss9.pfb
+plssbi10 LMSans10-BoldOblique     "enclmrepplrm ReEncodeFont"  <lm-rep-plrm.enc  <lmssbo10.pfb
+plssbx10 LMSans10-Bold            "enclmrepplrm ReEncodeFont"  <lm-rep-plrm.enc  <lmssbx10.pfb
+plssdc10 LMSansDemiCond10-Regular "enclmrepplrm ReEncodeFont"  <lm-rep-plrm.enc  <lmssdc10.pfb
+plssi10  LMSans10-Oblique         "enclmrepplrm ReEncodeFont"  <lm-rep-plrm.enc  <lmsso10.pfb
+plssi12  LMSans12-Oblique         "enclmrepplrm ReEncodeFont"  <lm-rep-plrm.enc  <lmsso12.pfb
+plssi17  LMSans17-Oblique         "enclmrepplrm ReEncodeFont"  <lm-rep-plrm.enc  <lmsso17.pfb
+plssi8   LMSans8-Oblique          "enclmrepplrm ReEncodeFont"  <lm-rep-plrm.enc  <lmsso8.pfb
+plssi9   LMSans9-Oblique          "enclmrepplrm ReEncodeFont"  <lm-rep-plrm.enc  <lmsso9.pfb
+plssq8   LMSansQuot8-Regular      "enclmrepplrm ReEncodeFont"  <lm-rep-plrm.enc  <lmssq8.pfb
+plssqi8  LMSansQuot8-Oblique      "enclmrepplrm ReEncodeFont"  <lm-rep-plrm.enc  <lmssqo8.pfb
+pltcsc10 LMMonoCaps10-Regular     "enclmreppltt ReEncodeFont"  <lm-rep-pltt.enc  <lmtcsc10.pfb
+plti10   LMRoman10-Italic         "enclmrepplit ReEncodeFont"  <lm-rep-plit.enc  <lmri10.pfb
+plti12   LMRoman12-Italic         "enclmrepplit ReEncodeFont"  <lm-rep-plit.enc  <lmri12.pfb
+plti7    LMRoman7-Italic          "enclmrepplit ReEncodeFont"  <lm-rep-plit.enc  <lmri7.pfb
+plti8    LMRoman8-Italic          "enclmrepplit ReEncodeFont"  <lm-rep-plit.enc  <lmri8.pfb
+plti9    LMRoman9-Italic          "enclmrepplit ReEncodeFont"  <lm-rep-plit.enc  <lmri9.pfb
+pltt10   LMMono10-Regular         "enclmreppltt ReEncodeFont"  <lm-rep-pltt.enc  <lmtt10.pfb
+pltt12   LMMono12-Regular         "enclmreppltt ReEncodeFont"  <lm-rep-pltt.enc  <lmtt12.pfb
+pltt8    LMMono8-Regular          "enclmreppltt ReEncodeFont"  <lm-rep-pltt.enc  <lmtt8.pfb
+pltt9    LMMono9-Regular          "enclmreppltt ReEncodeFont"  <lm-rep-pltt.enc  <lmtt9.pfb
+plu10    LMRomanUnsl10-Regular    "enclmrepplit ReEncodeFont"  <lm-rep-plit.enc  <lmu10.pfb
+plvtt10  LMMonoProp10-Regular     "enclmrepplrm ReEncodeFont"  <lm-rep-plrm.enc  <lmvtt10.pfb
+vnb10    LMRomanDemi10-Regular    "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmb10.pfb
+vnbx10   LMRoman10-Bold           "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmbx10.pfb
+vnbx12   LMRoman12-Bold           "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmbx12.pfb
+vnbx5    LMRoman5-Bold            "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmbx5.pfb
+vnbx6    LMRoman6-Bold            "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmbx6.pfb
+vnbx7    LMRoman7-Bold            "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmbx7.pfb
+vnbx8    LMRoman8-Bold            "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmbx8.pfb
+vnbx9    LMRoman9-Bold            "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmbx9.pfb
+vnbxsl10 LMRomanSlant10-Bold      "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmbxo10.pfb
+vnbxti10 LMRoman10-BoldItalic     "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmbxi10.pfb
+vncsc10  LMRomanCaps10-Regular    "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmcsc10.pfb
+vndunh10 LMRomanDunh10-Regular    "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmdunh10.pfb
+vnitt10  LMMono10-Italic          "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmtti10.pfb
+vnr10    LMRoman10-Regular        "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmr10.pfb
+vnr12    LMRoman12-Regular        "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmr12.pfb
+vnr17    LMRoman17-Regular        "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmr17.pfb
+vnr5     LMRoman5-Regular         "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmr5.pfb
+vnr6     LMRoman6-Regular         "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmr6.pfb
+vnr7     LMRoman7-Regular         "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmr7.pfb
+vnr8     LMRoman8-Regular         "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmr8.pfb
+vnr9     LMRoman9-Regular         "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmr9.pfb
+vnsl10   LMRomanSlant10-Regular   "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmro10.pfb
+vnsl12   LMRomanSlant12-Regular   "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmro12.pfb
+vnsl8    LMRomanSlant8-Regular    "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmro8.pfb
+vnsl9    LMRomanSlant9-Regular    "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmro9.pfb
+vnsltt10 LMMonoSlant10-Regular    "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmtto10.pfb
+vnss10   LMSans10-Regular         "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmss10.pfb
+vnss12   LMSans12-Regular         "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmss12.pfb
+vnss17   LMSans17-Regular         "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmss17.pfb
+vnss8    LMSans8-Regular          "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmss8.pfb
+vnss9    LMSans9-Regular          "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmss9.pfb
+vnssbx10 LMSans10-Bold            "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmssbx10.pfb
+vnssdc10 LMSansDemiCond10-Regular "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmssdc10.pfb
+vnssi10  LMSans10-Oblique         "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmsso10.pfb
+vnssi12  LMSans12-Oblique         "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmsso12.pfb
+vnssi17  LMSans17-Oblique         "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmsso17.pfb
+vnssi8   LMSans8-Oblique          "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmsso8.pfb
+vnssi9   LMSans9-Oblique          "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmsso9.pfb
+vnssq8   LMSansQuot8-Regular      "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmssq8.pfb
+vnssqi8  LMSansQuot8-Oblique      "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmssqo8.pfb
+vntcsc10 LMMonoCaps10-Regular     "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmtcsc10.pfb
+vnti10   LMRoman10-Italic         "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmri10.pfb
+vnti12   LMRoman12-Italic         "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmri12.pfb
+vnti7    LMRoman7-Italic          "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmri7.pfb
+vnti8    LMRoman8-Italic          "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmri8.pfb
+vnti9    LMRoman9-Italic          "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmri9.pfb
+vntt10   LMMono10-Regular         "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmtt10.pfb
+vntt12   LMMono12-Regular         "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmtt12.pfb
+vntt8    LMMono8-Regular          "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmtt8.pfb
+vntt9    LMMono9-Regular          "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmtt9.pfb
+vnu10    LMRomanUnsl10-Regular    "enclmrepplit ReEncodeFont"  <lm-rep-t5psn.enc <lmu10.pfb
+vnvtt10  LMMonoProp10-Regular     "enclmrept5psn ReEncodeFont" <lm-rep-t5psn.enc <lmvtt10.pfb
 bbold17 BBOLD10 <bbold10.pfb
 bbold12 BBOLD10 <bbold10.pfb
 bbold10 BBOLD10 <bbold10.pfb
@@ -1097,29 +1266,6 @@ dsrom8 dsrom8 <dsrom8.pfb
 dsss12 dsss12 <dsss12.pfb
 dsss10 dsss10 <dsss10.pfb
 dsss8 dsss8 <dsss8.pfb
-futb8x UtopiaExp-Bold <putb8x.pfb
-futbi8x UtopiaExp-BoldItalic <putbi8x.pfb
-futbo8x UtopiaExp-Bold " .167 SlantFont " <putb8x.pfb
-futr8x UtopiaExp-Regular <putr8x.pfb
-futri8x UtopiaExp-Italic <putri8x.pfb
-futro8x UtopiaExp-Regular " .167 SlantFont " <putr8x.pfb
-futs8r Utopia-Semibold "TeXBase1Encoding ReEncodeFont " <8r.enc <puts8a.pfb
-futs8x UtopiaExp-Semibold <puts8x.pfb
-futsi8r Utopia-SemiboldItalic "TeXBase1Encoding ReEncodeFont " <8r.enc <putsi8a.pfb
-futsi8x UtopiaExp-SemiboldItalic <putsi8x.pfb
-futso8r Utopia-Semibold " .167 SlantFont TeXBase1Encoding ReEncodeFont " <8r.enc <puts8a.pfb
-futso8x UtopiaExp-Semibold " .167 SlantFont " <puts8x.pfb
-futrc8r Utopia-RegularSC "TeXBase1Encoding ReEncodeFont " <8r.enc <putrc8a.pfb
-futsc8r Utopia-SemiboldSC "TeXBase1Encoding ReEncodeFont " <8r.enc <putsc8a.pfb
-futrco8r Utopia-RegularSC " .167 SlantFont TeXBase1Encoding ReEncodeFont " <8r.enc <putrc8a.pfb
-futsco8r Utopia-SemiboldSC " .167 SlantFont TeXBase1Encoding ReEncodeFont " <8r.enc <putsc8a.pfb
-futrd8r Utopia-Titling "TeXBase1Encoding ReEncodeFont " <8r.enc <putrd8a.pfb
-futc8r Utopia-Black "TeXBase1Encoding ReEncodeFont " <8r.enc <putc8a.pfb
-futc8x UtopiaExp-Black <putc8x.pfb
-futco8r Utopia-Black " .167 SlantFont TeXBase1Encoding ReEncodeFont " <8r.enc <putc8a.pfb
-futco8x UtopiaExp-Black " .167 SlantFont " <putc8x.pfb
-fourier-ligs-it fourier-ligs-it <fourier-ligs-it.pfb
-fourier-ligs fourier-ligs <fourier-ligs.pfb
 fourier-orns fourier-orns <fourier-orns.pfb
 fourier-alt Fourier-Alternate-Roman <fourier-alt.pfb
 fourier-alt-semi Fourier-Alternate-SemiBold <fourier-alt-semi.pfb
@@ -1277,8 +1423,6 @@ qx-zi4nb-6 InconsolataN-Bold " zi4QXTTEncoding6 ReEncodeFont " <i4-qx-6.enc <Inc
 qx-zi4nb-7 InconsolataN-Bold " zi4QXTTEncoding7 ReEncodeFont " <i4-qx-7.enc <InconsolataN-Bold.pfb
 ts1-zi4nr InconsolataN-Regular " zi4TS1Encoding ReEncodeFont " <i4-ts1.enc <InconsolataN-Regular.pfb
 ts1-zi4nb InconsolataN-Bold " zi4TS1Encoding ReEncodeFont " <i4-ts1.enc <InconsolataN-Bold.pfb
-zxlz-caps LinLibertineZ " LibCapsEncoding ReEncodeFont " <[libcaps.enc <zxlz.pfb
-zxlr-caps LinLibertine " LibCapsEncoding ReEncodeFont " <[libcaps.enc <zxlr.pfb
 Libertine-nu Libertine-nu <Libertine-nu.pfb
 LibertineI-nu LibertineI-nu <LibertineI-nu.pfb
 LibertineZ-nu LibertineZ-nu <LibertineZ-nu.pfb
@@ -1287,10 +1431,6 @@ LibertineZI-7nu LibertineZI-7nu <LibertineZI-7nu.pfb
 LibertineZI-5nu LibertineZI-5nu <LibertineZI-5nu.pfb
 LibertineI-5nu LibertineI-5nu <LibertineI-5nu.pfb
 LibertineI-7nu LibertineI-7nu <LibertineI-7nu.pfb
-zxlzi-8r LinLibertineZI " TeXBase1Encoding ReEncodeFont " <[8r.enc <zxlzi.pfb
-zxlri-8r LinLibertineI " TeXBase1Encoding ReEncodeFont " <[8r.enc <zxlri.pfb
-zxlz-8r LinLibertineZ " TeXBase1Encoding ReEncodeFont " <[8r.enc <zxlz.pfb
-zxlr-8r LinLibertine " TeXBase1Encoding ReEncodeFont " <[8r.enc <zxlr.pfb
 zxlr-7nums zxlr-7nums <zxlr-7nums.pfb
 zxlr-5nums zxlr-5nums <zxlr-5nums.pfb
 rfxlzi-vw5 LibAltz-vw5 <fxlzi-vw5.pfb
@@ -1308,14 +1448,6 @@ ntxsym txsym <txsym.pfb
 ntxbsym txbsym <txbsym.pfb
 rtxmio rtxmi " -.167 SlantFont " <rtxmi.pfb
 rtxbmio rtxbmi " -.167 SlantFont " <rtxbmi.pfb
-rfxlri-alt LinLibertineI " LibertineAltEncoding ReEncodeFont " <[libertinealt.enc <zxlri.pfb
-rfxlzi-alt LinLibertineZI " LibertineAltEncoding ReEncodeFont " <[libertinealt.enc <zxlzi.pfb
-fxlri-7alt LinLibertineI7 " LibertineAltEncoding ReEncodeFont " <[libertinealt.enc <fxlri-7letters.pfb
-fxlzi-7alt LinLibertineZI7 " LibertineAltEncoding ReEncodeFont " <[libertinealt.enc <fxlzi-7letters.pfb
-fxlri-5alt LinLibertineI5 " LibertineAltEncoding ReEncodeFont " <[libertinealt.enc <fxlri-5letters.pfb
-fxlzi-5alt LinLibertineZI5 " LibertineAltEncoding ReEncodeFont " <[libertinealt.enc <fxlzi-5letters.pfb
-rfxlr-alt LinLibertine " LibertineAltEncoding ReEncodeFont " <[libertinealt.enc <zxlr.pfb
-rfxlz-alt LinLibertineZ " LibertineAltEncoding ReEncodeFont " <[libertinealt.enc <zxlz.pfb
 fxlri-7letters LinLibertineI7  <fxlri-7letters.pfb
 fxlri-5letters LinLibertineI5  <fxlri-5letters.pfb
 fxlzi-5letters LinLibertineZI5  <fxlzi-5letters.pfb
@@ -1333,18 +1465,10 @@ txsy7 txsy7 <txsy7.pfb
 txbsy7 txbsy7 <txbsy7.pfb
 txsy5 txsy5 <txsy5.pfb
 txbsy5 txbsy5 <txbsy5.pfb
-txsya7 txsya7 <txsya7.pfb
-txbsya7 txbsya7 <txbsya7.pfb
-txsyb5 txsyb5 <txsyb5.pfb
-txbsyb5 txbsyb5 <txbsyb5.pfb
 rtxmi7 rtxmi7 <rtxmi7.pfb
 rtxbmi7 rtxbmi7 <rtxbmi7.pfb
 rtxmi5 rtxmi5 <rtxmi5.pfb
 rtxbmi5 rtxbmi5 <rtxbmi5.pfb
-txmia7 txmia7 <txmia7.pfb
-txbmia7 txbmia7 <txbmia7.pfb
-txmia5 txmia5 <txmia5.pfb
-txbmia5 txbmia5 <txbmia5.pfb
 txmiaX txmiaX <txmiaX.pfb
 txbmiaX txbmiaX <txbmiaX.pfb
 rntxmi rntxmi <rntxmi.pfb
@@ -1360,202 +1484,8 @@ txex-bar txex-bar <txex-bar.pfb
 txbex-bar txbex-bar <txbex-bar.pfb
 ntxsyralt ntxsyralt <ntxsyralt.pfb
 ntxsybalt ntxsybalt <ntxsybalt.pfb
-MinLibIta-ly1 MinLibIta " TeXnANSIEncoding ReEncodeFont " <[texnansx.enc <MinLibIta.pfb
-MinLibBolIta-ly1 MinLibBolIta " TeXnANSIEncoding ReEncodeFont " <[texnansx.enc <MinLibBolIta.pfb
-MinLibReg-ly1 MinLibReg " TeXnANSIEncoding ReEncodeFont " <[texnansx.enc <MinLibReg.pfb
-MinLibBol-ly1 MinLibBol " TeXnANSIEncoding ReEncodeFont " <[texnansx.enc <MinLibBol.pfb
-MinLibIta-t1 MinLibIta " ECEncoding ReEncodeFont " <[ec.enc <MinLibIta.pfb
-MinLibBolIta-t1 MinLibBolIta " ECEncoding ReEncodeFont " <[ec.enc <MinLibBolIta.pfb
-MinLibReg-t1 MinLibReg " ECEncoding ReEncodeFont " <[ec.enc <MinLibReg.pfb
-MinLibBol-t1 MinLibBol " ECEncoding ReEncodeFont " <[ec.enc <MinLibBol.pfb
-MinLibIta-ot1 MinLibIta " LCDF7TEncoding ReEncodeFont " <[7t.enc <MinLibIta.pfb
-MinLibBolIta-ot1 MinLibBolIta " LCDF7TEncoding ReEncodeFont " <[7t.enc <MinLibBolIta.pfb
-MinLibReg-ot1 MinLibReg " LCDF7TEncoding ReEncodeFont " <[7t.enc <MinLibReg.pfb
-MinLibBol-ot1 MinLibBol " LCDF7TEncoding ReEncodeFont " <[7t.enc <MinLibBol.pfb
 rtxmi-ut rtxmi " -.0465 SlantFont " <rtxmi.pfb
 rtxbmi-ut rtxbmi " -.0465 SlantFont " <rtxbmi.pfb
-ptmrc8r Times-RomanSC " TeXBase1Encoding ReEncodeFont " <[8r.enc <ptmrc8a.pfb
-ptmbc8r Times-BoldSC " TeXBase1Encoding ReEncodeFont " <[8r.enc <ptmbc8a.pfb
-ntx-Regular-tlf-sc-t1 TeXGyreTermesX-Regular " encntx-ec-tlf-pc ReEncodeFont " <[ntx-ec-tlf-pc.enc <ztmr.pfb
-ntx-Regular-osf-sc-t1 TeXGyreTermesX-Regular " encntx-ec-osf-pc ReEncodeFont " <[ntx-ec-osf-pc.enc <ztmr.pfb
-ntx-Regular-lf-sc-t1 TeXGyreTermesX-Regular " encntx-ec-lf-pc ReEncodeFont " <[ntx-ec-lf-pc.enc <ztmr.pfb
-ntx-Regular-tosf-sc-t1 TeXGyreTermesX-Regular " encntx-ec-tosf-pc ReEncodeFont " <[ntx-ec-tosf-pc.enc <ztmr.pfb
-ntx-Regular-tlf-sc-ly1 TeXGyreTermesX-Regular " encntx-texnansi-tlf-pc ReEncodeFont " <[ntx-texnansi-tlf-pc.enc <ztmr.pfb
-ntx-Regular-osf-sc-ly1 TeXGyreTermesX-Regular " encntx-texnansi-osf-pc ReEncodeFont " <[ntx-texnansi-osf-pc.enc <ztmr.pfb
-ntx-Regular-lf-sc-ly1 TeXGyreTermesX-Regular " encntx-texnansi-lf-pc ReEncodeFont " <[ntx-texnansi-lf-pc.enc <ztmr.pfb
-ntx-Regular-tosf-sc-ly1 TeXGyreTermesX-Regular " encntx-texnansi-tosf-pc ReEncodeFont " <[ntx-texnansi-tosf-pc.enc <ztmr.pfb
-ntx-Italic-tlf-sc-t1 TeXGyreTermesX-Italic " encntx-ec-tlf-pc ReEncodeFont " <[ntx-ec-tlf-pc.enc <ztmri.pfb
-ntx-Italic-osf-sc-t1 TeXGyreTermesX-Italic " encntx-ec-osf-pc ReEncodeFont " <[ntx-ec-osf-pc.enc <ztmri.pfb
-ntx-Italic-lf-sc-t1 TeXGyreTermesX-Italic " encntx-ec-lf-pc ReEncodeFont " <[ntx-ec-lf-pc.enc <ztmri.pfb
-ntx-Italic-tosf-sc-t1 TeXGyreTermesX-Italic " encntx-ec-tosf-pc ReEncodeFont " <[ntx-ec-tosf-pc.enc <ztmri.pfb
-ntx-Italic-tlf-sc-ly1 TeXGyreTermesX-Italic " encntx-texnansi-tlf-pc ReEncodeFont " <[ntx-texnansi-tlf-pc.enc <ztmri.pfb
-ntx-Italic-osf-sc-ly1 TeXGyreTermesX-Italic " encntx-texnansi-osf-pc ReEncodeFont " <[ntx-texnansi-osf-pc.enc <ztmri.pfb
-ntx-Italic-lf-sc-ly1 TeXGyreTermesX-Italic " encntx-texnansi-lf-pc ReEncodeFont " <[ntx-texnansi-lf-pc.enc <ztmri.pfb
-ntx-Italic-tosf-sc-ly1 TeXGyreTermesX-Italic " encntx-texnansi-tosf-pc ReEncodeFont " <[ntx-texnansi-tosf-pc.enc <ztmri.pfb
-ntx-BoldItalic-tlf-sc-t1 TeXGyreTermesX-BoldItalic " encntx-ec-tlf-pc ReEncodeFont " <[ntx-ec-tlf-pc.enc <ztmbi.pfb
-ntx-BoldItalic-osf-sc-t1 TeXGyreTermesX-BoldItalic " encntx-ec-osf-pc ReEncodeFont " <[ntx-ec-osf-pc.enc <ztmbi.pfb
-ntx-BoldItalic-lf-sc-t1 TeXGyreTermesX-BoldItalic " encntx-ec-lf-pc ReEncodeFont " <[ntx-ec-lf-pc.enc <ztmbi.pfb
-ntx-BoldItalic-tosf-sc-t1 TeXGyreTermesX-BoldItalic " encntx-ec-tosf-pc ReEncodeFont " <[ntx-ec-tosf-pc.enc <ztmbi.pfb
-ntx-BoldItalic-tlf-sc-ly1 TeXGyreTermesX-BoldItalic " encntx-texnansi-tlf-pc ReEncodeFont " <[ntx-texnansi-tlf-pc.enc <ztmbi.pfb
-ntx-BoldItalic-osf-sc-ly1 TeXGyreTermesX-BoldItalic " encntx-texnansi-osf-pc ReEncodeFont " <[ntx-texnansi-osf-pc.enc <ztmbi.pfb
-ntx-BoldItalic-lf-sc-ly1 TeXGyreTermesX-BoldItalic " encntx-texnansi-lf-pc ReEncodeFont " <[ntx-texnansi-lf-pc.enc <ztmbi.pfb
-ntx-BoldItalic-tosf-sc-ly1 TeXGyreTermesX-BoldItalic " encntx-texnansi-tosf-pc ReEncodeFont " <[ntx-texnansi-tosf-pc.enc <ztmbi.pfb
-ntx-Bold-tlf-sc-t1 TeXGyreTermesX-Bold " encntx-ec-tlf-pc ReEncodeFont " <[ntx-ec-tlf-pc.enc <ztmb.pfb
-ntx-Bold-osf-sc-t1 TeXGyreTermesX-Bold " encntx-ec-osf-pc ReEncodeFont " <[ntx-ec-osf-pc.enc <ztmb.pfb
-ntx-Bold-lf-sc-t1 TeXGyreTermesX-Bold " encntx-ec-lf-pc ReEncodeFont " <[ntx-ec-lf-pc.enc <ztmb.pfb
-ntx-Bold-tosf-sc-t1 TeXGyreTermesX-Bold " encntx-ec-tosf-pc ReEncodeFont " <[ntx-ec-tosf-pc.enc <ztmb.pfb
-ntx-Bold-tlf-sc-ly1 TeXGyreTermesX-Bold " encntx-texnansi-tlf-pc ReEncodeFont " <[ntx-texnansi-tlf-pc.enc <ztmb.pfb
-ntx-Bold-osf-sc-ly1 TeXGyreTermesX-Bold " encntx-texnansi-osf-pc ReEncodeFont " <[ntx-texnansi-osf-pc.enc <ztmb.pfb
-ntx-Bold-lf-sc-ly1 TeXGyreTermesX-Bold " encntx-texnansi-lf-pc ReEncodeFont " <[ntx-texnansi-lf-pc.enc <ztmb.pfb
-ntx-Bold-tosf-sc-ly1 TeXGyreTermesX-Bold " encntx-texnansi-tosf-pc ReEncodeFont " <[ntx-texnansi-tosf-pc.enc <ztmb.pfb
-ntx-BoldItalic-tlf-sc-ot1 TeXGyreTermesX-BoldItalic " encntx-ot1-tlf-pc ReEncodeFont " <[ntx-ot1-tlf-pc.enc <ztmbi.pfb
-ntx-Bold-tlf-sc-ot1 TeXGyreTermesX-Bold " encntx-ot1-tlf-pc ReEncodeFont " <[ntx-ot1-tlf-pc.enc <ztmb.pfb
-ntx-BoldItalic-osf-sc-ot1 TeXGyreTermesX-BoldItalic " encntx-ot1-osf-pc ReEncodeFont " <[ntx-ot1-osf-pc.enc <ztmbi.pfb
-ntx-Bold-osf-sc-ot1 TeXGyreTermesX-Bold " encntx-ot1-osf-pc ReEncodeFont " <[ntx-ot1-osf-pc.enc <ztmb.pfb
-ntx-BoldItalic-lf-sc-ot1 TeXGyreTermesX-BoldItalic " encntx-ot1-lf-pc ReEncodeFont " <[ntx-ot1-lf-pc.enc <ztmbi.pfb
-ntx-Bold-lf-sc-ot1 TeXGyreTermesX-Bold " encntx-ot1-lf-pc ReEncodeFont " <[ntx-ot1-lf-pc.enc <ztmb.pfb
-ntx-BoldItalic-tosf-sc-ot1 TeXGyreTermesX-BoldItalic " encntx-ot1-tosf-pc ReEncodeFont " <[ntx-ot1-tosf-pc.enc <ztmbi.pfb
-ntx-Bold-tosf-sc-ot1 TeXGyreTermesX-Bold " encntx-ot1-tosf-pc ReEncodeFont " <[ntx-ot1-tosf-pc.enc <ztmb.pfb
-ntx-Regular-tlf-sc-ot1 TeXGyreTermesX-Regular " encntx-ot1-tlf-pc ReEncodeFont " <[ntx-ot1-tlf-pc.enc <ztmr.pfb
-ntx-Regular-osf-sc-ot1 TeXGyreTermesX-Regular " encntx-ot1-osf-pc ReEncodeFont " <[ntx-ot1-osf-pc.enc <ztmr.pfb
-ntx-Regular-lf-sc-ot1 TeXGyreTermesX-Regular " encntx-ot1-lf-pc ReEncodeFont " <[ntx-ot1-lf-pc.enc <ztmr.pfb
-ntx-Regular-tosf-sc-ot1 TeXGyreTermesX-Regular " encntx-ot1-tosf-pc ReEncodeFont " <[ntx-ot1-tosf-pc.enc <ztmr.pfb
-ntx-Italic-tlf-sc-ot1 TeXGyreTermesX-Italic " encntx-ot1-tlf-pc ReEncodeFont " <[ntx-ot1-tlf-pc.enc <ztmri.pfb
-ntx-Italic-osf-sc-ot1 TeXGyreTermesX-Italic " encntx-ot1-osf-pc ReEncodeFont " <[ntx-ot1-osf-pc.enc <ztmri.pfb
-ntx-Italic-lf-sc-ot1 TeXGyreTermesX-Italic " encntx-ot1-lf-pc ReEncodeFont " <[ntx-ot1-lf-pc.enc <ztmri.pfb
-ntx-Italic-tosf-sc-ot1 TeXGyreTermesX-Italic " encntx-ot1-tosf-pc ReEncodeFont " <[ntx-ot1-tosf-pc.enc <ztmri.pfb
-ntx-Regular-tlf-t1 TeXGyreTermesX-Regular " encntx-ec-tlf ReEncodeFont " <[ntx-ec-tlf.enc <ztmr.pfb
-ntx-Regular-osf-t1 TeXGyreTermesX-Regular " encntx-ec-osf ReEncodeFont " <[ntx-ec-osf.enc <ztmr.pfb
-ntx-Regular-lf-t1 TeXGyreTermesX-Regular " encntx-ec-lf ReEncodeFont " <[ntx-ec-lf.enc <ztmr.pfb
-ntx-Regular-tosf-t1 TeXGyreTermesX-Regular " encntx-ec-tosf ReEncodeFont " <[ntx-ec-tosf.enc <ztmr.pfb
-ntx-Regular-tlf-ly1 TeXGyreTermesX-Regular " encntx-texnansi-tlf ReEncodeFont " <[ntx-texnansi-tlf.enc <ztmr.pfb
-ntx-Regular-osf-ly1 TeXGyreTermesX-Regular " encntx-texnansi-osf ReEncodeFont " <[ntx-texnansi-osf.enc <ztmr.pfb
-ntx-Regular-lf-ly1 TeXGyreTermesX-Regular " encntx-texnansi-lf ReEncodeFont " <[ntx-texnansi-lf.enc <ztmr.pfb
-ntx-Regular-tosf-ly1 TeXGyreTermesX-Regular " encntx-texnansi-tosf ReEncodeFont " <[ntx-texnansi-tosf.enc <ztmr.pfb
-ntx-Italic-tlf-t1 TeXGyreTermesX-Italic " encntx-ec-tlf ReEncodeFont " <[ntx-ec-tlf.enc <ztmri.pfb
-ntx-Italic-osf-t1 TeXGyreTermesX-Italic " encntx-ec-osf ReEncodeFont " <[ntx-ec-osf.enc <ztmri.pfb
-ntx-Italic-lf-t1 TeXGyreTermesX-Italic " encntx-ec-lf ReEncodeFont " <[ntx-ec-lf.enc <ztmri.pfb
-ntx-Italic-tosf-t1 TeXGyreTermesX-Italic " encntx-ec-tosf ReEncodeFont " <[ntx-ec-tosf.enc <ztmri.pfb
-ntx-Italic-tlf-ly1 TeXGyreTermesX-Italic " encntx-texnansi-tlf ReEncodeFont " <[ntx-texnansi-tlf.enc <ztmri.pfb
-ntx-Italic-osf-ly1 TeXGyreTermesX-Italic " encntx-texnansi-osf ReEncodeFont " <[ntx-texnansi-osf.enc <ztmri.pfb
-ntx-Italic-lf-ly1 TeXGyreTermesX-Italic " encntx-texnansi-lf ReEncodeFont " <[ntx-texnansi-lf.enc <ztmri.pfb
-ntx-Italic-tosf-ly1 TeXGyreTermesX-Italic " encntx-texnansi-tosf ReEncodeFont " <[ntx-texnansi-tosf.enc <ztmri.pfb
-ntx-BoldItalic-tlf-t1 TeXGyreTermesX-BoldItalic " encntx-ec-tlf ReEncodeFont " <[ntx-ec-tlf.enc <ztmbi.pfb
-ntx-BoldItalic-osf-t1 TeXGyreTermesX-BoldItalic " encntx-ec-osf ReEncodeFont " <[ntx-ec-osf.enc <ztmbi.pfb
-ntx-BoldItalic-lf-t1 TeXGyreTermesX-BoldItalic " encntx-ec-lf ReEncodeFont " <[ntx-ec-lf.enc <ztmbi.pfb
-ntx-BoldItalic-tosf-t1 TeXGyreTermesX-BoldItalic " encntx-ec-tosf ReEncodeFont " <[ntx-ec-tosf.enc <ztmbi.pfb
-ntx-BoldItalic-tlf-ly1 TeXGyreTermesX-BoldItalic " encntx-texnansi-tlf ReEncodeFont " <[ntx-texnansi-tlf.enc <ztmbi.pfb
-ntx-BoldItalic-osf-ly1 TeXGyreTermesX-BoldItalic " encntx-texnansi-osf ReEncodeFont " <[ntx-texnansi-osf.enc <ztmbi.pfb
-ntx-BoldItalic-lf-ly1 TeXGyreTermesX-BoldItalic " encntx-texnansi-lf ReEncodeFont " <[ntx-texnansi-lf.enc <ztmbi.pfb
-ntx-BoldItalic-tosf-ly1 TeXGyreTermesX-BoldItalic " encntx-texnansi-tosf ReEncodeFont " <[ntx-texnansi-tosf.enc <ztmbi.pfb
-ntx-Bold-tlf-t1 TeXGyreTermesX-Bold " encntx-ec-tlf ReEncodeFont " <[ntx-ec-tlf.enc <ztmb.pfb
-ntx-Bold-osf-t1 TeXGyreTermesX-Bold " encntx-ec-osf ReEncodeFont " <[ntx-ec-osf.enc <ztmb.pfb
-ntx-Bold-lf-t1 TeXGyreTermesX-Bold " encntx-ec-lf ReEncodeFont " <[ntx-ec-lf.enc <ztmb.pfb
-ntx-Bold-tosf-t1 TeXGyreTermesX-Bold " encntx-ec-tosf ReEncodeFont " <[ntx-ec-tosf.enc <ztmb.pfb
-ntx-Bold-tlf-ly1 TeXGyreTermesX-Bold " encntx-texnansi-tlf ReEncodeFont " <[ntx-texnansi-tlf.enc <ztmb.pfb
-ntx-Bold-osf-ly1 TeXGyreTermesX-Bold " encntx-texnansi-osf ReEncodeFont " <[ntx-texnansi-osf.enc <ztmb.pfb
-ntx-Bold-lf-ly1 TeXGyreTermesX-Bold " encntx-texnansi-lf ReEncodeFont " <[ntx-texnansi-lf.enc <ztmb.pfb
-ntx-Bold-tosf-ly1 TeXGyreTermesX-Bold " encntx-texnansi-tosf ReEncodeFont " <[ntx-texnansi-tosf.enc <ztmb.pfb
-ntx-BoldItalic-tlf-ot1r TeXGyreTermesX-BoldItalic " encntx-ot1-tlf ReEncodeFont " <[ntx-ot1-tlf.enc <ztmbi.pfb
-ntx-Bold-tlf-ot1r TeXGyreTermesX-Bold " encntx-ot1-tlf ReEncodeFont " <[ntx-ot1-tlf.enc <ztmb.pfb
-ntx-BoldItalic-osf-ot1r TeXGyreTermesX-BoldItalic " encntx-ot1-osf ReEncodeFont " <[ntx-ot1-osf.enc <ztmbi.pfb
-ntx-Bold-osf-ot1r TeXGyreTermesX-Bold " encntx-ot1-osf ReEncodeFont " <[ntx-ot1-osf.enc <ztmb.pfb
-ntx-BoldItalic-lf-ot1r TeXGyreTermesX-BoldItalic " encntx-ot1-lf ReEncodeFont " <[ntx-ot1-lf.enc <ztmbi.pfb
-ntx-Bold-lf-ot1r TeXGyreTermesX-Bold " encntx-ot1-lf ReEncodeFont " <[ntx-ot1-lf.enc <ztmb.pfb
-ntx-BoldItalic-tosf-ot1r TeXGyreTermesX-BoldItalic " encntx-ot1-tosf ReEncodeFont " <[ntx-ot1-tosf.enc <ztmbi.pfb
-ntx-Bold-tosf-ot1r TeXGyreTermesX-Bold " encntx-ot1-tosf ReEncodeFont " <[ntx-ot1-tosf.enc <ztmb.pfb
-ntx-Regular-tlf-ot1r TeXGyreTermesX-Regular " encntx-ot1-tlf ReEncodeFont " <[ntx-ot1-tlf.enc <ztmr.pfb
-ntx-Regular-osf-ot1r TeXGyreTermesX-Regular " encntx-ot1-osf ReEncodeFont " <[ntx-ot1-osf.enc <ztmr.pfb
-ntx-Regular-lf-ot1r TeXGyreTermesX-Regular " encntx-ot1-lf ReEncodeFont " <[ntx-ot1-lf.enc <ztmr.pfb
-ntx-Regular-tosf-ot1r TeXGyreTermesX-Regular " encntx-ot1-tosf ReEncodeFont " <[ntx-ot1-tosf.enc <ztmr.pfb
-ntx-Italic-tlf-ot1r TeXGyreTermesX-Italic " encntx-ot1-tlf ReEncodeFont " <[ntx-ot1-tlf.enc <ztmri.pfb
-ntx-Italic-osf-ot1r TeXGyreTermesX-Italic " encntx-ot1-osf ReEncodeFont " <[ntx-ot1-osf.enc <ztmri.pfb
-ntx-Italic-lf-ot1r TeXGyreTermesX-Italic " encntx-ot1-lf ReEncodeFont " <[ntx-ot1-lf.enc <ztmri.pfb
-ntx-Italic-tosf-ot1r TeXGyreTermesX-Italic " encntx-ot1-tosf ReEncodeFont " <[ntx-ot1-tosf.enc <ztmri.pfb
-ntx-Bold-tlf-scl-ot1 TeXGyreTermesX-Bold " encntx-ot1-tlf-sc ReEncodeFont " <[ntx-ot1-tlf-sc.enc <ztmb.pfb
-ntx-Bold-osf-scl-ot1 TeXGyreTermesX-Bold " encntx-ot1-osf-sc ReEncodeFont " <[ntx-ot1-osf-sc.enc <ztmb.pfb
-ntx-Bold-lf-scl-ot1 TeXGyreTermesX-Bold " encntx-ot1-lf-sc ReEncodeFont " <[ntx-ot1-lf-sc.enc <ztmb.pfb
-ntx-Bold-tosf-scl-ot1 TeXGyreTermesX-Bold " encntx-ot1-tosf-sc ReEncodeFont " <[ntx-ot1-tosf-sc.enc <ztmb.pfb
-ntx-Bold-tlf-scl-t1 TeXGyreTermesX-Bold " encntx-ec-tlf-sc ReEncodeFont " <[ntx-ec-tlf-sc.enc <ztmb.pfb
-ntx-Bold-osf-scl-t1 TeXGyreTermesX-Bold " encntx-ec-osf-sc ReEncodeFont " <[ntx-ec-osf-sc.enc <ztmb.pfb
-ntx-Bold-lf-scl-t1 TeXGyreTermesX-Bold " encntx-ec-lf-sc ReEncodeFont " <[ntx-ec-lf-sc.enc <ztmb.pfb
-ntx-Bold-tosf-scl-t1 TeXGyreTermesX-Bold " encntx-ec-tosf-sc ReEncodeFont " <[ntx-ec-tosf-sc.enc <ztmb.pfb
-ntx-Bold-tlf-scl-ly1 TeXGyreTermesX-Bold " encntx-texnansi-tosf-sc ReEncodeFont " <[ntx-texnansi-tlf-sc.enc <ztmb.pfb
-ntx-Bold-osf-scl-ly1 TeXGyreTermesX-Bold " encntx-texnansi-osf-sc ReEncodeFont " <[ntx-texnansi-osf-sc.enc <ztmb.pfb
-ntx-Bold-lf-scl-ly1 TeXGyreTermesX-Bold " encntx-texnansi-lf-sc ReEncodeFont " <[ntx-texnansi-lf-sc.enc <ztmb.pfb
-ntx-Bold-tosf-scl-ly1 TeXGyreTermesX-Bold " encntx-texnansi-tosf-sc ReEncodeFont " <[ntx-texnansi-tosf-sc.enc <ztmb.pfb
-ntx-BoldItalic-tlf-scl-ot1 TeXGyreTermesX-BoldItalic " encntx-ot1-tlf-sc ReEncodeFont " <[ntx-ot1-tlf-sc.enc <ztmbi.pfb
-ntx-BoldItalic-osf-scl-ot1 TeXGyreTermesX-BoldItalic " encntx-ot1-osf-sc ReEncodeFont " <[ntx-ot1-osf-sc.enc <ztmbi.pfb
-ntx-BoldItalic-lf-scl-ot1 TeXGyreTermesX-BoldItalic " encntx-ot1-lf-sc ReEncodeFont " <[ntx-ot1-lf-sc.enc <ztmbi.pfb
-ntx-BoldItalic-tosf-scl-ot1 TeXGyreTermesX-BoldItalic " encntx-ot1-tosf-sc ReEncodeFont " <[ntx-ot1-tosf-sc.enc <ztmbi.pfb
-ntx-BoldItalic-tlf-scl-t1 TeXGyreTermesX-BoldItalic " encntx-ec-tlf-sc ReEncodeFont " <[ntx-ec-tlf-sc.enc <ztmbi.pfb
-ntx-BoldItalic-osf-scl-t1 TeXGyreTermesX-BoldItalic " encntx-ec-osf-sc ReEncodeFont " <[ntx-ec-osf-sc.enc <ztmbi.pfb
-ntx-BoldItalic-lf-scl-t1 TeXGyreTermesX-BoldItalic " encntx-ec-lf-sc ReEncodeFont " <[ntx-ec-lf-sc.enc <ztmbi.pfb
-ntx-BoldItalic-tosf-scl-t1 TeXGyreTermesX-BoldItalic " encntx-ec-tosf-sc ReEncodeFont " <[ntx-ec-tosf-sc.enc <ztmbi.pfb
-ntx-BoldItalic-tlf-scl-ly1 TeXGyreTermesX-BoldItalic " encntx-texnansi-tosf-sc ReEncodeFont " <[ntx-texnansi-tlf-sc.enc <ztmbi.pfb
-ntx-BoldItalic-osf-scl-ly1 TeXGyreTermesX-BoldItalic " encntx-texnansi-osf-sc ReEncodeFont " <[ntx-texnansi-osf-sc.enc <ztmbi.pfb
-ntx-BoldItalic-lf-scl-ly1 TeXGyreTermesX-BoldItalic " encntx-texnansi-lf-sc ReEncodeFont " <[ntx-texnansi-lf-sc.enc <ztmbi.pfb
-ntx-BoldItalic-tosf-scl-ly1 TeXGyreTermesX-BoldItalic " encntx-texnansi-tosf-sc ReEncodeFont " <[ntx-texnansi-tosf-sc.enc <ztmbi.pfb
-ntx-BoldSlanted-tlf-scl-ot1 TeXGyreTermesX-BoldSlanted " encntx-ot1-tlf-sc ReEncodeFont " <[ntx-ot1-tlf-sc.enc <ztmbsl.pfb
-ntx-BoldSlanted-osf-scl-ot1 TeXGyreTermesX-BoldSlanted " encntx-ot1-osf-sc ReEncodeFont " <[ntx-ot1-osf-sc.enc <ztmbsl.pfb
-ntx-BoldSlanted-lf-scl-ot1 TeXGyreTermesX-BoldSlanted " encntx-ot1-lf-sc ReEncodeFont " <[ntx-ot1-lf-sc.enc <ztmbsl.pfb
-ntx-BoldSlanted-tosf-scl-ot1 TeXGyreTermesX-BoldSlanted " encntx-ot1-tosf-sc ReEncodeFont " <[ntx-ot1-tosf-sc.enc <ztmbsl.pfb
-ntx-BoldSlanted-tlf-scl-t1 TeXGyreTermesX-BoldSlanted " encntx-ec-tlf-sc ReEncodeFont " <[ntx-ec-tlf-sc.enc <ztmbsl.pfb
-ntx-BoldSlanted-osf-scl-t1 TeXGyreTermesX-BoldSlanted " encntx-ec-osf-sc ReEncodeFont " <[ntx-ec-osf-sc.enc <ztmbsl.pfb
-ntx-BoldSlanted-lf-scl-t1 TeXGyreTermesX-BoldSlanted " encntx-ec-lf-sc ReEncodeFont " <[ntx-ec-lf-sc.enc <ztmbsl.pfb
-ntx-BoldSlanted-tosf-scl-t1 TeXGyreTermesX-BoldSlanted " encntx-ec-tosf-sc ReEncodeFont " <[ntx-ec-tosf-sc.enc <ztmbsl.pfb
-ntx-BoldSlanted-tlf-scl-ly1 TeXGyreTermesX-BoldSlanted " encntx-texnansi-tosf-sc ReEncodeFont " <[ntx-texnansi-tlf-sc.enc <ztmbsl.pfb
-ntx-BoldSlanted-osf-scl-ly1 TeXGyreTermesX-BoldSlanted " encntx-texnansi-osf-sc ReEncodeFont " <[ntx-texnansi-osf-sc.enc <ztmbsl.pfb
-ntx-BoldSlanted-lf-scl-ly1 TeXGyreTermesX-BoldSlanted " encntx-texnansi-lf-sc ReEncodeFont " <[ntx-texnansi-lf-sc.enc <ztmbsl.pfb
-ntx-BoldSlanted-tosf-scl-ly1 TeXGyreTermesX-BoldSlanted " encntx-texnansi-tosf-sc ReEncodeFont " <[ntx-texnansi-tosf-sc.enc <ztmbsl.pfb
-ntx-Italic-lf-scl-ly1 TeXGyreTermesX-Italic " encntx-texnansi-lf-sc ReEncodeFont " <[ntx-texnansi-lf-sc.enc <ztmri.pfb
-ntx-Italic-lf-scl-ot1 TeXGyreTermesX-Italic " encntx-ot1-lf-sc ReEncodeFont " <[ntx-ot1-lf-sc.enc <ztmri.pfb
-ntx-Italic-lf-scl-t1 TeXGyreTermesX-Italic " encntx-ec-lf-sc ReEncodeFont " <[ntx-ec-lf-sc.enc <ztmri.pfb
-ntx-Italic-osf-scl-ly1 TeXGyreTermesX-Italic " encntx-texnansi-osf-sc ReEncodeFont " <[ntx-texnansi-osf-sc.enc <ztmri.pfb
-ntx-Italic-osf-scl-ot1 TeXGyreTermesX-Italic " encntx-ot1-osf-sc ReEncodeFont " <[ntx-ot1-osf-sc.enc <ztmri.pfb
-ntx-Italic-osf-scl-t1 TeXGyreTermesX-Italic " encntx-ec-osf-sc ReEncodeFont " <[ntx-ec-osf-sc.enc <ztmri.pfb
-ntx-Italic-tlf-scl-ly1 TeXGyreTermesX-Italic " encntx-texnansi-tosf-sc ReEncodeFont " <[ntx-texnansi-tlf-sc.enc <ztmri.pfb
-ntx-Italic-tlf-scl-ot1 TeXGyreTermesX-Italic " encntx-ot1-tlf-sc ReEncodeFont " <[ntx-ot1-tlf-sc.enc <ztmri.pfb
-ntx-Italic-tlf-scl-t1 TeXGyreTermesX-Italic " encntx-ec-tlf-sc ReEncodeFont " <[ntx-ec-tlf-sc.enc <ztmri.pfb
-ntx-Italic-tosf-scl-ly1 TeXGyreTermesX-Italic " encntx-texnansi-tosf-sc ReEncodeFont " <[ntx-texnansi-tosf-sc.enc <ztmri.pfb
-ntx-Italic-tosf-scl-ot1 TeXGyreTermesX-Italic " encntx-ot1-tosf-sc ReEncodeFont " <[ntx-ot1-tosf-sc.enc <ztmri.pfb
-ntx-Italic-tosf-scl-t1 TeXGyreTermesX-Italic " encntx-ec-tosf-sc ReEncodeFont " <[ntx-ec-tosf-sc.enc <ztmri.pfb
-ntx-Slanted-lf-scl-ly1 TeXGyreTermesX-Slanted " encntx-texnansi-lf-sc ReEncodeFont " <[ntx-texnansi-lf-sc.enc <ztmrsl.pfb
-ntx-Slanted-lf-scl-ot1 TeXGyreTermesX-Slanted " encntx-ot1-lf-sc ReEncodeFont " <[ntx-ot1-lf-sc.enc <ztmrsl.pfb
-ntx-Slanted-lf-scl-t1 TeXGyreTermesX-Slanted " encntx-ec-lf-sc ReEncodeFont " <[ntx-ec-lf-sc.enc <ztmrsl.pfb
-ntx-Slanted-osf-scl-ly1 TeXGyreTermesX-Slanted " encntx-texnansi-osf-sc ReEncodeFont " <[ntx-texnansi-osf-sc.enc <ztmrsl.pfb
-ntx-Slanted-osf-scl-ot1 TeXGyreTermesX-Slanted " encntx-ot1-osf-sc ReEncodeFont " <[ntx-ot1-osf-sc.enc <ztmrsl.pfb
-ntx-Slanted-osf-scl-t1 TeXGyreTermesX-Slanted " encntx-ec-osf-sc ReEncodeFont " <[ntx-ec-osf-sc.enc <ztmrsl.pfb
-ntx-Slanted-tlf-scl-ly1 TeXGyreTermesX-Slanted " encntx-texnansi-tosf-sc ReEncodeFont " <[ntx-texnansi-tlf-sc.enc <ztmrsl.pfb
-ntx-Slanted-tlf-scl-ot1 TeXGyreTermesX-Slanted " encntx-ot1-tlf-sc ReEncodeFont " <[ntx-ot1-tlf-sc.enc <ztmrsl.pfb
-ntx-Slanted-tlf-scl-t1 TeXGyreTermesX-Slanted " encntx-ec-tlf-sc ReEncodeFont " <[ntx-ec-tlf-sc.enc <ztmrsl.pfb
-ntx-Slanted-tosf-scl-ly1 TeXGyreTermesX-Slanted " encntx-texnansi-tosf-sc ReEncodeFont " <[ntx-texnansi-tosf-sc.enc <ztmrsl.pfb
-ntx-Slanted-tosf-scl-ot1 TeXGyreTermesX-Slanted " encntx-ot1-tosf-sc ReEncodeFont " <[ntx-ot1-tosf-sc.enc <ztmrsl.pfb
-ntx-Slanted-tosf-scl-t1 TeXGyreTermesX-Slanted " encntx-ec-tosf-sc ReEncodeFont " <[ntx-ec-tosf-sc.enc <ztmrsl.pfb
-ntx-Regular-lf-scl-ly1 TeXGyreTermesX-Regular " encntx-texnansi-lf-sc ReEncodeFont " <[ntx-texnansi-lf-sc.enc <ztmr.pfb
-ntx-Regular-lf-scl-ot1 TeXGyreTermesX-Regular " encntx-ot1-lf-sc ReEncodeFont " <[ntx-ot1-lf-sc.enc <ztmr.pfb
-ntx-Regular-lf-scl-t1 TeXGyreTermesX-Regular " encntx-ec-lf-sc ReEncodeFont " <[ntx-ec-lf-sc.enc <ztmr.pfb
-ntx-Regular-osf-scl-ly1 TeXGyreTermesX-Regular " encntx-texnansi-osf-sc ReEncodeFont " <[ntx-texnansi-osf-sc.enc <ztmr.pfb
-ntx-Regular-osf-scl-ot1 TeXGyreTermesX-Regular " encntx-ot1-osf-sc ReEncodeFont " <[ntx-ot1-osf-sc.enc <ztmr.pfb
-ntx-Regular-osf-scl-t1 TeXGyreTermesX-Regular " encntx-ec-osf-sc ReEncodeFont " <[ntx-ec-osf-sc.enc <ztmr.pfb
-ntx-Regular-tlf-scl-ly1 TeXGyreTermesX-Regular " encntx-texnansi-tosf-sc ReEncodeFont " <[ntx-texnansi-tlf-sc.enc <ztmr.pfb
-ntx-Regular-tlf-scl-ot1 TeXGyreTermesX-Regular " encntx-ot1-tlf-sc ReEncodeFont " <[ntx-ot1-tlf-sc.enc <ztmr.pfb
-ntx-Regular-tlf-scl-t1 TeXGyreTermesX-Regular " encntx-ec-tlf-sc ReEncodeFont " <[ntx-ec-tlf-sc.enc <ztmr.pfb
-ntx-Regular-tosf-scl-ly1 TeXGyreTermesX-Regular " encntx-texnansi-tosf-sc ReEncodeFont " <[ntx-texnansi-tosf-sc.enc <ztmr.pfb
-ntx-Regular-tosf-scl-ot1 TeXGyreTermesX-Regular " encntx-ot1-tosf-sc ReEncodeFont " <[ntx-ot1-tosf-sc.enc <ztmr.pfb
-ntx-Regular-tosf-scl-t1 TeXGyreTermesX-Regular " encntx-ec-tosf-sc ReEncodeFont " <[ntx-ec-tosf-sc.enc <ztmr.pfb
-ntxth-Italic-tlf-t1 TeXGyreTermesX-Italic " encntx-ecth-tlf ReEncodeFont " <[ntx-ecth-tlf.enc <ztmri.pfb
-ntxth-Italic-osf-t1 TeXGyreTermesX-Italic " encntx-ecth-osf ReEncodeFont " <[ntx-ecth-osf.enc <ztmri.pfb
-ntxth-Italic-tlf-ot1 TeXGyreTermesX-Italic " encntx-ot1-th-tlf ReEncodeFont " <[ntx-ot1-th-tlf.enc <ztmri.pfb
-ntxth-Italic-osf-ot1 TeXGyreTermesX-Italic " encntx-ot1-th-osf ReEncodeFont " <[ntx-ot1-th-osf.enc <ztmri.pfb
-ntxth-Italic-tlf-ly1 TeXGyreTermesX-Italic " encntx-texnansi-th-tlf ReEncodeFont " <[ntx-texnansi-th-tlf.enc <ztmri.pfb
-ntxth-Italic-osf-ly1 TeXGyreTermesX-Italic " encntx-texnansi-th-osf ReEncodeFont " <[ntx-texnansi-th-osf.enc <ztmri.pfb
-ntxth-Slanted-tlf-t1 TeXGyreTermesX-Slanted " encntx-ecth-tlf ReEncodeFont " <[ntx-ecth-tlf.enc <ztmrsl.pfb
-ntxth-Slanted-osf-t1 TeXGyreTermesX-Slanted " encntx-ecth-osf ReEncodeFont " <[ntx-ecth-osf.enc <ztmrsl.pfb
-ntxth-Slanted-tlf-ot1 TeXGyreTermesX-Slanted " encntx-ot1-th-tlf ReEncodeFont " <[ntx-ot1-th-tlf.enc <ztmrsl.pfb
-ntxth-Slanted-osf-ot1 TeXGyreTermesX-Slanted " encntx-ot1-th-osf ReEncodeFont " <[ntx-ot1-th-osf.enc <ztmrsl.pfb
-ntxth-Slanted-tlf-ly1 TeXGyreTermesX-Slanted " encntx-texnansi-th-tlf ReEncodeFont " <[ntx-texnansi-th-tlf.enc <ztmrsl.pfb
-ntxth-Slanted-osf-ly1 TeXGyreTermesX-Slanted " encntx-texnansi-th-osf ReEncodeFont " <[ntx-texnansi-th-osf.enc <ztmrsl.pfb
 ztmfigs-sl ztmfigs-slanted <ztmfigs-sl.pfb
 ztmfigs-bsl ztmfigs-boldslanted <ztmfigs-bsl.pfb
 ztmbsl-tlf-t1 TeXGyreTermesX-Bold " .167 SlantFont encntx-ec-tlf ReEncodeFont " <ntx-ec-tlf.enc <ztmb.pfb
@@ -1591,30 +1521,6 @@ ebgMRM ebgMRM <ebgMRM.pfb
 ebgBRM ebgBRM <ebgBRM.pfb
 ebgMI ebgMI <ebgMI.pfb
 ebgBMI ebgBMI <ebgBMI.pfb
-LibertinusSerif-BoldItalic-inf-ot1 LibertinusSerif-BoldItalic "AutoEncI_yt5vb5obkhbpwda3dizc3xinja ReEncodeFont" <[lbtsI_yt5vb5.enc <LibertinusSerif-BoldItalic.pfb
-LibertinusSerif-BoldItalic-inf-t1 LibertinusSerif-BoldItalic "AutoEncI_ugujza22flfps6tvqymki4nazb ReEncodeFont" <[lbtsI_ugujza.enc <LibertinusSerif-BoldItalic.pfb
-LibertinusSerif-BoldItalic-inf-ly1 LibertinusSerif-BoldItalic "AutoEncI_n4gj6t5lvaiujpidttnrmrudsc ReEncodeFont" <[lbtsI_n4gj6t.enc <LibertinusSerif-BoldItalic.pfb
-LibertinusSerif-BoldItalic-inf-t2a LibertinusSerif-BoldItalic "AutoEncI_hhbt6zls3mprml2k6vpnyhnd5g ReEncodeFont" <[lbtsI_hhbt6z.enc <LibertinusSerif-BoldItalic.pfb
-LibertinusSerif-Bold-inf-ot1 LibertinusSerif-Bold "AutoEncI_yt5vb5obkhbpwda3dizc3xinja ReEncodeFont" <[lbtsI_yt5vb5.enc <LibertinusSerif-Bold.pfb
-LibertinusSerif-Bold-inf-t1 LibertinusSerif-Bold "AutoEncI_ugujza22flfps6tvqymki4nazb ReEncodeFont" <[lbtsI_ugujza.enc <LibertinusSerif-Bold.pfb
-LibertinusSerif-Bold-inf-ly1 LibertinusSerif-Bold "AutoEncI_xaezkf2necheckw6d723oe3qcd ReEncodeFont" <[lbtsI_xaezkf.enc <LibertinusSerif-Bold.pfb
-LibertinusSerif-Bold-inf-t2a LibertinusSerif-Bold "AutoEncI_77t54r3n2ka2m4tbkojzxxhseb ReEncodeFont" <[lbtsI_77t54r.enc <LibertinusSerif-Bold.pfb
-LibertinusSerif-Italic-inf-ot1 LibertinusSerif-Italic "AutoEncI_yt5vb5obkhbpwda3dizc3xinja ReEncodeFont" <[lbtsI_yt5vb5.enc <LibertinusSerif-Italic.pfb
-LibertinusSerif-Italic-inf-t1 LibertinusSerif-Italic "AutoEncI_ugujza22flfps6tvqymki4nazb ReEncodeFont" <[lbtsI_ugujza.enc <LibertinusSerif-Italic.pfb
-LibertinusSerif-Italic-inf-ly1 LibertinusSerif-Italic "AutoEncI_xaezkf2necheckw6d723oe3qcd ReEncodeFont" <[lbtsI_xaezkf.enc <LibertinusSerif-Italic.pfb
-LibertinusSerif-Italic-inf-t2a LibertinusSerif-Italic "AutoEncI_77t54r3n2ka2m4tbkojzxxhseb ReEncodeFont" <[lbtsI_77t54r.enc <LibertinusSerif-Italic.pfb
-LibertinusSerif-Regular-inf-ot1 LibertinusSerif-Regular "AutoEncI_yt5vb5obkhbpwda3dizc3xinja ReEncodeFont" <[lbtsI_yt5vb5.enc <LibertinusSerif-Regular.pfb
-LibertinusSerif-Regular-inf-t1 LibertinusSerif-Regular "AutoEncI_ugujza22flfps6tvqymki4nazb ReEncodeFont" <[lbtsI_ugujza.enc <LibertinusSerif-Regular.pfb
-LibertinusSerif-Regular-inf-ly1 LibertinusSerif-Regular "AutoEncI_xaezkf2necheckw6d723oe3qcd ReEncodeFont" <[lbtsI_xaezkf.enc <LibertinusSerif-Regular.pfb
-LibertinusSerif-Regular-inf-t2a LibertinusSerif-Regular "AutoEncI_77t54r3n2ka2m4tbkojzxxhseb ReEncodeFont" <[lbtsI_77t54r.enc <LibertinusSerif-Regular.pfb
-LibertinusSerif-SemiboldItalic-inf-ot1 LibertinusSerif-SemiboldItalic "AutoEncI_yt5vb5obkhbpwda3dizc3xinja ReEncodeFont" <[lbtsI_yt5vb5.enc <LibertinusSerif-SemiboldItalic.pfb
-LibertinusSerif-SemiboldItalic-inf-t1 LibertinusSerif-SemiboldItalic "AutoEncI_ugujza22flfps6tvqymki4nazb ReEncodeFont" <[lbtsI_ugujza.enc <LibertinusSerif-SemiboldItalic.pfb
-LibertinusSerif-SemiboldItalic-inf-ly1 LibertinusSerif-SemiboldItalic "AutoEncI_xaezkf2necheckw6d723oe3qcd ReEncodeFont" <[lbtsI_xaezkf.enc <LibertinusSerif-SemiboldItalic.pfb
-LibertinusSerif-SemiboldItalic-inf-t2a LibertinusSerif-SemiboldItalic "AutoEncI_77t54r3n2ka2m4tbkojzxxhseb ReEncodeFont" <[lbtsI_77t54r.enc <LibertinusSerif-SemiboldItalic.pfb
-LibertinusSerif-Semibold-inf-ot1 LibertinusSerif-Semibold "AutoEncI_yt5vb5obkhbpwda3dizc3xinja ReEncodeFont" <[lbtsI_yt5vb5.enc <LibertinusSerif-Semibold.pfb
-LibertinusSerif-Semibold-inf-t1 LibertinusSerif-Semibold "AutoEncI_ugujza22flfps6tvqymki4nazb ReEncodeFont" <[lbtsI_ugujza.enc <LibertinusSerif-Semibold.pfb
-LibertinusSerif-Semibold-inf-ly1 LibertinusSerif-Semibold "AutoEncI_xaezkf2necheckw6d723oe3qcd ReEncodeFont" <[lbtsI_xaezkf.enc <LibertinusSerif-Semibold.pfb
-LibertinusSerif-Semibold-inf-t2a LibertinusSerif-Semibold "AutoEncI_77t54r3n2ka2m4tbkojzxxhseb ReEncodeFont" <[lbtsI_77t54r.enc <LibertinusSerif-Semibold.pfb
 ntxnumr-Regular-ot1 ntxsups-Regular " encntx-ot1-numr ReEncodeFont " <ntxnumr_ot1.enc <ntxsups-Regular.pfb
 ntxnumr-Regular-t1 ntxsups-Regular " encntx-ec-numr ReEncodeFont " <ntxnumr_t1.enc <ntxsups-Regular.pfb
 ntxnumr-Regular-ly1 ntxsups-Regular " encntx-texnansi-numr ReEncodeFont " <ntxnumr_ly1.enc <ntxsups-Regular.pfb
@@ -1687,14 +1593,92 @@ ntxsups-BoldItalic-t1 ntxsups-BoldItalic " ntxsupsT1Encoding ReEncodeFont " <ntx
 ntxsupsalt-BoldItalic-t1 ntxsupsalt-BoldItalic " ntxsupsT1Encoding ReEncodeFont " <ntxsups_t1.enc <ntxsupsalt-BoldItalic.pfb
 ntxsups-BoldItalic-ly1 ntxsups-BoldItalic " ntxsupsLY1Encoding ReEncodeFont " <ntxsups_ly1.enc <ntxsups-BoldItalic.pfb
 ntxsupsalt-BoldItalic-ly1 ntxsupsalt-BoldItalic " ntxsupsLY1Encoding ReEncodeFont " <ntxsups_ly1.enc <ntxsupsalt-BoldItalic.pfb
-ntxsups-Regular-ts1 TeXGyreTermesX-Regular " zplsupsTS1Encoding ReEncodeFont " <zplsups-ts1.enc <ztmr.pfb
-ntxsups-Bold-ts1 TeXGyreTermesX-Bold " zplsupsTS1Encoding ReEncodeFont " <zplsups-ts1.enc <ztmb.pfb
-ntxsups-Italic-ts1 TeXGyreTermesX-Italic " zplsupsTS1Encoding ReEncodeFont " <zplsups-ts1.enc <ztmri.pfb
-ntxsups-BoldItalic-ts1 TeXGyreTermesX-BoldItalic " zplsupsTS1Encoding ReEncodeFont " <zplsups-ts1.enc <ztmbi.pfb
 ntxsupsalt-Regular-ts1 ntxsupsalt-Regular " ntxsupsTS1Encoding ReEncodeFont " <ntxsups-ts1.enc <ntxsupsalt-Regular.pfb
 ntxsupsalt-Bold-ts1 ntxsupsalt-Bold " ntxsupsTS1Encoding ReEncodeFont " <ntxsups-ts1.enc <ntxsupsalt-Bold.pfb
 ntxsupsalt-Italic-ts1 ntxsupsalt-Italic " ntxsupsTS1Encoding ReEncodeFont " <ntxsups-ts1.enc <ntxsupsalt-Italic.pfb
 ntxsupsalt-BoldItalic-ts1 ntxsupsalt-BoldItalic " ntxsupsTS1Encoding ReEncodeFont " <ntxsups-ts1.enc <ntxsupsalt-BoldItalic.pfb
+uagk8r URWGothicL-Book "TeXBase1Encoding ReEncodeFont " <8r.enc <uagk8a.pfb
+uagko8r URWGothicL-BookObli "TeXBase1Encoding ReEncodeFont " <8r.enc <uagko8a.pfb
+uagd8r URWGothicL-Demi "TeXBase1Encoding ReEncodeFont " <8r.enc <uagd8a.pfb
+uagdo8r URWGothicL-DemiObli "TeXBase1Encoding ReEncodeFont " <8r.enc <uagdo8a.pfb
+ubkd8r URWBookmanL-DemiBold "TeXBase1Encoding ReEncodeFont" <8r.enc <ubkd8a.pfb
+ubkdi8r URWBookmanL-DemiBoldItal "TeXBase1Encoding ReEncodeFont" <8r.enc <ubkdi8a.pfb
+ubkl8r URWBookmanL-Ligh "TeXBase1Encoding ReEncodeFont" <8r.enc <ubkl8a.pfb
+ubkli8r URWBookmanL-LighItal "TeXBase1Encoding ReEncodeFont" <8r.enc <ubkli8a.pfb
+ubkdo8r URWBookmanL-DemiBold " .167 SlantFont TeXBase1Encoding ReEncodeFont " <8r.enc <ubkd8a.pfb
+ubklo8r URWBookmanL-Ligh " .167 SlantFont TeXBase1Encoding ReEncodeFont " <8r.enc <ubkl8a.pfb
+ucrb8r NimbusMonL-Bold "TeXBase1Encoding ReEncodeFont" <8r.enc <ucrb8a.pfb
+ucrbo8r NimbusMonL-BoldObli "TeXBase1Encoding ReEncodeFont" <8r.enc <ucrbo8a.pfb
+ucrr8r NimbusMonL-Regu "TeXBase1Encoding ReEncodeFont" <8r.enc <ucrr8a.pfb
+ucrro8r NimbusMonL-ReguObli "TeXBase1Encoding ReEncodeFont" <8r.enc <ucrro8a.pfb
+feymr10 TeX-feymr10 <feymr10.pfb
+feymo10 TeX-feymo10 <feymo10.pfb
+feyml10 TeX-feyml10 <feyml10.pfb
+feybr10 TeX-feybr10 <feybr10.pfb
+feybo10 TeX-feybo10 <feybo10.pfb
+feybl10 TeX-feybl10 <feybl10.pfb
+uhvb8r NimbusSanL-Bold "TeXBase1Encoding ReEncodeFont" <8r.enc <uhvb8a.pfb
+uhvbo8r NimbusSanL-BoldItal "TeXBase1Encoding ReEncodeFont" <8r.enc <uhvbo8a.pfb
+uhvr8r NimbusSanL-Regu "TeXBase1Encoding ReEncodeFont" <8r.enc <uhvr8a.pfb
+uhvro8r NimbusSanL-ReguItal "TeXBase1Encoding ReEncodeFont" <8r.enc <uhvro8a.pfb
+manfnt manfnt <manfnt.pfb
+umvs MarVoSym <marvosym.pfb
+logo10      LOGO10      <logo10.pfb
+logod10     LOGOD10     <logod10.pfb
+logobf10    LOGOBF10    <logobf10.pfb
+logo9       LOGO9       <logo9.pfb
+logo8       LOGO8       <logo8.pfb
+logosl10    LOGOSL10    <logosl10.pfb
+logosl9     LOGOSL9     <logosl9.pfb
+logosl8     LOGOSL8     <logosl8.pfb
+uncb8r CenturySchL-Bold "TeXBase1Encoding ReEncodeFont" <8r.enc <uncb8a.pfb
+uncbi8r CenturySchL-BoldItal "TeXBase1Encoding ReEncodeFont" <8r.enc <uncbi8a.pfb
+uncr8r CenturySchL-Roma "TeXBase1Encoding ReEncodeFont" <8r.enc <uncr8a.pfb
+uncri8r CenturySchL-Ital "TeXBase1Encoding ReEncodeFont" <8r.enc <uncri8a.pfb
+uncbo8r CenturySchL-Bold " .167 SlantFont TeXBase1Encoding ReEncodeFont " <8r.enc <uncb8a.pfb
+uncro8r CenturySchL-Roma " .167 SlantFont TeXBase1Encoding ReEncodeFont " <8r.enc <uncr8a.pfb
+uplb8r URWPalladioL-Bold "TeXBase1Encoding ReEncodeFont" <8r.enc <uplb8a.pfb
+uplbi8r URWPalladioL-BoldItal "TeXBase1Encoding ReEncodeFont" <8r.enc <uplbi8a.pfb
+uplr8r URWPalladioL-Roma "TeXBase1Encoding ReEncodeFont" <8r.enc <uplr8a.pfb
+uplri8r URWPalladioL-Ital "TeXBase1Encoding ReEncodeFont" <8r.enc <uplri8a.pfb
+uplbo8r URWPalladioL-Bold " .167 SlantFont TeXBase1Encoding ReEncodeFont " <8r.enc <uplb8a.pfb
+uplro8r URWPalladioL-Roma " .167 SlantFont TeXBase1Encoding ReEncodeFont " <8r.enc <uplr8a.pfb
+pxbex Pxbex <pxbex.pfb
+pxbexa Pxbexa <pxbexa.pfb
+pxbmia Pxbmia <pxbmia.pfb
+pxbsy Pxbsy <pxbsy.pfb
+pxbsya Pxbsya <pxbsya.pfb
+pxbsyb Pxbsyb <pxbsyb.pfb
+pxbsyc Pxbsyc <pxbsyc.pfb
+pxex Pxex <pxex.pfb
+pxexa Pxexa <pxexa.pfb
+pxmia Pxmia <pxmia.pfb
+pxsy Pxsy <pxsy.pfb
+pxsya Pxsya <pxsya.pfb
+pxsyb Pxsyb <pxsyb.pfb
+pxsyc Pxsyc <pxsyc.pfb
+rpcxb Rpcxb <rpcxb.pfb
+rpcxbi Rpcxbi <rpcxbi.pfb
+rpcxbsl Rpcxb ".167 SlantFont" <rpcxb.pfb
+rpcxi Rpcxi <rpcxi.pfb
+rpcxr Rpcxr <rpcxr.pfb
+rpcxsl Rpcxr ".167 SlantFont" <rpcxr.pfb
+rpxb Rpxb <rpxb.pfb
+rpxbi Rpxbi <rpxbi.pfb
+rpxbmi Rpxbmi <rpxbmi.pfb
+rpxbsc Rpxbsc <rpxbsc.pfb
+rpxbsl Rpxb ".167 SlantFont" <rpxb.pfb
+rpxi Rpxi <rpxi.pfb
+rpxmi Rpxmi <rpxmi.pfb
+rpxr Rpxr <rpxr.pfb
+rpxsc Rpxsc <rpxsc.pfb
+rpxsl Rpxr ".167 SlantFont" <rpxr.pfb
+utmb8r NimbusRomNo9L-Medi "TeXBase1Encoding ReEncodeFont" <8r.enc <utmb8a.pfb
+utmbi8r NimbusRomNo9L-MediItal "TeXBase1Encoding ReEncodeFont" <8r.enc <utmbi8a.pfb
+utmr8r NimbusRomNo9L-Regu "TeXBase1Encoding ReEncodeFont" <8r.enc <utmr8a.pfb
+utmri8r NimbusRomNo9L-ReguItal "TeXBase1Encoding ReEncodeFont" <8r.enc <utmri8a.pfb
+utmbo8r NimbusRomNo9L-Medi " .167 SlantFont TeXBase1Encoding ReEncodeFont " <8r.enc <utmb8a.pfb
+utmro8r NimbusRomNo9L-Regu " .167 SlantFont TeXBase1Encoding ReEncodeFont " <8r.enc <utmr8a.pfb
 rtcxb rtcxb <rtcxb.pfb
 rtcxbi rtcxbi <rtcxbi.pfb
 rtcxbsl rtcxb ".167 SlantFont" <rtcxb.pfb
@@ -1751,3 +1735,23 @@ txsyc txsyc <txsyc.pfb
 txtt txtt <txtt.pfb
 txttsc txttsc <txttsc.pfb
 txttsl txtt ".167 SlantFont" <txtt.pfb
+wasy5 wasy5 <wasy5.pfb
+wasy6 wasy6 <wasy6.pfb
+wasy7 wasy7 <wasy7.pfb
+wasy8 wasy8 <wasy8.pfb
+wasy9 wasy9 <wasy9.pfb
+wasy10 wasy10 <wasy10.pfb
+wasyb10 wasyb10 <wasyb10.pfb
+wasysl10 wasysl10 <wasysl10.pfb
+uzcmi8r URWChanceryL-MediItal "TeXBase1Encoding ReEncodeFont" <8r.enc <uzcmi8a.pfb
+EpiOlmec Epi-Olmec <Epi-Olmec.pfb
+esint10  esint10  <esint10.pfb
+scanwipe scanwipe <scanwipe.pfb
+arrow arrow <arrow.pfb
+stmary5 stmary5 <stmary5.pfb
+stmary6 stmary6 <stmary6.pfb
+stmary7 stmary7 <stmary7.pfb
+stmary8 stmary8 <stmary8.pfb
+stmary9 stmary9 <stmary9.pfb
+stmary10 stmary10 <stmary10.pfb
+yrcmex10 Yhcmex <yhcmex.pfb

@@ -91,6 +91,15 @@ const TEX_DEL_USUARIO = [
 const TEX_DE_LA_APP = [
   /file `?[^'\s]+'? not found/i,
   /i can'?t find file|i couldn'?t open (style|database) file/i,
+  /* «Font umvs at 600 not found»: pdfTeX no encuentra la fuente en
+     pdftex.map —y el 600 es una RESOLUCIÓN, no un tamaño: al no haber
+     entrada en el mapa se pone a buscar un mapa de bits PK a 600 ppp
+     que no existe—. Es siempre nuestro: la fuente está empaquetada
+     pero falta su línea en el mapa (lo genera scripts/build-fontmap.js).
+     El patrón de arriba no lo pilla porque entre «file umvs» y «not
+     found» va «): Font umvs at 600 », y [^'\s]+ no cruza espacios. */
+  /font .* at \d+ not found/i,
+  /pdftex error|pdftex warning:.*(cannot|not found)/i,
   /\.(sty|cls|bst|def|fd|tfm|pfb|enc|map)'? not found/i,
   /(la)?tex capacity exceeded/i,
   /emergency stop|fatal error occurred|job aborted/i,

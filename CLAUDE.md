@@ -107,6 +107,32 @@ assets under `vendor/busytex/` (the WASM TeX engine). Only touch these when
 adding LaTeX packages/fonts that BusyTeX doesn't ship — see their header
 comments.
 
+**`build-fontmap.js` reads the packages' `.map` files out of the `.data`, not
+off the disk.** pdfTeX only embeds a Type1 font if it appears in the *assembled*
+`pdftex.map`; it does not read each package's own `.map`. That assembly is
+`updmap`'s job, driven by `updmap.cfg` — and the one BusyTeX ships lists
+seventeen maps, those of TeX Live basic. Everything that arrived later in the
+Ubuntu packages was therefore in the virtual file system but absent from the
+map, which is exactly the shape of the bug: `\usepackage{marvosym}` compiled
+into `pdfTeX error: Font umvs at 600 not found` while `umvs.tfm`, `umvs.fd`,
+`marvosym.pfb` **and** `marvosym.map` all sat inside
+`ubuntu-texlive-fonts-recommended.data`. (The 600 is a *resolution*: with no map
+entry pdfTeX falls back to hunting a 600 dpi PK bitmap that does not exist.) The
+script originally harvested maps only from a directory handed to it as
+`argv[2]`, so it caught the fonts added by hand (bbold, dsfont, fourier…) and
+nothing that shipped inside a package — eurosym, wasy, stmaryrd, esint, manfnt
+and mflogo were down the same hole. It now walks every `.data` manifest;
+`argv[2]` is still accepted and is now optional.
+
+A line only goes in if the files it cites (`.pfb`, `.enc`…) really travel in
+some package. Without that check an orphan entry turns `Font X at 600 not found`
+into `cannot open file for reading` — equally broken and harder to read — and
+193 of them were riding along (fourier's Utopia expert set, Libertinus).
+Regenerating the map is the **whole** deployment path for this class of bug:
+`latex.js` injects `extra/pdftex.map` on every compile (`always: true`), so
+`ENGINE_VERSION` need not move — it guards only `busytex_worker.js` and
+`busytex_pipeline.js`.
+
 ## CSV·Scope architecture
 
 One file, `scope-engine.js`, an IIFE on `window.ScopeApp` guarded against the
@@ -1234,8 +1260,16 @@ Four decisions worth keeping:
   *our* failures go up (a missing package or font, the engine aborting, memory
   exhausted — `TEX_DE_LA_APP`), user typos are dropped explicitly
   (`TEX_DEL_USUARIO`), and **anything unrecognised is dropped too**. A compile
-  that throws outright is the exception: that is always ours. From the browser,
-  known noise goes (`Script error.` with no origin, the ResizeObserver loop,
+  that throws outright is the exception: that is always ours. The price of that
+  last rule is that a fault nobody wrote a pattern for is invisible, and it was
+  paid in full: `!pdfTeX error: /bin/busytex (file umvs): Font umvs at 600 not
+  found` matched none of the eight app patterns — the first one wants
+  `file … not found` with nothing but non-space in between, and here there are
+  twenty characters of `): Font umvs at 600 ` in the way — so a real packaging
+  bug of ours never once reached the tracker. `/font .* at \d+ not found/` is
+  now in `TEX_DE_LA_APP` and it is always ours: the font is packaged, what is
+  missing is its line in the map. From the browser, known noise goes
+  (`Script error.` with no origin, the ResizeObserver loop,
   extensions, user-cancelled dialogs, network blips) — but a
   `PERMISSION_DENIED` stays, because that is exactly how the ColabDraw link bug
   would have surfaced.
