@@ -41,7 +41,35 @@ export class LatexEngine {
     this.busy = false;
   }
 
+  /* Tira el worker y olvida la promesa de arranque.
+
+     Sin esto, un motor que se ha caído se queda caído para toda la
+     pestaña, y eso es justo lo que contaba el informe: el
+     «memory access out of bounds» del wasm aparece 13 y 2 veces
+     seguidas: no son 15 documentos distintos, es el MISMO worker
+     envenenado respondiendo lo mismo a cada intento. Cuando el wasm
+     aborta, su montón queda en un estado que él mismo ya no sabe
+     describir, pero `this.worker` seguía ahí y `this.ready` seguía
+     resuelta, así que cada «▶ Compilar» posterior volvía a entrar en la
+     misma instancia rota. La única salida era recargar la página, cosa
+     que nadie adivina.
+
+     Volver a arrancar no vuelve a descargar los 150 MB: los paquetes y
+     el .wasm los sirve la caché HTTP del navegador, así que cuesta unos
+     segundos. */
+  _descartarMotor() {
+    if (this.worker) { try { this.worker.terminate(); } catch (err) {} }
+    this.worker = null;
+    this.ready = null;
+  }
+
   init() {
+    /* Solo se reaprovecha un arranque VIVO. Una promesa rechazada
+       también es una promesa, así que antes bastaba un corte de red en
+       el primer arranque para dejar el motor muerto el resto de la
+       sesión, repitiendo el error de aquella vez a cada compilación; es
+       `_descartarMotor` quien vacía esto al fallar, y por eso aquí ya no
+       puede quedar un rechazo guardado. */
     if (this.ready) return this.ready;
     this.onStatus("Descargando motor LaTeX (solo la primera vez)…");
     this.worker = new Worker(BUSYTEX_DIR + "busytex_worker.js?v=" + ENGINE_VERSION);
@@ -49,9 +77,10 @@ export class LatexEngine {
       const onmsg = ({ data }) => {
         if (data.print) this.onStatus(data.print);
         if (data.initialized) { this.worker.removeEventListener("message", onmsg); resolve(data.initialized); }
-        if (data.exception) { this.worker.removeEventListener("message", onmsg); reject(new Error(data.exception)); }
+        if (data.exception) { this._descartarMotor(); reject(new Error(data.exception)); }
       };
       this.worker.addEventListener("message", onmsg);
+      this.worker.onerror = e => { this._descartarMotor(); reject(new Error(e.message || "el motor LaTeX no arrancó")); };
       this.worker.postMessage({
         busytex_js: "busytex.js",
         busytex_wasm: "busytex.wasm",
@@ -101,7 +130,14 @@ export class LatexEngine {
       return await new Promise((resolve, reject) => {
         const onmsg = ({ data }) => {
           if (data.print) { this.onStatus(data.print); return; }
-          if (data.exception) { this.worker.removeEventListener("message", onmsg); reject(new Error(data.exception)); return; }
+          if (data.exception) {
+            /* El wasm que ha abortado no vuelve a servir: se tira para
+               que el siguiente intento arranque uno limpio en vez de
+               repetir el mismo fallo hasta que alguien recargue. */
+            this._descartarMotor();
+            reject(new Error(data.exception));
+            return;
+          }
           if (data.logs !== undefined || data.pdf !== undefined) {
             this.worker.removeEventListener("message", onmsg);
             resolve(data);

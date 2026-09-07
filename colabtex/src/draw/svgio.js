@@ -481,16 +481,36 @@ function renumerarIds(root) {
    una importación: lo que llega del portapapeles es tan ajeno como un
    archivo. Con `freshIds` se renuevan los identificadores, porque dos
    figuras con el mismo id romperían la selección. */
+/* Lo que devuelve `textToNodes` cuando no hay nada que sacar del texto.
+
+   Tiene que ser ESTA FORMA y no un array vacío. Las cuatro personas que
+   la llaman —`tools.js: paste`, las dos de `latex.js` y `ponerEnDefs` en
+   `paint.js`— la desestructuran como objeto, y desestructurar un `[]`
+   deja `nodes` en `undefined` sin lanzar nada: el error salta una línea
+   más abajo, en el `nodes.length`, convertido en un
+   «Cannot read properties of undefined» que no dice de dónde viene.
+
+   Era el fallo más repetido del informe (35 veces entre tres versiones,
+   siempre al pegar). Basta con que el navegador copie algo que pase el
+   filtro de «esto parece SVG» pero no sea XML válido —`image/svg+xml`
+   es estricto: una etiqueta sin cerrar o un prefijo de espacio de
+   nombres sin declarar ya es `parsererror`— para que la aplicación se
+   caiga entera en vez de decir «eso no se puede pegar aquí», que es lo
+   que el `catch` de al lado estaba esperando poder decir. */
+const NADA = () => ({ nodes: [], info: [], defs: [] });
+
 export function textToNodes(text, { freshIds = true } = {}) {
-  if (esBlanco(text)) return [];
+  if (esBlanco(text)) return NADA();
   const bruto = String(text).trim();
   const envuelto = /^<svg[\s>]/i.test(bruto)
     ? bruto
     : `<svg xmlns="http://www.w3.org/2000/svg">${bruto}</svg>`;
-  const doc = new DOMParser().parseFromString(envuelto, "image/svg+xml");
-  if (doc.getElementsByTagName("parsererror").length) return [];
+  let doc;
+  try { doc = new DOMParser().parseFromString(envuelto, "image/svg+xml"); }
+  catch (err) { return NADA(); }
+  if (!doc || doc.getElementsByTagName("parsererror").length) return NADA();
   const root = doc.documentElement;
-  if (!root || root.nodeName.toLowerCase() !== "svg") return [];
+  if (!root || root.nodeName.toLowerCase() !== "svg") return NADA();
 
   if (freshIds) renumerarIds(root);
 

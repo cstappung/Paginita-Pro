@@ -99,6 +99,19 @@ const TEX_DE_LA_APP = [
   /worker|wasm|out of memory|memory access out of bounds/i
 ];
 
+/* Estas no son una causa, son el ESTERTOR: pdfTeX las escribe detrás de
+   cualquier fallo que le impida seguir, sea nuestro o una errata. Siguen
+   en la lista de arriba a propósito —cuando son lo único que hay, son la
+   única prueba de que algo reventó— pero se descartan en cuanto la misma
+   compilación trae algo que sí explique por qué. */
+const TEX_SECUELA = [
+  /emergency stop/i,
+  /fatal error occurred/i,
+  /job aborted/i,
+  /no pages of output/i,
+  /output file removed/i
+];
+
 const alguno = (lista, s) => lista.some(re => re.test(s));
 
 export const esRuido = msg => alguno(RUIDO, String(msg || ""));
@@ -114,6 +127,33 @@ export function esFalloDeLaTeX(msg) {
      acaso convertiría el informe en un vertedero. Lo que sí sube
      siempre, y por otra vía, es una compilación que revienta entera. */
   return false;
+}
+
+/* Los fallos de UNA compilación, ya decidido cuáles suben.
+
+   `esFalloDeLaTeX` mira cada línea por separado, y eso no basta para el
+   estertor: «! Emergency stop.» y «! ==> Fatal error occurred, no output
+   PDF file produced!» salen SIEMPRE juntas y siempre detrás de otra
+   cosa. En el informe eran dos entradas de 8 repeticiones cada una —16
+   filas— que no decían nada de por qué, porque la causa real de aquella
+   compilación era una errata del documento y se había descartado, como
+   debe ser. Contadas aparte parecían un fallo del motor.
+
+   Así que se decide por compilación, no por línea:
+
+     - si hay una causa nuestra (falta un paquete, una fuente, el motor
+       sin memoria), se sube esa y el estertor sobra;
+     - si no hay causa nuestra pero sí una errata de quien escribe, el
+       estertor es suyo y no sube nada;
+     - si no hay ni lo uno ni lo otro, el estertor es lo único que
+       tenemos y sube: algo reventó sin decir su nombre, y eso hay que
+       verlo. */
+export function fallosDeLaTeX(mensajes) {
+  const lista = (mensajes || []).map(m => String(m || "")).filter(m => m.trim());
+  const utiles = lista.filter(esFalloDeLaTeX);
+  const causas = utiles.filter(m => !alguno(TEX_SECUELA, m));
+  if (causas.length) return causas;
+  return lista.some(m => alguno(TEX_DEL_USUARIO, m)) ? [] : utiles;
 }
 
 /* ============================================================
@@ -374,7 +414,7 @@ export function installErrorCapture({ app, buffer, publicar, ver, getDonde }) {
     /* Errores de LaTeX ya filtrados. `donde` cuenta lo que se estaba
        haciendo, que es lo que de verdad permite reproducirlo. */
     noteTex(mensajes, ctx) {
-      const utiles = (mensajes || []).filter(esFalloDeLaTeX);
+      const utiles = fallosDeLaTeX(mensajes);
       for (const m of utiles) anotar(null, m, { donde: "compilar el documento", ctx });
       return utiles.length;
     },
