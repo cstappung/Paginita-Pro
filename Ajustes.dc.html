@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;display=swap">
+  <style>
+    /* Los mismos tokens que CSV·Scope y FiltroLab: las tres herramientas se
+       ven como el mismo instrumento. Estar aquí (y no sólo en injectCSS)
+       evita el parpadeo blanco antes de que arranque ajuste-engine.js. */
+    :root{
+      --chassis:#0b0f14; --panel:#141b23; --panel2:#10161d; --line:#26333f;
+      --text:#dfe8f2; --dim:#7d8fa3; --accent:#2ea8ff; --on-accent:#0b1118;
+      --accent-a1:rgba(46,168,255,.13); --accent-a2:rgba(46,168,255,.28);
+      --ok:#3ddc7f; --bad:#ff6b6b; --bad-a:rgba(255,107,107,.25);
+      --sheen:rgba(255,255,255,.05); --shadow-1:rgba(0,0,0,.35); --shadow-2:rgba(0,0,0,.5);
+      --screen:#05090c; --grid1:#1e323f; --grid2:#3a5a6d;
+      --bezel:inset 0 0 0 1px rgba(0,0,0,.6), inset 0 3px 26px rgba(0,0,0,.55);
+    }
+    html, body { margin:0; padding:0; height:100%; overflow:hidden; background:var(--chassis); }
+    * { box-sizing: border-box; }
+    input[type="checkbox"] { accent-color: var(--accent); }
+    input[type="range"] { accent-color: var(--accent); }
+  </style>
+  <script src="ajuste-engine.js"></script>
+</helmet>
+
+<div class="aju" data-screen-label="Ajuste de datos">
+
+  <!-- ============ PANEL FRONTAL ============ -->
+  <header class="hdr">
+    <a href="Inicio.dc.html" title="Menú principal" class="home">⌂</a>
+
+    <div class="brand">
+      <span class="pwr" title="Listo"></span>
+      <span class="mark">AJUSTE·LAB</span>
+      <span class="model">ajuste de curvas con incertidumbres · parámetros ± σ · χ² · tabla y figura para el informe</span>
+    </div>
+
+    <div class="tabs">
+      <button id="tabAjuste" class="tab">Ajuste</button>
+      <button id="tabDatos" class="tab">Datos</button>
+      <button id="tabInforme" class="tab">Informe</button>
+    </div>
+
+    <div class="tools">
+      <button id="btnSvg" class="btn" title="Figura en SVG, en milímetros, lista para abrir en ColabDraw">SVG</button>
+      <button id="btnPng" class="btn" title="Figura en PNG a 300 ppp para el artículo">PNG</button>
+      <button id="btnCsv" class="btn" title="Datos, ajuste y residuos en CSV">Exportar CSV</button>
+    </div>
+  </header>
+
+  <div class="body">
+
+    <!-- ---- RACK IZQUIERDO: LOS DATOS Y EL MODELO ---- -->
+    <aside class="side">
+
+      <section class="grp">
+        <h3 class="ttl">Datos</h3>
+        <div class="row pad">
+          <button id="btnAbrir" class="btn key" title="Abrir un CSV — el de un osciloscopio también">Abrir CSV</button>
+          <button id="btnPegarIr" class="btn key" title="Escribir o pegar los datos a mano">Escribir</button>
+        </div>
+        <input id="fileIn" type="file" accept=".csv,.txt,.tsv,.dat" class="hide">
+        <div class="row">
+          <label class="lab">Ejemplo</label>
+          <select id="selEjemplo" class="in grow">
+            <option value="">—</option>
+            <option value="ohm">Ley de Ohm (recta)</option>
+            <option value="rc">Descarga de un RC</option>
+            <option value="pendulo">Péndulo: T frente a L</option>
+            <option value="resonancia">Resonancia (lorentziana)</option>
+          </select>
+        </div>
+        <div id="datosInfo" class="readout mono"></div>
+      </section>
+
+      <section class="grp">
+        <h3 class="ttl">Columnas</h3>
+        <div class="row">
+          <label class="lab">x</label>
+          <select id="selX" class="in grow"></select>
+        </div>
+        <div class="row">
+          <label class="lab">y</label>
+          <select id="selY" class="in grow"></select>
+        </div>
+        <div class="row">
+          <label class="lab">&#963;<sub>y</sub></label>
+          <select id="selSy" class="in grow"></select>
+        </div>
+        <div id="rowSyVal" class="row hide">
+          <label class="lab">valor</label>
+          <input id="syValIn" class="in grow mono" type="text" defaultValue="1">
+          <span id="unidSy" class="unit"></span>
+        </div>
+        <div class="row">
+          <label class="lab">&#963;<sub>x</sub></label>
+          <select id="selSx" class="in grow"></select>
+        </div>
+        <div id="rowSxVal" class="row hide">
+          <label class="lab">valor</label>
+          <input id="sxValIn" class="in grow mono" type="text" defaultValue="0">
+          <span id="unidSx" class="unit"></span>
+        </div>
+        <div class="hint">Sin &#963; el ajuste sale igual, pero las incertidumbres
+        de los parámetros se estiman de la dispersión de los propios puntos.</div>
+      </section>
+
+      <section class="grp">
+        <h3 class="ttl">Modelo</h3>
+        <select id="selModelo" class="in">
+          <optgroup label="Lineal en los parámetros">
+            <option value="recta">Recta · a·x + b</option>
+            <option value="prop">Por el origen · a·x</option>
+            <option value="poly">Polinomio de grado n</option>
+            <option value="log">Logarítmico · a + b·ln x</option>
+          </optgroup>
+          <optgroup label="No lineal">
+            <option value="exp">Exponencial · a·e^(b·x)</option>
+            <option value="expOff">Descarga · a·e^(&minus;x/&tau;) + c</option>
+            <option value="pot">Potencia · a·x^b</option>
+            <option value="seno">Senoidal · A·sin(2&pi;f·x + &phi;) + c</option>
+            <option value="gauss">Gaussiana</option>
+            <option value="lorentz">Lorentziana</option>
+            <option value="sat">Saturación · a·x/(b + x)</option>
+          </optgroup>
+          <optgroup label="Tuyo">
+            <option value="libre">Fórmula libre…</option>
+          </optgroup>
+        </select>
+        <div id="rowGrado" class="row hide">
+          <label class="lab">Grado</label>
+          <input id="gradoIn" class="in grow mono" type="number" min="1" max="12" defaultValue="2">
+        </div>
+        <div id="rowLibre" class="row hide">
+          <input id="libreIn" class="in grow mono" type="text" defaultValue="a*exp(-x/tau)+c" title="En función de x; todo lo demás que escribas es un parámetro">
+        </div>
+        <div id="modeloEc" class="readout mono"></div>
+        <div id="modeloAviso" class="warn hide"></div>
+      </section>
+
+      <section class="grp">
+        <h3 class="ttl">Parámetros de partida</h3>
+        <table class="tbl par">
+          <thead><tr><th></th><th>Valor inicial</th><th title="No se ajusta: se queda en el valor escrito">Fijo</th></tr></thead>
+          <tbody id="paramsBody"></tbody>
+        </table>
+        <div class="row pad">
+          <button id="btnSemillas" class="btn key" title="Volver a estimar los valores de partida a partir de los datos">Estimar</button>
+          <button id="btnAjustar" class="btn key">Ajustar</button>
+        </div>
+        <label class="chk" title="Con varios valores de partida que corregir, reajustar en cada uno los va moviendo mientras escribes los demás"><input id="chkAuto" type="checkbox"> Reajustar al escribir un valor</label>
+      </section>
+    </aside>
+
+    <!-- ---- CENTRO ---- -->
+    <main class="center">
+
+      <!-- VISTA AJUSTE -->
+      <div id="viewAjuste" class="view">
+        <div class="bar">
+          <select id="selEscX" class="in xs">
+            <option value="lin">Eje x lineal</option>
+            <option value="log">Eje x logarítmico</option>
+          </select>
+          <select id="selEscY" class="in xs">
+            <option value="lin">Eje y lineal</option>
+            <option value="log">Eje y logarítmico</option>
+          </select>
+          <span class="sep"></span>
+          <label class="chk xs"><input id="chkBanda" type="checkbox"> Banda &plusmn;1&#963; del ajuste</label>
+          <label class="chk xs"><input id="chkNorm" type="checkbox"> Residuos normalizados</label>
+          <span class="sep"></span>
+          <span class="bl">Clic en un punto para dejarlo fuera del ajuste</span>
+        </div>
+        <div id="plotWrap" class="scr"><canvas id="plotCanvas"></canvas><pre id="plotHover" class="hover"></pre></div>
+        <div id="resWrap" class="scr fixed h150"><canvas id="resCanvas"></canvas></div>
+      </div>
+
+      <!-- VISTA DATOS -->
+      <div id="viewDatos" class="view hide datos">
+        <div class="card w380">
+          <div class="card-hd">
+            <span class="ttl">Escribir o pegar</span>
+            <button id="btnAplicarTexto" class="btn xs push">Usar estos datos</button>
+          </div>
+          <div class="card-bd pad">
+            <textarea id="datosTexto" class="ta mono" spellcheck="false" placeholder="x  y  sigma&#10;1  2.03  0.05&#10;2  3.98  0.05&#10;3  6.10  0.05"></textarea>
+            <div class="hint">Separadas por tabuladores, comas, punto y coma o
+            espacios. La primera fila puede ser la de los nombres.</div>
+          </div>
+        </div>
+        <div class="card fill">
+          <div class="card-hd">
+            <span class="ttl">Puntos</span>
+            <button id="btnTodos" class="btn xs push">Todos</button>
+            <button id="btnNinguno" class="btn xs">Ninguno</button>
+          </div>
+          <div class="card-bd">
+            <table class="tbl">
+              <thead><tr id="tablaHead"></tr></thead>
+              <tbody id="tablaBody"></tbody>
+            </table>
+          </div>
+          <div id="tablaNota" class="note-card"></div>
+        </div>
+      </div>
+
+      <!-- VISTA INFORME -->
+      <div id="viewInforme" class="view hide">
+        <div class="bar">
+          <span class="bl">Números</span>
+          <select id="selFormato" class="in xs">
+            <option value="siunitx">siunitx</option>
+            <option value="llano">Sencillo</option>
+          </select>
+          <label class="chk xs"><input id="chkTablaDatos" type="checkbox"> Incluir la tabla de datos</label>
+          <span class="sep"></span>
+          <button id="btnCopiaTex" class="btn xs">Copiar</button>
+          <button id="btnTex" class="btn xs">Descargar .tex</button>
+        </div>
+        <div class="card fill scroll">
+          <div class="card-bd pad"><pre id="texOut" class="tex mono"></pre></div>
+        </div>
+      </div>
+    </main>
+
+    <!-- ---- RACK DERECHO: EL RESULTADO ---- -->
+    <aside class="side r">
+      <section class="grp accent">
+        <h3 class="ttl">Parámetros</h3>
+        <table class="tbl res">
+          <tbody id="resParamsBody"></tbody>
+        </table>
+      </section>
+
+      <section class="grp">
+        <h3 class="ttl">Calidad del ajuste</h3>
+        <div class="rdo2">
+          <div class="cell"><div class="k">&chi;&sup2;/&nu;</div><div id="calChi" class="v">—</div></div>
+          <div class="cell"><div class="k">R&sup2;</div><div id="calR2" class="v alt">—</div></div>
+        </div>
+        <div id="calDet" class="readout mono"></div>
+        <div id="calAviso" class="warn hide"></div>
+      </section>
+
+      <section id="corrCard" class="grp hide">
+        <h3 class="ttl">Correlación entre parámetros</h3>
+        <table class="tbl corr"><tbody id="corrBody"></tbody></table>
+        <div class="hint">&plusmn;1 quiere decir que los dos parámetros dicen lo
+        mismo: el ajuste no puede separarlos.</div>
+      </section>
+
+      <section class="grp">
+        <h3 class="ttl">Magnitudes derivadas</h3>
+        <div class="row">
+          <input id="derivIn" class="in grow mono" type="text" defaultValue="" placeholder="R = 1/a">
+          <button id="btnDeriv" class="btn xs">+</button>
+        </div>
+        <table class="tbl res"><tbody id="derivBody"></tbody></table>
+        <div class="hint">Su &#963; se propaga con la matriz de covarianza
+        entera, correlaciones incluidas — no sumando las &#963; por separado.</div>
+      </section>
+
+      <section class="grp">
+        <h3 class="ttl">Cómo se calcula</h3>
+        <div id="notaMetodo" class="hint"></div>
+      </section>
+    </aside>
+  </div>
+
+  <div class="stat">
+    <span id="statusLeft">—</span>
+    <span id="statusRight">AjusteLab</span>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;modelo&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Ajuste&quot;,&quot;description&quot;:&quot;Vacío = el que traiga el ejemplo. recta | prop | poly | log | exp | expOff | pot | seno | gauss | lorentz | sat | libre&quot;},&quot;formula&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Ajuste&quot;,&quot;description&quot;:&quot;Fórmula del modelo libre, en función de x&quot;},&quot;ejemplo&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;ohm&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Datos&quot;,&quot;description&quot;:&quot;ohm | rc | pendulo | resonancia&quot;}}">
+class Component extends DCLogic {
+  componentDidMount() {
+    this._tries = 0;
+    this._boot();
+  }
+  _boot() {
+    if (window.AjusteApp && document.getElementById("plotCanvas")) {
+      window.AjusteApp.init(this._opts());
+    } else if (this._tries++ < 100) {
+      setTimeout(() => this._boot(), 60);
+    }
+  }
+  _opts() {
+    return {
+      modelo: this.props.modelo ?? "",
+      formula: this.props.formula ?? "",
+      ejemplo: this.props.ejemplo ?? "ohm"
+    };
+  }
+  componentDidUpdate() {
+    if (window.AjusteApp && window.AjusteApp.ready) {
+      window.AjusteApp.applyOptions(this._opts());
+    }
+  }
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>
