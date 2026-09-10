@@ -9,7 +9,8 @@ const ROOT = path.join(__dirname, "..", "..");
 const PAGES = [
   { html: "colabtex.html", bundle: "colabtex-app.js" },
   { html: "colabdraw.html", bundle: "colabdraw-app.js" },
-  { html: "informes.html", bundle: "informes-app.js" }
+  { html: "informes.html", bundle: "informes-app.js" },
+  { html: "juegos.html", bundle: "juegos-app.js" }
 ];
 
 const v = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 12); // AAAAMMDDHHMM
