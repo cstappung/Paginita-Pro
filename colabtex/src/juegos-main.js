@@ -32,19 +32,37 @@
 import { watchAuth, loginGoogle, logout } from "./firebase.js";
 import * as fb from "./fb-juegos.js";
 import { escapeHtml, timeAgo, colorForUid } from "./util.js";
-import { JUEGOS, reducir, jugadasDe, acumula } from "./juegos/motor.js";
+import { JUEGOS, reducir, jugadasDe, acumula, cupoDe, TAMANOS, etiquetaTamano } from "./juegos/motor.js";
 import { crearEscondite } from "./juegos/escondite.js";
 import { crearCartas } from "./juegos/cartas.js";
 import { crearCuadritos } from "./juegos/cuadritos.js";
+import { crearReversi } from "./juegos/reversi.js";
 import { crearRanks } from "./juegos/ranks.js";
 import { createReportWidget } from "./report-widget.js";
 
 const $ = id => document.getElementById(id);
 const VER = (document.currentScript && document.currentScript.src.split("?v=")[1]) || "";
 
-const FABRICAS = { escondite: crearEscondite, cartas: crearCartas, cuadritos: crearCuadritos };
+const FABRICAS = {
+  escondite: crearEscondite, cartas: crearCartas,
+  cuadritos: crearCuadritos, reversi: crearReversi
+};
 
-const ICONO = { escondite: "🔍", cartas: "🔥", cuadritos: "▦" };
+const ICONO = { escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫" };
+
+/* Lo que puede elegir quien abre la sala, por juego. Vive aquí y no en
+   `motor.js` porque son controles y no reglas: el motor ya recorta lo
+   que llegue (`cupoDe`, `ladoDe`), así que una sala creada a mano en la
+   base tampoco puede pedir un tablero que no existe. Un juego que no
+   aparezca aquí no ofrece nada y su tarjeta sale con el botón solo. */
+const OPCIONES = {
+  cuadritos: [
+    { clave: "cupo", etiqueta: "Jugadores",
+      valores: [2, 3, 4, 5, 6].map(n => ({ v: n, t: n + " jugadores" })) },
+    { clave: "lado", etiqueta: "Tablero", por: TAMANOS.mediano.lado,
+      valores: Object.keys(TAMANOS).map(k => ({ v: TAMANOS[k].lado, t: etiquetaTamano(k) })) }
+  ]
+};
 
 const state = {
   user: null,
@@ -66,6 +84,7 @@ let ranks = null;
 let proximo = 0;          // el número de jugada que toca escribir
 let anotada = "";         // partida ya sumada a la clasificación desde esta pestaña
 let finEnviado = "";
+let finCerrado = "";        // partida cuyo cartel de fin se ha cerrado a mano
 
 /* ---------- sesión ---------- */
 function pintaUsuario() {
@@ -91,6 +110,16 @@ function mostrar(dentro) {
    escribir. */
 async function jugar(jugada) {
   if (!state.pid) return false;
+  /* Una partida terminada no acepta más jugadas, y el sitio de decirlo
+     es este y no cada juego. La regla de la base ya lo exige
+     (`jugadas/$n` pide que `fin` no exista) y el reductor ignora todo lo
+     que llegue detrás de un ganador — pero sin este portón la escritura
+     fallaba en silencio, el módulo no se enteraba, y la última jugada se
+     podía repetir con su animación infinitas veces. Se mira `est.fase`
+     además de `fin` porque el reductor sabe que la partida acabó antes
+     de que `fb.terminar` llegue a escribirlo. */
+  if (state.partida && state.partida.fin) return false;
+  if (state.estado && state.estado.fase === "fin") return false;
   const enBase = Object.keys((state.partida && state.partida.jugadas) || {}).length;
   let n = Math.max(proximo, enBase);
   const pid = state.pid;
@@ -175,7 +204,7 @@ function engancharVestibulo() {
 
 function engancharPartida(pid) {
   soltarPartida();
-  proximo = 0; anotada = ""; finEnviado = "";
+  proximo = 0; anotada = ""; finEnviado = ""; finCerrado = "";
   offPartida = fb.watchPartida(pid, (p, err) => {
     state.cargando = false;
     if (err) { state.fallo = err; state.partida = null; render(); return; }
@@ -208,11 +237,12 @@ function cuidaLaSala(p) {
 }
 
 /* ---------- acciones del vestíbulo ---------- */
-async function crear(juego) {
+async function crear(juego, extra) {
   const u = state.user;
   if (!u) return;
   try {
-    const pid = await fb.crearPartida(juego, { uid: u.uid, nombre: u.name, foto: u.photo, color: u.color });
+    const pid = await fb.crearPartida(juego,
+      { uid: u.uid, nombre: u.name, foto: u.photo, color: u.color }, extra);
     ir("#p/" + pid);
   } catch (e) { avisa(e); }
 }
@@ -274,9 +304,9 @@ function armazon() {
   }
   h.innerHTML = `
     <p class="lead">
-      Tres juegos por turnos para dos personas. Abre una sala, pásale el enlace a quien
-      quieras y jugad — no hace falta que estéis a la vez frente a la pantalla: la partida
-      espera, y cada jugada llega sola a la otra.
+      Cuatro juegos por turnos: tres duelos y uno para hasta seis. Abre una sala, pásale
+      el enlace a quien quieras y jugad — no hace falta que estéis a la vez frente a la
+      pantalla: la partida espera, y cada jugada llega sola a la otra.
     </p>
     <div id="vesAviso"></div>
     <div class="jg-elige" id="vesElige"></div>
@@ -295,10 +325,11 @@ function pintaVestibulo() {
       <div class="jg-of-icono">${ICONO[k] || "●"}</div>
       <div class="jg-of-nombre">${escapeHtml(j.nombre)}</div>
       <div class="jg-of-lema">${escapeHtml(j.lema)}</div>
+      ${opcionesHtml(k)}
       <button class="btn jg-of-btn" data-crear="${k}">Abrir sala</button>
     </div>`).join("");
   for (const b of $("vesElige").querySelectorAll("[data-crear]")) {
-    b.onclick = () => crear(b.getAttribute("data-crear"));
+    b.onclick = () => crear(b.getAttribute("data-crear"), leeOpciones(b));
   }
 
   const mias = new Set(state.mias.map(x => x.id));
@@ -306,8 +337,9 @@ function pintaVestibulo() {
   $("vesSalas").innerHTML = abiertas.length ? abiertas.map(s => `
     <div class="row row-top">
       ${pillJuego(s.juego)}
-      <div class="row-title">${escapeHtml(s.nombre || "Alguien")} espera rival
-        <div class="row-meta">${escapeHtml((JUEGOS[s.juego] || {}).nombre || s.juego)} · abierta ${escapeHtml(timeAgo(s.at))}</div>
+      <div class="row-title">${escapeHtml(s.nombre || "Alguien")} ${cupoDe(s) > 2 ? "abrió una sala" : "espera rival"}
+        <div class="row-meta">${escapeHtml((JUEGOS[s.juego] || {}).nombre || s.juego)} ·
+          ${Object.keys(s.jugadores || {}).length}/${cupoDe(s)} dentro · abierta ${escapeHtml(timeAgo(s.at))}</div>
       </div>
       <button class="btn" data-entrar="${escapeHtml(s.id)}">Entrar</button>
     </div>`).join("")
@@ -332,6 +364,29 @@ function pintaVestibulo() {
   for (const b of $("vesMias").querySelectorAll("[data-olvidar]")) {
     b.onclick = () => fb.olvidarMia(b.getAttribute("data-olvidar"), state.user.uid).catch(avisa);
   }
+}
+
+/* Los controles de la tarjeta. Se leen del DOM al pulsar y no se
+   guardan en `state`: son de un solo uso, y un estado paralelo que hay
+   que mantener a la par de dos `<select>` cuesta más de lo que vale. */
+function opcionesHtml(juego) {
+  const ops = OPCIONES[juego];
+  if (!ops) return "";
+  return `<div class="jg-of-ops">` + ops.map(o => `
+    <label class="jg-of-op"><span>${escapeHtml(o.etiqueta)}</span>
+      <select data-op="${o.clave}">${o.valores.map(v =>
+        `<option value="${v.v}"${v.v === (o.por || o.valores[0].v) ? " selected" : ""}>${escapeHtml(v.t)}</option>`
+      ).join("")}</select>
+    </label>`).join("") + `</div>`;
+}
+
+function leeOpciones(boton) {
+  const tarjeta = boton.closest(".jg-oferta");
+  const extra = {};
+  if (tarjeta) for (const sel of tarjeta.querySelectorAll("[data-op]")) {
+    extra[sel.getAttribute("data-op")] = Number(sel.value);
+  }
+  return extra;
 }
 
 const pillJuego = j => `<span class="pill jg-p" style="--c:${(JUEGOS[j] || {}).color || "#888"}">${escapeHtml(ICONO[j] || "●")}</span>`;
@@ -368,19 +423,11 @@ function pintaPartida() {
       ${escapeHtml(x.nombre || "Alguien")}${x.uid === state.user.uid ? " (tú)" : ""}
     </span>`).join("");
 
-  const enJuego = !p.fin && (p.jugadores || {})[state.user.uid];
+  const enJuego = !datosFin(p, est) && (p.jugadores || {})[state.user.uid];
   $("jgAbandonar").style.display = enJuego && est.listos ? "" : "none";
 
-  /* Mientras falte el rival, el enlace es lo único que hay que hacer. */
-  $("jgInvita").innerHTML = est.listos ? "" : `
-    <div class="jg-invita">
-      <b>Falta el otro jugador.</b>
-      <p>Pásale este enlace: en cuanto entre, la partida empieza sola.</p>
-      <div class="jg-enlace">
-        <input class="inp" id="jgUrl" readonly value="${escapeHtml(enlace())}">
-        <button class="btn2" id="jgCopiar">Copiar</button>
-      </div>
-    </div>`;
+  /* Mientras falte gente, el enlace es lo único que hay que hacer. */
+  $("jgInvita").innerHTML = est.listos ? "" : panelEspera(p, est);
   if (!est.listos) {
     $("jgCopiar").onclick = async () => {
       const campo = $("jgUrl");
@@ -388,11 +435,45 @@ function pintaPartida() {
       try { await navigator.clipboard.writeText(enlace()); $("jgCopiar").textContent = "Copiado"; }
       catch (e) { $("jgCopiar").textContent = "Copia a mano ↑"; }
     };
+    const emp = $("jgEmpezar");
+    if (emp) emp.onclick = () => {
+      emp.disabled = true;
+      fb.setEstado(state.pid, "jugando").catch(e => { emp.disabled = false; avisa(e); });
+    };
   }
 
   montaJuego(p);
   if (modulo) modulo.actualizar(p, est);
   pintaFin(p, est);
+}
+
+/* Una sala de dos se cierra sola al llenarse, así que ahí no hay nada
+   que decidir. Una de más de dos no se llena nunca — cuatro dentro de
+   seis se quedan esperando a dos que no van a venir — así que alguien
+   tiene que decir «ya está», y ese alguien es quien la abrió, que es
+   quien puso las condiciones. */
+function panelEspera(p, est) {
+  const cupo = est.cupo || 2;
+  const dentro = (est.jugadores || []).length;
+  const min = (JUEGOS[p.juego] || {}).minimo || 2;
+  const anfitrion = p.anfitrion === state.user.uid;
+  const varios = cupo > min;
+  return `
+    <div class="jg-invita">
+      <b>${varios ? `${dentro} de ${cupo} dentro.` : "Falta el otro jugador."}</b>
+      <p>Pásale este enlace a quien quieras: en cuanto entre,
+         ${varios ? "aparece en la partida" : "la partida empieza sola"}.</p>
+      <div class="jg-enlace">
+        <input class="inp" id="jgUrl" readonly value="${escapeHtml(enlace())}">
+        <button class="btn2" id="jgCopiar">Copiar</button>
+      </div>
+      ${!varios ? ""
+        : anfitrion && dentro >= min
+          ? `<button class="btn jg-empezar" id="jgEmpezar">Empezar con ${dentro}</button>`
+        : anfitrion
+          ? `<div class="jg-nota">Hacen falta ${min} para poder empezar.</div>`
+          : `<div class="jg-nota">Empieza cuando lo diga quien abrió la sala.</div>`}
+    </div>`;
 }
 
 const enlace = () => location.origin + location.pathname + "#p/" + state.pid;
@@ -414,35 +495,90 @@ function desmontaJuego() {
   if (h) h.innerHTML = "";
 }
 
+/* ---------- el cartel de fin ----------
+   Va en una capa fija por encima de todo y no en un bloque debajo del
+   tablero, que es donde estaba: un tablero de cuadritos grande mide
+   más que la pantalla, así que el cartel salía bajo el pliegue y la
+   partida parecía acabar sin decir nada. Dos decisiones más:
+
+   - **Se dibuja en cuanto el reductor sabe que hay ganador**, sin
+     esperar a que `fin` esté escrito en la base. Escribirlo es una ida
+     y vuelta a la red que puede fallar (o quedarse a medias si las
+     reglas no están publicadas), y quien acaba de ganar no tiene por
+     qué mirar una pantalla muerta mientras tanto.
+   - **Se puede cerrar** con la ✕, y queda cerrado para esa partida:
+     mirar el tablero final es la mitad de la gracia, y un cartel que
+     vuelve a salir en cada repintado tapa justo eso. */
+function datosFin(p, est) {
+  if (p.fin) return { ganador: p.fin.ganador || "", motivo: p.fin.motivo || "" };
+  if (est && est.fase === "fin") return { ganador: est.ganador || "", motivo: est.motivo || "" };
+  return null;
+}
+
+const CARA = { gano: "🏆", perdi: "😫", empate: "🤝", mirando: "🏁" };
+
 function pintaFin(p, est) {
   const caja = $("jgFin");
-  if (!p.fin) { caja.innerHTML = ""; return; }
-  const g = p.fin.ganador || "";
-  const yo = state.user.uid;
-  const clase = !g ? "jg-fin-empate" : g === yo ? "jg-fin-gano" : "jg-fin-perdi";
-  const texto = !g ? "Empate" : g === yo ? "¡Has ganado!" : "Ha ganado " + nombreDe(est, g);
-  const firma = clase + texto;
+  const f = datosFin(p, est);
+  if (!f || finCerrado === state.pid) {
+    if (caja.innerHTML) { caja.innerHTML = ""; caja.dataset.firma = ""; }
+    return;
+  }
+  const yo = state.user.uid, g = f.ganador;
+  const juega = !!(p.jugadores || {})[yo];
+  const clase = !g ? "empate" : g === yo ? "gano" : juega ? "perdi" : "mirando";
+  const titulo = clase === "gano" ? "¡Has ganado!"
+    : clase === "perdi" ? "Has perdido"
+    : clase === "empate" ? "Empate"
+    : "Ganó " + nombreDe(est, g);
+  const sub = clase === "perdi" ? "Ganó " + nombreDe(est, g) : "";
+  const marca = marcadorFin(est);
+  const firma = clase + titulo + sub + f.motivo + marca;
   if (caja.dataset.firma === firma) return;      // no repintar: reinicia la animación
   caja.dataset.firma = firma;
   caja.innerHTML = `
-    <div class="jg-fin ${clase}">
-      <div class="jg-fin-t">${escapeHtml(texto)}</div>
-      <div class="jg-fin-m">${escapeHtml(razon(p.fin.motivo))}</div>
-      <div class="jg-fin-btns">
-        <button class="btn" id="jgOtra">Otra partida</button>
-        <button class="btn2" id="jgAlVestibulo">Vestíbulo</button>
+    <div class="jg-fin-capa">
+      <div class="jg-fin jg-fin-${clase}">
+        <button class="jg-fin-x" id="jgFinX" title="Ver el tablero">✕</button>
+        <div class="jg-fin-cara">${CARA[clase]}</div>
+        <div class="jg-fin-t">${escapeHtml(titulo)}</div>
+        ${sub ? `<div class="jg-fin-sub">${escapeHtml(sub)}</div>` : ""}
+        <div class="jg-fin-m">${escapeHtml(razon(f.motivo))}</div>
+        ${marca}
+        <div class="jg-fin-btns">
+          <button class="btn" id="jgOtra">Otra partida</button>
+          <button class="btn2" id="jgAlVestibulo">Vestíbulo</button>
+        </div>
       </div>
     </div>`;
-  $("jgOtra").onclick = () => crear(p.juego);
+  $("jgFinX").onclick = () => { finCerrado = state.pid; caja.innerHTML = ""; caja.dataset.firma = ""; };
+  $("jgOtra").onclick = () => crear(p.juego, { cupo: est.cupo || 2, lado: p.lado || undefined });
   $("jgAlVestibulo").onclick = () => ir("#");
+}
+
+/* El marcador final, cuando el juego cuenta algo: en cuadritos son las
+   cajas y en reversi las fichas, y en los dos la pregunta inmediata al
+   acabar es «por cuánto». Los que no cuentan nada — el escondite, las
+   cartas — no ponen nada. */
+function marcadorFin(est) {
+  const cuenta = est && (est.puntos || est.cuenta);
+  if (!cuenta || !est.jugadores || !est.jugadores.length) return "";
+  const filas = est.jugadores.map(x => ({ x, n: cuenta[x.uid] || 0 }));
+  if (!filas.some(r => r.n)) return "";
+  filas.sort((a, b) => b.n - a.n);
+  return `<div class="jg-fin-marca">` + filas.map(r => `
+    <span class="jg-m" style="--c:${escapeHtml(r.x.color || "#888")}">
+      <b>${r.n}</b><span>${escapeHtml(r.x.uid === state.user.uid ? "tú" : (r.x.nombre || "?"))}</span>
+    </span>`).join("") + `</div>`;
 }
 
 const RAZONES = {
   encontrado: "Encontró al personaje escondido.",
-  abandono: "El otro jugador abandonó la partida.",
+  abandono: "La partida acabó por abandono.",
   trio: "Reunió tres cartas del mismo elemento en tres colores distintos.",
-  puntos: "Cerró más cajas.",
-  empate: "Las mismas cajas cada uno."
+  puntos: "Cerró más cajas que nadie.",
+  fichas: "Acabó con más fichas sobre el tablero.",
+  empate: "Nadie sacó ventaja."
 };
 const razon = m => RAZONES[m] || "";
 const nombreDe = (est, uid) => {

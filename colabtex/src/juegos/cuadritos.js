@@ -14,6 +14,16 @@
  * El tablero es SVG y no canvas porque lo que hay que acertar con el
  * ratón es una raya de dos milímetros: en SVG cada hueco lleva detrás su
  * propia zona de clic ancha y el navegador hace la puntería solo.
+ *
+ * Se juega **de dos a seis**, y el tamaño del tablero lo elige quien abre
+ * la sala. Nada de eso está aquí: el cupo y el lado viven en la partida
+ * (`cupoDe`, `ladoDe`) y el reductor ya reparte los turnos en círculo y
+ * salta a quien se haya ido. Esta pantalla solo tiene que dejar de dar
+ * por hecho que enfrente hay exactamente una persona — que era lo que
+ * hacía el marcador de dos huecos, y lo que decía cada frase del pie.
+ * El marcador va en **orden de asiento**, no de puntos: así se lee de
+ * corrido quién viene después, que es la mitad de la estrategia cuando
+ * son cinco y hay que decidir a quién se le regala la cadena.
  */
 import { claveRaya, rayaValida, cajasQueCierra } from "./motor.js";
 
@@ -52,15 +62,22 @@ export function crearCuadritos(ctx) {
     host = null;
   }
 
-  const yo = () => (est ? est.jugadores.find(j => j.uid === uid) : null);
-  const otro = () => (est ? est.jugadores.find(j => j.uid !== uid) : null);
   const colorDe = u => {
     const j = est && est.jugadores.find(x => x.uid === u);
     return (j && j.color) || "#8a97a3";
   };
   const nombreDe = u => {
     const j = est && est.jugadores.find(x => x.uid === u);
-    return j ? j.nombre : "el rival";
+    return j ? j.nombre : "alguien";
+  };
+  /* Quién va ganando, para la frase del final. Devuelve la lista de
+     empatados arriba, que con más de dos jugadores es lo normal. */
+  const cabeza = () => {
+    const vivos = (est.jugadores || []).filter(j => !(est.fuera || {})[j.uid]);
+    const cs = vivos.length ? vivos : (est.jugadores || []);
+    if (!cs.length) return [];
+    const tope = Math.max(...cs.map(j => (est.puntos || {})[j.uid] || 0));
+    return cs.filter(j => ((est.puntos || {})[j.uid] || 0) === tope);
   };
 
   function set(id, firma, html) {
@@ -124,31 +141,59 @@ export function crearCuadritos(ctx) {
 
   function pinta() {
     if (!host || !est) return;
-    const y = yo(), o = otro();
+    const dentro = (est.jugadores || []).length, cupo = est.cupo || 2;
+    const fuera = est.fuera || {};
 
     let fase;
-    if (est.fase === "espera") fase = "Esperando a que entre alguien…";
-    else if (est.fase === "fin") {
-      if (est.motivo === "empate") fase = "Empate: mismas cajas.";
-      else if (est.motivo === "abandono") fase = est.ganador === uid ? "¡Ganas! El otro se fue." : "Abandonaste la partida.";
-      else fase = est.ganador === uid ? "🏆 Ganas la partida." : "Pierdes la partida.";
+    if (est.fase === "espera") {
+      const faltan = Math.max(0, cupo - dentro);
+      fase = faltan
+        ? `Esperando a ${faltan} ${faltan === 1 ? "jugador" : "jugadores"}…`
+        : "Listos: que empiece quien abrió la sala.";
+    } else if (est.fase === "fin") {
+      if (est.motivo === "empate") {
+        const arriba = cabeza();
+        fase = arriba.length > 1
+          ? `Empate entre ${arriba.map(j => (j.uid === uid ? "tú" : j.nombre)).join(", ")}.`
+          : "Empate: mismas cajas.";
+      } else if (est.motivo === "abandono") {
+        fase = est.ganador === uid
+          ? "🏆 Ganas: los demás se fueron."
+          : fuera[uid] ? "Abandonaste la partida."
+          : est.ganador ? `Gana ${nombreDe(est.ganador)}: los demás se fueron.`
+          : "La partida se quedó sin jugadores.";
+      } else {
+        fase = est.ganador === uid
+          ? "🏆 Ganas la partida."
+          : `Gana ${nombreDe(est.ganador)} con ${(est.puntos || {})[est.ganador] || 0} cajas.`;
+      }
     } else fase = est.turno === uid ? "Te toca: pon una raya" : `Le toca a ${nombreDe(est.turno)}`;
     set("cuFase", fase, `<span class="jg-punto-t" style="background:${esc(colorDe(est.turno))}"></span>${esc(fase)}`);
 
-    const marca = j => j
-      ? `<span class="jg-m" style="--c:${esc(j.color || "#888")}">
+    /* Un hueco por jugador, en orden de asiento, con quien tiene el
+       turno marcado y quien se fue en gris: con seis nombres ahí, sin
+       esas dos marcas el marcador no dice de quién se espera nada. */
+    const marca = j => {
+      const cl = "jg-m"
+        + (j.uid === est.turno && est.fase === "jugando" ? " jg-m-turno" : "")
+        + (fuera[j.uid] ? " jg-m-fuera" : "");
+      return `<span class="${cl}" style="--c:${esc(j.color || "#888")}"
+          title="${esc(fuera[j.uid] ? j.nombre + " abandonó" : j.nombre)}">
            <b>${(est.puntos && est.puntos[j.uid]) || 0}</b>
-           <span>${esc(j.uid === uid ? "tú" : j.nombre)}</span></span>` : "";
+           <span>${esc(j.uid === uid ? "tú" : j.nombre)}</span></span>`;
+    };
     set("cuMarcador",
-      (y ? y.uid + (est.puntos[y.uid] || 0) : "") + "/" + (o ? o.uid + (est.puntos[o.uid] || 0) : ""),
-      marca(y) + marca(o));
+      (est.jugadores || []).map(j =>
+        j.uid + ":" + ((est.puntos || {})[j.uid] || 0) + (fuera[j.uid] ? "x" : "")).join("/")
+        + "|" + est.turno + "|" + est.fase,
+      (est.jugadores || []).map(marca).join(""));
 
     set("cuTablero",
       Object.keys(est.rayas).length + "|" + est.turno + "|" + est.fase + "|" + Object.keys(est.cajas).length,
       tablero());
 
     const pie = est.fase === "espera"
-      ? "Pásale el enlace de la sala a quien quieras y empezáis."
+      ? `Pásale el enlace de la sala a quien quieras: caben ${cupo} y estáis ${dentro}.`
       : est.fase === "fin" ? "Partida terminada."
       : `Quedan ${est.restantes} rayas. Cerrar una caja te da otro turno.`;
     set("cuPie", pie, `<span class="jg-nota">${esc(pie)}</span>`);

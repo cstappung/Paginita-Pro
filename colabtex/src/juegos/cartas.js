@@ -273,6 +273,11 @@ export function crearCartas(ctx) {
 
   /* ---------- interacción ---------- */
   function alClic(ev) {
+    /* Con la partida cerrada no se toca nada. El portón de
+       `juegos-main.js` ya impide la escritura, pero sin esto la carta se
+       seleccionaba y el pie invitaba a echarla: la pantalla decía que
+       quedaba jugada donde no queda ninguna. */
+    if (est && est.fase === "fin") return;
     const carta = ev.target.closest(".jg-carta.jg-jugable");
     if (carta && !carta.classList.contains("jg-quieta")) {
       elegida = Number(carta.getAttribute("data-i"));
@@ -283,7 +288,8 @@ export function crearCartas(ctx) {
   }
 
   async function echar() {
-    if (elegida === null || enviando || !est || est.comp[uid] || mandadaEn === est.ronda) return;
+    if (elegida === null || enviando || !est || est.fase !== "jugando") return;
+    if (est.comp[uid] || mandadaEn === est.ronda) return;
     enviando = true;
     mandadaEn = est.ronda;
     try {
