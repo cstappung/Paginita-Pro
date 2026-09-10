@@ -45,6 +45,31 @@ reglas. Lo que garantizan una vez publicadas:
   puede marcarlo como resuelto**;
 - los textos tienen tope de tamaño, para que un error en bucle no llene la base.
 
+### ⚠ Si vienes de una versión anterior: los juegos
+
+La página **Juegos** usa otros tres nodos nuevos, `partidas`, `misPartidas` y
+`ranks`, y le pasa exactamente lo mismo: mientras no publiques de nuevo
+`database.rules.json`, el vestíbulo se abre con un aviso amarillo que nombra
+esta causa y no se puede crear ni entrar en ninguna partida.
+
+Lo que garantizan una vez publicadas:
+
+- cualquiera con sesión lee las partidas — y puede, porque lo que se esconde
+  en el escondite y la carta que se juega en cartas **no viajan en claro**:
+  viaja su huella (SHA-256 con sal) y solo se revela cuando ya no sirve de
+  nada. Con las reglas no habría bastado: leer la partida es justo lo que hace
+  falta para jugarla;
+- una jugada **se escribe una vez y no se reescribe** (`!data.exists()`), así
+  que nadie vuelve atrás a cambiar la carta que jugó, y solo la firma quien la
+  juega (`uid === auth.uid`);
+- solo se entra en una sala que sigue en `esperando`, que es lo que impide que
+  un tercero se meta en una partida empezada;
+- la sala la borra su anfitrión y solo mientras no haya terminado;
+- una fila de la clasificación solo la escribe su dueño, solo puede subir de
+  una partida en una, y esa partida tiene que existir, haber terminado, ser de
+  ese juego y tenerle a él dentro. Es lo que impide anotarse cien victorias a
+  mano desde la consola del navegador.
+
 ## 2. Reglas de Storage
 
 1. Consola → **Storage** → pestaña **Reglas**.

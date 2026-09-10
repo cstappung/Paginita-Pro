@@ -69,7 +69,8 @@ function parar() {
 }
 
 /* ---------- pintado ---------- */
-const pillApp = a => `<span class="pill ${a === "colabdraw" ? "p-draw" : "p-tex"}">${escapeHtml(APPS[a] || a)}</span>`;
+const CLASE_APP = { colabdraw: "p-draw", juegos: "p-juegos" };
+const pillApp = a => `<span class="pill ${CLASE_APP[a] || "p-tex"}">${escapeHtml(APPS[a] || a)}</span>`;
 
 function filtra(lista, campos) {
   const q = state.busca.trim().toLowerCase();
