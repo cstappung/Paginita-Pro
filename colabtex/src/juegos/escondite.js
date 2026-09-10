@@ -34,6 +34,15 @@ import { pinta, pintaPersona } from "./paisaje.js";
    escondite y demasiado poco para pensárselo, que es justo el punto. */
 const TIEMPO_ESCONDER = 60000;
 
+/* A los cuarenta segundos de búsqueda aparece un cerco flojo alrededor
+   del escondite. Es justo, aunque suene a trampa: `arranque` viene del
+   registro y las dos máquinas lo leen igual, así que la ayuda llega a
+   los dos en el mismo instante — y quien ya haya encontrado al otro
+   antes no la ve nunca. Sin ella, dos personas cabezotas se quedaban
+   veinte minutos pinchando un bosque. */
+const PISTA_MS = 40000;
+const RADIO_PISTA = 0.16;
+
 const clave = (pid, uid) => `jg.escondite.${pid}.${uid}`;
 
 function guardaSecreto(pid, uid, s) {
@@ -134,13 +143,25 @@ export function crearEscondite(ctx) {
       if (s) pintaPersona(c2d, s.x, s.y, W, H, (mi && mi.color) || "#e0653a", !est.compromisos[uid]);
       if (propuesta && !est.compromisos[uid]) marco(c2d, propuesta.x * W, propuesta.y * H, W, "#ffffff");
     } else if (f === "buscar" || f === "fin") {
-      for (const t of (est.intentos[uid] || [])) if (!t.ok) cruz(c2d, t.x * W, t.y * H, W);
+      /* **El personaje se dibuja desde el primer segundo.** Antes solo
+         aparecía al encontrarlo o al acabar la partida, y eso no era un
+         escondite: era buscar algo que no estaba en la pantalla. Se
+         probó con un amigo y el veredicto fue exacto — «es invisible e
+         imposible de encontrar, y no estaba donde lo puso» —, porque en
+         efecto no estaba en ningún sitio hasta que el reloj lo decidía.
+         Dibujado, el juego es lo que prometía: una figura pequeña entre
+         doscientas piezas parecidas, difícil pero honesta. */
       const blanco = su ? est.sitios[su.uid] : null;
       const visto = est.fase === "fin" || (est.intentos[uid] || []).some(t => t.ok);
-      if (blanco && visto) {
-        pintaPersona(c2d, blanco.x, blanco.y, W, H, (su && su.color) || "#0f62fe", false);
-        marco(c2d, blanco.x * W, blanco.y * H, W, "#ffe066");
+      if (blanco && f === "buscar" && !visto && ahora() - (est.arranque || 0) > PISTA_MS) {
+        cerco(c2d, blanco.x * W, blanco.y * H, W);
       }
+      if (blanco) pintaPersona(c2d, blanco.x, blanco.y, W, H, (su && su.color) || "#0f62fe", false);
+      /* Las cruces van encima del personaje: son lo que ya se ha
+         descartado, y taparlas con la figura sería esconder la única
+         cuenta que lleva quien busca. */
+      for (const t of (est.intentos[uid] || [])) if (!t.ok) cruz(c2d, t.x * W, t.y * H, W);
+      if (blanco && visto) marco(c2d, blanco.x * W, blanco.y * H, W, "#ffe066");
     }
     if (ahora() < bloqueoHasta) {
       c2d.fillStyle = "rgba(12,16,22,0.45)"; c2d.fillRect(0, 0, W, H);
@@ -153,6 +174,19 @@ export function crearEscondite(ctx) {
     c.beginPath(); c.arc(x, y, RADIO_ACIERTO * W, 0, 7); c.stroke();
     c.restore();
   }
+  /* El cerco de la pista: ancho, flojo y sin borde duro, para que diga
+     «por aquí» y no «aquí». */
+  function cerco(c, x, y, W) {
+    const r = RADIO_PISTA * W;
+    c.save();
+    const g = c.createRadialGradient(x, y, r * 0.2, x, y, r);
+    g.addColorStop(0, "rgba(255,224,102,0.30)");
+    g.addColorStop(1, "rgba(255,224,102,0)");
+    c.fillStyle = g;
+    c.beginPath(); c.arc(x, y, r, 0, 7); c.fill();
+    c.restore();
+  }
+
   function cruz(c, x, y, W) {
     const r = W * 0.011;
     c.save();
@@ -203,18 +237,38 @@ export function crearEscondite(ctx) {
       reloj.className = "jg-reloj";
       const espera = Math.max(0, bloqueoHasta - ahora());
       const fallos = (est.intentos[uid] || []).filter(t => !t.ok).length;
+      const cal = calor(su);
       pie.innerHTML = espera
-        ? `<span class="jg-castigo">Fallaste — espera ${seg(espera)} s</span>`
-        : `<span class="jg-nota">${fallos ? fallos + (fallos === 1 ? " fallo" : " fallos") + " · " : ""}Cada fallo cuesta ${CASTIGO_FALLO / 1000} s. Gana quien encuentre primero.</span>`;
+        ? `<span class="jg-castigo">Fallaste — espera ${seg(espera)} s${cal ? " · " + escapa(cal.texto) : ""}</span>`
+        : `<span class="jg-nota">${cal ? `<b class="jg-calor jg-calor-${cal.clase}">${escapa(cal.texto)}</b> · ` : ""}${fallos ? fallos + (fallos === 1 ? " fallo" : " fallos") + " · " : ""}Cada fallo cuesta ${CASTIGO_FALLO / 1000} s. Gana quien encuentre primero.</span>`;
     } else if (f === "fin") {
       const gane = est.ganador === uid;
       fase.innerHTML = gane ? `<b class="jg-gana">¡Le encontraste!</b>` : `<b class="jg-pierde">Te encontró ${escapa(su ? su.nombre : "el otro")}</b>`;
       reloj.textContent = "";
       pie.innerHTML = `<span class="jg-nota">${est.motivo === "abandono"
         ? "La partida terminó porque alguien se fue."
-        : "El escondite del otro queda marcado en amarillo."}</span>`;
+        : "El escondite queda cercado en amarillo."}</span>`;
     }
     capa.style.display = "none";
+  }
+
+  /* Lo caliente o frío del último fallo. La distancia se mide con la
+     misma corrección de aspecto que `acierta` (el lienzo es más ancho
+     que alto), o «caliente» querría decir una cosa a lo ancho y otra a
+     lo alto. Es información que el navegador ya tiene — las coordenadas
+     del otro están en su memoria para poder juzgar el clic —, así que
+     decirla en voz alta no revela nada nuevo y convierte el juego en
+     una búsqueda que converge. */
+  function calor(su) {
+    if (!est || !su) return null;
+    const blanco = est.sitios[su.uid];
+    const t = (est.intentos[uid] || []).filter(x => !x.ok).slice(-1)[0];
+    if (!blanco || !t) return null;
+    const d = Math.hypot(t.x - blanco.x, (t.y - blanco.y) * 0.62);
+    if (d < 0.08) return { clase: "casi", texto: "¡Casi!" };
+    if (d < 0.18) return { clase: "caliente", texto: "Caliente" };
+    if (d < 0.32) return { clase: "templado", texto: "Templado" };
+    return { clase: "frio", texto: "Frío" };
   }
 
   const escapa = s => String(s || "").replace(/[&<>"]/g, x => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[x]));

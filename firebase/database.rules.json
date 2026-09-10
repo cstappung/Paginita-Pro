@@ -106,10 +106,11 @@
         ".write": "auth != null && ((!data.exists() && newData.child('anfitrion').val() === auth.uid && newData.child('jugadores').child(auth.uid).exists()) || (!newData.exists() && data.child('anfitrion').val() === auth.uid && !data.child('fin').exists()))",
         ".validate": "newData.hasChildren(['juego', 'estado', 'anfitrion'])",
 
-        "juego": { ".validate": "newData.val() === 'escondite' || newData.val() === 'cartas' || newData.val() === 'cuadritos'" },
+        "juego": { ".validate": "newData.val() === 'escondite' || newData.val() === 'cartas' || newData.val() === 'cuadritos' || newData.val() === 'reversi'" },
         "nombre": { ".validate": "newData.isString() && newData.val().length <= 40" },
         "semilla": { ".validate": "newData.isNumber()" },
-        "lado": { ".validate": "newData.isNumber()" },
+        "lado": { ".validate": "newData.isNumber() && newData.val() >= 4 && newData.val() <= 10" },
+        "cupo": { ".validate": "newData.isNumber() && newData.val() >= 2 && newData.val() <= 6" },
 
         "estado": {
           ".write": "auth != null && root.child('partidas').child($pid).child('jugadores').child(auth.uid).exists()",

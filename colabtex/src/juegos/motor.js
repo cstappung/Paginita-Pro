@@ -23,26 +23,50 @@
    que un número de 32 bits describe igual de bien.
    ============================================================ */
 
+/* `minimo` es cuántos hacen falta para empezar y `cupo` cuántos caben
+   como mucho. Solo cuadritos admite más de dos: los otros tres son
+   duelos por construcción — el escondite cruza *dos* paisajes, las
+   cartas resuelven *un* choque y el reversi tiene *dos* colores. */
 export const JUEGOS = {
   escondite: {
     nombre: "Escondite",
     lema: "Esconde a tu persona en el paisaje y encuentra la del otro",
     color: "#e0653a",
-    jugadores: 2
+    minimo: 2,
+    cupo: 2
   },
   cartas: {
     nombre: "Cartas de los tres elementos",
     lema: "Fuego, agua y nieve — tres cartas de tres colores y ganas",
     color: "#d4356b",
-    jugadores: 2
+    minimo: 2,
+    cupo: 2
   },
   cuadritos: {
     nombre: "Cuadritos",
-    lema: "Cierra más cajas que el otro, una raya por turno",
+    lema: "Cierra más cajas que los demás, una raya por turno",
     color: "#0f62fe",
-    jugadores: 2
+    minimo: 2,
+    cupo: 6
+  },
+  reversi: {
+    nombre: "Reversi",
+    lema: "Atrapa las fichas del otro entre las tuyas y dales la vuelta",
+    color: "#0d9488",
+    minimo: 2,
+    cupo: 2
   }
 };
+
+/* Cuánta gente cabe en *esta* sala: lo que eligió quien la abrió,
+   recortado a lo que el juego admite. Una partida creada antes de que
+   esto existiera no tiene `cupo` y se lee como dos, que es lo que era. */
+export function cupoDe(p) {
+  const j = JUEGOS[p && p.juego] || {};
+  const tope = j.cupo || 2, min = j.minimo || 2;
+  const n = Math.floor(Number(p && p.cupo)) || min;
+  return Math.max(min, Math.min(tope, n));
+}
 
 /* ============================================================
    1. Azar reproducible
@@ -298,6 +322,28 @@ export function victoriaCartas(ganadas) {
 
 export const LADO = 6;        // 6×6 puntos = 25 cajas; una partida dura unos tres minutos
 
+/* Los tres tamaños que ofrece la sala. El mediano es el de siempre,
+   que es el que se mide en minutos; el grande con seis jugadores pasa
+   de los diez, y por eso no hay un cuarto más grande. Se guarda el
+   número de *puntos* del lado, que es lo que el resto del código pide,
+   y la etiqueta habla de cajas, que es lo que se ve. */
+export const TAMANOS = {
+  pequeno: { nombre: "Pequeño", lado: 5 },
+  mediano: { nombre: "Mediano", lado: 6 },
+  grande:  { nombre: "Grande",  lado: 8 }
+};
+export const etiquetaTamano = k => {
+  const t = TAMANOS[k];
+  return t ? `${t.nombre} (${t.lado - 1}×${t.lado - 1})` : "";
+};
+/* Un `lado` que llega de la base se recorta a los tamaños ofrecidos:
+   un número cualquiera dibujaría un tablero que nadie eligió. */
+export function ladoDe(p) {
+  const n = Math.floor(Number(p && p.lado)) || LADO;
+  const validos = Object.values(TAMANOS).map(t => t.lado);
+  return validos.includes(n) ? n : LADO;
+}
+
 export const claveRaya = (o, f, c) => `${o}${f}_${c}`;
 
 export function rayaValida(o, f, c, lado = LADO) {
@@ -320,6 +366,90 @@ export function cajasQueCierra(rayas, o, f, c, lado = LADO) {
   const out = [];
   if (o === "h") { if (caja(f, c)) out.push([f, c]); if (caja(f - 1, c)) out.push([f - 1, c]); }
   else { if (caja(f, c)) out.push([f, c]); if (caja(f, c - 1)) out.push([f, c - 1]); }
+  return out;
+}
+
+/* ============================================================
+   5.4 Reversi
+
+   El cuarto juego, y está aquí por lo mismo que cuadritos estaba: los
+   otros tres son mirar, adivinar y contar cadenas, y este es leer el
+   tablero. Es Othello con sus reglas de siempre: se pone ficha donde
+   atrape una fila de fichas del otro entre la nueva y una propia, y
+   todas las atrapadas cambian de color. Gana quien tenga más al final.
+
+   Tres decisiones:
+
+   - **El tablero se guarda como casilla → uid**, no como "n"/"b". El
+     color lo da el orden de entrada (quien abre la sala juega negras y
+     empieza, que es la regla del juego), pero contar fichas por
+     jugador es lo que hace el marcador, y con el uid dentro eso es un
+     recorrido y no una traducción.
+   - **La captura se decide con una bandera explícita**, no deduciendo
+     por qué salió el bucle: el rayo tiene que morir en una ficha
+     propia *después* de al menos una del otro, y esas dos condiciones
+     leídas del estado final del índice se confunden con el borde.
+   - **Pasar no es una jugada.** Si al que le toca no le quedan
+     casillas, el turno vuelve al otro sin que nadie escriba nada — el
+     reductor lo calcula — y la partida acaba cuando ninguno de los dos
+     puede. Una jugada «paso» habría sido una jugada que el otro no
+     puede comprobar y que se podría escribir de más.
+   ============================================================ */
+
+export const REV_LADO = 8;
+export const claveCasilla = (f, c) => `${f}_${c}`;
+
+const REV_DIRS = [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]];
+
+/* Las cuatro del centro, como manda el juego: las negras en diagonal
+   ascendente y las blancas en la otra. */
+export function revInicial(negras, blancas, lado = REV_LADO) {
+  const m = lado / 2 - 1;
+  return {
+    [claveCasilla(m, m)]: blancas,
+    [claveCasilla(m, m + 1)]: negras,
+    [claveCasilla(m + 1, m)]: negras,
+    [claveCasilla(m + 1, m + 1)]: blancas
+  };
+}
+
+/* Las fichas que se voltean al poner una en (f,c). Vacío significa
+   «ahí no se puede», que es la única forma de saberlo. */
+export function revCapturas(tab, f, c, mio, lado = REV_LADO) {
+  if (!Number.isInteger(f) || !Number.isInteger(c)) return [];
+  if (f < 0 || c < 0 || f >= lado || c >= lado) return [];
+  if (tab[claveCasilla(f, c)]) return [];
+  const out = [];
+  for (const [df, dc] of REV_DIRS) {
+    const tramo = [];
+    let ff = f + df, cc = c + dc, cierra = false;
+    while (ff >= 0 && cc >= 0 && ff < lado && cc < lado) {
+      const q = tab[claveCasilla(ff, cc)];
+      if (!q) break;                       // hueco: el rayo no cierra
+      if (q === mio) { cierra = tramo.length > 0; break; }
+      tramo.push([ff, cc]);
+      ff += df; cc += dc;
+    }
+    if (cierra) for (const x of tramo) out.push(x);
+  }
+  return out;
+}
+
+/* Casilla → fichas que voltearía, para todas las jugables. El tablero
+   son 64 casillas y ocho direcciones: recorrerlo entero cada vez es
+   medio millar de comprobaciones, nada que se note. */
+export function revJugadas(tab, mio, lado = REV_LADO) {
+  const out = {};
+  for (let f = 0; f < lado; f++) for (let c = 0; c < lado; c++) {
+    const caps = revCapturas(tab, f, c, mio, lado);
+    if (caps.length) out[claveCasilla(f, c)] = caps;
+  }
+  return out;
+}
+
+export function revCuenta(tab) {
+  const out = {};
+  for (const k in tab) out[tab[k]] = (out[tab[k]] || 0) + 1;
   return out;
 }
 
@@ -350,12 +480,21 @@ export function jugadasDe(p) {
 
 export const claveJugada = n => String(n).padStart(4, "0");
 
+/* `listos` es «la partida está en marcha». Con cupo de dos basta con
+   que estén los dos; con cupo mayor hace falta además que la sala se
+   haya cerrado — llena, o cerrada a mano por quien la abrió — porque
+   si no, el tercero llegaría a un tablero empezado y sin turno. Ese
+   cierre es justo el `estado`, que deja de ser «esperando». */
 export function reducir(p) {
   const js = jugadoresDe(p);
-  const base = { jugadores: js, listos: js.length >= 2, fin: p.fin || null };
+  const cupo = cupoDe(p);
+  const min = (JUEGOS[p.juego] || {}).minimo || 2;
+  const listos = js.length >= min && (cupo === min || p.estado !== "esperando");
+  const base = { jugadores: js, cupo, listos, fin: p.fin || null };
   if (p.juego === "escondite") return { ...base, ...redEscondite(p, js) };
   if (p.juego === "cartas") return { ...base, ...redCartas(p, js) };
-  if (p.juego === "cuadritos") return { ...base, ...redCuadritos(p, js) };
+  if (p.juego === "cuadritos") return { ...base, ...redCuadritos(p, js, listos) };
+  if (p.juego === "reversi") return { ...base, ...redReversi(p, js) };
   return base;
 }
 
@@ -440,24 +579,56 @@ function redCartas(p, js) {
   };
 }
 
-/* ---------- cuadritos ---------- */
-function redCuadritos(p, js) {
-  const lado = p.lado || LADO;
+/* ---------- cuadritos ----------
+   El único de los cuatro que admite más de dos. Con N jugadores hay
+   dos cosas que dejan de ser lo que eran con dos:
+
+   - **Abandonar no da la partida a nadie** mientras queden dos o más
+     jugando. Quien se va deja de recibir turnos (`fuera`) y sus cajas
+     se quedan donde están, porque el tablero las tiene pintadas y
+     borrarlas cambiaría la partida de los demás a mitad. Solo cuando
+     queda uno vivo gana él por abandono de los otros.
+   - **El ganador es el máximo, y el empate es un empate a varios.**
+     Con dos bastaba comparar; con seis hay que buscar el máximo y
+     además comprobar que sea único, o el «ganador» sería el primero
+     de la lista por casualidad. */
+function redCuadritos(p, js, listos) {
+  const lado = ladoDe(p);
   const jug = jugadasDe(p);
   const rayas = {};                     // clave → uid de quien la puso
   const cajas = {};                     // "f_c" → uid
   const puntos = {};
+  const fuera = {};                     // uid → true si abandonó
   for (const j of js) puntos[j.uid] = 0;
   let turno = js.length ? js[0].uid : "";
   let ganador = null, motivo = "";
   const ultima = { clave: "", cajas: [] };
 
+  const vivos = () => js.filter(x => !fuera[x.uid]);
+  /* El siguiente que sigue en la partida. Se recorre la lista entera
+     por si los de en medio se han ido; si no queda nadie más, el turno
+     se queda quieto y el fin lo decide el bucle de fuera. */
+  const siguiente = uid => {
+    const i = js.findIndex(x => x.uid === uid);
+    for (let k = 1; k <= js.length; k++) {
+      const c = js[(i + k) % js.length];
+      if (!fuera[c.uid]) return c.uid;
+    }
+    return uid;
+  };
+
   for (const j of jug) {
     if (j.t === "abandona") {
-      if (!ganador) { const o = js.find(x => x.uid !== j.uid); if (o) { ganador = o.uid; motivo = "abandono"; } }
+      if (ganador !== null || fuera[j.uid]) continue;
+      fuera[j.uid] = true;
+      const quedan = vivos();
+      if (quedan.length <= 1) {
+        if (quedan.length === 1) { ganador = quedan[0].uid; motivo = "abandono"; }
+        else { ganador = ""; motivo = "abandono"; }
+      } else if (turno === j.uid) turno = siguiente(j.uid);
       continue;
     }
-    if (j.t !== "l" || ganador) continue;
+    if (j.t !== "l" || ganador !== null) continue;
     if (j.uid !== turno) continue;                       // fuera de turno: se ignora, no se cree
     const k = claveRaya(j.o, j.f, j.c);
     if (rayas[k] || !rayaValida(j.o, j.f, j.c, lado)) continue;
@@ -467,21 +638,85 @@ function redCuadritos(p, js) {
     ultima.clave = k; ultima.cajas = nuevas;
     /* Cerrar caja da otro turno — es la regla que crea las cadenas y
        toda la estrategia del juego. */
-    if (!nuevas.length) { const i = js.findIndex(x => x.uid === turno); turno = js[(i + 1) % js.length].uid; }
+    if (!nuevas.length) turno = siguiente(turno);
   }
 
   const llenas = Object.keys(cajas).length;
   const totales = (lado - 1) * (lado - 1);
-  if (!ganador && js.length >= 2 && llenas >= totales) {
-    const [a, b] = js;
-    if (puntos[a.uid] > puntos[b.uid]) { ganador = a.uid; motivo = "puntos"; }
-    else if (puntos[b.uid] > puntos[a.uid]) { ganador = b.uid; motivo = "puntos"; }
+  if (ganador === null && listos && llenas >= totales) {
+    const candidatos = vivos().length ? vivos() : js;
+    const tope = Math.max(...candidatos.map(x => puntos[x.uid] || 0));
+    const mejores = candidatos.filter(x => (puntos[x.uid] || 0) === tope);
+    if (mejores.length === 1) { ganador = mejores[0].uid; motivo = "puntos"; }
     else { ganador = ""; motivo = "empate"; }
   }
   return {
-    fase: js.length < 2 ? "espera" : (ganador !== null ? "fin" : "jugando"),
-    lado, rayas, cajas, puntos, turno, ultima, ganador, motivo,
+    fase: !listos ? "espera" : (ganador !== null ? "fin" : "jugando"),
+    lado, rayas, cajas, puntos, fuera, turno, ultima, ganador, motivo,
     restantes: totalRayas(lado) - Object.keys(rayas).length
+  };
+}
+
+/* ---------- reversi ---------- */
+function redReversi(p, js) {
+  const lado = REV_LADO;
+  const jug = jugadasDe(p);
+  const negras = js[0] ? js[0].uid : "";
+  const blancas = js[1] ? js[1].uid : "";
+  const listos = !!(negras && blancas);
+  const otroDe = u => (u === negras ? blancas : negras);
+
+  let tab = listos ? revInicial(negras, blancas, lado) : {};
+  let turno = negras;                   // negras abren, como en el juego
+  let pasa = "";                        // quién se ha quedado sin jugada
+  let ganador = null, motivo = "";
+  const ultima = { casilla: "", voltea: [] };
+
+  /* A quién le toca después de mover. Si el otro no tiene casilla, el
+     turno se queda donde estaba y se anota que ha pasado; si tampoco
+     la tiene el que acaba de mover, la partida ha terminado y el turno
+     se queda vacío, que es lo que lee el cierre de abajo. */
+  const tras = (t, actual) => {
+    const o = otroDe(actual);
+    if (Object.keys(revJugadas(t, o, lado)).length) return { turno: o, pasa: "" };
+    if (Object.keys(revJugadas(t, actual, lado)).length) return { turno: actual, pasa: o };
+    return { turno: "", pasa: "" };
+  };
+
+  for (const j of jug) {
+    if (j.t === "abandona") {
+      if (ganador === null) {
+        const o = otroDe(j.uid);
+        if (o) { ganador = o; motivo = "abandono"; }
+      }
+      continue;
+    }
+    if (j.t !== "p" || ganador !== null || !listos || !turno) continue;
+    if (j.uid !== turno) continue;                       // fuera de turno: no existe
+    const caps = revCapturas(tab, j.f, j.c, j.uid, lado);
+    if (!caps.length) continue;                          // ahí no se podía
+    tab = Object.assign({}, tab, { [claveCasilla(j.f, j.c)]: j.uid });
+    for (const [ff, cc] of caps) tab[claveCasilla(ff, cc)] = j.uid;
+    ultima.casilla = claveCasilla(j.f, j.c);
+    ultima.voltea = caps;
+    const nx = tras(tab, j.uid);
+    turno = nx.turno; pasa = nx.pasa;
+  }
+
+  const cuenta = revCuenta(tab);
+  if (ganador === null && listos && !turno) {
+    const a = cuenta[negras] || 0, b = cuenta[blancas] || 0;
+    if (a > b) { ganador = negras; motivo = "fichas"; }
+    else if (b > a) { ganador = blancas; motivo = "fichas"; }
+    else { ganador = ""; motivo = "empate"; }
+  }
+
+  return {
+    fase: !listos ? "espera" : (ganador !== null ? "fin" : "jugando"),
+    lado, tab, turno, pasa, negras, blancas, cuenta,
+    legales: turno ? revJugadas(tab, turno, lado) : {},
+    ultima, ganador, motivo,
+    libres: lado * lado - Object.keys(tab).length
   };
 }
 

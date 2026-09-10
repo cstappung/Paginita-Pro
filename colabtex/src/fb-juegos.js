@@ -41,10 +41,10 @@
    ============================================================ */
 import { db } from "./firebase.js";
 import {
-  ref, get, set, update, push, remove, onValue, onDisconnect,
+  ref, get, set, push, remove, onValue, onDisconnect,
   runTransaction, query, orderByChild, equalTo, serverTimestamp
 } from "firebase/database";
-import { claveJugada, semillaAleatoria, LADO } from "./juegos/motor.js";
+import { claveJugada, semillaAleatoria, LADO, cupoDe } from "./juegos/motor.js";
 
 const P = "partidas", MIAS = "misPartidas", R = "ranks";
 
@@ -60,6 +60,10 @@ export const ahora = () => Date.now() + offset;
 
 /* ---------- partidas ---------- */
 
+/* `extra` es lo que eligió quien abre la sala — de momento `cupo` y
+   `lado` de cuadritos. Va detrás del objeto base a propósito: los
+   valores por omisión son los de siempre y lo elegido los pisa, así
+   que un juego que no ofrezca nada no tiene que pasar nada. */
 export async function crearPartida(juego, quien, extra) {
   const pid = push(ref(db, P)).key;
   await set(ref(db, `${P}/${pid}`), Object.assign({
@@ -69,6 +73,7 @@ export async function crearPartida(juego, quien, extra) {
     nombre: (quien.nombre || "Alguien").split(" ")[0],
     semilla: semillaAleatoria(),
     lado: LADO,
+    cupo: 2,
     at: serverTimestamp(),
     jugadores: { [quien.uid]: ficha(quien, 0) }
   }, extra || {}));
@@ -92,10 +97,18 @@ export async function unirse(pid, quien) {
   const p = snap.val();
   if (!p) throw new Error("Esa partida ya no existe.");
   const ya = p.jugadores || {};
+  const cupo = cupoDe(p);
   if (!ya[quien.uid]) {
-    if (Object.keys(ya).length >= 2) throw new Error("La sala está llena.");
+    if (Object.keys(ya).length >= cupo) throw new Error("La sala está llena.");
     await set(ref(db, `${P}/${pid}/jugadores/${quien.uid}`), ficha(quien, Object.keys(ya).length));
-    await set(ref(db, `${P}/${pid}/estado`), "jugando");
+    /* La sala se cierra sola al llenarse. Con cupo de más de dos puede
+       cerrarla antes quien la abrió (`setEstado`), porque si no, una
+       sala de seis con cuatro dentro no empezaría nunca. Las reglas
+       solo dejan entrar mientras el estado sea «esperando», así que
+       cerrar es también lo que echa el cerrojo. */
+    if (Object.keys(ya).length + 1 >= cupo) {
+      await set(ref(db, `${P}/${pid}/estado`), "jugando");
+    }
   }
   await marcarMia(pid, p.juego, quien.uid);
   return p.juego;
@@ -124,11 +137,21 @@ export async function jugar(pid, n, jugada) {
 
 export const setEstado = (pid, estado) => set(ref(db, `${P}/${pid}/estado`), estado);
 
+/* Dos escrituras y no un `update` del nodo entero. `fin` y `estado`
+   cuelgan de reglas distintas (una exige que el que escribe sea
+   jugador y que el ganador no cambie; la otra solo que sea jugador), y
+   un `update` en el padre se valida hijo por hijo pero se aplica o se
+   rechaza **entero**: si una de las dos condiciones no se cumple,
+   la partida se queda sin cerrar y sin decir cuál de las dos falló.
+   Separadas, `fin` — que es la que congela el registro de jugadas —
+   va primero y siempre entra, y el `estado` es solo para que la sala
+   salga del listado. */
 export async function terminar(pid, ganador, motivo) {
-  await update(ref(db, `${P}/${pid}`), {
-    estado: "fin",
-    fin: { ganador: ganador || "", motivo: motivo || "", at: Date.now() }
+  await set(ref(db, `${P}/${pid}/fin`), {
+    ganador: ganador || "", motivo: motivo || "", at: Date.now()
   });
+  try { await set(ref(db, `${P}/${pid}/estado`), "fin"); }
+  catch (e) { console.warn("[juegos] la partida quedó cerrada pero el estado no", e); }
 }
 
 export const borrarPartida = pid => remove(ref(db, `${P}/${pid}`));

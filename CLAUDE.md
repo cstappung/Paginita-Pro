@@ -45,11 +45,12 @@ Six apps plus a small shared **Informes** page:
   collect by themselves, plus the bugs and ideas people write. See "Informes"
   below.
 - **Juegos** (`juegos.html` + `juegos-app.js`, entry
-  `colabtex/src/juegos-main.js`) — three turn-based games for two, on the same
-  Google account and the same Firebase project: **Escondite** (hide a person in
-  a landscape, then cross the landscapes and race to find the other's),
-  **Cartas de los tres elementos** (a Card-Jitsu duel) and **Cuadritos** (dots
-  and boxes), plus a **Clasificación** tab. See "Juegos" below.
+  `colabtex/src/juegos-main.js`) — four turn-based games, on the same Google
+  account and the same Firebase project: **Escondite** (hide a person in a
+  landscape, then cross the landscapes and race to find the other's),
+  **Cartas de los tres elementos** (a Card-Jitsu duel), **Cuadritos** (dots and
+  boxes, two to six players and three board sizes) and **Reversi**, plus a
+  **Clasificación** tab. See "Juegos" below.
 
 ColabTeX, ColabDraw, FiltroLab, AjusteLab, Juegos and Informes are authored in
 **Spanish** — UI text, comments and identifiers alike. **CSV·Scope is the exception: it is in
@@ -1465,10 +1466,40 @@ Four decisions worth keeping:
 
 ## Juegos architecture
 
-Three turn-based games for two players, on the same Firebase project and the
-same Google session as ColabTeX and ColabDraw. Turn-based on purpose: with one
-move per turn the network carries a handful of fields and there is nothing to
-interpolate, so no game loop ever has to be synchronised.
+Four turn-based games, on the same Firebase project and the same Google session
+as ColabTeX and ColabDraw. Turn-based on purpose: with one move per turn the
+network carries a handful of fields and there is nothing to interpolate, so no
+game loop ever has to be synchronised.
+
+**How many people fit is a property of the room, not of the game.** `JUEGOS`
+declares `minimo` and `cupo` (escondite, cartas and reversi are duels by
+construction — two landscapes, one clash, two colours), and whoever opens the
+room picks inside that range along with anything else the game offers;
+`crearPartida(juego, quien, extra)` writes those over the defaults, so a game
+that offers nothing passes nothing. Only cuadritos offers anything today: **two
+to six players** and three board sizes (`TAMANOS`, 4×4 to 7×7 boxes).
+`cupoDe(p)` / `ladoDe(p)` clamp what comes back from the database to what the
+game admits, which is also what makes a room created before any of this existed
+read as the two-player 6×6 it was. With a cupo above the minimum the room does
+**not** start by itself when it fills — a room for six with four inside would
+never begin — so the host gets an *Empezar* button, and closing the room is
+also what bolts the door, since the rules only let someone in while the state
+is `esperando`.
+
+**Winning has a screen, and it is a fixed layer.** `datosFin(p, est)` in
+`juegos-main.js` reads the outcome from `partidas/<pid>/fin` when it is there
+and from the reducer's own `fase === "fin"` when it is not, so the cartel
+appears the moment the board says the game is over rather than waiting for the
+write that closes the room. It is `position:fixed` (`.jg-fin-capa`) for a
+reason that was a real bug: as an ordinary block after the board it rendered
+*below* a board taller than the screen, so winning looked like nothing
+happening. There are four faces — won, lost, drawn and "you were watching" —
+plus the final scoreboard and a ✕ that dismisses it, because looking at the
+finished board is half the point. Each screen additionally refuses to act on
+`fase === "fin"` (`alClic` returns, `echar()` requires `"jugando"`): the
+central `jugar()` gate already blocks the *write*, but without the local guard
+the UI still highlighted a card and invited a move that no longer exists —
+which is what "you can repeat the last move infinitely" was.
 
 `juegos.html` carries the whole `.jg-*` stylesheet — unlike CSV·Scope this is a
 plain page, not a generated `.dc.html` with nowhere to put it, so the skin
@@ -1522,11 +1553,15 @@ deliberately simple and drawn from six-tone palettes: what makes a hiding place
 hard is repetition, not detail — two hundred nearly identical trees hide a
 person far better than a photographic forest.
 
-**Cuadritos is SVG, cartas and the escondite are not.** What has to be hit with
-the mouse there is a two-millimetre line, so each gap carries its own fat
-invisible click zone (`.jg-hueco{stroke:transparent;stroke-width:16}`) and the
-browser aims for you; painting that zone would draw the board full of lines
-that are not there.
+**Cuadritos and reversi are SVG, cartas and the escondite are not.** What has
+to be hit with the mouse in cuadritos is a two-millimetre line, so each gap
+carries its own fat invisible click zone
+(`.jg-hueco{stroke:transparent;stroke-width:16}`) and the browser aims for you;
+painting that zone would draw the board full of lines that are not there.
+Reversi's legal-square hint is the same idea from the other side: the dot is a
+third of the square, so the clickable `<g>` wraps a transparent rect covering
+the **whole** square — hitting the dot with a finger would be marksmanship,
+not play.
 
 **Repaints go by signature.** Each region of each screen builds a signature
 string and skips the `innerHTML` when it has not changed. Rewriting it on every
@@ -1540,13 +1575,42 @@ Modules in [colabtex/src/juegos/](colabtex/src/juegos/):
   verifiable from Node.
 - `paisaje.js` — draws the scene `motor.js` decided. Split from it because the
   only thing the two machines must share is the layout, and that is a number.
-- `escondite.js`, `cartas.js`, `cuadritos.js`, `ranks.js` — one screen each.
-- All four expose the **same shape**: `crearX(ctx)` with
+- `escondite.js`, `cartas.js`, `cuadritos.js`, `reversi.js`, `ranks.js` — one
+  screen each.
+- All of them expose the **same shape**: `crearX(ctx)` with
   `ctx = {uid, pid, jugar, terminar, ahora}`, returning
-  `{montar(hostEl), actualizar(partida, estado), destruir()}`. Adding a fourth
+  `{montar(hostEl), actualizar(partida, estado), destruir()}`. Adding a fifth
   game is a file and a row in `JUEGOS`. `ranks.js` is the exception —
   `crearRanks({uid, watchRanks})` with no `actualizar`, since it watches its
   own node.
+
+Two things about the individual screens are worth knowing before editing them:
+
+- **The escondite draws the hidden person from the first second.** It used not
+  to during `buscar`, which is exactly the bug reported as "the character is
+  invisible and it wasn't where they put it": nothing was misplaced, it simply
+  was not painted, so the search was of an empty landscape. It is drawn small
+  and in the scene's own palette — hard, which is the game — and after
+  `PISTA_MS` a ring narrows around it, plus a `calor()` chip (frío / templado
+  / caliente / ¡Casi!) on every miss, because a search with no feedback at all
+  is not difficulty, it is a blank screen.
+- **Cuadritos' scoreboard is in seating order, never sorted by points.** With
+  five players, knowing who plays *next* is half the strategy — it decides
+  whom you hand the chain to — and a scoreboard whose rows jump around after
+  every box is unreadable. Whoever left is struck through rather than removed,
+  matching the reducer, which leaves their closed boxes on the board and skips
+  their turn.
+- **Reversi's discs are black and white, not each player's colour.**
+  `colorForUid` hands out tones by uid and two can come out nearly identical,
+  which ruins a game that consists precisely of reading at a glance who owns
+  the board; each player's own colour still shows, as the ring of their
+  scoreboard slot. The reducer already computes `legales` (square → the discs
+  it would flip) because it needs it to know whether a turn must be passed, so
+  drawing those hints, with the capture count inside the dot, costs nothing and
+  removes half the frustration of learning the game. The just-flipped discs
+  spin once (`.jg-rev-gira`) and the newest wears a ring: that one-shot
+  animation is safe only because the board's repaint signature carries
+  `est.ultima.casilla`, so the SVG is rebuilt exactly once per move.
 
 `colabtex/src/fb-juegos.js` is the data layer, over three nodes **outside**
 `projects/` for the same reason the reports are: a game belongs to the team,

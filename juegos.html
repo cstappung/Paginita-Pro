@@ -8,10 +8,11 @@
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   /* ============================================================
-     Juegos — la hoja de estilo de las cinco piezas
+     Juegos — la hoja de estilo de las seis piezas
 
      Las clases `.jg-*` las escriben los módulos (escondite, cartas,
-     cuadritos, ranks y el propio arranque) y se definen aquí, no en
+     cuadritos, reversi, ranks y el propio arranque) y se definen
+     aquí, no en
      JavaScript: una hoja en el HTML se cachea con la página y no
      cuesta un `injectCSS()` como en CSV·Scope, donde el documento es
      un `.dc.html` generado y no hay dónde meterla.
@@ -82,6 +83,13 @@
   .jg-of-icono{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;font-size:20px;background:color-mix(in srgb,var(--c,#0d9488) 12%,#fff);border:1px solid color-mix(in srgb,var(--c,#0d9488) 30%,#fff)}
   .jg-of-nombre{font-size:15px;font-weight:600}
   .jg-of-lema{font-size:12.5px;color:#5a6772;line-height:1.55;flex:1}
+  /* Los desplegables de la tarjeta (cupo, tamaño). Van dentro de la
+     tarjeta y no en un diálogo aparte porque son dos elecciones y un
+     paso más antes de jugar se nota. */
+  .jg-of-ops{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px}
+  .jg-of-op{display:flex;flex-direction:column;gap:3px;font-size:10.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:#8a97a3}
+  .jg-of-op select{height:30px;padding:0 6px;border:1px solid #d4dce2;border-radius:6px;background:#fff;font-family:inherit;font-size:12px;color:#1f2933;cursor:pointer}
+  .jg-of-op select:focus{outline:2px solid color-mix(in srgb,var(--c,#0d9488) 45%,#fff);outline-offset:1px}
   .jg-of-btn{margin-top:6px;align-self:flex-start;background:var(--c,#0d9488)}
   .jg-of-btn:hover{background:var(--c,#0d9488);filter:brightness(.9)}
   .jg-h2{font-size:13px;font-weight:600;color:#5a6772;letter-spacing:.03em;text-transform:uppercase;margin:0 0 10px}
@@ -96,21 +104,38 @@
   .jg-invita{margin-top:16px;padding:16px;background:#fff;border:1px solid #e2e8ec;border-radius:10px;font-size:12.5px;color:#5a6772;line-height:1.6}
   .jg-enlace{display:flex;gap:8px;margin-top:10px}
   .jg-enlace .inp{flex:1;font-family:'IBM Plex Mono',monospace;font-size:11.5px}
+  .jg-empezar{margin-top:12px}
 
-  .jg-fin{margin-top:16px;padding:22px;border-radius:12px;text-align:center;animation:jgEntra .35s ease-out}
+  /* El cartel del final es una capa fija sobre la pantalla, no un
+     recuadro debajo del tablero: un tablero de cuadritos grande mide
+     más de lo que se ve, así que ahí abajo el cartel caía bajo el
+     pliegue y la partida parecía acabar sin decir nada. */
+  .jg-fin-capa{position:fixed;inset:0;z-index:60;display:grid;place-items:center;padding:18px;background:#0f172899;backdrop-filter:blur(2px);animation:jgVela .2s ease-out}
+  .jg-fin{position:relative;width:400px;max-width:100%;max-height:calc(100vh - 36px);overflow:auto;padding:26px 24px 22px;border-radius:14px;text-align:center;box-shadow:0 18px 50px #0f172840;animation:jgEntra .35s ease-out}
   .jg-fin-gano{background:linear-gradient(160deg,#e9f7f2,#d5f0e6);border:1px solid #0d948855}
-  .jg-fin-perdi{background:#f7f9fa;border:1px solid #e2e8ec}
-  .jg-fin-empate{background:#fff8ec;border:1px solid #e2c08d66}
-  .jg-fin-t{font-size:22px;font-weight:700}
+  .jg-fin-perdi{background:linear-gradient(160deg,#fff,#f2f5f7);border:1px solid #e2e8ec}
+  .jg-fin-empate{background:linear-gradient(160deg,#fffaf0,#fdf1dc);border:1px solid #e2c08d66}
+  .jg-fin-mirando{background:linear-gradient(160deg,#fff,#eef3f7);border:1px solid #d4dce2}
+  /* La ✕ cierra el cartel para esa partida: mirar el tablero final es
+     la mitad de la gracia. */
+  .jg-fin-x{position:absolute;top:8px;right:8px;width:28px;height:28px;border:none;border-radius:7px;background:#0f172812;color:#42505c;font-size:13px;line-height:1;cursor:pointer}
+  .jg-fin-x:hover{background:#0f172822}
+  .jg-fin-cara{font-size:46px;line-height:1;margin-bottom:8px;animation:jgCara .5s cubic-bezier(.2,1.5,.4,1)}
+  .jg-fin-t{font-size:24px;font-weight:700;line-height:1.2}
   .jg-fin-gano .jg-fin-t{color:#0d9488}
   .jg-fin-perdi .jg-fin-t{color:#5a6772}
   .jg-fin-empate .jg-fin-t{color:#8a6a2a}
-  .jg-fin-m{font-size:12.5px;color:#5a6772;margin-top:6px}
-  .jg-fin-btns{display:flex;gap:8px;justify-content:center;margin-top:16px}
-  @keyframes jgEntra{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .jg-fin-mirando .jg-fin-t{color:#42505c}
+  .jg-fin-sub{font-size:13.5px;font-weight:600;color:#42505c;margin-top:4px}
+  .jg-fin-m{font-size:12.5px;color:#5a6772;margin-top:6px;line-height:1.55}
+  .jg-fin-marca{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:14px;padding-top:14px;border-top:1px solid #0f172815}
+  .jg-fin-btns{display:flex;gap:8px;justify-content:center;margin-top:18px;flex-wrap:wrap}
+  @keyframes jgEntra{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
+  @keyframes jgVela{from{opacity:0}to{opacity:1}}
+  @keyframes jgCara{from{opacity:0;transform:scale(.4)}to{opacity:1;transform:none}}
 
   /* ============================================================
-     Piezas comunes a los tres juegos
+     Piezas comunes a los cuatro juegos
      ============================================================ */
   .jg-barra{display:flex;align-items:center;gap:10px;padding:12px 16px;background:#fff;border:1px solid #e2e8ec;border-radius:10px 10px 0 0;border-bottom:none;font-size:13px}
   .jg-fase{color:#42505c;display:flex;align-items:center;gap:7px}
@@ -137,6 +162,13 @@
   .jg-lienzo canvas{display:block;width:100%;cursor:crosshair}
   .jg-capa{position:absolute;inset:0;display:grid;place-items:center;background:#0d1117cc;color:#e6edf3;font-size:14px;font-weight:600}
   .jg-castigo{font-size:12.5px;font-weight:600;color:#c0392b}
+  /* Frío/templado/caliente/casi. Se lee de un vistazo por el color, así
+     que el color es el dato y la palabra la confirmación. */
+  .jg-calor{font-size:12.5px;font-weight:700;padding:3px 9px;border-radius:99px;border:1px solid currentColor}
+  .jg-calor-frio{color:#2563eb;background:#eff6ff}
+  .jg-calor-templado{color:#7c6a1f;background:#fefbe8}
+  .jg-calor-caliente{color:#c2410c;background:#fff5ed}
+  .jg-calor-casi{color:#be123c;background:#fff1f4;animation:jgLate .8s steps(2,end) infinite}
 
   /* ============================================================
      Cartas de los tres elementos
@@ -215,6 +247,13 @@
   .jg-marcador{display:flex;gap:14px;align-items:center}
   .jg-m{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:#42505c;border-left:3px solid var(--c,#888);padding-left:8px}
   .jg-m b{font-size:16px;font-family:'IBM Plex Mono',monospace}
+  /* Con seis nombres en la barra hace falta decir de quién se espera:
+     el del turno lleva el nombre en negro y el que abandonó, tachado. */
+  .jg-m-turno{color:#1f2933;font-weight:700}
+  .jg-m-turno b{color:var(--c,#888)}
+  .jg-m-fuera{opacity:.42}
+  .jg-m-fuera span{text-decoration:line-through}
+  .jg-marcador{flex-wrap:wrap;row-gap:6px}
   .jg-punto-t{width:9px;height:9px;border-radius:50%;display:inline-block}
   .jg-tablero{display:grid;place-items:center;padding:20px 16px;background:#fff;border-left:1px solid #e2e8ec;border-right:1px solid #e2e8ec}
   .jg-svg{width:100%;max-width:440px;height:auto;touch-action:manipulation}
@@ -229,6 +268,48 @@
   .jg-libre:hover{stroke:var(--turno,#0f62fe);stroke-opacity:.35;stroke-width:7}
   .jg-cierra.jg-libre:hover{stroke-opacity:.75}
   .jg-svg .jg-punto{fill:#cbd5dd}
+
+  /* ============================================================
+     Reversi
+     ============================================================ */
+  .jg-rev{display:flex;flex-direction:column}
+  /* El tablero es cuadrado y de ocho por ocho: dejarle los 440 px de
+     cuadritos lo deja con casillas de 55 px, que en un móvil es todo
+     lo que hay. En pantalla grande no crece más porque una ficha de
+     ocho centímetros no ayuda a leer nada. */
+  .jg-rev-svg{max-width:460px}
+  .jg-rev-fondo{fill:#1f6f5c}
+  /* La cuadrícula se dibuja con el borde de cada casilla y no con
+     líneas: así el último surco del borde queda dentro del fondo
+     redondeado, sin sobresalir por la esquina. */
+  .jg-rev-cas{fill:none;stroke:#14503f;stroke-width:2}
+  .jg-rev-hito{fill:#14503f}
+  .jg-rev-f{stroke:#0000001f;stroke-width:2}
+  /* La ficha recién puesta lleva aro claro: sin eso, en un tablero
+     que cambia de color a la mitad no hay forma de saber cuál fue la
+     jugada. */
+  .jg-rev-ult{stroke:#ffd166;stroke-width:6}
+  /* Las volteadas giran una vez, no en bucle: la firma de la pintada
+     lleva dentro la última casilla, así que el SVG se rehace una vez
+     por jugada y la animación arranca sola justo cuando toca. */
+  .jg-rev-gira{animation:jgVoltea .42s ease-out;transform-box:fill-box;transform-origin:center}
+  @keyframes jgVoltea{
+    0%{transform:scaleX(1)}
+    50%{transform:scaleX(.06)}
+    100%{transform:scaleX(1)}
+  }
+  .jg-rev-libre{cursor:pointer}
+  .jg-rev-pista{fill:none;stroke-width:4;stroke-dasharray:7 7;opacity:.55}
+  .jg-rev-n{font-size:34px;font-weight:700;text-anchor:middle;dominant-baseline:central;
+    font-family:'IBM Plex Mono',monospace;opacity:.55;pointer-events:none}
+  .jg-rev-libre:hover .jg-rev-pista{opacity:1;stroke-dasharray:none;fill:currentColor;fill-opacity:.12}
+  .jg-rev-libre:hover .jg-rev-n{opacity:1}
+  /* El punto de la barra de fase es la ficha de quien tiene el turno,
+     y una blanca sobre fondo blanco no se ve: de ahí el borde. */
+  .jg-rev-punto{border:1px solid #0f172833}
+  .jg-rev-m{gap:7px}
+  .jg-rev-chip{width:13px;height:13px;border-radius:50%;display:inline-block;flex-shrink:0;
+    border:1px solid #0f172833}
 
   /* ============================================================
      Ranks
@@ -266,6 +347,21 @@
     .jg-c-icono{font-size:21px}
     .jg-c-valor{font-size:19px}
     .jg-trofeos{grid-template-columns:1fr}
+    /* El tablero se lleva todo el ancho: con seis jugadores el
+       marcador ya se parte en dos filas y el margen lateral es lo
+       único que se puede dar. */
+    .jg-tablero{padding:14px 8px}
+    .jg-marcador{gap:9px}
+    .jg-m{padding-left:6px;gap:4px}
+    .jg-m b{font-size:14px}
+    /* El cartel del final es una capa fija, así que en un móvil tiene
+       que caber en la pantalla, no en la página. */
+    .jg-fin{padding:22px 16px 18px}
+    .jg-fin-cara{font-size:38px}
+    .jg-fin-t{font-size:20px}
+    .jg-fin-btns{flex-direction:column}
+    .jg-fin-btns .btn{width:100%}
+    .jg-of-ops{gap:6px}
   }
 </style>
 </head>
@@ -290,8 +386,9 @@
     <div class="login-card">
       <h2 style="margin:0 0 8px;font-size:18px">Juegos del Laboratorio</h2>
       <p style="font-size:12.5px;color:#5a6772;line-height:1.6;margin:0 0 20px">
-        Entra con la misma cuenta de Google que usas en ColabTeX. Las partidas son de dos,
-        por turnos: abres una sala, le pasas el enlace a quien quieras y jugáis.</p>
+        Entra con la misma cuenta de Google que usas en ColabTeX. Se juega por turnos:
+        abres una sala, eliges las opciones si el juego las tiene, le pasas el enlace a
+        quien quieras y jugáis.</p>
       <button class="btn" id="btnLogin" style="width:100%;height:38px">Entrar con Google</button>
       <div id="loginError" style="margin-top:12px;font-size:12px;color:#c0392b"></div>
     </div>
@@ -305,6 +402,6 @@
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202609100656"></script>
+<script src="juegos-app.js?v=202609102240"></script>
 </body>
 </html>
