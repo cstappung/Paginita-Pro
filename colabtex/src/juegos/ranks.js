@@ -15,6 +15,7 @@
  * lleva 200 partidas y otro 6.
  */
 import { JUEGOS, ordenaRanks, porcentaje } from "./motor.js";
+import { mezcla } from "./perfil.js";
 
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -23,6 +24,12 @@ const MEDALLA = ["🥇", "🥈", "🥉"];
 
 export function crearRanks(ctx) {
   const { uid, watchRanks } = ctx;
+  /* La fila de la clasificación guarda el nombre y la foto del día
+     en que se apuntó la partida — y su `foto` no puede pasar de 400
+     caracteres, así que una foto subida no cabe ahí de ninguna
+     manera. El perfil vivo se pone encima al pintar; sin resolutor
+     se pinta la fila tal cual, que es lo que había. */
+  const perfil = ctx.perfil || (() => null);
 
   let host = null, muerto = false;
   let juego = Object.keys(JUEGOS)[0];
@@ -103,7 +110,8 @@ export function crearRanks(ctx) {
       </tr></thead><tbody>${orden.map((f, i) => fila(f, i)).join("")}</tbody>`;
   }
 
-  function fila(f, i) {
+  function fila(fx, i) {
+    const f = mezcla(fx, perfil(fx.uid));
     const yo = f.uid === uid;
     const pc = porcentaje(f);
     return `<tr class="${yo ? "jg-yo" : ""}">
@@ -133,5 +141,9 @@ export function crearRanks(ctx) {
     escucha();
   }
 
-  return { montar, destruir };
+  /* Un perfil que llega después de la tabla no trae fila nueva que
+     escuchar, así que hay que decirle desde fuera que se repinte. */
+  function refresca() { pinta(); }
+
+  return { montar, destruir, refresca };
 }

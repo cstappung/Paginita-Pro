@@ -26,6 +26,17 @@
  * son cinco y hay que decidir a quién se le regala la cadena.
  */
 import { claveRaya, rayaValida, cajasQueCierra } from "./motor.js";
+import { suena } from "./sonido.js";
+
+/* Quién hizo la última jugada. El reductor no lo guarda —no le hace
+   falta para dibujar— y el log sí, así que se lee de ahí: el sonido
+   tiene que sonar distinto según sea tuya o suya. */
+function ultimoAutor(partida) {
+  const js = (partida && partida.jugadas) || {};
+  const ks = Object.keys(js).sort();
+  const u = ks.length ? js[ks[ks.length - 1]] : null;
+  return u ? u.uid : "";
+}
 
 const S = 100;   // separación entre puntos, en unidades del viewBox
 const M = 46;    // margen
@@ -39,6 +50,8 @@ export function crearCuadritos(ctx) {
   let host = null, muerto = false;
   let p = null, est = null;
   let enviando = false;
+  let vistas = -1;             // cuántas jugadas llevaba el log la última vez
+  let sonoFin = false;
   const firmas = {};
 
   function montar(donde) {
@@ -210,9 +223,25 @@ export function crearCuadritos(ctx) {
     finally { if (!muerto) enviando = false; }
   }
 
+  /* El sonido va por el log, no por el clic: así también se oye la
+     jugada del otro, que es justo la que no se está mirando. */
+  function suenaJugada(quien) {
+    if (est.ultima && est.ultima.cajas && est.ultima.cajas.length)
+      suena(quien === uid ? "gana" : "pierde");
+    else suena("ficha");
+  }
+
   function actualizar(partida, estado) {
     p = partida; est = estado;
+    const n = Object.keys((partida && partida.jugadas) || {}).length;
+    if (vistas >= 0 && n > vistas) suenaJugada(ultimoAutor(partida));
+    vistas = n;
     pinta();
+    if (est.fase === "fin" && !sonoFin) {
+      sonoFin = true;
+      setTimeout(() => suena(est.ganador === uid ? "victoria"
+        : est.ganador === "" ? "empate" : "derrota"), 450);
+    }
     if (est.ganador !== null && est.ganador !== undefined && !(p.fin && p.fin.at)) {
       terminar(est.ganador, est.motivo);
     }

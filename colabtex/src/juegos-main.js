@@ -38,6 +38,8 @@ import { crearCartas } from "./juegos/cartas.js";
 import { crearCuadritos } from "./juegos/cuadritos.js";
 import { crearReversi } from "./juegos/reversi.js";
 import { crearRanks } from "./juegos/ranks.js";
+import { mezcla, abrePerfil } from "./juegos/perfil.js";
+import { suena, silenciar, silenciado } from "./juegos/sonido.js";
 import { createReportWidget } from "./report-widget.js";
 
 const $ = id => document.getElementById(id);
@@ -65,7 +67,8 @@ const OPCIONES = {
 };
 
 const state = {
-  user: null,
+  user: null,           // el perfil ya aplicado: lo que se pinta
+  base: null,           // lo que dice Google, sin tocar
   vista: "vestibulo",     // vestibulo | partida | ranks
   pid: "",
   partida: null,
@@ -85,6 +88,90 @@ let proximo = 0;          // el número de jugada que toca escribir
 let anotada = "";         // partida ya sumada a la clasificación desde esta pestaña
 let finEnviado = "";
 let finCerrado = "";        // partida cuyo cartel de fin se ha cerrado a mano
+let dentroVistos = -1;    // cuánta gente había en la sala la última vez
+
+/* ---------- perfiles ----------
+   La ficha que guarda la partida se escribe una vez y no se puede
+   reescribir — así nadie se cambia el nombre a mitad de duelo — así
+   que el apodo, la foto y el color vivos se superponen encima al
+   pintar, y un cambio se ve también en las partidas de ayer.
+
+   Se escucha **bajo demanda**: el primero que pregunta por un uid
+   abre la escucha, y desde entonces llega sola. Traer `users`
+   entero habría sido bajarse el perfil de todo el que haya entrado
+   jamás en ColabTeX para pintar dos nombres. */
+const perfiles = new Map();   // uid -> perfil (o null: no tiene)
+const oyendo = new Map();     // uid -> cómo dejar de escucharlo
+
+function perfilDe(uid) {
+  if (!uid) return null;
+  if (!oyendo.has(uid)) {
+    /* Un perfil que no se puede leer no es un fallo de la página:
+       se pinta la ficha y ya, que es lo que había antes de esto. */
+    oyendo.set(uid, fb.watchPerfil(uid, (p, err) => {
+      if (err) { perfiles.set(uid, null); return; }
+      const antes = JSON.stringify(perfiles.get(uid) || null);
+      if (JSON.stringify(p || null) === antes) return;
+      perfiles.set(uid, p || null);
+      if (state.base && uid === state.base.uid) aplicaPropio();
+      if (state.estado) vistePerfiles(state.estado);
+      if (ranks) ranks.refresca();
+      render();
+    }));
+    perfiles.set(uid, perfiles.get(uid) || null);
+  }
+  return perfiles.get(uid) || null;
+}
+
+/* Se escribe **dentro** de cada ficha en vez de cambiarla por otra
+   para no romper ninguna referencia que el reductor haya dejado
+   apuntando a ella — `auditaCartas`, sin ir más lejos, lee el
+   `hmazo` de estos mismos objetos. */
+function vistePerfiles(est) {
+  for (const j of (est && est.jugadores) || []) {
+    const p = perfilDe(j.uid);
+    if (p) Object.assign(j, mezcla(j, p));
+  }
+}
+
+/* Lo propio se aplica sobre lo de Google, que es lo único que hay
+   cuando todavía no se ha tocado nada. */
+function aplicaPropio() {
+  const b = state.base;
+  if (!b) return;
+  const m = mezcla({ nombre: b.name, foto: b.photo, color: b.color },
+                   perfiles.get(b.uid) || null);
+  state.user = { uid: b.uid, name: m.nombre, photo: m.foto, color: m.color };
+  pintaUsuario();
+}
+
+/* Las reglas limitan a 400 caracteres la `foto` de la ficha y la de
+   la clasificación — caben de sobra una URL de Google, y ninguna
+   foto subida por nadie. Mandar la data URL entera ahí no es que se
+   vea mal: la base **rechaza la escritura entera**, así que crear
+   una sala con foto propia habría fallado con PERMISSION_DENIED. Va
+   vacía, y al pintar se superpone el perfil, que no tiene tope. */
+const fotoBreve = f => (typeof f === "string" && f.length <= 400 && !/^data:/.test(f)) ? f : "";
+
+function editaPerfil() {
+  const b = state.base;
+  if (!b) return;
+  abrePerfil({
+    base: { nombre: b.name, foto: b.photo, color: b.color },
+    perfil: perfiles.get(b.uid) || null,
+    onGuardar: async p => {
+      await fb.guardarPerfil(b.uid, p);
+      /* La escucha traerá lo mismo en un instante; adelantarlo aquí
+         evita que el botón se cierre sobre el avatar de antes. */
+      perfiles.set(b.uid, Object.assign({}, p));
+      aplicaPropio();
+      if (state.estado) vistePerfiles(state.estado);
+      if (ranks) ranks.refresca();
+      render();
+      suena("clic");
+    }
+  });
+}
 
 /* ---------- sesión ---------- */
 function pintaUsuario() {
@@ -99,7 +186,7 @@ function pintaUsuario() {
 function mostrar(dentro) {
   $("viewLogin").style.display = dentro ? "none" : "grid";
   $("viewMain").style.display = dentro ? "" : "none";
-  for (const id of ["userName", "userAvatar", "btnLogout"]) $(id).style.display = dentro ? "" : "none";
+  for (const id of ["userName", "userAvatar", "btnPerfil", "btnLogout"]) $(id).style.display = dentro ? "" : "none";
 }
 
 /* ---------- escribir en la partida ----------
@@ -117,9 +204,15 @@ async function jugar(jugada) {
      fallaba en silencio, el módulo no se enteraba, y la última jugada se
      podía repetir con su animación infinitas veces. Se mira `est.fase`
      además de `fin` porque el reductor sabe que la partida acabó antes
-     de que `fb.terminar` llegue a escribirlo. */
+     de que `fb.terminar` llegue a escribirlo.
+
+     La única excepción es `t: "s"`, la revelación de la semilla del
+     mazo en cartas: llega justo cuando la partida acaba de acabar, y
+     es lo que deja auditarla. La regla de la base también la deja
+     pasar mientras `fin` no esté escrito, que es por lo que se manda
+     antes de `terminar`. */
   if (state.partida && state.partida.fin) return false;
-  if (state.estado && state.estado.fase === "fin") return false;
+  if (state.estado && state.estado.fase === "fin" && jugada.t !== "s") return false;
   const enBase = Object.keys((state.partida && state.partida.jugadas) || {}).length;
   let n = Math.max(proximo, enBase);
   const pid = state.pid;
@@ -149,7 +242,7 @@ async function anotar(p) {
   const res = !g ? "empate" : (g === u.uid ? "ganada" : "perdida");
   try {
     const previa = await fb.leerRank(p.juego, u.uid);
-    const fila = acumula(previa, res, state.pid, { nombre: u.name, foto: u.photo });
+    const fila = acumula(previa, res, state.pid, { nombre: u.name, foto: fotoBreve(u.photo) });
     if (fila) await fb.guardarRank(p.juego, u.uid, fila);
   } catch (e) {
     anotada = "";
@@ -204,13 +297,20 @@ function engancharVestibulo() {
 
 function engancharPartida(pid) {
   soltarPartida();
-  proximo = 0; anotada = ""; finEnviado = ""; finCerrado = "";
+  proximo = 0; anotada = ""; finEnviado = ""; finCerrado = ""; dentroVistos = -1;
   offPartida = fb.watchPartida(pid, (p, err) => {
     state.cargando = false;
     if (err) { state.fallo = err; state.partida = null; render(); return; }
     state.partida = p;
     state.estado = p ? reducir(p) : null;
+    vistePerfiles(state.estado);
     if (p) {
+      /* Alguien ha entrado. Suena aquí y no en `unirse` porque quien
+         necesita enterarse es justamente el que ya estaba dentro,
+         mirando el enlace y esperando. */
+      const dentro = Object.keys(p.jugadores || {}).length;
+      if (dentroVistos >= 0 && dentro > dentroVistos) suena("entra");
+      dentroVistos = dentro;
       proximo = Math.max(proximo, jugadasDe(p).length);
       cuidaLaSala(p);
       anotar(p);
@@ -242,21 +342,105 @@ async function crear(juego, extra) {
   if (!u) return;
   try {
     const pid = await fb.crearPartida(juego,
-      { uid: u.uid, nombre: u.name, foto: u.photo, color: u.color }, extra);
+      { uid: u.uid, nombre: u.name, foto: fotoBreve(u.photo), color: u.color }, extra);
     ir("#p/" + pid);
-  } catch (e) { avisa(e); }
+  } catch (e) { avisa(e, juego); }
 }
 
 async function entrar(pid) {
   const u = state.user;
   if (!u) return;
   try {
-    await fb.unirse(pid, { uid: u.uid, nombre: u.name, foto: u.photo, color: u.color });
+    await fb.unirse(pid, { uid: u.uid, nombre: u.name, foto: fotoBreve(u.photo), color: u.color });
     ir("#p/" + pid);
   } catch (e) { avisa(e); }
 }
 
-const avisa = e => alert(e && e.message ? e.message : String(e));
+/* ---------- cuando la base dice que no ---------- */
+
+const CONSOLA_REGLAS =
+  "https://console.firebase.google.com/project/mi-pagina-pro/database/mi-pagina-pro-default-rtdb/rules";
+
+/* El archivo de reglas está en el mismo sitio que la página — Pages
+   sirve el repositorio entero — así que se puede traer desde aquí. */
+const URL_REGLAS = new URL("firebase/database.rules.json", location.href).href;
+
+/* Las reglas de seguridad no viajan con la página: subirla no las
+   publica, se pegan a mano en la consola. Así que una copia publicada
+   antes de que existiera un juego rechaza justamente las salas de ese
+   juego — su nombre no está en la lista blanca de `juego` — y el
+   navegador solo dice «permission denied». Contarlo entero es la
+   diferencia entre un fallo de dos minutos y uno que parece del juego. */
+function esPermiso(e) {
+  const t = ((e && (e.code || e.message)) || "") + "";
+  return /permission[_ ]denied/i.test(t);
+}
+
+function cuerpoReglas(cod, juego) {
+  const nombre = juego && JUEGOS[juego] ? JUEGOS[juego].nombre : null;
+  return `
+    <div class="jg-fin-m">La base de datos ha rechazado la operación${
+      nombre ? " al abrir una sala de <b>" + escapeHtml(nombre) + "</b>" : ""
+    }: <code>${escapeHtml(String(cod || "PERMISSION_DENIED"))}</code>.</div>
+    <div class="jg-fin-m">Las reglas de seguridad <b>no viajan con la página</b>:
+      subirla no las publica. La copia que hay puesta en Firebase es anterior a
+      <b>Reversi</b> y a las manos privadas de Cartas, así que rechaza las salas
+      de ese juego y el nodo <code>misPartidas</code>.</div>
+    <div class="jg-fin-m">Se arregla una sola vez: copia el archivo
+      <code>firebase/database.rules.json</code> de este repositorio, pégalo en la
+      consola de Firebase en <b>Realtime Database → Reglas</b> y pulsa
+      <b>Publicar</b>. Está contado en <code>firebase/CONFIGURAR-FIREBASE.md</code>.</div>`;
+}
+
+/* Copiar el archivo evita el viaje a GitHub a buscarlo. Si el
+   portapapeles se niega — pide un origen seguro — el botón pasa a
+   abrirlo en otra pestaña, que es lo mismo con un paso más. */
+async function copiaReglas(b) {
+  b.disabled = true;
+  const antes = b.textContent;
+  b.textContent = "Copiando…";
+  try {
+    const r = await fetch(URL_REGLAS, { cache: "no-store" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    await navigator.clipboard.writeText(await r.text());
+    b.textContent = "Copiado ✓";
+    setTimeout(() => { if (b.textContent === "Copiado ✓") b.textContent = antes; }, 2500);
+  } catch (e) {
+    b.textContent = "Ábrelo en otra pestaña ↗";
+    b.onclick = () => window.open(URL_REGLAS, "_blank", "noopener");
+  }
+  b.disabled = false;
+}
+
+function capaReglas(cod, juego) {
+  const vieja = document.getElementById("jgReglas");
+  if (vieja) vieja.remove();
+  const capa = document.createElement("div");
+  capa.id = "jgReglas";
+  capa.className = "jg-fin-capa";
+  capa.innerHTML = `<div class="jg-fin jg-fin-empate jg-reglas">
+    <button class="jg-fin-x" title="Cerrar">✕</button>
+    <div class="jg-fin-cara">🔒</div>
+    <div class="jg-fin-t">Faltan reglas por publicar</div>
+    ${cuerpoReglas(cod, juego)}
+    <div class="jg-fin-btns">
+      <button class="btn2" id="jgCopiaReglas">Copiar las reglas</button>
+      <a class="btn" href="${CONSOLA_REGLAS}" target="_blank" rel="noopener">Abrir la consola</a>
+    </div>
+  </div>`;
+  capa.querySelector(".jg-fin-x").onclick = () => capa.remove();
+  capa.onclick = e => { if (e.target === capa) capa.remove(); };
+  capa.querySelector("#jgCopiaReglas").onclick = e => copiaReglas(e.currentTarget);
+  document.body.appendChild(capa);
+}
+
+/* Un `alert` con «permission denied» dentro no dice quién ha denegado
+   qué ni qué hacer con ello, que es exactamente como se leyó la primera
+   vez que alguien intentó abrir una sala de Reversi. */
+function avisa(e, juego) {
+  if (esPermiso(e)) { capaReglas((e && (e.code || e.message)) || "", juego); return; }
+  alert(e && e.message ? e.message : String(e));
+}
 
 /* ---------- pintado: el armazón ---------- */
 function render() {
@@ -281,7 +465,7 @@ function armazon() {
   const h = $("pantalla");
   if (state.vista === "ranks") {
     h.innerHTML = "";
-    ranks = crearRanks({ uid: state.user.uid, watchRanks: fb.watchRanks });
+    ranks = crearRanks({ uid: state.user.uid, watchRanks: fb.watchRanks, perfil: perfilDe });
     ranks.montar(h);
     return;
   }
@@ -394,11 +578,12 @@ const pillJuego = j => `<span class="pill jg-p" style="--c:${(JUEGOS[j] || {}).c
 function avisoReglas(err) {
   const cod = (err && (err.code || err.message)) || "";
   return `<div class="aviso">
-    <b>No se puede leer la base de datos.</b> ${escapeHtml(String(cod))}<br>
-    Si pone <code>PERMISSION_DENIED</code>, es que las reglas de los nodos
-    <code>partidas</code>, <code>misPartidas</code> y <code>ranks</code> todavía no se han
-    publicado a mano en la consola de Firebase: no viajan solas al subir la página.
-    Está explicado en <code>firebase/CONFIGURAR-FIREBASE.md</code>.
+    <b>No se puede leer la base de datos.</b>
+    ${cuerpoReglas(cod, null)}
+    <div style="margin-top:8px">
+      <a href="${escapeHtml(URL_REGLAS)}" target="_blank" rel="noopener">ver el archivo de reglas</a> ·
+      <a href="${CONSOLA_REGLAS}" target="_blank" rel="noopener">abrir la consola de Firebase</a>
+    </div>
   </div>`;
 }
 
@@ -483,7 +668,12 @@ function montaJuego(p) {
   desmontaJuego();
   const fab = FABRICAS[p.juego];
   if (!fab) { $("jgHost").innerHTML = `<div class="vacio">Ese juego no existe en esta versión.</div>`; return; }
-  modulo = fab({ uid: state.user.uid, pid: state.pid, jugar, terminar, ahora: fb.ahora });
+  /* `secreto` solo lo usa cartas, pero se pasa a todos: el contrato de un
+     juego es un objeto, y ramificarlo por juego lo convierte en cuatro. */
+  modulo = fab({
+    uid: state.user.uid, pid: state.pid, jugar, terminar, ahora: fb.ahora,
+    secreto: () => fb.leerSecreto(state.pid, state.user.uid)
+  });
   modulo.montar($("jgHost"));
   pidMontado = state.pid;
 }
@@ -605,11 +795,25 @@ async function abandonar() {
 }
 
 /* ---------- arranque ---------- */
+/* El botón dice lo que hay, no lo que haría al pulsarlo: un altavoz
+   tachado sobre un juego mudo se lee como «pulsa para callarlo». */
+function pintaSonido() {
+  const b = $("btnSonido");
+  if (!b) return;
+  const on = !silenciado();
+  b.textContent = on ? "\uD83D\uDD0A" : "\uD83D\uDD07";
+  b.title = on ? "Sonido activado \u2014 pulsa para silenciar" : "Silenciado \u2014 pulsa para o\u00edr";
+  b.setAttribute("aria-pressed", on ? "true" : "false");
+}
+
 function wire() {
   $("btnLogin").onclick = () => loginGoogle().catch(e => {
     $("loginError").textContent = "No se pudo iniciar sesión: " + (e.code || e.message);
   });
   $("btnLogout").onclick = () => logout();
+  $("btnPerfil").onclick = editaPerfil;
+  pintaSonido();
+  $("btnSonido").onclick = () => { silenciar(silenciado()); pintaSonido(); suena("clic"); };
   $("tabJugar").onclick = () => ir(state.pid ? "#p/" + state.pid : "#");
   $("tabRanks").onclick = () => ir("#ranks");
   window.addEventListener("hashchange", aplicaRuta);
@@ -628,6 +832,7 @@ function wire() {
   watchAuth(user => {
     if (!user) {
       state.user = null;
+      state.base = null;
       soltarPartida();
       for (const f of [offSalas, offMias, offReloj]) { if (f) { try { f(); } catch (e) {} } }
       offSalas = offMias = offReloj = null;
@@ -635,13 +840,15 @@ function wire() {
       mostrar(false); pintaUsuario();
       return;
     }
-    state.user = {
+    state.base = {
       uid: user.uid,
       name: user.displayName || user.email || "Usuario",
       photo: user.photoURL || "",
       color: colorForUid(user.uid)
     };
-    pintaUsuario();
+    state.user = Object.assign({}, state.base);
+    perfilDe(user.uid);          // abre la escucha; al llegar repinta
+    aplicaPropio();
     mostrar(true);
     if (!offReloj) offReloj = fb.seguirReloj();
     engancharVestibulo();

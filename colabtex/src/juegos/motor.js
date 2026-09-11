@@ -263,19 +263,47 @@ export function mazoDe(semilla, orden) {
   return m;
 }
 
-/* La carta número `i` del mazo de un jugador. Que la carta se deduzca
-   del índice, y no venga escrita en la jugada, es lo que impide
-   revelar una carta que no se tenía: el mazo sale de la semilla de la
-   partida, que está a la vista de los dos.
+/* La carta número `i` del mazo de un jugador.
 
-   La consecuencia, dicha claro porque manda sobre cómo se pinta: si
-   los dos pueden calcular el mazo del otro, **las dos manos están a la
-   vista**. Fingir lo contrario sería un secreto que cualquiera destapa
-   con la consola del navegador. Así que se enseñan, y el juego pasa a
-   ser adivinar cuál de las cinco cartas que le ves va a echar —
-   que con el compromiso de por medio (nadie puede elegir después de
-   ver la del otro) es un juego mejor, no peor. */
+   **El mazo se baraja con una semilla privada**, no con la de la
+   partida. Vive en `misPartidas/<uid>/<pid>/sec`, que las reglas solo
+   dejan leer a su dueño (ver `fb-juegos.js`), y esa es toda la
+   diferencia: la mano del otro ya no se puede calcular. Antes la
+   semilla era la de la partida, pública por fuerza, así que las dos
+   manos se enseñaban boca arriba — fingir lo contrario habría sido un
+   secreto que cualquiera destapa con la consola del navegador.
+
+   El precio es que la carta ya no se deduce del índice: viaja escrita
+   en la jugada revelada. Lo que impide entonces revelar una carta que
+   no se tenía son dos candados, y hacen falta los dos:
+
+   - **el compromiso de la ronda**, que ahora se hace sobre
+     `[i, e, c, v]` — la carta entera, no solo su sitio —, así que
+     nadie puede cambiarla después de ver la del otro;
+   - **el compromiso del mazo**: al entrar se promete `hmazo` en la
+     ficha (que las reglas dejan escribir una sola vez) y al acabar se
+     revela la semilla. Con ella el otro navegador rehace el mazo y
+     comprueba que cada carta jugada estuviera de verdad en el índice
+     que dijo. Lo hace `auditaCartas`.
+
+   La frontera honesta, igual que en el escondite: quien cierre la
+   pestaña antes del final no revela su semilla, y esa partida se queda
+   sin auditar. Nadie gana con ello — la victoria ya está escrita —,
+   pero tampoco queda demostrado que se jugara limpio. */
 export const cartaDe = (semilla, orden, i) => mazoDe(semilla, orden)[i] || null;
+
+/* Una carta que llega escrita en una jugada solo es una carta si sus
+   tres campos existen de verdad en el mazo. No prueba que sea *la
+   suya* — eso es cosa de la auditoría —, pero evita que un `v: 99`
+   inventado entre en el reductor y decida una ronda. */
+export function cartaLegal(j) {
+  if (!j) return null;
+  const i = Math.floor(Number(j.i)), v = Math.floor(Number(j.v));
+  if (!Number.isInteger(i) || i < 0) return null;
+  if (!ELEMENTOS[j.e] || COLORES_CARTA.indexOf(j.c) < 0) return null;
+  if (!Number.isInteger(v) || v < 1 || v > VALOR_MAX) return null;
+  return { i, e: j.e, c: j.c, v };
+}
 
 /* Quién gana la ronda: 1 el primero, 2 el segundo, 0 nadie. */
 export function resuelveRonda(a, b) {
@@ -536,6 +564,7 @@ function redCartas(p, js) {
   const ganadas = {}, usadas = {};
   for (const j of js) { ganadas[j.uid] = []; usadas[j.uid] = []; }
   const rondas = [];
+  const semillas = {};
   let ronda = 0, comp = {}, rev = {};
   let ganador = null, motivo = "";
 
@@ -554,6 +583,13 @@ function redCartas(p, js) {
   };
 
   for (const j of jug) {
+    if (j.t === "s") {
+      /* La semilla del mazo, revelada al acabar. Se lee **también con
+         la partida ganada**, que es justo cuando llega: es lo que deja
+         a la otra pantalla rehacer el mazo y auditar lo jugado. */
+      if (!semillas[j.uid]) semillas[j.uid] = { sem: j.sem, sal: j.sal || "" };
+      continue;
+    }
     if (j.t === "abandona") {
       if (!ganador) { const o = js.find(x => x.uid !== j.uid); if (o) { ganador = o.uid; motivo = "abandono"; } }
       continue;
@@ -561,21 +597,23 @@ function redCartas(p, js) {
     if (ganador) continue;
     if (j.t === "c" && !comp[j.uid]) comp[j.uid] = j.h;
     else if (j.t === "r" && !rev[j.uid] && comp[j.uid]) {
-      /* La carta no viene en la jugada: se saca del mazo, que las dos
-         máquinas calculan igual. Escribirla habría dejado revelar una
-         carta que no se tenía. */
-      const quien = js.find(x => x.uid === j.uid);
-      const carta = quien ? cartaDe(p.semilla, quien.orden || 0, j.i) : null;
+      /* La carta viene escrita en la jugada, porque el mazo del que
+         sale es privado y la otra máquina no puede deducirla. Aquí solo
+         se comprueba que sea una carta posible y que el índice no esté
+         gastado; que sea la prometida lo comprueba `auditaCartas`, que
+         necesita hash y por tanto no cabe en un reductor síncrono. */
+      const carta = cartaLegal(j);
       if (!carta) continue;
-      rev[j.uid] = Object.assign({ i: j.i, sal: j.sal || "" }, carta);
-      usadas[j.uid].push(j.i);
+      if (usadas[j.uid].indexOf(carta.i) >= 0) continue;
+      rev[j.uid] = { i: carta.i, sal: j.sal || "", e: carta.e, c: carta.c, v: carta.v };
+      usadas[j.uid].push(carta.i);
       if (js.length >= 2 && js.every(x => rev[x.uid])) cierra();
     }
   }
   const trio = ganador ? victoriaCartas(ganadas[ganador]) : null;
   return {
     fase: js.length < 2 ? "espera" : ganador ? "fin" : "jugando",
-    ronda, comp, rev, ganadas, usadas, rondas, ganador, motivo, trio
+    ronda, comp, rev, ganadas, usadas, rondas, semillas, ganador, motivo, trio
   };
 }
 
@@ -731,27 +769,69 @@ function redReversi(p, js) {
    victorias sin necesidad de un servidor.
    ============================================================ */
 
-/* Lo único que el reductor no puede comprobar por sí mismo: que la
-   carta revelada sea la que se prometió en el compromiso. Comprobarlo
-   pide SHA-256, que es asíncrono, y el reductor es síncrono a propósito
+/* Lo que el reductor no puede comprobar por sí mismo. Comprobarlo pide
+   SHA-256, que es asíncrono, y el reductor es síncrono a propósito
    (corre en cada pintada). Así que se audita aparte, y las dos
-   pantallas lo hacen: quien cambie de carta después de ver la del otro
-   no gana en silencio, sale su nombre en rojo en los dos navegadores.
-   Devuelve la lista de rondas donde algo no cuadra. */
+   pantallas lo hacen: quien haga trampa no gana en silencio, sale su
+   nombre en rojo en los dos navegadores.
+
+   Con el mazo privado son **dos** candados, no uno:
+
+   1. `ronda` — que la carta revelada sea la prometida al empezar la
+      ronda. El compromiso se hace sobre `[i, e, c, v]`, la carta
+      entera y no solo su índice: ahora la carta viaja escrita en la
+      jugada, así que prometer un índice no dice nada de lo que se
+      acabará enseñando.
+   2. `mazo` — que esas cartas estuvieran de verdad en su mazo. Al
+      entrar cada uno promete `hmazo` en su ficha (que las reglas
+      dejan escribir una sola vez) y al acabar revela la semilla; con
+      ella se rehace el mazo y se comprueba carta por carta. Es lo que
+      impide inventarse un doce de fuego sin haberlo tenido nunca.
+
+   La frontera honesta: quien cierre la pestaña antes del final no
+   revela su semilla, y ese segundo candado se queda sin cerrar — el
+   primero sigue en pie. Devuelve la lista de faltas; `ronda` es -1
+   cuando la falta es del mazo entero y no de una ronda concreta. */
 export async function auditaCartas(partida, estado) {
   const malas = [];
   const jug = jugadasDe(partida);
   const compHash = {};
+  const semillas = {};
+  const jugadas = {};               // uid -> cartas que ha enseñado
   let ronda = 0;
   const vistos = {};
   for (const j of jug) {
+    if (j.t === "s") { if (!semillas[j.uid]) semillas[j.uid] = { sem: j.sem, sal: j.sal || "" }; continue; }
     if (j.t === "c" && compHash[j.uid + ":" + ronda] === undefined) compHash[j.uid + ":" + ronda] = j.h;
     else if (j.t === "r" && !vistos[j.uid + ":" + ronda]) {
       vistos[j.uid + ":" + ronda] = true;
+      const carta = cartaLegal(j);
       const h = compHash[j.uid + ":" + ronda];
-      if (h && !(await compromisoValido(j.i, j.sal || "", h))) malas.push({ uid: j.uid, ronda });
+      if (!carta) malas.push({ uid: j.uid, ronda, que: "ronda" });
+      else {
+        if (h && !(await compromisoValido([carta.i, carta.e, carta.c, carta.v], j.sal || "", h)))
+          malas.push({ uid: j.uid, ronda, que: "ronda" });
+        (jugadas[j.uid] = jugadas[j.uid] || []).push(carta);
+      }
       if (Object.keys(vistos).filter(k => k.endsWith(":" + ronda)).length >= (estado.jugadores || []).length) ronda++;
     }
+  }
+
+  /* Segunda pasada: el mazo. Solo de quien haya revelado su semilla,
+     y solo si su ficha prometía una — una partida de antes de que
+     esto existiera no tiene `hmazo` y no hay nada que comprobar. */
+  for (const j of (estado.jugadores || [])) {
+    const s = semillas[j.uid];
+    if (!s || !j.hmazo) continue;
+    let mal = !(await compromisoValido(s.sem, s.sal, j.hmazo));
+    if (!mal) {
+      const m = mazoDe(s.sem >>> 0, 0);
+      for (const c of (jugadas[j.uid] || [])) {
+        const real = m[c.i];
+        if (!real || real.e !== c.e || real.c !== c.c || real.v !== c.v) { mal = true; break; }
+      }
+    }
+    if (mal) malas.push({ uid: j.uid, ronda: -1, que: "mazo" });
   }
   return malas;
 }

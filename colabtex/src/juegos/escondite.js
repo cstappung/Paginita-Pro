@@ -29,6 +29,16 @@ import {
   acierta, RADIO_ACIERTO, CASTIGO_FALLO
 } from "./motor.js";
 import { pinta, pintaPersona } from "./paisaje.js";
+import { suena } from "./sonido.js";
+
+/* La última jugada del registro, en crudo. El reductor no guarda quién
+   la hizo —no le hace falta para dibujar— y el sonido sí: un disparo
+   propio y uno ajeno no pueden sonar igual. */
+function ultimaJugada(partida) {
+  const js = (partida && partida.jugadas) || {};
+  const ks = Object.keys(js).sort();
+  return ks.length ? js[ks[ks.length - 1]] : null;
+}
 
 /* Lo que dura colocarse. Sesenta segundos son de sobra para elegir un
    escondite y demasiado poco para pensárselo, que es justo el punto. */
@@ -61,6 +71,8 @@ export function crearEscondite(ctx) {
   let propuesta = null;            // {x,y} colocada pero sin confirmar
   let enviando = false;            // evita mandar el mismo compromiso dos veces
   let bloqueoHasta = 0;            // castigo por fallar
+  let vistas = -1;                 // cuántas jugadas llevaba el registro
+  let sonoBuscar = false, sonoFin = false;
   let vistaW = 0, vistaH = 0;      // tamaño en píxeles CSS, no del búfer
   let muerto = false;
 
@@ -345,11 +357,30 @@ export function crearEscondite(ctx) {
     }
   }
 
+  /* El sonido va por el registro, no por el clic: así también se oye lo
+     que hace el otro, que en un escondite es justo lo que no se ve. */
+  function suenaJugada(partida) {
+    const j = ultimaJugada(partida);
+    if (!j) return;
+    if (j.t === "c") { suena("clic"); return; }
+    if (j.t !== "b") return;
+    const dio = est && est.ganador === j.uid;
+    suena(dio ? (j.uid === uid ? "gana" : "pierde") : "ficha");
+  }
+
   function actualizar(partida, estado) {
     p = partida; est = estado;
     if (est && est.fase !== "esconder") propuesta = null;
+    const n = Object.keys((partida && partida.jugadas) || {}).length;
+    if (vistas >= 0 && n > vistas) suenaJugada(partida);
+    vistas = n;
+    if (est && est.fase === "buscar" && !sonoBuscar) { sonoBuscar = true; suena("entra"); }
     render(); pintar();
     automatismos();
+    if (est && est.fase === "fin" && !sonoFin) {
+      sonoFin = true;
+      setTimeout(() => suena(est.ganador === uid ? "victoria" : "derrota"), 450);
+    }
     if (est && est.ganador !== null && est.ganador !== undefined && !(p.fin && p.fin.at)) {
       terminar(est.ganador, est.motivo);
     }
