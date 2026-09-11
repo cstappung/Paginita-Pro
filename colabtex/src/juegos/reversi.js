@@ -26,6 +26,17 @@
  *   firma lleva la última casilla dentro: una pintada por jugada.
  */
 import { claveCasilla } from "./motor.js";
+import { suena } from "./sonido.js";
+
+/* Quién hizo la última jugada. El reductor no lo guarda —no le hace
+   falta para dibujar— y el log sí, así que se lee de ahí: el sonido
+   tiene que sonar distinto según sea tuya o suya. */
+function ultimoAutor(partida) {
+  const js = (partida && partida.jugadas) || {};
+  const ks = Object.keys(js).sort();
+  const u = ks.length ? js[ks[ks.length - 1]] : null;
+  return u ? u.uid : "";
+}
 
 const S = 100;   // lado de la casilla, en unidades del viewBox
 const M = 14;    // margen del tablero
@@ -41,6 +52,8 @@ export function crearReversi(ctx) {
   let host = null, muerto = false;
   let p = null, est = null;
   let enviando = false;
+  let vistas = -1;             // cuántas jugadas llevaba el log la última vez
+  let sonoFin = false;
   const firmas = {};
 
   function montar(donde) {
@@ -182,9 +195,25 @@ export function crearReversi(ctx) {
     finally { if (!muerto) enviando = false; }
   }
 
+  /* Una captura grande suena a jugada, no a ficha: cuatro vueltas de una
+     tacada es lo que decide la partida y merece oírse desde el otro lado. */
+  function suenaJugada(quien) {
+    const v = (est.ultima && est.ultima.voltea) ? est.ultima.voltea.length : 0;
+    if (v >= 4) suena(quien === uid ? "gana" : "pierde");
+    else suena("ficha");
+  }
+
   function actualizar(partida, estado) {
     p = partida; est = estado;
+    const n = Object.keys((partida && partida.jugadas) || {}).length;
+    if (vistas >= 0 && n > vistas) suenaJugada(ultimoAutor(partida));
+    vistas = n;
     pinta();
+    if (est.fase === "fin" && !sonoFin) {
+      sonoFin = true;
+      setTimeout(() => suena(est.ganador === uid ? "victoria"
+        : est.ganador === "" ? "empate" : "derrota"), 450);
+    }
     if (est.ganador !== null && est.ganador !== undefined && !(p.fin && p.fin.at)) {
       terminar(est.ganador, est.motivo);
     }

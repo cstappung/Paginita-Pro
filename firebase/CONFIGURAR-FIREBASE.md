@@ -70,6 +70,27 @@ Lo que garantizan una vez publicadas:
   ese juego y tenerle a él dentro. Es lo que impide anotarse cien victorias a
   mano desde la consola del navegador.
 
+### ⚠ Si publicaste las reglas antes de que existiera Reversi
+
+Este es el caso que se lee como «el juego nuevo está roto». La regla que
+valida el campo `juego` lleva **la lista de los juegos que existían el día
+que copiaste el archivo**:
+
+```
+"juego": { ".validate": "newData.val() === 'escondite' || … || newData.val() === 'reversi'" }
+```
+
+Si tu copia publicada es anterior, `'reversi'` no está en esa lista y la base
+**rechaza la sala al crearla**, con un `PERMISSION_DENIED` seco que no dice
+nada más. Los otros tres juegos siguen funcionando, que es lo que despista.
+Lo mismo vale para `misPartidas`, que es donde cada quien guarda la semilla de
+su mano de cartas: sin esa regla la mano privada no se puede guardar.
+
+El arreglo es el de siempre — volver a pegar `firebase/database.rules.json`
+entero y **Publicar** — y no hay que tocar nada más. Desde la propia página
+de juegos, cuando la base rechaza algo sale un cartel que lo explica y trae el
+archivo al portapapeles con un botón.
+
 ## 2. Reglas de Storage
 
 1. Consola → **Storage** → pestaña **Reglas**.

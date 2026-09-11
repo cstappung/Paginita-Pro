@@ -1534,16 +1534,88 @@ so those coordinates are in its memory and anyone who opens the developer tools
 will see them. There is no way around that without a server that arbitrates,
 which is exactly what this site does not have.
 
-That limit is also why `cartas` deals **both hands face up**. The deck comes
-from the game's public seed, so the other's hand can be computed from the
-console anyway; a secret that F12 breaks is not a secret, it is a rule only the
-people who don't know how to look obey. Face up, the game becomes "guess which
-of those five they will play", which with the commitment is a better game, not
-a worse one. What the reducer cannot check by itself is that the revealed card
-is the promised one — verifying a hash is asynchronous and the reducer is
-synchronous by design (it runs on every repaint) — so `auditaCartas` does it
-separately, in **both** browsers, and a mismatch prints the offender's name in
-red on both screens.
+**In `cartas` each hand is dealt from a seed only its owner knows.** The deck
+used to come from the game's *public* seed, which meant either hand could be
+recomputed from the console — so both were dealt face up and the game was
+"guess which of those five they will play". Now, on creating or joining a room,
+each browser draws its own `{sem, sal}` and writes it to
+`misPartidas/<uid>/<pid>/sec`, the one node the rules let **only its owner
+read**; what goes into the public ficha is `hmazo = compromiso(sem, sal)`, and
+the ficha is write-once, so nobody can redraw a better hand halfway through.
+The opponent's cards are therefore not hidden by convention but genuinely
+unknown, and `caManoOtro` paints backs. The seeds are published as a
+`{t:"s", uid, sem, sal}` entry **at the end**, which is what lets both browsers
+verify afterwards that the hands really were the promised ones — hence the
+`jugada.t !== "s"` exception in `jugar()`, the one write the "the game is over"
+gate has to allow. Rooms created before this still exist, so `cartas.js`'s
+`miMazo()` falls back to the room's public seed for a player with no secret of
+their own — a half-played duel should not become unplayable.
+
+What the reducer cannot check by itself is that the revealed card is the
+promised one — verifying a hash is asynchronous and the reducer is synchronous
+by design (it runs on every repaint) — so `auditaCartas` does it separately, in
+**both** browsers, and a mismatch prints the offender's name in red on both
+screens.
+
+**A card is a picture, and the suit is drawn around it.** The 36 PNGs in
+`juegos/cartas/` are full card faces, so the old drawn chrome is gone; with 36
+images against a 216-card deck the element cannot come from the art, so it is
+carried by the `.jg-arte` inset ring and the `.jg-c-palo` label. The box is
+76×112 to match the files' own 164:242, and `precarga()` pulls all 36 in the
+background — a card that arrives while it is being flipped reads as a glitch.
+Winning with a 10, 11 or 12 fires `efectoGolpe` and a tie fires `efectoHumo`,
+both absolutely positioned over `.jg-choque` (which is `position:relative` for
+exactly that) with per-particle `--a`/`--r`/`--x`/`--d`/`--s` custom properties;
+the `"choque" + ult.n` repaint signature is what guarantees one firing per round
+instead of one per repaint.
+
+**Sound is driven by the move log, not by the click** (`juegos/sonido.js`, a
+small WebAudio synth — no files to host, no CORS, nothing to wait for). Playing
+it on the local click would make the game silent for everything the *opponent*
+does, which is most of what you are waiting for; watching the log grow instead
+means both sides are audible. Each screen counts `partida.jugadas` between
+repaints and, where it matters who moved, reads the author out of the raw log
+with its own little `ultimoAutor` — the reducers record the move, never who
+wrote it, and adding an author to the state for a sound effect would put a fact
+in two places. The header's 🔊 mutes it, persisted in `localStorage` under
+`jg.sonido`, and the context is created on the first gesture because a browser
+refuses one before that.
+
+**Everyone's apodo, foto and colour live in `users/<uid>/perfil`**
+(`juegos/perfil.js` for the editor, `fb-juegos.js` for the three calls). Not in
+the ficha: the ficha is written once by rule — so nobody renames themselves
+mid-duel — and its `foto` is capped at 400 characters by `.validate`, which
+fits a Google URL and no uploaded photo at all. Three consequences:
+
+- **The live profile is laid over the frozen ficha at paint time**, in
+  `juegos-main.js`'s `vistePerfiles(est)`, right after `reducir()`. That is why
+  **no game module had to change**, and why changing your apodo changes it in
+  yesterday's games too. It writes **into** each ficha with `Object.assign`
+  rather than substituting the object, because `auditaCartas` holds references
+  to those very objects.
+- **A photo that would not fit goes out as `""`** (`fotoBreve`). Sending a
+  ~13 kB data URL to `jugadores/$uid/foto` or `ranks/$juego/$uid/foto` does not
+  merely look wrong: the `.validate` rejects the **whole write**, so creating a
+  room would have failed with `PERMISSION_DENIED`. The real photo only ever
+  lives under `users/`, which has no cap, and reaches the screen through the
+  overlay.
+- **Profiles are watched on demand**, one listener per uid asked about
+  (`perfilDe`). Reading `users` whole would download the profile of everyone who
+  has ever opened ColabTeX in order to paint two names. And `users/$uid` is
+  already readable by anyone signed in and writable only by its owner, with no
+  validation — so this needed **no rules change**, which after Reversi is a
+  feature in itself.
+
+**A `PERMISSION_DENIED` now says what to do about it.** The rules in the repo
+are not the rules in force: they are published by hand in the console and
+pushing to Pages does not deploy them, so the live copy lags behind every new
+game. Reversi was refused for exactly that — `database.rules.json` lists it in
+the `juego` whitelist, the deployed copy did not, and a room of a game the
+rules have never heard of cannot be created. A bare `alert("permission denied")` left
+no way to tell that apart from a bug, so `juegos-main.js` routes it to a
+`.jg-fin-capa` overlay with a **Copiar las reglas** button: the site serves its
+own repo, so `firebase/database.rules.json` is fetchable same-origin, and the
+panel links straight to Realtime Database → Reglas.
 
 **The scenery is a seed, not an image.** `escena(semilla)` lays out a couple of
 hundred pieces from a mulberry32 PRNG and `juegos/paisaje.js` draws them; the
@@ -1577,6 +1649,12 @@ Modules in [colabtex/src/juegos/](colabtex/src/juegos/):
   only thing the two machines must share is the layout, and that is a number.
 - `escondite.js`, `cartas.js`, `cuadritos.js`, `reversi.js`, `ranks.js` — one
   screen each.
+- `sonido.js` — the WebAudio synth and the mute flag. No DOM beyond the header
+  button's state, no Firebase.
+- `perfil.js` — the profile editor: `COLORES`, `mezcla` (ficha + perfil → what
+  is painted, pure and verifiable in Node), `recorta` (the browser-side 96×96
+  centre crop to a JPEG data URL, which is what keeps the photo at ~10 kB) and
+  `abrePerfil`, the modal.
 - All of them expose the **same shape**: `crearX(ctx)` with
   `ctx = {uid, pid, jugar, terminar, ahora}`, returning
   `{montar(hostEl), actualizar(partida, estado), destruir()}`. Adding a fifth

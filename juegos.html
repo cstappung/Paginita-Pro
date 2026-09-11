@@ -130,6 +130,57 @@
   .jg-fin-m{font-size:12.5px;color:#5a6772;margin-top:6px;line-height:1.55}
   .jg-fin-marca{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:14px;padding-top:14px;border-top:1px solid #0f172815}
   .jg-fin-btns{display:flex;gap:8px;justify-content:center;margin-top:18px;flex-wrap:wrap}
+
+  /* El cartel de «faltan reglas» reusa el del final de partida, pero su
+     texto es de leer, no de celebrar: alineado a la izquierda, y el
+     enlace a la consola es un `<a>` con pinta de botón. */
+  .jg-reglas .jg-fin-m{text-align:left;margin-top:10px}
+  .jg-reglas .jg-fin-m code{font-family:'IBM Plex Mono',monospace;font-size:11.5px;background:#0f172814;padding:1px 5px;border-radius:4px;word-break:break-word}
+  .jg-fin-btns a.btn{display:inline-flex;align-items:center;text-decoration:none}
+  .aviso .jg-fin-m{color:inherit;font-size:12.5px;margin-top:8px;line-height:1.6}
+  .aviso .jg-fin-m code{background:#00000010}
+
+  /* El editor del perfil reusa la capa del cartel del final — misma
+     penumbra, misma entrada, misma ✕ — porque es el mismo gesto:
+     algo que se pone delante de la partida y se quita. Lo propio de
+     aquí es el cuerpo en dos columnas y la rejilla de colores. */
+  .jg-modal-capa{position:fixed;inset:0;z-index:70;display:grid;place-items:center;padding:18px;background:#0f172899;backdrop-filter:blur(2px);animation:jgVela .2s ease-out}
+  .jg-modal{position:relative;width:460px;max-width:100%;max-height:calc(100vh - 36px);overflow:auto;padding:24px 22px 20px;border-radius:14px;background:#fff;border:1px solid #e2e8ec;box-shadow:0 18px 50px #0f172840;animation:jgEntra .35s ease-out;text-align:left}
+  .jg-modal-t{font-size:19px;font-weight:700;color:#1f2933}
+  .jg-modal-s{font-size:12px;color:#5a6772;line-height:1.55;margin:6px 0 0}
+  /* El hueco del error existe siempre (no se muestra y se oculta): si
+     apareciera de la nada, el botón Guardar se movería bajo el dedo
+     justo cuando se acaba de fallar al pulsarlo. */
+  .jg-modal-err{min-height:16px;margin-top:10px;font-size:12px;color:#c0392b;line-height:1.5}
+
+  .jg-perfil-cuerpo{display:flex;gap:18px;margin-top:16px;flex-wrap:wrap}
+  .jg-perfil-foto{display:flex;flex-direction:column;align-items:center;gap:6px;width:116px;flex:0 0 auto}
+  .jg-perfil-foto .btn2,.jg-perfil-foto .btn-ghost{width:100%;text-align:center;font-size:11.5px;padding:0 8px}
+  /* `.btn-ghost` nace con el color de la cabecera, que es oscura; aquí
+     el fondo es blanco y ese gris claro no se lee. */
+  .jg-perfil-foto .btn-ghost{height:28px;color:#5a6772}
+  .jg-perfil-foto .btn-ghost:hover{background:#0f172810;color:#0d9488}
+  /* La vista previa es la misma bola que luego se ve en la cabecera y
+     en el marcador, en grande: lo que se está eligiendo es eso. */
+  .jg-perfil-av{width:96px;height:96px;border-radius:50%;overflow:hidden;background:#eef3f7;border:1px solid #e2e8ec;display:grid;place-items:center}
+  .jg-perfil-av img{width:100%;height:100%;object-fit:cover;display:block}
+  .jg-perfil-av i{width:100%;height:100%;display:grid;place-items:center;font-style:normal;font-size:38px;font-weight:600;color:#fff}
+
+  .jg-perfil-campos{flex:1;min-width:200px;display:flex;flex-direction:column;gap:14px}
+  .jg-campo{display:flex;flex-direction:column;gap:6px}
+  .jg-campo>span{font-size:11.5px;font-weight:600;color:#42505c}
+  .jg-campo input[type=text]{height:34px;padding:0 11px;border:1px solid #d4dce2;border-radius:6px;font-size:13px;font-family:inherit;background:#fff;color:#1f2933}
+  .jg-campo input[type=text]:focus{outline:none;border-color:#0d9488;box-shadow:0 0 0 3px #0d948822}
+  .jg-colores{display:grid;grid-template-columns:repeat(8,1fr);gap:6px}
+  .jg-color{aspect-ratio:1;border:2px solid transparent;border-radius:50%;cursor:pointer;padding:0}
+  .jg-color:hover{transform:scale(1.12)}
+  /* El elegido se marca con un aro por fuera, no con un borde propio:
+     un borde del color del fondo no se ve, y uno blanco por dentro
+     encoge la muestra justo del que se quiere comparar. */
+  .jg-color.on{border-color:#fff;box-shadow:0 0 0 2px #1f2933}
+  .jg-color-libre{display:flex;align-items:center;gap:7px;font-size:11.5px;color:#5a6772}
+  .jg-color-libre input[type=color]{width:30px;height:24px;padding:0;border:1px solid #d4dce2;border-radius:5px;background:#fff;cursor:pointer}
+
   @keyframes jgEntra{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
   @keyframes jgVela{from{opacity:0}to{opacity:1}}
   @keyframes jgCara{from{opacity:0;transform:scale(.4)}to{opacity:1;transform:none}}
@@ -185,27 +236,30 @@
   .jg-mano-otro{min-height:76px}
   .jg-duelo{min-height:150px;display:grid;place-items:center}
 
-  /* Una carta es un rectángulo con su propio color de elemento en dos
-     tonos: el borde y el fondo salen del mismo par, así que añadir un
-     cuarto elemento es una fila más en la tabla y ni una regla aquí. */
-  .jg-carta{position:relative;width:76px;height:106px;border-radius:9px;flex-shrink:0;
+  /* Una carta es la ilustración dentro de un marco que dice el color.
+     La proporción (76×112) es la del dibujo, 164×242: recortarlo a otra
+     dejaría al personaje sin cabeza o sin pies. */
+  .jg-carta{position:relative;width:76px;height:112px;border-radius:9px;flex-shrink:0;
     background:linear-gradient(160deg,var(--elc,#888),var(--el,#555));
     border:1px solid #ffffff33;box-shadow:0 5px 14px #00000055;
     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
-    color:#fff;user-select:none;transition:transform .15s,box-shadow .15s}
-  .jg-c-borde{position:absolute;inset:5px;border:1px solid #ffffff40;border-radius:6px;pointer-events:none}
-  .jg-c-icono{font-size:26px;line-height:1}
-  .jg-c-valor{font-size:24px;font-weight:700;font-family:'IBM Plex Mono',monospace;line-height:1;text-shadow:0 1px 3px #0006}
-  .jg-c-pie{font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;opacity:.85}
+    color:#fff;user-select:none;overflow:hidden;transition:transform .15s,box-shadow .15s}
+  /* El dibujo lleva elemento y número, que es lo que ya trae pintado. Del
+     color de palo —el que decide el trío— no hay dibujo, así que lo dicen
+     el anillo interior y la etiqueta del pie. */
+  .jg-arte{padding:3px;gap:0;box-shadow:0 0 0 2px var(--col,#888) inset,0 5px 14px #00000055}
+  .jg-c-img{width:100%;height:100%;object-fit:cover;border-radius:6px;display:block;
+    background:#00000055;pointer-events:none}
+  .jg-c-palo{position:absolute;left:0;right:0;bottom:0;padding:2px 0 3px;
+    font-size:8.5px;letter-spacing:.09em;text-transform:uppercase;text-align:center;
+    font-weight:700;color:#fff;background:var(--col,#888);
+    text-shadow:0 1px 2px #00000088;pointer-events:none}
   .jg-dorso{background:repeating-linear-gradient(45deg,#1e3a5f,#1e3a5f 6px,#24466f 6px,#24466f 12px);color:#7ab8ff;font-size:24px;justify-content:center}
-  .jg-pequena{width:56px;height:78px}
-  .jg-pequena .jg-c-icono{font-size:19px}
-  .jg-pequena .jg-c-valor{font-size:17px}
-  .jg-pequena .jg-c-pie{display:none}
-  .jg-mini{width:34px;height:48px;border-radius:6px}
-  .jg-mini .jg-c-icono{font-size:13px}
-  .jg-mini .jg-c-valor{font-size:11px}
-  .jg-mini .jg-c-pie,.jg-mini .jg-c-borde{display:none}
+  .jg-pequena{width:56px;height:83px}
+  .jg-pequena .jg-c-palo{font-size:7px;letter-spacing:.05em}
+  .jg-mini{width:34px;height:50px;border-radius:6px}
+  .jg-mini .jg-c-palo{display:none}
+  .jg-mini.jg-arte{padding:2px;box-shadow:0 0 0 1.5px var(--col,#888) inset,0 5px 14px #00000055}
   .jg-jugable{cursor:pointer}
   .jg-jugable:hover{transform:translateY(-8px);box-shadow:0 12px 22px #00000066}
   .jg-elegida{transform:translateY(-12px);box-shadow:0 0 0 3px #ffd76a,0 12px 22px #00000066}
@@ -218,7 +272,7 @@
 
   .jg-espera{display:flex;align-items:center;gap:18px}
   .jg-vs{font-size:15px;font-weight:700;color:#8fa3b8;letter-spacing:.08em}
-  .jg-choque{display:flex;align-items:center;gap:16px}
+  .jg-choque{display:flex;align-items:center;gap:16px;position:relative}
   .jg-veredicto{font-size:15px;font-weight:700;color:#e6edf3;min-width:110px;text-align:center}
   .jg-choque.jg-gana .jg-veredicto{color:#4ade80}
   .jg-choque.jg-pierde .jg-veredicto{color:#ff8a7a}
@@ -227,6 +281,37 @@
   .jg-vuela-abajo{animation:jgAbajo .4s ease-out}
   @keyframes jgArriba{from{transform:translateY(-60px) rotate(-8deg);opacity:0}to{transform:none;opacity:1}}
   @keyframes jgAbajo{from{transform:translateY(60px) rotate(8deg);opacity:0}to{transform:none;opacity:1}}
+
+  /* Ganar con un 10, un 11 o un 12 estalla; empatar echa humo. Las dos
+     capas se pintan *encima* del choque y no dentro de la fila: metidas
+     en el flex, las cartas se correrían a un lado al aparecer. Cada
+     partícula trae su ángulo y su retardo en una variable, porque son
+     doce rayos y siete bocanadas y una regla por cada una no se lee. */
+  .jg-golpea{animation:jgSacude .5s ease-out}
+  @keyframes jgSacude{0%,100%{transform:none}15%{transform:translateX(-7px)}
+    35%{transform:translateX(6px)}55%{transform:translateX(-4px)}75%{transform:translateX(2px)}}
+  .jg-estallido,.jg-humo{position:absolute;left:50%;top:50%;width:0;height:0;
+    pointer-events:none;z-index:2}
+  .jg-onda{position:absolute;left:-9px;top:-9px;width:18px;height:18px;border-radius:50%;
+    border:3px solid var(--elc,#fff);animation:jgOnda .85s ease-out forwards}
+  @keyframes jgOnda{from{transform:scale(.3);opacity:.95}to{transform:scale(13);opacity:0}}
+  .jg-rayos{position:absolute}
+  .jg-rayos i{position:absolute;left:-2.5px;top:-2.5px;width:5px;height:5px;border-radius:3px;
+    background:var(--el,#fff);box-shadow:0 0 9px var(--elc,#fff);
+    animation:jgRayo .75s ease-out forwards}
+  @keyframes jgRayo{
+    from{transform:rotate(var(--a,0deg)) translateY(0) scaleY(1);opacity:1}
+    to{transform:rotate(var(--a,0deg)) translateY(calc(var(--r,1) * -78px)) scaleY(3.4);opacity:0}}
+  .jg-golpe-t{display:block;margin-top:5px;font-size:23px;font-weight:800;color:#ffd76a;
+    text-shadow:0 2px 9px #ffb30099;animation:jgGolpeT .55s cubic-bezier(.2,1.7,.4,1)}
+  @keyframes jgGolpeT{from{transform:scale(2.4) rotate(-9deg);opacity:0}to{transform:none;opacity:1}}
+  .jg-humo i{position:absolute;left:-23px;top:-23px;width:46px;height:46px;border-radius:50%;
+    background:radial-gradient(circle at 40% 38%,#ffffffcc,#b9c6d3a0 54%,#8a99a800 72%);
+    opacity:0;animation:jgHumo 1.7s ease-out var(--d,0ms) forwards}
+  @keyframes jgHumo{
+    0%{opacity:0;transform:translate(0,0) scale(calc(var(--s,1) * .35))}
+    18%{opacity:.85}
+    100%{opacity:0;transform:translate(var(--x,0px),-64px) scale(calc(var(--s,1) * 1.9))}}
   .jg-remate{display:flex;flex-direction:column;align-items:center;gap:12px;animation:jgEntra .4s ease-out}
   .jg-remate-t{font-size:24px;font-weight:700}
   .jg-remate.jg-gana .jg-remate-t{color:#4ade80}
@@ -343,9 +428,8 @@
   .jg-nota-larga{margin-top:18px;font-size:11.5px;color:#8a97a3;line-height:1.7;max-width:78ch}
 
   @media (max-width:640px){
-    .jg-carta{width:62px;height:86px}
-    .jg-c-icono{font-size:21px}
-    .jg-c-valor{font-size:19px}
+    .jg-carta{width:62px;height:91px}
+    .jg-pequena{width:48px;height:71px}
     .jg-trofeos{grid-template-columns:1fr}
     /* El tablero se lleva todo el ancho: con seis jugadores el
        marcador ya se parte en dos filas y el margen lateral es lo
@@ -361,6 +445,14 @@
     .jg-fin-t{font-size:20px}
     .jg-fin-btns{flex-direction:column}
     .jg-fin-btns .btn{width:100%}
+    /* En un móvil las dos columnas del perfil no caben: la foto pasa
+       a ser una fila propia, centrada, y los colores se reparten en
+       ocho de ancho completo para que se puedan tocar con el dedo. */
+    .jg-modal{padding:20px 15px 16px}
+    .jg-perfil-cuerpo{gap:14px}
+    .jg-perfil-foto{width:100%;flex-direction:row;flex-wrap:wrap;justify-content:center}
+    .jg-perfil-foto .btn2,.jg-perfil-foto .btn-ghost{width:auto;flex:1;min-width:120px}
+    .jg-perfil-av{flex:0 0 auto}
     .jg-of-ops{gap:6px}
   }
 </style>
@@ -376,8 +468,10 @@
       <a href="informes.html">Informes</a>
     </nav>
     <div class="head-right">
+      <button class="btn-ghost" id="btnSonido" title="Sonido" aria-pressed="true">🔊</button>
       <span id="userName"></span>
       <span class="avatar" id="userAvatar"></span>
+      <button class="btn-ghost" id="btnPerfil" title="Tu apodo, tu foto y tu color">Perfil</button>
       <button class="btn-ghost" id="btnLogout">Salir</button>
     </div>
   </header>
@@ -402,6 +496,6 @@
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202609102240"></script>
+<script src="juegos-app.js?v=202609110124"></script>
 </body>
 </html>
