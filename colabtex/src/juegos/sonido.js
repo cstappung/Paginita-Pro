@@ -139,6 +139,7 @@ const TEMAS = {
   reversi: { bpm: 72, notas: [50, 57, 60, 64, 62, 57, 55, 60] },
   orbita: { bpm: 88, notas: [57, 64, 69, 71, 76, 71, 69, 64] }
 };
+let pistaEscondite = null;
 let tema = "", timer = null, paso = 0, desbloqueado = false;
 let audioMusica = null, bus = null, volumen = 0.3, musicaOn = true;
 const voces = new Set();
@@ -162,12 +163,24 @@ export function ambientar(juego) {
 }
 export function activarAudio() { desbloqueado = true; sincronizaMusica(); }
 function detenerMusica() {
+  if (pistaEscondite) pistaEscondite.pause();
   clearInterval(timer); timer = null;
   for (const osc of voces) { try { osc.stop(); osc.disconnect(); } catch (_) {} }
   voces.clear();
 }
 function sincronizaMusica() {
   if (!tema || !musicaOn || !desbloqueado || document.hidden) { detenerMusica(); return; }
+  if (tema === "escondite") {
+    try {
+      if (!pistaEscondite) {
+        pistaEscondite = new Audio("juegos/audio/escondite-midnight-pulse.mp3");
+        pistaEscondite.loop = true; pistaEscondite.preload = "none";
+      }
+      pistaEscondite.volume = volumen;
+      if (pistaEscondite.paused) pistaEscondite.play().catch(() => {});
+    } catch (_) {}
+    return;
+  }
   if (timer) return;
   try {
     const AC = window.AudioContext || window.webkitAudioContext;
