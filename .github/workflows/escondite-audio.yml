@@ -1,0 +1,34 @@
+name: Preparar audio de Escondite
+on:
+  push:
+    branches: [codex/escondite-rework]
+    paths:
+      - '.github/audio-parts/**'
+      - '.github/workflows/escondite-audio.yml'
+permissions:
+  contents: write
+jobs:
+  audio:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reconstruir y verificar MP3 original
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+          partes = sorted(Path('.github/audio-parts').glob('*.bin'))
+          assert len(partes) == 11, 'Faltan partes del audio'
+          audio = b''.join(p.read_bytes() for p in partes)
+          assert hashlib.sha256(audio).hexdigest() == '2024abc0edc0704a0171f24792733f5052f461e7fdc925521d70d6625a9b4b40', 'Audio distinto al original'
+          destino = Path('juegos/audio/escondite-midnight-pulse.mp3')
+          destino.parent.mkdir(parents=True, exist_ok=True)
+          destino.write_bytes(audio)
+          PY
+      - name: Guardar audio completo y retirar partes temporales
+        run: |
+          git add juegos/audio/escondite-midnight-pulse.mp3
+          git rm -r .github/audio-parts
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m "Guardar Midnight Pulse original verificado para Escondite"
+          git push origin HEAD:refs/heads/codex/escondite-rework
