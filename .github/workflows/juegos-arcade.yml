@@ -1,0 +1,43 @@
+name: Compilar Juegos
+on:
+  push:
+    branches: [codex/juegos-arcade-orbita]
+    paths:
+      - "colabtex/**"
+      - "juegos.html"
+      - ".github/workflows/juegos-arcade.yml"
+permissions:
+  contents: write
+concurrency:
+  group: juegos-arcade
+  cancel-in-progress: true
+jobs:
+  build:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/juegos-arcade-orbita
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: colabtex/package-lock.json
+      - name: Instalar dependencias del lockfile
+        run: npm ci --prefix colabtex
+      - name: Verificar reglas del motor
+        run: npm run test:juegos --prefix colabtex
+      - name: Compilar el proyecto
+        run: npm run build --prefix colabtex
+      - name: Conservar únicamente los artefactos de Juegos
+        run: |
+          git restore colabtex-app.js colabdraw-app.js informes-app.js colabdraw-math.js colabtex-pdf-worker.js colabtex.html colabdraw.html informes.html
+          git diff --check
+      - name: Guardar el bundle en la rama de revisión
+        run: |
+          git add juegos-app.js juegos.html
+          if git diff --cached --quiet; then exit 0; fi
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m "Compilar sección de juegos arcade"
+          git push origin HEAD:refs/heads/codex/juegos-arcade-orbita

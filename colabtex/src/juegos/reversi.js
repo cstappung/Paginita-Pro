@@ -100,6 +100,11 @@ export function crearReversi(ctx) {
     for (const [f, c] of (est.ultima && est.ultima.voltea) || []) volteadas[claveCasilla(f, c)] = true;
 
     const out = [`<svg viewBox="0 0 ${W} ${W}" class="jg-svg jg-rev-svg">`,
+      `<defs>
+        <radialGradient id="rv-fieltro" cx="40%" cy="30%" r="80%"><stop stop-color="#358568"/><stop offset="1" stop-color="#184535"/></radialGradient>
+        <radialGradient id="rv-negra" cx="30%" cy="25%" r="75%"><stop stop-color="#667184"/><stop offset=".45" stop-color="#2a303d"/><stop offset="1" stop-color="#111723"/></radialGradient>
+        <radialGradient id="rv-blanca" cx="30%" cy="25%" r="75%"><stop stop-color="#fff"/><stop offset=".55" stop-color="#eff3f6"/><stop offset="1" stop-color="#aab8c7"/></radialGradient>
+      </defs>`,
       `<rect class="jg-rev-fondo" x="0" y="0" width="${W}" height="${W}" rx="10"></rect>`];
 
     /* La cuadrícula, y los cuatro puntos de siempre en las esquinas de
@@ -116,7 +121,7 @@ export function crearReversi(ctx) {
       if (duena) {
         const ult = est.ultima && est.ultima.casilla === k;
         out.push(`<circle class="jg-rev-f${volteadas[k] ? " jg-rev-gira" : ""}${ult ? " jg-rev-ult" : ""}"
-          cx="${cx}" cy="${cy}" r="${S * 0.4}" fill="${fichaDe(duena)}"></circle>`);
+          cx="${cx}" cy="${cy}" r="${S * 0.4}" fill="url(#${duena === est.negras ? "rv-negra" : "rv-blanca"})"></circle>`);
         continue;
       }
       const caps = mio && est.legales[k];

@@ -261,3 +261,33 @@ export function watchPerfil(uid, cb) {
   return onValue(ref(db, `${U}/${uid}/perfil`), s => cb(s.val(), null),
                  err => cb(null, err));
 }
+
+
+/* Una única invitación por partida; las solicitudes simultáneas convergen. */
+export async function pedirRevancha(pid, quien) {
+  const original = (await get(ref(db, P + "/" + pid))).val();
+  if (!original?.fin || !original.jugadores?.[quien.uid]) throw new Error("La partida debe terminar antes de pedir revancha.");
+  if (original.revancha) return original.revancha;
+  const candidata = await crearPartida(original.juego, quien, {
+    origen: pid, cupo: cupoDe(original), lado: original.lado || LADO
+  });
+  let res;
+  try {
+    res = await runTransaction(ref(db, P + "/" + pid + "/revancha"), actual => actual === null ? candidata : undefined);
+  } catch (error) {
+    // No borrar una invitación confirmada si se perdió la respuesta.
+    try {
+      const enlace = (await get(ref(db, P + "/" + pid + "/revancha"))).val();
+      if (enlace === candidata) return candidata;
+      await borrarPartida(candidata);
+      await olvidarMia(candidata, quien.uid);
+    } catch (_) {}
+    throw error;
+  }
+  if (res.committed) return candidata;
+  await borrarPartida(candidata);
+  await olvidarMia(candidata, quien.uid);
+  const elegida = (await get(ref(db, P + "/" + pid + "/revancha"))).val();
+  if (!elegida) throw new Error("No se pudo enviar la revancha. Inténtalo de nuevo.");
+  return elegida;
+}

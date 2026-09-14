@@ -48,7 +48,7 @@ function motor() {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return null;
     if (!ctx) ctx = new AC();
-    if (ctx.state === "suspended") ctx.resume();
+    if (ctx.state === "suspended") ctx.resume().catch(() => {});
     return ctx;
   } catch (e) { return null; }
 }
@@ -129,3 +129,75 @@ export function suena(nombre) {
     if (f) f(a.currentTime + 0.01);
   } catch (e) { /* un sonido que falla no puede tumbar una partida */ }
 }
+
+
+/* Música original generativa, independiente de los efectos. */
+const TEMAS = {
+  escondite: { bpm: 78, notas: [60, 64, 67, 71, 67, 64, 62, 67] },
+  cartas: { bpm: 108, notas: [57, 60, 64, 69, 67, 64, 60, 64] },
+  cuadritos: { bpm: 94, notas: [60, 67, 69, 64, 62, 69, 67, 64] },
+  reversi: { bpm: 72, notas: [50, 57, 60, 64, 62, 57, 55, 60] },
+  orbita: { bpm: 88, notas: [57, 64, 69, 71, 76, 71, 69, 64] }
+};
+let tema = "", timer = null, paso = 0, desbloqueado = false;
+let audioMusica = null, bus = null, volumen = 0.3, musicaOn = true;
+const voces = new Set();
+try {
+  musicaOn = localStorage.getItem("jg.musica") !== "0";
+  const guardado = localStorage.getItem("jg.volumen");
+  if (guardado !== null && Number.isFinite(Number(guardado))) volumen = Math.max(0, Math.min(1, Number(guardado)));
+} catch (_) {}
+export const musicaActiva = () => musicaOn;
+export const volumenMusica = () => volumen;
+export function configurarMusica(on, v = volumen) {
+  musicaOn = !!on; volumen = Math.max(0, Math.min(1, Number(v) || 0));
+  try { localStorage.setItem("jg.musica", on ? "1" : "0"); localStorage.setItem("jg.volumen", String(volumen)); } catch (_) {}
+  if (bus && audioMusica) bus.gain.setTargetAtTime(volumen * 0.2, audioMusica.currentTime, 0.05);
+  sincronizaMusica();
+}
+export function ambientar(juego) {
+  const siguiente = TEMAS[juego] ? juego : "";
+  if (tema !== siguiente) { detenerMusica(); tema = siguiente; paso = 0; }
+  sincronizaMusica();
+}
+export function activarAudio() { desbloqueado = true; sincronizaMusica(); }
+function detenerMusica() {
+  clearInterval(timer); timer = null;
+  for (const osc of voces) { try { osc.stop(); osc.disconnect(); } catch (_) {} }
+  voces.clear();
+}
+function sincronizaMusica() {
+  if (!tema || !musicaOn || !desbloqueado || document.hidden) { detenerMusica(); return; }
+  if (timer) return;
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    if (!audioMusica) {
+      audioMusica = new AC(); bus = audioMusica.createGain(); bus.connect(audioMusica.destination);
+    }
+    audioMusica.resume().catch(() => {});
+    bus.gain.value = volumen * 0.2;
+    const tick = () => {
+      if (!tema || document.hidden) return;
+      const t = audioMusica.currentTime, config = TEMAS[tema];
+      const melodia = config.notas[paso % config.notas.length];
+      const notas = paso % 4 === 0 ? [melodia, config.notas[Math.floor(paso / 16) % 2 * 4] - 24] : [melodia];
+      for (const [i, midi] of notas.entries()) {
+        const o = audioMusica.createOscillator(), g = audioMusica.createGain();
+        const dur = i ? 1.4 : 0.5;
+        o.type = i ? "sine" : "triangle"; o.frequency.value = 440 * Math.pow(2, (midi - 69) / 12);
+        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(i ? 0.6 : 0.24, t + 0.025);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        o.connect(g).connect(bus); voces.add(o);
+        o.onended = () => { voces.delete(o); o.disconnect(); g.disconnect(); };
+        o.start(t); o.stop(t + dur + 0.02);
+      }
+      paso++;
+    };
+    tick();
+    timer = setInterval(() => { try { tick(); } catch (_) { detenerMusica(); } }, 30000 / TEMAS[tema].bpm);
+  } catch (_) { detenerMusica(); }
+}
+document.addEventListener("visibilitychange", sincronizaMusica);
+window.addEventListener("pagehide", detenerMusica);
+window.addEventListener("pageshow", sincronizaMusica);
