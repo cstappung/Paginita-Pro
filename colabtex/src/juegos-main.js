@@ -36,21 +36,22 @@ import { JUEGOS, reducir, jugadasDe, acumula, cupoDe, TAMANOS, etiquetaTamano } 
 import { crearEscondite } from "./juegos/escondite.js";
 import { crearCartas } from "./juegos/cartas.js";
 import { crearCuadritos } from "./juegos/cuadritos.js";
+import { crearOrbita } from "./juegos/orbita.js";
 import { crearReversi } from "./juegos/reversi.js";
 import { crearRanks } from "./juegos/ranks.js";
 import { mezcla, abrePerfil } from "./juegos/perfil.js";
-import { suena, silenciar, silenciado } from "./juegos/sonido.js";
+import { suena, silenciar, silenciado, ambientar, activarAudio, configurarMusica, musicaActiva, volumenMusica } from "./juegos/sonido.js";
 import { createReportWidget } from "./report-widget.js";
 
 const $ = id => document.getElementById(id);
 const VER = (document.currentScript && document.currentScript.src.split("?v=")[1]) || "";
 
 const FABRICAS = {
-  escondite: crearEscondite, cartas: crearCartas,
+  orbita: crearOrbita, escondite: crearEscondite, cartas: crearCartas,
   cuadritos: crearCuadritos, reversi: crearReversi
 };
 
-const ICONO = { escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫" };
+const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫" };
 
 /* Lo que puede elegir quien abre la sala, por juego. Vive aquí y no en
    `motor.js` porque son controles y no reglas: el motor ya recorta lo
@@ -322,6 +323,7 @@ function engancharPartida(pid) {
 function soltarPartida() {
   if (offPartida) { try { offPartida(); } catch (e) {} offPartida = null; }
   if (cancelarLimpieza) { try { cancelarLimpieza(); } catch (e) {} cancelarLimpieza = null; }
+  ambientar("");
   desmontaJuego();
 }
 
@@ -331,7 +333,7 @@ function soltarPartida() {
    partida empezada tiene que sobrevivir a una recarga. */
 function cuidaLaSala(p) {
   const soyAnfitrion = state.user && p.anfitrion === state.user.uid;
-  const espera = p.estado === "esperando" && Object.keys(p.jugadores || {}).length < 2;
+  const espera = !p.origen && p.estado === "esperando" && Object.keys(p.jugadores || {}).length < 2;
   if (soyAnfitrion && espera && !cancelarLimpieza) cancelarLimpieza = fb.limpiarSiSeVa(state.pid);
   else if ((!espera || !soyAnfitrion) && cancelarLimpieza) { cancelarLimpieza(); cancelarLimpieza = null; }
 }
@@ -480,6 +482,7 @@ function armazon() {
       </div>
       <div id="jgInvita"></div>
       <div id="jgHost"></div>
+      <div id="jgRevancha" aria-live="polite"></div>
       <div id="jgFin"></div>`;
     $("jgVolver").onclick = salirDeLaPartida;
     $("jgAbandonar").onclick = abandonar;
@@ -487,11 +490,14 @@ function armazon() {
     return;
   }
   h.innerHTML = `
-    <p class="lead">
-      Cuatro juegos por turnos: tres duelos y uno para hasta seis. Abre una sala, pásale
-      el enlace a quien quieras y jugad — no hace falta que estéis a la vez frente a la
-      pantalla: la partida espera, y cada jugada llega sola a la otra.
-    </p>
+    <section class="jg-hero">
+      <div><span class="jg-eyebrow">LABORATORIO / PLAY</span>
+      <h2>Una pausa.<br>Otra partida.</h2>
+      <p>Cinco juegos, tu gente y una buena revancha.<br>Abre una sala y comparte el enlace para jugar.</p>
+      <div class="jg-hero-tags"><span>02—06 jugadores</span><span>Por turnos</span><span>Música original</span></div></div>
+      <div class="jg-hero-orbita" aria-hidden="true"><i></i><i></i><i></i><b>✦</b><span>ÓRBITA<br><small>EL NUEVO DESAFÍO</small></span></div>
+    </section>
+    <div class="jg-section-title"><h2>Elige tu próxima partida</h2><span>05 juegos para desconectar</span></div>
     <div id="vesAviso"></div>
     <div class="jg-elige" id="vesElige"></div>
     <h2 class="jg-h2">Salas abiertas</h2>
@@ -505,19 +511,20 @@ function pintaVestibulo() {
   $("vesAviso").innerHTML = state.fallo ? avisoReglas(state.fallo) : "";
 
   $("vesElige").innerHTML = Object.entries(JUEGOS).map(([k, j]) => `
-    <div class="jg-oferta" style="--c:${j.color}">
-      <div class="jg-of-icono">${ICONO[k] || "●"}</div>
+    <div class="jg-oferta jg-of-${k}" style="--c:${j.color}">
+      <div class="jg-portada jg-portada-${k}" aria-hidden="true">${arteJuego(k)}</div>
+      <div class="jg-of-meta">${k === "orbita" ? "NUEVO · ORIGINAL" : "MULTIJUGADOR"}<span>${j.cupo > 2 ? "2–6" : "2"} JUGADORES</span></div>
       <div class="jg-of-nombre">${escapeHtml(j.nombre)}</div>
       <div class="jg-of-lema">${escapeHtml(j.lema)}</div>
       ${opcionesHtml(k)}
-      <button class="btn jg-of-btn" data-crear="${k}">Abrir sala</button>
+      <button class="btn jg-of-btn" data-crear="${k}">Jugar ahora <span aria-hidden="true">↗</span></button>
     </div>`).join("");
   for (const b of $("vesElige").querySelectorAll("[data-crear]")) {
     b.onclick = () => crear(b.getAttribute("data-crear"), leeOpciones(b));
   }
 
   const mias = new Set(state.mias.map(x => x.id));
-  const abiertas = state.salas.filter(s => s.anfitrion !== state.user.uid && !mias.has(s.id));
+  const abiertas = state.salas.filter(s => s.anfitrion !== state.user.uid && !mias.has(s.id) && !s.origen);
   $("vesSalas").innerHTML = abiertas.length ? abiertas.map(s => `
     <div class="row row-top">
       ${pillJuego(s.juego)}
@@ -591,6 +598,7 @@ function avisoReglas(err) {
 function pintaPartida() {
   const p = state.partida, est = state.estado;
   if (!p) {
+    ambientar("");
     $("jgTitulo").textContent = state.cargando ? "Abriendo…" : "Esa partida ya no existe";
     $("jgInvita").innerHTML = state.fallo ? avisoReglas(state.fallo)
       : state.cargando ? "" : `<div class="vacio">La sala se cerró o el enlace no es correcto.</div>`;
@@ -611,6 +619,20 @@ function pintaPartida() {
   const enJuego = !datosFin(p, est) && (p.jugadores || {})[state.user.uid];
   $("jgAbandonar").style.display = enJuego && est.listos ? "" : "none";
 
+  // Un enlace permite ver la invitación; entrar requiere aceptarla.
+  if (!p.jugadores?.[state.user.uid]) {
+    ambientar(""); desmontaJuego(); $("jgFin").innerHTML = "";
+    $("jgRevancha").innerHTML = "";
+    const admite = p.estado === "esperando" && !p.fin && est.jugadores.length < cupoDe(p);
+    $("jgInvita").innerHTML = '<div class="jg-invita"><b>' +
+      (admite ? "Te han invitado a jugar" : "Esta sala ya no admite jugadores") + '</b><p>' +
+      (admite ? "Únete para comenzar la partida con quienes están dentro." : "Puedes abrir otra sala desde el vestíbulo.") +
+      '</p>' + (admite ? '<button class="btn" id="jgUnirse">Unirse a la partida</button>' : '') + '</div>';
+    const unir = $("jgUnirse");
+    if (unir) unir.onclick = async () => { unir.disabled = true; await entrar(state.pid); if (unir.isConnected) unir.disabled = false; };
+    return;
+  }
+
   /* Mientras falte gente, el enlace es lo único que hay que hacer. */
   $("jgInvita").innerHTML = est.listos ? "" : panelEspera(p, est);
   if (!est.listos) {
@@ -627,8 +649,10 @@ function pintaPartida() {
     };
   }
 
+  ambientar(est.listos && !datosFin(p, est) ? p.juego : "");
   montaJuego(p);
   if (modulo) modulo.actualizar(p, est);
+  pintaRevancha(p, est);
   pintaFin(p, est);
 }
 
@@ -723,12 +747,12 @@ function pintaFin(p, est) {
     : "Ganó " + nombreDe(est, g);
   const sub = clase === "perdi" ? "Ganó " + nombreDe(est, g) : "";
   const marca = marcadorFin(est);
-  const firma = clase + titulo + sub + f.motivo + marca;
+  const firma = clase + titulo + sub + f.motivo + marca + (p.revancha || "");
   if (caja.dataset.firma === firma) return;      // no repintar: reinicia la animación
   caja.dataset.firma = firma;
   caja.innerHTML = `
     <div class="jg-fin-capa">
-      <div class="jg-fin jg-fin-${clase}">
+      <div class="jg-fin jg-fin-${clase}" role="dialog" aria-modal="true" aria-label="Resultado de la partida" tabindex="-1">
         <button class="jg-fin-x" id="jgFinX" title="Ver el tablero">✕</button>
         <div class="jg-fin-cara">${CARA[clase]}</div>
         <div class="jg-fin-t">${escapeHtml(titulo)}</div>
@@ -736,13 +760,24 @@ function pintaFin(p, est) {
         <div class="jg-fin-m">${escapeHtml(razon(f.motivo))}</div>
         ${marca}
         <div class="jg-fin-btns">
-          <button class="btn" id="jgOtra">Otra partida</button>
+          ${juega ? `<button class="btn" id="jgOtra">${p.revancha ? "Aceptar revancha" : "Pedir revancha"}</button>` : ""}
           <button class="btn2" id="jgAlVestibulo">Vestíbulo</button>
         </div>
       </div>
     </div>`;
-  $("jgFinX").onclick = () => { finCerrado = state.pid; caja.innerHTML = ""; caja.dataset.firma = ""; };
-  $("jgOtra").onclick = () => crear(p.juego, { cupo: est.cupo || 2, lado: p.lado || undefined });
+  const cerrar = () => { finCerrado = state.pid; caja.innerHTML = ""; caja.dataset.firma = ""; $("jgRevanchaBtn")?.focus(); };
+  $("jgFinX").onclick = cerrar;
+  const dialogo = caja.querySelector('[role="dialog"]');
+  dialogo.focus();
+  dialogo.onkeydown = e => {
+    if (e.key === "Escape") { e.preventDefault(); cerrar(); }
+    if (e.key !== "Tab") return;
+    const botones = [...dialogo.querySelectorAll("button:not(:disabled)")];
+    const primero = botones[0], ultimo = botones[botones.length - 1];
+    if (e.shiftKey && (document.activeElement === primero || document.activeElement === dialogo)) { e.preventDefault(); ultimo.focus(); }
+    else if (!e.shiftKey && document.activeElement === ultimo) { e.preventDefault(); primero.focus(); }
+  };
+  if ($("jgOtra")) $("jgOtra").onclick = () => revancha(p, est);
   $("jgAlVestibulo").onclick = () => ir("#");
 }
 
@@ -763,6 +798,7 @@ function marcadorFin(est) {
 }
 
 const RAZONES = {
+  estrellas: "Capturó más energía en las 36 estrellas.",
   encontrado: "Encontró al personaje escondido.",
   abandono: "La partida acabó por abandono.",
   trio: "Reunió tres cartas del mismo elemento en tres colores distintos.",
@@ -781,7 +817,7 @@ async function salirDeLaPartida() {
   const p = state.partida;
   /* Si la sala es mía y sigue vacía, se va conmigo: nadie tiene por
      qué encontrarse un vestíbulo lleno de salas que no arrancan. */
-  if (p && p.anfitrion === state.user.uid && p.estado === "esperando"
+  if (p && !p.origen && p.anfitrion === state.user.uid && p.estado === "esperando"
       && Object.keys(p.jugadores || {}).length < 2) {
     const pid = state.pid;
     try { await fb.borrarPartida(pid); await fb.olvidarMia(pid, state.user.uid); } catch (e) {}
@@ -813,7 +849,17 @@ function wire() {
   $("btnLogout").onclick = () => logout();
   $("btnPerfil").onclick = editaPerfil;
   pintaSonido();
-  $("btnSonido").onclick = () => { silenciar(silenciado()); pintaSonido(); suena("clic"); };
+  const pintaMusica = () => {
+    $("btnMusica").textContent = musicaActiva() ? "♫ Música" : "♫ Sin música";
+    $("btnMusica").setAttribute("aria-pressed", String(musicaActiva()));
+  };
+  pintaMusica();
+  $("volMusica").value = Math.round(volumenMusica() * 100);
+  $("btnMusica").onclick = () => { activarAudio(); configurarMusica(!musicaActiva()); pintaMusica(); };
+  $("volMusica").oninput = e => { activarAudio(); configurarMusica(musicaActiva(), Number(e.target.value) / 100); };
+  document.addEventListener("pointerdown", activarAudio, { passive: true });
+  document.addEventListener("keydown", activarAudio);
+  $("btnSonido").onclick = () => { silenciar(!silenciado()); pintaSonido(); suena("clic"); };
   $("tabJugar").onclick = () => ir(state.pid ? "#p/" + state.pid : "#");
   $("tabRanks").onclick = () => ir("#ranks");
   window.addEventListener("hashchange", aplicaRuta);
@@ -860,3 +906,45 @@ function wire() {
     render();
   });
 })();
+
+
+function arteJuego(k) {
+  if (k === "orbita") return '<div class="jg-art-orbit"><i></i><i></i><b>✦</b><span>✧</span></div>';
+  if (k === "cartas") return '<img src="juegos/cartas/agua/agua_10.png" alt=""><img src="juegos/cartas/fuego/fuego_12.png" alt=""><img src="juegos/cartas/nieve/nieve_11.png" alt="">';
+  if (k === "reversi") return '<div class="jg-art-rev">' + Array.from({ length: 16 }, (_, i) => '<i class="' + ([1, 4, 5, 10, 11, 14].includes(i) ? "negra" : [2, 6, 9, 13].includes(i) ? "blanca" : "") + '"></i>').join("") + '</div>';
+  if (k === "cuadritos") return '<div class="jg-art-dots">' + Array.from({ length: 9 }, (_, i) => '<i class="' + (i % 3 === 0 ? "llena" : "") + '"></i>').join("") + '</div>';
+  return '<div class="jg-art-land"><i></i><i></i><i></i><b>⌖</b><span>ENCUENTRA LO INVISIBLE</span></div>';
+}
+let pidiendoRevancha = false;
+async function revancha(p, est) {
+  if (pidiendoRevancha) return;
+  pidiendoRevancha = true;
+  const pid = state.pid, u = state.user;
+  for (const b of document.querySelectorAll("#jgOtra, #jgRevanchaBtn")) { b.disabled = true; b.textContent = "Preparando revancha…"; }
+  try {
+    const fin = datosFin(p, est);
+    if (!p.fin) await fb.terminar(pid, fin.ganador, fin.motivo);
+    const destino = p.revancha || await fb.pedirRevancha(pid, {
+      uid: u.uid, nombre: u.name, foto: fotoBreve(u.photo), color: u.color
+    });
+    if (state.pid === pid) await entrar(destino);
+  } catch (e) { avisa(e, p.juego); }
+  finally {
+    pidiendoRevancha = false;
+    if (state.pid === pid && state.partida && $("jgFin")) {
+      $("jgFin").dataset.firma = "";
+      pintaRevancha(state.partida, state.estado); pintaFin(state.partida, state.estado);
+    }
+  }
+}
+function pintaRevancha(p, est) {
+  const el = $("jgRevancha");
+  if (!el) return;
+  if (!datosFin(p, est) || !p.jugadores?.[state.user.uid]) { el.innerHTML = ""; return; }
+  el.innerHTML = '<div class="jg-revancha"><div><b>' +
+    (p.revancha ? "Hay una revancha esperándote" : "¿Nos damos otra oportunidad?") + '</b><p>' +
+    (p.revancha ? "Únete a la nueva sala con los mismos participantes." : "Invita a los participantes a repetir este juego.") +
+    '</p></div><button class="btn" id="jgRevanchaBtn" ' + (pidiendoRevancha ? "disabled" : "") + '>' +
+    (p.revancha ? "Aceptar revancha" : "Pedir revancha") + '</button></div>';
+  $("jgRevanchaBtn").onclick = () => revancha(p, est);
+}

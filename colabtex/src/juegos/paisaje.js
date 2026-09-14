@@ -242,6 +242,16 @@ export function pinta(c, esc, W, H) {
   g2.addColorStop(0, t.suelo); g2.addColorStop(1, sombra(t.suelo, 0.22));
   c.fillStyle = g2; c.fillRect(0, hz, W, H - hz);
 
+  // Luz ambiental y colinas deterministas, sin alterar las posiciones.
+  c.save();
+  const luz = c.createRadialGradient(W * .22, H * .08, 0, W * .22, H * .08, W * .65);
+  luz.addColorStop(0, "#fff4d536"); luz.addColorStop(1, "#fff4d500");
+  c.fillStyle = luz; c.fillRect(0, 0, W, H);
+  c.fillStyle = "#ffffff14";
+  c.beginPath(); c.moveTo(0, hz);
+  c.bezierCurveTo(W * .2, hz - H * .09, W * .35, hz - H * .04, W * .5, hz);
+  c.bezierCurveTo(W * .7, hz - H * .08, W * .9, hz - H * .1, W, hz);
+  c.closePath(); c.fill(); c.restore();
   const u0 = W / 900 * 30;
   for (const pz of esc.piezas) {
     const f = HOJA[pz.k]; if (!f) continue;
@@ -253,6 +263,7 @@ export function pinta(c, esc, W, H) {
     c.translate(pz.x * W, pz.y * H);
     c.rotate(pz.g * 0.35);
     c.globalAlpha = 0.92 + pz.v * 0.08;
+    c.shadowColor = "#10201a28"; c.shadowBlur = 2 * prof; c.shadowOffsetY = 2 * prof;
     f(c, u0 * pz.s * prof, pz.c, pz.v);
     c.restore();
   }

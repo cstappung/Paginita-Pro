@@ -28,6 +28,7 @@
    duelos por construcción — el escondite cruza *dos* paisajes, las
    cartas resuelven *un* choque y el reversi tiene *dos* colores. */
 export const JUEGOS = {
+  orbita: { nombre: "Órbita", lema: "Captura estrellas y decide el próximo movimiento de tu rival", color: "#8860ed", minimo: 2, cupo: 2 },
   escondite: {
     nombre: "Escondite",
     lema: "Esconde a tu persona en el paisaje y encuentra la del otro",
@@ -523,6 +524,7 @@ export function reducir(p) {
   if (p.juego === "cartas") return { ...base, ...redCartas(p, js) };
   if (p.juego === "cuadritos") return { ...base, ...redCuadritos(p, js, listos) };
   if (p.juego === "reversi") return { ...base, ...redReversi(p, js) };
+  if (p.juego === "orbita") return { ...base, ...redOrbita(p, js) };
   return base;
 }
 
@@ -869,4 +871,44 @@ export function ordenaRanks(filas) {
 export function porcentaje(f) {
   const j = f.jugadas || 0;
   return j ? Math.round((f.ganadas || 0) * 100 / j) : 0;
+}
+
+
+/* Órbita: cada captura dirige al rival hacia su fila o columna.
+   Si ese eje queda vacío, la órbita se abre a todo el tablero.
+   La semilla y el registro producen el mismo resultado en ambos clientes. */
+export function redOrbita(p, js = jugadoresDe(p)) {
+  const r = rng(p.semilla || 1);
+  const estrellas = Array.from({ length: 36 }, () => 1 + Math.floor(r() * 5));
+  const tomadas = {}, puntos = Object.fromEntries(js.map(j => [j.uid, 0]));
+  const listos = js.length === 2;
+  let turno = js[0]?.uid || "", ultima = -1, eje = "fila", ganador = null, motivo = "";
+  const disponibles = () => {
+    const libres = estrellas.map((_, i) => i).filter(i => !tomadas[i]);
+    const dirigidas = ultima < 0 ? libres : libres.filter(i => eje === "fila"
+      ? Math.floor(i / 6) === Math.floor(ultima / 6) : i % 6 === ultima % 6);
+    return dirigidas.length ? dirigidas : libres;
+  };
+  for (const j of jugadasDe(p)) {
+    if (!listos || ganador !== null || !js.some(x => x.uid === j.uid)) continue;
+    if (j.t === "abandona") {
+      ganador = js.find(x => x.uid !== j.uid).uid; motivo = "abandono"; continue;
+    }
+    if (j.t !== "orbita" || j.uid !== turno || !Number.isInteger(j.casilla)
+      || !["fila", "columna"].includes(j.eje) || !disponibles().includes(j.casilla)) continue;
+    tomadas[j.casilla] = j.uid;
+    puntos[j.uid] += estrellas[j.casilla];
+    ultima = j.casilla; eje = j.eje;
+    turno = js.find(x => x.uid !== j.uid).uid;
+    if (Object.keys(tomadas).length === 36) {
+      const [a, b] = js.map(x => x.uid);
+      ganador = puntos[a] === puntos[b] ? "" : puntos[a] > puntos[b] ? a : b;
+      motivo = ganador ? "estrellas" : "empate";
+    }
+  }
+  const legales = listos && ganador === null ? disponibles() : [];
+  return { fase: !listos ? "espera" : ganador !== null ? "fin" : "jugando",
+    estrellas, tomadas, puntos, turno, ultima, eje, legales, ganador, motivo,
+    libre: ultima < 0 || (legales.length > 0 && legales.some(i => eje === "fila"
+      ? Math.floor(i / 6) !== Math.floor(ultima / 6) : i % 6 !== ultima % 6)) };
 }
