@@ -252,8 +252,18 @@ export function pinta(c, esc, W, H) {
   c.bezierCurveTo(W * .2, hz - H * .09, W * .35, hz - H * .04, W * .5, hz);
   c.bezierCurveTo(W * .7, hz - H * .08, W * .9, hz - H * .1, W, hz);
   c.closePath(); c.fill(); c.restore();
+  // Senderos y plazas dan estructura al mapa y referencias para orientarse.
+  c.save(); c.strokeStyle = esc.tema === "espacio" ? "#a394b32e" : "#e7d4a34d";
+  c.lineWidth = H*.055; c.lineCap = "round";
+  for (let j=0;j<3;j++) { c.beginPath(); c.moveTo(0,H*(.3+j*.23));
+    c.bezierCurveTo(W*.3,H*(.1+j*.23),W*.65,H*(.55+j*.16),W,H*(.32+j*.22));c.stroke(); }
+  c.restore();
   const u0 = W / 900 * 30;
   for (const pz of esc.piezas) {
+    if (pz.k === "persona") {
+      pintaPersona(c, pz.x, pz.y, W, H, COLORES_TRAJE[pz.c], false);
+      continue;
+    }
     const f = HOJA[pz.k]; if (!f) continue;
     /* Las de arriba se dibujan más pequeñas: da profundidad y, de
        paso, hace que el fondo tenga piezas de todos los tamaños, que
@@ -301,5 +311,33 @@ export function pintaPersona(c, x, y, W, H, color, fantasma) {
   c.beginPath(); c.arc(0, -u * 0.86, u * 0.15, 0, 7); c.fill();
   c.fillStyle = "#3a2f28";
   c.beginPath(); c.arc(0, -u * 0.92, u * 0.15, Math.PI, 0); c.fill();
+  c.restore();
+}
+
+// Paletas compartidas por visitantes y objetivo: el camuflaje es visual.
+export const TRAJES = ["Musgo", "Arena", "Pizarra", "Coral", "Lavanda", "Marfil"];
+export const COLORES_TRAJE = ["#63845d", "#c3a574", "#697d8d", "#c67568", "#9380aa", "#d4d3be"];
+export function pintaExplorador(c, sitio, W, H, marcado = false) {
+  const color = COLORES_TRAJE[sitio.traje || 0];
+  pintaPersona(c, sitio.x, sitio.y, W, H, color, false);
+  const u = H * ALTO_PERSONA;
+  c.save(); c.translate(sitio.x * W, sitio.y * H);
+  // Gorra y bandolera crema: rasgos que permiten reconocerlo entre la gente.
+  c.fillStyle = color; c.fillRect(-u*.2, -u*1.03, u*.4, u*.12);
+  c.fillStyle = "#eee0b9"; c.fillRect(-u*.025, -u*.73, u*.05, u*.34);
+  if (marcado) { c.strokeStyle = "#fff4bd"; c.lineWidth = 2; c.strokeRect(-u*.5,-u*1.2,u,u*1.4); }
+  c.restore();
+}
+
+// Cobertura parcial: nunca tapa la cabeza ni hace invisible al objetivo.
+export function pintaCobertura(c, esc, sitio, W, H) {
+  const u = H * ALTO_PERSONA;
+  c.save(); c.beginPath(); c.rect(sitio.x*W-u*.55, sitio.y*H-u*.36,u*1.1,u*.5); c.clip();
+  for (const pieza of esc.piezas) {
+    if (pieza.k === "persona" || Math.abs(pieza.x-sitio.x)>.055 || Math.abs(pieza.y-sitio.y)>.06 || pieza.y<sitio.y) continue;
+    const f=HOJA[pieza.k]; if (!f) continue;
+    c.save(); c.translate(pieza.x*W,pieza.y*H); c.rotate(pieza.g*.35);
+    f(c,W/900*30*pieza.s*(.45+pieza.y*.85),pieza.c,pieza.v);c.restore();
+  }
   c.restore();
 }

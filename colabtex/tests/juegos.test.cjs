@@ -46,3 +46,21 @@ test('100 partidas completas terminan, conservan puntos y convergen',()=>{
 test('los cuatro juegos anteriores siguen arrancando',()=>{
  for(const juego of ['reversi','cuadritos','cartas','escondite']){const e=reducir({...sala(),juego});assert.equal(e.listos,true);assert.notEqual(e.fase,'fin');}
 });
+test('Escondite: escenarios densos reproducibles y coordenadas válidas',()=>{
+ const a=context.escena(42),b=context.escena(42);
+ assert.deepEqual(copia(a),copia(b));assert.equal(a.piezas.length,480);
+ assert.equal(a.piezas.filter(x=>x.k==='persona').length,150);
+ assert.equal(context.sitioValido({x:'0.5',y:.5}),false);
+ assert.equal(context.sitioValido({x:.5,y:.5}),true);
+});
+test('Escondite: ropa persistida, turnos de búsqueda y resultado estable',()=>{
+ const p={...sala(),juego:'escondite'};
+ mover(p,{t:'r',uid:'a',x:.5,y:.5});assert.equal(reducir(p).sitios.a,undefined);
+ mover(p,{t:'c',uid:'a',h:'a'});mover(p,{t:'c',uid:'b',h:'b'});
+ mover(p,{t:'r',uid:'a',x:.5,y:.5,traje:3,at:10});
+ mover(p,{t:'b',uid:'b',x:.5,y:.5,at:11});assert.notEqual(reducir(p).fase,'fin');
+ mover(p,{t:'r',uid:'b',x:.7,y:.7,traje:5,at:12});assert.equal(reducir(p).sitios.b.traje,5);
+ mover(p,{t:'b',uid:'intruso',x:.5,y:.5});assert.equal(reducir(p).fase,'buscar');
+ mover(p,{t:'b',uid:'b',x:.5,y:.5,at:13});assert.equal(reducir(p).ganador,'b');
+ mover(p,{t:'abandona',uid:'b'});assert.equal(reducir(p).ganador,'b');
+});

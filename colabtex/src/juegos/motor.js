@@ -164,7 +164,7 @@ const NOMBRES_TEMA = Object.keys(TEMAS);
    una sopa. Con menos de 140 el personaje canta a la primera; con más
    de 300 el canvas tarda y el juego deja de ser mirar y pasa a ser
    suerte. */
-const PIEZAS = 210;
+const PIEZAS = 330;
 
 export function escena(semilla) {
   const r = rng(semilla >>> 0);
@@ -183,6 +183,9 @@ export function escena(semilla) {
       v: r()                                          // variación libre (altura, número de hojas…)
     });
   }
+  // Multitud reproducible: los mismos personajes en ambos dispositivos.
+  for (let i = 0; i < 150; i++) piezas.push({k: "persona", x: .04 + r() * .92,
+    y: .23 + r() * .71, s: 1, g: 0, c: Math.floor(r() * 6), v: r()});
   /* De cerca a lejos: lo que está más abajo se pinta encima, o los
      árboles del fondo taparían a los de delante. */
   piezas.sort((a, b) => a.y - b.y);
@@ -208,7 +211,7 @@ export function acierta(clic, sitio) {
 /* Márgenes del escondite: pegado al borde no se ve entero y no habría
    forma de encontrarlo. */
 export function sitioValido(p) {
-  return !!p && p.x >= 0.03 && p.x <= 0.97 && p.y >= 0.20 && p.y <= 0.97;
+  return !!p && Number.isFinite(p.x) && Number.isFinite(p.y) && p.x >= 0.03 && p.x <= 0.97 && p.y >= 0.20 && p.y <= 0.97;
 }
 
 /* Cada fallo cuesta dos segundos de espera. Sin penalización la
@@ -534,9 +537,10 @@ function redEscondite(p, js) {
   const comp = {}, sitios = {}, intentos = {};
   let ganador = null, motivo = "";
   for (const j of jug) {
+    if (ganador || !js.some(x => x.uid === j.uid)) continue;
     if (j.t === "c" && !comp[j.uid]) comp[j.uid] = j.h;
-    else if (j.t === "r" && !sitios[j.uid]) sitios[j.uid] = { x: j.x, y: j.y, sal: j.sal, at: j.at || 0 };
-    else if (j.t === "b") {
+    else if (j.t === "r" && comp[j.uid] && !sitios[j.uid] && sitioValido(j)) sitios[j.uid] = { x: j.x, y: j.y, traje: Number.isInteger(j.traje) && j.traje >= 0 && j.traje < 6 ? j.traje : 0, sal: j.sal, at: j.at || 0 };
+    else if (j.t === "b" && js.every(x => sitios[x.uid])) {
       /* El acierto se recalcula aquí, no se cree lo que diga la jugada.
          En el momento de buscar el escondite del otro ya está revelado
          en el registro, así que los dos clientes pueden juzgar el clic
