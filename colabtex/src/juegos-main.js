@@ -1,3 +1,4 @@
+import { crearSolo } from "./juegos/solo/pantalla.js";
 "use strict";
 /* ============================================================
    Juegos — la página
@@ -85,6 +86,7 @@ let cancelarLimpieza = null;
 let modulo = null, pidMontado = "";
 let vistaPintada = "";
 let ranks = null;
+let individual = null;
 let proximo = 0;          // el número de jugada que toca escribir
 let anotada = "";         // partida ya sumada a la clasificación desde esta pestaña
 let finEnviado = "";
@@ -257,6 +259,7 @@ async function anotar(p) {
    barra de direcciones. */
 function leerRuta() {
   const h = (location.hash || "").replace(/^#/, "");
+  if (h === "solo/minas" || h === "solo/snake") return {vista: h === "solo/minas" ? "solo-minas" : "solo-snake", pid:""};
   if (h === "ranks") return { vista: "ranks", pid: "" };
   const m = h.match(/^p\/([-\w]+)$/);
   if (m) return { vista: "partida", pid: m[1] };
@@ -446,8 +449,9 @@ function avisa(e, juego) {
 
 /* ---------- pintado: el armazón ---------- */
 function render() {
-  if (!state.user) return;
+  if (!state.user) { if (individual) { individual.destruir(); individual = null; } return; }
   if (state.vista !== vistaPintada) {
+    if (individual) { individual.destruir(); individual = null; }
     if (vistaPintada === "ranks" && ranks) { ranks.destruir(); ranks = null; }
     armazon();
     vistaPintada = state.vista;
@@ -465,9 +469,13 @@ function pintaTabs() {
 
 function armazon() {
   const h = $("pantalla");
+  if (state.vista.startsWith("solo-")) {
+    individual = crearSolo({juego:state.vista.slice(5),usuario:state.user,guardar:fb.guardarSolo,watch:fb.watchSolo,volver:()=>ir("")});
+    individual.montar(h); return;
+  }
   if (state.vista === "ranks") {
     h.innerHTML = "";
-    ranks = crearRanks({ uid: state.user.uid, watchRanks: fb.watchRanks, perfil: perfilDe });
+    ranks = crearRanks({ uid: state.user.uid, watchRanks: fb.watchRanks, watchSolo: fb.watchSolo, perfil: perfilDe });
     ranks.montar(h);
     return;
   }
@@ -493,11 +501,12 @@ function armazon() {
     <section class="jg-hero">
       <div><span class="jg-eyebrow">LABORATORIO / PLAY</span>
       <h2>Una pausa.<br>Otra partida.</h2>
-      <p>Cinco juegos, tu gente y una buena revancha.<br>Abre una sala y comparte el enlace para jugar.</p>
-      <div class="jg-hero-tags"><span>02—06 jugadores</span><span>Por turnos</span><span>Música original</span></div></div>
+      <p>Tu próximo récord o una buena revancha.<br>Abre una sala y comparte el enlace para jugar.</p>
+      <div class="jg-hero-tags"><span>01—06 jugadores</span><span>Por turnos</span><span>Música original</span></div></div>
       <div class="jg-hero-orbita" aria-hidden="true"><i></i><i></i><i></i><b>✦</b><span>ÓRBITA<br><small>EL NUEVO DESAFÍO</small></span></div>
     </section>
-    <div class="jg-section-title"><h2>Elige tu próxima partida</h2><span>05 juegos para desconectar</span></div>
+    <div class="jg-section-title"><h2>Elige tu próxima partida</h2><span>07 juegos para desconectar</span></div>
+    <div class="sp-entradas"><a href="#solo/minas" class="sp-entrada sp-e-minas"><small>SINGLEPLAYER / ESTRATEGIA</small><strong>MINEFALL <span>✦</span></strong><p>Buscaminas reinventado. Tres territorios, dos variantes.</p><b>Explorar →</b></a><a href="#solo/snake" class="sp-entrada sp-e-snake"><small>SINGLEPLAYER / REFLEJOS</small><strong>NEON COIL <span>ϟ</span></strong><p>Snake, a otra velocidad. Portales, ruinas y récords.</p><b>Entrar al circuito →</b></a></div>
     <div id="vesAviso"></div>
     <div class="jg-elige" id="vesElige"></div>
     <h2 class="jg-h2">Salas abiertas</h2>
@@ -877,6 +886,7 @@ function wire() {
   });
   watchAuth(user => {
     if (!user) {
+      if (individual) { individual.destruir(); individual = null; }
       state.user = null;
       state.base = null;
       soltarPartida();

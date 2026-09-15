@@ -291,3 +291,16 @@ export async function pedirRevancha(pid, quien) {
   if (!elegida) throw new Error("No se pudo enviar la revancha. Inténtalo de nuevo.");
   return elegida;
 }
+
+/* Récord por categoría; la transacción conserva el mejor entre pestañas. */
+export function watchSolo(categoria, cb) {
+  return onValue(ref(db, `soloRanks/${categoria}`), s => {
+    cb(Object.entries(s.val() || {}).map(([uid, fila]) => ({...fila, uid})), null);
+  }, e => cb([], e));
+}
+export function guardarSolo(categoria, uid, dato) {
+  return runTransaction(ref(db, `soloRanks/${categoria}/${uid}`), previo => {
+    if (previo && (previo.puntos > dato.puntos || previo.puntos === dato.puntos && previo.tiempo <= dato.tiempo)) return;
+    return {nombre:dato.nombre, puntos:dato.puntos, tiempo:dato.tiempo, partida:dato.partida};
+  }, {applyLocally:false});
+}
