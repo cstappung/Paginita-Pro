@@ -23,6 +23,6 @@ El récord personal se conserva además en localStorage, separado por cuenta y c
 - `npm run test:juegos`: 13 pruebas, incluyendo 120 tableros de Buscaminas, primer clic seguro, banderas/acordes, colisiones/portales de Snake y regresiones.
 - Comprobaciones de DOM simulado: inicio, pausa, victoria de Buscaminas y guardado, derrota de Snake, nueva partida y limpieza de escuchas.
 - `npm run build`: compilación completa, conservando solamente los artefactos generados de Juegos.
-- `node tests/solo-firebase.cjs` con emuladores Auth 9099 y Database 9000, proyecto demo-solo: prueba de transacciones y reglas. Nunca se conecta a producción.
+- Prueba de Firebase aprobada: transacciones concurrentes, desempates, lectura y rechazo de escrituras ajenas o inválidas. `node tests/solo-firebase.cjs` con emuladores Auth 9099 y Database 9000, proyecto demo-solo: prueba de transacciones y reglas. Nunca se conecta a producción.
 
 La inspección visual en navegador y la prueba táctil real siguen pendientes; el navegador de la sesión bloquea las vistas locales. La interfaz contempla anchos móviles y movimiento reducido.
