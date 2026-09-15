@@ -1,0 +1,31 @@
+name: Verificar arcade individual
+on:
+  push:
+    branches: [codex/singleplayer-arcade]
+  pull_request:
+    paths:
+      - 'colabtex/src/juegos/solo/**'
+      - 'colabtex/tests/solo*'
+      - 'firebase/database.rules.json'
+permissions:
+  contents: read
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: colabtex/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: npm ci --prefix colabtex
+      - run: npm run test:juegos --prefix colabtex
+      - run: npm run build --prefix colabtex
+      - name: Probar ranking con usuarios del emulador
+        run: npx --yes firebase-tools@13 emulators:exec --only auth,database --project demo-solo "cd colabtex && node tests/solo-firebase.cjs"

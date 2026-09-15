@@ -133,6 +133,8 @@ export function suena(nombre) {
 
 /* Música original generativa, independiente de los efectos. */
 const TEMAS = {
+  minas: {bpm:72, notas:[48,55,60,62,67,62,60,55]},
+  snake: {bpm:126, notas:[45,57,60,64,67,64,60,57]},
   escondite: { bpm: 78, notas: [60, 64, 67, 71, 67, 64, 62, 67] },
   cartas: { bpm: 108, notas: [57, 60, 64, 69, 67, 64, 60, 64] },
   cuadritos: { bpm: 94, notas: [60, 67, 69, 64, 62, 69, 67, 64] },

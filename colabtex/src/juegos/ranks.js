@@ -33,6 +33,7 @@ export function crearRanks(ctx) {
 
   let host = null, muerto = false;
   let juego = Object.keys(JUEGOS)[0];
+  let categoriaSolo = "minas-explorador-clasico";
   let filas = [];
   let cargando = true;
   let fallo = "";
@@ -43,7 +44,7 @@ export function crearRanks(ctx) {
     host.innerHTML = `
       <div class="jg-ranks">
         <div class="jg-bar-juegos" id="rkJuegos"></div>
-        <div id="rkAviso"></div>
+        <div id="rkSolo"></div><div id="rkAviso"></div>
         <div class="jg-tabla-caja"><table class="jg-tabla" id="rkTabla"></table></div>
         <p class="jg-nota-larga">
           Se suman 3 puntos por partida ganada y 1 por empate. Cada jugador apunta su propia
@@ -66,7 +67,8 @@ export function crearRanks(ctx) {
   function escucha() {
     if (parar) { try { parar(); } catch (e) {} parar = null; }
     cargando = true; fallo = ""; filas = []; pinta();
-    parar = watchRanks(juego, (lista, err) => {
+    const individual = juego === "minas" || juego === "snake";
+    parar = (individual ? ctx.watchSolo : watchRanks)(individual ? categoriaSolo : juego, (lista, err) => {
       if (muerto) return;
       cargando = false;
       fallo = err ? String(err.code || err.message || err) : "";
@@ -78,7 +80,7 @@ export function crearRanks(ctx) {
   function pintaBarra() {
     const el = host && host.querySelector("#rkJuegos");
     if (!el) return;
-    el.innerHTML = Object.entries(JUEGOS).map(([k, j]) =>
+    el.innerHTML = Object.entries({...JUEGOS,minas:{nombre:"Buscaminas",color:"#eeb765"},snake:{nombre:"Snake",color:"#4be9bc"}}).map(([k, j]) =>
       `<button class="jg-tab${k === juego ? " on" : ""}" data-juego="${k}"
          style="--c:${j.color}">${esc(j.nombre)}</button>`).join("");
   }
@@ -94,12 +96,15 @@ export function crearRanks(ctx) {
 
     const t = host.querySelector("#rkTabla");
     if (!t) return;
-    const orden = ordenaRanks(filas);
+    const solo = juego === "minas" || juego === "snake";
+    const orden = solo ? [...filas].sort((a,b)=>b.puntos-a.puntos||a.tiempo-b.tiempo||a.uid.localeCompare(b.uid)) : ordenaRanks(filas);
+    host.querySelector('.jg-nota-larga').textContent = solo ? 'Mejor récord por jugador y categoría. En empate, menor tiempo. Las puntuaciones se calculan en el navegador.' : 'Se suman 3 puntos por victoria y 1 por empate.';
     if (!orden.length) {
       t.innerHTML = `<tr><td class="jg-vacio">${cargando ? "Cargando…"
         : "Todavía no ha terminado ninguna partida de este juego. Sé el primero."}</td></tr>`;
       return;
     }
+    if (solo) {t.innerHTML = `<thead><tr><th>#</th><th>Jugador</th><th>Récord</th><th>Tiempo</th></tr></thead><tbody>${orden.map((f,i)=>`<tr class="${f.uid===uid?'jg-yo':''}"><td>${i+1}</td><td>${esc(f.nombre)}</td><td>${f.puntos}</td><td>${(f.tiempo/1000).toFixed(1)} s</td></tr>`).join('')}</tbody>`;return;}
     t.innerHTML = `
       <thead><tr>
         <th class="jg-th-n">#</th><th>Jugador</th>
@@ -137,6 +142,12 @@ export function crearRanks(ctx) {
     const k = b.getAttribute("data-juego");
     if (k === juego) return;
     juego = k;
+    const solo = host.querySelector('#rkSolo');solo.innerHTML = '';
+    if (k === 'minas' || k === 'snake') {
+      const categorias = k === 'minas' ? ['explorador','veterano','leyenda'].flatMap(t=>['clasico','cruz'].map(v=>'minas-'+t+'-'+v)) : ['clasico','portal','ruinas'].flatMap(m=>['lenta','media','rapida'].map(v=>'snake-'+m+'-'+v));
+      categoriaSolo = categorias[0];solo.innerHTML = `<label>Categoría <select id="rkCategoria">${categorias.map(c=>`<option value="${c}">${c.split('-').slice(1).join(' / ')}</option>`).join('')}</select></label>`;
+      solo.querySelector('select').onchange=e=>{categoriaSolo=e.target.value;escucha();};
+    }
     pintaBarra();
     escucha();
   }
