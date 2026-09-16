@@ -44,7 +44,7 @@
    draw-link.js, para poder verificar todo esto sin red.
    ============================================================ */
 
-export const APPS = { colabtex: "ColabTeX", colabdraw: "ColabDraw", informes: "Informes" };
+export const APPS = { colabtex: "ColabTeX", colabdraw: "ColabDraw", juegos: "Juegos", informes: "Informes" };
 export const TIPOS = { bug: "Fallo", idea: "Sugerencia" };
 
 const MAX_MSG = 300;          // caracteres de mensaje que se guardan

@@ -45,6 +45,52 @@ reglas. Lo que garantizan una vez publicadas:
   puede marcarlo como resuelto**;
 - los textos tienen tope de tamaño, para que un error en bucle no llene la base.
 
+### ⚠ Si vienes de una versión anterior: los juegos
+
+La página **Juegos** usa otros tres nodos nuevos, `partidas`, `misPartidas` y
+`ranks`, y le pasa exactamente lo mismo: mientras no publiques de nuevo
+`database.rules.json`, el vestíbulo se abre con un aviso amarillo que nombra
+esta causa y no se puede crear ni entrar en ninguna partida.
+
+Lo que garantizan una vez publicadas:
+
+- cualquiera con sesión lee las partidas — y puede, porque lo que se esconde
+  en el escondite y la carta que se juega en cartas **no viajan en claro**:
+  viaja su huella (SHA-256 con sal) y solo se revela cuando ya no sirve de
+  nada. Con las reglas no habría bastado: leer la partida es justo lo que hace
+  falta para jugarla;
+- una jugada **se escribe una vez y no se reescribe** (`!data.exists()`), así
+  que nadie vuelve atrás a cambiar la carta que jugó, y solo la firma quien la
+  juega (`uid === auth.uid`);
+- solo se entra en una sala que sigue en `esperando`, que es lo que impide que
+  un tercero se meta en una partida empezada;
+- la sala la borra su anfitrión y solo mientras no haya terminado;
+- una fila de la clasificación solo la escribe su dueño, solo puede subir de
+  una partida en una, y esa partida tiene que existir, haber terminado, ser de
+  ese juego y tenerle a él dentro. Es lo que impide anotarse cien victorias a
+  mano desde la consola del navegador.
+
+### ⚠ Si publicaste las reglas antes de que existiera Reversi
+
+Este es el caso que se lee como «el juego nuevo está roto». La regla que
+valida el campo `juego` lleva **la lista de los juegos que existían el día
+que copiaste el archivo**:
+
+```
+"juego": { ".validate": "newData.val() === 'escondite' || … || newData.val() === 'reversi'" }
+```
+
+Si tu copia publicada es anterior, `'reversi'` no está en esa lista y la base
+**rechaza la sala al crearla**, con un `PERMISSION_DENIED` seco que no dice
+nada más. Los otros tres juegos siguen funcionando, que es lo que despista.
+Lo mismo vale para `misPartidas`, que es donde cada quien guarda la semilla de
+su mano de cartas: sin esa regla la mano privada no se puede guardar.
+
+El arreglo es el de siempre — volver a pegar `firebase/database.rules.json`
+entero y **Publicar** — y no hay que tocar nada más. Desde la propia página
+de juegos, cuando la base rechaza algo sale un cartel que lo explica y trae el
+archivo al portapapeles con un botón.
+
 ## 2. Reglas de Storage
 
 1. Consola → **Storage** → pestaña **Reglas**.

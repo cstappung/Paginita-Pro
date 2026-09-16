@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Juegos — Laboratorio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* ============================================================
+     Juegos — la hoja de estilo de las seis piezas
+
+     Las clases `.jg-*` las escriben los módulos (escondite, cartas,
+     cuadritos, reversi, ranks y el propio arranque) y se definen
+     aquí, no en
+     JavaScript: una hoja en el HTML se cachea con la página y no
+     cuesta un `injectCSS()` como en CSV·Scope, donde el documento es
+     un `.dc.html` generado y no hay dónde meterla.
+
+     El armazón (cabecera, tarjeta de login, .card, .row, .btn…) es el
+     mismo de informes.html a propósito: las dos páginas son la misma
+     aplicación con distinto contenido, y copiar la piel es más barato
+     que un archivo común de dos reglas.
+     ============================================================ */
+  html,body{margin:0;padding:0;height:100%}
+  *{box-sizing:border-box}
+  body{background:#f2f5f7;color:#1f2933;font-family:'IBM Plex Sans',sans-serif}
+  a{color:#0d9488;text-decoration:none}
+  a:hover{text-decoration:underline}
+  button{font-family:'IBM Plex Sans',sans-serif}
+  #app{min-height:100vh;display:flex;flex-direction:column}
+
+  .head{display:flex;align-items:center;gap:16px;height:52px;padding:0 22px;background:#10201f;color:#e8f0ef;flex-shrink:0}
+  .logo{display:flex;align-items:center;gap:8px;color:#e8f0ef}
+  .logo:hover{color:#fff;text-decoration:none}
+  .logo-mark{width:26px;height:26px;border-radius:6px;background:linear-gradient(135deg,#0f62fe,#0d9488);display:grid;place-items:center;font-size:13px;font-weight:700;color:#fff}
+  .head-nav{display:flex;gap:16px;font-size:12.5px;color:#9fb5b2;margin-left:10px}
+  .head-nav a{color:#9fb5b2}
+  .head-nav a:hover{color:#fff;text-decoration:none}
+  .head-right{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:12.5px}
+  .avatar{width:28px;height:28px;border-radius:50%;background:#0d9488;display:grid;place-items:center;font-size:12px;font-weight:600;color:#fff;overflow:hidden}
+  .btn-ghost{border:none;background:transparent;color:#9fb5b2;cursor:pointer;font-size:12px;padding:5px 8px;border-radius:5px}
+  .btn-ghost:hover{background:#ffffff1a;color:#fff}
+
+  main{flex:1;width:100%;max-width:1080px;margin:0 auto;padding:24px 26px 60px}
+  h1{font-size:22px;font-weight:600;margin:0 0 5px}
+  .lead{font-size:13px;color:#5a6772;margin:0 0 20px;line-height:1.6;max-width:74ch}
+
+  .bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+  .tab{padding:8px 14px;border:1px solid #d4dce2;border-radius:8px;background:#fff;font-size:12.5px;font-weight:600;color:#42505c;cursor:pointer}
+  .tab.on{border-color:#0d9488;background:#e9f4f2;color:#0d9488}
+  .grow{flex:1}
+  .inp{height:34px;padding:0 11px;border:1px solid #d4dce2;border-radius:6px;font-size:12.5px;font-family:inherit;background:#fff;color:#1f2933}
+  .inp:focus{outline:none;border-color:#0d9488}
+  .btn{height:34px;padding:0 14px;border:none;border-radius:6px;background:#0d9488;color:#fff;font-size:12.5px;font-weight:600;cursor:pointer}
+  .btn:hover{background:#0f766e}
+  .btn2{height:34px;padding:0 12px;border:1px solid #d4dce2;border-radius:6px;background:#fff;color:#42505c;font-size:12.5px;font-weight:600;cursor:pointer}
+  .btn2:hover{border-color:#0d9488;color:#0d9488}
+  .btn2:disabled,.btn:disabled{opacity:.5;cursor:default}
+
+  .card{background:#fff;border:1px solid #e2e8ec;border-radius:10px;overflow:hidden}
+  .row{padding:13px 16px;border-bottom:1px solid #f0f4f6}
+  .row:last-child{border-bottom:none}
+  .row-top{display:flex;align-items:center;gap:10px}
+  .row-title{flex:1;min-width:0;font-size:13.5px;font-weight:600;line-height:1.45;word-break:break-word}
+  .row-meta{margin-top:5px;font-size:11.5px;color:#8a97a3;line-height:1.6;font-weight:400}
+  .pill{flex-shrink:0;font-size:10px;font-weight:700;letter-spacing:.04em;border-radius:99px;padding:3px 8px}
+  .mini{border:none;background:transparent;color:#b3bec7;cursor:pointer;font-size:12px;padding:3px 6px;border-radius:5px}
+  .mini:hover{background:#f0f4f6;color:#42505c}
+  .mini.del:hover{color:#c0392b}
+  .vacio{padding:34px 16px;text-align:center;font-size:12.5px;color:#8a97a3;line-height:1.7}
+  .aviso{padding:14px 16px;border-radius:9px;background:#fff8ec;border:1px solid #e2c08d66;font-size:12.5px;color:#6b5320;line-height:1.6;margin-bottom:16px}
+  .aviso code{font-family:'IBM Plex Mono',monospace;font-size:11.5px;background:#00000010;padding:1px 5px;border-radius:4px}
+
+  #viewLogin{flex:1;display:none;place-items:center}
+  .login-card{width:400px;max-width:92vw;background:#fff;border:1px solid #e2e8ec;border-radius:12px;padding:30px;text-align:center}
+
+  /* ============================================================
+     Vestíbulo
+     ============================================================ */
+  .jg-elige{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-bottom:26px}
+  .jg-oferta{display:flex;flex-direction:column;gap:8px;padding:20px;background:#fff;border:1px solid #e2e8ec;border-top:3px solid var(--c,#0d9488);border-radius:10px}
+  .jg-of-icono{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;font-size:20px;background:color-mix(in srgb,var(--c,#0d9488) 12%,#fff);border:1px solid color-mix(in srgb,var(--c,#0d9488) 30%,#fff)}
+  .jg-of-nombre{font-size:15px;font-weight:600}
+  .jg-of-lema{font-size:12.5px;color:#5a6772;line-height:1.55;flex:1}
+  /* Los desplegables de la tarjeta (cupo, tamaño). Van dentro de la
+     tarjeta y no en un diálogo aparte porque son dos elecciones y un
+     paso más antes de jugar se nota. */
+  .jg-of-ops{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px}
+  .jg-of-op{display:flex;flex-direction:column;gap:3px;font-size:10.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:#8a97a3}
+  .jg-of-op select{height:30px;padding:0 6px;border:1px solid #d4dce2;border-radius:6px;background:#fff;font-family:inherit;font-size:12px;color:#1f2933;cursor:pointer}
+  .jg-of-op select:focus{outline:2px solid color-mix(in srgb,var(--c,#0d9488) 45%,#fff);outline-offset:1px}
+  .jg-of-btn{margin-top:6px;align-self:flex-start;background:var(--c,#0d9488)}
+  .jg-of-btn:hover{background:var(--c,#0d9488);filter:brightness(.9)}
+  .jg-h2{font-size:13px;font-weight:600;color:#5a6772;letter-spacing:.03em;text-transform:uppercase;margin:0 0 10px}
+  .jg-p{background:color-mix(in srgb,var(--c,#888) 12%,#fff);border:1px solid color-mix(in srgb,var(--c,#888) 34%,#fff);color:var(--c,#888);font-size:12px;line-height:1}
+
+  /* ============================================================
+     Cabecera de la partida
+     ============================================================ */
+  .jg-cab{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+  .jg-quienes{display:flex;gap:6px;flex-wrap:wrap}
+  .jg-quien-chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#42505c;background:#fff;border:1px solid #e2e8ec;border-left:3px solid var(--c,#888);border-radius:99px;padding:4px 11px}
+  .jg-invita{margin-top:16px;padding:16px;background:#fff;border:1px solid #e2e8ec;border-radius:10px;font-size:12.5px;color:#5a6772;line-height:1.6}
+  .jg-enlace{display:flex;gap:8px;margin-top:10px}
+  .jg-enlace .inp{flex:1;font-family:'IBM Plex Mono',monospace;font-size:11.5px}
+  .jg-empezar{margin-top:12px}
+
+  /* El cartel del final es una capa fija sobre la pantalla, no un
+     recuadro debajo del tablero: un tablero de cuadritos grande mide
+     más de lo que se ve, así que ahí abajo el cartel caía bajo el
+     pliegue y la partida parecía acabar sin decir nada. */
+  .jg-fin-capa{position:fixed;inset:0;z-index:60;display:grid;place-items:center;padding:18px;background:#0f172899;backdrop-filter:blur(2px);animation:jgVela .2s ease-out}
+  .jg-fin{position:relative;width:400px;max-width:100%;max-height:calc(100vh - 36px);overflow:auto;padding:26px 24px 22px;border-radius:14px;text-align:center;box-shadow:0 18px 50px #0f172840;animation:jgEntra .35s ease-out}
+  .jg-fin-gano{background:linear-gradient(160deg,#e9f7f2,#d5f0e6);border:1px solid #0d948855}
+  .jg-fin-perdi{background:linear-gradient(160deg,#fff,#f2f5f7);border:1px solid #e2e8ec}
+  .jg-fin-empate{background:linear-gradient(160deg,#fffaf0,#fdf1dc);border:1px solid #e2c08d66}
+  .jg-fin-mirando{background:linear-gradient(160deg,#fff,#eef3f7);border:1px solid #d4dce2}
+  /* La ✕ cierra el cartel para esa partida: mirar el tablero final es
+     la mitad de la gracia. */
+  .jg-fin-x{position:absolute;top:8px;right:8px;width:28px;height:28px;border:none;border-radius:7px;background:#0f172812;color:#42505c;font-size:13px;line-height:1;cursor:pointer}
+  .jg-fin-x:hover{background:#0f172822}
+  .jg-fin-cara{font-size:46px;line-height:1;margin-bottom:8px;animation:jgCara .5s cubic-bezier(.2,1.5,.4,1)}
+  .jg-fin-t{font-size:24px;font-weight:700;line-height:1.2}
+  .jg-fin-gano .jg-fin-t{color:#0d9488}
+  .jg-fin-perdi .jg-fin-t{color:#5a6772}
+  .jg-fin-empate .jg-fin-t{color:#8a6a2a}
+  .jg-fin-mirando .jg-fin-t{color:#42505c}
+  .jg-fin-sub{font-size:13.5px;font-weight:600;color:#42505c;margin-top:4px}
+  .jg-fin-m{font-size:12.5px;color:#5a6772;margin-top:6px;line-height:1.55}
+  .jg-fin-marca{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:14px;padding-top:14px;border-top:1px solid #0f172815}
+  .jg-fin-btns{display:flex;gap:8px;justify-content:center;margin-top:18px;flex-wrap:wrap}
+
+  /* El cartel de «faltan reglas» reusa el del final de partida, pero su
+     texto es de leer, no de celebrar: alineado a la izquierda, y el
+     enlace a la consola es un `<a>` con pinta de botón. */
+  .jg-reglas .jg-fin-m{text-align:left;margin-top:10px}
+  .jg-reglas .jg-fin-m code{font-family:'IBM Plex Mono',monospace;font-size:11.5px;background:#0f172814;padding:1px 5px;border-radius:4px;word-break:break-word}
+  .jg-fin-btns a.btn{display:inline-flex;align-items:center;text-decoration:none}
+  .aviso .jg-fin-m{color:inherit;font-size:12.5px;margin-top:8px;line-height:1.6}
+  .aviso .jg-fin-m code{background:#00000010}
+
+  /* El editor del perfil reusa la capa del cartel del final — misma
+     penumbra, misma entrada, misma ✕ — porque es el mismo gesto:
+     algo que se pone delante de la partida y se quita. Lo propio de
+     aquí es el cuerpo en dos columnas y la rejilla de colores. */
+  .jg-modal-capa{position:fixed;inset:0;z-index:70;display:grid;place-items:center;padding:18px;background:#0f172899;backdrop-filter:blur(2px);animation:jgVela .2s ease-out}
+  .jg-modal{position:relative;width:460px;max-width:100%;max-height:calc(100vh - 36px);overflow:auto;padding:24px 22px 20px;border-radius:14px;background:#fff;border:1px solid #e2e8ec;box-shadow:0 18px 50px #0f172840;animation:jgEntra .35s ease-out;text-align:left}
+  .jg-modal-t{font-size:19px;font-weight:700;color:#1f2933}
+  .jg-modal-s{font-size:12px;color:#5a6772;line-height:1.55;margin:6px 0 0}
+  /* El hueco del error existe siempre (no se muestra y se oculta): si
+     apareciera de la nada, el botón Guardar se movería bajo el dedo
+     justo cuando se acaba de fallar al pulsarlo. */
+  .jg-modal-err{min-height:16px;margin-top:10px;font-size:12px;color:#c0392b;line-height:1.5}
+
+  .jg-perfil-cuerpo{display:flex;gap:18px;margin-top:16px;flex-wrap:wrap}
+  .jg-perfil-foto{display:flex;flex-direction:column;align-items:center;gap:6px;width:116px;flex:0 0 auto}
+  .jg-perfil-foto .btn2,.jg-perfil-foto .btn-ghost{width:100%;text-align:center;font-size:11.5px;padding:0 8px}
+  /* `.btn-ghost` nace con el color de la cabecera, que es oscura; aquí
+     el fondo es blanco y ese gris claro no se lee. */
+  .jg-perfil-foto .btn-ghost{height:28px;color:#5a6772}
+  .jg-perfil-foto .btn-ghost:hover{background:#0f172810;color:#0d9488}
+  /* La vista previa es la misma bola que luego se ve en la cabecera y
+     en el marcador, en grande: lo que se está eligiendo es eso. */
+  .jg-perfil-av{width:96px;height:96px;border-radius:50%;overflow:hidden;background:#eef3f7;border:1px solid #e2e8ec;display:grid;place-items:center}
+  .jg-perfil-av img{width:100%;height:100%;object-fit:cover;display:block}
+  .jg-perfil-av i{width:100%;height:100%;display:grid;place-items:center;font-style:normal;font-size:38px;font-weight:600;color:#fff}
+
+  .jg-perfil-campos{flex:1;min-width:200px;display:flex;flex-direction:column;gap:14px}
+  .jg-campo{display:flex;flex-direction:column;gap:6px}
+  .jg-campo>span{font-size:11.5px;font-weight:600;color:#42505c}
+  .jg-campo input[type=text]{height:34px;padding:0 11px;border:1px solid #d4dce2;border-radius:6px;font-size:13px;font-family:inherit;background:#fff;color:#1f2933}
+  .jg-campo input[type=text]:focus{outline:none;border-color:#0d9488;box-shadow:0 0 0 3px #0d948822}
+  .jg-colores{display:grid;grid-template-columns:repeat(8,1fr);gap:6px}
+  .jg-color{aspect-ratio:1;border:2px solid transparent;border-radius:50%;cursor:pointer;padding:0}
+  .jg-color:hover{transform:scale(1.12)}
+  /* El elegido se marca con un aro por fuera, no con un borde propio:
+     un borde del color del fondo no se ve, y uno blanco por dentro
+     encoge la muestra justo del que se quiere comparar. */
+  .jg-color.on{border-color:#fff;box-shadow:0 0 0 2px #1f2933}
+  .jg-color-libre{display:flex;align-items:center;gap:7px;font-size:11.5px;color:#5a6772}
+  .jg-color-libre input[type=color]{width:30px;height:24px;padding:0;border:1px solid #d4dce2;border-radius:5px;background:#fff;cursor:pointer}
+
+  @keyframes jgEntra{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
+  @keyframes jgVela{from{opacity:0}to{opacity:1}}
+  @keyframes jgCara{from{opacity:0;transform:scale(.4)}to{opacity:1;transform:none}}
+
+  /* ============================================================
+     Piezas comunes a los cuatro juegos
+     ============================================================ */
+  .jg-barra{display:flex;align-items:center;gap:10px;padding:12px 16px;background:#fff;border:1px solid #e2e8ec;border-radius:10px 10px 0 0;border-bottom:none;font-size:13px}
+  .jg-fase{color:#42505c;display:flex;align-items:center;gap:7px}
+  .jg-fase b{color:#1f2933}
+  .jg-grow{flex:1}
+  .jg-pie{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:12px 16px;background:#fff;border:1px solid #e2e8ec;border-radius:0 0 10px 10px;border-top:none;min-height:56px}
+  .jg-nota{font-size:12px;color:#8a97a3;line-height:1.55}
+  .jg-btn{height:34px;padding:0 16px;border:none;border-radius:6px;background:#0d9488;color:#fff;font-size:12.5px;font-weight:600;cursor:pointer}
+  .jg-btn:hover{background:#0f766e}
+  .jg-btn:disabled{opacity:.45;cursor:default}
+  .jg-gana{color:#0d9488}
+  .jg-pierde{color:#c0392b}
+
+  /* ============================================================
+     Escondite
+     ============================================================ */
+  .jg-esc{display:flex;flex-direction:column}
+  .jg-reloj{font-family:'IBM Plex Mono',monospace;font-size:15px;font-weight:600;color:#42505c;font-variant-numeric:tabular-nums}
+  .jg-reloj.urge{color:#c0392b;animation:jgLate 1s steps(2,end) infinite}
+  @keyframes jgLate{50%{opacity:.35}}
+  /* El lienzo es el marco del canvas: `position:relative` es lo que
+     permite que la capa de avisos se ponga encima sin desplazarlo. */
+  .jg-lienzo{position:relative;line-height:0;background:#0d1117;border-left:1px solid #e2e8ec;border-right:1px solid #e2e8ec;overflow:hidden}
+  .jg-lienzo canvas{display:block;width:100%;cursor:crosshair}
+  .jg-capa{position:absolute;inset:0;display:grid;place-items:center;background:#0d1117cc;color:#e6edf3;font-size:14px;font-weight:600}
+  .jg-castigo{font-size:12.5px;font-weight:600;color:#c0392b}
+  /* Frío/templado/caliente/casi. Se lee de un vistazo por el color, así
+     que el color es el dato y la palabra la confirmación. */
+  .jg-calor{font-size:12.5px;font-weight:700;padding:3px 9px;border-radius:99px;border:1px solid currentColor}
+  .jg-calor-frio{color:#2563eb;background:#eff6ff}
+  .jg-calor-templado{color:#7c6a1f;background:#fefbe8}
+  .jg-calor-caliente{color:#c2410c;background:#fff5ed}
+  .jg-calor-casi{color:#be123c;background:#fff1f4;animation:jgLate .8s steps(2,end) infinite}
+
+  /* ============================================================
+     Cartas de los tres elementos
+     ============================================================ */
+  .jg-cartas{display:flex;flex-direction:column}
+  .jg-ronda{font-size:12px;font-weight:600;color:#8a97a3;letter-spacing:.03em}
+  .jg-trampa{padding:10px 16px;background:#fdecea;border-left:3px solid #c0392b;color:#8c2f22;font-size:12px;line-height:1.55}
+  .jg-mesa{display:flex;flex-direction:column;gap:12px;padding:18px 16px;background:linear-gradient(180deg,#101c2e,#152a3f);border-left:1px solid #e2e8ec;border-right:1px solid #e2e8ec}
+  .jg-lado{display:flex;flex-direction:column;gap:8px;align-items:center}
+  .jg-quien{display:flex;align-items:center;gap:7px;font-size:12.5px;color:#c8d5e2}
+  .jg-cuenta{color:#8fa3b8;font-size:11.5px}
+  .jg-cartas .jg-punto{width:9px;height:9px;border-radius:50%;display:inline-block;flex-shrink:0}
+  .jg-mano{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;min-height:112px}
+  .jg-mano-otro{min-height:76px}
+  .jg-duelo{min-height:150px;display:grid;place-items:center}
+
+  /* Una carta es la ilustración dentro de un marco que dice el color.
+     La proporción (76×112) es la del dibujo, 164×242: recortarlo a otra
+     dejaría al personaje sin cabeza o sin pies. */
+  .jg-carta{position:relative;width:76px;height:112px;border-radius:9px;flex-shrink:0;
+    background:linear-gradient(160deg,var(--elc,#888),var(--el,#555));
+    border:1px solid #ffffff33;box-shadow:0 5px 14px #00000055;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+    color:#fff;user-select:none;overflow:hidden;transition:transform .15s,box-shadow .15s}
+  /* El dibujo lleva elemento y número, que es lo que ya trae pintado. Del
+     color de palo —el que decide el trío— no hay dibujo, así que lo dicen
+     el anillo interior y la etiqueta del pie. */
+  .jg-arte{padding:3px;gap:0;box-shadow:0 0 0 2px var(--col,#888) inset,0 5px 14px #00000055}
+  .jg-c-img{width:100%;height:100%;object-fit:cover;border-radius:6px;display:block;
+    background:#00000055;pointer-events:none}
+  .jg-c-palo{position:absolute;left:0;right:0;bottom:0;padding:2px 0 3px;
+    font-size:8.5px;letter-spacing:.09em;text-transform:uppercase;text-align:center;
+    font-weight:700;color:#fff;background:var(--col,#888);
+    text-shadow:0 1px 2px #00000088;pointer-events:none}
+  .jg-dorso{background:repeating-linear-gradient(45deg,#1e3a5f,#1e3a5f 6px,#24466f 6px,#24466f 12px);color:#7ab8ff;font-size:24px;justify-content:center}
+  .jg-pequena{width:56px;height:83px}
+  .jg-pequena .jg-c-palo{font-size:7px;letter-spacing:.05em}
+  .jg-mini{width:34px;height:50px;border-radius:6px}
+  .jg-mini .jg-c-palo{display:none}
+  .jg-mini.jg-arte{padding:2px;box-shadow:0 0 0 1.5px var(--col,#888) inset,0 5px 14px #00000055}
+  .jg-jugable{cursor:pointer}
+  .jg-jugable:hover{transform:translateY(-8px);box-shadow:0 12px 22px #00000066}
+  .jg-elegida{transform:translateY(-12px);box-shadow:0 0 0 3px #ffd76a,0 12px 22px #00000066}
+  .jg-quieta{cursor:default;opacity:.55}
+  .jg-quieta:hover{transform:none;box-shadow:0 5px 14px #00000055}
+  .jg-lista{box-shadow:0 0 0 2px #4ade80,0 5px 14px #00000055}
+  .jg-tenue{opacity:.4}
+  .jg-brilla{animation:jgBrilla 1.1s ease-in-out infinite alternate}
+  @keyframes jgBrilla{from{box-shadow:0 0 0 0 #ffd76a00}to{box-shadow:0 0 14px 3px #ffd76aaa}}
+
+  .jg-espera{display:flex;align-items:center;gap:18px}
+  .jg-vs{font-size:15px;font-weight:700;color:#8fa3b8;letter-spacing:.08em}
+  .jg-choque{display:flex;align-items:center;gap:16px;position:relative}
+  .jg-veredicto{font-size:15px;font-weight:700;color:#e6edf3;min-width:110px;text-align:center}
+  .jg-choque.jg-gana .jg-veredicto{color:#4ade80}
+  .jg-choque.jg-pierde .jg-veredicto{color:#ff8a7a}
+  .jg-choque.jg-empate .jg-veredicto{color:#ffd76a}
+  .jg-vuela-arriba{animation:jgArriba .4s ease-out}
+  .jg-vuela-abajo{animation:jgAbajo .4s ease-out}
+  @keyframes jgArriba{from{transform:translateY(-60px) rotate(-8deg);opacity:0}to{transform:none;opacity:1}}
+  @keyframes jgAbajo{from{transform:translateY(60px) rotate(8deg);opacity:0}to{transform:none;opacity:1}}
+
+  /* Ganar con un 10, un 11 o un 12 estalla; empatar echa humo. Las dos
+     capas se pintan *encima* del choque y no dentro de la fila: metidas
+     en el flex, las cartas se correrían a un lado al aparecer. Cada
+     partícula trae su ángulo y su retardo en una variable, porque son
+     doce rayos y siete bocanadas y una regla por cada una no se lee. */
+  .jg-golpea{animation:jgSacude .5s ease-out}
+  @keyframes jgSacude{0%,100%{transform:none}15%{transform:translateX(-7px)}
+    35%{transform:translateX(6px)}55%{transform:translateX(-4px)}75%{transform:translateX(2px)}}
+  .jg-estallido,.jg-humo{position:absolute;left:50%;top:50%;width:0;height:0;
+    pointer-events:none;z-index:2}
+  .jg-onda{position:absolute;left:-9px;top:-9px;width:18px;height:18px;border-radius:50%;
+    border:3px solid var(--elc,#fff);animation:jgOnda .85s ease-out forwards}
+  @keyframes jgOnda{from{transform:scale(.3);opacity:.95}to{transform:scale(13);opacity:0}}
+  .jg-rayos{position:absolute}
+  .jg-rayos i{position:absolute;left:-2.5px;top:-2.5px;width:5px;height:5px;border-radius:3px;
+    background:var(--el,#fff);box-shadow:0 0 9px var(--elc,#fff);
+    animation:jgRayo .75s ease-out forwards}
+  @keyframes jgRayo{
+    from{transform:rotate(var(--a,0deg)) translateY(0) scaleY(1);opacity:1}
+    to{transform:rotate(var(--a,0deg)) translateY(calc(var(--r,1) * -78px)) scaleY(3.4);opacity:0}}
+  .jg-golpe-t{display:block;margin-top:5px;font-size:23px;font-weight:800;color:#ffd76a;
+    text-shadow:0 2px 9px #ffb30099;animation:jgGolpeT .55s cubic-bezier(.2,1.7,.4,1)}
+  @keyframes jgGolpeT{from{transform:scale(2.4) rotate(-9deg);opacity:0}to{transform:none;opacity:1}}
+  .jg-humo i{position:absolute;left:-23px;top:-23px;width:46px;height:46px;border-radius:50%;
+    background:radial-gradient(circle at 40% 38%,#ffffffcc,#b9c6d3a0 54%,#8a99a800 72%);
+    opacity:0;animation:jgHumo 1.7s ease-out var(--d,0ms) forwards}
+  @keyframes jgHumo{
+    0%{opacity:0;transform:translate(0,0) scale(calc(var(--s,1) * .35))}
+    18%{opacity:.85}
+    100%{opacity:0;transform:translate(var(--x,0px),-64px) scale(calc(var(--s,1) * 1.9))}}
+  .jg-remate{display:flex;flex-direction:column;align-items:center;gap:12px;animation:jgEntra .4s ease-out}
+  .jg-remate-t{font-size:24px;font-weight:700}
+  .jg-remate.jg-gana .jg-remate-t{color:#4ade80}
+  .jg-remate.jg-pierde .jg-remate-t{color:#ff8a7a}
+  .jg-remate-trio{display:flex;gap:10px}
+
+  .jg-trofeos{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:#e2e8ec;border-left:1px solid #e2e8ec;border-right:1px solid #e2e8ec}
+  .jg-trofeo{background:#fff;padding:12px 16px}
+  .jg-trofeo-t{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#8a97a3;margin-bottom:8px}
+  .jg-grupos{display:flex;gap:14px;flex-wrap:wrap}
+  .jg-grupo{display:flex;gap:3px}
+  .jg-nada{font-size:12px;color:#b3bec7}
+
+  /* ============================================================
+     Cuadritos
+     ============================================================ */
+  .jg-cuad{display:flex;flex-direction:column}
+  .jg-marcador{display:flex;gap:14px;align-items:center}
+  .jg-m{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:#42505c;border-left:3px solid var(--c,#888);padding-left:8px}
+  .jg-m b{font-size:16px;font-family:'IBM Plex Mono',monospace}
+  /* Con seis nombres en la barra hace falta decir de quién se espera:
+     el del turno lleva el nombre en negro y el que abandonó, tachado. */
+  .jg-m-turno{color:#1f2933;font-weight:700}
+  .jg-m-turno b{color:var(--c,#888)}
+  .jg-m-fuera{opacity:.42}
+  .jg-m-fuera span{text-decoration:line-through}
+  .jg-marcador{flex-wrap:wrap;row-gap:6px}
+  .jg-punto-t{width:9px;height:9px;border-radius:50%;display:inline-block}
+  .jg-tablero{display:grid;place-items:center;padding:20px 16px;background:#fff;border-left:1px solid #e2e8ec;border-right:1px solid #e2e8ec}
+  .jg-svg{width:100%;max-width:440px;height:auto;touch-action:manipulation}
+  .jg-caja{opacity:.16}
+  .jg-caja-l{font-size:26px;font-weight:700;opacity:.4;text-anchor:middle;dominant-baseline:central;font-family:'IBM Plex Sans',sans-serif}
+  .jg-raya{stroke-width:7;stroke-linecap:round}
+  .jg-ult{stroke-width:9;filter:drop-shadow(0 0 4px currentColor)}
+  /* El hueco es una zona de clic gorda y transparente: pintarla sería
+     dibujar el tablero lleno de rayas que no están puestas. */
+  .jg-hueco{stroke:transparent;stroke-width:16;stroke-linecap:round}
+  .jg-libre{cursor:pointer}
+  .jg-libre:hover{stroke:var(--turno,#0f62fe);stroke-opacity:.35;stroke-width:7}
+  .jg-cierra.jg-libre:hover{stroke-opacity:.75}
+  .jg-svg .jg-punto{fill:#cbd5dd}
+
+  /* ============================================================
+     Reversi
+     ============================================================ */
+  .jg-rev{display:flex;flex-direction:column}
+  /* El tablero es cuadrado y de ocho por ocho: dejarle los 440 px de
+     cuadritos lo deja con casillas de 55 px, que en un móvil es todo
+     lo que hay. En pantalla grande no crece más porque una ficha de
+     ocho centímetros no ayuda a leer nada. */
+  .jg-rev-svg{max-width:460px}
+  .jg-rev-fondo{fill:#1f6f5c}
+  /* La cuadrícula se dibuja con el borde de cada casilla y no con
+     líneas: así el último surco del borde queda dentro del fondo
+     redondeado, sin sobresalir por la esquina. */
+  .jg-rev-cas{fill:none;stroke:#14503f;stroke-width:2}
+  .jg-rev-hito{fill:#14503f}
+  .jg-rev-f{stroke:#0000001f;stroke-width:2}
+  /* La ficha recién puesta lleva aro claro: sin eso, en un tablero
+     que cambia de color a la mitad no hay forma de saber cuál fue la
+     jugada. */
+  .jg-rev-ult{stroke:#ffd166;stroke-width:6}
+  /* Las volteadas giran una vez, no en bucle: la firma de la pintada
+     lleva dentro la última casilla, así que el SVG se rehace una vez
+     por jugada y la animación arranca sola justo cuando toca. */
+  .jg-rev-gira{animation:jgVoltea .42s ease-out;transform-box:fill-box;transform-origin:center}
+  @keyframes jgVoltea{
+    0%{transform:scaleX(1)}
+    50%{transform:scaleX(.06)}
+    100%{transform:scaleX(1)}
+  }
+  .jg-rev-libre{cursor:pointer}
+  .jg-rev-pista{fill:none;stroke-width:4;stroke-dasharray:7 7;opacity:.55}
+  .jg-rev-n{font-size:34px;font-weight:700;text-anchor:middle;dominant-baseline:central;
+    font-family:'IBM Plex Mono',monospace;opacity:.55;pointer-events:none}
+  .jg-rev-libre:hover .jg-rev-pista{opacity:1;stroke-dasharray:none;fill:currentColor;fill-opacity:.12}
+  .jg-rev-libre:hover .jg-rev-n{opacity:1}
+  /* El punto de la barra de fase es la ficha de quien tiene el turno,
+     y una blanca sobre fondo blanco no se ve: de ahí el borde. */
+  .jg-rev-punto{border:1px solid #0f172833}
+  .jg-rev-m{gap:7px}
+  .jg-rev-chip{width:13px;height:13px;border-radius:50%;display:inline-block;flex-shrink:0;
+    border:1px solid #0f172833}
+
+  /* ============================================================
+     Ranks
+     ============================================================ */
+  .jg-ranks{display:flex;flex-direction:column}
+  .jg-bar-juegos{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+  .jg-tab{padding:8px 14px;border:1px solid #d4dce2;border-radius:8px;background:#fff;font-size:12.5px;font-weight:600;color:#42505c;cursor:pointer}
+  .jg-tab.on{border-color:#0d9488;background:#e9f4f2;color:#0d9488}
+  .jg-aviso{padding:14px 16px;border-radius:9px;background:#fff8ec;border:1px solid #e2c08d66;font-size:12.5px;color:#6b5320;line-height:1.6;margin-bottom:16px}
+  .jg-aviso code{font-family:'IBM Plex Mono',monospace;font-size:11.5px;background:#00000010;padding:1px 5px;border-radius:4px}
+  .jg-tabla-caja{background:#fff;border:1px solid #e2e8ec;border-radius:10px;overflow-x:auto}
+  .jg-tabla{width:100%;border-collapse:collapse;font-size:12.5px}
+  .jg-tabla th{text-align:left;font-size:10.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#8a97a3;padding:11px 12px;border-bottom:1px solid #e2e8ec;white-space:nowrap}
+  .jg-tabla td{padding:10px 12px;border-bottom:1px solid #f0f4f6;white-space:nowrap}
+  .jg-tabla tr:last-child td{border-bottom:none}
+  .jg-th-n{width:44px;text-align:center;color:#8a97a3;font-variant-numeric:tabular-nums}
+  .jg-jug{display:flex;align-items:center;gap:9px;white-space:nowrap}
+  .jg-foto{width:26px;height:26px;border-radius:50%;object-fit:cover;flex-shrink:0}
+  .jg-sin{background:#0d9488;color:#fff;display:grid;place-items:center;font-size:11px;font-weight:700}
+  .jg-num{text-align:right;font-variant-numeric:tabular-nums}
+  .jg-gan{color:#0d9488;font-weight:600}
+  .jg-pts{font-weight:700;color:#1f2933}
+  /* El porcentaje se lee mejor con la barra al lado que solo: una
+     columna de números de dos cifras no dice quién va bien de un
+     vistazo. */
+  .jg-barra-pc{display:inline-block;width:44px;height:5px;border-radius:99px;background:#eef1f4;margin-right:7px;vertical-align:middle;overflow:hidden}
+  .jg-barra-pc i{display:block;height:100%;background:#0d9488}
+  .jg-yo{background:#f3faf9}
+  .jg-yo .jg-jug{font-weight:700}
+  .jg-vacio{padding:34px 16px;text-align:center;font-size:12.5px;color:#8a97a3;line-height:1.7}
+  .jg-nota-larga{margin-top:18px;font-size:11.5px;color:#8a97a3;line-height:1.7;max-width:78ch}
+
+  @media (max-width:640px){
+    .jg-carta{width:62px;height:91px}
+    .jg-pequena{width:48px;height:71px}
+    .jg-trofeos{grid-template-columns:1fr}
+    /* El tablero se lleva todo el ancho: con seis jugadores el
+       marcador ya se parte en dos filas y el margen lateral es lo
+       único que se puede dar. */
+    .jg-tablero{padding:14px 8px}
+    .jg-marcador{gap:9px}
+    .jg-m{padding-left:6px;gap:4px}
+    .jg-m b{font-size:14px}
+    /* El cartel del final es una capa fija, así que en un móvil tiene
+       que caber en la pantalla, no en la página. */
+    .jg-fin{padding:22px 16px 18px}
+    .jg-fin-cara{font-size:38px}
+    .jg-fin-t{font-size:20px}
+    .jg-fin-btns{flex-direction:column}
+    .jg-fin-btns .btn{width:100%}
+    /* En un móvil las dos columnas del perfil no caben: la foto pasa
+       a ser una fila propia, centrada, y los colores se reparten en
+       ocho de ancho completo para que se puedan tocar con el dedo. */
+    .jg-modal{padding:20px 15px 16px}
+    .jg-perfil-cuerpo{gap:14px}
+    .jg-perfil-foto{width:100%;flex-direction:row;flex-wrap:wrap;justify-content:center}
+    .jg-perfil-foto .btn2,.jg-perfil-foto .btn-ghost{width:auto;flex:1;min-width:120px}
+    .jg-perfil-av{flex:0 0 auto}
+    .jg-of-ops{gap:6px}
+  }
+
+  /* Arcade: exclusivo de Juegos. */
+  :root{--jg-ink:#232137;--jg-purple:#7042df;--jg-muted:#706d81}
+  body{background:#f5f4fa;color:var(--jg-ink)}
+  .head{height:auto;min-height:64px;padding:12px 28px;flex-wrap:wrap;background:#171522;gap:12px;border-bottom:1px solid #ffffff12}
+  .logo-mark{background:#ab8bff;color:#171522;border-radius:9px}.head-nav a{color:#b8b2c8}.head-right{gap:8px}.btn-ghost{color:#cbc4de}
+  #volMusica{width:62px;accent-color:#b598ff;cursor:pointer}
+  main{max-width:1232px;padding:28px 32px 72px}.bar{margin-bottom:24px;gap:10px}
+  .tab{border:0;background:transparent;border-radius:100px;padding:11px 20px;color:#6b6679}.tab.on{background:#242031;color:#fff}
+  h1{font-size:24px;letter-spacing:-.7px}.btn,.btn2,.jg-btn{height:42px;border-radius:10px;font-size:13px}
+  .btn,.jg-btn{background:var(--jg-purple)}.btn:hover,.jg-btn:hover{background:#5d32c5}.btn2{border-color:#ddd9e8}.btn2:hover{border-color:var(--jg-purple);color:var(--jg-purple)}
+  button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible{outline:3px solid #9164ff;outline-offset:4px}
+  .jg-hero{min-height:320px;border-radius:24px;background:radial-gradient(ellipse at 80% 60%,#452d76 0,transparent 47%),#1e192c;color:#fff;padding:42px;display:grid;grid-template-columns:1.4fr 1fr;overflow:hidden;position:relative;margin-bottom:34px}
+  .jg-eyebrow{font:500 10px 'IBM Plex Mono',monospace;letter-spacing:2.4px;color:#c5b5e8}
+  .jg-hero h2{font-size:clamp(36px,4.5vw,58px);line-height:1.02;letter-spacing:-2.4px;margin:22px 0 18px;font-weight:600}.jg-hero p{font-size:14px;line-height:1.65;color:#c7bfd6;margin:0}
+  .jg-hero-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:24px}.jg-hero-tags span{border:1px solid #ffffff24;border-radius:100px;padding:6px 10px;color:#d1c8df;font-size:10px}
+  .jg-hero-orbita{position:relative;display:grid;place-items:center;min-height:240px;isolation:isolate}
+  .jg-hero-orbita i{position:absolute;width:260px;height:160px;border:1px solid #b88ef780;border-radius:50%;transform:rotate(-28deg);box-shadow:0 0 40px #aa7cff12}
+  .jg-hero-orbita i:nth-child(2){transform:rotate(35deg);width:210px;height:260px;border-color:#d9c8ff45}.jg-hero-orbita i:nth-child(3){transform:rotate(20deg);width:300px;height:220px;border-color:#d9c8ff20}
+  .jg-hero-orbita i:first-child:after{content:'';position:absolute;top:16px;left:33px;width:15px;height:15px;background:#eac280;box-shadow:0 0 24px #ffcb71;border-radius:50%}
+  .jg-hero-orbita b{font-size:132px;font-weight:400;background:linear-gradient(140deg,#fff,#c6a0ff 55%,#8156dd);background-clip:text;color:transparent;filter:drop-shadow(0 0 26px #bb8aff66);transform:translateY(-8px)}
+  .jg-hero-orbita>span{position:absolute;bottom:0;text-align:center;font:500 13px 'IBM Plex Mono',monospace;letter-spacing:5px}.jg-hero-orbita small{font-size:8px;letter-spacing:2px;color:#bdaecf;line-height:3}
+  .jg-section-title{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:18px}.jg-section-title h2{font-size:21px;margin:0;letter-spacing:-.6px}.jg-section-title>span{font-size:11px;color:var(--jg-muted)}
+  .jg-elige{grid-template-columns:repeat(3,minmax(0,1fr));gap:20px;margin-bottom:40px}
+  .jg-oferta{padding:14px;gap:12px;border:1px solid #e5e0ee;border-radius:19px;background:#fff;transition:transform .2s,box-shadow .2s;min-width:0}.jg-oferta:hover{transform:translateY(-4px);box-shadow:0 15px 32px #39226d12}
+  .jg-portada{height:165px;border-radius:12px;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#221936}
+  .jg-of-meta{display:flex;justify-content:space-between;gap:8px;font:500 8px 'IBM Plex Mono',monospace;color:var(--c);letter-spacing:.5px;margin:3px 3px 0}.jg-of-meta span{color:#777184}
+  .jg-of-nombre{font-size:18px;letter-spacing:-.4px;padding:0 3px}.jg-of-lema{font-size:13px;line-height:1.6;padding:0 3px;min-height:42px;color:#746e80}
+  .jg-of-btn{width:100%;display:flex;align-items:center;justify-content:space-between;background:#f2eef9;color:#342646;font-weight:600;margin:4px 0 0;align-self:stretch}.jg-of-btn:hover{background:#e9e0fa;filter:none}.jg-of-orbita .jg-of-btn{background:#7042df;color:#fff}
+  .jg-of-ops{padding:0 3px}.jg-of-op{flex:1;color:#6e647c}.jg-of-op select{height:35px;border-radius:8px}
+  .jg-portada-orbita{background:radial-gradient(ellipse at center,#58317d,#211931)}.jg-art-orbit{width:220px;height:150px;position:relative;display:grid;place-items:center}.jg-art-orbit i{position:absolute;border:1px solid #b78ee5;border-radius:50%;width:185px;height:85px;transform:rotate(-30deg)}.jg-art-orbit i:nth-child(2){width:140px;height:120px;transform:rotate(45deg);border-color:#b78ee54d}.jg-art-orbit b{color:#e4d3ff;font-size:88px;text-shadow:0 0 25px #b881ff}.jg-art-orbit span{position:absolute;right:18px;top:18px;color:#ffe0a4;font-size:25px}
+  .jg-portada-cartas{background:radial-gradient(ellipse at center,#6f3449,#291b2d)}.jg-portada-cartas img{width:75px;height:111px;object-fit:cover;border-radius:7px;box-shadow:0 9px 20px #0008;border:1px solid #ffffff50;transform:rotate(-17deg) translateX(9px)}.jg-portada-cartas img:nth-child(2){transform:translateY(-7px);z-index:1}.jg-portada-cartas img:nth-child(3){transform:rotate(17deg) translateX(-9px)}
+  .jg-portada-reversi{background:radial-gradient(ellipse,#34745d,#183f35)}.jg-art-rev{display:grid;grid-template-columns:repeat(4,32px);gap:2px;padding:8px;transform:rotate(-12deg);border:1px solid #70ab9160;border-radius:9px;background:#164632;box-shadow:10px 12px 24px #06251e80}.jg-art-rev i{width:32px;height:32px;border:1px solid #79ad8b30;position:relative}.jg-art-rev i.negra:after,.jg-art-rev i.blanca:after{content:'';position:absolute;inset:3px;border-radius:50%;box-shadow:2px 3px 3px #0006;background:radial-gradient(circle at 30% 25%,#656777,#11121a 70%)}.jg-art-rev i.blanca:after{background:radial-gradient(circle at 30% 25%,white,#c6cfda 80%)}
+  .jg-portada-cuadritos{background:radial-gradient(ellipse,#405e9f,#1d2b4d)}.jg-art-dots{display:grid;grid-template-columns:repeat(3,36px);transform:rotate(-12deg)}.jg-art-dots i{width:36px;height:36px;border:1px solid #a6c4ff55;position:relative}.jg-art-dots i:after{content:'';position:absolute;width:6px;height:6px;border-radius:50%;background:#e0ebff;left:-3px;top:-3px;box-shadow:36px 0 #e0ebff,36px 36px #e0ebff,0 36px #e0ebff}.jg-art-dots .llena{background:#729afc88;border:2px solid #9dbdff}
+  .jg-portada-escondite{background:linear-gradient(#c88f58,#ecd6a0)}.jg-art-land{width:100%;height:100%;position:relative}.jg-art-land i{position:absolute;bottom:-55px;left:-12%;width:85%;height:180px;border-radius:50%;background:#3c695a;transform:rotate(-15deg)}.jg-art-land i:nth-child(2){left:45%;bottom:-60px;background:#244e43;transform:rotate(25deg)}.jg-art-land i:nth-child(3){left:30%;bottom:-90px;background:#173e38}.jg-art-land b{position:absolute;left:48%;top:30%;color:#fff0c5;font:64px sans-serif;text-shadow:0 0 15px #f5ddb380}.jg-art-land span{position:absolute;bottom:14px;width:100%;text-align:center;color:#d6e4d3;font:8px 'IBM Plex Mono',monospace;letter-spacing:1.6px}
+  .card{border-color:#e4dfeb;border-radius:16px}.row{padding:17px 20px}.row-meta,.vacio,.jg-nota{color:#777183}.jg-h2{margin-top:25px;color:#716a7f;font-size:11px;letter-spacing:1.4px}.row-title{font-size:14px}
+  .jg-cab{padding:18px 0}.jg-quien-chip{padding:6px 12px}.jg-invita{border-radius:15px;margin-bottom:18px;padding:20px;border-color:#e4dfeb}
+  .jg-barra{padding:17px 20px;border-radius:18px 18px 0 0;background:#fff;border-color:#e4dfeb;gap:16px}.jg-fase{font-weight:600;font-size:13px}.jg-m b{font-size:21px}.jg-pie{border-radius:0 0 18px 18px;padding:16px 20px;border-color:#e4dfeb}
+  .jg-tablero{padding:30px;background:radial-gradient(ellipse at center,#fff,#eeedf6);border-color:#e4dfeb}.jg-svg{max-width:500px}.jg-cuad .jg-svg{padding:16px;border-radius:16px;background:#fff;box-shadow:0 8px 35px #29204013}.jg-svg .jg-punto{fill:#758199}.jg-caja{opacity:.25}.jg-caja-l{opacity:.7}.jg-raya{filter:drop-shadow(0 2px 1px #0002)}
+  .jg-rev-svg{max-width:480px;border:9px solid #214536;border-radius:20px;box-shadow:0 18px 28px #17372830,0 2px 0 2px #183529}.jg-rev-fondo{fill:url(#rv-fieltro)}.jg-rev-f{filter:drop-shadow(2px 4px 2px #0005)}.jg-rev-cas{stroke:#153e3555}.jg-rev-pista,.jg-rev-n{opacity:.8}
+  .jg-mesa{padding:28px 20px;gap:20px;background:radial-gradient(ellipse at center,#414267,#252237 60%,#1c1a2b);border-color:#e4dfeb}.jg-carta:not(.jg-pequena):not(.jg-mini){width:96px;height:142px;border-radius:12px}.jg-duelo{min-height:178px}.jg-jugable:hover{transform:translateY(-12px) rotate(-2deg);box-shadow:0 15px 30px #0008,0 0 0 2px #e5c3ff}.jg-dorso{background:repeating-linear-gradient(45deg,#423458,#423458 6px,#4d3c67 6px,#4d3c67 12px);color:#d1b4fc}.jg-trofeo{padding:18px}.jg-lienzo{box-shadow:inset 0 0 50px #0003}.jg-capa{backdrop-filter:blur(5px)}
+  .jg-fin{width:460px;padding:38px 30px 28px;border-radius:24px}.jg-fin-capa{background:#171123b3;backdrop-filter:blur(8px)}.jg-fin-gano{background:radial-gradient(ellipse at top,#e5dbff,#fff 70%);border-color:#c9b7f6}.jg-fin-gano .jg-fin-t{color:#6c3ed2}.jg-fin-t{letter-spacing:-.6px;font-size:28px}.jg-fin-cara{margin-bottom:16px}.jg-fin-btns{gap:10px}.jg-fin-btns .btn{flex:1}.jg-fin-x{width:34px;height:34px;border-radius:100px}
+  .jg-revancha{display:flex;align-items:center;justify-content:space-between;gap:18px;border:1px solid #d7c5fb;border-radius:16px;padding:22px;background:#efe7ff;margin-top:20px}.jg-revancha b{font-size:15px}.jg-revancha p{font-size:12px;color:#75648c;margin:5px 0 0}.jg-revancha .btn{flex-shrink:0}
+  .login-card{border-radius:24px;padding:40px;box-shadow:0 20px 70px #3d24541a}.login-card:before{content:'✦';display:block;font-size:72px;color:#8659e2;margin-bottom:20px}
+  .jg-orbita{border-radius:18px;overflow:hidden;background:#1d192d;border:1px solid #3d3457}.jg-orbita .jg-barra{background:#241f35;border:0;display:flex;justify-content:space-between}.jg-orbita .jg-fase,.jg-orbita .jg-m{color:#e9e0fa}
+  .jg-orbita-cosmos{padding:28px;background:radial-gradient(ellipse at 50% 30%,#4b306b70,transparent 70%),radial-gradient(circle at 18px 25px,#b8a3eb35 1px,transparent 1.5px);background-size:auto,53px 53px}
+  .jg-orbita-grid{max-width:480px;margin:auto;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+  .jg-estrella{aspect-ratio:1;min-width:0;border-radius:12px;border:1px solid #554567;background:#2a223b;color:#9d8eb5;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:2px;font-family:inherit;transition:background .16s,transform .16s,box-shadow .16s;opacity:.65}
+  .jg-estrella span{font-size:27px;line-height:1}.jg-estrella b{font:500 12px 'IBM Plex Mono',monospace}.jg-estrella.legal{opacity:1;border-color:#a481e1;background:linear-gradient(145deg,#614082,#35284d);color:#ffe3a6;box-shadow:inset 0 1px 0 #ffffff20}.jg-estrella.legal:not(:disabled){cursor:pointer}.jg-estrella.legal:not(:disabled):hover{transform:translateY(-3px);box-shadow:0 0 22px #9b6df847;border-color:#f2d095}.jg-estrella.tomada{opacity:.55;background:#211c2f;border-color:#4d425f}.jg-estrella.propia{color:#bca1ff}.jg-estrella.rival{color:#ffc78d}.jg-estrella.ultima{opacity:1;outline:2px solid currentColor;outline-offset:-3px}.jg-estrella.tomada span{font-size:17px}
+  .jg-orbita-controles{padding:14px 24px;display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap;color:#c3b4d7;font-size:12px}.jg-ejes{display:flex;gap:6px}.jg-ejes button{border:1px solid #625078;background:#2b233b;color:#d9cbea;border-radius:10px;padding:10px 15px;cursor:pointer}.jg-ejes button[aria-pressed=true]{background:#c3a0ff;color:#211530;border-color:#c3a0ff;font-weight:600}.jg-ejes button:disabled{opacity:.5;cursor:default}.jg-instrucciones{padding:18px 24px;color:#baadce;font-size:12px;line-height:1.7;border-top:1px solid #ffffff14}.jg-instrucciones summary{cursor:pointer;color:#e5d8f7}.jg-orbita-error{color:#ffb5a6;font-size:12px;text-align:center;margin:0 20px;min-height:16px}
+  @media(max-width:900px){.jg-elige{grid-template-columns:repeat(2,minmax(0,1fr))}.head-nav{order:3;width:100%;margin:0}.jg-hero{padding:30px}.jg-hero-orbita{transform:scale(.85)}.head-right{flex-wrap:wrap}.jg-section-title>span{display:none}}
+  @media(max-width:600px){main{padding:20px 16px 48px}.head{padding:12px 16px}.head-right{width:100%;margin:0;gap:8px}.head-nav{gap:20px;overflow:auto}.jg-hero{grid-template-columns:1fr;padding:28px;min-height:0;border-radius:18px}.jg-hero h2{font-size:42px}.jg-hero-orbita{display:none}.jg-elige{gap:14px;grid-template-columns:1fr}.jg-portada{height:180px}.jg-oferta{padding:16px}.jg-of-lema{min-height:0}.jg-section-title h2{font-size:20px}.jg-tablero{padding:22px 10px}.jg-mesa{padding:20px 10px}.jg-carta:not(.jg-pequena):not(.jg-mini){width:72px;height:106px}.jg-mano{gap:8px}.jg-choque{gap:10px;flex-wrap:wrap;justify-content:center}.jg-veredicto{min-width:80px;font-size:13px}.jg-revancha{flex-direction:column;align-items:stretch}.jg-orbita-cosmos{padding:18px 10px}.jg-orbita-grid{gap:5px}.jg-estrella{border-radius:9px}.jg-estrella span{font-size:23px}.jg-orbita .jg-barra{padding:14px;flex-wrap:wrap}.jg-barra{padding:14px}.jg-enlace .inp{min-width:0}.jg-fin{padding:32px 22px 24px}.jg-fin-btns .btn2{width:100%}}
+  @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+
+/* Escondite: atlas ilustrado */
+.esc-rework {overflow:hidden;border:1px solid #d8d4c7;border-radius:22px;background:#f7f5ed;box-shadow:0 16px 45px #242c3514}
+.esc-editorial{padding:28px 28px 20px;background:#203e38;color:#f3edd9}
+.esc-editorial>span{font-size:10px;letter-spacing:.22em;color:#b9cdab;font-weight:800}
+.esc-editorial h2{font-family:Georgia,serif;font-size:clamp(26px,4vw,42px);font-weight:400;letter-spacing:-.04em;margin:10px 0}
+.esc-editorial p{margin:0;color:#cbd6c8;font-size:13px}
+.esc-herramientas{display:flex;gap:16px;align-items:center;flex-wrap:wrap;padding:16px 22px;border-bottom:1px solid #dedacb}
+.esc-herramientas label{display:flex;gap:8px;align-items:center;font-size:12px;font-weight:700}
+.esc-herramientas select{padding:9px;border:1px solid #c5c8b9;border-radius:8px;background:#fffdf6;color:#244137}
+#escObjetivo{font-size:12px;color:#526452;flex:1;min-width:180px}
+.esc-visor{overflow:auto;max-height:70vh;background:#bac5a5;overscroll-behavior:contain}
+.esc-rework .jg-lienzo{max-width:none;min-width:100%;border:0;border-radius:0;position:relative}
+.esc-rework canvas{display:block;width:100%;touch-action:pan-x pan-y;cursor:crosshair}
+.esc-rework .jg-barra,.esc-rework .jg-pie{padding:14px 22px;margin:0}
+.esc-ayuda{padding:16px 22px;border-top:1px solid #dedacb;color:#4c5e50;font-size:13px;line-height:1.65}
+.esc-ayuda summary{cursor:pointer;font-weight:700}
+.esc-rework :focus-visible{outline:3px solid #c18b29;outline-offset:3px}
+@media(max-width:600px){.esc-editorial{padding:20px}.esc-herramientas{padding:12px;gap:10px}.esc-herramientas label{flex:1}.esc-visor{max-height:60vh}}
+/* Singleplayer: obsidiana, ámbar y fósforo. */
+.sp{--accent:#f6bc64;--glow:#ce792a;--ink:#e9edf5;background:#080d19;color:var(--ink);border-radius:24px;overflow:hidden;font-family:inherit;border:1px solid #273248;animation:sp-entrada .5s ease-out}
+.sp-snake{--accent:#58f5c0;--glow:#138e89}
+.sp-hero{padding:32px 38px 38px;position:relative;overflow:hidden;background:radial-gradient(ellipse at 85% 40%,color-mix(in srgb,var(--glow),transparent 55%),transparent 55%),linear-gradient(130deg,#172032,#090e19)}
+.sp-hero:after{content:'';position:absolute;inset:0;background:repeating-linear-gradient(120deg,transparent 0 60px,#ffffff04 61px 62px);pointer-events:none}
+.sp-link{border:0!important;background:transparent!important;color:#a5b2c9!important;padding:8px 0!important;cursor:pointer}.sp-hero .sp-link{display:block;margin-bottom:30px;position:relative;z-index:1}
+.sp-kicker{font-size:10px;letter-spacing:.23em;font-weight:800;color:var(--accent);display:block}
+.sp-hero h1{font-size:clamp(40px,7vw,84px);letter-spacing:-.07em;line-height:1;margin:16px 0;font-weight:900;font-style:italic}.sp-hero h1 span{color:var(--accent)}.sp-hero p{color:#9babc5;font-size:14px;margin-bottom:0}
+.sp-emblema{position:absolute;right:8%;top:15%;font-size:180px;color:var(--accent);opacity:.18;transform:rotate(-15deg);text-shadow:0 0 60px var(--glow)}
+.sp-layout{display:grid;grid-template-columns:minmax(0,1fr) 255px;gap:24px;padding:26px}.sp-layout main{min-width:0}.sp-config{display:flex;gap:12px;flex-wrap:wrap;align-items:end;margin-bottom:20px}.sp-config label{display:grid;gap:7px;font-size:11px;color:#a1b0c6;flex:1;min-width:130px}.sp select,.sp button{font:inherit}.sp select{background:#131e30;color:#e5eaf2;border:1px solid #34425a;border-radius:9px;padding:10px;max-width:100%}.sp button{border:1px solid #34425a;color:#cfdaec;background:#172236;border-radius:9px;padding:10px 14px;cursor:pointer;transition:background .18s,transform .18s}.sp button:active{transform:scale(.96)}.sp button:disabled{opacity:.45;cursor:default}.sp button.sp-primary{background:var(--accent);border-color:var(--accent);color:#102022;font-weight:800;box-shadow:0 6px 24px color-mix(in srgb,var(--glow),transparent 75%)}
+.sp-hud{display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:14px 16px;border:1px solid #26344b;background:#101a2b;border-radius:14px 14px 0 0}.sp-hud div{flex:1;min-width:70px}.sp-hud small{display:block;color:#8ea0bc;font-size:8px;letter-spacing:.12em}.sp-hud b{font:700 23px ui-monospace,monospace;display:block;margin-top:6px}.sp-hud [aria-pressed=true]{background:var(--accent);color:#141e24}
+.sp-arena{position:relative;border:1px solid #26344b;border-top:0;border-radius:0 0 16px 16px;overflow:hidden;min-height:330px;background:radial-gradient(circle,#142038,#060b15)}.sp-scroll{overflow:auto;padding:18px;max-height:75vh}.sp-minas-grid{display:grid;grid-template-columns:repeat(var(--cols),minmax(30px,1fr));gap:4px;min-width:calc(var(--cols)*34px);margin:auto}.sp-minas-grid button{aspect-ratio:1;padding:0;border-radius:5px;background:linear-gradient(145deg,#2b3b54,#172338);border:1px solid #3b4e6b;box-shadow:inset 0 1px #6e84a038;font:800 15px ui-monospace,monospace;min-width:30px;min-height:30px}.sp-minas-grid button:hover{background:#405477}.sp-minas-grid button.abierta{background:#0c1423;border-color:#18263c;box-shadow:none;animation:sp-revela .25s ease-out}.sp-minas-grid .n1{color:#65c8fa}.sp-minas-grid .n2{color:#63e8ba}.sp-minas-grid .n3{color:#ffae72}.sp-minas-grid .n4,.sp-minas-grid .n5,.sp-minas-grid .n6,.sp-minas-grid .n7,.sp-minas-grid .n8{color:#d693fa}.sp-minas-grid button.bandera{color:#ffd079}.sp-minas-grid button.mina{background:#63283b;color:#ffb1b8}.sp-minas-grid button.golpe{background:#ce4059;animation:sp-revela .4s ease-out}
+.sp-canvas-wrap{width:100%;max-width:630px;margin:auto;aspect-ratio:1}.sp-canvas-wrap canvas{width:100%;height:100%;display:block;touch-action:none}.sp-capa{position:absolute;inset:0;z-index:2;background:#080d19e8;backdrop-filter:blur(8px);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:24px;animation:sp-entrada .3s ease-out}.sp-capa[hidden]{display:none}.sp-capa h2{font-size:clamp(26px,4vw,46px);letter-spacing:-.04em;margin:15px 0}.sp-capa h2 small{font-size:14px;color:var(--accent)}.sp-capa p{font-size:13px;color:#a7b6ce}.sp-capa button{margin-top:10px}.sp-pad{display:flex;justify-content:center;gap:12px;margin:16px}.sp-pad button{font-size:24px;min-width:52px;min-height:48px;touch-action:manipulation}
+.sp-ranking{border:1px solid #2a374e;border-radius:16px;background:linear-gradient(160deg,#162136,#0b1322);padding:22px;align-self:start}.sp-ranking h2{font-size:24px;line-height:1.2;font-weight:600;letter-spacing:-.03em;margin:14px 0}.sp-ranking p{font-size:11px;color:#9aacc8;line-height:1.7}.sp-ranking ol{padding:0;list-style:none;margin:22px 0}.sp-ranking li{display:flex;align-items:center;gap:10px;padding:14px 0;border-bottom:1px solid #29364c;font-size:12px}.sp-ranking li>b{color:#6c7f9d;font:12px monospace}.sp-ranking li>span{flex:1;min-width:0;overflow-wrap:anywhere}.sp-ranking strong{color:var(--accent)}.sp-ranking .sp-yo{background:#ffffff08}.sp-instrucciones{font-size:12px;color:#95a7c3;line-height:1.8;padding:20px 0}.sp-instrucciones summary{cursor:pointer;color:#d9e2ef;font-weight:700}#spEstado{font-size:12px;color:var(--accent);padding:14px;min-height:16px}.sp :focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+.sp-entradas{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:20px 0 28px}.sp-entrada{text-decoration:none!important;padding:28px;border-radius:18px;background:radial-gradient(ellipse at right,#704823,#0c1629 75%);color:#fff!important;border:1px solid #384352;transition:transform .2s}.sp-e-snake{background:radial-gradient(ellipse at right,#13615b,#0c1629 75%)}.sp-entrada:hover{transform:translateY(-4px)}.sp-entrada small{font-size:9px;letter-spacing:.16em;color:#abbccc}.sp-entrada strong{display:block;font-size:30px;letter-spacing:-.05em;font-style:italic;margin:14px 0}.sp-entrada strong span{float:right;color:#f6bc64}.sp-e-snake strong span{color:#58f5c0}.sp-entrada p{font-size:12px;color:#adbdd1}.sp-entrada>b{font-size:12px}
+@keyframes sp-entrada{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}@keyframes sp-revela{from{transform:scale(.8);filter:brightness(1.8)}to{transform:scale(1);filter:brightness(1)}}
+@media(max-width:900px){.sp-layout{grid-template-columns:1fr}.sp-ranking{width:auto}.sp-hero{padding:24px}.sp-ranking ol{display:grid;grid-template-columns:1fr 1fr;gap:0 20px}}@media(max-width:580px){.sp-layout{padding:12px;gap:16px}.sp-entradas{grid-template-columns:1fr}.sp-hud{gap:10px;padding:12px}.sp-hud b{font-size:19px}.sp-scroll{padding:8px}.sp-config>button{width:100%}.sp-ranking ol{display:block}.sp-hero .sp-link{margin-bottom:20px}.sp-hero h1{font-size:43px}}
+@media(prefers-reduced-motion:reduce){.sp *,.sp-entrada{animation:none!important;transition:none!important}}
+
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="head">
+    <a class="logo" href="Inicio.dc.html"><span class="logo-mark">L</span><b style="font-size:14px">Laboratorio</b></a>
+    <nav class="head-nav">
+      <a href="colabtex.html">ColabTeX</a>
+      <a href="colabdraw.html">ColabDraw</a>
+      <a href="juegos.html" style="color:#fff;font-weight:600">Juegos</a>
+      <a href="informes.html">Informes</a>
+    </nav>
+    <div class="head-right">
+      <button class="btn-ghost" id="btnMusica" aria-pressed="true">♫ Música</button>
+      <input id="volMusica" type="range" min="0" max="100" value="30" aria-label="Volumen de la música" title="Volumen de la música">
+      <button class="btn-ghost" id="btnSonido" title="Sonido" aria-pressed="true">🔊</button>
+      <span id="userName"></span>
+      <span class="avatar" id="userAvatar"></span>
+      <button class="btn-ghost" id="btnPerfil" title="Tu apodo, tu foto y tu color">Perfil</button>
+      <button class="btn-ghost" id="btnLogout">Salir</button>
+    </div>
+  </header>
+
+  <div id="viewLogin">
+    <div class="login-card">
+      <h2 style="margin:0 0 8px;font-size:18px">Juegos del Laboratorio</h2>
+      <p style="font-size:12.5px;color:#5a6772;line-height:1.6;margin:0 0 20px">
+        Entra con la misma cuenta de Google que usas en ColabTeX. Se juega por turnos:
+        abres una sala, eliges las opciones si el juego las tiene, le pasas el enlace a
+        quien quieras y jugáis.</p>
+      <button class="btn" id="btnLogin" style="width:100%;height:38px">Entrar con Google</button>
+      <div id="loginError" style="margin-top:12px;font-size:12px;color:#c0392b"></div>
+    </div>
+  </div>
+
+  <main id="viewMain" style="display:none">
+    <div class="bar">
+      <button class="tab on" id="tabJugar">Jugar</button>
+      <button class="tab" id="tabRanks">Clasificación</button>
+    </div>
+    <div id="pantalla"></div>
+  </main>
+</div>
+<script src="juegos-app.js?v=202609150240"></script>
+</body>
+</html>

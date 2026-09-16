@@ -1,0 +1,428 @@
+"use strict";
+/* ============================================================
+   Escondite — la pantalla
+
+   Tres fases y ni una más: **esconder** (cada uno coloca su persona en
+   su propio paisaje), **revelar** (los dos publican dónde) y **buscar**
+   (se cruzan los paisajes y gana quien encuentre antes al otro).
+
+   Por qué hay una fase de revelar y no se manda el sitio directamente:
+   el que escribiera segundo vería el escondite del primero en la base
+   antes de elegir el suyo. Así que primero se publica el hash del sitio
+   con una sal (`compromiso`) y solo cuando los dos han publicado el suyo
+   se sueltan las coordenadas. Nadie puede cambiar de sitio a la vista
+   del otro.
+
+   La frontera honesta, dicha aquí porque es aquí donde se ve: el
+   navegador que busca tiene que poder juzgar el clic, así que las
+   coordenadas del otro están en su memoria durante la búsqueda y quien
+   abra las herramientas del navegador las verá. No hay forma de evitarlo
+   sin un servidor que arbitre, y esto es un juego entre amigos.
+
+   El sitio elegido se guarda además en `localStorage`: entre que se
+   publica el compromiso y se revela, el único sitio del mundo donde
+   están esas coordenadas es esta pestaña. Una recarga sin eso dejaba la
+   partida colgada para siempre en «revelar», sin nadie capaz de abrirla.
+   ============================================================ */
+import {
+  escena, semillaEscena, salAleatoria, compromiso, sitioValido,
+  acierta, RADIO_ACIERTO, CASTIGO_FALLO
+} from "./motor.js";
+import { pinta, pintaExplorador, pintaCobertura, TRAJES, COLORES_TRAJE } from "./paisaje.js";
+import { suena } from "./sonido.js";
+
+/* La última jugada del registro, en crudo. El reductor no guarda quién
+   la hizo —no le hace falta para dibujar— y el sonido sí: un disparo
+   propio y uno ajeno no pueden sonar igual. */
+function ultimaJugada(partida) {
+  const js = (partida && partida.jugadas) || {};
+  const ks = Object.keys(js).sort();
+  return ks.length ? js[ks[ks.length - 1]] : null;
+}
+
+/* Lo que dura colocarse. Sesenta segundos son de sobra para elegir un
+   escondite y demasiado poco para pensárselo, que es justo el punto. */
+const TIEMPO_ESCONDER = 90000;
+
+/* A los cuarenta segundos de búsqueda aparece un cerco flojo alrededor
+   del escondite. Es justo, aunque suene a trampa: `arranque` viene del
+   registro y las dos máquinas lo leen igual, así que la ayuda llega a
+   los dos en el mismo instante — y quien ya haya encontrado al otro
+   antes no la ve nunca. Sin ella, dos personas cabezotas se quedaban
+   veinte minutos pinchando un bosque. */
+const PISTA_MS = 40000;
+const RADIO_PISTA = 0.16;
+
+const clave = (pid, uid) => `jg.escondite.${pid}.${uid}`;
+
+function guardaSecreto(pid, uid, s) {
+  try { localStorage.setItem(clave(pid, uid), JSON.stringify(s)); } catch (e) {}
+}
+function leeSecreto(pid, uid) {
+  try { return JSON.parse(localStorage.getItem(clave(pid, uid)) || "null"); } catch (e) { return null; }
+}
+
+export function crearEscondite(ctx) {
+  const { uid, pid, jugar, terminar, ahora } = ctx;
+
+  let host = null, lienzo = null, c2d = null, ro = null, tic = null;
+  let p = null, est = null;
+  let escCache = { semilla: -1, esc: null };
+  let propuesta = null;            // {x,y} colocada pero sin confirmar
+  let enviando = false;            // evita mandar el mismo compromiso dos veces
+  let bloqueoHasta = 0;            // castigo por fallar
+  let vistas = -1;                 // cuántas jugadas llevaba el registro
+  let sonoBuscar = false, sonoFin = false;
+  let vistaW = 0, vistaH = 0;      // tamaño en píxeles CSS, no del búfer
+  let muerto = false, traje = 0, zoom = 1, buscando = false, cursorTeclado = null;
+  let fondo = null, firmaFondo = "", reintentarDesde = 0;
+
+  /* ---------- estructura ---------- */
+  function montar(donde) {
+    host = donde;
+    host.innerHTML = `
+      <div class="jg-esc esc-rework">
+        <div class="esc-editorial"><span>ATLAS / DUELO DE OBSERVACIÓN</span><h2>Perdidos entre la multitud.</h2><p>Un paisaje lleno de historias. Una sola persona que encontrar.</p></div>
+        <div class="esc-herramientas">
+          <label>Camuflaje <select id="escTraje">${TRAJES.map((t,i)=>`<option value="${i}">${t}</option>`).join("")}</select></label>
+          <label>Explorar <select id="escZoom"><option value="1">Vista completa</option><option value="1.5">Zoom 1,5×</option><option value="2">Zoom 2×</option><option value="3">Zoom 3×</option></select></label>
+          <span id="escObjetivo">Elige ropa, busca cobertura y confirma tu escondite.</span>
+        </div>
+        <div class="jg-barra">
+          <div class="jg-fase" id="escFase"></div>
+          <div class="jg-grow"></div>
+          <div class="jg-reloj" id="escReloj"></div>
+        </div>
+        <div class="esc-visor"><div class="jg-lienzo" id="escLienzo"><canvas id="escCanvas" tabindex="0" aria-label="Paisaje interactivo. Usa las flechas para mover el cursor y Enter para elegir." ></canvas>
+          <div class="jg-capa" id="escCapa"></div>
+        </div>
+        </div><div class="jg-pie" id="escPie" aria-live="polite"></div>
+        <details class="esc-ayuda"><summary>Cómo jugar</summary><p>Tienes 90 segundos para elegir una de seis prendas y esconderte. La vegetación puede cubrir tus piernas, pero la cabeza siempre queda visible. Busca la gorra y la bandolera crema de tu rival entre 150 visitantes. Amplía y desplázate por la escena; cada fallo bloquea los intentos durante dos segundos. A los 40 segundos aparece una pista.</p><p>Teclado: flechas para mover el cursor, Enter para colocar o buscar. Música: Midnight Pulse · pista aportada por el creador · reproducción en bucle.</p></details>
+      </div>`;
+    lienzo = host.querySelector("#escCanvas");
+    c2d = lienzo.getContext("2d");
+    lienzo.addEventListener("click", alClic);
+    host.querySelector("#escTraje").onchange = e => {traje = Number(e.target.value); pintar();};
+    host.querySelector("#escZoom").onchange = e => {
+      zoom = Number(e.target.value); host.querySelector("#escLienzo").style.width = (zoom*100)+"%"; medir(); pintar();
+    };
+    let cursor = {x:.5,y:.5};
+    lienzo.addEventListener("keydown", e => {
+      const dirs = {ArrowLeft:[-.01,0],ArrowRight:[.01,0],ArrowUp:[0,-.01],ArrowDown:[0,.01]};
+      if (dirs[e.key]) {e.preventDefault(); cursor.x=Math.max(.03,Math.min(.97,cursor.x+dirs[e.key][0])); cursor.y=Math.max(.2,Math.min(.97,cursor.y+dirs[e.key][1])); cursorTeclado = {...cursor}; pintar();}
+      else if (e.key === "Enter") {e.preventDefault(); const r=lienzo.getBoundingClientRect();alClic({clientX:r.left+cursor.x*r.width,clientY:r.top+cursor.y*r.height});}
+    });
+    ro = new ResizeObserver(() => { medir(); pintar(); });
+    ro.observe(host.querySelector("#escLienzo"));
+    /* Un tic por segundo: la cuenta atrás y el cronómetro no dependen de
+       que llegue nada de la base, y el castigo por fallar tiene que
+       levantarse solo. */
+    tic = setInterval(() => { if (!muerto) { render(); pintar(); automatismos().catch(muestraError); } }, 250);
+    medir();
+  }
+
+  function medir() {
+    if (!lienzo) return;
+    const caja = lienzo.parentElement.getBoundingClientRect();
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const W = Math.max(240, Math.round(caja.width)), H = Math.round(W * 0.62);
+    vistaW = W; vistaH = H;
+    lienzo.style.height = H + "px";
+    lienzo.width = Math.round(W * dpr); lienzo.height = Math.round(H * dpr);
+    c2d.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function destruir() {
+    muerto = true;
+    if (ro) { try { ro.disconnect(); } catch (e) {} ro = null; }
+    if (tic) { clearInterval(tic); tic = null; }
+    if (host) host.innerHTML = "";
+    host = lienzo = c2d = null;
+  }
+
+  /* ---------- quién es quién ---------- */
+  const yo = () => (est ? est.jugadores.find(j => j.uid === uid) : null);
+  const otro = () => (est ? est.jugadores.find(j => j.uid !== uid) : null);
+
+  /* En «esconder» miro mi paisaje; en «buscar», el suyo. Cada paisaje
+     sale de la semilla de la partida y del orden de entrada, así que los
+     dos clientes generan los dos sin mandarse un solo píxel. */
+  function escenaActual() {
+    if (!p || !est) return null;
+    const quien = est.fase === "buscar" || est.fase === "fin" ? otro() : yo();
+    if (!quien) return null;
+    const s = semillaEscena(p.semilla, quien.orden || 0);
+    if (escCache.semilla !== s) escCache = { semilla: s, esc: escena(s) };
+    return escCache.esc;
+  }
+
+  /* ---------- pintar ---------- */
+  function pintar() {
+    if (!c2d || !lienzo) return;
+    const W = vistaW, H = vistaH;
+    if (!W || !H) return;
+    const esc = escenaActual();
+    if (!esc) { c2d.fillStyle = "#dde5ea"; c2d.fillRect(0, 0, W, H); return; }
+    const firma = `${esc.semilla}:${W}:${H}`;
+    if (firma !== firmaFondo) {
+      fondo = document.createElement("canvas"); fondo.width = lienzo.width; fondo.height = lienzo.height;
+      const c = fondo.getContext("2d"); c.scale(fondo.width/W, fondo.height/H); pinta(c, esc, W, H); firmaFondo = firma;
+    }
+    c2d.drawImage(fondo, 0, 0, W, H);
+
+    const f = est ? est.fase : "espera";
+    const mi = yo(), su = otro();
+
+    if (f === "esconder" || f === "revelar") {
+      const s = est.sitios[uid] || propuesta || leeSecreto(pid, uid);
+      if (s) { const vestido = {...s, traje: est.compromisos[uid] ? s.traje : traje}; pintaExplorador(c2d, vestido, W, H); pintaCobertura(c2d, esc, vestido, W, H); }
+      if (propuesta && !est.compromisos[uid]) marco(c2d, propuesta.x * W, propuesta.y * H, W, "#ffffff");
+    } else if (f === "buscar" || f === "fin") {
+      /* **El personaje se dibuja desde el primer segundo.** Antes solo
+         aparecía al encontrarlo o al acabar la partida, y eso no era un
+         escondite: era buscar algo que no estaba en la pantalla. Se
+         probó con un amigo y el veredicto fue exacto — «es invisible e
+         imposible de encontrar, y no estaba donde lo puso» —, porque en
+         efecto no estaba en ningún sitio hasta que el reloj lo decidía.
+         Dibujado, el juego es lo que prometía: una figura pequeña entre
+         doscientas piezas parecidas, difícil pero honesta. */
+      const blanco = su ? est.sitios[su.uid] : null;
+      const visto = est.fase === "fin" || (est.intentos[uid] || []).some(t => t.ok);
+      if (blanco && f === "buscar" && !visto && ahora() - (est.arranque || 0) > PISTA_MS) {
+        cerco(c2d, blanco.x * W, blanco.y * H, W);
+      }
+      if (blanco) { pintaExplorador(c2d, blanco, W, H); pintaCobertura(c2d, esc, blanco, W, H); }
+      /* Las cruces van encima del personaje: son lo que ya se ha
+         descartado, y taparlas con la figura sería esconder la única
+         cuenta que lleva quien busca. */
+      for (const t of (est.intentos[uid] || [])) if (!t.ok) cruz(c2d, t.x * W, t.y * H, W);
+      if (blanco && visto) marco(c2d, blanco.x * W, blanco.y * H, W, "#ffe066");
+    }
+    if (cursorTeclado) marco(c2d,cursorTeclado.x*W,cursorTeclado.y*H,W,"#fff");
+    if (ahora() < bloqueoHasta) {
+      c2d.fillStyle = "rgba(12,16,22,0.45)"; c2d.fillRect(0, 0, W, H);
+    }
+  }
+
+  function marco(c, x, y, W, color) {
+    c.save();
+    c.strokeStyle = color; c.lineWidth = 2; c.setLineDash([5, 4]);
+    c.beginPath(); c.arc(x, y, RADIO_ACIERTO * W, 0, 7); c.stroke();
+    c.restore();
+  }
+  /* El cerco de la pista: ancho, flojo y sin borde duro, para que diga
+     «por aquí» y no «aquí». */
+  function cerco(c, x, y, W) {
+    const r = RADIO_PISTA * W;
+    c.save();
+    const g = c.createRadialGradient(x, y, r * 0.2, x, y, r);
+    g.addColorStop(0, "rgba(255,224,102,0.30)");
+    g.addColorStop(1, "rgba(255,224,102,0)");
+    c.fillStyle = g;
+    c.beginPath(); c.arc(x, y, r, 0, 7); c.fill();
+    c.restore();
+  }
+
+  function cruz(c, x, y, W) {
+    const r = W * 0.011;
+    c.save();
+    c.strokeStyle = "#c0392b"; c.lineWidth = 2.4; c.lineCap = "round"; c.globalAlpha = 0.85;
+    c.beginPath(); c.moveTo(x - r, y - r); c.lineTo(x + r, y + r);
+    c.moveTo(x + r, y - r); c.lineTo(x - r, y + r); c.stroke();
+    c.restore();
+  }
+
+  /* ---------- texto ---------- */
+  function render() {
+    if (!host || !est) return;
+    const focoConfirmar = document.activeElement?.id === "escOk";
+    const f = est.fase, mi = yo(), su = otro();
+    host.querySelector("#escTraje").disabled = f !== "esconder" || !!est.compromisos[uid];
+    const objetivo = su && est.sitios[su.uid];
+    host.querySelector("#escObjetivo").textContent = objetivo ? "Busca: gorra " + TRAJES[objetivo.traje || 0].toLowerCase() + " y bandolera crema" : "Elige ropa, busca cobertura y confirma tu escondite.";
+    const fase = host.querySelector("#escFase");
+    const reloj = host.querySelector("#escReloj");
+    const pie = host.querySelector("#escPie");
+    const capa = host.querySelector("#escCapa");
+    if (!fase) return;
+
+    const restante = f === "esconder" ? Math.max(0, quedaEsconder()) : 0;
+    const seg = n => String(Math.ceil(n / 1000));
+
+    if (f === "espera") {
+      fase.innerHTML = `<b>Esperando</b> a que entre alguien`;
+      reloj.textContent = "";
+      pie.innerHTML = `<span class="jg-nota">Comparte el enlace de la sala o espera en el vestíbulo.</span>`;
+    } else if (f === "esconder") {
+      const listo = !!est.compromisos[uid];
+      fase.innerHTML = listo
+        ? `<b>Escondido.</b> Esperando a ${escapa(su ? su.nombre : "el otro")}`
+        : `<b>Esconde a tu persona</b> — pincha en el paisaje`;
+      reloj.textContent = seg(restante) + " s";
+      reloj.className = "jg-reloj" + (restante < 10000 ? " urge" : "");
+      pie.innerHTML = listo
+        ? `<span class="jg-nota">Tu sitio ya está sellado: nadie puede verlo hasta que los dos hayáis terminado.</span>`
+        : `<button class="jg-btn" id="escOk"${propuesta ? "" : " disabled"}>Esconder aquí</button>
+           <span class="jg-nota">${propuesta ? "¿Seguro? No se podrá mover." : "Pincha donde quieras esconderte. Cuanto más se confunda con el fondo, mejor."}</span>`;
+      const b = host.querySelector("#escOk");
+      if (b) b.onclick = confirmar;
+    } else if (f === "revelar") {
+      fase.innerHTML = `<b>Cruzando los paisajes…</b>`;
+      reloj.textContent = "";
+      pie.innerHTML = `<span class="jg-nota">Los dos habéis escondido. Se están destapando los sitios.</span>`;
+    } else if (f === "buscar") {
+      const desde = est.arranque || ahora();
+      fase.innerHTML = `<b>Busca a ${escapa(su ? su.nombre : "el otro")}</b> en su paisaje`;
+      reloj.textContent = seg(Math.max(0, ahora() - desde)) + " s";
+      reloj.className = "jg-reloj";
+      const espera = Math.max(0, bloqueoHasta - ahora());
+      const fallos = (est.intentos[uid] || []).filter(t => !t.ok).length;
+      const cal = calor(su);
+      pie.innerHTML = espera
+        ? `<span class="jg-castigo">Fallaste — espera ${seg(espera)} s${cal ? " · " + escapa(cal.texto) : ""}</span>`
+        : `<span class="jg-nota">${cal ? `<b class="jg-calor jg-calor-${cal.clase}">${escapa(cal.texto)}</b> · ` : ""}${fallos ? fallos + (fallos === 1 ? " fallo" : " fallos") + " · " : ""}Cada fallo cuesta ${CASTIGO_FALLO / 1000} s. Gana quien encuentre primero.</span>`;
+    } else if (f === "fin") {
+      const gane = est.ganador === uid;
+      fase.innerHTML = gane ? `<b class="jg-gana">¡Le encontraste!</b>` : `<b class="jg-pierde">Te encontró ${escapa(su ? su.nombre : "el otro")}</b>`;
+      reloj.textContent = "";
+      pie.innerHTML = `<span class="jg-nota">${est.motivo === "abandono"
+        ? "La partida terminó porque alguien se fue."
+        : "El escondite queda cercado en amarillo."}</span>`;
+    }
+    capa.style.display = "none";
+    if (focoConfirmar) host.querySelector("#escOk")?.focus({preventScroll:true});
+  }
+
+  /* Lo caliente o frío del último fallo. La distancia se mide con la
+     misma corrección de aspecto que `acierta` (el lienzo es más ancho
+     que alto), o «caliente» querría decir una cosa a lo ancho y otra a
+     lo alto. Es información que el navegador ya tiene — las coordenadas
+     del otro están en su memoria para poder juzgar el clic —, así que
+     decirla en voz alta no revela nada nuevo y convierte el juego en
+     una búsqueda que converge. */
+  function calor(su) {
+    if (!est || !su) return null;
+    const blanco = est.sitios[su.uid];
+    const t = (est.intentos[uid] || []).filter(x => !x.ok).slice(-1)[0];
+    if (!blanco || !t) return null;
+    const d = Math.hypot(t.x - blanco.x, (t.y - blanco.y) * 0.62);
+    if (d < 0.08) return { clase: "casi", texto: "¡Casi!" };
+    if (d < 0.18) return { clase: "caliente", texto: "Caliente" };
+    if (d < 0.32) return { clase: "templado", texto: "Templado" };
+    return { clase: "frio", texto: "Frío" };
+  }
+
+  const escapa = s => String(s || "").replace(/[&<>"]/g, x => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[x]));
+
+  /* Cuándo empezó la fase de esconder: cuando entró el segundo. Los `at`
+     de las fichas los pone cada navegador con su reloj, así que esto es
+     aproximado — y puede serlo, porque de que se acabe el tiempo solo
+     depende que se coloque un escondite al azar, no quién gana. */
+  function quedaEsconder() {
+    const ats = (est ? est.jugadores : []).map(j => j.at || 0).filter(Boolean);
+    if (ats.length < 2) return TIEMPO_ESCONDER;
+    return Math.max(...ats) + TIEMPO_ESCONDER - ahora();
+  }
+
+  /* ---------- clics ---------- */
+  function coords(ev) {
+    const r = lienzo.getBoundingClientRect();
+    return { x: (ev.clientX - r.left) / r.width, y: (ev.clientY - r.top) / r.height };
+  }
+
+  async function alClic(ev) {
+    if (!est) return;
+    const q = coords(ev);
+    if (!Number.isFinite(q.x) || !Number.isFinite(q.y)) return;
+    if (est.fase === "esconder" && !est.compromisos[uid]) {
+      if (!sitioValido(q)) return;
+      propuesta = q; render(); pintar();
+      return;
+    }
+    if (est.fase === "buscar") {
+      if (ahora() < bloqueoHasta || buscando) return;
+      const su = otro(); if (!su) return;
+      const blanco = est.sitios[su.uid];
+      const ok = !!blanco && acierta(q, blanco);
+      /* El castigo se aplica aquí y ya, sin esperar a que la jugada
+         llegue a la base: si no, dos clics seguidos se colaban antes de
+         que el registro dijera nada. */
+      if (!ok) bloqueoHasta = ahora() + CASTIGO_FALLO;
+      render(); pintar();
+      buscando = true;
+      try { await jugar({ t: "b", uid, x: q.x, y: q.y, at: ahora() }); }
+      catch (e) { bloqueoHasta = 0; muestraError(e); } finally { buscando = false; }
+    }
+  }
+
+  async function confirmar() {
+    if (!propuesta || enviando || !est || est.compromisos[uid]) return;
+    enviando = true;
+    try {
+      const sitio = { x: +propuesta.x.toFixed(4), y: +propuesta.y.toFixed(4), traje };
+      const sal = salAleatoria();
+      const h = await compromiso(sitio, sal);
+      guardaSecreto(pid, uid, { ...sitio, sal });
+      await jugar({ t: "c", uid, h });
+    } catch (e) { muestraError(e); } finally { enviando = false; }
+  }
+
+  /* ---------- lo que se hace solo ---------- */
+  async function automatismos() {
+    if (!est || !p || muerto || ahora() < reintentarDesde) return;
+    if (est.fase === "esconder" && !est.compromisos[uid] && !enviando) {
+      /* Se acabó el tiempo sin colocarse: se coloca solo. Dejar la
+         partida bloqueada porque alguien se fue a por café es peor que
+         un escondite mediocre. */
+      if (quedaEsconder() <= 0) {
+        propuesta = propuesta || { x: 0.1 + Math.random() * 0.8, y: 0.3 + Math.random() * 0.6 };
+        await confirmar();
+      }
+      return;
+    }
+    if (est.fase === "revelar" && !est.sitios[uid] && !enviando) {
+      const s = leeSecreto(pid, uid);
+      if (!s) return;                        // otra pestaña lo tiene; ella lo revelará
+      enviando = true;
+      try { await jugar({ t: "r", uid, x: s.x, y: s.y, traje: s.traje || 0, sal: s.sal, at: ahora() }); }
+      finally { enviando = false; }
+    }
+  }
+
+  /* El sonido va por el registro, no por el clic: así también se oye lo
+     que hace el otro, que en un escondite es justo lo que no se ve. */
+  function suenaJugada(partida) {
+    const j = ultimaJugada(partida);
+    if (!j) return;
+    if (j.t === "c") { suena("clic"); return; }
+    if (j.t !== "b") return;
+    const dio = est && est.ganador === j.uid;
+    suena(dio ? (j.uid === uid ? "gana" : "pierde") : "ficha");
+  }
+
+  function muestraError(e) {
+    reintentarDesde = ahora() + 5000;
+    if (host) host.querySelector("#escPie").textContent = "No se pudo enviar. Revisa tu conexión e inténtalo de nuevo.";
+  }
+  function actualizar(partida, estado) {
+    p = partida; est = estado;
+    const ultimoFallo = (est?.intentos?.[uid] || []).filter(t=>!t.ok).at(-1);
+    if (ultimoFallo) bloqueoHasta = Math.max(bloqueoHasta, ultimoFallo.at + CASTIGO_FALLO);
+    if (est && est.fase !== "esconder") propuesta = null;
+    const n = Object.keys((partida && partida.jugadas) || {}).length;
+    if (vistas >= 0 && n > vistas) suenaJugada(partida);
+    vistas = n;
+    if (est && est.fase === "buscar" && !sonoBuscar) { sonoBuscar = true; suena("entra"); }
+    render(); pintar();
+    automatismos().catch(muestraError);
+    if (est && est.fase === "fin" && !sonoFin) {
+      sonoFin = true;
+      setTimeout(() => suena(est.ganador === uid ? "victoria" : "derrota"), 450);
+    }
+    if (est && est.ganador !== null && est.ganador !== undefined && !(p.fin && p.fin.at)) {
+      terminar(est.ganador, est.motivo);
+    }
+  }
+
+  return { montar, actualizar, destruir };
+}

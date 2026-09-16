@@ -99,6 +99,114 @@
       }
     },
 
+    "partidas": {
+      ".read": "auth != null",
+      ".indexOn": ["estado"],
+      "$pid": {
+        ".write": "auth != null && ((!data.exists() && newData.child('anfitrion').val() === auth.uid && newData.child('jugadores').child(auth.uid).exists()) || (!newData.exists() && data.child('anfitrion').val() === auth.uid && !data.child('fin').exists()))",
+        ".validate": "newData.hasChildren(['juego', 'estado', 'anfitrion'])",
+
+        "origen": {".validate":"newData.isString() && root.child('partidas').child(newData.val()).child('fin').exists() && root.child('partidas').child(newData.val()).child('jugadores').child(auth.uid).exists() && root.child('partidas').child(newData.val()).child('juego').val() === newData.parent().child('juego').val()"},
+        "revancha": {".write":"auth != null && !data.exists() && newData.isString() && root.child('partidas').child($pid).child('fin').exists() && root.child('partidas').child($pid).child('jugadores').child(auth.uid).exists()",".validate":"newData.isString() && root.child('partidas').child(newData.val()).child('origen').val() === $pid"},
+
+        "juego": { ".validate": "newData.val() === 'escondite' || newData.val() === 'cartas' || newData.val() === 'cuadritos' || newData.val() === 'reversi' || newData.val() === 'orbita'" },
+        "nombre": { ".validate": "newData.isString() && newData.val().length <= 40" },
+        "semilla": { ".validate": "newData.isNumber()" },
+        "lado": { ".validate": "newData.isNumber() && newData.val() >= 4 && newData.val() <= 10" },
+        "cupo": { ".validate": "newData.isNumber() && newData.val() >= 2 && newData.val() <= 6" },
+
+        "estado": {
+          ".write": "auth != null && root.child('partidas').child($pid).child('jugadores').child(auth.uid).exists()",
+          ".validate": "newData.val() === 'esperando' || newData.val() === 'jugando' || newData.val() === 'fin'"
+        },
+
+        "fin": {
+          ".write": "auth != null && root.child('partidas').child($pid).child('jugadores').child(auth.uid).exists() && (!data.exists() || data.child('ganador').val() === newData.child('ganador').val())",
+          "motivo": { ".validate": "newData.isString() && newData.val().length <= 120" },
+          "$otro": { ".validate": true }
+        },
+
+        "jugadores": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid && !data.exists() && root.child('partidas').child($pid).child('estado').val() === 'esperando' && (!root.child('partidas').child($pid).child('origen').exists() || root.child('partidas').child(root.child('partidas').child($pid).child('origen').val()).child('jugadores').child(auth.uid).exists())",
+            ".validate": "newData.hasChildren(['nombre', 'orden'])",
+            "nombre": { ".validate": "newData.isString() && newData.val().length <= 80" },
+            "foto": { ".validate": "newData.isString() && newData.val().length <= 400" },
+            "color": { ".validate": "newData.isString() && newData.val().length <= 24" },
+            "orden": { ".validate": "newData.isNumber()" },
+            "$otro": { ".validate": true }
+          }
+        },
+
+        "jugadas": {
+          "$n": {
+            ".write": "auth != null && !data.exists() && newData.child('uid').val() === auth.uid && root.child('partidas').child($pid).child('jugadores').child(auth.uid).exists() && !root.child('partidas').child($pid).child('fin').exists()",
+            ".validate": "newData.hasChildren(['t', 'uid']) && newData.child('t').isString() && newData.child('t').val().length <= 16 && $n.length >= 4",
+            "h": { ".validate": "newData.isString() && newData.val().length <= 80" },
+            "sal": { ".validate": "newData.isString() && newData.val().length <= 40" },
+            "$otro": { ".validate": true }
+          }
+        },
+
+        "$otro": { ".validate": true }
+      }
+    },
+
+    "misPartidas": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+
+    "soloRanks": {
+      ".read": "auth != null",
+      "$categoria": {
+        ".indexOn": [
+          "puntos"
+        ],
+        "$uid": {
+          ".write": "auth != null && auth.uid === $uid",
+          ".validate": "$categoria.matches(/^(minas-(explorador|veterano|leyenda)-(clasico|cruz)|snake-(clasico|portal|ruinas)-(lenta|media|rapida))$/) && newData.hasChildren(['nombre','puntos','tiempo','partida']) && (!data.exists() || newData.child('puntos').val() > data.child('puntos').val() || (newData.child('puntos').val() === data.child('puntos').val() && newData.child('tiempo').val() < data.child('tiempo').val()))",
+          "nombre": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "puntos": {
+            ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= 100000 && newData.val() % 1 === 0"
+          },
+          "tiempo": {
+            ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 604800000 && newData.val() % 1 === 0"
+          },
+          "partida": {
+            ".validate": "newData.isString() && newData.val().length <= 80"
+          },
+          "$otro": {
+            ".validate": false
+          }
+        }
+      }
+    },
+
+    "ranks": {
+      ".read": "auth != null",
+      "$juego": {
+        "$uid": {
+          ".write": "auth != null && auth.uid === $uid",
+          ".validate": "newData.hasChildren(['jugadas', 'ultima']) && newData.child('ultima').isString() && newData.child('ultima').val() !== data.child('ultima').val() && newData.child('jugadas').val() === (data.exists() ? data.child('jugadas').val() : 0) + 1 && newData.child('puntos').val() <= (data.exists() ? data.child('puntos').val() : 0) + 3 && root.child('partidas').child(newData.child('ultima').val()).child('juego').val() === $juego && root.child('partidas').child(newData.child('ultima').val()).child('fin').exists() && root.child('partidas').child(newData.child('ultima').val()).child('jugadores').child($uid).exists()",
+          "nombre": { ".validate": "newData.isString() && newData.val().length <= 80" },
+          "foto": { ".validate": "newData.isString() && newData.val().length <= 400" },
+          "jugadas": { ".validate": "newData.isNumber()" },
+          "ganadas": { ".validate": "newData.isNumber()" },
+          "perdidas": { ".validate": "newData.isNumber()" },
+          "empates": { ".validate": "newData.isNumber()" },
+          "puntos": { ".validate": "newData.isNumber()" },
+          "racha": { ".validate": "newData.isNumber()" },
+          "mejorRacha": { ".validate": "newData.isNumber()" },
+          "$otro": { ".validate": true }
+        }
+      }
+    },
+
     "presence": {
       "$pid": {
         ".read": "auth != null && root.child('projects').child($pid).child('members').child(auth.uid).exists()",
