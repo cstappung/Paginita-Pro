@@ -599,11 +599,17 @@ window.FiltrosApp = window.FiltrosApp || (function () {
      sierra — que además está como forma propia porque es la que se pide por su
      nombre. La cuadrada con duty distinto de 50 % tiene continua (2·duty−1) y
      se deja tal cual: es lo que sale de un generador, y ver cómo un paso alto
-     se la come es justo la gracia. */
+     se la come es justo la gracia.
+     En las rectificadas la frecuencia es la de la senoide *antes* del puente
+     — 50 Hz de red — aunque la de onda completa repita a 2f: es el número que
+     se sabe y el que se teclea; que el rizado salga a 100 Hz es precisamente
+     lo que se quiere ver. */
   function muestraSenal(s, ph) {
     switch (s.tipo) {
       case "cuad": return ph < s.duty ? 1 : -1;
       case "sierra": return 2 * ph - 1;
+      case "rectc": return Math.abs(Math.sin(2 * Math.PI * ph));
+      case "rectm": return Math.max(0, Math.sin(2 * Math.PI * ph));
       case "tri": {
         const k = clamp(s.sim, 0.002, 0.998);
         return ph < k ? (2 * ph / k - 1) : (1 - 2 * (ph - k) / (1 - k));
@@ -659,11 +665,17 @@ window.FiltrosApp = window.FiltrosApp || (function () {
     };
     sim.medIn = medidas(x, sim.armIn, sim.dcIn);
     sim.medOut = medidas(y, sim.armOut, sim.dcOut);
-    const a1 = sim.armIn[1], b1 = sim.armOut[1];
+    /* El fundamental es el primer armónico que exista, no el bin de f: la
+       senoidal rectificada de onda completa no tiene nada en f — su primera
+       raya está en 2f — y leer ahí daba una ganancia sobre 0/0 y ninguna
+       fase. */
+    sim.kFund = kFundamental(sim.armIn);
+    const a1 = sim.armIn[sim.kFund], b1 = sim.armOut[sim.kFund];
+    sim.fFund = sim.kFund * f;
     if (a1 && b1 && a1.a > 1e-12 && dis && !dis.error) {
       sim.ganFund = aDb(b1.a / a1.a);           // medida sobre la señal, no calculada
-      sim.faseFund = faseAcum(dis, f) * 180 / Math.PI;
-      sim.retFund = -sim.faseFund / 360 / f;    // retardo de fase
+      sim.faseFund = faseAcum(dis, sim.fFund) * 180 / Math.PI;
+      sim.retFund = -sim.faseFund / 360 / sim.fFund;    // retardo de fase
     }
     return sim;
   }
@@ -684,6 +696,12 @@ window.FiltrosApp = window.FiltrosApp || (function () {
     for (let k = 1; k <= kmax; k++) out[k] = { a: esp.mag[k * M], fase: esp.fase[k * M] };
     return out;
   }
+  function kFundamental(arm) {
+    let mayor = 0;
+    for (let k = 1; k < arm.length; k++) if (arm[k] && arm[k].a > mayor) mayor = arm[k].a;
+    for (let k = 1; k < arm.length; k++) if (arm[k] && arm[k].a > mayor * 1e-6) return k;
+    return 1;
+  }
   function medidas(v, arm, dc) {
     let mn = Infinity, mx = -Infinity, s = 0, s2 = 0;
     for (let i = 0; i < v.length; i++) {
@@ -693,9 +711,10 @@ window.FiltrosApp = window.FiltrosApp || (function () {
       s += q; s2 += q * q;
     }
     const med = s / v.length;
+    const k1 = kFundamental(arm);
     let h2 = 0;
-    for (let k = 2; k < arm.length; k++) if (arm[k]) h2 += arm[k].a * arm[k].a;
-    const f1 = arm[1] ? arm[1].a : 0;
+    for (let k = k1 + 1; k < arm.length; k++) if (arm[k]) h2 += arm[k].a * arm[k].a;
+    const f1 = arm[k1] ? arm[k1].a : 0;
     return {
       vpp: mx - mn, vrms: Math.sqrt(s2 / v.length), vmed: med, vmin: mn, vmax: mx,
       thd: f1 > 1e-9 ? Math.sqrt(h2) / f1 : null, dc: dc
@@ -1019,7 +1038,9 @@ window.FiltrosApp = window.FiltrosApp || (function () {
      decidir un filtro mirando la señal, y no el número de dB sueltos: aquí se
      ve de un vistazo qué armónico sobrevive. */
   function dibujaArmonicosBode(g, R2, f0, f1, y0, y1) {
-    const arm = S.sim.armIn, ref = arm[1] ? arm[1].a : 0;
+    const arm = S.sim.armIn;
+    let ref = 0;
+    for (let k = 1; k < arm.length; k++) if (arm[k] && arm[k].a > ref) ref = arm[k].a;
     g.save();
     g.beginPath();
     g.rect(R2.x0, R2.y0, R2.x1 - R2.x0, R2.y1 - R2.y0);
@@ -1618,7 +1639,7 @@ window.FiltrosApp = window.FiltrosApp || (function () {
     R.medThdOut.textContent = sim.medOut.thd === null ? "—" : num(sim.medOut.thd * 100, 2) + " %";
     const l = [];
     if (sim.ganFund !== undefined) {
-      l.push("En f = " + fmtHz(sim.f) + ":");
+      l.push("En f = " + fmtHz(sim.fFund) + (sim.kFund > 1 ? " (armónico " + sim.kFund + ", el primero que hay)" : "") + ":");
       l.push("  ganancia " + num(sim.ganFund, 2) + " dB (×" + num(deDb(sim.ganFund), 4) + ")");
       l.push("  desfase " + num(sim.faseFund, 1) + "°  →  " +
         fmt(Math.abs(sim.retFund), "s", 3) + (sim.retFund >= 0 ? " de retardo" : " de adelanto"));
@@ -2126,7 +2147,7 @@ window.FiltrosApp = window.FiltrosApp || (function () {
     S.fs = n(o.fRechazo, S.fs);
     S.amax = n(o.atenPaso, S.amax);
     S.amin = n(o.atenRechazo, S.amin);
-    if (o.senal && ["seno", "tri", "sierra", "cuad"].indexOf(o.senal) >= 0) S.senal.tipo = o.senal;
+    if (o.senal && ["seno", "tri", "sierra", "cuad", "rectc", "rectm"].indexOf(o.senal) >= 0) S.senal.tipo = o.senal;
     S.senal.f = n(o.fSenal, S.senal.f);
   }
   function applyOptions(opts) {
