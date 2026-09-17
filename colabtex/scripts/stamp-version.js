@@ -10,7 +10,15 @@ const PAGES = [
   { html: "colabtex.html", bundle: "colabtex-app.js" },
   { html: "colabdraw.html", bundle: "colabdraw-app.js" },
   { html: "informes.html", bundle: "informes-app.js" },
-  { html: "juegos.html", bundle: "juegos-app.js" }
+  { html: "juegos.html", bundle: "juegos-app.js" },
+  /* Los motores de las herramientas .dc no pasan por esbuild, pero el
+     problema de la caché es el mismo: la página se sirve fresca (trae la
+     opción nueva) y el navegador reutiliza el motor viejo, que no la
+     entiende. Quien edite uno de estos y no compile, que suba el ?v= a
+     mano. */
+  { html: "CSV Oscilloscope.dc.html", bundle: "scope-engine.js" },
+  { html: "Filtros.dc.html", bundle: "filtros-engine.js" },
+  { html: "Ajustes.dc.html", bundle: "ajuste-engine.js" }
 ];
 
 const v = new Date().toISOString().replace(/[-:T]/g, "").slice(0, 12); // AAAAMMDDHHMM
@@ -25,12 +33,16 @@ for (const page of PAGES) {
      reemplazo no altera nada y aquello se daba por «etiqueta no
      encontrada» — con lo que `npm run build` salía con error después de
      haber ido perfectamente. */
-  if (!new RegExp(nombre).test(src)) {
+  /* Anclado a src="…": en las páginas .dc el nombre del motor aparece antes
+     en un comentario CSS, y «la primera aparición» sellaba el comentario y
+     dejaba la etiqueta como estaba. */
+  const patron = new RegExp('src="' + nombre + '(\\?v=[^"]*)?"');
+  if (!patron.test(src)) {
     console.error(`stamp-version: no se encontró la etiqueta de ${page.bundle} en ${page.html}`);
     failed = true;
     continue;
   }
-  const out = src.replace(new RegExp(nombre + '(\\?v=[^"]*)?'), `${page.bundle}?v=${v}`);
+  const out = src.replace(patron, `src="${page.bundle}?v=${v}"`);
   if (out !== src) fs.writeFileSync(file, out);
   console.log(`stamp-version: ${page.bundle}?v=${v}`);
 }
