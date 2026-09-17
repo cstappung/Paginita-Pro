@@ -77,7 +77,16 @@ npm start            # static preview server at http://localhost:8123
   `../colabdraw-math.js` via `build:math`, plus the
   pdf.js worker), then `scripts/stamp-version.js` rewrites the `?v=…` query on
   the `<script>` tag of **each** page (its `PAGES` table) so GitHub
-  Pages/browsers don't serve a stale cached bundle. **After editing anything
+  Pages/browsers don't serve a stale cached bundle. The three `.dc.html`
+  instruments (`scope-engine.js`, `filtros-engine.js`, `ajuste-engine.js`)
+  are in that table too even though they never go through esbuild, because
+  the failure is the same and it was seen: the page arrived fresh with a new
+  signal in its `<select>` while the browser kept the old engine from cache,
+  which did not know the option and fell through to a sine. **After editing
+  one of those engines without running the build, bump its `?v=` by hand.**
+  The replacement is anchored to `src="…"`: in the `.dc` pages the engine's
+  name appears earlier inside a CSS comment, and "first occurrence" stamped
+  the comment. **After editing anything
   under `colabtex/src/`, you must `npm run build`** — the root `*-app.js` files
   are generated and not hand-edited.
 - `colabdraw-math.js` is **not** in `PAGES` and no page has a `<script>` tag for
@@ -339,6 +348,14 @@ wanted: what is being looked at is the settled waveform. The Nyquist bin's
 imaginary part is zeroed for the same reason. The waveform itself is sampled
 directly (a square wave has real edges, no Gibbs), and with 16384 points over at
 most 20 cycles the aliasing that costs is far below anything the screen shows.
+
+**The rectified sines keep the frequency of the sine *before* the bridge**
+(`rectc` full-wave, `rectm` half-wave): 50 Hz of mains is the number people
+know and type, and the ripple coming out at 100 Hz is precisely what they want
+to see. The consequence is that the full-wave one has nothing at f — its first
+line is at 2f — so the readout's "fundamental" is the **first harmonic that
+exists** (`kFundamental`), not the bin at f: read there, the gain was 0/0 and
+there was no phase. THD is taken against that same fundamental.
 
 **The phase readout comes from the accumulated stage phase, not from the FFT.**
 Each section knows which branch it is on (a low-pass biquad runs 0° to −180°, a
