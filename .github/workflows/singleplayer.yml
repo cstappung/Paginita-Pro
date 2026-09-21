@@ -1,10 +1,11 @@
 name: Verificar arcade individual
 on:
   push:
-    branches: [codex/singleplayer-arcade]
+    branches: [codex/singleplayer-arcade, codex/club-games]
   pull_request:
     paths:
       - 'colabtex/src/juegos/solo/**'
+      - 'juegos/club/**'
       - 'colabtex/tests/solo*'
       - 'firebase/database.rules.json'
 permissions:

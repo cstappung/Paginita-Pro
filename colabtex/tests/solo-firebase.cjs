@@ -12,6 +12,14 @@ const timeout=setTimeout(()=>{console.error('Tiempo agotado');process.exit(1);},
  await api.guardarSolo(key,c.uid,{...dato,puntos:300,tiempo:800,partida:'d'});await api.guardarSolo(key,c.uid,{...dato,puntos:300,tiempo:1200,partida:'e'});assert.equal((await get(ref(c.db,path))).val().tiempo,800);
  const deniega=async(fn)=>{let fallo=false;try{await fn()}catch{fallo=true}assert.ok(fallo);};
  await deniega(()=>set(ref(clientes[1].db,path),{...dato,puntos:999}));await deniega(()=>set(ref(c.db,path),{...dato,puntos:-1}));await deniega(()=>set(ref(c.db,`soloRanks/inventada/${c.uid}`),dato));await deniega(()=>set(ref(c.db,path),{...dato,puntos:999999}));
+
+ const mina='club-minas-easy',minapath=`soloRanks/${mina}/${c.uid}`;
+ await api.guardarSolo(mina,c.uid,{...dato,puntos:1,tiempo:90000});
+ await api.guardarSolo(mina,c.uid,{...dato,puntos:1,tiempo:30000,partida:'mina-2'});
+ assert.equal((await get(ref(c.db,minapath))).val().tiempo,30000);
+ await deniega(()=>set(ref(c.db,minapath),{...dato,puntos:2}));
+ await api.guardarSolo('club-snake-arcade-normal',c.uid,{...dato,puntos:150000});
+ await deniega(()=>set(ref(c.db,`soloRanks/club-snake-zen-normal/${c.uid}`),dato));
  const filas=await new Promise((resolve,reject)=>{let off;off=api.watchSolo(key,(f,e)=>{if(e)reject(e);else resolve(f);setTimeout(()=>off(),0);});});assert.equal(filas[0].puntos,300);
  console.log('Firebase: récord concurrente, desempate, lectura y aislamiento entre usuarios correctos.');for(const x of clientes){goOffline(x.db);await deleteApp(x.app);}clearTimeout(timeout);
  // El SDK mantiene temporizadores auxiliares en Node; todas las aserciones ya finalizaron.

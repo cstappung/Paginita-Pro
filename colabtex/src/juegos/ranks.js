@@ -104,7 +104,7 @@ export function crearRanks(ctx) {
         : "Todavía no ha terminado ninguna partida de este juego. Sé el primero."}</td></tr>`;
       return;
     }
-    if (solo) {t.innerHTML = `<thead><tr><th>#</th><th>Jugador</th><th>Récord</th><th>Tiempo</th></tr></thead><tbody>${orden.map((f,i)=>`<tr class="${f.uid===uid?'jg-yo':''}"><td>${i+1}</td><td>${esc(f.nombre)}</td><td>${f.puntos}</td><td>${(f.tiempo/1000).toFixed(1)} s</td></tr>`).join('')}</tbody>`;return;}
+    if (solo) {t.innerHTML = `<thead><tr><th>#</th><th>Jugador</th><th>Récord</th><th>Tiempo</th></tr></thead><tbody>${orden.map((f,i)=>`<tr class="${f.uid===uid?'jg-yo':''}"><td>${i+1}</td><td>${esc(f.nombre)}</td><td>${categoriaSolo.startsWith('club-minas-')?'Completado':f.puntos}</td><td>${(f.tiempo/1000).toFixed(2)} s</td></tr>`).join('')}</tbody>`;return;}
     t.innerHTML = `
       <thead><tr>
         <th class="jg-th-n">#</th><th>Jugador</th>
@@ -145,7 +145,9 @@ export function crearRanks(ctx) {
     const solo = host.querySelector('#rkSolo');solo.innerHTML = '';
     if (k === 'minas' || k === 'snake') {
       const categorias = k === 'minas' ? ['explorador','veterano','leyenda'].flatMap(t=>['clasico','cruz'].map(v=>'minas-'+t+'-'+v)) : ['clasico','portal','ruinas'].flatMap(m=>['lenta','media','rapida'].map(v=>'snake-'+m+'-'+v));
-      categoriaSolo = categorias[0];solo.innerHTML = `<label>Categoría <select id="rkCategoria">${categorias.map(c=>`<option value="${c}">${c.split('-').slice(1).join(' / ')}</option>`).join('')}</select></label>`;
+      const actuales = k === 'minas' ? ['easy','medium','hard'].map(n=>'club-minas-'+n) : ['classic','arcade','portals'].flatMap(m=>['chill','normal','fast'].map(v=>'club-snake-'+m+'-'+v));
+      categorias.unshift(...actuales);
+      categoriaSolo = categorias[0];solo.innerHTML = `<label>Categoría <select id="rkCategoria">${categorias.map(c=>`<option value="${c}">${c.startsWith('club-')?'Club · '+c.split('-').slice(2).join(' / '):'Archivo · '+c.split('-').slice(1).join(' / ')}</option>`).join('')}</select></label>`;
       solo.querySelector('select').onchange=e=>{categoriaSolo=e.target.value;escucha();};
     }
     pintaBarra();
