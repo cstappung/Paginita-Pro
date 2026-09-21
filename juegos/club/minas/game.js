@@ -11,7 +11,7 @@
     constructor() {
       this.enabled = read('mina-sound', true); this.volume = read('mina-volume', 45) / 100;
       this.context = null; this.master = null; this.loop = null; this.step = 0; this.progress = 0; this.active = false;
-      this.voices = new Set(); this.nextBeat = 0;
+      this.voices = new Set(); this.nextBeat = 0; this.lastOpen = -Infinity;
     }
     unlock() {
       if (!this.enabled) return;
@@ -35,6 +35,7 @@
       oscillator.onended = () => { this.voices.delete(oscillator); oscillator.disconnect(); gain.disconnect(); };
     }
     start() {
+      if (this.active) return; // Un solo secuenciador, también ante eventos repetidos.
       this.stop(); this.unlock();
       if (!this.enabled || !this.context) return;
       this.active = true; this.step = 0; this.nextBeat = this.context.currentTime + .08;
@@ -45,36 +46,50 @@
       const ctx = this.context;
       if (this.nextBeat < ctx.currentTime - .2) this.nextBeat = ctx.currentTime + .03;
       while (this.nextBeat < ctx.currentTime + .2) {
-        const s = this.step, t = this.nextBeat;
-        const chords = [[48,55,60,64,67], [45,52,57,60,64], [41,48,53,57,60], [43,50,55,59,62]];
-        const chord = chords[Math.floor(s / 16) % 4];
-        if (s % 4 === 0) this.note(chord[0] - 12, t, .65, .19, 'triangle');
-        if (s % 2 === 0) this.note(chord[2 + (Math.floor(s / 2) % 3)] + 12, t, .45, .085);
-        if (s % 8 === 0) chord.slice(2).forEach(n => this.note(n, t, 1.8, .038));
-        if (this.progress > .28 && s % 2 === 1) this.note(88 + (s % 3) * 2, t, .045, .024, 'triangle');
-        if (this.progress > .65 && s % 4 === 2) this.note(chord[4] + 12, t, .25, .065);
-        this.step++; this.nextBeat += 60 / (88 + this.progress * 22) / 4;
+        const s = this.step, t = this.nextBeat, beat = 60 / 88;
+        // Una melodía y un bajo discreto. Sin contramelodías ni acordes
+        // sostenidos que invadan el siguiente compás al avanzar el tablero.
+        const phrases = [[72,76,79,76,74,72,67,71], [72,76,81,79,76,72,69,71],
+          [72,77,79,77,76,72,69,72], [71,74,79,77,74,71,67,71]];
+        const bar = Math.floor(s / 16) % 4;
+        if (s % 2 === 0) this.note(phrases[bar][(s % 16) / 2], t, beat * .42, .085);
+        if (s % 8 === 0) this.note([36,33,29,31][bar], t, beat * 1.4, .075, 'triangle');
+        this.step++; this.nextBeat += beat / 4;
       }
     }
     stop(clearVoices = true) {
       clearInterval(this.loop); this.loop = null; this.active = false;
-      if (clearVoices) for (const voice of this.voices) { try { voice.stop(); } catch {} }
+      if (clearVoices) {
+        for (const voice of this.voices) { try { voice.stop(); voice.disconnect(); } catch {} }
+        this.voices.clear();
+      }
+      this.lastOpen = -Infinity;
       this.updateUI();
     }
     effect(kind, amount = 1) {
       this.unlock(); if (!this.context) return;
       const t = this.context.currentTime;
-      if (kind === 'open') { this.note(72 + Math.floor(this.progress * 4) * 2, t, .18, .13); if (amount > 3) [76,79,84].forEach((n, i) => this.note(n, t + .05 * (i + 1), .23, .08)); }
-      if (kind === 'flag') { this.note(67, t, .1, .13, 'triangle'); this.note(79, t + .065, .17, .1); }
-      if (kind === 'unflag') this.note(64, t, .13, .09, 'triangle');
-      if (kind === 'mine') this.note(40 + amount % 12, t, .3, .12, 'triangle');
+      // Los clics son acentos breves, no otra canción encima del fondo.
+      if (kind === 'open' && t - this.lastOpen >= .12) {
+        this.lastOpen = t; this.note(84, t, .055, .035);
+      }
+      if (kind === 'flag') this.note(79, t, .09, .055, 'triangle');
+      if (kind === 'unflag') this.note(67, t, .08, .04, 'triangle');
       if (kind === 'win') {
         [60,64,67,72,76,79,84,79,84].forEach((n, i) => this.note(n, t + i * .14, .55, .19, 'triangle'));
         [48,60,64,67,72].forEach(n => this.note(n, t + 1.3, 2, .09));
       }
       if (kind === 'lose') {
-        [60,56,53,48,41].forEach((n, i) => this.note(n, t + i * .17, .6, .17, 'triangle'));
-        [48,55,60].forEach(n => this.note(n, t + 1.35, 1.3, .055));
+        // Cierre único de cuatro segundos: impacto suave, respuesta en
+        // la menor y resolución. Todas las voces se cancelan al reiniciar.
+        this.stop();
+        this.note(33, t, .65, .22, 'triangle');
+        [[81,.18,.3],[76,.52,.3],[72,.86,.48],[71,1.38,.3],
+          [74,1.72,.3],[76,2.06,.48],[72,2.65,.55],[69,3.2,1.15]]
+          .forEach(([n,offset,duration]) => this.note(n,t+offset,duration,.12));
+        [[45,0],[41,1.36],[40,2.04],[45,3.2]]
+          .forEach(([n,offset]) => this.note(n,t+offset,.85,.065,'triangle'));
+        [57,60,64].forEach(n => this.note(n,t+3.2,1.25,.035));
       }
     }
     setVolume(value) {
@@ -141,7 +156,7 @@
     soundtrack.stop(); soundtrack.progress = 0;
     $('result').close(); $('help-dialog').close(); particles = []; cancelAnimationFrame(animationId); animationId = 0; ctx.clearRect(0,0,viewWidth,viewHeight);
     level = nextLevel; window.Club?.category(`club-minas-${level}`); game = new Mina.Game(level); paused = false; elapsed = 0; startedAt = 0; focusedIndex = 0;
-    $('field').classList.remove('shake'); $('pause-screen').hidden = true; $('pause').textContent = 'Ⅱ'; $('pause').setAttribute('aria-label','Pausar');
+    $('field').classList.remove('shake', 'defeat'); $('result').classList.remove('defeat'); $('pause-screen').hidden = true; $('pause').textContent = 'Ⅱ'; $('pause').setAttribute('aria-label','Pausar');
     $('status').textContent = 'Todo empieza con un clic.'; $('field-caption').innerHTML = '<span>✦</span> Tu primera jugada siempre es segura.';
     board.style.setProperty('--cols',game.cols); board.style.setProperty('--min-cell',level === 'easy' ? '24px' : '26px');
     board.setAttribute('aria-rowcount',game.rows); board.setAttribute('aria-colcount',game.cols);
@@ -201,24 +216,30 @@
       game.flags = game.mines;
       for(let j=0;j<5;j++) later(()=>burst(viewWidth*(.18+j*.16),viewHeight*.5,55,true),j*200);
     } else {
-      $('field').classList.add('shake');
+      $('field').classList.add('shake', 'defeat');
       const origin = game.exploded, ox=origin%game.cols, oy=Math.floor(origin/game.cols);
+      const maxDistance = Math.max(1, Math.hypot(Math.max(ox,game.cols-1-ox),Math.max(oy,game.rows-1-oy)));
+      const waveDelay = i => reducedMotion.matches ? 0 : 80 + 900 * Math.hypot(i%game.cols-ox,Math.floor(i/game.cols)-oy) / maxDistance;
+      buttons.forEach((b,i) => {
+        b.style.setProperty('--wave-delay', `${waveDelay(i)}ms`);
+        b.classList.add('loss-wave');
+      });
       const mines = game.cells.map((c,i)=>({c,i})).filter(({c})=>c.mine).sort((a,b)=>Math.hypot(a.i%game.cols-ox,Math.floor(a.i/game.cols)-oy)-Math.hypot(b.i%game.cols-ox,Math.floor(b.i/game.cols)-oy));
       mines.forEach(({c,i},j)=>later(()=>{
         const b=buttons[i];b.innerHTML=icon('mine');b.classList.remove('flagged');b.classList.add('mine');b.classList.toggle('exploded',i===origin);
         b.style.setProperty('--mine-color',['#edb98d','#cab2d9','#edce82','#a6c6c6','#dba6a4'][j%5]);b.style.setProperty('--delay','0ms');
         b.setAttribute('aria-label',`Fila ${Math.floor(i/game.cols)+1}, columna ${i%game.cols+1}: mina`);
-        const r=b.getBoundingClientRect();burst(r.x+r.width/2,r.y+r.height/2,8);
-        if(j>0&&j<8)soundtrack.effect('mine',j);
-      },reducedMotion.matches?0:j*Math.min(80,1100/mines.length)));
+        const r=b.getBoundingClientRect();burst(r.x+r.width/2,r.y+r.height/2,i===origin?28:4);
+      },waveDelay(i)));
       game.cells.forEach((c,i)=>{if(c.flag&&!c.mine)buttons[i].classList.add('wrong');});
     }
+    $('result').classList.toggle('defeat', !won);
     $('result-icon').innerHTML=won?'✿':icon('mine');$('result-icon').style.background=won?'#e7edcb':'#f4dfcc';$('result-icon').style.color=won?'#819e49':'#bb7f58';
     $('result-kicker').textContent=won?(newBest?'UN NUEVO RÉCORD PERSONAL':'UN JARDÍN DE POSIBILIDADES'):'HASTA LAS FLORES TIENEN SORPRESAS';
     $('result-title').textContent=won?'¡Lo hiciste florecer!':'Ups… había una mina.';
     $('result-copy').textContent=won?'Calma, intuición y una gran jugada. Este pequeño triunfo es tuyo.':'No pasa nada. Respira, sacúdete el polvo y vuelve a seguir las pistas.';
     $('result-time').textContent=formatTime(elapsed);$('result-progress').textContent=`${Math.round(game.progress*100)}%`;
-    resultTimeout=setTimeout(()=>{$('result').showModal();},reducedMotion.matches?250:won?1500:1750);
+    resultTimeout=setTimeout(()=>{$('result').showModal();},reducedMotion.matches?250:won?1500:2100);
   }
   function togglePause(force) {
     if(game.state!=='playing')return;
