@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f5f5ed">
+  <meta name="description" content="Snake Club: el clásico de siempre con cuatro modos, poderes, portales y mucho estilo. Juega gratis, incluso sin conexión.">
+  <title>Snake Club — Una más.</title>
+  <link rel="stylesheet" href="style.css?v=club-1">
+<link rel="stylesheet" href="../conexion.css?v=club-1">
+<script src="../conexion.js?v=club-1"></script>
+</head>
+<body>
+  <div class="site-shell">
+    <header class="topbar">
+      <a class="brand" href="./index.html" aria-label="Snake Club, inicio"><span class="brand-mark" aria-hidden="true"><i></i><i></i></span><span>SNAKE<span class="brand-light">CLUB</span><span class="brand-dot">®</span></span></a>
+      <div class="header-note"><span class="live-dot"></span> UN PEQUEÑO ESCAPE DEL SCROLL</div>
+      <button class="icon-button" id="sound-button" aria-label="Activar sonido" title="Activar sonido"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M11 5 6 9H3v6h3l5 4z"/><path id="sound-waves" d="m16 9 6 6m0-6-6 6"/></svg></button>
+    </header>
+
+    <main>
+      <section class="intro"><div><div class="eyebrow"><span></span> EL DE SIEMPRE. COMO NUNCA.</div><h1>Una más<span class="lime-period">.</span></h1><p>Come. Crece. Repite. Ya sabes cómo va esto.</p></div><div class="intro-stamp" aria-hidden="true"><span>100% JUEGO</span><svg viewBox="0 0 50 30" fill="none"><path d="M4 16h24c14 0 14-12 4-12H20c-10 0-10 22 0 22h25" stroke="currentColor" stroke-width="7" stroke-linecap="round"/><circle cx="43" cy="24" r="1.5" fill="#f5f5ed"/></svg><span>0% COMPLICACIONES</span></div></section>
+
+      <div class="game-layout">
+        <section class="play-section" aria-label="Zona de juego">
+          <div class="scorebar">
+            <div class="score-block"><span class="stat-label">PUNTOS</span><strong id="score">000</strong><span id="score-pop" aria-hidden="true"></span></div>
+            <div class="score-block best-block"><span class="stat-label"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 3h8v5a4 4 0 0 1-8 0V3Zm0 2H3v2c0 3 3 3 3 3m8-5h3v2c0 3-3 3-3 3m-4 2v4m-3 1h6"/></svg> RÉCORD</span><strong id="best">000</strong></div>
+            <div class="game-status" id="game-status"><span class="live-dot"></span> A TU RITMO</div>
+            <button class="small-icon" id="pause-button" aria-label="Pausar partida" title="Pausar (P)" disabled><svg viewBox="0 0 20 20" fill="currentColor"><rect x="5" y="4" width="3" height="12" rx="1"/><rect x="12" y="4" width="3" height="12" rx="1"/></svg></button>
+            <button class="small-icon fullscreen-button" id="fullscreen-button" aria-label="Pantalla completa" title="Pantalla completa"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M7 3H3v4m10-4h4v4M3 13v4h4m10-4v4h-4"/></svg></button>
+          </div>
+          <div class="board-wrap" id="board-wrap">
+            <canvas id="game" width="1008" height="792" role="img" aria-label="Tablero de Snake. Usa flechas o WASD para moverte." tabindex="0"></canvas>
+            <div class="board-top"><span id="board-mode">01 / CLÁSICO</span><span id="power-status"></span><span class="board-live"><i></i> LIVE PLAY</span></div>
+            <div class="overlay" id="overlay">
+              <div class="overlay-content" id="overlay-content">
+                <div class="overlay-eyebrow" id="overlay-eyebrow">¿UN DESCANSO RÁPIDO?</div>
+                <h2 id="overlay-title">Sigue tu<br><span>instinto.</span></h2>
+                <p id="overlay-text">Un bocado más. Una curva más.<br>Veamos hasta dónde llegas.</p>
+                <button class="play-button" id="play-button"><span id="play-label">Vamos a jugar</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12h15m-6-6 6 6-6 6"/></svg></button>
+                <span class="keyboard-start" id="keyboard-start">o pulsa <kbd>ESPACIO</kbd></span>
+              </div>
+            </div>
+            <div id="toast" class="toast" role="status"></div>
+            <div class="board-bottom"><span id="board-hint">POCO A POCO SE LLEGA LEJOS.</span><span>✦</span></div>
+          </div>
+          <div class="controls-caption"><span><span class="key-group"><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd></span> o <b>W A S D</b> para moverte</span><span><kbd>P</kbd> pausa <span class="caption-divider">/</span> <kbd>R</kbd> reinicia</span></div>
+          <div class="touch-controls" aria-label="Controles táctiles"><button data-direction="left" aria-label="Izquierda">←</button><div><button data-direction="up" aria-label="Arriba">↑</button><button data-direction="down" aria-label="Abajo">↓</button></div><button data-direction="right" aria-label="Derecha">→</button></div>
+        </section>
+
+        <aside class="sidebar">
+          <section class="settings-section"><div class="section-heading"><h2>Tu juego, tus reglas</h2><span>01—04</span></div>
+            <div class="mode-list" role="group" aria-label="Modo de juego">
+              <button class="mode-card active" data-mode="classic" aria-pressed="true"><span class="mode-icon">↳</span><span><strong>Clásico</strong><small>El original nunca falla.</small></span><span class="mode-radio"></span></button>
+              <button class="mode-card" data-mode="arcade" aria-pressed="false"><span class="mode-icon">ϟ</span><span><strong>Arcade <em>CON PODERES</em></strong><small>Más sorpresas. Más adrenalina.</small></span><span class="mode-radio"></span></button>
+              <button class="mode-card" data-mode="portals" aria-pressed="false"><span class="mode-icon portal-icon">◎</span><span><strong>Portales</strong><small>Sal por donde menos esperas.</small></span><span class="mode-radio"></span></button>
+              <button class="mode-card" data-mode="zen" aria-pressed="false"><span class="mode-icon">✳</span><span><strong>Zen</strong><small>Sin choques. Sin prisa. Sin fin.</small></span><span class="mode-radio"></span></button>
+            </div>
+          </section>
+          <section class="speed-section"><div class="section-heading"><h2>Marca el ritmo</h2><span aria-hidden="true">↗</span></div><div class="speed-control" role="group" aria-label="Dificultad"><button data-speed="chill" aria-pressed="false">Tranqui</button><button class="active" data-speed="normal" aria-pressed="true">Normal</button><button data-speed="fast" aria-pressed="false">¡A tope!</button></div></section>
+          <section class="tip-card"><span class="tip-icon" aria-hidden="true">✦</span><div><h3 id="tip-title">Lo simple tiene su truco.</h3><p id="tip-text">Come las frutas, evita las paredes y no te muerdas la cola. Fácil… al principio.</p></div><div class="tip-line"></div><div class="fruit-legend"><span class="mini-fruit"></span><span>UN BOCADO <b>+10 PTS</b></span></div></section>
+          <div class="palette-row"><span>CAMBIA EL MOOD</span><div role="group" aria-label="Color de la serpiente"><button class="swatch active" data-theme="lime" style="--swatch:#c1f45a" aria-label="Verde lima" aria-pressed="true"></button><button class="swatch" data-theme="cyan" style="--swatch:#69dbe8" aria-label="Azul hielo" aria-pressed="false"></button><button class="swatch" data-theme="pink" style="--swatch:#f79dc5" aria-label="Rosa chicle" aria-pressed="false"></button></div></div>
+        </aside>
+      </div>
+      <footer><span>HECHO PARA PERDER LA NOCIÓN DEL TIEMPO.</span><span>Sin descargas. Sin cuentas. Solo <b>snake.</b> <span class="footer-snake">↝</span></span></footer>
+    </main>
+  </div>
+  <div class="sr-only" id="announcer" aria-live="polite"></div>
+  <script src="game.js?v=club-1"></script>
+</body>
+</html>

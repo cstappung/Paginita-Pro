@@ -1,4 +1,4 @@
-import { crearSolo } from "./juegos/solo/pantalla.js";
+import { crearSolo } from "./juegos/solo/club.js";
 "use strict";
 /* ============================================================
    Juegos — la página
@@ -506,7 +506,7 @@ function armazon() {
       <div class="jg-hero-orbita" aria-hidden="true"><i></i><i></i><i></i><b>✦</b><span>ÓRBITA<br><small>EL NUEVO DESAFÍO</small></span></div>
     </section>
     <div class="jg-section-title"><h2>Elige tu próxima partida</h2><span>07 juegos para desconectar</span></div>
-    <div class="sp-entradas"><a href="#solo/minas" class="sp-entrada sp-e-minas"><small>SINGLEPLAYER / ESTRATEGIA</small><strong>MINEFALL <span>✦</span></strong><p>Buscaminas reinventado. Tres territorios, dos variantes.</p><b>Explorar →</b></a><a href="#solo/snake" class="sp-entrada sp-e-snake"><small>SINGLEPLAYER / REFLEJOS</small><strong>NEON COIL <span>ϟ</span></strong><p>Snake, a otra velocidad. Portales, ruinas y récords.</p><b>Entrar al circuito →</b></a></div>
+    <div class="sp-entradas"><a href="#solo/minas" class="sp-entrada sp-e-minas"><small>SINGLEPLAYER / ESTRATEGIA</small><strong>MINA CLUB <span>✦</span></strong><p>Piensa, explora y florece. Tres dificultades y música progresiva.</p><b>Explorar →</b></a><a href="#solo/snake" class="sp-entrada sp-e-snake"><small>SINGLEPLAYER / REFLEJOS</small><strong>SNAKE CLUB <span>ϟ</span></strong><p>Clásico, arcade, portales y Zen. Una más.</p><b>Entrar al circuito →</b></a></div>
     <div id="vesAviso"></div>
     <div class="jg-elige" id="vesElige"></div>
     <h2 class="jg-h2">Salas abiertas</h2>
