@@ -1,0 +1,60 @@
+<div id="app">
+ <img id="environment-art" src="__ART_DATA__" alt="" hidden>
+ <img id="environment-alpine" src="__ART_ALPINE__" alt="" hidden>
+ <img id="environment-desert" src="__ART_DESERT__" alt="" hidden>
+ <img id="environment-tidal" src="__ART_TIDAL__" alt="" hidden>
+ <canvas id="scene" aria-label="Campo de batalla. A y D: mover. W: saltar. Flechas: apuntar. Espacio: disparar. Rueda: zoom."></canvas>
+ <div class="vignette"></div>
+ <header class="topbar">
+  <a class="brand" href="#" id="brand-home" aria-label="Circuit Breakers"><span class="brand-mark">ϟ</span><span>CIRCUIT<span class="brand-light">BREAKERS</span><small>OVERLOAD EDITION / 02</small></span></a>
+  <span class="top-label" id="top-label"><i></i> CENTRO DE OPERACIONES</span>
+  <nav class="top-actions"><button id="music-btn" class="icon-btn" aria-label="Desactivar música" title="Activar o desactivar música">♫ <span>MÚSICA ON</span></button><button id="settings-btn" class="icon-btn" aria-label="Ajustes de audio">⚙</button><button id="help-btn" class="icon-btn" aria-label="Cómo jugar">?</button><button id="pause-btn" class="icon-btn" aria-label="Pausar partida" hidden>Ⅱ</button></nav>
+ </header>
+
+ <main id="menu" class="menu">
+  <div class="menu-upper">
+   <section class="hero">
+    <div class="eyebrow"><span class="live-dot"></span> INGENIERÍA DEL CAOS</div>
+    <h1>LA TENSIÓN<br>SE <em>DESATA.</em></h1>
+    <p>Un equipo brillante. Un plan cuestionable.<br>Una guerra de alto voltaje.</p>
+    <div class="hero-stats"><div><strong>10</strong><span>HERRAMIENTAS<br>DE DESTRUCCIÓN</span></div><div><strong>36</strong><span>INGENIEROS<br>EN EL CAMPO</span></div><div><strong>3.2<span>km</span></strong><span>DE TERRENO<br>DESTRUCTIBLE</span></div></div>
+    <div class="hero-note"><span>✦</span> FÍSICA · ESTRATEGIA · CAOS ELÉCTRICO</div>
+   </section>
+   <section class="operation-panel">
+    <div class="panel-heading"><span><i></i> NUEVA OPERACIÓN</span><span>01—06</span></div>
+    <h2>Prepara tu cuadrilla.</h2><p class="panel-subtitle">Multijugador local y bots. Un dispositivo, muchos rivales.</p>
+    <div class="fields">
+     <div class="field"><label for="humans">Jugadores locales</label><select id="humans"><option value="1">1 jugador</option><option value="2">2 jugadores</option><option value="3">3 jugadores</option><option value="4">4 jugadores</option><option value="5">5 jugadores</option><option value="6">6 jugadores</option></select></div>
+     <div class="field"><label for="bots">Equipos de bots</label><select id="bots"><option value="1">1 bot</option></select></div>
+     <div class="field"><label for="squad">Ingenieros por equipo</label><select id="squad"><option value="2">2 · escaramuza</option><option value="3">3 · patrulla</option><option value="4" selected>4 · cuadrilla</option><option value="5">5 · brigada</option><option value="6">6 · batallón</option></select></div>
+     <div class="field"><label for="difficulty">Inteligencia de los bots</label><select id="difficulty"><option value="easy">Aprendiz · fácil</option><option value="normal" selected>Ingeniero · normal</option><option value="hard">Doctorado · difícil</option></select></div>
+    </div>
+    <div class="roster-preview" id="roster-preview"></div>
+    <div class="operation-summary"><span id="operation-summary">8 ingenieros · 2 equipos</span><span>45 s / turno</span></div>
+    <button id="start-btn" class="primary"><span>DESPLEGAR CUADRILLA</span><span>↗</span></button>
+    <p class="sound-note">♫ Banda sonora original · Sonido al iniciar</p>
+   </section>
+  </div>
+  <section class="map-selection" aria-label="Seleccionar escenario"><div class="section-label"><span>ELIGE EL CAMPO DE BATALLA</span><span>04 ESCENARIOS / TERRENO 100% DESTRUCTIBLE</span></div><div id="map-cards" class="map-cards"></div></section>
+  <footer class="menu-footer"><span><i></i> TODO LISTO PARA CREAR UN CORTOCIRCUITO.</span><button id="manual-btn">MANUAL DE CAMPO ↗</button><span>LOCAL · SIN CONEXIÓN · SIN INSTALACIÓN</span></footer>
+ </main>
+
+ <section id="hud" class="hud" hidden>
+  <div class="roster" id="teams"></div>
+  <div class="mission-bar"><span id="map-label"></span><span id="round-label"></span><span id="wind-label"></span></div>
+  <div id="turn-banner" class="turn-banner"><small>CAMBIO DE TURNO</small><strong id="banner-team"></strong><span id="banner-unit"></span></div>
+  <div id="notice" class="notice" role="status" aria-live="polite"></div>
+  <div class="map-tools"><div class="mini-heading"><span>RECONOCIMIENTO</span><span id="zoom-label">80%</span></div><canvas id="minimap" width="280" height="98" aria-label="Minimapa: pulsa para explorar" role="img"></canvas><div class="camera-buttons"><button id="zoom-out" title="Alejar" aria-label="Alejar cámara">−</button><button id="zoom-in" title="Acercar" aria-label="Acercar cámara">+</button><button id="overview" title="Vista general (Q)">⊞ Mapa</button><button id="center-camera" title="Seguir ingeniero (C)">◎ Seguir</button></div></div>
+  <div class="combat-dock" id="combat-dock">
+   <div class="turn-card"><div class="turn-card-top"><span id="turn-kind">TU TURNO</span><span id="timer">45</span></div><strong id="unit-name"></strong><span id="unit-role"></span><div class="unit-vitals"><span id="unit-health"></span><span id="team-name"></span></div><div class="mobility-track"><i id="mobility-fill"></i></div><div class="movement-row"><button id="move-left" aria-label="Mover a la izquierda">←</button><button id="jump" aria-label="Saltar">↥</button><button id="move-right" aria-label="Mover a la derecha">→</button><span>MOVILIDAD</span><button id="skip-turn" title="Terminar turno">Pasar ↗</button></div></div>
+   <div class="arsenal"><div class="weapon-caption"><div><strong id="weapon-name"></strong><span id="weapon-description"></span></div><span id="weapon-stats"></span></div><div id="weapons" class="weapons"></div><div class="aim-controls"><div class="slider-field"><label for="angle">ÁNGULO</label><input id="angle" aria-label="Ángulo" type="range" min="-85" max="265" step="1" value="43"><output id="angle-out">43°</output></div><div class="slider-field"><label for="power">POTENCIA</label><input id="power" aria-label="Potencia" type="range" min="12" max="100" value="52"><output id="power-out">52%</output></div><button id="fire" class="fire">DISPARAR <span>↗</span></button></div></div>
+  </div>
+  <div class="key-guide"><span><kbd>A</kbd><kbd>D</kbd> mover &nbsp; <kbd>W</kbd> saltar &nbsp; <kbd>←</kbd><kbd>→</kbd> apuntar &nbsp; <kbd>↑</kbd><kbd>↓</kbd> potencia &nbsp; <kbd>ESPACIO</kbd> mantener para cargar</span><span>RUEDA: ZOOM · ARRASTRE DERECHO: CÁMARA · <kbd>Q</kbd> mapa · <kbd>C</kbd> seguir</span></div>
+ </section>
+
+ <div id="pause-dialog" class="overlay" hidden><section class="dialog"><div class="eyebrow">CIRCUITO ABIERTO</div><h2>Un respiro.<br>Luego, el caos.</h2><p>La operación está en pausa. El tiempo, la física y la música esperan contigo.</p><button id="resume" class="primary">CONTINUAR OPERACIÓN <span>→</span></button><button id="pause-help" class="secondary">Consultar el manual de campo</button><button id="quit" class="text-button">Terminar partida y volver al inicio</button></section></div>
+ <div id="help-dialog" class="overlay" hidden><section class="dialog wide-dialog"><div class="dialog-top"><div class="eyebrow">MANUAL DE CAMPO / REV. 02</div><button class="close-dialog" data-close="help-dialog" aria-label="Cerrar manual">×</button></div><h2>El conocimiento es potencia.</h2><p>Elimina a los equipos rivales. Cada ingeniero comienza con 120 de vida; la última cuadrilla con supervivientes gana. Las explosiones afectan a aliados y rivales. El agua elimina al instante.</p><div class="manual-grid"><div><b>01 / MUÉVETE</b><p><kbd>A</kbd> y <kbd>D</kbd> para caminar. <kbd>W</kbd> para saltar. Tienes una reserva de movilidad por turno. También hay controles táctiles.</p></div><div><b>02 / APUNTA</b><p>Haz clic o arrastra sobre el campo. Ajusta ángulo y potencia con las flechas o los deslizadores. Mantén <kbd>Espacio</kbd> para cargar y suelta para disparar.</p></div><div><b>03 / ELIGE</b><p>Teclas <kbd>1</kbd>–<kbd>9</kbd> y <kbd>0</kbd>: arsenal. La cadena Tesla necesita un rival cercano; para Tormenta, marca el destino haciendo clic en el mapa.</p></div><div><b>04 / EXPLORA</b><p>Rueda para zoom, arrastre derecho para cámara. <kbd>Q</kbd> muestra todo el escenario; <kbd>C</kbd> sigue al ingeniero. Pulsa el minimapa para explorar.</p></div><div><b>05 / ADÁPTATE</b><p>El viento afecta los tiros. Los barriles causan explosiones encadenadas. Recoge cajas de vida y munición caminando sobre ellas.</p></div><div><b>06 / SOBREVIVE</b><p>A partir de la ronda 12 sube el agua. Las caídas muy fuertes también dañan. <kbd>P</kbd> o <kbd>Esc</kbd> pausará la partida en cualquier momento.</p></div></div><button class="primary close-dialog" data-close="help-dialog">LISTO PARA EL DESPLIEGUE <span>↗</span></button></section></div>
+ <div id="settings-dialog" class="overlay" hidden><section class="dialog"><div class="dialog-top"><div class="eyebrow">SONIDO / MEZCLA</div><button class="close-dialog" data-close="settings-dialog" aria-label="Cerrar ajustes">×</button></div><h2>Que suene<br>la operación.</h2><p>Banda sonora electrónica original con sintetizadores, bajo, arpegios y percusión durante el combate.</p><label class="setting-switch"><span>Música ambiental</span><input id="music-enabled" type="checkbox" checked></label><label class="setting-switch"><span>Efectos de combate</span><input id="effects-enabled" type="checkbox" checked></label><label class="volume-label" for="music-volume">VOLUMEN DE MÚSICA <output id="volume-value">60%</output></label><input id="music-volume" type="range" min="0" max="100" value="60"><p id="audio-status" class="sound-note">El navegador activa el audio con tu primera interacción.</p><button class="primary close-dialog" data-close="settings-dialog">GUARDAR Y VOLVER <span>→</span></button></section></div>
+ <div id="results-dialog" class="overlay" hidden><section class="dialog result-dialog"><div class="eyebrow">OPERACIÓN COMPLETADA</div><div class="victory-symbol">ϟ</div><h2 id="winner-title"></h2><p id="winner-description"></p><div id="result-list"></div><button id="rematch" class="primary">OTRA RONDA <span>↗</span></button><button id="back-menu" class="secondary">Volver al centro de operaciones</button></section></div>
+ <div id="portrait-tip">Para una mejor vista del campo, gira el dispositivo ↻</div>
+</div>
