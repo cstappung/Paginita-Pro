@@ -539,6 +539,45 @@ export function reducir(p) {
   return base;
 }
 
+/* ¿La partida está esperando algo de `uid`? Es lo que enciende el «Tu
+   turno» del título de la pestaña. Los juegos por turnos lo dicen con
+   `turno`; cartas y escondite eligen a la vez, y ahí «te toca» es «los
+   demás ya pueden haber elegido y tú todavía no». La búsqueda del
+   escondite no cuenta: los dos buscan a la vez desde que empieza, así
+   que no hay nada que avisar que no se esté viendo ya. */
+export function meToca(est, uid) {
+  if (!est || !uid || !est.listos || est.fin || est.fase === "fin" || est.fase === "espera") return false;
+  if (!(est.jugadores || []).some(j => j.uid === uid)) return false;
+  if (est.fase === "esconder") return !(est.compromisos || {})[uid];
+  if (est.rev && est.comp) return est.fase === "jugando" && !est.comp[uid];
+  return !!est.turno && est.turno === uid;
+}
+
+/* Cuánto de la partida se ha jugado, de 0 a 1. Solo lo usa la música,
+   que acelera en el último tramo como en una recreativa: el tablero ya
+   dice cuánto queda, así que no hace falta llevar la cuenta aparte.
+   Cartas no tiene tablero que se llene; ahí cuentan las rondas que
+   lleva ganadas quien va delante, sobre cinco. No es exacto —cinco
+   cartas del mismo color no hacen trío— pero con tres ya puede haberlo,
+   así que a partir de ahí el duelo puede acabar en cualquier ronda. Los juegos que no se prestan
+   —el escondite va a reloj, Circuit Breakers trae su propia música—
+   dan 0. */
+export function progreso(est, juego) {
+  if (!est || est.fase !== "jugando") return 0;
+  const c = x => Math.max(0, Math.min(1, x || 0));
+  if (juego === "cuadritos" && est.rayas) {
+    const hechas = Object.keys(est.rayas).length;
+    return c(hechas / (hechas + (est.restantes || 0)));
+  }
+  if (juego === "reversi" && est.lado) {
+    const casillas = est.lado * est.lado - 4;
+    return c((casillas - (est.libres || 0)) / casillas);
+  }
+  if (juego === "orbita" && est.estrellas) return c(Object.keys(est.tomadas || {}).length / est.estrellas.length);
+  if (juego === "cartas" && est.ganadas) return c(Math.max(0, ...Object.values(est.ganadas).map(g => g.length)) / 5);
+  return 0;
+}
+
 /* ---------- Circuit Breakers ----------
    La física no pasa por aquí: la simula el propio juego (juegos/worms),
    que publica al final de cada turno una foto del estado como jugada

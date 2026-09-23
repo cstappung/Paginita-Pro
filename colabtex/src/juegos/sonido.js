@@ -79,6 +79,10 @@ const REPERTORIO = {
   clic:     (a, t) => P(a, t, 1568, 0.03, { onda: "p50", vol: 0.05 }),
   carta:    (a, t) => { N(a, t, 0.09, { vol: 0.09, corto: false, tono: 3, tono1: 1.2 });
                         P(a, t + 0.02, 1760, 0.03, { onda: "p12", vol: 0.04 }); },
+  /* El timbre de «te toca»: dos notas rápidas hacia arriba, como un
+     «¿hola?». Solo suena con la pestaña escondida. */
+  turno:    (a, t) => { P(a, t, H(79), 0.06, { onda: "p50", vol: 0.08 });
+                        P(a, t + 0.08, H(86), 0.14, { onda: "p50", vol: 0.08, sus: 0.6 }); },
   ficha:    (a, t) => P(a, t, 440, 0.08, { f1: 990, onda: "p50", vol: 0.08 }),
   entra:    (a, t) => [72, 76, 79, 84].forEach((n, k) => P(a, t + k * 0.045, H(n), 0.05, { onda: "p50", vol: 0.07 })),
   /* La moneda: si y mi, la segunda larga. Dos notas bastan para decir «bien». */

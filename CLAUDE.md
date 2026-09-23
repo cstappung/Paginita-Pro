@@ -45,12 +45,13 @@ Six apps plus a small shared **Informes** page:
   collect by themselves, plus the bugs and ideas people write. See "Informes"
   below.
 - **Juegos** (`juegos.html` + `juegos-app.js`, entry
-  `colabtex/src/juegos-main.js`) — four turn-based games, on the same Google
+  `colabtex/src/juegos-main.js`) — six turn-based games, on the same Google
   account and the same Firebase project: **Escondite** (hide a person in a
   landscape, then cross the landscapes and race to find the other's),
   **Cartas de los tres elementos** (a Card-Jitsu duel), **Cuadritos** (dots and
-  boxes, two to six players and three board sizes) and **Reversi**, plus a
-  **Clasificación** tab. See "Juegos" below.
+  boxes, two to six players and three board sizes), **Reversi**, **Órbita**
+  and **Circuit Breakers** (a Worms-style artillery game for two to four
+  squads, in an iframe), plus a **Clasificación** tab. See "Juegos" below.
 
 ColabTeX, ColabDraw, FiltroLab, AjusteLab, Juegos and Informes are authored in
 **Spanish** — UI text, comments and identifiers alike. **CSV·Scope is the exception: it is in
@@ -1483,7 +1484,7 @@ Four decisions worth keeping:
 
 ## Juegos architecture
 
-Four turn-based games, on the same Firebase project and the same Google session
+Six turn-based games, on the same Firebase project and the same Google session
 as ColabTeX and ColabDraw. Turn-based on purpose: with one move per turn the
 network carries a handful of fields and there is nothing to interpolate, so no
 game loop ever has to be synchronised.
@@ -1706,6 +1707,50 @@ Two things about the individual screens are worth knowing before editing them:
   spin once (`.jg-rev-gira`) and the newest wears a ring: that one-shot
   animation is safe only because the board's repaint signature carries
   `est.ultima.casilla`, so the SVG is rebuilt exactly once per move.
+
+**Circuit Breakers (`worms`) is a whole game in an iframe**, like Mina Club:
+`juegos/worms/` is its own document (canvas, physics, `audio.js`) and
+`juegos/worms.js` (`crearWorms`) is only the postman between that frame and the
+room — it simulates nothing. Four things hold it together:
+
+- **The log carries one entry per turn**, `{t:"turno", uid, k, s, v, d, ti}`:
+  `k` the turn number, `s` the serialised snapshot at its end, `v` the squads
+  still standing, `d` damage per seat, `ti` the seat that played. `redWorms` in
+  `motor.js` reads **only those headers**, never the snapshot, and the **first
+  entry for a given `k` wins** — two tabs of the same player can both publish
+  turn 7, and whichever arrived second is ignored rather than trusted.
+- **The frame is configured only once the room has started** (`est.listos`).
+  Before that it does not know how many squads there will be, and a game that
+  begins with two and then receives a third has no deterministic repair.
+- **What the active player is doing mid-turn goes through `vivo/<pid>`**, not
+  the log: a header `h = {k, uid}` plus chunks under `c/<i>`. It is disposable —
+  nothing is rebuilt from it — so whichever tab sees `fin` deletes it, and the
+  rules let only players write there and only until the game ends (or delete).
+- **Each log entry is forwarded to the frame once, by its key**, not by
+  `jugadasDe`, whose helper overwrites the key with the entry's own `k`.
+
+**The music is one songbook** (`juegos/audio/chip.js` + `temas.js`, plain
+scripts on `globalThis.Chip` / `globalThis.Temas`). The lobby's `sonido.js`,
+Mina Club, Snake and Circuit Breakers all play through the same
+`Chip.Reproductor`, so the whole room sounds like one console instead of four
+radios. `Reproductor` reads `tempo` on every step, which is what lets
+`ajustarMusica({tempo, capas})` speed a song up mid-bar; `ambientar()` resets
+that adjustment whenever the theme changes, so one game's hurry never leaks
+into the next. `tests/temas.test.cjs` checks every theme compiles, that its
+section lengths are whole bars, and that no note is silently dropped.
+
+**The endgame speeds the music up.** `progreso(est, juego)` in `motor.js`
+returns how far the board is (boxes drawn, squares filled, stars taken, rounds
+won — 0 outside `jugando`), and over the last 30 % `juegos-main.js` ramps the
+tempo up to +12 %: the arcade "hurry up". The cartas figure is an estimate on
+purpose, since five rounds of one colour make no trio.
+
+**"Your turn" is in the tab title.** `meToca(est, uid)` answers for every game
+(the escondite's hiding phase and the cartas commit are simultaneous, so there
+it means "you still owe a move"), `avisaTurno` prefixes `● Tu turno ·` to the
+title, and the `turno` chime plays **only when the tab is hidden** and only on
+a change after the first snapshot — reopening a room where it is already your
+turn should not ring.
 
 `colabtex/src/fb-juegos.js` is the data layer, over three nodes **outside**
 `projects/` for the same reason the reports are: a game belongs to the team,

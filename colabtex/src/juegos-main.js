@@ -33,7 +33,7 @@ import { crearSolo } from "./juegos/solo/club.js";
 import { watchAuth, loginGoogle, logout } from "./firebase.js";
 import * as fb from "./fb-juegos.js";
 import { escapeHtml, timeAgo, colorForUid } from "./util.js";
-import { JUEGOS, reducir, jugadasDe, acumula, cupoDe, TAMANOS, etiquetaTamano } from "./juegos/motor.js";
+import { JUEGOS, reducir, jugadasDe, acumula, cupoDe, TAMANOS, etiquetaTamano, meToca, progreso } from "./juegos/motor.js";
 import { crearEscondite } from "./juegos/escondite.js";
 import { crearCartas } from "./juegos/cartas.js";
 import { crearCuadritos } from "./juegos/cuadritos.js";
@@ -42,7 +42,7 @@ import { crearReversi } from "./juegos/reversi.js";
 import { crearWorms } from "./juegos/worms.js";
 import { crearRanks } from "./juegos/ranks.js";
 import { mezcla, abrePerfil } from "./juegos/perfil.js";
-import { suena, silenciar, silenciado, ambientar, activarAudio, configurarMusica, musicaActiva, volumenMusica } from "./juegos/sonido.js";
+import { suena, silenciar, silenciado, ambientar, ajustarMusica, activarAudio, configurarMusica, musicaActiva, volumenMusica } from "./juegos/sonido.js";
 import { createReportWidget } from "./report-widget.js";
 
 const $ = id => document.getElementById(id);
@@ -104,6 +104,8 @@ let anotada = "";         // partida ya sumada a la clasificación desde esta pe
 let finEnviado = "";
 let finCerrado = "";        // partida cuyo cartel de fin se ha cerrado a mano
 let dentroVistos = -1;    // cuánta gente había en la sala la última vez
+let tocaba = false;       // si la última foto de la partida esperaba algo de mí
+const TITULO = document.title;
 
 /* ---------- perfiles ----------
    La ficha que guarda la partida se escribe una vez y no se puede
@@ -313,7 +315,7 @@ function engancharVestibulo() {
 
 function engancharPartida(pid) {
   soltarPartida();
-  proximo = 0; anotada = ""; finEnviado = ""; finCerrado = ""; dentroVistos = -1;
+  proximo = 0; anotada = ""; finEnviado = ""; finCerrado = ""; dentroVistos = -1; tocaba = false;
   offPartida = fb.watchPartida(pid, (p, err) => {
     state.cargando = false;
     if (err) { state.fallo = err; state.partida = null; render(); return; }
@@ -326,6 +328,7 @@ function engancharPartida(pid) {
          mirando el enlace y esperando. */
       const dentro = Object.keys(p.jugadores || {}).length;
       if (dentroVistos >= 0 && dentro > dentroVistos) suena("entra");
+      avisaTurno(meToca(state.estado, state.user && state.user.uid), dentroVistos >= 0);
       dentroVistos = dentro;
       proximo = Math.max(proximo, jugadasDe(p).length);
       cuidaLaSala(p);
@@ -335,7 +338,18 @@ function engancharPartida(pid) {
   });
 }
 
+/* «Te toca» en el título de la pestaña, y un timbre solo si la pestaña
+   no se ve: con ella delante ya suena la jugada del otro, y dos avisos
+   por el mismo hecho es ruido. Tampoco suena al entrar en la sala (la
+   primera foto), porque eso no es que te haya llegado el turno. */
+function avisaTurno(toca, yaVista) {
+  document.title = (toca ? "● Tu turno · " : "") + TITULO;
+  if (toca && !tocaba && yaVista && document.hidden) suena("turno");
+  tocaba = toca;
+}
+
 function soltarPartida() {
+  document.title = TITULO; tocaba = false;
   if (offPartida) { try { offPartida(); } catch (e) {} offPartida = null; }
   if (cancelarLimpieza) { try { cancelarLimpieza(); } catch (e) {} cancelarLimpieza = null; }
   ambientar("");
@@ -674,6 +688,10 @@ function pintaPartida() {
   }
 
   ambientar(est.listos && !datosFin(p, est) ? p.juego : "");
+  /* El último tramo acelera la música hasta un 12 %: el «hurry up» de
+     las recreativas. Antes del 70 % no se toca, para que el tema suene
+     a su tempo casi toda la partida y el cambio se note cuando llega. */
+  ajustarMusica({ tempo: 1 + 0.12 * Math.max(0, (progreso(est, p.juego) - 0.7) / 0.3) });
   montaJuego(p);
   if (modulo) modulo.actualizar(p, est);
   pintaRevancha(p, est);
