@@ -70,7 +70,7 @@ export function crearCadena(ctx) {
 
   let host = null, muerto = false;
   let p = null, est = null;
-  let enviando = false, animando = false, sonoFin = false;
+  let enviando = false, animando = false;
   let vistos = -1;            // cuántas jugadas llevaba el tablero la última vez
   let gen = 0;                // cada animación nueva deja obsoletas las anteriores
   let malla = "";             // filas×cols con que se construyó el SVG
@@ -381,7 +381,6 @@ export function crearCadena(ctx) {
     }
     pinta();
     if (ctx.listo) ctx.listo();
-    finSonoro();
   }
 
   /* ---------- el resto de la pantalla ---------- */
@@ -446,13 +445,6 @@ export function crearCadena(ctx) {
     finally { if (!muerto) enviando = false; }
   }
 
-  function finSonoro() {
-    if (est.fase !== "fin" || sonoFin || animando) return;
-    sonoFin = true;
-    setTimeout(() => suena(est.ganador === uid ? "victoria"
-      : est.ganador === "" ? "empate" : "derrota"), 450);
-  }
-
   function actualizar(partida, estado) {
     p = partida; est = estado;
     if (!host) return;
@@ -465,7 +457,6 @@ export function crearCadena(ctx) {
       marcaUlt();
     }
     pinta();
-    finSonoro();
     if (est.ganador !== null && est.ganador !== undefined && !(p.fin && p.fin.at)) {
       terminar(est.ganador, est.motivo);
     }

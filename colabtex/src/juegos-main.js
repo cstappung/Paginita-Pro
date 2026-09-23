@@ -111,6 +111,10 @@ let proximo = 0;          // el número de jugada que toca escribir
 let anotada = "";         // partida ya sumada a la clasificación desde esta pestaña
 let finEnviado = "";
 let finCerrado = "";        // partida cuyo cartel de fin se ha cerrado a mano
+let finVivo = "";           // partida que esta pestaña vio en juego, sin terminar
+let finDesde = 0;           // cuándo se vio el final (0: aún no, o la pantalla sigue contando)
+let finReloj = 0;           // el temporizador que sacará el cartel
+let finSonado = "";         // partida cuya fanfarria ya sonó
 let dentroVistos = -1;    // cuánta gente había en la sala la última vez
 let tocaba = false;       // si la última foto de la partida esperaba algo de mí
 const TITULO = document.title;
@@ -324,12 +328,14 @@ function engancharVestibulo() {
 function engancharPartida(pid) {
   soltarPartida();
   proximo = 0; anotada = ""; finEnviado = ""; finCerrado = ""; dentroVistos = -1; tocaba = false;
+  finVivo = ""; finDesde = 0; finSonado = ""; clearTimeout(finReloj);
   offPartida = fb.watchPartida(pid, (p, err) => {
     state.cargando = false;
     if (err) { state.fallo = err; state.partida = null; render(); return; }
     state.partida = p;
     state.estado = p ? reducir(p) : null;
     vistePerfiles(state.estado);
+    if (p && !datosFin(p, state.estado)) finVivo = pid;
     if (p) {
       /* Alguien ha entrado. Suena aquí y no en `unirse` porque quien
          necesita enterarse es justamente el que ya estaba dentro,
@@ -357,7 +363,7 @@ function avisaTurno(toca, yaVista) {
 }
 
 function soltarPartida() {
-  document.title = TITULO; tocaba = false;
+  document.title = TITULO; tocaba = false; clearTimeout(finReloj);
   if (offPartida) { try { offPartida(); } catch (e) {} offPartida = null; }
   if (cancelarLimpieza) { try { cancelarLimpieza(); } catch (e) {} cancelarLimpieza = null; }
   ambientar("");
@@ -531,22 +537,72 @@ function armazon() {
     pidMontado = "";
     return;
   }
+  /* El vestíbulo es un salón: a la izquierda el catálogo, a la derecha la
+     puerta. Las salas abiertas van en una columna propia y pegajosa porque
+     son lo único de la página que cambia solo —alguien abre una mientras
+     miras las tarjetas— y abajo del todo nadie las veía. La rejilla va por
+     áreas y no por dos cajas anidadas: en el móvil la columna cae entre la
+     marquesina y el catálogo, que es donde tiene que estar una sala que
+     espera, y con dos cajas habría acabado al final de la página. */
   h.innerHTML = `
-    <section class="jg-hero">
-      <div><span class="jg-eyebrow">LABORATORIO / PLAY</span>
-      <h2>Una pausa.<br>Otra partida.</h2>
-      <p>Tu próximo récord o una buena revancha.<br>Abre una sala y comparte el enlace para jugar.</p>
-      <div class="jg-hero-tags"><span>01—06 jugadores</span><span>Por turnos</span><span>Música original</span></div></div>
-      <div class="jg-hero-orbita" aria-hidden="true"><i></i><i></i><i></i><b>✦</b><span>ÓRBITA<br><small>EL NUEVO DESAFÍO</small></span></div>
-    </section>
-    <div class="jg-section-title"><h2>Elige tu próxima partida</h2><span>08 juegos para desconectar</span></div>
-    <div class="sp-entradas"><a href="#solo/minas" class="sp-entrada sp-e-minas"><small>SINGLEPLAYER / ESTRATEGIA</small><strong>MINA CLUB <span>✦</span></strong><p>Piensa, explora y florece. Tres dificultades y música progresiva.</p><b>Explorar →</b></a><a href="#solo/snake" class="sp-entrada sp-e-snake"><small>SINGLEPLAYER / REFLEJOS</small><strong>SNAKE CLUB <span>ϟ</span></strong><p>Clásico, arcade, portales y Zen. Una más.</p><b>Entrar al circuito →</b></a><a href="juegos/worms/index.html?v=worms-3" class="sp-entrada sp-e-worms"><small>LOCAL · BOTS / ARTILLERÍA</small><strong>CIRCUIT BREAKERS <span>💥</span></strong><p>Tu cuadrilla contra bots o amigos en el mismo equipo. En línea: abre una sala abajo.</p><b>Desplegar →</b></a></div>
-    <div id="vesAviso"></div>
-    <div class="jg-elige" id="vesElige"></div>
-    <h2 class="jg-h2">Salas abiertas</h2>
-    <div class="card" id="vesSalas"></div>
-    <h2 class="jg-h2">Tus partidas</h2>
-    <div class="card" id="vesMias"></div>`;
+    <div class="jg-ves">
+      <section class="jg-marquesina">
+        <div class="jg-mq-texto">
+          <span class="jg-eyebrow">LABORATORIO · SALÓN DE JUEGOS</span>
+          <h2>¿A qué jugamos?</h2>
+          <p>Elige un juego, abre la sala y pasa el enlace. O entra en una que ya esté esperando.</p>
+          <div class="jg-mq-cifras">
+            <span><b id="vesNSalas">0</b>salas esperando</span>
+            <span><b id="vesNMias">0</b>partidas tuyas</span>
+            <span><b>${String(Object.keys(JUEGOS).length + 2).padStart(2, "0")}</b>juegos</span>
+          </div>
+          <div class="jg-mq-acciones">
+            <button class="btn jg-mq-rapida" id="vesRapida"></button>
+            <a class="jg-mq-link" href="#vesCatalogo">Ver el catálogo ↓</a>
+          </div>
+        </div>
+        <div class="jg-mq-rueda" aria-hidden="true">${Object.keys(JUEGOS).map((k, i, t) =>
+          `<i style="--c:${JUEGOS[k].color};--a:${Math.round(360 * i / t.length)}deg">${escapeHtml(ICONO[k] || "●")}</i>`).join("")}<b>▶</b></div>
+      </section>
+      <aside class="jg-ves-lado" aria-label="Salas y partidas">
+        <section class="jg-lado-caja">
+          <header><span class="jg-vivo" aria-hidden="true"></span><h2>Salas abiertas</h2><span class="jg-lado-n" id="vesCuenta">0</span></header>
+          <div id="vesSalas"></div>
+        </section>
+        <section class="jg-lado-caja">
+          <header><h2>Tus partidas</h2></header>
+          <div id="vesMias"></div>
+        </section>
+      </aside>
+      <div class="jg-ves-cat" id="vesCatalogo">
+        <div id="vesAviso"></div>
+        <div class="jg-section-title"><h2>Multijugador</h2>
+          <div class="jg-filtros" role="group" aria-label="Filtrar juegos">
+            <button data-filtro="todos">Todos</button><button data-filtro="duelo">Duelos</button><button data-filtro="grupo">En grupo</button>
+          </div></div>
+        <div class="jg-elige" id="vesElige"></div>
+        <div class="jg-section-title"><h2>Para jugar solo</h2><span>sin sala, cuando quieras</span></div>
+        <div class="sp-entradas"><a href="#solo/minas" class="sp-entrada sp-e-minas"><small>SINGLEPLAYER / ESTRATEGIA</small><strong>MINA CLUB <span>✦</span></strong><p>Piensa, explora y florece. Tres dificultades y música progresiva.</p><b>Explorar →</b></a><a href="#solo/snake" class="sp-entrada sp-e-snake"><small>SINGLEPLAYER / REFLEJOS</small><strong>SNAKE CLUB <span>ϟ</span></strong><p>Clásico, arcade, portales y Zen. Una más.</p><b>Entrar al circuito →</b></a><a href="juegos/worms/index.html?v=worms-3" class="sp-entrada sp-e-worms"><small>LOCAL · BOTS / ARTILLERÍA</small><strong>CIRCUIT BREAKERS <span>💥</span></strong><p>Tu cuadrilla contra bots o amigos en el mismo equipo. En línea: abre una sala arriba.</p><b>Desplegar →</b></a></div>
+      </div>
+    </div>`;
+  for (const b of h.querySelectorAll("[data-filtro]")) {
+    b.onclick = () => { filtroVes = b.getAttribute("data-filtro"); aplicaFiltro(); };
+  }
+  h.querySelector(".jg-mq-link").onclick = ev => {
+    ev.preventDefault();   // un #ancla cambiaría la ruta del hash
+    $("vesCatalogo").scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+}
+
+/* El filtro solo esconde tarjetas: no se repinta nada, así que lo que
+   alguien haya elegido en los `<select>` de una tarjeta sobrevive a
+   cambiar de pestaña y volver. */
+let filtroVes = "todos";
+function aplicaFiltro() {
+  for (const b of document.querySelectorAll("[data-filtro]"))
+    b.setAttribute("aria-pressed", String(b.getAttribute("data-filtro") === filtroVes));
+  for (const c of document.querySelectorAll("#vesElige [data-tipo]"))
+    c.hidden = filtroVes !== "todos" && c.getAttribute("data-tipo") !== filtroVes;
 }
 
 /* ---------- pintado: el vestíbulo ---------- */
@@ -554,42 +610,65 @@ function pintaVestibulo() {
   $("vesAviso").innerHTML = state.fallo ? avisoReglas(state.fallo) : "";
 
   $("vesElige").innerHTML = Object.entries(JUEGOS).map(([k, j]) => `
-    <div class="jg-oferta jg-of-${k}" style="--c:${j.color}">
+    <div class="jg-oferta jg-of-${k}" style="--c:${j.color}" data-tipo="${j.cupo > 2 ? "grupo" : "duelo"}">
       <div class="jg-portada jg-portada-${k}" aria-hidden="true">${arteJuego(k)}</div>
-      <div class="jg-of-meta">${k === "orbita" ? "NUEVO · ORIGINAL" : "MULTIJUGADOR"}<span>${j.cupo > 2 ? "2–6" : "2"} JUGADORES</span></div>
+      <div class="jg-of-meta">${k === "orbita" ? "NUEVO · ORIGINAL" : j.cupo > 2 ? "EN GRUPO" : "DUELO"}<span>${j.cupo > 2 ? "2–" + j.cupo : "2"} JUGADORES</span></div>
       <div class="jg-of-nombre">${escapeHtml(j.nombre)}</div>
       <div class="jg-of-lema">${escapeHtml(j.lema)}</div>
       ${opcionesHtml(k)}
-      <button class="btn jg-of-btn" data-crear="${k}">Jugar ahora <span aria-hidden="true">↗</span></button>
+      <button class="btn jg-of-btn" data-crear="${k}">Abrir sala <span aria-hidden="true">↗</span></button>
     </div>`).join("");
   for (const b of $("vesElige").querySelectorAll("[data-crear]")) {
     b.onclick = () => crear(b.getAttribute("data-crear"), leeOpciones(b));
   }
+  aplicaFiltro();
 
   const mias = new Set(state.mias.map(x => x.id));
   const abiertas = state.salas.filter(s => s.anfitrion !== state.user.uid && !mias.has(s.id) && !s.origen);
-  $("vesSalas").innerHTML = abiertas.length ? abiertas.map(s => `
-    <div class="row row-top">
-      ${pillJuego(s.juego)}
-      <div class="row-title">${escapeHtml(s.nombre || "Alguien")} ${cupoDe(s) > 2 ? "abrió una sala" : "espera rival"}
-        <div class="row-meta">${escapeHtml((JUEGOS[s.juego] || {}).nombre || s.juego)} ·
-          ${Object.keys(s.jugadores || {}).length}/${cupoDe(s)} dentro · abierta ${escapeHtml(timeAgo(s.at))}</div>
+  $("vesCuenta").textContent = abiertas.length;
+  $("vesNSalas").textContent = abiertas.length;
+  $("vesNMias").textContent = state.mias.length;
+
+  /* El botón grande de la marquesina hace lo más probable: entrar en la
+     sala que lleva más rato esperando, o, si no hay ninguna, llevarte a
+     abrir una. */
+  const rapida = $("vesRapida");
+  const primera = abiertas.slice().sort((x, y) => (x.at || 0) - (y.at || 0))[0];
+  rapida.innerHTML = primera
+    ? `Unirme a ${escapeHtml(primera.nombre || "alguien")} <small>${escapeHtml((JUEGOS[primera.juego] || {}).nombre || primera.juego)}</small>`
+    : `Abrir una sala`;
+  rapida.onclick = primera ? () => entrar(primera.id)
+    : () => $("vesCatalogo").scrollIntoView({ behavior: "smooth", block: "start" });
+
+  $("vesSalas").innerHTML = abiertas.length ? abiertas.map(s => {
+    const j = JUEGOS[s.juego] || {}, n = Object.keys(s.jugadores || {}).length, cupo = cupoDe(s);
+    return `
+    <div class="jg-sala" style="--c:${j.color || "#888"}">
+      <span class="jg-sala-ico" aria-hidden="true">${escapeHtml(ICONO[s.juego] || "●")}</span>
+      <div class="jg-sala-txt">
+        <b>${escapeHtml(j.nombre || s.juego)}</b>
+        <span>${escapeHtml(s.nombre || "Alguien")} · ${escapeHtml(timeAgo(s.at))}</span>
+        <span class="jg-sala-cupo" title="${n} de ${cupo} dentro"><i style="width:${Math.round(100 * n / cupo)}%"></i></span>
       </div>
-      <button class="btn" data-entrar="${escapeHtml(s.id)}">Entrar</button>
-    </div>`).join("")
+      <div class="jg-sala-der"><small>${n}/${cupo}</small>
+        <button class="btn" data-entrar="${escapeHtml(s.id)}">Entrar</button></div>
+    </div>`;
+  }).join("")
     : `<div class="vacio">No hay ninguna sala abierta ahora mismo.<br>Abre tú una y pasa el enlace.</div>`;
   for (const b of $("vesSalas").querySelectorAll("[data-entrar]")) {
     b.onclick = () => entrar(b.getAttribute("data-entrar"));
   }
 
   $("vesMias").innerHTML = state.mias.length ? state.mias.map(m => `
-    <div class="row row-top">
-      ${pillJuego(m.juego)}
-      <div class="row-title">${escapeHtml((JUEGOS[m.juego] || {}).nombre || m.juego)}
-        <div class="row-meta">${escapeHtml(timeAgo(m.at))}</div>
+    <div class="jg-sala jg-sala-mia" style="--c:${(JUEGOS[m.juego] || {}).color || "#888"}">
+      <span class="jg-sala-ico" aria-hidden="true">${escapeHtml(ICONO[m.juego] || "●")}</span>
+      <div class="jg-sala-txt">
+        <b>${escapeHtml((JUEGOS[m.juego] || {}).nombre || m.juego)}</b>
+        <span>${escapeHtml(timeAgo(m.at))}</span>
       </div>
-      <button class="btn2" data-abrir="${escapeHtml(m.id)}">Abrir</button>
-      <button class="mini del" data-olvidar="${escapeHtml(m.id)}" title="Quitarla de tu lista">✕</button>
+      <div class="jg-sala-der">
+        <button class="btn2" data-abrir="${escapeHtml(m.id)}">Abrir</button>
+        <button class="mini del" data-olvidar="${escapeHtml(m.id)}" title="Quitarla de tu lista">✕</button></div>
     </div>`).join("")
     : `<div class="vacio">Todavía no has jugado ninguna partida.</div>`;
   for (const b of $("vesMias").querySelectorAll("[data-abrir]")) {
@@ -626,7 +705,6 @@ function leeOpciones(boton) {
   return extra;
 }
 
-const pillJuego = j => `<span class="pill jg-p" style="--c:${(JUEGOS[j] || {}).color || "#888"}">${escapeHtml(ICONO[j] || "●")}</span>`;
 
 function avisoReglas(err) {
   const cod = (err && (err.code || err.message)) || "";
@@ -783,13 +861,36 @@ function datosFin(p, est) {
 }
 
 const CARA = { gano: "🏆", perdi: "😫", empate: "🤝", mirando: "🏁" };
+const FANFARRIA = { gano: "victoria", perdi: "derrota", empate: "empate", mirando: "victoria" };
+
+/* Cuánto se deja ver la última jugada antes de tapar el tablero, por
+   juego: lo que dura su animación y un respiro para leer el marcador.
+   En cartas es el choque entero (`CHOQUE`, 2,6 s): la ronda que gana
+   el trío se enseña igual que las demás. Worms no pone fanfarria — el
+   marco tiene su propio audio y su propio final. */
+const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800 };
 
 function pintaFin(p, est) {
   const caja = $("jgFin");
   const f = datosFin(p, est);
-  if (!f || finCerrado === state.pid || (modulo && modulo.ocupado && modulo.ocupado())) {
-    if (caja.innerHTML) { caja.innerHTML = ""; caja.dataset.firma = ""; }
-    return;
+  const vacia = () => { if (caja.innerHTML) { caja.innerHTML = ""; caja.dataset.firma = ""; } };
+  if (!f || finCerrado === state.pid) { vacia(); return; }
+  /* La pantalla sigue contando la jugada: la pausa empieza cuando acabe
+     (llamará a `listo`), no ahora. */
+  if (modulo && modulo.ocupado && modulo.ocupado()) { finDesde = 0; vacia(); return; }
+  const vivo = finVivo === state.pid;
+  if (vivo && f.motivo !== "abandono") {
+    if (!finDesde) finDesde = Date.now();
+    const falta = (PAUSA_FIN[p.juego] ?? 1200) - (Date.now() - finDesde);
+    if (falta > 0) {
+      const pid = state.pid;
+      clearTimeout(finReloj);
+      finReloj = setTimeout(() => {
+        if (state.pid === pid && state.vista === "partida" && state.partida && state.estado) pintaFin(state.partida, state.estado);
+      }, falta);
+      vacia();
+      return;
+    }
   }
   const yo = state.user.uid, g = f.ganador;
   const juega = !!(p.jugadores || {})[yo];
@@ -803,6 +904,10 @@ function pintaFin(p, est) {
   const firma = clase + titulo + sub + f.motivo + marca + (p.revancha || "");
   if (caja.dataset.firma === firma) return;      // no repintar: reinicia la animación
   caja.dataset.firma = firma;
+  if (vivo && finSonado !== state.pid) {
+    finSonado = state.pid;
+    if (p.juego !== "worms") suena(FANFARRIA[clase]);
+  }
   caja.innerHTML = `
     <div class="jg-fin-capa">
       <div class="jg-fin jg-fin-${clase}" role="dialog" aria-modal="true" aria-label="Resultado de la partida" tabindex="-1">

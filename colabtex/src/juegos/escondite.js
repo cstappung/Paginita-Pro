@@ -72,7 +72,7 @@ export function crearEscondite(ctx) {
   let enviando = false;            // evita mandar el mismo compromiso dos veces
   let bloqueoHasta = 0;            // castigo por fallar
   let vistas = -1;                 // cuántas jugadas llevaba el registro
-  let sonoBuscar = false, sonoFin = false;
+  let sonoBuscar = false;
   let vistaW = 0, vistaH = 0;      // tamaño en píxeles CSS, no del búfer
   let muerto = false, traje = 0, zoom = 1, buscando = false, cursorTeclado = null;
   let fondo = null, firmaFondo = "", reintentarDesde = 0;
@@ -415,10 +415,6 @@ export function crearEscondite(ctx) {
     if (est && est.fase === "buscar" && !sonoBuscar) { sonoBuscar = true; suena("entra"); }
     render(); pintar();
     automatismos().catch(muestraError);
-    if (est && est.fase === "fin" && !sonoFin) {
-      sonoFin = true;
-      setTimeout(() => suena(est.ganador === uid ? "victoria" : "derrota"), 450);
-    }
     if (est && est.ganador !== null && est.ganador !== undefined && !(p.fin && p.fin.at)) {
       terminar(est.ganador, est.motivo);
     }

@@ -51,7 +51,6 @@ export function crearCuadritos(ctx) {
   let p = null, est = null;
   let enviando = false;
   let vistas = -1;             // cuántas jugadas llevaba el log la última vez
-  let sonoFin = false;
   const firmas = {};
 
   function montar(donde) {
@@ -110,12 +109,16 @@ export function crearCuadritos(ctx) {
 
     /* Las cajas cerradas van primero: son el fondo sobre el que se
        pintan las rayas, no un adorno encima. */
+    /* Las recién cerradas entran con un golpe: es el punto que se acaba
+       de ganar, y sin él la última caja de la partida pasaba sin verse. */
+    const recien = new Set(((est.ultima && est.ultima.cajas) || []).map(([f, c]) => `${f}_${c}`));
     for (const k in est.cajas) {
       const [f, c] = k.split("_").map(Number);
       const col = colorDe(est.cajas[k]);
-      out.push(`<rect class="jg-caja" x="${px(c)}" y="${px(f)}" width="${S}" height="${S}"
+      const nueva = recien.has(k) ? " jg-caja-nueva" : "";
+      out.push(`<rect class="jg-caja${nueva}" x="${px(c)}" y="${px(f)}" width="${S}" height="${S}"
         fill="${col}" rx="6"></rect>`);
-      out.push(`<text class="jg-caja-l" x="${px(c) + S / 2}" y="${px(f) + S / 2}"
+      out.push(`<text class="jg-caja-l${nueva}" x="${px(c) + S / 2}" y="${px(f) + S / 2}"
         fill="${col}">${esc((nombreDe(est.cajas[k]) || "?").slice(0, 1).toUpperCase())}</text>`);
     }
 
@@ -186,8 +189,11 @@ export function crearCuadritos(ctx) {
     /* Un hueco por jugador, en orden de asiento, con quien tiene el
        turno marcado y quien se fue en gris: con seis nombres ahí, sin
        esas dos marcas el marcador no dice de quién se espera nada. */
+    const recien = est.ultima && est.ultima.cajas && est.ultima.cajas.length
+      ? est.cajas[est.ultima.cajas[0].join("_")] : "";
     const marca = j => {
       const cl = "jg-m"
+        + (j.uid === recien ? " jg-m-sube" : "")
         + (j.uid === est.turno && est.fase === "jugando" ? " jg-m-turno" : "")
         + (fuera[j.uid] ? " jg-m-fuera" : "");
       return `<span class="${cl}" style="--c:${esc(j.color || "#888")}"
@@ -237,11 +243,6 @@ export function crearCuadritos(ctx) {
     if (vistas >= 0 && n > vistas) suenaJugada(ultimoAutor(partida));
     vistas = n;
     pinta();
-    if (est.fase === "fin" && !sonoFin) {
-      sonoFin = true;
-      setTimeout(() => suena(est.ganador === uid ? "victoria"
-        : est.ganador === "" ? "empate" : "derrota"), 450);
-    }
     if (est.ganador !== null && est.ganador !== undefined && !(p.fin && p.fin.at)) {
       terminar(est.ganador, est.motivo);
     }

@@ -122,7 +122,6 @@ export function crearCartas(ctx) {
   let sec = null;              // {sem, sal} — la semilla privada del mazo
   let secPedido = false;
   let cerrando = false;
-  let sonoFin = false;
   const firmas = {};           // región → última firma pintada
 
   /* ---------- estructura ---------- */
@@ -500,10 +499,6 @@ export function crearCartas(ctx) {
     if (est.rondas.length > vistas) {
       vistas = est.rondas.length; tChoque = ahora(); elegida = null;
       suenaRonda(est.rondas[est.rondas.length - 1]);
-    }
-    if (est.fase === "fin" && !sonoFin) {
-      sonoFin = true;
-      setTimeout(() => suena(est.ganador === uid ? "victoria" : "derrota"), 500);
     }
     pinta();
     automatismos();
