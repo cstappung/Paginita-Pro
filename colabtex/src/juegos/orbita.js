@@ -27,7 +27,8 @@ export function crearOrbita({ uid, jugar, terminar }) {
       ? "Tu turno · " + (est.libre ? "órbita libre" : "elige en la " + est.eje + " iluminada")
       : "Turno de " + (rival?.nombre || "tu rival");
     host.querySelector(".jg-marcador").innerHTML = est.jugadores.map((j, i) =>
-      '<span class="jg-m" style="--c:' + (i ? "#fbba65" : "#b0a0ff") + '"><b>' +
+      '<span class="jg-m' + (est.ultima !== null && est.ultima !== undefined && est.tomadas[est.ultima] === j.uid ? " jg-m-sube" : "") +
+      '" style="--c:' + (i ? "#fbba65" : "#b0a0ff") + '"><b>' +
       (est.puntos[j.uid] || 0) + '</b><span>' + esc(j.uid === uid ? "Tú" : j.nombre) + '</span></span>').join("");
     const focused = document.activeElement?.dataset?.casilla;
     host.querySelector(".jg-orbita-grid").innerHTML = est.estrellas.map((n, i) => {
@@ -62,7 +63,7 @@ export function crearOrbita({ uid, jugar, terminar }) {
   function actualizar(p, estado) {
     est = estado;
     const n = Object.keys(est.tomadas).length;
-    if (vistas >= 0 && n > vistas) suena(est.fase === "fin" ? (est.ganador === uid ? "victoria" : est.ganador === "" ? "empate" : "derrota") : "ficha");
+    if (vistas >= 0 && n > vistas) suena("ficha");
     vistas = n;
     const nueva = JSON.stringify([est.tomadas, est.turno, est.fase, est.jugadores]);
     if (nueva !== firma) { firma = nueva; pintar(); }

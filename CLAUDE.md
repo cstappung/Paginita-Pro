@@ -1521,6 +1521,39 @@ central `jugar()` gate already blocks the *write*, but without the local guard
 the UI still highlighted a card and invited a move that no longer exists —
 which is what "you can repeat the last move infinitely" was.
 
+**The cartel waits for the last move to be seen.** Appearing "the moment the
+board says so" was itself the next bug: the winning box, the last flipped
+discs or the final clash were still animating — or had not even been painted —
+when the overlay covered them, so the last point looked uncounted. `pintaFin`
+now holds the cartel back in two steps: while the screen says `ocupado()`
+(Chain Reaction's replay), and then for a per-game grace (`PAUSA_FIN`, 0.8 s
+for cadena up to 2.8 s for the cartas clash) counted from the moment the end
+was **first seen** (`finDesde`), which restarts if `ocupado()` comes back. The
+grace applies only to a game this tab watched live (`finVivo`) and never to an
+abandono: opening a room that finished yesterday, or seeing your rival leave,
+shows the result at once. The **fanfarria lives there too**, played once per
+room, and only for a game seen live, when the cartel actually appears
+(`finSonado`) — each screen used to play
+its own `sonoFin` on the same repaint that decided the winner, so the victory
+sounded before the move that won it. Worms is excluded: its frame has its own
+ending music. The last point also has to be *visible*: a closed box pops in
+(`.jg-caja-nueva`), a score that just went up bounces (`.jg-m-sube`, cuadritos
+and órbita), and the star just taken in órbita wears `.jg-estrella.ultima`.
+
+**The lobby is a grid with the rooms on the right.** `.jg-ves` has the areas
+`"mq lado" "cat lado"`: the *marquesina* (title, counters, a quick-join button
+and the ring of game icons) and the catalogue on the left, and a **sticky**
+`aside.jg-ves-lado` with *Salas abiertas* and *Tus partidas* spanning both rows
+on the right — scrolling the catalogue must not take the rooms out of view. At
+≤900 px it collapses to `"mq" "lado" "cat"`, so on a phone the open rooms sit
+between the header and the catalogue rather than after seven cards. The quick
+button (`#vesRapida`) joins the **oldest** waiting room — the one that has
+waited longest — or scrolls to the catalogue when there is none. The
+Todos/Duelos/En grupo chips only toggle `hidden` on the cards (`aplicaFiltro`)
+and never repaint them, so the options already picked in a card's selects
+survive a filter change. "Ver el catálogo" scrolls by hand instead of following
+its `#vesCatalogo` anchor, because a hash change is a route change here.
+
 `juegos.html` carries the whole `.jg-*` stylesheet — unlike CSV·Scope this is a
 plain page, not a generated `.dc.html` with nowhere to put it, so the skin
 caches with the page instead of being injected on every load. Its header and

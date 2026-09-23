@@ -53,7 +53,6 @@ export function crearReversi(ctx) {
   let p = null, est = null;
   let enviando = false;
   let vistas = -1;             // cuántas jugadas llevaba el log la última vez
-  let sonoFin = false;
   const firmas = {};
 
   function montar(donde) {
@@ -214,11 +213,6 @@ export function crearReversi(ctx) {
     if (vistas >= 0 && n > vistas) suenaJugada(ultimoAutor(partida));
     vistas = n;
     pinta();
-    if (est.fase === "fin" && !sonoFin) {
-      sonoFin = true;
-      setTimeout(() => suena(est.ganador === uid ? "victoria"
-        : est.ganador === "" ? "empate" : "derrota"), 450);
-    }
     if (est.ganador !== null && est.ganador !== undefined && !(p.fin && p.fin.at)) {
       terminar(est.ganador, est.motivo);
     }
