@@ -50,6 +50,13 @@ export const JUEGOS = {
     minimo: 2,
     cupo: 6
   },
+  worms: {
+    nombre: "Circuit Breakers",
+    lema: "Cuadrillas eléctricas, terreno destructible y un disparo por turno",
+    color: "#f2a33a",
+    minimo: 2,
+    cupo: 6
+  },
   reversi: {
     nombre: "Reversi",
     lema: "Atrapa las fichas del otro entre las tuyas y dales la vuelta",
@@ -528,7 +535,63 @@ export function reducir(p) {
   if (p.juego === "cuadritos") return { ...base, ...redCuadritos(p, js, listos) };
   if (p.juego === "reversi") return { ...base, ...redReversi(p, js) };
   if (p.juego === "orbita") return { ...base, ...redOrbita(p, js) };
+  if (p.juego === "worms") return { ...base, ...redWorms(p, js, listos) };
   return base;
+}
+
+/* ---------- Circuit Breakers ----------
+   La física no pasa por aquí: la simula el propio juego (juegos/worms),
+   que publica al final de cada turno una foto del estado como jugada
+   `turno` con `k` (número de turno), `v` (los uid que siguen en pie),
+   `d` (daño hecho por cada cuadrilla, en orden de asiento) y `ti` (qué
+   cuadrilla jugó). Este reductor solo lee esas cabeceras, que es todo
+   lo que la página necesita: quién juega, quién queda y quién ganó.
+
+   Vale la *primera* foto de cada turno, igual que en el juego: si dos
+   navegadores publican el mismo turno —el que jugó y el que lo releva
+   porque se le cayó la red— el segundo llega tarde y no cuenta. */
+const lista = x => Array.isArray(x) ? x : Object.values(x || {});
+
+export function redWorms(p, js = jugadoresDe(p), listos = true) {
+  const vistos = new Set(), fuera = {};
+  let ultimo = null, turnos = 0, motivo = "";
+  const ids = new Set(js.map(j => j.uid));
+  for (const j of jugadasDe(p)) {
+    if (j.t === "abandona") { if (ids.has(j.uid)) fuera[j.uid] = true; continue; }
+    if (j.t !== "turno") continue;
+    const k = +j.k;
+    if (!(k > 0) || vistos.has(k)) continue;
+    vistos.add(k); turnos++;
+    if (!ultimo || k > +ultimo.k) ultimo = j;
+  }
+  const enPie = ultimo ? new Set(lista(ultimo.v).filter(u => ids.has(u))) : new Set(ids);
+  const vivos = js.filter(j => enPie.has(j.uid) && !fuera[j.uid]);
+  const d = ultimo ? lista(ultimo.d) : [];
+  const puntos = {};
+  js.forEach((j, i) => { puntos[j.uid] = Math.round(+d[i] || 0); });
+
+  let ganador = null;
+  if (listos && vivos.length <= 1) {
+    ganador = vivos.length ? vivos[0].uid : "";
+    /* Si alguien se fue y eso dejó la partida con uno, fue por abandono;
+       si las cuadrillas cayeron combatiendo, es victoria (o apagón). */
+    const sinAbandonos = js.filter(j => enPie.has(j.uid));
+    motivo = sinAbandonos.length > 1 ? "abandono" : vivos.length ? "victoria" : "apagon";
+  }
+  let turno = "";
+  if (vivos.length) {
+    const ti = ultimo ? +ultimo.ti : -1;
+    for (let n = 1; n <= js.length; n++) {
+      const c = js[((ti + n) % js.length + js.length) % js.length];
+      if (vivos.includes(c)) { turno = c.uid; break; }
+    }
+  }
+  return {
+    fase: !listos ? "espera" : ganador !== null ? "fin" : "jugando",
+    turno, turnos, puntos, fuera,
+    vivos: vivos.map(j => j.uid),
+    ganador, motivo
+  };
 }
 
 /* ---------- escondite ---------- */

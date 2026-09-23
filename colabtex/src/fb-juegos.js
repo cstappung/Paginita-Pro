@@ -56,7 +56,7 @@
 import { db } from "./firebase.js";
 import {
   ref, get, set, update, push, remove, onValue, onDisconnect,
-  runTransaction, query, orderByChild, equalTo, serverTimestamp
+  runTransaction, query, orderByChild, equalTo, serverTimestamp, onChildAdded
 } from "firebase/database";
 import {
   claveJugada, semillaAleatoria, salAleatoria, compromiso, LADO, cupoDe
@@ -263,13 +263,19 @@ export function watchPerfil(uid, cb) {
 }
 
 
+/* Lo que eligió quien abrió la sala y la revancha repite. Solo lo que
+   existe: un `undefined` en un `set` hace fallar la escritura entera. */
+const opcionesDe = p => Object.fromEntries(["mapa", "escuadra", "tiempo"]
+  .filter(k => p[k] !== undefined && p[k] !== null).map(k => [k, p[k]]));
+
 /* Una única invitación por partida; las solicitudes simultáneas convergen. */
 export async function pedirRevancha(pid, quien) {
   const original = (await get(ref(db, P + "/" + pid))).val();
   if (!original?.fin || !original.jugadores?.[quien.uid]) throw new Error("La partida debe terminar antes de pedir revancha.");
   if (original.revancha) return original.revancha;
   const candidata = await crearPartida(original.juego, quien, {
-    origen: pid, cupo: cupoDe(original), lado: original.lado || LADO
+    origen: pid, cupo: cupoDe(original), lado: original.lado || LADO,
+    ...opcionesDe(original)
   });
   let res;
   try {
@@ -304,3 +310,21 @@ export function guardarSolo(categoria, uid, dato) {
     return {nombre:dato.nombre, puntos:dato.puntos, tiempo:dato.tiempo, partida:dato.partida};
   }, {applyLocally:false});
 }
+
+/* ---------- el directo de Circuit Breakers ----------
+   `vivo/<pid>` es la pizarra del turno en curso: `h` dice de quién es
+   (turno y uid) y `c` los trozos de entradas que va grabando, uno cada
+   300 ms. Vive fuera de `partidas/` porque es efímero —se reescribe
+   entero en cada turno y se borra al acabar— y porque colgado de la
+   partida lo descargaría cualquiera que abra el vestíbulo o la lista de
+   sus partidas. Lo que queda para siempre es la foto de cada turno, que
+   va al registro de jugadas como cualquier otra jugada. */
+export const escribeVivo = (pid, h) => set(ref(db, `vivo/${pid}`), { h });
+export const trozoVivo = (pid, i, s) => set(ref(db, `vivo/${pid}/c/${i}`), s);
+export const leerVivo = pid => get(ref(db, `vivo/${pid}`)).then(s => s.val(), () => null);
+export function watchVivo(pid, alCabecera, alTrozo) {
+  const a = onValue(ref(db, `vivo/${pid}/h`), s => alCabecera(s.val()), () => {});
+  const b = onChildAdded(ref(db, `vivo/${pid}/c`), s => alTrozo(s.key, s.val()), () => {});
+  return () => { a(); b(); };
+}
+export const borraVivo = pid => remove(ref(db, `vivo/${pid}`)).catch(() => {});

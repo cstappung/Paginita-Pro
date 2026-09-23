@@ -109,7 +109,7 @@
         "origen": {".validate":"newData.isString() && root.child('partidas').child(newData.val()).child('fin').exists() && root.child('partidas').child(newData.val()).child('jugadores').child(auth.uid).exists() && root.child('partidas').child(newData.val()).child('juego').val() === newData.parent().child('juego').val()"},
         "revancha": {".write":"auth != null && !data.exists() && newData.isString() && root.child('partidas').child($pid).child('fin').exists() && root.child('partidas').child($pid).child('jugadores').child(auth.uid).exists()",".validate":"newData.isString() && root.child('partidas').child(newData.val()).child('origen').val() === $pid"},
 
-        "juego": { ".validate": "newData.val() === 'escondite' || newData.val() === 'cartas' || newData.val() === 'cuadritos' || newData.val() === 'reversi' || newData.val() === 'orbita'" },
+        "juego": { ".validate": "newData.val() === 'escondite' || newData.val() === 'cartas' || newData.val() === 'cuadritos' || newData.val() === 'reversi' || newData.val() === 'orbita' || newData.val() === 'worms'" },
         "nombre": { ".validate": "newData.isString() && newData.val().length <= 40" },
         "semilla": { ".validate": "newData.isNumber()" },
         "lado": { ".validate": "newData.isNumber() && newData.val() >= 4 && newData.val() <= 10" },
@@ -156,6 +156,13 @@
       "$uid": {
         ".read": "auth != null && auth.uid === $uid",
         ".write": "auth != null && auth.uid === $uid"
+      }
+    },
+
+    "vivo": {
+      ".read": "auth != null",
+      "$pid": {
+        ".write": "auth != null && root.child('partidas').child($pid).child('jugadores').child(auth.uid).exists() && (!root.child('partidas').child($pid).child('fin').exists() || !newData.exists())"
       }
     },
 

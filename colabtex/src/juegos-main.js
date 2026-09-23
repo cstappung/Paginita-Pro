@@ -39,6 +39,7 @@ import { crearCartas } from "./juegos/cartas.js";
 import { crearCuadritos } from "./juegos/cuadritos.js";
 import { crearOrbita } from "./juegos/orbita.js";
 import { crearReversi } from "./juegos/reversi.js";
+import { crearWorms } from "./juegos/worms.js";
 import { crearRanks } from "./juegos/ranks.js";
 import { mezcla, abrePerfil } from "./juegos/perfil.js";
 import { suena, silenciar, silenciado, ambientar, activarAudio, configurarMusica, musicaActiva, volumenMusica } from "./juegos/sonido.js";
@@ -49,10 +50,10 @@ const VER = (document.currentScript && document.currentScript.src.split("?v=")[1
 
 const FABRICAS = {
   orbita: crearOrbita, escondite: crearEscondite, cartas: crearCartas,
-  cuadritos: crearCuadritos, reversi: crearReversi
+  cuadritos: crearCuadritos, reversi: crearReversi, worms: crearWorms
 };
 
-const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫" };
+const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥" };
 
 /* Lo que puede elegir quien abre la sala, por juego. Vive aquí y no en
    `motor.js` porque son controles y no reglas: el motor ya recorta lo
@@ -65,6 +66,17 @@ const OPCIONES = {
       valores: [2, 3, 4, 5, 6].map(n => ({ v: n, t: n + " jugadores" })) },
     { clave: "lado", etiqueta: "Tablero", por: TAMANOS.mediano.lado,
       valores: Object.keys(TAMANOS).map(k => ({ v: TAMANOS[k].lado, t: etiquetaTamano(k) })) }
+  ],
+  worms: [
+    { clave: "cupo", etiqueta: "Cuadrillas",
+      valores: [2, 3, 4, 5, 6].map(n => ({ v: n, t: n + " jugadores" })) },
+    { clave: "mapa", etiqueta: "Mapa", valores: [
+      { v: "substation", t: "Valle del reactor" }, { v: "alpine", t: "Cordillera Boreal" },
+      { v: "desert", t: "Desierto de cobre" }, { v: "tidal", t: "Puerto de tormenta" }] },
+    { clave: "escuadra", etiqueta: "Robots por cuadrilla", por: 4,
+      valores: [2, 3, 4, 6].map(n => ({ v: n, t: n + " robots" })) },
+    { clave: "tiempo", etiqueta: "Tiempo por turno", por: 45,
+      valores: [30, 45, 60].map(n => ({ v: n, t: n + " s" })) }
   ]
 };
 
@@ -505,8 +517,8 @@ function armazon() {
       <div class="jg-hero-tags"><span>01—06 jugadores</span><span>Por turnos</span><span>Música original</span></div></div>
       <div class="jg-hero-orbita" aria-hidden="true"><i></i><i></i><i></i><b>✦</b><span>ÓRBITA<br><small>EL NUEVO DESAFÍO</small></span></div>
     </section>
-    <div class="jg-section-title"><h2>Elige tu próxima partida</h2><span>07 juegos para desconectar</span></div>
-    <div class="sp-entradas"><a href="#solo/minas" class="sp-entrada sp-e-minas"><small>SINGLEPLAYER / ESTRATEGIA</small><strong>MINA CLUB <span>✦</span></strong><p>Piensa, explora y florece. Tres dificultades y música progresiva.</p><b>Explorar →</b></a><a href="#solo/snake" class="sp-entrada sp-e-snake"><small>SINGLEPLAYER / REFLEJOS</small><strong>SNAKE CLUB <span>ϟ</span></strong><p>Clásico, arcade, portales y Zen. Una más.</p><b>Entrar al circuito →</b></a></div>
+    <div class="jg-section-title"><h2>Elige tu próxima partida</h2><span>08 juegos para desconectar</span></div>
+    <div class="sp-entradas"><a href="#solo/minas" class="sp-entrada sp-e-minas"><small>SINGLEPLAYER / ESTRATEGIA</small><strong>MINA CLUB <span>✦</span></strong><p>Piensa, explora y florece. Tres dificultades y música progresiva.</p><b>Explorar →</b></a><a href="#solo/snake" class="sp-entrada sp-e-snake"><small>SINGLEPLAYER / REFLEJOS</small><strong>SNAKE CLUB <span>ϟ</span></strong><p>Clásico, arcade, portales y Zen. Una más.</p><b>Entrar al circuito →</b></a><a href="juegos/worms/index.html?v=worms-2" class="sp-entrada sp-e-worms"><small>LOCAL · BOTS / ARTILLERÍA</small><strong>CIRCUIT BREAKERS <span>💥</span></strong><p>Tu cuadrilla contra bots o amigos en el mismo equipo. En línea: abre una sala abajo.</p><b>Desplegar →</b></a></div>
     <div id="vesAviso"></div>
     <div class="jg-elige" id="vesElige"></div>
     <h2 class="jg-h2">Salas abiertas</h2>
@@ -584,7 +596,10 @@ function leeOpciones(boton) {
   const tarjeta = boton.closest(".jg-oferta");
   const extra = {};
   if (tarjeta) for (const sel of tarjeta.querySelectorAll("[data-op]")) {
-    extra[sel.getAttribute("data-op")] = Number(sel.value);
+    /* Casi todo es un número, pero el mapa de worms es un nombre: un
+       `Number("alpine")` habría escrito NaN y la base rechaza la sala. */
+    const n = Number(sel.value);
+    extra[sel.getAttribute("data-op")] = Number.isFinite(n) ? n : sel.value;
   }
   return extra;
 }
@@ -813,7 +828,9 @@ const RAZONES = {
   trio: "Reunió tres cartas del mismo elemento en tres colores distintos.",
   puntos: "Cerró más cajas que nadie.",
   fichas: "Acabó con más fichas sobre el tablero.",
-  empate: "Nadie sacó ventaja."
+  empate: "Nadie sacó ventaja.",
+  victoria: "Su cuadrilla fue la última en pie.",
+  apagon: "Apagón total: no quedó ninguna cuadrilla en pie."
 };
 const razon = m => RAZONES[m] || "";
 const nombreDe = (est, uid) => {
@@ -922,6 +939,7 @@ function arteJuego(k) {
   if (k === "orbita") return '<div class="jg-art-orbit"><i></i><i></i><b>✦</b><span>✧</span></div>';
   if (k === "cartas") return '<img src="juegos/cartas/agua/agua_10.png" alt=""><img src="juegos/cartas/fuego/fuego_12.png" alt=""><img src="juegos/cartas/nieve/nieve_11.png" alt="">';
   if (k === "reversi") return '<div class="jg-art-rev">' + Array.from({ length: 16 }, (_, i) => '<i class="' + ([1, 4, 5, 10, 11, 14].includes(i) ? "negra" : [2, 6, 9, 13].includes(i) ? "blanca" : "") + '"></i>').join("") + '</div>';
+  if (k === "worms") return '<div class="jg-art-worms"><i></i><i></i><i></i><b>💥</b><span>CIRCUIT BREAKERS</span></div>';
   if (k === "cuadritos") return '<div class="jg-art-dots">' + Array.from({ length: 9 }, (_, i) => '<i class="' + (i % 3 === 0 ? "llena" : "") + '"></i>').join("") + '</div>';
   return '<div class="jg-art-land"><i></i><i></i><i></i><b>⌖</b><span>ENCUENTRA LO INVISIBLE</span></div>';
 }
