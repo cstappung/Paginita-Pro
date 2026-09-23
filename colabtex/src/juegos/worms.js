@@ -108,7 +108,7 @@ export function crearWorms({ uid, pid, jugar, terminar }) {
     frame.allow = "fullscreen";
     frame.setAttribute("allowfullscreen", "");
     window.addEventListener("message", mensaje);
-    frame.src = "juegos/worms/index.html?modo=online&v=worms-2";
+    frame.src = "juegos/worms/index.html?modo=online&v=worms-3";
     host.append(aviso, frame);
   }
 

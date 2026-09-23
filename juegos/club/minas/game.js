@@ -7,60 +7,58 @@
   const save = (key, value) => { try { localStorage.setItem(window.Club?.storageKey(key) || key, JSON.stringify(value)); } catch { /* Storage is optional. */ } };
   const formatTime = seconds => `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
 
+  /* La música es el tema `minas` del chip de la sala (juegos/audio), y crece
+     con el tablero: el arpegio entra pasado un 30 % despejado y la batería
+     pasado un 65 %, con el tempo subiendo hasta un 8 %. Los efectos van por el
+     mismo chip y se guardan en `voices`, así `stop()` calla también lo que
+     aún no ha empezado a sonar. */
   class Soundtrack {
     constructor() {
       this.enabled = read('mina-sound', true); this.volume = read('mina-volume', 45) / 100;
-      this.context = null; this.master = null; this.loop = null; this.step = 0; this.progress = 0; this.active = false;
-      this.voices = new Set(); this.nextBeat = 0; this.lastOpen = -Infinity;
+      this.context = null; this.master = null; this.loop = null; this.progress = 0; this.active = false;
+      this.voices = new Set(); this.player = null; this.lastOpen = -Infinity;
     }
     unlock() {
       if (!this.enabled) return;
       const Audio = window.AudioContext || window.webkitAudioContext;
-      if (!Audio) { $('music-label').textContent = 'Audio no disponible en este navegador'; return; }
+      if (!Audio || !window.Chip) { $('music-label').textContent = 'Audio no disponible en este navegador'; return; }
       if (!this.context) {
         this.context = new Audio(); this.master = this.context.createGain();
         this.master.gain.value = this.volume * .6; this.master.connect(this.context.destination);
       }
       if (this.context.state === 'suspended') this.context.resume().catch(() => {});
     }
-    note(midi, time, length = .3, volume = .16, type = 'sine') {
-      if (!this.enabled || !this.context || this.context.state !== 'running') return;
-      const ctx = this.context, start = Math.max(time, ctx.currentTime);
-      const oscillator = ctx.createOscillator(), gain = ctx.createGain();
-      oscillator.type = type; oscillator.frequency.value = 440 * 2 ** ((midi - 69) / 12);
-      gain.gain.setValueAtTime(0, start); gain.gain.linearRampToValueAtTime(volume, start + .012);
-      gain.gain.exponentialRampToValueAtTime(.001, start + length);
-      oscillator.connect(gain); gain.connect(this.master); oscillator.start(start); oscillator.stop(start + length + .03);
-      this.voices.add(oscillator);
-      oscillator.onended = () => { this.voices.delete(oscillator); oscillator.disconnect(); gain.disconnect(); };
+    ready() { return this.enabled && this.context && this.context.state === 'running'; }
+    note(midi, time, length = .3, volume = .1, wave = 'p25', extra = {}) {
+      if (!this.ready()) return;
+      const ctx = this.context;
+      window.Chip.voz(ctx, this.master, Object.assign({ t: Math.max(time, ctx.currentTime), f: window.Chip.hz(midi), dur: length, vol: volume, onda: wave, sus: .75 }, extra), this.voices);
     }
     start() {
       if (this.active) return; // Un solo secuenciador, también ante eventos repetidos.
       this.stop(); this.unlock();
       if (!this.enabled || !this.context) return;
-      this.active = true; this.step = 0; this.nextBeat = this.context.currentTime + .08;
+      if (!this.player && window.Temas) this.player = new window.Chip.Reproductor(this.context, this.master, window.Temas.temas.minas);
+      if (!this.player) return;
+      this.player.reinicia();
+      this.active = true;
       this.loop = setInterval(() => this.schedule(), 75); this.schedule(); this.updateUI();
     }
     schedule() {
-      if (!this.active || !this.context || this.context.state !== 'running') return;
-      const ctx = this.context;
-      if (this.nextBeat < ctx.currentTime - .2) this.nextBeat = ctx.currentTime + .03;
-      while (this.nextBeat < ctx.currentTime + .2) {
-        const s = this.step, t = this.nextBeat, beat = 60 / 88;
-        // Una melodía y un bajo discreto. Sin contramelodías ni acordes
-        // sostenidos que invadan el siguiente compás al avanzar el tablero.
-        const phrases = [[72,76,79,76,74,72,67,71], [72,76,81,79,76,72,69,71],
-          [72,77,79,77,76,72,69,72], [71,74,79,77,74,71,67,71]];
-        const bar = Math.floor(s / 16) % 4;
-        if (s % 2 === 0) this.note(phrases[bar][(s % 16) / 2], t, beat * .42, .085);
-        if (s % 8 === 0) this.note([36,33,29,31][bar], t, beat * 1.4, .075, 'triangle');
-        this.step++; this.nextBeat += beat / 4;
-      }
+      if (!this.active || !this.player || this.context.state !== 'running') return;
+      const p = this.progress, r = this.player;
+      r.capas.arp = p > .3 ? 1 : 0; r.capas.bat = p > .65 ? 1 : 0;
+      r.tempo = 1 + Math.min(1, Math.max(0, p)) * .08;
+      r.tick(.2);
     }
     stop(clearVoices = true) {
       clearInterval(this.loop); this.loop = null; this.active = false;
       if (clearVoices) {
-        for (const voice of this.voices) { try { voice.stop(); voice.disconnect(); } catch {} }
+        if (this.player) this.player.detener();
+        for (const v of this.voices) {
+          try { v.fuente.stop(0); } catch {}
+          for (const n of v.nodos) { try { n.disconnect(); } catch {} }
+        }
         this.voices.clear();
       }
       this.lastOpen = -Infinity;
@@ -69,27 +67,30 @@
     effect(kind, amount = 1) {
       this.unlock(); if (!this.context) return;
       const t = this.context.currentTime;
-      // Los clics son acentos breves, no otra canción encima del fondo.
+      // Los clics son acentos breves, no otra canción encima del fondo; abrir
+      // una zona grande suena un poco más agudo que abrir una casilla.
       if (kind === 'open' && t - this.lastOpen >= .12) {
-        this.lastOpen = t; this.note(84, t, .055, .035);
+        this.lastOpen = t; this.note(84 + Math.min(7, Math.floor(Math.log2(Math.max(1, amount)))), t, .05, .05, 'p12');
       }
-      if (kind === 'flag') this.note(79, t, .09, .055, 'triangle');
-      if (kind === 'unflag') this.note(67, t, .08, .04, 'triangle');
+      if (kind === 'flag') this.note(79, t, .09, .07, 'p50', { f1: window.Chip.hz(86) });
+      if (kind === 'unflag') this.note(74, t, .08, .06, 'p50', { f1: window.Chip.hz(67) });
       if (kind === 'win') {
-        [60,64,67,72,76,79,84,79,84].forEach((n, i) => this.note(n, t + i * .14, .55, .19, 'triangle'));
-        [48,60,64,67,72].forEach(n => this.note(n, t + 1.3, 2, .09));
+        [67,71,74,79,83,86,83,86].forEach((n, i) => this.note(n, t + i * .12, .2, .1, 'p25'));
+        this.note(91, t + .98, 1.2, .1, 'p25', { vib: .008 });
+        [55,62,67,71].forEach(n => this.note(n, t + .98, 1.4, .07, 'p12', { sus: .5 }));
+        this.note(43, t + .98, 1.4, .2, 'tri', { sus: 1 });
       }
       if (kind === 'lose') {
-        // Cierre único de cuatro segundos: impacto suave, respuesta en
-        // la menor y resolución. Todas las voces se cancelan al reiniciar.
+        // Cierre de cuatro segundos en sol menor, la tonalidad del tema:
+        // golpe grave, bajada cromática y reposo. Se cancela al reiniciar.
         this.stop();
-        this.note(33, t, .65, .22, 'triangle');
-        [[81,.18,.3],[76,.52,.3],[72,.86,.48],[71,1.38,.3],
-          [74,1.72,.3],[76,2.06,.48],[72,2.65,.55],[69,3.2,1.15]]
-          .forEach(([n,offset,duration]) => this.note(n,t+offset,duration,.12));
-        [[45,0],[41,1.36],[40,2.04],[45,3.2]]
-          .forEach(([n,offset]) => this.note(n,t+offset,.85,.065,'triangle'));
-        [57,60,64].forEach(n => this.note(n,t+3.2,1.25,.035));
+        this.note(31, t, .6, .24, 'tri', { f1: window.Chip.hz(19), sus: 1 });
+        [[74,.18,.3],[70,.52,.3],[67,.86,.48],[66,1.38,.3],
+          [69,1.72,.3],[70,2.06,.48],[69,2.65,.5],[67,3.2,1.15]]
+          .forEach(([n,offset,duration]) => this.note(n,t+offset,duration,.1,'p25',{vib:.006}));
+        [[43,0],[39,1.36],[38,2.04],[43,3.2]]
+          .forEach(([n,offset]) => this.note(n,t+offset,.85,.18,'tri',{sus:1}));
+        [55,58,62].forEach(n => this.note(n,t+3.2,1.25,.04,'p12',{sus:.5}));
       }
     }
     setVolume(value) {
