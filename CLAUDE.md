@@ -45,13 +45,15 @@ Six apps plus a small shared **Informes** page:
   collect by themselves, plus the bugs and ideas people write. See "Informes"
   below.
 - **Juegos** (`juegos.html` + `juegos-app.js`, entry
-  `colabtex/src/juegos-main.js`) — six turn-based games, on the same Google
+  `colabtex/src/juegos-main.js`) — seven turn-based games, on the same Google
   account and the same Firebase project: **Escondite** (hide a person in a
   landscape, then cross the landscapes and race to find the other's),
   **Cartas de los tres elementos** (a Card-Jitsu duel), **Cuadritos** (dots and
-  boxes, two to six players and three board sizes), **Reversi**, **Órbita**
-  and **Circuit Breakers** (a Worms-style artillery game for two to four
-  squads, in an iframe), plus a **Clasificación** tab. See "Juegos" below.
+  boxes, two to six players and three board sizes), **Reversi**, **Órbita**,
+  **Chain Reaction** (critical-mass orbs that burst into their neighbours, two
+  to six players and three grid sizes) and **Circuit Breakers** (a
+  Worms-style artillery game for two to four squads, in an iframe), plus a
+  **Clasificación** tab. See "Juegos" below.
 
 ColabTeX, ColabDraw, FiltroLab, AjusteLab, Juegos and Informes are authored in
 **Spanish** — UI text, comments and identifiers alike. **CSV·Scope is the exception: it is in
@@ -1484,7 +1486,7 @@ Four decisions worth keeping:
 
 ## Juegos architecture
 
-Six turn-based games, on the same Firebase project and the same Google session
+Seven turn-based games, on the same Firebase project and the same Google session
 as ColabTeX and ColabDraw. Turn-based on purpose: with one move per turn the
 network carries a handful of fields and there is nothing to interpolate, so no
 game loop ever has to be synchronised.
@@ -1707,6 +1709,37 @@ Two things about the individual screens are worth knowing before editing them:
   spin once (`.jg-rev-gira`) and the newest wears a ring: that one-shot
   animation is safe only because the board's repaint signature carries
   `est.ultima.casilla`, so the SVG is rebuilt exactly once per move.
+
+**Chain Reaction (`cadena`) is decided by the reducer, and the screen only
+retells it.** `redCadena` in `motor.js` resolves the whole chain when it
+replays a move and keeps, in `ultima`, the board *before* the orb (`antes`)
+and the list of **waves** (`ondas`, the cells that burst in each one);
+`cadena.js` replays that list slowly, from `antes`, with `crOnda` — the very
+function the reducer used — so what is animated can never differ from what
+was decided. Rules that are easy to get wrong:
+
+- **Waves are simultaneous.** Every cell that reached its critical mass (its
+  number of orthogonal neighbours) bursts in the same wave; resolving them one
+  at a time from a queue gives a different board, and the two browsers would
+  have to agree on the queue order.
+- **The chain stops as soon as no active rival has an orb left**, not when the
+  board is stable: past that point the mover already owns every orb and a full
+  board would loop forever. `CR_TOPE` (1000 waves) is only a safety net.
+- **A player is out only after having played** and then reaching zero orbs —
+  otherwise everybody but the first player would be out after move one.
+- The seat decides the colour (`PALETA` in `cadena.js`, fixed), not
+  `colorForUid`: in a six-player board two nearly identical tones would make it
+  unreadable, as in Reversi.
+
+The move that wins is usually the longest chain of the game, so the fin
+overlay **waits for the animation**: the screen exposes `ocupado()` and calls
+`ctx.listo()` when the replay ends, and `pintaFin` in `juegos-main.js` does not
+show the cartel while `ocupado()` is true. A hidden tab skips the replay and
+paints the final board, and a generation counter (`gen`) cancels a replay that
+a newer move made stale. Each orb is **three nested `<g>`s** (position → pop →
+shake → spin) because a CSS `transform` animation *replaces* the element's
+`transform` attribute: animating the group that carries the `translate` would
+throw every orb to the corner of the board. A replay longer than `MAX_ONDAS` (60) jumps straight to the end.
 
 **Circuit Breakers (`worms`) is a whole game in an iframe**, like Mina Club:
 `juegos/worms/` is its own document (canvas, physics, `audio.js`) and

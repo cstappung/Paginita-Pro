@@ -101,6 +101,15 @@ Circuit Breakers no se puede crear. El arreglo es el de siempre: pegar
 `firebase/database.rules.json` entero y **Publicar** — o usar el botón
 **Copiar las reglas** del cartel que sale en la página de juegos.
 
+### ⚠ Chain Reaction (cadena) pide publicar otra vez
+
+El mismo caso otra vez: `'cadena'` tiene que estar en la lista del campo
+`juego`, y la sala guarda además el tamaño del tablero en un campo nuevo,
+`malla` (solo admite `chica`, `clasica` o `grande`). Con las reglas viejas la
+sala de Chain Reaction no se puede crear. El arreglo es el de siempre: pegar
+`firebase/database.rules.json` entero y **Publicar**, o usar el botón
+**Copiar las reglas** del cartel de la página de juegos.
+
 ## 2. Reglas de Storage
 
 1. Consola → **Storage** → pestaña **Reglas**.
