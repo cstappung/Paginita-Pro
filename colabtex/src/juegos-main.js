@@ -33,13 +33,14 @@ import { crearSolo } from "./juegos/solo/club.js";
 import { watchAuth, loginGoogle, logout } from "./firebase.js";
 import * as fb from "./fb-juegos.js";
 import { escapeHtml, timeAgo, colorForUid } from "./util.js";
-import { JUEGOS, reducir, jugadasDe, acumula, cupoDe, TAMANOS, etiquetaTamano, meToca, progreso } from "./juegos/motor.js";
+import { JUEGOS, reducir, jugadasDe, acumula, cupoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS } from "./juegos/motor.js";
 import { crearEscondite } from "./juegos/escondite.js";
 import { crearCartas } from "./juegos/cartas.js";
 import { crearCuadritos } from "./juegos/cuadritos.js";
 import { crearOrbita } from "./juegos/orbita.js";
 import { crearReversi } from "./juegos/reversi.js";
 import { crearWorms } from "./juegos/worms.js";
+import { crearCadena } from "./juegos/cadena.js";
 import { crearRanks } from "./juegos/ranks.js";
 import { mezcla, abrePerfil } from "./juegos/perfil.js";
 import { suena, silenciar, silenciado, ambientar, ajustarMusica, activarAudio, configurarMusica, musicaActiva, volumenMusica } from "./juegos/sonido.js";
@@ -50,10 +51,11 @@ const VER = (document.currentScript && document.currentScript.src.split("?v=")[1
 
 const FABRICAS = {
   orbita: crearOrbita, escondite: crearEscondite, cartas: crearCartas,
-  cuadritos: crearCuadritos, reversi: crearReversi, worms: crearWorms
+  cuadritos: crearCuadritos, reversi: crearReversi, worms: crearWorms,
+  cadena: crearCadena
 };
 
-const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥" };
+const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛" };
 
 /* Lo que puede elegir quien abre la sala, por juego. Vive aquí y no en
    `motor.js` porque son controles y no reglas: el motor ya recorta lo
@@ -77,6 +79,12 @@ const OPCIONES = {
       valores: [2, 3, 4, 6].map(n => ({ v: n, t: n + " robots" })) },
     { clave: "tiempo", etiqueta: "Tiempo por turno", por: 45,
       valores: [30, 45, 60].map(n => ({ v: n, t: n + " s" })) }
+  ],
+  cadena: [
+    { clave: "cupo", etiqueta: "Jugadores",
+      valores: [2, 3, 4, 5, 6].map(n => ({ v: n, t: n + " jugadores" })) },
+    { clave: "malla", etiqueta: "Tablero", por: "clasica",
+      valores: Object.keys(CR_MALLAS).map(k => ({ v: k, t: `${CR_MALLAS[k].nombre} ${CR_MALLAS[k].cols}×${CR_MALLAS[k].filas}` })) }
   ]
 };
 
@@ -738,7 +746,10 @@ function montaJuego(p) {
      juego es un objeto, y ramificarlo por juego lo convierte en cuatro. */
   modulo = fab({
     uid: state.user.uid, pid: state.pid, jugar, terminar, ahora: fb.ahora,
-    secreto: () => fb.leerSecreto(state.pid, state.user.uid)
+    secreto: () => fb.leerSecreto(state.pid, state.user.uid),
+    /* La pantalla avisa cuando acaba de contar una jugada: el cartel del
+       final espera a que la cadena que ganó la partida se haya visto. */
+    listo: () => { if (state.partida && state.estado) pintaFin(state.partida, state.estado); }
   });
   modulo.montar($("jgHost"));
   pidMontado = state.pid;
@@ -776,7 +787,7 @@ const CARA = { gano: "🏆", perdi: "😫", empate: "🤝", mirando: "🏁" };
 function pintaFin(p, est) {
   const caja = $("jgFin");
   const f = datosFin(p, est);
-  if (!f || finCerrado === state.pid) {
+  if (!f || finCerrado === state.pid || (modulo && modulo.ocupado && modulo.ocupado())) {
     if (caja.innerHTML) { caja.innerHTML = ""; caja.dataset.firma = ""; }
     return;
   }
@@ -848,7 +859,8 @@ const RAZONES = {
   fichas: "Acabó con más fichas sobre el tablero.",
   empate: "Nadie sacó ventaja.",
   victoria: "Su cuadrilla fue la última en pie.",
-  apagon: "Apagón total: no quedó ninguna cuadrilla en pie."
+  apagon: "Apagón total: no quedó ninguna cuadrilla en pie.",
+  reaccion: "Su reacción en cadena se tragó a todos los demás."
 };
 const razon = m => RAZONES[m] || "";
 const nombreDe = (est, uid) => {
@@ -958,6 +970,7 @@ function arteJuego(k) {
   if (k === "cartas") return '<img src="juegos/cartas/agua/agua_10.png" alt=""><img src="juegos/cartas/fuego/fuego_12.png" alt=""><img src="juegos/cartas/nieve/nieve_11.png" alt="">';
   if (k === "reversi") return '<div class="jg-art-rev">' + Array.from({ length: 16 }, (_, i) => '<i class="' + ([1, 4, 5, 10, 11, 14].includes(i) ? "negra" : [2, 6, 9, 13].includes(i) ? "blanca" : "") + '"></i>').join("") + '</div>';
   if (k === "worms") return '<div class="jg-art-worms"><i></i><i></i><i></i><b>💥</b><span>CIRCUIT BREAKERS</span></div>';
+  if (k === "cadena") return '<div class="jg-art-cr">' + Array.from({ length: 12 }, (_, i) => '<i class="o' + [1, 0, 2, 1, 3, 0, 1, 2, 0, 3, 2, 1][i] + " c" + (i % 4) + '"></i>').join("") + '</div>';
   if (k === "cuadritos") return '<div class="jg-art-dots">' + Array.from({ length: 9 }, (_, i) => '<i class="' + (i % 3 === 0 ? "llena" : "") + '"></i>').join("") + '</div>';
   return '<div class="jg-art-land"><i></i><i></i><i></i><b>⌖</b><span>ENCUENTRA LO INVISIBLE</span></div>';
 }

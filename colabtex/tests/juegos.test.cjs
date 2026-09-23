@@ -44,7 +44,7 @@ test('100 partidas completas terminan, conservan puntos y convergen',()=>{
  }assert.ok(empates>0);
 });
 test('los cuatro juegos anteriores siguen arrancando',()=>{
- for(const juego of ['reversi','cuadritos','cartas','escondite']){const e=reducir({...sala(),juego});assert.equal(e.listos,true);assert.notEqual(e.fase,'fin');}
+ for(const juego of ['reversi','cuadritos','cartas','escondite','cadena']){const e=reducir({...sala(),juego});assert.equal(e.listos,true);assert.notEqual(e.fase,'fin');}
 });
 test('Escondite: escenarios densos reproducibles y coordenadas válidas',()=>{
  const a=context.escena(42),b=context.escena(42);
@@ -107,4 +107,80 @@ test('progreso: de 0 a 1 según lo jugado, 0 fuera de juego',()=>{
  e=reducir(q);assert.equal(progreso(e,'cuadritos'),0);
  assert.equal(progreso(reducir(sala()),'escondite'),0);assert.equal(progreso(null,'orbita'),0);
  const f=sala();mover(f,{t:'abandona',uid:'a'});assert.equal(progreso(reducir(f),'orbita'),0,'terminada ya no acelera');
+});
+const cr=(n=2,malla)=>({juego:'cadena',semilla:1,estado:'jugando',cupo:n,...(malla?{malla}:{}),
+ jugadores:Object.fromEntries(['a','b','c','d','e','f'].slice(0,n).map((u,i)=>[u,{nombre:u,orden:i}])),jugadas:{}});
+const pon=(p,uid,f,c)=>mover(p,{t:'p',uid,f,c});
+test('Reacción en cadena: masas críticas y vecinas',()=>{
+ const {crCritica,crVecinas}=context;
+ assert.equal(crCritica(0,9,6),2);assert.equal(crCritica(3,9,6),3);assert.equal(crCritica(7,9,6),4);assert.equal(crCritica(53,9,6),2);
+ assert.deepEqual(copia(crVecinas(0,9,6)).sort((x,y)=>x-y),[1,6]);assert.deepEqual(copia(crVecinas(7,9,6)).sort((x,y)=>x-y),[1,6,8,13]);
+ const e=reducir(cr());assert.equal(e.filas,9);assert.equal(e.cols,6);assert.equal(e.tab.length,54);
+ const g=reducir(cr(2,'grande'));assert.equal(g.filas*g.cols,96);
+ assert.equal(reducir(cr(2,'nada')).malla,'clasica');
+});
+test('Reacción en cadena: turnos, celdas ajenas y jugadas inválidas',()=>{
+ const p=cr();let e=reducir(p);assert.equal(e.turno,'a');assert.equal(context.meToca(e,'a'),true);
+ e=pon(p,'b',0,0);assert.equal(e.movs,0,'fuera de turno no existe');
+ e=pon(p,'a',0,0);assert.equal(e.turno,'b');
+ e=pon(p,'b',0,0);assert.equal(e.movs,1,'la celda es de a');
+ for(const [f,c] of [[-1,0],[9,0],[0,6],[0.5,1],[null,1],['1',1]])e=pon(p,'b',f,c);
+ assert.equal(e.movs,1);assert.equal(e.turno,'b');
+ e=pon(p,'b',8,5);assert.equal(e.turno,'a');assert.equal(e.cuenta.a,1);assert.equal(e.cuenta.b,1);
+ assert.equal(e.fase,'jugando','con cero orbes antes de jugar nadie está fuera');
+});
+test('Reacción en cadena: estallido de esquina y captura en cadena',()=>{
+ const p=cr();
+ pon(p,'a',0,0);pon(p,'b',0,1);          // b en el borde, al lado de la esquina de a
+ pon(p,'a',5,5);pon(p,'b',0,1);          // b: dos en (0,1), crítica 3
+ pon(p,'a',5,4);pon(p,'b',8,5);          // b guarda otra celda lejos
+ let e=pon(p,'a',0,0);                   // la esquina estalla y (0,1), ya con 3 de a, también
+ assert.deepEqual(copia(e.ultima.ondas),[[0],[1]]);
+ assert.equal(e.tab[0].u,'a');assert.equal(e.tab[0].n,1);assert.equal(e.tab[1],null);
+ assert.equal(e.tab[2].n,1);assert.equal(e.tab[7].n,1);assert.equal(e.tab[6].n,1);
+ assert.equal(e.ultima.capturadas,0,'(0,1) se vació: no queda como capturada');
+ assert.equal(e.cuenta.b,1);assert.equal(e.fase,'jugando');assert.equal(e.turno,'b');
+ assert.equal(e.tab.reduce((s,o)=>s+(o?o.n:0),0),7,'los orbes se conservan');
+});
+test('Reacción en cadena: sin orbes rivales la cadena se corta y gana',()=>{
+ const p=cr();
+ pon(p,'a',0,0);pon(p,'b',0,1);pon(p,'a',5,5);pon(p,'b',0,1);
+ const e=pon(p,'a',0,0);
+ assert.equal(e.ultima.ondas.length,1,'con b sin orbes la segunda onda sobra');
+ assert.equal(e.fase,'fin');assert.equal(e.ganador,'a');assert.equal(e.motivo,'reaccion');assert.equal(e.turno,'');
+ assert.deepEqual(copia(e.ultima.caen),['b']);assert.equal(e.ultima.capturadas,1);
+ assert.equal(context.progreso(e,'cadena'),0,'terminada ya no acelera');
+});
+test('Reacción en cadena: onda simultánea reproducible con crOnda',()=>{
+ const {crOnda,crPon}=context;
+ const t=new Array(9).fill(null);t[4]={u:'a',n:4};t[1]={u:'b',n:1};
+ const r=crPon(t,4,'a',3,3,new Set(['b']));
+ assert.equal(r.ondas.length>=1,true);
+ let u=t.slice();u[4]={u:'a',n:5};for(const o of r.ondas)u=crOnda(u,o,'a',3,3);
+ assert.deepEqual(copia(u),copia(r.tab));assert.equal(r.tab[1].u,'a');
+});
+test('Reacción en cadena: seis jugadores, abandono y turno que salta',()=>{
+ const p=cr(3);pon(p,'a',0,0);let e=pon(p,'b',4,2);assert.equal(e.turno,'c');
+ e=mover(p,{t:'abandona',uid:'c'});assert.equal(e.turno,'a');assert.equal(e.fase,'jugando');
+ e=pon(p,'a',8,5);assert.equal(e.turno,'b');
+ e=mover(p,{t:'abandona',uid:'a'});assert.equal(e.ganador,'b');assert.equal(e.motivo,'abandono');
+ const antes=copia(e);pon(p,'b',4,2);assert.deepEqual(copia(reducir(p)),antes,'tras el final no cambia nada');
+ const z=cr(3);z.estado='esperando';delete z.jugadores.c;assert.equal(reducir(z).fase,'espera');
+});
+test('Reacción en cadena: 200 partidas al azar terminan con un solo color',()=>{
+ const {rng,progreso}=context;
+ for(let s=1;s<=200;s++){
+  const n=2+s%5,p=cr(n,['chica','clasica','grande'][s%3]),r=rng(s);let e=reducir(p),guard=0;
+  let total=0;
+  while(e.fase==='jugando'&&guard++<3000){
+   const libres=[];for(let i=0;i<e.tab.length;i++)if(!e.tab[i]||e.tab[i].u===e.turno)libres.push(i);
+   const i=libres[Math.floor(r()*libres.length)];const antes=e.movs;e=pon(p,e.turno,Math.floor(i/e.cols),i%e.cols);
+   assert.equal(e.movs,antes+1);total++;
+   assert.ok(progreso(e,'cadena')>=0&&progreso(e,'cadena')<=1);
+   const orbes=e.tab.reduce((a,o)=>a+(o?o.n:0),0);assert.equal(orbes,total,'se conserva la masa');
+  }
+  assert.equal(e.fase,'fin','termina: '+s);assert.equal(e.motivo,'reaccion');
+  assert.deepEqual([...new Set(e.tab.filter(Boolean).map(o=>o.u))],[e.ganador]);
+  assert.deepEqual(copia(e),copia(reducir(copia(p))));
+ }
 });

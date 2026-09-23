@@ -10,6 +10,7 @@
  *   cartas     La hirajoshi, 144 — escala japonesa sobre tambores taiko.
  *   cuadritos  Do mayor, 132 con swing — el tema de cuadernillo alegre.
  *   reversi    Re menor, 120 — pulso fino (12 %), casi de clavecín.
+ *   cadena     Fa# menor, 138 — arpegios que suben como la cadena, con eco.
  *   minas      Sol menor, 116 — staccato nervioso; las capas entran con el avance.
  *   snake      Do dórico, 150 — funk: bajo con octavas y caja a contratiempo.
  *   worms-menu / worms-combate  Mi mayor tranquilo y Si menor de batalla.
@@ -129,6 +130,22 @@
         "R - . R F - . F O - . O F - . F", "k...h...s...h...", 2)
     },
     orden: "A A B"
+  };
+
+  T.cadena = {
+    bpm: 138,
+    lead: { onda: "p50", vol: .13, vib: .006, eco: { fb: .3, mezcla: .25 } },
+    bajo: { onda: "tri", vol: .21 }, arp: { onda: "p12", vol: .06, oct: 4, paso: .03 }, bat: { vol: .34 },
+    secciones: {
+      I: sec("F#m D", "", "R . R . R . R . R . R . O . F .", "k...h...k...h..h", 2),
+      A: sec("F#m D A E",
+        "C#5*2 F#5*2 A5*2 F#5*2 C#6*4 B5*2 A5*2 A5*2 F#5*2 D5*4 F#5*2 A5*2 D6*4 C#6*2 A5*2 E5*2 A5*2 C#6*4 E6*4 B5*2 G#5*2 E5*4 G#5*2 B5*2 E5*4",
+        "R . R . F . R . O . R . F . R .", "k.h.s.hkk.h.s.hh", 2),
+      B: sec("Bm D F#m E",
+        "B4*2 D5*2 F#5*2 B5*2 A5*2 F#5*2 D5*4 D5*2 F#5*2 A5*2 D6*2 C#6*2 A5*2 F#5*4 F#5*2 A5*2 C#6*2 F#6*2 E6*2 C#6*2 A5*4 G#5*2 B5*2 E6*4 D#6*2 C#6*2 B5*4",
+        "R . R R F . R . O . R R F . O .", "k.hks.hkk.hks.hx", 2)
+    },
+    orden: "I A A B A B"
   };
 
   T.minas = {

@@ -24,9 +24,9 @@
    ============================================================ */
 
 /* `minimo` es cuántos hacen falta para empezar y `cupo` cuántos caben
-   como mucho. Solo cuadritos admite más de dos: los otros tres son
-   duelos por construcción — el escondite cruza *dos* paisajes, las
-   cartas resuelven *un* choque y el reversi tiene *dos* colores. */
+   como mucho. Cuadritos, Circuit Breakers y la reacción en cadena
+   admiten más de dos; el resto son duelos por construcción — el
+   escondite cruza *dos* paisajes, las cartas resuelven *un* choque y el reversi tiene *dos* colores. */
 export const JUEGOS = {
   orbita: { nombre: "Órbita", lema: "Captura estrellas y decide el próximo movimiento de tu rival", color: "#8860ed", minimo: 2, cupo: 2 },
   escondite: {
@@ -63,6 +63,13 @@ export const JUEGOS = {
     color: "#0d9488",
     minimo: 2,
     cupo: 2
+  },
+  cadena: {
+    nombre: "Reacción en cadena",
+    lema: "Carga una celda hasta que estalle y conquista a sus vecinas en cadena",
+    color: "#ff3d7f",
+    minimo: 2,
+    cupo: 6
   }
 };
 
@@ -536,6 +543,7 @@ export function reducir(p) {
   if (p.juego === "reversi") return { ...base, ...redReversi(p, js) };
   if (p.juego === "orbita") return { ...base, ...redOrbita(p, js) };
   if (p.juego === "worms") return { ...base, ...redWorms(p, js, listos) };
+  if (p.juego === "cadena") return { ...base, ...redCadena(p, js, listos) };
   return base;
 }
 
@@ -574,6 +582,14 @@ export function progreso(est, juego) {
     return c((casillas - (est.libres || 0)) / casillas);
   }
   if (juego === "orbita" && est.estrellas) return c(Object.keys(est.tomadas || {}).length / est.estrellas.length);
+  /* En la reacción en cadena el tablero no se llena: se tiñe. Cuenta
+     qué parte de lo ocupado es de quien va delante, y no antes de que
+     todos hayan jugado dos veces — al principio uno solo ya es «todo». */
+  if (juego === "cadena" && est.celdas) {
+    if ((est.movs || 0) < 2 * (est.jugadores || []).length) return 0;
+    const v = Object.values(est.celdas), tot = v.reduce((a, b) => a + b, 0);
+    return tot ? c(Math.max(...v) / tot) : 0;
+  }
   if (juego === "cartas" && est.ganadas) return c(Math.max(0, ...Object.values(est.ganadas).map(g => g.length)) / 5);
   return 0;
 }
@@ -863,6 +879,170 @@ function redReversi(p, js) {
     legales: turno ? revJugadas(tab, turno, lado) : {},
     ultima, ganador, motivo,
     libres: lado * lado - Object.keys(tab).length
+  };
+}
+
+/* ---------- reacción en cadena ----------
+   Cada celda aguanta tantos orbes como vecinas tiene menos uno: dos en
+   una esquina, tres en un borde, cuatro en el centro. La que llega a su
+   masa crítica estalla, manda un orbe a cada vecina y las hace suyas, y
+   esas pueden estallar a su vez. Se pone en una celda vacía o propia.
+
+   Tres cosas que sostienen el reductor:
+
+   - **Las ondas son simultáneas.** En cada onda primero se vacían todas
+     las celdas inestables y luego se reparten los orbes; hacerlo celda
+     a celda daría un tablero distinto según el orden en que se
+     recorran, y las dos pantallas tienen que llegar al mismo.
+   - **Solo pueden ser inestables las celdas de quien mueve.** Antes de
+     su jugada el tablero está quieto, y lo que estalla solo pinta del
+     color de quien mueve. Así una onda nunca tiene dos dueños.
+   - **La cadena se corta cuando no queda un orbe rival.** Con el
+     tablero entero de un color, la reacción ya no tiene fin — cada
+     onda alimenta a la siguiente —, y además ya no hace falta: ha
+     ganado. `CR_TOPE` es solo una red por si acaso. En la primera
+     vuelta no puede estallar nada (cada uno pone un único orbe en una
+     celda vacía y la masa crítica mínima es dos), así que cuando algo
+     estalla todos han jugado ya y «sin orbes rivales» es exactamente
+     «sin rivales»: el corte nunca deja un tablero inestable a mitad de
+     partida.
+
+   Nadie queda fuera antes de haber jugado: al empezar todos tienen
+   cero orbes, y eso no es haber perdido. Los orbes de quien abandona
+   se quedan en el tablero —se pueden capturar— pero ya no cuentan como
+   rivales. */
+export const CR_MALLAS = {
+  chica: { nombre: "Chica", filas: 7, cols: 5 },
+  clasica: { nombre: "Clásica", filas: 9, cols: 6 },
+  grande: { nombre: "Grande", filas: 12, cols: 8 }
+};
+export const CR_TOPE = 1000;
+
+export function mallaDe(p) {
+  const k = p && p.malla;
+  return CR_MALLAS[k] ? k : "clasica";
+}
+
+export function crCritica(i, filas, cols) {
+  const f = Math.floor(i / cols), c = i % cols;
+  return (f > 0) + (f < filas - 1) + (c > 0) + (c < cols - 1);
+}
+
+export function crVecinas(i, filas, cols) {
+  const f = Math.floor(i / cols), c = i % cols, v = [];
+  if (f > 0) v.push(i - cols);
+  if (f < filas - 1) v.push(i + cols);
+  if (c > 0) v.push(i - 1);
+  if (c < cols - 1) v.push(i + 1);
+  return v;
+}
+
+/* Una onda: estallan a la vez las celdas de `estallan` y cada vecina
+   recibe un orbe y pasa a ser de `uid`. Devuelve un tablero nuevo; la
+   pantalla la usa también para animar la jugada paso a paso. */
+export function crOnda(tab, estallan, uid, filas, cols) {
+  const t = tab.slice();
+  for (const i of estallan) {
+    const n = t[i].n - crCritica(i, filas, cols);
+    t[i] = n > 0 ? { u: t[i].u, n } : null;
+  }
+  for (const i of estallan) {
+    for (const v of crVecinas(i, filas, cols)) t[v] = { u: uid, n: (t[v] ? t[v].n : 0) + 1 };
+  }
+  return t;
+}
+
+export const crInestables = (tab, filas, cols) => {
+  const r = [];
+  for (let i = 0; i < tab.length; i++) if (tab[i] && tab[i].n >= crCritica(i, filas, cols)) r.push(i);
+  return r;
+};
+
+/* Pone un orbe de `uid` en `i` y deja correr la cadena. `rivales` es el
+   conjunto de dueños cuyos orbes impiden dar la partida por acabada. */
+export function crPon(tab, i, uid, filas, cols, rivales) {
+  let t = tab.slice();
+  t[i] = { u: uid, n: (t[i] ? t[i].n : 0) + 1 };
+  const ondas = [];
+  const hayRival = x => x.some(o => o && rivales.has(o.u));
+  while (ondas.length < CR_TOPE) {
+    const inest = crInestables(t, filas, cols);
+    if (!inest.length || !hayRival(t)) break;
+    ondas.push(inest);
+    t = crOnda(t, inest, uid, filas, cols);
+  }
+  return { tab: t, ondas };
+}
+
+export function crCuenta(tab) {
+  const orbes = {}, celdas = {};
+  for (const o of tab) {
+    if (!o) continue;
+    orbes[o.u] = (orbes[o.u] || 0) + o.n;
+    celdas[o.u] = (celdas[o.u] || 0) + 1;
+  }
+  return { orbes, celdas };
+}
+
+function redCadena(p, js, listos) {
+  const malla = mallaDe(p);
+  const { filas, cols } = CR_MALLAS[malla];
+  let tab = new Array(filas * cols).fill(null);
+  const fuera = {}, jugo = {}, caidos = {};
+  let turno = js.length ? js[0].uid : "";
+  let ganador = null, motivo = "", movs = 0, ultima = null;
+
+  const vivo = uid => !fuera[uid] && !caidos[uid];
+  const vivos = () => js.filter(x => vivo(x.uid));
+  const siguiente = uid => {
+    const k0 = js.findIndex(x => x.uid === uid);
+    for (let k = 1; k <= js.length; k++) {
+      const c = js[(k0 + k) % js.length];
+      if (vivo(c.uid)) return c.uid;
+    }
+    return uid;
+  };
+
+  for (const j of jugadasDe(p)) {
+    if (j.t === "abandona") {
+      if (ganador !== null || fuera[j.uid] || !js.some(x => x.uid === j.uid)) continue;
+      const tenia = turno === j.uid;
+      fuera[j.uid] = true;
+      const quedan = vivos();
+      if (quedan.length <= 1) { ganador = quedan.length ? quedan[0].uid : ""; motivo = "abandono"; }
+      else if (tenia) turno = siguiente(j.uid);
+      continue;
+    }
+    if (j.t !== "p" || ganador !== null || !listos || j.uid !== turno) continue;
+    const f = j.f, c = j.c;
+    if (!Number.isInteger(f) || !Number.isInteger(c) || f < 0 || c < 0 || f >= filas || c >= cols) continue;
+    const i = f * cols + c;
+    if (tab[i] && tab[i].u !== j.uid) continue;          // celda ajena: no se puede
+    const rivales = new Set(js.filter(x => x.uid !== j.uid && !fuera[x.uid]).map(x => x.uid));
+    const antes = tab;
+    const r = crPon(tab, i, j.uid, filas, cols, rivales);
+    tab = r.tab;
+    jugo[j.uid] = true;
+    movs++;
+    const { orbes } = crCuenta(tab);
+    const caen = [];
+    for (const x of js) {
+      if (!vivo(x.uid) || !jugo[x.uid] || orbes[x.uid]) continue;
+      caidos[x.uid] = true; caen.push(x.uid);
+    }
+    let capturadas = 0;
+    for (let k = 0; k < tab.length; k++) if (tab[k] && tab[k].u === j.uid && antes[k] && antes[k].u !== j.uid) capturadas++;
+    ultima = { uid: j.uid, i, f, c, antes, ondas: r.ondas, capturadas, caen, n: movs };
+    const quedan = vivos();
+    if (quedan.length <= 1) { ganador = quedan.length ? quedan[0].uid : j.uid; motivo = "reaccion"; }
+    else turno = siguiente(j.uid);
+  }
+
+  const { orbes, celdas } = crCuenta(tab);
+  return {
+    fase: !listos ? "espera" : (ganador !== null ? "fin" : "jugando"),
+    malla, filas, cols, tab, turno: ganador !== null ? "" : turno,
+    fuera, caidos, jugo, cuenta: orbes, celdas, ultima, ganador, motivo, movs
   };
 }
 

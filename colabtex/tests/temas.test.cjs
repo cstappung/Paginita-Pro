@@ -21,7 +21,7 @@ const fichas = (txt, tipo) => {
 const sonoras = (txt, tipo) => fichas(txt, tipo).filter(f => f !== "-" && f !== ".").length;
 
 test("temas: están los de cada juego y todos compilan", () => {
-  for (const id of ["orbita", "cartas", "cuadritos", "reversi", "minas", "snake", "worms-menu", "worms-combate"])
+  for (const id of ["orbita", "cartas", "cuadritos", "reversi", "cadena", "minas", "snake", "worms-menu", "worms-combate"])
     assert.ok(Temas.temas[id], "falta el tema " + id);
   for (const [id, c] of Object.entries(Temas.temas)) {
     assert.ok(c.bpm >= 60 && c.bpm <= 220, id + ": bpm " + c.bpm);

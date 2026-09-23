@@ -97,6 +97,14 @@ const REPERTORIO = {
   golpe:    (a, t) => { N(a, t, 0.5, { vol: 0.2, tono: 1.1, tono1: 0.18 });
                         P(a, t, 190, 0.32, { f1: 45, onda: "tri", vol: 0.22, sus: 0.6 });
                         P(a, t, 1200, 0.16, { f1: 200, onda: "p12", vol: 0.05 }); },
+  /* La reacción en cadena: el orbe que se posa es un «plip» corto, y cada
+     onda de la cadena estalla medio tono más aguda que la anterior —
+     `k` es el número de onda —, que es lo que hace que una cadena larga
+     suene a subida y no a la misma explosión repetida. */
+  orbe:     (a, t) => P(a, t, H(76), 0.06, { f1: H(88), onda: "p50", vol: 0.07 }),
+  estalla:  (a, t, k = 0) => { const n = Math.min(k || 0, 24);
+                               N(a, t, 0.18, { vol: 0.1, tono: 1.4 + n * 0.05, tono1: 0.4 });
+                               P(a, t, H(60 + n), 0.09, { f1: H(72 + n), onda: "p25", vol: 0.07 }); },
   victoria: (a, t) => {
     [[72, 0, .09], [76, .1, .09], [79, .2, .09], [84, .3, .16], [79, .48, .08], [84, .58, .5]]
       .forEach(([n, d, l]) => { P(a, t + d, H(n), l, { vol: 0.09 }); P(a, t + d, H(n - 12), l, { onda: "p12", vol: 0.04 }); });
@@ -110,12 +118,12 @@ const REPERTORIO = {
 };
 
 /* Lo único que exportan los juegos. Nunca lanza: ver la decisión 3. */
-export function suena(nombre) {
+export function suena(nombre, x) {
   try {
     const a = motor();
     if (!a) return;
     const f = REPERTORIO[nombre];
-    if (f && fx()) f(a, a.currentTime + 0.01);
+    if (f && fx()) f(a, a.currentTime + 0.01, x);
   } catch (e) { /* un sonido que falla no puede tumbar una partida */ }
 }
 
