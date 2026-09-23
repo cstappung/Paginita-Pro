@@ -91,6 +91,16 @@ entero y **Publicar** — y no hay que tocar nada más. Desde la propia página
 de juegos, cuando la base rechaza algo sale un cartel que lo explica y trae el
 archivo al portapapeles con un botón.
 
+### ⚠ Circuit Breakers (worms) pide publicar otra vez
+
+Es el mismo caso que Reversi, dos veces: `'worms'` tiene que estar en la lista
+del campo `juego`, y además hay un nodo nuevo, `vivo`, por donde viaja en
+directo lo que hace quien tiene el turno (solo lo escriben los jugadores de
+esa sala, y solo mientras la partida no termina). Sin publicar, la sala de
+Circuit Breakers no se puede crear. El arreglo es el de siempre: pegar
+`firebase/database.rules.json` entero y **Publicar** — o usar el botón
+**Copiar las reglas** del cartel que sale en la página de juegos.
+
 ## 2. Reglas de Storage
 
 1. Consola → **Storage** → pestaña **Reglas**.

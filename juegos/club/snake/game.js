@@ -47,29 +47,62 @@
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => $('toast').classList.remove('show'), 2300);
   }
+  /* El sonido es el chip de la sala (juegos/audio). El tema `snake` suena
+     solo mientras se juega, al tempo de la velocidad elegida y un poco más
+     rápido a cada bocado; la cámara lenta lo frena y en zen se queda sin
+     batería. Pausar o perder llama a `detener()`, que calla también las notas
+     que el reproductor ya había agendado 0,2 s por delante; reanudar sigue
+     donde iba y una partida nueva empieza el tema desde el principio. */
+  const TEMPO = { chill: .9, normal: 1, fast: 1.12 };
+  let audio = null, musicPlaying = false, musicFresh = true;
   function initAudio() {
     if (!sound) return;
     try {
       const Audio = window.AudioContext || window.webkitAudioContext;
-      if (!audioContext && Audio) audioContext = new Audio();
-      if (audioContext?.state === 'suspended') audioContext.resume().catch(() => {});
-    } catch (_) { /* Audio may be unavailable. */ }
+      if (!audio && Audio && window.Chip && window.Temas) {
+        const c = new Audio(), master = c.createGain(), music = c.createGain(), fx = c.createGain();
+        master.gain.value = .6; music.gain.value = .5; fx.gain.value = .75;
+        music.connect(master); fx.connect(master); master.connect(c.destination);
+        audio = { ctx: c, fx, rep: new window.Chip.Reproductor(c, music, window.Temas.temas.snake) };
+      }
+      if (audio?.ctx.state === 'suspended') audio.ctx.resume().catch(() => {});
+    } catch (_) { audio = null; /* Audio may be unavailable. */ }
   }
-  function tone(freq, duration = .1, type = 'sine', volume = .045, delay = 0) {
-    if (!sound || !audioContext) return;
+  function tickMusic() {
+    if (!audio) return;
+    const r = audio.rep;
+    if (!sound || state !== 'playing' || audio.ctx.state !== 'running') {
+      if (musicPlaying || r.voces.size) r.detener();
+      musicPlaying = false; return;
+    }
+    if (musicFresh) { r.reinicia(); musicFresh = false; }
+    musicPlaying = true;
+    r.tempo = TEMPO[speed] * (activePower?.type === 'slow' ? .82 : 1) + (mode === 'zen' ? 0 : Math.min(eaten * .002, .06));
+    r.capas.bat = mode === 'zen' ? 0 : 1;
+    r.capas.arp = mode === 'zen' || eaten >= 6 || activePower?.type === 'double' ? 1 : 0;
+    try { r.tick(.2); } catch (_) { /* Sound never blocks the game. */ }
+  }
+  /** Efectos de 8 bits; `n` afina algunos (el combo sube el bocado). */
+  function sfx(kind, n = 0) {
+    if (!sound || !audio) return;
     try {
-      const oscillator = audioContext.createOscillator(), gain = audioContext.createGain();
-      const time = audioContext.currentTime + delay;
-      oscillator.type = type;
-      oscillator.frequency.setValueAtTime(freq, time);
-      gain.gain.setValueAtTime(volume, time);
-      gain.gain.exponentialRampToValueAtTime(.001, time + duration);
-      oscillator.connect(gain); gain.connect(audioContext.destination);
-      oscillator.start(time); oscillator.stop(time + duration);
-      oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
+      const C = window.Chip, c = audio.ctx, d = audio.fx, t = c.currentTime + .005, H = C.hz;
+      const P = (m, dur, o = {}) => C.voz(c, d, Object.assign({ t, f: H(m), dur, vol: .1, onda: 'p25', sus: .8 }, o));
+      const N = (dur, o = {}) => C.ruido(c, d, Object.assign({ t, dur, vol: .16 }, o));
+      const run = (notes, step, o = {}) => notes.forEach((m, i) => P(m, step * .95, Object.assign({ t: t + i * step }, o)));
+      switch (kind) {
+        case 'start': run([60, 64, 67, 72, 76, 79], .05, { onda: 'p12', vol: .08 }); P(84, .22, { t: t + .3, vol: .09, onda: 'p50' }); break;
+        case 'eat': { const m = 76 + Math.min(12, n); P(m, .05, { onda: 'p12', vol: .09 }); P(m + 7, .08, { t: t + .045, onda: 'p12', vol: .08 }); break; }
+        case 'bonus': P(83, .07, { onda: 'p50' }); P(88, .3, { t: t + .07, onda: 'p50', sus: .6 }); run([91, 95, 98], .04, { t: t + .12, onda: 'p12', vol: .05 }); break;
+        case 'power': run([72, 76, 79, 84, 88, 91], .04, { vol: .09 }); P(96, .25, { t: t + .24, onda: 'p12', vol: .06, vib: .01 }); break;
+        case 'shield': P(88, .12, { onda: 'p50', f1: H(76) }); P(76, .2, { t: t + .12, onda: 'tri', vol: .16, sus: 1 }); N(.12, { vol: .1, corto: true, tono: 1.6 }); break;
+        case 'portal': P(55, .22, { onda: 'p12', f1: H(91), vol: .08 }); P(91, .2, { t: t + .12, onda: 'tri', f1: H(67), vol: .12, sus: 1 }); break;
+        case 'record': run([72, 76, 79, 84, 79, 84], .09, { vol: .09 }); P(88, .6, { t: t + .54, vol: .09, vib: .008 }); P(48, .9, { t: t + .54, onda: 'tri', vol: .18, sus: 1 }); break;
+        case 'die': N(.45, { vol: .2, tono: .9, tono1: .2 }); P(45, .5, { onda: 'tri', f1: H(28), vol: .2, sus: 1 }); run([67, 63, 60, 55], .12, { t: t + .12, vol: .08 }); break;
+        case 'on': P(72, .06, { onda: 'p12', vol: .08 }); P(79, .1, { t: t + .06, onda: 'p12', vol: .08 }); break;
+      }
     } catch (_) { /* Sound never blocks the game. */ }
   }
-  function melody(notes) { notes.forEach((f, i) => tone(f, .15, 'sine', .04, i * .075)); }
 
   function resize() {
     const rect = canvas.getBoundingClientRect();
@@ -147,7 +180,7 @@
     $('overlay').classList.add('hidden'); $('overlay').inert = true; $('overlay').setAttribute('aria-hidden', 'true'); $('pause-button').disabled = false;
     $('pause-button').setAttribute('aria-label', 'Pausar partida');
     status(mode === 'zen' ? 'TODO FLUYE' : 'EN JUEGO');
-    melody([330, 440, 660]); announce('Partida iniciada. Modo ' + MODES[mode].label);
+    musicFresh = true; sfx('start'); announce('Partida iniciada. Modo ' + MODES[mode].label);
     canvas.focus({ preventScroll: true });
   }
   function pause() {
@@ -175,7 +208,7 @@
     status(newRecord ? 'NUEVO RÉCORD' : 'BUENA PARTIDA');
     if (!reducedMotion) { $('board-wrap').classList.remove('hit'); void $('board-wrap').offsetWidth; $('board-wrap').classList.add('hit'); }
     burst(snake[0], win ? THEMES[theme][0] : '#f19a7e', 28);
-    if (win || newRecord) melody([523, 659, 784, 1047]); else { tone(180, .22, 'triangle'); tone(100, .3, 'triangle', .045, .13); }
+    tickMusic(); sfx(win || newRecord ? 'record' : 'die');
     setOverlay(win ? 'TE QUEDASTE CON TODO EL TABLERO' : newRecord ? '✦ NUEVO RÉCORD PERSONAL ✦' : 'LAS BUENAS PARTIDAS PIDEN OTRA', win ? 'Qué<br><span>leyenda.</span>' : '¿Una<br><span>más?</span>', `<strong style="color:#edf4df;font-size:24px">${score} puntos</strong><br>${eaten} bocados · ${Math.floor(gameTime / 60)}:${String(Math.floor(gameTime % 60)).padStart(2, '0')} de puro juego`, 'Volver a jugar');
     announce(`Partida terminada. ${score} puntos.${newRecord ? ' Nuevo récord.' : ''}`);
   }
@@ -227,7 +260,7 @@
     }
     if (mode === 'portals') {
       const portalIndex = portals.findIndex(p => same(p, head));
-      if (portalIndex !== -1) { burst(head, '#9b91f1', 14); head = copy(portals[1 - portalIndex]); burst(head, '#83dfcc', 14); tone(420, .2, 'sine'); tone(840, .2, 'sine', .03, .06); }
+      if (portalIndex !== -1) { burst(head, '#9b91f1', 14); head = copy(portals[1 - portalIndex]); burst(head, '#83dfcc', 14); sfx('portal'); }
     }
     const eatsFruit = same(head, fruit), eatsBonus = same(head, bonus), grows = eatsFruit || eatsBonus;
     const body = grows ? snake : snake.slice(0, -1);
@@ -246,20 +279,20 @@
     if (eatsFruit) {
       eaten++; combo = gameTime - lastEat < 4 ? Math.min(combo + 1, 5) : 1; lastEat = gameTime;
       addPoints(mode === 'arcade' ? 10 + (combo - 1) * 2 : 10);
-      burst(head, '#f2a086', 13); melody([500 + combo * 65, 700 + combo * 65]);
+      burst(head, '#f2a086', 13); sfx('eat', combo);
       fruit = null; fruit = freeCell();
       if (!fruit) { finish(true); return; }
       if (mode === 'arcade') { spawnArcadeExtras(); if (combo >= 3) toast(`¡Combo ×${combo}! +${10 + (combo - 1) * 2} puntos base`); }
       if (eaten === 10 || eaten === 25 || eaten === 50) toast(eaten === 10 ? '10 bocados. Ya le pillaste el ritmo.' : `${eaten} bocados. ¡No hay quien te pare!`);
     }
-    if (eatsBonus) { addPoints(50); burst(head, '#f7d776', 24); bonus = null; melody([660, 880, 1100]); toast('Fruta dorada. ¡+50 puntos base!'); }
+    if (eatsBonus) { addPoints(50); burst(head, '#f7d776', 24); bonus = null; sfx('bonus'); toast('Fruta dorada. ¡+50 puntos base!'); }
     if (same(head, pickup)) {
       activePower = { type: pickup.type, expires: gameTime + 10 }; pickup = null;
-      burst(head, POWER_TYPES[activePower.type].color, 22); melody([440, 660, 880]);
+      burst(head, POWER_TYPES[activePower.type].color, 22); sfx('power');
       toast(`${POWER_TYPES[activePower.type].label} · 10 segundos`);
     }
   }
-  function consumeShield() { activePower = null; burst(snake[0], '#80dbef', 20); toast('¡El escudo te salvó!'); melody([880, 440]); }
+  function consumeShield() { activePower = null; burst(snake[0], '#80dbef', 20); toast('¡El escudo te salvó!'); sfx('shield'); }
 
   function burst(p, color, count) {
     if (reducedMotion) return;
@@ -388,12 +421,12 @@
       for (const p of particles) { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= Math.pow(.2, dt); p.vy *= Math.pow(.2, dt); }
       particles = particles.filter(p => p.life > 0);
     }
-    render(); requestAnimationFrame(frame);
+    tickMusic(); render(); requestAnimationFrame(frame);
   }
 
   $('play-button').addEventListener('click', () => state === 'paused' ? pause() : start());
   $('pause-button').addEventListener('click', pause);
-  $('sound-button').addEventListener('click', () => { sound = !sound; initAudio(); syncSettings(); save(); if (sound) melody([440, 660]); });
+  $('sound-button').addEventListener('click', () => { sound = !sound; initAudio(); syncSettings(); save(); if (sound) sfx('on'); });
   $('fullscreen-button').addEventListener('click', async () => {
     try {
       if (document.fullscreenElement) await document.exitFullscreen();

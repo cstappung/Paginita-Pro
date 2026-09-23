@@ -3,10 +3,11 @@
  * Tres decisiones, y las tres se explican solas en cuanto se intenta lo
  * contrario:
  *
- * 1. NO HAY ARCHIVOS DE AUDIO. Cada sonido son dos o tres osciladores con
- *    su envolvente, unas decenas de bytes de código frente a los cientos
- *    de kilobytes que pesaría una carpeta de .mp3 que además habría que
- *    servir, cachear y esperar. Un pitido de 120 ms no necesita un archivo.
+ * 1. NO HAY ARCHIVOS DE AUDIO (salvo el tema del Escondite). Efectos y
+ *    música salen de `juegos/audio/chip.js`, un chip de 8 bits hecho con
+ *    Web Audio, y las canciones son texto en `juegos/audio/temas.js`: unas
+ *    decenas de líneas frente a los megas que pesaría una carpeta de .mp3
+ *    que además habría que servir, cachear y esperar.
  *
  * 2. EL `AudioContext` NACE EN EL PRIMER GESTO, no al cargar la página.
  *    Un contexto creado sin que nadie haya tocado nada arranca
@@ -24,6 +25,8 @@
  * preferencia de este ordenador y de estos altavoces, no de la cuenta.
  */
 "use strict";
+import Chip from "../../../juegos/audio/chip.js";
+import Temas from "../../../juegos/audio/temas.js";
 
 const LLAVE = "jg.sonido";
 
@@ -42,8 +45,10 @@ export function silenciar(v) {
   return apagado;
 }
 
-function motor() {
-  if (apagado) return null;
+/* Un solo contexto para efectos y música: el silencio de los efectos no
+   puede apagar la música, así que `motor` pregunta por él y `contexto` no. */
+function motor() { return apagado ? null : contexto(); }
+function contexto() {
   try {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return null;
@@ -53,71 +58,55 @@ function motor() {
   } catch (e) { return null; }
 }
 
-/* Una nota: onda, frecuencia (o rampa de f0 a f1), cuándo y cuánto.
-   La envolvente sube en 8 ms y baja exponencialmente; sin esa subida
-   cada nota empieza con un chasquido, que es el salto de cero al
-   volumen de golpe. */
-function nota(t0, { onda = "sine", f = 440, f1 = 0, dur = 0.12, vol = 0.12, retardo = 0 } = {}) {
+/* Los efectos son de consola de 8 bits: onda de pulso, barridos y ruido de
+   registro de desplazamiento, del mismo `Chip` que toca la música. Así un
+   «gana» suena de la misma familia que el tema que tiene debajo, en vez de
+   un pitido de seno pegado encima de otra cosa. */
+let bus = null, busFx = null;
+function fx() {
   const a = motor();
-  if (!a) return;
-  const t = t0 + retardo;
-  const osc = a.createOscillator(), g = a.createGain();
-  osc.type = onda;
-  osc.frequency.setValueAtTime(f, t);
-  if (f1) osc.frequency.exponentialRampToValueAtTime(Math.max(1, f1), t + dur);
-  g.gain.setValueAtTime(0.0001, t);
-  g.gain.exponentialRampToValueAtTime(vol, t + 0.008);
-  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-  osc.connect(g).connect(a.destination);
-  osc.start(t);
-  osc.stop(t + dur + 0.02);
+  if (!a) return null;
+  if (!busFx) { busFx = a.createGain(); busFx.gain.value = 0.9; busFx.connect(a.destination); }
+  return a;
 }
-
-/* Ruido blanco con filtro: es lo que suena a humo, a barajar y a roce.
-   Un oscilador no sabe hacer eso por muchas envolventes que se le
-   pongan — lo que define esos sonidos es justamente no tener tono. */
-function ruido(t0, { dur = 0.25, vol = 0.08, tipo = "bandpass", f = 900, q = 0.7, f1 = 0 } = {}) {
-  const a = motor();
-  if (!a) return;
-  const n = Math.floor(a.sampleRate * dur);
-  const buf = a.createBuffer(1, n, a.sampleRate);
-  const d = buf.getChannelData(0);
-  for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
-  const src = a.createBufferSource(); src.buffer = buf;
-  const filtro = a.createBiquadFilter();
-  filtro.type = tipo; filtro.frequency.setValueAtTime(f, t0); filtro.Q.value = q;
-  if (f1) filtro.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t0 + dur);
-  const g = a.createGain();
-  g.gain.setValueAtTime(vol, t0);
-  g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
-  src.connect(filtro).connect(g).connect(a.destination);
-  src.start(t0);
-  src.stop(t0 + dur + 0.02);
-}
+const P = (a, t, f, dur, o = {}) => Chip.voz(a, busFx, Object.assign({ t, f, dur, vol: 0.1, onda: "p25", sus: 0.8 }, o));
+const N = (a, t, dur, o = {}) => Chip.ruido(a, busFx, Object.assign({ t, dur, vol: 0.12 }, o));
+const H = Chip.hz;
 
 /* El repertorio. Los nombres dicen qué pasó, no cómo suena: así se
    puede cambiar el timbre de «gana» sin tocar ningún juego. */
 const REPERTORIO = {
-  clic:     a => nota(a, { onda: "triangle", f: 660, dur: 0.05, vol: 0.06 }),
-  carta:    a => ruido(a, { dur: 0.16, vol: 0.09, tipo: "bandpass", f: 2200, f1: 700, q: 1.2 }),
-  ficha:    a => { nota(a, { onda: "sine", f: 520, f1: 320, dur: 0.09, vol: 0.1 }); },
-  entra:    a => { nota(a, { f: 523, dur: 0.1 }); nota(a, { f: 784, dur: 0.14, retardo: 0.09 }); },
-  gana:     a => { nota(a, { onda: "triangle", f: 659, dur: 0.1, vol: 0.13 });
-                   nota(a, { onda: "triangle", f: 988, dur: 0.16, vol: 0.13, retardo: 0.09 }); },
-  pierde:   a => { nota(a, { onda: "triangle", f: 392, dur: 0.12, vol: 0.11 });
-                   nota(a, { onda: "triangle", f: 262, dur: 0.2, vol: 0.11, retardo: 0.1 }); },
-  empate:   a => { ruido(a, { dur: 0.5, vol: 0.07, tipo: "lowpass", f: 1200, f1: 240 });
-                   nota(a, { onda: "sine", f: 300, f1: 180, dur: 0.4, vol: 0.05 }); },
-  /* El golpe del 10, 11 o 12: ruido grave y una caída de sierra. Es el
-     único sonido deliberadamente más fuerte que los demás, porque marca
-     justo lo que la animación está celebrando. */
-  golpe:    a => { ruido(a, { dur: 0.45, vol: 0.16, tipo: "lowpass", f: 1800, f1: 120 });
-                   nota(a, { onda: "sawtooth", f: 180, f1: 60, dur: 0.35, vol: 0.12 });
-                   nota(a, { onda: "square", f: 880, f1: 220, dur: 0.18, vol: 0.06 }); },
-  victoria: a => [523, 659, 784, 1047].forEach((f, k) =>
-                   nota(a, { onda: "triangle", f, dur: 0.22, vol: 0.13, retardo: k * 0.1 })),
-  derrota:  a => [440, 392, 330, 262].forEach((f, k) =>
-                   nota(a, { onda: "triangle", f, dur: 0.26, vol: 0.11, retardo: k * 0.12 }))
+  clic:     (a, t) => P(a, t, 1568, 0.03, { onda: "p50", vol: 0.05 }),
+  carta:    (a, t) => { N(a, t, 0.09, { vol: 0.09, corto: false, tono: 3, tono1: 1.2 });
+                        P(a, t + 0.02, 1760, 0.03, { onda: "p12", vol: 0.04 }); },
+  /* El timbre de «te toca»: dos notas rápidas hacia arriba, como un
+     «¿hola?». Solo suena con la pestaña escondida. */
+  turno:    (a, t) => { P(a, t, H(79), 0.06, { onda: "p50", vol: 0.08 });
+                        P(a, t + 0.08, H(86), 0.14, { onda: "p50", vol: 0.08, sus: 0.6 }); },
+  ficha:    (a, t) => P(a, t, 440, 0.08, { f1: 990, onda: "p50", vol: 0.08 }),
+  entra:    (a, t) => [72, 76, 79, 84].forEach((n, k) => P(a, t + k * 0.045, H(n), 0.05, { onda: "p50", vol: 0.07 })),
+  /* La moneda: si y mi, la segunda larga. Dos notas bastan para decir «bien». */
+  gana:     (a, t) => { P(a, t, H(83), 0.07, { vol: 0.09 }); P(a, t + 0.07, H(88), 0.22, { vol: 0.09, sus: 0.5 }); },
+  pierde:   (a, t) => { P(a, t, 392, 0.1, { f1: 330, onda: "p50", vol: 0.08 });
+                        P(a, t + 0.11, 311, 0.2, { f1: 196, onda: "p50", vol: 0.08 }); },
+  empate:   (a, t) => { N(a, t, 0.55, { vol: 0.09, tono: 0.7, tono1: 0.25 });
+                        P(a, t, 300, 0.4, { f1: 170, onda: "tri", vol: 0.1 }); },
+  /* El golpe del 10, 11 o 12: explosión de ruido que cae y un bombo de
+     triángulo. Es el único efecto deliberadamente más fuerte que los demás,
+     porque marca justo lo que la animación está celebrando. */
+  golpe:    (a, t) => { N(a, t, 0.5, { vol: 0.2, tono: 1.1, tono1: 0.18 });
+                        P(a, t, 190, 0.32, { f1: 45, onda: "tri", vol: 0.22, sus: 0.6 });
+                        P(a, t, 1200, 0.16, { f1: 200, onda: "p12", vol: 0.05 }); },
+  victoria: (a, t) => {
+    [[72, 0, .09], [76, .1, .09], [79, .2, .09], [84, .3, .16], [79, .48, .08], [84, .58, .5]]
+      .forEach(([n, d, l]) => { P(a, t + d, H(n), l, { vol: 0.09 }); P(a, t + d, H(n - 12), l, { onda: "p12", vol: 0.04 }); });
+    P(a, t + 0.3, H(48), 0.8, { onda: "tri", vol: 0.14, sus: 0.9 });
+  },
+  derrota:  (a, t) => {
+    [[67, 0], [66, .16], [65, .32]].forEach(([n, d]) => P(a, t + d, H(n), 0.14, { onda: "p50", vol: 0.07 }));
+    P(a, t + 0.48, H(64), 0.6, { onda: "p50", vol: 0.07, vib: 0.02, sus: 0.8 });
+    P(a, t + 0.48, H(40), 0.6, { onda: "tri", vol: 0.14, sus: 0.9 });
+  }
 };
 
 /* Lo único que exportan los juegos. Nunca lanza: ver la decisión 3. */
@@ -126,52 +115,63 @@ export function suena(nombre) {
     const a = motor();
     if (!a) return;
     const f = REPERTORIO[nombre];
-    if (f) f(a.currentTime + 0.01);
+    if (f && fx()) f(a, a.currentTime + 0.01);
   } catch (e) { /* un sonido que falla no puede tumbar una partida */ }
 }
 
 
-/* Música original generativa, independiente de los efectos. */
-const TEMAS = {
-  minas: {bpm:72, notas:[48,55,60,62,67,62,60,55]},
-  snake: {bpm:126, notas:[45,57,60,64,67,64,60,57]},
-  escondite: { bpm: 78, notas: [60, 64, 67, 71, 67, 64, 62, 67] },
-  cartas: { bpm: 108, notas: [57, 60, 64, 69, 67, 64, 60, 64] },
-  cuadritos: { bpm: 94, notas: [60, 67, 69, 64, 62, 69, 67, 64] },
-  reversi: { bpm: 72, notas: [50, 57, 60, 64, 62, 57, 55, 60] },
-  orbita: { bpm: 88, notas: [57, 64, 69, 71, 76, 71, 69, 64] }
-};
+/* La música. Cada juego tiene su tema en el cancionero compartido
+   (`juegos/audio/temas.js`) y lo toca un `Chip.Reproductor`, que agenda un
+   poco por delante del reloj de audio: el temporizador solo lo despierta, no
+   marca el compás, así que un `setInterval` que llega tarde no desafina nada.
+   El Escondite es la excepción: su tema es una grabación, Midnight Pulse. */
+const TEMAS = Temas.temas;
 let pistaEscondite = null;
-let tema = "", timer = null, paso = 0, desbloqueado = false;
-let audioMusica = null, bus = null, volumen = 0.3, musicaOn = true;
-const voces = new Set();
+let tema = "", timer = null, desbloqueado = false, rep = null;
+let volumen = 0.3, musicaOn = true;
+let ajuste = { tempo: 1, capas: null };
 try {
   musicaOn = localStorage.getItem("jg.musica") !== "0";
   const guardado = localStorage.getItem("jg.volumen");
   if (guardado !== null && Number.isFinite(Number(guardado))) volumen = Math.max(0, Math.min(1, Number(guardado)));
 } catch (_) {}
+const GANANCIA = 0.5;
 export const musicaActiva = () => musicaOn;
 export const volumenMusica = () => volumen;
 export function configurarMusica(on, v = volumen) {
   musicaOn = !!on; volumen = Math.max(0, Math.min(1, Number(v) || 0));
   try { localStorage.setItem("jg.musica", on ? "1" : "0"); localStorage.setItem("jg.volumen", String(volumen)); } catch (_) {}
-  if (bus && audioMusica) bus.gain.setTargetAtTime(volumen * 0.2, audioMusica.currentTime, 0.05);
+  if (bus && ctx) bus.gain.setTargetAtTime(volumen * GANANCIA, ctx.currentTime, 0.05);
   sincronizaMusica();
 }
 export function ambientar(juego) {
-  const siguiente = TEMAS[juego] ? juego : "";
-  if (tema !== siguiente) { detenerMusica(); tema = siguiente; paso = 0; }
+  const siguiente = juego === "escondite" || TEMAS[juego] ? juego : "";
+  if (tema !== siguiente) { detenerMusica(true); tema = siguiente; ajuste = { tempo: 1, capas: null }; }
   sincronizaMusica();
 }
+/** Lo que el juego sabe y la música no: lo rápido que va y cuánto falta.
+    tempo multiplica el bpm; capas pone a 0 o a 1 cada canal (lead, arp, bajo, bat). */
+export function ajustarMusica({ tempo, capas } = {}) {
+  if (Number.isFinite(tempo)) ajuste.tempo = Math.max(0.5, Math.min(2, tempo));
+  if (capas) ajuste.capas = Object.assign({}, ajuste.capas, capas);
+  aplicaAjuste();
+}
+function aplicaAjuste() {
+  if (!rep) return;
+  rep.tempo = ajuste.tempo;
+  if (ajuste.capas) Object.assign(rep.capas, ajuste.capas);
+}
 export function activarAudio() { desbloqueado = true; sincronizaMusica(); }
-function detenerMusica() {
+function detenerMusica(olvida) {
   if (pistaEscondite) pistaEscondite.pause();
   clearInterval(timer); timer = null;
-  for (const osc of voces) { try { osc.stop(); osc.disconnect(); } catch (_) {} }
-  voces.clear();
+  if (rep) {
+    try { if (olvida) rep.destruir(); else rep.detener(); } catch (_) {}
+    if (olvida) rep = null;
+  }
 }
 function sincronizaMusica() {
-  if (!tema || !musicaOn || !desbloqueado || document.hidden) { detenerMusica(); return; }
+  if (!tema || !musicaOn || !desbloqueado || document.hidden) { detenerMusica(false); return; }
   if (tema === "escondite") {
     try {
       if (!pistaEscondite) {
@@ -185,34 +185,16 @@ function sincronizaMusica() {
   }
   if (timer) return;
   try {
-    const AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) return;
-    if (!audioMusica) {
-      audioMusica = new AC(); bus = audioMusica.createGain(); bus.connect(audioMusica.destination);
-    }
-    audioMusica.resume().catch(() => {});
-    bus.gain.value = volumen * 0.2;
-    const tick = () => {
-      if (!tema || document.hidden) return;
-      const t = audioMusica.currentTime, config = TEMAS[tema];
-      const melodia = config.notas[paso % config.notas.length];
-      const notas = paso % 4 === 0 ? [melodia, config.notas[Math.floor(paso / 16) % 2 * 4] - 24] : [melodia];
-      for (const [i, midi] of notas.entries()) {
-        const o = audioMusica.createOscillator(), g = audioMusica.createGain();
-        const dur = i ? 1.4 : 0.5;
-        o.type = i ? "sine" : "triangle"; o.frequency.value = 440 * Math.pow(2, (midi - 69) / 12);
-        g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(i ? 0.6 : 0.24, t + 0.025);
-        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
-        o.connect(g).connect(bus); voces.add(o);
-        o.onended = () => { voces.delete(o); o.disconnect(); g.disconnect(); };
-        o.start(t); o.stop(t + dur + 0.02);
-      }
-      paso++;
-    };
-    tick();
-    timer = setInterval(() => { try { tick(); } catch (_) { detenerMusica(); } }, 30000 / TEMAS[tema].bpm);
-  } catch (_) { detenerMusica(); }
+    const a = contexto();
+    if (!a) return;
+    if (!bus) { bus = a.createGain(); bus.connect(a.destination); }
+    bus.gain.value = volumen * GANANCIA;
+    if (!rep) rep = new Chip.Reproductor(a, bus, TEMAS[tema]);
+    aplicaAjuste();
+    rep.tick(0.25);
+    timer = setInterval(() => { try { rep.tick(0.25); } catch (_) { detenerMusica(true); } }, 50);
+  } catch (_) { detenerMusica(true); }
 }
 document.addEventListener("visibilitychange", sincronizaMusica);
-window.addEventListener("pagehide", detenerMusica);
+window.addEventListener("pagehide", () => detenerMusica(false));
 window.addEventListener("pageshow", sincronizaMusica);

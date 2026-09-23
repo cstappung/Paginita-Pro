@@ -50,6 +50,13 @@ export const JUEGOS = {
     minimo: 2,
     cupo: 6
   },
+  worms: {
+    nombre: "Circuit Breakers",
+    lema: "Cuadrillas eléctricas, terreno destructible y un disparo por turno",
+    color: "#f2a33a",
+    minimo: 2,
+    cupo: 6
+  },
   reversi: {
     nombre: "Reversi",
     lema: "Atrapa las fichas del otro entre las tuyas y dales la vuelta",
@@ -528,7 +535,102 @@ export function reducir(p) {
   if (p.juego === "cuadritos") return { ...base, ...redCuadritos(p, js, listos) };
   if (p.juego === "reversi") return { ...base, ...redReversi(p, js) };
   if (p.juego === "orbita") return { ...base, ...redOrbita(p, js) };
+  if (p.juego === "worms") return { ...base, ...redWorms(p, js, listos) };
   return base;
+}
+
+/* ¿La partida está esperando algo de `uid`? Es lo que enciende el «Tu
+   turno» del título de la pestaña. Los juegos por turnos lo dicen con
+   `turno`; cartas y escondite eligen a la vez, y ahí «te toca» es «los
+   demás ya pueden haber elegido y tú todavía no». La búsqueda del
+   escondite no cuenta: los dos buscan a la vez desde que empieza, así
+   que no hay nada que avisar que no se esté viendo ya. */
+export function meToca(est, uid) {
+  if (!est || !uid || !est.listos || est.fin || est.fase === "fin" || est.fase === "espera") return false;
+  if (!(est.jugadores || []).some(j => j.uid === uid)) return false;
+  if (est.fase === "esconder") return !(est.compromisos || {})[uid];
+  if (est.rev && est.comp) return est.fase === "jugando" && !est.comp[uid];
+  return !!est.turno && est.turno === uid;
+}
+
+/* Cuánto de la partida se ha jugado, de 0 a 1. Solo lo usa la música,
+   que acelera en el último tramo como en una recreativa: el tablero ya
+   dice cuánto queda, así que no hace falta llevar la cuenta aparte.
+   Cartas no tiene tablero que se llene; ahí cuentan las rondas que
+   lleva ganadas quien va delante, sobre cinco. No es exacto —cinco
+   cartas del mismo color no hacen trío— pero con tres ya puede haberlo,
+   así que a partir de ahí el duelo puede acabar en cualquier ronda. Los juegos que no se prestan
+   —el escondite va a reloj, Circuit Breakers trae su propia música—
+   dan 0. */
+export function progreso(est, juego) {
+  if (!est || est.fase !== "jugando") return 0;
+  const c = x => Math.max(0, Math.min(1, x || 0));
+  if (juego === "cuadritos" && est.rayas) {
+    const hechas = Object.keys(est.rayas).length;
+    return c(hechas / (hechas + (est.restantes || 0)));
+  }
+  if (juego === "reversi" && est.lado) {
+    const casillas = est.lado * est.lado - 4;
+    return c((casillas - (est.libres || 0)) / casillas);
+  }
+  if (juego === "orbita" && est.estrellas) return c(Object.keys(est.tomadas || {}).length / est.estrellas.length);
+  if (juego === "cartas" && est.ganadas) return c(Math.max(0, ...Object.values(est.ganadas).map(g => g.length)) / 5);
+  return 0;
+}
+
+/* ---------- Circuit Breakers ----------
+   La física no pasa por aquí: la simula el propio juego (juegos/worms),
+   que publica al final de cada turno una foto del estado como jugada
+   `turno` con `k` (número de turno), `v` (los uid que siguen en pie),
+   `d` (daño hecho por cada cuadrilla, en orden de asiento) y `ti` (qué
+   cuadrilla jugó). Este reductor solo lee esas cabeceras, que es todo
+   lo que la página necesita: quién juega, quién queda y quién ganó.
+
+   Vale la *primera* foto de cada turno, igual que en el juego: si dos
+   navegadores publican el mismo turno —el que jugó y el que lo releva
+   porque se le cayó la red— el segundo llega tarde y no cuenta. */
+const lista = x => Array.isArray(x) ? x : Object.values(x || {});
+
+export function redWorms(p, js = jugadoresDe(p), listos = true) {
+  const vistos = new Set(), fuera = {};
+  let ultimo = null, turnos = 0, motivo = "";
+  const ids = new Set(js.map(j => j.uid));
+  for (const j of jugadasDe(p)) {
+    if (j.t === "abandona") { if (ids.has(j.uid)) fuera[j.uid] = true; continue; }
+    if (j.t !== "turno") continue;
+    const k = +j.k;
+    if (!(k > 0) || vistos.has(k)) continue;
+    vistos.add(k); turnos++;
+    if (!ultimo || k > +ultimo.k) ultimo = j;
+  }
+  const enPie = ultimo ? new Set(lista(ultimo.v).filter(u => ids.has(u))) : new Set(ids);
+  const vivos = js.filter(j => enPie.has(j.uid) && !fuera[j.uid]);
+  const d = ultimo ? lista(ultimo.d) : [];
+  const puntos = {};
+  js.forEach((j, i) => { puntos[j.uid] = Math.round(+d[i] || 0); });
+
+  let ganador = null;
+  if (listos && vivos.length <= 1) {
+    ganador = vivos.length ? vivos[0].uid : "";
+    /* Si alguien se fue y eso dejó la partida con uno, fue por abandono;
+       si las cuadrillas cayeron combatiendo, es victoria (o apagón). */
+    const sinAbandonos = js.filter(j => enPie.has(j.uid));
+    motivo = sinAbandonos.length > 1 ? "abandono" : vivos.length ? "victoria" : "apagon";
+  }
+  let turno = "";
+  if (vivos.length) {
+    const ti = ultimo ? +ultimo.ti : -1;
+    for (let n = 1; n <= js.length; n++) {
+      const c = js[((ti + n) % js.length + js.length) % js.length];
+      if (vivos.includes(c)) { turno = c.uid; break; }
+    }
+  }
+  return {
+    fase: !listos ? "espera" : ganador !== null ? "fin" : "jugando",
+    turno, turnos, puntos, fuera,
+    vivos: vivos.map(j => j.uid),
+    ganador, motivo
+  };
 }
 
 /* ---------- escondite ---------- */

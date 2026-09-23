@@ -64,3 +64,47 @@ test('Escondite: ropa persistida, turnos de búsqueda y resultado estable',()=>{
  mover(p,{t:'b',uid:'b',x:.5,y:.5,at:13});assert.equal(reducir(p).ganador,'b');
  mover(p,{t:'abandona',uid:'b'});assert.equal(reducir(p).ganador,'b');
 });
+test('meToca: por turnos, a la vez, esperando y terminada',()=>{
+ const {meToca}=context;
+ const p=sala();let e=reducir(p);
+ assert.equal(meToca(e,'a'),true);assert.equal(meToca(e,'b'),false);assert.equal(meToca(e,'mirón'),false);assert.equal(meToca(e,''),false);
+ e=mover(p,{t:'orbita',uid:'a',casilla:7,eje:'fila'});assert.equal(meToca(e,'a'),false);assert.equal(meToca(e,'b'),true);
+ e=mover(p,{t:'abandona',uid:'a'});assert.equal(meToca(e,'b'),false,'terminada no llama a nadie');
+ const q=sala();delete q.jugadores.b;assert.equal(meToca(reducir(q),'a'),false,'sola en la sala no hay turno');
+ /* cartas: eligen a la vez, avisa a quien falta */
+ const c={juego:'cartas',semilla:5,estado:'jugando',jugadores:{a:{nombre:'A',orden:0},b:{nombre:'B',orden:1}},jugadas:{}};
+ e=reducir(c);assert.equal(meToca(e,'a'),true);assert.equal(meToca(e,'b'),true);
+ c.jugadas['0000']={t:'c',uid:'a',h:'x'};e=reducir(c);assert.equal(meToca(e,'a'),false);assert.equal(meToca(e,'b'),true);
+ /* escondite: al esconder avisa, al buscar no */
+ const s={juego:'escondite',semilla:9,estado:'jugando',jugadores:{a:{nombre:'A',orden:0},b:{nombre:'B',orden:1}},jugadas:{}};
+ e=reducir(s);assert.equal(e.fase,'esconder');assert.equal(meToca(e,'a'),true);
+ s.jugadas['0000']={t:'c',uid:'a',h:'x'};assert.equal(meToca(reducir(s),'a'),false);assert.equal(meToca(reducir(s),'b'),true);
+});
+test('Circuit Breakers: turno rotando, primera foto vale, vivos y final',()=>{
+ const {meToca}=context;
+ const w=(n=3)=>({juego:'worms',semilla:1,estado:'jugando',cupo:n,jugadores:Object.fromEntries(['a','b','c'].slice(0,n).map((u,i)=>[u,{nombre:u,orden:i}])),jugadas:{}});
+ const p=w();let e=reducir(p);
+ assert.equal(e.fase,'jugando');assert.equal(e.turno,'a');assert.equal(meToca(e,'a'),true);
+ e=mover(p,{t:'turno',uid:'a',k:1,s:'…',v:['a','b','c'],d:[30,0,0],ti:0});assert.equal(e.turno,'b');assert.equal(e.puntos.a,30);
+ e=mover(p,{t:'turno',uid:'c',k:1,s:'…',v:['a'],d:[999,0,0],ti:2});assert.equal(e.turno,'b','una segunda foto del mismo turno no cuenta');assert.equal(e.turnos,1);
+ e=mover(p,{t:'turno',uid:'b',k:2,s:'…',v:['a','c'],d:[30,10,0],ti:1});assert.equal(e.turno,'c');assert.deepEqual(copia(e.vivos),['a','c']);
+ e=mover(p,{t:'turno',uid:'c',k:3,s:'…',v:['a','c'],d:[30,10,5],ti:2});assert.equal(e.turno,'a','salta a la cuadrilla caída');
+ e=mover(p,{t:'turno',uid:'a',k:4,s:'…',v:['a'],d:[80,10,5],ti:0});
+ assert.equal(e.fase,'fin');assert.equal(e.ganador,'a');assert.equal(e.motivo,'victoria');assert.equal(meToca(e,'a'),false);
+ const q=w(2);mover(q,{t:'abandona',uid:'b'});e=reducir(q);assert.equal(e.ganador,'a');assert.equal(e.motivo,'abandono');
+ const r=w(2);e=mover(r,{t:'turno',uid:'a',k:1,s:'…',v:[],d:[1,1],ti:0});assert.equal(e.ganador,'');assert.equal(e.motivo,'apagon');
+ const z=w(3);z.estado='esperando';delete z.jugadores.c;assert.equal(reducir(z).fase,'espera','con cupo 3 y dos dentro espera al anfitrión');
+});
+test('progreso: de 0 a 1 según lo jugado, 0 fuera de juego',()=>{
+ const {progreso}=context;
+ const p=sala();let e=reducir(p);assert.equal(progreso(e,'orbita'),0);
+ e=mover(p,{t:'orbita',uid:'a',casilla:7,eje:'fila'});assert.equal(progreso(e,'orbita'),1/36);
+ const r={juego:'reversi',semilla:1,estado:'jugando',jugadores:{a:{nombre:'A',orden:0},b:{nombre:'B',orden:1}},jugadas:{}};
+ e=reducir(r);assert.equal(progreso(e,'reversi'),0);
+ const [f0,c0]=Object.keys(e.legales)[0].split(/\D+/).filter(Boolean).map(Number);e=mover(r,{t:'p',uid:e.turno,f:f0,c:c0});
+ assert.ok(progreso(e,'reversi')>0&&progreso(e,'reversi')<.1,'una ficha puesta: '+progreso(e,'reversi'));
+ const q={juego:'cuadritos',semilla:1,estado:'jugando',jugadores:{a:{nombre:'A',orden:0},b:{nombre:'B',orden:1}},jugadas:{}};
+ e=reducir(q);assert.equal(progreso(e,'cuadritos'),0);
+ assert.equal(progreso(reducir(sala()),'escondite'),0);assert.equal(progreso(null,'orbita'),0);
+ const f=sala();mover(f,{t:'abandona',uid:'a'});assert.equal(progreso(reducir(f),'orbita'),0,'terminada ya no acelera');
+});
