@@ -1846,19 +1846,33 @@ retold from `hist`.** `redFlip7` keeps the last 40 events (`hist`, each with an
 never the state — the state says where a card *is*, the history says that it
 *arrived*. Things worth knowing before editing it:
 
-- **The seats are placed in percent around an oval** (`#f7Asientos` over
-  `.jg-f7-mesa-o`), with you always at the bottom and the rest spread over the
-  arc in seating order. Their parent `.jg-f7-sala` has only absolutely
-  positioned children, so inside `.jg-tablero` — which is `place-items:center`
-  — it **collapsed to width 0** and the table was a brown sliver; hence
-  `.jg-f7 .jg-tablero{place-items:stretch}` and an explicit `width:100%`.
-  Below 720 px the oval is dropped and the seats become a two-column grid with
-  you last.
-- **The croupier deals.** It is an inline SVG whose eyes and hand turn to the
-  seat receiving (`mira()`); each new card is a real element flown from the
-  deck to the seat (`lanza`, counted in `vuelos`) and the seat does not show it
-  until it lands (`enVuelo`), so a card is never in two places. A hidden tab
-  flies nothing and keeps the last one in `pendiente` for `alVolver`.
+- **The table is a half moon with the croupier on the flat side**, as in a
+  casino: players only use the curved half, and the straight edge is the
+  dealer's rail with the discard tray, the showcase (a mark printed on the felt
+  where an action card waits for its target) and the shoe, each with a brass
+  plaque (`.jg-f7-cuenta`) under it. Seats are **placed by hand per player
+  count** (`PUESTOS`, percent of `#f7Asientos`, you always at the bottom
+  centre) — an even spread over an arc made six seats overlap and push the
+  end ones through the rail. Five and six players get compact seats (smaller
+  cards, `.jg-f7-sala[data-n]`), and the room's height per count lives in two
+  places that must agree: the CSS `[data-n]` rule and `ALTO_SALA`, which the
+  head-turn angle is computed with. `.jg-f7-sala` has only absolutely
+  positioned children, so inside `.jg-tablero` — which is
+  `place-items:center` — it **collapsed to width 0** and the table was a brown
+  sliver; hence `.jg-f7 .jg-tablero{place-items:stretch}` and an explicit
+  `width:100%`. Below 720 px the half moon is dropped and the seats become a
+  two-column grid with you last, full width.
+- **The croupier deals with a real arm.** The SVG is only the torso and head
+  (whose eyes turn to the seat receiving, `mira()`); the arm is an HTML
+  element (`#f7Brazo`) anchored at the shoulder and rotated/stretched by
+  **measuring** where the target seat is (`--ang`, `--l`), because an SVG arm
+  inside the dealer's own viewBox could not reach a seat outside it. At rest
+  (`reposa()`) the hand lies on the felt beside the shoe, not over it — resting
+  on the shoe covered its top card. Each new card is a real element flown from
+  the shoe's `.jg-f7-tope` to the seat (`lanza`, counted in `vuelos`) and the
+  seat does not show it until it lands (`enVuelo`), so a card is never in two
+  places. A hidden tab flies nothing and keeps the last one in `pendiente` for
+  `alVolver`.
 - **Sound follows the history, like everywhere else**: `madera` (knuckles on
   the table) when someone asks for a card, `reparte` for each card that flies,
   `planta` on standing, `revienta` on busting, `flip7` for seven distinct
