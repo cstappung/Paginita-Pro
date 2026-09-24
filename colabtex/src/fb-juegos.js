@@ -265,7 +265,7 @@ export function watchPerfil(uid, cb) {
 
 /* Lo que eligió quien abrió la sala y la revancha repite. Solo lo que
    existe: un `undefined` en un `set` hace fallar la escritura entera. */
-const opcionesDe = p => Object.fromEntries(["mapa", "escuadra", "tiempo", "malla"]
+const opcionesDe = p => Object.fromEntries(["mapa", "escuadra", "tiempo", "malla", "modo"]
   .filter(k => p[k] !== undefined && p[k] !== null).map(k => [k, p[k]]));
 
 /* Una única invitación por partida; las solicitudes simultáneas convergen. */

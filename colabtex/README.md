@@ -28,9 +28,11 @@ El login con Google funciona en localhost. Producción: ver
 
 ## Estructura
 
-Esta carpeta es además el **taller de compilación de las dos aplicaciones web**
-del sitio (ColabTeX y ColabDraw): es la única con `node_modules`, y duplicarla
-solo por Firebase y Yjs costaría unos 200 MB.
+Esta carpeta es además el **taller de compilación de todas las aplicaciones
+empaquetadas** del sitio (ColabTeX, ColabDraw, Informes y Juegos): es la única
+con `node_modules`, y duplicarla solo por Firebase y Yjs costaría unos 200 MB.
+Los tres instrumentos `.dc.html` de la raíz (CSV·Scope, FiltroLab y AjusteLab)
+no pasan por aquí: su motor es un `.js` que se edita y se recarga.
 
 ```
 colabtex/
@@ -50,6 +52,15 @@ colabtex/
                     reescritura de referencias y arrastrar/soltar
   src/comments.js   Comentarios sobre el texto (hilos anclados con
                     posiciones relativas de Yjs; resalte, burbuja y panel)
+  src/reports-main.js  Informes: el gestor de fallos compartido (bundle aparte)
+  src/reports.js    Parte pura de los informes: filtro, huella, exportación
+  src/fb-reports.js Nodos errors/ y feedback/ de Realtime Database
+  src/report-widget.js  Botón ⚑ y su cuadro, inyectado en cada página
+  src/juegos-main.js    Juegos: vestíbulo, salas y pantalla de fin (bundle aparte)
+  src/juegos/       Un archivo por juego + motor.js (reductor puro del registro
+                    de jugadas), sonido, perfil y clasificación
+  src/fb-juegos.js  Nodos partidas/, misPartidas/, vivo/ y ranks/
+  tests/            Pruebas de Juegos (npm run test:juegos)
   server/static.js  Servidor estático SOLO para desarrollo local
 firebase/           Reglas de seguridad + guía de configuración
 vendor/busytex/     Motor pdfTeX WASM + paquetes TeXLive (~217 MB)
@@ -60,17 +71,29 @@ colabdraw-app.js    Bundle generado de ColabDraw
 colabdraw-math.js   Motor de fórmulas LaTeX (MathJax → SVG). Bundle APARTE:
                     solo se descarga la primera vez que se escribe una
                     fórmula, y lo pide draw/latex.js con el ?v= de la página
+informes.html       Interfaz de Informes  (bundle: informes-app.js)
+juegos.html         Interfaz de Juegos    (bundle: juegos-app.js)
+juegos/             Recursos de los juegos: cartas, música, Circuit Breakers
+                    (iframe) y el club (Mina Club, Snake)
 ```
 
 ## Desarrollo
 
 ```
 cd colabtex
-npm run build      # re-empaqueta las dos aplicaciones + el worker de pdf.js
+npm run build        # re-empaqueta ColabTeX, ColabDraw, Informes, Juegos,
+                     # el motor de fórmulas y el worker de pdf.js
+npm run test:juegos  # pruebas de los juegos (node --test)
 ```
 
 `scripts/stamp-version.js` sella el `?v=…` de **cada** página (tabla `PAGES`)
-para que el navegador no sirva un bundle viejo de la caché.
+para que el navegador no sirva un bundle viejo de la caché. Los motores de los
+instrumentos `.dc.html` también están en esa tabla: si se edita uno sin
+compilar, hay que subir su `?v=` a mano.
+
+Tras cambiar `../firebase/database.rules.json`, las reglas se prueban contra el
+emulador (ver `CLAUDE.md` en la raíz) y **se publican a mano** en la consola de
+Firebase: subir a GitHub Pages no las despliega.
 
 ## ColabDraw (editor SVG)
 
@@ -219,7 +242,19 @@ projects/<pid>/doc/updates/<k>   cambios incrementales (se compactan cada ~80)
 projects/<pid>/assetsIndex/<k>   índice de binarios (storage o base64)
 tokenIndex/<token>               {pid, role} — unirse por enlace
 presence/<pid>/<clientID>        cursores y presencia (se limpia al desconectar)
+
+errors/<huella>                  Informes: fallo recogido solo, con contador
+feedback/<id>                    Informes: errores e ideas escritos a mano
+partidas/<pid>                   Juegos: sala (estado, jugadores) y jugadas/<n>,
+                                 registro de solo añadir del que sale el tablero
+misPartidas/<uid>/<pid>          Juegos: índice propio + secreto (solo el dueño)
+vivo/<pid>                       Juegos: turno en curso de Circuit Breakers
+ranks/<juego>/<uid>              Juegos: clasificación, cada uno la suya
+soloRanks/<categoria>/…          Juegos: marcas de los juegos de un jugador
 ```
+
+`errors`, `feedback` y los nodos de Juegos están fuera de `projects/` a
+propósito: pertenecen al equipo, no a un documento.
 
 ## Notas
 

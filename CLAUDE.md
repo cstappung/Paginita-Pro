@@ -45,14 +45,16 @@ Six apps plus a small shared **Informes** page:
   collect by themselves, plus the bugs and ideas people write. See "Informes"
   below.
 - **Juegos** (`juegos.html` + `juegos-app.js`, entry
-  `colabtex/src/juegos-main.js`) — seven turn-based games, on the same Google
+  `colabtex/src/juegos-main.js`) — eight turn-based games, on the same Google
   account and the same Firebase project: **Escondite** (hide a person in a
   landscape, then cross the landscapes and race to find the other's),
   **Cartas de los tres elementos** (a Card-Jitsu duel), **Cuadritos** (dots and
   boxes, two to six players and three board sizes), **Reversi**, **Órbita**,
   **Chain Reaction** (critical-mass orbs that burst into their neighbours, two
-  to six players and three grid sizes) and **Circuit Breakers** (a
-  Worms-style artillery game for two to four squads, in an iframe), plus a
+  to six players and three grid sizes), **Flip 7** (the push-your-luck card
+  game, two to six players, normal and "Vengeance" mode) and **Circuit
+  Breakers** (a Worms-style artillery game for two to four squads, in an
+  iframe), plus a
   **Clasificación** tab. See "Juegos" below.
 
 ColabTeX, ColabDraw, FiltroLab, AjusteLab, Juegos and Informes are authored in
@@ -1486,7 +1488,7 @@ Four decisions worth keeping:
 
 ## Juegos architecture
 
-Seven turn-based games, on the same Firebase project and the same Google session
+Eight turn-based games, on the same Firebase project and the same Google session
 as ColabTeX and ColabDraw. Turn-based on purpose: with one move per turn the
 network carries a handful of fields and there is nothing to interpolate, so no
 game loop ever has to be synchronised.
@@ -1700,8 +1702,8 @@ Modules in [colabtex/src/juegos/](colabtex/src/juegos/):
   verifiable from Node.
 - `paisaje.js` — draws the scene `motor.js` decided. Split from it because the
   only thing the two machines must share is the layout, and that is a number.
-- `escondite.js`, `cartas.js`, `cuadritos.js`, `reversi.js`, `ranks.js` — one
-  screen each.
+- `escondite.js`, `cartas.js`, `cuadritos.js`, `reversi.js`, `cadena.js`,
+  `flip7.js`, `ranks.js` — one screen each.
 - `sonido.js` — the WebAudio synth and the mute flag. No DOM beyond the header
   button's state, no Firebase.
 - `perfil.js` — the profile editor: `COLORES`, `mezcla` (ficha + perfil → what
@@ -1773,6 +1775,42 @@ a newer move made stale. Each orb is **three nested `<g>`s** (position → pop �
 shake → spin) because a CSS `transform` animation *replaces* the element's
 `transform` attribute: animating the group that carries the `translate` would
 throw every orb to the corner of the board. A replay longer than `MAX_ONDAS` (60) jumps straight to the end.
+
+**Flip 7 (`flip7`) deals from a deck nobody controls.** A shared deck
+cannot come from the room's public seed — anyone could read the next card from
+the console and know when to stop — and it cannot come from one player's
+secret either, because that player would know. So every card drawn is decided
+by **two contributions**: the receiver's and that of the next seat still in the
+game (`espera.k === "roba"`, `faltan`). A contribution is `aporteF7(sem, sal,
+n)`, the first 32 bits of SHA-256 over the player's *private* seed (the same
+`misPartidas/<uid>/<pid>/sec` cartas uses, committed as `hmazo`) and the draw
+number `n`; `indiceF7` combines them into an index into what is left of the
+deck. Neither can steer the card without knowing the other's value, and the
+second one to write cannot have seen the first's future ones. A `pide {n, v}`
+carries the asker's own contribution so asking is one write; the rest arrive
+as `{t:"r", uid, n, v}`, sent **by the screen on its own** after `PAUSA_ROBO`
+(`PAUSA_RONDA` at the start of a round, so the summary can be read). At the end
+every player publishes `{t:"s"}` exactly as in cartas and `auditaFlip7`
+recomputes every contribution: a lie is `que:"carta"`, a seed that does not
+match its `hmazo` is `que:"semilla"`, and one never revealed is only
+`que:"oculta"` (soft yellow notice, not the red one — closing the tab is not
+cheating). `flip7.js` calls `terminar` once everyone still seated has revealed
+or after `ESPERA_SEMILLAS`.
+
+The two modes are one reducer (`redFlip7`, `modoF7`, `mazoF7`): **normal** is
+the 94-card box (0, 1×1 … 12×12, six modifiers, Freeze / Flip Three / Second
+Chance); **venganza** is the 108-card Vengeance deck (numbers up to 13, the
+unlucky 7 that throws the line away, the lucky 13 that may repeat, the Cero
+that scores nothing unless it makes Flip 7 and **forbids standing** while there
+are cards to draw, negative and ÷2 modifiers, and the take-that actions: Swap,
+Steal, Discard, Just One More, Flip Four). Rules that are easy to get wrong:
+an action may target any player still in the round, a Swap or a Steal can make
+the receiver bust, and Flip Three/Four cards that come up mid-series are set
+aside (`aparta`) and resolved after it. The game ends at the end of the round in
+which someone reaches `F7_META` (200), and the highest total wins — not the first
+to cross; a tie at the top plays one more round. `tests/flip7.test.cjs` plays 30 full robot games per mode and
+checks that each one ends, pays out what `rondas` says and passes the audit,
+and that a forged contribution or seed is caught and attributed to the forger.
 
 **Circuit Breakers (`worms`) is a whole game in an iframe**, like Mina Club:
 `juegos/worms/` is its own document (canvas, physics, `audio.js`) and
