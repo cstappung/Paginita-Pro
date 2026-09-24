@@ -1542,6 +1542,22 @@ ending music. The last point also has to be *visible*: a closed box pops in
 (`.jg-caja-nueva`), a score that just went up bounces (`.jg-m-sube`, cuadritos
 and órbita), and the star just taken in órbita wears `.jg-estrella.ultima`.
 
+**A hidden tab does not get the cartel until it comes back.** The loser was
+the one who never saw the ending: the winner is looking at the board when the
+last move lands, the loser is usually in another tab waiting for their turn,
+and every timer there — the grace, the replay, the flights — ran with nobody
+watching, so the first thing on screen on returning was «Perdiste». So
+`pintaFin` does nothing while `document.hidden` for a game seen live that did
+not end by abandono (it resets `finDesde`), a document-wide `visibilitychange`
+listener in `juegos-main.js` calls it again on return, and the screens that
+animate keep the move they skipped (`pendiente` in `cadena.js` and `flip7.js`)
+and play it on their own `visibilitychange` (`alVolver`) — so the grace is
+counted from the moment the move was actually seen. The final scoreboard
+reads `est.puntos` before `est.cuenta`: `redCadena` returns `puntos` with **0
+for anyone `fuera` or `caido`**, because someone who abandons leaves their orbs
+on the board and `cuenta` showed an eliminated player with their score from
+before dying; `cadena.js`'s marcador does the same once the replay is over.
+
 **The lobby is a grid with the rooms on the right.** `.jg-ves` has the areas
 `"mq lado" "cat lado"`: the *marquesina* (title, counters, a quick-join button
 and the ring of game icons) and the catalogue on the left, and a **sticky**
@@ -1811,6 +1827,40 @@ which someone reaches `F7_META` (200), and the highest total wins — not the fi
 to cross; a tie at the top plays one more round. `tests/flip7.test.cjs` plays 30 full robot games per mode and
 checks that each one ends, pays out what `rondas` says and passes the audit,
 and that a forged contribution or seed is caught and attributed to the forger.
+
+**The Flip 7 screen is a round table with a croupier, and everything on it is
+retold from `hist`.** `redFlip7` keeps the last 40 events (`hist`, each with an
+`e`: `carta`, `pide`, `planta`, `pasa`, `f7`, `congela`, `ronda`, …) and
+`flip7.js` diffs it between repaints (`nuevosDe`) to decide what to animate,
+never the state — the state says where a card *is*, the history says that it
+*arrived*. Things worth knowing before editing it:
+
+- **The seats are placed in percent around an oval** (`#f7Asientos` over
+  `.jg-f7-mesa-o`), with you always at the bottom and the rest spread over the
+  arc in seating order. Their parent `.jg-f7-sala` has only absolutely
+  positioned children, so inside `.jg-tablero` — which is `place-items:center`
+  — it **collapsed to width 0** and the table was a brown sliver; hence
+  `.jg-f7 .jg-tablero{place-items:stretch}` and an explicit `width:100%`.
+  Below 720 px the oval is dropped and the seats become a two-column grid with
+  you last.
+- **The croupier deals.** It is an inline SVG whose eyes and hand turn to the
+  seat receiving (`mira()`); each new card is a real element flown from the
+  deck to the seat (`lanza`, counted in `vuelos`) and the seat does not show it
+  until it lands (`enVuelo`), so a card is never in two places. A hidden tab
+  flies nothing and keeps the last one in `pendiente` for `alVolver`.
+- **Sound follows the history, like everywhere else**: `madera` (knuckles on
+  the table) when someone asks for a card, `reparte` for each card that flies,
+  `planta` on standing, `revienta` on busting, `flip7` for seven distinct
+  numbers, `hielo` for a Freeze. When several land in one repaint only the most
+  important one sounds (the `orden` list), or a bust and a stand at once were
+  noise.
+- **The end of a round is a summary, not a jump.** The reducer starts the next
+  round in the same move that closes this one, so while the new round has no
+  card on the table yet the seats keep showing the lines that just closed
+  (`fantasma()`, read from `est.finRonda`) under the round summary. At the end of the game `trasVuelos` holds that
+  summary for `FIN_MS` (2.2 s) and only then calls `ctx.listo`; `ocupado()` is
+  `vuelos > 0 || Date.now() < finHasta`, which is what keeps `pintaFin` from
+  covering the last card with the cartel.
 
 **Circuit Breakers (`worms`) is a whole game in an iframe**, like Mina Club:
 `juegos/worms/` is its own document (canvas, physics, `audio.js`) and

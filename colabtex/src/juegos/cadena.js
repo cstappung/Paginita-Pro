@@ -79,6 +79,7 @@ export function crearCadena(ctx) {
   let raf = 0, tComb = 0, tAviso = 0;
   const timers = new Set();
   const firmas = {};
+  let pendiente = -1;         // jugada que llegó sin verse (pestaña detrás)
 
   /* ---------- montaje ---------- */
   function montar(donde) {
@@ -100,11 +101,23 @@ export function crearCadena(ctx) {
         <div class="jg-pie" id="crPie"></div>
       </div>`;
     host.addEventListener("click", alClic);
+    document.addEventListener("visibilitychange", alVolver);
+  }
+
+  /* La jugada que llegó con la pestaña detrás no se animó: se cuenta al
+     volver, si sigue siendo la última. Es sobre todo la que acaba la
+     partida — el que pierde suele estar mirando otra cosa cuando el
+     otro remata — y sin esto el cartel era lo primero que veía. */
+  function alVolver() {
+    if (document.hidden || muerto || !est || animando) return;
+    if (pendiente >= 0 && pendiente === est.movs && est.ultima) anima(est.ultima);
+    pendiente = -1;
   }
 
   function destruir() {
     muerto = true; gen++;
     corta();
+    document.removeEventListener("visibilitychange", alVolver);
     if (host) { host.removeEventListener("click", alClic); host.innerHTML = ""; }
     host = null;
   }
@@ -321,6 +334,7 @@ export function crearCadena(ctx) {
   /* ---------- la jugada, contada despacio ---------- */
   async function anima(ult) {
     const g = ++gen;
+    pendiente = -1;
     corta();
     animando = true;
     pintaTab(ult.antes);
@@ -423,7 +437,9 @@ export function crearCadena(ctx) {
     const { orbes } = crCuenta(mostrado || est.tab);
     const filas = est.jugadores.map(j => {
       const out = est.fuera[j.uid] || est.caidos[j.uid];
-      const n = orbes[j.uid] || 0;
+      /* Quien está fuera tiene 0, aunque el que abandonó deje sus orbes
+         en el tablero; a mitad de la cadena manda lo que se ve. */
+      const n = out && !animando ? 0 : orbes[j.uid] || 0;
       return { j, n, out, turno: est.turno === j.uid };
     });
     set("crMarcador", filas.map(f => f.j.uid + ":" + f.n + (f.out ? "x" : "") + (f.turno ? "*" : "") + ":" + f.j.nombre).join("/"),
@@ -450,6 +466,7 @@ export function crearCadena(ctx) {
     if (!host) return;
     const nuevo = vistos >= 0 && est.movs > vistos && est.ultima;
     vistos = est.movs;
+    if (nuevo && document.hidden) pendiente = est.movs;
     if (nuevo && !document.hidden) anima(est.ultima);
     else if (nuevo || !animando) {
       if (animando) { gen++; corta(); }

@@ -17,8 +17,30 @@
  *   porque la regla de la base rechaza cualquier jugada con `fin` escrito.
  *   `auditaFlip7` rehace entonces cada aporte, en todas las pantallas.
  *
+ * Lo que se ve es una mesa redonda con un crupier en medio. Tres cosas
+ * sostienen la puesta en escena:
+ *
+ * - **La carta nueva vuela desde el mazo** (`lanza`). Se pinta primero
+ *   en su sitio de verdad, oculta (`enVuelo`), y un doble con dos caras
+ *   viaja del mazo a ese sitio girándose por el camino; al aterrizar se
+ *   destapa la de verdad. Así el destino lo decide el pintado — la fila
+ *   de quien la recibe, la vitrina si hay que elegir — y no una copia de
+ *   las reglas aquí dentro.
+ * - **Lo que pasó sale de comparar el historial** (`nuevosDe`), no del
+ *   último suceso: dos «pide» seguidos son iguales, y buscar el último
+ *   visto con `lastIndexOf` se comía el segundo.
+ * - **La pantalla dice cuándo está ocupada** (`ocupado`): mientras vuela
+ *   una carta y mientras se enseña el resumen de la última ronda, el
+ *   cartel de fin de partida espera. Si no, quien perdía veía el cartel
+ *   antes que la carta que le hizo perder. Con la pestaña detrás no se
+ *   anima nada: se guarda lo pendiente y se cuenta al volver (`alVolver`).
+ *
+ * Al cerrarse una ronda el reductor vacía las filas en el acto; la mesa
+ * sigue enseñando cómo quedaron (la vista «fantasma», de `finRonda`)
+ * hasta que cae la primera carta de la siguiente, que es cuando se lee.
+ *
  * El repintado va por firmas, como en los demás juegos: reescribir el
- * innerHTML en cada tic reiniciaría la animación de la última carta.
+ * innerHTML en cada tic reiniciaría las animaciones.
  */
 import { mazoF7, aporteF7, auditaFlip7, F7_SIETE } from "./motor.js";
 import { suena } from "./sonido.js";
@@ -26,23 +48,31 @@ import { suena } from "./sonido.js";
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
-/* Lo que se tarda en mandar el propio aporte: entre robos, y al empezar
-   una ronda nueva (el resumen de la anterior tiene que poder leerse). */
-const PAUSA_ROBO = 550;
-const PAUSA_RONDA = 2600;
+/* Lo que se tarda en mandar el propio aporte: entre robos (lo que dura
+   el vuelo de la carta y un respiro), y al empezar una ronda nueva, que
+   es lo que dura el resumen de la anterior. */
+const PAUSA_ROBO = 750;
+const PAUSA_RONDA = 4600;
 /* Cuánto se espera a que los demás revelen su semilla antes de cerrar
    la partida igualmente: quien ya cerró la pestaña no va a hacerlo. */
 const ESPERA_SEMILLAS = 6000;
+/* El vuelo de una carta, y lo que se deja ver el resumen final antes
+   de soltar el cartel de fin de partida. */
+const VUELO_MS = 620;
+const FIN_MS = 2200;
+const ANCHO = 44;             // el ancho de una carta normal, en px
+
+const quieto = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 const ACCION = {
-  congela: { n: "Congelar", i: "❄" },
-  tres: { n: "Voltea tres", i: "③" },
-  segunda: { n: "Segunda oportunidad", i: "♥" },
-  cuatro: { n: "Voltea cuatro", i: "④" },
-  otra: { n: "Solo una más", i: "☝" },
-  cambia: { n: "Intercambio", i: "⇄" },
-  roba: { n: "Robo", i: "✋" },
-  tira: { n: "Descarte", i: "✕" }
+  congela: { n: "Congelar", i: "❄", t: "#38bdf8" },
+  tres: { n: "Voltea tres", i: "③", t: "#f59e0b" },
+  segunda: { n: "Segunda oportunidad", i: "♥", t: "#ec4899" },
+  cuatro: { n: "Voltea cuatro", i: "④", t: "#f97316" },
+  otra: { n: "Solo una más", i: "☝", t: "#a855f7" },
+  cambia: { n: "Intercambio", i: "⇄", t: "#14b8a6" },
+  roba: { n: "Robo", i: "✋", t: "#ef4444" },
+  tira: { n: "Descarte", i: "✕", t: "#64748b" }
 };
 
 /* Un tono por número, del frío al cálido, como en la caja: a la hora de
@@ -57,21 +87,80 @@ function nombreCarta(c) {
   return "«" + ACCION[c.a].n + "»";
 }
 
-function htmlCarta(c, clases, attrs) {
-  if (!c) return `<div class="jg-f7-c jg-f7-dorso ${clases || ""}"><span>7</span></div>`;
-  let cara, tipo, estilo = "", titulo = nombreCarta(c);
+const DORSO = `<i><b>7</b></i>`;
+
+/* Una carta. Siempre lleva `data-c` con su índice en el mazo: por ahí
+   la encuentra el vuelo, esté en una fila, en la vitrina o en el
+   resumen. Sin carta, un dorso. */
+function htmlCarta(c, clases, attrs, estilo) {
+  if (!c) return `<div class="jg-f7-c jg-f7-dorso ${clases || ""}" style="${estilo || ""}">${DORSO}</div>`;
+  let cara, tipo, st = estilo || "";
+  const titulo = nombreCarta(c);
   if (c.k === "n") {
     tipo = "num" + (c.cero ? " jg-f7-cero" : c.gafe ? " jg-f7-gafe" : c.suerte ? " jg-f7-suerte" : "");
-    estilo = `--t:${TONO[c.v] || TONO[0]}`;
-    cara = `<b>${c.cero ? "∅" : c.v}</b>${c.gafe ? "<i>gafe</i>" : c.suerte ? "<i>suerte</i>" : c.cero ? "<i>cero</i>" : ""}`;
+    st += `;--t:${TONO[c.v] || TONO[0]}`;
+    const cifra = c.cero ? "∅" : String(c.v);
+    const lema = c.gafe ? "gafe" : c.suerte ? "suerte" : c.cero ? "cero" : "";
+    cara = `<span class="jg-f7-esq">${cifra}</span><b class="jg-f7-cifra">${cifra}</b>`
+      + (lema ? `<i class="jg-f7-lema">${lema}</i>` : "") + `<span class="jg-f7-esq2">${cifra}</span>`;
   } else if (c.k === "m") {
     tipo = "mod" + (c.v < 0 || c.mitad ? " jg-f7-neg" : "");
-    cara = `<b>${c.doble ? "×2" : c.mitad ? "÷2" : (c.v > 0 ? "+" : "−") + Math.abs(c.v)}</b>`;
+    const t = c.doble ? "×2" : c.mitad ? "÷2" : (c.v > 0 ? "+" : "−") + Math.abs(c.v);
+    cara = `<span class="jg-f7-esq">${t}</span><b class="jg-f7-cifra">${t}</b><i class="jg-f7-lema">${c.doble || c.mitad ? "multiplica" : "suma"}</i>`;
   } else {
+    const a = ACCION[c.a];
     tipo = "acc jg-f7-" + c.a;
-    cara = `<b>${ACCION[c.a].i}</b><i>${esc(ACCION[c.a].n)}</i>`;
+    st += `;--t:${a.t}`;
+    cara = `<b class="jg-f7-icono">${a.i}</b><i class="jg-f7-lema">${esc(a.n)}</i>`;
   }
-  return `<div ${attrs || ""} class="jg-f7-c jg-f7-${tipo} ${clases || ""}" style="${estilo}" title="${esc(titulo)}">${cara}</div>`;
+  return `<div ${attrs || ""} data-c="${c.i}" class="jg-f7-c jg-f7-${tipo} ${clases || ""}" style="${st}" title="${esc(titulo)}">${cara}</div>`;
+}
+
+/* El crupier. Mira a quien espera la mesa (`--ox`/`--oy` en las pupilas,
+   `--rz` en la cabeza) y lanza con el brazo derecho, que es donde tiene
+   el mazo. */
+const CRUPIER = `
+<svg class="jg-f7-crupier" id="f7Crupier" viewBox="0 0 120 110" aria-hidden="true">
+  <path d="M22 110 C24 84 38 72 60 72 C82 72 96 84 98 110 Z" fill="#6b1f2a"/>
+  <path d="M48 73 L60 96 L72 73 Z" fill="#f7f3ea"/>
+  <path d="M60 96 L60 110" stroke="#4a141d" stroke-width="1.2"/>
+  <circle cx="60" cy="100" r="1.6" fill="#e8b64a"/><circle cx="60" cy="106" r="1.6" fill="#e8b64a"/>
+  <path d="M52 76 L60 80 L52 84 Z M68 76 L60 80 L68 84 Z" fill="#17131c"/><circle cx="60" cy="80" r="2.2" fill="#17131c"/>
+  <path d="M30 92 C26 98 30 104 40 104 L50 102" stroke="#6b1f2a" stroke-width="9" fill="none" stroke-linecap="round"/>
+  <circle cx="50" cy="102" r="4.6" fill="#f0bf94"/>
+  <g class="jg-f7-cabeza">
+    <rect x="54" y="58" width="12" height="14" rx="4" fill="#dca57c"/>
+    <circle cx="39.5" cy="46" r="4" fill="#e6b087"/><circle cx="80.5" cy="46" r="4" fill="#e6b087"/>
+    <circle cx="60" cy="44" r="20" fill="#f0bf94"/>
+    <path d="M40 42 C40 26 50 20 60 20 C72 20 81 27 80 42 C76 34 70 31 60 31 C50 31 44 34 40 42 Z" fill="#2b1d18"/>
+    <path d="M36 35 C44 29 76 29 84 35 L84 38 C76 34 44 34 36 38 Z" fill="#1f8a5a" opacity=".8"/>
+    <path d="M47 38 L56 37 M64 37 L73 38" stroke="#2b1d18" stroke-width="2" stroke-linecap="round"/>
+    <g class="jg-f7-ojos"><circle cx="52" cy="44" r="2.2" fill="#1d1a24"/><circle cx="68" cy="44" r="2.2" fill="#1d1a24"/></g>
+    <g class="jg-f7-parpado"><rect x="48.5" y="40.5" width="7" height="7" rx="3" fill="#f0bf94"/><rect x="64.5" y="40.5" width="7" height="7" rx="3" fill="#f0bf94"/></g>
+    <path d="M51 53 C55 50 58 51 60 52 C62 51 65 50 69 53 C65 54 62 54 60 53 C58 54 55 54 51 53 Z" fill="#3a2620"/>
+    <path d="M54 57 C57 60 63 60 66 57" stroke="#a0513f" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+  </g>
+  <g class="jg-f7-brazo" id="f7Brazo">
+    <path d="M90 92 C96 96 92 102 84 102" stroke="#6b1f2a" stroke-width="9" fill="none" stroke-linecap="round"/>
+    <circle cx="84" cy="102" r="4.6" fill="#f0bf94"/>
+    <rect x="74" y="91" width="9" height="13" rx="1.6" fill="#7a1f2e" stroke="#e8b64a" stroke-width="1" transform="rotate(-18 78 97)"/>
+  </g>
+</svg>`;
+
+/* Qué sucesos del historial son nuevos. El historial es una cola de 40:
+   al llenarse, cada suceso nuevo empuja uno viejo por delante. Se busca
+   el menor desplazamiento con el que lo que ya había casa con el
+   principio de lo que hay, y lo que sobra por detrás es lo nuevo. */
+function nuevosDe(prev, cur) {
+  const a = prev.map(x => JSON.stringify(x)), b = cur.map(x => JSON.stringify(x));
+  for (let d = 0; d <= a.length; d++) {
+    const k = a.length - d;
+    if (k > b.length) continue;
+    let igual = true;
+    for (let i = 0; i < k; i++) if (a[d + i] !== b[i]) { igual = false; break; }
+    if (igual) return cur.slice(k);
+  }
+  return cur.slice();
 }
 
 export function crearFlip7(ctx) {
@@ -85,10 +174,24 @@ export function crearFlip7(ctx) {
   let reloj = null, relojN = -1;
   let rondaVista = 0, tRonda = 0;
   let sel1 = null;             // primera carta del intercambio, aún sin pareja
-  let ultimaVista = -1, histVisto = "";
   let tramposos = [], auditando = false, firmaAudit = "";
   let cerrando = false, finVisto = 0, relojFin = null;
   const firmas = {};
+
+  /* La puesta en escena. */
+  let histPrev = [], ultimaN = -1, primera = true;
+  const enVuelo = new Set();   // cartas pintadas en su sitio pero aún en el aire
+  let vuelos = 0, finHasta = 0;
+  let vioJugar = false, finAnimado = false;
+  let pendiente = null;        // lo que pasó con la pestaña detrás
+  let resumenR = 0, relojRes = null, resumenFijo = false, relojListo = null;
+  let firmaOrden = "";
+  const angulo = {};           // uid → ángulo de su asiento, en grados
+  const temporizadores = new Set();
+
+  const ocupado = () => vuelos > 0 || Date.now() < finHasta;
+  const luego = (f, ms) => { const t = setTimeout(() => { temporizadores.delete(t); if (!muerto) f(); }, ms); temporizadores.add(t); return t; };
+  const $ = sel => host && host.querySelector(sel);
 
   function montar(donde) {
     host = donde;
@@ -101,20 +204,37 @@ export function crearFlip7(ctx) {
         </div>
         <div id="f7Trampa"></div>
         <div class="jg-tablero jg-f7-tablero">
-          <div class="jg-f7-centro" id="f7Centro"></div>
-          <div class="jg-f7-resumen" id="f7Resumen"></div>
-          <div class="jg-f7-mesa" id="f7Mesa"></div>
+          <div class="jg-f7-sala" id="f7Sala">
+            <div class="jg-f7-mesa-o"></div>
+            <div class="jg-f7-centro">
+              ${CRUPIER}
+              <div class="jg-f7-fila-c">
+                <div class="jg-f7-pila" id="f7Desc"></div>
+                <div class="jg-f7-vitrina" id="f7Vitrina"></div>
+                <div class="jg-f7-pila" id="f7Mazo"></div>
+              </div>
+              <div class="jg-f7-info" id="f7Info"></div>
+            </div>
+            <div id="f7Asientos"></div>
+            <div class="jg-f7-resumen" id="f7Resumen"></div>
+            <div class="jg-f7-vuelos" id="f7Vuelos"></div>
+            <div class="jg-f7-fx" id="f7Fx"></div>
+          </div>
         </div>
         <div class="jg-pie" id="f7Pie"></div>
         <div class="jg-f7-hist" id="f7Hist"></div>
       </div>`;
     host.addEventListener("click", alClic);
+    document.addEventListener("visibilitychange", alVolver);
     pideSecreto();
   }
 
   function destruir() {
     muerto = true;
-    clearTimeout(reloj); clearTimeout(relojFin);
+    clearTimeout(reloj); clearTimeout(relojFin); clearTimeout(relojRes); clearTimeout(relojListo);
+    for (const t of temporizadores) clearTimeout(t);
+    temporizadores.clear();
+    document.removeEventListener("visibilitychange", alVolver);
     if (host) { host.removeEventListener("click", alClic); host.innerHTML = ""; }
     host = null;
   }
@@ -155,6 +275,18 @@ export function crearFlip7(ctx) {
     if (el) el.innerHTML = html;
   }
 
+  /* Las filas de la ronda que acaba de cerrarse, mientras la nueva aún
+     no tiene ninguna carta: el reductor ya las vació, pero es justo lo
+     que se quiere estar mirando. */
+  function fantasma() {
+    const f = est.finRonda;
+    if (est.fase !== "jugando" || !f || f.r !== est.ronda - 1) return false;
+    return est.jugadores.every(j => {
+      const l = est.lineas[j.uid];
+      return !l || (!l.nums.length && !l.mods.length && l.seg == null);
+    });
+  }
+
   function pinta() {
     if (!host || !est) return;
     set("f7Fase", textoFase(), esc(textoFase()));
@@ -162,11 +294,17 @@ export function crearFlip7(ctx) {
     set("f7Modo", modo + est.ronda, `<span class="jg-f7-etq${est.modo === "venganza" ? " jg-f7-v" : ""}">${modo}</span>
       ${est.ronda ? `<span class="jg-nota">Ronda ${est.ronda} · a ${est.meta}</span>` : ""}`);
     set("f7Trampa", tramposos.map(t => t.uid + t.que).join(","), avisoTrampa());
+    const fant = fantasma();
     pintaCentro();
-    pintaResumen();
-    pintaMesa();
+    pintaAsientos(fant);
     pintaPie();
     pintaHist();
+    /* Las que siguen en el aire no se ven en su sitio todavía. */
+    for (const id of enVuelo) {
+      host.querySelectorAll(`#f7Asientos [data-c="${id}"], #f7Vitrina [data-c="${id}"]`).forEach(el => el.classList.add("jg-f7-oculta"));
+    }
+    if (!resumenFijo && !fant && est.fase === "jugando") escondeResumen();
+    mira(aQuienEspera(fant));
   }
 
   function textoFase() {
@@ -198,25 +336,46 @@ export function crearFlip7(ctx) {
       (¿pestaña cerrada?), así que sus aportes no se han podido comprobar.</div>`;
   }
 
-  /* El centro: el montón, la última carta que salió y para quién. */
+  /* El centro: el descarte, la vitrina (la carta que espera a que alguien
+     decida qué hacer con ella) y el mazo, bajo la mano del crupier. */
   function pintaCentro() {
-    const u = est.ultima;
-    const c = u ? carta(u.id) : null;
-    const firma = [est.fase, est.monton, est.descarte, u ? u.n : -1].join("|");
-    set("f7Centro", firma, `
-      <div class="jg-f7-monton">${htmlCarta(null)}<span>${est.monton ?? 0} en el mazo · ${est.descarte ?? 0} descartadas</span></div>
-      <div class="jg-f7-ultima">${c ? htmlCarta(c, "jg-f7-grande jg-f7-sale") + `<span>para <b>${esc(nombre(u.para))}</b></span>` : `<span class="jg-nota">Aún no ha salido ninguna carta.</span>`}</div>`);
+    const mon = est.monton ?? 0, des = est.descarte ?? 0;
+    const altura = Math.min(4, Math.ceil(mon / 20));
+    set("f7Mazo", "m" + altura + ":" + mon, altura
+      ? Array.from({ length: altura }, (_, k) => htmlCarta(null, k === altura - 1 ? "jg-f7-tope" : "", "", `--k:${k}`)).join("")
+        + `<span class="jg-f7-cuenta">${mon}</span>`
+      : `<div class="jg-f7-hueco">vacío</div><span class="jg-f7-cuenta">0</span>`);
+    const alto = Math.min(3, Math.ceil(des / 15));
+    set("f7Desc", "d" + alto + ":" + des, alto
+      ? Array.from({ length: alto }, (_, k) => htmlCarta(null, "jg-f7-tirada", "", `--k:${k}`)).join("")
+        + `<span class="jg-f7-cuenta">${des} fuera</span>`
+      : `<div class="jg-f7-hueco">descarte</div>`);
+    const w = est.espera, eli = est.fase === "jugando" && w && w.k === "elige";
+    set("f7Vitrina", eli ? "v" + w.id + w.quien : "v-", eli
+      ? htmlCarta(carta(w.id), "jg-f7-grande" + (w.quien === uid ? " jg-f7-mia" : "")) + `<span class="jg-f7-de">${w.quien === uid ? "la tuya" : "de " + esc(nombre(w.quien))}</span>`
+      : `<div class="jg-f7-hueco jg-f7-hueco-g"></div>`);
+    const info = est.ronda
+      ? `Ronda ${est.ronda} · reparte ${esc(est.reparte === uid ? "tú" : (jugador(est.reparte) || {}).nombre || "—")}`
+      : est.fase === "espera" ? "La mesa está abierta" : "";
+    set("f7Info", info, info);
   }
 
-  function pintaResumen() {
-    const f = est.finRonda;
-    if (!f) { set("f7Resumen", "-", ""); return; }
-    const filas = est.jugadores.map(j => {
-      const l = f.lineas[j.uid] || {};
-      const extra = l.f7 ? " · Flip 7" : l.estado === "pasa" ? " · se pasó" : l.estado === "fuera" ? " · fuera" : "";
-      return `<span class="jg-m" style="--c:${esc(j.color || "#888")}"><b>+${f.pts[j.uid] || 0}</b><span>${esc(nombre(j.uid))}${extra}</span></span>`;
-    }).join("");
-    set("f7Resumen", "r" + f.r, `<div class="jg-f7-res-t">Ronda ${f.r}${f.f7 ? ` · ¡Flip 7 de ${esc(nombre(f.f7))}!` : ""}</div><div class="jg-marcador">${filas}</div>`);
+  /* A quién mira el crupier: al que tiene que decidir, al que elige a
+     quién va una carta, o al que la va a recibir. */
+  function aQuienEspera(fant) {
+    const w = est.espera;
+    if (est.fase === "fin") return est.ganador;
+    if (!w || fant) return null;
+    return w.k === "decide" ? w.uid : w.k === "elige" ? w.quien : w.para;
+  }
+
+  function mira(u) {
+    const cr = $("#f7Crupier");
+    if (!cr) return;
+    const a = u != null && angulo[u] != null ? angulo[u] * Math.PI / 180 : null;
+    cr.style.setProperty("--ox", a == null ? "0px" : (Math.cos(a) * 2.4).toFixed(2) + "px");
+    cr.style.setProperty("--oy", a == null ? "0px" : (Math.sin(a) * 1.8).toFixed(2) + "px");
+    cr.style.setProperty("--rz", a == null ? "0deg" : (Math.cos(a) * 8).toFixed(2) + "deg");
   }
 
   /* Qué cartas de la mesa se pueden tocar ahora mismo: solo cuando me
@@ -232,53 +391,90 @@ export function crearFlip7(ctx) {
     return o;
   }
 
-  function pintaMesa() {
+  /* Los asientos, alrededor del óvalo: yo siempre abajo, los demás en el
+     orden de la mesa y en el sentido del reloj. Las cajas se rehacen solo
+     cuando cambia quién se sienta; lo de dentro va por firma. */
+  function ordenMesa() {
+    const js = est.jugadores.slice().sort((a, b) => (a.orden || 0) - (b.orden || 0));
+    const i = js.findIndex(j => j.uid === uid);
+    return i > 0 ? js.slice(i).concat(js.slice(0, i)) : js;
+  }
+
+  function pintaAsientos(fant) {
+    const js = ordenMesa(), N = js.length;
+    const orden = js.map(j => j.uid).join(",");
+    const cont = $("#f7Asientos"), sala = $("#f7Sala");
+    if (!cont) return;
+    if (orden !== firmaOrden) {
+      firmaOrden = orden;
+      sala.classList.toggle("jg-f7-muchos", N > 2);
+      cont.innerHTML = js.map((j, i) => {
+        const th = 90 + i * 360 / N;
+        angulo[j.uid] = th;
+        const r = th * Math.PI / 180;
+        const x = Math.min(85, Math.max(15, 50 + 41 * Math.cos(r)));
+        const y = Math.min(84, Math.max(16, 50 + 37 * Math.sin(r)));
+        return `<div class="jg-f7-asiento${j.uid === uid ? " jg-f7-yo" : ""}" id="f7S${i}" data-u="${esc(j.uid)}" style="left:${x.toFixed(2)}%;top:${y.toFixed(2)}%"></div>`;
+      }).join("");
+      for (const k in firmas) if (/^f7S\d/.test(k)) delete firmas[k];
+    }
     const w = est.espera, el = elegibles();
     const apuntables = w && w.k === "elige" && w.quien === uid && w.op.tipo === "a" ? w.op.uids : [];
-    const html = [], firma = [];
-    for (const j of est.jugadores) {
-      const l = est.lineas[j.uid] || { nums: [], mods: [], estado: "fuera" };
-      const turno = w && ((w.k === "decide" && w.uid === j.uid) || (w.k === "elige" && w.quien === j.uid) || (w.k === "roba" && w.para === j.uid));
-      const puede = el && el[j.uid] ? el[j.uid] : [];
-      const apunta = apuntables.includes(j.uid);
-      const estado = (est.fuera || {})[j.uid] ? "fuera"
+    const f = est.finRonda;
+    js.forEach((j, i) => {
+      const fuera = !!(est.fuera || {})[j.uid];
+      const l = fant ? Object.assign({ seg: null, congelado: false }, f.lineas[j.uid] || { nums: [], mods: [], estado: "fuera" })
+        : est.lineas[j.uid] || { nums: [], mods: [], estado: "fuera" };
+      const turno = !fant && est.fase === "jugando" && w && ((w.k === "decide" && w.uid === j.uid) || (w.k === "elige" && w.quien === j.uid) || (w.k === "roba" && w.para === j.uid));
+      const puede = !fant && el && el[j.uid] ? el[j.uid] : [];
+      const apunta = !fant && apuntables.includes(j.uid);
+      const estado = fuera ? "fuera"
         : l.f7 ? "¡Flip 7!"
         : l.estado === "pasa" ? "se pasó"
         : l.congelado ? "congelado"
         : l.estado === "planta" ? "plantado"
+        : fant ? "en pie"
         : est.ronda ? "en juego" : "";
       const cls = "jg-f7-jug" + (turno ? " jg-f7-turno" : "") + (l.estado === "pasa" ? " jg-f7-pasado" : "")
         + (l.estado === "planta" ? " jg-f7-plantado" : "") + (l.f7 ? " jg-f7-siete" : "") + (apunta ? " jg-f7-apuntable" : "")
-        + ((est.fuera || {})[j.uid] ? " jg-f7-fuera" : "");
+        + (fuera ? " jg-f7-fuera" : "") + (fant ? " jg-f7-fantasma" : "");
       const pts = est.puntos[j.uid] || 0;
-      const cartas = ids => ids.map(id => {
+      const vale = fant ? (f.pts[j.uid] || 0) : (est.valor[j.uid] || 0);
+      const n = l.nums.length;
+      const paso = n > 1 ? Math.min(40, (160 - ANCHO) / (n - 1)) : 0;
+      const nums = l.nums.map((id, k) => {
+        const d = k - (n - 1) / 2;
         const ok = puede.includes(id), s = sel1 && sel1.id === id && sel1.u === j.uid;
-        return htmlCarta(carta(id), (ok ? "jg-f7-elegible" : "") + (s ? " jg-f7-sel" : ""), ok || s ? `data-u="${esc(j.uid)}" data-id="${id}"` : "");
+        return htmlCarta(carta(id), (ok ? "jg-f7-elegible" : "") + (s ? " jg-f7-sel" : ""),
+          ok || s ? `data-u="${esc(j.uid)}" data-id="${id}"` : "",
+          `--r:${(d * 4).toFixed(1)}deg;--y:${(d * d * 0.9).toFixed(1)}px;margin-left:${k ? (paso - ANCHO).toFixed(1) : 0}px;z-index:${k + 1}`);
       }).join("");
-      const nNums = l.nums.length;
-      firma.push([j.uid, j.nombre, j.color, l.nums.join(","), l.mods.join(","), l.seg, l.estado, l.f7, l.congelado, pts,
-        est.valor[j.uid], turno, apunta, puede.join(","), sel1 && sel1.u === j.uid ? sel1.id : ""].join(":"));
-      html.push(`<div class="${cls}" style="--c:${esc(j.color || "#888")}" ${apunta ? `data-apunta="${esc(j.uid)}"` : ""}>
-        <div class="jg-f7-cab">
-          <span class="jg-punto" style="background:${esc(j.color || "#888")}"></span>
-          <b>${esc(j.uid === uid ? "Tú" : j.nombre)}</b>
-          <span class="jg-f7-est">${esc(estado)}</span>
-          <span class="jg-grow"></span>
+      const minis = l.mods.map(id => {
+        const ok = puede.includes(id), s = sel1 && sel1.id === id && sel1.u === j.uid;
+        return htmlCarta(carta(id), "jg-f7-mini" + (ok ? " jg-f7-elegible" : "") + (s ? " jg-f7-sel" : ""), ok || s ? `data-u="${esc(j.uid)}" data-id="${id}"` : "");
+      }).join("") + (l.seg != null ? htmlCarta(carta(l.seg), "jg-f7-mini jg-f7-guardada") : "");
+      const foto = j.foto && /^(https?:|data:image\/)/.test(j.foto)
+        ? `<img src="${esc(j.foto)}" alt="" referrerpolicy="no-referrer">` : esc((j.nombre || "?").charAt(0).toUpperCase());
+      const firma = [fant, j.nombre, j.color, j.foto, l.nums.join(","), l.mods.join(","), l.seg, l.estado, l.f7, l.congelado, pts,
+        vale, turno, apunta, puede.join(","), sel1 && sel1.u === j.uid ? sel1.id : "", fuera, est.reparte === j.uid].join(":");
+      set("f7S" + i, firma, `<div class="${cls}" style="--c:${esc(j.color || "#888")}" ${apunta ? `data-apunta="${esc(j.uid)}"` : ""}>
+        <div class="jg-f7-placa">
+          <span class="jg-f7-ava">${foto}</span>
+          <span class="jg-f7-quien"><b>${esc(j.uid === uid ? "Tú" : j.nombre)}</b><span class="jg-f7-est">${esc(estado)}</span></span>
+          ${est.reparte === j.uid && est.ronda ? `<span class="jg-f7-dealer" title="Reparte esta ronda">D</span>` : ""}
           <span class="jg-f7-total" title="Puntos de la partida"><b>${pts}</b>/${est.meta}</span>
         </div>
         <div class="jg-f7-barra"><i style="width:${Math.min(100, pts / est.meta * 100)}%"></i></div>
-        <div class="jg-f7-fila">${cartas(l.nums) || '<span class="jg-nota">sin cartas</span>'}</div>
-        ${l.mods.length || l.seg != null ? `<div class="jg-f7-fila jg-f7-mods">${cartas(l.mods)}${l.seg != null ? htmlCarta(carta(l.seg), "jg-f7-guardada") : ""}</div>` : ""}
+        <div class="jg-f7-mano">${nums || `<span class="jg-f7-vacia">${fuera ? "" : "sin cartas"}</span>`}</div>
+        ${minis ? `<div class="jg-f7-extras">${minis}</div>` : ""}
         <div class="jg-f7-pie-j">
-          <span title="Números distintos">${nNums}/${F7_SIETE}</span>
-          <span class="jg-f7-siete-p">${Array.from({ length: F7_SIETE }, (_, k) => `<i class="${k < nNums ? "on" : ""}"></i>`).join("")}</span>
+          <span class="jg-f7-siete-p" title="Números distintos: ${n} de ${F7_SIETE}">${Array.from({ length: F7_SIETE }, (_, k) => `<i class="${k < n ? "on" : ""}"></i>`).join("")}</span>
           <span class="jg-grow"></span>
-          <span title="Lo que se lleva si la ronda acabara ahora">vale <b>${est.valor[j.uid] || 0}</b></span>
+          <span title="${fant ? "Lo que sumó la ronda pasada" : "Lo que se lleva si la ronda acabara ahora"}">${fant ? "sumó" : "vale"} <b>${fant ? "+" : ""}${vale}</b></span>
         </div>
         ${apunta ? `<button class="jg-btn jg-f7-apunta" data-apunta="${esc(j.uid)}">${j.uid === uid ? "A mí" : "A " + esc(j.nombre)}</button>` : ""}
       </div>`);
-    }
-    set("f7Mesa", firma.join("|"), html.join(""));
+    });
   }
 
   function pintaPie() {
@@ -290,14 +486,14 @@ export function crearFlip7(ctx) {
     else if (w && w.k === "decide" && w.uid === uid) {
       const listo = secListo && !enviando;
       firma = "dec" + w.cero + listo + est.valor[uid];
-      html = `<button class="jg-btn" id="f7Pide"${listo ? "" : " disabled"}>Pedir carta</button>
-        <button class="jg-btn jg-f7-planta" id="f7Planta"${w.cero || !listo ? " disabled" : ""}>Plantarme con ${est.valor[uid] || 0}</button>
+      html = `<button class="jg-btn jg-f7-pide" id="f7Pide"${listo ? "" : " disabled"}><span>✋</span> Pedir carta</button>
+        <button class="jg-btn jg-f7-planta" id="f7Planta"${w.cero || !listo ? " disabled" : ""}><span>✊</span> Plantarme con ${est.valor[uid] || 0}</button>
         <span class="jg-nota">${w.cero ? "Tienes el Cero: no puedes plantarte. O haces Flip 7, o esta ronda no suma." : "Si repites un número te pasas y la ronda no te da nada."}</span>`;
     } else if (w && w.k === "elige" && w.quien === uid) {
       const c = carta(w.id);
       firma = "eli" + w.id + (sel1 ? sel1.u + sel1.id : "");
       html = `${htmlCarta(c, "jg-f7-mini")}<span class="jg-nota">${esc(textoEleccion(c, w.op))}</span>
-        ${sel1 ? `<button class="jg-btn jg-f7-planta" id="f7Anula">Cambiar la primera</button>` : ""}`;
+        ${sel1 ? `<button class="jg-btn jg-f7-anula" id="f7Anula">Cambiar la primera</button>` : ""}`;
     } else {
       firma = "otro";
       html = `<span class="jg-nota">Pide carta cuando sea tu turno. Siete números distintos cierran la ronda con +15; un repetido y te quedas sin nada.</span>`;
@@ -358,27 +554,244 @@ export function crearFlip7(ctx) {
       : "");
   }
 
-  /* ---------- sonido: por lo que cuenta el registro ---------- */
-  function suenaNuevo() {
-    const h = est.hist || [];
-    const claves = h.map(x => JSON.stringify(x));
-    let nuevos = [];
-    if (histVisto) {
-      const i = claves.lastIndexOf(histVisto);
-      nuevos = i >= 0 ? h.slice(i + 1) : h.slice(-3);
+  /* ---------- la puesta en escena ---------- */
+
+  /* Dónde está una carta ahora mismo, en el pintado de verdad. */
+  const sitioDe = id => $(`#f7Asientos [data-c="${id}"]`) || $(`#f7Vitrina [data-c="${id}"]`);
+  const asientoDe = u => {
+    if (!host) return null;
+    for (const s of host.querySelectorAll(".jg-f7-asiento")) if (s.dataset.u === u) return s;
+    return null;
+  };
+
+  function destapa(id) {
+    enVuelo.delete(id);
+    const el = sitioDe(id);
+    if (!el) return;
+    el.classList.remove("jg-f7-oculta");
+    el.classList.remove("jg-f7-cae");
+    void el.offsetWidth;                  // para que la animación vuelva a empezar
+    el.classList.add("jg-f7-cae");
+  }
+
+  /* El crupier lanza la carta `id` hacia `para`; al aterrizar se cuentan
+     los sucesos `ev` que trajo. */
+  function lanza(id, para, ev) {
+    const sala = $("#f7Sala"), capa = $("#f7Vuelos"), tope = $("#f7Mazo .jg-f7-tope") || $("#f7Mazo");
+    const c = carta(id);
+    if (quieto() || !sala || !capa || !tope || typeof Element.prototype.animate !== "function" || !c) {
+      destapa(id);
+      efectos(ev, true);
+      trasVuelos();
+      return;
     }
-    histVisto = claves[claves.length - 1] || "";
-    if (!nuevos.length) return;
-    if (nuevos.some(x => x.e === "f7")) suena("gana");
-    else if (nuevos.some(x => x.e === "pasa")) suena("pierde");
-    else if (nuevos.some(x => x.e === "congela" || x.e === "roba" || x.e === "cambia" || x.e === "tira")) suena("golpe");
-    else if (est.ultima && est.ultima.n !== ultimaVista) suena("carta");
-    else if (nuevos.some(x => x.e === "planta")) suena("ficha");
-    if (est.ultima) ultimaVista = est.ultima.n;
+    vuelos++;
+    const rs = sala.getBoundingClientRect(), ro = tope.getBoundingClientRect();
+    const destino = sitioDe(id);
+    let dx, dy, esc2 = 0.6, giro = 0, desvanece = false;
+    const ox = ro.left + ro.width / 2 - rs.left, oy = ro.top + ro.height / 2 - rs.top;
+    if (destino) {
+      const rd = destino.getBoundingClientRect();
+      dx = rd.left + rd.width / 2 - rs.left - ox;
+      dy = rd.top + rd.height / 2 - rs.top - oy;
+      esc2 = (destino.offsetWidth || ANCHO) / ANCHO;
+      giro = parseFloat(destino.style.getPropertyValue("--r")) || 0;
+    } else {
+      /* Una carta que no se queda en la mesa (una acción que ya se
+         aplicó, una segunda oportunidad gastada): va hacia su asiento y
+         se desvanece. */
+      const s = asientoDe(para);
+      const rd = s ? s.getBoundingClientRect() : rs;
+      dx = rd.left + rd.width / 2 - rs.left - ox;
+      dy = rd.top + rd.height / 2 - rs.top - oy;
+      desvanece = true;
+    }
+    const v = document.createElement("div");
+    v.className = "jg-f7-vuelo";
+    v.style.left = (ox - ANCHO / 2) + "px";
+    v.style.top = (oy - 31) + "px";
+    v.innerHTML = `<div class="jg-f7-vuelo-in">${htmlCarta(null, "jg-f7-cara-a")}${htmlCarta(c, "jg-f7-cara-b")}</div>`;
+    capa.appendChild(v);
+    const mx = dx / 2, my = dy / 2 - 50;
+    const anim = v.animate([
+      { transform: "perspective(700px) translate(0px,0px) rotate(-8deg) rotateY(0deg) scale(1)", opacity: 1 },
+      { transform: `perspective(700px) translate(${mx}px,${my}px) rotate(${giro / 2 - 4}deg) rotateY(90deg) scale(1.15)`, opacity: 1, offset: 0.5 },
+      { transform: `perspective(700px) translate(${dx}px,${dy}px) rotate(${giro}deg) rotateY(180deg) scale(${esc2})`, opacity: desvanece ? 0 : 1 }
+    ], { duration: VUELO_MS, easing: "cubic-bezier(.3,.7,.3,1)", fill: "forwards" });
+    const brazo = $("#f7Brazo");
+    if (brazo && brazo.animate) {
+      brazo.animate([{ transform: "rotate(0deg)" }, { transform: "rotate(-26deg)", offset: 0.35 }, { transform: "rotate(0deg)" }],
+        { duration: 420, easing: "ease-out" });
+    }
+    mira(para);
+    if (!document.hidden) suena("reparte");
+    let hecho = false;
+    const acaba = () => {
+      if (hecho) return;
+      hecho = true;
+      v.remove();
+      destapa(id);
+      vuelos--;
+      if (muerto) return;
+      efectos(ev, true);
+      trasVuelos();
+      if (est) mira(aQuienEspera(fantasma()));
+    };
+    anim.onfinish = acaba;
+    anim.oncancel = acaba;
+    luego(acaba, VUELO_MS + 300);
+  }
+
+  /* Un sello sobre un asiento («¡Se pasó!», «Congelado»…). Varios sobre
+     el mismo asiento se apilan. */
+  function sello(u, texto, clase, pila) {
+    const s = asientoDe(u), sala = $("#f7Sala"), fx = $("#f7Fx");
+    if (!s || !sala || !fx) return;
+    const rs = sala.getBoundingClientRect(), ra = s.getBoundingClientRect();
+    const k = pila[u] = (pila[u] || 0) + 1;
+    const el = document.createElement("div");
+    el.className = "jg-f7-sello " + (clase || "");
+    el.textContent = texto;
+    el.style.left = (ra.left + ra.width / 2 - rs.left) + "px";
+    el.style.top = (ra.top + ra.height / 2 - rs.top - (k - 1) * 30) + "px";
+    fx.appendChild(el);
+    luego(() => el.remove(), 1700);
+  }
+
+  function sacude(u) {
+    const s = asientoDe(u);
+    if (!s || quieto()) return;
+    s.classList.remove("jg-f7-sacude");
+    void s.offsetWidth;
+    s.classList.add("jg-f7-sacude");
+    luego(() => s.classList.remove("jg-f7-sacude"), 700);
+  }
+
+  function flip7(u) {
+    const fx = $("#f7Fx");
+    if (!fx) return;
+    const b = document.createElement("div");
+    b.className = "jg-f7-banner";
+    b.innerHTML = `<b>¡FLIP 7!</b><span>${esc(Nombre(u))} · +15</span>`;
+    fx.appendChild(b);
+    luego(() => b.remove(), 2400);
+    if (quieto()) return;
+    const colores = ["#e8b64a", "#ef4444", "#22c55e", "#3b82f6", "#d946ef", "#f97316", "#fff"];
+    for (let k = 0; k < 28; k++) {
+      const c = document.createElement("i");
+      c.className = "jg-f7-confeti";
+      c.style.cssText = `--x:${(Math.random() * 100).toFixed(1)}%;--d:${(Math.random() * 360 - 180).toFixed(0)}deg;--s:${(0.9 + Math.random() * 0.9).toFixed(2)}s;--w:${(Math.random() * 0.5).toFixed(2)}s;background:${colores[k % colores.length]}`;
+      fx.appendChild(c);
+      luego(() => c.remove(), 2400);
+    }
+  }
+
+  /* Lo que se ve y se oye de un puñado de sucesos. Un solo sonido por
+     tanda, el más importante: tres a la vez no se distinguen. */
+  function efectos(ev, aterriza) {
+    if (!host || document.hidden) return;
+    const pila = {}, oye = new Set();
+    for (const h of ev || []) {
+      switch (h.e) {
+        case "f7": flip7(h.uid); sello(h.uid, "¡Flip 7!", "jg-f7-sello-oro", pila); oye.add("flip7"); break;
+        case "pasa": sello(h.uid, "¡Se pasó!", "jg-f7-sello-rojo", pila); sacude(h.uid); oye.add("revienta"); break;
+        case "salva": sello(h.uid, "¡Salvado!", "jg-f7-sello-rosa", pila); oye.add("gana"); break;
+        case "gafe": sello(h.uid, "¡Gafe!", "jg-f7-sello-rojo", pila); sacude(h.uid); oye.add("pierde"); break;
+        case "congela": sello(h.a, "Congelado", "jg-f7-sello-hielo", pila); oye.add("hielo"); break;
+        case "roba": sello(h.a, "¡Robo!", "jg-f7-sello-rojo", pila); oye.add("golpe"); break;
+        case "tira": sello(h.a, "Descarte", "jg-f7-sello-gris", pila); oye.add("golpe"); break;
+        case "cambia": sello(h.a, "⇄", "jg-f7-sello-verde", pila); sello(h.b, "⇄", "jg-f7-sello-verde", pila); oye.add("golpe"); break;
+        case "planta": sello(h.uid, "Plantado", "jg-f7-sello-oro", pila); oye.add("planta"); break;
+        case "regala": sello(h.a, "♥ Segunda", "jg-f7-sello-rosa", pila); oye.add("ficha"); break;
+        case "da": sello(h.a, nombreCarta(carta(h.id)), "", pila); oye.add("ficha"); break;
+        case "tres": case "cuatro": sello(h.a, h.e === "tres" ? "Voltea 3" : "Voltea 4", "", pila); oye.add("ficha"); break;
+        case "otra": sello(h.a, "Una más", "", pila); oye.add("ficha"); break;
+      }
+    }
+    const orden = ["flip7", "revienta", "gana", "pierde", "hielo", "golpe", "planta", "ficha"];
+    const s = orden.find(x => oye.has(x));
+    if (s) suena(s);
+    else if (aterriza) suena("carta");
+  }
+
+  /* Cuando ya no vuela nada: el resumen de la ronda que se cerró, o el
+     final de la partida, que se enseña entero antes de soltar el cartel. */
+  function trasVuelos() {
+    if (vuelos > 0 || !est || muerto) return;
+    if (est.fase === "fin") {
+      if (finAnimado || document.hidden) return;
+      finAnimado = true;
+      if (est.motivo === "abandono" || !vioJugar) { if (ctx.listo) ctx.listo(); return; }
+      finHasta = Date.now() + FIN_MS;
+      mostrarResumen(true);
+      clearTimeout(relojListo);
+      relojListo = setTimeout(() => { if (!muerto && ctx.listo) ctx.listo(); }, FIN_MS + 30);
+      return;
+    }
+    const f = est.finRonda;
+    if (f && f.r !== resumenR) {
+      resumenR = f.r;
+      clearTimeout(relojRes);
+      relojRes = setTimeout(() => {
+        if (muerto || !est || est.fase !== "jugando") return;
+        mostrarResumen(false);
+        relojRes = setTimeout(escondeResumen, 3400);
+      }, 500);
+    }
+  }
+
+  function mostrarResumen(fin) {
+    const f = est && est.finRonda, caja = $("#f7Resumen");
+    if (!f || !caja) return;
+    resumenFijo = fin;
+    const filas = est.jugadores.slice().sort((a, b) => (f.total[b.uid] || 0) - (f.total[a.uid] || 0)).map(j => {
+      const l = f.lineas[j.uid] || { nums: [], mods: [] };
+      const fuera = (est.fuera || {})[j.uid];
+      const tag = l.f7 ? ["Flip 7", "oro"] : fuera || l.estado === "fuera" ? ["fuera", "gris"] : l.estado === "pasa" ? ["se pasó", "rojo"]
+        : l.estado === "planta" ? ["plantado", "verde"] : ["en pie", "verde"];
+      const minis = l.nums.concat(l.mods).map(id => htmlCarta(carta(id), "jg-f7-mini")).join("");
+      return `<div class="jg-f7-res-f${j.uid === est.ganador && fin ? " jg-f7-res-gana" : ""}" style="--c:${esc(j.color || "#888")}">
+        <span class="jg-f7-res-n"><i></i>${esc(j.uid === uid ? "Tú" : j.nombre)}</span>
+        <span class="jg-f7-res-c">${minis || '<span class="jg-nota">—</span>'}</span>
+        <span class="jg-f7-res-tag jg-f7-tag-${tag[1]}">${tag[0]}</span>
+        <span class="jg-f7-res-p">+${f.pts[j.uid] || 0}</span>
+        <span class="jg-f7-res-t2"><b>${f.total[j.uid] || 0}</b>/${est.meta}</span>
+      </div>`;
+    }).join("");
+    caja.innerHTML = `<div class="jg-f7-res-in">
+        <div class="jg-f7-res-titulo">${fin ? "Última ronda" : `Fin de la ronda ${f.r}`}${f.f7 ? ` · <span>¡Flip 7 de ${esc(nombre(f.f7))}!</span>` : ""}</div>
+        ${filas}
+        ${fin ? "" : `<div class="jg-f7-res-pie">Toca para cerrar</div>`}
+      </div>`;
+    caja.classList.add("jg-f7-res-on");
+    if (!fin) suena("entra");
+  }
+
+  function escondeResumen() {
+    clearTimeout(relojRes);
+    resumenFijo = false;
+    const caja = $("#f7Resumen");
+    if (caja && caja.classList.contains("jg-f7-res-on")) caja.classList.remove("jg-f7-res-on");
+  }
+
+  /* La pestaña vuelve: se cuenta lo que pasó mientras estaba detrás. */
+  function alVolver() {
+    if (document.hidden || muerto || !est) return;
+    const q = pendiente;
+    pendiente = null;
+    if (q && q.carta && sitioDe(q.carta.id) && !quieto()) {
+      enVuelo.add(q.carta.id);
+      sitioDe(q.carta.id).classList.add("jg-f7-oculta");
+      lanza(q.carta.id, q.carta.para, q.ev);
+    } else {
+      if (q) efectos(q.ev, !!q.carta);
+      trasVuelos();
+    }
   }
 
   /* ---------- interacción ---------- */
   function alClic(ev) {
+    if (ev.target.closest("#f7Resumen") && !resumenFijo) { escondeResumen(); return; }
     if (!est || est.fase !== "jugando" || enviando) return;
     const w = est.espera;
     if (ev.target.closest("#f7Pide")) { pide(); return; }
@@ -483,12 +896,40 @@ export function crearFlip7(ctx) {
     }
     const w = est.espera;
     if (sel1 && !(w && w.k === "elige" && w.quien === uid && w.op.tipo === "2")) sel1 = null;
-    suenaNuevo();
+
+    const hist = est.hist || [];
+    const nuevos = primera ? [] : nuevosDe(histPrev, hist).slice(-16);
+    histPrev = hist.slice();
+    const u = est.ultima;
+    const cartaNueva = !primera && !!u && u.n !== ultimaN;
+    if (u) ultimaN = u.n;
+    if (est.fase === "jugando") vioJugar = true;
+    const visible = !document.hidden;
+    if (visible && nuevos.some(h => h.e === "pide")) suena("madera");
+    if (cartaNueva && visible && !quieto()) enVuelo.add(u.id);
+
     pinta();
+
+    if (primera) {
+      primera = false;
+      resumenR = est.finRonda ? est.finRonda.r : 0;
+      if (est.fase === "fin") trasVuelos();
+    } else if (!visible) {
+      if (cartaNueva || nuevos.length) {
+        const ev = ((pendiente && pendiente.ev) || []).concat(nuevos).slice(-12);
+        pendiente = { carta: cartaNueva ? { id: u.id, para: u.para } : (pendiente && pendiente.carta), ev };
+      }
+    } else if (cartaNueva) {
+      lanza(u.id, u.para, nuevos);
+    } else {
+      efectos(nuevos, false);
+      trasVuelos();
+    }
+
     automatismos();
     audita();
     if (est.fase === "fin" && !(p.fin && p.fin.at)) cierre();
   }
 
-  return { montar, actualizar, destruir };
+  return { montar, actualizar, destruir, ocupado };
 }
