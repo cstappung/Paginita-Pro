@@ -41,6 +41,7 @@ import { crearOrbita } from "./juegos/orbita.js";
 import { crearReversi } from "./juegos/reversi.js";
 import { crearWorms } from "./juegos/worms.js";
 import { crearCadena } from "./juegos/cadena.js";
+import { crearFlip7 } from "./juegos/flip7.js";
 import { crearRanks } from "./juegos/ranks.js";
 import { mezcla, abrePerfil } from "./juegos/perfil.js";
 import { suena, silenciar, silenciado, ambientar, ajustarMusica, activarAudio, configurarMusica, musicaActiva, volumenMusica } from "./juegos/sonido.js";
@@ -52,10 +53,10 @@ const VER = (document.currentScript && document.currentScript.src.split("?v=")[1
 const FABRICAS = {
   orbita: crearOrbita, escondite: crearEscondite, cartas: crearCartas,
   cuadritos: crearCuadritos, reversi: crearReversi, worms: crearWorms,
-  cadena: crearCadena
+  cadena: crearCadena, flip7: crearFlip7
 };
 
-const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛" };
+const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏" };
 
 /* Lo que puede elegir quien abre la sala, por juego. Vive aquí y no en
    `motor.js` porque son controles y no reglas: el motor ya recorta lo
@@ -85,6 +86,12 @@ const OPCIONES = {
       valores: [2, 3, 4, 5, 6].map(n => ({ v: n, t: n + " jugadores" })) },
     { clave: "malla", etiqueta: "Tablero", por: "clasica",
       valores: Object.keys(CR_MALLAS).map(k => ({ v: k, t: `${CR_MALLAS[k].nombre} ${CR_MALLAS[k].cols}×${CR_MALLAS[k].filas}` })) }
+  ],
+  flip7: [
+    { clave: "cupo", etiqueta: "Jugadores",
+      valores: [2, 3, 4, 5, 6].map(n => ({ v: n, t: n + " jugadores" })) },
+    { clave: "modo", etiqueta: "Modo", por: "normal",
+      valores: [{ v: "normal", t: "Normal" }, { v: "venganza", t: "Con venganza" }] }
   ]
 };
 
@@ -868,7 +875,7 @@ const FANFARRIA = { gano: "victoria", perdi: "derrota", empate: "empate", mirand
    En cartas es el choque entero (`CHOQUE`, 2,6 s): la ronda que gana
    el trío se enseña igual que las demás. Worms no pone fanfarria — el
    marco tiene su propio audio y su propio final. */
-const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800 };
+const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1800 };
 
 function pintaFin(p, est) {
   const caja = $("jgFin");
@@ -965,7 +972,8 @@ const RAZONES = {
   empate: "Nadie sacó ventaja.",
   victoria: "Su cuadrilla fue la última en pie.",
   apagon: "Apagón total: no quedó ninguna cuadrilla en pie.",
-  reaccion: "Su reacción en cadena se tragó a todos los demás."
+  reaccion: "Su reacción en cadena se tragó a todos los demás.",
+  flip7: "Pasó de 200 puntos con más que nadie."
 };
 const razon = m => RAZONES[m] || "";
 const nombreDe = (est, uid) => {
@@ -1076,6 +1084,7 @@ function arteJuego(k) {
   if (k === "reversi") return '<div class="jg-art-rev">' + Array.from({ length: 16 }, (_, i) => '<i class="' + ([1, 4, 5, 10, 11, 14].includes(i) ? "negra" : [2, 6, 9, 13].includes(i) ? "blanca" : "") + '"></i>').join("") + '</div>';
   if (k === "worms") return '<div class="jg-art-worms"><i></i><i></i><i></i><b>💥</b><span>CIRCUIT BREAKERS</span></div>';
   if (k === "cadena") return '<div class="jg-art-cr">' + Array.from({ length: 12 }, (_, i) => '<i class="o' + [1, 0, 2, 1, 3, 0, 1, 2, 0, 3, 2, 1][i] + " c" + (i % 4) + '"></i>').join("") + '</div>';
+  if (k === "flip7") return '<div class="jg-art-f7">' + [[7, "#e8a317"], [3, "#3fa7d6"], [12, "#d64545"]].map(([n, c]) => '<i style="--t:' + c + '">' + n + '</i>').join("") + '<b>FLIP 7</b></div>';
   if (k === "cuadritos") return '<div class="jg-art-dots">' + Array.from({ length: 9 }, (_, i) => '<i class="' + (i % 3 === 0 ? "llena" : "") + '"></i>').join("") + '</div>';
   return '<div class="jg-art-land"><i></i><i></i><i></i><b>⌖</b><span>ENCUENTRA LO INVISIBLE</span></div>';
 }

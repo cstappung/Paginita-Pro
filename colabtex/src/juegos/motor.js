@@ -70,6 +70,13 @@ export const JUEGOS = {
     color: "#ff3d7f",
     minimo: 2,
     cupo: 6
+  },
+  flip7: {
+    nombre: "Flip 7",
+    lema: "Pide carta o plántate: siete números distintos y te llevas el bono",
+    color: "#e8a317",
+    minimo: 2,
+    cupo: 6
   }
 };
 
@@ -544,6 +551,7 @@ export function reducir(p) {
   if (p.juego === "orbita") return { ...base, ...redOrbita(p, js) };
   if (p.juego === "worms") return { ...base, ...redWorms(p, js, listos) };
   if (p.juego === "cadena") return { ...base, ...redCadena(p, js, listos) };
+  if (p.juego === "flip7") return { ...base, ...redFlip7(p, js, listos) };
   return base;
 }
 
@@ -590,6 +598,7 @@ export function progreso(est, juego) {
     const v = Object.values(est.celdas), tot = v.reduce((a, b) => a + b, 0);
     return tot ? c(Math.max(...v) / tot) : 0;
   }
+  if (juego === "flip7" && est.puntos) return c(Math.max(0, ...Object.values(est.puntos)) / (est.meta || F7_META));
   if (juego === "cartas" && est.ganadas) return c(Math.max(0, ...Object.values(est.ganadas).map(g => g.length)) / 5);
   return 0;
 }
@@ -1197,4 +1206,492 @@ export function redOrbita(p, js = jugadoresDe(p)) {
     estrellas, tomadas, puntos, turno, ultima, eje, legales, ganador, motivo,
     libre: ultima < 0 || (legales.length > 0 && legales.some(i => eje === "fila"
       ? Math.floor(i / 6) !== Math.floor(ultima / 6) : i % 6 !== ultima % 6)) };
+}
+
+/* ============================================================
+   8. Flip 7 — normal y «con venganza»
+
+   Un juego de pedir carta o plantarse. Cada uno va poniendo números
+   delante; si repite uno se pasa y se queda la ronda sin nada, y quien
+   junta siete números distintos cierra la ronda de golpe con un bono
+   de quince. Gana quien acaba una ronda con 200 o más, y más que nadie.
+
+   **El mazo es compartido y aquí no hay un servidor que baraje.** En
+   cartas cada uno roba de su propio mazo; aquí todos roban del mismo
+   montón, así que nadie puede tener la baraja: el que la tuviera sabría
+   qué sale antes de decidir si pide. Cada carta sale entonces de **dos
+   aportes**, el de quien la recibe y el del siguiente asiento
+   (`ayudante`), y cada aporte es un número que ya estaba decidido
+   antes de empezar: los primeros 32 bits de SHA-256 de
+   `semilla:sal:n`, con la semilla y la sal privadas que la ficha
+   promete en `hmazo` y `n` el número de carta de la partida. Así:
+
+   - **Nadie puede calcular la siguiente carta** antes de que el otro
+     publique su aporte, porque no conoce su semilla. Quien pide carta
+     manda el suyo dentro de la propia jugada (`pide`), y el ayudante
+     lo manda solo, desde su navegador, en cuanto ve el robo pendiente.
+   - **Nadie puede escoger la carta** publicando otro número: al acabar
+     cada uno revela semilla y sal (`{t:"s"}`) y `auditaFlip7` rehace
+     todos sus aportes. Quien mintió sale en rojo en todas las pantallas.
+   - La frontera honesta: quien publica segundo *ve* la carta un
+     instante antes que los demás (no puede cambiarla), y quien cierre
+     la pestaña antes de revelar deja sus aportes sin comprobar — la
+     pantalla lo dice en vez de darlos por buenos.
+
+   El montón es una lista de índices que empieza en el orden canónico;
+   cada robo quita la posición `indiceF7(aportes) % largo`, y cuando se
+   vacía se rellena con el descarte. Las cartas que están en la mesa al
+   acabar una ronda van al descarte, como en la caja.
+
+   **Las reglas se encadenan, y por eso el reductor lleva una pila de
+   tareas**: una carta de acción repartida manda elegir objetivo, un
+   «voltea tres» hace robar tres veces a otro, y las acciones que salen
+   *durante* esas tres se apartan y se resuelven al final si quien las
+   sacó sigue en pie. Cada tarea espera una de tres cosas — aportes para
+   robar, una decisión (pedir o plantarse) o una elección (a quién, qué
+   carta) — y `avanza()` las va sacando hasta dar con una que espera.
+   ============================================================ */
+
+export const F7_META = 200;
+export const F7_BONO = 15;
+export const F7_SIETE = 7;
+
+export const modoF7 = p => (p && p.modo === "venganza") ? "venganza" : "normal";
+
+/* Los dos mazos, carta a carta. El índice en la lista es la identidad
+   de la carta, y es lo único que viaja: el reductor, la pantalla y la
+   auditoría leen de aquí qué es. Normal: 94 cartas (un 0, n copias de
+   cada n del 1 al 12, +2…+10 y ×2, y tres de cada acción). Con
+   venganza: 108 (el Cero, n copias del 1 al 13 con un 7 gafe y un 13
+   de la suerte entre ellas, −2…−10 y ÷2, y dos de cada acción). */
+function construyeMazoF7(modo) {
+  const m = [];
+  const pon = c => m.push(Object.freeze(Object.assign({ i: m.length }, c)));
+  const venganza = modo === "venganza";
+  const tope = venganza ? 13 : 12;
+  pon(venganza ? { k: "n", v: 0, cero: true } : { k: "n", v: 0 });
+  for (let v = 1; v <= tope; v++) for (let c = 0; c < v; c++) {
+    const x = { k: "n", v };
+    if (venganza && v === 7 && c === 0) x.gafe = true;
+    if (venganza && v === 13 && c === 0) x.suerte = true;
+    pon(x);
+  }
+  for (const v of [2, 4, 6, 8, 10]) pon({ k: "m", v: venganza ? -v : v });
+  pon(venganza ? { k: "m", v: 0, mitad: true } : { k: "m", v: 0, doble: true });
+  const acciones = venganza ? ["cuatro", "otra", "cambia", "roba", "tira"] : ["congela", "tres", "segunda"];
+  for (const a of acciones) for (let c = 0; c < (venganza ? 2 : 3); c++) pon({ k: "a", a });
+  return Object.freeze(m);
+}
+const mazosF7 = {};
+export const mazoF7 = modo => mazosF7[modo] || (mazosF7[modo] = construyeMazoF7(modo));
+
+/* ¿Esta fila de números se puede tener sin haberse pasado? Una sola
+   copia de cada valor; con venganza, el 13 admite un segundo si uno de
+   los dos es el de la suerte. */
+export function lineaValidaF7(nums, modo) {
+  const M = mazoF7(modo), cuenta = {};
+  let suerte = false;
+  for (const id of nums) {
+    const c = M[id];
+    cuenta[c.v] = (cuenta[c.v] || 0) + 1;
+    if (c.suerte) suerte = true;
+  }
+  for (const v in cuenta) {
+    const tope = modo === "venganza" && Number(v) === 13 && suerte ? 2 : 1;
+    if (cuenta[v] > tope) return false;
+  }
+  return true;
+}
+
+/* Lo que vale una fila si la ronda acabara ahora. Normal: números,
+   ×2 (solo a los números), más los modificadores, más 15 por Flip 7.
+   Con venganza: números, ÷2 redondeando hacia abajo, menos los
+   negativos, nunca por debajo de cero, y 15 por Flip 7; quien tiene
+   el Cero se queda en nada salvo que haga Flip 7. */
+export function valorLineaF7(l, modo) {
+  if (!l || l.estado === "pasa" || l.estado === "fuera") return 0;
+  const M = mazoF7(modo);
+  let s = l.nums.reduce((a, id) => a + M[id].v, 0);
+  const mods = l.mods.map(id => M[id]);
+  if (modo === "venganza") {
+    if (!l.f7 && l.nums.some(id => M[id].cero)) return 0;
+    if (mods.some(c => c.mitad)) s = Math.floor(s / 2);
+    s = Math.max(0, s + mods.reduce((a, c) => a + c.v, 0));
+  } else {
+    if (mods.some(c => c.doble)) s *= 2;
+    s += mods.reduce((a, c) => a + c.v, 0);
+  }
+  return s + (l.f7 ? F7_BONO : 0);
+}
+
+/* El aporte de un jugador a la carta número `n`. Lleva la sal además
+   de la semilla porque la semilla son 32 bits: con solo ella, un aporte
+   publicado se podría invertir por fuerza bruta y el resto de la
+   partida quedaría a la vista. */
+export async function aporteF7(sem, sal, n) {
+  const d = new TextEncoder().encode(`${sem >>> 0}:${sal || ""}:${n}`);
+  const h = await globalThis.crypto.subtle.digest("SHA-256", d);
+  return new DataView(h).getUint32(0);
+}
+
+/* De dos aportes, una posición en el montón. Mezcla también `n` para
+   que dos robos con los mismos aportes no caigan en el mismo sitio. */
+export function indiceF7(va, vb, n, largo) {
+  const s = ((va >>> 0) ^ Math.imul(((vb >>> 0) ^ Math.imul(n + 1, 0x85EBCA6B)) >>> 0, 0x9E3779B1)) >>> 0;
+  return Math.floor(rng(s)() * largo);
+}
+
+function redFlip7(p, js, listos) {
+  const modo = modoF7(p), M = mazoF7(modo), V = modo === "venganza";
+  const fuera = {}, puntos = {}, semillas = {}, aportes = {};
+  for (const j of js) puntos[j.uid] = 0;
+  let lin = {}, pila = [], mazo = M.map(c => c.i), descarte = [];
+  let n = 0, ronda = 0, reparte = "", viva = false, cierra = false;
+  let ganador = null, motivo = "", ultima = null, finRonda = null;
+  const hist = [], rondas = [];
+
+  const suceso = e => { hist.push(e); if (hist.length > 40) hist.shift(); };
+  const esta = u => !fuera[u];
+  const enPie = u => !!lin[u] && (lin[u].estado === "activo" || lin[u].estado === "planta");
+  const activo = u => !!lin[u] && lin[u].estado === "activo";
+  const tieneCero = u => V && !!lin[u] && lin[u].nums.some(id => M[id].cero);
+  /* El primero después de `u` que cumple `ok`, dando la vuelta a la
+     mesa; `u` mismo es el último candidato. */
+  const tras = (u, ok) => {
+    const k0 = js.findIndex(x => x.uid === u);
+    for (let k = 1; k <= js.length; k++) {
+      const c = js[(k0 + k + js.length) % js.length];
+      if (ok(c.uid)) return c.uid;
+    }
+    return null;
+  };
+  const ayudante = u => tras(u, x => x !== u && esta(x));
+  const aportantes = u => { const b = ayudante(u); return b ? [u, b] : [u]; };
+  const cartasDe = u => lin[u].nums.concat(lin[u].mods);
+  const quita = (u, id) => {
+    const l = lin[u];
+    l.nums = l.nums.filter(x => x !== id);
+    l.mods = l.mods.filter(x => x !== id);
+  };
+  const pon = (u, id) => { if (M[id].k === "n") lin[u].nums.push(id); else lin[u].mods.push(id); };
+  const uids = ok => js.map(x => x.uid).filter(ok);
+
+  /* Tras recibir un número por intercambio o robo: con un repetido se
+     pasa, con siete se cierra la ronda. */
+  const revisa = u => {
+    const l = lin[u];
+    if (!enPie(u)) return;
+    if (!lineaValidaF7(l.nums, modo)) { l.estado = "pasa"; suceso({ e: "pasa", uid: u }); return; }
+    if (l.nums.length >= F7_SIETE) { l.f7 = true; cierra = true; suceso({ e: "f7", uid: u }); }
+  };
+
+  /* A quién (o qué carta) se puede elegir con la carta `id` en la mano
+     de `quien`. `a` es un jugador, `c` una carta y `2` dos cartas de
+     dos jugadores distintos. */
+  const opciones = (quien, id) => {
+    const c = M[id];
+    const conCartas = ok => {
+      const o = {};
+      for (const u of uids(ok)) { const cs = cartasDe(u); if (cs.length) o[u] = cs; }
+      return o;
+    };
+    if (c.k === "m") return { tipo: "a", uids: uids(enPie) };
+    switch (c.a) {
+      case "congela": case "tres": return { tipo: "a", uids: uids(activo) };
+      case "segunda": return { tipo: "a", uids: uids(u => u !== quien && activo(u) && lin[u].seg == null) };
+      case "cuatro": case "otra": return { tipo: "a", uids: uids(enPie) };
+      case "roba": return { tipo: "c", cartas: enPie(quien) ? conCartas(u => u !== quien && enPie(u)) : {} };
+      case "tira": return { tipo: "c", cartas: conCartas(enPie) };
+      case "cambia": return { tipo: "2", cartas: conCartas(enPie) };
+    }
+    return { tipo: "a", uids: [] };
+  };
+  const sinSalida = o => o.tipo === "a" ? !o.uids.length
+    : o.tipo === "c" ? !Object.keys(o.cartas).length : Object.keys(o.cartas).length < 2;
+  const valida = (o, j) => {
+    const tiene = (u, id) => typeof u === "string" && Number.isInteger(id) && (o.cartas[u] || []).includes(id);
+    if (o.tipo === "a") return o.uids.includes(j.a);
+    if (o.tipo === "c") return tiene(j.a, j.c);
+    return j.a !== j.b && tiene(j.a, j.c) && tiene(j.b, j.d);
+  };
+
+  /* Con un único objetivo posible no se pregunta: congelar siendo el
+     último en pie es congelarse, y esperar un clic para eso es ruido. */
+  const pideEleccion = (quien, id) => {
+    const o = opciones(quien, id);
+    if (sinSalida(o)) { descarte.push(id); suceso({ e: "nada", uid: quien, id }); return; }
+    if (o.tipo === "a" && o.uids.length === 1) { aplica(quien, id, { a: o.uids[0] }); return; }
+    pila.push({ k: "elige", quien, id });
+  };
+
+  const aplica = (quien, id, j) => {
+    const c = M[id];
+    if (c.k === "m") { lin[j.a].mods.push(id); suceso({ e: "da", uid: quien, a: j.a, id }); return; }
+    if (c.a !== "segunda") descarte.push(id);
+    switch (c.a) {
+      case "congela":
+        lin[j.a].estado = "planta"; lin[j.a].congelado = true;
+        suceso({ e: "congela", uid: quien, a: j.a }); break;
+      case "tres": case "cuatro":
+        pila.push({ k: "serie", para: j.a, quedan: c.a === "tres" ? 3 : 4, total: c.a === "tres" ? 3 : 4, apartadas: [] });
+        suceso({ e: c.a, uid: quien, a: j.a }); break;
+      case "segunda":
+        lin[j.a].seg = id; suceso({ e: "regala", uid: quien, a: j.a }); break;
+      case "otra":
+        pila.push({ k: "quieto", para: j.a }, { k: "robar", para: j.a, de: "otra" });
+        suceso({ e: "otra", uid: quien, a: j.a }); break;
+      case "roba":
+        quita(j.a, j.c); pon(quien, j.c);
+        suceso({ e: "roba", uid: quien, a: j.a, id: j.c }); revisa(quien); break;
+      case "tira":
+        quita(j.a, j.c); descarte.push(j.c);
+        suceso({ e: "tira", uid: quien, a: j.a, id: j.c }); break;
+      case "cambia":
+        quita(j.a, j.c); quita(j.b, j.d); pon(j.a, j.d); pon(j.b, j.c);
+        suceso({ e: "cambia", uid: quien, a: j.a, b: j.b, c: j.c, d: j.d });
+        revisa(j.a); revisa(j.b); break;
+    }
+  };
+
+  const recibeNumero = (u, id) => {
+    const l = lin[u], c = M[id];
+    if (c.gafe) {
+      descarte.push(...l.nums, ...l.mods);
+      l.nums = [id]; l.mods = [];
+      suceso({ e: "gafe", uid: u, id }); return;
+    }
+    const prueba = l.nums.concat(id);
+    if (!lineaValidaF7(prueba, modo)) {
+      if (l.seg != null) {
+        descarte.push(id, l.seg); l.seg = null;
+        suceso({ e: "salva", uid: u, id }); return;
+      }
+      l.nums = prueba; l.estado = "pasa";
+      suceso({ e: "pasa", uid: u, id }); return;
+    }
+    l.nums = prueba;
+    suceso({ e: "carta", uid: u, id });
+    if (l.nums.length >= F7_SIETE) { l.f7 = true; cierra = true; suceso({ e: "f7", uid: u }); }
+  };
+
+  const recibe = (u, id, serie) => {
+    const c = M[id], l = lin[u];
+    if (c.k === "n") { recibeNumero(u, id); return; }
+    /* Durante una serie solo se quedan en el acto los números (y los
+       modificadores en el modo normal) y la segunda oportunidad que se
+       puede guardar; lo demás espera a que acabe la serie. */
+    const guardable = c.a === "segunda" && l.seg == null;
+    if (serie && !guardable && (c.k === "a" || V)) {
+      serie.apartadas.push(id); suceso({ e: "aparta", uid: u, id }); return;
+    }
+    suceso({ e: "carta", uid: u, id });
+    if (c.k === "m" && !V) { l.mods.push(id); return; }
+    if (guardable) { l.seg = id; return; }
+    pideEleccion(u, id);
+  };
+
+  const empiezaRonda = () => {
+    ronda++;
+    reparte = !reparte ? js[0].uid : (tras(reparte, esta) || reparte);
+    lin = {};
+    for (const j of js) lin[j.uid] = { nums: [], mods: [], seg: null, estado: esta(j.uid) ? "activo" : "fuera", congelado: false, f7: false };
+    const orden = [];
+    for (let u = tras(reparte, esta); u; u = tras(u, esta)) { orden.push(u); if (u === reparte) break; }
+    pila = [{ k: "turnos", tras: reparte }, { k: "reparto", orden, i: 0 }];
+    viva = true; cierra = false;
+    suceso({ e: "ronda", r: ronda, uid: reparte });
+  };
+
+  const acabaRonda = () => {
+    viva = false; cierra = false;
+    const pts = {}, lineas = {};
+    let f7 = "";
+    for (const j of js) {
+      const l = lin[j.uid];
+      pts[j.uid] = esta(j.uid) ? valorLineaF7(l, modo) : 0;
+      puntos[j.uid] += pts[j.uid];
+      if (l.f7) f7 = j.uid;
+      lineas[j.uid] = { nums: l.nums.slice(), mods: l.mods.slice(), estado: l.estado, f7: l.f7 };
+      descarte.push(...l.nums, ...l.mods);
+      if (l.seg != null) descarte.push(l.seg);
+    }
+    for (const t of pila) {
+      if (t.apartadas) descarte.push(...t.apartadas);
+      if (t.k === "elige" || t.k === "resuelve") descarte.push(t.id);
+    }
+    pila = [];
+    finRonda = { r: ronda, pts, lineas, f7, total: Object.assign({}, puntos) };
+    rondas.push({ r: ronda, pts, f7 });
+    suceso({ e: "cierra", r: ronda, f7 });
+    const vivos = js.filter(x => esta(x.uid));
+    const max = Math.max(...vivos.map(x => puntos[x.uid]));
+    if (max >= F7_META) {
+      const arriba = vivos.filter(x => puntos[x.uid] === max);
+      if (arriba.length === 1) { ganador = arriba[0].uid; motivo = "flip7"; return; }
+    }
+    empiezaRonda();
+  };
+
+  /* Saca tareas hasta dar con una que espera algo de fuera. */
+  const avanza = () => {
+    for (let guarda = 0; guarda < 100000; guarda++) {
+      if (ganador !== null || !viva) return;
+      if (cierra || !pila.length) { acabaRonda(); continue; }
+      const t = pila[pila.length - 1];
+      if (t.k === "reparto") {
+        while (t.i < t.orden.length && !activo(t.orden[t.i])) t.i++;
+        if (t.i >= t.orden.length) { pila.pop(); continue; }
+        pila.push({ k: "robar", para: t.orden[t.i++], de: "reparto" });
+        continue;
+      }
+      if (t.k === "turnos") {
+        t.toca = tras(t.tras, activo);
+        if (!t.toca) { pila.pop(); continue; }
+        return;
+      }
+      if (t.k === "robar") {
+        if (!enPie(t.para)) { pila.pop(); continue; }
+        const quien = aportantes(t.para), a = aportes[n] || {};
+        if (!quien.every(u => a[u] !== undefined)) return;
+        pila.pop();
+        if (!mazo.length) { mazo = descarte; descarte = []; suceso({ e: "baraja" }); }
+        if (!mazo.length) continue;              // todo está en la mesa: no hay carta que dar
+        const id = mazo.splice(indiceF7(a[quien[0]], quien[1] ? a[quien[1]] : 0, n, mazo.length), 1)[0];
+        ultima = { n, id, para: t.para, de: t.de || (t.serie ? "serie" : "") };
+        n++;
+        recibe(t.para, id, t.serie || null);
+        continue;
+      }
+      if (t.k === "serie") {
+        if (!enPie(t.para)) { pila.pop(); descarte.push(...t.apartadas); continue; }
+        if (t.quedan > 0) { t.quedan--; pila.push({ k: "robar", para: t.para, serie: t }); continue; }
+        pila.pop();
+        for (let i = t.apartadas.length - 1; i >= 0; i--) pila.push({ k: "resuelve", quien: t.para, id: t.apartadas[i] });
+        continue;
+      }
+      if (t.k === "resuelve") {
+        pila.pop();
+        if (!enPie(t.quien)) { descarte.push(t.id); continue; }
+        if (M[t.id].a === "segunda" && lin[t.quien].seg == null) { lin[t.quien].seg = t.id; continue; }
+        pideEleccion(t.quien, t.id);
+        continue;
+      }
+      if (t.k === "elige") {
+        if (!esta(t.quien) || sinSalida(opciones(t.quien, t.id))) {
+          pila.pop(); descarte.push(t.id); suceso({ e: "nada", uid: t.quien, id: t.id }); continue;
+        }
+        return;
+      }
+      if (t.k === "quieto") {
+        pila.pop();
+        if (activo(t.para)) { lin[t.para].estado = "planta"; suceso({ e: "planta", uid: t.para }); }
+        continue;
+      }
+      pila.pop();
+    }
+  };
+
+  const aporta = (j, nn) => {
+    const a = aportes[nn] = aportes[nn] || {};
+    if (a[j.uid] === undefined) a[j.uid] = j.v >>> 0;
+  };
+
+  if (listos && js.length) { empiezaRonda(); avanza(); }
+
+  for (const j of jugadasDe(p)) {
+    if (!js.some(x => x.uid === j.uid)) continue;
+    if (j.t === "s") {
+      if (!semillas[j.uid]) semillas[j.uid] = { sem: j.sem, sal: j.sal || "" };
+      continue;
+    }
+    if (j.t === "abandona") {
+      if (ganador !== null || fuera[j.uid]) continue;
+      fuera[j.uid] = true;
+      if (lin[j.uid]) lin[j.uid].estado = "fuera";
+      suceso({ e: "abandona", uid: j.uid });
+      const quedan = js.filter(x => esta(x.uid));
+      if (quedan.length <= 1) { ganador = quedan.length ? quedan[0].uid : ""; motivo = "abandono"; continue; }
+      avanza();
+      continue;
+    }
+    if (ganador !== null || !listos || !viva) continue;
+    const v = Number(j.v);
+    if (j.t === "r") {
+      if (Number.isInteger(j.n) && j.n >= 0 && Number.isFinite(v)) { aporta({ uid: j.uid, v }, j.n); avanza(); }
+      continue;
+    }
+    const t = pila[pila.length - 1];
+    if (!t) continue;
+    if (j.t === "pide" && t.k === "turnos" && t.toca === j.uid && j.n === n && Number.isFinite(v)) {
+      aporta({ uid: j.uid, v }, n);
+      t.tras = j.uid; t.toca = null;
+      suceso({ e: "pide", uid: j.uid });
+      pila.push({ k: "robar", para: j.uid, de: "pide" });
+      avanza();
+    } else if (j.t === "planta" && t.k === "turnos" && t.toca === j.uid && !(tieneCero(j.uid) && (mazo.length || descarte.length))) {
+      lin[j.uid].estado = "planta";
+      t.tras = j.uid; t.toca = null;
+      suceso({ e: "planta", uid: j.uid });
+      avanza();
+    } else if (j.t === "apunta" && t.k === "elige" && t.quien === j.uid) {
+      const eleccion = { a: j.a, b: j.b, c: Number(j.c), d: Number(j.d) };
+      if (!valida(opciones(t.quien, t.id), eleccion)) continue;
+      pila.pop();
+      aplica(t.quien, t.id, eleccion);
+      avanza();
+    }
+  }
+
+  const top = ganador === null && listos ? pila[pila.length - 1] : null;
+  let espera = null, turno = "";
+  if (top && top.k === "turnos" && top.toca) {
+    espera = { k: "decide", uid: top.toca, cero: tieneCero(top.toca) && !!(mazo.length || descarte.length) };
+    turno = top.toca;
+  } else if (top && top.k === "elige") {
+    espera = { k: "elige", quien: top.quien, id: top.id, op: opciones(top.quien, top.id) };
+    turno = top.quien;
+  } else if (top && top.k === "robar") {
+    const a = aportes[n] || {};
+    const serie = top.serie ? { quedan: top.serie.quedan, total: top.serie.total } : null;
+    espera = { k: "roba", n, para: top.para, de: top.de || (serie ? "serie" : ""), serie,
+      faltan: aportantes(top.para).filter(u => a[u] === undefined) };
+  }
+  const valor = {};
+  for (const j of js) valor[j.uid] = valorLineaF7(lin[j.uid], modo);
+  return {
+    fase: !listos ? "espera" : ganador !== null ? "fin" : "jugando",
+    modo, meta: F7_META, puntos, lineas: lin, valor, ronda, reparte, turno, espera, n,
+    monton: mazo.length, descarte: descarte.length, hist, ultima, rondas, finRonda,
+    fuera, semillas, ganador, motivo
+  };
+}
+
+/* La auditoría de Flip 7: con la semilla y la sal reveladas al final
+   se rehace cada aporte que publicó cada uno y se compara. Tres faltas
+   posibles: `semilla` (lo revelado no es lo que prometía su ficha),
+   `carta` (un aporte no sale de su semilla: escogió una carta) y
+   `oculta` (acabó la partida sin revelar, así que no se puede
+   comprobar — puede ser una pestaña cerrada, y la pantalla lo dice
+   con esas palabras y no como trampa). */
+export async function auditaFlip7(partida, estado) {
+  const malas = [], semillas = {}, aportes = {}, vistos = {};
+  for (const j of jugadasDe(partida)) {
+    if (j.t === "s") { if (!semillas[j.uid]) semillas[j.uid] = { sem: j.sem, sal: j.sal || "" }; continue; }
+    if ((j.t === "r" || j.t === "pide") && Number.isInteger(j.n) && Number.isFinite(Number(j.v))) {
+      const k = j.n + ":" + j.uid;
+      if (vistos[k]) continue;
+      vistos[k] = true;
+      (aportes[j.uid] = aportes[j.uid] || []).push({ n: j.n, v: Number(j.v) >>> 0 });
+    }
+  }
+  for (const x of (estado.jugadores || [])) {
+    if (!aportes[x.uid]) continue;
+    const s = semillas[x.uid];
+    if (!s) { if (partida.fin) malas.push({ uid: x.uid, que: "oculta" }); continue; }
+    if (x.hmazo && !(await compromisoValido(s.sem, s.sal, x.hmazo))) { malas.push({ uid: x.uid, que: "semilla" }); continue; }
+    for (const a of aportes[x.uid]) {
+      if ((await aporteF7(s.sem, s.sal, a.n)) !== a.v) { malas.push({ uid: x.uid, que: "carta", n: a.n }); break; }
+    }
+  }
+  return malas;
 }
