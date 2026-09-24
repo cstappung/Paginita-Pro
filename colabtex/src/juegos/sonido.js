@@ -73,6 +73,58 @@ const P = (a, t, f, dur, o = {}) => Chip.voz(a, busFx, Object.assign({ t, f, dur
 const N = (a, t, dur, o = {}) => Chip.ruido(a, busFx, Object.assign({ t, dur, vol: 0.12 }, o));
 const H = Chip.hz;
 
+/* La mesa de Flip 7 no suena a consola sino a mesa: madera, cartón y una
+   campanilla. El chip no sabe hacer un golpe de nudillo — su ruido es de
+   registro de desplazamiento y sus ondas no caen de tono lo bastante
+   rápido —, así que estos van con nodos de Web Audio a pelo: un seno que
+   cae de tono (el cuerpo del tablero), un parcial agudo que muere en
+   cuarenta milisegundos (la veta) y un chasquido de ruido filtrado (el
+   nudillo). Los tres juntos, y dos veces, son el «toc toc» de pedir. */
+let ruidoBlanco = null;
+function ruido(a) {
+  if (ruidoBlanco && ruidoBlanco.sampleRate === a.sampleRate) return ruidoBlanco;
+  const n = Math.floor(a.sampleRate * 0.5), b = a.createBuffer(1, n, a.sampleRate), d = b.getChannelData(0);
+  let x = 22222;
+  for (let i = 0; i < n; i++) { x = (x * 1103515245 + 12345) & 0x7fffffff; d[i] = x / 0x3fffffff - 1; }
+  return (ruidoBlanco = b);
+}
+function envol(a, t, pico, dur, ataque = 0.002) {
+  const g = a.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(pico, t + ataque);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  g.connect(busFx);
+  return g;
+}
+function seno(a, t, f, f1, dur, vol, tipo = "sine") {
+  const o = a.createOscillator();
+  o.type = tipo;
+  o.frequency.setValueAtTime(f, t);
+  if (f1 && f1 !== f) o.frequency.exponentialRampToValueAtTime(f1, t + dur * 0.8);
+  o.connect(envol(a, t, vol, dur));
+  o.start(t); o.stop(t + dur + 0.02);
+}
+function soplo(a, t, dur, vol, { f = 1800, f1 = f, q = 2, tipo = "bandpass", ataque = 0.002 } = {}) {
+  const s = a.createBufferSource(), fl = a.createBiquadFilter();
+  s.buffer = ruido(a);
+  fl.type = tipo; fl.Q.value = q;
+  fl.frequency.setValueAtTime(f, t);
+  if (f1 !== f) fl.frequency.exponentialRampToValueAtTime(f1, t + dur);
+  s.connect(fl); fl.connect(envol(a, t, vol, dur, ataque));
+  s.start(t, Math.random() * 0.3); s.stop(t + dur + 0.02);
+}
+function nudillo(a, t, v = 1) {
+  seno(a, t, 250 * v, 150 * v, 0.14, 0.34);
+  seno(a, t, 640 * v, 560 * v, 0.045, 0.1, "triangle");
+  soplo(a, t, 0.028, 0.22, { f: 2300 * v, q: 1.4 });
+}
+/* Una campana: fundamental y dos parciales inarmónicos, como una de mano. */
+function campana(a, t, f, vol = 0.07, dur = 1.3) {
+  seno(a, t, f, 0, dur, vol);
+  seno(a, t, f * 2.76, 0, dur * 0.45, vol * 0.45);
+  seno(a, t, f * 5.4, 0, dur * 0.2, vol * 0.2);
+}
+
 /* El repertorio. Los nombres dicen qué pasó, no cómo suena: así se
    puede cambiar el timbre de «gana» sin tocar ningún juego. */
 const REPERTORIO = {
@@ -105,6 +157,26 @@ const REPERTORIO = {
   estalla:  (a, t, k = 0) => { const n = Math.min(k || 0, 24);
                                N(a, t, 0.18, { vol: 0.1, tono: 1.4 + n * 0.05, tono1: 0.4 });
                                P(a, t, H(60 + n), 0.09, { f1: H(72 + n), onda: "p25", vol: 0.07 }); },
+  /* Flip 7: dos golpes en la mesa para pedir, el segundo algo más grave. */
+  madera:   (a, t) => { nudillo(a, t, 1.06); nudillo(a, t + 0.11, 0.92); },
+  /* La carta que el crupier desliza por el tapete: un soplo que sube y el
+     chasquido del cartón al posarse. */
+  reparte:  (a, t) => { soplo(a, t, 0.16, 0.12, { f: 700, f1: 3600, q: 0.9, ataque: 0.03 });
+                        soplo(a, t + 0.17, 0.03, 0.14, { f: 3200, q: 1.2 }); },
+  /* Plantarse: la palma sobre la mesa y una campanilla que sube en arpegio. */
+  planta:   (a, t) => { seno(a, t, 120, 55, 0.3, 0.42); soplo(a, t, 0.1, 0.18, { f: 420, q: 0.7, tipo: "lowpass" });
+                        [H(84), H(88), H(91), H(96)].forEach((f, k) => campana(a, t + 0.12 + k * 0.07, f, 0.05, 1.1 + k * 0.2)); },
+  /* Pasarse: el cartón que se rompe y dos notas que se caen. */
+  revienta: (a, t) => { soplo(a, t, 0.22, 0.22, { f: 900, f1: 180, q: 0.8 }); seno(a, t, 180, 60, 0.35, 0.3);
+                        P(a, t + 0.12, 392, 0.12, { f1: 330, onda: "p50", vol: 0.07 });
+                        P(a, t + 0.25, 311, 0.28, { f1: 185, onda: "p50", vol: 0.07 }); },
+  /* Siete distintos: campanas en escalera y la fanfarria del chip encima. */
+  flip7:    (a, t) => { [72, 76, 79, 84, 88, 91, 96].forEach((n, k) => campana(a, t + k * 0.075, H(n), 0.06, 1.6));
+                        [[84, .55, .12], [88, .68, .12], [91, .81, .5]].forEach(([n, d, l]) => P(a, t + d, H(n), l, { vol: 0.08 }));
+                        P(a, t + 0.55, H(48), 0.9, { onda: "tri", vol: 0.13, sus: 0.9 }); },
+  /* Congelar: un cristal que se estrecha. */
+  hielo:    (a, t) => { [H(96), H(100), H(103)].forEach((f, k) => campana(a, t + k * 0.04, f, 0.04, 0.7));
+                        soplo(a, t, 0.4, 0.08, { f: 6000, f1: 2500, q: 3 }); },
   victoria: (a, t) => {
     [[72, 0, .09], [76, .1, .09], [79, .2, .09], [84, .3, .16], [79, .48, .08], [84, .58, .5]]
       .forEach(([n, d, l]) => { P(a, t + d, H(n), l, { vol: 0.09 }); P(a, t + d, H(n - 12), l, { onda: "p12", vol: 0.04 }); });

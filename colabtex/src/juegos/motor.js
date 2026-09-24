@@ -1048,10 +1048,15 @@ function redCadena(p, js, listos) {
   }
 
   const { orbes, celdas } = crCuenta(tab);
+  /* Lo que se cuenta al final: los orbes de cada uno, y 0 a quien está
+     fuera. El que abandona deja sus orbes en el tablero, y enseñarlos
+     como suyos ponía en el cartel a un eliminado con su marca de antes. */
+  const puntos = {};
+  for (const x of js) puntos[x.uid] = fuera[x.uid] || caidos[x.uid] ? 0 : orbes[x.uid] || 0;
   return {
     fase: !listos ? "espera" : (ganador !== null ? "fin" : "jugando"),
     malla, filas, cols, tab, turno: ganador !== null ? "" : turno,
-    fuera, caidos, jugo, cuenta: orbes, celdas, ultima, ganador, motivo, movs
+    fuera, caidos, jugo, cuenta: orbes, puntos, celdas, ultima, ganador, motivo, movs
   };
 }
 

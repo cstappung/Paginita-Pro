@@ -875,7 +875,7 @@ const FANFARRIA = { gano: "victoria", perdi: "derrota", empate: "empate", mirand
    En cartas es el choque entero (`CHOQUE`, 2,6 s): la ronda que gana
    el trío se enseña igual que las demás. Worms no pone fanfarria — el
    marco tiene su propio audio y su propio final. */
-const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1800 };
+const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000 };
 
 function pintaFin(p, est) {
   const caja = $("jgFin");
@@ -887,6 +887,12 @@ function pintaFin(p, est) {
   if (modulo && modulo.ocupado && modulo.ocupado()) { finDesde = 0; vacia(); return; }
   const vivo = finVivo === state.pid;
   if (vivo && f.motivo !== "abandono") {
+    /* Con la pestaña detrás no se ha visto nada: la pantalla se salta
+       la animación y el reloj corre igual, así que al volver el cartel
+       ya tapaba la jugada que decidió la partida — casi siempre la del
+       que pierde, que es quien espera mirando otra cosa. La pausa se
+       cuenta desde que la pestaña vuelve (`visibilitychange`). */
+    if (document.hidden) { finDesde = 0; clearTimeout(finReloj); vacia(); return; }
     if (!finDesde) finDesde = Date.now();
     const falta = (PAUSA_FIN[p.juego] ?? 1200) - (Date.now() - finDesde);
     if (falta > 0) {
@@ -945,6 +951,13 @@ function pintaFin(p, est) {
   if ($("jgOtra")) $("jgOtra").onclick = () => revancha(p, est);
   $("jgAlVestibulo").onclick = () => ir("#");
 }
+
+/* Un tick después, para que la pantalla del juego — que escucha el
+   mismo evento — haya arrancado ya la animación que se perdió y
+   `ocupado()` lo diga. */
+document.addEventListener("visibilitychange", () => setTimeout(() => {
+  if (!document.hidden && state.vista === "partida" && state.partida && state.estado) pintaFin(state.partida, state.estado);
+}, 0));
 
 /* El marcador final, cuando el juego cuenta algo: en cuadritos son las
    cajas y en reversi las fichas, y en los dos la pregunta inmediata al
