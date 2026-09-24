@@ -42,7 +42,7 @@
  * El repintado va por firmas, como en los demás juegos: reescribir el
  * innerHTML en cada tic reiniciaría las animaciones.
  */
-import { mazoF7, aporteF7, auditaFlip7, F7_SIETE } from "./motor.js";
+import { mazoF7, aporteF7, auditaFlip7, F7_SIETE, F7_BONO } from "./motor.js";
 import { suena } from "./sonido.js";
 
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
@@ -51,14 +51,14 @@ const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
 /* Lo que se tarda en mandar el propio aporte: entre robos (lo que dura
    el vuelo de la carta y un respiro), y al empezar una ronda nueva, que
    es lo que dura el resumen de la anterior. */
-const PAUSA_ROBO = 750;
+const PAUSA_ROBO = 850;
 const PAUSA_RONDA = 4600;
 /* Cuánto se espera a que los demás revelen su semilla antes de cerrar
    la partida igualmente: quien ya cerró la pestaña no va a hacerlo. */
 const ESPERA_SEMILLAS = 6000;
 /* El vuelo de una carta, y lo que se deja ver el resumen final antes
    de soltar el cartel de fin de partida. */
-const VUELO_MS = 620;
+const VUELO_MS = 760;
 const FIN_MS = 2200;
 const ANCHO = 44;             // el ancho de una carta normal, en px
 
@@ -116,20 +116,24 @@ function htmlCarta(c, clases, attrs, estilo) {
   return `<div ${attrs || ""} data-c="${c.i}" class="jg-f7-c jg-f7-${tipo} ${clases || ""}" style="${st}" title="${esc(titulo)}">${cara}</div>`;
 }
 
-/* El crupier. Mira a quien espera la mesa (`--ox`/`--oy` en las pupilas,
-   `--rz` en la cabeza) y lanza con el brazo derecho, que es donde tiene
-   el mazo. */
+/* El crupier, de pie al otro lado de la mesa. Mira a quien espera la
+   mesa (`--ox`/`--oy` en las pupilas, `--rz` en la cabeza). El brazo con
+   el que reparte no está en el dibujo: es `#f7Brazo`, HTML, porque tiene
+   que alargarse hasta el asiento y pasar por encima del paño, y el
+   dibujo queda detrás de la mesa, que le tapa la cintura. */
 const CRUPIER = `
-<svg class="jg-f7-crupier" id="f7Crupier" viewBox="0 0 120 110" aria-hidden="true">
-  <path d="M22 110 C24 84 38 72 60 72 C82 72 96 84 98 110 Z" fill="#6b1f2a"/>
-  <path d="M48 73 L60 96 L72 73 Z" fill="#f7f3ea"/>
-  <path d="M60 96 L60 110" stroke="#4a141d" stroke-width="1.2"/>
-  <circle cx="60" cy="100" r="1.6" fill="#e8b64a"/><circle cx="60" cy="106" r="1.6" fill="#e8b64a"/>
-  <path d="M52 76 L60 80 L52 84 Z M68 76 L60 80 L68 84 Z" fill="#17131c"/><circle cx="60" cy="80" r="2.2" fill="#17131c"/>
-  <path d="M30 92 C26 98 30 104 40 104 L50 102" stroke="#6b1f2a" stroke-width="9" fill="none" stroke-linecap="round"/>
-  <circle cx="50" cy="102" r="4.6" fill="#f0bf94"/>
+<svg class="jg-f7-crupier" id="f7Crupier" viewBox="-20 0 160 130" aria-hidden="true">
+  <path d="M-2 130 C0 102 18 84 44 78 L60 76 L76 78 C102 84 120 102 122 130 Z" fill="#6b1f2a"/>
+  <path d="M26 88 C30 84 38 80 44 78 L50 96 Z M94 88 C90 84 82 80 76 78 L70 96 Z" fill="#561824"/>
+  <path d="M47 77 L60 104 L73 77 Z" fill="#f7f3ea"/>
+  <path d="M60 104 L60 130" stroke="#4a141d" stroke-width="1.2"/>
+  <circle cx="60" cy="110" r="1.7" fill="#e8b64a"/><circle cx="60" cy="118" r="1.7" fill="#e8b64a"/><circle cx="60" cy="126" r="1.7" fill="#e8b64a"/>
+  <path d="M51 78 L60 82.5 L51 87 Z M69 78 L60 82.5 L69 87 Z" fill="#17131c"/><circle cx="60" cy="82.5" r="2.4" fill="#17131c"/>
+  <rect x="76" y="98" width="17" height="6" rx="1.5" fill="#e8b64a"/><rect x="78" y="100" width="13" height="2" rx="1" fill="#9a6d1c"/>
+  <path d="M20 94 C10 104 8 118 12 130" stroke="#6b1f2a" stroke-width="15" fill="none" stroke-linecap="round"/>
+  <circle cx="102" cy="93" r="8.5" fill="#6b1f2a"/>
   <g class="jg-f7-cabeza">
-    <rect x="54" y="58" width="12" height="14" rx="4" fill="#dca57c"/>
+    <rect x="54" y="58" width="12" height="16" rx="4" fill="#dca57c"/>
     <circle cx="39.5" cy="46" r="4" fill="#e6b087"/><circle cx="80.5" cy="46" r="4" fill="#e6b087"/>
     <circle cx="60" cy="44" r="20" fill="#f0bf94"/>
     <path d="M40 42 C40 26 50 20 60 20 C72 20 81 27 80 42 C76 34 70 31 60 31 C50 31 44 34 40 42 Z" fill="#2b1d18"/>
@@ -140,12 +144,31 @@ const CRUPIER = `
     <path d="M51 53 C55 50 58 51 60 52 C62 51 65 50 69 53 C65 54 62 54 60 53 C58 54 55 54 51 53 Z" fill="#3a2620"/>
     <path d="M54 57 C57 60 63 60 66 57" stroke="#a0513f" stroke-width="1.6" fill="none" stroke-linecap="round"/>
   </g>
-  <g class="jg-f7-brazo" id="f7Brazo">
-    <path d="M90 92 C96 96 92 102 84 102" stroke="#6b1f2a" stroke-width="9" fill="none" stroke-linecap="round"/>
-    <circle cx="84" cy="102" r="4.6" fill="#f0bf94"/>
-    <rect x="74" y="91" width="9" height="13" rx="1.6" fill="#7a1f2e" stroke="#e8b64a" stroke-width="1" transform="rotate(-18 78 97)"/>
-  </g>
 </svg>`;
+
+/* Lo impreso en el paño: la regla que paga, en arco como en las mesas
+   de casino, y el nombre del juego debajo. */
+const LEMA = `
+<svg class="jg-f7-lema-m" viewBox="0 0 560 130" aria-hidden="true">
+  <path id="f7Arco" d="M30 18 Q280 118 530 18" fill="none"/>
+  <path d="M22 30 Q280 132 538 30" fill="none" stroke="#e8c56a" stroke-opacity=".28" stroke-width="1.2"/>
+  <text class="jg-f7-lema-t"><textPath href="#f7Arco" startOffset="50%" text-anchor="middle">SIETE NÚMEROS DISTINTOS PAGAN +${F7_BONO}</textPath></text>
+  <text class="jg-f7-lema-l" x="280" y="112" text-anchor="middle">FLIP 7</text>
+</svg>`;
+
+/* Dónde se sienta cada uno, en % de la sala, de derecha a izquierda (el
+   sentido en que reparte el crupier, que está arriba). Hechas a mano por
+   número de jugadores: un arco calculado dejaba siempre a alguien encima
+   del zapato o fuera del paño. */
+const PUESTOS = {
+  1: [[50, 72]],
+  2: [[70, 70], [30, 70]],
+  3: [[82, 55], [50, 76], [18, 55]],
+  4: [[85, 50], [62, 78], [38, 78], [15, 50]],
+  5: [[87, 43], [72, 70], [50, 83], [28, 70], [13, 43]],
+  6: [[86.5, 36], [77, 61], [62, 85], [38, 85], [23, 61], [13.5, 36]]
+};
+const ALTO_SALA = n => n <= 2 ? 640 : n <= 4 ? 700 : 780;
 
 /* Qué sucesos del historial son nuevos. El historial es una cola de 40:
    al llenarse, cada suceso nuevo empuja uno viejo por delante. Se busca
@@ -205,16 +228,19 @@ export function crearFlip7(ctx) {
         <div id="f7Trampa"></div>
         <div class="jg-tablero jg-f7-tablero">
           <div class="jg-f7-sala" id="f7Sala">
-            <div class="jg-f7-mesa-o"></div>
-            <div class="jg-f7-centro">
+            <div class="jg-f7-luz"></div>
+            <div class="jg-f7-crup">
               ${CRUPIER}
-              <div class="jg-f7-fila-c">
-                <div class="jg-f7-pila" id="f7Desc"></div>
-                <div class="jg-f7-vitrina" id="f7Vitrina"></div>
-                <div class="jg-f7-pila" id="f7Mazo"></div>
-              </div>
-              <div class="jg-f7-info" id="f7Info"></div>
+              <div class="jg-f7-brazo" id="f7Brazo"><i class="jg-f7-manga"><b class="jg-f7-mano-d"></b></i></div>
             </div>
+            <div class="jg-f7-mesa-o"></div>
+            ${LEMA}
+            <div class="jg-f7-riel">
+              <div class="jg-f7-pila jg-f7-bandeja" id="f7Desc"></div>
+              <div class="jg-f7-vitrina" id="f7Vitrina"></div>
+              <div class="jg-f7-pila jg-f7-sabot" id="f7Mazo"></div>
+            </div>
+            <div class="jg-f7-info" id="f7Info"></div>
             <div id="f7Asientos"></div>
             <div class="jg-f7-resumen" id="f7Resumen"></div>
             <div class="jg-f7-vuelos" id="f7Vuelos"></div>
@@ -305,6 +331,23 @@ export function crearFlip7(ctx) {
     }
     if (!resumenFijo && !fant && est.fase === "jugando") escondeResumen();
     mira(aQuienEspera(fant));
+    reposa();
+  }
+
+  /* El brazo en reposo: la mano apoyada en el paño junto al zapato, sin
+     tapar la carta de arriba ni la cuenta. Se mide en vez de
+     escribirse porque el zapato cambia de sitio con el ancho (en el
+     móvil queda debajo del crupier, no a su derecha). */
+  let reposo = { ang: 40, l: 90 };
+  function reposa() {
+    const b = $("#f7Brazo"), z = $("#f7Mazo");
+    if (!b || !z || vuelos > 0) return;
+    const rb = b.getBoundingClientRect(), rz = z.getBoundingClientRect();
+    if (!rz.width) return;
+    const dx = rz.left - 14 - rb.left, dy = rz.top + rz.height * 0.55 - rb.top;
+    reposo = { ang: Math.atan2(dy, dx) * 180 / Math.PI, l: Math.max(30, Math.hypot(dx, dy) - 6) };
+    b.style.setProperty("--ang", reposo.ang.toFixed(1) + "deg");
+    b.style.setProperty("--l", reposo.l.toFixed(0) + "px");
   }
 
   function textoFase() {
@@ -336,8 +379,9 @@ export function crearFlip7(ctx) {
       (¿pestaña cerrada?), así que sus aportes no se han podido comprobar.</div>`;
   }
 
-  /* El centro: el descarte, la vitrina (la carta que espera a que alguien
-     decida qué hacer con ella) y el mazo, bajo la mano del crupier. */
+  /* El riel del crupier: la bandeja del descarte, la vitrina (la carta
+     que espera a que alguien decida qué hacer con ella, sobre su marca
+     impresa en el paño) y el zapato del que reparte. */
   function pintaCentro() {
     const mon = est.monton ?? 0, des = est.descarte ?? 0;
     const altura = Math.min(4, Math.ceil(mon / 20));
@@ -353,7 +397,7 @@ export function crearFlip7(ctx) {
     const w = est.espera, eli = est.fase === "jugando" && w && w.k === "elige";
     set("f7Vitrina", eli ? "v" + w.id + w.quien : "v-", eli
       ? htmlCarta(carta(w.id), "jg-f7-grande" + (w.quien === uid ? " jg-f7-mia" : "")) + `<span class="jg-f7-de">${w.quien === uid ? "la tuya" : "de " + esc(nombre(w.quien))}</span>`
-      : `<div class="jg-f7-hueco jg-f7-hueco-g"></div>`);
+      : `<div class="jg-f7-hueco jg-f7-hueco-g"><b>7</b></div>`);
     const info = est.ronda
       ? `Ronda ${est.ronda} · reparte ${esc(est.reparte === uid ? "tú" : (jugador(est.reparte) || {}).nombre || "—")}`
       : est.fase === "espera" ? "La mesa está abierta" : "";
@@ -391,9 +435,10 @@ export function crearFlip7(ctx) {
     return o;
   }
 
-  /* Los asientos, alrededor del óvalo: yo siempre abajo, los demás en el
-     orden de la mesa y en el sentido del reloj. Las cajas se rehacen solo
-     cuando cambia quién se sienta; lo de dentro va por firma. */
+  /* Los asientos, en la media luna frente al crupier: yo en el centro
+     del arco, los demás en el orden de la mesa de derecha a izquierda,
+     que es como reparte un crupier. Las cajas se rehacen solo cuando
+     cambia quién se sienta; lo de dentro va por firma. */
   function ordenMesa() {
     const js = est.jugadores.slice().sort((a, b) => (a.orden || 0) - (b.orden || 0));
     const i = js.findIndex(j => j.uid === uid);
@@ -408,12 +453,12 @@ export function crearFlip7(ctx) {
     if (orden !== firmaOrden) {
       firmaOrden = orden;
       sala.classList.toggle("jg-f7-muchos", N > 2);
+      sala.dataset.n = Math.min(6, Math.max(1, N));
+      const pos = PUESTOS[Math.min(6, Math.max(1, N))], m = Math.floor((N - 1) / 2);
       cont.innerHTML = js.map((j, i) => {
-        const th = 90 + i * 360 / N;
-        angulo[j.uid] = th;
-        const r = th * Math.PI / 180;
-        const x = Math.min(85, Math.max(15, 50 + 41 * Math.cos(r)));
-        const y = Math.min(84, Math.max(16, 50 + 37 * Math.sin(r)));
+        const [x, y] = pos[(m + i) % pos.length];
+        /* Visto desde la cabeza del crupier, que está arriba en el centro. */
+        angulo[j.uid] = Math.atan2(y / 100 * ALTO_SALA(N) - 62, (x - 50) * 10) * 180 / Math.PI;
         return `<div class="jg-f7-asiento${j.uid === uid ? " jg-f7-yo" : ""}" id="f7S${i}" data-u="${esc(j.uid)}" style="left:${x.toFixed(2)}%;top:${y.toFixed(2)}%"></div>`;
       }).join("");
       for (const k in firmas) if (/^f7S\d/.test(k)) delete firmas[k];
@@ -465,7 +510,7 @@ export function crearFlip7(ctx) {
           <span class="jg-f7-total" title="Puntos de la partida"><b>${pts}</b>/${est.meta}</span>
         </div>
         <div class="jg-f7-barra"><i style="width:${Math.min(100, pts / est.meta * 100)}%"></i></div>
-        <div class="jg-f7-mano">${nums || `<span class="jg-f7-vacia">${fuera ? "" : "sin cartas"}</span>`}</div>
+        <div class="jg-f7-mano">${nums || (fuera ? "" : `<span class="jg-f7-vacia" title="Sin cartas"></span>`)}</div>
         ${minis ? `<div class="jg-f7-extras">${minis}</div>` : ""}
         <div class="jg-f7-pie-j">
           <span class="jg-f7-siete-p" title="Números distintos: ${n} de ${F7_SIETE}">${Array.from({ length: F7_SIETE }, (_, k) => `<i class="${k < n ? "on" : ""}"></i>`).join("")}</span>
@@ -606,23 +651,45 @@ export function crearFlip7(ctx) {
       dy = rd.top + rd.height / 2 - rs.top - oy;
       desvanece = true;
     }
+    /* El crupier estira el brazo hacia el asiento, la carta sale del
+       zapato a su mano boca abajo y desde ahí se lanza, volteándose. */
+    const brazo = $("#f7Brazo"), manga = brazo && brazo.querySelector(".jg-f7-manga");
+    let hx = ox, hy = oy, hombro = null;
+    if (brazo && manga && brazo.animate) {
+      reposa();
+      const rh = brazo.getBoundingClientRect();
+      hombro = { x: rh.left - rs.left, y: rh.top - rs.top };
+      const tx = ox + dx - hombro.x, ty = oy + dy - hombro.y;
+      let th = Math.atan2(ty, tx) * 180 / Math.PI;
+      if (th < -90) th += 360;
+      const lejos = Math.hypot(tx, ty);
+      const alcance = Math.min(250, lejos - 40, Math.max(90, lejos * 0.55));
+      const r = th * Math.PI / 180;
+      if (alcance > reposo.l) {
+        hx = hombro.x + Math.cos(r) * alcance;
+        hy = hombro.y + Math.sin(r) * alcance;
+        const ang0 = `rotate(${reposo.ang.toFixed(1)}deg)`, ang1 = `rotate(${th.toFixed(1)}deg)`;
+        brazo.animate([{ transform: ang0 }, { transform: ang1, offset: 0.35 }, { transform: ang1, offset: 0.5 }, { transform: ang0 }],
+          { duration: VUELO_MS, easing: "ease-in-out" });
+        const l0 = reposo.l.toFixed(0) + "px", l1 = alcance.toFixed(0) + "px";
+        manga.animate([{ width: l0 }, { width: l1, offset: 0.35 }, { width: l1, offset: 0.5 }, { width: l0 }],
+          { duration: VUELO_MS, easing: "ease-in-out" });
+      }
+    }
     const v = document.createElement("div");
     v.className = "jg-f7-vuelo";
     v.style.left = (ox - ANCHO / 2) + "px";
     v.style.top = (oy - 31) + "px";
     v.innerHTML = `<div class="jg-f7-vuelo-in">${htmlCarta(null, "jg-f7-cara-a")}${htmlCarta(c, "jg-f7-cara-b")}</div>`;
     capa.appendChild(v);
-    const mx = dx / 2, my = dy / 2 - 50;
+    const px = hx - ox, py = hy - oy;
+    const mx = (px + dx) / 2, my = (py + dy) / 2 - 30;
     const anim = v.animate([
-      { transform: "perspective(700px) translate(0px,0px) rotate(-8deg) rotateY(0deg) scale(1)", opacity: 1 },
-      { transform: `perspective(700px) translate(${mx}px,${my}px) rotate(${giro / 2 - 4}deg) rotateY(90deg) scale(1.15)`, opacity: 1, offset: 0.5 },
+      { transform: "perspective(700px) translate(0px,0px) rotate(0deg) rotateY(0deg) scale(1)", opacity: 1 },
+      { transform: `perspective(700px) translate(${px.toFixed(1)}px,${py.toFixed(1)}px) rotate(-6deg) rotateY(0deg) scale(1.05)`, opacity: 1, offset: 0.35, easing: "cubic-bezier(.3,.7,.3,1)" },
+      { transform: `perspective(700px) translate(${mx.toFixed(1)}px,${my.toFixed(1)}px) rotate(${(giro / 2 - 3).toFixed(1)}deg) rotateY(90deg) scale(1.1)`, opacity: 1, offset: 0.68 },
       { transform: `perspective(700px) translate(${dx}px,${dy}px) rotate(${giro}deg) rotateY(180deg) scale(${esc2})`, opacity: desvanece ? 0 : 1 }
-    ], { duration: VUELO_MS, easing: "cubic-bezier(.3,.7,.3,1)", fill: "forwards" });
-    const brazo = $("#f7Brazo");
-    if (brazo && brazo.animate) {
-      brazo.animate([{ transform: "rotate(0deg)" }, { transform: "rotate(-26deg)", offset: 0.35 }, { transform: "rotate(0deg)" }],
-        { duration: 420, easing: "ease-out" });
-    }
+    ], { duration: VUELO_MS, easing: "ease-in-out", fill: "forwards" });
     mira(para);
     if (!document.hidden) suena("reparte");
     let hecho = false;
