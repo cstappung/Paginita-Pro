@@ -3,11 +3,14 @@
  * Tres decisiones, y las tres se explican solas en cuanto se intenta lo
  * contrario:
  *
- * 1. NO HAY ARCHIVOS DE AUDIO (salvo el tema del Escondite). Efectos y
- *    música salen de `juegos/audio/chip.js`, un chip de 8 bits hecho con
- *    Web Audio, y las canciones son texto en `juegos/audio/temas.js`: unas
- *    decenas de líneas frente a los megas que pesaría una carpeta de .mp3
- *    que además habría que servir, cachear y esperar.
+ * 1. CASI NO HAY ARCHIVOS DE AUDIO. Efectos y música salen de
+ *    `juegos/audio/chip.js`, un chip de 8 bits hecho con Web Audio, y las
+ *    canciones son texto en `juegos/audio/temas.js`: unas decenas de líneas
+ *    frente a los megas que pesaría una carpeta de .mp3 que además habría
+ *    que servir, cachear y esperar. Las excepciones son las que un chip no
+ *    sabe imitar: los temas grabados del Escondite y de Flip 7 (`GRABADAS`)
+ *    y el golpe de madera y la carta deslizada de Flip 7 (`MUESTRAS`). Todas
+ *    son CC0 y se cargan solo cuando ese juego se abre.
  *
  * 2. EL `AudioContext` NACE EN EL PRIMER GESTO, no al cargar la página.
  *    Un contexto creado sin que nadie haya tocado nada arranca
@@ -125,6 +128,44 @@ function campana(a, t, f, vol = 0.07, dur = 1.3) {
   seno(a, t, f * 5.4, 0, dur * 0.2, vol * 0.2);
 }
 
+/* Muestras grabadas de la mesa de Flip 7 — de los paquetes «Impact Sounds»
+   y «Casino Audio» de Kenney (kenney.nl, CC0), recortadas a mono 16 bits.
+   El nudillo sintetizado de arriba sonaba a juguete: un seno que cae es un
+   tambor, no un tablero, y la veta de verdad no se deja sintetizar con tres
+   nodos. Se piden la primera vez que suena algo de Flip 7 y, mientras no
+   han llegado (o si no llegan nunca), suena el sintetizado: el primer toc
+   de la partida no se pierde esperando a la red. */
+const MUESTRAS = {
+  toc: ["juegos/audio/flip7-toc-1.wav", "juegos/audio/flip7-toc-2.wav"],
+  carta: ["juegos/audio/flip7-carta-1.wav", "juegos/audio/flip7-carta-2.wav", "juegos/audio/flip7-carta-3.wav"]
+};
+const bufs = {};
+let pidiendo = false;
+function cargaMuestras(a) {
+  if (pidiendo || typeof fetch !== "function") return;
+  pidiendo = true;
+  for (const [k, urls] of Object.entries(MUESTRAS)) {
+    Promise.all(urls.map(u => fetch(u).then(r => { if (!r.ok) throw new Error(u); return r.arrayBuffer(); })
+      .then(b => new Promise((ok, mal) => a.decodeAudioData(b, ok, mal)))))
+      .then(lista => { bufs[k] = lista; })
+      .catch(() => {});
+  }
+}
+/* Toca la muestra `i` del grupo `k` (al azar si no se dice) y responde si
+   pudo, para que quien llama caiga al sintetizado si no. */
+function muestra(a, k, t, { i, vol = 1, vel = 1 } = {}) {
+  cargaMuestras(a);
+  const lista = bufs[k];
+  if (!lista || !lista.length) return false;
+  const s = a.createBufferSource(), g = a.createGain();
+  s.buffer = lista[Number.isInteger(i) ? i % lista.length : Math.floor(Math.random() * lista.length)];
+  s.playbackRate.value = vel;
+  g.gain.value = vol;
+  s.connect(g); g.connect(busFx);
+  s.start(t);
+  return true;
+}
+
 /* El repertorio. Los nombres dicen qué pasó, no cómo suena: así se
    puede cambiar el timbre de «gana» sin tocar ningún juego. */
 const REPERTORIO = {
@@ -157,11 +198,15 @@ const REPERTORIO = {
   estalla:  (a, t, k = 0) => { const n = Math.min(k || 0, 24);
                                N(a, t, 0.18, { vol: 0.1, tono: 1.4 + n * 0.05, tono1: 0.4 });
                                P(a, t, H(60 + n), 0.09, { f1: H(72 + n), onda: "p25", vol: 0.07 }); },
-  /* Flip 7: dos golpes en la mesa para pedir, el segundo algo más grave. */
-  madera:   (a, t) => { nudillo(a, t, 1.06); nudillo(a, t + 0.11, 0.92); },
-  /* La carta que el crupier desliza por el tapete: un soplo que sube y el
-     chasquido del cartón al posarse. */
-  reparte:  (a, t) => { soplo(a, t, 0.16, 0.12, { f: 700, f1: 3600, q: 0.9, ataque: 0.03 });
+  /* Flip 7: dos golpes en la mesa para pedir, el segundo algo más grave
+     y más flojo, como los da una mano de verdad. */
+  madera:   (a, t) => { if (muestra(a, "toc", t, { i: 0, vol: 0.95, vel: 1.02 + Math.random() * 0.04 })) {
+                          muestra(a, "toc", t + 0.12, { i: 1, vol: 0.72, vel: 0.9 + Math.random() * 0.04 }); return; }
+                        nudillo(a, t, 1.06); nudillo(a, t + 0.11, 0.92); },
+  /* La carta que el crupier desliza por el tapete. Se varía un poco la
+     velocidad para que veinte cartas seguidas no suenen a la misma. */
+  reparte:  (a, t) => { if (muestra(a, "carta", t, { vol: 0.8, vel: 0.95 + Math.random() * 0.1 })) return;
+                        soplo(a, t, 0.16, 0.12, { f: 700, f1: 3600, q: 0.9, ataque: 0.03 });
                         soplo(a, t + 0.17, 0.03, 0.14, { f: 3200, q: 1.2 }); },
   /* Plantarse: la palma sobre la mesa y una campanilla que sube en arpegio. */
   planta:   (a, t) => { seno(a, t, 120, 55, 0.3, 0.42); soplo(a, t, 0.1, 0.18, { f: 420, q: 0.7, tipo: "lowpass" });
@@ -204,9 +249,22 @@ export function suena(nombre, x) {
    (`juegos/audio/temas.js`) y lo toca un `Chip.Reproductor`, que agenda un
    poco por delante del reloj de audio: el temporizador solo lo despierta, no
    marca el compás, así que un `setInterval` que llega tarde no desafina nada.
-   El Escondite es la excepción: su tema es una grabación, Midnight Pulse. */
+   Dos juegos son la excepción y suenan a grabación (`GRABADAS`): el
+   Escondite, con Midnight Pulse, y Flip 7, con «Poker Night» de Zane Little
+   (opengameart.org, CC0) — un casino pide un piano de bar de fondo, y un
+   chip de 8 bits sobre madera y tapete sonaba a otra habitación.
+
+   `fin` es dónde acaba la música de verdad: «Poker Night» termina en seco a
+   los 124 s y trae dos segundos y medio de silencio detrás, que en bucle
+   eran un hueco en cada vuelta. `loop` no sabe de puntos de corte, así que
+   se salta a mano al inicio desde `timeupdate`. `vol` equilibra cada pista
+   con los efectos: esta es más fuerte que Midnight Pulse. */
 const TEMAS = Temas.temas;
-let pistaEscondite = null;
+const GRABADAS = {
+  escondite: { url: "juegos/audio/escondite-midnight-pulse.mp3", vol: 1 },
+  flip7: { url: "juegos/audio/flip7-poker-night.mp3", vol: 0.7, fin: 124.3 }
+};
+const pistas = {};
 let tema = "", timer = null, desbloqueado = false, rep = null;
 let volumen = 0.3, musicaOn = true;
 let ajuste = { tempo: 1, capas: null };
@@ -225,7 +283,7 @@ export function configurarMusica(on, v = volumen) {
   sincronizaMusica();
 }
 export function ambientar(juego) {
-  const siguiente = juego === "escondite" || TEMAS[juego] ? juego : "";
+  const siguiente = GRABADAS[juego] || TEMAS[juego] ? juego : "";
   if (tema !== siguiente) { detenerMusica(true); tema = siguiente; ajuste = { tempo: 1, capas: null }; }
   sincronizaMusica();
 }
@@ -237,13 +295,18 @@ export function ajustarMusica({ tempo, capas } = {}) {
   aplicaAjuste();
 }
 function aplicaAjuste() {
+  /* Una grabación no se acelera nota a nota, pero sí entera: el navegador
+     conserva el tono al cambiar `playbackRate`, así que el «date prisa» del
+     final de partida también llega a ellas. */
+  const p = pistas[tema];
+  if (p) try { p.playbackRate = ajuste.tempo; } catch (_) {}
   if (!rep) return;
   rep.tempo = ajuste.tempo;
   if (ajuste.capas) Object.assign(rep.capas, ajuste.capas);
 }
 export function activarAudio() { desbloqueado = true; sincronizaMusica(); }
 function detenerMusica(olvida) {
-  if (pistaEscondite) pistaEscondite.pause();
+  for (const p of Object.values(pistas)) p.pause();
   clearInterval(timer); timer = null;
   if (rep) {
     try { if (olvida) rep.destruir(); else rep.detener(); } catch (_) {}
@@ -252,14 +315,21 @@ function detenerMusica(olvida) {
 }
 function sincronizaMusica() {
   if (!tema || !musicaOn || !desbloqueado || document.hidden) { detenerMusica(false); return; }
-  if (tema === "escondite") {
+  const g = GRABADAS[tema];
+  if (g) {
     try {
-      if (!pistaEscondite) {
-        pistaEscondite = new Audio("juegos/audio/escondite-midnight-pulse.mp3");
-        pistaEscondite.loop = true; pistaEscondite.preload = "none";
+      let p = pistas[tema];
+      if (!p) {
+        p = pistas[tema] = new Audio(g.url);
+        p.loop = true; p.preload = "none";
+        if (g.fin) p.addEventListener("timeupdate", () => { if (p.currentTime >= g.fin) p.currentTime = 0; });
       }
-      pistaEscondite.volume = volumen;
-      if (pistaEscondite.paused) pistaEscondite.play().catch(() => {});
+      p.volume = Math.min(1, volumen * g.vol);
+      aplicaAjuste();
+      if (p.paused) p.play().catch(() => {});
+      /* Las muestras de la mesa se piden con la música, no con el primer
+         toc: así ese primero ya suena a madera. */
+      if (tema === "flip7") { const a = motor(); if (a) cargaMuestras(a); }
     } catch (_) {}
     return;
   }

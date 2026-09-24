@@ -404,6 +404,9 @@ export function crearCadena(ctx) {
 
     let fase;
     if (est.fase === "espera") fase = "Esperando a que entren los demás…";
+    /* Mientras la cadena ganadora se está contando, el texto no la
+       destripa: el resultado aparece cuando termina, igual que el cartel. */
+    else if (est.fase === "fin" && (animando || pendiente >= 0) && est.motivo !== "abandono") fase = "¡Reacción en cadena!";
     else if (est.fase === "fin") {
       if (est.motivo === "abandono") fase = est.ganador === uid ? "¡Ganas! Los demás se fueron." : "La partida terminó por abandono.";
       else fase = est.ganador === uid ? "🏆 Tu reacción se lo tragó todo." : `Gana ${nombreDe(est.ganador)}.`;

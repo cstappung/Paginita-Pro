@@ -115,6 +115,7 @@ let vistaPintada = "";
 let ranks = null;
 let individual = null;
 let proximo = 0;          // el número de jugada que toca escribir
+const enVuelo = new Set(); // jugadas de esta pestaña aún sin confirmar (ver `terminar`)
 let anotada = "";         // partida ya sumada a la clasificación desde esta pestaña
 let finEnviado = "";
 let finCerrado = "";        // partida cuyo cartel de fin se ha cerrado a mano
@@ -252,20 +253,51 @@ async function jugar(jugada) {
   const enBase = Object.keys((state.partida && state.partida.jugadas) || {}).length;
   let n = Math.max(proximo, enBase);
   const pid = state.pid;
-  for (let i = 0; i < 25; i++, n++) {
-    if (await fb.jugar(pid, n, jugada)) { proximo = n + 1; return true; }
-  }
-  throw new Error("No se pudo escribir la jugada: la partida va demasiado rápida.");
+  /* Se apunta en `enVuelo` ANTES de llamar a `fb.jugar`, no al volver:
+     el `terminar` que esta misma jugada provoca corre dentro de esa
+     llamada (ver `terminar`), y para entonces tiene que poder verla. */
+  let suelta;
+  const tarea = new Promise(r => { suelta = r; });
+  enVuelo.add(tarea);
+  try {
+    for (let i = 0; i < 25; i++, n++) {
+      if (await fb.jugar(pid, n, jugada)) { proximo = n + 1; return true; }
+    }
+    throw new Error("No se pudo escribir la jugada: la partida va demasiado rápida.");
+  } finally { enVuelo.delete(tarea); suelta(); }
 }
 
 /* El módulo canta el ganador en cuanto lo ve; los dos lo cantan, y
    suele ser a la vez. Escribirlo una vez por pestaña basta, y el
-   segundo `update` es idéntico al primero. */
+   segundo `update` es idéntico al primero.
+
+   Lo que no puede hacer es cantarlo antes de que la jugada ganadora
+   esté en el servidor, y eso es exactamente lo que pasaba en la pestaña
+   de quien ganaba. `runTransaction` del SDK dispara el evento local
+   (el valor optimista) de forma síncrona y SÓLO DESPUÉS envía la
+   transacción (`repoStartTransaction`: primero
+   `eventQueueRaiseEventsForChangedPath`, luego
+   `repoSendReadyTransactions`). Nuestro `onValue` repinta dentro de ese
+   evento, el módulo ve al ganador y llama aquí, y el `set(fin)` salía
+   por el socket antes que la jugada. El servidor aplicaba `fin`, la
+   regla de `jugadas/$n` (que `fin` no exista) rechazaba la jugada
+   ganadora y el SDK la revertía: la partida quedaba cerrada sin su
+   última jugada — nadie veía la cadena final y el perdedor conservaba
+   sus puntos de antes. Por eso se espera a que se confirme toda jugada
+   de esta pestaña que siga en vuelo, y sólo se cierra si, tras ello,
+   la partida sigue acabada. */
 async function terminar(ganador, motivo) {
-  if (!state.pid || finEnviado === state.pid) return;
-  finEnviado = state.pid;
-  try { await fb.terminar(state.pid, ganador, motivo); }
-  catch (e) { finEnviado = ""; console.warn("[juegos] no se pudo cerrar la partida", e); }
+  const pid = state.pid;
+  if (!pid || finEnviado === pid) return;
+  finEnviado = pid;
+  if (enVuelo.size) {
+    await Promise.allSettled([...enVuelo]);
+    if (state.pid !== pid) return;
+    const acabada = (state.partida && state.partida.fin) || (state.estado && state.estado.fase === "fin");
+    if (!acabada) { finEnviado = ""; return; }   // la jugada no entró: la partida sigue
+  }
+  try { await fb.terminar(pid, ganador, motivo); }
+  catch (e) { if (finEnviado === pid) finEnviado = ""; console.warn("[juegos] no se pudo cerrar la partida", e); }
 }
 
 /* ---------- clasificación ---------- */

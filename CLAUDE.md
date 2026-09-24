@@ -1594,6 +1594,17 @@ transaction aborts, `jugar` returns false, and `juegos-main.js` re-reads the log
 and retries with the next index (up to 25 times). A `push` would have accepted
 both and left the log with two move fours in an order neither client chose.
 
+**`terminar` waits for the moves still in flight** (`enVuelo` in
+`juegos-main.js`, a Set of the `jugar` promises not yet settled). The SDK fires
+a transaction's *optimistic* events synchronously, so the screen sees the
+winning move — and calls `terminar` — before that move has reached the server.
+Writing `fin` right away sent it ahead of the move, and the rules then refused
+the move itself (`jugadas/$n` requires `!fin.exists()`): the room closed on the
+board *before* the winning move, which is exactly how the loser in Chain
+Reaction kept their old score and neither side saw the final chain. So
+`terminar` awaits `Promise.allSettled(enVuelo)` and writes `fin` only if the
+state it re-reads really says the game is over.
+
 **What is chosen at the same time travels as a hash first** (`compromiso`,
 SHA-256 over the value plus a random salt). Both games with hidden information —
 the escondite's hiding place and the card's index — publish the hash, and only
@@ -1893,6 +1904,17 @@ that adjustment whenever the theme changes, so one game's hurry never leaks
 into the next. `tests/temas.test.cjs` checks every theme compiles, that its
 section lengths are whole bars, and that no note is silently dropped.
 
+**A theme may be a recording instead** (`GRABADAS` in `sonido.js`): Flip 7 plays
+"Poker Night" by Zane Little (OpenGameArt, CC0) from `juegos/audio/`, looped by
+hand at `fin` (124.3 s) through `timeupdate` because the file's tail is
+silence. The chip version of a table game sounded thin, and a lounge track is
+what the room was missing. The hurry-up reaches it through `playbackRate`.
+The same file also carries **sampled effects** (`MUESTRAS`: Kenney's Impact
+Sounds and Casino Audio, both CC0) — knuckles on wood for `madera`, a card
+sliding for `reparte`. They are fetched when the flip7 theme starts
+(`cargaMuestras`) and `muestra()` falls back to the synth until they decode, so
+the first card of a room is never silent.
+
 **The endgame speeds the music up.** `progreso(est, juego)` in `motor.js`
 returns how far the board is (boxes drawn, squares filled, stars taken, rounds
 won — 0 outside `jugando`), and over the last 30 % `juegos-main.js` ramps the
@@ -1931,6 +1953,14 @@ has finished, is of that game, and has the writer in it, that it is not the one
 already counted, and that `jugadas` goes up by exactly one. Three points for a
 win and one for a draw, because ordering by wins alone ranks whoever plays
 most.
+
+**The Clasificación is a stage, not a table** (`ranks.js`): a 2-1-3 podium with
+metal blocks, a crown over the first, and under it a card that tells *you* what
+you need — how many points (and wins) to reach the podium, to pass the next
+one, or how far ahead you are if you already lead. The table stays below for
+everyone else. The entry animation plays **once per game** (`animado` holds
+the key) and the scene repaints by signature (`firma`), because `watchRanks`
+fires on every write and replaying the rise each time would make it twitch.
 
 **The new nodes need their rules published by hand** in the Firebase console,
 exactly like the reports' (`firebase/CONFIGURAR-FIREBASE.md`). Until then
