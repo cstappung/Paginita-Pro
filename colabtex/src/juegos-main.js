@@ -33,7 +33,7 @@ import { crearSolo } from "./juegos/solo/club.js";
 import { watchAuth, loginGoogle, logout } from "./firebase.js";
 import * as fb from "./fb-juegos.js";
 import { escapeHtml, timeAgo, colorForUid } from "./util.js";
-import { JUEGOS, reducir, jugadasDe, acumula, cupoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion } from "./juegos/motor.js";
+import { JUEGOS, reducir, jugadasDe, acumula, cupoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7 } from "./juegos/motor.js";
 import { crearEscondite } from "./juegos/escondite.js";
 import { crearCartas } from "./juegos/cartas.js";
 import { crearCuadritos } from "./juegos/cuadritos.js";
@@ -92,7 +92,7 @@ const OPCIONES = {
   flip7: [
     { clave: "cupo", etiqueta: "Jugadores", valores: cupos("flip7") },
     { clave: "modo", etiqueta: "Modo", por: "normal",
-      valores: [{ v: "normal", t: "Normal" }, { v: "venganza", t: "Con venganza" }] }
+      valores: Object.keys(MODOS_F7).map(v => ({ v, t: MODOS_F7[v] })) }
   ]
 };
 

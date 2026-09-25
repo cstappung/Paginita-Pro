@@ -81,7 +81,7 @@ export const JUEGOS = {
     lema: "Pide carta o plántate: siete números distintos y te llevas el bono",
     color: "#e8a317",
     minimo: 2,
-    cupo: 8
+    cupo: 10
   }
 };
 
@@ -1288,7 +1288,7 @@ export function redOrbita(p, js = jugadoresDe(p)) {
 }
 
 /* ============================================================
-   8. Flip 7 — normal y «con venganza»
+   8. Flip 7 — Normal, Vengeance y Super Vengeance
 
    Un juego de pedir carta o plantarse. Cada uno va poniendo números
    delante; si repite uno se pasa y se queda la ronda sin nada, y quien
@@ -1349,18 +1349,27 @@ export const F7_META = 200;
 export const F7_BONO = 15;
 export const F7_SIETE = 7;
 
-export const modoF7 = p => (p && p.modo === "venganza") ? "venganza" : "normal";
+/* Los tres modos, de menos a más malicia. `venganza` es la clave que ya
+   está escrita en las salas y en las reglas de la base; lo que se lee en
+   pantalla es la etiqueta. Super Vengeance es Vengeance con más cartas y
+   dos reglas más (`golpeF7` y el bono del Flip 7 a elegir). */
+export const MODOS_F7 = { normal: "Normal", venganza: "Vengeance", super: "Super Vengeance" };
+export const modoF7 = p => (p && (p.modo === "venganza" || p.modo === "super")) ? p.modo : "normal";
 
 /* Los dos mazos, carta a carta. El índice en la lista es la identidad
    de la carta, y es lo único que viaja: el reductor, la pantalla y la
    auditoría leen de aquí qué es. Normal: 94 cartas (un 0, n copias de
    cada n del 1 al 12, +2…+10 y ×2, y tres de cada acción). Con
    venganza: 108 (el Cero, n copias del 1 al 13 con un 7 gafe y un 13
-   de la suerte entre ellas, −2…−10 y ÷2, y dos de cada acción). */
+   de la suerte entre ellas, −2…−10 y ÷2, y dos de cada acción). Super
+   Vengeance: las 108 de Vengeance en el mismo orden y, detrás, 24 más —
+   catorce 14 (uno vale −14 y otro 0, y dos cualesquiera de ellos pasan),
+   tres segundas oportunidades, dos cambios de mano, dos fulminar y tres
+   comodines —, 132 en total. */
 function construyeMazoF7(modo) {
   const m = [];
   const pon = c => m.push(Object.freeze(Object.assign({ i: m.length }, c)));
-  const venganza = modo === "venganza";
+  const venganza = modo !== "normal";
   const tope = venganza ? 13 : 12;
   pon(venganza ? { k: "n", v: 0, cero: true } : { k: "n", v: 0 });
   for (let v = 1; v <= tope; v++) for (let c = 0; c < v; c++) {
@@ -1373,24 +1382,41 @@ function construyeMazoF7(modo) {
   pon(venganza ? { k: "m", v: 0, mitad: true } : { k: "m", v: 0, doble: true });
   const acciones = venganza ? ["cuatro", "otra", "cambia", "roba", "tira"] : ["congela", "tres", "segunda"];
   for (const a of acciones) for (let c = 0; c < (venganza ? 2 : 3); c++) pon({ k: "a", a });
+  if (modo === "super") {
+    for (let c = 0; c < 14; c++) pon({ k: "n", v: c === 0 ? -14 : c === 1 ? 0 : 14, catorce: true });
+    for (const [a, k] of [["segunda", 3], ["trueca", 2], ["mata", 2], ["comodin", 3]]) for (let c = 0; c < k; c++) pon({ k: "a", a });
+  }
   return Object.freeze(m);
 }
 const mazosF7 = {};
 export const mazoF7 = modo => mazosF7[modo] || (mazosF7[modo] = construyeMazoF7(modo));
 
+/* El comodín no trae número: vale el que eligió quien lo jugó, y ese
+   valor vive fuera de la carta (`com`, id → valor), porque la misma
+   carta puede volver a salir y valer otra cosa. Como se busca por el id,
+   viaja con la carta si alguien la roba o la cambia. */
+export const valorCartaF7 = (c, com) => c.a === "comodin" ? Number((com || {})[c.i]) || 0 : c.v;
+/* Con qué cuenta para repetir: su valor, salvo los catorce, que chocan
+   entre sí valgan lo que valgan (−14, 0 o 14). Un comodín que vale 14
+   cuenta como un catorce más. */
+const claveF7 = (c, com) => c.catorce ? 14 : valorCartaF7(c, com);
+/* Va en la fila de números y no con los modificadores: los números y el
+   comodín, que una vez jugado es un número más. */
+export const esNumeroF7 = c => c.k === "n" || c.a === "comodin";
+
 /* ¿Esta fila de números se puede tener sin haberse pasado? Una sola
    copia de cada valor; con venganza, el 13 admite un segundo si uno de
    los dos es el de la suerte. */
-export function lineaValidaF7(nums, modo) {
+export function lineaValidaF7(nums, modo, com) {
   const M = mazoF7(modo), cuenta = {};
   let suerte = false;
   for (const id of nums) {
-    const c = M[id];
-    cuenta[c.v] = (cuenta[c.v] || 0) + 1;
+    const c = M[id], k = claveF7(c, com);
+    cuenta[k] = (cuenta[k] || 0) + 1;
     if (c.suerte) suerte = true;
   }
   for (const v in cuenta) {
-    const tope = modo === "venganza" && Number(v) === 13 && suerte ? 2 : 1;
+    const tope = modo !== "normal" && Number(v) === 13 && suerte ? 2 : 1;
     if (cuenta[v] > tope) return false;
   }
   return true;
@@ -1400,22 +1426,51 @@ export function lineaValidaF7(nums, modo) {
    ×2 (solo a los números), más los modificadores, más 15 por Flip 7.
    Con venganza: números, ÷2 redondeando hacia abajo, menos los
    negativos, nunca por debajo de cero, y 15 por Flip 7; quien tiene
-   el Cero se queda en nada salvo que haga Flip 7. */
-export function valorLineaF7(l, modo) {
+   el Cero se queda en nada salvo que haga Flip 7. Super Vengeance igual,
+   con dos diferencias: si los números no suman nada, los modificadores
+   no se aplican aquí sino al total (`golpeF7`), y quien gastó su Flip 7
+   en quitarle 15 a otro (`l.bono`, el uid de ese otro) no se los suma. */
+export function valorLineaF7(l, modo, com) {
   if (!l || l.estado === "pasa" || l.estado === "fuera") return 0;
   const M = mazoF7(modo);
-  let s = l.nums.reduce((a, id) => a + M[id].v, 0);
+  let s = numerosF7(l, modo, com);
   const mods = l.mods.map(id => M[id]);
-  if (modo === "venganza") {
-    if (!l.f7 && l.nums.some(id => M[id].cero)) return 0;
-    if (mods.some(c => c.mitad)) s = Math.floor(s / 2);
-    s = Math.max(0, s + mods.reduce((a, c) => a + c.v, 0));
-  } else {
+  if (modo === "normal") {
     if (mods.some(c => c.doble)) s *= 2;
     s += mods.reduce((a, c) => a + c.v, 0);
+  } else if (s > 0 || modo !== "super") {
+    if (mods.some(c => c.mitad)) s = Math.floor(s / 2);
+    s = Math.max(0, s + mods.reduce((a, c) => a + c.v, 0));
   }
-  return s + (l.f7 ? F7_BONO : 0);
+  return s + (l.f7 && !l.bono ? F7_BONO : 0);
 }
+
+/* Lo que suman los números de una fila, antes de modificadores y bono.
+   Con venganza el Cero la deja en nada salvo con Flip 7, y nunca baja
+   de cero: en Super Vengeance hay un 14 que vale −14. */
+function numerosF7(l, modo, com) {
+  if (!l || l.estado === "pasa" || l.estado === "fuera") return 0;
+  const M = mazoF7(modo);
+  const s = l.nums.reduce((a, id) => a + valorCartaF7(M[id], com), 0);
+  if (modo === "normal") return s;
+  if (!l.f7 && l.nums.some(id => M[id].cero)) return 0;
+  return Math.max(0, s);
+}
+
+/* Super Vengeance: los «menos algo» y el ÷2 pegan a la ronda, pero si en
+   la ronda no sumaste nada —te pasaste, te fulminaron, tienes el Cero
+   sin Flip 7, no tienes números— pegan al total acumulado. Devuelve lo
+   que le toca al total (primero `mitad`, luego `resta`) o null; se
+   aplica al cerrar la ronda (`aplicaGolpeF7`) y el total no baja de 0. */
+export function golpeF7(l, modo, com) {
+  if (modo !== "super" || !l || l.estado === "fuera" || !l.mods.length) return null;
+  const M = mazoF7(modo), mods = l.mods.map(id => M[id]);
+  const mitad = mods.some(c => c.mitad), resta = mods.reduce((a, c) => a + c.v, 0);
+  if (!mitad && !resta) return null;
+  if (numerosF7(l, modo, com) > 0) return null;
+  return { mitad, resta };
+}
+export const aplicaGolpeF7 = (total, g) => Math.max(0, (g.mitad ? Math.floor(total / 2) : total) + g.resta);
 
 /* El aporte de un jugador a la carta número `n`. Lleva la sal además
    de la semilla porque la semilla son 32 bits: con solo ella, un aporte
@@ -1435,10 +1490,11 @@ export function indiceF7(va, vb, n, largo) {
 }
 
 function redFlip7(p, js, listos) {
-  const modo = modoF7(p), M = mazoF7(modo), V = modo === "venganza";
+  const modo = modoF7(p), M = mazoF7(modo), V = modo !== "normal", S = modo === "super";
   const fuera = {}, puntos = {}, semillas = {}, aportes = {};
   for (const j of js) puntos[j.uid] = 0;
   let lin = {}, pila = [], mazo = M.map(c => c.i), descarte = [];
+  let com = {};                                  // comodines jugados esta ronda: id → valor
   let n = 0, ronda = 0, reparte = "", viva = false, cierra = false;
   let ganador = null, motivo = "", ultima = null, finRonda = null;
   const hist = [], rondas = [];
@@ -1492,21 +1548,37 @@ function redFlip7(p, js, listos) {
     l.nums = l.nums.filter(x => x !== id);
     l.mods = l.mods.filter(x => x !== id);
   };
-  const pon = (u, id) => { if (M[id].k === "n") lin[u].nums.push(id); else lin[u].mods.push(id); };
+  const pon = (u, id) => { if (esNumeroF7(M[id])) lin[u].nums.push(id); else lin[u].mods.push(id); };
   const uids = ok => js.map(x => x.uid).filter(ok);
+
+  /* Super Vengeance: quien hizo Flip 7 elige antes de cerrar la ronda
+     entre sumarse los 15 o quitárselos a otro (`l.bono`: "" para sí, el
+     uid del otro si castiga). Sin nadie más en la mesa no hay qué elegir. */
+  const bonoPendiente = () => {
+    if (!S || !cierra) return null;
+    for (const j of js) {
+      const l = lin[j.uid];
+      if (!l || !l.f7 || l.bono != null || !esta(j.uid)) continue;
+      if (!uids(x => x !== j.uid && esta(x)).length) { l.bono = ""; continue; }
+      return j.uid;
+    }
+    return null;
+  };
 
   /* Tras recibir un número por intercambio o robo: con un repetido se
      pasa, con siete se cierra la ronda. */
   const revisa = u => {
     const l = lin[u];
     if (!enPie(u)) return;
-    if (!lineaValidaF7(l.nums, modo)) { l.estado = "pasa"; suceso({ e: "pasa", uid: u }); return; }
+    if (!lineaValidaF7(l.nums, modo, com)) { l.estado = "pasa"; suceso({ e: "pasa", uid: u }); return; }
     if (l.nums.length >= F7_SIETE) { l.f7 = true; cierra = true; suceso({ e: "f7", uid: u }); }
   };
 
   /* A quién (o qué carta) se puede elegir con la carta `id` en la mano
-     de `quien`. `a` es un jugador, `c` una carta y `2` dos cartas de
-     dos jugadores distintos. */
+     de `quien`. `a` es un jugador, `c` una carta, `2` dos cartas de
+     dos jugadores distintos, `p2` dos jugadores distintos (el cambio de
+     mano, que puede incluir a quien la juega) y `n` un jugador y un
+     número de 0 a `max` (el comodín). */
   const opciones = (quien, id) => {
     const c = M[id];
     const conCartas = ok => {
@@ -1522,14 +1594,20 @@ function redFlip7(p, js, listos) {
       case "roba": return { tipo: "c", cartas: enPie(quien) ? conCartas(u => u !== quien && enPie(u)) : {} };
       case "tira": return { tipo: "c", cartas: conCartas(enPie) };
       case "cambia": return { tipo: "2", cartas: conCartas(enPie) };
+      case "mata": return { tipo: "a", uids: uids(u => u !== quien && enPie(u)) };
+      case "trueca": return { tipo: "p2", uids: uids(enPie) };
+      case "comodin": return { tipo: "n", uids: uids(enPie), max: 14 };
     }
     return { tipo: "a", uids: [] };
   };
-  const sinSalida = o => o.tipo === "a" ? !o.uids.length
+  const sinSalida = o => o.tipo === "a" || o.tipo === "n" ? !o.uids.length
+    : o.tipo === "p2" ? o.uids.length < 2
     : o.tipo === "c" ? !Object.keys(o.cartas).length : Object.keys(o.cartas).length < 2;
   const valida = (o, j) => {
     const tiene = (u, id) => typeof u === "string" && Number.isInteger(id) && (o.cartas[u] || []).includes(id);
     if (o.tipo === "a") return o.uids.includes(j.a);
+    if (o.tipo === "n") return o.uids.includes(j.a) && Number.isInteger(j.v) && j.v >= 0 && j.v <= o.max;
+    if (o.tipo === "p2") return j.a !== j.b && o.uids.includes(j.a) && o.uids.includes(j.b);
     if (o.tipo === "c") return tiene(j.a, j.c);
     return j.a !== j.b && tiene(j.a, j.c) && tiene(j.b, j.d);
   };
@@ -1540,13 +1618,14 @@ function redFlip7(p, js, listos) {
     const o = opciones(quien, id);
     if (sinSalida(o)) { descarte.push(id); suceso({ e: "nada", uid: quien, id }); return; }
     if (o.tipo === "a" && o.uids.length === 1) { aplica(quien, id, { a: o.uids[0] }); return; }
+    if (o.tipo === "p2" && o.uids.length === 2) { aplica(quien, id, { a: o.uids[0], b: o.uids[1] }); return; }
     pila.push({ k: "elige", quien, id });
   };
 
   const aplica = (quien, id, j) => {
     const c = M[id];
     if (c.k === "m") { lin[j.a].mods.push(id); suceso({ e: "da", uid: quien, a: j.a, id }); return; }
-    if (c.a !== "segunda") descarte.push(id);
+    if (c.a !== "segunda" && c.a !== "comodin") descarte.push(id);
     switch (c.a) {
       case "congela":
         lin[j.a].estado = "planta"; lin[j.a].congelado = true;
@@ -1569,10 +1648,26 @@ function redFlip7(p, js, listos) {
         quita(j.a, j.c); quita(j.b, j.d); pon(j.a, j.d); pon(j.b, j.c);
         suceso({ e: "cambia", uid: quien, a: j.a, b: j.b, c: j.c, d: j.d });
         revisa(j.a); revisa(j.b); break;
+      case "mata":
+        lin[j.a].estado = "pasa";
+        suceso({ e: "mata", uid: quien, a: j.a }); break;
+      case "trueca": {
+        /* La mano entera: números, modificadores y la segunda oportunidad
+           guardada. Lo que no es de la mano —plantado, congelado— se
+           queda con quien estaba sentado ahí. */
+        const A = lin[j.a], B = lin[j.b];
+        for (const k of ["nums", "mods", "seg"]) [A[k], B[k]] = [B[k], A[k]];
+        suceso({ e: "trueca", uid: quien, a: j.a, b: j.b });
+        revisa(j.a); revisa(j.b); break;
+      }
+      case "comodin":
+        com[id] = j.v;
+        suceso({ e: "comodin", uid: quien, a: j.a, id, v: j.v });
+        recibeNumero(j.a, id, true); break;
     }
   };
 
-  const recibeNumero = (u, id) => {
+  const recibeNumero = (u, id, callado) => {
     const l = lin[u], c = M[id];
     if (c.gafe) {
       descarte.push(...l.nums, ...l.mods);
@@ -1580,7 +1675,7 @@ function redFlip7(p, js, listos) {
       suceso({ e: "gafe", uid: u, id }); return;
     }
     const prueba = l.nums.concat(id);
-    if (!lineaValidaF7(prueba, modo)) {
+    if (!lineaValidaF7(prueba, modo, com)) {
       if (l.seg != null) {
         descarte.push(id, l.seg); l.seg = null;
         suceso({ e: "salva", uid: u, id }); return;
@@ -1589,7 +1684,7 @@ function redFlip7(p, js, listos) {
       suceso({ e: "pasa", uid: u, id }); return;
     }
     l.nums = prueba;
-    suceso({ e: "carta", uid: u, id });
+    if (!callado) suceso({ e: "carta", uid: u, id });
     if (l.nums.length >= F7_SIETE) { l.f7 = true; cierra = true; suceso({ e: "f7", uid: u }); }
   };
 
@@ -1612,8 +1707,8 @@ function redFlip7(p, js, listos) {
   const empiezaRonda = () => {
     ronda++;
     reparte = !reparte ? js[0].uid : (tras(reparte, esta) || reparte);
-    lin = {};
-    for (const j of js) lin[j.uid] = { nums: [], mods: [], seg: null, estado: esta(j.uid) ? "activo" : "fuera", congelado: false, f7: false };
+    lin = {}; com = {};
+    for (const j of js) lin[j.uid] = { nums: [], mods: [], seg: null, estado: esta(j.uid) ? "activo" : "fuera", congelado: false, f7: false, bono: null };
     const orden = [];
     for (let u = tras(reparte, esta); u; u = tras(u, esta)) { orden.push(u); if (u === reparte) break; }
     pila = [{ k: "turnos", tras: reparte }, { k: "reparto", orden, i: 0 }];
@@ -1623,24 +1718,35 @@ function redFlip7(p, js, listos) {
 
   const acabaRonda = () => {
     viva = false; cierra = false;
-    const pts = {}, lineas = {};
+    const pts = {}, lineas = {}, aj = {};
     let f7 = "";
     for (const j of js) {
       const l = lin[j.uid];
-      pts[j.uid] = esta(j.uid) ? valorLineaF7(l, modo) : 0;
+      pts[j.uid] = esta(j.uid) ? valorLineaF7(l, modo, com) : 0;
+      /* Super Vengeance: lo que la ronda no pudo absorber pega al total
+         de antes, y después se suma lo de la ronda. `aj` es lo que el
+         total perdió por fuera de la ronda, para el resumen. */
+      const g = esta(j.uid) && golpeF7(l, modo, com);
+      if (g) { const t = aplicaGolpeF7(puntos[j.uid], g); aj[j.uid] = t - puntos[j.uid]; puntos[j.uid] = t; }
       puntos[j.uid] += pts[j.uid];
       if (l.f7) f7 = j.uid;
-      lineas[j.uid] = { nums: l.nums.slice(), mods: l.mods.slice(), estado: l.estado, f7: l.f7 };
+      lineas[j.uid] = { nums: l.nums.slice(), mods: l.mods.slice(), estado: l.estado, f7: l.f7, bono: l.bono };
       descarte.push(...l.nums, ...l.mods);
       if (l.seg != null) descarte.push(l.seg);
+    }
+    for (const j of js) {
+      const b = lin[j.uid].f7 && lin[j.uid].bono;
+      if (!b || !esta(b) || puntos[b] === undefined) continue;
+      const t = Math.max(0, puntos[b] - F7_BONO);
+      aj[b] = (aj[b] || 0) + t - puntos[b]; puntos[b] = t;
     }
     for (const t of pila) {
       if (t.apartadas) descarte.push(...t.apartadas);
       if (t.k === "elige" || t.k === "resuelve") descarte.push(t.id);
     }
     pila = [];
-    finRonda = { r: ronda, pts, lineas, f7, total: Object.assign({}, puntos) };
-    rondas.push({ r: ronda, pts, f7 });
+    finRonda = { r: ronda, pts, lineas, f7, aj, com: Object.assign({}, com), total: Object.assign({}, puntos) };
+    rondas.push({ r: ronda, pts, f7, aj });
     suceso({ e: "cierra", r: ronda, f7 });
     const vivos = js.filter(x => esta(x.uid));
     const max = Math.max(...vivos.map(x => puntos[x.uid]));
@@ -1655,7 +1761,7 @@ function redFlip7(p, js, listos) {
   const avanza = () => {
     for (let guarda = 0; guarda < 100000; guarda++) {
       if (ganador !== null || !viva) return;
-      if (cierra || !pila.length) { acabaRonda(); continue; }
+      if (cierra || !pila.length) { if (bonoPendiente()) return; acabaRonda(); continue; }
       const t = pila[pila.length - 1];
       if (t.k === "reparto") {
         while (t.i < t.orden.length && !activo(t.orden[t.i])) t.i++;
@@ -1739,6 +1845,14 @@ function redFlip7(p, js, listos) {
       if (Number.isInteger(j.n) && j.n >= 0 && Number.isFinite(v)) { aporta({ uid: j.uid, v }, j.n); avanza(); }
       continue;
     }
+    if (j.t === "bono") {
+      const u = bonoPendiente();
+      if (u !== j.uid || !(j.a === u || (esta(j.a) && js.some(x => x.uid === j.a)))) continue;
+      lin[u].bono = j.a === u ? "" : j.a;
+      suceso({ e: "bono", uid: u, a: j.a });
+      avanza();
+      continue;
+    }
     const t = pila[pila.length - 1];
     if (!t) continue;
     if (j.t === "pide" && t.k === "turnos" && t.toca === j.uid && j.n === n && Number.isFinite(v)) {
@@ -1753,7 +1867,7 @@ function redFlip7(p, js, listos) {
       suceso({ e: "planta", uid: j.uid });
       avanza();
     } else if (j.t === "apunta" && t.k === "elige" && t.quien === j.uid) {
-      const eleccion = { a: j.a, b: j.b, c: Number(j.c), d: Number(j.d) };
+      const eleccion = { a: j.a, b: j.b, c: Number(j.c), d: Number(j.d), v: Number(j.v) };
       if (!valida(opciones(t.quien, t.id), eleccion)) continue;
       pila.pop();
       aplica(t.quien, t.id, eleccion);
@@ -1762,8 +1876,12 @@ function redFlip7(p, js, listos) {
   }
 
   const top = ganador === null && listos ? pila[pila.length - 1] : null;
+  const bono = ganador === null && listos && viva ? bonoPendiente() : null;
   let espera = null, turno = "";
-  if (top && top.k === "turnos" && top.toca) {
+  if (bono) {
+    espera = { k: "bono", quien: bono, uids: uids(x => x !== bono && esta(x)) };
+    turno = bono;
+  } else if (top && top.k === "turnos" && top.toca) {
     espera = { k: "decide", uid: top.toca, cero: tieneCero(top.toca) && !!(mazo.length || descarte.length) };
     turno = top.toca;
   } else if (top && top.k === "elige") {
@@ -1776,11 +1894,15 @@ function redFlip7(p, js, listos) {
       faltan: aportantes(top.para).filter(u => a[u] === undefined),
       suplentes: preferencia(top.para).filter(u => !aportantes(top.para).includes(u) && a[u] === undefined) };
   }
-  const valor = {};
-  for (const j of js) valor[j.uid] = valorLineaF7(lin[j.uid], modo);
+  const valor = {}, golpe = {};
+  for (const j of js) {
+    valor[j.uid] = valorLineaF7(lin[j.uid], modo, com);
+    const g = viva && golpeF7(lin[j.uid], modo, com);
+    if (g) golpe[j.uid] = g;
+  }
   return {
     fase: !listos ? "espera" : ganador !== null ? "fin" : "jugando",
-    modo, meta: F7_META, puntos, lineas: lin, valor, ronda, reparte, turno, espera, n,
+    modo, meta: F7_META, puntos, lineas: lin, valor, golpe, com, ronda, reparte, turno, espera, n,
     monton: mazo.length, descarte: descarte.length, hist, ultima, rondas, finRonda,
     fuera, semillas, ganador, motivo
   };
