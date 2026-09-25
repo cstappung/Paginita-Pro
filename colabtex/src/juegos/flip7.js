@@ -1,4 +1,5 @@
-/* Flip 7 — pedir carta o plantarse, de dos a ocho, normal o con venganza.
+/* Flip 7 — pedir carta o plantarse, de dos a diez, en Normal, Vengeance
+ * o Super Vengeance.
  *
  * Esta pantalla no decide nada: el reductor (`redFlip7` en motor.js)
  * sabe de quién es el turno, qué carta salió y quién se pasó. Aquí se
@@ -42,7 +43,7 @@
  * El repintado va por firmas, como en los demás juegos: reescribir el
  * innerHTML en cada tic reiniciaría las animaciones.
  */
-import { mazoF7, aporteF7, auditaFlip7, F7_SIETE, F7_BONO } from "./motor.js";
+import { mazoF7, aporteF7, auditaFlip7, lineaValidaF7, MODOS_F7, F7_SIETE, F7_BONO } from "./motor.js";
 import { suena } from "./sonido.js";
 
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
@@ -90,17 +91,28 @@ const ACCION = {
   otra: { n: "Solo una más", i: "☝", t: "#a855f7" },
   cambia: { n: "Intercambio", i: "⇄", t: "#14b8a6" },
   roba: { n: "Robo", i: "✋", t: "#ef4444" },
-  tira: { n: "Descarte", i: "✕", t: "#64748b" }
+  tira: { n: "Descarte", i: "✕", t: "#64748b" },
+  trueca: { n: "Cambio de manos", i: "⇅", t: "#0891b2" },
+  mata: { n: "Fulminar", i: "☠", t: "#1f2937" },
+  comodin: { n: "Comodín", i: "★", t: "#7c3aed" }
 };
 
 /* Un tono por número, del frío al cálido, como en la caja: a la hora de
-   buscar el repetido en una fila se mira el color antes que la cifra. */
+   buscar el repetido en una fila se mira el color antes que la cifra. El
+   último es el de los catorce, que valgan lo que valgan son el mismo. */
 const TONO = ["#8a97a3", "#3b82f6", "#0ea5e9", "#14b8a6", "#22c55e", "#84cc16", "#eab308",
-  "#f59e0b", "#f97316", "#ef4444", "#e11d48", "#d946ef", "#8b5cf6", "#6366f1"];
+  "#f59e0b", "#f97316", "#ef4444", "#e11d48", "#d946ef", "#8b5cf6", "#6366f1", "#0f172a"];
+
+/* Un comodín ya jugado lleva su valor (`v`, puesto por `carta()`); el
+   que aún espera a que lo jueguen, no. */
+const comJugado = c => c && c.a === "comodin" && c.v != null;
+const signo = v => (v < 0 ? "−" : "") + Math.abs(v);
 
 function nombreCarta(c) {
   if (!c) return "";
-  if (c.k === "n") return c.cero ? "el Cero" : c.gafe ? "el 7 gafe" : c.suerte ? "el 13 de la suerte" : "un " + c.v;
+  if (comJugado(c)) return "el comodín (" + c.v + ")";
+  if (c.k === "n") return c.cero ? "el Cero" : c.gafe ? "el 7 gafe" : c.suerte ? "el 13 de la suerte"
+    : c.catorce && c.v !== 14 ? `el 14 que vale ${signo(c.v)}` : "un " + c.v;
   if (c.k === "m") return c.doble ? "×2" : c.mitad ? "÷2" : (c.v > 0 ? "+" : "−") + Math.abs(c.v);
   return "«" + ACCION[c.a].n + "»";
 }
@@ -114,11 +126,14 @@ function htmlCarta(c, clases, attrs, estilo) {
   if (!c) return `<div class="jg-f7-c jg-f7-dorso ${clases || ""}" style="${estilo || ""}">${DORSO}</div>`;
   let cara, tipo, st = estilo || "";
   const titulo = nombreCarta(c);
-  if (c.k === "n") {
-    tipo = "num" + (c.cero ? " jg-f7-cero" : c.gafe ? " jg-f7-gafe" : c.suerte ? " jg-f7-suerte" : "");
-    st += `;--t:${TONO[c.v] || TONO[0]}`;
-    const cifra = c.cero ? "∅" : String(c.v);
-    const lema = c.gafe ? "gafe" : c.suerte ? "suerte" : c.cero ? "cero" : "";
+  if (c.k === "n" || comJugado(c)) {
+    const com = comJugado(c);
+    tipo = "num" + (c.cero ? " jg-f7-cero" : c.gafe ? " jg-f7-gafe" : c.suerte ? " jg-f7-suerte"
+      : c.catorce ? " jg-f7-catorce" : com ? " jg-f7-comodin" : "");
+    st += `;--t:${TONO[c.catorce ? 14 : c.v] || TONO[0]}`;
+    const cifra = c.cero ? "∅" : c.catorce ? "14" : String(c.v);
+    const lema = c.gafe ? "gafe" : c.suerte ? "suerte" : c.cero ? "cero" : com ? "★ comodín"
+      : c.catorce && c.v !== 14 ? "vale " + signo(c.v) : "";
     cara = `<span class="jg-f7-esq">${cifra}</span><b class="jg-f7-cifra">${cifra}</b>`
       + (lema ? `<i class="jg-f7-lema">${lema}</i>` : "") + `<span class="jg-f7-esq2">${cifra}</span>`;
   } else if (c.k === "m") {
@@ -186,9 +201,17 @@ const PUESTOS = {
   5: [[87, 43], [72, 70], [50, 83], [28, 70], [13, 43]],
   6: [[86.5, 36], [77, 61], [62, 85], [38, 85], [23, 61], [13.5, 36]],
   7: [[89, 35], [80.5, 56], [71, 75], [50, 90], [29, 75], [19.5, 56], [11, 35]],
-  8: [[90, 33], [84, 52], [75, 71], [63, 88.5], [37, 88.5], [25, 71], [16, 52], [10, 33]]
+  8: [[90, 33], [84, 52], [75, 71], [63, 88.5], [37, 88.5], [25, 71], [16, 52], [10, 33]],
+  /* Con nueve y diez la sala crece (1260 px) y los asientos adelgazan.
+     Tres por lado, con 18 % (~227 px) entre vecinos, que es lo que mide
+     un asiento compacto con modificadores y botón, y el resto en una
+     fila abajo: seguir la diagonal hasta el fondo montaba los de abajo
+     unos sobre otros. */
+  9: [[91, 25], [86, 43], [79, 61], [75, 84], [50, 87], [25, 84], [21, 61], [14, 43], [9, 25]],
+  10: [[91, 25], [86, 43], [79, 61], [80, 83], [60, 86], [40, 86], [20, 83], [21, 61], [14, 43], [9, 25]]
 };
-const ALTO_SALA = n => n <= 2 ? 640 : n <= 4 ? 700 : n <= 6 ? 780 : 980;
+const MAX_PUESTOS = 10;
+const ALTO_SALA = n => n <= 2 ? 640 : n <= 4 ? 700 : n <= 6 ? 780 : n <= 8 ? 980 : 1260;
 
 /* Qué sucesos del historial son nuevos. El historial es una cola de 40:
    al llenarse, cada suceso nuevo empuja uno viejo por delante. Se busca
@@ -316,7 +339,18 @@ export function crearFlip7(ctx) {
     return { sem: ((p.semilla >>> 0) ^ Math.imul((y.orden || 0) + 1, 0x9E3779B1)) >>> 0, sal: "" };
   }
 
-  const carta = id => (M && id != null ? M[id] : null);
+  /* La carta `id`. Un comodín jugado sale con el valor que le dieron,
+     que no está en el mazo sino en `com` (el de la ronda en curso, o el
+     de la que acaba de cerrarse para la vista fantasma y el resumen). */
+  const carta = (id, com) => {
+    const c = M && id != null ? M[id] : null;
+    if (!c || c.a !== "comodin") return c;
+    const v = (com || (est && est.com) || {})[id];
+    return v == null ? c : Object.assign({}, c, { v });
+  };
+  let comV = null;             // el valor elegido para el comodín, antes de elegir a quién
+  let selU = null;             // el primer jugador del cambio de manos
+  let eleccionVista = "";      // la elección a la que pertenecen comV y selU
 
   /* ---------- pintado ---------- */
   function set(id, firma, html) {
@@ -347,8 +381,8 @@ export function crearFlip7(ctx) {
   function pinta() {
     if (!host || !est) return;
     set("f7Fase", textoFase(), esc(textoFase()));
-    const modo = est.modo === "venganza" ? "Con venganza" : "Normal";
-    set("f7Modo", modo + est.ronda, `<span class="jg-f7-etq${est.modo === "venganza" ? " jg-f7-v" : ""}">${modo}</span>
+    const modo = MODOS_F7[est.modo] || MODOS_F7.normal;
+    set("f7Modo", modo + est.ronda, `<span class="jg-f7-etq${est.modo === "venganza" ? " jg-f7-v" : est.modo === "super" ? " jg-f7-sv" : ""}">${modo}</span>
       ${est.ronda ? `<span class="jg-nota">Ronda ${est.ronda} · a ${est.meta}</span>` : ""}`);
     set("f7Trampa", tramposos.map(t => t.uid + t.que).join(","), avisoTrampa());
     const fant = fantasma();
@@ -390,7 +424,8 @@ export function crearFlip7(ctx) {
     const w = est.espera;
     if (!w) return "…";
     if (w.k === "decide") return w.uid === uid ? "Te toca: ¿pides o te plantas?" : `Le toca a ${nombre(w.uid)}.`;
-    if (w.k === "elige") return w.quien === uid ? `Tienes ${nombreCarta(carta(w.id))}: elige.` : `${Nombre(w.quien)} decide qué hacer con ${nombreCarta(carta(w.id))}.`;
+    if (w.k === "elige") return w.quien === uid ? `Tienes ${nombreCarta(carta(w.id, {}))}: elige.` : `${Nombre(w.quien)} decide qué hacer con ${nombreCarta(carta(w.id, {}))}.`;
+    if (w.k === "bono") return w.quien === uid ? `¡Flip 7! ¿Te sumas ${F7_BONO} o se los quitas a alguien?` : `${Nombre(w.quien)} decide qué hace con su Flip 7.`;
     if (w.de === "reparto") return `Repartiendo a ${nombre(w.para)}…`;
     if (w.serie) return `${Nombre(w.para)} voltea: ${w.serie.total - w.serie.quedan} de ${w.serie.total}…`;
     return `Carta para ${nombre(w.para)}…`;
@@ -427,7 +462,7 @@ export function crearFlip7(ctx) {
       : `<div class="jg-f7-hueco">descarte</div>`);
     const w = est.espera, eli = est.fase === "jugando" && w && w.k === "elige";
     set("f7Vitrina", eli ? "v" + w.id + w.quien : "v-", eli
-      ? htmlCarta(carta(w.id), "jg-f7-grande" + (w.quien === uid ? " jg-f7-mia" : "")) + `<span class="jg-f7-de">${w.quien === uid ? "la tuya" : "de " + esc(nombre(w.quien))}</span>`
+      ? htmlCarta(carta(w.id, {}), "jg-f7-grande" + (w.quien === uid ? " jg-f7-mia" : "")) + `<span class="jg-f7-de">${w.quien === uid ? "la tuya" : "de " + esc(nombre(w.quien))}</span>`
       : `<div class="jg-f7-hueco jg-f7-hueco-g"><b>7</b></div>`);
     const info = est.ronda
       ? `Ronda ${est.ronda} · reparte ${esc(est.reparte === uid ? "tú" : (jugador(est.reparte) || {}).nombre || "—")}`
@@ -441,7 +476,7 @@ export function crearFlip7(ctx) {
     const w = est.espera;
     if (est.fase === "fin") return est.ganador;
     if (!w || fant) return null;
-    return w.k === "decide" ? w.uid : w.k === "elige" ? w.quien : w.para;
+    return w.k === "decide" ? w.uid : w.k === "elige" || w.k === "bono" ? w.quien : w.para;
   }
 
   function mira(u) {
@@ -457,7 +492,7 @@ export function crearFlip7(ctx) {
      toca elegir una carta (robo, descarte o intercambio). */
   function elegibles() {
     const w = est.espera;
-    if (est.fase !== "jugando" || !w || w.k !== "elige" || w.quien !== uid || w.op.tipo === "a") return null;
+    if (est.fase !== "jugando" || !w || w.k !== "elige" || w.quien !== uid || (w.op.tipo !== "c" && w.op.tipo !== "2")) return null;
     const o = {};
     for (const u in w.op.cartas) {
       if (sel1 && w.op.tipo === "2" && u === sel1.u) continue;
@@ -484,8 +519,8 @@ export function crearFlip7(ctx) {
     if (orden !== firmaOrden) {
       firmaOrden = orden;
       sala.classList.toggle("jg-f7-muchos", N > 2);
-      sala.dataset.n = Math.min(8, Math.max(1, N));
-      const pos = PUESTOS[Math.min(8, Math.max(1, N))], m = Math.floor((N - 1) / 2);
+      sala.dataset.n = Math.min(MAX_PUESTOS, Math.max(1, N));
+      const pos = PUESTOS[Math.min(MAX_PUESTOS, Math.max(1, N))], m = Math.floor((N - 1) / 2);
       cont.innerHTML = js.map((j, i) => {
         const [x, y] = pos[(m + i) % pos.length];
         /* Visto desde la cabeza del crupier, que está arriba en el centro. */
@@ -495,13 +530,18 @@ export function crearFlip7(ctx) {
       for (const k in firmas) if (/^f7S\d/.test(k)) delete firmas[k];
     }
     const w = est.espera, el = elegibles();
-    const apuntables = w && w.k === "elige" && w.quien === uid && w.op.tipo === "a" ? w.op.uids : [];
+    /* A quién se puede señalar desde su asiento: el objetivo de una
+       acción, cualquiera de los dos del cambio de manos y, una vez
+       elegido el valor, quien recibe el comodín. */
+    const op = w && w.k === "elige" && w.quien === uid ? w.op : null;
+    const apuntables = !op ? [] : op.tipo === "a" || op.tipo === "p2" || (op.tipo === "n" && comV != null) ? op.uids : [];
     const f = est.finRonda;
+    const com = fant ? (f.com || {}) : (est.com || {});
     js.forEach((j, i) => {
       const fuera = !!(est.fuera || {})[j.uid];
       const l = fant ? Object.assign({ seg: null, congelado: false }, f.lineas[j.uid] || { nums: [], mods: [], estado: "fuera" })
         : est.lineas[j.uid] || { nums: [], mods: [], estado: "fuera" };
-      const turno = !fant && est.fase === "jugando" && w && ((w.k === "decide" && w.uid === j.uid) || (w.k === "elige" && w.quien === j.uid) || (w.k === "roba" && w.para === j.uid));
+      const turno = !fant && est.fase === "jugando" && w && ((w.k === "decide" && w.uid === j.uid) || ((w.k === "elige" || w.k === "bono") && w.quien === j.uid) || (w.k === "roba" && w.para === j.uid));
       const puede = !fant && el && el[j.uid] ? el[j.uid] : [];
       const apunta = !fant && apuntables.includes(j.uid);
       const estado = fuera ? "fuera"
@@ -516,12 +556,22 @@ export function crearFlip7(ctx) {
         + (fuera ? " jg-f7-fuera" : "") + (fant ? " jg-f7-fantasma" : "");
       const pts = est.puntos[j.uid] || 0;
       const vale = fant ? (f.pts[j.uid] || 0) : (est.valor[j.uid] || 0);
+      /* Super Vengeance: lo que le pegaría (o ya le pegó) al total. */
+      const g = !fant && (est.golpe || {})[j.uid], aj = fant ? ((f.aj || {})[j.uid] || 0) : 0;
+      const golpe = g ? `<span class="jg-f7-golpe" title="La ronda no suma nada: los modificadores le pegan al total acumulado">total ${[g.mitad ? "÷2" : "", g.resta ? "−" + Math.abs(g.resta) : ""].filter(Boolean).join(" ")}</span>`
+        : aj ? `<span class="jg-f7-golpe" title="Lo que perdió el total por fuera de la ronda">total −${Math.abs(aj)}</span>` : "";
+      const sel = selU === j.uid;
+      const txtApunta = !apunta ? "" : op.tipo === "p2"
+        ? (sel ? "✓ Quitar" : (selU ? "⇅ con " : "Elegir ") + (j.uid === uid ? "la mía" : j.nombre))
+        : op.tipo === "n"
+          ? `${j.uid === uid ? "A mí" : "A " + j.nombre}: ${comV}${lineaValidaF7(l.nums.concat(w.id), est.modo, Object.assign({}, com, { [w.id]: comV })) ? "" : " · se pasa"}`
+          : j.uid === uid ? "A mí" : "A " + j.nombre;
       const n = l.nums.length;
       const paso = n > 1 ? Math.min(40, (160 - ANCHO) / (n - 1)) : 0;
       const nums = l.nums.map((id, k) => {
         const d = k - (n - 1) / 2;
         const ok = puede.includes(id), s = sel1 && sel1.id === id && sel1.u === j.uid;
-        return htmlCarta(carta(id), (ok ? "jg-f7-elegible" : "") + (s ? " jg-f7-sel" : ""),
+        return htmlCarta(carta(id, com), (ok ? "jg-f7-elegible" : "") + (s ? " jg-f7-sel" : ""),
           ok || s ? `data-u="${esc(j.uid)}" data-id="${id}"` : "",
           `--r:${(d * 4).toFixed(1)}deg;--y:${(d * d * 0.9).toFixed(1)}px;margin-left:${k ? (paso - ANCHO).toFixed(1) : 0}px;z-index:${k + 1}`);
       }).join("");
@@ -531,8 +581,8 @@ export function crearFlip7(ctx) {
       }).join("") + (l.seg != null ? htmlCarta(carta(l.seg), "jg-f7-mini jg-f7-guardada") : "");
       const foto = j.foto && /^(https?:|data:image\/)/.test(j.foto)
         ? `<img src="${esc(j.foto)}" alt="" referrerpolicy="no-referrer">` : esc((j.nombre || "?").charAt(0).toUpperCase());
-      const firma = [fant, j.nombre, j.color, j.foto, l.nums.join(","), l.mods.join(","), l.seg, l.estado, l.f7, l.congelado, pts,
-        vale, turno, apunta, puede.join(","), sel1 && sel1.u === j.uid ? sel1.id : "", fuera, est.reparte === j.uid].join(":");
+      const firma = [fant, j.nombre, j.color, j.foto, l.nums.map(id => id + "=" + (com[id] ?? "")).join(","), l.mods.join(","), l.seg, l.estado, l.f7, l.congelado, pts,
+        vale, golpe, turno, apunta, txtApunta, sel, puede.join(","), sel1 && sel1.u === j.uid ? sel1.id : "", fuera, est.reparte === j.uid].join(":");
       set("f7S" + i, firma, `<div class="${cls}" style="--c:${esc(j.color || "#888")}" ${apunta ? `data-apunta="${esc(j.uid)}"` : ""}>
         <div class="jg-f7-placa">
           <span class="jg-f7-ava">${foto}</span>
@@ -546,9 +596,10 @@ export function crearFlip7(ctx) {
         <div class="jg-f7-pie-j">
           <span class="jg-f7-siete-p" title="Números distintos: ${n} de ${F7_SIETE}">${Array.from({ length: F7_SIETE }, (_, k) => `<i class="${k < n ? "on" : ""}"></i>`).join("")}</span>
           <span class="jg-grow"></span>
-          <span title="${fant ? "Lo que sumó la ronda pasada" : "Lo que se lleva si la ronda acabara ahora"}">${fant ? "sumó" : "vale"} <b>${fant ? "+" : ""}${vale}</b></span>
+          ${golpe && !vale ? "" : `<span title="${fant ? "Lo que sumó la ronda pasada" : "Lo que se lleva si la ronda acabara ahora"}">${fant ? "sumó" : "vale"} <b>${fant ? "+" : ""}${vale}</b></span>`}
+          ${golpe}
         </div>
-        ${apunta ? `<button class="jg-btn jg-f7-apunta" data-apunta="${esc(j.uid)}">${j.uid === uid ? "A mí" : "A " + esc(j.nombre)}</button>` : ""}
+        ${apunta ? `<button class="jg-btn jg-f7-apunta${sel ? " jg-f7-apunta-sel" : ""}" data-apunta="${esc(j.uid)}">${esc(txtApunta)}</button>` : ""}
       </div>`);
     });
   }
@@ -566,10 +617,19 @@ export function crearFlip7(ctx) {
         <button class="jg-btn jg-f7-planta" id="f7Planta"${w.cero || !listo ? " disabled" : ""}><span>✊</span> Plantarme con ${est.valor[uid] || 0}</button>
         <span class="jg-nota">${w.cero ? "Tienes el Cero: no puedes plantarte. O haces Flip 7, o esta ronda no suma." : "Si repites un número te pasas y la ronda no te da nada."}</span>`;
     } else if (w && w.k === "elige" && w.quien === uid) {
-      const c = carta(w.id);
-      firma = "eli" + w.id + (sel1 ? sel1.u + sel1.id : "");
-      html = `${htmlCarta(c, "jg-f7-mini")}<span class="jg-nota">${esc(textoEleccion(c, w.op))}</span>
-        ${sel1 ? `<button class="jg-btn jg-f7-anula" id="f7Anula">Cambiar la primera</button>` : ""}`;
+      const c = carta(w.id, {});
+      firma = "eli" + w.id + (sel1 ? sel1.u + sel1.id : "") + ":" + selU + ":" + comV + enviando;
+      /* El comodín: primero el número, luego a quién (en su asiento). */
+      const valores = w.op.tipo === "n"
+        ? `<span class="jg-f7-comv">${Array.from({ length: w.op.max + 1 }, (_, v) =>
+          `<button class="jg-btn${v === comV ? " jg-f7-comv-on" : ""}" data-comv="${v}">${v}</button>`).join("")}</span>` : "";
+      html = `${htmlCarta(c, "jg-f7-mini")}<span class="jg-nota">${esc(textoEleccion(c, w.op))}</span>${valores}
+        ${sel1 || selU ? `<button class="jg-btn jg-f7-anula" id="f7Anula">Cambiar la primera</button>` : ""}`;
+    } else if (w && w.k === "bono" && w.quien === uid) {
+      firma = "bono" + w.uids.join(",") + enviando;
+      html = `<button class="jg-btn jg-f7-planta" data-bono="${esc(uid)}"${enviando ? " disabled" : ""}><span>＋</span> Sumarme ${F7_BONO}</button>
+        ${w.uids.map(u => `<button class="jg-btn jg-f7-castiga" data-bono="${esc(u)}"${enviando ? " disabled" : ""}>−${F7_BONO} a ${esc(nombre(u))}</button>`).join("")}
+        <span class="jg-nota">Los ${F7_BONO} de tu Flip 7: para ti, o quitados del total de otro (sin bajar de cero).</span>`;
     } else {
       const ag = aguardados(), largo = ag.length && Date.now() - esperaDesde > AVISO_ESPERA;
       const seg = largo ? Math.round((Date.now() - esperaDesde) / 5000) * 5 : 0;
@@ -589,14 +649,17 @@ export function crearFlip7(ctx) {
   function aguardados() {
     const w = est && est.espera;
     if (!w || est.fase !== "jugando") return [];
-    const u = w.k === "decide" ? [w.uid] : w.k === "elige" ? [w.quien] : (w.faltan || []);
+    const u = w.k === "decide" ? [w.uid] : w.k === "elige" || w.k === "bono" ? [w.quien] : (w.faltan || []);
     return u.filter(x => x !== uid);
   }
 
   function textoEleccion(c, op) {
     if (c.k === "m") return `¿A quién le pones ${nombreCarta(c)}?`;
     if (op.tipo === "2") return sel1 ? "Ahora una carta de otro jugador para intercambiarlas." : "Elige dos cartas de dos jugadores distintos para intercambiarlas.";
+    if (op.tipo === "p2") return selU ? `Ahora la otra mano: ${selU === uid ? "la tuya" : "la de " + nombre(selU)} se cambia entera por ella.` : "Elige dos jugadores (puedes ser tú): se cambian la mano entera.";
+    if (op.tipo === "n") return comV == null ? "Elige qué número vale el comodín…" : `Vale ${comV}: ¿a quién se lo pones? Si ya tiene un ${comV}, se pasa.`;
     return {
+      mata: "¿A quién fulminas? Se queda la ronda sin nada, como si se hubiera pasado.",
       congela: "¿A quién congelas? Se planta con lo que tiene.",
       tres: "¿Quién voltea tres cartas seguidas?",
       cuatro: "¿Quién voltea cuatro cartas seguidas?",
@@ -610,7 +673,8 @@ export function crearFlip7(ctx) {
   /* El historial va en tercera persona: con «tú» cada verbo tendría que
      conjugarse aparte, y «Tú pide carta» es lo que salía. */
   function textoSuceso(h) {
-    const c = h.id != null ? nombreCarta(carta(h.id)) : "";
+    /* Un comodín que sale del mazo todavía no vale nada. */
+    const c = h.id != null ? nombreCarta(carta(h.id, h.e === "carta" || h.e === "aparta" || h.e === "nada" ? {} : undefined)) : "";
     const nombre = u => ((jugador(u) || {}).nombre || "alguien") + (u === uid ? " (tú)" : "");
     const Nombre = nombre, mismo = h.a === h.uid;
     switch (h.e) {
@@ -620,7 +684,13 @@ export function crearFlip7(ctx) {
       case "planta": return `${Nombre(h.uid)} se planta.`;
       case "pasa": return `${Nombre(h.uid)} se pasa${c ? ` con ${c}` : ""}.`;
       case "salva": return `${Nombre(h.uid)} gasta la segunda oportunidad contra ${c}.`;
-      case "f7": return `¡${Nombre(h.uid)} hace Flip 7! +15`;
+      case "f7": return `¡${Nombre(h.uid)} hace Flip 7!${est.modo === "super" ? "" : " +" + F7_BONO}`;
+      case "bono": return h.a === h.uid ? `${Nombre(h.uid)} se suma los ${F7_BONO} del Flip 7.` : `${Nombre(h.uid)} le quita ${F7_BONO} del total a ${nombre(h.a)}.`;
+      case "mata": return `${Nombre(h.uid)} fulmina a ${nombre(h.a)}: se queda la ronda sin nada.`;
+      case "trueca": return h.a === h.uid || h.b === h.uid
+        ? `${Nombre(h.uid)} cambia su mano entera por la de ${nombre(h.a === h.uid ? h.b : h.a)}.`
+        : `${Nombre(h.uid)} cambia las manos de ${nombre(h.a)} y ${nombre(h.b)}.`;
+      case "comodin": return h.a === h.uid ? `${Nombre(h.uid)} se pone el comodín como un ${h.v}.` : `${Nombre(h.uid)} le pone el comodín a ${nombre(h.a)} como un ${h.v}.`;
       case "gafe": return `El 7 gafe deja a ${nombre(h.uid)} solo con el 7.`;
       case "aparta": return `${Nombre(h.uid)} aparta ${c} hasta acabar la serie.`;
       case "da": return mismo ? `${Nombre(h.uid)} se queda ${c}.` : `${Nombre(h.uid)} le pone ${c} a ${nombre(h.a)}.`;
@@ -786,7 +856,7 @@ export function crearFlip7(ctx) {
     if (!fx) return;
     const b = document.createElement("div");
     b.className = "jg-f7-banner";
-    b.innerHTML = `<b>¡FLIP 7!</b><span>${esc(Nombre(u))} · +15</span>`;
+    b.innerHTML = `<b>¡FLIP 7!</b><span>${esc(Nombre(u))} · ${est && est.modo === "super" ? `+${F7_BONO} o −${F7_BONO} a otro` : "+" + F7_BONO}</span>`;
     fx.appendChild(b);
     luego(() => b.remove(), 2400);
     if (quieto()) return;
@@ -820,6 +890,13 @@ export function crearFlip7(ctx) {
         case "da": sello(h.a, nombreCarta(carta(h.id)), "", pila); oye.add("ficha"); break;
         case "tres": case "cuatro": sello(h.a, h.e === "tres" ? "Voltea 3" : "Voltea 4", "", pila); oye.add("ficha"); break;
         case "otra": sello(h.a, "Una más", "", pila); oye.add("ficha"); break;
+        case "mata": sello(h.a, "☠ Fulminado", "jg-f7-sello-rojo", pila); sacude(h.a); oye.add("revienta"); break;
+        case "trueca": sello(h.a, "⇅", "jg-f7-sello-verde", pila); sello(h.b, "⇅", "jg-f7-sello-verde", pila); oye.add("golpe"); break;
+        case "comodin": sello(h.a, "★ " + h.v, "", pila); oye.add("ficha"); break;
+        case "bono":
+          if (h.a === h.uid) { sello(h.uid, "+" + F7_BONO, "jg-f7-sello-oro", pila); oye.add("gana"); }
+          else { sello(h.a, "−" + F7_BONO, "jg-f7-sello-rojo", pila); sacude(h.a); oye.add("golpe"); }
+          break;
       }
     }
     const orden = ["flip7", "revienta", "gana", "pierde", "hielo", "golpe", "planta", "ficha"];
@@ -865,12 +942,14 @@ export function crearFlip7(ctx) {
       const fuera = (est.fuera || {})[j.uid];
       const tag = l.f7 ? ["Flip 7", "oro"] : fuera || l.estado === "fuera" ? ["fuera", "gris"] : l.estado === "pasa" ? ["se pasó", "rojo"]
         : l.estado === "planta" ? ["plantado", "verde"] : ["en pie", "verde"];
-      const minis = l.nums.concat(l.mods).map(id => htmlCarta(carta(id), "jg-f7-mini")).join("");
+      const minis = l.nums.concat(l.mods).map(id => htmlCarta(carta(id, f.com || {}), "jg-f7-mini")).join("");
+      const aj = (f.aj || {})[j.uid] || 0;
+      const castiga = l.f7 && l.bono ? ` title="Usó su Flip 7 para quitarle ${F7_BONO} a ${esc(nombre(l.bono))}"` : "";
       return `<div class="jg-f7-res-f${j.uid === est.ganador && fin ? " jg-f7-res-gana" : ""}" style="--c:${esc(j.color || "#888")}">
         <span class="jg-f7-res-n"><i></i>${esc(j.uid === uid ? "Tú" : j.nombre)}</span>
         <span class="jg-f7-res-c">${minis || '<span class="jg-nota">—</span>'}</span>
-        <span class="jg-f7-res-tag jg-f7-tag-${tag[1]}">${tag[0]}</span>
-        <span class="jg-f7-res-p">+${f.pts[j.uid] || 0}</span>
+        <span class="jg-f7-res-tag jg-f7-tag-${tag[1]}"${castiga}>${tag[0]}${castiga ? " ☠" : ""}</span>
+        <span class="jg-f7-res-p">+${f.pts[j.uid] || 0}${aj ? `<small title="Lo que perdió el total por fuera de la ronda">−${Math.abs(aj)}</small>` : ""}</span>
         <span class="jg-f7-res-t2"><b>${f.total[j.uid] || 0}</b>/${est.meta}</span>
       </div>`;
     }).join("");
@@ -916,10 +995,23 @@ export function crearFlip7(ctx) {
     const w = est.espera;
     if (ev.target.closest("#f7Pide")) { pide(); return; }
     if (ev.target.closest("#f7Planta")) { manda({ t: "planta", uid }); return; }
-    if (ev.target.closest("#f7Anula")) { sel1 = null; pinta(); return; }
+    if (ev.target.closest("#f7Anula")) { sel1 = null; selU = null; pinta(); return; }
+    const bono = ev.target.closest("[data-bono]");
+    if (bono && w && w.k === "bono" && w.quien === uid) { manda({ t: "bono", uid, a: bono.getAttribute("data-bono") }); return; }
     if (!w || w.k !== "elige" || w.quien !== uid) return;
+    const cv = ev.target.closest("[data-comv]");
+    if (cv && w.op.tipo === "n") { comV = Number(cv.getAttribute("data-comv")); suena("clic"); pinta(); return; }
     const a = ev.target.closest("[data-apunta]");
     if (a && w.op.tipo === "a") { manda({ t: "apunta", uid, a: a.getAttribute("data-apunta") }); return; }
+    if (a && w.op.tipo === "n" && comV != null) { manda({ t: "apunta", uid, a: a.getAttribute("data-apunta"), v: comV }); return; }
+    if (a && w.op.tipo === "p2") {
+      const u = a.getAttribute("data-apunta");
+      if (selU === u) { selU = null; pinta(); return; }
+      if (!selU) { selU = u; suena("clic"); pinta(); return; }
+      const primero = selU; selU = null;
+      manda({ t: "apunta", uid, a: primero, b: u });
+      return;
+    }
     const c = ev.target.closest(".jg-f7-c[data-id]");
     if (!c) return;
     const u = c.getAttribute("data-u"), id = Number(c.getAttribute("data-id"));
@@ -1076,6 +1168,10 @@ export function crearFlip7(ctx) {
     }
     const w = est.espera;
     if (sel1 && !(w && w.k === "elige" && w.quien === uid && w.op.tipo === "2")) sel1 = null;
+    /* El valor del comodín y la primera mano del cambio valen para esta
+       carta y nada más: con la siguiente elección se empieza de cero. */
+    const eleccionN = w && w.k === "elige" && w.quien === uid ? w.id + ":" + est.n : "";
+    if (eleccionN !== eleccionVista) { eleccionVista = eleccionN; comV = null; selU = null; }
     const fe = !w || est.fase !== "jugando" ? "" : w.k === "roba" ? "r" + w.n + ":" + (w.faltan || []).join(",") : w.k + (w.uid || w.quien) + est.n;
     if (fe !== esperaFirma) { esperaFirma = fe; esperaDesde = Date.now(); }
 

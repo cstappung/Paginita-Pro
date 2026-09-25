@@ -184,9 +184,9 @@ test('Reacción en cadena: 200 partidas al azar terminan con un solo color',()=>
   assert.deepEqual(copia(e),copia(reducir(copia(p))));
  }
 });
-test('cupos: cuadritos hasta diez, worms, cadena y flip7 hasta ocho, duelos a dos',()=>{
+test('cupos: cuadritos y flip7 hasta diez, worms y cadena hasta ocho, duelos a dos',()=>{
  const {cupoDe}=context;
- for(const [j,max] of [['cuadritos',10],['worms',8],['cadena',8],['flip7',8],['reversi',2],['cartas',2],['escondite',2]]){
+ for(const [j,max] of [['cuadritos',10],['worms',8],['cadena',8],['flip7',10],['reversi',2],['cartas',2],['escondite',2]]){
   assert.equal(cupoDe({juego:j,cupo:99}),max,j+' tope');
   assert.equal(cupoDe({juego:j,cupo:max}),max,j+' justo en el tope');
  }

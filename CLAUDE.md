@@ -52,7 +52,7 @@ Six apps plus a small shared **Informes** page:
   boxes, two to ten players and three board sizes), **Reversi**, **Órbita**,
   **Chain Reaction** (critical-mass orbs that burst into their neighbours, two
   to eight players and three grid sizes), **Flip 7** (the push-your-luck card
-  game, two to eight players, normal and "Vengeance" mode) and **Circuit
+  game, two to ten players, Normal, Vengeance and Super Vengeance) and **Circuit
   Breakers** (a Worms-style artillery game for two to eight squads, in an
   iframe), plus a
   **Clasificación** tab. See "Juegos" below.
@@ -1508,9 +1508,11 @@ game stops working, not a round number:
   4×4 board is thin, which is the host's choice to make.
 - **cadena, 8.** Colour is by seat (`PALETA`), and eight is how many tones can
   still be told apart at a glance on an orb.
-- **flip7, 8.** Eight seats is what fits on the half moon without overlapping
-  (`PUESTOS`); the deck holds up, and `tests/flip7.test.cjs` plays robot games
-  up to eight to prove it.
+- **flip7, 10.** Past eight the half moon stops being a diagonal: nine and
+  ten sit three per side plus a row along the bottom, in a 1260 px room with
+  150 px seats (`PUESTOS`) — following the diagonal to the bottom stacked
+  the lower seats on top of each other. The deck holds up (it reshuffles the
+  discard), and `tests/flip7.test.cjs` plays robot games up to ten to prove it.
 - **worms, 8.** Eight squads of six spawn on all four maps; at ten `tidal`
   runs out of ground. The frame's `engine.js` carries eight colours, eight
   team names and 48 engineers' names, and clamps humans/bots to eight.
@@ -1965,6 +1967,43 @@ which someone reaches `F7_META` (200), and the highest total wins — not the fi
 to cross; a tie at the top plays one more round. `tests/flip7.test.cjs` plays 30 full robot games per mode and
 checks that each one ends, pays out what `rondas` says and passes the audit,
 and that a forged contribution or seed is caught and attributed to the forger.
+The labels are in `MODOS_F7` ("Normal", "Vengeance", "Super Vengeance"); the
+stored keys stay `normal`/`venganza`/`super`, because `venganza` is already
+written in existing rooms and in the rules' `modo` whitelist.
+
+**Super Vengeance (`super`) is Vengeance plus 24 cards and two rules.** The
+deck is Vengeance's 108 **in the same order** with the new ones appended
+(132 in all), so Vengeance's card indices never move. What it adds:
+
+- **Fourteen 14s** (`catorce`): twelve worth 14, one −14, one 0, and any two
+  of them bust whatever they are worth — repeats are counted by `claveF7`,
+  which is the value except for a 14. The −14 can drag the numbers below
+  zero; the round is floored at 0.
+- **Three Second Chances, two Cambio de manos (`trueca`), two Fulminar
+  (`mata`), three Comodín.** `trueca` swaps two players' whole hand (numbers,
+  modifiers, stored Second Chance — not planted/frozen, which belong to the
+  seat); the chooser may be one of the two (choice type `p2`). `mata` busts
+  any other player still standing. The comodín (choice type `n`) is played on
+  anyone standing as a number 0–14 the player picks; it lives in `nums` like
+  any number (`esNumeroF7`), and its value is **not in the card** but in the
+  round's `com` map (id → value), because the same card can come back later
+  worth something else. That map is looked up by id, so it travels with the
+  card through a Steal or a Swap, and it is snapshotted into `finRonda.com` for
+  the ghost view and the summary.
+- **Negative modifiers hit the total when the round scores nothing**
+  (`golpeF7`): if the numbers add up to 0 — busted, killed, Cero without
+  Flip 7, no numbers — the ÷2 and the minuses apply to the accumulated total
+  instead (`aplicaGolpeF7`, floored at 0) at round close. `rondas[].aj` records
+  what the total lost outside the round, so `Σ(pts + aj)` is still each
+  player's total.
+- **Flip 7 is a choice** (espera `bono`, move `{t:"bono", a}`): before the
+  round closes the Flip 7 player picks `+15` for themselves (`a` = own uid) or
+  `−15` off another seated player's total (floored at 0). It is stored in
+  `l.bono` (`""` for self, the victim's uid otherwise) and `valorLineaF7` drops
+  the 15 when it is a uid.
+
+The `super` mode value needed the rules' `modo` `.validate` widened, so it
+needs the rules re-published before a Super room can be created.
 
 **The Flip 7 screen is a round table with a croupier, and everything on it is
 retold from `hist`.** `redFlip7` keeps the last 40 events (`hist`, each with an
@@ -1983,7 +2022,8 @@ never the state — the state says where a card *is*, the history says that it
   end ones through the rail. With an even count "you" sit at index
   `⌊(N−1)/2⌋`, i.e. just right of centre beside another seat. Five to eight
   players get compact seats (smaller cards, `.jg-f7-sala[data-n]`), seven
-  and eight a taller room (980 px) and narrower seats, and the room's height
+  and eight a taller room (980 px) and narrower seats, nine and ten 1260 px
+  and narrower still, and the room's height
   per count lives in two
   places that must agree: the CSS `[data-n]` rule and `ALTO_SALA`, which the
   head-turn angle is computed with. `.jg-f7-sala` has only absolutely

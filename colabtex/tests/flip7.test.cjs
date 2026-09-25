@@ -2,9 +2,25 @@ const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),vm=require('node:vm');
 const code=fs.readFileSync('src/juegos/motor.js','utf8').replace(/\bexport\s+/g,'');
-const context={crypto:require('node:crypto').webcrypto,TextEncoder};vm.createContext(context);vm.runInContext(code+';Object.assign(this,{mazoF7,modoF7,F7_META});',context);
-const {reducir,mazoF7,lineaValidaF7,valorLineaF7,aporteF7,compromiso,auditaFlip7,progreso,meToca}=context;
-const nombres=['a','b','c','d','e','f','g','h'];
+const context={crypto:require('node:crypto').webcrypto,TextEncoder};vm.createContext(context);vm.runInContext(code+';Object.assign(this,{mazoF7,modoF7,F7_META,golpeF7,aplicaGolpeF7});',context);
+const {reducir,mazoF7,lineaValidaF7,valorLineaF7,aporteF7,compromiso,auditaFlip7,progreso,meToca,golpeF7,aplicaGolpeF7}=context;
+const nombres=['a','b','c','d','e','f','g','h','i','j'];
+const MODOS=['normal','venganza','super'];
+
+/* Lo que elige un robot cuando una carta le pide objetivo, para todos
+   los tipos de elección: `k` decide cuál de las opciones (un contador o
+   un azar). */
+function eleccion(o,k){
+ const de=(xs,m=0)=>xs[Math.abs(Math.floor(k()*1e6)+m)%xs.length];
+ if(o.tipo==='a')return {a:de(o.uids)};
+ if(o.tipo==='n')return {a:de(o.uids),v:Math.floor(k()*(o.max+1))};
+ if(o.tipo==='p2'){const a=de(o.uids);return {a,b:de(o.uids.filter(x=>x!==a),1)};}
+ if(o.tipo==='c'){const ks=Object.keys(o.cartas),u=de(ks);return {a:u,c:de(o.cartas[u])};}
+ const [a,b]=Object.keys(o.cartas);return {a,b,c:o.cartas[a][0],d:o.cartas[b][0]};
+}
+/* El bono del Flip 7 en Super Vengeance: sumárselo o quitárselo a otro. */
+const bono=(w,k)=>({t:'bono',uid:w.quien,a:k()<0.5?w.quien:w.uids[Math.floor(k()*w.uids.length)]});
+const cuenta=n=>{let i=n;return()=>((i++*0.61803398875)%1);};
 
 async function sala(modo,nj,semilla){
  const p={juego:'flip7',modo,semilla,estado:'jugando',cupo:nj,jugadores:{},jugadas:{}};
@@ -20,10 +36,11 @@ const mover=(p,j)=>{p.jugadas[String(Object.keys(p.jugadas).length).padStart(4,'
    se los piden — lo mismo que hará la pantalla. */
 async function juega(modo,nj,semilla,{trampa}={}){
  const {p,sec}=await sala(modo,nj,semilla);
- let e=reducir(p),pasos=0,mintio=false;
+ let e=reducir(p),pasos=0,mintio=false;const k=cuenta(semilla),vistos=new Set();
  while(e.fase==='jugando'){
   assert.ok(++pasos<20000,'la partida no termina');
   const w=e.espera;assert.ok(w,'jugando sin nada que esperar');
+  vistos.add(w.k==='elige'?'elige:'+(mazoF7(modo)[w.id].a||'mod'):w.k);
   if(w.k==='roba'){
    const u=w.faltan[0];let v=await aporteF7(sec[u].sem,sec[u].sal,w.n);
    if(trampa&&u===trampa&&w.n>=3&&!mintio){v=(v+1)>>>0;mintio=true;}
@@ -33,18 +50,25 @@ async function juega(modo,nj,semilla,{trampa}={}){
    if(!w.cero&&val>=((semilla+pasos)%3===0?15:25))e=mover(p,{t:'planta',uid:u});
    else e=mover(p,{t:'pide',uid:u,n:e.n,v:await aporteF7(sec[u].sem,sec[u].sal,e.n)});
   }else if(w.k==='elige'){
-   const o=w.op;
-   if(o.tipo==='a')e=mover(p,{t:'apunta',uid:w.quien,a:o.uids[pasos%o.uids.length]});
-   else if(o.tipo==='c'){const u=Object.keys(o.cartas)[0];e=mover(p,{t:'apunta',uid:w.quien,a:u,c:o.cartas[u][0]});}
-   else{const [a,b]=Object.keys(o.cartas);e=mover(p,{t:'apunta',uid:w.quien,a,b,c:o.cartas[a][0],d:o.cartas[b][0]});}
+   e=mover(p,{t:'apunta',uid:w.quien,...eleccion(w.op,k)});
+  }else if(w.k==='bono'){
+   e=mover(p,bono(w,k));
   }else assert.fail('espera desconocida '+w.k);
  }
- return {p,sec,e};
+ return {p,sec,e,vistos};
 }
 
-test('mazos: 94 cartas en normal y 108 con venganza',()=>{
- const N=mazoF7('normal'),V=mazoF7('venganza');
- assert.equal(N.length,94);assert.equal(V.length,108);
+test('mazos: 94 cartas en normal, 108 en Vengeance y 132 en Super Vengeance',()=>{
+ const N=mazoF7('normal'),V=mazoF7('venganza'),S=mazoF7('super');
+ assert.equal(N.length,94);assert.equal(V.length,108);assert.equal(S.length,132);
+ // Super es Vengeance con 24 cartas detrás: los índices de Vengeance no se mueven
+ assert.ok(V.every((c,i)=>JSON.stringify(c)===JSON.stringify(S[i])));
+ const catorces=S.filter(c=>c.catorce);
+ assert.equal(catorces.length,14);
+ assert.deepEqual([...catorces.map(c=>c.v)].sort((a,b)=>a-b),[-14,0,14,14,14,14,14,14,14,14,14,14,14,14]);
+ const acc=a=>S.filter(c=>c.a===a).length;
+ assert.equal(acc('segunda'),3);assert.equal(acc('trueca'),2);assert.equal(acc('mata'),2);assert.equal(acc('comodin'),3);
+ assert.ok(S.every((c,i)=>c.i===i));
  assert.equal(N.filter(c=>c.k==='n'&&c.v===12).length,12);
  assert.equal(V.filter(c=>c.k==='n'&&c.v===13).length,13);
  assert.equal(V.filter(c=>c.gafe).length,1);assert.equal(V.filter(c=>c.suerte).length,1);assert.equal(V.filter(c=>c.cero).length,1);
@@ -96,15 +120,23 @@ test('fuera de turno no cuenta; el Cero no deja plantarse',async()=>{
  }
 });
 
-for(const modo of ['normal','venganza'])test(`partidas completas (${modo}) terminan y pasan la auditoría`,async()=>{
+for(const modo of MODOS)test(`partidas completas (${modo}) terminan y pasan la auditoría`,async()=>{
  let ganadas=0;
  for(let s=1;s<=30;s++){
-  const nj=2+s%7;
+  const nj=2+s%9;
   const {p,sec,e}=await juega(modo,nj,s);
   assert.equal(e.fase,'fin');assert.equal(e.motivo,'flip7');
   assert.ok(e.puntos[e.ganador]>=200);
   assert.ok(Object.entries(e.puntos).every(([u,v])=>u===e.ganador||v<e.puntos[e.ganador]));
-  assert.equal(e.rondas.reduce((a,r)=>a+r.pts[e.ganador],0),e.puntos[e.ganador]);
+  assert.ok(Object.values(e.puntos).every(v=>v>=0),'un total bajo cero');
+  // el total es lo que dieron las rondas más lo que le quitaron por fuera (sólo en Super)
+  for(const u of Object.keys(sec)){
+   const aj=e.rondas.reduce((a,r)=>a+((r.aj||{})[u]||0),0);
+   if(modo!=='super')assert.equal(aj,0);
+   if(!e.fuera[u])assert.ok(aj<=0);
+  }
+  for(const u of Object.keys(sec))
+   assert.equal(e.rondas.reduce((a,r)=>a+r.pts[u]+((r.aj||{})[u]||0),0),e.puntos[u]);
   // sin revelar: aún no hay faltas mientras la partida no esté cerrada
   assert.equal((await auditaFlip7(p,e)).length,0);
   p.fin={ganador:e.ganador};
@@ -150,7 +182,8 @@ test('progreso sube con los puntos',async()=>{
   const w=e.espera;
   if(w.k==='roba'){const u=w.faltan[0];e=mover(p,{t:'r',uid:u,n:w.n,v:await aporteF7(sec[u].sem,sec[u].sal,w.n)});}
   else if(w.k==='decide')e=mover(p,e.valor[w.uid]>=20&&!w.cero?{t:'planta',uid:w.uid}:{t:'pide',uid:w.uid,n:e.n,v:await aporteF7(sec[w.uid].sem,sec[w.uid].sal,e.n)});
-  else{const o=w.op;e=mover(p,o.tipo==='a'?{t:'apunta',uid:w.quien,a:o.uids[0]}:{t:'apunta',uid:w.quien,a:Object.keys(o.cartas)[0],c:Object.values(o.cartas)[0][0]});}
+  else if(w.k==='bono')e=mover(p,bono(w,cuenta(pasos)));
+  else e=mover(p,{t:'apunta',uid:w.quien,...eleccion(w.op,cuenta(pasos))});
  }
  if(e.fase==='jugando'&&Math.max(...Object.values(e.puntos))>0)assert.ok(progreso(e,'flip7')>0);
 });
@@ -219,7 +252,7 @@ test('suplentes: dos en la mesa no tienen suplente; quien se fue no cuenta',asyn
 function azar(s){return()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
 test('fuzz: robos con suplentes, ruido, abandonos y un jugador dormido',async()=>{
  for(let s=1;s<=60;s++){
-  const R=azar(s),modo=s%2?'normal':'venganza',nj=2+s%7;
+  const R=azar(s),modo=MODOS[s%3],nj=2+s%9;
   const {p,sec}=await sala(modo,nj,s);
   const dormido=nj>=3&&s%3===0?nombres[s%nj]:null,abandonos=!dormido&&s%2===0;
   let e=reducir(p),pasos=0;
@@ -243,10 +276,11 @@ test('fuzz: robos con suplentes, ruido, abandonos y un jugador dormido',async()=
     e=mover(p,await aporte(sec,u,w.n));
    }else if(w.k==='decide'){const u=w.uid;
     e=mover(p,!w.cero&&R()<0.25?{t:'planta',uid:u}:{t:'pide',uid:u,n:e.n,v:await aporteF7(sec[u].sem,sec[u].sal,e.n)});
+   }else if(w.k==='bono'){e=mover(p,bono(w,R));
+    assert.ok(!(e.espera&&e.espera.k==='bono'&&e.espera.quien===w.quien),`semilla ${s}: bono válido rechazado`);
    }else{const o=w.op;let j;
-    if(o.tipo==='a')j={a:o.uids[Math.floor(R()*o.uids.length)]};
-    else if(o.tipo==='c'){const ks=Object.keys(o.cartas),u=ks[Math.floor(R()*ks.length)];j={a:u,c:o.cartas[u][Math.floor(R()*o.cartas[u].length)]};}
-    else{const [a,b]=Object.keys(o.cartas).sort(()=>R()-.5);j={a,b,c:o.cartas[a][0],d:o.cartas[b][0]};}
+    if(o.tipo==='2'){const [a,b]=Object.keys(o.cartas).sort(()=>R()-.5);j={a,b,c:o.cartas[a][0],d:o.cartas[b][0]};}
+    else j=eleccion(o,R);
     const nn=e.n;e=mover(p,{t:'apunta',uid:w.quien,...j});
     assert.ok(!(JSON.stringify(e.espera)===JSON.stringify(w)&&e.n===nn),`semilla ${s}: apunta válido rechazado`);}
   }
@@ -262,7 +296,7 @@ test('fuzz: robos con suplentes, ruido, abandonos y un jugador dormido',async()=
    sentado pueda cumplir, hasta acabar. */
 test('flip7: nadie que se va, por su pie o expulsado, deja la mesa colgada',async()=>{
  for(let s=1;s<=120;s++){
-  const modo=s%2?'normal':'venganza',nj=2+(s%7);
+  const modo=MODOS[s%3],nj=2+(s%9);
   const {p,sec}=await sala(modo,nj,s*31);
   let e=reducir(p),pasos=0,cortes=0;
   const corteEn=new Set([5+(s%17),40+(s%23),90+(s%11)]);
@@ -286,13 +320,68 @@ test('flip7: nadie que se va, por su pie o expulsado, deja la mesa colgada',asyn
     const u=w.uid;
     if(!w.cero&&e.valor[u]>=20)e=mover(p,{t:'planta',uid:u});
     else e=mover(p,{t:'pide',uid:u,n:e.n,v:await aporteF7(sec[u].sem,sec[u].sal,e.n)});
-   }else{
-    const o=w.op;
-    if(o.tipo==='a')e=mover(p,{t:'apunta',uid:w.quien,a:o.uids[0]});
-    else if(o.tipo==='c'){const u=Object.keys(o.cartas)[0];e=mover(p,{t:'apunta',uid:w.quien,a:u,c:o.cartas[u][0]});}
-    else{const [a,b]=Object.keys(o.cartas);e=mover(p,{t:'apunta',uid:w.quien,a,b,c:o.cartas[a][0],d:o.cartas[b][0]});}
-   }
+   }else if(w.k==='bono')e=mover(p,bono(w,cuenta(pasos)));
+   else e=mover(p,{t:'apunta',uid:w.quien,...eleccion(w.op,cuenta(pasos))});
   }
   assert.equal(e.fase,'fin','semilla '+s);
+ }
+});
+
+/* Super Vengeance, regla a regla, sobre las funciones puras. */
+test('super: los catorce chocan entre sí valgan lo que valgan, y el comodín vale lo que se eligió',()=>{
+ const S=mazoF7('super'),ids=f=>S.map((c,i)=>f(c)?i:-1).filter(i=>i>=0);
+ const [menos,cero,c14]=[ids(c=>c.catorce&&c.v===-14)[0],ids(c=>c.catorce&&c.v===0)[0],ids(c=>c.catorce&&c.v===14)[0]];
+ const nueve=ids(c=>c.k==='n'&&c.v===9)[0],cinco=ids(c=>c.k==='n'&&c.v===5)[0],com=ids(c=>c.a==='comodin')[0];
+ assert.equal(lineaValidaF7([menos,nueve],'super'),true);
+ assert.equal(lineaValidaF7([menos,cero],'super'),false);
+ assert.equal(lineaValidaF7([cero,c14],'super'),false);
+ // el comodín: 5 choca con un 5, 14 choca con cualquier catorce, 6 no choca con nada
+ assert.equal(lineaValidaF7([cinco,com],'super',{[com]:5}),false);
+ assert.equal(lineaValidaF7([menos,com],'super',{[com]:14}),false);
+ assert.equal(lineaValidaF7([cinco,com],'super',{[com]:6}),true);
+ assert.equal(valorLineaF7({nums:[cinco,com],mods:[],estado:'planta'},'super',{[com]:6}),11);
+ // el −14 resta, pero la ronda no baja de cero
+ assert.equal(valorLineaF7({nums:[nueve,menos],mods:[],estado:'planta'},'super'),0);
+ assert.equal(valorLineaF7({nums:[nueve,c14,menos],mods:[],estado:'planta'},'super'),9);
+});
+
+test('super: los negativos pegan a la ronda y, si la ronda no suma, al total',()=>{
+ const S=mazoF7('super'),id=f=>S.findIndex(f);
+ const nueve=id(c=>c.k==='n'&&c.v===9),mitad=id(c=>c.mitad),m10=id(c=>c.k==='m'&&c.v===-10),m2=id(c=>c.k==='m'&&c.v===-2),cero=id(c=>c.cero);
+ // con números: como en Vengeance, y nada al total
+ assert.equal(valorLineaF7({nums:[nueve],mods:[mitad,m2],estado:'planta'},'super'),2);
+ assert.equal(golpeF7({nums:[nueve],mods:[mitad,m2],estado:'planta'},'super'),null);
+ // pasado, con el Cero o sin números: al total
+ for(const l of [{nums:[nueve],mods:[m10],estado:'pasa'},{nums:[nueve,cero],mods:[m10],estado:'planta'},{nums:[],mods:[m10],estado:'activo'}]){
+  assert.equal(valorLineaF7(l,'super'),0);
+  assert.deepEqual({...golpeF7(l,'super')},{mitad:false,resta:-10});
+  assert.equal(golpeF7(l,'venganza'),null);
+ }
+ assert.equal(aplicaGolpeF7(30,{mitad:false,resta:-10}),20);
+ assert.equal(aplicaGolpeF7(31,{mitad:true,resta:-2}),13);
+ assert.equal(aplicaGolpeF7(4,{mitad:false,resta:-10}),0);
+ // sin modificadores no hay golpe, y quien se fue tampoco lo recibe
+ assert.equal(golpeF7({nums:[],mods:[],estado:'pasa'},'super'),null);
+ assert.equal(golpeF7({nums:[],mods:[m10],estado:'fuera'},'super'),null);
+});
+
+test('super: el Flip 7 da +15 o se lo quita a otro',()=>{
+ const S=mazoF7('super');
+ const siete=[1,2,3,4,5,6,8].map(v=>S.findIndex(c=>c.k==='n'&&c.v===v&&!c.gafe));
+ assert.equal(valorLineaF7({nums:siete,mods:[],estado:'planta',f7:true,bono:null},'super'),29+15);
+ assert.equal(valorLineaF7({nums:siete,mods:[],estado:'planta',f7:true,bono:''},'super'),29+15);
+ assert.equal(valorLineaF7({nums:siete,mods:[],estado:'planta',f7:true,bono:'b'},'super'),29);
+});
+
+test('super: los robots llegan a usar todas las cartas nuevas y el bono',async()=>{
+ const todo=new Set();
+ for(let s=1;s<=30;s++){const {vistos}=await juega('super',2+s%9,s);for(const v of vistos)todo.add(v);}
+ for(const x of ['elige:mata','elige:trueca','elige:comodin','elige:segunda','bono'])assert.ok(todo.has(x),'nunca salió '+x);
+});
+
+test('diez en la mesa: la partida acaba en los tres modos',async()=>{
+ for(const modo of MODOS)for(const s of [3,17]){
+  const {e}=await juega(modo,10,s);
+  assert.equal(e.fase,'fin');assert.equal(Object.keys(e.puntos).length,10);
  }
 });
