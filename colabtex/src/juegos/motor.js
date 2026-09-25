@@ -1242,6 +1242,20 @@ export function redOrbita(p, js = jugadoresDe(p)) {
      instante antes que los demás (no puede cambiarla), y quien cierre
      la pestaña antes de revelar deja sus aportes sin comprobar — la
      pantalla lo dice en vez de darlos por buenos.
+   - **Los suplentes** (`aportesDe`): si falta uno de los dos
+     designados — una pestaña dormida, un móvil bloqueado — la mesa
+     entera se quedaba esperando para siempre. Si los dos están, salen
+     ellos; si no, la carta sale de los primeros K presentes en orden de
+     preferencia (el receptor y luego los demás por distancia en la
+     mesa), con K = max(2, min(3, sentados − 1)) y los valores
+     combinados `[a0, a1 ^ a2]`. Con dos en la mesa no hay suplente. La
+     pantalla de un suplente espera 6 s más 2 s por puesto antes de
+     mandar el suyo, pero eso no lo puede exigir el reductor (las
+     jugadas no llevan hora), así que el precio queda dicho: un ayudante
+     con un cliente trucado puede callarse para que la carta la echen
+     los suplentes — la vuelve a sortear, no la escoge — y con tres en
+     la mesa un suplente con prisa puede adelantarse. Todo aporte sigue
+     pasando por la auditoría.
 
    El montón es una lista de índices que empieza en el orden canónico;
    cada robo quita la posición `indiceF7(aportes) % largo`, y cuando se
@@ -1372,6 +1386,32 @@ function redFlip7(p, js, listos) {
   };
   const ayudante = u => tras(u, x => x !== u && esta(x));
   const aportantes = u => { const b = ayudante(u); return b ? [u, b] : [u]; };
+  /* Quién puede aportar al robo de `u`, por orden de preferencia: él,
+     su ayudante y, detrás, el resto de la mesa en el orden de los
+     asientos. Los dos primeros son los de siempre; los demás son los
+     suplentes, que sólo cuentan si falta uno de aquellos. */
+  const preferencia = u => [u].concat(uids(x => x !== u && esta(x))
+    .sort((x, y) => distancia(u, x) - distancia(u, y)));
+  const distancia = (u, x) => {
+    const a = js.findIndex(q => q.uid === u), b = js.findIndex(q => q.uid === x);
+    return (b - a + js.length) % js.length;
+  };
+  /* Cuántos aportes hacen falta cuando no están los dos designados:
+     dos con tres jugadores en la mesa, tres con cuatro o más. Con tres,
+     un suplente que se adelante no puede forzar la carta que ya conoce:
+     le falta el aporte de otro que no ve. */
+  const cupoSuplencia = () => Math.max(2, Math.min(3, uids(esta).length - 1));
+  /* Los dos aportes con los que sale la carta `nn` para `u`, o null si
+     todavía no alcanzan. Primero los designados; si alguno no está (una
+     pestaña dormida, un móvil bloqueado, alguien que cerró sin
+     abandonar), los primeros que hayan llegado por orden de preferencia. */
+  const aportesDe = (u, nn) => {
+    const a = aportes[nn] || {}, quien = aportantes(u);
+    if (quien.every(x => a[x] !== undefined)) return [a[quien[0]], quien[1] ? a[quien[1]] : 0];
+    const k = cupoSuplencia(), hay = preferencia(u).filter(x => a[x] !== undefined).slice(0, k);
+    if (hay.length < k) return null;
+    return [a[hay[0]], (a[hay[1]] ^ (hay[2] ? a[hay[2]] : 0)) >>> 0];
+  };
   const cartasDe = u => lin[u].nums.concat(lin[u].mods);
   const quita = (u, id) => {
     const l = lin[u];
@@ -1556,12 +1596,12 @@ function redFlip7(p, js, listos) {
       }
       if (t.k === "robar") {
         if (!enPie(t.para)) { pila.pop(); continue; }
-        const quien = aportantes(t.para), a = aportes[n] || {};
-        if (!quien.every(u => a[u] !== undefined)) return;
+        const par = aportesDe(t.para, n);
+        if (!par) return;
         pila.pop();
         if (!mazo.length) { mazo = descarte; descarte = []; suceso({ e: "baraja" }); }
         if (!mazo.length) continue;              // todo está en la mesa: no hay carta que dar
-        const id = mazo.splice(indiceF7(a[quien[0]], quien[1] ? a[quien[1]] : 0, n, mazo.length), 1)[0];
+        const id = mazo.splice(indiceF7(par[0], par[1], n, mazo.length), 1)[0];
         ultima = { n, id, para: t.para, de: t.de || (t.serie ? "serie" : "") };
         n++;
         recibe(t.para, id, t.serie || null);
@@ -1659,7 +1699,8 @@ function redFlip7(p, js, listos) {
     const a = aportes[n] || {};
     const serie = top.serie ? { quedan: top.serie.quedan, total: top.serie.total } : null;
     espera = { k: "roba", n, para: top.para, de: top.de || (serie ? "serie" : ""), serie,
-      faltan: aportantes(top.para).filter(u => a[u] === undefined) };
+      faltan: aportantes(top.para).filter(u => a[u] === undefined),
+      suplentes: preferencia(top.para).filter(u => !aportantes(top.para).includes(u) && a[u] === undefined) };
   }
   const valor = {};
   for (const j of js) valor[j.uid] = valorLineaF7(lin[j.uid], modo);

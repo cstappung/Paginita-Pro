@@ -1822,7 +1822,36 @@ recomputes every contribution: a lie is `que:"carta"`, a seed that does not
 match its `hmazo` is `que:"semilla"`, and one never revealed is only
 `que:"oculta"` (soft yellow notice, not the red one — closing the tab is not
 cheating). `flip7.js` calls `terminar` once everyone still seated has revealed
-or after `ESPERA_SEMILLAS`.
+or after `ESPERA_SEMILLAS`, and **keeps re-arming that check every second until
+`fin` is really written** — `terminar` can fail (a transaction lost, a network
+blip), and `cierre` used to stop at the first try, leaving the room open
+forever on a finished board.
+
+**An absent contributor must not freeze the table** (`aportesDe`, the
+*suplentes*). The designated pair is receiver + next seat, and either one can
+be asleep — a background tab, a locked phone — which left every draw waiting
+for good: the most common "se queda pegada". If both designated values are in,
+they are used; otherwise the card comes from the first K contributors present
+in preference order (receiver, then the others by distance at the table), with
+K = max(2, min(3, seated − 1)) and the values combined `[a0, a1 ^ a2]`. Two at
+the table have no suplente. The `roba` espera lists them (`suplentes`), and the
+screen of a suplente waits `SUPLENCIA_MS` (6 s) plus `SUPLENCIA_PASO` (2 s) per
+rank before sending (`papel()` in `flip7.js`). That delay lives only on the
+screen — moves carry no timestamp and the reducer cannot enforce time — so the
+accepted price is written down: a helper running a modified client can withhold
+its value to force a re-draw by the suplentes (it re-rolls the card, it cannot
+choose it), and with three seated a hasty suplente can jump in early; with four
+or more it needs an accomplice. Every contribution still goes through the audit.
+What suplentes cannot fix is an absent player on **their own** decision
+(`decide`/`elige`): there is no kick, and the others wait.
+
+Three smaller holes of the same family: a `jugar` that returns false resets
+`enviadoN` so the contribution is retried instead of being marked as sent;
+`alVolver` re-arms the contribution timer, because the browser throttles a
+background tab's timers and one armed there can fire far too late; and the ghost view (below) applies
+**only while `espera.k === "roba"`**, i.e. while the dealer is actually dealing
+— when the new round's first card was an action card, the ghost hid the target
+buttons and the game waited for a choice nobody could make.
 
 The two modes are one reducer (`redFlip7`, `modoF7`, `mazoF7`): **normal** is
 the 94-card box (0, 1×1 … 12×12, six modifiers, Freeze / Flip Three / Second
@@ -1882,7 +1911,8 @@ never the state — the state says where a card *is*, the history says that it
 - **The end of a round is a summary, not a jump.** The reducer starts the next
   round in the same move that closes this one, so while the new round has no
   card on the table yet the seats keep showing the lines that just closed
-  (`fantasma()`, read from `est.finRonda`) under the round summary. At the end of the game `trasVuelos` holds that
+  (`fantasma()`, read from `est.finRonda`, and only while the espera is a
+  `roba`) under the round summary. At the end of the game `trasVuelos` holds that
   summary for `FIN_MS` (2.2 s) and only then calls `ctx.listo`; `ocupado()` is
   `vuelos > 0 || Date.now() < finHasta`, which is what keeps `pintaFin` from
   covering the last card with the cartel.
