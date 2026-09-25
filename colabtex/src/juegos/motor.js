@@ -1596,7 +1596,9 @@ function redFlip7(p, js, listos) {
       case "cambia": return { tipo: "2", cartas: conCartas(enPie) };
       case "mata": return { tipo: "a", uids: uids(u => u !== quien && enPie(u)) };
       case "trueca": return { tipo: "p2", uids: uids(enPie) };
-      case "comodin": return { tipo: "n", uids: uids(enPie), max: 14 };
+      /* El comodín sólo se lo juega quien lo saca: no sirve para
+         hacer pasarse a otro poniéndole un número que ya tiene. */
+      case "comodin": return { tipo: "n", uids: enPie(quien) ? [quien] : [], max: 14 };
     }
     return { tipo: "a", uids: [] };
   };

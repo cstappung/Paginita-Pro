@@ -348,9 +348,8 @@ export function crearFlip7(ctx) {
     const v = (com || (est && est.com) || {})[id];
     return v == null ? c : Object.assign({}, c, { v });
   };
-  let comV = null;             // el valor elegido para el comodín, antes de elegir a quién
   let selU = null;             // el primer jugador del cambio de manos
-  let eleccionVista = "";      // la elección a la que pertenecen comV y selU
+  let eleccionVista = "";      // la elección a la que pertenece selU
 
   /* ---------- pintado ---------- */
   function set(id, firma, html) {
@@ -534,7 +533,7 @@ export function crearFlip7(ctx) {
        acción, cualquiera de los dos del cambio de manos y, una vez
        elegido el valor, quien recibe el comodín. */
     const op = w && w.k === "elige" && w.quien === uid ? w.op : null;
-    const apuntables = !op ? [] : op.tipo === "a" || op.tipo === "p2" || (op.tipo === "n" && comV != null) ? op.uids : [];
+    const apuntables = !op ? [] : op.tipo === "a" || op.tipo === "p2" ? op.uids : [];
     const f = est.finRonda;
     const com = fant ? (f.com || {}) : (est.com || {});
     js.forEach((j, i) => {
@@ -563,9 +562,7 @@ export function crearFlip7(ctx) {
       const sel = selU === j.uid;
       const txtApunta = !apunta ? "" : op.tipo === "p2"
         ? (sel ? "✓ Quitar" : (selU ? "⇅ con " : "Elegir ") + (j.uid === uid ? "la mía" : j.nombre))
-        : op.tipo === "n"
-          ? `${j.uid === uid ? "A mí" : "A " + j.nombre}: ${comV}${lineaValidaF7(l.nums.concat(w.id), est.modo, Object.assign({}, com, { [w.id]: comV })) ? "" : " · se pasa"}`
-          : j.uid === uid ? "A mí" : "A " + j.nombre;
+        : j.uid === uid ? "A mí" : "A " + j.nombre;
       const n = l.nums.length;
       const paso = n > 1 ? Math.min(40, (160 - ANCHO) / (n - 1)) : 0;
       const nums = l.nums.map((id, k) => {
@@ -618,11 +615,15 @@ export function crearFlip7(ctx) {
         <span class="jg-nota">${w.cero ? "Tienes el Cero: no puedes plantarte. O haces Flip 7, o esta ronda no suma." : "Si repites un número te pasas y la ronda no te da nada."}</span>`;
     } else if (w && w.k === "elige" && w.quien === uid) {
       const c = carta(w.id, {});
-      firma = "eli" + w.id + (sel1 ? sel1.u + sel1.id : "") + ":" + selU + ":" + comV + enviando;
-      /* El comodín: primero el número, luego a quién (en su asiento). */
+      firma = "eli" + w.id + (sel1 ? sel1.u + sel1.id : "") + ":" + selU + enviando;
+      /* El comodín va siempre a la propia fila, así que basta con elegir
+         el número. Los que ya están en la fila se marcan: jugarlos es
+         pasarse (salvo que haya segunda oportunidad). */
+      const mia = (est.lineas[uid] || { nums: [] }).nums;
+      const pasa = v => !lineaValidaF7(mia.concat(w.id), est.modo, Object.assign({}, est.com, { [w.id]: v }));
       const valores = w.op.tipo === "n"
         ? `<span class="jg-f7-comv">${Array.from({ length: w.op.max + 1 }, (_, v) =>
-          `<button class="jg-btn${v === comV ? " jg-f7-comv-on" : ""}" data-comv="${v}">${v}</button>`).join("")}</span>` : "";
+          `<button class="jg-btn${pasa(v) ? " jg-f7-comv-mal" : ""}" data-comv="${v}"${enviando ? " disabled" : ""}${pasa(v) ? ` title="Ya tienes un ${v}: te pasarías"` : ""}>${v}</button>`).join("")}</span>` : "";
       html = `${htmlCarta(c, "jg-f7-mini")}<span class="jg-nota">${esc(textoEleccion(c, w.op))}</span>${valores}
         ${sel1 || selU ? `<button class="jg-btn jg-f7-anula" id="f7Anula">Cambiar la primera</button>` : ""}`;
     } else if (w && w.k === "bono" && w.quien === uid) {
@@ -657,7 +658,7 @@ export function crearFlip7(ctx) {
     if (c.k === "m") return `¿A quién le pones ${nombreCarta(c)}?`;
     if (op.tipo === "2") return sel1 ? "Ahora una carta de otro jugador para intercambiarlas." : "Elige dos cartas de dos jugadores distintos para intercambiarlas.";
     if (op.tipo === "p2") return selU ? `Ahora la otra mano: ${selU === uid ? "la tuya" : "la de " + nombre(selU)} se cambia entera por ella.` : "Elige dos jugadores (puedes ser tú): se cambian la mano entera.";
-    if (op.tipo === "n") return comV == null ? "Elige qué número vale el comodín…" : `Vale ${comV}: ¿a quién se lo pones? Si ya tiene un ${comV}, se pasa.`;
+    if (op.tipo === "n") return "¿Qué número vale tu comodín? Va a tu fila; los marcados ya los tienes.";
     return {
       mata: "¿A quién fulminas? Se queda la ronda sin nada, como si se hubiera pasado.",
       congela: "¿A quién congelas? Se planta con lo que tiene.",
@@ -1000,10 +1001,9 @@ export function crearFlip7(ctx) {
     if (bono && w && w.k === "bono" && w.quien === uid) { manda({ t: "bono", uid, a: bono.getAttribute("data-bono") }); return; }
     if (!w || w.k !== "elige" || w.quien !== uid) return;
     const cv = ev.target.closest("[data-comv]");
-    if (cv && w.op.tipo === "n") { comV = Number(cv.getAttribute("data-comv")); suena("clic"); pinta(); return; }
+    if (cv && w.op.tipo === "n") { manda({ t: "apunta", uid, a: uid, v: Number(cv.getAttribute("data-comv")) }); return; }
     const a = ev.target.closest("[data-apunta]");
     if (a && w.op.tipo === "a") { manda({ t: "apunta", uid, a: a.getAttribute("data-apunta") }); return; }
-    if (a && w.op.tipo === "n" && comV != null) { manda({ t: "apunta", uid, a: a.getAttribute("data-apunta"), v: comV }); return; }
     if (a && w.op.tipo === "p2") {
       const u = a.getAttribute("data-apunta");
       if (selU === u) { selU = null; pinta(); return; }
@@ -1168,10 +1168,9 @@ export function crearFlip7(ctx) {
     }
     const w = est.espera;
     if (sel1 && !(w && w.k === "elige" && w.quien === uid && w.op.tipo === "2")) sel1 = null;
-    /* El valor del comodín y la primera mano del cambio valen para esta
-       carta y nada más: con la siguiente elección se empieza de cero. */
+    /* La primera mano del cambio vale para esta carta y nada más: con la siguiente elección se empieza de cero. */
     const eleccionN = w && w.k === "elige" && w.quien === uid ? w.id + ":" + est.n : "";
-    if (eleccionN !== eleccionVista) { eleccionVista = eleccionN; comV = null; selU = null; }
+    if (eleccionN !== eleccionVista) { eleccionVista = eleccionN; selU = null; }
     const fe = !w || est.fase !== "jugando" ? "" : w.k === "roba" ? "r" + w.n + ":" + (w.faltan || []).join(",") : w.k + (w.uid || w.quien) + est.n;
     if (fe !== esperaFirma) { esperaFirma = fe; esperaDesde = Date.now(); }
 
