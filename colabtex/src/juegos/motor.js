@@ -1427,9 +1427,11 @@ export function lineaValidaF7(nums, modo, com) {
    Con venganza: números, ÷2 redondeando hacia abajo, menos los
    negativos, nunca por debajo de cero, y 15 por Flip 7; quien tiene
    el Cero se queda en nada salvo que haga Flip 7. Super Vengeance igual,
-   con dos diferencias: si los números no suman nada, los modificadores
-   no se aplican aquí sino al total (`golpeF7`), y quien gastó su Flip 7
-   en quitarle 15 a otro (`l.bono`, el uid de ese otro) no se los suma. */
+   con tres diferencias: nada satura en cero (con el −14 y los «menos
+   algo» la ronda puede quedar en negativo, y eso se le resta al total);
+   si los números suman justo 0, los modificadores no se aplican aquí
+   sino al total (`golpeF7`); y quien gastó su Flip 7 en quitarle 15 a
+   otro (`l.bono`, el uid de ese otro) no se los suma. */
 export function valorLineaF7(l, modo, com) {
   if (!l || l.estado === "pasa" || l.estado === "fuera") return 0;
   const M = mazoF7(modo);
@@ -1438,39 +1440,45 @@ export function valorLineaF7(l, modo, com) {
   if (modo === "normal") {
     if (mods.some(c => c.doble)) s *= 2;
     s += mods.reduce((a, c) => a + c.v, 0);
-  } else if (s > 0 || modo !== "super") {
+  } else if (modo !== "super") {
     if (mods.some(c => c.mitad)) s = Math.floor(s / 2);
     s = Math.max(0, s + mods.reduce((a, c) => a + c.v, 0));
+  } else if (s !== 0) {
+    if (mods.some(c => c.mitad)) s = Math.floor(s / 2);
+    s += mods.reduce((a, c) => a + c.v, 0);
   }
   return s + (l.f7 && !l.bono ? F7_BONO : 0);
 }
 
 /* Lo que suman los números de una fila, antes de modificadores y bono.
-   Con venganza el Cero la deja en nada salvo con Flip 7, y nunca baja
-   de cero: en Super Vengeance hay un 14 que vale −14. */
+   Con venganza el Cero la deja en nada salvo con Flip 7. En Vengeance
+   nunca baja de cero; en Super Vengeance sí (el 14 que vale −14, un
+   comodín bajo), y esa ronda negativa se resta del total. */
 function numerosF7(l, modo, com) {
   if (!l || l.estado === "pasa" || l.estado === "fuera") return 0;
   const M = mazoF7(modo);
   const s = l.nums.reduce((a, id) => a + valorCartaF7(M[id], com), 0);
   if (modo === "normal") return s;
   if (!l.f7 && l.nums.some(id => M[id].cero)) return 0;
-  return Math.max(0, s);
+  return modo === "super" ? s : Math.max(0, s);
 }
 
 /* Super Vengeance: los «menos algo» y el ÷2 pegan a la ronda, pero si en
    la ronda no sumaste nada —te pasaste, te fulminaron, tienes el Cero
    sin Flip 7, no tienes números— pegan al total acumulado. Devuelve lo
    que le toca al total (primero `mitad`, luego `resta`) o null; se
-   aplica al cerrar la ronda (`aplicaGolpeF7`) y el total no baja de 0. */
+   aplica al cerrar la ronda (`aplicaGolpeF7`) y el total puede quedar
+   en negativo. Una ronda que ya es negativa no pasa por aquí: los
+   modificadores se le aplican a ella y todo baja al total igual. */
 export function golpeF7(l, modo, com) {
   if (modo !== "super" || !l || l.estado === "fuera" || !l.mods.length) return null;
   const M = mazoF7(modo), mods = l.mods.map(id => M[id]);
   const mitad = mods.some(c => c.mitad), resta = mods.reduce((a, c) => a + c.v, 0);
   if (!mitad && !resta) return null;
-  if (numerosF7(l, modo, com) > 0) return null;
+  if (numerosF7(l, modo, com) !== 0) return null;
   return { mitad, resta };
 }
-export const aplicaGolpeF7 = (total, g) => Math.max(0, (g.mitad ? Math.floor(total / 2) : total) + g.resta);
+export const aplicaGolpeF7 = (total, g) => (g.mitad ? Math.floor(total / 2) : total) + g.resta;
 
 /* El aporte de un jugador a la carta número `n`. Lleva la sal además
    de la semilla porque la semilla son 32 bits: con solo ella, un aporte
@@ -1743,7 +1751,7 @@ function redFlip7(p, js, listos) {
     for (const j of js) {
       const b = lin[j.uid].f7 && lin[j.uid].bono;
       if (!b || !esta(b) || puntos[b] === undefined) continue;
-      const t = Math.max(0, puntos[b] - F7_BONO);
+      const t = puntos[b] - F7_BONO;
       aj[b] = (aj[b] || 0) + t - puntos[b]; puntos[b] = t;
     }
     for (const t of pila) {

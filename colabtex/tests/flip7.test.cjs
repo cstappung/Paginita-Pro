@@ -128,12 +128,13 @@ for(const modo of MODOS)test(`partidas completas (${modo}) terminan y pasan la a
   assert.equal(e.fase,'fin');assert.equal(e.motivo,'flip7');
   assert.ok(e.puntos[e.ganador]>=200);
   assert.ok(Object.entries(e.puntos).every(([u,v])=>u===e.ganador||v<e.puntos[e.ganador]));
-  assert.ok(Object.values(e.puntos).every(v=>v>=0),'un total bajo cero');
+  // sólo Super deja que un total quede en negativo
+  if(modo!=='super')assert.ok(Object.values(e.puntos).every(v=>v>=0),'un total bajo cero');
   // el total es lo que dieron las rondas más lo que le quitaron por fuera (sólo en Super)
   for(const u of Object.keys(sec)){
    const aj=e.rondas.reduce((a,r)=>a+((r.aj||{})[u]||0),0);
    if(modo!=='super')assert.equal(aj,0);
-   if(!e.fuera[u])assert.ok(aj<=0);
+   if(modo!=='super'&&!e.fuera[u])assert.ok(aj<=0);
   }
   for(const u of Object.keys(sec))
    assert.equal(e.rondas.reduce((a,r)=>a+r.pts[u]+((r.aj||{})[u]||0),0),e.puntos[u]);
@@ -341,7 +342,8 @@ test('super: los catorce chocan entre sí valgan lo que valgan, y el comodín va
  assert.equal(lineaValidaF7([cinco,com],'super',{[com]:6}),true);
  assert.equal(valorLineaF7({nums:[cinco,com],mods:[],estado:'planta'},'super',{[com]:6}),11);
  // el −14 resta, pero la ronda no baja de cero
- assert.equal(valorLineaF7({nums:[nueve,menos],mods:[],estado:'planta'},'super'),0);
+ // en Super la ronda no satura: 9 − 14 = −5, y eso baja al total; en Vengeance no existe el −14
+ assert.equal(valorLineaF7({nums:[nueve,menos],mods:[],estado:'planta'},'super'),-5);
  assert.equal(valorLineaF7({nums:[nueve,c14,menos],mods:[],estado:'planta'},'super'),9);
 });
 
@@ -359,7 +361,8 @@ test('super: los negativos pegan a la ronda y, si la ronda no suma, al total',()
  }
  assert.equal(aplicaGolpeF7(30,{mitad:false,resta:-10}),20);
  assert.equal(aplicaGolpeF7(31,{mitad:true,resta:-2}),13);
- assert.equal(aplicaGolpeF7(4,{mitad:false,resta:-10}),0);
+ assert.equal(aplicaGolpeF7(4,{mitad:false,resta:-10}),-6);
+ assert.equal(aplicaGolpeF7(0,{mitad:false,resta:-10}),-10);
  // sin modificadores no hay golpe, y quien se fue tampoco lo recibe
  assert.equal(golpeF7({nums:[],mods:[],estado:'pasa'},'super'),null);
  assert.equal(golpeF7({nums:[],mods:[m10],estado:'fuera'},'super'),null);
@@ -440,8 +443,8 @@ test('super: los negativos se pueden tirar a quien ya se pasó, y le restan del 
      }
      const f=e.finRonda;
      assert.equal(f.pts[muerto],0);
-     if(antes>0)assert.ok((f.aj[muerto]||0)<0,'no le restó del total');
-     assert.ok(f.total[muerto]<=antes);
+     assert.equal(f.total[muerto],antes+(f.aj[muerto]||0));
+     if(M[w.id].v<0&&!M[w.id].mitad&&antes>=0)assert.ok((f.aj[muerto]||0)<0,'no le restó del total');
      break;
     }
    }
@@ -452,4 +455,19 @@ test('super: los negativos se pueden tirar a quien ya se pasó, y le restan del 
   }
  }
  assert.ok(casos.super>=1&&casos.venganza>=1,'no se dio el caso: '+JSON.stringify(casos));
+});
+
+test('super: nada satura en cero, ni la ronda ni el total',()=>{
+ const S=mazoF7('super'),id=f=>S.findIndex(f);
+ const nueve=id(c=>c.k==='n'&&c.v===9),cinco=id(c=>c.k==='n'&&c.v===5&&!c.catorce),menos=id(c=>c.catorce&&c.v===-14);
+ const m10=id(c=>c.k==='m'&&c.v===-10),m2=id(c=>c.k==='m'&&c.v===-2),mitad=id(c=>c.mitad);
+ // los «menos algo» llevan la ronda por debajo de cero
+ assert.equal(valorLineaF7({nums:[cinco],mods:[m10],estado:'planta'},'super'),-5);
+ assert.equal(valorLineaF7({nums:[cinco],mods:[m10],estado:'planta'},'venganza'),0);
+ // una ronda negativa se queda con sus modificadores: no es «ronda en 0»
+ assert.equal(valorLineaF7({nums:[nueve,menos],mods:[m2],estado:'planta'},'super'),-7);
+ assert.equal(golpeF7({nums:[nueve,menos],mods:[m2],estado:'planta'},'super'),null);
+ assert.equal(valorLineaF7({nums:[nueve,menos],mods:[mitad],estado:'planta'},'super'),-3);
+ // el ÷2 sobre un total negativo redondea hacia abajo
+ assert.equal(aplicaGolpeF7(-9,{mitad:true,resta:0}),-5);
 });

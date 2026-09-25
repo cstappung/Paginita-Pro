@@ -1978,7 +1978,10 @@ deck is Vengeance's 108 **in the same order** with the new ones appended
 - **Fourteen 14s** (`catorce`): twelve worth 14, one −14, one 0, and any two
   of them bust whatever they are worth — repeats are counted by `claveF7`,
   which is the value except for a 14. The −14 can drag the numbers below
-  zero; the round is floored at 0.
+  zero, and in Super **nothing is floored at 0**: a hand that adds up
+  negative (the −14, a "−x") scores that negative, and it comes off the
+  total, which may itself go below zero. A busted/killed row still scores 0 —
+  that is the rule, not a floor. Vengeance and Normal keep their floors.
 - **Three Second Chances, two Cambio de manos (`trueca`), two Fulminar
   (`mata`), three Comodín.** `trueca` swaps two players' whole hand (numbers,
   modifiers, stored Second Chance — not planted/frozen, which belong to the
@@ -1994,9 +1997,10 @@ deck is Vengeance's 108 **in the same order** with the new ones appended
   card through a Steal or a Swap, and it is snapshotted into `finRonda.com` for
   the ghost view and the summary.
 - **Negative modifiers hit the total when the round scores nothing**
-  (`golpeF7`): if the numbers add up to 0 — busted, killed, Cero without
+  (`golpeF7`): if the numbers add up to exactly 0 — busted, killed, Cero without
   Flip 7, no numbers — the ÷2 and the minuses apply to the accumulated total
-  instead (`aplicaGolpeF7`, floored at 0) at round close. `rondas[].aj` records
+  instead (`aplicaGolpeF7`, no floor) at round close. A round that is already
+  negative keeps its modifiers: it goes to the total anyway. `rondas[].aj` records
   what the total lost outside the round, so `Σ(pts + aj)` is still each
   player's total.
   That is also why, in Super only, a negative or ÷2 card can be **aimed at a
@@ -2005,7 +2009,7 @@ deck is Vengeance's 108 **in the same order** with the new ones appended
   same card on a busted player would do nothing, so it is not offered.
 - **Flip 7 is a choice** (espera `bono`, move `{t:"bono", a}`): before the
   round closes the Flip 7 player picks `+15` for themselves (`a` = own uid) or
-  `−15` off another seated player's total (floored at 0). It is stored in
+  `−15` off another seated player's total (it may go negative). It is stored in
   `l.bono` (`""` for self, the victim's uid otherwise) and `valorLineaF7` drops
   the 15 when it is a uid.
 

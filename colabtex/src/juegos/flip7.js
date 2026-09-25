@@ -107,6 +107,8 @@ const TONO = ["#8a97a3", "#3b82f6", "#0ea5e9", "#14b8a6", "#22c55e", "#84cc16", 
    que aún espera a que lo jueguen, no. */
 const comJugado = c => c && c.a === "comodin" && c.v != null;
 const signo = v => (v < 0 ? "−" : "") + Math.abs(v);
+/* Con signo siempre: en Super Vengeance una ronda puede restar. */
+const conSigno = v => (v < 0 ? "−" : "+") + Math.abs(v);
 
 function nombreCarta(c) {
   if (!c) return "";
@@ -558,7 +560,7 @@ export function crearFlip7(ctx) {
       /* Super Vengeance: lo que le pegaría (o ya le pegó) al total. */
       const g = !fant && (est.golpe || {})[j.uid], aj = fant ? ((f.aj || {})[j.uid] || 0) : 0;
       const golpe = g ? `<span class="jg-f7-golpe" title="La ronda no suma nada: los modificadores le pegan al total acumulado">total ${[g.mitad ? "÷2" : "", g.resta ? "−" + Math.abs(g.resta) : ""].filter(Boolean).join(" ")}</span>`
-        : aj ? `<span class="jg-f7-golpe" title="Lo que perdió el total por fuera de la ronda">total −${Math.abs(aj)}</span>` : "";
+        : aj ? `<span class="jg-f7-golpe" title="Lo que cambió el total por fuera de la ronda">total ${conSigno(aj)}</span>` : "";
       const sel = selU === j.uid;
       const txtApunta = !apunta ? "" : op.tipo === "p2"
         ? (sel ? "✓ Quitar" : (selU ? "⇅ con " : "Elegir ") + (j.uid === uid ? "la mía" : j.nombre))
@@ -585,15 +587,15 @@ export function crearFlip7(ctx) {
           <span class="jg-f7-ava">${foto}</span>
           <span class="jg-f7-quien"><b>${esc(j.uid === uid ? "Tú" : j.nombre)}</b><span class="jg-f7-est">${esc(estado)}</span></span>
           ${est.reparte === j.uid && est.ronda ? `<span class="jg-f7-dealer" title="Reparte esta ronda">D</span>` : ""}
-          <span class="jg-f7-total" title="Puntos de la partida"><b>${pts}</b>/${est.meta}</span>
+          <span class="jg-f7-total${pts < 0 ? " jg-f7-total-neg" : ""}" title="Puntos de la partida"><b>${signo(pts)}</b>/${est.meta}</span>
         </div>
-        <div class="jg-f7-barra"><i style="width:${Math.min(100, pts / est.meta * 100)}%"></i></div>
+        <div class="jg-f7-barra"><i style="width:${Math.max(0, Math.min(100, pts / est.meta * 100))}%"></i></div>
         <div class="jg-f7-mano">${nums || (fuera ? "" : `<span class="jg-f7-vacia" title="Sin cartas"></span>`)}</div>
         ${minis ? `<div class="jg-f7-extras">${minis}</div>` : ""}
         <div class="jg-f7-pie-j">
           <span class="jg-f7-siete-p" title="Números distintos: ${n} de ${F7_SIETE}">${Array.from({ length: F7_SIETE }, (_, k) => `<i class="${k < n ? "on" : ""}"></i>`).join("")}</span>
           <span class="jg-grow"></span>
-          ${golpe && !vale ? "" : `<span title="${fant ? "Lo que sumó la ronda pasada" : "Lo que se lleva si la ronda acabara ahora"}">${fant ? "sumó" : "vale"} <b>${fant ? "+" : ""}${vale}</b></span>`}
+          ${golpe && !vale ? "" : `<span title="${fant ? "Lo que sumó la ronda pasada" : "Lo que se lleva si la ronda acabara ahora"}">${fant ? "sumó" : "vale"} <b>${fant ? conSigno(vale) : signo(vale)}</b></span>`}
           ${golpe}
         </div>
         ${apunta ? `<button class="jg-btn jg-f7-apunta${sel ? " jg-f7-apunta-sel" : ""}" data-apunta="${esc(j.uid)}">${esc(txtApunta)}</button>` : ""}
@@ -611,7 +613,7 @@ export function crearFlip7(ctx) {
       const listo = secListo && !enviando;
       firma = "dec" + w.cero + listo + est.valor[uid];
       html = `<button class="jg-btn jg-f7-pide" id="f7Pide"${listo ? "" : " disabled"}><span>✋</span> Pedir carta</button>
-        <button class="jg-btn jg-f7-planta" id="f7Planta"${w.cero || !listo ? " disabled" : ""}><span>✊</span> Plantarme con ${est.valor[uid] || 0}</button>
+        <button class="jg-btn jg-f7-planta" id="f7Planta"${w.cero || !listo ? " disabled" : ""}><span>✊</span> Plantarme con ${signo(est.valor[uid] || 0)}</button>
         <span class="jg-nota">${w.cero ? "Tienes el Cero: no puedes plantarte. O haces Flip 7, o esta ronda no suma." : "Si repites un número te pasas y la ronda no te da nada."}</span>`;
     } else if (w && w.k === "elige" && w.quien === uid) {
       const c = carta(w.id, {});
@@ -630,7 +632,7 @@ export function crearFlip7(ctx) {
       firma = "bono" + w.uids.join(",") + enviando;
       html = `<button class="jg-btn jg-f7-planta" data-bono="${esc(uid)}"${enviando ? " disabled" : ""}><span>＋</span> Sumarme ${F7_BONO}</button>
         ${w.uids.map(u => `<button class="jg-btn jg-f7-castiga" data-bono="${esc(u)}"${enviando ? " disabled" : ""}>−${F7_BONO} a ${esc(nombre(u))}</button>`).join("")}
-        <span class="jg-nota">Los ${F7_BONO} de tu Flip 7: para ti, o quitados del total de otro (sin bajar de cero).</span>`;
+        <span class="jg-nota">Los ${F7_BONO} de tu Flip 7: para ti, o quitados del total de otro (aunque quede en negativo).</span>`;
     } else {
       const ag = aguardados(), largo = ag.length && Date.now() - esperaDesde > AVISO_ESPERA;
       const seg = largo ? Math.round((Date.now() - esperaDesde) / 5000) * 5 : 0;
@@ -951,8 +953,8 @@ export function crearFlip7(ctx) {
         <span class="jg-f7-res-n"><i></i>${esc(j.uid === uid ? "Tú" : j.nombre)}</span>
         <span class="jg-f7-res-c">${minis || '<span class="jg-nota">—</span>'}</span>
         <span class="jg-f7-res-tag jg-f7-tag-${tag[1]}"${castiga}>${tag[0]}${castiga ? " ☠" : ""}</span>
-        <span class="jg-f7-res-p">+${f.pts[j.uid] || 0}${aj ? `<small title="Lo que perdió el total por fuera de la ronda">−${Math.abs(aj)}</small>` : ""}</span>
-        <span class="jg-f7-res-t2"><b>${f.total[j.uid] || 0}</b>/${est.meta}</span>
+        <span class="jg-f7-res-p${(f.pts[j.uid] || 0) < 0 ? " jg-f7-res-neg" : ""}">${conSigno(f.pts[j.uid] || 0)}${aj ? `<small title="Lo que cambió el total por fuera de la ronda">${conSigno(aj)}</small>` : ""}</span>
+        <span class="jg-f7-res-t2"><b>${signo(f.total[j.uid] || 0)}</b>/${est.meta}</span>
       </div>`;
     }).join("");
     caja.innerHTML = `<div class="jg-f7-res-in">
