@@ -163,8 +163,20 @@ const CRUPIER = `
   <circle cx="60" cy="110" r="1.7" fill="#e8b64a"/><circle cx="60" cy="118" r="1.7" fill="#e8b64a"/><circle cx="60" cy="126" r="1.7" fill="#e8b64a"/>
   <path d="M51 78 L60 82.5 L51 87 Z M69 78 L60 82.5 L69 87 Z" fill="#17131c"/><circle cx="60" cy="82.5" r="2.4" fill="#17131c"/>
   <rect x="76" y="98" width="17" height="6" rx="1.5" fill="#e8b64a"/><rect x="78" y="100" width="13" height="2" rx="1" fill="#9a6d1c"/>
-  <path d="M20 94 C10 104 8 118 12 130" stroke="#6b1f2a" stroke-width="15" fill="none" stroke-linecap="round"/>
+  <path class="jg-f7-brazo-i" d="M20 94 C10 104 8 118 12 130" stroke="#6b1f2a" stroke-width="15" fill="none" stroke-linecap="round"/>
   <circle cx="102" cy="93" r="8.5" fill="#6b1f2a"/>
+  <g class="jg-f7-67">
+    <g class="jg-f7-67-i">
+      <path d="M20 94 C12 94 5 91 -1 89" stroke="#6b1f2a" stroke-width="14" fill="none" stroke-linecap="round"/>
+      <path d="M-1 83 L-1 95" stroke="#f7f3ea" stroke-width="4" stroke-linecap="round"/>
+      <ellipse cx="-10" cy="87" rx="8" ry="4.2" fill="#f0bf94"/><circle cx="-5" cy="83.5" r="2.2" fill="#e6b087"/>
+    </g>
+    <g class="jg-f7-67-d">
+      <path d="M102 93 C110 93 117 91 123 89" stroke="#6b1f2a" stroke-width="14" fill="none" stroke-linecap="round"/>
+      <path d="M123 83 L123 95" stroke="#f7f3ea" stroke-width="4" stroke-linecap="round"/>
+      <ellipse cx="132" cy="87" rx="8" ry="4.2" fill="#f0bf94"/><circle cx="127" cy="83.5" r="2.2" fill="#e6b087"/>
+    </g>
+  </g>
   <g class="jg-f7-cabeza">
     <rect x="54" y="58" width="12" height="16" rx="4" fill="#dca57c"/>
     <circle cx="39.5" cy="46" r="4" fill="#e6b087"/><circle cx="80.5" cy="46" r="4" fill="#e6b087"/>
@@ -748,6 +760,7 @@ export function crearFlip7(ctx) {
       return;
     }
     vuelos++;
+    paraSeisSiete();
     const rs = sala.getBoundingClientRect(), ro = tope.getBoundingClientRect();
     const destino = sitioDe(id);
     let dx, dy, esc2 = 0.6, giro = 0, desvanece = false;
@@ -870,11 +883,54 @@ export function crearFlip7(ctx) {
     }
   }
 
+  /* «Six seven»: la carta que acaba de llegar (un número o un comodín
+     jugado como tal) es un 6 o un 7 y con ella la fila de quien la
+     recibe tiene los dos. Se mira la fila de la ronda en curso y, si la
+     carta cerró la ronda (un Flip 7), la de la ronda que se acaba de
+     cerrar, que es donde quedó. */
+  function haceSeisSiete(h) {
+    const u = h.e === "comodin" ? h.a : h.uid;
+    const v = h.e === "comodin" ? h.v : (carta(h.id) || {}).v;
+    if (v !== 6 && v !== 7) return false;
+    let l = est.lineas[u], com = est.com;
+    if (!l || !l.nums.includes(h.id)) {
+      const f = est.finRonda;
+      l = f && f.lineas[u]; com = f && f.com;
+      if (!l || !l.nums.includes(h.id)) return false;
+    }
+    const vs = l.nums.map(id => (carta(id, com) || {}).v);
+    return vs.includes(6) && vs.includes(7);
+  }
+
+  /* El crupier hace el gesto: las dos manos con la palma hacia arriba,
+     subiendo y bajando a contratiempo. Mientras dura, el brazo con el
+     que reparte se esconde (serían tres brazos); si hay que repartir
+     antes de que acabe, `lanza` corta el gesto. */
+  let relojSeis = null;
+  function seisSiete() {
+    const sala = $("#f7Sala"), fx = $("#f7Fx");
+    if (!sala || !fx) return;
+    clearTimeout(relojSeis);
+    sala.classList.add("jg-f7-seis");
+    relojSeis = luego(paraSeisSiete, 2200);
+    const b = document.createElement("div");
+    b.className = "jg-f7-bocadillo";
+    b.innerHTML = "<b>6 7</b> six seven!";
+    fx.appendChild(b);
+    luego(() => b.remove(), 2200);
+  }
+  function paraSeisSiete() {
+    clearTimeout(relojSeis);
+    const sala = $("#f7Sala");
+    if (sala) sala.classList.remove("jg-f7-seis");
+  }
+
   /* Lo que se ve y se oye de un puñado de sucesos. Un solo sonido por
      tanda, el más importante: tres a la vez no se distinguen. */
   function efectos(ev, aterriza) {
     if (!host || document.hidden) return;
     const pila = {}, oye = new Set();
+    if ((ev || []).some(h => (h.e === "carta" || h.e === "comodin") && haceSeisSiete(h))) seisSiete();
     for (const h of ev || []) {
       switch (h.e) {
         case "f7": flip7(h.uid); sello(h.uid, "¡Flip 7!", "jg-f7-sello-oro", pila); oye.add("flip7"); break;

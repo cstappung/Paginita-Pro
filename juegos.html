@@ -769,6 +769,12 @@
   .jg-f7-golpe{font:700 10px 'IBM Plex Mono',monospace;color:#fff;background:#b3261e;border-radius:4px;padding:1px 5px;white-space:nowrap}
   .jg-f7-comv{display:flex;flex-wrap:wrap;gap:4px}.jg-f7-comv .jg-btn{min-width:32px;height:32px;padding:0 6px;font:700 13px 'IBM Plex Mono',monospace;background:#fff;color:#4c1d95;border:1px solid #c4b5fd}.jg-f7-comv .jg-f7-comv-on{background:#7c3aed;color:#fff;border-color:#5b21b6;box-shadow:0 0 0 3px #c4b5fd}
   .jg-f7-castiga{height:46px;padding:0 16px;font-weight:700;border-radius:12px;background:linear-gradient(#f07b6c,#b3261e);color:#fff;border:1px solid #7f1a15;box-shadow:0 4px 0 #7f1a15}
+  .jg-f7-67{display:none}.jg-f7-seis .jg-f7-67{display:inline}.jg-f7-seis .jg-f7-brazo-i,.jg-f7-seis .jg-f7-brazo{visibility:hidden}
+  .jg-f7-67-i,.jg-f7-67-d{transform-box:view-box;animation:jgF7Seis .36s ease-in-out infinite alternate}.jg-f7-67-i{transform-origin:20px 94px}.jg-f7-67-d{transform-origin:102px 93px}
+  @keyframes jgF7Seis{from{transform:rotate(13deg)}to{transform:rotate(-13deg)}}
+  .jg-f7-bocadillo{position:absolute;left:calc(50% + 78px);top:18px;padding:6px 12px;border-radius:14px 14px 14px 3px;background:#fffdf8;color:#232137;font:800 15px 'IBM Plex Mono',monospace;white-space:nowrap;box-shadow:0 8px 18px #0007;animation:jgF7Bocadillo 2.2s cubic-bezier(.2,1.4,.4,1) forwards}.jg-f7-bocadillo b{color:#e11d48;font-size:18px}
+  @keyframes jgF7Bocadillo{0%{opacity:0;scale:.3;rotate:-10deg}12%{opacity:1;scale:1.1;rotate:3deg}22%{scale:1;rotate:0deg}85%{opacity:1}100%{opacity:0;translate:0 -8px}}
+  @media(max-width:720px){.jg-f7-bocadillo{left:calc(50% + 60px);top:8px;font-size:13px}}
   .jg-f7-apunta{max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.jg-f7-pie-j>span:not(.jg-f7-siete-p):not(.jg-grow){white-space:nowrap}
   .jg-f7-sala:is([data-n="9"],[data-n="10"]) .jg-f7-siete-p{gap:2px}.jg-f7-sala:is([data-n="9"],[data-n="10"]) .jg-f7-siete-p i{width:6px;height:6px}.jg-f7-sala:is([data-n="9"],[data-n="10"]) .jg-f7-asiento:not(.jg-f7-yo) .jg-f7-total{font-size:0}.jg-f7-sala:is([data-n="9"],[data-n="10"]) .jg-f7-asiento:not(.jg-f7-yo) .jg-f7-total b{font-size:15px}
   .jg-f7-apunta-sel{background:linear-gradient(#a78bfa,#7c3aed);color:#fff;border-color:#5b21b6}
@@ -967,6 +973,6 @@
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202609250343"></script>
+<script src="juegos-app.js?v=202609250408"></script>
 </body>
 </html>
