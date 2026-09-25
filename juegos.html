@@ -101,6 +101,32 @@
   .jg-cab{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px}
   .jg-quienes{display:flex;gap:6px;flex-wrap:wrap}
   .jg-quien-chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:#42505c;background:#fff;border:1px solid #e2e8ec;border-left:3px solid var(--c,#888);border-radius:99px;padding:4px 11px}
+  .jg-quien-chip img,.jg-quien-chip>i{width:18px;height:18px;border-radius:50%;object-fit:cover;flex-shrink:0}
+  .jg-quien-chip>i{display:grid;place-items:center;font:700 10px inherit;font-style:normal;color:#fff;background:var(--c,#888)}
+  /* Quien ya no está —se fue o lo echaron— sigue en la fila, tachado:
+     quitarlo movería a los demás y nadie sabría qué pasó. */
+  .jg-quien-chip.fuera{opacity:.5;text-decoration:line-through;border-left-style:dashed}
+  .jg-voto-n{font:600 10.5px 'IBM Plex Mono',monospace;color:#b4232a;background:#fde8e8;border-radius:99px;padding:1px 6px}
+  .jg-voto{border:1px solid #e2e8ec;background:#f6f7f9;color:#8a97a3;border-radius:50%;width:22px;height:22px;padding:0;display:grid;place-items:center;font-size:11px;cursor:pointer;margin-right:-5px}
+  .jg-voto:hover{background:#fde8e8;border-color:#f3b4b4;color:#b4232a}
+  .jg-voto.on{background:#b4232a;border-color:#b4232a;color:#fff}
+  .jg-mirando{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;padding:11px 16px;border-radius:12px;background:#eef4ff;border:1px solid #c9dafc;color:#2d4a86;font-size:12.5px;line-height:1.5}
+  .jg-mirando>span:first-child{font-size:16px}
+  .jg-ojo{font-size:14px;line-height:1}
+  .jg-fin-exp{color:#b4232a;font-weight:600}
+  /* El chat va debajo del tablero, no al lado: al lado le robaba ancho
+     justo a los tableros que más lo necesitan. */
+  .jg-chat{margin-top:18px;background:#fff;border:1px solid #e4dfeb;border-radius:16px;overflow:hidden}
+  .jg-chat>header{display:flex;align-items:baseline;gap:10px;padding:12px 16px;border-bottom:1px solid #efebf5}
+  .jg-chat>header h2{font-size:13.5px;margin:0}.jg-chat>header small{font-size:11px;color:#8a97a3}
+  .jg-chat-lista{max-height:220px;overflow:auto;overscroll-behavior:contain;padding:10px 16px;display:grid;gap:6px;align-content:start}
+  .jg-chat-lista .vacio{padding:14px 0}
+  .jg-chat-msg{font-size:12.5px;line-height:1.5;color:#34404b;overflow-wrap:anywhere}
+  .jg-chat-msg b{color:var(--c,#555);margin-right:6px}
+  .jg-chat-msg b small{font:500 9.5px 'IBM Plex Mono',monospace;color:#8a97a3;background:#f2f4f6;border-radius:99px;padding:1px 6px;margin-left:3px}
+  .jg-chat-msg.mio{padding-left:8px;box-shadow:inset 2px 0 var(--c,#555)}
+  .jg-chat-form{display:flex;gap:8px;padding:10px 16px;border-top:1px solid #efebf5}
+  .jg-chat-form .inp{flex:1;min-width:0}
   .jg-invita{margin-top:16px;padding:16px;background:#fff;border:1px solid #e2e8ec;border-radius:10px;font-size:12.5px;color:#5a6772;line-height:1.6}
   .jg-enlace{display:flex;gap:8px;margin-top:10px}
   .jg-enlace .inp{flex:1;font-family:'IBM Plex Mono',monospace;font-size:11.5px}
@@ -738,6 +764,7 @@
   @keyframes jgF7Late{from{box-shadow:0 0 0 2px #e8a317,0 6px 12px #0004}to{box-shadow:0 0 0 4px #ffd978,0 0 18px #ffd978cc}}
   .jg-f7-sel{box-shadow:0 0 0 3px #7042df,0 8px 16px #0005!important;transform:rotate(var(--r,0deg)) translateY(calc(var(--y,0px) - 8px))!important}.jg-f7-guardada{transform:rotate(-8deg);opacity:.9}
   .jg-f7-oculta{visibility:hidden}
+  .jg-f7-aguarda{display:block;margin-top:6px;padding:7px 10px;border-radius:8px;background:#f2c14e14;border:1px solid #f2c14e44;color:#e8d9a8}.jg-f7-aguarda b{color:#ffd978}
   .jg-f7-cae{animation:jgF7Cae .32s cubic-bezier(.3,1.6,.5,1)}@keyframes jgF7Cae{from{filter:brightness(1.35);translate:0 -6px;scale:1.1}to{filter:none;translate:0 0;scale:1}}
   .jg-f7-sacude .jg-f7-jug{animation:jgF7Sacude .55s}@keyframes jgF7Sacude{0%,100%{translate:0}15%{translate:-8px 0}30%{translate:7px 0}45%{translate:-6px 0}60%{translate:4px 0}75%{translate:-2px 0}}
   .jg-f7-vuelos,.jg-f7-fx{position:absolute;inset:0;pointer-events:none}.jg-f7-vuelos{z-index:8}.jg-f7-fx{z-index:9;overflow:hidden}
@@ -931,6 +958,6 @@
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202609250110"></script>
+<script src="juegos-app.js?v=202609250241"></script>
 </body>
 </html>

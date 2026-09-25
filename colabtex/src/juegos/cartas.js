@@ -108,7 +108,12 @@ function precarga() {
 }
 
 export function crearCartas(ctx) {
-  const { uid, pid, jugar, terminar, ahora, secreto } = ctx;
+  const { pid, jugar, terminar, ahora, secreto } = ctx;
+  /* Quien mira ve la mesa desde el asiento del anfitrión: la mano de
+     abajo es la suya, pero boca abajo — no está en esta máquina — y
+     nada de lo que se pinta dice «tú». */
+  const mirando = !!ctx.mirando;
+  let uid = ctx.uid;
 
   let host = null, tic = null, muerto = false;
   let p = null, est = null;
@@ -198,6 +203,7 @@ export function crearCartas(ctx) {
      El mazo son 216 cartas y una partida no pasa de unas pocas rondas,
      así que nunca se acaba. */
   function miMano() {
+    if (mirando) return [];
     const s = siembra();
     if (!s || !est) return [];
     const usadas = (est.usadas && est.usadas[uid]) || [];
@@ -237,6 +243,9 @@ export function crearCartas(ctx) {
     /* barra */
     let fase = "";
     if (est.fase === "espera") fase = "Esperando a que entre alguien…";
+    else if (mirando) fase = est.fase === "fin"
+      ? (est.ganador ? `Gana ${nombre(est.ganador)}.` : "Partida terminada.")
+      : `Mirando: ${y ? y.nombre : "?"} contra ${o ? o.nombre : "?"}`;
     else if (est.fase === "fin") {
       if (est.motivo === "abandono") fase = est.ganador === uid ? "¡Ganas! El otro se fue." : "Abandonaste la partida.";
       else fase = est.ganador === uid ? "¡Trío! Ganas la partida." : "Trío del rival. Pierdes.";
@@ -296,7 +305,7 @@ export function crearCartas(ctx) {
   function etiqueta(j, esMio) {
     const n = (est.ganadas && est.ganadas[j.uid] || []).length;
     return `<span class="jg-punto" style="background:${esc(j.color || "#888")}"></span>
-      <b>${esc(esMio ? "Tú" : j.nombre)}</b>
+      <b>${esc(esMio && !mirando ? "Tú" : j.nombre)}</b>
       <span class="jg-cuenta">${n} carta${n === 1 ? "" : "s"} ganada${n === 1 ? "" : "s"}</span>`;
   }
 
@@ -320,14 +329,17 @@ export function crearCartas(ctx) {
           ${golpe ? efectoGolpe(cg) : ""}
           ${res === "empate" ? efectoHumo() : ""}
           ${htmlCarta(co, "jg-vuela-arriba")}
-          <div class="jg-veredicto">${res === "gana" ? "¡Te la llevas!" : res === "empate" ? "Empate" : "Se la lleva"}${
+          <div class="jg-veredicto">${res === "empate" ? "Empate"
+            : mirando ? "Se la lleva " + esc(nombre(ult.gana))
+            : res === "gana" ? "¡Te la llevas!" : "Se la lleva"}${
             golpe ? `<span class="jg-golpe-t">¡${cg.v}!</span>` : ""}</div>
           ${htmlCarta(cy, "jg-vuela-abajo")}
         </div>`;
     } else if (est.fase === "fin") {
       firma = "fin" + est.ganador;
       html = `<div class="jg-remate ${est.ganador === uid ? "jg-gana" : "jg-pierde"}">
-          <div class="jg-remate-t">${est.ganador === uid ? "🏆 Ganas" : "Pierdes"}</div>
+          <div class="jg-remate-t">${mirando ? "🏆 Gana " + esc(nombre(est.ganador))
+            : est.ganador === uid ? "🏆 Ganas" : "Pierdes"}</div>
           <div class="jg-remate-trio">${(est.trio || []).map(c => htmlCarta(c, "jg-pequena jg-brilla")).join("")}</div>
         </div>`;
     } else {
@@ -376,7 +388,7 @@ export function crearCartas(ctx) {
         return `<div class="jg-grupo">${cs.map(c => htmlCarta(c, "jg-mini" + (dentro(c) ? " jg-brilla" : ""))).join("")}</div>`;
       }).join("");
       set(id, j.uid + "|" + g.map(c => c.e + c.c + c.v).join(",") + "|" + enTrio.length,
-        `<div class="jg-trofeo-t">${esc(mio ? "Tus cartas" : "Cartas de " + j.nombre)}</div>
+        `<div class="jg-trofeo-t">${esc(mio && !mirando ? "Tus cartas" : "Cartas de " + j.nombre)}</div>
          <div class="jg-grupos">${grupos || '<span class="jg-nada">todavía ninguna</span>'}</div>`);
     }
   }
@@ -385,6 +397,7 @@ export function crearCartas(ctx) {
     let firma, html;
     if (est.fase === "espera") { firma = "esp"; html = `<span class="jg-nota">Pásale el enlace de la sala a quien quieras y empezáis.</span>`; }
     else if (est.fase === "fin") { firma = "fin"; html = `<span class="jg-nota">Partida terminada.</span>`; }
+    else if (mirando) { firma = "mira"; html = `<span class="jg-nota">Estás mirando: las manos no se ven desde aquí, solo las cartas que se echan.</span>`; }
     else if (est.comp && est.comp[uid]) { firma = "mandada"; html = `<span class="jg-nota">Tu carta está echada boca abajo. Se dan la vuelta cuando el rival eche la suya.</span>`; }
     else {
       firma = "elige" + elegida + "|" + mY.length;
@@ -403,7 +416,7 @@ export function crearCartas(ctx) {
        `juegos-main.js` ya impide la escritura, pero sin esto la carta se
        seleccionaba y el pie invitaba a echarla: la pantalla decía que
        quedaba jugada donde no queda ninguna. */
-    if (est && est.fase === "fin") return;
+    if (mirando || (est && est.fase === "fin")) return;
     const carta = ev.target.closest(".jg-carta.jg-jugable");
     if (carta && !carta.classList.contains("jg-quieta")) {
       elegida = Number(carta.getAttribute("data-i"));
@@ -445,7 +458,7 @@ export function crearCartas(ctx) {
   /* Revelar no lo decide nadie: en cuanto los dos compromisos están en
      el registro, cada navegador destapa el suyo. */
   async function automatismos() {
-    if (!est || est.fase !== "jugando" || enviando) return;
+    if (mirando || !est || est.fase !== "jugando" || enviando) return;
     const o = otro();
     if (!o || !est.comp[uid] || !est.comp[o.uid] || est.rev[uid]) return;
     const s = leeSecreto(pid, uid, est.ronda);
@@ -459,7 +472,7 @@ export function crearCartas(ctx) {
      propósito: la regla de la base rechaza cualquier jugada en cuanto
      `fin` existe, así que revelarla después es revelarla nunca. */
   async function cierre() {
-    if (cerrando) return;
+    if (mirando || cerrando) return;
     cerrando = true;
     const s = sec;
     if (s && est && !(est.semillas || {})[uid]) {
@@ -495,6 +508,7 @@ export function crearCartas(ctx) {
 
   function actualizar(partida, estado) {
     p = partida; est = estado;
+    if (mirando && est.jugadores.length) uid = est.jugadores[0].uid;
     pideSecreto();
     if (est.rondas.length > vistas) {
       vistas = est.rondas.length; tChoque = ahora(); elegida = null;

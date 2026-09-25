@@ -33,7 +33,7 @@ import { crearSolo } from "./juegos/solo/club.js";
 import { watchAuth, loginGoogle, logout } from "./firebase.js";
 import * as fb from "./fb-juegos.js";
 import { escapeHtml, timeAgo, colorForUid } from "./util.js";
-import { JUEGOS, reducir, jugadasDe, acumula, cupoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS } from "./juegos/motor.js";
+import { JUEGOS, reducir, jugadasDe, acumula, cupoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion } from "./juegos/motor.js";
 import { crearEscondite } from "./juegos/escondite.js";
 import { crearCartas } from "./juegos/cartas.js";
 import { crearCuadritos } from "./juegos/cuadritos.js";
@@ -105,10 +105,16 @@ const state = {
   salas: [],
   mias: [],
   fallo: null,            // por qué no se puede leer (reglas sin publicar, casi siempre)
-  cargando: false
+  cargando: false,
+  enCurso: []             // partidas empezadas que se pueden mirar
 };
 
-let offSalas = null, offMias = null, offPartida = null, offReloj = null;
+let offSalas = null, offMias = null, offPartida = null, offReloj = null, offEnCurso = null;
+let offChat = null, chatMsgs = [], chatFirma = "";
+let jugadasVistas = -1;   // cuántas jugadas tenía el registro la última vez
+let ultimoCambio = 0;     // cuándo creció el registro por última vez (reloj local)
+let relojVotos = 0;       // repinta los botones de votar, que dependen del tiempo
+let enCursoToque = 0;     // cuándo se anunció la partida en «En juego ahora»
 let cancelarLimpieza = null;
 let modulo = null, pidMontado = "";
 let vistaPintada = "";
@@ -232,8 +238,16 @@ function mostrar(dentro) {
    la otra fuente, y se toma la mayor de las dos, porque la escucha
    puede ir un instante por detrás de lo que uno mismo acaba de
    escribir. */
+const soyJugador = () => !!(state.partida && state.partida.jugadores && state.user &&
+  state.partida.jugadores[state.user.uid]);
+
 async function jugar(jugada) {
   if (!state.pid) return false;
+  /* Quien mira no juega. Las reglas ya lo impiden (una jugada la firma
+     un jugador de la sala), pero los módulos tienen temporizadores que
+     escriben solos — Flip 7 manda aportes — y un espectador no debe
+     ni intentarlo. */
+  if (!soyJugador()) return false;
   /* Una partida terminada no acepta más jugadas, y el sitio de decirlo
      es este y no cada juego. La regla de la base ya lo exige
      (`jugadas/$n` pide que `fin` no exista) y el reductor ignora todo lo
@@ -288,7 +302,7 @@ async function jugar(jugada) {
    la partida sigue acabada. */
 async function terminar(ganador, motivo) {
   const pid = state.pid;
-  if (!pid || finEnviado === pid) return;
+  if (!pid || finEnviado === pid || !soyJugador()) return;
   finEnviado = pid;
   if (enVuelo.size) {
     await Promise.allSettled([...enVuelo]);
@@ -362,12 +376,20 @@ function engancharVestibulo() {
     state.mias = (lista || []).sort((a, b) => (b.at || 0) - (a.at || 0));
     if (state.vista === "vestibulo") render();
   });
+  /* Sin reglas publicadas este nodo falla; no es motivo para tapar el
+     vestíbulo con el aviso: la lista simplemente sale vacía. */
+  offEnCurso = fb.watchEnCurso(lista => {
+    state.enCurso = lista || [];
+    if (state.vista === "vestibulo") render();
+  });
 }
 
 function engancharPartida(pid) {
   soltarPartida();
   proximo = 0; anotada = ""; finEnviado = ""; finCerrado = ""; dentroVistos = -1; tocaba = false;
   finVivo = ""; finDesde = 0; finSonado = ""; clearTimeout(finReloj);
+  jugadasVistas = -1; ultimoCambio = Date.now(); enCursoToque = 0;
+  chatMsgs = []; chatFirma = "";
   offPartida = fb.watchPartida(pid, (p, err) => {
     state.cargando = false;
     if (err) { state.fallo = err; state.partida = null; render(); return; }
@@ -386,8 +408,40 @@ function engancharPartida(pid) {
       proximo = Math.max(proximo, jugadasDe(p).length);
       cuidaLaSala(p);
       anotar(p);
+      const hechas = jugadasDe(p).length;
+      if (hechas !== jugadasVistas) { jugadasVistas = hechas; ultimoCambio = Date.now(); }
+      anunciaEnCurso(p, state.estado);
     }
     render();
+  });
+  offChat = fb.watchChat(pid, v => { chatMsgs = v || []; pintaChat(); });
+  /* Los botones de votar en un duelo aparecen solo tras un rato sin
+     jugadas, y eso no lo dice ninguna escucha: lo dice el reloj. */
+  relojVotos = setInterval(() => {
+    if (state.vista === "partida" && state.partida && state.estado) pintaQuienes(state.partida, state.estado);
+  }, 5000);
+}
+
+/* «En juego ahora»: el cartel con el que una partida empezada sale en
+   el vestíbulo para que otros entren a mirarla. Lo pone cualquiera de
+   sus jugadores — el primero que la ve empezada — y se refresca cada
+   cinco minutos mientras dura, porque el vestíbulo descarta los que
+   llevan un cuarto de hora sin tocarse (una pestaña que se cerró a
+   mitad no puede quitar el suyo). Al terminar lo quita quien lo vea. */
+function anunciaEnCurso(p, est) {
+  const u = state.user;
+  if (!u || !est) return;
+  if (datosFin(p, est) || p.fin) {
+    if (enCursoToque >= 0) { enCursoToque = -1; fb.quitaEnCurso(state.pid); }
+    return;
+  }
+  if (!(p.jugadores || {})[u.uid] || !est.listos) return;
+  if (enCursoToque > 0 && Date.now() - enCursoToque < 5 * 60 * 1000) return;
+  enCursoToque = Date.now();
+  fb.anunciaEnCurso(state.pid, {
+    juego: p.juego,
+    nombres: (est.jugadores || []).map(j => j.nombre || "").join(" · ").slice(0, 200),
+    n: (est.jugadores || []).length
   });
 }
 
@@ -404,6 +458,9 @@ function avisaTurno(toca, yaVista) {
 function soltarPartida() {
   document.title = TITULO; tocaba = false; clearTimeout(finReloj);
   if (offPartida) { try { offPartida(); } catch (e) {} offPartida = null; }
+  if (offChat) { try { offChat(); } catch (e) {} offChat = null; }
+  clearInterval(relojVotos); relojVotos = 0;
+  chatMsgs = []; chatFirma = "";
   if (cancelarLimpieza) { try { cancelarLimpieza(); } catch (e) {} cancelarLimpieza = null; }
   ambientar("");
   desmontaJuego();
@@ -567,13 +624,34 @@ function armazon() {
         <span id="jgQuienes" class="jg-quienes"></span>
         <button class="btn2" id="jgAbandonar" style="display:none">Abandonar</button>
       </div>
+      <div id="jgMirando"></div>
       <div id="jgInvita"></div>
       <div id="jgHost"></div>
       <div id="jgRevancha" aria-live="polite"></div>
-      <div id="jgFin"></div>`;
+      <div id="jgFin"></div>
+      <section class="jg-chat" id="jgChat" aria-label="Chat de la partida">
+        <header><h2>Chat de la sala</h2><small>lo leen jugadores y espectadores</small></header>
+        <div class="jg-chat-lista" id="jgChatLista" aria-live="polite"></div>
+        <form class="jg-chat-form" id="jgChatForm" autocomplete="off">
+          <input class="inp" id="jgChatTxt" maxlength="${fb.CHAT_LARGO}" placeholder="Escribe algo…">
+          <button class="btn" id="jgChatBtn">Enviar</button>
+        </form>
+      </section>`;
     $("jgVolver").onclick = salirDeLaPartida;
     $("jgAbandonar").onclick = abandonar;
+    $("jgChatForm").onsubmit = async ev => {
+      ev.preventDefault();
+      const campo = $("jgChatTxt"), texto = campo.value.trim();
+      if (!texto || !state.pid) return;
+      campo.value = "";
+      const ok = await fb.mandaChat(state.pid, { uid: state.user.uid, nombre: state.user.name }, texto);
+      /* Lo que no salió se devuelve al campo: perder una frase escrita
+         porque las reglas no están publicadas es peor que no mandarla. */
+      if (!ok && !campo.value) { campo.value = texto; avisa(Object.assign(new Error("PERMISSION_DENIED"), { code: "PERMISSION_DENIED" })); }
+    };
     pidMontado = "";
+    chatFirma = "";
+    pintaChat();
     return;
   }
   /* El vestíbulo es un salón: a la izquierda el catálogo, a la derecha la
@@ -611,6 +689,10 @@ function armazon() {
         <section class="jg-lado-caja">
           <header><h2>Tus partidas</h2></header>
           <div id="vesMias"></div>
+        </section>
+        <section class="jg-lado-caja">
+          <header><span class="jg-ojo" aria-hidden="true">👁</span><h2>En juego ahora</h2><span class="jg-lado-n" id="vesNCurso">0</span></header>
+          <div id="vesEnCurso"></div>
         </section>
       </aside>
       <div class="jg-ves-cat" id="vesCatalogo">
@@ -716,6 +798,30 @@ function pintaVestibulo() {
   for (const b of $("vesMias").querySelectorAll("[data-olvidar]")) {
     b.onclick = () => fb.olvidarMia(b.getAttribute("data-olvidar"), state.user.uid).catch(avisa);
   }
+
+  /* Las partidas que se pueden mirar. Las mías ya están arriba, y un
+     anuncio viejo es de una partida que alguien dejó a medias sin
+     cerrar la pestaña: la base no lo sabe, así que se filtra aquí. */
+  const fresco = fb.ahora() - fb.EN_CURSO_FRESCO;
+  const vivas = state.enCurso.filter(x => !mias.has(x.id) && (x.at || 0) > fresco);
+  $("vesNCurso").textContent = vivas.length;
+  $("vesEnCurso").innerHTML = vivas.length ? vivas.map(x => {
+    const j = JUEGOS[x.juego] || {};
+    return `
+    <div class="jg-sala" style="--c:${j.color || "#888"}">
+      <span class="jg-sala-ico" aria-hidden="true">${escapeHtml(ICONO[x.juego] || "●")}</span>
+      <div class="jg-sala-txt">
+        <b>${escapeHtml(j.nombre || x.juego)}</b>
+        <span>${escapeHtml(x.nombres || "")}</span>
+      </div>
+      <div class="jg-sala-der"><small>${x.n || ""}</small>
+        <button class="btn2" data-mirar="${escapeHtml(x.id)}">Mirar</button></div>
+    </div>`;
+  }).join("")
+    : `<div class="vacio">No hay partidas en juego ahora mismo.</div>`;
+  for (const b of $("vesEnCurso").querySelectorAll("[data-mirar]")) {
+    b.onclick = () => ir("#p/" + b.getAttribute("data-mirar"));
+  }
 }
 
 /* Los controles de la tarjeta. Se leen del DOM al pulsar y no se
@@ -773,28 +879,45 @@ function pintaPartida() {
   const j = JUEGOS[p.juego] || { nombre: p.juego, color: "#888" };
   $("jgTitulo").textContent = j.nombre;
   $("jgTitulo").style.color = j.color;
-  $("jgQuienes").innerHTML = (est.jugadores || []).map(x => `
-    <span class="jg-quien-chip" style="--c:${escapeHtml(x.color || "#888")}">
-      ${x.foto ? `<img src="${escapeHtml(x.foto)}" alt="" referrerpolicy="no-referrer">` : `<i>${escapeHtml((x.nombre || "?").charAt(0))}</i>`}
-      ${escapeHtml(x.nombre || "Alguien")}${x.uid === state.user.uid ? " (tú)" : ""}
-    </span>`).join("");
+  pintaQuienes(p, est);
 
   const enJuego = !datosFin(p, est) && (p.jugadores || {})[state.user.uid];
   $("jgAbandonar").style.display = enJuego && est.listos ? "" : "none";
 
-  // Un enlace permite ver la invitación; entrar requiere aceptarla.
+  /* Un enlace permite ver la invitación; entrar requiere aceptarla. Y
+     si ya no se puede entrar —la partida empezó—, se puede **mirar**: el
+     módulo del juego se monta igual que para un jugador, porque todo lo
+     que pinta sale del registro, que es público. Lo que no puede es
+     escribir: `jugar()` se niega a quien no está en la ficha, así que
+     ninguna pantalla tiene que saber que existe el modo espectador. */
   if (!p.jugadores?.[state.user.uid]) {
-    ambientar(""); desmontaJuego(); $("jgFin").innerHTML = "";
     $("jgRevancha").innerHTML = "";
     const admite = p.estado === "esperando" && !p.fin && est.jugadores.length < cupoDe(p);
-    $("jgInvita").innerHTML = '<div class="jg-invita"><b>' +
-      (admite ? "Te han invitado a jugar" : "Esta sala ya no admite jugadores") + '</b><p>' +
-      (admite ? "Únete para comenzar la partida con quienes están dentro." : "Puedes abrir otra sala desde el vestíbulo.") +
-      '</p>' + (admite ? '<button class="btn" id="jgUnirse">Unirse a la partida</button>' : '') + '</div>';
-    const unir = $("jgUnirse");
-    if (unir) unir.onclick = async () => { unir.disabled = true; await entrar(state.pid); if (unir.isConnected) unir.disabled = false; };
+    if (admite) {
+      $("jgMirando").innerHTML = "";
+      ambientar(""); desmontaJuego(); $("jgFin").innerHTML = "";
+      $("jgInvita").innerHTML = '<div class="jg-invita"><b>Te han invitado a jugar</b>' +
+        '<p>Únete para comenzar la partida con quienes están dentro.</p>' +
+        '<button class="btn" id="jgUnirse">Unirse a la partida</button></div>';
+      const unir = $("jgUnirse");
+      unir.onclick = async () => { unir.disabled = true; await entrar(state.pid); if (unir.isConnected) unir.disabled = false; };
+    } else {
+      const acabada = !!datosFin(p, est);
+      $("jgMirando").innerHTML = `<div class="jg-mirando"><span aria-hidden="true">👁</span>
+        <b>Estás mirando esta partida.</b>
+        <span>${acabada ? "Ya terminó: esto es cómo quedó." : est.listos ? "Lo ves en directo; puedes escribir en el chat, pero no jugar." : "Todavía no ha empezado."}</span></div>`;
+      $("jgInvita").innerHTML = "";
+      if (est.listos) {
+        ambientar(acabada ? "" : p.juego);
+        montaJuego(p);
+        if (modulo) modulo.actualizar(p, est);
+        pintaFin(p, est);
+      } else { ambientar(""); desmontaJuego(); $("jgFin").innerHTML = ""; }
+    }
+    pintaChat();
     return;
   }
+  $("jgMirando").innerHTML = "";
 
   /* Mientras falte gente, el enlace es lo único que hay que hacer. */
   $("jgInvita").innerHTML = est.listos ? "" : panelEspera(p, est);
@@ -863,7 +986,13 @@ function montaJuego(p) {
      juego es un objeto, y ramificarlo por juego lo convierte en cuatro. */
   modulo = fab({
     uid: state.user.uid, pid: state.pid, jugar, terminar, ahora: fb.ahora,
-    secreto: () => fb.leerSecreto(state.pid, state.user.uid),
+    /* Quien mira monta el mismo módulo, que con esto sabe que no debe
+       pintar una mano «suya» ni ofrecer botones que no van a escribir. */
+    mirando: !soyJugador(),
+    /* Un espectador no tiene mano propia, y leer `misPartidas` de una
+       partida en la que no está solo devolvería vacío tras un viaje. */
+    secreto: () => soyJugador()
+      ? fb.leerSecreto(state.pid, state.user.uid) : Promise.resolve(null),
     /* La pantalla avisa cuando acaba de contar una jugada: el cartel del
        final espera a que la cadena que ganó la partida se haya visto. */
     listo: () => { if (state.partida && state.estado) pintaFin(state.partida, state.estado); }
@@ -946,7 +1075,9 @@ function pintaFin(p, est) {
     : "Ganó " + nombreDe(est, g);
   const sub = clase === "perdi" ? "Ganó " + nombreDe(est, g) : "";
   const marca = marcadorFin(est);
-  const firma = clase + titulo + sub + f.motivo + marca + (p.revancha || "");
+  const echados = (est.expulsados || []).map(x => nombreDe(est, x.uid)).join(", ");
+  const expulsion = echados ? `Expulsad${(est.expulsados || []).length > 1 ? "os" : "o"} por votación: ${echados}.` : "";
+  const firma = clase + titulo + sub + f.motivo + marca + expulsion + (p.revancha || "");
   if (caja.dataset.firma === firma) return;      // no repintar: reinicia la animación
   caja.dataset.firma = firma;
   if (vivo && finSonado !== state.pid) {
@@ -961,6 +1092,7 @@ function pintaFin(p, est) {
         <div class="jg-fin-t">${escapeHtml(titulo)}</div>
         ${sub ? `<div class="jg-fin-sub">${escapeHtml(sub)}</div>` : ""}
         <div class="jg-fin-m">${escapeHtml(razon(f.motivo))}</div>
+        ${expulsion ? `<div class="jg-fin-m jg-fin-exp">${escapeHtml(expulsion)}</div>` : ""}
         ${marca}
         <div class="jg-fin-btns">
           ${juega ? `<button class="btn" id="jgOtra">${p.revancha ? "Aceptar revancha" : "Pedir revancha"}</button>` : ""}
@@ -1044,6 +1176,97 @@ async function abandonar() {
   try { await jugar({ t: "abandona", uid: state.user.uid }); } catch (e) { avisa(e); }
 }
 
+/* ---------- quién juega, y la votación para echar a alguien ----------
+   Los votos son jugadas como las demás (`{t:"voto", uid, contra}`), así
+   que el reductor los ve en el mismo orden en los dos navegadores y la
+   expulsión ocurre exactamente en la misma jugada para todos: no hay un
+   «ya lo han echado» que un cliente vea y el otro no.
+
+   El botón no sale siempre. En un duelo votar contra el otro es ganar,
+   así que solo se ofrece a quien **no** tiene el turno y lleva un rato
+   (`VOTO_DUELO_MS`) esperando sin que se mueva nada: es el remedio para
+   la pestaña dormida, no un botón de «gano yo». Con tres o más la
+   mayoría de los demás ya es freno suficiente y se ofrece desde que la
+   partida empieza. */
+const VOTO_DUELO_MS = 90 * 1000;
+
+function fueraDe(est) {
+  const f = new Set();
+  for (const o of [est.fuera, est.caidos]) if (o) for (const u in o) if (o[u]) f.add(u);
+  for (const x of est.expulsados || []) f.add(x.uid);
+  return f;
+}
+
+function pintaQuienes(p, est) {
+  const caja = $("jgQuienes");
+  if (!caja) return;
+  const yo = state.user.uid;
+  const juego = !!(p.jugadores || {})[yo];
+  const fuera = fueraDe(est);
+  const activos = (est.jugadores || []).filter(x => !fuera.has(x.uid));
+  const hace = mayoriaExpulsion(activos.length);
+  const abierta = juego && est.listos && !datosFin(p, est) && !fuera.has(yo) && activos.length >= 2;
+  const duelo = activos.length <= 2;
+  const puedoVotar = abierta && (!duelo || (!meToca(est, yo) && Date.now() - ultimoCambio >= VOTO_DUELO_MS));
+  const votos = est.votos || {};
+  const firma = JSON.stringify([est.jugadores.map(x => [x.uid, x.nombre, x.color, x.foto]), [...fuera], votos, puedoVotar, hace]);
+  if (caja.dataset.firma === firma) return;
+  caja.dataset.firma = firma;
+  caja.innerHTML = (est.jugadores || []).map(x => {
+    const contra = votos[x.uid] || [];
+    const mio = contra.includes(yo);
+    const out = fuera.has(x.uid);
+    const boton = !out && x.uid !== yo && (mio || puedoVotar)
+      ? `<button class="jg-voto${mio ? " on" : ""}" data-voto="${escapeHtml(x.uid)}" title="${mio ? "Retirar tu voto" : "Votar para expulsar a " + escapeHtml(x.nombre || "Alguien")}">${mio ? "↺" : "⏏"}</button>` : "";
+    return `
+    <span class="jg-quien-chip${out ? " fuera" : ""}" style="--c:${escapeHtml(x.color || "#888")}">
+      ${x.foto ? `<img src="${escapeHtml(x.foto)}" alt="" referrerpolicy="no-referrer">` : `<i>${escapeHtml((x.nombre || "?").charAt(0))}</i>`}
+      ${escapeHtml(x.nombre || "Alguien")}${x.uid === yo ? " (tú)" : ""}
+      ${contra.length && !out ? `<small class="jg-voto-n" title="Votos para expulsar">⏏ ${contra.length}/${hace}</small>` : ""}
+      ${boton}
+    </span>`;
+  }).join("");
+  for (const b of caja.querySelectorAll("[data-voto]")) b.onclick = () => vota(b.getAttribute("data-voto"));
+}
+
+async function vota(contra) {
+  const est = state.estado;
+  if (!est) return;
+  const yo = state.user.uid;
+  const ya = ((est.votos || {})[contra] || []).includes(yo);
+  const nombre = nombreDe(est, contra);
+  const activos = (est.jugadores || []).filter(x => !fueraDe(est).has(x.uid)).length;
+  const hace = mayoriaExpulsion(activos);
+  const aviso = ya ? `¿Retirar tu voto contra ${nombre}?`
+    : hace <= 1 ? `¿Expulsar a ${nombre}? Sale de la partida al momento, como si hubiera abandonado.`
+    : `¿Votar para expulsar a ${nombre}? Hacen falta ${hace} votos de los demás; cuando se alcancen, sale como si hubiera abandonado.`;
+  if (!confirm(aviso)) return;
+  try { await jugar(ya ? { t: "voto", uid: yo, contra, no: true } : { t: "voto", uid: yo, contra }); }
+  catch (e) { avisa(e); }
+}
+
+/* ---------- el chat ----------
+   Va aparte de `partidas/` (`chat/<pid>`) para que escribir no sea una
+   jugada: el registro de jugadas es el estado, y un «hola» no puede
+   cambiar de quién es el turno. Lo escriben también los espectadores. */
+function pintaChat() {
+  const lista = $("jgChatLista");
+  if (!lista) return;
+  const firma = chatMsgs.map(m => m.id).join(",");
+  if (lista.dataset.firma === firma && chatFirma === firma) return;
+  lista.dataset.firma = firma;
+  chatFirma = firma;
+  const yo = state.user && state.user.uid;
+  const jugadores = (state.partida && state.partida.jugadores) || {};
+  lista.innerHTML = chatMsgs.length ? chatMsgs.map(m => `
+    <div class="jg-chat-msg${m.uid === yo ? " mio" : ""}" style="--c:${escapeHtml(colorForUid(m.uid || ""))}">
+      <b>${escapeHtml(m.nombre || "Alguien")}${jugadores[m.uid] ? "" : ' <small>mirando</small>'}</b>
+      <span>${escapeHtml(m.t || "")}</span>
+    </div>`).join("")
+    : `<div class="vacio">Nadie ha escrito todavía.</div>`;
+  lista.scrollTop = lista.scrollHeight;
+}
+
 /* ---------- arranque ---------- */
 /* El botón dice lo que hay, no lo que haría al pulsarlo: un altavoz
    tachado sobre un juego mudo se lee como «pulsa para callarlo». */
@@ -1095,8 +1318,8 @@ function wire() {
       state.user = null;
       state.base = null;
       soltarPartida();
-      for (const f of [offSalas, offMias, offReloj]) { if (f) { try { f(); } catch (e) {} } }
-      offSalas = offMias = offReloj = null;
+      for (const f of [offSalas, offMias, offReloj, offEnCurso]) { if (f) { try { f(); } catch (e) {} } }
+      offSalas = offMias = offReloj = offEnCurso = null;
       vistaPintada = "";
       mostrar(false); pintaUsuario();
       return;

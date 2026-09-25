@@ -15,6 +15,10 @@
                                la semilla privada con la que se baraja
                                *su* mazo de cartas (ver abajo)
      ranks/<juego>/<uid>       la fila de la clasificación
+     chat/<pid>/<id>           {uid, nombre, t, at} — la charla de la sala,
+                               que escriben jugadores y espectadores
+     enCurso/<pid>             {juego, nombres, n, at} — el cartel de
+                               «en juego ahora» del vestíbulo
 
    Dos cosas de las reglas mandan sobre el diseño de este archivo:
 
@@ -56,7 +60,8 @@
 import { db } from "./firebase.js";
 import {
   ref, get, set, update, push, remove, onValue, onDisconnect,
-  runTransaction, query, orderByChild, equalTo, serverTimestamp, onChildAdded
+  runTransaction, query, orderByChild, equalTo, serverTimestamp, onChildAdded,
+  limitToLast, startAt
 } from "firebase/database";
 import {
   claveJugada, semillaAleatoria, salAleatoria, compromiso, LADO, cupoDe
@@ -328,3 +333,49 @@ export function watchVivo(pid, alCabecera, alTrozo) {
   return () => { a(); b(); };
 }
 export const borraVivo = pid => remove(ref(db, `vivo/${pid}`)).catch(() => {});
+
+/* ---------- el chat de la sala ----------
+   `chat/<pid>` y no `partidas/<pid>/chat`: colgado de la partida, cada
+   mensaje reescribiría el nodo que todos escuchan y el reductor volvería
+   a correr por una frase. Cada mensaje se escribe una vez y no se edita
+   (la regla exige `!data.exists()`), y solo mientras la partida existe.
+   Se escuchan los últimos CHAT_MAX: una sala larga no tiene por qué
+   descargar su charla entera cada vez que alguien entra a mirar. */
+export const CHAT_MAX = 100, CHAT_LARGO = 300;
+export function mandaChat(pid, quien, texto) {
+  const t = String(texto || "").trim().slice(0, CHAT_LARGO);
+  if (!t) return Promise.resolve(false);
+  return push(ref(db, `chat/${pid}`), {
+    uid: quien.uid, nombre: String(quien.nombre || "Jugador").slice(0, 80),
+    t, at: serverTimestamp()
+  }).then(() => true);
+}
+export function watchChat(pid, cb) {
+  const q = query(ref(db, `chat/${pid}`), limitToLast(CHAT_MAX));
+  return onValue(q, s => {
+    const v = [];
+    s.forEach(h => { v.push(Object.assign({ id: h.key }, h.val())); });
+    cb(v, null);
+  }, err => cb([], err));
+}
+
+/* ---------- «en juego ahora» ----------
+   Para mirar una partida hay que saber que existe, y la consulta natural
+   (`estado === 'jugando'`) bajaría el registro de jugadas de cada una.
+   Así que los jugadores cuelgan un cartel pequeño en `enCurso/<pid>` y
+   lo van refrescando (`at`) mientras juegan; el vestíbulo solo lista los
+   frescos, de modo que una partida abandonada con la pestaña cerrada se
+   cae sola de la lista aunque su cartel siga ahí. Lo quita quien vea el
+   final, y las reglas dejan a cualquiera borrar el de una partida que ya
+   acabó o que ya no existe. */
+export const EN_CURSO_FRESCO = 15 * 60 * 1000;
+export const anunciaEnCurso = (pid, datos) =>
+  set(ref(db, `enCurso/${pid}`), Object.assign({}, datos, { at: serverTimestamp() })).catch(() => {});
+export const quitaEnCurso = pid => remove(ref(db, `enCurso/${pid}`)).catch(() => {});
+export function watchEnCurso(cb) {
+  const q = query(ref(db, "enCurso"), orderByChild("at"), startAt(ahora() - EN_CURSO_FRESCO));
+  return onValue(q, s => {
+    const v = s.val() || {};
+    cb(Object.entries(v).map(([id, x]) => Object.assign({ id }, x)), null);
+  }, err => cb([], err));
+}

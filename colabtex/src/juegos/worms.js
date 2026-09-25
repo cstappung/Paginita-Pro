@@ -51,6 +51,11 @@ export function crearWorms({ uid, pid, jugar, terminar }) {
       if (j.t === "turno") { enviadas.add(idx); turnos.push({ idx, uid: j.uid, k: j.k, s: j.s, v: j.v, d: j.d, ti: j.ti }); }
       else if (j.t === "abandona") { enviadas.add(idx); if (!abandonos.has(j.uid)) { abandonos.add(j.uid); fuera.push({ uid: j.uid, idx }); } }
     }
+    /* Una expulsión por votos no es un «abandona» en el registro crudo:
+       es el voto que alcanzó la mayoría, y solo `votacion()` lo sabe. */
+    for (const e of (est?.expulsados || [])) {
+      if (!abandonos.has(e.uid)) { abandonos.add(e.uid); fuera.push({ uid: e.uid, idx: e.k }); }
+    }
     /* La primera tanda va aunque esté vacía: el marco no arranca hasta
        saber que no hay nada que ponerse al día. */
     if (turnos.length || !reenvia.primera) { reenvia.primera = true; enviar("turnos", { lista: turnos }); }

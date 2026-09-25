@@ -1688,6 +1688,64 @@ fits a Google URL and no uploaded photo at all. Three consequences:
   validation — so this needed **no rules change**, which after Reversi is a
   feature in itself.
 
+**Voting someone out is a move, not a new mechanism** (`votacion` and
+`mayoriaExpulsion` in `motor.js`). A vote is `{t:"voto", uid, contra}`, and
+withdrawing it is another entry with `no:true`, so the log stays append-only
+and the rules needed nothing new. `reducir()` runs `votacion(p)` **before**
+any game reducer. The vote that reaches the majority of the *other* players
+still in the room is rewritten, at read time and at its own key, as
+`{t:"abandona", uid, expulsado:true, por}`. Every game already handles a
+player who left. Votes that expel nobody are removed before the game reducer
+sees them, so no game had to learn to ignore them. `est.votos` (who is voting
+against whom) and `est.expulsados` (`[{uid, por, k}]`) come out alongside.
+Order decides here too:
+
+- a vote counts against the room as it is at that moment;
+- a vote from or against someone already gone does not count;
+- pending votes do not fire by themselves when the room shrinks.
+
+With two players the majority is one vote, so expelling someone means
+winning. That is why `pintaQuienes` in `juegos-main.js` offers the ⏏ button
+in a duel only when the move is not mine and the board has not moved for
+`VOTO_DUELO_MS` (90 s). The reducer cannot check that delay because moves
+carry no time, which is the same price abandonar already pays. With three or
+more players the button is always there. It is never shown to spectators,
+against yourself, or against someone already out. The seat stays in the
+header, struck through (`.jg-quien-chip.fuera`), and the fin cartel names who
+was expelled and by whom (`.jg-fin-exp`). Circuit Breakers needs one extra
+step: `worms.js`'s `reenvia()` reads the **raw** log to forward `abandona`
+entries to the frame, and an expulsion is not in the raw log, so it also
+forwards `est.expulsados`. Without that the expelled squad kept playing
+inside the iframe. `tests/votos.test.cjs` covers the majority table, vote
+withdrawal, votes that come too late, and each reducer treating an expulsion
+as an abandono.
+
+**Anyone signed in can watch a room** (spectator mode). The rules already
+let everyone read `partidas/`; what was missing was a screen that did not
+assume the viewer plays. `soyJugador()` in `juegos-main.js` gates `jugar()`
+and `terminar()`. Every module gets `ctx.mirando`, and a spectator's
+`secreto()` resolves `null` without touching `misPartidas`. Cartas is the
+only screen that needed real work: a spectator sees the duel from the first
+player's seat, with no hand (it is secret by construction) and every "tú"
+replaced by a name. Flip 7's `cierre()` returns early for a spectator, which
+otherwise re-armed its one-second timer forever. `anotar()` already skipped
+non-members. For games in progress to appear in the lobby ("En juego
+ahora"), each player's tab writes a small notice to `enCurso/<pid>` while the
+game runs, refreshing it every five minutes (`enCursoToque`) and removing it
+(`fb.quitaEnCurso`) when the game ends; the lobby queries only notices
+newer than `EN_CURSO_FRESCO` (15 min), so a tab that died mid-game drops
+out by itself. Nobody
+has to listen to `partidas` as a whole, which would download every move log.
+
+**The room chat lives outside the move log**, in `chat/<pid>`. The log is the
+state, and a «hola» must not change whose turn it is. Players and spectators
+both write to it, each message is written once and signed with the writer's
+own uid, and the length is capped at `CHAT_LARGO` characters. The spectator
+tag on a message is computed at paint time from `partida.jugadores`, not
+stored. Both new nodes, `chat` and `enCurso`, need the rules re-published
+(`firebase/CONFIGURAR-FIREBASE.md`). Until then games play normally, but the
+chat sends nothing and the lobby shows no games in progress.
+
 **A `PERMISSION_DENIED` now says what to do about it.** The rules in the repo
 are not the rules in force: they are published by hand in the console and
 pushing to Pages does not deploy them, so the live copy lags behind every new
@@ -1843,7 +1901,31 @@ its value to force a re-draw by the suplentes (it re-rolls the card, it cannot
 choose it), and with three seated a hasty suplente can jump in early; with four
 or more it needs an accomplice. Every contribution still goes through the audit.
 What suplentes cannot fix is an absent player on **their own** decision
-(`decide`/`elige`): there is no kick, and the others wait.
+(`decide`/`elige`). The others wait, and after `AVISO_ESPERA` (10 s) the
+table names who it is waiting for and points to the vote to expel them. In a
+duel, where there are no suplentes, that vote is also the only remedy for a
+rival whose tab has gone to sleep.
+
+**Nothing in `flip7.js` depends on a single one-shot timer firing.** Timers
+get lost: a background tab throttles them, a locked phone freezes them, and a
+failed write never re-armed them. Each of those left a table stuck for good,
+which is how "I lost, then a card came and I couldn't play" happened. Four
+things close those gaps:
+
+- **A heartbeat.** Every `LATIDO_MS` (2 s), `late()` re-runs `automatismos()`
+  and repaints. It also throws away a contribution timer that should have
+  fired more than 4 s ago, un-sticks cards left `enVuelo` by an animation that
+  never finished, and retries `cierre()` on a finished board.
+- **A timeout on every write.** `conTope` releases the buttons after
+  `ENVIO_MAX` (12 s). A transaction with no network does not fail, it waits,
+  and meanwhile «Pedir carta» stayed greyed out with no way out. If the move
+  did reach the database, the reducer ignores the repeat.
+- **Retrying a contribution that failed.** It is retried after 1.5 s instead
+  of only being unmarked.
+- **No delay for a hidden designated tab.** It sends its contribution at once
+  instead of after `PAUSA_ROBO`. The pause exists so someone watching sees
+  the card fly, and a hidden tab is watching nothing. Suplentes still wait,
+  or they would always get in first.
 
 Three smaller holes of the same family: a `jugar` that returns false resets
 `enviadoN` so the contribution is retried instead of being marked as sent;

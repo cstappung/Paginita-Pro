@@ -66,6 +66,18 @@ const ESPERA_SEMILLAS = 6000;
    de soltar el cartel de fin de partida. */
 const VUELO_MS = 760;
 const FIN_MS = 2200;
+/* El latido: cada cuánto se repasa si esta pestaña debe algo a la mesa
+   (un aporte, un cierre) aunque no haya llegado nada nuevo. Los relojes
+   de un solo disparo se pierden — una pestaña de fondo los frena, un
+   móvil bloqueado los congela, una escritura fallida no los rearmaba —
+   y cada uno de esos huecos era una mesa parada para siempre. */
+const LATIDO_MS = 2000;
+/* Lo más que puede tardar una jugada en volver antes de soltar los
+   botones. Una transacción sin red no falla: espera, y mientras tanto
+   «Pedir carta» se quedaba gris sin forma de salir. */
+const ENVIO_MAX = 12000;
+/* Cuánto lleva la mesa esperando a alguien antes de decirlo con nombre. */
+const AVISO_ESPERA = 10000;
 const ANCHO = 44;             // el ancho de una carta normal, en px
 
 const quieto = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -198,14 +210,16 @@ export function crearFlip7(ctx) {
   let host = null, muerto = false;
   let p = null, est = null, M = null;
   let sec = null, secPedido = false, secListo = false;
-  let enviando = false;
+  let enviando = false, enviandoT = 0;
+  let latido = null;
+  let esperaFirma = "", esperaDesde = 0;   // qué espera la mesa y desde cuándo
   let enviadoN = -1;           // robo cuyo aporte ya salió de esta pestaña
-  let reloj = null, relojN = -1;
+  let reloj = null, relojN = -1, relojHasta = 0;
   let roboN = -1, roboT = 0;   // el robo pendiente y cuándo lo vio esta pestaña
   let rondaVista = 0, tRonda = 0;
   let sel1 = null;             // primera carta del intercambio, aún sin pareja
   let tramposos = [], auditando = false, firmaAudit = "";
-  let cerrando = false, finVisto = 0, relojFin = null;
+  let cerrando = false, finVisto = 0, relojFin = null, cierreT = 0;
   const firmas = {};
 
   /* La puesta en escena. */
@@ -259,12 +273,14 @@ export function crearFlip7(ctx) {
       </div>`;
     host.addEventListener("click", alClic);
     document.addEventListener("visibilitychange", alVolver);
+    latido = setInterval(late, LATIDO_MS);
     pideSecreto();
   }
 
   function destruir() {
     muerto = true;
     clearTimeout(reloj); clearTimeout(relojFin); clearTimeout(relojRes); clearTimeout(relojListo);
+    clearInterval(latido);
     for (const t of temporizadores) clearTimeout(t);
     temporizadores.clear();
     document.removeEventListener("visibilitychange", alVolver);
@@ -553,10 +569,26 @@ export function crearFlip7(ctx) {
       html = `${htmlCarta(c, "jg-f7-mini")}<span class="jg-nota">${esc(textoEleccion(c, w.op))}</span>
         ${sel1 ? `<button class="jg-btn jg-f7-anula" id="f7Anula">Cambiar la primera</button>` : ""}`;
     } else {
-      firma = "otro";
-      html = `<span class="jg-nota">Pide carta cuando sea tu turno. Siete números distintos cierran la ronda con +15; un repetido y te quedas sin nada.</span>`;
+      const ag = aguardados(), largo = ag.length && Date.now() - esperaDesde > AVISO_ESPERA;
+      const seg = largo ? Math.round((Date.now() - esperaDesde) / 5000) * 5 : 0;
+      firma = "otro" + (largo ? ag.join(",") + seg : "");
+      html = largo
+        ? `<span class="jg-nota jg-f7-aguarda">La mesa espera a <b>${esc(ag.map(nombre).join(" y "))}</b> desde hace ${seg} s.
+            Si tiene la pestaña de fondo o el móvil bloqueado no puede seguir sin esa persona${est.jugadores.length - Object.keys(est.fuera || {}).length > 2 ? " (los suplentes cubren los repartos, no sus decisiones)" : ""}:
+            avísale, o votad su expulsión desde la lista de jugadores de la sala.</span>`
+        : `<span class="jg-nota">Pide carta cuando sea tu turno. Siete números distintos cierran la ronda con +15; un repetido y te quedas sin nada.</span>`;
     }
     set("f7Pie", firma, html);
+  }
+
+  /* A quién espera la mesa ahora mismo, sin contarme a mí: quien tiene
+     que decidir o elegir, o quienes aún no han mandado su parte del
+     reparto. Es lo que se dice con nombre cuando la espera se alarga. */
+  function aguardados() {
+    const w = est && est.espera;
+    if (!w || est.fase !== "jugando") return [];
+    const u = w.k === "decide" ? [w.uid] : w.k === "elige" ? [w.quien] : (w.faltan || []);
+    return u.filter(x => x !== uid);
   }
 
   function textoEleccion(c, op) {
@@ -813,7 +845,9 @@ export function crearFlip7(ctx) {
       resumenR = f.r;
       clearTimeout(relojRes);
       relojRes = setTimeout(() => {
-        if (muerto || !est || est.fase !== "jugando") return;
+        /* Solo mientras se reparte la ronda nueva: si ya hay que decidir o
+           elegir, el resumen taparía justo los asientos donde se elige. */
+        if (muerto || !est || est.fase !== "jugando" || !fantasma()) return;
         mostrarResumen(false);
         relojRes = setTimeout(escondeResumen, 3400);
       }, 500);
@@ -896,21 +930,31 @@ export function crearFlip7(ctx) {
     }
   }
 
+  /* Una jugada con tope de tiempo: si no vuelve en ENVIO_MAX se sueltan
+     los botones igual. Si al final sí entró, el reductor ignora la
+     repetida (ya no es el turno de nadie para ella); si no entró, se
+     puede volver a pulsar — que es justo lo que no se podía. */
+  function conTope(promesa) {
+    let t;
+    return Promise.race([promesa, new Promise((_, no) => { t = setTimeout(() => no(new Error("la jugada no vuelve")), ENVIO_MAX); })])
+      .finally(() => clearTimeout(t));
+  }
+
   async function manda(j) {
     if (enviando) return;
-    enviando = true; pinta();
-    try { await jugar(j); } catch (e) { console.warn("[flip7]", e); }
+    enviando = true; enviandoT = Date.now(); pinta();
+    try { await conTope(jugar(j)); } catch (e) { console.warn("[flip7]", e); }
     finally { enviando = false; if (est) pinta(); }
   }
 
   async function pide() {
     const s = miSemilla();
-    if (!s || !est || est.espera.k !== "decide" || est.espera.uid !== uid) return;
+    if (enviando || !s || !est || !est.espera || est.espera.k !== "decide" || est.espera.uid !== uid) return;
     const n = est.n;
-    enviando = true; pinta();
+    enviando = true; enviandoT = Date.now(); pinta();
     try {
       const v = await aporteF7(s.sem, s.sal, n);
-      await jugar({ t: "pide", uid, n, v });
+      await conTope(jugar({ t: "pide", uid, n, v }));
     } catch (e) { console.warn("[flip7]", e); }
     finally { enviando = false; if (est) pinta(); }
   }
@@ -937,26 +981,62 @@ export function crearFlip7(ctx) {
     clearTimeout(reloj);
     relojN = w.n;
     const rango = papel(w);
-    const falta = Math.max(PAUSA_ROBO, PAUSA_RONDA - (Date.now() - tRonda) * (w.de === "reparto" ? 1 : 99))
-      + (rango ? Math.max(0, SUPLENCIA_MS + (rango - 1) * SUPLENCIA_PASO - (Date.now() - roboT)) : 0);
+    /* La pausa es para que quien mira vea volar la carta. Una pestaña de
+       fondo no la ve, y su reloj el navegador lo estira a su antojo: el
+       designado que está detrás aporta ya, y el ritmo lo marca el otro,
+       que sí mira. Un suplente espera igual — si no, pisaría siempre. */
+    const falta = !rango && document.hidden ? 0
+      : Math.max(PAUSA_ROBO, PAUSA_RONDA - (Date.now() - tRonda) * (w.de === "reparto" ? 1 : 99))
+        + (rango ? Math.max(0, SUPLENCIA_MS + (rango - 1) * SUPLENCIA_PASO - (Date.now() - roboT)) : 0);
+    relojHasta = Date.now() + falta;
     reloj = setTimeout(async () => {
       reloj = null;
       const x = est && est.espera;
-      if (muerto || !x || x.k !== "roba" || x.n !== relojN || papel(x) < 0 || enviadoN === x.n) return;
+      if (muerto || !x || x.k !== "roba" || x.n !== relojN || papel(x) < 0 || enviadoN === x.n) { relojN = -1; return; }
       const s = miSemilla();
-      if (!s) return;
+      if (!s) { relojN = -1; return; }
       enviadoN = x.n;
+      let ok = false;
       try {
         const v = await aporteF7(s.sem, s.sal, x.n);
-        if (!(await jugar({ t: "r", uid, n: x.n, v }))) enviadoN = -1;
-      } catch (e) { enviadoN = -1; console.warn("[flip7]", e); if (est) automatismos(); }
+        ok = await conTope(jugar({ t: "r", uid, n: x.n, v }));
+      } catch (e) { console.warn("[flip7]", e); }
+      /* Un aporte que no entró se vuelve a intentar: antes solo se
+         desmarcaba, y nada volvía a armar el reloj hasta que llegase
+         otra jugada — que no llegaba, porque la mesa esperaba ésta. */
+      if (!ok && !muerto) {
+        if (enviadoN === x.n) enviadoN = -1;
+        relojN = -1;
+        luego(() => { if (est) automatismos(); }, 1500);
+      }
     }, falta);
+  }
+
+  /* El latido: lo que tenga que salir de esta pestaña sale aunque los
+     relojes de un disparo se hayan perdido, y lo que se ve se pone al
+     día (el aviso de a quién se espera, cartas que se quedaron «en el
+     aire» por una animación que nunca acabó). */
+  function late() {
+    if (muerto || !est) return;
+    if (enviando && Date.now() - enviandoT > ENVIO_MAX + 3000) enviando = false;
+    if (vuelos === 0 && enVuelo.size && !document.hidden) for (const id of [...enVuelo]) destapa(id);
+    if (est.fase === "jugando") {
+      /* Un reloj que debía haber saltado hace rato y no lo hizo (una
+         pestaña que se durmió con él puesto) se tira y se rearma. */
+      if (reloj && Date.now() > relojHasta + 4000) { clearTimeout(reloj); reloj = null; relojN = -1; }
+      automatismos();
+      pinta();
+    } else if (est.fase === "fin" && !(p.fin && p.fin.at) && Date.now() - cierreT > 3000) cierre();
   }
 
   /* Al acabar: revelar la semilla y, cuando la hayan revelado todos los
      que siguen en la mesa (o haya pasado un rato), cerrar la partida. */
   function cierre() {
+    cierreT = Date.now();
     if (!finVisto) finVisto = Date.now();
+    /* Quien mira no tiene semilla que revelar ni partida que cerrar: sin
+       esto se quedaba rearmando este reloj cada segundo para nada. */
+    if (ctx.mirando) return;
     if (!cerrando && jugador(uid) && !(est.semillas || {})[uid] && secListo) {
       cerrando = true;
       const s = miSemilla();
@@ -994,6 +1074,8 @@ export function crearFlip7(ctx) {
     }
     const w = est.espera;
     if (sel1 && !(w && w.k === "elige" && w.quien === uid && w.op.tipo === "2")) sel1 = null;
+    const fe = !w || est.fase !== "jugando" ? "" : w.k === "roba" ? "r" + w.n + ":" + (w.faltan || []).join(",") : w.k + (w.uid || w.quien) + est.n;
+    if (fe !== esperaFirma) { esperaFirma = fe; esperaDesde = Date.now(); }
 
     const hist = est.hist || [];
     const nuevos = primera ? [] : nuevosDe(histPrev, hist).slice(-16);
