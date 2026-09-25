@@ -412,3 +412,44 @@ test('super: el comodín sólo se lo puede jugar quien lo saca',async()=>{
  }
  assert.ok(vistos>=1,'no salió ningún comodín');
 });
+
+test('super: los negativos se pueden tirar a quien ya se pasó, y le restan del total',async()=>{
+ const casos={super:0,venganza:0};
+ for(const modo of ['super','venganza'])for(let s=1;s<=80&&casos[modo]<2;s++){
+  const {p,sec}=await sala(modo,5,s);const M=mazoF7(modo),k=cuenta(s);
+  let e=reducir(p),pasos=0;
+  while(e.fase==='jugando'&&pasos++<4000){
+   const w=e.espera;
+   if(w.k==='elige'&&M[w.id].k==='m'&&(M[w.id].v<0||M[w.id].mitad)){
+    const muerto=Object.keys(sec).find(u=>e.lineas[u].estado==='pasa');
+    if(muerto){
+     casos[modo]++;
+     if(modo==='venganza'){assert.ok(!w.op.uids.includes(muerto));break;}
+     assert.ok(w.op.uids.includes(muerto),'no ofrece al que se pasó');
+     const r=e.ronda,antes=e.puntos[muerto];
+     e=mover(p,{t:'apunta',uid:w.quien,a:muerto});
+     if(e.ronda===r){assert.ok(e.golpe[muerto],'no marca el golpe al total');}
+     // al cerrar la ronda, el total del muerto no sube y lo perdido queda en aj
+     while(e.fase==='jugando'&&e.ronda===r&&pasos++<4000){
+      const x=e.espera;
+      if(x.k==='roba'){const u=x.faltan[0];e=mover(p,{t:'r',uid:u,n:x.n,v:await aporteF7(sec[u].sem,sec[u].sal,x.n)});}
+      else if(x.k==='decide')e=mover(p,{t:'planta',uid:x.uid});
+      else if(x.k==='bono')e=mover(p,{t:'bono',uid:x.quien,a:x.quien});
+      else e=mover(p,{t:'apunta',uid:x.quien,...eleccion(x.op,k)});
+      if(x.k==='decide'&&x.cero)e=mover(p,{t:'pide',uid:x.uid,n:e.n,v:await aporteF7(sec[x.uid].sem,sec[x.uid].sal,e.n)});
+     }
+     const f=e.finRonda;
+     assert.equal(f.pts[muerto],0);
+     if(antes>0)assert.ok((f.aj[muerto]||0)<0,'no le restó del total');
+     assert.ok(f.total[muerto]<=antes);
+     break;
+    }
+   }
+   if(w.k==='roba'){const u=w.faltan[0];e=mover(p,{t:'r',uid:u,n:w.n,v:await aporteF7(sec[u].sem,sec[u].sal,w.n)});}
+   else if(w.k==='decide')e=mover(p,{t:'pide',uid:w.uid,n:e.n,v:await aporteF7(sec[w.uid].sem,sec[w.uid].sal,e.n)});
+   else if(w.k==='bono')e=mover(p,bono(w,k));
+   else e=mover(p,{t:'apunta',uid:w.quien,...eleccion(w.op,k)});
+  }
+ }
+ assert.ok(casos.super>=1&&casos.venganza>=1,'no se dio el caso: '+JSON.stringify(casos));
+});

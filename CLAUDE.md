@@ -1999,6 +1999,10 @@ deck is Vengeance's 108 **in the same order** with the new ones appended
   instead (`aplicaGolpeF7`, floored at 0) at round close. `rondas[].aj` records
   what the total lost outside the round, so `Σ(pts + aj)` is still each
   player's total.
+  That is also why, in Super only, a negative or ÷2 card can be **aimed at a
+  player who already busted** (or was fulminated) — their round is 0, so it
+  lands on their total: they get hit after they are dead. In Vengeance the
+  same card on a busted player would do nothing, so it is not offered.
 - **Flip 7 is a choice** (espera `bono`, move `{t:"bono", a}`): before the
   round closes the Flip 7 player picks `+15` for themselves (`a` = own uid) or
   `−15` off another seated player's total (floored at 0). It is stored in

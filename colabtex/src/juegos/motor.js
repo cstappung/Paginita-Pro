@@ -1586,7 +1586,11 @@ function redFlip7(p, js, listos) {
       for (const u of uids(ok)) { const cs = cartasDe(u); if (cs.length) o[u] = cs; }
       return o;
     };
-    if (c.k === "m") return { tipo: "a", uids: uids(enPie) };
+    /* En Super Vengeance un «menos algo» o un ÷2 también se le puede
+       poner a quien ya se pasó (o fulminaron): su ronda vale 0, así que
+       le pega al total (`golpeF7`) — se le resta después de muerto. En
+       Vengeance no tendría ningún efecto, y no se ofrece. */
+    if (c.k === "m") return { tipo: "a", uids: uids(u => enPie(u) || (S && (c.v < 0 || c.mitad) && lin[u].estado === "pasa")) };
     switch (c.a) {
       case "congela": case "tres": return { tipo: "a", uids: uids(activo) };
       case "segunda": return { tipo: "a", uids: uids(u => u !== quien && activo(u) && lin[u].seg == null) };
