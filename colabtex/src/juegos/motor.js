@@ -31,7 +31,9 @@
    cuadrillas es lo más que Circuit Breakers sabe colocar en los cuatro
    mapas con seis robots cada una, ocho colores es lo más que la reacción
    en cadena distingue de un vistazo, ocho asientos es lo que cabe en la
-   media luna de Flip 7; cuadritos no tiene nada de eso y llega a diez. */
+   media luna de Flip 7; cuadritos no tiene nada de eso y llega a diez.
+   El cacho se queda en ocho: son cuarenta dados en la mesa, y con más
+   una apuesta ya no se puede calcular a ojo, que es todo el juego. */
 export const JUEGOS = {
   orbita: { nombre: "Órbita", lema: "Captura estrellas y decide el próximo movimiento de tu rival", color: "#8860ed", minimo: 2, cupo: 2 },
   escondite: {
@@ -82,6 +84,13 @@ export const JUEGOS = {
     color: "#e8a317",
     minimo: 2,
     cupo: 10
+  },
+  cacho: {
+    nombre: "Cacho",
+    lema: "Dudo o calzo: cinco dados en el vaso y gana el último que conserve alguno",
+    color: "#b5462c",
+    minimo: 2,
+    cupo: 8
   }
 };
 
@@ -626,6 +635,7 @@ export function reducir(p) {
   if (p.juego === "worms") return { ...base, ...redWorms(p, js, listos) };
   if (p.juego === "cadena") return { ...base, ...redCadena(p, js, listos) };
   if (p.juego === "flip7") return { ...base, ...redFlip7(p, js, listos) };
+  if (p.juego === "cacho") return { ...base, ...redCacho(p, js, listos) };
   return base;
 }
 
@@ -673,6 +683,8 @@ export function progreso(est, juego) {
     return tot ? c(Math.max(...v) / tot) : 0;
   }
   if (juego === "flip7" && est.puntos) return c(Math.max(0, ...Object.values(est.puntos)) / (est.meta || F7_META));
+  /* En el cacho se van perdiendo dados: cuenta lo que ya no está en la mesa. */
+  if (juego === "cacho" && est.inicial) return c(1 - (est.total || 0) / est.inicial);
   if (juego === "cartas" && est.ganadas) return c(Math.max(0, ...Object.values(est.ganadas).map(g => g.length)) / 5);
   return 0;
 }
@@ -1950,4 +1962,367 @@ export async function auditaFlip7(partida, estado) {
     }
   }
   return malas;
+}
+
+/* ============================================================
+   Cacho (modalidad de dudo)
+
+   Cada uno tiene un vaso con cinco dados; se apuesta por turnos
+   cuántos dados de una pinta hay *entre todos los vasos* —los ases son
+   comodines— y el siguiente sube la apuesta, duda o calza. Al dudar o
+   calzar se destapan los vasos y quien se equivocó pierde un dado
+   (calzar justo lo recupera). Gana el último que conserve alguno. No
+   hay dealer: cada uno agita su propio vaso.
+
+   Lo difícil aquí no son las reglas sino los dados. Tienen que ser
+   secretos —cada uno ve solo los suyos— y nadie puede elegirlos, y no
+   hay un servidor que los tire. La solución es una **cadena de
+   hashes** por jugador: al entrar en la sala cada navegador calcula,
+   con su semilla privada (la misma de `misPartidas/<uid>/<pid>/sec`
+   que usan cartas y Flip 7), e0 = H(semilla), e1 = H(e0) … eN, y
+   publica en su ficha solo la punta eN (`hcad`). La llave de la ronda
+   r es e(N−1−r): quien la tiene la conoce desde el principio, nadie
+   más puede calcularla (habría que invertir SHA-256) y cualquiera
+   puede *comprobarla* cuando se revela, porque su hash es la llave de
+   la ronda anterior. Los dados de la ronda salen de esa llave y de la
+   `mezcla`, las llaves que todos revelaron al destapar la ronda
+   anterior — así que nadie conoce sus dados antes de que empiece la
+   ronda, y los de los demás no los conoce nadie hasta el destape.
+
+   Todo eso se comprueba **dentro del reductor**, a diferencia de la
+   auditoría de Flip 7: por eso SHA-256 está escrito aquí a mano y es
+   síncrono (`crypto.subtle` es asíncrono y el reductor no puede
+   esperar). Una llave que no encaja con la cadena no cuenta: la mesa
+   sigue esperando la buena, la pantalla dice en rojo quién mintió, y
+   la votación puede echarlo. La primera ronda la precede un
+   `arranque` en el que todos revelan la llave 0: de ahí salen la
+   mezcla de la ronda 1 y quién abre, sin que nadie lo escoja.
+
+   Partida siciliana: dudar la *primera* apuesta de la ronda es jugarse
+   dos dados. Quien duda de entrada y se equivoca pierde dos; quien
+   abrió con una apuesta que no estaba, también. Castiga el farol de
+   salida y el dudo por costumbre, que son las dos cosas que alargan
+   una partida de cacho sin que pase nada.
+   ============================================================ */
+
+export const CC_DADOS = 5;
+export const CC_CADENA = 300;
+export const PINTAS_CACHO = ["", "As", "Tonto", "Tren", "Cuadra", "Quina", "Sexto"];
+export const PINTAS_CACHO_PL = ["", "Ases", "Tontos", "Trenes", "Cuadras", "Quinas", "Sextos"];
+export const textoApuesta = (c, p) => `${c} ${(c === 1 ? PINTAS_CACHO[p] : PINTAS_CACHO_PL[p] || "").toLowerCase()}`;
+
+/* SHA-256 a mano. Las constantes van escritas y no calculadas con
+   `Math.cbrt`: dos navegadores que redondearan distinto el último bit
+   de una raíz cúbica verían dados distintos en la misma mesa. */
+const SHA_K = [
+  0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+  0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+  0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+  0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+  0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+  0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+  0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+  0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
+];
+const SHA_H = [0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19];
+const shaMemo = new Map();
+
+/* El reductor corre en cada repintado y rehace todas las rondas, así
+   que el mismo hash se pide cientos de veces; se recuerda. */
+export function sha256hex(texto) {
+  const s = String(texto);
+  const ya = shaMemo.get(s);
+  if (ya) return ya;
+  const b = new TextEncoder().encode(s);
+  const largo = ((b.length + 9 + 63) >> 6) << 6;
+  const m = new Uint8Array(largo);
+  m.set(b);
+  m[b.length] = 0x80;
+  const dv = new DataView(m.buffer);
+  dv.setUint32(largo - 8, Math.floor(b.length / 0x20000000));
+  dv.setUint32(largo - 4, (b.length * 8) >>> 0);
+  const h = SHA_H.slice(), w = new Int32Array(64);
+  const ror = (x, n) => (x >>> n) | (x << (32 - n));
+  for (let o = 0; o < largo; o += 64) {
+    for (let i = 0; i < 16; i++) w[i] = dv.getInt32(o + i * 4);
+    for (let i = 16; i < 64; i++) {
+      const a = w[i - 15], c = w[i - 2];
+      const s0 = ror(a, 7) ^ ror(a, 18) ^ (a >>> 3);
+      const s1 = ror(c, 17) ^ ror(c, 19) ^ (c >>> 10);
+      w[i] = (w[i - 16] + s0 + w[i - 7] + s1) | 0;
+    }
+    let [A, B, C, D, E, F, G, H] = h;
+    for (let i = 0; i < 64; i++) {
+      const S1 = ror(E, 6) ^ ror(E, 11) ^ ror(E, 25);
+      const ch = (E & F) ^ (~E & G);
+      const t1 = (H + S1 + ch + SHA_K[i] + w[i]) | 0;
+      const S0 = ror(A, 2) ^ ror(A, 13) ^ ror(A, 22);
+      const may = (A & B) ^ (A & C) ^ (B & C);
+      const t2 = (S0 + may) | 0;
+      H = G; G = F; F = E; E = (D + t1) | 0;
+      D = C; C = B; B = A; A = (t1 + t2) | 0;
+    }
+    h[0] = (h[0] + A) | 0; h[1] = (h[1] + B) | 0; h[2] = (h[2] + C) | 0; h[3] = (h[3] + D) | 0;
+    h[4] = (h[4] + E) | 0; h[5] = (h[5] + F) | 0; h[6] = (h[6] + G) | 0; h[7] = (h[7] + H) | 0;
+  }
+  const out = h.map(x => (x >>> 0).toString(16).padStart(8, "0")).join("");
+  if (shaMemo.size > 20000) shaMemo.clear();
+  shaMemo.set(s, out);
+  return out;
+}
+
+/* La cadena entera de un jugador: `e[0]` sale de la semilla y `e[N]`
+   es la punta que va en la ficha. Solo la calcula su dueño. */
+const cadenas = new Map();
+export function cadenaCacho(sem, sal) {
+  const k = (sem >>> 0) + ":" + (sal || "");
+  if (cadenas.has(k)) return cadenas.get(k);
+  const e = [sha256hex("cacho:" + k)];
+  for (let i = 0; i < CC_CADENA; i++) e.push(sha256hex(e[i]));
+  cadenas.set(k, e);
+  return e;
+}
+/* La llave de la ronda `r` (la 0 es la del arranque). */
+export const llaveCacho = (cad, r) => cad[CC_CADENA - 1 - r];
+
+/* Los `k` dados de un vaso: de la llave del dueño y la mezcla pública
+   de la ronda. */
+export function dadosCacho(llave, mezcla, k) {
+  const r = rng(parseInt(sha256hex(llave + "|" + (mezcla || "")).slice(0, 8), 16));
+  const d = [];
+  for (let i = 0; i < k; i++) d.push(1 + Math.floor(r() * 6));
+  return d;
+}
+
+/* Cuántos dados de la pinta `p` hay en la mesa. Los ases cuentan como
+   cualquiera salvo cuando se apuesta a ases o la ronda está obligada. */
+export const cuentaDado = (d, p, obligada) => d === p || (d === 1 && p !== 1 && !obligada);
+export function cuentaCacho(vasos, p, obligada) {
+  let n = 0;
+  for (const u in vasos) for (const d of vasos[u]) if (cuentaDado(d, p, obligada)) n++;
+  return n;
+}
+
+/* La cantidad mínima para apostar a la pinta `p` después de `ant`, o
+   null si esa pinta no se puede. Las conversiones son las de siempre:
+   de una pinta a otra mayor basta la misma cantidad, a una igual o
+   menor hay que subir; de algo a ases se pide la mitad más uno, y de
+   ases a algo el doble más uno. En ronda obligada no se cambia de pinta.
+   Abrir con ases solo lo puede quien tiene un dado. */
+export function minimoCacho(ant, p, { obligada = false, unDado = false } = {}) {
+  if (!ant) return p === 1 && !unDado ? null : 1;
+  if (obligada) return p === ant.p ? ant.c + 1 : null;
+  if (ant.p !== 1 && p !== 1) return p > ant.p ? ant.c : ant.c + 1;
+  if (ant.p !== 1) return Math.floor(ant.c / 2) + 1;
+  if (p === 1) return ant.c + 1;
+  return 2 * ant.c + 1;
+}
+
+export function apuestaValidaCacho(ant, a, o = {}) {
+  const c = Number(a && a.c), p = Number(a && a.p);
+  if (!Number.isInteger(c) || !Number.isInteger(p) || p < 1 || p > 6 || c < 1) return false;
+  if (o.total && c > o.total) return false;
+  const m = minimoCacho(ant, p, o);
+  return m !== null && c >= m;
+}
+
+function redCacho(p, js, listos) {
+  const sicil = !!Number(p.sicil);
+  const ids = js.map(j => j.uid), N = ids.length;
+  const ficha = {};
+  for (const j of js) ficha[j.uid] = j;
+  const dados = {}, fuera = {}, obligo = {}, ultLlave = {}, llaves = [];
+  for (const u of ids) dados[u] = CC_DADOS;
+  let etapa = "arranque", ronda = 0, turno = "", sentido = 1, abre = "";
+  let apuestas = [], obligada = false, mezcla = "", enVaso = {};
+  let destape = null, ultimo = null, ganador = null, motivo = "", ni = 0;
+  const hist = [], falsas = [];
+
+  const suceso = e => { e.i = ni++; hist.push(e); if (hist.length > 40) hist.shift(); };
+  const esta = u => !fuera[u] && dados[u] > 0;
+  const enRonda = u => !fuera[u] && (enVaso[u] || 0) > 0;
+  const alrededor = (u, k) => ids[(((ids.indexOf(u) + sentido * k) % N) + N) % N];
+  /* El siguiente que cumple `ok` en el sentido de la ronda; `u` mismo
+     es el último candidato. */
+  const sig = (u, ok) => {
+    for (let k = 1; k <= N; k++) { const c = alrededor(u, k); if (ok(c)) return c; }
+    return null;
+  };
+  const total = () => ids.reduce((s, u) => s + (esta(u) ? dados[u] : 0), 0);
+  const enMesa = () => ids.reduce((s, u) => s + (enRonda(u) ? enVaso[u] : 0), 0);
+  const inicial = N * CC_DADOS;
+  /* Obligar: quien se queda con un dado por primera vez puede, al abrir,
+     declarar la ronda obligada (sin comodines y sin cambiar de pinta).
+     Una vez por partida, y con dos en la mesa no tiene sentido. */
+  const puedeObligar = u => etapa === "apuesta" && !apuestas.length && turno === u
+    && enVaso[u] === 1 && !obligo[u] && ids.filter(esta).length >= 3;
+  /* Calzar: con la mitad de los dados todavía en juego, o teniendo uno. */
+  const puedeCalzar = u => etapa === "apuesta" && turno === u && apuestas.length > 0
+    && (total() * 2 >= inicial || enVaso[u] === 1);
+  const faltan = r => (r === 0 ? ids.filter(u => !fuera[u]) : ids.filter(enRonda))
+    .filter(u => !(llaves[r] && llaves[r][u]));
+
+  /* Una llave es buena si, hasheada tantas veces como rondas separan a
+     esta de la última que reveló, da aquella. La primera se compara con
+     la punta de la ficha. */
+  const llaveBuena = (u, r, c) => {
+    const prev = ultLlave[u] || { r: -1, c: ficha[u].hcad };
+    const d = r - prev.r;
+    if (d < 1 || d > CC_CADENA) return false;
+    let x = c;
+    for (let i = 0; i < d; i++) x = sha256hex(x);
+    return x === prev.c;
+  };
+
+  const empiezaRonda = quien => {
+    ronda++;
+    const prev = llaves[ronda - 1] || {};
+    mezcla = ids.filter(u => prev[u]).map(u => u + ":" + prev[u]).join("|");
+    enVaso = {};
+    for (const u of ids) if (esta(u)) enVaso[u] = dados[u];
+    etapa = "apuesta"; apuestas = []; obligada = false; destape = null;
+    abre = turno = quien;
+    suceso({ e: "ronda", r: ronda, uid: quien });
+  };
+
+  const resuelve = () => {
+    const d = destape, L = llaves[ronda] || {};
+    const vasos = {};
+    for (const u of ids) if ((enVaso[u] || 0) > 0 && L[u]) vasos[u] = dadosCacho(L[u], mezcla, enVaso[u]);
+    const orden = [];
+    for (let k = 0; k < N; k++) { const c = alrededor(d.quien, k); if (vasos[c]) orden.push(c); }
+    const antes = { ...dados };
+    let cuenta = null, acierta = null, pierde = "", gana = "", n = 0;
+    if (d.tipo !== "anula" && d.apuesta) {
+      cuenta = cuentaCacho(vasos, d.apuesta.p, obligada);
+      if (d.tipo === "dudo") {
+        acierta = cuenta < d.apuesta.c;
+        pierde = acierta ? d.contra : d.quien;
+        n = sicil && d.primera ? 2 : 1;
+      } else {
+        acierta = cuenta === d.apuesta.c;
+        if (!acierta) { pierde = d.quien; n = 1; }
+        else if (dados[d.quien] < CC_DADOS) { gana = d.quien; n = 1; }
+      }
+    }
+    if (pierde && !fuera[pierde]) dados[pierde] = Math.max(0, dados[pierde] - n);
+    if (gana && !fuera[gana]) dados[gana] += 1;
+    ultimo = {
+      r: ronda, tipo: d.tipo, quien: d.quien, contra: d.contra, apuesta: d.apuesta, obligada, sentido,
+      orden, vasos, cuenta, acierta, pierde, gana, n, sicil: sicil && d.tipo === "dudo" && d.primera,
+      antes, despues: { ...dados }
+    };
+    suceso({ e: "destape", r: ronda, tipo: d.tipo, uid: d.quien, a: d.contra, acierta, pierde, gana, n });
+    for (const u of ids) if (antes[u] > 0 && dados[u] === 0) suceso({ e: "sale", uid: u });
+    const quedan = ids.filter(esta);
+    if (quedan.length <= 1) { ganador = quedan[0] || ""; motivo = "cacho"; return; }
+    if (ronda >= CC_CADENA - 1) {
+      const max = Math.max(...quedan.map(u => dados[u])), arriba = quedan.filter(u => dados[u] === max);
+      ganador = arriba.length === 1 ? arriba[0] : ""; motivo = "tope"; return;
+    }
+    /* Parte quien perdió el dado; tras un calzo, quien calzó; tras una
+       ronda anulada, el mismo que la abrió. */
+    let prox = d.tipo === "dudo" ? pierde : d.tipo === "calzo" ? d.quien : abre;
+    if (!prox) prox = abre;
+    if (!esta(prox)) prox = sig(prox, esta) || quedan[0];
+    empiezaRonda(prox);
+  };
+
+  const avanza = () => {
+    if (ganador !== null || !listos) return;
+    if (etapa === "arranque") {
+      if (faltan(0).length) return;
+      const vivos = ids.filter(u => !fuera[u]);
+      if (!vivos.length) return;
+      const m0 = vivos.map(u => u + ":" + llaves[0][u]).join("|");
+      empiezaRonda(vivos[parseInt(sha256hex(m0).slice(0, 8), 16) % vivos.length]);
+      return;
+    }
+    if (etapa === "destape" && !faltan(ronda).length) resuelve();
+  };
+
+  const destapa = (tipo, quien, primera) => {
+    const last = apuestas[apuestas.length - 1] || null;
+    destape = { tipo, quien, contra: last ? last.uid : "", apuesta: last, primera };
+    etapa = "destape"; turno = "";
+  };
+
+  for (const j of jugadasDe(p)) {
+    const u = j.uid;
+    if (!ficha[u]) continue;
+    if (j.t === "abandona") {
+      if (ganador !== null || fuera[u]) continue;
+      const estaba = enRonda(u);
+      fuera[u] = true;
+      suceso({ e: "abandona", uid: u });
+      const quedan = ids.filter(esta);
+      if (quedan.length <= 1) { ganador = quedan[0] || ""; motivo = "abandono"; continue; }
+      if (!listos) continue;
+      /* Con sus dados en la mesa, la ronda ya no se puede resolver: se
+         destapa igual —las llaves hacen falta para la mezcla siguiente—
+         pero sin veredicto. */
+      if (etapa === "apuesta" && estaba) {
+        destapa("anula", u, false);
+        suceso({ e: "anula", uid: u });
+      } else if (etapa === "destape" && estaba && !(llaves[ronda] && llaves[ronda][u])) {
+        destape = { ...destape, tipo: "anula", quien: u };
+        suceso({ e: "anula", uid: u });
+      }
+      avanza();
+      continue;
+    }
+    if (ganador !== null || !listos || fuera[u]) continue;
+    if (j.t === "k") {
+      const r = Number(j.r), c = String(j.c || "");
+      const vale = (etapa === "arranque" && r === 0) || (etapa === "destape" && r === ronda && enRonda(u));
+      if (!vale || (llaves[r] && llaves[r][u]) || !/^[0-9a-f]{64}$/.test(c) || !ficha[u].hcad) continue;
+      if (!llaveBuena(u, r, c)) {
+        if (!falsas.some(f => f.uid === u && f.r === r)) { falsas.push({ uid: u, r }); suceso({ e: "falsa", uid: u, r }); }
+        continue;
+      }
+      (llaves[r] = llaves[r] || {})[u] = c;
+      ultLlave[u] = { r, c };
+      avanza();
+      continue;
+    }
+    if (etapa !== "apuesta" || turno !== u) continue;
+    if (j.t === "ap") {
+      const ant = apuestas[apuestas.length - 1] || null;
+      const ob = !ant && !!j.ob && puedeObligar(u);
+      const a = { c: Number(j.c), p: Number(j.p) };
+      if (!apuestaValidaCacho(ant, a, { obligada: obligada || ob, unDado: enVaso[u] === 1, total: enMesa() })) continue;
+      if (!ant) {
+        if (Number(j.s) === -1 || Number(j.s) === 1) sentido = Number(j.s);
+        if (ob) { obligada = true; obligo[u] = true; }
+      }
+      apuestas.push({ uid: u, c: a.c, p: a.p });
+      suceso({ e: "ap", uid: u, c: a.c, p: a.p, ob, s: !ant ? sentido : 0 });
+      turno = sig(u, enRonda) || u;
+    } else if (j.t === "dudo" && apuestas.length) {
+      destapa("dudo", u, apuestas.length === 1);
+      suceso({ e: "dudo", uid: u, a: destape.contra });
+      avanza();
+    } else if (j.t === "calzo" && puedeCalzar(u)) {
+      destapa("calzo", u, apuestas.length === 1);
+      suceso({ e: "calzo", uid: u, a: destape.contra });
+      avanza();
+    }
+  }
+
+  let espera = null;
+  if (listos && ganador === null) {
+    if (etapa === "arranque") espera = { k: "llaves", r: 0, faltan: faltan(0) };
+    else if (etapa === "destape") espera = { k: "llaves", r: ronda, tipo: destape.tipo, faltan: faltan(ronda) };
+    else espera = { k: "apuesta", uid: turno };
+  }
+  const puntos = {};
+  for (const u of ids) puntos[u] = fuera[u] ? 0 : dados[u];
+  const fin = ganador !== null;
+  return {
+    fase: !listos ? "espera" : fin ? "fin" : "jugando",
+    sicil, dados, fuera, obligo, puntos, etapa, ronda, turno: fin ? "" : turno, sentido, abre,
+    apuestas, obligada, mezcla, enVaso, total: total(), enMesa: enMesa(), inicial,
+    destape, espera, ultimo, hist, falsas, ganador, motivo,
+    calzo: !fin && puedeCalzar(turno), obligar: !fin && puedeObligar(turno)
+  };
 }

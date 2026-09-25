@@ -42,6 +42,7 @@ import { crearReversi } from "./juegos/reversi.js";
 import { crearWorms } from "./juegos/worms.js";
 import { crearCadena } from "./juegos/cadena.js";
 import { crearFlip7 } from "./juegos/flip7.js";
+import { crearCacho } from "./juegos/cacho.js";
 import { crearRanks } from "./juegos/ranks.js";
 import { mezcla, abrePerfil } from "./juegos/perfil.js";
 import { suena, silenciar, silenciado, ambientar, ajustarMusica, activarAudio, configurarMusica, musicaActiva, volumenMusica } from "./juegos/sonido.js";
@@ -53,10 +54,10 @@ const VER = (document.currentScript && document.currentScript.src.split("?v=")[1
 const FABRICAS = {
   orbita: crearOrbita, escondite: crearEscondite, cartas: crearCartas,
   cuadritos: crearCuadritos, reversi: crearReversi, worms: crearWorms,
-  cadena: crearCadena, flip7: crearFlip7
+  cadena: crearCadena, flip7: crearFlip7, cacho: crearCacho
 };
 
-const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏" };
+const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲" };
 
 /* Lo que puede elegir quien abre la sala, por juego. Vive aquí y no en
    `motor.js` porque son controles y no reglas: el motor ya recorta lo
@@ -93,6 +94,11 @@ const OPCIONES = {
     { clave: "cupo", etiqueta: "Jugadores", valores: cupos("flip7") },
     { clave: "modo", etiqueta: "Modo", por: "normal",
       valores: Object.keys(MODOS_F7).map(v => ({ v, t: MODOS_F7[v] })) }
+  ],
+  cacho: [
+    { clave: "cupo", etiqueta: "Jugadores", valores: cupos("cacho") },
+    { clave: "sicil", etiqueta: "Partida", por: 0,
+      valores: [{ v: 0, t: "Normal" }, { v: 1, t: "Siciliana" }] }
   ]
 };
 
@@ -983,8 +989,9 @@ function montaJuego(p) {
   desmontaJuego();
   const fab = FABRICAS[p.juego];
   if (!fab) { $("jgHost").innerHTML = `<div class="vacio">Ese juego no existe en esta versión.</div>`; return; }
-  /* `secreto` solo lo usa cartas, pero se pasa a todos: el contrato de un
-     juego es un objeto, y ramificarlo por juego lo convierte en cuatro. */
+  /* `secreto` solo lo usan cartas, Flip 7 y el cacho, pero se pasa a
+     todos: el contrato de un juego es un objeto, y ramificarlo por juego
+     lo convierte en cuatro. */
   modulo = fab({
     uid: state.user.uid, pid: state.pid, jugar, terminar, ahora: fb.ahora,
     /* Quien mira monta el mismo módulo, que con esto sabe que no debe
@@ -1037,7 +1044,7 @@ const FANFARRIA = { gano: "victoria", perdi: "derrota", empate: "empate", mirand
    En cartas es el choque entero (`CHOQUE`, 2,6 s): la ronda que gana
    el trío se enseña igual que las demás. Worms no pone fanfarria — el
    marco tiene su propio audio y su propio final. */
-const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000 };
+const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900 };
 
 function pintaFin(p, est) {
   const caja = $("jgFin");
@@ -1151,7 +1158,9 @@ const RAZONES = {
   victoria: "Su cuadrilla fue la última en pie.",
   apagon: "Apagón total: no quedó ninguna cuadrilla en pie.",
   reaccion: "Su reacción en cadena se tragó a todos los demás.",
-  flip7: "Pasó de 200 puntos con más que nadie."
+  flip7: "Pasó de 200 puntos con más que nadie.",
+  cacho: "Fue el último en conservar dados en el vaso.",
+  tope: "Se acabaron las rondas: ganó quien tenía más dados."
 };
 const razon = m => RAZONES[m] || "";
 const nombreDe = (est, uid) => {
@@ -1384,6 +1393,7 @@ function arteJuego(k) {
   if (k === "worms") return '<div class="jg-art-worms"><i></i><i></i><i></i><b>💥</b><span>CIRCUIT BREAKERS</span></div>';
   if (k === "cadena") return '<div class="jg-art-cr">' + Array.from({ length: 12 }, (_, i) => '<i class="o' + [1, 0, 2, 1, 3, 0, 1, 2, 0, 3, 2, 1][i] + " c" + (i % 4) + '"></i>').join("") + '</div>';
   if (k === "flip7") return '<div class="jg-art-f7">' + [[7, "#e8a317"], [3, "#3fa7d6"], [12, "#d64545"]].map(([n, c]) => '<i style="--t:' + c + '">' + n + '</i>').join("") + '<b>FLIP 7</b></div>';
+  if (k === "cacho") return '<div class="jg-art-cc"><b></b>' + [5, 1, 3].map(n => '<i class="c' + n + '">' + "<s></s>".repeat(n) + '</i>').join("") + '</div>';
   if (k === "cuadritos") return '<div class="jg-art-dots">' + Array.from({ length: 9 }, (_, i) => '<i class="' + (i % 3 === 0 ? "llena" : "") + '"></i>').join("") + '</div>';
   return '<div class="jg-art-land"><i></i><i></i><i></i><b>⌖</b><span>ENCUENTRA LO INVISIBLE</span></div>';
 }
