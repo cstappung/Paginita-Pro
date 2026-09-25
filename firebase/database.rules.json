@@ -115,7 +115,7 @@
         "nombre": { ".validate": "newData.isString() && newData.val().length <= 40" },
         "semilla": { ".validate": "newData.isNumber()" },
         "lado": { ".validate": "newData.isNumber() && newData.val() >= 4 && newData.val() <= 10" },
-        "cupo": { ".validate": "newData.isNumber() && newData.val() >= 2 && newData.val() <= 6" },
+        "cupo": { ".validate": "newData.isNumber() && newData.val() >= 2 && newData.val() <= 10" },
 
         "estado": {
           ".write": "auth != null && root.child('partidas').child($pid).child('jugadores').child(auth.uid).exists()",

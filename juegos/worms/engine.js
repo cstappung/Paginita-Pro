@@ -4,9 +4,9 @@
 const W=3200,H=1200,G=330,STEP=1/60;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const randomSeed=s=>()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
-const COLORS=['#eaff83','#65e7ed','#ff9b9e','#beabff','#ffbe7d','#94bfff'];
-const TEAM_NAMES=['Fase Lima','Neutro Azul','Arco Coral','Ohm Violeta','Cobre Naranja','Volt Cobalto'];
-const NAMES=['Tesla','Faraday','Ampère','Curie','Ohm','Volta','Maxwell','Hertz','Joule','Edison','Watt','Kirchhoff','Lenz','Gauss','Coulomb','Weber','Henry','Oersted','Heaviside','Marconi','Franklin','Hopper','Clarke','Lovelace','Fleming','Bardeen','Shannon','Boole','Nyquist','Turing','Norton','Thévenin','Hedy','Raman','Fermi','Planck'];
+const COLORS=['#eaff83','#65e7ed','#ff9b9e','#beabff','#ffbe7d','#94bfff','#7dffb2','#ff9be8'];
+const TEAM_NAMES=['Fase Lima','Neutro Azul','Arco Coral','Ohm Violeta','Cobre Naranja','Volt Cobalto','Tierra Menta','Fase Magenta'];
+const NAMES=['Tesla','Faraday','Ampère','Curie','Ohm','Volta','Maxwell','Hertz','Joule','Edison','Watt','Kirchhoff','Lenz','Gauss','Coulomb','Weber','Henry','Oersted','Heaviside','Marconi','Franklin','Hopper','Clarke','Lovelace','Fleming','Bardeen','Shannon','Boole','Nyquist','Turing','Norton','Thévenin','Hedy','Raman','Fermi','Planck','Siemens','Steinmetz','Kelvin','Laplace','Fourier','Bode','Wheatstone','Shockley','Kilby','Noyce','Bose','Meitner'];
 const ROLES=['Potencia','Automatización','Telecomunicaciones','Alta tensión','Instrumentación','Electrónica'];
 const MAPS={
  substation:{name:'Valle del reactor',tag:'INDUSTRIAL · ATARDECER',desc:'Colinas amplias, instalaciones eléctricas y depósitos explosivos.',sky:['#102235','#617580','#e4a67c'],ground:['#75836b','#445554','#24343f'],grass:'#b3bd88',water:'#3f8c9f',accent:'#ffd292',seed:27},
@@ -49,7 +49,7 @@ class Terrain{
 class Game{
  constructor(options={}){
   this.options={humans:1,bots:1,squad:4,difficulty:'normal',map:'substation',turnTime:45,seed:Date.now(),...options};
-  const o=this.options;o.humans=clamp(Math.round(+o.humans)||1,1,6);o.bots=clamp(Math.round(+o.bots)||0,o.humans===1?1:0,6-o.humans);o.squad=clamp(Math.round(+o.squad)||4,2,6);o.turnTime=clamp(+o.turnTime||45,30,90);if(!MAPS[o.map])o.map='substation';
+  const o=this.options;o.humans=clamp(Math.round(+o.humans)||1,1,8);o.bots=clamp(Math.round(+o.bots)||0,o.humans===1?1:0,8-o.humans);o.squad=clamp(Math.round(+o.squad)||4,2,6);o.turnTime=clamp(+o.turnTime||45,30,90);if(!MAPS[o.map])o.map='substation';
   this.rngS=o.seed|0;this.terrain=new Terrain(o.map);this.water=1030;this.turn=0;this.teamIndex=-1;this.active=null;this.phase='intro';this.paused=false;this.time=0;this.turnTime=o.turnTime;this.delay=0;this.wind=0;this.energy=240;this.angle=45;this.power=52;this.weapon=0;this.aimTarget=null;this.projectiles=[];this.events=[];this.keys={left:false,right:false};this.jumpBuffer=0;this.botPlan=null;this.botDelay=0;this.winner=undefined;this.round=1;this.crates=[];this.barrels=[];this.nextProjectile=0;this.settleElapsed=0;
   this.teams=Array.from({length:o.humans+o.bots},(_,id)=>({id,name:(o.names&&o.names[id])||TEAM_NAMES[id],color:COLORS[id],bot:id>=o.humans,cursor:0,damage:0,kills:0,ammo:WEAPONS.map(w=>w.ammo*Math.ceil(o.squad/4))}));
   this.units=[];const count=this.teams.length*o.squad;

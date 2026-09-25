@@ -1,4 +1,4 @@
-/* Reacción en cadena — Chain Reaction, de dos a seis jugadores.
+/* Reacción en cadena — Chain Reaction, de dos a ocho jugadores.
  *
  * Cada uno pone por turno un orbe en una celda vacía o en una suya.
  * Cuando una celda junta tantos orbes como vecinas tiene (dos en la
@@ -40,7 +40,7 @@ const R = 17;           // radio de un orbe
 const MAX_ONDAS = 60;   // a partir de aquí se salta al final
 const MAX_CHISPAS = 260;
 
-const PALETA = ["#ff3d7f", "#27c8ff", "#ffc53d", "#5dff8a", "#b36bff", "#ff7a2e"];
+const PALETA = ["#ff3d7f", "#27c8ff", "#ffc53d", "#5dff8a", "#b36bff", "#ff7a2e", "#3d6bff", "#e8eef5"];
 const GRIS = "#8a97a3";
 
 /* Dónde va cada orbe dentro de la celda según cuántos hay. Pasado el

@@ -49,11 +49,11 @@ Six apps plus a small shared **Informes** page:
   account and the same Firebase project: **Escondite** (hide a person in a
   landscape, then cross the landscapes and race to find the other's),
   **Cartas de los tres elementos** (a Card-Jitsu duel), **Cuadritos** (dots and
-  boxes, two to six players and three board sizes), **Reversi**, **Órbita**,
+  boxes, two to ten players and three board sizes), **Reversi**, **Órbita**,
   **Chain Reaction** (critical-mass orbs that burst into their neighbours, two
-  to six players and three grid sizes), **Flip 7** (the push-your-luck card
-  game, two to six players, normal and "Vengeance" mode) and **Circuit
-  Breakers** (a Worms-style artillery game for two to four squads, in an
+  to eight players and three grid sizes), **Flip 7** (the push-your-luck card
+  game, two to eight players, normal and "Vengeance" mode) and **Circuit
+  Breakers** (a Worms-style artillery game for two to eight squads, in an
   iframe), plus a
   **Clasificación** tab. See "Juegos" below.
 
@@ -1498,8 +1498,24 @@ declares `minimo` and `cupo` (escondite, cartas and reversi are duels by
 construction — two landscapes, one clash, two colours), and whoever opens the
 room picks inside that range along with anything else the game offers;
 `crearPartida(juego, quien, extra)` writes those over the defaults, so a game
-that offers nothing passes nothing. Only cuadritos offers anything today: **two
-to six players** and three board sizes (`TAMANOS`, 4×4 to 7×7 boxes).
+that offers nothing passes nothing. The lobby's player-count options are
+derived from `JUEGOS` (`cupos(k)` in `juegos-main.js`), so raising a `cupo` is
+one number in `motor.js` plus the rule's ceiling
+(`partidas/$pid/cupo` `.validate`, now `<= 10`). Each ceiling is where *that*
+game stops working, not a round number:
+
+- **cuadritos, 10.** Nothing on the board depends on the count; with ten a
+  4×4 board is thin, which is the host's choice to make.
+- **cadena, 8.** Colour is by seat (`PALETA`), and eight is how many tones can
+  still be told apart at a glance on an orb.
+- **flip7, 8.** Eight seats is what fits on the half moon without overlapping
+  (`PUESTOS`); the deck holds up, and `tests/flip7.test.cjs` plays robot games
+  up to eight to prove it.
+- **worms, 8.** Eight squads of six spawn on all four maps; at ten `tidal`
+  runs out of ground. The frame's `engine.js` carries eight colours, eight
+  team names and 48 engineers' names, and clamps humans/bots to eight.
+
+Cuadritos also offers three board sizes (`TAMANOS`, 4×4 to 7×7 boxes).
 `cupoDe(p)` / `ladoDe(p)` clamp what comes back from the database to what the
 game admits, which is also what makes a room created before any of this existed
 read as the two-player 6×6 it was. With a cupo above the minimum the room does
@@ -1848,7 +1864,7 @@ was decided. Rules that are easy to get wrong:
 - **A player is out only after having played** and then reaching zero orbs —
   otherwise everybody but the first player would be out after move one.
 - The seat decides the colour (`PALETA` in `cadena.js`, fixed), not
-  `colorForUid`: in a six-player board two nearly identical tones would make it
+  `colorForUid`: in an eight-player board two nearly identical tones would make it
   unreadable, as in Reversi.
 
 The move that wins is usually the longest chain of the game, so the fin
@@ -1964,8 +1980,11 @@ never the state — the state says where a card *is*, the history says that it
   plaque (`.jg-f7-cuenta`) under it. Seats are **placed by hand per player
   count** (`PUESTOS`, percent of `#f7Asientos`, you always at the bottom
   centre) — an even spread over an arc made six seats overlap and push the
-  end ones through the rail. Five and six players get compact seats (smaller
-  cards, `.jg-f7-sala[data-n]`), and the room's height per count lives in two
+  end ones through the rail. With an even count "you" sit at index
+  `⌊(N−1)/2⌋`, i.e. just right of centre beside another seat. Five to eight
+  players get compact seats (smaller cards, `.jg-f7-sala[data-n]`), seven
+  and eight a taller room (980 px) and narrower seats, and the room's height
+  per count lives in two
   places that must agree: the CSS `[data-n]` rule and `ALTO_SALA`, which the
   head-turn angle is computed with. `.jg-f7-sala` has only absolutely
   positioned children, so inside `.jg-tablero` — which is
