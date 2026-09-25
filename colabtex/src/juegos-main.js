@@ -1280,7 +1280,37 @@ function pintaSonido() {
   b.setAttribute("aria-pressed", on ? "true" : "false");
 }
 
+/* El tema claro u oscuro. El guion del <head> ya lo puso antes de pintar;
+   aquí sólo se pinta el botón y se cambia. Mientras nadie haya elegido,
+   sigue al sistema también en caliente (si el sistema pasa a oscuro al
+   anochecer, la página lo sigue); una vez pulsado el botón, manda lo
+   elegido. Como el sonido, el botón dice lo que hay: ☾ es oscuro. */
+const TEMA = "jg.tema";
+const temaGuardado = () => { try { return localStorage.getItem(TEMA); } catch (e) { return null; } };
+const esOscuro = () => document.documentElement.dataset.tema === "oscuro";
+function ponTema(oscuro) {
+  if (oscuro) document.documentElement.dataset.tema = "oscuro";
+  else delete document.documentElement.dataset.tema;
+  const b = $("btnTema");
+  if (!b) return;
+  b.textContent = oscuro ? "☾" : "☀";
+  b.title = oscuro ? "Modo oscuro — pulsa para el claro" : "Modo claro — pulsa para el oscuro";
+  b.setAttribute("aria-pressed", oscuro ? "true" : "false");
+}
+function wireTema() {
+  ponTema(esOscuro());
+  $("btnTema").onclick = () => {
+    const oscuro = !esOscuro();
+    try { localStorage.setItem(TEMA, oscuro ? "oscuro" : "claro"); } catch (e) { /* sin almacenamiento: vale para esta visita */ }
+    ponTema(oscuro);
+    suena("clic");
+  };
+  const mq = typeof matchMedia === "function" ? matchMedia("(prefers-color-scheme: dark)") : null;
+  if (mq && mq.addEventListener) mq.addEventListener("change", e => { if (!temaGuardado()) ponTema(e.matches); });
+}
+
 function wire() {
+  wireTema();
   $("btnLogin").onclick = () => loginGoogle().catch(e => {
     $("loginError").textContent = "No se pudo iniciar sesión: " + (e.code || e.message);
   });

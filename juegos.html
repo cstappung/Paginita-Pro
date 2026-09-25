@@ -4,6 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Laboratorio</title>
+<script>
+/* El tema se pone antes de pintar nada: si esperara al bundle, la
+   página saldría blanca un instante antes de oscurecerse. Sin elección
+   guardada sigue al sistema; el botón ☾/☀ de la cabecera la guarda. */
+try { var t = localStorage.getItem("jg.tema");
+  if (t === "oscuro" || (t !== "claro" && matchMedia("(prefers-color-scheme: dark)").matches)) document.documentElement.dataset.tema = "oscuro";
+} catch (e) {}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
@@ -930,6 +938,152 @@
 @media(max-width:900px){.sp-layout{grid-template-columns:1fr}.sp-ranking{width:auto}.sp-hero{padding:24px}.sp-ranking ol{display:grid;grid-template-columns:1fr 1fr;gap:0 20px}}@media(max-width:580px){.sp-layout{padding:12px;gap:16px}.sp-entradas{grid-template-columns:1fr}.sp-hud{gap:10px;padding:12px}.sp-hud b{font-size:19px}.sp-scroll{padding:8px}.sp-config>button{width:100%}.sp-ranking ol{display:block}.sp-hero .sp-link{margin-bottom:20px}.sp-hero h1{font-size:43px}}
 @media(prefers-reduced-motion:reduce){.sp *,.sp-entrada{animation:none!important;transition:none!important}}
 
+/* ============================================================
+   Modo oscuro
+
+   Se enciende con `data-tema="oscuro"` en <html>: lo pone el guion
+   del <head> antes de pintar (si no, la página sale blanca un
+   instante) y el botón ☾/☀ de la cabecera. Sin elección guardada
+   sigue al sistema (`prefers-color-scheme`); pulsar el botón la
+   guarda en `localStorage` (`jg.tema`).
+
+   Sólo se oscurece el armazón —página, tarjetas, salas, chat,
+   carteles, tablas—. El arte se queda como está: las portadas ya son
+   oscuras, la mesa de Flip 7 es un paño verde y las cartas son
+   cartas, que en la vida real son blancas. Todo va en este bloque y
+   con el prefijo `html[data-tema=oscuro]`, que gana por especificidad
+   a la regla clara sin tocarla: el tema claro sigue siendo el de
+   siempre, línea por línea.
+   ============================================================ */
+html[data-tema=oscuro]{
+  color-scheme:dark;
+  --jg-ink:#ebe7f5;--jg-muted:#9d96ad;
+  --os-fondo:#0f0d15;--os-sup:#18151f;--os-sup2:#211d2b;--os-sup3:#2a2536;
+  --os-borde:#2c2738;--os-borde2:#3a3449;--os-tx:#ebe7f5;--os-tx2:#bcb5cc;--os-tx3:#8f889f
+}
+html[data-tema=oscuro] body{background:var(--os-fondo);color:var(--os-tx)}
+html[data-tema=oscuro] .jg-marquesina{box-shadow:0 0 0 1px var(--os-borde)}
+html[data-tema=oscuro] .head{background:#0b0a10;border-bottom-color:#ffffff10}
+html[data-tema=oscuro] .lead,html[data-tema=oscuro] .row-meta,html[data-tema=oscuro] .vacio,html[data-tema=oscuro] .jg-nota{color:var(--os-tx3)}
+
+/* Pestañas, botones, campos */
+html[data-tema=oscuro] .tab{color:var(--os-tx3)}
+html[data-tema=oscuro] .tab.on{background:var(--os-sup3);color:#fff}
+html[data-tema=oscuro] .inp,html[data-tema=oscuro] .jg-of-op select,html[data-tema=oscuro] .jg-campo input[type=text],
+html[data-tema=oscuro] .esc-herramientas select{background:var(--os-sup2);border-color:var(--os-borde2);color:var(--os-tx)}
+html[data-tema=oscuro] .btn2,html[data-tema=oscuro] .jg-tab,html[data-tema=oscuro] .jg-f7-anula{background:var(--os-sup2);border-color:var(--os-borde2);color:var(--os-tx2)}
+html[data-tema=oscuro] .btn2:hover{border-color:#a88bff;color:#c4b1ff}
+html[data-tema=oscuro] .jg-tab.on{background:#0d94882b;color:#5eead4}
+html[data-tema=oscuro] .mini{color:#6f687f}
+html[data-tema=oscuro] .mini:hover{background:var(--os-sup3);color:var(--os-tx2)}
+html[data-tema=oscuro] .mini.del:hover,html[data-tema=oscuro] .jg-pierde,html[data-tema=oscuro] .jg-castigo,
+html[data-tema=oscuro] .jg-modal-err,html[data-tema=oscuro] .jg-reloj.urge,html[data-tema=oscuro] #loginError{color:#ff8a7a}
+
+/* Superficies: tarjetas, cajas y el marco de cada juego */
+html[data-tema=oscuro] .card,html[data-tema=oscuro] .login-card,html[data-tema=oscuro] .jg-oferta,html[data-tema=oscuro] .jg-lado-caja,
+html[data-tema=oscuro] .jg-invita,html[data-tema=oscuro] .jg-chat,html[data-tema=oscuro] .jg-tabla-caja,html[data-tema=oscuro] .jg-modal,
+html[data-tema=oscuro] .jg-barra,html[data-tema=oscuro] .jg-pie,html[data-tema=oscuro] .jg-f7-hist{background:var(--os-sup);border-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-tablero{background:radial-gradient(ellipse at 50% 0,#211d2b,var(--os-sup) 70%);border-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-mesa,html[data-tema=oscuro] .jg-lienzo{border-color:var(--os-borde)}
+html[data-tema=oscuro] .row{border-bottom-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-oferta:hover{box-shadow:0 15px 32px #0008}
+html[data-tema=oscuro] .login-card p{color:var(--os-tx2)!important}
+html[data-tema=oscuro] .jg-invita,html[data-tema=oscuro] .jg-fase{color:var(--os-tx2)}
+html[data-tema=oscuro] .jg-fase b,html[data-tema=oscuro] .jg-m-turno,html[data-tema=oscuro] .jg-pts,html[data-tema=oscuro] .jg-modal-t{color:var(--os-tx)}
+html[data-tema=oscuro] .jg-m,html[data-tema=oscuro] .jg-reloj{color:var(--os-tx2)}
+
+/* Vestíbulo */
+html[data-tema=oscuro] .jg-filtros{background:var(--os-sup2)}
+html[data-tema=oscuro] .jg-filtros button{color:var(--os-tx3)}
+html[data-tema=oscuro] .jg-filtros button[aria-pressed=true]{background:var(--os-sup3);color:var(--os-tx)}
+html[data-tema=oscuro] .jg-lado-caja header,html[data-tema=oscuro] .jg-sala+.jg-sala{border-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-lado-n{background:#7042df33;color:#c4b1ff}
+html[data-tema=oscuro] .jg-sala-ico,html[data-tema=oscuro] .jg-of-icono{background:color-mix(in srgb,var(--c) 18%,var(--os-sup));border-color:color-mix(in srgb,var(--c) 35%,var(--os-sup))}
+html[data-tema=oscuro] .jg-sala-txt>.jg-sala-cupo{background:var(--os-sup3)}
+html[data-tema=oscuro] .jg-of-meta span{color:var(--os-tx3)}
+html[data-tema=oscuro] .jg-of-lema{color:var(--os-tx2)}
+html[data-tema=oscuro] .jg-of-op{color:var(--os-tx3)}
+html[data-tema=oscuro] .jg-of-btn{background:var(--os-sup3);color:var(--os-tx)}
+html[data-tema=oscuro] .jg-of-btn:hover{background:#3a3150}
+html[data-tema=oscuro] .jg-of-orbita .jg-of-btn{background:#7042df;color:#fff}
+html[data-tema=oscuro] .jg-p{background:color-mix(in srgb,var(--c,#888) 18%,var(--os-sup));border-color:color-mix(in srgb,var(--c,#888) 40%,var(--os-sup))}
+
+/* Cabecera de la partida, votos, espectador, chat */
+html[data-tema=oscuro] .jg-quien-chip{background:var(--os-sup);border-color:var(--os-borde);color:var(--os-tx2)}
+html[data-tema=oscuro] .jg-voto{background:var(--os-sup2);border-color:var(--os-borde2);color:var(--os-tx3)}
+html[data-tema=oscuro] .jg-voto:hover,html[data-tema=oscuro] .jg-voto-n{background:#b4232a33;border-color:#b4232a66;color:#ff8a7a}
+html[data-tema=oscuro] .jg-voto.on{background:#b4232a;color:#fff}
+html[data-tema=oscuro] .jg-fin-exp{color:#ff8a7a}
+html[data-tema=oscuro] .jg-mirando{background:#1d2a45;border-color:#2e4270;color:#b9cdf6}
+html[data-tema=oscuro] .jg-chat>header,html[data-tema=oscuro] .jg-chat-form{border-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-chat>header small{color:var(--os-tx3)}
+html[data-tema=oscuro] .jg-chat-msg{color:var(--os-tx2)}
+/* El nombre va en el color de cada uno, que se eligió pensando en un
+   fondo blanco: sobre el oscuro se aclara un poco para que se lea. */
+html[data-tema=oscuro] .jg-chat-msg b{color:color-mix(in srgb,var(--c,#aaa) 70%,#fff)}
+html[data-tema=oscuro] .jg-chat-msg b small{background:var(--os-sup3);color:var(--os-tx3)}
+
+/* Avisos */
+html[data-tema=oscuro] .aviso,html[data-tema=oscuro] .jg-aviso{background:#2a2112;border-color:#6b532066;color:#e8cf95}
+html[data-tema=oscuro] .aviso code,html[data-tema=oscuro] .aviso .jg-fin-m code{background:#ffffff14}
+html[data-tema=oscuro] .jg-trampa{background:#3a1512;color:#ffb4a8}
+html[data-tema=oscuro] .jg-f7-aviso{background:#2a2112;color:#e8cf95}
+
+/* El cartel del final y los modales */
+html[data-tema=oscuro] .jg-fin-gano{background:linear-gradient(160deg,#2a2144,#1d1830);border-color:#6c3ed2aa}
+html[data-tema=oscuro] .jg-fin-gano .jg-fin-t{color:#c4b1ff}
+html[data-tema=oscuro] .jg-fin-perdi,html[data-tema=oscuro] .jg-fin-mirando{background:linear-gradient(160deg,var(--os-sup2),var(--os-sup));border-color:var(--os-borde2)}
+html[data-tema=oscuro] .jg-fin-empate{background:linear-gradient(160deg,#2c2415,#1f1a12);border-color:#e2c08d44}
+html[data-tema=oscuro] .jg-fin-empate .jg-fin-t{color:#e8cf95}
+html[data-tema=oscuro] .jg-fin-perdi .jg-fin-t,html[data-tema=oscuro] .jg-fin-mirando .jg-fin-t,html[data-tema=oscuro] .jg-fin-sub{color:var(--os-tx)}
+html[data-tema=oscuro] .jg-fin-m{color:var(--os-tx2)}
+html[data-tema=oscuro] .jg-fin-marca{border-top-color:#ffffff14}
+html[data-tema=oscuro] .jg-fin-x{background:#ffffff12;color:var(--os-tx2)}
+html[data-tema=oscuro] .jg-fin-x:hover{background:#ffffff22}
+html[data-tema=oscuro] .jg-reglas .jg-fin-m code{background:#ffffff14}
+html[data-tema=oscuro] .jg-revancha{background:#2a2144;border-color:#4b3a7a}
+html[data-tema=oscuro] .jg-modal-s,html[data-tema=oscuro] .jg-color-libre,html[data-tema=oscuro] .jg-perfil-foto .btn-ghost{color:var(--os-tx2)}
+html[data-tema=oscuro] .jg-perfil-av{background:var(--os-sup2);border-color:var(--os-borde2)}
+html[data-tema=oscuro] .jg-campo>span{color:var(--os-tx2)}
+html[data-tema=oscuro] .jg-color.on{border-color:var(--os-sup);box-shadow:0 0 0 2px var(--os-tx)}
+html[data-tema=oscuro] .jg-color-libre input[type=color]{background:var(--os-sup2);border-color:var(--os-borde2)}
+
+/* Clasificación: la tabla bajo el podio */
+html[data-tema=oscuro] .jg-tabla th{border-bottom-color:var(--os-borde);color:var(--os-tx3)}
+html[data-tema=oscuro] .jg-tabla td{border-bottom-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-barra-pc{background:var(--os-sup3)}
+html[data-tema=oscuro] .jg-yo td,html[data-tema=oscuro] .jg-yo{background:#0d948818}
+html[data-tema=oscuro] .jg-tabla tr.jg-rk-top:nth-child(1) td{background:#f4c54212}
+html[data-tema=oscuro] .jg-tabla tr.jg-rk-top:nth-child(2) td{background:#cbd5e10d}
+html[data-tema=oscuro] .jg-tabla tr.jg-rk-top:nth-child(3) td{background:#e89a5c10}
+html[data-tema=oscuro] .jg-trofeos{background:var(--os-borde);border-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-trofeo{background:var(--os-sup)}
+
+/* Escondite: las pistas de calor y el panel del visor */
+html[data-tema=oscuro] .jg-calor-frio{background:#1d2a45}
+html[data-tema=oscuro] .jg-calor-templado{background:#2c2715}
+html[data-tema=oscuro] .jg-calor-caliente{background:#3a2012;color:#fdba74}
+html[data-tema=oscuro] .jg-calor-casi{background:#3a1220;color:#fda4af}
+html[data-tema=oscuro] .esc-rework{background:#191c16;border-color:#30352a}
+html[data-tema=oscuro] .esc-herramientas,html[data-tema=oscuro] .esc-ayuda{border-color:#30352a}
+html[data-tema=oscuro] .esc-ayuda,html[data-tema=oscuro] #escObjetivo{color:#b7c2ad}
+
+/* Cuadritos: el papel del tablero se oscurece con la página (los puntos
+   y las rayas ya son de color). Reversi: el borde que dejaba ver la ficha
+   blanca sobre blanco es ahora el que deja ver la negra sobre negro. */
+html[data-tema=oscuro] .jg-cuad .jg-svg{background:var(--os-sup2);box-shadow:0 8px 35px #0006}
+html[data-tema=oscuro] .jg-svg .jg-punto{fill:#9d96ad}
+html[data-tema=oscuro] .jg-rev-punto,html[data-tema=oscuro] .jg-rev-chip{border-color:#ffffff66}
+
+/* Flip 7: lo que queda fuera del paño (el pie y el historial) */
+html[data-tema=oscuro] .jg-f7-hist{color:var(--os-tx2)}
+html[data-tema=oscuro] .jg-f7-hist-t{color:var(--os-tx3)}
+html[data-tema=oscuro] .jg-f7-h{border-left-color:var(--os-borde2)}
+html[data-tema=oscuro] .jg-f7-hist-t+.jg-f7-h{color:var(--os-tx)}
+html[data-tema=oscuro] .jg-f7-h-f7{color:#f2c14e}
+html[data-tema=oscuro] .jg-f7-h-ronda,html[data-tema=oscuro] .jg-f7-h-cierra{color:var(--os-tx3)}
+html[data-tema=oscuro] .jg-f7-comv .jg-btn{background:var(--os-sup2);color:#c4b1ff;border-color:#4b3a7a}
+html[data-tema=oscuro] .jg-f7-comv .jg-f7-comv-mal{background:#3a1512;color:#ff8a7a;border-color:#7f1a15}
 </style>
 </head>
 <body>
@@ -946,6 +1100,7 @@
       <button class="btn-ghost" id="btnMusica" aria-pressed="true">♫ Música</button>
       <input id="volMusica" type="range" min="0" max="100" value="30" aria-label="Volumen de la música" title="Volumen de la música">
       <button class="btn-ghost" id="btnSonido" title="Sonido" aria-pressed="true">🔊</button>
+      <button class="btn-ghost" id="btnTema" title="Modo oscuro" aria-pressed="false">☾</button>
       <span id="userName"></span>
       <span class="avatar" id="userAvatar"></span>
       <button class="btn-ghost" id="btnPerfil" title="Tu apodo, tu foto y tu color">Perfil</button>
@@ -973,6 +1128,6 @@
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202609250445"></script>
+<script src="juegos-app.js?v=202609250501"></script>
 </body>
 </html>

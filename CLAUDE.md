@@ -1596,6 +1596,20 @@ caches with the page instead of being injected on every load. Its header and
 login card are a **deliberate copy** of `informes.html`'s: the shared part is a
 dozen rules, and a common file for that costs more than it saves.
 
+**Dark mode is one block at the end of that stylesheet**, every rule prefixed
+`html[data-tema=oscuro]`. The prefix out-ranks the light rule without touching
+it, so the light theme stays exactly as it was: when you add a light surface,
+add its dark twin there too. The block redefines `--jg-ink`/`--jg-muted` and
+adds a few `--os-*` surface and border tokens. It darkens only the chrome: page,
+cards, rooms, chat, end-of-game panels, dialogs, tables, footers and the
+Flip 7 history. The art keeps its own colours: the covers are already dark,
+the Flip 7 table is felt, cards are white like real cards, and the Reversi
+board is green. The attribute is set by a tiny inline script in `<head>`,
+before first paint; waiting for the bundle flashed the light page first.
+With nothing stored it follows `prefers-color-scheme`, live. The ☾/☀ button
+(`wireTema` in `juegos-main.js`) stores an explicit choice in `jg.tema`, and
+from then on that choice wins over the system setting.
+
 **The move log is the state.** A game lives in `partidas/<pid>` and everything
 that happens is one append-only entry in `jugadas/<0000…>`; `reducir(partida)`
 in `juegos/motor.js` replays that log into whatever the screen draws — whose
