@@ -24,9 +24,14 @@
    ============================================================ */
 
 /* `minimo` es cuántos hacen falta para empezar y `cupo` cuántos caben
-   como mucho. Cuadritos, Circuit Breakers y la reacción en cadena
+   como mucho. Cuadritos, Circuit Breakers, la reacción en cadena y Flip 7
    admiten más de dos; el resto son duelos por construcción — el
-   escondite cruza *dos* paisajes, las cartas resuelven *un* choque y el reversi tiene *dos* colores. */
+   escondite cruza *dos* paisajes, las cartas resuelven *un* choque y el reversi tiene *dos* colores.
+   Los topes de grupo son lo que cada juego aguanta sin romperse: ocho
+   cuadrillas es lo más que Circuit Breakers sabe colocar en los cuatro
+   mapas con seis robots cada una, ocho colores es lo más que la reacción
+   en cadena distingue de un vistazo, ocho asientos es lo que cabe en la
+   media luna de Flip 7; cuadritos no tiene nada de eso y llega a diez. */
 export const JUEGOS = {
   orbita: { nombre: "Órbita", lema: "Captura estrellas y decide el próximo movimiento de tu rival", color: "#8860ed", minimo: 2, cupo: 2 },
   escondite: {
@@ -48,14 +53,14 @@ export const JUEGOS = {
     lema: "Cierra más cajas que los demás, una raya por turno",
     color: "#0f62fe",
     minimo: 2,
-    cupo: 6
+    cupo: 10
   },
   worms: {
     nombre: "Circuit Breakers",
     lema: "Cuadrillas eléctricas, terreno destructible y un disparo por turno",
     color: "#f2a33a",
     minimo: 2,
-    cupo: 6
+    cupo: 8
   },
   reversi: {
     nombre: "Reversi",
@@ -69,14 +74,14 @@ export const JUEGOS = {
     lema: "Carga una celda hasta que estalle y conquista a sus vecinas en cadena",
     color: "#ff3d7f",
     minimo: 2,
-    cupo: 6
+    cupo: 8
   },
   flip7: {
     nombre: "Flip 7",
     lema: "Pide carta o plántate: siete números distintos y te llevas el bono",
     color: "#e8a317",
     minimo: 2,
-    cupo: 6
+    cupo: 8
   }
 };
 

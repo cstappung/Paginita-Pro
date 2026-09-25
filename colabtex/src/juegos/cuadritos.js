@@ -15,7 +15,7 @@
  * ratón es una raya de dos milímetros: en SVG cada hueco lleva detrás su
  * propia zona de clic ancha y el navegador hace la puntería solo.
  *
- * Se juega **de dos a seis**, y el tamaño del tablero lo elige quien abre
+ * Se juega **de dos a diez**, y el tamaño del tablero lo elige quien abre
  * la sala. Nada de eso está aquí: el cupo y el lado viven en la partida
  * (`cupoDe`, `ladoDe`) y el reductor ya reparte los turnos en círculo y
  * salta a quien se haya ido. Esta pantalla solo tiene que dejar de dar
@@ -187,7 +187,7 @@ export function crearCuadritos(ctx) {
     set("cuFase", fase, `<span class="jg-punto-t" style="background:${esc(colorDe(est.turno))}"></span>${esc(fase)}`);
 
     /* Un hueco por jugador, en orden de asiento, con quien tiene el
-       turno marcado y quien se fue en gris: con seis nombres ahí, sin
+       turno marcado y quien se fue en gris: con diez nombres ahí, sin
        esas dos marcas el marcador no dice de quién se espera nada. */
     const recien = est.ultima && est.ultima.cajas && est.ultima.cajas.length
       ? est.cajas[est.ultima.cajas[0].join("_")] : "";

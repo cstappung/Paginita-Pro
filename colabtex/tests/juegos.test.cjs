@@ -109,7 +109,7 @@ test('progreso: de 0 a 1 según lo jugado, 0 fuera de juego',()=>{
  const f=sala();mover(f,{t:'abandona',uid:'a'});assert.equal(progreso(reducir(f),'orbita'),0,'terminada ya no acelera');
 });
 const cr=(n=2,malla)=>({juego:'cadena',semilla:1,estado:'jugando',cupo:n,...(malla?{malla}:{}),
- jugadores:Object.fromEntries(['a','b','c','d','e','f'].slice(0,n).map((u,i)=>[u,{nombre:u,orden:i}])),jugadas:{}});
+ jugadores:Object.fromEntries(['a','b','c','d','e','f','g','h'].slice(0,n).map((u,i)=>[u,{nombre:u,orden:i}])),jugadas:{}});
 const pon=(p,uid,f,c)=>mover(p,{t:'p',uid,f,c});
 test('Reacción en cadena: masas críticas y vecinas',()=>{
  const {crCritica,crVecinas}=context;
@@ -170,7 +170,7 @@ test('Reacción en cadena: seis jugadores, abandono y turno que salta',()=>{
 test('Reacción en cadena: 200 partidas al azar terminan con un solo color',()=>{
  const {rng,progreso}=context;
  for(let s=1;s<=200;s++){
-  const n=2+s%5,p=cr(n,['chica','clasica','grande'][s%3]),r=rng(s);let e=reducir(p),guard=0;
+  const n=2+s%7,p=cr(n,['chica','clasica','grande'][s%3]),r=rng(s);let e=reducir(p),guard=0;
   let total=0;
   while(e.fase==='jugando'&&guard++<3000){
    const libres=[];for(let i=0;i<e.tab.length;i++)if(!e.tab[i]||e.tab[i].u===e.turno)libres.push(i);
@@ -183,4 +183,12 @@ test('Reacción en cadena: 200 partidas al azar terminan con un solo color',()=>
   assert.deepEqual([...new Set(e.tab.filter(Boolean).map(o=>o.u))],[e.ganador]);
   assert.deepEqual(copia(e),copia(reducir(copia(p))));
  }
+});
+test('cupos: cuadritos hasta diez, worms, cadena y flip7 hasta ocho, duelos a dos',()=>{
+ const {cupoDe}=context;
+ for(const [j,max] of [['cuadritos',10],['worms',8],['cadena',8],['flip7',8],['reversi',2],['cartas',2],['escondite',2]]){
+  assert.equal(cupoDe({juego:j,cupo:99}),max,j+' tope');
+  assert.equal(cupoDe({juego:j,cupo:max}),max,j+' justo en el tope');
+ }
+ assert.equal(cupoDe({juego:'cadena',cupo:1}),2,'nunca menos de dos');
 });

@@ -4,7 +4,7 @@ const fs=require('node:fs'),vm=require('node:vm');
 const code=fs.readFileSync('src/juegos/motor.js','utf8').replace(/\bexport\s+/g,'');
 const context={crypto:require('node:crypto').webcrypto,TextEncoder};vm.createContext(context);vm.runInContext(code+';Object.assign(this,{mazoF7,modoF7,F7_META});',context);
 const {reducir,mazoF7,lineaValidaF7,valorLineaF7,aporteF7,compromiso,auditaFlip7,progreso,meToca}=context;
-const nombres=['a','b','c','d','e','f'];
+const nombres=['a','b','c','d','e','f','g','h'];
 
 async function sala(modo,nj,semilla){
  const p={juego:'flip7',modo,semilla,estado:'jugando',cupo:nj,jugadores:{},jugadas:{}};
@@ -99,7 +99,7 @@ test('fuera de turno no cuenta; el Cero no deja plantarse',async()=>{
 for(const modo of ['normal','venganza'])test(`partidas completas (${modo}) terminan y pasan la auditoría`,async()=>{
  let ganadas=0;
  for(let s=1;s<=30;s++){
-  const nj=2+s%5;
+  const nj=2+s%7;
   const {p,sec,e}=await juega(modo,nj,s);
   assert.equal(e.fase,'fin');assert.equal(e.motivo,'flip7');
   assert.ok(e.puntos[e.ganador]>=200);
@@ -219,7 +219,7 @@ test('suplentes: dos en la mesa no tienen suplente; quien se fue no cuenta',asyn
 function azar(s){return()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
 test('fuzz: robos con suplentes, ruido, abandonos y un jugador dormido',async()=>{
  for(let s=1;s<=60;s++){
-  const R=azar(s),modo=s%2?'normal':'venganza',nj=2+s%5;
+  const R=azar(s),modo=s%2?'normal':'venganza',nj=2+s%7;
   const {p,sec}=await sala(modo,nj,s);
   const dormido=nj>=3&&s%3===0?nombres[s%nj]:null,abandonos=!dormido&&s%2===0;
   let e=reducir(p),pasos=0;
@@ -262,7 +262,7 @@ test('fuzz: robos con suplentes, ruido, abandonos y un jugador dormido',async()=
    sentado pueda cumplir, hasta acabar. */
 test('flip7: nadie que se va, por su pie o expulsado, deja la mesa colgada',async()=>{
  for(let s=1;s<=120;s++){
-  const modo=s%2?'normal':'venganza',nj=2+(s%5);
+  const modo=s%2?'normal':'venganza',nj=2+(s%7);
   const {p,sec}=await sala(modo,nj,s*31);
   let e=reducir(p),pasos=0,cortes=0;
   const corteEn=new Set([5+(s%17),40+(s%23),90+(s%11)]);

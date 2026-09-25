@@ -1,4 +1,4 @@
-/* Flip 7 — pedir carta o plantarse, de dos a seis, normal o con venganza.
+/* Flip 7 — pedir carta o plantarse, de dos a ocho, normal o con venganza.
  *
  * Esta pantalla no decide nada: el reductor (`redFlip7` en motor.js)
  * sabe de quién es el turno, qué carta salió y quién se pasó. Aquí se
@@ -184,9 +184,11 @@ const PUESTOS = {
   3: [[82, 55], [50, 76], [18, 55]],
   4: [[85, 50], [62, 78], [38, 78], [15, 50]],
   5: [[87, 43], [72, 70], [50, 83], [28, 70], [13, 43]],
-  6: [[86.5, 36], [77, 61], [62, 85], [38, 85], [23, 61], [13.5, 36]]
+  6: [[86.5, 36], [77, 61], [62, 85], [38, 85], [23, 61], [13.5, 36]],
+  7: [[89, 35], [80.5, 56], [71, 75], [50, 90], [29, 75], [19.5, 56], [11, 35]],
+  8: [[90, 33], [84, 52], [75, 71], [63, 88.5], [37, 88.5], [25, 71], [16, 52], [10, 33]]
 };
-const ALTO_SALA = n => n <= 2 ? 640 : n <= 4 ? 700 : 780;
+const ALTO_SALA = n => n <= 2 ? 640 : n <= 4 ? 700 : n <= 6 ? 780 : 980;
 
 /* Qué sucesos del historial son nuevos. El historial es una cola de 40:
    al llenarse, cada suceso nuevo empuja uno viejo por delante. Se busca
@@ -482,8 +484,8 @@ export function crearFlip7(ctx) {
     if (orden !== firmaOrden) {
       firmaOrden = orden;
       sala.classList.toggle("jg-f7-muchos", N > 2);
-      sala.dataset.n = Math.min(6, Math.max(1, N));
-      const pos = PUESTOS[Math.min(6, Math.max(1, N))], m = Math.floor((N - 1) / 2);
+      sala.dataset.n = Math.min(8, Math.max(1, N));
+      const pos = PUESTOS[Math.min(8, Math.max(1, N))], m = Math.floor((N - 1) / 2);
       cont.innerHTML = js.map((j, i) => {
         const [x, y] = pos[(m + i) % pos.length];
         /* Visto desde la cabeza del crupier, que está arriba en el centro. */

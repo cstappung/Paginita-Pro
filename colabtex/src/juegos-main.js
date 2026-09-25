@@ -63,16 +63,19 @@ const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "�
    que llegue (`cupoDe`, `ladoDe`), así que una sala creada a mano en la
    base tampoco puede pedir un tablero que no existe. Un juego que no
    aparezca aquí no ofrece nada y su tarjeta sale con el botón solo. */
+/* Cuántos pueden entrar, del mínimo al cupo del juego: sale de `JUEGOS`
+   para que subir el tope de un juego sea cambiar un número en un sitio. */
+const cupos = k => Array.from({ length: JUEGOS[k].cupo - JUEGOS[k].minimo + 1 },
+  (_, i) => ({ v: JUEGOS[k].minimo + i, t: JUEGOS[k].minimo + i + " jugadores" }));
+
 const OPCIONES = {
   cuadritos: [
-    { clave: "cupo", etiqueta: "Jugadores",
-      valores: [2, 3, 4, 5, 6].map(n => ({ v: n, t: n + " jugadores" })) },
+    { clave: "cupo", etiqueta: "Jugadores", valores: cupos("cuadritos") },
     { clave: "lado", etiqueta: "Tablero", por: TAMANOS.mediano.lado,
       valores: Object.keys(TAMANOS).map(k => ({ v: TAMANOS[k].lado, t: etiquetaTamano(k) })) }
   ],
   worms: [
-    { clave: "cupo", etiqueta: "Cuadrillas",
-      valores: [2, 3, 4, 5, 6].map(n => ({ v: n, t: n + " jugadores" })) },
+    { clave: "cupo", etiqueta: "Cuadrillas", valores: cupos("worms") },
     { clave: "mapa", etiqueta: "Mapa", valores: [
       { v: "substation", t: "Valle del reactor" }, { v: "alpine", t: "Cordillera Boreal" },
       { v: "desert", t: "Desierto de cobre" }, { v: "tidal", t: "Puerto de tormenta" }] },
@@ -82,14 +85,12 @@ const OPCIONES = {
       valores: [30, 45, 60].map(n => ({ v: n, t: n + " s" })) }
   ],
   cadena: [
-    { clave: "cupo", etiqueta: "Jugadores",
-      valores: [2, 3, 4, 5, 6].map(n => ({ v: n, t: n + " jugadores" })) },
+    { clave: "cupo", etiqueta: "Jugadores", valores: cupos("cadena") },
     { clave: "malla", etiqueta: "Tablero", por: "clasica",
       valores: Object.keys(CR_MALLAS).map(k => ({ v: k, t: `${CR_MALLAS[k].nombre} ${CR_MALLAS[k].cols}×${CR_MALLAS[k].filas}` })) }
   ],
   flip7: [
-    { clave: "cupo", etiqueta: "Jugadores",
-      valores: [2, 3, 4, 5, 6].map(n => ({ v: n, t: n + " jugadores" })) },
+    { clave: "cupo", etiqueta: "Jugadores", valores: cupos("flip7") },
     { clave: "modo", etiqueta: "Modo", por: "normal",
       valores: [{ v: "normal", t: "Normal" }, { v: "venganza", t: "Con venganza" }] }
   ]
@@ -703,7 +704,7 @@ function armazon() {
           </div></div>
         <div class="jg-elige" id="vesElige"></div>
         <div class="jg-section-title"><h2>Para jugar solo</h2><span>sin sala, cuando quieras</span></div>
-        <div class="sp-entradas"><a href="#solo/minas" class="sp-entrada sp-e-minas"><small>SINGLEPLAYER / ESTRATEGIA</small><strong>MINA CLUB <span>✦</span></strong><p>Piensa, explora y florece. Tres dificultades y música progresiva.</p><b>Explorar →</b></a><a href="#solo/snake" class="sp-entrada sp-e-snake"><small>SINGLEPLAYER / REFLEJOS</small><strong>SNAKE CLUB <span>ϟ</span></strong><p>Clásico, arcade, portales y Zen. Una más.</p><b>Entrar al circuito →</b></a><a href="juegos/worms/index.html?v=worms-3" class="sp-entrada sp-e-worms"><small>LOCAL · BOTS / ARTILLERÍA</small><strong>CIRCUIT BREAKERS <span>💥</span></strong><p>Tu cuadrilla contra bots o amigos en el mismo equipo. En línea: abre una sala arriba.</p><b>Desplegar →</b></a></div>
+        <div class="sp-entradas"><a href="#solo/minas" class="sp-entrada sp-e-minas"><small>SINGLEPLAYER / ESTRATEGIA</small><strong>MINA CLUB <span>✦</span></strong><p>Piensa, explora y florece. Tres dificultades y música progresiva.</p><b>Explorar →</b></a><a href="#solo/snake" class="sp-entrada sp-e-snake"><small>SINGLEPLAYER / REFLEJOS</small><strong>SNAKE CLUB <span>ϟ</span></strong><p>Clásico, arcade, portales y Zen. Una más.</p><b>Entrar al circuito →</b></a><a href="juegos/worms/index.html?v=worms-4" class="sp-entrada sp-e-worms"><small>LOCAL · BOTS / ARTILLERÍA</small><strong>CIRCUIT BREAKERS <span>💥</span></strong><p>Tu cuadrilla contra bots o amigos en el mismo equipo. En línea: abre una sala arriba.</p><b>Desplegar →</b></a></div>
       </div>
     </div>`;
   for (const b of h.querySelectorAll("[data-filtro]")) {
