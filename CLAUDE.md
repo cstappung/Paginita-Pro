@@ -1983,8 +1983,11 @@ deck is Vengeance's 108 **in the same order** with the new ones appended
   (`mata`), three Comodín.** `trueca` swaps two players' whole hand (numbers,
   modifiers, stored Second Chance — not planted/frozen, which belong to the
   seat); the chooser may be one of the two (choice type `p2`). `mata` busts
-  any other player still standing. The comodín (choice type `n`) is played on
-  anyone standing as a number 0–14 the player picks; it lives in `nums` like
+  any other player still standing. The comodín (choice type `n`) goes **only
+  into the drawer's own row** (its `uids` is just `[quien]`, so it cannot be
+  used to bust someone else by handing them a number they already hold) as a
+  number 0–14 the player picks — on screen, clicking the number plays it, and
+  the numbers already in the row are struck through; it lives in `nums` like
   any number (`esNumeroF7`), and its value is **not in the card** but in the
   round's `com` map (id → value), because the same card can come back later
   worth something else. That map is looked up by id, so it travels with the

@@ -385,3 +385,30 @@ test('diez en la mesa: la partida acaba en los tres modos',async()=>{
   assert.equal(e.fase,'fin');assert.equal(Object.keys(e.puntos).length,10);
  }
 });
+
+test('super: el comodín sólo se lo puede jugar quien lo saca',async()=>{
+ let vistos=0;
+ for(let s=1;s<=40&&vistos<3;s++){
+  const {p,sec}=await sala('super',4,s);const M=mazoF7('super'),k=cuenta(s);
+  let e=reducir(p),pasos=0;
+  while(e.fase==='jugando'&&pasos++<3000){
+   const w=e.espera;
+   if(w.k==='elige'&&M[w.id].a==='comodin'){
+    vistos++;
+    assert.deepEqual([...w.op.uids],[w.quien]);
+    const otro=Object.keys(sec).find(u=>u!==w.quien&&e.lineas[u].estado!=='fuera');
+    const antes=JSON.stringify(e.espera);
+    e=mover(p,{t:'apunta',uid:w.quien,a:otro,v:5});
+    assert.equal(JSON.stringify(e.espera),antes,'aceptó el comodín para otro');
+    e=mover(p,{t:'apunta',uid:w.quien,a:w.quien,v:5});
+    assert.notEqual(JSON.stringify(e.espera),antes);
+    break;
+   }
+   if(w.k==='roba'){const u=w.faltan[0];e=mover(p,{t:'r',uid:u,n:w.n,v:await aporteF7(sec[u].sem,sec[u].sal,w.n)});}
+   else if(w.k==='decide')e=mover(p,{t:'pide',uid:w.uid,n:e.n,v:await aporteF7(sec[w.uid].sem,sec[w.uid].sal,e.n)});
+   else if(w.k==='bono')e=mover(p,bono(w,k));
+   else e=mover(p,{t:'apunta',uid:w.quien,...eleccion(w.op,k)});
+  }
+ }
+ assert.ok(vistos>=1,'no salió ningún comodín');
+});
