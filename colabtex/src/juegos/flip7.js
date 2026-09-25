@@ -655,7 +655,8 @@ export function crearFlip7(ctx) {
   }
 
   function textoEleccion(c, op) {
-    if (c.k === "m") return `¿A quién le pones ${nombreCarta(c)}?`;
+    if (c.k === "m") return `¿A quién le pones ${nombreCarta(c)}?` + (est.modo === "super" && (c.v < 0 || c.mitad)
+      ? " A quien ya se pasó también: le resta del total." : "");
     if (op.tipo === "2") return sel1 ? "Ahora una carta de otro jugador para intercambiarlas." : "Elige dos cartas de dos jugadores distintos para intercambiarlas.";
     if (op.tipo === "p2") return selU ? `Ahora la otra mano: ${selU === uid ? "la tuya" : "la de " + nombre(selU)} se cambia entera por ella.` : "Elige dos jugadores (puedes ser tú): se cambian la mano entera.";
     if (op.tipo === "n") return "¿Qué número vale tu comodín? Va a tu fila; los marcados ya los tienes.";
