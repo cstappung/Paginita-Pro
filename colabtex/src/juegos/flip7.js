@@ -53,6 +53,12 @@ const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
    es lo que dura el resumen de la anterior. */
 const PAUSA_ROBO = 850;
 const PAUSA_RONDA = 4600;
+/* Lo que espera un suplente antes de aportar en lugar de alguien que no
+   contesta (una pestaña dormida, un móvil bloqueado), y cuánto más el
+   siguiente suplente: el que está no pisa al que tarda un poco, y dos
+   suplentes no escriben a la vez. */
+const SUPLENCIA_MS = 6000;
+const SUPLENCIA_PASO = 2000;
 /* Cuánto se espera a que los demás revelen su semilla antes de cerrar
    la partida igualmente: quien ya cerró la pestaña no va a hacerlo. */
 const ESPERA_SEMILLAS = 6000;
@@ -195,6 +201,7 @@ export function crearFlip7(ctx) {
   let enviando = false;
   let enviadoN = -1;           // robo cuyo aporte ya salió de esta pestaña
   let reloj = null, relojN = -1;
+  let roboN = -1, roboT = 0;   // el robo pendiente y cuándo lo vio esta pestaña
   let rondaVista = 0, tRonda = 0;
   let sel1 = null;             // primera carta del intercambio, aún sin pareja
   let tramposos = [], auditando = false, firmaAudit = "";
@@ -305,8 +312,14 @@ export function crearFlip7(ctx) {
      no tiene ninguna carta: el reductor ya las vació, pero es justo lo
      que se quiere estar mirando. */
   function fantasma() {
-    const f = est.finRonda;
+    const f = est.finRonda, w = est.espera;
     if (est.fase !== "jugando" || !f || f.r !== est.ronda - 1) return false;
+    /* Sólo mientras el crupier reparte. Si la ronda nueva ya pide algo a
+       alguien —un comodín que elige a quién va, o un turno con todas las
+       filas vacías porque el reparto fue todo acciones—, la mesa tiene
+       que ser la de ahora: con la de la ronda pasada no había botones de
+       objetivo ni de turno y la partida se quedaba parada para siempre. */
+    if (!w || w.k !== "roba") return false;
     return est.jugadores.every(j => {
       const l = est.lineas[j.uid];
       return !l || (!l.nums.length && !l.mods.length && l.seg == null);
@@ -844,6 +857,10 @@ export function crearFlip7(ctx) {
   /* La pestaña vuelve: se cuenta lo que pasó mientras estaba detrás. */
   function alVolver() {
     if (document.hidden || muerto || !est) return;
+    /* Un reloj de una pestaña de fondo puede haberse retrasado mucho (el
+       navegador los frena) o estar ya viejo: al volver se rearma. */
+    if (reloj) { clearTimeout(reloj); reloj = null; relojN = -1; }
+    automatismos();
     const q = pendiente;
     pendiente = null;
     if (q && q.carta && sitioDe(q.carta.id) && !quieto()) {
@@ -899,28 +916,39 @@ export function crearFlip7(ctx) {
   }
 
   /* Mi aporte al robo pendiente, con su pausa. El reloj se rearma si el
-     robo que espera cambia; si no, se deja correr. */
+     robo que espera cambia; si no, se deja correr. Si no me toca aportar
+     pero soy suplente (`espera.suplentes`), aporto igual pasado un rato:
+     el reductor sólo lo usa si los designados siguen sin estar, y sin
+     eso una pestaña dormida dejaba la mesa entera esperando. */
+  function papel(w) {
+    if (w.faltan.includes(uid)) return 0;
+    const k = (w.suplentes || []).indexOf(uid);
+    return k < 0 ? -1 : k + 1;
+  }
   function automatismos() {
     const w = est && est.espera;
     if (!w || est.fase !== "jugando" || w.k !== "roba" || !juego() || !secListo
-        || !w.faltan.includes(uid) || enviadoN === w.n) {
+        || papel(w) < 0 || enviadoN === w.n) {
       if (reloj && (!w || w.k !== "roba" || w.n !== relojN)) { clearTimeout(reloj); reloj = null; relojN = -1; }
       return;
     }
+    if (roboN !== w.n) { roboN = w.n; roboT = Date.now(); }
     if (reloj && relojN === w.n) return;
     clearTimeout(reloj);
     relojN = w.n;
-    const falta = Math.max(PAUSA_ROBO, PAUSA_RONDA - (Date.now() - tRonda) * (w.de === "reparto" ? 1 : 99));
+    const rango = papel(w);
+    const falta = Math.max(PAUSA_ROBO, PAUSA_RONDA - (Date.now() - tRonda) * (w.de === "reparto" ? 1 : 99))
+      + (rango ? Math.max(0, SUPLENCIA_MS + (rango - 1) * SUPLENCIA_PASO - (Date.now() - roboT)) : 0);
     reloj = setTimeout(async () => {
       reloj = null;
       const x = est && est.espera;
-      if (muerto || !x || x.k !== "roba" || x.n !== relojN || !x.faltan.includes(uid) || enviadoN === x.n) return;
+      if (muerto || !x || x.k !== "roba" || x.n !== relojN || papel(x) < 0 || enviadoN === x.n) return;
       const s = miSemilla();
       if (!s) return;
       enviadoN = x.n;
       try {
         const v = await aporteF7(s.sem, s.sal, x.n);
-        await jugar({ t: "r", uid, n: x.n, v });
+        if (!(await jugar({ t: "r", uid, n: x.n, v }))) enviadoN = -1;
       } catch (e) { enviadoN = -1; console.warn("[flip7]", e); if (est) automatismos(); }
     }, falta);
   }
@@ -935,7 +963,10 @@ export function crearFlip7(ctx) {
       if (s) jugar({ t: "s", uid, sem: s.sem, sal: s.sal }).catch(() => {});
     }
     const faltan = est.jugadores.filter(j => !(est.fuera || {})[j.uid] && !(est.semillas || {})[j.uid]);
-    if (!faltan.length || Date.now() - finVisto > ESPERA_SEMILLAS) { terminar(est.ganador, est.motivo); return; }
+    if (!faltan.length || Date.now() - finVisto > ESPERA_SEMILLAS) terminar(est.ganador, est.motivo);
+    /* Se sigue mirando hasta que `fin` está escrito: un `terminar` que
+       falló (la red, una jugada que no llegó) no puede dejar la sala
+       abierta para siempre con la partida ya decidida. */
     clearTimeout(relojFin);
     relojFin = setTimeout(() => { if (!muerto && est && !(p.fin && p.fin.at)) cierre(); }, 1000);
   }
