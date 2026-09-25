@@ -64,7 +64,8 @@ import {
   limitToLast, startAt
 } from "firebase/database";
 import {
-  claveJugada, semillaAleatoria, salAleatoria, compromiso, LADO, cupoDe
+  claveJugada, semillaAleatoria, salAleatoria, compromiso, LADO, cupoDe,
+  cadenaCacho, CC_CADENA
 } from "./juegos/motor.js";
 
 const P = "partidas", MIAS = "misPartidas", R = "ranks";
@@ -87,7 +88,7 @@ export const ahora = () => Date.now() + offset;
    que un juego que no ofrezca nada no tiene que pasar nada. */
 export async function crearPartida(juego, quien, extra) {
   const pid = push(ref(db, P)).key;
-  const sec = await secreto(pid, quien.uid);
+  const sec = await secreto(pid, quien.uid, juego);
   await set(ref(db, `${P}/${pid}`), Object.assign({
     juego,
     estado: "esperando",
@@ -97,20 +98,20 @@ export async function crearPartida(juego, quien, extra) {
     lado: LADO,
     cupo: 2,
     at: serverTimestamp(),
-    jugadores: { [quien.uid]: ficha(quien, 0, sec.h) }
+    jugadores: { [quien.uid]: ficha(quien, 0, sec.h, sec.hcad) }
   }, extra || {}));
   await marcarMia(pid, juego, quien.uid);
   return pid;
 }
 
-const ficha = (q, orden, hmazo) => ({
+const ficha = (q, orden, hmazo, hcad) => Object.assign({
   nombre: q.nombre || "Alguien",
   foto: q.foto || "",
   color: q.color || "#0d9488",
   orden,
   hmazo: hmazo || "",
   at: Date.now()
-});
+}, hcad ? { hcad } : {});
 
 /* ---------- el secreto de cada jugador ----------
    Una semilla y una sal, guardadas donde solo su dueño puede leerlas,
@@ -118,11 +119,15 @@ const ficha = (q, orden, hmazo) => ({
    mazo de cartas: el contrario no puede calcularlo, y al acabar la
    partida se revela la semilla y se comprueba que jugara lo que
    tenía. Cuelga de su propio hijo, `sec`, para que `marcarMia` — que
-   escribe `juego` y `at` — no lo pise. */
-async function secreto(pid, uid) {
+   escribe `juego` y `at` — no lo pise.
+
+   En el cacho la misma semilla da además la cadena de llaves de los
+   dados, y lo que se publica es su punta (`hcad`, ver `redCacho`). */
+async function secreto(pid, uid, juego) {
   const sem = semillaAleatoria(), sal = salAleatoria();
   await set(ref(db, `${MIAS}/${uid}/${pid}/sec`), { sem, sal });
-  return { sem, sal, h: await compromiso(sem, sal) };
+  const hcad = juego === "cacho" ? cadenaCacho(sem, sal)[CC_CADENA] : "";
+  return { sem, sal, h: await compromiso(sem, sal), hcad };
 }
 
 export async function leerSecreto(pid, uid) {
@@ -141,9 +146,9 @@ export async function unirse(pid, quien) {
   const cupo = cupoDe(p);
   if (!ya[quien.uid]) {
     if (Object.keys(ya).length >= cupo) throw new Error("La sala está llena.");
-    const sec = await secreto(pid, quien.uid);
+    const sec = await secreto(pid, quien.uid, p.juego);
     await set(ref(db, `${P}/${pid}/jugadores/${quien.uid}`),
-              ficha(quien, Object.keys(ya).length, sec.h));
+              ficha(quien, Object.keys(ya).length, sec.h, sec.hcad));
     /* La sala se cierra sola al llenarse. Con cupo de más de dos puede
        cerrarla antes quien la abrió (`setEstado`), porque si no, una
        sala de seis con cuatro dentro no empezaría nunca. Las reglas
@@ -270,7 +275,7 @@ export function watchPerfil(uid, cb) {
 
 /* Lo que eligió quien abrió la sala y la revancha repite. Solo lo que
    existe: un `undefined` en un `set` hace fallar la escritura entera. */
-const opcionesDe = p => Object.fromEntries(["mapa", "escuadra", "tiempo", "malla", "modo"]
+const opcionesDe = p => Object.fromEntries(["mapa", "escuadra", "tiempo", "malla", "modo", "sicil"]
   .filter(k => p[k] !== undefined && p[k] !== null).map(k => [k, p[k]]));
 
 /* Una única invitación por partida; las solicitudes simultáneas convergen. */

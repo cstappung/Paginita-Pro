@@ -208,6 +208,16 @@ const REPERTORIO = {
   reparte:  (a, t) => { if (muestra(a, "carta", t, { vol: 0.8, vel: 0.95 + Math.random() * 0.1 })) return;
                         soplo(a, t, 0.16, 0.12, { f: 700, f1: 3600, q: 0.9, ataque: 0.03 });
                         soplo(a, t + 0.17, 0.03, 0.14, { f: 3200, q: 1.2 }); },
+  /* Cacho: el cubilete agitado — una docena de dados chocando contra el
+     cuero, cada vez más juntos — y el golpe del vaso boca abajo en la mesa. */
+  cubilete: (a, t) => { for (let k = 0; k < 12; k++) {
+                          const d = k * 0.038 + Math.random() * 0.012;
+                          soplo(a, t + d, 0.018, 0.07 + Math.random() * 0.05, { f: 2600 + Math.random() * 2400, q: 3 }); }
+                        if (!muestra(a, "toc", t + 0.5, { i: 1, vol: 0.85, vel: 0.8 })) nudillo(a, t + 0.5, 0.8); },
+  /* Cacho: alzar un vaso — el cuero que despega y los dados que se asientan. */
+  dado:     (a, t) => { soplo(a, t, 0.06, 0.06, { f: 500, f1: 1400, q: 0.8, ataque: 0.01 });
+                        [0.05, 0.085, 0.11].forEach((d, k) => soplo(a, t + d, 0.02, 0.1 - k * 0.025, { f: 3400 - k * 400, q: 3 }));
+                        if (!muestra(a, "toc", t, { i: 0, vol: 0.5, vel: 1.25 })) nudillo(a, t, 1.3); },
   /* Plantarse: la palma sobre la mesa y una campanilla que sube en arpegio. */
   planta:   (a, t) => { seno(a, t, 120, 55, 0.3, 0.42); soplo(a, t, 0.1, 0.18, { f: 420, q: 0.7, tipo: "lowpass" });
                         [H(84), H(88), H(91), H(96)].forEach((f, k) => campana(a, t + 0.12 + k * 0.07, f, 0.05, 1.1 + k * 0.2)); },
@@ -262,7 +272,9 @@ export function suena(nombre, x) {
 const TEMAS = Temas.temas;
 const GRABADAS = {
   escondite: { url: "juegos/audio/escondite-midnight-pulse.mp3", vol: 1 },
-  flip7: { url: "juegos/audio/flip7-poker-night.mp3", vol: 0.7, fin: 124.3 }
+  flip7: { url: "juegos/audio/flip7-poker-night.mp3", vol: 0.7, fin: 124.3 },
+  /* El Cacho se juega en la misma barra de madera: comparte la grabación. */
+  cacho: { url: "juegos/audio/flip7-poker-night.mp3", vol: 0.6, fin: 124.3 }
 };
 const pistas = {};
 let tema = "", timer = null, desbloqueado = false, rep = null;
@@ -329,7 +341,7 @@ function sincronizaMusica() {
       if (p.paused) p.play().catch(() => {});
       /* Las muestras de la mesa se piden con la música, no con el primer
          toc: así ese primero ya suena a madera. */
-      if (tema === "flip7") { const a = motor(); if (a) cargaMuestras(a); }
+      if (tema === "flip7" || tema === "cacho") { const a = motor(); if (a) cargaMuestras(a); }
     } catch (_) {}
     return;
   }

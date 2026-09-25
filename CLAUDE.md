@@ -45,15 +45,16 @@ Six apps plus a small shared **Informes** page:
   collect by themselves, plus the bugs and ideas people write. See "Informes"
   below.
 - **Juegos** (`juegos.html` + `juegos-app.js`, entry
-  `colabtex/src/juegos-main.js`) — eight turn-based games, on the same Google
+  `colabtex/src/juegos-main.js`) — nine turn-based games, on the same Google
   account and the same Firebase project: **Escondite** (hide a person in a
   landscape, then cross the landscapes and race to find the other's),
   **Cartas de los tres elementos** (a Card-Jitsu duel), **Cuadritos** (dots and
   boxes, two to ten players and three board sizes), **Reversi**, **Órbita**,
   **Chain Reaction** (critical-mass orbs that burst into their neighbours, two
   to eight players and three grid sizes), **Flip 7** (the push-your-luck card
-  game, two to ten players, Normal, Vengeance and Super Vengeance) and **Circuit
-  Breakers** (a Worms-style artillery game for two to eight squads, in an
+  game, two to ten players, Normal, Vengeance and Super Vengeance), **Cacho**
+  (the Chilean liar's dice, *dudo* mode, two to eight players, with the
+  optional *partida siciliana*) and **Circuit Breakers** (a Worms-style artillery game for two to eight squads, in an
   iframe), plus a
   **Clasificación** tab. See "Juegos" below.
 
@@ -1488,7 +1489,7 @@ Four decisions worth keeping:
 
 ## Juegos architecture
 
-Eight turn-based games, on the same Firebase project and the same Google session
+Nine turn-based games, on the same Firebase project and the same Google session
 as ColabTeX and ColabDraw. Turn-based on purpose: with one move per turn the
 network carries a handful of fields and there is nothing to interpolate, so no
 game loop ever has to be synchronised.
@@ -1513,6 +1514,8 @@ game stops working, not a round number:
   150 px seats (`PUESTOS`) — following the diagonal to the bottom stacked
   the lower seats on top of each other. The deck holds up (it reshuffles the
   discard), and `tests/flip7.test.cjs` plays robot games up to ten to prove it.
+- **cacho, 8.** Forty dice on the table: past that a bet of «22 quinas» is
+  a lottery rather than a read, and the oval stops holding the cups.
 - **worms, 8.** Eight squads of six spawn on all four maps; at ten `tidal`
   runs out of ground. The frame's `engine.js` carries eight colours, eight
   team names and 48 engineers' names, and clamps humans/bots to eight.
@@ -1820,7 +1823,7 @@ Modules in [colabtex/src/juegos/](colabtex/src/juegos/):
 - `paisaje.js` — draws the scene `motor.js` decided. Split from it because the
   only thing the two machines must share is the layout, and that is a number.
 - `escondite.js`, `cartas.js`, `cuadritos.js`, `reversi.js`, `cadena.js`,
-  `flip7.js`, `ranks.js` — one screen each.
+  `flip7.js`, `cacho.js`, `ranks.js` — one screen each.
 - `sonido.js` — the WebAudio synth and the mute flag. No DOM beyond the header
   button's state, no Firebase.
 - `perfil.js` — the profile editor: `COLORES`, `mezcla` (ficha + perfil → what
@@ -2082,6 +2085,60 @@ never the state — the state says where a card *is*, the history says that it
   summary for `FIN_MS` (2.2 s) and only then calls `ctx.listo`; `ocupado()` is
   `vuelos > 0 || Date.now() < finHasta`, which is what keeps `pintaFin` from
   covering the last card with the cartel.
+
+**Cacho (`cacho`) has no dealer, and its dice come out of a hash chain.**
+Each player's dice must be secret, nobody may choose them, and there is no
+server to roll them. So on joining a room each browser computes, from its
+private seed (the same `misPartidas/<uid>/<pid>/sec` as cartas and Flip 7), a
+chain `e0 = H("cacho:" + sem + ":" + sal)`, `e1 = H(e0)` … `e300`
+(`cadenaCacho`, `CC_CADENA`), and publishes only the tip as `hcad` in the
+write-once ficha. The key of round `r` is `e[299 − r]` (`llaveCacho`): its
+owner has known it since the start, nobody else can compute it, and anyone can
+check it once revealed, because its hash is the previous round's key
+(`llaveBuena`). A round's dice are `dadosCacho(llave, mezcla, k)`, where the
+`mezcla` is every key revealed when the *previous* round was uncovered — so
+nobody knows even their own dice before the round starts, and nobody knows
+anyone else's until the uncovering. Round 0 is the `arranque`: everyone reveals
+key 0, and that mezcla decides round 1's dice and who opens, with nobody
+choosing either. Points worth knowing:
+
+- **The check runs inside the reducer**, unlike Flip 7's asynchronous audit.
+  That is why `motor.js` carries a hand-written, synchronous, memoised SHA-256
+  (`sha256hex`) — `crypto.subtle` is async and the reducer cannot wait — with
+  the round constants written out rather than computed with `Math.cbrt`, since
+  two browsers rounding the last bit differently would see different dice. A
+  key that does not fit the chain does not count: the table keeps waiting for
+  the real one, `est.falsas` names the liar in red, and the vote can expel
+  them. The price is that a game can last at most 300 rounds; hitting that
+  ends it as `motivo: "tope"`: the most dice wins, and a tie is a draw.
+- **Keys are sent by the screen, not by the player**: whenever
+  `espera.k === "llaves"` and your key is missing, `cacho.js` sends
+  `{t:"k", uid, r, c}` by itself. Same heartbeat (`LATIDO_MS`) and write
+  timeout (`ENVIO_MAX`) as Flip 7, for the same reasons — a lost timer or a
+  write with no network must never leave the table stuck.
+- **The rules** (`minimoCacho`): aces are wild unless the bet is on aces or
+  the round is *obligada*; going to aces needs `⌊c/2⌋ + 1`, coming back from
+  them `2c + 1`, and opening on aces is only allowed with one die left.
+  **Obligar** (once per game, with one die, three or more players left) turns
+  aces into a plain face for that round. **Calzar** (claiming the bet is
+  exact) is allowed while at least half the initial dice are still on the
+  table, or to whoever holds one die; right wins a die back (up to five),
+  wrong loses one. The next round opens with whoever lost, with whoever calzó
+  after a calzo, and with the same opener after an annulled round — an
+  abandono mid-round annuls it, since that player's cup can never be
+  uncovered.
+- **Partida siciliana** (`sicil`, chosen at room creation): doubting the
+  *first* bet of a round risks two dice, for whoever was wrong. It punishes
+  the opening bluff and the reflex dudo, which are what make a cacho game drag
+  on without anything happening.
+- **The cups lift one by one.** `ultimo` carries `orden` — from whoever dudó
+  or calzó, in the round's direction — plus every cup's dice, the count and
+  the verdict; the screen lifts one cup every `pasoMs`, keeps a running
+  «Van k de c» in the middle, and only then shows who loses. Clicking the
+  table skips to the end. `ocupado()` covers the replay, so `pintaFin` never
+  covers the last uncovering, and `PAUSA_FIN.cacho` adds its grace.
+- **Sound follows `hist`**, like Flip 7: the cup rattle (`cubilete`) when a
+  round starts, `dado` on each cup lifted.
 
 **Circuit Breakers (`worms`) is a whole game in an iframe**, like Mina Club:
 `juegos/worms/` is its own document (canvas, physics, `audio.js`) and
