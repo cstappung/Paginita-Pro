@@ -110,6 +110,25 @@ sala de Chain Reaction no se puede crear. El arreglo es el de siempre: pegar
 `firebase/database.rules.json` entero y **Publicar**, o usar el botón
 **Copiar las reglas** del cartel de la página de juegos.
 
+### ⚠ El chat de sala y «en juego ahora» piden publicar otra vez
+
+Dos nodos nuevos, los dos fuera de `partidas/`:
+
+- `chat/<pid>` — la charla de cada sala. La leen todos los que tienen sesión y
+  escribe cualquiera, jugador o espectador, pero **solo con su propio uid**,
+  **una vez** por mensaje (no se editan) y solo mientras la partida existe;
+  300 caracteres como mucho.
+- `enCurso/<pid>` — el cartel con el que una partida empezada aparece en el
+  vestíbulo para que otros la miren. Lo escriben solo sus jugadores y solo
+  mientras no termina; lo puede borrar cualquiera cuando la partida ya acabó o
+  ya no existe.
+
+La votación para expulsar a alguien **no necesita nada nuevo**: los votos son
+jugadas como cualquier otra, y viajan por `partidas/<pid>/jugadas`. Sin
+publicar, las partidas se juegan igual, pero el chat no manda nada y el
+vestíbulo no enseña las partidas en juego. El arreglo es el de siempre: pegar
+`firebase/database.rules.json` entero y **Publicar**.
+
 ## 2. Reglas de Storage
 
 1. Consola → **Storage** → pestaña **Reglas**.

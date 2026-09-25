@@ -255,3 +255,44 @@ test('fuzz: robos con suplentes, ruido, abandonos y un jugador dormido',async()=
   assert.deepEqual([...await auditaFlip7(p,reducir(p))].filter(m=>m.que!=='oculta'),[],`semilla ${s}: auditoría`);
  }
 });
+
+/* Nada puede dejar la mesa sin nadie a quien esperar: en cualquier punto de
+   la partida —a mitad de un reparto incluido— alguien se va o lo expulsan por
+   votación, y la partida tiene que seguir teniendo una espera que alguien
+   sentado pueda cumplir, hasta acabar. */
+test('flip7: nadie que se va, por su pie o expulsado, deja la mesa colgada',async()=>{
+ for(let s=1;s<=120;s++){
+  const modo=s%2?'normal':'venganza',nj=2+(s%5);
+  const {p,sec}=await sala(modo,nj,s*31);
+  let e=reducir(p),pasos=0,cortes=0;
+  const corteEn=new Set([5+(s%17),40+(s%23),90+(s%11)]);
+  while(e.fase==='jugando'){
+   assert.ok(++pasos<20000,'semilla '+s+': la partida no termina');
+   const w=e.espera;assert.ok(w,'semilla '+s+': jugando sin nada que esperar');
+   const sentados=Object.keys(p.jugadores).filter(u=>!e.fuera[u]);
+   /* La espera siempre nombra a alguien que sigue en la mesa. */
+   const deQuien=w.k==='roba'?w.faltan:[w.k==='decide'?w.uid:w.quien];
+   assert.ok(deQuien.length&&deQuien.every(u=>sentados.includes(u)),'semilla '+s+': espera a quien no está ('+w.k+')');
+   if(corteEn.has(pasos)&&sentados.length>1){
+    cortes++;
+    const vic=deQuien[0];
+    if(cortes%2){e=mover(p,{t:'abandona',uid:vic});}
+    else{for(const u of sentados)if(u!==vic&&!e.fuera[vic])e=mover(p,{t:'voto',uid:u,contra:vic});
+     assert.ok(e.fuera[vic],'semilla '+s+': la votación no expulsa');}
+    continue;
+   }
+   if(w.k==='roba'){const u=w.faltan[0];e=mover(p,{t:'r',uid:u,n:w.n,v:await aporteF7(sec[u].sem,sec[u].sal,w.n)});}
+   else if(w.k==='decide'){
+    const u=w.uid;
+    if(!w.cero&&e.valor[u]>=20)e=mover(p,{t:'planta',uid:u});
+    else e=mover(p,{t:'pide',uid:u,n:e.n,v:await aporteF7(sec[u].sem,sec[u].sal,e.n)});
+   }else{
+    const o=w.op;
+    if(o.tipo==='a')e=mover(p,{t:'apunta',uid:w.quien,a:o.uids[0]});
+    else if(o.tipo==='c'){const u=Object.keys(o.cartas)[0];e=mover(p,{t:'apunta',uid:w.quien,a:u,c:o.cartas[u][0]});}
+    else{const [a,b]=Object.keys(o.cartas);e=mover(p,{t:'apunta',uid:w.quien,a,b,c:o.cartas[a][0],d:o.cartas[b][0]});}
+   }
+  }
+  assert.equal(e.fase,'fin','semilla '+s);
+ }
+});

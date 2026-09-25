@@ -168,6 +168,35 @@
       }
     },
 
+    "chat": {
+      ".read": "auth != null",
+      "$pid": {
+        "$id": {
+          ".write": "auth != null && !data.exists() && newData.child('uid').val() === auth.uid && root.child('partidas').child($pid).exists()",
+          ".validate": "newData.hasChildren(['uid', 'nombre', 't', 'at'])",
+          "uid": {".validate": "newData.isString()"},
+          "nombre": {".validate": "newData.isString() && newData.val().length <= 80"},
+          "t": {".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 300"},
+          "at": {".validate": "newData.val() === now"},
+          "$otro": {".validate": false}
+        }
+      }
+    },
+
+    "enCurso": {
+      ".read": "auth != null",
+      ".indexOn": ["at"],
+      "$pid": {
+        ".write": "auth != null && ((newData.exists() && root.child('partidas').child($pid).child('jugadores').child(auth.uid).exists() && !root.child('partidas').child($pid).child('fin').exists()) || (!newData.exists() && (!root.child('partidas').child($pid).exists() || root.child('partidas').child($pid).child('fin').exists() || root.child('partidas').child($pid).child('jugadores').child(auth.uid).exists())))",
+        ".validate": "newData.hasChildren(['juego', 'nombres', 'n', 'at'])",
+        "juego": {".validate": "newData.isString() && newData.val().length <= 20"},
+        "nombres": {".validate": "newData.isString() && newData.val().length <= 200"},
+        "n": {".validate": "newData.isNumber()"},
+        "at": {".validate": "newData.val() === now"},
+        "$otro": {".validate": false}
+      }
+    },
+
     "soloRanks": {
       ".read": "auth != null",
       "$categoria": {

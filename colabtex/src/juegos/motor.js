@@ -533,17 +533,86 @@ export function jugadasDe(p) {
 
 export const claveJugada = n => String(n).padStart(4, "0");
 
+/* ---------- Expulsar por votación ----------
+   Un voto es una jugada más, `{t:"voto", uid:<quien vota>, contra:<a
+   quién>}`, y retirarlo es otra con `no:true`: el registro sigue siendo
+   de solo añadir, y las reglas no necesitan saber que existe (una
+   jugada solo ha de estar firmada por un jugador de la sala). Cuando
+   los votos contra alguien alcanzan la mayoría de los *demás* que
+   siguen en la sala, esa misma jugada se reescribe —aquí, al leerla,
+   nunca en la base— como `{t:"abandona", uid:<expulsado>}`: para cada
+   reductor el expulsado se ha ido por su pie, que es un caso que todos
+   ya saben resolver. Los votos que no expulsan a nadie desaparecen del
+   registro antes de llegar al reductor del juego, así que ninguno
+   tiene que aprender a ignorarlos.
+
+   El orden decide, como en todo lo demás: un voto cuenta con los que
+   hay *en ese momento*, y uno posterior a la expulsión, del expulsado
+   o contra él, no cuenta. Con dos en la sala «la mayoría de los demás»
+   es uno, es decir, el otro: en un duelo expulsar es ganar, y por eso
+   la pantalla solo ofrece el botón cuando el rival lleva un buen rato
+   sin mover en su turno. El reductor no puede comprobar ese rato —las
+   jugadas no llevan hora—, y es el mismo precio que ya se paga con
+   abandonar: un cliente modificado podría escribir `fin` directamente.
+   Quien el propio juego ha eliminado (sin orbes, sin cuadrilla) sigue
+   contando para la mayoría; ahí la cuenta sale más exigente de lo
+   necesario, nunca más laxa. */
+export function mayoriaExpulsion(n) {
+  const otros = n - 1;
+  return otros <= 1 ? 1 : Math.floor(otros / 2) + 1;
+}
+
+export function votacion(p) {
+  const js = jugadoresDe(p), ids = new Set(js.map(j => j.uid));
+  const fuera = new Set(), votos = {}, expulsados = [], jugadas = {};
+  let hay = false;
+  /* Quien se va, por su pie o expulsado, se lleva los votos que tenía
+     y los que había contra él. Los pendientes no se disparan solos
+     porque la sala haya encogido: cuentan cuando alguien vuelve a
+     votar, que es cuando alguien ha decidido algo con la sala nueva. */
+  const olvida = u => {
+    delete votos[u];
+    for (const x in votos) votos[x] = votos[x].filter(y => y !== u);
+  };
+  for (const j of jugadasDe(p)) {
+    const { k, ...v } = j;
+    if (j.t !== "voto") {
+      if (j.t === "abandona" && ids.has(j.uid)) { fuera.add(j.uid); olvida(j.uid); }
+      jugadas[k] = v;
+      continue;
+    }
+    hay = true;
+    const de = j.uid, contra = j.contra;
+    if (!ids.has(de) || !ids.has(contra) || de === contra || fuera.has(de) || fuera.has(contra)) continue;
+    const s = votos[contra] || (votos[contra] = []);
+    const i = s.indexOf(de);
+    if (j.no) { if (i >= 0) s.splice(i, 1); }
+    else if (i < 0) s.push(de);
+    const activos = js.filter(x => !fuera.has(x.uid)).length;
+    if (s.length >= mayoriaExpulsion(activos)) {
+      jugadas[k] = { t: "abandona", uid: contra, expulsado: true, por: s.slice() };
+      expulsados.push({ uid: contra, por: s.slice(), k });
+      fuera.add(contra);
+      olvida(contra);
+    }
+  }
+  for (const u in votos) if (!votos[u].length) delete votos[u];
+  return { p: hay ? { ...p, jugadas } : p, votos, expulsados };
+}
+
 /* `listos` es «la partida está en marcha». Con cupo de dos basta con
    que estén los dos; con cupo mayor hace falta además que la sala se
    haya cerrado — llena, o cerrada a mano por quien la abrió — porque
    si no, el tercero llegaría a un tablero empezado y sin turno. Ese
    cierre es justo el `estado`, que deja de ser «esperando». */
 export function reducir(p) {
+  const V = votacion(p);
+  p = V.p;
   const js = jugadoresDe(p);
   const cupo = cupoDe(p);
   const min = (JUEGOS[p.juego] || {}).minimo || 2;
   const listos = js.length >= min && (cupo === min || p.estado !== "esperando");
-  const base = { jugadores: js, cupo, listos, fin: p.fin || null };
+  const base = { jugadores: js, cupo, listos, fin: p.fin || null, votos: V.votos, expulsados: V.expulsados };
   if (p.juego === "escondite") return { ...base, ...redEscondite(p, js) };
   if (p.juego === "cartas") return { ...base, ...redCartas(p, js) };
   if (p.juego === "cuadritos") return { ...base, ...redCuadritos(p, js, listos) };
