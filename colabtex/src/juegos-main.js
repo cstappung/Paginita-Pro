@@ -33,7 +33,7 @@ import { crearSolo } from "./juegos/solo/club.js";
 import { watchAuth, loginGoogle, logout } from "./firebase.js";
 import * as fb from "./fb-juegos.js";
 import { escapeHtml, timeAgo, colorForUid } from "./util.js";
-import { JUEGOS, reducir, jugadasDe, acumula, cupoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO } from "./juegos/motor.js";
+import { JUEGOS, reducir, jugadasDe, acumula, cupoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES } from "./juegos/motor.js";
 import { crearEscondite } from "./juegos/escondite.js";
 import { crearCartas } from "./juegos/cartas.js";
 import { crearCuadritos } from "./juegos/cuadritos.js";
@@ -44,6 +44,7 @@ import { crearCadena } from "./juegos/cadena.js";
 import { crearFlip7 } from "./juegos/flip7.js";
 import { crearCacho } from "./juegos/cacho.js";
 import { crearUno } from "./juegos/uno.js";
+import { crearCatan } from "./juegos/catan.js";
 import { abreReglas, tieneReglas } from "./juegos/reglas.js";
 import { crearRanks } from "./juegos/ranks.js";
 import { mezcla, abrePerfil } from "./juegos/perfil.js";
@@ -56,10 +57,10 @@ const VER = (document.currentScript && document.currentScript.src.split("?v=")[1
 const FABRICAS = {
   orbita: crearOrbita, escondite: crearEscondite, cartas: crearCartas,
   cuadritos: crearCuadritos, reversi: crearReversi, worms: crearWorms,
-  cadena: crearCadena, flip7: crearFlip7, cacho: crearCacho, uno: crearUno
+  cadena: crearCadena, flip7: crearFlip7, cacho: crearCacho, uno: crearUno, catan: crearCatan
 };
 
-const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥" };
+const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢" };
 
 /* Lo que puede elegir quien abre la sala, por juego. Vive aquí y no en
    `motor.js` porque son controles y no reglas: el motor ya recorta lo
@@ -106,8 +107,27 @@ const OPCIONES = {
     { clave: "cupo", etiqueta: "Jugadores", valores: cupos("uno") },
     { clave: "modo", etiqueta: "Versión", por: "clasico",
       valores: Object.keys(MODOS_UNO).map(v => ({ v, t: MODOS_UNO[v] })) }
+  ],
+  /* Catan: de 2 a 6 (con 5 o 6 entra sola la ampliación: isla grande y
+     fase especial de construcción), y cada expansión o variante en su
+     propio desplegable. Los campos no son `modo` a propósito: `modo` está
+     en la lista blanca de las reglas, y estos van por `$otro`. El
+     primer valor de cada lista es el de siempre, que es el que queda
+     elegido — `por: 0` se leería como «sin valor por omisión». */
+  catan: [
+    { clave: "cupo", etiqueta: "Jugadores", por: 4, valores: cupos("catan") },
+    { clave: "exp", etiqueta: "Expansión", por: "base",
+      valores: Object.keys(CT_EXPANSIONES).map(v => ({ v, t: CT_EXPANSIONES[v] })) },
+    { clave: "baraja", etiqueta: "Dados", valores: [{ v: 0, t: "Dos dados" }, { v: 1, t: "Baraja de eventos" }] },
+    { clave: "amable", etiqueta: "Ladrón", valores: [{ v: 0, t: "Normal" }, { v: 1, t: "Amistoso" }] },
+    { clave: "puerto", etiqueta: "Puertos", valores: [{ v: 0, t: "Normales" }, { v: 1, t: "Maestro del puerto" }] },
+    { clave: "largo", etiqueta: "Partida", valores: [{ v: 0, t: "Estándar" }, { v: -2, t: "Corta (−2 puntos)" }, { v: 2, t: "Larga (+2 puntos)" }] }
   ]
 };
+
+/* La pestaña del manual que abre cada sala: la de su variante. */
+const modoReglas = (juego, o) => juego === "cacho" ? (Number(o.sicil) || 0)
+  : juego === "catan" ? (o.exp === "mar" ? "mar" : "base") : o.modo;
 
 const state = {
   user: null,           // el perfil ya aplicado: lo que se pinta
@@ -668,7 +688,7 @@ function armazon() {
     $("jgReglas").onclick = () => {
       const p = state.partida;
       if (!p || !tieneReglas(p.juego)) return;
-      abreReglas(p.juego, { modo: p.juego === "cacho" ? (Number(p.sicil) || 0) : p.modo, nombre: JUEGOS[p.juego].nombre });
+      abreReglas(p.juego, { modo: modoReglas(p.juego, p), nombre: JUEGOS[p.juego].nombre });
     };
     $("jgChatForm").onsubmit = async ev => {
       ev.preventDefault();
@@ -781,7 +801,7 @@ function pintaVestibulo() {
   for (const b of $("vesElige").querySelectorAll("[data-reglas]")) {
     b.onclick = () => {
       const k = b.getAttribute("data-reglas"), op = leeOpciones(b) || {};
-      abreReglas(k, { modo: k === "cacho" ? (Number(op.sicil) || 0) : op.modo, nombre: JUEGOS[k].nombre });
+      abreReglas(k, { modo: modoReglas(k, op), nombre: JUEGOS[k].nombre });
     };
   }
   aplicaFiltro();
@@ -1079,7 +1099,7 @@ const FANFARRIA = { gano: "victoria", perdi: "derrota", empate: "empate", mirand
    En cartas es el choque entero (`CHOQUE`, 2,6 s): la ronda que gana
    el trío se enseña igual que las demás. Worms no pone fanfarria — el
    marco tiene su propio audio y su propio final. */
-const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000 };
+const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300 };
 
 function pintaFin(p, est) {
   const caja = $("jgFin");
@@ -1197,7 +1217,9 @@ const RAZONES = {
   cacho: "Fue el último en conservar dados en el vaso.",
   tope: "Se acabaron las rondas: ganó quien tenía más dados.",
   uno: "Se quedó sin cartas antes que nadie.",
-  piedad: "Fue el último en pie: los demás llegaron a 25 cartas."
+  piedad: "Fue el último en pie: los demás llegaron a 25 cartas.",
+  catan: "Llegó a los puntos de victoria antes que nadie.",
+  agotado: "Se agotaron las llaves de los dados: ganó quien tenía más puntos."
 };
 const razon = m => RAZONES[m] || "";
 const nombreDe = (est, uid) => {
@@ -1432,9 +1454,38 @@ function arteJuego(k) {
   if (k === "flip7") return '<div class="jg-art-f7">' + [[7, "#e8a317"], [3, "#3fa7d6"], [12, "#d64545"]].map(([n, c]) => '<i style="--t:' + c + '">' + n + '</i>').join("") + '<b>FLIP 7</b></div>';
   if (k === "cacho") return '<div class="jg-art-cc"><b></b>' + [5, 1, 3].map(n => '<i class="c' + n + '">' + "<s></s>".repeat(n) + '</i>').join("") + '</div>';
   if (k === "uno") return '<div class="jg-art-uno">' + [["7", "#d72600"], ["⊘", "#0956bf"], ["+2", "#379711"], ["+4", "#222"]].map(([n, c]) => '<i style="--t:' + c + '"><span>' + n + '</span></i>').join("") + '<b>UNO</b></div>';
+  if (k === "catan") return arteCatan();
   if (k === "cuadritos") return '<div class="jg-art-dots">' + Array.from({ length: 9 }, (_, i) => '<i class="' + (i % 3 === 0 ? "llena" : "") + '"></i>').join("") + '</div>';
   return '<div class="jg-art-land"><i></i><i></i><i></i><b>⌖</b><span>ENCUENTRA LO INVISIBLE</span></div>';
 }
+/* La portada de Catan: siete hexágonos con su terreno, una ficha roja,
+   un poblado, una ciudad y un camino, y un barquito que se mece en el
+   mar. Es SVG a mano y no los símbolos del tablero, que solo existen
+   dentro de la partida. */
+function arteCatan() {
+  const R = 25, w = R * Math.sqrt(3) / 2;
+  const hex = (cx, cy, fill) => `<polygon points="${[[0, -R], [w, -R / 2], [w, R / 2], [0, R], [-w, R / 2], [-w, -R / 2]]
+    .map(([x, y]) => (cx + x).toFixed(1) + "," + (cy + y).toFixed(1)).join(" ")}" fill="${fill}" stroke="#00000030" stroke-width="1.2"/>`;
+  const arbol = (x, y) => `<path d="M${x} ${y - 9}l6 9h-3l4 6h-14l4-6h-3z" fill="#1f6a31"/>`;
+  const pico = (x, y) => `<path d="M${x - 10} ${y + 6}l10-15 10 15z" fill="#6e7885"/><path d="M${x - 3.5} ${y - 3}l3.5-6 3.5 6-2-1-1.5 1.5-1.5-1.5z" fill="#fff"/>`;
+  const oveja = (x, y) => `<g fill="#fff"><circle cx="${x - 3}" cy="${y}" r="3.6"/><circle cx="${x + 1}" cy="${y - 2}" r="3.8"/><circle cx="${x + 3}" cy="${y + 1}" r="3.4"/></g><circle cx="${x + 7}" cy="${y - 2}" r="2.2" fill="#333"/>`;
+  const celdas = [
+    [0, 0, "#f0cf5e", ""], [2 * w, 0, "#3f8f45", arbol(2 * w, 2)], [-2 * w, 0, "#d9804a", `<rect x="${(-2 * w - 8).toFixed(1)}" y="-4" width="16" height="7" rx="1" fill="#a9481f"/>`],
+    [w, -1.5 * R, "#9fd66b", oveja(w, -1.5 * R)], [-w, -1.5 * R, "#a7afb9", pico(-w, -1.5 * R)],
+    [w, 1.5 * R, "#a7afb9", pico(w, 1.5 * R)], [-w, 1.5 * R, "#3f8f45", arbol(-w, 1.5 * R + 2)]
+  ];
+  return `<svg class="jg-art-ct" viewBox="-78 -70 156 140" aria-hidden="true">
+    <path class="jg-art-ct-ola" d="M-78 58 q9 -6 18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0 t18 0" fill="none" stroke="#ffffff55" stroke-width="2"/>
+    ${celdas.map(([x, y, c, d]) => hex(x, y, c) + d).join("")}
+    <circle cx="0" cy="2" r="9.5" fill="#f7ecd0" stroke="#b08f5a" stroke-width="1.2"/><text x="0" y="6" text-anchor="middle" font-family="IBM Plex Mono,monospace" font-weight="800" font-size="11" fill="#c0392b">8</text>
+    <line x1="${(w * 0.2).toFixed(1)}" y1="${(-R * 0.9).toFixed(1)}" x2="${(w * 0.85).toFixed(1)}" y2="${(-R * 0.58).toFixed(1)}" stroke="#1d1a17" stroke-width="6.5" stroke-linecap="round"/>
+    <line x1="${(w * 0.2).toFixed(1)}" y1="${(-R * 0.9).toFixed(1)}" x2="${(w * 0.85).toFixed(1)}" y2="${(-R * 0.58).toFixed(1)}" stroke="#d8412f" stroke-width="4" stroke-linecap="round"/>
+    <path d="M-6 -${R + 6} v-7 l6 -6 6 6 v7z" fill="#d8412f" stroke="#1d1a17" stroke-width="1.3" class="jg-art-ct-casa"/>
+    <path d="M${(-w - 9).toFixed(1)} ${R / 2 + 9} v-9 l5 -6 5 6 v3 h9 v6z" fill="#2f6fd6" stroke="#1d1a17" stroke-width="1.3" class="jg-art-ct-casa b"/>
+    <g class="jg-art-ct-barco"><path d="M50 40 h22 l-4 7 h-14z" fill="#8a5a2c"/><path d="M61 40 v-16" stroke="#3b220f" stroke-width="1.5"/><path d="M62 25 l8 13 h-8z" fill="#f3efe3"/></g>
+  </svg><b class="jg-art-ct-t">CATAN</b>`;
+}
+
 let pidiendoRevancha = false;
 async function revancha(p, est) {
   if (pidiendoRevancha) return;

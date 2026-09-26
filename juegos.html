@@ -1180,6 +1180,279 @@ try { var t = localStorage.getItem("jg.tema");
 @media(prefers-reduced-motion:reduce){.sp *,.sp-entrada{animation:none!important;transition:none!important}}
 
 /* ============================================================
+   Catan
+
+   El tablero es un mar: el hueco `.jg-tablero` va en azul profundo con
+   luz desde arriba, y la isla (un SVG) flota encima con su sombra. Los
+   jugadores van en una columna a la derecha, sobre el mismo mar, y
+   bajan debajo de la isla en pantallas estrechas. Las animaciones son de
+   una sola vez (piezas que caen, dados que ruedan y caen, fichas de
+   producción que suben) salvo las del agua, que son lentas y en bucle,
+   y el latido de los sitios donde se puede construir, que es lo que
+   dice «aquí» sin tener que leerlo.
+   ============================================================ */
+.jg-ct .jg-tablero{padding:0;overflow:hidden;place-items:stretch;background:radial-gradient(ellipse 80% 65% at 45% 35%,#2f7fbd,#17507f 58%,#0c2d4d);border-color:#15406a}
+.jg-ct-mesa{display:grid;grid-template-columns:minmax(0,1fr) 250px;min-height:420px}
+.jg-ct-isla{position:relative;padding:14px 12px;display:grid;place-items:center;min-width:0;overflow:hidden}
+.jg-ct-isla::before{content:'';position:absolute;inset:-20%;background:repeating-radial-gradient(circle at 30% 30%,#ffffff07 0 2px,transparent 3px 28px);animation:ctDeriva 40s linear infinite;pointer-events:none}
+@keyframes ctDeriva{to{transform:translate(28px,28px)}}
+/* El lienzo mide lo que el SVG: las fichas que suben se colocan en % de
+   él, así que siguen en su sitio aunque la isla se desplace en el móvil. */
+.jg-ct-scroll{width:100%;display:grid;place-items:center}
+.jg-ct-lienzo{position:relative;width:100%;max-width:100%}
+.jg-ct-svg{position:relative;width:100%;height:auto;max-height:76vh;display:block;margin:0 auto;filter:drop-shadow(0 14px 22px #0008);user-select:none;-webkit-user-select:none}
+.jg-ct-isla.ancha .jg-ct-svg{max-height:66vh}
+.jg-ct-isla.eligiendo .ct-hex:not(.ct-mar-h) .ct-losa{filter:brightness(.82) saturate(.85)}
+
+.ct-losa{stroke:#00000040;stroke-width:1.1;transition:filter .3s}
+.ct-mar-h .ct-losa{stroke:#ffffff14;stroke-width:.8}
+.ct-bisel{stroke:#ffffff3a;stroke-width:1.2;pointer-events:none}
+.ct-ola{fill:none;stroke:#ffffff50;stroke-width:1.4;stroke-linecap:round;animation:ctOla 5s ease-in-out infinite alternate}
+.ct-ola.b{animation-delay:-2.5s;opacity:.55}
+@keyframes ctOla{from{transform:translateX(-3px)}to{transform:translateX(3px)}}
+.ct-deco{opacity:.5}
+.ct-hex use{pointer-events:none}
+.ct-hex{transform-box:fill-box;transform-origin:center}
+.ct-hex.robado:not(.ct-mar-h) .ct-losa{filter:grayscale(.55) brightness(.72)}
+.ct-hex.robado .ct-ficha{opacity:.55}
+.ct-hex.brilla{animation:ctBrilla 1.7s ease-out}
+@keyframes ctBrilla{0%{filter:brightness(1)}22%{filter:brightness(1.5) drop-shadow(0 0 10px #fff3a8)}100%{filter:brightness(1)}}
+.ct-t-oro .ct-chispa,.ct-chispa{animation:ctChispa 2.2s ease-in-out infinite;transform-box:fill-box;transform-origin:center}
+@keyframes ctChispa{0%,100%{opacity:.25;transform:scale(.6) rotate(0)}50%{opacity:1;transform:scale(1.15) rotate(45deg)}}
+
+.ct-ficha circle{fill:#f7ecd0;stroke:#a9884f;stroke-width:1.2}
+.ct-ficha>circle{filter:drop-shadow(0 1.5px 1px #0005)}
+.ct-ficha text{font:800 12.5px 'IBM Plex Mono',ui-monospace,monospace;text-anchor:middle;fill:#2c2418}
+.ct-pips circle{fill:#2c2418;stroke:none}
+.ct-ficha.roja text,.ct-ficha.roja .ct-pips circle{fill:#c0392b}
+
+.ct-muelle{stroke:#8a6a44;stroke-width:3.2;stroke-linecap:round;fill:none}
+.ct-puerto-c{fill:#f7ecd0;stroke:#6b5234;stroke-width:1.2;filter:drop-shadow(0 2px 2px #0006)}
+.ct-puerto-t{font:800 8.5px 'IBM Plex Mono',ui-monospace,monospace;text-anchor:middle;fill:#3a2e22}
+.ct-puerto-t2{font:800 6px 'IBM Plex Mono',ui-monospace,monospace;text-anchor:middle;fill:#3a2e22}
+
+.ct-camino-b{stroke:#1d1a17;stroke-width:8.5;stroke-linecap:round}
+.ct-camino-c{stroke-width:5.4;stroke-linecap:round}
+.ct-camino.ct-nuevo line{stroke-dasharray:1;stroke-dashoffset:1;animation:ctTraza .6s ease-out forwards}
+@keyframes ctTraza{to{stroke-dashoffset:0}}
+.ct-pieza{transform-box:fill-box;transform-origin:50% 100%;filter:drop-shadow(0 2.5px 1.5px #0007)}
+.ct-pieza.ct-nuevo{animation:ctCae .75s cubic-bezier(.3,1.5,.5,1) both}
+@keyframes ctCae{0%{transform:translateY(-30px) scale(1.3);opacity:0}55%{transform:translateY(2px) scale(.92);opacity:1}100%{transform:none}}
+.ct-flota{transform-box:fill-box;transform-origin:50% 80%;animation:ctMecer 3.4s ease-in-out infinite alternate}
+@keyframes ctMecer{from{transform:translateY(-1px) rotate(-4deg)}to{transform:translateY(1.5px) rotate(4deg)}}
+
+.ct-mueble{transition:transform .8s cubic-bezier(.34,1.45,.64,1);pointer-events:none}
+.ct-mueble-i{filter:drop-shadow(0 4px 3px #0008);transform-box:fill-box;transform-origin:50% 100%}
+.ct-mueble.salta .ct-mueble-i{animation:ctSalto .8s ease-out}
+@keyframes ctSalto{0%{transform:none}40%{transform:translateY(-16px) scale(1.12)}80%{transform:translateY(1px) scale(.96)}100%{transform:none}}
+#ctPirataG .ct-mueble-i{animation:ctMecer 2.6s ease-in-out infinite alternate}
+
+.ct-hit{fill:transparent;stroke:transparent;cursor:pointer}
+.ct-sitio-v .ct-anillo{fill:#ffffffb0;stroke:#fff;stroke-width:2;pointer-events:none;transform-box:fill-box;transform-origin:center;animation:ctLate 1.1s ease-in-out infinite}
+.ct-sitio-v:hover .ct-anillo{fill:#ffe066;stroke:#1d1a17}
+@keyframes ctLate{0%,100%{transform:scale(.8);opacity:.75}50%{transform:scale(1.15);opacity:1}}
+.ct-sitio-e .ct-hit{stroke-width:15}
+.ct-sitio-e .ct-anillo{stroke:#fff;stroke-width:4.5;stroke-linecap:round;stroke-dasharray:5 4;pointer-events:none;animation:ctHormiga .7s linear infinite}
+.ct-sitio-e.agua .ct-anillo{stroke:#bdf1ff}
+.ct-sitio-e:hover .ct-anillo{stroke:#ffe066;stroke-dasharray:none}
+.ct-sitio-e.elegido .ct-anillo{stroke:#ffe066;stroke-width:7;stroke-dasharray:none}
+@keyframes ctHormiga{to{stroke-dashoffset:-9}}
+.ct-sitio-h{fill:#ffe06614;stroke:#ffe066;stroke-width:3;stroke-linejoin:round;cursor:pointer;animation:ctLateH 1.3s ease-in-out infinite}
+.ct-sitio-h.agua{stroke:#9fe7ff;fill:#9fe7ff12}
+.ct-sitio-h:hover,.ct-sitio-h.fijo{fill:#ffe06640;animation:none}
+@keyframes ctLateH{0%,100%{stroke-opacity:.45}50%{stroke-opacity:1}}
+
+/* Los dados, arriba a la izquierda del mar. */
+.jg-ct-dados{position:absolute;left:14px;top:12px;display:flex;align-items:center;gap:10px;z-index:2;pointer-events:none}
+.jg-ct-dados:empty{display:none}
+.jg-ct-par{display:flex;gap:7px}
+.jg-ct-dado{width:32px;height:32px;box-sizing:border-box;padding:5px;border-radius:8px;background:#fbf7ec;display:grid;grid-template:repeat(3,1fr)/repeat(3,1fr);place-items:center;box-shadow:inset 0 -3px 0 #d8cdb4,0 6px 12px #0006}
+.jg-ct-dado.b{background:#f6d77a;box-shadow:inset 0 -3px 0 #d0a93c,0 6px 12px #0006}
+.jg-ct-dado i{width:6px;height:6px;border-radius:50%}
+.jg-ct-dado i.on{background:#2a2320}
+.jg-ct-par.rodando .jg-ct-dado{animation:ctRueda .5s linear infinite}
+.jg-ct-par.rodando .jg-ct-dado.b{animation-duration:.43s;animation-direction:reverse}
+@keyframes ctRueda{0%{transform:rotate(0)}25%{transform:rotate(90deg) translateY(-5px)}50%{transform:rotate(180deg)}75%{transform:rotate(270deg) translateY(-3px)}100%{transform:rotate(360deg)}}
+.jg-ct-par.cae .jg-ct-dado{animation:ctDadoCae .85s cubic-bezier(.3,1.35,.5,1) both}
+.jg-ct-par.cae .jg-ct-dado.b{animation-delay:.06s}
+@keyframes ctDadoCae{0%{transform:translate(-50px,-40px) rotate(-400deg) scale(1.35);opacity:.3}70%{transform:translate(0,3px) rotate(10deg)}100%{transform:none;opacity:1}}
+.jg-ct-dados b{font:800 22px 'IBM Plex Mono',ui-monospace,monospace;color:#fff;text-shadow:0 2px 8px #000a;animation:ctPop .5s cubic-bezier(.3,1.6,.5,1)}
+.jg-ct-dados b.siete{color:#ff7a6b}
+.jg-ct-dados small{font-size:12px;font-weight:600;color:#e6f2ff;text-shadow:0 1px 4px #000a}
+
+/* Fichas de producción que suben de los hexágonos. */
+.jg-ct-fx{position:absolute;inset:0;pointer-events:none;z-index:2}
+.jg-ct-flota{position:absolute;display:flex;align-items:center;gap:2px;padding:2px 7px 2px 3px;border-radius:99px;background:#fffdf5;border:2px solid var(--c,#888);font:800 12px 'IBM Plex Mono',ui-monospace,monospace;color:#2c2418;box-shadow:0 6px 14px #0006;transform:translate(-50%,-50%);animation:ctSube 2s ease-out both;white-space:nowrap}
+.jg-ct-flota .jg-ct-ico{width:19px;height:19px}
+@keyframes ctSube{0%{opacity:0;transform:translate(-50%,-30%) scale(.5)}14%{opacity:1;transform:translate(-50%,-65%) scale(1.1)}72%{opacity:1}100%{opacity:0;transform:translate(-50%,-210%) scale(.95)}}
+
+/* El cartel del centro: el siete, la carta que se juega, los logros. */
+.jg-ct-banner{position:absolute;left:50%;top:45%;transform:translate(-50%,-50%);pointer-events:none;z-index:3}
+.jg-ct-banner-t{display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px 26px;border-radius:18px;background:#1a1626e6;color:#fff;font:800 20px system-ui,sans-serif;box-shadow:0 18px 40px #0008;animation:ctBanner 1.9s cubic-bezier(.3,1.3,.5,1) both;text-align:center}
+.jg-ct-banner-t small{font-size:12px;font-weight:600;color:#c9c2da}
+.jg-ct-banner-t .jg-ct-ico.grande{width:46px;height:46px;filter:drop-shadow(0 3px 4px #0006)}
+.jg-ct-banner-t.siete{font-size:44px;letter-spacing:-1px;background:#b0261ae8;padding:10px 34px}
+.jg-ct-banner-t.turno{background:#d9822be8;font-size:22px}
+.jg-ct-banner-t.logro{background:#2b5f2fe8}
+@keyframes ctBanner{0%{opacity:0;transform:scale(.6)}18%{opacity:1;transform:scale(1.06)}30%{transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:translateY(-14px)}}
+.jg-ct-toasts{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);display:grid;gap:6px;justify-items:center;pointer-events:none;z-index:3;width:max-content;max-width:90%}
+.jg-ct-toast{padding:7px 14px;border-radius:99px;background:#1a1626e0;color:#fff;font-size:12.5px;font-weight:600;box-shadow:0 8px 18px #0006;animation:ctToast 3.6s ease-out both}
+@keyframes ctToast{0%{opacity:0;transform:translateY(10px)}10%,82%{opacity:1;transform:none}100%{opacity:0;transform:translateY(-6px)}}
+
+/* Los jugadores. */
+.jg-ct-lado{display:grid;align-content:start;gap:8px;padding:12px;background:#08223bb8;border-left:1px solid #ffffff14}
+.jg-ct-jug{--c:#888;position:relative;padding:10px 11px 9px 13px;border-radius:12px;background:#ffffff10;border:1px solid #ffffff1c;color:#e8eef5;transition:background .3s,box-shadow .3s,border-color .3s}
+.jg-ct-jug::before{content:'';position:absolute;left:0;top:10px;bottom:10px;width:4px;border-radius:0 4px 4px 0;background:var(--c)}
+.jg-ct-jug.on{background:#ffffff22;border-color:var(--c);box-shadow:0 0 0 2px color-mix(in srgb,var(--c) 45%,transparent),0 10px 22px #0006}
+.jg-ct-jug.on::before{animation:ctLateBarra 1.3s ease-in-out infinite}
+@keyframes ctLateBarra{0%,100%{opacity:.55}50%{opacity:1}}
+.jg-ct-jug.fuera{opacity:.45}.jg-ct-jug.fuera b{text-decoration:line-through}
+.jg-ct-cab{display:flex;align-items:center;gap:8px;min-width:0}
+.jg-ct-cab b{font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jg-ct-cab b small{font-weight:500;color:#a9bbcd}
+.jg-ct-av{flex:none;width:26px;height:26px;border-radius:50%;background:var(--c);display:grid;place-items:center;font-weight:800;font-size:12px;color:#1d1a17;box-shadow:inset 0 -2px 0 #0003,0 0 0 2px var(--c);overflow:hidden}
+.jg-ct-av img{width:100%;height:100%;object-fit:cover}
+.jg-ct-vp{margin-left:auto;min-width:30px;height:30px;padding:0 6px;box-sizing:border-box;border-radius:9px;display:grid;place-items:center;font:800 18px 'IBM Plex Mono',ui-monospace,monospace;background:#0000003a;color:#ffe9a8}
+.jg-ct-meta{height:4px;margin:7px 0 6px;border-radius:9px;background:#ffffff18;overflow:hidden}
+.jg-ct-meta i{display:block;height:100%;border-radius:9px;background:linear-gradient(90deg,var(--c),#ffe066);transition:width .6s cubic-bezier(.3,1.3,.5,1)}
+.jg-ct-cifras{display:flex;flex-wrap:wrap;gap:4px 11px;font:700 11.5px 'IBM Plex Mono',ui-monospace,monospace;color:#c0cfdd}
+.jg-ct-cifras span{display:inline-flex;align-items:center;gap:3px}
+.jg-ct-ico{width:16px;height:16px;flex:none;vertical-align:middle}
+.jg-ct-ico.col{color:var(--c)}
+.jg-ct-insignias{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
+.jg-ct-ins{display:inline-flex;align-items:center;gap:3px;padding:2px 7px 2px 4px;border-radius:99px;background:#ffe06622;border:1px solid #ffe06655;color:#ffe9a8;font:700 11px 'IBM Plex Mono',ui-monospace,monospace;animation:ctPop .5s cubic-bezier(.3,1.6,.5,1)}
+.jg-ct-ins .jg-ct-ico{width:18px;height:18px}
+.jg-ct-estado{margin-top:6px;font-size:11px;font-weight:600;color:#ffd79a}
+@keyframes ctPop{0%{transform:scale(.6)}60%{transform:scale(1.14)}100%{transform:none}}
+
+/* Barra de arriba. */
+.jg-ct-chips{display:flex;flex-wrap:wrap;gap:6px;justify-content:flex-end}
+.jg-ct-chip{padding:4px 10px;border-radius:99px;background:#f4efe6;color:#6a5334;font:600 11px system-ui,sans-serif;white-space:nowrap}
+.jg-ct-chip.meta{background:#fff3d6;color:#8a5a0a}
+.jg-ct-chip.mar{background:#dcefff;color:#1f5f94}
+
+/* Mi mano. */
+.jg-ct-mano{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:flex-end;padding:14px 18px;background:#fff;border:1px solid #e4dfeb;border-top:none}
+.jg-ct-mano[hidden]{display:none}
+.jg-ct-mano-t{width:100%;font:700 10px 'IBM Plex Mono',ui-monospace,monospace;letter-spacing:1.3px;text-transform:uppercase;color:#8a8494;margin-bottom:-4px}
+.jg-ct-mano-t small{font-weight:500;letter-spacing:0;text-transform:none;margin-left:6px}
+.jg-ct-cartas{display:flex;flex-wrap:wrap;gap:9px}
+.jg-ct-carta{position:relative;width:62px;height:84px;box-sizing:border-box;border-radius:10px;display:grid;justify-items:center;align-content:center;gap:3px;background:linear-gradient(160deg,var(--a),var(--b));border:2px solid #fff;box-shadow:0 5px 12px #2a1e4426;color:#fff;transition:transform .15s}
+.jg-ct-carta:hover{transform:translateY(-3px)}
+.jg-ct-carta .jg-ct-ico{width:34px;height:34px;filter:drop-shadow(0 2px 2px #0004)}
+.jg-ct-carta b{position:absolute;top:-9px;right:-9px;min-width:23px;height:23px;box-sizing:border-box;padding:0 5px;border-radius:99px;background:#1f2933;color:#fff;font:800 12px/19px 'IBM Plex Mono',ui-monospace,monospace;text-align:center;border:2px solid #fff}
+.jg-ct-carta small{font:800 9px system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase;text-shadow:0 1px 2px #0007}
+.jg-ct-carta.cero{filter:grayscale(.85);opacity:.4}
+.jg-ct-carta.pop{animation:ctCarta .7s cubic-bezier(.3,1.6,.5,1)}
+@keyframes ctCarta{0%{transform:translateY(12px) scale(.75)}55%{transform:translateY(-8px) scale(1.12)}100%{transform:none}}
+.r-madera{--a:#56a45b;--b:#2b6b35}.r-arcilla{--a:#e5925e;--b:#ad4f27}.r-lana{--a:#b0df82;--b:#69a843}
+.r-trigo{--a:#f6d874;--b:#d29d30}.r-mineral{--a:#b1b9c4;--b:#6c7582}.r-oro{--a:#f8dc68;--b:#c9951e}
+.jg-ct-deses{display:flex;flex-wrap:wrap;gap:9px}
+.jg-ct-des{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:12px;background:linear-gradient(160deg,#fffaf0,#f4e8cc);border:1.5px solid #d9c49a;box-shadow:0 4px 10px #6b4a0a1a;max-width:250px}
+.jg-ct-des>.jg-ct-ico{width:32px;height:32px}
+.jg-ct-des div{display:grid;gap:1px;min-width:0}
+.jg-ct-des b{font-size:12.5px;color:#3a2e22}
+.jg-ct-des small{font-size:10.5px;color:#7a6a52;line-height:1.3}
+.jg-ct-des.nueva{opacity:.7}
+.jg-ct-des.sel{border-color:#d9822b;box-shadow:0 0 0 3px #d9822b44}
+.jg-ct-jugar{flex:none;padding:6px 11px;border:0;border-radius:8px;background:#d9822b;color:#fff;font:700 12px system-ui,sans-serif;cursor:pointer;box-shadow:inset 0 -2px 0 #0003}
+.jg-ct-jugar:hover{background:#c06f1d}
+.jg-ct-oculto{font:600 10px 'IBM Plex Mono',ui-monospace,monospace;color:#9a8a6a}
+
+/* El pie: construir, comerciar, tirar. */
+.jg-ct .jg-pie{display:block}
+.jg-ct-guia{font-size:13.5px;color:#3a3446;line-height:1.5;margin-bottom:8px}
+.jg-ct-acciones{display:flex;flex-wrap:wrap;gap:8px}
+.jg-ct-accion{display:flex;align-items:center;gap:8px;padding:7px 12px 7px 9px;border-radius:12px;border:1px solid #e0dbe8;background:#fff;color:#2c2437;font:600 13px system-ui,sans-serif;cursor:pointer;transition:transform .12s,box-shadow .12s,border-color .12s}
+.jg-ct-accion>span{display:grid;gap:3px;text-align:left}
+.jg-ct-accion small{font-size:10.5px;font-weight:600;color:#8a8494}
+.jg-ct-accion:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 7px 16px #2a1e441c;border-color:#d9822b}
+.jg-ct-accion.on{border-color:#d9822b;background:#fff6e9;box-shadow:0 0 0 3px #d9822b40}
+.jg-ct-accion:disabled{opacity:.4;cursor:default}
+.jg-ct-accion .jg-ct-ico.pieza{width:26px;height:26px;filter:drop-shadow(0 2px 1px #0003)}
+.jg-ct-accion .jg-ct-coste,.jg-ct-coste{display:inline-flex;flex-wrap:nowrap;gap:1px}
+.jg-ct-coste .jg-ct-ico{width:14px;height:14px}
+.jg-ct-tirar{display:inline-flex;align-items:center;gap:8px;padding:10px 20px 10px 12px;border:0;border-radius:14px;background:linear-gradient(135deg,#e8993a,#c9651c);color:#fff;font:800 15px system-ui,sans-serif;cursor:pointer;box-shadow:0 8px 20px #c9651c55,inset 0 -3px 0 #0003;animation:ctInvita 1.6s ease-in-out infinite}
+.jg-ct-tirar .jg-ct-dado{width:26px;height:26px;padding:4px;box-shadow:inset 0 -2px 0 #d8cdb4}
+.jg-ct-tirar .jg-ct-dado i{width:5px;height:5px}
+.jg-ct-tirar:hover:not(:disabled) .jg-ct-dado{animation:ctRueda .6s linear infinite}
+.jg-ct-tirar:disabled{opacity:.5;animation:none;cursor:default}
+@keyframes ctInvita{0%,100%{box-shadow:0 8px 20px #c9651c55,inset 0 -3px 0 #0003}50%{box-shadow:0 8px 30px #e8993a99,inset 0 -3px 0 #0003}}
+.jg-ct-fila{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+.jg-ct-fin{justify-content:flex-end;border-top:1px dashed #e4dfeb;padding-top:10px}
+.jg-ct-link{border:0;background:none;padding:4px 2px;color:#7042df;font:600 12px system-ui,sans-serif;cursor:pointer;text-decoration:underline}
+.jg-ct-tog,.jg-ct-res,.jg-ct-tab{display:inline-flex;align-items:center;gap:5px;padding:6px 10px;border-radius:10px;border:1px solid #e0dbe8;background:#fff;color:#2c2437;font:600 12.5px system-ui,sans-serif;cursor:pointer}
+.jg-ct-res .jg-ct-ico{width:22px;height:22px}
+.jg-ct-res small{font:700 11px 'IBM Plex Mono',ui-monospace,monospace;color:#8a8494}
+.jg-ct-tog.sel,.jg-ct-res.sel,.jg-ct-tab.on{border-color:#d9822b;background:#fff6e9;box-shadow:0 0 0 2px #d9822b33}
+.jg-ct-res:disabled{opacity:.35;cursor:default}
+.jg-ct-comercio{margin-top:12px;padding:12px;border-radius:14px;background:#faf8fc;border:1px solid #ece7f3}
+.jg-ct-tabs{display:flex;gap:6px;flex-wrap:wrap}
+.jg-ct-trato-f{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:10px}
+.jg-ct-lbl{min-width:58px;font:700 10px 'IBM Plex Mono',ui-monospace,monospace;letter-spacing:1px;text-transform:uppercase;color:#8a8494}
+.jg-ct-contadores{display:flex;flex-wrap:wrap;gap:6px}
+.jg-ct-contador{display:inline-flex;align-items:center;gap:3px;padding:3px 5px;border-radius:10px;background:#fff;border:1px solid #e6e1ee}
+.jg-ct-contador.con{border-color:#d9822b;background:#fff6e9}
+.jg-ct-contador.sin{opacity:.45}
+.jg-ct-contador .jg-ct-ico{width:22px;height:22px}
+.jg-ct-contador b{min-width:16px;text-align:center;font:800 13px 'IBM Plex Mono',ui-monospace,monospace;color:#2c2437}
+.jg-ct-contador button{width:22px;height:22px;border:0;border-radius:6px;background:#f0ecf6;color:#2c2437;font:800 14px system-ui,sans-serif;cursor:pointer;padding:0}
+.jg-ct-contador button:disabled{opacity:.3;cursor:default}
+.jg-ct-trato{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-top:10px;padding:10px 12px;border-radius:12px;background:#fff;border:1px solid #e6e1ee;font-size:13px;color:#3a3446}
+.jg-ct-trato>div:first-child{display:flex;flex-wrap:wrap;align-items:center;gap:5px}
+.jg-ct-trato.entra{animation:ctEntra .45s cubic-bezier(.3,1.4,.5,1);border-color:#d9822b}
+@keyframes ctEntra{from{opacity:0;transform:translateY(8px) scale(.97)}to{opacity:1;transform:none}}
+.jg-ct-cuenta{display:inline-flex;align-items:center;gap:1px;font:800 12px 'IBM Plex Mono',ui-monospace,monospace}
+.jg-ct-cuenta .jg-ct-ico{width:20px;height:20px}
+.jg-ct-flecha{color:#d9822b;font-weight:800}
+.jg-ct-resp{font-size:12px;color:#8a8494}.jg-ct-resp.no{color:#b4232a}.jg-ct-resp.si{color:#2f7d3b;font-weight:600}
+.jg-ct-props{display:grid;gap:0}
+.jg-ct-panel{margin-top:12px;padding:12px;border-radius:14px;background:#fff8ec;border:1px solid #f0dcb8;font-size:13px;color:#3a3446}
+.jg-ct-panel>b{display:block;margin-bottom:8px}
+.jg-ct-victima{display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:12px;border:2px solid var(--c);background:#fff;color:#2c2437;font:700 13px system-ui,sans-serif;cursor:pointer}
+.jg-ct-victima small{font-weight:500;color:#8a8494}
+.jg-ct-victima:hover{background:color-mix(in srgb,var(--c) 15%,#fff)}
+
+.jg-ct-hist{margin-top:12px;display:grid;gap:3px;padding:12px 16px;border-radius:12px;background:#faf8fc;border:1px solid #ece7f3;font-size:12px;color:#5a5566}
+.jg-ct-hist:empty{display:none}
+.jg-ct-hist-t{font:600 10px 'IBM Plex Mono',ui-monospace,monospace;letter-spacing:1.2px;text-transform:uppercase;color:#8a8494;margin-bottom:2px}
+.jg-ct-h{padding-left:8px;border-left:3px solid var(--c,#e4dcef)}
+.jg-ct-hist-t+.jg-ct-h{color:#2c2437;font-weight:600}
+.jg-ct-h.h-tirada{font-family:'IBM Plex Mono',ui-monospace,monospace}
+
+@media(max-width:900px){
+  .jg-ct-mesa{grid-template-columns:1fr}
+  .jg-ct-lado{border-left:0;border-top:1px solid #ffffff14;grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}
+  .jg-ct-svg,.jg-ct-isla.ancha .jg-ct-svg{max-height:none}
+}
+@media(max-width:600px){
+  /* Un cruce tiene que caber bajo un dedo: la isla no baja de un ancho
+     mínimo y se desplaza de lado si no cabe. */
+  .jg-ct-isla{padding:8px 0}
+  .jg-ct-scroll{overflow-x:auto;place-items:start;-webkit-overflow-scrolling:touch;padding:0 4px}
+  .jg-ct-lienzo{min-width:540px;max-width:none}
+  .jg-ct-isla.ancha .jg-ct-lienzo{min-width:760px}
+  .jg-ct-dados{left:8px;top:6px}
+  .jg-ct-carta{width:52px;height:72px}.jg-ct-carta .jg-ct-ico{width:28px;height:28px}
+  .jg-ct-accion{padding:6px 9px 6px 7px;font-size:12px}
+  .jg-ct-dado{width:26px;height:26px;padding:4px}.jg-ct-dado i{width:5px;height:5px}
+  .jg-ct-banner-t.siete{font-size:34px}
+  .jg-ct-mano{padding:12px}
+  .jg-ct-chips{display:none}
+}
+@media(prefers-reduced-motion:reduce){.jg-ct *,.jg-ct *::before{animation:none!important;transition:none!important}}
+
+/* Portada del vestíbulo */
+.jg-portada-catan{background:radial-gradient(ellipse at 50% 45%,#48a0dc,#1a5588 70%,#0f3558)}
+.jg-art-ct{width:200px;height:180px;overflow:visible;filter:drop-shadow(0 12px 16px #0008)}
+.jg-art-ct-ola{animation:ctOla 4s ease-in-out infinite alternate}
+.jg-art-ct-barco{transform-box:fill-box;transform-origin:50% 90%;animation:ctMecer 2.8s ease-in-out infinite alternate}
+.jg-art-ct-casa{transform-box:fill-box;transform-origin:50% 100%}
+.jg-oferta:hover .jg-art-ct-casa{animation:ctCae .7s cubic-bezier(.3,1.5,.5,1)}
+.jg-oferta:hover .jg-art-ct-casa.b{animation-delay:.12s}
+.jg-art-ct-t{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);font:900 13px 'IBM Plex Mono',ui-monospace,monospace;letter-spacing:4px;color:#ffe9a8;text-shadow:0 2px 6px #0008}
+
+/* ============================================================
    Modo oscuro
 
    Se enciende con `data-tema="oscuro"` en <html>: lo pone el guion
@@ -1377,6 +1650,29 @@ html[data-tema=oscuro] .jg-reglas-tabs button{background:var(--os-sup);border-co
 html[data-tema=oscuro] .jg-reglas-tabs button.on{background:#ebe7f5;border-color:#ebe7f5;color:#18151f}
 html[data-tema=oscuro] .jg-reglas-cuerpo section{border-bottom-color:var(--os-borde)}
 html[data-tema=oscuro] .jg-reglas-cuerpo h3,html[data-tema=oscuro] .jg-reglas-cuerpo b{color:#fff}
+/* Catan: el mar y la isla se quedan como están; se oscurece la mano, el
+   pie y el historial. Las cartas siguen siendo cartas. */
+html[data-tema=oscuro] .jg-ct-mano{background:var(--os-sup);border-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-ct-mano-t{color:var(--os-tx3)}
+html[data-tema=oscuro] .jg-ct-carta{border-color:var(--os-sup3)}
+html[data-tema=oscuro] .jg-ct-carta b{border-color:var(--os-sup);background:#0b0a10}
+html[data-tema=oscuro] .jg-ct-guia,html[data-tema=oscuro] .jg-ct-panel,html[data-tema=oscuro] .jg-ct-trato{color:var(--os-tx2)}
+html[data-tema=oscuro] .jg-ct-accion,html[data-tema=oscuro] .jg-ct-tog,html[data-tema=oscuro] .jg-ct-res,html[data-tema=oscuro] .jg-ct-tab,
+html[data-tema=oscuro] .jg-ct-contador,html[data-tema=oscuro] .jg-ct-trato,html[data-tema=oscuro] .jg-ct-victima{background:var(--os-sup2);border-color:var(--os-borde2);color:var(--os-tx)}
+html[data-tema=oscuro] .jg-ct-accion small,html[data-tema=oscuro] .jg-ct-res small,html[data-tema=oscuro] .jg-ct-lbl,html[data-tema=oscuro] .jg-ct-resp,html[data-tema=oscuro] .jg-ct-victima small{color:var(--os-tx3)}
+html[data-tema=oscuro] .jg-ct-accion.on,html[data-tema=oscuro] .jg-ct-tog.sel,html[data-tema=oscuro] .jg-ct-res.sel,html[data-tema=oscuro] .jg-ct-tab.on,
+html[data-tema=oscuro] .jg-ct-contador.con{background:#3a2a14;border-color:#d9822b}
+html[data-tema=oscuro] .jg-ct-contador b{color:var(--os-tx)}
+html[data-tema=oscuro] .jg-ct-contador button{background:var(--os-sup3);color:var(--os-tx)}
+html[data-tema=oscuro] .jg-ct-comercio,html[data-tema=oscuro] .jg-ct-hist{background:var(--os-sup);border-color:var(--os-borde);color:var(--os-tx2)}
+html[data-tema=oscuro] .jg-ct-panel{background:#2a2114;border-color:#5a4524}
+html[data-tema=oscuro] .jg-ct-hist-t{color:var(--os-tx3)}
+html[data-tema=oscuro] .jg-ct-hist-t+.jg-ct-h{color:var(--os-tx)}
+html[data-tema=oscuro] .jg-ct-fin{border-top-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-ct-link{color:#c4b1ff}
+html[data-tema=oscuro] .jg-ct-chip{background:var(--os-sup3);color:var(--os-tx2)}
+html[data-tema=oscuro] .jg-ct-chip.meta{background:#3a2e12;color:#f2c14e}
+html[data-tema=oscuro] .jg-ct-chip.mar{background:#16304a;color:#9fd0ff}
 </style>
 </head>
 <body>
@@ -1421,6 +1717,6 @@ html[data-tema=oscuro] .jg-reglas-cuerpo h3,html[data-tema=oscuro] .jg-reglas-cu
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202609261615"></script>
+<script src="juegos-app.js?v=202609261920"></script>
 </body>
 </html>
