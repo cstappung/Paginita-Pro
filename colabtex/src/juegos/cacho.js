@@ -2,8 +2,9 @@
  *
  * Esta pantalla no decide nada: el reductor (`redCacho` en motor.js)
  * sabe de quién es el turno, qué apuesta vale, cuántos dados había y
- * quién pierde uno. Aquí se pinta eso y se mandan tres jugadas —
- * apostar, dudar y calzar— más una que nadie pulsa:
+ * quién pierde uno. Aquí se pinta eso y se mandan las jugadas —
+ * apostar, dudar, calzar, pasar, dudar el paso y obligar— más una que
+ * nadie pulsa:
  *
  * - **La llave va sola.** Los dados de cada vaso salen de una cadena de
  *   hashes que solo conoce su dueño (`cadenaCacho`), y al destapar cada
@@ -28,8 +29,8 @@
  * innerHTML en cada tic reiniciaría las animaciones.
  */
 import {
-  CC_CADENA, PINTAS_CACHO_PL, textoApuesta, cadenaCacho, llaveCacho,
-  dadosCacho, cuentaDado, minimoCacho
+  CC_CADENA, PINTAS_CACHO_PL, MODOS_OBLIGA, textoApuesta, cadenaCacho, llaveCacho,
+  dadosCacho, cuentaDado, minimoCacho, pasoCacho
 } from "./motor.js";
 import { suena } from "./sonido.js";
 
@@ -57,8 +58,18 @@ function dado(v, cls = "") {
   const on = PIPS[v] || [];
   let h = "";
   for (let i = 0; i < 9; i++) h += on.includes(i) ? `<i class="on"></i>` : `<i></i>`;
-  return `<span class="jg-cc-dado${cls ? " " + cls : ""}${v === 1 ? " as" : ""}" data-v="${v}">${h}</span>`;
+  return `<span class="jg-cc-dado${cls ? " " + cls : ""}${v === 1 ? " as" : ""}${!v ? " q" : ""}" data-v="${v}">${h}</span>`;
 }
+
+/* Qué dados de un vaso destapado se marcan: los que cuentan para la
+   apuesta, los que se lleva el torbellino, o el vaso entero si tenía paso. */
+function marcado(d, u) {
+  if (u.tipo === "torbellino") return d === u.pinta;
+  if (u.tipo === "paso") return !!u.paso;
+  return !!u.pinta && cuentaDado(d, u.pinta, u.obligada);
+}
+const TIPO_PASO = { iguales: "todos iguales", distintos: "todos distintos", full: "full" };
+const GRITO = { dudo: "¡Dudo!", calzo: "¡Calzo!", paso: "¡Dudo el paso!", torbellino: "¡Torbellino!", anula: "Ronda anulada" };
 
 /* Qué sucesos del historial son nuevos (la misma cuenta que en Flip 7:
    el historial es una cola, y lo que ya había casa con su principio). */
@@ -85,7 +96,7 @@ export function crearCacho(ctx) {
   let latido = null;
   let esperaFirma = "", esperaDesde = 0;
   let enviadoR = -1, enviadoKT = 0;   // ronda cuya llave ya salió, y cuándo
-  let sel = { firma: "", p: 0, c: 1, s: 1, ob: false };
+  let sel = { firma: "", p: 0, c: 1, s: 1, ob: "" };
   let anim = null, gen = 0, pendiente = null, vistoR = 0, primera = true;
   let histPrev = [];
   let agitaHasta = 0, listoDado = false, cierreT = 0, relojFin = null;
@@ -167,10 +178,12 @@ export function crearCacho(ctx) {
     return cad;
   }
 
+  /* En una ronda obligada los dados propios no se ven (ni existen
+     todavía: se tiran con las llaves de todos). */
   function misDados() {
     const c = miCadena();
     const k = (est.enVaso || {})[uid] || 0;
-    if (!c || !k || est.fase !== "jugando" || est.etapa === "arranque") return null;
+    if (!c || !k || est.fase !== "jugando" || est.etapa === "arranque" || est.obligada) return null;
     return dadosCacho(llaveCacho(c, est.ronda), est.mezcla, k);
   }
 
@@ -213,7 +226,8 @@ export function crearCacho(ctx) {
     else if (est.etapa === "arranque") f = "Agitando los vasos…";
     else f = `Ronda ${est.ronda} · ` + (est.turno === uid ? "Te toca" : "Turno de " + nombre(est.turno));
     set("ccFase", f, esc(f));
-    const m = (est.sicil ? "Siciliana" : "Normal") + " · " + est.total + " dados";
+    const m = (est.sicil ? "Siciliana" : "Normal") + " · " + est.total + " dados"
+      + (est.fase === "jugando" && est.obligada ? " · Obligada " + MODOS_OBLIGA[est.obligada].toLowerCase() : "");
     set("ccModo", m, esc(m));
   }
 
@@ -274,28 +288,36 @@ export function crearCacho(ctx) {
 
       /* El globo: lo que dijo. */
       let g = "", gc = "";
+      const paso = est.paso;
       if (u) {
-        if (w === u.quien && u.tipo !== "anula") { g = u.tipo === "dudo" ? "¡Dudo!" : "¡Calzo!"; gc = "grito"; }
+        if (w === u.quien && u.tipo !== "anula") { g = GRITO[u.tipo]; gc = "grito"; }
+        else if (w === u.contra && u.tipo === "paso") { g = "Paso"; gc = "ultima"; }
         else if (w === u.contra && u.apuesta) { g = textoApuesta(u.apuesta.c, u.apuesta.p); gc = "ultima"; }
       } else if (est.fase === "jugando") {
         if (est.etapa === "destape" && est.destape && w === est.destape.quien && est.destape.tipo !== "anula") {
-          g = est.destape.tipo === "dudo" ? "¡Dudo!" : "¡Calzo!"; gc = "grito";
+          g = GRITO[est.destape.tipo]; gc = "grito";
+        } else if (est.etapa === "muestra" && w === est.obliga) {
+          g = "¡Obligo abierta!"; gc = "grito";
+        } else if (paso && paso.uid === w && paso.tras === aps.length) {
+          g = "Paso"; gc = "ultima";
         } else {
           let mia = null;
           for (let k = aps.length - 1; k >= 0; k--) if (aps[k].uid === w) { mia = aps[k]; break; }
-          if (mia) { g = textoApuesta(mia.c, mia.p); gc = mia === ultAp ? "ultima" : ""; }
+          if (mia) { g = textoApuesta(mia.c, mia.p); gc = mia === ultAp && !(paso && paso.tras === aps.length) ? "ultima" : ""; }
         }
       }
       set("ccB" + i, g + "|" + gc, g ? `<span class="${gc}">${esc(g)}</span>` : "");
 
-      /* El vaso y, si está alzado, lo que tenía debajo. */
-      const vasos = u ? u.vasos || {} : {};
-      const alzado = alzados.includes(w);
+      /* El vaso y, si está alzado, lo que tenía debajo. En ronda abierta
+         los vasos de los demás están alzados desde el principio. */
+      const abiertos = !u && est.abiertos;
+      const vasos = u ? u.vasos || {} : abiertos || {};
+      const alzado = u ? alzados.includes(w) : !!(abiertos && abiertos[w] && w !== uid);
       const tiene = u ? !!vasos[w] : ((est.enVaso || {})[w] || 0) > 0 || est.etapa === "arranque" && !fuera && nd > 0;
       let dh = "";
       if (alzado) {
-        const pinta = u.apuesta ? u.apuesta.p : 0;
-        dh = (vasos[w] || []).map(d => dado(d, pinta && cuentaDado(d, pinta, u.obligada) ? "cuenta" : "")).join("");
+        const pin = u ? null : ultAp ? ultAp.p : 0;
+        dh = (vasos[w] || []).map(d => dado(d, (u ? marcado(d, u) : pin && cuentaDado(d, pin, true)) ? "cuenta" : "")).join("");
       }
       const cls = ["jg-cc-vasw", alzado ? "alzado" : "", !tiene ? "vacio" : "", tiene && !u && agita ? "agita" : ""].filter(Boolean).join(" ");
       set("ccV" + i, cls + "|" + dh + "|" + (u ? u.r : est.ronda),
@@ -324,20 +346,34 @@ export function crearCacho(ctx) {
     let h = "";
     if (v) {
       const u = v.u;
+      let k = 0;
+      for (const w of u.orden.slice(0, v.n)) for (const d of (u.vasos || {})[w] || []) if (marcado(d, u)) k++;
+      const tono = () => {
+        const malo = u.pierde === uid || (u.quita || {})[uid] > 0;
+        const bueno = u.gana === uid || (!malo && jugador(uid) && (u.pierde || Object.keys(u.quita || {}).length));
+        return malo ? "malo" : bueno ? "bueno" : "";
+      };
       if (u.tipo === "anula") {
         h = `<div class="jg-cc-grito">Ronda anulada</div>
           <div class="jg-cc-sub">${esc(verbo(u.quien, "Te fuiste", "se fue"))} con sus dados en la mesa</div>`;
         if (v.ver) h += `<div class="jg-cc-veredicto">Nadie pierde</div>`;
+      } else if (u.tipo === "torbellino") {
+        h = `<div class="jg-cc-grito">¡Torbellino!</div>
+          <div class="jg-cc-sub">${esc(Nombre(u.quien))} elige ${esc(PINTAS_CACHO_PL[u.pinta].toLowerCase())}: se pierden todos</div>
+          <div class="jg-cc-ap">${dado(u.pinta)} <b>${esc(PINTAS_CACHO_PL[u.pinta])}</b></div>
+          <div class="jg-cc-cuenta">Salen <b>${k}</b> <small>· ${v.n}/${u.orden.length} vasos</small></div>`;
+      } else if (u.tipo === "paso") {
+        h = `<div class="jg-cc-grito">¡Dudo el paso!</div>
+          <div class="jg-cc-sub">${esc(Nombre(u.quien))} → ${esc(nombre(u.contra))}</div>`;
       } else {
         const a = u.apuesta;
-        let k = 0;
-        for (const w of u.orden.slice(0, v.n)) for (const d of (u.vasos || {})[w] || []) if (cuentaDado(d, a.p, u.obligada)) k++;
-        h = `<div class="jg-cc-grito">${u.tipo === "dudo" ? "¡Dudo!" : "¡Calzo!"}</div>
+        const pin = a.p === 0 && u.pinta ? ` <small>(${esc(PINTAS_CACHO_PL[u.pinta].toLowerCase())})</small>` : "";
+        h = `<div class="jg-cc-grito">${esc(GRITO[u.tipo])}</div>
           <div class="jg-cc-sub">${esc(Nombre(u.quien))} → ${esc(nombre(u.contra))}</div>
-          <div class="jg-cc-ap">${dado(a.p)} <b>${esc(textoApuesta(a.c, a.p))}</b></div>
+          <div class="jg-cc-ap">${dado(u.pinta)} <b>${esc(textoApuesta(a.c, a.p))}${pin}</b></div>
           <div class="jg-cc-cuenta">Van <b>${k}</b> de ${a.c} <small>· ${v.n}/${u.orden.length} vasos</small></div>`;
-        if (v.ver) h += `<div class="jg-cc-veredicto ${u.pierde === uid ? "malo" : (u.gana === uid || (u.pierde && u.pierde !== uid)) ? "bueno" : ""}">${esc(veredicto(u))}</div>`;
       }
+      if (v.ver && u.tipo !== "anula") h += `<div class="jg-cc-veredicto ${tono()}">${esc(veredicto(u))}</div>`;
     } else if (est.fase === "espera") {
       h = `<div class="jg-cc-sub">Esperando a que se sienten todos</div>`;
     } else if (est.fase === "fin") {
@@ -345,26 +381,41 @@ export function crearCacho(ctx) {
     } else if (est.etapa === "arranque") {
       h = `<div class="jg-cc-grito">A agitar</div><div class="jg-cc-sub">Cada uno agita su vaso</div>`;
     } else if (est.etapa === "destape") {
-      h = `<div class="jg-cc-grito">${est.destape && est.destape.tipo === "calzo" ? "¡Calzo!" : est.destape && est.destape.tipo === "anula" ? "Ronda anulada" : "¡Dudo!"}</div>
-        <div class="jg-cc-sub">Levantando los vasos…</div>`;
+      const t = (est.destape && est.destape.tipo) || "dudo";
+      h = `<div class="jg-cc-grito">${esc(GRITO[t] || "¡Dudo!")}</div>
+        <div class="jg-cc-sub">${t === "torbellino" ? "Tirando los dados…" : "Levantando los vasos…"}</div>`;
+    } else if (est.etapa === "muestra") {
+      h = `<div class="jg-cc-grito">Ronda abierta</div>
+        <div class="jg-cc-sub">${esc(Nombre(est.obliga))} obliga: cada uno ve los dados de los demás</div>`;
     } else {
       const aps = est.apuestas || [];
       const ult = aps[aps.length - 1];
+      const pasado = est.paso && est.paso.tras === aps.length;
       h = ult
         ? `<div class="jg-cc-ap grande">${dado(ult.p)} <b>${esc(textoApuesta(ult.c, ult.p))}</b></div>
-           <div class="jg-cc-sub">apuesta de ${esc(nombre(ult.uid))}</div>`
+           <div class="jg-cc-sub">apuesta de ${esc(nombre(ult.uid))}${pasado ? ` · ${esc(verbo(est.paso.uid, "pasaste", "pasó"))}` : ""}</div>`
         : `<div class="jg-cc-sub">Abre ${esc(nombre(est.turno))}</div>`;
       h += `<div class="jg-cc-meta"><span>🎲 ${est.enMesa} en la mesa</span>
         <span>${est.sentido === 1 ? "⟳ Horario" : "⟲ Antihorario"}</span>
-        ${est.obligada ? `<span class="jg-cc-ob">Obligada</span>` : ""}
+        ${est.obligada ? `<span class="jg-cc-ob">Obligada ${esc(MODOS_OBLIGA[est.obligada].toLowerCase())}</span>` : ""}
         <span>Ronda ${est.ronda}</span></div>`;
     }
     set("ccCentro", h, h);
   }
 
   function veredicto(u) {
+    const fueraDe = w => u.despues[w] === 0 ? (w === uid ? " y quedas fuera" : " y queda fuera") : "";
+    if (u.tipo === "torbellino") {
+      const q = Object.keys(u.quita || {});
+      if (!q.length) return "No salió ninguno: nadie pierde";
+      return q.map(w => `${verbo(w, "pierdes", "pierde")} ${dd(u.quita[w])}${fueraDe(w)}`).join(" · ");
+    }
+    if (u.tipo === "paso") {
+      const t = u.paso ? `Tenía paso (${TIPO_PASO[u.paso]})` : "No tenía paso";
+      return `${t}: ${verbo(u.pierde, "pierdes", "pierde")} un dado${fueraDe(u.pierde)}`;
+    }
     const a = u.apuesta;
-    const habia = "Había " + textoApuesta(u.cuenta, a.p);
+    const habia = "Había " + textoApuesta(u.cuenta, u.pinta);
     if (u.tipo === "dudo") {
       let s = `${habia}: ${verbo(u.pierde, "pierdes", "pierde")} ${dd(u.n)}`;
       if (u.sicil) s += " (siciliana)";
@@ -384,6 +435,17 @@ export function crearCacho(ctx) {
     else if (v) { clave = "anim"; h = `<div class="jg-cc-mios-t">Destapando la ronda…</div>`; }
     else if (!juego()) { clave = "fuera"; h = `<div class="jg-cc-mios-t">Te quedaste sin dados: ahora miras cómo acaba.</div>`; }
     else if (est.etapa === "arranque") { clave = "arr"; h = `<div class="jg-cc-mios-t">Agitando…</div>`; }
+    else if (est.obligada) {
+      clave = "ob" + est.obligada + est.etapa;
+      const t = est.obligada === "abierto"
+        ? (est.etapa === "muestra" ? "Destapando los vasos de los demás…" : "Ronda abierta: ves los dados de todos menos los tuyos.")
+        : est.obligada === "cerrado"
+          ? `Ronda cerrada: nadie ve ningún dado. Se apuesta «de esta», la pinta del dado de ${nombre(est.obliga)}.`
+          : "Torbellino: tirando los dados…";
+      h = `<div class="jg-cc-mios-t">Tu vaso</div>
+        <div class="jg-cc-mios-d">${Array.from({ length: (est.enVaso || {})[uid] || 0 }, () => dado(0)).join("")}</div>
+        <div class="jg-cc-mios-n">${esc(t)}</div>`;
+    }
     else {
       const c = miCadena();
       if (c === null) { clave = "espera"; h = `<div class="jg-cc-mios-t">Mirando bajo el vaso…</div>`; }
@@ -394,41 +456,53 @@ export function crearCacho(ctx) {
         const mio = est.etapa === "apuesta" && est.turno === uid;
         const pin = mio && sel.p ? sel.p : aps.length ? aps[aps.length - 1].p : 0;
         const n = pin ? ds.filter(d => cuentaDado(d, pin, est.obligada)).length : 0;
-        clave = est.ronda + "|" + ds.join("") + "|" + pin + "|" + est.obligada;
+        const tp = pasoCacho(ds);
+        clave = est.ronda + "|" + ds.join("") + "|" + pin;
         h = `<div class="jg-cc-mios-t">Tu vaso</div>
-          <div class="jg-cc-mios-d r${est.ronda % 2}">${ds.map((d, i) => dado(d, (pin && cuentaDado(d, pin, est.obligada) ? "cuenta" : "") + ` d${i}`)).join("")}</div>
-          ${pin ? `<div class="jg-cc-mios-n">${n} ${n === 1 ? "cuenta" : "cuentan"} para ${esc(PINTAS_CACHO_PL[pin].toLowerCase())}</div>` : ""}`;
+          <div class="jg-cc-mios-d r${est.ronda % 2}">${ds.map((d, i) => dado(d, (pin && cuentaDado(d, pin, false) ? "cuenta" : "") + ` d${i}`)).join("")}</div>
+          ${pin ? `<div class="jg-cc-mios-n">${n} ${n === 1 ? "cuenta" : "cuentan"} para ${esc(PINTAS_CACHO_PL[pin].toLowerCase())}</div>` : ""}
+          ${tp ? `<div class="jg-cc-mios-n">Tienes paso: ${esc(TIPO_PASO[tp])}</div>` : ""}`;
       }
     }
     set("ccMios", clave, h);
   }
 
   /* La apuesta que propone el panel al llegarme el turno: la de antes
-     subida lo justo, o al abrir, la pinta de la que más tengo. */
+     subida lo justo, o al abrir, la pinta de la que más tengo (en ronda
+     abierta, la que más se ve en los vasos de los demás). */
   function preparaSel() {
     const aps = est.apuestas || [];
-    const f = est.ronda + ":" + aps.length + ":" + (est.espera && est.espera.uid);
+    const f = [est.ronda, aps.length, est.espera && est.espera.uid, est.obligada, est.etapa].join(":");
     if (sel.firma === f) return;
     const ant = aps[aps.length - 1] || null;
-    const o = opciones(ant, false);
-    sel = { firma: f, p: 0, c: 1, s: est.sentido || 1, ob: false };
-    if (ant) {
+    const o = opciones();
+    sel = { firma: f, p: 0, c: 1, s: est.sentido || 1, ob: "" };
+    if (est.obligada === "cerrado") {
+      sel.c = Math.min(est.enMesa, minimoCacho(ant, 0, o) || 1);
+    } else if (ant) {
       let pin = ant.p;
       if (minimoCacho(ant, pin, o) == null) for (let k = 1; k <= 6; k++) if (minimoCacho(ant, k, o) != null) { pin = k; break; }
       sel.p = pin;
       sel.c = Math.min(est.enMesa, minimoCacho(ant, pin, o) || 1);
     } else {
-      const ds = misDados() || [];
+      const ab = est.abiertos;
+      const ds = ab ? Object.keys(ab).filter(w => w !== uid).flatMap(w => ab[w]) : misDados() || [];
       let mejor = 2, mn = -1;
-      for (let k = 2; k <= 6; k++) {
-        const n = ds.filter(d => cuentaDado(d, k, false)).length;
+      for (let k = ab ? 1 : 2; k <= 6; k++) {
+        const n = ds.filter(d => cuentaDado(d, k, !!ab)).length;
         if (n >= mn) { mn = n; mejor = k; }
       }
       sel.p = mejor;
       sel.c = Math.max(1, Math.min(est.enMesa, mn));
     }
   }
-  const opciones = (ant, ob) => ({ obligada: est.obligada || (!ant && ob), unDado: (est.enVaso || {})[uid] === 1 });
+  const opciones = () => ({ obligada: est.obligada, unDado: (est.enVaso || {})[uid] === 1 });
+
+  const NOTA_OBLIGA = {
+    abierto: "Abierta: cada uno ve los dados de los demás, no los suyos. Partes tú, y nadie cambia la pinta que elijas.",
+    cerrado: "Cerrada: nadie ve ningún dado. Partes tú con «X de esta», la pinta de tu dado, y solo se sube la cantidad.",
+    torbellino: "Torbellino: eliges una pinta, se tiran los dados y todos pierden los que salgan de esa pinta, tú también."
+  };
 
   function pintaPie(v) {
     let h = "", clave;
@@ -441,44 +515,76 @@ export function crearCacho(ctx) {
       preparaSel();
       const aps = est.apuestas || [];
       const ant = aps[aps.length - 1] || null;
-      const o = opciones(ant, sel.ob);
+      const o = opciones();
       const tope = est.enMesa;
-      const minP = minimoCacho(ant, sel.p, o);
-      if (minP == null || minP > tope) {
-        for (let k = 1; k <= 6; k++) { const m = minimoCacho(ant, k, o); if (m != null && m <= tope) { sel.p = k; break; } }
-      }
-      const min = minimoCacho(ant, sel.p, o);
-      const puede = min != null && min <= tope;
-      if (puede) sel.c = Math.max(min, Math.min(tope, sel.c));
-      let pin = "";
-      for (let k = 1; k <= 6; k++) {
-        const m = minimoCacho(ant, k, o);
-        const off = m == null || m > tope;
-        pin += `<button class="jg-cc-pinta${sel.p === k ? " sel" : ""}" data-pinta="${k}"${off ? " disabled" : ""}>${dado(k)}<span>${esc(PINTAS_CACHO_PL[k])}</span></button>`;
-      }
+      const ob = !ant && est.obligar ? sel.ob : "";
+      const cerrada = est.obligada === "cerrado";
       const notas = [];
-      if (est.sicil && aps.length === 1) notas.push("Siciliana: dudar la primera apuesta se juega dos dados.");
-      if (est.obligada) notas.push("Ronda obligada: sin comodines y sin cambiar de pinta.");
-      if (!ant && sel.ob) notas.push("Al obligar, los ases no son comodín y nadie cambia de pinta.");
-      if (!ant && (est.enVaso || {})[uid] === 1) notas.push("Con un dado puedes abrir a ases.");
-      if (!puede) notas.push("No se puede subir más: duda o calza.");
-      clave = ["ap", sel.firma, sel.p, sel.c, sel.s, sel.ob, puede, enviando, est.calzo, est.obligar].join("|");
+      let pin = "", cuerpo = "", botones = "";
+
+      const filaObliga = !ant && est.obligar
+        ? `<div class="jg-cc-fila"><span class="jg-cc-lbl">Obligar:</span>${Object.keys(MODOS_OBLIGA).map(m =>
+            `<button class="jg-cc-tog${ob === m ? " sel" : ""}" data-obliga="${m}">${ob === m ? "✓ " : ""}${esc(MODOS_OBLIGA[m])}</button>`).join("")}</div>`
+        : "";
+
+      if (ob) {
+        /* Obligando: el torbellino pide una pinta; abierta y cerrada, nada. */
+        if (ob === "torbellino") {
+          if (!(sel.p >= 1 && sel.p <= 6)) sel.p = 6;
+          for (let k = 1; k <= 6; k++)
+            pin += `<button class="jg-cc-pinta${sel.p === k ? " sel" : ""}" data-pinta="${k}">${dado(k)}<span>${esc(PINTAS_CACHO_PL[k])}</span></button>`;
+          cuerpo = `<div class="jg-cc-pintas">${pin}</div>`;
+        }
+        notas.push(NOTA_OBLIGA[ob]);
+        const t = ob === "torbellino" ? "Torbellino de " + PINTAS_CACHO_PL[sel.p].toLowerCase() : "Obligar " + (ob === "abierto" ? "abierta" : "cerrada");
+        botones = `<button class="jg-cc-boton jg-cc-apuesta" id="ccObliga"${enviando ? " disabled" : ""}>${esc(t)}</button>`;
+        clave = ["ob", sel.firma, ob, sel.p, enviando].join("|");
+      } else {
+        if (!cerrada) {
+          const minP = minimoCacho(ant, sel.p, o);
+          if (minP == null || minP > tope) {
+            for (let k = 1; k <= 6; k++) { const m = minimoCacho(ant, k, o); if (m != null && m <= tope) { sel.p = k; break; } }
+          }
+        } else sel.p = 0;
+        const min = minimoCacho(ant, sel.p, o);
+        const puede = min != null && min <= tope;
+        if (puede) sel.c = Math.max(min, Math.min(tope, sel.c));
+        if (!cerrada) {
+          for (let k = 1; k <= 6; k++) {
+            const m = minimoCacho(ant, k, o);
+            const off = m == null || m > tope;
+            pin += `<button class="jg-cc-pinta${sel.p === k ? " sel" : ""}" data-pinta="${k}"${off ? " disabled" : ""}>${dado(k)}<span>${esc(PINTAS_CACHO_PL[k])}</span></button>`;
+          }
+        }
+        if (est.sicil && aps.length === 1) notas.push("Siciliana: dudar la primera apuesta se juega dos dados.");
+        if (est.obligada === "abierto") notas.push("Ronda abierta: sin comodines y sin cambiar de pinta.");
+        if (cerrada) notas.push(`Ronda cerrada: se apuesta «de esta», la pinta del dado de ${nombre(est.obliga)}, sin comodines.`);
+        if (!ant && !est.obligada && (est.enVaso || {})[uid] === 1) notas.push("Con un dado puedes abrir a ases.");
+        if (est.dudaPaso) notas.push(`${Nombre(est.paso.uid)} pasó: puedes dudarle el paso o seguir sobre la apuesta de ${nombre(ant.uid)}.`);
+        if (est.pasar) notas.push("Paso: todos iguales, todos distintos o full. Se puede pasar sin tenerlo, pero te lo pueden dudar.");
+        if (!puede) notas.push("No se puede subir más: duda o calza.");
+        cuerpo = `${pin ? `<div class="jg-cc-pintas">${pin}</div>` : ""}
+          <div class="jg-cc-fila">
+            ${cerrada ? `<span class="jg-cc-lbl">${dado(0)} de esta</span>` : ""}
+            <div class="jg-cc-paso">
+              <button class="jg-cc-mm" data-mas="-1"${!puede || sel.c <= min ? " disabled" : ""}>−</button>
+              <b>${puede ? sel.c : "—"}</b>
+              <button class="jg-cc-mm" data-mas="1"${!puede || sel.c >= tope ? " disabled" : ""}>+</button>
+            </div>
+            ${!ant ? `<button class="jg-cc-tog" data-sentido>${sel.s === 1 ? "⟳ Horario" : "⟲ Antihorario"}</button>` : ""}
+          </div>`;
+        const off = enviando ? " disabled" : "";
+        botones = `<button class="jg-cc-boton jg-cc-apuesta" id="ccApuesta"${!puede || enviando ? " disabled" : ""}>Apostar ${puede ? esc(textoApuesta(sel.c, sel.p)) : ""}</button>
+          ${ant ? `<button class="jg-cc-boton jg-cc-dudo" id="ccDudo"${off}>Dudo${est.sicil && aps.length === 1 ? " (se juegan 2)" : ""}</button>` : ""}
+          ${est.calzo ? `<button class="jg-cc-boton jg-cc-calzo" id="ccCalzo"${off}>Calzo</button>` : ""}
+          ${est.pasar ? `<button class="jg-cc-boton jg-cc-pasa" id="ccPaso"${off}>Paso</button>` : ""}
+          ${est.dudaPaso ? `<button class="jg-cc-boton jg-cc-dudo" id="ccDudaPaso"${off}>Dudo el paso</button>` : ""}`;
+        clave = ["ap", sel.firma, sel.p, sel.c, sel.s, puede, enviando, est.calzo, est.obligar, est.pasar, est.dudaPaso].join("|");
+      }
       h = `<div class="jg-cc-panel">
-        <div class="jg-cc-pintas">${pin}</div>
-        <div class="jg-cc-fila">
-          <div class="jg-cc-paso">
-            <button class="jg-cc-mm" data-mas="-1"${!puede || sel.c <= min ? " disabled" : ""}>−</button>
-            <b>${puede ? sel.c : "—"}</b>
-            <button class="jg-cc-mm" data-mas="1"${!puede || sel.c >= tope ? " disabled" : ""}>+</button>
-          </div>
-          ${!ant ? `<button class="jg-cc-tog" data-sentido>${sel.s === 1 ? "⟳ Horario" : "⟲ Antihorario"}</button>` : ""}
-          ${!ant && est.obligar ? `<button class="jg-cc-tog${sel.ob ? " sel" : ""}" data-obliga>${sel.ob ? "✓ " : ""}Obligar</button>` : ""}
-        </div>
-        <div class="jg-cc-fila">
-          <button class="jg-cc-boton jg-cc-apuesta" id="ccApuesta"${!puede || enviando ? " disabled" : ""}>Apostar ${puede ? esc(textoApuesta(sel.c, sel.p)) : ""}</button>
-          ${ant ? `<button class="jg-cc-boton jg-cc-dudo" id="ccDudo"${enviando ? " disabled" : ""}>Dudo${est.sicil && aps.length === 1 ? " (se juegan 2)" : ""}</button>` : ""}
-          ${est.calzo ? `<button class="jg-cc-boton jg-cc-calzo" id="ccCalzo"${enviando ? " disabled" : ""}>Calzo</button>` : ""}
-        </div>
+        ${filaObliga}
+        ${cuerpo}
+        <div class="jg-cc-fila">${botones}</div>
         ${notas.map(n => `<div class="jg-nota">${esc(n)}</div>`).join("")}
       </div>`;
     } else if (w && w.k === "apuesta") {
@@ -488,7 +594,8 @@ export function crearCacho(ctx) {
       const mia = w.faltan.includes(uid);
       const t = mia && c === false
         ? "No encuentro la semilla de esta sala en este navegador, y sin ella no se puede revelar tu vaso."
-        : w.r === 0 ? "Agitando…" : "Levantando los vasos…";
+        : w.r === 0 ? "Agitando…" : w.tipo === "muestra" ? "Destapando los vasos para la ronda abierta…"
+          : w.tipo === "torbellino" ? "Tirando los dados del torbellino…" : "Levantando los vasos…";
       clave = "llaves" + w.r + t; h = `<div class="jg-nota">${esc(t)}</div>` + aviso();
     } else { clave = "otro"; h = aviso(); }
     set("ccPie", clave + "|" + aviso(), h);
@@ -511,11 +618,19 @@ export function crearCacho(ctx) {
     const ap = a => a ? textoApuesta(a.c, a.p) : "";
     switch (e.e) {
       case "ronda": return `Ronda ${e.r}: abre ${nombre(e.uid)}`;
-      case "ap": return `${Nombre(e.uid)}: ${textoApuesta(e.c, e.p)}${e.ob ? " (obligada)" : ""}${e.s ? (e.s === 1 ? " ⟳" : " ⟲") : ""}`;
+      case "ap": return `${Nombre(e.uid)}: ${textoApuesta(e.c, e.p)}${e.s ? (e.s === 1 ? " ⟳" : " ⟲") : ""}`;
       case "dudo": return verbo(e.uid, "Dudas", "duda") + (e.a ? " a " + nombre(e.a) : "");
       case "calzo": return verbo(e.uid, "Calzas", "calza");
+      case "paso": return verbo(e.uid, "Pasas", "pasa");
+      case "dudapaso": return verbo(e.uid, "Dudas", "duda") + " el paso de " + nombre(e.a);
+      case "obliga": return verbo(e.uid, "Obligas", "obliga") + " " + (e.m === "abierto" ? "abierta" : e.m === "cerrado" ? "cerrada"
+        : "con torbellino de " + (PINTAS_CACHO_PL[e.p] || "").toLowerCase());
       case "destape":
         if (e.tipo === "anula") return `Ronda ${e.r} anulada`;
+        if (e.tipo === "torbellino") {
+          const q = Object.keys(e.q || {});
+          return q.length ? "Torbellino: " + q.map(w => `${nombre(w)} −${e.q[w]}`).join(", ") : "Torbellino: no salió ninguno";
+        }
         if (e.pierde) return `${verbo(e.pierde, "Pierdes", "pierde")} ${dd(e.n)}`;
         if (e.gana) return `${verbo(e.gana, "Recuperas", "recupera")} un dado`;
         return e.tipo === "calzo" ? "Calzo justo" : "";
@@ -611,7 +726,8 @@ export function crearCacho(ctx) {
     const ant = aps[aps.length - 1] || null;
     if (b.hasAttribute("data-pinta")) {
       const k = Number(b.getAttribute("data-pinta"));
-      const m = minimoCacho(ant, k, opciones(ant, sel.ob));
+      if (sel.ob === "torbellino") { sel.p = k; suena("clic"); pinta(); return; }
+      const m = minimoCacho(ant, k, opciones());
       if (m == null) return;
       /* Al cambiar de pinta se conserva la cantidad si todavía vale, y
          si no se sube a la mínima: bajar sola lo que uno eligió sorprende. */
@@ -623,18 +739,27 @@ export function crearCacho(ctx) {
     if (b.hasAttribute("data-mas")) { sel.c += Number(b.getAttribute("data-mas")); suena("clic"); pinta(); return; }
     if (b.hasAttribute("data-sentido")) { sel.s = -sel.s; suena("clic"); pinta(); return; }
     if (b.hasAttribute("data-obliga")) {
-      sel.ob = !sel.ob;
-      const m = minimoCacho(null, sel.p, opciones(null, sel.ob));
-      if (m == null) sel.p = 2;
+      const m = b.getAttribute("data-obliga");
+      sel.ob = sel.ob === m ? "" : m;
+      /* Al volver de un torbellino la pinta elegida puede no valer para abrir. */
+      if (!sel.ob && minimoCacho(null, sel.p, opciones()) == null) sel.p = 2;
       suena("clic"); pinta(); return;
+    }
+    if (b.id === "ccObliga" && sel.ob) {
+      const j = { t: "obliga", uid, m: sel.ob };
+      if (sel.ob === "torbellino") j.p = sel.p;
+      sel.ob = "";
+      manda(j); return;
     }
     if (b.id === "ccApuesta") {
       const j = { t: "ap", uid, c: sel.c, p: sel.p };
-      if (!ant) { j.s = sel.s; if (sel.ob) j.ob = true; }
+      if (!ant) j.s = sel.s;
       manda(j); return;
     }
     if (b.id === "ccDudo") { manda({ t: "dudo", uid }); return; }
     if (b.id === "ccCalzo") { manda({ t: "calzo", uid }); return; }
+    if (b.id === "ccPaso") { manda({ t: "paso", uid }); return; }
+    if (b.id === "ccDudaPaso") { manda({ t: "dudapaso", uid }); return; }
   }
 
   /* Una jugada con tope de tiempo: una transacción sin red no falla,
@@ -699,8 +824,9 @@ export function crearCacho(ctx) {
     histPrev = hist.slice();
     const visible = !document.hidden;
     if (visible && nuevos.length) {
-      if (nuevos.some(h => h.e === "dudo" || h.e === "calzo")) suena("golpe");
-      else if (nuevos.some(h => h.e === "ap")) suena("madera");
+      if (nuevos.some(h => h.e === "dudo" || h.e === "calzo" || h.e === "dudapaso")) suena("golpe");
+      else if (nuevos.some(h => h.e === "obliga")) suena("cubilete");
+      else if (nuevos.some(h => h.e === "ap" || h.e === "paso")) suena("madera");
       if (nuevos.some(h => h.e === "ronda") && !nuevos.some(h => h.e === "destape")) {
         agitaHasta = Date.now() + 1200;
         suena("cubilete");
