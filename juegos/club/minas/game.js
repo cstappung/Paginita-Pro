@@ -109,7 +109,39 @@
   const soundtrack = new Soundtrack();
   const board = $('board'); let game, buttons = [], level = 'easy', paused = false, flagMode = false;
   let elapsed = 0, startedAt = 0, resultTimeout, animationId = 0, focusedIndex = 0;
-  let pending = [], particles = [], lastFrame = 0, longPress = null, touchStart = null, suppressClickUntil = 0;
+  let pending = [], particles = [], lastFrame = 0, longPress = null, touchStart = null, suppressClickUntil = 0, traspuesto = false;
+
+  /* El tablero cabe siempre en su caja. Antes tenía un ancho mínimo de
+     26 px por columna: el medio pedía 468 px y el difícil 624, y en una
+     tablet o dentro del marco de Juegos la caja era más angosta, así que la
+     última columna (o las tres últimas) quedaban escondidas tras un scroll
+     horizontal que en pantalla táctil peleaba con el toque. Ahora las
+     columnas encogen hasta MIN_CASILLA y solo por debajo de eso aparece el
+     scroll.
+     En vertical y sin sitio, el tablero se traspone: 18 × 14 se ve como
+     14 × 18, que es el mismo buscaminas (sus reglas no distinguen filas de
+     columnas) con casillas un 30 % más grandes. Solo cambia el dibujo —
+     la casilla i sigue siendo la misma — y por eso lo hace el CSS
+     (grid-auto-flow:column) y no el motor. */
+  const CASILLA_MAX = { easy: 54, medium: 34, hard: 30 }, MIN_CASILLA = 13;
+  function vertical() {
+    // Dentro del marco de Juegos el iframe mide lo que su contenido, así que
+    // su propia orientación no dice nada: se mira la ventana de arriba.
+    try { return window.top.innerHeight > window.top.innerWidth; } catch { return screen.height > screen.width; }
+  }
+  function acomodar() {
+    if (!game) return;
+    const ancho = $('board-scroll').clientWidth - 10, max = CASILLA_MAX[level];
+    const trasponer = game.rows < game.cols && vertical() && ancho / game.cols < max;
+    board.style.setProperty('--max-cell', `${max}px`); board.style.setProperty('--min-cell', `${MIN_CASILLA}px`);
+    if (trasponer === traspuesto) return;
+    traspuesto = trasponer; board.classList.toggle('traspuesto', traspuesto);
+    board.style.setProperty('--cols', traspuesto ? game.rows : game.cols); board.style.setProperty('--rows', traspuesto ? game.cols : game.rows);
+    board.setAttribute('aria-rowcount', traspuesto ? game.cols : game.rows); board.setAttribute('aria-colcount', traspuesto ? game.rows : game.cols);
+    $('field-size').textContent = traspuesto ? `${game.rows} × ${game.cols}` : `${game.cols} × ${game.rows}`;
+  }
+  new ResizeObserver(() => acomodar()).observe($('board-scroll'));
+  window.addEventListener('resize', () => acomodar());
   const canvas = $('effects'), ctx = canvas.getContext('2d');
   let viewWidth = innerWidth, viewHeight = innerHeight;
   function resizeEffects() {
@@ -149,7 +181,7 @@
     $('timer').textContent = formatTime(seconds()); $('progress').style.width = `${game.progress * 100}%`;
     $('pause').disabled = game.state !== 'playing';
     const best = currentBest(); $('best').textContent = best === null ? '— —' : formatTime(best);
-    $('field-name').textContent = `EL JARDÍN · ${game.label}`; $('field-size').textContent = `${game.cols} × ${game.rows}`;
+    $('field-name').textContent = `EL JARDÍN · ${game.label}`; $('field-size').textContent = traspuesto ? `${game.rows} × ${game.cols}` : `${game.cols} × ${game.rows}`;
     document.querySelector('.best-row>span').textContent = {easy:'Tu mejor paseo',medium:'Tu mejor aventura',hard:'Tu mejor desafío'}[level];
   }
   function reset(nextLevel = level) {
@@ -159,15 +191,13 @@
     level = nextLevel; window.Club?.category(`club-minas-${level}`); game = new Mina.Game(level); paused = false; elapsed = 0; startedAt = 0; focusedIndex = 0;
     $('field').classList.remove('shake', 'defeat'); $('result').classList.remove('defeat'); $('pause-screen').hidden = true; $('pause').textContent = 'Ⅱ'; $('pause').setAttribute('aria-label','Pausar');
     $('status').textContent = 'Todo empieza con un clic.'; $('field-caption').innerHTML = '<span>✦</span> Tu primera jugada siempre es segura.';
-    board.style.setProperty('--cols',game.cols); board.style.setProperty('--min-cell',level === 'easy' ? '24px' : '26px');
-    board.setAttribute('aria-rowcount',game.rows); board.setAttribute('aria-colcount',game.cols);
-    const fragment = document.createDocumentFragment();
+        const fragment = document.createDocumentFragment();
     buttons = game.cells.map((cell,i) => {
       const el = document.createElement('button'); el.className = `cell${(i % game.cols + Math.floor(i/game.cols))%2 ? ' odd' : ''}`;
       el.dataset.index = i; el.setAttribute('role','gridcell'); el.setAttribute('aria-rowindex',Math.floor(i/game.cols)+1); el.setAttribute('aria-colindex',i%game.cols+1);
       el.setAttribute('aria-label',`Fila ${Math.floor(i/game.cols)+1}, columna ${i%game.cols+1}: sin explorar`); el.tabIndex = i === 0 ? 0 : -1; fragment.appendChild(el); return el;
     });
-    board.replaceChildren(fragment); $('board-scroll').scrollLeft = 0;
+    board.replaceChildren(fragment); traspuesto = null; acomodar(); $('board-scroll').scrollLeft = 0;
     document.querySelectorAll('[data-level]').forEach(b => { const active = b.dataset.level === level; b.classList.toggle('active',active); b.setAttribute('aria-pressed',String(active)); });
     updateHUD(); soundtrack.updateUI();
   }
@@ -252,24 +282,29 @@
     updateHUD();
   }
   function cellIndex(event) { const cell=event.target.closest('.cell');return cell?Number(cell.dataset.index):null; }
-  board.addEventListener('click',event=>{const i=cellIndex(event);if(i===null||performance.now()<suppressClickUntil)return;focusCell(i);if(flagMode)flag(i);else open(i);});
+  /* En modo bandera, tocar un número ya abierto sigue abriendo sus vecinas:
+     ponerle bandera a una casilla abierta no significa nada. */
+  function tocar(i, alReves = false) { if ((flagMode !== alReves) && !game.cells[i].open) flag(i); else open(i); }
+  board.addEventListener('click',event=>{const i=cellIndex(event);if(i===null||performance.now()<suppressClickUntil)return;focusCell(i);tocar(i);});
   board.addEventListener('contextmenu',event=>{event.preventDefault();const i=cellIndex(event);if(i!==null){focusCell(i);if(performance.now()>=suppressClickUntil)flag(i);}});
   board.addEventListener('pointerdown',event=>{
     if(event.pointerType==='mouse')return;const i=cellIndex(event);if(i===null)return;
     clearTimeout(longPress);touchStart={x:event.clientX,y:event.clientY};
-    longPress=setTimeout(()=>{focusCell(i);flag(i);suppressClickUntil=performance.now()+800;longPress=null;},430);
+    longPress=setTimeout(()=>{focusCell(i);tocar(i,true);suppressClickUntil=performance.now()+800;longPress=null;},430);
   });
   board.addEventListener('pointermove',event=>{if(touchStart&&Math.hypot(event.clientX-touchStart.x,event.clientY-touchStart.y)>9){clearTimeout(longPress);longPress=null;}});
   ['pointerup','pointercancel','pointerleave'].forEach(type=>board.addEventListener(type,()=>{clearTimeout(longPress);longPress=null;touchStart=null;}));
   board.addEventListener('keydown',event=>{
     const i=cellIndex(event);if(i===null)return;
     const col=i%game.cols,row=Math.floor(i/game.cols);let next=i;
-    if(event.key==='ArrowLeft')next=row*game.cols+Math.max(0,col-1);
-    else if(event.key==='ArrowRight')next=row*game.cols+Math.min(game.cols-1,col+1);
-    else if(event.key==='ArrowUp')next=Math.max(0,row-1)*game.cols+col;
-    else if(event.key==='ArrowDown')next=Math.min(game.rows-1,row+1)*game.cols+col;
+    // Traspuesto, lo horizontal en pantalla son las filas del juego.
+    const flecha=traspuesto?{ArrowLeft:'ArrowUp',ArrowRight:'ArrowDown',ArrowUp:'ArrowLeft',ArrowDown:'ArrowRight'}[event.key]||event.key:event.key;
+    if(flecha==='ArrowLeft')next=row*game.cols+Math.max(0,col-1);
+    else if(flecha==='ArrowRight')next=row*game.cols+Math.min(game.cols-1,col+1);
+    else if(flecha==='ArrowUp')next=Math.max(0,row-1)*game.cols+col;
+    else if(flecha==='ArrowDown')next=Math.min(game.rows-1,row+1)*game.cols+col;
     else if(event.key.toLowerCase()==='f'){event.preventDefault();flag(i);return;}
-    else if(event.key==='Enter'||event.key===' '){event.preventDefault();if(flagMode)flag(i);else open(i);return;}else return;
+    else if(event.key==='Enter'||event.key===' '){event.preventDefault();tocar(i);return;}else return;
     event.preventDefault();focusCell(next,true);buttons[next].scrollIntoView({block:'nearest',inline:'nearest'});
   });
   document.addEventListener('keydown',event=>{
@@ -280,7 +315,15 @@
   $('restart').addEventListener('click',()=>reset());$('play-again').addEventListener('click',()=>{reset();focusCell(0,true);});
   $('view-board').addEventListener('click',()=>{$('result').close();focusCell(focusedIndex,true);});
   $('pause').addEventListener('click',()=>togglePause());$('resume').addEventListener('click',()=>togglePause(false));
-  $('flag-mode').addEventListener('click',()=>{flagMode=!flagMode;$('flag-mode').setAttribute('aria-pressed',String(flagMode));$('flag-mode-state').textContent=flagMode?'ON':'OFF';});
+  function ponModo(bandera, avisar = true) {
+    flagMode = bandera;
+    document.querySelectorAll('#modo-toque [data-modo]').forEach(b => b.setAttribute('aria-checked', String((b.dataset.modo === 'bandera') === flagMode)));
+    $('field').classList.toggle('modo-bandera', flagMode);
+    if (avisar) $('status').textContent = flagMode ? 'Cada toque pone o quita una bandera.' : 'Cada toque descubre terreno.';
+  }
+  document.querySelectorAll('#modo-toque [data-modo]').forEach(b => b.addEventListener('click', () => ponModo(b.dataset.modo === 'bandera')));
+  // Flechas dentro del selector, como en cualquier grupo de radios.
+  $('modo-toque').addEventListener('keydown', event => { if (['ArrowLeft','ArrowRight'].includes(event.key)) { event.preventDefault(); ponModo(!flagMode); document.querySelector(`#modo-toque [data-modo=${flagMode ? 'bandera' : 'explorar'}]`).focus(); } });
   document.querySelectorAll('[data-level]').forEach(b=>b.addEventListener('click',()=>reset(b.dataset.level)));
   $('sound').addEventListener('click',()=>{soundtrack.enabled=!soundtrack.enabled;save('mina-sound',soundtrack.enabled);if(soundtrack.enabled&&game.state==='playing'&&!paused)soundtrack.start();else soundtrack.stop();soundtrack.updateUI();});
   $('volume').value=soundtrack.volume*100;$('volume').addEventListener('input',event=>soundtrack.setVolume(Number(event.target.value)));
