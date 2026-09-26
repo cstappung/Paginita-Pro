@@ -2003,13 +2003,62 @@ export async function auditaFlip7(partida, estado) {
    abrió con una apuesta que no estaba, también. Castiga el farol de
    salida y el dudo por costumbre, que son las dos cosas que alargan
    una partida de cacho sin que pase nada.
+
+   El paso: con una apuesta en la mesa, uno por ronda puede pasar en
+   vez de subir, y la apuesta sigue como estaba. Es legal con todos los
+   dados iguales, todos distintos o un full (`pasoCacho`), pero se
+   puede pasar sin tenerlo: el siguiente lo duda o sigue. Dudado, se
+   destapa y pierde un dado quien se equivocó.
+
+   Obligar: quien se queda con un dado, al abrir, puede obligar una vez
+   por partida en uno de tres modos. En todos los ases dejan de ser
+   comodín y los dados se tiran *después* de obligar — salen de la
+   llave de cada uno y de la de todos los demás de esta ronda
+   (`mezclaObligada`), así que nadie los conoce hasta que todos las
+   revelan, ni siquiera los propios:
+   - **abierto**: todos revelan la llave al empezar y cada uno ve los
+     dados de los demás, no los suyos. El límite honesto es el del
+     escondite: la pestaña de cada uno tiene los datos para calcular
+     sus propios dados, y ocultarlos es cosa de la pantalla.
+   - **cerrado**: nadie ve nada; se apuesta a «X de esta», la pinta del
+     único dado de quien obligó, y solo se sube la cantidad.
+   - **torbellino**: quien obliga elige una pinta, se tiran los dados y
+     cada uno pierde los que salgan de esa pinta, él incluido. No hay
+     apuestas.
    ============================================================ */
 
 export const CC_DADOS = 5;
 export const CC_CADENA = 300;
 export const PINTAS_CACHO = ["", "As", "Tonto", "Tren", "Cuadra", "Quina", "Sexto"];
 export const PINTAS_CACHO_PL = ["", "Ases", "Tontos", "Trenes", "Cuadras", "Quinas", "Sextos"];
-export const textoApuesta = (c, p) => `${c} ${(c === 1 ? PINTAS_CACHO[p] : PINTAS_CACHO_PL[p] || "").toLowerCase()}`;
+export const MODOS_OBLIGA = { abierto: "Abierto", cerrado: "Cerrado", torbellino: "Torbellino" };
+/* En ronda cerrada la pinta es la del dado de quien obligó, que nadie
+   conoce: se guarda como 0 y se lee «de esta». */
+export const textoApuesta = (c, p) => p === 0 ? `${c} de esta`
+  : `${c} ${(c === 1 ? PINTAS_CACHO[p] : PINTAS_CACHO_PL[p] || "").toLowerCase()}`;
+
+/* Si un vaso tiene paso, y cuál: todos iguales, todos distintos o un
+   full (trío y par). Con las caras tal cual: aquí el as no es comodín. */
+export function pasoCacho(ds) {
+  if (!ds || !ds.length) return "";
+  const n = {};
+  for (const d of ds) n[d] = (n[d] || 0) + 1;
+  const k = Object.values(n).sort((a, b) => a - b);
+  if (k.length === 1) return "iguales";
+  if (k.length === ds.length) return "distintos";
+  if (ds.length === 5 && k.length === 2 && k[0] === 2) return "full";
+  return "";
+}
+
+/* La mezcla de una ronda obligada: la de siempre más el modo y el hash
+   de las llaves de *esta* ronda de todos los que tienen dados. Como
+   esas llaves solo se conocen cuando se revelan, nadie —ni quien
+   obligó— sabe qué salió hasta entonces. */
+export function mezclaObligada(mezcla, modo, llavesRonda, enVaso) {
+  const ks = Object.keys(enVaso || {}).filter(u => enVaso[u] > 0).sort()
+    .map(u => u + ":" + ((llavesRonda || {})[u] || "")).join("|");
+  return (mezcla || "") + "|" + modo + "|" + sha256hex(ks);
+}
 
 /* SHA-256 a mano. Las constantes van escritas y no calculadas con
    `Math.cbrt`: dos navegadores que redondearan distinto el último bit
@@ -2106,21 +2155,24 @@ export function cuentaCacho(vasos, p, obligada) {
 /* La cantidad mínima para apostar a la pinta `p` después de `ant`, o
    null si esa pinta no se puede. Las conversiones son las de siempre:
    de una pinta a otra mayor basta la misma cantidad, a una igual o
-   menor hay que subir; de algo a ases se pide la mitad más uno, y de
-   ases a algo el doble más uno. En ronda obligada no se cambia de pinta.
+   menor hay que subir; de algo a ases se pide la mitad redondeada hacia
+   arriba, y de ases a algo el doble más uno. En ronda obligada no se
+   cambia de pinta, y en la cerrada la única pinta es «de esta» (0).
    Abrir con ases solo lo puede quien tiene un dado. */
 export function minimoCacho(ant, p, { obligada = false, unDado = false } = {}) {
+  if (obligada === "cerrado") return p === 0 ? (ant ? ant.c + 1 : 1) : null;
+  if (p === 0) return null;
   if (!ant) return p === 1 && !unDado ? null : 1;
   if (obligada) return p === ant.p ? ant.c + 1 : null;
   if (ant.p !== 1 && p !== 1) return p > ant.p ? ant.c : ant.c + 1;
-  if (ant.p !== 1) return Math.floor(ant.c / 2) + 1;
+  if (ant.p !== 1) return Math.ceil(ant.c / 2);
   if (p === 1) return ant.c + 1;
   return 2 * ant.c + 1;
 }
 
 export function apuestaValidaCacho(ant, a, o = {}) {
   const c = Number(a && a.c), p = Number(a && a.p);
-  if (!Number.isInteger(c) || !Number.isInteger(p) || p < 1 || p > 6 || c < 1) return false;
+  if (!Number.isInteger(c) || !Number.isInteger(p) || p < 0 || p > 6 || c < 1) return false;
   if (o.total && c > o.total) return false;
   const m = minimoCacho(ant, p, o);
   return m !== null && c >= m;
@@ -2134,7 +2186,10 @@ function redCacho(p, js, listos) {
   const dados = {}, fuera = {}, obligo = {}, ultLlave = {}, llaves = [];
   for (const u of ids) dados[u] = CC_DADOS;
   let etapa = "arranque", ronda = 0, turno = "", sentido = 1, abre = "";
-  let apuestas = [], obligada = false, mezcla = "", enVaso = {};
+  /* `obligada` es el modo de la ronda ("" si es normal), `obliga` quién
+     la obligó, `torb` la pinta de un torbellino y `paso` el paso de la
+     ronda: quién pasó y cuántas apuestas había entonces. */
+  let apuestas = [], obligada = "", obliga = "", torb = 0, paso = null, mezcla = "", enVaso = {};
   let destape = null, ultimo = null, ganador = null, motivo = "", ni = 0;
   const hist = [], falsas = [];
 
@@ -2151,16 +2206,32 @@ function redCacho(p, js, listos) {
   const total = () => ids.reduce((s, u) => s + (esta(u) ? dados[u] : 0), 0);
   const enMesa = () => ids.reduce((s, u) => s + (enRonda(u) ? enVaso[u] : 0), 0);
   const inicial = N * CC_DADOS;
-  /* Obligar: quien se queda con un dado por primera vez puede, al abrir,
-     declarar la ronda obligada (sin comodines y sin cambiar de pinta).
-     Una vez por partida, y con dos en la mesa no tiene sentido. */
-  const puedeObligar = u => etapa === "apuesta" && !apuestas.length && turno === u
+  /* Obligar: quien tiene un dado puede, al abrir, obligar la ronda en
+     uno de los tres modos. Una vez por partida, y con dos en la mesa no
+     tiene sentido. */
+  const puedeObligar = u => etapa === "apuesta" && !apuestas.length && !obligada && turno === u
     && enVaso[u] === 1 && !obligo[u] && ids.filter(esta).length >= 3;
-  /* Calzar: con la mitad de los dados todavía en juego, o teniendo uno. */
-  const puedeCalzar = u => etapa === "apuesta" && turno === u && apuestas.length > 0
-    && (total() * 2 >= inicial || enVaso[u] === 1);
+  /* Calzar: mientras quede en la mesa al menos la mitad de los dados
+     con que empezó la partida. */
+  const puedeCalzar = u => etapa === "apuesta" && turno === u && apuestas.length > 0 && total() * 2 >= inicial;
+  /* Pasar: con una apuesta en la mesa, uno solo por ronda. En una
+     obligada no, porque nadie sabe si tiene paso sin ver sus dados. */
+  const puedePasar = u => etapa === "apuesta" && turno === u && apuestas.length > 0 && !obligada && !paso;
+  /* El paso solo se le duda al que viene justo detrás: si sube, ya lo
+     dejó pasar. */
+  const puedeDudarPaso = u => etapa === "apuesta" && turno === u && !!paso
+    && paso.tras === apuestas.length && paso.uid !== u;
   const faltan = r => (r === 0 ? ids.filter(u => !fuera[u]) : ids.filter(enRonda))
     .filter(u => !(llaves[r] && llaves[r][u]));
+
+  /* Los vasos de la ronda con las llaves que ya se conocen. */
+  const vasosRonda = () => {
+    const L = llaves[ronda] || {};
+    const m = obligada ? mezclaObligada(mezcla, obligada, L, enVaso) : mezcla;
+    const v = {};
+    for (const u of ids) if ((enVaso[u] || 0) > 0 && L[u]) v[u] = dadosCacho(L[u], m, enVaso[u]);
+    return v;
+  };
 
   /* Una llave es buena si, hasheada tantas veces como rondas separan a
      esta de la última que reveló, da aquella. La primera se compara con
@@ -2180,21 +2251,36 @@ function redCacho(p, js, listos) {
     mezcla = ids.filter(u => prev[u]).map(u => u + ":" + prev[u]).join("|");
     enVaso = {};
     for (const u of ids) if (esta(u)) enVaso[u] = dados[u];
-    etapa = "apuesta"; apuestas = []; obligada = false; destape = null;
+    etapa = "apuesta"; apuestas = []; destape = null;
+    obligada = ""; obliga = ""; torb = 0; paso = null;
     abre = turno = quien;
     suceso({ e: "ronda", r: ronda, uid: quien });
   };
 
   const resuelve = () => {
-    const d = destape, L = llaves[ronda] || {};
-    const vasos = {};
-    for (const u of ids) if ((enVaso[u] || 0) > 0 && L[u]) vasos[u] = dadosCacho(L[u], mezcla, enVaso[u]);
-    const orden = [];
+    const d = destape;
+    const vasos = vasosRonda();
+    let orden = [];
     for (let k = 0; k < N; k++) { const c = alrededor(d.quien, k); if (vasos[c]) orden.push(c); }
     const antes = { ...dados };
-    let cuenta = null, acierta = null, pierde = "", gana = "", n = 0;
-    if (d.tipo !== "anula" && d.apuesta) {
-      cuenta = cuentaCacho(vasos, d.apuesta.p, obligada);
+    const quita = {};
+    let cuenta = null, acierta = null, pierde = "", gana = "", n = 0, pinta = 0, tiene = "";
+    if (d.tipo === "torbellino") {
+      /* Cada uno pierde los dados que salieron de la pinta elegida. */
+      pinta = torb; cuenta = 0;
+      for (const u in vasos) {
+        const k = vasos[u].filter(x => x === torb).length;
+        if (k) { quita[u] = k; cuenta += k; }
+      }
+    } else if (d.tipo === "paso") {
+      /* Solo importa el vaso de quien pasó. */
+      orden = vasos[d.contra] ? [d.contra] : [];
+      tiene = pasoCacho(vasos[d.contra]);
+      acierta = !tiene;
+      pierde = acierta ? d.contra : d.quien; n = 1;
+    } else if (d.tipo !== "anula" && d.apuesta) {
+      pinta = obligada === "cerrado" ? ((vasos[obliga] || [])[0] || 0) : d.apuesta.p;
+      cuenta = cuentaCacho(vasos, pinta, obligada);
       if (d.tipo === "dudo") {
         acierta = cuenta < d.apuesta.c;
         pierde = acierta ? d.contra : d.quien;
@@ -2205,14 +2291,15 @@ function redCacho(p, js, listos) {
         else if (dados[d.quien] < CC_DADOS) { gana = d.quien; n = 1; }
       }
     }
-    if (pierde && !fuera[pierde]) dados[pierde] = Math.max(0, dados[pierde] - n);
+    if (pierde) quita[pierde] = n;
+    for (const u in quita) if (!fuera[u]) dados[u] = Math.max(0, dados[u] - quita[u]);
     if (gana && !fuera[gana]) dados[gana] += 1;
     ultimo = {
-      r: ronda, tipo: d.tipo, quien: d.quien, contra: d.contra, apuesta: d.apuesta, obligada, sentido,
-      orden, vasos, cuenta, acierta, pierde, gana, n, sicil: sicil && d.tipo === "dudo" && d.primera,
-      antes, despues: { ...dados }
+      r: ronda, tipo: d.tipo, quien: d.quien, contra: d.contra, apuesta: d.apuesta, obligada, obliga, sentido,
+      orden, vasos, cuenta, acierta, pierde, gana, n, pinta, paso: tiene, quita,
+      sicil: sicil && d.tipo === "dudo" && d.primera, antes, despues: { ...dados }
     };
-    suceso({ e: "destape", r: ronda, tipo: d.tipo, uid: d.quien, a: d.contra, acierta, pierde, gana, n });
+    suceso({ e: "destape", r: ronda, tipo: d.tipo, uid: d.quien, a: d.contra, acierta, pierde, gana, n, p: pinta, q: quita });
     for (const u of ids) if (antes[u] > 0 && dados[u] === 0) suceso({ e: "sale", uid: u });
     const quedan = ids.filter(esta);
     if (quedan.length <= 1) { ganador = quedan[0] || ""; motivo = "cacho"; return; }
@@ -2220,9 +2307,11 @@ function redCacho(p, js, listos) {
       const max = Math.max(...quedan.map(u => dados[u])), arriba = quedan.filter(u => dados[u] === max);
       ganador = arriba.length === 1 ? arriba[0] : ""; motivo = "tope"; return;
     }
-    /* Parte quien perdió el dado; tras un calzo, quien calzó; tras una
-       ronda anulada, el mismo que la abrió. */
-    let prox = d.tipo === "dudo" ? pierde : d.tipo === "calzo" ? d.quien : abre;
+    /* Parte quien perdió el dado; tras un calzo, quien calzó; tras un
+       torbellino, quien lo tiró; tras una ronda anulada, el mismo que la
+       abrió. */
+    let prox = d.tipo === "dudo" || d.tipo === "paso" ? pierde
+      : d.tipo === "calzo" || d.tipo === "torbellino" ? d.quien : abre;
     if (!prox) prox = abre;
     if (!esta(prox)) prox = sig(prox, esta) || quedan[0];
     empiezaRonda(prox);
@@ -2238,6 +2327,8 @@ function redCacho(p, js, listos) {
       empiezaRonda(vivos[parseInt(sha256hex(m0).slice(0, 8), 16) % vivos.length]);
       return;
     }
+    /* Ronda abierta: con todas las llaves a la vista, parte quien obligó. */
+    if (etapa === "muestra" && !faltan(ronda).length) { etapa = "apuesta"; turno = obliga; return; }
     if (etapa === "destape" && !faltan(ronda).length) resuelve();
   };
 
@@ -2261,7 +2352,7 @@ function redCacho(p, js, listos) {
       /* Con sus dados en la mesa, la ronda ya no se puede resolver: se
          destapa igual —las llaves hacen falta para la mezcla siguiente—
          pero sin veredicto. */
-      if (etapa === "apuesta" && estaba) {
+      if ((etapa === "apuesta" || etapa === "muestra") && estaba) {
         destapa("anula", u, false);
         suceso({ e: "anula", uid: u });
       } else if (etapa === "destape" && estaba && !(llaves[ronda] && llaves[ronda][u])) {
@@ -2274,7 +2365,8 @@ function redCacho(p, js, listos) {
     if (ganador !== null || !listos || fuera[u]) continue;
     if (j.t === "k") {
       const r = Number(j.r), c = String(j.c || "");
-      const vale = (etapa === "arranque" && r === 0) || (etapa === "destape" && r === ronda && enRonda(u));
+      const vale = (etapa === "arranque" && r === 0)
+        || ((etapa === "destape" || etapa === "muestra") && r === ronda && enRonda(u));
       if (!vale || (llaves[r] && llaves[r][u]) || !/^[0-9a-f]{64}$/.test(c) || !ficha[u].hcad) continue;
       if (!llaveBuena(u, r, c)) {
         if (!falsas.some(f => f.uid === u && f.r === r)) { falsas.push({ uid: u, r }); suceso({ e: "falsa", uid: u, r }); }
@@ -2288,15 +2380,11 @@ function redCacho(p, js, listos) {
     if (etapa !== "apuesta" || turno !== u) continue;
     if (j.t === "ap") {
       const ant = apuestas[apuestas.length - 1] || null;
-      const ob = !ant && !!j.ob && puedeObligar(u);
       const a = { c: Number(j.c), p: Number(j.p) };
-      if (!apuestaValidaCacho(ant, a, { obligada: obligada || ob, unDado: enVaso[u] === 1, total: enMesa() })) continue;
-      if (!ant) {
-        if (Number(j.s) === -1 || Number(j.s) === 1) sentido = Number(j.s);
-        if (ob) { obligada = true; obligo[u] = true; }
-      }
+      if (!apuestaValidaCacho(ant, a, { obligada, unDado: enVaso[u] === 1, total: enMesa() })) continue;
+      if (!ant && (Number(j.s) === -1 || Number(j.s) === 1)) sentido = Number(j.s);
       apuestas.push({ uid: u, c: a.c, p: a.p });
-      suceso({ e: "ap", uid: u, c: a.c, p: a.p, ob, s: !ant ? sentido : 0 });
+      suceso({ e: "ap", uid: u, c: a.c, p: a.p, s: !ant ? sentido : 0 });
       turno = sig(u, enRonda) || u;
     } else if (j.t === "dudo" && apuestas.length) {
       destapa("dudo", u, apuestas.length === 1);
@@ -2306,12 +2394,32 @@ function redCacho(p, js, listos) {
       destapa("calzo", u, apuestas.length === 1);
       suceso({ e: "calzo", uid: u, a: destape.contra });
       avanza();
+    } else if (j.t === "paso" && puedePasar(u)) {
+      paso = { uid: u, tras: apuestas.length };
+      suceso({ e: "paso", uid: u });
+      turno = sig(u, enRonda) || u;
+    } else if (j.t === "dudapaso" && puedeDudarPaso(u)) {
+      destapa("paso", u, false);
+      destape.contra = paso.uid;
+      suceso({ e: "dudapaso", uid: u, a: paso.uid });
+      avanza();
+    } else if (j.t === "obliga" && puedeObligar(u) && ["abierto", "cerrado", "torbellino"].includes(j.m)) {
+      if (j.m === "torbellino") {
+        const q = Number(j.p);
+        if (!Number.isInteger(q) || q < 1 || q > 6) continue;
+        torb = q;
+      }
+      obligada = j.m; obliga = u; obligo[u] = true;
+      suceso({ e: "obliga", uid: u, m: j.m, p: torb });
+      if (j.m === "abierto") { etapa = "muestra"; turno = ""; avanza(); }
+      else if (j.m === "torbellino") { destapa("torbellino", u, false); avanza(); }
     }
   }
 
   let espera = null;
   if (listos && ganador === null) {
     if (etapa === "arranque") espera = { k: "llaves", r: 0, faltan: faltan(0) };
+    else if (etapa === "muestra") espera = { k: "llaves", r: ronda, tipo: "muestra", faltan: faltan(ronda) };
     else if (etapa === "destape") espera = { k: "llaves", r: ronda, tipo: destape.tipo, faltan: faltan(ronda) };
     else espera = { k: "apuesta", uid: turno };
   }
@@ -2321,8 +2429,11 @@ function redCacho(p, js, listos) {
   return {
     fase: !listos ? "espera" : fin ? "fin" : "jugando",
     sicil, dados, fuera, obligo, puntos, etapa, ronda, turno: fin ? "" : turno, sentido, abre,
-    apuestas, obligada, mezcla, enVaso, total: total(), enMesa: enMesa(), inicial,
+    apuestas, obligada, obliga, torb, paso, mezcla, enVaso, total: total(), enMesa: enMesa(), inicial,
+    /* En ronda abierta, los vasos de todos: la pantalla esconde el propio. */
+    abiertos: !fin && obligada === "abierto" && etapa === "apuesta" ? vasosRonda() : null,
     destape, espera, ultimo, hist, falsas, ganador, motivo,
-    calzo: !fin && puedeCalzar(turno), obligar: !fin && puedeObligar(turno)
+    calzo: !fin && puedeCalzar(turno), obligar: !fin && puedeObligar(turno),
+    pasar: !fin && puedePasar(turno), dudaPaso: !fin && puedeDudarPaso(turno)
   };
 }

@@ -2117,16 +2117,35 @@ choosing either. Points worth knowing:
   timeout (`ENVIO_MAX`) as Flip 7, for the same reasons — a lost timer or a
   write with no network must never leave the table stuck.
 - **The rules** (`minimoCacho`): aces are wild unless the bet is on aces or
-  the round is *obligada*; going to aces needs `⌊c/2⌋ + 1`, coming back from
+  the round is *obligada*; going to aces needs `⌈c/2⌉`, coming back from
   them `2c + 1`, and opening on aces is only allowed with one die left.
-  **Obligar** (once per game, with one die, three or more players left) turns
-  aces into a plain face for that round. **Calzar** (claiming the bet is
-  exact) is allowed while at least half the initial dice are still on the
-  table, or to whoever holds one die; right wins a die back (up to five),
-  wrong loses one. The next round opens with whoever lost, with whoever calzó
-  after a calzo, and with the same opener after an annulled round — an
-  abandono mid-round annuls it, since that player's cup can never be
-  uncovered.
+  **Calzar** (claiming the bet is exact) is allowed only while at least half
+  the initial dice are still on the table — holding one die is no exception;
+  right wins a die back (up to five), wrong loses one. The next round opens
+  with whoever lost, with whoever calzó after a calzo, and with the same
+  opener after an annulled round — an abandono mid-round annuls it, since
+  that player's cup can never be uncovered.
+- **El paso** (`pasoCacho`): with a bet on the table, one player per round
+  may pass instead of raising and the bet stands. It is legal with all dice
+  equal, all different or a full house (faces as they are, no wild aces), but
+  it can be bluffed: only the **next** player may doubt it (`dudapaso`), and
+  once they raise it is accepted. Doubted, only the passer's cup is lifted
+  and whoever was wrong loses one die. Not offered in an obligada round,
+  where nobody knows their own dice.
+- **Obligar** (once per game, the opener with one die, three or more players
+  left) picks one of three modes, and in all of them aces are not wild. The
+  dice of an obligada round are rolled **after** the choice:
+  `mezclaObligada` mixes in the hash of *every* player's key for this round,
+  so nobody — the obligator included — can know them until all keys are out.
+  **Abierto** reveals every key at once (`etapa: "muestra"`), `est.abiertos`
+  carries every cup and the screen hides your own; the obligator opens and
+  the pinta never changes. That hiding is only the screen's — the tab has the
+  data to compute its own dice, the same honest limit as the escondite.
+  **Cerrado** shows nothing to anyone; bets are «X de esta» (`p: 0`), the
+  pinta being the obligator's single die, resolved at the uncovering, and
+  only the count goes up. **Torbellino** has no bets: the obligator names a
+  pinta, the round is uncovered at once and every cup loses the dice showing
+  it, the obligator's too; they open the next round if they still have dice.
 - **Partida siciliana** (`sicil`, chosen at room creation): doubting the
   *first* bet of a round risks two dice, for whoever was wrong. It punishes
   the opening bluff and the reflex dudo, which are what make a cacho game drag
