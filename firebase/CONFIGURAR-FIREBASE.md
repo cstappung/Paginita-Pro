@@ -129,6 +129,16 @@ publicar, las partidas se juegan igual, pero el chat no manda nada y el
 vestíbulo no enseña las partidas en juego. El arreglo es el de siempre: pegar
 `firebase/database.rules.json` entero y **Publicar**.
 
+### ⚠ Catan pide publicar otra vez
+
+Solo cambia la lista del campo `juego`, que ahora lleva `'catan'`. Las
+opciones de la sala (`exp`, `baraja`, `amable`, `puerto`, `largo`) no son
+`modo` a propósito: van por la regla genérica de los campos de la partida y
+no necesitan nada. Sin publicar, la sala de Catan no se puede crear. El
+arreglo es el de siempre: pegar `firebase/database.rules.json` entero y
+**Publicar**, o usar el botón **Copiar las reglas** del cartel de la página de
+juegos.
+
 ## 2. Reglas de Storage
 
 1. Consola → **Storage** → pestaña **Reglas**.

@@ -232,6 +232,15 @@ const REPERTORIO = {
   /* Congelar: un cristal que se estrecha. */
   hielo:    (a, t) => { [H(96), H(100), H(103)].forEach((f, k) => campana(a, t + k * 0.04, f, 0.04, 0.7));
                         soplo(a, t, 0.4, 0.08, { f: 6000, f1: 2500, q: 3 }); },
+  /* Catan: el martillo al construir — dos golpes secos sobre madera con un
+     tintineo de clavo —, la cosecha que llega (tres campanitas hacia
+     arriba) y el ladrón, un pasito grave que baja. */
+  martillo: (a, t) => { if (!muestra(a, "toc", t, { i: 0, vol: 0.6, vel: 1.3 })) nudillo(a, t, 1.35);
+                        campana(a, t + 0.012, H(96), 0.025, 0.25);
+                        if (!muestra(a, "toc", t + 0.14, { i: 1, vol: 0.5, vel: 1.2 })) nudillo(a, t + 0.14, 1.25); },
+  cosecha:  (a, t) => [79, 83, 86, 91].forEach((n, k) => campana(a, t + k * 0.055, H(n), 0.05 - k * 0.006, 0.9)),
+  ladron:   (a, t) => { [55, 53, 50].forEach((n, k) => P(a, t + k * 0.13, H(n), 0.12, { onda: "tri", vol: 0.13 }));
+                        soplo(a, t, 0.45, 0.07, { f: 380, f1: 140, q: 1.1, tipo: "lowpass" }); },
   victoria: (a, t) => {
     [[72, 0, .09], [76, .1, .09], [79, .2, .09], [84, .3, .16], [79, .48, .08], [84, .58, .5]]
       .forEach(([n, d, l]) => { P(a, t + d, H(n), l, { vol: 0.09 }); P(a, t + d, H(n - 12), l, { onda: "p12", vol: 0.04 }); });

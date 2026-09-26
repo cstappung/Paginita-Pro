@@ -12,6 +12,7 @@
  *   reversi    Re menor, 120 — pulso fino (12 %), casi de clavecín.
  *   cadena     Fa# menor, 138 — arpegios que suben como la cadena, con eco.
  *   minas      Sol menor, 116 — staccato nervioso; las capas entran con el avance.
+ *   catan      Re mayor, 116 con swing — tonada de puerto, el bajo como tambor de marcha.
  *   snake      Do dórico, 150 — funk: bajo con octavas y caja a contratiempo.
  *   worms-menu / worms-combate  Mi mayor tranquilo y Si menor de batalla.
  *
@@ -146,6 +147,25 @@
         "R . R R F . R . O . R R F . O .", "k.hks.hkk.hks.hx", 2)
     },
     orden: "I A A B A B"
+  };
+
+  /* Catan: Re mayor con un poco de swing, una tonada de puerto que sube
+     en la segunda parte. El bajo salta a la quinta como un tambor de
+     marcha y el arpegio hace de gaita. */
+  T.catan = {
+    bpm: 116, swing: .1,
+    lead: { onda: "p25", vol: .14, vib: .01 },
+    bajo: { onda: "tri", vol: .2 }, arp: { onda: "p12", vol: .05, oct: 4, paso: .05 }, bat: { vol: .3 },
+    secciones: {
+      I: sec("D A", "", "R . F . O . F . R . F . O . F .", "k..hs.h.k.hks.h.", 4),
+      A: sec("D G A D",
+        "D5*2 F#5*2 A5*4 F#5*2 E5*2 D5*4 B4*2 D5*2 G5*4 F#5*2 E5*2 D5*4 C#5*2 E5*2 A5*4 G5*2 F#5*2 E5*4 F#5*4 E5*2 C#5*2 D5*8",
+        "R . F . O . F . R . F . O . F .", "k..hs.h.k.hks.h.", 4),
+      B: sec("Bm G D A",
+        "B4*2 D5*2 F#5*4 B5*4 A5*4 G5*4 F#5*2 E5*2 D5*4 B4*4 A4*2 D5*2 F#5*2 A5*2 D6*4 C#6*4 B5*2 A5*2 G5*2 E5*2 A5*8",
+        "R . R F . R O . R . R F . R O .", "k.hhs.h.k.hks.hx", 2)
+    },
+    orden: "I A A B A"
   };
 
   T.minas = {

@@ -65,7 +65,7 @@ import {
 } from "firebase/database";
 import {
   claveJugada, semillaAleatoria, salAleatoria, compromiso, LADO, cupoDe,
-  cadenaCacho, CC_CADENA, sha256hex, arrUno, dhPublica
+  cadenaCacho, CC_CADENA, sha256hex, arrUno, dhPublica, cadenaCatan, CT_CADENA
 } from "./juegos/motor.js";
 
 const P = "partidas", MIAS = "misPartidas", R = "ranks";
@@ -124,12 +124,15 @@ const ficha = (q, orden, hmazo, extra) => Object.assign({
    En el cacho la misma semilla da además la cadena de llaves de los
    dados, y lo que se publica es su punta (`hcad`, ver `redCacho`). En
    el UNO, la promesa de su parte de la mezcla (`hcad` también) y su
-   clave pública de Diffie-Hellman (`pk`), la de los sobres. */
+   clave pública de Diffie-Hellman (`pk`), la de los sobres. En Catan,
+   la punta de la cadena de llaves con que se tiran los dados y se roba
+   (`hcad`, ver `redCatan`): 800 hashes, que salen en milisegundos. */
 async function secreto(pid, uid, juego) {
   const sem = semillaAleatoria(), sal = salAleatoria();
   await set(ref(db, `${MIAS}/${uid}/${pid}/sec`), { sem, sal });
   const extra = juego === "cacho" ? { hcad: cadenaCacho(sem, sal)[CC_CADENA] }
     : juego === "uno" ? { hcad: sha256hex(arrUno(sem, sal)), pk: dhPublica(sem, sal) }
+    : juego === "catan" ? { hcad: cadenaCatan(sem, sal)[CT_CADENA] }
     : {};
   return { sem, sal, h: await compromiso(sem, sal), extra };
 }

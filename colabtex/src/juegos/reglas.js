@@ -13,7 +13,7 @@
    `motor.js`, cambia también aquí — un manual que miente es peor que
    ninguno.
 
-   Los juegos con variantes (UNO, Flip 7, cacho) llevan una pestaña por
+   Los juegos con variantes (UNO, Flip 7, cacho, Catan) llevan una pestaña por
    variante, y se abre en la de la sala: quien está jugando al No Mercy
    no tiene por qué leerse antes el clásico entero.
    ============================================================ */
@@ -319,6 +319,78 @@ const REGLAS = {
             "Las cartas que no se destapan se quedan en el descarte. Si alguien se queda sin cartas así, gana."
           ])],
           ["Sin trampas", "Cada carta boca abajo queda sellada con un hash antes de destaparse, así que no se puede cambiar después."]
+        ]
+      }
+    }
+  },
+  catan: {
+    lema: "Coloniza la isla, comercia y construye hasta llegar a la meta.",
+    secciones: [
+      ["El objetivo", "Llegar a la meta de <b>puntos de victoria</b> en tu turno: 10 en el juego base, 12 con Navegantes (más o menos según la sala; la cifra está arriba, junto a la bandera 🏁). Cada <b>poblado</b> vale 1, cada <b>ciudad</b> 2, y hay puntos extra por la ruta más larga, el mayor ejército y las cartas de punto de victoria."],
+      ["La colocación", lista([
+        "Cada uno coloca <b>un poblado y un camino</b> junto a él, y luego lo mismo en orden inverso: el último en poner el primero pone también el segundo.",
+        "Un poblado nunca puede estar a un paso de otro (ni tuyo ni ajeno).",
+        "Con el <b>segundo</b> poblado recibes una carta de cada terreno que toca.",
+        "Quién empieza lo decide el azar entre todos, no quien abrió la sala."
+      ])],
+      ["Tu turno", lista([
+        "<b>Tira los dados.</b> Cada terreno con ese número da una carta a cada poblado que lo toca y dos a cada ciudad: <b>bosque</b> madera, <b>colinas</b> arcilla, <b>pastos</b> lana, <b>campos</b> trigo y <b>montañas</b> mineral. El desierto no da nada.",
+        "Después, en el orden que quieras: <b>comercia</b>, <b>construye</b> y <b>juega</b> una carta de desarrollo. Termina con <b>Terminar el turno</b>.",
+        "Costes: camino = madera + arcilla · poblado = madera + arcilla + lana + trigo · ciudad = 2 trigo + 3 mineral (sustituye a un poblado) · carta de desarrollo = lana + trigo + mineral.",
+        "Caminos y poblados tienen que tocar tu red. Hay 15 caminos, 5 poblados y 4 ciudades por jugador."
+      ])],
+      ["El siete y el ladrón", lista([
+        "Con un <b>7</b> nadie produce. Quien tenga <b>más de 7 cartas</b> descarta la mitad (redondeando hacia abajo).",
+        "Quien tiró mueve el <b>ladrón</b> a otro terreno, que deja de producir mientras esté ahí, y roba una carta al azar a alguien con un edificio al lado."
+      ])],
+      ["Comerciar", lista([
+        "Con la <b>banca</b>: 4 cartas iguales por 1 cualquiera. Un <b>puerto 3:1</b> mejora eso a 3 de lo que sea; un <b>puerto 2:1</b>, a 2 de su recurso. Para usarlo tienes que tener un poblado o ciudad en él.",
+        "Con la <b>mesa</b>: en tu turno ofreces un trato; los demás lo aceptan o no, y tú eliges con quién cerrarlo. Quien no tiene el turno puede <b>proponerte</b> otro trato."
+      ])],
+      ["Cartas de desarrollo", lista([
+        "<b>Caballero</b>: mueve el ladrón y roba. Se puede jugar antes de tirar.",
+        "<b>Construcción de carreteras</b>: dos caminos (o barcos) gratis.",
+        "<b>Año de la abundancia</b>: dos recursos de la banca, los que quieras.",
+        "<b>Monopolio</b>: eliges un recurso y todos te dan todas sus cartas de ese recurso.",
+        "<b>Punto de victoria</b>: vale un punto, en secreto. Se revela solo cuando te da la victoria.",
+        "Una carta por turno como mucho, y nunca la comprada en ese mismo turno."
+      ])],
+      ["Puntos especiales", lista([
+        "<b>Ruta comercial más larga</b> (+2): el primero con 5 tramos seguidos. Otro se la quita al superarla; un poblado ajeno en medio la corta.",
+        "<b>Mayor ejército</b> (+2): el primero con 3 caballeros jugados. Se pierde si alguien juega más."
+      ])],
+      ["Cinco o seis jugadores", lista([
+        "La isla crece a 30 terrenos, con más puertos y más cartas de desarrollo.",
+        "<b>Fase especial de construcción</b>: al acabar cada turno, los demás, en orden, pueden construir o comprar cartas (sin comerciar ni jugarlas). A quien no le llega para nada se le salta solo."
+      ])],
+      ["Variantes de la sala", lista([
+        "<b>Baraja de eventos</b>: en vez de dados, un mazo de 36 cartas con las 36 combinaciones de dos dados. Se rebaraja cuando quedan 5. La suerte se reparte más: al final sale todo.",
+        "<b>Ladrón amistoso</b>: el ladrón (y el pirata) no pueden ir junto a quien tiene 2 puntos o menos, ni robarle.",
+        "<b>Maestro del puerto</b> (+2): el primero que suma 3 puntos de puerto (poblado en puerto 1, ciudad 2), y quien le supere después. La meta sube un punto.",
+        "<b>Partida corta o larga</b>: la meta baja o sube dos puntos."
+      ])],
+      ["Lo que es distinto aquí", lista([
+        "No hay servidor que tire los dados: cada tirada junta una llave secreta de quien tira y otra de otro jugador (el siguiente en la mesa, o la víctima en un robo). Ninguno puede elegir el resultado. Si alguien no contesta, lo hace otro a los pocos segundos.",
+        "Cada uno roba sus cartas de desarrollo de un mazo propio que solo ve su navegador, con las proporciones de la caja. Al acabar se revelan las semillas y se comprueba que cada carta jugada fuera la de verdad: quien mintió sale en rojo.",
+        "La banca no se agota, y el mazo de desarrollo tampoco.",
+        "Las cartas de recurso de los rivales se ven solo como un número, pero quien abra la consola del navegador podría contarlas: en la mesa de verdad también se pueden contar."
+      ])]
+    ],
+    modos: {
+      base: { nombre: "Base", secciones: [["La isla", "Diecinueve terrenos rodeados de mar, con nueve puertos en la costa. Con cinco o seis jugadores, treinta terrenos y once puertos."]] },
+      mar: {
+        nombre: "Navegantes",
+        secciones: [
+          ["Navegantes", lista([
+            "La isla principal está rodeada de <b>islotes</b>. Todos empiezan en la principal; los islotes hay que alcanzarlos por mar.",
+            "<b>Barco</b> = madera + lana. Va en un tramo junto al agua y tiene que enlazar con un edificio tuyo o con otro barco tuyo. Caminos y barcos solo se enlazan a través de un poblado o ciudad propios.",
+            "Una vez por turno puedes <b>mover un barco abierto</b> (el del extremo de una línea, sin edificio propio detrás) a otro sitio válido. No el que botaste este turno.",
+            "El primer poblado de cada jugador en cada islote da <b>+2 puntos</b>.",
+            "El <b>río de oro</b> no da oro: quien lo toca elige el recurso que quiera (uno por poblado, dos por ciudad).",
+            "Con un 7 o un caballero puedes mover el <b>ladrón</b> o el <b>pirata</b>. El pirata va por el mar: roba a quien tenga un barco al lado, y mientras esté ahí no se pueden botar ni mover barcos junto a él.",
+            "La ruta comercial más larga cuenta caminos y barcos juntos.",
+            "Se juega a 12 puntos."
+          ])]
         ]
       }
     }

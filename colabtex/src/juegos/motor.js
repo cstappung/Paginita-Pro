@@ -33,7 +33,9 @@
    en cadena distingue de un vistazo, ocho asientos es lo que cabe en la
    media luna de Flip 7; cuadritos no tiene nada de eso y llega a diez.
    El cacho se queda en ocho: son cuarenta dados en la mesa, y con más
-   una apuesta ya no se puede calcular a ojo, que es todo el juego. */
+   una apuesta ya no se puede calcular a ojo, que es todo el juego.
+   Catan llega a seis, que es lo que admite la ampliación: pasado eso
+   la isla grande no tiene costa para todos. */
 export const JUEGOS = {
   orbita: { nombre: "Órbita", lema: "Captura estrellas y decide el próximo movimiento de tu rival", color: "#8860ed", minimo: 2, cupo: 2 },
   escondite: {
@@ -98,6 +100,13 @@ export const JUEGOS = {
     color: "#e03a2f",
     minimo: 2,
     cupo: 10
+  },
+  catan: {
+    nombre: "Catan",
+    lema: "Coloniza la isla, comercia y construye: el primero en llegar a la meta gana",
+    color: "#d9822b",
+    minimo: 2,
+    cupo: 6
   }
 };
 
@@ -644,6 +653,7 @@ export function reducir(p) {
   if (p.juego === "flip7") return { ...base, ...redFlip7(p, js, listos) };
   if (p.juego === "cacho") return { ...base, ...redCacho(p, js, listos) };
   if (p.juego === "uno") return { ...base, ...redUno(p, js, listos) };
+  if (p.juego === "catan") return { ...base, ...redCatan(p, js, listos) };
   return base;
 }
 
@@ -702,6 +712,8 @@ export function progreso(est, juego) {
     if (!q.length) return 0;
     return c((UNO_MANO - Math.min(...q.map(u => est.cartas[u]))) / (UNO_MANO - 1));
   }
+  /* En Catan, lo cerca que está de la meta quien va primero. */
+  if (juego === "catan" && est.vp) return c(Math.max(0, ...Object.values(est.vp)) / (est.meta || 10));
   if (juego === "cartas" && est.ganadas) return c(Math.max(0, ...Object.values(est.ganadas).map(g => g.length)) / 5);
   return 0;
 }
@@ -3304,5 +3316,1104 @@ export async function auditaUno(partida, estado) {
   }
   if (estado.mezcla) repasaUno(estado, secretos, pon);
   for (const j of estado.jugadores || []) if (!secretos[j.uid] && !fallos.some(x => x.uid === j.uid)) pon(j.uid, "oculta");
+  return fallos;
+}
+
+/* ============================================================
+   Catan — colonos, comercio y un ladrón, sin nadie que tire los dados
+
+   Las reglas son las de la caja: dos poblados y dos caminos por cabeza
+   en serpiente, dados cada turno, producción de los hexágonos vecinos,
+   el siete que obliga a descartar y trae al ladrón, comercio con la
+   banca (4:1, 3:1 o 2:1 con puerto) y entre jugadores, cartas de
+   desarrollo, ruta más larga y mayor ejército. Encima, lo que quien
+   abre la sala elige:
+
+   - **Ampliación 5–6** (sola, según cuántos se sienten): isla de 30
+     hexágonos, más fichas y puertos, mazo de 34 cartas y la **fase
+     especial de construcción** — al acabar cada turno, los demás, en
+     orden, pueden construir o comprar sin comerciar. El reductor salta
+     solo a quien no puede pagar nada, que es casi siempre casi todos:
+     así la fase no convierte cada turno en seis esperas.
+   - **Navegantes**: la isla principal más islotes separados por mar,
+     barcos (madera + lana) que llevan la ruta por el agua, un barco
+     abierto que se puede mover una vez por turno, el pirata que bloquea
+     y roba a los barcos, ríos de oro que dan el recurso que uno elija y
+     +2 puntos por el primer poblado en cada isla nueva. Se juega a 12.
+   - **Baraja de eventos** (de Mercaderes y Bárbaros): los dados salen
+     de un mazo de 36 cartas con la distribución exacta de dos dados,
+     que se rebaraja cuando quedan cinco. Menos rachas, la misma media.
+   - **Ladrón amistoso**: ni el ladrón ni el pirata pueden ir a donde
+     perjudiquen a quien tiene dos puntos o menos.
+   - **Maestro del puerto**: +2 puntos a quien sume más puntos de
+     puerto (poblado en puerto 1, ciudad 2; al menos 3). Meta +1.
+   - **Partida** corta o larga: la meta baja o sube dos puntos.
+
+   Lo difícil vuelve a ser el azar sin servidor, y aquí hay de tres
+   clases:
+
+   1. **Los dados y los robos.** Cada jugador tiene una cadena de
+      hashes como la del cacho (`cadenaCatan`, punta `hcad` en la
+      ficha) y cada vez que hace falta azar se juntan **dos** llaves
+      de dos personas distintas: la de quien tira (va dentro de la
+      jugada `tira`, o de la del ladrón) y la del primero que conteste
+      de los demás — el siguiente en la mesa si es una tirada, la
+      víctima si es un robo. Ninguno de los dos conoce la llave del
+      otro antes de publicar la suya, así que ninguno escoge el
+      resultado. La llave k-ésima de cada uno es la k-ésima de su
+      cadena, siempre la siguiente: `aceptaLlave` exige que su hash
+      sea la anterior, así que nadie puede elegir entre varias.
+      El precio, dicho como en Flip 7: quien ayuda ya ha visto la
+      llave de quien tira cuando manda la suya, así que sabe qué va a
+      salir y podría callarse; entonces responde otro (suplente, tras
+      unos segundos) y sale otra cosa. Puede provocar una segunda
+      tirada, no elegirla, y con dos en la mesa no hay suplente: la
+      votación es el remedio, como con cualquier pestaña dormida.
+   2. **Las cartas de desarrollo.** Cada uno roba de su propio mazo,
+      como en el UNO: la carta k que compra `u` sale de su semilla
+      privada y de la `mezcla` del arranque (`cartaCatan`), así que
+      nadie más sabe qué tiene. Es un muestreo con reposición de las
+      proporciones de la caja: lo que se pierde es que el mazo se
+      agote. Al acabar se revelan las semillas y `auditaCatan`
+      comprueba que cada carta jugada fuera la que tocaba.
+   3. **El tablero** sale de la `semilla` pública de la sala, igual en
+      todas las pantallas: no hay nada que ocultar en él. Quién empieza
+      sale de la mezcla del arranque, en el que todos revelan su
+      primera llave.
+
+   Lo que no se esconde, y se dice: las manos de recursos están en el
+   registro. La pantalla solo enseña cuántas cartas tiene cada rival,
+   pero quien abra la consola puede contarlas — en la mesa de verdad
+   también se pueden contar, solo que con más esfuerzo. La banca no se
+   agota.
+   ============================================================ */
+
+export const CT_CADENA = 800;
+export const CT_RECURSOS = ["madera", "arcilla", "lana", "trigo", "mineral"];
+export const CT_PRODUCE = { bosque: "madera", colinas: "arcilla", pasto: "lana", campo: "trigo", montana: "mineral" };
+export const CT_COSTE = {
+  camino: { madera: 1, arcilla: 1 },
+  barco: { madera: 1, lana: 1 },
+  poblado: { madera: 1, arcilla: 1, lana: 1, trigo: 1 },
+  ciudad: { trigo: 2, mineral: 3 },
+  desarrollo: { lana: 1, trigo: 1, mineral: 1 }
+};
+export const CT_TOPE = { camino: 15, barco: 15, poblado: 5, ciudad: 4 };
+export const CT_CARTAS = {
+  caballero: "Caballero", punto: "Punto de victoria", carreteras: "Construcción de carreteras",
+  abundancia: "Año de la abundancia", monopolio: "Monopolio"
+};
+export const CT_EXPANSIONES = { base: "Base", mar: "Navegantes" };
+export const CT_LIMITE_MANO = 7;
+export const CT_RESTO_BARAJA = 5;
+
+const ctRepite = (o) => Object.entries(o).flatMap(([k, n]) => Array(n).fill(k));
+const CT_MAZO = ctRepite({ caballero: 14, punto: 5, carreteras: 2, abundancia: 2, monopolio: 2 });
+const CT_MAZO_GRANDE = ctRepite({ caballero: 20, punto: 5, carreteras: 3, abundancia: 3, monopolio: 3 });
+/* Las 36 combinaciones de dos dados, una carta por combinación. */
+export const CT_BARAJA = (() => {
+  const b = [];
+  for (let s = 2; s <= 12; s++) for (let k = 0; k < 6 - Math.abs(7 - s); k++) b.push(s);
+  return b;
+})();
+
+/* Lo que eligió quien abrió la sala. Los campos llegan como números
+   del `<select>`; lo que no se entiende vale lo de siempre. */
+export function opcionesCatan(p) {
+  const si = k => Number(p && p[k]) === 1;
+  const largo = Number(p && p.largo);
+  return {
+    mar: !!p && p.exp === "mar",
+    baraja: si("baraja"), amable: si("amable"), puerto: si("puerto"),
+    largo: largo === -2 || largo === 2 ? largo : 0
+  };
+}
+export const metaCatan = o => (o.mar ? 12 : 10) + (o.puerto ? 1 : 0) + (o.largo || 0);
+
+/* ---------- El tablero ----------
+   Hexágonos con la punta arriba, en coordenadas enteras: el centro de
+   la fila f, columna c, está en x = 2c + (f impar), y = 3f, y sus
+   esquinas en (x, y−2), (x+1, y−1), (x+1, y+1), (x, y+2)… Con enteros
+   dos hexágonos vecinos encuentran la esquina compartida por su clave
+   exacta, sin comparar decimales — y sin senos ni cosenos, que cada
+   navegador redondea a su manera y aquí los dos tableros tienen que
+   ser idénticos hasta el último vértice.
+
+   Los planos: «L» tierra de la isla principal, un dígito tierra de un
+   islote, «.» nada (el mar se añade alrededor). Las filas impares van
+   desplazadas medio hexágono a la derecha. */
+const CT_ESQ = [[0, -2], [1, -1], [1, 1], [0, 2], [-1, 1], [-1, -1]];
+const CT_VECINOS = [[2, 0], [1, 1], [-1, 1], [-2, 0], [-1, -1], [1, -1]];
+const CT_PLANOS = {
+  base: [".LLL.", "LLLL", "LLLLL", "LLLL", ".LLL."],
+  baseGrande: ["..LLL", ".LLLL", ".LLLLL", "LLLLLL", ".LLLLL", ".LLLL", "..LLL"],
+  mar: [".LLL..11", "LLLL..1.44", "LLLLL", "LLLL...22", ".LLL....2", ".....33", "......3"],
+  marGrande: ["..LLL..11.4", ".LLLL..1..4", ".LLLLL...2", "LLLLLL..22", ".LLLLL", ".LLLL..3..5", "..LLL..33.55"]
+};
+const CT_REPARTO = {
+  base: {
+    tierra: { bosque: 4, colinas: 3, pasto: 4, campo: 4, montana: 3, desierto: 1 },
+    fichas: [2, 3, 3, 4, 4, 5, 5, 6, 6, 8, 8, 9, 9, 10, 10, 11, 11, 12],
+    puertos: ["3", "3", "3", "3", "madera", "arcilla", "lana", "trigo", "mineral"]
+  },
+  grande: {
+    tierra: { bosque: 6, colinas: 5, pasto: 6, campo: 6, montana: 5, desierto: 2 },
+    fichas: [2, 2, 3, 3, 3, 4, 4, 4, 5, 5, 5, 6, 6, 6, 8, 8, 8, 9, 9, 9, 10, 10, 10, 11, 11, 11, 12, 12],
+    puertos: ["3", "3", "3", "3", "3", "madera", "arcilla", "lana", "lana", "trigo", "mineral"]
+  },
+  islas: {
+    tierra: { oro: 2, bosque: 1, colinas: 2, pasto: 2, campo: 2, montana: 2 },
+    fichas: [3, 4, 4, 5, 6, 8, 9, 10, 10, 11, 12]
+  },
+  islasGrande: {
+    tierra: { oro: 3, bosque: 2, colinas: 2, pasto: 2, campo: 2, montana: 3 },
+    fichas: [2, 3, 3, 4, 5, 5, 6, 8, 9, 9, 10, 11, 11, 12]
+  }
+};
+
+const ctTableros = new Map();
+export function tableroCatan(semilla, grande, mar) {
+  const clave = (semilla >>> 0) + ":" + (grande ? "g" : "n") + (mar ? "m" : "t");
+  const ya = ctTableros.get(clave);
+  if (ya) return ya;
+  const plano = CT_PLANOS[(mar ? "mar" : "base") + (grande ? "Grande" : "")];
+  const celdas = [], ocupa = new Set();
+  const pon = (x, f, isla) => {
+    const k = x + "," + f;
+    if (ocupa.has(k)) return;
+    ocupa.add(k);
+    celdas.push({ x, f, isla });
+  };
+  plano.forEach((fila, f) => {
+    for (let c = 0; c < fila.length; c++)
+      if (fila[c] !== ".") pon(2 * c + (f & 1), f, fila[c] === "L" ? 0 : Number(fila[c]));
+  });
+  const tierra = celdas.slice();
+  if (mar) {
+    /* Con islas el mar es el rectángulo entero: los canales entre la
+       isla y los islotes tienen que existir para poder navegarlos. */
+    const xs = tierra.map(c => c.x), fs = tierra.map(c => c.f);
+    const x0 = Math.min(...xs) - 2, x1 = Math.max(...xs) + 2, f0 = Math.min(...fs) - 1, f1 = Math.max(...fs) + 1;
+    for (let f = f0; f <= f1; f++)
+      for (let x = x0; x <= x1; x++) if ((((x - f) % 2) + 2) % 2 === 0) pon(x, f, -1);
+  } else {
+    for (const c of tierra) for (const [dx, df] of CT_VECINOS) pon(c.x + dx, c.f + df, -1);
+  }
+  celdas.sort((a, b) => a.f - b.f || a.x - b.x);
+
+  const H = celdas.map((c, i) => ({ i, x: c.x, f: c.f, isla: c.isla, t: c.isla < 0 ? "mar" : "", n: 0, v: [], e: [] }));
+  const V = [], E = [], vx = new Map(), ex = new Map();
+  for (const h of H) {
+    const cy = 3 * h.f;
+    h.v = CT_ESQ.map(([dx, dy]) => {
+      const k = (h.x + dx) + "," + (cy + dy);
+      let id = vx.get(k);
+      if (id == null) {
+        id = V.length; vx.set(k, id);
+        V.push({ i: id, x: h.x + dx, y: cy + dy, h: [], e: [], adj: [], tierra: false, puerto: "", isla: -1 });
+      }
+      V[id].h.push(h.i);
+      return id;
+    });
+    for (let k = 0; k < 6; k++) {
+      const a = Math.min(h.v[k], h.v[(k + 1) % 6]), b = Math.max(h.v[k], h.v[(k + 1) % 6]);
+      const kk = a + "-" + b;
+      let id = ex.get(kk);
+      if (id == null) {
+        id = E.length; ex.set(kk, id);
+        E.push({ i: id, a, b, h: [], tierra: false, mar: false });
+        V[a].e.push(id); V[b].e.push(id); V[a].adj.push(b); V[b].adj.push(a);
+      }
+      E[id].h.push(h.i);
+      h.e.push(id);
+    }
+  }
+  const vecinos = h => h.e.map(e => E[e].h.find(o => o !== h.i)).filter(o => o != null);
+
+  /* Terrenos y fichas, barajados hasta que ningún 6 toque a un 8 ni a
+     otro 6: dos números rojos juntos hacen una casilla que decide la
+     partida antes de empezar. */
+  const r = rng(((semilla >>> 0) ^ 0x5bd1e995) >>> 0);
+  const regiones = [{ hs: H.filter(h => h.isla === 0), rep: CT_REPARTO[grande ? "grande" : "base"] }];
+  if (mar) regiones.push({ hs: H.filter(h => h.isla > 0), rep: CT_REPARTO[grande ? "islasGrande" : "islas"] });
+  const roja = n => n === 6 || n === 8;
+  for (let intento = 0; intento < 600; intento++) {
+    for (const { hs, rep } of regiones) {
+      const ts = mezcla(ctRepite(rep.tierra), r), fs = mezcla(rep.fichas, r);
+      let j = 0;
+      hs.forEach((h, k) => { h.t = ts[k]; h.n = h.t === "desierto" ? 0 : fs[j++]; });
+    }
+    if (!H.some(h => roja(h.n) && vecinos(h).some(o => roja(H[o].n)))) break;
+  }
+
+  for (const v of V) {
+    const t = v.h.filter(i => H[i].isla >= 0);
+    v.tierra = t.length > 0;
+    v.isla = t.length ? H[t[0]].isla : -1;
+  }
+  for (const e of E) {
+    e.tierra = e.h.some(i => H[i].isla >= 0);
+    e.mar = e.h.length === 2 && e.h.some(i => H[i].isla < 0);
+  }
+
+  /* Los puertos, repartidos a lo largo de la costa de la isla principal.
+     La costa se recorre arista a arista (cada esquina de la costa toca
+     exactamente dos) en vez de ordenarla por ángulo: `atan2` no está
+     obligado a redondear igual en dos navegadores. */
+  const costa = E.filter(e => e.h.length === 2 && e.h.some(i => H[i].isla === 0) && e.h.some(i => H[i].isla < 0));
+  const porV = new Map();
+  for (const e of costa) for (const w of [e.a, e.b]) { if (!porV.has(w)) porV.set(w, []); porV.get(w).push(e.i); }
+  const peso = e => [V[e.a].y + V[e.b].y, V[e.a].x + V[e.b].x];
+  let ini = costa[0];
+  for (const e of costa) {
+    const a = peso(e), b = peso(ini);
+    if (a[0] < b[0] || (a[0] === b[0] && a[1] < b[1])) ini = e;
+  }
+  const orden = [], visto = new Set();
+  let cur = ini ? ini.i : null, w = ini ? ini.a : -1;
+  while (cur != null && !visto.has(cur)) {
+    orden.push(cur); visto.add(cur);
+    const e = E[cur], sig = e.a === w ? e.b : e.a;
+    w = sig;
+    const prox = (porV.get(sig) || []).find(x => !visto.has(x));
+    cur = prox == null ? null : prox;
+  }
+  const tipos = mezcla(CT_REPARTO[grande ? "grande" : "base"].puertos, r);
+  const L = orden.length, off = Math.floor(r() * L), paso = L / tipos.length;
+  const puertos = tipos.map((tipo, k) => {
+    const e = E[orden[(off + Math.round(k * paso)) % L]];
+    V[e.a].puerto = V[e.b].puerto = tipo;
+    return { e: e.i, tipo, h: e.h.find(i => H[i].isla < 0) };
+  });
+
+  const desierto = H.find(h => h.t === "desierto");
+  let pirata = -1;
+  if (mar) {
+    /* El pirata empieza en alta mar, lo más cerca posible del centro. */
+    const ts = H.filter(h => h.isla >= 0);
+    const cx = ts.reduce((s, h) => s + h.x, 0) / ts.length, cy = ts.reduce((s, h) => s + 3 * h.f, 0) / ts.length;
+    let mejor = Infinity;
+    for (const h of H) {
+      if (h.isla >= 0 || h.e.length !== 6 || vecinos(h).some(o => H[o].isla >= 0)) continue;
+      const d = 3 * (h.x - cx) * (h.x - cx) + (3 * h.f - cy) * (3 * h.f - cy);
+      if (d < mejor) { mejor = d; pirata = h.i; }
+    }
+  }
+  const T = {
+    H, V, E, puertos, pirata, grande: !!grande, mar: !!mar,
+    ladron: desierto ? desierto.i : H.find(h => h.isla >= 0).i,
+    islas: Math.max(0, ...H.map(h => h.isla))
+  };
+  if (ctTableros.size > 30) ctTableros.clear();
+  ctTableros.set(clave, T);
+  return T;
+}
+
+/* ---------- Manos ---------- */
+const ctVacia = () => ({ madera: 0, arcilla: 0, lana: 0, trigo: 0, mineral: 0 });
+export const cartasEnMano = m => CT_RECURSOS.reduce((s, r) => s + ((m && m[r]) | 0), 0);
+export const alcanzaCatan = (m, c) => CT_RECURSOS.every(r => ((m && m[r]) | 0) >= ((c && c[r]) | 0));
+const ctSuma = (m, c, s) => { for (const r of CT_RECURSOS) m[r] += s * ((c && c[r]) | 0); };
+/* Un puñado de recursos que llega en una jugada: solo los cinco
+   nombres, enteros y sin negativos; cualquier otra cosa lo invalida. */
+function ctRecursos(o) {
+  if (o != null && typeof o !== "object") return null;
+  const r = ctVacia();
+  for (const k in o || {}) {
+    const n = Number(o[k]);
+    if (!CT_RECURSOS.includes(k) || !Number.isInteger(n) || n < 0 || n > 99) return null;
+    r[k] = n;
+  }
+  return r;
+}
+const ctNat = x => { const n = Number(x); return x !== "" && x != null && Number.isInteger(n) && n >= 0 ? n : -1; };
+
+/* ---------- Dónde se puede construir ----------
+   Todas reciben el estado reducido (o el que el reductor va armando,
+   que tiene la misma forma), así la pantalla ilumina exactamente las
+   casillas que el reductor va a aceptar. */
+const ctLibre = (S, v) => !S.edif[v] && S.T.V[v].adj.every(w => !S.edif[w]);
+export function puedePobladoCatan(S, u, v, inicial) {
+  const V = S.T.V[v];
+  if (!V || !V.tierra || !ctLibre(S, v)) return false;
+  /* Con Navegantes se empieza en la isla principal: los islotes son
+     para llegar a ellos. */
+  /* Al colocar, además, tiene que caberle un camino (o un barco) al lado:
+     si no, la colocación se quedaría esperando algo imposible. */
+  if (inicial) return (!S.T.mar || V.h.some(i => S.T.H[i].isla === 0))
+    && V.e.some(e => puedeCaminoCatan(S, u, e, v) || puedeBarcoCatan(S, u, e, v));
+  return V.e.some(e => S.cam[e] === u || S.bar[e] === u);
+}
+/* Un camino enlaza con un camino propio, y un barco con un barco
+   propio, por una esquina que no tenga un edificio ajeno; camino y
+   barco solo se enlazan a través de un poblado o ciudad propios. */
+function ctConecta(S, u, e, red, sin) {
+  const E = S.T.E[e];
+  for (const w of [E.a, E.b]) {
+    const b = S.edif[w];
+    if (b && b.u === u) return true;
+    if (b) continue;
+    if (S.T.V[w].e.some(x => x !== e && x !== sin && red[x] === u)) return true;
+  }
+  return false;
+}
+export function puedeCaminoCatan(S, u, e, desde) {
+  const E = S.T.E[e];
+  if (!E || !E.tierra || S.cam[e] != null || S.bar[e] != null) return false;
+  if (desde != null && desde >= 0) return E.a === desde || E.b === desde;
+  return ctConecta(S, u, e, S.cam, -1);
+}
+export function puedeBarcoCatan(S, u, e, desde, sin = -1) {
+  const E = S.T.E[e];
+  if (!S.T.mar || !E || !E.mar || e === sin || S.cam[e] != null || S.bar[e] != null || E.h.includes(S.pirata)) return false;
+  if (desde != null && desde >= 0) return E.a === desde || E.b === desde;
+  return ctConecta(S, u, e, S.bar, sin);
+}
+export function piezasCatan(S, u) {
+  const n = { camino: 0, barco: 0, poblado: 0, ciudad: 0 };
+  for (const k in S.cam) if (S.cam[k] === u) n.camino++;
+  for (const k in S.bar) if (S.bar[k] === u) n.barco++;
+  for (const k in S.edif) if (S.edif[k].u === u) n[S.edif[k].c === 2 ? "ciudad" : "poblado"]++;
+  return n;
+}
+/* Las esquinas que toca la red de `u` (caminos, barcos y edificios):
+   fuera de ellas no puede construir nada, así que no hace falta mirar
+   el resto del mapa — que con Navegantes y seis jugadores son 180
+   aristas por cada pregunta, y la fase especial pregunta mucho. */
+function ctAlcance(S, u) {
+  const vs = new Set(), T = S.T;
+  for (const k in S.cam) if (S.cam[k] === u) { vs.add(T.E[k].a); vs.add(T.E[k].b); }
+  for (const k in S.bar) if (S.bar[k] === u) { vs.add(T.E[k].a); vs.add(T.E[k].b); }
+  for (const k in S.edif) if (S.edif[k].u === u) vs.add(+k);
+  return vs;
+}
+function ctCandidatas(S, u, que, o) {
+  const T = S.T;
+  if (o.inicial) return T.V.map(v => v.i);
+  if (o.desde != null && o.desde >= 0) return T.V[o.desde] ? T.V[o.desde].e : [];
+  const vs = ctAlcance(S, u);
+  if (que === "poblado") return [...vs];
+  const es = new Set();
+  for (const v of vs) for (const e of T.V[v].e) es.add(e);
+  return [...es].sort((a, b) => a - b);
+}
+/* Sin piezas en la caja no hay sitio que valga: los topes van aquí
+   para que la pantalla no ilumine casillas que el reductor rechazará. */
+export function sitiosCatan(S, u, que, o = {}) {
+  const out = [];
+  if (CT_TOPE[que] && !o.inicial && o.desde == null && o.sin == null && (o.n || piezasCatan(S, u))[que] >= CT_TOPE[que]) return out;
+  if (que === "ciudad") { for (const k in S.edif) if (S.edif[k].u === u && S.edif[k].c === 1) out.push(+k); return out; }
+  const cs = ctCandidatas(S, u, que, o);
+  if (que === "poblado") { for (const v of cs) if (puedePobladoCatan(S, u, v, o.inicial)) out.push(v); }
+  else if (que === "camino") { for (const e of cs) if (puedeCaminoCatan(S, u, e, o.desde)) out.push(e); }
+  else if (que === "barco") { for (const e of cs) if (puedeBarcoCatan(S, u, e, o.desde, o.sin)) out.push(e); }
+  return out.sort((a, b) => a - b);
+}
+
+/* Un barco se puede mover si es el extremo abierto de su línea: en una
+   de sus puntas no hay ni edificio propio ni otro barco propio. No uno
+   botado este turno, no uno junto al pirata y solo uno por turno. */
+export function barcosMoviblesCatan(S, u) {
+  const T = S.T, out = [];
+  if (!T.mar || S.movioBarco) return out;
+  for (const k in S.bar) {
+    const e = +k;
+    if (S.bar[k] !== u || (S.nuevos || []).includes(e) || T.E[e].h.includes(S.pirata)) continue;
+    const E = T.E[e];
+    if ([E.a, E.b].some(w => !(S.edif[w] && S.edif[w].u === u) && !T.V[w].e.some(x => x !== e && S.bar[x] === u))) out.push(e);
+  }
+  return out;
+}
+
+/* Los puntos que se ven. Las cartas de punto solo cuentan reveladas. */
+export function vpCatan(S, u) {
+  let v = 0;
+  for (const k in S.edif) if (S.edif[k].u === u) v += S.edif[k].c;
+  if (S.largoDe === u) v += 2;
+  if (S.ejercito === u) v += 2;
+  if (S.puertoDe === u) v += 2;
+  v += 2 * Object.keys((S.islas || {})[u] || {}).length;
+  v += (((S.des || {})[u] || {}).puntos || []).length;
+  return v;
+}
+
+/* El ladrón amistoso no pisa a quien tiene dos puntos o menos. Si eso
+   dejara sin sitio al ladrón, puede ir a cualquier parte. */
+const ctProtegido = (S, w) => S.O.amable && !S.fuera[w] && vpCatan(S, w) <= 2;
+export function hexesLadronCatan(S, u) {
+  const T = S.T, todos = [];
+  for (const h of T.H) {
+    if (h.isla >= 0) {
+      if (h.i === S.ladron) continue;
+      todos.push([h.i, h.v.some(v => S.edif[v] && S.edif[v].u !== u && ctProtegido(S, S.edif[v].u))]);
+    } else if (T.mar && h.i !== S.pirata && h.e.some(e => T.E[e].mar)) {
+      todos.push([h.i, h.e.some(e => S.bar[e] != null && S.bar[e] !== u && ctProtegido(S, S.bar[e]))]);
+    }
+  }
+  const libres = todos.filter(x => !x[1]).map(x => x[0]);
+  return libres.length ? libres : todos.map(x => x[0]);
+}
+export function victimasCatan(S, u, h) {
+  const H = S.T.H[h];
+  if (!H) return [];
+  const vs = new Set();
+  if (H.isla >= 0) { for (const v of H.v) if (S.edif[v]) vs.add(S.edif[v].u); }
+  else for (const e of H.e) if (S.bar[e] != null) vs.add(S.bar[e]);
+  return [...vs].filter(w => w !== u && !S.fuera[w] && cartasEnMano(S.mano[w]) > 0 && !ctProtegido(S, w)).sort();
+}
+
+/* Cuánto pide la banca por cada recurso: 4, o 3 con un puerto
+   genérico, o 2 con el puerto de ese recurso. */
+export function ratiosCatan(S, u) {
+  const r = {};
+  for (const k of CT_RECURSOS) r[k] = 4;
+  for (const k in S.edif) {
+    if (S.edif[k].u !== u) continue;
+    const p = S.T.V[k].puerto;
+    if (p === "3") for (const x of CT_RECURSOS) r[x] = Math.min(r[x], 3);
+    else if (p) r[p] = 2;
+  }
+  return r;
+}
+
+/* La ruta comercial más larga: caminos y barcos seguidos, sin pasar por
+   un edificio ajeno, y cambiando de camino a barco solo en un edificio
+   propio. Búsqueda en profundidad desde cada tramo: con quince caminos
+   y quince barcos como mucho, sale en nada. */
+export function rutaCatan(S, u) {
+  const T = S.T, tipo = new Map();
+  for (const e in S.cam) if (S.cam[e] === u) tipo.set(+e, "c");
+  for (const e in S.bar) if (S.bar[e] === u) tipo.set(+e, "b");
+  if (!tipo.size) return 0;
+  const usados = new Set();
+  const dfs = (w, t) => {
+    const b = S.edif[w];
+    if (b && b.u !== u) return 0;
+    let m = 0;
+    for (const e of T.V[w].e) {
+      if (usados.has(e) || !tipo.has(e)) continue;
+      const te = tipo.get(e);
+      if (te !== t && !(b && b.u === u)) continue;
+      usados.add(e);
+      const E = T.E[e];
+      m = Math.max(m, 1 + dfs(E.a === w ? E.b : E.a, te));
+      usados.delete(e);
+    }
+    return m;
+  };
+  let mejor = 0;
+  for (const [e, t] of tipo) {
+    const E = T.E[e];
+    for (const o of [E.a, E.b]) { usados.add(e); mejor = Math.max(mejor, 1 + dfs(o, t)); usados.delete(e); }
+  }
+  return mejor;
+}
+
+/* ¿Tiene `u` algo que construir o comprar ahora mismo? Es lo que decide
+   si la fase especial se detiene en él o lo salta. */
+export function puedeAlgoCatan(S, u) {
+  const m = S.mano[u], n = piezasCatan(S, u), T = S.T;
+  if (alcanzaCatan(m, CT_COSTE.desarrollo)) return true;
+  if (alcanzaCatan(m, CT_COSTE.ciudad) && n.ciudad < CT_TOPE.ciudad && n.poblado > 0) return true;
+  if (alcanzaCatan(m, CT_COSTE.poblado) && n.poblado < CT_TOPE.poblado && sitiosCatan(S, u, "poblado", { n }).length) return true;
+  if (alcanzaCatan(m, CT_COSTE.camino) && n.camino < CT_TOPE.camino && sitiosCatan(S, u, "camino", { n }).length) return true;
+  if (T.mar && alcanzaCatan(m, CT_COSTE.barco) && n.barco < CT_TOPE.barco && sitiosCatan(S, u, "barco", { n }).length) return true;
+  return false;
+}
+
+/* ---------- Las llaves y las cartas ---------- */
+const ctCadenas = new Map();
+export function cadenaCatan(sem, sal) {
+  const k = (sem >>> 0) + ":" + (sal || "");
+  if (ctCadenas.has(k)) return ctCadenas.get(k);
+  const e = [sha256hex("catan:" + k)];
+  for (let i = 0; i < CT_CADENA; i++) e.push(sha256hex(e[i]));
+  ctCadenas.set(k, e);
+  return e;
+}
+/* La llave número `n` que aporta un jugador (la 0 es la del arranque). */
+export const llaveCatan = (cad, n) => cad[CT_CADENA - 1 - n];
+/* La carta de desarrollo número `k` que compra quien tiene esa semilla. */
+export function cartaCatan(sem, sal, mezclaCt, k, grande) {
+  const m = grande ? CT_MAZO_GRANDE : CT_MAZO;
+  const h = sha256hex("catan-des:" + (sem >>> 0) + ":" + (sal || "") + ":" + (mezclaCt || "") + ":" + k);
+  return m[parseInt(h.slice(0, 8), 16) % m.length];
+}
+
+function redCatan(p, js, listos) {
+  const O = opcionesCatan(p);
+  const ids = js.map(j => j.uid), N = ids.length;
+  const ficha = {};
+  for (const j of js) ficha[j.uid] = j;
+  const T = tableroCatan(Number(p.semilla) || 1, N >= 5, O.mar);
+  const meta = metaCatan(O);
+  const S = {
+    T, O, meta, edif: {}, cam: {}, bar: {}, mano: {}, des: {}, caballeros: {}, islas: {}, fuera: {},
+    ladron: T.ladron, pirata: T.pirata, largoDe: "", ejercito: "", puertoDe: "", rutas: {},
+    movioBarco: false, nuevos: []
+  };
+  for (const u of ids) {
+    S.mano[u] = ctVacia();
+    S.des[u] = { n: 0, t: [], usadas: {}, puntos: [] };
+    S.caballeros[u] = 0; S.islas[u] = {}; S.rutas[u] = 0;
+  }
+  let etapa = "arranque", turno = "", turnoN = 0, sub = "", ultPob = -1, primero = "";
+  let seq = [], si = 0, azar = null, tras = "", oferta = null, propuestas = {}, esp = null;
+  let descartar = {}, oroP = {}, gratis = 0, jugoDes = false, ultima = null;
+  let ganador = null, motivo = "", ni = 0, tope = false, mezclaCt = "";
+  let restantes = O.baraja ? CT_BARAJA.slice() : null;
+  const llaves0 = {}, ult = {}, aportes = {}, usadasK = {}, semillas = {};
+  const hist = [], falsas = [];
+  for (const u of ids) { ult[u] = String(ficha[u].hcad || ""); aportes[u] = 0; usadasK[u] = new Set(); }
+
+  const suceso = e => { e.i = ni++; hist.push(e); if (hist.length > 60) hist.shift(); };
+  const activos = () => ids.filter(u => !S.fuera[u]);
+  const sigActivo = u => {
+    const i = ids.indexOf(u);
+    for (let k = 1; k <= N; k++) { const c = ids[(i + k) % N]; if (!S.fuera[c]) return c; }
+    return "";
+  };
+
+  /* Una llave vale si su hash es la última que aportó ese jugador (al
+     principio, la punta de su ficha): la siguiente de su cadena y
+     ninguna otra. Repetir una que ya entró es una carrera de la red y
+     se ignora; una que no encaja es mentira y se dice. */
+  const aceptaLlave = (u, c) => {
+    c = String(c || "");
+    if (!/^[0-9a-f]{64}$/.test(c) || !ult[u]) return false;
+    if (usadasK[u].has(c)) return null;
+    if (sha256hex(c) !== ult[u]) {
+      if (!falsas.includes(u)) { falsas.push(u); suceso({ e: "falsa", uid: u }); }
+      return false;
+    }
+    usadasK[u].add(c); ult[u] = c; aportes[u]++;
+    if (aportes[u] >= CT_CADENA - 1) tope = true;
+    return true;
+  };
+
+  /* Solo se recalcula la ruta de quien puede haber cambiado: el que
+     construye, y — si es un poblado — los dueños de lo que pasa por
+     esa esquina, que pueden haber quedado cortados. */
+  const actualizaRutas = (quien = ids) => {
+    for (const u of quien) S.rutas[u] = S.fuera[u] ? 0 : rutaCatan(S, u);
+    const h = S.largoDe, max = Math.max(0, ...ids.map(u => S.rutas[u]));
+    let nuevo = h;
+    /* Quien la tiene la conserva en un empate; si la pierde y hay empate
+       entre los demás, no la tiene nadie. */
+    if (!(h && S.rutas[h] >= 5 && S.rutas[h] === max)) {
+      const top = ids.filter(u => S.rutas[u] === max);
+      nuevo = max >= 5 && top.length === 1 ? top[0] : "";
+    }
+    if (nuevo !== h) { S.largoDe = nuevo; suceso({ e: "largo", uid: nuevo, de: h, n: max }); }
+  };
+  const actualizaEjercito = u => {
+    const h = S.ejercito;
+    if (S.caballeros[u] >= 3 && u !== h && (!h || S.caballeros[u] > S.caballeros[h])) {
+      S.ejercito = u; suceso({ e: "ejercito", uid: u, de: h, n: S.caballeros[u] });
+    }
+  };
+  const puntosPuerto = w => {
+    let n = 0;
+    for (const k in S.edif) if (S.edif[k].u === w && T.V[k].puerto) n += S.edif[k].c;
+    return n;
+  };
+  const actualizaPuerto = u => {
+    if (!O.puerto) return;
+    const h = S.puertoDe, n = puntosPuerto(u);
+    if (n >= 3 && u !== h && (!h || n > puntosPuerto(h))) { S.puertoDe = u; suceso({ e: "puerto", uid: u, de: h }); }
+  };
+
+  /* Se gana en el propio turno, en cuanto se llega a la meta. */
+  const compruebaFin = () => {
+    if (ganador !== null || !turno || S.fuera[turno] || !["tirar", "accion", "ladron"].includes(etapa)) return;
+    if (vpCatan(S, turno) >= meta) { ganador = turno; motivo = "catan"; suceso({ e: "gana", uid: turno, n: vpCatan(S, turno) }); }
+  };
+  const acabaTope = () => {
+    const vs = activos(), pts = vs.map(u => vpCatan(S, u)), max = Math.max(...pts);
+    const top = vs.filter((u, k) => pts[k] === max);
+    ganador = top.length === 1 ? top[0] : ""; motivo = "agotado";
+  };
+
+  const empiezaTurno = u => {
+    turno = u; turnoN++; etapa = "tirar"; tras = ""; azar = null; oferta = null; propuestas = {}; esp = null;
+    descartar = {}; oroP = {}; gratis = 0; jugoDes = false; S.movioBarco = false; S.nuevos = [];
+    suceso({ e: "turno", uid: u, n: turnoN });
+    compruebaFin();
+  };
+
+  const avanzaColocacion = () => {
+    while (si < seq.length && S.fuera[seq[si]]) si++;
+    if (si >= seq.length) { sub = ""; ultPob = -1; empiezaTurno(S.fuera[primero] ? sigActivo(primero) : primero); return; }
+    turno = seq[si]; sub = "poblado"; ultPob = -1;
+  };
+
+  /* Todos revelaron la primera llave: de la mezcla sale quién empieza
+     y, con la semilla de cada uno, sus cartas de desarrollo. */
+  const arranca = () => {
+    const vs = activos();
+    if (!vs.length) return;
+    mezclaCt = vs.map(x => x + ":" + llaves0[x]).join("|");
+    primero = vs[parseInt(sha256hex("catan-primero|" + mezclaCt).slice(0, 8), 16) % vs.length];
+    const i0 = ids.indexOf(primero), orden = [];
+    for (let k = 0; k < N; k++) { const x = ids[(i0 + k) % N]; if (!S.fuera[x]) orden.push(x); }
+    seq = orden.concat(orden.slice().reverse()); si = 0;
+    etapa = "colocacion";
+    suceso({ e: "orden", uid: primero });
+    avanzaColocacion();
+  };
+
+  const vuelve = () => { etapa = tras || "accion"; tras = ""; compruebaFin(); };
+
+  const tirada = (u, d1, d2) => {
+    const s = d1 + d2, prod = {}, oro = {}, hx = [];
+    if (s !== 7) {
+      for (const h of T.H) {
+        if (h.n !== s || h.isla < 0 || h.i === S.ladron) continue;
+        let alguno = false;
+        for (const v of h.v) {
+          const b = S.edif[v];
+          if (!b || S.fuera[b.u]) continue;
+          alguno = true;
+          if (h.t === "oro") { oro[b.u] = (oro[b.u] || 0) + b.c; continue; }
+          const r = CT_PRODUCE[h.t];
+          if (!r) continue;
+          const q = prod[b.u] || (prod[b.u] = {});
+          q[r] = (q[r] || 0) + b.c;
+          S.mano[b.u][r] += b.c;
+        }
+        if (alguno) hx.push(h.i);
+      }
+    }
+    ultima = { uid: u, d1, d2, s, n: turnoN };
+    suceso({ e: "tirada", uid: u, d1, d2, s, prod, oro, hx });
+    if (s === 7) {
+      descartar = {};
+      for (const v of activos()) { const k = cartasEnMano(S.mano[v]); if (k > CT_LIMITE_MANO) descartar[v] = Math.floor(k / 2); }
+      tras = "accion";
+      etapa = Object.keys(descartar).length ? "descarte" : "ladron";
+    } else if (Object.keys(oro).length) { oroP = oro; etapa = "oro"; }
+    else etapa = "accion";
+  };
+
+  const roba = (u, v, n) => {
+    const lista = [];
+    for (const r of CT_RECURSOS) for (let k = 0; k < S.mano[v][r]; k++) lista.push(r);
+    if (!lista.length) { suceso({ e: "roba", uid: u, v, r: "" }); return; }
+    const r = lista[n % lista.length];
+    S.mano[v][r]--; S.mano[u][r]++;
+    suceso({ e: "roba", uid: u, v, r });
+  };
+
+  const resuelveAzar = c => {
+    const a = azar;
+    azar = null;
+    const h = sha256hex(a.c + "|" + c + "|" + a.tipo + "|" + a.id);
+    const n1 = parseInt(h.slice(0, 8), 16), n2 = parseInt(h.slice(8, 16), 16);
+    if (a.tipo === "dados") {
+      let d1 = 1 + n1 % 6, d2 = 1 + n2 % 6;
+      if (restantes) {
+        if (restantes.length <= CT_RESTO_BARAJA) { restantes = CT_BARAJA.slice(); suceso({ e: "baraja" }); }
+        const s = restantes.splice(n1 % restantes.length, 1)[0];
+        const lo = Math.max(1, s - 6), hi = Math.min(6, s - 1);
+        d1 = lo + n2 % (hi - lo + 1); d2 = s - d1;
+      }
+      tirada(a.por, d1, d2);
+    } else {
+      roba(a.por, a.v, n1);
+      vuelve();
+    }
+  };
+
+  const llave = (u, j) => {
+    const a = String(j.a == null ? "" : j.a);
+    if (etapa === "arranque") {
+      if (a !== "0" || llaves0[u] || aceptaLlave(u, j.c) !== true) return;
+      llaves0[u] = String(j.c);
+      if (activos().every(x => llaves0[x])) arranca();
+      return;
+    }
+    if (!azar || a !== azar.id || u === azar.por) return;
+    if (aceptaLlave(u, j.c) !== true) return;
+    resuelveAzar(String(j.c));
+  };
+
+  const coloca = (u, j) => {
+    if (u !== turno) return;
+    if (sub === "poblado" && j.t === "poblado") {
+      const v = ctNat(j.v);
+      if (!puedePobladoCatan(S, u, v, true)) return;
+      S.edif[v] = { u, c: 1 };
+      ultPob = v; sub = "camino";
+      /* El segundo poblado ya produce: una carta de cada terreno que toca. */
+      let gana = null;
+      if (si >= seq.length / 2) {
+        gana = {};
+        for (const h of T.V[v].h) {
+          const r = CT_PRODUCE[T.H[h].t];
+          if (r) { S.mano[u][r]++; gana[r] = (gana[r] || 0) + 1; }
+        }
+      }
+      suceso({ e: "poblado", uid: u, v, ini: true, gana });
+      actualizaPuerto(u);
+      return;
+    }
+    if (sub === "camino" && (j.t === "camino" || j.t === "barco")) {
+      const e = ctNat(j.e);
+      if (!(j.t === "camino" ? puedeCaminoCatan(S, u, e, ultPob) : puedeBarcoCatan(S, u, e, ultPob))) return;
+      (j.t === "camino" ? S.cam : S.bar)[e] = u;
+      suceso({ e: j.t, uid: u, a: e, ini: true });
+      si++;
+      actualizaRutas([u]);
+      avanzaColocacion();
+    }
+  };
+
+  const construye = (u, j, deBalde) => {
+    const tipo = j.t, n = piezasCatan(S, u), mano = S.mano[u];
+    if (tipo === "camino" || tipo === "barco") {
+      const e = ctNat(j.e);
+      if (!(tipo === "camino" ? puedeCaminoCatan(S, u, e) : puedeBarcoCatan(S, u, e)) || n[tipo] >= CT_TOPE[tipo]) return false;
+      if (deBalde) gratis--;
+      else if (!alcanzaCatan(mano, CT_COSTE[tipo])) return false;
+      else ctSuma(mano, CT_COSTE[tipo], -1);
+      (tipo === "camino" ? S.cam : S.bar)[e] = u;
+      if (tipo === "barco") S.nuevos.push(e);
+      suceso({ e: tipo, uid: u, a: e, gratis: !!deBalde });
+      actualizaRutas([u]);
+      return true;
+    }
+    if (tipo === "poblado") {
+      const v = ctNat(j.v);
+      if (!puedePobladoCatan(S, u, v, false) || n.poblado >= CT_TOPE.poblado || !alcanzaCatan(mano, CT_COSTE.poblado)) return false;
+      ctSuma(mano, CT_COSTE.poblado, -1);
+      S.edif[v] = { u, c: 1 };
+      suceso({ e: "poblado", uid: u, v });
+      const isla = T.V[v].isla;
+      if (T.mar && isla > 0 && !S.islas[u][isla]) { S.islas[u][isla] = true; suceso({ e: "isla", uid: u, isla }); }
+      actualizaPuerto(u);
+      /* Corta la ruta ajena que pasa por esa esquina, y la propia puede
+         crecer: ahí un camino y un barco quedan enlazados. */
+      const tocan = new Set();
+      for (const e of T.V[v].e) { if (S.cam[e] != null) tocan.add(S.cam[e]); if (S.bar[e] != null) tocan.add(S.bar[e]); }
+      if (tocan.size) actualizaRutas([...tocan]);
+      return true;
+    }
+    if (tipo === "ciudad") {
+      const v = ctNat(j.v), b = S.edif[v];
+      if (!b || b.u !== u || b.c !== 1 || n.ciudad >= CT_TOPE.ciudad || !alcanzaCatan(mano, CT_COSTE.ciudad)) return false;
+      ctSuma(mano, CT_COSTE.ciudad, -1);
+      S.edif[v] = { u, c: 2 };
+      suceso({ e: "ciudad", uid: u, v });
+      actualizaPuerto(u);
+      return true;
+    }
+    if (tipo === "compra") {
+      if (!alcanzaCatan(mano, CT_COSTE.desarrollo)) return false;
+      ctSuma(mano, CT_COSTE.desarrollo, -1);
+      S.des[u].t.push(turnoN); S.des[u].n++;
+      suceso({ e: "compra", uid: u });
+      return true;
+    }
+    return false;
+  };
+
+  const juegaCarta = (u, j) => {
+    const d = S.des[u], k = ctNat(j.k), c = String(j.c || "");
+    /* Una por turno, nunca la comprada en este mismo turno, y nunca la
+       misma dos veces. Qué carta era de verdad lo comprueba la auditoría. */
+    if (jugoDes || k < 0 || k >= d.n || d.usadas[k] || d.puntos.includes(k) || !(d.t[k] < turnoN)) return;
+    if (c === "caballero") {
+      d.usadas[k] = c; jugoDes = true; S.caballeros[u]++;
+      suceso({ e: "juega", uid: u, c });
+      actualizaEjercito(u);
+      tras = etapa; etapa = "ladron";
+      compruebaFin();
+    } else if (c === "carreteras") {
+      const n = piezasCatan(S, u);
+      d.usadas[k] = c; jugoDes = true;
+      gratis = Math.min(2, (CT_TOPE.camino - n.camino) + (T.mar ? CT_TOPE.barco - n.barco : 0));
+      suceso({ e: "juega", uid: u, c });
+    } else if (c === "abundancia") {
+      const r = ctRecursos(j.r);
+      if (!r || cartasEnMano(r) !== 2) return;
+      d.usadas[k] = c; jugoDes = true;
+      ctSuma(S.mano[u], r, 1);
+      suceso({ e: "juega", uid: u, c, r });
+    } else if (c === "monopolio") {
+      const res = String(j.res || "");
+      if (!CT_RECURSOS.includes(res)) return;
+      d.usadas[k] = c; jugoDes = true;
+      let n = 0;
+      for (const w of ids) if (w !== u && !S.fuera[w] && S.mano[w][res] > 0) { n += S.mano[w][res]; S.mano[w][res] = 0; }
+      S.mano[u][res] += n;
+      suceso({ e: "juega", uid: u, c, res, n });
+    }
+  };
+
+  const revela = (u, j) => {
+    const d = S.des[u];
+    let n = 0;
+    for (const x of lista(j.ks)) {
+      const k = ctNat(x);
+      if (k < 0 || k >= d.n || d.usadas[k] || d.puntos.includes(k)) continue;
+      d.puntos.push(k); n++;
+    }
+    if (!n) return;
+    suceso({ e: "revela", uid: u, n });
+    compruebaFin();
+  };
+
+  const banco = (u, j) => {
+    const da = ctRecursos(j.da), pide = ctRecursos(j.pide);
+    if (!da || !pide) return;
+    const rt = ratiosCatan(S, u);
+    let cred = 0;
+    for (const r of CT_RECURSOS) {
+      if (da[r] % rt[r] || (da[r] && pide[r])) return;
+      cred += da[r] / rt[r];
+    }
+    if (!cred || cartasEnMano(pide) !== cred || !alcanzaCatan(S.mano[u], da)) return;
+    ctSuma(S.mano[u], da, -1); ctSuma(S.mano[u], pide, 1);
+    suceso({ e: "banco", uid: u, da, pide });
+  };
+  const trato = (da, pide) => !!da && !!pide && cartasEnMano(da) > 0 && cartasEnMano(pide) > 0
+    && CT_RECURSOS.every(r => !(da[r] && pide[r]));
+
+  const mueveLadron = (u, j) => {
+    const h = ctNat(j.x);
+    if (!hexesLadronCatan(S, u).includes(h)) return;
+    const vs = victimasCatan(S, u, h);
+    const v = vs.length ? String(j.v || "") : "";
+    if (vs.length && !vs.includes(v)) return;
+    if (v && aceptaLlave(u, j.c) !== true) return;
+    const pir = T.H[h].isla < 0;
+    if (pir) S.pirata = h; else S.ladron = h;
+    suceso({ e: "ladron", uid: u, x: h, pir, v });
+    if (v) azar = { id: j.k, tipo: "robo", por: u, v, c: String(j.c), pref: v };
+    else vuelve();
+  };
+
+  /* La fase especial (5–6): tras cada turno, los demás en orden pueden
+     construir o comprar. Quien no puede pagar nada se salta solo. */
+  const avanzaEsp = () => {
+    while (esp && esp.i < esp.orden.length && (S.fuera[esp.orden[esp.i]] || !puedeAlgoCatan(S, esp.orden[esp.i]))) esp.i++;
+    if (esp && esp.i >= esp.orden.length) { const de = esp.de; esp = null; empiezaTurno(sigActivo(de) || de); return; }
+    if (esp) etapa = "especial";
+  };
+  const finTurno = u => {
+    oferta = null; propuestas = {}; gratis = 0;
+    if (T.grande) {
+      esp = { de: u, i: 0, orden: [] };
+      for (let k = 1; k < N; k++) { const c = ids[(ids.indexOf(u) + k) % N]; if (!S.fuera[c]) esp.orden.push(c); }
+      suceso({ e: "especial", uid: u });
+      avanzaEsp();
+      return;
+    }
+    empiezaTurno(sigActivo(u));
+  };
+  const especial = (u, j) => {
+    if (etapa !== "especial" || !esp) return;
+    const cur = esp.orden[esp.i];
+    if (j.t === "salta") {
+      /* Cualquiera puede saltarse a quien se ha dormido: la pantalla solo
+         lo ofrece pasado un rato, y lo que se pierde es opcional. */
+      if (u === cur) return;
+      suceso({ e: "salta", uid: cur, por: u });
+      esp.i++; avanzaEsp();
+      return;
+    }
+    if (u !== cur) return;
+    if (j.t === "pasa") { esp.i++; avanzaEsp(); return; }
+    if (["camino", "barco", "poblado", "ciudad", "compra"].includes(j.t) && construye(u, j, false) && !puedeAlgoCatan(S, u)) {
+      esp.i++; avanzaEsp();
+    }
+  };
+
+  const abandona = u => {
+    if (ganador !== null || S.fuera[u]) return;
+    S.fuera[u] = true;
+    suceso({ e: "abandona", uid: u });
+    if (!listos) return;
+    const vs = activos();
+    if (vs.length <= 1) { ganador = vs[0] || ""; motivo = "abandono"; return; }
+    delete descartar[u]; delete oroP[u]; delete propuestas[u];
+    if (oferta) { if (oferta.uid === u) oferta = null; else { delete oferta.si[u]; delete oferta.no[u]; } }
+    if (etapa === "arranque") { if (vs.every(x => llaves0[x])) arranca(); return; }
+    if (etapa === "colocacion") { if (turno === u) avanzaColocacion(); return; }
+    actualizaRutas([u]);
+    if (etapa === "especial" && esp) { if (esp.orden[esp.i] === u) { esp.i++; avanzaEsp(); } return; }
+    if (turno === u) { empiezaTurno(sigActivo(u)); return; }
+    if (etapa === "descarte" && !Object.keys(descartar).length) { etapa = "ladron"; tras = "accion"; }
+    if (etapa === "oro" && !Object.keys(oroP).length) etapa = "accion";
+  };
+
+  for (const j of jugadasDe(p)) {
+    const u = j.uid;
+    if (!ficha[u]) continue;
+    if (j.t === "s") { if (ganador !== null) semillas[u] = true; continue; }
+    if (j.t === "abandona") { abandona(u); continue; }
+    if (tope && ganador === null) acabaTope();
+    if (ganador !== null || !listos || S.fuera[u]) continue;
+    if (j.t === "k") { llave(u, j); continue; }
+    if (etapa === "arranque") continue;
+    if (etapa === "colocacion") { coloca(u, j); continue; }
+    const esTurno = u === turno;
+
+    if (j.t === "descarta") {
+      if (etapa !== "descarte" || !descartar[u]) continue;
+      const r = ctRecursos(j.r);
+      if (!r || cartasEnMano(r) !== descartar[u] || !alcanzaCatan(S.mano[u], r)) continue;
+      ctSuma(S.mano[u], r, -1);
+      suceso({ e: "descarta", uid: u, n: descartar[u] });
+      delete descartar[u];
+      if (!Object.keys(descartar).length) etapa = "ladron";
+      continue;
+    }
+    if (j.t === "oro") {
+      if (etapa !== "oro" || !oroP[u]) continue;
+      const r = ctRecursos(j.r);
+      if (!r || cartasEnMano(r) !== oroP[u]) continue;
+      ctSuma(S.mano[u], r, 1);
+      suceso({ e: "oro", uid: u, r });
+      delete oroP[u];
+      if (!Object.keys(oroP).length) { etapa = "accion"; compruebaFin(); }
+      continue;
+    }
+    if (j.t === "acepta" || j.t === "rechaza") {
+      if (esTurno || etapa !== "accion" || azar || !oferta || String(j.o) !== oferta.id) continue;
+      if (j.t === "acepta") {
+        if (!alcanzaCatan(S.mano[u], oferta.pide)) continue;
+        oferta.si[u] = true; delete oferta.no[u];
+        suceso({ e: "acepta", uid: u });
+      } else { oferta.no[u] = true; delete oferta.si[u]; }
+      continue;
+    }
+    if (j.t === "contra") {
+      if (esTurno || etapa !== "accion" || azar) continue;
+      const da = ctRecursos(j.da), pide = ctRecursos(j.pide);
+      if (!trato(da, pide) || !alcanzaCatan(S.mano[u], da)) continue;
+      propuestas[u] = { id: j.k, da, pide };
+      suceso({ e: "contra", uid: u });
+      continue;
+    }
+    if (j.t === "retira" && !esTurno) { delete propuestas[u]; continue; }
+    if (etapa === "especial") { especial(u, j); continue; }
+    if (!esTurno || azar) continue;
+
+    switch (j.t) {
+      case "tira":
+        if (etapa === "tirar" && aceptaLlave(u, j.c) === true) {
+          azar = { id: j.k, tipo: "dados", por: u, c: String(j.c), pref: sigActivo(u) };
+          suceso({ e: "agita", uid: u });
+        }
+        break;
+      case "juega": if (etapa === "tirar" || etapa === "accion") juegaCarta(u, j); break;
+      case "revela": if (etapa === "tirar" || etapa === "accion" || etapa === "ladron") revela(u, j); break;
+      case "ladron": if (etapa === "ladron") mueveLadron(u, j); break;
+      case "camino": case "barco":
+        if (gratis > 0 && (etapa === "tirar" || etapa === "accion")) construye(u, j, true);
+        else if (etapa === "accion") construye(u, j, false);
+        compruebaFin();
+        break;
+      case "poblado": case "ciudad": case "compra":
+        if (etapa === "accion") { construye(u, j, false); compruebaFin(); }
+        break;
+      case "banco": if (etapa === "accion") banco(u, j); break;
+      case "oferta": {
+        if (etapa !== "accion") break;
+        const da = ctRecursos(j.da), pide = ctRecursos(j.pide);
+        if (!trato(da, pide) || !alcanzaCatan(S.mano[u], da)) break;
+        oferta = { id: j.k, uid: u, da, pide, si: {}, no: {} };
+        suceso({ e: "oferta", uid: u });
+        break;
+      }
+      case "retira": oferta = null; break;
+      case "cierra": {
+        if (etapa !== "accion") break;
+        const con = String(j.con || ""), o = String(j.o || "");
+        if (!ficha[con] || con === u || S.fuera[con]) break;
+        let da, pide;
+        if (oferta && o === oferta.id && oferta.si[con]) { da = oferta.da; pide = oferta.pide; }
+        else if (propuestas[con] && propuestas[con].id === o) { da = propuestas[con].pide; pide = propuestas[con].da; }
+        else break;
+        if (!alcanzaCatan(S.mano[u], da) || !alcanzaCatan(S.mano[con], pide)) break;
+        ctSuma(S.mano[u], da, -1); ctSuma(S.mano[con], da, 1);
+        ctSuma(S.mano[con], pide, -1); ctSuma(S.mano[u], pide, 1);
+        suceso({ e: "comercio", uid: u, con, da, pide });
+        if (oferta && o === oferta.id) oferta = null;
+        delete propuestas[con];
+        break;
+      }
+      case "mueve": {
+        if (etapa !== "accion" || !T.mar) break;
+        const de = ctNat(j.de), a = ctNat(j.a);
+        if (!barcosMoviblesCatan(S, u).includes(de) || !puedeBarcoCatan(S, u, a, -1, de)) break;
+        delete S.bar[de]; S.bar[a] = u; S.movioBarco = true;
+        suceso({ e: "mueve", uid: u, de, a });
+        actualizaRutas([u]); compruebaFin();
+        break;
+      }
+      case "fin": if (etapa === "accion") finTurno(u); break;
+    }
+    /* Un trato que ya no se puede pagar (un robo, otro cambio) deja de
+       estar sobre la mesa: si no, la pantalla ofrecería cerrarlo. */
+    if (oferta) {
+      if (!alcanzaCatan(S.mano[oferta.uid], oferta.da)) oferta = null;
+      else for (const w in oferta.si) if (!alcanzaCatan(S.mano[w], oferta.pide)) delete oferta.si[w];
+    }
+    for (const w in propuestas) if (!alcanzaCatan(S.mano[w], propuestas[w].da)) delete propuestas[w];
+  }
+  if (tope && ganador === null) acabaTope();
+
+  let debe = [], espera = null;
+  const fin = ganador !== null;
+  if (listos && !fin) {
+    if (etapa === "arranque") espera = { k: "llaves", faltan: activos().filter(x => !llaves0[x]) };
+    else if (azar) espera = { k: "azar", id: azar.id, tipo: azar.tipo, por: azar.por, pref: azar.pref, v: azar.v || "" };
+    else if (etapa === "descarte") { debe = Object.keys(descartar); espera = { k: "descarte" }; }
+    else if (etapa === "oro") { debe = Object.keys(oroP); espera = { k: "oro" }; }
+    else if (etapa === "especial" && esp) { debe = [esp.orden[esp.i]]; espera = { k: "especial", uid: debe[0] }; }
+    else { debe = turno ? [turno] : []; espera = { k: etapa, uid: turno }; }
+  }
+  const vp = {}, cartas = {}, desN = {}, ppuerto = {};
+  for (const u of ids) {
+    vp[u] = vpCatan(S, u); cartas[u] = cartasEnMano(S.mano[u]); ppuerto[u] = puntosPuerto(u);
+    desN[u] = S.des[u].n - Object.keys(S.des[u].usadas).length - S.des[u].puntos.length;
+  }
+  return Object.assign(S, {
+    fase: !listos ? "espera" : fin ? "fin" : "jugando",
+    etapa, turno: fin ? "" : turno, turnoN, sub, ultPob, primero,
+    azar: azar ? { id: azar.id, tipo: azar.tipo, por: azar.por, pref: azar.pref, v: azar.v || "" } : null,
+    espera, debe, descartar, oro: oroP, oferta, propuestas, gratis, jugoDes,
+    esp: esp ? { de: esp.de, orden: esp.orden, i: esp.i, uid: esp.orden[esp.i] || "" } : null,
+    ultima, hist, falsas, ganador, motivo, aportes, mezcla: mezclaCt, semillas,
+    restantes: restantes ? restantes.length : null,
+    vp, puntos: vp, cartas, desN, ppuerto
+  });
+}
+
+/* Al acabar cada uno revela su semilla, y aquí se comprueba que la
+   cadena de llaves y el mazo eran los prometidos en la ficha, y que
+   cada carta jugada (y cada punto revelado) era la que tocaba. */
+export async function auditaCatan(partida, estado) {
+  const fallos = [], sec = {};
+  const pon = (uid, que) => { if (!fallos.some(x => x.uid === uid && x.que === que)) fallos.push({ uid, que }); };
+  for (const j of jugadasDe(partida)) {
+    if (j.t !== "s" || sec[j.uid]) continue;
+    const f = (estado.jugadores || []).find(x => x.uid === j.uid);
+    if (!f) continue;
+    const sem = j.sem, sal = String(j.sal || "");
+    const ok = await compromisoValido(sem, sal, f.hmazo) && cadenaCatan(Number(sem) >>> 0, sal)[CT_CADENA] === f.hcad;
+    if (!ok) { pon(j.uid, "semilla"); continue; }
+    sec[j.uid] = { sem: Number(sem) >>> 0, sal };
+  }
+  const grande = !!(estado.T && estado.T.grande);
+  for (const u in sec) {
+    const d = (estado.des || {})[u];
+    if (!d) continue;
+    for (const k in d.usadas) if (cartaCatan(sec[u].sem, sec[u].sal, estado.mezcla, +k, grande) !== d.usadas[k]) pon(u, "carta");
+    for (const k of d.puntos || []) if (cartaCatan(sec[u].sem, sec[u].sal, estado.mezcla, k, grande) !== "punto") pon(u, "carta");
+  }
+  for (const j of estado.jugadores || []) if (!sec[j.uid] && !fallos.some(x => x.uid === j.uid)) pon(j.uid, "oculta");
   return fallos;
 }
