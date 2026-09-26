@@ -274,7 +274,9 @@ const GRABADAS = {
   escondite: { url: "juegos/audio/escondite-midnight-pulse.mp3", vol: 1 },
   flip7: { url: "juegos/audio/flip7-poker-night.mp3", vol: 0.7, fin: 124.3 },
   /* El Cacho se juega en la misma barra de madera: comparte la grabación. */
-  cacho: { url: "juegos/audio/flip7-poker-night.mp3", vol: 0.6, fin: 124.3 }
+  cacho: { url: "juegos/audio/flip7-poker-night.mp3", vol: 0.6, fin: 124.3 },
+  /* Y el UNO, que es otra mesa de cartas con las mismas muestras. */
+  uno: { url: "juegos/audio/flip7-poker-night.mp3", vol: 0.6, fin: 124.3 }
 };
 const pistas = {};
 let tema = "", timer = null, desbloqueado = false, rep = null;
@@ -341,7 +343,7 @@ function sincronizaMusica() {
       if (p.paused) p.play().catch(() => {});
       /* Las muestras de la mesa se piden con la música, no con el primer
          toc: así ese primero ya suena a madera. */
-      if (tema === "flip7" || tema === "cacho") { const a = motor(); if (a) cargaMuestras(a); }
+      if (tema === "flip7" || tema === "cacho" || tema === "uno") { const a = motor(); if (a) cargaMuestras(a); }
     } catch (_) {}
     return;
   }

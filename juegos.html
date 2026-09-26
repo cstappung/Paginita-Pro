@@ -998,6 +998,150 @@ try { var t = localStorage.getItem("jg.tema");
   @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 
 
+/* ---------- UNO ----------
+   Una carta es un <span>: esquinas, el óvalo blanco inclinado y el
+   símbolo en el color de la carta; el comodín lleva la rueda de cuatro
+   colores dentro del óvalo. El tamaño lo dan tres clases: normal (mano),
+   `mini` (anuncios, tapas) y `tope` (el descarte). */
+.jg-uno{--un-R:#d72600;--un-A:#e8c300;--un-V:#379711;--un-Z:#0956bf;--un-N:#1b1b1f}
+.jg-un-modo{font:600 11px 'IBM Plex Mono',monospace;border-radius:100px;padding:3px 10px;background:#fde7e2;color:#8c2310}.jg-un-modo:empty{display:none}
+.jg-un-c{--k:var(--un-N);position:relative;display:inline-block;box-sizing:border-box;width:62px;height:92px;border-radius:9px;background:var(--k);border:3px solid #fff;box-shadow:0 0 0 1px #0002,0 4px 10px #0003;color:#fff;overflow:hidden;flex-shrink:0;vertical-align:middle;transition:transform .15s,box-shadow .15s,opacity .15s,filter .15s}
+.jg-un-c.c-R{--k:var(--un-R)}.jg-un-c.c-A{--k:var(--un-A)}.jg-un-c.c-V{--k:var(--un-V)}.jg-un-c.c-Z{--k:var(--un-Z)}.jg-un-c.c-N{--k:var(--un-N)}
+.jg-un-c .ov{position:absolute;left:13%;right:13%;top:17%;bottom:17%;border-radius:50%;background:#fff;transform:rotate(28deg);display:grid;place-items:center;overflow:hidden}
+.jg-un-c .ov em{position:relative;transform:rotate(-28deg);font:800 22px/1 'IBM Plex Mono',monospace;font-style:normal;color:var(--k);text-shadow:1px 1px 0 #0002;white-space:nowrap}
+.jg-un-c.c-N .ov{background:var(--un-N)}.jg-un-c.c-N .ov em{color:#fff;text-shadow:0 1px 3px #000}
+.jg-un-c .rueda{position:absolute;inset:0;background:conic-gradient(var(--un-R) 0 25%,var(--un-Z) 0 50%,var(--un-V) 0 75%,var(--un-A) 0)}
+.jg-un-c .esq{position:absolute;left:4px;top:2px;font:800 11px/1 'IBM Plex Mono',monospace;font-style:normal;color:#fff;text-shadow:0 1px 1px #0006}
+.jg-un-c .esq.b{left:auto;top:auto;right:4px;bottom:2px;transform:rotate(180deg)}
+.jg-un-c u{position:absolute;right:2px;top:1px;font-size:12px;text-decoration:none;filter:drop-shadow(0 1px 1px #0008)}
+.jg-un-c.mentira{border-style:dashed}
+.jg-un-c.dorso{background:radial-gradient(ellipse at center,#e03a1c,#1b1b1f 72%)}
+.jg-un-c.dorso .ov{background:#d72600;left:10%;right:10%;top:22%;bottom:22%;transform:rotate(-24deg)}
+.jg-un-c.dorso .ov em{transform:rotate(24deg);color:#ffe14d;font-size:15px;letter-spacing:-1px;text-shadow:1px 2px 0 #1b1b1f}
+.jg-un-c.mini{width:36px;height:54px;border-width:2px;border-radius:6px}.jg-un-c.mini .ov em{font-size:12px}.jg-un-c.mini .esq{font-size:8px;left:2px}.jg-un-c.mini .esq.b{display:none}.jg-un-c.mini u{font-size:9px}
+.jg-un-c.dorso.mini .ov em{font-size:9px}
+.jg-un-c.tope{width:92px;height:136px;border-width:4px;border-radius:12px;box-shadow:0 0 0 1px #0003,0 10px 24px #0007}.jg-un-c.tope .ov em{font-size:32px}.jg-un-c.tope .esq{font-size:15px;left:6px;top:4px}.jg-un-c.tope .esq.b{right:6px;bottom:4px}
+.jg-un-c.tope[class*=anillo-]{animation:jgUnCae .35s cubic-bezier(.3,1.5,.5,1)}
+.jg-un-c.anillo-R{box-shadow:0 0 0 4px var(--un-R),0 10px 24px #0007}.jg-un-c.anillo-A{box-shadow:0 0 0 4px var(--un-A),0 10px 24px #0007}.jg-un-c.anillo-V{box-shadow:0 0 0 4px var(--un-V),0 10px 24px #0007}.jg-un-c.anillo-Z{box-shadow:0 0 0 4px var(--un-Z),0 10px 24px #0007}
+@keyframes jgUnCae{from{transform:translateY(-18px) rotate(-8deg) scale(1.08);opacity:.4}}
+.jg-un-punto{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--un-N);vertical-align:middle}
+.jg-un-punto.c-R{background:var(--un-R)}.jg-un-punto.c-A{background:var(--un-A)}.jg-un-punto.c-V{background:var(--un-V)}.jg-un-punto.c-Z{background:var(--un-Z)}
+
+/* Los asientos: una rejilla, tú primero y los demás en el orden de la mesa. */
+.jg-un-asientos{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;padding:16px;background:#fff;border-left:1px solid #e2e8ec;border-right:1px solid #e2e8ec}
+.jg-un-asiento{--c:#888;position:relative;display:grid;gap:6px;padding:10px 12px;border-radius:12px;background:#faf8fc;border:1px solid #ece7f3;border-left:4px solid var(--c);transition:box-shadow .2s,opacity .3s,filter .3s}
+.jg-un-asiento.yo{background:#fff}
+.jg-un-asiento.turno{box-shadow:0 0 0 2px var(--c),0 8px 20px #0001;background:#fff}
+.jg-un-asiento.fuera,.jg-un-asiento.elim{opacity:.5;filter:grayscale(.8)}
+.jg-un-asiento.gana{box-shadow:0 0 0 2px #e8b64a,0 8px 22px #e8b64a55;background:#fffaf0}
+.jg-un-asiento.uno .jg-un-n{color:#d72600}
+.jg-un-quien{display:flex;align-items:center;gap:8px;min-width:0}
+.jg-un-ava{width:26px;height:26px;border-radius:50%;flex-shrink:0;display:grid;place-items:center;background:var(--c);color:#fff;font-weight:700;font-size:12px;overflow:hidden}.jg-un-ava img{width:100%;height:100%;object-fit:cover}
+.jg-un-nom{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
+.jg-un-reloj{animation:jgUnLatido 1.2s ease-in-out infinite}
+@keyframes jgUnLatido{50%{transform:scale(1.2)}}
+.jg-un-abanico{position:relative;height:34px}
+.jg-un-abanico i{position:absolute;left:calc(50% - 11px);bottom:0;width:22px;height:32px;border-radius:4px;border:1.5px solid #fff;background:radial-gradient(ellipse at center,#e03a1c,#1b1b1f 75%);box-shadow:0 1px 3px #0004;transform-origin:50% 120%;transform:rotate(calc((var(--k) - (var(--n) - 1) / 2) * 7deg))}
+.jg-un-n{font:700 12px 'IBM Plex Mono',monospace;color:#5a5566;text-align:center}
+.jg-un-marcas{display:flex;flex-wrap:wrap;gap:4px;justify-content:center}
+.jg-un-marca{font:600 10px 'IBM Plex Mono',monospace;padding:2px 7px;border-radius:100px;background:#eee9f5;color:#5a5566}
+.jg-un-marca.sig{background:#e6f0fb;color:#0a4a94}
+.jg-un-marca.uno{background:#d72600;color:#fff;animation:jgUnLatido 1s ease-in-out 3}
+.jg-un-marca.olvido{background:#fff1c9;color:#7a5200}
+.jg-un-marca.elim{background:#fde2e2;color:#8a1020}
+.jg-un-marca.moneda{background:#f3eee2;font-size:12px}.jg-un-marca.moneda.usada{opacity:.35;filter:grayscale(1)}
+.jg-un-pilla{font:700 11px 'IBM Plex Mono',monospace;padding:3px 9px;border-radius:100px;border:0;background:#d72600;color:#fff;cursor:pointer;animation:jgUnLatido .8s ease-in-out infinite}.jg-un-pilla:disabled{opacity:.5;animation:none;cursor:default}
+.jg-un-tapa{display:flex;align-items:center;justify-content:center;gap:4px}.jg-un-tapa b{font-size:16px}.jg-un-tapa b.ok{color:#1d7a3a}.jg-un-tapa b.no{color:#c0392b}
+
+/* La mesa: el mazo y el descarte sobre un paño oscuro, como la caja. */
+.jg-un-mesa{display:grid;justify-items:center;gap:12px;padding:26px 16px;background:radial-gradient(ellipse at 50% 40%,#3a1d4f,#1c1128 70%);border-left:1px solid #2c2140;border-right:1px solid #2c2140;color:#f0eaf8}
+.jg-un-aviso{padding:30px 0;font:600 14px 'IBM Plex Mono',monospace;color:#cfc4e0}
+.jg-un-pilas{display:flex;align-items:center;gap:34px}
+.jg-un-mazo{position:relative;width:92px;height:136px;padding:0;border:0;background:none;cursor:default}
+.jg-un-mazo .jg-un-c{position:absolute;left:0;top:0;width:92px;height:136px;border-width:4px;border-radius:12px}
+.jg-un-mazo .jg-un-c .ov em{font-size:22px}
+.jg-un-mazo .jg-un-c.b{transform:translate(-3px,3px)}.jg-un-mazo .jg-un-c.c{transform:translate(-6px,6px)}
+.jg-un-mazo .jg-un-c:first-child{z-index:2}.jg-un-mazo .jg-un-c.b{z-index:1}
+.jg-un-mazo.vivo{cursor:pointer}.jg-un-mazo.vivo .jg-un-c:first-child{box-shadow:0 0 0 3px #ffe14d,0 0 22px #ffe14d88}
+.jg-un-mazo.vivo:hover .jg-un-c:first-child{transform:translateY(-4px)}
+.jg-un-descarte{min-width:92px;min-height:136px;display:grid;place-items:center}
+.jg-un-oculta{display:grid;justify-items:center;gap:6px}.jg-un-oculta span{font:600 11px 'IBM Plex Mono',monospace;color:#ffe14d}
+.jg-un-info{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px}
+.jg-un-color{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:100px;background:#ffffff14;font:600 12px 'IBM Plex Mono',monospace;text-transform:capitalize}
+.jg-un-dir{font-size:24px;line-height:1;color:#ffe14d}
+.jg-un-pena{padding:4px 12px;border-radius:100px;background:#d72600;color:#fff;font:700 13px 'IBM Plex Mono',monospace;animation:jgUnLatido 1.2s ease-in-out infinite}.jg-un-pena small{font-weight:500;opacity:.85}
+
+/* La mano: se ordena por color y valor; las que no sirven se apagan. */
+.jg-un-mano{padding:14px 16px;background:#fff;border-left:1px solid #e2e8ec;border-right:1px solid #e2e8ec;border-top:1px solid #efeaf5}.jg-un-mano:empty{display:none}
+.jg-un-mano-t{display:flex;align-items:center;gap:10px;margin-bottom:10px;font-size:13px}.jg-un-mano-t span{font:600 11px 'IBM Plex Mono',monospace;color:#8a8494}
+.jg-un-uno{margin-left:auto;font:800 12px 'IBM Plex Mono',monospace;padding:6px 14px;border-radius:100px;border:2px solid #d72600;background:#fff;color:#d72600;cursor:pointer}.jg-un-uno.on{background:#d72600;color:#fff}
+.jg-un-cartas{display:flex;flex-wrap:wrap;gap:6px}
+.jg-un-hueco{padding:0;border:0;background:none;cursor:pointer;border-radius:10px}
+.jg-un-hueco:disabled{cursor:default}
+.jg-un-hueco:not(:disabled):hover .jg-un-c{transform:translateY(-6px)}
+.jg-un-c.no{opacity:.45;filter:saturate(.5)}
+.jg-un-c.ok{box-shadow:0 0 0 1px #0002,0 4px 12px #0003}
+.jg-un-c.sel{transform:translateY(-10px);box-shadow:0 0 0 3px #ffe14d,0 10px 20px #0004}
+.jg-un-hueco.verdad .jg-un-c{box-shadow:0 0 0 3px #1d7a3a,0 4px 10px #0003}
+
+/* El pie: lo que te toca decidir. */
+.jg-un-panel{display:grid;gap:10px;width:100%}
+.jg-un-fila{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.jg-un-lbl{font:600 12px 'IBM Plex Mono',monospace;color:#8a8494}
+.jg-un-anuncios{display:flex;flex-wrap:wrap;gap:6px}
+.jg-un-boton{font:600 13px system-ui,sans-serif;padding:8px 14px;border-radius:10px;border:1px solid #d9d2e5;background:#fff;color:#2c2437;cursor:pointer;transition:transform .1s,background .15s}
+.jg-un-boton:hover:not(:disabled){background:#f4f0fa}.jg-un-boton:active:not(:disabled){transform:translateY(1px)}.jg-un-boton:disabled{opacity:.5;cursor:default}
+.jg-un-boton small{font-weight:400;color:#8a8494}
+.jg-un-boton.grande{background:#2c2437;color:#fff;border-color:#2c2437;padding:10px 18px}.jg-un-boton.grande:hover:not(:disabled){background:#43375a}
+.jg-un-boton.malo{background:#d72600;color:#fff;border-color:#d72600}.jg-un-boton.malo:hover:not(:disabled){background:#b31f00}
+.jg-un-boton.suave{background:none;border-color:transparent;color:#8a8494}
+.jg-un-boton.sel{background:#fff1c9;border-color:#e8b64a}
+.jg-un-boton.moneda{display:grid;gap:2px;text-align:left;max-width:260px;padding:10px 14px}.jg-un-boton.moneda small{font-size:11px}
+.jg-un-bcol{--k:var(--un-N);min-width:78px;padding:9px 14px;border-radius:10px;border:0;background:var(--k);color:#fff;font:700 13px system-ui,sans-serif;text-transform:capitalize;cursor:pointer;box-shadow:inset 0 -3px 0 #0003}
+.jg-un-bcol.c-R{--k:var(--un-R)}.jg-un-bcol.c-A{--k:var(--un-A);color:#3a2e00}.jg-un-bcol.c-V{--k:var(--un-V)}.jg-un-bcol.c-Z{--k:var(--un-Z)}
+.jg-un-bcol.sel{box-shadow:0 0 0 3px #2c2437}.jg-un-bcol:disabled{opacity:.4;cursor:default}
+
+.jg-un-hist{margin-top:12px;display:grid;gap:3px;padding:12px 16px;border-radius:12px;background:#faf8fc;border:1px solid #ece7f3;font-size:12px;color:#5a5566}.jg-un-hist:empty{display:none}
+.jg-un-hist-t{font:600 10px 'IBM Plex Mono',monospace;letter-spacing:1.2px;text-transform:uppercase;color:#8a8494;margin-bottom:2px}
+.jg-un-h{padding-left:8px;border-left:2px solid #e4dcef}.jg-un-hist-t+.jg-un-h{color:#2c2437;font-weight:600}
+
+@media(max-width:600px){.jg-un-asientos{grid-template-columns:repeat(2,1fr);padding:10px;gap:8px}.jg-un-c{width:50px;height:74px}.jg-un-c .ov em{font-size:17px}.jg-un-pilas{gap:22px}.jg-un-mazo,.jg-un-mazo .jg-un-c,.jg-un-c.tope{width:76px;height:112px}.jg-un-descarte{min-width:76px;min-height:112px}.jg-un-c.tope .ov em{font-size:26px}}
+
+/* Portada del vestíbulo */
+.jg-portada-uno{background:radial-gradient(ellipse at center,#3a1d4f,#1c1128 75%)}
+.jg-art-uno{position:relative;display:flex}
+.jg-art-uno i{position:relative;width:58px;height:86px;border-radius:9px;background:var(--t);border:3px solid #fff;box-shadow:0 8px 18px #0008;margin-left:-16px;display:grid;place-items:center;overflow:hidden}
+.jg-art-uno i:first-child{margin:0;transform:rotate(-16deg) translateY(10px)}.jg-art-uno i:nth-child(2){transform:rotate(-5deg)}.jg-art-uno i:nth-child(3){transform:rotate(6deg)}.jg-art-uno i:nth-child(4){transform:rotate(17deg) translateY(10px)}
+.jg-art-uno i::before{content:'';position:absolute;left:12%;right:12%;top:18%;bottom:18%;border-radius:50%;background:#fff;transform:rotate(28deg)}
+.jg-art-uno i:nth-child(4)::before{background:conic-gradient(#d72600 0 25%,#0956bf 0 50%,#379711 0 75%,#e8c300 0)}
+.jg-art-uno span{position:relative;font:800 22px 'IBM Plex Mono',monospace;color:var(--t)}.jg-art-uno i:nth-child(4) span{color:#fff;text-shadow:0 1px 3px #000}
+.jg-art-uno b{position:absolute;left:50%;bottom:-30px;transform:translateX(-50%) rotate(-6deg);font:900 20px 'IBM Plex Mono',monospace;letter-spacing:1px;color:#ffe14d;text-shadow:2px 2px 0 #d72600}
+
+/* ---------- El manual de reglas ----------
+   Cuelga de <body> en `position:fixed`, por encima del cartel de fin
+   (z 60): quien acaba de perder puede querer leer por qué. */
+.jg-of-pie{display:flex;gap:8px;align-items:stretch;margin-top:4px}.jg-of-pie .jg-of-btn{flex:1;margin:0}
+.jg-of-reglas{flex-shrink:0;white-space:nowrap}
+.jg-solo-barra{display:flex;justify-content:flex-end;margin-bottom:10px}
+.jg-reglas-capa{position:fixed;inset:0;z-index:80;display:grid;place-items:center;padding:18px;background:#171123b3;backdrop-filter:blur(6px);animation:jgVela .2s ease-out}
+.jg-reglas{display:flex;flex-direction:column;width:min(680px,100%);max-height:min(88vh,860px);background:#fff;border-radius:18px;box-shadow:0 30px 80px #0006;overflow:hidden;color:#2c2437}
+.jg-reglas-cab{display:flex;align-items:flex-start;gap:14px;padding:20px 22px 14px;border-bottom:1px solid #eee9f5}
+.jg-reglas-cab>div{flex:1;min-width:0}
+.jg-reglas-cab small{font:600 10px 'IBM Plex Mono',monospace;letter-spacing:1.4px;text-transform:uppercase;color:#8a8494}
+.jg-reglas-cab h2{margin:4px 0 6px;font-size:22px;letter-spacing:-.02em}
+.jg-reglas-cab p{margin:0;font-size:13px;color:#5a5566;line-height:1.5}
+.jg-reglas-x{flex-shrink:0;width:34px;height:34px;border-radius:50%;border:0;background:#f2eef9;color:#342646;font-size:15px;cursor:pointer}.jg-reglas-x:hover{background:#e9e0fa}
+.jg-reglas-tabs{display:flex;flex-wrap:wrap;gap:6px;padding:12px 22px;border-bottom:1px solid #eee9f5;background:#faf8fc}
+.jg-reglas-tabs button{font:600 12px system-ui,sans-serif;padding:6px 12px;border-radius:100px;border:1px solid #e0d8ec;background:#fff;color:#5a5566;cursor:pointer}
+.jg-reglas-tabs button.on{background:#342646;border-color:#342646;color:#fff}
+.jg-reglas-cuerpo{flex:1;overflow:auto;padding:6px 22px 18px;font-size:13.5px;line-height:1.6;overscroll-behavior:contain}
+.jg-reglas-cuerpo section{padding:12px 0;border-bottom:1px dashed #eee9f5}.jg-reglas-cuerpo section:last-child{border-bottom:0}
+.jg-reglas-cuerpo h3{margin:0 0 6px;font-size:14px;color:#342646}
+.jg-reglas-cuerpo p{margin:0 0 6px}.jg-reglas-cuerpo ul{margin:0;padding-left:20px}.jg-reglas-cuerpo li{margin:3px 0}
+.jg-reglas-cuerpo b{color:#1f1829}
+.jg-reglas-pie{display:flex;justify-content:flex-end;padding:12px 22px;border-top:1px solid #eee9f5}
+@media(max-width:600px){.jg-reglas-capa{padding:0;place-items:end stretch}.jg-reglas{max-height:92vh;border-radius:18px 18px 0 0}.jg-reglas-cab,.jg-reglas-tabs,.jg-reglas-cuerpo,.jg-reglas-pie{padding-left:16px;padding-right:16px}}
+
 /* Escondite: atlas ilustrado */
 .esc-rework {overflow:hidden;border:1px solid #d8d4c7;border-radius:22px;background:#f7f5ed;box-shadow:0 16px 45px #242c3514}
 .esc-editorial{padding:28px 28px 20px;background:#203e38;color:#f3edd9}
@@ -1197,6 +1341,42 @@ html[data-tema=oscuro] .jg-cc-hist-t{color:var(--os-tx3)}
 html[data-tema=oscuro] .jg-cc-h{border-left-color:var(--os-borde2)}
 html[data-tema=oscuro] .jg-cc-hist-t+.jg-cc-h{color:var(--os-tx)}
 html[data-tema=oscuro] .jg-cc-h.h-ronda,html[data-tema=oscuro] .jg-cc-h.h-anula{color:var(--os-tx3)}
+/* UNO y el manual de reglas */
+html[data-tema=oscuro] .jg-un-modo{background:#3a1d17;color:#ffb4a3}
+html[data-tema=oscuro] .jg-un-asientos,html[data-tema=oscuro] .jg-un-mano{background:var(--os-sup);border-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-un-asiento{background:var(--os-sup2);border-color:var(--os-borde);border-left-color:var(--c)}
+html[data-tema=oscuro] .jg-un-asiento.yo,html[data-tema=oscuro] .jg-un-asiento.turno{background:var(--os-sup3)}
+html[data-tema=oscuro] .jg-un-asiento.gana{background:#3a2f15}
+html[data-tema=oscuro] .jg-un-n,html[data-tema=oscuro] .jg-un-mano-t span,html[data-tema=oscuro] .jg-un-lbl{color:var(--os-tx3)}
+html[data-tema=oscuro] .jg-un-marca{background:var(--os-sup3);color:var(--os-tx2)}
+html[data-tema=oscuro] .jg-un-marca.sig{background:#16304f;color:#9cc8ff}
+html[data-tema=oscuro] .jg-un-marca.olvido{background:#3d3010;color:#ffd36b}
+html[data-tema=oscuro] .jg-un-marca.elim{background:#3d1418;color:#ff9da6}
+html[data-tema=oscuro] .jg-un-marca.uno{background:#d72600;color:#fff}
+html[data-tema=oscuro] .jg-un-mano{border-top-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-un-uno{background:var(--os-sup);color:#ff7a5c;border-color:#ff7a5c}html[data-tema=oscuro] .jg-un-uno.on{background:#d72600;color:#fff;border-color:#d72600}
+html[data-tema=oscuro] .jg-un-boton{background:var(--os-sup2);border-color:var(--os-borde2);color:var(--os-tx)}
+html[data-tema=oscuro] .jg-un-boton:hover:not(:disabled){background:var(--os-sup3)}
+html[data-tema=oscuro] .jg-un-boton small{color:var(--os-tx3)}
+html[data-tema=oscuro] .jg-un-boton.grande{background:#ebe7f5;color:#18151f;border-color:#ebe7f5}html[data-tema=oscuro] .jg-un-boton.grande:hover:not(:disabled){background:#fff}
+html[data-tema=oscuro] .jg-un-boton.malo{background:#d72600;color:#fff;border-color:#d72600}
+html[data-tema=oscuro] .jg-un-boton.suave{background:none;border-color:transparent;color:var(--os-tx3)}
+html[data-tema=oscuro] .jg-un-boton.sel{background:#3d3010;border-color:#e8b64a}
+html[data-tema=oscuro] .jg-un-bcol.sel{box-shadow:0 0 0 3px #ebe7f5}
+html[data-tema=oscuro] .jg-un-hist{background:var(--os-sup);border-color:var(--os-borde);color:var(--os-tx2)}
+html[data-tema=oscuro] .jg-un-hist-t{color:var(--os-tx3)}
+html[data-tema=oscuro] .jg-un-h{border-left-color:var(--os-borde2)}
+html[data-tema=oscuro] .jg-un-hist-t+.jg-un-h{color:var(--os-tx)}
+html[data-tema=oscuro] .jg-reglas{background:var(--os-sup);color:var(--os-tx)}
+html[data-tema=oscuro] .jg-reglas-cab,html[data-tema=oscuro] .jg-reglas-tabs,html[data-tema=oscuro] .jg-reglas-pie{border-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-reglas-cab small{color:var(--os-tx3)}
+html[data-tema=oscuro] .jg-reglas-cab p{color:var(--os-tx2)}
+html[data-tema=oscuro] .jg-reglas-x{background:var(--os-sup3);color:var(--os-tx)}html[data-tema=oscuro] .jg-reglas-x:hover{background:#3a3150}
+html[data-tema=oscuro] .jg-reglas-tabs{background:var(--os-sup2)}
+html[data-tema=oscuro] .jg-reglas-tabs button{background:var(--os-sup);border-color:var(--os-borde2);color:var(--os-tx2)}
+html[data-tema=oscuro] .jg-reglas-tabs button.on{background:#ebe7f5;border-color:#ebe7f5;color:#18151f}
+html[data-tema=oscuro] .jg-reglas-cuerpo section{border-bottom-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-reglas-cuerpo h3,html[data-tema=oscuro] .jg-reglas-cuerpo b{color:#fff}
 </style>
 </head>
 <body>
@@ -1241,6 +1421,6 @@ html[data-tema=oscuro] .jg-cc-h.h-ronda,html[data-tema=oscuro] .jg-cc-h.h-anula{
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202609260440"></script>
+<script src="juegos-app.js?v=202609260631"></script>
 </body>
 </html>

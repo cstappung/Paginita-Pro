@@ -109,8 +109,8 @@
         "origen": {".validate":"newData.isString() && root.child('partidas').child(newData.val()).child('fin').exists() && root.child('partidas').child(newData.val()).child('jugadores').child(auth.uid).exists() && root.child('partidas').child(newData.val()).child('juego').val() === newData.parent().child('juego').val()"},
         "revancha": {".write":"auth != null && !data.exists() && newData.isString() && root.child('partidas').child($pid).child('fin').exists() && root.child('partidas').child($pid).child('jugadores').child(auth.uid).exists()",".validate":"newData.isString() && root.child('partidas').child(newData.val()).child('origen').val() === $pid"},
 
-        "juego": { ".validate": "newData.val() === 'escondite' || newData.val() === 'cartas' || newData.val() === 'cuadritos' || newData.val() === 'reversi' || newData.val() === 'orbita' || newData.val() === 'worms' || newData.val() === 'cadena' || newData.val() === 'flip7' || newData.val() === 'cacho'" },
-        "modo": { ".validate": "newData.val() === 'normal' || newData.val() === 'venganza' || newData.val() === 'super'" },
+        "juego": { ".validate": "newData.val() === 'escondite' || newData.val() === 'cartas' || newData.val() === 'cuadritos' || newData.val() === 'reversi' || newData.val() === 'orbita' || newData.val() === 'worms' || newData.val() === 'cadena' || newData.val() === 'flip7' || newData.val() === 'cacho' || newData.val() === 'uno'" },
+        "modo": { ".validate": "newData.val() === 'normal' || newData.val() === 'venganza' || newData.val() === 'super' || newData.val() === 'clasico' || newData.val() === 'nomercy' || newData.val() === 'nomercyx' || newData.val() === 'allwild' || newData.val() === 'liar'" },
         "malla": { ".validate": "newData.val() === 'chica' || newData.val() === 'clasica' || newData.val() === 'grande'" },
         "nombre": { ".validate": "newData.isString() && newData.val().length <= 40" },
         "semilla": { ".validate": "newData.isNumber()" },
