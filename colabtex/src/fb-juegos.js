@@ -65,7 +65,7 @@ import {
 } from "firebase/database";
 import {
   claveJugada, semillaAleatoria, salAleatoria, compromiso, LADO, cupoDe,
-  cadenaCacho, CC_CADENA
+  cadenaCacho, CC_CADENA, sha256hex, arrUno, dhPublica
 } from "./juegos/motor.js";
 
 const P = "partidas", MIAS = "misPartidas", R = "ranks";
@@ -98,20 +98,20 @@ export async function crearPartida(juego, quien, extra) {
     lado: LADO,
     cupo: 2,
     at: serverTimestamp(),
-    jugadores: { [quien.uid]: ficha(quien, 0, sec.h, sec.hcad) }
+    jugadores: { [quien.uid]: ficha(quien, 0, sec.h, sec.extra) }
   }, extra || {}));
   await marcarMia(pid, juego, quien.uid);
   return pid;
 }
 
-const ficha = (q, orden, hmazo, hcad) => Object.assign({
+const ficha = (q, orden, hmazo, extra) => Object.assign({
   nombre: q.nombre || "Alguien",
   foto: q.foto || "",
   color: q.color || "#0d9488",
   orden,
   hmazo: hmazo || "",
   at: Date.now()
-}, hcad ? { hcad } : {});
+}, extra || {});
 
 /* ---------- el secreto de cada jugador ----------
    Una semilla y una sal, guardadas donde solo su dueño puede leerlas,
@@ -122,12 +122,16 @@ const ficha = (q, orden, hmazo, hcad) => Object.assign({
    escribe `juego` y `at` — no lo pise.
 
    En el cacho la misma semilla da además la cadena de llaves de los
-   dados, y lo que se publica es su punta (`hcad`, ver `redCacho`). */
+   dados, y lo que se publica es su punta (`hcad`, ver `redCacho`). En
+   el UNO, la promesa de su parte de la mezcla (`hcad` también) y su
+   clave pública de Diffie-Hellman (`pk`), la de los sobres. */
 async function secreto(pid, uid, juego) {
   const sem = semillaAleatoria(), sal = salAleatoria();
   await set(ref(db, `${MIAS}/${uid}/${pid}/sec`), { sem, sal });
-  const hcad = juego === "cacho" ? cadenaCacho(sem, sal)[CC_CADENA] : "";
-  return { sem, sal, h: await compromiso(sem, sal), hcad };
+  const extra = juego === "cacho" ? { hcad: cadenaCacho(sem, sal)[CC_CADENA] }
+    : juego === "uno" ? { hcad: sha256hex(arrUno(sem, sal)), pk: dhPublica(sem, sal) }
+    : {};
+  return { sem, sal, h: await compromiso(sem, sal), extra };
 }
 
 export async function leerSecreto(pid, uid) {
@@ -148,7 +152,7 @@ export async function unirse(pid, quien) {
     if (Object.keys(ya).length >= cupo) throw new Error("La sala está llena.");
     const sec = await secreto(pid, quien.uid, p.juego);
     await set(ref(db, `${P}/${pid}/jugadores/${quien.uid}`),
-              ficha(quien, Object.keys(ya).length, sec.h, sec.hcad));
+              ficha(quien, Object.keys(ya).length, sec.h, sec.extra));
     /* La sala se cierra sola al llenarse. Con cupo de más de dos puede
        cerrarla antes quien la abrió (`setEstado`), porque si no, una
        sala de seis con cuatro dentro no empezaría nunca. Las reglas

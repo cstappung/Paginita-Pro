@@ -45,7 +45,7 @@ Six apps plus a small shared **Informes** page:
   collect by themselves, plus the bugs and ideas people write. See "Informes"
   below.
 - **Juegos** (`juegos.html` + `juegos-app.js`, entry
-  `colabtex/src/juegos-main.js`) — nine turn-based games, on the same Google
+  `colabtex/src/juegos-main.js`) — ten turn-based games, on the same Google
   account and the same Firebase project: **Escondite** (hide a person in a
   landscape, then cross the landscapes and race to find the other's),
   **Cartas de los tres elementos** (a Card-Jitsu duel), **Cuadritos** (dots and
@@ -54,9 +54,11 @@ Six apps plus a small shared **Informes** page:
   to eight players and three grid sizes), **Flip 7** (the push-your-luck card
   game, two to ten players, Normal, Vengeance and Super Vengeance), **Cacho**
   (the Chilean liar's dice, *dudo* mode, two to eight players, with the
-  optional *partida siciliana*) and **Circuit Breakers** (a Worms-style artillery game for two to eight squads, in an
-  iframe), plus a
-  **Clasificación** tab. See "Juegos" below.
+  optional *partida siciliana*), **UNO** (two to ten players, in five
+  versions: Clásico, No Mercy, No Mercy with the expansion, All Wild and
+  Liar's) and **Circuit Breakers** (a Worms-style artillery game for two to
+  eight squads, in an iframe), plus a **Clasificación** tab and a 📖 **Reglas**
+  manual for every game, solo ones included. See "Juegos" below.
 
 ColabTeX, ColabDraw, FiltroLab, AjusteLab, Juegos and Informes are authored in
 **Spanish** — UI text, comments and identifiers alike. **CSV·Scope is the exception: it is in
@@ -1489,7 +1491,7 @@ Four decisions worth keeping:
 
 ## Juegos architecture
 
-Nine turn-based games, on the same Firebase project and the same Google session
+Ten turn-based games, on the same Firebase project and the same Google session
 as ColabTeX and ColabDraw. Turn-based on purpose: with one move per turn the
 network carries a handful of fields and there is nothing to interpolate, so no
 game loop ever has to be synchronised.
@@ -1516,6 +1518,10 @@ game stops working, not a round number:
   discard), and `tests/flip7.test.cjs` plays robot games up to ten to prove it.
 - **cacho, 8.** Forty dice on the table: past that a bet of «22 quinas» is
   a lottery rather than a read, and the oval stops holding the cups.
+- **uno, 10.** Nothing on the table depends on the count: every player
+  draws from a deck of their own (below), so the box never runs short, and
+  the seats are a grid of cards that wraps (`.jg-un-asientos`) rather than
+  places around a table.
 - **worms, 8.** Eight squads of six spawn on all four maps; at ten `tidal`
   runs out of ground. The frame's `engine.js` carries eight colours, eight
   team names and 48 engineers' names, and clamps humans/bots to eight.
@@ -1823,7 +1829,9 @@ Modules in [colabtex/src/juegos/](colabtex/src/juegos/):
 - `paisaje.js` — draws the scene `motor.js` decided. Split from it because the
   only thing the two machines must share is the layout, and that is a number.
 - `escondite.js`, `cartas.js`, `cuadritos.js`, `reversi.js`, `cadena.js`,
-  `flip7.js`, `cacho.js`, `ranks.js` — one screen each.
+  `flip7.js`, `cacho.js`, `uno.js`, `ranks.js` — one screen each.
+- `reglas.js` — the 📖 manual of every game (`abreReglas`, `tieneReglas`); see
+  below.
 - `sonido.js` — the WebAudio synth and the mute flag. No DOM beyond the header
   button's state, no Firebase.
 - `perfil.js` — the profile editor: `COLORES`, `mezcla` (ficha + perfil → what
@@ -1832,8 +1840,9 @@ Modules in [colabtex/src/juegos/](colabtex/src/juegos/):
   `abrePerfil`, the modal.
 - All of them expose the **same shape**: `crearX(ctx)` with
   `ctx = {uid, pid, jugar, terminar, ahora}`, returning
-  `{montar(hostEl), actualizar(partida, estado), destruir()}`. Adding a fifth
-  game is a file and a row in `JUEGOS`. `ranks.js` is the exception —
+  `{montar(hostEl), actualizar(partida, estado), destruir()}`. Adding a
+  game is a file, a row in `JUEGOS`, a row in `FABRICAS` and one in the
+  rules' `juego` whitelist — and an entry in `reglas.js`. `ranks.js` is the exception —
   `crearRanks({uid, watchRanks})` with no `actualizar`, since it watches its
   own node.
 
@@ -2158,6 +2167,77 @@ choosing either. Points worth knowing:
   covers the last uncovering, and `PAUSA_FIN.cacho` adds its grace.
 - **Sound follows `hist`**, like Flip 7: the cup rattle (`cubilete`) when a
   round starts, `dado` on each cup lifted.
+
+**UNO (`uno`) has five versions over one reducer** (`redUno`, `MODOS_UNO`:
+`clasico`, `nomercy`, `nomercyx`, `allwild`, `liar`), chosen when the room is
+opened and stored in `modo` like Flip 7's. The problem is the usual one here
+with no server — every hand secret, nobody choosing what they draw — and it
+is solved by four pieces (the long version is the comment above `MODOS_UNO`):
+
+- **Every player draws from a deck of their own.** Card number k that `u`
+  draws is `mazo[H(sem, sal, mezcla, k) mod largo]` (`cartaUno`): their
+  private seed from `misPartidas/<uid>/<pid>/sec`, as in cartas, Flip 7 and
+  cacho, and a `mezcla` nobody knows until the game starts. It is sampling
+  with replacement from the version's box, so the proportions are the box's
+  and the deck never runs out. The mezcla comes out of a commit-and-reveal
+  start: the ficha carries `hcad = H(arr)`, each screen sends `arr` by itself
+  (`{t:"k"}`), and the mezcla is the hash of all of them — so nobody can shop
+  for a seed with a good hand.
+- **The reducer only knows how many cards each hand holds.** It also keeps
+  `ops`, a list of what happened to each hand (drew n, played this, discarded
+  that colour, swapped), and each screen replays it with its own secret to
+  know what it holds (`repasaUno` → `manoUno`). Everyone else is card backs.
+- **What is not shown is promised with a hash or sealed.** Liar's face-down
+  cards are played as `H(carta + ":" + sal)` (`tapaUno`, codes starting with
+  `~`), and hand swaps — No Mercy's 7 and 0, All Wild's forced swap — travel
+  as **sobres**: the hand encrypted with a Diffie-Hellman key between the two
+  players (RFC 3526 group 14, public key `pk` in the ficha, private key
+  derived from the seed so the audit can check it). The reducer waits for
+  every envelope (`espera.k === "sobres"`) and applies them at once, which is
+  what the 0's rotating hands need.
+- **At the end everyone reveals `{t:"s"}` and `auditaUno` replays the whole
+  game with every hand visible**: each card played was in the hand, the
+  draw-until-playable stopped where it should, the answer to a +4 challenge
+  was true, each envelope held the real hand. A liar is named in red, as in
+  Flip 7. The price, said aloud in the code: whoever opens the console can
+  compute what *they themselves* would draw next — their deck is theirs.
+  They cannot change it, nor see anyone else's.
+
+What the screen sends by itself, without asking — the start key, the
+envelopes, the answer to a +4 challenge, the face-down card when doubted — is
+exactly what only that browser can send and the whole table is waiting for;
+`uno.js` has the same heartbeat (`LATIDO_MS`) and write timeout (`ENVIO_MAX`)
+as Flip 7 and cacho for the same reasons. `est.debe` says who owes something
+now (it can be several: the No Mercy + expansion coin toss, the envelopes),
+and `meToca` reads it. Three versions add a way out besides winning: in No
+Mercy a hand that reaches `UNO_TOPE` (25) is **eliminated** (`elim[u]`, its
+count set to 0 on purpose so the seat reads empty), and the last one standing
+wins with `motivo: "piedad"`; otherwise it is `motivo: "uno"`. Forgetting to
+call UNO leaves `olvido` set until the next player acts, and anyone can
+`{t:"pilla"}` in that window for two cards. The history is written in the
+second person for the viewer (`verbo`, `ati`: «duda de ti», never «de tú»).
+`tests/uno.test.cjs` plays robot games in every version to the end and
+through the audit, and checks that the audit catches a card that was not in
+the hand, a forged envelope and a short draw-until-playable, and that a false
+start key does not start the game. The `uno` game and its `modo`
+values needed the rules' whitelists widened, so it needs the rules
+re-published before a room can be created.
+
+**Every game has a manual** (`reglas.js`, the 📖 **Reglas** button). It is a
+modal hanging off `<body>` in `position:fixed` at z-index 80 — above the fin
+cartel (60) and `jg-modal-capa` (70), because the question «what did this card
+do?» comes up exactly when the cartel is on screen. It opens from three
+places: the room header (mid-game, which is when people ask), the footer of
+every lobby card (before opening a room — `leeOpciones` hands it the variant
+picked in that card's select), and a bar above the solo games' iframe (Mina
+Club, Snake Club). Games with variants (UNO, Flip 7, cacho with or without
+*siciliana*) get one tab per variant and open on the room's: whoever is
+playing No Mercy need not read the whole classic first. The text describes
+**what the engine does, not what the box says** — where this version departs
+from the table game (UNO draws from private decks, Flip 7 does not shuffle)
+the manual says what happens here. Change a rule in `motor.js` and change it
+there too: a manual that lies is worse than none. Escape, the backdrop, ✕ and
+«Entendido» close it, and focus goes back to the button that opened it.
 
 **Circuit Breakers (`worms`) is a whole game in an iframe**, like Mina Club:
 `juegos/worms/` is its own document (canvas, physics, `audio.js`) and

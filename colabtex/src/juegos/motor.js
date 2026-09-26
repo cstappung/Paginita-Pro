@@ -91,6 +91,13 @@ export const JUEGOS = {
     color: "#b5462c",
     minimo: 2,
     cupo: 8
+  },
+  uno: {
+    nombre: "UNO",
+    lema: "Clásico, No Mercy, All Wild o Liar's: quédate sin cartas antes que nadie",
+    color: "#e03a2f",
+    minimo: 2,
+    cupo: 10
   }
 };
 
@@ -636,6 +643,7 @@ export function reducir(p) {
   if (p.juego === "cadena") return { ...base, ...redCadena(p, js, listos) };
   if (p.juego === "flip7") return { ...base, ...redFlip7(p, js, listos) };
   if (p.juego === "cacho") return { ...base, ...redCacho(p, js, listos) };
+  if (p.juego === "uno") return { ...base, ...redUno(p, js, listos) };
   return base;
 }
 
@@ -650,6 +658,9 @@ export function meToca(est, uid) {
   if (!(est.jugadores || []).some(j => j.uid === uid)) return false;
   if (est.fase === "esconder") return !(est.compromisos || {})[uid];
   if (est.rev && est.comp) return est.fase === "jugando" && !est.comp[uid];
+  /* El UNO dice a quién espera en `debe`: a veces a varios (las monedas,
+     las cartas boca abajo del reto del Liar's). */
+  if (Array.isArray(est.debe)) return est.debe.includes(uid);
   return !!est.turno && est.turno === uid;
 }
 
@@ -685,6 +696,12 @@ export function progreso(est, juego) {
   if (juego === "flip7" && est.puntos) return c(Math.max(0, ...Object.values(est.puntos)) / (est.meta || F7_META));
   /* En el cacho se van perdiendo dados: cuenta lo que ya no está en la mesa. */
   if (juego === "cacho" && est.inicial) return c(1 - (est.total || 0) / est.inicial);
+  /* En el UNO cuenta lo cerca que está de quedarse sin cartas quien menos tiene. */
+  if (juego === "uno" && est.cartas && est.etapa === "juego") {
+    const q = (est.jugadores || []).map(j => j.uid).filter(u => !(est.fuera || {})[u] && !(est.elim || {})[u]);
+    if (!q.length) return 0;
+    return c((UNO_MANO - Math.min(...q.map(u => est.cartas[u]))) / (UNO_MANO - 1));
+  }
   if (juego === "cartas" && est.ganadas) return c(Math.max(0, ...Object.values(est.ganadas).map(g => g.length)) / 5);
   return 0;
 }
@@ -2436,4 +2453,856 @@ function redCacho(p, js, listos) {
     calzo: !fin && puedeCalzar(turno), obligar: !fin && puedeObligar(turno),
     pasar: !fin && puedePasar(turno), dudaPaso: !fin && puedeDudarPaso(turno)
   };
+}
+
+/* ============================================================
+   UNO — cinco versiones sobre el mismo reductor
+
+   El problema es el de siempre aquí, sin servidor: cada mano es
+   secreta, nadie puede elegir qué roba y nadie puede saber lo que
+   tiene otro. Lo resuelven cuatro piezas:
+
+   1. **Cada jugador roba de un mazo propio e infinito.** La carta
+      número k que roba `u` es `mazo[H("uno:" + sem + ":" + sal + ":" +
+      mezcla + ":" + k) mod largo]`: su semilla privada (la de
+      `misPartidas/<uid>/<pid>/sec`, la misma de cartas, Flip 7 y el
+      cacho) y una `mezcla` que nadie conoce hasta que empieza la
+      partida. Es un muestreo con reposición del mazo de la versión,
+      así que las proporciones son las de la caja; lo que se pierde es
+      que el mazo se agote, que en el UNO real solo obliga a barajar el
+      descarte. La mezcla sale de un arranque de compromiso y
+      revelación: la ficha lleva `hcad = H(arr)`, cada pantalla manda
+      `arr` sola al empezar, y la mezcla es el hash de todas. Así nadie
+      puede buscarse una semilla con buena mano.
+   2. **El reductor solo sabe cuántas cartas tiene cada uno.** Lleva
+      además una lista `ops` de lo que le pasó a cada mano (roba n,
+      juega tal carta, descarta el color tal…), que cada pantalla
+      repasa con su secreto para saber qué tiene (`repasaUno`).
+   3. **Lo que no se ve se promete con un hash**: las cartas boca abajo
+      del Liar's se juegan como `H(carta + ":" + sal)`, y los cambios de
+      mano (el 7 y el 0 del No Mercy, el Intercambio forzado del All
+      Wild) viajan en un sobre cifrado con Diffie-Hellman entre los dos
+      jugadores (`pk` en la ficha, grupo MODP de 2048 bits del RFC
+      3526): solo el que lo recibe puede abrirlo.
+   4. **Al acabar, todos revelan la semilla** `{t:"s"}` y `auditaUno`
+      repite la partida entera con todas las manos a la vista: que cada
+      carta jugada estuviera en la mano, que el robar-hasta-poder parara
+      donde tocaba, que la respuesta al reto del +4 fuera verdad, que
+      cada sobre llevara la mano de verdad… Quien mintió sale en rojo en
+      todas las pantallas.
+
+   El precio, dicho en voz alta: quien abra la consola puede calcular
+   qué robaría *él mismo* si robara ahora — su mazo es suyo. No puede
+   cambiarlo ni ver el de nadie.
+   ============================================================ */
+
+export const MODOS_UNO = {
+  clasico: "Clásico", nomercy: "No Mercy", nomercyx: "No Mercy + expansión",
+  allwild: "All Wild", liar: "Liar's"
+};
+export const modoUno = p => (p && Object.prototype.hasOwnProperty.call(MODOS_UNO, p.modo)) ? p.modo : "clasico";
+export const esNoMercy = modo => modo === "nomercy" || modo === "nomercyx";
+export const UNO_COLORES = ["R", "A", "V", "Z"];
+export const UNO_NOMBRE_COLOR = { R: "rojo", A: "amarillo", V: "verde", Z: "azul" };
+export const UNO_MANO = 7;
+export const UNO_TOPE = 25;          // No Mercy: con 25 cartas o más, fuera
+export const UNO_MUERTE = 24;        // Muerte súbita: todos roban hasta 24
+
+/* Los códigos. Una carta de color es su color y su valor (`R7`, `AS`
+   salta, `VI` invierte, `Z+2`, `R+4` el +4 de color del No Mercy, `AT`
+   salta a todos, `VD` descarta todo, `R10`); un comodín empieza por N
+   (`N`, `N+4`, `N+6`, `N+10`, `NI4` y `NI8` los que invierten, `NC` la
+   ruleta, `ND` descarte total, `NF` ataque final, `NM` muerte súbita,
+   y los del All Wild: `N+2`, `NS`, `NI`, `NS2`, `NT2` diana, `NW`
+   intercambio; `NL` el reto del Liar's). La tilde delante marca una
+   carta de mentiroso: `~R5` se juega boca abajo. */
+function construyeMazoUno(modo) {
+  const m = [];
+  const pon = (c, n) => { for (let i = 0; i < n; i++) m.push(c); };
+  if (modo === "allwild") {
+    pon("N", 54); pon("N+2", 10); pon("NS", 14); pon("NI", 14);
+    pon("NS2", 6); pon("NT2", 4); pon("N+4", 6); pon("NW", 4);
+    return m;
+  }
+  if (modo === "liar") {
+    for (const c of UNO_COLORES) {
+      for (let v = 0; v <= 9; v++) { pon(c + v, 1); pon("~" + c + v, 1); }
+      pon("~" + c + "S", 2); pon("~" + c + "I", 2); pon("~" + c + "+2", 2);
+    }
+    pon("~N+4", 2); pon("NL", 6);
+    return m;
+  }
+  if (esNoMercy(modo)) {
+    for (const c of UNO_COLORES) {
+      for (let v = 0; v <= 9; v++) pon(c + v, 2);
+      pon(c + "+2", 3); pon(c + "+4", 2); pon(c + "S", 3); pon(c + "T", 2);
+      pon(c + "I", 3); pon(c + "D", 3);
+      if (modo === "nomercyx") pon(c + "10", 2);
+    }
+    pon("NI4", 8); pon("N+6", 4); pon("N+10", 4); pon("NC", 8);
+    if (modo === "nomercyx") { pon("ND", 8); pon("NI8", 4); pon("NF", 2); pon("NM", 2); }
+    return m;
+  }
+  for (const c of UNO_COLORES) {
+    pon(c + "0", 1);
+    for (let v = 1; v <= 9; v++) pon(c + v, 2);
+    pon(c + "S", 2); pon(c + "I", 2); pon(c + "+2", 2);
+  }
+  pon("N", 4); pon("N+4", 4);
+  return m;
+}
+const mazosUno = {};
+export const mazoUno = modo => mazosUno[modo] || (mazosUno[modo] = construyeMazoUno(modo));
+const codigosUno = {};
+/* Todo código que la versión conoce, con y sin tilde. */
+export const codigosDeUno = modo => codigosUno[modo]
+  || (codigosUno[modo] = new Set(mazoUno(modo).flatMap(c => [c, c.replace(/^~/, "")])));
+
+export const sinTilde = c => (c && c[0] === "~") ? c.slice(1) : String(c || "");
+export const esMentiraUno = c => !!c && c[0] === "~";
+export const esComodinUno = c => sinTilde(c)[0] === "N";
+export const colorUno = c => esComodinUno(c) ? "" : sinTilde(c)[0];
+export const valorUno = c => esComodinUno(c) ? sinTilde(c) : sinTilde(c).slice(1);
+export const esNumeroUno = c => !esComodinUno(c) && /^\d+$/.test(valorUno(c));
+const ROBO_UNO = { "+2": 2, "+4": 4, "N+4": 4, "NI4": 4, "N+6": 6, "N+10": 10, "NI8": 8, "N+2": 2 };
+/* Cuánto hace robar una carta: en el No Mercy es también lo que decide
+   sobre qué se puede apilar. */
+export const roboUno = c => ROBO_UNO[valorUno(c)] || 0;
+
+/* ¿Se puede jugar `c` sobre la mesa? `e` = {modo, tope:{c, col}, pena}.
+   Con una pena encima (No Mercy) solo vale otra carta de robar de valor
+   igual o mayor, sin mirar el color. */
+export function jugableUno(c, e) {
+  if (!c) return false;
+  if (e.modo === "allwild") return true;
+  if (e.pena) return roboUno(c) > 0 && roboUno(c) >= e.pena.min;
+  if (esComodinUno(c)) return true;
+  const t = e.tope || {};
+  if (colorUno(c) === t.col) return true;
+  return !!t.c && !esComodinUno(t.c) && valorUno(c) === valorUno(t.c);
+}
+
+/* Lo que se puede anunciar al jugar boca abajo en el Liar's: cualquier
+   cara de carta de mentiroso. */
+export const anunciablesUno = () => [
+  ...UNO_COLORES.flatMap(c => [...Array(10).keys()].map(v => c + v).concat([c + "S", c + "I", c + "+2"])),
+  "N+4"
+];
+
+/* La primera carta del descarte: un número, de la mezcla. En el All
+   Wild no hay números; la mesa empieza con un comodín sin color. */
+export function topeInicialUno(modo, mezcla) {
+  if (modo === "allwild") return { c: "N", col: "" };
+  const h = parseInt(sha256hex("uno-tope:" + mezcla).slice(0, 8), 16);
+  const col = UNO_COLORES[h % 4];
+  return { c: col + ((h >>> 2) % 10), col };
+}
+
+/* ---------- los secretos derivados de la semilla ---------- */
+export const arrUno = (sem, sal) => sha256hex("uno-arr:" + sem + ":" + sal);
+export const salUno = (sem, sal, n) => sha256hex("uno-sal:" + sem + ":" + sal + ":" + n).slice(0, 16);
+export const tapaUno = (c, s) => sha256hex(c + ":" + s);
+export function cartaUno(modo, sem, sal, mezcla, k) {
+  const m = mazoUno(modo);
+  return m[parseInt(sha256hex("uno:" + sem + ":" + sal + ":" + mezcla + ":" + k).slice(0, 8), 16) % m.length];
+}
+
+/* Diffie-Hellman con el grupo 14 del RFC 3526 (2048 bits, g = 2). Lo
+   bastante para que un sobre no se abra en la consola a mitad de
+   partida; la privada sale de la semilla, así que al final se puede
+   comprobar que la pública era suya. */
+const DH_P = BigInt("0x" +
+  "ffffffffffffffffc90fdaa22168c234c4c6628b80dc1cd129024e088a67cc74020bbea63b139b22514a08798e3404dd" +
+  "ef9519b3cd3a431b302b0a6df25f14374fe1356d6d51c245e485b576625e7ec6f44c42e9a637ed6b0bff5cb6f406b7ed" +
+  "ee386bfb5a899fa5ae9f24117c4b1fe649286651ece45b3dc2007cb8a163bf0598da48361c55d39a69163fa8fd24cf5f" +
+  "83655d23dca3ad961c62f356208552bb9ed529077096966d670c354e4abc9804f1746c08ca18217c32905e462e36ce3b" +
+  "e39e772c180e86039b2783a2ec07a28fb5c55df06f4c52c9de2bcbf6955817183995497cea956ae515d2261898fa0510" +
+  "15728e5a8aacaa68ffffffffffffffff");
+function potMod(b, e, m) {
+  let r = 1n; b %= m;
+  while (e > 0n) { if (e & 1n) r = r * b % m; b = b * b % m; e >>= 1n; }
+  return r;
+}
+const dhPrivada = (sem, sal) => BigInt("0x" + sha256hex("uno-dh:" + sem + ":" + sal));
+const dhMemo = new Map();
+export function dhPublica(sem, sal) {
+  const k = "p:" + sem + ":" + sal;
+  if (!dhMemo.has(k)) dhMemo.set(k, potMod(2n, dhPrivada(sem, sal), DH_P).toString(16));
+  return dhMemo.get(k);
+}
+/* La clave que comparten el dueño de (sem, sal) y el de `pkOtro`; null
+   si la pública del otro no es un número. */
+export function dhCompartida(sem, sal, pkOtro) {
+  const k = sem + ":" + sal + ":" + pkOtro;
+  if (dhMemo.has(k)) return dhMemo.get(k);
+  let v = null;
+  try {
+    if (/^[0-9a-f]{1,600}$/.test(String(pkOtro))) {
+      const x = BigInt("0x" + pkOtro);
+      if (x > 1n && x < DH_P - 1n) v = sha256hex("uno-k:" + potMod(x, dhPrivada(sem, sal), DH_P).toString(16));
+    }
+  } catch (e) { v = null; }
+  dhMemo.set(k, v);
+  return v;
+}
+/* Un sobre: la mano como texto, XOR con un flujo de SHA-256 de la
+   clave compartida. Cada sobre lleva su `id`, así que dos sobres entre
+   los mismos dos no comparten flujo. */
+function flujoUno(clave, id, largo) {
+  const b = [];
+  for (let i = 0; b.length < largo; i++) {
+    const h = sha256hex(clave + ":" + id + ":" + i);
+    for (let j = 0; j < 64 && b.length < largo; j += 2) b.push(parseInt(h.substr(j, 2), 16));
+  }
+  return b;
+}
+export function cierraSobreUno(clave, id, mano) {
+  const t = mano.join(",");
+  const f = flujoUno(clave, id, t.length);
+  let s = "";
+  for (let i = 0; i < t.length; i++) s += ((t.charCodeAt(i) & 0xff) ^ f[i]).toString(16).padStart(2, "0");
+  return s;
+}
+/* La mano que había dentro, o null si no se deja leer como cartas de
+   esta versión (sobre falso, o pública falsa). */
+export function abreSobreUno(clave, id, hex, modo) {
+  if (!clave || typeof hex !== "string" || hex.length % 2 || !/^[0-9a-f]*$/.test(hex)) return null;
+  const f = flujoUno(clave, id, hex.length / 2);
+  let t = "";
+  for (let i = 0; i < hex.length / 2; i++) t += String.fromCharCode(parseInt(hex.substr(i * 2, 2), 16) ^ f[i]);
+  const m = t ? t.split(",") : [];
+  const ok = codigosDeUno(modo);
+  return m.every(c => ok.has(c)) ? m : null;
+}
+
+const listaUno = x => Array.isArray(x) ? x : Object.values(x || {});
+
+/* ---------- el reductor ---------- */
+function redUno(p, js, listos) {
+  const modo = modoUno(p), nm = esNoMercy(modo);
+  const ids = js.map(j => j.uid), N = ids.length;
+  const ficha = {};
+  for (const j of js) ficha[j.uid] = j;
+  const codigos = codigosDeUno(modo);
+  const cartas = {}, fuera = {}, elim = {}, arr = {}, monedas = {}, ocultas = {}, semillas = {};
+  for (const u of ids) { cartas[u] = 0; ocultas[u] = 0; }
+  let etapa = "arranque", mezcla = "", tope = null, dir = 1, turno = "", pena = null, espera = null;
+  let olvido = "", ganador = null, motivo = "", ni = 0, nsobre = 0, jugadas = 0;
+  const ops = [], hist = [], falsas = [];
+
+  const suceso = e => { e.i = ni++; hist.push(e); if (hist.length > 40) hist.shift(); };
+  const activo = u => !!ficha[u] && !fuera[u] && !elim[u];
+  const activos = () => ids.filter(activo);
+  const alrededor = (u, k) => ids[(((ids.indexOf(u) + dir * k) % N) + N) % N];
+  const sig1 = u => { for (let k = 1; k <= N; k++) { const c = alrededor(u, k); if (activo(c)) return c; } return u; };
+  const sig = (u, pasos = 1) => { let c = u; for (let s = 0; s < pasos; s++) c = sig1(c); return c; };
+  const vivoOSig = u => activo(u) ? u : sig1(u);
+  const op = (u, ...o) => ops.push([u, ...o]);
+  const roba = (u, n, por, ctx) => {
+    if (!(n > 0) || !activo(u)) return;
+    cartas[u] += n;
+    op(u, "r", n, por || "", ctx === undefined ? null : ctx);
+    if (por !== "mano") suceso({ e: "roba", uid: u, n, por: por || "" });
+  };
+  const gana = (u, m) => {
+    if (ganador !== null) return;
+    ganador = u; motivo = m;
+    if (u) suceso({ e: "gana", uid: u });
+  };
+  /* No Mercy: 25 cartas o más y fuera. Si queda uno, ha ganado. */
+  const revisaTope = () => {
+    if (!nm || ganador !== null) return;
+    for (const u of ids) if (activo(u) && cartas[u] >= UNO_TOPE) {
+      suceso({ e: "elimina", uid: u, n: cartas[u] });
+      elim[u] = true; cartas[u] = 0; op(u, "e");
+      if (olvido === u) olvido = "";
+    }
+    const q = activos();
+    if (q.length <= 1) gana(q[0] || "", "piedad");
+  };
+
+  const arranca = () => {
+    const vivos = ids.filter(u => !fuera[u]);
+    mezcla = sha256hex(vivos.map(u => u + ":" + arr[u]).join("|"));
+    for (const u of vivos) roba(u, UNO_MANO, "mano");
+    tope = topeInicialUno(modo, mezcla);
+    turno = vivos[parseInt(mezcla.slice(8, 16), 16) % vivos.length];
+    etapa = modo === "nomercyx" ? "monedas" : "juego";
+    suceso({ e: "empieza", uid: turno });
+  };
+
+  /* Un cambio de manos: cada par [de, a] es «la mano de `de` pasa a
+     `a`». Espera los sobres de todos y los aplica de golpe, que es lo
+     que hace falta para la rueda del 0. */
+  const intercambia = (pares, luego, por) => {
+    espera = { k: "sobres", id: nsobre++, pares: pares.map(([de, a]) => ({ de, a })), hechos: {}, luego, por };
+    turno = "";
+  };
+  const cierraSobres = () => {
+    const e = espera;
+    const antes = { ...cartas };
+    const lista = e.pares.map(x => [x.de, x.a, e.hechos[x.de + ">" + x.a]]);
+    for (const [de, a] of lista) cartas[a] = antes[de];
+    ops.push(["", "X", e.id, lista]);
+    suceso({ e: "cambio", por: e.por, pares: e.pares });
+    espera = null;
+    turno = vivoOSig(e.luego);
+  };
+
+  /* Lo que hace una carta al caer, ya jugada y descontada. `c` va sin
+     tilde (una carta de mentiroso aceptada vale lo que anunció). */
+  const efecto = (u, c, x) => {
+    const v = valorUno(c);
+    const col = modo === "allwild" ? "" : esComodinUno(c) ? x.col : colorUno(c);
+    tope = { c, col };
+    if (v === "D" || c === "ND") {
+      cartas[u] -= x.n; op(u, "dc", col, x.n);
+      suceso({ e: "descarta", uid: u, col, n: x.n });
+    }
+    if (c === "NF") op(u, "fa", x.mano);
+    if (cartas[u] <= 0) { cartas[u] = 0; gana(u, "uno"); return; }
+    const dos = activos().length === 2;
+    let luego = sig(u);
+    if (modo === "allwild") {
+      if (c === "N+2" || c === "N+4") { const w = sig(u); roba(w, roboUno(c), "carta"); luego = sig(u, 2); }
+      else if (c === "NS") luego = sig(u, 2);
+      else if (c === "NS2") luego = sig(u, 3);
+      else if (c === "NI") { dir = -dir; luego = dos ? u : sig(u); }
+      else if (c === "NT2") roba(x.obj, 2, "diana");
+      else if (c === "NW") return intercambia([[u, x.obj], [x.obj, u]], luego, "NW");
+      turno = luego;
+      return;
+    }
+    if (v === "S") luego = sig(u, 2);
+    else if (v === "I") { dir = -dir; luego = dos ? u : sig(u); }
+    else if (v === "T") luego = u;
+    else if (nm && roboUno(c)) {
+      if (c === "NI4" || c === "NI8") dir = -dir;
+      const val = roboUno(c);
+      let tot = (pena ? pena.n : 0) + val;
+      if (x.moneda) tot *= 2;
+      pena = { n: tot, min: val, de: u };
+      turno = sig(u);
+      return;
+    }
+    else if (v === "+2") { const w = sig(u); roba(w, 2, "carta"); luego = sig(u, 2); }
+    else if (c === "N+4" && modo === "clasico") {
+      espera = { k: "reto", uid: sig(u), de: u, prev: x.prev };
+      turno = sig(u);
+      return;
+    }
+    else if (c === "N+4") { const w = sig(u); roba(w, 4, "carta"); luego = sig(u, 2); }
+    else if (nm && v === "7") return intercambia([[u, x.obj], [x.obj, u]], luego, "7");
+    else if (nm && v === "0") return intercambia(activos().map(w => [w, sig1(w)]), luego, "0");
+    else if (c === "NC") { espera = { k: "ruleta", uid: sig(u), de: u }; turno = sig(u); return; }
+    else if (c === "NF") {
+      const w = sig(u), n = x.mano.filter(y => !esNumeroUno(y)).length;
+      if (n >= 7) {
+        roba(w, UNO_TOPE, "final");
+        for (const o of activos()) if (o !== u && o !== w) roba(o, 5, "final");
+      } else roba(w, n, "final");
+      suceso({ e: "final", uid: u, a: w, n, mano: x.mano });
+      revisaTope();
+      luego = sig1(w);
+    }
+    else if (c === "NM") { for (const o of activos()) if (cartas[o] < UNO_MUERTE) roba(o, UNO_MUERTE - cartas[o], "muerte"); }
+    else if (c === "NL") {
+      const faltan = activos().filter(o => o !== u && cartas[o] > 0);
+      espera = { k: "tapas", de: u, col, faltan, tapas: {}, abiertas: {} };
+      turno = "";
+      if (!faltan.length) { espera = null; turno = luego; }
+      return;
+    }
+    revisaTope();
+    if (ganador === null) turno = vivoOSig(luego);
+  };
+
+  /* El reto del Liar's se cierra: las cartas que no se destaparon, y la
+     verdadera que lo paró, se quedan en el descarte. */
+  const cierraTapas = d => {
+    espera = null;
+    suceso({ e: "tapas", uid: d.de, abiertas: d.abiertas });
+    const vacios = ids.filter(o => activo(o) && d.tapas[o] && cartas[o] === 0);
+    if (vacios.length) {
+      /* Si alguien se quedó sin cartas, gana el primero desde quien retó. */
+      for (let k = 1; k <= N; k++) { const c = alrededor(d.de, k); if (vacios.includes(c)) { gana(c, "uno"); return; } }
+    }
+    turno = sig(d.de);
+  };
+
+  /* Alguien se va: lo que se le estaba esperando no puede quedarse
+     esperando. */
+  const repara = u => {
+    const e = espera;
+    if (olvido === u) olvido = "";
+    if (e) {
+      if (e.k === "sobres" && e.pares.some(x => x.de === u || x.a === u)) { espera = null; turno = vivoOSig(e.luego); }
+      else if ((e.k === "tras" || e.k === "hasta") && e.uid === u) { espera = null; turno = sig1(u); }
+      else if (e.k === "reto" && (e.uid === u || e.de === u)) { espera = null; turno = vivoOSig(e.uid); }
+      else if (e.k === "resp" && (e.uid === u || e.reta === u)) { espera = null; turno = vivoOSig(e.reta); }
+      else if (e.k === "ruleta" && e.uid === u) { espera = null; turno = sig1(u); }
+      else if (e.k === "duda") {
+        if (e.de === u) { tope = e.antes; espera = null; turno = sig1(u); }
+        else if (e.sig === u) e.sig = sig1(e.de);
+      } else if (e.k === "revela" && e.uid === u) {
+        if (e.por === "duda") { tope = e.d.antes; espera = null; turno = sig1(u); }
+        else { espera = e.d; if (!Object.keys(e.d.tapas).some(o => activo(o) && !e.d.abiertas[o])) cierraTapas(e.d); }
+      } else if (e.k === "revela" && e.por === "tapa" && e.d.de === u) cierraTapas(e.d);
+      else if (e.k === "tapas") {
+        if (e.de === u) cierraTapas(e);
+        else { e.faltan = e.faltan.filter(o => o !== u); if (e.faltan.every(o => e.tapas[o])) espera = { ...e, k: "destapa" }; }
+      } else if (e.k === "destapa") {
+        if (e.de === u || !Object.keys(e.tapas).some(o => o !== u && activo(o) && !e.abiertas[o])) cierraTapas(e);
+      }
+    }
+    if (!espera && turno === u) turno = sig1(u);
+    if (!espera && pena && turno && !activo(turno)) turno = sig1(turno);
+  };
+
+  const TURNO = new Set(["juega", "roba", "pasa", "carga", "reta", "ruleta", "miente", "merced"]);
+
+  for (const j of jugadasDe(p)) {
+    const u = j.uid;
+    if (!ficha[u]) continue;
+    if (j.t === "s") { if (ganador !== null) semillas[u] = true; continue; }
+    if (j.t === "abandona") {
+      if (ganador !== null || fuera[u]) continue;
+      fuera[u] = true;
+      suceso({ e: "abandona", uid: u });
+      const quedan = ids.filter(o => !fuera[o] && !elim[o]);
+      if (quedan.length <= 1) { gana(quedan[0] || "", "abandono"); continue; }
+      if (!listos) continue;
+      if (etapa === "arranque") { if (ids.every(o => fuera[o] || arr[o])) arranca(); continue; }
+      if (etapa === "monedas") { if (activos().every(o => monedas[o])) etapa = "juego"; }
+      repara(u);
+      continue;
+    }
+    if (ganador !== null || !listos || !activo(u)) continue;
+
+    if (j.t === "k") {
+      const c = String(j.c || "");
+      if (etapa !== "arranque" || arr[u]) continue;
+      if (!/^[0-9a-f]{64}$/.test(c) || sha256hex(c) !== ficha[u].hcad) {
+        if (!falsas.some(f => f.uid === u && f.que === "llave")) { falsas.push({ uid: u, que: "llave" }); suceso({ e: "falsa", uid: u }); }
+        continue;
+      }
+      arr[u] = c;
+      if (ids.every(o => fuera[o] || arr[o])) arranca();
+      continue;
+    }
+    if (etapa === "monedas") {
+      if (j.t === "moneda" && !monedas[u] && (j.lado === "mercy" || j.lado === "nomercy")) {
+        monedas[u] = { lado: j.lado, usada: false };
+        suceso({ e: "moneda", uid: u, lado: j.lado });
+        if (activos().every(o => monedas[o])) etapa = "juego";
+      }
+      continue;
+    }
+    if (etapa !== "juego") continue;
+
+    /* ¡UNO! y pillar al que se olvidó. */
+    if (j.t === "uno") {
+      if (olvido === u) { olvido = ""; suceso({ e: "uno", uid: u }); }
+      continue;
+    }
+    if (j.t === "pilla") {
+      const a = j.a;
+      if (a !== u && olvido === a && activo(a) && cartas[a] === 1 && !(espera && espera.k === "sobres")) {
+        olvido = "";
+        suceso({ e: "pilla", uid: u, a });
+        roba(a, 2, "uno");
+      }
+      continue;
+    }
+    if (TURNO.has(j.t) && olvido && olvido !== u) olvido = "";
+
+    const e = espera;
+    const miTurno = !e && turno === u;
+    const tras = e && (e.k === "tras" || e.k === "hasta") && e.uid === u;
+
+    if (j.t === "juega") {
+      const c = String(j.c || "");
+      if (!(miTurno || tras) || !codigos.has(c) || esMentiraUno(c)) continue;
+      if (!jugableUno(c, { modo, tope, pena })) continue;
+      if (esComodinUno(c) && modo !== "allwild" && !UNO_COLORES.includes(j.col)) continue;
+      const quedan = cartas[u] - 1;
+      const x = { col: j.col, prev: tope.col, obj: j.obj, n: 0, mano: null, moneda: false };
+      if ((nm && valorUno(c) === "7") || c === "NW") {
+        if (quedan > 0 && (!activo(j.obj) || j.obj === u)) continue;
+      }
+      if (c === "NT2" && !activo(j.obj)) continue;
+      if (valorUno(c) === "D" || c === "ND") {
+        const n = Number(j.n);
+        if (!Number.isInteger(n) || n < 0 || n > quedan) continue;
+        x.n = n;
+      }
+      if (c === "NF") {
+        const m = listaUno(j.mano).map(String);
+        if (m.length !== quedan || !m.every(y => codigos.has(y))) continue;
+        x.mano = m;
+      }
+      if (j.moneda) {
+        const mo = monedas[u];
+        if (!mo || mo.lado !== "nomercy" || mo.usada || !roboUno(c)) continue;
+        mo.usada = true; x.moneda = true;
+        suceso({ e: "usamoneda", uid: u, lado: "nomercy" });
+      }
+      cartas[u] = quedan;
+      op(u, "j", c, tras ? 1 : 0);
+      espera = null;
+      jugadas++;
+      suceso({ e: "juega", uid: u, c, col: j.col || "", obj: j.obj || "", moneda: x.moneda || undefined });
+      if (quedan - (x.n || 0) === 1) { if (j.uno) suceso({ e: "uno", uid: u }); else olvido = u; }
+      efecto(u, c, x);
+      continue;
+    }
+    if (j.t === "miente") {
+      const di = String(j.di || ""), h = String(j.h || "");
+      if (modo !== "liar" || !miTurno || !anunciablesUno().includes(di) || !/^[0-9a-f]{64}$/.test(h)) continue;
+      if (!jugableUno(di, { modo, tope, pena })) continue;
+      if (esComodinUno(di) && !UNO_COLORES.includes(j.col)) continue;
+      cartas[u]--;
+      const n = ocultas[u]++;
+      op(u, "h", h, n, "m");
+      const antes = tope;
+      tope = { c: di, col: esComodinUno(di) ? j.col : colorUno(di), oculta: true };
+      espera = { k: "duda", de: u, di, col: j.col || "", h, n, sig: sig(u), antes };
+      jugadas++;
+      suceso({ e: "miente", uid: u, di, col: j.col || "" });
+      if (cartas[u] === 1) { if (j.uno) suceso({ e: "uno", uid: u }); else olvido = u; }
+      continue;
+    }
+    if (j.t === "roba") {
+      if (!miTurno || pena || modo === "allwild") continue;
+      if (nm) {
+        const n = Number(j.n);
+        if (!Number.isInteger(n) || n < 1 || n > UNO_TOPE + 1) continue;
+        roba(u, n, "hasta", { c: tope.c, col: tope.col });
+        revisaTope();
+        if (ganador !== null) continue;
+        if (elim[u]) turno = sig1(u);
+        else espera = { k: "hasta", uid: u };
+      } else {
+        roba(u, 1, "turno");
+        espera = { k: "tras", uid: u };
+      }
+      continue;
+    }
+    /* Tras robar hasta poder, lo honrado es jugar la última; pasar se
+       deja (una pantalla que contó mal no debe dejar la mesa parada)
+       y lo juzga la auditoría. */
+    if (j.t === "pasa") {
+      if (!(e && (e.k === "tras" || e.k === "hasta") && e.uid === u)) continue;
+      if (e.k === "hasta") op(u, "ph", { c: tope.c, col: tope.col });
+      espera = null;
+      suceso({ e: "pasa", uid: u });
+      turno = sig(u);
+      continue;
+    }
+    if (j.t === "carga") {
+      if (miTurno && pena) {
+        const n = pena.n;
+        pena = null;
+        roba(u, n, "pena");
+        revisaTope();
+        if (ganador === null) turno = sig1(u);
+      } else if (e && e.k === "reto" && e.uid === u) {
+        espera = null;
+        roba(u, 4, "carta");
+        turno = sig(u);
+      }
+      continue;
+    }
+    if (j.t === "reta") {
+      if (!(e && e.k === "reto" && e.uid === u)) continue;
+      espera = { k: "resp", uid: e.de, reta: u, prev: e.prev };
+      turno = "";
+      suceso({ e: "reta", uid: u, a: e.de });
+      continue;
+    }
+    if (j.t === "resp") {
+      if (!(e && e.k === "resp" && e.uid === u)) continue;
+      const legal = !!j.ok;
+      op(u, "w4", legal ? 1 : 0, e.prev);
+      espera = null;
+      suceso({ e: "resp", uid: u, a: e.reta, legal });
+      if (legal) { roba(e.reta, 6, "reto"); turno = sig(e.reta); }
+      else { roba(u, 4, "reto"); turno = e.reta; }
+      continue;
+    }
+    if (j.t === "ruleta") {
+      const n = Number(j.n);
+      if (!(e && e.k === "ruleta" && e.uid === u) || !UNO_COLORES.includes(j.col)) continue;
+      if (!Number.isInteger(n) || n < 1 || n > UNO_TOPE + 1) continue;
+      espera = null;
+      tope = { ...tope, col: j.col };
+      suceso({ e: "ruleta", uid: u, col: j.col, n });
+      roba(u, n, "ruleta", j.col);
+      revisaTope();
+      if (ganador === null) turno = sig1(u);
+      continue;
+    }
+    if (j.t === "sobre") {
+      if (!(e && e.k === "sobres")) continue;
+      const clave = u + ">" + j.a;
+      if (!e.pares.some(x => x.de === u && x.a === j.a) || e.hechos[clave] !== undefined || typeof j.enc !== "string") continue;
+      e.hechos[clave] = j.enc;
+      if (e.pares.every(x => e.hechos[x.de + ">" + x.a] !== undefined)) cierraSobres();
+      continue;
+    }
+    if (j.t === "merced") {
+      const mo = monedas[u];
+      if (!miTurno || !mo || mo.lado !== "mercy" || mo.usada) continue;
+      mo.usada = true;
+      if (olvido === u) olvido = "";
+      op(u, "v");
+      cartas[u] = 0;
+      pena = null;
+      suceso({ e: "usamoneda", uid: u, lado: "mercy" });
+      roba(u, UNO_MANO, "merced");
+      continue;
+    }
+    if (j.t === "cree") {
+      if (!(e && e.k === "duda" && e.sig === u)) continue;
+      espera = null;
+      suceso({ e: "cree", uid: u, a: e.de });
+      efecto(e.de, e.di, { col: e.col });
+      continue;
+    }
+    if (j.t === "duda") {
+      if (!(e && e.k === "duda" && e.de !== u)) continue;
+      espera = { k: "revela", uid: e.de, h: e.h, n: e.n, por: "duda", dudon: u, d: e };
+      suceso({ e: "duda", uid: u, a: e.de });
+      continue;
+    }
+    if (j.t === "revela") {
+      if (!(e && e.k === "revela" && e.uid === u)) continue;
+      const c = String(j.c || "");
+      if (!codigos.has(c) || tapaUno(c, String(j.s || "")) !== e.h) {
+        if (!falsas.some(f => f.uid === u && f.que === "revela" && f.n === e.n)) {
+          falsas.push({ uid: u, que: "revela", n: e.n });
+          suceso({ e: "falsa", uid: u });
+        }
+        continue;
+      }
+      if (e.por === "duda") {
+        const d = e.d;
+        if (esMentiraUno(c) && sinTilde(c) === d.di) {
+          suceso({ e: "verdad", uid: u, a: e.dudon, c });
+          espera = null;
+          roba(e.dudon, 1, "duda");
+          efecto(u, d.di, { col: d.col });
+        } else {
+          suceso({ e: "mentira", uid: u, a: e.dudon, c });
+          espera = null;
+          tope = d.antes;
+          cartas[u] += 1; op(u, "b", c);
+          if (olvido === u) olvido = "";
+          roba(u, 1, "mentira");
+          turno = sig(u);
+        }
+      } else {
+        const d = e.d;
+        const verdad = colorUno(c) === d.col;
+        d.abiertas[u] = { c, v: verdad };
+        suceso({ e: verdad ? "verdad" : "mentira", uid: u, a: d.de, c, tapa: true });
+        if (verdad) cierraTapas(d);
+        else {
+          cartas[u] += 1; op(u, "b", c);
+          roba(u, 1, "mentira");
+          espera = d;
+          if (!Object.keys(d.tapas).some(o => activo(o) && !d.abiertas[o])) cierraTapas(d);
+        }
+      }
+      continue;
+    }
+    if (j.t === "tapa") {
+      const h = String(j.h || "");
+      if (!(e && e.k === "tapas" && e.faltan.includes(u)) || e.tapas[u] || !/^[0-9a-f]{64}$/.test(h)) continue;
+      cartas[u]--;
+      const n = ocultas[u]++;
+      op(u, "h", h, n, "t");
+      e.tapas[u] = { h, n };
+      suceso({ e: "tapa", uid: u });
+      if (e.faltan.every(o => e.tapas[o] || !activo(o))) espera = { ...e, k: "destapa" };
+      continue;
+    }
+    if (j.t === "destapa") {
+      if (!(e && e.k === "destapa" && e.de === u)) continue;
+      const t = e.tapas[j.a];
+      if (!t || e.abiertas[j.a] || !activo(j.a)) continue;
+      espera = { k: "revela", uid: j.a, h: t.h, n: t.n, por: "tapa", d: e };
+      suceso({ e: "destapa", uid: u, a: j.a });
+      continue;
+    }
+    if (j.t === "basta") {
+      if (!(e && e.k === "destapa" && e.de === u)) continue;
+      cierraTapas(e);
+      continue;
+    }
+  }
+
+  /* Quién debe algo ahora mismo, y qué. Lo que las pantallas mandan
+     solas (llaves, sobres, respuestas, revelaciones) no cuenta como
+     «te toca». */
+  let esp = null, debe = [];
+  if (listos && ganador === null) {
+    if (etapa === "arranque") esp = { k: "llaves", faltan: ids.filter(o => !fuera[o] && !arr[o]) };
+    else if (etapa === "monedas") { esp = { k: "monedas", faltan: activos().filter(o => !monedas[o]) }; debe = esp.faltan; }
+    else if (espera) {
+      esp = espera;
+      if (espera.k === "sobres") esp = { ...espera, faltan: espera.pares.filter(x => espera.hechos[x.de + ">" + x.a] === undefined) };
+      if (espera.k === "tapas") esp = { ...espera, faltan: espera.faltan.filter(o => activo(o) && !espera.tapas[o]) };
+      const k = esp.k;
+      debe = k === "tras" || k === "hasta" || k === "reto" || k === "ruleta" ? [esp.uid]
+        : k === "duda" ? [esp.sig] : k === "tapas" ? esp.faltan : k === "destapa" ? [esp.de] : [];
+    } else { esp = { k: pena ? "pena" : "turno", uid: turno }; debe = [turno]; }
+  }
+  const fin = ganador !== null;
+  return {
+    fase: !listos ? "espera" : fin ? "fin" : "jugando",
+    modo, nm, etapa, cartas, fuera, elim, monedas, mezcla, tope, dir, pena: fin ? null : pena,
+    turno: fin ? "" : (espera ? "" : turno), espera: esp, debe: fin ? [] : debe,
+    olvido: fin ? "" : olvido, ops, hist, falsas, ganador, motivo, semillas, jugadas
+  };
+}
+
+/* ---------- repasar las manos ----------
+   Lo que tiene cada uno sale de repetir `ops` con su semilla. Con un
+   solo secreto (el propio) es lo que pinta la pantalla; con todos es la
+   auditoría, y entonces `fallo(uid, que)` avisa de cada cosa que no
+   cuadra. Una mano que no se puede saber (secreto sin revelar) es
+   null y no se comprueba. */
+export function repasaUno(est, secretos, fallo) {
+  const modo = est.modo, mezcla = est.mezcla;
+  const pk = {};
+  for (const j of est.jugadores || []) pk[j.uid] = j.pk || "";
+  const manos = {}, k = {}, ultima = {}, tapadas = {};
+  for (const j of est.jugadores || []) { manos[j.uid] = secretos[j.uid] ? [] : null; k[j.uid] = 0; tapadas[j.uid] = {}; }
+  const f = (u, que) => { if (fallo) fallo(u, que); };
+  const quita = (m, c) => { const i = m.indexOf(c); if (i < 0) return false; m.splice(i, 1); return true; };
+  const ilegibles = [];
+  for (const o of est.ops || []) {
+    const [u, t] = o;
+    if (t === "X") {
+      const [, , id, lista] = o;
+      const antes = {};
+      for (const [de] of lista) antes[de] = manos[de] ? manos[de].slice() : null;
+      for (const [de, a, enc] of lista) {
+        let dentro = null, visto = false;
+        if (secretos[de]) {
+          const m = abreSobreUno(dhCompartida(secretos[de].sem, secretos[de].sal, pk[a]), id, enc, modo);
+          visto = true;
+          if (!m || m.slice().sort().join() !== antes[de].slice().sort().join()) f(de, "sobre");
+          dentro = antes[de].slice();
+        }
+        if (secretos[a] && !visto) {
+          dentro = abreSobreUno(dhCompartida(secretos[a].sem, secretos[a].sal, pk[de]), id, enc, modo);
+          if (!dentro) { ilegibles.push(de); dentro = null; }
+        }
+        if (manos[a] !== null || secretos[a]) manos[a] = dentro;
+      }
+      continue;
+    }
+    const s = secretos[u], m = manos[u];
+    if (!s || !m) continue;
+    if (t === "r") {
+      const [, , n, por, ctx] = o;
+      const nuevas = [];
+      for (let i = 0; i < n; i++) nuevas.push(cartaUno(modo, s.sem, s.sal, mezcla, k[u]++));
+      m.push(...nuevas);
+      if (nuevas.length) ultima[u] = nuevas[nuevas.length - 1];
+      if (fallo && por === "hasta") {
+        const ok = c => jugableUno(c, { modo, tope: ctx });
+        const lleno = m.length >= UNO_TOPE;
+        if (nuevas.slice(0, -1).some(ok) || (!lleno && !ok(nuevas[nuevas.length - 1]))) f(u, "roba");
+      }
+      if (fallo && por === "ruleta") {
+        const es = c => colorUno(c) === ctx;
+        const lleno = m.length >= UNO_TOPE;
+        if (nuevas.slice(0, -1).some(es) || (!lleno && !es(nuevas[nuevas.length - 1]))) f(u, "ruleta");
+      }
+    } else if (t === "j") {
+      const [, , c, trasRobar] = o;
+      if (trasRobar && c !== ultima[u]) f(u, "carta");
+      if (!quita(m, c)) f(u, "carta");
+    } else if (t === "h") {
+      const [, , h, n, tipo] = o;
+      const sal = salUno(s.sem, s.sal, n);
+      const c = m.find(x => tapaUno(x, sal) === h);
+      if (!c) f(u, "tapada");
+      else { quita(m, c); tapadas[u][n] = c; if (tipo === "m" && !esMentiraUno(c)) f(u, "tapada"); }
+    } else if (t === "ph") {
+      if (fallo && m.length < UNO_TOPE && jugableUno(ultima[u], { modo, tope: o[2] })) f(u, "roba");
+    } else if (t === "b") m.push(o[2]);
+    else if (t === "dc") {
+      const [, , col, n] = o;
+      const antes = m.length;
+      for (let i = m.length - 1; i >= 0; i--) if (colorUno(m[i]) === col) m.splice(i, 1);
+      if (antes - m.length !== n) f(u, "descarte");
+    } else if (t === "v" || t === "e") m.length = 0;
+    else if (t === "w4") {
+      const [, , legal, prev] = o;
+      if (!!legal !== !m.some(c => colorUno(c) === prev)) f(u, "reto");
+    } else if (t === "fa") {
+      if (listaUno(o[2]).slice().sort().join() !== m.slice().sort().join()) f(u, "final");
+    }
+  }
+  return { manos, ilegibles, tapadas };
+}
+
+/* La mano propia, para pintar, y las cartas que uno tiene boca abajo
+   en la mesa (por su `n`), que son las que habrá que destapar. */
+export function manoUno(est, uid, sec) {
+  if (!sec || !est || !est.mezcla) return { mano: [], ilegibles: [], tapadas: {} };
+  const r = repasaUno(est, { [uid]: sec }, null);
+  return { mano: r.manos[uid] || [], ilegibles: r.ilegibles, tapadas: r.tapadas[uid] || {} };
+}
+
+/* Lo que la pantalla necesita para jugar su propia mano sin mirar la
+   de nadie: cuántas cartas lleva robadas de su mazo (el `k` de la
+   siguiente) y cuántas ha puesto boca abajo (el `n` de la sal de la
+   siguiente). Salen de `ops`, igual que la mano. */
+export function cuentaUno(est, uid) {
+  let robadas = 0, ocultas = 0;
+  for (const o of (est && est.ops) || []) {
+    if (o[0] !== uid) continue;
+    if (o[1] === "r") robadas += o[2];
+    else if (o[1] === "h") ocultas++;
+  }
+  return { robadas, ocultas };
+}
+
+/* Robar hasta poder jugar (No Mercy), o hasta sacar el color de la
+   ruleta: cuántas cartas son, calculado con el mazo propio. Para al
+   llegar a 25 en la mano, que es quedar fuera. */
+export function robaHastaUno(est, sec, uid, mano, vale) {
+  const { robadas } = cuentaUno(est, uid);
+  for (let i = 0; ; i++) {
+    const c = cartaUno(est.modo, sec.sem, sec.sal, est.mezcla, robadas + i);
+    if (vale(c) || mano.length + i + 1 >= UNO_TOPE) return i + 1;
+  }
+}
+
+/* La auditoría de final de partida: con las semillas reveladas, la
+   partida entera otra vez. Devuelve [{uid, que}], como la de Flip 7:
+   `que` es "semilla" si no cuadra con lo prometido en la ficha, "oculta"
+   si nunca se reveló (aviso suave: cerrar la pestaña no es hacer
+   trampa), y el nombre de la comprobación que falló si no. */
+export async function auditaUno(partida, estado) {
+  const secretos = {}, fallos = [];
+  const pon = (uid, que) => { if (!fallos.some(x => x.uid === uid && x.que === que)) fallos.push({ uid, que }); };
+  for (const j of jugadasDe(partida)) {
+    if (j.t !== "s" || secretos[j.uid]) continue;
+    const f = (estado.jugadores || []).find(x => x.uid === j.uid);
+    if (!f) continue;
+    const sem = j.sem, sal = String(j.sal || "");
+    const ok = await compromisoValido(sem, sal, f.hmazo)
+      && sha256hex(arrUno(sem, sal)) === f.hcad && dhPublica(sem, sal) === f.pk;
+    if (!ok) { pon(j.uid, "semilla"); continue; }
+    secretos[j.uid] = { sem, sal };
+  }
+  if (estado.mezcla) repasaUno(estado, secretos, pon);
+  for (const j of estado.jugadores || []) if (!secretos[j.uid] && !fallos.some(x => x.uid === j.uid)) pon(j.uid, "oculta");
+  return fallos;
 }

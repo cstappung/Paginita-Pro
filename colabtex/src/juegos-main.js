@@ -33,7 +33,7 @@ import { crearSolo } from "./juegos/solo/club.js";
 import { watchAuth, loginGoogle, logout } from "./firebase.js";
 import * as fb from "./fb-juegos.js";
 import { escapeHtml, timeAgo, colorForUid } from "./util.js";
-import { JUEGOS, reducir, jugadasDe, acumula, cupoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7 } from "./juegos/motor.js";
+import { JUEGOS, reducir, jugadasDe, acumula, cupoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO } from "./juegos/motor.js";
 import { crearEscondite } from "./juegos/escondite.js";
 import { crearCartas } from "./juegos/cartas.js";
 import { crearCuadritos } from "./juegos/cuadritos.js";
@@ -43,6 +43,8 @@ import { crearWorms } from "./juegos/worms.js";
 import { crearCadena } from "./juegos/cadena.js";
 import { crearFlip7 } from "./juegos/flip7.js";
 import { crearCacho } from "./juegos/cacho.js";
+import { crearUno } from "./juegos/uno.js";
+import { abreReglas, tieneReglas } from "./juegos/reglas.js";
 import { crearRanks } from "./juegos/ranks.js";
 import { mezcla, abrePerfil } from "./juegos/perfil.js";
 import { suena, silenciar, silenciado, ambientar, ajustarMusica, activarAudio, configurarMusica, musicaActiva, volumenMusica } from "./juegos/sonido.js";
@@ -54,10 +56,10 @@ const VER = (document.currentScript && document.currentScript.src.split("?v=")[1
 const FABRICAS = {
   orbita: crearOrbita, escondite: crearEscondite, cartas: crearCartas,
   cuadritos: crearCuadritos, reversi: crearReversi, worms: crearWorms,
-  cadena: crearCadena, flip7: crearFlip7, cacho: crearCacho
+  cadena: crearCadena, flip7: crearFlip7, cacho: crearCacho, uno: crearUno
 };
 
-const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲" };
+const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥" };
 
 /* Lo que puede elegir quien abre la sala, por juego. Vive aquí y no en
    `motor.js` porque son controles y no reglas: el motor ya recorta lo
@@ -99,6 +101,11 @@ const OPCIONES = {
     { clave: "cupo", etiqueta: "Jugadores", valores: cupos("cacho") },
     { clave: "sicil", etiqueta: "Partida", por: 0,
       valores: [{ v: 0, t: "Normal" }, { v: 1, t: "Siciliana" }] }
+  ],
+  uno: [
+    { clave: "cupo", etiqueta: "Jugadores", valores: cupos("uno") },
+    { clave: "modo", etiqueta: "Versión", por: "clasico",
+      valores: Object.keys(MODOS_UNO).map(v => ({ v, t: MODOS_UNO[v] })) }
   ]
 };
 
@@ -614,7 +621,16 @@ function armazon() {
   const h = $("pantalla");
   if (state.vista.startsWith("solo-")) {
     individual = crearSolo({juego:state.vista.slice(5),usuario:state.user,guardar:fb.guardarSolo,watch:fb.watchSolo,volver:()=>ir("")});
-    individual.montar(h); return;
+    individual.montar(h);
+    /* Mina y Snake traen su propia pantalla, pero el manual es el mismo
+       para todos: una barrita encima del marco, que mide 1100 px y
+       dejaría debajo cualquier botón puesto después. */
+    const juego = state.vista.slice(5), barra = document.createElement("div");
+    barra.className = "jg-solo-barra";
+    barra.innerHTML = `<button class="btn2" type="button">📖 Reglas</button>`;
+    barra.firstChild.onclick = () => abreReglas(juego);
+    h.insertBefore(barra, h.firstChild);
+    return;
   }
   if (state.vista === "ranks") {
     h.innerHTML = "";
@@ -629,6 +645,7 @@ function armazon() {
         <b id="jgTitulo"></b>
         <span class="grow"></span>
         <span id="jgQuienes" class="jg-quienes"></span>
+        <button class="btn2" id="jgReglas" title="Cómo se juega">📖 Reglas</button>
         <button class="btn2" id="jgAbandonar" style="display:none">Abandonar</button>
       </div>
       <div id="jgMirando"></div>
@@ -646,6 +663,13 @@ function armazon() {
       </section>`;
     $("jgVolver").onclick = salirDeLaPartida;
     $("jgAbandonar").onclick = abandonar;
+    /* Las reglas se abren en la versión de esta sala: quien entra a un
+       No Mercy no tiene por qué leer primero las del clásico. */
+    $("jgReglas").onclick = () => {
+      const p = state.partida;
+      if (!p || !tieneReglas(p.juego)) return;
+      abreReglas(p.juego, { modo: p.juego === "cacho" ? (Number(p.sicil) || 0) : p.modo, nombre: JUEGOS[p.juego].nombre });
+    };
     $("jgChatForm").onsubmit = async ev => {
       ev.preventDefault();
       const campo = $("jgChatTxt"), texto = campo.value.trim();
@@ -744,10 +768,21 @@ function pintaVestibulo() {
       <div class="jg-of-nombre">${escapeHtml(j.nombre)}</div>
       <div class="jg-of-lema">${escapeHtml(j.lema)}</div>
       ${opcionesHtml(k)}
-      <button class="btn jg-of-btn" data-crear="${k}">Abrir sala <span aria-hidden="true">↗</span></button>
+      <div class="jg-of-pie">
+        <button class="btn jg-of-btn" data-crear="${k}">Abrir sala <span aria-hidden="true">↗</span></button>
+        ${tieneReglas(k) ? `<button class="btn2 jg-of-reglas" type="button" data-reglas="${k}" title="Cómo se juega">📖 Reglas</button>` : ""}
+      </div>
     </div>`).join("");
   for (const b of $("vesElige").querySelectorAll("[data-crear]")) {
     b.onclick = () => crear(b.getAttribute("data-crear"), leeOpciones(b));
+  }
+  /* Desde el vestíbulo, el manual abre en la versión que está elegida
+     en la tarjeta: es la que se va a jugar. */
+  for (const b of $("vesElige").querySelectorAll("[data-reglas]")) {
+    b.onclick = () => {
+      const k = b.getAttribute("data-reglas"), op = leeOpciones(b) || {};
+      abreReglas(k, { modo: k === "cacho" ? (Number(op.sicil) || 0) : op.modo, nombre: JUEGOS[k].nombre });
+    };
   }
   aplicaFiltro();
 
@@ -1044,7 +1079,7 @@ const FANFARRIA = { gano: "victoria", perdi: "derrota", empate: "empate", mirand
    En cartas es el choque entero (`CHOQUE`, 2,6 s): la ronda que gana
    el trío se enseña igual que las demás. Worms no pone fanfarria — el
    marco tiene su propio audio y su propio final. */
-const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900 };
+const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000 };
 
 function pintaFin(p, est) {
   const caja = $("jgFin");
@@ -1160,7 +1195,9 @@ const RAZONES = {
   reaccion: "Su reacción en cadena se tragó a todos los demás.",
   flip7: "Pasó de 200 puntos con más que nadie.",
   cacho: "Fue el último en conservar dados en el vaso.",
-  tope: "Se acabaron las rondas: ganó quien tenía más dados."
+  tope: "Se acabaron las rondas: ganó quien tenía más dados.",
+  uno: "Se quedó sin cartas antes que nadie.",
+  piedad: "Fue el último en pie: los demás llegaron a 25 cartas."
 };
 const razon = m => RAZONES[m] || "";
 const nombreDe = (est, uid) => {
@@ -1394,6 +1431,7 @@ function arteJuego(k) {
   if (k === "cadena") return '<div class="jg-art-cr">' + Array.from({ length: 12 }, (_, i) => '<i class="o' + [1, 0, 2, 1, 3, 0, 1, 2, 0, 3, 2, 1][i] + " c" + (i % 4) + '"></i>').join("") + '</div>';
   if (k === "flip7") return '<div class="jg-art-f7">' + [[7, "#e8a317"], [3, "#3fa7d6"], [12, "#d64545"]].map(([n, c]) => '<i style="--t:' + c + '">' + n + '</i>').join("") + '<b>FLIP 7</b></div>';
   if (k === "cacho") return '<div class="jg-art-cc"><b></b>' + [5, 1, 3].map(n => '<i class="c' + n + '">' + "<s></s>".repeat(n) + '</i>').join("") + '</div>';
+  if (k === "uno") return '<div class="jg-art-uno">' + [["7", "#d72600"], ["⊘", "#0956bf"], ["+2", "#379711"], ["+4", "#222"]].map(([n, c]) => '<i style="--t:' + c + '"><span>' + n + '</span></i>').join("") + '<b>UNO</b></div>';
   if (k === "cuadritos") return '<div class="jg-art-dots">' + Array.from({ length: 9 }, (_, i) => '<i class="' + (i % 3 === 0 ? "llena" : "") + '"></i>').join("") + '</div>';
   return '<div class="jg-art-land"><i></i><i></i><i></i><b>⌖</b><span>ENCUENTRA LO INVISIBLE</span></div>';
 }
