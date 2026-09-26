@@ -330,7 +330,7 @@ const REGLAS = {
       ["Cómo se juega", lista([
         "<b>Clic</b> en una casilla para abrirla; los huecos vacíos se abren en cadena.",
         "Un número dice cuántas minas hay entre las ocho casillas que lo rodean.",
-        "<b>Clic derecho</b>, tecla <b>F</b> o pulsación larga para poner una bandera.",
+        "<b>Clic derecho</b>, tecla <b>F</b> o pulsación larga para poner una bandera. En el móvil, el selector <b>Descubrir · Bandera</b> sobre el tablero decide qué hace un toque; mantener pulsado hace siempre lo otro.",
         "Pulsa un número que ya tenga a su alrededor tantas banderas como indica para abrir el resto de vecinas de golpe (¡cuidado con las banderas mal puestas!)."
       ])],
       ["Clasificación", "Hay tres dificultades, y cada una guarda tu mejor tiempo."]

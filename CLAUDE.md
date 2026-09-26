@@ -2260,6 +2260,25 @@ room — it simulates nothing. Four things hold it together:
 - **Each log entry is forwarded to the frame once, by its key**, not by
   `jugadasDe`, whose helper overwrites the key with the entry's own `k`.
 
+**Mina Club's board fits its box; it never pushes past it** (`juegos/club/minas/`,
+plain files with no build, mounted by `solo/club.js` in an iframe whose `?v=`
+has to be bumped when they change). The board used to carry
+`min-width: cols × 26px`, which on a tablet and inside the Juegos iframe was
+wider than the room it had. The last columns ended up behind a horizontal
+scroll that fought with the touch, and that was «a column you can't see». Now:
+
+- the columns are `minmax(0,1fr)` and cells `min-width/min-height:0`, so
+  `aspect-ratio` keeps them square — a flag's svg used to stretch its cell,
+  hence the svgs are absolutely positioned;
+- the number's size is in `cqi` of the board;
+- a wide board on a portrait screen is **transposed for display only**
+  (`acomodar()`, `grid-auto-flow:column`), with the arrow keys remapped;
+  minesweeper doesn't care which way it is drawn, so the engine never knows.
+
+`vertical()` reads `window.top` because the iframe's own shape says nothing.
+The **Descubrir · Bandera** selector decides what a tap does (`tocar(i, alReves)`),
+and a long press always does the other thing.
+
 **The music is one songbook** (`juegos/audio/chip.js` + `temas.js`, plain
 scripts on `globalThis.Chip` / `globalThis.Temas`). The lobby's `sonido.js`,
 Mina Club, Snake and Circuit Breakers all play through the same

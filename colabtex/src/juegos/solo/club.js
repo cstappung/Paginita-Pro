@@ -60,7 +60,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver}) {
     frame.style.cssText='display:block;width:100%;height:1100px;border:0;border-radius:18px;background:#f5f5ed';
     frame.allow='fullscreen';frame.setAttribute('allowfullscreen','');
     window.addEventListener('message',mensaje);
-    frame.src='juegos/club/'+juego+'/index.html?v=club-1&cuenta='+encodeURIComponent(usuario.uid);
+    frame.src='juegos/club/'+juego+'/index.html?v=club-2&cuenta='+encodeURIComponent(usuario.uid);
     host.appendChild(frame);
   }
   function destruir(){muerto=true;if(off)off();window.removeEventListener('message',mensaje);for(const [el,valor]of ocultos)el.style.display=valor;frame?.remove();host.innerHTML='';ambientar('');}
