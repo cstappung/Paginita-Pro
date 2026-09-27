@@ -25,6 +25,10 @@
  *   pulso       Sol menor, 126 — techno con bombeo.
  *   cumbia      La menor, 100 — cumbia de 8 bits con güiro.
  *
+ * Y los homenajes a Pokémon Rojo Fuego / Verde Hoja (`pk-*`), con melodías
+ * propias al estilo de la GBA: pueblo, ruta, centro, bosque, bici, salvaje,
+ * entrenador y gimnasio.
+ *
  * Los bajos y los arpegios no se escriben nota a nota: salen de la lista de
  * acordes con `linea` y `arpegio`, así que cambiar la armonía de un compás es
  * cambiar una palabra y no dieciséis fichas.
@@ -353,6 +357,174 @@
         "R . . . F . . F R . . . F . O .", "k.hhs.hhk.hhs.hx", 4)
     },
     orden: "A A B A"
+  };
+
+  /* ---------- Pokémon: homenajes a Rojo Fuego / Verde Hoja ----------
+     Un tema por cada momento que cualquiera que jugó reconoce: el pueblo
+     donde empieza todo, la ruta, el Centro, el bosque, la bici, el combate
+     salvaje, el duelo contra un entrenador y el gimnasio. **Las melodías son
+     originales**, escritas para aquí: lo que evocan es el sonido de la GBA
+     (pulso con vibrato y eco de sala, triangular de bajo, ruido de batería) y
+     el carácter de cada lugar, no las partituras de Game Freak. Transcribir
+     las de verdad —aunque estén en una decompilación pública— sería publicar
+     composiciones de Nintendo en un sitio abierto, así que no se hace. */
+
+  /* Pueblo de partida: Fa mayor, 96. Tranquilo, de mañana de verano. */
+  T["pk-pueblo"] = {
+    bpm: 96,
+    lead: { onda: "p50", vol: .13, vib: .01, sus: .7, eco: { fb: .3, mezcla: .25 } },
+    bajo: { onda: "tri", vol: .19 }, arp: { onda: "p12", vol: .045, oct: 4, paso: .06 }, bat: { vol: .2 },
+    secciones: {
+      I: sec("Fmaj7 Bbmaj7", "", "R - - - F - - - O - - - F - - -", "k.......h.......", 8),
+      A: sec("F Dm Bb C",
+        "A4*2 C5*2 F5*4 E5*2 F5*2 G5*4  A5*6 G5*2 F5*4 D5*4  D5*2 F5*2 Bb5*4 A5*2 G5*2 F5*4  G5*8 E5*4 C5*4",
+        "R - - - F - - - O - - - F - R -", "k...h...s...h...", 4),
+      B: sec("Bb C Am Dm",
+        "F5*3 G5 A5*4 Bb5*4 A5*2 G5*2  G5*4 E5*4 C5*4 E5*4  E5*3 F5 G5*4 A5*2 C6*2 A5*4  F5*12 .*4",
+        "R - - - F - - - O - - - F - R -", "k...h...s...h...", 4),
+      C: sec("Gm7 C7 F F",
+        "Bb4*2 D5*2 F5*4 A5*4 G5*4  E5*2 G5*2 Bb5*4 A5*2 G5*2 E5*4  F5*8 A5*4 C6*4  F5*12 .*4",
+        "R - - - F - - - O - - - F - R -", "k...h...s...h..h", 4)
+    },
+    orden: "I A A B C A"
+  };
+
+  /* Hierba alta: Re mayor, 140. La ruta: se sale a caminar con ganas. */
+  T["pk-ruta"] = {
+    bpm: 140,
+    lead: { onda: "p25", vol: .14, vib: .008, eco: { fb: .22, mezcla: .18 } },
+    bajo: { onda: "tri", vol: .21 }, arp: { onda: "p12", vol: .05, oct: 4, paso: .045 }, bat: { vol: .3 },
+    secciones: {
+      I: sec("D A", "", "R . R F O . F . R . R F O . F .", "k.h.s.h.k.h.s.hh", 4),
+      A: sec("D G A D",
+        "F#5*2 A5*2 D6*3 C#6 B5*2 A5*2 F#5*4  G5*2 B5*2 D6*2 B5*2 A5*4 G5*4  E5*2 A5*2 C#6*2 E6*2 D6*2 C#6*2 B5*4  A5*6 F#5*2 D5*8",
+        "R . R F O . F . R . R F O . F .", "k.h.s.h.k.h.s.hh", 4),
+      B: sec("D G Em A",
+        "F#5*2 A5*2 D6*3 C#6 B5*2 A5*2 F#5*4  B5*2 D6*2 G6*4 F#6*2 E6*2 D6*4  E6*3 D6 B5*4 G5*2 E5*2 G5*4  A5*8 C#6*4 E6*4",
+        "R . R F O . F . R . R F O . F .", "k.h.s.h.k.h.s.hs", 4),
+      C: sec("Bm G D A",
+        "D6*2 C#6*2 B5*4 F#5*4 B5*4  B5*2 A5*2 G5*4 D5*4 G5*4  A5*2 G5*2 F#5*2 A5*2 D6*4 F#6*4  E6*8 C#6*4 A5*4",
+        "R . R . F . R . O . R . F . O .", "k.hhs.h.k.hhs.hx", 4)
+    },
+    orden: "I A B C A B"
+  };
+
+  /* Centro de curación: Do mayor, 116 con un poco de swing. Mullido. */
+  T["pk-centro"] = {
+    bpm: 116, swing: .08,
+    lead: { onda: "p50", vol: .12, vib: .006, sus: .6, eco: { fb: .25, mezcla: .2 } },
+    bajo: { onda: "tri", vol: .19 }, arp: { onda: "p25", vol: .045, oct: 4, paso: .05 }, bat: { vol: .2 },
+    secciones: {
+      A: sec("C Am Dm7 G7",
+        "E5*2 G5*2 C6*2 G5*2 E5*4 C5*4  A5*2 C6*2 E6*4 D6*2 C6*2 A5*4  F5*2 A5*2 C6*2 A5*2 F5*2 D5*2 F5*4  G5*6 B5*2 D6*4 .*4",
+        "R . F . O . F . R . F . O . F .", "k.h.s.h.k.h.s.h.", 4),
+      B: sec("F G Em Am",
+        "A5*3 G5 F5*2 A5*2 C6*8  B5*3 A5 G5*2 B5*2 D6*8  E6*2 D6*2 B5*2 G5*2 E5*2 G5*2 B5*4  A5*12 .*4",
+        "R . F . O . F . R . F . O . F .", "k.h.s.h.k.h.s.h.", 4),
+      C: sec("Dm7 G7 C C",
+        "D5*2 F5*2 A5*2 C6*2 B5*4 A5*4  G5*2 B5*2 D6*2 F6*2 E6*4 D6*4  C6*8 G5*4 E5*4  C5*12 .*4",
+        "R . F . O . F . R . F . O . F .", "k.h.s.h.k.h.s.hh", 4)
+    },
+    orden: "A A B C"
+  };
+
+  /* Bosque espeso: Mi menor, 112. Staccato y eco: no se ve la salida. */
+  T["pk-bosque"] = {
+    bpm: 112,
+    lead: { onda: "p25", vol: .14, vib: .004, sus: .6, eco: { fb: .4, mezcla: .32 } },
+    bajo: { onda: "tri", vol: .2 }, arp: { onda: "p12", vol: .05, oct: 4, paso: .05 }, bat: { vol: .26 },
+    secciones: {
+      I: sec("Em Em", "", "R . . R . . F . R . . R . . O .", "k..h..h.k..h..h.", 2),
+      A: sec("Em D C D",
+        "E5 . G5 . B5 . A5 G5 F#5*2 G5*2 E5*4  D5 . F#5 . A5 . G5 F#5 E5*2 F#5*2 D5*4  C5 . E5 . G5 . B5 . C6*2 B5*2 G5*4  A5*2 F#5*2 D5*2 E5*2 F#5*8",
+        "R . . R . . F . R . . R . . O .", "k..h..h.k..h.sh.", 2),
+      B: sec("Am Em C B7",
+        "A5*4 C6*2 B5*2 A5*4 E5*4  G5*4 B5*2 A5*2 G5*4 E5*4  E5*2 G5*2 C6*2 E6*2 D6*4 C6*4  B5*4 A5*4 F#5*4 D#5*4",
+        "R . . R . . F . R . . R . . O .", "k..h..h.k..h.shx", 2)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* Cuesta abajo en bici: Sol mayor, 150 con swing. Viento en la cara. */
+  T["pk-bici"] = {
+    bpm: 150, swing: .12,
+    lead: { onda: "p50", vol: .13, vib: .006, eco: { fb: .2, mezcla: .16 } },
+    bajo: { onda: "tri", vol: .21 }, arp: { onda: "p25", vol: .045, oct: 4, paso: .04 }, bat: { vol: .3 },
+    secciones: {
+      A: sec("G Em C D",
+        "D5*2 G5*2 B5*2 D6*2 B5*2 G5*2 A5*2 B5*2  G5*4 E5*2 G5*2 B5*8  C6*2 B5*2 A5*2 G5*2 E5*2 G5*2 C6*4  D6*4 C6*2 B5*2 A5*8",
+        "R . F . R . F . O . F . R . F .", "k.hhs.hhk.hhs.hh", 4),
+      B: sec("G Em C,D G",
+        "D5*2 G5*2 B5*2 D6*2 B5*2 G5*2 A5*2 B5*2  G5*4 E5*2 G5*2 E6*8  E6*2 D6*2 C6*4 C6*2 B5*2 A5*4  G5*12 .*4",
+        "R . F . R . F . O . F . R . F .", "k.hhs.hhk.hhs.hx", 4),
+      C: sec("C D Bm Em Am D G D",
+        "E6*6 D6*2 C6*4 G5*4  F#6*6 E6*2 D6*4 A5*4  D6*4 B5*4 F#5*4 B5*4  G5*2 A5*2 B5*4 E6*8  C6*2 B5*2 A5*4 E5*4 A5*4  F#5*2 G5*2 A5*4 D6*8  B5*2 A5*2 G5*2 B5*2 D6*4 G6*4  F#6*8 D6*4 A5*4",
+        "R . F . R . F . O . F . R . F .", "k.hhs.hhk.hhs.hh", 4)
+    },
+    orden: "A B C A B"
+  };
+
+  /* ¡Apareció uno salvaje!: La menor, 168. Escala que sube y a pelear. */
+  T["pk-salvaje"] = {
+    bpm: 168,
+    lead: { onda: "p25", vol: .15, vib: .006, eco: { fb: .18, mezcla: .14 } },
+    bajo: { onda: "p50", vol: .12 }, arp: { onda: "p12", vol: .05, oct: 4, paso: .035 }, bat: { vol: .34 },
+    secciones: {
+      I: sec("Am E",
+        "A4 B4 C5 D5 E5 F5 G#5 A5 B5 C6 D6 E6*4 .  B5 . B5 . B5 . G#5 . E5*8",
+        "R R R R R R R R O O O O O O O O", "k.k.k.k.k.k.s.ss", 4),
+      A: sec("Am F G E",
+        "A5*2 . A5 C6*2 E6*2 D6*2 C6*2 B5*2 C6*2  A5*4 F5*4 C5*4 F5*4  G5*2 . G5 B5*2 D6*2 C6*2 B5*2 A5*2 B5*2  G#5*4 B5*4 E6*8",
+        "R . R O . R O . R . R O . R F O", "k.h.s.hkk.h.s.hh", 2),
+      B: sec("Dm Am Bb E",
+        "F5*2 E5*2 D5*2 F5*2 A5*4 D6*4  C6*2 B5*2 A5*2 E5*2 A5*4 C6*4  D6*2 C6*2 Bb5*2 F5*2 Bb5*4 D6*4  E6*4 D6*4 B5*4 G#5*4",
+        "R . R O . R O . R . R O . R F O", "k.hks.hkk.hks.hx", 2)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* Duelo de entrenadores: Si menor, 176. El que más aprieta de todos. */
+  T["pk-entrenador"] = {
+    bpm: 176,
+    lead: { onda: "p25", vol: .15, vib: .006, eco: { fb: .18, mezcla: .14 } },
+    bajo: { onda: "p50", vol: .12 }, arp: { onda: "p12", vol: .05, oct: 4, paso: .03 }, bat: { vol: .36 },
+    secciones: {
+      I: sec("Bm F#",
+        "B4 D5 F#5 B5 D6 F#6*2 . F#6 . F#6 . E6 D6 C#6 A#5  B5*4 . . F#5 . B5 . . F#5 B5*4",
+        "R . . R . . R . R . . R . R R R", "k..k..s.k..k.sss", 2),
+      A: sec("Bm G A F#",
+        "F#5*2 B5*2 D6*4 C#6*2 B5*2 A5*2 B5*2  G5*2 B5*2 D6*2 G6*2 F#6*4 E6*4  E6*2 C#6*2 A5*2 C#6*2 E6*4 A6*4  F#6*8 E6*2 C#6*2 A#5*4",
+        "R . R O R . R O R . R O F . O F", "k.h.s.hkk.hks.hh", 2),
+      B: sec("Em F#m G A",
+        "G5*3 F#5 E5*4 B5*4 E6*4  A5*3 G5 F#5*4 C#6*4 F#6*4  B5*2 D6*2 G6*4 F#6*2 E6*2 D6*4  C#6*2 D6*2 E6*4 F#6*8",
+        "R . R O R . R O R . R O F . O F", "k.h.s.hkk.hks.hs", 2),
+      C: sec("Bm G Em F#",
+        "B5*8 D6*8  D6*4 C#6*4 B5*8  G5*8 B5*8  A#5*8 C#6*4 F#6*4",
+        "R . R O R . R O R . R O F . O F", "k...s...k.k.s..x", 4)
+    },
+    orden: "I A A B C A B"
+  };
+
+  /* Líder de gimnasio: Do menor, 156, que se abre a Mi bemol mayor. */
+  T["pk-gimnasio"] = {
+    bpm: 156,
+    lead: { onda: "p25", vol: .15, vib: .007, eco: { fb: .2, mezcla: .16 } },
+    bajo: { onda: "p50", vol: .12 }, arp: { onda: "p12", vol: .05, oct: 4, paso: .035 }, bat: { vol: .34 },
+    secciones: {
+      I: sec("Cm G",
+        "C5 C5 . C5 Eb5 . G5 . C6*8  B4 B4 . B4 D5 . G5 . B5*8",
+        "R R . R R . R . R R . R O . F .", "k.k.s...k.k.s.ss", 4),
+      A: sec("Cm Ab Bb G",
+        "C5*2 Eb5*2 G5*2 C6*2 Bb5*4 G5*4  Ab5*2 C6*2 Eb6*4 D6*2 C6*2 Ab5*4  Bb5*2 D6*2 F6*4 Eb6*2 D6*2 Bb5*4  B5*8 D6*4 G6*4",
+        "R R . R R . R . R R . R O . F .", "k.h.s.h.k.hks.hs", 4),
+      B: sec("Fm Cm Ab G",
+        "F5*3 G5 Ab5*4 C6*4 F6*4  Eb6*3 D6 C6*4 G5*4 Eb5*4  Ab5*2 Bb5*2 C6*4 Eb6*4 Ab6*4  G6*8 F6*2 D6*2 B5*4",
+        "R R . R R . R . R R . R O . F .", "k.h.s.h.k.hks.hs", 4),
+      C: sec("Eb Bb Ab Bb",
+        "G5*4 Bb5*4 Eb6*8  D6*4 F6*4 Bb5*8  C6*4 Eb6*4 Ab6*8  G6*4 F6*4 D6*4 Bb5*4",
+        "R . F . O . F . R . F . O . F .", "k.hhs.h.k.hhs.hx", 4)
+    },
+    orden: "I A A B C A"
   };
 
   const Temas = { temas: T, linea, arpegio, raiz };

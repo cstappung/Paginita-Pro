@@ -2461,7 +2461,13 @@ Intensas, *Neón 84* (synthwave) and *Pulso de datos* (techno with sidechain
 pump) under Electrónicas, *Turno de noche* (lo-fi with an 808, in the vein of
 Schedule I's soundtrack) and *Cumbia de la mesa* under Chill y fiesta. Those
 needed the chip to grow a low-pass filter, sidechain pump, detune, glide and
-an 808 kick with claps. **Automático** (the default) keeps the old behaviour,
+an 808 kick with claps. The **Pokémon** group holds eight tributes to
+FireRed/LeafGreen (`pk-*` in `temas.js`): town, route, Center, forest, bike,
+wild battle, trainer battle and gym. **Their melodies are original on
+purpose**, and only the GBA timbre and the mood of each place are borrowed.
+Transcribing the real ones, even out of a public decompilation, would publish
+Nintendo's compositions on an open site, so don't "fix" them into the real
+tunes. **Automático** (the default) keeps the old behaviour,
 one song per game and silence in the lobby. Picking a song makes it play
 everywhere, lobby included, until you go back to Automático. The choice,
 the list mode (repeat / in order / shuffle) and the volume persist in

@@ -293,7 +293,7 @@ export function suena(nombre, x) {
    los efectos. */
 const TEMAS = Temas.temas;
 const POKER = { url: "juegos/audio/flip7-poker-night.mp3", fin: 124.3 };
-export const GRUPOS = ["De los juegos", "Intensas", "Electrónicas", "Chill y fiesta"];
+export const GRUPOS = ["De los juegos", "Intensas", "Electrónicas", "Chill y fiesta", "Pokémon"];
 export const CANCIONES = [
   { id: "orbita", nombre: "Deriva orbital", grupo: "De los juegos", desc: "Órbita · espacial, con eco", chip: "orbita", juegos: ["orbita"] },
   { id: "cartas", nombre: "Tres elementos", grupo: "De los juegos", desc: "Cartas · taiko y escala japonesa", chip: "cartas", juegos: ["cartas"] },
@@ -312,7 +312,17 @@ export const CANCIONES = [
   { id: "neon", nombre: "Neón 84", grupo: "Electrónicas", desc: "Synthwave · arpegio de sierra", chip: "neon" },
   { id: "pulso", nombre: "Pulso de datos", grupo: "Electrónicas", desc: "Techno con bombeo · 126", chip: "pulso" },
   { id: "lofi", nombre: "Turno de noche", grupo: "Chill y fiesta", desc: "Lo-fi con 808 · estilo Schedule I", chip: "lofi" },
-  { id: "cumbia", nombre: "Cumbia de la mesa", grupo: "Chill y fiesta", desc: "Cumbia de 8 bits con güiro", chip: "cumbia" }
+  { id: "cumbia", nombre: "Cumbia de la mesa", grupo: "Chill y fiesta", desc: "Cumbia de 8 bits con güiro", chip: "cumbia" },
+  /* Homenajes a Rojo Fuego / Verde Hoja: melodías propias con el timbre de
+     la GBA, no transcripciones (ver el porqué en `temas.js`). */
+  { id: "pk-pueblo", nombre: "Pueblo de partida", grupo: "Pokémon", desc: "Homenaje · el pueblo donde empieza todo", chip: "pk-pueblo" },
+  { id: "pk-ruta", nombre: "Hierba alta", grupo: "Pokémon", desc: "Homenaje · de ruta", chip: "pk-ruta" },
+  { id: "pk-centro", nombre: "Centro de curación", grupo: "Pokémon", desc: "Homenaje · el Centro Pokémon", chip: "pk-centro" },
+  { id: "pk-bosque", nombre: "Bosque espeso", grupo: "Pokémon", desc: "Homenaje · perdido entre árboles", chip: "pk-bosque" },
+  { id: "pk-bici", nombre: "Cuesta abajo en bici", grupo: "Pokémon", desc: "Homenaje · la bici", chip: "pk-bici" },
+  { id: "pk-salvaje", nombre: "¡Apareció uno salvaje!", grupo: "Pokémon", desc: "Homenaje · combate salvaje", chip: "pk-salvaje" },
+  { id: "pk-entrenador", nombre: "Duelo de entrenadores", grupo: "Pokémon", desc: "Homenaje · combate contra entrenador", chip: "pk-entrenador" },
+  { id: "pk-gimnasio", nombre: "Líder de gimnasio", grupo: "Pokémon", desc: "Homenaje · el combate de medalla", chip: "pk-gimnasio" }
 ].filter(c => c.url || TEMAS[c.chip]);
 const POR_ID = Object.fromEntries(CANCIONES.map(c => [c.id, c]));
 const POR_JUEGO = {};
