@@ -16,6 +16,15 @@
  *   snake      Do dórico, 150 — funk: bajo con octavas y caja a contratiempo.
  *   worms-menu / worms-combate  Mi mayor tranquilo y Si menor de batalla.
  *
+ * Y los que no son de ningún juego, para el reproductor de la cabecera:
+ *
+ *   lofi        Fa menor, 86 con swing — lo-fi con 808, estilo Schedule I.
+ *   sobrecarga  Mi menor, 172 — drum'n'bass de consola.
+ *   tormenta    Re menor, 152 — combate final con tambores y sierra doble.
+ *   neon        La menor, 104 — synthwave, arpegio de sierra filtrada.
+ *   pulso       Sol menor, 126 — techno con bombeo.
+ *   cumbia      La menor, 100 — cumbia de 8 bits con güiro.
+ *
  * Los bajos y los arpegios no se escriben nota a nota: salen de la lista de
  * acordes con `linea` y `arpegio`, así que cambiar la armonía de un compás es
  * cambiar una palabra y no dieciséis fichas.
@@ -221,6 +230,127 @@
       B: sec("G A Bm F#",
         "D6*4 B5*4 G5*4 B5*4 C#6*4 A5*4 E5*4 A5*4 B5*2 A5*2 F#5*2 D5*2 E5*2 F#5*2 A5*4 A#5*4 C#6*4 F#6*8",
         "R R . R O . R R . R O . F . R .", "k.hks.hkk.hks.hx", 2)
+    },
+    orden: "A A B A"
+  };
+
+  /* ---------- El repertorio: temas que no son de ningún juego ----------
+     Se eligen desde el reproductor de la cabecera. Usan lo que el motor
+     tiene de sintetizador además de chip (sierras desafinadas, filtros,
+     bombo 808, palmas, bombeo), porque «más electrónico» era exactamente
+     lo que se pedía. */
+
+  /* Turno de noche: lo-fi con 808, a la manera de la radio del garaje en
+     Schedule I. Acordes de séptima que ruedan despacio como un Rhodes, un bajo
+     senoidal que entra resbalando y una melodía suelta con mucho eco. */
+  T.lofi = {
+    bpm: 86, swing: .14,
+    lead: { onda: "sine", vol: .17, vib: .004, sus: .6, eco: { fb: .42, mezcla: .36 } },
+    bajo: { onda: "sine", vol: .3, desliza: 1 },
+    arp: { onda: "tri", vol: .075, oct: 4, paso: .11, sus: .45, filtro: 1800 },
+    bat: { vol: .32 },
+    secciones: {
+      I: sec("Fm7 Dbmaj7", "", "R - - - - - - R - - - . F - - -", "..h...h...h...hh", 8),
+      A: sec("Fm7 Dbmaj7 Bbm7 C7",
+        "C5*3 Eb5 F5*6 .*2 Ab5*2 G5*2 F5*8 .*4 Eb5*2 F5*2 Db5*3 C5 Bb4*4 .*2 Db5*2 F5*2 Ab5*2 G5*6 E5*2 C5*8",
+        "R - - - - - - R - - - . F - - -", "K.h.c.hKh.K.c.hh", 8),
+      B: sec("Bbm7 Eb7 Abmaj7 Dbmaj7,C7",
+        "Db6*2 C6*2 Ab5*4 .*2 F5*2 Ab5*2 Bb5*2 G5*8 .*2 Eb5*2 G5*2 Bb5*2 C6*6 Bb5*2 Ab5*4 Eb5*4 F5*4 Db5*4 E5*4 G5*4",
+        "R - - - - - . R - - R - F - - -", "K.hhc.hKh.K.c.hK", 8)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* Sobrecarga: drum'n'bass de consola a 172. Mi menor, bajo de sierra
+     filtrado que no para y un ritmo roto que empuja hacia delante. */
+  T.sobrecarga = {
+    bpm: 172,
+    lead: { onda: "p25", vol: .14, vib: .006, eco: { fb: .22, mezcla: .18 } },
+    bajo: { onda: "saw", vol: .11, filtro: 700, q: 5 },
+    arp: { onda: "p12", vol: .05, oct: 4, paso: .03 }, bat: { vol: .38 },
+    secciones: {
+      I: sec("Em Em", "", "R . R . R . R . R . R . O . R .", "k...s...k.k.s..x", 4),
+      A: sec("Em C D B7",
+        "E5 . G5 . B5 . E6*2 D6 . B5 . G5*2 A5*2 G5*4 E5*2 C5*2 E5 . G5 . C6*4 F#5 . A5 . D6*2 C6 . A5 . F#5*2 D5*2 E5*2 D#5*4 F#5*4 A5*4 B5*4",
+        "R R O R R . R O . R R O R . F O", "k.h.s.hk.hkhs.hs", 4),
+      B: sec("Am Em C,D B",
+        "C6*2 B5*2 A5*4 E5*2 A5*2 C6*4 B5*6 G5*2 E5*4 G5*4 E6*4 D6*2 C6*2 D6*4 F#6*4 D#6*8 B5*4 F#5*4",
+        "R R O R R . R O . R R O R . F O", "x.hks.hk.hkhs.ss", 4)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* Tormenta: combate final. Re menor, tambores graves, una sierra doble
+     desafinada al frente y platillos al cambiar de frase. */
+  T.tormenta = {
+    bpm: 152,
+    lead: { onda: "saw", vol: .1, vib: .007, desafina: 10, filtro: 3200, eco: { fb: .25, mezcla: .2 } },
+    bajo: { onda: "p50", vol: .12 }, arp: { onda: "p12", vol: .05, oct: 4, paso: .03 }, bat: { vol: .38 },
+    secciones: {
+      I: sec("Dm Dm", "", "R . . . R . . . R . R . R R R R", "t...t...t...T.TT", 4),
+      A: sec("Dm Bb C A",
+        "D5*2 D5 . F5*2 A5*2 D6*4 C6*2 A5*2 Bb5*4 A5*2 F5*2 D5*4 F5*4 E5*2 G5*2 C6*4 Bb5*2 A5*2 G5*4 A5*4 C#6*4 E6*4 A5*4",
+        "R R O R R O R R R R O R F F O F", "k.k.s.T.kkk.s.tT", 2),
+      B: sec("Gm A Dm,Bb A7",
+        "G5*2 Bb5*2 D6*4 C6*2 Bb5*2 A5*4 C#6*4 A5*4 E5*4 A5*4 F6*4 E6*2 D6*2 D6*4 F6*4 E6*8 C#6*4 A5*4",
+        "R R O R R O R R R R O R F F O F", "x.k.s.T.kkk.s.TT", 2)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* Neón 84: synthwave. La menor, arpegio de semicorcheas en sierra
+     filtrada, bajo que salta de octava y una melodía ancha con mucho eco. */
+  T.neon = {
+    bpm: 104,
+    lead: { onda: "saw", vol: .1, vib: .006, desafina: 12, filtro: 2400, eco: { fb: .45, mezcla: .38 } },
+    bajo: { onda: "saw", vol: .12, filtro: 520, q: 3 },
+    arp: { onda: "saw", vol: .05, oct: 4, paso: .144, desafina: 8, filtro: 1600, sus: .5 },
+    bat: { vol: .34 },
+    secciones: {
+      I: sec("Am F", "", "R O R O R O R O R O R O R O R O", "k.......k.......", 16),
+      A: sec("Am F C G",
+        "E5*6 D5*2 C5*4 B4*2 C5*2 A4*8 C5*4 F5*4 E5*6 G5*2 C6*4 B5*2 A5*2 G5*8 B4*4 D5*4",
+        "R O R O R O R O R O R O R O R O", "k.h.s.h.k.h.s.hh", 16),
+      B: sec("F G Em Am",
+        "A5*4 C6*4 A5*4 F5*4 G5*4 B5*4 D6*4 B5*4 B5*6 G5*2 E5*8 A5*12 .*4",
+        "R O R O R O R O R O R O R O R O", "k.h.s.h.k.h.s.hx", 16)
+    },
+    orden: "I A A B B A"
+  };
+
+  /* Pulso de datos: techno a 126. Bombo en negras que hunde todo lo demás
+     (el bombeo), bajo a contratiempo y acordes cortos como un stab. */
+  T.pulso = {
+    bpm: 126, bombeo: .55,
+    lead: { onda: "p50", vol: .12, vib: 0, sus: .5, filtro: 2000, eco: { fb: .35, mezcla: .3 } },
+    bajo: { onda: "saw", vol: .13, filtro: 600, q: 4 },
+    arp: { onda: "saw", vol: .06, oct: 4, paso: .06, filtro: 1100, q: 6, sus: .4 },
+    bat: { vol: .36 },
+    secciones: {
+      I: sec("Gm Gm", "", ". . R . . . R . . . R . . . O .", "k...k...k...k...", 2),
+      A: sec("Gm Gm Eb F",
+        "D5 . . D5 . . G5 . . . Bb5 . A5*2 G5*2 D5 . . D5 . . G5 . . . F5 . G5*4 Eb5 . . Eb5 . . G5 . . . Bb5 . C6*2 Bb5*2 F5 . . F5 . . A5 . . . C6 . D6*4",
+        ". . R . . . R . . . R . . . O .", "k.o.k.o.k.o.k.oh", 2),
+      B: sec("Cm Eb F Gm",
+        "G5*16 Bb5*16 A5*16 D6*16",
+        ". . R . . . R . . . R . . . O .", "khohkhohkhohkhoc", 2)
+    },
+    orden: "I A A B A"
+  };
+
+  /* Cumbia de la mesa: 8 bits con güiro. La menor, el bajo que pisa
+     fundamental y quinta, y una melodía de acordeón que se contesta sola. */
+  T.cumbia = {
+    bpm: 100,
+    lead: { onda: "p25", vol: .14, vib: .012, eco: { fb: .2, mezcla: .18 } },
+    bajo: { onda: "tri", vol: .22 }, arp: { onda: "p12", vol: .05, oct: 4, paso: .05 }, bat: { vol: .3 },
+    secciones: {
+      A: sec("Am G Am E",
+        "E5 . A5 . C6 . B5 A5 B5*2 A5*2 E5*4 D5 . G5 . B5 . A5 G5 A5*2 G5*2 D5*4 C5 . E5 . A5 . G5 E5 F5*2 E5*2 C5*4 B4*2 D5*2 G#5*4 B5*2 G#5*2 E5*4",
+        "R . . . F . . F R . . . F . O .", "k.hhs.hhk.hhs.hh", 4),
+      B: sec("Dm G C E",
+        "F5*2 A5*2 D6*4 C6*2 A5*2 F5*4 D5*2 G5*2 B5*4 A5*2 G5*2 D5*4 E5*2 G5*2 C6*4 B5*2 G5*2 E5*4 G#5*4 B5*4 E6*4 D6*2 B5*2",
+        "R . . . F . . F R . . . F . O .", "k.hhs.hhk.hhs.hx", 4)
     },
     orden: "A A B A"
   };

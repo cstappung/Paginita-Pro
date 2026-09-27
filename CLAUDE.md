@@ -2227,6 +2227,38 @@ start key does not start the game. The `uno` game and its `modo`
 values needed the rules' whitelists widened, so it needs the rules
 re-published before a room can be created.
 
+**The UNO table is a scene, and everything on it is retold from `hist`**
+(`uno.js`), the way Flip 7 does it: the state says where a card *is*, the
+history says that it *arrived*. Things worth knowing before editing it:
+
+- **Seats sit on an ellipse around a felt** (`--x`/`--y` per seat, you at the
+  bottom), and below 720 px they fold into a strip above a shorter felt. The
+  table is **always dark**, in both themes: `.jg-uno` repaints the shared
+  chrome (`:root .jg-uno .jg-barra`, `.jg-pie`, `.jg-nota`…) because the dark
+  block's rules are (0,2,1) and would otherwise win over a lighter table.
+  There is no `html[data-tema=oscuro] .jg-un-*` twin on purpose.
+- **Cards fly in a layer hung off `<body>`** (`.jg-un-vuelos`, WAAPI arcs in
+  `vuela`), because the seats and the hand repaint by signature and a card
+  inside them would vanish mid-flight. `vuelos` counts what is in the air and
+  `ocupado()` is `vuelos > 0`, so `pintaFin` never covers the winning card.
+  The top of the discard stays covered (`topeTapado`) until its flight lands
+  (`aterriza`). `animaSucesos` puts the flights and the shouts (`grito`) of one
+  repaint on a timeline, so three cards drawn arrive one after another.
+- **The hand is a fan animated with FLIP** (`setMano`). The button
+  (`.jg-un-hueco`) carries the fan's fixed transform, and hover/selection lift
+  only the card **inside** it. Lifting the button itself moved it out from under
+  the pointer, lost the hover and made the card flicker. The inline `z-index`
+  that orders the fan is why hover and `sel` need `!important`.
+- **The turn beam (`#unFoco`) is measured, not placed.** `apunta()` reads the
+  angle from the beam's centre to the active placa and unwraps it
+  (`angAcum`), so going from the right seat to the left one turns the short
+  way instead of sweeping across the table. The ring under the piles
+  (`.jg-un-giro`) turns with the direction of play and flips under `.inv`.
+  The felt's aura follows the colour in play through `@property --aura` (a
+  registered `<color>`, which is what lets it transition), keyed on the
+  sala's `data-tinte`. It is not `data-col`, because that is the attribute
+  of the colour buttons and a click on the felt would read as a choice.
+
 **Catan (`catan`) rolls its dice with two keys from two people.** There is
 no server to roll, and a die that one player could steer is the whole game.
 Each player derives a chain of 800 hashes from their private seed
@@ -2396,7 +2428,29 @@ that adjustment whenever the theme changes, so one game's hurry never leaks
 into the next. `tests/temas.test.cjs` checks every theme compiles, that its
 section lengths are whole bars, and that no note is silently dropped.
 
-**A theme may be a recording instead** (`GRABADAS` in `sonido.js`): Flip 7 plays
+**The header's ♪ button is a player, not a mute** (`reproductor.js` over
+`CANCIONES` in `sonido.js`). Every song in the house is in one repertoire,
+grouped by mood (`GRUPOS`): the games' own themes, plus six more written
+for the list — *Sobrecarga* (drum'n'bass) and *Tormenta* (boss fight) under
+Intensas, *Neón 84* (synthwave) and *Pulso de datos* (techno with sidechain
+pump) under Electrónicas, *Turno de noche* (lo-fi with an 808, in the vein of
+Schedule I's soundtrack) and *Cumbia de la mesa* under Chill y fiesta. Those
+needed the chip to grow a low-pass filter, sidechain pump, detune, glide and
+an 808 kick with claps. **Automático** (the default) keeps the old behaviour,
+one song per game and silence in the lobby. Picking a song makes it play
+everywhere, lobby included, until you go back to Automático. The choice,
+the list mode (repeat / in order / shuffle) and the volume persist in
+`localStorage` (`jg.cancion`, `jg.modoLista`, `jg.volumen`). A song's end is
+seen through `Reproductor.vueltas` for the chip and a backwards jump of
+`timeupdate` for a recording. `ambientar(null)` means "this screen brings its
+own music" (Circuit Breakers' frame). `PROPIAS` maps the game's name to that
+same `null`, because `juegos-main.js` re-ambients every room by name on each
+repaint and was overwriting the frame's request. The panel hangs off `<body>`
+in `position:fixed`, like the rules manual, and while open it only retouches
+classes and texts on each `alCambiarMusica`, so the volume slider keeps the
+finger mid-drag.
+
+**A theme may be a recording instead** (a `CANCIONES` entry with a `url`): Flip 7, Cacho and UNO play
 "Poker Night" by Zane Little (OpenGameArt, CC0) from `juegos/audio/`, looped by
 hand at `fin` (124.3 s) through `timeupdate` because the file's tail is
 silence. The chip version of a table game sounded thin, and a lounge track is

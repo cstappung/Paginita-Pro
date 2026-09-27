@@ -48,7 +48,8 @@ import { crearCatan } from "./juegos/catan.js";
 import { abreReglas, tieneReglas } from "./juegos/reglas.js";
 import { crearRanks } from "./juegos/ranks.js";
 import { mezcla, abrePerfil } from "./juegos/perfil.js";
-import { suena, silenciar, silenciado, ambientar, ajustarMusica, activarAudio, configurarMusica, musicaActiva, volumenMusica } from "./juegos/sonido.js";
+import { suena, silenciar, silenciado, ambientar, ajustarMusica, activarAudio } from "./juegos/sonido.js";
+import { montaReproductor } from "./juegos/reproductor.js";
 import { createReportWidget } from "./report-widget.js";
 
 const $ = id => document.getElementById(id);
@@ -1385,14 +1386,7 @@ function wire() {
   $("btnLogout").onclick = () => logout();
   $("btnPerfil").onclick = editaPerfil;
   pintaSonido();
-  const pintaMusica = () => {
-    $("btnMusica").textContent = musicaActiva() ? "♫ Música" : "♫ Sin música";
-    $("btnMusica").setAttribute("aria-pressed", String(musicaActiva()));
-  };
-  pintaMusica();
-  $("volMusica").value = Math.round(volumenMusica() * 100);
-  $("btnMusica").onclick = () => { activarAudio(); configurarMusica(!musicaActiva()); pintaMusica(); };
-  $("volMusica").oninput = e => { activarAudio(); configurarMusica(musicaActiva(), Number(e.target.value) / 100); };
+  montaReproductor($("btnMusica"));
   document.addEventListener("pointerdown", activarAudio, { passive: true });
   document.addEventListener("keydown", activarAudio);
   $("btnSonido").onclick = () => { silenciar(!silenciado()); pintaSonido(); suena("clic"); };
