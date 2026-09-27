@@ -661,7 +661,7 @@ export function reducir(p) {
   if (p.juego === "cacho") return { ...base, ...redCacho(p, js, listos) };
   if (p.juego === "uno") return { ...base, ...redUno(p, js, listos) };
   if (p.juego === "catan") return { ...base, ...redCatan(p, js, listos) };
-  if (p.juego === "presidente") return { ...base, ...redPresidente(p, js) };
+  if (p.juego === "presidente") return { ...base, ...redPresidente(p, js, listos) };
   return base;
 }
 
@@ -4689,7 +4689,7 @@ export function llavePr(est, uid, rep, cad) {
 const rolPr = (i, n) => i === 0 ? "pres" : i === n - 1 ? "culo"
   : n >= 4 && i === 1 ? "vice" : n >= 4 && i === n - 2 ? "vculo" : "pueblo";
 
-function redPresidente(p, js) {
+function redPresidente(p, js, listos) {
   const ids = js.map(j => j.uid);
   const ficha = {};
   for (const j of js) ficha[j.uid] = j;
@@ -4698,7 +4698,9 @@ function redPresidente(p, js) {
   const fuera = {}, conocido = {}, retirado = {}, saliendo = {}, llegada = {}, puntos = {}, desde = {};
   const ultLlave = {}, llaves = {}, falsas = [], hist = [], rondas = [];
   let iniciado = false, nl = 0, rep = 0, R = null, roles = {}, ultOrden = [], cierre = [];
-  let fase = "espera", ganador = null, motivo = "", ni = 0, nmov = 0;
+  // La UI solo envía «inicio» estando en juego: el arranque debe respetar
+  // el mínimo y el cierre de la sala, igual que los demás juegos.
+  let fase = listos ? "jugando" : "espera", ganador = null, motivo = "", ni = 0, nmov = 0;
 
   const suceso = e => { e.i = ni++; hist.push(e); if (hist.length > 40) hist.shift(); };
   const enSala = u => !!ficha[u] && !fuera[u];

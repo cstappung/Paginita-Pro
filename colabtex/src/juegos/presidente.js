@@ -486,18 +486,23 @@ export function crearPresidente(ctx) {
     if (enviando && Date.now() - enviandoT > ENVIO_MAX + 2000) enviando = false;
     if (!sec && secListo && !ctx.mirando) { secPedido = false; secListo = false; pideSecreto(); }
     if (est.fase === "jugando") { automatismos(); firmas.prPie = ""; pintaPie(); }
-    else cierre();
+    else if (est.fase === "fin") cierre();
   }
   function alVolver() { if (!document.hidden && est) { automatismos(); pinta(); if (est.fase === "fin") listo(); } }
   function listo() { if (!document.hidden && ctx.listo) ctx.listo(); }
 
   function cierre() {
+    if (muerto || !est || est.fase !== "fin") return;
     if (!finVisto) finVisto = Date.now();
     automatismos();
     if (ctx.mirando || !jugador(uid)) return;
     const faltan = est.jugadores.some(j => !est.fuera[j.uid] && llavesDebidas(j.uid).length);
     if (!(p.fin && p.fin.at) && (!faltan || Date.now() - finVisto > ESPERA_LLAVES))
-      Promise.resolve().then(() => terminar(est.ganador, est.motivo)).catch(() => {});
+      Promise.resolve().then(() => {
+        // Puede haberse desmontado la vista o revertido una jugada local.
+        if (!muerto && est && est.fase === "fin" && !(p.fin && p.fin.at))
+          return terminar(est.ganador, est.motivo);
+      }).catch(() => {});
     clearTimeout(relojFin);
     relojFin = setTimeout(() => { if (!muerto && est && !(p.fin && p.fin.at)) cierre(); }, 1000);
   }
@@ -528,6 +533,7 @@ export function crearPresidente(ctx) {
 
   function actualizar(partida, estado) {
     p = partida; est = estado;
+    if (est.fase !== "fin") { clearTimeout(relojFin); relojFin = 0; finVisto = 0; }
     if (!host) return;
     const ult = est.hist.length ? est.hist[est.hist.length - 1].i : -1;
     const nuevos = primera ? [] : est.hist.filter(e => e.i > histPrev).slice(-16);
