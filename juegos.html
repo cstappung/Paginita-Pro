@@ -1270,6 +1270,35 @@ try { var t = localStorage.getItem("jg.tema");
 .jg-art-uno i:nth-child(4)::before{background:conic-gradient(#d72600 0 25%,#0956bf 0 50%,#379711 0 75%,#e8c300 0)}
 .jg-art-uno span{position:relative;font:800 22px 'IBM Plex Mono',monospace;color:var(--t)}.jg-art-uno i:nth-child(4) span{color:#fff;text-shadow:0 1px 3px #000}
 .jg-art-uno b{position:absolute;left:50%;bottom:-30px;transform:translateX(-50%) rotate(-6deg);font:900 20px 'IBM Plex Mono',monospace;letter-spacing:1px;color:#ffe14d;text-shadow:2px 2px 0 #d72600}
+/* Presidente: baraja francesa sobre la misma mesa oscura que UNO */
+.jg-pr-c{background:#fbfaf6;border-color:#fbfaf6;color:#1b1b1f}
+.jg-pr-c.roja{color:#c8102e}
+.jg-pr-c .ov{background:none;transform:none}.jg-pr-c .ov em{transform:none;color:inherit;text-shadow:none;font-size:30px}
+.jg-pr-c .esq{color:inherit;text-shadow:none;display:flex;flex-direction:column;align-items:center;gap:1px}.jg-pr-c .esq s{text-decoration:none;font-size:.9em}
+.jg-pr-c.dorso{background:repeating-linear-gradient(45deg,#3b1f6e 0 6px,#52309a 0 12px);border-color:#fbfaf6;color:#ffd76a}
+.jg-pr-c.dorso .ov em{font-size:26px;color:#ffd76a}
+.jg-pr-c.mini .ov em{font-size:16px}.jg-pr-c.tope .ov em{font-size:44px}
+.jg-pr-mesa{display:flex;flex-direction:column;align-items:center;gap:10px}
+.jg-pr-baza{display:flex;align-items:flex-end;justify-content:center;gap:10px;flex-wrap:wrap}
+.jg-pr-grupo{display:flex;flex-direction:column;align-items:center;gap:4px}.jg-pr-grupo>.jg-un-c+.jg-un-c{margin-left:-30px}
+.jg-pr-grupo{flex-direction:row;flex-wrap:wrap;justify-content:center}.jg-pr-grupo small{flex-basis:100%;text-align:center;color:#fff9;font-size:11px}
+.jg-pr-grupo.vieja{opacity:.55}.jg-pr-grupo.vieja>.jg-un-c+.jg-un-c{margin-left:-20px}
+.jg-pr-nueva{animation:jgPrEntra .35s cubic-bezier(.3,1.5,.5,1)}
+@keyframes jgPrEntra{from{transform:translateY(40px) scale(.7);opacity:0}}
+.jg-pr-info{display:flex;flex-direction:column;align-items:center;gap:4px;color:#fff;text-align:center;font-size:13px}.jg-pr-info b{font-size:15px}
+.jg-pr-cambios{list-style:none;margin:4px 0 0;padding:0;font-size:12px;text-align:left}.jg-pr-cambios li.hecho{opacity:.6}.jg-pr-cambios li.anulado{text-decoration:line-through;opacity:.5}
+.jg-pr-rol{background:#ffd76a;color:#1b1b1f}
+.jg-pr-control{display:flex;flex-direction:column;gap:6px;margin:10px auto;max-width:900px}
+.jg-pr-marcador{max-width:900px;margin:10px auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:4px 12px}
+.jg-pr-marcador .jg-un-hist-t{grid-column:1/-1}
+.jg-pr-punto{display:flex;justify-content:space-between;padding:3px 8px;border-radius:6px;background:#ffffff10}.jg-pr-punto.ido{opacity:.5;text-decoration:line-through}
+.jg-portada-presidente{background:radial-gradient(ellipse at center,#3b1f6e,#150c28 75%)}
+.jg-art-pr{position:relative;display:flex;align-items:center}
+.jg-art-pr>b{position:absolute;left:50%;top:-34px;transform:translateX(-50%);font-size:30px;filter:drop-shadow(0 3px 4px #0008)}
+.jg-art-pr i{position:relative;width:54px;height:80px;border-radius:8px;background:#fbfaf6;box-shadow:0 8px 18px #0008;margin-left:-14px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-style:normal;color:var(--t)}
+.jg-art-pr i:first-of-type{margin:0;transform:rotate(-15deg) translateY(8px)}.jg-art-pr i:nth-of-type(2){transform:rotate(-5deg)}.jg-art-pr i:nth-of-type(3){transform:rotate(6deg)}.jg-art-pr i:nth-of-type(4){transform:rotate(16deg) translateY(8px)}
+.jg-art-pr span{font:800 22px 'IBM Plex Mono',monospace}.jg-art-pr s{text-decoration:none;font-size:20px}
+.jg-art-pr em{position:absolute;left:50%;bottom:-30px;transform:translateX(-50%) rotate(-5deg);font:900 18px 'IBM Plex Mono',monospace;font-style:normal;letter-spacing:1px;color:#ffd76a;text-shadow:2px 2px 0 #7c4dff}
 
 /* ---------- El manual de reglas ----------
    Cuelga de <body> en `position:fixed`, por encima del cartel de fin
@@ -1845,6 +1874,6 @@ html[data-tema=oscuro] .jg-ct-chip.mar{background:#16304a;color:#9fd0ff}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202609270450"></script>
+<script src="juegos-app.js?v=202609271916"></script>
 </body>
 </html>

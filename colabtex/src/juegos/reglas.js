@@ -323,6 +323,39 @@ const REGLAS = {
       }
     }
   },
+  presidente: {
+    lema: "El «culo»: de 3 a 10 jugadores, ronda tras ronda y sin final fijo.",
+    secciones: [
+      ["El objetivo", "Quedarte sin cartas antes que nadie. El orden en que se acaba da los papeles de la ronda siguiente: el primero es el <b>Presidente</b> 👑, el segundo el <b>Vicepresidente</b> 🎩, el penúltimo el <b>Viceculo</b> 🧹 y el último el <b>Culo</b> 💩; el resto es Pueblo."],
+      ["Las cartas", lista([
+        "Del 3 (la más baja) al 2 (la más alta): 3 4 5 6 7 8 9 10 J Q K A 2. Los palos no cuentan.",
+        "Con más de ocho en la mesa se juega con <b>dos barajas</b>.",
+        "Se reparte todo el mazo; a unos les puede tocar una carta más que a otros."
+      ])],
+      ["Tu turno", lista([
+        "Con la mesa limpia abres con lo que quieras: una carta, o dos, tres o cuatro <b>del mismo número</b>.",
+        "Sobre la mesa hay que poner <b>la misma cantidad</b> de cartas y de un número <b>más alto</b>. Si no puedes o no quieres, pasas.",
+        "Quien pasa no vuelve a jugar hasta que se limpie la mesa.",
+        "Cuando todos los demás han pasado, la mesa se limpia y abre quien jugó lo último.",
+        "Un <b>2</b> limpia la mesa al momento, y vuelves a abrir tú.",
+        "Si no tienes con qué superar la mesa, la pantalla pasa por ti."
+      ])],
+      ["El cambio de cartas", lista([
+        "Desde la segunda ronda, el Culo da sus <b>dos mejores cartas</b> al Presidente, y este le devuelve dos que elija. El Viceculo da <b>una</b> al Vicepresidente, que le devuelve una.",
+        "Las mejores las da la pantalla sola: no hay nada que decidir. Lo que devuelves sí lo eliges tú; si tardas mucho, van las más bajas.",
+        "El Presidente abre la ronda y los asientos se ordenan por los papeles."
+      ])],
+      ["Una mesa que no se acaba", lista([
+        "Entre ronda y ronda puede sentarse gente nueva o levantarse quien quiera: los papeles de la ronda anterior se conservan para los que siguen.",
+        "Quien pide levantarse a media ronda la termina; quien llega a media ronda espera a la siguiente.",
+        "Hacen falta al menos tres para repartir.",
+        "Cada ronda da puntos: tantos como jugadores quedan detrás de ti.",
+        "Cuando la mitad de la mesa vota <b>✋ Acabar la partida</b>, se termina y gana quien más puntos tenga."
+      ])],
+      ["Nadie reparte con trampa", "No hay crupier: cada uno baraja con su candado y luego lo quita, así que nadie sabe las cartas de los demás. Las cartas del cambio viajan en sobres cerrados. Al acabar cada ronda se revelan las llaves y todos comprueban que nadie jugó cartas que no tenía; quien hizo trampa sale en rojo."],
+      ["Si alguien se duerme", "Pasado un rato aparece <b>Saltarle</b>: en su turno pasa por él; en el reparto o el cambio se le levanta de la ronda. También se le puede echar con ⏏."]
+    ]
+  },
   catan: {
     lema: "Coloniza la isla, comercia y construye hasta llegar a la meta.",
     secciones: [
