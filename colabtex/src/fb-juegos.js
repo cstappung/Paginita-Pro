@@ -65,7 +65,8 @@ import {
 } from "firebase/database";
 import {
   claveJugada, semillaAleatoria, salAleatoria, compromiso, LADO, cupoDe,
-  cadenaCacho, CC_CADENA, sha256hex, arrUno, dhPublica, cadenaCatan, CT_CADENA
+  cadenaCacho, CC_CADENA, sha256hex, arrUno, dhPublica, cadenaCatan, CT_CADENA,
+  cadenaPr, PR_CADENA
 } from "./juegos/motor.js";
 
 const P = "partidas", MIAS = "misPartidas", R = "ranks";
@@ -126,13 +127,15 @@ const ficha = (q, orden, hmazo, extra) => Object.assign({
    el UNO, la promesa de su parte de la mezcla (`hcad` también) y su
    clave pública de Diffie-Hellman (`pk`), la de los sobres. En Catan,
    la punta de la cadena de llaves con que se tiran los dados y se roba
-   (`hcad`, ver `redCatan`): 800 hashes, que salen en milisegundos. */
+   (`hcad`, ver `redCatan`): 800 hashes, que salen en milisegundos. En
+   el Presidente, la de las llaves de cada reparto (`redPresidente`). */
 async function secreto(pid, uid, juego) {
   const sem = semillaAleatoria(), sal = salAleatoria();
   await set(ref(db, `${MIAS}/${uid}/${pid}/sec`), { sem, sal });
   const extra = juego === "cacho" ? { hcad: cadenaCacho(sem, sal)[CC_CADENA] }
     : juego === "uno" ? { hcad: sha256hex(arrUno(sem, sal)), pk: dhPublica(sem, sal) }
     : juego === "catan" ? { hcad: cadenaCatan(sem, sal)[CT_CADENA] }
+    : juego === "presidente" ? { hcad: cadenaPr(sem, sal)[PR_CADENA] }
     : {};
   return { sem, sal, h: await compromiso(sem, sal), extra };
 }
@@ -151,8 +154,15 @@ export async function unirse(pid, quien) {
   if (!p) throw new Error("Esa partida ya no existe.");
   const ya = p.jugadores || {};
   const cupo = cupoDe(p);
+  /* El Presidente no se acaba nunca, así que se puede entrar con la
+     partida en marcha: la ficha se escribe ya y la mesa te sienta al
+     empezar la ronda siguiente (`{t:"entra"}`, lo manda la pantalla).
+     El cupo lo hace cumplir el reductor, que no sienta a más; aquí
+     solo se pone un techo para que la sala no crezca sin fin. */
+  const enMarcha = p.juego === "presidente" && p.estado === "jugando";
+  if (enMarcha && p.fin) throw new Error("Esa partida ya terminó.");
   if (!ya[quien.uid]) {
-    if (Object.keys(ya).length >= cupo) throw new Error("La sala está llena.");
+    if (Object.keys(ya).length >= (enMarcha ? 3 * cupo : cupo)) throw new Error("La sala está llena.");
     const sec = await secreto(pid, quien.uid, p.juego);
     await set(ref(db, `${P}/${pid}/jugadores/${quien.uid}`),
               ficha(quien, Object.keys(ya).length, sec.h, sec.extra));
@@ -161,7 +171,7 @@ export async function unirse(pid, quien) {
        sala de seis con cuatro dentro no empezaría nunca. Las reglas
        solo dejan entrar mientras el estado sea «esperando», así que
        cerrar es también lo que echa el cerrojo. */
-    if (Object.keys(ya).length + 1 >= cupo) {
+    if (!enMarcha && Object.keys(ya).length + 1 >= cupo) {
       await set(ref(db, `${P}/${pid}/estado`), "jugando");
     }
   }

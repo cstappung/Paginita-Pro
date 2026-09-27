@@ -25,7 +25,7 @@
  */
 import {
   MODOS_UNO, UNO_COLORES, UNO_NOMBRE_COLOR, UNO_TOPE, sha256hex, arrUno, salUno, tapaUno, cartaUno,
-  dhCompartida, cierraSobreUno, manoUno, cuentaUno, robaHastaUno, auditaUno, jugableUno,
+  dhCompartida, cierraSobreUno, manoUno, cuentaUno, robaHastaUno, sacaRuletaUno, auditaUno, jugableUno,
   anunciablesUno, colorUno, valorUno, esComodinUno, esMentiraUno, esNumeroUno, sinTilde, roboUno
 } from "./motor.js";
 import { suena } from "./sonido.js";
@@ -402,7 +402,9 @@ export function crearUno(ctx) {
     if (est.fase === "espera") h = `<div class="jg-un-aviso">Esperando a que se sienten todos</div>`;
     else if (!t) h = `<div class="jg-un-aviso"><span class="jg-un-baraja">${dorso("tope")}${dorso("tope")}</span>Barajando…</div>`;
     else {
-      const puedeRobar = turnoMio() && !est.pena && est.modo !== "allwild" && !enviando;
+      const rw = esp();
+      const saca = !!(rw && rw.k === "ruleta" && rw.uid === uid && rw.col && !enviando && !ctx.mirando);
+      const puedeRobar = (turnoMio() && !est.pena && est.modo !== "allwild" && !enviando) || saca;
       /* El montón de debajo sale del historial: las últimas cartas
          jugadas, cada una con su giro, y encima la que manda. */
       const ev = (est.hist || []).filter(x => (x.e === "juega" && x.c) || x.e === "miente");
@@ -419,7 +421,7 @@ export function crearUno(ctx) {
       const color = t.col ? `<span class="jg-un-color c-${t.col}">${punto(t.col)} ${esc(UNO_NOMBRE_COLOR[t.col])}</span>`
         : est.modo === "allwild" ? `<span class="jg-un-color">todo vale</span>` : "";
       h = `<div class="jg-un-pilas">
-          <button class="jg-un-mazo${puedeRobar ? " vivo" : ""}" data-roba${puedeRobar ? "" : " disabled"} title="${puedeRobar ? (est.nm ? "Robar hasta poder jugar" : "Robar una carta") : "Mazo"}">${dorso("tope m3")}${dorso("tope m2")}${dorso("tope m1")}${puedeRobar ? `<span class="jg-un-roba-t">Robar</span>` : ""}</button>
+          <button class="jg-un-mazo${puedeRobar ? " vivo" : ""}" data-roba${puedeRobar ? "" : " disabled"} title="${saca ? "Sacar una carta de la ruleta" : puedeRobar ? (est.nm ? "Robar hasta poder jugar" : "Robar una carta") : "Mazo"}">${dorso("tope m3")}${dorso("tope m2")}${dorso("tope m1")}${puedeRobar ? `<span class="jg-un-roba-t">${saca ? "Sacar" : "Robar"}</span>` : ""}</button>
           <div class="jg-un-descarte">${pila}${top}</div>
         </div>
         <div class="jg-un-info">
@@ -544,7 +546,7 @@ export function crearUno(ctx) {
       if (esComodinUno(sel.di) && !sel.col) return "color";
       return "";
     }
-    if (esComodinUno(c) && est.modo !== "allwild" && !sel.col) return "color";
+    if (esComodinUno(c) && est.modo !== "allwild" && c !== "NC" && !sel.col) return "color";
     if (pideObj(c) && !sel.obj) return "obj";
     return "";
   }
@@ -795,6 +797,7 @@ export function crearUno(ctx) {
         case "gana": grito(u, "🏆 ¡Gana!", "oro", t); break;
         case "final": grito(u, "⚔ Ataque final", "malo", t); break;
         case "ruleta": grito(u, "🎡 " + (UNO_NOMBRE_COLOR[x.col] || ""), "", t); break;
+        case "saca": if (x.ok) grito(u, "🎯 ¡" + (UNO_NOMBRE_COLOR[x.col] || "") + "!", "bien", t); break;
         case "usamoneda": grito(u, x.lado === "mercy" ? "🕊 Piedad" : "💀 ×2", "", t); break;
         case "pasa": grito(u, "Paso", "suave", t); break;
         default: break;
@@ -905,10 +908,15 @@ export function crearUno(ctx) {
       h = `<div class="jg-un-panel"><div class="jg-nota">${esc(Nombre(w.de))} te echó un +4. Solo es legal si no tenía ninguna carta ${esc(UNO_NOMBRE_COLOR[w.prev] || "del color")}. Si lo retas y era ilegal, roba 4 él; si era legal, robas 6 tú.</div>
         <div class="jg-un-fila"><button class="jg-un-boton malo" id="unCarga"${off}>Robar 4</button><button class="jg-un-boton grande" id="unReta"${off}>¡Reto!</button></div></div>`;
     }
-    else if (w.k === "ruleta" && w.uid === uid) {
+    else if (w.k === "ruleta" && w.uid === uid && !w.col) {
       clave = "ruleta" + enviando;
-      h = `<div class="jg-un-panel"><div class="jg-nota">Ruleta de color: elige un color y robas hasta que salga una carta de ese color (que se queda en tu mano).</div>
+      h = `<div class="jg-un-panel"><div class="jg-nota">${esc(Nombre(w.de))} te tiró la ruleta. Eliges tú el color, y luego sacas cartas de una en una hasta que salga una de ese color (se quedan todas en tu mano).</div>
         <div class="jg-un-fila">${botonesColor("data-ruleta")}</div></div>`;
+    }
+    else if (w.k === "ruleta" && w.uid === uid) {
+      clave = ["ruleta", w.col, w.n, enviando].join("|");
+      h = `<div class="jg-un-panel"><div class="jg-nota">Ruleta <b>${esc(UNO_NOMBRE_COLOR[w.col] || "")}</b>: ${w.n ? `llevas ${nc(w.n)} y ninguna es ${esc(UNO_NOMBRE_COLOR[w.col] || "")}.` : "saca la primera."} Para en cuanto salga una de ese color.</div>
+        <div class="jg-un-fila"><button class="jg-un-boton grande" id="unSaca"${off}>🎡 Sacar carta</button></div></div>`;
     }
     else if (w.k === "duda") {
       const puedoDudar = w.de !== uid, creo = w.sig === uid;
@@ -935,11 +943,13 @@ export function crearUno(ctx) {
       } else { clave = "destapa-ya"; h = `<div class="jg-nota">${esc(Nombre(w.de))} decide qué cartas destapar.</div>` + aviso(); }
     }
     else {
-      clave = "otro" + w.k + (w.uid || "");
+      clave = "otro" + w.k + (w.uid || "") + (w.k === "ruleta" ? w.col + w.n : "");
       const t = w.k === "sobres" ? "Pasando las manos en sobres cerrados…"
         : w.k === "resp" ? `${Nombre(w.uid)} responde al reto…`
         : w.k === "revela" ? `${Nombre(w.uid)} destapa su carta…`
         : w.k === "llaves" ? "Barajando…"
+        : w.k === "ruleta" && !w.col ? `${Nombre(w.uid)} elige el color de la ruleta…`
+        : w.k === "ruleta" ? `${Nombre(w.uid)} saca de la ruleta hasta que salga ${UNO_NOMBRE_COLOR[w.col] || ""}: ${w.n ? "lleva " + nc(w.n) : "empieza"}.`
         : (est.debe || []).length ? `Turno de ${nombre(est.debe[0])}.` : "";
       h = (t ? `<div class="jg-nota">${esc(t)}</div>` : "") + aviso();
     }
@@ -971,6 +981,7 @@ export function crearUno(ctx) {
       case "miente": return `${verbo(x.uid, "Juegas", "juega")} boca abajo: «${nombreCarta(x.di)}»${esComodinUno(x.di) && x.col ? " → " + col(x.col) : ""}`;
       case "roba": {
         const n = x.n;
+        if (x.por === "rul1") return "";
         const s = { turno: "", hasta: " hasta poder jugar", carta: "", diana: " (diana)", final: " (ataque final)",
           muerte: " (muerte súbita)", reto: " por el reto", ruleta: " en la ruleta", uno: " por no decir UNO",
           merced: " (mano nueva)", duda: " por dudar", mentira: " por mentir" }[x.por] || "";
@@ -984,6 +995,7 @@ export function crearUno(ctx) {
         const a = (x.pares || [])[0];
         return a ? `${Nombre(a.de)} y ${nombre(a.a)} cambian de mano` : "Cambio de manos";
       }
+      case "saca": return x.ok ? `${verbo(x.uid, "Sacas", "saca")} ${nc(x.n)} y ¡sale ${col(x.col)}!` : `${verbo(x.uid, "Sacas", "saca")} otra: no es ${col(x.col)}`;
       case "descarta": return `${verbo(x.uid, "Descartas", "descarta")} ${x.n} ${x.n === 1 ? "carta" : "cartas"} ${col(x.col)}`;
       case "final": return `Ataque final de ${ati(x.uid)} contra ${ati(x.a)}: ${x.n >= 7 ? "¡siete o más acciones!" : x.n + (x.n === 1 ? " acción" : " acciones")}`;
       case "tapas": return `Se cierra el reto de ${ati(x.uid)}`;
@@ -994,7 +1006,7 @@ export function crearUno(ctx) {
       case "pasa": return `${verbo(x.uid, "Pasas", "pasa")}`;
       case "reta": return `${verbo(x.uid, "Retas", "reta")} el +4 de ${ati(x.a)}`;
       case "resp": return `${x.uid === uid ? "Tu +4" : "El +4 de " + nombre(x.uid)} era ${x.legal ? "legal" : "ilegal"}`;
-      case "ruleta": return `${verbo(x.uid, "Pides", "pide")} ${col(x.col)} a la ruleta: ${nc(x.n)}`;
+      case "ruleta": return `${verbo(x.uid, "Pides", "pide")} ${col(x.col)} a la ruleta${x.n ? ": " + nc(x.n) : ""}`;
       case "cree": return x.a === uid ? `${Nombre(x.uid)} te cree` : `${verbo(x.uid, "Crees", "cree")} a ${nombre(x.a)}`;
       case "duda": return `${verbo(x.uid, "Dudas", "duda")} de ${ati(x.a)}`;
       case "verdad": return `${verbo(x.uid, "Destapas", "destapa")} ${nombreCarta(x.c)}: ${x.tapa ? "es del color" : "decía la verdad"}`;
@@ -1045,6 +1057,10 @@ export function crearUno(ctx) {
       if (b.id === "unJugar" && !falta()) { mandaSel(); return; }
     }
     const s = miSec();
+    if ((b.id === "unSaca" || b.hasAttribute("data-roba")) && s && w && w.k === "ruleta" && w.uid === uid && w.col) {
+      manda({ ...sacaRuletaUno(est, s, uid), k: w.n });
+      return;
+    }
     if (b.hasAttribute("data-roba") || b.id === "unRoba") {
       if (!turnoMio() || est.pena || est.modo === "allwild") return;
       if (!est.nm) { manda({ t: "roba", uid }); return; }
@@ -1056,11 +1072,7 @@ export function crearUno(ctx) {
     if (b.id === "unCarga") { manda({ t: "carga", uid }); return; }
     if (b.id === "unReta") { manda({ t: "reta", uid }); return; }
     if (b.id === "unMerced") { manda({ t: "merced", uid }); return; }
-    if (b.hasAttribute("data-ruleta") && s) {
-      const col = b.getAttribute("data-ruleta");
-      manda({ t: "ruleta", uid, col, n: robaHastaUno(est, s, uid, mano(), c => colorUno(c) === col) });
-      return;
-    }
+    if (b.hasAttribute("data-ruleta")) { manda({ t: "ruleta", uid, col: b.getAttribute("data-ruleta") }); return; }
     if (b.id === "unDuda") { manda({ t: "duda", uid }); return; }
     if (b.id === "unCree") { manda({ t: "cree", uid }); return; }
     if (b.id === "unTapa" && tapaSel >= 0 && s) {

@@ -265,7 +265,7 @@ const REGLAS = {
           ["Los comodines", lista([
             "<b>⇄+4 Invierte +4</b>: cambia el sentido y el siguiente (el de antes) roba 4.",
             "<b>+6</b> y <b>+10</b>.",
-            "<b>🎡 Ruleta de color</b>: el siguiente elige un color y va robando hasta que le sale una carta de ese color."
+            "<b>🎡 Ruleta de color</b>: quien la tira no pide color; el siguiente elige uno y va sacando cartas de una en una (un clic cada una, o en el mazo) hasta que le sale una de ese color. Todas se quedan en su mano, y si llega a 25 queda fuera."
           ])],
           ["Intercambios", "Los cambios de mano del 7 y del 0 viajan cifrados entre los dos jugadores: solo quien recibe la mano puede verla."]
         ]

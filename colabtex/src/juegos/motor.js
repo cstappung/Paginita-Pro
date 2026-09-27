@@ -107,6 +107,13 @@ export const JUEGOS = {
     color: "#d9822b",
     minimo: 2,
     cupo: 6
+  },
+  presidente: {
+    nombre: "Presidente",
+    lema: "Deshazte de tus cartas primero: el Culo le da sus mejores al Presidente, ronda tras ronda",
+    color: "#7c4dff",
+    minimo: 3,
+    cupo: 10
   }
 };
 
@@ -654,6 +661,7 @@ export function reducir(p) {
   if (p.juego === "cacho") return { ...base, ...redCacho(p, js, listos) };
   if (p.juego === "uno") return { ...base, ...redUno(p, js, listos) };
   if (p.juego === "catan") return { ...base, ...redCatan(p, js, listos) };
+  if (p.juego === "presidente") return { ...base, ...redPresidente(p, js) };
   return base;
 }
 
@@ -714,6 +722,11 @@ export function progreso(est, juego) {
   }
   /* En Catan, lo cerca que está de la meta quien va primero. */
   if (juego === "catan" && est.vp) return c(Math.max(0, ...Object.values(est.vp)) / (est.meta || 10));
+  /* En Presidente, lo que va de la ronda: cartas que ya salieron. */
+  if (juego === "presidente" && est.R && est.etapa === "juego") {
+    const q = Object.values(est.mano || {}).reduce((a, b) => a + b, 0);
+    return c(1 - q / est.R.D);
+  }
   if (juego === "cartas" && est.ganadas) return c(Math.max(0, ...Object.values(est.ganadas).map(g => g.length)) / 5);
   return 0;
 }
@@ -2590,6 +2603,9 @@ export function jugableUno(c, e) {
   if (e.pena) return roboUno(c) > 0 && roboUno(c) >= e.pena.min;
   if (esComodinUno(c)) return true;
   const t = e.tope || {};
+  /* Una ruleta cuya víctima se fue antes de elegir deja la mesa sin
+     color: vale cualquiera. */
+  if (!t.col) return true;
   if (colorUno(c) === t.col) return true;
   return !!t.c && !esComodinUno(t.c) && valorUno(c) === valorUno(t.c);
 }
@@ -2806,7 +2822,12 @@ function redUno(p, js, listos) {
     else if (c === "N+4") { const w = sig(u); roba(w, 4, "carta"); luego = sig(u, 2); }
     else if (nm && v === "7") return intercambia([[u, x.obj], [x.obj, u]], luego, "7");
     else if (nm && v === "0") return intercambia(activos().map(w => [w, sig1(w)]), luego, "0");
-    else if (c === "NC") { espera = { k: "ruleta", uid: sig(u), de: u }; turno = sig(u); return; }
+    else if (c === "NC") {
+      tope = { c, col: "" };
+      espera = { k: "ruleta", uid: sig(u), de: u, col: "", n: 0 };
+      turno = sig(u);
+      return;
+    }
     else if (c === "NF") {
       const w = sig(u), n = x.mano.filter(y => !esNumeroUno(y)).length;
       if (n >= 7) {
@@ -2871,7 +2892,7 @@ function redUno(p, js, listos) {
     if (!espera && pena && turno && !activo(turno)) turno = sig1(turno);
   };
 
-  const TURNO = new Set(["juega", "roba", "pasa", "carga", "reta", "ruleta", "miente", "merced"]);
+  const TURNO = new Set(["juega", "roba", "pasa", "carga", "reta", "ruleta", "saca", "miente", "merced"]);
 
   for (const j of jugadasDe(p)) {
     const u = j.uid;
@@ -2936,7 +2957,8 @@ function redUno(p, js, listos) {
       const c = String(j.c || "");
       if (!(miTurno || tras) || !codigos.has(c) || esMentiraUno(c)) continue;
       if (!jugableUno(c, { modo, tope, pena })) continue;
-      if (esComodinUno(c) && modo !== "allwild" && !UNO_COLORES.includes(j.col)) continue;
+      /* La ruleta no pide color a quien la tira: lo elige la víctima. */
+      if (esComodinUno(c) && modo !== "allwild" && c !== "NC" && !UNO_COLORES.includes(j.col)) continue;
       const quedan = cartas[u] - 1;
       const x = { col: j.col, prev: tope.col, obj: j.obj, n: 0, mano: null, moneda: false };
       if ((nm && valorUno(c) === "7") || c === "NW") {
@@ -3042,16 +3064,35 @@ function redUno(p, js, listos) {
       else { roba(u, 4, "reto"); turno = e.reta; }
       continue;
     }
+    /* La ruleta, en dos tiempos: la víctima elige el color y luego saca
+       de una en una, cada carta un clic. La pantalla dice en `ok` si
+       la que acaba de sacar es del color (solo ella puede saberlo, el
+       mazo es suyo) y la auditoría lo comprueba al final. Una sala de
+       antes traía `n` y lo sacaba todo de golpe; eso sigue valiendo. */
     if (j.t === "ruleta") {
+      if (!(e && e.k === "ruleta" && e.uid === u) || e.col || !UNO_COLORES.includes(j.col)) continue;
+      tope = { ...tope, col: j.col };
+      suceso({ e: "ruleta", uid: u, col: j.col });
       const n = Number(j.n);
-      if (!(e && e.k === "ruleta" && e.uid === u) || !UNO_COLORES.includes(j.col)) continue;
+      if (j.n === undefined) { espera = { ...e, col: j.col, n: 0 }; continue; }
       if (!Number.isInteger(n) || n < 1 || n > UNO_TOPE + 1) continue;
       espera = null;
-      tope = { ...tope, col: j.col };
-      suceso({ e: "ruleta", uid: u, col: j.col, n });
       roba(u, n, "ruleta", j.col);
       revisaTope();
       if (ganador === null) turno = sig1(u);
+      continue;
+    }
+    if (j.t === "saca") {
+      if (!(e && e.k === "ruleta" && e.uid === u && e.col)) continue;
+      /* `k` es cuántas llevaba al pedirla: un doble clic no saca dos. */
+      if (j.k !== undefined && Number(j.k) !== e.n) continue;
+      const ok = !!j.ok;
+      roba(u, 1, "rul1", { col: e.col, ok: ok ? 1 : 0 });
+      suceso({ e: "saca", uid: u, col: e.col, ok, n: e.n + 1 });
+      revisaTope();
+      if (ganador !== null) continue;
+      if (ok || elim[u]) { espera = null; turno = sig1(u); }
+      else espera = { ...e, n: e.n + 1 };
       continue;
     }
     if (j.t === "sobre") {
@@ -3229,6 +3270,7 @@ export function repasaUno(est, secretos, fallo) {
         const lleno = m.length >= UNO_TOPE;
         if (nuevas.slice(0, -1).some(ok) || (!lleno && !ok(nuevas[nuevas.length - 1]))) f(u, "roba");
       }
+      if (fallo && por === "rul1" && (colorUno(nuevas[0]) === ctx.col) !== !!ctx.ok) f(u, "ruleta");
       if (fallo && por === "ruleta") {
         const es = c => colorUno(c) === ctx;
         const lleno = m.length >= UNO_TOPE;
@@ -3294,6 +3336,14 @@ export function robaHastaUno(est, sec, uid, mano, vale) {
     const c = cartaUno(est.modo, sec.sem, sec.sal, est.mezcla, robadas + i);
     if (vale(c) || mano.length + i + 1 >= UNO_TOPE) return i + 1;
   }
+}
+
+/* La carta siguiente de la ruleta, sacada por la víctima: la jugada
+   que la pide y dice si es del color. */
+export function sacaRuletaUno(est, sec, uid) {
+  const e = est.espera || {};
+  const c = cartaUno(est.modo, sec.sem, sec.sal, est.mezcla, cuentaUno(est, uid).robadas);
+  return { t: "saca", uid, ok: colorUno(c) === e.col };
 }
 
 /* La auditoría de final de partida: con las semillas reveladas, la
@@ -4415,5 +4465,657 @@ export async function auditaCatan(partida, estado) {
     for (const k of d.puntos || []) if (cartaCatan(sec[u].sem, sec[u].sal, estado.mezcla, k, grande) !== "punto") pon(u, "carta");
   }
   for (const j of estado.jugadores || []) if (!sec[j.uid] && !fallos.some(x => x.uid === j.uid)) pon(j.uid, "oculta");
+  return fallos;
+}
+
+/* ============================================================
+   Presidente (el «culo») — una mesa que no se acaba
+
+   Las reglas son las de siempre: se reparte la baraja entera, quien
+   sale echa una carta o varias del mismo valor, los demás tienen que
+   echar las mismas que haya en la mesa y más altas, o pasar; quien
+   pasa queda fuera de esa baza, y cuando todos los demás han pasado
+   quien echó lo último sale otra vez. El 2 es la carta más alta y
+   además cierra la baza en el acto. El primero en quedarse sin cartas
+   es el **Presidente**, el segundo el **Vicepresidente**, el penúltimo
+   el **Viceculo** y el último el **Culo** (Vice solo con cuatro o más);
+   los del medio son Pueblo. Cada ronda da un punto por cada jugador
+   que uno dejó atrás.
+
+   **La partida no tiene final escrito.** Al cerrar una ronda empieza
+   otra con los papeles de la anterior: el Culo le da sus dos mejores
+   cartas al Presidente y este le devuelve dos cualesquiera; el
+   Viceculo, una al Vicepresidente, que devuelve otra. Entre ronda y
+   ronda se sienta quien llegó (`{t:"entra"}`, que en esta sala se puede
+   escribir con la partida en marcha: las reglas dejan escribir la
+   ficha mientras no haya `fin`) y se levanta quien se retira
+   (`{t:"sale"}`, que conserva sus puntos y puede volver). Se acaba
+   cuando la mitad de la mesa vota acabar (`{t:"cierra"}`), y gana
+   quien lleve más puntos.
+
+   **Nadie reparte, porque nadie puede ver la baraja.** Es el póquer
+   mental de Shamir, Rivest y Adleman (SRA): cada carta es un número
+   del subgrupo de residuos cuadráticos de un primo seguro `PR_P`, y
+   cifrar es elevar a un exponente secreto — y elevar conmuta, que es
+   todo el truco. En orden de asiento, cada uno cifra la baraja entera
+   con su exponente y la baraja a su manera (`{t:"mezcla"}`); después,
+   también en orden, cada uno quita su exponente de las cartas que no
+   son suyas (`{t:"quita"}`: la posición j es del asiento j mod n). Al
+   final a cada carta le queda solo el candado de su dueño, que la abre
+   y la busca en la tabla pública. Nadie ha visto la baraja en claro, y
+   basta con que *uno* baraje de verdad para que el orden no lo sepa
+   nadie. El intercambio de papeles viaja en **sobres** cifrados con un
+   Diffie-Hellman sobre el mismo primo (`{t:"da"}`).
+
+   **Cada reparto usa una llave distinta, sacada de una cadena de
+   hashes** como la del cacho: la punta `hcad` va en la ficha y la
+   llave del reparto `rep` es `e[N−1−(rep−desde)]`. De ella salen el
+   exponente, la permutación y la privada de Diffie-Hellman, así que al
+   revelarla (`{t:"llave"}`, lo manda la pantalla sola en cuanto acaba
+   la ronda) cualquiera puede rehacer ese reparto entero:
+   `auditaPresidente` comprueba cada mezcla, cada quita, cada sobre, que
+   el Culo dio de verdad sus mejores cartas y que cada carta jugada
+   estaba en la mano. El reductor solo sabe cuántas cartas tiene cada
+   uno y cuáles han salido; la exponenciación modular no pasa nunca por
+   él, que corre en cada repintado.
+
+   El precio, dicho: repartir son 2n escrituras seguidas, cada una de
+   la pantalla de un jugador, así que una pestaña dormida para la mesa.
+   Por eso cualquiera puede `salta`r a quien se ha quedado dormido
+   (la pantalla lo ofrece pasado un rato): en el reparto se le retira
+   y se reparte otra vez sin él; en su turno, pasa.
+   ============================================================ */
+
+export const PR_CADENA = 1000;
+const PR_P = BigInt("0xb6bf55230ee6009266d1e75101cad38d71e5a1bd4d71c91b1099365a0ccc4f0b2f62fabbe3241387cc00f1742c8be47f");
+const PR_Q = (PR_P - 1n) / 2n;
+export const PR_RANGOS = ["3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A", "2"];
+export const PR_PALOS = ["♣", "♦", "♥", "♠"];
+export const PR_ROLES = { pres: "Presidente", vice: "Vicepresidente", pueblo: "Pueblo", vculo: "Viceculo", culo: "Culo" };
+export const rangoPr = id => Math.floor((id % 52) / 4);
+export const paloPr = id => id % 4;
+/* Hasta ocho, una baraja; con nueve o diez, dos. */
+export const barajaPrN = n => n > 8 ? 104 : 52;
+export const nombreCartaPr = id => PR_RANGOS[rangoPr(id)] + PR_PALOS[paloPr(id)];
+
+/* Cada valor del subgrupo va en 64 caracteres de base64url (48 bytes). */
+const PR_B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+const PR_B64I = (() => { const m = {}; for (let i = 0; i < 64; i++) m[PR_B64[i]] = i; return m; })();
+function prCod(x) {
+  const h = x.toString(16).padStart(96, "0");
+  let s = "";
+  for (let i = 0; i < 96; i += 3) { const v = parseInt(h.substr(i, 3), 16); s += PR_B64[v >> 6] + PR_B64[v & 63]; }
+  return s;
+}
+function prNum(s, o = 0) {
+  let h = "";
+  for (let i = o; i < o + 64; i += 2) {
+    const a = PR_B64I[s[i]], b = PR_B64I[s[i + 1]];
+    if (a === undefined || b === undefined) return 0n;
+    h += ((a << 6) | b).toString(16).padStart(3, "0");
+  }
+  const x = BigInt("0x" + h);
+  return x > 1n && x < PR_P ? x : 0n;
+}
+function prTrozos(v, D) {
+  if (typeof v !== "string" || v.length !== 64 * D) return null;
+  const x = [];
+  for (let j = 0; j < D; j++) { const n = prNum(v, j * 64); if (!n) return null; x.push(n); }
+  return x;
+}
+
+/* La tabla pública: la carta `id` es H(id)² mod p, que cae en el
+   subgrupo (y así elevar no filtra el símbolo de Legendre). */
+const prTablas = new Map();
+function prTabla(D) {
+  if (!prTablas.has(D)) {
+    const cod = [], id = new Map();
+    for (let i = 0; i < D; i++) {
+      const h = BigInt("0x" + sha256hex("pres-c:" + i));
+      const c = prCod(h * h % PR_P);
+      cod.push(c); id.set(c, i);
+    }
+    prTablas.set(D, { texto: cod.join(""), id });
+  }
+  return prTablas.get(D);
+}
+export const barajaPr = D => prTabla(D).texto;
+
+/* Todo lo que sale de una llave: exponente, su inverso, la permutación
+   y la privada de Diffie-Hellman con su pública. */
+const prMemo = new Map();
+export function llavesPr(llave, D) {
+  const c = llave + ":" + D;
+  if (prMemo.has(c)) return prMemo.get(c);
+  const k = BigInt("0x" + sha256hex("pres-k:" + llave)) % (PR_Q - 1n) + 1n;
+  const perm = Array.from({ length: D }, (_, i) => i);
+  for (let i = D - 1; i > 0; i--) {
+    const j = parseInt(sha256hex("pres-p:" + llave + ":" + i).slice(0, 8), 16) % (i + 1);
+    const t = perm[i]; perm[i] = perm[j]; perm[j] = t;
+  }
+  const dh = BigInt("0x" + sha256hex("pres-dh:" + llave)) % (PR_Q - 1n) + 1n;
+  const v = { k, ki: potMod(k, PR_Q - 2n, PR_Q), perm, dh, pk: prCod(potMod(4n, dh, PR_P)) };
+  if (prMemo.size > 400) prMemo.clear();
+  prMemo.set(c, v);
+  return v;
+}
+
+/* Cifrar con el exponente propio y barajar. */
+export function mezclaPr(prev, llave, D) {
+  const x = prTrozos(prev, D);
+  if (!x) return null;
+  const { k, perm } = llavesPr(llave, D);
+  const y = x.map(v => prCod(potMod(v, k, PR_P)));
+  return perm.map(i => y[i]).join("");
+}
+/* Quitar el candado propio de las cartas de los demás. */
+export function quitaPr(prev, llave, D, n, asiento) {
+  const x = prTrozos(prev, D);
+  if (!x) return null;
+  const { ki } = llavesPr(llave, D);
+  return x.map((v, j) => j % n === asiento ? prev.substr(j * 64, 64) : prCod(potMod(v, ki, PR_P))).join("");
+}
+/* Las cartas del asiento: su candado fuera y a la tabla. Una que no
+   está en la tabla sale `null` (alguien rompió el reparto). */
+export function abreManoPr(fin, llave, D, n, asiento) {
+  const x = prTrozos(fin, D);
+  if (!x) return null;
+  const { ki } = llavesPr(llave, D), T = prTabla(D).id, out = [];
+  for (let j = asiento; j < D; j += n) {
+    const id = T.get(prCod(potMod(x[j], ki, PR_P)));
+    out.push(id === undefined ? null : id);
+  }
+  return out;
+}
+/* La clave de un sobre entre el dueño de `llave` y el de `pkOtro`. */
+export function secretoPr(llave, pkOtro, D) {
+  const x = typeof pkOtro === "string" && pkOtro.length === 64 ? prNum(pkOtro) : 0n;
+  if (!x) return null;
+  return sha256hex("pres-s:" + potMod(x, llavesPr(llave, D).dh, PR_P).toString(16));
+}
+export const idSobrePr = (rep, de, a) => rep + ":" + de + ">" + a;
+export function sobrePr(clave, id, cartas) {
+  const t = cartas.map(c => String(c).padStart(3, "0")).join("");
+  const f = flujoUno(clave, "pres:" + id, t.length);
+  let s = "";
+  for (let i = 0; i < t.length; i++) s += (t.charCodeAt(i) ^ f[i]).toString(16).padStart(2, "0");
+  return s;
+}
+export function abreSobrePr(clave, id, hex, D) {
+  if (!clave || typeof hex !== "string" || hex.length % 6 || !/^[0-9a-f]*$/.test(hex)) return null;
+  const f = flujoUno(clave, "pres:" + id, hex.length / 2);
+  let t = "";
+  for (let i = 0; i < hex.length / 2; i++) t += String.fromCharCode(parseInt(hex.substr(i * 2, 2), 16) ^ f[i]);
+  const out = [];
+  for (let i = 0; i < t.length; i += 3) {
+    const s = t.substr(i, 3);
+    if (!/^\d{3}$/.test(s) || +s >= D) return null;
+    out.push(+s);
+  }
+  return out;
+}
+/* Las `n` mejores de una mano: el valor manda; entre iguales, el palo
+   (para que la pantalla elija siempre las mismas). */
+export const ordenaPr = m => m.slice().sort((a, b) => rangoPr(a) - rangoPr(b) || paloPr(a) - paloPr(b) || a - b);
+export const mejoresPr = (mano, n) => ordenaPr(mano).slice(-n).reverse();
+
+/* La cadena de llaves de un jugador (solo la calcula su dueño). */
+const prCadenas = new Map();
+export function cadenaPr(sem, sal) {
+  const c = (sem >>> 0) + ":" + (sal || "");
+  if (!prCadenas.has(c)) {
+    const e = [sha256hex("pres:" + c)];
+    for (let i = 0; i < PR_CADENA; i++) e.push(sha256hex(e[i]));
+    prCadenas.set(c, e);
+  }
+  return prCadenas.get(c);
+}
+/* La llave de `uid` para el reparto `rep`: la propia, de su cadena; la
+   ajena, de la última que reveló (hacia atrás la cadena se recorre
+   sola). null si todavía no se puede saber. */
+export function llavePr(est, uid, rep, cad) {
+  const d = (est.desde || {})[uid];
+  if (d === undefined) return null;
+  const idx = rep - d;
+  if (idx < 0 || idx >= PR_CADENA) return null;
+  if (cad) return cad[PR_CADENA - 1 - idx];
+  const u = (est.ultLlave || {})[uid];
+  if (!u || u.idx < idx) return null;
+  let c = u.c;
+  for (let i = u.idx; i > idx; i--) c = sha256hex(c);
+  return c;
+}
+
+const rolPr = (i, n) => i === 0 ? "pres" : i === n - 1 ? "culo"
+  : n >= 4 && i === 1 ? "vice" : n >= 4 && i === n - 2 ? "vculo" : "pueblo";
+
+function redPresidente(p, js) {
+  const ids = js.map(j => j.uid);
+  const ficha = {};
+  for (const j of js) ficha[j.uid] = j;
+  const cupo = cupoDe(p);
+  const valida = u => !!ficha[u] && /^[0-9a-f]{64}$/.test(String(ficha[u].hcad || ""));
+  const fuera = {}, conocido = {}, retirado = {}, saliendo = {}, llegada = {}, puntos = {}, desde = {};
+  const ultLlave = {}, llaves = {}, falsas = [], hist = [], rondas = [];
+  let iniciado = false, nl = 0, rep = 0, R = null, roles = {}, ultOrden = [], cierre = [];
+  let fase = "espera", ganador = null, motivo = "", ni = 0, nmov = 0;
+
+  const suceso = e => { e.i = ni++; hist.push(e); if (hist.length > 40) hist.shift(); };
+  const enSala = u => !!ficha[u] && !fuera[u];
+  const plantilla = () => ids.filter(u => conocido[u] && !fuera[u] && !retirado[u]);
+  const etapaDe = () => !R ? (iniciado ? "espera" : "arranque")
+    : R.qui.length < R.n ? "reparto"
+    : R.cambios.some(c => !c.hecho && !c.anulado) ? "cambio" : "juego";
+  const enRonda = u => !!R && R.orden.includes(u) && !R.idos[u];
+  const vivo = u => enRonda(u) && !R.salidos.includes(u);
+  const siguiente = (u, f) => {
+    const i = R.orden.indexOf(u);
+    for (let k = 1; k < R.n; k++) { const x = R.orden[(i + k) % R.n]; if (f(x)) return x; }
+    return "";
+  };
+
+  const acaba = m => {
+    if (fase === "fin") return;
+    fase = "fin"; motivo = m;
+    const q = ids.filter(u => !fuera[u] && puntos[u] !== undefined);
+    const max = Math.max(-1, ...q.map(u => puntos[u]));
+    const top = q.filter(u => puntos[u] === max);
+    ganador = top.length === 1 ? top[0] : "";
+    if (R && etapaDe() !== "juego") R = null;
+    suceso({ e: "fin", uid: ganador, motivo: m });
+  };
+
+  /* Quién se sienta y dónde: primero la última ronda en el orden en que
+     acabó (Presidente, Vice, Pueblo…), después los que llegan, y al
+     final Viceculo y Culo, que cierran la mesa como en el juego de
+     verdad. */
+  const sentar = () => {
+    const queda = u => conocido[u] && !fuera[u] && !retirado[u];
+    const F = ultOrden.filter(queda);
+    const cola = F.filter(u => roles[u] === "vculo" || roles[u] === "culo");
+    const cabeza = F.filter(u => !cola.includes(u));
+    const nuevos = ids.filter(u => queda(u) && !F.includes(u)).sort((a, b) => llegada[a] - llegada[b]);
+    /* La mesa no crece más allá del cupo: los últimos en llegar esperan
+       a que alguien se levante. */
+    return [...cabeza, ...nuevos.slice(0, Math.max(0, cupo - cabeza.length - cola.length)), ...cola];
+  };
+  const reparte = () => {
+    R = null;
+    if (fase === "fin") return;
+    const orden = sentar();
+    if (orden.length < 2) return;
+    for (const u of orden) if (desde[u] === undefined) desde[u] = rep;
+    if (orden.some(u => rep - desde[u] >= PR_CADENA)) { acaba("tope"); return; }
+    const n = orden.length, D = barajaPrN(n);
+    R = { rep, orden, n, D, mez: [], pk: {}, qui: [], mano: {}, usadas: {}, cambios: [], dar: [],
+          mesa: null, pasados: {}, turno: "", salidos: [], idos: {}, log: [] };
+    suceso({ e: "reparto", rep, orden: orden.slice() });
+  };
+  /* Repartir otra vez (alguien se fue o llegó a tiempo). Si alguien ya
+     publicó su mezcla, esa llave está gastada y se pasa a la siguiente. */
+  const rehace = () => { if (R && R.mez.length) rep++; reparte(); };
+
+  const limpia = w => {
+    R.mesa = null; R.pasados = {};
+    R.turno = vivo(w) ? w : siguiente(w, vivo);
+    suceso({ e: "limpia", uid: R.turno });
+  };
+  const avanza = u => {
+    const nx = siguiente(u, x => vivo(x) && !R.pasados[x]);
+    if (!nx || nx === R.mesa.de) limpia(R.mesa.de);
+    else R.turno = nx;
+  };
+  const empieza = () => {
+    R.turno = vivo(R.orden[0]) ? R.orden[0] : siguiente(R.orden[0], vivo);
+    suceso({ e: "empieza", uid: R.turno });
+    revisaRonda();
+  };
+  const cierraRonda = () => {
+    for (const u of R.orden) if (vivo(u)) R.salidos.push(u);
+    const F = R.salidos, n = F.length, pts = {};
+    roles = {};
+    F.forEach((u, i) => { roles[u] = rolPr(i, n); pts[u] = n - 1 - i; puntos[u] = (puntos[u] || 0) + pts[u]; });
+    rondas.push({ rep: R.rep, orden: R.orden, n: R.n, D: R.D, mez: R.mez, pk: R.pk, qui: R.qui,
+                  dar: R.dar, log: R.log, salidos: F.slice(), pts, roles: { ...roles } });
+    suceso({ e: "ronda", ronda: rondas.length, salidos: F.slice(), pts });
+    ultOrden = F.slice();
+    for (const u in saliendo) { retirado[u] = true; suceso({ e: "retira", uid: u }); }
+    for (const u in saliendo) delete saliendo[u];
+    rep++;
+    R = null;
+    revisaCierre();
+    if (fase !== "fin") reparte();
+  };
+  const revisaRonda = () => {
+    if (R && etapaDe() === "juego" && R.orden.filter(vivo).length <= 1) cierraRonda();
+  };
+  const revisaCierre = () => {
+    if (fase === "fin" || !iniciado) return;
+    if (ids.filter(enSala).length < 2) { acaba("abandono"); return; }
+    const pl = plantilla();
+    cierre = cierre.filter(u => pl.includes(u));
+    if (cierre.length && cierre.length >= Math.ceil(pl.length / 2)) acaba("cierre");
+  };
+  /* Alguien deja la ronda a medias (se fue o lo saltaron en el reparto). */
+  const dejaRonda = u => {
+    if (!enRonda(u)) return;
+    const et = etapaDe();
+    if (et === "reparto") { rehace(); return; }
+    R.idos[u] = true;
+    for (const c of R.cambios) if (!c.hecho && !c.anulado && (c.de === u || c.a === u)) c.anulado = true;
+    if (et === "cambio") { if (etapaDe() === "juego") empieza(); return; }
+    if (R.salidos.includes(u)) return;
+    if (R.orden.filter(vivo).length <= 1) { cierraRonda(); return; }
+    if (R.turno === u) { if (R.mesa) avanza(u); else R.turno = siguiente(u, vivo); }
+  };
+
+  for (const j of jugadasDe(p)) {
+    if (fase === "fin") {
+      if (j.t === "llave") llave(j);
+      continue;
+    }
+    const u = j.uid;
+    if (!enSala(u)) continue;
+    const et = etapaDe();
+
+    if (j.t === "abandona") {
+      fuera[u] = true; delete saliendo[u];
+      suceso({ e: "abandona", uid: u, expulsado: !!j.expulsado });
+      if (R && R.orden.includes(u)) dejaRonda(u);
+      revisaCierre();
+      if (!R && fase !== "fin" && iniciado) reparte();
+      continue;
+    }
+    if (j.t === "inicio") {
+      if (iniciado) continue;
+      const q = [...new Set(lista(j.q))].filter(x => enSala(x) && valida(x));
+      if (q.length < 2) continue;
+      iniciado = true; fase = "jugando";
+      for (const x of q) { conocido[x] = true; llegada[x] = ++nl; }
+      suceso({ e: "inicio", q });
+      reparte();
+      continue;
+    }
+    if (j.t === "entra") {
+      if (!valida(u)) continue;
+      if (saliendo[u]) { delete saliendo[u]; suceso({ e: "sigue", uid: u }); continue; }
+      if (conocido[u] && !retirado[u]) continue;
+      conocido[u] = true; delete retirado[u]; llegada[u] = ++nl;
+      suceso({ e: "entra", uid: u });
+      if (!iniciado) continue;
+      if (!R || (et === "reparto" && !R.mez.length)) reparte();
+      continue;
+    }
+    if (!iniciado) continue;
+    if (j.t === "sale") {
+      if (j.no) { if (saliendo[u]) { delete saliendo[u]; suceso({ e: "sigue", uid: u }); } continue; }
+      if (!conocido[u] || retirado[u] || saliendo[u]) continue;
+      if (enRonda(u) && et !== "reparto") { saliendo[u] = true; suceso({ e: "saldra", uid: u }); continue; }
+      retirado[u] = true;
+      suceso({ e: "retira", uid: u });
+      if (enRonda(u)) rehace();
+      revisaCierre();
+      continue;
+    }
+    if (j.t === "cierra") {
+      if (!conocido[u] || retirado[u]) continue;
+      cierre = cierre.filter(x => x !== u);
+      if (!j.no) { cierre.push(u); suceso({ e: "cierra", uid: u }); }
+      revisaCierre();
+      continue;
+    }
+    if (j.t === "llave") { llave(j); continue; }
+    if (!R) continue;
+
+    if (j.t === "mezcla") {
+      if (et !== "reparto" || R.mez.length >= R.n || u !== R.orden[R.mez.length] || j.r !== R.rep) continue;
+      if (typeof j.v !== "string" || j.v.length !== 64 * R.D || typeof j.pk !== "string" || j.pk.length !== 64) continue;
+      R.mez.push(j.v); R.pk[u] = j.pk;
+      continue;
+    }
+    if (j.t === "quita") {
+      if (et !== "reparto" || R.mez.length < R.n || u !== R.orden[R.qui.length] || j.r !== R.rep) continue;
+      if (typeof j.v !== "string" || j.v.length !== 64 * R.D) continue;
+      R.qui.push(j.v);
+      if (R.qui.length < R.n) continue;
+      R.orden.forEach((x, i) => { R.mano[x] = Math.ceil((R.D - i) / R.n); });
+      /* Los papeles de la ronda anterior, si los dos siguen en la mesa. */
+      const quien = r => R.orden.find(x => roles[x] === r);
+      const par = (bajo, alto, n) => {
+        const b = quien(bajo), a = quien(alto);
+        if (!a || !b) return;
+        R.cambios.push({ de: b, a, n, tipo: "da" }, { de: a, a: b, n, tipo: "devuelve" });
+      };
+      par("culo", "pres", 2);
+      par("vculo", "vice", 1);
+      suceso({ e: "repartido", rep: R.rep });
+      if (etapaDe() === "juego") empieza();
+      continue;
+    }
+    if (j.t === "da") {
+      if (et !== "cambio") continue;
+      const c = R.cambios.find(x => x.de === u && x.a === j.a && !x.hecho && !x.anulado);
+      if (!c) continue;
+      if (c.tipo === "devuelve" && !R.cambios.some(x => x.tipo === "da" && x.de === c.a && x.a === u && x.hecho)) continue;
+      if (typeof j.v !== "string" || j.v.length !== 6 * c.n) continue;
+      c.hecho = true; c.v = j.v;
+      R.mano[u] -= c.n; R.mano[c.a] += c.n;
+      R.dar.push({ de: u, a: c.a, n: c.n, tipo: c.tipo, v: j.v });
+      suceso({ e: "da", uid: u, a: c.a, n: c.n, tipo: c.tipo });
+      if (etapaDe() === "juego") empieza();
+      continue;
+    }
+    if (j.t === "salta") {
+      const a = j.a;
+      if (!enRonda(u) || !a || a === u || !enRonda(a)) continue;
+      if (et === "reparto") {
+        const toca = R.orden[R.mez.length < R.n ? R.mez.length : R.qui.length];
+        if (a !== toca) continue;
+        retirado[a] = true;
+        suceso({ e: "salta", uid: a, por: u, en: "reparto" });
+        rehace();
+        revisaCierre();
+        continue;
+      }
+      if (et === "cambio") {
+        const c = R.cambios.find(x => x.de === a && !x.hecho && !x.anulado);
+        if (!c) continue;
+        c.anulado = true;
+        if (c.tipo === "da") for (const x of R.cambios) if (x.tipo === "devuelve" && x.de === c.a && x.a === a) x.anulado = true;
+        suceso({ e: "salta", uid: a, por: u, en: "cambio" });
+        if (etapaDe() === "juego") empieza();
+        continue;
+      }
+      if (a !== R.turno) continue;
+      suceso({ e: "salta", uid: a, por: u, en: "juego" });
+      nmov++;
+      if (R.mesa) { R.pasados[a] = true; avanza(a); }
+      else R.turno = siguiente(a, vivo);
+      continue;
+    }
+    if (et !== "juego" || u !== R.turno) continue;
+    if (j.t === "pasa") {
+      if (!R.mesa) continue;
+      R.pasados[u] = true; nmov++;
+      suceso({ e: "pasa", uid: u });
+      avanza(u);
+      continue;
+    }
+    if (j.t === "juega") {
+      const c = lista(j.c).map(Number);
+      const tope = R.D > 52 ? 8 : 4;
+      if (!c.length || c.length > tope || c.length > R.mano[u]) continue;
+      if (c.some(x => !Number.isInteger(x) || x < 0 || x >= R.D || R.usadas[x]) || new Set(c).size !== c.length) continue;
+      const r = rangoPr(c[0]);
+      if (c.some(x => rangoPr(x) !== r)) continue;
+      if (R.mesa && (c.length !== R.mesa.n || r <= R.mesa.r)) continue;
+      for (const x of c) R.usadas[x] = true;
+      R.mano[u] -= c.length; nmov++;
+      R.log.push({ uid: u, c });
+      R.mesa = { c, r, n: c.length, de: u };
+      suceso({ e: "juega", uid: u, c, r });
+      if (R.mano[u] === 0) {
+        R.salidos.push(u);
+        suceso({ e: "acaba", uid: u, pos: R.salidos.length });
+      }
+      if (R.orden.filter(vivo).length <= 1) { cierraRonda(); continue; }
+      if (r === 12) limpia(u);
+      else avanza(u);
+      continue;
+    }
+  }
+
+  /* Revelar la llave de un reparto ya jugado. Vale si encaja en la
+     cadena con la última buena de ese jugador, hacia delante o hacia
+     atrás; repetir una ya aceptada no es mentir, es la red. */
+  function llave(j) {
+    const u = j.uid, i = j.i, c = String(j.c || "");
+    if (!valida(u) || desde[u] === undefined || !Number.isInteger(i)) return;
+    const jugada = rondas.some(r => r.rep === i && r.orden.includes(u)) || (fase === "fin" && R && R.rep === i && R.orden.includes(u));
+    if (!jugada) return;
+    if ((llaves[i] || {})[u] === c) return;
+    const idx = i - desde[u];
+    const prev = ultLlave[u] || { idx: -1, c: ficha[u].hcad };
+    let ok = /^[0-9a-f]{64}$/.test(c) && idx >= 0 && idx < PR_CADENA;
+    if (ok) {
+      let a = idx >= prev.idx ? c : prev.c;
+      for (let s = Math.abs(idx - prev.idx); s > 0; s--) a = sha256hex(a);
+      ok = a === (idx >= prev.idx ? prev.c : c);
+    }
+    if (!ok) { if (!falsas.some(f => f.uid === u && f.i === i)) falsas.push({ uid: u, i }); return; }
+    (llaves[i] || (llaves[i] = {}))[u] = c;
+    if (idx > prev.idx) ultLlave[u] = { idx, c };
+  }
+
+  if (fase !== "fin" && p.fin) fase = "fin";
+  const etapa = fase === "fin" ? "fin" : etapaDe();
+  const debe = [];
+  if (etapa === "juego") debe.push(R.turno);
+  if (etapa === "cambio") for (const c of R.cambios)
+    if (c.tipo === "devuelve" && !c.hecho && !c.anulado && R.cambios.some(x => x.tipo === "da" && x.de === c.a && x.a === c.de && x.hecho)) debe.push(c.de);
+  let reparto = null;
+  if (etapa === "reparto") {
+    const paso = R.mez.length < R.n ? "mezcla" : "quita";
+    const i = paso === "mezcla" ? R.mez.length : R.qui.length;
+    reparto = { paso, i, uid: R.orden[i],
+                prev: paso === "mezcla" ? (i ? R.mez[i - 1] : "") : (i ? R.qui[i - 1] : R.mez[R.n - 1]) };
+  }
+  const pl = plantilla();
+  for (const u of ids) if (conocido[u] && puntos[u] === undefined) puntos[u] = 0;
+  return {
+    fase, etapa, rep, ronda: rondas.length + 1, R, reparto, debe,
+    orden: R ? R.orden : [], mano: R ? R.mano : {}, mesa: R ? R.mesa : null, turno: R && etapa === "juego" ? R.turno : "",
+    roles, puntos, rondas, conocido, retirado, saliendo, fuera, plantilla: pl,
+    esperan: pl.filter(u => !(R && R.orden.includes(u))),
+    cierre, cierreFalta: Math.max(1, Math.ceil(pl.length / 2)),
+    desde, llaves, ultLlave, falsas, hist, ganador, motivo, nmov
+  };
+}
+
+/* La mano de `uid` ahora mismo, con su llave: lo repartido, más y menos
+   los sobres, menos lo jugado. `rota` si el reparto no se deja abrir. */
+const prManos = new Map();
+export function manoPr(est, uid, cad) {
+  const R = est.R;
+  if (!R || R.qui.length < R.n || !R.orden.includes(uid)) return { mano: [], rota: false };
+  const k = llavePr(est, uid, R.rep, cad);
+  if (!k) return { mano: [], rota: true };
+  /* La llave sola no basta de clave: la misma llave con otro reparto
+     (una mezcla distinta de otro) abre otra mano. */
+  const clave = R.rep + ":" + uid + ":" + k + ":" + R.qui[R.n - 1];
+  let base = prManos.get(clave);
+  if (!base) {
+    base = abreManoPr(R.qui[R.n - 1], k, R.D, R.n, R.orden.indexOf(uid));
+    if (prManos.size > 50) prManos.clear();
+    prManos.set(clave, base);
+  }
+  if (!base || base.some(x => x === null)) return { mano: [], rota: true };
+  const m = new Set(base);
+  let rota = false;
+  for (const d of R.dar) {
+    if (d.de !== uid && d.a !== uid) continue;
+    const otro = d.de === uid ? d.a : d.de;
+    const cs = abreSobrePr(secretoPr(k, R.pk[otro], R.D), idSobrePr(R.rep, d.de, d.a), d.v, R.D);
+    if (!cs) { rota = true; continue; }
+    for (const c of cs) d.de === uid ? m.delete(c) : m.add(c);
+  }
+  /* Lo que ya salió a la mesa no está en ninguna mano, lo jugara quien
+     lo jugara: si alguien soltó una carta que era mía, ya no la tengo. */
+  for (const c in R.usadas) m.delete(+c);
+  return { mano: ordenaPr([...m]), rota };
+}
+
+/* Rehace una ronda con las llaves reveladas. `llaveDe(uid)` devuelve la
+   de ese reparto o null; lo que no se puede comprobar se salta. */
+export async function auditaRondaPr(X, llaveDe, pon, pausa = () => Promise.resolve()) {
+  const { orden, n, D, mez, pk, qui, dar, log, rep } = X;
+  const K = {};
+  for (const u of orden) K[u] = llaveDe(u);
+  let prev = barajaPr(D);
+  for (let i = 0; i < n; i++) {
+    const u = orden[i];
+    if (K[u]) {
+      if (llavesPr(K[u], D).pk !== pk[u]) pon(u, "clave", rep);
+      if (mezclaPr(prev, K[u], D) !== mez[i]) pon(u, "mezcla", rep);
+      await pausa();
+    }
+    prev = mez[i];
+  }
+  for (let i = 0; i < n; i++) {
+    const u = orden[i];
+    if (K[u]) { if (quitaPr(prev, K[u], D, n, i) !== qui[i]) pon(u, "quita", rep); await pausa(); }
+    prev = qui[i];
+  }
+  const mano = {};
+  orden.forEach((u, i) => {
+    if (!K[u]) return;
+    const m = abreManoPr(qui[n - 1], K[u], D, n, i);
+    if (m && !m.some(x => x === null)) mano[u] = new Set(m);
+  });
+  for (const d of dar) {
+    const clave = K[d.de] ? secretoPr(K[d.de], pk[d.a], D) : K[d.a] ? secretoPr(K[d.a], pk[d.de], D) : null;
+    if (!clave) continue;
+    const cs = abreSobrePr(clave, idSobrePr(rep, d.de, d.a), d.v, D);
+    if (!cs || cs.length !== d.n) { pon(d.de, "cambio", rep); continue; }
+    const m = mano[d.de];
+    if (m) {
+      if (cs.some(c => !m.has(c))) pon(d.de, "cambio", rep);
+      else if (d.tipo === "da") {
+        const r = x => x.map(rangoPr).sort((a, b) => b - a).join(",");
+        if (r(cs) !== r(mejoresPr([...m], d.n))) pon(d.de, "cambio", rep);
+      }
+      for (const c of cs) m.delete(c);
+    }
+    if (mano[d.a]) for (const c of cs) mano[d.a].add(c);
+  }
+  for (const l of log) {
+    const m = mano[l.uid];
+    if (!m) continue;
+    if (l.c.some(c => !m.has(c))) pon(l.uid, "carta", rep);
+    for (const c of l.c) m.delete(c);
+  }
+}
+
+/* Audita las rondas acabadas cuyas llaves ya están todas (o todas las
+   que haya, si la partida terminó: la que falte es `oculta`). `hechas`
+   guarda qué rondas ya se miraron, para no rehacerlas en cada llave. */
+export async function auditaPresidente(est, hechas = {}) {
+  const fallos = [];
+  const pon = (uid, que, rep) => { if (!fallos.some(x => x.uid === uid && x.que === que)) fallos.push({ uid, que, rep }); };
+  const pausa = () => new Promise(r => setTimeout(r, 0));
+  /* Si se votó acabar a media ronda, esa ronda también se mira. */
+  const todas = (est.rondas || []).slice();
+  if (est.fase === "fin" && est.R && est.R.qui.length === est.R.n) todas.push(est.R);
+  for (const X of todas) {
+    if (hechas[X.rep]) { for (const f of hechas[X.rep]) pon(f.uid, f.que, f.rep); continue; }
+    const falta = X.orden.filter(u => !llavePr(est, u, X.rep));
+    if (falta.length && est.fase !== "fin") continue;
+    const mias = [];
+    const pon1 = (uid, que, rep) => { mias.push({ uid, que, rep }); pon(uid, que, rep); };
+    for (const u of falta) pon1(u, "oculta", X.rep);
+    await auditaRondaPr(X, u => llavePr(est, u, X.rep), pon1, pausa);
+    if (!falta.length) hechas[X.rep] = mias;
+  }
+  for (const f of est.falsas || []) pon(f.uid, "llave", f.i);
   return fallos;
 }

@@ -306,7 +306,7 @@ export const CANCIONES = [
   { id: "worms-menu", nombre: "Taller", grupo: "De los juegos", desc: "Circuit Breakers · menú", chip: "worms-menu" },
   { id: "worms-combate", nombre: "Al ataque", grupo: "De los juegos", desc: "Circuit Breakers · combate", chip: "worms-combate" },
   { id: "midnight", nombre: "Midnight Pulse", grupo: "De los juegos", desc: "Escondite · grabación", url: "juegos/audio/escondite-midnight-pulse.mp3", vol: 1, juegos: ["escondite"] },
-  { id: "poker", nombre: "Poker Night", grupo: "De los juegos", desc: "Zane Little · Flip 7, Cacho y UNO", url: POKER.url, fin: POKER.fin, vol: 0.65, juegos: ["flip7", "cacho", "uno"] },
+  { id: "poker", nombre: "Poker Night", grupo: "De los juegos", desc: "Zane Little · Flip 7, Cacho, UNO y Presidente", url: POKER.url, fin: POKER.fin, vol: 0.65, juegos: ["flip7", "cacho", "uno", "presidente"] },
   { id: "sobrecarga", nombre: "Sobrecarga", grupo: "Intensas", desc: "Drum'n'bass de consola · 172", chip: "sobrecarga" },
   { id: "tormenta", nombre: "Tormenta", grupo: "Intensas", desc: "Combate final · tambores y sierra", chip: "tormenta" },
   { id: "neon", nombre: "Neón 84", grupo: "Electrónicas", desc: "Synthwave · arpegio de sierra", chip: "neon" },
