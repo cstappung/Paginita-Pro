@@ -45,7 +45,7 @@ Six apps plus a small shared **Informes** page:
   collect by themselves, plus the bugs and ideas people write. See "Informes"
   below.
 - **Juegos** (`juegos.html` + `juegos-app.js`, entry
-  `colabtex/src/juegos-main.js`) — eleven turn-based games, on the same Google
+  `colabtex/src/juegos-main.js`) — twelve turn-based games, on the same Google
   account and the same Firebase project: **Escondite** (hide a person in a
   landscape, then cross the landscapes and race to find the other's),
   **Cartas de los tres elementos** (a Card-Jitsu duel), **Cuadritos** (dots and
@@ -57,7 +57,8 @@ Six apps plus a small shared **Informes** page:
   optional *partida siciliana*), **UNO** (two to ten players, in five
   versions: Clásico, No Mercy, No Mercy with the expansion, All Wild and
   Liar's), **Catan** (two to six, with the 5–6 extension, *Navegantes* and
-  three table variants) and **Circuit Breakers** (a Worms-style artillery game
+  three table variants), **Presidente** (the «culo», three to ten, an endless
+  table people join and leave between rounds) and **Circuit Breakers** (a Worms-style artillery game
   for two to eight squads, in an iframe), plus a **Clasificación** tab and a 📖 **Reglas**
   manual for every game, solo ones included. See "Juegos" below.
 
@@ -1492,7 +1493,7 @@ Four decisions worth keeping:
 
 ## Juegos architecture
 
-Eleven turn-based games, on the same Firebase project and the same Google session
+Twelve turn-based games, on the same Firebase project and the same Google session
 as ColabTeX and ColabDraw. Turn-based on purpose: with one move per turn the
 network carries a handful of fields and there is nothing to interpolate, so no
 game loop ever has to be synchronised.
@@ -2361,6 +2362,30 @@ the end, and checks that the base board is the box's (54 corners, 72 roads),
 that replaying the log gives the same state, that a skipped key does not
 roll, that the audit catches a lied card and that a vote-out behaves as an
 abandono.
+
+**Presidente (`presidente`) is a table that never ends.** A round is dealt,
+played out and scored (`n − 1 − position` points), and the next one starts by
+itself with the roles of the last: the Culo gives their two best cards to the
+Presidente and gets two back, the Viceculo one to the Vice. Between rounds
+anyone may sit down (`entra`) or stand up (`sale`, which mid-round means
+«after this one»); the game ends only when half the table votes `cierra`,
+and the most points wins. With no dealer the deal is **mental poker**: each
+seat, in order, shuffles the deck under its own commutative lock (`mezcla`),
+then each removes its lock from everyone's hand but its own (`quita`), so
+nobody knows another hand. Exchange cards travel in DH-sealed envelopes
+(`sobrePr`). Every round's key comes from a hash chain committed as `hcad`
+(`cadenaPr`, 1000 rounds) and is revealed when the round ends (`llave`);
+`auditaPresidente` then replays every shuffle, lock removal, envelope and
+card played. The screen (`presidente.js`) sends by itself what only it can
+send — keys, its shuffle and lock turns, the forced «best cards», and «paso»
+when nothing beats the table — and offers **Saltarle** for someone asleep.
+`tests/presidente.test.cjs` plays robot tables with people joining, leaving
+and voting, and checks the audit catches a crooked shuffle, a short exchange
+and a card that was never in the hand.
+
+**UNO No Mercy's roulette is played by its victim**: the victim picks the
+colour (not whoever threw the card) and then draws one card at a time with
+the button until that colour comes out.
 
 **Every game has a manual** (`reglas.js`, the 📖 **Reglas** button). It is a
 modal hanging off `<body>` in `position:fixed` at z-index 80 — above the fin

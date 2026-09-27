@@ -6,7 +6,7 @@ const context={crypto:require('node:crypto').webcrypto,TextEncoder};vm.createCon
 vm.runInContext(code+';Object.assign(this,{UNO_TOPE,UNO_MANO,UNO_COLORES,mazoUno,esNoMercy,modoUno,sinTilde,esMentiraUno,esComodinUno,colorUno,valorUno,esNumeroUno,roboUno,anunciablesUno,arrUno,salUno,tapaUno,codigosDeUno});',context);
 const {reducir,sha256hex,compromiso,mazoUno,jugableUno,roboUno,colorUno,valorUno,esComodinUno,esMentiraUno,
  esNumeroUno,sinTilde,esNoMercy,arrUno,salUno,tapaUno,cartaUno,dhPublica,dhCompartida,cierraSobreUno,abreSobreUno,
- manoUno,auditaUno,cuentaUno,robaHastaUno,anunciablesUno,meToca,progreso,UNO_TOPE,UNO_COLORES}=context;
+ manoUno,auditaUno,cuentaUno,robaHastaUno,sacaRuletaUno,anunciablesUno,meToca,progreso,UNO_TOPE,UNO_COLORES}=context;
 const nombres=['a','b','c','d','e','f','g','h','i','j'];
 const MODOS=['clasico','nomercy','nomercyx','allwild','liar'];
 
@@ -59,8 +59,8 @@ function robot(est,u,s,k){
  }
  if(e.k==='reto'&&e.uid===u)return {t:k()<0.4?'reta':'carga',uid:u};
  if(e.k==='ruleta'&&e.uid===u){
-  const col=elige(k,UNO_COLORES);
-  return {t:'ruleta',uid:u,col,n:robaHastaUno(est,s,u,mano,c=>colorUno(c)===col)};
+  if(!e.col)return {t:'ruleta',uid:u,col:elige(k,UNO_COLORES)};
+  return {...sacaRuletaUno(est,s,u),k:e.n};
  }
  const ctx={modo,tope:est.tope,pena:est.pena};
  const tras=(e.k==='tras'||e.k==='hasta')&&e.uid===u;
@@ -88,7 +88,7 @@ function robot(est,u,s,k){
  const c=elige(k,jugables),resto=mano.slice();resto.splice(resto.indexOf(c),1);
  const j={t:'juega',uid:u,c};
  const otros=activos.filter(o=>o!==u);
- if(esComodinUno(c)&&modo!=='allwild')j.col=elige(k,UNO_COLORES);
+ if(esComodinUno(c)&&modo!=='allwild'&&c!=='NC')j.col=elige(k,UNO_COLORES);
  if((nm&&valorUno(c)==='7')||c==='NW'||c==='NT2')j.obj=elige(k,otros);
  if(valorUno(c)==='D'||c==='ND'){const col=c==='ND'?j.col:colorUno(c);j.n=resto.filter(x=>colorUno(x)===col).length;}
  if(c==='NF')j.mano=resto;
@@ -164,6 +164,7 @@ for(const modo of MODOS){
   }
   assert.ok(vistos.has('juega')&&vistos.has('gana'));
   if(esNoMercy(modo))assert.ok(vistos.has('cambio'),'sin cambios de mano en '+modo);
+  if(esNoMercy(modo))assert.ok(vistos.has('saca'),'sin ruleta en '+modo);
   if(modo==='liar')assert.ok(vistos.has('mentira')&&vistos.has('verdad'));
  });
 }
@@ -219,4 +220,47 @@ test('en No Mercy quien llega a 25 cartas queda fuera',async()=>{
  assert.ok(est.elim[u]);
  assert.equal(est.cartas[u],0);
  assert.notEqual(est.turno,u);
+});
+
+test('la ruleta: elige la víctima y saca de una en una',async()=>{
+ const {p,sec}=await sala(3,21,'nomercy');
+ let est=reducir(p);
+ for(const u of ['a','b','c'])est=mover(p,{t:'k',uid:u,c:arrUno(sec[u].sem,sec[u].sal)});
+ const u=est.turno,v=est.jugadores.map(j=>j.uid)[(est.jugadores.findIndex(j=>j.uid===u)+1)%3];
+ /* Se le mete la ruleta en la mano a mano: una jugada a la que le falta
+    la carta no se puede probar de otra forma sin buscar la semilla. */
+ p.jugadas[String(Object.keys(p.jugadas).length).padStart(4,'0')]={t:'juega',uid:u,c:'NC'};
+ est=reducir(p);
+ assert.equal(est.espera.k,'ruleta');
+ assert.equal(est.espera.uid,v);
+ assert.equal(est.espera.col,'');
+ assert.equal(est.tope.col,'');
+ /* Quien la tiró no elige: solo la víctima. */
+ est=mover(p,{t:'ruleta',uid:u,col:'R'});
+ assert.equal(est.espera.col,'');
+ est=mover(p,{t:'ruleta',uid:v,col:'A'});
+ assert.equal(est.espera.col,'A');
+ assert.equal(est.tope.col,'A');
+ const antes=est.cartas[v];
+ let n=0;
+ while(est.espera&&est.espera.k==='ruleta'){
+  const j={...sacaRuletaUno(est,sec[v],v),k:est.espera.n};
+  est=mover(p,j);n++;
+  /* El mismo clic dos veces no saca dos. */
+  if(est.espera&&est.espera.k==='ruleta'){const c=est.cartas[v];est=mover(p,j);assert.equal(est.cartas[v],c);}
+ }
+ assert.ok(est.elim[v]||est.cartas[v]===antes+n);
+ if(!est.elim[v])assert.equal(colorUno(manoUno(est,v,sec[v]).mano.slice(-1)[0]),'A');
+});
+
+test('la auditoría pilla una ruleta que paró antes de tiempo',async()=>{
+ let hecha=false;
+ const r=await partida('nomercy',3,5,(est,u,j,sec)=>{
+  if(hecha||j.t!=='saca'||j.ok)return null;
+  hecha=true;return {...j,ok:true};
+ });
+ assert.ok(hecha,'ninguna ruleta en la partida');
+ const f=await auditaUno(r.p,r.est);
+ const quien=f.find(x=>x.que==='ruleta');
+ assert.ok(quien,JSON.stringify(f));
 });

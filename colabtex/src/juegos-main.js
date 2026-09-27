@@ -45,6 +45,7 @@ import { crearFlip7 } from "./juegos/flip7.js";
 import { crearCacho } from "./juegos/cacho.js";
 import { crearUno } from "./juegos/uno.js";
 import { crearCatan } from "./juegos/catan.js";
+import { crearPresidente } from "./juegos/presidente.js";
 import { abreReglas, tieneReglas } from "./juegos/reglas.js";
 import { crearRanks } from "./juegos/ranks.js";
 import { mezcla, abrePerfil } from "./juegos/perfil.js";
@@ -58,10 +59,11 @@ const VER = (document.currentScript && document.currentScript.src.split("?v=")[1
 const FABRICAS = {
   orbita: crearOrbita, escondite: crearEscondite, cartas: crearCartas,
   cuadritos: crearCuadritos, reversi: crearReversi, worms: crearWorms,
-  cadena: crearCadena, flip7: crearFlip7, cacho: crearCacho, uno: crearUno, catan: crearCatan
+  cadena: crearCadena, flip7: crearFlip7, cacho: crearCacho, uno: crearUno, catan: crearCatan,
+  presidente: crearPresidente
 };
 
-const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢" };
+const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑" };
 
 /* Lo que puede elegir quien abre la sala, por juego. Vive aquí y no en
    `motor.js` porque son controles y no reglas: el motor ya recorta lo
@@ -123,6 +125,11 @@ const OPCIONES = {
     { clave: "amable", etiqueta: "Ladrón", valores: [{ v: 0, t: "Normal" }, { v: 1, t: "Amistoso" }] },
     { clave: "puerto", etiqueta: "Puertos", valores: [{ v: 0, t: "Normales" }, { v: 1, t: "Maestro del puerto" }] },
     { clave: "largo", etiqueta: "Partida", valores: [{ v: 0, t: "Estándar" }, { v: -2, t: "Corta (−2 puntos)" }, { v: 2, t: "Larga (+2 puntos)" }] }
+  ],
+  /* En el Presidente el cupo es cuántos se sientan a la mesa a la vez:
+     la sala admite a más, que esperan a que alguien se levante. */
+  presidente: [
+    { clave: "cupo", etiqueta: "Asientos", por: 6, valores: cupos("presidente") }
   ]
 };
 
@@ -151,7 +158,7 @@ let ultimoCambio = 0;     // cuándo creció el registro por última vez (reloj 
 let relojVotos = 0;       // repinta los botones de votar, que dependen del tiempo
 let enCursoToque = 0;     // cuándo se anunció la partida en «En juego ahora»
 let cancelarLimpieza = null;
-let modulo = null, pidMontado = "";
+let modulo = null, pidMontado = "", mirandoMontado = false;
 let vistaPintada = "";
 let ranks = null;
 let individual = null;
@@ -296,9 +303,11 @@ async function jugar(jugada) {
      mazo en cartas: llega justo cuando la partida acaba de acabar, y
      es lo que deja auditarla. La regla de la base también la deja
      pasar mientras `fin` no esté escrito, que es por lo que se manda
-     antes de `terminar`. */
+     antes de `terminar`. En el Presidente pasa lo mismo con `llave`: la
+     de la ronda que se cortó al votar acabar se revela con la partida
+     ya acabada para el reductor, antes de escribir `fin`. */
   if (state.partida && state.partida.fin) return false;
-  if (state.estado && state.estado.fase === "fin" && jugada.t !== "s") return false;
+  if (state.estado && state.estado.fase === "fin" && jugada.t !== "s" && jugada.t !== "llave") return false;
   const enBase = Object.keys((state.partida && state.partida.jugadas) || {}).length;
   let n = Math.max(proximo, enBase);
   const pid = state.pid;
@@ -966,9 +975,15 @@ function pintaPartida() {
       unir.onclick = async () => { unir.disabled = true; await entrar(state.pid); if (unir.isConnected) unir.disabled = false; };
     } else {
       const acabada = !!datosFin(p, est);
+      /* El Presidente no se acaba: quien mira puede sentarse, y la mesa
+         le hace sitio al empezar la ronda siguiente. */
+      const sentarse = p.juego === "presidente" && p.estado === "jugando" && !acabada;
       $("jgMirando").innerHTML = `<div class="jg-mirando"><span aria-hidden="true">👁</span>
         <b>Estás mirando esta partida.</b>
-        <span>${acabada ? "Ya terminó: esto es cómo quedó." : est.listos ? "Lo ves en directo; puedes escribir en el chat, pero no jugar." : "Todavía no ha empezado."}</span></div>`;
+        <span>${acabada ? "Ya terminó: esto es cómo quedó." : sentarse ? "Puedes sentarte: entras al empezar la ronda siguiente." : est.listos ? "Lo ves en directo; puedes escribir en el chat, pero no jugar." : "Todavía no ha empezado."}</span>
+        ${sentarse ? '<button class="btn" id="jgSentarse">Sentarte a la mesa</button>' : ""}</div>`;
+      const sen = $("jgSentarse");
+      if (sen) sen.onclick = async () => { sen.disabled = true; await entrar(state.pid); if (sen.isConnected) sen.disabled = false; };
       $("jgInvita").innerHTML = "";
       if (est.listos) {
         ambientar(acabada ? "" : p.juego);
@@ -1041,7 +1056,9 @@ function panelEspera(p, est) {
 const enlace = () => location.origin + location.pathname + "#p/" + state.pid;
 
 function montaJuego(p) {
-  if (pidMontado === state.pid && modulo) return;
+  /* Quien mira y se sienta (el Presidente deja entrar con la partida en
+     marcha) necesita la pantalla de jugador, no la de mirón. */
+  if (pidMontado === state.pid && modulo && mirandoMontado === !soyJugador()) return;
   desmontaJuego();
   const fab = FABRICAS[p.juego];
   if (!fab) { $("jgHost").innerHTML = `<div class="vacio">Ese juego no existe en esta versión.</div>`; return; }
@@ -1063,6 +1080,7 @@ function montaJuego(p) {
   });
   modulo.montar($("jgHost"));
   pidMontado = state.pid;
+  mirandoMontado = !soyJugador();
 }
 
 function desmontaJuego() {
@@ -1100,7 +1118,7 @@ const FANFARRIA = { gano: "victoria", perdi: "derrota", empate: "empate", mirand
    En cartas es el choque entero (`CHOQUE`, 2,6 s): la ronda que gana
    el trío se enseña igual que las demás. Worms no pone fanfarria — el
    marco tiene su propio audio y su propio final. */
-const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300 };
+const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300, presidente: 1200 };
 
 function pintaFin(p, est) {
   const caja = $("jgFin");
@@ -1220,7 +1238,8 @@ const RAZONES = {
   uno: "Se quedó sin cartas antes que nadie.",
   piedad: "Fue el último en pie: los demás llegaron a 25 cartas.",
   catan: "Llegó a los puntos de victoria antes que nadie.",
-  agotado: "Se agotaron las llaves de los dados: ganó quien tenía más puntos."
+  agotado: "Se agotaron las llaves de los dados: ganó quien tenía más puntos.",
+  cierre: "La mesa votó acabar: ganó quien llevaba más puntos."
 };
 const razon = m => RAZONES[m] || "";
 const nombreDe = (est, uid) => {
@@ -1449,6 +1468,7 @@ function arteJuego(k) {
   if (k === "cacho") return '<div class="jg-art-cc"><b></b>' + [5, 1, 3].map(n => '<i class="c' + n + '">' + "<s></s>".repeat(n) + '</i>').join("") + '</div>';
   if (k === "uno") return '<div class="jg-art-uno">' + [["7", "#d72600"], ["⊘", "#0956bf"], ["+2", "#379711"], ["+4", "#222"]].map(([n, c]) => '<i style="--t:' + c + '"><span>' + n + '</span></i>').join("") + '<b>UNO</b></div>';
   if (k === "catan") return arteCatan();
+  if (k === "presidente") return '<div class="jg-art-pr"><b>👑</b>' + [["2", "♠", "#1d1d1d"], ["A", "♥", "#c62828"], ["K", "♦", "#c62828"], ["3", "♣", "#1d1d1d"]].map(([r, p, c]) => '<i style="--t:' + c + '"><span>' + r + '</span><s>' + p + '</s></i>').join("") + '<em>PRESIDENTE</em></div>';
   if (k === "cuadritos") return '<div class="jg-art-dots">' + Array.from({ length: 9 }, (_, i) => '<i class="' + (i % 3 === 0 ? "llena" : "") + '"></i>').join("") + '</div>';
   return '<div class="jg-art-land"><i></i><i></i><i></i><b>⌖</b><span>ENCUENTRA LO INVISIBLE</span></div>';
 }
