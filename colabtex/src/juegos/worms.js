@@ -98,7 +98,7 @@ export function crearWorms({ uid, pid, jugar, terminar }) {
   }
 
   function montar(el) {
-    host = el; ambientar(""); host.innerHTML = "";
+    host = el; ambientar(null); host.innerHTML = "";
     for (const id of ["btnMusica", "volMusica", "btnSonido"]) {
       const b = document.getElementById(id);
       if (b) { ocultos.push([b, b.style.display]); b.style.display = "none"; }

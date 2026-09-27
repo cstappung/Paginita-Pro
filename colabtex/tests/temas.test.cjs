@@ -56,7 +56,7 @@ test("temas: ninguna nota, acorde o golpe se pierde por mal escrito", () => {
         assert.equal(Chip.pista(s[canal], "mel").ev.length, sonoras(s[canal], "mel"), donde + "." + canal);
       assert.equal(Chip.pista(s.arp, "arp", oct(c)).ev.length, sonoras(s.arp, "arp"), donde + ".arp");
       for (const g of fichas(s.bat, "bat"))
-        assert.ok("kshoxtT-.".includes(g), donde + ".bat: golpe desconocido «" + g + "»");
+        assert.ok("kshoxtTKc-.".includes(g), donde + ".bat: golpe desconocido «" + g + "»");
       for (const e of Chip.pista(s.lead, "mel").ev)
         assert.ok(e.v >= 36 && e.v <= 100, donde + ".lead: nota fuera de rango " + e.v);
     }

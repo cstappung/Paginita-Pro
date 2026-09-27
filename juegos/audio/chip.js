@@ -147,11 +147,15 @@
    *   f1  → barrido de tono hasta f1 (efectos).
    *   vib → profundidad del vibrato retardado (0.006 ≈ un cuarto de semitono).
    *   arp → lista de frecuencias que se ciclan cada `paso` segundos.
+   *   desde → la nota entra desde esa frecuencia y resbala hasta `f`.
+   *   det → desafinación en cents (dos voces a ±det es el «unísono» de un
+   *         sintetizador: lo que hace ancha una sierra de synthwave).
    */
   function voz(ctx, dest, o, voces) {
     const t = o.t, dur = Math.max(.02, o.dur), vol = Math.max(.0002, o.vol);
     const osc = ctx.createOscillator(), g = ctx.createGain();
     ponOnda(ctx, osc, o.onda || "p50");
+    if (o.det && osc.detune) osc.detune.setValueAtTime(o.det, t);
     const fq = osc.frequency;
     fq.setValueAtTime(o.f, t);
     if (o.arp && o.arp.length > 1) {
@@ -159,6 +163,9 @@
       for (let i = 1; i <= n; i++) fq.setValueAtTime(o.arp[i % o.arp.length], t + i * paso);
     } else if (o.f1) {
       fq.exponentialRampToValueAtTime(Math.max(1, o.f1), t + dur);
+    } else if (o.desde) {
+      fq.setValueAtTime(o.desde, t);
+      fq.exponentialRampToValueAtTime(o.f, t + Math.min(.08, dur * .5));
     } else if (o.vib && dur > .22) {
       const n = Math.min(40, Math.floor((dur - .16) / .07));
       fq.setValueAtTime(o.f, t + .16);   // la nota empieza limpia; el vibrato llega después
@@ -213,6 +220,17 @@
     },
     platillo(ctx, dest, t, vol, voces) {
       ruido(ctx, dest, { t, dur: .7, vol: vol * .3, tono: 1.8, tono1: .9 }, voces);
+    },
+    /** El bombo «808»: una senoidal que cae de 120 a 38 Hz y se queda
+        zumbando medio segundo. Es el suelo de todo el trap y el lo-fi. */
+    bombo808(ctx, dest, t, vol, voces) {
+      voz(ctx, dest, { t, f: 120, f1: 38, dur: .55, vol: vol * 1.35, onda: "sine", sus: .85 }, voces);
+      voz(ctx, dest, { t, f: 1400, f1: 200, dur: .012, vol: vol * .25, onda: "tri", sus: 1 }, voces);
+    },
+    /** Palmada: tres ráfagas de ruido muy juntas y una cola; una sola sonaba
+        a caja y no a manos. */
+    palmas(ctx, dest, t, vol, voces) {
+      for (const [dt, v] of [[0, .45], [.011, .4], [.022, .55]]) ruido(ctx, dest, { t: t + dt, dur: dt < .02 ? .012 : .14, vol: vol * v, tono: 1.9 }, voces);
     }
   };
 
@@ -289,11 +307,29 @@
       this.orden = compila(cancion);
       this.capas = { lead: 1, arp: 1, bajo: 1, bat: 1 };
       this.tempo = 1; this.paso = 0; this.i = 0; this.s = 0;
+      /* Cuántas veces ha dado la vuelta a su `orden`: el reproductor de la
+         página cambia de canción mirando esto, sin reloj propio. */
+      this.vueltas = 0;
       this.voces = new Set();
       this.sig = ctx.currentTime + .05;
       this.salida = ctx.createGain(); this.salida.gain.value = 1; this.salida.connect(destino);
       this.canal = {};
-      for (const c of ["lead", "arp", "bajo", "bat"]) { this.canal[c] = ctx.createGain(); this.canal[c].gain.value = 1; this.canal[c].connect(this.salida); }
+      this.filtros = [];
+      for (const c of ["lead", "arp", "bajo", "bat"]) {
+        this.canal[c] = ctx.createGain(); this.canal[c].gain.value = 1;
+        /* `filtro` (Hz) pone un pasabajos en el canal: sin él una sierra es
+           áspera como un chip, con él suena a sintetizador analógico. */
+        const fc = cancion[c] && cancion[c].filtro;
+        if (fc && typeof ctx.createBiquadFilter === "function") {
+          try {
+            const f = ctx.createBiquadFilter();
+            f.type = "lowpass"; f.frequency.value = fc; f.Q.value = (cancion[c].q != null ? cancion[c].q : 1);
+            this.canal[c].connect(f); f.connect(this.salida); this.filtros.push(f);
+            continue;
+          } catch (e) {}
+        }
+        this.canal[c].connect(this.salida);
+      }
       const eco = cancion.lead && cancion.lead.eco;
       if (eco && typeof ctx.createDelay === "function") {
         try {
@@ -319,7 +355,10 @@
         const d = this.duracionPaso(this.s);
         this.toca(this.orden[this.i], this.s, Math.max(this.sig, ahora), d);
         this.sig += d; this.paso++;
-        if (++this.s >= this.orden[this.i].s.largo) { this.s = 0; this.i = (this.i + 1) % this.orden.length; }
+        if (++this.s >= this.orden[this.i].s.largo) {
+          this.s = 0; this.i = (this.i + 1) % this.orden.length;
+          if (this.i === 0) this.vueltas++;
+        }
       }
     }
     toca(ent, k, t, d) {
@@ -328,17 +367,29 @@
       const lead = pp.lead && pp.lead[k];
       if (lead && cap("lead") > 0) {
         const L = c.lead || {};
-        voz(ctx, this.canal.lead, { t, f: hz(lead.v + ent.tr), dur: d * lead.dur * .95, vol: (L.vol || VOL.lead) * cap("lead"), onda: L.onda || "p25", vib: L.vib != null ? L.vib : .006, sus: .75 }, V);
+        const o = { t, f: hz(lead.v + ent.tr), dur: d * lead.dur * .95, vol: (L.vol || VOL.lead) * cap("lead"), onda: L.onda || "p25", vib: L.vib != null ? L.vib : .006, sus: L.sus != null ? L.sus : .75 };
+        if (L.desafina) {
+          voz(ctx, this.canal.lead, Object.assign({}, o, { vol: o.vol * .62, det: L.desafina }), V);
+          voz(ctx, this.canal.lead, Object.assign({}, o, { vol: o.vol * .62, det: -L.desafina }), V);
+        } else voz(ctx, this.canal.lead, o, V);
       }
       const bajo = pp.bajo && pp.bajo[k];
       if (bajo && cap("bajo") > 0) {
         const B = c.bajo || {};
-        voz(ctx, this.canal.bajo, { t, f: hz(bajo.v + ent.tr), dur: d * bajo.dur * .9, vol: (B.vol || VOL.bajo) * cap("bajo"), onda: B.onda || "tri", sus: 1 }, V);
+        const o = { t, f: hz(bajo.v + ent.tr), dur: d * bajo.dur * .9, vol: (B.vol || VOL.bajo) * cap("bajo"), onda: B.onda || "tri", sus: 1 };
+        /* `desliza`: el bajo 808 entra desde un semitono arriba, que es el
+           «glide» que lo delata. */
+        if (B.desliza) o.desde = o.f * Math.pow(2, B.desliza / 12);
+        voz(ctx, this.canal.bajo, o, V);
       }
       const arp = pp.arp && pp.arp[k];
       if (arp && cap("arp") > 0) {
         const A = c.arp || {}, fs = arp.v.map(n => hz(n + ent.tr));
-        voz(ctx, this.canal.arp, { t, f: fs[0], arp: fs, paso: A.paso || .045, dur: d * arp.dur * .96, vol: (A.vol || VOL.arp) * cap("arp"), onda: A.onda || "p12", sus: .6 }, V);
+        const o = { t, f: fs[0], arp: fs, paso: A.paso || .045, dur: d * arp.dur * .96, vol: (A.vol || VOL.arp) * cap("arp"), onda: A.onda || "p12", sus: A.sus != null ? A.sus : .6 };
+        if (A.desafina) {
+          voz(ctx, this.canal.arp, Object.assign({}, o, { vol: o.vol * .62, det: A.desafina }), V);
+          voz(ctx, this.canal.arp, Object.assign({}, o, { vol: o.vol * .62, det: -A.desafina }), V);
+        } else voz(ctx, this.canal.arp, o, V);
       }
       const bat = pp.bat && pp.bat[k];
       if (bat && cap("bat") > 0) {
@@ -351,6 +402,15 @@
           case "x": Sinte.platillo(ctx, dest, t, vol, V); break;
           case "t": Sinte.tambor(ctx, dest, t, vol, false, V); break;
           case "T": Sinte.tambor(ctx, dest, t, vol, true, V); break;
+          case "K": Sinte.bombo808(ctx, dest, t, vol, V); break;
+          case "c": Sinte.palmas(ctx, dest, t, vol, V); break;
+        }
+        /* `bombeo`: cada bombo hunde un instante el arpegio y la melodía y los
+           deja volver — el «sidechain» que hace respirar a la electrónica. */
+        const b = c.bombeo;
+        if (b && (bat.v === "k" || bat.v === "K")) for (const x of ["arp", "lead", "bajo"]) {
+          const gp = this.canal[x].gain, prof = x === "bajo" ? b * .5 : b;
+          try { gp.cancelScheduledValues(t); gp.setValueAtTime(1 - prof, t); gp.linearRampToValueAtTime(1, t + Math.min(.3, d * 3.2)); } catch (e) {}
         }
       }
     }
@@ -363,10 +423,10 @@
       this.voces.clear();
       this.sig = this.ctx.currentTime + .05;
     }
-    reinicia() { this.detener(); this.i = 0; this.s = 0; this.paso = 0; }
+    reinicia() { this.detener(); this.i = 0; this.s = 0; this.paso = 0; this.vueltas = 0; }
     destruir() {
       this.detener();
-      for (const n of [this.salida, ...Object.values(this.canal), ...(this.eco || [])]) { try { n.disconnect(); } catch (e) {} }
+      for (const n of [this.salida, ...Object.values(this.canal), ...this.filtros, ...(this.eco || [])]) { try { n.disconnect(); } catch (e) {} }
     }
   }
 

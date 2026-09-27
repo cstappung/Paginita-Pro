@@ -264,50 +264,121 @@ export function suena(nombre, x) {
 }
 
 
-/* La música. Cada juego tiene su tema en el cancionero compartido
-   (`juegos/audio/temas.js`) y lo toca un `Chip.Reproductor`, que agenda un
-   poco por delante del reloj de audio: el temporizador solo lo despierta, no
-   marca el compás, así que un `setInterval` que llega tarde no desafina nada.
-   Dos juegos son la excepción y suenan a grabación (`GRABADAS`): el
-   Escondite, con Midnight Pulse, y Flip 7, con «Poker Night» de Zane Little
-   (opengameart.org, CC0) — un casino pide un piano de bar de fondo, y un
-   chip de 8 bits sobre madera y tapete sonaba a otra habitación.
+/* La música: un reproductor con repertorio.
 
-   `fin` es dónde acaba la música de verdad: «Poker Night» termina en seco a
-   los 124 s y trae dos segundos y medio de silencio detrás, que en bucle
-   eran un hueco en cada vuelta. `loop` no sabe de puntos de corte, así que
-   se salta a mano al inicio desde `timeupdate`. `vol` equilibra cada pista
-   con los efectos: esta es más fuerte que Midnight Pulse. */
+   Todo lo que suena está en `CANCIONES`: los temas de chip del cancionero
+   compartido (`juegos/audio/temas.js`), que toca un `Chip.Reproductor`
+   agendando un poco por delante del reloj de audio — el temporizador solo lo
+   despierta, no marca el compás, así que un `setInterval` que llega tarde no
+   desafina nada —, y dos grabaciones: Midnight Pulse y «Poker Night» de Zane
+   Little (opengameart.org, CC0), que un casino pide un piano de bar de fondo.
+
+   Qué suena lo deciden dos cosas. `eleccion` es la de la persona: "auto" (el
+   tema de cada juego, y silencio en el vestíbulo — lo de siempre) o el id de
+   una canción, que entonces suena en todas partes. `juego` es dónde se está,
+   y `null` significa «esta pantalla trae su propia música» (Circuit Breakers
+   y los clubes, en su iframe): ahí se calla aunque haya una elección, porque
+   dos músicas a la vez no son una elección de nadie.
+
+   `modo` decide qué pasa al acabar una canción elegida: `repite`, `lista`
+   (la siguiente del repertorio) o `mezcla` (una al azar). No hay reloj
+   propio para eso: un tema de chip avisa con `vueltas` al dar la vuelta a su
+   orden, y una grabación cuando `currentTime` vuelve atrás. Un tema de chip
+   dura a veces diez segundos, así que no se cambia antes de `MIN_LISTA`.
+
+   `fin` es dónde acaba la grabación de verdad: «Poker Night» termina en seco
+   a los 124 s y trae dos segundos y medio de silencio detrás, que en bucle
+   eran un hueco en cada vuelta. `loop` no sabe de puntos de corte, así que se
+   salta a mano al inicio desde `timeupdate`. `vol` equilibra cada pista con
+   los efectos. */
 const TEMAS = Temas.temas;
-const GRABADAS = {
-  escondite: { url: "juegos/audio/escondite-midnight-pulse.mp3", vol: 1 },
-  flip7: { url: "juegos/audio/flip7-poker-night.mp3", vol: 0.7, fin: 124.3 },
-  /* El Cacho se juega en la misma barra de madera: comparte la grabación. */
-  cacho: { url: "juegos/audio/flip7-poker-night.mp3", vol: 0.6, fin: 124.3 },
-  /* Y el UNO, que es otra mesa de cartas con las mismas muestras. */
-  uno: { url: "juegos/audio/flip7-poker-night.mp3", vol: 0.6, fin: 124.3 }
-};
+const POKER = { url: "juegos/audio/flip7-poker-night.mp3", fin: 124.3 };
+export const GRUPOS = ["De los juegos", "Intensas", "Electrónicas", "Chill y fiesta"];
+export const CANCIONES = [
+  { id: "orbita", nombre: "Deriva orbital", grupo: "De los juegos", desc: "Órbita · espacial, con eco", chip: "orbita", juegos: ["orbita"] },
+  { id: "cartas", nombre: "Tres elementos", grupo: "De los juegos", desc: "Cartas · taiko y escala japonesa", chip: "cartas", juegos: ["cartas"] },
+  { id: "cuadritos", nombre: "Cuadernillo", grupo: "De los juegos", desc: "Cuadritos · alegre, con swing", chip: "cuadritos", juegos: ["cuadritos"] },
+  { id: "reversi", nombre: "Clavecín", grupo: "De los juegos", desc: "Reversi · Re menor, casi barroco", chip: "reversi", juegos: ["reversi"] },
+  { id: "cadena", nombre: "Reacción en cadena", grupo: "De los juegos", desc: "Chain Reaction · arpegios que suben", chip: "cadena", juegos: ["cadena"] },
+  { id: "catan", nombre: "Tonada de puerto", grupo: "De los juegos", desc: "Catan · marcha con gaita", chip: "catan", juegos: ["catan"] },
+  { id: "minas", nombre: "Campo minado", grupo: "De los juegos", desc: "Buscaminas · staccato nervioso", chip: "minas", juegos: ["minas"] },
+  { id: "snake", nombre: "Serpiente funk", grupo: "De los juegos", desc: "Snake · bajo con octavas", chip: "snake", juegos: ["snake"] },
+  { id: "worms-menu", nombre: "Taller", grupo: "De los juegos", desc: "Circuit Breakers · menú", chip: "worms-menu" },
+  { id: "worms-combate", nombre: "Al ataque", grupo: "De los juegos", desc: "Circuit Breakers · combate", chip: "worms-combate" },
+  { id: "midnight", nombre: "Midnight Pulse", grupo: "De los juegos", desc: "Escondite · grabación", url: "juegos/audio/escondite-midnight-pulse.mp3", vol: 1, juegos: ["escondite"] },
+  { id: "poker", nombre: "Poker Night", grupo: "De los juegos", desc: "Zane Little · Flip 7, Cacho y UNO", url: POKER.url, fin: POKER.fin, vol: 0.65, juegos: ["flip7", "cacho", "uno"] },
+  { id: "sobrecarga", nombre: "Sobrecarga", grupo: "Intensas", desc: "Drum'n'bass de consola · 172", chip: "sobrecarga" },
+  { id: "tormenta", nombre: "Tormenta", grupo: "Intensas", desc: "Combate final · tambores y sierra", chip: "tormenta" },
+  { id: "neon", nombre: "Neón 84", grupo: "Electrónicas", desc: "Synthwave · arpegio de sierra", chip: "neon" },
+  { id: "pulso", nombre: "Pulso de datos", grupo: "Electrónicas", desc: "Techno con bombeo · 126", chip: "pulso" },
+  { id: "lofi", nombre: "Turno de noche", grupo: "Chill y fiesta", desc: "Lo-fi con 808 · estilo Schedule I", chip: "lofi" },
+  { id: "cumbia", nombre: "Cumbia de la mesa", grupo: "Chill y fiesta", desc: "Cumbia de 8 bits con güiro", chip: "cumbia" }
+].filter(c => c.url || TEMAS[c.chip]);
+const POR_ID = Object.fromEntries(CANCIONES.map(c => [c.id, c]));
+const POR_JUEGO = {};
+for (const c of CANCIONES) for (const j of c.juegos || []) POR_JUEGO[j] = c.id;
+export const MODOS_LISTA = { repite: "Repetir", lista: "En orden", mezcla: "Aleatorio" };
+const MIN_LISTA = 75;   // segundos antes de pasar a la siguiente en lista/mezcla
+
 const pistas = {};
-let tema = "", timer = null, desbloqueado = false, rep = null;
-let volumen = 0.3, musicaOn = true;
+let juego = "", sonando = "", timer = null, desbloqueado = false, rep = null;
+let volumen = 0.3, musicaOn = true, eleccion = "auto", modo = "repite";
 let ajuste = { tempo: 1, capas: null };
+let inicio = 0, vueltasVistas = 0;
+const oyentes = new Set();
 try {
   musicaOn = localStorage.getItem("jg.musica") !== "0";
   const guardado = localStorage.getItem("jg.volumen");
   if (guardado !== null && Number.isFinite(Number(guardado))) volumen = Math.max(0, Math.min(1, Number(guardado)));
+  const c = localStorage.getItem("jg.cancion");
+  if (c && (c === "auto" || POR_ID[c])) eleccion = c;
+  const m = localStorage.getItem("jg.modoLista");
+  if (m && MODOS_LISTA[m]) modo = m;
 } catch (_) {}
 const GANANCIA = 0.5;
+const guarda = (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} };
+const avisa = () => { const e = estadoMusica(); for (const f of oyentes) { try { f(e); } catch (_) {} } };
+
 export const musicaActiva = () => musicaOn;
 export const volumenMusica = () => volumen;
+/** Todo lo que el reproductor de la cabecera necesita para pintarse. */
+export function estadoMusica() {
+  const c = POR_ID[sonando] || null;
+  return { on: musicaOn, volumen, eleccion, modo, juego, cancion: c, sonando: !!(c && musicaOn && desbloqueado && !document.hidden),
+    propia: juego === null, delJuego: POR_ID[POR_JUEGO[juego]] || null };
+}
+/** Se avisa con cada cambio: canción, pausa, volumen, modo o sitio. Devuelve cómo dejar de oír. */
+export function alCambiarMusica(f) { oyentes.add(f); return () => oyentes.delete(f); }
+
 export function configurarMusica(on, v = volumen) {
   musicaOn = !!on; volumen = Math.max(0, Math.min(1, Number(v) || 0));
-  try { localStorage.setItem("jg.musica", on ? "1" : "0"); localStorage.setItem("jg.volumen", String(volumen)); } catch (_) {}
+  guarda("jg.musica", on ? "1" : "0"); guarda("jg.volumen", String(volumen));
   if (bus && ctx) bus.gain.setTargetAtTime(volumen * GANANCIA, ctx.currentTime, 0.05);
   sincronizaMusica();
 }
-export function ambientar(juego) {
-  const siguiente = GRABADAS[juego] || TEMAS[juego] ? juego : "";
-  if (tema !== siguiente) { detenerMusica(true); tema = siguiente; ajuste = { tempo: 1, capas: null }; }
+/** "auto" o el id de una canción del repertorio. */
+export function elegirCancion(id) {
+  if (id !== "auto" && !POR_ID[id]) return;
+  eleccion = id; guarda("jg.cancion", id);
+  if (!musicaOn) { musicaOn = true; guarda("jg.musica", "1"); }
+  sincronizaMusica();
+}
+export function modoMusica(m) { if (!MODOS_LISTA[m]) return; modo = m; guarda("jg.modoLista", m); avisa(); }
+/** ⏭ / ⏮: recorre el repertorio desde lo que suena; en mezcla, al azar. */
+export function siguienteCancion(dir = 1) {
+  const ids = CANCIONES.map(c => c.id);
+  const desde = ids.indexOf(sonando || POR_JUEGO[juego] || (eleccion !== "auto" ? eleccion : ""));
+  let sig;
+  if (modo === "mezcla" && dir > 0 && ids.length > 1) {
+    do sig = ids[Math.floor(Math.random() * ids.length)]; while (sig === ids[desde]);
+  } else sig = ids[((desde < 0 ? (dir > 0 ? -1 : 0) : desde) + dir + ids.length) % ids.length];
+  elegirCancion(sig);
+}
+
+/** `null` = esta pantalla trae su propia música; "" = ninguna en particular. */
+export function ambientar(j) {
+  const siguiente = j === null ? null : (j || "");
+  if (juego !== siguiente) { juego = siguiente; ajuste = { tempo: 1, capas: null }; }
   sincronizaMusica();
 }
 /** Lo que el juego sabe y la música no: lo rápido que va y cuánto falta.
@@ -321,13 +392,13 @@ function aplicaAjuste() {
   /* Una grabación no se acelera nota a nota, pero sí entera: el navegador
      conserva el tono al cambiar `playbackRate`, así que el «date prisa» del
      final de partida también llega a ellas. */
-  const p = pistas[tema];
+  const p = pistas[sonando];
   if (p) try { p.playbackRate = ajuste.tempo; } catch (_) {}
   if (!rep) return;
   rep.tempo = ajuste.tempo;
-  if (ajuste.capas) Object.assign(rep.capas, ajuste.capas);
+  rep.capas = Object.assign({ lead: 1, arp: 1, bajo: 1, bat: 1 }, ajuste.capas || {});
 }
-export function activarAudio() { desbloqueado = true; sincronizaMusica(); }
+export function activarAudio() { const antes = desbloqueado; desbloqueado = true; if (!antes) sincronizaMusica(); }
 function detenerMusica(olvida) {
   for (const p of Object.values(pistas)) p.pause();
   clearInterval(timer); timer = null;
@@ -336,23 +407,49 @@ function detenerMusica(olvida) {
     if (olvida) rep = null;
   }
 }
-function sincronizaMusica() {
-  if (!tema || !musicaOn || !desbloqueado || document.hidden) { detenerMusica(false); return; }
-  const g = GRABADAS[tema];
-  if (g) {
+/** La canción que toca ahora: la elegida, o la del juego en automático. */
+function queSuena() {
+  if (juego === null) return "";
+  if (eleccion !== "auto") return eleccion;
+  return POR_JUEGO[juego] || "";
+}
+/** Al acabar una vuelta: en lista o mezcla, la siguiente. */
+function vuelta() {
+  if (eleccion === "auto" || modo === "repite") return;
+  const a = contexto(), t = a ? a.currentTime : 0;
+  if (t - inicio < MIN_LISTA && !pistas[sonando]) return;
+  siguienteCancion(1);
+}
+function sincronizaMusica(reinicia) {
+  const id = queSuena();
+  if (id !== sonando || reinicia) {
+    detenerMusica(true);
+    const p = pistas[id];
+    if (p) try { p.currentTime = 0; } catch (_) {}
+    sonando = id; inicio = ctx ? ctx.currentTime : 0; vueltasVistas = 0;
+  }
+  avisa();
+  if (!sonando || !musicaOn || !desbloqueado || document.hidden) { detenerMusica(false); return; }
+  const c = POR_ID[sonando];
+  if (c.url) {
     try {
-      let p = pistas[tema];
+      let p = pistas[sonando];
       if (!p) {
-        p = pistas[tema] = new Audio(g.url);
+        p = pistas[sonando] = new Audio(c.url);
         p.loop = true; p.preload = "none";
-        if (g.fin) p.addEventListener("timeupdate", () => { if (p.currentTime >= g.fin) p.currentTime = 0; });
+        let antes = 0;
+        p.addEventListener("timeupdate", () => {
+          if (c.fin && p.currentTime >= c.fin) p.currentTime = 0;
+          if (p.currentTime + 1 < antes && sonando === c.id) { antes = 0; vuelta(); return; }
+          antes = p.currentTime;
+        });
       }
-      p.volume = Math.min(1, volumen * g.vol);
+      p.volume = Math.min(1, volumen * c.vol);
       aplicaAjuste();
       if (p.paused) p.play().catch(() => {});
       /* Las muestras de la mesa se piden con la música, no con el primer
          toc: así ese primero ya suena a madera. */
-      if (tema === "flip7" || tema === "cacho" || tema === "uno") { const a = motor(); if (a) cargaMuestras(a); }
+      if (c.id === "poker") { const a = motor(); if (a) cargaMuestras(a); }
     } catch (_) {}
     return;
   }
@@ -362,12 +459,17 @@ function sincronizaMusica() {
     if (!a) return;
     if (!bus) { bus = a.createGain(); bus.connect(a.destination); }
     bus.gain.value = volumen * GANANCIA;
-    if (!rep) rep = new Chip.Reproductor(a, bus, TEMAS[tema]);
+    if (!rep) { rep = new Chip.Reproductor(a, bus, TEMAS[c.chip]); inicio = a.currentTime; vueltasVistas = 0; }
     aplicaAjuste();
     rep.tick(0.25);
-    timer = setInterval(() => { try { rep.tick(0.25); } catch (_) { detenerMusica(true); } }, 50);
+    timer = setInterval(() => {
+      try {
+        rep.tick(0.25);
+        if (rep.vueltas > vueltasVistas) { vueltasVistas = rep.vueltas; vuelta(); }
+      } catch (_) { detenerMusica(true); }
+    }, 50);
   } catch (_) { detenerMusica(true); }
 }
-document.addEventListener("visibilitychange", sincronizaMusica);
+document.addEventListener("visibilitychange", () => sincronizaMusica());
 window.addEventListener("pagehide", () => detenerMusica(false));
-window.addEventListener("pageshow", sincronizaMusica);
+window.addEventListener("pageshow", () => sincronizaMusica());

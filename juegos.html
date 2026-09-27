@@ -630,7 +630,56 @@ try { var t = localStorage.getItem("jg.tema");
   body{background:#f5f4fa;color:var(--jg-ink)}
   .head{height:auto;min-height:64px;padding:12px 28px;flex-wrap:wrap;background:#171522;gap:12px;border-bottom:1px solid #ffffff12}
   .logo-mark{background:#ab8bff;color:#171522;border-radius:9px}.head-nav a{color:#b8b2c8}.head-right{gap:8px}.btn-ghost{color:#cbc4de}
-  #volMusica{width:62px;accent-color:#b598ff;cursor:pointer}
+  /* El reproductor: botón con ecualizador en la cabecera y panel con el repertorio.
+     El panel es oscuro en los dos temas, como la cabecera de la que sale. */
+  .jg-rep-btn{display:inline-flex;align-items:center;gap:7px;max-width:210px;padding:6px 11px;border-radius:100px;background:#ffffff0d;border:1px solid #ffffff14;color:#e4ddf6}
+  .jg-rep-btn:hover{background:#ffffff1a}
+  .jg-rep-btn.apagado{color:#8f89a3}
+  .jg-rep-nom{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+  .jg-rep-flecha{font-size:9px;opacity:.6}
+  .jg-eq{display:inline-flex;align-items:flex-end;gap:2px;height:12px;width:15px;flex:0 0 auto}
+  .jg-eq i{display:block;width:2.5px;height:30%;border-radius:2px;background:#b598ff;transform-origin:bottom}
+  .sonando .jg-eq i{animation:jgEq .9s ease-in-out infinite}
+  .jg-eq i:nth-child(2){animation-delay:-.35s!important}.jg-eq i:nth-child(3){animation-delay:-.6s!important}.jg-eq i:nth-child(4){animation-delay:-.15s!important}
+  @keyframes jgEq{0%,100%{height:25%}25%{height:95%}50%{height:45%}75%{height:75%}}
+  .jg-rep{position:fixed;z-index:90;display:flex;flex-direction:column;background:linear-gradient(170deg,#241f36,#15121f 70%);color:#ece6fb;border:1px solid #ffffff1c;border-radius:18px;box-shadow:0 24px 60px #0007,0 0 0 1px #0003;overflow:hidden;opacity:0;transform:translateY(-8px) scale(.98);transform-origin:top right;transition:opacity .18s ease,transform .18s ease}
+  .jg-rep.abierto{opacity:1;transform:none}
+  .jg-rep-ahora{display:flex;gap:13px;align-items:center;padding:16px 16px 10px}
+  .jg-rep-disco{width:54px;height:54px;flex:0 0 auto;border-radius:14px;display:grid;place-items:center;background:radial-gradient(circle at 30% 25%,#9d7bff,#5b34c9 55%,#2c1d63);box-shadow:0 8px 22px #7042df55,inset 0 1px 0 #ffffff40}
+  .jg-rep-disco .jg-eq{height:24px;width:26px;gap:3px}.jg-rep-disco .jg-eq i{width:4px;background:#fff}
+  .jg-rep.sonando .jg-rep-disco{animation:jgLatido 2.4s ease-in-out infinite}
+  @keyframes jgLatido{50%{box-shadow:0 8px 30px #9164ffaa,inset 0 1px 0 #ffffff40}}
+  .jg-rep-txt{min-width:0}
+  .jg-rep-k{font:500 9.5px 'IBM Plex Mono',monospace;letter-spacing:1.8px;text-transform:uppercase;color:#a99bd0}
+  .jg-rep-tit{font-size:16px;font-weight:700;letter-spacing:-.2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .jg-rep-sub{font-size:11.5px;color:#a8a1bd;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .jg-rep-ctrl{display:flex;align-items:center;gap:6px;padding:4px 14px 10px}
+  .jg-rep-b{width:34px;height:34px;border-radius:50%;border:0;background:#ffffff12;color:#fff;cursor:pointer;font-size:13px;display:grid;place-items:center;transition:background .15s,transform .15s}
+  .jg-rep-b:hover{background:#ffffff24}.jg-rep-b:active{transform:scale(.92)}
+  .jg-rep-b.pp{width:42px;height:42px;font-size:16px;background:#fff;color:#241f36}
+  .jg-rep-b.pp:hover{background:#e9e2ff}
+  .jg-rep-vol{margin-left:auto;display:flex;align-items:center;gap:5px;font-size:12px}
+  .jg-rep-vol input{width:92px;accent-color:#b598ff;cursor:pointer}
+  .jg-rep-modos{display:flex;gap:4px;margin:0 14px 10px;padding:3px;border-radius:100px;background:#0000003d}
+  .jg-rep-modos button{flex:1;border:0;border-radius:100px;background:transparent;color:#b3abc9;font-size:11px;padding:6px 4px;cursor:pointer;white-space:nowrap}
+  .jg-rep-modos button.on{background:#ffffff1f;color:#fff}
+  .jg-rep-modos button:disabled{opacity:.4;cursor:default}
+  .jg-rep-aviso{margin:0 14px 10px;padding:8px 10px;border-radius:10px;background:#f7c94b1f;color:#f2d98c;font-size:11.5px}
+  .jg-rep-lista{overflow:auto;padding:4px 8px 10px;border-top:1px solid #ffffff12;overscroll-behavior:contain}
+  .jg-rep-grupo{font:500 9.5px 'IBM Plex Mono',monospace;letter-spacing:1.8px;text-transform:uppercase;color:#8d84aa;padding:12px 8px 5px}
+  .jg-rep-it{display:flex;width:100%;gap:10px;align-items:center;text-align:left;border:0;background:transparent;color:inherit;padding:7px 8px;border-radius:10px;cursor:pointer;transition:background .12s}
+  .jg-rep-it:hover{background:#ffffff0f}
+  .jg-rep-it b{display:block;font-size:13px;font-weight:600}
+  .jg-rep-it small{display:block;font-size:11px;color:#9a93b1}
+  .jg-rep-ic{width:28px;height:28px;flex:0 0 auto;border-radius:8px;background:#ffffff0d;display:grid;place-items:center;color:#b598ff;font-size:13px}
+  .jg-rep-ic .jg-eq{display:none}
+  .jg-rep-it.activa .jg-rep-ic .jg-eq{display:inline-flex}.jg-rep-it.activa .jg-rep-ic em{display:none}
+  .jg-rep-ic em{font-style:normal}
+  .jg-rep-it.elegida{background:#7042df33}
+  .jg-rep-it.elegida b{color:#d6c7ff}
+  .jg-rep-it.auto{margin-top:6px}
+  @media (max-width:560px){.jg-rep-btn{max-width:150px}}
+  @media (prefers-reduced-motion:reduce){.jg-eq i,.jg-rep.sonando .jg-rep-disco{animation:none!important}}
   main{max-width:1232px;padding:28px 32px 72px}.bar{margin-bottom:24px;gap:10px}
   .tab{border:0;background:transparent;border-radius:100px;padding:11px 20px;color:#6b6679}.tab.on{background:#242031;color:#fff}
   h1{font-size:24px;letter-spacing:-.7px}.btn,.btn2,.jg-btn{height:42px;border-radius:10px;font-size:13px}
@@ -1686,8 +1735,7 @@ html[data-tema=oscuro] .jg-ct-chip.mar{background:#16304a;color:#9fd0ff}
       <a href="informes.html">Informes</a>
     </nav>
     <div class="head-right">
-      <button class="btn-ghost" id="btnMusica" aria-pressed="true">♫ Música</button>
-      <input id="volMusica" type="range" min="0" max="100" value="30" aria-label="Volumen de la música" title="Volumen de la música">
+      <button class="btn-ghost jg-rep-btn" id="btnMusica">Música</button>
       <button class="btn-ghost" id="btnSonido" title="Sonido" aria-pressed="true">🔊</button>
       <button class="btn-ghost" id="btnTema" title="Modo oscuro" aria-pressed="false">☾</button>
       <span id="userName"></span>
@@ -1717,6 +1765,6 @@ html[data-tema=oscuro] .jg-ct-chip.mar{background:#16304a;color:#9fd0ff}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202609261920"></script>
+<script src="juegos-app.js?v=202609270416"></script>
 </body>
 </html>
