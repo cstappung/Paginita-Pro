@@ -3,7 +3,7 @@ const {test}=require('node:test');const assert=require('node:assert/strict');con
    guiones (dejan `Chip` y `Temas` en el global) y se quitan los `import`. */
 function carga(extra={}){
  const pistas=[],events={},intervalos=[];
- class Audio{constructor(src){this.src=src;this.paused=true;pistas.push(this)}play(){this.paused=false;return Promise.resolve()}pause(){this.paused=true}}
+ class Audio{constructor(src){this.src=src;this.paused=true;pistas.push(this)}play(){this.paused=false;return Promise.resolve()}pause(){this.paused=true}addEventListener(){}}
  const document={hidden:false,addEventListener:(k,v)=>events[k]=v};
  const c={Audio,document,window:Object.assign({addEventListener:(k,v)=>events[k]=v},extra.window||{}),localStorage:{getItem:()=>null,setItem:()=>{}},
   setInterval:f=>{intervalos.push(f);return intervalos.length},clearInterval(i){if(i)intervalos[i-1]=null},Math,Object,Array,Number,Set,WeakMap,Float32Array,String,JSON};

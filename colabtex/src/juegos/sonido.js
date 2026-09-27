@@ -8,7 +8,7 @@
  *    canciones son texto en `juegos/audio/temas.js`: unas decenas de líneas
  *    frente a los megas que pesaría una carpeta de .mp3 que además habría
  *    que servir, cachear y esperar. Las excepciones son las que un chip no
- *    sabe imitar: los temas grabados del Escondite y de Flip 7 (`GRABADAS`)
+ *    sabe imitar: los temas grabados del Escondite y de Flip 7 (las entradas de `CANCIONES` con `url`)
  *    y el golpe de madera y la carta deslizada de Flip 7 (`MUESTRAS`). Todas
  *    son CC0 y se cargan solo cuando ese juego se abre.
  *
@@ -375,9 +375,13 @@ export function siguienteCancion(dir = 1) {
   elegirCancion(sig);
 }
 
+/* Juegos que traen su propia música dentro del marco. `juegos-main.js` los
+   ambienta por su nombre en cada repintado como a todos, y eso pisaba el
+   `null` que el marco pidió al montarse: una canción elegida sonaba encima. */
+const PROPIAS = new Set(["worms"]);
 /** `null` = esta pantalla trae su propia música; "" = ninguna en particular. */
 export function ambientar(j) {
-  const siguiente = j === null ? null : (j || "");
+  const siguiente = j === null || PROPIAS.has(j) ? null : (j || "");
   if (juego !== siguiente) { juego = siguiente; ajuste = { tempo: 1, capas: null }; }
   sincronizaMusica();
 }
