@@ -237,3 +237,60 @@ test('con nueve se juega con dos barajas',async()=>{
  for(const u of est.R.orden)for(const c of manoPr(est,u,sec[u].cad).mano)todas.add(c);
  assert.equal(todas.size,104);
 });
+
+/* Regresión de pantalla: los robots no ejecutan el latido de la UI.
+   DOM mínimo y reloj controlado; motor, reparto y automatismos reales. */
+function pantalla({p,sec,uid='a',jugar,terminar}){
+ const source=fs.readFileSync('src/juegos/presidente.js','utf8');
+ const imports=source.match(/import\s*\{([^}]+)\}\s*from "\.\/motor.js"/)[1];
+ const motor=vm.runInContext('({'+imports+'})',context);
+ let now=100000,id=0;const timers=new Map();
+ const set=(fn,ms,repeat=false)=>{timers.set(++id,{fn,at:now+ms,ms,repeat});return id;};
+ const el=()=>({innerHTML:'',dataset:{},style:{setProperty(){}},addEventListener(){},removeEventListener(){}});
+ const nodes=new Map(),host=el();host.querySelector=s=>{if(!nodes.has(s))nodes.set(s,el());return nodes.get(s);};
+ const scope={...motor,suena(){},console,Date:{now:()=>now},document:{hidden:false,addEventListener(){},removeEventListener(){}},setTimeout:(f,ms)=>set(f,ms),clearTimeout:i=>timers.delete(i),setInterval:(f,ms)=>set(f,ms,true),clearInterval:i=>timers.delete(i)};
+ vm.createContext(scope);vm.runInContext(source.replace(/import\s*\{[^}]+\}\s*from\s*"[^"]+";/g,'').replace(/\bexport\s+/g,''),scope);
+ const ui=scope.crearPresidente({uid,jugar,terminar,secreto:()=>Promise.resolve(sec[uid])});ui.montar(host);
+ const flush=async()=>{for(let i=0;i<12;i++)await Promise.resolve();};
+ return{ui,nodes,flush,refresh:()=>ui.actualizar(p,reducir(p)),tick:async ms=>{
+  const end=now+ms;await flush();
+  while(true){const next=[...timers].filter(([,t])=>t.at<=end).sort((a,b)=>a[1].at-b[1].at)[0];if(!next)break;
+   const [key,t]=next;now=t.at;if(t.repeat)t.at+=t.ms;else timers.delete(key);t.fn();await flush();
+  }now=end;await flush();
+ }};
+}
+
+test('pantalla: esperar no cierra la sala y empezar reparte hasta permitir jugar',async()=>{
+ const {p,sec}=sala(3,34);p.estado='esperando';p.anfitrion='a';const q=[],cierres=[];
+ const clients=['a','b','c'].map(uid=>pantalla({p,sec,uid,jugar:j=>{q.push(j);return Promise.resolve(true);},terminar:(...x)=>cierres.push(x)}));
+ try{
+  clients.forEach(c=>c.refresh());for(const c of clients)await c.tick(10000);
+  assert.equal(cierres.length,0,'el latido no debe guardar fin mientras se espera');assert.equal(q.length,0);
+  p.estado='jugando';clients.forEach(c=>c.refresh());for(const c of clients)await c.flush();
+  assert.ok(q.some(j=>j.t==='inicio'),'la sala lista debe iniciar el reparto por sí misma');
+  for(let i=0;i<40&&q.length&&reducir(p).etapa!=='juego';i++){
+   mover(p,q.shift());clients.forEach(c=>c.refresh());for(const c of clients)await c.flush();
+  }
+  let est=reducir(p);assert.equal(est.etapa,'juego');assert.equal(est.fase,'jugando');assert.equal(cierres.length,0);
+  assert.equal(Object.values(est.mano).reduce((a,b)=>a+b,0),52);
+  const u=est.turno,mano=manoPr(est,u,sec[u].cad).mano;
+  est=mover(p,{t:'juega',uid:u,c:[mano[0]]});assert.equal(est.mesa.de,u);assert.equal(est.mano[u],mano.length-1);
+ }finally{clients.forEach(c=>c.ui.destruir());}
+});
+
+test('pantalla: un cierre real se publica, pero no después de destruir la vista',async()=>{
+ const {p,sec}=sala(3,35);p.anfitrion='a';mover(p,{t:'inicio',uid:'a',q:['a','b','c']});
+ mover(p,{t:'cierra',uid:'a'});mover(p,{t:'cierra',uid:'b'});assert.equal(reducir(p).fase,'fin');
+ let cierres=0;const c=pantalla({p,sec,jugar:()=>Promise.resolve(true),terminar:()=>{cierres++;p.fin={at:123};}});
+ c.refresh();await c.flush();assert.equal(cierres,1);c.ui.destruir();
+ delete p.fin;const gone=pantalla({p,sec,jugar:()=>Promise.resolve(true),terminar:()=>cierres++});
+ gone.refresh();gone.ui.destruir();await gone.flush();assert.equal(cierres,1,'un cierre pendiente no debe sobrevivir a la vista');
+});
+
+test('arranque: mínimo de tres, sala abierta y sala lista tienen fases distintas',()=>{
+ const {p}=sala(3,36);p.estado='esperando';assert.equal(reducir(p).fase,'espera');
+ p.estado='jugando';assert.equal(reducir(p).fase,'jugando');assert.equal(reducir(p).etapa,'arranque');
+ p.estado='esperando';p.cupo=3;assert.equal(reducir(p).fase,'jugando','al llenarse el cupo mínimo puede empezar');
+ delete p.jugadores.c;assert.equal(reducir(p).fase,'espera');
+ delete p.jugadores.b;assert.equal(reducir(p).fase,'espera');
+});
