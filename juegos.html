@@ -447,6 +447,14 @@ try { var t = localStorage.getItem("jg.tema");
   .jg-bar-juegos{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
   .jg-tab{padding:8px 14px;border:1px solid #d4dce2;border-radius:8px;background:#fff;font-size:12.5px;font-weight:600;color:#42505c;cursor:pointer}
   .jg-tab.on{border-color:#0d9488;background:#e9f4f2;color:#0d9488}
+  /* Categorías de los juegos individuales: control segmentado, no <select>. */
+  .jg-rk-cats{display:flex;flex-direction:column;gap:8px;margin:0 0 16px;padding:12px 14px;border:1px solid #e2e8ec;border-radius:12px;background:#fff}
+  .jg-rk-fila{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .jg-rk-fila>span{min-width:74px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6b7a86}
+  .jg-rk-seg{display:inline-flex;flex-wrap:wrap;gap:3px;padding:3px;border-radius:10px;background:#eef2f5}
+  .jg-rk-seg button{border:0;background:transparent;padding:7px 13px;border-radius:8px;font-family:inherit;font-weight:600;font-size:12.5px;color:#42505c;cursor:pointer;transition:background .15s,color .15s,box-shadow .15s}
+  .jg-rk-seg button:hover{background:#ffffffaa}
+  .jg-rk-seg button.on{background:#fff;color:#0f1720;box-shadow:0 1px 3px #0f172422,inset 0 -2px 0 var(--c,#0d9488)}
   .jg-aviso{padding:14px 16px;border-radius:9px;background:#fff8ec;border:1px solid #e2c08d66;font-size:12.5px;color:#6b5320;line-height:1.6;margin-bottom:16px}
   .jg-aviso code{font-family:'IBM Plex Mono',monospace;font-size:11.5px;background:#00000010;padding:1px 5px;border-radius:4px}
   .jg-tabla-caja{background:#fff;border:1px solid #e2e8ec;border-radius:10px;overflow-x:auto}
@@ -1727,6 +1735,11 @@ html[data-tema=oscuro] .esc-herramientas select{background:var(--os-sup2);border
 html[data-tema=oscuro] .btn2,html[data-tema=oscuro] .jg-tab,html[data-tema=oscuro] .jg-f7-anula{background:var(--os-sup2);border-color:var(--os-borde2);color:var(--os-tx2)}
 html[data-tema=oscuro] .btn2:hover{border-color:#a88bff;color:#c4b1ff}
 html[data-tema=oscuro] .jg-tab.on{background:#0d94882b;color:#5eead4}
+html[data-tema=oscuro] .jg-rk-cats{background:var(--os-sup);border-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-rk-seg{background:var(--os-sup2)}
+html[data-tema=oscuro] .jg-rk-seg button{color:var(--os-tx2)}
+html[data-tema=oscuro] .jg-rk-seg button:hover{background:#ffffff10}
+html[data-tema=oscuro] .jg-rk-seg button.on{background:#ffffff1c;color:#fff}
 html[data-tema=oscuro] .mini{color:#6f687f}
 html[data-tema=oscuro] .mini:hover{background:var(--os-sup3);color:var(--os-tx2)}
 html[data-tema=oscuro] .mini.del:hover,html[data-tema=oscuro] .jg-pierde,html[data-tema=oscuro] .jg-castigo,
@@ -1956,6 +1969,6 @@ main.jg-ancho{max-width:1480px}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202609280516"></script>
+<script src="juegos-app.js?v=202609280523"></script>
 </body>
 </html>

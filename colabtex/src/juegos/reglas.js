@@ -500,16 +500,19 @@ const REGLAS = {
     ]
   },
   snake: {
-    lema: "Snake Club: la serpiente de siempre, en cuatro modos.",
+    lema: "Snake Club: la serpiente de siempre, en siete modos y cuatro tamaños.",
     secciones: [
-      ["Cómo se juega", "Mueve la serpiente con las flechas o <b>WASD</b> (o deslizando el dedo). Cada fruta la alarga y suma puntos; chocar contra una pared o contra tu propia cola acaba la partida."],
+      ["Cómo se juega", "Mueve la serpiente con las flechas o <b>WASD</b> (o deslizando el dedo). Cada fruta la alarga y suma puntos; chocar contra una pared, un muro o tu propia cola acaba la partida."],
       ["Los modos", lista([
         "<b>Clásico</b>: el de siempre.",
-        "<b>Arcade</b>: poderes (escudo, cámara lenta, puntos dobles), frutas doradas que valen 50 y obstáculos.",
-        "<b>Portales</b>: los bordes llevan al lado contrario y dos portales están conectados. Tu cola sigue siendo peligrosa.",
-        "<b>Zen</b>: sin choques ni prisa; atraviesas paredes y tu cola."
+        "<b>Arcade</b>: poderes (escudo, cámara lenta, puntos dobles), combos, frutas doradas que valen 50 y obstáculos que van apareciendo.",
+        "<b>Portales</b>: los bordes llevan al lado contrario y dos portales están conectados; cada 4 frutas los portales cambian de sitio.",
+        "<b>Contrarreloj</b>: empiezas con 40 s; cada fruta suma 2,5 s y los relojes dorados, 6 s y 30 puntos. A cero, se acabó.",
+        "<b>Espejo</b>: cada 5 frutas los controles se invierten (y vuelven). Al revés, cada fruta vale 15.",
+        "<b>Laberinto</b>: cada 6 frutas pasas de nivel y aparecen muros nuevos (más un premio de 25 × nivel). Los bordes llevan al otro lado.",
+        "<b>Zen</b>: sin choques ni prisa; atraviesas paredes y tu cola. No puntúa."
       ])],
-      ["Ritmo", "Tranqui, Normal o ¡A tope!: cada combinación de modo y ritmo tiene su propia clasificación."]
+      ["Tamaño y ritmo", "El mapa puede ser Chico, Mediano, Grande o Gigante, y cada combinación de modo y tamaño tiene su propia clasificación. El ritmo multiplica los puntos: Tranqui ×1, Normal ×2, ¡A tope! ×3."]
     ]
   }
 };

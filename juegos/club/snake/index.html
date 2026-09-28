@@ -4,9 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#f5f5ed">
-  <meta name="description" content="Snake Club: el clásico de siempre con cuatro modos, poderes, portales y mucho estilo. Juega gratis, incluso sin conexión.">
+  <meta name="description" content="Snake Club: el clásico de siempre con siete modos, cuatro tamaños, poderes, portales y mucho estilo. Juega gratis, incluso sin conexión.">
   <title>Snake Club — Una más.</title>
-  <link rel="stylesheet" href="style.css?v=club-1">
+  <link rel="stylesheet" href="style.css?v=snake-2">
 <link rel="stylesheet" href="../conexion.css?v=club-3">
 <script src="../conexion.js?v=club-3"></script>
 </head>
@@ -50,16 +50,20 @@
         </section>
 
         <aside class="sidebar">
-          <section class="settings-section"><div class="section-heading"><h2>Tu juego, tus reglas</h2><span>01—04</span></div>
+          <section class="settings-section"><div class="section-heading"><h2>Tu juego, tus reglas</h2><span>01—07</span></div>
             <div class="mode-list" role="group" aria-label="Modo de juego">
               <button class="mode-card active" data-mode="classic" aria-pressed="true"><span class="mode-icon">↳</span><span><strong>Clásico</strong><small>El original nunca falla.</small></span><span class="mode-radio"></span></button>
               <button class="mode-card" data-mode="arcade" aria-pressed="false"><span class="mode-icon">ϟ</span><span><strong>Arcade <em>CON PODERES</em></strong><small>Más sorpresas. Más adrenalina.</small></span><span class="mode-radio"></span></button>
               <button class="mode-card" data-mode="portals" aria-pressed="false"><span class="mode-icon portal-icon">◎</span><span><strong>Portales</strong><small>Sal por donde menos esperas.</small></span><span class="mode-radio"></span></button>
-              <button class="mode-card" data-mode="zen" aria-pressed="false"><span class="mode-icon">✳</span><span><strong>Zen</strong><small>Sin choques. Sin prisa. Sin fin.</small></span><span class="mode-radio"></span></button>
+              <button class="mode-card" data-mode="reloj" aria-pressed="false"><span class="mode-icon">⏱</span><span><strong>Contrarreloj</strong><small>Cada fruta es tiempo.</small></span><span class="mode-radio"></span></button>
+              <button class="mode-card" data-mode="espejo" aria-pressed="false"><span class="mode-icon">⇄</span><span><strong>Espejo</strong><small>Los controles se dan vuelta.</small></span><span class="mode-radio"></span></button>
+              <button class="mode-card" data-mode="laberinto" aria-pressed="false"><span class="mode-icon">▦</span><span><strong>Laberinto</strong><small>Cada nivel, más muros.</small></span><span class="mode-radio"></span></button>
+              <button class="mode-card" data-mode="zen" aria-pressed="false"><span class="mode-icon">✳</span><span><strong>Zen</strong><small>Sin choques. Sin fin.</small></span><span class="mode-radio"></span></button>
             </div>
           </section>
           <section class="speed-section"><div class="section-heading"><h2>Marca el ritmo</h2><span aria-hidden="true">↗</span></div><div class="speed-control" role="group" aria-label="Dificultad"><button data-speed="chill" aria-pressed="false">Tranqui</button><button class="active" data-speed="normal" aria-pressed="true">Normal</button><button data-speed="fast" aria-pressed="false">¡A tope!</button></div></section>
-          <section class="tip-card"><span class="tip-icon" aria-hidden="true">✦</span><div><h3 id="tip-title">Lo simple tiene su truco.</h3><p id="tip-text">Come las frutas, evita las paredes y no te muerdas la cola. Fácil… al principio.</p></div><div class="tip-line"></div><div class="fruit-legend"><span class="mini-fruit"></span><span>UN BOCADO <b>+10 PTS</b></span></div></section>
+          <section class="speed-section size-section"><div class="section-heading"><h2>Tamaño del mapa</h2><span aria-hidden="true">▢</span></div><div class="speed-control" role="group" aria-label="Tamaño del mapa"><button data-size="chico" aria-pressed="false">Chico</button><button data-size="mediano" aria-pressed="false">Mediano</button><button class="active" data-size="grande" aria-pressed="true">Grande</button><button data-size="gigante" aria-pressed="false">Gigante</button></div></section>
+          <section class="tip-card"><span class="tip-icon" aria-hidden="true">✦</span><div><h3 id="tip-title">Lo simple tiene su truco.</h3><p id="tip-text">Come las frutas, evita las paredes y no te muerdas la cola. Fácil… al principio.</p></div><div class="tip-line"></div><div class="fruit-legend"><span class="mini-fruit"></span><span>UN BOCADO <b id="fruit-points">+20 PTS</b></span></div></section>
           <div class="palette-row"><span>CAMBIA EL MOOD</span><div role="group" aria-label="Color de la serpiente"><button class="swatch active" data-theme="lime" style="--swatch:#c1f45a" aria-label="Verde lima" aria-pressed="true"></button><button class="swatch" data-theme="cyan" style="--swatch:#69dbe8" aria-label="Azul hielo" aria-pressed="false"></button><button class="swatch" data-theme="pink" style="--swatch:#f79dc5" aria-label="Rosa chicle" aria-pressed="false"></button></div></div>
         </aside>
       </div>
@@ -67,6 +71,6 @@
     </main>
   </div>
   <div class="sr-only" id="announcer" aria-live="polite"></div>
-  <script src="../../audio/chip.js?v=snake-audio-1"></script><script src="../../audio/temas.js?v=snake-audio-1"></script><script src="game.js?v=snake-audio-1"></script>
+  <script src="../../audio/chip.js?v=snake-audio-1"></script><script src="../../audio/temas.js?v=snake-audio-1"></script><script src="game.js?v=snake-2"></script>
 </body>
 </html>

@@ -152,8 +152,20 @@ const state = {
   mias: [],
   fallo: null,            // por qué no se puede leer (reglas sin publicar, casi siempre)
   cargando: false,
-  enCurso: []             // partidas empezadas que se pueden mirar
+  enCurso: [],            // partidas empezadas que se pueden mirar
+  popular: leePopular()   // juego → cuánto se ha jugado (ordena el catálogo)
 };
+
+/* El orden del catálogo es el de la última visita mientras llega el de
+   hoy: si no, las tarjetas saltarían de sitio medio segundo después de
+   pintarse, justo cuando uno va a hacer clic. */
+function leePopular() {
+  try { return JSON.parse(localStorage.getItem("jg.popular") || "{}") || {}; } catch (e) { return {}; }
+}
+function ordenPopular(claves) {
+  const n = state.popular, pos = Object.fromEntries(claves.map((k, i) => [k, i]));
+  return claves.slice().sort((a, b) => (n[b] || 0) - (n[a] || 0) || pos[a] - pos[b]);
+}
 
 let offSalas = null, offMias = null, offPartida = null, offReloj = null, offEnCurso = null;
 let offChat = null, chatMsgs = [], chatFirma = "";
@@ -426,6 +438,12 @@ function engancharVestibulo() {
   });
   /* Sin reglas publicadas este nodo falla; no es motivo para tapar el
      vestíbulo con el aviso: la lista simplemente sale vacía. */
+  fb.leerPopularidad().then(n => {
+    const cambio = JSON.stringify(n) !== JSON.stringify(state.popular);
+    state.popular = n;
+    try { localStorage.setItem("jg.popular", JSON.stringify(n)); } catch (e) {}
+    if (cambio && state.vista === "vestibulo") { vesFirma = ""; render(); }
+  }).catch(() => {});
   offEnCurso = fb.watchEnCurso(lista => {
     state.enCurso = lista || [];
     if (state.vista === "vestibulo") render();
@@ -767,7 +785,7 @@ function armazon() {
           </div></div>
         <div class="jg-elige" id="vesElige"></div>
         <div class="jg-section-title"><h2>Para jugar solo</h2><span>sin sala, cuando quieras</span></div>
-        <div class="sp-entradas"><a href="#solo/minas" class="sp-entrada sp-e-minas"><small>SINGLEPLAYER / ESTRATEGIA</small><strong>MINA CLUB <span>✦</span></strong><p>Piensa, explora y florece. Tres dificultades y música progresiva.</p><b>Explorar →</b></a><a href="#solo/snake" class="sp-entrada sp-e-snake"><small>SINGLEPLAYER / REFLEJOS</small><strong>SNAKE CLUB <span>ϟ</span></strong><p>Clásico, arcade, portales y Zen. Una más.</p><b>Entrar al circuito →</b></a><a href="#solo/tetris" class="sp-entrada sp-e-tetris"><small>SINGLEPLAYER / REFLEJOS</small><strong>TETRIS CLUB <span>▤</span></strong><p>Maratón, Sprint de 40 líneas y Ultra de dos minutos.</p><b>Apilar →</b></a><a href="juegos/worms/index.html?v=worms-4" class="sp-entrada sp-e-worms"><small>LOCAL · BOTS / ARTILLERÍA</small><strong>CIRCUIT BREAKERS <span>💥</span></strong><p>Tu cuadrilla contra bots o amigos en el mismo equipo. En línea: abre una sala arriba.</p><b>Desplegar →</b></a></div>
+        <div class="sp-entradas"><a href="#solo/minas" class="sp-entrada sp-e-minas"><small>SINGLEPLAYER / ESTRATEGIA</small><strong>MINA CLUB <span>✦</span></strong><p>Piensa, explora y florece. Tres dificultades y música progresiva.</p><b>Explorar →</b></a><a href="#solo/snake" class="sp-entrada sp-e-snake"><small>SINGLEPLAYER / REFLEJOS</small><strong>SNAKE CLUB <span>ϟ</span></strong><p>Siete modos —contrarreloj, espejo, laberinto…— y cuatro tamaños de mapa.</p><b>Entrar al circuito →</b></a><a href="#solo/tetris" class="sp-entrada sp-e-tetris"><small>SINGLEPLAYER / REFLEJOS</small><strong>TETRIS CLUB <span>▤</span></strong><p>Maratón, Sprint de 40 líneas y Ultra de dos minutos.</p><b>Apilar →</b></a><a href="juegos/worms/index.html?v=worms-4" class="sp-entrada sp-e-worms"><small>LOCAL · BOTS / ARTILLERÍA</small><strong>CIRCUIT BREAKERS <span>💥</span></strong><p>Tu cuadrilla contra bots o amigos en el mismo equipo. En línea: abre una sala arriba.</p><b>Desplegar →</b></a></div>
       </div>
     </div>`;
   for (const b of h.querySelectorAll("[data-filtro]")) {
@@ -791,10 +809,29 @@ function aplicaFiltro() {
 }
 
 /* ---------- pintado: el vestíbulo ---------- */
+/* Los individuales son HTML fijo: se reordenan moviendo los nodos, con
+   Circuit Breakers local siempre al final (su sala en línea está arriba). */
+let vesFirma = "";
+function ordenaSolos() {
+  const caja = document.querySelector(".sp-entradas");
+  if (!caja) return;
+  const clave = a => { const m = /#solo\/(\w+)/.exec(a.getAttribute("href") || ""); return m ? "club-" + m[1] : ""; };
+  const todas = [...caja.children];
+  const solos = todas.filter(clave);
+  const orden = ordenPopular(solos.map(clave));
+  const nuevo = orden.map(k => solos.find(a => clave(a) === k)).concat(todas.filter(a => !clave(a)));
+  if (nuevo.some((a, i) => a !== todas[i])) nuevo.forEach(a => caja.appendChild(a));
+}
+
 function pintaVestibulo() {
   $("vesAviso").innerHTML = state.fallo ? avisoReglas(state.fallo) : "";
 
-  $("vesElige").innerHTML = Object.entries(JUEGOS).map(([k, j]) => `
+  ordenaSolos();
+  const orden = ordenPopular(Object.keys(JUEGOS));
+  const firmaV = orden.join();
+  if (firmaV !== vesFirma || !$("vesElige").firstElementChild) {
+  vesFirma = firmaV;
+  $("vesElige").innerHTML = orden.map(k => [k, JUEGOS[k]]).map(([k, j]) => `
     <div class="jg-oferta jg-of-${k}" style="--c:${j.color}" data-tipo="${j.cupo > 2 ? "grupo" : "duelo"}">
       <div class="jg-portada jg-portada-${k}" aria-hidden="true">${arteJuego(k)}</div>
       <div class="jg-of-meta">${k === "orbita" ? "NUEVO · ORIGINAL" : j.cupo > 2 ? "EN GRUPO" : "DUELO"}<span>${j.cupo > 2 ? "2–" + j.cupo : "2"} JUGADORES</span></div>
@@ -816,6 +853,7 @@ function pintaVestibulo() {
       const k = b.getAttribute("data-reglas"), op = leeOpciones(b) || {};
       abreReglas(k, { modo: modoReglas(k, op), nombre: JUEGOS[k].nombre });
     };
+  }
   }
   aplicaFiltro();
 

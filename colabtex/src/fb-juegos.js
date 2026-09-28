@@ -258,6 +258,23 @@ export function watchRanks(juego, cb) {
   }, err => cb([], err));
 }
 
+/* Cuánto se juega cada cosa, para ordenar el catálogo: la suma de
+   `jugadas` de todas las filas de `ranks/<juego>` (una partida de cuatro
+   cuenta cuatro — es tiempo de gente jugando, que es lo que se mide) y,
+   de los individuales, cuántos récords hay en `soloRanks`. Una lectura
+   al entrar; las filas son pequeñas y no hace falta escucharlas. */
+export async function leerPopularidad() {
+  const [r, s] = await Promise.all([get(ref(db, R)), get(ref(db, "soloRanks")).catch(() => null)]);
+  const n = {};
+  for (const [juego, filas] of Object.entries(r.val() || {}))
+    n[juego] = Object.values(filas || {}).reduce((t, f) => t + (+(f && f.jugadas) || 0), 0);
+  for (const [cat, filas] of Object.entries((s && s.val()) || {})) {
+    const m = /^club-(minas|snake|tetris)-/.exec(cat);
+    if (m) n["club-" + m[1]] = (n["club-" + m[1]] || 0) + Object.keys(filas || {}).length;
+  }
+  return n;
+}
+
 export const leerRank = (juego, uid) => get(ref(db, `${R}/${juego}/${uid}`)).then(s => s.val());
 export const guardarRank = (juego, uid, fila) => set(ref(db, `${R}/${juego}/${uid}`), fila);
 
