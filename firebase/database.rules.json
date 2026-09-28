@@ -206,7 +206,7 @@
         ],
         "$uid": {
           ".write": "auth != null && auth.uid === $uid",
-          ".validate": "$categoria.matches(/^(minas-(explorador|veterano|leyenda)-(clasico|cruz)|snake-(clasico|portal|ruinas)-(lenta|media|rapida)|club-minas-(easy|medium|hard)|club-snake-(classic|arcade|portals)-(chill|normal|fast)|club-tetris-(maraton|sprint|ultra))$/) && newData.hasChildren(['nombre','puntos','tiempo','partida']) && (!data.exists() || newData.child('puntos').val() > data.child('puntos').val() || (newData.child('puntos').val() === data.child('puntos').val() && newData.child('tiempo').val() < data.child('tiempo').val()))",
+          ".validate": "$categoria.matches(/^(club-minas-(easy|medium|hard)|club-snake-(classic|arcade|portals|reloj|espejo|laberinto)-(chico|mediano|grande|gigante)|club-tetris-(maraton|sprint|ultra))$/) && newData.hasChildren(['nombre','puntos','tiempo','partida']) && (!data.exists() || newData.child('puntos').val() > data.child('puntos').val() || (newData.child('puntos').val() === data.child('puntos').val() && newData.child('tiempo').val() < data.child('tiempo').val()))",
           "nombre": {
             ".validate": "newData.isString() && newData.val().length <= 80"
           },
@@ -221,6 +221,19 @@
           },
           "$otro": {
             ".validate": false
+          }
+        }
+      }
+    },
+
+    "logros": {
+      ".read": "auth != null",
+      "$juego": {
+        ".validate": "$juego.matches(/^(escondite|cartas|cuadritos|reversi|orbita|worms|cadena|flip7|cacho|uno|catan|presidente|spicy|tetris)$/)",
+        "$uid": {
+          "$id": {
+            ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists()",
+            ".validate": "$id.matches(/^[a-z0-9]{1,20}$/) && newData.isNumber() && newData.val() <= now"
           }
         }
       }

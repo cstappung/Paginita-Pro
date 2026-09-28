@@ -234,8 +234,15 @@
     s.tiempo += dt;
     if (s.subeCada) subeNivel(s);
     const g = gravedad(s.nivel);
-    const paso = s.blando ? Math.min(g, 40) : g;
+    /* El blando es veinte veces la gravedad (con un tope de 30 ms por fila),
+       nunca un salto. Antes el paso pasaba de `g` a 40 ms con `acum` ya
+       lleno de lo que llevaba esperando la gravedad normal: al pulsar la
+       flecha a mitad de un segundo la pieza bajaba de golpe doce filas, que
+       era el «a veces es instantánea». Ahora lo acumulado nunca vale más de
+       una fila del paso nuevo. */
+    const paso = s.blando ? Math.min(g, Math.max(30, g / 20)) : g;
     s.acum += dt;
+    if (s.blando && s.acum > paso) s.acum = Math.min(s.acum, paso + dt);
     while (s.acum >= paso && !s.fin) {
       s.acum -= paso;
       if (!enSuelo(s)) { s.p = { ...s.p, y: s.p.y + 1 }; s.giro = false; if (s.blando) s.puntos += 1; }
@@ -312,15 +319,51 @@
 
   /* ---------- mando: teclado con DAS/ARR ----------
      `acciones` recibe "izq", "der", "gira", "contragira", "caer",
-     "guarda" y "pausa"; el blando se lee de `mando.blando`. */
+     "guarda" y "pausa"; el blando se lee de `mando.blando`.
+     Las teclas son configurables: `op.teclas` es {acción: [código, …]} y,
+     si no viene, se lee lo guardado (`leeTeclas`), que comparten la sala y
+     Tetris Club porque viven en el mismo origen. */
+  const ACCIONES = [
+    ["izq", "Mover a la izquierda"], ["der", "Mover a la derecha"], ["blando", "Bajar más rápido"],
+    ["caer", "Caída instantánea"], ["gira", "Girar a la derecha"], ["contragira", "Girar a la izquierda"],
+    ["guarda", "Guardar pieza"], ["pausa", "Pausa"]
+  ];
+  const TECLAS_DEFECTO = {
+    izq: ["ArrowLeft", "KeyA"], der: ["ArrowRight", "KeyD"], blando: ["ArrowDown", "KeyS"], caer: ["Space"],
+    gira: ["ArrowUp", "KeyX"], contragira: ["KeyZ", "KeyQ"], guarda: ["KeyC", "ShiftLeft"], pausa: ["KeyP", "Escape"]
+  };
+  const CLAVE_TECLAS = "jg.tetris.teclas";
+  function leeTeclas() {
+    const t = {};
+    for (const [a] of ACCIONES) t[a] = TECLAS_DEFECTO[a].slice();
+    try {
+      const g = JSON.parse(localStorage.getItem(CLAVE_TECLAS) || "null");
+      if (g && typeof g === "object") for (const [a] of ACCIONES) if (Array.isArray(g[a])) t[a] = g[a].filter(c => typeof c === "string").slice(0, 2);
+    } catch (e) { /* sin almacenamiento: las de siempre */ }
+    return t;
+  }
+  function guardaTeclas(t) { try { localStorage.setItem(CLAVE_TECLAS, JSON.stringify(t)); } catch (e) { /* opcional */ } }
+  function mapaDe(t) { const m = {}; for (const [a] of ACCIONES) for (const c of t[a] || []) if (!(c in m)) m[c] = a; return m; }
+  function nombreTecla(c) {
+    if (!c) return "—";
+    const fijo = { ArrowLeft: "←", ArrowRight: "→", ArrowUp: "↑", ArrowDown: "↓", Space: "Espacio", ShiftLeft: "Mayús izq.", ShiftRight: "Mayús der.",
+      ControlLeft: "Ctrl izq.", ControlRight: "Ctrl der.", AltLeft: "Alt", Escape: "Esc", Enter: "Intro", Tab: "Tab", Backspace: "Borrar" };
+    if (fijo[c]) return fijo[c];
+    if (/^Key[A-Z]$/.test(c)) return c.slice(3);
+    if (/^Digit\d$/.test(c)) return c.slice(5);
+    if (/^Numpad/.test(c)) return "Num " + c.slice(6);
+    return c;
+  }
+  const CORTO = { izq: "izq.", der: "der.", blando: "bajar", caer: "soltar", gira: "girar", contragira: "contragiro", guarda: "guardar", pausa: "pausa" };
+  function textoTeclas(t) {
+    t = t || leeTeclas();
+    return ACCIONES.map(([a]) => (t[a] || []).map(nombreTecla).join("/") + " " + CORTO[a]).join(" · ");
+  }
   function crearMando(acciones, op = {}) {
     const DAS = op.das || 150, ARR = op.arr || 45;
     const m = { blando: false, lado: 0, t: 0, repite: false };
-    const mapa = {
-      ArrowLeft: "izq", ArrowRight: "der", ArrowUp: "gira", KeyX: "gira", KeyZ: "contragira", ControlLeft: "contragira",
-      Space: "caer", KeyC: "guarda", ShiftLeft: "guarda", ShiftRight: "guarda", ArrowDown: "blando", KeyP: "pausa", Escape: "pausa",
-      KeyA: "izq", KeyD: "der", KeyW: "gira", KeyS: "blando", KeyQ: "contragira", KeyE: "gira"
-    };
+    let mapa = mapaDe(op.teclas || leeTeclas());
+    m.recarga = t => { mapa = mapaDe(t || leeTeclas()); m.suelta(); };
     m.baja = e => {
       const a = mapa[e.code];
       if (!a) return false;
@@ -345,6 +388,55 @@
     m.suelta = () => { m.blando = false; m.lado = 0; };
     return m;
   }
+  /* El panel de teclas, igual en la sala y en el Club: una fila por acción
+     con dos casillas; se pulsa una y la siguiente tecla queda asignada. Una
+     tecla que ya tenía otra acción se le quita a esa, para que nunca haya
+     dos acciones en la misma. Se cuelga de `doc.body` con estilos en línea
+     porque las dos páginas no comparten hoja. `alCambiar(teclas)` recibe
+     cada cambio ya guardado. */
+  function panelTeclas(doc, alCambiar, alCerrar) {
+    let t = leeTeclas(), esperando = null;
+    const capa = doc.createElement("div");
+    capa.setAttribute("role", "dialog"); capa.setAttribute("aria-label", "Configurar teclas");
+    capa.style.cssText = "position:fixed;inset:0;z-index:90;display:grid;place-items:center;background:#0009;font:14px system-ui,sans-serif";
+    const caja = doc.createElement("div");
+    caja.style.cssText = "background:#15121f;color:#eee;border:1px solid #3a3350;border-radius:14px;padding:18px 20px;width:min(440px,calc(100vw - 32px));max-height:90vh;overflow:auto;box-shadow:0 20px 60px #000a";
+    capa.appendChild(caja);
+    const btn = "background:#241f33;color:#fff;border:1px solid #4a4266;border-radius:8px;padding:6px 8px;min-width:92px;cursor:pointer;font:inherit";
+    function pinta() {
+      caja.innerHTML = '<h3 style="margin:0 0 4px;font-size:17px">⌨ Teclas</h3>' +
+        '<p style="margin:0 0 12px;color:#aaa;font-size:12px">Pulsa una casilla y luego la tecla. Se guardan en este navegador y valen en la sala y en Tetris Club.</p>' +
+        ACCIONES.map(([a, txt]) => '<div style="display:flex;align-items:center;gap:8px;margin:6px 0"><span style="flex:1">' + txt + "</span>" +
+          [0, 1].map(k => '<button type="button" data-a="' + a + '" data-k="' + k + '" style="' + btn +
+            (esperando && esperando[0] === a && esperando[1] === k ? ";outline:2px solid #b04ee8;background:#3a2a55" : "") + '">' +
+            (esperando && esperando[0] === a && esperando[1] === k ? "pulsa…" : nombreTecla((t[a] || [])[k])) + "</button>").join("") + "</div>").join("") +
+        '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px">' +
+        '<button type="button" data-x="defecto" style="' + btn + '">Restablecer</button>' +
+        '<button type="button" data-x="cerrar" style="' + btn + ';background:#b04ee8;border-color:#b04ee8">Listo</button></div>';
+    }
+    function cierra() { doc.removeEventListener("keydown", tecla, true); capa.remove(); if (alCerrar) alCerrar(); }
+    function tecla(e) {
+      if (!esperando) { if (e.key === "Escape") { e.preventDefault(); cierra(); } return; }
+      e.preventDefault(); e.stopPropagation();
+      const [a, k] = esperando; esperando = null;
+      if (e.code !== "Escape" || a === "pausa") {
+        for (const [b] of ACCIONES) t[b] = (t[b] || []).filter(c => c !== e.code);
+        const l = t[a] || []; l[k] = e.code; t[a] = l.filter(Boolean);
+        guardaTeclas(t); if (alCambiar) alCambiar(t);
+      }
+      pinta();
+    }
+    capa.addEventListener("click", e => {
+      if (e.target === capa) return cierra();
+      const b = e.target.closest("button"); if (!b) return;
+      if (b.dataset.x === "cerrar") return cierra();
+      if (b.dataset.x === "defecto") { t = {}; for (const [a] of ACCIONES) t[a] = TECLAS_DEFECTO[a].slice(); guardaTeclas(t); if (alCambiar) alCambiar(t); return pinta(); }
+      if (b.dataset.a) { esperando = [b.dataset.a, Number(b.dataset.k)]; pinta(); }
+    });
+    doc.addEventListener("keydown", tecla, true);
+    pinta(); doc.body.appendChild(capa);
+    return { cierra };
+  }
   /* Aplica una acción del mando a una partida. */
   function accion(s, a) {
     if (a === "izq") return mover(s, -1);
@@ -358,6 +450,7 @@
 
   return {
     W, H, OCULTAS, PIEZAS, COLOR, rng, bolsa, gravedad, crear, cabe, mover, rotar, fantasma, caer, guardar,
-    avanza, recibe, pendiente, resumen, accion, pintaPozo, pintaPieza, pintaResumen, crearMando, celdas
+    avanza, recibe, pendiente, resumen, accion, pintaPozo, pintaPieza, pintaResumen, crearMando, celdas,
+    ACCIONES, TECLAS_DEFECTO, leeTeclas, guardaTeclas, nombreTecla, panelTeclas, textoTeclas
   };
 });

@@ -128,7 +128,16 @@
     if (TM.accion(s, a) && (a === 'izq' || a === 'der')) efecto('mueve');
   }
   const mando = TM.crearMando(acciones);
+  let configurando = false;
+  const pintaTeclas = () => { $('teclasTxt').textContent = TM.textoTeclas(); };
+  pintaTeclas();
+  $('teclas').addEventListener('click', () => {
+    if (estado === 'jugando') pausa();
+    configurando = true; mando.suelta();
+    TM.panelTeclas(document, t => { mando.recarga(t); pintaTeclas(); }, () => { configurando = false; });
+  });
   document.addEventListener('keydown', e => {
+    if (configurando) return;
     if (estado !== 'jugando' && estado !== 'pausa' && (e.code === 'Space' || e.code === 'Enter')) {
       if (e.target.closest?.('button') && e.code === 'Enter') return;
       e.preventDefault(); return estado === 'pausa' ? pausa() : empieza();

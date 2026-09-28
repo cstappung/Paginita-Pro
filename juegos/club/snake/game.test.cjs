@@ -39,17 +39,17 @@ function game() {
 }
 
 test('fruit adds points, grows the snake, persists record and respawns on a free cell', () => {
-  const g = game(); g.start(); for (let i = 0; i < 10; i++) g.step();
-  const s = g.get(); assert.equal(s.score, 10); assert.equal(s.snake.length, 6); assert.equal(s.records['classic-normal'], 10);
+  const g = game(); g.start(); for (let i = 0; i < 16; i++) g.step();
+  const s = g.get(); assert.equal(s.score, 20); assert.equal(s.snake.length, 6); assert.equal(s.records['classic-grande'], 20);
   assert.ok(!s.snake.some(p => p.x === s.fruit.x && p.y === s.fruit.y));
 });
 test('classic wall collision ends the game', () => {
-  const g = game(); g.start(); for (let i = 0; i < 20; i++) g.step(); assert.equal(g.get().state, 'over');
+  const g = game(); g.start(); for (let i = 0; i < 30; i++) g.step(); assert.equal(g.get().state, 'over');
 });
 test('input rejects reversals and buffers two legal turns', () => {
   const g = game(); g.start(); g.enqueue('left'); assert.equal(g.get().queue.length, 0);
   g.enqueue('up'); g.enqueue('left'); g.enqueue('down'); assert.equal(g.get().queue.length, 2);
-  g.step(); assert.equal(g.get().snake[0].y, 10); g.step(); assert.equal(g.get().snake[0].x, 7);
+  g.step(); assert.equal(g.get().snake[0].y, 10); g.step(); assert.equal(g.get().snake[0].x, 5);
 });
 test('moving into the departing tail cell is legal', () => {
   const g = game(); g.start(); g.patch({ snake: [{x:5,y:5},{x:5,y:6},{x:4,y:6},{x:4,y:5}], direction:'left' });
@@ -79,12 +79,12 @@ test('shield absorbs one wall collision', () => {
   g.step(); assert.equal(g.get().state, 'playing'); assert.equal(g.get().snake[0].x, 0); assert.equal(g.get().activePower, null);
 });
 test('shield removes an obstacle and is consumed', () => {
-  const g = game(); g.setMode('arcade'); g.patch({ obstacles:[{x:9,y:11}], activePower:{type:'shield',expires:10} });
+  const g = game(); g.setMode('arcade'); g.patch({ obstacles:[{x:7,y:11}], activePower:{type:'shield',expires:10} });
   g.step(); assert.equal(g.get().state, 'playing'); assert.equal(g.get().obstacles.length, 0); assert.equal(g.get().activePower, null);
 });
 test('double points applies to golden fruit', () => {
-  const g = game(); g.setMode('arcade'); g.patch({ bonus:{x:9,y:11,expires:10}, activePower:{type:'double',expires:10} });
-  g.step(); assert.equal(g.get().score, 100); assert.equal(g.get().bonus, null);
+  const g = game(); g.setMode('arcade'); g.patch({ bonus:{x:7,y:11,expires:10}, activePower:{type:'double',expires:10} });
+  g.step(); assert.equal(g.get().score, 200); assert.equal(g.get().bonus, null);
 });
 test('Arcade generates powers, golden fruit and obstacles at their milestones', () => {
   const g = game(); g.setMode('arcade');
@@ -105,6 +105,6 @@ test('filling the board completes the game instead of looping on fruit spawning'
 
 test('completed Snake game sends its exact mode, score and time once',()=>{
  const g=game();g.start();for(let i=0;i<25;i++)g.step();
- assert.equal(g.sent.length,1);assert.equal(g.sent[0].categoria,'club-snake-classic-normal');assert.equal(g.sent[0].puntos,g.get().score);assert.ok(g.sent[0].tiempo>=1);
+ assert.equal(g.sent.length,1);assert.equal(g.sent[0].categoria,'club-snake-classic-grande');assert.equal(g.sent[0].puntos,g.get().score);assert.ok(g.sent[0].tiempo>=1);
  const z=game();z.setMode('zen');for(let i=0;i<50;i++)z.step();assert.equal(z.sent.length,0);
 });

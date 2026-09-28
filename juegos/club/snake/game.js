@@ -4,13 +4,21 @@
   const $ = id => document.getElementById(id);
   const canvas = $('game');
   const ctx = canvas.getContext('2d');
-  const COLS = 28, ROWS = 22;
+  /* El tablero tiene cuatro tamaños; la clasificación es por modo y tamaño,
+     y el ritmo multiplica los puntos (×1, ×2, ×3) en vez de partir la tabla
+     en tres: con 7 modos × 4 tamaños × 3 ritmos nadie encontraría a nadie. */
+  const SIZES = { chico: { cols: 16, rows: 12, label: 'CHICO' }, mediano: { cols: 22, rows: 17, label: 'MEDIANO' }, grande: { cols: 28, rows: 22, label: 'GRANDE' }, gigante: { cols: 40, rows: 30, label: 'GIGANTE' } };
+  const SPEED_MULT = { chill: 1, normal: 2, fast: 3 };
+  let COLS = 28, ROWS = 22;
   const DIRS = { right: { x: 1, y: 0 }, left: { x: -1, y: 0 }, up: { x: 0, y: -1 }, down: { x: 0, y: 1 } };
   const MODES = {
     classic: { label: 'CLÁSICO', number: '01', title: 'Lo simple tiene su truco.', tip: 'Come las frutas, evita las paredes y no te muerdas la cola. Fácil… al principio.', hint: 'POCO A POCO SE LLEGA LEJOS.' },
     arcade: { label: 'ARCADE', number: '02', title: 'Un poquito de caos.', tip: 'Atrapa poderes: escudo, cámara lenta y puntos dobles. Las frutas doradas valen 50. ¡Ojo con los obstáculos!', hint: 'PODERES, COMBOS Y ALGUNA SORPRESA.' },
     portals: { label: 'PORTALES', number: '03', title: 'Las paredes son puertas.', tip: 'Cruza los bordes y aparecerás al otro lado. Los dos portales están conectados. Tu cola sigue siendo peligrosa.', hint: 'EL CAMINO MÁS CORTO NO ES UNA RECTA.' },
-    zen: { label: 'ZEN', number: '04', title: 'Aquí se viene a fluir.', tip: 'Atraviesa paredes y tu propia cola. La velocidad se mantiene. Respira, recoge frutas y disfruta el camino.', hint: 'NO HAY PRISA. ESTE MOMENTO ES TUYO.' }
+    reloj: { label: 'CONTRARRELOJ', number: '04', title: 'El reloj no espera.', tip: 'Empiezas con 40 segundos. Cada fruta suma 2,5 s y los relojes dorados, 6 s y 30 puntos. Cuando llega a cero, se acabó.', hint: 'CADA BOCADO ES TIEMPO.' },
+    espejo: { label: 'ESPEJO', number: '05', title: 'Izquierda es derecha.', tip: 'Cada 5 frutas los controles se invierten (y vuelven). Mientras estás al revés, cada fruta vale 15 en vez de 10.', hint: 'CONFÍA EN LOS DEDOS, NO EN LA CABEZA.' },
+    laberinto: { label: 'LABERINTO', number: '06', title: 'Cada nivel, más muros.', tip: 'Cada 6 frutas pasas de nivel y el tablero se llena de muros nuevos. Los bordes llevan al otro lado; los muros no perdonan.', hint: 'LA SALIDA SIEMPRE ESTÁ POR ALGÚN LADO.' },
+    zen: { label: 'ZEN', number: '07', title: 'Aquí se viene a fluir.', tip: 'Atraviesa paredes y tu propia cola. La velocidad se mantiene. Respira, recoge frutas y disfruta el camino.', hint: 'NO HAY PRISA. ESTE MOMENTO ES TUYO.' }
   };
   const THEMES = { lime: ['#c1f45a', '#77b83e'], cyan: ['#7fe5ee', '#369aab'], pink: ['#ffacd1', '#b8619a'] };
   const POWER_TYPES = { shield: { icon: '◇', label: 'ESCUDO', color: '#80dbef' }, slow: { icon: '◷', label: 'CÁMARA LENTA', color: '#b6a0fa' }, double: { icon: '×2', label: 'PUNTOS DOBLES', color: '#f5cd72' } };
@@ -19,26 +27,29 @@
   try { saved = JSON.parse(localStorage.getItem(window.Club?.storageKey('snake-club-v1') || 'snake-club-v1') || '{}') || {}; } catch (_) { /* Storage is optional. */ }
   let mode = MODES[saved.mode] ? saved.mode : 'classic';
   let speed = ['chill', 'normal', 'fast'].includes(saved.speed) ? saved.speed : 'normal';
+  let size = SIZES[saved.size] ? saved.size : 'grande';
   let theme = THEMES[saved.theme] ? saved.theme : 'lime';
   let sound = saved.sound === true;
   let records = saved.records && typeof saved.records === 'object' ? saved.records : {};
   let state = 'ready', snake = [], previous = [], direction = DIRS.right, queue = [];
   let score = 0, eaten = 0, fruit = null, bonus = null, pickup = null, obstacles = [], portals = [];
+  let timeLeft = 0, mirrored = false, level = 1;
   let activePower = null, particles = [], combo = 0, lastEat = -100, gameTime = 0;
   let accumulator = 0, lastFrame = 0, visualTime = 0, deathAt = 0, oldBest = 0;
   let cell = 28, width = 784, height = 616, toastTimer, audioContext;
   const same = (a, b) => a && b && a.x === b.x && a.y === b.y;
   const copy = p => ({ x: p.x, y: p.y });
-  const bestKey = () => `${mode}-${speed}`;
+  const bestKey = () => `${mode}-${size}`;
+  const category = () => `club-snake-${mode}-${size}`;
   const getBest = () => Number(records[bestKey()]) || 0;
   const pad = n => String(n).padStart(3, '0');
 
   window.addEventListener('club-record', e => {
-    if(e.detail.categoria!==`club-snake-${mode}-${speed}`)return;
+    if(e.detail.categoria!==category())return;
     if(e.detail.puntos>getBest()){records[bestKey()]=e.detail.puntos;save();$('best').textContent=pad(getBest());}
   });
   function save() {
-    try { localStorage.setItem(window.Club?.storageKey('snake-club-v1') || 'snake-club-v1', JSON.stringify({ mode, speed, theme, sound, records })); } catch (_) { /* Private browsing still works. */ }
+    try { localStorage.setItem(window.Club?.storageKey('snake-club-v1') || 'snake-club-v1', JSON.stringify({ mode, speed, size, theme, sound, records })); } catch (_) { /* Private browsing still works. */ }
   }
   function announce(text) { $('announcer').textContent = text; }
   function toast(text) {
@@ -104,6 +115,12 @@
     } catch (_) { /* Sound never blocks the game. */ }
   }
 
+  function applySize() {
+    COLS = SIZES[size].cols; ROWS = SIZES[size].rows;
+    $('board-wrap').style.setProperty('--ar', `${COLS}/${ROWS}`);
+    $('board-wrap').style.setProperty('--arn', COLS / ROWS);
+    resize();
+  }
   function resize() {
     const rect = canvas.getBoundingClientRect();
     width = rect.width; height = rect.height; cell = width / COLS;
@@ -116,9 +133,11 @@
   function syncSettings() {
     document.querySelectorAll('[data-mode]').forEach(b => { b.classList.toggle('active', b.dataset.mode === mode); b.setAttribute('aria-pressed', b.dataset.mode === mode); });
     document.querySelectorAll('[data-speed]').forEach(b => { b.classList.toggle('active', b.dataset.speed === speed); b.setAttribute('aria-pressed', b.dataset.speed === speed); });
+    document.querySelectorAll('[data-size]').forEach(b => { b.classList.toggle('active', b.dataset.size === size); b.setAttribute('aria-pressed', b.dataset.size === size); });
     document.querySelectorAll('[data-theme]').forEach(b => { b.classList.toggle('active', b.dataset.theme === theme); b.setAttribute('aria-pressed', b.dataset.theme === theme); });
+    const fl = $('fruit-points'); if (fl) fl.textContent = `+${10 * SPEED_MULT[speed]} PTS`;
     document.documentElement.style.setProperty('--accent', THEMES[theme][0]);
-    $('board-mode').textContent = `${MODES[mode].number} / ${MODES[mode].label}`;
+    $('board-mode').textContent = `${MODES[mode].number} / ${MODES[mode].label} · ${SIZES[size].label}`;
     $('tip-title').textContent = MODES[mode].title;
     $('tip-text').textContent = MODES[mode].tip;
     $('board-hint').textContent = MODES[mode].hint;
@@ -143,15 +162,44 @@
     }
     return free.length ? free[Math.floor(Math.random() * free.length)] : null;
   }
+  /* Los muros del laberinto: el nivel n suma los patrones 1..n (dos barras,
+     una columna con paso, esquinas en L, un marco con puertas) y, pasado el
+     cuarto, bloques sueltos. Nunca caen sobre la serpiente ni en las tres
+     casillas que tiene delante: un muro que aparece bajo la cabeza sería una
+     muerte que nadie pudo evitar. */
+  function mazeWalls(n) {
+    const w = [], add = (x, y) => { if (x >= 0 && y >= 0 && x < COLS && y < ROWS) w.push({ x, y }); };
+    const mx = Math.floor(COLS * .25), my = Math.floor(ROWS / 3), cx = Math.floor(COLS / 2), cy = Math.floor(ROWS / 2);
+    if (n >= 1) for (let x = mx; x < COLS - mx; x++) { add(x, my); add(x, ROWS - 1 - my); }
+    if (n >= 2) for (let y = 2; y < ROWS - 2; y++) if (Math.abs(y - cy) > 1 && y !== my && y !== ROWS - 1 - my) add(cx, y);
+    if (n >= 3) { const l = Math.max(2, Math.floor(COLS / 8)); for (let i = 0; i < l; i++) for (const [sx, sy] of [[2, 2], [COLS - 3, 2], [2, ROWS - 3], [COLS - 3, ROWS - 3]]) { add(sx + (sx < cx ? i : -i), sy); add(sx, sy + (sy < cy ? i : -i)); } }
+    if (n >= 4) { for (let x = 0; x < COLS; x++) if (Math.abs(x - cx) > 1) { add(x, 0); add(x, ROWS - 1); } for (let y = 0; y < ROWS; y++) if (Math.abs(y - cy) > 1) { add(0, y); add(COLS - 1, y); } }
+    const seen = new Set(), out = [], head = snake[0];
+    const ahead = head ? [1, 2, 3].map(k => ({ x: (head.x + direction.x * k + COLS) % COLS, y: (head.y + direction.y * k + ROWS) % ROWS })) : [];
+    for (const p of w) { const k = p.x + ',' + p.y; if (seen.has(k) || snake.some(s => same(s, p)) || ahead.some(a => same(a, p))) continue; seen.add(k); out.push(p); }
+    for (let i = 0; i < (n - 4) * 3 && n > 4; i++) { const p = freeCell([...out, ...ahead]); if (p) out.push(p); }
+    return out;
+  }
+  function movePortals() {
+    const a = freeCell(); if (!a) return;
+    let b = null;
+    for (let i = 0; i < 30; i++) { const p = freeCell([a]); if (p && Math.abs(p.x - a.x) + Math.abs(p.y - a.y) > (COLS + ROWS) / 3) { b = p; break; } b = b || p; }
+    if (b) portals = [a, b];
+  }
   function reset() {
-    window.Club?.category(mode === 'zen' ? 'zen' : `club-snake-${mode}-${speed}`);
-    snake = Array.from({ length: 5 }, (_, i) => ({ x: 8 - i, y: 11 }));
+    window.Club?.category(mode === 'zen' ? 'zen' : category());
+    const my = Math.floor(ROWS / 2);
+    snake = Array.from({ length: 5 }, (_, i) => ({ x: 6 - i, y: my }));
     previous = snake.map(copy); direction = DIRS.right; queue = [];
     score = 0; eaten = 0; gameTime = 0; combo = 0; lastEat = -100;
     fruit = null; bonus = null; pickup = null; activePower = null; obstacles = [];
-    portals = mode === 'portals' ? [{ x: 6, y: 5 }, { x: 21, y: 16 }] : [];
+    const px = Math.floor(COLS * .22), py = Math.floor(ROWS * .23);
+    portals = mode === 'portals' ? [{ x: px, y: py }, { x: COLS - 1 - px, y: ROWS - 1 - py }] : [];
     particles = []; accumulator = 0; oldBest = getBest();
-    fruit = { x: 18, y: 11 };
+    timeLeft = 40; mirrored = false; level = 1;
+    fruit = { x: COLS - 6, y: my };
+    if (mode === 'laberinto') { obstacles = mazeWalls(1); if (obstacles.some(o => same(o, fruit))) fruit = freeCell(); }
+    $('board-wrap').classList.remove('mirror');
     $('score').textContent = '000'; $('best').textContent = pad(getBest());
     $('power-status').textContent = '';
     $('toast').classList.remove('show'); clearTimeout(toastTimer);
@@ -200,7 +248,7 @@
   function finish(win = false) {
     if (state !== 'playing') return;
     state = 'over'; deathAt = visualTime;
-    if (mode !== 'zen' && score > 0) window.Club?.result({categoria:`club-snake-${mode}-${speed}`,puntos:score,tiempo:Math.max(1,Math.round(gameTime*1000))});
+    if (mode !== 'zen' && score > 0) window.Club?.result({categoria:category(),puntos:score,tiempo:Math.max(1,Math.round(gameTime*1000))});
     $('pause-button').disabled = true;
     if (score > getBest()) { records[bestKey()] = score; save(); }
     const newRecord = score > oldBest;
@@ -214,6 +262,7 @@
   }
   function enqueue(name) {
     if (state !== 'playing' || queue.length >= 2) return;
+    if (mirrored) name = { left: 'right', right: 'left', up: 'down', down: 'up' }[name];
     const next = DIRS[name], last = queue.length ? queue[queue.length - 1] : direction;
     if (!next || same(next, last) || (next.x === -last.x && next.y === -last.y)) return;
     queue.push(next);
@@ -224,7 +273,7 @@
     return Math.max(.055, base - acceleration) * (activePower?.type === 'slow' ? 1.65 : 1);
   }
   function addPoints(amount) {
-    const multiplier = activePower?.type === 'double' ? 2 : 1;
+    const multiplier = (activePower?.type === 'double' ? 2 : 1) * SPEED_MULT[speed];
     const total = amount * multiplier;
     score += total; $('score').textContent = pad(score);
     if (score > getBest()) { records[bestKey()] = score; $('best').textContent = pad(score); save(); }
@@ -253,9 +302,9 @@
     const outside = head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS;
     const shield = activePower?.type === 'shield';
     if (outside) {
-      if (mode === 'zen' || mode === 'portals' || shield) {
+      if (mode === 'zen' || mode === 'portals' || mode === 'laberinto' || shield) {
         head.x = (head.x + COLS) % COLS; head.y = (head.y + ROWS) % ROWS;
-        if (shield && mode !== 'zen' && mode !== 'portals') consumeShield();
+        if (shield && mode === 'arcade') consumeShield();
       } else { finish(); return; }
     }
     if (mode === 'portals') {
@@ -278,14 +327,28 @@
     if (mode === 'zen' && snake.length > 130) snake.pop();
     if (eatsFruit) {
       eaten++; combo = gameTime - lastEat < 4 ? Math.min(combo + 1, 5) : 1; lastEat = gameTime;
-      addPoints(mode === 'arcade' ? 10 + (combo - 1) * 2 : 10);
+      addPoints(mode === 'arcade' ? 10 + (combo - 1) * 2 : mode === 'espejo' && mirrored ? 15 : 10);
+      if (mode === 'reloj') timeLeft = Math.min(60, timeLeft + 2.5);
       burst(head, '#f2a086', 13); sfx('eat', combo);
       fruit = null; fruit = freeCell();
       if (!fruit) { finish(true); return; }
+      if (mode === 'reloj' && eaten % 5 === 0 && !bonus) { const p = freeCell(); if (p) bonus = { ...p, expires: gameTime + 8 }; }
+      if (mode === 'portals' && eaten % 4 === 0) { burst(portals[0], '#9b91f1', 10); burst(portals[1], '#83dfcc', 10); movePortals(); toast('Los portales se movieron.'); }
+      if (mode === 'espejo' && eaten % 5 === 0) {
+        mirrored = !mirrored; queue = [];
+        $('board-wrap').classList.toggle('mirror', mirrored); sfx('portal');
+        toast(mirrored ? '¡Espejo! Los controles se invierten.' : 'Todo vuelve a su sitio.');
+      }
+      if (mode === 'laberinto' && eaten % 6 === 0) {
+        level++; obstacles = mazeWalls(level); addPoints(25 * level); sfx('power');
+        if (obstacles.some(o => same(o, fruit))) fruit = freeCell();
+        toast(`Nivel ${level}. Más muros.`);
+      }
       if (mode === 'arcade') { spawnArcadeExtras(); if (combo >= 3) toast(`¡Combo ×${combo}! +${10 + (combo - 1) * 2} puntos base`); }
       if (eaten === 10 || eaten === 25 || eaten === 50) toast(eaten === 10 ? '10 bocados. Ya le pillaste el ritmo.' : `${eaten} bocados. ¡No hay quien te pare!`);
     }
-    if (eatsBonus) { addPoints(50); burst(head, '#f7d776', 24); bonus = null; sfx('bonus'); toast('Fruta dorada. ¡+50 puntos base!'); }
+    if (eatsBonus && mode === 'reloj') { addPoints(30); timeLeft = Math.min(60, timeLeft + 6); burst(head, '#f7d776', 24); bonus = null; sfx('bonus'); toast('Reloj dorado. ¡+6 segundos!'); }
+    else if (eatsBonus) { addPoints(50); burst(head, '#f7d776', 24); bonus = null; sfx('bonus'); toast('Fruta dorada. ¡+50 puntos base!'); }
     if (same(head, pickup)) {
       activePower = { type: pickup.type, expires: gameTime + 10 }; pickup = null;
       burst(head, POWER_TYPES[activePower.type].color, 22); sfx('power');
@@ -372,11 +435,12 @@
   function idleSnake() {
     const path = [{ x: 3, y: 6 }, { x: 3, y: 5 }, { x: 3, y: 4 }, { x: 4, y: 4 }, { x: 5, y: 4 }, { x: 6, y: 4 }, { x: 7, y: 4 }, { x: 8, y: 4 }, { x: 8, y: 3 }, { x: 8, y: 2 }];
     const wave = reducedMotion ? 0 : Math.sin(visualTime * .85) * .18;
-    drawSnake(path.map(p => ({ x: p.x + wave, y: p.y })), DIRS.down, .87);
+    const sx = COLS / 28, sy = ROWS / 22, sc = p => ({ x: p.x * sx, y: p.y * sy });
+    drawSnake(path.map(p => sc({ x: p.x + wave, y: p.y })), DIRS.down, .87);
     const second = [{ x: 23, y: 15 }, { x: 24, y: 15 }, { x: 24, y: 16 }, { x: 24, y: 17 }, { x: 23, y: 17 }, { x: 22, y: 17 }, { x: 21, y: 17 }, { x: 20, y: 17 }, { x: 20, y: 18 }, { x: 20, y: 19 }, { x: 19, y: 19 }, { x: 18, y: 19 }];
-    drawSnake(second.map(p => ({ x: p.x, y: p.y - wave })), DIRS.left, .72);
-    drawFruit({ x: 22, y: 4 }); drawFruit({ x: 5, y: 17 });
-    circle(11.5 * cell, 18.5 * cell, cell * .09, '#88a16d55');
+    drawSnake(second.map(p => sc({ x: p.x, y: p.y - wave })), DIRS.left, .72);
+    drawFruit(sc({ x: 22, y: 4 })); drawFruit(sc({ x: 5, y: 17 }));
+    circle(11.5 * sx * cell, 18.5 * sy * cell, cell * .09, '#88a16d55');
   }
   function render() {
     ctx.clearRect(0, 0, width, height); ctx.fillStyle = '#17271e'; ctx.fillRect(0, 0, width, height);
@@ -392,6 +456,7 @@
       roundRect((p.x + .13) * cell, (p.y + .13) * cell, cell * .74, cell * .74, cell * .16, '#63745a');
       roundRect((p.x + .24) * cell, (p.y + .24) * cell, cell * .52, cell * .11, cell * .04, '#829375');
     }
+    if (mirrored) { ctx.fillStyle = '#9b91f114'; ctx.fillRect(0, 0, width, height); }
     drawFruit(fruit);
     if (bonus && (bonus.expires - gameTime > 3 || Math.sin(visualTime * 12) > 0)) drawFruit(bonus, true);
     drawPickup();
@@ -413,7 +478,8 @@
       if (activePower && gameTime >= activePower.expires) activePower = null;
       if (bonus && gameTime >= bonus.expires) bonus = null;
       if (pickup && gameTime >= pickup.expires) pickup = null;
-      $('power-status').textContent = activePower ? `${POWER_TYPES[activePower.type].icon} ${POWER_TYPES[activePower.type].label} ${Math.ceil(activePower.expires - gameTime)}s` : '';
+      if (mode === 'reloj') { timeLeft -= dt; if (timeLeft <= 0) { timeLeft = 0; finish(); } }
+      $('power-status').textContent = mode === 'reloj' ? `⏱ ${timeLeft.toFixed(1)}s` : mode === 'laberinto' ? `NIVEL ${level}` : mode === 'espejo' && mirrored ? '⇄ CONTROLES INVERTIDOS' : activePower ? `${POWER_TYPES[activePower.type].icon} ${POWER_TYPES[activePower.type].label} ${Math.ceil(activePower.expires - gameTime)}s` : '';
       let tick = interval();
       while (accumulator >= tick && state === 'playing') { accumulator -= tick; step(); tick = interval(); }
     }
@@ -442,6 +508,10 @@
   document.querySelectorAll('[data-speed]').forEach(b => b.addEventListener('click', () => {
     if (speed === b.dataset.speed) return;
     speed = b.dataset.speed; syncSettings(); save(); ready();
+  }));
+  document.querySelectorAll('[data-size]').forEach(b => b.addEventListener('click', () => {
+    if (size === b.dataset.size) return;
+    size = b.dataset.size; applySize(); syncSettings(); save(); ready();
   }));
   document.querySelectorAll('[data-theme]').forEach(b => b.addEventListener('click', () => { theme = b.dataset.theme; syncSettings(); save(); }));
   document.querySelectorAll('[data-direction]').forEach(b => b.addEventListener('pointerdown', e => {
@@ -472,5 +542,5 @@
   canvas.addEventListener('pointercancel', () => { touch = null; });
   document.addEventListener('visibilitychange', () => { if (document.hidden && state === 'playing') pause(); });
   window.addEventListener('blur', () => { if (state === 'playing') pause(); });
-  syncSettings(); ready(); resize(); requestAnimationFrame(frame);
+  applySize(); syncSettings(); ready(); requestAnimationFrame(frame);
 })();

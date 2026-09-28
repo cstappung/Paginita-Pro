@@ -65,3 +65,25 @@ test('guardar cambia la pieza una vez por caída',()=>{
  T.caer(s);
  assert.ok(T.guardar(s));
 });
+
+test('la bajada blanda nunca salta de golpe lo que la gravedad llevaba esperando',()=>{
+ const s=T.crear({semilla:9});
+ /* 900 ms de gravedad a nivel 1 sin llegar a la fila siguiente… */
+ const g=T.gravedad(s.nivel);T.avanza(s,g-5);
+ const y0=s.p.y;
+ /* …y un solo cuadro con la flecha abajo: una fila, no doce. */
+ s.blando=true;T.avanza(s,16);
+ assert.ok(s.p.y-y0<=2,'bajó '+(s.p.y-y0)+' filas en un cuadro');
+});
+
+test('las teclas guardadas se leen y la tecla repetida no se asigna dos veces',()=>{
+ const m={};global.localStorage={getItem:k=>m[k]??null,setItem:(k,v)=>{m[k]=v;}};
+ const t=T.leeTeclas();assert.deepEqual(t.caer,['Space']);
+ t.caer=['KeyV'];T.guardaTeclas(t);
+ const hechas=[];const mando=T.crearMando(a=>hechas.push(a));
+ const ev=code=>({code,preventDefault(){},repeat:false});
+ mando.baja(ev('KeyV'));mando.baja(ev('Space'));
+ assert.deepEqual(hechas,['caer']);
+ mando.baja(ev('ArrowDown'));assert.equal(mando.blando,true);
+ delete global.localStorage;
+});

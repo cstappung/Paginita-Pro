@@ -447,6 +447,14 @@ try { var t = localStorage.getItem("jg.tema");
   .jg-bar-juegos{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
   .jg-tab{padding:8px 14px;border:1px solid #d4dce2;border-radius:8px;background:#fff;font-size:12.5px;font-weight:600;color:#42505c;cursor:pointer}
   .jg-tab.on{border-color:#0d9488;background:#e9f4f2;color:#0d9488}
+  /* Categorías de los juegos individuales: control segmentado, no <select>. */
+  .jg-rk-cats{display:flex;flex-direction:column;gap:8px;margin:0 0 16px;padding:12px 14px;border:1px solid #e2e8ec;border-radius:12px;background:#fff}
+  .jg-rk-fila{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .jg-rk-fila>span{min-width:74px;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#6b7a86}
+  .jg-rk-seg{display:inline-flex;flex-wrap:wrap;gap:3px;padding:3px;border-radius:10px;background:#eef2f5}
+  .jg-rk-seg button{border:0;background:transparent;padding:7px 13px;border-radius:8px;font-family:inherit;font-weight:600;font-size:12.5px;color:#42505c;cursor:pointer;transition:background .15s,color .15s,box-shadow .15s}
+  .jg-rk-seg button:hover{background:#ffffffaa}
+  .jg-rk-seg button.on{background:#fff;color:#0f1720;box-shadow:0 1px 3px #0f172422,inset 0 -2px 0 var(--c,#0d9488)}
   .jg-aviso{padding:14px 16px;border-radius:9px;background:#fff8ec;border:1px solid #e2c08d66;font-size:12.5px;color:#6b5320;line-height:1.6;margin-bottom:16px}
   .jg-aviso code{font-family:'IBM Plex Mono',monospace;font-size:11.5px;background:#00000010;padding:1px 5px;border-radius:4px}
   .jg-tabla-caja{background:#fff;border:1px solid #e2e8ec;border-radius:10px;overflow-x:auto}
@@ -1332,6 +1340,7 @@ try { var t = localStorage.getItem("jg.tema");
 .jg-tt{background:#0a0f1c;border-radius:14px;padding:0 0 12px;color:#e9edf5}
 .jg-tt .jg-barra{display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:space-between;color:#e9edf5}
 .jg-tt-ayuda{font-size:11px;color:#8fa0bb}
+.jg-tt-ayuda button{margin-left:6px;background:transparent;color:inherit;border:1px solid currentColor;border-radius:7px;padding:2px 8px;font:inherit;cursor:pointer}
 .jg-tt .jg-tablero.jg-tt-sala{display:flex;flex-wrap:wrap;gap:18px;justify-content:center;align-items:flex-start;padding:10px}
 .jg-tt-yo{display:flex;gap:10px;align-items:flex-start}
 .jg-tt-lado{display:flex;flex-direction:column;gap:6px;align-items:center;width:96px}.jg-tt-lado small{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#8fa0bb}
@@ -1726,6 +1735,11 @@ html[data-tema=oscuro] .esc-herramientas select{background:var(--os-sup2);border
 html[data-tema=oscuro] .btn2,html[data-tema=oscuro] .jg-tab,html[data-tema=oscuro] .jg-f7-anula{background:var(--os-sup2);border-color:var(--os-borde2);color:var(--os-tx2)}
 html[data-tema=oscuro] .btn2:hover{border-color:#a88bff;color:#c4b1ff}
 html[data-tema=oscuro] .jg-tab.on{background:#0d94882b;color:#5eead4}
+html[data-tema=oscuro] .jg-rk-cats{background:var(--os-sup);border-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-rk-seg{background:var(--os-sup2)}
+html[data-tema=oscuro] .jg-rk-seg button{color:var(--os-tx2)}
+html[data-tema=oscuro] .jg-rk-seg button:hover{background:#ffffff10}
+html[data-tema=oscuro] .jg-rk-seg button.on{background:#ffffff1c;color:#fff}
 html[data-tema=oscuro] .mini{color:#6f687f}
 html[data-tema=oscuro] .mini:hover{background:var(--os-sup3);color:var(--os-tx2)}
 html[data-tema=oscuro] .mini.del:hover,html[data-tema=oscuro] .jg-pierde,html[data-tema=oscuro] .jg-castigo,
@@ -1912,6 +1926,82 @@ main.jg-ancho{max-width:1480px}
 .jg-solo-barra .on{border-color:#0d9488;color:#0d9488;background:#e9f4f2}
 .jg-solo-frame{display:block;width:100%;border:0;background:transparent;color-scheme:normal}
 @media(max-width:1050px){.jg-partida-layout{grid-template-columns:minmax(0,1fr)}.jg-partida-layout>.jg-chat{position:static;height:300px}.jg-solo-barra nav{margin-left:0}}
+/* ---------- logros ---------- */
+.jg-lg{display:grid;gap:18px;max-width:980px;margin:0 auto}
+.jg-lg-desafio{background:linear-gradient(135deg,#2b1f55,#6a3fd6 60%,#c0569a);color:#fff;border-radius:18px;padding:18px 20px;box-shadow:0 10px 30px #3b2a7a33}
+.jg-lg-desafio header{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px}
+.jg-lg-desafio h2{margin:0;font-size:22px}
+.jg-lg-desafio p{margin:0;opacity:.9}
+.jg-lg-retos{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:14px}
+.jg-lg-reto{background:#ffffff1c;border:1px solid #ffffff2e;border-radius:14px;padding:12px;display:grid;gap:8px;align-content:start}
+.jg-lg-reto>small{text-transform:uppercase;letter-spacing:.08em;font-size:11px;opacity:.8;font-weight:700}
+.jg-lg-reto.joya{background:#ffd36a26;border-color:#ffd36a66}
+.jg-lg-reto p{margin:0;font-size:14px}
+.jg-lg-rival{display:grid}
+.jg-lg-rival b{font-size:17px}
+.jg-lg-rival span{font-size:13px;opacity:.85}
+.jg-lg-mini{display:flex;gap:10px;align-items:flex-start;text-align:left;background:#00000026;border:0;border-radius:10px;color:inherit;padding:8px 10px;cursor:pointer;font:inherit}
+.jg-lg-mini:hover{background:#00000040}
+.jg-lg-mini>span:last-child{display:grid;gap:2px}
+.jg-lg-mini em{font-style:normal;font-size:12px;opacity:.85}
+.jg-lg-mini i{font-size:12px;color:#ffe08a}
+.jg-lg-podio{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+.jg-lg-podio span{display:flex;gap:6px;align-items:center;background:#ffffff1f;border-radius:999px;padding:4px 12px 4px 6px;font-size:14px}
+.jg-lg-podio span.yo{background:#fff;color:#2b1f55}
+.jg-lg-podio i{font-style:normal;min-width:22px;text-align:center}
+.jg-lg-podio b{margin-left:4px}
+.jg-lg-chips{display:flex;flex-wrap:wrap;gap:8px}
+.jg-lg-chip{display:flex;align-items:center;gap:8px;border:1px solid #0000001a;background:#fff;color:var(--jg-ink);border-radius:999px;padding:6px 12px 6px 10px;cursor:pointer;font:inherit;font-size:14px;box-shadow:inset 4px 0 0 var(--c)}
+.jg-lg-chip small{color:var(--jg-muted);font-weight:700}
+.jg-lg-chip.on{background:var(--c);color:#fff;border-color:transparent;box-shadow:0 4px 14px #0002}
+.jg-lg-chip.on small{color:#ffffffd0}
+.jg-lg-juego{background:#fff;border-radius:18px;padding:16px 18px;border-top:6px solid var(--c);box-shadow:0 6px 22px #2321370f}
+.jg-lg-juego>header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px}
+.jg-lg-juego h2{margin:0}
+.jg-lg-juego>header span{color:var(--jg-muted);font-size:14px}
+.jg-lg-lideres{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 6px}
+.jg-lg-lideres span{background:#f3f0fa;border-radius:999px;padding:4px 12px;font-size:14px}
+.jg-lg-lideres span.yo{outline:2px solid var(--c)}
+.jg-lg-lideres i{font-style:normal;margin-right:4px}
+.jg-lg-lideres em{color:var(--jg-muted)}
+.jg-lg-lista{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:8px}
+.jg-lg-lista li{display:grid;grid-template-columns:44px 1fr 120px;gap:12px;align-items:center;padding:10px 12px;border-radius:12px;background:#f7f5fb;filter:saturate(.35);opacity:.85}
+.jg-lg-lista li.mio{background:#fff;filter:none;opacity:1;box-shadow:inset 4px 0 0 var(--c),0 2px 10px #0000000d}
+.jg-lg-ico{font-size:26px;line-height:1;display:grid;place-items:center}
+.jg-lg-lista li:not(.mio) .jg-lg-ico{filter:grayscale(1)}
+.jg-lg-txt{display:grid;gap:3px;min-width:0}
+.jg-lg-txt>span{font-size:14px;color:var(--jg-muted)}
+.jg-lg-modo,.jg-lg-ok{font-style:normal;font-size:11px;font-weight:700;border-radius:999px;padding:1px 8px;margin-left:4px;vertical-align:2px}
+.jg-lg-modo{background:#ece7fb;color:#5a3cc0}
+.jg-lg-ok{background:#d9f5e3;color:#16774a}
+.jg-lg-quien{display:flex;flex-wrap:wrap;gap:4px}
+.jg-lg-quien i{font-style:normal;font-size:12px;background:#0000000d;border-radius:999px;padding:1px 8px}
+.jg-lg-quien i.yo{background:var(--c);color:#fff}
+.jg-lg-quien i.mas{font-weight:700}
+.jg-lg-pct{display:grid;gap:4px;text-align:right}
+.jg-lg-pct b{font-size:18px}
+.jg-lg-pct small{color:var(--jg-muted);font-size:12px}
+.jg-lg-barra{height:6px;border-radius:999px;background:#0000001a;overflow:hidden}
+.jg-lg-barra span{display:block;height:100%;background:var(--c);border-radius:inherit}
+@media (max-width:620px){.jg-lg-lista li{grid-template-columns:36px 1fr}.jg-lg-pct{grid-column:2;text-align:left}}
+.jg-logro-toast{position:fixed;right:18px;bottom:18px;z-index:90;display:flex;gap:12px;align-items:center;max-width:340px;background:linear-gradient(135deg,#2b1f55,#6a3fd6);color:#fff;border-radius:14px;padding:12px 16px;box-shadow:0 12px 30px #0005;cursor:pointer;animation:jgLogroEntra .45s cubic-bezier(.2,1.4,.4,1)}
+.jg-logro-toast.sale{transition:opacity .4s,transform .4s;opacity:0;transform:translateY(20px)}
+.jg-logro-toast .i{font-size:34px}
+.jg-logro-toast>span:last-child{display:grid}
+.jg-logro-toast small{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:#ffe08a;font-weight:700}
+.jg-logro-toast b{font-size:16px}
+.jg-logro-toast em{font-style:normal;font-size:13px;opacity:.85}
+@keyframes jgLogroEntra{from{opacity:0;transform:translateY(30px) scale(.9)}to{opacity:1;transform:none}}
+html[data-tema=oscuro] .jg-lg-chip{background:var(--os-sup);border-color:var(--os-borde);color:var(--os-tx)}
+html[data-tema=oscuro] .jg-lg-chip.on{background:var(--c);color:#fff}
+html[data-tema=oscuro] .jg-lg-juego{background:var(--os-sup);box-shadow:none}
+html[data-tema=oscuro] .jg-lg-lideres span{background:var(--os-sup2)}
+html[data-tema=oscuro] .jg-lg-lista li{background:var(--os-sup2)}
+html[data-tema=oscuro] .jg-lg-lista li.mio{background:var(--os-sup3)}
+html[data-tema=oscuro] .jg-lg-modo{background:#3a2f63;color:#cdbdff}
+html[data-tema=oscuro] .jg-lg-ok{background:#1c4a33;color:#9be8bd}
+html[data-tema=oscuro] .jg-lg-quien i{background:#ffffff14}
+html[data-tema=oscuro] .jg-lg-barra{background:#ffffff1a}
 </style>
 </head>
 <body>
@@ -1951,10 +2041,11 @@ main.jg-ancho{max-width:1480px}
     <div class="bar">
       <button class="tab on" id="tabJugar">Jugar</button>
       <button class="tab" id="tabRanks">Clasificación</button>
+      <button class="tab" id="tabLogros">Logros</button>
     </div>
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202609280432"></script>
+<script src="juegos-app.js?v=202609280542"></script>
 </body>
 </html>

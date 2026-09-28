@@ -4,7 +4,7 @@ export function categoriaClub(juego, categoria) {
     ? /^club-minas-(easy|medium|hard)$/.test(categoria)
     : juego === 'tetris'
     ? /^club-tetris-(maraton|sprint|ultra)$/.test(categoria)
-    : /^club-snake-(classic|arcade|portals)-(chill|normal|fast)$/.test(categoria));
+    : /^club-snake-(classic|arcade|portals|reloj|espejo|laberinto)-(chico|mediano|grande|gigante)$/.test(categoria));
 }
 export function resultadoClub(juego, dato) {
   if (!dato || !categoriaClub(juego, dato.categoria) || !Number.isSafeInteger(dato.puntos) || dato.puntos < 1 || dato.puntos > 1e9 ||

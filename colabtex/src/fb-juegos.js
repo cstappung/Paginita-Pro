@@ -258,6 +258,40 @@ export function watchRanks(juego, cb) {
   }, err => cb([], err));
 }
 
+/* Cuánto se juega cada cosa, para ordenar el catálogo: la suma de
+   `jugadas` de todas las filas de `ranks/<juego>` (una partida de cuatro
+   cuenta cuatro — es tiempo de gente jugando, que es lo que se mide) y,
+   de los individuales, cuántos récords hay en `soloRanks`. Una lectura
+   al entrar; las filas son pequeñas y no hace falta escucharlas. */
+export async function leerPopularidad() {
+  const [r, s] = await Promise.all([get(ref(db, R)), get(ref(db, "soloRanks")).catch(() => null)]);
+  const n = {};
+  for (const [juego, filas] of Object.entries(r.val() || {}))
+    n[juego] = Object.values(filas || {}).reduce((t, f) => t + (+(f && f.jugadas) || 0), 0);
+  for (const [cat, filas] of Object.entries((s && s.val()) || {})) {
+    const m = /^club-(minas|snake|tetris)-/.exec(cat);
+    if (m) n["club-" + m[1]] = (n["club-" + m[1]] || 0) + Object.keys(filas || {}).length;
+  }
+  return n;
+}
+
+/* ---------- logros ----------
+   `logros/<juego>/<uid>/<id>` = cuándo. Solo los de partida: los de la
+   fila y los individuales se derivan de `ranks` y `soloRanks` al pintar
+   (juegos/logros.js). La regla deja escribir cada uno una vez, y solo a
+   su dueño. La pestaña escucha los tres nodos enteros: son filas
+   pequeñas, y el porcentaje necesita a todo el mundo. */
+export const leerMisLogros = (juego, uid) =>
+  get(ref(db, `logros/${juego}/${uid}`)).then(s => s.val() || {}, () => ({}));
+export const otorgarLogro = (juego, uid, id) => set(ref(db, `logros/${juego}/${uid}/${id}`), serverTimestamp());
+export function watchLogros(cb) {
+  const d = { ranks: {}, solo: {}, logros: {} }, err = {};
+  const oye = (nodo, k) => onValue(ref(db, nodo), s => { d[k] = s.val() || {}; err[k] = null; cb(d, err); },
+    e => { err[k] = e; cb(d, err); });
+  const offs = [oye(R, "ranks"), oye("soloRanks", "solo"), oye("logros", "logros")];
+  return () => offs.forEach(f => f());
+}
+
 export const leerRank = (juego, uid) => get(ref(db, `${R}/${juego}/${uid}`)).then(s => s.val());
 export const guardarRank = (juego, uid, fila) => set(ref(db, `${R}/${juego}/${uid}`), fila);
 

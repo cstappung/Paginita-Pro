@@ -3,8 +3,8 @@ import {categoriaClub,resultadoClub,mejorClub} from './club-datos.js';
 
 /* El documento del juego conserva su CSS, su audio y sus animaciones.
    Solo este adaptador conoce la cuenta y escribe en Firebase. */
-export function crearSolo({juego,usuario,guardar,watch,volver}) {
-  let host,frame,off,temaObserver,categoria='',muerto=false,pendientes={},guardando=false;
+export function crearSolo({juego,usuario,guardar,watch,volver,alResultado}) {
+  let host,frame,off,temaObserver,categoria='',muerto=false,pendientes={},guardando=false,propios={};
   const clave='jg.club.pendientes.'+usuario.uid+'.'+juego;
   const ocultos=[];
   try { const valor=JSON.parse(localStorage.getItem(clave)||'{}');
@@ -32,6 +32,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver}) {
     off=watch(key,(filas,error)=>{
       if(muerto||categoria!==key)return;
       const orden=(filas||[]).sort((a,b)=>b.puntos-a.puntos||a.tiempo-b.tiempo||a.uid.localeCompare(b.uid));
+      propios[key]=orden.find(f=>f.uid===usuario.uid)||null;
       enviar({tipo:'ranking',categoria:key,filas:orden.slice(0,10).map(f=>({nombre:f.nombre,puntos:f.puntos,tiempo:f.tiempo,yo:f.uid===usuario.uid})),propio:orden.find(f=>f.uid===usuario.uid)||null,error:!!error});
     });
     sincronizar();
@@ -49,6 +50,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver}) {
     }
     if(d.tipo==='resultado'){
       const dato=resultadoClub(juego,d);if(!dato)return;
+      if(alResultado){try{alResultado(dato,propios[dato.categoria]||pendientes[dato.categoria]||null);}catch(err){/* un logro no debe romper la partida */}}
       if(mejorClub(dato,pendientes[dato.categoria])){pendientes[dato.categoria]=dato;persistir();}
       sincronizar();
     }
@@ -65,7 +67,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver}) {
     temaObserver.observe(document.documentElement,{attributes:true,attributeFilter:['data-tema']});
     frame.allow='fullscreen';frame.setAttribute('allowfullscreen','');
     window.addEventListener('message',mensaje);
-    frame.src='juegos/club/'+juego+'/index.html?v=club-3&embed=1&cuenta='+encodeURIComponent(usuario.uid);
+    frame.src='juegos/club/'+juego+'/index.html?v=club-5&embed=1&cuenta='+encodeURIComponent(usuario.uid);
     host.appendChild(frame);
   }
   function destruir(){muerto=true;temaObserver?.disconnect();if(off)off();window.removeEventListener('message',mensaje);for(const [el,valor]of ocultos)el.style.display=valor;frame?.remove();host.innerHTML='';ambientar('');}

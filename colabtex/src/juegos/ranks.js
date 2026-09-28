@@ -30,7 +30,24 @@ const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
 /* Los tres metales, en el orden del puesto. */
 const METAL = ["oro", "plata", "bronce"];
 const TITULO = ["Campeón", "Subcampeón", "Tercer puesto"];
-const EXTRA = { minas: { nombre: "Buscaminas", color: "#eeb765" }, snake: { nombre: "Snake", color: "#4be9bc" }, tetrisclub: { nombre: "Tetris Club", color: "#b04ee8" } };
+const EXTRA = { minas: { nombre: "Mina Club", color: "#eeb765" }, snake: { nombre: "Snake Club", color: "#4be9bc" }, tetrisclub: { nombre: "Tetris Club", color: "#b04ee8" } };
+
+/* Las categorías de los juegos individuales, como botones y no como un
+   desplegable: son pocas, se leen de un vistazo y cambiar de una a otra
+   es un toque. Solo las que existen hoy — las del archivo viejo eran de
+   juegos que ya no están. Snake tiene dos filas (modo y mapa) porque su
+   récord es de la pareja; Zen no puntúa y no sale. */
+const SOLO = {
+  minas: { filas: [{ k: "n", t: "Dificultad", ops: [["easy", "Fácil"], ["medium", "Medio"], ["hard", "Difícil"]] }],
+    cat: s => `club-minas-${s.n}` },
+  tetrisclub: { filas: [{ k: "n", t: "Modo", ops: [["maraton", "Maratón"], ["sprint", "Sprint 40"], ["ultra", "Ultra 2 min"]] }],
+    cat: s => `club-tetris-${s.n}` },
+  snake: { filas: [
+      { k: "m", t: "Modo", ops: [["classic", "Clásico"], ["arcade", "Arcade"], ["portals", "Portales"], ["reloj", "Contrarreloj"], ["espejo", "Espejo"], ["laberinto", "Laberinto"]] },
+      { k: "t", t: "Mapa", ops: [["chico", "Chico"], ["mediano", "Mediano"], ["grande", "Grande"], ["gigante", "Gigante"]] }],
+    cat: s => `club-snake-${s.m}-${s.t}`, def: { t: "grande" } }
+};
+const esSolo = k => !!SOLO[k];
 
 /* La corona es SVG dibujado, no un emoji: cada sistema pinta 👑 a su
    tamaño y su color, y aquí tiene que brillar en el oro del podio. */
@@ -60,7 +77,8 @@ export function crearRanks(ctx) {
 
   let host = null, muerto = false;
   let juego = Object.keys(JUEGOS)[0];
-  let categoriaSolo = "minas-explorador-clasico";
+  let categoriaSolo = "";
+  const eleccion = {};
   let filas = [];
   let cargando = true;
   let fallo = "";
@@ -100,7 +118,7 @@ export function crearRanks(ctx) {
   function escucha() {
     if (parar) { try { parar(); } catch (e) {} parar = null; }
     cargando = true; fallo = ""; filas = []; pinta();
-    const individual = juego === "minas" || juego === "snake" || juego === "tetrisclub";
+    const individual = esSolo(juego);
     parar = (individual ? ctx.watchSolo : watchRanks)(individual ? categoriaSolo : juego, (lista, err) => {
       if (muerto) return;
       cargando = false;
@@ -129,7 +147,7 @@ export function crearRanks(ctx) {
 
     const t = host.querySelector("#rkTabla");
     if (!t) return;
-    const solo = juego === "minas" || juego === "snake" || juego === "tetrisclub";
+    const solo = esSolo(juego);
     const orden = solo ? [...filas].sort((a,b)=>b.puntos-a.puntos||a.tiempo-b.tiempo||a.uid.localeCompare(b.uid)) : ordenaRanks(filas);
     host.querySelector('.jg-nota-larga').textContent = solo ? 'Mejor récord por jugador y categoría. En empate, menor tiempo. Las puntuaciones se calculan en el navegador.' : 'Se suman 3 puntos por victoria y 1 por empate.';
     pintaEscena(solo ? orden : orden.map(f => mezcla(f, perfil(f.uid))), solo);
@@ -258,7 +276,7 @@ export function crearRanks(ctx) {
     const entra = animado !== clave;
     animado = clave;
     const j = JUEGOS[juego] || EXTRA[juego] || { nombre: juego };
-    const sub = solo ? (host.querySelector("#rkCategoria option:checked") || {}).textContent || "" : "";
+    const sub = solo ? subtitulo() : "";
     const html = `
       <div class="jg-rk-rayos"></div>
       <header class="jg-rk-cab"><span>Salón de la fama</span><h2>${esc(j.nombre)}</h2>${sub ? `<small>${esc(sub)}</small>` : ""}</header>
@@ -272,20 +290,46 @@ export function crearRanks(ctx) {
     el.innerHTML = html;
   }
 
+  function elige(k) {
+    const d = SOLO[k];
+    const e = eleccion[k] || (eleccion[k] = Object.assign(
+      Object.fromEntries(d.filas.map(f => [f.k, f.ops[0][0]])), d.def || {}));
+    categoriaSolo = d.cat(e);
+    return e;
+  }
+
+  function subtitulo() {
+    const d = SOLO[juego], e = eleccion[juego];
+    return d && e ? d.filas.map(f => (f.ops.find(o => o[0] === e[f.k]) || [])[1]).join(" · ") : "";
+  }
+
+  function pintaCategorias() {
+    const el = host && host.querySelector("#rkSolo");
+    if (!el) return;
+    if (!esSolo(juego)) { el.innerHTML = ""; return; }
+    const d = SOLO[juego], e = elige(juego);
+    el.innerHTML = `<div class="jg-rk-cats" style="--c:${EXTRA[juego].color}">${d.filas.map(f =>
+      `<div class="jg-rk-fila"><span>${f.t}</span><div class="jg-rk-seg" role="group" aria-label="${f.t}">${f.ops.map(([v, t]) =>
+        `<button type="button" class="${e[f.k] === v ? "on" : ""}" aria-pressed="${e[f.k] === v}" data-cat-k="${f.k}" data-cat-v="${v}">${t}</button>`).join("")}</div></div>`).join("")}</div>`;
+  }
+
   function alClic(ev) {
+    const c = ev.target.closest("[data-cat-k]");
+    if (c && esSolo(juego)) {
+      const e = elige(juego), k = c.getAttribute("data-cat-k"), v = c.getAttribute("data-cat-v");
+      if (e[k] === v) return;
+      e[k] = v; elige(juego);
+      pintaCategorias();
+      escucha();
+      return;
+    }
     const b = ev.target.closest("[data-juego]");
     if (!b) return;
     const k = b.getAttribute("data-juego");
     if (k === juego) return;
     juego = k;
-    const solo = host.querySelector('#rkSolo');solo.innerHTML = '';
-    if (k === 'minas' || k === 'snake' || k === 'tetrisclub') {
-      const categorias = k === 'tetrisclub' ? [] : k === 'minas' ? ['explorador','veterano','leyenda'].flatMap(t=>['clasico','cruz'].map(v=>'minas-'+t+'-'+v)) : ['clasico','portal','ruinas'].flatMap(m=>['lenta','media','rapida'].map(v=>'snake-'+m+'-'+v));
-      const actuales = k === 'tetrisclub' ? ['maraton','sprint','ultra'].map(n=>'club-tetris-'+n) : k === 'minas' ? ['easy','medium','hard'].map(n=>'club-minas-'+n) : ['classic','arcade','portals'].flatMap(m=>['chill','normal','fast'].map(v=>'club-snake-'+m+'-'+v));
-      categorias.unshift(...actuales);
-      categoriaSolo = categorias[0];solo.innerHTML = `<label>Categoría <select id="rkCategoria">${categorias.map(c=>`<option value="${c}">${c.startsWith('club-')?'Club · '+c.split('-').slice(2).join(' / '):'Archivo · '+c.split('-').slice(1).join(' / ')}</option>`).join('')}</select></label>`;
-      solo.querySelector('select').onchange=e=>{categoriaSolo=e.target.value;escucha();};
-    }
+    if (esSolo(k)) elige(k);
+    pintaCategorias();
     pintaBarra();
     escucha();
   }

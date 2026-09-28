@@ -2571,6 +2571,23 @@ everyone else. The entry animation plays **once per game** (`animado` holds
 the key) and the scene repaints by signature (`firma`), because `watchRanks`
 fires on every write and replaying the rise each time would make it twitch.
 
+**Logros: ten per game, three sources, one table** (`juegos/logros.js`,
+the view in `logros-vista.js`, the **Logros** tab at `#logros`). Four of
+every room game's ten are **derived from its `ranks` row** (first win, ten
+wins, a streak of three, 25 games) and the ten of each solo game from its best
+`soloRanks` marks (`deMarca`); neither is ever written, so they are
+retroactive and cannot disagree with the tables they come from. The other six
+of a room game are detected **live on every repaint** (`detecta`) — `hist` is
+a short window, so waiting for the end would miss what happened early — and
+written once to `logros/<juego>/<uid>/<id>` (a timestamp; the rules refuse a
+rewrite or a delete). A logro may name a mode (`m`) but belongs to the game.
+`reparto` joins the three reads; the percentage is over people who have played
+that game, not over the whole site. The tab opens on a *desafío*: the most
+common logro you lack, the person just ahead and one of theirs you lack, and
+the rarest logro anyone holds. The `logros` node needs the rules re-published.
+`tests/logros.test.cjs` checks ten unique ids per game and that the rules'
+whitelist names every room game.
+
 **The new nodes need their rules published by hand** in the Firebase console,
 exactly like the reports' (`firebase/CONFIGURAR-FIREBASE.md`). Until then
 everything fails with `PERMISSION_DENIED`, and the lobby says so in plain
