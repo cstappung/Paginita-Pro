@@ -66,7 +66,7 @@ import {
 import {
   claveJugada, semillaAleatoria, salAleatoria, compromiso, LADO, cupoDe,
   cadenaCacho, CC_CADENA, sha256hex, arrUno, dhPublica, cadenaCatan, CT_CADENA,
-  cadenaPr, PR_CADENA
+  cadenaPr, PR_CADENA, arrSp
 } from "./juegos/motor.js";
 
 const P = "partidas", MIAS = "misPartidas", R = "ranks";
@@ -136,6 +136,7 @@ async function secreto(pid, uid, juego) {
     : juego === "uno" ? { hcad: sha256hex(arrUno(sem, sal)), pk: dhPublica(sem, sal) }
     : juego === "catan" ? { hcad: cadenaCatan(sem, sal)[CT_CADENA] }
     : juego === "presidente" ? { hcad: cadenaPr(sem, sal)[PR_CADENA] }
+    : juego === "spicy" ? { hcad: sha256hex(arrSp(sem, sal)) }
     : {};
   return { sem, sal, h: await compromiso(sem, sal), extra };
 }
@@ -353,6 +354,13 @@ export function watchVivo(pid, alCabecera, alTrozo) {
   const a = onValue(ref(db, `vivo/${pid}/h`), s => alCabecera(s.val()), () => {});
   const b = onChildAdded(ref(db, `vivo/${pid}/c`), s => alTrozo(s.key, s.val()), () => {});
   return () => { a(); b(); };
+}
+/* El pozo de cada uno en el Tetris de sala, para las miniaturas de los
+   demás: `vivo/<pid>/t/<uid>`, reescrito unas pocas veces por segundo.
+   Tampoco es estado: la partida la deciden los ataques y las caídas. */
+export const tetrisVivo = (pid, uid, d) => set(ref(db, `vivo/${pid}/t/${uid}`), d).catch(() => {});
+export function watchTetrisVivo(pid, cb) {
+  return onValue(ref(db, `vivo/${pid}/t`), s => cb(s.val() || {}), () => {});
 }
 export const borraVivo = pid => remove(ref(db, `vivo/${pid}`)).catch(() => {});
 
