@@ -34,3 +34,4 @@ kbd{display:inline-block;min-width:20px;padding:1px 5px;border:1px solid var(--b
 .tt-tactil button{font-size:22px;min-width:48px;min-height:48px;border-radius:12px;border:1px solid var(--borde);background:var(--caja);touch-action:manipulation}
 @media(pointer:coarse){.tt-tactil{display:flex}.tt-teclas{display:none}}
 @media(max-width:560px){.tt-lado{width:78px}.tt-datos b{font-size:14px}.tt-modos small{display:none}}
+.tt-teclas button{margin-left:8px;background:transparent;color:inherit;border:1px solid currentColor;border-radius:8px;padding:3px 9px;font:inherit;cursor:pointer}.tt-teclas button:hover{color:#fff}

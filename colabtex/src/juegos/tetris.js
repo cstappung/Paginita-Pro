@@ -50,8 +50,9 @@ export function crearTetris(ctx) {
     const ok = TM.accion(s, a);
     if (ok && (a === "izq" || a === "der")) suena("clic");
   });
+  let configurando = false;
   const teclaAbajo = e => {
-    if (!juego()) return;
+    if (!juego() || configurando) return;
     const t = e.target;
     if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
     mando.baja(e);
@@ -63,7 +64,7 @@ export function crearTetris(ctx) {
     raiz = document.createElement("div");
     raiz.className = "jg-tt";
     raiz.innerHTML = `
-      <div class="jg-barra"><span id="ttFase"></span><span class="jg-tt-ayuda">← → mover · ↑/X girar · Z contragiro · ↓ bajar · Espacio soltar · C guardar</span></div>
+      <div class="jg-barra"><span id="ttFase"></span><span class="jg-tt-ayuda"><span id="ttTeclasTxt"></span> <button type="button" id="ttTeclas" class="jg-btn-mini">⌨ Teclas</button></span></div>
       <div class="jg-tablero jg-tt-sala">
         <div class="jg-tt-yo">
           <div class="jg-tt-lado"><small>Guardada</small><canvas id="ttGuarda" width="96" height="72"></canvas><div id="ttDatos" class="jg-tt-datos"></div></div>
@@ -77,6 +78,12 @@ export function crearTetris(ctx) {
       </div>
       <div id="ttHist" class="jg-tt-hist"></div>`;
     host.appendChild(raiz);
+    const pintaTeclas = () => { raiz.querySelector("#ttTeclasTxt").textContent = TM.textoTeclas(); };
+    pintaTeclas();
+    raiz.querySelector("#ttTeclas").addEventListener("click", () => {
+      configurando = true; mando.suelta();
+      TM.panelTeclas(document, t => { mando.recarga(t); pintaTeclas(); }, () => { configurando = false; });
+    });
     raiz.querySelector("#ttTactil").addEventListener("pointerdown", e => {
       const b = e.target.closest("button[data-a]");
       if (!b || !juego()) return;

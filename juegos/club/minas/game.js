@@ -69,7 +69,7 @@
       const t = this.context.currentTime;
       // Los clics son acentos breves, no otra canción encima del fondo; abrir
       // una zona grande suena un poco más agudo que abrir una casilla.
-      if (kind === 'open' && t - this.lastOpen >= .12) {
+      if (kind === 'open' && t - this.lastOpen >= .04) {
         this.lastOpen = t; this.note(84 + Math.min(7, Math.floor(Math.log2(Math.max(1, amount)))), t, .05, .05, 'p12');
       }
       if (kind === 'flag') this.note(79, t, .09, .07, 'p50', { f1: window.Chip.hz(86) });
@@ -281,7 +281,23 @@
     if(paused)$('resume').focus();else focusCell(focusedIndex,true);
     updateHUD();
   }
-  function cellIndex(event) { const cell=event.target.closest('.cell');return cell?Number(cell.dataset.index):null; }
+  /* La casilla se busca por coordenadas cuando el clic no cae en un botón.
+     Las casillas recién abiertas entran con scale(.75) y el botón pulsado
+     baja un píxel: durante esa fracción de segundo el puntero cae en el hueco
+     entre dos casillas, el clic llegaba al tablero y se perdía. Eso era el
+     «intervalo mínimo entre clics» al despejar rápido: no había espera, había
+     clics tirados a la basura. */
+  function cellIndex(event) {
+    const cell = event.target.closest?.('.cell');
+    if (cell) return Number(cell.dataset.index);
+    if (event.clientX === undefined || !game) return null;
+    const r = board.getBoundingClientRect(), borde = 5;
+    const ancho = r.width - 2 * borde, alto = r.height - 2 * borde;
+    const vc = traspuesto ? game.rows : game.cols, vf = traspuesto ? game.cols : game.rows;
+    const c = Math.floor((event.clientX - r.left - borde) / ancho * vc), f = Math.floor((event.clientY - r.top - borde) / alto * vf);
+    if (c < 0 || f < 0 || c >= vc || f >= vf) return null;
+    return traspuesto ? c * game.cols + f : f * game.cols + c;
+  }
   /* En modo bandera, tocar un número ya abierto sigue abriendo sus vecinas:
      ponerle bandera a una casilla abierta no significa nada. */
   function tocar(i, alReves = false) { if ((flagMode !== alReves) && !game.cells[i].open) flag(i); else open(i); }

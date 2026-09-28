@@ -22,3 +22,4 @@
 @media(prefers-reduced-motion:reduce){.cell.exploded::before{display:none}}
 @media(max-width:560px){.shell{padding:0 12px}.field{padding:12px 6px 0}.board-scroll{padding:0 0 7px}.game-toolbar{padding:13px 14px;gap:18px}.modo-toque{margin-bottom:12px}.modo-toque button{padding:9px 18px;font-size:12px;min-height:40px}}
 @media(max-width:380px){.game-toolbar{gap:12px;padding:12px 10px}.game-toolbar .stat strong{font-size:21px}.stat{gap:7px}.field-meta{letter-spacing:.5px}}
+.cell:active{transform:none}
