@@ -50,6 +50,8 @@ import { crearSpicy } from "./juegos/spicy.js";
 import { crearTetris } from "./juegos/tetris.js";
 import { abreReglas, tieneReglas } from "./juegos/reglas.js";
 import { crearRanks } from "./juegos/ranks.js";
+import { LOGROS, detecta, deFila, deMarca } from "./juegos/logros.js";
+import { crearLogros } from "./juegos/logros-vista.js";
 import { mezcla, abrePerfil } from "./juegos/perfil.js";
 import { suena, silenciar, silenciado, ambientar, ajustarMusica, activarAudio } from "./juegos/sonido.js";
 import { montaReproductor } from "./juegos/reproductor.js";
@@ -177,6 +179,7 @@ let cancelarLimpieza = null;
 let modulo = null, pidMontado = "", mirandoMontado = false;
 let vistaPintada = "";
 let ranks = null;
+let logrosVista = null;
 let individual = null;
 let proximo = 0;          // el número de jugada que toca escribir
 const enVuelo = new Set(); // jugadas de esta pestaña aún sin confirmar (ver `terminar`)
@@ -217,6 +220,7 @@ function perfilDe(uid) {
       if (state.base && uid === state.base.uid) aplicaPropio();
       if (state.estado) vistePerfiles(state.estado);
       if (ranks) ranks.refresca();
+      if (logrosVista) logrosVista.refresca();
       render();
     }));
     perfiles.set(uid, perfiles.get(uid) || null);
@@ -385,11 +389,56 @@ async function anotar(p) {
   try {
     const previa = await fb.leerRank(p.juego, u.uid);
     const fila = acumula(previa, res, state.pid, { nombre: u.name, foto: fotoBreve(u.photo) });
-    if (fila) await fb.guardarRank(p.juego, u.uid, fila);
+    if (fila) {
+      await fb.guardarRank(p.juego, u.uid, fila);
+      const antes = new Set(deFila(previa));
+      for (const id of deFila(fila)) if (!antes.has(id)) celebra(p.juego, id);
+    }
   } catch (e) {
     anotada = "";
     console.warn("[juegos] no se pudo apuntar la partida", e);
   }
+}
+
+/* ---------- logros ----------
+   Los de partida se miran en cada repintado (el `hist` es una ventana
+   corta: esperar al final perdería lo que pasó al principio) y se
+   escriben una sola vez; las reglas no dejan reescribir ni borrar uno.
+   Un id que no se pudo escribir se queda en el conjunto igual, para no
+   reintentarlo en cada repintado. */
+const logrosMios = new Map();   // juego -> Promise<Set(id)>
+function misLogros(juego, uid) {
+  const k = juego + "/" + uid;
+  if (!logrosMios.has(k)) logrosMios.set(k, fb.leerMisLogros(juego, uid).then(d => new Set(Object.keys(d))));
+  return logrosMios.get(k);
+}
+async function revisaLogros(p, est) {
+  const u = state.user;
+  if (!p || !est || !u || !(p.jugadores || {})[u.uid] || !LOGROS[p.juego]) return;
+  const nuevos = detecta(p, est, u.uid);
+  if (!nuevos.length) return;
+  const ya = await misLogros(p.juego, u.uid);
+  for (const id of nuevos) {
+    if (ya.has(id)) continue;
+    ya.add(id);
+    fb.otorgarLogro(p.juego, u.uid, id).then(() => celebra(p.juego, id),
+      e => console.warn("[juegos] no se pudo guardar el logro", id, e));
+  }
+}
+let toastCola = Promise.resolve();
+function celebra(juego, id) {
+  const x = (LOGROS[juego] || []).find(l => l.id === id);
+  if (!x) return;
+  toastCola = toastCola.then(() => new Promise(fin => {
+    const t = document.createElement("div");
+    t.className = "jg-logro-toast";
+    t.setAttribute("role", "status");
+    t.innerHTML = `<span class="i">${x.i}</span><span><small>🏆 ¡Logro desbloqueado!</small><b>${escapeHtml(x.n)}</b><em>${escapeHtml(x.d)}</em></span>`;
+    t.onclick = () => ir("#logros");
+    document.body.appendChild(t);
+    suena("entra");
+    setTimeout(() => { t.classList.add("sale"); setTimeout(() => { t.remove(); fin(); }, 400); }, 3800);
+  }));
 }
 
 /* ---------- rutas ----------
@@ -400,6 +449,7 @@ function leerRuta() {
   const h = (location.hash || "").replace(/^#/, "");
   if (/^solo\/(minas|snake|tetris)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
   if (h === "ranks") return { vista: "ranks", pid: "" };
+  if (h === "logros") return { vista: "logros", pid: "" };
   const m = h.match(/^p\/([-\w]+)$/);
   if (m) return { vista: "partida", pid: m[1] };
   return { vista: "vestibulo", pid: "" };
@@ -474,6 +524,7 @@ function engancharPartida(pid) {
       proximo = Math.max(proximo, jugadasDe(p).length);
       cuidaLaSala(p);
       anotar(p);
+      revisaLogros(p, state.estado);
       const hechas = jugadasDe(p).length;
       if (hechas !== jugadasVistas) { jugadasVistas = hechas; ultimoCambio = Date.now(); }
       anunciaEnCurso(p, state.estado);
@@ -655,6 +706,7 @@ function render() {
   if (state.vista !== vistaPintada) {
     if (individual) { individual.destruir(); individual = null; }
     if (vistaPintada === "ranks" && ranks) { ranks.destruir(); ranks = null; }
+    if (vistaPintada === "logros" && logrosVista) { logrosVista.destruir(); logrosVista = null; }
     armazon();
     vistaPintada = state.vista;
   }
@@ -664,22 +716,35 @@ function render() {
 }
 
 function pintaTabs() {
-  const jugando = state.vista !== "ranks";
-  $("tabJugar").classList.toggle("on", jugando);
-  $("tabRanks").classList.toggle("on", !jugando);
+  $("tabJugar").classList.toggle("on", state.vista !== "ranks" && state.vista !== "logros");
+  $("tabRanks").classList.toggle("on", state.vista === "ranks");
+  $("tabLogros").classList.toggle("on", state.vista === "logros");
 }
 
 function armazon() {
   const h = $("pantalla");
   h.closest("main").classList.toggle("jg-ancho", state.vista === "partida" || state.vista.startsWith("solo-"));
   if (state.vista.startsWith("solo-")) {
-    individual = crearSolo({juego:state.vista.slice(5),usuario:state.user,guardar:fb.guardarSolo,watch:fb.watchSolo,volver:()=>ir("")});
+    const clave = state.vista.slice(5) === "tetris" ? "tetrisclub" : state.vista.slice(5);
+    individual = crearSolo({juego:state.vista.slice(5),usuario:state.user,guardar:fb.guardarSolo,watch:fb.watchSolo,volver:()=>ir(""),
+      /* Un logro individual sale de la marca: se celebra el que esta
+         partida da y la mejor marca guardada no daba ya. */
+      alResultado: (d, previa) => { const antes = new Set(previa ? deMarca(clave, Object.assign({ categoria: d.categoria }, previa)) : []);
+        for (const id of deMarca(clave, d)) if (!antes.has(id)) celebra(clave, id); }});
     individual.montar(h);
     const juego = state.vista.slice(5), barra = document.createElement("div");
     barra.className = "jg-solo-barra";
     barra.innerHTML = `<a class="btn2" href="#">← Juegos</a><div class="jg-solo-titulo"><small>UN JUGADOR · RANKING POR MODALIDAD</small><strong>${juego === "minas" ? "Buscaminas" : juego === "tetris" ? "Tetris" : "Snake"}</strong></div><nav aria-label="Juegos individuales"><a class="btn2${juego === "minas" ? " on" : ""}" href="#solo/minas">Buscaminas</a><a class="btn2${juego === "snake" ? " on" : ""}" href="#solo/snake">Snake</a><a class="btn2${juego === "tetris" ? " on" : ""}" href="#solo/tetris">Tetris</a><button class="btn2" type="button">📖 Reglas</button></nav>`;
     barra.querySelector("button").onclick = () => abreReglas(juego === "tetris" ? "tetrisclub" : juego);
     h.insertBefore(barra, h.firstChild);
+    return;
+  }
+  if (state.vista === "logros") {
+    h.innerHTML = "";
+    logrosVista = crearLogros({ uid: state.user.uid, watchLogros: fb.watchLogros, perfil: perfilDe,
+      orden: () => ordenPopular([...Object.keys(JUEGOS), "club-minas", "club-snake", "club-tetris"])
+        .map(k => ({ "club-minas": "minas", "club-snake": "snake", "club-tetris": "tetrisclub" })[k] || k) });
+    logrosVista.montar(h);
     return;
   }
   if (state.vista === "ranks") {
@@ -1452,6 +1517,7 @@ function wire() {
   $("btnSonido").onclick = () => { silenciar(!silenciado()); pintaSonido(); suena("clic"); };
   $("tabJugar").onclick = () => ir(state.pid ? "#p/" + state.pid : "#");
   $("tabRanks").onclick = () => ir("#ranks");
+  $("tabLogros").onclick = () => ir("#logros");
   window.addEventListener("hashchange", aplicaRuta);
 }
 

@@ -226,6 +226,19 @@
       }
     },
 
+    "logros": {
+      ".read": "auth != null",
+      "$juego": {
+        ".validate": "$juego.matches(/^(escondite|cartas|cuadritos|reversi|orbita|worms|cadena|flip7|cacho|uno|catan|presidente|spicy|tetris)$/)",
+        "$uid": {
+          "$id": {
+            ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists()",
+            ".validate": "$id.matches(/^[a-z0-9]{1,20}$/) && newData.isNumber() && newData.val() <= now"
+          }
+        }
+      }
+    },
+
     "ranks": {
       ".read": "auth != null",
       "$juego": {

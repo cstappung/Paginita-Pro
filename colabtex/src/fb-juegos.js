@@ -275,6 +275,23 @@ export async function leerPopularidad() {
   return n;
 }
 
+/* ---------- logros ----------
+   `logros/<juego>/<uid>/<id>` = cuándo. Solo los de partida: los de la
+   fila y los individuales se derivan de `ranks` y `soloRanks` al pintar
+   (juegos/logros.js). La regla deja escribir cada uno una vez, y solo a
+   su dueño. La pestaña escucha los tres nodos enteros: son filas
+   pequeñas, y el porcentaje necesita a todo el mundo. */
+export const leerMisLogros = (juego, uid) =>
+  get(ref(db, `logros/${juego}/${uid}`)).then(s => s.val() || {}, () => ({}));
+export const otorgarLogro = (juego, uid, id) => set(ref(db, `logros/${juego}/${uid}/${id}`), serverTimestamp());
+export function watchLogros(cb) {
+  const d = { ranks: {}, solo: {}, logros: {} }, err = {};
+  const oye = (nodo, k) => onValue(ref(db, nodo), s => { d[k] = s.val() || {}; err[k] = null; cb(d, err); },
+    e => { err[k] = e; cb(d, err); });
+  const offs = [oye(R, "ranks"), oye("soloRanks", "solo"), oye("logros", "logros")];
+  return () => offs.forEach(f => f());
+}
+
 export const leerRank = (juego, uid) => get(ref(db, `${R}/${juego}/${uid}`)).then(s => s.val());
 export const guardarRank = (juego, uid, fila) => set(ref(db, `${R}/${juego}/${uid}`), fila);
 
