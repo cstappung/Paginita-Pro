@@ -323,6 +323,48 @@ const REGLAS = {
       }
     }
   },
+  spicy: {
+    lema: "Faroles picantes: de 2 a 6 jugadores, gana quien consiga dos trofeos.",
+    secciones: [
+      ["Las cartas", lista([
+        "Números del 1 al 10 en tres especias: <b>🌶 ají</b>, <b>🍃 wasabi</b> y <b>⚫ pimienta</b>.",
+        "<b>Comodín de especia</b>: vale por cualquier especia, pero no tiene número. <b>Comodín de número</b>: vale por cualquier número, pero no tiene especia.",
+        "Cada uno empieza con 6 cartas."
+      ])],
+      ["Tu turno", lista([
+        "Juegas una carta <b>boca abajo</b> y dices qué es. Puede ser mentira.",
+        "Con la pila vacía abres con un 1, 2 o 3 de la especia que quieras. Después hay que decir la <b>misma especia</b> y un número <b>mayor</b>; sobre un 10 se vuelve a empezar del 1 al 3 en esa especia.",
+        "Si no quieres o no puedes, <b>pasas</b>: robas una carta y sigue el siguiente."
+      ])],
+      ["Dudar", lista([
+        "Cualquiera puede dudar de la última carta, del <b>número</b> o de la <b>especia</b> (no de las dos).",
+        "Se destapa sola. Si mentía, quien dudó se lleva la pila: un punto por carta. Si era verdad, se la lleva quien la jugó y quien dudó roba dos.",
+        "Dudar de lo que un comodín no tiene (el número de un comodín de especia, por ejemplo) es acertar siempre."
+      ])],
+      ["Trofeos y final", lista([
+        "Si juegas tu última carta y nadie la desmiente, ganas un <b>trofeo</b> 🏆 y robas 6 nuevas. <b>Dos trofeos</b> ganan la partida.",
+        "El mazo tiene un <b>Fin del Mundo</b>: después del reparto se cuentan las cartas robadas y, al llegar al límite de la mesa (30 con dos, 5 más por cada jugador), la partida se acaba.",
+        "Entonces gana quien más puntos tenga: cartas ganadas + 10 por trofeo − cartas en la mano."
+      ])],
+      ["Sin trampas", "Cada uno roba de un mazo propio que solo su navegador conoce, y cada carta jugada queda sellada con un hash: nadie puede cambiarla después ni ver la mano de otro. Al final todos revelan su semilla y la mesa comprueba cada carta; a quien mintió se le marca en rojo."]
+    ]
+  },
+  tetris: {
+    lema: "Tetris a la vez: de 2 a 8 pozos, gana el último en pie.",
+    secciones: [
+      ["Cómo se juega", lista([
+        "Todos reciben las <b>mismas piezas</b> en el mismo orden; cada uno juega en su propio pozo.",
+        "<b>← →</b> mover · <b>↑ o X</b> girar · <b>Z</b> girar al revés · <b>↓</b> bajar rápido · <b>Espacio</b> soltar · <b>C o Mayús</b> guardar una pieza. En el móvil, los botones de abajo.",
+        "Cada 30 segundos sube el nivel y las piezas caen más rápido."
+      ])],
+      ["Basura", lista([
+        "Las líneas que limpias mandan <b>basura</b> al siguiente jugador en pie: un doble manda 1, un triple 2 y un Tetris 4; los T-Spin, los combos y el <i>back-to-back</i> suman más, y una limpieza total manda 10.",
+        "La barra roja al lado de tu pozo es la basura que te espera. Limpiar líneas antes de que caiga la cancela."
+      ])],
+      ["El final", "Cuando una pieza ya no cabe, quedas fuera. El último que sigue apilando gana la sala."],
+      ["Para practicar", "Tetris Club, en la portada, tiene Maratón, Sprint de 40 líneas y Ultra de dos minutos para jugar solo."]
+    ]
+  },
   presidente: {
     lema: "El «culo»: de 3 a 10 jugadores, ronda tras ronda y sin final fijo.",
     secciones: [
@@ -446,6 +488,17 @@ const REGLAS = {
       ["Clasificación", "Hay tres dificultades, y cada una guarda tu mejor tiempo."]
     ]
   },
+  tetrisclub: {
+    lema: "Tetris Club: para ti solo, en tres modos.",
+    secciones: [
+      ["Cómo se juega", "<b>← →</b> mover · <b>↑ o X</b> girar · <b>Z</b> girar al revés · <b>↓</b> bajar rápido · <b>Espacio</b> soltar · <b>C</b> guardar · <b>P</b> pausa. Completa filas para limpiarlas."],
+      ["Los modos", lista([
+        "<b>Maratón</b>: hasta que el pozo se llene; el nivel sube cada 10 líneas.",
+        "<b>Sprint</b>: 40 líneas lo más rápido posible. Cuenta el tiempo.",
+        "<b>Ultra</b>: dos minutos para hacer tantos puntos como puedas."
+      ])]
+    ]
+  },
   snake: {
     lema: "Snake Club: la serpiente de siempre, en cuatro modos.",
     secciones: [
@@ -461,7 +514,7 @@ const REGLAS = {
   }
 };
 
-const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club" };
+const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club" };
 
 export const tieneReglas = juego => Object.prototype.hasOwnProperty.call(REGLAS, juego);
 

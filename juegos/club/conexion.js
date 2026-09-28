@@ -30,7 +30,7 @@
     if(d.categoria!==categoria)return;
     if(d.tipo==='estado'&&estado){estado.textContent=d.texto;return;}
     if(d.tipo!=='ranking'||!lista)return;
-    lista.replaceChildren();const minas=categoria.startsWith('club-minas-');
+    lista.replaceChildren();const minas=categoria.startsWith('club-minas-')||categoria==='club-tetris-sprint';
     for(const f of d.filas||[]){const li=document.createElement('li');li.textContent=(f.nombre||'Jugador')+(f.yo?' (tú)':'')+' · '+(minas?(f.tiempo/1000).toFixed(2)+' s':f.puntos+' puntos');lista.appendChild(li);}
     estado.textContent=d.error?'No se pudo cargar el ranking en línea. Tu récord local se conserva.':d.filas?.length?'Cada modalidad tiene su propia clasificación.':'Todavía no hay récords. ¡Estrena esta clasificación!';
     propio.textContent=d.propio?'Tu récord en la nube: '+(minas?(d.propio.tiempo/1000).toFixed(2)+' s':d.propio.puntos+' puntos'):'';

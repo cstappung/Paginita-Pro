@@ -56,9 +56,9 @@ export function crearSolo({juego,usuario,guardar,watch,volver}) {
   function montar(el){
     host=el;ambientar(null);host.innerHTML='';
     for(const id of ['btnMusica','volMusica','btnSonido']){const el=document.getElementById(id);if(el){ocultos.push([el,el.style.display]);el.style.display='none';}}
-    frame=document.createElement('iframe');frame.title=juego==='minas'?'Mina Club — Buscaminas':'Snake Club';
+    frame=document.createElement('iframe');frame.title=juego==='minas'?'Mina Club — Buscaminas':juego==='tetris'?'Tetris Club':'Snake Club';
     frame.className='jg-solo-frame';
-    frame.style.height='760px';
+    frame.style.height=juego==='tetris'?'880px':'760px';
     const tema=()=>enviar({tipo:'tema',oscuro:document.documentElement.dataset.tema==='oscuro'});
     frame.addEventListener('load',tema);
     temaObserver=new MutationObserver(tema);

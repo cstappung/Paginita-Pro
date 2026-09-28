@@ -114,6 +114,20 @@ export const JUEGOS = {
     color: "#7c4dff",
     minimo: 3,
     cupo: 10
+  },
+  spicy: {
+    nombre: "Spicy",
+    lema: "Bota cartas boca abajo, miente con cara de póker y duda del picante ajeno",
+    color: "#e2412b",
+    minimo: 2,
+    cupo: 6
+  },
+  tetris: {
+    nombre: "Tetris",
+    lema: "Todos a la vez con las mismas piezas: cada línea que limpias es basura para otro",
+    color: "#22b8cf",
+    minimo: 2,
+    cupo: 8
   }
 };
 
@@ -662,6 +676,8 @@ export function reducir(p) {
   if (p.juego === "uno") return { ...base, ...redUno(p, js, listos) };
   if (p.juego === "catan") return { ...base, ...redCatan(p, js, listos) };
   if (p.juego === "presidente") return { ...base, ...redPresidente(p, js, listos) };
+  if (p.juego === "spicy") return { ...base, ...redSpicy(p, js, listos) };
+  if (p.juego === "tetris") return { ...base, ...redTetris(p, js, listos) };
   return base;
 }
 
@@ -727,6 +743,10 @@ export function progreso(est, juego) {
     const q = Object.values(est.mano || {}).reduce((a, b) => a + b, 0);
     return c(1 - q / est.R.D);
   }
+  /* En Spicy, lo más avanzado entre el Fin del Mundo y los trofeos. */
+  if (juego === "spicy" && est.limite) return c(Math.max(est.robos / est.limite, (3 - est.libres) / 3));
+  /* En Tetris, cuántos han caído ya. */
+  if (juego === "tetris" && est.caidos) return c(est.caidos.length / Math.max(1, (est.jugadores || []).length - 1));
   if (juego === "cartas" && est.ganadas) return c(Math.max(0, ...Object.values(est.ganadas).map(g => g.length)) / 5);
   return 0;
 }
@@ -5130,4 +5150,372 @@ export async function auditaPresidente(est, hechas = {}) {
   }
   for (const f of est.falsas || []) pon(f.uid, "llave", f.i);
   return fallos;
+}
+
+/* ============================================================
+   Spicy — faroles picantes, sin nadie que reparta
+
+   Cada uno juega una carta boca abajo y dice qué es («un 4 de wasabi»),
+   que puede ser mentira. Cualquiera puede dudar de la carta de arriba,
+   del número o de la especia: se destapa, quien acierta se lleva la
+   pila (un punto por carta) y quien falla roba dos. Jugar la última
+   carta sin que te pillen da un trofeo; dos trofeos ganan. Si antes sale
+   el Fin del Mundo al robar, se cuenta: cartas ganadas + 10 por trofeo −
+   cartas en la mano.
+
+   El reparto es el del UNO: cada uno roba de un mazo propio que sale de
+   su semilla privada (`cartaSp`, con reposición, con las proporciones
+   de la caja de 100) y de una mezcla que nadie conoce hasta que todos
+   han revelado su `arr` (`{t:"k"}`, prometido como `hcad` en la ficha).
+   El reductor solo sabe cuántas cartas tiene cada mano y el hash de cada
+   carta jugada (`tapaSp`); cuando alguien duda, la pantalla del dueño
+   destapa sola `{t:"revela", c, s}` y el reductor comprueba el hash. Al
+   acabar todos revelan su semilla y `auditaSpicy` repasa que cada carta
+   jugada estaba en la mano.
+
+   El Fin del Mundo no puede estar en ningún mazo propio: es un contador
+   público de cartas robadas después del reparto (`SP_MUNDO`, por número
+   de jugadores — la tabla es nuestra, pensada para que la partida dure
+   lo que en la caja). La carta que lo alcanza no se roba: se para ahí.
+
+   Carta: "a7" (ají 7), "w10", "p3"; "CE" es el comodín de especia (vale
+   todas las especias y ningún número) y "CN" el de número (todos los
+   números, ninguna especia). Dudar de lo que el comodín no tiene es
+   acertar siempre.
+   ============================================================ */
+export const SP_ESPECIAS = ["a", "w", "p"];
+export const SP_NOMBRE = { a: "ají", w: "wasabi", p: "pimienta" };
+export const SP_MANO = 6;
+export const SP_MUNDO = { 2: 30, 3: 35, 4: 40, 5: 45, 6: 50 };
+let SP_MAZO = null;
+export function mazoSp() {
+  if (SP_MAZO) return SP_MAZO;
+  const m = [];
+  for (const e of SP_ESPECIAS) for (let n = 1; n <= 10; n++) for (let k = 0; k < 3; k++) m.push(e + n);
+  for (let k = 0; k < 5; k++) m.push("CE", "CN");
+  return (SP_MAZO = m);
+}
+const SP_CODIGOS = new Set(["CE", "CN", ...SP_ESPECIAS.flatMap(e => [...Array(10).keys()].map(n => e + (n + 1)))]);
+export const numeroSp = c => c === "CN" ? 0 : c === "CE" ? -1 : +c.slice(1);
+export const especiaSp = c => c === "CE" ? "*" : c === "CN" ? "" : c[0];
+/* ¿Es verdad lo que se dijo de `que` ("num" o "esp")? */
+export function verdadSp(c, num, esp, que) {
+  if (que === "num") return c === "CN" || (c !== "CE" && +c.slice(1) === num);
+  return c === "CE" || (c !== "CN" && c[0] === esp);
+}
+/* Lo que se puede anunciar sobre la pila: `tope` es el último anuncio. */
+export function anunciablesSp(tope) {
+  const out = [];
+  if (!tope || tope.num === 10) {
+    for (const e of tope ? [tope.esp] : SP_ESPECIAS) for (let n = 1; n <= 3; n++) out.push({ num: n, esp: e });
+  } else for (let n = tope.num + 1; n <= 10; n++) out.push({ num: n, esp: tope.esp });
+  return out;
+}
+export const arrSp = (sem, sal) => sha256hex("sp-arr:" + sem + ":" + sal);
+export const salSp = (sem, sal, n) => sha256hex("sp-sal:" + sem + ":" + sal + ":" + n).slice(0, 16);
+export const tapaSp = (c, s) => sha256hex("sp:" + c + ":" + s);
+export function cartaSp(sem, sal, mezcla, k) {
+  const m = mazoSp();
+  return m[parseInt(sha256hex("sp:" + sem + ":" + sal + ":" + mezcla + ":" + k).slice(0, 8), 16) % m.length];
+}
+
+function redSpicy(p, js, listos) {
+  const ids = js.map(j => j.uid), N = ids.length;
+  const ficha = {};
+  for (const j of js) ficha[j.uid] = j;
+  const cartas = {}, fuera = {}, arr = {}, ocultas = {}, trofeos = {}, ganadas = {}, semillas = {};
+  for (const u of ids) { cartas[u] = 0; ocultas[u] = 0; trofeos[u] = 0; ganadas[u] = 0; }
+  const limite = SP_MUNDO[Math.max(2, Math.min(6, N))];
+  let etapa = "arranque", mezcla = "", turno = "", espera = null, pila = [], robos = 0, mundo = false;
+  let ganador = null, motivo = "", ni = 0, nid = 0, nmov = 0, libres = 3;
+  const ops = [], hist = [], falsas = [];
+  const suceso = e => { e.i = ni++; hist.push(e); if (hist.length > 40) hist.shift(); };
+  const activo = u => !!ficha[u] && !fuera[u];
+  const sig = u => { const i = ids.indexOf(u); for (let k = 1; k <= N; k++) { const c = ids[(i + k) % N]; if (activo(c)) return c; } return u; };
+  const vivoOSig = u => activo(u) ? u : sig(u);
+  const puntos = () => { const o = {}; for (const u of ids) o[u] = ganadas[u] + 10 * trofeos[u] - cartas[u]; return o; };
+  const cuenta = m => {
+    if (ganador !== null) return;
+    const pt = puntos(), q = ids.filter(activo);
+    const max = Math.max(...q.map(u => pt[u]));
+    const top = q.filter(u => pt[u] === max);
+    ganador = top.length === 1 ? top[0] : ""; motivo = top.length === 1 ? m : "empate";
+    suceso({ e: "gana", uid: ganador, por: m, tops: top });
+  };
+  /* Robar para en seco si sale el Fin del Mundo. */
+  const roba = (u, n, por) => {
+    if (!(n > 0) || !activo(u) || ganador !== null) return;
+    let r = 0;
+    for (; r < n; r++) {
+      if (por !== "mano" && robos >= limite) { mundo = true; break; }
+      if (por !== "mano") robos++;
+    }
+    if (r) { cartas[u] += r; ops.push([u, "r", r]); }
+    if (por !== "mano") suceso({ e: "roba", uid: u, n: r, por });
+    if (mundo) { suceso({ e: "mundo", uid: u }); cuenta("mundo"); }
+  };
+  const arranca = () => {
+    const vivos = ids.filter(activo);
+    mezcla = sha256hex(vivos.map(u => u + ":" + arr[u]).join("|"));
+    for (const u of vivos) roba(u, SP_MANO, "mano");
+    etapa = "juego";
+    turno = vivos[parseInt(mezcla.slice(8, 16), 16) % vivos.length];
+    suceso({ e: "empieza", uid: turno });
+  };
+  const trofeo = u => {
+    trofeos[u]++; libres--;
+    suceso({ e: "trofeo", uid: u, n: trofeos[u] });
+    if (trofeos[u] >= 2) { ganador = u; motivo = "trofeos"; suceso({ e: "gana", uid: u, por: "trofeos", tops: [u] }); return true; }
+    if (libres <= 0) { cuenta("trofeos"); return true; }
+    roba(u, SP_MANO, "trofeo");
+    return ganador !== null;
+  };
+  /* Se destapa la carta de arriba: el que acierta se lleva la pila. */
+  const resuelve = (e, verdad, c) => {
+    const w = verdad ? e.uid : e.dudon, l = verdad ? e.dudon : e.uid;
+    const top = pila[pila.length - 1];
+    const n = pila.length;
+    ganadas[w] += n;
+    suceso({ e: "destapa", uid: e.uid, a: e.dudon, c: c || "", que: e.que, verdad, gana: w, n, num: top.num, esp: top.esp });
+    pila = []; espera = null;
+    const ultima = e.ultima && activo(e.uid);
+    roba(l, 2, "duda");
+    if (ganador !== null) return;
+    if (ultima && verdad) { if (trofeo(e.uid)) return; }
+    turno = vivoOSig(w);
+  };
+
+  for (const j of jugadasDe(p)) {
+    const u = j.uid;
+    if (!ficha[u]) continue;
+    if (j.t === "s") { if (ganador !== null) semillas[u] = true; continue; }
+    if (j.t === "abandona") {
+      if (ganador !== null || fuera[u]) continue;
+      fuera[u] = true;
+      suceso({ e: "abandona", uid: u });
+      const q = ids.filter(activo);
+      if (q.length <= 1) { ganador = q[0] || ""; motivo = "abandono"; continue; }
+      if (!listos) continue;
+      if (etapa === "arranque") { if (ids.every(o => fuera[o] || arr[o])) arranca(); continue; }
+      const e = espera;
+      if (e && e.k === "revela" && e.uid === u) resuelve(e, false, "");
+      else if (e && e.k === "revela" && e.dudon === u) { espera = e.ultima ? { k: "ultima", uid: e.uid, id: e.id, ok: e.ok || {} } : null; if (!espera) turno = vivoOSig(e.sig); }
+      else if (e && e.k === "ultima" && e.uid === u) { espera = null; turno = sig(u); }
+      if (espera && espera.k === "ultima" && ids.every(o => !activo(o) || o === espera.uid || espera.ok[o])) {
+        const w = espera.uid; espera = null;
+        if (!trofeo(w)) turno = sig(w);
+      }
+      if (!espera && turno === u) turno = sig(u);
+      continue;
+    }
+    if (ganador !== null || !listos || !activo(u)) continue;
+    if (j.t === "k") {
+      const c = String(j.c || "");
+      if (etapa !== "arranque" || arr[u]) continue;
+      if (!/^[0-9a-f]{64}$/.test(c) || sha256hex(c) !== ficha[u].hcad) {
+        if (!falsas.some(f => f.uid === u && f.que === "llave")) { falsas.push({ uid: u, que: "llave" }); suceso({ e: "falsa", uid: u }); }
+        continue;
+      }
+      arr[u] = c;
+      if (ids.every(o => fuera[o] || arr[o])) arranca();
+      continue;
+    }
+    if (etapa !== "juego") continue;
+    const e = espera;
+    if (j.t === "revela") {
+      if (!(e && e.k === "revela" && e.uid === u)) continue;
+      const c = String(j.c || "");
+      if (!SP_CODIGOS.has(c) || tapaSp(c, String(j.s || "")) !== e.h) {
+        if (!falsas.some(f => f.uid === u && f.que === "revela" && f.n === e.n)) { falsas.push({ uid: u, que: "revela", n: e.n }); suceso({ e: "falsa", uid: u }); }
+        continue;
+      }
+      nmov++;
+      resuelve(e, verdadSp(c, e.num, e.esp, e.que), c);
+      continue;
+    }
+    if (j.t === "duda") {
+      const top = pila[pila.length - 1];
+      if (!top || top.id !== +j.c || top.uid === u || !activo(top.uid) || (e && e.k === "revela")) continue;
+      const que = j.que === "esp" ? "esp" : "num";
+      nmov++;
+      espera = { k: "revela", uid: top.uid, h: top.h, n: top.n, num: top.num, esp: top.esp, id: top.id, que, dudon: u,
+        ultima: !!(e && e.k === "ultima" && e.id === top.id), ok: e && e.ok, sig: turno };
+      turno = "";
+      suceso({ e: "duda", uid: u, a: top.uid, que });
+      continue;
+    }
+    if (j.t === "acepta" || j.t === "salta") {
+      if (j.t === "salta" && !(activo(j.a) && j.a !== u)) continue;
+      const quien = j.t === "salta" ? j.a : u;
+      if (e && e.k === "ultima" && e.id === +j.c) {
+        if (quien === e.uid || (j.t === "salta" && u === e.uid)) continue;
+        e.ok[quien] = true;
+        nmov++;
+        if (ids.every(o => !activo(o) || o === e.uid || e.ok[o])) {
+          espera = null;
+          suceso({ e: "limpia", uid: e.uid });
+          if (!trofeo(e.uid)) turno = sig(e.uid);
+        }
+        continue;
+      }
+      /* Saltar a quien se durmió en su turno: pasa por él (roba una). */
+      if (j.t === "salta" && !e && turno === j.a) {
+        nmov++;
+        suceso({ e: "salta", uid: j.a, por: u });
+        roba(j.a, 1, "pasa");
+        if (ganador === null) turno = sig(j.a);
+      }
+      continue;
+    }
+    if (e || turno !== u) continue;
+    if (j.t === "pasa") {
+      nmov++;
+      suceso({ e: "pasa", uid: u });
+      roba(u, 1, "pasa");
+      if (ganador === null) turno = sig(u);
+      continue;
+    }
+    if (j.t === "juega") {
+      const h = String(j.h || ""), num = +j.num, esp = String(j.esp || "");
+      if (!/^[0-9a-f]{64}$/.test(h) || cartas[u] <= 0) continue;
+      const tope = pila[pila.length - 1];
+      if (!anunciablesSp(tope).some(a => a.num === num && a.esp === esp)) continue;
+      nmov++;
+      cartas[u]--;
+      const n = ocultas[u]++;
+      ops.push([u, "h", h, n]);
+      const id = ++nid;
+      pila.push({ uid: u, h, n, num, esp, id });
+      const ultima = cartas[u] === 0;
+      suceso({ e: "juega", uid: u, num, esp, id, ultima });
+      if (ultima) { espera = { k: "ultima", uid: u, id, ok: {} }; turno = ""; }
+      else turno = sig(u);
+      continue;
+    }
+  }
+
+  let esp = null, debe = [];
+  if (listos && ganador === null) {
+    if (etapa === "arranque") { esp = { k: "llaves", faltan: ids.filter(o => activo(o) && !arr[o]) }; debe = esp.faltan; }
+    else if (espera) {
+      esp = espera;
+      if (espera.k === "revela") debe = [espera.uid];
+      else if (espera.k === "ultima") debe = ids.filter(o => activo(o) && o !== espera.uid && !espera.ok[o]);
+    } else { esp = { k: "turno", uid: turno }; debe = [turno]; }
+  }
+  const fin = ganador !== null;
+  const top = pila[pila.length - 1];
+  return {
+    fase: !listos ? "espera" : fin ? "fin" : "jugando",
+    etapa, cartas, fuera, trofeos, ganadas, libres, pila: pila.map(x => ({ uid: x.uid, num: x.num, esp: x.esp, id: x.id })),
+    tope: top ? { uid: top.uid, num: top.num, esp: top.esp, id: top.id } : null,
+    turno: fin || espera ? "" : turno, espera: fin ? null : esp, debe: fin ? [] : debe,
+    robos, limite, mundo, puntos: puntos(), mezcla, ops, hist, falsas, ganador, motivo, semillas, nmov
+  };
+}
+
+/* La mano de cada uno, repitiendo `ops` con su semilla. Con `fallo`
+   es la auditoría: una carta jugada que no estaba en la mano. */
+export function repasaSp(est, secretos, fallo) {
+  const manos = {}, k = {}, tapadas = {};
+  for (const j of est.jugadores || []) { manos[j.uid] = secretos[j.uid] ? [] : null; k[j.uid] = 0; tapadas[j.uid] = {}; }
+  for (const [u, t, a, b] of est.ops || []) {
+    const s = secretos[u], m = manos[u];
+    if (!s || !m) continue;
+    if (t === "r") for (let i = 0; i < a; i++) m.push(cartaSp(s.sem, s.sal, est.mezcla, k[u]++));
+    else if (t === "h") {
+      const sal = salSp(s.sem, s.sal, b);
+      const i = m.findIndex(c => tapaSp(c, sal) === a);
+      if (i < 0) { if (fallo) fallo(u, "carta"); }
+      else { tapadas[u][b] = m[i]; m.splice(i, 1); }
+    }
+  }
+  return { manos, tapadas };
+}
+export function manoSp(est, uid, sec) {
+  if (!sec || !est || !est.mezcla) return { mano: [], tapadas: {} };
+  const r = repasaSp(est, { [uid]: sec }, null);
+  return { mano: r.manos[uid] || [], tapadas: r.tapadas[uid] || {} };
+}
+/* Cuántas cartas llevo puestas boca abajo: el `n` de la siguiente sal. */
+export const ocultasSp = (est, uid) => (est.ops || []).filter(o => o[0] === uid && o[1] === "h").length;
+
+export async function auditaSpicy(partida, estado) {
+  const secretos = {}, fallos = [];
+  const pon = (uid, que) => { if (!fallos.some(x => x.uid === uid && x.que === que)) fallos.push({ uid, que }); };
+  for (const j of jugadasDe(partida)) {
+    if (j.t !== "s" || secretos[j.uid]) continue;
+    const f = (estado.jugadores || []).find(x => x.uid === j.uid);
+    if (!f) continue;
+    const sem = j.sem, sal = String(j.sal || "");
+    const ok = await compromisoValido(sem, sal, f.hmazo) && sha256hex(arrSp(sem, sal)) === f.hcad;
+    if (!ok) { pon(j.uid, "semilla"); continue; }
+    secretos[j.uid] = { sem, sal };
+  }
+  if (estado.mezcla) repasaSp(estado, secretos, pon);
+  for (const j of estado.jugadores || []) if (!secretos[j.uid] && !fallos.some(x => x.uid === j.uid)) pon(j.uid, "oculta");
+  return fallos;
+}
+
+/* ============================================================
+   TETRIS (sala): todos juegan a la vez, cada navegador simula su propio
+   pozo con la misma secuencia de piezas (la semilla pública de la sala:
+   lo que cae no es secreto, es igual para todos). El registro solo lleva
+   lo que cruza de un pozo a otro — `{t:"ataque", a, n}` son n líneas de
+   basura para `a` — y `{t:"cae", l, p}` cuando uno se ahoga. Quien recibe
+   suma los ataques dirigidos a él y aplica los que aún no aplicó: el
+   reductor es la cuenta, y la pantalla la gasta.
+   ============================================================ */
+export function redTetris(p, js, listos) {
+  const ids = js.map(j => j.uid);
+  const ficha = {};
+  for (const j of js) ficha[j.uid] = j;
+  const caidos = [], fuera = {}, basura = {}, enviadas = {}, lineas = {}, pts = {};
+  for (const u of ids) { basura[u] = 0; enviadas[u] = 0; lineas[u] = 0; pts[u] = 0; }
+  let ganador = null, motivo = "", ni = 0;
+  const hist = [];
+  const suceso = e => { e.i = ni++; hist.push(e); if (hist.length > 30) hist.shift(); };
+  const vivos = () => ids.filter(u => !fuera[u]);
+  const sig = u => { const i = ids.indexOf(u); for (let k = 1; k < ids.length; k++) { const c = ids[(i + k) % ids.length]; if (!fuera[c]) return c; } return ""; };
+  const cierra = m => {
+    const q = vivos();
+    if (ganador !== null || q.length > 1) return;
+    ganador = q[0] || (caidos.length ? caidos[caidos.length - 1].uid : "");
+    motivo = m;
+    suceso({ e: "gana", uid: ganador });
+  };
+  for (const j of jugadasDe(p)) {
+    const u = j.uid;
+    if (!ficha[u] || fuera[u] || ganador !== null || !listos) continue;
+    if (j.t === "ataque") {
+      const n = Math.max(0, Math.min(12, Math.floor(+j.n || 0)));
+      if (!n) continue;
+      const a = ficha[j.a] && !fuera[j.a] && j.a !== u ? j.a : sig(u);
+      if (!a) continue;
+      basura[a] += n; enviadas[u] += n;
+      suceso({ e: "ataque", uid: u, a, n });
+      continue;
+    }
+    if (j.t === "cae" || j.t === "abandona") {
+      fuera[u] = true;
+      lineas[u] = Math.max(0, Math.floor(+j.l || 0));
+      pts[u] = Math.max(0, Math.floor(+j.p || 0));
+      caidos.push({ uid: u, l: lineas[u], p: pts[u], abandona: j.t === "abandona" });
+      suceso({ e: j.t === "cae" ? "cae" : "abandona", uid: u });
+      cierra(j.t === "cae" ? "ultimo" : "abandono");
+    }
+  }
+  const fin = ganador !== null;
+  return {
+    fase: !listos ? "espera" : fin ? "fin" : "jugando",
+    caidos, fuera, vivos: vivos(), basura, enviadas, lineas, pts, hist, ganador, motivo,
+    semilla: p.semilla >>> 0
+  };
+}
+/* A quién le toca recibir mi basura: el siguiente vivo en la mesa. */
+export function blancoTetris(est, uid) {
+  const ids = (est.jugadores || []).map(j => j.uid);
+  const i = ids.indexOf(uid);
+  for (let k = 1; k < ids.length; k++) { const c = ids[(i + k) % ids.length]; if (!est.fuera[c]) return c; }
+  return "";
 }

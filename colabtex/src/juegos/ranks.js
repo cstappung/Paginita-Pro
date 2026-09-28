@@ -30,7 +30,7 @@ const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
 /* Los tres metales, en el orden del puesto. */
 const METAL = ["oro", "plata", "bronce"];
 const TITULO = ["Campeón", "Subcampeón", "Tercer puesto"];
-const EXTRA = { minas: { nombre: "Buscaminas", color: "#eeb765" }, snake: { nombre: "Snake", color: "#4be9bc" } };
+const EXTRA = { minas: { nombre: "Buscaminas", color: "#eeb765" }, snake: { nombre: "Snake", color: "#4be9bc" }, tetrisclub: { nombre: "Tetris Club", color: "#b04ee8" } };
 
 /* La corona es SVG dibujado, no un emoji: cada sistema pinta 👑 a su
    tamaño y su color, y aquí tiene que brillar en el oro del podio. */
@@ -100,7 +100,7 @@ export function crearRanks(ctx) {
   function escucha() {
     if (parar) { try { parar(); } catch (e) {} parar = null; }
     cargando = true; fallo = ""; filas = []; pinta();
-    const individual = juego === "minas" || juego === "snake";
+    const individual = juego === "minas" || juego === "snake" || juego === "tetrisclub";
     parar = (individual ? ctx.watchSolo : watchRanks)(individual ? categoriaSolo : juego, (lista, err) => {
       if (muerto) return;
       cargando = false;
@@ -129,7 +129,7 @@ export function crearRanks(ctx) {
 
     const t = host.querySelector("#rkTabla");
     if (!t) return;
-    const solo = juego === "minas" || juego === "snake";
+    const solo = juego === "minas" || juego === "snake" || juego === "tetrisclub";
     const orden = solo ? [...filas].sort((a,b)=>b.puntos-a.puntos||a.tiempo-b.tiempo||a.uid.localeCompare(b.uid)) : ordenaRanks(filas);
     host.querySelector('.jg-nota-larga').textContent = solo ? 'Mejor récord por jugador y categoría. En empate, menor tiempo. Las puntuaciones se calculan en el navegador.' : 'Se suman 3 puntos por victoria y 1 por empate.';
     pintaEscena(solo ? orden : orden.map(f => mezcla(f, perfil(f.uid))), solo);
@@ -138,7 +138,7 @@ export function crearRanks(ctx) {
         : "Todavía no ha terminado ninguna partida de este juego. Sé el primero."}</td></tr>`;
       return;
     }
-    if (solo) {t.innerHTML = `<thead><tr><th>#</th><th>Jugador</th><th>Récord</th><th>Tiempo</th></tr></thead><tbody>${orden.map((f,i)=>`<tr class="${f.uid===uid?'jg-yo':''}${i<3?' jg-rk-top':''}"><td class="jg-th-n">${puesto(i)}</td><td>${esc(f.nombre)}</td><td>${categoriaSolo.startsWith('club-minas-')?'Completado':f.puntos}</td><td>${(f.tiempo/1000).toFixed(2)} s</td></tr>`).join('')}</tbody>`;return;}
+    if (solo) {t.innerHTML = `<thead><tr><th>#</th><th>Jugador</th><th>Récord</th><th>Tiempo</th></tr></thead><tbody>${orden.map((f,i)=>`<tr class="${f.uid===uid?'jg-yo':''}${i<3?' jg-rk-top':''}"><td class="jg-th-n">${puesto(i)}</td><td>${esc(f.nombre)}</td><td>${categoriaSolo.startsWith('club-minas-')?'Completado':categoriaSolo==='club-tetris-sprint'?'40 líneas':f.puntos}</td><td>${(f.tiempo/1000).toFixed(2)} s</td></tr>`).join('')}</tbody>`;return;}
     t.innerHTML = `
       <thead><tr>
         <th class="jg-th-n">#</th><th>Jugador</th>
@@ -179,7 +179,7 @@ export function crearRanks(ctx) {
   /* Lo que se compara en esta tabla, y cómo se dice. Las del club de
      buscaminas se ganan por tiempo (menos es mejor); el resto, por puntos. */
   function medida(solo) {
-    if (solo && categoriaSolo.startsWith("club-minas-"))
+    if (solo && (categoriaSolo.startsWith("club-minas-") || categoriaSolo === "club-tetris-sprint"))
       return { valor: f => (f.tiempo || 0) / 1000, txt: v => `${v.toFixed(2)} s`, unidad: "", menor: true };
     return { valor: f => f.puntos || 0, txt: v => String(v), unidad: "pts", menor: false };
   }
@@ -279,9 +279,9 @@ export function crearRanks(ctx) {
     if (k === juego) return;
     juego = k;
     const solo = host.querySelector('#rkSolo');solo.innerHTML = '';
-    if (k === 'minas' || k === 'snake') {
-      const categorias = k === 'minas' ? ['explorador','veterano','leyenda'].flatMap(t=>['clasico','cruz'].map(v=>'minas-'+t+'-'+v)) : ['clasico','portal','ruinas'].flatMap(m=>['lenta','media','rapida'].map(v=>'snake-'+m+'-'+v));
-      const actuales = k === 'minas' ? ['easy','medium','hard'].map(n=>'club-minas-'+n) : ['classic','arcade','portals'].flatMap(m=>['chill','normal','fast'].map(v=>'club-snake-'+m+'-'+v));
+    if (k === 'minas' || k === 'snake' || k === 'tetrisclub') {
+      const categorias = k === 'tetrisclub' ? [] : k === 'minas' ? ['explorador','veterano','leyenda'].flatMap(t=>['clasico','cruz'].map(v=>'minas-'+t+'-'+v)) : ['clasico','portal','ruinas'].flatMap(m=>['lenta','media','rapida'].map(v=>'snake-'+m+'-'+v));
+      const actuales = k === 'tetrisclub' ? ['maraton','sprint','ultra'].map(n=>'club-tetris-'+n) : k === 'minas' ? ['easy','medium','hard'].map(n=>'club-minas-'+n) : ['classic','arcade','portals'].flatMap(m=>['chill','normal','fast'].map(v=>'club-snake-'+m+'-'+v));
       categorias.unshift(...actuales);
       categoriaSolo = categorias[0];solo.innerHTML = `<label>Categoría <select id="rkCategoria">${categorias.map(c=>`<option value="${c}">${c.startsWith('club-')?'Club · '+c.split('-').slice(2).join(' / '):'Archivo · '+c.split('-').slice(1).join(' / ')}</option>`).join('')}</select></label>`;
       solo.querySelector('select').onchange=e=>{categoriaSolo=e.target.value;escucha();};
