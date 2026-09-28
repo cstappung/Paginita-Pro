@@ -171,13 +171,19 @@ export function fallosDeLaTeX(mensajes) {
 
 /* Mensaje sin lo que cambia de una vez a otra, para poder agrupar. */
 export function normaliza(msg) {
+  /* Los nombres de archivo entre comillas se guardan tal cual: «falta
+     fontawesome.sty» y «falta tikzfill.image.sty» son dos fallos distintos,
+     y el borrado de comillas y dígitos de abajo los juntaba en uno. */
+  const archivos = [];
   return String(msg || "")
+    .replace(/["'`«]([\w.\-+]+\.[a-z]{2,5})["'`»]/gi, (_, f) => `\u0000${archivos.push(f) - 1}\u0000`)
     .replace(/https?:\/\/\S+/g, "URL")
     .replace(/[A-Za-z]:\\[^\s"']+/g, "RUTA")
     .replace(/\/[\w.\-]+\/[\w.\-/]+/g, "RUTA")
     .replace(/["'`«][^"'`»]{0,80}["'`»]/g, "«…»")
     .replace(/\b[0-9a-f]{8,}\b/gi, "ID")
     .replace(/\d+/g, "N")
+    .replace(/\u0000N\u0000/g, () => `«${archivos.shift()}»`)
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 200);
