@@ -410,7 +410,8 @@ export function crearCadena(ctx) {
     else if (est.fase === "fin") {
       if (est.motivo === "abandono") fase = est.ganador === uid ? "¡Ganas! Los demás se fueron." : "La partida terminó por abandono.";
       else fase = est.ganador === uid ? "🏆 Tu reacción se lo tragó todo." : `Gana ${nombreDe(est.ganador)}.`;
-    } else if (est.fuera[uid] || est.caidos[uid]) fase = `Estás fuera. Le toca a ${nombreDe(est.turno)}`;
+    } else if (animando || pendiente >= 0) fase = "¡Reacción en cadena!";
+    else if (est.fuera[uid] || est.caidos[uid]) fase = `Estás fuera. Le toca a ${nombreDe(est.turno)}`;
     else fase = est.turno === uid ? "Te toca: pon un orbe en una celda vacía o tuya" : `Le toca a ${nombreDe(est.turno)}`;
     set("crFase", fase + "|" + est.turno, `<span class="jg-punto-t jg-cr-punto"
       style="background:${esc(est.turno ? colorDe(est.turno) : GRIS)}"></span>${esc(fase)}`);
@@ -423,6 +424,7 @@ export function crearCadena(ctx) {
 
     let pie;
     if (est.fase === "espera") pie = "Pásale el enlace de la sala a quien quieras; con dos ya se puede empezar.";
+    else if (animando || pendiente >= 0) pie = "Resolviendo la reacción…";
     else if (est.fase === "fin") pie = "Partida terminada.";
     else if (activo) pie = "Las esquinas estallan con 2, los bordes con 3 y el centro con 4. Lo que tiembla está a punto.";
     else if (est.ultima && est.ultima.ondas.length) {
@@ -439,7 +441,7 @@ export function crearCadena(ctx) {
     if (!est) return;
     const { orbes } = crCuenta(mostrado || est.tab);
     const filas = est.jugadores.map(j => {
-      const out = est.fuera[j.uid] || est.caidos[j.uid];
+      const out = est.fuera[j.uid] || (!(animando || pendiente >= 0) && est.caidos[j.uid]);
       /* Quien está fuera tiene 0, aunque el que abandonó deje sus orbes
          en el tablero; a mitad de la cadena manda lo que se ve. */
       const n = out && !animando ? 0 : orbes[j.uid] || 0;
@@ -482,5 +484,5 @@ export function crearCadena(ctx) {
     }
   }
 
-  return { montar, actualizar, destruir, ocupado: () => animando };
+  return { montar, actualizar, destruir, ocupado: () => animando || pendiente >= 0 };
 }

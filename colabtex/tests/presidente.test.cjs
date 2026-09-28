@@ -3,9 +3,9 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs'),vm=require('node:vm');
 const code=fs.readFileSync('src/juegos/motor.js','utf8').replace(/\bexport\s+/g,'');
 const context={crypto:require('node:crypto').webcrypto,TextEncoder,setTimeout};vm.createContext(context);
-vm.runInContext(code+';Object.assign(this,{PR_CADENA,barajaPr,mejoresPr,ordenaPr,rangoPr,idSobrePr,barajaPrN});',context);
+vm.runInContext(code+';Object.assign(this,{PR_CADENA,barajaPr,mejoresPr,ordenaPr,rangoPr,idSobrePr,barajaPrN,jokerPr,nombreCartaPr});',context);
 const {reducir,meToca,progreso,PR_CADENA,cadenaPr,llavePr,llavesPr,barajaPr,mezclaPr,quitaPr,manoPr,sobrePr,secretoPr,
- idSobrePr,mejoresPr,ordenaPr,rangoPr,auditaPresidente,barajaPrN}=context;
+ idSobrePr,mejoresPr,ordenaPr,rangoPr,auditaPresidente,barajaPrN,jugadaPr,jokerPr,nombreCartaPr}=context;
 const J=x=>JSON.parse(JSON.stringify(x));
 const nombres=['a','b','c','d','e','f','g','h','i','j'];
 
@@ -63,9 +63,10 @@ function robot(est,u,s,k,trampa={}){
   if(ajena!==undefined){trampa.hecha=true;return {t:'juega',uid:u,c:[ajena]};}
  }
  if(!est.mesa){const r=rs[0];return {t:'juega',uid:u,c:k()<0.5?por[r]:por[r].slice(0,1)};}
- const r=rs.find(r=>r>est.mesa.r&&por[r].length>=est.mesa.n);
+ const grupo=r=>por[r].slice(0,r===13?Math.max(1,est.mesa.n-1):est.mesa.n);
+ const r=rs.find(r=>jugadaPr(grupo(r),est.mesa,X.D));
  if(r===undefined||k()<0.1)return {t:'pasa',uid:u};
- return {t:'juega',uid:u,c:por[r].slice(0,est.mesa.n)};
+ return {t:'juega',uid:u,c:grupo(r)};
 }
 
 /* Juega hasta que `hasta(est)` o hasta que nadie tenga nada que hacer. */
@@ -230,12 +231,12 @@ test('si todos se van menos uno, la partida acaba',()=>{
 test('con nueve se juega con dos barajas',async()=>{
  const {p,sec}=sala(9,2),k=azar(8);
  let est=juega(p,sec,reducir(p),k,e=>e.etapa==='juego');
- assert.equal(est.R.D,104);
- assert.equal(barajaPrN(9),104);
- assert.equal(Object.values(est.mano).reduce((a,b)=>a+b,0),104);
+ assert.equal(est.R.D,106);
+ assert.equal(barajaPrN(9),106);
+ assert.equal(Object.values(est.mano).reduce((a,b)=>a+b,0),106);
  const todas=new Set();
  for(const u of est.R.orden)for(const c of manoPr(est,u,sec[u].cad).mano)todas.add(c);
- assert.equal(todas.size,104);
+ assert.equal(todas.size,106);
 });
 
 /* Regresión de pantalla: los robots no ejecutan el latido de la UI.
@@ -272,7 +273,7 @@ test('pantalla: esperar no cierra la sala y empezar reparte hasta permitir jugar
    mover(p,q.shift());clients.forEach(c=>c.refresh());for(const c of clients)await c.flush();
   }
   let est=reducir(p);assert.equal(est.etapa,'juego');assert.equal(est.fase,'jugando');assert.equal(cierres.length,0);
-  assert.equal(Object.values(est.mano).reduce((a,b)=>a+b,0),52);
+  assert.equal(Object.values(est.mano).reduce((a,b)=>a+b,0),54);
   const u=est.turno,mano=manoPr(est,u,sec[u].cad).mano;
   est=mover(p,{t:'juega',uid:u,c:[mano[0]]});assert.equal(est.mesa.de,u);assert.equal(est.mano[u],mano.length-1);
  }finally{clients.forEach(c=>c.ui.destruir());}
@@ -293,4 +294,61 @@ test('arranque: mínimo de tres, sala abierta y sala lista tienen fases distinta
  p.estado='esperando';p.cupo=3;assert.equal(reducir(p).fase,'jugando','al llenarse el cupo mínimo puede empezar');
  delete p.jugadores.c;assert.equal(reducir(p).fase,'espera');
  delete p.jugadores.b;assert.equal(reducir(p).fase,'espera');
+});
+
+/* Transporte de reparto simulado para aislar turnos; las mesas robot de
+   arriba comprueban el cifrado, posesión de cartas e intercambio reales. */
+function mesaReglas(n=3){
+ const {p}=sala(n,91),q=nombres.slice(0,n);let e=mover(p,{t:'inicio',uid:q[0],q});
+ const v=barajaPr(e.R.D);
+ for(const u of q)e=mover(p,{t:'mezcla',uid:u,r:0,v,pk:'0'.repeat(64)});
+ for(const u of q)e=mover(p,{t:'quita',uid:u,r:0,v});
+ return {p,e};
+}
+test('Presidente: una vuelta; abre la mayor aunque el último pase',()=>{
+ for(const pasa of [false,true]){
+  const {p}=mesaReglas();let e=mover(p,{t:'juega',uid:'a',c:[0]});
+  assert.equal(e.turno,'b');e=mover(p,{t:'juega',uid:'b',c:[4]});assert.equal(e.turno,'c');
+  e=mover(p,pasa?{t:'pasa',uid:'c'}:{t:'juega',uid:'c',c:[8]});
+  assert.equal(e.mesa,null);assert.equal(e.turno,pasa?'b':'c');assert.deepEqual(J(e.R.actuaron),{});
+  e=mover(p,{t:'juega',uid:e.turno,c:[12]});assert.equal(e.turno,pasa?'c':'a');
+ }
+});
+test('Presidente: A supera K, 2 es menor y dos jokers también en doble baraja',()=>{
+ assert.equal(nombreCartaPr(0),'2♣');assert.equal(nombreCartaPr(48),'A♣');
+ assert.equal(rangoPr(54),0);assert.equal(rangoPr(102),12);
+ for(const n of [3,8,9,10]){
+  const ids=[...Array(barajaPrN(n)).keys()];assert.equal(ids.filter(jokerPr).length,2);
+  assert.equal(ids.filter(c=>rangoPr(c)===12).length,n>8?8:4);
+ }
+ assert.ok(jugadaPr([48],{r:11,n:1}));assert.equal(jugadaPr([0],{r:12,n:1}),null);
+ const {p}=mesaReglas();const e=mover(p,{t:'juega',uid:'a',c:[48]});
+ assert.equal(e.mesa.r,12);assert.equal(e.turno,'b','el A no limpia antes de tiempo');
+});
+test('Presidente: joker sobre pares conserva el tamaño y otro joker lo supera',()=>{
+ const {p}=mesaReglas();mover(p,{t:'juega',uid:'a',c:[48,49]});
+ let e=mover(p,{t:'juega',uid:'b',c:[52]});assert.equal(e.mesa.n,2);assert.equal(e.mano.b,17);
+ e=mover(p,{t:'juega',uid:'c',c:[53]});assert.equal(e.mesa,null);assert.equal(e.turno,'c');
+ assert.ok(jugadaPr([53],{r:13,n:1}));assert.equal(jugadaPr([48],{r:13,n:1}),null);
+});
+test('Presidente: un joker no cubre tríos; ambos sí, nunca cuartetos',()=>{
+ const {p}=mesaReglas();mover(p,{t:'juega',uid:'a',c:[0,1,2]});
+ let e=mover(p,{t:'juega',uid:'b',c:[52]});assert.equal(e.turno,'b');assert.equal(e.mano.b,18);
+ e=mover(p,{t:'juega',uid:'b',c:[52,53]});assert.equal(e.mesa.n,3);assert.equal(e.mano.b,16);
+ e=mover(p,{t:'pasa',uid:'c'});assert.equal(e.turno,'b');assert.equal(e.mesa,null);
+ assert.equal(jugadaPr([52,53],{r:12,n:4}),null);assert.equal(jugadaPr([0,52],null),null);
+ assert.equal(jugadaPr([52,52],null),null);
+});
+test('Presidente: salto y abandono cuentan sin volver al que ya jugó',()=>{
+ for(const t of ['salta','abandona']){
+  const {p}=mesaReglas(4);mover(p,{t:'juega',uid:'a',c:[0]});mover(p,{t:'juega',uid:'b',c:[4]});mover(p,{t:'pasa',uid:'c'});
+  const e=mover(p,t==='salta'?{t,uid:'a',a:'d'}:{t,uid:'d'});
+  assert.equal(e.turno,'b');assert.equal(e.mesa,null);
+ }
+});
+test('Presidente: si el ganador se queda sin cartas abre el siguiente activo',()=>{
+ const {p}=mesaReglas();let e;
+ for(let c=0;c<16;c+=4){mover(p,{t:'juega',uid:'a',c:[c,c+1,c+2,c+3]});mover(p,{t:'pasa',uid:'b'});mover(p,{t:'pasa',uid:'c'});}
+ e=mover(p,{t:'juega',uid:'a',c:[16,17]});assert.ok(e.R.salidos.includes('a'));
+ mover(p,{t:'pasa',uid:'b'});e=mover(p,{t:'pasa',uid:'c'});assert.equal(e.turno,'b');assert.equal(e.mesa,null);
 });

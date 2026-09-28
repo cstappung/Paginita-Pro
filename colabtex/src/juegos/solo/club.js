@@ -4,7 +4,7 @@ import {categoriaClub,resultadoClub,mejorClub} from './club-datos.js';
 /* El documento del juego conserva su CSS, su audio y sus animaciones.
    Solo este adaptador conoce la cuenta y escribe en Firebase. */
 export function crearSolo({juego,usuario,guardar,watch,volver}) {
-  let host,frame,off,categoria='',muerto=false,pendientes={},guardando=false;
+  let host,frame,off,temaObserver,categoria='',muerto=false,pendientes={},guardando=false;
   const clave='jg.club.pendientes.'+usuario.uid+'.'+juego;
   const ocultos=[];
   try { const valor=JSON.parse(localStorage.getItem(clave)||'{}');
@@ -39,7 +39,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver}) {
   function mensaje(e){
     if(muerto||e.source!==frame.contentWindow||e.origin!==location.origin||e.data?.canal!=='club-child')return;
     const d=e.data;
-    if(d.tipo==='alto'&&Number.isFinite(d.alto)){frame.style.height=Math.min(4000,Math.max(600,d.alto))+'px';return;}
+    if(d.tipo==='alto'&&Number.isFinite(d.alto)){frame.style.height=Math.min(4000,Math.max(320,d.alto))+'px';return;}
     if(d.tipo==='volver'){volver();return;}
     if(d.tipo==='reintentar'){sincronizar();return;}
     if(d.tipo==='categoria'){
@@ -57,12 +57,17 @@ export function crearSolo({juego,usuario,guardar,watch,volver}) {
     host=el;ambientar(null);host.innerHTML='';
     for(const id of ['btnMusica','volMusica','btnSonido']){const el=document.getElementById(id);if(el){ocultos.push([el,el.style.display]);el.style.display='none';}}
     frame=document.createElement('iframe');frame.title=juego==='minas'?'Mina Club — Buscaminas':'Snake Club';
-    frame.style.cssText='display:block;width:100%;height:1100px;border:0;border-radius:18px;background:#f5f5ed';
+    frame.className='jg-solo-frame';
+    frame.style.height='760px';
+    const tema=()=>enviar({tipo:'tema',oscuro:document.documentElement.dataset.tema==='oscuro'});
+    frame.addEventListener('load',tema);
+    temaObserver=new MutationObserver(tema);
+    temaObserver.observe(document.documentElement,{attributes:true,attributeFilter:['data-tema']});
     frame.allow='fullscreen';frame.setAttribute('allowfullscreen','');
     window.addEventListener('message',mensaje);
-    frame.src='juegos/club/'+juego+'/index.html?v=club-2&cuenta='+encodeURIComponent(usuario.uid);
+    frame.src='juegos/club/'+juego+'/index.html?v=club-3&embed=1&cuenta='+encodeURIComponent(usuario.uid);
     host.appendChild(frame);
   }
-  function destruir(){muerto=true;if(off)off();window.removeEventListener('message',mensaje);for(const [el,valor]of ocultos)el.style.display=valor;frame?.remove();host.innerHTML='';ambientar('');}
+  function destruir(){muerto=true;temaObserver?.disconnect();if(off)off();window.removeEventListener('message',mensaje);for(const [el,valor]of ocultos)el.style.display=valor;frame?.remove();host.innerHTML='';ambientar('');}
   return {montar,destruir};
 }

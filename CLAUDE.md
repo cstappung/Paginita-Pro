@@ -2140,14 +2140,15 @@ choosing either. Points worth knowing:
   opener after an annulled round — an abandono mid-round annuls it, since
   that player's cup can never be uncovered.
 - **El paso** (`pasoCacho`): with a bet on the table, one player per round
-  may pass instead of raising and the bet stands. It is legal with all dice
+  may pass instead of raising and the bet stands. A valid pass needs exactly
+  five dice, with all dice
   equal, all different or a full house (faces as they are, no wild aces), but
   it can be bluffed: only the **next** player may doubt it (`dudapaso`), and
   once they raise it is accepted. Doubted, only the passer's cup is lifted
   and whoever was wrong loses one die. Not offered in an obligada round,
   where nobody knows their own dice.
-- **Obligar** (once per game, the opener with one die, three or more players
-  left) picks one of three modes, and in all of them aces are not wild. The
+- **Obligar** (once per game, the opener with one die; torbellino is also
+  available in a duel, while abierto/cerrado require three players) picks one of three modes, and in all of them aces are not wild. The
   dice of an obligada round are rolled **after** the choice:
   `mezclaObligada` mixes in the hash of *every* player's key for this round,
   so nobody — the obligator included — can know them until all keys are out.
@@ -2363,7 +2364,14 @@ that replaying the log gives the same state, that a skipped key does not
 roll, that the audit catches a lied card and that a vote-out behaves as an
 abandono.
 
-**Presidente (`presidente`) is a table that never ends.** A round is dealt,
+**Presidente (`presidente`) is a table that never ends.** Each trick is one
+lap: every active player acts once, then the highest play opens again (or
+the next active seat if that player finished/left). Normal ranks are 2–A;
+exactly two jokers (IDs 52–53) accompany either 52 or 104 normal cards.
+The second normal deck occupies IDs 54–105. One joker covers singles/pairs;
+both cover triples. A joker may beat another joker, and the trick retains
+its original group size. `jugadaPr` shares validation with the UI.
+A round is dealt,
 played out and scored (`n − 1 − position` points), and the next one starts by
 itself with the roles of the last: the Culo gives their two best cards to the
 Presidente and gets two back, the Viceculo one to the Vice. Between rounds
@@ -2569,3 +2577,13 @@ Plain `.html` files (`colabtex.html`, `index.html`) are ordinary pages.
 `ColabTeX.dc.html` at the root is **dead** — a landing page from the very first
 ColabTeX commit, never touched since, linked from nowhere and absent from
 `stamp-version.js`'s `PAGES`. The live editor is `colabtex.html`; edit that one.
+
+**Presentation timing and layout:** `presentacion.test.cjs` checks that
+Chain Reaction's footer, elimination badges and the shared rematch prompt
+wait for the reaction. The Chain Reaction header reserves space for turn
+text, so the board stays still. Flip 7 preserves its displayed state during
+the card flight and holds the face-up card for 240 ms before its effects.
+Room chat sits in a sticky right column on desktop and below the game on
+narrow screens. Solo Club retains isolated audio/game documents, with shared
+navigation, automatic height, parent theme updates and rankings in the game
+sidebar; embedded documents hide standalone branding, intros and footers.
