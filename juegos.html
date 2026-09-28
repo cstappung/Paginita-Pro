@@ -1299,6 +1299,61 @@ try { var t = localStorage.getItem("jg.tema");
 .jg-art-pr i:first-of-type{margin:0;transform:rotate(-15deg) translateY(8px)}.jg-art-pr i:nth-of-type(2){transform:rotate(-5deg)}.jg-art-pr i:nth-of-type(3){transform:rotate(6deg)}.jg-art-pr i:nth-of-type(4){transform:rotate(16deg) translateY(8px)}
 .jg-art-pr span{font:800 22px 'IBM Plex Mono',monospace}.jg-art-pr s{text-decoration:none;font-size:20px}
 .jg-art-pr em{position:absolute;left:50%;bottom:-30px;transform:translateX(-50%) rotate(-5deg);font:900 18px 'IBM Plex Mono',monospace;font-style:normal;letter-spacing:1px;color:#ffd76a;text-shadow:2px 2px 0 #7c4dff}
+/* ---------- Spicy ---------- */
+.jg-sp-c{--sp:#e2412b;background:#fff8ef;border-color:#fff8ef;color:var(--sp)}
+.jg-sp-c .ov{background:none;transform:none}.jg-sp-c .ov em{transform:none;text-shadow:none;font-size:30px;color:inherit}
+.jg-sp-c .esq{color:var(--sp);text-shadow:none;font-weight:900}
+.jg-sp-c.comodin{background:linear-gradient(135deg,#e2412b,#5dac3a 50%,#6b4a2b);color:#fff}.jg-sp-c.comodin .esq{color:#fff}.jg-sp-c.comodin .ov em{font-size:15px}
+.jg-sp-c.comodin.num{background:linear-gradient(135deg,#ffb400,#e2412b)}
+.jg-sp-c.dorso{background:repeating-linear-gradient(-45deg,#8e1b10 0 6px,#b0281a 0 12px);border-color:#fff8ef}.jg-sp-c.dorso .ov em{font-size:26px}
+.jg-sp-c.mini .ov em{font-size:16px}
+.jg-sp-pila{position:relative;width:calc(62px + var(--n,1) * 6px);height:96px}
+.jg-sp-pila>.jg-un-c{position:absolute;top:0}
+.jg-sp-pila>.jg-un-c:nth-child(1){left:0;transform:rotate(-8deg)}.jg-sp-pila>.jg-un-c:nth-child(2){left:6px;transform:rotate(-4deg)}.jg-sp-pila>.jg-un-c:nth-child(3){left:12px;transform:rotate(3deg)}.jg-sp-pila>.jg-un-c:nth-child(4){left:18px;transform:rotate(-2deg)}.jg-sp-pila>.jg-un-c:nth-child(5){left:24px;transform:rotate(5deg)}.jg-sp-pila>.jg-un-c:nth-child(6){left:30px}
+.jg-sp-dice{--sp:#e2412b;display:flex;flex-direction:column;align-items:center;padding:8px 18px;border-radius:14px;background:#0006;border:2px solid var(--sp);color:#fff;box-shadow:0 0 22px color-mix(in srgb,var(--sp) 45%,transparent)}
+.jg-sp-dice small{font-size:11px;color:#fffb}.jg-sp-dice b{font:900 34px 'IBM Plex Mono',monospace;line-height:1.1}.jg-sp-dice em{font-style:normal;font-size:13px}
+.jg-sp-destape{display:flex;align-items:center;gap:12px;padding:8px 14px;border-radius:14px;background:#0005;animation:jgPrEntra .35s cubic-bezier(.3,1.5,.5,1)}
+.jg-sp-destape.verdad{box-shadow:0 0 0 2px #5fd38a,0 0 24px #5fd38a66}.jg-sp-destape.mentira{box-shadow:0 0 0 2px #ff5a4a,0 0 24px #ff5a4a66}
+.jg-sp-destape.mentira .jg-pr-info b{color:#ff8b7f}.jg-sp-destape.verdad .jg-pr-info b{color:#8ff0b0}
+.jg-sp-anuncios{flex-wrap:wrap;gap:6px}
+.jg-portada-spicy{background:radial-gradient(ellipse at center,#8e1b10,#240805 75%)}
+.jg-art-sp{position:relative;display:flex;align-items:center}
+.jg-art-sp>b{position:absolute;left:50%;top:-36px;transform:translateX(-50%) rotate(-12deg);font-size:34px;filter:drop-shadow(0 3px 4px #0008)}
+.jg-art-sp i{position:relative;width:54px;height:80px;border-radius:8px;background:#fff8ef;box-shadow:0 8px 18px #0008;margin-left:-14px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-style:normal;color:var(--t)}
+.jg-art-sp i:first-of-type{margin:0;transform:rotate(-12deg) translateY(6px)}.jg-art-sp i:nth-of-type(2){transform:rotate(0deg)}.jg-art-sp i:nth-of-type(3){transform:rotate(12deg) translateY(6px)}
+.jg-art-sp span{font:800 22px 'IBM Plex Mono',monospace}.jg-art-sp s{text-decoration:none;font-size:20px}
+.jg-art-sp em{position:absolute;left:50%;bottom:-30px;transform:translateX(-50%) rotate(-4deg);font:900 18px 'IBM Plex Mono',monospace;font-style:normal;letter-spacing:2px;color:#ffcf4a;text-shadow:2px 2px 0 #b0281a}
+/* ---------- Tetris ---------- */
+.jg-portada-tetris{background:radial-gradient(ellipse at center,#1b3b7a,#0a0f24 75%)}
+.jg-art-tt{position:relative;display:grid;grid-template-columns:repeat(6,16px);gap:2px}
+.jg-art-tt i{width:16px;height:16px;border-radius:2px;box-shadow:inset 2px 2px 0 #fff5,inset -2px -2px 0 #0004}
+.jg-art-tt i.p-i{background:#2fd3e8}.jg-art-tt i.p-j{background:#3b6cf6}.jg-art-tt i.p-l{background:#f59a23}.jg-art-tt i.p-o{background:#f5d432}.jg-art-tt i.p-s{background:#46d160}.jg-art-tt i.p-t{background:#b04ee8}.jg-art-tt i.p-z{background:#f0455a}.jg-art-tt i[class=""]{box-shadow:none}
+.jg-art-tt em{position:absolute;left:50%;bottom:-30px;transform:translateX(-50%);font:900 18px 'IBM Plex Mono',monospace;font-style:normal;letter-spacing:3px;color:#fff;text-shadow:2px 2px 0 #3b6cf6}
+.jg-tt{background:#0a0f1c;border-radius:14px;padding:0 0 12px;color:#e9edf5}
+.jg-tt .jg-barra{display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:space-between;color:#e9edf5}
+.jg-tt-ayuda{font-size:11px;color:#8fa0bb}
+.jg-tt .jg-tablero.jg-tt-sala{display:flex;flex-wrap:wrap;gap:18px;justify-content:center;align-items:flex-start;padding:10px}
+.jg-tt-yo{display:flex;gap:10px;align-items:flex-start}
+.jg-tt-lado{display:flex;flex-direction:column;gap:6px;align-items:center;width:96px}.jg-tt-lado small{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:#8fa0bb}
+.jg-tt-lado canvas{background:#111829;border-radius:8px}
+.jg-tt-datos{display:flex;flex-direction:column;gap:6px;width:100%}.jg-tt-datos p{margin:0;display:flex;flex-direction:column;background:#111829;border-radius:8px;padding:5px 8px}.jg-tt-datos b{font:800 18px 'IBM Plex Mono',monospace}
+.jg-tt-pozo{position:relative;display:flex;gap:4px}
+.jg-tt-pozo canvas{display:block;border-radius:6px;box-shadow:0 0 0 2px #273248,0 12px 30px #0008;max-width:min(260px,62vw);height:auto}
+.jg-tt-basura{position:relative;width:8px;background:#111829;border-radius:4px;overflow:hidden}.jg-tt-basura i{position:absolute;left:0;right:0;bottom:0;background:linear-gradient(#ff5a4a,#b0281a);transition:height .2s}
+.jg-tt-aviso{position:absolute;left:12px;right:0;top:38%;text-align:center;font:900 20px 'IBM Plex Mono',monospace;color:#ffe14d;text-shadow:0 2px 0 #000,0 0 18px #ffe14d99;opacity:0;pointer-events:none}
+.jg-tt-aviso.ve{animation:jgTtAviso 1.4s ease-out}
+@keyframes jgTtAviso{0%{opacity:0;transform:scale(.6)}15%{opacity:1;transform:scale(1.15)}30%{transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:translateY(-30px)}}
+.jg-tt-rivales{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;max-width:420px}
+.jg-tt-rival{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:12px}
+.jg-tt-rival canvas{border-radius:4px;box-shadow:0 0 0 1px #273248}
+.jg-tt-rival .nom{font-weight:700;border-bottom:3px solid var(--c)}.jg-tt-rival .dat{color:#8fa0bb;font-size:10px}
+.jg-tt-rival.fuera{opacity:.5}.jg-tt-rival.gana canvas{box-shadow:0 0 0 2px #ffd76a,0 0 18px #ffd76a88}
+.jg-tt-tactil{display:none;justify-content:center;gap:6px;flex-wrap:wrap;margin:6px}
+.jg-tt-tactil button{font-size:22px;min-width:48px;min-height:46px;border-radius:10px;border:1px solid #273248;background:#111829;color:#e9edf5;touch-action:manipulation}
+.jg-tt.mirando .jg-tt-tactil{display:none!important}
+@media(pointer:coarse){.jg-tt-tactil{display:flex}.jg-tt-ayuda{display:none}}
+.jg-tt-hist{max-width:640px;margin:0 auto;padding:0 12px;font-size:12px;color:#adbdd1}.jg-tt-hist p{margin:2px 0}.jg-tt-hist p:first-child{color:#fff}
+.sp-e-tetris{background:radial-gradient(ellipse at right,#1b5f7a,#0c1629 75%)}.sp-e-tetris strong span{color:#2fd3e8}
 
 /* ---------- El manual de reglas ----------
    Cuelga de <body> en `position:fixed`, por encima del cartel de fin
@@ -1874,6 +1929,6 @@ html[data-tema=oscuro] .jg-ct-chip.mar{background:#16304a;color:#9fd0ff}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202609272112"></script>
+<script src="juegos-app.js?v=202609280426"></script>
 </body>
 </html>

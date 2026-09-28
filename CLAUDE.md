@@ -45,7 +45,7 @@ Six apps plus a small shared **Informes** page:
   collect by themselves, plus the bugs and ideas people write. See "Informes"
   below.
 - **Juegos** (`juegos.html` + `juegos-app.js`, entry
-  `colabtex/src/juegos-main.js`) — twelve turn-based games, on the same Google
+  `colabtex/src/juegos-main.js`) — fourteen multiplayer games, on the same Google
   account and the same Firebase project: **Escondite** (hide a person in a
   landscape, then cross the landscapes and race to find the other's),
   **Cartas de los tres elementos** (a Card-Jitsu duel), **Cuadritos** (dots and
@@ -58,7 +58,9 @@ Six apps plus a small shared **Informes** page:
   versions: Clásico, No Mercy, No Mercy with the expansion, All Wild and
   Liar's), **Catan** (two to six, with the 5–6 extension, *Navegantes* and
   three table variants), **Presidente** (the «culo», three to ten, an endless
-  table people join and leave between rounds) and **Circuit Breakers** (a Worms-style artillery game
+  table people join and leave between rounds), **Spicy** (the bluffing card
+  game, two to six), **Tetris** (everyone plays at once and sends garbage to
+  the next seat) and **Circuit Breakers** (a Worms-style artillery game
   for two to eight squads, in an iframe), plus a **Clasificación** tab and a 📖 **Reglas**
   manual for every game, solo ones included. See "Juegos" below.
 
@@ -1493,7 +1495,7 @@ Four decisions worth keeping:
 
 ## Juegos architecture
 
-Twelve turn-based games, on the same Firebase project and the same Google session
+Fourteen games, on the same Firebase project and the same Google session
 as ColabTeX and ColabDraw. Turn-based on purpose: with one move per turn the
 network carries a handful of fields and there is nothing to interpolate, so no
 game loop ever has to be synchronised.
@@ -2382,6 +2384,28 @@ when nothing beats the table — and offers **Saltarle** for someone asleep.
 `tests/presidente.test.cjs` plays robot tables with people joining, leaving
 and voting, and checks the audit catches a crooked shuffle, a short exchange
 and a card that was never in the hand.
+
+**Spicy (`spicy`) deals like UNO.** Each player draws from a private deck
+(`cartaSp`, seed + a `mezcla` from a commit-and-reveal start). A card is
+played face down as a hash (`tapaSp`) with a claim. When someone doubts it,
+the owner's screen reveals it by itself (`{t:"revela"}`) and the reducer
+checks the hash. The World's End card cannot live in anyone's private deck,
+so it is a public counter of cards drawn after the deal (`SP_MUNDO`, per
+player count). `auditaSpicy` replays the game at the end, as in UNO.
+
+**Tetris (`tetris`) is the one real-time game, and the log still only
+carries what crosses between wells.** Every browser simulates its own well
+with the room's public seed, on `juegos/club/tetris/motor.js` (UMD: the
+room imports it through esbuild, and Tetris Club loads it as a plain script).
+The log holds only `{t:"ataque", a, n}` (n ≤ 12 lines of garbage for `a`)
+and `{t:"cae", l, p}`. `redTetris` adds up `basura[uid]`, and the screen feeds
+the engine only the difference from what it already applied. The rivals'
+wells are thumbnails. They come from `fb.tetrisVivo`, a 200-character summary
+each tab writes every 250 ms to a disposable node, as in Circuit Breakers.
+The last one standing wins. **Tetris Club** (`juegos/club/tetris/`) is
+the solo version on the same engine: Maratón, Sprint (40 lines; the
+result is `puntos: 40` plus the time, so the ranking orders it by time) and
+Ultra (two minutes). Its categories are `club-tetris-*` in `soloRanks`.
 
 **UNO No Mercy's roulette is played by its victim**: the victim picks the
 colour (not whoever threw the card) and then draws one card at a time with
