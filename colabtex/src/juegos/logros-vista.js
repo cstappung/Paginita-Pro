@@ -83,7 +83,7 @@ export function crearLogros({ uid, watchLogros, perfil, orden }) {
       <header><h2>🎯 Tu desafío</h2><p>Tienes <b>${mios}</b> de ${R.juegos.reduce((t, j) => t + LOGROS[j].length, 0)} logros${i >= 0 ? ` · puesto <b>#${i + 1}</b> de ${tabla.length}` : ""}.</p></header>
       <div class="jg-lg-retos">
         ${tarjeta("Lo siguiente", faltan[0] ? logroMini(faltan[0].j, faltan[0].x, `<i>El ${faltan[0].p} % ya lo tiene. ¿Y tú?</i>`) : "<p>Juega una partida de algo y aquí aparecerá tu próximo logro.</p>")}
-        ${tarjeta("Rival a batir", delante ? `<div class="jg-lg-rival"><b>${esc(nombreDe(delante[0]))}</b><span>${delante[1]} logros · te saca ${Math.max(0, delante[1] - mios)}${delante[1] - mios <= 0 ? " (empate: desempata con uno más)" : ""}</span></div>${robable ? logroMini(robable.j, robable.x, "<i>Él lo tiene; tú no.</i>") : ""}` : "<p>Vas primero. Defiende el trono sacando los raros.</p>", "rival")}
+        ${tarjeta("Rival a batir", delante ? `<div class="jg-lg-rival"><b>${esc(nombreDe(delante[0]))}</b><span>${delante[1]} logros · te saca ${Math.max(0, delante[1] - mios)}${delante[1] - mios <= 0 ? " (empate: desempata con uno más)" : ""}</span></div>${robable ? logroMini(robable.j, robable.x, "<i>Lo tiene; tú no.</i>") : ""}` : "<p>Vas primero. Defiende el trono sacando los raros.</p>", "rival")}
         ${tarjeta("La joya", joyas[0] ? logroMini(joyas[0].j, joyas[0].x, `<i>Solo el ${joyas[0].p} % lo tiene${joyas[0].mio ? " — y tú eres de ellos" : ""}.</i>`) : "<p>Nadie tiene aún ningún logro. El primero se lleva la gloria.</p>", "joya")}
       </div>
       <div class="jg-lg-podio">${ranking(R.total).slice(0, 5).map(([u, n], k) =>

@@ -770,7 +770,7 @@ ${this.customData.serverResponse}`:this.message=this._baseMessage}};(function(t)
       <header><h2>\u{1F3AF} Tu desaf\xEDo</h2><p>Tienes <b>${C}</b> de ${S.juegos.reduce((G,J)=>G+Jn[J].length,0)} logros${E>=0?` \xB7 puesto <b>#${E+1}</b> de ${O.length}`:""}.</p></header>
       <div class="jg-lg-retos">
         ${I("Lo siguiente",X[0]?U(X[0].j,X[0].x,`<i>El ${X[0].p} % ya lo tiene. \xBFY t\xFA?</i>`):"<p>Juega una partida de algo y aqu\xED aparecer\xE1 tu pr\xF3ximo logro.</p>")}
-        ${I("Rival a batir",j?`<div class="jg-lg-rival"><b>${ma(h(j[0]))}</b><span>${j[1]} logros \xB7 te saca ${Math.max(0,j[1]-C)}${j[1]-C<=0?" (empate: desempata con uno m\xE1s)":""}</span></div>${$?U($.j,$.x,"<i>\xC9l lo tiene; t\xFA no.</i>"):""}`:"<p>Vas primero. Defiende el trono sacando los raros.</p>","rival")}
+        ${I("Rival a batir",j?`<div class="jg-lg-rival"><b>${ma(h(j[0]))}</b><span>${j[1]} logros \xB7 te saca ${Math.max(0,j[1]-C)}${j[1]-C<=0?" (empate: desempata con uno m\xE1s)":""}</span></div>${$?U($.j,$.x,"<i>Lo tiene; t\xFA no.</i>"):""}`:"<p>Vas primero. Defiende el trono sacando los raros.</p>","rival")}
         ${I("La joya",w[0]?U(w[0].j,w[0].x,`<i>Solo el ${w[0].p} % lo tiene${w[0].mio?" \u2014 y t\xFA eres de ellos":""}.</i>`):"<p>Nadie tiene a\xFAn ning\xFAn logro. El primero se lleva la gloria.</p>","joya")}
       </div>
       <div class="jg-lg-podio">${T(S.total).slice(0,5).map(([G,J],Y)=>`<span class="${G===t?"yo":""}"><i>${["\u{1F947}","\u{1F948}","\u{1F949}","4","5"][Y]}</i>${ma(h(G))}<b>${J}</b></span>`).join("")||"<em>A\xFAn no hay nadie en la tabla de logros.</em>"}</div>
