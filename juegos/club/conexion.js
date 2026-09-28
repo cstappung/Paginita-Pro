@@ -16,7 +16,8 @@
     volver.onclick=e=>{if(embebido){e.preventDefault();enviar({tipo:'volver'});}};shell.prepend(volver);
     const panel=document.createElement('section');panel.className='club-ranking';
     panel.innerHTML='<h2>Clasificación de este modo</h2><p class="club-propio"></p><ol></ol><p role="status" aria-live="polite"></p><button type="button">Reintentar sincronización</button>';
-    (embebido?shell.querySelector('.game-layout>aside'):null)?.appendChild(panel)||shell.appendChild(panel);lista=panel.querySelector('ol');estado=panel.querySelector('[role=status]');propio=panel.querySelector('.club-propio');panel.querySelector('button').onclick=()=>enviar({tipo:'reintentar'});
+    const lateral=embebido?shell.querySelector(':is(.game-layout,.layout)>aside'):null;
+    (lateral||shell).appendChild(panel);lista=panel.querySelector('ol');estado=panel.querySelector('[role=status]');propio=panel.querySelector('.club-propio');panel.querySelector('button').onclick=()=>enviar({tipo:'reintentar'});
     if(!embebido){estado.textContent='Abre este juego desde Juegos para sincronizar tu clasificación con tu cuenta.';}else window.Club.category(categoria);
     if(embebido){const sonido=document.getElementById('sound-button');if(sonido)shell.querySelector('.scorebar')?.appendChild(sonido);}
     let alto=0;const medir=()=>{const nuevo=Math.ceil(shell.getBoundingClientRect().bottom+32);if(nuevo!==alto){alto=nuevo;enviar({tipo:'alto',alto});}};
