@@ -2067,7 +2067,7 @@ export async function auditaFlip7(partida, estado) {
    una partida de cacho sin que pase nada.
 
    El paso: con una apuesta en la mesa, uno por ronda puede pasar en
-   vez de subir, y la apuesta sigue como estaba. Es legal con todos los
+   vez de subir, y la apuesta sigue como estaba. Es legal solo con cinco
    dados iguales, todos distintos o un full (`pasoCacho`), pero se
    puede pasar sin tenerlo: el siguiente lo duda o sigue. Dudado, se
    destapa y pierde un dado quien se equivocó.
@@ -2102,7 +2102,7 @@ export const textoApuesta = (c, p) => p === 0 ? `${c} de esta`
 /* Si un vaso tiene paso, y cuál: todos iguales, todos distintos o un
    full (trío y par). Con las caras tal cual: aquí el as no es comodín. */
 export function pasoCacho(ds) {
-  if (!ds || !ds.length) return "";
+  if (!ds || ds.length !== CC_DADOS) return "";
   const n = {};
   for (const d of ds) n[d] = (n[d] || 0) + 1;
   const k = Object.values(n).sort((a, b) => a - b);
@@ -2269,10 +2269,9 @@ function redCacho(p, js, listos) {
   const enMesa = () => ids.reduce((s, u) => s + (enRonda(u) ? enVaso[u] : 0), 0);
   const inicial = N * CC_DADOS;
   /* Obligar: quien tiene un dado puede, al abrir, obligar la ronda en
-     uno de los tres modos. Una vez por partida, y con dos en la mesa no
-     tiene sentido. */
+     uno de los tres modos. En duelo solo se permite torbellino. */
   const puedeObligar = u => etapa === "apuesta" && !apuestas.length && !obligada && turno === u
-    && enVaso[u] === 1 && !obligo[u] && ids.filter(esta).length >= 3;
+    && enVaso[u] === 1 && !obligo[u] && ids.filter(esta).length >= 2;
   /* Calzar: mientras quede en la mesa al menos la mitad de los dados
      con que empezó la partida. */
   const puedeCalzar = u => etapa === "apuesta" && turno === u && apuestas.length > 0 && total() * 2 >= inicial;
@@ -2466,6 +2465,7 @@ function redCacho(p, js, listos) {
       suceso({ e: "dudapaso", uid: u, a: paso.uid });
       avanza();
     } else if (j.t === "obliga" && puedeObligar(u) && ["abierto", "cerrado", "torbellino"].includes(j.m)) {
+      if (j.m !== "torbellino" && ids.filter(esta).length < 3) continue;
       if (j.m === "torbellino") {
         const q = Number(j.p);
         if (!Number.isInteger(q) || q < 1 || q > 6) continue;
@@ -2496,6 +2496,7 @@ function redCacho(p, js, listos) {
     abiertos: !fin && obligada === "abierto" && etapa === "apuesta" ? vasosRonda() : null,
     destape, espera, ultimo, hist, falsas, ganador, motivo,
     calzo: !fin && puedeCalzar(turno), obligar: !fin && puedeObligar(turno),
+    modosObliga: ids.filter(esta).length >= 3 ? Object.keys(MODOS_OBLIGA) : ["torbellino"],
     pasar: !fin && puedePasar(turno), dudaPaso: !fin && puedeDudarPaso(turno)
   };
 }
@@ -4494,9 +4495,9 @@ export async function auditaCatan(partida, estado) {
    Las reglas son las de siempre: se reparte la baraja entera, quien
    sale echa una carta o varias del mismo valor, los demás tienen que
    echar las mismas que haya en la mesa y más altas, o pasar; quien
-   pasa queda fuera de esa baza, y cuando todos los demás han pasado
-   quien echó lo último sale otra vez. El 2 es la carta más alta y
-   además cierra la baza en el acto. El primero en quedarse sin cartas
+   cada jugador actúa una sola vez por baza y abre la siguiente quien
+   puso la jugada mayor. El 2 es la menor, el A la mayor normal, y hay
+   dos jokers: uno supera simples/pares; ambos, hasta tríos. El primero en quedarse sin cartas
    es el **Presidente**, el segundo el **Vicepresidente**, el penúltimo
    el **Viceculo** y el último el **Culo** (Vice solo con cuatro o más);
    los del medio son Pueblo. Cada ronda da un punto por cada jugador
@@ -4549,14 +4550,27 @@ export async function auditaCatan(partida, estado) {
 export const PR_CADENA = 1000;
 const PR_P = BigInt("0xb6bf55230ee6009266d1e75101cad38d71e5a1bd4d71c91b1099365a0ccc4f0b2f62fabbe3241387cc00f1742c8be47f");
 const PR_Q = (PR_P - 1n) / 2n;
-export const PR_RANGOS = ["3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A", "2"];
+export const PR_RANGOS = ["2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A", "Joker"];
 export const PR_PALOS = ["♣", "♦", "♥", "♠"];
 export const PR_ROLES = { pres: "Presidente", vice: "Vicepresidente", pueblo: "Pueblo", vculo: "Viceculo", culo: "Culo" };
-export const rangoPr = id => Math.floor((id % 52) / 4);
-export const paloPr = id => id % 4;
-/* Hasta ocho, una baraja; con nueve o diez, dos. */
-export const barajaPrN = n => n > 8 ? 104 : 52;
-export const nombreCartaPr = id => PR_RANGOS[rangoPr(id)] + PR_PALOS[paloPr(id)];
+/* Dos comodines (52–53); la segunda baraja normal ocupa 54–105. */
+export const jokerPr = id => id === 52 || id === 53;
+export const rangoPr = id => jokerPr(id) ? 13 : Math.floor((id >= 54 ? id - 54 : id) / 4);
+export const paloPr = id => jokerPr(id) ? -1 : (id >= 54 ? id - 54 : id) % 4;
+export const barajaPrN = n => n > 8 ? 106 : 54;
+export const nombreCartaPr = id => jokerPr(id) ? "Joker " + (id === 52 ? "negro" : "rojo") : PR_RANGOS[rangoPr(id)] + PR_PALOS[paloPr(id)];
+
+/* Un joker sustituye simples/pares; ambos, hasta tríos. La baza conserva
+   su tamaño. Un joker posterior supera al anterior. Motor y UI comparten esto. */
+export function jugadaPr(c, mesa = null, D = 54) {
+  if (!Array.isArray(c) || !c.length || c.length > (D > 54 ? 8 : 4) ||
+      c.some(x => !Number.isInteger(x) || x < 0 || x >= D) || new Set(c).size !== c.length) return null;
+  const r = rangoPr(c[0]), n = mesa ? mesa.n : c.length;
+  if (c.some(x => rangoPr(x) !== r)) return null;
+  if (r === 13) { if (n > c.length + 1) return null; }
+  else if (mesa && (c.length !== n || r <= mesa.r)) return null;
+  return { r, n };
+}
 
 /* Cada valor del subgrupo va en 64 caracteres de base64url (48 bytes). */
 const PR_B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
@@ -4770,7 +4784,7 @@ function redPresidente(p, js, listos) {
     if (orden.some(u => rep - desde[u] >= PR_CADENA)) { acaba("tope"); return; }
     const n = orden.length, D = barajaPrN(n);
     R = { rep, orden, n, D, mez: [], pk: {}, qui: [], mano: {}, usadas: {}, cambios: [], dar: [],
-          mesa: null, pasados: {}, turno: "", salidos: [], idos: {}, log: [] };
+          mesa: null, pasados: {}, actuaron: {}, turno: "", salidos: [], idos: {}, log: [] };
     suceso({ e: "reparto", rep, orden: orden.slice() });
   };
   /* Repartir otra vez (alguien se fue o llegó a tiempo). Si alguien ya
@@ -4778,13 +4792,14 @@ function redPresidente(p, js, listos) {
   const rehace = () => { if (R && R.mez.length) rep++; reparte(); };
 
   const limpia = w => {
-    R.mesa = null; R.pasados = {};
+    R.mesa = null; R.pasados = {}; R.actuaron = {};
     R.turno = vivo(w) ? w : siguiente(w, vivo);
     suceso({ e: "limpia", uid: R.turno });
   };
   const avanza = u => {
-    const nx = siguiente(u, x => vivo(x) && !R.pasados[x]);
-    if (!nx || nx === R.mesa.de) limpia(R.mesa.de);
+    R.actuaron[u] = true;
+    const nx = siguiente(u, x => vivo(x) && !R.actuaron[x]);
+    if (!nx) limpia(R.mesa ? R.mesa.de : u);
     else R.turno = nx;
   };
   const empieza = () => {
@@ -4828,7 +4843,7 @@ function redPresidente(p, js, listos) {
     if (et === "cambio") { if (etapaDe() === "juego") empieza(); return; }
     if (R.salidos.includes(u)) return;
     if (R.orden.filter(vivo).length <= 1) { cierraRonda(); return; }
-    if (R.turno === u) { if (R.mesa) avanza(u); else R.turno = siguiente(u, vivo); }
+    if (R.turno === u) avanza(u);
   };
 
   for (const j of jugadasDe(p)) {
@@ -4951,8 +4966,7 @@ function redPresidente(p, js, listos) {
       if (a !== R.turno) continue;
       suceso({ e: "salta", uid: a, por: u, en: "juego" });
       nmov++;
-      if (R.mesa) { R.pasados[a] = true; avanza(a); }
-      else R.turno = siguiente(a, vivo);
+      R.pasados[a] = true; avanza(a);
       continue;
     }
     if (et !== "juego" || u !== R.turno) continue;
@@ -4965,24 +4979,20 @@ function redPresidente(p, js, listos) {
     }
     if (j.t === "juega") {
       const c = lista(j.c).map(Number);
-      const tope = R.D > 52 ? 8 : 4;
-      if (!c.length || c.length > tope || c.length > R.mano[u]) continue;
-      if (c.some(x => !Number.isInteger(x) || x < 0 || x >= R.D || R.usadas[x]) || new Set(c).size !== c.length) continue;
-      const r = rangoPr(c[0]);
-      if (c.some(x => rangoPr(x) !== r)) continue;
-      if (R.mesa && (c.length !== R.mesa.n || r <= R.mesa.r)) continue;
+      const jugada = jugadaPr(c, R.mesa, R.D);
+      if (!jugada || c.length > R.mano[u] || c.some(x => R.usadas[x])) continue;
+      const { r, n } = jugada;
       for (const x of c) R.usadas[x] = true;
       R.mano[u] -= c.length; nmov++;
       R.log.push({ uid: u, c });
-      R.mesa = { c, r, n: c.length, de: u };
+      R.mesa = { c, r, n, de: u };
       suceso({ e: "juega", uid: u, c, r });
       if (R.mano[u] === 0) {
         R.salidos.push(u);
         suceso({ e: "acaba", uid: u, pos: R.salidos.length });
       }
       if (R.orden.filter(vivo).length <= 1) { cierraRonda(); continue; }
-      if (r === 12) limpia(u);
-      else avanza(u);
+      avanza(u);
       continue;
     }
   }

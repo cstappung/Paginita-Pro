@@ -32,7 +32,7 @@ function decide(e,u,mios,k){
   return mios.filter(d=>d===p||(d===1&&p!==1)).length+ajenos*(p===1?1/6:1/3);
  };
  if(e.obligar&&k()<0.6){
-  const m=['abierto','cerrado','torbellino'][Math.floor(k()*3)];
+  const m=e.modosObliga[Math.floor(k()*e.modosObliga.length)];
   return m==='torbellino'?{t:'obliga',uid:u,m,p:1+Math.floor(k()*6)}:{t:'obliga',uid:u,m};
  }
  if(e.dudaPaso&&k()<0.5)return {t:'dudapaso',uid:u};
@@ -268,8 +268,8 @@ test('pasoCacho: iguales, distintos o full',()=>{
  assert.equal(pasoCacho([2,2,5,5,5]),'full');
  assert.equal(pasoCacho([2,2,5,5,1]),'','dos pares no es paso');
  assert.equal(pasoCacho([3,3,3,3,1]),'','póker no es paso, el as no es comodín aquí');
- assert.equal(pasoCacho([6]),'iguales');
- assert.equal(pasoCacho([2,5]),'distintos');
+ assert.equal(pasoCacho([6]),'');
+ assert.equal(pasoCacho([2,5]),'');
  assert.equal(pasoCacho([2,2,5,5]),'');
 });
 
@@ -385,4 +385,24 @@ test('obligar: ronda abierta, cerrada y torbellino',()=>{
    if(e.fase==='jugando'&&e.dados[v]>0)assert.equal(e.turno,v,'tras el torbellino parte quien lo tiró');
   }
  }
+});
+
+test('Cacho: torbellino en duelo y farol de paso con menos de cinco dados',()=>{
+ const {p,cad}=sala(2,72);let e=reducir(p);
+ for(const u of e.espera.faltan)e=mover(p,{t:'k',uid:u,r:0,c:llaveCacho(cad[u],0)});
+ const v=e.turno,otro=nombres.find(u=>u!==v&&p.jugadores[u]);
+ // Apuestas imposibles: quien abre pierde un dado y vuelve a abrir.
+ for(let i=0;i<4;i++){e=mover(p,{t:'ap',uid:v,c:e.enMesa,p:6});e=mover(p,{t:'dudo',uid:otro});e=destapar(p,cad,e);}
+ assert.equal(e.dados[v],1);assert.ok(e.obligar);assert.deepEqual(copia(e.modosObliga),['torbellino']);
+ const base=copia(p);
+ e=mover(p,{t:'obliga',uid:v,m:'abierto'});assert.equal(e.obligada,'');
+ e=mover(p,{t:'obliga',uid:v,m:'cerrado'});assert.equal(e.obligada,'');
+ e=mover(p,{t:'obliga',uid:v,m:'torbellino',p:3});assert.equal(e.etapa,'destape');
+ e=destapar(p,cad,e);assert.equal(e.ultimo.tipo,'torbellino');
+ for(const u in e.ultimo.vasos)assert.equal(e.ultimo.antes[u]-e.ultimo.despues[u],e.ultimo.vasos[u].filter(d=>d===3).length);
+ // El rival sube y el vaso de un dado puede farolear, pero pierde al dudar.
+ e=mover(base,{t:'ap',uid:v,c:1,p:2});e=mover(base,{t:'ap',uid:otro,c:2,p:2});
+ assert.ok(e.pasar);e=mover(base,{t:'paso',uid:v});assert.ok(e.dudaPaso);
+ e=mover(base,{t:'dudapaso',uid:otro});e=destapar(base,cad,e);
+ assert.equal(e.ultimo.paso,'');assert.equal(e.ultimo.pierde,v);assert.equal(e.dados[v],0);
 });

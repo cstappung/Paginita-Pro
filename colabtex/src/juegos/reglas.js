@@ -201,8 +201,8 @@ const REGLAS = {
         "<b>Calzo</b>: crees que hay <b>exactamente</b> esos. Si aciertas recuperas un dado (máximo cinco); si no, pierdes uno. Se puede calzar mientras quede en la mesa al menos la mitad de los dados iniciales.",
         "Abre la siguiente ronda quien perdió el dado (o quien calzó)."
       ])],
-      ["El paso", "Una vez por ronda, con una apuesta en la mesa, puedes <b>pasar</b> en vez de subir: dices que tu vaso tiene todos los dados iguales, todos distintos o un full. El siguiente puede dudarte el paso: se mira solo tu vaso y pierde un dado quien se equivocó."],
-      ["Obligar", "Quien se queda con <b>un dado</b>, al abrir, puede obligar una vez por partida (con tres o más en la mesa). Los ases dejan de ser comodín y se elige un modo: <b>abierto</b> (ves los dados de los demás, no los tuyos), <b>cerrado</b> (nadie ve nada y se apuesta «X de esta», la pinta del dado de quien obligó) o <b>torbellino</b> (elige una pinta y cada uno pierde los dados que le salgan de ella)."],
+      ["El paso", "Una vez por ronda, con una apuesta en la mesa, puedes <b>pasar</b> en vez de subir: dices que tienes <b>exactamente cinco dados</b>, todos iguales, todos distintos o un full. Puedes decir «paso» aunque tengas menos o no cumplas la combinación; si te dudan, pierdes un dado. El siguiente puede dudarte el paso: se mira solo tu vaso y pierde un dado quien se equivocó."],
+      ["Obligar", "Quien se queda con <b>un dado</b>, al abrir, puede obligar una vez por partida. <b>Torbellino también está permitido en 1 contra 1</b>; abierto y cerrado requieren tres o más. Los ases dejan de ser comodín y se elige un modo: <b>abierto</b> (ves los dados de los demás, no los tuyos), <b>cerrado</b> (nadie ve nada y se apuesta «X de esta», la pinta del dado de quien obligó) o <b>torbellino</b> (elige una pinta y cada uno pierde los dados que le salgan de ella)."],
       ["El final", "Quien pierde su último dado queda fuera. Gana el último con dados en el vaso."]
     ],
     modos: {
@@ -370,17 +370,22 @@ const REGLAS = {
     secciones: [
       ["El objetivo", "Quedarte sin cartas antes que nadie. El orden en que se acaba da los papeles de la ronda siguiente: el primero es el <b>Presidente</b> 👑, el segundo el <b>Vicepresidente</b> 🎩, el penúltimo el <b>Viceculo</b> 🧹 y el último el <b>Culo</b> 💩; el resto es Pueblo."],
       ["Las cartas", lista([
-        "Del 3 (la más baja) al 2 (la más alta): 3 4 5 6 7 8 9 10 J Q K A 2. Los palos no cuentan.",
-        "Con más de ocho en la mesa se juega con <b>dos barajas</b>.",
+        "Del <b>2</b> (la más baja) al <b>A</b> (la más alta normal): 2 3 4 5 6 7 8 9 10 J Q K A. Los palos no cuentan.",
+        "Hay <b>dos jokers</b> en total. Con más de ocho se usan dos barajas normales más esos dos jokers (106 cartas; en mesa pequeña, 54).",
         "Se reparte todo el mazo; a unos les puede tocar una carta más que a otros."
       ])],
       ["Tu turno", lista([
-        "Con la mesa limpia abres con lo que quieras: una carta, o dos, tres o cuatro <b>del mismo número</b>.",
+        "Con la mesa limpia abres con cartas <b>del mismo número</b> (hasta cuatro; hasta ocho con dos barajas). También puedes abrir con uno o dos jokers.",
         "Sobre la mesa hay que poner <b>la misma cantidad</b> de cartas y de un número <b>más alto</b>. Si no puedes o no quieres, pasas.",
-        "Quien pasa no vuelve a jugar hasta que se limpie la mesa.",
-        "Cuando todos los demás han pasado, la mesa se limpia y abre quien jugó lo último.",
-        "Un <b>2</b> limpia la mesa al momento, y vuelves a abrir tú.",
+        "Cada baza da <b>una sola vuelta</b>: cada jugador juega o pasa una vez, incluido quien abre.",
+        "Al terminar esa vuelta se limpia la mesa y abre quien puso la jugada más alta. Ejemplo: 1 → 2 → 3; si 3 supera, abre 3. Si pasa y la mayor era de 2, abre 2. Si el ganador se quedó sin cartas o salió, abre el siguiente con cartas.",
+        "Ni el A ni el joker limpian al instante: se completa la vuelta.",
         "Si no tienes con qué superar la mesa, la pantalla pasa por ti."
+      ])],
+      ["Los comodines", lista([
+        "Un <b>joker solo</b> supera cualquier simple o par. Los <b>dos juntos</b> superan también un trío. Se juegan solos, sin mezclarlos con cartas normales.",
+        "La baza conserva su tamaño: un joker sobre un par sigue siendo una baza de pares.",
+        "Solo <b>otro joker</b> supera un joker, respetando el tamaño de la baza. No sirven contra grupos de cuatro o más."
       ])],
       ["El cambio de cartas", lista([
         "Desde la segunda ronda, el Culo da sus <b>dos mejores cartas</b> al Presidente, y este le devuelve dos que elija. El Viceculo da <b>una</b> al Vicepresidente, que le devuelve una.",

@@ -1,1 +1,21 @@
 .club-volver{display:inline-block;margin:14px 0 4px;color:#52643e;font:600 13px 'DM Sans',sans-serif;text-decoration:none}.club-ranking{border:1px solid #dedfd2;background:#fafbf5;border-radius:18px;padding:22px;margin:20px 0;font:14px 'DM Sans',sans-serif;color:#424c38}.club-ranking h2{margin:0 0 12px;font-size:20px}.club-ranking ol{padding-left:24px;line-height:2}.club-ranking p{font-size:12px;line-height:1.7}.club-ranking button{border:1px solid #c5ccaf;background:#edf1df;border-radius:9px;padding:9px 13px;color:#42502e;cursor:pointer}.club-ranking :focus-visible,.club-volver:focus-visible{outline:3px solid #758f42;outline-offset:3px}
+/* La versión dentro de Juegos comparte navegación, tema y espacio de juego. */
+.club-integrado{--body:'IBM Plex Sans',Arial,sans-serif;--display:'IBM Plex Sans',Arial,sans-serif;--paper:transparent;--ink:#283449;--muted:#718096;--line:#e4dfeb;--border:#e4dfeb}
+.club-integrado body{background:transparent;min-height:0}
+.club-integrado .site-shell,.club-integrado .shell{max-width:none;margin:0;padding:0}
+.club-integrado .shell>header,.club-integrado .topbar,.club-integrado .intro,.club-integrado footer,.club-integrado .club-volver{display:none}
+.club-integrado main{padding:0;margin:0;max-width:none}
+.club-integrado :is(.game-layout,.layout){gap:24px;grid-template-columns:minmax(0,1fr) 285px}
+.club-integrado .club-ranking{margin:20px 0 0;padding:18px;border-color:var(--line);background:#fff;font-family:var(--body);color:var(--ink)}
+.club-integrado .club-ranking h2{font-size:16px}.club-integrado .club-ranking ol{font-size:12px;padding-left:20px}
+.club-integrado .scorebar,.club-integrado .game-toolbar{background:#fff}
+.club-integrado .field{border-radius:0 0 16px 16px}
+.club-integrado #sound-button{flex-shrink:0;margin-left:0}
+.club-integrado[data-tema=oscuro]{--ink:#e5e9f2;--muted:#9aa8b9;--line:#34354b;--border:#34354b;--green:#afd281;--paper:#191c2a}
+.club-integrado[data-tema=oscuro] .club-ranking,.club-integrado[data-tema=oscuro] .scorebar,.club-integrado[data-tema=oscuro] .game-toolbar,.club-integrado[data-tema=oscuro] .difficulty,.club-integrado[data-tema=oscuro] .mode-card,.club-integrado[data-tema=oscuro] .music-card,.club-integrado[data-tema=oscuro] .tip-card,.club-integrado[data-tema=oscuro] .field{background:#222638;color:var(--ink);border-color:var(--border)}
+.club-integrado[data-tema=oscuro] .difficulty.active,.club-integrado[data-tema=oscuro] .mode-card.active{background:#303d30;border-color:#a4c874}
+.club-integrado[data-tema=oscuro] .speed-control{background:#222638}.club-integrado[data-tema=oscuro] .speed-control button.active{background:#43553b;color:#fff}
+.club-integrado[data-tema=oscuro] .section-heading h2,.club-integrado[data-tema=oscuro] .music-top h2,.club-integrado[data-tema=oscuro] .best-row,.club-integrado[data-tema=oscuro] .stat strong{color:var(--ink)}
+.club-integrado[data-tema=oscuro] .difficulty small,.club-integrado[data-tema=oscuro] .mode-card small,.club-integrado[data-tema=oscuro] .tip-card p,.club-integrado[data-tema=oscuro] .tip-example,.club-integrado[data-tema=oscuro] .music-top p{color:#b2bed0}
+@media(max-width:850px){.club-integrado :is(.game-layout,.layout){grid-template-columns:minmax(0,1fr)}.club-integrado :is(.game-layout,.layout)>aside{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.club-integrado .club-ranking{grid-column:1/-1}.club-integrado :is(.game-layout,.layout)>aside>section{margin-top:0}}
+@media(max-width:540px){.club-integrado :is(.game-layout,.layout)>aside{grid-template-columns:minmax(0,1fr)}.club-integrado :is(.game-layout,.layout){gap:16px}}
