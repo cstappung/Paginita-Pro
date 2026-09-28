@@ -30,7 +30,10 @@ const ALL_PACKAGES = [
   // .bst pero no IEEEtran.bst —solo IEEEtranM/MN—, y el generador de paquetes
   // omitía el subárbol bibtex/. Sin esto BibTeX aborta con «I couldn't open
   // style file» y TODAS las citas quedan sin resolver.
-  "texlive-bst.js"
+  "texlive-bst.js",
+  // Iconos de los CV (fontawesome, fontawesome5) y tikzfill, que tcolorbox
+  // pide con la biblioteca «skins» (File `tikzfill.image.sty' not found).
+  "texlive-iconos.js"
 ];
 
 export class LatexEngine {

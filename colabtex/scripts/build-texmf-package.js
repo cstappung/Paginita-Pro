@@ -46,8 +46,11 @@ const N_CACHED = 2;
 const EXISTING = [
   "texlive-basic.js", "ubuntu-texlive-latex-recommended.js",
   "ubuntu-texlive-latex-extra.js", "ubuntu-texlive-science.js",
-  "ubuntu-texlive-fonts-recommended.js"
-];
+  "ubuntu-texlive-fonts-recommended.js",
+  // los generados por este mismo script: un paquete nuevo no puede repetir
+  // un archivo de ellos (se omite el que se está regenerando)
+  "texlive-pictures.js", "texlive-extra.js", "texlive-bst.js", "texlive-iconos.js"
+].filter(f => f !== OUT_NAME + ".js" && fs.existsSync(path.join(VENDOR, f)));
 
 /* subárboles que se empaquetan: macros, estilos de bibliografía y lo que
    pdfTeX necesita de las fuentes (métricas, Type1, virtuales, codificaciones

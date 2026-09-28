@@ -191,7 +191,7 @@ function absorbe(texto, etiqueta) {
        arregla nada: cambia un error por otro. Fuera. */
     const faltan = campos
       .filter(c => c.startsWith("<"))
-      .map(c => c.replace(/^<+/, ""))
+      .map(c => c.replace(/^<+\[?/, ""))
       .filter(c => CITABLES.test(c) && !disponibles.has(c.toLowerCase()));
     if (faltan.length) { huerfanas++; faltan.forEach(f => sinFuente.add(f)); continue; }
     known.add(name);

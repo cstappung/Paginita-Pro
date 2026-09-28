@@ -1482,6 +1482,9 @@ Four decisions worth keeping:
   object-valued entries are dropped — that last one is what stops a whole
   document being smuggled in as "context". The `where` (what the app was doing)
   is worth more for reproducing than the minified stack.
+- **A quoted file name survives the fingerprint** (`normaliza`): quotes and
+  digits are blanked so the same fault groups, but that turned every
+  `File `x.sty' not found` into one row. File names are now kept as-is.
 - **Errors are keyed by fingerprint, not pushed.** The same fault seen a hundred
   times is one row with a counter; otherwise the noisiest error hides the other
   nine. The counter is bumped with `runTransaction` because several people write
