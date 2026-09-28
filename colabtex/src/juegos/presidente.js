@@ -15,7 +15,7 @@
    perdido o una escritura sin red no pueden dejar la mesa parada.
    ============================================================ */
 import {
-  PR_CADENA, PR_RANGOS, PR_PALOS, PR_ROLES, rangoPr, paloPr, nombreCartaPr,
+  PR_CADENA, PR_RANGOS, PR_PALOS, PR_ROLES, rangoPr, paloPr, nombreCartaPr, jokerPr, jugadaPr,
   barajaPr, llavesPr, mezclaPr, quitaPr, secretoPr, idSobrePr, sobrePr,
   ordenaPr, mejoresPr, cadenaPr, llavePr, manoPr, auditaPresidente
 } from "./motor.js";
@@ -37,6 +37,7 @@ const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&a
 /* Una carta francesa: blanca, con el palo en rojo o negro. */
 export function cartaPr(id, cls = "") {
   if (id == null) return `<span class="jg-un-c jg-pr-c dorso ${cls}"><b class="ov"><em>♛</em></b></span>`;
+  if (jokerPr(id)) return `<span class="jg-un-c jg-pr-c joker${id === 53 ? " roja" : ""} ${cls}" title="${esc(nombreCartaPr(id))}"><i class="esq">★</i><b class="ov"><em>🃏</em></b><strong class="jg-pr-joker-t">JOKER</strong><i class="esq b">★</i></span>`;
   const r = PR_RANGOS[rangoPr(id)], s = PR_PALOS[paloPr(id)], roja = paloPr(id) === 1 || paloPr(id) === 2;
   return `<span class="jg-un-c jg-pr-c${roja ? " roja" : ""} ${cls}" title="${esc(nombreCartaPr(id))}">` +
     `<i class="esq">${r}<s>${s}</s></i><b class="ov"><em>${s}</em></b><i class="esq b">${r}<s>${s}</s></i></span>`;
@@ -104,7 +105,7 @@ export function crearPresidente(ctx) {
   const nc = n => n === 1 ? "una carta" : n + " cartas";
   const juego = () => !ctx.mirando && !!jugador(uid) && !est.fuera[uid] && est.fase === "jugando";
   const enRonda = u => !!(est.R && est.R.orden.includes(u) && !est.R.idos[u]);
-  const tope = () => est.R && est.R.D > 52 ? 8 : 4;
+  const tope = () => est.R && est.R.D > 54 ? 8 : 4;
 
   /* Mi cadena de llaves, comprobada contra la promesa de mi ficha. */
   function miCad() {
@@ -148,12 +149,11 @@ export function crearPresidente(ctx) {
   }
 
   /* Lo que se puede jugar sobre la mesa con esta mano. */
-  function sirve(c, mano) {
-    const m = est.mesa;
-    if (!m) return true;
-    const r = rangoPr(c);
-    return r > m.r && mano.filter(x => rangoPr(x) === r).length >= m.n;
+  function grupo(c, mano) {
+    const n = est.mesa ? (jokerPr(c) ? Math.max(1, est.mesa.n - 1) : est.mesa.n) : 1;
+    return [c, ...mano.filter(x => x !== c && rangoPr(x) === rangoPr(c))].slice(0, n);
   }
+  function sirve(c, mano) { return !!jugadaPr(grupo(c, mano), est.mesa, est.R.D); }
 
   /* ---------- lo que manda la pantalla sola ---------- */
   function conTope(promesa) {
@@ -257,7 +257,7 @@ export function crearPresidente(ctx) {
     else f = est.turno === uid ? "Tu turno" : "Turno de " + nombre(est.turno);
     pon("prFase", esc(f));
     const n = est.R ? est.R.n : est.plantilla.length;
-    pon("prModo", esc(`Ronda ${est.ronda} · ${n} en la mesa${est.R && est.R.D > 52 ? " · dos barajas" : ""}`));
+    pon("prModo", esc(`Ronda ${est.ronda} · ${n} en la mesa${est.R && est.R.D > 54 ? " · dos barajas" : ""}`));
   }
 
   function sentados() {
@@ -279,7 +279,7 @@ export function crearPresidente(ctx) {
       const marcas = [];
       if (rol && rol !== "pueblo") marcas.push(`<span class="jg-un-marca jg-pr-rol">${ICONO_ROL[rol]} ${esc(PR_ROLES[rol])}</span>`);
       if (pos >= 0) marcas.push(`<span class="jg-un-marca">Nº ${pos + 1}</span>`);
-      else if (R && R.pasados[u] && est.etapa === "juego") marcas.push(`<span class="jg-un-marca">pasó</span>`);
+      else if (R && R.actuaron[u] && est.etapa === "juego") marcas.push(`<span class="jg-un-marca">${R.pasados[u] ? "pasó" : "ya jugó"}</span>`);
       if (est.saliendo[u]) marcas.push(`<span class="jg-un-marca">se levanta</span>`);
       if (est.cierre.includes(u)) marcas.push(`<span class="jg-un-marca">✋</span>`);
       const na = Math.min(12, n);
@@ -324,7 +324,10 @@ export function crearPresidente(ctx) {
       const g = baza(), m = est.mesa;
       h = g.length ? `<div class="jg-pr-baza">${g.map((e, i) => `<div class="jg-pr-grupo${i < g.length - 1 ? " vieja" : ""}">${e.c.map(c => cartaPr(c, i === g.length - 1 ? "jg-pr-nueva" : "mini")).join("")}<small>${esc(Nombre(e.uid))}</small></div>`).join("")}</div>`
         : `<div class="jg-pr-info"><b>Mesa limpia</b><span>${est.turno === uid ? "Abres tú: lo que quieras" : esc(Nombre(est.turno)) + " abre"}</span></div>`;
-      if (m) h += `<div class="jg-pr-info"><span>Hay que superar ${m.n === 1 ? "un" : m.n} <b>${PR_RANGOS[m.r]}</b>${m.n > 1 ? "" : ""}</span></div>`;
+      if (m) {
+        const faltan = est.R.orden.filter(u => !est.R.idos[u] && !est.R.salidos.includes(u) && !est.R.actuaron[u]).length;
+        h += `<div class="jg-pr-info"><span>${m.r === 13 ? "Solo otro joker puede superar esta jugada" : `Hay que superar ${m.n === 1 ? "un" : m.n} <b>${PR_RANGOS[m.r]}</b>`}</span><span>${faltan} turno${faltan === 1 ? "" : "s"} para cerrar la baza · grupos de ${m.n}</span></div>`;
+      }
     }
     pon("prMesa", h);
   }
@@ -363,12 +366,12 @@ export function crearPresidente(ctx) {
     if (juego() && est.etapa === "juego" && est.turno === uid) {
       const m = mia(), mesa = est.mesa;
       const nsel = sel.length;
-      const vale = nsel && (!mesa || nsel === mesa.n);
+      const vale = jugadaPr(sel, mesa, est.R.D);
       h += `<div class="jg-un-panel"><div class="jg-un-fila">
         <button class="jg-un-boton grande" id="prJugar" ${vale && !enviando ? "" : "disabled"}>Jugar ${nsel ? nc(nsel) : ""}</button>
         ${mesa ? `<button class="jg-un-boton suave" id="prPasa" ${enviando ? "disabled" : ""}>Paso</button>` : ""}
         ${!mesa && nsel ? `<button class="jg-un-boton suave" id="prTodas">Todas las de ese número</button>` : ""}
-      </div><div class="jg-nota">${mesa ? `Toca ${mesa.n === 1 ? "una carta" : mesa.n + " cartas iguales"} mayor${mesa.n > 1 ? "es" : ""} que ${PR_RANGOS[mesa.r]}. El 2 limpia la mesa.` : "Mesa limpia: abre con una o varias cartas del mismo número."}${m && m.mano.length && !m.mano.some(x => sirve(x, m.mano)) ? " No tienes con qué: pasas solo." : ""}</div></div>`;
+      </div><div class="jg-nota">${mesa ? `Baza de ${mesa.n}: ${mesa.r === 13 ? "solo puedes superar con otro joker" : "supera " + PR_RANGOS[mesa.r]}. Un joker cubre simples o pares; dos cubren hasta tríos.` : "Mesa limpia: abre con cartas del mismo número. 2 es la menor; A, la mayor normal. Una sola vuelta por baza."}${m && m.mano.length && !m.mano.some(x => sirve(x, m.mano)) ? " No tienes con qué: pasas solo." : ""}</div></div>`;
     } else if (cb && devuelvoYa(cb)) {
       h += `<div class="jg-un-panel"><div class="jg-un-fila"><button class="jg-un-boton grande" id="prDevuelve" ${sel.length === cb.n && !enviando ? "" : "disabled"}>Devolver ${nc(cb.n)} a ${esc(nombre(cb.a))}</button></div>
         <div class="jg-nota">Elige ${nc(cb.n)} de tu mano (las que quieras). Si no eliges, van las más bajas.</div></div>`;
@@ -414,7 +417,7 @@ export function crearPresidente(ctx) {
       case "repartido": return "Cartas repartidas";
       case "empieza": return verbo(e.uid, "Abres tú", "abre");
       case "da": return verbo(e.uid, e.tipo === "da" ? "Das" : "Devuelves", e.tipo === "da" ? "da" : "devuelve") + " " + nc(e.n) + " a " + (e.a === uid ? "ti" : nombre(e.a));
-      case "juega": return verbo(e.uid, "Juegas", "juega") + " " + e.c.map(c => PR_RANGOS[rangoPr(c)] + PR_PALOS[paloPr(c)]).join(" ");
+      case "juega": return verbo(e.uid, "Juegas", "juega") + " " + e.c.map(nombreCartaPr).join(" ");
       case "pasa": return verbo(e.uid, "Pasas", "pasa");
       case "limpia": return verbo(e.uid, "Limpias", "limpia") + " la mesa";
       case "acaba": return verbo(e.uid, "Te quedas", "se queda") + " sin cartas: Nº " + e.pos;
@@ -468,14 +471,14 @@ export function crearPresidente(ctx) {
         sel = sel.includes(c) ? sel.filter(x => x !== c) : sel.length < cb.n ? [...sel, c] : sel;
       } else if (est.mesa) {
         /* Con mesa: el grupo justo del número tocado, de una vez. */
-        const del = m.mano.filter(x => rangoPr(x) === r).slice(0, est.mesa.n);
+        const del = grupo(c, m.mano);
         sel = sel.length && rangoPr(sel[0]) === r ? [] : del;
       } else if (sel.includes(c)) sel = sel.filter(x => x !== c);
       else sel = sel.length && rangoPr(sel[0]) === r && sel.length < tope() ? [...sel, c] : [c];
       suena("clic"); firmas.prMano = firmas.prPie = ""; pintaMano(); pintaPie(); return;
     }
     if (b.id === "prTodas" && sel.length) { const r = rangoPr(sel[0]); sel = m.mano.filter(x => rangoPr(x) === r).slice(0, tope()); pinta(); return; }
-    if (b.id === "prJugar" && sel.length) { manda({ t: "juega", uid, c: sel.slice() }); return; }
+    if (b.id === "prJugar" && est.turno === uid && jugadaPr(sel, est.mesa, est.R.D)) { manda({ t: "juega", uid, c: sel.slice() }); return; }
     if (b.id === "prPasa") { manda({ t: "pasa", uid }); return; }
     if (b.id === "prDevuelve") { const cb = miCambio(); if (cb && sel.length === cb.n) daCartas(cb, sel.slice(), true); }
   }

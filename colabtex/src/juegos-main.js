@@ -649,16 +649,14 @@ function pintaTabs() {
 
 function armazon() {
   const h = $("pantalla");
+  h.closest("main").classList.toggle("jg-ancho", state.vista === "partida" || state.vista.startsWith("solo-"));
   if (state.vista.startsWith("solo-")) {
     individual = crearSolo({juego:state.vista.slice(5),usuario:state.user,guardar:fb.guardarSolo,watch:fb.watchSolo,volver:()=>ir("")});
     individual.montar(h);
-    /* Mina y Snake traen su propia pantalla, pero el manual es el mismo
-       para todos: una barrita encima del marco, que mide 1100 px y
-       dejaría debajo cualquier botón puesto después. */
     const juego = state.vista.slice(5), barra = document.createElement("div");
     barra.className = "jg-solo-barra";
-    barra.innerHTML = `<button class="btn2" type="button">📖 Reglas</button>`;
-    barra.firstChild.onclick = () => abreReglas(juego);
+    barra.innerHTML = `<a class="btn2" href="#">← Juegos</a><div class="jg-solo-titulo"><small>UN JUGADOR · RANKING POR MODALIDAD</small><strong>${juego === "minas" ? "Buscaminas" : "Snake"}</strong></div><nav aria-label="Juegos individuales"><a class="btn2${juego === "minas" ? " on" : ""}" href="#solo/minas">Buscaminas</a><a class="btn2${juego === "snake" ? " on" : ""}" href="#solo/snake">Snake</a><button class="btn2" type="button">📖 Reglas</button></nav>`;
+    barra.querySelector("button").onclick = () => abreReglas(juego);
     h.insertBefore(barra, h.firstChild);
     return;
   }
@@ -678,19 +676,20 @@ function armazon() {
         <button class="btn2" id="jgReglas" title="Cómo se juega">📖 Reglas</button>
         <button class="btn2" id="jgAbandonar" style="display:none">Abandonar</button>
       </div>
+      <div class="jg-partida-layout"><div class="jg-partida-juego">
       <div id="jgMirando"></div>
       <div id="jgInvita"></div>
       <div id="jgHost"></div>
       <div id="jgRevancha" aria-live="polite"></div>
       <div id="jgFin"></div>
-      <section class="jg-chat" id="jgChat" aria-label="Chat de la partida">
+      </div><section class="jg-chat" id="jgChat" aria-label="Chat de la partida">
         <header><h2>Chat de la sala</h2><small>lo leen jugadores y espectadores</small></header>
         <div class="jg-chat-lista" id="jgChatLista" aria-live="polite"></div>
         <form class="jg-chat-form" id="jgChatForm" autocomplete="off">
           <input class="inp" id="jgChatTxt" maxlength="${fb.CHAT_LARGO}" placeholder="Escribe algo…">
           <button class="btn" id="jgChatBtn">Enviar</button>
         </form>
-      </section>`;
+      </section></div>`;
     $("jgVolver").onclick = salirDeLaPartida;
     $("jgAbandonar").onclick = abandonar;
     /* Las reglas se abren en la versión de esta sala: quien entra a un
@@ -1076,7 +1075,7 @@ function montaJuego(p) {
       ? fb.leerSecreto(state.pid, state.user.uid) : Promise.resolve(null),
     /* La pantalla avisa cuando acaba de contar una jugada: el cartel del
        final espera a que la cadena que ganó la partida se haya visto. */
-    listo: () => { if (state.partida && state.estado) pintaFin(state.partida, state.estado); }
+    listo: () => { if (state.partida && state.estado) { pintaRevancha(state.partida, state.estado); pintaFin(state.partida, state.estado); } }
   });
   modulo.montar($("jgHost"));
   pidMontado = state.pid;
@@ -1525,7 +1524,7 @@ async function revancha(p, est) {
 function pintaRevancha(p, est) {
   const el = $("jgRevancha");
   if (!el) return;
-  if (!datosFin(p, est) || !p.jugadores?.[state.user.uid]) { el.innerHTML = ""; return; }
+  if (!datosFin(p, est) || modulo?.ocupado?.() || !p.jugadores?.[state.user.uid]) { el.innerHTML = ""; return; }
   el.innerHTML = '<div class="jg-revancha"><div><b>' +
     (p.revancha ? "Hay una revancha esperándote" : "¿Nos damos otra oportunidad?") + '</b><p>' +
     (p.revancha ? "Únete a la nueva sala con los mismos participantes." : "Invita a los participantes a repetir este juego.") +

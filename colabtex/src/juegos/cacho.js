@@ -523,7 +523,7 @@ export function crearCacho(ctx) {
       let pin = "", cuerpo = "", botones = "";
 
       const filaObliga = !ant && est.obligar
-        ? `<div class="jg-cc-fila"><span class="jg-cc-lbl">Obligar:</span>${Object.keys(MODOS_OBLIGA).map(m =>
+        ? `<div class="jg-cc-fila"><span class="jg-cc-lbl">Obligar:</span>${est.modosObliga.map(m =>
             `<button class="jg-cc-tog${ob === m ? " sel" : ""}" data-obliga="${m}">${ob === m ? "✓ " : ""}${esc(MODOS_OBLIGA[m])}</button>`).join("")}</div>`
         : "";
 

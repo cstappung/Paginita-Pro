@@ -272,7 +272,7 @@ export function crearFlip7(ctx) {
   const angulo = {};           // uid → ángulo de su asiento, en grados
   const temporizadores = new Set();
 
-  const ocupado = () => vuelos > 0 || Date.now() < finHasta;
+  const ocupado = () => enVuelo.size > 0 || vuelos > 0 || !!pendiente || Date.now() < finHasta;
   const luego = (f, ms) => { const t = setTimeout(() => { temporizadores.delete(t); if (!muerto) f(); }, ms); temporizadores.add(t); return t; };
   const $ = sel => host && host.querySelector(sel);
 
@@ -392,7 +392,9 @@ export function crearFlip7(ctx) {
   }
 
   function pinta() {
-    if (!host || !est) return;
+    // La mesa conserva lo ya visto hasta que la carta se da vuelta. Esto
+    // incluye puntos, «se pasó», historial, botones y cierre de ronda.
+    if (!host || !est || enVuelo.size) return;
     set("f7Fase", textoFase(), esc(textoFase()));
     const modo = MODOS_F7[est.modo] || MODOS_F7.normal;
     set("f7Modo", modo + est.ronda, `<span class="jg-f7-etq${est.modo === "venganza" ? " jg-f7-v" : est.modo === "super" ? " jg-f7-sv" : ""}">${modo}</span>
@@ -759,6 +761,7 @@ export function crearFlip7(ctx) {
     const c = carta(id);
     if (quieto() || !sala || !capa || !tope || typeof Element.prototype.animate !== "function" || !c) {
       destapa(id);
+      pinta();
       efectos(ev, true);
       trasVuelos();
       return;
@@ -767,7 +770,7 @@ export function crearFlip7(ctx) {
     paraSeisSiete();
     const rs = sala.getBoundingClientRect(), ro = tope.getBoundingClientRect();
     const destino = sitioDe(id);
-    let dx, dy, esc2 = 0.6, giro = 0, desvanece = false;
+    let dx, dy, esc2 = 0.6, giro = 0;
     const ox = ro.left + ro.width / 2 - rs.left, oy = ro.top + ro.height / 2 - rs.top;
     if (destino) {
       const rd = destino.getBoundingClientRect();
@@ -783,7 +786,7 @@ export function crearFlip7(ctx) {
       const rd = s ? s.getBoundingClientRect() : rs;
       dx = rd.left + rd.width / 2 - rs.left - ox;
       dy = rd.top + rd.height / 2 - rs.top - oy;
-      desvanece = true;
+
     }
     /* El crupier estira el brazo hacia el asiento, la carta sale del
        zapato a su mano boca abajo y desde ahí se lanza, volteándose. */
@@ -822,7 +825,7 @@ export function crearFlip7(ctx) {
       { transform: "perspective(700px) translate(0px,0px) rotate(0deg) rotateY(0deg) scale(1)", opacity: 1 },
       { transform: `perspective(700px) translate(${px.toFixed(1)}px,${py.toFixed(1)}px) rotate(-6deg) rotateY(0deg) scale(1.05)`, opacity: 1, offset: 0.35, easing: "cubic-bezier(.3,.7,.3,1)" },
       { transform: `perspective(700px) translate(${mx.toFixed(1)}px,${my.toFixed(1)}px) rotate(${(giro / 2 - 3).toFixed(1)}deg) rotateY(90deg) scale(1.1)`, opacity: 1, offset: 0.68 },
-      { transform: `perspective(700px) translate(${dx}px,${dy}px) rotate(${giro}deg) rotateY(180deg) scale(${esc2})`, opacity: desvanece ? 0 : 1 }
+      { transform: `perspective(700px) translate(${dx}px,${dy}px) rotate(${giro}deg) rotateY(180deg) scale(${esc2})`, opacity: 1 }
     ], { duration: VUELO_MS, easing: "ease-in-out", fill: "forwards" });
     mira(para);
     if (!document.hidden) suena("reparte");
@@ -830,13 +833,13 @@ export function crearFlip7(ctx) {
     const acaba = () => {
       if (hecho) return;
       hecho = true;
-      v.remove();
-      destapa(id);
-      vuelos--;
-      if (muerto) return;
-      efectos(ev, true);
-      trasVuelos();
-      if (est) mira(aQuienEspera(fantasma()));
+      if (muerto) { v.remove(); return; }
+      // Deja leer el valor boca arriba antes de anunciar su consecuencia.
+      luego(() => {
+        v.remove(); destapa(id); vuelos--;
+        pinta(); efectos(ev, true); trasVuelos();
+        if (est) mira(aQuienEspera(fantasma()));
+      }, 240);
     };
     anim.onfinish = acaba;
     anim.oncancel = acaba;
@@ -1038,9 +1041,10 @@ export function crearFlip7(ctx) {
     automatismos();
     const q = pendiente;
     pendiente = null;
-    if (q && q.carta && sitioDe(q.carta.id) && !quieto()) {
+    if (q && q.carta && !quieto()) {
+      enVuelo.clear();
       enVuelo.add(q.carta.id);
-      sitioDe(q.carta.id).classList.add("jg-f7-oculta");
+      sitioDe(q.carta.id)?.classList.add("jg-f7-oculta");
       lanza(q.carta.id, q.carta.para, q.ev);
     } else {
       if (q) efectos(q.ev, !!q.carta);
@@ -1051,7 +1055,7 @@ export function crearFlip7(ctx) {
   /* ---------- interacción ---------- */
   function alClic(ev) {
     if (ev.target.closest("#f7Resumen") && !resumenFijo) { escondeResumen(); return; }
-    if (!est || est.fase !== "jugando" || enviando) return;
+    if (!est || est.fase !== "jugando" || enviando || enVuelo.size || vuelos) return;
     const w = est.espera;
     if (ev.target.closest("#f7Pide")) { pide(); return; }
     if (ev.target.closest("#f7Planta")) { manda({ t: "planta", uid }); return; }
@@ -1242,7 +1246,7 @@ export function crearFlip7(ctx) {
     if (est.fase === "jugando") vioJugar = true;
     const visible = !document.hidden;
     if (visible && nuevos.some(h => h.e === "pide")) suena("madera");
-    if (cartaNueva && visible && !quieto()) enVuelo.add(u.id);
+    if (cartaNueva && !quieto()) enVuelo.add(u.id);
 
     pinta();
 

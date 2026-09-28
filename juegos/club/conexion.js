@@ -1,6 +1,7 @@
 /* Comunicación con la sección Juegos; no contiene credenciales ni Firebase. */
 (() => {
   const embebido=window.parent!==window;
+  if(embebido)document.documentElement.classList.add('club-integrado');
   const cuenta=new URLSearchParams(location.search).get('cuenta')||'local';
   let categoria='',lista,estado,propio;
   const enviar=d=>{if(embebido)parent.postMessage({canal:'club-child',...d},location.origin);};
@@ -15,14 +16,19 @@
     volver.onclick=e=>{if(embebido){e.preventDefault();enviar({tipo:'volver'});}};shell.prepend(volver);
     const panel=document.createElement('section');panel.className='club-ranking';
     panel.innerHTML='<h2>Clasificación de este modo</h2><p class="club-propio"></p><ol></ol><p role="status" aria-live="polite"></p><button type="button">Reintentar sincronización</button>';
-    shell.appendChild(panel);lista=panel.querySelector('ol');estado=panel.querySelector('[role=status]');propio=panel.querySelector('.club-propio');panel.querySelector('button').onclick=()=>enviar({tipo:'reintentar'});
+    const lateral=embebido?shell.querySelector(':is(.game-layout,.layout)>aside'):null;
+    (lateral||shell).appendChild(panel);lista=panel.querySelector('ol');estado=panel.querySelector('[role=status]');propio=panel.querySelector('.club-propio');panel.querySelector('button').onclick=()=>enviar({tipo:'reintentar'});
     if(!embebido){estado.textContent='Abre este juego desde Juegos para sincronizar tu clasificación con tu cuenta.';}else window.Club.category(categoria);
+    if(embebido){const sonido=document.getElementById('sound-button');if(sonido)shell.querySelector('.scorebar')?.appendChild(sonido);}
     let alto=0;const medir=()=>{const nuevo=Math.ceil(shell.getBoundingClientRect().bottom+32);if(nuevo!==alto){alto=nuevo;enviar({tipo:'alto',alto});}};
     new ResizeObserver(medir).observe(shell);medir();
   });
   window.addEventListener('message',e=>{
-    if(!embebido||e.source!==parent||e.origin!==location.origin||e.data?.canal!=='club-parent'||e.data.categoria!==categoria)return;
-    const d=e.data;if(d.tipo==='estado'&&estado){estado.textContent=d.texto;return;}
+    if(!embebido||e.source!==parent||e.origin!==location.origin||e.data?.canal!=='club-parent')return;
+    const d=e.data;
+    if(d.tipo==='tema'){document.documentElement.dataset.tema=d.oscuro?'oscuro':'claro';return;}
+    if(d.categoria!==categoria)return;
+    if(d.tipo==='estado'&&estado){estado.textContent=d.texto;return;}
     if(d.tipo!=='ranking'||!lista)return;
     lista.replaceChildren();const minas=categoria.startsWith('club-minas-');
     for(const f of d.filas||[]){const li=document.createElement('li');li.textContent=(f.nombre||'Jugador')+(f.yo?' (tú)':'')+' · '+(minas?(f.tiempo/1000).toFixed(2)+' s':f.puntos+' puntos');lista.appendChild(li);}
