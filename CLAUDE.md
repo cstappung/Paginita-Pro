@@ -2642,6 +2642,17 @@ is retried without components on a 400. It never throws: a room that could not
 be announced plays the same. `mensajeSala` is pure and tested in
 `tests/discord.test.cjs`.
 
+The same webhook announces a **club record that lifts someone onto the
+podium** of its category (`anunciaPodio` / `mensajePodio`). `crearSolo`
+receives `guardaConPodio` from `juegos-main.js` instead of `fb.guardarSolo`.
+It reads the category **before** writing (`fb.leerSolo`) to learn the old
+place, and it derives the table after the write with `conRecord` instead of
+reading it again. It announces only when the transaction committed and the
+place **improved** to 1–3: beating your own time while staying second is not
+news. `ordenSolo` is the club table's own order (points, then time, then uid),
+so the announced place is the one the club shows. No rules change was needed,
+because `soloRanks` is already readable by anyone signed in.
+
 **The new nodes need their rules published by hand** in the Firebase console,
 exactly like the reports' (`firebase/CONFIGURAR-FIREBASE.md`). Until then
 everything fails with `PERMISSION_DENIED`, and the lobby says so in plain

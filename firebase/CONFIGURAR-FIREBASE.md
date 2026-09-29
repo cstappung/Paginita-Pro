@@ -174,6 +174,10 @@ anuncian, y las salas abiertas desde `localhost` tampoco.
    - `discord/mencion` (opcional) = `@here`, o `<@&ID_DEL_ROL>` para avisar
      a un rol. Sin este campo el mensaje no llama a nadie.
 
+El mismo webhook anuncia también, a lo grande, cada récord de Mina Club,
+Snake Club o Tetris Club que sube a alguien al podio (top 3) de su modalidad.
+No necesita configuración aparte.
+
 Para apagarlo, borra `discord/webhook`. Si alguien copia la URL y manda spam,
 borra el webhook en Discord, crea otro y cambia el valor. No hace falta
 recompilar ni publicar el sitio.
