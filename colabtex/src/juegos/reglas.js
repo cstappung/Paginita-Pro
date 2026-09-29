@@ -365,6 +365,28 @@ const REGLAS = {
       ["Para practicar", "Tetris Club, en la portada, tiene Maratón, Sprint de 40 líneas y Ultra de dos minutos para jugar solo."]
     ]
   },
+  yemas: {
+    lema: "Shooter de huevos en primera persona, de 2 a 8 jugadores.",
+    secciones: [
+      ["El objetivo", "Freír a los demás. Cada baja suma una; gana el primero que llega a la meta que eligió quien abrió la sala (10, 15 o 25 bajas)."],
+      ["Controles", lista([
+        "Haz click en el juego para capturar el mouse; <b>Esc</b> lo suelta.",
+        "<b>WASD</b> o flechas para moverte, <b>Espacio</b> para saltar, el mouse para mirar.",
+        "<b>Click</b> dispara, <b>R</b> recarga, <b>1 2 3</b> o la rueda cambian de arma y <b>Tab</b> muestra la tabla."
+      ])],
+      ["Las armas", lista([
+        "<b>1 · Batidora</b>: automática, 30 balas, 17 de daño.",
+        "<b>2 · Revuelta</b>: escopeta de 9 perdigones; de cerca fríe de un tiro, de lejos pierde fuerza.",
+        "<b>3 · Poché</b>: francotirador. <b>Click derecho</b> para la mira; 90 de daño al cuerpo y fríe de un tiro a la cabeza."
+      ])],
+      ["Vida y muerte", lista([
+        "Tienes 100 de vida. La parte de arriba del huevo es la cabeza y ahí el daño sube.",
+        "Al morir vuelves a los tres segundos, en el punto más lejos de los demás, con un segundo y medio de protección."
+      ])],
+      ["Sin servidor", "Cada navegador decide si lo alcanzaron y anota su propia muerte en el registro. Nadie puede anotarse una baja que no le dieron, pero un navegador modificado podría no morirse: es el mismo límite honesto del resto de los juegos."],
+      ["Para practicar", "El juego suelto (<code>juegos/yemas/</code>) se juega contra cuatro bots, sin sala."]
+    ]
+  },
   presidente: {
     lema: "El «culo»: de 3 a 10 jugadores, ronda tras ronda y sin final fijo.",
     secciones: [

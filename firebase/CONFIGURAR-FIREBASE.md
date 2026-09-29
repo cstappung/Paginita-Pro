@@ -101,6 +101,21 @@ Circuit Breakers no se puede crear. El arreglo es el de siempre: pegar
 `firebase/database.rules.json` entero y **Publicar** — o usar el botón
 **Copiar las reglas** del cartel que sale en la página de juegos.
 
+### ⚠ Yemas pide publicar otra vez
+
+`'yemas'` tiene que estar en la lista del campo `juego` y en la de `logros`.
+El directo de cada huevo va por el nodo `vivo` que ya existe (`vivo/<pid>/y`),
+así que no hay nodo nuevo. Sin publicar, la sala de Yemas no se puede crear.
+El arreglo es el de siempre: pegar `firebase/database.rules.json` entero y
+**Publicar**, o usar el botón **Copiar las reglas** del cartel de la página
+de juegos.
+
+Ojo con el consumo: cada jugador escribe su posición unas doce veces por
+segundo y recibe la de los demás. Con seis en la sala son del orden de
+10 KB/s de bajada por persona, bastante más que cualquier otro juego. En el
+plan gratuito (10 GB al mes) alcanza para varias decenas de horas de partidas
+al mes; si se juega mucho conviene mirar el uso en la consola.
+
 ### ⚠ Chain Reaction (cadena) pide publicar otra vez
 
 El mismo caso otra vez: `'cadena'` tiene que estar en la lista del campo
