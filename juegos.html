@@ -1542,14 +1542,29 @@ try { var t = localStorage.getItem("jg.tema");
 
 /* Escondite: atlas ilustrado */
 .esc-rework {overflow:hidden;border:1px solid #d8d4c7;border-radius:22px;background:#f7f5ed;box-shadow:0 16px 45px #242c3514}
-.esc-editorial{padding:28px 28px 20px;background:#203e38;color:#f3edd9}
-.esc-editorial>span{font-size:10px;letter-spacing:.22em;color:#b9cdab;font-weight:800}
+.esc-editorial{padding:24px 28px 20px;background:#203e38;color:#f3edd9;display:flex;gap:20px;align-items:center}
+.esc-titular{flex:1;min-width:0}
+.esc-titular>span{font-size:10px;letter-spacing:.22em;color:#b9cdab;font-weight:800}
 .esc-editorial h2{font-family:Georgia,serif;font-size:clamp(26px,4vw,42px);font-weight:400;letter-spacing:-.04em;margin:10px 0}
 .esc-editorial p{margin:0;color:#cbd6c8;font-size:13px}
+.esc-cartel{margin:0;flex:none;width:118px;padding:8px 8px 7px;background:#f1e3bf;color:#3a2a14;border-radius:4px;transform:rotate(2deg);box-shadow:0 8px 18px #0006,inset 0 0 0 2px #c9ae78;text-align:center;font-family:Georgia,serif}
+.esc-cartel figcaption{font-size:11px;font-weight:700;letter-spacing:.14em}
+.esc-cartel canvas{display:block;width:84px;height:104px;margin:4px auto;background:radial-gradient(#fff8e4,#e6d3a4)}
+.esc-cartel small{display:block;font-size:9.5px;line-height:1.25}
+.esc-prendas{display:flex;flex-direction:column;gap:6px;flex:1;min-width:260px}
+.esc-fila{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.esc-fila b{font-size:11px;width:64px;color:#526452}
+.esc-chip{width:26px;height:26px;border-radius:50%;border:2px solid #fffdf6;box-shadow:0 0 0 1px #b9bba9;background:var(--c);cursor:pointer;padding:0}
+.esc-chip.rayas{background:repeating-linear-gradient(0deg,var(--c) 0 4px,var(--r) 4px 7px)}
+.esc-chip.txt{width:auto;height:26px;border-radius:13px;padding:0 10px;background:#fffdf6;color:#244137;font-size:11px;font-weight:700}
+.esc-chip.sel{box-shadow:0 0 0 3px #c18b29}
+.esc-chip.txt.sel{background:#244137;color:#f3edd9}
+.esc-chip:disabled{cursor:default}
+.esc-prendas.fijo .esc-chip:not(.sel){opacity:.3}
+.esc-rival{font-size:12px;color:#526452;margin-right:12px}
 .esc-herramientas{display:flex;gap:16px;align-items:center;flex-wrap:wrap;padding:16px 22px;border-bottom:1px solid #dedacb}
 .esc-herramientas label{display:flex;gap:8px;align-items:center;font-size:12px;font-weight:700}
 .esc-herramientas select{padding:9px;border:1px solid #c5c8b9;border-radius:8px;background:#fffdf6;color:#244137}
-#escObjetivo{font-size:12px;color:#526452;flex:1;min-width:180px}
 .esc-visor{overflow:auto;max-height:70vh;background:#bac5a5;overscroll-behavior:contain}
 .esc-rework .jg-lienzo{max-width:none;min-width:100%;border:0;border-radius:0;position:relative}
 .esc-rework canvas{display:block;width:100%;touch-action:pan-x pan-y;cursor:crosshair}
@@ -1557,7 +1572,7 @@ try { var t = localStorage.getItem("jg.tema");
 .esc-ayuda{padding:16px 22px;border-top:1px solid #dedacb;color:#4c5e50;font-size:13px;line-height:1.65}
 .esc-ayuda summary{cursor:pointer;font-weight:700}
 .esc-rework :focus-visible{outline:3px solid #c18b29;outline-offset:3px}
-@media(max-width:600px){.esc-editorial{padding:20px}.esc-herramientas{padding:12px;gap:10px}.esc-herramientas label{flex:1}.esc-visor{max-height:60vh}}
+@media(max-width:600px){.esc-editorial{padding:16px;gap:12px}.esc-editorial h2{font-size:22px;margin:6px 0}.esc-cartel{width:96px}.esc-cartel canvas{width:70px;height:87px}.esc-herramientas{padding:12px;gap:10px}.esc-herramientas label{flex:1}.esc-fila b{width:100%}.esc-prendas{min-width:0}.esc-visor{max-height:60vh}}
 /* Singleplayer: obsidiana, ámbar y fósforo. */
 .sp{--accent:#f6bc64;--glow:#ce792a;--ink:#e9edf5;background:#080d19;color:var(--ink);border-radius:24px;overflow:hidden;font-family:inherit;border:1px solid #273248;animation:sp-entrada .5s ease-out}
 .sp-snake{--accent:#58f5c0;--glow:#138e89}
@@ -1981,7 +1996,11 @@ html[data-tema=oscuro] .jg-calor-caliente{background:#3a2012;color:#fdba74}
 html[data-tema=oscuro] .jg-calor-casi{background:#3a1220;color:#fda4af}
 html[data-tema=oscuro] .esc-rework{background:#191c16;border-color:#30352a}
 html[data-tema=oscuro] .esc-herramientas,html[data-tema=oscuro] .esc-ayuda{border-color:#30352a}
-html[data-tema=oscuro] .esc-ayuda,html[data-tema=oscuro] #escObjetivo{color:#b7c2ad}
+html[data-tema=oscuro] .esc-ayuda,html[data-tema=oscuro] .esc-rival,html[data-tema=oscuro] .esc-fila b{color:#b7c2ad}
+html[data-tema=oscuro] .esc-chip{border-color:#191c16;box-shadow:0 0 0 1px #4a5242}
+html[data-tema=oscuro] .esc-chip.txt{background:#262b22;color:#dfe6d4}
+html[data-tema=oscuro] .esc-chip.sel{box-shadow:0 0 0 3px #d9a441}
+html[data-tema=oscuro] .esc-chip.txt.sel{background:#d9a441;color:#191c16}
 
 /* Cuadritos: el papel del tablero se oscurece con la página (los puntos
    y las rayas ya son de color). Reversi: el borde que dejaba ver la ficha
@@ -2293,6 +2312,6 @@ html[data-tema=oscuro] .jg-lado-caja>div>.jg-sala{border-color:var(--os-borde)}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202609290607"></script>
+<script src="juegos-app.js?v=202609291315"></script>
 </body>
 </html>

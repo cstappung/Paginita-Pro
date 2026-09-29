@@ -62,11 +62,14 @@ const REGLAS = {
     lema: "Esconde a tu persona en el paisaje y encuentra la del otro.",
     secciones: [
       ["1 · Esconder", lista([
-        "Elige la ropa de tu persona y colócala en el paisaje, detrás de un árbol, entre rocas… donde menos se vea.",
+        "Cada uno tiene su escena: una playa, un mercado, una feria, una estación de esquí o un campamento, llenos de gente.",
+        "Viste a tu persona con un <b>gorro</b>, una <b>camiseta</b> y lo que lleva en la mano (nada, mochila, globo o bastón). Nadie de la multitud lleva tu combinación entera, pero muchos comparten dos prendas.",
+        "Colócala donde menos se vea: entre gente parecida, detrás de un puesto, en el agua (solo asoman cabeza y hombros)… Lo que tengas justo delante tapa tus piernas, nunca la cabeza.",
         "Tienes un minuto y medio. Tu escondite queda sellado con un hash: tu rival no puede verlo hasta que los dos hayáis confirmado."
       ])],
       ["2 · Buscar", lista([
-        "Los dos buscáis a la vez en el paisaje del otro. Arriba se dice qué ropa lleva la persona que buscas.",
+        "Los dos buscáis a la vez en la escena del otro, con su cartel de <b>SE BUSCA</b> a la vista.",
+        "Con ratón, una lupa amplía lo que tienes debajo. También puedes hacer zoom y desplazarte.",
         "Haz clic donde creas que está. Cada fallo te cuesta unos segundos de espera y te dice si vas <b>frío</b>, <b>templado</b> o <b>caliente</b>.",
         "A los 40 segundos aparece un círculo que rodea la zona del escondite, igual para los dos."
       ])],

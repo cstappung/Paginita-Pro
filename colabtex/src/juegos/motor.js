@@ -220,55 +220,242 @@ export async function compromisoValido(valor, sal, hash) {
 /* ============================================================
    3. Escondite — el paisaje
 
-   Un fondo son piezas colocadas al azar sobre un degradado. Se generan
-   aquí (números) y se pintan en `escondite.js` (trazos): así el paisaje
-   se puede comprobar en Node y, sobre todo, las dos máquinas parten de
-   la misma lista sin mandarse un solo píxel.
+   Un escenario ya no son piezas tiradas al azar sobre un degradado —
+   eso era una sopa, y en una sopa no hay dónde mirar ni forma de
+   recorrerla con orden—. Es un **lugar compuesto**, como una lámina de
+   «¿Dónde está Wally?»: una playa con su mar, su orilla, sus filas de
+   toallas y su paseo con la cola de la heladería; una plaza con sus
+   fachadas, sus puestos en fila y el corro de la fuente. El azar solo
+   decide lo que en un lugar real varía (qué toalla, quién hace cola,
+   hacia dónde mira cada uno); la estructura es la del sitio.
 
-   El personaje se esconde en coordenadas normalizadas (0..1) para que
-   el mismo escondite valga en una pantalla de portátil y en un móvil.
+   La gente es la mitad del juego. Cada figura lleva gorro (o no),
+   camiseta y a veces un accesorio, sacados de los **mismos** repertorios
+   que el disfraz que elige quien se esconde: así el paisaje está lleno
+   de señuelos que coinciden en una o dos prendas, que es exactamente lo
+   que hace difícil a Wally. Lo que se garantiza es que la combinación
+   completa sea única (`vistePersona`): encontrar al otro es cuestión de
+   mirar bien, nunca de suerte entre dos gemelos.
+
+   Se generan aquí (números) y se pintan en `paisaje.js` (trazos): las
+   dos máquinas parten de la misma lista sin mandarse un solo píxel. El
+   escondite va en coordenadas normalizadas (0..1), así que vale igual en
+   un portátil que en un móvil.
    ============================================================ */
 
 export const TEMAS = {
-  bosque:  { cielo: ["#bfe3a7", "#7cb964"], suelo: "#4a7a3a", piezas: ["arbol", "mata", "roca", "flor", "tronco", "seta"] },
-  playa:   { cielo: ["#bfe8f5", "#7fc9e8"], suelo: "#e6d3a3", piezas: ["palmera", "sombrilla", "concha", "roca", "cangrejo", "mata"] },
-  ciudad:  { cielo: ["#c9d2dc", "#8d9aa8"], suelo: "#6d737a", piezas: ["edificio", "farola", "coche", "banco", "arbusto", "senal"] },
-  nieve:   { cielo: ["#dceaf5", "#a9c7de"], suelo: "#eef4f8", piezas: ["pino", "muneco", "roca", "tronco", "valla", "mata"] },
-  espacio: { cielo: ["#171a33", "#2b2050"], suelo: "#3b2f4d", piezas: ["planeta", "estrella", "roca", "cohete", "cristal", "antena"] }
+  playa:   { nombre: "La playa del Faro" },
+  mercado: { nombre: "La plaza del mercado" },
+  feria:   { nombre: "La feria de verano" },
+  nieve:   { nombre: "La estación de esquí" },
+  lago:    { nombre: "El campamento del lago" }
 };
 
 const NOMBRES_TEMA = Object.keys(TEMAS);
 
-/* Cuántas piezas caben sin que deje de ser un paisaje y empiece a ser
-   una sopa. Con menos de 140 el personaje canta a la primera; con más
-   de 300 el canvas tarda y el juego deja de ser mirar y pasa a ser
-   suerte. */
-const PIEZAS = 330;
+/* ---------- el disfraz ----------
+   6 gorros × 6 camisetas × 4 accesorios = 144 disfraces, guardados como
+   un entero en `traje`. Los seis primeros códigos son gorro 0..5 con
+   camiseta 0 y sin accesorio, que es lo que eran los seis trajes de
+   antes: una sala abierta con la versión anterior se sigue leyendo. */
+export const GORROS = [
+  { n: "rojo", c: "#d6392f" }, { n: "azul", c: "#2d5fc4" }, { n: "amarillo", c: "#ecc234" },
+  { n: "verde", c: "#2f8f49" }, { n: "blanco", c: "#f3efe4" }, { n: "morado", c: "#8448bf" }
+];
+/* Las seis primeras son las que puede llevar quien se esconde; la gente
+   lleva además otras ocho, que hacen de ruido. Rayas contra lisa del
+   mismo color es a propósito: de lejos se confunden. */
+export const CAMISETAS = [
+  { n: "rayas rojas", c: "#d6392f", r: "#f6f2e8" }, { n: "rayas azules", c: "#2d5fc4", r: "#f6f2e8" },
+  { n: "rayas amarillas", c: "#ecc234", r: "#29282c" }, { n: "roja lisa", c: "#d6392f" },
+  { n: "azul lisa", c: "#2d5fc4" }, { n: "verde lisa", c: "#2f8f49" },
+  { c: "#8a5a3c" }, { c: "#e690b1" }, { c: "#33a3a0" }, { c: "#f3efe4" },
+  { c: "#2d2f36" }, { c: "#e8813a" }, { c: "#8448bf", r: "#f6f2e8" }, { c: "#2f8f49", r: "#f6f2e8" }
+];
+export const ACCESORIOS = ["sin nada en las manos", "con mochila", "con globo", "con bastón"];
+export const TRAJES_N = 144;
+export function traje(t) {
+  const n = Number.isInteger(t) && t >= 0 && t < TRAJES_N ? t : 0;
+  return { h: n % 6, s: Math.floor(n / 6) % 6, a: Math.floor(n / 36) };
+}
+export const codigoTraje = ({ h, s, a }) => h + s * 6 + a * 36;
+export const describeTraje = t => {
+  const d = traje(t);
+  return `gorro ${GORROS[d.h].n} · camiseta ${CAMISETAS[d.s].n} · ${ACCESORIOS[d.a]}`;
+};
+
+/* Si alguien de la multitud lleva justo el disfraz buscado, se le cambia
+   el accesorio. Lo hacen las dos pantallas con la misma regla, así que
+   nadie ve un gemelo que el otro no vea. */
+export function vistePersona(pz, obj) {
+  if (obj && pz.h === obj.h && pz.c === obj.s && pz.a === obj.a) return { ...pz, a: (pz.a + 1) % 4 };
+  return pz;
+}
+
+/* Dónde el cuerpo no se ve entero: en el agua solo asoman cabeza y
+   hombros, en la pista se va sobre esquís. Lo usan la multitud y el
+   escondido por igual, o el escondido sería el único de pie en el mar. */
+export function poseEn(esc, x, y) {
+  const z = esc && esc.zona;
+  if (!z) return 0;
+  if (z.mar && y >= z.mar[0] && y <= z.mar[1] + 0.012 * Math.sin(x * 21)) return 4;
+  if (z.lago) {
+    const [cx, cy, rx, ry] = z.lago;
+    if (((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 < 0.8) return 4;
+  }
+  if (z.pista && y < z.pista) return 5;
+  return 0;
+}
 
 export function escena(semilla) {
   const r = rng(semilla >>> 0);
   const tema = NOMBRES_TEMA[Math.floor(r() * NOMBRES_TEMA.length)];
-  const t = TEMAS[tema];
-  const piezas = [];
-  for (let i = 0; i < PIEZAS; i++) {
-    const y = 0.18 + Math.pow(r(), 0.7) * 0.80;      // más densidad abajo, como en un paisaje real
+  const piezas = [], zona = {};
+  const ent = (a, b) => a + Math.floor(r() * (b - a + 1));
+  const ent01 = (a, b) => a + r() * (b - a);
+  const cl = (v, a, b) => Math.max(a, Math.min(b, v));
+  const pon = (k, x, y, s = 1, extra) => piezas.push({ k, x: cl(x, 0.01, 0.99), y: cl(y, 0.02, 0.995), s, g: 0, c: Math.floor(r() * 6), v: r(), ...extra });
+  const gente = (x, y, o) => {
+    const q = r();
     piezas.push({
-      k: t.piezas[Math.floor(r() * t.piezas.length)],
-      x: r(),
-      y,
-      s: 0.5 + r() * 1.3,
-      g: r() * 0.5 - 0.25,                            // giro leve, en radianes
-      c: Math.floor(r() * 6),                         // índice dentro de la paleta de la pieza
-      v: r()                                          // variación libre (altura, número de hojas…)
+      k: "persona", x: cl(x, 0.02, 0.98), y: cl(y, 0.14, 0.99), s: 1, g: 0,
+      c: r() < 0.55 ? Math.floor(r() * 6) : 6 + Math.floor(r() * 8),
+      v: r(), h: r() < 0.72 ? Math.floor(r() * 6) : -1,
+      a: q < 0.6 ? 0 : q < 0.77 ? 1 : q < 0.89 ? 2 : 3,
+      o: o === undefined ? (r() < 0.55 ? 1 : r() < 0.8 ? 0 : 2) : o,
+      m: r() < 0.5 ? -1 : 1
     });
+  };
+  const cola = (x, y, dx, dy, n) => { for (let i = 0; i < n; i++) gente(x + dx * i + ent01(-.004, .004), y + dy * i, 0); };
+  const corro = (cx, cy, rx, ry, n, o) => {
+    const a0 = r() * 6.28;
+    for (let i = 0; i < n; i++) { const a = a0 + i * 6.283 / n + ent01(-.15, .15); gente(cx + Math.cos(a) * rx, cy + Math.sin(a) * ry, o); }
+  };
+  const paseantes = (n, x0, x1, y0, y1, o) => { for (let i = 0; i < n; i++) gente(ent01(x0, x1), ent01(y0, y1), o); };
+  const bosquete = (cx, cy, n, rx, ry, k) => { for (let i = 0; i < n; i++) pon(k || (r() < .5 ? "arbol" : "pino"), cx + ent01(-rx, rx), cy + ent01(-ry, ry), ent01(.8, 1.3)); };
+
+  if (tema === "playa") {
+    zona.mar = [0.13, 0.40];
+    zona.ola = [r() * 6, r() * 6];
+    const faroX = r() < 0.5 ? 0.07 : 0.93;
+    zona.faro = faroX;
+    pon("faro", faroX, 0.22, 1.5);
+    for (let i = 0; i < 4; i++) pon("velero", ent01(0.12, 0.88), ent01(0.16, 0.27), ent01(.8, 1.2));
+    for (let i = 0; i < 5; i++) pon("boya", ent01(0.05, 0.95), ent01(0.3, 0.38), 0.8);
+    for (let i = 0; i < 6; i++) pon("gaviota", ent01(0.05, 0.95), ent01(0.03, 0.11), 0.8);
+    paseantes(26, 0.04, 0.96, 0.24, 0.39, 4);                      // bañistas
+    paseantes(18, 0.03, 0.97, 0.415, 0.46, 1);                     // la orilla
+    pon("socorrista", ent01(0.25, 0.75), 0.47, 1.5);
+    // Las toallas en filas sueltas, como se ocupa una playa de verdad.
+    for (let fy = 0.52; fy < 0.84; fy += 0.078) {
+      for (let fx = 0.05 + r() * 0.04; fx < 0.96; fx += ent01(0.085, 0.13)) {
+        const y = fy + ent01(-.015, .015), q = r();
+        if (q < 0.12) { pon("castillo", fx, y, 1); gente(fx + .02, y + .01, 3); continue; }
+        if (q < 0.18) { pon("pelota", fx, y); gente(fx - .02, y, 2); continue; }
+        if (r() < 0.5) pon("sombrilla", fx + .012, y - .012, 1.3);
+        pon("toalla", fx, y, 1);
+        const n = r() < 0.25 ? 0 : r() < 0.6 ? 1 : 2;
+        for (let i = 0; i < n; i++) gente(fx + (i ? .018 : -.008), y + .012, 3);
+        if (r() < 0.15) pon("nevera", fx + .03, y + .01, 0.9);
+      }
+    }
+    // El paseo marítimo: farolas, bancos y la cola de la heladería.
+    zona.paseo = 0.875;
+    for (let x = 0.06; x < 0.97; x += 0.15) pon("farola", x, 0.905, 1.1);
+    const kx = ent01(0.2, 0.75);
+    pon("heladeria", kx, 0.93, 1.6);
+    cola(kx + 0.06, 0.965, 0.024, 0.002, 7);
+    for (let i = 0; i < 3; i++) { const bx = ent01(0.05, 0.95); if (Math.abs(bx - kx) > 0.14) { pon("banco", bx, 0.94, 1); gente(bx, 0.945, 3); } }
+    paseantes(14, 0.03, 0.97, 0.89, 0.99, 1);
+  } else if (tema === "mercado") {
+    const fach = [];
+    for (let x = 0; x < 1;) { const w = ent01(0.1, 0.17); fach.push([x, w, Math.floor(r() * 6), ent01(0.2, 0.28), r()]); x += w; }
+    zona.fachadas = fach;
+    zona.banderines = [r() * 6, r() * 6];
+    for (let i = 0; i < 5; i++) gente(ent01(0.03, 0.97), ent01(0.33, 0.37), 0);    // en las puertas
+    const fx = ent01(0.4, 0.6);
+    pon("fuente", fx, 0.64, 2.3);
+    corro(fx, 0.645, 0.1, 0.07, 11);
+    for (let i = 0; i < 3; i++) pon("palomas", fx + ent01(-.18, .18), ent01(.57, .72), 1);
+    for (const fy of [0.47, 0.86]) {
+      for (let x = 0.07 + r() * 0.03; x < 0.95; x += ent01(0.14, 0.17)) {
+        pon("puesto", x, fy, 1.35);
+        gente(x + ent01(-.015, .015), fy - 0.03, 0);                   // el tendero
+        const n = ent(1, 4);
+        for (let i = 0; i < n; i++) gente(x + ent01(-.04, .04), fy + ent01(.025, .055), r() < .7 ? 0 : 2);
+        if (r() < 0.5) pon("cajas", x + 0.06, fy + 0.005, 1);
+      }
+    }
+    pon("carro", ent01(0.05, 0.3), 0.7, 1.2); pon("carro", ent01(0.7, 0.95), 0.72, 1.2);
+    for (let x = 0.1; x < 0.95; x += 0.27) pon("farola", x + ent01(-.03, .03), 0.58, 1.2);
+    for (let i = 0; i < 45; i++) {
+      const x = ent01(0.03, 0.97), y = ent01(0.52, 0.8);
+      if (Math.abs(x - fx) < 0.13 && Math.abs(y - 0.64) < 0.09) continue;
+      gente(x, y);
+    }
+    paseantes(10, 0.03, 0.97, 0.9, 0.99);
+  } else if (tema === "feria") {
+    const nx = r() < 0.5 ? 0.18 : 0.82;
+    zona.noria = nx;
+    pon("noria", nx, 0.42, 3.2);
+    cola(nx + (nx < .5 ? .07 : -.07), 0.45, nx < .5 ? .022 : -.022, .004, 8);
+    const cx = nx < 0.5 ? ent01(0.55, 0.7) : ent01(0.3, 0.45);
+    pon("carrusel", cx, 0.55, 2.1);
+    corro(cx, 0.58, 0.12, 0.055, 12, 0);
+    for (let i = 0; i < 3; i++) {
+      const x = ent01(0.08, 0.92);
+      if (Math.abs(x - nx) > 0.16 && Math.abs(x - cx) > 0.12) pon("carpa", x, ent01(0.3, 0.36), 1.8);
+    }
+    zona.guirnalda = [r() * 6];
+    for (let x = 0.08 + r() * 0.05; x < 0.95; x += ent01(0.16, 0.2)) {
+      pon("caseta", x, 0.76, 1.4);
+      cola(x, 0.8, ent01(-.006, .006), 0.028, ent(1, 4));
+    }
+    for (let i = 0; i < 2; i++) { const x = ent01(0.1, 0.9), y = ent01(0.62, 0.7); pon("globos", x + .012, y - .005, 1.3); gente(x, y, 0); }
+    for (let i = 0; i < 50; i++) gente(ent01(0.03, 0.97), ent01(0.4, 0.98));
+  } else if (tema === "nieve") {
+    zona.montes = [r(), r(), r()];
+    zona.pista = 0.8;
+    zona.cable = [ent01(0.04, 0.12), 0.74, ent01(0.82, 0.95), 0.2];
+    const [x0, y0, x1, y1] = zona.cable;
+    for (let t = 0.08; t < 0.95; t += 0.09) pon("silla", x0 + (x1 - x0) * t, y0 + (y1 - y0) * t + 0.035, 1);
+    pon("poste", x0, y0 + 0.03, 1.4); pon("poste", (x0 + x1) / 2, (y0 + y1) / 2 + 0.03, 1.4); pon("poste", x1, y1 + 0.03, 1.4);
+    const lado = x0 < 0.5 ? 1 : -1;
+    bosquete(lado > 0 ? 0.88 : 0.12, 0.62, 14, 0.09, 0.12, "pino");
+    bosquete(0.5 + ent01(-.1, .1), 0.3, 10, 0.12, 0.06, "pino");
+    bosquete(lado > 0 ? 0.35 : 0.65, 0.55, 8, 0.06, 0.05, "pino");
+    for (let i = 0; i < 44; i++) gente(ent01(0.03, 0.97), ent01(0.22, 0.79), 5);
+    for (let i = 0; i < 3; i++) pon("muneco", ent01(0.05, 0.95), ent01(0.4, 0.78), 1.2);
+    for (let i = 0; i < 4; i++) { const x = ent01(0.05, 0.95), y = ent01(0.5, 0.78); pon("trineo", x, y, 1); gente(x, y - .005, 3); }
+    const lx = ent01(0.3, 0.7);
+    pon("cabana", lx, 0.9, 2.4);
+    cola(x0 + 0.02 * lado, 0.79, 0.022 * lado, 0.012, 7);
+    for (let i = 0; i < 26; i++) gente(ent01(0.03, 0.97), ent01(0.83, 0.99), r() < 0.3 ? 3 : undefined);
+  } else {
+    zona.lago = [ent01(0.45, 0.6), 0.45, 0.27, 0.13];
+    const [cx, cy, rx, ry] = zona.lago;
+    bosquete(0.12, 0.3, 16, 0.12, 0.1);
+    bosquete(0.88, 0.3, 16, 0.12, 0.1);
+    bosquete(0.5, 0.22, 12, 0.3, 0.04);
+    for (let i = 0; i < 4; i++) { const a = r() * 6.28, x = cx + Math.cos(a) * rx * .6, y = cy + Math.sin(a) * ry * .5; pon("canoa", x, y, 1.2); gente(x - .008, y - .004, 4); gente(x + .012, y - .004, 4); }
+    const mx = cx + rx * 0.55;
+    zona.muelle = [mx, cy + ry * 0.35];
+    for (let i = 0; i < 3; i++) gente(mx + ent01(-.01, .01), cy + ry * (0.45 + i * 0.25), 3);
+    paseantes(10, cx - rx * .8, cx + rx * .8, cy - ry * .6, cy + ry * .6, 4);
+    const hx = ent01(0.2, 0.35), hy = 0.8;
+    pon("hoguera", hx, hy, 1.4);
+    corro(hx, hy + 0.005, 0.07, 0.045, 9, 3);
+    for (let fy = 0.66; fy < 0.97; fy += 0.1) for (let x = 0.55 + r() * .03; x < 0.96; x += ent01(0.09, 0.12)) {
+      pon("tienda", x, fy + ent01(-.01, .01), 1.4);
+      if (r() < 0.6) gente(x + .03, fy + .015, r() < .5 ? 0 : 3);
+    }
+    for (let i = 0; i < 12; i++) pon(r() < .5 ? "mata" : r() < .6 ? "roca" : "flor", ent01(0.03, 0.97), ent01(0.6, 0.98), ent01(.8, 1.2));
+    paseantes(38, 0.03, 0.97, 0.6, 0.99);
+    paseantes(10, 0.03, 0.97, 0.33, 0.4);
   }
-  // Multitud reproducible: los mismos personajes en ambos dispositivos.
-  for (let i = 0; i < 150; i++) piezas.push({k: "persona", x: .04 + r() * .92,
-    y: .23 + r() * .71, s: 1, g: 0, c: Math.floor(r() * 6), v: r()});
-  /* De cerca a lejos: lo que está más abajo se pinta encima, o los
-     árboles del fondo taparían a los de delante. */
+  /* De atrás hacia delante: lo que está más abajo se pinta encima. */
   piezas.sort((a, b) => a.y - b.y);
-  return { tema, semilla: semilla >>> 0, piezas };
+  return { tema, semilla: semilla >>> 0, piezas, zona };
 }
 
 /* La escena de cada jugador sale de la semilla de la partida y de su
@@ -892,7 +1079,7 @@ function redEscondite(p, js) {
   for (const j of jug) {
     if (ganador || !js.some(x => x.uid === j.uid)) continue;
     if (j.t === "c" && !comp[j.uid]) comp[j.uid] = j.h;
-    else if (j.t === "r" && comp[j.uid] && !sitios[j.uid] && sitioValido(j)) sitios[j.uid] = { x: j.x, y: j.y, traje: Number.isInteger(j.traje) && j.traje >= 0 && j.traje < 6 ? j.traje : 0, sal: j.sal, at: j.at || 0 };
+    else if (j.t === "r" && comp[j.uid] && !sitios[j.uid] && sitioValido(j)) sitios[j.uid] = { x: j.x, y: j.y, traje: Number.isInteger(j.traje) && j.traje >= 0 && j.traje < TRAJES_N ? j.traje : 0, sal: j.sal, at: j.at || 0 };
     else if (j.t === "b" && js.every(x => sitios[x.uid])) {
       /* El acierto se recalcula aquí, no se cree lo que diga la jugada.
          En el momento de buscar el escondite del otro ya está revelado

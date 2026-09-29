@@ -53,10 +53,27 @@ test('los cuatro juegos anteriores siguen arrancando',()=>{
 });
 test('Escondite: escenarios densos reproducibles y coordenadas válidas',()=>{
  const a=context.escena(42),b=context.escena(42);
- assert.deepEqual(copia(a),copia(b));assert.equal(a.piezas.length,480);
- assert.equal(a.piezas.filter(x=>x.k==='persona').length,150);
+ assert.deepEqual(copia(a),copia(b));
+ const temas=new Set(),TEMAS=vm.runInContext('TEMAS',context);
+ for(let s=1;s<=60;s++){
+  const e=context.escena(s*7919);temas.add(e.tema);assert.ok(TEMAS[e.tema],e.tema);
+  const n=e.piezas.filter(x=>x.k==='persona').length;assert.ok(n>=60&&n<=200,`${e.tema}: ${n} personas`);
+  assert.ok(e.piezas.every(x=>x.x>=0&&x.x<=1&&x.y>=0&&x.y<=1),'coordenadas en 0..1');
+ }
+ assert.equal(temas.size,Object.keys(TEMAS).length,'salen todos los escenarios');
  assert.equal(context.sitioValido({x:'0.5',y:.5}),false);
  assert.equal(context.sitioValido({x:.5,y:.5}),true);
+});
+test('Escondite: 144 disfraces y ningún gemelo en la multitud',()=>{
+ const {traje,vistePersona}=context,codigoTraje=vm.runInContext('codigoTraje',context);
+ for(let t=0;t<144;t++)assert.equal(codigoTraje(traje(t)),t);
+ assert.deepEqual(copia(traje(3)),{h:3,s:0,a:0},'los seis trajes de antes se siguen leyendo');
+ assert.deepEqual(copia(traje(999)),{h:0,s:0,a:0});
+ for(let s=1;s<=20;s++){
+  const e=context.escena(s);
+  for(let t=0;t<144;t+=7){const o=traje(t);
+   assert.ok(!e.piezas.filter(x=>x.k==='persona').map(x=>vistePersona(x,o)).some(x=>x.h===o.h&&x.c===o.s&&x.a===o.a));}
+ }
 });
 test('Escondite: ropa persistida, turnos de búsqueda y resultado estable',()=>{
  const p={...sala(),juego:'escondite'};
