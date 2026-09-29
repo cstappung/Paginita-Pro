@@ -45,7 +45,7 @@ Six apps plus a small shared **Informes** page:
   collect by themselves, plus the bugs and ideas people write. See "Informes"
   below.
 - **Juegos** (`juegos.html` + `juegos-app.js`, entry
-  `colabtex/src/juegos-main.js`) — fourteen multiplayer games, on the same Google
+  `colabtex/src/juegos-main.js`) — fifteen multiplayer games, on the same Google
   account and the same Firebase project: **Escondite** (hide a person in a
   landscape, then cross the landscapes and race to find the other's),
   **Cartas de los tres elementos** (a Card-Jitsu duel), **Cuadritos** (dots and
@@ -60,8 +60,9 @@ Six apps plus a small shared **Informes** page:
   three table variants), **Presidente** (the «culo», three to ten, an endless
   table people join and leave between rounds), **Spicy** (the bluffing card
   game, two to six), **Tetris** (everyone plays at once and sends garbage to
-  the next seat) and **Circuit Breakers** (a Worms-style artillery game
-  for two to eight squads, in an iframe), plus a **Clasificación** tab and a 📖 **Reglas**
+  the next seat), **Circuit Breakers** (a Worms-style artillery game
+  for two to eight squads, in an iframe) and **Yemas** (a first-person
+  egg shooter for two to eight, also in an iframe), plus a **Clasificación** tab and a 📖 **Reglas**
   manual for every game, solo ones included. See "Juegos" below.
 
 ColabTeX, ColabDraw, FiltroLab, AjusteLab, Juegos and Informes are authored in
@@ -1498,8 +1499,9 @@ Four decisions worth keeping:
 
 ## Juegos architecture
 
-Fourteen games, on the same Firebase project and the same Google session
-as ColabTeX and ColabDraw. Turn-based on purpose: with one move per turn the
+Fifteen games, on the same Firebase project and the same Google session
+as ColabTeX and ColabDraw. Turn-based on purpose (Tetris and Yemas are the
+real-time exceptions, and both still keep the log to what decides the game): with one move per turn the
 network carries a handful of fields and there is nothing to interpolate, so no
 game loop ever has to be synchronised.
 
@@ -2458,6 +2460,42 @@ room — it simulates nothing. Four things hold it together:
   rules let only players write there and only until the game ends (or delete).
 - **Each log entry is forwarded to the frame once, by its key**, not by
   `jugadasDe`, whose helper overwrites the key with the entry's own `k`.
+
+**Yemas (`yemas`) is a first-person shooter in an iframe, and the log only
+carries deaths.** `juegos/yemas/` is its own document (Three.js from
+jsDelivr through an import map, ES modules whose `?v=` lives only in that
+import map, physics, bots) and `colabtex/src/juegos/yemas.js` (`crearYemas`)
+is the postman, like Circuit Breakers'. Four things hold it together:
+
+- **A death is one entry, written by whoever died**: `{t:"muere", uid,
+  por, a, cab}`. `redYemas` counts `bajas`, `muertes`, `cabezas` and kill
+  streaks from those, and the first to reach `meta` (10, 15 or 25, the
+  room's `meta`, clamped by `metaYemas`) wins; the state freezes on that
+  entry. A kill credited to oneself, to an intruder or to someone who left
+  adds a death and no kill. Nobody can write a kill for themselves: the
+  honest limit, said in the manual, is that a modified client could refuse
+  to die.
+- **Movement goes through `vivo/<pid>/y/<uid>`**, about twelve writes a
+  second (`fb.yemasVivo`, which also arms an `onDisconnect` remove so a
+  closed tab does not leave a frozen egg to farm). It is the existing `vivo`
+  node, so it needed no new rule, and whoever sees `fin` deletes it.
+- **Hits have no channel of their own.** Each egg's state carries its last
+  eight hits (`g`, `[id, target, damage, head, weapon]`, ids from
+  `Date.now()` so a reloaded tab keeps climbing) and each frame applies the
+  ones naming it that it had not seen. The first state seen from a player
+  only sets the watermark, so joining mid-game never replays old hits. That
+  is what let the whole game ride on `vivo` without a rules change there.
+- **The frame is configured once the room has started**, with the seats in
+  order (the seat decides the shell colour, `PALETA` in `juegos/yemas/js/red.js`),
+  and gets the reducer's scoreboard on every repaint plus each `muere` once,
+  by key, for the kill feed; the first batch is flagged `viejas` and not
+  announced.
+
+Opened on its own, `juegos/yemas/index.html` is practice against four bots
+with the same engine (`conectarLocal`), which is also the quickest place to
+test a change. The window hooks `__yemas.paso(dt)` step the game without
+`requestAnimationFrame`, which is how it can be driven from a script while
+the tab is hidden. `tests/yemas.test.cjs` covers the reducer.
 
 **Mina Club's board fits its box; it never pushes past it** (`juegos/club/minas/`,
 plain files with no build, mounted by `solo/club.js` in an iframe whose `?v=`

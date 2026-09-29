@@ -33,7 +33,7 @@ import { crearSolo } from "./juegos/solo/club.js";
 import { watchAuth, loginGoogle, logout } from "./firebase.js";
 import * as fb from "./fb-juegos.js";
 import { escapeHtml, timeAgo, colorForUid } from "./util.js";
-import { JUEGOS, reducir, jugadasDe, acumula, cupoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES } from "./juegos/motor.js";
+import { JUEGOS, reducir, jugadasDe, acumula, cupoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_META, YM_METAS } from "./juegos/motor.js";
 import { crearEscondite } from "./juegos/escondite.js";
 import { crearCartas } from "./juegos/cartas.js";
 import { crearCuadritos } from "./juegos/cuadritos.js";
@@ -48,6 +48,7 @@ import { crearCatan } from "./juegos/catan.js";
 import { crearPresidente } from "./juegos/presidente.js";
 import { crearSpicy } from "./juegos/spicy.js";
 import { crearTetris } from "./juegos/tetris.js";
+import { crearYemas } from "./juegos/yemas.js";
 import { abreReglas, tieneReglas } from "./juegos/reglas.js";
 import { crearRanks } from "./juegos/ranks.js";
 import { LOGROS, detecta, deFila, deMarca } from "./juegos/logros.js";
@@ -65,10 +66,10 @@ const FABRICAS = {
   orbita: crearOrbita, escondite: crearEscondite, cartas: crearCartas,
   cuadritos: crearCuadritos, reversi: crearReversi, worms: crearWorms,
   cadena: crearCadena, flip7: crearFlip7, cacho: crearCacho, uno: crearUno, catan: crearCatan,
-  presidente: crearPresidente, spicy: crearSpicy, tetris: crearTetris
+  presidente: crearPresidente, spicy: crearSpicy, tetris: crearTetris, yemas: crearYemas
 };
 
-const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤" };
+const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚" };
 
 /* Lo que puede elegir quien abre la sala, por juego. Vive aquí y no en
    `motor.js` porque son controles y no reglas: el motor ya recorta lo
@@ -137,7 +138,12 @@ const OPCIONES = {
     { clave: "cupo", etiqueta: "Asientos", por: 6, valores: cupos("presidente") }
   ],
   spicy: [{ clave: "cupo", etiqueta: "Jugadores", por: 4, valores: cupos("spicy") }],
-  tetris: [{ clave: "cupo", etiqueta: "Jugadores", por: 4, valores: cupos("tetris") }]
+  tetris: [{ clave: "cupo", etiqueta: "Jugadores", por: 4, valores: cupos("tetris") }],
+  yemas: [
+    { clave: "cupo", etiqueta: "Jugadores", por: 4, valores: cupos("yemas") },
+    { clave: "meta", etiqueta: "Gana quien llegue a", por: YM_META,
+      valores: YM_METAS.map(n => ({ v: n, t: n + " bajas" })) }
+  ]
 };
 
 /* La pestaña del manual que abre cada sala: la de su variante. */
@@ -1247,7 +1253,7 @@ const FANFARRIA = { gano: "victoria", perdi: "derrota", empate: "empate", mirand
    En cartas es el choque entero (`CHOQUE`, 2,6 s): la ronda que gana
    el trío se enseña igual que las demás. Worms no pone fanfarria — el
    marco tiene su propio audio y su propio final. */
-const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300, presidente: 1200, spicy: 1200, tetris: 1500 };
+const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300, presidente: 1200, spicy: 1200, tetris: 1500, yemas: 1500 };
 
 function pintaFin(p, est) {
   const caja = $("jgFin");
@@ -1601,6 +1607,7 @@ function arteJuego(k) {
   if (k === "presidente") return '<div class="jg-art-pr"><b>👑</b>' + [["2", "♠", "#1d1d1d"], ["A", "♥", "#c62828"], ["K", "♦", "#c62828"], ["3", "♣", "#1d1d1d"]].map(([r, p, c]) => '<i style="--t:' + c + '"><span>' + r + '</span><s>' + p + '</s></i>').join("") + '<em>PRESIDENTE</em></div>';
   if (k === "spicy") return '<div class="jg-art-sp"><b>🌶</b>' + [["7", "#e2412b", "🌶"], ["3", "#5dac3a", "🍃"], ["9", "#6b4a2b", "⚫"]].map(([n, c, e]) => '<i style="--t:' + c + '"><span>' + n + '</span><s>' + e + '</s></i>').join("") + '<em>SPICY</em></div>';
   if (k === "tetris") return '<div class="jg-art-tt">' + ["....ll", "t..zll", "ttzzoo", "itsjoo", "issjjj"].map(f => [...f].map(c => '<i class="' + (c === "." ? "" : "p-" + c) + '"></i>').join("")).join("") + '<em>TETRIS</em></div>';
+  if (k === "yemas") return '<div class="jg-art-ym"><i></i><i></i><i></i><b></b><em>YEMAS</em></div>';
   if (k === "cuadritos") return '<div class="jg-art-dots">' + Array.from({ length: 9 }, (_, i) => '<i class="' + (i % 3 === 0 ? "llena" : "") + '"></i>').join("") + '</div>';
   return '<div class="jg-art-land"><i></i><i></i><i></i><b>⌖</b><span>ENCUENTRA LO INVISIBLE</span></div>';
 }

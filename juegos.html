@@ -1336,6 +1336,18 @@ try { var t = localStorage.getItem("jg.tema");
 .jg-art-tt{position:relative;display:grid;grid-template-columns:repeat(6,16px);gap:2px}
 .jg-art-tt i{width:16px;height:16px;border-radius:2px;box-shadow:inset 2px 2px 0 #fff5,inset -2px -2px 0 #0004}
 .jg-art-tt i.p-i{background:#2fd3e8}.jg-art-tt i.p-j{background:#3b6cf6}.jg-art-tt i.p-l{background:#f59a23}.jg-art-tt i.p-o{background:#f5d432}.jg-art-tt i.p-s{background:#46d160}.jg-art-tt i.p-t{background:#b04ee8}.jg-art-tt i.p-z{background:#f0455a}.jg-art-tt i[class=""]{box-shadow:none}
+.jg-portada-yemas{background:radial-gradient(ellipse at 50% 75%,#ffe2b0,#f0a040 55%,#8a4414)}
+.jg-art-ym{position:relative;width:170px;height:104px}
+.jg-art-ym i{position:absolute;bottom:12px;width:40px;height:54px;border-radius:50% 50% 50% 50%/60% 60% 40% 40%;box-shadow:inset -6px -8px 0 #0000001a,0 4px 0 #0000002a}
+.jg-art-ym i::before,.jg-art-ym i::after{content:"";position:absolute;top:16px;width:8px;height:9px;border-radius:50%;background:#222;box-shadow:0 0 0 3px #fff}
+.jg-art-ym i::before{left:10px}.jg-art-ym i::after{right:10px}
+.jg-art-ym i:nth-child(1){left:8px;background:#8fd3ff;transform:rotate(-8deg)}
+.jg-art-ym i:nth-child(2){left:65px;bottom:24px;background:#fff4e0}
+.jg-art-ym i:nth-child(3){left:122px;background:#ff9ec7;transform:rotate(8deg)}
+.jg-art-ym b{position:absolute;left:50%;bottom:2px;width:132px;height:16px;margin-left:-66px;border-radius:50%;background:#ffc21a;box-shadow:0 0 0 5px #fff8}
+.jg-art-ym em{position:absolute;left:50%;bottom:-30px;transform:translateX(-50%);font:900 18px 'IBM Plex Mono',monospace;font-style:normal;letter-spacing:3px;color:#fff;text-shadow:2px 2px 0 #b36b00}
+.jg-yemas-aviso{margin:0 0 10px;padding:10px 14px;border-radius:12px;background:#ffb3001f;border:1px solid #ffb30055;font:13px 'IBM Plex Mono',monospace}.jg-yemas-aviso[hidden]{display:none}
+.jg-yemas-marco{display:block;width:100%;height:calc(100vh - 120px);min-height:520px;border:0;border-radius:18px;background:#a9dcff}
 .jg-art-tt em{position:absolute;left:50%;bottom:-30px;transform:translateX(-50%);font:900 18px 'IBM Plex Mono',monospace;font-style:normal;letter-spacing:3px;color:#fff;text-shadow:2px 2px 0 #3b6cf6}
 .jg-tt{background:#0a0f1c;border-radius:14px;padding:0 0 12px;color:#e9edf5}
 .jg-tt .jg-barra{display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:space-between;color:#e9edf5}
@@ -2046,6 +2058,6 @@ html[data-tema=oscuro] .jg-lg-barra{background:#ffffff1a}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202609290012"></script>
+<script src="juegos-app.js?v=202609290109"></script>
 </body>
 </html>
