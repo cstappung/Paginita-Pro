@@ -1617,6 +1617,25 @@ caches with the page instead of being injected on every load. Its header and
 login card are a **deliberate copy** of `informes.html`'s: the shared part is a
 dozen rules, and a common file for that costs more than it saves.
 
+**The room has an immersive mode** (⛶ in its header, `ponInmersivo` in
+`juegos-main.js`): `html.jg-inm` turns `#pantalla` into a `position:fixed;
+inset:0` layer with the site header hidden, and asks for real fullscreen
+where the browser has it — iOS has no element fullscreen, so the class alone
+has to be the whole effect. The chat becomes a background-less overlay in the
+bottom-left corner whose messages fade out: each carries `--edad` (seconds
+since `at`, from `fb.ahora()`) and a 10 s animation starts at
+`-var(--edad)`, so an old message does not relight on repaint. 💬 or Intro
+opens it to write, Escape closes it or leaves the mode. Leaving the room
+always leaves the mode (`armazon`).
+
+**Lobby cards** are cover on top, body below (`.jg-of-cuerpo`), options
+folded into a `<details>` whose summary shows what is chosen
+(`resumeOpciones`), and a dark-ink button: several games' colours are
+yellows, and a button filled with `--c` was unreadable with white text. On a
+phone the card is a row with a 108 px cover (`zoom` on the art, which is
+fixed-px), and at ≤900 px the sidebar's room lists become horizontal
+carousels, with empty boxes other than «Salas abiertas» hidden.
+
 **Dark mode is one block at the end of that stylesheet**, every rule prefixed
 `html[data-tema=oscuro]`. The prefix out-ranks the light rule without touching
 it, so the light theme stays exactly as it was: when you add a light surface,
