@@ -293,7 +293,7 @@ export function suena(nombre, x) {
    los efectos. */
 const TEMAS = Temas.temas;
 const POKER = { url: "juegos/audio/flip7-poker-night.mp3", fin: 124.3 };
-export const GRUPOS = ["De los juegos", "Intensas", "Electrónicas", "Chill y fiesta", "Pokémon"];
+export const GRUPOS = ["De los juegos", "Intensas", "Electrónicas", "Chill y fiesta", "Aventura", "Pokémon"];
 export const CANCIONES = [
   { id: "orbita", nombre: "Deriva orbital", grupo: "De los juegos", desc: "Órbita · espacial, con eco", chip: "orbita", juegos: ["orbita"] },
   { id: "cartas", nombre: "Tres elementos", grupo: "De los juegos", desc: "Cartas · taiko y escala japonesa", chip: "cartas", juegos: ["cartas"] },
@@ -313,6 +313,16 @@ export const CANCIONES = [
   { id: "pulso", nombre: "Pulso de datos", grupo: "Electrónicas", desc: "Techno con bombeo · 126", chip: "pulso" },
   { id: "lofi", nombre: "Turno de noche", grupo: "Chill y fiesta", desc: "Lo-fi con 808 · estilo Schedule I", chip: "lofi" },
   { id: "cumbia", nombre: "Cumbia de la mesa", grupo: "Chill y fiesta", desc: "Cumbia de 8 bits con güiro", chip: "cumbia" },
+  { id: "laboratorio", nombre: "Laboratorio casero", grupo: "Chill y fiesta", desc: "Hip-hop con 808 · estilo Schedule I", chip: "laboratorio" },
+  { id: "reparto", nombre: "Reparto nocturno", grupo: "Electrónicas", desc: "Deep house de furgoneta · estilo Schedule I", chip: "reparto" },
+  { id: "bossa", nombre: "Bossa de ascensor", grupo: "Chill y fiesta", desc: "Bossa nova con séptimas", chip: "bossa" },
+  { id: "reggae", nombre: "Reggae de bits", grupo: "Chill y fiesta", desc: "One drop con eco de dub", chip: "reggae" },
+  { id: "aurora", nombre: "Aurora", grupo: "Chill y fiesta", desc: "Ambiente lento, notas largas", chip: "aurora" },
+  { id: "turbo", nombre: "Carrera turbo", grupo: "Intensas", desc: "Eurobeat de octavas · 156", chip: "turbo" },
+  { id: "surf", nombre: "Ola de 8 bits", grupo: "Aventura", desc: "Surf con trémolo · 168", chip: "surf" },
+  { id: "oeste", nombre: "Duelo al sol", grupo: "Aventura", desc: "Western con silbido y galope", chip: "oeste" },
+  { id: "mazmorra", nombre: "Mazmorra", grupo: "Aventura", desc: "Do menor armónica, pasos con eco", chip: "mazmorra" },
+  { id: "celta", nombre: "Galope celta", grupo: "Aventura", desc: "Giga en Re mixolidio", chip: "celta" },
   /* Homenajes a Rojo Fuego / Verde Hoja: melodías propias con el timbre de
      la GBA, no transcripciones (ver el porqué en `temas.js`). */
   { id: "pk-pueblo", nombre: "Pueblo de partida", grupo: "Pokémon", desc: "Homenaje · el pueblo donde empieza todo", chip: "pk-pueblo" },
