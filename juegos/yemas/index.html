@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Yemas</title>
+<link rel="stylesheet" href="estilo.css?v=yemas-1">
+<!-- Los módulos llevan la versión aquí, en un solo sitio: GitHub Pages
+     cachea diez minutos y un import sin ?v= serviría el archivo viejo. -->
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.min.js",
+  "yemas/mundo": "./js/mundo.js?v=yemas-1",
+  "yemas/armas": "./js/armas.js?v=yemas-1",
+  "yemas/audio": "./js/audio.js?v=yemas-1",
+  "yemas/red": "./js/red.js?v=yemas-1"
+} }
+</script>
+</head>
+<body>
+<canvas id="lienzo"></canvas>
+
+<div id="hud" hidden>
+  <div id="mira"></div>
+  <div id="marca"></div>
+  <div id="mira-sniper" hidden></div>
+  <div id="danio"></div>
+  <div id="feed"></div>
+  <div id="marcador-mini"></div>
+  <div id="meta"></div>
+  <div id="aviso" hidden></div>
+  <div id="vida"><div id="vida-barra"></div><span id="vida-num">100</span></div>
+  <div id="arma"><span id="arma-nombre"></span><span id="municion"></span></div>
+  <div id="tabla" hidden>
+    <table>
+      <thead><tr><th>Huevo</th><th>Bajas</th><th>Muertes</th></tr></thead>
+      <tbody id="tabla-filas"></tbody>
+    </table>
+  </div>
+  <div id="muerte" hidden><h2>¡Te frieron!</h2><p id="muerte-txt"></p></div>
+  <div id="fin" hidden><h2>Fin de la partida</h2><p id="fin-txt"></p></div>
+  <div id="pausa" hidden>
+    <h2>Haz click para jugar</h2>
+    <p>Se captura el mouse para apuntar. <b>Esc</b> lo suelta.</p>
+    <p class="chico">WASD moverse · Espacio saltar · Click disparar · Click der. mira · R recargar · 1 2 3 armas · Tab tabla</p>
+  </div>
+</div>
+
+<div id="espera" hidden><p>Esperando que empiece la sala…</p></div>
+
+<div id="menu">
+  <a class="volver" href="../../juegos.html">← Juegos</a>
+  <h1>YEMAS</h1>
+  <p class="sub">un shooter de huevos · práctica contra bots</p>
+  <label>Tu nombre <input id="nombre" maxlength="14" autocomplete="off"></label>
+  <div class="etq">Color de cáscara</div>
+  <div id="colores"></div>
+  <button id="jugar">Jugar</button>
+  <p id="modo">Para jugar con otros, abre una sala de Yemas en Juegos.</p>
+  <div class="ayuda">
+    <span>WASD</span> moverse · <span>Espacio</span> saltar · <span>Click</span> disparar ·
+    <span>Click der.</span> mira (Poché) · <span>R</span> recargar · <span>1 2 3</span> o rueda: armas ·
+    <span>Tab</span> tabla · <span>Esc</span> soltar mouse
+  </div>
+</div>
+
+<script type="module" src="js/main.js?v=yemas-1"></script>
+</body>
+</html>

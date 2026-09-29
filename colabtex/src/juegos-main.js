@@ -33,7 +33,7 @@ import { crearSolo } from "./juegos/solo/club.js";
 import { watchAuth, loginGoogle, logout } from "./firebase.js";
 import * as fb from "./fb-juegos.js";
 import { escapeHtml, timeAgo, colorForUid } from "./util.js";
-import { JUEGOS, reducir, jugadasDe, acumula, cupoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES } from "./juegos/motor.js";
+import { JUEGOS, reducir, jugadasDe, acumula, cupoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_META, YM_METAS } from "./juegos/motor.js";
 import { crearEscondite } from "./juegos/escondite.js";
 import { crearCartas } from "./juegos/cartas.js";
 import { crearCuadritos } from "./juegos/cuadritos.js";
@@ -48,6 +48,7 @@ import { crearCatan } from "./juegos/catan.js";
 import { crearPresidente } from "./juegos/presidente.js";
 import { crearSpicy } from "./juegos/spicy.js";
 import { crearTetris } from "./juegos/tetris.js";
+import { crearYemas } from "./juegos/yemas.js";
 import { abreReglas, tieneReglas } from "./juegos/reglas.js";
 import { crearRanks } from "./juegos/ranks.js";
 import { LOGROS, detecta, deFila, deMarca } from "./juegos/logros.js";
@@ -56,6 +57,7 @@ import { mezcla, abrePerfil } from "./juegos/perfil.js";
 import { suena, silenciar, silenciado, ambientar, ajustarMusica, activarAudio } from "./juegos/sonido.js";
 import { montaReproductor } from "./juegos/reproductor.js";
 import { createReportWidget } from "./report-widget.js";
+import { anunciaSala, anunciaPodio, puestoSolo, conRecord, ordenSolo } from "./juegos/discord.js";
 
 const $ = id => document.getElementById(id);
 const VER = (document.currentScript && document.currentScript.src.split("?v=")[1]) || "";
@@ -64,10 +66,10 @@ const FABRICAS = {
   orbita: crearOrbita, escondite: crearEscondite, cartas: crearCartas,
   cuadritos: crearCuadritos, reversi: crearReversi, worms: crearWorms,
   cadena: crearCadena, flip7: crearFlip7, cacho: crearCacho, uno: crearUno, catan: crearCatan,
-  presidente: crearPresidente, spicy: crearSpicy, tetris: crearTetris
+  presidente: crearPresidente, spicy: crearSpicy, tetris: crearTetris, yemas: crearYemas
 };
 
-const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤" };
+const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚" };
 
 /* Lo que puede elegir quien abre la sala, por juego. Vive aquí y no en
    `motor.js` porque son controles y no reglas: el motor ya recorta lo
@@ -136,7 +138,12 @@ const OPCIONES = {
     { clave: "cupo", etiqueta: "Asientos", por: 6, valores: cupos("presidente") }
   ],
   spicy: [{ clave: "cupo", etiqueta: "Jugadores", por: 4, valores: cupos("spicy") }],
-  tetris: [{ clave: "cupo", etiqueta: "Jugadores", por: 4, valores: cupos("tetris") }]
+  tetris: [{ clave: "cupo", etiqueta: "Jugadores", por: 4, valores: cupos("tetris") }],
+  yemas: [
+    { clave: "cupo", etiqueta: "Jugadores", por: 4, valores: cupos("yemas") },
+    { clave: "meta", etiqueta: "Gana quien llegue a", por: YM_META,
+      valores: YM_METAS.map(n => ({ v: n, t: n + " bajas" })) }
+  ]
 };
 
 /* La pestaña del manual que abre cada sala: la de su variante. */
@@ -601,8 +608,30 @@ async function crear(juego, extra) {
   try {
     const pid = await fb.crearPartida(juego,
       { uid: u.uid, nombre: u.name, foto: fotoBreve(u.photo), color: u.color }, extra);
+    anunciaSala(salaParaDiscord(pid, juego, extra, u));
     ir("#p/" + pid);
   } catch (e) { avisa(e, juego); }
+}
+
+/* Lo que el aviso de Discord cuenta de la sala. Solo desde aquí: la
+   revancha también crea una partida, pero es para los mismos que ya
+   jugaban y no hace falta llamar a nadie. Las opciones se traducen con
+   la misma tabla que pinta los desplegables, así que el mensaje dice
+   «No Mercy» y no «nomercy». */
+function salaParaDiscord(pid, juego, extra, u) {
+  const j = JUEGOS[juego] || {};
+  const opciones = (OPCIONES[juego] || []).filter(o => o.clave !== "cupo").map(o => {
+    const v = extra && extra[o.clave] !== undefined ? extra[o.clave] : (o.por || o.valores[0].v);
+    const hit = o.valores.find(x => x.v === v);
+    return hit ? [o.etiqueta, hit.t] : null;
+  }).filter(Boolean);
+  const base = location.origin + location.pathname;
+  return {
+    pid, juego, nombre: j.nombre, lema: j.lema, color: j.color, icono: ICONO[juego],
+    anfitrion: u.name, foto: fotoBreve(u.photo),
+    cupo: cupoDe(Object.assign({ juego }, extra)), opciones,
+    enlace: base + "#p/" + pid, vestibulo: base
+  };
 }
 
 async function entrar(pid) {
@@ -721,12 +750,39 @@ function pintaTabs() {
   $("tabLogros").classList.toggle("on", state.vista === "logros");
 }
 
+/* Guarda un récord de club y, si sube a su dueño al podio de la
+   modalidad, lo anuncia en Discord. La tabla se lee *antes* de escribir
+   para saber de qué puesto venía; la de después no hace falta leerla,
+   es la misma con la fila nueva. Solo se anuncia si la transacción
+   escribió de verdad (otra pestaña pudo guardar una marca mejor) y si
+   el puesto mejoró: repetir el segundo lugar con mejor tiempo no es
+   noticia. El aviso nunca estorba al guardado. */
+async function guardaConPodio(categoria, uid, dato) {
+  const antes = await fb.leerSolo(categoria).catch(() => null);
+  const res = await fb.guardarSolo(categoria, uid, dato);
+  if (!antes || !res || !res.committed) return res;
+  const filas = conRecord(antes, uid, dato);
+  const puesto = puestoSolo(filas, uid), previo = puestoSolo(antes, uid);
+  if (puesto >= 1 && puesto <= 3 && (!previo || puesto < previo)) {
+    const sitio = antes.slice().sort(ordenSolo)[puesto - 1];
+    const u = state.user || {};
+    const juego = categoria.split("-")[1];
+    anunciaPodio({
+      categoria, uid, nombre: dato.nombre || u.name, foto: fotoBreve(u.photo),
+      puesto, antes: previo, filas,
+      desbancado: sitio && sitio.uid !== uid ? sitio.nombre || "" : "",
+      enlace: location.origin + location.pathname + "#solo/" + juego
+    });
+  }
+  return res;
+}
+
 function armazon() {
   const h = $("pantalla");
   h.closest("main").classList.toggle("jg-ancho", state.vista === "partida" || state.vista.startsWith("solo-"));
   if (state.vista.startsWith("solo-")) {
     const clave = state.vista.slice(5) === "tetris" ? "tetrisclub" : state.vista.slice(5);
-    individual = crearSolo({juego:state.vista.slice(5),usuario:state.user,guardar:fb.guardarSolo,watch:fb.watchSolo,volver:()=>ir(""),
+    individual = crearSolo({juego:state.vista.slice(5),usuario:state.user,guardar:guardaConPodio,watch:fb.watchSolo,volver:()=>ir(""),
       /* Un logro individual sale de la marca: se celebra el que esta
          partida da y la mejor marca guardada no daba ya. */
       alResultado: (d, previa) => { const antes = new Set(previa ? deMarca(clave, Object.assign({ categoria: d.categoria }, previa)) : []);
@@ -1224,7 +1280,7 @@ const FANFARRIA = { gano: "victoria", perdi: "derrota", empate: "empate", mirand
    En cartas es el choque entero (`CHOQUE`, 2,6 s): la ronda que gana
    el trío se enseña igual que las demás. Worms no pone fanfarria — el
    marco tiene su propio audio y su propio final. */
-const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300, presidente: 1200, spicy: 1200, tetris: 1500 };
+const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300, presidente: 1200, spicy: 1200, tetris: 1500, yemas: 1500 };
 
 function pintaFin(p, est) {
   const caja = $("jgFin");
@@ -1578,6 +1634,7 @@ function arteJuego(k) {
   if (k === "presidente") return '<div class="jg-art-pr"><b>👑</b>' + [["2", "♠", "#1d1d1d"], ["A", "♥", "#c62828"], ["K", "♦", "#c62828"], ["3", "♣", "#1d1d1d"]].map(([r, p, c]) => '<i style="--t:' + c + '"><span>' + r + '</span><s>' + p + '</s></i>').join("") + '<em>PRESIDENTE</em></div>';
   if (k === "spicy") return '<div class="jg-art-sp"><b>🌶</b>' + [["7", "#e2412b", "🌶"], ["3", "#5dac3a", "🍃"], ["9", "#6b4a2b", "⚫"]].map(([n, c, e]) => '<i style="--t:' + c + '"><span>' + n + '</span><s>' + e + '</s></i>').join("") + '<em>SPICY</em></div>';
   if (k === "tetris") return '<div class="jg-art-tt">' + ["....ll", "t..zll", "ttzzoo", "itsjoo", "issjjj"].map(f => [...f].map(c => '<i class="' + (c === "." ? "" : "p-" + c) + '"></i>').join("")).join("") + '<em>TETRIS</em></div>';
+  if (k === "yemas") return '<div class="jg-art-ym"><i></i><i></i><i></i><b></b><em>YEMAS</em></div>';
   if (k === "cuadritos") return '<div class="jg-art-dots">' + Array.from({ length: 9 }, (_, i) => '<i class="' + (i % 3 === 0 ? "llena" : "") + '"></i>').join("") + '</div>';
   return '<div class="jg-art-land"><i></i><i></i><i></i><b>⌖</b><span>ENCUENTRA LO INVISIBLE</span></div>';
 }

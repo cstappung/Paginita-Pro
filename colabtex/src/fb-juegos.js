@@ -366,6 +366,12 @@ export function watchSolo(categoria, cb) {
     cb(Object.entries(s.val() || {}).map(([uid, fila]) => ({...fila, uid})), null);
   }, e => cb([], e));
 }
+/* La tabla de una modalidad, una vez: el aviso del podio la necesita
+   *antes* del récord para saber de qué puesto venía. */
+export async function leerSolo(categoria) {
+  const s = await get(ref(db, `soloRanks/${categoria}`));
+  return Object.entries(s.val() || {}).map(([uid, fila]) => ({...fila, uid}));
+}
 export function guardarSolo(categoria, uid, dato) {
   return runTransaction(ref(db, `soloRanks/${categoria}/${uid}`), previo => {
     if (previo && (previo.puntos > dato.puntos || previo.puntos === dato.puntos && previo.tiempo <= dato.tiempo)) return;
@@ -395,6 +401,20 @@ export function watchVivo(pid, alCabecera, alTrozo) {
 export const tetrisVivo = (pid, uid, d) => set(ref(db, `vivo/${pid}/t/${uid}`), d).catch(() => {});
 export function watchTetrisVivo(pid, cb) {
   return onValue(ref(db, `vivo/${pid}/t`), s => cb(s.val() || {}), () => {});
+}
+/* Cada huevo de Yemas: `vivo/<pid>/y/<uid>`, reescrito unas doce veces por
+   segundo con dónde está, adónde mira, su último disparo y sus últimos
+   golpes. Se borra solo al desconectarse, porque un huevo congelado en
+   medio del mapa sería una baja gratis para el resto. Tampoco es estado:
+   las bajas van al registro, que es lo que decide la partida. */
+const yemasDesconexion = new Set();
+export function yemasVivo(pid, uid, d) {
+  const r = ref(db, `vivo/${pid}/y/${uid}`);
+  if (!yemasDesconexion.has(pid)) { yemasDesconexion.add(pid); onDisconnect(r).remove().catch(() => {}); }
+  return set(r, d).catch(() => {});
+}
+export function watchYemasVivo(pid, cb) {
+  return onValue(ref(db, `vivo/${pid}/y`), s => cb(s.val() || {}), () => {});
 }
 export const borraVivo = pid => remove(ref(db, `vivo/${pid}`)).catch(() => {});
 

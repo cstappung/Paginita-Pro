@@ -159,6 +159,14 @@ const SALA = {
     { id: "avalancha", n: "Avalancha", d: "Envía 6 líneas de una vez.", i: "🏔️", x: c => c.ev("ataque", h => h.uid === c.me && h.n >= 6) },
     { id: "multitud", n: "Último en pie", d: "Gana contra 3 rivales o más.", i: "🗼", x: c => c.gano && c.n >= 4 },
     { id: "pacifista", n: "Zen", d: "Gana habiendo enviado menos de 5 líneas.", i: "🧘", x: c => c.gano && ((c.est.enviadas || {})[c.me] || 0) < 5 }
+  ],
+  yemas: [
+    { id: "sangre", n: "Primera sangre", d: "Haz la primera baja de la partida.", i: "🍳", x: c => c.est.primera === c.me },
+    { id: "racha5", n: "Sartén caliente", d: "Fríe a 5 seguidos sin que te frían.", i: "🔥", x: c => ((c.est.mejorRacha || {})[c.me] || 0) >= 5 },
+    { id: "cabezas", n: "Punto de yema", d: "Haz 5 bajas a la cabeza en una partida.", i: "🎯", x: c => ((c.est.cabezas || {})[c.me] || 0) >= 5 },
+    { id: "poche", n: "Poché", d: "Haz una baja a la cabeza con el Poché.", i: "🔭", x: c => c.ev("baja", h => h.uid === c.me && h.a === 2 && h.cab) },
+    { id: "intacto", n: "Cáscara intacta", d: "Gana sin morir ni una vez.", i: "🥚", x: c => c.gano && ((c.est.muertes || {})[c.me] || 0) === 0 },
+    { id: "multitud", n: "Omelette gigante", d: "Gana con 5 jugadores o más.", i: "🍽️", x: c => c.gano && c.n >= 5 }
   ]
 };
 

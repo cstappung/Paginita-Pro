@@ -128,6 +128,13 @@ export const JUEGOS = {
     color: "#22b8cf",
     minimo: 2,
     cupo: 8
+  },
+  yemas: {
+    nombre: "Yemas",
+    lema: "Shooter de huevos en primera persona: el primero en freír a los demás hasta la meta gana",
+    color: "#ffb300",
+    minimo: 2,
+    cupo: 8
   }
 };
 
@@ -678,6 +685,7 @@ export function reducir(p) {
   if (p.juego === "presidente") return { ...base, ...redPresidente(p, js, listos) };
   if (p.juego === "spicy") return { ...base, ...redSpicy(p, js, listos) };
   if (p.juego === "tetris") return { ...base, ...redTetris(p, js, listos) };
+  if (p.juego === "yemas") return { ...base, ...redYemas(p, js, listos) };
   return base;
 }
 
@@ -747,6 +755,8 @@ export function progreso(est, juego) {
   if (juego === "spicy" && est.limite) return c(Math.max(est.robos / est.limite, (3 - est.libres) / 3));
   /* En Tetris, cuántos han caído ya. */
   if (juego === "tetris" && est.caidos) return c(est.caidos.length / Math.max(1, (est.jugadores || []).length - 1));
+  /* En Yemas, lo cerca de la meta que está quien más bajas lleva. */
+  if (juego === "yemas" && est.bajas) return c(Math.max(0, ...Object.values(est.bajas)) / (est.meta || YM_META));
   if (juego === "cartas" && est.ganadas) return c(Math.max(0, ...Object.values(est.ganadas).map(g => g.length)) / 5);
   return 0;
 }
@@ -802,6 +812,74 @@ export function redWorms(p, js = jugadoresDe(p), listos = true) {
     fase: !listos ? "espera" : ganador !== null ? "fin" : "jugando",
     turno, turnos, puntos, fuera,
     vivos: vivos.map(j => j.uid),
+    ganador, motivo
+  };
+}
+
+/* ---------- Yemas ----------
+   El único juego de sala que es un shooter en tiempo real, y aun así el
+   registro solo lleva lo que decide la partida: una jugada por muerte,
+   `{t:"muere", uid, por, a, cab}`, que escribe **quien muere** (es su
+   `uid` el que las reglas dejan escribir) nombrando a quien lo frió, con
+   qué arma y si fue a la cabeza. Moverse, apuntar y disparar va por
+   `vivo/<pid>/y/<uid>` y no deja rastro: nada se reconstruye de ahí.
+
+   El límite honesto, dicho como en el escondite: sin un servidor que
+   arbitre, cada navegador decide si lo alcanzaron. Un cliente modificado
+   podría no morirse nunca; lo que no puede es anotarse bajas, porque una
+   baja solo existe si la escribe el que murió.
+
+   Gana el primero que llega a la `meta` de bajas, y la partida se congela
+   en esa jugada: una muerte escrita después no cambia al ganador. Una baja
+   de alguien que ya se fue, o sobre uno mismo, cuenta como muerte de la
+   víctima y no le suma a nadie. `racha` son las bajas seguidas sin morir,
+   que es lo que miran los logros. */
+export const YM_METAS = [10, 15, 25];
+export const YM_META = 15;
+export function metaYemas(p) {
+  const m = Math.floor(Number(p && p.meta));
+  return YM_METAS.includes(m) ? m : YM_META;
+}
+
+export function redYemas(p, js = jugadoresDe(p), listos = true) {
+  const ids = new Set(js.map(j => j.uid));
+  const meta = metaYemas(p);
+  const bajas = {}, muertes = {}, cabezas = {}, racha = {}, mejorRacha = {}, fuera = {};
+  for (const u of ids) { bajas[u] = 0; muertes[u] = 0; cabezas[u] = 0; racha[u] = 0; mejorRacha[u] = 0; }
+  const hist = [];
+  let ganador = null, motivo = "", primera = "";
+  for (const j of jugadasDe(p)) {
+    if (ganador !== null) break;
+    if (j.t === "abandona") {
+      if (ids.has(j.uid) && !fuera[j.uid]) { fuera[j.uid] = true; hist.push({ e: "sale", uid: j.uid }); }
+      continue;
+    }
+    if (j.t !== "muere" || !listos || !ids.has(j.uid) || fuera[j.uid]) continue;
+    const v = j.uid, k = j.por;
+    muertes[v]++;
+    racha[v] = 0;
+    const vale = typeof k === "string" && ids.has(k) && k !== v && !fuera[k];
+    const a = Number.isInteger(j.a) && j.a >= 0 && j.a <= 2 ? j.a : 0;
+    hist.push({ e: "baja", uid: vale ? k : "", v, a, cab: !!j.cab });
+    if (!vale) continue;
+    bajas[k]++;
+    if (j.cab) cabezas[k]++;
+    racha[k]++;
+    if (racha[k] > mejorRacha[k]) mejorRacha[k] = racha[k];
+    if (!primera) primera = k;
+    if (bajas[k] >= meta) { ganador = k; motivo = "meta"; }
+  }
+  const activos = js.filter(j => !fuera[j.uid]);
+  if (ganador === null && listos && activos.length <= 1) {
+    ganador = activos.length ? activos[0].uid : "";
+    motivo = "abandono";
+  }
+  return {
+    fase: !listos ? "espera" : ganador !== null ? "fin" : "jugando",
+    turno: "", meta, bajas, muertes, cabezas, racha, mejorRacha, fuera, primera,
+    puntos: bajas,
+    vivos: activos.map(j => j.uid),
+    hist: hist.slice(-40),
     ganador, motivo
   };
 }
