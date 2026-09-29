@@ -56,6 +56,7 @@ import { mezcla, abrePerfil } from "./juegos/perfil.js";
 import { suena, silenciar, silenciado, ambientar, ajustarMusica, activarAudio } from "./juegos/sonido.js";
 import { montaReproductor } from "./juegos/reproductor.js";
 import { createReportWidget } from "./report-widget.js";
+import { anunciaSala } from "./juegos/discord.js";
 
 const $ = id => document.getElementById(id);
 const VER = (document.currentScript && document.currentScript.src.split("?v=")[1]) || "";
@@ -601,8 +602,30 @@ async function crear(juego, extra) {
   try {
     const pid = await fb.crearPartida(juego,
       { uid: u.uid, nombre: u.name, foto: fotoBreve(u.photo), color: u.color }, extra);
+    anunciaSala(salaParaDiscord(pid, juego, extra, u));
     ir("#p/" + pid);
   } catch (e) { avisa(e, juego); }
+}
+
+/* Lo que el aviso de Discord cuenta de la sala. Solo desde aquí: la
+   revancha también crea una partida, pero es para los mismos que ya
+   jugaban y no hace falta llamar a nadie. Las opciones se traducen con
+   la misma tabla que pinta los desplegables, así que el mensaje dice
+   «No Mercy» y no «nomercy». */
+function salaParaDiscord(pid, juego, extra, u) {
+  const j = JUEGOS[juego] || {};
+  const opciones = (OPCIONES[juego] || []).filter(o => o.clave !== "cupo").map(o => {
+    const v = extra && extra[o.clave] !== undefined ? extra[o.clave] : (o.por || o.valores[0].v);
+    const hit = o.valores.find(x => x.v === v);
+    return hit ? [o.etiqueta, hit.t] : null;
+  }).filter(Boolean);
+  const base = location.origin + location.pathname;
+  return {
+    pid, juego, nombre: j.nombre, lema: j.lema, color: j.color, icono: ICONO[juego],
+    anfitrion: u.name, foto: fotoBreve(u.photo),
+    cupo: cupoDe(Object.assign({ juego }, extra)), opciones,
+    enlace: base + "#p/" + pid, vestibulo: base
+  };
 }
 
 async function entrar(pid) {

@@ -139,6 +139,30 @@ arreglo es el de siempre: pegar `firebase/database.rules.json` entero y
 **Publicar**, o usar el botón **Copiar las reglas** del cartel de la página de
 juegos.
 
+### Aviso de salas nuevas en Discord (opcional)
+
+Cada sala que se abre desde el vestíbulo puede anunciarse en un canal de
+Discord: un mensaje con el juego, quién la abrió, las opciones elegidas y un
+botón **Unirse a la sala**. No hace falta bot ni servidor. Es un *webhook*, y
+el mensaje lo manda el navegador de quien abre la sala. Las revanchas no se
+anuncian, y las salas abiertas desde `localhost` tampoco.
+
+1. En Discord: **Editar canal → Integraciones → Webhooks → Nuevo webhook**.
+   Ponle nombre y foto si quieres (el mensaje firma como «Laboratorio ·
+   Juegos») y pulsa **Copiar URL del webhook**.
+2. Publica las reglas otra vez (pegar `firebase/database.rules.json` entero y
+   **Publicar**). Traen un nodo nuevo, `discord`, que pueden leer los que
+   tienen sesión y no puede escribir nadie desde la web.
+3. En **Realtime Database → Datos**, crea a mano, en la raíz:
+   - `discord/webhook` = la URL copiada
+     (`https://discord.com/api/webhooks/…`).
+   - `discord/mencion` (opcional) = `@here`, o `<@&ID_DEL_ROL>` para avisar
+     a un rol. Sin este campo el mensaje no llama a nadie.
+
+Para apagarlo, borra `discord/webhook`. Si alguien copia la URL y manda spam,
+borra el webhook en Discord, crea otro y cambia el valor. No hace falta
+recompilar ni publicar el sitio.
+
 ## 2. Reglas de Storage
 
 1. Consola → **Storage** → pestaña **Reglas**.

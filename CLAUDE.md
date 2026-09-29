@@ -2591,6 +2591,19 @@ the rarest logro anyone holds. The `logros` node needs the rules re-published.
 `tests/logros.test.cjs` checks ten unique ids per game and that the rules'
 whitelist names every room game.
 
+**A new room is announced on Discord** (`juegos/discord.js`), with no bot
+and no server: a Discord *webhook* that the host's own browser POSTs to
+(Discord answers CORS for it) right after `crear()` in `juegos-main.js`.
+Rematches are not announced, and neither is `localhost`. The webhook URL is
+**not in the bundle**. It lives in `discord/webhook`, readable by anyone signed
+in and writable by nobody from the web, and is pasted by hand in the console,
+with an optional `discord/mencion`. So a leaked URL is fixed by swapping that
+value, with no build. The message carries a link button (`style: 5`, sent
+with `?with_components=true`, the only kind a plain webhook may send), and it
+is retried without components on a 400. It never throws: a room that could not
+be announced plays the same. `mensajeSala` is pure and tested in
+`tests/discord.test.cjs`.
+
 **The new nodes need their rules published by hand** in the Firebase console,
 exactly like the reports' (`firebase/CONFIGURAR-FIREBASE.md`). Until then
 everything fails with `PERMISSION_DENIED`, and the lobby says so in plain
