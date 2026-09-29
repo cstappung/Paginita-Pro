@@ -184,6 +184,11 @@
       }
     },
 
+    "discord": {
+      ".read": "auth != null",
+      ".write": false
+    },
+
     "enCurso": {
       ".read": "auth != null",
       ".indexOn": ["at"],
