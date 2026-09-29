@@ -356,6 +356,12 @@ self.onmessage = function(e) {
     glowOn: true,
     fft: null,          // last spectrum result
     harm: null,         // last harmonic analysis
+    /* Channels analysed next to the source, in channel order. `series` is what
+       the FFT tab draws: the source first, then each of those, every one with
+       its own {ch, fft, harm}. S.fft/S.harm stay the source's, so everything
+       that only ever looked at one channel (THD card, table, recon) is as it was. */
+    fftCompare: [],
+    series: [],
     fftMaxFreq: null,
     iL: null,           // rated demand current for TDD (rms, null = not set)
     xy: { xId: "", yId: "" },
@@ -385,7 +391,7 @@ self.onmessage = function(e) {
     "scopeWrap", "scopeCanvas", "hoverReadout", "zoomWrap", "zoomCanvas",
     "splitWrap", "splitCanvas", "splitReadout",
     "measureBody", "measureScopeSel", "btnExportMeas",
-    "fftSource", "fftWindow", "fftScale", "fftRange", "fftMaxIn",
+    "fftSource", "fftCompareList", "fftPhaseMode", "fftCmpCard", "fftCmpBody", "fftWindow", "fftScale", "fftRange", "fftMaxIn",
     "f0In", "nHarmIn", "multMode", "multKIn", "multKRow", "harmUnit",
     "ilIn", "btnIeee", "btnCompute", "btnExportHarm", "fftSummary",
     "specWrap", "specCanvas", "harmWrap", "harmCanvas", "phaseWrap", "phaseCanvas",
@@ -526,6 +532,13 @@ self.onmessage = function(e) {
     /* the harmonics table carries six numeric columns in a 340px rail */
     .osc .fft-rdo .tbl th{padding:5px 5px;letter-spacing:.03em}
     .osc .fft-rdo .tbl td{padding:3px 5px;font-size:10.5px}
+    .osc .row.top{align-items:flex-start}
+    .osc .cmp-list{display:flex;flex-direction:column;gap:4px;max-height:132px;overflow-y:auto;min-width:0}
+    .osc .cmp-list .chk{gap:6px;font-size:11px}
+    .osc .cmp-list .hint{padding-top:2px}
+    .osc .dot{display:inline-block;width:8px;height:8px;border-radius:50%;flex-shrink:0;vertical-align:middle;margin-right:5px}
+    .osc .card.cmp{max-height:170px;overflow-y:auto}
+    .osc .card.cmp td:first-child{max-width:92px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
     /* ===== THD / TDD readout ===== */
     .osc .rdo{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line)}
@@ -762,7 +775,7 @@ self.onmessage = function(e) {
     S.files = S.files.filter(f => f.id !== fileId);
     S.channels = S.channels.filter(ch => ch.isMath || ch.fileId !== fileId);
     S.channels = S.channels.filter(ch => !ch.isMath || (S.channels.some(c => c.id === ch.mathA) && S.channels.some(c => c.id === ch.mathB)));
-    S.fft = null; S.harm = null;
+    S.fft = null; S.harm = null; S.series = [];
     rebuildFileList(); rebuildChannelList(); rebuildSelects();
     render(); scheduleMeasure(); scheduleSplit(); renderFFTView(); renderXY();
   }
@@ -1047,6 +1060,34 @@ self.onmessage = function(e) {
     S.trigger.sourceId = R.trigSource.value;
     S.cursors.refId = R.cursorRef.value;
     S.xy.xId = R.xySrcX.value; S.xy.yId = R.xySrcY.value;
+    buildCompareList();
+  }
+
+  /* One tick per channel other than the source, as many as wanted. The set is
+     kept in S.fftCompare rather than read back from the DOM, so rebuilding the
+     list (a rename, a new file) does not forget what was ticked; a channel that
+     no longer exists, or has just become the source, drops out of it here. */
+  function buildCompareList() {
+    const src = R.fftSource.value;
+    S.fftCompare = S.fftCompare.filter(id => id !== src && S.channels.some(c => c.id === id));
+    S.series = S.series.filter(x => S.channels.includes(x.ch));
+    const others = S.channels.filter(c => c.id !== src);
+    R.fftCompareList.innerHTML = others.length ? "" : '<div class="hint">Load a second channel to compare spectra.</div>';
+    others.forEach(ch => {
+      const lab = document.createElement("label");
+      lab.className = "chk";
+      lab.title = "Overlay " + ch.label + " on the source's spectrum, magnitudes and phases";
+      lab.innerHTML = '<input type="checkbox"' + (S.fftCompare.includes(ch.id) ? " checked" : "") + '><span class="dot"></span><span></span>';
+      lab.querySelector(".dot").style.background = ch.color;
+      lab.lastChild.textContent = ch.label;
+      lab.querySelector("input").addEventListener("change", e => {
+        const on = new Set(S.fftCompare);
+        if (e.target.checked) on.add(ch.id); else on.delete(ch.id);
+        S.fftCompare = S.channels.filter(c => on.has(c.id)).map(c => c.id);
+        if (S.harm || S.fft) runAnalysis();
+      });
+      R.fftCompareList.appendChild(lab);
+    });
   }
 
   // ---------- horizontal ----------
@@ -2192,12 +2233,50 @@ self.onmessage = function(e) {
     if (mode === "mult" && k > 1) return S.harm.harms.filter(h => h.n % k === 0);
     return S.harm.harms;
   }
-  function harmDisplayMag(h) {
+  function harmDisplayMag(h, H) {
+    H = H || S.harm;
     const u = R.harmUnit.value;
-    if (!S.harm) return h.mag;
+    if (!H) return h.mag;
     if (u === "rms") return h.mag / Math.SQRT2;
-    if (u === "pct") { const f = S.harm.harms[0].mag; return f > 0 ? (h.mag / f) * 100 : 0; }
+    if (u === "pct") { const f = H.harms[0].mag; return f > 0 ? (h.mag / f) * 100 : 0; }
     return h.mag;
+  }
+
+  // ---------- comparing channels ----------
+  const wrap180 = (d) => ((d + 180) % 360 + 360) % 360 - 180;
+  const harmAt = (H, n) => (H.harms[n - 1] && H.harms[n - 1].n === n) ? H.harms[n - 1] : null;
+  const comparing = () => S.series.length > 1;
+  /* Every series with a usable harmonic analysis, source first. */
+  const harmSeries = () => S.series.filter(x => x.harm && !x.harm.error);
+  /* What the phase panel draws. Δφ mode leaves the source out: against itself
+     it is a row of zeros that only takes width from the channels that differ. */
+  function phaseSeries() {
+    const all = harmSeries();
+    if (R.fftPhaseMode.value !== "rel" || !comparing()) return all;
+    return all[0] && all[0].ref ? all.slice(1) : [];
+  }
+  /* The phase of harmonic `hh` of series `x` as the panel shows it: referred
+     to the source's window start (`phaseRef`, see runAnalysis) and, in Δφ
+     mode, minus the source's own phase at that order. null = too small to
+     have a meaningful phase, on either side. */
+  function shownPhase(x, hh) {
+    const fund = x.harm.harms[0].mag;
+    if (!(fund > 0 && hh.mag >= fund * 0.001)) return null;
+    if (R.fftPhaseMode.value !== "rel" || !comparing() || x.ref) return comparing() ? hh.phaseRef : hh.phase;
+    const src = S.series[0] && S.series[0].ref && S.series[0].harm && !S.series[0].harm.error ? S.series[0].harm : null;
+    const r = src && harmAt(src, hh.n);
+    if (!r || !(src.harms[0].mag > 0 && r.mag >= src.harms[0].mag * 0.001)) return null;
+    return wrap180(hh.phaseRef - r.phaseRef);
+  }
+  /* Bars of one harmonic order side by side: the slot widens a little when
+     there are several so each bar stays readable, and never eats the gap. */
+  function slotGeometry(g, K) {
+    const slot = K > 1 ? Math.min(g.step * 0.88, Math.max(g.bw, g.bw * 0.55 * K)) : g.bw;
+    return { slot, sub: slot / Math.max(1, K) };
+  }
+  function seriesColor(x, t, i, n) {
+    if (comparing()) return x.ch.color + (n === 1 ? "" : "cc");
+    return i === "phase" ? "#1d9e4f" + (n === 1 ? "" : "aa") : (n === 1 ? t.accent : t.accent + "99");
   }
   function harmUnitLabel() {
     const u = R.harmUnit.value;
@@ -2234,6 +2313,24 @@ self.onmessage = function(e) {
     setTimeout(() => {
       S.fft = computeSpectrum(ch, R.fftWindow.value, R.fftRange.value);
       S.harm = computeHarmonics(ch, f0, nHarm, R.fftRange.value, S.iL);
+      /* The compared channels go through the very same f₁, window, range and
+         harmonic count as the source: harmonic n must be the same frequency on
+         every series or putting their bars side by side compares nothing. */
+      S.series = [{ ch, fft: S.fft, harm: S.harm, ref: true }];
+      S.fftCompare.forEach(id => {
+        const c = S.channels.find(x => x.id === id);
+        if (c && c.id !== ch.id) S.series.push({ ch: c, fft: computeSpectrum(c, R.fftWindow.value, R.fftRange.value), harm: computeHarmonics(c, f0, nHarm, R.fftRange.value, null) });
+      });
+      /* Each analysis measures phase against the start of ITS OWN window. Two
+         files, or a channel whose visible slice starts a sample later, would
+         then disagree by n·ω₁·Δt for no physical reason — so every phase is
+         moved to the source's window start before anything compares them. */
+      const t0ref = S.harm && !S.harm.error ? S.harm.t0 : null;
+      S.series.forEach(x => {
+        if (!x.harm || x.harm.error) return;
+        const dt0 = t0ref === null ? 0 : x.harm.t0 - t0ref;
+        x.harm.harms.forEach(hh => { hh.phaseRef = wrap180(hh.phase - 360 * hh.f * dt0); });
+      });
       if (S.fft && !S.fftMaxFreq) S.fftMaxFreq = clamp(f0 * (nHarm + 2), S.fft.freqStep * 10, S.fft.fs / 2);
       if (S.fft) {
         const wanted = parseScaleInput(R.fftMaxIn.value);
@@ -2251,6 +2348,8 @@ self.onmessage = function(e) {
         ? "Done · " + (R.fftRange.value === "full" ? "full record" : "visible window") + " · "
           + S.fft.usable.toLocaleString() + " samples · Δf " + fmt(S.fft.freqStep, "Hz", 2)
           + " · Nyquist " + fmt(S.fft.fs / 2, "Hz", 1)
+          + (comparing() ? " · " + S.series.length + " channels" : "")
+          + S.series.filter(x => !x.ref && (!x.harm || x.harm.error)).map(x => " · ⚠ " + x.ch.label + ": " + (x.harm ? x.harm.error : "not enough samples")).join("")
         : "Not enough samples in the selected range.";
     }, 15);
   }
@@ -2268,6 +2367,7 @@ self.onmessage = function(e) {
     drawHarmBars();
     drawPhaseBars();
     buildHarmTable();
+    buildCompareTable();
   }
 
   function drawSpectrumCanvas() {
@@ -2286,11 +2386,16 @@ self.onmessage = function(e) {
     const result = S.fft;
     const maxFreq = S.fftMaxFreq || result.fs / 2;
     const useDb = R.fftScale.value === "db";
-    const mags = result.mags;
+    /* One vertical scale for every trace, set by the tallest of them: that is
+       what makes "this one is 6 dB below that one" readable off the screen.
+       Scaling each to its own peak would draw every spectrum the same height. */
+    const specs = S.series.length ? S.series.filter(x => x.fft) : [{ ch: result.channel, fft: result }];
     let maxMag = 0;
-    for (let i = 1; i < mags.length; i++) if (mags[i] > maxMag) maxMag = mags[i];
+    specs.forEach(x => {
+      const m = x.fft.mags, top = Math.min(m.length - 1, Math.round(maxFreq / x.fft.freqStep));
+      for (let i = 1; i <= top; i++) if (m[i] > maxMag) maxMag = m[i];
+    });
     if (maxMag <= 0) maxMag = 1e-12;
-    const idxMax = clamp(Math.round(maxFreq / result.freqStep), 1, mags.length - 1);
     const yMin = useDb ? -100 : 0, yMax = useDb ? 0 : maxMag * 1.08;
     const fToX = (f) => (f / maxFreq) * w;
     const mToY = (m) => {
@@ -2309,32 +2414,37 @@ self.onmessage = function(e) {
       });
       ctx.setLineDash([]);
     }
-    ctx.save();
-    ctx.strokeStyle = result.channel.color;
-    ctx.lineWidth = 1.2;
-    if (S.glowOn && t.dark) { ctx.shadowColor = result.channel.color; ctx.shadowBlur = 4; }
-    ctx.beginPath();
     const W = Math.max(1, Math.round(w));
-    if (idxMax <= W * 2) {
-      for (let i = 1; i <= idxMax; i++) {
-        const x = fToX(i * result.freqStep), y = mToY(mags[i]);
-        if (i === 1) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    // drawn last-to-first so the source ends up on top of what it is compared with
+    specs.slice().reverse().forEach(x => {
+      const res = x.fft, mags = res.mags;
+      const idxMax = clamp(Math.round(maxFreq / res.freqStep), 1, mags.length - 1);
+      ctx.save();
+      ctx.strokeStyle = x.ch.color;
+      ctx.lineWidth = x.ref || specs.length === 1 ? 1.2 : 1;
+      if (specs.length > 1 && !x.ref) ctx.globalAlpha = 0.85;
+      if (S.glowOn && t.dark) { ctx.shadowColor = x.ch.color; ctx.shadowBlur = 4; }
+      ctx.beginPath();
+      if (idxMax <= W * 2) {
+        for (let i = 1; i <= idxMax; i++) {
+          const px = fToX(i * res.freqStep), y = mToY(mags[i]);
+          if (i === 1) ctx.moveTo(px, y); else ctx.lineTo(px, y);
+        }
+      } else {
+        // more bins than pixels: each column draws the largest bin it covers
+        const fPer = maxFreq / W;
+        for (let px = 0; px < W; px++) {
+          const a = Math.max(1, Math.floor(px * fPer / res.freqStep));
+          let b = Math.min(idxMax + 1, Math.floor((px + 1) * fPer / res.freqStep));
+          if (b <= a) b = a + 1;
+          let mx = 0;
+          for (let i = a; i < b && i < mags.length; i++) if (mags[i] > mx) mx = mags[i];
+          if (px === 0) ctx.moveTo(px + 0.5, mToY(mx)); else ctx.lineTo(px + 0.5, mToY(mx));
+        }
       }
-    } else {
-      const per = idxMax / W;
-      for (let px = 0; px < W; px++) {
-        const a = 1 + Math.floor(px * per);
-        let b = 1 + Math.floor((px + 1) * per);
-        if (b <= a) b = a + 1;
-        if (b > idxMax + 1) b = idxMax + 1;
-        let mx = 0;
-        for (let i = a; i < b && i < mags.length; i++) if (mags[i] > mx) mx = mags[i];
-        const x = px + 0.5;
-        if (px === 0) ctx.moveTo(x, mToY(mx)); else ctx.lineTo(x, mToY(mx));
-      }
-    }
-    ctx.stroke();
-    ctx.restore();
+      ctx.stroke();
+      ctx.restore();
+    });
     // axis labels
     ctx.fillStyle = t.muted;
     ctx.font = "10px 'IBM Plex Mono', monospace";
@@ -2343,12 +2453,33 @@ self.onmessage = function(e) {
       if (d % 2) continue;
       ctx.fillText(fmt((d / 10) * maxFreq, "Hz", 1), (d / 10) * w, h - 5);
     }
+    const units = [...new Set(specs.map(x => x.ch.unit || ""))];
     ctx.textAlign = "right";
-    ctx.fillText(useDb ? "0 dB" : fmt(yMax, result.channel.unit, 1), w - 5, 12);
+    ctx.fillText(useDb ? "0 dB" : fmt(yMax, units.length === 1 ? units[0] : "", 1), w - 5, 12);
     ctx.fillText(useDb ? "-100 dB" : "0", w - 5, h - 5);
     ctx.textAlign = "left";
     ctx.fillStyle = t.text;
-    ctx.fillText("SPECTRUM — " + result.channel.label + "  ·  window: " + result.windowType + "  ·  Δf " + fmt(result.freqStep, "Hz", 2) + "  ·  Nyquist " + fmt(result.fs / 2, "Hz", 1), 8, 12);
+    ctx.fillText("SPECTRUM — " + (specs.length > 1 ? specs.length + " channels" : result.channel.label) + "  ·  window: " + result.windowType + "  ·  Δf " + fmt(result.freqStep, "Hz", 2) + "  ·  Nyquist " + fmt(result.fs / 2, "Hz", 1), 8, 12);
+    if (specs.length > 1) drawLegend(ctx, t, specs, 8, 26, w - 60, units.length > 1 ? "units differ — pick “% of fundamental” to compare shapes" : "");
+  }
+
+  /* Colour swatch + name per series, in one row that wraps to the next when
+     the canvas runs out of width. The source is marked, since in Δφ mode it is
+     the zero every other phase is measured from. */
+  function drawLegend(ctx, t, list, x0, y0, maxX, note) {
+    ctx.font = "10px 'IBM Plex Mono', monospace";
+    let x = x0, y = y0;
+    list.forEach(s => {
+      const txt = s.ch.label + (s.ref ? " (src)" : "");
+      const tw = ctx.measureText(txt).width + 22;
+      if (x + tw > maxX && x > x0) { x = x0; y += 13; }
+      ctx.fillStyle = s.ch.color;
+      ctx.fillRect(x, y - 7, 10, 3);
+      ctx.fillStyle = t.text;
+      ctx.fillText(txt, x + 14, y);
+      x += tw;
+    });
+    if (note) { ctx.fillStyle = t.muted; ctx.fillText(note, x0, y + 13); }
   }
 
   function barGeometry(c, list) {
@@ -2357,6 +2488,22 @@ self.onmessage = function(e) {
     const bw = Math.max(2, Math.min(34, iw / Math.max(1, list.length) * 0.62));
     const step = iw / Math.max(1, list.length);
     return { padL, padR, padT, padB, iw, ih: c.h - padT - padB, bw, step };
+  }
+
+  /* The hover box, one line per series. Shared by both bar panels. */
+  function drawHarmTooltip(ctx, t, w, lines) {
+    ctx.font = "10px 'IBM Plex Mono', monospace";
+    const tw = Math.max(...lines.map(l => ctx.measureText(l.txt).width));
+    const bx = w - tw - 20 - (lines.some(l => l.color) ? 12 : 0), bh = 6 + lines.length * 13;
+    ctx.fillStyle = t.scopeBg === "#ffffff" ? "rgba(26,35,46,0.92)" : "rgba(240,244,250,0.94)";
+    ctx.fillRect(bx, 18, w - bx - 8, bh);
+    lines.forEach((l, i) => {
+      const y = 29 + i * 13;
+      let x = bx + 6;
+      if (l.color) { ctx.fillStyle = l.color; ctx.fillRect(x, y - 7, 8, 8); x += 12; }
+      ctx.fillStyle = t.scopeBg === "#ffffff" ? "#fff" : "#111";
+      ctx.fillText(l.txt, x, y);
+    });
   }
 
   function drawHarmBars() {
@@ -2379,8 +2526,13 @@ self.onmessage = function(e) {
     const list = displayedHarms();
     if (!list.length) return;
     const g = barGeometry(c, list);
+    const ser = S.series.length ? harmSeries() : [{ ch: S.harm.channel, harm: S.harm, ref: true }];
+    const K = ser.length, sg = slotGeometry(g, K);
     let maxV = 0;
-    list.forEach(hh => { const v = harmDisplayMag(hh); if (v > maxV) maxV = v; });
+    list.forEach(hh => ser.forEach(x => {
+      const o = harmAt(x.harm, hh.n);
+      if (o) { const v = harmDisplayMag(o, x.harm); if (v > maxV) maxV = v; }
+    }));
     if (maxV <= 0) maxV = 1;
     // y grid
     ctx.strokeStyle = t.gridMinor;
@@ -2392,30 +2544,35 @@ self.onmessage = function(e) {
       ctx.fillText(R.harmUnit.value === "pct" ? ((i / 4) * maxV).toFixed(0) : fmt((i / 4) * maxV, "", 1), g.padL - 4, y + 3);
     }
     ctx.textAlign = "center";
-    const accent = t.accent;
     list.forEach((hh, i) => {
-      const v = harmDisplayMag(hh);
-      const bh = (v / maxV) * g.ih;
-      const x = g.padL + i * g.step + (g.step - g.bw) / 2;
-      const y = g.padT + g.ih - bh;
-      ctx.fillStyle = i === S.hoverHarm ? "#e0821f" : (hh.n === 1 ? accent : accent + "99");
-      ctx.fillRect(x, y, g.bw, Math.max(1, bh));
+      const x0 = g.padL + i * g.step + (g.step - sg.slot) / 2;
+      ser.forEach((x, k) => {
+        const o = harmAt(x.harm, hh.n);
+        if (!o) return;
+        const bh = (harmDisplayMag(o, x.harm) / maxV) * g.ih;
+        ctx.fillStyle = i === S.hoverHarm ? (K > 1 ? x.ch.color : "#e0821f") : seriesColor(x, t, "mag", hh.n);
+        ctx.fillRect(x0 + k * sg.sub, g.padT + g.ih - bh, Math.max(1, sg.sub - (K > 1 && sg.sub > 3 ? 1 : 0)), Math.max(1, bh));
+      });
+      if (i === S.hoverHarm && K > 1) {
+        ctx.strokeStyle = "#e0821f";
+        ctx.strokeRect(Math.round(x0) - 1.5, g.padT - 0.5, Math.round(sg.slot) + 3, g.ih + 1);
+      }
       if (g.step > 14) {
         ctx.fillStyle = t.muted;
-        ctx.fillText(String(hh.n), x + g.bw / 2, h - 7);
+        ctx.fillText(String(hh.n), x0 + sg.slot / 2, h - 7);
       }
     });
     ctx.textAlign = "left";
     // hover tooltip
     if (S.hoverHarm >= 0 && list[S.hoverHarm]) {
-      const hh = list[S.hoverHarm];
-      const txt = "n=" + hh.n + "  " + fmt(hh.f, "Hz", 1) + "  " + fmt(harmDisplayMag(hh), R.harmUnit.value === "pct" ? "%" : "", 3) + "  φ " + hh.phase.toFixed(1) + "°";
-      ctx.font = "10px 'IBM Plex Mono', monospace";
-      const tw2 = ctx.measureText(txt).width;
-      ctx.fillStyle = t.scopeBg === "#ffffff" ? "rgba(26,35,46,0.92)" : "rgba(240,244,250,0.94)";
-      ctx.fillRect(w - tw2 - 20, 18, tw2 + 12, 16);
-      ctx.fillStyle = t.scopeBg === "#ffffff" ? "#fff" : "#111";
-      ctx.fillText(txt, w - tw2 - 14, 29);
+      const hh = list[S.hoverHarm], pct = R.harmUnit.value === "pct" ? "%" : "";
+      const lines = K > 1
+        ? [{ txt: "n=" + hh.n + "  " + fmt(hh.f, "Hz", 1) }].concat(ser.map(x => {
+            const o = harmAt(x.harm, hh.n);
+            return { color: x.ch.color, txt: x.ch.label + "  " + (o ? fmt(harmDisplayMag(o, x.harm), pct, 3) : "—") };
+          }))
+        : [{ txt: "n=" + hh.n + "  " + fmt(hh.f, "Hz", 1) + "  " + fmt(harmDisplayMag(hh), pct, 3) + "  φ " + hh.phase.toFixed(1) + "°" }];
+      drawHarmTooltip(ctx, t, w, lines);
     }
   }
 
@@ -2428,11 +2585,16 @@ self.onmessage = function(e) {
     ctx.strokeRect(0.5, 0.5, w - 1, h - 1);
     ctx.fillStyle = t.text;
     ctx.font = "10px 'IBM Plex Mono', monospace";
-    ctx.fillText("HARMONIC PHASE (° · cos ref @ window start)", 8, 12);
+    const rel = comparing() && R.fftPhaseMode.value === "rel";
+    ctx.fillText(rel ? "HARMONIC PHASE Δφ (° · channel − source, same order)"
+      : comparing() ? "HARMONIC PHASE (° · cos ref @ source window start)"
+      : "HARMONIC PHASE (° · cos ref @ window start)", 8, 12);
     if (!S.harm || S.harm.error) return;
     const list = displayedHarms();
     if (!list.length) return;
     const g = barGeometry(c, list);
+    const ser = S.series.length ? phaseSeries() : [{ ch: S.harm.channel, harm: S.harm, ref: true }];
+    const K = Math.max(1, ser.length), sg = slotGeometry(g, K);
     const zeroY = g.padT + g.ih / 2;
     ctx.strokeStyle = t.gridMinor;
     [-180, -90, 0, 90, 180].forEach(deg => {
@@ -2444,25 +2606,44 @@ self.onmessage = function(e) {
     });
     ctx.strokeStyle = t.gridMajor;
     ctx.beginPath(); ctx.moveTo(g.padL, Math.round(zeroY) + 0.5); ctx.lineTo(w - g.padR, Math.round(zeroY) + 0.5); ctx.stroke();
-    const fundMag = S.harm.harms[0].mag;
     ctx.textAlign = "center";
     list.forEach((hh, i) => {
-      const x = g.padL + i * g.step + (g.step - g.bw) / 2;
-      const significant = fundMag > 0 && hh.mag >= fundMag * 0.001;
-      const bh = (hh.phase / 180) * (g.ih / 2);
-      ctx.fillStyle = i === S.hoverHarm ? "#e0821f" : (significant ? "#1d9e4f" + (hh.n === 1 ? "" : "aa") : t.gridMajor);
-      if (significant) {
-        if (bh >= 0) ctx.fillRect(x, zeroY - bh, g.bw, Math.max(1, bh));
-        else ctx.fillRect(x, zeroY, g.bw, Math.max(1, -bh));
-      } else {
-        ctx.fillRect(x, zeroY - 1, g.bw, 2);
+      const x0 = g.padL + i * g.step + (g.step - sg.slot) / 2;
+      ser.forEach((x, k) => {
+        const o = harmAt(x.harm, hh.n);
+        if (!o) return;
+        const ph = shownPhase(x, o);
+        const bx = x0 + k * sg.sub, bw = Math.max(1, sg.sub - (K > 1 && sg.sub > 3 ? 1 : 0));
+        if (ph === null) {
+          ctx.fillStyle = t.gridMajor;
+          ctx.fillRect(bx, zeroY - 1, bw, 2);
+          return;
+        }
+        const bh = (ph / 180) * (g.ih / 2);
+        ctx.fillStyle = i === S.hoverHarm ? (K > 1 ? x.ch.color : "#e0821f") : seriesColor(x, t, "phase", hh.n);
+        if (bh >= 0) ctx.fillRect(bx, zeroY - bh, bw, Math.max(1, bh));
+        else ctx.fillRect(bx, zeroY, bw, Math.max(1, -bh));
+      });
+      if (i === S.hoverHarm && K > 1) {
+        ctx.strokeStyle = "#e0821f";
+        ctx.strokeRect(Math.round(x0) - 1.5, g.padT - 0.5, Math.round(sg.slot) + 3, g.ih + 1);
       }
       if (g.step > 14) {
         ctx.fillStyle = t.muted;
-        ctx.fillText(String(hh.n), x + g.bw / 2, h - 7);
+        ctx.fillText(String(hh.n), x0 + sg.slot / 2, h - 7);
       }
     });
     ctx.textAlign = "left";
+    if (comparing() && S.hoverHarm >= 0 && list[S.hoverHarm]) {
+      const hh = list[S.hoverHarm];
+      drawHarmTooltip(ctx, t, w, [{ txt: "n=" + hh.n + (rel ? "  Δφ vs source" : "  φ") }].concat(ser.map(x => {
+        const o = harmAt(x.harm, hh.n), ph = o ? shownPhase(x, o) : null;
+        return { color: x.ch.color, txt: x.ch.label + "  " + (ph === null ? "—" : (ph >= 0 && rel ? "+" : "") + ph.toFixed(1) + "°") };
+      })));
+    } else if (rel && !ser.length) {
+      ctx.fillStyle = t.muted;
+      ctx.fillText("Tick a channel under Compare to see its phase against the source.", g.padL, g.padT + 12);
+    }
   }
 
   const IL_PROMPT = "set I<sub>L</sub> to enable";
@@ -2530,6 +2711,35 @@ self.onmessage = function(e) {
     });
   }
 
+  /* One row per analysed channel: how its fundamental compares with the
+     source's, in size and in phase, plus its own THD. Δφ₁ is the number people
+     actually came for — voltage against current, input against output. */
+  function buildCompareTable() {
+    const on = comparing();
+    R.fftCmpCard.style.display = on ? "flex" : "none";
+    if (!on) return;
+    const src = S.series[0].harm && !S.series[0].harm.error ? S.series[0].harm : null;
+    const f1 = src ? src.harms[0] : null;
+    R.fftCmpBody.innerHTML = "";
+    S.series.forEach(x => {
+      const tr = document.createElement("tr");
+      tr.className = "osc-tr";
+      const H = x.harm && !x.harm.error ? x.harm : null;
+      const a = H ? H.harms[0] : null;
+      const cells = !H ? ["—", "—", "—", "—"] : [
+        fmt(a.mag, x.ch.unit, 3),
+        x.ref ? "1" : (f1 && f1.mag > 0 ? (a.mag / f1.mag).toPrecision(3) : "—"),
+        x.ref ? "0" : (f1 ? (d => (d >= 0 ? "+" : "") + d.toFixed(1))(wrap180(a.phaseRef - f1.phaseRef)) : "—"),
+        H.thd !== null ? (H.thd * 100).toFixed(2) + " %" : "—"
+      ];
+      tr.innerHTML = '<td><span class="dot"></span></td>' + cells.map(v => "<td>" + v + "</td>").join("");
+      tr.firstChild.querySelector(".dot").style.background = x.ch.color;
+      tr.firstChild.appendChild(document.createTextNode(x.ch.label + (x.ref ? " · src" : "")));
+      tr.firstChild.title = x.ch.label + (!H ? " — " + (x.harm ? x.harm.error : "not enough samples") : "");
+      R.fftCmpBody.appendChild(tr);
+    });
+  }
+
   function exportHarmonics() {
     if (!S.harm || S.harm.error) return;
     const H = S.harm;
@@ -2539,13 +2749,23 @@ self.onmessage = function(e) {
       + "\n# THD_pct," + (H.thd !== null ? (H.thd * 100).toFixed(4) : "")
       + "\n# I_L_rms," + (H.iL !== null ? H.iL : "")
       + "\n# TDD_pct," + (H.tdd !== null ? (H.tdd * 100).toFixed(4) : "") + "\n";
-    csv += "n,freq_Hz,mag_peak,mag_rms,pct_of_fundamental,pct_of_IL,phase_deg\n";
+    /* Compared channels get three columns each. Their phase is referred to the
+       source's window start, so it can be subtracted from the source's
+       phase_deg directly; dphase_deg is that subtraction, already wrapped. */
+    const others = harmSeries().filter(x => !x.ref);
+    const tag = (x) => x.ch.label.replace(/[^\w]+/g, "_");
+    if (others.length) csv += "# compared_phase_reference,source window start\n";
+    csv += "n,freq_Hz,mag_peak,mag_rms,pct_of_fundamental,pct_of_IL,phase_deg"
+      + others.map(x => "," + tag(x) + "_mag_peak," + tag(x) + "_phase_deg," + tag(x) + "_dphase_deg").join("") + "\n";
     const fund = H.harms[0].mag;
     displayedHarms().forEach(hh => {
       csv += [hh.n, hh.f, hh.mag, hh.mag / Math.SQRT2,
         fund > 0 ? (hh.mag / fund * 100) : 0,
         H.iL ? (hh.mag / Math.SQRT2 / H.iL * 100) : "",
-        hh.phase].join(",") + "\n";
+        hh.phase].concat(...others.map(x => {
+          const o = harmAt(x.harm, hh.n);
+          return o ? [o.mag, o.phaseRef, wrap180(o.phaseRef - hh.phaseRef)] : ["", "", ""];
+        })).join(",") + "\n";
     });
     downloadText("harmonics_" + H.channel.label.replace(/[^\w]+/g, "_") + ".csv", csv);
   }
@@ -3182,7 +3402,8 @@ self.onmessage = function(e) {
        itself: leaving it ticked would silently overwrite what was just typed
        the next time the source changed. */
     R.f0In.addEventListener("input", () => { R.chkF0Auto.checked = false; });
-    R.fftSource.addEventListener("change", () => fillAutoF0(false));
+    R.fftSource.addEventListener("change", () => { buildCompareList(); fillAutoF0(false); });
+    R.fftPhaseMode.addEventListener("change", () => drawPhaseBars());
     ["fftSource", "fftWindow", "fftRange", "f0In", "nHarmIn", "ilIn"].forEach(id => {
       R[id].addEventListener("change", scheduleAnalysis);
     });

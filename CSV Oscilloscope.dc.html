@@ -24,7 +24,7 @@
     input[type="checkbox"] { accent-color: var(--accent); }
     input[type="range"] { accent-color: var(--accent); }
   </style>
-  <script src="scope-engine.js?v=202609291315"></script>
+  <script src="scope-engine.js?v=202609291805"></script>
 </helmet>
 
 <div class="osc" data-screen-label="CSV Oscilloscope">
@@ -155,6 +155,14 @@
               </div>
             </div>
             <div id="harmMeta" class="meta">Run Compute to analyze harmonics.</div>
+          </div>
+          <div id="fftCmpCard" class="card cmp hide">
+            <table class="tbl">
+              <thead>
+                <tr><th>Channel</th><th>f₁ pk</th><th>× src</th><th>Δφ₁ °</th><th>THD</th></tr>
+              </thead>
+              <tbody id="fftCmpBody"></tbody>
+            </table>
           </div>
           <div class="card fill scroll">
             <table class="tbl">
@@ -295,6 +303,10 @@
         <section class="grp">
           <h3 class="ttl">FFT source</h3>
           <div class="row"><label class="lab w">Channel</label><select id="fftSource" class="in grow"></select></div>
+          <div class="row top">
+            <label class="lab w" title="Analyse these channels too, with the same f₁, window and range, and overlay them on the source">Compare</label>
+            <div id="fftCompareList" class="cmp-list grow"></div>
+          </div>
           <div class="row">
             <label class="lab w">Range</label>
             <select id="fftRange" class="in grow">
@@ -344,6 +356,13 @@
               <option value="peak">Peak</option>
               <option value="rms">RMS</option>
               <option value="pct">% of fundamental</option>
+            </select>
+          </div>
+          <div class="row">
+            <label class="lab w" title="Only matters when comparing channels">Phase</label>
+            <select id="fftPhaseMode" class="in grow">
+              <option value="abs">Absolute</option>
+              <option value="rel">Δφ vs. source</option>
             </select>
           </div>
         </section>
