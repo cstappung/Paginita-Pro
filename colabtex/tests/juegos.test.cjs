@@ -7,41 +7,46 @@ const {reducir}=context;
 const copia=x=>JSON.parse(JSON.stringify(x));
 const sala=(semilla=123)=>({juego:'orbita',semilla,estado:'jugando',jugadores:{a:{nombre:'Ana',orden:0},b:{nombre:'Beto',orden:1}},jugadas:{}});
 const mover=(p,j)=>{p.jugadas[String(Object.keys(p.jugadas).length).padStart(4,'0')]=j;return reducir(p)};
-test('espera, semilla reproducible y valores de estrellas',()=>{
- const p=sala();delete p.jugadores.b;assert.equal(reducir(p).fase,'espera');assert.equal(reducir(p).legales.length,0);
+const tiro=(uid,vx,vy)=>({t:'lanza',uid,vx:Math.round(vx*100),vy:Math.round(vy*100)});
+test('órbita: espera, mundo reproducible y cielo lleno',()=>{
+ const p=sala();delete p.jugadores.b;assert.equal(reducir(p).fase,'espera');
+ assert.deepEqual(copia(reducir(sala()).cuerpos),copia(reducir(sala()).cuerpos));
  assert.deepEqual(copia(reducir(sala()).estrellas),copia(reducir(sala()).estrellas));
- assert.notDeepEqual(copia(reducir(sala(1)).estrellas),copia(reducir(sala(2)).estrellas));
- assert.ok(reducir(sala()).estrellas.every(n=>n>=1&&n<=5));
+ assert.notDeepEqual(copia(reducir(sala(1)).cuerpos),copia(reducir(sala(2)).cuerpos));
+ const e=reducir(sala());assert.equal(e.estrellas.length,14);assert.ok(e.estrellas.every(s=>[1,2,3,5].includes(s.v)));
+ assert.equal(e.turno,'a');assert.equal(e.total,14);
 });
-test('captura y dirige al rival por fila o columna',()=>{
- const p=sala(),valor=reducir(p).estrellas[7];
- let e=mover(p,{t:'orbita',uid:'a',casilla:7,eje:'fila'});
- assert.equal(e.puntos.a,valor);assert.equal(e.turno,'b');assert.deepEqual(copia(e.legales),[6,8,9,10,11]);
- e=mover(p,{t:'orbita',uid:'b',casilla:8,eje:'columna'});assert.deepEqual(copia(e.legales),[2,14,20,26,32]);
+test('órbita: un lanzamiento deja satélite, pasa el turno y rellena el cielo',()=>{
+ const p=sala();let e=mover(p,tiro('a',2.5,2.2));
+ assert.equal(e.turno,'b');assert.equal(e.lanzados.a,1);assert.equal(e.movs,1);assert.equal(e.ultima.uid,'a');
+ assert.equal(e.estrellas.length,14,'el cielo se rellena');
+ const sumas=e.ultima.eventos.filter(x=>x.k==='estrella').reduce((t,x)=>t+x.v,0);assert.equal(e.puntos.a,sumas);
 });
-test('rechaza índices, autores, ejes y turnos inválidos',()=>{
+test('órbita: rechaza autores, turnos y velocidades inválidas',()=>{
  const p=sala();
- for(const j of [{uid:'b',casilla:0,eje:'fila'},{uid:'a',casilla:-1,eje:'fila'},{uid:'a',casilla:36,eje:'fila'},
- {uid:'a',casilla:1.5,eje:'fila'},{uid:'a',casilla:'1',eje:'fila'},{uid:'a',casilla:0,eje:'diagonal'},{uid:'intruso',casilla:0,eje:'fila'}])mover(p,{t:'orbita',...j});
- mover(p,{t:'abandona',uid:'intruso'});assert.equal(Object.keys(reducir(p).tomadas).length,0);assert.equal(reducir(p).fase,'jugando');
- mover(p,{t:'orbita',uid:'a',casilla:0,eje:'fila'});mover(p,{t:'orbita',uid:'b',casilla:0,eje:'fila'});mover(p,{t:'orbita',uid:'b',casilla:10,eje:'fila'});
- assert.equal(Object.keys(reducir(p).tomadas).length,1);
+ for(const j of [tiro('b',2,2),tiro('intruso',2,2),{t:'lanza',uid:'a',vx:1.5,vy:100},{t:'lanza',uid:'a',vx:'100',vy:0},{t:'lanza',uid:'a',vx:0,vy:0},{t:'orbita',uid:'a',casilla:0,eje:'fila'}])mover(p,j);
+ mover(p,{t:'abandona',uid:'intruso'});let e=reducir(p);assert.equal(e.movs,0);assert.equal(e.fase,'jugando');assert.equal(e.turno,'a');
+ e=mover(p,tiro('a',50,0));assert.ok(Math.hypot(e.ultima.lanza.vx,e.ultima.lanza.vy)<=8+1e-9,'la velocidad se recorta');
 });
-test('un eje vacío abre la órbita; abandono congela el resultado',()=>{
- const p=sala();for(let i=0;i<6;i++)mover(p,{t:'orbita',uid:i%2?'b':'a',casilla:i,eje:'fila'});
- let e=reducir(p);assert.equal(e.libre,true);assert.equal(e.legales.length,30);
- e=mover(p,{t:'abandona',uid:'a'});assert.equal(e.ganador,'b');
- mover(p,{t:'orbita',uid:'b',casilla:6,eje:'columna'});assert.equal(Object.keys(reducir(p).tomadas).length,6);
+test('órbita: 60 partidas completas terminan, deterministas y con el ganador bien leído',()=>{
+ let empates=0,derribos=0;
+ for(let seed=1;seed<=60;seed++){
+  const p=sala(seed);if(seed%3===0)p.jugadores.c={nombre:'Cris',orden:2};
+  let e=reducir(p),g=context.rng(seed);
+  while(e.fase==='jugando'){const a=g()*Math.PI*2,v=1+g()*4;e=mover(p,tiro(e.turno,Math.cos(a)*v,Math.sin(a)*v));}
+  assert.equal(e.fase,'fin');assert.equal(e.movs,e.total);
+  const pts=Object.values(e.puntos),max=Math.max(...pts),top=Object.keys(e.puntos).filter(u=>e.puntos[u]===max);
+  assert.equal(e.ganador,top.length>1?'':top[0]);if(!e.ganador)empates++;
+  for(const u of Object.keys(e.puntos))derribos+=e.derribos[u];
+  assert.deepEqual(copia(e),copia(reducir(copia(p))));const antes=copia(e);mover(p,tiro('a',2,2));assert.deepEqual(copia(reducir(p)),antes);
+ }
+ assert.ok(empates<30);
 });
-test('100 partidas completas terminan, conservan puntos y convergen',()=>{
- let empates=0;
- for(let seed=1;seed<=100;seed++){
-  const p=sala(seed);let e=reducir(p);
-  for(let n=0;n<36;n++){assert.equal(e.fase,'jugando');e=mover(p,{t:'orbita',uid:e.turno,casilla:e.legales[(seed+n)%e.legales.length],eje:n%2?'fila':'columna'});}
-  assert.equal(e.fase,'fin');assert.equal(e.legales.length,0);assert.equal(e.puntos.a+e.puntos.b,e.estrellas.reduce((a,b)=>a+b,0));
-  assert.equal(e.ganador,e.puntos.a===e.puntos.b?'':e.puntos.a>e.puntos.b?'a':'b');if(e.ganador==='')empates++;
-  assert.deepEqual(copia(e),copia(reducir(copia(p))));const antes=copia(e);mover(p,{t:'abandona',uid:e.ganador||'a'});assert.deepEqual(copia(reducir(p)),antes);
- }assert.ok(empates>0);
+test('órbita: el abandono se lleva los satélites y en duelo da la victoria',()=>{
+ const p=sala();mover(p,tiro('a',2.5,2.2));let e=mover(p,{t:'abandona',uid:'a'});
+ assert.equal(e.fase,'fin');assert.equal(e.ganador,'b');assert.equal(e.motivo,'abandono');assert.ok(e.objetos.every(o=>o.u!=='a'));
+ const q=sala();q.jugadores.c={nombre:'Cris',orden:2};mover(q,tiro('a',2.5,2.2));e=mover(q,{t:'abandona',uid:'b'});
+ assert.equal(e.fase,'jugando');assert.equal(e.turno,'c');
 });
 test('los cuatro juegos anteriores siguen arrancando',()=>{
  for(const juego of ['reversi','cuadritos','cartas','escondite','cadena']){const e=reducir({...sala(),juego});assert.equal(e.listos,true);assert.notEqual(e.fase,'fin');}
@@ -68,7 +73,7 @@ test('meToca: por turnos, a la vez, esperando y terminada',()=>{
  const {meToca}=context;
  const p=sala();let e=reducir(p);
  assert.equal(meToca(e,'a'),true);assert.equal(meToca(e,'b'),false);assert.equal(meToca(e,'mirón'),false);assert.equal(meToca(e,''),false);
- e=mover(p,{t:'orbita',uid:'a',casilla:7,eje:'fila'});assert.equal(meToca(e,'a'),false);assert.equal(meToca(e,'b'),true);
+ e=mover(p,tiro('a',2.5,2.2));assert.equal(meToca(e,'a'),false);assert.equal(meToca(e,'b'),true);
  e=mover(p,{t:'abandona',uid:'a'});assert.equal(meToca(e,'b'),false,'terminada no llama a nadie');
  const q=sala();delete q.jugadores.b;assert.equal(meToca(reducir(q),'a'),false,'sola en la sala no hay turno');
  /* cartas: eligen a la vez, avisa a quien falta */
@@ -98,7 +103,7 @@ test('Circuit Breakers: turno rotando, primera foto vale, vivos y final',()=>{
 test('progreso: de 0 a 1 según lo jugado, 0 fuera de juego',()=>{
  const {progreso}=context;
  const p=sala();let e=reducir(p);assert.equal(progreso(e,'orbita'),0);
- e=mover(p,{t:'orbita',uid:'a',casilla:7,eje:'fila'});assert.equal(progreso(e,'orbita'),1/36);
+ e=mover(p,tiro('a',2.5,2.2));assert.equal(progreso(e,'orbita'),1/14);
  const r={juego:'reversi',semilla:1,estado:'jugando',jugadores:{a:{nombre:'A',orden:0},b:{nombre:'B',orden:1}},jugadas:{}};
  e=reducir(r);assert.equal(progreso(e,'reversi'),0);
  const [f0,c0]=Object.keys(e.legales)[0].split(/\D+/).filter(Boolean).map(Number);e=mover(r,{t:'p',uid:e.turno,f:f0,c:c0});

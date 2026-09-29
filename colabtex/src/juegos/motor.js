@@ -37,7 +37,7 @@
    Catan llega a seis, que es lo que admite la ampliación: pasado eso
    la isla grande no tiene costa para todos. */
 export const JUEGOS = {
-  orbita: { nombre: "Órbita", lema: "Captura estrellas y decide el próximo movimiento de tu rival", color: "#8860ed", minimo: 2, cupo: 2 },
+  orbita: { nombre: "Órbita", lema: "Lanza sondas con la gravedad, roba estrellas y derriba satélites", color: "#8860ed", minimo: 2, cupo: 4 },
   escondite: {
     nombre: "Escondite",
     lema: "Esconde a tu persona en el paisaje y encuentra la del otro",
@@ -675,7 +675,7 @@ export function reducir(p) {
   if (p.juego === "cartas") return { ...base, ...redCartas(p, js) };
   if (p.juego === "cuadritos") return { ...base, ...redCuadritos(p, js, listos) };
   if (p.juego === "reversi") return { ...base, ...redReversi(p, js) };
-  if (p.juego === "orbita") return { ...base, ...redOrbita(p, js) };
+  if (p.juego === "orbita") return { ...base, ...redOrbita(p, js, listos) };
   if (p.juego === "worms") return { ...base, ...redWorms(p, js, listos) };
   if (p.juego === "cadena") return { ...base, ...redCadena(p, js, listos) };
   if (p.juego === "flip7") return { ...base, ...redFlip7(p, js, listos) };
@@ -726,7 +726,7 @@ export function progreso(est, juego) {
     const casillas = est.lado * est.lado - 4;
     return c((casillas - (est.libres || 0)) / casillas);
   }
-  if (juego === "orbita" && est.estrellas) return c(Object.keys(est.tomadas || {}).length / est.estrellas.length);
+  if (juego === "orbita" && est.total) return c((est.movs || 0) / est.total);
   /* En la reacción en cadena el tablero no se llena: se tiñe. Cuenta
      qué parte de lo ocupado es de quien va delante, y no antes de que
      todos hayan jugado dos veces — al principio uno solo ya es «todo». */
@@ -1400,43 +1400,227 @@ export function porcentaje(f) {
 }
 
 
-/* Órbita: cada captura dirige al rival hacia su fila o columna.
-   Si ese eje queda vacío, la órbita se abre a todo el tablero.
-   La semilla y el registro producen el mismo resultado en ambos clientes. */
-export function redOrbita(p, js = jugadoresDe(p)) {
-  const r = rng(p.semilla || 1);
-  const estrellas = Array.from({ length: 36 }, () => 1 + Math.floor(r() * 5));
-  const tomadas = {}, puntos = Object.fromEntries(js.map(j => [j.uid, 0]));
-  const listos = js.length === 2;
-  let turno = js[0]?.uid || "", ultima = -1, eje = "fila", ganador = null, motivo = "";
-  const disponibles = () => {
-    const libres = estrellas.map((_, i) => i).filter(i => !tomadas[i]);
-    const dirigidas = ultima < 0 ? libres : libres.filter(i => eje === "fila"
-      ? Math.floor(i / 6) === Math.floor(ultima / 6) : i % 6 === ultima % 6);
-    return dirigidas.length ? dirigidas : libres;
-  };
-  for (const j of jugadasDe(p)) {
-    if (!listos || ganador !== null || !js.some(x => x.uid === j.uid)) continue;
-    if (j.t === "abandona") {
-      ganador = js.find(x => x.uid !== j.uid).uid; motivo = "abandono"; continue;
-    }
-    if (j.t !== "orbita" || j.uid !== turno || !Number.isInteger(j.casilla)
-      || !["fila", "columna"].includes(j.eje) || !disponibles().includes(j.casilla)) continue;
-    tomadas[j.casilla] = j.uid;
-    puntos[j.uid] += estrellas[j.casilla];
-    ultima = j.casilla; eje = j.eje;
-    turno = js.find(x => x.uid !== j.uid).uid;
-    if (Object.keys(tomadas).length === 36) {
-      const [a, b] = js.map(x => x.uid);
-      ganador = puntos[a] === puntos[b] ? "" : puntos[a] > puntos[b] ? a : b;
-      motivo = ganador ? "estrellas" : "empate";
-    }
+/* ============================================================
+   Órbita — honda gravitatoria por turnos
+
+   Cada turno quien juega lanza una sonda desde su base con un vector
+   (`{t:"lanza", uid, vx, vy}`, en centésimas). La sonda cae por el
+   campo de gravedad del sol y de los planetas, y durante la simulación
+   del turno *todo* lo que ya está en órbita se mueve con ella: los
+   satélites de antes siguen dando vueltas y recogiendo estrellas para
+   su dueño. Una sonda que pasa a menos de `OR_CHOQUE` de otra ajena las
+   destruye a las dos (y si una era la recién lanzada, su dueño cobra el
+   derribo); la que entra en un astro se estrella; la que se aleja del
+   campo se pierde. Cada satélite vive `2·n` simulaciones.
+
+   Todo es aritmética de coma flotante con + − × ÷ y raíz cuadrada, que
+   IEEE fija bit a bit: las dos máquinas simulan lo mismo. Nada de
+   senos ni arcotangentes aquí dentro; esos quedan para dibujar. La
+   pantalla vuelve a correr `orTurno` desde `ultima.antes` para
+   animarlo, así que lo que se ve no puede diferir de lo decidido. */
+export const OR_W = 160, OR_H = 100, OR_DT = 0.05, OR_PASOS = 400, OR_VMAX = 8;
+export const OR_ESTRELLAS = 14, OR_CAPTURA = 3.2, OR_CHOQUE = 2.8, OR_DERRIBO = 3, OR_MARGEN = 30;
+export const OR_RONDAS = { 2: 7, 3: 6, 4: 5 };
+const OR_BASES = { 2: [[6, 50], [154, 50]], 3: [[6, 50], [154, 20], [154, 80]], 4: [[6, 20], [154, 80], [154, 20], [6, 80]] };
+
+function orDist2(ax, ay, bx, by) { const dx = ax - bx, dy = ay - by; return dx * dx + dy * dy; }
+
+/* Los astros salen de la semilla pública: no hay nada que esconder. */
+export function orMundo(semilla, n) {
+  const r = rng((semilla ^ 0x0B17A) >>> 0);
+  const bases = (OR_BASES[Math.max(2, Math.min(4, n))] || OR_BASES[2]).map(([x, y]) => ({ x, y }));
+  const cuerpos = [{ x: 80, y: 50, r: 6, gm: 1000, sol: true }];
+  const quiere = 2 + (r() < 0.5 ? 1 : 0);
+  for (let i = 0; i < 400 && cuerpos.length < 1 + quiere; i++) {
+    const x = 30 + r() * 100, y = 15 + r() * 70;
+    if (orDist2(x, y, 80, 50) < 26 * 26) continue;
+    if (bases.some(b => orDist2(x, y, b.x, b.y) < 32 * 32)) continue;
+    if (cuerpos.some((c, k) => k && orDist2(x, y, c.x, c.y) < 28 * 28)) continue;
+    cuerpos.push({ x, y, r: 3 + r() * 1.5, gm: 150 + r() * 150, tono: Math.floor(r() * 5) });
   }
-  const legales = listos && ganador === null ? disponibles() : [];
-  return { fase: !listos ? "espera" : ganador !== null ? "fin" : "jugando",
-    estrellas, tomadas, puntos, turno, ultima, eje, legales, ganador, motivo,
-    libre: ultima < 0 || (legales.length > 0 && legales.some(i => eje === "fila"
-      ? Math.floor(i / 6) !== Math.floor(ultima / 6) : i % 6 !== ultima % 6)) };
+  return { W: OR_W, H: OR_H, cuerpos, bases };
+}
+
+/* Rellena el cielo hasta OR_ESTRELLAS con su propio generador, que
+   avanza a la par en las dos máquinas porque el estado es el mismo. */
+function orRellena(mundo, estrellas, objetos, r, sig) {
+  let tries = 0;
+  while (estrellas.length < OR_ESTRELLAS && tries++ < 600) {
+    const x = 14 + r() * (OR_W - 28), y = 6 + r() * (OR_H - 12);
+    let cerca = Infinity, mal = false;
+    for (const c of mundo.cuerpos) {
+      const d = Math.sqrt(orDist2(x, y, c.x, c.y)) - c.r;
+      if (d < 3) { mal = true; break; }
+      if (d < cerca) cerca = d;
+    }
+    if (mal || mundo.bases.some(b => orDist2(x, y, b.x, b.y) < 18 * 18)) continue;
+    if (estrellas.some(s => orDist2(x, y, s.x, s.y) < 36)) continue;
+    if (objetos.some(o => orDist2(x, y, o.x, o.y) < 25)) continue;
+    const nova = r() < 0.08;
+    const v = nova ? 5 : cerca < 6 ? 3 : cerca < 14 ? 2 : 1;
+    estrellas.push({ id: sig.n++, x, y, v });
+  }
+}
+
+/* Un turno de simulación: mueve todo `OR_PASOS` pasos y devuelve lo
+   que pasó. `alPaso(i, objetos)` es para la pantalla, que dibuja. */
+export function orTurno(mundo, objetos0, estrellas0, alPaso) {
+  const objetos = objetos0.map(o => ({ ...o }));
+  let estrellas = estrellas0.slice();
+  const eventos = [], ganado = {};
+  const suma = (u, v) => { ganado[u] = (ganado[u] || 0) + v; };
+  const cs = mundo.cuerpos;
+  for (let paso = 0; paso < OR_PASOS; paso++) {
+    for (const o of objetos) {
+      if (!o.vivo) continue;
+      let ax = 0, ay = 0;
+      for (const c of cs) {
+        const dx = c.x - o.x, dy = c.y - o.y;
+        const d2 = dx * dx + dy * dy + 1, d = Math.sqrt(d2);
+        const f = c.gm / (d2 * d);
+        ax += dx * f; ay += dy * f;
+      }
+      o.vx += ax * OR_DT; o.vy += ay * OR_DT;
+      o.x += o.vx * OR_DT; o.y += o.vy * OR_DT;
+    }
+    for (const o of objetos) {
+      if (!o.vivo) continue;
+      const c = cs.find(c => orDist2(o.x, o.y, c.x, c.y) < c.r * c.r);
+      if (c) { o.vivo = false; eventos.push({ p: paso, k: "cae", id: o.id, u: o.u, x: o.x, y: o.y }); continue; }
+      if (o.x < -OR_MARGEN || o.y < -OR_MARGEN || o.x > OR_W + OR_MARGEN || o.y > OR_H + OR_MARGEN) {
+        o.vivo = false; eventos.push({ p: paso, k: "pierde", id: o.id, u: o.u, x: o.x, y: o.y });
+      }
+    }
+    for (let a = 0; a < objetos.length; a++) {
+      const A = objetos[a];
+      if (!A.vivo) continue;
+      for (let b = a + 1; b < objetos.length; b++) {
+        const B = objetos[b];
+        if (!B.vivo || B.u === A.u || orDist2(A.x, A.y, B.x, B.y) >= OR_CHOQUE * OR_CHOQUE) continue;
+        A.vivo = B.vivo = false;
+        const quien = A.nueva ? A.u : B.nueva ? B.u : "";
+        if (quien) suma(quien, OR_DERRIBO);
+        eventos.push({ p: paso, k: "choque", ids: [A.id, B.id], us: [A.u, B.u], x: (A.x + B.x) / 2, y: (A.y + B.y) / 2, quien, v: quien ? OR_DERRIBO : 0 });
+        break;
+      }
+    }
+    if (estrellas.length) {
+      const quedan = [];
+      for (const s of estrellas) {
+        const o = objetos.find(o => o.vivo && orDist2(o.x, o.y, s.x, s.y) < OR_CAPTURA * OR_CAPTURA);
+        if (!o) { quedan.push(s); continue; }
+        o.n = (o.n || 0) + 1; o.pts = (o.pts || 0) + s.v;
+        suma(o.u, s.v);
+        eventos.push({ p: paso, k: "estrella", id: o.id, u: o.u, x: s.x, y: s.y, v: s.v, s: s.id, nueva: !!o.nueva, n: o.n });
+      }
+      estrellas = quedan;
+    }
+    if (alPaso) alPaso(paso, objetos, estrellas);
+  }
+  const siguen = [];
+  for (const o of objetos) {
+    if (!o.vivo) continue;
+    o.vida -= 1; o.nueva = false;
+    if (o.vida <= 0) { eventos.push({ p: OR_PASOS, k: "apaga", id: o.id, u: o.u, x: o.x, y: o.y, n: o.n || 0 }); continue; }
+    siguen.push(o);
+  }
+  return { objetos: siguen, estrellas, eventos, ganado };
+}
+
+export function orVelocidad(j) {
+  if (!Number.isInteger(j.vx) || !Number.isInteger(j.vy)) return null;
+  let vx = j.vx / 100, vy = j.vy / 100;
+  const m = Math.sqrt(vx * vx + vy * vy);
+  if (!(m > 0.2)) return null;
+  if (m > OR_VMAX) { vx *= OR_VMAX / m; vy *= OR_VMAX / m; }
+  return { vx, vy };
+}
+
+/* La simulación entera cuesta unos milisegundos, pero el reductor
+   corre en cada repintado: se recuerda la última respuesta por sala. */
+const orCache = new Map();
+
+export function redOrbita(p, js = jugadoresDe(p), listos = true) {
+  const jugadas = jugadasDe(p);
+  const clave = [p.semilla, listos, js.map(x => x.uid).join(","), jugadas.map(j => j.k + j.t + (j.uid || "")).join("|")].join("#");
+  const hit = orCache.get(p.semilla + ":" + js.map(x => x.uid).join(","));
+  if (hit && hit.clave === clave) return hit.est;
+  const est = redOrbitaCalc(p, js, listos, jugadas);
+  orCache.set(p.semilla + ":" + js.map(x => x.uid).join(","), { clave, est });
+  if (orCache.size > 12) orCache.delete(orCache.keys().next().value);
+  return est;
+}
+
+function redOrbitaCalc(p, js, listos, jugadas) {
+  const n = js.length;
+  const mundo = orMundo(p.semilla || 1, n);
+  const rondas = OR_RONDAS[Math.max(2, Math.min(4, n))] || 7;
+  const rE = rng(((p.semilla || 1) ^ 0x5A7E11) >>> 0);
+  const sig = { n: 0 };
+  let objetos = [], estrellas = [];
+  orRellena(mundo, estrellas, objetos, rE, sig);
+  const puntos = {}, lanzados = {}, fuera = {}, capturas = {}, derribos = {};
+  js.forEach(x => { puntos[x.uid] = 0; lanzados[x.uid] = 0; capturas[x.uid] = 0; derribos[x.uid] = 0; });
+  let turno = js.length ? js[0].uid : "", ganador = null, motivo = "", ultima = null, movs = 0, idSig = 0;
+  const hist = [];
+  const activos = () => js.filter(x => !fuera[x.uid]);
+  const siguiente = uid => {
+    const k0 = js.findIndex(x => x.uid === uid);
+    for (let k = 1; k <= js.length; k++) {
+      const c = js[(k0 + k) % js.length];
+      if (!fuera[c.uid] && lanzados[c.uid] < rondas) return c.uid;
+    }
+    return "";
+  };
+  const cierra = () => {
+    const a = activos();
+    const max = Math.max(...a.map(x => puntos[x.uid]));
+    const top = a.filter(x => puntos[x.uid] === max);
+    ganador = top.length === 1 ? top[0].uid : "";
+    motivo = ganador ? "estrellas" : "empate";
+  };
+
+  for (const j of jugadas) {
+    if (ganador !== null || !js.some(x => x.uid === j.uid)) continue;
+    if (j.t === "abandona") {
+      if (fuera[j.uid]) continue;
+      fuera[j.uid] = true;
+      objetos = objetos.filter(o => o.u !== j.uid);
+      const a = activos();
+      if (a.length <= 1) { ganador = a.length ? a[0].uid : ""; motivo = "abandono"; continue; }
+      if (turno === j.uid || fuera[turno]) turno = siguiente(j.uid);
+      if (!turno) cierra();
+      continue;
+    }
+    if (j.t !== "lanza" || !listos || j.uid !== turno) continue;
+    const v = orVelocidad(j);
+    if (!v) continue;
+    const b = mundo.bases[js.findIndex(x => x.uid === j.uid)];
+    const lanza = { id: idSig++, u: j.uid, x: b.x, y: b.y, vx: v.vx, vy: v.vy, vida: 2 * activos().length, vivo: true, nueva: true, n: 0, pts: 0 };
+    const antes = { objetos, estrellas };
+    const res = orTurno(mundo, [...objetos.map(o => ({ ...o, vivo: true })), lanza], estrellas);
+    for (const u in res.ganado) puntos[u] += res.ganado[u];
+    for (const e of res.eventos) {
+      if (e.k === "estrella") capturas[e.u]++;
+      if (e.k === "choque" && e.quien) derribos[e.quien]++;
+    }
+    objetos = res.objetos.map(o => { const c = { ...o }; delete c.vivo; return c; });
+    estrellas = res.estrellas;
+    orRellena(mundo, estrellas, objetos, rE, sig);
+    lanzados[j.uid]++;
+    movs++;
+    ultima = { k: j.k, uid: j.uid, n: movs, antes, lanza: { ...lanza }, eventos: res.eventos, ganado: res.ganado };
+    hist.push({ uid: j.uid, ganado: res.ganado, eventos: res.eventos.map(e => ({ k: e.k, u: e.u, v: e.v, quien: e.quien, us: e.us, nueva: e.nueva, n: e.n })) });
+    if (hist.length > 40) hist.shift();
+    turno = siguiente(j.uid);
+    if (!turno) cierra();
+  }
+  const fase = !listos ? "espera" : ganador !== null ? "fin" : "jugando";
+  const total = rondas * n;
+  return { fase, mundo, W: OR_W, H: OR_H, cuerpos: mundo.cuerpos, bases: mundo.bases,
+    objetos, estrellas, puntos, capturas, derribos, lanzados, rondas, total, movs,
+    ronda: Math.min(rondas, 1 + Math.min(...activos().map(x => lanzados[x.uid]).concat([rondas]))),
+    turno: fase === "jugando" ? turno : "", ultima, hist, fuera, ganador, motivo };
 }
 
 /* ============================================================

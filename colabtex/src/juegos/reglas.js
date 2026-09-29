@@ -40,16 +40,22 @@ const UNO_COMUN = [
 
 const REGLAS = {
   orbita: {
-    lema: "Duelo por capturar estrellas en una rejilla de 6×6.",
+    lema: "Lanza sondas con la gravedad: roba estrellas y derriba satélites.",
     secciones: [
-      ["El objetivo", "Sumar más puntos que tu rival capturando estrellas. Cada estrella vale de 1 a 5."],
+      ["El objetivo", "Sumar más puntos que los demás capturando estrellas. Una estrella normal vale 1; cerca de un planeta o del sol vale 2 o 3, y las <b>novas</b> (poco comunes) valen 5."],
       ["Tu turno", lista([
-        "Elige una estrella <b>iluminada</b>: solo valen las de la fila o la columna que te marcó tu rival (en la primera jugada, cualquiera).",
-        "<b>Antes de capturar</b>, decide con los botones <b>↔ Fila</b> o <b>↕ Columna</b>: tu rival tendrá que jugar en esa línea, pasando por la estrella que acabas de tomar.",
-        "Si esa línea ya no tiene estrellas libres, tu rival juega en «órbita libre»: cualquier estrella que quede."
+        "Apunta desde tu base: arrastra en el campo (la distancia es la fuerza) o usa los deslizadores de <b>ángulo</b> y <b>potencia</b>, y pulsa <b>🚀 Lanzar</b>.",
+        "Solo se ve el primer tramo de la trayectoria: el resto depende de cómo la curven el sol y los planetas.",
+        "Tu sonda vuela un rato y se queda en el campo como <b>satélite</b>: en cada turno siguiente (el tuyo y el de los demás) sigue moviéndose y capturando estrellas para ti, hasta que se le acaba la vida (el arco que la rodea)."
       ])],
-      ["El final", "Cuando se capturan las 36 estrellas, gana quien más puntos sume. Puede haber empate."],
-      ["Consejo", "Lo importante no es solo lo que tomas, sino la línea que le dejas al otro: a veces conviene una estrella pequeña que lo manda a una fila vacía de cincos."]
+      ["Choques", lista([
+        "Si una sonda nueva toca un satélite de otro jugador, <b>los dos revientan</b> y quien lanzó gana <b>+3</b> por el derribo. Dos satélites viejos de distinto dueño que se tocan también revientan, sin puntos para nadie.",
+        "Los satélites en órbita enseñan en puntos su camino del próximo turno: es lo que te deja apuntarles.",
+        "Lo que cae en el sol o en un planeta, o sale del campo, se pierde."
+      ])],
+      ["El cielo", "Cuando se capturan estrellas aparecen otras nuevas, siempre en los mismos sitios para todos. El sol y los planetas salen de la semilla de la sala."],
+      ["El final", "Cada jugador lanza un número fijo de sondas (7 en duelo, 6 con tres, 5 con cuatro). Cuando todos han lanzado las suyas, gana quien más puntos tenga. Puede haber empate."],
+      ["Consejo", "Una órbita cerrada alrededor del sol sigue sumando turno tras turno, pero es un blanco fácil. Una pasada rápida por un racimo de estrellas cobra ya y no deja nada que derribar."]
     ]
   },
   escondite: {

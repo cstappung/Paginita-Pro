@@ -49,7 +49,8 @@ Six apps plus a small shared **Informes** page:
   account and the same Firebase project: **Escondite** (hide a person in a
   landscape, then cross the landscapes and race to find the other's),
   **Cartas de los tres elementos** (a Card-Jitsu duel), **Cuadritos** (dots and
-  boxes, two to ten players and three board sizes), **Reversi**, **Órbita**,
+  boxes, two to ten players and three board sizes), **Reversi**, **Órbita** (gravity
+  slingshot for two to four: launch probes, steal stars, shoot down satellites),
   **Chain Reaction** (critical-mass orbs that burst into their neighbours, two
   to eight players and three grid sizes), **Flip 7** (the push-your-luck card
   game, two to ten players, Normal, Vengeance and Super Vengeance), **Cacho**
@@ -1579,7 +1580,7 @@ its own `sonoFin` on the same repaint that decided the winner, so the victory
 sounded before the move that won it. Worms is excluded: its frame has its own
 ending music. The last point also has to be *visible*: a closed box pops in
 (`.jg-caja-nueva`), a score that just went up bounces (`.jg-m-sube`, cuadritos
-and órbita), and the star just taken in órbita wears `.jg-estrella.ultima`.
+and órbita), and in órbita the launch itself is replayed before the cartel.
 
 **A hidden tab does not get the cartel until it comes back.** The loser was
 the one who never saw the ending: the winner is looking at the board when the
@@ -1836,6 +1837,35 @@ have to be uploaded somewhere, served with CORS and waited for. The pieces are
 deliberately simple and drawn from six-tone palettes: what makes a hiding place
 hard is repetition, not detail — two hundred nearly identical trees hide a
 person far better than a photographic forest.
+
+**Órbita (`orbita`) is a physics game whose physics runs in the reducer.**
+A move is only `{t:"lanza", uid, vx, vy}`, velocities in integer hundredths
+(`orVelocidad` refuses anything else and clamps to `OR_VMAX`). `redOrbita`
+simulates the whole turn with `orTurno` — semi-implicit Euler, softened
+gravity from the sun and two or three planets (`orMundo`, from the room's
+seed), `OR_PASOS` steps — and every probe already in the field moves in
+*every* turn, capturing stars for its owner until its `vida` (two laps of
+the table) runs out. Every browser gets the same doubles because the
+arithmetic is the same sequence of IEEE operations; nothing is `Math.random`
+and nothing depends on frame rate. Things that are easy to break:
+
+- **The screen replays, it never decides.** `orbita.js` reruns `orTurno`
+  from `ultima.antes` a few steps per frame and fires the effects from the
+  same `eventos` the reducer scored, so what is animated is what was
+  counted. `ocupado()`/`ctx.listo()`/`pendiente` work as in Chain Reaction.
+- **Only the first `PREVIA` steps of the aim are shown.** The whole path
+  would turn it into billiards with the cue marked. Satellites already in
+  orbit show their full next-turn path dotted (`calculaFuturos`), because
+  that is what makes aiming at one to shoot it down a real play.
+- **A collision needs a new probe to score.** New probe against someone
+  else's satellite: both burst and the launcher gets `OR_DERRIBO`. Two old
+  satellites that meet burst with no points.
+- **The sky refills from its own stream** (`orRellena`, `rng(semilla ^
+  0x5A7E11)`), so both browsers draw the same new stars in the same order;
+  a star's value comes from how close it is to a body (1–3) plus a rare
+  nova worth 5.
+- The reducer is memoised (`orCache`, keyed by the log) because a whole
+  replay is ~400 steps × every move, and a repaint happens on every tick.
 
 **Cuadritos and reversi are SVG, cartas and the escondite are not.** What has
 to be hit with the mouse in cuadritos is a two-millimetre line, so each gap
