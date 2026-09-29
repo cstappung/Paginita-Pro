@@ -45,17 +45,33 @@
  * reiniciaría las animaciones CSS y las cartas parpadearían eternamente.
  */
 import {
-  ELEMENTOS, HEX_CARTA, MANO, cartaDe, salAleatoria, compromiso, auditaCartas
+  ELEMENTOS, HEX_CARTA, COLORES_CARTA, MANO, cartaDe, salAleatoria, compromiso,
+  auditaCartas, victoriaCartas
 } from "./motor.js";
 import { suena } from "./sonido.js";
 
-/* Lo que dura el choque en pantalla. Por debajo de dos segundos no da
-   tiempo a leer quién ganó y por qué. */
-const CHOQUE = 2600;
+/* El choque se cuenta por tiempos, como en el CardJitsu: las dos cartas
+   entran boca abajo, se dan la vuelta, la que gana embiste y el
+   elemento hace lo suyo sobre la que pierde, sale el veredicto con su
+   porqué y la carta ganada vuela al tablero de su dueño. Menos de tres
+   segundos y medio no da para leer las cuatro cosas. Los tiempos viven
+   aquí y en la hoja de estilo (`--t-*` no, retardos escritos): el
+   sonido tiene que caer en el mismo instante que el golpe. */
+const CHOQUE = 3600;
+const T_VUELTA = 520;     // se dan la vuelta
+const T_GOLPE = 1150;     // la ganadora embiste
 
 /* A partir de este valor la victoria de la ronda es un golpe: sale el
    estallido y suena distinto. Son las tres cartas altas de doce. */
 const GOLPE = 10;
+
+/* Orden fijo de los elementos en la mano y en los tableros: el mismo
+   en todas partes para que el ojo aprenda dónde mirar. */
+const ORDEN_EL = ["fuego", "agua", "nieve"];
+
+/* Qué le hace cada elemento al que vence. Es la frase del veredicto y
+   la leyenda de arriba, y es lo que decide la animación de la perdedora. */
+const VERBO = { fuego: "derrite", nieve: "congela", agua: "apaga" };
 
 const clave = (pid, uid, ronda) => `jg.cartas.${pid}.${uid}.${ronda}`;
 
@@ -72,24 +88,57 @@ const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
 
 const dosCifras = v => (v < 10 ? "0" : "") + v;
 const arteDe = c => `juegos/cartas/${c.e}/${c.e}_${dosCifras(c.v)}.png`;
+const mismaCarta = (a, b) => a && b && a.e === b.e && a.c === b.c && a.v === b.v;
 
-/* Una carta: el dibujo, y el color de palo como variable CSS. El diseño
-   entero vive en la hoja de estilo y aquí solo se dicen los datos. */
-function htmlCarta(carta, clases, attrs) {
+/* Una carta. El dibujo trae número y elemento, pero el agua y la nieve
+   son las dos azules y en una mano de cinco se confundían: por eso el
+   elemento va además en un sello grande arriba a la derecha, con su
+   color propio. El color de palo —el que decide el trío— es el marco
+   entero, no una etiqueta al pie: se tiene que ver desde lejos. */
+function htmlCarta(carta, clases, attrs, extra) {
   if (!carta) return `<div class="jg-carta jg-dorso ${clases || ""}"><span>✦</span></div>`;
   const el = ELEMENTOS[carta.e] || ELEMENTOS.fuego;
   const alt = `${el.nombre} ${carta.v}, ${carta.c}`;
   return `<div ${attrs || ""} class="jg-carta jg-arte ${clases || ""}" title="${esc(alt)}"
       style="--el:${el.color};--elc:${el.claro};--col:${HEX_CARTA[carta.c] || "#888"}">
       <img class="jg-c-img" src="${arteDe(carta)}" alt="${esc(alt)}" draggable="false">
-      <div class="jg-c-palo">${esc(carta.c)}</div>
+      <span class="jg-c-el">${el.icono}</span>
+      <div class="jg-c-palo">${esc(carta.c)}</div>${extra || ""}
     </div>`;
+}
+
+/* La ficha del tablero: el color de palo de fondo, el elemento y el
+   número. Una miniatura del dibujo a 34 px no decía ninguna de las tres. */
+function htmlFicha(c, clases) {
+  const el = ELEMENTOS[c.e] || ELEMENTOS.fuego;
+  return `<span class="jg-ficha ${clases || ""}" title="${esc(`${el.nombre} ${c.v}, ${c.c}`)}"
+    style="--col:${HEX_CARTA[c.c] || "#888"}"><i>${el.icono}</i>${c.v}</span>`;
+}
+
+/* Con qué carta se cierra un trío: para cada elemento, los colores que
+   bastarían. El número no importa para el trío, así que se prueba con
+   cualquiera. */
+function faltaPara(ganadas) {
+  const out = [];
+  for (const e of ORDEN_EL) {
+    const cols = COLORES_CARTA.filter(c => victoriaCartas([...(ganadas || []), { e, c, v: 1 }]));
+    if (cols.length) out.push({ e, cols });
+  }
+  return out;
+}
+
+/* Por qué se llevó alguien la ronda, en una frase. */
+function porQue(cg, cp) {
+  if (!cg || !cp) return "Mismo elemento y mismo número: no se la lleva nadie.";
+  if (cg.e !== cp.e)
+    return `${ELEMENTOS[cg.e].icono} ${ELEMENTOS[cg.e].nombre} ${VERBO[cg.e]} ${ELEMENTOS[cp.e].nombre.toLowerCase()} ${ELEMENTOS[cp.e].icono}`;
+  return `Mismo elemento: manda el número, ${cg.v} contra ${cp.v}`;
 }
 
 /* Las 36 imágenes, traídas de fondo y de una en una. Sin esto la
    primera carta de cada elemento y valor aparece en blanco justo en el
-   choque, que dura dos segundos y medio y es lo único que se mira.
-   Escalonadas para no pelear con la partida por el ancho de banda. */
+   choque, que es lo único que se mira. Escalonadas para no pelear con
+   la partida por el ancho de banda. */
 let precargado = false;
 function precarga() {
   if (precargado || typeof Image === "undefined") return;
@@ -120,14 +169,21 @@ export function crearCartas(ctx) {
   let elegida = null;          // índice señalado en la mano, aún sin comprometer
   let mandadaEn = -1;          // ronda cuya carta ya se echó desde esta pestaña
   let enviando = false;
-  let vistas = 0;              // rondas que ya se han animado
-  let tChoque = 0;
+  let vistas = -1;             // rondas ya contadas; -1 = aún no llegó la primera foto
+  let tChoque = -1e9;
+  let pendiente = false;       // hubo ronda con la pestaña oculta: se cuenta al volver
   let tramposos = [];
   let auditando = false;
   let sec = null;              // {sem, sal} — la semilla privada del mazo
   let secPedido = false;
   let cerrando = false;
+  let manoAntes = null;        // índices de la última mano pintada
+  let nuevas = [];             // cartas recién robadas, para que se note cuál entró
+  const relojes = [];
   const firmas = {};           // región → última firma pintada
+
+  const luego = (f, ms) => relojes.push(setTimeout(() => { if (!muerto) f(); }, ms));
+  const enChoque = () => ahora() - tChoque < CHOQUE;
 
   /* ---------- estructura ---------- */
   function montar(donde) {
@@ -141,23 +197,21 @@ export function crearCartas(ctx) {
         </div>
         <div id="caTrampa"></div>
         <div class="jg-mesa">
-          <div class="jg-lado">
-            <div class="jg-quien" id="caQuienOtro"></div>
+          <div class="jg-ley" id="caLey"></div>
+          <div class="jg-ca-fila jg-ca-otro">
+            <div class="jg-tb" id="caTbOtro"></div>
             <div class="jg-mano jg-mano-otro" id="caManoOtro"></div>
           </div>
           <div class="jg-duelo" id="caDuelo"></div>
-          <div class="jg-lado">
+          <div class="jg-ca-fila jg-ca-yo">
+            <div class="jg-tb" id="caTbYo"></div>
             <div class="jg-mano" id="caManoYo"></div>
-            <div class="jg-quien" id="caQuienYo"></div>
           </div>
-        </div>
-        <div class="jg-trofeos">
-          <div class="jg-trofeo" id="caGanYo"></div>
-          <div class="jg-trofeo" id="caGanOtro"></div>
         </div>
         <div class="jg-pie" id="caPie"></div>
       </div>`;
     host.addEventListener("click", alClic);
+    document.addEventListener("visibilitychange", alVolver);
     precarga();
     pideSecreto();
     /* El choque se apaga solo: nadie va a mandar nada por la base de
@@ -168,6 +222,8 @@ export function crearCartas(ctx) {
   function destruir() {
     muerto = true;
     if (tic) { clearInterval(tic); tic = null; }
+    relojes.forEach(clearTimeout);
+    document.removeEventListener("visibilitychange", alVolver);
     if (host) { host.removeEventListener("click", alClic); host.innerHTML = ""; }
     host = null;
   }
@@ -186,6 +242,7 @@ export function crearCartas(ctx) {
   /* ---------- quién es quién ---------- */
   const yo = () => (est ? est.jugadores.find(j => j.uid === uid) : null);
   const otro = () => (est ? est.jugadores.find(j => j.uid !== uid) : null);
+  const ganadasDe = u => (est && est.ganadas && est.ganadas[u]) || [];
 
   /* De dónde sale *mi* mazo. Lo normal es la semilla privada; una sala
      abierta antes de que esto existiera no tiene ninguna guardada, y
@@ -199,9 +256,11 @@ export function crearCartas(ctx) {
     return { sem: p.semilla >>> 0, orden: y.orden || 0 };
   }
 
-  /* Mi mano: las primeras MANO cartas del mazo que aún no he jugado.
-     El mazo son 216 cartas y una partida no pasa de unas pocas rondas,
-     así que nunca se acaba. */
+  /* Mi mano: las primeras MANO cartas del mazo que aún no he jugado,
+     **ordenadas por elemento y número**. En el orden del mazo cada
+     robo caía en un sitio distinto y había que releer la mano entera
+     cada ronda para saber qué se tenía; así el fuego siempre está a la
+     izquierda y la carta nueva se ve porque entra brillando. */
   function miMano() {
     if (mirando) return [];
     const s = siembra();
@@ -213,7 +272,8 @@ export function crearCartas(ctx) {
       if (!c) break;
       if (usadas.indexOf(i) < 0) m.push({ i, carta: c });
     }
-    return m;
+    return m.sort((a, b) => ORDEN_EL.indexOf(a.carta.e) - ORDEN_EL.indexOf(b.carta.e)
+      || a.carta.v - b.carta.v || a.i - b.i);
   }
 
   const cartaEn = i => {
@@ -229,10 +289,17 @@ export function crearCartas(ctx) {
     if (el) el.innerHTML = html;
   }
 
+  const nombre = u => {
+    const j = est && est.jugadores.find(x => x.uid === u);
+    return j ? j.nombre : "el rival";
+  };
+  const llamo = j => (j && j.uid === uid && !mirando ? "Tú" : j ? j.nombre : "?");
+  const yaMandeOtro = () => { const o = otro(); return !!(o && est.comp && est.comp[o.uid]); };
+
   function pinta() {
     if (!host || !est) return;
     const y = yo(), o = otro();
-    const enChoque = ahora() - tChoque < CHOQUE;
+    const choque = enChoque();
     /* Cuenta como echada en cuanto se pulsa, sin esperar a que la base
        devuelva el compromiso: si no, el segundo clic del impaciente
        guardaría otra carta sobre el secreto de la ronda y la auditoría
@@ -240,53 +307,62 @@ export function crearCartas(ctx) {
     const yaMande = !!(est.comp && est.comp[uid]) || mandadaEn === est.ronda;
     const mY = miMano();
 
+    const clave = mY.map(x => x.i).join(",");
+    if (manoAntes !== null && clave !== manoAntes.join(",")) {
+      nuevas = mY.map(x => x.i).filter(i => manoAntes.indexOf(i) < 0);
+      if (nuevas.length) luego(() => { nuevas = []; pinta(); }, 1400);
+    }
+    if (mY.length) manoAntes = mY.map(x => x.i);
+
     /* barra */
     let fase = "";
     if (est.fase === "espera") fase = "Esperando a que entre alguien…";
     else if (mirando) fase = est.fase === "fin"
       ? (est.ganador ? `Gana ${nombre(est.ganador)}.` : "Partida terminada.")
       : `Mirando: ${y ? y.nombre : "?"} contra ${o ? o.nombre : "?"}`;
-    else if (est.fase === "fin") {
+    else if (est.fase === "fin" && !choque) {
       if (est.motivo === "abandono") fase = est.ganador === uid ? "¡Ganas! El otro se fue." : "Abandonaste la partida.";
       else fase = est.ganador === uid ? "¡Trío! Ganas la partida." : "Trío del rival. Pierdes.";
-    } else if (!mY.length) fase = "Repartiendo tu mazo…";
+    } else if (choque) fase = "¡Choque!";
+    else if (!mY.length) fase = "Repartiendo tu mazo…";
     else if (yaMande) fase = "Carta echada. Esperando al rival…";
-    else fase = elegida === null ? "Elige una carta" : "Pulsa «Echar carta»";
+    else fase = elegida === null ? "Elige una carta de tu mano" : "Pulsa otra vez la carta o «Echar carta»";
     set("caFase", fase, esc(fase));
-    set("caRonda", "r" + est.ronda, est.fase === "fin" ? "" : "Ronda " + (est.ronda + 1));
+    set("caRonda", "r" + est.ronda + est.fase, est.fase === "fin" ? "" : "Ronda " + (est.ronda + 1));
 
     /* aviso de compromiso roto */
     set("caTrampa", tramposos.map(t => t.uid + ":" + t.que + t.ronda).join(","), avisoTrampa());
 
-    /* jugadores */
-    set("caQuienYo", "y" + (y ? y.uid : ""), y ? etiqueta(y, true) : "");
-    set("caQuienOtro", "o" + (o ? o.uid : ""), o ? etiqueta(o, false) : "");
+    pintaLeyenda(choque);
 
     /* manos. La del rival son dorsos y nada más: sus cartas no están
        en esta máquina ni se pueden calcular desde aquí. */
-    const puedo = est.fase === "jugando" && !yaMande && !enChoque && mY.length > 0;
+    const puedo = est.fase === "jugando" && !yaMande && !choque && mY.length > 0;
+    const mias = ganadasDe(uid);
     set("caManoYo",
-      mY.map(x => x.i + ":" + x.carta.e + x.carta.c + x.carta.v).join(",") + "|" + elegida + "|" + puedo,
+      clave + "|" + elegida + "|" + puedo + "|" + nuevas.join(",") + "|" + mias.length,
       mY.length
-        ? mY.map(x => htmlCarta(x.carta,
-            "jg-jugable" + (x.i === elegida ? " jg-elegida" : "") + (puedo ? "" : " jg-quieta"),
-            `data-i="${x.i}"`)).join("")
-        : Array.from({ length: MANO }, () => htmlCarta(null, "jg-tenue")).join(""));
-    const otroMando = yaMandeOtro();
+        ? mY.map(x => {
+            const decisiva = est.fase === "jugando" && !!victoriaCartas([...mias, x.carta]);
+            return htmlCarta(x.carta,
+              "jg-jugable" + (x.i === elegida ? " jg-elegida" : "") + (puedo ? "" : " jg-quieta")
+                + (nuevas.indexOf(x.i) >= 0 ? " jg-nueva" : "") + (decisiva ? " jg-decisiva" : ""),
+              `data-i="${x.i}"`,
+              decisiva ? `<b class="jg-c-cinta">¡Trío!</b>` : "");
+          }).join("")
+        : mirando
+          ? Array.from({ length: MANO }, () => htmlCarta(null, "jg-pequena")).join("")
+          : Array.from({ length: MANO }, () => htmlCarta(null, "jg-tenue")).join(""));
+    const otroMando = yaMandeOtro() && !choque;
     set("caManoOtro", "dorsos|" + otroMando,
       Array.from({ length: otroMando ? MANO - 1 : MANO },
         () => htmlCarta(null, "jg-pequena")).join(""));
 
-    pintaDuelo(y, o, enChoque);
-    pintaTrofeos(y, o);
-    pintaPie(mY, puedo);
+    pintaDuelo(y, o, choque, yaMande);
+    pintaTablero("caTbYo", y, choque);
+    pintaTablero("caTbOtro", o, choque);
+    pintaPie(mY, puedo, choque);
   }
-
-  const yaMandeOtro = () => { const o = otro(); return !!(o && est.comp && est.comp[o.uid]); };
-  const nombre = u => {
-    const j = est && est.jugadores.find(x => x.uid === u);
-    return j ? j.nombre : "el rival";
-  };
 
   /* Los dos candados fallan por motivos distintos y se cuentan
      distinto: uno es «esa no es la carta que prometías esta ronda» y el
@@ -302,56 +378,168 @@ export function crearCartas(ctx) {
       } La partida ya no vale.</div>`;
   }
 
-  function etiqueta(j, esMio) {
-    const n = (est.ganadas && est.ganadas[j.uid] || []).length;
-    return `<span class="jg-punto" style="background:${esc(j.color || "#888")}"></span>
-      <b>${esc(esMio && !mirando ? "Tú" : j.nombre)}</b>
-      <span class="jg-cuenta">${n} carta${n === 1 ? "" : "s"} ganada${n === 1 ? "" : "s"}</span>`;
+  /* La regla entera, siempre a la vista, y durante el choque se
+     enciende la que se está aplicando. */
+  function pintaLeyenda(choque) {
+    const ult = est.rondas[est.rondas.length - 1];
+    let activo = "";
+    if (choque && ult && ult.gana) {
+      const cg = ult.cartas[ult.gana];
+      const cp = Object.keys(ult.cartas).map(k => ult.cartas[k]).find(c => c !== cg);
+      activo = cg && cp && cg.e !== cp.e ? cg.e : "num";
+    }
+    set("caLey", "ley" + activo,
+      ORDEN_EL.map(e => {
+        const a = ELEMENTOS[e], b = ELEMENTOS[a.gana];
+        return `<span class="jg-ley-r${activo === e ? " on" : ""}" style="--el:${a.color}">
+          <i>${a.icono}</i> ${VERBO[e]} <i>${b.icono}</i></span>`;
+      }).join("") +
+      `<span class="jg-ley-r jg-ley-n${activo === "num" ? " on" : ""}">igual elemento: gana el número</span>`);
+  }
+
+  /* El tablero de cada uno: lo ganado, en tres columnas por elemento, y
+     debajo con qué carta cerraría el trío. Es lo que en la mesa del
+     CardJitsu se tiene delante todo el rato, y sin ello la partida era
+     echar cartas a ciegas: el trío se buscaba recorriendo miniaturas. */
+  function pintaTablero(id, j, choque) {
+    if (!j) { set(id, "-", ""); return; }
+    /* Durante el choque la carta recién ganada aún no ha llegado: se
+       pinta el tablero de antes y aparece cuando termina el vuelo. */
+    let g = ganadasDe(j.uid);
+    const ult = est.rondas[est.rondas.length - 1];
+    if (choque && ult && ult.gana === j.uid) g = g.slice(0, -1);
+    const recien = !choque && ult && ult.gana === j.uid && ahora() - tChoque < CHOQUE + 1500
+      ? ult.cartas[j.uid] : null;
+    const enTrio = !choque && est.ganador === j.uid && est.trio ? est.trio : [];
+    const falta = est.fase === "jugando" || choque ? faltaPara(g) : [];
+    const mio = j.uid === uid && !mirando;
+    const cols = ORDEN_EL.map(e => {
+      const el = ELEMENTOS[e];
+      const cs = g.filter(c => c.e === e);
+      return `<div class="jg-tb-col" style="--el:${el.color}">
+        <div class="jg-tb-ico">${el.icono}</div>
+        <div class="jg-tb-fichas">${cs.map(c => htmlFicha(c,
+          (enTrio.some(t => mismaCarta(t, c)) ? "jg-brilla" : "") +
+          (mismaCarta(recien, c) ? " jg-llega" : ""))).join("") || '<span class="jg-tb-vacio">·</span>'}</div>
+      </div>`;
+    }).join("");
+    let aviso = "";
+    if (falta.length) {
+      const partes = falta.map(f => `<span class="jg-tb-f"><i>${ELEMENTOS[f.e].icono}</i>${
+        f.cols.length === COLORES_CARTA.length ? "cualquier color"
+          : f.cols.map(c => `<u style="--col:${HEX_CARTA[c]}" title="${c}"></u>`).join("")}</span>`).join("");
+      aviso = `<div class="jg-tb-falta ${mio ? "bien" : "mal"}"><b>${mio ? "Ganas con" : "Gana con"}</b>${partes}</div>`;
+    }
+    const n = g.length;
+    set(id, j.uid + "|" + g.map(c => c.e + c.c + c.v).join(",") + "|" + enTrio.length + "|" + !!recien + "|" + falta.length + est.fase,
+      `<div class="jg-tb-cab"><span class="jg-punto" style="background:${esc(j.color || "#888")}"></span>
+         <b>${esc(llamo(j))}</b><span>${n} ganada${n === 1 ? "" : "s"}</span></div>
+       <div class="jg-tb-cols">${cols}</div>${aviso}`);
   }
 
   /* El centro enseña, por este orden: el choque recién resuelto mientras
-     dura la animación, si no las cartas que ya estén reveladas, y si no
-     el hueco con lo que falta por pasar. */
-  function pintaDuelo(y, o, enChoque) {
+     dura, el remate de la partida, o la espera con las dos plazas —la
+     mía con la carta que eché, que yo sí sé cuál es— y lo que pasó en
+     la ronda anterior, para quien se perdió el choque. */
+  function pintaDuelo(y, o, choque, yaMande) {
     const ult = est.rondas[est.rondas.length - 1];
     let firma, html;
-    if (enChoque && ult) {
-      const cy = ult.cartas[uid], co = o ? ult.cartas[o.uid] : null;
-      const res = ult.gana === uid ? "gana" : ult.gana === "" ? "empate" : "pierde";
-      /* La carta que se lleva la ronda; con un 10, 11 o 12 el choque
-         estalla en el color de su elemento. El empate no tiene carta
-         ganadora y saca humo, que es lo que queda cuando chocan dos
-         que no se pueden. */
-      const cg = ult.gana === uid ? cy : ult.gana === "" ? null : co;
-      const golpe = !!(cg && cg.v >= GOLPE);
+    if (choque && ult) {
       firma = "choque" + ult.n;
-      html = `<div class="jg-choque jg-${res}${golpe ? " jg-golpea" : ""}">
-          ${golpe ? efectoGolpe(cg) : ""}
-          ${res === "empate" ? efectoHumo() : ""}
-          ${htmlCarta(co, "jg-vuela-arriba")}
-          <div class="jg-veredicto">${res === "empate" ? "Empate"
-            : mirando ? "Se la lleva " + esc(nombre(ult.gana))
-            : res === "gana" ? "¡Te la llevas!" : "Se la lleva"}${
-            golpe ? `<span class="jg-golpe-t">¡${cg.v}!</span>` : ""}</div>
-          ${htmlCarta(cy, "jg-vuela-abajo")}
-        </div>`;
+      html = htmlChoque(ult, o);
     } else if (est.fase === "fin") {
       firma = "fin" + est.ganador;
-      html = `<div class="jg-remate ${est.ganador === uid ? "jg-gana" : "jg-pierde"}">
-          <div class="jg-remate-t">${mirando ? "🏆 Gana " + esc(nombre(est.ganador))
-            : est.ganador === uid ? "🏆 Ganas" : "Pierdes"}</div>
-          <div class="jg-remate-trio">${(est.trio || []).map(c => htmlCarta(c, "jg-pequena jg-brilla")).join("")}</div>
-        </div>`;
+      html = htmlRemate();
     } else {
       const comp = est.comp || {};
-      firma = "espera" + est.ronda + (comp[uid] ? "1" : "0") + (o && comp[o.uid] ? "1" : "0");
+      const mia = yaMande && !mirando ? leeSecreto(pid, uid, est.ronda) : null;
+      const suyaLista = o && comp[o.uid], miaLista = comp[uid] || yaMande;
+      firma = "espera" + est.ronda + (miaLista ? "1" : "0") + (suyaLista ? "1" : "0") + (mia ? "m" : "") + (o ? o.uid : "");
       html = `<div class="jg-espera">
-          ${htmlCarta(null, (o && comp[o.uid]) ? "jg-lista" : "jg-tenue")}
+          <div class="jg-plaza">
+            ${miaLista ? htmlCarta(mia, mia ? "jg-pequena jg-boca-abajo" : "jg-pequena jg-lista") : `<div class="jg-hueco">tu carta</div>`}
+            <span>${esc(llamo(y))}${miaLista ? " · echada" : ""}</span>
+          </div>
           <div class="jg-vs">VS</div>
-          ${htmlCarta(null, comp[uid] ? "jg-lista" : "jg-tenue")}
-        </div>`;
+          <div class="jg-plaza">
+            ${suyaLista ? htmlCarta(null, "jg-pequena jg-lista") : `<div class="jg-hueco jg-piensa">pensando…</div>`}
+            <span>${esc(o ? o.nombre : "rival")}${suyaLista ? " · echada" : ""}</span>
+          </div>
+        </div>${ult ? htmlUltima(ult) : ""}`;
     }
     set("caDuelo", firma, html);
+  }
+
+  /* Lo que pasó en la ronda anterior, en una línea. */
+  function htmlUltima(ult) {
+    const o = otro();
+    const cy = ult.cartas[uid], co = o ? ult.cartas[o.uid] : null;
+    const res = ult.gana === uid ? (mirando ? "se la lleva " + esc(nombre(uid)) : "te la llevas")
+      : ult.gana === "" ? "empate" : "se la lleva " + esc(nombre(ult.gana));
+    return `<div class="jg-ultima">Ronda ${ult.n + 1}: ${cy ? htmlFicha(cy) : ""} contra ${co ? htmlFicha(co) : ""} · ${res}</div>`;
+  }
+
+  function htmlChoque(ult, o) {
+    const cy = ult.cartas[uid], co = o ? ult.cartas[o.uid] : null;
+    const res = ult.gana === uid ? "gana" : ult.gana === "" ? "empate" : "pierde";
+    const cg = res === "gana" ? cy : res === "pierde" ? co : null;
+    const cp = res === "gana" ? co : res === "pierde" ? cy : null;
+    const golpe = !!(cg && cg.v >= GOLPE);
+    /* Lo que el elemento le hace a la perdedora; con el mismo elemento
+       no hay magia, solo el número, y la perdedora se rompe. */
+    const fx = cg && cp ? (cg.e !== cp.e ? cg.e : "num") : "";
+    const lado = (c, quien, papel) => `
+      <div class="jg-ch-lado jg-ch-${quien} jg-ch-${papel}">
+        <div class="jg-ch-carta">
+          <div class="jg-flip">
+            <div class="jg-cara">${htmlCarta(c, "", "", papel === "pierde" ? `<div class="jg-fx jg-fx-${fx}"></div>` : "")}</div>
+            <div class="jg-cara jg-reves">${htmlCarta(null)}</div>
+          </div>
+        </div>
+        <div class="jg-ch-nombre">${esc(quien === "yo" ? llamo(yo()) : (o ? o.nombre : "rival"))}</div>
+      </div>`;
+    const papel = mia => res === "empate" ? "empate" : (res === "gana") === mia ? "gana" : "pierde";
+    const titulo = res === "empate" ? "Empate"
+      : mirando ? "Se la lleva " + esc(nombre(ult.gana))
+      : res === "gana" ? "¡Te la llevas!" : "Se la lleva " + esc(nombre(ult.gana));
+    return `<div class="jg-choque jg-${res}${golpe ? " jg-golpea" : ""}">
+        ${lado(cy, "yo", papel(true))}
+        <div class="jg-ch-centro">
+          <div class="jg-ch-vs">VS</div>
+          <div class="jg-veredicto">${titulo}${golpe ? `<span class="jg-golpe-t">¡${cg.v}!</span>` : ""}</div>
+          <div class="jg-ch-porque">${esc(porQue(cg, cp))}</div>
+          ${golpe ? efectoGolpe(cg) : ""}
+          ${res === "empate" ? efectoHumo() : ""}
+        </div>
+        ${lado(co, "otro", papel(false))}
+      </div>`;
+  }
+
+  /* El remate: el trío, grande y carta a carta, y el nombre de lo que
+     es. Al que gana le llueven chispas de los tres elementos. */
+  function htmlRemate() {
+    const gano = est.ganador === uid;
+    if (est.motivo === "abandono" || !est.trio) {
+      return `<div class="jg-remate ${gano ? "jg-gana" : "jg-pierde"}">
+        <div class="jg-remate-t">${mirando ? "Gana " + esc(nombre(est.ganador))
+          : gano ? "🏆 Ganas" : "Pierdes"}</div>
+        <div class="jg-remate-s">${est.motivo === "abandono" ? "Se abandonó la partida." : ""}</div></div>`;
+    }
+    const els = new Set(est.trio.map(c => c.e));
+    const tipo = els.size === 1
+      ? `Trío de ${ELEMENTOS[est.trio[0].e].nombre.toLowerCase()} ${ELEMENTOS[est.trio[0].e].icono}`
+      : "Trío de los tres elementos 🔥💧❄";
+    const chispas = gano && !mirando ? `<div class="jg-confeti">${Array.from({ length: 26 }, (_, k) => {
+      const e = ORDEN_EL[k % 3];
+      return `<i style="--x:${(k * 37) % 100}%;--d:${(k * 97) % 900}ms;--c:${ELEMENTOS[e].color};--r:${(k * 53) % 360}deg">${ELEMENTOS[e].icono}</i>`;
+    }).join("")}</div>` : "";
+    return `<div class="jg-remate ${mirando || gano ? "jg-gana" : "jg-pierde"}">${chispas}
+        <div class="jg-remate-t">${mirando ? "🏆 Gana " + esc(nombre(est.ganador))
+          : gano ? "🏆 ¡Ganas!" : "Gana " + esc(nombre(est.ganador))}</div>
+        <div class="jg-remate-s">${tipo} · tres colores distintos</div>
+        <div class="jg-remate-trio">${est.trio.map((c, k) =>
+          `<div class="jg-rt" style="--k:${k}">${htmlCarta(c, "jg-brilla")}</div>`).join("")}</div>
+      </div>`;
   }
 
   /* Los rayos y las volutas se escriben aquí y no en la hoja de estilo
@@ -373,44 +561,29 @@ export function crearCartas(ctx) {
     return `<div class="jg-humo">${puffs}</div>`;
   }
 
-  /* Las cartas ganadas se agrupan por elemento porque el trío se busca
-     mirando colores dentro de un elemento: amontonadas por orden de
-     llegada hay que recorrerlas con el dedo. */
-  function pintaTrofeos(y, o) {
-    for (const [id, j, mio] of [["caGanYo", y, true], ["caGanOtro", o, false]]) {
-      if (!j) { set(id, "-", ""); continue; }
-      const g = (est.ganadas && est.ganadas[j.uid]) || [];
-      const enTrio = est.ganador === j.uid && est.trio ? est.trio : [];
-      const dentro = c => enTrio.some(t => t.e === c.e && t.c === c.c && t.v === c.v);
-      const grupos = Object.keys(ELEMENTOS).map(e => {
-        const cs = g.filter(c => c.e === e);
-        if (!cs.length) return "";
-        return `<div class="jg-grupo">${cs.map(c => htmlCarta(c, "jg-mini" + (dentro(c) ? " jg-brilla" : ""))).join("")}</div>`;
-      }).join("");
-      set(id, j.uid + "|" + g.map(c => c.e + c.c + c.v).join(",") + "|" + enTrio.length,
-        `<div class="jg-trofeo-t">${esc(mio && !mirando ? "Tus cartas" : "Cartas de " + j.nombre)}</div>
-         <div class="jg-grupos">${grupos || '<span class="jg-nada">todavía ninguna</span>'}</div>`);
-    }
-  }
-
-  function pintaPie(mY, puedo) {
+  function pintaPie(mY, puedo, choque) {
     let firma, html;
     if (est.fase === "espera") { firma = "esp"; html = `<span class="jg-nota">Pásale el enlace de la sala a quien quieras y empezáis.</span>`; }
-    else if (est.fase === "fin") { firma = "fin"; html = `<span class="jg-nota">Partida terminada.</span>`; }
+    else if (est.fase === "fin" && !choque) { firma = "fin"; html = `<span class="jg-nota">Partida terminada.</span>`; }
     else if (mirando) { firma = "mira"; html = `<span class="jg-nota">Estás mirando: las manos no se ven desde aquí, solo las cartas que se echan.</span>`; }
+    else if (choque) { firma = "choque"; html = `<span class="jg-nota">Se resuelve la ronda…</span>`; }
     else if (est.comp && est.comp[uid]) { firma = "mandada"; html = `<span class="jg-nota">Tu carta está echada boca abajo. Se dan la vuelta cuando el rival eche la suya.</span>`; }
     else {
-      firma = "elige" + elegida + "|" + mY.length;
+      firma = "elige" + elegida + "|" + mY.length + "|" + puedo;
       const c = elegida !== null ? (mY.find(x => x.i === elegida) || {}).carta : null;
+      let nota = "Elige una carta. El sello de arriba a la derecha dice su elemento; el marco, su color.";
+      if (c) {
+        const el = ELEMENTOS[c.e];
+        const pierdeCon = ORDEN_EL.find(e => ELEMENTOS[e].gana === c.e);
+        nota = `<b>${el.icono} ${el.nombre} ${c.v}</b> · ${esc(c.c)} — ${VERBO[c.e]} ${ELEMENTOS[el.gana].icono}, cae ante ${ELEMENTOS[pierdeCon].icono}, y contra ${el.icono} manda el número.`;
+      }
       html = `<button class="jg-btn" id="caEchar"${elegida === null || !puedo ? " disabled" : ""}>Echar carta</button>
-        <span class="jg-nota">${c
-          ? `${ELEMENTOS[c.e].icono} ${esc(c.e)} · ${esc(c.c)} · ${c.v} — el elemento manda, y a igual elemento manda el número.`
-          : "Fuego quema la nieve · la nieve congela el agua · el agua apaga el fuego."}</span>`;
+        <span class="jg-nota">${nota}</span>`;
     }
     set("caPie", firma, html);
   }
 
-  /* ---------- interacción ---------- */
+/* ---------- interacción ---------- */
   function alClic(ev) {
     /* Con la partida cerrada no se toca nada. El portón de
        `juegos-main.js` ya impide la escritura, pero sin esto la carta se
@@ -419,7 +592,11 @@ export function crearCartas(ctx) {
     if (mirando || (est && est.fase === "fin")) return;
     const carta = ev.target.closest(".jg-carta.jg-jugable");
     if (carta && !carta.classList.contains("jg-quieta")) {
-      elegida = Number(carta.getAttribute("data-i"));
+      const i = Number(carta.getAttribute("data-i"));
+      /* Tocar otra vez la carta ya señalada la echa: en un teléfono el
+         botón queda lejos del pulgar, y dos toques es lo que se espera. */
+      if (elegida === i) { echar(); return; }
+      elegida = i;
       suena("clic");
       pinta();
       return;
@@ -506,13 +683,35 @@ export function crearCartas(ctx) {
     else suena(ult.gana === uid ? "gana" : "pierde");
   }
 
+  /* El choque de una ronda se cuenta cuando alguien lo mira. Con la
+     pestaña oculta se guarda para la vuelta: si no, quien esperaba su
+     turno en otra pestaña volvía a un marcador ya movido sin haber
+     visto qué carta le ganó. */
+  function arrancaChoque() {
+    const ult = est && est.rondas[est.rondas.length - 1];
+    tChoque = ahora(); elegida = null; pendiente = false;
+    luego(() => suena("carta"), T_VUELTA);
+    luego(() => suenaRonda(ult), T_GOLPE);
+    luego(() => { if (ctx.listo) ctx.listo(); pinta(); }, CHOQUE);
+  }
+
+  function alVolver() {
+    if (!pendiente || document.hidden || muerto) return;
+    arrancaChoque();
+    pinta();
+  }
+
   function actualizar(partida, estado) {
     p = partida; est = estado;
     if (mirando && est.jugadores.length) uid = est.jugadores[0].uid;
     pideSecreto();
-    if (est.rondas.length > vistas) {
-      vistas = est.rondas.length; tChoque = ahora(); elegida = null;
-      suenaRonda(est.rondas[est.rondas.length - 1]);
+    /* La primera foto no se anima: abrir una sala a medias no es ver
+       una ronda nueva. */
+    if (vistas < 0) vistas = est.rondas.length;
+    else if (est.rondas.length > vistas) {
+      vistas = est.rondas.length;
+      if (document.hidden) { pendiente = true; elegida = null; }
+      else arrancaChoque();
     }
     pinta();
     automatismos();
@@ -520,5 +719,5 @@ export function crearCartas(ctx) {
     if (est.ganador !== null && est.ganador !== undefined && !(p.fin && p.fin.at)) cierre();
   }
 
-  return { montar, actualizar, destruir };
+  return { montar, actualizar, destruir, ocupado: () => pendiente || enChoque() };
 }
