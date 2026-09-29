@@ -279,6 +279,28 @@ The spectrum is no help: its resolution is 1/record, which over six cycles of
 tick by itself, or the next source change would silently overwrite what was
 just typed.
 
+**The FFT tab compares any number of channels against the source**
+(`S.fftCompare`, ticked under *Compare*). `runAnalysis` fills `S.series` —
+the source first (`ref: true`), then each compared channel — and `S.fft` /
+`S.harm` stay the source's, so THD/TDD, the harmonic table and the export's
+base columns did not change meaning. Three things make the comparison honest:
+
+- **Every channel is analysed with the source's settings**: the same f₁, window,
+  range and number of harmonics. Harmonic n must be the same frequency in every
+  series, or "compare the 3rd" compares two different lines. TDD is not
+  computed for them (`iL` null): the rated current belongs to the source.
+- **Phases are referred to the source's window start** (`phaseRef`, shifted by
+  360·f·Δt₀). Each FFT's phase is relative to its own first sample, and two
+  channels with different time offsets or sample grids would otherwise report a
+  lag that is only bookkeeping. *Phase → Δφ vs. source* subtracts the source's
+  phase for the same harmonic, and a harmonic below 0.1 % of the fundamental
+  (on either side) shows no phase, because the phase of noise is noise.
+- **All the spectra share one vertical scale**, because comparing magnitudes
+  is the point. With different units (V beside A) the legend suggests
+  *% of fundamental* rather than silently normalising each trace. The bars are
+  grouped per harmonic in each channel's colour, and the compare card lists
+  f₁, the ratio to the source, Δφ₁ and THD per channel.
+
 ## FiltroLab architecture
 
 One file, `filtros-engine.js`, an IIFE on `window.FiltrosApp` behind the same
