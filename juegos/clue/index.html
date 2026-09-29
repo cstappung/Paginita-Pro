@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Clue</title>
+<link rel="stylesheet" href="estilo.css?v=clue-1">
+</head>
+<body>
+<div id="app">
+  <!-- Pantallas previas: inicio, conexion, elegir personaje, reparto -->
+  <section id="pantalla" hidden></section>
+
+  <!-- La partida -->
+  <section id="juego" hidden>
+    <div id="rejilla">
+      <div id="accion" class="tarjeta"></div>
+      <div id="caja-tablero">
+        <svg id="tablero" viewBox="0 0 960 1000" role="img" aria-label="Tablero del edificio">
+          <g id="estatico"></g>
+          <g id="dina"></g>
+        </svg>
+      </div>
+      <div id="resto">
+        <div id="mano" class="tarjeta"></div>
+        <div id="cuaderno" class="tarjeta">
+          <div id="tabs" role="tablist">
+            <button class="tab" data-act="tab" data-tab="hist">Historial</button>
+            <button class="tab" data-act="tab" data-tab="lib">Libreta</button>
+          </div>
+          <div id="hist"></div>
+          <div id="libreta" hidden></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div id="modal" hidden></div>
+<div id="toast" hidden></div>
+
+<script src="js/motor.js?v=clue-1"></script>
+<script src="js/bots.js?v=clue-1"></script>
+<script src="js/mesa.js?v=clue-1"></script>
+<script src="js/red.js?v=clue-1"></script>
+<script src="js/main.js?v=clue-1"></script>
+</body>
+</html>

@@ -416,6 +416,24 @@ export function yemasVivo(pid, uid, d) {
 export function watchYemasVivo(pid, cb) {
   return onValue(ref(db, `vivo/${pid}/y`), s => cb(s.val() || {}), () => {});
 }
+/* El elenco de Clue: nombres y fotos de gente de verdad, así que no
+   viven en el repositorio (que es público) sino aquí, legibles solo con
+   sesión iniciada y escritos a mano en la consola, como el webhook de
+   Discord. `{id: {n, d?, f}}`, con `f` una foto pequeña en data URL.
+   Si no está, o las reglas aún no lo dejan leer, el juego usa su
+   elenco inventado. */
+export async function leerElencoClue() {
+  try {
+    const s = await get(ref(db, "clueElenco"));
+    const v = s.val() || {};
+    return Object.entries(v)
+      .filter(([id, x]) => /^[a-z0-9-]{1,24}$/.test(id) && x && typeof x.n === "string")
+      .map(([id, x]) => ({ id, n: x.n.slice(0, 60), c: typeof x.c === "string" ? x.c.slice(0, 24) : "", d: typeof x.d === "string" ? x.d.slice(0, 140) : "", foto: typeof x.f === "string" && x.f.startsWith("data:image/") ? x.f : "" }))
+      .sort((a, b) => a.n.localeCompare(b.n));
+  } catch (e) {
+    return null;
+  }
+}
 export const borraVivo = pid => remove(ref(db, `vivo/${pid}`)).catch(() => {});
 
 /* ---------- el chat de la sala ----------

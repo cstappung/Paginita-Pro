@@ -110,6 +110,33 @@ El arreglo es el de siempre: pegar `firebase/database.rules.json` entero y
 **Publicar**, o usar el botón **Copiar las reglas** del cartel de la página
 de juegos.
 
+### ⚠ Clue pide publicar otra vez, y un elenco a mano
+
+`'clue'` tiene que estar en la lista del campo `juego` y en la de `logros`, y
+hay un nodo nuevo, `clueElenco`, que se lee con sesión iniciada y no se
+escribe desde la web. Sin publicar, la sala de Clue no se puede crear. El
+arreglo es el de siempre: pegar `firebase/database.rules.json` entero y
+**Publicar**, o usar el botón **Copiar las reglas** del cartel de la página
+de juegos.
+
+`clueElenco` son los personajes que se eligen al empezar: nombres y fotos de
+gente de verdad, y por eso **no están en este repositorio**, que es público.
+Se cargan una vez a mano en Realtime Database: crear el hijo `clueElenco`
+en la raíz, abrirlo y, **ya dentro de él**, usar ⋮ → **Importar JSON** con el
+archivo que te pasen. Ojo: importar sobre la raíz reemplazaría la base
+entera. El archivo tiene esta forma:
+
+```json
+{ "apellido": { "n": "Nombre Apellido", "c": "Apellido", "f": "data:image/jpeg;base64,..." } }
+```
+
+La clave es el id del personaje (minúsculas, números y guiones, hasta 24),
+`n` el nombre, `c` el corto y `f` una foto de unos 160×160 en data URL
+(unos 8 KB). Hacen falta seis o más. Mientras no esté, el juego usa su
+elenco inventado, así que se puede jugar igual.
+
+### Consumo de Yemas
+
 Ojo con el consumo: cada jugador escribe su posición unas doce veces por
 segundo y recibe la de los demás. Con seis en la sala son del orden de
 10 KB/s de bajada por persona, bastante más que cualquier otro juego. En el

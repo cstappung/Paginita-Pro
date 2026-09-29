@@ -45,7 +45,7 @@ Six apps plus a small shared **Informes** page:
   collect by themselves, plus the bugs and ideas people write. See "Informes"
   below.
 - **Juegos** (`juegos.html` + `juegos-app.js`, entry
-  `colabtex/src/juegos-main.js`) — fifteen multiplayer games, on the same Google
+  `colabtex/src/juegos-main.js`) — sixteen multiplayer games, on the same Google
   account and the same Firebase project: **Escondite** (hide a person in a
   landscape, then cross the landscapes and race to find the other's),
   **Cartas de los tres elementos** (a Card-Jitsu duel), **Cuadritos** (dots and
@@ -61,8 +61,10 @@ Six apps plus a small shared **Informes** page:
   table people join and leave between rounds), **Spicy** (the bluffing card
   game, two to six), **Tetris** (everyone plays at once and sends garbage to
   the next seat), **Circuit Breakers** (a Worms-style artillery game
-  for two to eight squads, in an iframe) and **Yemas** (a first-person
-  egg shooter for two to eight, also in an iframe), plus a **Clasificación** tab and a 📖 **Reglas**
+  for two to eight squads, in an iframe), **Yemas** (a first-person
+  egg shooter for two to eight, also in an iframe) and **Clue** (the
+  deduction board game on a map of a real university building, two to six,
+  in an iframe, dealt with mental poker), plus a **Clasificación** tab and a 📖 **Reglas**
   manual for every game, solo ones included. See "Juegos" below.
 
 ColabTeX, ColabDraw, FiltroLab, AjusteLab, Juegos and Informes are authored in
@@ -1499,7 +1501,7 @@ Four decisions worth keeping:
 
 ## Juegos architecture
 
-Fifteen games, on the same Firebase project and the same Google session
+Sixteen games, on the same Firebase project and the same Google session
 as ColabTeX and ColabDraw. Turn-based on purpose (Tetris and Yemas are the
 real-time exceptions, and both still keep the log to what decides the game): with one move per turn the
 network carries a handful of fields and there is nothing to interpolate, so no
@@ -2496,6 +2498,61 @@ with the same engine (`conectarLocal`), which is also the quickest place to
 test a change. The window hooks `__yemas.paso(dt)` step the game without
 `requestAnimationFrame`, which is how it can be driven from a script while
 the tab is hidden. `tests/yemas.test.cjs` covers the reducer.
+
+**Clue (`clue`) is a deduction game in an iframe, dealt with mental poker
+so that nobody (not even the host) knows the envelope.** `juegos/clue/` is
+its own document: `js/motor.js` (UMD `ClueMotor`: data, the 24x25 board,
+movement, the reducer and the SRA crypto), `js/mesa.js` (practice table,
+you against bots), `js/bots.js` (the deduction bots), `js/red.js` (the
+online side of the frame) and `js/main.js` (the screen). The board is the
+building filmed in a walkthrough video: three rooms on the second floor
+(lockers, emergency landing, window corridor) and six on the first, the
+courtyard in the middle holding the envelope, and two secret passages
+(the stair and the goods lift). `colabtex/src/juegos/clue.js` (`crearClue`)
+is only the postman, like Yemas'. Things that hold it together:
+
+- **One engine, three users.** `motor.js` of colabtex cannot import (the
+  tests load it in a `vm` with the `export`s stripped), so `redClue` reads
+  `globalThis.ClueMotor`, which `clue.js` sets when it imports the UMD file.
+  `redClue` drops the engine's own `jugadores` so the room's (with photo and
+  colour) survive. The reducer never exponentiates.
+- **Characters are chosen, not fixed.** The six suspects are six coloured
+  slots; each player picks a character first (`{t:"elige", r}`), seat i
+  plays slot i, and free slots are filled from the roster with the seed.
+  The roster is real people (names and photos), so it is **not in the
+  repo**: it lives in the RTDB node `clueElenco` (read with a session,
+  written by hand in the console, see `firebase/CONFIGURAR-FIREBASE.md`),
+  `fb.leerElencoClue()` reads it and the postman hands it to the frame,
+  which caches it in `localStorage` (`clue.elenco`) for practice. Without
+  it the game uses the invented `SOSPECHOSOS`.
+- **The deal is Presidente's SRA, on the same 384-bit safe prime**, in
+  three sequential passes of the frozen table `cr.mesa`: `mezcla` (all 21
+  cards, exponent k1, shuffled *within* each category; positions 0, 6 and
+  12 are the envelope), `revuelve` (the other 18, exponent k2, shuffled
+  together so nobody learns the category mix of a hand) and `quita` (each
+  removes k1·k2 from the cards that are not theirs; card j belongs to
+  `mesa[j % n]`). `red.js` does these by itself, as it does `paso` when
+  you hold nothing, `abre` (the others remove their k1 from the envelope,
+  in seat order, when someone accuses) and the accuser's `veredicto`.
+  A shown card travels in a Diffie-Hellman envelope keyed by the
+  suggestion's key (`muestra.x`).
+- **The end waits for the seeds.** With `fin` written no move gets in, not
+  even `{t:"s"}`, so the postman calls `terminar` only once every seated
+  player revealed theirs, or after `ESPERA_SEMILLAS` (12 s), re-arming
+  every second like Flip 7. A correct accuser reveals at once. `auditar`
+  then replays the whole deal and flags `paso` lies, cards shown that were
+  not theirs, bad passes and false verdicts. The honest limit, said in the
+  manual: whoever leaves after choosing without revealing their seed takes
+  their lock with them, and the game is void (`motivo: "anulada"`).
+- **Dice come from the seed, the turn number and a hash of the accepted
+  moves** (`huella`), so they are the same on every screen and cannot be
+  known turns ahead; rejected moves do not enter the hash, or writing junk
+  would re-roll the next turns.
+
+`tests/clue.test.cjs` covers the board, movement, the reducer and the crypto
+end to end; `tests/clue-bots.test.cjs` plays full practice games;
+`tests/clue-red.test.cjs` runs several `red.js` frames against a fake room
+through a whole online game and checks the audit comes out clean.
 
 **Mina Club's board fits its box; it never pushes past it** (`juegos/club/minas/`,
 plain files with no build, mounted by `solo/club.js` in an iframe whose `?v=`

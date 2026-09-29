@@ -167,6 +167,14 @@ const SALA = {
     { id: "poche", n: "Poché", d: "Haz una baja a la cabeza con el Poché.", i: "🔭", x: c => c.ev("baja", h => h.uid === c.me && h.a === 2 && h.cab) },
     { id: "intacto", n: "Cáscara intacta", d: "Gana sin morir ni una vez.", i: "🥚", x: c => c.gano && ((c.est.muertes || {})[c.me] || 0) === 0 },
     { id: "multitud", n: "Omelette gigante", d: "Gana con 5 jugadores o más.", i: "🍽️", x: c => c.gano && c.n >= 5 }
+  ],
+  clue: [
+    { id: "ojo", n: "Ojo clínico", d: "Resuelve el caso con 4 sugerencias o menos.", i: "🔎", x: c => c.gano && c.est.motivo === "acierto" && (c.est.sugerencias || []).filter(s => s.uid === c.me).length <= 4 },
+    { id: "callejon", n: "Callejón sin salida", d: "Haz una sugerencia que nadie pueda refutar.", i: "🧱", x: c => c.ev("nadie", h => h.uid === c.me) },
+    { id: "atajo", n: "Atajo", d: "Usa la escalera o el montacargas.", i: "🛗", x: c => c.ev("mueve", h => h.uid === c.me && h.v === "pasadizo") },
+    { id: "doble6", n: "Doble seis", d: "Saca 12 con los dados.", i: "🎲", x: c => c.ev("mueve", h => h.uid === c.me && Array.isArray(h.dados) && h.dados[0] + h.dados[1] === 12) },
+    { id: "poker", n: "Cara de póker", d: "Resuelve el caso sin haber enseñado ni una carta.", i: "😶", x: c => c.gano && c.est.motivo === "acierto" && !(c.est.sugerencias || []).some(s => s.mostro === c.me) },
+    { id: "multitud", n: "Caso cerrado", d: "Resuelve el caso contra 4 rivales o más.", i: "🗂️", x: c => c.gano && c.est.motivo === "acierto" && c.n >= 5 }
   ]
 };
 
