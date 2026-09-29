@@ -366,6 +366,12 @@ export function watchSolo(categoria, cb) {
     cb(Object.entries(s.val() || {}).map(([uid, fila]) => ({...fila, uid})), null);
   }, e => cb([], e));
 }
+/* La tabla de una modalidad, una vez: el aviso del podio la necesita
+   *antes* del récord para saber de qué puesto venía. */
+export async function leerSolo(categoria) {
+  const s = await get(ref(db, `soloRanks/${categoria}`));
+  return Object.entries(s.val() || {}).map(([uid, fila]) => ({...fila, uid}));
+}
 export function guardarSolo(categoria, uid, dato) {
   return runTransaction(ref(db, `soloRanks/${categoria}/${uid}`), previo => {
     if (previo && (previo.puntos > dato.puntos || previo.puntos === dato.puntos && previo.tiempo <= dato.tiempo)) return;

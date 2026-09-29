@@ -56,7 +56,7 @@ import { mezcla, abrePerfil } from "./juegos/perfil.js";
 import { suena, silenciar, silenciado, ambientar, ajustarMusica, activarAudio } from "./juegos/sonido.js";
 import { montaReproductor } from "./juegos/reproductor.js";
 import { createReportWidget } from "./report-widget.js";
-import { anunciaSala } from "./juegos/discord.js";
+import { anunciaSala, anunciaPodio, puestoSolo, conRecord, ordenSolo } from "./juegos/discord.js";
 
 const $ = id => document.getElementById(id);
 const VER = (document.currentScript && document.currentScript.src.split("?v=")[1]) || "";
@@ -744,12 +744,39 @@ function pintaTabs() {
   $("tabLogros").classList.toggle("on", state.vista === "logros");
 }
 
+/* Guarda un récord de club y, si sube a su dueño al podio de la
+   modalidad, lo anuncia en Discord. La tabla se lee *antes* de escribir
+   para saber de qué puesto venía; la de después no hace falta leerla,
+   es la misma con la fila nueva. Solo se anuncia si la transacción
+   escribió de verdad (otra pestaña pudo guardar una marca mejor) y si
+   el puesto mejoró: repetir el segundo lugar con mejor tiempo no es
+   noticia. El aviso nunca estorba al guardado. */
+async function guardaConPodio(categoria, uid, dato) {
+  const antes = await fb.leerSolo(categoria).catch(() => null);
+  const res = await fb.guardarSolo(categoria, uid, dato);
+  if (!antes || !res || !res.committed) return res;
+  const filas = conRecord(antes, uid, dato);
+  const puesto = puestoSolo(filas, uid), previo = puestoSolo(antes, uid);
+  if (puesto >= 1 && puesto <= 3 && (!previo || puesto < previo)) {
+    const sitio = antes.slice().sort(ordenSolo)[puesto - 1];
+    const u = state.user || {};
+    const juego = categoria.split("-")[1];
+    anunciaPodio({
+      categoria, uid, nombre: dato.nombre || u.name, foto: fotoBreve(u.photo),
+      puesto, antes: previo, filas,
+      desbancado: sitio && sitio.uid !== uid ? sitio.nombre || "" : "",
+      enlace: location.origin + location.pathname + "#solo/" + juego
+    });
+  }
+  return res;
+}
+
 function armazon() {
   const h = $("pantalla");
   h.closest("main").classList.toggle("jg-ancho", state.vista === "partida" || state.vista.startsWith("solo-"));
   if (state.vista.startsWith("solo-")) {
     const clave = state.vista.slice(5) === "tetris" ? "tetrisclub" : state.vista.slice(5);
-    individual = crearSolo({juego:state.vista.slice(5),usuario:state.user,guardar:fb.guardarSolo,watch:fb.watchSolo,volver:()=>ir(""),
+    individual = crearSolo({juego:state.vista.slice(5),usuario:state.user,guardar:guardaConPodio,watch:fb.watchSolo,volver:()=>ir(""),
       /* Un logro individual sale de la marca: se celebra el que esta
          partida da y la mejor marca guardada no daba ya. */
       alResultado: (d, previa) => { const antes = new Set(previa ? deMarca(clave, Object.assign({ categoria: d.categoria }, previa)) : []);
