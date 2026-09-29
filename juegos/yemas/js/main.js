@@ -2,10 +2,10 @@
 // Suelto es práctica contra bots; con ?modo=online dentro de la sala de Juegos,
 // la sala le pasa los demás jugadores y anota las muertes en el registro.
 import * as THREE from 'three';
-import { crearMundo, moverCuerpo, rayoMundo, rayoHuevo, crearHuevo, SPAWNS, ALTO, OJOS } from 'yemas/mundo';
+import { crearMundo, moverCuerpo, rayoMundo, rayoHuevo, crearHuevo, crearBandera, crearBase, SPAWNS, BASES, ALTO, OJOS } from 'yemas/mundo';
 import { ARMAS, caida } from 'yemas/armas';
 import { sonido } from 'yemas/audio';
-import { conectarMarco, conectarLocal, PALETA } from 'yemas/red';
+import { conectarMarco, conectarLocal, PALETA, COLOR_EQUIPO } from 'yemas/red';
 
 const VEL = 7, SALTO = 8, SENS = 0.0022, HZ_RED = 12, INVULNERABLE = 1.5;
 const ONLINE = new URLSearchParams(location.search).get('modo') === 'online' && parent !== window;
@@ -88,7 +88,7 @@ ajustar();
 // ---------- Estado ----------
 // `jugando` es que hay partida en pantalla; `terminado`, que la sala ya tiene ganador.
 let red = null, jugando = false, terminado = false;
-let marcador = { bajas: {}, muertes: {} };
+let marcador = { bajas: {}, muertes: {}, puntosEq: null, banderas: null };
 const yo = {
   pos: new THREE.Vector3(), vel: new THREE.Vector3(), enSuelo: false,
   yaw: 0, pitch: 0, hp: 100, vivo: false,
@@ -102,8 +102,13 @@ let gatillo = false, yaDisparo = false;
 const miNombre = () => red?.jugadores.get(red.yo)?.nombre || '';
 const miColor = () => red?.jugadores.get(red.yo)?.color || PALETA[0];
 const puedoJugar = () => jugando && !terminado && red && !red.mirando;
+const EQUIPOS = ['rojo', 'azul'];
+const NOMBRE_EQ = { rojo: 'Rojo', azul: 'Azul' };
+const miEquipo = () => red?.equipos?.[red.yo] || '';
+const rival = () => miEquipo() === 'rojo' ? 'azul' : 'rojo';
+const aliado = id => !!red?.equipos && red.equipos[id] === miEquipo();
 
-const handlers = { alConfig, alJugador, alGolpe, alBaja, alFeed, alMarcador, alFin };
+const handlers = { alConfig, alJugador, alGolpe, alBaja, alFeed, alSuceso, alMarcador, alFin, alVoces };
 
 // ---------- Menú (sólo práctica) ----------
 let colorElegido = PALETA[0];
@@ -140,9 +145,15 @@ function alConfig(r) {
   $('menu').hidden = true;
   $('espera').hidden = true;
   $('hud').hidden = false;
-  $('meta').textContent = red.meta ? `Primero a ${red.meta} bajas` : 'Práctica contra bots';
-  marcador = { bajas: {}, muertes: {} };
+  $('meta').textContent = !red.meta ? 'Práctica contra bots'
+    : red.variante === 'bandera' ? `Captura la bandera · primero a ${red.meta} 🚩`
+    : red.variante === 'equipos' ? `Duelo por equipos · primero a ${red.meta} bajas`
+    : `Todos contra todos · primero a ${red.meta} bajas`;
+  marcador = { bajas: {}, muertes: {}, puntosEq: null, banderas: null };
   jugando = true;
+  if (red.variante === 'bandera') montaBanderas();
+  if (miEquipo()) $('mi-equipo').textContent = `Equipo ${NOMBRE_EQ[miEquipo()]}`;
+  $('mi-equipo').className = miEquipo();
   if (red.mirando) {
     $('hud').classList.add('mirando');
     return;
@@ -168,12 +179,16 @@ addEventListener('keydown', e => {
   teclas.add(e.code);
   if (e.code === 'Tab') $('tabla').hidden = false;
   if (e.code === 'KeyR') recargar();
+  if (e.code === 'KeyV') red?.hablar(true);
   if (/^Digit[123]$/.test(e.code)) cambiarArma(+e.code.slice(5) - 1);
 });
 addEventListener('keyup', e => {
   teclas.delete(e.code);
   if (e.code === 'Tab') $('tabla').hidden = true;
+  if (e.code === 'KeyV') red?.hablar(false);
 });
+// Soltar la V cuando se pierde el foco: si no, el micrófono queda abierto.
+addEventListener('blur', () => red?.hablar(false));
 addEventListener('mousemove', e => {
   if (!bloqueado() || !yo.vivo) return;
   const s = SENS * (1 - yo.zoom * 0.7);
@@ -236,7 +251,7 @@ function disparar() {
     let t = rayoMundo(o, d, a.alcance, colisores);
     let quien = null;
     for (const [id, j] of otros) {
-      if (!j.vivo) continue;
+      if (!j.vivo || aliado(id)) continue;   // sin fuego amigo: la bala los atraviesa
       const tj = rayoHuevo(o, d, j.mesh.position);
       if (tj !== null && tj < t) { t = tj; quien = id; }
     }
@@ -272,10 +287,13 @@ function disparar() {
 
 // ---------- Vida y muerte ----------
 function aparecer() {
-  let mejor = SPAWNS[0], dMejor = -1;
-  for (const s of SPAWNS) {
+  // En equipos cada uno aparece en su mitad del mapa: rojo al norte (z > 0).
+  const lado = miEquipo() === 'rojo' ? 1 : miEquipo() === 'azul' ? -1 : 0;
+  const lugares = lado ? SPAWNS.filter(s => s.z * lado >= 15) : SPAWNS;
+  let mejor = lugares[0], dMejor = -1;
+  for (const s of lugares) {
     let dMin = Infinity;
-    for (const j of otros.values()) if (j.vivo) dMin = Math.min(dMin, s.distanceTo(j.obj));
+    for (const [id, j] of otros) if (j.vivo && !aliado(id)) dMin = Math.min(dMin, s.distanceTo(j.obj));
     dMin = Math.min(dMin, 60) + Math.random() * 10;
     if (dMin > dMejor) { dMejor = dMin; mejor = s; }
   }
@@ -312,13 +330,25 @@ function morir(g) {
   yo.asesino = g.n;
   gatillo = false;
   yo.apuntando = false;
-  red.morir(g);
+  // Quien lleva una bandera la suelta donde cae: el registro necesita el sitio.
+  const llevo = marcador.banderas && EQUIPOS.some(b => marcador.banderas[b]?.uid === red.yo);
+  red.morir(llevo ? { ...g, x: r2(yo.pos.x), z: r2(yo.pos.z) } : g);
   explotar(yo.pos, miColor());
   $('muerte').hidden = false;
   publicar();
 }
 
-function alMarcador(m) { marcador = m; tablaT = 0; }
+function alMarcador(m) {
+  const antes = marcador.banderas;
+  marcador = m;
+  tablaT = 0;
+  // Desde cuándo está cada bandera en el suelo, para devolverla sola.
+  if (m.banderas) for (const b of EQUIPOS) {
+    const ahora = m.banderas[b]?.e, previo = antes?.[b]?.e;
+    if (ahora === 'suelo' && previo !== 'suelo') enSuelo[b] = performance.now();
+    if (ahora !== 'suelo') enSuelo[b] = 0;
+  }
+}
 
 function alFin(f) {
   if (terminado) return;
@@ -328,8 +358,9 @@ function alFin(f) {
   $('pausa').hidden = true;
   $('muerte').hidden = true;
   $('hud').classList.add('terminado');
-  const g = red.jugadores.get(f.ganador);
-  $('fin-txt').textContent = f.ganador === red.yo ? '¡Ganaste! Nadie te frió a tiempo.'
+  const g = red.jugadores.get(f.ganador), eq = String(f.ganador).startsWith('eq:') ? f.ganador.slice(3) : '';
+  $('fin-txt').textContent = eq ? (eq === miEquipo() ? `¡Ganó tu equipo, el ${NOMBRE_EQ[eq]}!` : `Ganó el equipo ${NOMBRE_EQ[eq]}.`)
+    : f.ganador === red.yo ? '¡Ganaste! Nadie te frió a tiempo.'
     : g ? `${g.nombre} llegó primero a la meta.` : 'La partida terminó.';
   $('fin').hidden = false;
 }
@@ -480,6 +511,90 @@ function actualizarEfectos(dt) {
   }
 }
 
+// ---------- Captura la bandera ----------
+// El estado de las banderas es del registro (lo trae el marcador); aquí solo
+// se dibuja y se pide `toma`, `devuelve` o `captura` al tocarlas. Mientras la
+// jugada no vuelve con el estado nuevo, no se repite la misma petición.
+const banderas = {};
+const enSuelo = { rojo: 0, azul: 0 }, pedido = {};
+const TOQUE = 1.8, AUTO_DEVUELVE = 25000;
+function montaBanderas() {
+  for (const b of EQUIPOS) {
+    const base = crearBase(COLOR_EQUIPO[b]);
+    base.position.x = BASES[b].x; base.position.z = BASES[b].z;
+    escena.add(base);
+    banderas[b] = crearBandera(COLOR_EQUIPO[b]);
+    banderas[b].position.copy(BASES[b]);
+    escena.add(banderas[b]);
+  }
+}
+const dist2 = (p, x, z) => Math.hypot(p.x - x, p.z - z);
+function pide(tipo, b, extra = {}) {
+  const k = tipo + b, t = performance.now();
+  if (pedido[k] && t - pedido[k] < 1500) return;
+  pedido[k] = t;
+  red.accion(tipo, { b, ...extra });
+}
+function actualizaBanderas() {
+  const bs = marcador.banderas;
+  if (!bs) return;
+  const t = performance.now() / 1000;
+  for (const b of EQUIPOS) {
+    const f = bs[b], m = banderas[b];
+    if (!f || !m) continue;
+    if (f.e === 'lleva') {
+      const j = f.uid === red.yo ? null : otros.get(f.uid);
+      m.visible = !!j && j.vivo;
+      if (j) { m.position.copy(j.mesh.position); m.position.y += 1.1; m.scale.setScalar(0.6); }
+    } else {
+      m.visible = true;
+      m.scale.setScalar(1);
+      m.position.set(f.x, 0, f.z);
+    }
+    m.userData.tela.rotation.y = Math.sin(t * 3 + (b === 'rojo' ? 0 : 1)) * 0.25;
+  }
+  if (!puedoJugar() || !yo.vivo || !miEquipo()) { $('llevo').hidden = true; return; }
+  const mia = bs[miEquipo()], suya = bs[rival()];
+  if (suya.e !== 'lleva' && dist2(yo.pos, suya.x, suya.z) < TOQUE) pide('toma', rival());
+  if (mia.e === 'suelo' && dist2(yo.pos, mia.x, mia.z) < TOQUE) pide('devuelve', miEquipo());
+  if (mia.e === 'suelo' && enSuelo[miEquipo()] && performance.now() - enSuelo[miEquipo()] > AUTO_DEVUELVE)
+    pide('devuelve', miEquipo(), { auto: true });
+  const base = BASES[miEquipo()];
+  if (suya.uid === red.yo && mia.e === 'base' && dist2(yo.pos, base.x, base.z) < 3) pide('captura', rival());
+  const llevo = suya.uid === red.yo;
+  $('llevo').hidden = !llevo;
+  if (llevo) $('llevo').textContent = mia.e === 'base' ? '🚩 ¡Llevas la bandera! Vuelve a tu base'
+    : '🚩 Llevas la bandera, pero la tuya no está en casa: recupérala para capturar';
+}
+
+function alSuceso(s) {
+  const eq = NOMBRE_EQ[s.b] || '', mio = s.uid === red.yo;
+  if (s.t === 'toma') aviso(mio ? `¡Tomaste la bandera ${eq}!` : `${s.nombre} tomó la bandera ${eq}`);
+  else if (s.t === 'devuelve') aviso(`La bandera ${eq} volvió a su base`);
+  else if (s.t === 'captura') { aviso(`¡${mio ? 'Capturaste' : s.nombre + ' capturó'} la bandera ${eq}!`); sonido.baja(); }
+  const div = document.createElement('div');
+  div.className = 'baja' + (mio ? ' mia' : '');
+  div.textContent = s.t === 'toma' ? `🚩 ${s.nombre} tomó la ${eq}` : s.t === 'captura' ? `🏁 ${s.nombre} capturó la ${eq}`
+    : `↩ La ${eq} volvió${s.auto ? ' sola' : ''}`;
+  $('feed').prepend(div);
+  while ($('feed').children.length > 5) $('feed').lastChild.remove();
+  setTimeout(() => div.remove(), 6000);
+}
+
+// ---------- Voz ----------
+// La voz la maneja la sala; aquí solo se pinta quién está y quién habla.
+function alVoces(v) {
+  const en = (v.en || []).filter(u => red && red.jugadores.has(u));
+  $('voces').hidden = !en.length;
+  $('voces').innerHTML = '';
+  for (const u of en) {
+    const s = document.createElement('span');
+    s.className = (v.hablan || []).includes(u) ? 'habla' : '';
+    s.textContent = u === red.yo ? 'Tú' : red.jugadores.get(u).nombre;
+    $('voces').append(s);
+  }
+}
+
 // ---------- HUD ----------
 let danio = 0, marcaT = 0, tablaT = 0, avisoT = null;
 function marcaGolpe(cab) {
@@ -521,11 +636,17 @@ function hud(dt) {
     const tr = document.createElement('tr');
     if (f.u === red.yo) tr.className = 'yo';
     tr.innerHTML = '<td><i></i><span></span></td><td></td><td></td>';
+    if (red.equipos) tr.classList.add(red.equipos[f.u] || 'x');
     tr.querySelector('i').style.background = f.c;
     tr.querySelector('span').textContent = f.n;
     tr.children[1].textContent = f.k;
     tr.children[2].textContent = f.d;
     $('tabla-filas').append(tr);
+  }
+  if (marcador.puntosEq) {
+    const pe = marcador.puntosEq, band = red.variante === 'bandera' ? ' 🚩' : '';
+    $('equipos').hidden = false;
+    $('equipos').innerHTML = `<b class="rojo">Rojo ${pe.rojo || 0}</b><span>${red.meta}${band}</span><b class="azul">${pe.azul || 0} Azul</b>`;
   }
   const lider = filas[0], mio = filas.find(f => f.u === red.yo);
   $('marcador-mini').textContent = (mio ? `Tú ${mio.k}/${mio.d}` : 'Mirando') +
@@ -596,6 +717,7 @@ function actualizar(dt) {
   m.position.z += yo.retroceso * 0.07;
   m.rotation.set(yo.retroceso * 0.15 - bajar * 0.7, 0, 0);
 
+  actualizaBanderas();
   red.tick(dt);
   acumRed += dt;
   if (acumRed >= 1 / HZ_RED) { acumRed = 0; publicar(); }

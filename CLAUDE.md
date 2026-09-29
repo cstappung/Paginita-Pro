@@ -63,7 +63,7 @@ Six apps plus a small shared **Informes** page:
   game, two to six), **Tetris** (everyone plays at once and sends garbage to
   the next seat), **Circuit Breakers** (a Worms-style artillery game
   for two to eight squads, in an iframe) and **Yemas** (a first-person
-  egg shooter for two to eight, also in an iframe), plus a **Clasificación** tab and a 📖 **Reglas**
+  egg shooter for two to eight in three modes, with voice chat, also in an iframe), plus a **Clasificación** tab and a 📖 **Reglas**
   manual for every game, solo ones included. See "Juegos" below.
 
 ColabTeX, ColabDraw, FiltroLab, AjusteLab, Juegos and Informes are authored in
@@ -2609,11 +2609,55 @@ is the postman, like Circuit Breakers'. Four things hold it together:
   by key, for the kill feed; the first batch is flagged `viejas` and not
   announced.
 
+**Three variants over one reducer** (`variante` in the room, not `modo`,
+which the rules whitelist): `todos` (free-for-all), `equipos` (team
+deathmatch) and `bandera` (capture the flag). Teams are by seat parity
+(`equiposYemas`), so a room splits itself evenly as it fills. The room picks a
+`largo` (short/normal/long) rather than a number, because one select cannot
+change its options by another; `YM_LARGOS` turns it into 10/15/25 kills,
+20/30/50 team kills or 1/3/5 captures, and a room from before, with only a
+`meta`, still reads it. In capture the flag **the flags are game state, so
+they go in the log**, written by whoever touches them: `{t:"toma", b}`,
+`{t:"devuelve", b, auto?}`, `{t:"captura", b}`, plus the carrier's `muere`
+with `x`/`z` to drop it where they fell. The log's order settles two players
+grabbing at once. A capture needs your own flag at home, and a dropped flag
+goes home when a teammate touches it or, after 25 s, when any teammate's
+frame sends `auto`. Bases are `YM_BASES` in `motor.js` and `BASES` in the
+frame's `mundo.js`, which must agree. There is no friendly fire (the frame
+skips teammates in the raycast), and each team spawns in its own half.
+
+**A team win is `ganador: "eq:rojo"`**, and `ganoEn(p, ganador, uid)` in
+`motor.js` is the one place that knows it includes the whole team. `anotar`,
+`pintaFin` and logros' `contexto` ask it instead of comparing with the uid,
+so the ranking gives the win to every member. `nombreDe` says «el equipo
+Rojo».
+
+**Voice chat is WebRTC between browsers** (`juegos/voz.js`, generic, used by
+`yemas.js`). It is a mesh with no media server, and the database is only
+the signalling mailbox, `vivo/<pid>/voz` (`fb.senalVoz`): `en/<uid>` holds
+each person's session while they are in, and `b/<uid>/<push>` holds the
+offers, answers and ICE candidates sent to them, deleted on read. Both are
+removed on disconnect. Three rules keep it simple. The lower uid of each
+pair offers, so there is no glare. Every message carries the sender's and
+the recipient's session, so leftovers from a reloaded tab are ignored. ICE
+candidates that arrive before the offer wait in a queue. The mic is
+push-to-talk on V by default, or open; the frame forwards the V key
+(`hablar`) and paints who is talking (`voces`, measured with an
+`AnalyserNode` in the room page). Only STUN is configured, with no TURN, so
+two networks that refuse a direct connection (some mobile carriers) do not
+hear each other; the bar strikes that name through in red rather than
+staying silent. Because it all lives in `vivo`, **no rules change was
+needed**. `voz.js` takes the mailbox as a parameter, so it was tested with
+three instances in one page over real `RTCPeerConnection`s, a fake mailbox
+and oscillators as microphones.
+
 Opened on its own, `juegos/yemas/index.html` is practice against four bots
 with the same engine (`conectarLocal`), which is also the quickest place to
 test a change. The window hooks `__yemas.paso(dt)` step the game without
 `requestAnimationFrame`, which is how it can be driven from a script while
-the tab is hidden. `tests/yemas.test.cjs` covers the reducer.
+the tab is hidden. `tests/yemas.test.cjs` covers the reducer, the three
+variants and `ganoEn`. Practice is free-for-all only; the team modes were
+tested with four frames driven by a fake room that runs the real `reducir`.
 
 **Mina Club's board fits its box; it never pushes past it** (`juegos/club/minas/`,
 plain files with no build, mounted by `solo/club.js` in an iframe whose `?v=`

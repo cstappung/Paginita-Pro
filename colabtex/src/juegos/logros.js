@@ -21,7 +21,7 @@
    Un logro es del juego, no de la modalidad; los que solo se sacan en
    una llevan `m`, que es lo que la pestaña pinta como etiqueta.
    ============================================================ */
-import { TAMANOS } from "./motor.js";
+import { TAMANOS, ganoEn } from "./motor.js";
 
 const FILA = [
   { id: "primera", n: "Primera victoria", d: "Gana tu primera partida.", i: "🥇", f: f => f.ganadas >= 1 },
@@ -38,7 +38,7 @@ export function contexto(p, est, me) {
   const otros = js.map(j => j.uid).filter(u => u !== me);
   const hist = (est && est.hist) || [];
   return {
-    p: p || {}, est: est || {}, me, fin, gano: fin && !!g && g === me, n: js.length, otros, rival: otros[0], hist,
+    p: p || {}, est: est || {}, me, fin, gano: fin && ganoEn(p, g, me), n: js.length, otros, rival: otros[0], hist,
     ev: (e, f) => hist.some(h => h && h.e === e && (!f || f(h)))
   };
 }
