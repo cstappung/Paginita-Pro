@@ -26,9 +26,10 @@
    ============================================================ */
 import {
   escena, semillaEscena, salAleatoria, compromiso, sitioValido,
-  acierta, RADIO_ACIERTO, CASTIGO_FALLO
+  acierta, RADIO_ACIERTO, CASTIGO_FALLO,
+  TEMAS, GORROS, CAMISETAS, ACCESORIOS, traje as decodifica, codigoTraje, describeTraje
 } from "./motor.js";
-import { pinta, pintaExplorador, pintaCobertura, TRAJES, COLORES_TRAJE } from "./paisaje.js";
+import { pinta, pintaExplorador, pintaCobertura, pintaCartel } from "./paisaje.js";
 import { suena } from "./sonido.js";
 
 /* La última jugada del registro, en crudo. El reductor no guarda quién
@@ -74,35 +75,61 @@ export function crearEscondite(ctx) {
   let vistas = -1;                 // cuántas jugadas llevaba el registro
   let sonoBuscar = false;
   let vistaW = 0, vistaH = 0;      // tamaño en píxeles CSS, no del búfer
-  let muerto = false, traje = 0, zoom = 1, buscando = false, cursorTeclado = null;
+  let muerto = false, zoom = 1, buscando = false, cursorTeclado = null;
   let fondo = null, firmaFondo = "", reintentarDesde = 0;
+  /* El disfraz se elige por prendas: gorro, camiseta y accesorio. El
+     código que viaja (`traje`) es la combinación, 144 posibles, y la
+     escena garantiza que nadie de la multitud la repite entera. */
+  let vest = { h: 0, s: 0, a: 0 }, traje = 0;
+  let lupa = null, lupaPedida = false, firmaCartel = "";
 
   /* ---------- estructura ---------- */
   function montar(donde) {
     host = donde;
     host.innerHTML = `
       <div class="jg-esc esc-rework">
-        <div class="esc-editorial"><span>ATLAS / DUELO DE OBSERVACIÓN</span><h2>Perdidos entre la multitud.</h2><p>Un paisaje lleno de historias. Una sola persona que encontrar.</p></div>
+        <div class="esc-editorial"><div class="esc-titular"><span id="escTema">DUELO DE OBSERVACIÓN</span><h2>Perdidos entre la multitud.</h2><p id="escObjetivo">Vístete, mézclate con la gente y confirma tu escondite.</p></div>
+          <figure class="esc-cartel"><figcaption id="escCartelTit">SE BUSCA</figcaption><canvas id="escCartel"></canvas><small id="escCartelTxt"></small></figure></div>
         <div class="esc-herramientas">
-          <label>Camuflaje <select id="escTraje">${TRAJES.map((t,i)=>`<option value="${i}">${t}</option>`).join("")}</select></label>
+          <div class="esc-prendas" id="escPrendas">
+            <div class="esc-fila"><b>Gorro</b>${GORROS.map((g, i) => `<button class="esc-chip" data-p="h" data-i="${i}" title="Gorro ${g.n}" style="--c:${g.c}"></button>`).join("")}</div>
+            <div class="esc-fila"><b>Camiseta</b>${CAMISETAS.slice(0, 6).map((t, i) => `<button class="esc-chip${t.r ? " rayas" : ""}" data-p="s" data-i="${i}" title="Camiseta ${t.n}" style="--c:${t.c};--r:${t.r || t.c}"></button>`).join("")}</div>
+            <div class="esc-fila"><b>Lleva</b>${["Nada", "Mochila", "Globo", "Bastón"].map((t, i) => `<button class="esc-chip txt" data-p="a" data-i="${i}" title="${ACCESORIOS[i]}">${t}</button>`).join("")}</div>
+          </div>
           <label>Explorar <select id="escZoom"><option value="1">Vista completa</option><option value="1.5">Zoom 1,5×</option><option value="2">Zoom 2×</option><option value="3">Zoom 3×</option></select></label>
-          <span id="escObjetivo">Elige ropa, busca cobertura y confirma tu escondite.</span>
         </div>
         <div class="jg-barra">
           <div class="jg-fase" id="escFase"></div>
           <div class="jg-grow"></div>
+          <span class="esc-rival" id="escRival"></span>
           <div class="jg-reloj" id="escReloj"></div>
         </div>
         <div class="esc-visor"><div class="jg-lienzo" id="escLienzo"><canvas id="escCanvas" tabindex="0" aria-label="Paisaje interactivo. Usa las flechas para mover el cursor y Enter para elegir." ></canvas>
           <div class="jg-capa" id="escCapa"></div>
         </div>
         </div><div class="jg-pie" id="escPie" aria-live="polite"></div>
-        <details class="esc-ayuda"><summary>Cómo jugar</summary><p>Tienes 90 segundos para elegir una de seis prendas y esconderte. La vegetación puede cubrir tus piernas, pero la cabeza siempre queda visible. Busca la gorra y la bandolera crema de tu rival entre 150 visitantes. Amplía y desplázate por la escena; cada fallo bloquea los intentos durante dos segundos. A los 40 segundos aparece una pista.</p><p>Teclado: flechas para mover el cursor, Enter para colocar o buscar. Música: Midnight Pulse · pista aportada por el creador · reproducción en bucle.</p></details>
+        <details class="esc-ayuda"><summary>Cómo jugar</summary><p>Tienes 90 segundos para vestirte —gorro, camiseta y lo que llevas en la mano— y esconderte en tu escena. Tu combinación es única: nadie de la multitud la lleva entera, pero muchos comparten dos de las tres prendas. Lo que tengas justo delante tapa tus piernas, nunca la cabeza; en el agua solo asoman cabeza y hombros. Después buscas a tu rival en la suya, con su cartel de SE BUSCA a la vista. Con ratón, la lupa amplía lo que tienes debajo; también puedes hacer zoom y desplazarte. Cada fallo bloquea los intentos durante dos segundos, y a los 40 segundos aparece una pista.</p><p>Teclado: flechas para mover el cursor, Enter para colocar o buscar. Música: Midnight Pulse · pista aportada por el creador · reproducción en bucle.</p></details>
       </div>`;
     lienzo = host.querySelector("#escCanvas");
     c2d = lienzo.getContext("2d");
     lienzo.addEventListener("click", alClic);
-    host.querySelector("#escTraje").onchange = e => {traje = Number(e.target.value); pintar();};
+    host.querySelector("#escPrendas").onclick = e => {
+      const b = e.target.closest(".esc-chip");
+      if (!b || b.disabled) return;
+      vest = { ...vest, [b.dataset.p]: Number(b.dataset.i) };
+      traje = codigoTraje(vest);
+      render(); pintar();
+    };
+    /* La lupa: solo con ratón. En táctil ya está el zoom, y el dedo
+       taparía justo lo que se amplía. Como mucho un repintado por
+       fotograma. */
+    lienzo.addEventListener("pointermove", e => {
+      if (e.pointerType !== "mouse") return;
+      const r = lienzo.getBoundingClientRect();
+      lupa = { x: e.clientX - r.left, y: e.clientY - r.top };
+      if (!lupaPedida) { lupaPedida = true; requestAnimationFrame(() => { lupaPedida = false; pintar(); }); }
+    });
+    lienzo.addEventListener("pointerleave", () => { lupa = null; pintar(); });
     host.querySelector("#escZoom").onchange = e => {
       zoom = Number(e.target.value); host.querySelector("#escLienzo").style.width = (zoom*100)+"%"; medir(); pintar();
     };
@@ -163,19 +190,67 @@ export function crearEscondite(ctx) {
     if (!W || !H) return;
     const esc = escenaActual();
     if (!esc) { c2d.fillStyle = "#dde5ea"; c2d.fillRect(0, 0, W, H); return; }
-    const firma = `${esc.semilla}:${W}:${H}`;
+    /* La multitud depende del disfraz buscado: quien coincida en las tres
+       prendas cambia de accesorio. Por eso el disfraz entra en la firma. */
+    const t = trajeBuscado();
+    const obj = decodifica(t);
+    const firma = `${esc.semilla}:${W}:${H}:${t}`;
     if (firma !== firmaFondo) {
       fondo = document.createElement("canvas"); fondo.width = lienzo.width; fondo.height = lienzo.height;
-      const c = fondo.getContext("2d"); c.scale(fondo.width/W, fondo.height/H); pinta(c, esc, W, H); firmaFondo = firma;
+      const c = fondo.getContext("2d"); c.scale(fondo.width/W, fondo.height/H); pinta(c, esc, W, H, obj); firmaFondo = firma;
     }
     c2d.drawImage(fondo, 0, 0, W, H);
+    encima(c2d, esc, W, H);
+    /* La lupa repinta la escena de verdad, no amplía el mapa de bits: a
+       2,5× un mapa de bits es un borrón, y lo que se busca es un gorro de
+       tres píxeles. */
+    if (lupa && est && (est.fase === "buscar" || est.fase === "esconder")) {
+      const r = Math.min(W * 0.11, 120), k = 2.5;
+      c2d.save();
+      c2d.beginPath(); c2d.arc(lupa.x, lupa.y, r, 0, 7); c2d.clip();
+      c2d.translate(lupa.x, lupa.y); c2d.scale(k, k); c2d.translate(-lupa.x, -lupa.y);
+      pinta(c2d, esc, W, H, obj);
+      encima(c2d, esc, W, H);
+      c2d.restore();
+      c2d.save();
+      c2d.strokeStyle = "#1d2a26"; c2d.lineWidth = 4;
+      c2d.beginPath(); c2d.arc(lupa.x, lupa.y, r, 0, 7); c2d.stroke();
+      c2d.strokeStyle = "#f3edd9"; c2d.lineWidth = 1.5;
+      c2d.beginPath(); c2d.arc(lupa.x, lupa.y, r - 2.5, 0, 7); c2d.stroke();
+      c2d.restore();
+    }
+    if (cursorTeclado) marco(c2d,cursorTeclado.x*W,cursorTeclado.y*H,W,"#fff");
+    if (ahora() < bloqueoHasta) {
+      c2d.fillStyle = "rgba(12,16,22,0.45)"; c2d.fillRect(0, 0, W, H);
+    }
+  }
 
+  /* El disfraz que la escena en pantalla esconde: el mío mientras me
+     escondo (lo que verá el otro), el del rival mientras le busco. */
+  function trajeBuscado() {
+    if (!est) return traje;
+    const f = est.fase;
+    if (f === "buscar" || f === "fin") {
+      const su = otro(), s = su && est.sitios[su.uid];
+      return s ? (s.traje || 0) : 0;
+    }
+    return trajePropio();
+  }
+  function trajePropio() {
+    if (!est || !est.compromisos[uid]) return traje;
+    const s = est.sitios[uid] || leeSecreto(pid, uid);
+    return s ? (s.traje || 0) : traje;
+  }
+
+  /* Lo que va encima del fondo: el escondido, lo que le tapa, las cruces
+     y el foco final. Separado para que la lupa lo repinte igual. */
+  function encima(c2d, esc, W, H) {
     const f = est ? est.fase : "espera";
-    const mi = yo(), su = otro();
+    const su = otro();
 
     if (f === "esconder" || f === "revelar") {
       const s = est.sitios[uid] || propuesta || leeSecreto(pid, uid);
-      if (s) { const vestido = {...s, traje: est.compromisos[uid] ? s.traje : traje}; pintaExplorador(c2d, vestido, W, H); pintaCobertura(c2d, esc, vestido, W, H); }
+      if (s) { const vestido = {...s, traje: est.compromisos[uid] ? s.traje : traje}; pintaExplorador(c2d, vestido, W, H, esc); pintaCobertura(c2d, esc, vestido, W, H); }
       if (propuesta && !est.compromisos[uid]) marco(c2d, propuesta.x * W, propuesta.y * H, W, "#ffffff");
     } else if (f === "buscar" || f === "fin") {
       /* **El personaje se dibuja desde el primer segundo.** Antes solo
@@ -191,17 +266,25 @@ export function crearEscondite(ctx) {
       if (blanco && f === "buscar" && !visto && ahora() - (est.arranque || 0) > PISTA_MS) {
         cerco(c2d, blanco.x * W, blanco.y * H, W);
       }
-      if (blanco) { pintaExplorador(c2d, blanco, W, H); pintaCobertura(c2d, esc, blanco, W, H); }
+      if (blanco) { pintaExplorador(c2d, blanco, W, H, esc); pintaCobertura(c2d, esc, blanco, W, H); }
       /* Las cruces van encima del personaje: son lo que ya se ha
          descartado, y taparlas con la figura sería esconder la única
          cuenta que lleva quien busca. */
       for (const t of (est.intentos[uid] || [])) if (!t.ok) cruz(c2d, t.x * W, t.y * H, W);
-      if (blanco && visto) marco(c2d, blanco.x * W, blanco.y * H, W, "#ffe066");
+      if (blanco && visto) foco(c2d, blanco.x * W, blanco.y * H, W, H);
     }
-    if (cursorTeclado) marco(c2d,cursorTeclado.x*W,cursorTeclado.y*H,W,"#fff");
-    if (ahora() < bloqueoHasta) {
-      c2d.fillStyle = "rgba(12,16,22,0.45)"; c2d.fillRect(0, 0, W, H);
-    }
+  }
+
+  /* El foco del final: todo se apaga menos el escondite. Es el momento
+     «¡ahí estaba!» del libro, y un círculo punteado solo no lo daba. */
+  function foco(c, x, y, W, H) {
+    const r = RADIO_ACIERTO * W * 1.6;
+    c.save();
+    c.fillStyle = "rgba(8,10,16,0.55)";
+    c.beginPath(); c.rect(0, 0, W, H); c.arc(x, y, r, 0, 7); c.fill("evenodd");
+    c.strokeStyle = "#ffe066"; c.lineWidth = 3;
+    c.beginPath(); c.arc(x, y, r, 0, 7); c.stroke();
+    c.restore();
   }
 
   function marco(c, x, y, W, color) {
@@ -237,9 +320,22 @@ export function crearEscondite(ctx) {
     if (!host || !est) return;
     const focoConfirmar = document.activeElement?.id === "escOk";
     const f = est.fase, mi = yo(), su = otro();
-    host.querySelector("#escTraje").disabled = f !== "esconder" || !!est.compromisos[uid];
+    const cerrado = f !== "esconder" || !!est.compromisos[uid];
+    const puesto = decodifica(trajePropio());
+    host.querySelectorAll(".esc-chip").forEach(b => {
+      b.disabled = cerrado;
+      b.classList.toggle("sel", Number(b.dataset.i) === puesto[b.dataset.p]);
+    });
+    host.querySelector("#escPrendas").classList.toggle("fijo", cerrado);
+    const esc = escenaActual();
+    host.querySelector("#escTema").textContent = esc ? `${TEMAS[esc.tema].nombre.toUpperCase()} · DUELO DE OBSERVACIÓN` : "DUELO DE OBSERVACIÓN";
+    const cazando = f === "buscar" || f === "fin";
     const objetivo = su && est.sitios[su.uid];
-    host.querySelector("#escObjetivo").textContent = objetivo ? "Busca: gorra " + TRAJES[objetivo.traje || 0].toLowerCase() + " y bandolera crema" : "Elige ropa, busca cobertura y confirma tu escondite.";
+    host.querySelector("#escObjetivo").textContent = cazando && objetivo
+      ? "Busca a quien lleve " + describeTraje(objetivo.traje || 0) + "."
+      : "Vístete, mézclate con la gente y confirma tu escondite.";
+    cartel(cazando, objetivo, su);
+    rival(cazando, su);
     const fase = host.querySelector("#escFase");
     const reloj = host.querySelector("#escReloj");
     const pie = host.querySelector("#escPie");
@@ -300,16 +396,48 @@ export function crearEscondite(ctx) {
      del otro están en su memoria para poder juzgar el clic —, así que
      decirla en voz alta no revela nada nuevo y convierte el juego en
      una búsqueda que converge. */
-  function calor(su) {
+  function calor(su, quien = uid) {
     if (!est || !su) return null;
     const blanco = est.sitios[su.uid];
-    const t = (est.intentos[uid] || []).filter(x => !x.ok).slice(-1)[0];
+    const t = (est.intentos[quien] || []).filter(x => !x.ok).slice(-1)[0];
     if (!blanco || !t) return null;
     const d = Math.hypot(t.x - blanco.x, (t.y - blanco.y) * 0.62);
     if (d < 0.08) return { clase: "casi", texto: "¡Casi!" };
     if (d < 0.18) return { clase: "caliente", texto: "Caliente" };
     if (d < 0.32) return { clase: "templado", texto: "Templado" };
     return { clase: "frio", texto: "Frío" };
+  }
+
+  /* El cartel: el disfraz en grande, como la lámina de Wally al principio
+     del libro. Mientras me escondo es el mío («así te buscarán»); luego,
+     el del rival. Se repinta solo si cambia lo que muestra. */
+  function cartel(cazando, objetivo, su) {
+    const cv = host.querySelector("#escCartel");
+    if (!cv) return;
+    const t = cazando ? (objetivo ? objetivo.traje || 0 : -1) : trajePropio();
+    host.querySelector("#escCartelTit").textContent = cazando ? "SE BUSCA" : "ASÍ TE BUSCARÁN";
+    host.querySelector("#escCartelTxt").textContent = t < 0 ? "Aún no se sabe" : (cazando && su ? su.nombre + " · " : "") + describeTraje(t);
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const W = 84, H = 104;
+    const firma = `${t}:${dpr}`;
+    if (firma === firmaCartel) return;
+    firmaCartel = firma;
+    cv.width = W * dpr; cv.height = H * dpr;
+    const c = cv.getContext("2d");
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    if (t < 0) { c.clearRect(0, 0, W, H); c.fillStyle = "#8a7a5a"; c.font = "bold 40px Georgia,serif"; c.textAlign = "center"; c.fillText("?", W / 2, H * 0.62); return; }
+    pintaCartel(c, t, W, H);
+  }
+
+  /* Cómo le va al otro buscándome: sus fallos y lo cerca que pasó el
+     último. Un duelo en el que no se ve al rival es un solitario. */
+  function rival(cazando, su) {
+    const el = host.querySelector("#escRival");
+    if (!el) return;
+    if (!cazando || !su || est.fase !== "buscar") { el.innerHTML = ""; return; }
+    const n = (est.intentos[su.uid] || []).filter(t => !t.ok).length;
+    const cal = calor(yo(), su.uid);
+    el.innerHTML = `${escapa(su.nombre)}: ${n ? n + (n === 1 ? " fallo" : " fallos") : "aún no ha pinchado"}${cal ? ` · <b class="jg-calor jg-calor-${cal.clase}">${escapa(cal.texto)}</b>` : ""}`;
   }
 
   const escapa = s => String(s || "").replace(/[&<>"]/g, x => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[x]));

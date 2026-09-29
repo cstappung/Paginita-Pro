@@ -261,103 +261,240 @@ try { var t = localStorage.getItem("jg.tema");
   .jg-cartas{display:flex;flex-direction:column}
   .jg-ronda{font-size:12px;font-weight:600;color:#8a97a3;letter-spacing:.03em}
   .jg-trampa{padding:10px 16px;background:#fdecea;border-left:3px solid #c0392b;color:#8c2f22;font-size:12px;line-height:1.55}
-  .jg-mesa{display:flex;flex-direction:column;gap:12px;padding:18px 16px;background:linear-gradient(180deg,#101c2e,#152a3f);border-left:1px solid #e2e8ec;border-right:1px solid #e2e8ec}
-  .jg-lado{display:flex;flex-direction:column;gap:8px;align-items:center}
-  .jg-quien{display:flex;align-items:center;gap:7px;font-size:12.5px;color:#c8d5e2}
-  .jg-cuenta{color:#8fa3b8;font-size:11.5px}
+  /* La mesa es siempre oscura, en los dos temas: un tapete de dojo con
+     las dos filas —la del rival arriba, la mía abajo— y el choque en
+     medio. Cada fila es el tablero de lo ganado y la mano, que es lo
+     que en el CardJitsu se tiene delante todo el rato. */
+  .jg-cartas .jg-mesa{position:relative;overflow:hidden;display:flex;flex-direction:column;gap:14px;
+    padding:18px 20px 22px;border-left:1px solid #e2e8ec;border-right:1px solid #e2e8ec;
+    background:radial-gradient(ellipse 70% 55% at 50% 50%,#3a2f55 0%,#241d38 55%,#16121f 100%)}
   .jg-cartas .jg-punto{width:9px;height:9px;border-radius:50%;display:inline-block;flex-shrink:0}
-  .jg-mano{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;min-height:112px}
-  .jg-mano-otro{min-height:76px}
-  .jg-duelo{min-height:150px;display:grid;place-items:center}
+  .jg-ley{display:flex;flex-wrap:wrap;justify-content:center;gap:6px}
+  .jg-ley-r{display:inline-flex;align-items:center;gap:5px;padding:4px 11px;border-radius:999px;
+    font-size:11.5px;font-weight:600;color:#cfc6e4;background:#ffffff10;border:1px solid #ffffff1c;
+    transition:transform .25s,background .25s,box-shadow .25s,color .25s}
+  .jg-ley-r i{font-style:normal;font-size:14px}
+  .jg-ley-r.on{color:#fff;background:var(--el,#b58cff);border-color:transparent;transform:scale(1.12);
+    box-shadow:0 0 18px var(--el,#b58cff)}
+  .jg-ley-n.on{--el:#8a6fd0}
+  .jg-ca-fila{display:grid;grid-template-columns:minmax(250px,320px) 1fr;gap:18px;align-items:center}
+  .jg-mano{display:flex;gap:10px;flex-wrap:nowrap;justify-content:center;align-items:flex-end;min-height:150px}
+  .jg-mano-otro{min-height:86px;gap:6px}
+  .jg-duelo{min-height:250px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px}
 
-  /* Una carta es la ilustración dentro de un marco que dice el color.
-     La proporción (76×112) es la del dibujo, 164×242: recortarlo a otra
-     dejaría al personaje sin cabeza o sin pies. */
-  .jg-carta{position:relative;width:76px;height:112px;border-radius:9px;flex-shrink:0;
-    background:linear-gradient(160deg,var(--elc,#888),var(--el,#555));
-    border:1px solid #ffffff33;box-shadow:0 5px 14px #00000055;
-    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
-    color:#fff;user-select:none;overflow:hidden;transition:transform .15s,box-shadow .15s}
-  /* El dibujo lleva elemento y número, que es lo que ya trae pintado. Del
-     color de palo —el que decide el trío— no hay dibujo, así que lo dicen
-     el anillo interior y la etiqueta del pie. */
-  .jg-arte{padding:3px;gap:0;box-shadow:0 0 0 2px var(--col,#888) inset,0 5px 14px #00000055}
-  .jg-c-img{width:100%;height:100%;object-fit:cover;border-radius:6px;display:block;
-    background:#00000055;pointer-events:none}
-  .jg-c-palo{position:absolute;left:0;right:0;bottom:0;padding:2px 0 3px;
-    font-size:8.5px;letter-spacing:.09em;text-transform:uppercase;text-align:center;
-    font-weight:700;color:#fff;background:var(--col,#888);
-    text-shadow:0 1px 2px #00000088;pointer-events:none}
-  .jg-dorso{background:repeating-linear-gradient(45deg,#1e3a5f,#1e3a5f 6px,#24466f 6px,#24466f 12px);color:#7ab8ff;font-size:24px;justify-content:center}
-  .jg-pequena{width:56px;height:83px}
-  .jg-pequena .jg-c-palo{font-size:7px;letter-spacing:.05em}
-  .jg-mini{width:34px;height:50px;border-radius:6px}
-  .jg-mini .jg-c-palo{display:none}
-  .jg-mini.jg-arte{padding:2px;box-shadow:0 0 0 1.5px var(--col,#888) inset,0 5px 14px #00000055}
+  /* El tablero: tres columnas, una por elemento, con las fichas ganadas
+     en su color de palo. Debajo, con qué cerraría el trío cada uno. */
+  .jg-tb{background:#0000004d;border:1px solid #ffffff14;border-radius:14px;padding:10px 12px;color:#e8e2f4}
+  .jg-tb-cab{display:flex;align-items:center;gap:7px;font-size:12.5px;margin-bottom:8px}
+  .jg-tb-cab span:last-child{margin-left:auto;color:#a99cc6;font-size:11.5px}
+  .jg-tb-cols{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+  .jg-tb-col{border-top:3px solid var(--el);background:#ffffff08;border-radius:0 0 8px 8px;padding:5px 4px 6px;min-height:58px}
+  .jg-tb-ico{text-align:center;font-size:15px;line-height:1;margin-bottom:5px}
+  .jg-tb-fichas{display:flex;flex-wrap:wrap;gap:3px;justify-content:center}
+  .jg-tb-vacio{color:#ffffff30;font-size:14px}
+  .jg-ficha{display:inline-flex;align-items:center;gap:1px;padding:2px 5px 2px 3px;border-radius:6px;
+    background:var(--col,#888);color:#fff;font-size:12px;font-weight:800;line-height:1.2;
+    text-shadow:0 1px 2px #000a;box-shadow:inset 0 -2px 0 #0003,0 1px 3px #0006;vertical-align:middle}
+  .jg-ficha i{font-style:normal;font-size:10px}
+  .jg-llega{animation:jgLlega .7s cubic-bezier(.2,1.6,.4,1)}
+  @keyframes jgLlega{from{transform:scale(2.6) translateY(-10px);opacity:0}to{transform:none;opacity:1}}
+  .jg-tb-falta{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px;font-size:11.5px;color:#cfc6e4}
+  .jg-tb-falta b{font-weight:700}
+  .jg-tb-falta.bien b{color:#7ee8a1}
+  .jg-tb-falta.mal b{color:#ff9d8f}
+  .jg-tb-f{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:999px;background:#ffffff12}
+  .jg-tb-f i{font-style:normal}
+  .jg-tb-f u{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--col);box-shadow:0 0 0 1.5px #fff6}
+  .jg-tb-falta.mal .jg-tb-f{animation:jgAviso 1.6s ease-in-out infinite}
+  @keyframes jgAviso{50%{background:#ff6b5a33}}
+
+  /* Una carta: la ilustración dentro de un marco del color de palo —el
+     que decide el trío, visible desde lejos— y el sello del elemento
+     arriba a la derecha, porque en el dibujo el agua y la nieve son las
+     dos azules. La proporción es la del dibujo, 164×242. */
+  .jg-carta{position:relative;width:96px;height:142px;border-radius:11px;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;color:#fff;user-select:none;
+    box-shadow:0 6px 16px #0008;transition:transform .18s,box-shadow .18s,opacity .18s}
+  .jg-arte{background:var(--col,#888);padding:5px 5px 17px}
+  .jg-arte::after{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+    box-shadow:inset 0 0 0 1px #ffffff55,inset 0 -3px 0 #0003}
+  .jg-c-img{width:100%;height:100%;object-fit:cover;border-radius:6px;display:block;background:#00000055;pointer-events:none}
+  .jg-c-el{position:absolute;top:-6px;right:-6px;width:28px;height:28px;border-radius:50%;
+    display:grid;place-items:center;font-size:15px;background:var(--el,#555);
+    border:2px solid #fff;box-shadow:0 2px 6px #0008;z-index:1}
+  .jg-c-palo{position:absolute;left:0;right:0;bottom:1px;height:15px;line-height:15px;
+    font-size:9px;letter-spacing:.1em;text-transform:uppercase;text-align:center;font-weight:800;
+    color:#fff;text-shadow:0 1px 2px #000,0 0 4px #0008;pointer-events:none}
+  .jg-carta.jg-arte{overflow:visible}
+  .jg-dorso{border:3px solid #d8c7f5;color:#e9dcff;font-size:26px;
+    background:radial-gradient(circle at 50% 45%,#6c4bb6 0 22%,transparent 23%),
+      repeating-linear-gradient(45deg,#3b2d5c 0 7px,#46376b 7px 14px)}
+  .jg-pequena{width:56px;height:83px;border-radius:8px}
+  .jg-pequena.jg-arte{padding:3px 3px 11px}
+  .jg-pequena .jg-c-palo{font-size:6.5px;height:11px;line-height:11px;letter-spacing:.04em}
+  .jg-pequena .jg-c-el{width:20px;height:20px;font-size:11px;top:-5px;right:-5px}
+  .jg-pequena.jg-dorso{font-size:16px;border-width:2px}
+  .jg-mano-otro .jg-carta:nth-child(odd){transform:rotate(-2deg)}
+  .jg-mano-otro .jg-carta:nth-child(even){transform:rotate(2deg) translateY(2px)}
   .jg-jugable{cursor:pointer}
-  .jg-jugable:hover{transform:translateY(-8px);box-shadow:0 12px 22px #00000066}
-  .jg-elegida{transform:translateY(-12px);box-shadow:0 0 0 3px #ffd76a,0 12px 22px #00000066}
-  .jg-quieta{cursor:default;opacity:.55}
-  .jg-quieta:hover{transform:none;box-shadow:0 5px 14px #00000055}
-  .jg-lista{box-shadow:0 0 0 2px #4ade80,0 5px 14px #00000055}
-  .jg-tenue{opacity:.4}
+  .jg-jugable:hover{transform:translateY(-10px) rotate(-1.5deg);box-shadow:0 16px 28px #000a}
+  .jg-elegida,.jg-elegida:hover{transform:translateY(-22px) scale(1.06);
+    box-shadow:0 0 0 3px #ffd76a,0 0 26px #ffd76a88,0 18px 30px #000a;z-index:2}
+  .jg-quieta,.jg-quieta:hover{cursor:default;opacity:.5;transform:none;box-shadow:0 6px 16px #0008}
+  .jg-tenue{opacity:.35}
+  .jg-lista{box-shadow:0 0 0 2px #4ade80,0 6px 16px #0008}
+  .jg-boca-abajo{transform:rotate(-4deg);box-shadow:0 0 0 2px #4ade80,0 6px 16px #0008}
+  .jg-nueva{animation:jgNueva .8s cubic-bezier(.2,1.4,.4,1)}
+  @keyframes jgNueva{from{transform:translateY(-70px) rotate(10deg);opacity:0;box-shadow:0 0 30px #fff}to{transform:none;opacity:1}}
+  /* La carta que, si gana esta ronda, cierra el trío. */
+  .jg-decisiva{box-shadow:0 0 0 2px #ffd76a,0 0 22px #ffb300aa,0 6px 16px #0008}
+  .jg-decisiva.jg-quieta{opacity:.7}
+  .jg-c-cinta{position:absolute;left:50%;top:-11px;transform:translateX(-50%);padding:2px 8px;border-radius:999px;
+    background:linear-gradient(#ffe38a,#f5b42a);color:#4a2c00;font-size:10px;font-weight:800;white-space:nowrap;
+    box-shadow:0 2px 6px #0008;z-index:2;animation:jgCinta 1.2s ease-in-out infinite alternate}
+  @keyframes jgCinta{to{transform:translateX(-50%) scale(1.1)}}
   .jg-brilla{animation:jgBrilla 1.1s ease-in-out infinite alternate}
-  @keyframes jgBrilla{from{box-shadow:0 0 0 0 #ffd76a00}to{box-shadow:0 0 14px 3px #ffd76aaa}}
+  @keyframes jgBrilla{from{box-shadow:0 0 0 0 #ffd76a00}to{box-shadow:0 0 16px 4px #ffd76acc}}
 
-  .jg-espera{display:flex;align-items:center;gap:18px}
-  .jg-vs{font-size:15px;font-weight:700;color:#8fa3b8;letter-spacing:.08em}
-  .jg-choque{display:flex;align-items:center;gap:16px;position:relative}
-  .jg-veredicto{font-size:15px;font-weight:700;color:#e6edf3;min-width:110px;text-align:center}
-  .jg-choque.jg-gana .jg-veredicto{color:#4ade80}
-  .jg-choque.jg-pierde .jg-veredicto{color:#ff8a7a}
+  .jg-espera{display:flex;align-items:center;gap:26px}
+  .jg-plaza{display:flex;flex-direction:column;align-items:center;gap:7px;font-size:11.5px;color:#cfc6e4}
+  .jg-cartas .jg-hueco{width:56px;height:83px;border-radius:8px;border:2px dashed #ffffff33;
+    display:grid;place-items:center;text-align:center;font-size:10px;color:#ffffff66;padding:4px}
+  .jg-piensa{animation:jgPiensa 1.4s ease-in-out infinite}
+  @keyframes jgPiensa{50%{border-color:#ffffff88;color:#ffffffaa}}
+  .jg-vs{font-size:22px;font-weight:900;color:#ffd76a;letter-spacing:.06em;text-shadow:0 0 14px #ffb30066;font-style:italic}
+  .jg-ultima{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:center;
+    font-size:11.5px;color:#a99cc6;padding:5px 12px;border-radius:999px;background:#0000003a}
+
+  /* ---- El choque, por tiempos (ver CHOQUE en cartas.js) ----
+     0 s entran boca abajo · .52 s se dan la vuelta · 1.15 s la ganadora
+     embiste y el elemento actúa sobre la perdedora · 1.5 s el veredicto ·
+     2.7 s la ganada vuela a su tablero. */
+  .jg-choque{position:relative;display:flex;align-items:center;justify-content:center;gap:22px}
+  .jg-ch-lado{display:flex;flex-direction:column;align-items:center;gap:8px;perspective:700px}
+  .jg-ch-yo{animation:jgEntraYo .45s cubic-bezier(.2,1.2,.4,1) both}
+  .jg-ch-otro{animation:jgEntraOtro .45s cubic-bezier(.2,1.2,.4,1) both}
+  @keyframes jgEntraYo{from{transform:translate(-60px,90px) rotate(-12deg);opacity:0}}
+  @keyframes jgEntraOtro{from{transform:translate(60px,-90px) rotate(12deg);opacity:0}}
+  .jg-ch-nombre{font-size:12px;font-weight:700;color:#e8e2f4}
+  .jg-ch-carta{position:relative}
+  .jg-ch-carta .jg-carta{width:120px;height:177px}
+  .jg-ch-carta .jg-arte{padding:6px 6px 19px}
+  .jg-ch-carta .jg-c-el{width:34px;height:34px;font-size:18px}
+  .jg-flip{position:relative;width:120px;height:177px;transform-style:preserve-3d;
+    animation:jgVuelta .5s .2s ease-in-out both}
+  @keyframes jgVuelta{from{transform:rotateY(180deg)}to{transform:rotateY(0)}}
+  .jg-cara{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+  .jg-reves{transform:rotateY(180deg)}
+  /* La ganadora embiste hacia la otra y luego vuela a su tablero: la mía
+     hacia abajo, la del rival hacia arriba. */
+  .jg-ch-yo.jg-ch-gana .jg-ch-carta{animation:jgEmbisteD .5s 1s ease-in both,jgVuelaAbajo .8s 2.7s ease-in forwards}
+  .jg-ch-otro.jg-ch-gana .jg-ch-carta{animation:jgEmbisteI .5s 1s ease-in both,jgVuelaArriba .8s 2.7s ease-in forwards}
+  @keyframes jgEmbisteD{0%{transform:none}35%{transform:translateX(-14px) rotate(-5deg)}70%{transform:translateX(34px) scale(1.12) rotate(4deg)}100%{transform:scale(1.08)}}
+  @keyframes jgEmbisteI{0%{transform:none}35%{transform:translateX(14px) rotate(5deg)}70%{transform:translateX(-34px) scale(1.12) rotate(-4deg)}100%{transform:scale(1.08)}}
+  @keyframes jgVuelaAbajo{from{transform:scale(1.08)}to{transform:translate(-120px,220px) scale(.25) rotate(-20deg);opacity:0}}
+  @keyframes jgVuelaArriba{from{transform:scale(1.08)}to{transform:translate(120px,-220px) scale(.25) rotate(20deg);opacity:0}}
+  .jg-ch-gana .jg-carta{animation:jgAura .6s 1.3s ease-out both}
+  @keyframes jgAura{to{box-shadow:0 0 0 3px #ffd76a,0 0 34px #ffd76a,0 10px 24px #000a}}
+  .jg-ch-pierde .jg-ch-carta{animation:jgRecibe .5s 1.3s ease-out both,jgApaga .6s 2.3s ease-in forwards}
+  @keyframes jgRecibe{20%{transform:translateX(0) rotate(0)}40%{transform:translateX(-8px) rotate(-4deg)}60%{transform:translateX(7px) rotate(3deg)}100%{transform:translateY(8px) rotate(-3deg)}}
+  @keyframes jgApaga{to{transform:translateY(8px) rotate(-6deg) scale(.88);opacity:.18;filter:grayscale(1)}}
+  .jg-ch-empate .jg-ch-carta{animation:jgTiembla .5s 1.1s ease-in-out both,jgApaga .6s 2.8s ease-in forwards}
+  @keyframes jgTiembla{25%{transform:translateX(-6px)}50%{transform:translateX(6px)}75%{transform:translateX(-3px)}}
+  /* Lo que el elemento ganador le hace a la perdedora. */
+  .jg-fx{position:absolute;inset:0;border-radius:inherit;pointer-events:none;z-index:2;opacity:0}
+  .jg-fx-fuego{background:linear-gradient(0deg,#ff5a1f 0%,#ffb02e 38%,#ffd76a00 75%);mix-blend-mode:screen;
+    animation:jgFuego 1.1s 1.25s ease-out forwards}
+  @keyframes jgFuego{0%{opacity:0;transform:scaleY(.2);transform-origin:bottom}30%{opacity:1;transform:scaleY(1.1)}
+    60%{opacity:.9;transform:scaleY(.9)}100%{opacity:.55;transform:scaleY(1);filter:brightness(.6)}}
+  .jg-fx-agua{background:linear-gradient(180deg,#5ec8ff 0%,#1a7fd4cc 55%,#0b4a8a 100%);
+    animation:jgAgua 1s 1.25s ease-out forwards}
+  @keyframes jgAgua{0%{opacity:0;clip-path:inset(0 0 100% 0)}35%{opacity:.9;clip-path:inset(0 0 0 0)}100%{opacity:.7;clip-path:inset(0 0 0 0)}}
+  .jg-fx-nieve{background:linear-gradient(135deg,#ffffffee,#c9e6ffcc 40%,#8fc3ff99);
+    box-shadow:inset 0 0 0 3px #eaf6ff,inset 0 0 22px #fff;animation:jgHielo .9s 1.25s ease-out forwards}
+  @keyframes jgHielo{0%{opacity:0;transform:scale(1.3)}40%{opacity:1;transform:scale(.98)}100%{opacity:.8;transform:none}}
+  .jg-fx-num{background:
+      linear-gradient(115deg,transparent 46%,#fff 47%,#fff 48.5%,transparent 49.5%),
+      linear-gradient(60deg,transparent 58%,#fffc 59%,#fffc 60%,transparent 61%),#0005;
+    animation:jgRompe .5s 1.25s steps(2,end) forwards}
+  @keyframes jgRompe{from{opacity:0}to{opacity:1}}
+  .jg-ch-centro{position:relative;display:flex;flex-direction:column;align-items:center;gap:8px;min-width:150px;max-width:210px;text-align:center}
+  .jg-ch-vs{font-size:26px;font-weight:900;font-style:italic;color:#ffd76a;text-shadow:0 0 16px #ffb300aa;
+    animation:jgVs 1.2s both}
+  @keyframes jgVs{0%{transform:scale(2.5);opacity:0}25%{transform:scale(1);opacity:1}80%{opacity:1}100%{opacity:.25;transform:scale(.8)}}
+  .jg-veredicto{font-size:21px;font-weight:900;color:#fff;animation:jgVeredicto .55s 1.5s cubic-bezier(.2,1.7,.4,1) both}
+  @keyframes jgVeredicto{from{transform:scale(2.2);opacity:0}to{transform:none;opacity:1}}
+  .jg-choque.jg-gana .jg-veredicto{color:#7ee8a1;text-shadow:0 0 18px #4ade8088}
+  .jg-choque.jg-pierde .jg-veredicto{color:#ff9d8f;text-shadow:0 0 18px #ff5a4a66}
   .jg-choque.jg-empate .jg-veredicto{color:#ffd76a}
-  .jg-vuela-arriba{animation:jgArriba .4s ease-out}
-  .jg-vuela-abajo{animation:jgAbajo .4s ease-out}
-  @keyframes jgArriba{from{transform:translateY(-60px) rotate(-8deg);opacity:0}to{transform:none;opacity:1}}
-  @keyframes jgAbajo{from{transform:translateY(60px) rotate(8deg);opacity:0}to{transform:none;opacity:1}}
-
-  /* Ganar con un 10, un 11 o un 12 estalla; empatar echa humo. Las dos
-     capas se pintan *encima* del choque y no dentro de la fila: metidas
-     en el flex, las cartas se correrían a un lado al aparecer. Cada
-     partícula trae su ángulo y su retardo en una variable, porque son
-     doce rayos y siete bocanadas y una regla por cada una no se lee. */
-  .jg-golpea{animation:jgSacude .5s ease-out}
+  .jg-ch-porque{font-size:12px;line-height:1.45;color:#d9d0ec;animation:jgEntra .4s 1.85s ease-out both}
+  .jg-golpea{animation:jgSacude .5s 1.15s ease-out}
   @keyframes jgSacude{0%,100%{transform:none}15%{transform:translateX(-7px)}
     35%{transform:translateX(6px)}55%{transform:translateX(-4px)}75%{transform:translateX(2px)}}
-  .jg-estallido,.jg-humo{position:absolute;left:50%;top:50%;width:0;height:0;
-    pointer-events:none;z-index:2}
+  .jg-estallido,.jg-humo{position:absolute;left:50%;top:50%;width:0;height:0;pointer-events:none;z-index:3}
+  .jg-estallido{animation:jgTarde 0s 1.15s both}
+  @keyframes jgTarde{from{visibility:hidden}to{visibility:visible}}
   .jg-onda{position:absolute;left:-9px;top:-9px;width:18px;height:18px;border-radius:50%;
-    border:3px solid var(--elc,#fff);animation:jgOnda .85s ease-out forwards}
-  @keyframes jgOnda{from{transform:scale(.3);opacity:.95}to{transform:scale(13);opacity:0}}
+    border:3px solid var(--elc,#fff);animation:jgOnda .85s 1.15s ease-out both}
+  @keyframes jgOnda{from{transform:scale(.3);opacity:.95}to{transform:scale(15);opacity:0}}
   .jg-rayos{position:absolute}
   .jg-rayos i{position:absolute;left:-2.5px;top:-2.5px;width:5px;height:5px;border-radius:3px;
-    background:var(--el,#fff);box-shadow:0 0 9px var(--elc,#fff);
-    animation:jgRayo .75s ease-out forwards}
+    background:var(--el,#fff);box-shadow:0 0 9px var(--elc,#fff);animation:jgRayo .75s 1.15s ease-out both}
   @keyframes jgRayo{
     from{transform:rotate(var(--a,0deg)) translateY(0) scaleY(1);opacity:1}
-    to{transform:rotate(var(--a,0deg)) translateY(calc(var(--r,1) * -78px)) scaleY(3.4);opacity:0}}
-  .jg-golpe-t{display:block;margin-top:5px;font-size:23px;font-weight:800;color:#ffd76a;
-    text-shadow:0 2px 9px #ffb30099;animation:jgGolpeT .55s cubic-bezier(.2,1.7,.4,1)}
-  @keyframes jgGolpeT{from{transform:scale(2.4) rotate(-9deg);opacity:0}to{transform:none;opacity:1}}
+    to{transform:rotate(var(--a,0deg)) translateY(calc(var(--r,1) * -96px)) scaleY(3.4);opacity:0}}
+  .jg-golpe-t{display:block;margin-top:4px;font-size:30px;font-weight:900;color:#ffd76a;
+    text-shadow:0 2px 12px #ffb300cc;animation:jgGolpeT .55s 1.4s cubic-bezier(.2,1.7,.4,1) both}
+  @keyframes jgGolpeT{from{transform:scale(2.6) rotate(-9deg);opacity:0}to{transform:none;opacity:1}}
   .jg-humo i{position:absolute;left:-23px;top:-23px;width:46px;height:46px;border-radius:50%;
     background:radial-gradient(circle at 40% 38%,#ffffffcc,#b9c6d3a0 54%,#8a99a800 72%);
-    opacity:0;animation:jgHumo 1.7s ease-out var(--d,0ms) forwards}
+    opacity:0;animation:jgHumo 1.7s ease-out calc(var(--d,0ms) + 1.15s) forwards}
   @keyframes jgHumo{
     0%{opacity:0;transform:translate(0,0) scale(calc(var(--s,1) * .35))}
     18%{opacity:.85}
     100%{opacity:0;transform:translate(var(--x,0px),-64px) scale(calc(var(--s,1) * 1.9))}}
-  .jg-remate{display:flex;flex-direction:column;align-items:center;gap:12px;animation:jgEntra .4s ease-out}
-  .jg-remate-t{font-size:24px;font-weight:700}
-  .jg-remate.jg-gana .jg-remate-t{color:#4ade80}
-  .jg-remate.jg-pierde .jg-remate-t{color:#ff8a7a}
-  .jg-remate-trio{display:flex;gap:10px}
 
-  .jg-trofeos{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:#e2e8ec;border-left:1px solid #e2e8ec;border-right:1px solid #e2e8ec}
-  .jg-trofeo{background:#fff;padding:12px 16px}
-  .jg-trofeo-t{font-size:11px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:#8a97a3;margin-bottom:8px}
-  .jg-grupos{display:flex;gap:14px;flex-wrap:wrap}
-  .jg-grupo{display:flex;gap:3px}
-  .jg-nada{font-size:12px;color:#b3bec7}
+  /* El remate: el trío carta a carta y, al que gana, lluvia de elementos. */
+  .jg-remate{display:flex;flex-direction:column;align-items:center;gap:10px;animation:jgEntra .4s ease-out}
+  .jg-remate-t{font-size:30px;font-weight:900;animation:jgVeredicto .6s cubic-bezier(.2,1.7,.4,1) both}
+  .jg-remate.jg-gana .jg-remate-t{color:#ffd76a;text-shadow:0 0 24px #ffb300aa}
+  .jg-remate.jg-pierde .jg-remate-t{color:#ff9d8f}
+  .jg-remate-s{font-size:12.5px;color:#d9d0ec}
+  .jg-remate-trio{display:flex;gap:14px;margin-top:6px}
+  .jg-rt{animation:jgTrio .6s calc(var(--k,0) * 200ms + 300ms) cubic-bezier(.2,1.5,.4,1) both}
+  @keyframes jgTrio{from{transform:translateY(60px) rotate(calc(var(--k,0) * 8deg - 8deg)) scale(.4);opacity:0}}
+  .jg-remate.jg-pierde .jg-remate-trio .jg-carta{filter:saturate(.7)}
+  .jg-confeti{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:4}
+  .jg-confeti i{position:absolute;top:-30px;left:var(--x);font-style:normal;font-size:22px;
+    animation:jgLluvia 2.6s var(--d) ease-in forwards;opacity:0}
+  @keyframes jgLluvia{0%{opacity:0;transform:translateY(0) rotate(0)}10%{opacity:1}
+    100%{opacity:0;transform:translateY(560px) rotate(var(--r))}}
+  @media(max-width:720px){
+    .jg-cartas .jg-mesa{padding:14px 8px 18px;gap:10px}
+    .jg-ca-fila{grid-template-columns:1fr;gap:8px}
+    .jg-ca-otro .jg-mano-otro{order:-1;min-height:0}
+    .jg-mano-otro .jg-carta{width:34px;height:50px;border-width:2px;font-size:0}
+    .jg-mano{gap:5px;min-height:112px;padding-right:6px}
+    .jg-mano .jg-carta:not(.jg-pequena){width:58px;height:86px;border-radius:8px}
+    .jg-mano .jg-arte:not(.jg-pequena){padding:3px 3px 12px}
+    .jg-mano .jg-arte .jg-c-palo{font-size:7px;height:12px;line-height:12px;letter-spacing:.03em}
+    .jg-mano .jg-c-el{width:22px;height:22px;font-size:12px;top:-5px;right:-5px}
+    .jg-c-cinta{font-size:8.5px;padding:1px 6px}
+    .jg-tb{padding:8px 9px}
+    .jg-tb-col{min-height:44px}
+    .jg-duelo{min-height:220px}
+    .jg-choque{gap:8px}
+    .jg-ch-carta .jg-carta,.jg-flip{width:92px;height:136px}
+    .jg-ch-centro{min-width:0;max-width:130px}
+    .jg-veredicto{font-size:16px}
+    .jg-ch-porque{font-size:11px}
+    .jg-remate-trio{gap:8px}
+    .jg-remate-trio .jg-carta{width:72px;height:106px}
+    .jg-ch-yo.jg-ch-gana .jg-ch-carta{animation-name:jgEmbisteDm,jgVuelaAbajo}
+    .jg-ch-otro.jg-ch-gana .jg-ch-carta{animation-name:jgEmbisteIm,jgVuelaArriba}
+    @keyframes jgEmbisteDm{0%{transform:none}35%{transform:translateX(-6px) rotate(-4deg)}70%{transform:translateX(14px) scale(1.06) rotate(3deg)}100%{transform:scale(1.04)}}
+    @keyframes jgEmbisteIm{0%{transform:none}35%{transform:translateX(6px) rotate(4deg)}70%{transform:translateX(-14px) scale(1.06) rotate(-3deg)}100%{transform:scale(1.04)}}
+  }
 
   /* ============================================================
      Cuadritos
@@ -605,9 +742,6 @@ try { var t = localStorage.getItem("jg.tema");
   }
 
   @media (max-width:640px){
-    .jg-carta{width:62px;height:91px}
-    .jg-pequena{width:48px;height:71px}
-    .jg-trofeos{grid-template-columns:1fr}
     /* El tablero se lleva todo el ancho: con seis jugadores el
        marcador ya se parte en dos filas y el margen lateral es lo
        único que se puede dar. */
@@ -1040,18 +1174,23 @@ try { var t = localStorage.getItem("jg.tema");
   @keyframes jgCrHormigas{to{stroke-dashoffset:-36}}
   @keyframes jgCrSacude{0%,100%{transform:translate(0,0)}20%{transform:translate(var(--s),calc(var(--s) * -.6))}40%{transform:translate(calc(var(--s) * -.8),calc(var(--s) * .5))}60%{transform:translate(calc(var(--s) * .5),calc(var(--s) * .8))}80%{transform:translate(calc(var(--s) * -.3),calc(var(--s) * -.3))}}
   @media(max-width:600px){.jg-cr .jg-tablero{padding:16px 6px}.jg-cr-combo{font-size:22px}.jg-cr-aviso{font-size:14px}}
-  .jg-mesa{padding:28px 20px;gap:20px;background:radial-gradient(ellipse at center,#414267,#252237 60%,#1c1a2b);border-color:#e4dfeb}.jg-carta:not(.jg-pequena):not(.jg-mini){width:96px;height:142px;border-radius:12px}.jg-duelo{min-height:178px}.jg-jugable:hover{transform:translateY(-12px) rotate(-2deg);box-shadow:0 15px 30px #0008,0 0 0 2px #e5c3ff}.jg-dorso{background:repeating-linear-gradient(45deg,#423458,#423458 6px,#4d3c67 6px,#4d3c67 12px);color:#d1b4fc}.jg-trofeo{padding:18px}.jg-lienzo{box-shadow:inset 0 0 50px #0003}.jg-capa{backdrop-filter:blur(5px)}
+  .jg-lienzo{box-shadow:inset 0 0 50px #0003}.jg-capa{backdrop-filter:blur(5px)}
   .jg-fin{width:460px;padding:38px 30px 28px;border-radius:24px}.jg-fin-capa{background:#171123b3;backdrop-filter:blur(8px)}.jg-fin-gano{background:radial-gradient(ellipse at top,#e5dbff,#fff 70%);border-color:#c9b7f6}.jg-fin-gano .jg-fin-t{color:#6c3ed2}.jg-fin-t{letter-spacing:-.6px;font-size:28px}.jg-fin-cara{margin-bottom:16px}.jg-fin-btns{gap:10px}.jg-fin-btns .btn{flex:1}.jg-fin-x{width:34px;height:34px;border-radius:100px}
   .jg-revancha{display:flex;align-items:center;justify-content:space-between;gap:18px;border:1px solid #d7c5fb;border-radius:16px;padding:22px;background:#efe7ff;margin-top:20px}.jg-revancha b{font-size:15px}.jg-revancha p{font-size:12px;color:#75648c;margin:5px 0 0}.jg-revancha .btn{flex-shrink:0}
   .login-card{border-radius:24px;padding:40px;box-shadow:0 20px 70px #3d24541a}.login-card:before{content:'✦';display:block;font-size:72px;color:#8659e2;margin-bottom:20px}
-  .jg-orbita{border-radius:18px;overflow:hidden;background:#1d192d;border:1px solid #3d3457}.jg-orbita .jg-barra{background:#241f35;border:0;display:flex;justify-content:space-between}.jg-orbita .jg-fase,.jg-orbita .jg-m{color:#e9e0fa}
-  .jg-orbita-cosmos{padding:28px;background:radial-gradient(ellipse at 50% 30%,#4b306b70,transparent 70%),radial-gradient(circle at 18px 25px,#b8a3eb35 1px,transparent 1.5px);background-size:auto,53px 53px}
-  .jg-orbita-grid{max-width:480px;margin:auto;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
-  .jg-estrella{aspect-ratio:1;min-width:0;border-radius:12px;border:1px solid #554567;background:#2a223b;color:#9d8eb5;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:2px;font-family:inherit;transition:background .16s,transform .16s,box-shadow .16s;opacity:.65}
-  .jg-estrella span{font-size:27px;line-height:1}.jg-estrella b{font:500 12px 'IBM Plex Mono',monospace}.jg-estrella.legal{opacity:1;border-color:#a481e1;background:linear-gradient(145deg,#614082,#35284d);color:#ffe3a6;box-shadow:inset 0 1px 0 #ffffff20}.jg-estrella.legal:not(:disabled){cursor:pointer}.jg-estrella.legal:not(:disabled):hover{transform:translateY(-3px);box-shadow:0 0 22px #9b6df847;border-color:#f2d095}.jg-estrella.tomada{opacity:.55;background:#211c2f;border-color:#4d425f}.jg-estrella.propia{color:#bca1ff}.jg-estrella.rival{color:#ffc78d}.jg-estrella.ultima{opacity:1;outline:2px solid currentColor;outline-offset:-3px}.jg-estrella.tomada span{font-size:17px}
-  .jg-orbita-controles{padding:14px 24px;display:flex;align-items:center;justify-content:center;gap:16px;flex-wrap:wrap;color:#c3b4d7;font-size:12px}.jg-ejes{display:flex;gap:6px}.jg-ejes button{border:1px solid #625078;background:#2b233b;color:#d9cbea;border-radius:10px;padding:10px 15px;cursor:pointer}.jg-ejes button[aria-pressed=true]{background:#c3a0ff;color:#211530;border-color:#c3a0ff;font-weight:600}.jg-ejes button:disabled{opacity:.5;cursor:default}.jg-instrucciones{padding:18px 24px;color:#baadce;font-size:12px;line-height:1.7;border-top:1px solid #ffffff14}.jg-instrucciones summary{cursor:pointer;color:#e5d8f7}.jg-orbita-error{color:#ffb5a6;font-size:12px;text-align:center;margin:0 20px;min-height:16px}
+  .jg-orb{border-radius:18px;overflow:hidden;background:#0b0916;border:1px solid #2d2544;color:#e9e0fa}
+  .jg-orb-hud{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 18px 6px;font-size:14px}.jg-orb-fase{font-weight:650}.jg-orb-ronda{font:500 12px 'IBM Plex Mono',monospace;color:#a99bc4;white-space:nowrap}
+  .jg-orb-marcador{display:flex;flex-wrap:wrap;gap:8px;padding:6px 18px 12px}
+  .jg-orb-chip{display:flex;align-items:center;gap:8px;padding:6px 12px;border-radius:12px;background:#1a1530;border:1px solid #2f2748;font-size:13px;transition:box-shadow .3s,border-color .3s}.jg-orb-chip i{width:10px;height:10px;border-radius:50%;background:var(--c);box-shadow:0 0 8px var(--c)}.jg-orb-chip .n{max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.jg-orb-chip b{font:700 16px 'IBM Plex Mono',monospace;color:var(--c)}.jg-orb-chip small{color:#9a8db3;font-size:11px}
+  .jg-orb-chip.activo{border-color:var(--c);box-shadow:0 0 0 1px var(--c),0 0 18px color-mix(in srgb,var(--c) 45%,transparent)}.jg-orb-chip.fuera{opacity:.45;text-decoration:line-through}
+  .jg-orb-lienzo{position:relative;touch-action:none}.jg-orb-lienzo canvas{display:block;width:100%;cursor:crosshair}
+  .jg-orb-aviso{position:absolute;left:50%;bottom:14px;transform:translateX(-50%);padding:6px 14px;border-radius:99px;background:#0b0916cc;color:#e5d8f7;font-size:12.5px;pointer-events:none;transition:opacity .3s}.jg-orb-aviso:empty{opacity:0}
+  .jg-orb-mando{display:flex;align-items:center;justify-content:center;gap:18px;flex-wrap:wrap;padding:12px 18px;border-top:1px solid #ffffff12;font-size:12.5px;color:#c3b4d7;transition:opacity .25s}.jg-orb-mando label{display:flex;align-items:center;gap:8px}.jg-orb-mando input[type=range]{width:150px;accent-color:#a78bfa}.jg-orb-mando b{font:500 12px 'IBM Plex Mono',monospace;min-width:40px;color:#fff}
+  .jg-orb-lanza{border:0;border-radius:12px;padding:10px 20px;background:linear-gradient(135deg,#8b5cf6,#ec4899);color:#fff;font-weight:700;font-size:14px;cursor:pointer;box-shadow:0 6px 20px #8b5cf655;transition:transform .15s,filter .15s}.jg-orb-lanza:hover:not(:disabled){transform:translateY(-1px);filter:brightness(1.1)}.jg-orb-lanza:disabled{opacity:.4;cursor:default;box-shadow:none}
+  .jg-orb-mando.off{opacity:.45}.jg-orb-error{color:#ffb5a6;font-size:12px;text-align:center;margin:0 20px 10px;min-height:0}.jg-orb-error:empty{display:none}
+  @media(max-width:600px){.jg-orb-hud,.jg-orb-marcador{padding-left:12px;padding-right:12px}.jg-orb-mando{gap:10px}.jg-orb-mando label{width:100%;justify-content:space-between}.jg-orb-mando input[type=range]{flex:1}.jg-orb-lanza{width:100%}}
   @media(max-width:900px){.jg-elige{grid-template-columns:repeat(2,minmax(0,1fr))}.head-nav{order:3;width:100%;margin:0}.head-right{flex-wrap:wrap}.jg-section-title>span{display:none}}
-  @media(max-width:600px){main{padding:20px 16px 48px}.head{padding:12px 16px}.head-right{width:100%;margin:0;gap:8px}.head-nav{gap:20px;overflow:auto}.jg-marquesina{grid-template-columns:1fr;padding:26px 22px;border-radius:18px}.jg-marquesina h2{font-size:40px}.jg-mq-rueda{display:none!important}.jg-mq-cifras span{flex:1;padding:9px 12px}.jg-mq-rapida{width:100%}.jg-section-title{flex-wrap:wrap}.jg-elige{gap:14px;grid-template-columns:1fr}.jg-portada{height:180px}.jg-oferta{padding:16px}.jg-of-lema{min-height:0}.jg-section-title h2{font-size:20px}.jg-tablero{padding:22px 10px}.jg-mesa{padding:20px 10px}.jg-carta:not(.jg-pequena):not(.jg-mini){width:72px;height:106px}.jg-mano{gap:8px}.jg-choque{gap:10px;flex-wrap:wrap;justify-content:center}.jg-veredicto{min-width:80px;font-size:13px}.jg-revancha{flex-direction:column;align-items:stretch}.jg-orbita-cosmos{padding:18px 10px}.jg-orbita-grid{gap:5px}.jg-estrella{border-radius:9px}.jg-estrella span{font-size:23px}.jg-orbita .jg-barra{padding:14px;flex-wrap:wrap}.jg-barra{padding:14px}.jg-enlace .inp{min-width:0}.jg-fin{padding:32px 22px 24px}.jg-fin-btns .btn2{width:100%}}
+  @media(max-width:600px){main{padding:20px 16px 48px}.head{padding:12px 16px}.head-right{width:100%;margin:0;gap:8px}.head-nav{gap:20px;overflow:auto}.jg-marquesina{grid-template-columns:1fr;padding:26px 22px;border-radius:18px}.jg-marquesina h2{font-size:40px}.jg-mq-rueda{display:none!important}.jg-mq-cifras span{flex:1;padding:9px 12px}.jg-mq-rapida{width:100%}.jg-section-title{flex-wrap:wrap}.jg-elige{gap:14px;grid-template-columns:1fr}.jg-portada{height:180px}.jg-oferta{padding:16px}.jg-of-lema{min-height:0}.jg-section-title h2{font-size:20px}.jg-tablero{padding:22px 10px}.jg-revancha{flex-direction:column;align-items:stretch}.jg-barra{padding:14px}.jg-enlace .inp{min-width:0}.jg-fin{padding:32px 22px 24px}.jg-fin-btns .btn2{width:100%}}
   @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
 
 
@@ -1403,14 +1542,29 @@ try { var t = localStorage.getItem("jg.tema");
 
 /* Escondite: atlas ilustrado */
 .esc-rework {overflow:hidden;border:1px solid #d8d4c7;border-radius:22px;background:#f7f5ed;box-shadow:0 16px 45px #242c3514}
-.esc-editorial{padding:28px 28px 20px;background:#203e38;color:#f3edd9}
-.esc-editorial>span{font-size:10px;letter-spacing:.22em;color:#b9cdab;font-weight:800}
+.esc-editorial{padding:24px 28px 20px;background:#203e38;color:#f3edd9;display:flex;gap:20px;align-items:center}
+.esc-titular{flex:1;min-width:0}
+.esc-titular>span{font-size:10px;letter-spacing:.22em;color:#b9cdab;font-weight:800}
 .esc-editorial h2{font-family:Georgia,serif;font-size:clamp(26px,4vw,42px);font-weight:400;letter-spacing:-.04em;margin:10px 0}
 .esc-editorial p{margin:0;color:#cbd6c8;font-size:13px}
+.esc-cartel{margin:0;flex:none;width:118px;padding:8px 8px 7px;background:#f1e3bf;color:#3a2a14;border-radius:4px;transform:rotate(2deg);box-shadow:0 8px 18px #0006,inset 0 0 0 2px #c9ae78;text-align:center;font-family:Georgia,serif}
+.esc-cartel figcaption{font-size:11px;font-weight:700;letter-spacing:.14em}
+.esc-cartel canvas{display:block;width:84px;height:104px;margin:4px auto;background:radial-gradient(#fff8e4,#e6d3a4)}
+.esc-cartel small{display:block;font-size:9.5px;line-height:1.25}
+.esc-prendas{display:flex;flex-direction:column;gap:6px;flex:1;min-width:260px}
+.esc-fila{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.esc-fila b{font-size:11px;width:64px;color:#526452}
+.esc-chip{width:26px;height:26px;border-radius:50%;border:2px solid #fffdf6;box-shadow:0 0 0 1px #b9bba9;background:var(--c);cursor:pointer;padding:0}
+.esc-chip.rayas{background:repeating-linear-gradient(0deg,var(--c) 0 4px,var(--r) 4px 7px)}
+.esc-chip.txt{width:auto;height:26px;border-radius:13px;padding:0 10px;background:#fffdf6;color:#244137;font-size:11px;font-weight:700}
+.esc-chip.sel{box-shadow:0 0 0 3px #c18b29}
+.esc-chip.txt.sel{background:#244137;color:#f3edd9}
+.esc-chip:disabled{cursor:default}
+.esc-prendas.fijo .esc-chip:not(.sel){opacity:.3}
+.esc-rival{font-size:12px;color:#526452;margin-right:12px}
 .esc-herramientas{display:flex;gap:16px;align-items:center;flex-wrap:wrap;padding:16px 22px;border-bottom:1px solid #dedacb}
 .esc-herramientas label{display:flex;gap:8px;align-items:center;font-size:12px;font-weight:700}
 .esc-herramientas select{padding:9px;border:1px solid #c5c8b9;border-radius:8px;background:#fffdf6;color:#244137}
-#escObjetivo{font-size:12px;color:#526452;flex:1;min-width:180px}
 .esc-visor{overflow:auto;max-height:70vh;background:#bac5a5;overscroll-behavior:contain}
 .esc-rework .jg-lienzo{max-width:none;min-width:100%;border:0;border-radius:0;position:relative}
 .esc-rework canvas{display:block;width:100%;touch-action:pan-x pan-y;cursor:crosshair}
@@ -1418,7 +1572,7 @@ try { var t = localStorage.getItem("jg.tema");
 .esc-ayuda{padding:16px 22px;border-top:1px solid #dedacb;color:#4c5e50;font-size:13px;line-height:1.65}
 .esc-ayuda summary{cursor:pointer;font-weight:700}
 .esc-rework :focus-visible{outline:3px solid #c18b29;outline-offset:3px}
-@media(max-width:600px){.esc-editorial{padding:20px}.esc-herramientas{padding:12px;gap:10px}.esc-herramientas label{flex:1}.esc-visor{max-height:60vh}}
+@media(max-width:600px){.esc-editorial{padding:16px;gap:12px}.esc-editorial h2{font-size:22px;margin:6px 0}.esc-cartel{width:96px}.esc-cartel canvas{width:70px;height:87px}.esc-herramientas{padding:12px;gap:10px}.esc-herramientas label{flex:1}.esc-fila b{width:100%}.esc-prendas{min-width:0}.esc-visor{max-height:60vh}}
 /* Singleplayer: obsidiana, ámbar y fósforo. */
 .sp{--accent:#f6bc64;--glow:#ce792a;--ink:#e9edf5;background:#080d19;color:var(--ink);border-radius:24px;overflow:hidden;font-family:inherit;border:1px solid #273248;animation:sp-entrada .5s ease-out}
 .sp-snake{--accent:#58f5c0;--glow:#138e89}
@@ -1834,8 +1988,6 @@ html[data-tema=oscuro] .jg-yo td,html[data-tema=oscuro] .jg-yo{background:#0d948
 html[data-tema=oscuro] .jg-tabla tr.jg-rk-top:nth-child(1) td{background:#f4c54212}
 html[data-tema=oscuro] .jg-tabla tr.jg-rk-top:nth-child(2) td{background:#cbd5e10d}
 html[data-tema=oscuro] .jg-tabla tr.jg-rk-top:nth-child(3) td{background:#e89a5c10}
-html[data-tema=oscuro] .jg-trofeos{background:var(--os-borde);border-color:var(--os-borde)}
-html[data-tema=oscuro] .jg-trofeo{background:var(--os-sup)}
 
 /* Escondite: las pistas de calor y el panel del visor */
 html[data-tema=oscuro] .jg-calor-frio{background:#1d2a45}
@@ -1844,7 +1996,11 @@ html[data-tema=oscuro] .jg-calor-caliente{background:#3a2012;color:#fdba74}
 html[data-tema=oscuro] .jg-calor-casi{background:#3a1220;color:#fda4af}
 html[data-tema=oscuro] .esc-rework{background:#191c16;border-color:#30352a}
 html[data-tema=oscuro] .esc-herramientas,html[data-tema=oscuro] .esc-ayuda{border-color:#30352a}
-html[data-tema=oscuro] .esc-ayuda,html[data-tema=oscuro] #escObjetivo{color:#b7c2ad}
+html[data-tema=oscuro] .esc-ayuda,html[data-tema=oscuro] .esc-rival,html[data-tema=oscuro] .esc-fila b{color:#b7c2ad}
+html[data-tema=oscuro] .esc-chip{border-color:#191c16;box-shadow:0 0 0 1px #4a5242}
+html[data-tema=oscuro] .esc-chip.txt{background:#262b22;color:#dfe6d4}
+html[data-tema=oscuro] .esc-chip.sel{box-shadow:0 0 0 3px #d9a441}
+html[data-tema=oscuro] .esc-chip.txt.sel{background:#d9a441;color:#191c16}
 
 /* Cuadritos: el papel del tablero se oscurece con la página (los puntos
    y las rayas ya son de color). Reversi: el borde que dejaba ver la ficha
@@ -2156,6 +2312,6 @@ html[data-tema=oscuro] .jg-lado-caja>div>.jg-sala{border-color:var(--os-borde)}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202609290513"></script>
+<script src="juegos-app.js?v=202609291315"></script>
 </body>
 </html>

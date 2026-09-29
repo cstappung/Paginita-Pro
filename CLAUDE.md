@@ -49,7 +49,8 @@ Six apps plus a small shared **Informes** page:
   account and the same Firebase project: **Escondite** (hide a person in a
   landscape, then cross the landscapes and race to find the other's),
   **Cartas de los tres elementos** (a Card-Jitsu duel), **Cuadritos** (dots and
-  boxes, two to ten players and three board sizes), **Reversi**, **Órbita**,
+  boxes, two to ten players and three board sizes), **Reversi**, **Órbita** (gravity
+  slingshot for two to four: launch probes, steal stars, shoot down satellites),
   **Chain Reaction** (critical-mass orbs that burst into their neighbours, two
   to eight players and three grid sizes), **Flip 7** (the push-your-luck card
   game, two to ten players, Normal, Vengeance and Super Vengeance), **Cacho**
@@ -1579,7 +1580,7 @@ its own `sonoFin` on the same repaint that decided the winner, so the victory
 sounded before the move that won it. Worms is excluded: its frame has its own
 ending music. The last point also has to be *visible*: a closed box pops in
 (`.jg-caja-nueva`), a score that just went up bounces (`.jg-m-sube`, cuadritos
-and órbita), and the star just taken in órbita wears `.jg-estrella.ultima`.
+and órbita), and in órbita the launch itself is replayed before the cartel.
 
 **A hidden tab does not get the cartel until it comes back.** The loser was
 the one who never saw the ending: the winner is looking at the board when the
@@ -1712,16 +1713,40 @@ by design (it runs on every repaint) — so `auditaCartas` does it separately, i
 screens.
 
 **A card is a picture, and the suit is drawn around it.** The 36 PNGs in
-`juegos/cartas/` are full card faces, so the old drawn chrome is gone; with 36
-images against a 216-card deck the element cannot come from the art, so it is
-carried by the `.jg-arte` inset ring and the `.jg-c-palo` label. The box is
-76×112 to match the files' own 164:242, and `precarga()` pulls all 36 in the
-background — a card that arrives while it is being flipped reads as a glitch.
-Winning with a 10, 11 or 12 fires `efectoGolpe` and a tie fires `efectoHumo`,
-both absolutely positioned over `.jg-choque` (which is `position:relative` for
-exactly that) with per-particle `--a`/`--r`/`--x`/`--d`/`--s` custom properties;
-the `"choque" + ult.n` repaint signature is what guarantees one firing per round
-instead of one per repaint.
+`juegos/cartas/` are full card faces; with 36 images against a 216-card deck
+the element cannot come from the art, so the colour is the thick `.jg-arte`
+frame plus the `.jg-c-palo` label, and the element is a seal in the corner
+(`.jg-c-el`). The box is 96×142 (164:242, the files' own ratio), and
+`precarga()` pulls all 36 in the background — a card that arrives while it is
+being flipped reads as a glitch.
+
+**The cartas screen is built so nobody gets lost** (`cartas.js`), which was
+the complaint: the old one showed a row of loose trophies and a hand in deal
+order. Now:
+
+- **Each player has a board of three columns** (fire, water, snow), chips
+  grouped by colour inside each, and under yours a hint of what is missing
+  («Ganas con …» / «Gana con …» for the rival, `faltaPara`). A chip just won
+  drops in (`.jg-llega`); the ones that make a trio glow.
+- **The hand is sorted** by element and then number (`miMano`), a card just
+  dealt pops (`jg-nueva`), and a card that would win the game wears a «¡Trío!»
+  ribbon (`jg-decisiva`, only while `fase === "jugando"`). Tapping a card
+  selects it and tapping it again plays it.
+- **The legend of what beats what is always on screen** (`.jg-ley`), and the
+  pill that decided the round lights up during the clash.
+- **The clash is staged like Card-Jitsu**, all in CSS delays off one repaint:
+  both cards slide in and flip (0.2 s), the winner lunges (1 s), the loser
+  takes the element's hit (`.jg-fx-fuego/agua/nieve/num`) and greys out, the
+  verdict and a one-line *why* (`porQue`) appear, and the winner flies to its
+  owner's board (2.7 s). Winning with a 10–12 adds the strike (`efectoGolpe`),
+  a tie the smoke (`efectoHumo`), both delayed to land with the hit. The
+  whole thing lasts `CHOQUE` (3.6 s) and `ocupado()` covers it, so `pintaFin`
+  does not cover the clash that won the game; after it, the remate shows the
+  winning trio. A clash that arrives in a **hidden tab** is kept in
+  `pendiente` and played on return (`alVolver`), for the same reason as in
+  Chain Reaction. One trap: the trio cards take `--k` on a wrapper
+  (`.jg-rt`), because `htmlCarta` already writes a `style` and the browser
+  ignores a second `style` attribute.
 
 **Sound is driven by the move log, not by the click** (`juegos/sonido.js`, a
 small WebAudio synth — no files to host, no CORS, nothing to wait for). Playing
@@ -1837,6 +1862,49 @@ deliberately simple and drawn from six-tone palettes: what makes a hiding place
 hard is repetition, not detail — two hundred nearly identical trees hide a
 person far better than a photographic forest.
 
+The seed now picks one of five **themed scenes** (`TEMAS`: playa, mercado,
+feria, nieve, lago) instead of scattering random props. Each scene is built
+from `zona` bands, so it reads as a place: backdrops (sea, stalls, a frozen
+lake) are painted first and the pieces sit where they belong. The crowd is
+around a hundred people (80–120 depending on the scene) dressed from the same
+palettes, and `poseEn` decides from the
+spot whether someone stands, swims or skis. The target is a **costume**, not
+just a colour: a hat (6), a shirt (6 selectable) and an accessory (4) give
+`TRAJES_N` = 144 codes, `codigoTraje({h,s,a}) = h + s·6 + a·36`. A code below
+6 decodes to the old "hat only" costume, so rooms from before still read.
+`vistePersona` then bumps the accessory of any crowd member who happens to
+wear all three pieces. It runs inside `paisaje.pinta`, so both screens see the
+same crowd and there is never a twin to click by mistake.
+
+**Órbita (`orbita`) is a physics game whose physics runs in the reducer.**
+A move is only `{t:"lanza", uid, vx, vy}`, velocities in integer hundredths
+(`orVelocidad` refuses anything else and clamps to `OR_VMAX`). `redOrbita`
+simulates the whole turn with `orTurno` — semi-implicit Euler, softened
+gravity from the sun and two or three planets (`orMundo`, from the room's
+seed), `OR_PASOS` steps — and every probe already in the field moves in
+*every* turn, capturing stars for its owner until its `vida` (two laps of
+the table) runs out. Every browser gets the same doubles because the
+arithmetic is the same sequence of IEEE operations; nothing is `Math.random`
+and nothing depends on frame rate. Things that are easy to break:
+
+- **The screen replays, it never decides.** `orbita.js` reruns `orTurno`
+  from `ultima.antes` a few steps per frame and fires the effects from the
+  same `eventos` the reducer scored, so what is animated is what was
+  counted. `ocupado()`/`ctx.listo()`/`pendiente` work as in Chain Reaction.
+- **Only the first `PREVIA` steps of the aim are shown.** The whole path
+  would turn it into billiards with the cue marked. Satellites already in
+  orbit show their full next-turn path dotted (`calculaFuturos`), because
+  that is what makes aiming at one to shoot it down a real play.
+- **A collision needs a new probe to score.** New probe against someone
+  else's satellite: both burst and the launcher gets `OR_DERRIBO`. Two old
+  satellites that meet burst with no points.
+- **The sky refills from its own stream** (`orRellena`, `rng(semilla ^
+  0x5A7E11)`), so both browsers draw the same new stars in the same order;
+  a star's value comes from how close it is to a body (1–3) plus a rare
+  nova worth 5.
+- The reducer is memoised (`orCache`, keyed by the log) because a whole
+  replay is ~400 steps × every move, and a repaint happens on every tick.
+
 **Cuadritos and reversi are SVG, cartas and the escondite are not.** What has
 to be hit with the mouse in cuadritos is a two-millimetre line, so each gap
 carries its own fat invisible click zone
@@ -1887,6 +1955,15 @@ Two things about the individual screens are worth knowing before editing them:
   `PISTA_MS` a ring narrows around it, plus a `calor()` chip (frío / templado
   / caliente / ¡Casi!) on every miss, because a search with no feedback at all
   is not difficulty, it is a blank screen.
+  Four more things:
+  - **The target is shown as a SE BUSCA poster** (`cartel()`), drawn with
+    `pintaCartel` on its own small canvas. The description is not enough; you
+    search for a figure.
+  - **The magnifier (lupa) redraws the vector scene at 2.5×** inside a clipped
+    circle rather than scaling the bitmap, so it stays sharp.
+  - **Finding someone darkens everything around them** (`foco()`, even-odd).
+  - **A rival chip shows the other player's misses and their heat**, so the
+    duel feels like a race.
 - **Cuadritos' scoreboard is in seating order, never sorted by points.** With
   five players, knowing who plays *next* is half the strategy — it decides
   whom you hand the chain to — and a scoreboard whose rows jump around after

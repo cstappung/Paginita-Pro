@@ -24,6 +24,9 @@
  *   neon        La menor, 104 — synthwave, arpegio de sierra filtrada.
  *   pulso       Sol menor, 126 — techno con bombeo.
  *   cumbia      La menor, 100 — cumbia de 8 bits con güiro.
+ *   laboratorio Sol menor, 140 — hip-hop de medio tiempo, estilo Schedule I.
+ *   reparto     Re menor, 122 — deep house con bombeo, estilo Schedule I.
+ *   bossa, surf, oeste, mazmorra, celta, turbo, reggae, aurora — ocho estilos más.
  *
  * Y los homenajes a Pokémon Rojo Fuego / Verde Hoja (`pk-*`), con melodías
  * propias al estilo de la GBA: pueblo, ruta, centro, bosque, bici, salvaje,
@@ -525,6 +528,207 @@
         "R . F . O . F . R . F . O . F .", "k.hhs.h.k.hhs.hx", 4)
     },
     orden: "I A A B C A"
+  };
+
+
+  /* ---------- Diez más para el reproductor ----------
+     Dos a la manera de Schedule I (el laboratorio y el reparto de noche),
+     y ocho que no se parecen a nada de lo que ya había: bossa, surf, western,
+     mazmorra, celta, eurobeat, reggae y un ambiente lento. */
+
+  /* Laboratorio casero: Schedule I, el hip-hop del cuarto de atrás. Sol
+     menor a 140 en medio tiempo: 808 en el uno, palmas en el tres, hi-hats
+     en semicorcheas y una campanita senoidal con mucho eco. */
+  T.laboratorio = {
+    bpm: 140, swing: .1,
+    lead: { onda: "sine", vol: .16, vib: .003, sus: .35, eco: { fb: .45, mezcla: .4 } },
+    bajo: { onda: "sine", vol: .32, desliza: 1 },
+    arp: { onda: "tri", vol: .06, oct: 4, paso: .09, sus: .4, filtro: 1600 },
+    bat: { vol: .34 },
+    secciones: {
+      I: sec("Gm7 Ebmaj7", "", "R - - - - - - . R - . R - - F -", "..h.h.h...h.h.hh", 8),
+      A: sec("Gm7 Ebmaj7 Cm7 D7",
+        "D5*2 .*2 Bb4*2 G4*2 .*4 A4*2 Bb4*2  D5*3 Eb5 D5*4 .*4 G5*2 F5*2  Eb5*2 .*2 C5*2 G4*2 .*2 C5*2 Eb5*2 G5*2  F#5*6 D5*2 A4*4 .*4",
+        "R - - - - - - . R - . R - - F -", "K.h.h.hhc.h.hKhh", 8),
+      B: sec("Cm7 Gm7 Ebmaj7 D7",
+        "G5*2 Eb5*2 C5*4 .*2 Bb4*2 C5*2 Eb5*2  D5*8 .*2 F5*2 G5*2 Bb5*2  G5*3 F5 Eb5*4 D5*2 Bb4*2 G4*4  A4*2 C5*2 F#5*4 D5*8",
+        "R - - - - - - . R - . R - - F -", "K.hhh.hhc.h.hKhK", 8)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* Reparto nocturno: Schedule I, la furgoneta a las tres de la mañana.
+     Deep house a 122 en Re menor, bombo a negras que hunde lo demás, bajo a
+     contratiempo y acordes cortos de órgano. */
+  T.reparto = {
+    bpm: 122, bombeo: .5,
+    lead: { onda: "p25", vol: .11, vib: .004, sus: .6, filtro: 1900, eco: { fb: .4, mezcla: .32 } },
+    bajo: { onda: "saw", vol: .12, filtro: 480, q: 4 },
+    arp: { onda: "saw", vol: .055, oct: 4, paso: .05, filtro: 1200, q: 5, sus: .3 },
+    bat: { vol: .36 },
+    secciones: {
+      I: sec("Dm7 Am7", "", ". . R . . . R O . . R . . . R O", "k.o.k.o.k.o.k.o.", 2),
+      A: sec("Dm7 Am7 Bbmaj7 C",
+        ".*4 A5*2 C6*2 D6*4 C6*2 A5*2  G5*6 E5*2 .*4 C5*2 E5*2  F5*4 A5*4 D6*2 C6*2 A5*4  G5*8 E5*4 .*4",
+        ". . R . . . R O . . R . . . R O", "k.o.k.ohk.o.k.oh", 2),
+      B: sec("Gm7 Dm7 Bbmaj7 A7",
+        "Bb5*2 A5*2 G5*4 D6*4 C6*2 Bb5*2  A5*8 F5*4 D5*4  D6*2 F6*2 D6*2 Bb5*2 A5*4 F5*4  E5*4 G5*4 C#6*4 E6*4",
+        ". . R . . . R O . . R . . . R O", "k.o.k.ohk.o.k.ox", 2)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* Bossa de ascensor: Do mayor, 118 con un poco de swing. Séptimas
+     mayores, el bajo que pisa fundamental y quinta, la guitarra en corto. */
+  T.bossa = {
+    bpm: 118, swing: .06,
+    lead: { onda: "p50", vol: .12, vib: .01, sus: .7, eco: { fb: .2, mezcla: .15 } },
+    bajo: { onda: "tri", vol: .2 },
+    arp: { onda: "tri", vol: .07, oct: 4, paso: .02, sus: .3 },
+    bat: { vol: .22 },
+    secciones: {
+      A: sec("Cmaj7 Am7 Dm7 G7",
+        "E5*3 G5 B5*4 A5*2 G5*2 E5*4  C5*2 E5*2 G5*2 C6*2 B5*6 .*2  A5*3 F5 D5*4 C5*2 D5*2 F5*4  E5*6 D5*2 B4*4 G4*4",
+        "R - - F R - - F R - - F R - F -", "k.hsh.k.hsh.k.hs", 2),
+      B: sec("Em7 A7 Dm7 G7",
+        "G5*2 B5*2 D6*4 C6*2 B5*2 G5*4  C#6*6 A5*2 G5*4 E5*4  F5*2 A5*2 C6*4 A5*2 F5*2 D5*4  B4*4 D5*4 F5*4 G5*4",
+        "R - - F R - - F R - - F R - F -", "k.hsh.k.hsh.k.hs", 2),
+      C: sec("Cmaj7 Fmaj7 Cmaj7 Cmaj7",
+        "E5*8 G5*8  A5*8 C6*8  B5*16  .*16",
+        "R - - F R - - F R - - F R - F -", "k.hsh.k.hsh.k.hs", 2)
+    },
+    orden: "A A B A C"
+  };
+
+  /* Ola de 8 bits: surf a 168 en Mi. Pulso fino con mucho vibrato (el
+     trémolo de la guitarra de muelle), bajo que corre y caja seca. */
+  T.surf = {
+    bpm: 168,
+    lead: { onda: "p25", vol: .14, vib: .02, eco: { fb: .3, mezcla: .25 } },
+    bajo: { onda: "tri", vol: .22 }, arp: { onda: "p12", vol: .05, oct: 4, paso: .03 }, bat: { vol: .34 },
+    secciones: {
+      I: sec("E E", "", "R . R . O . R . F . F . O . F .", "k.h.s.hkk.h.s.hx", 4),
+      A: sec("E G A B",
+        "E5 E5 G5 E5 B5*4 A5*2 G5*2 E5*4  D5 D5 G5 D5 B5*4 A5*2 G5*2 D5*4  E5 E5 A5 E5 C#6*4 B5*2 A5*2 E5*4  F#5*2 A5*2 B5*4 D#6*4 F#6*4",
+        "R . R . O . R . F . F . O . F .", "k.h.s.hkk.h.s.hh", 4),
+      B: sec("C D E E",
+        "G5*2 E5*2 C5*4 E5*2 G5*2 C6*4  A5*2 F#5*2 D5*4 F#5*2 A5*2 D6*4  B5 A5 G5 F#5 E5*4 G5 A5 B5 D6 E6*4  E6*8 .*4 B5*2 G#5*2",
+        "R . R . O . R . F . F . O . F .", "k.h.s.hkk.h.s.hx", 4)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* Duelo al sol: western de los sesenta, La menor a 92. Un silbido con
+     eco de cañón, el galope del bajo y un tambor que marca el paso. */
+  T.oeste = {
+    bpm: 92,
+    lead: { onda: "p12", vol: .15, vib: .015, sus: .8, eco: { fb: .5, mezcla: .4 } },
+    bajo: { onda: "tri", vol: .21 }, arp: { onda: "p25", vol: .045, oct: 4, paso: .07 }, bat: { vol: .28 },
+    secciones: {
+      I: sec("Am Am", "", "R . . R F . . F R . . R F . . F", "t.......t.......", 4),
+      A: sec("Am G F E",
+        "A4*2 E5*2 A5*8 G5*2 A5*2  B5*4 G5*4 D5*8  C6*2 A5*2 F5*4 E5*2 F5*2 A5*4  G#5*12 .*4",
+        "R . . R F . . F R . . R F . . F", "k.hhk.hhk.hhk.hh", 4),
+      B: sec("Dm Am E Am",
+        "D5*2 F5*2 A5*4 D6*8  C6*2 B5*2 A5*4 E5*8  E5*2 G#5*2 B5*4 D6*4 B5*4  A5*16",
+        "R . . R F . . F R . . R F . . F", "k.hhk.hhk.hhT.TT", 4)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* Mazmorra: Do menor armónica a 88. Pasos que resuenan, un triángulo
+     grave que no se va y una segunda menor (Reb) que da frío. */
+  T.mazmorra = {
+    bpm: 88,
+    lead: { onda: "p12", vol: .13, vib: .012, sus: .85, eco: { fb: .52, mezcla: .42 } },
+    bajo: { onda: "tri", vol: .23 },
+    arp: { onda: "p25", vol: .045, oct: 4, paso: .12, filtro: 1200, sus: .6 },
+    bat: { vol: .3 },
+    secciones: {
+      I: sec("Cm Cm", "", "R - - - - - - - F - - - - - - -", "T...............", 8),
+      A: sec("Cm Ab Fm G",
+        "G5*4 Ab5*2 G5*2 Eb5*4 C5*4  C5*2 Eb5*2 Ab5*4 G5*8  F5*4 Ab5*2 C6*2 B5*4 Ab5*4  G5*8 D5*4 B4*4",
+        "R - - - - - - - F - - - - - - -", "T.......t...t...", 8),
+      B: sec("Cm Db Cm G",
+        "C6*4 Eb6*4 D6*4 C6*4  Db6*8 Ab5*4 F5*4  Eb5*2 G5*2 C6*4 G5*4 Eb5*4  D5*4 F5*4 B5*8",
+        "R - - - - - - - F - - - - - - -", "T...t...T...t.TT", 8)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* Galope celta: Re mixolidio a 150 con swing de giga. La flauta de pulso
+     corre en tresillos fingidos y el Do natural le quita lo de himno. */
+  T.celta = {
+    bpm: 150, swing: .2,
+    lead: { onda: "p25", vol: .14, vib: .01, eco: { fb: .15, mezcla: .12 } },
+    bajo: { onda: "tri", vol: .2 }, arp: { onda: "p12", vol: .05, oct: 4, paso: .04 }, bat: { vol: .3 },
+    secciones: {
+      A: sec("D C D G",
+        "A5 F#5 D5 F#5 A5*2 D6*2 C6*2 A5*2 F#5*4  G5 E5 C5 E5 G5*2 C6*2 B5*2 G5*2 E5*4  F#5 A5 D6 A5 F#5*2 A5*2 D6*4 C6*4  B5*2 G5*2 D5*4 G5*8",
+        "R . F . O . F . R . F . O . F .", "k.h.s.htk.h.s.hh", 4),
+      B: sec("Em C D D",
+        "E6*4 D6*2 B5*2 G5*4 B5*4  C6*4 G5*2 E5*2 C5*4 E5*4  D5 E5 F#5 G5 A5*4 C6*4 A5*4  D6*12 .*4",
+        "R . F . O . F . R . F . O . F .", "k.h.s.htk.h.s.hx", 4)
+    },
+    orden: "A A B A B"
+  };
+
+  /* Carrera turbo: eurobeat a 156 en Fa# menor. Bajo de octavas que no
+     respira, sierra doble al frente y un estribillo que sube de golpe. */
+  T.turbo = {
+    bpm: 156,
+    lead: { onda: "saw", vol: .1, vib: .006, desafina: 10, filtro: 3000, eco: { fb: .25, mezcla: .2 } },
+    bajo: { onda: "saw", vol: .11, filtro: 650, q: 4 },
+    arp: { onda: "saw", vol: .05, oct: 4, paso: .03, desafina: 6, filtro: 1800, sus: .4 },
+    bat: { vol: .36 },
+    secciones: {
+      I: sec("F#m F#m", "", "R O R O R O R O R O R O R O R O", "k...k...k...k.hh", 2),
+      A: sec("F#m D E C#",
+        "C#6*2 A5*2 F#5*2 A5*2 C#6*4 E6*4  D6*4 F#6*4 E6*2 D6*2 A5*4  B5*2 G#5*2 E5*2 G#5*2 B5*4 E6*4  C#6*4 F6*4 G#6*8",
+        "R O R O R O R O R O R O R O R O", "k.o.s.o.k.o.s.oh", 2),
+      B: sec("D E F#m F#m",
+        "F#6*4 E6*4 D6*4 A5*4  G#6*4 F#6*4 E6*4 B5*4  A6*6 G#6*2 F#6*4 C#6*4  F#6*12 .*4",
+        "R O R O R O R O R O R O R O R O", "k.o.s.o.k.o.s.ox", 2)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* Reggae de bits: Sol mayor a 78, one drop (el bombo solo en el tres),
+     acordes picados y una melodía con eco de dub. */
+  T.reggae = {
+    bpm: 78,
+    lead: { onda: "p50", vol: .13, vib: .01, sus: .7, eco: { fb: .48, mezcla: .38 } },
+    bajo: { onda: "tri", vol: .24 },
+    arp: { onda: "p25", vol: .055, oct: 4, paso: .01, sus: .18 },
+    bat: { vol: .3 },
+    secciones: {
+      A: sec("G C D C",
+        ".*4 B5*2 D6*2 B5*4 G5*4  E5*6 G5*2 C6*4 .*4  D6*2 C6*2 A5*4 F#5*4 D5*4  E5*8 .*8",
+        "R - - . F - R . . . R - O - F .", "..h...h.k.h...h.", 4),
+      B: sec("Em C G D",
+        "G5*2 B5*2 E6*4 D6*4 B5*4  C6*8 .*4 E5*4  D5*2 G5*2 B5*4 D6*8  C6*4 A5*4 F#5*8",
+        "R - - . F - R . . . R - O - F .", "..h...h.k.h.s.hs", 4)
+    },
+    orden: "A A B A B"
+  };
+
+  /* Aurora: Mi bemol mayor a 72, para no hacer nada. Notas largas con eco
+     de catedral, arpegio de triángulo que brilla y casi nada de batería. */
+  T.aurora = {
+    bpm: 72,
+    lead: { onda: "sine", vol: .14, vib: .006, sus: .9, eco: { fb: .55, mezcla: .45 } },
+    bajo: { onda: "sine", vol: .22 },
+    arp: { onda: "tri", vol: .07, oct: 4, paso: .2, sus: .7, filtro: 1400 },
+    bat: { vol: .16 },
+    secciones: {
+      A: sec("Ebmaj7 Cm7 Abmaj7 Bb",
+        "G5*8 Bb5*8  Eb6*12 D6*4  C6*8 G5*8  F5*16",
+        "R - - - - - - - - - - - F - - -", "h.......h.......", 2),
+      B: sec("Abmaj7 Bb Gm7 Cm7",
+        "Eb6*4 C6*4 G5*8  F5*4 D6*12  Bb5*8 D6*4 F6*4  Eb6*16",
+        "R - - - - - - - - - - - F - - -", "h.......h...h...", 2)
+    },
+    orden: "A B A B"
   };
 
   const Temas = { temas: T, linea, arpegio, raiz };
