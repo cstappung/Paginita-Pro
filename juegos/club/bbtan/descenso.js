@@ -1,7 +1,8 @@
-/* El descenso: cinco pisos por debajo de la luz (rondas 100, 200, 300, 400 y
-   500). Cada uno entra fundido a lo largo de veinte rondas, no de golpe:
-   `corrupcion(ronda)` vale 0 hasta la 99, sube de a 1/21 por ronda entre la
-   100 y la 120, y así en cada piso hasta 5. De ese número salen los colores,
+/* El descenso: cinco pisos por debajo de la luz (rondas 50, 110, 170, 230 y
+   290). Cada uno entra fundido a lo largo de sesenta rondas, no de golpe, y
+   cada fundido empieza justo donde acaba el anterior: `corrupcion(ronda)` vale
+   0 hasta la 49 y sube sin mesetas de a 1/60 por ronda hasta llegar a 5 en la
+   349. De ese número salen los colores,
    los bordes, la cara del personaje, los textos y la música. La jugabilidad
    no lo lee: los bloques, las bolas y la física son los mismos en todos. */
 (function (root, fabrica) {
@@ -10,8 +11,8 @@
   else root.BBTANDescenso = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function () {
   'use strict';
-  const DESDE = [100, 200, 300, 400, 500];
-  const FUNDIDO = 21;
+  const DESDE = [50, 110, 170, 230, 290];
+  const FUNDIDO = 60;
   const lim = v => Math.max(0, Math.min(1, v));
 
   function corrupcion(ronda) {

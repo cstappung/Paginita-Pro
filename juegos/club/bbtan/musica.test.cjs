@@ -82,7 +82,7 @@ test('bbtan: el motor agenda, se calma, baja al abismo y calla', () => {
   m.animo({ filas: 1, bloques: 20, ronda: 50 }); avanza(200);
   assert.ok(m.bpm() > lento, 'con peligro acelera');
   m.animo({ filas: 7, bloques: 3, ronda: 120 }); avanza(200);
-  assert.equal(m.abismo, true, 'desde la ronda 100 baja al abismo');
+  assert.equal(m.abismo, true, 'desde la ronda 50 baja al abismo');
   m.detener(); const n = starts.length;
   ctx.currentTime += 30; m.tick(.2);
   assert.ok(starts.length - n < 40, 'tras una pausa larga no hay ráfaga');
@@ -100,13 +100,13 @@ const DSC = require('./descenso.js');
 
 test('bbtan: el descenso funde de a veinte rondas por piso', () => {
   assert.equal(DSC.corrupcion(1), 0);
-  assert.equal(DSC.corrupcion(99), 0);
-  assert.ok(DSC.corrupcion(100) > 0 && DSC.corrupcion(100) < .1, 'la 100 apenas empieza');
-  assert.ok(Math.abs(DSC.corrupcion(110) - .5) < .05, 'a mitad del fundido');
-  assert.equal(DSC.corrupcion(120), 1);
-  assert.equal(DSC.corrupcion(199), 1);
-  assert.equal(DSC.corrupcion(320), 3);
-  assert.equal(DSC.corrupcion(520), 5);
+  assert.equal(DSC.corrupcion(49), 0);
+  assert.ok(DSC.corrupcion(50) > 0 && DSC.corrupcion(50) < .1, 'la 50 apenas empieza');
+  assert.ok(Math.abs(DSC.corrupcion(79) - .5) < .05, 'a mitad del primer fundido');
+  assert.equal(DSC.corrupcion(109), 1);
+  assert.equal(DSC.corrupcion(229), 3);
+  assert.ok(DSC.corrupcion(300) < 5, 'aún no está roto del todo');
+  assert.equal(DSC.corrupcion(349), 5);
   assert.equal(DSC.corrupcion(9999), 5);
   for (let r = 1, a = 0; r < 600; r++) { const c = DSC.corrupcion(r); assert.ok(c >= a); a = c; }
   for (const c of [0, .3, 1, 1.5, 2.7, 4, 5]) {

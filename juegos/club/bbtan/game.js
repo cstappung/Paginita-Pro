@@ -7,9 +7,8 @@
   const W = grid.width, H = 580, FLOOR = 540, SIZE = grid.size, TOP = grid.top, ROW = grid.size;
   const bounds = { width: W, floor: FLOOR, radius: ballRadius };
   const colors = { lime: '#c4f568', purple: '#b7a1f7', orange: '#ffa675', cyan: '#77d9d2' };
-  // El descenso (descenso.js): desde la ronda 100, y otra vez en la 200, 300,
-  // 400 y 500, la máquina se pudre de a poco, fundida a lo largo de veinte
-  // rondas. Solo cambia lo que se ve, se oye y se lee; la física no lo lee.
+  // El descenso (descenso.js): desde la ronda 50 y hasta la 350 la máquina se
+  // pudre de a poco, en cinco pisos fundidos uno tras otro, sin mesetas. Solo cambia lo que se ve, se oye y se lee; la física no lo lee.
   const DSC = BBTANDescenso, T = DSC.TEXTOS;
   let corr = 0, pal = DSC.mezcla(0), etapaT = 0;
   const CSS_VARS = Object.keys(pal.css);
