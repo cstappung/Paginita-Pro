@@ -35,8 +35,8 @@
      colchón y una alarma grave;
    - vacío (D>4): notas que se desploman, casi todo calla y hay compases
      enteros de silencio.
-   El tempo baja con cada piso. Cada piso nuevo anuncia su llegada con una
-   caída (`presagio`), más larga y más sucia cuanto más hondo.
+   El tempo baja con cada piso. Ningún piso se anuncia: no hay golpe ni
+   caída al entrar, la música simplemente se va pudriendo.
 
    La mitad pura (`intensidad`, `siguienteArmonia`, `eventos`) no toca audio y
    se prueba en Node; `Motor` es sólo el agendador, a lo Chip.Reproductor. */
@@ -351,9 +351,7 @@
         // La armonía y el lugar sólo cambian al empezar un compás.
         this.filo = siguienteArmonia(this.filo ? 'filo' : 'calma', this.I) === 'filo';
         this.abismo = this.D >= .5;
-        const piso = Math.ceil(this.metaD - 1e-6);
-        if (piso > this.piso) this.presagio(t, piso);
-        this.piso = piso;
+        this.piso = Math.ceil(this.metaD - 1e-6);
       }
       if (s % 4 === 0) this.colorea(t, d);
       const e = { I: this.I, D: this.D, filo: this.filo, vuelta: this.vuelta };
@@ -430,25 +428,6 @@
         try { gp.cancelScheduledValues(t); gp.setValueAtTime(1 - prof, t); gp.linearRampToValueAtTime(1, t + Math.min(.35, paso * 3.5)); } catch (e) {}
       }
     }
-    /** Entrar al abismo: un sub que se desploma, platillo y un golpe grave. */
-    caida(t) {
-      const ctx = this.ctx, V = this.voces;
-      Chip.voz(ctx, this.canal.sub, { t, f: 110, f1: 28, dur: 2.2, vol: .26, onda: 'sine', sus: .9 }, V);
-      Chip.Sinte.platillo(ctx, this.canal.bat, t, .55, V);
-      Chip.Sinte.tambor(ctx, this.canal.bat, t, .6, false, V);
-    }
-    /** Llegar al piso n: la caída, y desde el segundo un cluster de sierras
-        que se desploma con ella y n golpes, cada piso más lentos. */
-    presagio(t, n) {
-      this.caida(t);
-      if (n < 2) return;
-      const ctx = this.ctx, V = this.voces;
-      for (const m of [50, 51, 56].slice(0, Math.min(3, n))) {
-        const f = hz(m);
-        Chip.voz(ctx, this.canal.grave, { t, f, f1: f / (1 + n * .4), dur: 1.4 + .4 * n, vol: .08, onda: 'saw', det: 20, sus: .8 }, V);
-      }
-      for (let i = 1; i <= n; i++) Chip.Sinte.tambor(ctx, this.canal.bat, t + i * (.28 + .06 * n), .7 - .08 * i, false, V);
-    }
     detener() {
       for (const v of this.voces) {
         try { v.fuente.stop(0); } catch (e) {}
@@ -457,7 +436,7 @@
       this.voces.clear();
       this.sig = this.ctx.currentTime + .05;
     }
-    /** Desde el principio, sin la caída: una partida nueva no es una sorpresa. */
+    /** Desde el principio, en el piso en que está la partida. */
     reinicia() {
       this.detener();
       this.k = 0; this.vuelta = 0; this.I = this.meta; this.filo = false;

@@ -804,6 +804,7 @@ function armazon() {
   if (state.vista.startsWith("solo-")) {
     const clave = state.vista.slice(5) === "tetris" ? "tetrisclub" : state.vista.slice(5);
     individual = crearSolo({juego:state.vista.slice(5),usuario:state.user,guardar:guardaConPodio,watch:fb.watchSolo,volver:()=>ir(""),
+      partida:{leer:()=>fb.leerPartidaClub(state.user.uid,state.vista.slice(5)),guardar:(d,at)=>fb.guardarPartidaClub(state.user.uid,state.vista.slice(5),d,at)},
       /* Un logro individual sale de la marca: se celebra el que esta
          partida da y la mejor marca guardada no daba ya. */
       alResultado: (d, previa) => { const antes = new Set(previa ? deMarca(clave, Object.assign({ categoria: d.categoria }, previa)) : []);

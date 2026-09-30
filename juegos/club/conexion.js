@@ -3,12 +3,15 @@
   const embebido=window.parent!==window;
   if(embebido)document.documentElement.classList.add('club-integrado');
   const cuenta=new URLSearchParams(location.search).get('cuenta')||'local';
-  let categoria='',lista,estado,propio;
+  let categoria='',lista,estado,propio,alPartida=null;
   const enviar=d=>{if(embebido)parent.postMessage({canal:'club-child',...d},location.origin);};
   window.Club={
     storageKey:key=>key+'.cuenta.'+cuenta,
     category(key){categoria=key;enviar({tipo:'categoria',categoria:key});if(lista)lista.replaceChildren();if(estado)estado.textContent=key==='zen'?'Zen es libre: conserva tu récord local, sin clasificación competitiva.':'Clasificación por modalidad · cargando…';},
-    result(dato){enviar({tipo:'resultado',...dato,partida:crypto.randomUUID()});}
+    result(dato){enviar({tipo:'resultado',...dato,partida:crypto.randomUUID()});},
+    // La partida a medias, en la cuenta (solo dentro de Juegos).
+    guardarPartida(texto){enviar({tipo:'partida-guardar',d:texto||null,at:Date.now()});},
+    pedirPartida(cb){if(!embebido){cb(null);return;}alPartida=cb;enviar({tipo:'partida-pedir'});}
   };
   document.addEventListener('DOMContentLoaded',()=>{
     const shell=document.querySelector('.site-shell,.shell');
@@ -27,6 +30,7 @@
     if(!embebido||e.source!==parent||e.origin!==location.origin||e.data?.canal!=='club-parent')return;
     const d=e.data;
     if(d.tipo==='tema'){document.documentElement.dataset.tema=d.oscuro?'oscuro':'claro';return;}
+    if(d.tipo==='partida'){const f=alPartida;alPartida=null;if(f)f(d.error?null:d.dato||null);return;}
     if(d.categoria!==categoria)return;
     if(d.tipo==='estado'&&estado){estado.textContent=d.texto;return;}
     if(d.tipo!=='ranking'||!lista)return;
