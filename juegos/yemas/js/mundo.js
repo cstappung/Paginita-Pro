@@ -263,3 +263,33 @@ export function crearHuevo(color, nombre) {
   g.userData = { cuerpo, punta };
   return g;
 }
+
+// ---------- Captura la bandera ----------
+// Las mismas coordenadas que YM_BASES en colabtex/src/juegos/motor.js: el
+// reductor devuelve ahí una bandera, y aquí se dibuja la base.
+export const BASES = { rojo: new THREE.Vector3(0, 0, 29), azul: new THREE.Vector3(0, 0, -29) };
+
+const matAsta = new THREE.MeshLambertMaterial({ color: '#6b4a2b' });
+export function crearBandera(color) {
+  const g = new THREE.Group();
+  const asta = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 2.4, 8), matAsta);
+  asta.position.y = 1.2;
+  asta.castShadow = true;
+  g.add(asta);
+  const tela = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.6, 0.04), new THREE.MeshLambertMaterial({ color }));
+  tela.position.set(0.5, 2.05, 0);
+  tela.castShadow = true;
+  g.add(tela);
+  g.userData.tela = tela;
+  return g;
+}
+
+export function crearBase(color) {
+  const m = new THREE.Mesh(
+    new THREE.CylinderGeometry(2.2, 2.2, 0.06, 32),
+    new THREE.MeshLambertMaterial({ color, transparent: true, opacity: 0.55 })
+  );
+  m.position.y = 0.03;
+  m.receiveShadow = true;
+  return m;
+}

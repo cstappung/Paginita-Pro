@@ -195,6 +195,13 @@ const REPERTORIO = {
      `k` es el número de onda —, que es lo que hace que una cadena larga
      suene a subida y no a la misma explosión repetida. */
   orbe:     (a, t) => P(a, t, H(76), 0.06, { f1: H(88), onda: "p50", vol: 0.07 }),
+  /* Órbita: el lanzamiento es un silbido que sube; cada estrella, una
+     campanita que sube con el valor (la nova, un arpegio). */
+  lanza:    (a, t) => { soplo(a, t, 0.55, 0.08, { f: 400, f1: 2400, q: 3, tipo: "bandpass", ataque: 0.02 });
+                        seno(a, t, 180, 520, 0.4, 0.05); },
+  capta:    (a, t, v = 1) => { const k = Math.min(v || 1, 5);
+                               if (k >= 5) [0, 4, 7, 12].forEach((d, i) => campana(a, t + i * 0.06, H(84 + d), 0.05, 0.6));
+                               else campana(a, t, H(79 + k * 3), 0.05 + k * 0.01, 0.7); },
   estalla:  (a, t, k = 0) => { const n = Math.min(k || 0, 24);
                                N(a, t, 0.18, { vol: 0.1, tono: 1.4 + n * 0.05, tono1: 0.4 });
                                P(a, t, H(60 + n), 0.09, { f1: H(72 + n), onda: "p25", vol: 0.07 }); },
@@ -293,7 +300,7 @@ export function suena(nombre, x) {
    los efectos. */
 const TEMAS = Temas.temas;
 const POKER = { url: "juegos/audio/flip7-poker-night.mp3", fin: 124.3 };
-export const GRUPOS = ["De los juegos", "Intensas", "Electrónicas", "Chill y fiesta", "Pokémon"];
+export const GRUPOS = ["De los juegos", "Intensas", "Electrónicas", "Chill y fiesta", "Aventura", "Pokémon"];
 export const CANCIONES = [
   { id: "orbita", nombre: "Deriva orbital", grupo: "De los juegos", desc: "Órbita · espacial, con eco", chip: "orbita", juegos: ["orbita"] },
   { id: "cartas", nombre: "Tres elementos", grupo: "De los juegos", desc: "Cartas · taiko y escala japonesa", chip: "cartas", juegos: ["cartas"] },
@@ -313,6 +320,16 @@ export const CANCIONES = [
   { id: "pulso", nombre: "Pulso de datos", grupo: "Electrónicas", desc: "Techno con bombeo · 126", chip: "pulso" },
   { id: "lofi", nombre: "Turno de noche", grupo: "Chill y fiesta", desc: "Lo-fi con 808 · estilo Schedule I · Clue", chip: "lofi", juegos: ["clue"] },
   { id: "cumbia", nombre: "Cumbia de la mesa", grupo: "Chill y fiesta", desc: "Cumbia de 8 bits con güiro", chip: "cumbia" },
+  { id: "laboratorio", nombre: "Laboratorio casero", grupo: "Chill y fiesta", desc: "Hip-hop con 808 · estilo Schedule I", chip: "laboratorio" },
+  { id: "reparto", nombre: "Reparto nocturno", grupo: "Electrónicas", desc: "Deep house de furgoneta · estilo Schedule I", chip: "reparto" },
+  { id: "bossa", nombre: "Bossa de ascensor", grupo: "Chill y fiesta", desc: "Bossa nova con séptimas", chip: "bossa" },
+  { id: "reggae", nombre: "Reggae de bits", grupo: "Chill y fiesta", desc: "One drop con eco de dub", chip: "reggae" },
+  { id: "aurora", nombre: "Aurora", grupo: "Chill y fiesta", desc: "Ambiente lento, notas largas", chip: "aurora" },
+  { id: "turbo", nombre: "Carrera turbo", grupo: "Intensas", desc: "Eurobeat de octavas · 156", chip: "turbo" },
+  { id: "surf", nombre: "Ola de 8 bits", grupo: "Aventura", desc: "Surf con trémolo · 168", chip: "surf" },
+  { id: "oeste", nombre: "Duelo al sol", grupo: "Aventura", desc: "Western con silbido y galope", chip: "oeste" },
+  { id: "mazmorra", nombre: "Mazmorra", grupo: "Aventura", desc: "Do menor armónica, pasos con eco", chip: "mazmorra" },
+  { id: "celta", nombre: "Galope celta", grupo: "Aventura", desc: "Giga en Re mixolidio", chip: "celta" },
   /* Homenajes a Rojo Fuego / Verde Hoja: melodías propias con el timbre de
      la GBA, no transcripciones (ver el porqué en `temas.js`). */
   { id: "pk-pueblo", nombre: "Pueblo de partida", grupo: "Pokémon", desc: "Homenaje · el pueblo donde empieza todo", chip: "pk-pueblo" },

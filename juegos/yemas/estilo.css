@@ -89,3 +89,21 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #a9dcff; fon
 }
 #pausa h2 { margin: 0 0 6px; }
 #pausa .chico { font-size: 13px; opacity: 0.8; margin-bottom: 4px; }
+
+/* ---------- Equipos, banderas y voz ---------- */
+#mi-equipo { position: absolute; top: 56px; left: 16px; font-size: 12px; font-weight: 700; }
+#mi-equipo.rojo { color: #ff9a8c; }
+#mi-equipo.azul { color: #8cc2ff; }
+#equipos { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; align-items: center;
+  background: rgba(0,0,0,0.45); padding: 5px 14px; border-radius: 12px; font-size: 18px; }
+#equipos b.rojo { color: #ff9a8c; }
+#equipos b.azul { color: #8cc2ff; }
+#equipos span { font-size: 12px; opacity: 0.75; }
+#voces { position: absolute; top: 76px; left: 16px; display: flex; flex-direction: column; gap: 3px; font-size: 12px; }
+#voces span { opacity: 0.7; }
+#voces span::before { content: '🎙 '; }
+#voces span.habla { opacity: 1; color: #7dff9a; font-weight: 700; }
+#voces span.habla::before { content: '🔊 '; }
+#llevo { position: absolute; bottom: 60px; width: 100%; text-align: center; font-size: 18px; font-weight: 800; color: #ffe066; }
+#tabla tr.rojo td:first-child span { color: #ff9a8c; }
+#tabla tr.azul td:first-child span { color: #8cc2ff; }

@@ -4,16 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Yemas</title>
-<link rel="stylesheet" href="estilo.css?v=yemas-1">
+<link rel="stylesheet" href="estilo.css?v=yemas-2">
 <!-- Los módulos llevan la versión aquí, en un solo sitio: GitHub Pages
      cachea diez minutos y un import sin ?v= serviría el archivo viejo. -->
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.min.js",
-  "yemas/mundo": "./js/mundo.js?v=yemas-1",
-  "yemas/armas": "./js/armas.js?v=yemas-1",
-  "yemas/audio": "./js/audio.js?v=yemas-1",
-  "yemas/red": "./js/red.js?v=yemas-1"
+  "yemas/mundo": "./js/mundo.js?v=yemas-2",
+  "yemas/armas": "./js/armas.js?v=yemas-2",
+  "yemas/audio": "./js/audio.js?v=yemas-2",
+  "yemas/red": "./js/red.js?v=yemas-2"
 } }
 </script>
 </head>
@@ -28,6 +28,10 @@
   <div id="feed"></div>
   <div id="marcador-mini"></div>
   <div id="meta"></div>
+  <div id="mi-equipo"></div>
+  <div id="equipos" hidden></div>
+  <div id="voces" hidden></div>
+  <div id="llevo" hidden></div>
   <div id="aviso" hidden></div>
   <div id="vida"><div id="vida-barra"></div><span id="vida-num">100</span></div>
   <div id="arma"><span id="arma-nombre"></span><span id="municion"></span></div>
@@ -42,7 +46,7 @@
   <div id="pausa" hidden>
     <h2>Haz click para jugar</h2>
     <p>Se captura el mouse para apuntar. <b>Esc</b> lo suelta.</p>
-    <p class="chico">WASD moverse · Espacio saltar · Click disparar · Click der. mira · R recargar · 1 2 3 armas · Tab tabla</p>
+    <p class="chico">WASD moverse · Espacio saltar · Click disparar · Click der. mira · R recargar · 1 2 3 armas · Tab tabla · V hablar (si estás en la voz)</p>
   </div>
 </div>
 
@@ -64,6 +68,6 @@
   </div>
 </div>
 
-<script type="module" src="js/main.js?v=yemas-1"></script>
+<script type="module" src="js/main.js?v=yemas-2"></script>
 </body>
 </html>

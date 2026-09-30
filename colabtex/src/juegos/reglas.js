@@ -1,3 +1,5 @@
+import { montarGuia } from "./reglas-guia.js";
+
 /* ============================================================
    El manual de cada juego — el botón 📖 Reglas
 
@@ -40,27 +42,36 @@ const UNO_COMUN = [
 
 const REGLAS = {
   orbita: {
-    lema: "Duelo por capturar estrellas en una rejilla de 6×6.",
+    lema: "Lanza sondas con la gravedad: roba estrellas y derriba satélites.",
     secciones: [
-      ["El objetivo", "Sumar más puntos que tu rival capturando estrellas. Cada estrella vale de 1 a 5."],
+      ["El objetivo", "Sumar más puntos que los demás capturando estrellas. Una estrella normal vale 1; cerca de un planeta o del sol vale 2 o 3, y las <b>novas</b> (poco comunes) valen 5."],
       ["Tu turno", lista([
-        "Elige una estrella <b>iluminada</b>: solo valen las de la fila o la columna que te marcó tu rival (en la primera jugada, cualquiera).",
-        "<b>Antes de capturar</b>, decide con los botones <b>↔ Fila</b> o <b>↕ Columna</b>: tu rival tendrá que jugar en esa línea, pasando por la estrella que acabas de tomar.",
-        "Si esa línea ya no tiene estrellas libres, tu rival juega en «órbita libre»: cualquier estrella que quede."
+        "Apunta desde tu base: arrastra en el campo (la distancia es la fuerza) o usa los deslizadores de <b>ángulo</b> y <b>potencia</b>, y pulsa <b>🚀 Lanzar</b>.",
+        "Solo se ve el primer tramo de la trayectoria: el resto depende de cómo la curven el sol y los planetas.",
+        "Tu sonda vuela un rato y se queda en el campo como <b>satélite</b>: en cada turno siguiente (el tuyo y el de los demás) sigue moviéndose y capturando estrellas para ti, hasta que se le acaba la vida (el arco que la rodea)."
       ])],
-      ["El final", "Cuando se capturan las 36 estrellas, gana quien más puntos sume. Puede haber empate."],
-      ["Consejo", "Lo importante no es solo lo que tomas, sino la línea que le dejas al otro: a veces conviene una estrella pequeña que lo manda a una fila vacía de cincos."]
+      ["Choques", lista([
+        "Si una sonda nueva toca un satélite de otro jugador, <b>los dos revientan</b> y quien lanzó gana <b>+3</b> por el derribo. Dos satélites viejos de distinto dueño que se tocan también revientan, sin puntos para nadie.",
+        "Los satélites en órbita enseñan en puntos su camino del próximo turno: es lo que te deja apuntarles.",
+        "Lo que cae en el sol o en un planeta, o sale del campo, se pierde."
+      ])],
+      ["El cielo", "Cuando se capturan estrellas aparecen otras nuevas, siempre en los mismos sitios para todos. El sol y los planetas salen de la semilla de la sala."],
+      ["El final", "Cada jugador lanza un número fijo de sondas (7 en duelo, 6 con tres, 5 con cuatro). Cuando todos han lanzado las suyas, gana quien más puntos tenga. Puede haber empate."],
+      ["Consejo", "Una órbita cerrada alrededor del sol sigue sumando turno tras turno, pero es un blanco fácil. Una pasada rápida por un racimo de estrellas cobra ya y no deja nada que derribar."]
     ]
   },
   escondite: {
     lema: "Esconde a tu persona en el paisaje y encuentra la del otro.",
     secciones: [
       ["1 · Esconder", lista([
-        "Elige la ropa de tu persona y colócala en el paisaje, detrás de un árbol, entre rocas… donde menos se vea.",
+        "Cada uno tiene su escena: una playa, un mercado, una feria, una estación de esquí o un campamento, llenos de gente.",
+        "Viste a tu persona con un <b>gorro</b>, una <b>camiseta</b> y lo que lleva en la mano (nada, mochila, globo o bastón). Nadie de la multitud lleva tu combinación entera, pero muchos comparten dos prendas.",
+        "Colócala donde menos se vea: entre gente parecida, detrás de un puesto, en el agua (solo asoman cabeza y hombros)… Lo que tengas justo delante tapa tus piernas, nunca la cabeza.",
         "Tienes un minuto y medio. Tu escondite queda sellado con un hash: tu rival no puede verlo hasta que los dos hayáis confirmado."
       ])],
       ["2 · Buscar", lista([
-        "Los dos buscáis a la vez en el paisaje del otro. Arriba se dice qué ropa lleva la persona que buscas.",
+        "Los dos buscáis a la vez en la escena del otro, con su cartel de <b>SE BUSCA</b> a la vista.",
+        "Con ratón, una lupa amplía lo que tienes debajo. También puedes hacer zoom y desplazarte.",
         "Haz clic donde creas que está. Cada fallo te cuesta unos segundos de espera y te dice si vas <b>frío</b>, <b>templado</b> o <b>caliente</b>.",
         "A los 40 segundos aparece un círculo que rodea la zona del escondite, igual para los dos."
       ])],
@@ -366,9 +377,8 @@ const REGLAS = {
     ]
   },
   yemas: {
-    lema: "Shooter de huevos en primera persona, de 2 a 8 jugadores.",
+    lema: "Shooter de huevos en primera persona, de 2 a 8 jugadores, en tres modos.",
     secciones: [
-      ["El objetivo", "Freír a los demás. Cada baja suma una; gana el primero que llega a la meta que eligió quien abrió la sala (10, 15 o 25 bajas)."],
       ["Controles", lista([
         "Haz click en el juego para capturar el mouse; <b>Esc</b> lo suelta.",
         "<b>WASD</b> o flechas para moverte, <b>Espacio</b> para saltar, el mouse para mirar.",
@@ -381,11 +391,31 @@ const REGLAS = {
       ])],
       ["Vida y muerte", lista([
         "Tienes 100 de vida. La parte de arriba del huevo es la cabeza y ahí el daño sube.",
-        "Al morir vuelves a los tres segundos, en el punto más lejos de los demás, con un segundo y medio de protección."
+        "Al morir vuelves a los tres segundos, lo más lejos posible de tus rivales, con un segundo y medio de protección."
+      ])],
+      ["Chat de voz", lista([
+        "Arriba del juego está <b>🎙 Entrar a la voz</b>. La primera vez el navegador pide permiso para el micrófono.",
+        "Por defecto se habla <b>manteniendo apretada la V</b>; en la barra se puede cambiar a micrófono abierto, y <b>🔈</b> silencia a los demás.",
+        "La voz va directo de navegador a navegador, sin pasar por el sitio. Si dos redes no dejan una conexión directa (pasa con algunas de celular), ese par no se oye y su nombre sale en rojo."
       ])],
       ["Sin servidor", "Cada navegador decide si lo alcanzaron y anota su propia muerte en el registro. Nadie puede anotarse una baja que no le dieron, pero un navegador modificado podría no morirse: es el mismo límite honesto del resto de los juegos."],
-      ["Para practicar", "El juego suelto (<code>juegos/yemas/</code>) se juega contra cuatro bots, sin sala."]
-    ]
+      ["Para practicar", "El juego suelto (<code>juegos/yemas/</code>) se juega contra cuatro bots, todos contra todos."]
+    ],
+    modos: {
+      todos: { nombre: "Todos contra todos", secciones: [["Todos contra todos", "Cada uno por su cuenta. Gana el primero que llega a la meta de bajas: 10, 15 o 25 según el largo que eligió quien abrió la sala."]] },
+      equipos: { nombre: "Duelo por equipos", secciones: [["Duelo por equipos", lista([
+        "Rojo contra azul: los asientos se reparten alternados, así que los equipos quedan parejos.",
+        "Las bajas suman para el equipo; gana el que llega primero a 20, 30 o 50.",
+        "No hay fuego amigo: las balas atraviesan a los compañeros. Cada equipo aparece en su mitad del mapa.",
+        "Si un equipo se queda sin nadie, gana el otro."
+      ])]] },
+      bandera: { nombre: "Captura la bandera", secciones: [["Captura la bandera", lista([
+        "Cada equipo tiene su bandera en su base: la roja al norte y la azul al sur.",
+        "Pasa por encima de la bandera rival para tomarla y llévala a tu base. <b>Solo se captura si la tuya está en casa.</b>",
+        "Quien muere con la bandera la suelta donde cayó. Si es la tuya, tócala para devolverla; si nadie la toca, vuelve sola a los 25 segundos.",
+        "Gana el equipo que captura 1, 3 o 5 banderas, según el largo de la partida."
+      ])]] }
+    }
   },
   clue: {
     lema: "Un crimen en el edificio, de 2 a 6 detectives.",
@@ -597,12 +627,15 @@ export function abreReglas(juego, { modo, nombre } = {}) {
       <footer class="jg-reglas-pie"><button type="button" class="btn jg-reglas-ok">Entendido</button></footer>
     </div>`;
   const cuerpo = capa.querySelector(".jg-reglas-cuerpo");
+  let guia = null;
   const seccion = ([t, h]) => `<section><h3>${esc(t)}</h3>${h.startsWith("<") ? h : "<p>" + h + "</p>"}</section>`;
   const pinta = () => {
     /* La variante va primero: es lo que distingue esta sala; lo común
        (el objetivo, el ¡UNO!) viene detrás. */
     const propio = actual ? r.modos[actual].secciones : [];
-    cuerpo.innerHTML = propio.map(seccion).join("") + r.secciones.map(seccion).join("");
+    guia?.destruir();
+    cuerpo.innerHTML = '<div class="jg-reglas-visual"></div><h3 class="jg-reglas-lectura">Las reglas, en detalle</h3>' + propio.map(seccion).join("") + r.secciones.map(seccion).join("");
+    guia = montarGuia(cuerpo.querySelector(".jg-reglas-visual"), juego, actual);
     cuerpo.scrollTop = 0;
     for (const b of capa.querySelectorAll("[data-modo]")) {
       const si = b.getAttribute("data-modo") === actual;
@@ -612,22 +645,31 @@ export function abreReglas(juego, { modo, nombre } = {}) {
   };
   for (const b of capa.querySelectorAll("[data-modo]"))
     b.onclick = () => { actual = b.getAttribute("data-modo"); pinta(); };
-  const tecla = ev => { if (ev.key === "Escape") { ev.stopPropagation(); cierra(); } };
+  const tecla = ev => {
+    if (ev.key === "Escape") { ev.stopPropagation(); cierra(); }
+    if (ev.key === "Tab") {
+      const controles = [...capa.querySelectorAll('button:not([disabled]), select, a[href]')];
+      const primero = controles[0], ultimo = controles[controles.length - 1];
+      if (ev.shiftKey && document.activeElement === primero) { ev.preventDefault(); ultimo.focus(); }
+      else if (!ev.shiftKey && document.activeElement === ultimo) { ev.preventDefault(); primero.focus(); }
+    }
+  };
   capa.addEventListener("click", ev => { if (ev.target === capa) cierra(); });
   capa.querySelector(".jg-reglas-x").onclick = cierra;
   capa.querySelector(".jg-reglas-ok").onclick = cierra;
   document.addEventListener("keydown", tecla, true);
   document.body.appendChild(capa);
   pinta();
-  abierto = { capa, tecla, previo };
+  abierto = { capa, tecla, previo, destruirGuia: () => guia?.destruir() };
   capa.querySelector(".jg-reglas-x").focus();
 }
 
 export function cierra() {
   if (!abierto) return;
-  const { capa, tecla, previo } = abierto;
+  const { capa, tecla, previo, destruirGuia } = abierto;
   abierto = null;
   document.removeEventListener("keydown", tecla, true);
+  destruirGuia();
   capa.remove();
   if (previo && typeof previo.focus === "function" && document.contains(previo)) previo.focus();
 }

@@ -33,7 +33,7 @@ import { crearSolo } from "./juegos/solo/club.js";
 import { watchAuth, loginGoogle, logout } from "./firebase.js";
 import * as fb from "./fb-juegos.js";
 import { escapeHtml, timeAgo, colorForUid } from "./util.js";
-import { JUEGOS, reducir, jugadasDe, acumula, cupoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_META, YM_METAS } from "./juegos/motor.js";
+import { JUEGOS, reducir, jugadasDe, acumula, cupoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, ganoEn } from "./juegos/motor.js";
 import { crearEscondite } from "./juegos/escondite.js";
 import { crearCartas } from "./juegos/cartas.js";
 import { crearCuadritos } from "./juegos/cuadritos.js";
@@ -142,15 +142,22 @@ const OPCIONES = {
   tetris: [{ clave: "cupo", etiqueta: "Jugadores", por: 4, valores: cupos("tetris") }],
   yemas: [
     { clave: "cupo", etiqueta: "Jugadores", por: 4, valores: cupos("yemas") },
-    { clave: "meta", etiqueta: "Gana quien llegue a", por: YM_META,
-      valores: YM_METAS.map(n => ({ v: n, t: n + " bajas" })) }
+    { clave: "variante", etiqueta: "Modo", por: "todos",
+      valores: Object.keys(YM_VARIANTES).map(v => ({ v, t: YM_VARIANTES[v] })) },
+    /* La meta depende del modo (bajas, bajas del equipo o banderas), y un
+       desplegable no puede cambiar sus opciones según otro: se elige el
+       largo y el motor lo traduce con `YM_LARGOS`. */
+    { clave: "largo", etiqueta: "Partida", por: 1,
+      valores: ["Corta", "Normal", "Larga"].map((t, i) => ({ v: i,
+        t: `${t} (${YM_LARGOS.todos[i]} / ${YM_LARGOS.equipos[i]} bajas, ${YM_LARGOS.bandera[i]} 🚩)` })) }
   ],
   clue: [{ clave: "cupo", etiqueta: "Detectives", por: 4, valores: cupos("clue") }]
 };
 
 /* La pestaña del manual que abre cada sala: la de su variante. */
 const modoReglas = (juego, o) => juego === "cacho" ? (Number(o.sicil) || 0)
-  : juego === "catan" ? (o.exp === "mar" ? "mar" : "base") : o.modo;
+  : juego === "catan" ? (o.exp === "mar" ? "mar" : "base")
+  : juego === "yemas" ? (o.variante || "todos") : o.modo;
 
 const state = {
   user: null,           // el perfil ya aplicado: lo que se pinta
@@ -394,7 +401,7 @@ async function anotar(p) {
   if (!(p.jugadores || {})[u.uid]) return;         // mirón: no juega, no puntúa
   anotada = state.pid;
   const g = p.fin.ganador || "";
-  const res = !g ? "empate" : (g === u.uid ? "ganada" : "perdida");
+  const res = !g ? "empate" : (ganoEn(p, g, u.uid) ? "ganada" : "perdida");
   try {
     const previa = await fb.leerRank(p.juego, u.uid);
     const fila = acumula(previa, res, state.pid, { nombre: u.name, foto: fotoBreve(u.photo) });
@@ -781,6 +788,7 @@ async function guardaConPodio(categoria, uid, dato) {
 
 function armazon() {
   const h = $("pantalla");
+  if (state.vista !== "partida") ponInmersivo(false);
   h.closest("main").classList.toggle("jg-ancho", state.vista === "partida" || state.vista.startsWith("solo-"));
   if (state.vista.startsWith("solo-")) {
     const clave = state.vista.slice(5) === "tetris" ? "tetrisclub" : state.vista.slice(5);
@@ -814,12 +822,13 @@ function armazon() {
   if (state.vista === "partida") {
     h.innerHTML = `
       <div class="jg-cab">
-        <button class="btn2" id="jgVolver">← Vestíbulo</button>
+        <button class="btn2" id="jgVolver" title="Volver al vestíbulo">←<span class="jg-cab-txt"> Vestíbulo</span></button>
         <b id="jgTitulo"></b>
         <span class="grow"></span>
         <span id="jgQuienes" class="jg-quienes"></span>
-        <button class="btn2" id="jgReglas" title="Cómo se juega">📖 Reglas</button>
+        <button class="btn2" id="jgReglas" title="Cómo se juega">📖<span class="jg-cab-txt"> Reglas</span></button>
         <button class="btn2" id="jgAbandonar" style="display:none">Abandonar</button>
+        <button class="btn2 jg-inm-btn" id="jgInm" type="button"></button>
       </div>
       <div class="jg-partida-layout"><div class="jg-partida-juego">
       <div id="jgMirando"></div>
@@ -830,6 +839,7 @@ function armazon() {
       </div><section class="jg-chat" id="jgChat" aria-label="Chat de la partida">
         <header><h2>Chat de la sala</h2><small>lo leen jugadores y espectadores</small></header>
         <div class="jg-chat-lista" id="jgChatLista" aria-live="polite"></div>
+        <button class="jg-chat-abre" id="jgChatAbre" type="button" title="Escribir en el chat (Intro)" aria-label="Escribir en el chat">💬</button>
         <form class="jg-chat-form" id="jgChatForm" autocomplete="off">
           <input class="inp" id="jgChatTxt" maxlength="${fb.CHAT_LARGO}" placeholder="Escribe algo…">
           <button class="btn" id="jgChatBtn">Enviar</button>
@@ -853,7 +863,19 @@ function armazon() {
       /* Lo que no salió se devuelve al campo: perder una frase escrita
          porque las reglas no están publicadas es peor que no mandarla. */
       if (!ok && !campo.value) { campo.value = texto; avisa(Object.assign(new Error("PERMISSION_DENIED"), { code: "PERMISSION_DENIED" })); }
+      /* En pantalla completa se escribe y se vuelve al juego, como en
+         cualquier juego con chat: el campo abierto taparía el tablero. */
+      else if (ok && enInmersivo()) chatAbierto(false);
     };
+    $("jgInm").onclick = () => ponInmersivo(!enInmersivo());
+    $("jgChatAbre").onclick = () => chatAbierto(true);
+    /* El campo se cierra solo al perder el foco vacío; con algo escrito
+       se queda, que es texto que alguien quería mandar. */
+    $("jgChat").addEventListener("focusout", () => setTimeout(() => {
+      const c = $("jgChat");
+      if (c && enInmersivo() && !c.contains(document.activeElement) && !$("jgChatTxt").value) chatAbierto(false);
+    }, 120));
+    pintaInmersivo();
     pidMontado = "";
     chatFirma = "";
     pintaChat();
@@ -908,7 +930,7 @@ function armazon() {
           </div></div>
         <div class="jg-elige" id="vesElige"></div>
         <div class="jg-section-title"><h2>Para jugar solo</h2><span>sin sala, cuando quieras</span></div>
-        <div class="sp-entradas"><a href="#solo/minas" class="sp-entrada sp-e-minas"><small>SINGLEPLAYER / ESTRATEGIA</small><strong>MINA CLUB <span>✦</span></strong><p>Piensa, explora y florece. Tres dificultades y música progresiva.</p><b>Explorar →</b></a><a href="#solo/snake" class="sp-entrada sp-e-snake"><small>SINGLEPLAYER / REFLEJOS</small><strong>SNAKE CLUB <span>ϟ</span></strong><p>Siete modos —contrarreloj, espejo, laberinto…— y cuatro tamaños de mapa.</p><b>Entrar al circuito →</b></a><a href="#solo/tetris" class="sp-entrada sp-e-tetris"><small>SINGLEPLAYER / REFLEJOS</small><strong>TETRIS CLUB <span>▤</span></strong><p>Maratón, Sprint de 40 líneas y Ultra de dos minutos.</p><b>Apilar →</b></a><a href="juegos/worms/index.html?v=worms-4" class="sp-entrada sp-e-worms"><small>LOCAL · BOTS / ARTILLERÍA</small><strong>CIRCUIT BREAKERS <span>💥</span></strong><p>Tu cuadrilla contra bots o amigos en el mismo equipo. En línea: abre una sala arriba.</p><b>Desplegar →</b></a></div>
+        <div class="sp-entradas"><a href="#solo/minas" class="sp-entrada sp-e-minas"><small>SINGLEPLAYER / ESTRATEGIA</small><strong>MINA CLUB <span>✦</span></strong><p>Piensa, explora y florece. Tres dificultades y música progresiva.</p><b>Explorar →</b></a><a href="#solo/snake" class="sp-entrada sp-e-snake"><small>SINGLEPLAYER / REFLEJOS</small><strong>SNAKE CLUB <span>ϟ</span></strong><p>Siete modos —contrarreloj, espejo, laberinto…— y cuatro tamaños de mapa.</p><b>Entrar al circuito →</b></a><a href="#solo/tetris" class="sp-entrada sp-e-tetris"><small>SINGLEPLAYER / REFLEJOS</small><strong>TETRIS CLUB <span>▤</span></strong><p>Maratón, Sprint de 40 líneas y Ultra de dos minutos.</p><b>Apilar →</b></a><a href="juegos/sortem/index.html" class="sp-entrada sp-e-sortem"><small>PLATANUS HACK 25 / PUZZLE</small><strong>sortEm <span>↔</span></strong><p>Mueve y fusiona los bloques hasta ordenar los números del 1 al 10.</p><b>Ordenar →</b></a><a href="juegos/worms/index.html?v=worms-4" class="sp-entrada sp-e-worms"><small>LOCAL · BOTS / ARTILLERÍA</small><strong>CIRCUIT BREAKERS <span>💥</span></strong><p>Tu cuadrilla contra bots o amigos en el mismo equipo. En línea: abre una sala arriba.</p><b>Desplegar →</b></a></div>
       </div>
     </div>`;
   for (const b of h.querySelectorAll("[data-filtro]")) {
@@ -927,6 +949,8 @@ let filtroVes = "todos";
 function aplicaFiltro() {
   for (const b of document.querySelectorAll("[data-filtro]"))
     b.setAttribute("aria-pressed", String(b.getAttribute("data-filtro") === filtroVes));
+  const el = document.getElementById("vesElige");
+  if (el) el.dataset.filtro = filtroVes;
   for (const c of document.querySelectorAll("#vesElige [data-tipo]"))
     c.hidden = filtroVes !== "todos" && c.getAttribute("data-tipo") !== filtroVes;
 }
@@ -954,18 +978,32 @@ function pintaVestibulo() {
   const firmaV = orden.join();
   if (firmaV !== vesFirma || !$("vesElige").firstElementChild) {
   vesFirma = firmaV;
-  $("vesElige").innerHTML = orden.map(k => [k, JUEGOS[k]]).map(([k, j]) => `
-    <div class="jg-oferta jg-of-${k}" style="--c:${j.color}" data-tipo="${j.cupo > 2 ? "grupo" : "duelo"}">
+  /* La tarjeta es la portada: el arte manda y el texto va debajo, en
+     una columna que no cambia de alto según cuántas opciones tenga el
+     juego —las opciones se pliegan en un resumen que dice lo elegido—,
+     así que la rejilla sale pareja. La primera, la más jugada, ocupa
+     dos columnas en pantalla ancha. */
+  const masJugado = orden[0];
+  $("vesElige").innerHTML = orden.map(k => [k, JUEGOS[k]]).map(([k, j]) => {
+    const grupo = j.cupo > 2, cupo = grupo ? (j.minimo || 2) + "–" + j.cupo : "2";
+    const sello = k === masJugado ? "Más jugado" : j.nuevo || k === "orbita" ? "Original" : "";
+    return `
+    <article class="jg-oferta jg-of-${k}" style="--c:${j.color}" data-tipo="${grupo ? "grupo" : "duelo"}">
       <div class="jg-portada jg-portada-${k}" aria-hidden="true">${arteJuego(k)}</div>
-      <div class="jg-of-meta">${k === "orbita" ? "NUEVO · ORIGINAL" : j.cupo > 2 ? "EN GRUPO" : "DUELO"}<span>${j.cupo > 2 ? "2–" + j.cupo : "2"} JUGADORES</span></div>
-      <div class="jg-of-nombre">${escapeHtml(j.nombre)}</div>
-      <div class="jg-of-lema">${escapeHtml(j.lema)}</div>
-      ${opcionesHtml(k)}
-      <div class="jg-of-pie">
-        <button class="btn jg-of-btn" data-crear="${k}">Abrir sala <span aria-hidden="true">↗</span></button>
-        ${tieneReglas(k) ? `<button class="btn2 jg-of-reglas" type="button" data-reglas="${k}" title="Cómo se juega">📖 Reglas</button>` : ""}
+      ${sello ? `<span class="jg-of-sello">${sello}</span>` : ""}
+      <div class="jg-of-cuerpo">
+        <div class="jg-of-meta"><span class="jg-of-tipo">${grupo ? "En grupo" : "Duelo"}</span><span class="jg-of-cupo" title="Jugadores"><i aria-hidden="true"></i>${cupo}</span></div>
+        <h3 class="jg-of-nombre">${escapeHtml(j.nombre)}</h3>
+        <p class="jg-of-lema" title="${escapeHtml(j.lema)}">${escapeHtml(j.lema)}</p>
+        ${opcionesHtml(k)}
+        <div class="jg-of-pie">
+          <button class="btn jg-of-btn" data-crear="${k}">Abrir sala <span class="jg-of-flecha" aria-hidden="true">→</span></button>
+          ${tieneReglas(k) ? `<button class="btn2 jg-of-reglas" type="button" data-reglas="${k}" title="Cómo se juega" aria-label="Reglas de ${escapeHtml(j.nombre)}">📖</button>` : ""}
+        </div>
       </div>
-    </div>`).join("");
+    </article>`;
+  }).join("");
+  $("vesElige").onchange = ev => { const d = ev.target.closest(".jg-of-ops"); if (d) resumeOpciones(d); };
   for (const b of $("vesElige").querySelectorAll("[data-crear]")) {
     b.onclick = () => crear(b.getAttribute("data-crear"), leeOpciones(b));
   }
@@ -1058,6 +1096,10 @@ function pintaVestibulo() {
   for (const b of $("vesEnCurso").querySelectorAll("[data-mirar]")) {
     b.onclick = () => ir("#p/" + b.getAttribute("data-mirar"));
   }
+  /* En el móvil una caja vacía se pliega a su cabecera: tres avisos de
+     «no hay nada» apilados empujaban el catálogo una pantalla abajo. */
+  for (const [id, n] of [["vesSalas", abiertas.length], ["vesMias", state.mias.length], ["vesEnCurso", vivas.length]])
+    $(id).closest(".jg-lado-caja").classList.toggle("vacia", !n);
 }
 
 /* Los controles de la tarjeta. Se leen del DOM al pulsar y no se
@@ -1066,12 +1108,19 @@ function pintaVestibulo() {
 function opcionesHtml(juego) {
   const ops = OPCIONES[juego];
   if (!ops) return "";
-  return `<div class="jg-of-ops">` + ops.map(o => `
+  const elegido = o => o.valores.find(v => v.v === (o.por || o.valores[0].v)) || o.valores[0];
+  return `<details class="jg-of-ops"><summary><span>Opciones</span><em>${escapeHtml(ops.map(o => elegido(o).t).join(" · "))}</em></summary><div class="jg-of-ops-in">` + ops.map(o => `
     <label class="jg-of-op"><span>${escapeHtml(o.etiqueta)}</span>
       <select data-op="${o.clave}">${o.valores.map(v =>
-        `<option value="${v.v}"${v.v === (o.por || o.valores[0].v) ? " selected" : ""}>${escapeHtml(v.t)}</option>`
+        `<option value="${v.v}"${v === elegido(o) ? " selected" : ""}>${escapeHtml(v.t)}</option>`
       ).join("")}</select>
-    </label>`).join("") + `</div>`;
+    </label>`).join("") + `</div></details>`;
+}
+/* El resumen plegado dice lo que se va a jugar, no «Opciones» a secas:
+   quien no abre el desplegable sabe igual con qué sale la sala. */
+function resumeOpciones(d) {
+  const em = d.querySelector("summary em");
+  if (em) em.textContent = [...d.querySelectorAll("select")].map(s => (s.selectedOptions[0] || {}).textContent || "").join(" · ");
 }
 
 function leeOpciones(boton) {
@@ -1314,7 +1363,7 @@ function pintaFin(p, est) {
   }
   const yo = state.user.uid, g = f.ganador;
   const juega = !!(p.jugadores || {})[yo];
-  const clase = !g ? "empate" : g === yo ? "gano" : juega ? "perdi" : "mirando";
+  const clase = !g ? "empate" : ganoEn(p, g, yo) ? "gano" : juega ? "perdi" : "mirando";
   const titulo = clase === "gano" ? "¡Has ganado!"
     : clase === "perdi" ? "Has perdido"
     : clase === "empate" ? "Empate"
@@ -1389,6 +1438,9 @@ const RAZONES = {
   estrellas: "Capturó más energía en las 36 estrellas.",
   encontrado: "Encontró al personaje escondido.",
   abandono: "La partida acabó por abandono.",
+  meta: "Llegó primero a la meta de bajas.",
+  equipo: "Su equipo llegó primero a la meta de bajas.",
+  bandera: "Su equipo capturó las banderas que pedía la meta.",
   trio: "Reunió tres cartas del mismo elemento en tres colores distintos.",
   puntos: "Cerró más cajas que nadie.",
   fichas: "Acabó con más fichas sobre el tablero.",
@@ -1407,6 +1459,7 @@ const RAZONES = {
 };
 const razon = m => RAZONES[m] || "";
 const nombreDe = (est, uid) => {
+  if (String(uid).startsWith("eq:")) return "el equipo " + (uid === "eq:rojo" ? "Rojo" : "Azul");
   const x = (est.jugadores || []).find(y => y.uid === uid);
   return x ? (x.nombre || "el otro") : "el otro";
 };
@@ -1511,13 +1564,105 @@ function pintaChat() {
   chatFirma = firma;
   const yo = state.user && state.user.uid;
   const jugadores = (state.partida && state.partida.jugadores) || {};
+  const ahora = fb.ahora();
   lista.innerHTML = chatMsgs.length ? chatMsgs.map(m => `
-    <div class="jg-chat-msg${m.uid === yo ? " mio" : ""}" style="--c:${escapeHtml(colorForUid(m.uid || ""))}">
+    <div class="jg-chat-msg${m.uid === yo ? " mio" : ""}" style="--c:${escapeHtml(colorForUid(m.uid || ""))};--edad:${Math.max(0, Math.round((ahora - (Number(m.at) || ahora)) / 100) / 10)}s">
       <b>${escapeHtml(m.nombre || "Alguien")}${jugadores[m.uid] ? "" : ' <small>mirando</small>'}</b>
       <span>${escapeHtml(m.t || "")}</span>
     </div>`).join("")
     : `<div class="vacio">Nadie ha escrito todavía.</div>`;
   lista.scrollTop = lista.scrollHeight;
+}
+
+/* ---------- el modo inmersivo ----------
+   La sala a pantalla completa: sin cabecera del sitio ni pestañas, una
+   barra fina arriba y el chat encima del juego, sin fondo, con los
+   mensajes que se apagan solos a los diez segundos. Es una clase en
+   <html> (`jg-inm`) más la API de pantalla completa cuando existe; en
+   el iPhone no existe para una página, y la clase sola ya deja el juego
+   en los `100dvh` enteros. `viewport-fit=cover` se pide sólo aquí: en
+   la página normal, con el móvil apaisado, el contenido se metería
+   debajo de la muesca. */
+let inmPantalla = false;
+const enInmersivo = () => document.documentElement.classList.contains("jg-inm");
+const pantallaDelNavegador = () => document.fullscreenElement || document.webkitFullscreenElement || null;
+function ponInmersivo(si) {
+  const raiz = document.documentElement;
+  if (!!si === enInmersivo()) return;
+  raiz.classList.toggle("jg-inm", !!si);
+  const meta = document.querySelector("meta[name=viewport]");
+  if (meta) meta.content = "width=device-width, initial-scale=1" + (si ? ", viewport-fit=cover" : "");
+  if (si) {
+    const pide = raiz.requestFullscreen || raiz.webkitRequestFullscreen;
+    if (pide && !pantallaDelNavegador()) {
+      try {
+        const r = pide.call(raiz, { navigationUI: "hide" });
+        if (r && r.then) r.then(() => { inmPantalla = true; }, () => {});
+        else inmPantalla = true;
+      } catch (e) {}
+    }
+  } else {
+    chatAbierto(false);
+    const sal = document.exitFullscreen || document.webkitExitFullscreen;
+    if (pantallaDelNavegador() && sal) { try { const r = sal.call(document); if (r && r.catch) r.catch(() => {}); } catch (e) {} }
+    inmPantalla = false;
+  }
+  pintaInmersivo();
+  refrescaChat();
+  /* Los juegos que miden su mesa (Flip 7, UNO, Catan) lo hacen al
+     cambiar el tamaño de la ventana. */
+  window.dispatchEvent(new Event("resize"));
+}
+function pintaInmersivo() {
+  const b = $("jgInm");
+  if (!b) return;
+  const si = enInmersivo();
+  b.innerHTML = si ? `<span aria-hidden="true">✕</span><span class="jg-cab-txt"> Salir</span>`
+    : `<span aria-hidden="true">⛶</span><span class="jg-cab-txt"> Pantalla completa</span>`;
+  b.title = si ? "Salir de la pantalla completa (Esc)" : "Jugar a pantalla completa";
+  b.setAttribute("aria-pressed", String(si));
+}
+/* La edad de cada mensaje se calcula al pintar, y la animación que lo
+   apaga arranca con un retraso negativo de esa edad: por eso hay que
+   repintar al entrar o al cerrar el campo, o un mensaje de hace un
+   minuto volvería a encenderse. */
+function refrescaChat() {
+  const l = $("jgChatLista");
+  if (l) l.dataset.firma = "";
+  chatFirma = "";
+  pintaChat();
+}
+function chatAbierto(si) {
+  const c = $("jgChat");
+  if (!c || c.classList.contains("abierto") === !!si) return;
+  c.classList.toggle("abierto", !!si);
+  refrescaChat();
+  if (si) $("jgChatTxt").focus();
+  else if (c.contains(document.activeElement)) document.activeElement.blur();
+}
+function wireInmersivo() {
+  const cambia = () => {
+    if (pantallaDelNavegador()) return;
+    /* Salió de la pantalla completa con Esc o el gesto del sistema: la
+       clase se va con ella, o quedaría una página a medias. */
+    if (inmPantalla && enInmersivo()) ponInmersivo(false);
+  };
+  document.addEventListener("fullscreenchange", cambia);
+  document.addEventListener("webkitfullscreenchange", cambia);
+  document.addEventListener("keydown", e => {
+    if (!enInmersivo() || e.defaultPrevented || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (document.querySelector(".jg-reglas-capa,.jg-modal-capa")) return;
+    const c = $("jgChat"), abierto = c && c.classList.contains("abierto");
+    if (e.key === "Escape") {
+      if (abierto) { $("jgChatTxt").value = ""; chatAbierto(false); e.preventDefault(); }
+      else if (!pantallaDelNavegador()) ponInmersivo(false);
+      return;
+    }
+    /* Intro abre el chat sólo si nada tiene el foco: el escondite usa
+       Intro sobre su lienzo, y un botón enfocado es un botón. */
+    const libre = !document.activeElement || document.activeElement === document.body;
+    if (e.key === "Enter" && !abierto && libre && c) { e.preventDefault(); chatAbierto(true); }
+  });
 }
 
 /* ---------- arranque ---------- */
@@ -1563,6 +1708,7 @@ function wireTema() {
 
 function wire() {
   wireTema();
+  wireInmersivo();
   $("btnLogin").onclick = () => loginGoogle().catch(e => {
     $("loginError").textContent = "No se pudo iniciar sesión: " + (e.code || e.message);
   });

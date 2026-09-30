@@ -23,7 +23,10 @@ window.ScopeApp = window.ScopeApp || (function () {
      an index instead of a fixed colour and are repainted when the theme
      changes, unless the user picked a colour by hand (autoColor = false). */
   const PALETTE_DARK = ["#ffd93d", "#3ad6f0", "#ff5fd2", "#5ce65c", "#ff9f45", "#a98bff", "#ff6b6b", "#8ad7ff"];
-  const PALETTE_LIGHT = ["#a97c00", "#0e7490", "#be185d", "#15803d", "#c2410c", "#6d28d9", "#b91c1c", "#0369a1"];
+  /* The light set is the MATLAB/PLECS line order (blue, orange, yellow,
+     purple, green, light blue, dark red, black): on a white plot it is what
+     people who simulate power electronics are used to reading. */
+  const PALETTE_LIGHT = ["#0072bd", "#d95319", "#edb120", "#7e2f8e", "#77ac30", "#4dbeee", "#a2142f", "#000000"];
   let paletteIdx = 0;
   const nextColorIdx = () => paletteIdx++;
   const clamp = (v, lo, hi) => v < lo ? lo : (v > hi ? hi : v);
@@ -33,7 +36,7 @@ window.ScopeApp = window.ScopeApp || (function () {
     const r = parseInt(m.slice(0, 2), 16) / 255, g = parseInt(m.slice(2, 4), 16) / 255, b = parseInt(m.slice(4, 6), 16) / 255;
     return 0.2126 * r + 0.7152 * g + 0.0722 * b;
   }
-  const screenIsDark = () => luminance((S.theme || THEME_DARK).scopeBg) < 0.5;
+  const screenIsDark = () => luminance((S.theme || THEME_LIGHT).scopeBg) < 0.5;
   const colorFor = (idx) => (screenIsDark() ? PALETTE_DARK : PALETTE_LIGHT)[idx % PALETTE_DARK.length];
   let uidN = 1;
   const nextId = () => "id" + (uidN++);
@@ -307,10 +310,13 @@ self.onmessage = function(e) {
      chrome and the colours the canvases paint with. `--panel` and friends are
      written straight onto documentElement, so there is no need for the old
      trick of matching inline `style` attributes with CSS selectors. */
-  const THEME_LIGHT = { app: "#e7ecf1", surface: "#ffffff", surface2: "#f4f7fa", border: "#ccd6df", text: "#16202b", muted: "#61728a", accent: "#0f62fe", scopeBg: "#ffffff", gridMinor: "#e3e9ee", gridMajor: "#b9c6d2", cursor: "#3a4a5c" };
+  /* Light is the default and looks like a PLECS scope window: grey chrome,
+     white plots with a thin frame and dotted tick lines, black cursors. The
+     dark theme is kept for whoever prefers a bench-scope screen. */
+  const THEME_LIGHT = { app: "#eceef1", surface: "#ffffff", surface2: "#f5f6f8", border: "#c8cdd3", text: "#1b1f24", muted: "#5c6670", accent: "#0072bd", scopeBg: "#ffffff", gridMinor: "#dfe2e6", gridMajor: "#b9bec5", cursor: "#202020" };
   const THEME_DARK = { app: "#0b0f14", surface: "#141b23", surface2: "#10161d", border: "#26333f", text: "#dfe8f2", muted: "#7d8fa3", accent: "#2ea8ff", scopeBg: "#05090c", gridMinor: "#1e323f", gridMajor: "#3a5a6d", cursor: "#d7e6f5" };
   const CSS_VARS = { app: "chassis", surface: "panel", surface2: "panel2", border: "line", text: "text", muted: "dim", accent: "accent", scopeBg: "screen", gridMinor: "grid1", gridMajor: "grid2", cursor: "cursor" };
-  const THEME_KEY = "csvscope_theme_v2";
+  const THEME_KEY = "csvscope_theme_v3";
   function hexA(hex, a) {
     const m = hex.replace("#", "");
     const r = parseInt(m.slice(0, 2), 16), g = parseInt(m.slice(2, 4), 16), b = parseInt(m.slice(4, 6), 16);
@@ -321,6 +327,10 @@ self.onmessage = function(e) {
     return { scopeBg: t.scopeBg, gridMinor: t.gridMinor, gridMajor: t.gridMajor, gridTick: t.gridMajor,
       border: t.gridMajor, text: t.text, muted: t.muted, accent: t.accent, cursor: t.cursor,
       dark,
+      // the figure around the plots, the plot frame and the legend box
+      figBg: t.surface2,
+      axis: dark ? t.gridMajor : "#7d848c",
+      legendBg: dark ? "rgba(10,16,22,0.9)" : "rgba(255,255,255,0.92)",
       // on-screen legend bar, drawn over the graticule like a real DSO
       barBg: dark ? "rgba(8,14,19,0.82)" : "rgba(248,250,252,0.88)",
       barLine: hexA(t.gridMajor, 0.75),
@@ -329,7 +339,7 @@ self.onmessage = function(e) {
 
   // ---------- state ----------
   const S = {
-    opts: { scopeDark: true, traceWidth: 1.6, traceGlow: true, fundamental: 50, ratedCurrent: "" },
+    opts: { scopeDark: false, traceWidth: 1.6, traceGlow: true, fundamental: 50, ratedCurrent: "" },
     files: [], channels: [],
     divsH: 10, divsV: 8,
     /* Plot layout: the screen is ONE canvas subdivided into rows×cols panes,
@@ -356,14 +366,36 @@ self.onmessage = function(e) {
     glowOn: true,
     fft: null,          // last spectrum result
     harm: null,         // last harmonic analysis
+    /* Channels analysed next to the source, in channel order. `series` is what
+       the FFT tab draws: the source first, then each of those, every one with
+       its own {ch, fft, harm}. S.fft/S.harm stay the source's, so everything
+       that only ever looked at one channel (THD card, table, recon) is as it was. */
+    fftCompare: [],
+    series: [],
     fftMaxFreq: null,
     iL: null,           // rated demand current for TDD (rms, null = not set)
     xy: { xId: "", yId: "" },
     hoverHarm: -1,
-    theme: null
+    theme: null,
+    /* Vertical scaling. "axis" is the PLECS way: every plot has a y axis with
+       real tick labels and all its channels share it (S.axes[pane], auto or a
+       fixed min/max). "div" is the bench-scope way this tool started with:
+       each channel has its own V/div and position on an 8-division graticule.
+       Touching a channel's V/div or position switches to "div", since that is
+       unambiguously asking for it. */
+    yMode: "axis",
+    axes: [],
+    /* The toolbar tool the left button does on the plot: "zoom" (rubber band,
+       the PLECS default), "zoomx", "zoomy", "pan" or "pointer" (only grabs
+       cursors, trigger and markers). */
+    tool: "zoom",
+    /* Zoom history, as PLECS' back/forward arrows: each entry is the whole
+       view (time window + every axis), so undoing a Y zoom restores Y too. */
+    hist: { back: [], fwd: [] },
+    legendOn: true
   };
-  const th = () => themeCanvas(S.theme || THEME_DARK);
-  const curTheme = () => Object.assign({}, S.theme || THEME_DARK);
+  const th = () => themeCanvas(S.theme || THEME_LIGHT);
+  const curTheme = () => Object.assign({}, S.theme || THEME_LIGHT);
 
   // ---------- DOM refs ----------
   const $ = (id) => document.getElementById(id);
@@ -385,11 +417,15 @@ self.onmessage = function(e) {
     "scopeWrap", "scopeCanvas", "hoverReadout", "zoomWrap", "zoomCanvas",
     "splitWrap", "splitCanvas", "splitReadout",
     "measureBody", "measureScopeSel", "btnExportMeas",
-    "fftSource", "fftWindow", "fftScale", "fftRange", "fftMaxIn",
+    "fftSource", "fftCompareList", "fftPhaseMode", "fftCmpCard", "fftCmpBody", "fftWindow", "fftScale", "fftRange", "fftMaxIn",
     "f0In", "nHarmIn", "multMode", "multKIn", "multKRow", "harmUnit",
     "ilIn", "btnIeee", "btnCompute", "btnExportHarm", "fftSummary",
     "specWrap", "specCanvas", "harmWrap", "harmCanvas", "phaseWrap", "phaseCanvas",
     "harmTableBody", "thdBig", "tddBig", "tddSub", "harmMeta",
+    "tbPointer", "tbZoom", "tbZoomX", "tbZoomY", "tbPan", "tbFit", "tbFitY", "tbBack", "tbFwd",
+    "tbCursors", "tbLegend", "tbYMode", "tbPng", "tbCsv", "tbInfo",
+    "cursorCard", "cursorHead", "cursorBody",
+    "tStartIn", "tEndIn", "yModeSel", "axPane", "axMin", "axMax", "axAuto",
     "xySrcX", "xySrcY", "xyRange", "btnXYFit", "xyWrap", "xyCanvas",
     "statusLeft", "statusRight"
   ];
@@ -526,6 +562,13 @@ self.onmessage = function(e) {
     /* the harmonics table carries six numeric columns in a 340px rail */
     .osc .fft-rdo .tbl th{padding:5px 5px;letter-spacing:.03em}
     .osc .fft-rdo .tbl td{padding:3px 5px;font-size:10.5px}
+    .osc .row.top{align-items:flex-start}
+    .osc .cmp-list{display:flex;flex-direction:column;gap:4px;max-height:132px;overflow-y:auto;min-width:0}
+    .osc .cmp-list .chk{gap:6px;font-size:11px}
+    .osc .cmp-list .hint{padding-top:2px}
+    .osc .dot{display:inline-block;width:8px;height:8px;border-radius:50%;flex-shrink:0;vertical-align:middle;margin-right:5px}
+    .osc .card.cmp{max-height:170px;overflow-y:auto}
+    .osc .card.cmp td:first-child{max-width:92px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
     /* ===== THD / TDD readout ===== */
     .osc .rdo{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line)}
@@ -591,6 +634,15 @@ self.onmessage = function(e) {
     /* Last, so it beats the display value of any layout class it is combined
        with. Deliberately not !important: the engine toggles these elements back
        on with an inline style, which still wins. */
+    .osc .ptb{display:flex;flex-wrap:wrap;align-items:center;gap:2px;padding:3px 6px;background:var(--panel2);border:1px solid var(--line);border-bottom:none;border-radius:6px 6px 0 0}
+    .osc .ptb button{min-width:28px;height:26px;padding:0 6px;border:1px solid transparent;background:transparent;color:var(--text);border-radius:4px;cursor:pointer;font:12px/1 system-ui,sans-serif;display:inline-flex;align-items:center;justify-content:center;gap:4px}
+    .osc .ptb button:hover:not(:disabled){background:var(--panel);border-color:var(--line)}
+    .osc .ptb button.on{background:var(--accent);color:#fff;border-color:var(--accent)}
+    .osc .ptb button:disabled{opacity:.35;cursor:default}
+    .osc .ptb svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+    .osc .ptb .sep{width:1px;height:18px;background:var(--line);margin:0 4px}
+    .osc .hover{right:16px;bottom:44px;top:auto}
+    .osc .sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:middle}
     .osc .hide{display:none}
     `;
     const st = document.createElement("style");
@@ -740,7 +792,7 @@ self.onmessage = function(e) {
     const steps = decadeSteps(target / 20, target * 20);
     ch.voltsPerDiv = nearestStep(steps.length ? steps : [1], target);
     const mid = (ch.fullStats.max + ch.fullStats.min) / 2;
-    ch.position = -mid / ch.voltsPerDiv;
+    ch.position = -(ch.invert ? -mid : mid) / ch.voltsPerDiv;
   }
 
   // ---------- left panel UI ----------
@@ -762,7 +814,7 @@ self.onmessage = function(e) {
     S.files = S.files.filter(f => f.id !== fileId);
     S.channels = S.channels.filter(ch => ch.isMath || ch.fileId !== fileId);
     S.channels = S.channels.filter(ch => !ch.isMath || (S.channels.some(c => c.id === ch.mathA) && S.channels.some(c => c.id === ch.mathB)));
-    S.fft = null; S.harm = null;
+    S.fft = null; S.harm = null; S.series = [];
     rebuildFileList(); rebuildChannelList(); rebuildSelects();
     render(); scheduleMeasure(); scheduleSplit(); renderFFTView(); renderXY();
   }
@@ -781,6 +833,7 @@ self.onmessage = function(e) {
     const range = posPopEl.querySelector('input[type="range"]');
     range.addEventListener("input", () => {
       if (!posPopCh) return;
+      if (S.yMode !== "div") { setYMode("div"); updateToolbar(); }
       posPopCh.position = clamp(parseFloat(range.value), -8, 8);
       posPopEl.querySelector(".val").textContent = posPopCh.position.toFixed(2);
       syncChannelCard(posPopCh);
@@ -913,7 +966,7 @@ self.onmessage = function(e) {
       const vdiv = card.querySelector(".vdiv");
       vdiv.addEventListener("change", () => {
         const p = parseScaleInput(vdiv.value);
-        if (p !== null && p > 0) ch.voltsPerDiv = p;
+        if (p !== null && p > 0) { if (S.yMode !== "div") { setYMode("div"); updateToolbar(); } ch.voltsPerDiv = p; }
         else { vdiv.classList.add("invalid"); setTimeout(() => vdiv.classList.remove("invalid"), 700); }
         vdiv.value = fmtScale(ch.voltsPerDiv, ch.unit);
         render();
@@ -921,7 +974,7 @@ self.onmessage = function(e) {
       const pos = card.querySelector(".pos");
       pos.addEventListener("change", () => {
         const v = parseFloat(pos.value);
-        if (isFinite(v)) ch.position = clamp(v, -8, 8);
+        if (isFinite(v)) { if (S.yMode !== "div") { setYMode("div"); updateToolbar(); } ch.position = clamp(v, -8, 8); }
         pos.value = ch.position.toFixed(2);
         if (posPopCh === ch) { ensurePosPopover().querySelector('input[type="range"]').value = ch.position; ensurePosPopover().querySelector(".val").textContent = ch.position.toFixed(2); }
         render();
@@ -1047,6 +1100,34 @@ self.onmessage = function(e) {
     S.trigger.sourceId = R.trigSource.value;
     S.cursors.refId = R.cursorRef.value;
     S.xy.xId = R.xySrcX.value; S.xy.yId = R.xySrcY.value;
+    buildCompareList();
+  }
+
+  /* One tick per channel other than the source, as many as wanted. The set is
+     kept in S.fftCompare rather than read back from the DOM, so rebuilding the
+     list (a rename, a new file) does not forget what was ticked; a channel that
+     no longer exists, or has just become the source, drops out of it here. */
+  function buildCompareList() {
+    const src = R.fftSource.value;
+    S.fftCompare = S.fftCompare.filter(id => id !== src && S.channels.some(c => c.id === id));
+    S.series = S.series.filter(x => S.channels.includes(x.ch));
+    const others = S.channels.filter(c => c.id !== src);
+    R.fftCompareList.innerHTML = others.length ? "" : '<div class="hint">Load a second channel to compare spectra.</div>';
+    others.forEach(ch => {
+      const lab = document.createElement("label");
+      lab.className = "chk";
+      lab.title = "Overlay " + ch.label + " on the source's spectrum, magnitudes and phases";
+      lab.innerHTML = '<input type="checkbox"' + (S.fftCompare.includes(ch.id) ? " checked" : "") + '><span class="dot"></span><span></span>';
+      lab.querySelector(".dot").style.background = ch.color;
+      lab.lastChild.textContent = ch.label;
+      lab.querySelector("input").addEventListener("change", e => {
+        const on = new Set(S.fftCompare);
+        if (e.target.checked) on.add(ch.id); else on.delete(ch.id);
+        S.fftCompare = S.channels.filter(c => on.has(c.id)).map(c => c.id);
+        if (S.harm || S.fft) runAnalysis();
+      });
+      R.fftCompareList.appendChild(lab);
+    });
   }
 
   // ---------- horizontal ----------
@@ -1059,64 +1140,78 @@ self.onmessage = function(e) {
     R.timeDiv.innerHTML = S.timeDivOptions.map(s => '<option value="' + s + '">' + fmt(s, "s", 0) + "/div</option>").join("");
   }
   function syncTimeDivUI() {
-    let best = S.timeDivOptions[0], bd = Infinity;
-    for (const s of S.timeDivOptions) { const d = Math.abs(s - S.timePerDiv); if (d < bd) { bd = d; best = s; } }
-    R.timeDiv.value = String(best);
+    const tpd = S.timePerDiv;
+    let hit = S.timeDivOptions.find(v => Math.abs(v - tpd) <= tpd * 1e-9);
+    const old = R.timeDiv.querySelector("option[data-custom]");
+    if (old) old.remove();
+    if (hit === undefined) {
+      const o = document.createElement("option");
+      o.value = String(tpd); o.dataset.custom = "1"; o.textContent = fmt(tpd, "s") + "/div";
+      R.timeDiv.insertBefore(o, R.timeDiv.firstChild);
+      hit = tpd;
+    }
+    R.timeDiv.value = String(hit);
     if (document.activeElement !== R.hOffsetIn) R.hOffsetIn.value = (S.hOffset * 1000).toPrecision(6);
+    const w = viewWindow();
+    if (R.tStartIn && document.activeElement !== R.tStartIn) R.tStartIn.value = String(+(w.tA * 1000).toPrecision(6));
+    if (R.tEndIn && document.activeElement !== R.tEndIn) R.tEndIn.value = String(+(w.tB * 1000).toPrecision(6));
   }
   function zoomHStep(dir) {
     const steps = S.timeDivOptions;
     if (!steps.length) return;
-    let idx = 0, bd = Infinity;
-    for (let i = 0; i < steps.length; i++) { const d = Math.abs(steps[i] - S.timePerDiv); if (d < bd) { bd = d; idx = i; } }
-    idx = clamp(idx + dir, 0, steps.length - 1);
-    S.timePerDiv = steps[idx];
-    syncTimeDivUI(); render(); scheduleMeasure();
+    const tpd = S.timePerDiv;
+    let next = dir > 0 ? steps.find(v => v > tpd * (1 + 1e-9)) : [...steps].reverse().find(v => v < tpd * (1 - 1e-9));
+    if (next === undefined) return;
+    pushHist();
+    S.timePerDiv = next;
+    afterView();
   }
-  function fitAll() {
+  function fitTimeWin() {
     if (S.files.length === 0) return;
     const t0 = Math.min(...S.files.map(f => f.t0));
     const t1 = Math.max(...S.files.map(f => f.t1));
     updateTimeDivOptions();
     const span = Math.max(t1 - t0, 1e-9);
-    S.timePerDiv = nearestStep(S.timeDivOptions, span / S.divsH) || span / S.divsH;
-    while (S.timePerDiv * S.divsH < span) {
-      const idx = S.timeDivOptions.indexOf(S.timePerDiv);
-      if (idx >= 0 && idx < S.timeDivOptions.length - 1) S.timePerDiv = S.timeDivOptions[idx + 1];
-      else { S.timePerDiv *= 2; break; }
-    }
+    S.timePerDiv = span / S.divsH;
     S.hOffset = (t0 + t1) / 2;
     S.zoomT = S.hOffset;
-    S.zoomSpan = S.timePerDiv * S.divsH / 10;
-    syncTimeDivUI(); render(); scheduleMeasure();
+    S.zoomSpan = span / 10;
   }
+  function fitAll() { fitTimeWin(); afterView(); }
 
   // ---------- pane layout ----------
-  /* The panes of the grid, in reading order, as rectangles on the scope
-     canvas. A 1×1 layout returns exactly one pane covering the whole canvas,
-     so every coordinate helper below collapses to what it did before the grid
-     existed — that is what keeps the single-plot path free of layout code.
+  /* The plots of the grid, in reading order, as rectangles on the scope
+     canvas. Each rectangle is the PLOT AREA only: like a PLECS scope, every
+     plot carries its y axis (tick labels and unit) in a gutter to its left,
+     and the time axis is labelled once, under the bottom row. A 1×1 layout is
+     a single plot, and `fullPane()` is then that same rectangle.
 
-     Panes share the time base by design: one Time/div and one centre for the
-     whole screen. Splitting the traces apart vertically is the point; making
-     each pane show a different slice of time would break the one thing the
-     grid is for, which is comparing them at the same instant. */
+     Plots share the time base by design: one window for the whole screen.
+     Splitting the traces apart vertically is the point; making each plot
+     show a different slice of time would break the one thing the grid is
+     for, which is comparing them at the same instant. */
   const MAX_GRID = 6;
-  const PANE_GAP = 6;
   let paneCache = null;
   function invalidatePanes() { paneCache = null; }
+  /* Gutter sizes. The left one holds tick labels and the rotated unit title;
+     narrower when there are many columns, so a 6-wide grid still has plots. */
+  function gutters(cols, w) {
+    const L = cols >= 4 || w / cols < 260 ? 46 : 62;
+    return { L, R: 12, T: 10, B: 34, gapX: 10, gapY: 12 };
+  }
   function paneRects() {
     const c = CV.scope;
     const rows = clamp(S.layout.rows | 0, 1, MAX_GRID), cols = clamp(S.layout.cols | 0, 1, MAX_GRID);
     if (paneCache && paneCache.w === c.w && paneCache.h === c.h && paneCache.rows === rows && paneCache.cols === cols)
       return paneCache.list;
-    const gap = (rows === 1 && cols === 1) ? 0 : PANE_GAP;
-    const cw = (c.w - gap * (cols - 1)) / cols;
-    const chh = (c.h - gap * (rows - 1)) / rows;
+    const g = gutters(cols, c.w);
+    const pw = Math.max(10, (c.w - cols * g.L - (cols - 1) * g.gapX - g.R) / cols);
+    const ph = Math.max(10, (c.h - g.T - g.B - (rows - 1) * g.gapY) / rows);
     const list = [];
     for (let r = 0; r < rows; r++) for (let k = 0; k < cols; k++) {
       list.push({ i: r * cols + k, row: r, col: k,
-        x: k * (cw + gap), y: r * (chh + gap), w: cw, h: chh });
+        x: Math.round(g.L + k * (g.L + pw + g.gapX)), y: Math.round(g.T + r * (ph + g.gapY)),
+        w: Math.floor(pw), h: Math.floor(ph), showX: r === rows - 1, gL: g.L, gB: g.B });
     }
     paneCache = { w: c.w, h: c.h, rows, cols, list };
     return list;
@@ -1147,7 +1242,22 @@ self.onmessage = function(e) {
     });
   }
   const paneAt = (x, y) => paneRects().find(p => x >= p.x && x <= p.x + p.w && y >= p.y && y <= p.y + p.h) || null;
-  const fullPane = () => ({ i: 0, row: 0, col: 0, x: 0, y: 0, w: CV.scope.w, h: CV.scope.h });
+  /* The axis bands around a plot are live too, as in PLECS: dragging the y
+     axis pans that plot vertically, the wheel over it zooms it, and a
+     double-click hands it back to auto-scale. The time axis under the bottom
+     row does the same for time. */
+  function gutterAt(x, y) {
+    for (const P of paneRects()) {
+      if (x >= P.x - P.gL && x < P.x && y >= P.y && y <= P.y + P.h) return { P, side: "y" };
+      if (P.showX && x >= P.x && x <= P.x + P.w && y > P.y + P.h && y <= P.y + P.h + P.gB) return { P, side: "x" };
+    }
+    return null;
+  }
+  function fullPane() {
+    const l = paneRects(), a = l[0], b = l[l.length - 1];
+    if (!a) return { i: 0, row: 0, col: 0, x: 0, y: 0, w: CV.scope.w, h: CV.scope.h };
+    return { i: 0, row: 0, col: 0, x: a.x, y: a.y, w: b.x + b.w - a.x, h: b.y + b.h - a.y, showX: true, gL: a.gL, gB: a.gB };
+  }
   /* The visible time window. Shared by every pane, so it is a property of the
      time base alone — asking a canvas how wide it is would give the same
      answer and break when nothing has been laid out yet. */
@@ -1156,10 +1266,80 @@ self.onmessage = function(e) {
     return { tA: S.hOffset - span / 2, tB: S.hOffset + span / 2 };
   }
 
+  // ---------- y axes ----------
+  /* "Nice" tick positions: 1, 2 or 5 times a power of ten, about `n` of them
+     across the range — the same rule every plotting package uses, so the
+     numbers read as round ones. */
+  function niceStep(span, n) {
+    const raw = Math.abs(span) / Math.max(1, n);
+    if (!(raw > 0) || !isFinite(raw)) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(raw)));
+    const m = raw / p;
+    return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p;
+  }
+  function niceTicks(min, max, n) {
+    const step = niceStep(max - min, n);
+    const out = [];
+    const k0 = Math.ceil(min / step - 1e-9), k1 = Math.floor(max / step + 1e-9);
+    for (let k = k0; k <= k1 && out.length < 200; k++) out.push(k * step);
+    return { step, ticks: out };
+  }
+  /* One SI prefix for the whole axis, chosen by its largest magnitude, so the
+     labels are short plain numbers and the prefix goes once into the title:
+     "−200 … 200" under "[mV]", never "−200m, −100m, 0, 100m…". */
+  function axisPrefix(min, max) {
+    const av = Math.max(Math.abs(min), Math.abs(max));
+    let ch = { e: 0, s: "" };
+    if (av > 0) for (const p of SI) if (av >= Math.pow(10, p.e) * 0.999) ch = p;
+    return { mult: Math.pow(10, ch.e), s: ch.s };
+  }
+  function tickLabel(v, step, mult) {
+    const d = clamp(-Math.floor(Math.log10(step / mult) + 1e-9), 0, 6);
+    const x = v / mult;
+    const s = (Math.abs(x) < step / mult * 1e-6 ? 0 : x).toFixed(d);
+    return s.replace("-", "−");
+  }
+  function axisOf(i) {
+    if (!S.axes[i]) S.axes[i] = { auto: true, min: -1, max: 1 };
+    return S.axes[i];
+  }
+  /* The displayed range of every channel in a plot, padded. Uses the whole
+     record's statistics, not the window, so auto-scale does not breathe while
+     panning — a y axis that rescales under the mouse is unreadable. Inverted
+     channels contribute their mirrored range, since that is what is drawn. */
+  function autoRange(i) {
+    let lo = Infinity, hi = -Infinity;
+    for (const ch of S.channels) {
+      if (!ch.visible || panesOf(ch).indexOf(i) === -1 || !ch.fullStats) continue;
+      const a = ch.invert ? -ch.fullStats.max : ch.fullStats.min;
+      const b = ch.invert ? -ch.fullStats.min : ch.fullStats.max;
+      if (isFinite(a) && a < lo) lo = a;
+      if (isFinite(b) && b > hi) hi = b;
+    }
+    if (!(hi >= lo)) return { min: -1, max: 1 };
+    let span = hi - lo;
+    if (span <= Math.abs(hi) * 1e-9 || span === 0) {
+      const m = Math.abs(hi) || 1;
+      return { min: lo - m * 0.5, max: hi + m * 0.5 };
+    }
+    return { min: lo - span * 0.06, max: hi + span * 0.06 };
+  }
+  function yRange(i) {
+    const ax = axisOf(i);
+    if (ax.auto) return autoRange(i);
+    return (ax.max > ax.min) ? ax : { min: ax.min - 1, max: ax.min + 1 };
+  }
+  /* Freezes a plot's axis where it currently is — the step before any manual
+     Y zoom or pan, so the first drag starts from what is on screen. */
+  function fixAxis(i) {
+    const r = yRange(i), ax = axisOf(i);
+    ax.min = r.min; ax.max = r.max; ax.auto = false;
+    return ax;
+  }
+
   // ---------- coordinates ----------
-  /* All four take the pane they are measured in. The default keeps the callers
-     that are genuinely single-plot (the zoom strip, the quick spectrum) on the
-     whole canvas without having to know the grid exists. */
+  /* All of them take the plot they are measured in. The default is the whole
+     plot area, which is exactly the 1×1 case. */
   function timeToX(t, P) {
     P = P || fullPane();
     const span = S.timePerDiv * S.divsH;
@@ -1171,18 +1351,40 @@ self.onmessage = function(e) {
     return (S.hOffset - span / 2) + ((x - P.x) / P.w) * span;
   }
   const pxPerDivV = (P) => (P || fullPane()).h / S.divsV;
-  function valueToY(ch, v, P) {
+  /* dispToY maps a DISPLAYED value (inversion already applied) — the space
+     the axis, the trigger level and the reconstruction live in. valueToY
+     takes a raw sample and applies the channel's inversion first. */
+  function dispToY(ch, d, P) {
     P = P || fullPane();
+    if (S.yMode === "axis") {
+      const r = yRange(P.i);
+      return P.y + P.h - (d - r.min) / (r.max - r.min) * P.h;
+    }
     const ppd = P.h / S.divsV;
-    const midY = P.y + P.h / 2 - ch.position * ppd;
-    return midY - ((ch.invert ? -v : v) / ch.voltsPerDiv) * ppd;
+    return P.y + P.h / 2 - ch.position * ppd - (d / ch.voltsPerDiv) * ppd;
   }
-  function yToValue(ch, y, P) {
+  function yToDisp(ch, y, P) {
     P = P || fullPane();
+    if (S.yMode === "axis") {
+      const r = yRange(P.i);
+      return r.min + (P.y + P.h - y) / P.h * (r.max - r.min);
+    }
     const ppd = P.h / S.divsV;
-    const midY = P.y + P.h / 2 - ch.position * ppd;
-    const signed = -(y - midY) / ppd * ch.voltsPerDiv;
-    return ch.invert ? -signed : signed;
+    return -(y - (P.y + P.h / 2 - ch.position * ppd)) / ppd * ch.voltsPerDiv;
+  }
+  const valueToY = (ch, v, P) => dispToY(ch, ch.invert ? -v : v, P);
+  function yToValue(ch, y, P) { const d = yToDisp(ch, y, P); return ch.invert ? -d : d; }
+  /* The same mapping as valueToY with the axis range resolved once. The trace
+     loop calls it per sample, and recomputing an auto range 100 000 times a
+     frame would be the slowest thing on the screen. */
+  function fastValueToY(ch, P) {
+    const sg = ch.invert ? -1 : 1;
+    if (S.yMode === "axis") {
+      const r = yRange(P.i), k = P.h / (r.max - r.min), b = P.y + P.h + r.min * k;
+      return (c, v) => b - sg * v * k;
+    }
+    const ppd = P.h / S.divsV, mid = P.y + P.h / 2 - ch.position * ppd, k = ppd / ch.voltsPerDiv;
+    return (c, v) => mid - sg * v * k;
   }
 
   // ---------- drawing primitives ----------
@@ -1497,9 +1699,8 @@ self.onmessage = function(e) {
       const order = kShown === 0 ? "DC only" : ("Σ n = 1…" + kShown + (kShown >= kMaxShown ? " (all)" : ""));
       ctx.font = "10px 'IBM Plex Mono', monospace";
       ctx.fillStyle = t.muted;
-      ctx.textAlign = "right";
-      ctx.fillText("RECON " + order, P.x + P.w - 8, P.y + 14);
       ctx.textAlign = "left";
+      ctx.fillText("RECON " + order, P.x + 8, P.y + P.h - 8);
     }
     ctx.restore();
   }
@@ -1528,19 +1729,17 @@ self.onmessage = function(e) {
 
   function renderNow() {
     const c = CV.scope;
-    if (!resizeCanvas("scope")) { renderZoom(); updateStatus(); return; }
+    if (!resizeCanvas("scope")) { renderZoom(); updateStatus(); updateToolbar(); return; }
     const { ctx, w, h } = c;
     const t = th();
     const panes = paneRects();
-    const grid = panes.length > 1;
+    /* Every plot shows the same time window — the time base is shared — so it
+       is computed once and handed to each plot's own x mapping. */
+    const { tA, tB } = viewWindow();
 
-    // the gutters between panes are chassis, not screen
-    if (grid) { ctx.fillStyle = t.barBg; ctx.fillRect(0, 0, w, h); }
-
-    /* Every pane shows the same time window — the time base is shared — so the
-       span is computed once and handed to each pane's own x mapping. */
-    const span = S.timePerDiv * S.divsH;
-    const tA = S.hOffset - span / 2, tB = S.hOffset + span / 2;
+    // the figure: a grey window with white plot areas in it, as in PLECS
+    ctx.fillStyle = t.figBg;
+    ctx.fillRect(0, 0, w, h);
 
     if (S.persistOn) {
       ensurePersist();
@@ -1553,10 +1752,13 @@ self.onmessage = function(e) {
     }
 
     for (const P of panes) {
-      drawGrid(c, S.divsH, S.divsV, P);
+      drawPlotBack(ctx, P, t, tA, tB);
       const visCh = chansOfPane(P);
       const target = S.persistOn ? persistCtx : ctx;
-      visCh.forEach(ch => traceInto(target, ch, tA, tB, P.w, valueToY, P));
+      target.save();
+      target.beginPath(); target.rect(P.x, P.y, P.w, P.h); target.clip();
+      visCh.forEach(ch => traceInto(target, ch, tA, tB, P.w, fastValueToY(ch, P), P));
+      target.restore();
       if (S.persistOn) drawReconstruction(persistCtx, P, visCh, tA, tB);
     }
     if (S.persistOn) ctx.drawImage(persistCanvas, 0, 0, c.w, c.h);
@@ -1566,24 +1768,6 @@ self.onmessage = function(e) {
       if (!S.persistOn) drawReconstruction(ctx, P, visCh, tA, tB);
       ctx.save();
       ctx.beginPath(); ctx.rect(P.x, P.y, P.w, P.h); ctx.clip();
-
-      // ground markers on the left rail, numbered like a bench scope
-      ctx.font = "700 9px 'IBM Plex Sans', sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      visCh.forEach(ch => {
-        const y = valueToY(ch, 0, P);
-        if (y < P.y - 8 || y > P.y + P.h + 8) return;
-        ctx.fillStyle = ch.color;
-        ctx.beginPath();
-        ctx.moveTo(P.x + 1, y); ctx.lineTo(P.x + 15, y - 6); ctx.lineTo(P.x + 15, y + 6);
-        ctx.closePath(); ctx.fill();
-        ctx.fillStyle = luminance(ch.color) > 0.5 ? "#0b1118" : "#ffffff";
-        ctx.fillText(String(S.channels.indexOf(ch) + 1), P.x + 10, y);
-      });
-      ctx.textAlign = "left";
-      ctx.textBaseline = "alphabetic";
-
       // zoom region shade
       if (S.zoomOn && S.files.length) {
         const x1 = timeToX(S.zoomT - S.zoomSpan / 2, P), x2 = timeToX(S.zoomT + S.zoomSpan / 2, P);
@@ -1593,127 +1777,239 @@ self.onmessage = function(e) {
         ctx.lineWidth = 1;
         ctx.strokeRect(Math.round(x1) + 0.5, P.y + 0.5, Math.round(x2 - x1) - 1, P.h - 1);
       }
-
       drawTrigger(ctx, P, visCh);
-      drawCursors(ctx, P, visCh);
-
-      /* Chrome is dropped as the pane shrinks, biggest first. The legend plus a
-         row of time stamps is ~40 px; on a 6x6 pane (~120 px tall) that is a
-         third of the height spent on labels, leaving the trace squeezed into a
-         strip. Below these sizes the compact tag says which pane it is and the
-         numbers are read off the Horizontal panel instead. */
-      const legendH = P.h >= 150 ? LEGEND_H : 0;
-      // time axis labels, kept clear of the legend bar
-      if (P.h >= 105) {
-        ctx.fillStyle = t.muted;
-        ctx.font = "10px 'IBM Plex Mono', monospace";
-        ctx.textAlign = "center";
-        const stride = P.w < 320 ? 4 : 2;      // fewer stamps when the pane is narrow
-        for (let d = 1; d < S.divsH; d += stride) {
-          const tt = tA + (d / S.divsH) * (tB - tA);
-          ctx.fillText(fmt(tt, "s", 2), P.x + (d / S.divsH) * P.w, P.y + P.h - legendH - 6);
-        }
-        ctx.textAlign = "left";
-      }
-
-      if (legendH) drawLegendBar(ctx, P, t, visCh);
-      else if (grid) drawPaneTag(ctx, P, t, visCh);
+      drawCursors(ctx, P, visCh, t);
+      drawLegend(ctx, P, t, visCh);
+      drawBand(ctx, P, t);
       ctx.restore();
+      drawPlotFrame(ctx, P, t, visCh, tA, tB);
     }
 
     if (S.files.length === 0) {
+      const F = fullPane();
       ctx.fillStyle = t.muted;
       ctx.font = "13px 'IBM Plex Sans', sans-serif";
       ctx.textAlign = "center";
-      ctx.fillText("Drop CSV files here, or click Load CSV", w / 2, h / 2 - 10);
+      ctx.fillText("Drop CSV files here, or click Load CSV", F.x + F.w / 2, F.y + F.h / 2 - 10);
       ctx.font = "11px 'IBM Plex Sans', sans-serif";
-      ctx.fillText("Expected format: Time(s), CH1(V), CH2(A), …", w / 2, h / 2 + 12);
+      ctx.fillText("Expected format: Time(s), CH1(V), CH2(A), …", F.x + F.w / 2, F.y + F.h / 2 + 12);
       ctx.textAlign = "left";
     }
 
     updateCursorReadout();
+    updateCursorTable();
     renderZoom();
     updateStatus();
+    updateToolbar();
   }
 
-  /* A pane too short for the legend still has to say which pane it is and what
-     is in it, or a 6×6 grid is 36 anonymous boxes. */
-  function drawPaneTag(ctx, P, t, visCh) {
-    ctx.font = "9px 'IBM Plex Mono', monospace";
-    ctx.textBaseline = "top";
-    ctx.fillStyle = t.muted;
-    ctx.fillText(String(P.i + 1), P.x + 4, P.y + 3);
-    let x = P.x + 16;
-    for (const ch of visCh) {
-      if (x > P.x + P.w - 10) break;
-      ctx.fillStyle = ch.color;
-      ctx.fillRect(x, P.y + 4, 3, 7);
-      x += 6;
-    }
-    ctx.textBaseline = "alphabetic";
+  /* Tick density follows the plot's size, not a fixed division count: about
+     one time label per 90 px and one value label per 38 px, which is what
+     keeps a 6×6 grid readable and a single plot from looking empty. */
+  const xTicks = (P, tA, tB) => niceTicks(tA, tB, Math.max(2, Math.floor(P.w / 90)));
+  const yTicks = (P, r) => niceTicks(r.min, r.max, Math.max(2, Math.floor(P.h / 38)));
+  const axisY = (P, r, v) => P.y + P.h - (v - r.min) / (r.max - r.min) * P.h;
+  /* The unit a plot's y axis can honestly claim: the one all its channels
+     share. Mixed units (V beside A) get no unit rather than the first one. */
+  function paneUnit(visCh) {
+    if (!visCh.length) return "";
+    const u = visCh[0].unit || "";
+    return visCh.every(ch => (ch.unit || "") === u) ? u : "";
   }
 
-  /* Legend strip across the bottom of the graticule: the channel scales on the
-     left and the horizontal + trigger settings on the right, exactly where a
-     bench scope puts them. */
-  const LEGEND_H = 22;
-  function drawLegendBar(ctx, P, t, visCh) {
-    const y0 = P.y + P.h - LEGEND_H, w = P.w;
-    ctx.fillStyle = t.barBg;
-    ctx.fillRect(P.x, y0, w, LEGEND_H);
-    ctx.strokeStyle = t.barLine;
+  /* White plot area and its grid. In axis mode the grid sits on the tick
+     values, dotted and light, the way PLECS draws it; in div mode it is the
+     8-division graticule with solid centre lines, which is what V/div and
+     position are measured against. */
+  function drawPlotBack(ctx, P, t, tA, tB) {
+    ctx.save();
+    ctx.fillStyle = t.scopeBg;
+    ctx.fillRect(P.x, P.y, P.w, P.h);
+    ctx.beginPath(); ctx.rect(P.x, P.y, P.w, P.h); ctx.clip();
     ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(P.x, y0 + 0.5); ctx.lineTo(P.x + w, y0 + 0.5); ctx.stroke();
-
-    const mid = y0 + LEGEND_H / 2;
-    ctx.textBaseline = "middle";
-
-    // right side first, so the channel list knows where it must stop
-    ctx.font = "10px 'IBM Plex Mono', monospace";
-    ctx.textAlign = "right";
-    let right = P.x + w - 8;
-    const trigCh = visCh.find(c => c.id === S.trigger.sourceId);
-    if (trigCh) {
-      const txt = "T " + (S.trigger.slope === "rising" ? "↗" : "↘") + " " + fmt(S.trigger.level, trigCh.unit, 2);
-      ctx.fillStyle = trigCh.color;
-      ctx.fillText(txt, right, mid);
-      right -= ctx.measureText(txt).width + 14;
+    ctx.strokeStyle = t.gridMinor;
+    ctx.setLineDash([2, 3]);
+    ctx.beginPath();
+    xTicks(P, tA, tB).ticks.forEach(tt => {
+      const x = Math.round(timeToX(tt, P)) + 0.5;
+      ctx.moveTo(x, P.y); ctx.lineTo(x, P.y + P.h);
+    });
+    if (S.yMode === "axis") {
+      const r = yRange(P.i);
+      yTicks(P, r).ticks.forEach(v => {
+        const y = Math.round(axisY(P, r, v)) + 0.5;
+        ctx.moveTo(P.x, y); ctx.lineTo(P.x + P.w, y);
+      });
+      ctx.stroke();
+    } else {
+      const step = P.h / S.divsV, cy = Math.round(P.y + P.h / 2) + 0.5;
+      for (let j = 1; j < S.divsV; j++) {
+        const y = Math.round(P.y + j * step) + 0.5;
+        if (y === cy) continue;
+        ctx.moveTo(P.x, y); ctx.lineTo(P.x + P.w, y);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.strokeStyle = t.gridMajor;
+      ctx.beginPath();
+      ctx.moveTo(P.x, cy); ctx.lineTo(P.x + P.w, cy);
+      ctx.stroke();
     }
-    const hTxt = fmt(S.timePerDiv, "s", 0) + "/div  ⌖ " + fmt(S.hOffset, "s", 2);
-    ctx.fillStyle = t.text;
-    ctx.fillText(hTxt, right, mid);
-    right -= ctx.measureText(hTxt).width + 14;
-
-    // channel scales, left to right, truncated rather than overlapped
-    ctx.textAlign = "left";
-    let x = P.x + 8;
-    if (isGrid()) {
-      ctx.fillStyle = t.muted;
-      ctx.fillText(String(P.i + 1), x, mid);
-      x += 14;
-    }
-    for (const ch of visCh) {
-      const txt = ch.label + "  " + fmtScale(ch.voltsPerDiv, ch.unit) + "/div" + (ch.periodic ? " ∞" : "");
-      const tw = ctx.measureText(txt).width + 11;
-      if (x + tw > right) { ctx.fillStyle = t.muted; ctx.fillText("…", x, mid); break; }
-      ctx.fillStyle = ch.color;
-      ctx.fillRect(x, mid - 5, 3, 10);
-      ctx.fillStyle = t.text;
-      ctx.fillText(txt, x + 8, mid);
-      x += tw + 12;
-    }
-    ctx.textBaseline = "alphabetic";
+    ctx.restore();
   }
 
-  /* Trigger and cursors are drawn per pane, and only where they mean
-     something: the trigger marker belongs in the panes that actually show its
-     source channel, not smeared across all 36. */
+  /* The frame, its inward ticks and every label outside the plot area: the y
+     axis on the left of each plot, the time axis once under the bottom row. */
+  function drawPlotFrame(ctx, P, t, visCh, tA, tB) {
+    ctx.save();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = t.axis;
+    ctx.strokeRect(P.x + 0.5, P.y + 0.5, P.w - 1, P.h - 1);
+    const X = xTicks(P, tA, tB);
+    ctx.beginPath();
+    X.ticks.forEach(tt => {
+      const x = Math.round(timeToX(tt, P)) + 0.5;
+      ctx.moveTo(x, P.y + P.h); ctx.lineTo(x, P.y + P.h - 4);
+      ctx.moveTo(x, P.y); ctx.lineTo(x, P.y + 4);
+    });
+    let r = null, Y = null;
+    if (S.yMode === "axis") {
+      r = yRange(P.i);
+      Y = yTicks(P, r);
+      Y.ticks.forEach(v => {
+        const y = Math.round(axisY(P, r, v)) + 0.5;
+        ctx.moveTo(P.x, y); ctx.lineTo(P.x + 4, y);
+        ctx.moveTo(P.x + P.w, y); ctx.lineTo(P.x + P.w - 4, y);
+      });
+    }
+    ctx.stroke();
+
+    ctx.fillStyle = t.text;
+    ctx.font = "10.5px 'IBM Plex Sans', sans-serif";
+    if (Y) {
+      const pre = axisPrefix(r.min, r.max);
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+      Y.ticks.forEach(v => {
+        const y = axisY(P, r, v);
+        ctx.fillText(tickLabel(v, Y.step, pre.mult), P.x - 5, clamp(y, P.y + 5, P.y + P.h - 5));
+      });
+      const u = paneUnit(visCh);
+      if (P.gL >= 56 && P.h >= 70 && (pre.s || u)) {
+        ctx.save();
+        ctx.translate(P.x - P.gL + 9, P.y + P.h / 2);
+        ctx.rotate(-Math.PI / 2);
+        ctx.textAlign = "center";
+        ctx.fillStyle = t.muted;
+        ctx.fillText("[" + pre.s + u + "]", 0, 0);
+        ctx.restore();
+      }
+    } else {
+      /* Div mode: each channel's ground as a numbered marker in the axis band,
+         which is also the handle that drags its position. */
+      ctx.font = "700 9px 'IBM Plex Sans', sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      visCh.forEach(ch => {
+        const y = clamp(dispToY(ch, 0, P), P.y + 6, P.y + P.h - 6);
+        ctx.fillStyle = ch.color;
+        ctx.beginPath();
+        ctx.moveTo(P.x - 1, y); ctx.lineTo(P.x - 15, y - 6); ctx.lineTo(P.x - 15, y + 6);
+        ctx.closePath(); ctx.fill();
+        ctx.fillStyle = luminance(ch.color) > 0.5 ? "#0b1118" : "#ffffff";
+        ctx.fillText(String(S.channels.indexOf(ch) + 1), P.x - 9, y);
+      });
+    }
+
+    if (P.showX) {
+      const pre = axisPrefix(tA, tB);
+      ctx.font = "10.5px 'IBM Plex Sans', sans-serif";
+      ctx.fillStyle = t.text;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "alphabetic";
+      let lastR = -Infinity;
+      X.ticks.forEach(tt => {
+        const x = timeToX(tt, P);
+        const s = tickLabel(tt, X.step, pre.mult);
+        const hw = ctx.measureText(s).width / 2;
+        if (x - hw < lastR + 6 || x - hw < P.x - P.gL + 2 || x + hw > CV.scope.w - 2) return;
+        ctx.fillText(s, x, P.y + P.h + 14);
+        lastR = x + hw;
+      });
+      if (P.gB >= 30 && (P.col === 0 || P.w >= 200)) {
+        ctx.fillStyle = t.muted;
+        ctx.fillText("Time [" + pre.s + "s]", P.x + P.w / 2, P.y + P.h + 29);
+      }
+    }
+
+    if (isGrid()) {
+      ctx.font = "600 9px 'IBM Plex Sans', sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.fillStyle = t.muted;
+      ctx.fillText(String(P.i + 1), P.x + 4, P.y + 3);
+    }
+    ctx.restore();
+  }
+
+  /* The legend box in the top-right corner of each plot, one line per signal
+     with a stroke of its colour, as PLECS draws it. It says what a colour is,
+     which on a white plot with six traces is not optional; L hides it. */
+  function drawLegend(ctx, P, t, visCh) {
+    if (!S.legendOn || !visCh.length || P.h < 56 || P.w < 110) return;
+    ctx.save();
+    ctx.font = "10.5px 'IBM Plex Sans', sans-serif";
+    const rowH = 15, pad = 6, sw = 16;
+    const maxRows = Math.max(1, Math.floor((P.h - 24) / rowH));
+    const items = visCh.map(ch => {
+      let s = ch.label;
+      if (ch.unit) s += " [" + ch.unit + "]";
+      if (S.yMode === "div") s += "  " + fmtScale(ch.voltsPerDiv, ch.unit) + "/div";
+      if (ch.periodic) s += "  ∞";
+      if (ch.invert) s += "  inv";
+      return { ch, s };
+    });
+    let shown = items, more = "";
+    if (items.length > maxRows) { shown = items.slice(0, Math.max(1, maxRows - 1)); more = "+" + (items.length - shown.length) + " more"; }
+    let tw = 0;
+    shown.forEach(it => { tw = Math.max(tw, ctx.measureText(it.s).width); });
+    if (more) tw = Math.max(tw, ctx.measureText(more).width);
+    const bw = Math.min(P.w - 12, sw + 6 + tw + pad * 2);
+    const bh = (shown.length + (more ? 1 : 0)) * rowH + pad * 2 - 4;
+    const bx = Math.round(P.x + P.w - bw - 6), by = Math.round(P.y + 6);
+    ctx.fillStyle = t.legendBg;
+    ctx.fillRect(bx, by, bw, bh);
+    ctx.strokeStyle = t.axis;
+    ctx.lineWidth = 1;
+    ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
+    ctx.beginPath(); ctx.rect(bx, by, bw, bh); ctx.clip();
+    ctx.textBaseline = "middle";
+    ctx.textAlign = "left";
+    shown.forEach((it, k) => {
+      const y = by + pad + k * rowH + rowH / 2 - 2;
+      ctx.strokeStyle = it.ch.color;
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(bx + pad, y); ctx.lineTo(bx + pad + sw, y); ctx.stroke();
+      ctx.fillStyle = t.text;
+      ctx.fillText(it.s, bx + pad + sw + 6, y);
+    });
+    if (more) {
+      ctx.fillStyle = t.muted;
+      ctx.fillText(more, bx + pad + sw + 6, by + pad + shown.length * rowH + rowH / 2 - 2);
+    }
+    ctx.restore();
+  }
+
+  /* Trigger and cursors are drawn per plot, and only where they mean
+     something: the trigger marker belongs in the plots that actually show its
+     source channel. The level is a DISPLAYED value (findTriggerCrossing
+     compares it against the inverted trace), hence dispToY. */
   function drawTrigger(ctx, P, visCh) {
     const ch = visCh.find(c => c.id === S.trigger.sourceId);
     if (!ch) return;
-    const y = valueToY(ch, S.trigger.level, P);
+    const y = dispToY(ch, S.trigger.level, P);
     if (y < P.y - 10 || y > P.y + P.h + 10) return;
-    const w = P.w, xR = P.x + w;
+    const xR = P.x + P.w;
     ctx.strokeStyle = ch.color;
     ctx.setLineDash([5, 4]);
     ctx.lineWidth = 1;
@@ -1724,60 +2020,97 @@ self.onmessage = function(e) {
     ctx.moveTo(xR - 1, y); ctx.lineTo(xR - 11, y - 5); ctx.lineTo(xR - 11, y + 5);
     ctx.closePath(); ctx.fill();
     if (P.h < 90) return;                      // no room for the caption
-    ctx.fillStyle = th().cursor;
     ctx.font = "10px 'IBM Plex Mono', monospace";
     ctx.textAlign = "right";
     ctx.fillText("T" + (S.trigger.slope === "rising" ? "↑" : "↓") + " " + fmt(S.trigger.level, ch.unit, 2), xR - 15, y - 6);
     ctx.textAlign = "left";
   }
 
-  function drawCursors(ctx, P, visCh) {
-    const t = th(), cu = S.cursors;
-    const mode = cu.mode;
-    const yT = P.y, yB = P.y + P.h;
+  // a numbered cursor tab, the handle PLECS puts on each cursor line
+  function cursorTab(ctx, t, x, y, n) {
+    ctx.fillStyle = t.cursor;
+    ctx.fillRect(Math.round(x) - 7, y, 14, 13);
+    ctx.fillStyle = luminance(t.cursor) > 0.5 ? "#0b1118" : "#ffffff";
+    ctx.font = "700 9px 'IBM Plex Sans', sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(String(n), Math.round(x), y + 7);
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+  }
+  function drawCursors(ctx, P, visCh, t) {
+    const cu = S.cursors, mode = cu.mode;
     if (mode === "time" || mode === "track") {
       ctx.strokeStyle = t.cursor;
-      ctx.setLineDash([3, 3]);
       ctx.lineWidth = 1;
       [cu.t1, cu.t2].forEach((tt, i) => {
-        const x = timeToX(tt, P);
-        ctx.beginPath(); ctx.moveTo(x, yT); ctx.lineTo(x, yB); ctx.stroke();
-        ctx.setLineDash([]);
-        if (P.h >= 60) {
-          ctx.fillStyle = t.cursor;
-          ctx.font = "10px 'IBM Plex Mono', monospace";
-          ctx.fillText(i === 0 ? "①" : "②", x + 4, yT + 26);
-        }
-        ctx.setLineDash([3, 3]);
+        const x = Math.round(timeToX(tt, P)) + 0.5;
+        ctx.beginPath(); ctx.moveTo(x, P.y); ctx.lineTo(x, P.y + P.h); ctx.stroke();
+        if (P.h >= 40) cursorTab(ctx, t, x, P.y, i + 1);
       });
-      ctx.setLineDash([]);
-      if (mode === "track") {
-        visCh.forEach(ch => {
-          [cu.t1, cu.t2].forEach(tt => {
-            const v = sampleAt(ch, tt);
-            if (v === null) return;
-            const x = timeToX(tt, P), y = valueToY(ch, ch.invert ? -v : v, P);
-            ctx.fillStyle = ch.color;
-            ctx.beginPath(); ctx.arc(x, y, 3.5, 0, Math.PI * 2); ctx.fill();
-            ctx.strokeStyle = t.scopeBg;
-            ctx.lineWidth = 1.2;
-            ctx.stroke();
-          });
+      /* Where each cursor crosses each trace. Always drawn, not only in
+         "track": that dot is what ties a row of the cursor table to the
+         curve it describes. sampleAt returns the raw sample, and valueToY
+         applies the channel's inversion itself. */
+      visCh.forEach(ch => {
+        [cu.t1, cu.t2].forEach(tt => {
+          const v = sampleAt(ch, tt);
+          if (v === null) return;
+          const x = timeToX(tt, P), y = valueToY(ch, v, P);
+          ctx.fillStyle = ch.color;
+          ctx.beginPath(); ctx.arc(x, y, mode === "track" ? 3.5 : 2.6, 0, Math.PI * 2); ctx.fill();
+          ctx.strokeStyle = t.scopeBg;
+          ctx.lineWidth = 1.2;
+          ctx.stroke();
         });
-      }
+      });
     } else if (mode === "value") {
       const ref = visCh.find(ch => ch.id === cu.refId) || visCh[0];
-      if (ref) {
-        ctx.strokeStyle = t.cursor;
-        ctx.setLineDash([3, 3]);
-        [cu.v1, cu.v2].forEach(v => {
-          const y = valueToY(ref, v, P);
-          ctx.beginPath(); ctx.moveTo(P.x, y); ctx.lineTo(P.x + P.w, y); ctx.stroke();
-        });
-        ctx.setLineDash([]);
-      }
+      if (!ref) return;
+      ctx.strokeStyle = t.cursor;
+      ctx.lineWidth = 1;
+      [cu.v1, cu.v2].forEach((v, i) => {
+        const y = Math.round(dispToY(ref, v, P)) + 0.5;
+        ctx.beginPath(); ctx.moveTo(P.x, y); ctx.lineTo(P.x + P.w, y); ctx.stroke();
+        ctx.fillStyle = t.cursor;
+        ctx.fillRect(P.x, y - 6, 14, 12);
+        ctx.fillStyle = luminance(t.cursor) > 0.5 ? "#0b1118" : "#ffffff";
+        ctx.font = "700 9px 'IBM Plex Sans', sans-serif";
+        ctx.textAlign = "center"; ctx.textBaseline = "middle";
+        ctx.fillText(String(i + 1), P.x + 7, y);
+        ctx.textAlign = "left"; ctx.textBaseline = "alphabetic";
+      });
     }
   }
+
+  /* What a rubber band will zoom: both axes, or only one when the drag is
+     nearly flat or nearly vertical — the same gesture PLECS reads as "zoom
+     time only" / "zoom Y only". The Zoom X and Zoom Y tools force it. */
+  function bandKind(d) {
+    if (S.tool === "zoomx") return "x";
+    if (S.tool === "zoomy") return "y";
+    const dx = Math.abs(d.x1 - d.x0), dy = Math.abs(d.y1 - d.y0);
+    if (dy < 10 && dx >= 10) return "x";
+    if (dx < 10 && dy >= 10) return "y";
+    return "xy";
+  }
+  function drawBand(ctx, P, t) {
+    const d = S.dragging;
+    if (!d || d.type !== "box" || d.P.i !== P.i || !d.moved) return;
+    const k = bandKind(d);
+    let x1 = Math.min(d.x0, d.x1), x2 = Math.max(d.x0, d.x1);
+    let y1 = Math.min(d.y0, d.y1), y2 = Math.max(d.y0, d.y1);
+    if (k === "x") { y1 = P.y; y2 = P.y + P.h; }
+    if (k === "y") { x1 = P.x; x2 = P.x + P.w; }
+    ctx.fillStyle = t.shade;
+    ctx.fillRect(x1, y1, x2 - x1, y2 - y1);
+    ctx.strokeStyle = t.shadeEdge;
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 3]);
+    ctx.strokeRect(Math.round(x1) + 0.5, Math.round(y1) + 0.5, Math.round(x2 - x1), Math.round(y2 - y1));
+    ctx.setLineDash([]);
+  }
+
 
   /* Reading a sample honours Periodic: once a channel repeats, the readout and
      the track cursors have to agree with the trace under them, or hovering
@@ -1835,12 +2168,12 @@ self.onmessage = function(e) {
     drawGrid(c, S.divsH, 4);
     const tA = S.zoomT - S.zoomSpan / 2, tB = S.zoomT + S.zoomSpan / 2;
     const visCh = S.channels.filter(ch => ch.visible);
-    // vertical mapping: same volts/div as main but 4 divisions → keep same value range around channel position
-    const zoomValToY = (ch, v) => {
-      const midY = c.h / 2 - ch.position * (c.h / S.divsV);
-      return midY - ((ch.invert ? -v : v) / ch.voltsPerDiv) * (c.h / S.divsV);
-    };
-    visCh.forEach(ch => traceInto(c.ctx, ch, tA, tB, c.w, zoomValToY));
+    /* Same vertical mapping as the channel's first plot, stretched over the
+       strip: a pane whose rectangle is the whole zoom canvas. */
+    visCh.forEach(ch => {
+      const Pz = { i: panesOf(ch)[0], x: 0, y: 0, w: c.w, h: c.h };
+      traceInto(c.ctx, ch, tA, tB, c.w, fastValueToY(ch, Pz), Pz);
+    });
     const t = th();
     c.ctx.fillStyle = t.muted;
     c.ctx.font = "10px 'IBM Plex Mono', monospace";
@@ -2192,12 +2525,50 @@ self.onmessage = function(e) {
     if (mode === "mult" && k > 1) return S.harm.harms.filter(h => h.n % k === 0);
     return S.harm.harms;
   }
-  function harmDisplayMag(h) {
+  function harmDisplayMag(h, H) {
+    H = H || S.harm;
     const u = R.harmUnit.value;
-    if (!S.harm) return h.mag;
+    if (!H) return h.mag;
     if (u === "rms") return h.mag / Math.SQRT2;
-    if (u === "pct") { const f = S.harm.harms[0].mag; return f > 0 ? (h.mag / f) * 100 : 0; }
+    if (u === "pct") { const f = H.harms[0].mag; return f > 0 ? (h.mag / f) * 100 : 0; }
     return h.mag;
+  }
+
+  // ---------- comparing channels ----------
+  const wrap180 = (d) => ((d + 180) % 360 + 360) % 360 - 180;
+  const harmAt = (H, n) => (H.harms[n - 1] && H.harms[n - 1].n === n) ? H.harms[n - 1] : null;
+  const comparing = () => S.series.length > 1;
+  /* Every series with a usable harmonic analysis, source first. */
+  const harmSeries = () => S.series.filter(x => x.harm && !x.harm.error);
+  /* What the phase panel draws. Δφ mode leaves the source out: against itself
+     it is a row of zeros that only takes width from the channels that differ. */
+  function phaseSeries() {
+    const all = harmSeries();
+    if (R.fftPhaseMode.value !== "rel" || !comparing()) return all;
+    return all[0] && all[0].ref ? all.slice(1) : [];
+  }
+  /* The phase of harmonic `hh` of series `x` as the panel shows it: referred
+     to the source's window start (`phaseRef`, see runAnalysis) and, in Δφ
+     mode, minus the source's own phase at that order. null = too small to
+     have a meaningful phase, on either side. */
+  function shownPhase(x, hh) {
+    const fund = x.harm.harms[0].mag;
+    if (!(fund > 0 && hh.mag >= fund * 0.001)) return null;
+    if (R.fftPhaseMode.value !== "rel" || !comparing() || x.ref) return comparing() ? hh.phaseRef : hh.phase;
+    const src = S.series[0] && S.series[0].ref && S.series[0].harm && !S.series[0].harm.error ? S.series[0].harm : null;
+    const r = src && harmAt(src, hh.n);
+    if (!r || !(src.harms[0].mag > 0 && r.mag >= src.harms[0].mag * 0.001)) return null;
+    return wrap180(hh.phaseRef - r.phaseRef);
+  }
+  /* Bars of one harmonic order side by side: the slot widens a little when
+     there are several so each bar stays readable, and never eats the gap. */
+  function slotGeometry(g, K) {
+    const slot = K > 1 ? Math.min(g.step * 0.88, Math.max(g.bw, g.bw * 0.55 * K)) : g.bw;
+    return { slot, sub: slot / Math.max(1, K) };
+  }
+  function seriesColor(x, t, i, n) {
+    if (comparing()) return x.ch.color + (n === 1 ? "" : "cc");
+    return i === "phase" ? "#1d9e4f" + (n === 1 ? "" : "aa") : (n === 1 ? t.accent : t.accent + "99");
   }
   function harmUnitLabel() {
     const u = R.harmUnit.value;
@@ -2234,6 +2605,24 @@ self.onmessage = function(e) {
     setTimeout(() => {
       S.fft = computeSpectrum(ch, R.fftWindow.value, R.fftRange.value);
       S.harm = computeHarmonics(ch, f0, nHarm, R.fftRange.value, S.iL);
+      /* The compared channels go through the very same f₁, window, range and
+         harmonic count as the source: harmonic n must be the same frequency on
+         every series or putting their bars side by side compares nothing. */
+      S.series = [{ ch, fft: S.fft, harm: S.harm, ref: true }];
+      S.fftCompare.forEach(id => {
+        const c = S.channels.find(x => x.id === id);
+        if (c && c.id !== ch.id) S.series.push({ ch: c, fft: computeSpectrum(c, R.fftWindow.value, R.fftRange.value), harm: computeHarmonics(c, f0, nHarm, R.fftRange.value, null) });
+      });
+      /* Each analysis measures phase against the start of ITS OWN window. Two
+         files, or a channel whose visible slice starts a sample later, would
+         then disagree by n·ω₁·Δt for no physical reason — so every phase is
+         moved to the source's window start before anything compares them. */
+      const t0ref = S.harm && !S.harm.error ? S.harm.t0 : null;
+      S.series.forEach(x => {
+        if (!x.harm || x.harm.error) return;
+        const dt0 = t0ref === null ? 0 : x.harm.t0 - t0ref;
+        x.harm.harms.forEach(hh => { hh.phaseRef = wrap180(hh.phase - 360 * hh.f * dt0); });
+      });
       if (S.fft && !S.fftMaxFreq) S.fftMaxFreq = clamp(f0 * (nHarm + 2), S.fft.freqStep * 10, S.fft.fs / 2);
       if (S.fft) {
         const wanted = parseScaleInput(R.fftMaxIn.value);
@@ -2251,6 +2640,8 @@ self.onmessage = function(e) {
         ? "Done · " + (R.fftRange.value === "full" ? "full record" : "visible window") + " · "
           + S.fft.usable.toLocaleString() + " samples · Δf " + fmt(S.fft.freqStep, "Hz", 2)
           + " · Nyquist " + fmt(S.fft.fs / 2, "Hz", 1)
+          + (comparing() ? " · " + S.series.length + " channels" : "")
+          + S.series.filter(x => !x.ref && (!x.harm || x.harm.error)).map(x => " · ⚠ " + x.ch.label + ": " + (x.harm ? x.harm.error : "not enough samples")).join("")
         : "Not enough samples in the selected range.";
     }, 15);
   }
@@ -2268,6 +2659,7 @@ self.onmessage = function(e) {
     drawHarmBars();
     drawPhaseBars();
     buildHarmTable();
+    buildCompareTable();
   }
 
   function drawSpectrumCanvas() {
@@ -2286,11 +2678,16 @@ self.onmessage = function(e) {
     const result = S.fft;
     const maxFreq = S.fftMaxFreq || result.fs / 2;
     const useDb = R.fftScale.value === "db";
-    const mags = result.mags;
+    /* One vertical scale for every trace, set by the tallest of them: that is
+       what makes "this one is 6 dB below that one" readable off the screen.
+       Scaling each to its own peak would draw every spectrum the same height. */
+    const specs = S.series.length ? S.series.filter(x => x.fft) : [{ ch: result.channel, fft: result }];
     let maxMag = 0;
-    for (let i = 1; i < mags.length; i++) if (mags[i] > maxMag) maxMag = mags[i];
+    specs.forEach(x => {
+      const m = x.fft.mags, top = Math.min(m.length - 1, Math.round(maxFreq / x.fft.freqStep));
+      for (let i = 1; i <= top; i++) if (m[i] > maxMag) maxMag = m[i];
+    });
     if (maxMag <= 0) maxMag = 1e-12;
-    const idxMax = clamp(Math.round(maxFreq / result.freqStep), 1, mags.length - 1);
     const yMin = useDb ? -100 : 0, yMax = useDb ? 0 : maxMag * 1.08;
     const fToX = (f) => (f / maxFreq) * w;
     const mToY = (m) => {
@@ -2309,32 +2706,37 @@ self.onmessage = function(e) {
       });
       ctx.setLineDash([]);
     }
-    ctx.save();
-    ctx.strokeStyle = result.channel.color;
-    ctx.lineWidth = 1.2;
-    if (S.glowOn && t.dark) { ctx.shadowColor = result.channel.color; ctx.shadowBlur = 4; }
-    ctx.beginPath();
     const W = Math.max(1, Math.round(w));
-    if (idxMax <= W * 2) {
-      for (let i = 1; i <= idxMax; i++) {
-        const x = fToX(i * result.freqStep), y = mToY(mags[i]);
-        if (i === 1) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    // drawn last-to-first so the source ends up on top of what it is compared with
+    specs.slice().reverse().forEach(x => {
+      const res = x.fft, mags = res.mags;
+      const idxMax = clamp(Math.round(maxFreq / res.freqStep), 1, mags.length - 1);
+      ctx.save();
+      ctx.strokeStyle = x.ch.color;
+      ctx.lineWidth = x.ref || specs.length === 1 ? 1.2 : 1;
+      if (specs.length > 1 && !x.ref) ctx.globalAlpha = 0.85;
+      if (S.glowOn && t.dark) { ctx.shadowColor = x.ch.color; ctx.shadowBlur = 4; }
+      ctx.beginPath();
+      if (idxMax <= W * 2) {
+        for (let i = 1; i <= idxMax; i++) {
+          const px = fToX(i * res.freqStep), y = mToY(mags[i]);
+          if (i === 1) ctx.moveTo(px, y); else ctx.lineTo(px, y);
+        }
+      } else {
+        // more bins than pixels: each column draws the largest bin it covers
+        const fPer = maxFreq / W;
+        for (let px = 0; px < W; px++) {
+          const a = Math.max(1, Math.floor(px * fPer / res.freqStep));
+          let b = Math.min(idxMax + 1, Math.floor((px + 1) * fPer / res.freqStep));
+          if (b <= a) b = a + 1;
+          let mx = 0;
+          for (let i = a; i < b && i < mags.length; i++) if (mags[i] > mx) mx = mags[i];
+          if (px === 0) ctx.moveTo(px + 0.5, mToY(mx)); else ctx.lineTo(px + 0.5, mToY(mx));
+        }
       }
-    } else {
-      const per = idxMax / W;
-      for (let px = 0; px < W; px++) {
-        const a = 1 + Math.floor(px * per);
-        let b = 1 + Math.floor((px + 1) * per);
-        if (b <= a) b = a + 1;
-        if (b > idxMax + 1) b = idxMax + 1;
-        let mx = 0;
-        for (let i = a; i < b && i < mags.length; i++) if (mags[i] > mx) mx = mags[i];
-        const x = px + 0.5;
-        if (px === 0) ctx.moveTo(x, mToY(mx)); else ctx.lineTo(x, mToY(mx));
-      }
-    }
-    ctx.stroke();
-    ctx.restore();
+      ctx.stroke();
+      ctx.restore();
+    });
     // axis labels
     ctx.fillStyle = t.muted;
     ctx.font = "10px 'IBM Plex Mono', monospace";
@@ -2343,12 +2745,33 @@ self.onmessage = function(e) {
       if (d % 2) continue;
       ctx.fillText(fmt((d / 10) * maxFreq, "Hz", 1), (d / 10) * w, h - 5);
     }
+    const units = [...new Set(specs.map(x => x.ch.unit || ""))];
     ctx.textAlign = "right";
-    ctx.fillText(useDb ? "0 dB" : fmt(yMax, result.channel.unit, 1), w - 5, 12);
+    ctx.fillText(useDb ? "0 dB" : fmt(yMax, units.length === 1 ? units[0] : "", 1), w - 5, 12);
     ctx.fillText(useDb ? "-100 dB" : "0", w - 5, h - 5);
     ctx.textAlign = "left";
     ctx.fillStyle = t.text;
-    ctx.fillText("SPECTRUM — " + result.channel.label + "  ·  window: " + result.windowType + "  ·  Δf " + fmt(result.freqStep, "Hz", 2) + "  ·  Nyquist " + fmt(result.fs / 2, "Hz", 1), 8, 12);
+    ctx.fillText("SPECTRUM — " + (specs.length > 1 ? specs.length + " channels" : result.channel.label) + "  ·  window: " + result.windowType + "  ·  Δf " + fmt(result.freqStep, "Hz", 2) + "  ·  Nyquist " + fmt(result.fs / 2, "Hz", 1), 8, 12);
+    if (specs.length > 1) drawSpecLegend(ctx, t, specs, 8, 26, w - 60, units.length > 1 ? "units differ — pick “% of fundamental” to compare shapes" : "");
+  }
+
+  /* Colour swatch + name per series, in one row that wraps to the next when
+     the canvas runs out of width. The source is marked, since in Δφ mode it is
+     the zero every other phase is measured from. */
+  function drawSpecLegend(ctx, t, list, x0, y0, maxX, note) {
+    ctx.font = "10px 'IBM Plex Mono', monospace";
+    let x = x0, y = y0;
+    list.forEach(s => {
+      const txt = s.ch.label + (s.ref ? " (src)" : "");
+      const tw = ctx.measureText(txt).width + 22;
+      if (x + tw > maxX && x > x0) { x = x0; y += 13; }
+      ctx.fillStyle = s.ch.color;
+      ctx.fillRect(x, y - 7, 10, 3);
+      ctx.fillStyle = t.text;
+      ctx.fillText(txt, x + 14, y);
+      x += tw;
+    });
+    if (note) { ctx.fillStyle = t.muted; ctx.fillText(note, x0, y + 13); }
   }
 
   function barGeometry(c, list) {
@@ -2357,6 +2780,22 @@ self.onmessage = function(e) {
     const bw = Math.max(2, Math.min(34, iw / Math.max(1, list.length) * 0.62));
     const step = iw / Math.max(1, list.length);
     return { padL, padR, padT, padB, iw, ih: c.h - padT - padB, bw, step };
+  }
+
+  /* The hover box, one line per series. Shared by both bar panels. */
+  function drawHarmTooltip(ctx, t, w, lines) {
+    ctx.font = "10px 'IBM Plex Mono', monospace";
+    const tw = Math.max(...lines.map(l => ctx.measureText(l.txt).width));
+    const bx = w - tw - 20 - (lines.some(l => l.color) ? 12 : 0), bh = 6 + lines.length * 13;
+    ctx.fillStyle = t.scopeBg === "#ffffff" ? "rgba(26,35,46,0.92)" : "rgba(240,244,250,0.94)";
+    ctx.fillRect(bx, 18, w - bx - 8, bh);
+    lines.forEach((l, i) => {
+      const y = 29 + i * 13;
+      let x = bx + 6;
+      if (l.color) { ctx.fillStyle = l.color; ctx.fillRect(x, y - 7, 8, 8); x += 12; }
+      ctx.fillStyle = t.scopeBg === "#ffffff" ? "#fff" : "#111";
+      ctx.fillText(l.txt, x, y);
+    });
   }
 
   function drawHarmBars() {
@@ -2379,8 +2818,13 @@ self.onmessage = function(e) {
     const list = displayedHarms();
     if (!list.length) return;
     const g = barGeometry(c, list);
+    const ser = S.series.length ? harmSeries() : [{ ch: S.harm.channel, harm: S.harm, ref: true }];
+    const K = ser.length, sg = slotGeometry(g, K);
     let maxV = 0;
-    list.forEach(hh => { const v = harmDisplayMag(hh); if (v > maxV) maxV = v; });
+    list.forEach(hh => ser.forEach(x => {
+      const o = harmAt(x.harm, hh.n);
+      if (o) { const v = harmDisplayMag(o, x.harm); if (v > maxV) maxV = v; }
+    }));
     if (maxV <= 0) maxV = 1;
     // y grid
     ctx.strokeStyle = t.gridMinor;
@@ -2392,30 +2836,35 @@ self.onmessage = function(e) {
       ctx.fillText(R.harmUnit.value === "pct" ? ((i / 4) * maxV).toFixed(0) : fmt((i / 4) * maxV, "", 1), g.padL - 4, y + 3);
     }
     ctx.textAlign = "center";
-    const accent = t.accent;
     list.forEach((hh, i) => {
-      const v = harmDisplayMag(hh);
-      const bh = (v / maxV) * g.ih;
-      const x = g.padL + i * g.step + (g.step - g.bw) / 2;
-      const y = g.padT + g.ih - bh;
-      ctx.fillStyle = i === S.hoverHarm ? "#e0821f" : (hh.n === 1 ? accent : accent + "99");
-      ctx.fillRect(x, y, g.bw, Math.max(1, bh));
+      const x0 = g.padL + i * g.step + (g.step - sg.slot) / 2;
+      ser.forEach((x, k) => {
+        const o = harmAt(x.harm, hh.n);
+        if (!o) return;
+        const bh = (harmDisplayMag(o, x.harm) / maxV) * g.ih;
+        ctx.fillStyle = i === S.hoverHarm ? (K > 1 ? x.ch.color : "#e0821f") : seriesColor(x, t, "mag", hh.n);
+        ctx.fillRect(x0 + k * sg.sub, g.padT + g.ih - bh, Math.max(1, sg.sub - (K > 1 && sg.sub > 3 ? 1 : 0)), Math.max(1, bh));
+      });
+      if (i === S.hoverHarm && K > 1) {
+        ctx.strokeStyle = "#e0821f";
+        ctx.strokeRect(Math.round(x0) - 1.5, g.padT - 0.5, Math.round(sg.slot) + 3, g.ih + 1);
+      }
       if (g.step > 14) {
         ctx.fillStyle = t.muted;
-        ctx.fillText(String(hh.n), x + g.bw / 2, h - 7);
+        ctx.fillText(String(hh.n), x0 + sg.slot / 2, h - 7);
       }
     });
     ctx.textAlign = "left";
     // hover tooltip
     if (S.hoverHarm >= 0 && list[S.hoverHarm]) {
-      const hh = list[S.hoverHarm];
-      const txt = "n=" + hh.n + "  " + fmt(hh.f, "Hz", 1) + "  " + fmt(harmDisplayMag(hh), R.harmUnit.value === "pct" ? "%" : "", 3) + "  φ " + hh.phase.toFixed(1) + "°";
-      ctx.font = "10px 'IBM Plex Mono', monospace";
-      const tw2 = ctx.measureText(txt).width;
-      ctx.fillStyle = t.scopeBg === "#ffffff" ? "rgba(26,35,46,0.92)" : "rgba(240,244,250,0.94)";
-      ctx.fillRect(w - tw2 - 20, 18, tw2 + 12, 16);
-      ctx.fillStyle = t.scopeBg === "#ffffff" ? "#fff" : "#111";
-      ctx.fillText(txt, w - tw2 - 14, 29);
+      const hh = list[S.hoverHarm], pct = R.harmUnit.value === "pct" ? "%" : "";
+      const lines = K > 1
+        ? [{ txt: "n=" + hh.n + "  " + fmt(hh.f, "Hz", 1) }].concat(ser.map(x => {
+            const o = harmAt(x.harm, hh.n);
+            return { color: x.ch.color, txt: x.ch.label + "  " + (o ? fmt(harmDisplayMag(o, x.harm), pct, 3) : "—") };
+          }))
+        : [{ txt: "n=" + hh.n + "  " + fmt(hh.f, "Hz", 1) + "  " + fmt(harmDisplayMag(hh), pct, 3) + "  φ " + hh.phase.toFixed(1) + "°" }];
+      drawHarmTooltip(ctx, t, w, lines);
     }
   }
 
@@ -2428,11 +2877,16 @@ self.onmessage = function(e) {
     ctx.strokeRect(0.5, 0.5, w - 1, h - 1);
     ctx.fillStyle = t.text;
     ctx.font = "10px 'IBM Plex Mono', monospace";
-    ctx.fillText("HARMONIC PHASE (° · cos ref @ window start)", 8, 12);
+    const rel = comparing() && R.fftPhaseMode.value === "rel";
+    ctx.fillText(rel ? "HARMONIC PHASE Δφ (° · channel − source, same order)"
+      : comparing() ? "HARMONIC PHASE (° · cos ref @ source window start)"
+      : "HARMONIC PHASE (° · cos ref @ window start)", 8, 12);
     if (!S.harm || S.harm.error) return;
     const list = displayedHarms();
     if (!list.length) return;
     const g = barGeometry(c, list);
+    const ser = S.series.length ? phaseSeries() : [{ ch: S.harm.channel, harm: S.harm, ref: true }];
+    const K = Math.max(1, ser.length), sg = slotGeometry(g, K);
     const zeroY = g.padT + g.ih / 2;
     ctx.strokeStyle = t.gridMinor;
     [-180, -90, 0, 90, 180].forEach(deg => {
@@ -2444,25 +2898,44 @@ self.onmessage = function(e) {
     });
     ctx.strokeStyle = t.gridMajor;
     ctx.beginPath(); ctx.moveTo(g.padL, Math.round(zeroY) + 0.5); ctx.lineTo(w - g.padR, Math.round(zeroY) + 0.5); ctx.stroke();
-    const fundMag = S.harm.harms[0].mag;
     ctx.textAlign = "center";
     list.forEach((hh, i) => {
-      const x = g.padL + i * g.step + (g.step - g.bw) / 2;
-      const significant = fundMag > 0 && hh.mag >= fundMag * 0.001;
-      const bh = (hh.phase / 180) * (g.ih / 2);
-      ctx.fillStyle = i === S.hoverHarm ? "#e0821f" : (significant ? "#1d9e4f" + (hh.n === 1 ? "" : "aa") : t.gridMajor);
-      if (significant) {
-        if (bh >= 0) ctx.fillRect(x, zeroY - bh, g.bw, Math.max(1, bh));
-        else ctx.fillRect(x, zeroY, g.bw, Math.max(1, -bh));
-      } else {
-        ctx.fillRect(x, zeroY - 1, g.bw, 2);
+      const x0 = g.padL + i * g.step + (g.step - sg.slot) / 2;
+      ser.forEach((x, k) => {
+        const o = harmAt(x.harm, hh.n);
+        if (!o) return;
+        const ph = shownPhase(x, o);
+        const bx = x0 + k * sg.sub, bw = Math.max(1, sg.sub - (K > 1 && sg.sub > 3 ? 1 : 0));
+        if (ph === null) {
+          ctx.fillStyle = t.gridMajor;
+          ctx.fillRect(bx, zeroY - 1, bw, 2);
+          return;
+        }
+        const bh = (ph / 180) * (g.ih / 2);
+        ctx.fillStyle = i === S.hoverHarm ? (K > 1 ? x.ch.color : "#e0821f") : seriesColor(x, t, "phase", hh.n);
+        if (bh >= 0) ctx.fillRect(bx, zeroY - bh, bw, Math.max(1, bh));
+        else ctx.fillRect(bx, zeroY, bw, Math.max(1, -bh));
+      });
+      if (i === S.hoverHarm && K > 1) {
+        ctx.strokeStyle = "#e0821f";
+        ctx.strokeRect(Math.round(x0) - 1.5, g.padT - 0.5, Math.round(sg.slot) + 3, g.ih + 1);
       }
       if (g.step > 14) {
         ctx.fillStyle = t.muted;
-        ctx.fillText(String(hh.n), x + g.bw / 2, h - 7);
+        ctx.fillText(String(hh.n), x0 + sg.slot / 2, h - 7);
       }
     });
     ctx.textAlign = "left";
+    if (comparing() && S.hoverHarm >= 0 && list[S.hoverHarm]) {
+      const hh = list[S.hoverHarm];
+      drawHarmTooltip(ctx, t, w, [{ txt: "n=" + hh.n + (rel ? "  Δφ vs source" : "  φ") }].concat(ser.map(x => {
+        const o = harmAt(x.harm, hh.n), ph = o ? shownPhase(x, o) : null;
+        return { color: x.ch.color, txt: x.ch.label + "  " + (ph === null ? "—" : (ph >= 0 && rel ? "+" : "") + ph.toFixed(1) + "°") };
+      })));
+    } else if (rel && !ser.length) {
+      ctx.fillStyle = t.muted;
+      ctx.fillText("Tick a channel under Compare to see its phase against the source.", g.padL, g.padT + 12);
+    }
   }
 
   const IL_PROMPT = "set I<sub>L</sub> to enable";
@@ -2530,6 +3003,35 @@ self.onmessage = function(e) {
     });
   }
 
+  /* One row per analysed channel: how its fundamental compares with the
+     source's, in size and in phase, plus its own THD. Δφ₁ is the number people
+     actually came for — voltage against current, input against output. */
+  function buildCompareTable() {
+    const on = comparing();
+    R.fftCmpCard.style.display = on ? "flex" : "none";
+    if (!on) return;
+    const src = S.series[0].harm && !S.series[0].harm.error ? S.series[0].harm : null;
+    const f1 = src ? src.harms[0] : null;
+    R.fftCmpBody.innerHTML = "";
+    S.series.forEach(x => {
+      const tr = document.createElement("tr");
+      tr.className = "osc-tr";
+      const H = x.harm && !x.harm.error ? x.harm : null;
+      const a = H ? H.harms[0] : null;
+      const cells = !H ? ["—", "—", "—", "—"] : [
+        fmt(a.mag, x.ch.unit, 3),
+        x.ref ? "1" : (f1 && f1.mag > 0 ? (a.mag / f1.mag).toPrecision(3) : "—"),
+        x.ref ? "0" : (f1 ? (d => (d >= 0 ? "+" : "") + d.toFixed(1))(wrap180(a.phaseRef - f1.phaseRef)) : "—"),
+        H.thd !== null ? (H.thd * 100).toFixed(2) + " %" : "—"
+      ];
+      tr.innerHTML = '<td><span class="dot"></span></td>' + cells.map(v => "<td>" + v + "</td>").join("");
+      tr.firstChild.querySelector(".dot").style.background = x.ch.color;
+      tr.firstChild.appendChild(document.createTextNode(x.ch.label + (x.ref ? " · src" : "")));
+      tr.firstChild.title = x.ch.label + (!H ? " — " + (x.harm ? x.harm.error : "not enough samples") : "");
+      R.fftCmpBody.appendChild(tr);
+    });
+  }
+
   function exportHarmonics() {
     if (!S.harm || S.harm.error) return;
     const H = S.harm;
@@ -2539,13 +3041,23 @@ self.onmessage = function(e) {
       + "\n# THD_pct," + (H.thd !== null ? (H.thd * 100).toFixed(4) : "")
       + "\n# I_L_rms," + (H.iL !== null ? H.iL : "")
       + "\n# TDD_pct," + (H.tdd !== null ? (H.tdd * 100).toFixed(4) : "") + "\n";
-    csv += "n,freq_Hz,mag_peak,mag_rms,pct_of_fundamental,pct_of_IL,phase_deg\n";
+    /* Compared channels get three columns each. Their phase is referred to the
+       source's window start, so it can be subtracted from the source's
+       phase_deg directly; dphase_deg is that subtraction, already wrapped. */
+    const others = harmSeries().filter(x => !x.ref);
+    const tag = (x) => x.ch.label.replace(/[^\w]+/g, "_");
+    if (others.length) csv += "# compared_phase_reference,source window start\n";
+    csv += "n,freq_Hz,mag_peak,mag_rms,pct_of_fundamental,pct_of_IL,phase_deg"
+      + others.map(x => "," + tag(x) + "_mag_peak," + tag(x) + "_phase_deg," + tag(x) + "_dphase_deg").join("") + "\n";
     const fund = H.harms[0].mag;
     displayedHarms().forEach(hh => {
       csv += [hh.n, hh.f, hh.mag, hh.mag / Math.SQRT2,
         fund > 0 ? (hh.mag / fund * 100) : 0,
         H.iL ? (hh.mag / Math.SQRT2 / H.iL * 100) : "",
-        hh.phase].join(",") + "\n";
+        hh.phase].concat(...others.map(x => {
+          const o = harmAt(x.harm, hh.n);
+          return o ? [o.mag, o.phaseRef, wrap180(o.phaseRef - hh.phaseRef)] : ["", "", ""];
+        })).join(",") + "\n";
     });
     downloadText("harmonics_" + H.channel.label.replace(/[^\w]+/g, "_") + ".csv", csv);
   }
@@ -2665,115 +3177,396 @@ self.onmessage = function(e) {
      that pane along so the drag that follows keeps using the same mapping.
      A grab that started in pane 4 must not be interpreted against pane 0's
      rectangle halfway through. */
+  // ---------- view changes: zoom, pan, history ----------
+  const up125 = (x) => {
+    const p = Math.pow(10, Math.floor(Math.log10(x))), m = x / p;
+    return (m <= 1.0001 ? 1 : m <= 2.0001 ? 2 : m <= 5.0001 ? 5 : 10) * p;
+  };
+  /* Switching scale model keeps what is on screen as nearly as it can: going
+     to divisions, each channel takes the V/div (rounded up to 1-2-5) that
+     covers its plot's current axis, centred where the axis was centred. Going
+     back to axes, every plot returns to auto — a fixed axis would have to be
+     invented out of eight different channel scales. */
+  function setYMode(mode) {
+    if (mode !== "div") mode = "axis";
+    if (mode === S.yMode) return;
+    if (mode === "div") {
+      S.channels.forEach(ch => {
+        const r = yRange(panesOf(ch)[0]), span = r.max - r.min;
+        if (!(span > 0) || !isFinite(span)) return;
+        ch.voltsPerDiv = up125(span / S.divsV);
+        ch.position = -((r.min + r.max) / 2) / ch.voltsPerDiv;
+      });
+    } else {
+      S.axes.forEach(ax => { if (ax) ax.auto = true; });
+    }
+    S.yMode = mode;
+    S.channels.forEach(syncChannelCard);
+    syncAxisUI();
+  }
+  // everything that has to follow a change of the visible window
+  function afterView() {
+    if (S.persistOn) clearPersist();
+    syncTimeDivUI(); syncAxisUI();
+    render(); scheduleMeasure(); scheduleSplit();
+  }
+  function setTimeWindow(tA, tB) {
+    const span = tB - tA;
+    if (!(span > 0) || !isFinite(span)) return;
+    S.timePerDiv = clamp(span, 1e-15, 1e12) / S.divsH;
+    S.hOffset = (tA + tB) / 2;
+  }
+  /* Zoom history, PLECS' back/forward arrows. A snapshot is the whole view —
+     time window, scale model, every plot's axis and every channel's V/div and
+     position — so going back after a Y zoom restores Y as well. */
+  function viewSnap() {
+    return {
+      tpd: S.timePerDiv, off: S.hOffset, yMode: S.yMode,
+      axes: S.axes.map(a => a ? { auto: a.auto, min: a.min, max: a.max } : null),
+      ch: S.channels.map(ch => [ch.id, ch.voltsPerDiv, ch.position])
+    };
+  }
+  function pushHist() {
+    const s = viewSnap(), b = S.hist.back;
+    S.hist.fwd = [];
+    if (!b.length || JSON.stringify(b[b.length - 1]) !== JSON.stringify(s)) {
+      b.push(s);
+      if (b.length > 100) b.shift();
+    }
+    updateToolbar();
+  }
+  function restoreView(v) {
+    S.timePerDiv = v.tpd; S.hOffset = v.off; S.yMode = v.yMode;
+    S.axes = v.axes.map(a => a ? Object.assign({}, a) : null);
+    v.ch.forEach(([id, vpd, pos]) => {
+      const ch = S.channels.find(c => c.id === id);
+      if (ch) { ch.voltsPerDiv = vpd; ch.position = pos; }
+    });
+    S.channels.forEach(syncChannelCard);
+  }
+  function histGo(dir) {
+    const from = dir < 0 ? S.hist.back : S.hist.fwd, to = dir < 0 ? S.hist.fwd : S.hist.back;
+    if (!from.length) return;
+    to.push(viewSnap());
+    restoreView(from.pop());
+    afterView();
+  }
+  /* A burst of wheel notches is one history step, not thirty: a new entry
+     only when the wheel has been still for a moment. */
+  let lastBurst = 0;
+  function histBurst() {
+    const now = performance.now();
+    if (now - lastBurst > 600) pushHist();
+    lastBurst = now;
+  }
+  // zoom time about the pointer: the instant under it stays under it
+  function zoomTAt(P, mx, f) {
+    const t = xToTime(mx, P), frac = (mx - P.x) / Math.max(1, P.w);
+    const span = clamp(S.timePerDiv * S.divsH * f, 1e-15, 1e12);
+    S.timePerDiv = span / S.divsH;
+    S.hOffset = t - frac * span + span / 2;
+  }
+  function zoomYAt(P, y, f) {
+    if (S.yMode === "axis") {
+      const ax = fixAxis(P.i), v = yToDisp(null, y, P);
+      ax.min = v - (v - ax.min) * f;
+      ax.max = v + (ax.max - v) * f;
+      return;
+    }
+    const ppd = P.h / S.divsV;
+    chansOfPane(P).forEach(ch => {
+      const d = yToDisp(ch, y, P);
+      ch.voltsPerDiv *= f;
+      ch.position = (P.y + P.h / 2 - y) / ppd - d / ch.voltsPerDiv;
+      syncChannelCard(ch);
+    });
+  }
+  function panY(P, dy) {
+    if (S.yMode === "axis") {
+      const ax = fixAxis(P.i), k = dy / P.h * (ax.max - ax.min);
+      ax.min += k; ax.max += k;
+      return;
+    }
+    const ppd = P.h / S.divsV;
+    chansOfPane(P).forEach(ch => { ch.position -= dy / ppd; syncChannelCard(ch); });
+  }
+  const panT = (P, dx) => { S.hOffset -= dx / Math.max(1, P.w) * S.timePerDiv * S.divsH; };
+  // Y back to auto: one plot, or all of them when P is null
+  function autoY(P) {
+    if (S.yMode === "axis") (P ? [P] : paneRects()).forEach(Q => { axisOf(Q.i).auto = true; });
+    else S.channels.filter(ch => ch.visible && (!P || panesOf(ch).indexOf(P.i) !== -1))
+      .forEach(ch => { autoscaleChannel(ch); syncChannelCard(ch); });
+  }
+  function applyBand(d) {
+    const P = d.P, k = bandKind(d);
+    const xa = Math.min(d.x0, d.x1), xb = Math.max(d.x0, d.x1);
+    const yTop = Math.min(d.y0, d.y1), yBot = Math.max(d.y0, d.y1);
+    if (k !== "y" && xb - xa < 3) { render(); return; }
+    if (k !== "x" && yBot - yTop < 3) { render(); return; }
+    pushHist();
+    if (k !== "y") setTimeWindow(xToTime(xa, P), xToTime(xb, P));
+    if (k !== "x") {
+      if (S.yMode === "axis") {
+        const lo = yToDisp(null, yBot, P), hi = yToDisp(null, yTop, P), ax = axisOf(P.i);
+        ax.min = lo; ax.max = hi; ax.auto = false;
+      } else chansOfPane(P).forEach(ch => {
+        const lo = yToDisp(ch, yBot, P), hi = yToDisp(ch, yTop, P);
+        ch.voltsPerDiv = (hi - lo) / S.divsV;
+        ch.position = -(lo + hi) / 2 / ch.voltsPerDiv;
+        syncChannelCard(ch);
+      });
+    }
+    afterView();
+  }
+
+  // ---------- plot toolbar, axis panel, cursor table ----------
+  const TOOL_BTN = { zoom: "tbZoom", zoomx: "tbZoomX", zoomy: "tbZoomY", pan: "tbPan", pointer: "tbPointer" };
+  let tbSig = "";
+  function updateToolbar() {
+    if (!R.tbZoom) return;
+    const sig = [S.tool, S.hist.back.length > 0, S.hist.fwd.length > 0, S.cursors.mode, S.legendOn, S.yMode].join("|");
+    if (sig === tbSig) return;
+    tbSig = sig;
+    for (const k in TOOL_BTN) R[TOOL_BTN[k]].classList.toggle("on", S.tool === k);
+    R.tbBack.disabled = !S.hist.back.length;
+    R.tbFwd.disabled = !S.hist.fwd.length;
+    R.tbCursors.classList.toggle("on", S.cursors.mode !== "off");
+    R.tbLegend.classList.toggle("on", S.legendOn);
+    R.tbYMode.classList.toggle("on", S.yMode === "div");
+  }
+  function setTool(tool) {
+    S.tool = TOOL_BTN[tool] ? tool : "zoom";
+    updateToolbar();
+  }
+  function syncAxisUI() {
+    if (!R.axPane) return;
+    const n = paneCount();
+    if (R.axPane.options.length !== n) {
+      const keep = +R.axPane.value || 0;
+      R.axPane.innerHTML = Array.from({ length: n }, (_, i) => '<option value="' + i + '">Plot ' + (i + 1) + "</option>").join("");
+      R.axPane.value = String(Math.min(keep, n - 1));
+    }
+    const i = +R.axPane.value || 0, div = S.yMode === "div";
+    const r = yRange(i), ax = axisOf(i);
+    const f = v => isFinite(v) ? String(+v.toPrecision(5)) : "";
+    R.yModeSel.value = S.yMode;
+    if (document.activeElement !== R.axMin) R.axMin.value = f(r.min);
+    if (document.activeElement !== R.axMax) R.axMax.value = f(r.max);
+    R.axAuto.checked = ax.auto;
+    [R.axPane, R.axMin, R.axMax, R.axAuto].forEach(el => { el.disabled = div; });
+  }
+  const escHtml = (s) => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  /* Mean, RMS, min and max of the samples between the two cursors, in
+     displayed values. A periodic channel is read through its repetition, so
+     the numbers agree with a window that lies past the end of the record. */
+  function statsBetween(ch, a, b) {
+    const time = getTime(ch), data = getData(ch);
+    if (!time || !data || time.length < 2) return null;
+    const N = Math.min(time.length, data.length);
+    const t0 = time[0], dt = (time[N - 1] - t0) / (N - 1);
+    if (!(dt > 0)) return null;
+    const sg = ch.invert ? -1 : 1;
+    let n = 0, s = 0, q = 0, lo = Infinity, hi = -Infinity;
+    const add = (v) => { v *= sg; n++; s += v; q += v * v; if (v < lo) lo = v; if (v > hi) hi = v; };
+    const T = resolvePeriod(ch);
+    if (T && T > 0) {
+      const m = clamp(Math.round((b - a) / dt) + 1, 2, 200000), st = (b - a) / (m - 1);
+      for (let k = 0; k < m; k++) {
+        const t = a + k * st, tt = t - Math.floor((t - t0) / T) * T;
+        const i = Math.round((tt - t0) / dt);
+        if (i >= 0 && i < N) add(data[i]);
+      }
+    } else {
+      const i0 = Math.max(0, Math.ceil((a - t0) / dt - 1e-9)), i1 = Math.min(N - 1, Math.floor((b - t0) / dt + 1e-9));
+      for (let i = i0; i <= i1; i++) add(data[i]);
+    }
+    return n ? { mean: s / n, rms: Math.sqrt(q / n), min: lo, max: hi, n } : null;
+  }
+  /* The PLECS cursor table: one row per signal, its value at each cursor, the
+     difference, and what the signal does between the two. Rebuilt only when
+     something it shows changes, never per frame. */
+  let curSig = "";
+  function updateCursorTable() {
+    if (!R.cursorCard) return;
+    const cu = S.cursors;
+    const on = (cu.mode === "time" || cu.mode === "track") && S.files.length > 0;
+    R.cursorCard.classList.toggle("hide", !on);
+    if (!on) { curSig = ""; return; }
+    const vis = S.channels.filter(c => c.visible);
+    const sig = cu.t1 + "|" + cu.t2 + "|" + vis.map(c => [c.id, c.label, c.color, c.unit, c.invert, (getData(c) || []).length, resolvePeriod(c), c.tOffset || 0].join(",")).join(";");
+    if (sig === curSig) return;
+    curSig = sig;
+    const dt = cu.t2 - cu.t1;
+    R.cursorHead.textContent = "Δt = " + fmt(dt, "s") + "   1/Δt = " + (dt !== 0 ? fmt(1 / Math.abs(dt), "Hz") : "—");
+    const a = Math.min(cu.t1, cu.t2), b = Math.max(cu.t1, cu.t2);
+    const cell = (v, u) => "<td>" + (v === null || v === undefined ? "—" : fmt(v, u, 3)) + "</td>";
+    R.cursorBody.innerHTML = vis.map(ch => {
+      const sg = ch.invert ? -1 : 1;
+      const r1 = sampleAt(ch, cu.t1), r2 = sampleAt(ch, cu.t2);
+      const v1 = r1 === null ? null : sg * r1, v2 = r2 === null ? null : sg * r2;
+      const st = statsBetween(ch, a, b) || {};
+      return '<tr><td class="sig"><span class="sw" style="background:' + ch.color + '"></span>' + escHtml(ch.label) + "</td>" +
+        cell(v1, ch.unit) + cell(v2, ch.unit) + cell(v1 !== null && v2 !== null ? v2 - v1 : null, ch.unit) +
+        cell(st.mean, ch.unit) + cell(st.rms, ch.unit) + cell(st.min, ch.unit) + cell(st.max, ch.unit) + "</tr>";
+    }).join("") || '<tr><td colspan="8" class="osc-empty">No visible signals.</td></tr>';
+  }
+
+  /* What is under the pointer, most specific first: the axis bands (and, in
+     div mode, the ground markers inside the y band), cursors, the trigger
+     arrow, the zoom region. */
   function hitTest(mx, my) {
+    const g = gutterAt(mx, my);
+    if (g) {
+      const P = g.P;
+      if (g.side === "y" && S.yMode === "div" && mx >= P.x - 17) {
+        for (const ch of chansOfPane(P)) {
+          const y = clamp(dispToY(ch, 0, P), P.y + 6, P.y + P.h - 6);
+          if (Math.abs(my - y) <= 7) return { type: "chpos", ch, P };
+        }
+      }
+      return { type: g.side === "y" ? "gutterY" : "gutterX", P };
+    }
     const P = paneAt(mx, my);
-    if (!P) return null;                       // the gutter between panes
+    if (!P) return null;
     const cu = S.cursors;
     const visCh = chansOfPane(P);
     if (cu.mode === "time" || cu.mode === "track") {
       for (const key of ["t1", "t2"]) {
-        if (Math.abs(mx - timeToX(cu[key], P)) <= 6) return { type: "cursorT", key, P };
+        const x = timeToX(cu[key], P);
+        if (Math.abs(mx - x) <= 6 || (P.h >= 40 && my <= P.y + 13 && Math.abs(mx - x) <= 8)) return { type: "cursorT", key, P };
       }
     }
     if (cu.mode === "value") {
       const ref = visCh.find(ch => ch.id === cu.refId) || visCh[0];
       if (ref) for (const key of ["v1", "v2"]) {
-        if (Math.abs(my - valueToY(ref, cu[key], P)) <= 6) return { type: "cursorV", key, ref, P };
+        if (Math.abs(my - dispToY(ref, cu[key], P)) <= 6) return { type: "cursorV", key, ref, P };
       }
-    }
-    for (const ch of visCh) {
-      const y = valueToY(ch, 0, P);
-      if (mx >= P.x && mx <= P.x + 14 && Math.abs(my - y) <= 8) return { type: "chpos", ch, P };
     }
     const trig = visCh.find(c => c.id === S.trigger.sourceId);
     if (trig) {
-      const y = valueToY(trig, S.trigger.level, P);
+      const y = dispToY(trig, S.trigger.level, P);
       if (mx >= P.x + P.w - 14 && Math.abs(my - y) <= 8) return { type: "trigger", ch: trig, P };
     }
     if (S.zoomOn) {
       const x1 = timeToX(S.zoomT - S.zoomSpan / 2, P), x2 = timeToX(S.zoomT + S.zoomSpan / 2, P);
-      if (mx >= x1 && mx <= x2) return { type: "zoomRegion", P };
+      if (mx >= x1 && mx <= x2 && my >= P.y + P.h - 16) return { type: "zoomRegion", P };
     }
     return null;
   }
 
+  const HIT_CURSOR = { cursorT: "ew-resize", cursorV: "ns-resize", chpos: "ns-resize", trigger: "ns-resize", zoomRegion: "grab", gutterY: "ns-resize", gutterX: "ew-resize" };
   function bindScopeInteractions() {
     const canvas = R.scopeCanvas;
+    const at = (e) => { const r = canvas.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+
+    /* Wheel zooms about the pointer, as in PLECS: time over a plot or the
+       time axis, Y with Shift or over a y axis, both with Ctrl. Continuous,
+       not stepped through the Time/div list — a trackpad sends slivers, and
+       jumping a whole 1-2-5 step per sliver made it unusable. */
     canvas.addEventListener("wheel", (e) => {
       e.preventDefault();
       if (S.files.length === 0) return;
-      const rect = canvas.getBoundingClientRect();
-      const mx = e.clientX - rect.left, my = e.clientY - rect.top;
-      /* Zoom about the pointer, measured in the pane it is over. Using the
-         canvas-wide fraction instead would drag the window sideways whenever
-         the cursor was in any pane but the leftmost. */
-      const P = paneAt(mx, my) || fullPane();
-      const tAtMouse = xToTime(mx, P);
-      const frac = (mx - P.x) / Math.max(1, P.w);
-      const steps = S.timeDivOptions;
-      if (steps.length) {
-        let idx = 0, bd = Infinity;
-        for (let i = 0; i < steps.length; i++) { const d = Math.abs(steps[i] - S.timePerDiv); if (d < bd) { bd = d; idx = i; } }
-        idx = clamp(idx + (e.deltaY > 0 ? 1 : -1), 0, steps.length - 1);
-        S.timePerDiv = steps[idx];
-      }
-      const newT0 = tAtMouse - frac * (S.timePerDiv * S.divsH);
-      S.hOffset = newT0 + (S.timePerDiv * S.divsH) / 2;
-      if (S.persistOn) clearPersist();
-      syncTimeDivUI(); render(); scheduleMeasure(); scheduleSplit();
+      const [mx, my] = at(e);
+      const g = gutterAt(mx, my), P = g ? g.P : paneAt(mx, my);
+      if (!P) return;
+      const dl = (e.deltaY || e.deltaX) * (e.deltaMode === 1 ? 33 : e.deltaMode === 2 ? 400 : 1);
+      if (!dl) return;
+      const f = Math.exp(clamp(dl, -300, 300) * 0.0015);
+      const cx = clamp(mx, P.x, P.x + P.w), cy = clamp(my, P.y, P.y + P.h);
+      histBurst();
+      const doY = e.shiftKey || e.ctrlKey || (g && g.side === "y");
+      const doT = !e.shiftKey && !(g && g.side === "y");
+      if (doY) zoomYAt(P, cy, f);
+      if (doT) zoomTAt(P, cx, f);
+      afterView();
     }, { passive: false });
 
     canvas.addEventListener("mousedown", (e) => {
-      const rect = canvas.getBoundingClientRect();
-      const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+      if (e.button === 2 || S.files.length === 0) return;
+      const [mx, my] = at(e);
       const hit = hitTest(mx, my);
-      if (hit) S.dragging = { ...hit, startX: mx, startT: xToTime(mx, hit.P), zoomT0: S.zoomT };
-      else if (S.files.length > 0) {
-        const P = paneAt(mx, my);
-        if (P) S.dragging = { type: "pan", P, startX: mx, startTime: xToTime(mx, P) };
+      const P = hit ? hit.P : paneAt(mx, my);
+      if (!P) return;
+      e.preventDefault();
+      const base = { P, lastX: mx, lastY: my, histPushed: false };
+      const onAxis = hit && (hit.type === "gutterY" || hit.type === "gutterX");
+      if (onAxis) S.dragging = Object.assign(base, { type: hit.type === "gutterY" ? "panY" : "panT" });
+      else if (e.button === 1) S.dragging = Object.assign(base, { type: "panxy" });
+      else if (hit) S.dragging = Object.assign(base, hit, { startT: xToTime(mx, P), zoomT0: S.zoomT });
+      else if (S.tool === "pan") S.dragging = Object.assign(base, { type: "panxy" });
+      else if (S.tool === "pointer") S.dragging = Object.assign(base, { type: "panT" });
+      else {
+        const x = clamp(mx, P.x, P.x + P.w), y = clamp(my, P.y, P.y + P.h);
+        S.dragging = Object.assign(base, { type: "box", x0: x, y0: y, x1: x, y1: y, moved: false });
       }
+      if (S.dragging.type.indexOf("pan") === 0 && S.dragging.type !== "panY") canvas.style.cursor = "grabbing";
+    });
+
+    canvas.addEventListener("dblclick", (e) => {
+      if (S.files.length === 0) return;
+      const [mx, my] = at(e);
+      const g = gutterAt(mx, my), P = paneAt(mx, my);
+      if (!g && !P) return;
+      pushHist();
+      if (g && g.side === "y") autoY(g.P);
+      else if (g) fitTimeWin();
+      else { fitTimeWin(); autoY(null); }
+      afterView();
     });
 
     window.addEventListener("mousemove", (e) => {
-      const rect = canvas.getBoundingClientRect();
-      const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+      const [mx, my] = at(e);
       const inside = mx >= 0 && mx <= CV.scope.w && my >= 0 && my <= CV.scope.h;
 
       if (S.dragging) {
         const d = S.dragging;
         const P = d.P || fullPane();
-        if (d.type === "pan") {
-          S.hOffset -= (xToTime(mx, P) - d.startTime);
-          if (S.persistOn) clearPersist();
-        } else if (d.type === "chpos") {
+        const dx = mx - d.lastX, dy = my - d.lastY;
+        d.lastX = mx; d.lastY = my;
+        const once = () => { if (!d.histPushed) { pushHist(); d.histPushed = true; } };
+        if (d.type === "box") {
+          d.x1 = clamp(mx, P.x, P.x + P.w); d.y1 = clamp(my, P.y, P.y + P.h);
+          if (!d.moved && Math.hypot(d.x1 - d.x0, d.y1 - d.y0) > 4) d.moved = true;
+          render();
+          return;
+        }
+        if (d.type === "panT" || d.type === "panY" || d.type === "panxy") {
+          if (!dx && !dy) return;
+          once();
+          if (d.type !== "panY" && dx) panT(P, dx);
+          if (d.type !== "panT" && dy) panY(P, dy);
+          afterView();
+          return;
+        }
+        if (d.type === "chpos") {
+          once();
           d.ch.position = (P.y + P.h / 2 - my) / pxPerDivV(P);
           syncChannelCard(d.ch);
         } else if (d.type === "trigger") {
-          S.trigger.level = yToValue(d.ch, my, P);
+          S.trigger.level = yToDisp(d.ch, my, P);
           if (document.activeElement !== R.trigLevelIn) R.trigLevelIn.value = fmtScale(S.trigger.level, "");
         } else if (d.type === "cursorT") {
-          S.cursors[d.key] = xToTime(mx, P);
+          S.cursors[d.key] = xToTime(clamp(mx, P.x, P.x + P.w), P);
         } else if (d.type === "cursorV") {
-          S.cursors[d.key] = yToValue(d.ref, my, P);
+          S.cursors[d.key] = yToDisp(d.ref, clamp(my, P.y, P.y + P.h), P);
         } else if (d.type === "zoomRegion") {
           S.zoomT = d.zoomT0 + (xToTime(mx, P) - d.startT);
         }
         render();
-        if (d.type === "pan" || d.type === "cursorT") scheduleMeasure();
-        if (d.type === "pan") scheduleSplit();
         return;
       }
 
-      const hoverPane = inside ? paneAt(mx, my) : null;
-      if (hoverPane && S.files.length > 0 && S.tab === "scope") {
-        const hit = hitTest(mx, my);
-        canvas.style.cursor = hit ? (hit.type === "cursorT" ? "ew-resize" : hit.type === "cursorV" ? "ns-resize" : hit.type === "zoomRegion" ? "grab" : "pointer") : "crosshair";
+      if (!inside || S.files.length === 0 || S.tab !== "scope") { R.hoverReadout.style.display = "none"; return; }
+      const hit = hitTest(mx, my);
+      canvas.style.cursor = hit ? HIT_CURSOR[hit.type] : (S.tool === "pan" ? "grab" : S.tool === "pointer" ? "default" : "crosshair");
+      const hoverPane = paneAt(mx, my);
+      if (hoverPane) {
         const t = xToTime(mx, hoverPane);
-        // only what is actually plotted in the pane under the pointer
-        let lines = [(isGrid() ? "pane " + (hoverPane.i + 1) + "   " : "") + "t = " + fmt(t, "s")];
+        // only what is actually plotted in the plot under the pointer
+        const lines = [(isGrid() ? "plot " + (hoverPane.i + 1) + "   " : "") + "t = " + fmt(t, "s")];
         chansOfPane(hoverPane).forEach(ch => {
           const v = sampleAt(ch, t);
-          if (v !== null) lines.push(ch.label + " = " + fmt(ch.invert ? -v : v, ch.unit, 2));
+          if (v !== null) lines.push(ch.label + " = " + fmt(ch.invert ? -v : v, ch.unit, 3));
         });
         R.hoverReadout.textContent = lines.join("\n");
         R.hoverReadout.style.display = "block";
@@ -2781,7 +3574,15 @@ self.onmessage = function(e) {
         R.hoverReadout.style.display = "none";
       }
     });
-    window.addEventListener("mouseup", () => { S.dragging = null; });
+    window.addEventListener("mouseup", () => {
+      const d = S.dragging;
+      if (!d) return;
+      S.dragging = null;
+      if (d.type === "box") { if (d.moved) applyBand(d); else render(); }
+      else if (d.type === "cursorT") scheduleMeasure();
+      if (R.scopeCanvas.style.cursor === "grabbing") R.scopeCanvas.style.cursor = S.tool === "pan" ? "grab" : "crosshair";
+    });
+    canvas.addEventListener("mouseleave", () => { if (!S.dragging) R.hoverReadout.style.display = "none"; });
 
     R.zoomCanvas.addEventListener("wheel", (e) => {
       e.preventDefault();
@@ -2954,6 +3755,7 @@ self.onmessage = function(e) {
     if (S.persistOn) clearPersist();          // the old afterglow is in the wrong places now
     paintLayoutPicker();
     rebuildChannelList();
+    syncAxisUI();
     render();
   }
   /* One channel per plot, in order. The obvious thing to want after choosing a
@@ -3016,6 +3818,7 @@ self.onmessage = function(e) {
   }
 
   function wire() {
+    bindScopeInteractions();
     R.btnLoad.addEventListener("click", () => R.fileInput.click());
     R.fileInput.addEventListener("change", () => {
       Array.from(R.fileInput.files || []).forEach(loadFile);
@@ -3031,7 +3834,9 @@ self.onmessage = function(e) {
     });
 
     R.btnAutoset.addEventListener("click", () => {
+      pushHist();
       S.channels.forEach(autoscaleChannel);
+      S.axes.forEach(ax => { if (ax) ax.auto = true; });
       fitAll();
       rebuildChannelList();
     });
@@ -3054,8 +3859,10 @@ self.onmessage = function(e) {
       syncReconUI();
       clearPersist();
       setLayout(1, 1);
+      S.yMode = "axis"; S.axes = []; S.hist = { back: [], fwd: [] }; S.tool = "zoom";
       fitAll();
       rebuildChannelList();
+      updateToolbar();
     });
     R.btnShot.addEventListener("click", () => {
       const src = S.tab === "fft" ? CV.spec.canvas : S.tab === "xy" ? CV.xy.canvas : CV.scope.canvas;
@@ -3072,9 +3879,11 @@ self.onmessage = function(e) {
     R.tabXY.addEventListener("click", () => setTab("xy"));
 
     R.timeDiv.addEventListener("change", () => {
-      S.timePerDiv = nearestStep(S.timeDivOptions, parseFloat(R.timeDiv.value));
-      if (S.persistOn) clearPersist();
-      syncTimeDivUI(); render(); scheduleMeasure(); scheduleSplit();
+      const v = parseFloat(R.timeDiv.value);
+      if (!(v > 0)) return;
+      pushHist();
+      S.timePerDiv = v;
+      afterView();
     });
     R.hOffsetIn.addEventListener("change", () => {
       const v = parseFloat(R.hOffsetIn.value);
@@ -3084,6 +3893,59 @@ self.onmessage = function(e) {
     R.btnPanR.addEventListener("click", () => { S.hOffset += S.timePerDiv; if (S.persistOn) clearPersist(); syncTimeDivUI(); render(); scheduleMeasure(); scheduleSplit(); });
     R.btnZinH.addEventListener("click", () => { if (S.persistOn) clearPersist(); zoomHStep(-1); scheduleSplit(); });
     R.btnZoutH.addEventListener("click", () => { if (S.persistOn) clearPersist(); zoomHStep(1); scheduleSplit(); });
+
+    // ----- PLECS-style plot toolbar -----
+    ["pointer", "zoom", "zoomx", "zoomy", "pan"].forEach(t => R[TOOL_BTN[t]].addEventListener("click", () => setTool(t)));
+    R.tbFit.addEventListener("click", () => { pushHist(); fitTimeWin(); autoY(null); afterView(); });
+    R.tbFitY.addEventListener("click", () => { pushHist(); autoY(null); afterView(); });
+    R.tbBack.addEventListener("click", () => histGo(-1));
+    R.tbFwd.addEventListener("click", () => histGo(1));
+    R.tbCursors.addEventListener("click", () => {
+      R.cursorMode.value = S.cursors.mode === "off" ? "time" : "off";
+      R.cursorMode.dispatchEvent(new Event("change"));
+      updateToolbar();
+    });
+    R.tbLegend.addEventListener("click", () => { S.legendOn = !S.legendOn; updateToolbar(); render(); });
+    R.tbYMode.addEventListener("click", () => { pushHist(); setYMode(S.yMode === "div" ? "axis" : "div"); afterView(); updateToolbar(); });
+    R.tbPng.addEventListener("click", () => R.btnShot.click());
+    R.tbCsv.addEventListener("click", () => R.btnExportData.click());
+    R.tbInfo.addEventListener("click", () => {
+      alert("Plot tools (PLECS style)\n\n" +
+        "Zoom box: drag a rectangle · Zoom X / Zoom Y: drag a band · Pan: drag the view\n" +
+        "Wheel: zoom time · Shift/Ctrl+wheel or wheel over the y axis: zoom Y\n" +
+        "Drag the axis gutters to pan that axis · middle button: pan\n" +
+        "Double-click: fit · Backspace / Alt+←: back · Alt+→: forward\n" +
+        "Keys: Z zoom · X zoom X · Y zoom Y · H pan · Esc pointer · C cursors · L legend · A fit Y · F fit");
+    });
+    R.yModeSel.addEventListener("change", () => { pushHist(); setYMode(R.yModeSel.value); afterView(); updateToolbar(); });
+    R.axPane.addEventListener("change", syncAxisUI);
+    const axEdit = (lo) => {
+      const i = +R.axPane.value || 0;
+      const v = parseScaleInput((lo ? R.axMin : R.axMax).value);
+      const r = yRange(i);
+      if (v === null || (lo ? v >= r.max : v <= r.min)) { syncAxisUI(); return; }
+      pushHist();
+      const ax = fixAxis(i);
+      if (lo) ax.min = v; else ax.max = v;
+      afterView();
+    };
+    R.axMin.addEventListener("change", () => axEdit(true));
+    R.axMax.addEventListener("change", () => axEdit(false));
+    R.axAuto.addEventListener("change", () => {
+      const i = +R.axPane.value || 0;
+      pushHist();
+      if (R.axAuto.checked) axisOf(i).auto = true; else fixAxis(i);
+      afterView();
+    });
+    const tEdit = () => {
+      const a = parseFloat(R.tStartIn.value), b = parseFloat(R.tEndIn.value);
+      if (!(isFinite(a) && isFinite(b) && b > a)) { syncTimeDivUI(); return; }
+      pushHist();
+      setTimeWindow(a / 1000, b / 1000);
+      afterView();
+    };
+    R.tStartIn.addEventListener("change", tEdit);
+    R.tEndIn.addEventListener("change", tEdit);
 
     R.trigSource.addEventListener("change", () => { S.trigger.sourceId = R.trigSource.value; render(); });
     R.trigSlope.addEventListener("change", () => { S.trigger.slope = R.trigSlope.value; render(); });
@@ -3182,7 +4044,8 @@ self.onmessage = function(e) {
        itself: leaving it ticked would silently overwrite what was just typed
        the next time the source changed. */
     R.f0In.addEventListener("input", () => { R.chkF0Auto.checked = false; });
-    R.fftSource.addEventListener("change", () => fillAutoF0(false));
+    R.fftSource.addEventListener("change", () => { buildCompareList(); fillAutoF0(false); });
+    R.fftPhaseMode.addEventListener("change", () => drawPhaseBars());
     ["fftSource", "fftWindow", "fftRange", "f0In", "nHarmIn", "ilIn"].forEach(id => {
       R[id].addEventListener("change", scheduleAnalysis);
     });
@@ -3247,11 +4110,21 @@ self.onmessage = function(e) {
     window.addEventListener("keydown", (e) => {
       if (document.activeElement && ["INPUT", "SELECT", "TEXTAREA"].includes(document.activeElement.tagName)) return;
       if (S.files.length === 0 || S.tab !== "scope") return;
-      if (e.key === "ArrowLeft") { S.hOffset -= S.timePerDiv; if (S.persistOn) clearPersist(); syncTimeDivUI(); render(); scheduleMeasure(); }
+      if (e.key === "ArrowLeft" && !e.altKey) { S.hOffset -= S.timePerDiv; if (S.persistOn) clearPersist(); syncTimeDivUI(); render(); scheduleMeasure(); }
       else if (e.key === "ArrowRight") { S.hOffset += S.timePerDiv; if (S.persistOn) clearPersist(); syncTimeDivUI(); render(); scheduleMeasure(); }
       else if (e.key === "+" || e.key === "=") zoomHStep(-1);
       else if (e.key === "-" || e.key === "_") zoomHStep(1);
-      else if (e.key.toLowerCase() === "f") fitAll();
+      else if (e.key.toLowerCase() === "f") { pushHist(); fitAll(); }
+      else if (e.key === "Escape") setTool("pointer");
+      else if (e.key === "Backspace" || (e.altKey && e.key === "ArrowLeft")) { e.preventDefault(); histGo(-1); }
+      else if (e.ctrlKey || e.metaKey || e.altKey) return;
+      else if (e.key.toLowerCase() === "z") setTool("zoom");
+      else if (e.key.toLowerCase() === "x") setTool("zoomx");
+      else if (e.key.toLowerCase() === "y") setTool("zoomy");
+      else if (e.key.toLowerCase() === "h") setTool("pan");
+      else if (e.key.toLowerCase() === "c") R.tbCursors.click();
+      else if (e.key.toLowerCase() === "l") R.tbLegend.click();
+      else if (e.key.toLowerCase() === "a") R.tbFitY.click();
     });
 
     new ResizeObserver(() => {
@@ -3264,6 +4137,24 @@ self.onmessage = function(e) {
 
   // ---------- public API ----------
   let ready = false;
+  // toolbar icons: inline strokes in currentColor, so .on repaints them
+  const TB_ICON = {
+    tbPointer: '<path d="M5 3l12 8-5 1 3 6-2 1-3-6-4 3z"/>',
+    tbZoom: '<circle cx="10" cy="10" r="6"/><path d="M14.5 14.5L20 20M7 10h6M10 7v6"/>',
+    tbZoomX: '<path d="M3 12h18M6 9l-3 3 3 3M18 9l3 3-3 3"/>',
+    tbZoomY: '<path d="M12 3v18M9 6l3-3 3 3M9 18l3 3 3-3"/>',
+    tbPan: '<path d="M12 3v18M3 12h18M12 3l-2 2M12 3l2 2M12 21l-2-2M12 21l2-2M3 12l2-2M3 12l2 2M21 12l-2-2M21 12l-2 2"/>',
+    tbFit: '<path d="M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5"/>',
+    tbFitY: '<path d="M12 4v16M8 8l4-4 4 4M8 16l4 4 4-4M4 4h16M4 20h16"/>',
+    tbBack: '<path d="M15 5l-7 7 7 7"/>',
+    tbFwd: '<path d="M9 5l7 7-7 7"/>',
+    tbCursors: '<path d="M8 3v18M16 3v18M5 7h6M13 17h6"/>',
+    tbLegend: '<path d="M4 7h3M4 12h3M4 17h3M10 7h10M10 12h10M10 17h10"/>',
+    tbYMode: '<rect x="3" y="4" width="18" height="16"/><path d="M3 8h18M3 12h18M3 16h18"/>',
+    tbPng: '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-8 8"/>',
+    tbCsv: '<path d="M12 3v12M7 10l5 5 5-5M4 20h16"/>',
+    tbInfo: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/>'
+  };
   function init(opts) {
     if (ready) { applyOptions(opts); return; }
     Object.assign(S.opts, opts || {});
@@ -3294,6 +4185,9 @@ self.onmessage = function(e) {
     rebuildFileList();
     rebuildChannelList();
     syncReconUI();
+    for (const id in TB_ICON) R[id].innerHTML = '<svg viewBox="0 0 24 24">' + TB_ICON[id] + "</svg>";
+    updateToolbar();
+    syncAxisUI();
     setTab("scope");
     resizeCanvas("scope");
     render();

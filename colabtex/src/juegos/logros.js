@@ -21,7 +21,7 @@
    Un logro es del juego, no de la modalidad; los que solo se sacan en
    una llevan `m`, que es lo que la pestaña pinta como etiqueta.
    ============================================================ */
-import { TAMANOS } from "./motor.js";
+import { TAMANOS, ganoEn } from "./motor.js";
 
 const FILA = [
   { id: "primera", n: "Primera victoria", d: "Gana tu primera partida.", i: "🥇", f: f => f.ganadas >= 1 },
@@ -38,21 +38,23 @@ export function contexto(p, est, me) {
   const otros = js.map(j => j.uid).filter(u => u !== me);
   const hist = (est && est.hist) || [];
   return {
-    p: p || {}, est: est || {}, me, fin, gano: fin && !!g && g === me, n: js.length, otros, rival: otros[0], hist,
+    p: p || {}, est: est || {}, me, fin, gano: fin && ganoEn(p, g, me), n: js.length, otros, rival: otros[0], hist,
     ev: (e, f) => hist.some(h => h && h.e === e && (!f || f(h)))
   };
 }
 /* Mis puntos menos los del mejor de los demás. */
 const margen = (pts, c) => (pts[c.me] || 0) - Math.max(...c.otros.map(u => pts[u] || 0), -Infinity);
+/* Órbita: algún suceso de los turnos recientes (cada entrada de `hist` es un turno). */
+const orEv = (c, f) => c.hist.some(h => h && Array.isArray(h.eventos) && h.eventos.some(f));
 const mias = (obj, me) => Object.keys(obj || {}).filter(k => obj[k] === me);
 const ladoMax = Math.max(...Object.values(TAMANOS).map(t => t.lado));
 
 const SALA = {
   orbita: [
-    { id: "cinco", n: "Supernova", d: "Toma una estrella de 5.", i: "🌟", x: c => mias(c.est.tomadas, c.me).some(i => c.est.estrellas[i] === 5) },
-    { id: "coleccion", n: "Coleccionista", d: "Toma 10 estrellas en una partida.", i: "✨", x: c => mias(c.est.tomadas, c.me).length >= 10 },
-    { id: "humilde", n: "Polvo de estrellas", d: "Toma cinco estrellas de 1 en una partida.", i: "🌫️", x: c => mias(c.est.tomadas, c.me).filter(i => c.est.estrellas[i] === 1).length >= 5 },
-    { id: "constelacion", n: "Constelación", d: "Toma una estrella de cada valor, del 1 al 5, en la misma partida.", i: "🔭", x: c => new Set(mias(c.est.tomadas, c.me).map(i => c.est.estrellas[i])).size >= 5 },
+    { id: "racimo", n: "Racimo", d: "Captura 3 estrellas o más con un solo lanzamiento.", i: "✨", x: c => orEv(c, e => e.k === "estrella" && e.nueva && e.u === c.me && e.n >= 3) },
+    { id: "derribo", n: "Derribo", d: "Derriba un satélite rival con tu sonda.", i: "💥", x: c => orEv(c, e => e.k === "choque" && e.quien === c.me) },
+    { id: "nova", n: "Supernova", d: "Captura una nova (una estrella de 5).", i: "🌟", x: c => orEv(c, e => e.k === "estrella" && e.u === c.me && e.v === 5) },
+    { id: "veterano", n: "Satélite veterano", d: "Un satélite tuyo ya en órbita captura su 3.ª estrella.", i: "🛰️", x: c => orEv(c, e => e.k === "estrella" && !e.nueva && e.u === c.me && e.n >= 3) },
     { id: "aplastante", n: "Eclipse total", d: "Gana con el 60 % de los puntos o más.", i: "🌑", x: c => { const t = Object.values(c.est.puntos || {}).reduce((a, b) => a + b, 0); return c.gano && t > 0 && c.est.puntos[c.me] >= 0.6 * t; } },
     { id: "foto", n: "Por un pelo", d: "Gana por 2 puntos o menos.", i: "📸", x: c => c.gano && margen(c.est.puntos || {}, c) <= 2 }
   ],
