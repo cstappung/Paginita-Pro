@@ -2595,12 +2595,36 @@ to set the tempo, drums, arpeggio, filter cut-offs and a sidechain pump. In
 calm there is no snare and the melody is sparse; near the floor you get
 sixteenth hats, an alarm cluster and a heartbeat. The harmony switches to
 «filo» at I ≥ .7 and leaves it below .5. That hysteresis stops it flickering
-when a row goes back and forth. **From round 100 it drops into the abyss**
-(`ABISMO_DESDE`), with a sub under 40 Hz, a saturated bass, a detuned saw lead
-and slower tempos. Entering plays a falling sting (`caida`). The screen swaps
-to a crimson palette at the same time: `paleta()` writes into `colors` and
-toggles `html.abismo`, which re-skins `style.css`. `duck()` lowers the music
-bus under the NICE!.
+when a row goes back and forth. `duck()` lowers the music bus under the NICE!.
+
+**Below round 100 the game descends five floors** (`descenso.js`, UMD on
+`BBTANDescenso`, loaded before `musica.js`): abismo at 100, ruina at 200,
+estática at 300, hostil at 400 and vacío at 500. None of them is a switch.
+`corrupcion(ronda)` rises by 1/21 per round over the twenty rounds after each
+threshold, from 0 up to 5, and **everything reads that one number** except the
+gameplay: blocks, balls, physics and aim stay as they are, so the game only
+gets more uncomfortable. The colours are `mezcla(c)`, a blend between the two
+floors' palettes (`ETAPAS`), and `paleta()` in `game.js` writes them into
+`colors` and into CSS variables on `<html>`. The floor adds the classes
+`descenso` and `desc-2…5`, and each one breaks the frame a bit more: chipped
+corners, chromatic glow, jitter, a heartbeat and a skewed shell. The
+reduced-motion setting turns those animations off. The canvas gets cracks,
+faint words, blinking eyes and static (`drawDescenso`, `drawEstatica`). The
+character's face turns evil with `pose.maldad` in `character.js`, adding in
+order: pallor, V brows, red eyes, streaks and a jagged grin. The texts come from
+`TEXTOS`, one column per floor, picked with `etapa(c)`, the nearest floor, so
+the tone flips mid-fade. They go from cheering to «NO TE QUEREMOS AQUÍ», and
+past floor 2 `corrompe` swaps letters with a seeded noise so the status bar
+does not flicker. «PANTALLA LIMPIA» and the NICE! are never touched. The music
+gets `descenso` in `mood()`, and `Motor` smooths it (`D`, τ 4 s). The first
+floor fades the harmony into the abyss's sub bass, saturated bass and detuned
+lead. Past that, the wrapper `eventos()` breaks what `base()` plays: bitcrush
+(`trituradora`), wrong notes and a wobbling lead in ruina, dropouts and
+crackle (`bat 'r'`) in estática, and in hostil a heartbeat that never stops
+plus a dissonant pad cluster. In vacío come silent bars and notes that fall
+an octave (`cae`). Each floor is slower, and entering one plays `presagio` (the old
+`caida` plus falling detuned clusters and one drum hit per floor).
+`reinicia()` starts at the current floor without the sting.
 
 **UNO No Mercy's roulette is played by its victim**: the victim picks the
 colour (not whoever threw the card) and then draws one card at a time with

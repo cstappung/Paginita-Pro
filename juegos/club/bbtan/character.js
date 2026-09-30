@@ -113,6 +113,41 @@
     if(a.mouth===7){rect(-5,my-2,10,5,2,mc);rect(0,my,4,6,2,'#f68ca4');}
     if(a.mouth===8){curve(-5,my-1,0,my+5,5,my-1,mc,2);rect(-1,my,3,3,1,'#ffffff');}
     if(a.mouth===9){poly([[-3,my-3],[3,my-1],[0,my],[3,my+2],[-3,my+3],[0,my]],mc);}
+    // El descenso (pose.maldad, 0..5): la cara se va torciendo por capas,
+    // cada una fundida con su propio tramo. El vestidor no la pasa.
+    const m=pose.maldad||0;
+    if(m>0){
+      const k=v=>Math.max(0,Math.min(1,v));
+      const palidez=k((m-.5)/2)*.55;
+      if(palidez>0){ctx.globalAlpha=palidez;rect(-17,-90,34,35,14,'#2a1a28');ctx.globalAlpha=1;}
+      const ojos=k(m-1),boca=k(m-2),hondo=k(m-3);
+      if(ojos>0){
+        ctx.globalAlpha=ojos;
+        for(const side of [-1,1]){
+          rect(side*7-5,ey-5,10,9,3,c.skin);
+          if(palidez>0){ctx.globalAlpha=ojos*palidez;rect(side*7-5,ey-5,10,9,3,'#2a1a28');ctx.globalAlpha=ojos;}
+          if(hondo>0){ctx.globalAlpha=ojos*hondo*.7;line([[side*6,ey+3],[side*7,ey+9]],'#1a0508',1.5);line([[side*8.5,ey+3],[side*9,ey+7]],'#1a0508',1);ctx.globalAlpha=ojos;}
+          ctx.shadowColor='#ff1030';ctx.shadowBlur=4+8*hondo;
+          poly([[side*3,ey+1],[side*10,ey-3],[side*9,ey+1.5]],'#ff2238');
+          ctx.shadowBlur=0;
+        }
+        ctx.globalAlpha=1;
+      }
+      // Las cejas, en V, desde el primer piso.
+      ctx.globalAlpha=k(m);
+      for(const side of [-1,1])line([[side*3,ey-4],[side*11,ey-9]],c.hair,2.4);
+      ctx.globalAlpha=1;
+      if(boca>0){
+        ctx.globalAlpha=boca;rect(-8,my-4,16,9,3,c.skin);
+        if(palidez>0){ctx.globalAlpha=boca*palidez;rect(-8,my-4,16,9,3,'#2a1a28');}
+        ctx.globalAlpha=boca;
+        poly([[-8,my-3],[8,my-3],[5,my+3],[-5,my+3]],'#1a0508');
+        const dientes=[];for(let i=0;i<=8;i++)dientes.push([-7+i*1.75,my-3+(i%2?3:0)]);
+        dientes.push([7,my-3]);poly(dientes,'#f4ecd8');
+        line([[-8,my-3],[-10,my-6]],'#1a0508',1.2);line([[8,my-3],[10,my-6]],'#1a0508',1.2);
+        ctx.globalAlpha=1;
+      }
+    }
     ctx.restore();
   }
   const api={catalog,defaults,normalize,draw};

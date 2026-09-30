@@ -20,7 +20,23 @@
    Desde la ronda 100 la misma lógica toca en otro sitio, «el abismo»: más
    lento, en grave, con un sub que baja de 40 Hz, un bajo de sierra saturado,
    un 808 en medio tiempo que hunde el resto (sidechain) y una melodía de
-   sierra en la octava 4. Entrar suena a caída.
+   sierra en la octava 4.
+
+   El abismo es sólo el primer piso del descenso (descenso.js), y ninguno
+   entra de golpe: la corrupción D va de 0 a 5 fundiéndose a lo largo de
+   veinte rondas por piso. Entre la luz y el abismo cada frase de cuatro
+   compases echa una moneda cargada con la parte fraccionaria de D, así el
+   abismo se cuela primero de vez en cuando y al final se queda. Los pisos
+   siguientes son capas cuya probabilidad crece con D, encima del abismo:
+   - ruina (D>1): notas equivocadas, cinta que se estira (vibrato ancho),
+     la melodía que se corta y un bitcrush que se mezcla con la salida;
+   - estática (D>2): compases que tartamudean, crujidos y pasos en blanco;
+   - hostil (D>3): un latido fijo, clusters de semitono y trítono en el
+     colchón y una alarma grave;
+   - vacío (D>4): notas que se desploman, casi todo calla y hay compases
+     enteros de silencio.
+   El tempo baja con cada piso. Cada piso nuevo anuncia su llegada con una
+   caída (`presagio`), más larga y más sucia cuanto más hondo.
 
    La mitad pura (`intensidad`, `siguienteArmonia`, `eventos`) no toca audio y
    se prueba en Node; `Motor` es sólo el agendador, a lo Chip.Reproductor. */
@@ -28,6 +44,7 @@
   'use strict';
 
   const Chip = root.Chip || (typeof require === 'function' ? require('../../audio/chip.js') : null);
+  const Descenso = root.BBTANDescenso || (typeof require === 'function' ? require('./descenso.js') : null);
   const hz = n => 440 * Math.pow(2, (n - 69) / 12);
   const clamp = x => Math.max(0, Math.min(1, Number.isFinite(x) ? x : 0));
   const sm = (a, b, x) => { const t = clamp((x - a) / (b - a)); return t * t * (3 - 2 * t); };
@@ -104,14 +121,55 @@
     return (h >>> 0) / 4294967296;
   }
 
+  /** La corrupción pedida: D si viene, si no el abismo de antes (0 o 1). */
+  const corrDe = e => Number.isFinite(e.D) ? Math.max(0, Math.min(5, e.D)) : (e.abismo ? 1 : 0);
+  /** Peso del piso j (2..5) para una corrupción D. */
+  const pesoPiso = (D, j) => clamp(D - (j - 1));
+
   /**
    * Lo que suena en el paso k (0‥127: ocho compases de semicorcheas).
-   * e = {I, abismo, filo, vuelta}. Devuelve [{c, n|d, pasos, vol, ...}].
+   * e = {I, D, filo, vuelta} (o {abismo} en vez de D). Devuelve
+   * [{c, n|d, pasos, vol, ...}].
    * Canales: pad, bajo, sub, grave, lead, arp, brillo, alarma, bat.
    */
   function eventos(e, k) {
-    const I = clamp(e.I), ab = !!e.abismo, filo = !!e.filo, v = e.vuelta || 0;
+    const D = corrDe(e), v = e.vuelta || 0;
     k = ((k % 128) + 128) % 128;
+    const b = Math.floor(k / 16), s = k % 16;
+    // Luz o abismo: por frase, con la parte de D que ya entró.
+    const ab = D >= 1 || (D > 0 && azar(Math.floor(b / 4), v, 9) < D);
+    const w2 = pesoPiso(D, 2), w3 = pesoPiso(D, 3), w4 = pesoPiso(D, 4), w5 = pesoPiso(D, 5);
+    // Vacío: compases enteros de silencio, con apenas un latido.
+    if (w5 > 0 && b % 4 === 3 && azar(b, v, 13) < .5 * w5) return s === 0 ? [{ c: 'bat', d: 't', vol: .3 }] : [];
+    // Estática: la segunda mitad del compás repite una celda de cuatro pasos.
+    const tartamudea = w3 > 0 && s >= 8 && azar(b, v, 11) < .35 * w3;
+    let out = base(e, tartamudea ? b * 16 + 8 + (s % 4) : k, ab);
+    if (w3 > 0 && azar(k, v, 12) < .1 * w3) out = out.filter(x => x.c === 'sub' || x.c === 'pad');
+    for (const x of out) {
+      if (x.c !== 'lead' && x.c !== 'arp') continue;
+      // Ruina: la cinta se estira y algunas notas caen un semitono al lado.
+      if (w2 > 0) {
+        x.vib = .005 + .02 * w2;
+        if (azar(k, v, 20) < .25 * w2) x.n += azar(k, v, 21) < .5 ? -1 : 1;
+      }
+      // Vacío: la nota se desploma.
+      if (w5 > 0 && azar(k, v, 22) < .6 * w5) x.cae = true;
+    }
+    if (w2 > 0) out = out.filter(x => x.c !== 'lead' || azar(k, v, 23) >= .3 * w2);
+    if (w3 > 0 && azar(k, v, 24) < .5 * w3) out.push({ c: 'bat', d: 'r', vol: .34 * (.3 + .5 * azar(k, v, 25)) * w3 });
+    if (w4 > 0) {
+      const I = clamp(e.I);
+      if (I <= .9 && (s === 0 || s === 3)) out.push({ c: 'bat', d: 't', vol: .34 * (s ? .6 : .9) * w4 });
+      const r = PROG.abismo.raices[b % 4] + 24;
+      if (s === 0) for (const n of [r + 1, r + 6]) out.push({ c: 'pad', n, pasos: 16, vol: .03 * w4 });
+      if (s === 0 && b % 2 === 0) for (const n of [r + 12, r + 13]) out.push({ c: 'alarma', n, pasos: 6, vol: .03 * w4, onda: 'p12' });
+    }
+    if (w5 > 0) out = out.filter(x => x.c === 'sub' || x.c === 'pad' || (x.c === 'bat' && x.d === 't') || azar(k * 7 + x.c.length, v, 26) >= .45 * w5);
+    return out;
+  }
+
+  function base(e, k, ab) {
+    const I = clamp(e.I), filo = !!e.filo, v = e.vuelta || 0;
     const b = Math.floor(k / 16), s = k % 16, bb = b % 4;
     const P = PROG[ab ? (filo ? 'sima' : 'abismo') : (filo ? 'filo' : 'luz')];
     const ac = P.acordes[bb], raiz = P.raices[bb], out = [];
@@ -203,6 +261,14 @@
     const w = ctx.createWaveShaper(); w.curve = curva; w.oversample = '2x';
     return w;
   }
+  /** Bitcrush: la onda redondeada a pocos escalones. */
+  function trituradora(ctx) {
+    if (typeof ctx.createWaveShaper !== 'function') return null;
+    const n = 1024, curva = new Float32Array(n), niveles = 6;
+    for (let i = 0; i < n; i++) { const x = i / (n - 1) * 2 - 1; curva[i] = Math.round(x * niveles) / niveles; }
+    const w = ctx.createWaveShaper(); w.curve = curva;
+    return w;
+  }
   function filtro(ctx, tipo, f, q) {
     if (typeof ctx.createBiquadFilter !== 'function') return null;
     const x = ctx.createBiquadFilter(); x.type = tipo; x.frequency.value = f; x.Q.value = q;
@@ -219,7 +285,8 @@
     constructor(ctx, dest) {
       this.ctx = ctx; this.voces = new Set();
       this.k = 0; this.vuelta = 0; this.sig = ctx.currentTime + .05;
-      this.I = 0; this.meta = 0; this.filo = false; this.abismo = false; this.pideAbismo = false;
+      this.I = 0; this.meta = 0; this.filo = false; this.abismo = false;
+      this.D = 0; this.metaD = 0; this.piso = 0;
       this.visto = ctx.currentTime;
       this.salida = ctx.createGain(); this.salida.connect(dest);
       // Lo que respira con el 808 pasa por `bomba`; el bajo y la batería no.
@@ -234,7 +301,12 @@
       cadena(this.canal.arp, this.fArp, this.bomba);
       this.canal.lead.connect(this.bomba);
       for (const c of ['bajo', 'sub', 'brillo', 'alarma', 'bat']) this.canal[c].connect(this.salida);
-      this.nodos = [this.salida, this.bomba, ...Object.values(this.canal), this.fPad, this.fGrave, this.fArp].filter(Boolean);
+      // La ruina: una copia de lo melódico, triturada a pocos niveles, que se
+      // mezcla con la salida según D.
+      this.triza = trituradora(ctx);
+      this.mezTriza = ctx.createGain(); this.mezTriza.gain.value = 0;
+      if (this.triza) { this.bomba.connect(this.triza); this.canal.bajo.connect(this.triza); this.triza.connect(this.mezTriza); this.mezTriza.connect(this.salida); }
+      this.nodos = [this.salida, this.bomba, ...Object.values(this.canal), this.fPad, this.fGrave, this.fArp, this.triza, this.mezTriza].filter(Boolean);
       if (typeof ctx.createDelay === 'function') {
         try {
           const d = ctx.createDelay(1), fb = ctx.createGain(), wet = ctx.createGain();
@@ -246,15 +318,23 @@
     }
     /** Lo que el juego dice del tablero; I se acerca sola, sin saltos. */
     animo(o) {
+      o = o || {};
       this.meta = intensidad(o);
-      this.pideAbismo = (o && o.ronda) >= 100;
+      const DS = root.BBTANDescenso || Descenso;
+      this.metaD = Number.isFinite(o.descenso) ? Math.max(0, Math.min(5, o.descenso))
+        : DS ? DS.corrupcion(o.ronda || 0) : ((o.ronda || 0) >= 100 ? 1 : 0);
     }
-    bpm() { return this.abismo ? 84 + 26 * this.I : 98 + 34 * this.I; }
+    bpm() {
+      const D = this.D, a = Math.min(1, D), luz = 98 + 34 * this.I, abi = 84 + 26 * this.I;
+      const tambalea = 1 + .04 * pesoPiso(D, 5) * Math.sin(this.k / 128 * Math.PI * 2 * 3);
+      return (luz + (abi - luz) * a) * (1 - .06 * Math.max(0, D - 1)) * tambalea;
+    }
     paso() { return 60 / this.bpm() / 4; }
     tick(margen) {
       const ctx = this.ctx, ahora = ctx.currentTime, hasta = ahora + (margen || .2);
       const dt = Math.max(0, Math.min(1, ahora - this.visto)); this.visto = ahora;
       this.I += (this.meta - this.I) * (1 - Math.exp(-dt / 1.6));
+      this.D += (this.metaD - this.D) * (1 - Math.exp(-dt / 4));
       if (this.sig < ahora - .25) this.sig = ahora + .03;
       for (const v of this.voces) if (v.fin < ahora - .5) this.voces.delete(v);
       let n = 0;
@@ -270,21 +350,23 @@
       if (s === 0) {
         // La armonía y el lugar sólo cambian al empezar un compás.
         this.filo = siguienteArmonia(this.filo ? 'filo' : 'calma', this.I) === 'filo';
-        if (this.pideAbismo !== this.abismo) {
-          this.abismo = this.pideAbismo;
-          if (this.abismo) this.caida(t);
-        }
+        this.abismo = this.D >= .5;
+        const piso = Math.ceil(this.metaD - 1e-6);
+        if (piso > this.piso) this.presagio(t, piso);
+        this.piso = piso;
       }
       if (s % 4 === 0) this.colorea(t, d);
-      const e = { I: this.I, abismo: this.abismo, filo: this.filo, vuelta: this.vuelta };
+      const e = { I: this.I, D: this.D, filo: this.filo, vuelta: this.vuelta };
       for (const ev of eventos(e, this.k)) this.suena(ev, t, d);
     }
     /** Filtros y eco siguen a I cada tiempo. */
     colorea(t, d) {
-      const I = this.I, ab = this.abismo, pon = (p, v) => { try { p.setTargetAtTime(v, t, .25); } catch (e) {} };
-      if (this.fPad) { pon(this.fPad.frequency, ab ? 260 + 1100 * I : 650 + 2800 * I); pon(this.fPad.Q, ab ? 3 + 4 * I : 1 + 2 * I); }
-      if (this.fGrave) pon(this.fGrave.frequency, 160 + 1000 * I);
-      if (this.fArp) pon(this.fArp.frequency, ab ? 900 + 1800 * I : 2200 + 3000 * I);
+      const I = this.I, D = this.D, a = Math.min(1, D), pon = (p, v) => { try { p.setTargetAtTime(v, t, .25); } catch (e) {} };
+      const mix = (x, y) => x + (y - x) * a, oscuro = 1 - .13 * Math.max(0, D - 1);
+      if (this.fPad) { pon(this.fPad.frequency, mix(650 + 2800 * I, 260 + 1100 * I) * oscuro); pon(this.fPad.Q, mix(1 + 2 * I, 3 + 4 * I) + 1.5 * Math.max(0, D - 1)); }
+      if (this.fGrave) pon(this.fGrave.frequency, (160 + 1000 * I) * oscuro);
+      if (this.fArp) pon(this.fArp.frequency, mix(2200 + 3000 * I, 900 + 1800 * I) * oscuro);
+      pon(this.mezTriza.gain, this.triza ? .6 * pesoPiso(D, 2) : 0);
       if (this.eco) pon(this.eco.delayTime, Math.min(.9, d * 3));
     }
     suena(ev, t, d) {
@@ -292,6 +374,10 @@
       if (ev.c === 'bat') return this.golpe(ev.d, t, ev.vol, d);
       const f = hz(ev.n), dur = d * ev.pasos;
       if (!Number.isFinite(f)) return;
+      if (ev.cae) { // el vacío: la nota se cae una octava mientras suena
+        Chip.voz(ctx, dest, { t, f, f1: f / 2, dur: dur * 1.4, vol: ev.vol, onda: ev.onda || 'saw', sus: .6 }, V);
+        return;
+      }
       if (ev.c === 'pad') {
         this.colchon(t, f, dur, ev.vol, 7); this.colchon(t, f, dur, ev.vol, -7);
       } else if (ev.c === 'sub') {
@@ -302,11 +388,11 @@
       } else if (ev.c === 'brillo') {
         Chip.voz(ctx, dest, { t, f, f1: f * ev.sube, dur: Math.min(.3, dur), vol: ev.vol, onda: 'sine', sus: .4 }, V);
       } else if (ev.det) {
-        const o = { t, f, dur, vol: ev.vol * .62, onda: ev.onda, vib: .005, sus: .8 };
+        const o = { t, f, dur, vol: ev.vol * .62, onda: ev.onda, vib: ev.vib || .005, sus: .8 };
         Chip.voz(ctx, dest, Object.assign({}, o, { det: ev.det }), V);
         Chip.voz(ctx, dest, Object.assign({}, o, { det: -ev.det }), V);
       } else {
-        Chip.voz(ctx, dest, { t, f, dur, vol: ev.vol, onda: ev.onda || 'p25', vib: ev.c === 'lead' ? .005 : 0, sus: ev.c === 'bajo' ? 1 : .7 }, V);
+        Chip.voz(ctx, dest, { t, f, dur, vol: ev.vol, onda: ev.onda || 'p25', vib: ev.vib || (ev.c === 'lead' ? .005 : 0), sus: ev.c === 'bajo' ? 1 : .7 }, V);
       }
     }
     /** Una voz de colchón: sierra desafinada con ataque y caída lentos. */
@@ -336,6 +422,7 @@
         case 'T': S.tambor(ctx, dest, t, vol, true, V); break;
         case 'K': S.bombo808(ctx, dest, t, vol, V); break;
         case 'c': S.palmas(ctx, dest, t, vol, V); break;
+        case 'r': S.plato(ctx, dest, t, vol, .006, V); break;
       }
       // El 808 hunde el colchón, el bajo saturado y la melodía y los deja volver.
       if (d === 'K' || (d === 'k' && this.I > .62)) {
@@ -350,6 +437,18 @@
       Chip.Sinte.platillo(ctx, this.canal.bat, t, .55, V);
       Chip.Sinte.tambor(ctx, this.canal.bat, t, .6, false, V);
     }
+    /** Llegar al piso n: la caída, y desde el segundo un cluster de sierras
+        que se desploma con ella y n golpes, cada piso más lentos. */
+    presagio(t, n) {
+      this.caida(t);
+      if (n < 2) return;
+      const ctx = this.ctx, V = this.voces;
+      for (const m of [50, 51, 56].slice(0, Math.min(3, n))) {
+        const f = hz(m);
+        Chip.voz(ctx, this.canal.grave, { t, f, f1: f / (1 + n * .4), dur: 1.4 + .4 * n, vol: .08, onda: 'saw', det: 20, sus: .8 }, V);
+      }
+      for (let i = 1; i <= n; i++) Chip.Sinte.tambor(ctx, this.canal.bat, t + i * (.28 + .06 * n), .7 - .08 * i, false, V);
+    }
     detener() {
       for (const v of this.voces) {
         try { v.fuente.stop(0); } catch (e) {}
@@ -362,7 +461,8 @@
     reinicia() {
       this.detener();
       this.k = 0; this.vuelta = 0; this.I = this.meta; this.filo = false;
-      this.abismo = this.pideAbismo; this.visto = this.ctx.currentTime;
+      this.D = this.metaD; this.piso = Math.ceil(this.metaD - 1e-6); this.abismo = this.D >= .5;
+      this.visto = this.ctx.currentTime;
     }
     destruir() {
       this.detener();
@@ -370,7 +470,7 @@
     }
   }
 
-  const API = { intensidad, siguienteArmonia, eventos, Motor, PELIGRO, PROG, MEL_LUZ, MEL_ABISMO };
+  const API = { intensidad, siguienteArmonia, eventos, pesoPiso, Motor, PELIGRO, PROG, MEL_LUZ, MEL_ABISMO };
   if (typeof module === 'object' && module.exports) module.exports = API;
   else root.BBTANMusica = API;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

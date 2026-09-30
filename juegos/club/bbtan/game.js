@@ -7,16 +7,37 @@
   const W = grid.width, H = 580, FLOOR = 540, SIZE = grid.size, TOP = grid.top, ROW = grid.size;
   const bounds = { width: W, floor: FLOOR, radius: ballRadius };
   const colors = { lime: '#c4f568', purple: '#b7a1f7', orange: '#ffa675', cyan: '#77d9d2' };
-  // Desde la ronda 100, «el abismo»: la misma máquina en rojo y violeta,
-  // más oscura, a juego con la música que baja de registro.
-  const LUZ = { ...colors }, ABISMO = { lime: '#ff4f6d', purple: '#9b6bff', orange: '#ff7a3d', cyan: '#5f7bff' };
-  const ABISMO_DESDE = 100;
-  let abismo = false;
+  // El descenso (descenso.js): desde la ronda 100, y otra vez en la 200, 300,
+  // 400 y 500, la máquina se pudre de a poco, fundida a lo largo de veinte
+  // rondas. Solo cambia lo que se ve, se oye y se lee; la física no lo lee.
+  const DSC = BBTANDescenso, T = DSC.TEXTOS;
+  let corr = 0, pal = DSC.mezcla(0), etapaT = 0;
+  const CSS_VARS = Object.keys(pal.css);
+  // Peso de cada piso ya entrado (0..1): el 2 son las grietas, el 3 la
+  // estática, el 4 los ojos, el 5 el vacío.
+  const peso = j => clamp(corr - (j - 1), 0, 1);
   function paleta() {
-    abismo = round >= ABISMO_DESDE;
-    Object.assign(colors, abismo ? ABISMO : LUZ);
-    document.documentElement.classList.toggle('abismo', abismo);
+    corr = DSC.corrupcion(round); pal = DSC.mezcla(corr); etapaT = DSC.etapa(corr);
+    Object.assign(colors, { lime: pal.lime, purple: pal.purple, orange: pal.orange, cyan: pal.cyan });
+    const html = document.documentElement;
+    html.classList.toggle('descenso', corr > 0);
+    for (let k = 2; k <= 5; k++) html.classList.toggle('desc-' + k, corr >= k - .5);
+    for (const k of CSS_VARS) corr > 0 ? html.style.setProperty('--' + k, pal.css[k]) : html.style.removeProperty('--' + k);
   }
+  // Cómo de rotas salen las letras: nada antes del tercer piso.
+  const roto = s => DSC.corrompe(s, Math.max(0, (corr - 2) / 3), round);
+  // Grietas fijas del segundo piso: siempre las mismas, crecen con el peso.
+  const GRIETAS = (() => {
+    let s = 0x5eed; const r = () => ((s = Math.imul(s ^ (s >>> 13), 0x5bd1e995) ^ (s << 7)) >>> 0) / 4294967296;
+    const out = [];
+    for (let i = 0; i < 7; i++) {
+      let x = r() * W, y = r() * FLOOR; const pts = [[x, y]];
+      for (let k = 0; k < 9; k++) { x += (r() - .5) * 60; y += (r() - .3) * 44; pts.push([x, y]); }
+      out.push(pts);
+    }
+    return out;
+  })();
+  const PALABRAS = ['VETE', 'NO', 'APÁGALO', 'NADIE', 'FUERA', 'NO MIRES'];
   /* La música lee el tablero: cuántas filas quedan entre el bloque más bajo
      y el suelo, y cuántos bloques hay. Cinco veces por segundo basta. */
   let animoEn = 0;
@@ -26,7 +47,7 @@
     let fondo = 0, vivos = 0;
     for (const b of blocks) if (b.hp > 0) { vivos++; fondo = Math.max(fondo, b.y + b.h); }
     const filas = vivos ? Math.max(0, Math.round((FLOOR - fondo) / ROW)) : 8;
-    BBTANAudio.mood({ filas, bloques: vivos, ronda: round, disparando: state === 'shoot' });
+    BBTANAudio.mood({ filas, bloques: vivos, ronda: round, disparando: state === 'shoot', descenso: corr });
   }
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const number = n => Math.floor(n).toLocaleString('es-CL');
@@ -88,7 +109,9 @@
     $('balls').textContent = String(count + gained).padStart(2,'0');
     $('multiplier').textContent = `×${mult}`;
     $('remaining').textContent = state === 'shoot' ? `● ${returned}/${count}` : `● ×${count}`;
-    $('status').textContent = paused ? 'EN PAUSA' : state === 'over' ? 'FIN DE LA PARTIDA' : clearTime > 0 ? 'PANTALLA LIMPIA' : state === 'shoot' ? (mult > 1 ? `COMBO ×${mult}` : 'QUE NO PARE') : state === 'descend' ? 'SIGUIENTE RONDA' : 'TODO LISTO';
+    const E = T.estado, k = etapaT;
+    $('status').textContent = clearTime > 0 && !paused && state !== 'over' ? 'PANTALLA LIMPIA' : state === 'shoot' && !paused && mult > 1 ? `COMBO ×${mult}`
+      : roto(paused ? E.pause[k] : state === 'over' ? E.over[k] : state === 'shoot' ? E.shoot[k] : state === 'descend' ? E.descend[k] : E.aim[k]);
     $('recall').disabled = state !== 'shoot' || paused;
     $('pause').innerHTML = paused ? '<span>▶</span> Seguir' : '<span>Ⅱ</span> Pausa';
     BBTANAudio.music(sound && tocando && !paused && state !== 'over' && !document.hidden, round);
@@ -117,7 +140,7 @@
       floaters.push({ x:block.x+SIZE/2, y:block.y+SIZE/2, text:`+${50*mult}`, color:blockColor(block), life:.7 });
       const next = Math.min(5, 1 + Math.floor(combo / 5));
       BBTANAudio.broken(combo);
-      if (next > mult) { mult = next; toast(`¡COMBO ×${mult}!`); BBTANAudio.combo(mult); }
+      if (next > mult) { mult = next; toast(T.combo[etapaT](mult)); BBTANAudio.combo(mult); }
       if (hasClearedBoard(blocks, clearCelebrated)) celebrateClear();
     } else BBTANAudio.hit(block.hp);
     uiDirty = true;
@@ -160,19 +183,21 @@
   }
   function gameOver() {
     state = 'over'; archive(); reportar(); $('overlay').hidden = false;
-    $('overlay-label').textContent = score >= best && score > 0 ? 'UNA MARCA PARA SUPERAR' : 'BIEN JUGADO';
-    $('overlay-title').innerHTML = 'Una más<span>?</span>'; $('overlay-copy').textContent = 'Los bloques ganaron esta. La siguiente es tuya.';
+    const f = T.fin[etapaT];
+    $('overlay-label').textContent = roto(score >= best && score > 0 ? f.record : f.rotulo);
+    $('overlay-title').innerHTML = `${f.titulo}<span>${f.signo}</span>`; $('overlay-copy').textContent = f.copia;
     $('result-stats').hidden = false; $('result-stats').innerHTML = `<div class="result-score">${number(score)}</div><div class="result-detail">PUNTOS · RONDA ${round} · ${count} BOLAS</div>`;
-    $('resume').innerHTML = 'Volver a jugar <span>↗</span>'; $('overlay-restart').hidden = true; $('pause').disabled = true;
+    $('resume').innerHTML = `${f.boton} <span>↗</span>`; $('overlay-restart').hidden = true; $('pause').disabled = true;
     $('resume').focus({preventScroll:true}); BBTANAudio.gameOver(); uiDirty = true;
   }
   function pause(value) {
     if (state === 'over') return;
     paused = value; pointerDown = false; $('overlay').hidden = !value;
     if (value) {
-      $('overlay-label').textContent = 'TÓMATE UN RESPIRO'; $('overlay-title').innerHTML = 'En pausa<span>.</span>';
-      $('overlay-copy').textContent = 'Los bloques pueden esperar.'; $('result-stats').hidden = true;
-      $('resume').innerHTML = 'Seguir jugando <span>↗</span>'; $('overlay-restart').hidden = false;
+      const q = T.pausa[etapaT];
+      $('overlay-label').textContent = roto(q.rotulo); $('overlay-title').innerHTML = `${q.titulo}<span>${q.signo}</span>`;
+      $('overlay-copy').textContent = q.copia; $('result-stats').hidden = true;
+      $('resume').innerHTML = `${q.boton} <span>↗</span>`; $('overlay-restart').hidden = false;
       $('resume').focus({preventScroll:true});
     } else canvas.focus({preventScroll:true});
     uiDirty=true;
@@ -181,7 +206,7 @@
     if (state !== 'shoot' || paused) return;
     if (nextX === null) nextX = balls.length ? balls[0].x : launchX;
     balls.forEach(b=>burst(b.x,b.y,'#e5f2d6',3)); balls=[]; queue=0; returned=count;
-    toast('Todas de vuelta. ¡Nuevo tiro!'); finishShot();
+    toast(T.recall[etapaT]); finishShot();
   }
   function update(dt) {
     if (paused) return;
@@ -215,7 +240,7 @@
       blocks.forEach(b=>b.y=b.startY+ROW*eased);pickups.forEach(p=>p.y=p.startY+ROW*eased);
       if(t===1) {
         if(blocks.some(b=>b.hp>0 && b.y+b.h>=FLOOR-12))gameOver();
-        else { round++;clearCelebrated=false;paleta();createRow(TOP);characterX=launchX;state='aim';aimDirty=true;uiDirty=true; if(round===ABISMO_DESDE)toast(`RONDA ${round} · EL ABISMO`);else if(round%5===0)toast(`RONDA ${round} · ¡Vas con todo!`); }
+        else { round++;clearCelebrated=false;paleta();createRow(TOP);characterX=launchX;state='aim';aimDirty=true;uiDirty=true; const piso=DSC.DESDE.indexOf(round); if(piso>=0)toast(`RONDA ${round} · ${T.entrada[piso+1]}`);else if(round%5===0){const a=T.animo[etapaT];toast(roto(`RONDA ${round} · ${a[(round/5)%a.length]}`));} }
       }
     }
   }
@@ -230,16 +255,18 @@
   }
   function pixelBall(x,y,r) {x=Math.round(x);y=Math.round(y);ctx.fillRect(x-r+2,y-r,r*2-4,r*2);ctx.fillRect(x-r,y-r+2,r*2,r*2-4);}
   function drawCharacter() {
-    const x = characterX, y = FLOOR, scale = .48;
+    const w5 = peso(5), tic = !reducedMotion && w5 > 0 && Math.random() < .04 * w5 ? (Math.random() < .5 ? -1 : 1) : 0;
+    const x = characterX + tic, y = FLOOR, scale = .48;
     const kick = reducedMotion ? 0 : throwKick;
     BBTANCharacter.draw(ctx, BBTANAppearance.get(), x - 9, y + 35, scale, {
       handX: (9 + Math.cos(angle) * kick * 5) / scale,
-      handY: (-36 + Math.sin(angle) * kick * 5) / scale
+      handY: (-36 + Math.sin(angle) * kick * 5) / scale,
+      maldad: corr
     });
     if (state === 'aim' || (state === 'shoot' && queue > 0)) {
-      ctx.fillStyle = abismo ? '#ffe3ea' : '#f6ffe9'; pixelBall(x,y-1,bounds.radius);
+      ctx.fillStyle = pal.bola; pixelBall(x,y-1,bounds.radius);
     }
-    ctx.fillStyle='#a9b699'; ctx.font=`7px ${PIXEL}`; ctx.textAlign='center';
+    ctx.fillStyle=pal.texto; ctx.font=`7px ${PIXEL}`; ctx.textAlign='center';
     ctx.fillText(`×${state==='shoot'?queue:count}`,x,y-22);
   }
   function drawAim() {
@@ -258,12 +285,14 @@
     aimPoints.forEach((p,i)=>{ctx.globalAlpha=((1-i/aimPoints.length)*.5+.08)*visibility;ctx.fillStyle=colors.lime;ctx.fillRect(Math.round(p.x)-1,Math.round(p.y)-1,3,3);});ctx.globalAlpha=1;
   }
   function draw() {
-    ctx.clearRect(0,0,W,H);ctx.fillStyle=abismo?'#0b0709':'#141719';ctx.fillRect(0,0,W,H);
-    if(abismo){const r=reducedMotion?0:Math.sin(performance.now()/900)*.5+.5,g=ctx.createRadialGradient(W/2,H*.45,60,W/2,H*.45,W*.85);g.addColorStop(0,'#00000000');g.addColorStop(1,`rgba(120,10,30,${.22+.12*r})`);ctx.fillStyle=g;ctx.fillRect(0,0,W,H);}
-    ctx.fillStyle=abismo?'#241218':'#2a2e2f';for(let y=14;y<FLOOR;y+=19)for(let x=15;x<W;x+=19)ctx.fillRect(x,y,1,1);
-    const danger=blocks.some(b=>b.hp>0 && b.y+b.h>FLOOR-ROW*2);
+    const now=performance.now(), mov=!reducedMotion;
+    ctx.clearRect(0,0,W,H);ctx.fillStyle=pal.bg;ctx.fillRect(0,0,W,H);
+    if(corr>0){const r=mov?Math.sin(now/(900-60*Math.min(corr,5)))*.5+.5:.5,g=ctx.createRadialGradient(W/2,H*.45,60-6*Math.min(corr,5),W/2,H*.45,W*.85);g.addColorStop(0,'#00000000');g.addColorStop(1,pal.velo);ctx.globalAlpha=.75+.25*r;ctx.fillStyle=g;ctx.fillRect(0,0,W,H);ctx.globalAlpha=1;}
+    ctx.fillStyle=pal.puntos;for(let y=14;y<FLOOR;y+=19)for(let x=15;x<W;x+=19)ctx.fillRect(x,y,1,1);
+    drawDescenso(now,mov);
+    const danger=blocks.some(b=>b.hp>0 && b.y+b.h>FLOOR-ROW*2), w4=peso(4);
     if(danger){const gradient=ctx.createLinearGradient(0,FLOOR-100,0,FLOOR);gradient.addColorStop(0,'#ff846000');gradient.addColorStop(1,'#ff84600c');ctx.fillStyle=gradient;ctx.fillRect(0,FLOOR-100,W,100);}
-    ctx.strokeStyle=danger?'#e48b69':abismo?'#5a2a35':'#4b5142';ctx.lineWidth=1;ctx.setLineDash([5,6]);ctx.beginPath();ctx.moveTo(12,FLOOR+7);ctx.lineTo(W-12,FLOOR+7);ctx.stroke();ctx.setLineDash([]);
+    ctx.strokeStyle=danger?'#e48b69':pal.suelo;ctx.lineWidth=1;ctx.setLineDash([5,6]);ctx.beginPath();ctx.moveTo(12,FLOOR+7);ctx.lineTo(W-12,FLOOR+7);ctx.stroke();ctx.setLineDash([]);
     if(state==='aim' && !paused)drawAim();
     for(const b of blocks) {
       if(b.hp<=0)continue;const color=blockColor(b);
@@ -272,7 +301,13 @@
       pixelFrame(b.x,b.y,b.w,b.h,color);
       ctx.fillStyle=color+'55';ctx.fillRect(Math.round(b.x)+5,Math.round(b.y)+b.h-8,Math.round((b.w-10)*(b.hp/b.max)),2);
       if(b.flash>0){ctx.globalAlpha=b.flash*3;ctx.fillStyle=color;ctx.fillRect(Math.round(b.x)+1,Math.round(b.y)+1,b.w-2,b.h-2);ctx.globalAlpha=1;}
-      ctx.fillStyle=color;ctx.font=`${b.hp>99?11:14}px ${PIXEL}`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(b.hp,Math.round(b.x+b.w/2)+1,Math.round(b.y+b.h/2));ctx.textBaseline='alphabetic';
+      ctx.font=`${b.hp>99?11:14}px ${PIXEL}`;ctx.textAlign='center';ctx.textBaseline='middle';
+      let nx=Math.round(b.x+b.w/2)+1, ny=Math.round(b.y+b.h/2);
+      if(w4>0){ // el número ya no se queda quieto: se desdobla en rojo y cian
+        if(mov&&Math.random()<.012*w4){nx+=Math.random()<.5?-2:2;}
+        ctx.globalAlpha=.55*w4;ctx.fillStyle='#ff1030';ctx.fillText(b.hp,nx-1,ny);ctx.fillStyle='#10e0ff';ctx.fillText(b.hp,nx+1,ny);ctx.globalAlpha=1;
+      }
+      ctx.fillStyle=color;ctx.fillText(b.hp,nx,ny);ctx.textBaseline='alphabetic';
     }
     for(const p of pickups) {
       if(!p.alive)continue;const color=pickupColor(p);
@@ -294,17 +329,58 @@
       ctx.stroke();ctx.globalAlpha=1;
     }
     for(const b of balls) {
-      if(!reducedMotion)b.trail.forEach((p,i)=>{ctx.globalAlpha=(1-i/5)*.15;ctx.fillStyle=abismo?'#ffc9d4':'#ecfbd7';pixelBall(p.x,p.y,Math.max(3,Math.round(bounds.radius-1-i*.6)));});
-      ctx.globalAlpha=1;ctx.fillStyle=abismo?'#ffe3ea':'#f6ffe9';pixelBall(b.x,b.y,bounds.radius);
+      if(!reducedMotion)b.trail.forEach((p,i)=>{ctx.globalAlpha=(1-i/5)*.15;ctx.fillStyle=pal.estela;pixelBall(p.x,p.y,Math.max(3,Math.round(bounds.radius-1-i*.6)));});
+      ctx.globalAlpha=1;ctx.fillStyle=pal.bola;pixelBall(b.x,b.y,bounds.radius);
     }
     if(state==='shoot' && nextX!==null) {
       ctx.fillStyle=colors.lime;pixelBall(nextX,FLOOR,bounds.radius);
-      ctx.fillStyle='#a9b699';ctx.font=`7px ${PIXEL}`;ctx.textAlign='center';ctx.fillText(`+${returned}`,clamp(nextX,15,W-15),FLOOR-12);
+      ctx.fillStyle=pal.texto;ctx.font=`7px ${PIXEL}`;ctx.textAlign='center';ctx.fillText(`+${returned}`,clamp(nextX,15,W-15),FLOOR-12);
     }
     drawCharacter();
     for(const p of particles){ctx.globalAlpha=Math.min(1,p.life*2);ctx.fillStyle=p.color;ctx.fillRect(p.x,p.y,p.size,p.size);}ctx.globalAlpha=1;
     for(const p of floaters){ctx.globalAlpha=Math.min(1,p.life*2);ctx.fillStyle=p.color;ctx.font=`9px ${PIXEL}`;ctx.textAlign='center';ctx.fillText(p.text,p.x,p.y);}ctx.globalAlpha=1;
+    if(mov&&corr>2)drawEstatica();
     if (clearTime > 0) drawClear();
+  }
+  // Lo que el descenso pone detrás de los bloques: grietas (piso 2), ojos
+  // que parpadean en los huecos (piso 4) y palabras apenas visibles (piso 5).
+  function drawDescenso(now,mov) {
+    const w2=peso(2), w4=peso(4), w5=peso(5);
+    if(w2>0){
+      ctx.strokeStyle=pal.suelo;ctx.lineWidth=1;ctx.globalAlpha=.55*w2;ctx.beginPath();
+      for(const g of GRIETAS){const n=Math.max(2,Math.ceil(g.length*w2));ctx.moveTo(g[0][0],g[0][1]);for(let i=1;i<n;i++)ctx.lineTo(g[i][0],g[i][1]);}
+      ctx.stroke();ctx.globalAlpha=1;
+    }
+    if(w5>0){
+      ctx.fillStyle=pal.texto;ctx.font=`20px ${PIXEL}`;ctx.textAlign='center';
+      for(let i=0;i<3;i++){const x=40+((i*197+round*53)%(W-80)), y=80+((i*151+round*37)%(FLOOR-160));ctx.globalAlpha=.07*w5;ctx.fillText(PALABRAS[(round+i)%PALABRAS.length],x,y);}
+      ctx.globalAlpha=1;
+    }
+    if(w4>0){
+      ctx.fillStyle='#ff1a2e';
+      for(let i=0;i<4;i++){
+        const cx=30+((i*229+round*71)%(W-60)), cy=TOP+30+((i*113+round*29)%(FLOOR-TOP-120));
+        const abierto=mov?Math.sin(now/650+i*2.3)>-.7:true;
+        if(!abierto)continue;
+        ctx.globalAlpha=w4*(.35+.25*(mov?Math.sin(now/300+i):0));
+        ctx.fillRect(Math.round(cx-6),Math.round(cy),4,2);ctx.fillRect(Math.round(cx+3),Math.round(cy),4,2);
+      }
+      ctx.globalAlpha=1;
+    }
+  }
+  // Estática (piso 3 en adelante): ruido de píxeles y, de vez en cuando, una
+  // franja de la pantalla que se corre de lugar; en el vacío, un destello
+  // invertido. Solo sin «reducir movimiento».
+  function drawEstatica() {
+    const w3=peso(3), w5=peso(5);
+    ctx.fillStyle=pal.texto;
+    for(let i=0,n=Math.round(90*w3+60*w5);i<n;i++){ctx.globalAlpha=.08+Math.random()*.18;ctx.fillRect(Math.random()*W|0,Math.random()*H|0,1+(Math.random()*2|0),1);}
+    ctx.globalAlpha=1;
+    if(Math.random()<.02*w3){
+      const r=canvas.width/W, sy=Math.round((20+Math.random()*(FLOOR-40))*r), sh=Math.round((4+Math.random()*16)*r), dx=Math.round((Math.random()-.5)*14*r);
+      ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(canvas,0,sy,canvas.width,sh,dx,sy,canvas.width,sh);ctx.restore();
+    }
+    if(Math.random()<.003*w5){ctx.save();ctx.globalCompositeOperation='difference';ctx.globalAlpha=.35;ctx.fillStyle='#ffffff';ctx.fillRect(0,0,W,H);ctx.restore();}
   }
   function drawClear() {
     const age = 2.3 - clearTime;
