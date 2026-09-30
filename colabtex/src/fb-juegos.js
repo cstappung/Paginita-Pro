@@ -416,6 +416,30 @@ export function yemasVivo(pid, uid, d) {
 export function watchYemasVivo(pid, cb) {
   return onValue(ref(db, `vivo/${pid}/y`), s => cb(s.val() || {}), () => {});
 }
+/* El buzón del chat de voz (`juegos/voz.js`), también dentro de `vivo`:
+   `voz/en/<uid>` es la sesión de cada uno mientras está en la voz y
+   `voz/b/<uid>/<push>` los mensajes de señalización que le mandan, que se
+   borran al leerlos. Las dos cosas se van solas al desconectarse. Solo lo
+   escriben los jugadores (es la regla de `vivo`), así que un mirón oye
+   nada y no habla. El audio no pasa por aquí: va directo entre navegadores. */
+export function senalVoz(pid, uid) {
+  const base = `vivo/${pid}/voz`;
+  const rEn = ref(db, `${base}/en/${uid}`), rB = ref(db, `${base}/b/${uid}`);
+  return {
+    async entra(sesion) {
+      await remove(rB).catch(() => {});
+      onDisconnect(rEn).remove().catch(() => {});
+      onDisconnect(rB).remove().catch(() => {});
+      await set(rEn, sesion);
+    },
+    sale() { remove(rEn).catch(() => {}); remove(rB).catch(() => {}); },
+    alPresentes(cb) { return onValue(ref(db, `${base}/en`), s => cb(s.val() || {}), () => {}); },
+    envia(para, m) { push(ref(db, `${base}/b/${para}`), { de: uid, ...m }).catch(() => {}); },
+    alMensajes(cb) {
+      return onChildAdded(rB, s => { const v = s.val(); remove(s.ref).catch(() => {}); if (v) cb(v.de, v); }, () => {});
+    },
+  };
+}
 export const borraVivo = pid => remove(ref(db, `vivo/${pid}`)).catch(() => {});
 
 /* ---------- el chat de la sala ----------

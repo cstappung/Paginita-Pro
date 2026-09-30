@@ -83,3 +83,84 @@ test('yemas: reproducir el registro da el mismo estado',()=>{
  assert.deepEqual(copia(reducir(p)),copia(reducir(copia(p))));
  assert.ok(reducir(p).hist.length<=40);
 });
+
+// ---------- variantes ----------
+const {ganoEn,equiposYemas}=context;
+const salaEq=(n,variante,extra={})=>sala(n,{variante,...extra});
+const mov=(p,t,uid,o={})=>mover(p,{t,uid,...o});
+
+test('yemas: variante y meta por largo, con las salas viejas intactas',()=>{
+ assert.equal(reducir(sala(3)).variante,'todos');
+ assert.equal(reducir(salaEq(4,'equipos')).meta,30);
+ assert.equal(reducir(salaEq(4,'equipos',{largo:0})).meta,20);
+ assert.equal(reducir(salaEq(4,'bandera',{largo:2})).meta,5);
+ assert.equal(reducir(salaEq(4,'bandera',{meta:25})).meta,3);   // la meta vieja solo vale en todos
+ assert.equal(reducir(sala(3,{variante:'inventada'})).variante,'todos');
+ assert.equal(reducir(sala(3)).equipos,null);
+});
+
+test('yemas: los equipos salen del asiento y ganoEn incluye a todo el equipo',()=>{
+ const p=salaEq(4,'equipos');
+ assert.deepEqual(copia(equiposYemas(p)),{a:'rojo',b:'azul',c:'rojo',d:'azul'});
+ assert.equal(ganoEn(p,'eq:rojo','c'),true);
+ assert.equal(ganoEn(p,'eq:rojo','b'),false);
+ assert.equal(ganoEn(p,'a','a'),true);
+ assert.equal(ganoEn(p,'',''),false);
+ assert.equal(ganoEn({...p,juego:'uno'},'eq:rojo','a'),false);
+});
+
+test('yemas: por equipos suma el equipo y el fuego amigo no cuenta',()=>{
+ const p=salaEq(4,'equipos',{largo:0});
+ let e=muere(p,'c','a');                  // a y c son rojos
+ assert.equal(e.bajas.a,0);assert.equal(e.muertes.c,1);assert.equal(e.puntosEq.rojo,0);
+ for(let i=0;i<19;i++)e=muere(p,i%2?'b':'d',i%2?'a':'c');
+ assert.equal(e.puntosEq.rojo,19);assert.equal(e.fase,'jugando');
+ e=muere(p,'b','c');
+ assert.equal(e.fase,'fin');assert.equal(e.ganador,'eq:rojo');assert.equal(e.motivo,'equipo');
+ assert.ok(progreso(reducir(salaEq(4,'equipos')), 'yemas')===0);
+});
+
+test('yemas: por equipos, si un equipo se queda vacío gana el otro',()=>{
+ const p=salaEq(4,'equipos');
+ mov(p,'abandona','b');assert.equal(reducir(p).fase,'jugando');
+ const e=mov(p,'abandona','d');
+ assert.equal(e.ganador,'eq:rojo');assert.equal(e.motivo,'abandono');
+});
+
+test('yemas: bandera, tomar, soltar al morir, devolver y capturar',()=>{
+ const p=salaEq(4,'bandera',{largo:1});
+ let e=mov(p,'toma','a',{b:'rojo'});        // la propia no se toma
+ assert.equal(e.banderas.rojo.e,'base');
+ e=mov(p,'toma','a',{b:'azul'});
+ assert.equal(e.banderas.azul.e,'lleva');assert.equal(e.banderas.azul.uid,'a');
+ e=mov(p,'toma','c',{b:'azul'});            // ya la lleva otro
+ assert.equal(e.banderas.azul.uid,'a');
+ e=muere(p,'a','b',{x:3.456,z:-12});
+ assert.deepEqual(copia(e.banderas.azul),{e:'suelo',uid:'',x:3.46,z:-12});
+ e=mov(p,'devuelve','a',{b:'azul'});        // un rojo no devuelve la azul
+ assert.equal(e.banderas.azul.e,'suelo');
+ e=mov(p,'devuelve','d',{b:'azul'});
+ assert.equal(e.banderas.azul.e,'base');
+ e=mov(p,'toma','c',{b:'azul'});
+ e=mov(p,'toma','b',{b:'rojo'});
+ e=mov(p,'captura','c',{b:'azul'});         // su bandera no está en casa
+ assert.equal(e.capturas.c,0);
+ e=muere(p,'b','a');                        // se cae la roja
+ e=mov(p,'devuelve','x',{b:'rojo'});        // intruso: nada
+ e=mov(p,'devuelve','b',{b:'rojo',auto:true});   // automática: la manda cualquiera
+ assert.equal(e.banderas.rojo.e,'base');
+ e=mov(p,'captura','c',{b:'azul'});
+ assert.equal(e.puntosEq.rojo,1);assert.equal(e.capturas.c,1);assert.equal(e.banderas.azul.e,'base');
+ assert.ok(e.hist.some(h=>h.e==='captura'&&h.uid==='c'));
+});
+
+test('yemas: bandera, gana el equipo que llega a la meta y quien abandona la suelta en casa',()=>{
+ const p=salaEq(4,'bandera',{largo:0});
+ mov(p,'toma','b',{b:'rojo'});
+ let e=mov(p,'abandona','b');
+ assert.equal(e.banderas.rojo.e,'base');
+ mov(p,'toma','a',{b:'azul'});
+ e=mov(p,'captura','a',{b:'azul'});
+ assert.equal(e.fase,'fin');assert.equal(e.ganador,'eq:rojo');assert.equal(e.motivo,'bandera');
+ assert.equal(ganoEn(p,e.ganador,'c'),true);
+});

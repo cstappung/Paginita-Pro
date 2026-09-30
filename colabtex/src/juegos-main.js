@@ -33,7 +33,7 @@ import { crearSolo } from "./juegos/solo/club.js";
 import { watchAuth, loginGoogle, logout } from "./firebase.js";
 import * as fb from "./fb-juegos.js";
 import { escapeHtml, timeAgo, colorForUid } from "./util.js";
-import { JUEGOS, reducir, jugadasDe, acumula, cupoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_META, YM_METAS } from "./juegos/motor.js";
+import { JUEGOS, reducir, jugadasDe, acumula, cupoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, ganoEn } from "./juegos/motor.js";
 import { crearEscondite } from "./juegos/escondite.js";
 import { crearCartas } from "./juegos/cartas.js";
 import { crearCuadritos } from "./juegos/cuadritos.js";
@@ -141,14 +141,21 @@ const OPCIONES = {
   tetris: [{ clave: "cupo", etiqueta: "Jugadores", por: 4, valores: cupos("tetris") }],
   yemas: [
     { clave: "cupo", etiqueta: "Jugadores", por: 4, valores: cupos("yemas") },
-    { clave: "meta", etiqueta: "Gana quien llegue a", por: YM_META,
-      valores: YM_METAS.map(n => ({ v: n, t: n + " bajas" })) }
+    { clave: "variante", etiqueta: "Modo", por: "todos",
+      valores: Object.keys(YM_VARIANTES).map(v => ({ v, t: YM_VARIANTES[v] })) },
+    /* La meta depende del modo (bajas, bajas del equipo o banderas), y un
+       desplegable no puede cambiar sus opciones según otro: se elige el
+       largo y el motor lo traduce con `YM_LARGOS`. */
+    { clave: "largo", etiqueta: "Partida", por: 1,
+      valores: ["Corta", "Normal", "Larga"].map((t, i) => ({ v: i,
+        t: `${t} (${YM_LARGOS.todos[i]} / ${YM_LARGOS.equipos[i]} bajas, ${YM_LARGOS.bandera[i]} 🚩)` })) }
   ]
 };
 
 /* La pestaña del manual que abre cada sala: la de su variante. */
 const modoReglas = (juego, o) => juego === "cacho" ? (Number(o.sicil) || 0)
-  : juego === "catan" ? (o.exp === "mar" ? "mar" : "base") : o.modo;
+  : juego === "catan" ? (o.exp === "mar" ? "mar" : "base")
+  : juego === "yemas" ? (o.variante || "todos") : o.modo;
 
 const state = {
   user: null,           // el perfil ya aplicado: lo que se pinta
@@ -392,7 +399,7 @@ async function anotar(p) {
   if (!(p.jugadores || {})[u.uid]) return;         // mirón: no juega, no puntúa
   anotada = state.pid;
   const g = p.fin.ganador || "";
-  const res = !g ? "empate" : (g === u.uid ? "ganada" : "perdida");
+  const res = !g ? "empate" : (ganoEn(p, g, u.uid) ? "ganada" : "perdida");
   try {
     const previa = await fb.leerRank(p.juego, u.uid);
     const fila = acumula(previa, res, state.pid, { nombre: u.name, foto: fotoBreve(u.photo) });
@@ -1354,7 +1361,7 @@ function pintaFin(p, est) {
   }
   const yo = state.user.uid, g = f.ganador;
   const juega = !!(p.jugadores || {})[yo];
-  const clase = !g ? "empate" : g === yo ? "gano" : juega ? "perdi" : "mirando";
+  const clase = !g ? "empate" : ganoEn(p, g, yo) ? "gano" : juega ? "perdi" : "mirando";
   const titulo = clase === "gano" ? "¡Has ganado!"
     : clase === "perdi" ? "Has perdido"
     : clase === "empate" ? "Empate"
@@ -1429,6 +1436,9 @@ const RAZONES = {
   estrellas: "Capturó más energía en las 36 estrellas.",
   encontrado: "Encontró al personaje escondido.",
   abandono: "La partida acabó por abandono.",
+  meta: "Llegó primero a la meta de bajas.",
+  equipo: "Su equipo llegó primero a la meta de bajas.",
+  bandera: "Su equipo capturó las banderas que pedía la meta.",
   trio: "Reunió tres cartas del mismo elemento en tres colores distintos.",
   puntos: "Cerró más cajas que nadie.",
   fichas: "Acabó con más fichas sobre el tablero.",
@@ -1447,6 +1457,7 @@ const RAZONES = {
 };
 const razon = m => RAZONES[m] || "";
 const nombreDe = (est, uid) => {
+  if (String(uid).startsWith("eq:")) return "el equipo " + (uid === "eq:rojo" ? "Rojo" : "Azul");
   const x = (est.jugadores || []).find(y => y.uid === uid);
   return x ? (x.nombre || "el otro") : "el otro";
 };

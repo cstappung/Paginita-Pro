@@ -943,7 +943,10 @@ export function progreso(est, juego) {
   /* En Tetris, cuántos han caído ya. */
   if (juego === "tetris" && est.caidos) return c(est.caidos.length / Math.max(1, (est.jugadores || []).length - 1));
   /* En Yemas, lo cerca de la meta que está quien más bajas lleva. */
-  if (juego === "yemas" && est.bajas) return c(Math.max(0, ...Object.values(est.bajas)) / (est.meta || YM_META));
+  if (juego === "yemas" && est.bajas) {
+    const lider = est.puntosEq ? Math.max(0, ...Object.values(est.puntosEq)) : Math.max(0, ...Object.values(est.bajas));
+    return c(lider / (est.meta || YM_META));
+  }
   if (juego === "cartas" && est.ganadas) return c(Math.max(0, ...Object.values(est.ganadas).map(g => g.length)) / 5);
   return 0;
 }
@@ -1020,32 +1023,119 @@ export function redWorms(p, js = jugadoresDe(p), listos = true) {
    en esa jugada: una muerte escrita después no cambia al ganador. Una baja
    de alguien que ya se fue, o sobre uno mismo, cuenta como muerte de la
    víctima y no le suma a nadie. `racha` son las bajas seguidas sin morir,
-   que es lo que miran los logros. */
-export const YM_METAS = [10, 15, 25];
+   que es lo que miran los logros.
+
+   Hay tres variantes (`variante` de la sala, fuera de la lista blanca de
+   `modo` a propósito, como las opciones de Catan):
+
+   - **todos**: todos contra todos, lo de siempre.
+   - **equipos**: rojo contra azul por asiento (pares rojo, impares azul,
+     así que la sala se reparte sola al irse llenando). Suma el equipo; una
+     baja sobre un compañero no cuenta, aunque el marco ya no deja herirlo.
+   - **bandera**: cada equipo tiene una bandera en su base. Las banderas son
+     estado de la partida, así que van al registro, escritas por quien las
+     toca: `toma` (agarrar la del rival, en su base o en el suelo),
+     `devuelve` (tocar la propia caída; con `auto` la manda cualquiera
+     cuando lleva un rato en el suelo), `captura` (llevar la del rival a la
+     base propia con la propia en casa) y la `muere` de quien la llevaba,
+     que la deja en el suelo donde cayó (`x`, `z`). El orden del registro
+     decide: si dos la toman a la vez, la primera jugada se la lleva y la
+     segunda no existe.
+
+   `largo` (0, 1, 2: corta, normal, larga) elige la meta de la variante en
+   `YM_LARGOS`; una sala de antes, sin variante ni largo, lee su `meta`.
+   El ganador de las variantes por equipo es `"eq:rojo"` o `"eq:azul"`, y
+   `ganoEn` es quien sabe que eso incluye a todo el equipo. */
+export const YM_VARIANTES = { todos: "Todos contra todos", equipos: "Duelo por equipos", bandera: "Captura la bandera" };
+export const YM_LARGOS = { todos: [10, 15, 25], equipos: [20, 30, 50], bandera: [1, 3, 5] };
+export const YM_EQUIPOS = ["rojo", "azul"];
+export const YM_BASES = { rojo: [0, 29], azul: [0, -29] };
+export const YM_METAS = YM_LARGOS.todos;
 export const YM_META = 15;
+export function varianteYemas(p) {
+  const v = p && p.variante;
+  return Object.prototype.hasOwnProperty.call(YM_VARIANTES, v) ? v : "todos";
+}
 export function metaYemas(p) {
+  const v = varianteYemas(p);
+  const l = Math.floor(Number(p && p.largo));
+  if ([0, 1, 2].includes(l)) return YM_LARGOS[v][l];
   const m = Math.floor(Number(p && p.meta));
-  return YM_METAS.includes(m) ? m : YM_META;
+  if (v === "todos" && YM_METAS.includes(m)) return m;
+  return YM_LARGOS[v][1];
+}
+/* El equipo de cada uno, por asiento; `null` en todos contra todos. */
+export function equiposYemas(p, js = jugadoresDe(p)) {
+  if (varianteYemas(p) === "todos") return null;
+  const eq = {};
+  js.forEach((j, i) => { eq[j.uid] = YM_EQUIPOS[i % 2]; });
+  return eq;
+}
+/* ¿`uid` está entre los que ganaron? Sirve para todos los juegos. */
+export function ganoEn(p, ganador, uid) {
+  if (!ganador || !uid) return false;
+  if (ganador === uid) return true;
+  if (!String(ganador).startsWith("eq:") || !p || p.juego !== "yemas") return false;
+  const eq = equiposYemas(p);
+  return !!eq && eq[uid] === ganador.slice(3);
 }
 
 export function redYemas(p, js = jugadoresDe(p), listos = true) {
   const ids = new Set(js.map(j => j.uid));
+  const variante = varianteYemas(p);
   const meta = metaYemas(p);
-  const bajas = {}, muertes = {}, cabezas = {}, racha = {}, mejorRacha = {}, fuera = {};
-  for (const u of ids) { bajas[u] = 0; muertes[u] = 0; cabezas[u] = 0; racha[u] = 0; mejorRacha[u] = 0; }
+  const eq = equiposYemas(p, js);
+  const bajas = {}, muertes = {}, cabezas = {}, racha = {}, mejorRacha = {}, fuera = {}, capturasDe = {};
+  for (const u of ids) { bajas[u] = 0; muertes[u] = 0; cabezas[u] = 0; racha[u] = 0; mejorRacha[u] = 0; capturasDe[u] = 0; }
+  const puntosEq = { rojo: 0, azul: 0 }, capturas = { rojo: 0, azul: 0 };
+  const banderas = {};
+  for (const b of YM_EQUIPOS) banderas[b] = { e: "base", uid: "", x: YM_BASES[b][0], z: YM_BASES[b][1] };
+  const aBase = b => { banderas[b] = { e: "base", uid: "", x: YM_BASES[b][0], z: YM_BASES[b][1] }; };
+  const num = (x, d) => Number.isFinite(+x) && Math.abs(+x) < 60 ? Math.round(+x * 100) / 100 : d;
   const hist = [];
   let ganador = null, motivo = "", primera = "";
   for (const j of jugadasDe(p)) {
     if (ganador !== null) break;
     if (j.t === "abandona") {
-      if (ids.has(j.uid) && !fuera[j.uid]) { fuera[j.uid] = true; hist.push({ e: "sale", uid: j.uid }); }
+      if (ids.has(j.uid) && !fuera[j.uid]) {
+        fuera[j.uid] = true;
+        hist.push({ e: "sale", uid: j.uid });
+        for (const b of YM_EQUIPOS) if (banderas[b].uid === j.uid) aBase(b);
+      }
       continue;
     }
-    if (j.t !== "muere" || !listos || !ids.has(j.uid) || fuera[j.uid]) continue;
-    const v = j.uid, k = j.por;
+    if (!listos || !ids.has(j.uid) || fuera[j.uid]) continue;
+    const u = j.uid;
+
+    if (variante === "bandera" && (j.t === "toma" || j.t === "devuelve" || j.t === "captura")) {
+      const b = j.b;
+      if (!YM_EQUIPOS.includes(b)) continue;
+      const f = banderas[b];
+      if (j.t === "toma" && eq[u] !== b && f.e !== "lleva" && !YM_EQUIPOS.some(o => banderas[o].uid === u)) {
+        banderas[b] = { e: "lleva", uid: u, x: f.x, z: f.z };
+        hist.push({ e: "toma", uid: u, b });
+      } else if (j.t === "devuelve" && f.e === "suelo" && (eq[u] === b || j.auto)) {
+        aBase(b);
+        hist.push({ e: "devuelve", uid: u, b, auto: !!j.auto });
+      } else if (j.t === "captura" && f.e === "lleva" && f.uid === u && banderas[eq[u]].e === "base") {
+        aBase(b);
+        capturas[eq[u]]++;
+        capturasDe[u]++;
+        hist.push({ e: "captura", uid: u, b });
+        if (capturas[eq[u]] >= meta) { ganador = "eq:" + eq[u]; motivo = "bandera"; }
+      }
+      continue;
+    }
+
+    if (j.t !== "muere") continue;
+    const v = u, k = j.por;
     muertes[v]++;
     racha[v] = 0;
-    const vale = typeof k === "string" && ids.has(k) && k !== v && !fuera[k];
+    for (const b of YM_EQUIPOS) if (banderas[b].uid === v) {
+      banderas[b] = { e: "suelo", uid: "", x: num(j.x, banderas[b].x), z: num(j.z, banderas[b].z) };
+      hist.push({ e: "suelta", uid: v, b });
+    }
+    const vale = typeof k === "string" && ids.has(k) && k !== v && !fuera[k] && (!eq || eq[k] !== eq[v]);
     const a = Number.isInteger(j.a) && j.a >= 0 && j.a <= 2 ? j.a : 0;
     hist.push({ e: "baja", uid: vale ? k : "", v, a, cab: !!j.cab });
     if (!vale) continue;
@@ -1054,16 +1144,25 @@ export function redYemas(p, js = jugadoresDe(p), listos = true) {
     racha[k]++;
     if (racha[k] > mejorRacha[k]) mejorRacha[k] = racha[k];
     if (!primera) primera = k;
-    if (bajas[k] >= meta) { ganador = k; motivo = "meta"; }
+    if (eq) puntosEq[eq[k]]++;
+    if (variante === "todos" && bajas[k] >= meta) { ganador = k; motivo = "meta"; }
+    if (variante === "equipos" && puntosEq[eq[k]] >= meta) { ganador = "eq:" + eq[k]; motivo = "equipo"; }
   }
   const activos = js.filter(j => !fuera[j.uid]);
-  if (ganador === null && listos && activos.length <= 1) {
-    ganador = activos.length ? activos[0].uid : "";
-    motivo = "abandono";
+  if (ganador === null && listos) {
+    if (activos.length <= 1) {
+      ganador = activos.length ? activos[0].uid : "";
+      motivo = "abandono";
+    } else if (eq) {
+      const quedan = YM_EQUIPOS.filter(b => activos.some(j => eq[j.uid] === b));
+      if (quedan.length === 1) { ganador = "eq:" + quedan[0]; motivo = "abandono"; }
+    }
   }
   return {
     fase: !listos ? "espera" : ganador !== null ? "fin" : "jugando",
-    turno: "", meta, bajas, muertes, cabezas, racha, mejorRacha, fuera, primera,
+    turno: "", variante, meta, equipos: eq, bajas, muertes, cabezas, racha, mejorRacha, fuera, primera,
+    puntosEq: eq ? (variante === "bandera" ? capturas : puntosEq) : null,
+    capturas: capturasDe, banderas: variante === "bandera" ? banderas : null,
     puntos: bajas,
     vivos: activos.map(j => j.uid),
     hist: hist.slice(-40),

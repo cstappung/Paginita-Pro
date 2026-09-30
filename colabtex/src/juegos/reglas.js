@@ -377,9 +377,8 @@ const REGLAS = {
     ]
   },
   yemas: {
-    lema: "Shooter de huevos en primera persona, de 2 a 8 jugadores.",
+    lema: "Shooter de huevos en primera persona, de 2 a 8 jugadores, en tres modos.",
     secciones: [
-      ["El objetivo", "Freír a los demás. Cada baja suma una; gana el primero que llega a la meta que eligió quien abrió la sala (10, 15 o 25 bajas)."],
       ["Controles", lista([
         "Haz click en el juego para capturar el mouse; <b>Esc</b> lo suelta.",
         "<b>WASD</b> o flechas para moverte, <b>Espacio</b> para saltar, el mouse para mirar.",
@@ -392,11 +391,31 @@ const REGLAS = {
       ])],
       ["Vida y muerte", lista([
         "Tienes 100 de vida. La parte de arriba del huevo es la cabeza y ahí el daño sube.",
-        "Al morir vuelves a los tres segundos, en el punto más lejos de los demás, con un segundo y medio de protección."
+        "Al morir vuelves a los tres segundos, lo más lejos posible de tus rivales, con un segundo y medio de protección."
+      ])],
+      ["Chat de voz", lista([
+        "Arriba del juego está <b>🎙 Entrar a la voz</b>. La primera vez el navegador pide permiso para el micrófono.",
+        "Por defecto se habla <b>manteniendo apretada la V</b>; en la barra se puede cambiar a micrófono abierto, y <b>🔈</b> silencia a los demás.",
+        "La voz va directo de navegador a navegador, sin pasar por el sitio. Si dos redes no dejan una conexión directa (pasa con algunas de celular), ese par no se oye y su nombre sale en rojo."
       ])],
       ["Sin servidor", "Cada navegador decide si lo alcanzaron y anota su propia muerte en el registro. Nadie puede anotarse una baja que no le dieron, pero un navegador modificado podría no morirse: es el mismo límite honesto del resto de los juegos."],
-      ["Para practicar", "El juego suelto (<code>juegos/yemas/</code>) se juega contra cuatro bots, sin sala."]
-    ]
+      ["Para practicar", "El juego suelto (<code>juegos/yemas/</code>) se juega contra cuatro bots, todos contra todos."]
+    ],
+    modos: {
+      todos: { nombre: "Todos contra todos", secciones: [["Todos contra todos", "Cada uno por su cuenta. Gana el primero que llega a la meta de bajas: 10, 15 o 25 según el largo que eligió quien abrió la sala."]] },
+      equipos: { nombre: "Duelo por equipos", secciones: [["Duelo por equipos", lista([
+        "Rojo contra azul: los asientos se reparten alternados, así que los equipos quedan parejos.",
+        "Las bajas suman para el equipo; gana el que llega primero a 20, 30 o 50.",
+        "No hay fuego amigo: las balas atraviesan a los compañeros. Cada equipo aparece en su mitad del mapa.",
+        "Si un equipo se queda sin nadie, gana el otro."
+      ])]] },
+      bandera: { nombre: "Captura la bandera", secciones: [["Captura la bandera", lista([
+        "Cada equipo tiene su bandera en su base: la roja al norte y la azul al sur.",
+        "Pasa por encima de la bandera rival para tomarla y llévala a tu base. <b>Solo se captura si la tuya está en casa.</b>",
+        "Quien muere con la bandera la suelta donde cayó. Si es la tuya, tócala para devolverla; si nadie la toca, vuelve sola a los 25 segundos.",
+        "Gana el equipo que captura 1, 3 o 5 banderas, según el largo de la partida."
+      ])]] }
+    }
   },
   presidente: {
     lema: "El «culo»: de 3 a 10 jugadores, ronda tras ronda y sin final fijo.",

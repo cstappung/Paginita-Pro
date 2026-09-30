@@ -3,14 +3,17 @@
 //     los demás y publica lo nuestro en Firebase
 //   - local con bots, para practicar sin sala
 //
-// red:  yo, mirando, meta, jugadores (Map uid → {nombre, color}),
-//       publicar(estado), golpear(uid, golpe), morir(ev), tick(dt)
+// red:  yo, mirando, meta, variante, equipos (uid → 'rojo'|'azul', o null),
+//       jugadores (Map uid → {nombre, color}), publicar(estado),
+//       golpear(uid, golpe), morir(ev), accion(tipo, datos), hablar(on), tick(dt)
 // h:    alConfig(red), alJugador(uid, estado|null), alGolpe(g), alBaja(nombre),
-//       alFeed(item), alMarcador({bajas, muertes}), alFin({ganador, motivo})
+//       alFeed(item), alSuceso(item), alMarcador(m), alFin(f), alVoces(v)
 import * as THREE from 'three';
 import { moverCuerpo, rayoMundo, SPAWNS, OJOS } from 'yemas/mundo';
 
 export const PALETA = ['#fff4e0', '#ffd54a', '#8fd3ff', '#ff9ec7', '#9be28f', '#c98b55', '#b99bff', '#ff8a4a'];
+// En las variantes por equipo el color es del equipo, no del asiento.
+export const COLOR_EQUIPO = { rojo: '#ff8f7f', azul: '#7fb6ff' };
 const HIJO = 'yemas-hijo', PADRE = 'yemas-padre';
 const lista = x => Array.isArray(x) ? x : Object.values(x || {});
 
@@ -53,9 +56,14 @@ export function conectarMarco(h) {
     if (m.tipo === 'config') {
       if (red) return;
       const js = lista(m.jugadores).sort((a, b) => a.orden - b.orden);
+      const equipos = m.equipos && typeof m.equipos === 'object' ? m.equipos : null;
       red = {
         yo: m.yo, online: true, mirando: !!m.mirando, meta: m.meta | 0,
-        jugadores: new Map(js.map((j, i) => [j.uid, { nombre: String(j.nombre || 'Huevo').slice(0, 20), color: PALETA[i % PALETA.length] }])),
+        variante: ['todos', 'equipos', 'bandera'].includes(m.variante) ? m.variante : 'todos', equipos,
+        jugadores: new Map(js.map((j, i) => [j.uid, {
+          nombre: String(j.nombre || 'Huevo').slice(0, 20),
+          color: equipos ? COLOR_EQUIPO[equipos[j.uid]] || PALETA[0] : PALETA[i % PALETA.length],
+        }])),
         publicar(est) {
           if (red.mirando) return;
           if (golpes.length) est.g = golpes;
@@ -65,7 +73,13 @@ export function conectarMarco(h) {
           ultimoId = Math.max(ultimoId + 1, Date.now());
           golpes = [...golpes, [ultimoId, dest, Math.round(g.dmg), g.cab ? 1 : 0, g.a | 0]].slice(-8);
         },
-        morir(ev) { post('muere', { por: ev.de || '', a: ev.a | 0, cab: !!ev.cab }); },
+        morir(ev) {
+          const d = { por: ev.de || '', a: ev.a | 0, cab: !!ev.cab };
+          if (ev.x !== undefined) { d.x = ev.x; d.z = ev.z; }
+          post('muere', d);
+        },
+        accion(tipo, datos) { if (!red.mirando) post(tipo, datos); },
+        hablar(on) { post('hablar', { on: !!on }); },
         tick() {},
       };
       h.alConfig(red);
@@ -75,16 +89,19 @@ export function conectarMarco(h) {
     if (m.tipo === 'vivo') recibeVivo(m.v);
     else if (m.tipo === 'marcador') {
       for (const u of lista(m.fuera)) if (!fuera.has(u)) { fuera.add(u); presentes.delete(u); h.alJugador(u, null); }
-      h.alMarcador({ bajas: m.bajas || {}, muertes: m.muertes || {} });
+      h.alMarcador({ bajas: m.bajas || {}, muertes: m.muertes || {}, puntosEq: m.puntosEq || null, banderas: m.banderas || null });
       if (m.fin) h.alFin(m.fin);
     } else if (m.tipo === 'bajas') {
+      if (m.viejas) return;
       for (const b of lista(m.lista)) {
-        const k = red.jugadores.get(b.por), v = red.jugadores.get(b.v);
-        if (m.viejas || !v) continue;
-        h.alFeed({ k: k ? k.nombre : '', v: v.nombre, a: b.a | 0, cab: !!b.cab });
-        if (b.por === red.yo && b.v !== red.yo) h.alBaja(v.nombre);
+        const quien = red.jugadores.get(b.uid);
+        if (!quien) continue;
+        if (b.t && b.t !== 'muere') { h.alSuceso({ t: b.t, uid: b.uid, nombre: quien.nombre, b: b.b, auto: !!b.auto }); continue; }
+        const k = red.jugadores.get(b.por);
+        h.alFeed({ k: k ? k.nombre : '', v: quien.nombre, a: b.a | 0, cab: !!b.cab });
+        if (b.por === red.yo && b.uid !== red.yo) h.alBaja(quien.nombre);
       }
-    }
+    } else if (m.tipo === 'voces') h.alVoces({ en: lista(m.en), hablan: lista(m.hablan) });
   });
   post('listo');
 }
@@ -105,6 +122,8 @@ class RedLocal {
     this.online = false;
     this.mirando = false;
     this.meta = 0;
+    this.variante = 'todos';
+    this.equipos = null;
     this.cols = cols;
     this.h = h;
     this.estadoYo = null;
@@ -148,6 +167,8 @@ class RedLocal {
   }
 
   publicar(e) { this.estadoYo = e; }
+  accion() {}
+  hablar() {}
 
   golpear(dest, g) {
     const b = this.bots.find(x => x.id === dest);
