@@ -101,6 +101,14 @@ Circuit Breakers no se puede crear. El arreglo es el de siempre: pegar
 `firebase/database.rules.json` entero y **Publicar** — o usar el botón
 **Copiar las reglas** del cartel que sale en la página de juegos.
 
+### ⚠ La voz de Yemas después de la partida pide publicar otra vez
+
+`vivo/<pid>/voz` tiene ahora una regla propia que deja escribir a los
+jugadores de la sala también cuando la partida ya terminó. Así el chat de
+voz sigue funcionando en la pantalla del final y hasta que cada uno sale de
+la sala. Sin publicar, las conexiones que ya estaban siguen hablando, pero
+nadie puede entrar ni reconectarse a la voz después del fin.
+
 ### ⚠ Yemas pide publicar otra vez
 
 `'yemas'` tiene que estar en la lista del campo `juego` y en la de `logros`.

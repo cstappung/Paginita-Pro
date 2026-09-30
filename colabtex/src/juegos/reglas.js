@@ -382,12 +382,14 @@ const REGLAS = {
       ["Controles", lista([
         "Haz click en el juego para capturar el mouse; <b>Esc</b> lo suelta.",
         "<b>WASD</b> o flechas para moverte, <b>Espacio</b> para saltar, el mouse para mirar.",
-        "<b>Click</b> dispara, <b>R</b> recarga, <b>1 2 3</b> o la rueda cambian de arma y <b>Tab</b> muestra la tabla."
+        "<b>Click</b> dispara, <b>R</b> recarga, <b>1 2 3</b> o la rueda cambian de arma, <b>G</b> lanza una granada y <b>Tab</b> muestra la tabla.",
+        "<b>F</b> (o ⛶ en la cabecera de la sala) pone el juego a pantalla completa: solo el juego, sin la página alrededor."
       ])],
       ["Las armas", lista([
         "<b>1 · Batidora</b>: automática, 30 balas, 17 de daño.",
         "<b>2 · Revuelta</b>: escopeta de 9 perdigones; de cerca fríe de un tiro, de lejos pierde fuerza.",
-        "<b>3 · Poché</b>: francotirador. <b>Click derecho</b> para la mira; 90 de daño al cuerpo y fríe de un tiro a la cabeza."
+        "<b>3 · Poché</b>: francotirador. <b>Click derecho</b> para la mira; 90 de daño al cuerpo y fríe de un tiro a la cabeza.",
+        "<b>G · Huevo duro</b>: la granada. Dos por vida; rebota y revienta al segundo y medio largo. Hasta 140 de daño en el centro y nada detrás de una pared. <b>También te daña a ti</b> (la mitad), pero no a tus compañeros."
       ])],
       ["Vida y muerte", lista([
         "Tienes 100 de vida. La parte de arriba del huevo es la cabeza y ahí el daño sube.",
@@ -396,6 +398,7 @@ const REGLAS = {
       ["Chat de voz", lista([
         "Arriba del juego está <b>🎙 Entrar a la voz</b>. La primera vez el navegador pide permiso para el micrófono.",
         "Por defecto se habla <b>manteniendo apretada la V</b>; en la barra se puede cambiar a micrófono abierto, y <b>🔈</b> silencia a los demás.",
+        "La voz sigue abierta cuando termina la partida y solo se corta al salir de la sala. Si piden revancha, quien estaba en la voz entra sola a la nueva.",
         "La voz va directo de navegador a navegador, sin pasar por el sitio. Si dos redes no dejan una conexión directa (pasa con algunas de celular), ese par no se oye y su nombre sale en rojo."
       ])],
       ["Sin servidor", "Cada navegador decide si lo alcanzaron y anota su propia muerte en el registro. Nadie puede anotarse una baja que no le dieron, pero un navegador modificado podría no morirse: es el mismo límite honesto del resto de los juegos."],
@@ -404,13 +407,14 @@ const REGLAS = {
     modos: {
       todos: { nombre: "Todos contra todos", secciones: [["Todos contra todos", "Cada uno por su cuenta. Gana el primero que llega a la meta de bajas: 10, 15 o 25 según el largo que eligió quien abrió la sala."]] },
       equipos: { nombre: "Duelo por equipos", secciones: [["Duelo por equipos", lista([
-        "Rojo contra azul: los asientos se reparten alternados, así que los equipos quedan parejos.",
+        "Rojo contra azul. Mientras la sala espera, cada uno elige su equipo arriba del juego; quien no elige queda en el que le toca por asiento (alternados). Si todos eligen el mismo, se reparten alternados.",
+        "El equipo queda fijo desde la primera baja.",
         "Las bajas suman para el equipo; gana el que llega primero a 20, 30 o 50.",
         "No hay fuego amigo: las balas atraviesan a los compañeros. Cada equipo aparece en su mitad del mapa.",
         "Si un equipo se queda sin nadie, gana el otro."
       ])]] },
       bandera: { nombre: "Captura la bandera", secciones: [["Captura la bandera", lista([
-        "Cada equipo tiene su bandera en su base: la roja al norte y la azul al sur.",
+        "Cada equipo tiene su bandera en su base: la roja al norte y la azul al sur. Los equipos se eligen igual que en el duelo por equipos.",
         "Pasa por encima de la bandera rival para tomarla y llévala a tu base. <b>Solo se captura si la tuya está en casa.</b>",
         "Quien muere con la bandera la suelta donde cayó. Si es la tuya, tócala para devolverla; si nadie la toca, vuelve sola a los 25 segundos.",
         "Gana el equipo que captura 1, 3 o 5 banderas, según el largo de la partida."

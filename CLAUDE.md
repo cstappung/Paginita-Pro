@@ -2698,6 +2698,46 @@ needed**. `voz.js` takes the mailbox as a parameter, so it was tested with
 three instances in one page over real `RTCPeerConnection`s, a fake mailbox
 and oscillators as microphones.
 
+**The voice outlives the game, not the room.** At `fin` the postman deletes
+only the eggs (`fb.borraYemasVivo`, `vivo/<pid>/y`) and keeps the voice.
+`vivo/$pid/voz` has its own rule that lets players write after `fin` (a
+child grant, OR'ed with the parent's), so a reconnection still signals.
+Leaving the room (`destruir`) is what hangs up. Whoever was in the voice
+has the room's pid in `sessionStorage` (`yemas.voz`), and the postman
+re-enters by itself in a reload of the same room or in the rematch
+(`p.origen`). A re-entry without a gesture can leave remote audio
+blocked, so `voz.js` retries `play()` on every level check and it sounds
+from the first click anywhere, the game frame included. The rules must be
+re-published for the after-`fin` part; until then, established
+connections keep talking and only new signalling fails.
+
+**In the team variants each player picks a team** while the room waits:
+`{t:"equipo", uid, e}` from the picker the postman draws above the frame.
+`equiposYemas` starts from seat parity, applies the last choice of each
+player **before the first game event** (a death or a flag touch), so teams
+cannot change mid-game, and falls back to parity if a team ends up empty
+with two or more in the room. The frame gets the teams on every
+`marcador` and repaints the eggs when a colour changes.
+
+**Grenades** (`juegos/yemas/js/granada.js`, the *Huevo duro*, weapon index
+3, `YM_ARMAS`): two per life, `G` or `4`. The thrower's frame simulates it,
+decides where it bursts and whom it reaches (line of sight from the burst,
+damage falling linearly over `radio`), and sends the damage through the
+usual hits with `a: 3`. Self damage is half and applied directly, so a
+self-kill is a `muere` with `por` = oneself, which counts as a death and no
+kill. The state carries the last throw (`n: {i, o, v}`) and the last burst
+(`x2: {i, p}`). The others simulate the throw only to see it fly, and they
+burst it **where the owner said**, because two simulations with different
+frame rates do not land on exactly the same spot.
+
+**Fullscreen is the frame's**, not the page's. The room header's ⛶ asks the
+module first (`modulo.pantallaCompleta()`, which `yemas.js` answers with
+`frame.requestFullscreen()`), and only a game without that hook falls back
+to the immersive mode. Inside the frame, `F` and a button on the pause card
+do the same with the frame's own document. The voice bar stays outside;
+`V` still reaches it, and the pause card has a **🎙 Entrar a la voz**
+button that asks the postman (`voz`).
+
 Opened on its own, `juegos/yemas/index.html` is practice against four bots
 with the same engine (`conectarLocal`), which is also the quickest place to
 test a change. The window hooks `__yemas.paso(dt)` step the game without

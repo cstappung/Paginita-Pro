@@ -165,7 +165,10 @@
     "vivo": {
       ".read": "auth != null",
       "$pid": {
-        ".write": "auth != null && root.child('partidas').child($pid).child('jugadores').child(auth.uid).exists() && (!root.child('partidas').child($pid).child('fin').exists() || !newData.exists())"
+        ".write": "auth != null && root.child('partidas').child($pid).child('jugadores').child(auth.uid).exists() && (!root.child('partidas').child($pid).child('fin').exists() || !newData.exists())",
+        "voz": {
+          ".write": "auth != null && root.child('partidas').child($pid).child('jugadores').child(auth.uid).exists()"
+        }
       }
     },
 

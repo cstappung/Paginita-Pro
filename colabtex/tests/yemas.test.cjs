@@ -164,3 +164,39 @@ test('yemas: bandera, gana el equipo que llega a la meta y quien abandona la sue
  assert.equal(e.fase,'fin');assert.equal(e.ganador,'eq:rojo');assert.equal(e.motivo,'bandera');
  assert.equal(ganoEn(p,e.ganador,'c'),true);
 });
+
+// ---------- elegir equipo y granada ----------
+test('yemas: cada uno elige su equipo antes de empezar',()=>{
+ const p=salaEq(4,'equipos');
+ mov(p,'equipo','a',{e:'azul'});mov(p,'equipo','b',{e:'rojo'});
+ assert.deepEqual(copia(equiposYemas(p)),{a:'azul',b:'rojo',c:'rojo',d:'azul'});
+ mov(p,'equipo','a',{e:'rojo'});                       // vale la última
+ assert.equal(equiposYemas(p).a,'rojo');
+ mov(p,'equipo','c',{e:'morado'});mov(p,'equipo','x',{e:'azul'});   // inválidas
+ assert.equal(equiposYemas(p).c,'rojo');assert.equal(equiposYemas(p).x,undefined);
+});
+
+test('yemas: el equipo no se cambia a media partida y la victoria sigue la elección',()=>{
+ const p=salaEq(4,'equipos',{largo:0});
+ mov(p,'equipo','b',{e:'rojo'});mov(p,'equipo','c',{e:'azul'});   // rojos a,b; azules c,d
+ muere(p,'c','a');
+ mov(p,'equipo','a',{e:'azul'});                       // tarde: ya hubo una baja
+ assert.equal(equiposYemas(p).a,'rojo');
+ let e;for(let i=0;i<19;i++)e=muere(p,i%2?'c':'d',i%2?'a':'b');
+ assert.equal(e.ganador,'eq:rojo');
+ assert.equal(ganoEn(p,e.ganador,'b'),true);assert.equal(ganoEn(p,e.ganador,'c'),false);
+});
+
+test('yemas: si todos eligen el mismo equipo, se vuelve al asiento',()=>{
+ const p=salaEq(4,'bandera');
+ for(const u of ['a','b','c','d'])mov(p,'equipo',u,{e:'azul'});
+ assert.deepEqual(copia(equiposYemas(p)),{a:'rojo',b:'azul',c:'rojo',d:'azul'});
+ assert.equal(reducir(p).fase,'jugando');
+});
+
+test('yemas: una baja con granada (arma 3) cuenta y queda en el historial',()=>{
+ const p=sala(3);
+ const e=muere(p,'b','a',{a:3});
+ assert.equal(e.bajas.a,1);assert.equal(e.hist.at(-1).a,3);
+ assert.equal(muere(p,'c','a',{a:9}).hist.at(-1).a,0);
+});

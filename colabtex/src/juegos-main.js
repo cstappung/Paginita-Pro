@@ -879,7 +879,13 @@ function armazon() {
          cualquier juego con chat: el campo abierto taparía el tablero. */
       else if (ok && enInmersivo()) chatAbierto(false);
     };
-    $("jgInm").onclick = () => ponInmersivo(!enInmersivo());
+    /* Un juego que sabe ponerse él solo a pantalla completa (Yemas pone
+       su marco, y así no queda nada de la página alrededor) lo hace; el
+       resto usa el modo inmersivo de la sala. */
+    $("jgInm").onclick = () => {
+      if (!enInmersivo() && modulo && modulo.pantallaCompleta && modulo.pantallaCompleta()) return;
+      ponInmersivo(!enInmersivo());
+    };
     $("jgChatAbre").onclick = () => chatAbierto(true);
     /* El campo se cierra solo al perder el foco vacío; con algo escrito
        se queda, que es texto que alguien quería mandar. */

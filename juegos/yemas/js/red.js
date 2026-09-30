@@ -80,6 +80,7 @@ export function conectarMarco(h) {
         },
         accion(tipo, datos) { if (!red.mirando) post(tipo, datos); },
         hablar(on) { post('hablar', { on: !!on }); },
+        entrarVoz() { post('voz'); },
         tick() {},
       };
       h.alConfig(red);
@@ -89,6 +90,12 @@ export function conectarMarco(h) {
     if (m.tipo === 'vivo') recibeVivo(m.v);
     else if (m.tipo === 'marcador') {
       for (const u of lista(m.fuera)) if (!fuera.has(u)) { fuera.add(u); presentes.delete(u); h.alJugador(u, null); }
+      // Los equipos pueden cambiar hasta que empieza de verdad (cada uno elige
+      // el suyo): el marcador trae los vigentes y el color sigue al equipo.
+      if (m.equipos && JSON.stringify(m.equipos) !== JSON.stringify(red.equipos)) {
+        red.equipos = m.equipos;
+        for (const [u, f] of red.jugadores) f.color = COLOR_EQUIPO[m.equipos[u]] || f.color;
+      }
       h.alMarcador({ bajas: m.bajas || {}, muertes: m.muertes || {}, puntosEq: m.puntosEq || null, banderas: m.banderas || null });
       if (m.fin) h.alFin(m.fin);
     } else if (m.tipo === 'bajas') {
@@ -169,6 +176,7 @@ class RedLocal {
   publicar(e) { this.estadoYo = e; }
   accion() {}
   hablar() {}
+  entrarVoz() {}
 
   golpear(dest, g) {
     const b = this.bots.find(x => x.id === dest);
@@ -185,7 +193,7 @@ class RedLocal {
 
   morir(ev) {
     this.muertes.yo++;
-    if (this.bajas[ev.de] !== undefined) this.bajas[ev.de]++;
+    if (ev.de !== 'yo' && this.bajas[ev.de] !== undefined) this.bajas[ev.de]++;   // la propia granada no es baja
     this.h.alFeed({ k: this.nombre(ev.de), v: this.nombre('yo'), a: ev.a | 0, cab: !!ev.cab });
     this.avisaMarcador();
   }
