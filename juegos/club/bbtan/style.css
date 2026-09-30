@@ -84,3 +84,12 @@ html.descenso h1 span{color:color-mix(in srgb,var(--green),#ff2020 calc(var(--w5
 html.descenso .score-strip span{transition:color .3s}
 html.descenso .score-strip span.susurro{color:#ff2a2a}
 @media(prefers-reduced-motion:reduce){html.descenso .play-section,html.descenso h1,html.descenso .canvas-wrap{animation:none}}
+/* La voz de cada 50 rondas (voz.js): el aviso se viste como suena. */
+.toast[data-voz]{white-space:normal;width:max-content;max-width:86%;line-height:1.8}
+.toast[data-voz=alegre]{color:#fff36a;border-color:#ffb300;animation:voz-salta .5s steps(3) infinite alternate}
+.toast[data-voz=roto]{color:#e8f8ff;border-color:#10e0ff;text-shadow:-2px 0 #ff1030,2px 0 #10e0ff;animation:voz-tiembla .14s steps(2) infinite}
+.toast[data-voz=susurro]{color:#ff3040;background:#000000d8;border-color:#3a0006;font-size:8px;letter-spacing:2px;text-shadow:0 0 6px #ff1030;animation:voz-late 2.4s ease-in-out infinite}
+@keyframes voz-salta{to{transform:translate(-50%,-5px) scale(1.04)}}
+@keyframes voz-tiembla{50%{transform:translate(calc(-50% + 2px),1px) skewX(-4deg)}}
+@keyframes voz-late{50%{opacity:.55;transform:translate(-50%,0) scale(.97)}}
+@media (prefers-reduced-motion:reduce){.toast[data-voz]{animation:none}}

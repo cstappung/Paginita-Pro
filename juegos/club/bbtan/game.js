@@ -114,7 +114,16 @@
   function setSound() {
     $('sound').setAttribute('aria-pressed', String(sound)); $('sound').setAttribute('aria-label', sound ? 'Desactivar sonido' : 'Activar sonido');
   }
-  function toast(message) { $('toast').textContent = message; $('toast').classList.add('visible'); toastTime = 2; }
+  // Cada 50 rondas el juego habla (voz.js): alegre, luego roto, luego en
+  // contra tuya y en susurros. La frase también se lee, por si no hay voz.
+  function hablaJuego() {
+    const V = BBTANVoz, frase = V.frase(round, Math.random()), partes = V.trozos(frase, round, Math.random());
+    const animo = V.animo(round), texto = animo === 'susurro' ? frase.toLowerCase() : animo === 'roto' ? partes.map(p => p.t).join(' ') : frase;
+    toast(animo === 'alegre' ? texto.toUpperCase() : texto, Math.max(3, Math.min(9, V.duracion(partes) + 1)));
+    $('toast').dataset.voz = animo;
+    BBTANAudio.anuncio(round, partes);
+  }
+  function toast(message, secs = 2) { delete $('toast').dataset.voz; $('toast').textContent = message; $('toast').classList.add('visible'); toastTime = secs; }
   function blockColor(block) { return block.reinforced ? colors.orange : block.max >= 24 ? colors.orange : block.max >= 14 ? colors.purple : block.max >= 8 ? colors.cyan : colors.lime; }
   function pickupColor(p) { return p.kind === 'ball' ? colors.lime : p.kind === 'laser-h' ? colors.purple : p.kind === 'laser-v' ? colors.cyan : colors.orange; }
   function createRow(y) {
@@ -125,7 +134,7 @@
   function reset() {
     state = 'aim'; paused = false; tocando = false; score = 0; round = 1; count = initialBalls; blocks = []; pickups = []; balls = []; particles = []; rings = []; floaters = [];
     launchX = W / 2; nextX = null; angle = -Math.PI / 2 - .26; queue = 0; returned = 0; gained = 0; combo = 0; mult = 1; shotTime = 0; shotRealTime = 0; roundTimer = 0; archived = false; activo = 0; reportada = false; fast = false; clearCelebrated = false; clearTime = 0; idSeq = 0;
-    pointerDown = false; toastTime = 0; $('toast').classList.remove('visible');
+    pointerDown = false; toastTime = 0; $('toast').classList.remove('visible'); BBTANAudio.calla();
     createRow(TOP); characterX = sombraX = launchX; throwKick = 0; hintSeen = false; paleta(); animoEn = 0;
     $('overlay').hidden = true; $('pause').disabled = false; $('speed').setAttribute('aria-pressed','false'); $('speed-label').textContent = 'Velocidad ×1';
     aimDirty = true; uiDirty = true; updateUI();
@@ -273,7 +282,7 @@
       blocks.forEach(b=>baja(b,hsh(b.id)));pickups.forEach(p=>baja(p,hsh(p.x|0)));
       if(roundTimer>=.4+lag) {
         if(blocks.some(b=>b.hp>0 && b.y+b.h>=FLOOR-12))gameOver();
-        else { round++;clearCelebrated=false;paleta();createRow(TOP);characterX=launchX;state='aim';aimDirty=true;uiDirty=true; if(round%5===0){const a=T.animo[etapaT];toast(roto(`RONDA ${round} · ${a[(round/5)%a.length]}`));} guarda(); }
+        else { round++;clearCelebrated=false;paleta();createRow(TOP);characterX=launchX;state='aim';aimDirty=true;uiDirty=true; if(BBTANVoz.habla(round))hablaJuego();else if(round%5===0){const a=T.animo[etapaT];toast(roto(`RONDA ${round} · ${a[(round/5)%a.length]}`));} guarda(); }
       }
     }
   }
@@ -307,12 +316,13 @@
     const pose = {
       handX: (9 + Math.cos(angle) * kick * 5) / scale,
       handY: (-36 + Math.sin(angle) * kick * 5) / scale,
-      maldad: corr
+      maldad: corr,
+      t: reducedMotion ? 0 : performance.now()
     };
     drawSombra(pose);
     BBTANCharacter.draw(ctx, BBTANAppearance.get(), x - 9, y + 35, scale, pose);
     if (state === 'aim' || (state === 'shoot' && queue > 0)) {
-      ctx.fillStyle = pal.bola; pixelBall(x,y-1,bounds.radius);
+      drawBola(x,y-1,0,-1,performance.now(),!reducedMotion,0);
     }
     ctx.fillStyle=pal.texto; ctx.font=`7px ${PIXEL}`; ctx.textAlign='center';
     ctx.fillText(`×${state==='shoot'?queue:count}`,x,y-22);
@@ -380,13 +390,9 @@
       else ctx.arc(effect.x,effect.y,(.35-effect.life)*75+12,0,Math.PI*2);
       ctx.stroke();ctx.globalAlpha=1;
     }
-    const wE=lento(1.5,4.5), colorEstela=wE>0?DSC.mezclaHex(pal.estela,'#ff1030',wE):pal.estela;
-    for(const b of balls) {
-      if(!reducedMotion)b.trail.forEach((p,i)=>{const n=b.trail.length;ctx.globalAlpha=(1-i/n)*(.15+.2*wE);ctx.fillStyle=colorEstela;pixelBall(p.x,p.y,Math.max(2,Math.round(bounds.radius-1-i*6/n)));});
-      ctx.globalAlpha=1;ctx.fillStyle=pal.bola;pixelBall(b.x,b.y,bounds.radius);
-    }
+    balls.forEach((b,i)=>{if(!reducedMotion)drawEstelaBola(b,now,i);drawBola(b.x,b.y,b.vx,b.vy,now,mov,i);});
     if(state==='shoot' && nextX!==null) {
-      ctx.fillStyle=colors.lime;pixelBall(nextX,FLOOR,bounds.radius);
+      drawBola(nextX,FLOOR,0,-1,now,mov,-1,colors.lime);
       ctx.fillStyle=pal.texto;ctx.font=`7px ${PIXEL}`;ctx.textAlign='center';ctx.fillText(`+${returned}`,clamp(nextX,15,W-15),FLOOR-12);
     }
     drawCharacter();
@@ -397,6 +403,41 @@
   }
   // Lo que se va apoderando del juego. Nada entra de golpe ni se anuncia: cada
   // cosa tiene su propio tramo de corrupción (`lento`) y crece en silencio.
+  // La bola también se pudre, solo a la vista: primero un rescoldo rojo en el
+  // centro y un halo que late, después un ojo que mira hacia donde vuela, y al
+  // final un agujero negro de borde rojo. La estela pasa de copias a brasas y
+  // humo que suben. El radio de choque no cambia.
+  function drawBola(x,y,vx,vy,now,mov,sem,base) {
+    const r=bounds.radius, wA=lento(.8,2.6), wO=lento(2.4,4), wN=lento(4,5);
+    const late=mov?.5+.5*Math.sin(now/(140-40*Math.min(1,wN))+sem*1.9):.5;
+    if(wA>0){ctx.globalAlpha=(.12+.18*late)*wA;ctx.fillStyle=wN>.5?'#ff1030':DSC.mezclaHex('#ff9040','#ff1030',wA);pixelBall(x,y,r+2+Math.round(late*wA));ctx.globalAlpha=1;}
+    let color=base||pal.bola;
+    if(wO>0)color=DSC.mezclaHex(color,'#f0e0d8',wO*.6);
+    if(wN>0)color=DSC.mezclaHex(color,'#0a0003',wN);
+    if(wN>0){ctx.fillStyle=DSC.mezclaHex(color,'#ff1a2e',wN);pixelBall(x,y,r);ctx.fillStyle=color;pixelBall(x,y,r-1);}
+    else{ctx.fillStyle=color;pixelBall(x,y,r);}
+    x=Math.round(x);y=Math.round(y);
+    if(wA>0&&wO<1){ctx.globalAlpha=wA*(1-wO)*(.6+.4*late);ctx.fillStyle='#ff2a1a';ctx.fillRect(x-1,y-1,2,2);ctx.globalAlpha=1;}
+    if(wO>0){
+      const v=Math.hypot(vx,vy)||1, dx=Math.round(vx/v*2), dy=Math.round(vy/v*2);
+      const parpadea=mov&&Math.sin(now/600+sem*2.3)>.985;
+      ctx.globalAlpha=wO;ctx.fillStyle=wN>.5?'#ff1a2e':'#a0101c';
+      if(parpadea)ctx.fillRect(x-3,y,6,1);else{ctx.fillRect(x-2+dx,y-2+dy,4,4);ctx.fillStyle='#050000';ctx.fillRect(x-1+dx,y-1+dy,2,2);}
+      ctx.globalAlpha=1;
+    }
+  }
+  function drawEstelaBola(b,now,i) {
+    const n=b.trail.length, wE=lento(1.5,4.5), wH=lento(2,4.2);
+    const colorEstela=wE>0?DSC.mezclaHex(pal.estela,'#ff1030',wE):pal.estela;
+    b.trail.forEach((p,j)=>{
+      const f=j/n, sube=wH*f*f*18, deriva=wH*Math.sin(now/200+j*1.3+i)*3*f;
+      ctx.globalAlpha=(1-f)*(.15+.2*wE);
+      ctx.fillStyle=wH>0&&(j+i)%3===2?DSC.mezclaHex(colorEstela,'#2a1418',wH):wH>0&&j%4===1?DSC.mezclaHex(colorEstela,'#ffb040',wH*.7):colorEstela;
+      const rr=Math.max(2,Math.round(bounds.radius-1-j*6/n));
+      if(wH>.5&&j%2)ctx.fillRect(Math.round(p.x+deriva)-1,Math.round(p.y-sube)-1,2,2);else pixelBall(p.x+deriva,p.y-sube,rr);
+    });
+    ctx.globalAlpha=1;
+  }
   const largoEstela = () => 5 + Math.round(10 * lento(1.5, 4.5));
   // Lo que miran los ojos: la bola más alta en vuelo o, si no hay, tú.
   function objetivo() {
