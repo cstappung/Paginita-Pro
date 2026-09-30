@@ -2612,7 +2612,14 @@ corners, chromatic glow, jitter, a heartbeat and a skewed shell. The
 reduced-motion setting turns those animations off. The canvas gets cracks,
 faint words, blinking eyes and static (`drawDescenso`, `drawEstatica`). The
 character's face turns evil with `pose.maldad` in `character.js`, adding in
-order: pallor, V brows, red eyes, streaks and a jagged grin. The texts come from
+order: pallor, V brows, red eyes, streaks and a jagged grin. The whole body
+and outfit follow (`pose.t` animates them): the skin goes grey then blood red,
+the green shirt and blue jeans go black and burgundy, then come a stoop, a
+torn shirt and frayed hems, a tail, horns, veins, claws, a glowing pentagram,
+shoulder spikes and last bat wings, each over its own `m` range. The balls
+change too (`drawBola`, `drawEstelaBola`): a halo and embers, then an eye that
+looks where it flies and blinks, then a black core with a red rim, with a
+trail of rising embers and smoke. The texts come from
 `TEXTOS`, one column per floor, picked with `etapa(c)`, the nearest floor, so
 the tone flips mid-fade. They go from cheering to «NO TE QUEREMOS AQUÍ», and
 past floor 2 `corrompe` swaps letters with a seeded noise so the status bar
@@ -2637,6 +2644,20 @@ them (`gotea`). Labels change letter by letter (`ETIQUETAS`: PUNTAJE→PECADOS,
 RÉCORD→CONDENA, RONDA→CÍRCULO, BOLAS→ALMAS), the title turns BBTAN into
 SATAN (the `<h1>` and `document.title`), and a red `susurro` flashes in a
 label for a moment (`mutaciones`, every 120 ms).
+
+**The one exception is the voice, and it was asked for** (`voz.js`, UMD on
+`BBTANVoz`, tested by `voz.test.cjs`). Every 50 rounds the game speaks
+(`habla`), through `speechSynthesis` plus a toast (`hablaJuego` in `game.js`,
+`.toast[data-voz]`). It does not name the floor, it just changes mood: at 50
+and 100 it is an overexcited fairground host (`alegre`, one high, fast
+utterance), at 150 and 200 it is broken (`roto`: one utterance per word with
+random pitch and rate, stutters, words that repeat) and says absurd things,
+and from 250 it turns on the player and whispers (`susurro`: low, slow and
+quiet, each sentence apart, and an echo of the last two words at pitch 0).
+`trozos` is pure and seeded. `audio.js`'s `anuncio` ducks the music and lays
+a bed under it: a fair arpeggio, glitch beeps, or `susurro()` (band-passed
+breath noise, detuned low saws and a sub). With no voices the toast and the
+bed still play. The mute switch and `reset()` call `calla()`.
 
 **A game in progress is saved per account** (`guarda`/`cargaPartida` in
 `game.js`). At the start of every round from round 2 the board is written to

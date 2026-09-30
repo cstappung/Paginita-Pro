@@ -16,9 +16,25 @@
     for(const key of Object.keys(defaults.colors))if(/^#[0-9a-f]{6}$/i.test(input.colors?.[key]||''))result.colors[key]=input.colors[key].toLowerCase();
     return result;
   }
+  // Mezcla lineal de dos #rrggbb (t en 0..1).
+  const mix=(p,q,t)=>{if(t<=0)return p;const A=[1,3,5].map(i=>parseInt(p.slice(i,i+2),16)),B=[1,3,5].map(i=>parseInt(q.slice(i,i+2),16));return '#'+A.map((v,i)=>Math.round(v+(B[i]-v)*t).toString(16).padStart(2,'0')).join('');};
+  const kk=v=>Math.max(0,Math.min(1,v));
   function draw(ctx,appearance,x,y,scale=1,pose={}){
-    const a=appearance,c=a.colors;
+    const a=appearance,m=pose.maldad||0,t=pose.t||0;
+    // El descenso no se queda en la cara: la piel palidece y luego enrojece, la
+    // ropa se ennegrece y se rompe, y le salen cuernos, garras, cola y alas.
+    // Cada capa entra en su propio tramo de maldad; el vestidor no la pasa.
+    let c=a.colors;
+    if(m>0){
+      const ropa=kk((m-.8)/2.2),piel=kk((m-.5)/2.5),rojo=kk((m-3)/2);
+      c={...c,skin:mix(mix(c.skin,'#9c8e98',piel*.8),'#7a2432',rojo*.55),hair:mix(c.hair,'#0c0608',kk(m-1)),
+        shirt:mix(mix(c.shirt,'#2a1a24',ropa),'#4a0a14',rojo*.5),pants:mix(c.pants,'#1c1018',ropa),
+        shoes:mix(c.shoes,'#140a0c',ropa),mouth:mix(c.mouth,'#3a0008',kk(m-1))};
+    }
     ctx.save();ctx.translate(x,y);ctx.scale(scale,scale);ctx.lineCap='round';ctx.lineJoin='round';
+    // Se va encorvando y respira hondo.
+    const encorva=kk((m-2)/2);
+    if(encorva>0)ctx.transform(1,0,-.09*encorva,1-.05*encorva+.015*encorva*Math.sin(t/520),0,0);
     const rect=(x,y,w,h,r,color)=>{ctx.fillStyle=color;ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();};
     const circle=(x,y,r,color)=>{ctx.fillStyle=color;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();};
     const line=(points,color,width=2)=>{ctx.strokeStyle=color;ctx.lineWidth=width;ctx.beginPath();points.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.stroke();};
@@ -27,6 +43,16 @@
     const star=(x,y,r,color)=>{const pts=[];for(let i=0;i<10;i++){const ang=-Math.PI/2+i*Math.PI/5;pts.push([x+Math.cos(ang)*(i%2?r*.43:r),y+Math.sin(ang)*(i%2?r*.43:r)]);}poly(pts,color);};
     const heart=(x,y,s,color)=>{circle(x-s*.35,y-s*.2,s*.48,color);circle(x+s*.35,y-s*.2,s*.48,color);poly([[x-s*.8,y],[x+s*.8,y],[x,y+s]],color);};
     ctx.fillStyle='#05090555';ctx.beginPath();ctx.ellipse(0,2,31,4,0,0,Math.PI*2);ctx.fill();
+    if(m>2){
+      const aura=kk((m-2.5)/1.5),alas=kk((m-4)/.9),cola=kk((m-2.2)/1.4),late=.75+.25*Math.sin(t/260);
+      if(aura>0){const g=ctx.createRadialGradient(0,-50,6,0,-50,52);g.addColorStop(0,'#ff103000');g.addColorStop(.6,'#ff10301c');g.addColorStop(1,'#ff103000');ctx.globalAlpha=aura*late;ctx.fillStyle=g;ctx.fillRect(-56,-106,112,112);ctx.globalAlpha=1;}
+      if(alas>0){ctx.globalAlpha=alas;const b=Math.sin(t/340)*3*alas;
+        for(const s of [-1,1])poly([[s*12,-50],[s*(26+14*alas),-74-b],[s*(40+10*alas),-66-b],[s*(34+8*alas),-56],[s*(38+8*alas),-46+b],[s*28,-47],[s*30,-38+b],[s*16,-40]],'#14060a');
+        ctx.globalAlpha=1;}
+      if(cola>0){const w=Math.sin(t/300)*4;ctx.globalAlpha=cola;
+        ctx.strokeStyle='#1a0508';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(8,-30);ctx.bezierCurveTo(26,-24,30+w,-8,36+w*1.5,-26-10*cola);ctx.stroke();
+        const tx=36+w*1.5,ty=-26-10*cola;poly([[tx-4,ty+3],[tx+1,ty-7],[tx+5,ty+3],[tx,ty+1]],'#3a0810');ctx.globalAlpha=1;}
+    }
     // Longer hairstyles behind the face and shoulders.
     if(a.hair===3)rect(-21,-85,42,40,13,c.hair);
     if(a.hair===7){circle(18,-84,9,c.hair);curve(22,-84,34,-70,22,-52,c.hair,11);}
@@ -72,6 +98,23 @@
     if(a.shirt===8)star(0,-40,9,'#ffffffcc');
     if(a.shirt===9)poly([[-17,-49],[-17,-41],[12,-27],[17,-27],[17,-31]],'#ffffffaa');
     if(a.pants===7){rect(-11,-43,22,17,3,c.pants);line([[-11,-53],[-9,-37]],c.pants,5);line([[11,-53],[9,-37]],c.pants,5);circle(-8,-40,1.5,'#f1f0e9');circle(8,-40,1.5,'#f1f0e9');}
+    if(m>1.5){
+      const roto=kk((m-1.5)/1.5),venas=kk((m-3)/1.5),runa=kk((m-3.5)/1.2),puas=kk((m-4)/.8);
+      ctx.globalAlpha=roto;
+      // desgarros: borde dentado de la polera, jirones con piel a la vista
+      const dz=[];for(let i=0;i<=8;i++)dz.push([-18+i*4.5,-27+(i%2?-4:0)]);dz.push([18,-24],[-18,-24]);poly(dz,c.pants);
+      poly([[-11,-44],[-6,-41],[-9,-37],[-7,-33],[-12,-36]],c.skin);poly([[7,-38],[12,-35],[9,-31]],c.skin);
+      for(const side of [-1,1])poly([[side*9-4,-17],[side*9+2,-15],[side*9-1,-11],[side*9+3,-9],[side*9-3,-10]],c.skin);
+      for(const side of [-1,1])for(let i=0;i<3;i++)line([[side*(6+i*4),-8],[side*(6+i*4)+1,-4]],c.pants,2);
+      ctx.globalAlpha=1;
+      if(venas>0){ctx.globalAlpha=venas*.7;
+        for(const side of [-1,1]){line([[side*17,-47],[side*19,-41],[side*18,-37],[side*21,-33]],'#ff1030',.8);line([[side*9,-16],[side*10,-12],[side*8,-9]],'#ff1030',.8);}
+        ctx.globalAlpha=1;}
+      if(runa>0){ctx.save();ctx.globalAlpha=runa*(.6+.4*Math.sin(t/230));ctx.shadowColor='#ff1030';ctx.shadowBlur=6;
+        const pts=[];for(let i=0;i<5;i++){const g=-Math.PI/2+i*Math.PI*4/5;pts.push([Math.cos(g)*7,-40+Math.sin(g)*7]);}pts.push(pts[0]);line(pts,'#ff2238',1.1);
+        ctx.restore();}
+      if(puas>0){ctx.globalAlpha=puas;for(const side of [-1,1]){poly([[side*12,-54],[side*20,-54-7*puas],[side*18,-50]],'#1a0508');poly([[side*16,-52],[side*24,-54-4*puas],[side*20,-47]],'#1a0508');}ctx.globalAlpha=1;}
+    }
     // Face.
     circle(-16,-71,4,c.skin);circle(16,-71,4,c.skin);rect(-17,-90,34,35,14,c.skin);
     // Ten haircuts; front hair stays above the eyes.
@@ -85,6 +128,16 @@
     if(a.hair===7){rect(-17,-91,34,11,8,c.hair);poly([[-16,-82],[2,-88],[-11,-75]],c.hair);}
     if(a.hair===8){rect(-17,-92,34,11,7,c.hair);line([[0,-90],[0,-83]],'#00000044',1);}
     if(a.hair===9){for(let i=0;i<9;i++){const ang=Math.PI+i*Math.PI/8;circle(Math.cos(ang)*20,-79+Math.sin(ang)*14,8,c.hair);}rect(-17,-93,34,12,5,c.hair);}
+    if(m>2){
+      const cuernos=kk((m-2)/1.5),garras=kk((m-3)/1.2);
+      if(cuernos>0){ctx.globalAlpha=Math.min(1,cuernos*1.5);const L=6+12*cuernos;
+        for(const s of [-1,1]){poly([[s*7,-89],[s*14,-88],[s*(17+L*.35),-89-L*.7],[s*(13+L*.2),-89-L]],'#2a0a10');line([[s*9,-90],[s*(12+L*.2),-89-L*.8]],'#5a1a22',1);}
+        ctx.globalAlpha=1;}
+      if(garras>0){ctx.globalAlpha=garras;const manos=[[-23,-31,-1,1]];
+        manos.push(pose.handX!==undefined?[pose.handX,pose.handY,1,0]:[23,-31,1,1]);
+        for(const [hx,hy,s,abajo] of manos)for(let i=-1;i<=1;i++){const bx=hx+i*2.2;poly(abajo?[[bx-1,hy+2],[bx+1,hy+2],[bx+s*.8,hy+6+garras*2]]:[[bx,hy-1],[bx,hy+1],[bx+5+garras*2,hy+i*1.5]],'#140406');}
+        ctx.globalAlpha=1;}
+    }
     // Eyes.
     const ec=c.eyes,ey=-73;
     for(const side of [-1,1]){
@@ -113,19 +166,14 @@
     if(a.mouth===7){rect(-5,my-2,10,5,2,mc);rect(0,my,4,6,2,'#f68ca4');}
     if(a.mouth===8){curve(-5,my-1,0,my+5,5,my-1,mc,2);rect(-1,my,3,3,1,'#ffffff');}
     if(a.mouth===9){poly([[-3,my-3],[3,my-1],[0,my],[3,my+2],[-3,my+3],[0,my]],mc);}
-    // El descenso (pose.maldad, 0..5): la cara se va torciendo por capas,
-    // cada una fundida con su propio tramo. El vestidor no la pasa.
-    const m=pose.maldad||0;
+    // La cara se tuerce por capas, cada una fundida con su propio tramo.
     if(m>0){
-      const k=v=>Math.max(0,Math.min(1,v));
-      const palidez=k((m-.5)/2)*.55;
-      if(palidez>0){ctx.globalAlpha=palidez;rect(-17,-90,34,35,14,'#2a1a28');ctx.globalAlpha=1;}
+      const k=kk;
       const ojos=k(m-1),boca=k(m-2),hondo=k(m-3);
       if(ojos>0){
         ctx.globalAlpha=ojos;
         for(const side of [-1,1]){
           rect(side*7-5,ey-5,10,9,3,c.skin);
-          if(palidez>0){ctx.globalAlpha=ojos*palidez;rect(side*7-5,ey-5,10,9,3,'#2a1a28');ctx.globalAlpha=ojos;}
           if(hondo>0){ctx.globalAlpha=ojos*hondo*.7;line([[side*6,ey+3],[side*7,ey+9]],'#1a0508',1.5);line([[side*8.5,ey+3],[side*9,ey+7]],'#1a0508',1);ctx.globalAlpha=ojos;}
           ctx.shadowColor='#ff1030';ctx.shadowBlur=4+8*hondo;
           poly([[side*3,ey+1],[side*10,ey-3],[side*9,ey+1.5]],'#ff2238');
@@ -139,7 +187,6 @@
       ctx.globalAlpha=1;
       if(boca>0){
         ctx.globalAlpha=boca;rect(-8,my-4,16,9,3,c.skin);
-        if(palidez>0){ctx.globalAlpha=boca*palidez;rect(-8,my-4,16,9,3,'#2a1a28');}
         ctx.globalAlpha=boca;
         poly([[-8,my-3],[8,my-3],[5,my+3],[-5,my+3]],'#1a0508');
         const dientes=[];for(let i=0;i<=8;i++)dientes.push([-7+i*1.75,my-3+(i%2?3:0)]);

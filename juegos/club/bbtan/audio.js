@@ -56,6 +56,7 @@
     if (master && context) master.gain.setTargetAtTime(enabled ? .88 : 0, context.currentTime, .015);
     if (!enabled && clearSource) { try { clearSource.stop(); } catch {} clearSource = null; }
     if (!enabled && fallbackClip) fallbackClip.pause();
+    if (!enabled && root.BBTANVoz) root.BBTANVoz.calla();
   }
 
   function note(frequency, duration, type, volume, delay = 0, endFrequency = frequency * .72) {
@@ -206,5 +207,56 @@
     try { g.cancelScheduledValues(t); g.setTargetAtTime(.12, t, .05); g.setTargetAtTime(.5, t + seconds, .35); } catch {}
   }
 
-  root.BBTANAudio = { setEnabled, unlock, launch, hit, broken, pickup, combo, gameOver, clear, music, mood, duck };
+  /* Cada 50 rondas habla el juego (voz.js). Bajo la voz va una cama que dice
+     lo mismo sin palabras: un arpegio de feria cuando está contento, pitidos
+     que se cortan cuando se rompe, y en el susurro un aliento de ruido que
+     respira y un zumbido grave y desafinado. La música se agacha mientras. */
+  function anuncio(ronda, partes) {
+    const V = root.BBTANVoz;
+    if (!enabled || !V) return;
+    unlock();
+    V.decir(partes);
+    if (!context || context.state !== 'running') return;
+    const dur = Math.min(14, V.duracion(partes) + 1), animo = V.animo(ronda);
+    duck(dur);
+    if (animo === 'alegre') {
+      [523, 659, 784, 1047, 1319].forEach((f, i) => note(f, .22, 'square', .028, i * .07, f * 1.02));
+      note(1568, .5, 'triangle', .03, .4, 1760);
+    } else if (animo === 'roto') {
+      for (let i = 0; i < 16; i++) {
+        const f = 120 + Math.random() * 1800;
+        note(f, .03 + Math.random() * .09, Math.random() < .5 ? 'square' : 'sawtooth', .02, Math.random() * dur * .85, f * (Math.random() < .5 ? .3 : 2.5));
+      }
+      noise(.3, 4000, 300, .05, .1);
+    } else susurro(dur, V.nivel(ronda) - 4);
+  }
+  function susurro(dur, hondo) {
+    noise(.01, 1000, 1000, .0001); // asegura noiseBuffer
+    const at = context.currentTime, fin = at + dur, bus = context.createGain();
+    bus.gain.setValueAtTime(.0001, at); bus.gain.exponentialRampToValueAtTime(1, at + .8);
+    bus.gain.setValueAtTime(1, fin - 1.2); bus.gain.exponentialRampToValueAtTime(.0001, fin);
+    bus.connect(effects); bus.connect(reverb);
+    // El aliento: ruido en banda que entra y sale como una respiración.
+    const aire = context.createBufferSource(), banda = context.createBiquadFilter(), pecho = context.createGain();
+    aire.buffer = noiseBuffer; aire.loop = true;
+    banda.type = 'bandpass'; banda.frequency.value = 1500 - 250 * hondo; banda.Q.value = 1.1;
+    pecho.gain.setValueAtTime(.0001, at);
+    for (let t = at, k = 0; t < fin; t += 1.7, k++) {
+      pecho.gain.exponentialRampToValueAtTime(k % 2 ? .05 : .09, t + .7);
+      pecho.gain.exponentialRampToValueAtTime(.006, t + 1.6);
+    }
+    aire.connect(banda); banda.connect(pecho); pecho.connect(bus);
+    aire.start(at); aire.stop(fin + .05);
+    // El zumbido: dos sierras desafinadas bajo un paso bajo, y un sub.
+    const grave = context.createBiquadFilter(), zumba = context.createGain();
+    grave.type = 'lowpass'; grave.frequency.value = 190; zumba.gain.value = .07 + .015 * hondo;
+    grave.connect(zumba); zumba.connect(bus);
+    for (const [f, tipo] of [[55 - 4 * hondo, 'sawtooth'], [55.9 - 4 * hondo, 'sawtooth'], [36, 'sine']]) {
+      const o = context.createOscillator(); o.type = tipo; o.frequency.value = f;
+      o.connect(tipo === 'sine' ? zumba : grave); o.start(at); o.stop(fin + .05);
+    }
+  }
+  function calla() { if (root.BBTANVoz) root.BBTANVoz.calla(); }
+
+  root.BBTANAudio = { setEnabled, unlock, launch, hit, broken, pickup, combo, gameOver, clear, music, mood, duck, anuncio, calla };
 })(globalThis);
