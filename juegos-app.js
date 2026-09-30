@@ -1096,24 +1096,6 @@ ${this.customData.serverResponse}`:this.message=this._baseMessage}};(function(t)
   </svg><b class="jg-art-ct-t">CATAN</b>`}var Xf=!1;async function Ok(t,e){if(Xf)return;Xf=!0;let n=fe.pid,a=fe.user;for(let o of document.querySelectorAll("#jgOtra, #jgRevanchaBtn"))o.disabled=!0,o.textContent="Preparando revancha\u2026";try{let o=Fo(t,e);t.fin||await hb(n,o.ganador,o.motivo);let i=t.revancha||await ME(n,{uid:a.uid,nombre:a.name,foto:Sr(a.photo),color:a.color});fe.pid===n&&await Rc(i)}catch(o){Ts(o,t.juego)}finally{Xf=!1,fe.pid===n&&fe.partida&&Ze("jgFin")&&(Ze("jgFin").dataset.firma="",m0(fe.partida,fe.estado),wr(fe.partida,fe.estado))}}function m0(t,e){let n=Ze("jgRevancha");if(n){if(!Fo(t,e)||ua?.ocupado?.()||!t.jugadores?.[fe.user.uid]){n.innerHTML="";return}n.innerHTML='<div class="jg-revancha"><div><b>'+(t.revancha?"Hay una revancha esper\xE1ndote":"\xBFNos damos otra oportunidad?")+"</b><p>"+(t.revancha?"\xDAnete a la nueva sala con los mismos participantes.":"Invita a los participantes a repetir este juego.")+'</p></div><button class="btn" id="jgRevanchaBtn" '+(Xf?"disabled":"")+">"+(t.revancha?"Aceptar revancha":"Pedir revancha")+"</button></div>",Ze("jgRevanchaBtn").onclick=()=>Ok(t,e)}}});_M();})();
 /*! Bundled license information:
 
-@firebase/util/dist/postinstall.mjs:
-  (**
-   * @license
-   * Copyright 2025 Google LLC
-   *
-   * Licensed under the Apache License, Version 2.0 (the "License");
-   * you may not use this file except in compliance with the License.
-   * You may obtain a copy of the License at
-   *
-   *   http://www.apache.org/licenses/LICENSE-2.0
-   *
-   * Unless required by applicable law or agreed to in writing, software
-   * distributed under the License is distributed on an "AS IS" BASIS,
-   * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-   * See the License for the specific language governing permissions and
-   * limitations under the License.
-   *)
-
 @firebase/util/dist/index.esm.js:
   (**
    * @license
