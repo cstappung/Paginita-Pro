@@ -227,6 +227,20 @@ Consequences worth knowing:
   a division is under 22 px. At 6×6 a pane is ~120 px, and legend plus stamps
   would spend a third of it on labels.
 
+**It is driven like a PLECS scope.** A toolbar above the plot (`.ptb`, the
+`tb*` ids) holds pointer / zoom box / zoom X / zoom Y / pan, fit, fit Y, and
+back/forward through a view history (`S.hist`, snapshots from `viewSnap`, with
+`pushHist` called once per gesture and `histBurst` per wheel burst). The wheel
+zooms continuously about the pointer. Shift or the y gutter zooms Y. Dragging a
+gutter pans that axis, and a double-click fits. By default every plot has a real
+y axis (`S.yMode = "axis"`, `S.axes[pane]`, auto or fixed min/max, edited in
+*Plot axes*). The bench-scope V/div model is `"div"`, and touching a channel's
+V/div or position switches to it. Time cursors fill a table (`cursorCard`)
+with value at each cursor, Δ, mean, RMS, min and max between them. Two traps:
+`bindScopeInteractions()` must be called from `wire()`, and the FFT legend is
+`drawSpecLegend`. Two function declarations named `drawLegend` silently
+shadowed each other and broke `render()`.
+
 **Periodic repeat** (`ch.periodic`) redraws one period of the record over and
 over so the record can be scrolled past either end. `resolvePeriod` measures it
 with the *same* `findPeriod` the Measurements table uses, so the two can never
@@ -278,6 +292,28 @@ The spectrum is no help: its resolution is 1/record, which over six cycles of
 50 Hz is 8 Hz-wide bins. Typing in the f₁ box clears the "detect automatically"
 tick by itself, or the next source change would silently overwrite what was
 just typed.
+
+**The FFT tab compares any number of channels against the source**
+(`S.fftCompare`, ticked under *Compare*). `runAnalysis` fills `S.series` —
+the source first (`ref: true`), then each compared channel — and `S.fft` /
+`S.harm` stay the source's, so THD/TDD, the harmonic table and the export's
+base columns did not change meaning. Three things make the comparison honest:
+
+- **Every channel is analysed with the source's settings**: the same f₁, window,
+  range and number of harmonics. Harmonic n must be the same frequency in every
+  series, or "compare the 3rd" compares two different lines. TDD is not
+  computed for them (`iL` null): the rated current belongs to the source.
+- **Phases are referred to the source's window start** (`phaseRef`, shifted by
+  360·f·Δt₀). Each FFT's phase is relative to its own first sample, and two
+  channels with different time offsets or sample grids would otherwise report a
+  lag that is only bookkeeping. *Phase → Δφ vs. source* subtracts the source's
+  phase for the same harmonic, and a harmonic below 0.1 % of the fundamental
+  (on either side) shows no phase, because the phase of noise is noise.
+- **All the spectra share one vertical scale**, because comparing magnitudes
+  is the point. With different units (V beside A) the legend suggests
+  *% of fundamental* rather than silently normalising each trace. The bars are
+  grouped per harmonic in each channel's colour, and the compare card lists
+  f₁, the ratio to the source, Δφ₁ and THD per channel.
 
 ## FiltroLab architecture
 
