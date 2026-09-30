@@ -2314,6 +2314,56 @@ html[data-tema=oscuro] .jg-guia{--gv-borde:#46405a;--gv-papel:#262236;--gv-tinta
 @media(max-width:700px){.jg-guia-figura{grid-template-columns:minmax(0,1fr);gap:12px}.jg-guia-imagen{max-width:480px;width:100%;margin:auto}.jg-guia-figura figcaption{min-height:142px;justify-content:flex-start}.jg-guia{padding:14px}.jg-guia .jg-guia-cab h3{font-size:17px}}
 @media(max-width:380px){.jg-guia-controles{gap:5px}.jg-guia-controles button{padding:8px;font-size:11px}.jg-guia-controles [data-guia=play]{min-width:100px}.jg-guia-cantidad{display:none}}
 @media(prefers-reduced-motion:reduce){.jg-guia-imagen svg{animation:none}}
+/* Selector de la clasificación y de los logros: pastillas con el icono del
+   juego y su color, en el orden de popularidad del vestíbulo. En el móvil
+   son una tira que se desliza en vez de cuatro filas de botones. */
+.jg-rk-sel{display:inline-flex;align-items:center;gap:7px;padding:7px 13px 7px 9px;border:1px solid #0000001a;border-radius:999px;background:#fff;color:var(--jg-ink);font:inherit;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;transition:background .15s,transform .15s}
+.jg-rk-sel i{font-style:normal;display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:color-mix(in srgb,var(--c) 18%,transparent);font-size:12px;line-height:1}
+.jg-rk-sel:hover{background:color-mix(in srgb,var(--c) 10%,#fff);transform:translateY(-1px)}
+.jg-rk-sel.on{background:var(--c);border-color:transparent;color:#fff;box-shadow:0 4px 14px color-mix(in srgb,var(--c) 45%,transparent)}
+.jg-rk-sel.on i{background:#ffffff33}
+.jg-rk-sep{align-self:center;width:100%;margin:6px 0 -2px 4px;font-size:10.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--jg-muted);white-space:nowrap}
+.jg-lg-chip i{font-style:normal;font-size:13px;line-height:1}
+.jg-lg-chip.lleno{box-shadow:inset 4px 0 0 var(--c),0 0 0 2px #e8b64a}
+.jg-lg-chip.lleno small::after{content:" ★";color:#e8b64a}
+/* El podio de la tarjeta destacada: quién manda en el juego más jugado. */
+.jg-of-podio{display:block;margin:2px 0 4px;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,var(--c) 9%,#f7f6fb);border:1px solid color-mix(in srgb,var(--c) 25%,transparent);color:var(--jg-ink);text-decoration:none!important}
+.jg-of-podio:hover{background:color-mix(in srgb,var(--c) 15%,#f7f6fb)}
+.jg-of-podio-t{display:flex;justify-content:space-between;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--jg-muted);margin-bottom:6px}
+.jg-of-podio-t b{letter-spacing:0;text-transform:none;color:var(--c);filter:brightness(.8)}
+.jg-of-podio ol{list-style:none;margin:0;padding:0;display:grid;gap:3px}
+.jg-of-podio li{display:flex;align-items:center;gap:8px;font-size:13px;padding:2px 4px;border-radius:7px}
+.jg-of-podio li.yo{background:color-mix(in srgb,var(--c) 22%,transparent);font-weight:700}
+.jg-of-podio li i{font-style:normal;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:800;color:#fff;background:#b8b3c7;flex:0 0 auto}
+.jg-of-podio li:nth-child(1) i{background:linear-gradient(135deg,#f5d36b,#c9951c)}
+.jg-of-podio li:nth-child(2) i{background:linear-gradient(135deg,#dfe3ea,#98a1af)}
+.jg-of-podio li:nth-child(3) i{background:linear-gradient(135deg,#e9a877,#a8612d)}
+.jg-of-podio li span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jg-of-podio li b{font:600 12px 'IBM Plex Mono',monospace}
+.jg-of-podio small{display:block;margin-top:6px;font-size:12px;color:var(--jg-muted)}
+html[data-tema=oscuro] .jg-rk-sel{background:var(--os-sup);border-color:var(--os-borde);color:var(--os-tx)}
+html[data-tema=oscuro] .jg-rk-sel:hover{background:color-mix(in srgb,var(--c) 14%,var(--os-sup))}
+html[data-tema=oscuro] .jg-rk-sel.on{background:var(--c);color:#fff;border-color:transparent}
+html[data-tema=oscuro] .jg-of-podio{background:color-mix(in srgb,var(--c) 12%,var(--os-sup2));border-color:color-mix(in srgb,var(--c) 30%,transparent);color:var(--os-tx)}
+html[data-tema=oscuro] .jg-of-podio-t b{filter:brightness(1.3)}
+@media(max-width:600px){
+  /* La cabecera cabía en cuatro líneas: el nombre ya está en la foto. */
+  #userName{display:none}
+  .head{gap:8px;padding:10px 14px}
+  .head-nav{flex-wrap:nowrap;white-space:nowrap;scrollbar-width:none;gap:18px}
+  .head-nav::-webkit-scrollbar{display:none}
+  .head-right{width:auto;margin-left:auto;flex-wrap:nowrap}
+  .logo b{display:none}
+  .jg-rep-nom,.jg-rep-flecha{display:none}
+  .head-right .btn-ghost{padding-left:7px;padding-right:7px}
+  .jg-rk-sep{width:auto;margin:0 2px 0 8px}
+  .jg-bar-juegos,.jg-lg-chips{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;margin-left:-16px;margin-right:-16px;padding:2px 16px 6px;scroll-snap-type:x proximity}
+  .jg-bar-juegos::-webkit-scrollbar,.jg-lg-chips::-webkit-scrollbar{display:none}
+  .jg-rk-sel,.jg-lg-chip{flex:0 0 auto;scroll-snap-align:center}
+  .jg-lg-chip{white-space:nowrap}
+  .jg-tabla{font-size:12px}
+  .jg-tabla th,.jg-tabla td{padding-left:8px;padding-right:8px;white-space:nowrap}
+}
 </style>
 </head>
 <body>
@@ -2358,6 +2408,6 @@ html[data-tema=oscuro] .jg-guia{--gv-borde:#46405a;--gv-papel:#262236;--gv-tinta
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202609300606"></script>
+<script src="juegos-app.js?v=202609300631"></script>
 </body>
 </html>

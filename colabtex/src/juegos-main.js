@@ -33,7 +33,7 @@ import { crearSolo } from "./juegos/solo/club.js";
 import { watchAuth, loginGoogle, logout } from "./firebase.js";
 import * as fb from "./fb-juegos.js";
 import { escapeHtml, timeAgo, colorForUid } from "./util.js";
-import { JUEGOS, reducir, jugadasDe, acumula, cupoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, ganoEn } from "./juegos/motor.js";
+import { JUEGOS, reducir, jugadasDe, acumula, cupoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, ganoEn, ordenaRanks } from "./juegos/motor.js";
 import { crearEscondite } from "./juegos/escondite.js";
 import { crearCartas } from "./juegos/cartas.js";
 import { crearCuadritos } from "./juegos/cuadritos.js";
@@ -71,6 +71,9 @@ const FABRICAS = {
 };
 
 const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️" };
+/* Los clubes de un jugador, con sus claves de la clasificación y los
+   mismos signos que llevan en su tarjeta del vestíbulo. */
+const ICONO_TODOS = { ...ICONO, general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●" };
 
 /* Lo que puede elegir quien abre la sala, por juego. Vive aquí y no en
    `motor.js` porque son controles y no reglas: el motor ya recorta lo
@@ -171,7 +174,8 @@ const state = {
   fallo: null,            // por qué no se puede leer (reglas sin publicar, casi siempre)
   cargando: false,
   enCurso: [],            // partidas empezadas que se pueden mirar
-  popular: leePopular()   // juego → cuánto se ha jugado (ordena el catálogo)
+  popular: leePopular(),  // juego → cuánto se ha jugado (ordena el catálogo)
+  tablas: {}              // ranks/<juego>/<uid>, leído con la popularidad
 };
 
 /* El orden del catálogo es el de la última visita mientras llega el de
@@ -180,6 +184,9 @@ const state = {
 function leePopular() {
   try { return JSON.parse(localStorage.getItem("jg.popular") || "{}") || {}; } catch (e) { return {}; }
 }
+/* Los de un jugador, con su clave de popularidad. Cuentan como juegos en
+   la marquesina: el «18» fijo de antes se quedó atrás con cada club. */
+const CLUBES = ["club-minas", "club-snake", "club-tetris", "club-sortem", "club-bbtan"];
 function ordenPopular(claves) {
   const n = state.popular, pos = Object.fromEntries(claves.map((k, i) => [k, i]));
   return claves.slice().sort((a, b) => (n[b] || 0) - (n[a] || 0) || pos[a] - pos[b]);
@@ -504,11 +511,12 @@ function engancharVestibulo() {
   });
   /* Sin reglas publicadas este nodo falla; no es motivo para tapar el
      vestíbulo con el aviso: la lista simplemente sale vacía. */
-  fb.leerPopularidad().then(n => {
+  fb.leerPopularidad().then(({ n, ranks }) => {
+    state.tablas = ranks;
     const cambio = JSON.stringify(n) !== JSON.stringify(state.popular);
     state.popular = n;
     try { localStorage.setItem("jg.popular", JSON.stringify(n)); } catch (e) {}
-    if (cambio && state.vista === "vestibulo") { vesFirma = ""; render(); }
+    if (state.vista === "vestibulo") { if (cambio) vesFirma = ""; render(); }
   }).catch(() => {});
   offEnCurso = fb.watchEnCurso(lista => {
     state.enCurso = lista || [];
@@ -810,15 +818,16 @@ function armazon() {
   }
   if (state.vista === "logros") {
     h.innerHTML = "";
-    logrosVista = crearLogros({ uid: state.user.uid, watchLogros: fb.watchLogros, perfil: perfilDe,
-      orden: () => ordenPopular([...Object.keys(JUEGOS), "club-minas", "club-snake", "club-tetris", "club-sortem", "club-bbtan"])
+    logrosVista = crearLogros({ uid: state.user.uid, watchLogros: fb.watchLogros, perfil: perfilDe, icono: ICONO_TODOS,
+      orden: () => ordenPopular([...Object.keys(JUEGOS), ...CLUBES])
         .map(k => ({ "club-minas": "minas", "club-snake": "snake", "club-tetris": "tetrisclub", "club-sortem": "sortem", "club-bbtan": "bbtan" })[k] || k) });
     logrosVista.montar(h);
     return;
   }
   if (state.vista === "ranks") {
     h.innerHTML = "";
-    ranks = crearRanks({ uid: state.user.uid, watchRanks: fb.watchRanks, watchSolo: fb.watchSolo, perfil: perfilDe });
+    ranks = crearRanks({ uid: state.user.uid, watchRanks: fb.watchRanks, watchSolo: fb.watchSolo, watchTodos: fb.watchRanksTodos,
+      perfil: perfilDe, icono: ICONO_TODOS, orden: () => ordenPopular(Object.keys(JUEGOS)) });
     ranks.montar(h);
     return;
   }
@@ -901,7 +910,7 @@ function armazon() {
           <div class="jg-mq-cifras">
             <span><b id="vesNSalas">0</b>salas esperando</span>
             <span><b id="vesNMias">0</b>partidas tuyas</span>
-            <span><b>${String(Object.keys(JUEGOS).length + 2).padStart(2, "0")}</b>juegos</span>
+            <span><b>${Object.keys(JUEGOS).length + CLUBES.length}</b>juegos</span>
           </div>
           <div class="jg-mq-acciones">
             <button class="btn jg-mq-rapida" id="vesRapida"></button>
@@ -973,6 +982,26 @@ function ordenaSolos() {
   if (nuevo.some((a, i) => a !== todas[i])) nuevo.forEach(a => caja.appendChild(a));
 }
 
+/* La tarjeta destacada ocupa dos columnas y le sobraba media tarjeta en
+   blanco. Ahí va su podio y dónde vas tú: es la razón para abrir una
+   sala de ese juego y no de otro. Sale de las filas que ya trajo la
+   lectura de popularidad, así que no cuesta otra consulta. */
+function pintaDestacado() {
+  const el = document.querySelector(".jg-of-podio");
+  if (!el) return;
+  const k = el.getAttribute("data-rk");
+  const orden = ordenaRanks(Object.entries(state.tablas[k] || {}).map(([uid, f]) => Object.assign({ uid }, f)));
+  if (!orden.length) { el.hidden = true; return; }
+  const nombre = f => mezcla(f, perfilDe(f.uid)).nombre || "Jugador";
+  const yo = orden.findIndex(f => f.uid === state.user.uid);
+  const html = `<span class="jg-of-podio-t">Salón de la fama <b>ver todo →</b></span><ol>${orden.slice(0, 3).map((f, i) =>
+    `<li class="${f.uid === state.user.uid ? "yo" : ""}"><i>${i + 1}</i><span>${escapeHtml(nombre(f))}</span><b>${f.puntos || 0}</b></li>`).join("")}</ol>` +
+    `<small>${yo < 0 ? "Aún no estás en la tabla de este juego." : yo < 3 ? "Estás en el podio. Defiéndelo." : `Vas #${yo + 1} de ${orden.length}.`}</small>`;
+  if (el.innerHTML !== html) el.innerHTML = html;
+  el.hidden = false;
+  el.onclick = () => { try { localStorage.setItem("jg.rankJuego", k); } catch (e) {} };
+}
+
 function pintaVestibulo() {
   $("vesAviso").innerHTML = state.fallo ? avisoReglas(state.fallo) : "";
 
@@ -998,6 +1027,7 @@ function pintaVestibulo() {
         <div class="jg-of-meta"><span class="jg-of-tipo">${grupo ? "En grupo" : "Duelo"}</span><span class="jg-of-cupo" title="Jugadores"><i aria-hidden="true"></i>${cupo}</span></div>
         <h3 class="jg-of-nombre">${escapeHtml(j.nombre)}</h3>
         <p class="jg-of-lema" title="${escapeHtml(j.lema)}">${escapeHtml(j.lema)}</p>
+        ${k === masJugado ? `<a class="jg-of-podio" href="#ranks" data-rk="${k}" hidden></a>` : ""}
         ${opcionesHtml(k)}
         <div class="jg-of-pie">
           <button class="btn jg-of-btn" data-crear="${k}">Abrir sala <span class="jg-of-flecha" aria-hidden="true">→</span></button>
@@ -1020,6 +1050,7 @@ function pintaVestibulo() {
   }
   }
   aplicaFiltro();
+  pintaDestacado();
 
   const mias = new Set(state.mias.map(x => x.id));
   const abiertas = state.salas.filter(s => s.anfitrion !== state.user.uid && !mias.has(s.id) && !s.origen);

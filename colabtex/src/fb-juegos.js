@@ -272,7 +272,15 @@ export async function leerPopularidad() {
     const m = /^club-(minas|snake|tetris|sortem|bbtan)-/.exec(cat);
     if (m) n["club-" + m[1]] = (n["club-" + m[1]] || 0) + Object.keys(filas || {}).length;
   }
-  return n;
+  /* Las filas ya están aquí, así que van también: con ellas el
+     vestíbulo pinta el podio del juego destacado sin otra lectura. */
+  return { n, ranks: r.val() || {} };
+}
+
+/* La clasificación general: todas las filas de todos los juegos, que es
+   lo que ya lee la pestaña de logros. Se suma al pintar. */
+export function watchRanksTodos(cb) {
+  return onValue(ref(db, R), s => cb(s.val() || {}, null), err => cb({}, err));
 }
 
 /* ---------- logros ----------

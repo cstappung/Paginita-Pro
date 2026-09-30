@@ -80,7 +80,13 @@ export function crearRanks(ctx) {
   const perfil = ctx.perfil || (() => null);
 
   let host = null, muerto = false;
-  let juego = Object.keys(JUEGOS)[0];
+  /* Se abre en lo último que se miró —o en lo que pidió el vestíbulo al
+     tocar el podio de su tarjeta—, y si no, en la general: la pregunta
+     de quien entra aquí es «¿quién va ganando?», no «¿quién va ganando
+     a Órbita?», que era lo que contestaba por ser el primero del objeto. */
+  let juego = "general";
+  try { const g = localStorage.getItem("jg.rankJuego"); if (g && (g === "general" || JUEGOS[g] || EXTRA[g])) juego = g; } catch (e) { /* sin almacenamiento */ }
+  const icono = ctx.icono || {};
   let categoriaSolo = "";
   const eleccion = {};
   let filas = [];
@@ -108,7 +114,9 @@ export function crearRanks(ctx) {
         </p>
       </div>`;
     host.addEventListener("click", alClic);
+    if (esSolo(juego)) elige(juego);
     pintaBarra();
+    pintaCategorias();
     escucha();
   }
 
@@ -123,7 +131,9 @@ export function crearRanks(ctx) {
     if (parar) { try { parar(); } catch (e) {} parar = null; }
     cargando = true; fallo = ""; filas = []; pinta();
     const individual = esSolo(juego);
-    parar = (individual ? ctx.watchSolo : watchRanks)(individual ? categoriaSolo : juego, (lista, err) => {
+    const oye = juego === "general" ? (_, cb) => ctx.watchTodos((todo, err) => cb(suma(todo), err))
+      : individual ? ctx.watchSolo : watchRanks;
+    parar = oye(individual ? categoriaSolo : juego, (lista, err) => {
       if (muerto) return;
       cargando = false;
       fallo = err ? String(err.code || err.message || err) : "";
@@ -132,12 +142,42 @@ export function crearRanks(ctx) {
     });
   }
 
+  /* La general: cada jugador con lo de todos los juegos sumado. La racha
+     es la mejor de cualquiera de ellos (sumar rachas de juegos distintos
+     no significa nada) y «juegos» dice en cuántos tiene fila, que es lo
+     que distingue al que gana en todo del que solo juega a uno. */
+  function suma(todo) {
+    const t = {};
+    for (const [k, filas] of Object.entries(todo || {})) {
+      if (!JUEGOS[k]) continue;
+      for (const [u, f] of Object.entries(filas || {})) {
+        if (!f) continue;
+        const a = t[u] || (t[u] = { uid: u, nombre: "", foto: "", jugadas: 0, ganadas: 0, perdidas: 0, empates: 0, puntos: 0, mejorRacha: 0, juegos: 0, _at: -1 });
+        for (const c of ["jugadas", "ganadas", "perdidas", "empates", "puntos"]) a[c] += +f[c] || 0;
+        a.mejorRacha = Math.max(a.mejorRacha, +f.mejorRacha || 0);
+        a.juegos++;
+        if ((+f.at || 0) >= a._at) { a._at = +f.at || 0; a.nombre = f.nombre || a.nombre; a.foto = f.foto || a.foto; }
+      }
+    }
+    return Object.values(t);
+  }
+
+  /* 22 pastillas iguales, sin icono y en el orden del objeto, eran tres
+     filas de botones que no se distinguían. Ahora van en tres grupos
+     (general, en sala, de un jugador), cada uno con su icono y su color,
+     y los de sala por popularidad, como el catálogo. En el móvil es una
+     tira que se desliza en vez de medio metro de botones. */
   function pintaBarra() {
     const el = host && host.querySelector("#rkJuegos");
     if (!el) return;
-    el.innerHTML = Object.entries({ ...JUEGOS, ...EXTRA }).map(([k, j]) =>
-      `<button class="jg-tab${k === juego ? " on" : ""}" data-juego="${k}"
-         style="--c:${j.color}">${esc(j.nombre)}</button>`).join("");
+    const orden = ctx.orden ? ctx.orden().filter(k => JUEGOS[k]) : Object.keys(JUEGOS);
+    const boton = (k, j) => `<button class="jg-rk-sel${k === juego ? " on" : ""}" data-juego="${k}" style="--c:${j.color}"
+         ${k === juego ? 'aria-current="true"' : ""}><i aria-hidden="true">${esc(icono[k] || "●")}</i>${esc(j.nombre)}</button>`;
+    el.innerHTML = boton("general", { nombre: "General", color: "#7c5cff" }) +
+      `<span class="jg-rk-sep">En sala</span>` + orden.map(k => boton(k, JUEGOS[k])).join("") +
+      `<span class="jg-rk-sep">Un jugador</span>` + Object.entries(EXTRA).map(([k, j]) => boton(k, j)).join("");
+    const on = el.querySelector(".on");
+    if (on && el.scrollWidth > el.clientWidth) el.scrollLeft = on.offsetLeft - el.clientWidth / 2 + on.offsetWidth / 2;
   }
 
   function pinta() {
@@ -153,7 +193,10 @@ export function crearRanks(ctx) {
     if (!t) return;
     const solo = esSolo(juego);
     const orden = solo ? [...filas].sort((a,b)=>b.puntos-a.puntos||a.tiempo-b.tiempo||a.uid.localeCompare(b.uid)) : ordenaRanks(filas);
-    host.querySelector('.jg-nota-larga').textContent = solo ? 'Mejor récord por jugador y categoría. En empate, menor tiempo. Las puntuaciones se calculan en el navegador.' : 'Se suman 3 puntos por victoria y 1 por empate.';
+    const general = juego === "general";
+    host.querySelector('.jg-nota-larga').textContent = solo ? 'Mejor récord por jugador y categoría. En empate, menor tiempo. Las puntuaciones se calculan en el navegador.'
+      : general ? 'La general suma los puntos de todos los juegos en sala (3 por victoria, 1 por empate). «Juegos» dice en cuántos tiene fila cada uno.'
+      : 'Se suman 3 puntos por victoria y 1 por empate.';
     pintaEscena(solo ? orden : orden.map(f => mezcla(f, perfil(f.uid))), solo);
     if (!orden.length) {
       t.innerHTML = `<tr><td class="jg-vacio">${cargando ? "Cargando…"
@@ -166,7 +209,7 @@ export function crearRanks(ctx) {
         <th class="jg-th-n">#</th><th>Jugador</th>
         <th class="jg-num">Jugadas</th><th class="jg-num">Ganadas</th>
         <th class="jg-num">Perdidas</th><th class="jg-num">Empates</th>
-        <th class="jg-num">%</th><th class="jg-num">Mejor racha</th>
+        <th class="jg-num">%</th>${general ? `<th class="jg-num">Juegos</th>` : ""}<th class="jg-num">Racha</th>
         <th class="jg-num jg-pts">Puntos</th>
       </tr></thead><tbody>${orden.map((f, i) => fila(f, i)).join("")}</tbody>`;
   }
@@ -187,6 +230,7 @@ export function crearRanks(ctx) {
       <td class="jg-num">${f.perdidas || 0}</td>
       <td class="jg-num">${f.empates || 0}</td>
       <td class="jg-num"><span class="jg-barra-pc"><i style="width:${pc}%"></i></span>${pc}%</td>
+      ${juego === "general" ? `<td class="jg-num">${f.juegos || 0}</td>` : ""}
       <td class="jg-num">${f.mejorRacha || 0}</td>
       <td class="jg-num jg-pts">${f.puntos || 0}</td>
     </tr>`;
@@ -225,6 +269,7 @@ export function crearRanks(ctx) {
         <div class="jg-rk-pts">&nbsp;</div>
         ${bloque}</div>`;
     const detalle = solo ? (m.menor ? "mejor tiempo" : `${((f.tiempo || 0) / 1000).toFixed(1)} s`)
+      : juego === "general" ? `${f.ganadas || 0} G · ${plural(f.juegos || 0, "juego", "juegos")}`
       : `${f.ganadas || 0} G · ${porcentaje(f)} %${f.mejorRacha > 1 ? ` · racha ${f.mejorRacha}` : ""}`;
     return `<div class="${cls}">
         ${i === 0 ? CORONA : ""}
@@ -282,7 +327,7 @@ export function crearRanks(ctx) {
     const clave = solo ? categoriaSolo : juego;
     const entra = animado !== clave;
     animado = clave;
-    const j = JUEGOS[juego] || EXTRA[juego] || { nombre: juego };
+    const j = JUEGOS[juego] || EXTRA[juego] || { nombre: juego === "general" ? "Todos los juegos" : juego };
     const sub = solo ? subtitulo() : "";
     const html = `
       <div class="jg-rk-rayos"></div>
@@ -335,6 +380,7 @@ export function crearRanks(ctx) {
     const k = b.getAttribute("data-juego");
     if (k === juego) return;
     juego = k;
+    try { localStorage.setItem("jg.rankJuego", k); } catch (e) { /* nada */ }
     if (esSolo(k)) elige(k);
     pintaCategorias();
     pintaBarra();
