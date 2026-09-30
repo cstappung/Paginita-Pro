@@ -1,3 +1,5 @@
+import { montarGuia } from "./reglas-guia.js";
+
 /* ============================================================
    El manual de cada juego — el botón 📖 Reglas
 
@@ -597,12 +599,15 @@ export function abreReglas(juego, { modo, nombre } = {}) {
       <footer class="jg-reglas-pie"><button type="button" class="btn jg-reglas-ok">Entendido</button></footer>
     </div>`;
   const cuerpo = capa.querySelector(".jg-reglas-cuerpo");
+  let guia = null;
   const seccion = ([t, h]) => `<section><h3>${esc(t)}</h3>${h.startsWith("<") ? h : "<p>" + h + "</p>"}</section>`;
   const pinta = () => {
     /* La variante va primero: es lo que distingue esta sala; lo común
        (el objetivo, el ¡UNO!) viene detrás. */
     const propio = actual ? r.modos[actual].secciones : [];
-    cuerpo.innerHTML = propio.map(seccion).join("") + r.secciones.map(seccion).join("");
+    guia?.destruir();
+    cuerpo.innerHTML = '<div class="jg-reglas-visual"></div><h3 class="jg-reglas-lectura">Las reglas, en detalle</h3>' + propio.map(seccion).join("") + r.secciones.map(seccion).join("");
+    guia = montarGuia(cuerpo.querySelector(".jg-reglas-visual"), juego, actual);
     cuerpo.scrollTop = 0;
     for (const b of capa.querySelectorAll("[data-modo]")) {
       const si = b.getAttribute("data-modo") === actual;
@@ -612,22 +617,31 @@ export function abreReglas(juego, { modo, nombre } = {}) {
   };
   for (const b of capa.querySelectorAll("[data-modo]"))
     b.onclick = () => { actual = b.getAttribute("data-modo"); pinta(); };
-  const tecla = ev => { if (ev.key === "Escape") { ev.stopPropagation(); cierra(); } };
+  const tecla = ev => {
+    if (ev.key === "Escape") { ev.stopPropagation(); cierra(); }
+    if (ev.key === "Tab") {
+      const controles = [...capa.querySelectorAll('button:not([disabled]), select, a[href]')];
+      const primero = controles[0], ultimo = controles[controles.length - 1];
+      if (ev.shiftKey && document.activeElement === primero) { ev.preventDefault(); ultimo.focus(); }
+      else if (!ev.shiftKey && document.activeElement === ultimo) { ev.preventDefault(); primero.focus(); }
+    }
+  };
   capa.addEventListener("click", ev => { if (ev.target === capa) cierra(); });
   capa.querySelector(".jg-reglas-x").onclick = cierra;
   capa.querySelector(".jg-reglas-ok").onclick = cierra;
   document.addEventListener("keydown", tecla, true);
   document.body.appendChild(capa);
   pinta();
-  abierto = { capa, tecla, previo };
+  abierto = { capa, tecla, previo, destruirGuia: () => guia?.destruir() };
   capa.querySelector(".jg-reglas-x").focus();
 }
 
 export function cierra() {
   if (!abierto) return;
-  const { capa, tecla, previo } = abierto;
+  const { capa, tecla, previo, destruirGuia } = abierto;
   abierto = null;
   document.removeEventListener("keydown", tecla, true);
+  destruirGuia();
   capa.remove();
   if (previo && typeof previo.focus === "function" && document.contains(previo)) previo.focus();
 }

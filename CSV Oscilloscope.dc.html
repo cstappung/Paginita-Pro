@@ -15,16 +15,16 @@
        document.documentElement al cambiar de tema; estar aquí evita el
        parpadeo claro/oscuro antes de que scope-engine.js arranque. */
     :root{
-      --chassis:#0b0f14; --panel:#141b23; --panel2:#10161d; --line:#26333f;
-      --text:#dfe8f2; --dim:#7d8fa3; --accent:#2ea8ff;
-      --screen:#05090c; --grid1:#16242e; --grid2:#2c4655; --cursor:#d7e6f5;
+      --chassis:#eceef1; --panel:#ffffff; --panel2:#f5f6f8; --line:#c8cdd3;
+      --text:#1b1f24; --dim:#5c6670; --accent:#0072bd;
+      --screen:#ffffff; --grid1:#dfe2e6; --grid2:#b9bec5; --cursor:#202020;
     }
     html, body { margin:0; padding:0; height:100%; overflow:hidden; background:var(--chassis); }
     * { box-sizing: border-box; }
     input[type="checkbox"] { accent-color: var(--accent); }
     input[type="range"] { accent-color: var(--accent); }
   </style>
-  <script src="scope-engine.js?v=202609291805"></script>
+  <script src="scope-engine.js?v=202609291900"></script>
 </helmet>
 
 <div class="osc" data-screen-label="CSV Oscilloscope">
@@ -95,6 +95,26 @@
 
       <!-- SCOPE VIEW -->
       <div id="viewScope" class="view">
+        <div class="ptb">
+          <button id="tbPointer" title="Pointer: cursors, trigger and markers only (Esc)"></button>
+          <button id="tbZoom" title="Zoom box (Z)"></button>
+          <button id="tbZoomX" title="Zoom X (X)"></button>
+          <button id="tbZoomY" title="Zoom Y (Y)"></button>
+          <button id="tbPan" title="Pan (H)"></button>
+          <span class="sep"></span>
+          <button id="tbFit" title="Fit to view (F / double-click)"></button>
+          <button id="tbFitY" title="Auto-scale Y (A)"></button>
+          <button id="tbBack" title="Previous view (Backspace)"></button>
+          <button id="tbFwd" title="Next view (Alt+→)"></button>
+          <span class="sep"></span>
+          <button id="tbCursors" title="Cursors (C)"></button>
+          <button id="tbLegend" title="Legend (L)"></button>
+          <button id="tbYMode" title="Per-channel V/div instead of y axes"></button>
+          <span class="sep"></span>
+          <button id="tbPng" title="Save PNG"></button>
+          <button id="tbCsv" title="Export visible data (CSV)"></button>
+          <button id="tbInfo" title="Mouse and keyboard help"></button>
+        </div>
         <div id="scopeWrap" class="scr">
           <canvas id="scopeCanvas"></canvas>
           <pre id="hoverReadout" class="hover"></pre>
@@ -107,6 +127,21 @@
         <div id="splitWrap" class="scr fixed h160 hide">
           <canvas id="splitCanvas"></canvas>
           <div id="splitReadout" class="corner"></div>
+        </div>
+
+        <div id="cursorCard" class="card meas hide">
+          <div class="card-hd">
+            <span class="ttl">Cursors</span>
+            <span id="cursorHead" class="mono"></span>
+          </div>
+          <div class="card-bd">
+            <table class="tbl">
+              <thead>
+                <tr><th>Signal</th><th>Cursor 1</th><th>Cursor 2</th><th>Δ</th><th>Mean</th><th>RMS</th><th>Min</th><th>Max</th></tr>
+              </thead>
+              <tbody id="cursorBody"></tbody>
+            </table>
+          </div>
         </div>
 
         <div class="card meas">
@@ -190,12 +225,21 @@
           <h3 class="ttl">Horizontal</h3>
           <div class="row"><label class="lab">Time/div</label><select id="timeDiv" class="in grow mono"></select></div>
           <div class="row"><label class="lab">Center (ms)</label><input id="hOffsetIn" class="in grow mono" type="text" defaultValue="0"></div>
+          <div class="row"><label class="lab">Start (ms)</label><input id="tStartIn" class="in grow mono" type="text"></div>
+          <div class="row"><label class="lab">End (ms)</label><input id="tEndIn" class="in grow mono" type="text"></div>
           <div class="row pad">
             <button id="btnPanL" class="btn key" title="Pan left">◀</button>
             <button id="btnPanR" class="btn key" title="Pan right">▶</button>
             <button id="btnZinH" class="btn key" title="Zoom in (finer time/div)">＋</button>
             <button id="btnZoutH" class="btn key" title="Zoom out (coarser time/div)">－</button>
           </div>
+        </section>
+        <section class="grp">
+          <h3 class="ttl">Plot axes</h3>
+          <div class="row"><label class="lab">Y scale</label><select id="yModeSel" class="in grow"><option value="axis">Y axes (PLECS)</option><option value="div">V/div per channel</option></select></div>
+          <div class="row"><label class="lab">Plot</label><select id="axPane" class="in grow"></select><label class="lab"><input id="axAuto" type="checkbox"> Auto</label></div>
+          <div class="row"><label class="lab">Y min</label><input id="axMin" class="in grow mono" type="text"></div>
+          <div class="row"><label class="lab">Y max</label><input id="axMax" class="in grow mono" type="text"></div>
         </section>
 
         <section class="grp">
@@ -412,7 +456,7 @@
 </div>
 
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props="{&quot;scopeDark&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Display&quot;,&quot;description&quot;:&quot;Dark phosphor-style instrument look&quot;},&quot;traceWidth&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:1.6,&quot;min&quot;:1,&quot;max&quot;:3,&quot;step&quot;:0.1,&quot;unit&quot;:&quot;px&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Display&quot;,&quot;description&quot;:&quot;Trace line width&quot;},&quot;traceGlow&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Display&quot;,&quot;description&quot;:&quot;Phosphor glow around the traces&quot;},&quot;defaultFundamental&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:50,&quot;min&quot;:1,&quot;unit&quot;:&quot;Hz&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Analysis&quot;,&quot;description&quot;:&quot;Default fundamental frequency for harmonic analysis&quot;},&quot;ratedCurrent&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Analysis&quot;,&quot;description&quot;:&quot;Rated demand current I_L (rms) used for TDD&quot;}}">
+<script type="text/x-dc" data-dc-script data-props="{&quot;scopeDark&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Display&quot;,&quot;description&quot;:&quot;Dark phosphor-style instrument look&quot;},&quot;traceWidth&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:1.6,&quot;min&quot;:1,&quot;max&quot;:3,&quot;step&quot;:0.1,&quot;unit&quot;:&quot;px&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Display&quot;,&quot;description&quot;:&quot;Trace line width&quot;},&quot;traceGlow&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Display&quot;,&quot;description&quot;:&quot;Phosphor glow around the traces&quot;},&quot;defaultFundamental&quot;:{&quot;editor&quot;:&quot;int&quot;,&quot;default&quot;:50,&quot;min&quot;:1,&quot;unit&quot;:&quot;Hz&quot;,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Analysis&quot;,&quot;description&quot;:&quot;Default fundamental frequency for harmonic analysis&quot;},&quot;ratedCurrent&quot;:{&quot;editor&quot;:&quot;text&quot;,&quot;default&quot;:&quot;&quot;,&quot;tsType&quot;:&quot;string&quot;,&quot;section&quot;:&quot;Analysis&quot;,&quot;description&quot;:&quot;Rated demand current I_L (rms) used for TDD&quot;}}">
 class Component extends DCLogic {
   componentDidMount() {
     this._tries = 0;
@@ -427,7 +471,7 @@ class Component extends DCLogic {
   }
   _opts() {
     return {
-      scopeDark: this.props.scopeDark ?? true,
+      scopeDark: this.props.scopeDark ?? false,
       traceWidth: this.props.traceWidth ?? 1.6,
       traceGlow: this.props.traceGlow ?? true,
       fundamental: this.props.defaultFundamental ?? 50,

@@ -227,6 +227,20 @@ Consequences worth knowing:
   a division is under 22 px. At 6×6 a pane is ~120 px, and legend plus stamps
   would spend a third of it on labels.
 
+**It is driven like a PLECS scope.** A toolbar above the plot (`.ptb`, the
+`tb*` ids) holds pointer / zoom box / zoom X / zoom Y / pan, fit, fit Y, and
+back/forward through a view history (`S.hist`, snapshots from `viewSnap`, with
+`pushHist` called once per gesture and `histBurst` per wheel burst). The wheel
+zooms continuously about the pointer. Shift or the y gutter zooms Y. Dragging a
+gutter pans that axis, and a double-click fits. By default every plot has a real
+y axis (`S.yMode = "axis"`, `S.axes[pane]`, auto or fixed min/max, edited in
+*Plot axes*). The bench-scope V/div model is `"div"`, and touching a channel's
+V/div or position switches to it. Time cursors fill a table (`cursorCard`)
+with value at each cursor, Δ, mean, RMS, min and max between them. Two traps:
+`bindScopeInteractions()` must be called from `wire()`, and the FFT legend is
+`drawSpecLegend`. Two function declarations named `drawLegend` silently
+shadowed each other and broke `render()`.
+
 **Periodic repeat** (`ch.periodic`) redraws one period of the record over and
 over so the record can be scrolled past either end. `resolvePeriod` measures it
 with the *same* `findPeriod` the Measurements table uses, so the two can never
@@ -2855,3 +2869,13 @@ Room chat sits in a sticky right column on desktop and below the game on
 narrow screens. Solo Club retains isolated audio/game documents, with shared
 navigation, automatic height, parent theme updates and rankings in the game
 sidebar; embedded documents hide standalone branding, intros and footers.
+
+
+**Visual rules:** `juegos/reglas-ejemplos.js` supplies the Spanish examples,
+`reglas-ilustraciones.js` draws their own local SVGs, and `reglas-guia.js`
+mounts a selector and step player inside `reglas.js`. There is no autoplay
+on opening; reduced-motion uses manual steps. Hiding the tab, changing
+variant or closing the manual cancels the timer. Keep examples consistent
+with current engines when changing rules. Do not fetch external illustrations
+or write to a real match. `tests/reglas-visuales.test.cjs` checks manual and
+variant coverage, playback and teardown. Styles live in `juegos.html`.
