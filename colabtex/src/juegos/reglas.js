@@ -425,7 +425,11 @@ const REGLAS = {
         "Cada jugador elige su personaje; los sospechosos que falten hasta seis se sortean entre los que nadie eligió.",
         "Las 21 cartas que no están en el sobre se reparten entre todos. Tus cartas no son el culpable: táchalas en la <b>libreta</b>."
       ])],
-      ["Las armas", "Son nueve, todas de Electricidad, y cada sala empieza con una: la <b>Carta de Smith</b>, la <b>Transformada de Fourier</b>, la <b>Resistencia</b>, el <b>Capacitor</b>, el <b>Inductor</b>, el <b>Transistor</b>, la <b>Fuente de poder</b>, el <b>Amplificador operacional</b> y el <b>Diodo LED</b>. Toca un arma en el tablero para ver qué hace, y al final el arma del crimen muestra cómo fue."],
+      ["Las armas", lista([
+        "Cada partida tiene nueve armas, una por sala al empezar, sorteadas de un catálogo de quince: entre tres y cinco <b>clásicas del edificio</b> (el Extintor, la Enceradora, la Manguera, el Candado, el Trofeo y el Taburete) y el resto <b>de Electricidad</b> (la Carta de Smith, la Transformada de Fourier, la Resistencia, el Capacitor, el Inductor, el Transistor, la Fuente de poder, el Amplificador operacional y el Diodo LED).",
+        "Todos en la sala juegan con las mismas nueve; cambian de una partida a otra.",
+        "Toca un arma en el tablero para ver qué hace, y al final el arma del crimen muestra cómo fue."
+      ])],
       ["Tu turno", lista([
         "Tira los dos dados y avanza como mucho esa cantidad de casillas por el pasillo. Las fichas tapan su casilla. Entrar en una sala termina el movimiento, y no puedes volver a la sala de la que saliste en el mismo turno.",
         "Desde el <b>mirador</b> la <b>escalera</b> baja al hall azul, y desde los <b>lockers</b> el <b>montacargas</b> llega a la bodega: usarlos reemplaza a los dados.",

@@ -2700,12 +2700,16 @@ online side of the frame) and `js/main.js` (the screen). The board is the
 building filmed in a walkthrough video: three rooms on the second floor
 (lockers, emergency landing, window corridor) and six on the first, the
 courtyard in the middle holding the envelope, and two secret passages
-(the stair and the goods lift). The nine weapons are electrical (Smith
-chart, Fourier transform, resistor, capacitor, inductor, transistor, power
-supply, op-amp, LED), one per room at the start, 24 cards in all; each is
-drawn in SVG by `js/armas.js` (`ClueArmas.icono`), with a short feedback
-effect (`chispa`) and a murder scene (`escena`) that plays on the end
-screen for the weapon in the envelope. `colabtex/src/juegos/clue.js` (`crearClue`)
+(the stair and the goods lift). There are nine weapon slots, one per
+room at the start, 24 cards in all. Which weapon fills each slot is drawn
+per room from the seed (`armasDePartida`, returned as `est.armasPartida`):
+3 to 5 of the six classic ones from the building (with their video photo)
+and the rest from the nine electrical ones (Smith chart, Fourier
+transform, resistor, capacitor, inductor, transistor, power supply, op-amp,
+LED). A weapon card is still its slot; `M.arma(armasPartida, a)` gives
+the catalog entry. `js/armas.js` (`ClueArmas`, keyed by catalog id) draws
+each one, with a short feedback effect (`chispa`) and a murder scene
+(`escena`) that plays on the end screen for the weapon in the envelope. `colabtex/src/juegos/clue.js` (`crearClue`)
 is only the postman, like Yemas'. Things that hold it together:
 
 - **One engine, three users.** `motor.js` of colabtex cannot import (the
