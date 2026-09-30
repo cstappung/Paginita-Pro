@@ -66,6 +66,10 @@ export function crearVoz({ uid, senal, pista, alCambiar = () => {} }) {
     return Math.sqrt(s / x.buf.length);
   }
   function mide() {
+    /* Un audio que el navegador no dejó sonar (se entró a la voz sola, al
+       recargar, antes de tocar la página) se reintenta aquí: en cuanto la
+       persona hace click en cualquier parte, incluido el juego, suena. */
+    for (const x of pares.values()) if (x.audio && x.audio.paused && x.audio.srcObject) x.audio.play().catch(() => {});
     const antes = [...hablan].sort().join();
     hablan.clear();
     if (local && pistaActiva() && nivel(local.analizador) > UMBRAL) hablan.add(uid);

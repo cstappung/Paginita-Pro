@@ -54,5 +54,10 @@ export const sonido = {
   dolor() { tono(220, 110, 0.12, 0.2, 'sawtooth'); },
   crack(dist = 0) { const v = 1 / (1 + dist / 12); ruido(0.25, 5000, 0.8 * v); tono(300, 80, 0.3, 0.2 * v, 'triangle'); },
   recarga() { ruido(0.04, 4000, 0.3); ruido(0.05, 3000, 0.35, 0.45); },
+  lanza() { tono(520, 260, 0.1, 0.1, 'triangle'); ruido(0.06, 2000, 0.15); },
+  explosion(dist = 0) {
+    const v = 1 / (1 + dist / 18);
+    ruido(1.1, 700, 1.0 * v); ruido(0.35, 4500, 0.6 * v); tono(95, 28, 0.7, 0.55 * v, 'sine');
+  },
   vacio() { tono(900, 900, 0.03, 0.08); },
 };

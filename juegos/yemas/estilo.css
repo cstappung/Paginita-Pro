@@ -107,3 +107,11 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #a9dcff; fon
 #llevo { position: absolute; bottom: 60px; width: 100%; text-align: center; font-size: 18px; font-weight: 800; color: #ffe066; }
 #tabla tr.rojo td:first-child span { color: #ff9a8c; }
 #tabla tr.azul td:first-child span { color: #8cc2ff; }
+
+/* ---------- Granadas y pantalla completa ---------- */
+#granadas { display: block; font-size: 15px; font-weight: 700; margin-top: 2px; }
+#granadas.vacio { opacity: 0.4; }
+#pausa .botones { display: flex; gap: 8px; justify-content: center; margin-top: 12px; flex-wrap: wrap; }
+#pausa .botones button { font: inherit; font-size: 14px; padding: 8px 14px; border-radius: 10px; border: 0; cursor: pointer;
+  background: #ffc21a; color: #3a2a1a; font-weight: 700; }
+#pausa .botones button[hidden] { display: none; }

@@ -6,6 +6,7 @@ import { crearMundo, moverCuerpo, rayoMundo, rayoHuevo, crearHuevo, crearBandera
 import { ARMAS, caida } from 'yemas/armas';
 import { sonido } from 'yemas/audio';
 import { conectarMarco, conectarLocal, PALETA, COLOR_EQUIPO } from 'yemas/red';
+import { crearGranadas, GRANADA } from 'yemas/granada';
 
 const VEL = 7, SALTO = 8, SENS = 0.0022, HZ_RED = 12, INVULNERABLE = 1.5;
 const ONLINE = new URLSearchParams(location.search).get('modo') === 'online' && parent !== window;
@@ -95,7 +96,10 @@ const yo = {
   arma: 0, balas: ARMAS.map(a => a.cargador), recargando: 0, cadencia: 0,
   zoom: 0, apuntando: false, escudo: 0, muerteT: 0, asesino: '',
   disparo: 0, finales: null, retroceso: 0, bob: 0,
+  granadas: GRANADA.porVida, cdGranada: 0, lanzo: null, revento: null,
 };
+// Para el feed y los avisos: las tres armas y la granada, en el orden del `a`.
+const NOMBRE_ARMA = [...ARMAS.map(a => a.nombre), GRANADA.nombre];
 const otros = new Map();
 const teclas = new Set();
 let gatillo = false, yaDisparo = false;
@@ -160,6 +164,7 @@ function alConfig(r) {
   }
   aparecer();
   if (ONLINE) $('pausa').hidden = false;   // el mouse se captura con un click
+  $('voz-entrar').hidden = !ONLINE;
 }
 
 // ---------- Controles ----------
@@ -180,6 +185,8 @@ addEventListener('keydown', e => {
   if (e.code === 'Tab') $('tabla').hidden = false;
   if (e.code === 'KeyR') recargar();
   if (e.code === 'KeyV') red?.hablar(true);
+  if (e.code === 'KeyG' || e.code === 'Digit4') lanzarGranada();
+  if (e.code === 'KeyF') pantallaCompleta();
   if (/^Digit[123]$/.test(e.code)) cambiarArma(+e.code.slice(5) - 1);
 });
 addEventListener('keyup', e => {
@@ -305,6 +312,7 @@ function aparecer() {
   yo.vivo = true;
   yo.balas = ARMAS.map(a => a.cargador);
   yo.recargando = 0;
+  yo.granadas = GRANADA.porVida;
   yo.escudo = INVULNERABLE;
   $('muerte').hidden = true;
   publicar();
@@ -339,6 +347,12 @@ function morir(g) {
 }
 
 function alMarcador(m) {
+  // Si cambió algún color de equipo, los huevos se vuelven a pintar.
+  for (const [id, j] of otros) {
+    const c = red.jugadores.get(id)?.color;
+    if (c && c !== j.color) { escena.remove(j.mesh); otros.delete(id); }
+  }
+  if (miEquipo()) { $('mi-equipo').textContent = `Equipo ${NOMBRE_EQ[miEquipo()]}`; $('mi-equipo').className = miEquipo(); }
   const antes = marcador.banderas;
   marcador = m;
   tablaT = 0;
@@ -378,6 +392,7 @@ function alJugador(id, e) {
     j = {
       mesh: crearHuevo(ficha.color, ficha.nombre), obj: new THREE.Vector3(e.x, e.y, e.z),
       color: ficha.color, vivo: !!e.v, sI: e.s ? e.s.i : 0, ry: e.ry || 0,
+      nI: e.n ? e.n.i : 0, xI: e.x2 ? e.x2.i : 0,
     };
     j.mesh.position.copy(j.obj);
     j.mesh.rotation.y = j.ry;
@@ -402,6 +417,15 @@ function alJugador(id, e) {
     }
     sonido.disparo(e.a | 0, boca.distanceTo(yo.pos));
   }
+  // Su granada: se ve volar y revienta donde su dueño dice.
+  if (e.n && e.n.i !== j.nI && Array.isArray(e.n.o) && Array.isArray(e.n.v)) {
+    j.nI = e.n.i;
+    granadas.lanzar('r' + id + e.n.i, e.n.o.map(Number), e.n.v.map(Number), false, id);
+  }
+  if (e.x2 && e.x2.i !== j.xI && Array.isArray(e.x2.p)) {
+    j.xI = e.x2.i;
+    granadas.revienta('r' + id + e.x2.i, e.x2.p.map(Number));
+  }
 }
 
 function alFeed(item) {
@@ -409,7 +433,7 @@ function alFeed(item) {
   div.className = 'baja';
   const nombre = miNombre();
   if (item.k === nombre || item.v === nombre) div.classList.add('mia');
-  const arma = ARMAS[item.a]?.nombre ?? '';
+  const arma = NOMBRE_ARMA[item.a] ?? '';
   div.innerHTML = '<b></b> <span class="arma"></span> <b></b>';
   div.children[0].textContent = item.k || '💀';
   div.children[1].textContent = `[${arma}${item.cab ? ' · cabeza' : ''}]`;
@@ -428,8 +452,92 @@ function publicar() {
     v: yo.vivo ? 1 : 0, a: yo.arma,
   };
   if (yo.disparo) e.s = { i: yo.disparo, e: yo.finales };
+  if (yo.lanzo) e.n = yo.lanzo;
+  if (yo.revento) e.x2 = yo.revento;
   red.publicar(e);
 }
+
+// ---------- Granadas ----------
+const granadas = crearGranadas(escena, colisores, reventar);
+function lanzarGranada() {
+  if (!puedoJugar() || !yo.vivo || yo.granadas <= 0 || yo.cdGranada > 0) return;
+  yo.granadas--;
+  yo.cdGranada = GRANADA.cadencia;
+  const dir = camara.getWorldDirection(new THREE.Vector3());
+  const o = camara.getWorldPosition(new THREE.Vector3()).addScaledVector(dir, 0.6);
+  const v = dir.multiplyScalar(GRANADA.fuerza).add(new THREE.Vector3(yo.vel.x * 0.5, 4, yo.vel.z * 0.5));
+  const id = Math.max((yo.lanzo?.i || 0) + 1, Date.now() % 1e9);
+  const oa = [r2(o.x), r2(o.y), r2(o.z)], va = [r2(v.x), r2(v.y), r2(v.z)];
+  granadas.lanzar(id, oa, va, true, red.yo);
+  yo.lanzo = { i: id, o: oa, v: va };
+  yo.retroceso = 1;
+  sonido.lanza();
+  publicar();
+}
+
+// Revienta una granada, propia o ajena. Solo la propia hace daño (el dueño
+// decide a quién alcanzó, como con las balas): a los rivales por los golpes
+// de siempre con arma 3, y a uno mismo directo, a la mitad.
+function reventar(p, dueno, id, propia) {
+  explosion(p);
+  if (!propia || !red) return;
+  yo.revento = { i: id, p: [r2(p.x), r2(p.y), r2(p.z)] };
+  const alcance = (q) => {
+    const d = p.distanceTo(q);
+    if (d >= GRANADA.radio) return 0;
+    const dir = q.clone().sub(p).normalize();
+    if (rayoMundo(p.clone().addScaledVector(dir, 0.05), dir, d, colisores) < d - 0.3) return 0;   // tapado
+    return Math.round(GRANADA.danio * (1 - d / GRANADA.radio));
+  };
+  for (const [idJ, j] of otros) {
+    if (!j.vivo || aliado(idJ)) continue;
+    const dmg = alcance(j.mesh.position.clone().add(new THREE.Vector3(0, ALTO / 2, 0)));
+    if (dmg >= 5) { red.golpear(idJ, { dmg, cab: false, a: 3 }); marcaGolpe(false); }
+  }
+  if (yo.vivo && yo.escudo <= 0) {
+    const dmg = Math.round(alcance(yo.pos.clone().add(new THREE.Vector3(0, ALTO / 2, 0))) / 2);
+    if (dmg >= 5) {
+      yo.hp -= dmg;
+      danio = 1;
+      if (yo.hp <= 0) morir({ de: red.yo, n: 'tu propio huevo duro', dmg, cab: false, a: 3 });
+    }
+  }
+  publicar();
+}
+
+let temblor = 0;
+function explosion(p) {
+  const d = p.distanceTo(yo.pos);
+  sonido.explosion(d);
+  temblor = Math.max(temblor, Math.max(0, 1 - d / 14));
+  const bola = new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12),
+    new THREE.MeshBasicMaterial({ color: '#ffb347', transparent: true, opacity: 0.9 }));
+  bola.position.copy(p);
+  escena.add(bola);
+  efectos.push({ obj: bola, vida: 0.35, max: 0.35, crece: GRANADA.radio * 0.7 });
+  for (let i = 0; i < 16; i++) {
+    const m = new THREE.Mesh(geoCascara, new THREE.MeshLambertMaterial({ color: i % 2 ? '#f3ead8' : '#ffb300', transparent: true }));
+    m.position.copy(p);
+    escena.add(m);
+    efectos.push({
+      obj: m, vida: 1.2, max: 1.2, piso: 0,
+      vel: new THREE.Vector3((Math.random() - 0.5) * 12, 3 + Math.random() * 7, (Math.random() - 0.5) * 12),
+      giro: (Math.random() - 0.5) * 20,
+    });
+  }
+}
+
+// ---------- Pantalla completa ----------
+// La del marco: en la pantalla queda solo el juego. Dentro de la sala el
+// iframe tiene allow="fullscreen", así que esto no saca la página entera.
+function pantallaCompleta() {
+  const d = document;
+  if (d.fullscreenElement || d.webkitFullscreenElement) { (d.exitFullscreen || d.webkitExitFullscreen)?.call(d)?.catch?.(() => {}); return; }
+  const r = d.documentElement, pide = r.requestFullscreen || r.webkitRequestFullscreen;
+  try { pide?.call(r, { navigationUI: 'hide' })?.catch?.(() => {}); } catch {}
+}
+$('pantalla').onclick = e => { e.stopPropagation(); pantallaCompleta(); };
+$('voz-entrar').onclick = e => { e.stopPropagation(); red?.entrarVoz(); };
 
 // ---------- Efectos ----------
 const efectos = [];
@@ -584,6 +692,7 @@ function alSuceso(s) {
 // ---------- Voz ----------
 // La voz la maneja la sala; aquí solo se pinta quién está y quién habla.
 function alVoces(v) {
+  $('voz-entrar').hidden = !ONLINE || !red || red.mirando || (v.en || []).includes(red.yo);
   const en = (v.en || []).filter(u => red && red.jugadores.has(u));
   $('voces').hidden = !en.length;
   $('voces').innerHTML = '';
@@ -615,6 +724,8 @@ function hud(dt) {
   $('vida-num').textContent = Math.max(0, Math.round(yo.hp));
   $('arma-nombre').textContent = `${yo.arma + 1} · ${a.nombre}`;
   $('municion').textContent = yo.recargando > 0 ? 'recargando…' : `${yo.balas[yo.arma]} / ${a.cargador}`;
+  $('granadas').textContent = `🥚 ${yo.granadas} · G`;
+  $('granadas').classList.toggle('vacio', yo.granadas <= 0);
   danio = Math.max(0, danio - dt * 2.5);
   $('danio').style.opacity = danio * 0.7;
   marcaT -= dt;
@@ -718,6 +829,13 @@ function actualizar(dt) {
   m.rotation.set(yo.retroceso * 0.15 - bajar * 0.7, 0, 0);
 
   actualizaBanderas();
+  granadas.paso(dt);
+  yo.cdGranada = Math.max(0, yo.cdGranada - dt);
+  if (temblor > 0) {
+    camara.position.x += (Math.random() - 0.5) * temblor * 0.3;
+    camara.position.y += (Math.random() - 0.5) * temblor * 0.3;
+    temblor = Math.max(0, temblor - dt * 2.5);
+  }
   red.tick(dt);
   acumRed += dt;
   if (acumRed >= 1 / HZ_RED) { acumRed = 0; publicar(); }
@@ -761,6 +879,6 @@ requestAnimationFrame(bucle);
 
 // Para depurar desde la consola: __yemas.paso(dt) avanza el juego sin requestAnimationFrame
 window.__yemas = {
-  yo, otros, disparar, get red() { return red; }, get marcador() { return marcador; },
+  yo, otros, disparar, granadas, get red() { return red; }, get marcador() { return marcador; },
   paso(dt) { actualizar(dt); actualizarEfectos(dt); escena.updateMatrixWorld(); },
 };
