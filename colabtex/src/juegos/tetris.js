@@ -89,7 +89,19 @@ export function crearTetris(ctx) {
       if (!b || !juego()) return;
       e.preventDefault();
       const a = b.dataset.a;
-      if (a === "blando") { mando.blando = true; const off = () => { mando.blando = false; removeEventListener("pointerup", off); }; addEventListener("pointerup", off); return; }
+      /* ▼ y ◀ ▶ se mantienen, como en el Club: los laterales usan el mismo
+         autorrepetido (DAS) que el teclado. Sin `pointercancel` un dedo que
+         se desliza fuera dejaba la pieza bajando o corriendo sola. */
+      if (a === "blando" || a === "izq" || a === "der") {
+        if (a === "blando") mando.blando = true;
+        else { mando.lado = a === "izq" ? -1 : 1; mando.t = 0; mando.repite = false; if (TM.accion(s, a)) suena("clic"); }
+        const off = () => {
+          if (a === "blando") mando.blando = false; else mando.lado = 0;
+          removeEventListener("pointerup", off); removeEventListener("pointercancel", off);
+        };
+        addEventListener("pointerup", off); addEventListener("pointercancel", off);
+        return;
+      }
       TM.accion(s, a);
     });
     document.addEventListener("keydown", teclaAbajo);
