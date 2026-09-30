@@ -14,6 +14,7 @@
  *   minas      Sol menor, 116 — staccato nervioso; las capas entran con el avance.
  *   catan      Re mayor, 116 con swing — tonada de puerto, el bajo como tambor de marcha.
  *   snake      Do dórico, 150 — funk: bajo con octavas y caja a contratiempo.
+ *   bbtan      Do mayor, 142 — arcade saltarín: bajo que rebota en octavas.
  *   worms-menu / worms-combate  Mi mayor tranquilo y Si menor de batalla.
  *
  * Y los que no son de ningún juego, para el reproductor de la cabecera:
@@ -212,6 +213,27 @@
         "R . O R . R O . R . O . F . O .", "k.hsh.k.s.hkh.sx", 2)
     },
     orden: "A A B A"
+  };
+
+  /* BBTAN: Do mayor a 142, de sala de máquinas. La melodía sube y baja
+     por arpegios como una bola que rebota de pared en pared, el bajo salta
+     de la fundamental a su octava en cada corchea y el eco corto del pulso
+     le da la gota de burbuja que tienen los choques. La vuelta a B sube un
+     tono (B+2), para que la ronda cuarenta no suene igual que la primera. */
+  T.bbtan = {
+    bpm: 142,
+    lead: { onda: "p25", vol: .14, vib: .004, sus: .6, eco: { t: .11, fb: .22, mezcla: .22 } },
+    bajo: { onda: "tri", vol: .2 }, arp: { onda: "p12", vol: .045, oct: 5, paso: .028 }, bat: { vol: .28 },
+    secciones: {
+      I: sec("C G", "", "R . O . R . O . F . O . R . O .", "k...h...s...h.hh", 2),
+      A: sec("C Am F G",
+        "C5 . E5 . G5 . C6*2 B5 . G5 . E5*4 A5 . E5 . C5 . E5 A5 . G5 . E5 . C5*3 F5 . A5 . C6 . A5 . F5 . A5 C6 D6*2 C6*2 B5*2 G5*2 D5*2 G5*2 B5 . D6 . G6*4",
+        "R . O . R . O . F . O . R . O .", "k.h.s.hkk.h.s.hh", 2),
+      B: sec("Dm G Em F,G",
+        "D6*3 C6 A5*2 F5*2 D5*4 F5*2 A5*2 B5*3 A5 G5*2 D5*2 B4*4 D5*2 G5*2 E6*3 D6 B5*2 G5*2 E5*4 G5*2 B5*2 A5*2 C6*2 F6*4 G6*2 F6 E6 D6*4",
+        "R . O . R . O . F . O . R . O .", "k.hks.h.k.hks.hx", 2)
+    },
+    orden: "I A A B A B+2 A"
   };
 
   T["worms-menu"] = {

@@ -310,6 +310,7 @@ export const CANCIONES = [
   { id: "catan", nombre: "Tonada de puerto", grupo: "De los juegos", desc: "Catan · marcha con gaita", chip: "catan", juegos: ["catan"] },
   { id: "minas", nombre: "Campo minado", grupo: "De los juegos", desc: "Buscaminas · staccato nervioso", chip: "minas", juegos: ["minas"] },
   { id: "snake", nombre: "Serpiente funk", grupo: "De los juegos", desc: "Snake · bajo con octavas", chip: "snake", juegos: ["snake"] },
+  { id: "bbtan", nombre: "Rebote", grupo: "De los juegos", desc: "BBTAN · arcade saltarín", chip: "bbtan", juegos: ["bbtan"] },
   { id: "worms-menu", nombre: "Taller", grupo: "De los juegos", desc: "Circuit Breakers · menú", chip: "worms-menu" },
   { id: "worms-combate", nombre: "Al ataque", grupo: "De los juegos", desc: "Circuit Breakers · combate", chip: "worms-combate" },
   { id: "midnight", nombre: "Midnight Pulse", grupo: "De los juegos", desc: "Escondite · grabación", url: "juegos/audio/escondite-midnight-pulse.mp3", vol: 1, juegos: ["escondite"] },

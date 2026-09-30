@@ -19,6 +19,7 @@
   let best = Number.isFinite(saved.best) ? Math.max(0, saved.best) : 0;
   let history = Array.isArray(saved.history) ? saved.history.filter(s => s && Number.isFinite(s.score) && s.score >= 0 && Number.isFinite(s.round)).sort((a,b) => b.score-a.score).slice(0,5) : [];
   let sound = saved.sound !== false, fast = false;
+  let tocando = false; // la canción empieza con el primer tiro de cada partida
   let state, paused = false, pauseBeforeDialog = false, score, round, count, blocks, pickups, balls, particles, rings, floaters;
   let launchX, nextX, angle, queue, launchTimer, returned, gained, combo, mult, roundTimer, shotTime, shotRealTime, archived;
   let pointerDown = false, toastTime = 0, time = 0, lastFrame = 0, uiDirty = true, aimPoints = [], aimDirty = true;
@@ -53,7 +54,7 @@
     blocks.push(...row.blocks); pickups.push(...row.pickups);
   }
   function reset() {
-    state = 'aim'; paused = false; score = 0; round = 1; count = initialBalls; blocks = []; pickups = []; balls = []; particles = []; rings = []; floaters = [];
+    state = 'aim'; paused = false; tocando = false; score = 0; round = 1; count = initialBalls; blocks = []; pickups = []; balls = []; particles = []; rings = []; floaters = [];
     launchX = W / 2; nextX = null; angle = -Math.PI / 2 - .26; queue = 0; returned = 0; gained = 0; combo = 0; mult = 1; shotTime = 0; shotRealTime = 0; roundTimer = 0; archived = false; activo = 0; reportada = false; fast = false; clearCelebrated = false; clearTime = 0;
     pointerDown = false; toastTime = 0; $('toast').classList.remove('visible');
     createRow(TOP); characterX = launchX; throwKick = 0; hintSeen = false;
@@ -69,6 +70,7 @@
     $('status').textContent = paused ? 'EN PAUSA' : state === 'over' ? 'FIN DE LA PARTIDA' : clearTime > 0 ? 'PANTALLA LIMPIA' : state === 'shoot' ? (mult > 1 ? `COMBO ×${mult}` : 'QUE NO PARE') : state === 'descend' ? 'SIGUIENTE RONDA' : 'TODO LISTO';
     $('recall').disabled = state !== 'shoot' || paused;
     $('pause').innerHTML = paused ? '<span>▶</span> Seguir' : '<span>Ⅱ</span> Pausa';
+    BBTANAudio.music(sound && tocando && !paused && state !== 'over' && !document.hidden, round);
     uiDirty = false;
   }
   function updateSpeedLabel() {
@@ -101,7 +103,7 @@
   }
   function celebrateClear() {
     clearCelebrated = true; clearTime = 2.3;
-    BBTANAudio.clear();
+    BBTANAudio.clear(); BBTANAudio.duck();
     for (let x = 55; x < W; x += 65) burst(x, 170 + Math.random() * 140, [colors.lime, colors.purple, colors.cyan][Math.floor(x / 65) % 3], 9);
     uiDirty = true;
   }
@@ -124,7 +126,7 @@
   }
   function fire() {
     if (state !== 'aim' || paused || document.querySelector('dialog[open]')) return;
-    BBTANAudio.unlock(); state = 'shoot'; queue = count; launchTimer = 0; returned = 0; gained = 0; combo = 0; mult = 1; nextX = null; shotTime = 0; shotRealTime = 0; hintSeen = true; uiDirty = true;
+    BBTANAudio.unlock(); tocando = true; state = 'shoot'; queue = count; launchTimer = 0; returned = 0; gained = 0; combo = 0; mult = 1; nextX = null; shotTime = 0; shotRealTime = 0; hintSeen = true; uiDirty = true;
     canvas.focus({preventScroll:true}); BBTANAudio.launch();
   }
   function finishShot() {
@@ -314,7 +316,7 @@
   $('resume').addEventListener('click',()=>state==='over'?reset():pause(false));
   $('speed').addEventListener('click',()=>{fast=!fast;$('speed').setAttribute('aria-pressed',String(fast));updateSpeedLabel();});
   $('recall').addEventListener('click',recall);
-  $('sound').addEventListener('click',()=>{sound=!sound;BBTANAudio.setEnabled(sound);setSound();persist();if(sound)BBTANAudio.pickup('ball');});
+  $('sound').addEventListener('click',()=>{sound=!sound;BBTANAudio.setEnabled(sound);setSound();persist();if(sound)BBTANAudio.pickup('ball');uiDirty=true;});
   function openDialog(id) {pauseBeforeDialog=paused;if(state!=='over')pause(true);$(id).showModal();}
   $('customize').addEventListener('click',()=>{openDialog('customizer-dialog');BBTANAppearance.refresh();});
   $('restart').addEventListener('click',()=>openDialog('restart-dialog'));
@@ -335,7 +337,7 @@
     if(key==='m')$('sound').click();
     if(key==='r')openDialog('restart-dialog');
   });
-  document.addEventListener('visibilitychange',()=>{if(document.hidden && !paused && state!=='over')pause(true);});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden && !paused && state!=='over')pause(true);if(document.hidden)BBTANAudio.music(false);uiDirty=true;});
   window.addEventListener('pagehide',()=>{best=Math.max(best,score);persist();});
   function resize() {const ratio=Math.min(window.devicePixelRatio||1,2);canvas.width=Math.round(W*ratio);canvas.height=Math.round(H*ratio);ctx.setTransform(ratio,0,0,ratio,0,0);draw();}
   function frame(timestamp) {const dt=Math.min((timestamp-lastFrame)/1000||0,.035);lastFrame=timestamp;update(dt);if(uiDirty)updateUI();draw();requestAnimationFrame(frame);}

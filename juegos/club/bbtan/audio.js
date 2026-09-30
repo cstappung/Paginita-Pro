@@ -170,5 +170,35 @@
     });
   }
 
-  root.BBTANAudio = { setEnabled, unlock, launch, hit, broken, pickup, combo, gameOver, clear };
+  /* The song («Rebote», `bbtan` in the shared songbook) runs on the same
+     Chip.Reproductor as the rest of the site, into its own bus so it sits
+     under the effects and can duck while the NICE! clip plays. */
+  let player = null, musicBus = null, musicTimer = null, musicOn = false, pace = 1;
+  function tickMusic() {
+    if (!player || !enabled || !context || context.state !== 'running') return;
+    player.tempo = pace; player.tick(.2);
+  }
+  function music(on, round = 1) {
+    pace = 1 + Math.min(.1, Math.max(0, round - 1) * .0025);
+    if (player) { player.capas.arp = round >= 3 ? 1 : 0; player.capas.bat = round >= 6 ? 1 : .55; }
+    if (on === musicOn) return;
+    musicOn = on;
+    if (!on) { clearInterval(musicTimer); musicTimer = null; if (player) player.detener(); return; }
+    unlock();
+    if (!context || !root.Chip || !root.Temas || !root.Temas.temas.bbtan) { musicOn = false; return; }
+    if (!player) {
+      musicBus = context.createGain(); musicBus.gain.value = .5; musicBus.connect(master);
+      player = new root.Chip.Reproductor(context, musicBus, root.Temas.temas.bbtan);
+      player.capas.arp = round >= 3 ? 1 : 0; player.capas.bat = round >= 6 ? 1 : .55;
+    }
+    if (round <= 1) player.reinicia(); else player.detener();
+    musicTimer = setInterval(tickMusic, 75); tickMusic();
+  }
+  function duck(seconds = 1.7) {
+    if (!musicBus || !context) return;
+    const g = musicBus.gain, t = context.currentTime;
+    try { g.cancelScheduledValues(t); g.setTargetAtTime(.12, t, .05); g.setTargetAtTime(.5, t + seconds, .35); } catch {}
+  }
+
+  root.BBTANAudio = { setEnabled, unlock, launch, hit, broken, pickup, combo, gameOver, clear, music, duck };
 })(globalThis);
