@@ -28,3 +28,18 @@ h2{font-family:var(--pixel);font-size:20px;letter-spacing:0;line-height:1.4}
 .result-detail{font:400 7px var(--pixel);line-height:1.8}
 dialog{border-radius:0;border-width:2px;box-shadow:8px 8px 0 #000}
 .wardrobe-button{font:400 7px var(--pixel)}
+/* Desde la ronda 100, «el abismo» (game.js pone html.abismo): la misma
+   máquina en carmesí, más oscura y con el barrido más pesado. */
+html.abismo{--bg:#0a0608;--panel:#150b0e;--line:#3a1a22;--muted:#a08790;--green:#ff4f6d;--purple:#9b6bff}
+html.abismo body{background:radial-gradient(ellipse at center,#3a0a1644,transparent 65%),var(--bg);transition:background .8s}
+html.abismo h1{text-shadow:0 0 12px #ff4f6d88,2px 2px 0 #4a0b1a}
+html.abismo #best,html.abismo .result-score{text-shadow:0 0 12px #ff4f6d88}
+html.abismo .board-top,html.abismo .board-bottom{background:#170a0e;border-color:#3a1a22}
+html.abismo .play-section{border-color:#5a2a35;box-shadow:0 0 0 2px #050203,6px 6px 0 #050203,0 18px 80px #6a0a2240}
+html.abismo .canvas-wrap{background:#0b0709}
+html.abismo .canvas-wrap::after{background:repeating-linear-gradient(to bottom,#0000 0 2px,#00000055 2px 3px),radial-gradient(ellipse at center,#0000 50%,#2a000cb0 100%)}
+html.abismo .control-button{background:#140a0d;border-color:#3a1a22}
+html.abismo .control-button[aria-pressed=true]{background:#2a0e16;border-color:#8a2a3f}
+html.abismo .primary-button{color:#1a0509;box-shadow:3px 3px 0 #4a0b1a}
+html.abismo .toast{background:#0a0608eb;border-color:#8a2a3f}
+html.abismo .wardrobe-button{background:#1a0c10;border-color:#4a1f2a}

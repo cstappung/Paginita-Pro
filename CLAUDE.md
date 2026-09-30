@@ -2585,6 +2585,23 @@ into a wall of sound. The retro look is Press Start 2P, notched pixel frames
 `.canvas-wrap::after`. The regex in `soloRanks` needed widening, so the rules
 must be re-published.
 
+**BBTAN's music is composed live from the board** (`musica.js`, UMD over
+`Chip`, tested by `musica.test.cjs`); it no longer loads `temas.js`, though
+`T.bbtan` stays in the songbook. `game.js` sends `BBTANAudio.mood({filas,
+bloques, ronda, disparando})` every 200 ms. `intensidad()` turns that into I
+in [0, 1], driven mostly by how many free rows are left above the floor and
+partly by how full the board is. The `Motor` smooths I (τ 1.6 s) and uses it
+to set the tempo, drums, arpeggio, filter cut-offs and a sidechain pump. In
+calm there is no snare and the melody is sparse; near the floor you get
+sixteenth hats, an alarm cluster and a heartbeat. The harmony switches to
+«filo» at I ≥ .7 and leaves it below .5. That hysteresis stops it flickering
+when a row goes back and forth. **From round 100 it drops into the abyss**
+(`ABISMO_DESDE`), with a sub under 40 Hz, a saturated bass, a detuned saw lead
+and slower tempos. Entering plays a falling sting (`caida`). The screen swaps
+to a crimson palette at the same time: `paleta()` writes into `colors` and
+toggles `html.abismo`, which re-skins `style.css`. `duck()` lowers the music
+bus under the NICE!.
+
 **UNO No Mercy's roulette is played by its victim**: the victim picks the
 colour (not whoever threw the card) and then draws one card at a time with
 the button until that colour comes out.

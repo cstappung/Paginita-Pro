@@ -170,26 +170,32 @@
     });
   }
 
-  /* The song («Rebote», `bbtan` in the shared songbook) runs on the same
-     Chip.Reproductor as the rest of the site, into its own bus so it sits
-     under the effects and can duck while the NICE! clip plays. */
-  let player = null, musicBus = null, musicTimer = null, musicOn = false, pace = 1;
+  /* La música la compone musica.js paso a paso mirando el tablero (mood):
+     tensa cuando los bloques se acercan al suelo, tranquila cuando quedan
+     pocos, y desde la ronda 100 baja al abismo. Va a su propio bus para
+     quedar bajo los efectos y agacharse mientras suena el NICE!. */
+  let player = null, musicBus = null, musicTimer = null, musicOn = false, lastMood = null;
   function tickMusic() {
     if (!player || !enabled || !context || context.state !== 'running') return;
-    player.tempo = pace; player.tick(.2);
+    player.tick(.2);
+  }
+  function mood(o) {
+    lastMood = o;
+    if (player) player.animo(o);
   }
   function music(on, round = 1) {
-    pace = 1 + Math.min(.1, Math.max(0, round - 1) * .0025);
-    if (player) { player.capas.arp = round >= 3 ? 1 : 0; player.capas.bat = round >= 6 ? 1 : .55; }
+    if (lastMood) lastMood = Object.assign({}, lastMood, { ronda: round });
+    else lastMood = { ronda: round, filas: 8, bloques: 0 };
+    if (player) player.animo(lastMood);
     if (on === musicOn) return;
     musicOn = on;
     if (!on) { clearInterval(musicTimer); musicTimer = null; if (player) player.detener(); return; }
     unlock();
-    if (!context || !root.Chip || !root.Temas || !root.Temas.temas.bbtan) { musicOn = false; return; }
+    if (!context || !root.Chip || !root.BBTANMusica) { musicOn = false; return; }
     if (!player) {
       musicBus = context.createGain(); musicBus.gain.value = .5; musicBus.connect(master);
-      player = new root.Chip.Reproductor(context, musicBus, root.Temas.temas.bbtan);
-      player.capas.arp = round >= 3 ? 1 : 0; player.capas.bat = round >= 6 ? 1 : .55;
+      player = new root.BBTANMusica.Motor(context, musicBus);
+      player.animo(lastMood);
     }
     if (round <= 1) player.reinicia(); else player.detener();
     musicTimer = setInterval(tickMusic, 75); tickMusic();
@@ -200,5 +206,5 @@
     try { g.cancelScheduledValues(t); g.setTargetAtTime(.12, t, .05); g.setTargetAtTime(.5, t + seconds, .35); } catch {}
   }
 
-  root.BBTANAudio = { setEnabled, unlock, launch, hit, broken, pickup, combo, gameOver, clear, music, duck };
+  root.BBTANAudio = { setEnabled, unlock, launch, hit, broken, pickup, combo, gameOver, clear, music, mood, duck };
 })(globalThis);
