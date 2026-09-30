@@ -468,6 +468,11 @@ export function senalVoz(pid, uid) {
   };
 }
 export const borraVivo = pid => remove(ref(db, `vivo/${pid}`)).catch(() => {});
+/* Al acabar una partida de Yemas se borran los huevos pero no la voz:
+   la sala sigue abierta y la gente sigue hablando (y quizá pide la
+   revancha). `vivo/<pid>/voz` tiene su propia regla, que deja escribir a
+   los jugadores también con `fin`, y se vacía sola al desconectarse. */
+export const borraYemasVivo = pid => remove(ref(db, `vivo/${pid}/y`)).catch(() => {});
 
 /* ---------- el chat de la sala ----------
    `chat/<pid>` y no `partidas/<pid>/chat`: colgado de la partida, cada

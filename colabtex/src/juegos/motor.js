@@ -1059,6 +1059,9 @@ export const YM_VARIANTES = { todos: "Todos contra todos", equipos: "Duelo por e
 export const YM_LARGOS = { todos: [10, 15, 25], equipos: [20, 30, 50], bandera: [1, 3, 5] };
 export const YM_EQUIPOS = ["rojo", "azul"];
 export const YM_BASES = { rojo: [0, 29], azul: [0, -29] };
+/* Batidora, Revuelta, Poché, el Huevo duro (la granada) y la
+   autodestrucción: el `a` de una muerte es el índice en ese orden. */
+export const YM_ARMAS = 5;
 export const YM_METAS = YM_LARGOS.todos;
 export const YM_META = 15;
 export function varianteYemas(p) {
@@ -1073,11 +1076,25 @@ export function metaYemas(p) {
   if (v === "todos" && YM_METAS.includes(m)) return m;
   return YM_LARGOS[v][1];
 }
-/* El equipo de cada uno, por asiento; `null` en todos contra todos. */
+/* El equipo de cada uno; `null` en todos contra todos. Por defecto sale
+   del asiento (pares rojo, impares azul), y cada jugador puede elegir el
+   suyo con `{t:"equipo", uid, e}` mientras la partida no haya empezado de
+   verdad: vale la última elección antes del primer suceso de juego
+   (una muerte o un toque de bandera), así que el equipo no se cambia a
+   media partida. Si al final un equipo queda vacío, con dos o más en la
+   sala, se vuelve al reparto por asiento: una partida de uno contra nadie
+   terminaría por abandono en el primer repintado. */
+const YM_SUCESOS = new Set(["muere", "toma", "devuelve", "captura"]);
 export function equiposYemas(p, js = jugadoresDe(p)) {
   if (varianteYemas(p) === "todos") return null;
-  const eq = {};
-  js.forEach((j, i) => { eq[j.uid] = YM_EQUIPOS[i % 2]; });
+  const porAsiento = {}, eq = {};
+  js.forEach((j, i) => { porAsiento[j.uid] = eq[j.uid] = YM_EQUIPOS[i % 2]; });
+  for (const j of jugadasDe(p)) {
+    if (YM_SUCESOS.has(j.t)) break;
+    if (j.t === "equipo" && eq[j.uid] && YM_EQUIPOS.includes(j.e)) eq[j.uid] = j.e;
+  }
+  const rojos = js.filter(j => eq[j.uid] === "rojo").length;
+  if (js.length >= 2 && (rojos === 0 || rojos === js.length)) return porAsiento;
   return eq;
 }
 /* ¿`uid` está entre los que ganaron? Sirve para todos los juegos. */
@@ -1145,7 +1162,7 @@ export function redYemas(p, js = jugadoresDe(p), listos = true) {
       hist.push({ e: "suelta", uid: v, b });
     }
     const vale = typeof k === "string" && ids.has(k) && k !== v && !fuera[k] && (!eq || eq[k] !== eq[v]);
-    const a = Number.isInteger(j.a) && j.a >= 0 && j.a <= 2 ? j.a : 0;
+    const a = Number.isInteger(j.a) && j.a >= 0 && j.a <= YM_ARMAS - 1 ? j.a : 0;
     hist.push({ e: "baja", uid: vale ? k : "", v, a, cab: !!j.cab });
     if (!vale) continue;
     bajas[k]++;

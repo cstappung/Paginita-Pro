@@ -1503,6 +1503,12 @@ try { var t = localStorage.getItem("jg.tema");
 .jg-art-cl em{position:absolute;left:50%;bottom:-30px;transform:translateX(-50%);font:900 18px 'IBM Plex Mono',monospace;font-style:normal;letter-spacing:6px;color:#f3e6c8;text-shadow:2px 2px 0 #8e1b2b}
 .jg-clue-aviso{margin:0 0 10px;padding:10px 14px;border-radius:12px;background:#8e1b2b1f;border:1px solid #8e1b2b55;font:13px 'IBM Plex Mono',monospace}.jg-clue-aviso[hidden]{display:none}
 .jg-clue-marco{display:block;width:100%;height:calc(100vh - 120px);min-height:560px;border:0;border-radius:18px;background:#15110f}
+.jg-ym-equipos{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 10px;font:13px 'IBM Plex Mono',monospace}.jg-ym-equipos[hidden]{display:none}
+.jg-ym-equipos p{grid-column:1/-1;margin:0;opacity:.8}
+.jg-ym-eq{display:flex;flex-direction:column;gap:6px;padding:10px 12px;border-radius:12px;border:2px solid transparent}
+.jg-ym-eq.rojo{background:#ff8f7f22;border-color:#ff8f7f55}.jg-ym-eq.azul{background:#7fb6ff22;border-color:#7fb6ff55}
+.jg-ym-eq.mio{box-shadow:0 0 0 2px currentColor inset}.jg-ym-eq.rojo.mio{color:#c0392b}.jg-ym-eq.azul.mio{color:#1f5fa8}
+.jg-ym-eq button{align-self:flex-start}
 .jg-voz{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 10px;padding:8px 12px;border-radius:12px;background:#ffb30014;border:1px solid #ffb30040;font:13px 'IBM Plex Mono',monospace}.jg-voz[hidden]{display:none}
 .jg-voz select{font:inherit;padding:5px 8px;border-radius:8px;border:1px solid #0002;background:#fff}
 .jg-voz-gente{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
@@ -2376,6 +2382,8 @@ html[data-tema=oscuro] .jg-of-podio-t b{filter:brightness(1.3)}
   .jg-tabla{font-size:12px}
   .jg-tabla th,.jg-tabla td{padding-left:8px;padding-right:8px;white-space:nowrap}
 }
+html[data-tema=oscuro] .jg-ym-eq.rojo.mio{color:#ff9a8c}
+html[data-tema=oscuro] .jg-ym-eq.azul.mio{color:#8cc2ff}
 </style>
 </head>
 <body>
@@ -2420,6 +2428,6 @@ html[data-tema=oscuro] .jg-of-podio-t b{filter:brightness(1.3)}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202609301534"></script>
+<script src="juegos-app.js?v=202609301540"></script>
 </body>
 </html>

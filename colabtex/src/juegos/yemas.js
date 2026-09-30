@@ -24,12 +24,22 @@ import { crearVoz } from "./voz.js";
 
    La barra de voz vive aquí y no en el marco: el micrófono y las
    conexiones son de la sala, y el marco solo avisa cuándo se aprieta la V
-   (`hablar`) y recibe quién está hablando (`voces`) para pintarlo. */
+   (`hablar`) y recibe quién está hablando (`voces`) para pintarlo. La voz
+   dura lo que dura la sala abierta, no la partida: al acabar se borran los
+   huevos (`borraYemasVivo`) pero no la voz, y solo se corta al salir de la
+   sala. Quien estaba en la voz vuelve a entrar solo en la revancha
+   (`sessionStorage`, por el `origen` de la sala nueva) y al recargar.
+
+   En las variantes por equipo, mientras la sala espera, cada uno elige el
+   suyo (`{t:"equipo", e}`); el reductor decide qué elección vale. */
 const PADRE = "yemas-padre", HIJO = "yemas-hijo";
 const SUCESOS = new Set(["muere", "toma", "devuelve", "captura"]);
+const VOZ_RECUERDA = "yemas.voz";
+const recuerdaVoz = pid => { try { if (pid) sessionStorage.setItem(VOZ_RECUERDA, pid); else sessionStorage.removeItem(VOZ_RECUERDA); } catch {} };
+const vozRecordada = () => { try { return sessionStorage.getItem(VOZ_RECUERDA) || ""; } catch { return ""; } };
 
 export function crearYemas({ uid, pid, jugar, terminar, mirando }) {
-  let host, frame, aviso, barra, muerto = false, listo = false, configurado = false;
+  let host, frame, aviso, barra, equiposEl, muerto = false, listo = false, configurado = false, autoVoz = false;
   let offVivo = null, partida = null, est = null, borrado = false, primeraTanda = true;
   let voz = null, vozEstado = null;
   const enviadas = new Set();
@@ -57,7 +67,7 @@ export function crearYemas({ uid, pid, jugar, terminar, mirando }) {
       offVivo = fb.watchYemasVivo(pid, v => enviar("vivo", { v }));
     }
     enviar("marcador", {
-      bajas: est.bajas, muertes: est.muertes, meta: est.meta,
+      bajas: est.bajas, muertes: est.muertes, meta: est.meta, equipos: est.equipos || null,
       puntosEq: est.puntosEq || null, banderas: est.banderas || null,
       fuera: Object.keys(est.fuera || {}),
       fin: est.fase === "fin" ? { ganador: est.ganador || "", motivo: est.motivo || "" } : null
@@ -80,12 +90,13 @@ export function crearYemas({ uid, pid, jugar, terminar, mirando }) {
     const d = e.data;
     if (d.tipo === "listo") { listo = true; reenvia(); return; }
     if (d.tipo === "hablar") { voz?.hablar(!!d.on); return; }
+    if (d.tipo === "voz") { if (juego() && !vozEstado?.activo) entrarVoz(); return; }
     if (partida?.fin || !juego()) return;   // un mirón no escribe
     const anota = j => jugar(j).catch(err => console.warn("[yemas] no se pudo anotar", j.t, err));
     if (d.tipo === "estado" && d.e && typeof d.e === "object") {
       fb.yemasVivo(pid, uid, d.e);
     } else if (d.tipo === "muere") {
-      const a = Number.isInteger(d.a) && d.a >= 0 && d.a <= 2 ? d.a : 0;
+      const a = Number.isInteger(d.a) && d.a >= 0 && d.a <= 4 ? d.a : 0;
       const j = { t: "muere", uid, por: typeof d.por === "string" ? d.por.slice(0, 64) : "", a, cab: !!d.cab };
       if (d.x !== undefined) { j.x = num(d.x); j.z = num(d.z); }
       anota(j);
@@ -119,7 +130,7 @@ export function crearYemas({ uid, pid, jugar, terminar, mirando }) {
            <button class="btn2" data-v="silencio" title="Dejar de oír a los demás">${s.silencio ? "🔇 Sin sonido" : "🔈 Oyendo"}</button>
            <span class="jg-voz-gente"></span>`;
       barra.querySelector('[data-v="entrar"]')?.addEventListener("click", entrarVoz);
-      barra.querySelector('[data-v="salir"]')?.addEventListener("click", () => voz?.salir());
+      barra.querySelector('[data-v="salir"]')?.addEventListener("click", () => { recuerdaVoz(""); voz?.salir(); });
       barra.querySelector('[data-v="modo"]')?.addEventListener("change", ev => voz?.ponModo(ev.target.value));
       barra.querySelector('[data-v="silencio"]')?.addEventListener("click", () => voz?.silenciar(!vozEstado?.silencio));
     }
@@ -147,7 +158,7 @@ export function crearYemas({ uid, pid, jugar, terminar, mirando }) {
         enviar("voces", { en: s.activo ? [uid, ...s.pares.map(x => x.uid)] : [], hablan: s.hablan });
       }
     });
-    try { await voz.entrar(); }
+    try { await voz.entrar(); recuerdaVoz(pid); }
     catch (err) {
       console.warn("[yemas] voz", err);
       barra.dataset.firma = "";
@@ -162,6 +173,49 @@ export function crearYemas({ uid, pid, jugar, terminar, mirando }) {
     voz?.hablar(on);
   };
   const abajo = teclaV(true), arriba = teclaV(false);
+
+  // ---------- elegir equipo ----------
+  function pintaEquipos() {
+    if (!equiposEl || !est) return;
+    const ver = !!est.equipos && !est.listos;
+    equiposEl.hidden = !ver;
+    if (!ver) return;
+    const mio = est.equipos[uid], puedo = juego();
+    const col = e => {
+      const gente = est.jugadores.filter(j => est.equipos[j.uid] === e);
+      const nombre = e === "rojo" ? "Rojo" : "Azul";
+      return `<div class="jg-ym-eq ${e}${mio === e ? " mio" : ""}">
+        <b>${e === "rojo" ? "🔴" : "🔵"} Equipo ${nombre} · ${gente.length}</b>
+        <span>${gente.map(j => esc(j.uid === uid ? "Tú" : j.nombre || "Huevo")).join(", ") || "Nadie todavía"}</span>
+        ${puedo && mio !== e ? `<button class="btn2" data-e="${e}">Cambiarme al ${nombre}</button>` : ""}
+      </div>`;
+    };
+    const html = `<p>Elige tu equipo antes de empezar. Si nadie elige, se reparten alternados.</p>${col("rojo")}${col("azul")}`;
+    if (equiposEl.dataset.html === html) return;
+    equiposEl.dataset.html = html;
+    equiposEl.innerHTML = html;
+    for (const b of equiposEl.querySelectorAll("[data-e]")) {
+      b.onclick = () => {
+        b.disabled = true;
+        jugar({ t: "equipo", uid, e: b.dataset.e }).catch(err => console.warn("[yemas] equipo", err));
+      };
+    }
+  }
+
+  /* La pantalla completa de Yemas es la del marco, no la de la página: así
+     en la pantalla queda solo el juego, sin la barra ni el chat alrededor
+     donde el mouse se escapaba. `juegos-main.js` la pide por aquí cuando
+     se aprieta ⛶ en la cabecera de la sala. */
+  function pantallaCompleta() {
+    const pide = frame?.requestFullscreen || frame?.webkitRequestFullscreen;
+    if (!pide) return false;
+    try {
+      const r = pide.call(frame, { navigationUI: "hide" });
+      r?.then?.(() => frame.contentWindow?.focus(), () => {});
+    } catch { return false; }
+    frame.contentWindow?.focus();
+    return true;
+  }
 
   function pintaAviso() {
     if (!aviso || !est) return;
@@ -180,6 +234,9 @@ export function crearYemas({ uid, pid, jugar, terminar, mirando }) {
     barra = document.createElement("div");
     barra.className = "jg-voz";
     barra.hidden = true;
+    equiposEl = document.createElement("div");
+    equiposEl.className = "jg-ym-equipos";
+    equiposEl.hidden = true;
     frame = document.createElement("iframe");
     frame.title = "Yemas — partida en línea";
     frame.className = "jg-yemas-marco";
@@ -188,20 +245,27 @@ export function crearYemas({ uid, pid, jugar, terminar, mirando }) {
     window.addEventListener("message", mensaje);
     window.addEventListener("keydown", abajo);
     window.addEventListener("keyup", arriba);
-    frame.src = "juegos/yemas/index.html?modo=online&v=yemas-2";
-    host.append(aviso, barra, frame);
+    frame.src = "juegos/yemas/index.html?modo=online&v=yemas-4";
+    host.append(aviso, equiposEl, barra, frame);
   }
 
   function actualizar(p, estado) {
     partida = p; est = estado;
     pintaAviso();
+    pintaEquipos();
     pintaBarra();
     reenvia();
+    // Estaba en la voz en esta misma sala (recargó) o en la que originó
+    // esta revancha: vuelve a entrar solo, el permiso del micrófono ya está.
+    if (!autoVoz && !voz && juego()) {
+      const antes = vozRecordada();
+      autoVoz = true;
+      if (antes && (antes === pid || antes === p.origen)) entrarVoz();
+    }
     if (est.fase === "fin" && !p.fin && juego()) terminar(est.ganador, est.motivo);
     if (p.fin && !borrado && juego()) {
       borrado = true;
-      voz?.salir();
-      fb.borraVivo(pid);
+      fb.borraYemasVivo(pid);
     }
   }
 
@@ -216,5 +280,5 @@ export function crearYemas({ uid, pid, jugar, terminar, mirando }) {
     if (host) host.innerHTML = "";
   }
 
-  return { montar, actualizar, destruir };
+  return { montar, actualizar, destruir, pantallaCompleta };
 }
