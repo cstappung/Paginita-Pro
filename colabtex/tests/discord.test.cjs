@@ -60,5 +60,7 @@ test('fuera del podio o categoría rara, no hay mensaje; tiempos en buscaminas y
  assert.equal(marcaSolo('club-tetris-sprint',{puntos:40,tiempo:61000}),'⏱️ 1:01.00');
  assert.equal(categoriaLegible('club-tetris-ultra').modalidad,'Ultra (2 min)');
  assert.equal(categoriaLegible('club-sortem-20').modalidad,'del 1 al 20');
+ assert.equal(categoriaLegible('club-bbtan-rondas').club.nombre,'BBTAN');
+ assert.equal(marcaSolo('club-bbtan-rondas',{puntos:42,tiempo:1}),'🟩 Ronda 42');
  assert.ok(mensajePodio({categoria:'club-sortem-10',uid:'a',nombre:'Ana',puesto:1,filas:[{uid:'a',nombre:'Ana',puntos:10,tiempo:9000}],enlace:'https://x/juegos.html#solo/sortem'}));
 });

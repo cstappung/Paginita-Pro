@@ -4,6 +4,8 @@ export function categoriaClub(juego, categoria) {
     ? /^club-minas-(easy|medium|hard)$/.test(categoria)
     : juego === 'sortem'
     ? /^club-sortem-(10|20)$/.test(categoria)
+    : juego === 'bbtan'
+    ? categoria === 'club-bbtan-rondas'
     : juego === 'tetris'
     ? /^club-tetris-(maraton|sprint|ultra)$/.test(categoria)
     : /^club-snake-(classic|arcade|portals|reloj|espejo|laberinto)-(chico|mediano|grande|gigante)$/.test(categoria));

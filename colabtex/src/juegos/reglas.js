@@ -591,6 +591,20 @@ const REGLAS = {
       ["Clasificación", "El reloj corre desde el primer movimiento. Cada modo tiene su propia clasificación por tiempo, y tu mejor marca sale en la Clasificación del sitio junto a tu nombre."]
     ]
   },
+  bbtan: {
+    lema: "BBTAN: apunta, rebota y rompe los bloques antes de que toquen el suelo.",
+    secciones: [
+      ["Cómo se juega", "Arrastra (o mueve el ratón) para apuntar y suelta para lanzar todas tus pelotas en fila. Rebotan en las paredes y en los bloques; cada golpe le quita un punto al número del bloque y a cero revienta. Cuando vuelven todas, la fila entera baja un escalón y aparece otra arriba."],
+      ["Lo que se recoge", lista([
+        "<b>+1</b>: una pelota más para la próxima ronda.",
+        "<b>Láser</b> horizontal o vertical: cada pelota que lo cruza quita 4 a toda su fila o columna.",
+        "<b>Dispersor</b>: lanza hacia arriba, en un ángulo al azar, la pelota que lo toca.",
+        "Los láseres y el dispersor desaparecen al terminar la ronda en que se usaron.",
+        "Si rompes todos los bloques de la pantalla aparece <b>NICE!</b>."
+      ])],
+      ["Fin y clasificación", "La partida acaba cuando un bloque llega a la última fila. Lo que compite es la <b>ronda máxima</b> alcanzada: la mejor sale en la Clasificación del sitio y desbloquea logros cada tantas rondas."]
+    ]
+  },
   snake: {
     lema: "Snake Club: la serpiente de siempre, en siete modos y cuatro tamaños.",
     secciones: [
@@ -609,7 +623,7 @@ const REGLAS = {
   }
 };
 
-const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm" };
+const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN" };
 
 export const tieneReglas = juego => Object.prototype.hasOwnProperty.call(REGLAS, juego);
 

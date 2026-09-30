@@ -7,7 +7,7 @@ vm.runInContext(sin('src/juegos/motor.js')+'\n'+sin('src/juegos/logros.js')+'\n;
 const {LOGROS,detecta,deFila,deMarca,reparto,reducir,JUEGOS}=context.__L;
 
 test('diez logros por juego, con ids válidos y únicos',()=>{
- const juegos=[...Object.keys(JUEGOS),'minas','snake','tetrisclub','sortem'];
+ const juegos=[...Object.keys(JUEGOS),'minas','snake','tetrisclub','sortem','bbtan'];
  for(const j of juegos){
   assert.ok(LOGROS[j],j);assert.equal(LOGROS[j].length,10,j);
   const ids=LOGROS[j].map(x=>x.id);assert.equal(new Set(ids).size,10,j);
@@ -47,5 +47,6 @@ test('reparto junta fila, marca y guardados, y cuenta la gente',()=>{
 });
 test('sortEm: los logros salen del modo y del tiempo',()=>{
  assert.deepEqual([...deMarca('sortem',{categoria:'club-sortem-10',puntos:10,tiempo:14000})],['d10','d10t30','d10t15']);
+ assert.deepEqual([...deMarca('bbtan',{categoria:'club-bbtan-rondas',puntos:32,tiempo:60000})],['r10','r20','r30']);
  assert.deepEqual([...deMarca('sortem',{categoria:'club-sortem-20',puntos:20,tiempo:35000})],['d20','d20t60','d20t40']);
 });

@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="theme-color" content="#101113">
+<title>BBTAN</title><meta name="description" content="Bloques, rebotes y tu propio personaje.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23c4f568'/%3E%3Ctext x='8' y='25' font-size='26' font-family='Arial' font-weight='bold'%3Eb%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="../conexion.css?v=club-1">
+<link rel="stylesheet" href="style.css?v=bbtan-1">
+<script src="../conexion.js?v=club-3"></script>
+<style>
+/* Dentro de Juegos: la pantalla sigue siendo oscura (el juego es una
+   máquina, no una hoja), la tabla de la ronda máxima va a la derecha y
+   debajo en el móvil, y el alto lo mide conexion.js. */
+.layout{display:grid;gap:24px;grid-template-columns:minmax(0,440px);justify-content:center}
+.club-integrado body{background:var(--bg);display:block;padding:18px 14px}
+.club-integrado .layout{grid-template-columns:minmax(280px,440px) 260px}
+.club-integrado .game-shell{width:100%;min-width:0}
+.club-integrado main.game-shell{padding:0}
+.club-ranking{background:#16191a!important;color:var(--text)!important;border:2px solid #3a4235!important;border-radius:0!important;box-shadow:4px 4px 0 #0b0c0d}
+.club-ranking h2{font:400 11px var(--pixel)!important;color:var(--green)}
+.club-ranking ol,.club-ranking p{color:var(--muted)}
+.club-ranking button{border-radius:0;background:#222c1b;color:var(--green);border-color:#657b44}
+.shell>.club-volver{color:var(--green);font:400 8px var(--pixel)}
+@media(max-width:760px){.club-integrado .layout{grid-template-columns:minmax(0,440px)}}
+</style>
+<script src="physics.js?v=bbtan-1" defer></script><script src="rules.js?v=bbtan-1" defer></script><script src="character.js?v=bbtan-1" defer></script><script src="customizer.js?v=bbtan-1" defer></script><script src="audio.js?v=bbtan-1" defer></script><script src="game.js?v=bbtan-1" defer></script>
+</head><body>
+<div class="shell"><div class="layout">
+<main class="game-shell" aria-label="BBTAN">
+<header class="game-header"><h1>BBTAN<span>.</span></h1><div class="header-actions"><button id="customize" class="wardrobe-button" title="Personalizar personaje"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 4-6 4 3 5 3-2v10h8V11l3 2 3-5-6-4c0 4-8 4-8 0Z"/></svg>Personaje</button><button id="sound" class="icon-button" aria-label="Activar sonido" aria-pressed="false" title="Sonido (M)">♫<span class="sound-slash"></span></button></div></header>
+<div class="score-strip"><div><span>PUNTAJE</span><strong id="score">0</strong></div><div><span>RÉCORD</span><strong id="best">0</strong></div><div><span>RONDA</span><strong id="round">01</strong></div><div><span>BOLAS</span><strong id="balls">01</strong></div></div>
+<section class="play-section" aria-label="Juego"><div class="board-top"><span id="status">TODO LISTO</span><span id="multiplier">×1</span></div>
+<div class="canvas-wrap"><canvas id="game" width="420" height="580" tabindex="0" aria-label="Campo de juego. Apunta y suelta para lanzar; flechas para apuntar y espacio para lanzar.">Tu navegador necesita admitir Canvas.</canvas><div id="toast" class="toast" role="status"></div><div id="overlay" class="overlay" hidden><div class="overlay-content"><span id="overlay-label" class="eyebrow">PAUSA</span><h2 id="overlay-title">En pausa.</h2><p id="overlay-copy"></p><div id="result-stats" hidden></div><button id="resume" class="primary-button">Seguir jugando ↗</button><button id="overlay-restart" class="text-button" hidden>Jugar otra vez</button></div></div></div>
+<div class="board-bottom"><span id="remaining">● ×1</span><span id="storage-notice" role="status"></span></div></section>
+<nav class="game-controls" aria-label="Controles de partida"><button id="pause" class="control-button" title="Pausar (P)">Ⅱ Pausa</button><button id="speed" class="control-button" aria-pressed="false" title="Acelerar las bolas"><span id="speed-label">Velocidad ×1</span></button><button id="recall" class="control-button" disabled title="Recoger las bolas y terminar el tiro">↓ Recoger</button><button id="restart" class="control-button restart-button" aria-label="Nueva partida" title="Nueva partida (R)">↻</button></nav>
+</main>
+<aside></aside>
+</div></div>
+<dialog id="customizer-dialog" aria-labelledby="wardrobe-title">
+<header class="wardrobe-header"><div><span class="eyebrow">A TU MANERA</span><h2 id="wardrobe-title">Tu personaje<span>.</span></h2></div><button class="icon-button" data-close="customizer-dialog" aria-label="Cerrar personalización">×</button></header>
+<div class="wardrobe-layout">
+<section class="character-stage" aria-label="Vista previa"><div class="stage-tag">VISTA PREVIA</div><canvas id="character-preview" width="420" height="520" aria-label="Vista previa del personaje personalizado"></canvas><div class="stage-caption">LISTO PARA EL PRÓXIMO REBOTE</div><label class="skin-control">Piel <input id="skin-color" type="color" value="#ffc693" aria-label="Color de piel"></label></section>
+<section class="wardrobe-options"><div id="category-tabs" class="category-tabs" role="tablist" aria-label="Partes del personaje"></div><div id="style-panel" role="tabpanel"><div class="option-heading"><h3 id="category-title">Pelo</h3><span id="option-count">10 estilos</span></div><div id="style-options" class="style-options" aria-label="Estilos disponibles"></div><div class="color-heading"><label for="item-color" id="color-label">Color del pelo</label><div class="custom-color"><span id="color-value">#352A3E</span><input id="item-color" type="color" value="#352a3e" aria-label="Color de la parte seleccionada"></div></div><div id="color-swatches" class="color-swatches" aria-label="Colores rápidos"></div></div><div class="wardrobe-foot"><span id="appearance-status" role="status">Se guarda automáticamente.</span><button class="primary-button" data-close="customizer-dialog">Listo, a jugar ↗</button></div></section>
+</div></dialog>
+<dialog id="restart-dialog" aria-labelledby="restart-title"><span class="eyebrow">VUELTA A EMPEZAR</span><h2 id="restart-title">¿Otra partida<span>?</span></h2><p>El puntaje actual se guardará en tus mejores partidas.</p><div class="dialog-actions"><button class="control-button" data-close="restart-dialog">Seguir jugando</button><button id="confirm-restart" class="primary-button">Empezar de nuevo ↗</button></div></dialog>
+</body></html>
