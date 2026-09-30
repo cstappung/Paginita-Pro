@@ -28,18 +28,41 @@ h2{font-family:var(--pixel);font-size:20px;letter-spacing:0;line-height:1.4}
 .result-detail{font:400 7px var(--pixel);line-height:1.8}
 dialog{border-radius:0;border-width:2px;box-shadow:8px 8px 0 #000}
 .wardrobe-button{font:400 7px var(--pixel)}
-/* Desde la ronda 100, «el abismo» (game.js pone html.abismo): la misma
-   máquina en carmesí, más oscura y con el barrido más pesado. */
-html.abismo{--bg:#0a0608;--panel:#150b0e;--line:#3a1a22;--muted:#a08790;--green:#ff4f6d;--purple:#9b6bff}
-html.abismo body{background:radial-gradient(ellipse at center,#3a0a1644,transparent 65%),var(--bg);transition:background .8s}
-html.abismo h1{text-shadow:0 0 12px #ff4f6d88,2px 2px 0 #4a0b1a}
-html.abismo #best,html.abismo .result-score{text-shadow:0 0 12px #ff4f6d88}
-html.abismo .board-top,html.abismo .board-bottom{background:#170a0e;border-color:#3a1a22}
-html.abismo .play-section{border-color:#5a2a35;box-shadow:0 0 0 2px #050203,6px 6px 0 #050203,0 18px 80px #6a0a2240}
-html.abismo .canvas-wrap{background:#0b0709}
-html.abismo .canvas-wrap::after{background:repeating-linear-gradient(to bottom,#0000 0 2px,#00000055 2px 3px),radial-gradient(ellipse at center,#0000 50%,#2a000cb0 100%)}
-html.abismo .control-button{background:#140a0d;border-color:#3a1a22}
-html.abismo .control-button[aria-pressed=true]{background:#2a0e16;border-color:#8a2a3f}
-html.abismo .primary-button{color:#1a0509;box-shadow:3px 3px 0 #4a0b1a}
-html.abismo .toast{background:#0a0608eb;border-color:#8a2a3f}
-html.abismo .wardrobe-button{background:#1a0c10;border-color:#4a1f2a}
+/* El descenso (descenso.js). Desde la ronda 100 game.js pone html.descenso y
+   escribe en el estilo del <html> los colores fundidos del piso en que va
+   (--bg, --barra, --borde…), así el marco entra de a poco igual que el
+   tablero. Las clases desc-1…desc-5 llegan a mitad de cada fundido y traen lo
+   que no se puede fundir: bordes mordidos, temblores, parpadeos. */
+html.descenso body{background:radial-gradient(ellipse at center,color-mix(in srgb,var(--halo) 30%,transparent),transparent 65%),var(--bg);transition:background .8s}
+html.descenso h1{text-shadow:0 0 12px var(--halo),2px 2px 0 var(--sombra)}
+html.descenso #best,html.descenso .result-score{text-shadow:0 0 12px var(--halo)}
+html.descenso .board-top,html.descenso .board-bottom{background:var(--barra);border-color:var(--line)}
+html.descenso .play-section{border-color:var(--borde);box-shadow:0 0 0 2px #050203,6px 6px 0 #050203,0 18px 80px var(--halo)}
+html.descenso .canvas-wrap{background:var(--lienzo)}
+html.descenso .canvas-wrap::after{background:repeating-linear-gradient(to bottom,#0000 0 2px,#00000055 2px 3px),radial-gradient(ellipse at center,#0000 50%,#1a0006b0 100%)}
+html.descenso .control-button{background:var(--panel);border-color:var(--line)}
+html.descenso .control-button[aria-pressed=true]{background:var(--barra);border-color:var(--borde)}
+html.descenso .primary-button{color:#0a0204;box-shadow:3px 3px 0 var(--sombra)}
+html.descenso .toast{background:#050203eb;border-color:var(--borde)}
+html.descenso .wardrobe-button{background:var(--panel);border-color:var(--line)}
+html.descenso .overlay{background:#050203ee}
+/* 2 · la ruina: el marco se desportilla. */
+html.desc-2 .play-section{clip-path:polygon(0 0,18% 0,19.5% 5px,23% 0,61% 0,62% 4px,64% 0,100% 0,100% 31%,calc(100% - 4px) 33%,100% 36%,100% 78%,100% 100%,83% 100%,81% calc(100% - 5px),78% 100%,29% 100%,27% calc(100% - 3px),25% 100%,0 100%,0 64%,4px 62%,0 59%)}
+html.desc-2 .toast,html.desc-2 .control-button{border-style:dashed}
+/* 3 · la estática: colores corridos, barrido pesado y un salto de vez en cuando. */
+html.desc-3 .play-section{box-shadow:-3px 0 0 #ff003355,3px 0 0 #00ffe033,6px 6px 0 #050203,0 18px 80px var(--halo);animation:bb-salto 7s steps(1) infinite}
+html.desc-3 .canvas-wrap::after{background:repeating-linear-gradient(to bottom,#0000 0 1px,#00000070 1px 3px),radial-gradient(ellipse at center,#0000 40%,#000000c0 100%)}
+html.desc-3 h1,html.desc-3 #status{text-shadow:-2px 0 #ff0033aa,2px 0 #00ffe088}
+@keyframes bb-salto{0%,91%,95%,100%{transform:none}92%{transform:translate(-3px,1px)}93%{transform:translate(4px,-1px) skewX(-1deg)}94%{transform:translate(-1px,0)}}
+/* 4 · hostil: el borde late como un corazón y el título parpadea. */
+html.desc-4 .play-section{animation:bb-late 1.1s ease-in-out infinite,bb-salto 5s steps(1) infinite}
+html.desc-4 h1{animation:bb-parpadeo 3.3s steps(1) infinite}
+html.desc-4 body{background:radial-gradient(ellipse at center,#3a000044,transparent 60%),repeating-linear-gradient(0deg,#0000 0 3px,#1a000022 3px 4px),var(--bg)}
+@keyframes bb-late{0%,40%,100%{border-color:var(--borde);filter:none}10%{border-color:#ff1a1a;filter:drop-shadow(0 0 10px #ff000088)}25%{border-color:#c01010;filter:drop-shadow(0 0 5px #ff000055)}}
+@keyframes bb-parpadeo{0%,100%{opacity:1}12%{opacity:.25}13%{opacity:1}57%{opacity:.6}58%{opacity:0}59%{opacity:1}}
+/* 5 · el vacío: la máquina está torcida. */
+html.desc-5 .game-shell{transform:rotate(-.6deg) skewX(.4deg)}
+html.desc-5 h1{animation:bb-invierte 4.1s steps(1) infinite}
+html.desc-5 h1 span{color:#ff2020}
+@keyframes bb-invierte{0%,100%{filter:none}33%{filter:invert(1)}34%{filter:none}71%{filter:invert(1) hue-rotate(90deg)}72%{filter:none}}
+@media(prefers-reduced-motion:reduce){html.desc-3 .play-section,html.desc-4 .play-section,html.desc-4 h1,html.desc-5 h1{animation:none}}
