@@ -56,7 +56,7 @@
     if (master && context) master.gain.setTargetAtTime(enabled ? .88 : 0, context.currentTime, .015);
     if (!enabled && clearSource) { try { clearSource.stop(); } catch {} clearSource = null; }
     if (!enabled && fallbackClip) fallbackClip.pause();
-    if (!enabled && root.BBTANVoz) root.BBTANVoz.calla();
+    if (!enabled) calla();
   }
 
   function note(frequency, duration, type, volume, delay = 0, endFrequency = frequency * .72) {
@@ -207,34 +207,74 @@
     try { g.cancelScheduledValues(t); g.setTargetAtTime(.12, t, .05); g.setTargetAtTime(.5, t + seconds, .35); } catch {}
   }
 
-  /* Cada 50 rondas habla el juego (voz.js). Bajo la voz va una cama que dice
-     lo mismo sin palabras: un arpegio de feria cuando está contento, pitidos
-     que se cortan cuando se rompe, y en el susurro un aliento de ruido que
-     respira y un zumbido grave y desafinado. La música se agacha mientras. */
-  function anuncio(ronda, partes) {
+  /* Cada 50 rondas habla el juego (voz.js). La voz está grabada (assets/voz,
+     un MP3 por frase) y suena por WebAudio, así es la misma en cualquier
+     equipo: speechSynthesis no existe en muchos móviles y en cada PC sonaba
+     distinta. Los archivos se piden unas rondas antes (`prepara`) y quedan
+     decodificados; si llegan tarde, la frase suena en cuanto llega, y si una
+     partida nueva empieza entremedio, ya no suena (`vozSeq`).
+     Bajo la voz va una cama que dice lo mismo sin palabras: un arpegio de
+     feria, pitidos que se cortan, un aliento y un zumbido grave, o una caja
+     de música en mayor que no se acaba. La música se agacha mientras. */
+  const vozCache = new Map();
+  let vozSeq = 0, vozFuente = null;
+  function cargaVoz(url) {
+    if (!vozCache.has(url)) {
+      const p = typeof fetch === 'function'
+        ? fetch(url).then(r => r.ok ? r.arrayBuffer() : null).catch(() => null)
+        : Promise.resolve(null);
+      vozCache.set(url, { bytes: p, buffer: null });
+    }
+    const e = vozCache.get(url);
+    if (!e.buffer && context) e.buffer = e.bytes.then(b => b ? new Promise(ok => {
+      // La forma con callbacks: el Safari viejo no devuelve promesa.
+      try { const r = context.decodeAudioData(b.slice(0), ok, () => ok(null)); if (r && r.catch) r.catch(() => ok(null)); } catch { ok(null); }
+    }) : null);
+    return e.buffer || e.bytes.then(() => null);
+  }
+  function prepara(ronda) {
+    const V = root.BBTANVoz;
+    if (!V || !V.habla(ronda)) return;
+    for (let i = 0; i < V.FRASES[V.nivel(ronda)].length; i++) cargaVoz(V.archivo(ronda, i));
+  }
+  function anuncio(ronda, i, alDuracion) {
     const V = root.BBTANVoz;
     if (!enabled || !V) return;
     unlock();
-    V.decir(partes);
-    if (!context || context.state !== 'running') return;
-    const dur = Math.min(14, V.duracion(partes) + 1), animo = V.animo(ronda);
-    duck(dur);
+    if (!context) return;
+    const seq = ++vozSeq, animo = V.animo(ronda);
+    cargaVoz(V.archivo(ronda, i)).then(buffer => {
+      if (!buffer || seq !== vozSeq || !enabled || context.state !== 'running') return;
+      para();
+      const src = context.createBufferSource(), g = context.createGain();
+      src.buffer = buffer; g.gain.value = 1.15;
+      src.connect(g); g.connect(master);
+      src.onended = () => { if (vozFuente === src) vozFuente = null; try { src.disconnect(); g.disconnect(); } catch {} };
+      vozFuente = src; src.start(context.currentTime + .05);
+      const dur = buffer.duration;
+      duck(dur + .3); cama(animo, dur, V.nivel(ronda));
+      if (alDuracion) alDuracion(dur);
+    });
+  }
+  function cama(animo, dur, nivel) {
     if (animo === 'alegre') {
-      [523, 659, 784, 1047, 1319].forEach((f, i) => note(f, .22, 'square', .028, i * .07, f * 1.02));
-      note(1568, .5, 'triangle', .03, .4, 1760);
+      [523, 659, 784, 1047, 1319].forEach((f, i) => note(f, .22, 'square', .02, i * .07, f * 1.02));
+      note(1568, .5, 'triangle', .022, .4, 1760);
     } else if (animo === 'roto') {
-      for (let i = 0; i < 16; i++) {
+      for (let i = 0; i < 12; i++) {
         const f = 120 + Math.random() * 1800;
-        note(f, .03 + Math.random() * .09, Math.random() < .5 ? 'square' : 'sawtooth', .02, Math.random() * dur * .85, f * (Math.random() < .5 ? .3 : 2.5));
+        note(f, .03 + Math.random() * .08, Math.random() < .5 ? 'square' : 'sawtooth', .012, Math.random() * dur * .9, f * (Math.random() < .5 ? .3 : 2.5));
       }
-      noise(.3, 4000, 300, .05, .1);
-    } else susurro(dur, V.nivel(ronda) - 4);
+      noise(.25, 4000, 300, .035, .05);
+    } else if (animo === 'susurro') susurro(dur, nivel - 4);
+    else if (animo === 'giro') { susurro(dur * .55, 1); cajaDeMusica(dur * .45, dur * .55, nivel); }
+    else cajaDeMusica(dur, 0, nivel);
   }
   function susurro(dur, hondo) {
     noise(.01, 1000, 1000, .0001); // asegura noiseBuffer
     const at = context.currentTime, fin = at + dur, bus = context.createGain();
-    bus.gain.setValueAtTime(.0001, at); bus.gain.exponentialRampToValueAtTime(1, at + .8);
-    bus.gain.setValueAtTime(1, fin - 1.2); bus.gain.exponentialRampToValueAtTime(.0001, fin);
+    bus.gain.setValueAtTime(.0001, at); bus.gain.exponentialRampToValueAtTime(.7, at + .8);
+    bus.gain.setValueAtTime(.7, Math.max(at + .9, fin - 1.2)); bus.gain.exponentialRampToValueAtTime(.0001, fin);
     bus.connect(effects); bus.connect(reverb);
     // El aliento: ruido en banda que entra y sale como una respiración.
     const aire = context.createBufferSource(), banda = context.createBiquadFilter(), pecho = context.createGain();
@@ -242,21 +282,32 @@
     banda.type = 'bandpass'; banda.frequency.value = 1500 - 250 * hondo; banda.Q.value = 1.1;
     pecho.gain.setValueAtTime(.0001, at);
     for (let t = at, k = 0; t < fin; t += 1.7, k++) {
-      pecho.gain.exponentialRampToValueAtTime(k % 2 ? .05 : .09, t + .7);
-      pecho.gain.exponentialRampToValueAtTime(.006, t + 1.6);
+      pecho.gain.exponentialRampToValueAtTime(k % 2 ? .03 : .05, t + .7);
+      pecho.gain.exponentialRampToValueAtTime(.004, t + 1.6);
     }
     aire.connect(banda); banda.connect(pecho); pecho.connect(bus);
     aire.start(at); aire.stop(fin + .05);
     // El zumbido: dos sierras desafinadas bajo un paso bajo, y un sub.
     const grave = context.createBiquadFilter(), zumba = context.createGain();
-    grave.type = 'lowpass'; grave.frequency.value = 190; zumba.gain.value = .07 + .015 * hondo;
+    grave.type = 'lowpass'; grave.frequency.value = 190; zumba.gain.value = .06 + .015 * hondo;
     grave.connect(zumba); zumba.connect(bus);
     for (const [f, tipo] of [[55 - 4 * hondo, 'sawtooth'], [55.9 - 4 * hondo, 'sawtooth'], [36, 'sine']]) {
       const o = context.createOscillator(); o.type = tipo; o.frequency.value = f;
       o.connect(tipo === 'sine' ? zumba : grave); o.start(at); o.stop(fin + .05);
     }
   }
-  function calla() { if (root.BBTANVoz) root.BBTANVoz.calla(); }
+  // Una caja de música en do mayor, que sube de a un semitono en cada vuelta
+  // cuanto más perfecto es todo: la alegría que no para de subir.
+  function cajaDeMusica(dur, desde, nivel) {
+    const notas = [72, 76, 79, 84, 79, 76, 72, 79], paso = .16, sube = Math.max(0, nivel - 7);
+    for (let t = 0, k = 0; t < dur; t += paso, k++) {
+      const n = notas[k % notas.length] + Math.floor(k / notas.length) * sube, f = 440 * Math.pow(2, (n - 69) / 12);
+      note(f, .35, 'sine', .016, desde + t, f);
+      if (k % 4 === 0) note(f * 2, .2, 'triangle', .006, desde + t, f * 2);
+    }
+  }
+  function para() { if (vozFuente) { try { vozFuente.stop(); } catch {} vozFuente = null; } }
+  function calla() { vozSeq++; para(); }
 
-  root.BBTANAudio = { setEnabled, unlock, launch, hit, broken, pickup, combo, gameOver, clear, music, mood, duck, anuncio, calla };
+  root.BBTANAudio = { setEnabled, unlock, launch, hit, broken, pickup, combo, gameOver, clear, music, mood, duck, anuncio, prepara, calla };
 })(globalThis);

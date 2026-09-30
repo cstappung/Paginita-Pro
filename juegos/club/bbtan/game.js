@@ -10,21 +10,35 @@
   // El descenso (descenso.js): desde la ronda 50 y hasta la 350 la máquina se
   // pudre de a poco, en cinco pisos fundidos uno tras otro, sin mesetas. Solo cambia lo que se ve, se oye y se lee; la física no lo lee.
   const DSC = BBTANDescenso, T = DSC.TEXTOS;
-  let corr = 0, pal = DSC.mezcla(0), etapaT = 0;
+  // Y pasada la 350, el mundo perfecto: `cielo` (0..3) sube mientras el
+  // descenso se deshace (corrupcionVista). Tampoco toca la jugabilidad.
+  const TC = DSC.TEXTOS_CIELO;
+  let corr = 0, pal = DSC.mezcla(0), etapaT = 0, cielo = 0, etapaC = 0;
   const CSS_VARS = Object.keys(pal.css);
   // Peso de cada piso ya entrado (0..1): el 2 son las grietas, el 3 la
   // estática, el 4 los ojos, el 5 el vacío.
   const peso = j => clamp(corr - (j - 1), 0, 1);
+  // Lo mismo arriba: el 1 es dulce, el 2 radiante, el 3 perfecto.
+  const pesoC = j => clamp(cielo - (j - 1), 0, 1);
   function paleta() {
-    corr = DSC.corrupcion(round); pal = DSC.mezcla(corr); etapaT = DSC.etapa(corr);
+    corr = DSC.corrupcionVista(round); cielo = DSC.perfeccion(round);
+    pal = DSC.mezclaCielo(DSC.mezcla(corr), cielo); etapaT = DSC.etapa(corr); etapaC = DSC.etapaCielo(cielo);
     Object.assign(colors, { lime: pal.lime, purple: pal.purple, orange: pal.orange, cyan: pal.cyan });
-    const html = document.documentElement;
+    const html = document.documentElement, pinta = corr > 0 || cielo > 0;
     html.classList.toggle('descenso', corr > 0);
+    html.classList.toggle('cielo', cielo > 0);
     // Nada cambia de golpe: el CSS lee los pesos y los funde en 3 s.
     for (let k = 2; k <= 5; k++) corr > 0 ? html.style.setProperty('--w' + k, peso(k).toFixed(3)) : html.style.removeProperty('--w' + k);
-    for (const k of CSS_VARS) corr > 0 ? html.style.setProperty('--' + k, pal.css[k]) : html.style.removeProperty('--' + k);
-    canvas.style.cursor = lento(3.4, 4.4) > .5 ? MIRA_ROJA : '';
+    for (let k = 1; k <= 3; k++) cielo > 0 ? html.style.setProperty('--p' + k, pesoC(k).toFixed(3)) : html.style.removeProperty('--p' + k);
+    for (const k of CSS_VARS) pinta ? html.style.setProperty('--' + k, pal.css[k]) : html.style.removeProperty('--' + k);
+    canvas.style.cursor = lento(3.4, 4.4) > .5 ? MIRA_ROJA : cielo > 1.2 ? CORAZON : '';
   }
+  // Un efecto del cielo que entra entre dos perfecciones cualesquiera.
+  const suave = (a, b) => clamp((cielo - a) / (b - a), 0, 1);
+  const CORAZON = 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'24\' height=\'24\'%3E%3Cpath d=\'M12 20 4 12a4 4 0 0 1 8-5 4 4 0 0 1 8 5z\' fill=\'%23ff5fa8\' stroke=\'%23fff\' stroke-width=\'2\'/%3E%3C/svg%3E") 12 12, pointer';
+  const CONFETI = ['#ff6fae', '#ffd84d', '#5ec8ff', '#6fdc8c', '#c58cff', '#ffffff'];
+  // El texto de un piso: el del cielo si ya se nota, si no el del descenso.
+  const tx = clave => etapaC ? TC[clave][etapaC] : T[clave][etapaT];
   // Un efecto que entra entre dos corrupciones cualesquiera, no en un piso.
   const lento = (a, b) => clamp((corr - a) / (b - a), 0, 1);
   // Un número fijo en [0,1) por entero: decide qué bloque mira, cuál sangra…
@@ -45,9 +59,16 @@
     }
     return out.replace(/\s+$/, '');
   }
-  // El texto de un estado según la corrupción: fundido entre los dos pisos.
-  function fundeTexto(arr, semilla) {
-    const i = Math.min(4, Math.floor(corr)), t = corr - i;
+  // El texto de un estado según la corrupción (o la perfección): fundido
+  // entre los dos pisos.
+  function fundeTexto(clave, semilla) {
+    if (etapaC) {
+      const arr = TC.estado[clave];
+      if (cielo < 1) return arr[1];
+      const i = Math.min(2, Math.floor(cielo));
+      return transmuta(arr[i], arr[i + 1], cielo - i, semilla, false);
+    }
+    const arr = T.estado[clave], i = Math.min(4, Math.floor(corr)), t = corr - i;
     return roto(transmuta(arr[i], arr[i + 1], t, semilla, false));
   }
   // Cómo de rotas salen las letras: nada antes del tercer piso.
@@ -73,7 +94,7 @@
     let fondo = 0, vivos = 0;
     for (const b of blocks) if (b.hp > 0) { vivos++; fondo = Math.max(fondo, b.y + b.h); }
     const filas = vivos ? Math.max(0, Math.round((FLOOR - fondo) / ROW)) : 8;
-    BBTANAudio.mood({ filas, bloques: vivos, ronda: round, disparando: state === 'shoot', descenso: corr });
+    BBTANAudio.mood({ filas, bloques: vivos, ronda: round, disparando: state === 'shoot', descenso: corr, cielo });
   }
   const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const number = n => Math.floor(n).toLocaleString('es-CL');
@@ -114,14 +135,15 @@
   function setSound() {
     $('sound').setAttribute('aria-pressed', String(sound)); $('sound').setAttribute('aria-label', sound ? 'Desactivar sonido' : 'Activar sonido');
   }
-  // Cada 50 rondas el juego habla (voz.js): alegre, luego roto, luego en
-  // contra tuya y en susurros. La frase también se lee, por si no hay voz.
+  // Cada 50 rondas el juego habla (voz.js, grabada en assets/voz): alegre,
+  // luego roto, luego en contra tuya y en susurros, y desde la 350 perfecto.
+  // La frase también se lee, por si el sonido está apagado.
   function hablaJuego() {
-    const V = BBTANVoz, frase = V.frase(round, Math.random()), partes = V.trozos(frase, round, Math.random());
-    const animo = V.animo(round), texto = animo === 'susurro' ? frase.toLowerCase() : animo === 'roto' ? partes.map(p => p.t).join(' ') : frase;
-    toast(animo === 'alegre' ? texto.toUpperCase() : texto, Math.max(3, Math.min(9, V.duracion(partes) + 1)));
-    $('toast').dataset.voz = animo;
-    BBTANAudio.anuncio(round, partes);
+    const V = BBTANVoz, i = V.eleccion(round, Math.random()), frase = V.texto(round, i), animo = V.animo(round);
+    toast(animo === 'alegre' ? frase.toUpperCase() : animo === 'susurro' ? frase.toLowerCase() : frase, Math.min(12, V.estimada(frase) + .8));
+    const el = $('toast'); el.dataset.voz = animo;
+    // Con el audio ya decodificado se sabe cuánto dura: el aviso lo espera.
+    BBTANAudio.anuncio(round, i, dur => { if (el.dataset.voz === animo) toastTime = Math.max(toastTime, Math.min(14, dur + .5)); });
   }
   function toast(message, secs = 2) { delete $('toast').dataset.voz; $('toast').textContent = message; $('toast').classList.add('visible'); toastTime = secs; }
   function blockColor(block) { return block.reinforced ? colors.orange : block.max >= 24 ? colors.orange : block.max >= 14 ? colors.purple : block.max >= 8 ? colors.cyan : colors.lime; }
@@ -145,9 +167,8 @@
     $('balls').textContent = String(count + gained).padStart(2,'0');
     $('multiplier').textContent = `×${mult}`;
     $('remaining').textContent = state === 'shoot' ? `● ${returned}/${count}` : `● ×${count}`;
-    const E = T.estado;
     $('status').textContent = clearTime > 0 && !paused && state !== 'over' ? 'PANTALLA LIMPIA' : state === 'shoot' && !paused && mult > 1 ? `COMBO ×${mult}`
-      : paused ? fundeTexto(E.pause, 1) : state === 'over' ? fundeTexto(E.over, 2) : state === 'shoot' ? fundeTexto(E.shoot, 3) : state === 'descend' ? fundeTexto(E.descend, 4) : fundeTexto(E.aim, 5);
+      : paused ? fundeTexto('pause', 1) : state === 'over' ? fundeTexto('over', 2) : state === 'shoot' ? fundeTexto('shoot', 3) : state === 'descend' ? fundeTexto('descend', 4) : fundeTexto('aim', 5);
     $('recall').disabled = state !== 'shoot' || paused;
     $('pause').innerHTML = paused ? '<span>▶</span> Seguir' : '<span>Ⅱ</span> Pausa';
     BBTANAudio.music(sound && tocando && !paused && state !== 'over' && !document.hidden, round);
@@ -165,7 +186,9 @@
       const a = Math.random() * Math.PI * 2, speed = 25 + Math.random() * 135;
       // Con el descenso, parte de lo que salta ya no es luz: es sangre, y pesa.
       const sangre = Math.random() < .7 * lento(2, 4);
-      particles.push({ x, y, vx:Math.cos(a)*speed, vy:Math.sin(a)*speed, life:(.35+Math.random()*.3)*(sangre?1.8:1), color:sangre?(Math.random()<.5?'#b00018':'#6a0010'):color, size:1+Math.random()*3, g:sangre?420:130 });
+      // Arriba, en cambio, es confeti: de colores, liviano y dura más.
+      const confeti = !sangre && Math.random() < suave(.2, 1);
+      particles.push({ x, y, vx:Math.cos(a)*speed, vy:Math.sin(a)*speed-(confeti?40:0), life:(.35+Math.random()*.3)*(sangre?1.8:confeti?1.9:1), color:sangre?(Math.random()<.5?'#b00018':'#6a0010'):confeti?CONFETI[Math.random()*CONFETI.length|0]:color, size:confeti?2+Math.random()*2:1+Math.random()*3, g:sangre?420:confeti?70:130 });
     }
     if (particles.length > 350) particles.splice(0, particles.length - 350);
   }
@@ -175,10 +198,10 @@
     if (block.hp <= 0) {
       score += 50 * mult; combo++;
       burst(block.x + SIZE/2, block.y + SIZE/2, blockColor(block));
-      floaters.push({ x:block.x+SIZE/2, y:block.y+SIZE/2, text:roto(`+${50*mult}`), color:blockColor(block), life:.7 });
+      floaters.push({ x:block.x+SIZE/2, y:block.y+SIZE/2, text:cielo>.5?(cielo>2.4&&Math.random()<.35?'¡GRACIAS!':`+${50*mult} ♥`):roto(`+${50*mult}`), color:blockColor(block), life:cielo>2.4?1.1:.7 });
       const next = Math.min(5, 1 + Math.floor(combo / 5));
       BBTANAudio.broken(combo);
-      if (next > mult) { mult = next; toast(T.combo[etapaT](mult)); BBTANAudio.combo(mult); }
+      if (next > mult) { mult = next; toast(tx('combo')(mult)); BBTANAudio.combo(mult); }
       if (hasClearedBoard(blocks, clearCelebrated)) celebrateClear();
     } else BBTANAudio.hit(block.hp);
     uiDirty = true;
@@ -221,7 +244,7 @@
   }
   function gameOver() {
     state = 'over'; archive(); reportar(); borraPartida(); $('overlay').hidden = false;
-    const f = T.fin[etapaT];
+    const f = tx('fin');
     $('overlay-label').textContent = roto(score >= best && score > 0 ? f.record : f.rotulo);
     $('overlay-title').innerHTML = `${f.titulo}<span>${f.signo}</span>`; $('overlay-copy').textContent = f.copia;
     $('result-stats').hidden = false; $('result-stats').innerHTML = `<div class="result-score">${number(score)}</div><div class="result-detail">PUNTOS · RONDA ${round} · ${count} BOLAS</div>`;
@@ -232,7 +255,7 @@
     if (state === 'over') return;
     paused = value; pointerDown = false; $('overlay').hidden = !value;
     if (value) {
-      const q = T.pausa[etapaT];
+      const q = tx('pausa');
       $('overlay-label').textContent = roto(q.rotulo); $('overlay-title').innerHTML = `${q.titulo}<span>${q.signo}</span>`;
       $('overlay-copy').textContent = q.copia; $('result-stats').hidden = true;
       $('resume').innerHTML = `${q.boton} <span>↗</span>`; $('overlay-restart').hidden = false;
@@ -244,7 +267,7 @@
     if (state !== 'shoot' || paused) return;
     if (nextX === null) nextX = balls.length ? balls[0].x : launchX;
     balls.forEach(b=>burst(b.x,b.y,'#e5f2d6',3)); balls=[]; queue=0; returned=count;
-    toast(T.recall[etapaT]); finishShot();
+    toast(tx('recall')); finishShot();
   }
   function update(dt) {
     if (paused) return;
@@ -282,7 +305,7 @@
       blocks.forEach(b=>baja(b,hsh(b.id)));pickups.forEach(p=>baja(p,hsh(p.x|0)));
       if(roundTimer>=.4+lag) {
         if(blocks.some(b=>b.hp>0 && b.y+b.h>=FLOOR-12))gameOver();
-        else { round++;clearCelebrated=false;paleta();createRow(TOP);characterX=launchX;state='aim';aimDirty=true;uiDirty=true; if(BBTANVoz.habla(round))hablaJuego();else if(round%5===0){const a=T.animo[etapaT];toast(roto(`RONDA ${round} · ${a[(round/5)%a.length]}`));} guarda(); }
+        else { round++;clearCelebrated=false;paleta();createRow(TOP);characterX=launchX;state='aim';aimDirty=true;uiDirty=true; if(BBTANVoz.habla(round))hablaJuego();else if(round%5===0){const a=tx('animo');toast(roto(`RONDA ${round} · ${a[(round/5)%a.length]}`));} if((round+5)%50===0)BBTANAudio.prepara(round+5); guarda(); }
       }
     }
   }
@@ -317,6 +340,7 @@
       handX: (9 + Math.cos(angle) * kick * 5) / scale,
       handY: (-36 + Math.sin(angle) * kick * 5) / scale,
       maldad: corr,
+      perfecto: cielo,
       t: reducedMotion ? 0 : performance.now()
     };
     drawSombra(pose);
@@ -347,15 +371,20 @@
     ctx.clearRect(0,0,W,H);ctx.fillStyle=pal.bg;ctx.fillRect(0,0,W,H);
     if(corr>0){const r=mov?Math.sin(now/(900-60*Math.min(corr,5)))*.5+.5:.5,g=ctx.createRadialGradient(W/2,H*.45,60-6*Math.min(corr,5),W/2,H*.45,W*.85);g.addColorStop(0,'#00000000');g.addColorStop(1,pal.velo);ctx.globalAlpha=.75+.25*r;ctx.fillStyle=g;ctx.fillRect(0,0,W,H);ctx.globalAlpha=1;}
     ctx.fillStyle=pal.puntos;for(let y=14;y<FLOOR;y+=19)for(let x=15;x<W;x+=19)ctx.fillRect(x,y,1,1);
+    if(cielo>0)drawCielo(now,mov);
     drawDescenso(now,mov);
     drawCara(now,mov);
     const danger=blocks.some(b=>b.hp>0 && b.y+b.h>FLOOR-ROW*2), w4=peso(4);
     if(danger){const gradient=ctx.createLinearGradient(0,FLOOR-100,0,FLOOR);gradient.addColorStop(0,'#ff846000');gradient.addColorStop(1,'#ff84600c');ctx.fillStyle=gradient;ctx.fillRect(0,FLOOR-100,W,100);}
     ctx.strokeStyle=danger?'#e48b69':pal.suelo;ctx.lineWidth=1;ctx.setLineDash([5,6]);ctx.beginPath();ctx.moveTo(12,FLOOR+7);ctx.lineTo(W-12,FLOOR+7);ctx.stroke();ctx.setLineDash([]);
     if(state==='aim' && !paused)drawAim();
-    const ojosB=lento(2,4.5), sangreB=lento(3,5), mira=objetivo();
+    const ojosB=lento(2,4.5), sangreB=lento(3,5), mira=objetivo(), caras=suave(.1,1);
+    // Arriba todos los bloques saltan juntos, al mismo compás (solo a la vista).
+    const brinco=mov&&cielo>1?Math.round(Math.sin(now/260)*2*suave(1,2)):0;
+    if(brinco)ctx.save(),ctx.translate(0,brinco);
     for(const b of blocks) {
       if(b.hp<=0)continue;const color=blockColor(b);
+      if(cielo>0){ctx.globalAlpha=.3*suave(0,.8);ctx.fillStyle=color;ctx.fillRect(Math.round(b.x)+3,Math.round(b.y)+3,b.w-6,b.h-6);ctx.globalAlpha=.5*suave(0,.8);ctx.fillStyle='#ffffff';ctx.fillRect(Math.round(b.x)+5,Math.round(b.y)+5,b.w-10,3);ctx.globalAlpha=1;}
       ctx.fillStyle=color+'22';ctx.fillRect(Math.round(b.x)+3,Math.round(b.y)+3,b.w-6,b.h-6);
       ctx.fillStyle='#ffffff14';ctx.fillRect(Math.round(b.x)+4,Math.round(b.y)+4,b.w-8,2);
       pixelFrame(b.x,b.y,b.w,b.h,color);
@@ -367,10 +396,12 @@
         if(mov&&Math.random()<.012*w4){nx+=Math.random()<.5?-2:2;}
         ctx.globalAlpha=.55*w4;ctx.fillStyle='#ff1030';ctx.fillText(b.hp,nx-1,ny);ctx.fillStyle='#10e0ff';ctx.fillText(b.hp,nx+1,ny);ctx.globalAlpha=1;
       }
-      ctx.fillStyle=color;ctx.fillText(b.hp,nx,ny);ctx.textBaseline='alphabetic';
+      ctx.fillStyle=cielo>0?DSC.mezclaHex(color,'#5a1a40',.35*suave(0,1)):color;ctx.fillText(b.hp,nx,ny);ctx.textBaseline='alphabetic';
       if(hsh(b.id*7+3)<ojosB)ojosDeBloque(b,now,mov,mira);
       if(hsh(b.id+999)<sangreB)gotea(b,now,mov);
+      if(cielo>0&&hsh(b.id*5+1)<caras)carita(b,now,mov,mira);
     }
+    if(brinco)ctx.restore();
     for(const p of pickups) {
       if(!p.alive)continue;const color=pickupColor(p);
       const pulse=reducedMotion?0:Math.sin(time*3+p.x)*1.2;
@@ -408,6 +439,7 @@
   // final un agujero negro de borde rojo. La estela pasa de copias a brasas y
   // humo que suben. El radio de choque no cambia.
   function drawBola(x,y,vx,vy,now,mov,sem,base) {
+    if(cielo>.4)return drawBolaCielo(x,y,now,mov,sem);
     const r=bounds.radius, wA=lento(.8,2.6), wO=lento(2.4,4), wN=lento(4,5);
     const late=mov?.5+.5*Math.sin(now/(140-40*Math.min(1,wN))+sem*1.9):.5;
     if(wA>0){ctx.globalAlpha=(.12+.18*late)*wA;ctx.fillStyle=wN>.5?'#ff1030':DSC.mezclaHex('#ff9040','#ff1030',wA);pixelBall(x,y,r+2+Math.round(late*wA));ctx.globalAlpha=1;}
@@ -427,6 +459,7 @@
     }
   }
   function drawEstelaBola(b,now,i) {
+    if(cielo>.4)return drawEstelaCielo(b,now,i);
     const n=b.trail.length, wE=lento(1.5,4.5), wH=lento(2,4.2);
     const colorEstela=wE>0?DSC.mezclaHex(pal.estela,'#ff1030',wE):pal.estela;
     b.trail.forEach((p,j)=>{
@@ -438,7 +471,7 @@
     });
     ctx.globalAlpha=1;
   }
-  const largoEstela = () => 5 + Math.round(10 * lento(1.5, 4.5));
+  const largoEstela = () => 5 + Math.round(10 * Math.max(lento(1.5, 4.5), suave(.5, 2)));
   // Lo que miran los ojos: la bola más alta en vuelo o, si no hay, tú.
   function objetivo() {
     let o = null;
@@ -534,6 +567,8 @@
   /* Los rótulos cambian de nombre letra a letra, sin avisar. Mientras están
      a medio camino, de vez en cuando se asoma la palabra entera un instante. */
   const ETIQUETAS = [['PUNTAJE', 'PECADOS', 1.2, 3.6], ['RÉCORD', 'CONDENA', 1.6, 4.0], ['RONDA', 'CÍRCULO', 2.0, 4.3], ['BOLAS', 'ALMAS', 2.4, 4.6]];
+  // Y arriba se vuelven otra cosa: todo es alegría.
+  const ETIQUETAS_CIELO = [['ALEGRÍA', .6, 1.6], ['ORGULLO', .9, 1.9], ['SONRISA', 1.2, 2.2], ['AMIGOS', 1.5, 2.5]];
   const RETULOS = [...document.querySelectorAll('.score-strip span')], TITULO = document.querySelector('.game-header h1');
   let mutaEn = 0;
   function mutaciones(now) {
@@ -542,11 +577,14 @@
     ETIQUETAS.forEach(([a, b, d, h], i) => {
       const el = RETULOS[i]; if (!el) return;
       const t = lento(d, h), susurro = vivo && t > 0 && t < 1 && Math.random() < .015 * t;
-      const txt = susurro ? b : transmuta(a, b, t, 40 + i, vivo && t < 1);
+      let txt = susurro ? b : transmuta(a, b, t, 40 + i, vivo && t < 1);
+      if (cielo > 0) { const [c, dc, hc] = ETIQUETAS_CIELO[i], tc = suave(dc, hc); txt = transmuta(txt, c, tc, 60 + i, vivo && tc > 0 && tc < 1); }
       if (el.textContent !== txt) el.textContent = txt;
       el.classList.toggle('susurro', susurro);
     });
-    const t = lento(2.6, 4.8), nombre = transmuta('BBTAN', 'SATAN', t, 77, vivo && t > 0 && t < 1);
+    const t = lento(2.6, 4.8), tc = suave(1.4, 2.4);
+    let nombre = transmuta('BBTAN', 'SATAN', t, 77, vivo && t > 0 && t < 1);
+    if (cielo > 0) nombre = transmuta(nombre, 'BBTAN :)', tc, 78, vivo && tc > 0 && tc < 1);
     if (TITULO && TITULO.firstChild && TITULO.firstChild.nodeValue !== nombre) { TITULO.firstChild.nodeValue = nombre; document.title = nombre; }
   }
   /* La partida guardada: se escribe al empezar cada ronda (desde la 2) en el
@@ -584,6 +622,7 @@
     balls = []; particles = []; rings = []; floaters = [];
     characterX = sombraX = launchX; hintSeen = true; $('overlay').hidden = true; $('pause').disabled = false;
     paleta(); aimDirty = true; uiDirty = true; updateUI(); toast(`Partida recuperada · ronda ${round}`);
+    const prox = Math.ceil((round + 1) / 50) * 50; if (prox - round <= 5) BBTANAudio.prepara(prox);
   }
   function cargaPartida() {
     let local = null;
@@ -637,6 +676,158 @@
       ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.drawImage(canvas,0,sy,canvas.width,sh,dx,sy,canvas.width,sh);ctx.restore();
     }
     if(Math.random()<.003*w5){ctx.save();ctx.globalCompositeOperation='difference';ctx.globalAlpha=.35;ctx.fillStyle='#ffffff';ctx.fillRect(0,0,W,H);ctx.restore();}
+  }
+  /* El mundo perfecto (desde la 350). Es el descenso al revés: cada cosa
+     entra en su propio tramo de perfección (`suave`) y nada se anuncia. Primero
+     es bonito —cielo celeste, un sol, nubes, bloques con carita, bolas de
+     colores y confeti—; después es radiante —un arcoíris, las nubes sonríen,
+     los bloques abren los ojos y todo salta al mismo compás—; y al final es
+     perfecto, que es lo incómodo: el sol crece, todas las caras dejan de mirar
+     la bola y te miran a ti, las sonrisas no caben en la cara, y muy de vez en
+     cuando, un instante, se ve lo que hay debajo. */
+  const INK = '#5a1a40';
+  const NUBES = [[40, 34, 1], [210, 88, .8], [330, 26, 1.1], [120, 150, .7]];
+  const FELICES = ['TODO ESTÁ BIEN', 'SONRÍE', 'PERFECTO', 'QUÉDATE', 'NO MIRES DEBAJO'];
+  let debajo = -1e9;
+  function drawCielo(now, mov) {
+    const w1 = suave(0, 1), w2 = suave(1, 2), w3 = suave(2, 3), o = objetivo();
+    const g = ctx.createLinearGradient(0, 0, 0, FLOOR);
+    g.addColorStop(0, '#bfe6ff'); g.addColorStop(.6, pal.bg);
+    ctx.globalAlpha = .85 * w1; ctx.fillStyle = g; ctx.fillRect(0, 0, W, FLOOR + 40); ctx.globalAlpha = 1;
+    // Destellos en la cuadrícula: los mismos puntos, que ahora titilan.
+    if (w1 > 0) {
+      ctx.fillStyle = '#ffffff';
+      for (let i = 0; i < 26; i++) {
+        const x = 15 + 19 * Math.floor(hsh(i * 3) * 22), y = 14 + 19 * Math.floor(hsh(i * 3 + 1) * 28);
+        const f = mov ? Math.sin(now / 400 + i * 1.7) : .5; if (f < .2) continue;
+        ctx.globalAlpha = w1 * f * .9; ctx.fillRect(x - 1, y, 3, 1); ctx.fillRect(x, y - 1, 1, 3);
+      }
+      ctx.globalAlpha = 1;
+    }
+    if (w2 > 0) {
+      ctx.lineWidth = 6;
+      ['#ff8fb8', '#ffc36b', '#fff07a', '#8ff0a8', '#8fd3ff', '#c9a0ff'].forEach((c, i) => {
+        ctx.strokeStyle = c; ctx.globalAlpha = .3 * w2; ctx.beginPath(); ctx.arc(W / 2, FLOOR + 40, 290 - i * 6, Math.PI, 2 * Math.PI); ctx.stroke();
+      });
+      ctx.globalAlpha = 1;
+    }
+    // Las nubes derivan; al final se quedan quietas, mirándote.
+    NUBES.forEach(([x0, y, e], i) => {
+      const x = ((x0 + (mov ? now / 90 * (.25 + i * .07) * (1 - w3) : 0)) % (W + 90)) - 45;
+      nube(x, y, e, w1, w2, w3, now, mov, i);
+    });
+    sol(W - 58, 42, 17 + 9 * w3, w1, w2, w3, now, mov, o);
+    if (w2 > 0 && mov) { // corazones que suben
+      for (let i = 0; i < 6; i++) {
+        const f = (now / 5200 + hsh(i + 70)) % 1, x = 20 + hsh(i + 80) * (W - 40) + Math.sin(now / 600 + i) * 8, y = FLOOR - f * (FLOOR - 40);
+        ctx.globalAlpha = w2 * .35 * Math.sin(f * Math.PI); corazon(x, y, CONFETI[i % 5], 1); ctx.globalAlpha = 1;
+      }
+    }
+    if (w3 > 0) { // las palabras felices del fondo, como las otras
+      ctx.fillStyle = '#ff5fa8'; ctx.font = `16px ${PIXEL}`; ctx.textAlign = 'center';
+      for (let i = 0; i < 3; i++) { const x = 60 + ((i * 197 + round * 53) % (W - 120)), y = 120 + ((i * 151 + round * 37) % (FLOOR - 220)); ctx.globalAlpha = .07 * w3; ctx.fillText(FELICES[(round + i) % FELICES.length], x, y); }
+      ctx.globalAlpha = 1;
+    }
+    if (w1 > 0) { // flores en el suelo
+      ctx.globalAlpha = w1;
+      for (let x = 12; x < W; x += 26) {
+        const c = CONFETI[(x / 26 | 0) % 5], b = mov && cielo > 1 ? Math.round(Math.sin(now / 260) * suave(1, 2)) : 0;
+        ctx.fillStyle = '#7fd88f'; ctx.fillRect(x, FLOOR + 24, 1, 9); ctx.fillRect(x + 1, FLOOR + 29, 2, 1);
+        ctx.fillStyle = c; ctx.fillRect(x - 2, FLOOR + 21 + b, 5, 3); ctx.fillRect(x - 1, FLOOR + 20 + b, 3, 5);
+        ctx.fillStyle = '#fff07a'; ctx.fillRect(x, FLOOR + 22 + b, 1, 1);
+      }
+      ctx.globalAlpha = 1;
+    }
+    // Lo de debajo: al final, rarísima vez y por un instante, asoma la cara.
+    if (mov && w3 > .6 && Math.random() < .0008 * w3) debajo = now;
+    if (now - debajo < 90) {
+      ctx.fillStyle = '#ff1a2e'; ctx.globalAlpha = .08; ctx.fillRect(0, 0, W, H);
+      for (const [x, y, m] of CARA) { ctx.globalAlpha = .55 * m; ctx.fillRect(x - 1, y - 1, 3, 3); }
+      ctx.globalAlpha = 1;
+    }
+  }
+  function nube(x, y, e, w1, w2, w3, now, mov, i) {
+    x = Math.round(x); y = Math.round(y);
+    ctx.globalAlpha = .9 * w1; ctx.fillStyle = '#ffffff';
+    const R = (a, b, c, d) => ctx.fillRect(x + Math.round(a * e), y + Math.round(b * e), Math.round(c * e), Math.round(d * e));
+    R(0, 8, 56, 14); R(8, 2, 20, 8); R(24, -4, 22, 12); R(44, 4, 10, 6);
+    ctx.globalAlpha = 1;
+    if (w2 > .3) { // una carita, primero con ojos felices y al final abiertos
+      const cx = x + Math.round(28 * e), cy = y + Math.round(12 * e);
+      ctx.globalAlpha = Math.min(1, (w2 - .3) * 2); ctx.fillStyle = INK;
+      if (w3 > .5) { const d = mov ? Math.round(clamp((characterX - cx) / 120, -1, 1)) : 0; ctx.fillRect(cx - 7 + d, cy - 2, 2, 3); ctx.fillRect(cx + 5 + d, cy - 2, 2, 3); }
+      else { ctx.fillRect(cx - 8, cy - 1, 2, 1); ctx.fillRect(cx - 6, cy - 2, 2, 1); ctx.fillRect(cx + 4, cy - 2, 2, 1); ctx.fillRect(cx + 6, cy - 1, 2, 1); }
+      const a = 4 + Math.round(6 * w3); ctx.fillRect(cx - a, cy + 3, a * 2, 1); ctx.fillRect(cx - a - 1, cy + 2, 1, 1); ctx.fillRect(cx + a, cy + 2, 1, 1);
+      ctx.fillStyle = '#ff8fb8'; ctx.globalAlpha *= .6; ctx.fillRect(cx - 13, cy + 1, 4, 2); ctx.fillRect(cx + 9, cy + 1, 4, 2);
+      ctx.globalAlpha = 1;
+    }
+  }
+  function sol(x, y, r, w1, w2, w3, now, mov, o) {
+    const giro = mov ? now / 3000 : 0;
+    ctx.globalAlpha = w1; ctx.strokeStyle = '#ffd23f'; ctx.lineWidth = 3; ctx.beginPath();
+    for (let i = 0; i < 10; i++) { const a = giro + i * Math.PI / 5, l = r + 6 + (i % 2) * 5; ctx.moveTo(x + Math.cos(a) * (r + 3), y + Math.sin(a) * (r + 3)); ctx.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); }
+    ctx.stroke();
+    ctx.fillStyle = '#ffe066'; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#fff3a8'; ctx.beginPath(); ctx.arc(x - r * .3, y - r * .3, r * .35, 0, Math.PI * 2); ctx.fill();
+    // La cara: al principio ojos felices; al final te sigue con la mirada.
+    ctx.fillStyle = INK;
+    if (w2 > .5) {
+      const a = Math.atan2(o.y - y, o.x - x), d = 2 * w2;
+      for (const s of [-1, 1]) { ctx.fillStyle = '#ffffff'; ctx.fillRect(Math.round(x + s * r * .35) - 3, Math.round(y - r * .2) - 3, 6, 6); ctx.fillStyle = INK; ctx.fillRect(Math.round(x + s * r * .35 + Math.cos(a) * d) - 1, Math.round(y - r * .2 + Math.sin(a) * d) - 1, 2 + (w3 > .5 ? 0 : 1), 2 + (w3 > .5 ? 0 : 1)); }
+    } else for (const s of [-1, 1]) { const ex = Math.round(x + s * r * .35), ey = Math.round(y - r * .2); ctx.fillRect(ex - 3, ey, 2, 1); ctx.fillRect(ex - 1, ey - 1, 2, 1); ctx.fillRect(ex + 1, ey, 2, 1); }
+    const ancho = r * (.45 + .45 * w3);
+    ctx.lineWidth = 2; ctx.strokeStyle = INK; ctx.beginPath(); ctx.arc(x, y + r * .05, ancho, .15 * Math.PI, .85 * Math.PI); ctx.stroke();
+    if (w3 > .6) { ctx.fillStyle = '#ffffff'; for (let i = -3; i <= 3; i++) ctx.fillRect(Math.round(x + i * ancho * .22) - 1, Math.round(y + r * .05 + ancho * .85) - 2, 2, 2); }
+    ctx.fillStyle = '#ff8fb8'; ctx.globalAlpha = .5 * w1; ctx.fillRect(Math.round(x - r * .75), Math.round(y + r * .15), 5, 3); ctx.fillRect(Math.round(x + r * .75) - 5, Math.round(y + r * .15), 5, 3);
+    ctx.globalAlpha = 1;
+  }
+  // Una carita en el bloque. Cuando lo golpean, cierra los ojos de gusto.
+  function carita(b, now, mov, mira) {
+    const x = Math.round(b.x), y = Math.round(b.y), w2 = suave(1.6, 2.4), w3 = suave(2.4, 3);
+    ctx.fillStyle = INK;
+    if (w2 < .5 || b.flash > 0) {
+      for (const ex of [x + 16, x + 38]) { ctx.fillRect(ex, y + 16, 2, 2); ctx.fillRect(ex + 2, y + 14, 2, 2); ctx.fillRect(ex + 4, y + 16, 2, 2); }
+    } else {
+      // Abiertos: miran la bola; al final, todos a la vez, te miran a ti.
+      const o = w3 > .5 ? { x: characterX, y: FLOOR - 30 } : mira;
+      const dx = Math.round(clamp((o.x - (b.x + 30)) / 60, -1, 1) * 2), dy = Math.round(clamp((o.y - (b.y + 30)) / 60, -1, 1) * 2);
+      const p = w3 > .5 ? 2 : 3;
+      for (const ex of [x + 15, x + 37]) { ctx.fillStyle = '#ffffff'; ctx.fillRect(ex, y + 11, 9, 9); ctx.fillStyle = INK; ctx.fillRect(ex + 4 - (p >> 1) + dx, y + 15 - (p >> 1) + dy, p, p); }
+    }
+    ctx.globalAlpha = .6; ctx.fillStyle = '#ff8fb8'; ctx.fillRect(x + 8, y + 22, 6, 3); ctx.fillRect(x + 46, y + 22, 6, 3); ctx.globalAlpha = 1;
+    // La sonrisa crece con la perfección hasta no caber en la cara.
+    const ancho = Math.round(10 + 34 * suave(1, 3)), mx = x + 30 - (ancho >> 1), my = y + 41;
+    ctx.fillStyle = INK; ctx.fillRect(mx, my, ancho, 2); ctx.fillRect(mx - 2, my - 2, 2, 2); ctx.fillRect(mx + ancho, my - 2, 2, 2);
+    if (w2 > 0) {
+      const alto = 1 + Math.round(4 * w2);
+      ctx.fillRect(mx + 1, my + 2, ancho - 2, alto);
+      ctx.fillStyle = '#ffffff'; for (let i = 2; i < ancho - 3; i += 4) ctx.fillRect(mx + i, my + 2, 3, Math.min(2, alto));
+    }
+  }
+  // Un corazón de píxeles de 13×11, centrado en (x, y).
+  const CORAZON_PX = ['..XXX...XXX..', '.XXXXX.XXXXX.', 'XXXXXXXXXXXXX', 'XXXXXXXXXXXXX', 'XXXXXXXXXXXXX', '.XXXXXXXXXXX.', '..XXXXXXXXX..', '...XXXXXXX...', '....XXXXX....', '.....XXX.....', '......X......'];
+  function corazon(x, y, color, e = 1) {
+    x = Math.round(x - 6.5 * e); y = Math.round(y - 5.5 * e); ctx.fillStyle = color;
+    CORAZON_PX.forEach((fila, j) => { const a = fila.indexOf('X'), b = fila.lastIndexOf('X'); ctx.fillRect(x + Math.round(a * e), y + Math.round(j * e), Math.round((b - a + 1) * e), Math.max(1, Math.round(e))); });
+  }
+  // La bola de arriba: de todos los colores, luego un corazón, luego con cara.
+  function drawBolaCielo(x, y, now, mov, sem) {
+    const r = bounds.radius, h = ((mov ? now / 5 : 0) + sem * 47) % 360, color = `hsl(${h} 95% 64%)`;
+    ctx.globalAlpha = .25 + .15 * suave(1, 2); ctx.fillStyle = color; pixelBall(x, y, r + 2 + (mov && cielo > 1 ? Math.round(Math.sin(now / 150 + sem) + 1) : 0)); ctx.globalAlpha = 1;
+    if (suave(1.1, 1.9) > .5) corazon(x, y + 1, color, 1); else { ctx.fillStyle = color; pixelBall(x, y, r); }
+    x = Math.round(x); y = Math.round(y);
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(x - 3, y - 3, 2, 2);
+    if (suave(2.2, 2.8) > .5) { ctx.fillStyle = INK; ctx.fillRect(x - 2, y - 1, 1, 2); ctx.fillRect(x + 1, y - 1, 1, 2); ctx.fillRect(x - 2, y + 2, 4, 1); }
+  }
+  function drawEstelaCielo(b, now, i) {
+    const n = b.trail.length;
+    b.trail.forEach((p, j) => {
+      const f = j / n, h = (now / 5 + i * 47 + j * 24) % 360;
+      ctx.globalAlpha = (1 - f) * .45; ctx.fillStyle = `hsl(${h} 95% 70%)`;
+      if (j % 3 === 2) { ctx.fillRect(Math.round(p.x) - 2, Math.round(p.y), 5, 1); ctx.fillRect(Math.round(p.x), Math.round(p.y) - 2, 1, 5); }
+      else pixelBall(p.x, p.y, Math.max(2, Math.round(bounds.radius - 1 - j * 5 / n)));
+    });
+    ctx.globalAlpha = 1;
   }
   function drawClear() {
     const age = 2.3 - clearTime;

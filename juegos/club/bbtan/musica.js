@@ -38,6 +38,16 @@
    El tempo baja con cada piso. Ningún piso se anuncia: no hay golpe ni
    caída al entrar, la música simplemente se va pudriendo.
 
+   Y pasada la 350 el descenso se deshace y suena el cielo (C, la perfección
+   de descenso.js, de 0 a 3): do mayor, la progresión más feliz y más gastada
+   que hay (I–V–vi–IV), bajo que salta de octava, bombo en negras, palmas,
+   pandereta y un glockenspiel que dobla la melodía. Entra igual que el
+   abismo, frase a frase con una moneda cargada. Lo incómodo es que no
+   escucha: arriba del todo (C>2) el peligro ya no la pone tensa sino más
+   contenta —más rápida, más campanitas— justo cuando la partida se acaba,
+   cada vuelta de ocho compases sube un semitono y no deja de subir, y una
+   caja de música repite la melodía un paso tarde, como un eco que no toca.
+
    La mitad pura (`intensidad`, `siguienteArmonia`, `eventos`) no toca audio y
    se prueba en Node; `Motor` es sólo el agendador, a lo Chip.Reproductor. */
 (function (root) {
@@ -111,6 +121,18 @@
     'E4 . . . . . . . C#4 . . . . . . .'
   ]);
   const PENTA = [74, 77, 79, 81, 84];
+  const PROG_CIELO = { acordes: [[60, 64, 67], [59, 62, 67], [57, 60, 64], [57, 60, 65]], raices: [36, 31, 33, 29] };
+  const MEL_CIELO = melodia([
+    'E5 . G5 . C6 . G5 . A5 . G5 . E5 . C5 .',
+    'D5 . G5 . B5 . . . A5 . G5 . D5 . . .',
+    'C5 . E5 . A5 . . . G5 . E5 . C5 . E5 .',
+    'F5 . A5 . C6 . A5 . G5 . . . . . . .',
+    'E5 . G5 . C6 . D6 . E6 . D6 . C6 . G5 .',
+    'D5 . G5 . B5 . D6 . C6 . B5 . A5 . G5 .',
+    'A5 . C6 . E6 . C6 . A5 . G5 . E5 . C5 .',
+    'F5 . A5 . G5 . F5 . E5 . D5 . C5 . . .'
+  ]);
+  const PENTA_MAYOR = [84, 86, 88, 91, 93, 96];
   const OSTINATO = [2, 0, 1, 2, 0, 1, 2, 1];
   const ACENTOS = new Set([0, 3, 6, 8, 11, 14]);
 
@@ -125,6 +147,40 @@
   const corrDe = e => Number.isFinite(e.D) ? Math.max(0, Math.min(5, e.D)) : (e.abismo ? 1 : 0);
   /** Peso del piso j (2..5) para una corrupción D. */
   const pesoPiso = (D, j) => clamp(D - (j - 1));
+  /** La perfección pedida (0..3). */
+  const cieloDe = e => Number.isFinite(e.C) ? Math.max(0, Math.min(3, e.C)) : 0;
+
+  /** El cielo: lo que suena en el paso k cuando todo es perfecto. */
+  function cielo(e, k) {
+    const C = cieloDe(e), I = clamp(e.I), v = e.vuelta || 0;
+    const b = Math.floor(k / 16), s = k % 16, bb = b % 4;
+    const w2 = clamp(C - 1), w3 = clamp(C - 2);
+    // Arriba del todo, cada vuelta sube un semitono.
+    const tr = C >= 2 ? v % 12 : 0;
+    const ac = PROG_CIELO.acordes[bb].map(n => n + tr), raiz = PROG_CIELO.raices[bb] + tr, out = [];
+    const bat = (d, vol) => out.push({ c: 'bat', d, vol: .34 * vol });
+    if (s === 0) for (const n of ac) out.push({ c: 'pad', n, pasos: 16, vol: .026 });
+    if (s % 2 === 0) out.push({ c: 'bajo', n: raiz + (s % 4 === 2 ? 12 : 0), pasos: 1.6, vol: .15, onda: 'tri' });
+    const m = MEL_CIELO[b][s];
+    if (m) {
+      out.push({ c: 'lead', n: m.n + tr, pasos: m.pasos * .85, vol: .1, onda: 'p25' });
+      if (w2 > 0) out.push({ c: 'brillo', n: m.n + tr + 12, pasos: 2, vol: .04 * w2, sube: 1 });
+    }
+    // La caja de música: la misma melodía, un paso tarde.
+    const eco = s > 0 && MEL_CIELO[b][s - 1];
+    if (w3 > .3 && eco) out.push({ c: 'brillo', n: eco.n + tr + 24, pasos: 3, vol: .026 * w3, sube: 1 });
+    if (w2 > 0) out.push({ c: 'arp', n: ac[s % 3] + 24, pasos: .7, vol: .03 * w2, onda: 'p12' });
+    // Con peligro: abajo del cielo se tensa un poco; arriba, se pone más contento.
+    const chispas = C >= 2 ? .12 + .5 * I : .12 * (1 - I);
+    if (s % 2 === 1 && azar(k, v, 32) < chispas) out.push({ c: 'brillo', n: PENTA_MAYOR[Math.floor(azar(k, v, 33) * PENTA_MAYOR.length)] + tr, pasos: 2, vol: .045, sube: 1.5 });
+    if (s % 4 === 0) bat('k', s === 0 ? 1 : .85);
+    if (s === 4 || s === 12) { bat('c', .75); bat('s', .35); }
+    if (s % 4 === 2) bat('o', .5);
+    if (w2 > .5 || s % 2 === 0) bat('h', s % 2 ? .35 : .6);
+    if (C < 2 && I > .6 && bb === 3 && s >= 12) bat('c', .5);
+    if (k === 0) bat('x', .8);
+    return out;
+  }
 
   /**
    * Lo que suena en el paso k (0‥127: ocho compases de semicorcheas).
@@ -136,6 +192,9 @@
     const D = corrDe(e), v = e.vuelta || 0;
     k = ((k % 128) + 128) % 128;
     const b = Math.floor(k / 16), s = k % 16;
+    // El cielo entra frase a frase, como el abismo.
+    const C = cieloDe(e);
+    if (C > 0 && (C >= 1 || azar(Math.floor(b / 4), v, 31) < C)) return cielo(e, k);
     // Luz o abismo: por frase, con la parte de D que ya entró.
     const ab = D >= 1 || (D > 0 && azar(Math.floor(b / 4), v, 9) < D);
     const w2 = pesoPiso(D, 2), w3 = pesoPiso(D, 3), w4 = pesoPiso(D, 4), w5 = pesoPiso(D, 5);
@@ -286,7 +345,7 @@
       this.ctx = ctx; this.voces = new Set();
       this.k = 0; this.vuelta = 0; this.sig = ctx.currentTime + .05;
       this.I = 0; this.meta = 0; this.filo = false; this.abismo = false;
-      this.D = 0; this.metaD = 0; this.piso = 0;
+      this.D = 0; this.metaD = 0; this.piso = 0; this.C = 0; this.metaC = 0;
       this.visto = ctx.currentTime;
       this.salida = ctx.createGain(); this.salida.connect(dest);
       // Lo que respira con el 808 pasa por `bomba`; el bajo y la batería no.
@@ -322,12 +381,17 @@
       this.meta = intensidad(o);
       const DS = root.BBTANDescenso || Descenso;
       this.metaD = Number.isFinite(o.descenso) ? Math.max(0, Math.min(5, o.descenso))
-        : DS ? DS.corrupcion(o.ronda || 0) : ((o.ronda || 0) >= 50 ? 1 : 0);
+        : DS ? (DS.corrupcionVista || DS.corrupcion)(o.ronda || 0) : ((o.ronda || 0) >= 50 ? 1 : 0);
+      this.metaC = Number.isFinite(o.cielo) ? Math.max(0, Math.min(3, o.cielo))
+        : DS && DS.perfeccion ? DS.perfeccion(o.ronda || 0) : 0;
     }
     bpm() {
       const D = this.D, a = Math.min(1, D), luz = 98 + 34 * this.I, abi = 84 + 26 * this.I;
       const tambalea = 1 + .04 * pesoPiso(D, 5) * Math.sin(this.k / 128 * Math.PI * 2 * 3);
-      return (luz + (abi - luz) * a) * (1 - .06 * Math.max(0, D - 1)) * tambalea;
+      const abajo = (luz + (abi - luz) * a) * (1 - .06 * Math.max(0, D - 1)) * tambalea, C = this.C;
+      if (!(C > 0)) return abajo;
+      const arriba = 126 + 6 * Math.max(0, C - 1) + (C >= 2 ? 12 : 4) * this.I;
+      return abajo + (arriba - abajo) * Math.min(1, C);
     }
     paso() { return 60 / this.bpm() / 4; }
     tick(margen) {
@@ -335,6 +399,7 @@
       const dt = Math.max(0, Math.min(1, ahora - this.visto)); this.visto = ahora;
       this.I += (this.meta - this.I) * (1 - Math.exp(-dt / 1.6));
       this.D += (this.metaD - this.D) * (1 - Math.exp(-dt / 4));
+      this.C += (this.metaC - this.C) * (1 - Math.exp(-dt / 4));
       if (this.sig < ahora - .25) this.sig = ahora + .03;
       for (const v of this.voces) if (v.fin < ahora - .5) this.voces.delete(v);
       let n = 0;
@@ -354,16 +419,18 @@
         this.piso = Math.ceil(this.metaD - 1e-6);
       }
       if (s % 4 === 0) this.colorea(t, d);
-      const e = { I: this.I, D: this.D, filo: this.filo, vuelta: this.vuelta };
+      const e = { I: this.I, D: this.D, C: this.C, filo: this.filo, vuelta: this.vuelta };
       for (const ev of eventos(e, this.k)) this.suena(ev, t, d);
     }
     /** Filtros y eco siguen a I cada tiempo. */
     colorea(t, d) {
       const I = this.I, D = this.D, a = Math.min(1, D), pon = (p, v) => { try { p.setTargetAtTime(v, t, .25); } catch (e) {} };
       const mix = (x, y) => x + (y - x) * a, oscuro = 1 - .13 * Math.max(0, D - 1);
-      if (this.fPad) { pon(this.fPad.frequency, mix(650 + 2800 * I, 260 + 1100 * I) * oscuro); pon(this.fPad.Q, mix(1 + 2 * I, 3 + 4 * I) + 1.5 * Math.max(0, D - 1)); }
+      // Arriba se abre todo: brillante y sin resonancias.
+      const c = Math.min(1, this.C), sol = (x, y) => x + (y - x) * c;
+      if (this.fPad) { pon(this.fPad.frequency, sol(mix(650 + 2800 * I, 260 + 1100 * I) * oscuro, 3200)); pon(this.fPad.Q, sol(mix(1 + 2 * I, 3 + 4 * I) + 1.5 * Math.max(0, D - 1), .8)); }
       if (this.fGrave) pon(this.fGrave.frequency, (160 + 1000 * I) * oscuro);
-      if (this.fArp) pon(this.fArp.frequency, mix(2200 + 3000 * I, 900 + 1800 * I) * oscuro);
+      if (this.fArp) pon(this.fArp.frequency, sol(mix(2200 + 3000 * I, 900 + 1800 * I) * oscuro, 6500));
       pon(this.mezTriza.gain, this.triza ? .6 * pesoPiso(D, 2) : 0);
       if (this.eco) pon(this.eco.delayTime, Math.min(.9, d * 3));
     }
@@ -440,7 +507,7 @@
     reinicia() {
       this.detener();
       this.k = 0; this.vuelta = 0; this.I = this.meta; this.filo = false;
-      this.D = this.metaD; this.piso = Math.ceil(this.metaD - 1e-6); this.abismo = this.D >= .5;
+      this.D = this.metaD; this.piso = Math.ceil(this.metaD - 1e-6); this.abismo = this.D >= .5; this.C = this.metaC;
       this.visto = this.ctx.currentTime;
     }
     destruir() {
@@ -449,7 +516,7 @@
     }
   }
 
-  const API = { intensidad, siguienteArmonia, eventos, pesoPiso, Motor, PELIGRO, PROG, MEL_LUZ, MEL_ABISMO };
+  const API = { intensidad, siguienteArmonia, eventos, pesoPiso, Motor, PELIGRO, PROG, MEL_LUZ, MEL_ABISMO, PROG_CIELO, MEL_CIELO };
   if (typeof module === 'object' && module.exports) module.exports = API;
   else root.BBTANMusica = API;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

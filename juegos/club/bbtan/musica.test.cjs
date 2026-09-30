@@ -148,12 +148,61 @@ test('bbtan: el motor baja piso a piso y cada vez más lento', () => {
   const avanza = (n, dt = .05) => { for (let i = 0; i < n; i++) { ctx.currentTime += dt; m.tick(.2); } };
   avanza(100);
   const bpms = [m.bpm()];
-  for (const ronda of [110, 250, 550]) { m.animo({ filas: 7, bloques: 3, ronda }); avanza(600); bpms.push(m.bpm()); }
+  for (const ronda of [110, 250, 349]) { m.animo({ filas: 7, bloques: 3, ronda }); avanza(600); bpms.push(m.bpm()); }
   assert.ok(Math.abs(m.D - 5) < .1, 'llega al vacío');
   assert.equal(m.piso, 5);
   for (let i = 1; i < bpms.length; i++) assert.ok(bpms[i] < bpms[i - 1] + 3, `más lento: ${bpms}`);
   assert.ok(bpms[3] < bpms[0] - 10, `el vacío es mucho más lento: ${bpms}`);
-  m.animo({ filas: 7, bloques: 3, ronda: 520 }); m.reinicia();
+  m.animo({ filas: 7, bloques: 3, ronda: 349 }); m.reinicia();
   assert.equal(m.D, 5, 'reiniciar no rehace la caída');
+  assert.ok(starts.every(Number.isFinite));
+});
+
+test('bbtan: pasada la 350 el descenso se deshace y entra el cielo', () => {
+  assert.equal(DSC.perfeccion(349), 0);
+  assert.equal(DSC.corrupcionVista(349), 5);
+  assert.ok(DSC.corrupcionVista(357) < 5 && DSC.corrupcionVista(357) > 0, 'se deshace de a poco');
+  assert.equal(DSC.corrupcionVista(364), 0);
+  assert.equal(DSC.perfeccion(369), 1);
+  assert.equal(DSC.perfeccion(449), 2);
+  assert.equal(DSC.perfeccion(499), 3);
+  assert.equal(DSC.perfeccion(9999), 3);
+  for (let r = 1, a = 0; r < 700; r++) { const p = DSC.perfeccion(r); assert.ok(p >= a); a = p; }
+  for (const r of [300, 352, 360, 380, 420, 470, 520]) {
+    const pal = DSC.mezclaCielo(DSC.mezcla(DSC.corrupcionVista(r)), DSC.perfeccion(r));
+    for (const k of ['lime', 'purple', 'orange', 'cyan', 'bg', 'bola']) assert.match(pal[k], /^#[0-9a-f]{6}([0-9a-f]{2})?$/, `${r} ${k}`);
+    for (const k in pal.css) assert.match(pal.css[k], /^#[0-9a-f]{6}([0-9a-f]{2})?$/, `${r} css ${k}`);
+    assert.equal(new Set([pal.lime, pal.purple, pal.orange, pal.cyan]).size, 4, 'los bloques se siguen distinguiendo');
+  }
+  assert.deepEqual([0, .4, .6, 1.4, 2.6, 3].map(DSC.etapaCielo), [0, 0, 1, 1, 3, 3]);
+  for (const k of ['animo', 'combo', 'recall', 'fin', 'pausa']) assert.equal(DSC.TEXTOS_CIELO[k].length, 4, k);
+  for (const k in DSC.TEXTOS.estado) assert.equal(DSC.TEXTOS_CIELO.estado[k].length, 4, k);
+});
+
+test('bbtan: el cielo suena en mayor, no se tensa y sube sin parar', () => {
+  const cielo = compas({ I: .2, D: 0, C: 3 });
+  assert.ok(cielo.some(e => e.c === 'lead') && cielo.some(e => e.c === 'brillo'), 'melodía y campanitas');
+  assert.equal(cielo.filter(e => e.c === 'bat' && e.d === 'k').length, 32, 'bombo en negras, ocho compases');
+  assert.ok(!cielo.some(e => e.c === 'sub' || e.c === 'grave' || e.cae), 'nada del abismo');
+  const campanas = I => compas({ I, D: 0, C: 3 }).filter(e => e.c === 'brillo').length;
+  assert.ok(campanas(1) > campanas(0) + 10, 'con peligro, más contenta');
+  const alto = v => Math.min(...M.eventos({ I: .2, D: 0, C: 3, vuelta: v }, 0).filter(e => e.c === 'bajo').map(e => e.n));
+  assert.equal(alto(1), alto(0) + 1, 'cada vuelta sube un semitono');
+  const antes = M.eventos({ I: .2, D: 0, C: 1, vuelta: 1 }, 0).filter(e => e.c === 'bajo').map(e => e.n);
+  assert.deepEqual(antes, M.eventos({ I: .2, D: 0, C: 1, vuelta: 0 }, 0).filter(e => e.c === 'bajo').map(e => e.n), 'antes de la 450 no sube');
+  for (const e of cielo) assert.ok(Number.isFinite(e.vol) && e.vol > 0 && (e.c === 'bat' || Number.isFinite(e.n)));
+});
+
+test('bbtan: el motor sube al cielo y se acelera', () => {
+  const { ctx, starts } = contexto();
+  const m = new M.Motor(ctx, ctx.createGain());
+  m.animo({ filas: 7, bloques: 3, ronda: 349 }); m.reinicia();
+  const avanza = (n, dt = .05) => { for (let i = 0; i < n; i++) { ctx.currentTime += dt; m.tick(.2); } };
+  avanza(100); const abajo = m.bpm();
+  m.animo({ filas: 7, bloques: 3, ronda: 500 }); avanza(800);
+  assert.ok(Math.abs(m.C - 3) < .1 && m.D < .1, 'arriba del todo');
+  assert.ok(m.bpm() > abajo + 30, `mucho más rápido: ${abajo} → ${m.bpm()}`);
+  m.animo({ filas: 1, bloques: 20, ronda: 500 }); avanza(400);
+  assert.ok(m.bpm() > 140, 'con peligro, aún más rápido');
   assert.ok(starts.every(Number.isFinite));
 });
