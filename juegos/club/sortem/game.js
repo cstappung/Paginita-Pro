@@ -76,6 +76,8 @@ const config = {
   width: 800,
   height: 600,
   backgroundColor: '#1a0a2e',
+  // FIT escala el lienzo a su caja y corrige el puntero; la caja la decide el CSS.
+  scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
   scene: {
     create: create,
     update: update
