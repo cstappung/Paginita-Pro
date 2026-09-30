@@ -97,9 +97,15 @@ const yo = {
   zoom: 0, apuntando: false, escudo: 0, muerteT: 0, asesino: '',
   disparo: 0, finales: null, retroceso: 0, bob: 0,
   granadas: GRANADA.porVida, cdGranada: 0, lanzo: null, revento: null,
+  cargaAuto: -1,    // < 0: no se está cargando la autodestrucción
 };
-// Para el feed y los avisos: las tres armas y la granada, en el orden del `a`.
-const NOMBRE_ARMA = [...ARMAS.map(a => a.nombre), GRANADA.nombre];
+// La autodestrucción: se mantiene X un momento (soltarla antes la cancela,
+// así no se dispara sin querer), el huevo pita y brilla —también en la
+// pantalla de los demás, que alcanzan a arrancar— y revienta llevándose a
+// los rivales que tenga cerca. Uno muere siempre; es la baja «a 4».
+const AUTO = { nombre: 'Autodestrucción', carga: 0.9, radio: 6.5, danio: 220 };
+// Para el feed y los avisos: las tres armas, la granada y la autodestrucción, en el orden del `a`.
+const NOMBRE_ARMA = [...ARMAS.map(a => a.nombre), GRANADA.nombre, AUTO.nombre];
 const otros = new Map();
 const teclas = new Set();
 let gatillo = false, yaDisparo = false;
@@ -186,6 +192,7 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyR') recargar();
   if (e.code === 'KeyV') red?.hablar(true);
   if (e.code === 'KeyG' || e.code === 'Digit4') lanzarGranada();
+  if (e.code === 'KeyX' && puedoJugar() && yo.vivo) yo.cargaAuto = 0;
   if (e.code === 'KeyF') pantallaCompleta();
   if (/^Digit[123]$/.test(e.code)) cambiarArma(+e.code.slice(5) - 1);
 });
@@ -193,9 +200,10 @@ addEventListener('keyup', e => {
   teclas.delete(e.code);
   if (e.code === 'Tab') $('tabla').hidden = true;
   if (e.code === 'KeyV') red?.hablar(false);
+  if (e.code === 'KeyX') yo.cargaAuto = -1;   // soltó antes de tiempo: no pasa nada
 });
 // Soltar la V cuando se pierde el foco: si no, el micrófono queda abierto.
-addEventListener('blur', () => red?.hablar(false));
+addEventListener('blur', () => { red?.hablar(false); yo.cargaAuto = -1; });
 addEventListener('mousemove', e => {
   if (!bloqueado() || !yo.vivo) return;
   const s = SENS * (1 - yo.zoom * 0.7);
@@ -334,6 +342,7 @@ function alBaja(victima) {
 function morir(g) {
   yo.hp = 0;
   yo.vivo = false;
+  yo.cargaAuto = -1;
   yo.muerteT = 3;
   yo.asesino = g.n;
   gatillo = false;
@@ -417,6 +426,9 @@ function alJugador(id, e) {
     }
     sonido.disparo(e.a | 0, boca.distanceTo(yo.pos));
   }
+  // Está cargando su autodestrucción: brilla y pita (lo pinta el bucle).
+  if (e.ad && !j.ad) sonido.pitido(0, j.mesh.position.distanceTo(yo.pos));
+  j.ad = !!e.ad && j.vivo;
   // Su granada: se ve volar y revienta donde su dueño dice.
   if (e.n && e.n.i !== j.nI && Array.isArray(e.n.o) && Array.isArray(e.n.v)) {
     j.nI = e.n.i;
@@ -453,6 +465,7 @@ function publicar() {
   };
   if (yo.disparo) e.s = { i: yo.disparo, e: yo.finales };
   if (yo.lanzo) e.n = yo.lanzo;
+  if (yo.cargaAuto >= 0) e.ad = 1;
   if (yo.revento) e.x2 = yo.revento;
   red.publicar(e);
 }
@@ -482,18 +495,8 @@ function reventar(p, dueno, id, propia) {
   explosion(p);
   if (!propia || !red) return;
   yo.revento = { i: id, p: [r2(p.x), r2(p.y), r2(p.z)] };
-  const alcance = (q) => {
-    const d = p.distanceTo(q);
-    if (d >= GRANADA.radio) return 0;
-    const dir = q.clone().sub(p).normalize();
-    if (rayoMundo(p.clone().addScaledVector(dir, 0.05), dir, d, colisores) < d - 0.3) return 0;   // tapado
-    return Math.round(GRANADA.danio * (1 - d / GRANADA.radio));
-  };
-  for (const [idJ, j] of otros) {
-    if (!j.vivo || aliado(idJ)) continue;
-    const dmg = alcance(j.mesh.position.clone().add(new THREE.Vector3(0, ALTO / 2, 0)));
-    if (dmg >= 5) { red.golpear(idJ, { dmg, cab: false, a: 3 }); marcaGolpe(false); }
-  }
+  const alcance = q => alcanceExplosion(p, q, GRANADA.radio, GRANADA.danio);
+  golpeaRivales(p, GRANADA.radio, GRANADA.danio, 3);
   if (yo.vivo && yo.escudo <= 0) {
     const dmg = Math.round(alcance(yo.pos.clone().add(new THREE.Vector3(0, ALTO / 2, 0))) / 2);
     if (dmg >= 5) {
@@ -505,8 +508,38 @@ function reventar(p, dueno, id, propia) {
   publicar();
 }
 
+// Daño de una explosión en `p` sobre el punto `q`: lineal hasta `radio` y
+// nada si hay una pared en medio. Lo usan la granada y la autodestrucción.
+function alcanceExplosion(p, q, radio, danioMax) {
+  const d = p.distanceTo(q);
+  if (d >= radio) return 0;
+  const dir = q.clone().sub(p).normalize();
+  if (rayoMundo(p.clone().addScaledVector(dir, 0.05), dir, d, colisores) < d - 0.3) return 0;   // tapado
+  return Math.round(danioMax * (1 - d / radio));
+}
+function golpeaRivales(p, radio, danioMax, arma) {
+  for (const [idJ, j] of otros) {
+    if (!j.vivo || aliado(idJ)) continue;
+    const dmg = alcanceExplosion(p, j.mesh.position.clone().add(new THREE.Vector3(0, ALTO / 2, 0)), radio, danioMax);
+    if (dmg >= 5) { red.golpear(idJ, { dmg, cab: false, a: arma }); marcaGolpe(false); }
+  }
+}
+
+// La autodestrucción: la explosión se publica como la de una granada (`x2`),
+// así los demás la ven donde fue, y uno se muere con `por` = uno mismo.
+function autodestruir() {
+  yo.cargaAuto = -1;
+  if (!puedoJugar() || !yo.vivo) return;
+  const p = yo.pos.clone().add(new THREE.Vector3(0, ALTO / 2, 0));
+  const id = Math.max((yo.revento?.i || 0) + 1, Date.now() % 1e9);
+  explosion(p, AUTO.radio);
+  golpeaRivales(p, AUTO.radio, AUTO.danio, 4);
+  yo.revento = { i: id, p: [r2(p.x), r2(p.y), r2(p.z)] };
+  morir({ de: red.yo, n: 'tu autodestrucción', dmg: 999, cab: false, a: 4 });
+}
+
 let temblor = 0;
-function explosion(p) {
+function explosion(p, radio = GRANADA.radio) {
   const d = p.distanceTo(yo.pos);
   sonido.explosion(d);
   temblor = Math.max(temblor, Math.max(0, 1 - d / 14));
@@ -514,7 +547,7 @@ function explosion(p) {
     new THREE.MeshBasicMaterial({ color: '#ffb347', transparent: true, opacity: 0.9 }));
   bola.position.copy(p);
   escena.add(bola);
-  efectos.push({ obj: bola, vida: 0.35, max: 0.35, crece: GRANADA.radio * 0.7 });
+  efectos.push({ obj: bola, vida: 0.35, max: 0.35, crece: radio * 0.7 });
   for (let i = 0; i < 16; i++) {
     const m = new THREE.Mesh(geoCascara, new THREE.MeshLambertMaterial({ color: i % 2 ? '#f3ead8' : '#ffb300', transparent: true }));
     m.position.copy(p);
@@ -576,16 +609,58 @@ function explotar(p, color) {
       giro: (Math.random() - 0.5) * 16,
     });
   }
-  const mancha = new THREE.Mesh(
-    new THREE.CircleGeometry(0.5 + Math.random() * 0.3, 18),
-    new THREE.MeshLambertMaterial({ color: '#ffc21a', transparent: true, polygonOffset: true, polygonOffsetFactor: -2 })
-  );
-  mancha.rotation.x = -Math.PI / 2;
-  mancha.position.set(p.x, p.y + 0.01, p.z);
-  escena.add(mancha);
-  manchas.push({ obj: mancha, t: 12 });
-  if (manchas.length > 30) quitar(manchas.shift().obj);
+  const frito = huevoFrito(p);
+  escena.add(frito);
+  manchas.push({ obj: frito, t: 14 });
+  if (manchas.length > 30) quitaFrito(manchas.shift().obj);
   sonido.crack(p.distanceTo(yo.pos));
+  sonido.fritura(p.distanceTo(yo.pos));
+}
+
+// Lo que queda en el piso: un huevo frito. La clara es una mancha blanca de
+// borde irregular con una orilla dorada y crujiente debajo, y la yema una
+// cúpula amarilla brillante, corrida del centro como en la sartén. Aparece
+// creciendo, como si recién cayera, y se desvanece a los catorce segundos.
+const matBorde = () => new THREE.MeshLambertMaterial({ color: '#e2b86b', transparent: true, polygonOffset: true, polygonOffsetFactor: -2 });
+const matClara = () => new THREE.MeshLambertMaterial({ color: '#fbf8ef', transparent: true, polygonOffset: true, polygonOffsetFactor: -3 });
+const matYemaFrita = () => new THREE.MeshPhongMaterial({ color: '#ffb000', emissive: '#6b3a00', specular: '#ffffff', shininess: 90, transparent: true });
+function contornoClara(radio, puntos = 28) {
+  const f = new THREE.Shape();
+  const fase = Math.random() * 6, lobulos = 3 + Math.floor(Math.random() * 3);
+  for (let i = 0; i <= puntos; i++) {
+    const a = (i / puntos) * Math.PI * 2;
+    const r = radio * (1 + 0.16 * Math.sin(a * lobulos + fase) + 0.08 * Math.sin(a * 7 + fase * 2) + (Math.random() - 0.5) * 0.06);
+    const x = Math.cos(a) * r, y = Math.sin(a) * r;
+    if (i === 0) f.moveTo(x, y); else f.lineTo(x, y);
+  }
+  return f;
+}
+function huevoFrito(p) {
+  const g = new THREE.Group();
+  const radio = 0.75 + Math.random() * 0.2;
+  const forma = contornoClara(radio);
+  const borde = new THREE.Mesh(new THREE.ShapeGeometry(contornoClara(radio * 1.07)), matBorde());
+  borde.rotation.x = -Math.PI / 2;
+  borde.position.y = 0.008;
+  borde.receiveShadow = true;
+  const clara = new THREE.Mesh(new THREE.ShapeGeometry(forma), matClara());
+  clara.rotation.x = -Math.PI / 2;
+  clara.position.y = 0.014;
+  clara.receiveShadow = true;
+  const yema = new THREE.Mesh(new THREE.SphereGeometry(0.24, 18, 12, 0, Math.PI * 2, 0, Math.PI / 2), matYemaFrita());
+  yema.scale.y = 0.55;
+  yema.position.set((Math.random() - 0.5) * 0.25, 0.016, (Math.random() - 0.5) * 0.25);
+  yema.castShadow = true;
+  g.add(borde, clara, yema);
+  g.rotation.y = Math.random() * Math.PI * 2;
+  g.position.set(p.x, p.y, p.z);
+  g.scale.setScalar(0.2);
+  g.userData.crece = 0;
+  return g;
+}
+function quitaFrito(g) {
+  escena.remove(g);
+  g.traverse(o => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
 }
 
 function quitar(obj) {
@@ -614,8 +689,12 @@ function actualizarEfectos(dt) {
   for (let i = manchas.length - 1; i >= 0; i--) {
     const m = manchas[i];
     m.t -= dt;
-    if (m.t < 2) m.obj.material.opacity = Math.max(0, m.t / 2);
-    if (m.t <= 0) { quitar(m.obj); manchas.splice(i, 1); }
+    if (m.obj.userData.crece < 1) {
+      m.obj.userData.crece = Math.min(1, m.obj.userData.crece + dt * 3);
+      m.obj.scale.setScalar(0.2 + 0.8 * (1 - Math.pow(1 - m.obj.userData.crece, 3)));
+    }
+    if (m.t < 2) m.obj.traverse(o => { if (o.isMesh) o.material.opacity = Math.max(0, m.t / 2); });
+    if (m.t <= 0) { quitaFrito(m.obj); manchas.splice(i, 1); }
   }
 }
 
@@ -829,6 +908,14 @@ function actualizar(dt) {
   m.rotation.set(yo.retroceso * 0.15 - bajar * 0.7, 0, 0);
 
   actualizaBanderas();
+  if (yo.cargaAuto >= 0) {
+    const antes = Math.floor(yo.cargaAuto / 0.2);
+    yo.cargaAuto += dt;
+    if (Math.floor(yo.cargaAuto / 0.2) !== antes) sonido.pitido(Math.floor(yo.cargaAuto / 0.2));
+    if (yo.cargaAuto >= AUTO.carga) autodestruir();
+  }
+  $('auto').hidden = yo.cargaAuto < 0;
+  if (yo.cargaAuto >= 0) $('auto-barra').style.width = Math.min(100, yo.cargaAuto / AUTO.carga * 100) + '%';
   granadas.paso(dt);
   yo.cdGranada = Math.max(0, yo.cdGranada - dt);
   if (temblor > 0) {
@@ -850,6 +937,8 @@ function actualizar(dt) {
     j.mesh.rotation.y += dRy * kp;
     const v = dt > 0 ? antes.distanceTo(j.mesh.position) / dt : 0;
     const c = j.mesh.userData.cuerpo;
+    const casco = c.children[0].material;
+    casco.emissive.setRGB(j.ad ? 0.6 + 0.4 * Math.sin(t * 30) : 0, 0, 0);
     c.rotation.z = Math.sin(t * 14) * 0.12 * Math.min(1, v / 5);
     c.position.y = Math.abs(Math.sin(t * 14)) * 0.08 * Math.min(1, v / 5);
   }

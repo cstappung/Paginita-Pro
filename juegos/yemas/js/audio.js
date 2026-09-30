@@ -54,6 +54,13 @@ export const sonido = {
   dolor() { tono(220, 110, 0.12, 0.2, 'sawtooth'); },
   crack(dist = 0) { const v = 1 / (1 + dist / 12); ruido(0.25, 5000, 0.8 * v); tono(300, 80, 0.3, 0.2 * v, 'triangle'); },
   recarga() { ruido(0.04, 4000, 0.3); ruido(0.05, 3000, 0.35, 0.45); },
+  // La autodestrucción que se carga: un pitido que sube con cada paso.
+  pitido(n = 0, dist = 0) { const v = 1 / (1 + dist / 12); tono(880 + n * 160, 880 + n * 160, 0.07, 0.12 * v, 'square'); },
+  // El huevo que cae al piso se fríe: un chisporroteo corto.
+  fritura(dist = 0) {
+    const v = 1 / (1 + dist / 10);
+    for (let k = 0; k < 16; k++) ruido(0.025 + Math.random() * 0.02, 7000, 0.07 * v, 0.15 + k * 0.08 + Math.random() * 0.05);
+  },
   lanza() { tono(520, 260, 0.1, 0.1, 'triangle'); ruido(0.06, 2000, 0.15); },
   explosion(dist = 0) {
     const v = 1 / (1 + dist / 18);

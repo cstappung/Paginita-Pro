@@ -389,10 +389,12 @@ const REGLAS = {
         "<b>1 · Batidora</b>: automática, 30 balas, 17 de daño.",
         "<b>2 · Revuelta</b>: escopeta de 9 perdigones; de cerca fríe de un tiro, de lejos pierde fuerza.",
         "<b>3 · Poché</b>: francotirador. <b>Click derecho</b> para la mira; 90 de daño al cuerpo y fríe de un tiro a la cabeza.",
+        "<b>X · Autodestrucción</b>: mantén la X un segundo (si la sueltas antes, se cancela). Tu huevo pita y brilla en rojo —los demás también lo ven— y revienta: hasta 220 de daño a los rivales en unos seis metros (cerca, los fríe seguro), y tú mueres siempre. La baja es tuya; tu muerte no le suma a nadie.",
         "<b>G · Huevo duro</b>: la granada. Dos por vida; rebota y revienta al segundo y medio largo. Hasta 140 de daño en el centro y nada detrás de una pared. <b>También te daña a ti</b> (la mitad), pero no a tus compañeros."
       ])],
       ["Vida y muerte", lista([
         "Tienes 100 de vida. La parte de arriba del huevo es la cabeza y ahí el daño sube.",
+        "Quien muere queda frito: en el piso aparece un huevo frito, clara y yema, que se va a los pocos segundos.",
         "Al morir vuelves a los tres segundos, lo más lejos posible de tus rivales, con un segundo y medio de protección."
       ])],
       ["Chat de voz", lista([

@@ -2730,6 +2730,19 @@ kill. The state carries the last throw (`n: {i, o, v}`) and the last burst
 burst it **where the owner said**, because two simulations with different
 frame rates do not land on exactly the same spot.
 
+**Self-destruct** (weapon index 4, `AUTO` in the frame's `main.js`): hold X
+for `AUTO.carga` (0.9 s); releasing earlier or losing focus cancels it, so it
+never fires by accident. While charging the state carries `ad: 1` and the
+other frames make that egg glow red and beep, which gives them a moment to
+run. It bursts like a grenade (same `alcanceExplosion`/`golpeaRivales`,
+published as `x2`) with its own radius and damage, and the player always dies
+with `por` = themselves.
+
+**A death leaves a fried egg** (`huevoFrito` in the frame's `main.js`): an
+irregular white `ShapeGeometry` over a golden crispy rim and a glossy
+half-dome yolk off-centre, grown in over a third of a second, with a sizzle
+(`sonido.fritura`), faded after 14 s, at most 30 on the floor.
+
 **Fullscreen is the frame's**, not the page's. The room header's ⛶ asks the
 module first (`modulo.pantallaCompleta()`, which `yemas.js` answers with
 `frame.requestFullscreen()`), and only a game without that hook falls back
