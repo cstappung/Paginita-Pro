@@ -2647,17 +2647,70 @@ label for a moment (`mutaciones`, every 120 ms).
 
 **The one exception is the voice, and it was asked for** (`voz.js`, UMD on
 `BBTANVoz`, tested by `voz.test.cjs`). Every 50 rounds the game speaks
-(`habla`), through `speechSynthesis` plus a toast (`hablaJuego` in `game.js`,
-`.toast[data-voz]`). It does not name the floor, it just changes mood: at 50
-and 100 it is an overexcited fairground host (`alegre`, one high, fast
-utterance), at 150 and 200 it is broken (`roto`: one utterance per word with
-random pitch and rate, stutters, words that repeat) and says absurd things,
-and from 250 it turns on the player and whispers (`susurro`: low, slow and
-quiet, each sentence apart, and an echo of the last two words at pitch 0).
-`trozos` is pure and seeded. `audio.js`'s `anuncio` ducks the music and lays
-a bed under it: a fair arpeggio, glitch beeps, or `susurro()` (band-passed
-breath noise, detuned low saws and a sub). With no voices the toast and the
-bed still play. The mute switch and `reset()` call `calla()`.
+(`habla`) and the phrase is also shown as a toast (`hablaJuego` in `game.js`,
+`.toast[data-voz]`). It does not name the floor, it just changes mood: a
+fairground host at 50 and 100 (`alegre`), broken and absurd at 150 and 200
+(`roto`), whispering against the player at 250 and 300 (`susurro`), a
+whisper cut off by a sugary voice at 350 (`giro`) and a too-perfect chorus
+from 400 (`perfecto`). **It is recorded, not synthesised in the browser**:
+`speechSynthesis` did not exist on phones and sounded different, and bad, on
+every PC. `colabtex/scripts/bbtan-voz.py` renders each phrase of `FRASES`
+with Piper (voices `es_MX-claude-high` and `es_MX-ald-medium`, apache-2.0
+and unlicense datasets) into `assets/voz/v<nivel>-<i>.mp3` (~1.2 MB in
+all). Each mood has its own processing there. `alegre` is pitched up by
+synthesising slower and resampling faster. `roto` works in two- or
+three-word chunks, each in another voice and pitch; single words came out
+unintelligible. The stutter is spoken («cu, cu, cucharas»). `susurro` is a
+real whisper, an LPC vocoder excited with noise, over a growl seven
+semitones down. `perfecto` is a phase-vocoder chord (+4, +7, +12). The text
+in `FRASES` is both what is read and what was recorded: **change a phrase
+and re-run the script**. The test checks that there is one MP3 per phrase
+and none left over. `faster-whisper` transcribing the output is how
+intelligibility was checked. `audio.js` fetches a level's three files five
+rounds early (`prepara`), plays through WebAudio (`anuncio`), ducks the music
+and lays a bed under the voice. The beds are a fair arpeggio, glitch beeps,
+the breath and drone, or a music box that climbs. It reports the real
+duration back so the toast waits for the voice, and `vozSeq` drops a voice
+that arrives after a restart.
+
+**Past round 350 the descent is undone and the world turns perfect**
+(`descenso.js`). The descent does not stop; it is subtracted.
+`corrupcionVista = corrupcion × (1 − luz)`, with `luz` going 0 → 1 over
+350–364, so everything that reads `corr` rewinds by itself. That includes
+the character's evil, SATAN and the music's floors. `perfeccion(ronda)`
+(`cielo` in `game.js`) is 0 until 349, 1 at 369 (dulce enters fast because
+it is what sweeps the dark away), 2 at 449 (radiante) and 3 at 499
+(perfecto). It stays at 3 after that. The palettes are light candy colours
+(`CIELO`, blended over the fading descent by `mezclaCielo`). The CSS
+`html.cielo` gets `--p1…--p3` and one more palette key, `text`, because the
+page turns light. Texts come from `TEXTOS_CIELO` through `tx()`/`fundeTexto`.
+
+Like the descent it creeps in (`suave(a, b)`) and nothing is announced. In
+order:
+
+- a sky, a sun and clouds;
+- faces on the blocks (`carita`), rainbow balls that become hearts, and
+  confetti;
+- a rainbow, clouds that smile, and blocks, flowers and the page all bouncing
+  on the same 1.63 s beat;
+- at the end the sun grows, and every face stops following the ball and
+  stares at the player;
+- smiles grow wider than the faces, and background words appear («TODO ESTÁ
+  BIEN», «NO MIRES DEBAJO»);
+- very rarely, for 90 ms, the red face of the descent (`CARA`) flashes
+  underneath (`debajo`).
+
+The character comes back to normal and then gets «perfect» with
+`pose.perfecto`: pastel clothes, a flower crown, a halo, angel wings, blush,
+huge unblinking eyes and a grin that does not fit. Labels turn into
+ALEGRÍA/ORGULLO/SONRISA/AMIGOS and the title into «BBTAN :)».
+
+The music (`cielo()` in `musica.js`, `e.C`) is C major I–V–vi–IV with
+four-on-the-floor, claps and a glockenspiel. It enters phrase by phrase like
+the abyss. It is uncomfortable because it does not listen: above C = 2,
+danger makes it happier and faster instead of tense. Each 8-bar loop also
+modulates up a semitone, and a music box echoes the melody one step late.
+Gameplay is untouched here too.
 
 **A game in progress is saved per account** (`guarda`/`cargaPartida` in
 `game.js`). At the start of every round from round 2 the board is written to

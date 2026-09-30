@@ -1,73 +1,45 @@
 const test = require('node:test');
 const assert = require('node:assert');
+const fs = require('node:fs');
+const path = require('node:path');
 const V = require('./voz.js');
 
 test('habla solo en múltiplos de 50 desde la 50', () => {
-  for (const r of [50, 100, 350, 400]) assert.ok(V.habla(r), r);
+  for (const r of [50, 100, 350, 500, 650]) assert.ok(V.habla(r), r);
   for (const r of [0, 1, 49, 51, 99, 125]) assert.ok(!V.habla(r), r);
 });
 
-test('nivel acotado a las listas de frases', () => {
+test('nivel y ánimo por umbral', () => {
   assert.strictEqual(V.nivel(50), 0);
-  assert.strictEqual(V.nivel(300), 5);
   assert.strictEqual(V.nivel(350), 6);
-  assert.strictEqual(V.nivel(1000), V.FRASES.length - 1);
-  assert.strictEqual(V.nivel(10), 0);
+  assert.strictEqual(V.nivel(500), 9);
+  assert.strictEqual(V.nivel(900), V.FRASES.length - 1);
+  assert.deepStrictEqual([50, 100, 150, 200, 250, 300, 350, 400, 450, 500, 800].map(V.animo),
+    ['alegre', 'alegre', 'roto', 'roto', 'susurro', 'susurro', 'giro', 'perfecto', 'perfecto', 'perfecto', 'perfecto']);
+  assert.strictEqual(V.FRASES.length, V.ANIMO.length);
 });
 
-test('ánimo: alegre, roto y susurro', () => {
-  assert.strictEqual(V.animo(50), 'alegre');
-  assert.strictEqual(V.animo(100), 'alegre');
-  assert.strictEqual(V.animo(150), 'roto');
-  assert.strictEqual(V.animo(200), 'roto');
-  assert.strictEqual(V.animo(250), 'susurro');
-  assert.strictEqual(V.animo(400), 'susurro');
-});
-
-test('frase sustituye {n} y nunca se sale de la lista', () => {
+test('cada frase tiene su grabación, y ninguna sobra', () => {
+  const dir = path.join(__dirname, 'assets', 'voz'), esperados = [];
   for (let r = 50; r <= 500; r += 50)
-    for (const a of [0, .5, .999, 1]) {
-      const f = V.frase(r, a);
-      assert.ok(f && !f.includes('{n}'), f);
+    for (let i = 0; i < V.FRASES[V.nivel(r)].length; i++) {
+      const f = path.join(__dirname, V.archivo(r, i)); esperados.push(path.basename(f));
+      assert.ok(fs.statSync(f).size > 4000, f);
+      assert.strictEqual(fs.readFileSync(f).subarray(0, 3).toString('latin1') === 'ID3' || fs.readFileSync(f)[0] === 0xff, true, `${f} es MP3`);
     }
-  assert.ok(V.frase(50, 0).includes('50'));
+  assert.deepStrictEqual(fs.readdirSync(dir).filter(n => n.endsWith('.mp3')).sort(), esperados.sort());
 });
 
-function enRango(partes) {
-  assert.ok(partes.length > 0);
-  for (const p of partes) {
-    assert.ok(p.t && p.t.trim(), 'texto vacío');
-    assert.ok(p.pitch >= 0 && p.pitch <= 2, 'pitch ' + p.pitch);
-    assert.ok(p.rate >= .1 && p.rate <= 10, 'rate ' + p.rate);
-    assert.ok(p.volume >= 0 && p.volume <= 1, 'volume ' + p.volume);
-  }
-}
-
-test('alegre: un trozo, agudo y rápido', () => {
-  const p = V.trozos(V.frase(50, 0), 50, 0);
-  assert.strictEqual(p.length, 1);
-  assert.ok(p[0].pitch >= 1.8 && p[0].rate > 1);
-});
-
-test('roto: varios trozos a tirones', () => {
-  const p = V.trozos(V.frase(150, 0), 150, .3);
-  assert.ok(p.length > 3);
-  assert.ok(new Set(p.map(x => x.pitch)).size > 1);
-});
-
-test('susurro: grave, lento y con eco', () => {
-  const f = V.frase(300, 0), p = V.trozos(f, 300, 0);
-  assert.ok(p.every(x => x.pitch <= .3 && x.rate < 1));
-  assert.strictEqual(p[p.length - 1].pitch, 0);
-});
-
-test('todos los trozos están en rango', () => {
+test('el texto que se lee es el que se grabó, sin marcas', () => {
   for (let r = 50; r <= 600; r += 50)
-    for (const a of [0, .2, .5, .8, .99]) enRango(V.trozos(V.frase(r, a), r, a));
-  assert.ok(V.duracion(V.trozos(V.frase(250, 0), 250, 0)) > 1);
-});
-
-test('decir no rompe sin speechSynthesis', () => {
-  assert.strictEqual(V.decir([{ t: 'x', pitch: 1, rate: 1, volume: 1 }]), false);
-  V.calla();
+    for (const a of [0, .5, .99]) {
+      const i = V.eleccion(r, a), t = V.texto(r, i);
+      assert.ok(i >= 0 && i < V.FRASES[V.nivel(r)].length);
+      assert.ok(t && !t.includes('|') && !t.includes('  '), t);
+      assert.ok(V.estimada(t) >= 2.5 && V.estimada(t) < 12);
+    }
+  // Las rondas de más allá de la 500 no dicen un número que no es.
+  for (const f of V.FRASES[V.FRASES.length - 1]) assert.ok(!/\d/.test(f), f);
+  // El giro tiene las dos mitades.
+  for (const f of V.FRASES[6]) assert.strictEqual(f.split('|').length, 2, f);
 });
