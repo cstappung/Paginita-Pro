@@ -2111,6 +2111,11 @@ main.jg-ancho{max-width:1480px}
 .jg-solo-barra a.btn2{display:inline-flex;align-items:center;text-decoration:none}
 .jg-solo-barra .on{border-color:#0d9488;color:#0d9488;background:#e9f4f2}
 .jg-solo-frame{display:block;width:100%;border:0;background:transparent;color-scheme:normal}
+/* sortEm: solo el juego, a pantalla entera de la ventana (armazon pone la clase). */
+html.jg-sortem,html.jg-sortem body{overflow:hidden;height:100%}
+html.jg-sortem .head,html.jg-sortem .bar,html.jg-sortem .rp-fab,html.jg-sortem .jg-solo-barra{display:none!important}
+html.jg-sortem #pantalla{position:fixed;inset:0;z-index:1;margin:0;max-width:none;padding:0;background:#10051f}
+html.jg-sortem .jg-solo-frame{height:100%!important}
 @media(max-width:1050px){.jg-partida-layout{grid-template-columns:minmax(0,1fr)}.jg-partida-layout>.jg-chat{position:static;height:300px}.jg-solo-barra nav{margin-left:0}}
 /* ---------- logros ---------- */
 .jg-lg{display:grid;gap:18px;max-width:980px;margin:0 auto}
@@ -2353,6 +2358,6 @@ html[data-tema=oscuro] .jg-guia{--gv-borde:#46405a;--gv-papel:#262236;--gv-tinta
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202609300107"></script>
+<script src="juegos-app.js?v=202609300133"></script>
 </body>
 </html>

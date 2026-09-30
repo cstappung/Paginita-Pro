@@ -47,5 +47,5 @@ test('reparto junta fila, marca y guardados, y cuenta la gente',()=>{
 });
 test('sortEm: los logros salen del modo y del tiempo',()=>{
  assert.deepEqual([...deMarca('sortem',{categoria:'club-sortem-10',puntos:10,tiempo:14000})],['d10','d10t30','d10t15']);
- assert.deepEqual([...deMarca('sortem',{categoria:'club-sortem-30',puntos:30,tiempo:100000})],['d30','d30t120']);
+ assert.deepEqual([...deMarca('sortem',{categoria:'club-sortem-20',puntos:20,tiempo:35000})],['d20','d20t60','d20t40']);
 });

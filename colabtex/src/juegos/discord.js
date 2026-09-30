@@ -119,17 +119,19 @@ const MODALIDADES = {
   maraton: "Maratón", sprint: "Sprint (40 líneas)", ultra: "Ultra (2 min)",
   classic: "Clásico", arcade: "Arcade", portals: "Portales", reloj: "Contrarreloj",
   espejo: "Espejo", laberinto: "Laberinto",
+  10: "del 1 al 10", 20: "del 1 al 20",
   chico: "tablero chico", mediano: "tablero mediano", grande: "tablero grande", gigante: "tablero gigante"
 };
 const CLUBS = {
   minas: { nombre: "Mina Club", juego: "Buscaminas", icono: "💣", ruta: "minas" },
   snake: { nombre: "Snake Club", juego: "Snake", icono: "🐍", ruta: "snake" },
-  tetris: { nombre: "Tetris Club", juego: "Tetris", icono: "🧱", ruta: "tetris" }
+  tetris: { nombre: "Tetris Club", juego: "Tetris", icono: "🧱", ruta: "tetris" },
+  sortem: { nombre: "sortEm", juego: "sortEm", icono: "🔢", ruta: "sortem" }
 };
 
 /* "club-snake-arcade-grande" → {club, modalidad: "Arcade · tablero grande"} */
 export function categoriaLegible(cat) {
-  const m = /^club-(minas|snake|tetris)-(.+)$/.exec(String(cat || ""));
+  const m = /^club-(minas|snake|tetris|sortem)-(.+)$/.exec(String(cat || ""));
   if (!m) return null;
   return { club: CLUBS[m[1]], modalidad: m[2].split("-").map(k => MODALIDADES[k] || k).join(" · ") };
 }

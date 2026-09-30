@@ -40,7 +40,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado}) {
   function mensaje(e){
     if(muerto||e.source!==frame.contentWindow||e.origin!==location.origin||e.data?.canal!=='club-child')return;
     const d=e.data;
-    if(d.tipo==='alto'&&Number.isFinite(d.alto)){frame.style.height=Math.min(4000,Math.max(320,d.alto))+'px';return;}
+    if(d.tipo==='alto'&&Number.isFinite(d.alto)){if(juego==='sortem')return;frame.style.height=Math.min(4000,Math.max(320,d.alto))+'px';return;}
     if(d.tipo==='volver'){volver();return;}
     if(d.tipo==='reintentar'){sincronizar();return;}
     if(d.tipo==='categoria'){
@@ -63,11 +63,12 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado}) {
     frame.style.height=juego==='tetris'?'880px':juego==='sortem'?'900px':'760px';
     const tema=()=>enviar({tipo:'tema',oscuro:document.documentElement.dataset.tema==='oscuro'});
     frame.addEventListener('load',tema);
+    if(juego==='sortem')frame.addEventListener('load',()=>frame.focus());
     temaObserver=new MutationObserver(tema);
     temaObserver.observe(document.documentElement,{attributes:true,attributeFilter:['data-tema']});
     frame.allow='fullscreen';frame.setAttribute('allowfullscreen','');
     window.addEventListener('message',mensaje);
-    frame.src='juegos/club/'+juego+'/index.html?v=club-6&embed=1&cuenta='+encodeURIComponent(usuario.uid);
+    frame.src='juegos/club/'+juego+'/index.html?v=club-7&embed=1&cuenta='+encodeURIComponent(usuario.uid);
     host.appendChild(frame);
   }
   function destruir(){muerto=true;temaObserver?.disconnect();if(off)off();window.removeEventListener('message',mensaje);for(const [el,valor]of ocultos)el.style.display=valor;frame?.remove();host.innerHTML='';ambientar('');}

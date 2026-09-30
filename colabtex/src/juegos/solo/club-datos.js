@@ -3,7 +3,7 @@ export function categoriaClub(juego, categoria) {
   return typeof categoria === 'string' && (juego === 'minas'
     ? /^club-minas-(easy|medium|hard)$/.test(categoria)
     : juego === 'sortem'
-    ? /^club-sortem-(10|20|30)$/.test(categoria)
+    ? /^club-sortem-(10|20)$/.test(categoria)
     : juego === 'tetris'
     ? /^club-tetris-(maraton|sprint|ultra)$/.test(categoria)
     : /^club-snake-(classic|arcade|portals|reloj|espejo|laberinto)-(chico|mediano|grande|gigante)$/.test(categoria));

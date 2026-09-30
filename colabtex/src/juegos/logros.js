@@ -228,10 +228,10 @@ const SOLO = {
     { id: "d20", n: "Veinte en fila", d: "Ordena del 1 al 20.", i: "📶", m: "20", s: cat(/-20$/) },
     { id: "d20t60", n: "Minuto justo", d: "Ordena del 1 al 20 en menos de 1 min.", i: "⌛", m: "20", s: d => cat(/-20$/)(d) && d.tiempo < 60000 },
     { id: "d20t40", n: "Clasificador", d: "Ordena del 1 al 20 en menos de 40 s.", i: "🗂️", m: "20", s: d => cat(/-20$/)(d) && d.tiempo < 40000 },
-    { id: "d30", n: "Treintena", d: "Ordena del 1 al 30.", i: "🧮", m: "30", s: cat(/-30$/) },
-    { id: "d30t120", n: "Paciencia", d: "Ordena del 1 al 30 en menos de 2 min.", i: "🐢", m: "30", s: d => cat(/-30$/)(d) && d.tiempo < 120000 },
-    { id: "d30t80", n: "Mano rápida", d: "Ordena del 1 al 30 en menos de 80 s.", i: "🌪️", m: "30", s: d => cat(/-30$/)(d) && d.tiempo < 80000 },
-    { id: "d30t50", n: "Máquina de ordenar", d: "Ordena del 1 al 30 en menos de 50 s.", i: "🤖", m: "30", s: d => cat(/-30$/)(d) && d.tiempo < 50000 }
+    { id: "d10t10", n: "Relámpago", d: "Ordena del 1 al 10 en menos de 10 s.", i: "🌩️", m: "10", s: d => cat(/-10$/)(d) && d.tiempo < 10000 },
+    { id: "d10t7", n: "Máquina de ordenar", d: "Ordena del 1 al 10 en menos de 7 s.", i: "🤖", m: "10", s: d => cat(/-10$/)(d) && d.tiempo < 7000 },
+    { id: "d20t30", n: "Mano rápida", d: "Ordena del 1 al 20 en menos de 30 s.", i: "🌪️", m: "20", s: d => cat(/-20$/)(d) && d.tiempo < 30000 },
+    { id: "d20t20", n: "Sin mirar", d: "Ordena del 1 al 20 en menos de 20 s.", i: "🎯", m: "20", s: d => cat(/-20$/)(d) && d.tiempo < 20000 }
   ]
 };
 
