@@ -2570,6 +2570,21 @@ fullscreen button on purpose: a focused button turned the game's Space into a
 fullscreen toggle. The `soloRanks` regex needed widening, so the rules must
 be re-published.
 
+**BBTAN (`juegos/club/bbtan/`) is a Solo Club game too**, on the same
+`conexion.js` protocol: plain files, no build, bump `?v=bbtan-N` in its
+`index.html` when they change (and `club-N` in `solo/club.js` for the iframe).
+Its one category is `club-bbtan-rondas` and `puntos` is the **highest round
+reached** (the time played rides along as the tiebreak), reported once per game
+on game over or on restart, and only from round 2. Its ten logros are round
+thresholds (`deMarca`). Two things not to break: the audio's `clear()` and the
+NICE! celebration are the original's and stay as they are; ball hits are a
+short rising sine through a low-pass (`bubble`) and a broken block is a noise
+burst + thump + arpeggio (`broken`), both throttled so a combo does not turn
+into a wall of sound. The retro look is Press Start 2P, notched pixel frames
+(`pixelFrame`), plus-shaped balls (`pixelBall`) and CSS scanlines on
+`.canvas-wrap::after`. The regex in `soloRanks` needed widening, so the rules
+must be re-published.
+
 **UNO No Mercy's roulette is played by its victim**: the victim picks the
 colour (not whoever threw the card) and then draws one card at a time with
 the button until that colour comes out.

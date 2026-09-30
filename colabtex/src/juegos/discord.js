@@ -119,19 +119,20 @@ const MODALIDADES = {
   maraton: "Maratón", sprint: "Sprint (40 líneas)", ultra: "Ultra (2 min)",
   classic: "Clásico", arcade: "Arcade", portals: "Portales", reloj: "Contrarreloj",
   espejo: "Espejo", laberinto: "Laberinto",
-  10: "del 1 al 10", 20: "del 1 al 20",
+  10: "del 1 al 10", 20: "del 1 al 20", 30: "del 1 al 30", rondas: "ronda máxima",
   chico: "tablero chico", mediano: "tablero mediano", grande: "tablero grande", gigante: "tablero gigante"
 };
 const CLUBS = {
   minas: { nombre: "Mina Club", juego: "Buscaminas", icono: "💣", ruta: "minas" },
   snake: { nombre: "Snake Club", juego: "Snake", icono: "🐍", ruta: "snake" },
   tetris: { nombre: "Tetris Club", juego: "Tetris", icono: "🧱", ruta: "tetris" },
-  sortem: { nombre: "sortEm", juego: "sortEm", icono: "🔢", ruta: "sortem" }
+  sortem: { nombre: "sortEm", juego: "sortEm", icono: "🔢", ruta: "sortem" },
+  bbtan: { nombre: "BBTAN", juego: "BBTAN", icono: "🟩", ruta: "bbtan" }
 };
 
 /* "club-snake-arcade-grande" → {club, modalidad: "Arcade · tablero grande"} */
 export function categoriaLegible(cat) {
-  const m = /^club-(minas|snake|tetris|sortem)-(.+)$/.exec(String(cat || ""));
+  const m = /^club-(minas|snake|tetris|sortem|bbtan)-(.+)$/.exec(String(cat || ""));
   if (!m) return null;
   return { club: CLUBS[m[1]], modalidad: m[2].split("-").map(k => MODALIDADES[k] || k).join(" · ") };
 }
@@ -144,6 +145,7 @@ const reloj = ms => {
    tiempo (los puntos son fijos), en el resto los puntos. */
 export function marcaSolo(cat, f) {
   if (/^club-minas-|^club-sortem-|^club-tetris-sprint$/.test(cat)) return `⏱️ ${reloj(f.tiempo)}`;
+  if (/^club-bbtan-/.test(cat)) return `🟩 Ronda ${f.puntos}`;
   return `${Number(f.puntos).toLocaleString("es-CL")} pts`;
 }
 
