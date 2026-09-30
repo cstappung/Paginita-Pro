@@ -22,7 +22,7 @@ const EXTRA = { minas: { nombre: "Mina Club", color: "#eeb765" }, snake: { nombr
 const info = j => JUEGOS[j] || EXTRA[j] || { nombre: j, color: "#888" };
 const MAX_NOMBRES = 8;
 
-export function crearLogros({ uid, watchLogros, perfil, orden }) {
+export function crearLogros({ uid, watchLogros, perfil, orden, icono = {} }) {
   let host = null, off = null, datos = null, fallo = null, firma = "";
   let juego = "";
   try { juego = localStorage.getItem("jg.logrosJuego") || ""; } catch (e) { /* sin almacenamiento */ }
@@ -129,10 +129,14 @@ export function crearLogros({ uid, watchLogros, perfil, orden }) {
       ${desafio(R)}
       <nav class="jg-lg-chips" aria-label="Juego">${R.juegos.map(j => {
         const n = LOGROS[j].filter(x => R.tiene[j][x.id].has(uid)).length;
-        return `<button class="jg-lg-chip${j === juego ? " on" : ""}" data-j="${j}" style="--c:${info(j).color}">${esc(info(j).nombre)}<small>${n}/10</small></button>`;
+        return `<button class="jg-lg-chip${j === juego ? " on" : ""}${n === 10 ? " lleno" : ""}" data-j="${j}" style="--c:${info(j).color}"><i aria-hidden="true">${esc(icono[j] || "●")}</i>${esc(info(j).nombre)}<small>${n}/10</small></button>`;
       }).join("")}</nav>
       ${juegoHtml(R)}
     </div>`;
+    /* En el móvil los chips son una tira que se desliza: que el elegido
+       quede a la vista, o parece que no hay ninguno marcado. */
+    const tira = host.querySelector(".jg-lg-chips"), on = tira && tira.querySelector(".on");
+    if (on && tira.scrollWidth > tira.clientWidth) tira.scrollLeft = on.offsetLeft - tira.clientWidth / 2 + on.offsetWidth / 2;
     host.querySelectorAll("[data-j]").forEach(b => b.onclick = () => {
       juego = b.dataset.j;
       try { localStorage.setItem("jg.logrosJuego", juego); } catch (e) { /* nada */ }

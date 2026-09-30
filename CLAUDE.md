@@ -2876,6 +2876,15 @@ everyone else. The entry animation plays **once per game** (`animado` holds
 the key) and the scene repaints by signature (`firma`), because `watchRanks`
 fires on every write and replaying the rise each time would make it twitch.
 
+**The Clasificación opens on a General table** (`ranks.js`, key `general`):
+the sum of every room game's `ranks` row (points, wins, games played, and a
+«Juegos» column counting in how many games each person has a row), read
+through `fb.watchRanksTodos`. The picker lists the games in the lobby's
+popularity order, room games and solo games under separate labels, and the
+choice persists in `jg.rankJuego`. The lobby's featured card carries that
+game's top three (`pintaDestacado`, from the `ranks` that
+`leerPopularidad()` now returns alongside the counts as `{n, ranks}`).
+
 **Logros: ten per game, three sources, one table** (`juegos/logros.js`,
 the view in `logros-vista.js`, the **Logros** tab at `#logros`). Four of
 every room game's ten are **derived from its `ranks` row** (first win, ten
