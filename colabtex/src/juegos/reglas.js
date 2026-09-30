@@ -579,6 +579,19 @@ const REGLAS = {
       ])]
     ]
   },
+  sortem: {
+    lema: "sortEm: ordena la fila del 1 al N lo más rápido que puedas.",
+    secciones: [
+      ["Cómo se juega", "<b>← →</b> eligen un bloque · <b>Espacio</b> lo toma o lo suelta · <b>Enter</b> reinicia. Con un bloque tomado, <b>← →</b> lo cambian de lugar con su vecino. Al soltarlo, si queda pegado a su número consecutivo (el 4 justo después del 3) los dos se funden en un solo bloque que ya no se separa. Ganas cuando toda la fila es un bloque ordenado."],
+      ["Los modos", lista([
+        "<b>10 números</b>: del 1 al 10, para calentar.",
+        "<b>20 números</b>: del 1 al 20, bloques más chicos.",
+        "<b>30 números</b>: del 1 al 30, la fila entera de lado a lado.",
+        "En la pantalla de inicio, <b>↑ ↓</b> (o un clic) cambian el modo."
+      ])],
+      ["Clasificación", "El reloj corre desde el primer movimiento. Cada modo tiene su propia clasificación por tiempo, y tu mejor marca sale en la Clasificación del sitio junto a tu nombre."]
+    ]
+  },
   snake: {
     lema: "Snake Club: la serpiente de siempre, en siete modos y cuatro tamaños.",
     secciones: [
@@ -597,7 +610,7 @@ const REGLAS = {
   }
 };
 
-const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club" };
+const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm" };
 
 export const tieneReglas = juego => Object.prototype.hasOwnProperty.call(REGLAS, juego);
 

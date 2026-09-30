@@ -463,7 +463,7 @@ function celebra(juego, id) {
    barra de direcciones. */
 function leerRuta() {
   const h = (location.hash || "").replace(/^#/, "");
-  if (/^solo\/(minas|snake|tetris)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
+  if (/^solo\/(minas|snake|tetris|sortem)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
   if (h === "ranks") return { vista: "ranks", pid: "" };
   if (h === "logros") return { vista: "logros", pid: "" };
   const m = h.match(/^p\/([-\w]+)$/);
@@ -800,7 +800,7 @@ function armazon() {
     individual.montar(h);
     const juego = state.vista.slice(5), barra = document.createElement("div");
     barra.className = "jg-solo-barra";
-    barra.innerHTML = `<a class="btn2" href="#">← Juegos</a><div class="jg-solo-titulo"><small>UN JUGADOR · RANKING POR MODALIDAD</small><strong>${juego === "minas" ? "Buscaminas" : juego === "tetris" ? "Tetris" : "Snake"}</strong></div><nav aria-label="Juegos individuales"><a class="btn2${juego === "minas" ? " on" : ""}" href="#solo/minas">Buscaminas</a><a class="btn2${juego === "snake" ? " on" : ""}" href="#solo/snake">Snake</a><a class="btn2${juego === "tetris" ? " on" : ""}" href="#solo/tetris">Tetris</a><button class="btn2" type="button">📖 Reglas</button></nav>`;
+    barra.innerHTML = `<a class="btn2" href="#">← Juegos</a><div class="jg-solo-titulo"><small>UN JUGADOR · RANKING POR MODALIDAD</small><strong>${juego === "minas" ? "Buscaminas" : juego === "tetris" ? "Tetris" : juego === "sortem" ? "sortEm" : "Snake"}</strong></div><nav aria-label="Juegos individuales"><a class="btn2${juego === "minas" ? " on" : ""}" href="#solo/minas">Buscaminas</a><a class="btn2${juego === "snake" ? " on" : ""}" href="#solo/snake">Snake</a><a class="btn2${juego === "tetris" ? " on" : ""}" href="#solo/tetris">Tetris</a><a class="btn2${juego === "sortem" ? " on" : ""}" href="#solo/sortem">sortEm</a><button class="btn2" type="button">📖 Reglas</button></nav>`;
     barra.querySelector("button").onclick = () => abreReglas(juego === "tetris" ? "tetrisclub" : juego);
     h.insertBefore(barra, h.firstChild);
     return;
@@ -808,8 +808,8 @@ function armazon() {
   if (state.vista === "logros") {
     h.innerHTML = "";
     logrosVista = crearLogros({ uid: state.user.uid, watchLogros: fb.watchLogros, perfil: perfilDe,
-      orden: () => ordenPopular([...Object.keys(JUEGOS), "club-minas", "club-snake", "club-tetris"])
-        .map(k => ({ "club-minas": "minas", "club-snake": "snake", "club-tetris": "tetrisclub" })[k] || k) });
+      orden: () => ordenPopular([...Object.keys(JUEGOS), "club-minas", "club-snake", "club-tetris", "club-sortem"])
+        .map(k => ({ "club-minas": "minas", "club-snake": "snake", "club-tetris": "tetrisclub", "club-sortem": "sortem" })[k] || k) });
     logrosVista.montar(h);
     return;
   }
@@ -930,7 +930,7 @@ function armazon() {
           </div></div>
         <div class="jg-elige" id="vesElige"></div>
         <div class="jg-section-title"><h2>Para jugar solo</h2><span>sin sala, cuando quieras</span></div>
-        <div class="sp-entradas"><a href="#solo/minas" class="sp-entrada sp-e-minas"><small>SINGLEPLAYER / ESTRATEGIA</small><strong>MINA CLUB <span>✦</span></strong><p>Piensa, explora y florece. Tres dificultades y música progresiva.</p><b>Explorar →</b></a><a href="#solo/snake" class="sp-entrada sp-e-snake"><small>SINGLEPLAYER / REFLEJOS</small><strong>SNAKE CLUB <span>ϟ</span></strong><p>Siete modos —contrarreloj, espejo, laberinto…— y cuatro tamaños de mapa.</p><b>Entrar al circuito →</b></a><a href="#solo/tetris" class="sp-entrada sp-e-tetris"><small>SINGLEPLAYER / REFLEJOS</small><strong>TETRIS CLUB <span>▤</span></strong><p>Maratón, Sprint de 40 líneas y Ultra de dos minutos.</p><b>Apilar →</b></a><a href="juegos/sortem/index.html" class="sp-entrada sp-e-sortem"><small>PLATANUS HACK 25 / PUZZLE</small><strong>sortEm <span>↔</span></strong><p>Mueve y fusiona los bloques hasta ordenar los números del 1 al 10.</p><b>Ordenar →</b></a><a href="juegos/worms/index.html?v=worms-4" class="sp-entrada sp-e-worms"><small>LOCAL · BOTS / ARTILLERÍA</small><strong>CIRCUIT BREAKERS <span>💥</span></strong><p>Tu cuadrilla contra bots o amigos en el mismo equipo. En línea: abre una sala arriba.</p><b>Desplegar →</b></a></div>
+        <div class="sp-entradas"><a href="#solo/minas" class="sp-entrada sp-e-minas"><small>SINGLEPLAYER / ESTRATEGIA</small><strong>MINA CLUB <span>✦</span></strong><p>Piensa, explora y florece. Tres dificultades y música progresiva.</p><b>Explorar →</b></a><a href="#solo/snake" class="sp-entrada sp-e-snake"><small>SINGLEPLAYER / REFLEJOS</small><strong>SNAKE CLUB <span>ϟ</span></strong><p>Siete modos —contrarreloj, espejo, laberinto…— y cuatro tamaños de mapa.</p><b>Entrar al circuito →</b></a><a href="#solo/tetris" class="sp-entrada sp-e-tetris"><small>SINGLEPLAYER / REFLEJOS</small><strong>TETRIS CLUB <span>▤</span></strong><p>Maratón, Sprint de 40 líneas y Ultra de dos minutos.</p><b>Apilar →</b></a><a href="#solo/sortem" class="sp-entrada sp-e-sortem"><small>PLATANUS HACK 25 / PUZZLE</small><strong>sortEm <span>↔</span></strong><p>Mueve y fusiona los bloques hasta ordenar del 1 al 10, al 20 o al 30. Ranking por tiempo.</p><b>Ordenar →</b></a><a href="juegos/worms/index.html?v=worms-4" class="sp-entrada sp-e-worms"><small>LOCAL · BOTS / ARTILLERÍA</small><strong>CIRCUIT BREAKERS <span>💥</span></strong><p>Tu cuadrilla contra bots o amigos en el mismo equipo. En línea: abre una sala arriba.</p><b>Desplegar →</b></a></div>
       </div>
     </div>`;
   for (const b of h.querySelectorAll("[data-filtro]")) {

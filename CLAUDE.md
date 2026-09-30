@@ -2555,6 +2555,14 @@ the solo version on the same engine: Maratón, Sprint (40 lines; the
 result is `puntos: 40` plus the time, so the ranking orders it by time) and
 Ultra (two minutes). Its categories are `club-tetris-*` in `soloRanks`.
 
+**sortEm (`juegos/club/sortem/`) is a Solo Club game too**, on the same
+`conexion.js` protocol as Mina Club: no ranking of its own, only
+`Club.result({categoria: "club-sortem-N", puntos: N, tiempo})` for N = 10,
+20 or 30. `puntos` is fixed by the mode, so the table orders by time; the
+block width per mode is `MEDIDAS` in its `game.js` (30 blocks fill the 800 px
+canvas). The `soloRanks` regex needed widening, so the rules must be
+re-published.
+
 **UNO No Mercy's roulette is played by its victim**: the victim picks the
 colour (not whoever threw the card) and then draws one card at a time with
 the button until that colour comes out.

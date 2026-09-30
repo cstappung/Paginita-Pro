@@ -174,7 +174,7 @@ class GameState {
 
     while (!valid && attempts < 1000) {
       attempts++;
-      numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+      numbers = Array.from({ length: N }, (_, i) => i + 1);
 
       for (let i = numbers.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -196,9 +196,8 @@ class GameState {
   }
 
   calculatePositions() {
-    const blockW = 60;
-    const spacing = 12;
-    const totalW = 10 * blockW + 9 * spacing;
+    const { w: blockW, s: spacing } = medida();
+    const totalW = N * blockW + (N - 1) * spacing;
     let x = (800 - totalW) / 2;
 
     this.blockPositions = [];
@@ -219,7 +218,7 @@ class GameState {
       const blockTexts = block.map(num => {
         // Pixel-style text - larger, bolder, monospace
         return this.scene.add.text(0, 0, num.toString(), {
-          fontSize: '42px',
+          fontSize: medida().f + 'px',
           fontFamily: 'Courier New, monospace',
           color: '#00f5ff',
           fontStyle: 'bold',
@@ -399,8 +398,7 @@ class GameState {
   }
 
   createCoolParticles(idx, color, type, intensity = 1) {
-    const blockW = 60;
-    const spacing = 12;
+    const { w: blockW, s: spacing } = medida();
     const block = this.blocks[idx];
     const w = blockW * block.length + spacing * (block.length - 1);
     const x = this.blockPositions[idx] + w / 2;
@@ -460,8 +458,7 @@ class GameState {
   }
 
   createMergeWave(idx) {
-    const blockW = 60;
-    const spacing = 12;
+    const { w: blockW, s: spacing } = medida();
     const block = this.blocks[idx];
     const w = blockW * block.length + spacing * (block.length - 1);
     const centerX = this.blockPositions[idx] + w / 2;
@@ -513,8 +510,7 @@ class GameState {
     const oldIdx = direction === 'left' ? idx + 1 : idx - 1;
 
     // Create a visual trail/blur effect from old position to new
-    const blockW = 60;
-    const spacing = 12;
+    const { w: blockW, s: spacing } = medida();
 
     const oldX = this.blockPositions[oldIdx];
     const newX = this.blockPositions[idx];
@@ -552,8 +548,7 @@ class GameState {
     const swapBlock = this.textObjects[oldIdx];
 
     // Calculate distance to travel
-    const blockW = 60;
-    const spacing = 12;
+    const { w: blockW, s: spacing } = medida();
     const movingBlockWidth = blockW * this.blocks[idx].length + spacing * (this.blocks[idx].length - 1);
     const swapBlockWidth = blockW * this.blocks[oldIdx].length + spacing * (this.blocks[oldIdx].length - 1);
 
@@ -597,8 +592,7 @@ class GameState {
   draw(graphics) {
     graphics.clear();
 
-    const blockW = 60;
-    const spacing = 12;
+    const { w: blockW, s: spacing } = medida();
     const y = 300;
     const h = 80;
 
@@ -673,30 +667,28 @@ class GameState {
 }
 
 // ==========================================
-// IN-MEMORY LEADERBOARD STORAGE
+// MODES AND CLUB RANKING
 // ==========================================
-// Store leaderboard in memory (persists only during session)
-let leaderboardData = [];
-
-function getLb() {
-  return leaderboardData;
+// 10, 20 or 30 numbers. The ranking is the shared Club one (soloRanks, one
+// category per mode, by time); conexion.js carries the result to Juegos.
+const MODOS = [10, 20, 30];
+const MEDIDAS = { 10: { w: 60, s: 12, f: 42 }, 20: { w: 32, s: 5, f: 24 }, 30: { w: 22, s: 3, f: 17 } };
+const claveModo = () => window.Club ? Club.storageKey('sortem.modo') : 'sortem.modo';
+let N = 10;
+try { const g = Number(localStorage.getItem(claveModo())); if (MODOS.includes(g)) N = g; } catch (e) {}
+const medida = () => MEDIDAS[N];
+let recordNube = null;   // best time in ms for the current mode, from the cloud
+let ultimoRecord = false;
+window.addEventListener('club-record', e => {
+  if (e.detail && e.detail.categoria === 'club-sortem-' + N) recordNube = e.detail.tiempo;
+});
+function anunciaModo() {
+  recordNube = null;
+  if (window.Club) Club.category('club-sortem-' + N);
 }
-
-function saveLb(lb) {
-  leaderboardData = lb.slice(0, 3);
-}
-
-function addScore(name, time) {
-  const lb = getLb();
-  lb.push({ n: name, t: parseFloat(time) });
-  lb.sort((a, b) => a.t - b.t);
-  saveLb(lb);
-  return lb.slice(0, 3);
-}
-
-function isHigh(time) {
-  const lb = getLb();
-  return lb.length < 3 || parseFloat(time) < lb[2].t;
+anunciaModo();
+function isHigh(ms) {
+  return recordNube == null || ms < recordNube;
 }
 
 // ==========================================
@@ -714,10 +706,6 @@ let titleShadow2;
 let subtitleText;
 let instructionsText;
 let leaderboardText;
-let nameInputActive = false;
-let currentName = ['A', 'A', 'A'];
-let nameInputPos = 0;
-let nameInputObjects = [];
 let gameOverObjects = [];
 
 // ==========================================
@@ -769,181 +757,6 @@ function parseDrumPattern(patternStr) {
   });
 }
 
-
-// Display leaderboard - VERTICAL
-function showLb(scene, startY, scale = 1) {
-  const lb = getLb();
-  if (lb.length === 0) return null;
-
-  const objects = [];
-
-  // Scale-based sizing
-  const titleSize = Math.round(18 * scale);
-  const scoreSize = Math.round(16 * scale);
-  const lineHeight = Math.round(22 * scale);
-  const bgWidth = Math.round(160 * scale);
-  const bgX = 400 - bgWidth / 2;
-
-  // Title
-  const title = scene.add.text(400, startY, 'TOP SCORES', {
-    fontSize: titleSize + 'px',
-    fontFamily: 'Courier New, monospace',
-    color: '#ffffff',
-    fontStyle: 'bold'
-  }).setOrigin(0.5);
-  objects.push(title);
-
-  // Add solid background for better visibility
-  const bgHeight = Math.round(25 * scale) + lb.length * lineHeight;
-  const bg = scene.add.graphics();
-  bg.fillStyle(0x2d1b4e, 1);
-  bg.fillRect(bgX, startY - Math.round(15 * scale), bgWidth, bgHeight);
-  bg.lineStyle(3, 0xff006e, 1);
-  bg.strokeRect(bgX, startY - Math.round(15 * scale), bgWidth, bgHeight);
-
-  // Draw title AFTER background so it's on top
-  title.setDepth(10);
-
-  objects.push(bg);
-
-  // Each score on its own line
-  const colors = ['#ff006e', '#fbbf24', '#00f5ff'];
-  lb.forEach((s, i) => {
-    const y = startY + lineHeight + i * lineHeight;
-    const txt = (i + 1) + '. ' + s.n + '  ' + s.t.toFixed(1) + 's';
-    const scoreText = scene.add.text(400, y, txt, {
-      fontSize: scoreSize + 'px',
-      fontFamily: 'Courier New, monospace',
-      color: colors[i],
-      fontStyle: 'bold'
-    }).setOrigin(0.5).setDepth(10);
-    objects.push(scoreText);
-  });
-
-  return objects;
-}
-
-// Name input screen
-function showNameInput(scene) {
-  // Use stored final time
-  const finalTime = gameState.finalTime.toFixed(1);
-
-  nameInputActive = true;
-  currentName = ['A', 'A', 'A'];
-  nameInputPos = 0;
-  nameInputObjects = [];
-
-  // High score banner (moved up to match SORTED position)
-  const banner = scene.add.text(400, 260, 'NEW HIGH SCORE!', {
-    fontSize: '40px',
-    fontFamily: 'Courier New, monospace',
-    color: '#fbbf24',
-    fontStyle: 'bold',
-    stroke: '#ff006e',
-    strokeThickness: 4
-  }).setOrigin(0.5);
-
-  scene.tweens.add({
-    targets: banner,
-    scale: { from: 1, to: 1.1 },
-    duration: 500,
-    yoyo: true,
-    repeat: -1
-  });
-
-  nameInputObjects.push(banner);
-
-  // Instructions
-  const inst = scene.add.text(400, 310, 'Enter Your Name', {
-    fontSize: '18px',
-    fontFamily: 'Courier New, monospace',
-    color: '#00f5ff'
-  }).setOrigin(0.5);
-  nameInputObjects.push(inst);
-
-  // Letter blocks (in the middle area)
-  const letterY = 370;
-  const letterSpacing = 80;
-  const startX = 400 - letterSpacing;
-
-  for (let i = 0; i < 3; i++) {
-    const x = startX + i * letterSpacing;
-
-    // Block background
-    const bg = scene.add.graphics();
-    bg.fillStyle(0x2d1b4e, 1);
-    bg.fillRect(x - 30, letterY - 40, 60, 80);
-    bg.lineStyle(3, 0x8338ec, 1);
-    bg.strokeRect(x - 30, letterY - 40, 60, 80);
-    nameInputObjects.push(bg);
-
-    // Letter text
-    const letter = scene.add.text(x, letterY, currentName[i], {
-      fontSize: '56px',
-      fontFamily: 'Courier New, monospace',
-      color: '#00f5ff',
-      fontStyle: 'bold',
-      stroke: '#ff006e',
-      strokeThickness: 3
-    }).setOrigin(0.5);
-    nameInputObjects.push(letter);
-  }
-
-  // Cursor indicator
-  const cursor = scene.add.graphics();
-  nameInputObjects.push(cursor);
-
-  // Arcade controller instructions
-  const arrows = scene.add.text(400, 460, '↑/↓: Change Letter  ←/→: Move  Space: Confirm', {
-    fontSize: '16px',
-    fontFamily: 'Courier New, monospace',
-    color: '#00f5ff',
-    fontStyle: 'bold'
-  }).setOrigin(0.5);
-  nameInputObjects.push(arrows);
-
-  scene.tweens.add({
-    targets: arrows,
-    alpha: { from: 1, to: 0.5 },
-    duration: 600,
-    yoyo: true,
-    repeat: -1
-  });
-
-  // Update function for cursor
-  scene.events.on('update', () => {
-    if (!nameInputActive) return;
-    cursor.clear();
-    const x = startX + nameInputPos * letterSpacing;
-    const pulse = Math.sin(Date.now() / 200) * 0.3 + 0.7;
-    cursor.lineStyle(4, 0xff006e, pulse);
-    cursor.strokeRect(x - 32, letterY - 42, 64, 84);
-  });
-}
-
-// Update name input letter
-function updateNameLetter(scene, delta) {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  const idx = chars.indexOf(currentName[nameInputPos]);
-  const newIdx = (idx + delta + chars.length) % chars.length;
-  currentName[nameInputPos] = chars[newIdx];
-
-  // Update text object (letter texts are at positions 3, 5, 7)
-  // Structure: 0=banner, 1=inst, 2=bg0, 3=text0, 4=bg1, 5=text1, 6=bg2, 7=text2, 8=cursor, 9=arrows
-  const textIdx = 3 + nameInputPos * 2;
-  if (nameInputObjects[textIdx]) {
-    nameInputObjects[textIdx].setText(currentName[nameInputPos]);
-  }
-
-  playTone(scene, 440 + delta * 110, 0.05);
-}
-
-// Clear name input
-function clearNameInput() {
-  nameInputObjects.forEach(obj => obj.destroy());
-  nameInputObjects = [];
-  nameInputActive = false;
-}
 
 // ==========================================
 // CREATE FUNCTION
@@ -1108,8 +921,41 @@ function createStartScreen(scene) {
     repeat: -1
   });
 
-  // Leaderboard
-  leaderboardText = showLb(scene, 480);
+  // Mode selector
+  leaderboardText = pintaModos(scene);
+}
+
+function pintaModos(scene) {
+  const objs = [];
+  objs.push(scene.add.text(400, 470, 'NUMBERS', {
+    fontSize: '18px', fontFamily: 'Courier New, monospace', color: '#c8a9e8', fontStyle: 'bold'
+  }).setOrigin(0.5));
+  MODOS.forEach((m, i) => {
+    const sel = m === N;
+    const t = scene.add.text(300 + i * 100, 510, sel ? '[' + m + ']' : String(m), {
+      fontSize: sel ? '36px' : '28px', fontFamily: 'Courier New, monospace',
+      color: sel ? '#fbbf24' : '#8338ec', fontStyle: 'bold', stroke: '#ff006e', strokeThickness: sel ? 3 : 0
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    t.on('pointerdown', () => {
+      if (phaseManager.getPhase() === GamePhase.START_SCREEN && m !== N) cambiaModo(scene, i - MODOS.indexOf(N));
+    });
+    objs.push(t);
+  });
+  objs.push(scene.add.text(400, 545, '↑/↓ change mode • Space: start', {
+    fontSize: '14px', fontFamily: 'Courier New, monospace', color: '#8338ec'
+  }).setOrigin(0.5));
+  return objs;
+}
+
+function cambiaModo(scene, paso) {
+  N = MODOS[(MODOS.indexOf(N) + paso + MODOS.length) % MODOS.length];
+  try { localStorage.setItem(claveModo(), String(N)); } catch (e) {}
+  anunciaModo();
+  gameState.cleanup();
+  gameState.generateNumbers();
+  if (leaderboardText) leaderboardText.forEach(obj => obj.destroy());
+  leaderboardText = pintaModos(scene);
+  playTone(scene, 440 + MODOS.indexOf(N) * 110, 0.06);
 }
 
 // ==========================================
@@ -1167,9 +1013,6 @@ function handleKeyInput(scene, key) {
     case GamePhase.PLAYING:
       handlePlayingInput(scene, key);
       break;
-    case GamePhase.NAME_INPUT:
-      handleNameInput(scene, key);
-      break;
     case GamePhase.GAME_OVER:
       handleGameOverInput(scene, key);
       break;
@@ -1177,6 +1020,10 @@ function handleKeyInput(scene, key) {
 }
 
 function handleStartScreenInput(scene, key) {
+  if (isUpInput(key) || isDownInput(key)) {
+    cambiaModo(scene, isUpInput(key) ? 1 : -1);
+    return;
+  }
   // Any game input starts the game (joystick or action button)
   if (isLeftInput(key) || isRightInput(key) || isActionButton(key)) {
     // Play transition pattern first
@@ -1242,37 +1089,6 @@ function handlePlayingInput(scene, key) {
         winGame(scene);
       }
     }
-  }
-}
-
-function handleNameInput(scene, key) {
-  if (isUpInput(key)) {
-    updateNameLetter(scene, 1);
-  } else if (isDownInput(key)) {
-    updateNameLetter(scene, -1);
-  } else if (isLeftInput(key)) {
-    if (nameInputPos > 0) {
-      nameInputPos--;
-      playTone(scene, 330, 0.05);
-    }
-  } else if (isRightInput(key)) {
-    if (nameInputPos < 2) {
-      nameInputPos++;
-      playTone(scene, 330, 0.05);
-    }
-  } else if (isActionButton(key)) {
-    const name = currentName.join('');
-    // Use stored final time
-    const finalTime = gameState.finalTime.toFixed(1);
-    addScore(name, finalTime);
-    clearNameInput();
-    playTone(scene, 880, 0.15);
-    scene.cameras.main.shake(200, 0.01);
-
-    // Show game over screen
-    phaseManager.setPhase(GamePhase.GAME_OVER);
-    transitionToGameOver(scene);
-    showGameOverScreen(scene);
   }
 }
 
@@ -1609,8 +1425,12 @@ function winGame(scene) {
   // STOP ALL MUSIC
   stopDrumLoop(scene);
 
-  // Check if high score for sound choice
-  const isHighScore = isHigh(finalTime);
+  // Report to the Club ranking and compare with the cloud record
+  const ms = Math.max(1, Math.round(gameState.finalTime * 1000));
+  const isHighScore = isHigh(ms);
+  ultimoRecord = isHighScore;
+  if (isHighScore) recordNube = ms;
+  if (window.Club) Club.result({ categoria: 'club-sortem-' + N, puntos: N, tiempo: ms });
 
   // INSTANT BIG WIN!
   if (isHighScore) {
@@ -1747,16 +1567,10 @@ function winGame(scene) {
   }).setOrigin(0.5);
   gameOverObjects.push(timeText);
 
-  // Check if high score
   setTimeout(() => {
-    if (isHigh(finalTime)) {
-      phaseManager.setPhase(GamePhase.NAME_INPUT);
-      showNameInput(scene);
-    } else {
-      phaseManager.setPhase(GamePhase.GAME_OVER);
-      transitionToGameOver(scene);
-      showGameOverScreen(scene);
-    }
+    phaseManager.setPhase(GamePhase.GAME_OVER);
+    transitionToGameOver(scene);
+    showGameOverScreen(scene);
   }, 1500);
 }
 
@@ -1857,10 +1671,19 @@ function showGameOverScreen(scene) {
     repeat: -1
   });
 
-  const lbObjs = showLb(scene, 265, lbScale);
-  if (lbObjs) {
-    gameOverObjects = gameOverObjects.concat(lbObjs);
-  }
+  const lbObjs = [
+    scene.add.text(400, 255, N + ' NUMBERS', {
+      fontSize: '22px', fontFamily: 'Courier New, monospace', color: '#c8a9e8', fontStyle: 'bold'
+    }).setOrigin(0.5),
+    scene.add.text(400, 315, ultimoRecord ? 'NEW RECORD!' : 'YOUR BEST', {
+      fontSize: Math.round(22 * lbScale) + 'px', fontFamily: 'Courier New, monospace',
+      color: ultimoRecord ? '#ff006e' : '#ffffff', fontStyle: 'bold'
+    }).setOrigin(0.5),
+    scene.add.text(400, 375, recordNube != null ? (recordNube / 1000).toFixed(2) + 's' : '—', {
+      fontSize: Math.round(26 * lbScale) + 'px', fontFamily: 'Courier New, monospace', color: '#fbbf24', fontStyle: 'bold'
+    }).setOrigin(0.5)
+  ];
+  gameOverObjects = gameOverObjects.concat(lbObjs);
 
   // Cool divider line
   const divider = scene.add.graphics();
@@ -1972,9 +1795,6 @@ function restartGame(scene) {
   // Clean up
   if (gameState) {
     gameState.cleanup();
-  }
-  if (nameInputActive) {
-    clearNameInput();
   }
   clearGameOverObjects();
 

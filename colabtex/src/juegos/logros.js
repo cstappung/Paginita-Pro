@@ -220,6 +220,18 @@ const SOLO = {
     { id: "u5k", n: "Dos minutos intensos", d: "Haz 5000 puntos en Ultra.", i: "🔥", m: "Ultra", s: d => cat(/-ultra$/)(d) && d.puntos >= 5000 },
     { id: "u20k", n: "Ultravioleta", d: "Haz 20 000 puntos en Ultra.", i: "🟣", m: "Ultra", s: d => cat(/-ultra$/)(d) && d.puntos >= 20000 },
     { id: "u50k", n: "Ultrasónico", d: "Haz 50 000 puntos en Ultra.", i: "🚀", m: "Ultra", s: d => cat(/-ultra$/)(d) && d.puntos >= 50000 }
+  ],
+  sortem: [
+    { id: "d10", n: "En orden", d: "Ordena del 1 al 10.", i: "🔢", m: "10", s: cat(/-10$/) },
+    { id: "d10t30", n: "Sin pensarlo", d: "Ordena del 1 al 10 en menos de 30 s.", i: "⏱️", m: "10", s: d => cat(/-10$/)(d) && d.tiempo < 30000 },
+    { id: "d10t15", n: "Reflejos", d: "Ordena del 1 al 10 en menos de 15 s.", i: "⚡", m: "10", s: d => cat(/-10$/)(d) && d.tiempo < 15000 },
+    { id: "d20", n: "Veinte en fila", d: "Ordena del 1 al 20.", i: "📶", m: "20", s: cat(/-20$/) },
+    { id: "d20t60", n: "Minuto justo", d: "Ordena del 1 al 20 en menos de 1 min.", i: "⌛", m: "20", s: d => cat(/-20$/)(d) && d.tiempo < 60000 },
+    { id: "d20t40", n: "Clasificador", d: "Ordena del 1 al 20 en menos de 40 s.", i: "🗂️", m: "20", s: d => cat(/-20$/)(d) && d.tiempo < 40000 },
+    { id: "d30", n: "Treintena", d: "Ordena del 1 al 30.", i: "🧮", m: "30", s: cat(/-30$/) },
+    { id: "d30t120", n: "Paciencia", d: "Ordena del 1 al 30 en menos de 2 min.", i: "🐢", m: "30", s: d => cat(/-30$/)(d) && d.tiempo < 120000 },
+    { id: "d30t80", n: "Mano rápida", d: "Ordena del 1 al 30 en menos de 80 s.", i: "🌪️", m: "30", s: d => cat(/-30$/)(d) && d.tiempo < 80000 },
+    { id: "d30t50", n: "Máquina de ordenar", d: "Ordena del 1 al 30 en menos de 50 s.", i: "🤖", m: "30", s: d => cat(/-30$/)(d) && d.tiempo < 50000 }
   ]
 };
 
@@ -229,7 +241,7 @@ export const LOGROS = Object.fromEntries([
   ...Object.entries(SOLO)
 ]);
 /* Qué categorías de `soloRanks` alimentan cada juego individual. */
-export const SOLO_PREFIJO = { minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-" };
+export const SOLO_PREFIJO = { minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", sortem: "club-sortem-" };
 
 /* Los logros de partida que `uid` tiene ya en esta, según lo que se ve. */
 export function detecta(p, est, uid) {
