@@ -17,7 +17,7 @@
    - con pocos bloques suben burbujas pentatónicas y el filtro del colchón se
      cierra: es la música de tener la partida bajo control.
 
-   Desde la ronda 100 la misma lógica toca en otro sitio, «el abismo»: más
+   Desde la ronda 50 la misma lógica toca en otro sitio, «el abismo»: más
    lento, en grave, con un sub que baja de 40 Hz, un bajo de sierra saturado,
    un 808 en medio tiempo que hunde el resto (sidechain) y una melodía de
    sierra en la octava 4.
@@ -322,7 +322,7 @@
       this.meta = intensidad(o);
       const DS = root.BBTANDescenso || Descenso;
       this.metaD = Number.isFinite(o.descenso) ? Math.max(0, Math.min(5, o.descenso))
-        : DS ? DS.corrupcion(o.ronda || 0) : ((o.ronda || 0) >= 100 ? 1 : 0);
+        : DS ? DS.corrupcion(o.ronda || 0) : ((o.ronda || 0) >= 50 ? 1 : 0);
     }
     bpm() {
       const D = this.D, a = Math.min(1, D), luz = 98 + 34 * this.I, abi = 84 + 26 * this.I;

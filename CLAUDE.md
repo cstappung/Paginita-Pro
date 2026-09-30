@@ -2597,11 +2597,12 @@ sixteenth hats, an alarm cluster and a heartbeat. The harmony switches to
 «filo» at I ≥ .7 and leaves it below .5. That hysteresis stops it flickering
 when a row goes back and forth. `duck()` lowers the music bus under the NICE!.
 
-**Below round 100 the game descends five floors** (`descenso.js`, UMD on
-`BBTANDescenso`, loaded before `musica.js`): abismo at 100, ruina at 200,
-estática at 300, hostil at 400 and vacío at 500. None of them is a switch.
-`corrupcion(ronda)` rises by 1/21 per round over the twenty rounds after each
-threshold, from 0 up to 5, and **everything reads that one number** except the
+**From round 50 the game descends five floors** (`descenso.js`, UMD on
+`BBTANDescenso`, loaded before `musica.js`): abismo from 50, ruina from 110,
+estática from 170, hostil from 230 and vacío from 290. None of them is a switch.
+`corrupcion(ronda)` rises by 1/60 per round over the sixty rounds after each
+threshold, and each fade starts where the last one ends, so it climbs without
+plateaus from 0 at round 49 to 5 at round 349, and **everything reads that one number** except the
 gameplay: blocks, balls, physics and aim stay as they are, so the game only
 gets more uncomfortable. The colours are `mezcla(c)`, a blend between the two
 floors' palettes (`ETAPAS`), and `paleta()` in `game.js` writes them into
