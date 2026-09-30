@@ -29,8 +29,8 @@
   "use strict";
 
   /* ============================================================
-     Los datos. Una carta es un número: 0-5 sospechosos, 6-11 armas,
-     12-20 lugares.
+     Los datos. Una carta es un número: 0-5 sospechosos, 6-14 armas,
+     15-23 lugares.
 
      Los sospechosos son **seis puestos** con color fijo (la ficha del
      tablero), y quién ocupa cada uno lo elige cada partida: al empezar,
@@ -55,13 +55,20 @@
     { id: "malva", n: "Guardia Malva", c: "Malva", d: "Tiene la llave del montacargas y de todo lo demás." }
   ];
   const idValido = r => typeof r === "string" && /^[a-z0-9-]{1,24}$/.test(r);
+  /* Las armas son de Electricidad: nueve, una por sala al empezar, como
+     en el Cluedo de 2008. `art` es el artículo para escribir «con la
+     Carta de Smith»; `c`, el nombre corto; `i`, el emoji de reserva. El
+     dibujo y la animación de cada una viven en `armas.js`. */
   const ARMAS = [
-    { n: "Extintor", i: "🧯", img: "extintor" },
-    { n: "Enceradora", i: "🌀", img: "enceradora" },
-    { n: "Manguera", i: "🚒", img: "manguera" },
-    { n: "Candado", i: "🔒", img: "candado" },
-    { n: "Trofeo", i: "🏆", img: "trofeo" },
-    { n: "Taburete", i: "🪑", img: "taburete" }
+    { id: "smith", n: "Carta de Smith", c: "Smith", art: "la", i: "🎯" },
+    { id: "fourier", n: "Transformada de Fourier", c: "Fourier", art: "la", i: "〰️" },
+    { id: "resistencia", n: "Resistencia", c: "Resistencia", art: "la", i: "🟫" },
+    { id: "capacitor", n: "Capacitor", c: "Capacitor", art: "el", i: "🔋" },
+    { id: "inductor", n: "Inductor", c: "Inductor", art: "el", i: "🌀" },
+    { id: "transistor", n: "Transistor", c: "Transistor", art: "el", i: "🔌" },
+    { id: "fuente", n: "Fuente de poder", c: "Fuente", art: "la", i: "⚡" },
+    { id: "opamp", n: "Amplificador operacional", c: "Op-amp", art: "el", i: "🔺" },
+    { id: "led", n: "Diodo LED", c: "LED", art: "el", i: "💡" }
   ];
   const LUGARES = [
     { n: "Pasillo de lockers", c: "Lockers", piso: 2, img: "lockers" },
@@ -75,7 +82,7 @@
     { n: "Bodega", c: "Bodega", piso: 1, img: "bodega" }
   ];
   const NS = COLORES.length, NA = ARMAS.length, NL = LUGARES.length;
-  const NC = NS + NA + NL;                       // 21 cartas
+  const NC = NS + NA + NL;                       // 24 cartas
   const cartaS = i => i, cartaA = i => NS + i, cartaL = i => NS + NA + i;
   const tipoCarta = c => c < NS ? "s" : c < NS + NA ? "a" : "l";
   /* `nombres`: el nombre de cada puesto (lo sabe la pantalla, que
@@ -350,7 +357,7 @@
      Una jugada que no toca, o que no vale, no existe: se ignora.
      ============================================================ */
   const NUEVE = NL;
-  const SOBRE = [0, NS, NS + NA];                 // posiciones del sobre en el mazo de 21
+  const SOBRE = [0, NS, NS + NA];                 // posiciones del sobre en el mazo entero
   const RESTO = Array.from({ length: NC }, (_, i) => i).filter(i => !SOBRE.includes(i));
   const LARGO_VALOR = 64;                          // cada número cifrado, en base64url
 
@@ -409,8 +416,8 @@
       if (vivos.length === 0) { ganador = ""; motivo = "nadie"; return true; }
       return false;
     }
-    /* El reparto va en orden de asiento: 21 mezclas, 18 revueltas,
-       18 quitas. Quien debe la siguiente es el asiento `cr.orden`. */
+    /* El reparto va en orden de asiento: mezcla (las NC), revuelve y
+       quita (las NC - 3 que no van al sobre). Quien debe la siguiente es el asiento `cr.orden`. */
     const etapas = ["mezcla", "revuelve", "quita"];
     const debeReparto = () => cr.mesa[cr.orden] || "";
     const largoOk = (c, k) => typeof c === "string" && c.length === k * LARGO_VALOR && /^[A-Za-z0-9_-]+$/.test(c);
@@ -668,10 +675,10 @@
      de residuos cuadráticos; cifrar es elevar a un exponente secreto, y
      elevar conmuta.
 
-     1. `mezcla` (en orden de asiento): cada uno cifra las 21 con su
+     1. `mezcla` (en orden de asiento): cada uno cifra las NC con su
         exponente k1 y baraja *dentro* de cada categoría. La primera de
-        cada una (posiciones 0, 6 y 12) es el sobre.
-     2. `revuelve` (en orden): las 18 restantes se cifran con k2 y se
+        cada una (posiciones 0, 6 y 15) es el sobre.
+     2. `revuelve` (en orden): las NC - 3 restantes se cifran con k2 y se
         barajan todas juntas, para que nadie sepa de qué tipo es la
         mano de nadie.
      3. `quita` (en orden): cada uno quita k1·k2 de las cartas que no
@@ -772,7 +779,7 @@
     const y = x.map(v => potMod(v, ll.k2, P));
     return ll.pr.map(de => cod(y[de])).join("");
   }
-  /* `mias`: las posiciones del resto (0-17) que son de quien quita. */
+  /* `mias`: las posiciones del resto (0 a NC - 4) que son de quien quita. */
   function quita(prev, ll, mias) {
     const x = trozos(prev, RESTO.length);
     if (!x) return null;

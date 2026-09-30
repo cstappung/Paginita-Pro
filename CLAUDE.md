@@ -2700,7 +2700,12 @@ online side of the frame) and `js/main.js` (the screen). The board is the
 building filmed in a walkthrough video: three rooms on the second floor
 (lockers, emergency landing, window corridor) and six on the first, the
 courtyard in the middle holding the envelope, and two secret passages
-(the stair and the goods lift). `colabtex/src/juegos/clue.js` (`crearClue`)
+(the stair and the goods lift). The nine weapons are electrical (Smith
+chart, Fourier transform, resistor, capacitor, inductor, transistor, power
+supply, op-amp, LED), one per room at the start, 24 cards in all; each is
+drawn in SVG by `js/armas.js` (`ClueArmas.icono`), with a short feedback
+effect (`chispa`) and a murder scene (`escena`) that plays on the end
+screen for the weapon in the envelope. `colabtex/src/juegos/clue.js` (`crearClue`)
 is only the postman, like Yemas'. Things that hold it together:
 
 - **One engine, three users.** `motor.js` of colabtex cannot import (the
@@ -2718,9 +2723,10 @@ is only the postman, like Yemas'. Things that hold it together:
   which caches it in `localStorage` (`clue.elenco`) for practice. Without
   it the game uses the invented `SOSPECHOSOS`.
 - **The deal is Presidente's SRA, on the same 384-bit safe prime**, in
-  three sequential passes of the frozen table `cr.mesa`: `mezcla` (all 21
-  cards, exponent k1, shuffled *within* each category; positions 0, 6 and
-  12 are the envelope), `revuelve` (the other 18, exponent k2, shuffled
+  three sequential passes of the frozen table `cr.mesa`: `mezcla` (all
+  `NC` cards, exponent k1, shuffled *within* each category; the first of
+  each, positions 0, 6 and 15, is the envelope), `revuelve` (the other
+  `NC - 3`, exponent k2, shuffled
   together so nobody learns the category mix of a hand) and `quita` (each
   removes k1·k2 from the cards that are not theirs; card j belongs to
   `mesa[j % n]`). `red.js` does these by itself, as it does `paso` when

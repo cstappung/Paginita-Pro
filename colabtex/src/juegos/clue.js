@@ -38,8 +38,8 @@ function limpia(j) {
   const r = { t: j.t };
   const texto = (v, max) => typeof v === "string" && v.length <= max && /^[A-Za-z0-9_-]*$/.test(v);
   if (j.t === "elige" && texto(j.r, 24)) r.r = j.r;
-  if (j.t === "mezcla" && texto(j.c, 21 * 64) && texto(j.pk, 64)) { r.c = j.c; r.pk = j.pk; }
-  if ((j.t === "revuelve" || j.t === "quita") && texto(j.c, 18 * 64)) r.c = j.c;
+  if (j.t === "mezcla" && texto(j.c, CM.NC * 64) && texto(j.pk, 64)) { r.c = j.c; r.pk = j.pk; }
+  if ((j.t === "revuelve" || j.t === "quita") && texto(j.c, (CM.NC - 3) * 64)) r.c = j.c;
   if (j.t === "abre" && texto(j.c, 3 * 64)) r.c = j.c;
   if (j.t === "mueve" && Number.isInteger(j.a)) { r.a = j.a; r.v = j.v === "pasadizo" ? "pasadizo" : "dado"; }
   if (j.t === "sugiere" && Number.isInteger(j.s) && Number.isInteger(j.a)) { r.s = j.s; r.a = j.a; }
@@ -120,7 +120,7 @@ export function crearClue({ uid, pid, jugar, terminar, mirando, secreto }) {
     frame.title = "Clue: partida en línea";
     frame.className = "jg-clue-marco";
     window.addEventListener("message", mensaje);
-    frame.src = "juegos/clue/index.html?modo=online&v=clue-1";
+    frame.src = "juegos/clue/index.html?modo=online&v=clue-2";
     host.append(aviso, frame);
   }
 

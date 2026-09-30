@@ -16,10 +16,11 @@
   function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
   function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* sin almacenamiento */ } }
   function lsJson(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }
-  const ARTICULO_ARMA = ["el", "la", "la", "el", "el", "el"];
+  const CA = window.ClueArmas || null;          // dibujos y escenas de las armas (armas.js)
   const ARTICULO_LUGAR = ["el", "el", "el", "el", "el", "la", "la", "el", "la"];
   const enLugar = l => "en " + ARTICULO_LUGAR[l] + " " + M.LUGARES[l].n;
-  const conArma = a => "con " + ARTICULO_ARMA[a] + " " + M.ARMAS[a].n;
+  const conArma = a => "con " + M.ARMAS[a].art + " " + M.ARMAS[a].n;
+  const iconoArma = (a, at) => CA ? CA.icono(a, at) : '<span class="fondo-emoji">' + M.ARMAS[a].i + "</span>";
 
   function esClaro(hex) {
     const n = parseInt(hex.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
@@ -78,14 +79,11 @@
   function fotoCarta(c) {
     const t = M.tipoCarta(c);
     if (t === "s") return avatarPuesto(c, "lleno");
-    if (t === "a") {
-      const a = M.ARMAS[c - M.NS];
-      return '<span class="fondo-emoji">' + a.i + '</span><img src="img/armas/' + a.img + '.webp" alt="">';
-    }
+    if (t === "a") return '<span class="arma-ico">' + iconoArma(c - M.NS) + "</span>";
     return '<img src="img/salas/' + M.LUGARES[c - M.NS - M.NA].img + '.webp" alt="">';
   }
   function cartaHtml(c, extra) {
-    return '<div class="carta t-' + M.tipoCarta(c) + (extra ? " " + extra : "") + '"><div class="foto">' + fotoCarta(c) + '</div><div class="pie">' + esc(nombreCarta(c)) + "</div></div>";
+    return '<div class="carta t-' + M.tipoCarta(c) + (extra ? " " + extra : "") + '"><div class="foto"' + (M.tipoCarta(c) === "a" ? ' data-arma="' + (c - M.NS) + '"' : "") + ">" + fotoCarta(c) + '</div><div class="pie">' + esc(nombreCarta(c)) + "</div></div>";
   }
 
   /* ============================================================
@@ -192,9 +190,41 @@
       }
       if (est.fase === "fin" && !prev || (prev && prev.fase !== "fin" && est.fase === "fin")) ui.finCerrado = false;
       pinta();
+      const sg = est.sug;
+      if (prev && prev.jugadores && sg && (!prev.sug || prev.sug.k !== sg.k)) chispaArma(sg.a);
     } catch (e) {
       console.warn("[clue] pintar", e);
     }
+  }
+
+  /* Un destello sobre la arma nombrada en una sugerencia: así se ve que
+     viaja a la sala. Va en la capa #fx, que pintaDinamico no borra. */
+  function chispaArma(a) {
+    const fx = $("fx");
+    if (!CA || !fx || $("juego").hidden || !est || !est.armas) return;
+    const p = distribuye(est).arm[a];
+    if (!p) return;
+    const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    g.setAttribute("transform", "translate(" + p.x.toFixed(1) + "," + p.y.toFixed(1) + ")");
+    fx.appendChild(g);
+    const h = CA.chispa(a, g, { r: p.s * 0.95 });
+    setTimeout(() => { h.parar(); if (g.parentNode) g.parentNode.removeChild(g); }, 1400);
+  }
+
+  /* Escenas y chispas del dialogo abierto: se paran al cambiarlo o cerrarlo. */
+  let escenasVivas = [], timersFx = [];
+  function paraEscenas() {
+    escenasVivas.forEach(h => { try { h.parar(); } catch (e) { /* nada */ } });
+    timersFx.forEach(clearTimeout);
+    escenasVivas = []; timersFx = [];
+  }
+  function arrancaEscenas() {
+    if (!CA) return;
+    document.querySelectorAll("#modal [data-escena]").forEach(h => {
+      escenasVivas.push(CA.escena(Number(h.dataset.escena), h, { bucle: h.dataset.bucle === "1" }));
+    });
+    const foto = document.querySelector("#modal .giro .foto[data-arma]");
+    if (foto) timersFx.push(setTimeout(() => { escenasVivas.push(CA.chispa(Number(foto.dataset.arma), foto)); }, 1450));
   }
 
   function pinta() {
@@ -399,12 +429,12 @@
       '<circle r="' + r + '" fill="' + fondo + '"/>' + dentro +
       '<circle r="' + r + '" fill="none" stroke="rgba(0,0,0,.45)" stroke-width="1"/></g>';
   }
-  function armaSvg(a, x, y, s) {
-    const A = M.ARMAS[a];
-    return '<g class="arma" transform="translate(' + x.toFixed(1) + "," + y.toFixed(1) + ')"><title>' + esc(A.n) + "</title>" +
-      '<rect x="' + -s / 2 + '" y="' + -s / 2 + '" width="' + s + '" height="' + s + '" rx="6" fill="#20242c" stroke="#e6b85c" stroke-width="1.6"/>' +
-      '<text y="' + (s * 0.22) + '" text-anchor="middle" style="font-size:' + (s * 0.62).toFixed(1) + 'px">' + A.i + "</text>" +
-      '<image href="img/armas/' + A.img + '.webp" x="' + (-s / 2 + 1.5) + '" y="' + (-s / 2 + 1.5) + '" width="' + (s - 3) + '" height="' + (s - 3) + '" preserveAspectRatio="xMidYMid slice"/>' +
+  function armaSvg(a, x, y, s, clic) {
+    const A = M.ARMAS[a], m = s / 2 - 1.5;
+    const dentro = CA ? CA.icono(a, 'x="' + (-m).toFixed(1) + '" y="' + (-m).toFixed(1) + '" width="' + (2 * m).toFixed(1) + '" height="' + (2 * m).toFixed(1) + '"')
+      : '<text y="' + (s * 0.22) + '" text-anchor="middle" style="font-size:' + (s * 0.62).toFixed(1) + 'px">' + A.i + "</text>";
+    return '<g class="arma' + (clic ? " clic" : "") + '"' + (clic ? ' data-act="info-arma" data-a="' + a + '"' : "") + ' transform="translate(' + x.toFixed(1) + "," + y.toFixed(1) + ')"><title>' + esc(A.n) + "</title>" +
+      '<rect x="' + -s / 2 + '" y="' + -s / 2 + '" width="' + s + '" height="' + s + '" rx="6" fill="#0c2540"/>' + dentro +
       '<rect x="' + -s / 2 + '" y="' + -s / 2 + '" width="' + s + '" height="' + s + '" rx="6" fill="none" stroke="#e6b85c" stroke-width="1.6"/></g>';
   }
 
@@ -431,7 +461,7 @@
         h += '<rect class="dest sala-d" data-act="mover" data-a="' + (M.SALA + l) + '" x="' + (x0 * S + 3) + '" y="' + (y0 * S + 3) + '" width="' + ((x1 - x0 + 1) * S - 6) + '" height="' + ((y1 - y0 + 1) * S - 6) + '" rx="10"/>';
       });
     }
-    lay.arm.forEach((p, a) => { if (p) h += armaSvg(a, p.x, p.y, p.s); });
+    lay.arm.forEach((p, a) => { if (p) h += armaSvg(a, p.x, p.y, p.s, !al); });
     const turnoI = est.fase === "jugando" ? asientoDe(est.turno) : -1;
     // el turno activo va encima de los demas
     const orden = est.fichas.map((_, i) => i).sort((a, b) => (a === turnoI) - (b === turnoI));
@@ -745,12 +775,14 @@
     if (!d && est && est.fase === "fin" && !ui.finCerrado && !ui.dlg) d = { k: "fin" };
     if (!d && ui.dlg && est && est.fase === "jugando") d = ui.dlg;
     if (!d && ui.dlg && est && est.fase === "fin") d = ui.dlg;
-    if (!d) { if (!M_.hidden) { M_.hidden = true; M_.innerHTML = ""; } firmaModal = ""; return; }
+    if (!d) { paraEscenas(); if (!M_.hidden) { M_.hidden = true; M_.innerHTML = ""; } firmaModal = ""; return; }
     const firma = JSON.stringify([d, ui.selS, ui.selA, ui.selL, est.personajes, ui.busy, priv.mano, priv.problemas, priv.sobre]);
     if (firma === firmaModal) return;
     firmaModal = firma;
+    paraEscenas();
     M_.hidden = false;
     M_.innerHTML = '<div class="velo" data-act="velo"><div class="dialogo d-' + d.k + '" role="dialog" aria-modal="true">' + contenidoModal(d) + "</div></div>";
+    arrancaEscenas();
   }
 
   function contenidoModal(d) {
@@ -760,6 +792,7 @@
       case "sugiere": return dlgSugiere();
       case "acusa": return dlgAcusa();
       case "info": return dlgInfo(d.q);
+      case "arma": return dlgArma(d.a);
       case "fin": return dlgFin();
     }
     return "";
@@ -831,6 +864,15 @@
       '<div class="botones"><button class="btn primario" data-act="cierra-dlg">Cerrar</button></div>';
   }
 
+  function dlgArma(a) {
+    const A = M.ARMAS[a], D = CA && CA.DATOS[a];
+    return "<h2>" + esc(A.n) + "</h2>" +
+      (est && est.armas ? '<p class="sub2">Ahora está ' + esc(enLugar(est.armas[a])) + ".</p>" : "") +
+      '<div class="arma-ficha"><span class="grande-ico">' + iconoArma(a) + "</span>" + (D ? "<p>" + esc(D.dato) + "</p>" : "") + "</div>" +
+      (CA ? '<h4>Así se comete el crimen</h4><div class="escena-caja"><div class="escena-host" data-escena="' + a + '" data-bucle="1"></div></div>' : "") +
+      '<div class="botones"><button class="btn primario" data-act="cierra-dlg">Cerrar</button></div>';
+  }
+
   const QUE_PROBLEMA = {
     paso: "dijo que no tenía una carta que sí tenía", muestra: "mostró una carta que no era válida", mezcla: "no barajó como debía",
     revuelve: "alteró el reparto", quita: "alteró el reparto", veredicto: "dio un veredicto falso", oculta: "aún no reveló su semilla"
@@ -842,6 +884,11 @@
       const i = asientoDe(est.ganador);
       h += '<div class="ganador">' + (i >= 0 ? avatarPuesto(i, 64) : "") + "<div><b>" + esc(nombreDe(est.ganador)) + "</b><br><small>" + esc(textoGanador()) + "</small></div></div>";
     } else h += "<p>" + esc(textoGanador()) + "</p>";
+    if (CA && sobre && sobre.length === 3) {
+      const wi = sobre[1] - M.NS, D = CA.DATOS[wi];
+      h += '<div class="escena-caja"><div class="escena-host" data-escena="' + wi + '"></div><p class="frase-arma">' + esc(D.frase) + '</p><p class="dato-arma">' + esc(D.dato) + "</p>" +
+        '<button type="button" class="btn" data-act="repite-escena">&#8635; Repetir la escena</button></div>';
+    }
     if (sobre && sobre.length === 3) {
       h += '<h4>Dentro del sobre estaba</h4><div class="cartas-fila grandes">' + sobre.map(c => cartaHtml(c, "grande")).join("") + "</div>";
       h += '<p class="sub2">' + esc(nombreCarta(sobre[0])) + " " + esc(conArma(sobre[1] - M.NS)) + " " + esc(enLugar(sobre[2] - M.NS - M.NA)) + "</p>";
@@ -954,11 +1001,13 @@
           return;
         }
         case "cierra-revela": ui.cola.shift(); firmaModal = ""; pintaModal(); return;
+        case "info-arma": ui.dlg = { k: "arma", a: Number(el.dataset.a) }; pintaModal(); return;
+        case "repite-escena": paraEscenas(); arrancaEscenas(); return;
         case "info-pasadizo": ui.dlg = { k: "info", q: Number(el.dataset.q) }; pintaModal(); return;
         case "ver-fin": ui.finCerrado = false; ui.dlg = null; firmaModal = ""; pintaModal(); return;
         case "cierra-fin": ui.finCerrado = true; ui.dlg = null; firmaModal = ""; pintaModal(); return;
         case "velo":
-          if (ev.target === el && ui.dlg && (ui.dlg.k === "sugiere" || ui.dlg.k === "acusa" || ui.dlg.k === "info")) { ui.dlg = null; pintaModal(); }
+          if (ev.target === el && ui.dlg && (ui.dlg.k === "sugiere" || ui.dlg.k === "acusa" || ui.dlg.k === "info" || ui.dlg.k === "arma")) { ui.dlg = null; pintaModal(); }
           return;
       }
     } catch (e) { console.warn("[clue] accion", act, e); }

@@ -17,12 +17,13 @@ function estado(uids, sugerencias = [], acusaciones = []) {
 const sug = (uid, s, a, l, pasaron, mostro, k) => ({ uid, s, a, l, pasaron, mostro, k: k || 'k' + Math.random() });
 
 test('clue bots: con la mano y los tamaños cierra el sobre', () => {
-  /* Dos jugadores: 9 cartas cada uno. Yo tengo 9, y él las otras 9 si
-     sé que esas no están en el sobre. */
+  /* Dos jugadores: la mitad del resto cada uno (con cartas impares, el
+     primer asiento se lleva una más). */
   const uids = ['a', 'b'];
   const sobre = [0, M.NS, M.NS + M.NA];
   const resto = Array.from({ length: M.NC }, (_, i) => i).filter(c => !sobre.includes(c));
-  const mia = resto.slice(0, 9), suya = resto.slice(9);
+  const mitad = Math.ceil(resto.length / 2);
+  const mia = resto.slice(0, mitad), suya = resto.slice(mitad);
   const bot = B.crear({ uid: 'a', mano: mia, jugadores: uids });
   bot.observa(estado(uids), {});
   /* Sin más datos: quedan 3 candidatas por tipo salvo lo que él tenga. Le enseñan seis de las suyas. */
@@ -36,9 +37,9 @@ test('clue bots: con la mano y los tamaños cierra el sobre', () => {
   bot.observa(estado(uids, sugs), vistas);
   const sabe = bot.sabe();
   assert.ok(sabe.dueños.length === M.NC);
-  /* Con 9 cartas de cada uno y 6 vistas, las 3 que faltan de él son las que no están en el sobre ni en mi mano. */
+  /* Con 6 vistas, las que faltan de él son las que no están en el sobre ni en mi mano. */
   const desconocidas = resto.filter(c => !mia.includes(c) && !suya.slice(0, 6).includes(c));
-  assert.equal(desconocidas.length, 3);
+  assert.equal(desconocidas.length, suya.length - 6);
   const candidatas = c => (sabe.dueños[c] & sabe.E) !== 0;
   assert.ok(candidatas(sobre[0]) && candidatas(sobre[1]) && candidatas(sobre[2]));
 });

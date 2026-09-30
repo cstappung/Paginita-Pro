@@ -243,3 +243,21 @@ p { margin: 0 0 8px; }
 
 .dialogo .botones { position: sticky; bottom: -20px; background: var(--panel); padding: 10px 0 4px; margin-bottom: -4px; }
 .dialogo .grilla-op { grid-template-columns: repeat(auto-fill, minmax(74px, 1fr)); }
+
+/* ---------- armas eléctricas: iconos, escenas y ficha ---------- */
+.carta .foto .arma-ico { position: absolute; inset: 0; display: block; }
+.arma-ico svg, .grande-ico svg { width: 100%; height: 100%; display: block; }
+.arma.clic { cursor: pointer; }
+.arma.clic:hover rect:last-child { stroke: #fff; }
+.escena-caja { margin: 12px 0; text-align: center; }
+.escena-host { width: 100%; max-width: 540px; margin: 0 auto; aspect-ratio: 16 / 10; background: #0a2038; border-radius: 12px; border: 1px solid #2b5d95; overflow: hidden; position: relative; box-shadow: 0 8px 24px rgba(0, 0, 0, .45); }
+.escena-host svg { width: 100%; height: 100%; display: block; }
+.frase-arma { font-family: var(--serif); font-size: 19px; color: var(--oro); margin: 12px 0 4px; }
+.dato-arma { color: #cfc8b6; font-size: 13.5px; margin: 0 0 10px; }
+.arma-ficha { display: flex; gap: 14px; align-items: center; text-align: left; margin: 8px 0; }
+.arma-ficha p { margin: 0; color: #d9d2c0; }
+.grande-ico { position: relative; width: 120px; height: 120px; flex: none; border-radius: 13px; overflow: hidden; box-shadow: 0 6px 18px rgba(0, 0, 0, .5); }
+@media (max-width: 900px) { .grande-ico { width: 92px; height: 92px; } .frase-arma { font-size: 17px; } }
+.carta.t-a .pie { font-size: 9.5px; }
+.carta.mini.t-a .pie { font-size: 8.5px; }
+.carta.grande.t-a .pie { font-size: 14px; }

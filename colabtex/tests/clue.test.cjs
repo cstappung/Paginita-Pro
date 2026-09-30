@@ -82,7 +82,7 @@ test('clue: el reparto cifrado da manos disjuntas y el sobre, uno de cada tipo',
     const manos = S.js.map((_, i) => manoDe(e, S, i));
     const todas = manos.flat();
     assert.ok(todas.every(c => c >= 0), 'cada uno abre sus cartas');
-    assert.equal(new Set(todas).size, 18);
+    assert.equal(new Set(todas).size, M.NC - 3);
     assert.ok(M.auditar(S.log, S.js, S.op).problemas.every(p => p.que === 'oculta'));
     const a = auditaYa(S);
     assert.deepEqual(a.problemas, []);
