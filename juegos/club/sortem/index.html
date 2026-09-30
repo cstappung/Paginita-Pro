@@ -14,13 +14,24 @@
     nav{position:fixed;z-index:5;top:0;left:0;right:0;height:42px;display:flex;align-items:center;gap:14px;padding:0 16px;background:#160826e8;border-bottom:1px solid #8338ec88;backdrop-filter:blur(8px)}
     nav a{color:#00f5ff;text-decoration:none;font-weight:700}
     nav span{font-size:12px;color:#c8a9e8}
-    #game{width:min(800px,100%);aspect-ratio:4/3;box-shadow:0 0 0 2px #8338ec,0 18px 70px #ff006e2e;background:#1a0a2e;overflow:hidden}
-    #game canvas{display:block!important;width:100%!important;height:100%!important}
-    .shell{width:min(800px,100%)}
-    .club-volver{color:#00f5ff}
-    .club-ranking{background:#1a0a2e;border-color:#8338ec;color:#e9dcff}
+    /* El lienzo es 800×600 y Phaser lo escala con FIT: aquí solo se decide
+       el tamaño de la caja. Tan grande como quepa a lo ancho y a lo alto de
+       la pantalla; el alto dentro de Juegos lo mide el script de abajo en la
+       ventana de arriba, porque 100vh en el iframe es el iframe mismo. */
+    .shell{width:100%;max-width:1700px;display:flex;flex-wrap:wrap;justify-content:center;align-items:flex-start;gap:20px}
+    .marco{position:relative;flex:0 0 auto;width:min(100%,calc((100vh - 72px)*4/3))}
+    #game{width:100%;aspect-ratio:4/3;box-shadow:0 0 0 2px #8338ec,0 18px 70px #ff006e2e;background:#1a0a2e;overflow:hidden}
+    #game canvas{display:block}
+    .pantalla{position:absolute;z-index:3;top:8px;right:8px;width:34px;height:34px;border:1px solid #8338ec;border-radius:8px;background:#1a0a2ecc;color:#00f5ff;font-size:18px;line-height:1;cursor:pointer;opacity:.55;transition:opacity .15s}
+    .pantalla:hover,.pantalla:focus-visible{opacity:1}
+    .marco:fullscreen{width:100vw;height:100vh;display:grid;place-items:center;background:#10051f}
+    .marco:fullscreen #game{width:min(100vw,100vh*4/3);box-shadow:none}
+    .shell>.club-volver{display:none}
+    .club-ranking{background:#1a0a2e;border-color:#8338ec;color:#e9dcff;flex:1 1 100%;max-width:800px;margin:0}
     .club-integrado body{padding:0;display:block}
-    .club-integrado .shell{width:100%;max-width:800px;margin:0 auto}
+    .club-integrado .shell{max-width:none;margin:0 auto}
+    .club-integrado .marco{width:min(100%,calc(var(--alto-juego,600px)*4/3))}
+    .club-integrado .club-ranking{margin:0}
     .club-integrado nav{display:none}
     .error{width:min(800px,100%);padding:24px;border:1px solid #ff006e;background:#2d1b4e;color:#fff;line-height:1.6}
   </style>
@@ -28,8 +39,26 @@
 <body>
   <nav><a href="../../../juegos.html">← Juegos</a><span>sortEm · Arcade Edition</span></nav>
   <div class="shell">
-    <main id="game" aria-label="Juego sortEm"></main>
+    <div class="marco" id="marco">
+      <main id="game" aria-label="Juego sortEm"></main>
+      <button class="pantalla" id="pantalla" type="button" title="Pantalla completa" aria-label="Pantalla completa">⛶</button>
+    </div>
   </div>
+  <script>
+    (function(){
+      var marco=document.getElementById('marco'),boton=document.getElementById('pantalla');
+      var arriba=null;try{if(window.top!==window&&window.top.innerHeight)arriba=window.top;}catch(e){}
+      function mide(){if(arriba)document.documentElement.style.setProperty('--alto-juego',Math.max(300,arriba.innerHeight-24)+'px');}
+      mide();window.addEventListener('resize',mide);
+      if(arriba){arriba.addEventListener('resize',mide);window.addEventListener('pagehide',function(){try{arriba.removeEventListener('resize',mide);}catch(e){}});}
+      var pide=marco.requestFullscreen||marco.webkitRequestFullscreen;
+      if(!pide){boton.hidden=true;return;}
+      boton.onclick=function(){
+        if(document.fullscreenElement||document.webkitFullscreenElement)(document.exitFullscreen||document.webkitExitFullscreen).call(document);
+        else pide.call(marco);
+      };
+    })();
+  </script>
   <script>
     window.addEventListener('error',function(){
       var game=document.getElementById('game');
@@ -37,6 +66,6 @@
     });
   </script>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.87.0/dist/phaser.min.js"></script>
-  <script src="game.js?v=club-1"></script>
+  <script src="game.js?v=club-2"></script>
 </body>
 </html>
