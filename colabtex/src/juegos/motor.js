@@ -1059,9 +1059,9 @@ export const YM_VARIANTES = { todos: "Todos contra todos", equipos: "Duelo por e
 export const YM_LARGOS = { todos: [10, 15, 25], equipos: [20, 30, 50], bandera: [1, 3, 5] };
 export const YM_EQUIPOS = ["rojo", "azul"];
 export const YM_BASES = { rojo: [0, 29], azul: [0, -29] };
-/* Batidora, Revuelta, Poché y el Huevo duro (la granada): el `a` de una
-   muerte es el índice en ese orden. */
-export const YM_ARMAS = 4;
+/* Batidora, Revuelta, Poché, el Huevo duro (la granada) y la
+   autodestrucción: el `a` de una muerte es el índice en ese orden. */
+export const YM_ARMAS = 5;
 export const YM_METAS = YM_LARGOS.todos;
 export const YM_META = 15;
 export function varianteYemas(p) {

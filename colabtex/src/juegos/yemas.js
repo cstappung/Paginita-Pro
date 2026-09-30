@@ -96,7 +96,7 @@ export function crearYemas({ uid, pid, jugar, terminar, mirando }) {
     if (d.tipo === "estado" && d.e && typeof d.e === "object") {
       fb.yemasVivo(pid, uid, d.e);
     } else if (d.tipo === "muere") {
-      const a = Number.isInteger(d.a) && d.a >= 0 && d.a <= 3 ? d.a : 0;
+      const a = Number.isInteger(d.a) && d.a >= 0 && d.a <= 4 ? d.a : 0;
       const j = { t: "muere", uid, por: typeof d.por === "string" ? d.por.slice(0, 64) : "", a, cab: !!d.cab };
       if (d.x !== undefined) { j.x = num(d.x); j.z = num(d.z); }
       anota(j);
@@ -245,7 +245,7 @@ export function crearYemas({ uid, pid, jugar, terminar, mirando }) {
     window.addEventListener("message", mensaje);
     window.addEventListener("keydown", abajo);
     window.addEventListener("keyup", arriba);
-    frame.src = "juegos/yemas/index.html?modo=online&v=yemas-3";
+    frame.src = "juegos/yemas/index.html?modo=online&v=yemas-4";
     host.append(aviso, equiposEl, barra, frame);
   }
 

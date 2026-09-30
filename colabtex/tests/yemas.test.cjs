@@ -200,3 +200,11 @@ test('yemas: una baja con granada (arma 3) cuenta y queda en el historial',()=>{
  assert.equal(e.bajas.a,1);assert.equal(e.hist.at(-1).a,3);
  assert.equal(muere(p,'c','a',{a:9}).hist.at(-1).a,0);
 });
+
+test('yemas: la autodestrucción (arma 4) le suma al que revienta y su propia muerte a nadie',()=>{
+ const p=sala(3);
+ muere(p,'b','a',{a:4});
+ const e=muere(p,'a','a',{a:4});
+ assert.equal(e.bajas.a,1);assert.equal(e.muertes.a,1);assert.equal(e.muertes.b,1);
+ assert.equal(e.hist.at(-2).a,4);assert.equal(e.hist.at(-1).uid,'');
+});
