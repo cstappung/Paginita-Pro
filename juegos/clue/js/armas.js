@@ -1,8 +1,10 @@
-/* Clue - las armas eléctricas: iconos, escenas del crimen y chispas.
-   Todo es SVG dibujado aquí, sin imágenes ni librerías. Tres cosas:
-   - icono(i): el dibujo de la arma i (viewBox 100x100, estilo plano de laboratorio);
-   - escena(i, host, opciones): una animación de 3 a 5 s de cómo se cometió el crimen;
-   - chispa(i, host): un destello corto (<= 1,2 s) como aviso.
+/* Clue - las armas: iconos, escenas del crimen y chispas. Van por id de
+   catálogo (motor.js, `M.CATALOGO_ARMAS`): nueve eléctricas dibujadas aquí en
+   SVG, y seis clásicas del edificio que usan su foto real como icono y
+   como recuadro de la escena. Tres cosas:
+   - icono(id, atributos): el dibujo del arma (viewBox 100x100);
+   - escena(id, host, opciones): una animación de 3 a 5 s de cómo se cometió el crimen;
+   - chispa(id, host): un destello corto (<= 1,2 s) como aviso.
    Cada escena es una función del tiempo (`f(t, R)`), no una animación CSS:
    así se puede pintar el último cuadro tal cual con `prefers-reduced-motion`,
    o cualquier instante con `opciones.t` (segundos). */
@@ -105,14 +107,24 @@
       '<g stroke="' + C.tinta + '" fill="none" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M77 20V37M77 55V80"/><path d="M68 37H86L77 54z" fill="rgba(60,130,210,.35)"/><path d="M67 54H87"/></g><path d="M88 40l6-6M90 47l6-6" stroke="' + C.oro + '" stroke-width="2.4" stroke-linecap="round"/>'
   ];
 
+  const ELEC = ["smith", "fourier", "resistencia", "capacitor", "inductor", "transistor", "fuente", "opamp", "led"];
+  const IDX = {}; ELEC.forEach((k, i) => { IDX[k] = i; });
+  const ARMAS_N = {
+    smith: "Carta de Smith", fourier: "Transformada de Fourier", resistencia: "Resistencia", capacitor: "Capacitor", inductor: "Inductor",
+    transistor: "Transistor", fuente: "Fuente de poder", opamp: "Amplificador operacional", led: "Diodo LED",
+    extintor: "Extintor", enceradora: "Enceradora", manguera: "Manguera", candado: "Candado", trofeo: "Trofeo", taburete: "Taburete"
+  };
   const REJ100 = rejilla(100, 100, 10);
-  function icono(i, atributos) {
-    if (!I[i]) return "";
-    const id = nuevoId();
-    return '<svg xmlns="' + NS + '" viewBox="0 0 100 100"' + (atributos ? " " + atributos : "") + ' role="img" aria-label="' + escAttr(ARMAS_N[i]) + '">' +
-      '<rect width="100" height="100" rx="13" fill="' + C.fondo + '"/><path d="' + REJ100 + '" stroke="#4a90d9" stroke-opacity=".16" stroke-width=".6" fill="none"/><rect x="2" y="2" width="96" height="96" rx="11.5" fill="none" stroke="#2f6aa8" stroke-width="1.4"/>' + I[i](id) + "</svg>";
+  const CLASICAS = { extintor: 1, enceradora: 1, manguera: 1, candado: 1, trofeo: 1, taburete: 1 };
+  function icono(arma, atributos) {
+    if (!ARMAS_N[arma]) return "";
+    const id = nuevoId(), pre = '<svg xmlns="' + NS + '" viewBox="0 0 100 100"' + (atributos ? " " + atributos : "") + ' role="img" aria-label="' + escAttr(ARMAS_N[arma]) + '">';
+    if (CLASICAS[arma]) {
+      return pre + '<defs><clipPath id="' + id + 'k"><rect x="1" y="1" width="98" height="98" rx="12.5"/></clipPath></defs><rect width="100" height="100" rx="13" fill="' + C.fondo + '"/>' +
+        '<image href="img/armas/' + arma + '.webp" x="0" y="0" width="100" height="100" preserveAspectRatio="xMidYMid slice" clip-path="url(#' + id + 'k)"/><rect x="2" y="2" width="96" height="96" rx="11.5" fill="none" stroke="#2f6aa8" stroke-width="1.4"/></svg>';
+    }
+    return pre + '<rect width="100" height="100" rx="13" fill="' + C.fondo + '"/><path d="' + REJ100 + '" stroke="#4a90d9" stroke-opacity=".16" stroke-width=".6" fill="none"/><rect x="2" y="2" width="96" height="96" rx="11.5" fill="none" stroke="#2f6aa8" stroke-width="1.4"/>' + I[IDX[arma]](id) + "</svg>";
   }
-  const ARMAS_N = ["Carta de Smith", "Transformada de Fourier", "Resistencia", "Capacitor", "Inductor", "Transistor", "Fuente de poder", "Amplificador operacional", "Diodo LED"];
 
   /* ---------- las escenas ---------- */
   const REJ160 = rejilla(160, 100, 10);
@@ -343,14 +355,264 @@
     }
   };
 
+  /* ============================================================
+     Las seis clásicas del edificio: su foto real de icono y una escena
+     dibujada en SVG (con la foto de recuadro). Van por id.
+     ============================================================ */
+  const CLAS = { extintor: "Extintor", enceradora: "Enceradora", manguera: "Manguera", candado: "Candado", trofeo: "Trofeo", taburete: "Taburete" };
+  const foto = id => "img/armas/" + id + ".webp";
+  /* Recuadro con la foto real de la arma, esquinas redondeadas. */
+  const recuadro = (arma, uid, x, y, w, h) => '<defs><clipPath id="' + uid + 'i"><rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="2.5"/></clipPath></defs>' +
+    '<image href="' + foto(arma) + '" x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" preserveAspectRatio="xMidYMid slice" clip-path="url(#' + uid + 'i)"/>' +
+    '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" rx="2.5" fill="none" stroke="#e8f4ff" stroke-width="1"/>';
+  const traza = (e, x, y, r, s) => set(e, { transform: "translate(" + n1(x) + " " + n1(y) + ") rotate(" + n1(r || 0) + ")" + (s != null ? " scale(" + n1(s) + ")" : "") });
+  const arcoP = (cx, cy, r, a0, a1) => {
+    const p = a => n1(cx + r * Math.cos(a * Math.PI / 180)) + " " + n1(cy + r * Math.sin(a * Math.PI / 180));
+    return "M" + p(a0) + "A" + r + " " + r + " 0 " + (a1 - a0 > 180 ? 1 : 0) + " 1 " + p(a1);
+  };
+  const parab = k => 4 * k * (1 - k);
+
+  const ESC_CLAS = {};
+
+  /* Extintor: una nube de espuma llena la escena y la aguja cae a cero */
+  ESC_CLAS.extintor = {
+    dur: 4.8, tc: 3.4, cap: "Apagado para siempre",
+    dib: id => {
+      let nube = "";
+      for (let j = 0; j < 16; j++) nube += '<circle data-k="c' + j + '" r="3" fill="' + (j % 2 ? "#dbe8f5" : "#f4f8ff") + '" opacity="0"/>';
+      return '<rect y="78" width="160" height="7" fill="#12324f"/>' +
+        '<path d="M14 78V44a11 11 0 0 1 11-11h4a11 11 0 0 1 11 11V78z" fill="#d62e2a" stroke="#7d1512" stroke-width="1.4"/><path d="M18 46V75" stroke="#ff9a92" stroke-width="1.6" stroke-linecap="round" opacity=".7"/>' +
+        '<rect x="19" y="52" width="16" height="15" rx="1.5" fill="#f4f0e4"/><text x="27" y="62" font-size="5" fill="#9a1a16" text-anchor="middle" font-weight="700" font-family="' + SANS + '">EXT</text>' +
+        '<rect x="22" y="26" width="10" height="8" fill="#2b2f36"/><path d="M17 26h20" stroke="#2b2f36" stroke-width="3" stroke-linecap="round"/><path d="M19 21L45 17" stroke="#2b2f36" stroke-width="3" stroke-linecap="round"/>' +
+        '<path d="M36 29C48 29 50 40 58 42" fill="none" stroke="#1b1e24" stroke-width="2.6" stroke-linecap="round"/><path d="M56 40l7 4-2 3-7-4z" fill="#2b2f36"/>' +
+        '<circle cx="138" cy="30" r="16" fill="#0a1a2c" stroke="' + C.plata + '" stroke-width="2"/><path d="' + arcoP(138, 30, 12, 135 + 270 * 0.5, 135 + 270 * 0.85) + '" fill="none" stroke="' + C.verde + '" stroke-width="3"/>' +
+        '<path d="' + arcoP(138, 30, 12, 135, 135 + 270 * 0.12) + '" fill="none" stroke="' + C.rojo + '" stroke-width="3"/>' +
+        '<line data-k="ag" x1="138" y1="30" x2="138" y2="30" stroke="#fff" stroke-width="1.8" stroke-linecap="round"/><circle cx="138" cy="30" r="2" fill="' + C.plata + '"/>' +
+        texto("bar", 138, 54, 6, "#e8f4ff", "middle", 700) +
+        '<rect x="104" y="63" width="9" height="15" rx="1" fill="#f3e6c0" stroke="#a88f55" stroke-width=".8"/><path d="M108.5 63V60" stroke="#333" stroke-width=".9"/>' +
+        '<path data-k="ll" d="M0 0C-3.4-3-3.4-6.5 0-11C3.4-6.5 3.4-3 0 0z" fill="' + C.oro + '"/>' + humoMk("s", 4) + nube +
+        recuadro("extintor", id, 66, 5, 30, 20);
+    },
+    f(t, R) {
+      for (let j = 0; j < 16; j++) {
+        const tx = 20 + (j % 4) * 40 + ((j * 53) % 17 - 8), ty = 14 + Math.floor(j / 4) * 21 + ((j * 29) % 11 - 5);
+        const p = pr(t, 0.5 + j * 0.05, 2.7), e = ease(p);
+        const fin = 1 - 0.4 * pr(t, 3.6, 4.5);
+        set(R["c" + j], { cx: n1(lerp(62, tx, e)), cy: n1(lerp(44, ty, e)), r: n1(3 + 24 * e), opacity: n1(p > 0 ? 0.92 * fin : 0) });
+      }
+      const v = t < 0.5 ? 0.7 : 0.7 * (1 - ease(pr(t, 0.5, 3.0)));
+      const a = (135 + 270 * v + (v > 0.02 ? Math.sin(t * 30) * 1.2 : 0)) * Math.PI / 180;
+      set(R.ag, { x2: n1(138 + 11 * Math.cos(a)), y2: n1(30 + 11 * Math.sin(a)), stroke: v < 0.15 ? C.rojo : "#fff" });
+      txt(R.bar, Math.round(12 * v / 0.7) + " bar"); set(R.bar, { fill: v < 0.15 ? C.rojo : "#e8f4ff" });
+      const ap = ease(pr(t, 1.7, 2.3));
+      set(R.ll, { transform: "translate(108.5 60) scale(" + n1((1 - ap) * (1 + Math.sin(t * 20) * 0.08)) + ")", opacity: n1(ap < 1 ? 1 : 0) });
+      humoF(R, "s", 4, 108.5, 56, 2.3, t, 18);
+      set(R.flash, { opacity: n1(0.35 * pr(t, 0.5, 0.62) * (1 - pr(t, 0.62, 1.1))) });
+    }
+  };
+
+  /* Enceradora: gira cada vez más rápido, patina y se lleva por delante el cartel de piso mojado */
+  ESC_CLAS.enceradora = {
+    dur: 4.8, tc: 3.3, cap: "Pulido hasta el final",
+    dib: id => {
+      let e = "", w = "", sp = "";
+      for (let j = 0; j < 6; j++) { e += '<line data-k="e' + j + '" x1="0" y1="0" x2="0" y2="0" stroke="' + C.oro + '" stroke-width="1.6" stroke-linecap="round"/>'; sp += '<line data-k="sp' + j + '" stroke="#ffe066" stroke-width="1.6" stroke-linecap="round" opacity="0"/>'; }
+      for (let j = 0; j < 3; j++) w += '<ellipse data-k="w' + j + '" rx="' + (24 + j * 4) + '" ry="' + (6 + j) + '" fill="none" stroke="#e8f4ff" stroke-width="1.4" stroke-dasharray="9 13" opacity="0"/>';
+      return '<defs><linearGradient id="' + id + 'g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a6aa3"/><stop offset="1" stop-color="#0d2d4c"/></linearGradient></defs>' +
+        '<rect y="60" width="160" height="25" fill="url(#' + id + 'g)"/><path d="M0 60H160" stroke="' + C.tinta + '" stroke-opacity=".5" stroke-width=".8"/><path d="M14 68H58M92 77H146M30 81H70" stroke="#fff" stroke-opacity=".2" stroke-width="1.2" stroke-linecap="round"/>' +
+        '<path data-k="huella" fill="none" stroke="#fff" stroke-opacity=".28" stroke-width="2" stroke-linecap="round"/>' +
+        '<g data-k="mq"><ellipse cx="0" cy="6" rx="18" ry="4" fill="#fff" opacity=".18"/><ellipse cx="0" cy="0" rx="20" ry="5" fill="#2b2f36" stroke="#8794aa" stroke-width="1.2"/>' + e + w + sp +
+        '<path d="M-9-2V-26a9 4 0 0 1 18 0V-2z" fill="#e0403a" stroke="#7d1512" stroke-width="1.2"/><path d="M-5-6V-24" stroke="#ff9a92" stroke-width="1.4" stroke-linecap="round" opacity=".7"/><path d="M0-26L-15-50" stroke="' + C.plata + '" stroke-width="3" stroke-linecap="round"/><path d="M-21-52h11" stroke="#2b2f36" stroke-width="3.6" stroke-linecap="round"/></g>' +
+        '<g data-k="cono"><path d="M-8 0L0-20L8 0z" fill="#ffd21f" stroke="#7a5a00" stroke-width="1"/><text y="-3" font-size="9" fill="#7a5a00" text-anchor="middle" font-weight="800" font-family="' + SANS + '">!</text></g>' +
+        texto("rpm", 152, 12, 6.4, "#e8f4ff", "end", 700) + texto("vel", 152, 21, 5, C.tinta, "end") + recuadro("enceradora", id, 62, 5, 30, 20);
+    },
+    f(t, R) {
+      const mx = t < 2.6 ? 26 + 82 * Math.pow(pr(t, 0.5, 2.6), 2) : 108 - 10 * ease(pr(t, 2.6, 3.6));
+      const vel = ease(pr(t, 0.2, 2.6)) * (1 - 0.7 * pr(t, 3.2, 4.4)), ph = 3 * t + 22 * Math.pow(Math.min(t, 2.6), 2);
+      traza(R.mq, mx, 72, t > 2.4 && t < 2.8 ? -5 : 0);
+      for (let j = 0; j < 6; j++) { const a = ph + j * Math.PI / 3; set(R["e" + j], { x2: n1(17 * Math.cos(a)), y2: n1(4.2 * Math.sin(a)) }); }
+      for (let j = 0; j < 3; j++) set(R["w" + j], { opacity: n1(vel * 0.75), "stroke-dashoffset": n1(-ph * (12 + j * 4)) });
+      const on = t > 1.8 && t < 3.7;
+      rayos(R, "sp", 6, 19, 0, 3, 11, (t * 2.4) % 1, -1.2);
+      for (let j = 0; j < 6; j++) if (!on) set(R["sp" + j], { opacity: 0 });
+      set(R.huella, { d: "M26 74H" + n1(Math.max(26, mx - 10)) });
+      const p = pr(t, 2.6, 3.9);
+      traza(R.cono, 132 + 12 * p, 78 - 30 * parab(p), 105 * ease(p));
+      txt(R.rpm, Math.round(3200 * vel) + " rpm"); txt(R.vel, t > 2.6 ? "¡patina!" : "");
+    }
+  };
+
+  /* Manguera: sale del gabinete rojo y un chorro a presión tumba unas cajas */
+  ESC_CLAS.manguera = {
+    dur: 4.8, tc: 3.4, cap: "A presión",
+    dib: id => {
+      let g = "", cj = "";
+      for (let j = 0; j < 8; j++) g += '<circle data-k="g' + j + '" r="1.5" fill="#9fe0ff" opacity="0"/>';
+      for (let j = 0; j < 3; j++) cj += '<g data-k="bj' + j + '"><rect width="14" height="14" fill="#b8894f" stroke="#6b4a1f" stroke-width="1"/><path d="M0 7H14M7 0V14" stroke="#d9c08a" stroke-width="1.4"/></g>';
+      return '<rect y="78" width="160" height="7" fill="#12324f"/><ellipse data-k="charco" cx="100" cy="81" rx="0" ry="0" fill="#5cc8ff" opacity=".5"/>' +
+        '<rect x="6" y="14" width="38" height="64" rx="2" fill="#c8322e" stroke="#6d1512" stroke-width="1.6"/><rect x="10" y="18" width="30" height="46" rx="1.5" fill="#3a0f10" stroke="#ff9a92" stroke-width=".8"/>' +
+        '<circle cx="25" cy="40" r="13" fill="none" stroke="#e8e0d0" stroke-width="2.2"/><circle cx="25" cy="40" r="8.5" fill="none" stroke="#e8e0d0" stroke-width="2.2"/><circle cx="25" cy="40" r="3.4" fill="#e8e0d0"/>' +
+        '<text x="25" y="72" font-size="4.6" fill="#fff" text-anchor="middle" font-weight="700" font-family="' + SANS + '">MANGUERA</text>' +
+        '<path data-k="hose" d="M44 56C60 56 62 76 78 74L90 66" pathLength="100" fill="none" stroke="#2a2f38" stroke-width="3.6" stroke-linecap="round" stroke-dasharray="0 100"/>' +
+        '<path data-k="boq" d="M86 68l8-6 2.4 2.6-8 6z" fill="' + C.plata + '" stroke="#5a6472" stroke-width=".8" opacity="0"/>' +
+        '<path data-k="ch" fill="none" stroke="#5cc8ff" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/><path data-k="ch2" fill="none" stroke="#e6f8ff" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>' + cj + g +
+        '<rect x="104" y="15" width="48" height="5" rx="2.5" fill="#06121f" stroke="' + C.tinta + '" stroke-opacity=".5"/><rect data-k="med" x="104" y="15" width="0" height="5" rx="2.5" fill="#5cc8ff"/>' + texto("bar", 152, 30, 6.4, "#e8f4ff", "end", 700) + texto("cau", 152, 39, 5, C.tinta, "end") +
+        recuadro("manguera", id, 62, 5, 30, 20);
+    },
+    f(t, R) {
+      const hp = ease(pr(t, 0.3, 1.5));
+      set(R.hose, { "stroke-dasharray": n1(hp * 100) + " 100" }); set(R.boq, { opacity: hp >= 1 ? 1 : 0 });
+      const jp = ease(pr(t, 1.55, 2.3)), pts = [], N = 14;
+      for (let j = 0; j <= N; j++) { const u = jp * j / N; pts.push(n1(92 + 34 * u) + " " + n1(64 - 22 * u + 10 * u * u + (jp >= 1 ? Math.sin(t * 25 + j) * 0.5 : 0))); }
+      const d = jp > 0 ? "M" + pts.join("L") : "";
+      set(R.ch, { d }); set(R.ch2, { d });
+      const bar = 8 * ease(pr(t, 1.4, 2.2));
+      set(R.med, { width: n1(48 * bar / 8) }); txt(R.bar, bar.toFixed(1) + " bar"); txt(R.cau, t > 1.6 ? "caudal máximo" : "");
+      const X0 = [118, 133, 125.5], Y0 = [64, 64, 50], XE = [104, 146, 128], YE = [64, 64, 64], RE = [-30, 80, 200];
+      for (let j = 0; j < 3; j++) {
+        const tk = 2.2 + j * 0.15, k = pr(t, tk, tk + 1.1), e = ease(k);
+        traza(R["bj" + j], lerp(X0[j], XE[j], e), lerp(Y0[j], YE[j], e) - 26 * parab(k), RE[j] * e);
+      }
+      for (let j = 0; j < 8; j++) {
+        const k = ((t * 1.3 + j * 0.13) % 1), on = t > 2.2;
+        set(R["g" + j], { cx: n1(126 + (j - 3.5) * 5 * k + 14 * k), cy: n1(52 - 22 * parab(k) * (0.5 + (j % 3) * 0.3) + 24 * k * k), opacity: on ? n1(1 - k) : 0 });
+      }
+      const c = ease(pr(t, 2.2, 4.3));
+      set(R.charco, { rx: n1(42 * c), ry: n1(3.4 * c), opacity: n1(0.5 * (c > 0 ? 1 : 0)) });
+    }
+  };
+
+  /* Candado: el grillete se cierra de golpe, gira el dial y se cierra la puerta del locker */
+  ESC_CLAS.candado = {
+    dur: 4.8, tc: 3.4, cap: "Encerrado en el locker",
+    dib: id => {
+      let tk = "", ra = rayosMk("k", 6, "#fff2a8", 1.8);
+      for (let j = 0; j < 12; j++) { const a = j * Math.PI / 6; tk += '<path d="M' + n1(Math.cos(a) * 7) + " " + n1(Math.sin(a) * 7) + "L" + n1(Math.cos(a) * 9) + " " + n1(Math.sin(a) * 9) + '" stroke="#e8f4ff" stroke-width="1"/>'; }
+      return '<g data-k="lk"><rect x="100" y="12" width="42" height="68" rx="2" fill="#0a1220" stroke="#8794aa" stroke-width="1.6"/>' +
+        '<circle cx="121" cy="38" r="5.5" fill="#39465a"/><path d="M111 62V50a10 9 0 0 1 20 0V62z" fill="#39465a"/>' +
+        '<path data-k="pu" fill="#4a7fbf" stroke="#1f3f6f" stroke-width="1.4" stroke-linejoin="round"/><path data-k="ven" fill="none" stroke="#1f3f6f" stroke-width="1.6" stroke-linecap="round"/><rect data-k="asa" y="44" width="2.4" height="9" rx="1" fill="#e8f4ff"/>' +
+        '<g data-k="pq" opacity="0"><path d="M-3.4 0V-3.4a3.4 3.4 0 0 1 6.8 0V0" fill="none" stroke="' + C.plata + '" stroke-width="1.8"/><rect x="-5" y="0" width="10" height="7.6" rx="1.2" fill="#d8a63a" stroke="#7a5a12" stroke-width=".8"/></g></g>' +
+        '<g data-k="gril"><path d="M40 46V34a12 12 0 0 1 24 0V46" fill="none" stroke="' + C.plata + '" stroke-width="5" stroke-linecap="round"/></g>' +
+        '<rect x="34" y="46" width="36" height="30" rx="5" fill="#d8a63a" stroke="#7a5a12" stroke-width="1.4"/><path d="M38 50H66" stroke="#ffe7a3" stroke-width="1.6" stroke-linecap="round" opacity=".7"/>' +
+        '<circle cx="52" cy="63" r="10" fill="#2b2f36" stroke="' + C.plata + '" stroke-width="1.4"/><g data-k="dial" transform="translate(52 63)">' + tk + '<circle cx="0" cy="-5" r="1.4" fill="' + C.oro + '"/></g><path d="M52 51.2l-2.4-3.6h4.8z" fill="' + C.rojo + '"/>' +
+        '<g transform="translate(52 46)">' + ra + '</g>' + texto("clank", 52, 30, 7, "#fff2a8", "middle", 800) + texto("cod", 8, 20, 5.6, C.tinta) + texto("bam", 121, 8, 7, "#fff2a8", "middle", 800) + recuadro("candado", id, 72, 5, 24, 16);
+    },
+    f(t, R) {
+      const cerr = ease(pr(t, 1.7, 1.82));
+      set(R.gril, { transform: "translate(0 " + n1(-10 * (1 - cerr)) + ") rotate(" + n1(-16 * (1 - cerr)) + " 64 46)" });
+      const g = t < 1.7 ? ease(pr(t, 0.3, 1.7)) * 1080 : 1080 + 30 * Math.sin((t - 1.7) * 9) * (1 - pr(t, 1.7, 2.3));
+      set(R.dial, { transform: "translate(52 63) rotate(" + n1(g) + ")" });
+      txt(R.cod, t < 0.4 ? "" : t < 1.7 ? ["3", "3 - 27", "3 - 27 - 14"][Math.min(2, Math.floor(pr(t, 0.4, 1.7) * 2.99))] : "3 - 27 - 14");
+      rayos(R, "k", 6, 0, 0, 3, 13, pr(t, 1.72, 2.3), 0.3); if (t < 1.72) for (let j = 0; j < 6; j++) set(R["k" + j], { opacity: 0 });
+      txt(R.clank, t > 1.75 && t < 2.8 ? "¡CLANK!" : "");
+      const sx = t < 2.9 ? 0.16 : 0.16 + 0.84 * Math.pow(pr(t, 2.9, 3.1), 0.7), w = 42 * sx, kk = (1 - sx) * 6;
+      set(R.pu, { d: "M100 12L" + n1(100 + w) + " " + n1(12 + kk) + "L" + n1(100 + w) + " " + n1(80 - kk) + "L100 80z" });
+      set(R.ven, { d: [22, 27, 32].map(y => "M" + n1(100 + w * 0.2) + " " + y + "H" + n1(100 + w * 0.8)).join("") });
+      set(R.asa, { x: n1(100 + w - 7) });
+      const sh = t > 3.1 && t < 3.5 ? Math.sin((t - 3.1) * 90) * 1.4 * (1 - pr(t, 3.1, 3.5)) : 0;
+      set(R.lk, { transform: "translate(" + n1(sh) + " 0)" });
+      txt(R.bam, t > 3.1 && t < 4.2 ? "¡BAM!" : "");
+      const pp = ease(pr(t, 3.4, 3.8)), pop = 1 + 0.35 * Math.sin(Math.PI * pp);
+      set(R.pq, { opacity: pp > 0 ? 1 : 0, transform: "translate(134 47) scale(" + n1(pp * pop) + ")" });
+    }
+  };
+
+  /* Trofeo: se inclina en la repisa, cae, rebota con un tintineo y aplasta al de plata */
+  const TR_P = [80, 44];
+  function simTrofeo(t) {
+    const r = { x: 72, y: 29, rot: 0, imp: [], golpe: 99 };
+    if (t < 0.8) { r.rot = t > 0.5 ? Math.sin((t - 0.5) * 40) * 1.5 * (t < 0.8 ? 1 : 0) : 0; return r; }
+    const tip = a => ({ x: TR_P[0] - 8 * Math.cos(a) + 15 * Math.sin(a), y: TR_P[1] - 8 * Math.sin(a) - 15 * Math.cos(a) });
+    if (t < 1.4) { const a = 40 * Math.pow(pr(t, 0.8, 1.4), 2) * Math.PI / 180, q = tip(a); r.x = q.x; r.y = q.y; r.rot = a * 180 / Math.PI; return r; }
+    const q0 = tip(40 * Math.PI / 180);
+    let x = q0.x, y = q0.y, vx = 38, vy = -10, tt = 1.4;
+    const dt = 1 / 240;
+    while (tt < t) {
+      tt += dt; vy += 190 * dt; x += vx * dt; y += vy * dt;
+      if (y >= 71) { y = 71; if (vy > 25) { r.imp.push({ t: tt, x }); vy = -0.42 * vy; } else vy = 0; vx *= 1 - 5 * dt; }
+      if (x >= 104 && r.golpe === 99) r.golpe = tt;
+    }
+    r.x = Math.min(x, 122); r.y = y; r.rot = 40 + 230 * ease(pr(t, 1.4, 2.7));
+    return r;
+  }
+  ESC_CLAS.trofeo = {
+    dur: 4.8, tc: 3.4, cap: "Primer lugar en homicidio",
+    dib: id => {
+      const copa = (k, c1, c2, c3, num, esc) => '<g data-k="' + k + '"><g transform="scale(' + esc + ')"><rect x="-9" y="-5" width="18" height="5" rx="1" fill="#8a5a2b" stroke="#4b2f12" stroke-width=".8"/><rect x="-6" y="-7" width="12" height="2.4" fill="' + c2 + '"/><path d="M-2-7V-13h4V-7z" fill="' + c2 + '"/>' +
+        '<path d="M-11-32h22c0 11-5 17-11 19c-6-2-11-8-11-19z" fill="' + c1 + '" stroke="' + c3 + '" stroke-width="1.2"/><path d="M-11-29c-8 0-8 10 0 11M11-29c8 0 8 10 0 11" fill="none" stroke="' + c2 + '" stroke-width="2"/><path d="M-7-30c0 6 2 10 5 13" fill="none" stroke="#fff6c0" stroke-width="1.4" stroke-linecap="round" opacity=".7"/>' +
+        '<text y="-19" font-size="8" fill="' + c3 + '" text-anchor="middle" font-weight="800" font-family="' + SANS + '">' + num + "</text></g></g>";
+      return '<rect y="80" width="160" height="5" fill="#12324f"/><rect x="14" y="44" width="68" height="4" fill="#8a5a2b" stroke="#4b2f12" stroke-width=".8"/><path d="M24 48v10l10-10M62 48v10l-10-10" fill="none" stroke="#4b2f12" stroke-width="2"/>' +
+        copa("plata", "#cfd6e0", "#aab4c4", "#5a6472", "2", 0.72) +
+        [0, 1, 2].map(j => '<ellipse data-k="ri' + j + '" fill="none" stroke="#fff2a8" stroke-width="1.4" opacity="0"/>').join("") + copa("oro", "#f2c230", "#e0a820", "#7a5a00", "1", 1) +
+        texto("ding", 118, 44, 7.4, "#fff2a8", "middle", 800) + recuadro("trofeo", id, 100, 5, 30, 20) + '<path d="M22 44h56" stroke="#fff" stroke-opacity=".0"/>';
+    },
+    f(t, R) {
+      const s = simTrofeo(t);
+      set(R.oro, { transform: "translate(" + n1(s.x) + " " + n1(s.y) + ") rotate(" + n1(s.rot) + ") translate(0 15)" });
+      const k = pr(t, s.golpe, s.golpe + 0.9), e = ease(k);
+      set(R.plata, { transform: "translate(" + n1(124 + 14 * e) + " " + n1(80 - 4 * e) + ") rotate(" + n1(90 * e) + ")" });
+      for (let j = 0; j < 3; j++) {
+        const im = s.imp[j], p = im ? pr(t, im.t, im.t + 0.5) : 0;
+        set(R["ri" + j], { cx: im ? n1(im.x) : 0, cy: 80, rx: n1(4 + 16 * p), ry: n1(1.6 + 5 * p), opacity: im && p > 0 && p < 1 ? n1(1 - p) : 0 });
+      }
+      const ult = s.imp[s.imp.length - 1];
+      txt(R.ding, ult ? (s.imp.length % 2 ? "¡DING!" : "¡DONG!") : ""); set(R.ding, { x: ult ? n1(Math.min(130, ult.x)) : 118, y: 60 });
+    }
+  };
+
+  /* Taburete: un arco de golpe, el impacto y una sandía que no lo cuenta */
+  ESC_CLAS.taburete = {
+    dur: 4.8, tc: 3.3, cap: "Golpe de taburete",
+    dib: id => {
+      let pz = "", ra = rayosMk("b", 8, "#fff2a8", 2);
+      for (let j = 0; j < 6; j++) pz += '<circle data-k="p' + j + '" r="4" fill="#e8455a" stroke="#3f9a4a" stroke-width="1.4" opacity="0"/>';
+      const st = '<ellipse cx="0" cy="-8" rx="12" ry="3.6" fill="#b8890f"/><path d="M-12-12v4a12 3.6 0 0 0 24 0v-4z" fill="#d9a520"/><ellipse cx="0" cy="-12" rx="12" ry="3.6" fill="#f2c230" stroke="#a87a12" stroke-width="1"/>' +
+        '<path d="M-8-8L-12 12M8-8L12 12M0-6V13" stroke="#c99a12" stroke-width="2.6" stroke-linecap="round"/><path d="M-10 3H10" stroke="#a87a12" stroke-width="1.6"/>';
+      return '<defs><g id="' + id + 't">' + st + '</g></defs><rect y="78" width="160" height="7" fill="#12324f"/><path d="' + arcoP(62, 70, 48, -165, -20) + '" fill="none" stroke="' + C.tinta + '" stroke-opacity=".3" stroke-width="1" stroke-dasharray="3 3"/>' +
+        [2, 1, 0].map(j => '<use data-k="gh' + j + '" href="#' + id + 't" opacity="0"/>').join("") + '<use data-k="tab" href="#' + id + 't"/>' +
+        '<g data-k="melon"><circle r="10" fill="#3f9a4a" stroke="#1f5a2a" stroke-width="1.2"/><path d="M-4-9Q-8 0-4 9M4-9Q8 0 4 9M0-10V10" fill="none" stroke="#1f5a2a" stroke-width="1" opacity=".6"/><path d="M-6-6a8 8 0 0 1 5-3" fill="none" stroke="#9be0a0" stroke-width="1.4" stroke-linecap="round"/></g>' + pz +
+        '<g transform="translate(118 66)">' + ra + "</g>" + texto("pam", 118, 40, 8.4, "#fff2a8", "middle", 800) + recuadro("taburete", id, 100, 5, 30, 20);
+    },
+    f(t, R) {
+      const ang = tt => tt < 0.2 ? -150 : tt < 0.9 ? lerp(-150, -165, ease(pr(tt, 0.2, 0.9))) : tt < 2.0 ? lerp(-165, -6, Math.pow(pr(tt, 0.9, 2.0), 2.2)) : lerp(-6, -32, ease(pr(tt, 2.0, 2.7)));
+      const pos = a => { const r = a * Math.PI / 180; return [62 + 48 * Math.cos(r), 70 + 48 * Math.sin(r), a + 90]; };
+      const a = ang(t), q = pos(a);
+      set(R.tab, { transform: "translate(" + n1(q[0]) + " " + n1(q[1]) + ") rotate(" + n1(q[2]) + ")" });
+      const vel = t > 1.1 && t < 2.0 ? 1 : 0;
+      for (let j = 0; j < 3; j++) { const g = pos(a - 9 * (j + 1)); set(R["gh" + j], { transform: "translate(" + n1(g[0]) + " " + n1(g[1]) + ") rotate(" + n1(g[2]) + ")", opacity: n1(vel * (0.38 - j * 0.11)) }); }
+      const h = t >= 2.0 ? 1 : 0, sq = ease(pr(t, 2.0, 2.1));
+      set(R.melon, { transform: "translate(124 " + n1(78 - 10 * (1 - 0.45 * sq)) + ") scale(" + n1(1 + 0.35 * sq) + " " + n1(1 - 0.45 * sq) + ")", opacity: t < 2.12 ? 1 : 0 });
+      rayos(R, "b", 8, 0, 0, 3, 16, pr(t, 2.0, 2.5), 0.2); if (!h || t > 2.55) for (let j = 0; j < 8; j++) set(R["b" + j], { opacity: 0 });
+      set(R.flash, { opacity: n1(h ? 0.4 * (1 - pr(t, 2.0, 2.2)) : 0) });
+      txt(R.pam, t > 2.0 ? "¡PAM!" : "");
+      for (let j = 0; j < 6; j++) {
+        const k = pr(t, 2.05, 3.0), e = ease(k), dx = [-16, -8, 4, 12, 22, 30][j], yy = 76 - (j % 3) * 1.5;
+        set(R["p" + j], { cx: n1(124 + dx * e), cy: n1(lerp(68, yy, e) - 26 * parab(k) * (0.6 + (j % 3) * 0.25)), opacity: t > 2.05 ? 1 : 0 });
+      }
+    }
+  };
+
+  /* ---------- chispas de las clásicas ---------- */
+  const CHC = {
+    extintor: p => [0, 1, 2, 3, 4].map(j => '<circle cx="' + n1(-24 + j * 12 + Math.sin(j * 2) * 5) + '" cy="' + n1(14 - 40 * ease(p) * (0.6 + (j % 3) * 0.25)) + '" r="' + n1(6 + 14 * p) + '" fill="#f4f8ff" opacity="' + n1(0.9 * (1 - p)) + '"/>').join(""),
+    enceradora: p => [0, 1, 2].map(j => '<path d="' + arcoP(0, 0, 12 + 10 * j, p * 360 + j * 120, p * 360 + j * 120 + 200) + '" fill="none" stroke="' + (j ? C.tinta : C.oro) + '" stroke-width="4.4" stroke-linecap="round" opacity="' + n1(1 - p) + '"/>').join(""),
+    manguera: p => [0, 1, 2, 3, 4].map(j => '<path d="M' + (-24 + j * 12) + " " + n1(-30 + 62 * cl(p * 1.3 - j * 0.06, 0, 1)) + 'q-4 7 0 12q4-5 0-12z" fill="#5cc8ff" opacity="' + n1(1 - p) + '"/>').join("") + '<ellipse cy="34" rx="' + n1(6 + 34 * p) + '" ry="' + n1(2 + 6 * p) + '" fill="none" stroke="#9fe0ff" stroke-width="3" opacity="' + n1(1 - p) + '"/>',
+    candado: p => '<path d="M-14 4V-6a14 14 0 0 1 28 0V' + n1(4 - 12 * (1 - ease(pr(p, 0, 0.35)))) + '" fill="none" stroke="' + C.plata + '" stroke-width="6" stroke-linecap="round"/><rect x="-20" y="4" width="40" height="28" rx="5" fill="#d8a63a" stroke="#7a5a12" stroke-width="2"/>' +
+      [0, 1, 2, 3, 4].map(j => { const a = -2.6 + j * 0.55, q = pr(p, 0.3, 1); return '<line x1="' + n1(Math.cos(a) * 24 * q) + '" y1="' + n1(-6 + Math.sin(a) * 24 * q) + '" x2="' + n1(Math.cos(a) * (24 + 18 * q)) + '" y2="' + n1(-6 + Math.sin(a) * (24 + 18 * q)) + '" stroke="#fff2a8" stroke-width="4" stroke-linecap="round" opacity="' + n1(q ? 1 - q : 0) + '"/>'; }).join(""),
+    trofeo: p => { const r = 8 + 34 * Math.sin(Math.PI * Math.min(1, p * 1.1)), q = 4 + 4 * Math.sin(Math.PI * p); return '<path d="M0 ' + -r + "Q" + q + " " + -q + " " + r + " 0Q" + q + " " + q + " 0 " + r + "Q" + -q + " " + q + " " + -r + " 0Q" + -q + " " + -q + ' 0 ' + -r + 'z" fill="#fff6c0" opacity="' + n1(1 - p * 0.6) + '" transform="rotate(' + n1(p * 40) + ')"/>' + [[-28, -22], [30, -14], [22, 26]].map(([x, y], j) => '<circle cx="' + x + '" cy="' + y + '" r="' + n1(5 * Math.sin(Math.PI * cl(p * 1.3 - j * 0.15, 0, 1))) + '" fill="#ffe066"/>').join(""); },
+    taburete: p => '<ellipse cy="22" rx="' + n1(8 + 38 * p) + '" ry="' + n1(3 + 9 * p) + '" fill="none" stroke="#e8f4ff" stroke-width="4" opacity="' + n1(1 - p) + '"/>' + [0, 1, 2, 3, 4, 5].map(j => { const a = -Math.PI + j * Math.PI / 5; return '<line x1="' + n1(Math.cos(a) * 12 * p) + '" y1="' + n1(20 + Math.sin(a) * 12 * p) + '" x2="' + n1(Math.cos(a) * (12 + 30 * p)) + '" y2="' + n1(20 + Math.sin(a) * (12 + 30 * p)) + '" stroke="#ffd21f" stroke-width="5" stroke-linecap="round" opacity="' + n1(1 - p) + '"/>'; }).join("") + '<text y="' + n1(-6 - 14 * p) + '" font-size="18" fill="#fff2a8" text-anchor="middle" font-weight="800" font-family="' + SANS + '" opacity="' + n1(1 - p) + '">¡PAM!</text>'
+  };
+
+  const ESCI = Object.assign({}, ESC_CLAS); ELEC.forEach((k, i) => { ESCI[k] = ESC[i]; });
+
   /* ---------- el motor de las escenas ---------- */
-  function escena(i, host, op) {
+  function escena(arma, host, op) {
     op = op || {};
-    const S = ESC[i];
+    const S = ESCI[arma], i = arma;
     const nulo = { parar() {} };
     if (!S || !host) return nulo;
     const id = nuevoId(), cap = op.texto || S.cap;
-    host.innerHTML = '<svg xmlns="' + NS + '" viewBox="0 0 160 100" preserveAspectRatio="xMidYMid meet" role="img" aria-label="' + escAttr(ARMAS_N[i] + ": " + cap) + '" style="display:block;width:100%;height:100%">' +
+    host.innerHTML = '<svg xmlns="' + NS + '" viewBox="0 0 160 100" preserveAspectRatio="xMidYMid meet" role="img" aria-label="' + escAttr(ARMAS_N[arma] + ": " + cap) + '" style="display:block;width:100%;height:100%">' +
       '<rect width="160" height="100" fill="#0a2038"/><path d="' + REJ160 + '" stroke="#4a90d9" stroke-opacity=".13" stroke-width=".5" fill="none"/>' + S.dib(id) +
       '<rect data-k="flash" width="160" height="100" fill="#fff" opacity="0"/><g data-k="capg" opacity="0"><rect y="85" width="160" height="15" fill="#000" fill-opacity=".62"/><rect y="85" width="3" height="15" fill="' + C.oro + '"/><text data-k="capt" x="80" y="95.6" font-size="8.4" fill="#fff" text-anchor="middle" font-weight="700" font-family="' + SANS + '"></text></g></svg>';
     const svg = host.firstChild, R = {};
@@ -384,7 +646,7 @@
 
   /* ---------- chispas: micro animaciones de aviso (unidades de -50 a 50) ---------- */
   const zig = [[-6, -44], [8, -22], [-8, -12], [10, 8], [-4, 16], [6, 44]];
-  const CH = [
+  const CHE = [
     p => '<circle r="' + n1(8 + 38 * p) + '" fill="none" stroke="' + C.tinta + '" stroke-width="4" opacity="' + n1(1 - p) + '"/><circle r="' + n1(6 + 30 * ease(p)) + '" fill="none" stroke="' + C.vio + '" stroke-width="3" opacity="' + n1(1 - p) + '"/><circle cx="' + n1(30 * Math.cos(p * 9)) + '" cy="' + n1(30 * Math.sin(p * 9)) + '" r="5" fill="' + C.rojo + '"/>',
     p => '<path d="' + onda(-42, 42, 0, 26 * Math.sin(Math.PI * p), u => Math.sin(6 * Math.PI * u + p * 14), 40) + '" fill="none" stroke="' + C.oro + '" stroke-width="5" stroke-linecap="round" opacity="' + n1(1 - pr(p, 0.6, 1)) + '"/>',
     p => '<circle r="' + n1(20 + 14 * p) + '" fill="#ff6a2a" opacity="' + n1(0.55 * Math.sin(Math.PI * p)) + '"/>' + [-16, 0, 16].map((x, j) => '<path d="M' + x + " " + n1(20 - 60 * p) + 'q6-8 0-16t0-16" fill="none" stroke="#ffb27a" stroke-width="4" stroke-linecap="round" opacity="' + n1(1 - p) + '" transform="translate(0 ' + j * 4 + ')"/>').join(""),
@@ -395,8 +657,9 @@
     p => '<path d="' + onda(-42, 42, 0, 1, u => cl(34 * Math.sin(4 * Math.PI * u + p * 10) * (0.5 + 2 * p), -16, 16), 50) + '" fill="none" stroke="' + C.verde + '" stroke-width="5" stroke-linejoin="round" opacity="' + n1(1 - pr(p, 0.6, 1)) + '"/><path d="M-44 -16H44M-44 16H44" stroke="' + C.rojo + '" stroke-width="2.4" stroke-dasharray="6 4" opacity="' + n1(0.8 * (1 - p)) + '"/>',
     p => { let s = '<circle r="' + n1(10 + 34 * p) + '" fill="#fff" opacity="' + n1(0.85 * (1 - p)) + '"/>'; for (let j = 0; j < 8; j++) { const a = j * Math.PI / 4; s += '<line x1="' + n1(Math.cos(a) * 16) + '" y1="' + n1(Math.sin(a) * 16) + '" x2="' + n1(Math.cos(a) * (16 + 28 * p)) + '" y2="' + n1(Math.sin(a) * (16 + 28 * p)) + '" stroke="#fff2a8" stroke-width="5" stroke-linecap="round" opacity="' + n1(1 - p) + '"/>'; } return s; }
   ];
-  function chispa(i, host, op) {
-    const f = CH[i], nulo = { parar() {} };
+  const CH = Object.assign({}, CHC); ELEC.forEach((k, i) => { CH[k] = CHE[i]; });
+  function chispa(arma, host, op) {
+    const f = CH[arma], nulo = { parar() {} };
     if (!f || !host || reducido()) return nulo;
     const enSvg = typeof SVGElement !== "undefined" && host instanceof SVGElement;
     let nodo, g;
@@ -425,7 +688,7 @@
     return { parar };
   }
 
-  const DATOS = [
+  const DATOS_E = [
     { frase: "Lo dejó en reflexión total con la Carta de Smith.", dato: "La carta de Smith la ideó Phillip H. Smith en 1939, en los Bell Labs: representa todas las impedancias posibles dentro de un solo círculo, y en su borde izquierdo está el cortocircuito." },
     { frase: "Lo descompuso en armónicos con la Transformada de Fourier.", dato: "Fourier propuso en 1807 que toda señal periódica es una suma de senos. Al truncar una onda cuadrada aparece el fenómeno de Gibbs: un rebote de cerca del 9 % que no desaparece por más armónicos que se sumen." },
     { frase: "Lo dejó al rojo vivo con la Resistencia.", dato: "Una resistencia de 1/4 W solo puede disipar 0,25 W como calor. Con 10 V sobre 100 ohm serían 1 W, cuatro veces su límite (P = V²/R). La banda dorada indica una tolerancia de 5 %." },
@@ -437,5 +700,16 @@
     { frase: "Lo cegó con el Diodo LED, sin resistencia en serie.", dato: "El primer LED visible, de luz roja, lo creó Nick Holonyak en 1962. Un LED no limita su propia corriente: necesita una resistencia en serie o se quema en instantes." }
   ];
 
-  return { icono, escena, chispa, DATOS, NOMBRES: ARMAS_N };
+  const DATOS = {};
+  ELEC.forEach((k, i) => { DATOS[k] = DATOS_E[i]; });
+  Object.assign(DATOS, {
+    extintor: { frase: "Lo apagó para siempre con el Extintor.", dato: "El manómetro de un extintor de polvo debe marcar en la zona verde: si la aguja está fuera de ella, el aparato está descargado o mal presurizado y hay que revisarlo o recargarlo. Por eso se inspeccionan una vez al año." },
+    enceradora: { frase: "Lo dejó pulido hasta el final con la Enceradora.", dato: "Una enceradora común hace girar su disco a unas 175 vueltas por minuto; las abrillantadoras de alta velocidad superan las 1500. A esa velocidad el piso queda como un espejo, y también resbaladizo." },
+    manguera: { frase: "Lo dejó empapado, a presión, con la Manguera.", dato: "Un chorro de agua a presión empuja hacia atrás a quien sostiene la manguera (es la tercera ley de Newton). En las mangueras contra incendios el retroceso es tanto que se sujetan entre varias personas." },
+    candado: { frase: "Lo dejó encerrado en el locker con el Candado.", dato: "Un candado de combinación tiene una pila de discos con una muesca cada uno. Cuando la combinación alinea todas las muescas, el grillete queda libre y se puede abrir; con cualquier otra, la traba lo mantiene cerrado." },
+    trofeo: { frase: "Lo coronó campeón del homicidio con el Trofeo.", dato: "La copa Jules Rimet, el trofeo original del Mundial de fútbol, fue robada en Londres en 1966, una semana antes del torneo. La encontró un perro llamado Pickles, envuelta en papel de diario bajo un arbusto." },
+    taburete: { frase: "Lo tumbó de un solo golpe con el Taburete.", dato: "Un taburete de tres patas nunca cojea: tres puntos siempre definen un plano, así que apoya firme incluso en un suelo irregular. Con cuatro patas basta que una sea más corta para que se balancee." }
+  });
+
+  return { icono, escena, chispa, DATOS, NOMBRES: ARMAS_N, ELECTRICAS: ELEC, CLASICAS: Object.keys(CLAS) };
 });

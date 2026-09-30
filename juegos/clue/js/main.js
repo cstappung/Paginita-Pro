@@ -21,8 +21,10 @@
   const SVGNS = "http://www.w3.org/2000/svg";
   const ARTICULO_LUGAR = ["el", "el", "el", "el", "el", "la", "la", "el", "la"];
   const enLugar = l => "en " + ARTICULO_LUGAR[l] + " " + M.LUGARES[l].n;
-  const conArma = a => "con " + M.ARMAS[a].art + " " + M.ARMAS[a].n;
-  const iconoArma = (a, at) => CA ? CA.icono(a, at) : '<span class="fondo-emoji">' + M.ARMAS[a].i + "</span>";
+  /* `a` es el puesto (0..NA-1) de arma; su arma concreta sale de la sala (est.armasPartida). */
+  const armaDe = a => M.arma(est && est.armasPartida, a);
+  const conArma = a => { const A = armaDe(a); return "con " + A.art + " " + A.n; };
+  const iconoArma = (a, at) => { const A = armaDe(a); return CA && A.id ? CA.icono(A.id, at) : '<span class="fondo-emoji">' + A.i + "</span>"; };
 
   function esClaro(hex) {
     const n = parseInt(hex.slice(1), 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
@@ -73,7 +75,7 @@
   }
   const nomS = i => { const p = personaje(i); return p ? p.n : M.nombreCarta(i); };
   const nombresPuestos = () => M.COLORES.map((_, i) => nomS(i));
-  const nombreCarta = c => M.nombreCarta(c, nombresPuestos());
+  const nombreCarta = c => M.nombreCarta(c, nombresPuestos(), est && est.armasPartida);
 
   /* ---------- avatares y cartas ---------- */
   function avatarHtml(p, color, tam, texto) {
@@ -95,7 +97,7 @@
     return '<img src="img/salas/' + M.LUGARES[c - M.NS - M.NA].img + '.webp" alt="">';
   }
   function cartaHtml(c, extra, dc) {
-    return '<div class="carta t-' + M.tipoCarta(c) + (extra ? " " + extra : "") + '"' + (dc ? ' data-c="' + c + '"' : "") + '><div class="foto"' + (M.tipoCarta(c) === "a" ? ' data-arma="' + (c - M.NS) + '"' : "") + ">" + fotoCarta(c) + '</div><div class="pie">' + esc(nombreCarta(c)) + "</div></div>";
+    return '<div class="carta t-' + M.tipoCarta(c) + (extra ? " " + extra : "") + '"' + (dc ? ' data-c="' + c + '"' : "") + '><div class="foto"' + (M.tipoCarta(c) === "a" ? ' data-arma="' + esc(armaDe(c - M.NS).id) + '"' : "") + ">" + fotoCarta(c) + '</div><div class="pie">' + esc(nombreCarta(c)) + "</div></div>";
   }
 
   /* ============================================================
@@ -224,7 +226,7 @@
     const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
     g.setAttribute("transform", "translate(" + p.x.toFixed(1) + "," + p.y.toFixed(1) + ")");
     fx.appendChild(g);
-    const h = CA.chispa(a, g, { r: p.s * 0.95 });
+    const h = CA.chispa(armaDe(a).id, g, { r: p.s * 0.95 });
     setTimeout(() => { h.parar(); if (g.parentNode) g.parentNode.removeChild(g); }, 1400);
   }
 
@@ -239,10 +241,10 @@
     if (!CA) return;
     document.querySelectorAll("#modal [data-escena]").forEach(h => {
       const bucle = h.dataset.bucle === "1";
-      escenasVivas.push(CA.escena(Number(h.dataset.escena), h, { bucle, alTerminar: bucle ? undefined : liberaFin }));
+      escenasVivas.push(CA.escena(h.dataset.escena, h, { bucle, alTerminar: bucle ? undefined : liberaFin }));
     });
     const foto = document.querySelector("#modal .giro .foto[data-arma]");
-    if (foto) timersFx.push(setTimeout(() => { escenasVivas.push(CA.chispa(Number(foto.dataset.arma), foto)); }, 1450));
+    if (foto) timersFx.push(setTimeout(() => { escenasVivas.push(CA.chispa(foto.dataset.arma, foto)); }, 1450));
   }
 
   function pinta() {
@@ -474,8 +476,8 @@
       '<circle r="' + r + '" fill="none" stroke="rgba(0,0,0,.45)" stroke-width="1"/></g>';
   }
   function armaSvg(a, x, y, s, clic) {
-    const A = M.ARMAS[a], m = s / 2 - 1.5;
-    const dentro = CA ? CA.icono(a, 'x="' + (-m).toFixed(1) + '" y="' + (-m).toFixed(1) + '" width="' + (2 * m).toFixed(1) + '" height="' + (2 * m).toFixed(1) + '"')
+    const A = armaDe(a), m = s / 2 - 1.5;
+    const dentro = CA && A.id ? CA.icono(A.id, 'x="' + (-m).toFixed(1) + '" y="' + (-m).toFixed(1) + '" width="' + (2 * m).toFixed(1) + '" height="' + (2 * m).toFixed(1) + '"')
       : '<text y="' + (s * 0.22) + '" text-anchor="middle" style="font-size:' + (s * 0.62).toFixed(1) + 'px">' + A.i + "</text>";
     return '<g class="arma' + (clic ? " clic" : "") + '"' + (clic ? ' data-act="info-arma" data-a="' + a + '"' : "") + ' transform="translate(' + x.toFixed(1) + "," + y.toFixed(1) + ')"><title>' + esc(A.n) + "</title>" +
       '<rect x="' + -s / 2 + '" y="' + -s / 2 + '" width="' + s + '" height="' + s + '" rx="6" fill="#0c2540"/>' + dentro +
@@ -1413,7 +1415,7 @@
   function opciones(tipo, sel, act) {
     let items;
     if (tipo === "s") items = [0, 1, 2, 3, 4, 5].map(i => M.cartaS(i));
-    else if (tipo === "a") items = M.ARMAS.map((_, i) => M.cartaA(i));
+    else if (tipo === "a") items = Array.from({ length: M.NA }, (_, i) => M.cartaA(i));
     else items = M.LUGARES.map((_, i) => M.cartaL(i));
     return items.map(c => {
       const idx = tipo === "s" ? c : tipo === "a" ? c - M.NS : c - M.NS - M.NA;
@@ -1453,11 +1455,12 @@
   }
 
   function dlgArma(a) {
-    const A = M.ARMAS[a], D = CA && CA.DATOS[a];
+    const A = armaDe(a), D = CA && CA.DATOS[A.id];
     return "<h2>" + esc(A.n) + "</h2>" +
+      '<p class="familia-arma ' + esc(A.familia) + '">' + (A.familia === "clasica" ? "Clásica del edificio" : "De Electricidad") + "</p>" +
       (est && est.armas ? '<p class="sub2">Ahora está ' + esc(enLugar(est.armas[a])) + ".</p>" : "") +
       '<div class="arma-ficha"><span class="grande-ico">' + iconoArma(a) + "</span>" + (D ? "<p>" + esc(D.dato) + "</p>" : "") + "</div>" +
-      (CA ? '<h4>Así se comete el crimen</h4><div class="escena-caja"><div class="escena-host" data-escena="' + a + '" data-bucle="1"></div></div>' : "") +
+      (CA ? '<h4>Así se comete el crimen</h4><div class="escena-caja"><div class="escena-host" data-escena="' + esc(A.id) + '" data-bucle="1"></div></div>' : "") +
       '<div class="botones"><button class="btn primario" data-act="cierra-dlg">Cerrar</button></div>';
   }
 
@@ -1473,8 +1476,8 @@
       h += '<div class="ganador">' + (i >= 0 ? avatarPuesto(i, 64) : "") + "<div><b>" + esc(nombreDe(est.ganador)) + "</b><br><small>" + esc(textoGanador()) + "</small></div></div>";
     } else h += "<p>" + esc(textoGanador()) + "</p>";
     if (CA && sobre && sobre.length === 3) {
-      const wi = sobre[1] - M.NS, D = CA.DATOS[wi];
-      h += '<div class="escena-caja"><div class="escena-host" data-escena="' + wi + '"></div><p class="frase-arma">' + esc(D.frase) + '</p><p class="dato-arma">' + esc(D.dato) + "</p>" +
+      const wi = armaDe(sobre[1] - M.NS).id, D = CA.DATOS[wi];
+      if (D) h += '<div class="escena-caja"><div class="escena-host" data-escena="' + wi + '"></div><p class="frase-arma">' + esc(D.frase) + '</p><p class="dato-arma">' + esc(D.dato) + "</p>" +
         '<button type="button" class="btn" data-act="repite-escena">&#8635; Repetir la escena</button></div>';
     }
     if (sobre && sobre.length === 3) {

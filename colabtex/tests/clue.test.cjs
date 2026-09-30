@@ -256,3 +256,20 @@ test('clue: en la elección se puede cambiar de personaje o soltarlo hasta que t
   assert.equal(e.eleccion.u0, 'c');
   assert.deepEqual(e.personajes.slice(0, 3), ['c', 'a', 'b']);
 });
+
+test('clue: cada partida sortea nueve armas mezclando clásicas y eléctricas', () => {
+  const vistas = new Set();
+  for (let s = 0; s < 200; s++) {
+    const a = M.armasDePartida(s);
+    assert.equal(a.length, M.NA);
+    assert.equal(new Set(a).size, M.NA, 'sin repetir');
+    const clas = a.filter(id => M.ARMA_POR_ID[id].familia === 'clasica').length;
+    assert.ok(clas >= 3 && clas <= 5, 'entre 3 y 5 clásicas');
+    assert.deepEqual(M.armasDePartida(s), a, 'la misma semilla da las mismas');
+    a.forEach(id => vistas.add(id));
+  }
+  assert.equal(vistas.size, M.CATALOGO_ARMAS.length, 'todas salen alguna vez');
+  const e = M.reducir([], [{ uid: 'a' }, { uid: 'b' }], { semilla: 9 });
+  assert.deepEqual(e.armasPartida, M.armasDePartida(9));
+  assert.equal(M.nombreCarta(M.cartaA(2), null, e.armasPartida), M.arma(e.armasPartida, 2).n);
+});
