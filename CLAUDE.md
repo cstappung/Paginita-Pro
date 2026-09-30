@@ -2622,9 +2622,30 @@ lead. Past that, the wrapper `eventos()` breaks what `base()` plays: bitcrush
 (`trituradora`), wrong notes and a wobbling lead in ruina, dropouts and
 crackle (`bat 'r'`) in estática, and in hostil a heartbeat that never stops
 plus a dissonant pad cluster. In vacío come silent bars and notes that fall
-an octave (`cae`). Each floor is slower, and entering one plays `presagio` (the old
-`caida` plus falling detuned clusters and one drum hit per floor).
-`reinicia()` starts at the current floor without the sting.
+an octave (`cae`). Each floor is slower.
+
+**The descent is never announced.** Nothing says «entering floor N»: no
+entry toast, no `presagio` sting (both removed), no class that flips on one
+round. The CSS reads continuous weights `--w2…--w5` that `paleta()` writes,
+and in `game.js` each effect fades in over its own corruption range
+(`lento(a, b)`), so things take over one by one rather than per floor. What
+creeps in: a face hidden in the dot grid (`CARA`) whose red pupils follow the
+highest ball, veins from the corners (`VENAS`), a faint pentagram, eyes that
+open on the blocks and follow the ball (`ojosDeBloque`), blood dripping from
+them (`gotea`). Labels change letter by letter (`ETIQUETAS`: PUNTAJE→PECADOS,
+RÉCORD→CONDENA, RONDA→CÍRCULO, BOLAS→ALMAS), the title turns BBTAN into
+SATAN (the `<h1>` and `document.title`), and a red `susurro` flashes in a
+label for a moment (`mutaciones`, every 120 ms).
+
+**A game in progress is saved per account** (`guarda`/`cargaPartida` in
+`game.js`). At the start of every round from round 2 the board is written to
+`localStorage` and sent with `Club.guardarPartida` to the parent, which
+stores `{d, at}` at `users/<uid>/club/bbtan` (`fb.guardarPartidaClub`). That
+node is the user's own, so **no rules change was needed**. On load the local
+copy restores first; then `Club.pedirPartida` asks for the cloud one, which
+wins if it is newer and nothing has been shot yet. A finished or restarted
+game writes `d: null` (a tombstone with its `at`), so a stale copy on another
+device does not come back. It resumes at the start of the saved round.
 
 **UNO No Mercy's roulette is played by its victim**: the victim picks the
 colour (not whoever threw the card) and then draws one card at a time with

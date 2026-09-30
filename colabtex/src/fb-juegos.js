@@ -327,6 +327,16 @@ export const leerPerfil = uid =>
 export const guardarPerfil = (uid, p) =>
   set(ref(db, `${U}/${uid}/perfil`), Object.assign({}, p, { at: Date.now() }));
 
+/* La partida a medias de un juego del club (hoy, BBTAN), para seguirla otro
+   día. Va bajo users/<uid>, que ya solo escribe su dueño: no hizo falta tocar
+   las reglas. Con `d` nulo queda solo `at`, una lápida que le dice al otro
+   dispositivo que esa partida ya terminó. */
+export const leerPartidaClub = (uid, juego) =>
+  get(ref(db, `${U}/${uid}/club/${juego}`)).then(s => s.val());
+
+export const guardarPartidaClub = (uid, juego, d, at) =>
+  set(ref(db, `${U}/${uid}/club/${juego}`), { d: d || null, at: Number.isFinite(at) ? at : Date.now() });
+
 export function watchPerfil(uid, cb) {
   return onValue(ref(db, `${U}/${uid}/perfil`), s => cb(s.val(), null),
                  err => cb(null, err));

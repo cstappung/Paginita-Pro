@@ -3,7 +3,7 @@ import {categoriaClub,resultadoClub,mejorClub} from './club-datos.js';
 
 /* El documento del juego conserva su CSS, su audio y sus animaciones.
    Solo este adaptador conoce la cuenta y escribe en Firebase. */
-export function crearSolo({juego,usuario,guardar,watch,volver,alResultado}) {
+export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partida}) {
   let host,frame,off,temaObserver,categoria='',muerto=false,pendientes={},guardando=false,propios={};
   const clave='jg.club.pendientes.'+usuario.uid+'.'+juego;
   const ocultos=[];
@@ -43,6 +43,13 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado}) {
     if(d.tipo==='alto'&&Number.isFinite(d.alto)){if(juego==='sortem')return;frame.style.height=Math.min(4000,Math.max(320,d.alto))+'px';return;}
     if(d.tipo==='volver'){volver();return;}
     if(d.tipo==='reintentar'){sincronizar();return;}
+    /* La partida a medias vive en la cuenta: el juego la pide al abrir y la
+       manda al empezar cada ronda. Si no hay cuenta o falla, sigue la local. */
+    if(d.tipo==='partida-pedir'){
+      if(!partida){enviar({tipo:'partida',dato:null});return;}
+      partida.leer().then(dato=>enviar({tipo:'partida',dato:dato||null}),()=>enviar({tipo:'partida',error:true}));return;
+    }
+    if(d.tipo==='partida-guardar'){if(partida)partida.guardar(typeof d.d==='string'&&d.d.length<200000?d.d:null,d.at).catch(()=>{});return;}
     if(d.tipo==='categoria'){
       if(categoriaClub(juego,d.categoria))escuchar(d.categoria);
       else if(juego==='snake'&&d.categoria==='zen'){if(off)off();off=null;categoria='zen';}
@@ -68,7 +75,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado}) {
     temaObserver.observe(document.documentElement,{attributes:true,attributeFilter:['data-tema']});
     frame.allow='fullscreen';frame.setAttribute('allowfullscreen','');
     window.addEventListener('message',mensaje);
-    frame.src='juegos/club/'+juego+'/index.html?v=club-11&embed=1&cuenta='+encodeURIComponent(usuario.uid);
+    frame.src='juegos/club/'+juego+'/index.html?v=club-12&embed=1&cuenta='+encodeURIComponent(usuario.uid);
     host.appendChild(frame);
   }
   function destruir(){muerto=true;temaObserver?.disconnect();if(off)off();window.removeEventListener('message',mensaje);for(const [el,valor]of ocultos)el.style.display=valor;frame?.remove();host.innerHTML='';ambientar('');}

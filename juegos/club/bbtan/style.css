@@ -31,8 +31,7 @@ dialog{border-radius:0;border-width:2px;box-shadow:8px 8px 0 #000}
 /* El descenso (descenso.js). Desde la ronda 100 game.js pone html.descenso y
    escribe en el estilo del <html> los colores fundidos del piso en que va
    (--bg, --barra, --borde…), así el marco entra de a poco igual que el
-   tablero. Las clases desc-1…desc-5 llegan a mitad de cada fundido y traen lo
-   que no se puede fundir: bordes mordidos, temblores, parpadeos. */
+   tablero. */
 html.descenso body{background:radial-gradient(ellipse at center,color-mix(in srgb,var(--halo) 30%,transparent),transparent 65%),var(--bg);transition:background .8s}
 html.descenso h1{text-shadow:0 0 12px var(--halo),2px 2px 0 var(--sombra)}
 html.descenso #best,html.descenso .result-score{text-shadow:0 0 12px var(--halo)}
@@ -46,23 +45,42 @@ html.descenso .primary-button{color:#0a0204;box-shadow:3px 3px 0 var(--sombra)}
 html.descenso .toast{background:#050203eb;border-color:var(--borde)}
 html.descenso .wardrobe-button{background:var(--panel);border-color:var(--line)}
 html.descenso .overlay{background:#050203ee}
-/* 2 · la ruina: el marco se desportilla. */
-html.desc-2 .play-section{clip-path:polygon(0 0,18% 0,19.5% 5px,23% 0,61% 0,62% 4px,64% 0,100% 0,100% 31%,calc(100% - 4px) 33%,100% 36%,100% 78%,100% 100%,83% 100%,81% calc(100% - 5px),78% 100%,29% 100%,27% calc(100% - 3px),25% 100%,0 100%,0 64%,4px 62%,0 59%)}
-html.desc-2 .toast,html.desc-2 .control-button{border-style:dashed}
-/* 3 · la estática: colores corridos, barrido pesado y un salto de vez en cuando. */
-html.desc-3 .play-section{box-shadow:-3px 0 0 #ff003355,3px 0 0 #00ffe033,6px 6px 0 #050203,0 18px 80px var(--halo);animation:bb-salto 7s steps(1) infinite}
-html.desc-3 .canvas-wrap::after{background:repeating-linear-gradient(to bottom,#0000 0 1px,#00000070 1px 3px),radial-gradient(ellipse at center,#0000 40%,#000000c0 100%)}
-html.desc-3 h1,html.desc-3 #status{text-shadow:-2px 0 #ff0033aa,2px 0 #00ffe088}
-@keyframes bb-salto{0%,91%,95%,100%{transform:none}92%{transform:translate(-3px,1px)}93%{transform:translate(4px,-1px) skewX(-1deg)}94%{transform:translate(-1px,0)}}
-/* 4 · hostil: el borde late como un corazón y el título parpadea. */
-html.desc-4 .play-section{animation:bb-late 1.1s ease-in-out infinite,bb-salto 5s steps(1) infinite}
-html.desc-4 h1{animation:bb-parpadeo 3.3s steps(1) infinite}
-html.desc-4 body{background:radial-gradient(ellipse at center,#3a000044,transparent 60%),repeating-linear-gradient(0deg,#0000 0 3px,#1a000022 3px 4px),var(--bg)}
-@keyframes bb-late{0%,40%,100%{border-color:var(--borde);filter:none}10%{border-color:#ff1a1a;filter:drop-shadow(0 0 10px #ff000088)}25%{border-color:#c01010;filter:drop-shadow(0 0 5px #ff000055)}}
-@keyframes bb-parpadeo{0%,100%{opacity:1}12%{opacity:.25}13%{opacity:1}57%{opacity:.6}58%{opacity:0}59%{opacity:1}}
-/* 5 · el vacío: la máquina está torcida. */
-html.desc-5 .game-shell{transform:rotate(-.6deg) skewX(.4deg)}
-html.desc-5 h1{animation:bb-invierte 4.1s steps(1) infinite}
-html.desc-5 h1 span{color:#ff2020}
-@keyframes bb-invierte{0%,100%{filter:none}33%{filter:invert(1)}34%{filter:none}71%{filter:invert(1) hue-rotate(90deg)}72%{filter:none}}
-@media(prefers-reduced-motion:reduce){html.desc-3 .play-section,html.desc-4 .play-section,html.desc-4 h1,html.desc-5 h1{animation:none}}
+/* Lo que no es un color tampoco entra de golpe: game.js escribe --w2…--w5
+   (el peso de cada piso, 0..1, continuo) y cada efecto se multiplica por el
+   suyo. Nada aparece en la ronda 100 o 200; se va colando. */
+@property --w2{syntax:'<number>';inherits:true;initial-value:0}
+@property --w3{syntax:'<number>';inherits:true;initial-value:0}
+@property --w4{syntax:'<number>';inherits:true;initial-value:0}
+@property --w5{syntax:'<number>';inherits:true;initial-value:0}
+html{--w2:0;--w3:0;--w4:0;--w5:0;transition:--w2 3s,--w3 3s,--w4 3s,--w5 3s}
+/* 2 · la ruina: el marco se desportilla, mordisco a mordisco. */
+html.descenso .play-section{clip-path:polygon(-140px -140px,
+  calc(18% - 8px*var(--w2)) -140px,19.5% calc(5px*var(--w2)),calc(21% + 8px*var(--w2)) -140px,
+  calc(61% - 5px*var(--w2)) -140px,62% calc(4px*var(--w2)),calc(63% + 5px*var(--w2)) -140px,
+  calc(100% + 140px) -140px,calc(100% + 140px) calc(31% - 6px*var(--w3)),calc(100% - 4px*var(--w3)) 33%,calc(100% + 140px) calc(35% + 6px*var(--w3)),
+  calc(100% + 140px) calc(100% + 140px),calc(83% + 9px*var(--w2)) calc(100% + 140px),81% calc(100% - 5px*var(--w2)),calc(79% - 9px*var(--w2)) calc(100% + 140px),
+  calc(29% + 5px*var(--w4)) calc(100% + 140px),27% calc(100% - 4px*var(--w4)),calc(25% - 5px*var(--w4)) calc(100% + 140px),
+  -140px calc(100% + 140px),-140px calc(64% + 7px*var(--w3)),calc(5px*var(--w3)) 62%,-140px calc(60% - 7px*var(--w3)))}
+html.descenso .control-button{border-color:color-mix(in srgb,var(--line),#ff1a1a calc(var(--w4)*45%));transform:rotate(calc(var(--w5)*var(--giro,0)*1deg))}
+html.descenso .control-button:nth-child(1){--giro:-1.2}
+html.descenso .control-button:nth-child(3){--giro:.8}
+html.descenso .control-button:nth-child(4){--giro:2}
+/* 3 · la estática: colores corridos que se abren de a poco y un salto de vez en cuando. */
+html.descenso .play-section{box-shadow:calc(-3px*var(--w3)) 0 0 #ff003355,calc(3px*var(--w3)) 0 0 #00ffe033,6px 6px 0 #050203,0 18px 80px var(--halo);animation:bb-salto 7s steps(1) infinite}
+html.descenso h1,html.descenso #status{text-shadow:calc(-2px*var(--w3)) 0 #ff0033aa,calc(2px*var(--w3)) 0 #00ffe088,0 0 12px var(--halo)}
+html.descenso .canvas-wrap::after{background:repeating-linear-gradient(to bottom,#0000 0 1px,rgb(0 0 0/calc(.33 + .12*var(--w3))) 1px 3px),radial-gradient(ellipse at center,#0000 calc(50% - 10%*var(--w3)),#1a0006c0 100%)}
+@keyframes bb-salto{0%,91%,95%,100%{transform:rotate(calc(var(--w5)*-.6deg)) skewX(calc(var(--w5)*.4deg))}92%{transform:translate(calc(-3px*var(--w3)),calc(1px*var(--w3))) rotate(calc(var(--w5)*-.6deg))}93%{transform:translate(calc(4px*var(--w3)),calc(-1px*var(--w3))) skewX(calc(-1deg*var(--w3)))}94%{transform:translate(calc(-1px*var(--w3)),0)}}
+/* 4 · hostil: el borde late, el lienzo respira y el título titila. */
+html.descenso .play-section{animation:bb-salto 7s steps(1) infinite,bb-late 1.1s ease-in-out infinite}
+html.descenso .canvas-wrap{animation:bb-respira 2.2s ease-in-out infinite}
+html.descenso h1{animation:bb-parpadeo 3.3s steps(1) infinite,bb-invierte 4.1s steps(1) infinite}
+html.descenso body{background:radial-gradient(ellipse at center,color-mix(in srgb,var(--halo) 30%,transparent),transparent 65%),radial-gradient(ellipse at center,rgb(58 0 0/calc(var(--w4)*.27)),transparent 60%),repeating-linear-gradient(0deg,#0000 0 3px,rgb(26 0 0/calc(var(--w4)*.13)) 3px 4px),var(--bg)}
+@keyframes bb-late{0%,40%,100%{border-color:var(--borde);filter:none}10%{border-color:color-mix(in srgb,var(--borde),#ff1a1a calc(var(--w4)*100%));filter:drop-shadow(0 0 calc(var(--w4)*10px) #ff000088)}25%{border-color:color-mix(in srgb,var(--borde),#c01010 calc(var(--w4)*100%));filter:drop-shadow(0 0 calc(var(--w4)*5px) #ff000055)}}
+@keyframes bb-respira{0%,100%{transform:scale(1)}50%{transform:scale(calc(1 + .006*var(--w4)))}}
+@keyframes bb-parpadeo{0%,100%{opacity:1}12%{opacity:calc(1 - .75*var(--w4))}13%{opacity:1}57%{opacity:calc(1 - .4*var(--w4))}58%{opacity:calc(1 - var(--w4))}59%{opacity:1}}
+/* 5 · el vacío: la máquina está torcida y el título se da vuelta. */
+@keyframes bb-invierte{0%,100%{filter:none}33%{filter:invert(var(--w5))}34%{filter:none}71%{filter:invert(var(--w5)) hue-rotate(calc(90deg*var(--w5)))}72%{filter:none}}
+html.descenso h1 span{color:color-mix(in srgb,var(--green),#ff2020 calc(var(--w5)*100%))}
+html.descenso .score-strip span{transition:color .3s}
+html.descenso .score-strip span.susurro{color:#ff2a2a}
+@media(prefers-reduced-motion:reduce){html.descenso .play-section,html.descenso h1,html.descenso .canvas-wrap{animation:none}}
