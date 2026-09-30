@@ -141,7 +141,7 @@ const reloj = ms => {
 /* Lo que se lee de una marca: en el buscaminas y el sprint manda el
    tiempo (los puntos son fijos), en el resto los puntos. */
 export function marcaSolo(cat, f) {
-  if (/^club-minas-|^club-tetris-sprint$/.test(cat)) return `⏱️ ${reloj(f.tiempo)}`;
+  if (/^club-minas-|^club-sortem-|^club-tetris-sprint$/.test(cat)) return `⏱️ ${reloj(f.tiempo)}`;
   return `${Number(f.puntos).toLocaleString("es-CL")} pts`;
 }
 

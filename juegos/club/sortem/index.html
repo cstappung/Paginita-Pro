@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>sortEm — Arcade Edition</title>
+  <link rel="stylesheet" href="../conexion.css?v=club-1">
+  <script src="../conexion.js?v=club-3"></script>
   <style>
     :root{color-scheme:dark}
     *{box-sizing:border-box}
@@ -14,12 +16,20 @@
     nav span{font-size:12px;color:#c8a9e8}
     #game{width:min(800px,100%);aspect-ratio:4/3;box-shadow:0 0 0 2px #8338ec,0 18px 70px #ff006e2e;background:#1a0a2e;overflow:hidden}
     #game canvas{display:block!important;width:100%!important;height:100%!important}
+    .shell{width:min(800px,100%)}
+    .club-volver{color:#00f5ff}
+    .club-ranking{background:#1a0a2e;border-color:#8338ec;color:#e9dcff}
+    .club-integrado body{padding:0;display:block}
+    .club-integrado .shell{width:100%;max-width:800px;margin:0 auto}
+    .club-integrado nav{display:none}
     .error{width:min(800px,100%);padding:24px;border:1px solid #ff006e;background:#2d1b4e;color:#fff;line-height:1.6}
   </style>
 </head>
 <body>
-  <nav><a href="../../juegos.html">← Juegos</a><span>sortEm · Arcade Edition</span></nav>
-  <main id="game" aria-label="Juego sortEm"></main>
+  <nav><a href="../../../juegos.html">← Juegos</a><span>sortEm · Arcade Edition</span></nav>
+  <div class="shell">
+    <main id="game" aria-label="Juego sortEm"></main>
+  </div>
   <script>
     window.addEventListener('error',function(){
       var game=document.getElementById('game');
@@ -27,6 +37,6 @@
     });
   </script>
   <script src="https://cdn.jsdelivr.net/npm/phaser@3.87.0/dist/phaser.min.js"></script>
-  <script src="game.js"></script>
+  <script src="game.js?v=club-1"></script>
 </body>
 </html>
