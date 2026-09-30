@@ -347,7 +347,7 @@
        rellenan los puestos libres; sin él quedan en "".
 
      Las jugadas (`t` cabe en los 16 caracteres que dejan las reglas):
-       elegir    {t:"elige", r}
+       elegir    {t:"elige", r}  {t:"suelta"}
        reparto   {t:"mezcla", c, pk}  {t:"revuelve", c}  {t:"quita", c}
        turno     {t:"mueve", a, v:"dado"|"pasadizo"}  {t:"sugiere", s, a}
                  {t:"acusa", s, a, l}  {t:"pasa"}
@@ -492,8 +492,18 @@
          volver a tirar los dados de los turnos siguientes. */
       const vale = () => { aceptadas++; huella = sha256hex(huella + "|" + resumen(j)); };
 
+      /* Mientras quede alguien eligiendo, se puede cambiar de personaje
+         (otro `elige` con uno libre) o soltarlo (`suelta`). La partida
+         arranca cuando todos tienen uno: desde ahí ya no se cambia. */
       if (fase === "elige") {
-        if (j.t !== "elige" || !activo(u) || eleccion[u] || !idValido(j.r) || Object.values(eleccion).includes(j.r)) continue;
+        if (!activo(u)) continue;
+        if (j.t === "suelta") {
+          if (!eleccion[u]) continue;
+          delete eleccion[u];
+          vale();
+          continue;
+        }
+        if (j.t !== "elige" || !idValido(j.r) || eleccion[u] === j.r || Object.values(eleccion).includes(j.r)) continue;
         eleccion[u] = j.r;
         vale();
         eligieron();

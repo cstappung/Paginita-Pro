@@ -235,3 +235,24 @@ test('clue: reproducir el registro da el mismo estado', () => {
   const b = JSON.stringify(M.reducir(S.log.map(x => ({ ...x })), S.js, S.op));
   assert.equal(a, b);
 });
+
+test('clue: en la elección se puede cambiar de personaje o soltarlo hasta que todos tengan uno', () => {
+  const S = sala(3, false);
+  let e = S.jugar('u0', { t: 'elige', r: 'a' });
+  e = S.jugar('u0', { t: 'elige', r: 'b' });             // cambia a otro libre
+  assert.equal(e.eleccion.u0, 'b');
+  e = S.jugar('u1', { t: 'elige', r: 'a' });             // 'a' quedó libre
+  assert.equal(e.eleccion.u1, 'a');
+  e = S.jugar('u0', { t: 'elige', r: 'a' });             // ocupado: no cambia
+  assert.equal(e.eleccion.u0, 'b');
+  e = S.jugar('u0', { t: 'suelta' });                    // lo suelta
+  assert.equal(e.eleccion.u0, undefined);
+  assert.ok(e.debe.includes('u0'));
+  e = S.jugar('u2', { t: 'elige', r: 'b' });             // otro toma el que soltó
+  assert.equal(e.fase, 'elige');
+  e = S.jugar('u0', { t: 'elige', r: 'c' });
+  assert.equal(e.fase, 'jugando');
+  e = S.jugar('u0', { t: 'suelta' });                    // ya empezó: no se suelta
+  assert.equal(e.eleccion.u0, 'c');
+  assert.deepEqual(e.personajes.slice(0, 3), ['c', 'a', 'b']);
+});

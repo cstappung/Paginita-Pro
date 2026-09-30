@@ -151,7 +151,7 @@
       modo: "practica", yo: "yo", mirando: false, jugadores, elenco, semilla,
       suscribir(cb) { oyentes.add(cb); cb({ est, priv: priv() }); return () => oyentes.delete(cb); },
       jugar(j) {
-        if (!j || typeof j !== "object" || !est.debe.includes("yo") && j.t !== "elige") return Promise.resolve(false);
+        if (!j || typeof j !== "object" || !est.debe.includes("yo") && !(est.fase === "elige" && (j.t === "elige" || j.t === "suelta"))) return Promise.resolve(false);
         escribe("yo", j);
         return Promise.resolve(true);
       },

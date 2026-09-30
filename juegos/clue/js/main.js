@@ -37,6 +37,7 @@
   let conn = null, desuscribir = null, opcionesPractica = null;
   let est = null, priv = null, prev = null;
   const ui = {
+    candidato: "",   // personaje marcado en la eleccion, aun sin confirmar
     dlg: null, selS: null, selA: null, selL: null, tab: "hist",
     rolling: false, falsos: [1, 1], tirado: -1, busy: false,
     finCerrado: false, cola: [], vistasVistas: new Set(), primera: true, marcasV: 0
@@ -252,7 +253,10 @@
   function pintaEleccion() {
     $("juego").hidden = true;
     const tomados = est.eleccion || {};
-    const firma = JSON.stringify(["e", tomados, est.debe, conn.mirando, elenco().length, est.jugadores.length]);
+    const mioYa = tomados[yo()] || "";
+    /* El candidato se pierde si otro se lo lleva, o si ya confirmé. */
+    if (ui.candidato && (mioYa || Object.values(tomados).includes(ui.candidato))) ui.candidato = "";
+    const firma = JSON.stringify(["e", tomados, est.debe, conn.mirando, elenco().length, est.jugadores.length, ui.candidato]);
     if (firma === firmaPantalla) return;
     firmaPantalla = firma;
     const p = $("pantalla");
@@ -260,7 +264,10 @@
     p.className = "pantalla elige";
     const asiento = miAsiento();
     const yaElegi = !!tomados[yo()];
-    const puedo = !conn.mirando && !yaElegi && asiento >= 0;
+    /* Se puede tocar mientras dure la eleccion: sin personaje, tocar marca
+       o desmarca un candidato; con personaje, tocar el propio lo suelta y
+       tocar otro libre lo cambia. */
+    const puedo = !conn.mirando && asiento >= 0;
     const quien = uid => Object.keys(tomados).find(u => tomados[u] === uid);
     const tarjetas = elenco().map(e => {
       const dueno = Object.keys(tomados).find(u => tomados[u] === e.id);
@@ -268,24 +275,30 @@
       const as = ocupado ? asientoDe(dueno) : -1;
       const col = as >= 0 ? M.COLORES[as] : "#5b6472";
       const mio = dueno === yo();
-      return '<button type="button" class="pers' + (ocupado ? " tomado" : "") + (mio ? " mio" : "") + '" data-act="elige" data-id="' + esc(e.id) + '"' + ((ocupado || !puedo) ? " disabled" : "") + ' style="--c:' + col + '">' +
+      const cand = ui.candidato === e.id;
+      const bloqueado = !puedo || (ocupado && !mio);
+      return '<button type="button" class="pers' + (ocupado ? " tomado" : "") + (mio ? " mio" : "") + (cand ? " cand" : "") + '" data-act="elige" data-id="' + esc(e.id) + '"' + (bloqueado ? " disabled" : "") + ' aria-pressed="' + (cand || mio) + '" style="--c:' + (cand ? M.COLORES[Math.max(0, asiento)] : col) + '">' +
         '<span class="pers-foto">' + avatarHtml(e, col, "lleno", inicial(e.n)) + "</span>" +
         '<span class="pers-nom">' + esc(e.n) + "</span>" +
         (e.d ? '<span class="pers-desc">' + esc(e.d) + "</span>" : "") +
-        (ocupado ? '<span class="pers-etq">' + (mio ? "Tu personaje" : "Elegido por " + esc(nombreDe(dueno))) + "</span>" : "") +
+        (ocupado ? '<span class="pers-etq">' + (mio ? "Tu personaje (toca para soltarlo)" : "Elegido por " + esc(nombreDe(dueno))) + "</span>" : "") +
+        (cand ? '<span class="pers-etq">Marcado: confirma abajo</span>' : "") +
         "</button>";
     }).join("");
     const esperan = (est.debe || []).map(u => esc(nombreDe(u)));
     let estado;
     if (conn.mirando) estado = "Estás mirando: los jugadores están eligiendo personaje.";
-    else if (yaElegi) estado = "Listo. Esperando a: " + (esperan.join(", ") || "nadie") + ".";
+    else if (yaElegi) estado = "Listo. Esperando a: " + (esperan.join(", ") || "nadie") + ". Hasta que todos elijan puedes cambiar de personaje o soltar el tuyo.";
     else estado = "Elige a quién vas a interpretar. Tu ficha será de color " + M.NOMBRE_COLOR[Math.max(0, asiento)] + ".";
     const chips = est.jugadores.map((j, i) => '<span class="chip-j' + (tomados[j.uid] ? " listo" : "") + '">' + punto(i) + esc(j.nombre) + (tomados[j.uid] ? " &#10003;" : " ...") + "</span>").join("");
     p.innerHTML =
       '<div class="cab-eleccion"><h1 class="logo chico">CLUE</h1><h2>Elige tu personaje</h2>' +
       '<p class="estado">' + estado + "</p>" +
       (asiento >= 0 && !conn.mirando ? '<p class="mi-color"><span class="ficha-demo" style="background:' + M.COLORES[asiento] + '"></span> Tu color: ' + M.NOMBRE_COLOR[asiento] + "</p>" : "") +
-      '<div class="quienes">' + chips + "</div></div>" +
+      '<div class="quienes">' + chips + "</div>" +
+      (puedo && !yaElegi ? '<div class="confirma-pers"><button type="button" class="btn primario" data-act="confirma-pers"' + (ui.candidato ? "" : " disabled") + ">" +
+        (ui.candidato ? "Confirmar a " + esc((elenco().find(e => e.id === ui.candidato) || {}).n || "") : "Marca un personaje") + "</button></div>" : "") +
+      "</div>" +
       '<div class="rejilla-pers">' + tarjetas + "</div>";
     void quien;
   }
@@ -964,7 +977,17 @@
           return;
         }
         case "otra": if (opcionesPractica) iniciaPractica(opcionesPractica); else pantallaInicio(); return;
-        case "elige": if (!el.disabled) conn.jugar({ t: "elige", r: el.dataset.id }); return;
+        case "elige": {
+          if (el.disabled || !est || est.fase !== "elige") return;
+          const id = el.dataset.id, mio = (est.eleccion || {})[yo()];
+          if (mio === id) conn.jugar({ t: "suelta" });            // soltar el propio
+          else if (mio) conn.jugar({ t: "elige", r: id });        // cambiar a otro libre
+          else { ui.candidato = ui.candidato === id ? "" : id; firmaPantalla = ""; pintaEleccion(); }
+          return;
+        }
+        case "confirma-pers":
+          if (ui.candidato && est && est.fase === "elige") { conn.jugar({ t: "elige", r: ui.candidato }); ui.candidato = ""; }
+          return;
         case "tab": ui.tab = el.dataset.tab; firmas.libreta = ""; pintaTabs(); pintaLibreta(); return;
         case "marca": ciclaMarca(el.dataset.k); return;
         case "tirar": tirar(); return;

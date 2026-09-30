@@ -30,7 +30,7 @@ globalThis.ClueMotor = globalThis.ClueMotor || CM;
      exista de verdad. */
 const PADRE = "clue-padre", HIJO = "clue-hijo";
 const ESPERA_SEMILLAS = 12000;
-const TIPOS = new Set(["elige", "mezcla", "revuelve", "quita", "mueve", "sugiere", "acusa", "pasa", "paso", "muestra", "abre", "veredicto", "s"]);
+const TIPOS = new Set(["elige", "suelta", "mezcla", "revuelve", "quita", "mueve", "sugiere", "acusa", "pasa", "paso", "muestra", "abre", "veredicto", "s"]);
 
 /* Lo que se deja pasar de cada jugada: los campos que el motor lee y
    nada más, con los mazos cifrados acotados a su largo. */

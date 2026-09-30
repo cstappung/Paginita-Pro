@@ -78,6 +78,9 @@ p { margin: 0 0 8px; }
 .pers.tomado .pers-foto { filter: grayscale(.8) brightness(.6); }
 .pers.mio { box-shadow: 0 0 0 3px var(--oro); }
 .pers.mio .pers-foto { filter: none; }
+.pers.cand { border-color: var(--c); box-shadow: 0 0 0 3px var(--c); transform: translateY(-3px); }
+.confirma-pers { display: flex; justify-content: center; margin: 14px 0 4px; }
+.confirma-pers .btn { min-width: 260px; }
 .pers-foto { display: block; aspect-ratio: 1; container-type: size; }
 .pers-nom { font-family: var(--serif); font-weight: 700; padding: 8px 10px 0; }
 .pers-desc { font-size: 12px; color: var(--tenue); padding: 2px 10px 8px; }
