@@ -135,7 +135,7 @@ export function crearClue({ uid, pid, jugar, terminar, mirando, secreto, listo: 
     frame.title = "Clue: partida en línea";
     frame.className = "jg-clue-marco";
     window.addEventListener("message", mensaje);
-    frame.src = "juegos/clue/index.html?modo=online&v=clue-3";
+    frame.src = "juegos/clue/index.html?modo=online&v=clue-4";
     host.append(aviso, frame);
   }
 
