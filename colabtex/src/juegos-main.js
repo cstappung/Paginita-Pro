@@ -49,6 +49,7 @@ import { crearPresidente } from "./juegos/presidente.js";
 import { crearSpicy } from "./juegos/spicy.js";
 import { crearTetris } from "./juegos/tetris.js";
 import { crearYemas } from "./juegos/yemas.js";
+import { crearClue } from "./juegos/clue.js";
 import { abreReglas, tieneReglas } from "./juegos/reglas.js";
 import { crearRanks } from "./juegos/ranks.js";
 import { LOGROS, detecta, deFila, deMarca } from "./juegos/logros.js";
@@ -66,10 +67,10 @@ const FABRICAS = {
   orbita: crearOrbita, escondite: crearEscondite, cartas: crearCartas,
   cuadritos: crearCuadritos, reversi: crearReversi, worms: crearWorms,
   cadena: crearCadena, flip7: crearFlip7, cacho: crearCacho, uno: crearUno, catan: crearCatan,
-  presidente: crearPresidente, spicy: crearSpicy, tetris: crearTetris, yemas: crearYemas
+  presidente: crearPresidente, spicy: crearSpicy, tetris: crearTetris, yemas: crearYemas, clue: crearClue
 };
 
-const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚" };
+const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️" };
 
 /* Lo que puede elegir quien abre la sala, por juego. Vive aquí y no en
    `motor.js` porque son controles y no reglas: el motor ya recorta lo
@@ -149,7 +150,8 @@ const OPCIONES = {
     { clave: "largo", etiqueta: "Partida", por: 1,
       valores: ["Corta", "Normal", "Larga"].map((t, i) => ({ v: i,
         t: `${t} (${YM_LARGOS.todos[i]} / ${YM_LARGOS.equipos[i]} bajas, ${YM_LARGOS.bandera[i]} 🚩)` })) }
-  ]
+  ],
+  clue: [{ clave: "cupo", etiqueta: "Detectives", por: 4, valores: cupos("clue") }]
 };
 
 /* La pestaña del manual que abre cada sala: la de su variante. */
@@ -1329,7 +1331,7 @@ const FANFARRIA = { gano: "victoria", perdi: "derrota", empate: "empate", mirand
    En cartas es el choque entero (`CHOQUE`, 2,6 s): la ronda que gana
    el trío se enseña igual que las demás. Worms no pone fanfarria — el
    marco tiene su propio audio y su propio final. */
-const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300, presidente: 1200, spicy: 1200, tetris: 1500, yemas: 1500 };
+const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300, presidente: 1200, spicy: 1200, tetris: 1500, yemas: 1500, clue: 1800 };
 
 function pintaFin(p, est) {
   const caja = $("jgFin");
@@ -1781,6 +1783,7 @@ function arteJuego(k) {
   if (k === "spicy") return '<div class="jg-art-sp"><b>🌶</b>' + [["7", "#e2412b", "🌶"], ["3", "#5dac3a", "🍃"], ["9", "#6b4a2b", "⚫"]].map(([n, c, e]) => '<i style="--t:' + c + '"><span>' + n + '</span><s>' + e + '</s></i>').join("") + '<em>SPICY</em></div>';
   if (k === "tetris") return '<div class="jg-art-tt">' + ["....ll", "t..zll", "ttzzoo", "itsjoo", "issjjj"].map(f => [...f].map(c => '<i class="' + (c === "." ? "" : "p-" + c) + '"></i>').join("")).join("") + '<em>TETRIS</em></div>';
   if (k === "yemas") return '<div class="jg-art-ym"><i></i><i></i><i></i><b></b><em>YEMAS</em></div>';
+  if (k === "clue") return '<div class="jg-art-cl"><i></i><i></i><i></i><b>✉</b><s>🔍</s><em>CLUE</em></div>';
   if (k === "cuadritos") return '<div class="jg-art-dots">' + Array.from({ length: 9 }, (_, i) => '<i class="' + (i % 3 === 0 ? "llena" : "") + '"></i>').join("") + '</div>';
   return '<div class="jg-art-land"><i></i><i></i><i></i><b>⌖</b><span>ENCUENTRA LO INVISIBLE</span></div>';
 }

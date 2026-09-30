@@ -135,6 +135,13 @@ export const JUEGOS = {
     color: "#ffb300",
     minimo: 2,
     cupo: 8
+  },
+  clue: {
+    nombre: "Clue",
+    lema: "Un crimen en el edificio: descubre quién, con qué y dónde antes que los demás",
+    color: "#8e1b2b",
+    minimo: 2,
+    cupo: 6
   }
 };
 
@@ -873,6 +880,7 @@ export function reducir(p) {
   if (p.juego === "spicy") return { ...base, ...redSpicy(p, js, listos) };
   if (p.juego === "tetris") return { ...base, ...redTetris(p, js, listos) };
   if (p.juego === "yemas") return { ...base, ...redYemas(p, js, listos) };
+  if (p.juego === "clue") return { ...base, ...redClue(p, js, listos) };
   return base;
 }
 
@@ -943,6 +951,7 @@ export function progreso(est, juego) {
   /* En Tetris, cuántos han caído ya. */
   if (juego === "tetris" && est.caidos) return c(est.caidos.length / Math.max(1, (est.jugadores || []).length - 1));
   /* En Yemas, lo cerca de la meta que está quien más bajas lleva. */
+  if (juego === "clue" && est.sugerencias && globalThis.ClueMotor) return c(globalThis.ClueMotor.progreso(est));
   if (juego === "yemas" && est.bajas) {
     const lider = est.puntosEq ? Math.max(0, ...Object.values(est.puntosEq)) : Math.max(0, ...Object.values(est.bajas));
     return c(lider / (est.meta || YM_META));
@@ -1168,6 +1177,25 @@ export function redYemas(p, js = jugadoresDe(p), listos = true) {
     hist: hist.slice(-40),
     ganador, motivo
   };
+}
+
+/* ---------- Clue ----------
+   El motor entero vive en `juegos/clue/js/motor.js` (UMD, como el de
+   Tetris): lo comparten la sala, el juego suelto y las pruebas. Este
+   archivo no importa nada (las pruebas lo cargan en un `vm` quitándole
+   los `export`), así que el motor llega por `globalThis.ClueMotor`, que
+   deja puesto `clue.js` al importarlo. Aquí solo se le pasa el
+   registro. Sus jugadores (asiento, ficha, promesa) no pisan los de la
+   sala, que llevan foto y color para la cabecera. La exponenciación del
+   póquer mental no pasa nunca por el reductor: la hace cada pantalla
+   en `red.js`. */
+export function redClue(p, js = jugadoresDe(p), listos = true) {
+  const CM = globalThis.ClueMotor;
+  if (!listos || !CM) return { fase: "espera", turno: "", debe: [], ganador: null, motivo: "" };
+  const { jugadores, ...est } = CM.reducir(jugadasDe(p),
+    js.map(j => ({ uid: j.uid, nombre: j.nombre, hmazo: j.hmazo || "" })),
+    { semilla: p.semilla, cripto: true });
+  return est;
 }
 
 /* ---------- escondite ---------- */

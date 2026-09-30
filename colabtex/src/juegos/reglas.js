@@ -417,6 +417,34 @@ const REGLAS = {
       ])]] }
     }
   },
+  clue: {
+    lema: "Un crimen en el edificio, de 2 a 6 detectives.",
+    secciones: [
+      ["El objetivo", "En el sobre del patio hay tres cartas: <b>quién</b>, <b>con qué</b> y <b>dónde</b>. Gana el primero que acusa y acierta las tres."],
+      ["Antes de empezar", lista([
+        "Cada jugador elige su personaje; los sospechosos que falten hasta seis se sortean entre los que nadie eligió.",
+        "Las 18 cartas que no están en el sobre se reparten entre todos. Tus cartas no son el culpable: táchalas en la <b>libreta</b>."
+      ])],
+      ["Tu turno", lista([
+        "Tira los dos dados y avanza como mucho esa cantidad de casillas por el pasillo. Las fichas tapan su casilla. Entrar en una sala termina el movimiento, y no puedes volver a la sala de la que saliste en el mismo turno.",
+        "Desde el <b>mirador</b> la <b>escalera</b> baja al hall azul, y desde los <b>lockers</b> el <b>montacargas</b> llega a la bodega: usarlos reemplaza a los dados.",
+        "Si otro jugador te trajo a una sala con su sugerencia, en tu turno puedes sugerir ahí mismo sin moverte."
+      ])],
+      ["Sugerir", lista([
+        "Al entrar en una sala puedes sugerir un sospechoso y un arma <i>en esa sala</i>. Los dos vienen a la sala.",
+        "Los demás, en orden, dicen si tienen alguna de las tres cartas. El primero que tenga te enseña <b>una</b>, solo a ti; los demás solo ven que te enseñó algo.",
+        "Si nadie tiene ninguna, es una pista enorme."
+      ])],
+      ["Acusar", "Cuando creas saberlo, acusa (en tu turno, cuando quieras). Si aciertas, ganas. Si no, quedas fuera: ya no juegas turnos, pero sigues enseñando cartas cuando te lo pidan. Si solo queda uno sin acusar mal, gana ese."],
+      ["Sin servidor, sin trampas", lista([
+        "Nadie reparte: la baraja se mezcla y se reparte cifrada con póquer mental (SRA), así que nadie, ni quien abre la sala, sabe las cartas de los demás ni lo que hay en el sobre. Al empezar hay unos segundos de «barajando».",
+        "La carta que enseñas viaja cifrada solo para quien sugirió.",
+        "Al terminar, todos revelan su semilla y cada pantalla rehace la partida entera: si alguien dijo «no tengo» teniendo, o enseñó una carta que no era suya, sale su nombre.",
+        "El límite honesto: si alguien se va a mitad de partida sin revelar su semilla, sus cartas y el sobre quedan cerrados para siempre y la partida se anula."
+      ])],
+      ["Para practicar", "El juego suelto (<code>juegos/clue/</code>) se juega contra bots, sin sala."]
+    ]
+  },
   presidente: {
     lema: "El «culo»: de 3 a 10 jugadores, ronda tras ronda y sin final fijo.",
     secciones: [
