@@ -2825,3 +2825,13 @@ Room chat sits in a sticky right column on desktop and below the game on
 narrow screens. Solo Club retains isolated audio/game documents, with shared
 navigation, automatic height, parent theme updates and rankings in the game
 sidebar; embedded documents hide standalone branding, intros and footers.
+
+
+**Visual rules:** `juegos/reglas-ejemplos.js` supplies the Spanish examples,
+`reglas-ilustraciones.js` draws their own local SVGs, and `reglas-guia.js`
+mounts a selector and step player inside `reglas.js`. There is no autoplay
+on opening; reduced-motion uses manual steps. Hiding the tab, changing
+variant or closing the manual cancels the timer. Keep examples consistent
+with current engines when changing rules. Do not fetch external illustrations
+or write to a real match. `tests/reglas-visuales.test.cjs` checks manual and
+variant coverage, playback and teardown. Styles live in `juegos.html`.

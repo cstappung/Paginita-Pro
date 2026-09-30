@@ -1522,7 +1522,7 @@ try { var t = localStorage.getItem("jg.tema");
 .jg-of-reglas{flex-shrink:0;white-space:nowrap}
 .jg-solo-barra{display:flex;justify-content:flex-end;margin-bottom:10px}
 .jg-reglas-capa{position:fixed;inset:0;z-index:80;display:grid;place-items:center;padding:18px;background:#171123b3;backdrop-filter:blur(6px);animation:jgVela .2s ease-out}
-.jg-reglas{display:flex;flex-direction:column;width:min(680px,100%);max-height:min(88vh,860px);background:#fff;border-radius:18px;box-shadow:0 30px 80px #0006;overflow:hidden;color:#2c2437}
+.jg-reglas{display:flex;flex-direction:column;width:min(820px,100%);max-height:min(92dvh,1000px);background:#fff;border-radius:18px;box-shadow:0 30px 80px #0006;overflow:hidden;color:#2c2437}
 .jg-reglas-cab{display:flex;align-items:flex-start;gap:14px;padding:20px 22px 14px;border-bottom:1px solid #eee9f5}
 .jg-reglas-cab>div{flex:1;min-width:0}
 .jg-reglas-cab small{font:600 10px 'IBM Plex Mono',monospace;letter-spacing:1.4px;text-transform:uppercase;color:#8a8494}
@@ -2268,6 +2268,25 @@ html[data-tema=oscuro] .jg-oferta .jg-of-btn,html[data-tema=oscuro] .jg-of-orbit
 html[data-tema=oscuro] .jg-oferta .jg-of-btn:hover,html[data-tema=oscuro] .jg-of-orbita .jg-of-btn:hover{background:#fff}
 html[data-tema=oscuro] .jg-of-btn .jg-of-flecha{filter:brightness(.8) saturate(1.3)}
 html[data-tema=oscuro] .jg-lado-caja>div>.jg-sala{border-color:var(--os-borde)}
+
+/* Manual ilustrado: escenas ligeras y controles persistentes. */
+.jg-guia{--gv-borde:#ddd7ea;--gv-papel:#f7f5fc;--gv-tinta:#302441;--gv-suave:#655c74;margin:16px 0 24px;padding:18px;border:1px solid var(--gv-borde);border-radius:16px;background:var(--gv-papel);color:var(--gv-tinta)}
+.jg-guia-cab{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}.jg-guia-cab small{font-size:9px;font-weight:700;letter-spacing:1.6px;color:var(--gv-suave)}
+.jg-guia .jg-guia-cab h3{font-size:19px;margin:3px 0 0;color:var(--gv-tinta)}.jg-guia-cantidad{font-size:11px;white-space:nowrap;border:1px solid var(--gv-borde);border-radius:30px;padding:4px 9px;color:var(--gv-suave)}
+.jg-guia-selector{display:grid;gap:5px;font-size:11px;font-weight:600;color:var(--gv-suave);margin-bottom:14px}
+.jg-guia-selector select{width:100%;min-height:44px;padding:9px 12px;font-family:inherit;font-size:13px;font-weight:600;color:var(--gv-tinta);background:var(--gv-papel);border:1px solid var(--gv-borde);border-radius:9px;cursor:pointer}
+.jg-guia-figura{margin:0;display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:18px;align-items:center}
+.jg-guia-imagen{min-width:0;aspect-ratio:480/250;display:grid;align-items:center;background:#142139;border-radius:14px;overflow:hidden}.jg-guia-imagen svg{width:100%;height:auto;display:block;animation:jgGuiaEntra .22s ease-out}
+.jg-guia-figura figcaption{min-height:186px;display:flex;flex-direction:column;justify-content:center}.jg-guia-paso{font-size:10px;font-weight:700;letter-spacing:1px;color:var(--gv-suave)}
+.jg-guia h4{font-size:16px;line-height:1.35;margin:7px 0;color:var(--gv-tinta)}.jg-guia-figura p{font-size:13px;line-height:1.65;margin:0;color:var(--gv-suave)}
+.jg-guia-controles{display:flex;gap:8px;justify-content:space-between;margin-top:16px}.jg-guia-controles button{min-height:44px;padding:9px 12px;border:1px solid var(--gv-borde);border-radius:9px;background:var(--gv-papel);color:var(--gv-tinta);font-size:12px;font-weight:600;cursor:pointer}.jg-guia-controles [data-guia=play]{background:#554183;color:white;border-color:#554183;min-width:115px}
+.jg-guia-controles button:disabled{opacity:.35;cursor:default}.jg-guia-controles button:hover:not(:disabled){filter:brightness(.94)}.jg-guia :focus-visible{outline:3px solid #a68bdb;outline-offset:3px}
+.jg-guia .jg-guia-ayuda{font-size:10px;line-height:1.5;color:var(--gv-suave);margin:12px 0 0}.jg-reglas-lectura{padding-bottom:10px;border-bottom:1px solid #dcd4e7}
+html[data-tema=oscuro] .jg-guia{--gv-borde:#46405a;--gv-papel:#262236;--gv-tinta:#eee9fa;--gv-suave:#c1b6d2}
+@keyframes jgGuiaEntra{from{opacity:.35}to{opacity:1}}
+@media(max-width:700px){.jg-guia-figura{grid-template-columns:minmax(0,1fr);gap:12px}.jg-guia-imagen{max-width:480px;width:100%;margin:auto}.jg-guia-figura figcaption{min-height:142px;justify-content:flex-start}.jg-guia{padding:14px}.jg-guia .jg-guia-cab h3{font-size:17px}}
+@media(max-width:380px){.jg-guia-controles{gap:5px}.jg-guia-controles button{padding:8px;font-size:11px}.jg-guia-controles [data-guia=play]{min-width:100px}.jg-guia-cantidad{display:none}}
+@media(prefers-reduced-motion:reduce){.jg-guia-imagen svg{animation:none}}
 </style>
 </head>
 <body>
@@ -2312,6 +2331,6 @@ html[data-tema=oscuro] .jg-lado-caja>div>.jg-sala{border-color:var(--os-borde)}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202609291315"></script>
+<script src="juegos-app.js?v=202609300024"></script>
 </body>
 </html>
