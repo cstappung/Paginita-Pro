@@ -42,7 +42,7 @@ const SOLO = {
     cat: s => `club-minas-${s.n}` },
   tetrisclub: { filas: [{ k: "n", t: "Modo", ops: [["maraton", "Maratón"], ["sprint", "Sprint 40"], ["ultra", "Ultra 2 min"]] }],
     cat: s => `club-tetris-${s.n}` },
-  sortem: { filas: [{ k: "n", t: "Números", ops: [["10", "Del 1 al 10"], ["20", "Del 1 al 20"], ["30", "Del 1 al 30"]] }],
+  sortem: { filas: [{ k: "n", t: "Números", ops: [["10", "Del 1 al 10"], ["20", "Del 1 al 20"]] }],
     cat: s => `club-sortem-${s.n}` },
   snake: { filas: [
       { k: "m", t: "Modo", ops: [["classic", "Clásico"], ["arcade", "Arcade"], ["portals", "Portales"], ["reloj", "Contrarreloj"], ["espejo", "Espejo"], ["laberinto", "Laberinto"]] },

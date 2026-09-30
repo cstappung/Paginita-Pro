@@ -73,7 +73,7 @@ for (const [arcadeCode, keyboardKeys] of Object.entries(ARCADE_CONTROLS)) {
 const config = {
   type: Phaser.AUTO,
   parent: 'game',
-  width: 800,
+  width: 1000,
   height: 600,
   backgroundColor: '#1a0a2e',
   // FIT escala el lienzo a su caja y corrige el puntero; la caja la decide el CSS.
@@ -671,10 +671,10 @@ class GameState {
 // ==========================================
 // MODES AND CLUB RANKING
 // ==========================================
-// 10, 20 or 30 numbers. The ranking is the shared Club one (soloRanks, one
+// 10 or 20 numbers. The ranking is the shared Club one (soloRanks, one
 // category per mode, by time); conexion.js carries the result to Juegos.
-const MODOS = [10, 20, 30];
-const MEDIDAS = { 10: { w: 60, s: 12, f: 42 }, 20: { w: 32, s: 5, f: 24 }, 30: { w: 22, s: 3, f: 17 } };
+const MODOS = [10, 20];
+const MEDIDAS = { 10: { w: 72, s: 14, f: 48 }, 20: { w: 40, s: 6, f: 28 } };
 const claveModo = () => window.Club ? Club.storageKey('sortem.modo') : 'sortem.modo';
 let N = 10;
 try { const g = Number(localStorage.getItem(claveModo())); if (MODOS.includes(g)) N = g; } catch (e) {}
@@ -765,6 +765,9 @@ function parseDrumPattern(patternStr) {
 // ==========================================
 function create() {
   const scene = this;
+  // The canvas is 1000 wide but the layout was drawn for 800 centred on x=400:
+  // the camera shows x = -100..900 so everything stays centred.
+  scene.cameras.main.setScroll(-100, 0);
 
   // Initialize phase manager
   phaseManager = new GameStateManager();
@@ -934,7 +937,7 @@ function pintaModos(scene) {
   }).setOrigin(0.5));
   MODOS.forEach((m, i) => {
     const sel = m === N;
-    const t = scene.add.text(300 + i * 100, 510, sel ? '[' + m + ']' : String(m), {
+    const t = scene.add.text(400 + (i - (MODOS.length - 1) / 2) * 120, 510, sel ? '[' + m + ']' : String(m), {
       fontSize: sel ? '36px' : '28px', fontFamily: 'Courier New, monospace',
       color: sel ? '#fbbf24' : '#8338ec', fontStyle: 'bold', stroke: '#ff006e', strokeThickness: sel ? 3 : 0
     }).setOrigin(0.5).setInteractive({ useHandCursor: true });
@@ -1358,7 +1361,7 @@ function drawAnimatedGrid() {
   gridLines.lineStyle(1, gridColor, 0.15);
   for (let i = 0; i < 15; i++) {
     const y = i * 8 + (time % 8);
-    gridLines.lineBetween(0, y, 800, y);
+    gridLines.lineBetween(-100, y, 900, y);
   }
 
   // Floating triangles
@@ -1396,8 +1399,8 @@ function drawAnimatedGrid() {
 
     // Add wave distortion
     const wave = Math.sin(time / 10 + i) * 15 * scale;
-    const x1 = 400 - 350 * scale + wave;
-    const x2 = 400 + 350 * scale + wave;
+    const x1 = 400 - 450 * scale + wave;
+    const x2 = 400 + 450 * scale + wave;
 
     if (scale > 0.1) {
       // Thickness and alpha based on distance
@@ -1410,7 +1413,7 @@ function drawAnimatedGrid() {
 
   // Vertical lines
   gridLines.lineStyle(2, gridColor, 0.5);
-  for (let i = -8; i <= 8; i++) {
+  for (let i = -10; i <= 10; i++) {
     const x = 400 + i * 50;
     const glow = Math.sin(time / 15 + i) * 10;
     gridLines.lineBetween(x + glow, gridY, 400 + i * 20, gridY + 200);
@@ -1502,7 +1505,7 @@ function winGame(scene) {
   // Flash effect
   const flash = scene.add.graphics();
   flash.fillStyle(0xffffff, 1);
-  flash.fillRect(0, 0, 800, 600);
+  flash.fillRect(-100, 0, 1000, 600);
   scene.tweens.add({
     targets: flash,
     alpha: 0,
@@ -1513,7 +1516,7 @@ function winGame(scene) {
   // Overlay
   const overlay = scene.add.graphics();
   overlay.fillStyle(0x1a0a2e, 0.95);
-  overlay.fillRect(0, 0, 800, 600);
+  overlay.fillRect(-100, 0, 1000, 600);
   gameOverObjects.push(overlay);
 
   // Explosions
@@ -1591,7 +1594,7 @@ function showGameOverScreen(scene) {
   // Dark overlay to cover game elements
   const overlay = scene.add.graphics();
   overlay.fillStyle(0x1a0a2e, 0.97);
-  overlay.fillRect(0, 0, 800, 600);
+  overlay.fillRect(-100, 0, 1000, 600);
   gameOverObjects.push(overlay);
 
   // Add some floating particles in the background
