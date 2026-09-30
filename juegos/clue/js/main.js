@@ -17,6 +17,8 @@
   function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* sin almacenamiento */ } }
   function lsJson(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }
   const CA = window.ClueArmas || null;          // dibujos y escenas de las armas (armas.js)
+  const EF = window.ClueEfectos || null;        // maquinaria de las animaciones (efectos.js)
+  const SVGNS = "http://www.w3.org/2000/svg";
   const ARTICULO_LUGAR = ["el", "el", "el", "el", "el", "la", "la", "el", "la"];
   const enLugar = l => "en " + ARTICULO_LUGAR[l] + " " + M.LUGARES[l].n;
   const conArma = a => "con " + M.ARMAS[a].art + " " + M.ARMAS[a].n;
@@ -40,8 +42,17 @@
     candidato: "",   // personaje marcado en la eleccion, aun sin confirmar
     dlg: null, selS: null, selA: null, selL: null, tab: "hist",
     rolling: false, falsos: [1, 1], tirado: -1, busy: false,
-    finCerrado: false, cola: [], vistasVistas: new Set(), primera: true, marcasV: 0
+    finCerrado: false, cola: [], vistasVistas: new Set(), primera: true, marcasV: 0,
+    selloVisto: null,      // personajes ya sellados en la eleccion (null: aun no se pinto)
+    acuAbierta: false,     // el drama de la acusacion esta en pantalla: el final espera
+    vuelaCarta: false,     // vuela la carta que me muestran: el "revela" espera
+    ocuFin: null,          // liberador de `ocupado` que espera a la escena del crimen
+    acuSalto: "", eleg: null
   };
+  const ocultoTok = new Set();        // fichas que se dibujan aparte (en #fx) mientras vuelan
+  const ocultoArm = new Set();        // armas idem
+  const animArm = {};                 // arma -> {x, y, s, id}: donde se dibuja hasta que le toque volar
+  let acuCtx = null;                  // la acusacion que se esta contando
   const anim = {};                    // ficha -> {x, y, id}: posicion mientras se anima
   let animId = 0;
   let marcas = {};                    // marcas manuales de la libreta
@@ -83,8 +94,8 @@
     if (t === "a") return '<span class="arma-ico">' + iconoArma(c - M.NS) + "</span>";
     return '<img src="img/salas/' + M.LUGARES[c - M.NS - M.NA].img + '.webp" alt="">';
   }
-  function cartaHtml(c, extra) {
-    return '<div class="carta t-' + M.tipoCarta(c) + (extra ? " " + extra : "") + '"><div class="foto"' + (M.tipoCarta(c) === "a" ? ' data-arma="' + (c - M.NS) + '"' : "") + ">" + fotoCarta(c) + '</div><div class="pie">' + esc(nombreCarta(c)) + "</div></div>";
+  function cartaHtml(c, extra, dc) {
+    return '<div class="carta t-' + M.tipoCarta(c) + (extra ? " " + extra : "") + '"' + (dc ? ' data-c="' + c + '"' : "") + '><div class="foto"' + (M.tipoCarta(c) === "a" ? ' data-arma="' + (c - M.NS) + '"' : "") + ">" + fotoCarta(c) + '</div><div class="pie">' + esc(nombreCarta(c)) + "</div></div>";
   }
 
   /* ============================================================
@@ -122,6 +133,7 @@
 
   function pantallaInicio() {
     if (desuscribir) { try { desuscribir(); } catch (e) { /* nada */ } desuscribir = null; }
+    reiniciaEfectos();
     if (conn && conn.destruir) { try { conn.destruir(); } catch (e) { /* nada */ } }
     conn = null; est = null; priv = null; prev = null;
     $("juego").hidden = true;
@@ -149,6 +161,7 @@
   function iniciaPractica(op) {
     opcionesPractica = op;
     if (desuscribir) { try { desuscribir(); } catch (e) { /* nada */ } desuscribir = null; }
+    reiniciaEfectos();
     if (conn && conn.destruir) { try { conn.destruir(); } catch (e) { /* nada */ } }
     if (!window.ClueMesa) { mensajePantalla("No se pudo cargar el juego", "Falta la mesa de práctica."); return; }
     let el = lsJson("clue.elenco");
@@ -158,9 +171,10 @@
   }
 
   function adjunta(c) {
+    reiniciaEfectos();
     conn = c;
     est = null; priv = null; prev = null;
-    Object.assign(ui, { dlg: null, selS: null, selA: null, selL: null, tab: "hist", rolling: false, tirado: -1, busy: false, finCerrado: false, cola: [], vistasVistas: new Set(), primera: true });
+    Object.assign(ui, { dlg: null, selS: null, selA: null, selL: null, tab: "hist", rolling: false, tirado: -1, busy: false, finCerrado: false, cola: [], vistasVistas: new Set(), primera: true, selloVisto: null, acuAbierta: false, vuelaCarta: false, ocuFin: null, acuSalto: "", eleg: null });
     for (const k in anim) delete anim[k];
     for (const k in firmas) delete firmas[k];
     firmaModal = ""; firmaPantalla = "";
@@ -190,9 +204,11 @@
         try { animaCambios(prev, est); } catch (e) { console.warn("[clue] animacion", e); }
       }
       if (est.fase === "fin" && !prev || (prev && prev.fase !== "fin" && est.fase === "fin")) ui.finCerrado = false;
+      try { efPrepara(prev, est); } catch (e) { console.warn("[clue] efectos (prepara)", e); }
       pinta();
+      try { efDispara(prev, est); } catch (e) { console.warn("[clue] efectos", e); }
       const sg = est.sug;
-      if (prev && prev.jugadores && sg && (!prev.sug || prev.sug.k !== sg.k)) chispaArma(sg.a);
+      if (!EF && prev && prev.jugadores && sg && (!prev.sug || prev.sug.k !== sg.k)) chispaArma(sg.a);
     } catch (e) {
       console.warn("[clue] pintar", e);
     }
@@ -222,7 +238,8 @@
   function arrancaEscenas() {
     if (!CA) return;
     document.querySelectorAll("#modal [data-escena]").forEach(h => {
-      escenasVivas.push(CA.escena(Number(h.dataset.escena), h, { bucle: h.dataset.bucle === "1" }));
+      const bucle = h.dataset.bucle === "1";
+      escenasVivas.push(CA.escena(Number(h.dataset.escena), h, { bucle, alTerminar: bucle ? undefined : liberaFin }));
     });
     const foto = document.querySelector("#modal .giro .foto[data-arma]");
     if (foto) timersFx.push(setTimeout(() => { escenasVivas.push(CA.chispa(Number(foto.dataset.arma), foto)); }, 1450));
@@ -301,6 +318,20 @@
       "</div>" +
       '<div class="rejilla-pers">' + tarjetas + "</div>";
     void quien;
+    sellaElegidos(tomados);
+  }
+  /* Al confirmar alguien su personaje, su tarjeta hace un "sello": un
+     pulso y un destello del color de su puesto. Solo las recien elegidas. */
+  function sellaElegidos(tomados) {
+    const ahora = new Set(Object.values(tomados));
+    const vistos = ui.selloVisto;
+    ui.selloVisto = ahora;
+    if (!vistos || !EF || document.hidden) return;
+    ahora.forEach(id => {
+      if (vistos.has(id)) return;
+      const el = Array.from(document.querySelectorAll("#pantalla .pers")).find(b => b.dataset.id === id);
+      if (el) el.classList.add("sello");
+    });
   }
 
   function pintaReparto() {
@@ -426,11 +457,11 @@
     return { tok, arm };
   }
 
-  function tokenSvg(i, x, y, r, activo) {
+  function tokenSvg(i, x, y, r, activo, sinMuerto) {
     const p = personaje(i), col = M.COLORES[i];
     const j = est.jugadores[i];
     const npc = !j;
-    const muerto = j && (est.eliminados[j.uid] || est.fuera[j.uid]);
+    const muerto = !sinMuerto && j && (est.eliminados[j.uid] || est.fuera[j.uid]);
     let dentro;
     if (p && p.foto) dentro = '<image href="' + esc(p.foto) + '" x="' + -r + '" y="' + -r + '" width="' + 2 * r + '" height="' + 2 * r + '" preserveAspectRatio="xMidYMid slice" clip-path="url(#clipTok)"/>';
     else dentro = '<text class="tok-ini" y="' + (r * 0.36) + '" text-anchor="middle" style="font-size:' + (r * 1.05).toFixed(1) + "px;fill:" + (esClaro(col) ? "#1a1a1a" : "#fff") + '">' + esc(inicial(nomS(i))) + "</text>";
@@ -474,11 +505,16 @@
         h += '<rect class="dest sala-d" data-act="mover" data-a="' + (M.SALA + l) + '" x="' + (x0 * S + 3) + '" y="' + (y0 * S + 3) + '" width="' + ((x1 - x0 + 1) * S - 6) + '" height="' + ((y1 - y0 + 1) * S - 6) + '" rx="10"/>';
       });
     }
-    lay.arm.forEach((p, a) => { if (p) h += armaSvg(a, p.x, p.y, p.s, !al); });
+    lay.arm.forEach((p, a) => {
+      if (!p || ocultoArm.has(a)) return;
+      const q = animArm[a] || p;
+      h += armaSvg(a, q.x, q.y, p.s, !al);
+    });
     const turnoI = est.fase === "jugando" ? asientoDe(est.turno) : -1;
     // el turno activo va encima de los demas
     const orden = est.fichas.map((_, i) => i).sort((a, b) => (a === turnoI) - (b === turnoI));
     orden.forEach(i => {
+      if (ocultoTok.has(i)) return;
       const p = anim[i] || lay.tok[i];
       if (p) h += tokenSvg(i, p.x, p.y, (lay.tok[i] || p).r || S * 0.43, i === turnoI);
     });
@@ -489,9 +525,15 @@
   function animaCambios(a, b) {
     const layA = distribuye(a), layB = distribuye(b);
     const ult = (b.hist || [])[b.hist.length - 1];
+    const sg = b.sug;
+    /* Una sugerencia nueva llama al sospechoso y trae el arma: eso lo cuenta
+       animaSugerencia (arco, estela, globo), no el deslizamiento de siempre. */
+    const nueva = !!(sg && (!a.sug || a.sug.k !== sg.k));
+    const llamada = nueva ? animaSugerencia(a, b, layA, layB) : false;
     b.fichas.forEach((to, i) => {
       const from = a.fichas[i];
       if (from === to || !layA.tok[i] || !layB.tok[i]) return;
+      if (llamada && i === sg.s) return;
       const uid = b.jugadores[i] && b.jugadores[i].uid;
       let ruta = [];
       const porPasadizo = ult && ult.e === "mueve" && ult.v === "pasadizo" && ult.uid === uid;
@@ -505,6 +547,7 @@
         else { const [x, y] = M.xy(p); pts.push({ x: (x + 0.5) * S, y: (y + 0.5) * S }); }
       });
       else pts.push({ x: fin.x, y: fin.y });
+      if (hops[i]) hops[i].salta();                  // el saltito del turno cede ante el movimiento
       mueveFicha(i, pts, ruta.length ? 115 : 420);
     });
   }
@@ -535,6 +578,536 @@
     }
     requestAnimationFrame(paso);
     setTimeout(limpia, total + 500);       // por si el navegador no anima (pestana oculta)
+  }
+
+  /* ============================================================
+     Animaciones. La maquinaria generica (secuencias, carriles, vuelos,
+     burbujas) esta en efectos.js; aqui se decide QUE contar. Todo se
+     deduce de la diferencia entre el estado anterior y el nuevo, igual
+     que el recorrido de las fichas, asi que en la practica y en linea
+     (y en la pantalla de cada jugador) pasa lo mismo. Nada bloquea el
+     juego: si algo falla o se salta, la pantalla ya esta en su estado
+     final.
+     ============================================================ */
+  let epoca = 0;                      // cambia con cada partida: lo pendiente de la anterior ya no vale
+  const hops = {};                    // puesto -> secuencia del salto de inicio de turno
+  /* `ocupado`: la sala no debe tapar con su cartel lo que esta pasando.
+     Cuenta anidada: solo el primer true y el ultimo false llegan a la conexion. */
+  let ocuCuenta = 0;
+  const ocuSoltar = new Set();
+  function pideOcupado() {
+    let vivo = true, t = 0;
+    if (++ocuCuenta === 1) { try { if (conn && conn.ocupado) conn.ocupado(true); } catch (e) { /* nada */ } }
+    const suelta = () => {
+      if (!vivo) return;
+      vivo = false; clearTimeout(t); ocuSoltar.delete(suelta);
+      if (--ocuCuenta <= 0) { ocuCuenta = 0; try { if (conn && conn.ocupado) conn.ocupado(false); } catch (e) { /* nada */ } }
+    };
+    t = setTimeout(suelta, 12500);      // nunca mas de ~12 s
+    ocuSoltar.add(suelta);
+    return suelta;
+  }
+  function liberaFin() { const f = ui.ocuFin; ui.ocuFin = null; if (f) f(); }
+  function reiniciaEfectos() {
+    epoca++;
+    if (EF) EF.cancelaTodo();
+    ocultoTok.clear(); ocultoArm.clear();
+    for (const k in animArm) delete animArm[k];
+    for (const k in hops) delete hops[k];
+    acuCtx = null; ui.pendReparto = false;
+    const c = document.getElementById("fxtop"); if (c) c.innerHTML = "";
+    const a = document.getElementById("acu"); if (a && a.parentNode) a.parentNode.removeChild(a);
+    const m = document.getElementById("mano"); if (m) m.classList.remove("repartiendo");
+    ui.acuAbierta = false; ui.vuelaCarta = false; ui.ocuFin = null;
+    Array.from(ocuSoltar).forEach(f => f());
+  }
+  /* Limpieza visual al acabar una secuencia (no si ya es de otra partida). */
+  function enFinal(s, f) { const ep = epoca; s.alFinal(() => { if (ep === epoca) f(); }); }
+
+  /* Una ficha en el SVG de efectos: `wrap` se mueve, `inner` gira/escala. */
+  function nodoFicha(i, r, activo, sinMuerto) {
+    const wrap = document.createElementNS(SVGNS, "g"), inner = document.createElementNS(SVGNS, "g");
+    if (i >= 0) inner.innerHTML = tokenSvg(i, 0, 0, r, activo, sinMuerto);
+    wrap.appendChild(inner);
+    wrap.setAttribute("pointer-events", "none");
+    return { wrap, inner };
+  }
+  const pantTab = (x, y) => EF.pantallaDe($("tablero"), x, y);
+  /* Donde apunta un globo de la ficha `i` (en el tablero, `dy` mas arriba o abajo);
+     si el tablero no se ve (movil), en su fila de la lista de jugadores. */
+  function anclaBurbuja(i, x, y, dy) {
+    const p = pantTab(x, y + dy);
+    if (EF.enVista(p, 10)) return p;
+    const j = est && est.jugadores[i];
+    return j ? puntoJugador(j.uid) : EF.atVista(p, 20);
+  }
+  /* Un globo de dialogo que vive aparte (su propio carril), sin frenar lo demas. */
+  function hablar(clave, p, texto, clase, ms, pAbajo) {
+    EF.carril("burb-" + clave, async s => {
+      const b = EF.burbuja(s, p, texto, clase, pAbajo);
+      await s.espera(ms || 1300);
+      EF.desvanece(b, 220);
+      await s.espera(230);
+    }, "burbuja");
+  }
+
+  /* --- 1b y 2: una sugerencia llama al sospechoso y trae el arma --- */
+  function animaSugerencia(a, b, layA, layB) {
+    if (!EF) return false;
+    const sg = b.sug, i = sg.s, w = sg.a;
+    const tA = layA.tok[i], tB = layB.tok[i], wA = layA.arm[w], wB = layB.arm[w];
+    const mueveT = a.fichas[i] !== b.fichas[i] && !!tA && !!tB;
+    const mueveW = a.armas[w] !== b.armas[w] && !!wA && !!wB;
+    if (!EF.puede()) { chispaArma(w); return true; }
+    let idT = 0, idW = 0;
+    if (mueveT) { idT = ++animId; anim[i] = { x: tA.x, y: tA.y, id: idT }; }       // se queda en su sitio hasta que le toque volar
+    if (mueveW) { idW = ++animId; animArm[w] = { x: wA.x, y: wA.y, s: wA.s, id: idW }; }
+    if (hops[i]) hops[i].salta();
+    const soltar = () => {
+      ocultoTok.delete(i); ocultoArm.delete(w);
+      if (idT && anim[i] && anim[i].id === idT) delete anim[i];
+      if (idW && animArm[w] && animArm[w].id === idW) delete animArm[w];
+      pintaDinamico();
+    };
+    const asiento = i < b.jugadores.length;
+    EF.carril("tablero", async s => {
+      enFinal(s, soltar);
+      const tareas = [];
+      if (mueveT) tareas.push(vuelaFicha(s, i, tA, tB, asiento, soltar));
+      if (mueveW) tareas.push(vuelaArma(s, w, wA, wB, soltar));
+      else chispaArma(w);
+      await Promise.all(tareas);
+    }, "sugerencia");
+    return true;
+  }
+  async function vuelaFicha(s, i, tA, tB, asiento, soltar) {
+    const fx = $("fx");
+    if (!fx) return;
+    const { wrap } = nodoFicha(i, tB.r, false);
+    fx.appendChild(wrap); s.nodo(wrap);
+    ocultoTok.add(i); pintaDinamico();
+    const d = Math.hypot(tB.x - tA.x, tB.y - tA.y);
+    await EF.vuela(s, wrap, tA, tB, { svg: true, ms: Math.min(950, 560 + d * 0.55), alto: Math.max(50, d * 0.3), alzar: 0.3, rot0: -14, rot1: 0, estela: true, estelaOp: 0.55 });
+    await s.tween(170, k => {
+      const q = Math.sin(k * Math.PI);
+      wrap.setAttribute("transform", "translate(" + tB.x.toFixed(1) + " " + (tB.y + q * 3).toFixed(1) + ") scale(" + (1 + 0.14 * q).toFixed(3) + " " + (1 - 0.2 * q).toFixed(3) + ")");
+    });
+    if (asiento) hablar("llamado", anclaBurbuja(i, tB.x, tB.y, -tB.r * 1.5), "¡Llamado a declarar!", "grito", 1500, anclaBurbuja(i, tB.x, tB.y, tB.r * 1.5));
+    ocultoTok.delete(i); soltar();
+    if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+  }
+  async function vuelaArma(s, w, wA, wB, soltar) {
+    const fx = $("fx");
+    if (!fx) return;
+    const sh = document.createElementNS(SVGNS, "ellipse");
+    sh.setAttribute("rx", (wB.s * 0.38).toFixed(1)); sh.setAttribute("ry", (wB.s * 0.13).toFixed(1));
+    sh.setAttribute("fill", "#000"); sh.setAttribute("opacity", "0.4");
+    const { wrap, inner } = nodoFicha(-1, 1, false);
+    inner.innerHTML = armaSvg(w, 0, 0, wB.s, false);
+    fx.appendChild(sh); fx.appendChild(wrap); s.nodo(sh); s.nodo(wrap);
+    ocultoArm.add(w); pintaDinamico();
+    const d = Math.hypot(wB.x - wA.x, wB.y - wA.y);
+    await EF.vuela(s, wrap, wA, wB, {
+      svg: true, ms: Math.min(1050, 640 + d * 0.6), alto: Math.max(70, d * 0.4), alzar: 0.55, rot0: 0, rot1: 360, estela: true, estelaOp: 0.45,
+      cada: (k, p, q) => {
+        const e = 1 / (1 + Math.max(0, q.y - p.y) / 110);
+        sh.setAttribute("transform", "translate(" + q.x.toFixed(1) + " " + (q.y + wB.s * 0.34).toFixed(1) + ") scale(" + e.toFixed(3) + ")");
+        sh.setAttribute("opacity", (0.42 * e).toFixed(2));
+      }
+    });
+    ocultoArm.delete(w); soltar();
+    if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+    if (sh.parentNode) sh.parentNode.removeChild(sh);
+    chispaArma(w);                                   // la chispa, al aterrizar
+  }
+
+  /* --- 1a: al empezar el turno, un saltito y un globo con el nombre --- */
+  function saltoTurno(uid) {
+    const i = asientoDe(uid);
+    if (i < 0 || !EF) return;
+    if (hops[i]) hops[i].salta();
+    const sec = EF.carril("turno", async s => {
+      await EF.libre("acu");                         // tras un drama de acusacion
+      await EF.libre("reparto");                     // y tras el reparto
+      if (s.saltada || !est || est.turno !== uid || !EF.puede()) return;
+      const fx = $("fx"), lay = distribuye(est), t = lay.tok[i];
+      if (!fx || !t || anim[i] || ocultoTok.has(i) || $("juego").hidden) return;
+      enFinal(s, () => { ocultoTok.delete(i); pintaDinamico(); });
+      const { wrap, inner } = nodoFicha(i, t.r, true);
+      const sh = document.createElementNS(SVGNS, "ellipse");
+      sh.setAttribute("rx", (t.r * 0.9).toFixed(1)); sh.setAttribute("ry", (t.r * 0.28).toFixed(1)); sh.setAttribute("fill", "#000"); sh.setAttribute("opacity", "0.35");
+      sh.setAttribute("transform", "translate(" + t.x.toFixed(1) + " " + (t.y + t.r * 0.95).toFixed(1) + ")");
+      fx.appendChild(sh); fx.appendChild(wrap); s.nodo(sh); s.nodo(wrap);
+      ocultoTok.add(i); pintaDinamico();
+      hablar("turno", anclaBurbuja(i, t.x, t.y, -t.r * 1.9), "Turno de " + nombreDe(uid), "", 1350, anclaBurbuja(i, t.x, t.y, t.r * 1.7));
+      await s.tween(760, k => {
+        const h = Math.abs(Math.sin(k * Math.PI * 2)) * t.r * 0.95 * (1 - 0.4 * k);
+        const g = Math.pow(Math.abs(Math.cos(k * Math.PI * 2)), 10);      // 1 al tocar el suelo: aplasta
+        inner.setAttribute("transform", "scale(" + (1 + 0.12 * g).toFixed(3) + " " + (1 - 0.16 * g).toFixed(3) + ")");
+        sh.setAttribute("opacity", (0.35 - 0.2 * (h / t.r)).toFixed(2));
+      });
+    }, "hop");
+    hops[i] = sec;
+  }
+
+  /* --- 4: eliminado: se apaga, cae de lado con un rebote y un sello --- */
+  function caidaFicha(uid) {
+    const i = asientoDe(uid);
+    if (i < 0 || !EF) return;
+    EF.carril("acu", async s => {
+      const fx = $("fx");
+      if (s.saltada || !est || !fx || $("juego").hidden || !EF.puede()) return;
+      const t = distribuye(est).tok[i];
+      if (!t) return;
+      enFinal(s, () => { ocultoTok.delete(i); pintaDinamico(); });
+      const { wrap, inner } = nodoFicha(i, t.r, false, true);
+      fx.appendChild(wrap); s.nodo(wrap);
+      wrap.setAttribute("transform", "translate(" + t.x.toFixed(1) + " " + t.y.toFixed(1) + ")");
+      ocultoTok.add(i); pintaDinamico();
+      await s.tween(440, k => {                       // se estremece y se apaga
+        wrap.setAttribute("transform", "translate(" + (t.x + Math.sin(k * 40) * (1 - k) * 3.5).toFixed(1) + " " + t.y.toFixed(1) + ")");
+        inner.style.filter = "grayscale(" + k.toFixed(2) + ") brightness(" + (1 - 0.3 * k).toFixed(2) + ")";
+      });
+      await s.tween(640, k => {                       // cae de lado sobre su base, con rebote
+        const a = 88 * EF.ease.rebote(k);
+        inner.setAttribute("transform", "translate(0 " + t.r + ") rotate(" + a.toFixed(1) + ") translate(0 " + (-t.r) + ")");
+      });
+      const P0 = pantTab(t.x, t.y), P = EF.enVista(P0, 10) ? P0 : puntoJugador(uid), c = EF.capaFija(), st = document.createElement("div");
+      st.className = "sello-fuera"; st.textContent = "FUERA";
+      st.style.left = P.x.toFixed(1) + "px"; st.style.top = P.y.toFixed(1) + "px";
+      c.appendChild(st); s.nodo(st);
+      await s.anima(st, [
+        { opacity: 0, transform: "translate(-50%,-50%) rotate(-12deg) scale(3)" },
+        { opacity: 1, transform: "translate(-50%,-50%) rotate(-12deg) scale(.9)", offset: 0.65 },
+        { opacity: 1, transform: "translate(-50%,-50%) rotate(-12deg) scale(1)" }
+      ], { duration: 340, easing: "ease-out" });
+      EF.aro(s, P, "#d8382b", 70);
+      await s.espera(950);
+      EF.desvanece(st, 260);
+      await s.espera(260);
+    }, "elimina");
+  }
+
+  /* --- 5: el reparto inicial --- */
+  function tocaReparto(pv, e) {
+    if (e.fase !== "jugando") return false;
+    if (pv) return pv.fase === "elige" || pv.fase === "reparto";
+    return (e.nTurno || 0) <= 1 && (e.hist || []).every(h => h.e === "reparto");
+  }
+  const dorsoHtml = t => '<div class="dorso-fx"><span>' + (t || "") + "</span></div>";
+  /* Una carta que vuela: cara `a` visible al empezar y `b` (opcional) detras. */
+  function vueloEl(a, b, w) {
+    const d = document.createElement("div");
+    d.className = "vuelo";
+    d.style.setProperty("--vw", w.toFixed(0) + "px");
+    d.innerHTML = '<div class="vuelo-in"><div class="cara a">' + a + "</div>" + (b != null ? '<div class="cara b">' + b + "</div>" : "") + "</div>";
+    EF.capaFija().appendChild(d);
+    return d;
+  }
+  const girar = (s, d, desde, hasta, ms) => s.tween(ms, k => {
+    const el = d.querySelector(".vuelo-in");
+    if (el) el.style.transform = "rotateY(" + (desde + (hasta - desde) * k).toFixed(1) + "deg)";
+  }, EF ? EF.ease.suave : undefined);
+
+  /* Donde aterriza algo dirigido a un jugador: su ficha en el tablero si se
+     ve; si no, su fila de la lista; si no, el borde de la pantalla. */
+  function puntoJugador(uid) {
+    const i = asientoDe(uid), cand = [];
+    if (est && i >= 0 && !$("juego").hidden) { const t = distribuye(est).tok[i]; if (t) cand.push(pantTab(t.x, t.y)); }
+    const li = document.querySelectorAll("#accion .jugadores li")[i];
+    if (li) { const r = li.getBoundingClientRect(); cand.push({ x: r.left + 26, y: r.top + r.height / 2 }); }
+    for (const p of cand) if (EF.enVista(p, 6)) return p;
+    return EF.atVista(cand[0] || { x: innerWidth / 2, y: innerHeight / 2 }, 26);
+  }
+  function repartoInicial() {
+    const mano = $("mano");
+    if (!EF || !EF.puede()) { if (mano) mano.classList.remove("repartiendo"); return; }
+    EF.carril("reparto", async s => {
+      enFinal(s, () => { if (mano) { mano.classList.remove("repartiendo"); mano.querySelectorAll(".carta.lista").forEach(c => c.classList.remove("lista")); } });
+      if (s.saltada || !est || $("juego").hidden) return;
+      const k = pantTab(0, 0).k || 0.5, w = Math.max(26, Math.min(46, 50 * k));
+      const D = pantTab(M.ANCHO * S / 2, 6.3 * S), E = pantTab(M.ANCHO * S / 2, 11.75 * S);
+      const mazo = document.createElement("div");
+      mazo.className = "mazo-fx"; mazo.style.setProperty("--vw", w.toFixed(0) + "px");
+      mazo.innerHTML = "<i></i><i></i><i></i>";
+      mazo.style.transform = "translate(" + D.x.toFixed(1) + "px," + D.y.toFixed(1) + "px) translate(-50%,-50%)";
+      EF.capaFija().appendChild(mazo); s.nodo(mazo);
+      await s.anima(mazo, [{ opacity: 0, transform: "translate(" + D.x.toFixed(1) + "px," + (D.y - 20).toFixed(1) + "px) translate(-50%,-50%) scale(.5)" }, { opacity: 1, transform: "translate(" + D.x.toFixed(1) + "px," + D.y.toFixed(1) + "px) translate(-50%,-50%) scale(1)" }], { duration: 260 });
+      // tres cartas boca abajo al sobre del patio
+      const sobre = [0, 1, 2].map(async j => {
+        await s.espera(j * 190);
+        const c = vueloEl(dorsoHtml(""), null, w);
+        await EF.vuela(s, c, D, E, { ms: 460, alto: 46, esc0: 1, esc1: 0.62, rot0: 0, rot1: (j - 1) * 14, ease: EF.ease.suave });
+        if (c.parentNode) c.parentNode.removeChild(c);
+        EF.aro(s, E, "#e6b85c", 64);
+      });
+      await Promise.all(sobre);
+      await s.espera(140);
+      // el resto, a la redonda, boca abajo; las mias se giran en mi mano
+      const n = est.jugadores.length, total = M.NC - 3, soy = conn.mirando ? -1 : miAsiento();
+      const mias = (priv && priv.mano ? priv.mano.slice() : []).sort((x, y) => x - y);
+      let km = 0;
+      const reparte = [];
+      for (let c = 0; c < total; c++) {
+        const seat = c % n, uid = est.jugadores[seat].uid, mia = seat === soy && km < mias.length ? mias[km++] : null;
+        reparte.push((async () => {
+          await s.espera(c * 42);
+          if (mia != null) {
+            const dest = mano.querySelector('.carta[data-c="' + mia + '"]');
+            const r = dest ? dest.getBoundingClientRect() : null;
+            const B = r ? EF.atVista({ x: r.left + r.width / 2, y: r.top + r.height / 2 }, 30) : puntoJugador(uid);
+            const c1 = vueloEl(dorsoHtml(""), cartaHtml(mia, "mini"), w);
+            await EF.vuela(s, c1, D, B, { ms: 480, alto: 50, esc0: 1, esc1: r ? Math.max(1, Math.min(3, r.width / w)) : 1, rot0: 0, rot1: 0 });
+            await girar(s, c1, 0, 180, 240);
+            if (dest) dest.classList.add("lista");
+            if (c1.parentNode) c1.parentNode.removeChild(c1);
+          } else {
+            const B = puntoJugador(uid), c1 = vueloEl(dorsoHtml(""), null, w);
+            await EF.vuela(s, c1, D, B, { ms: 440, alto: 40, esc0: 1, esc1: 0.75, rot1: (seat % 2 ? 1 : -1) * 20 });
+            if (c1.parentNode) c1.parentNode.removeChild(c1);
+          }
+        })());
+      }
+      await Promise.all(reparte);
+      await s.espera(120);
+    }, "reparto");
+  }
+
+  /* --- 6: la carta que se muestra viaja oculta hasta quien sugirio --- */
+  function detectaRefu(pv, e) {
+    const sg = e.sug;
+    if (!pv || !sg || !sg.mostro) return null;
+    if (pv.sug && pv.sug.k === sg.k && pv.sug.mostro) return null;
+    return { sg, yoSug: !conn.mirando && sg.uid === yo(), yoShow: !conn.mirando && sg.mostro === yo() };
+  }
+  function pasaCarta(r) {
+    if (!EF) return;
+    const sg = r.sg, ep = epoca;
+    const cartaMia = r.yoShow && Number.isInteger(ui.eleg) ? ui.eleg : null;
+    EF.carril("tablero", async s => {
+      s.alFinal(() => { if (r.yoSug && ep === epoca) { ui.vuelaCarta = false; firmaModal = ""; try { pintaModal(); } catch (e) { /* nada */ } } });
+      if (s.saltada || !est || $("juego").hidden || !EF.puede()) return;
+      const k = pantTab(0, 0).k || 0.5, w = Math.max(38, Math.min(60, 60 * k + 12));
+      let A = puntoJugador(sg.mostro);
+      if (cartaMia != null) {
+        const dest = document.querySelector('#mano .carta[data-c="' + cartaMia + '"]');
+        if (dest) { const rr = dest.getBoundingClientRect(); if (rr.width) A = EF.atVista({ x: rr.left + rr.width / 2, y: rr.top + rr.height / 2 }, 20); }
+      }
+      const B = puntoJugador(sg.uid);
+      const d = Math.hypot(B.x - A.x, B.y - A.y);
+      // yo muestro: sale de mi mano boca arriba y se gira al llegar; los demas la ven de espaldas, con "?"
+      const c = cartaMia != null ? vueloEl(cartaHtml(cartaMia, "mini"), dorsoHtml("?"), w) : vueloEl(dorsoHtml("?"), null, w);
+      await EF.vuela(s, c, A, B, { ms: Math.min(950, 600 + d * 0.4), alto: Math.max(50, d * 0.3), alzar: 0.25, esc0: 0.85, esc1: 0.85, rot0: -10, rot1: 8, estela: true, estelaOp: 0.4 });
+      EF.aro(s, B, "#e6b85c", 56);
+      if (cartaMia != null) { await girar(s, c, 0, 180, 260); await s.espera(220); }
+      else await s.espera(120);
+      EF.desvanece(c, 200);
+      await s.espera(210);
+    }, "pasa-carta");
+  }
+  /* Nadie pudo refutar: un pulso sobre el cartel de la sugerencia. Va en su
+     propio carril y se ubica al detectarlo: el cartel dura poco. */
+  function pulsoNadie() {
+    if (!EF) return;
+    const ban = document.querySelector("#accion .sug"), r = ban ? ban.getBoundingClientRect() : null;
+    const P = r && r.width ? EF.atVista({ x: r.left + r.width / 2, y: r.top + r.height / 2 }, 60) : { x: innerWidth / 2, y: 120 };
+    EF.carril("nadie", async s => {
+      if (s.saltada || !EF.puede() || $("juego").hidden) return;
+      const el = document.createElement("div");
+      el.className = "nadie-fx"; el.textContent = "Nadie pudo refutar";
+      el.style.left = P.x.toFixed(1) + "px"; el.style.top = P.y.toFixed(1) + "px";
+      EF.capaFija().appendChild(el); s.nodo(el);
+      EF.aro(s, P, "#e6b85c", r ? Math.min(r.width, 200) : 120);
+      await s.anima(el, [
+        { opacity: 0, transform: "translate(-50%,-50%) scale(.5)" },
+        { opacity: 1, transform: "translate(-50%,-50%) scale(1.18)", offset: 0.3 },
+        { opacity: 1, transform: "translate(-50%,-50%) scale(1)", offset: 0.5 },
+        { opacity: 1, transform: "translate(-50%,-50%) scale(1.06)", offset: 0.75 },
+        { opacity: 0, transform: "translate(-50%,-50%) scale(1)" }
+      ], { duration: 1500 });
+    }, "nadie");
+  }
+
+  /* --- 3: el drama de la acusacion --- */
+  const ETQ_ACU = ["Sospechoso", "Arma", "Lugar"];
+  const CANDADO = '<svg viewBox="0 0 26 30"><path class="grillete" d="M5 14 V9 a8 8 0 0 1 16 0 V14"/><rect class="cuerpo" x="2" y="13" width="22" height="15" rx="3"/><circle cx="13" cy="20" r="2.2" fill="#2a1e08"/></svg>';
+  const SOBRE_SVG = '<svg viewBox="0 0 200 130"><rect x="4" y="4" width="192" height="122" rx="8" fill="#eadfc3" stroke="#7a5c26" stroke-width="4"/><path d="M6 124 L100 62 L194 124" fill="none" stroke="#c9b98a" stroke-width="3"/><g class="flap"><path d="M6 8 L100 74 L194 8 Z" fill="#f3e9cf" stroke="#7a5c26" stroke-width="3" stroke-linejoin="round"/><circle cx="100" cy="72" r="14" fill="#a4302a" stroke="#6d1c17" stroke-width="3"/></g></svg>';
+
+  function acuActualiza(e) {
+    const c = acuCtx;
+    if (!c || c.cerrado) return;
+    if (e.acu && e.acu.k === c.k) c.abiertos = new Set(e.acu.abiertos || []);
+    const capa = document.getElementById("acu");
+    if (capa) capa.querySelectorAll(".cerr").forEach(el => el.classList.toggle("abierta", c.abiertos.has(el.dataset.uid) || !!c.ver));
+  }
+  function acuAbre(a, ver, compacto) {
+    const ctx = {
+      k: a.k, uid: a.uid, cartas: [M.cartaS(a.s), M.cartaA(a.a), M.cartaL(a.l)],
+      locks: Array.from(new Set((a.faltan || []).concat(a.abiertos || []))), abiertos: new Set(a.abiertos || []),
+      ver: ver || null, abortado: false, cerrado: false, retiene: false
+    };
+    acuCtx = ctx; ui.acuAbierta = true;
+    EF.carril("acu", s => escenaAcusacion(s, ctx, compacto), "acusacion");
+  }
+  function efAcusacion(pv, e) {
+    if (!EF || !pv || !pv.jugadores) return;
+    const nA = (e.acusaciones || []).length, pA = (pv.acusaciones || []).length;
+    const ver = nA > pA ? e.acusaciones[nA - 1] : null;
+    const c = acuCtx;
+    if (c && !c.cerrado) {
+      if (ver && ver.uid === c.uid) c.ver = ver;
+      else if (!e.acu && !ver && e.fase !== "fin") c.abortado = true;
+      acuActualiza(e);
+      return;
+    }
+    if (document.hidden) return;
+    if (e.acu && e.acu.k && (!pv.acu || pv.acu.k !== e.acu.k) && !ver) {
+      ui.acuSalto = "";
+      if (!EF.reducido()) acuAbre(e.acu, null, false);
+      return;
+    }
+    if (ver) {
+      const saltado = ui.acuSalto === ver.uid;
+      ui.acuSalto = "";
+      if (!saltado) acuAbre({ uid: ver.uid, k: "v" + nA, s: ver.s, a: ver.a, l: ver.l }, ver, true);
+      /* Se saltó el drama, pero la escena del crimen sigue: la sala no la tapa. */
+      else if (ver.ok && e.fase === "fin") { liberaFin(); ui.ocuFin = pideOcupado(); }
+    }
+  }
+
+  async function escenaAcusacion(s, ctx, compacto) {
+    let liberar = null;
+    s.alFinal(() => {
+      ctx.cerrado = true;
+      if (acuCtx === ctx) acuCtx = null;
+      if (liberar) { if (ctx.retiene && est && est.fase === "fin") ui.ocuFin = liberar; else liberar(); }
+      ui.acuAbierta = false;
+      firmaModal = "";
+      try { pintaModal(); } catch (e) { /* nada */ }
+    });
+    if (s.saltada || !EF) { if (!ctx.ver) ui.acuSalto = ctx.uid; return; }
+    liberar = pideOcupado();
+    const viejo = document.getElementById("acu");
+    if (viejo && viejo.parentNode) viejo.parentNode.removeChild(viejo);
+    const capa = document.createElement("div");
+    capa.id = "acu"; capa.className = "acu";
+    capa.setAttribute("role", "dialog"); capa.setAttribute("aria-label", "Acusación: se abre el sobre");
+    const I = asientoDe(ctx.uid);
+    capa.innerHTML =
+      '<div class="acu-cont">' +
+      '<div class="acu-tit">' + (I >= 0 ? avatarPuesto(I, 34) : "") + "<span>Acusación de <b>" + esc(nombreDe(ctx.uid)) + "</b></span></div>" +
+      '<div class="acu-cartas">' + ctx.cartas.map((c, j) => '<div class="acu-slot"><span class="acu-etq">' + ETQ_ACU[j] + '</span><div class="acu-c">' + cartaHtml(c, "grande") + "</div></div>").join("") + '<div class="acu-falso" hidden>ACUSACIÓN FALSA</div></div>' +
+      '<div class="acu-centro"><div class="env">' + SOBRE_SVG + "</div>" +
+      '<div class="acu-cerraduras">' + ctx.locks.map(u => '<div class="cerr' + (ctx.abiertos.has(u) ? " abierta" : "") + '" data-uid="' + esc(u) + '" title="' + esc(nombreDe(u)) + '">' + CANDADO + "<span>" + esc(nombreDe(u)) + "</span></div>").join("") + "</div>" +
+      '<div class="acu-texto" hidden>Abriendo el sobre<i>.</i><i>.</i><i>.</i></div></div>' +
+      '<div class="acu-sol">' + [0, 1, 2].map(() => '<div class="acu-slot"><div class="acu-c hueco">?</div></div>').join("") + "</div>" +
+      '<div class="acu-sello" hidden></div>' +
+      "</div>" +
+      '<p class="acu-pista">Toca para saltar</p>';
+    document.body.appendChild(capa); s.nodo(capa);
+    const $c = q => capa.querySelector(q);
+    const env = $c(".env"), texto = $c(".acu-texto"), falso = $c(".acu-falso"), sello = $c(".acu-sello");
+    const cartasAcu = Array.from(capa.querySelectorAll(".acu-cartas .acu-c"));
+    const sellar = (el, txt, escala) => {
+      el.hidden = false; if (txt) el.textContent = txt;
+      return s.anima(el, [
+        { opacity: 0, transform: "translate(-50%,-50%) rotate(-8deg) scale(" + (escala || 3) + ")" },
+        { opacity: 1, transform: "translate(-50%,-50%) rotate(-8deg) scale(.92)", offset: 0.7 },
+        { opacity: 1, transform: "translate(-50%,-50%) rotate(-8deg) scale(1)" }
+      ], { duration: 420, easing: "ease-out" });
+    };
+    const abreSobre = async cartas => {
+      env.classList.add("abierto");
+      await s.espera(400);
+      const er = env.getBoundingClientRect(), huecos = Array.from(capa.querySelectorAll(".acu-sol .acu-c"));
+      await Promise.all(huecos.map(async (h, j) => {
+        h.classList.remove("hueco");
+        h.innerHTML = '<div class="giro3"><div class="giro3-in"><div class="cara a dorso-fx"><span>?</span></div><div class="cara b">' + cartaHtml(cartas[j], "grande") + "</div></div></div>";
+        h.style.opacity = "0";
+        const r = h.getBoundingClientRect();
+        const dx = er.left + er.width / 2 - (r.left + r.width / 2), dy = er.top + er.height / 2 - (r.top + r.height / 2);
+        await s.espera(j * 200);
+        await s.anima(h, [{ opacity: 0, transform: "translate(" + dx.toFixed(0) + "px," + dy.toFixed(0) + "px) scale(.35)" }, { opacity: 1, transform: "translate(0,0) scale(1)" }], { duration: 420, easing: "cubic-bezier(.2,.9,.3,1)" });
+        await s.anima(h.querySelector(".giro3-in"), [{ transform: "rotateY(0deg)" }, { transform: "rotateY(180deg)" }], { duration: 460, easing: "cubic-bezier(.3,.1,.2,1)" });
+      }));
+    };
+
+    await s.anima(capa, [{ opacity: 0 }, { opacity: 1 }], { duration: 260 });
+    if (!compacto) {
+      // las tres cartas de la acusacion, boca arriba, una a una
+      await Promise.all(cartasAcu.map((c, j) => s.anima(c, [
+        { opacity: 0, transform: "translateY(-70vh) rotate(" + ((j - 1) * -22) + "deg) scale(.6)" },
+        { opacity: 1, transform: "translateY(0) rotate(0) scale(1)" }
+      ], { duration: 480, delay: j * 300, easing: "cubic-bezier(.2,.9,.3,1.1)" })));
+    }
+    // el sobre, sellado, con el redoble
+    env.classList.add("redoble"); texto.hidden = false;
+    const t0 = Date.now();
+    await s.hasta(() => (ctx.ver || ctx.abortado) && Date.now() - t0 >= (compacto ? 250 : 1100), 9500);
+    env.classList.remove("redoble"); texto.hidden = true;
+    if (!ctx.ver) {
+      // se saltó, se agotó la espera o quien acusaba se fue: sin drama tardío
+      if (!ctx.abortado) ui.acuSalto = ctx.uid;
+      await s.anima(capa, [{ opacity: 1 }, { opacity: 0 }], { duration: 240 });
+      return;
+    }
+    const v = ctx.ver;
+    capa.querySelectorAll(".cerr").forEach(el => el.classList.add("abierta"));
+    if (v.ok) {
+      ctx.retiene = true;                             // el sobre se queda ocupado hasta la escena del crimen
+      const cs = priv && priv.sobre && priv.sobre.length === 3 ? priv.sobre : [M.cartaS(v.s), M.cartaA(v.a), M.cartaL(v.l)];
+      await abreSobre(cs);
+      await sellar(sello, "¡CASO RESUELTO!", 3);
+      await s.espera(950);
+    } else {
+      cartasAcu.forEach(c => c.classList.add("dim"));
+      await sellar(falso, "ACUSACIÓN FALSA", 2.6);
+      if (v.uid === yo() && !conn.mirando) {
+        await s.hasta(() => priv && priv.sobre && priv.sobre.length === 3, 1600);
+        if (priv && priv.sobre && priv.sobre.length === 3) {
+          const nota = document.createElement("p");
+          nota.className = "acu-solo"; nota.textContent = "Solo tú ves el sobre";
+          capa.querySelector(".acu-sol").after(nota);
+          await abreSobre(priv.sobre.slice());
+          await s.espera(2100);
+        } else await s.espera(1200);
+      } else await s.espera(1400);
+    }
+    await s.anima(capa, [{ opacity: 1 }, { opacity: 0 }], { duration: 300 });
+  }
+
+  /* --- los disparadores: comparan el estado anterior y el nuevo --- */
+  function efPrepara(pv, e) {
+    if (!EF) return;
+    ui.pendReparto = false;
+    if (tocaReparto(pv, e) && EF.puede()) {
+      ui.pendReparto = true;
+      const m = $("mano"); if (m) m.classList.add("repartiendo");
+    }
+    efAcusacion(pv, e);
+    ui.refu = null;
+    const r = detectaRefu(pv, e);
+    if (r && EF.puede()) {
+      ui.refu = r;
+      if (r.yoSug) {
+        ui.vuelaCarta = true;
+        const ep = epoca;
+        setTimeout(() => { if (ep === epoca && ui.vuelaCarta) { ui.vuelaCarta = false; firmaModal = ""; try { pintaModal(); } catch (er) { /* nada */ } } }, 6000);
+      }
+    }
+  }
+  function efDispara(pv, e) {
+    if (!EF) return;
+    if (ui.pendReparto) { ui.pendReparto = false; repartoInicial(); }
+    if (!pv || !pv.jugadores || !EF.puede()) return;
+    for (const u of Object.keys(e.eliminados || {})) if (!(pv.eliminados || {})[u]) caidaFicha(u);
+    if (e.fase === "jugando" && e.turno && (pv.turno !== e.turno || pv.fase !== "jugando")) saltoTurno(e.turno);
+    if (ui.refu) { const r = ui.refu; ui.refu = null; pasaCarta(r); }
+    else if (e.paso === "tras" && e.sug && !e.sug.mostro) {
+      const h = e.hist || [], u = h[h.length - 1], hp = pv.hist || [], up = hp[hp.length - 1];
+      const yaVisto = up && up.e === "nadie" && pv.sug && pv.sug.k === e.sug.k;
+      if (u && u.e === "nadie" && !yaVisto) pulsoNadie();
+    }
   }
 
   /* ============================================================
@@ -636,7 +1209,8 @@
       if (est.eliminados[j.uid]) estados.push('<b class="e-elim">eliminado</b>');
       if (est.fuera[j.uid]) estados.push('<b class="e-elim">se fue</b>');
       if (est.debe.includes(j.uid) && est.paso === "refuta") estados.push("<b>pensando</b>");
-      return '<li class="' + (j.uid === yo() ? "yo" : "") + '">' + avatarPuesto(i, 30) + '<span class="jn">' + esc(j.nombre) + (j.uid === yo() ? " (tú)" : "") + '<small>' + esc(nomS(i)) + "</small></span>" + estados.join("") + "</li>";
+      const fueraJ = est.eliminados[j.uid] || est.fuera[j.uid];
+      return '<li class="' + (j.uid === yo() ? "yo" : "") + (fueraJ ? " elim" : "") + '">' + avatarPuesto(i, 30) + '<span class="jn">' + esc(j.nombre) + (j.uid === yo() ? " (tú)" : "") + '<small>' + esc(nomS(i)) + "</small></span>" + estados.join("") + "</li>";
     }).join("") + "</ul>";
     A.innerHTML = h;
   }
@@ -663,7 +1237,7 @@
     firmas.mano = firma;
     if (conn.mirando || !priv.mano) { el.innerHTML = '<h3>Mis cartas</h3><p class="nota">' + (conn.mirando ? "Mirando: no tienes cartas." : "Aún sin cartas.") + "</p>"; return; }
     const orden = priv.mano.slice().sort((a, b) => a - b);
-    el.innerHTML = "<h3>Mis cartas <small>" + orden.length + "</small></h3><div class=\"mano\">" + orden.map(c => cartaHtml(c)).join("") + "</div>";
+    el.innerHTML = "<h3>Mis cartas <small>" + orden.length + "</small></h3><div class=\"mano\">" + orden.map(c => cartaHtml(c, "", true)).join("") + "</div>";
   }
 
   function pintaTabs() {
@@ -784,11 +1358,11 @@
       const s = est.sug;
       if (est.paso === "refuta" && est.fase === "jugando" && s && s.espera === yo()) d = { k: "refuta" };
     }
-    if (!d && ui.cola.length && est && est.fase !== "elige" && est.fase !== "reparto") d = { k: "revela", q: ui.cola[0] };
-    if (!d && est && est.fase === "fin" && !ui.finCerrado && !ui.dlg) d = { k: "fin" };
+    if (!d && ui.cola.length && !ui.vuelaCarta && est && est.fase !== "elige" && est.fase !== "reparto") d = { k: "revela", q: ui.cola[0] };
+    if (!d && est && est.fase === "fin" && !ui.finCerrado && !ui.dlg && !ui.acuAbierta) d = { k: "fin" };
     if (!d && ui.dlg && est && est.fase === "jugando") d = ui.dlg;
     if (!d && ui.dlg && est && est.fase === "fin") d = ui.dlg;
-    if (!d) { paraEscenas(); if (!M_.hidden) { M_.hidden = true; M_.innerHTML = ""; } firmaModal = ""; return; }
+    if (!d) { paraEscenas(); if (!M_.hidden) { M_.hidden = true; M_.innerHTML = ""; } firmaModal = ""; if (!ui.acuAbierta) liberaFin(); return; }
     const firma = JSON.stringify([d, ui.selS, ui.selA, ui.selL, est.personajes, ui.busy, priv.mano, priv.problemas, priv.sobre]);
     if (firma === firmaModal) return;
     firmaModal = firma;
@@ -796,6 +1370,7 @@
     M_.hidden = false;
     M_.innerHTML = '<div class="velo" data-act="velo"><div class="dialogo d-' + d.k + '" role="dialog" aria-modal="true">' + contenidoModal(d) + "</div></div>";
     arrancaEscenas();
+    if (d.k === "fin" && ui.ocuFin && !M_.querySelector("[data-escena]")) liberaFin();
   }
 
   function contenidoModal(d) {
@@ -1015,6 +1590,7 @@
         case "refutar": {
           if (ui.busy) return;
           const c = el.dataset.c === "null" ? null : Number(el.dataset.c);
+          ui.eleg = c;
           ui.busy = true; firmaModal = ""; pintaModal();
           let p;
           try { p = conn.refutar(c); } catch (e) { p = Promise.reject(e); }
@@ -1028,7 +1604,7 @@
         case "repite-escena": paraEscenas(); arrancaEscenas(); return;
         case "info-pasadizo": ui.dlg = { k: "info", q: Number(el.dataset.q) }; pintaModal(); return;
         case "ver-fin": ui.finCerrado = false; ui.dlg = null; firmaModal = ""; pintaModal(); return;
-        case "cierra-fin": ui.finCerrado = true; ui.dlg = null; firmaModal = ""; pintaModal(); return;
+        case "cierra-fin": ui.finCerrado = true; ui.dlg = null; firmaModal = ""; liberaFin(); pintaModal(); return;
         case "velo":
           if (ev.target === el && ui.dlg && (ui.dlg.k === "sugiere" || ui.dlg.k === "acusa" || ui.dlg.k === "info" || ui.dlg.k === "arma")) { ui.dlg = null; pintaModal(); }
           return;

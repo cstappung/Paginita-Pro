@@ -185,6 +185,9 @@
               const clave = M.compartida(ll, est.cr.pk[est.sug.uid]);
               return jugar({ t: "muestra", x: M.cierraSobre(clave, est.sug.k, c) });
             },
+            /* La pantalla avisa que está animando algo que la sala no
+               debe tapar con el cartel del final (ver `clue.js`). */
+            ocupado(v) { manda("ocupado", { v: !!v }); },
             destruir() { raiz.removeEventListener("message", mensaje); oyentes.clear(); }
           };
           resolver(conexion);

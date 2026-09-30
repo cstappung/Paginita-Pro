@@ -2742,6 +2742,14 @@ is only the postman, like Yemas'. Things that hold it together:
   not theirs, bad passes and false verdicts. The honest limit, said in the
   manual: whoever leaves after choosing without revealing their seed takes
   their lock with them, and the game is void (`motivo: "anulada"`).
+- **The end cartel waits for the frame's drama.** The screen animates the
+  accusation (the envelope opening lock by lock) and the murder scene, and
+  the room's fin overlay would cover them after `PAUSA_FIN`. So the frame
+  posts `{tipo:"ocupado", v}` (`conexion.ocupado`), the postman exposes it
+  as the module's `ocupado()` and calls `ctx.listo()` when it drops, like
+  Chain Reaction's replay; `OCUPADO_MAX` (15 s) releases it if the frame
+  never does. A wrong accuser peeks into the envelope (`priv.sobre`), as in
+  the board game.
 - **Dice come from the seed, the turn number and a hash of the accepted
   moves** (`huella`), so they are the same on every screen and cannot be
   known turns ahead; rejected moves do not enter the hash, or writing junk

@@ -27,9 +27,15 @@ globalThis.ClueMotor = globalThis.ClueMotor || CM;
      semillas nadie puede auditar la mesa. Así que `terminar` se llama
      cuando todos los que siguen sentados revelaron la suya, o pasado
      `ESPERA_SEMILLAS`, y se reintenta cada segundo hasta que `fin`
-     exista de verdad. */
+     exista de verdad.
+   - **El cartel del final espera a la animación**: mientras el marco
+     avisa que está contando algo (la acusación, la escena del crimen)
+     `ocupado()` es verdad y la sala no tapa el tablero; al terminar se
+     llama a `listo()`, como en Chain Reaction. Si el marco nunca avisa
+     que terminó, `OCUPADO_MAX` lo suelta igual. */
 const PADRE = "clue-padre", HIJO = "clue-hijo";
 const ESPERA_SEMILLAS = 12000;
+const OCUPADO_MAX = 15000;
 const TIPOS = new Set(["elige", "suelta", "mezcla", "revuelve", "quita", "mueve", "sugiere", "acusa", "pasa", "paso", "muestra", "abre", "veredicto", "s"]);
 
 /* Lo que se deja pasar de cada jugada: los campos que el motor lee y
@@ -50,9 +56,17 @@ function limpia(j) {
   return r;
 }
 
-export function crearClue({ uid, pid, jugar, terminar, mirando, secreto }) {
+export function crearClue({ uid, pid, jugar, terminar, mirando, secreto, listo: alListo }) {
   let host, frame, aviso, muerto = false, listo = false, configurado = false;
   let partida = null, est = null, ultimo = "", finDesde = 0, relojFin = null;
+  let animando = false, relojAnima = null;
+  function ocupa(v) {
+    clearTimeout(relojAnima);
+    const antes = animando;
+    animando = !!v;
+    if (animando) relojAnima = setTimeout(() => ocupa(false), OCUPADO_MAX);
+    else if (antes && alListo) alListo();
+  }
 
   const juego = () => !!est?.jugadores?.some(j => j.uid === uid) && !mirando;
 
@@ -95,6 +109,7 @@ export function crearClue({ uid, pid, jugar, terminar, mirando, secreto }) {
     if (muerto || e.source !== frame?.contentWindow || e.origin !== location.origin || e.data?.canal !== HIJO) return;
     const d = e.data;
     if (d.tipo === "listo") { listo = true; reenvia(); return; }
+    if (d.tipo === "ocupado") { ocupa(d.v); return; }
     if (!juego() || d.tipo !== "jugar" || !d.j || !TIPOS.has(d.j.t)) return;
     /* Tras el final solo se escribe la semilla (`jugar` deja pasar `s`). */
     if (partida?.fin && d.j.t !== "s") return;
@@ -120,7 +135,7 @@ export function crearClue({ uid, pid, jugar, terminar, mirando, secreto }) {
     frame.title = "Clue: partida en línea";
     frame.className = "jg-clue-marco";
     window.addEventListener("message", mensaje);
-    frame.src = "juegos/clue/index.html?modo=online&v=clue-2";
+    frame.src = "juegos/clue/index.html?modo=online&v=clue-3";
     host.append(aviso, frame);
   }
 
@@ -145,10 +160,11 @@ export function crearClue({ uid, pid, jugar, terminar, mirando, secreto }) {
   function destruir() {
     muerto = true;
     clearTimeout(relojFin);
+    clearTimeout(relojAnima);
     window.removeEventListener("message", mensaje);
     frame?.remove();
     if (host) host.innerHTML = "";
   }
 
-  return { montar, actualizar, destruir };
+  return { montar, actualizar, destruir, ocupado: () => animando };
 }
