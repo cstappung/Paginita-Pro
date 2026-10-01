@@ -1835,6 +1835,49 @@ fits a Google URL and no uploaded photo at all. Three consequences:
   validation — so this needed **no rules change**, which after Reversi is a
   feature in itself.
 
+**Everyone has a public profile: a card and a page** (`juegos/perfil-tarjeta.js`,
+pure, and `juegos/perfil-vista.js`, the DOM). Clicking any element with
+`data-perfil="<uid>"` opens the mini card. One document listener,
+`alTocarPerfil` in `juegos-main.js`, handles every such element: the header
+avatar, the room's player chips, chat names, ranking rows and podium, and
+the names in Logros. Tapping the same element again closes the card. On
+desktop it is anchored to the element; at ≤600 px it is a bottom sheet. It
+shows the background, the photo with its frame, the bio, three numbers and
+the first three pieces of the vitrina, plus **Ver perfil**, which opens
+`#perfil/<uid>`. The page holds the hero, five totals, the whole vitrina,
+every ranking table with its position, and the logros grouped by game.
+The header's **Perfil** goes to your own page, and **✎ Personalizar** opens
+`abrePerfil`. That editor has four tabs (datos, marco, fondo, vitrina) and a
+live preview of the card.
+
+Four decisions:
+
+- **No rules change.** The new fields `marco`, `fondo`, `bio` and `vitrina`
+  live in `users/<uid>/perfil` beside nick, foto and colour. Everything
+  else is computed from what Logros already reads (`fb.watchLogros`).
+  There is one shared listener per session (`datosPerfil`), opened the
+  first time someone touches a photo.
+- **Frames and backgrounds are CSS, not images.** A catalogue of ids
+  (`MARCOS`, `FONDOS`), with the `.jg-marco-<id>` classes in juegos.html
+  reading `--t` (size) and `--c` (colour). The same frame works on a 20 px
+  chip and a 116 px portrait. The laurel and the crown are inline SVG data
+  URIs, not emoji.
+- **Some are earned, and checked where they are seen.** A `req` is either a
+  number of logros or a podium / first place in a table of three or more.
+  `marcoVisible` and `fondoVisible` re-check it against the owner's stats
+  every time they paint. A frame written into the database by hand is
+  stored, but others see the plain ring.
+- **The vitrina stores keys, not copies.** `l:<juego>:<id>` is a logro,
+  `r:<juego>` a room ranking and `s:<categoría>` a club record. The keys
+  are resolved against live data (`vitrinaDe`), so the position shown is
+  today's, and anything gone drops out. Choosing nothing gives an
+  automatic vitrina: the best positions, then the rarest logros.
+  `limpiaPerfil` keeps only known ids, a bio of `LARGO_BIO` characters and
+  up to `MAX_VITRINA` keys.
+
+`tests/perfil.test.cjs` covers the stats, the requirements, the vitrina
+and the cleaning.
+
 **Voting someone out is a move, not a new mechanism** (`votacion` and
 `mayoriaExpulsion` in `motor.js`). A vote is `{t:"voto", uid, contra}`, and
 withdrawing it is another entry with `no:true`, so the log stays append-only
@@ -1984,8 +2027,8 @@ Modules in [colabtex/src/juegos/](colabtex/src/juegos/):
 - `sonido.js` — the WebAudio synth and the mute flag. No DOM beyond the header
   button's state, no Firebase.
 - `perfil.js` — the profile editor: `COLORES`, `mezcla` (ficha + perfil → what
-  is painted, pure and verifiable in Node), `recorta` (the browser-side 96×96
-  centre crop to a JPEG data URL, which is what keeps the photo at ~10 kB) and
+  is painted, pure and verifiable in Node), `recorta` (the browser-side 160×160
+  centre crop to a JPEG data URL, which is what keeps the photo at ~15 kB) and
   `abrePerfil`, the modal.
 - All of them expose the **same shape**: `crearX(ctx)` with
   `ctx = {uid, pid, jugar, terminar, ahora}`, returning
