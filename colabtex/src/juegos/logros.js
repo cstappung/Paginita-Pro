@@ -254,7 +254,7 @@ const SOLO = {
     { id: "r100", n: "Centenario", d: "Llega a la ronda 100.", i: "💯", m: "Rondas", s: d => cat(/-rondas$/)(d) && d.puntos >= 100 },
     { id: "r150", n: "Muro de ladrillos", d: "Llega a la ronda 150.", i: "🏗️", m: "Rondas", s: d => cat(/-rondas$/)(d) && d.puntos >= 150 },
     { id: "r200", n: "Maquinita", d: "Llega a la ronda 200.", i: "🕹️", m: "Rondas", s: d => cat(/-rondas$/)(d) && d.puntos >= 200 },
-    { id: "r300", n: "Insert coin", d: "Llega a la ronda 300.", i: "🪙", m: "Rondas", s: d => cat(/-rondas$/)(d) && d.puntos >= 300 },
+    { id: "r300", n: "Insert coin", d: "Llega a la ronda 300.", i: "💰", m: "Rondas", s: d => cat(/-rondas$/)(d) && d.puntos >= 300 },
     { id: "r500", n: "Leyenda del after hours", d: "Llega a la ronda 500.", i: "👾", m: "Rondas", s: d => cat(/-rondas$/)(d) && d.puntos >= 500 }
   ],
   /* La racha se lee de club-sopa-racha (puntos = días seguidos); el resto,

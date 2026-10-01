@@ -56,7 +56,7 @@ import { crearRanks } from "./juegos/ranks.js";
 import { LOGROS, detecta, deFila, deMarca } from "./juegos/logros.js";
 import { crearLogros } from "./juegos/logros-vista.js";
 import { monedasDe, formatoMonedas, valorLogro, registraDia, diaChile as diaMonedas } from "./juegos/monedas.js";
-import { crearMonedas, topHtml } from "./juegos/monedas-vista.js";
+import { crearMonedas, topHtml, MONEDA } from "./juegos/monedas-vista.js";
 import { mezcla, abrePerfil } from "./juegos/perfil.js";
 import { abreMini, cierraMini, miniAbierta, crearPaginaPerfil, avatarMarco } from "./juegos/perfil-vista.js";
 import { estadisticas } from "./juegos/perfil-tarjeta.js";
@@ -508,7 +508,7 @@ let offMonedas = null, datosMonedas = null, diaMarcado = -1;
 function pintaMonedas() {
   const u = state.user, d = datosMonedas;
   const chip = $("userMonedas");
-  if (chip) chip.textContent = u && d ? `🪙 ${formatoMonedas(monedasDe(u.uid, d).total)}` : "🪙 …";
+  if (chip) chip.innerHTML = `${MONEDA} ${u && d ? formatoMonedas(monedasDe(u.uid, d).total) : "…"}`;
   const caja = $("vesMonedas");
   if (caja && u && d) caja.innerHTML = topHtml(d, u.uid, perfilDe, colorForUid);
 }
@@ -558,7 +558,7 @@ function celebra(juego, id) {
     const t = document.createElement("div");
     t.className = "jg-logro-toast";
     t.setAttribute("role", "status");
-    t.innerHTML = `<span class="i">${x.i}</span><span><small>🏆 ¡Logro desbloqueado! · +${valorLogro(juego, id)} 🪙</small><b>${escapeHtml(x.n)}</b><em>${escapeHtml(x.d)}</em></span>`;
+    t.innerHTML = `<span class="i">${x.i}</span><span><small>🏆 ¡Logro desbloqueado! · +${valorLogro(juego, id)} ${MONEDA}</small><b>${escapeHtml(x.n)}</b><em>${escapeHtml(x.d)}</em></span>`;
     t.onclick = () => ir("#logros");
     document.body.appendChild(t);
     suena("entra");
@@ -1057,7 +1057,7 @@ function armazon() {
           <div id="vesSalas"></div>
         </section>
         <section class="jg-lado-caja jg-mo-ves">
-          <header><span aria-hidden="true">🪙</span><h2>Top monedas</h2></header>
+          <header>${MONEDA}<h2>Top monedas</h2></header>
           <div id="vesMonedas"><p class="jg-nada">Contando monedas…</p></div>
         </section>
         <section class="jg-lado-caja">
