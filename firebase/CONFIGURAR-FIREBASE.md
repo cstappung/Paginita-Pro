@@ -36,25 +36,18 @@ siquiera haciendo privado el repositorio. Lo que protege los datos son las
      como resuelto lo de otros. Ahora un error se crea y se cuenta, pero solo
      un administrador lo borra. El estado de una sugerencia lo cambia quien la
      escribió o un administrador.
-   - **El webhook de Discord.** Lo podía leer cualquiera con sesión (y mandar
-     spam al canal). Ahora solo lo leen las personas de confianza (ver punto 2).
    - **Storage.** Cada archivo recuerda quién lo subió y solo esa persona lo
      reemplaza o lo borra. No se aceptan HTML ni JavaScript, que servidos desde
      un dominio de Google serían una página falsa gratis. Los archivos de antes
      siguen como estaban. Si alguien del proyecto vuelve a exportar una figura
      que subió otra persona, se guarda dentro de la base (si mide ≤ 3 MB). Si
      es más grande, la web pide subirla con otro nombre.
-2. **Nombrarte administrador y de confianza.** Tu uid sale en
+2. **Nombrarte administrador** (opcional, solo para Informes). Tu uid sale en
    **Authentication → Users**, columna *User UID*. En **Realtime Database →
-   Datos**, crea en la raíz:
-   - `admins/<tu uid>` = `true` (booleano, no texto). Muestra ✕ y ✓ en
-     **Informes**.
-   - `confianza/<uid>` = `true` para cada persona cuyas salas quieras anunciar
-     en Discord (los administradores cuentan como de confianza). Las salas
-     abiertas por alguien que no está en la lista se juegan igual, solo que
-     no se anuncian.
-
-   Nadie puede escribir esos dos nodos desde la web; solo tú, en la consola.
+   Datos**, crea en la raíz `admins/<tu uid>` = `true` (booleano, no texto).
+   Con eso ves ✕ y ✓ en **Informes**. Nadie puede escribir ese nodo desde la
+   web; solo tú, en la consola. Sin él todo funciona igual, pero nadie puede
+   borrar errores del informe.
 3. **Restringir la API key por dominio.** [Google Cloud → APIs y servicios →
    Credenciales](https://console.cloud.google.com/apis/credentials?project=mi-pagina-pro)
    → la clave *Browser key (auto created by Firebase)* → **Restricciones de
@@ -82,13 +75,15 @@ siquiera haciendo privado el repositorio. Lo que protege los datos son las
       verificadas). Cuando casi todas lo estén, pulsa **Aplicar** en Realtime
       Database y en Storage. Si lo aplicas antes de publicar el sitio con la
       clave, la web se queda sin base.
-7. **Si se filtra el webhook de Discord**, bórralo en Discord, crea otro y
+7. **Si alguien usa el webhook de Discord para mandar spam**, bórralo en Discord, crea otro y
    cambia `discord/webhook`. No hace falta tocar el código.
 
 Lo que las reglas **no** pueden impedir sin un servidor propio, dicho claro:
 un jugador con la consola abierta puede declararse ganador de una partida en
 la que está (`partidas/<pid>/fin`) y así sumar a su clasificación; cualquiera
-con sesión puede llenar el chat de una sala o mandar muchas sugerencias; y el
+con sesión puede llenar el chat de una sala o mandar muchas sugerencias;
+cualquiera con sesión puede leer el webhook de Discord (a propósito, para que
+se anuncie la sala de cualquiera) y mandar spam al canal; y el
 elenco de Clue (`clueElenco`, nombres y fotos de personas reales) lo puede
 leer cualquiera con sesión, porque todos los jugadores de una sala tienen que
 ver los mismos personajes. Si eso último te preocupa, usa fotos que no sean
@@ -302,10 +297,9 @@ anuncian, y las salas abiertas desde `localhost` tampoco.
    Ponle nombre y foto si quieres (el mensaje firma como «Laboratorio ·
    Juegos») y pulsa **Copiar URL del webhook**.
 2. Publica las reglas otra vez (pegar `firebase/database.rules.json` entero y
-   **Publicar**). Traen un nodo nuevo, `discord`, que solo pueden leer las
-   personas de `confianza/<uid>` y los `admins/<uid>` (sección 0), y que no
-   puede escribir nadie desde la web. Solo se anuncian las salas que abren
-   ellas.
+   **Publicar**). Traen un nodo nuevo, `discord`, que pueden leer los que
+   tienen sesión (así se anuncia la sala de cualquiera) y que no puede
+   escribir nadie desde la web.
 3. En **Realtime Database → Datos**, crea a mano, en la raíz:
    - `discord/webhook` = la URL copiada
      (`https://discord.com/api/webhooks/…`).

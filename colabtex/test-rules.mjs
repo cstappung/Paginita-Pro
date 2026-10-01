@@ -185,7 +185,7 @@ await denied("B NO borra un error del informe", () => rep.deleteError("epruebas1
 await denied("B NO reescribe el mensaje de un error", () => set(ref(db, "errors/epruebas1/mensaje"), "otra cosa"));
 await denied("B NO infla el contador", () => set(ref(db, "errors/epruebas1/veces"), 1000));
 await allowed("B sí suma una vez", () => rep.publishError(errRec, userB2.uid));
-await denied("B no lee el webhook de Discord", () => get(ref(db, "discord")));
+await allowed("B lee el webhook de Discord (para anunciar sus salas)", () => get(ref(db, "discord")));
 await denied("B NO puede reescribir el texto de A", () =>
   set(ref(db, `feedback/${fbId}/titulo`), "secuestrado"));
 await denied("B NO puede borrar lo de A", () => rep.deleteFeedback(fbId));

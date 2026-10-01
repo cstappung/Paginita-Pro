@@ -42,10 +42,9 @@ test('las reglas cierran lo que se abrió',()=>{
  assert.doesNotMatch(R.tokenIndex.$token['.validate'],/owner/);
  assert.match(R.users.$uid['.read'],/auth.uid === \$uid/,'el registro de cada uno es privado');
  assert.equal(R.users.$uid.perfil['.read'],'auth != null','el perfil sigue siendo público');
- assert.match(R.discord['.read'],/confianza/);
+ assert.equal(R.discord['.read'],'auth != null','toda sala se anuncia: el webhook lo lee cualquiera con sesión');
  assert.match(R.errors.$fp['.write'],/newData.exists\(\) \|\| root.child\('admins'\)/,'borrar errores es de admins');
  assert.equal(R.admins.$uid['.write'],false);
- assert.equal(R.confianza.$uid['.write'],false);
  const st=fs.readFileSync('../firebase/storage.rules','utf8');
  assert.match(st,/allow delete: if request.auth != null && esDueno\(\)/);
 });
