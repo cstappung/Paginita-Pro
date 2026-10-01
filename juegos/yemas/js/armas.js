@@ -140,7 +140,7 @@ export const BEBIDAS = {
   jugger: { nombre: 'Juggernog', precio: 2500, color: '#d8343a', texto: 'Aguantas el doble' },
   speed: { nombre: 'Speed Cola', precio: 3000, color: '#3fbf4a', texto: 'Recargas el doble de rápido' },
   doble: { nombre: 'Double Tap', precio: 2000, color: '#e8a23a', texto: 'Disparas más rápido' },
-  revive: { nombre: 'Quick Revive', precio: 1500, solo: 500, color: '#5ab4ff', texto: 'Te levantas solo una vez', luz: false },
+  revive: { nombre: 'Quick Revive', precio: 1500, solo: 500, color: '#5ab4ff', texto: 'Levantas más rápido a tus compañeros; jugando solo, te levanta cuando caes', luz: false },
   stamina: { nombre: 'Stamin-Up', precio: 2000, color: '#f0d23a', texto: 'Corres más' },
   phd: { nombre: 'PhD Flopper', precio: 2000, color: '#a050e0', texto: 'Tus explosiones no te dañan' },
   deadshot: { nombre: 'Deadshot', precio: 1500, color: '#5a6a4a', texto: 'Apuntas más fino' },

@@ -150,7 +150,7 @@ export const JUEGOS = {
     nombre: "Yemas",
     lema: "Shooter de huevos en primera persona: el primero en freír a los demás hasta la meta gana",
     color: "#ffb300",
-    minimo: 2,
+    minimo: 1,
     cupo: 8,
     alta: "2026-09-28"
   },
@@ -182,9 +182,18 @@ export function novedades(n = 3) {
 /* Cuánta gente cabe en *esta* sala: lo que eligió quien la abrió,
    recortado a lo que el juego admite. Una partida creada antes de que
    esto existiera no tiene `cupo` y se lee como dos, que es lo que era. */
+/* Cuántos hacen falta para empezar *esta* sala. Casi siempre es el
+   `minimo` del juego; Yemas admite 1 solo en zombis, porque un todos
+   contra todos con un único huevo se ganaría por abandono al empezar. */
+export function minimoDe(p) {
+  const j = JUEGOS[p && p.juego] || {};
+  if (p && p.juego === "yemas" && varianteYemas(p) !== "zombis") return 2;
+  return j.minimo || 2;
+}
+
 export function cupoDe(p) {
   const j = JUEGOS[p && p.juego] || {};
-  const tope = j.cupo || 2, min = j.minimo || 2;
+  const tope = j.cupo || 2, min = Math.max(2, j.minimo || 2);
   const n = Math.floor(Number(p && p.cupo)) || min;
   return Math.max(min, Math.min(tope, n));
 }
@@ -896,8 +905,10 @@ export function reducir(p) {
   p = V.p;
   const js = jugadoresDe(p);
   const cupo = cupoDe(p);
-  const min = (JUEGOS[p.juego] || {}).minimo || 2;
-  const listos = js.length >= min && (cupo === min || p.estado !== "esperando");
+  const min = minimoDe(p);
+  // Una sala de dos arranca sola al llenarse aunque admita empezar con
+  // uno (los zombis): ahí el «Empezar» del anfitrión es para jugar solo.
+  const listos = js.length >= min && (p.estado !== "esperando" || (cupo <= Math.max(min, 2) && js.length >= cupo));
   const base = { jugadores: js, cupo, listos, fin: p.fin || null, votos: V.votos, expulsados: V.expulsados };
   if (p.juego === "escondite") return { ...base, ...redEscondite(p, js) };
   if (p.juego === "cartas") return { ...base, ...redCartas(p, js) };

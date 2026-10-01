@@ -182,7 +182,17 @@ const yo = {
   pz: 0, pzT: 0, zk: 0, ultDanio: 0,
   // Zombis: las bebidas tomadas, la vida máxima (Juggernog) y las armas con Pack-a-Punch.
   perks: new Set(), maxHp: 100, pap: new Set(),
+  // Zombis: en el suelo con la pistola (segundos que le quedan antes de
+  // morir), si se levanta solo (Quick Revive jugando solo), con qué lo
+  // tumbaron y si la pistola era prestada.
+  abatido: 0, autoLevanta: false, tumbo: null, pistolaPrestada: false,
 };
+// En el suelo, como en Black Ops: se aguanta ABATIDO.dura segundos con la
+// pistola mientras un compañero llega y mantiene E (ABATIDO.revive, la mitad
+// con Quick Revive). Si no queda nadie en pie, se termina de morir enseguida.
+const ABATIDO = { dura: 30, sinNadie: 2, revive: 4, alcance: 1.6, solo: 3, vel: 0.25, ojos: 0.35 };
+const REVIVE = 99;   // el «golpe» que levanta a un compañero: viaja con daño 0
+let reviviendo = { uid: '', t: 0 };
 // La autodestrucción: se mantiene X un momento (soltarla antes la cancela,
 // así no se dispara sin querer), el huevo pita y brilla —también en la
 // pantalla de los demás, que alcanzan a arrancar— y revienta llevándose a
@@ -193,7 +203,7 @@ const teclas = new Set();
 let gatillo = false, yaDisparo = false;
 // Los números de un arma tal como la lleva uno: con Pack-a-Punch si se lo hizo.
 const armaDe = id => ARMAS[id] && yo.pap.has(id) ? conPap(ARMAS[id]) : ARMAS[id];
-const armaActual = () => armaDe(yo.inv[yo.sel]) || ARMAS[SARTEN];
+const armaActual = () => (yo.abatido > 0 ? armaDe(7) : armaDe(yo.inv[yo.sel])) || ARMAS[SARTEN];
 const miNombre = () => red?.jugadores.get(red.yo)?.nombre || '';
 const miColor = () => red?.jugadores.get(red.yo)?.color || PALETA[0];
 const puedoJugar = () => jugando && !terminado && red && !red.mirando;
@@ -343,11 +353,11 @@ addEventListener('keydown', e => {
   if (e.code === 'Tab') $('tabla').hidden = false;
   if (e.code === 'KeyR') recargar();
   if (e.code === 'KeyV') red?.hablar(true);
-  if (e.code === 'KeyG') lanzarGranada();
+  if (e.code === 'KeyG' && !yo.abatido) lanzarGranada();
   if (e.code === 'KeyT') yo.grSel = yo.gr.length ? (yo.grSel + 1) % yo.gr.length : 0;
   if (e.code === 'KeyE') recogeCerca();
-  if (e.code === 'KeyQ') tirarEspatula();
-  if (e.code === 'KeyX' && puedoJugar() && yo.vivo) yo.cargaAuto = 0;
+  if (e.code === 'KeyQ' && !yo.abatido) tirarEspatula();
+  if (e.code === 'KeyX' && puedoJugar() && yo.vivo && !yo.abatido) yo.cargaAuto = 0;
   // Shift+F y no F sola: la F queda al lado de la G y se apretaba sin querer.
   if (e.code === 'KeyF' && e.shiftKey) pantallaCompleta();
   if (!yo.vivo && e.code === 'KeyZ') ciclaGranada(0);
@@ -396,7 +406,7 @@ function llenaArma(id) {
 }
 
 function cambiarArma(i) {
-  if (i === yo.sel || !yo.vivo || i >= yo.inv.length || yo.inv[i] === null) return;
+  if (i === yo.sel || !yo.vivo || yo.abatido > 0 || i >= yo.inv.length || yo.inv[i] === null) return;
   yo.sel = i;
   yo.recargando = 0;
   yo.zoom = 0;
@@ -544,7 +554,7 @@ function lanzarCohete(a) {
 // ---------- Vida y muerte ----------
 // C mientras se corre por el suelo: sale disparado en la dirección en que iba.
 function deslizar() {
-  if (!puedoJugar() || !yo.corriendo || !yo.enSuelo || yo.deslizando > 0 || yo.cdDesliz > 0) return;
+  if (!puedoJugar() || yo.abatido > 0 || !yo.corriendo || !yo.enSuelo || yo.deslizando > 0 || yo.cdDesliz > 0) return;
   const v = Math.hypot(yo.vel.x, yo.vel.z);
   const dx = v > 0.5 ? yo.vel.x / v : -Math.sin(yo.yaw), dz = v > 0.5 ? yo.vel.z / v : -Math.cos(yo.yaw);
   yo.vel.x = dx * DESLIZ.vel;
@@ -603,6 +613,7 @@ function aparecer() {
   }
   yo.suicidio = null;
   yo.matoMuerto = false;
+  yo.abatido = 0;
   yo.grSel = 0;
   yo.grTiradas = 0;
   yo.hpAntes = yo.hp;
@@ -616,7 +627,11 @@ function aparecer() {
 }
 
 function alGolpe(g) {
-  if (!puedoJugar() || !yo.vivo || yo.escudo > 0) return;
+  if (!puedoJugar()) return;
+  // Un compañero terminó de levantarme.
+  if (g.a === REVIVE) { if (yo.abatido > 0) levantarse(`${g.n} te levantó`); return; }
+  // En el suelo los zombis ya no muerden y nada más duele: solo corre el reloj.
+  if (!yo.vivo || yo.escudo > 0 || yo.abatido > 0) return;
   // Un mordisco viaja como un golpe del director, pero no es baja de nadie.
   if (g.a === ZOMBI) {
     if (!esZombis()) return;
@@ -631,7 +646,7 @@ function alGolpe(g) {
   yo.ultDanio = performance.now();
   danio = 1;
   sonido.dolor();
-  if (yo.hp <= 0) morir(g);
+  if (yo.hp <= 0) cae(g);
 }
 // Un balazo de otro a un zombi: solo lo aplica el director.
 function alGolpeZombi(g) {
@@ -649,16 +664,52 @@ function alBaja(victima) {
   aviso(`Freíste a ${victima}`);
 }
 
+// Quedarse sin vida: en zombis primero se cae al suelo; en lo demás se muere.
+function cae(g) {
+  if (!esZombis()) return morir(g);
+  if (yo.abatido > 0) return;
+  const qr = yo.perks.has('revive'), solo = nActivos() <= 1;
+  // Jugando solo no hay quién lo levante: sin Quick Revive se muere ya.
+  if (solo && !qr) return morir(g);
+  // Al caer se pierden las bebidas, como en Black Ops (Quick Revive también).
+  yo.perks.clear();
+  yo.maxHp = 100;
+  yo.hp = 1;
+  yo.tumbo = g;
+  yo.autoLevanta = solo;
+  yo.abatido = solo ? ABATIDO.solo : ABATIDO.dura;
+  yo.cargaAuto = -1;
+  yo.corriendo = false;
+  yo.deslizando = 0;
+  yo.recargando = 0;
+  yo.zoom = 0;
+  yo.apuntando = false;
+  // La pistola: la propia si la tiene, con al menos un cargador; si no, una prestada.
+  yo.pistolaPrestada = !yo.inv.includes(7);
+  if (yo.pistolaPrestada || !yo.mun[7] || (yo.mun[7].c <= 0 && yo.mun[7].r <= 0)) llenaArma(7);
+  sonido.dolor();
+  aviso(solo ? 'Quick Revive te va a levantar…' : '¡Caíste! Aguanta con la pistola hasta que te levanten');
+  pintaElegidas();
+  publicar();
+}
+function levantarse(texto) {
+  yo.abatido = 0;
+  yo.autoLevanta = false;
+  yo.hp = yo.maxHp;
+  yo.hpAntes = yo.hp;
+  yo.escudo = 1.5;
+  yo.recargando = 0;
+  if (yo.pistolaPrestada) delete yo.mun[7];
+  yo.pistolaPrestada = false;
+  sonido.bebida();
+  aviso(texto);
+  publicar();
+}
+
 function morir(g) {
-  // Quick Revive: la primera caída de esta vida no cuenta, se levanta solo.
-  if (esZombis() && yo.perks.has('revive') && g.de !== red.yo) {
-    yo.perks.delete('revive');
-    yo.hp = yo.maxHp / 2;
-    yo.escudo = 2;
-    aviso('¡Quick Revive te levantó! Ya no lo tienes');
-    sonido.bebida();
-    return;
-  }
+  yo.abatido = 0;
+  if (yo.pistolaPrestada) delete yo.mun[7];
+  yo.pistolaPrestada = false;
   if (g.de === red.yo) {
     yo.suicidio = { hp: Math.max(1, Math.round(yo.hpAntes)), mun: JSON.parse(JSON.stringify(yo.mun)), gr: [...yo.gr] };
     yo.matoMuerto = performance.now() - ultimaBaja < 300;
@@ -792,7 +843,7 @@ function pideArma(s, g, reemplaza) {
   red.accion('recoge', { s, g });
 }
 function recogeCerca() {
-  if (esZombis()) { if (puedoJugar() && yo.vivo) inter?.usar(); return; }
+  if (esZombis()) { if (puedoJugar() && yo.vivo && !yo.abatido && !reviviendo.uid) inter?.usar(); return; }
   if (!cerca || !puedoJugar() || !yo.vivo) return;
   pideArma(cerca.s, cerca.g, yo.sel !== 0 ? yo.sel : 1);
 }
@@ -871,6 +922,10 @@ function alJugador(id, e) {
   j.ad = !!e.ad && j.vivo;
   if (e.ds && !j.ds && j.vivo) sonido.desliza(j.mesh.position.distanceTo(yo.pos));
   j.ds = !!e.ds && j.vivo;
+  // En el suelo esperando que lo levanten.
+  const ab = j.vivo && e.ab > 0;
+  if (ab && !j.ab && esZombis() && !red.mirando) aviso(`¡${ficha.nombre} cayó! Ve y mantén E a su lado para levantarlo`);
+  j.ab = ab;
   // Lo que lanzó (granada o cohete): se ve volar y revienta donde su dueño dice.
   if (e.n && e.n.i !== j.nI && Array.isArray(e.n.o) && Array.isArray(e.n.v)) {
     j.nI = e.n.i;
@@ -925,6 +980,7 @@ function publicar() {
   if (yo.lanzo) e.n = yo.lanzo;
   if (yo.cargaAuto >= 0) e.ad = 1;
   if (yo.deslizando > 0) e.ds = 1;
+  if (yo.abatido > 0) e.ab = Math.ceil(yo.abatido);
   if (yo.revento) e.x2 = yo.revento;
   if (yo.ep) e.ep = { i: yo.ep.i, u: yo.ep.u, p: [r2(yo.ep.pos.x), r2(yo.ep.pos.y), r2(yo.ep.pos.z)] };
   if (esZombis()) {
@@ -985,13 +1041,13 @@ function reventar(p, dueno, id, propia, k) {
 function danioExplosivo(p, radio, danioMax, arma, comoMuero, pleno = 0) {
   golpeaRivales(p, radio, danioMax, arma, pleno);
   // PhD Flopper: las explosiones propias no le hacen nada a uno.
-  if (!yo.vivo || yo.escudo > 0 || yo.perks.has('phd')) return;
+  if (!yo.vivo || yo.escudo > 0 || yo.abatido > 0 || yo.perks.has('phd')) return;
   const dmg = Math.round(alcanceExplosion(p, yo.pos, radio, danioMax, pleno) / 2);
   if (dmg < 5) return;
   yo.hpAntes = yo.hp;
   yo.hp -= dmg;
   danio = 1;
-  if (yo.hp <= 0) morir({ de: red.yo, n: comoMuero, dmg, cab: false, a: arma });
+  if (yo.hp <= 0) cae({ de: red.yo, n: comoMuero, dmg, cab: false, a: arma });
 }
 
 // Daño de una explosión en `p` sobre el huevo parado en `pies`: entero hasta
@@ -1383,7 +1439,7 @@ function montaZombis() {
   sol.color.set(am.solColor || '#c9bbff');
   inter = crearInteractivo(escena, M, colisores, mundo, {
     pos: () => yo.pos,
-    puedo: () => puedoJugar() && yo.vivo,
+    puedo: () => puedoJugar() && yo.vivo && !yo.abatido,
     puntos: () => yo.pz,
     gasta: n => {
       if (yo.pz < n) { aviso(`Te faltan ${n - yo.pz} puntos`); sonido.vacio(); return false; }
@@ -1493,6 +1549,50 @@ function alCaeZombi({ pos, killer, cab, a, explota }) {
   sumaPuntos(cab ? 100 : a === SARTEN ? 130 : 60);
 }
 
+// El reloj del que está en el suelo: se levanta solo (Quick Revive jugando
+// solo) o se termina de morir. Sin nadie en pie que pueda venir, no se espera.
+function pasoAbatido(dt) {
+  if (!yo.autoLevanta && ![...otros.values()].some(j => j.vivo && !j.ab)) yo.abatido = Math.min(yo.abatido, ABATIDO.sinNadie);
+  yo.abatido -= dt;
+  if (yo.abatido > 0) return;
+  if (yo.autoLevanta) return levantarse('¡Quick Revive te levantó! Ya no lo tienes');
+  morir(yo.tumbo || { de: '', n: 'Los zombis', dmg: 0, cab: false, a: ZOMBI });
+}
+// El compañero en el suelo más cerca, si estoy en pie y lo alcanzo.
+function buscaCaido() {
+  if (!puedoJugar() || !yo.vivo || yo.abatido > 0) return null;
+  let mejor = null, dMejor = ABATIDO.alcance;
+  for (const [id, j] of otros) {
+    if (!j.ab) continue;
+    const d = Math.hypot(j.obj.x - yo.pos.x, j.obj.z - yo.pos.z);
+    if (d < dMejor && Math.abs(j.obj.y - yo.pos.y) < 1.5) { dMejor = d; mejor = id; }
+  }
+  return mejor;
+}
+// Mantener E al lado de un caído lo levanta. Con Quick Revive tarda la mitad.
+function pasoRevivir(dt, uid) {
+  if (!uid) { if (reviviendo.uid) $('revive').hidden = true; reviviendo = { uid: '', t: 0 }; return; }
+  if (reviviendo.uid !== uid) reviviendo = { uid, t: 0 };
+  const total = ABATIDO.revive * (yo.perks.has('revive') ? 0.5 : 1);
+  const nombre = red.jugadores.get(uid)?.nombre || 'tu compañero';
+  if (teclas.has('KeyE')) reviviendo.t += dt;
+  else reviviendo.t = 0;
+  $('prompt').hidden = false;
+  $('prompt').textContent = reviviendo.t > 0 ? `Levantando a ${nombre}…` : `Mantén E para levantar a ${nombre}`;
+  $('revive').hidden = !(reviviendo.t > 0);
+  $('revive-barra').style.width = Math.min(100, reviviendo.t / total * 100) + '%';
+  if (reviviendo.t < total) return;
+  red.golpear(uid, { dmg: 0, cab: false, a: REVIVE });
+  const j = otros.get(uid);
+  if (j) j.ab = false;   // hasta que llegue su estado, ya no está en el suelo
+  sumaPuntos(10);
+  aviso(`Levantaste a ${nombre}`);
+  sonido.bebida();
+  reviviendo = { uid: '', t: 0 };
+  $('revive').hidden = true;
+  publicar();
+}
+
 function pasoZombis(dt) {
   if (!zombis) return;
   const d = director(), soy = d === red.yo && !terminado;
@@ -1504,8 +1604,9 @@ function pasoZombis(dt) {
   if (d && d !== red.yo) ultimoDirector = d;
   if (soy) {
     const jug = [];
-    if (!red.mirando) jug.push({ uid: red.yo, pos: yo.pos, vivo: yo.vivo });
-    for (const [id, j] of otros) jug.push({ uid: id, pos: j.obj, vivo: j.vivo });
+    // A los que están en el suelo los zombis los dejan: van por los que siguen en pie.
+    if (!red.mirando) jug.push({ uid: red.yo, pos: yo.pos, vivo: yo.vivo && !yo.abatido });
+    for (const [id, j] of otros) jug.push({ uid: id, pos: j.obj, vivo: j.vivo && !j.ab });
     for (const m of zombis.paso(dt, jug, nActivos())) {
       if (m.uid === red.yo) alGolpe({ de: '', n: 'Los zombis', dmg: m.dmg, cab: false, a: ZOMBI });
       else red.golpear(m.uid, { dmg: m.dmg, cab: false, a: ZOMBI });
@@ -1640,6 +1741,9 @@ function hud(dt) {
   const francotirador = a.zoom && yo.zoom > 0.85;
   $('mira-sniper').hidden = !francotirador;
   $('mira').hidden = francotirador || !yo.vivo;
+  $('abatido').hidden = !(yo.abatido > 0) || terminado;
+  if (yo.abatido > 0) $('abatido').textContent = yo.autoLevanta ? `Quick Revive te levanta en ${Math.ceil(yo.abatido)}…`
+    : `En el suelo: te quedan ${Math.ceil(yo.abatido)} s para que te levanten`;
   if (!yo.vivo && !terminado) $('muerte-txt').textContent = esZombis() ? textoCaido()
     : `${yo.asesino} te frió. Vuelves en ${Math.ceil(yo.muerteT)}…`;
   if (zombis) {
@@ -1757,8 +1861,8 @@ function actualizar(dt) {
     const shift = teclas.has('ShiftLeft') || teclas.has('ShiftRight');
     const avanza = (teclas.has('KeyW') || teclas.has('ArrowUp')) && !teclas.has('KeyS') && !teclas.has('ArrowDown');
     const mira = a.zoom && yo.zoom > 0.5;
-    yo.corriendo = shift && !yo.sinSprint && avanza && !mira && yo.deslizando <= 0;
-    _quiero.multiplyScalar(VEL * (mira ? 0.5 : (a.melee ? 1.1 : 1) * (yo.corriendo ? SPRINT : 1) * (yo.perks.has('stamina') ? 1.1 : 1)));
+    yo.corriendo = shift && !yo.sinSprint && avanza && !mira && yo.deslizando <= 0 && !yo.abatido;
+    _quiero.multiplyScalar((yo.abatido > 0 ? ABATIDO.vel : 1) * VEL * (mira ? 0.5 : (a.melee ? 1.1 : 1) * (yo.corriendo ? SPRINT : 1) * (yo.perks.has('stamina') ? 1.1 : 1)));
     if (yo.deslizando > 0) {
       // Deslizándose no se dobla: el roce frena hasta que vuelve a caminar.
       yo.deslizando -= dt;
@@ -1772,19 +1876,19 @@ function actualizar(dt) {
     yo.cdDesliz = Math.max(0, yo.cdDesliz - dt);
     // Saltar corta el deslizamiento, pero el impulso sigue en el aire.
     // Saltando desde un deslizamiento se llega más alto.
-    if (teclas.has('Space') && yo.enSuelo) { yo.vel.y = SALTO * (yo.deslizando > 0 ? 1.3 : 1); yo.enSuelo = false; yo.deslizando = 0; }
+    if (teclas.has('Space') && yo.enSuelo && !yo.abatido) { yo.vel.y = SALTO * (yo.deslizando > 0 ? 1.3 : 1); yo.enSuelo = false; yo.deslizando = 0; }
     moverCuerpo(yo, dt, colisores);
 
     yo.cadencia = Math.max(0, yo.cadencia - dt);
     yo.escudo = Math.max(0, yo.escudo - dt);
     // En zombis la vida se recupera sola si pasan unos segundos sin daño.
-    if (zombis && yo.hp < yo.maxHp && performance.now() - yo.ultDanio > 4000) yo.hp = Math.min(yo.maxHp, yo.hp + 30 * dt);
+    if (zombis && !yo.abatido && yo.hp < yo.maxHp && performance.now() - yo.ultDanio > 4000) yo.hp = Math.min(yo.maxHp, yo.hp + 30 * dt);
     // La lava de Pueblo quema a quien la pisa.
-    if (inter?.enLava(yo.pos) && yo.escudo <= 0) {
+    if (inter?.enLava(yo.pos) && yo.escudo <= 0 && !yo.abatido) {
       yo.hp -= 12 * dt;
       yo.ultDanio = performance.now();
       danio = Math.max(danio, 0.5);
-      if (yo.hp <= 0) morir({ de: '', n: 'La lava', dmg: 0, cab: false, a: ZOMBI });
+      if (yo.hp <= 0) cae({ de: '', n: 'La lava', dmg: 0, cab: false, a: ZOMBI });
     }
     if (yo.recargando > 0) {
       yo.recargando -= dt;
@@ -1792,6 +1896,7 @@ function actualizar(dt) {
       if (yo.recargando <= 0) { yo.recargando = 0; if (m && m.r > 0) { m.c = a.cargador; m.r--; } }
     }
     if (gatillo && (a.auto || !yaDisparo)) { disparar(); yaDisparo = true; }
+    if (yo.abatido > 0) pasoAbatido(dt);
     const zoomObj = a.zoom && yo.apuntando && yo.recargando === 0 ? 1 : 0;
     yo.zoom += (zoomObj - yo.zoom) * (1 - Math.exp(-14 * dt));
   } else {
@@ -1806,7 +1911,7 @@ function actualizar(dt) {
   yo.agacho += ((yo.deslizando > 0 ? 1 : 0) - yo.agacho) * (1 - Math.exp(-14 * dt));
 
   if (!red.mirando && !terminado) {
-    const alturaCam = yo.vivo ? OJOS - DESLIZ.baja * yo.agacho : OJOS + Math.min(2.5, (3 - yo.muerteT) * 2);
+    const alturaCam = yo.vivo ? (yo.abatido > 0 ? OJOS * ABATIDO.ojos : OJOS - DESLIZ.baja * yo.agacho) : OJOS + Math.min(2.5, (3 - yo.muerteT) * 2);
     camara.position.set(yo.pos.x, yo.pos.y + alturaCam, yo.pos.z);
     camara.rotation.set(yo.pitch, yo.yaw, yo.agacho * 0.06);
   }
@@ -1833,7 +1938,9 @@ function actualizar(dt) {
 
   actualizaBanderas();
   actualizaArmasSuelo();
-  inter?.actualizar(dt, teclas.has('KeyE'));
+  const reviveA = zombis && !terminado ? buscaCaido() : null;
+  inter?.actualizar(dt, teclas.has('KeyE') && !reviveA);
+  if (zombis) pasoRevivir(dt, reviveA);
   if (yo.cargaAuto >= 0) {
     const antes = Math.floor(yo.cargaAuto / 0.2);
     yo.cargaAuto += dt;
@@ -1868,8 +1975,10 @@ function actualizar(dt) {
     j.mesh.userData.casco.material.emissive.setRGB(j.ad ? 0.6 + 0.4 * Math.sin(t * 30) : 0, 0, 0);
     c.rotation.z = j.ds ? 0 : Math.sin(t * 14) * 0.12 * Math.min(1, v / 5);
     // Deslizándose va echado hacia atrás.
-    c.rotation.x += ((j.ds ? 0.7 : 0) - c.rotation.x) * kp;
-    c.position.y = Math.abs(Math.sin(t * 14)) * 0.08 * Math.min(1, v / 5);
+    // En el suelo, tirado de espaldas; deslizándose, echado hacia atrás.
+    c.rotation.x += ((j.ab ? 1.35 : j.ds ? 0.7 : 0) - c.rotation.x) * kp;
+    if (j.ab) c.rotation.z = 0;
+    c.position.y = j.ab ? 0.25 : Math.abs(Math.sin(t * 14)) * 0.08 * Math.min(1, v / 5);
     if (j.epMalla && j.epObj) { j.epMalla.position.lerp(j.epObj, kp); j.epMalla.rotation.y += dt * 14; j.epMalla.rotation.x = 0.6; }
   }
 
@@ -1898,7 +2007,7 @@ requestAnimationFrame(bucle);
 
 // Para depurar desde la consola: __yemas.paso(dt) avanza el juego sin requestAnimationFrame
 window.__yemas = {
-  yo, otros, disparar, granadas, suelo, pref, nubes, tirarEspatula, director, get cegado() { return cegado; }, get zombis() { return zombis; },
+  yo, otros, disparar, granadas, suelo, pref, alGolpe, nubes, tirarEspatula, director, get cegado() { return cegado; }, get zombis() { return zombis; },
   get inter() { return inter; }, get mundo() { return mundo; },
   get red() { return red; }, get marcador() { return marcador; },
   paso(dt) { actualizar(dt); actualizarEfectos(dt); escena.updateMatrixWorld(); },

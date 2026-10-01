@@ -21,7 +21,7 @@
 // vez que se abre una. Si ven a su presa la persiguen derecho; si no, van al
 // nodo visible que deja menos camino hasta el nodo desde donde se la ve.
 import * as THREE from 'three';
-import { moverCuerpo, rayoMundo, crearZombi, geometriaHuevo, ALTO } from 'yemas/mundo';
+import { moverCuerpo, rayoMundo, crearZombi, ALTO } from 'yemas/mundo';
 
 export const ZB = {
   mordida: 40, alcance: 1.3, cadencia: 1.1, preparar: 0.35, sube: 0.9, pausa: 9, arranque: 3,
@@ -42,7 +42,36 @@ const FASES = ['dentro', 'fuera', 'rompe', 'entra', 'brote'];
 
 // El huevo verde que deja cada zombi al morir.
 const HUEVOS_MAX = 40, HUEVO_VIDA = 20;
-const matHuevo = new THREE.MeshLambertMaterial({ color: '#7dff5a', emissive: '#2fd12a', emissiveIntensity: 0.9 });
+// El huevo que deja un zombi es frito, como el de un jugador, pero verde: la
+// clara verdosa, el borde tostado oliva y la yema verde que brilla un poco.
+const matBordeV = () => new THREE.MeshLambertMaterial({ color: '#8fa63a', transparent: true, polygonOffset: true, polygonOffsetFactor: -2 });
+const matClaraV = () => new THREE.MeshLambertMaterial({ color: '#d9f5c4', emissive: '#1d3a10', transparent: true, polygonOffset: true, polygonOffsetFactor: -3 });
+const matYemaV = () => new THREE.MeshPhongMaterial({ color: '#5cff2e', emissive: '#1fa012', emissiveIntensity: 0.8, specular: '#ffffff', shininess: 90, transparent: true });
+function contorno(radio, puntos = 26) {
+  const f = new THREE.Shape();
+  const fase = Math.random() * 6, lobulos = 3 + Math.floor(Math.random() * 3);
+  for (let i = 0; i <= puntos; i++) {
+    const a = (i / puntos) * Math.PI * 2;
+    const r = radio * (1 + 0.16 * Math.sin(a * lobulos + fase) + 0.08 * Math.sin(a * 7 + fase * 2) + (Math.random() - 0.5) * 0.06);
+    if (i === 0) f.moveTo(Math.cos(a) * r, Math.sin(a) * r); else f.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+  }
+  return f;
+}
+function friteVerde() {
+  const g = new THREE.Group();
+  const radio = 0.6 + Math.random() * 0.15;
+  const borde = new THREE.Mesh(new THREE.ShapeGeometry(contorno(radio * 1.07)), matBordeV());
+  borde.rotation.x = -Math.PI / 2; borde.position.y = 0.009;
+  const clara = new THREE.Mesh(new THREE.ShapeGeometry(contorno(radio)), matClaraV());
+  clara.rotation.x = -Math.PI / 2; clara.position.y = 0.015;
+  const yema = new THREE.Mesh(new THREE.SphereGeometry(0.2, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), matYemaV());
+  yema.scale.y = 0.55;
+  yema.position.set((Math.random() - 0.5) * 0.2, 0.017, (Math.random() - 0.5) * 0.2);
+  g.add(borde, clara, yema);
+  g.userData.yema = yema;
+  return g;
+}
+const tiraHuevo = g => g.traverse(o => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
 // Las llamas de un zombi que pisó la lava.
 const geoLlama = new THREE.ConeGeometry(0.22, 0.7, 7);
 const matLlama = new THREE.MeshBasicMaterial({ color: '#ff8a1c', transparent: true, opacity: 0.85, depthWrite: false });
@@ -166,21 +195,20 @@ export function crearZombis(escena, colisores, cb) {
   }
   function vacia() {
     for (const id of [...zs.keys()]) quita(id);
-    for (const h of huevos) { escena.remove(h.mesh); h.mesh.material.dispose(); }
+    for (const h of huevos) { escena.remove(h.mesh); tiraHuevo(h.mesh); }
     huevos.length = 0;
   }
 
   function ponHuevo(pos) {
-    const mesh = new THREE.Mesh(geometriaHuevo(), matHuevo.clone());
-    mesh.material.transparent = true;
+    const mesh = friteVerde();
     mesh.position.set(pos.x, Math.max(0, pos.y), pos.z);
-    mesh.rotation.set((Math.random() - 0.5) * 0.5, Math.random() * 6.28, (Math.random() - 0.5) * 0.5);
-    mesh.scale.setScalar(0.01);
+    mesh.rotation.y = Math.random() * 6.28;
+    mesh.scale.setScalar(0.2);
     escena.add(mesh);
     huevos.push({ mesh, t: 0, fase: Math.random() * 6 });
     while (huevos.length > HUEVOS_MAX) {
       const h = huevos.shift();
-      escena.remove(h.mesh); h.mesh.material.dispose();
+      escena.remove(h.mesh); tiraHuevo(h.mesh);
     }
   }
   function cae(z, killer, cab, a, explota) {
@@ -525,16 +553,18 @@ export function crearZombis(escena, colisores, cb) {
         if (ojo && z.mesh.position.distanceTo(ojo) < 30) cb.grunido(z.mesh.position);
       }
     }
-    // Los huevos verdes: aparecen de golpe, laten y se apagan a los 20 s.
+    // Los huevos fritos verdes: se extienden al caer, la yema late y se
+    // desvanecen a los 20 s.
     for (let i = huevos.length - 1; i >= 0; i--) {
       const h = huevos[i];
       h.t += dt;
-      const s = Math.min(1, h.t / 0.25) * 0.3;
-      h.mesh.scale.setScalar(Math.max(0.01, s));
-      h.mesh.material.emissiveIntensity = 0.7 + 0.3 * Math.sin(t * 4 + h.fase);
+      const c = Math.min(1, h.t * 3);
+      h.mesh.scale.setScalar(0.2 + 0.8 * (1 - Math.pow(1 - c, 3)));
+      h.mesh.userData.yema.material.emissiveIntensity = 0.6 + 0.3 * Math.sin(t * 4 + h.fase);
       const queda = HUEVO_VIDA - h.t;
-      h.mesh.material.opacity = Math.max(0, Math.min(1, queda / 3));
-      if (queda <= 0) { escena.remove(h.mesh); h.mesh.material.dispose(); huevos.splice(i, 1); }
+      const op = Math.max(0, Math.min(1, queda / 3));
+      h.mesh.traverse(o => { if (o.isMesh) o.material.opacity = op; });
+      if (queda <= 0) { escena.remove(h.mesh); tiraHuevo(h.mesh); huevos.splice(i, 1); }
     }
   }
 

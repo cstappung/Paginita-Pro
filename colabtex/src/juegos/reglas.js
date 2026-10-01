@@ -471,7 +471,10 @@ const REGLAS = {
         "Cada ronda trae más zombis, con más vida y más rápidos. Entran por los muros del borde y van por el que tengan más cerca; si te subes a la torre o a una plataforma, suben por la escala. Cada mordisco quita 40, y la vida se recupera sola si pasan cuatro segundos sin que te muerdan.",
         "Se parte con la sartén y la pistola. Cada golpe a un zombi da <b>10 puntos</b>, freírlo da 60, a la cabeza 100 y con la sartén 130.",
         "Los puntos de armas son <b>tiendas</b>: acércate y apriétale <b>E</b> para comprar el arma que vende cada uno (pistola 500, escopeta 1.000, metralleta 1.200, sniper 1.500, bazuca 2.500). Comprar una que ya tienes llena su munición a mitad de precio.",
-        "Si te comen, quedas fuera hasta que empieza la ronda siguiente: vuelves con la sartén y la pistola, y con tus puntos. Al empezar cada ronda, los que siguen en pie recuperan sus granadas.",
+        "Se puede jugar <b>solo</b>: quien abre la sala puede empezar sin esperar a nadie.",
+        "Si te quedas sin vida, <b>caes al suelo</b> con la pistola: te arrastras despacio y sigues disparando. Un compañero que se acerque y mantenga <b>E</b> cuatro segundos te levanta. Si pasan 30 segundos sin que nadie lo haga, mueres (y si no queda nadie en pie, en dos).",
+        "<b>Quick Revive</b> hace que levantes a tus compañeros en la mitad de tiempo. Jugando solo te levanta a ti mismo a los tres segundos de caer, una vez; sin él, solo, mueres en el acto.",
+        "Si mueres, quedas fuera hasta que empieza la ronda siguiente: vuelves con la sartén y la pistola, y con tus puntos. Al empezar cada ronda, los que siguen en pie recuperan sus granadas.",
         "La partida se acaba cuando caen <b>todos a la vez</b>. En la clasificación gana quien hizo más puntos en total, aunque los haya gastado.",
         "A los zombis los mueve el navegador del primer jugador de la sala. Si se va, los toma el siguiente, así que la partida sigue."
       ])]] }
