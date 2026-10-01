@@ -120,19 +120,21 @@ const MODALIDADES = {
   classic: "Clásico", arcade: "Arcade", portals: "Portales", reloj: "Contrarreloj",
   espejo: "Espejo", laberinto: "Laberinto",
   10: "del 1 al 10", 20: "del 1 al 20", 30: "del 1 al 30", rondas: "ronda máxima",
-  chico: "tablero chico", mediano: "tablero mediano", grande: "tablero grande", gigante: "tablero gigante"
+  chico: "tablero chico", mediano: "tablero mediano", grande: "tablero grande", gigante: "tablero gigante",
+  racha: "racha diaria", facil: "Fácil", medio: "Medio", dificil: "Difícil", 8: "8×8", 12: "12×12", 15: "15×15"
 };
 const CLUBS = {
   minas: { nombre: "Mina Club", juego: "Buscaminas", icono: "💣", ruta: "minas" },
   snake: { nombre: "Snake Club", juego: "Snake", icono: "🐍", ruta: "snake" },
   tetris: { nombre: "Tetris Club", juego: "Tetris", icono: "🧱", ruta: "tetris" },
   sortem: { nombre: "sortEm", juego: "sortEm", icono: "🔢", ruta: "sortem" },
-  bbtan: { nombre: "BBTAN", juego: "BBTAN", icono: "🟩", ruta: "bbtan" }
+  bbtan: { nombre: "BBTAN", juego: "BBTAN", icono: "🟩", ruta: "bbtan" },
+  sopa: { nombre: "Sopa de letras", juego: "Sopa de letras", icono: "🔤", ruta: "sopa" }
 };
 
 /* "club-snake-arcade-grande" → {club, modalidad: "Arcade · tablero grande"} */
 export function categoriaLegible(cat) {
-  const m = /^club-(minas|snake|tetris|sortem|bbtan)-(.+)$/.exec(String(cat || ""));
+  const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa)-(.+)$/.exec(String(cat || ""));
   if (!m) return null;
   return { club: CLUBS[m[1]], modalidad: m[2].split("-").map(k => MODALIDADES[k] || k).join(" · ") };
 }
@@ -144,7 +146,8 @@ const reloj = ms => {
 /* Lo que se lee de una marca: en el buscaminas y el sprint manda el
    tiempo (los puntos son fijos), en el resto los puntos. */
 export function marcaSolo(cat, f) {
-  if (/^club-minas-|^club-sortem-|^club-tetris-sprint$/.test(cat)) return `⏱️ ${reloj(f.tiempo)}`;
+  if (cat === "club-sopa-racha") return `🔥 ${f.puntos} ${f.puntos === 1 ? "día" : "días"} seguidos`;
+  if (/^club-minas-|^club-sortem-|^club-sopa-|^club-tetris-sprint$/.test(cat)) return `⏱️ ${reloj(f.tiempo)}`;
   if (/^club-bbtan-/.test(cat)) return `🟩 Ronda ${f.puntos}`;
   return `${Number(f.puntos).toLocaleString("es-CL")} pts`;
 }

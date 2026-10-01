@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Sopa de letras</title>
+  <link rel="stylesheet" href="../conexion.css?v=club-1">
+  <script src="../conexion.js?v=club-5"></script>
+  <style>
+    /* Claro por omisión; oscuro si el sistema lo pide o si Juegos lo manda
+       (conexion.js escribe data-tema en <html> dentro del iframe). */
+    :root{--bg:#f5f6fb;--panel:#ffffff;--ink:#1f2937;--muted:#6b7280;--line:#e2e5ee;--cell:#ffffff;--acento:#2563eb;--acento-ink:#fff;--sel:#2563eb;--ok:#15803d;color-scheme:light}
+    @media (prefers-color-scheme:dark){:root:not([data-tema=claro]){--bg:#11131c;--panel:#1b1f2c;--ink:#e6e9f2;--muted:#9aa3b5;--line:#2e3446;--cell:#202536;--acento:#7aa2ff;--acento-ink:#0c1020;--sel:#9db8ff;--ok:#6ee7a0;color-scheme:dark}}
+    :root[data-tema=oscuro]{--bg:#11131c;--panel:#1b1f2c;--ink:#e6e9f2;--muted:#9aa3b5;--line:#2e3446;--cell:#202536;--acento:#7aa2ff;--acento-ink:#0c1020;--sel:#9db8ff;--ok:#6ee7a0;color-scheme:dark}
+    [hidden]{display:none!important}
+    *{box-sizing:border-box}
+    html,body{margin:0}
+    body{background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+    .shell{max-width:980px;margin:0 auto;padding:16px}
+    .layout{display:grid;grid-template-columns:minmax(0,1fr) 285px;gap:24px;align-items:start}
+    .layout>aside:empty{display:none}
+    @media (max-width:850px){.layout{grid-template-columns:minmax(0,1fr)}}
+    .club-integrado body{background:transparent}
+    .club-ranking,.club-integrado .club-ranking{background:var(--panel);color:var(--ink);border-color:var(--line)}
+    .club-ranking button{background:var(--cell);color:var(--ink);border-color:var(--line)}
+    .club-volver{color:var(--muted)}
+
+    .cab{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:4px 0 12px}
+    .cab h1{margin:0;font-size:26px;letter-spacing:-.01em}
+    .racha{display:inline-flex;align-items:center;gap:6px;padding:4px 12px;border-radius:999px;background:#ff7a1a1f;color:#c2410c;font-weight:700;font-size:14px;border:1px solid #ff7a1a55}
+    :root[data-tema=oscuro] .racha{color:#ffb070}
+    @media (prefers-color-scheme:dark){:root:not([data-tema=claro]) .racha{color:#ffb070}}
+    .racha.cero{filter:grayscale(1);opacity:.75}
+    .racha small{font-weight:500;opacity:.8}
+
+    .modos{display:inline-flex;padding:3px;border-radius:12px;background:var(--panel);border:1px solid var(--line);margin-bottom:10px}
+    .modos button{border:0;background:none;color:var(--muted);font-family:inherit;font-weight:600;font-size:14px;padding:7px 16px;border-radius:9px;cursor:pointer}
+    .modos button[aria-selected=true]{background:var(--acento);color:var(--acento-ink)}
+    .info{margin:0 0 10px;color:var(--muted)}
+    .info b{color:var(--ink)}
+    .selectores{display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin-bottom:12px}
+    .selectores label{display:grid;gap:3px;font-size:12px;color:var(--muted);font-weight:600}
+    select,.boton{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:7px 10px}
+    .boton{cursor:pointer;font-weight:600}
+    .boton.primario{background:var(--acento);border-color:var(--acento);color:var(--acento-ink)}
+    :focus-visible{outline:3px solid var(--acento);outline-offset:2px}
+
+    .marcador{display:flex;justify-content:space-between;width:min(520px,100%);margin:0 auto 6px;color:var(--muted);font-variant-numeric:tabular-nums;font-weight:600}
+    /* La grilla mide hasta 520 px y las letras escalan con su ancho
+       (unidades cqi) y con el número de columnas. */
+    .tablero{position:relative;width:min(520px,100%);aspect-ratio:1;margin:0 auto;container-type:inline-size;touch-action:none;user-select:none;-webkit-user-select:none;cursor:pointer;background:var(--cell);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+    .tablero.quieto{cursor:default}
+    .tablero svg{position:absolute;inset:0;width:100%;height:100%}
+    .grilla{position:absolute;inset:0;display:grid;grid-template-columns:repeat(var(--n),1fr);grid-template-rows:repeat(var(--n),1fr)}
+    .grilla span{display:grid;place-items:center;font-weight:700;font-size:calc(100cqi / var(--n) * .52);line-height:1}
+    .grilla span.en-sel{color:var(--sel)}
+
+    .lista{list-style:none;padding:0;margin:14px auto 0;width:min(520px,100%);display:flex;flex-wrap:wrap;gap:6px 8px;justify-content:center}
+    .lista li{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;border:1px solid var(--line);background:var(--panel);font-weight:600;font-size:13px;letter-spacing:.04em}
+    .lista li i{width:9px;height:9px;border-radius:50%;background:var(--line)}
+    .lista li.hecha{color:var(--muted);text-decoration:line-through;text-decoration-thickness:2px}
+    .lista li.hecha i{background:var(--c)}
+
+    .aviso{width:min(520px,100%);margin:14px auto 0;padding:14px 16px;border-radius:12px;background:var(--panel);border:1px solid var(--line);text-align:center}
+    .aviso strong{display:block;font-size:18px;color:var(--ok);margin-bottom:2px}
+    .aviso .boton{margin-top:8px}
+    .nota{width:min(520px,100%);margin:16px auto 0;font-size:12px;color:var(--muted);text-align:center}
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="layout">
+      <main>
+        <div class="cab">
+          <h1>Sopa de letras</h1>
+          <span id="racha" class="racha" title="Días seguidos completando la sopa diaria">🔥 0 días</span>
+        </div>
+        <div class="modos" role="tablist" aria-label="Modo de juego">
+          <button type="button" role="tab" data-modo="diaria">Diaria</button>
+          <button type="button" role="tab" data-modo="libre">Libre</button>
+        </div>
+        <p id="info" class="info"></p>
+        <div id="selectores" class="selectores" hidden>
+          <label>Temática<select id="selTema"></select></label>
+          <label>Dificultad<select id="selDif">
+            <option value="facil">Fácil · → ↓</option>
+            <option value="medio" selected>Medio · + diagonales</option>
+            <option value="dificil">Difícil · 8 direcciones</option>
+          </select></label>
+          <label>Tamaño<select id="selTam">
+            <option value="8">Pequeño · 8×8</option>
+            <option value="12" selected>Mediano · 12×12</option>
+            <option value="15">Grande · 15×15</option>
+          </select></label>
+          <button type="button" id="nueva" class="boton primario">Nueva sopa</button>
+        </div>
+        <div class="marcador"><span id="reloj">0:00</span><span id="cuenta">0 / 0</span></div>
+        <div id="tablero" class="tablero" role="application" aria-label="Sopa de letras: arrastra en línea recta sobre una palabra">
+          <svg id="trazos" aria-hidden="true"></svg>
+          <div id="grilla" class="grilla"></div>
+        </div>
+        <ul id="lista" class="lista" aria-label="Palabras por encontrar"></ul>
+        <div id="aviso" class="aviso" role="status" aria-live="polite" hidden></div>
+        <p class="nota" id="nota">La racha cuenta solo la sopa diaria y se guarda en este navegador.</p>
+      </main>
+      <aside></aside>
+    </div>
+  </div>
+  <script src="motor.js?v=sopa-1"></script>
+  <script src="game.js?v=sopa-1"></script>
+</body>
+</html>

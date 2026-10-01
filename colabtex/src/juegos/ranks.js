@@ -30,7 +30,7 @@ const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
 /* Los tres metales, en el orden del puesto. */
 const METAL = ["oro", "plata", "bronce"];
 const TITULO = ["Campeón", "Subcampeón", "Tercer puesto"];
-const EXTRA = { minas: { nombre: "Mina Club", color: "#eeb765" }, snake: { nombre: "Snake Club", color: "#4be9bc" }, tetrisclub: { nombre: "Tetris Club", color: "#b04ee8" }, sortem: { nombre: "sortEm", color: "#ff006e" }, bbtan: { nombre: "BBTAN", color: "#c4f568" } };
+const EXTRA = { minas: { nombre: "Mina Club", color: "#eeb765" }, snake: { nombre: "Snake Club", color: "#4be9bc" }, tetrisclub: { nombre: "Tetris Club", color: "#b04ee8" }, sortem: { nombre: "sortEm", color: "#ff006e" }, bbtan: { nombre: "BBTAN", color: "#c4f568" }, sopa: { nombre: "Sopa de letras", color: "#5b8cff" } };
 
 /* Las categorías de los juegos individuales, como botones y no como un
    desplegable: son pocas, se leen de un vistazo y cambiar de una a otra
@@ -46,6 +46,12 @@ const SOLO = {
     cat: s => `club-sortem-${s.n}` },
   bbtan: { filas: [{ k: "n", t: "Récord", ops: [["rondas", "Ronda máxima"]] }],
     cat: s => `club-bbtan-${s.n}` },
+  /* La racha diaria es una tabla sola; las libres van por dificultad y
+     tamaño, y con «Racha diaria» elegida el tamaño no cuenta. */
+  sopa: { filas: [
+      { k: "m", t: "Tabla", ops: [["racha", "Racha diaria"], ["facil", "Libre · Fácil"], ["medio", "Libre · Medio"], ["dificil", "Libre · Difícil"]] },
+      { k: "t", t: "Tamaño", ops: [["8", "8×8"], ["12", "12×12"], ["15", "15×15"]], si: e => e.m !== "racha" }],
+    cat: s => s.m === "racha" ? "club-sopa-racha" : `club-sopa-${s.m}-${s.t}`, def: { t: "12" } },
   snake: { filas: [
       { k: "m", t: "Modo", ops: [["classic", "Clásico"], ["arcade", "Arcade"], ["portals", "Portales"], ["reloj", "Contrarreloj"], ["espejo", "Espejo"], ["laberinto", "Laberinto"]] },
       { k: "t", t: "Mapa", ops: [["chico", "Chico"], ["mediano", "Mediano"], ["grande", "Grande"], ["gigante", "Gigante"]] }],
@@ -245,11 +251,14 @@ export function crearRanks(ctx) {
   /* Lo que se compara en esta tabla, y cómo se dice. Las del club de
      buscaminas se ganan por tiempo (menos es mejor); el resto, por puntos. */
   function medida(solo) {
-    if (solo && (categoriaSolo.startsWith("club-minas-") || categoriaSolo.startsWith("club-sortem-") || categoriaSolo === "club-tetris-sprint"))
+    if (solo && (categoriaSolo.startsWith("club-minas-") || categoriaSolo.startsWith("club-sortem-") || categoriaSolo === "club-tetris-sprint" ||
+        (categoriaSolo.startsWith("club-sopa-") && categoriaSolo !== "club-sopa-racha")))
       return { valor: f => (f.tiempo || 0) / 1000, txt: v => `${v.toFixed(2)} s`, unidad: "", menor: true };
     /* BBTAN se mide en rondas alcanzadas, no en puntos. */
     if (solo && categoriaSolo.startsWith("club-bbtan-"))
       return { valor: f => f.puntos || 0, txt: v => `ronda ${v}`, unidad: "", menor: false };
+    if (solo && categoriaSolo === "club-sopa-racha")
+      return { valor: f => f.puntos || 0, txt: v => `${v} ${v === 1 ? "día" : "días"}`, unidad: "", menor: false };
     return { valor: f => f.puntos || 0, txt: v => String(v), unidad: "pts", menor: false };
   }
 
@@ -350,9 +359,13 @@ export function crearRanks(ctx) {
     return e;
   }
 
+  /* Una fila con `si` solo aparece cuando tiene sentido (el tamaño de la
+     sopa no cuenta en la tabla de la racha). */
+  const visibles = (d, e) => d.filas.filter(f => !f.si || f.si(e));
+
   function subtitulo() {
     const d = SOLO[juego], e = eleccion[juego];
-    return d && e ? d.filas.map(f => (f.ops.find(o => o[0] === e[f.k]) || [])[1]).join(" · ") : "";
+    return d && e ? visibles(d, e).map(f => (f.ops.find(o => o[0] === e[f.k]) || [])[1]).join(" · ") : "";
   }
 
   function pintaCategorias() {
@@ -360,7 +373,7 @@ export function crearRanks(ctx) {
     if (!el) return;
     if (!esSolo(juego)) { el.innerHTML = ""; return; }
     const d = SOLO[juego], e = elige(juego);
-    el.innerHTML = `<div class="jg-rk-cats" style="--c:${EXTRA[juego].color}">${d.filas.map(f =>
+    el.innerHTML = `<div class="jg-rk-cats" style="--c:${EXTRA[juego].color}">${visibles(d, e).map(f =>
       `<div class="jg-rk-fila"><span>${f.t}</span><div class="jg-rk-seg" role="group" aria-label="${f.t}">${f.ops.map(([v, t]) =>
         `<button type="button" class="${e[f.k] === v ? "on" : ""}" aria-pressed="${e[f.k] === v}" data-cat-k="${f.k}" data-cat-v="${v}">${t}</button>`).join("")}</div></div>`).join("")}</div>`;
   }

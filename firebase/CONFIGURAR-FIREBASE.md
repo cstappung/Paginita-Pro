@@ -91,6 +91,10 @@ de cara.
 
 ## 1. Reglas de Realtime Database (IMPORTANTE)
 
+> **Sopa de letras (octubre de 2026):** sus clasificaciones (`club-sopa-…`)
+> son categorías nuevas de `soloRanks`. Hasta volver a publicar las reglas, el
+> juego funciona igual, pero los récords se quedan en el dispositivo.
+
 Tu base de datos está ahora en **modo de prueba** (abierta a cualquiera).
 Antes de publicar el sitio:
 
