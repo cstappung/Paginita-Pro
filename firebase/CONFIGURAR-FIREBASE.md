@@ -100,6 +100,12 @@ de cara.
 > son categorías nuevas de `soloRanks`. Hasta volver a publicar las reglas, el
 > juego funciona igual, pero los récords se quedan en el dispositivo.
 
+> **Electrodle (octubre de 2026):** `club-electro-racha` y
+> `club-electro-puntos` son categorías nuevas de `soloRanks` (los puntos, con
+> tope de 1 000 000 en vez de 100 000). Hasta volver a publicar las reglas, el
+> juego funciona igual, pero los récords se quedan en el dispositivo y se
+> sincronizan solos la próxima vez que se abra después de publicarlas.
+
 Tu base de datos está ahora en **modo de prueba** (abierta a cualquiera).
 Antes de publicar el sitio:
 

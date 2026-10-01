@@ -14,7 +14,7 @@ export const MONEDA = '<svg class="jg-moneda" viewBox="0 0 20 20" aria-hidden="t
 
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const NOMBRES_CLUB = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras" };
+const NOMBRES_CLUB = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle" };
 const PARTES = [
   ["partidas", "🎮", "Partidas", "5 por partida de sala, por el peso del juego"],
   ["victorias", "🏆", "Victorias", "15 por victoria y 5 por empate, por el peso"],
@@ -79,7 +79,7 @@ export function crearMonedas({ uid, datos, perfil, colorDe }) {
           <h3>Récords del club</h3>
           <p>Una vez por cada modalidad en la que tengas marca (mejorarla no vuelve a pagar):</p>
           <ul class="jg-mo-pesos">${Object.entries(RECORD).map(([j, v]) => `<li><span>${NOMBRES_CLUB[j] || j}</span><b>${v} ${MONEDA}</b></li>`).join("")}</ul>
-          <p>Además, BBTAN paga 1 por cada 2 rondas de tu récord, y la Sopa diaria 10 por cada día de tu mejor racha.</p>
+          <p>Además, BBTAN paga 1 por cada 2 rondas de tu récord, la Sopa diaria y Electrodle 10 por cada día de tu mejor racha, y Electrodle 1 más por cada 50 puntos.</p>
           <h3>Días seguidos</h3>
           <p>Cada día en que terminas una partida (de sala o del club) paga ${pagoDia(1)}, y la racha suma 5 por día hasta ${pagoDia(9)} desde el noveno. Si un día no juegas, vuelve a ${pagoDia(1)}. El día cambia a medianoche de Chile.</p>
         </section>

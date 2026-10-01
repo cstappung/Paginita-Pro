@@ -2816,6 +2816,41 @@ matter:
   fila's `si`). The `soloRanks` regex was widened, so the rules must be
   re-published.
 
+**Electrodle (`juegos/club/electro/`) is a Solo Club game too**, a daily
+guessing game in the vein of Pokedle/Wordle on electrical things, on the same
+`conexion.js` protocol: plain files, no build (`?v=electro-N` on its four
+scripts). `datos.js` holds the three catalogues (43 components, 48 people, 46
+formulas, each with an `alias` list for search: «condensador», «termocupla»),
+`simbolos.js` hand-drawn schematic symbols in a 120 x 80 box, and `motor.js`
+(UMD `ElectroMotor`, tested by `tests/electro.test.cjs`) everything pure.
+Things that matter:
+
+- **Four modes a day.** Componente and Científico are attribute tables
+  (green equal, yellow «something in common» for list columns, red different,
+  with an up/down arrow on numbers and on the ordered `EPOCAS`). Fórmula shows
+  the formula with every variable masked and uncovers one per miss, in an order
+  seeded by the formula id. Símbolo starts zoomed x5 on the symbol's `foco` and
+  steps out through `ZOOM` on each miss. Hints unlock by misses (`pistas`).
+- **The daily target depends only on the Chile date**, like the Sopa:
+  each pass through a catalogue is a seeded shuffle (`vuelta`), so nothing
+  repeats until all came out, and a pass never starts with the previous one's
+  last. Símbolo only draws components that have a symbol. Práctica is random
+  and scores nothing.
+- **Scoring.** A mode is worth `puntosDe(n)` = 100 at the first try, 10 less
+  per extra try, never below 10. The saved state is
+  `{hist: {fecha: {modo: [puntos, intentos, ms]}}, prog}`; points, total time,
+  streak (days with all four modes) and best streak are all derived from
+  `hist`, so `mezcla` (union by day and mode) is all a second device needs.
+  It lives in `localStorage` under `Club.storageKey` and in
+  `users/<uid>/club/electro` through `Club.guardarPartida`.
+- **Ranking.** `club-electro-puntos` has `puntos` = the running total (it only
+  grows, so every solved mode is a new record) and `tiempo` = total solving
+  time; `club-electro-racha` is sent when the fourth mode of a day is solved.
+  Both feed the podium announcement on Discord, logros (`deMarca`) and coins
+  (`extraRecord`: 10 per streak day, 1 per 50 points). The `soloRanks` regex
+  was widened and `club-electro-puntos` got a 1 000 000 cap, so the rules must
+  be re-published.
+
 **UNO No Mercy's roulette is played by its victim**: the victim picks the
 colour (not whoever threw the card) and then draws one card at a time with
 the button until that colour comes out.

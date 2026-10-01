@@ -80,7 +80,7 @@ const FABRICAS = {
 const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞" };
 /* Los clubes de un jugador, con sus claves de la clasificación y los
    mismos signos que llevan en su tarjeta del vestíbulo. */
-const ICONO_TODOS = { ...ICONO, general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤" };
+const ICONO_TODOS = { ...ICONO, general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡" };
 
 /* Lo que puede elegir quien abre la sala, por juego. Vive aquí y no en
    `motor.js` porque son controles y no reglas: el motor ya recorta lo
@@ -208,7 +208,7 @@ function leePopular() {
 }
 /* Los de un jugador, con su clave de popularidad. Cuentan como juegos en
    la marquesina: el «18» fijo de antes se quedó atrás con cada club. */
-const CLUBES = ["club-minas", "club-snake", "club-tetris", "club-sortem", "club-bbtan", "club-sopa"];
+const CLUBES = ["club-minas", "club-snake", "club-tetris", "club-sortem", "club-bbtan", "club-sopa", "club-electro"];
 function ordenPopular(claves) {
   const n = state.popular, pos = Object.fromEntries(claves.map((k, i) => [k, i]));
   return claves.slice().sort((a, b) => (n[b] || 0) - (n[a] || 0) || pos[a] - pos[b]);
@@ -579,7 +579,7 @@ function celebra(juego, id) {
    barra de direcciones. */
 function leerRuta() {
   const h = (location.hash || "").replace(/^#/, "");
-  if (/^solo\/(minas|snake|tetris|sortem|bbtan|sopa)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
+  if (/^solo\/(minas|snake|tetris|sortem|bbtan|sopa|electro)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
   if (h === "ranks") return { vista: "ranks", pid: "" };
   if (h === "logros") return { vista: "logros", pid: "" };
   if (h === "monedas") return { vista: "monedas", pid: "" };
@@ -930,7 +930,7 @@ function armazon() {
     individual.montar(h);
     const juego = state.vista.slice(5), barra = document.createElement("div");
     barra.className = "jg-solo-barra";
-    barra.innerHTML = `<a class="btn2" href="#">← Juegos</a><div class="jg-solo-titulo"><small>UN JUGADOR · RANKING POR MODALIDAD</small><strong>${juego === "minas" ? "Buscaminas" : juego === "tetris" ? "Tetris" : juego === "sortem" ? "sortEm" : juego === "bbtan" ? "BBTAN" : juego === "sopa" ? "Sopa de letras" : "Snake"}</strong></div><nav aria-label="Juegos individuales"><a class="btn2${juego === "minas" ? " on" : ""}" href="#solo/minas">Buscaminas</a><a class="btn2${juego === "snake" ? " on" : ""}" href="#solo/snake">Snake</a><a class="btn2${juego === "tetris" ? " on" : ""}" href="#solo/tetris">Tetris</a><a class="btn2${juego === "sortem" ? " on" : ""}" href="#solo/sortem">sortEm</a><a class="btn2${juego === "bbtan" ? " on" : ""}" href="#solo/bbtan">BBTAN</a><a class="btn2${juego === "sopa" ? " on" : ""}" href="#solo/sopa">Sopa</a><button class="btn2" type="button">📖 Reglas</button></nav>`;
+    barra.innerHTML = `<a class="btn2" href="#">← Juegos</a><div class="jg-solo-titulo"><small>UN JUGADOR · RANKING POR MODALIDAD</small><strong>${juego === "minas" ? "Buscaminas" : juego === "tetris" ? "Tetris" : juego === "sortem" ? "sortEm" : juego === "bbtan" ? "BBTAN" : juego === "sopa" ? "Sopa de letras" : juego === "electro" ? "Electrodle" : "Snake"}</strong></div><nav aria-label="Juegos individuales"><a class="btn2${juego === "minas" ? " on" : ""}" href="#solo/minas">Buscaminas</a><a class="btn2${juego === "snake" ? " on" : ""}" href="#solo/snake">Snake</a><a class="btn2${juego === "tetris" ? " on" : ""}" href="#solo/tetris">Tetris</a><a class="btn2${juego === "sortem" ? " on" : ""}" href="#solo/sortem">sortEm</a><a class="btn2${juego === "bbtan" ? " on" : ""}" href="#solo/bbtan">BBTAN</a><a class="btn2${juego === "sopa" ? " on" : ""}" href="#solo/sopa">Sopa</a><a class="btn2${juego === "electro" ? " on" : ""}" href="#solo/electro">Electrodle</a><button class="btn2" type="button">📖 Reglas</button></nav>`;
     barra.querySelector("button").onclick = () => abreReglas(juego === "tetris" ? "tetrisclub" : juego);
     h.insertBefore(barra, h.firstChild);
     return;
@@ -945,7 +945,7 @@ function armazon() {
     h.innerHTML = "";
     logrosVista = crearLogros({ uid: state.user.uid, watchLogros: fb.watchLogros, perfil: perfilDe, icono: ICONO_TODOS,
       orden: () => ordenPopular([...Object.keys(JUEGOS), ...CLUBES])
-        .map(k => ({ "club-minas": "minas", "club-snake": "snake", "club-tetris": "tetrisclub", "club-sortem": "sortem", "club-bbtan": "bbtan", "club-sopa": "sopa" })[k] || k) });
+        .map(k => ({ "club-minas": "minas", "club-snake": "snake", "club-tetris": "tetrisclub", "club-sortem": "sortem", "club-bbtan": "bbtan", "club-sopa": "sopa", "club-electro": "electro" })[k] || k) });
     logrosVista.montar(h);
     return;
   }
@@ -1084,7 +1084,7 @@ function armazon() {
           </div></div>
         <div class="jg-elige" id="vesElige"></div>
         <div class="jg-section-title"><h2>Para jugar solo</h2><span>sin sala, cuando quieras</span></div>
-        <div class="sp-entradas"><a href="#solo/minas" class="sp-entrada sp-e-minas"><small>SINGLEPLAYER / ESTRATEGIA</small><strong>MINA CLUB <span>✦</span></strong><p>Piensa, explora y florece. Tres dificultades y música progresiva.</p><b>Explorar →</b></a><a href="#solo/snake" class="sp-entrada sp-e-snake"><small>SINGLEPLAYER / REFLEJOS</small><strong>SNAKE CLUB <span>ϟ</span></strong><p>Siete modos —contrarreloj, espejo, laberinto…— y cuatro tamaños de mapa.</p><b>Entrar al circuito →</b></a><a href="#solo/tetris" class="sp-entrada sp-e-tetris"><small>SINGLEPLAYER / REFLEJOS</small><strong>TETRIS CLUB <span>▤</span></strong><p>Maratón, Sprint de 40 líneas y Ultra de dos minutos.</p><b>Apilar →</b></a><a href="#solo/sortem" class="sp-entrada sp-e-sortem"><small>PLATANUS HACK 25 / PUZZLE</small><strong>sortEm <span>↔</span></strong><p>Mueve y fusiona los bloques hasta ordenar del 1 al 10 o al 20. Ranking por tiempo.</p><b>Ordenar →</b></a><a href="#solo/bbtan" class="sp-entrada sp-e-bbtan"><small>SINGLEPLAYER / ARCADE</small><strong>BBTAN <span>●</span></strong><p>Apunta, rebota y rompe los bloques antes de que lleguen abajo. Ranking por ronda máxima.</p><b>Lanzar →</b></a><a href="#solo/sopa" class="sp-entrada sp-e-sopa"><small>SINGLEPLAYER / PALABRAS</small><strong>SOPA DE LETRAS <span>🔤</span></strong><p>Una sopa diaria igual para todos, con racha de días seguidos, y sopas libres por temática.</p><b>Buscar →</b></a><a href="juegos/worms/index.html?v=worms-4" class="sp-entrada sp-e-worms"><small>LOCAL · BOTS / ARTILLERÍA</small><strong>CIRCUIT BREAKERS <span>💥</span></strong><p>Tu cuadrilla contra bots o amigos en el mismo equipo. En línea: abre una sala arriba.</p><b>Desplegar →</b></a></div>
+        <div class="sp-entradas"><a href="#solo/minas" class="sp-entrada sp-e-minas"><small>SINGLEPLAYER / ESTRATEGIA</small><strong>MINA CLUB <span>✦</span></strong><p>Piensa, explora y florece. Tres dificultades y música progresiva.</p><b>Explorar →</b></a><a href="#solo/snake" class="sp-entrada sp-e-snake"><small>SINGLEPLAYER / REFLEJOS</small><strong>SNAKE CLUB <span>ϟ</span></strong><p>Siete modos —contrarreloj, espejo, laberinto…— y cuatro tamaños de mapa.</p><b>Entrar al circuito →</b></a><a href="#solo/tetris" class="sp-entrada sp-e-tetris"><small>SINGLEPLAYER / REFLEJOS</small><strong>TETRIS CLUB <span>▤</span></strong><p>Maratón, Sprint de 40 líneas y Ultra de dos minutos.</p><b>Apilar →</b></a><a href="#solo/sortem" class="sp-entrada sp-e-sortem"><small>PLATANUS HACK 25 / PUZZLE</small><strong>sortEm <span>↔</span></strong><p>Mueve y fusiona los bloques hasta ordenar del 1 al 10 o al 20. Ranking por tiempo.</p><b>Ordenar →</b></a><a href="#solo/bbtan" class="sp-entrada sp-e-bbtan"><small>SINGLEPLAYER / ARCADE</small><strong>BBTAN <span>●</span></strong><p>Apunta, rebota y rompe los bloques antes de que lleguen abajo. Ranking por ronda máxima.</p><b>Lanzar →</b></a><a href="#solo/sopa" class="sp-entrada sp-e-sopa"><small>SINGLEPLAYER / PALABRAS</small><strong>SOPA DE LETRAS <span>🔤</span></strong><p>Una sopa diaria igual para todos, con racha de días seguidos, y sopas libres por temática.</p><b>Buscar →</b></a><a href="#solo/electro" class="sp-entrada sp-e-electro"><small>SINGLEPLAYER / DIARIO · NUEVO</small><strong>ELECTRODLE <span>⚡</span></strong><p>Adivina el componente, el científico, la fórmula y el símbolo eléctrico del día. Puntos, racha y podio.</p><b>Adivinar →</b></a><a href="juegos/worms/index.html?v=worms-4" class="sp-entrada sp-e-worms"><small>LOCAL · BOTS / ARTILLERÍA</small><strong>CIRCUIT BREAKERS <span>💥</span></strong><p>Tu cuadrilla contra bots o amigos en el mismo equipo. En línea: abre una sala arriba.</p><b>Desplegar →</b></a></div>
       </div>
     </div>`;
   for (const b of h.querySelectorAll("[data-filtro]")) {

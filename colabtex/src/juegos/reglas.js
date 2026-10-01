@@ -690,6 +690,25 @@ const REGLAS = {
       ["Racha y clasificación", "La 🔥 racha cuenta los días seguidos que completas la sopa diaria: si ayer la hiciste, hoy sube uno; si te saltas un día, vuelve a empezar. Se guarda en tu navegador y, jugando con tu sesión, también en tu cuenta. En la Clasificación compite la mejor racha y, en el modo libre, el tiempo de cada dificultad y tamaño."]
     ]
   },
+  electro: {
+    lema: "Electrodle: adivina el componente, el científico, la fórmula y el símbolo eléctrico del día.",
+    secciones: [
+      ["Cómo se juega", "Escribe en el buscador y elige de la lista. Los intentos son ilimitados: cada uno te da información para el siguiente, y el modo termina cuando aciertas."],
+      ["Los cuatro modos", lista([
+        "<b>Componente</b>: cada intento muestra una fila con su familia, sus funciones, cuántos terminales tiene su encapsulado típico, si es polarizado, su designador en un esquemático (R, C, Q…) y su época.",
+        "<b>Científico</b>: lo mismo con personas de la historia de la electricidad: nacionalidad, años de nacimiento y muerte, área, si una unidad lleva su nombre y si ganó el Nobel.",
+        "<b>Fórmula</b>: ves la fórmula con las variables tapadas. Cada intento fallido destapa una y, con más fallos, llegan pistas: el área y la inicial.",
+        "<b>Símbolo</b>: ves un trozo del símbolo esquemático muy ampliado. Cada intento fallido aleja la vista hasta mostrarlo entero."
+      ])],
+      ["Los colores", lista([
+        "<b>Verde</b>: igual al correcto.",
+        "<b>Amarillo</b>: en las columnas con varios valores (funciones, nacionalidad, área), tienen algo en común pero no todo.",
+        "<b>Rojo</b>: distinto. En los números y en la época, la flecha ↑ o ↓ dice si el correcto es mayor o menor."
+      ])],
+      ["Diario y práctica", "El <b>Diario</b> es el mismo para todo el sitio y cambia a medianoche de Chile. La <b>Práctica</b> elige al azar, cuantas veces quieras, y no suma puntos."],
+      ["Puntos, racha y clasificación", "Cada modo del diario vale 100 puntos a la primera y 10 menos por cada intento extra, nunca menos de 10. Los puntos se acumulan día a día. La 🔥 racha cuenta los días seguidos en que completas los cuatro modos. En la Clasificación compiten los puntos totales y la racha; en empate gana quien tardó menos. Subir al podio se anuncia en Discord."]
+    ]
+  },
   snake: {
     lema: "Snake Club: la serpiente de siempre, en siete modos y cuatro tamaños.",
     secciones: [
@@ -708,7 +727,7 @@ const REGLAS = {
   }
 };
 
-const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras" };
+const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle" };
 
 export const tieneReglas = juego => Object.prototype.hasOwnProperty.call(REGLAS, juego);
 
