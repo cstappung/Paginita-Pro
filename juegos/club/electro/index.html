@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Electrodle</title>
+  <link rel="stylesheet" href="../conexion.css?v=club-1">
+  <script src="../conexion.js?v=club-6"></script>
+  <style>
+    /* Claro por omisión; oscuro si el sistema lo pide o si Juegos lo manda
+       (conexion.js escribe data-tema en <html> dentro del iframe). */
+    :root{--bg:#f3f5fa;--panel:#ffffff;--panel2:#f7f8fc;--ink:#172033;--muted:#5f6b82;--line:#dfe4ee;--acento:#e08a00;--acento2:#0b8fc7;--acento-ink:#fff;
+      --si:#1e9a55;--casi:#c99300;--no:#c8423b;--celda-ink:#fff;--traza:#0b8fc7;color-scheme:light}
+    @media (prefers-color-scheme:dark){:root:not([data-tema=claro]){--bg:#0c1120;--panel:#151c2e;--panel2:#1a2338;--ink:#e6ebf5;--muted:#93a0b9;--line:#283350;--acento:#fbbf24;--acento2:#38bdf8;--acento-ink:#141414;
+      --si:#1f9d57;--casi:#c49a06;--no:#c94640;--traza:#38bdf8;color-scheme:dark}}
+    :root[data-tema=oscuro]{--bg:#0c1120;--panel:#151c2e;--panel2:#1a2338;--ink:#e6ebf5;--muted:#93a0b9;--line:#283350;--acento:#fbbf24;--acento2:#38bdf8;--acento-ink:#141414;
+      --si:#1f9d57;--casi:#c49a06;--no:#c94640;--traza:#38bdf8;color-scheme:dark}
+    [hidden]{display:none!important}
+    *{box-sizing:border-box}
+    html,body{margin:0}
+    body{background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+    .shell{max-width:1060px;margin:0 auto;padding:16px}
+    .layout{display:grid;grid-template-columns:minmax(0,1fr) 285px;gap:24px;align-items:start}
+    .layout>aside:empty{display:none}
+    @media (max-width:850px){.layout{grid-template-columns:minmax(0,1fr)}}
+    .club-integrado body{background:transparent}
+    .club-ranking,.club-integrado .club-ranking{background:var(--panel);color:var(--ink);border-color:var(--line)}
+    .club-ranking button{background:var(--panel2);color:var(--ink);border-color:var(--line)}
+    .club-volver{color:var(--muted)}
+    :focus-visible{outline:3px solid var(--acento2);outline-offset:2px}
+    button{font:inherit;color:inherit}
+
+    /* ---------- cabecera ---------- */
+    .cab{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:2px 0 14px}
+    .logo{display:flex;align-items:center;gap:10px;margin:0}
+    .logo svg{width:42px;height:42px;flex:none}
+    .logo h1{margin:0;font-size:28px;line-height:1;letter-spacing:.02em;font-weight:900}
+    .logo h1 span{color:var(--acento)}
+    .logo small{display:block;font-size:11px;letter-spacing:.14em;color:var(--muted);font-weight:700;margin-top:4px}
+    .traza{fill:none;stroke:var(--traza);stroke-width:2;stroke-linecap:round;stroke-dasharray:60;animation:barre 2.6s linear infinite}
+    @keyframes barre{from{stroke-dashoffset:120}to{stroke-dashoffset:0}}
+    .chips{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}
+    .chip{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;font-weight:800;font-size:14px;border:1px solid var(--line);background:var(--panel);font-variant-numeric:tabular-nums}
+    .chip small{font-weight:600;color:var(--muted)}
+    .chip.racha.cero{filter:grayscale(1);opacity:.7}
+
+    /* ---------- tipo y modos ---------- */
+    .tipo{display:inline-flex;padding:3px;border-radius:12px;background:var(--panel);border:1px solid var(--line);margin-bottom:10px}
+    .tipo button{border:0;background:none;color:var(--muted);font-weight:700;font-size:14px;padding:7px 16px;border-radius:9px;cursor:pointer}
+    .tipo button[aria-selected=true]{background:var(--ink);color:var(--bg)}
+    .modos{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:14px}
+    .modo{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 6px 9px;border-radius:14px;border:1px solid var(--line);background:var(--panel);cursor:pointer;transition:transform .15s,border-color .15s}
+    .modo:hover{transform:translateY(-2px)}
+    .modo .ico{font-size:22px;line-height:1.1}
+    .modo b{font-size:13px}
+    .modo i{font-style:normal;font-size:11px;color:var(--muted);font-weight:600}
+    .modo[aria-selected=true]{border-color:var(--acento);box-shadow:0 0 0 2px color-mix(in srgb,var(--acento) 35%,transparent)}
+    .modo.ok i{color:var(--si)}
+    @media (max-width:480px){.modos{gap:6px}.modo{padding:8px 3px 7px}.modo b{font-size:11px;max-width:100%;overflow:hidden;text-overflow:ellipsis}.modo i{font-size:10px}.modo .ico{font-size:19px}}
+
+    /* ---------- panel ---------- */
+    .panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px}
+    .consigna{margin:0 0 12px;color:var(--muted)}
+    .consigna b{color:var(--ink)}
+    .visual{display:grid;place-items:center;margin:0 0 12px;padding:18px 10px;border-radius:14px;background:var(--panel2);border:1px solid var(--line);min-height:120px;position:relative;overflow:hidden}
+    .visual::before{content:"";position:absolute;inset:0;background-image:radial-gradient(color-mix(in srgb,var(--muted) 28%,transparent) 1px,transparent 1.2px);background-size:16px 16px;opacity:.55;pointer-events:none}
+    .visual>*{position:relative}
+    .zoom{position:absolute;top:8px;right:10px;font:700 12px/1 ui-monospace,Consolas,monospace;color:var(--muted);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:4px 6px}
+
+    /* La fórmula, escrita con HTML: fracciones en columna y raíces con techo. */
+    .formula{font:400 clamp(22px,5.4vw,34px)/1.2 "Cambria Math","STIX Two Math","Latin Modern Math","Times New Roman",serif;display:flex;align-items:center;flex-wrap:wrap;justify-content:center;gap:.08em .14em;text-align:center}
+    .formula i{font-style:italic}
+    .formula sub,.formula sup{font-size:.6em;font-style:normal}
+    .formula .op{margin:0 .12em}
+    .formula .lit{font-style:normal}
+    /* inline-block y no flex: dentro de un flex, vertical-align no sube el exponente. */
+    .formula .var{display:inline-block;white-space:nowrap}
+    .formula sup{vertical-align:.55em;line-height:0}.formula sub{vertical-align:-.3em;line-height:0}
+    .formula .tapa{display:inline-grid;place-items:center;min-width:1.05em;height:1.15em;border-radius:.18em;background:var(--acento);color:var(--acento-ink);font:800 .62em/1 system-ui,sans-serif;vertical-align:middle}
+    .formula .var.nueva .tapa,.formula .var.nueva i{animation:destapa .6s ease}
+    @keyframes destapa{0%{transform:scale(.4);opacity:0}70%{transform:scale(1.18)}100%{transform:none;opacity:1}}
+    .frac{display:inline-flex;flex-direction:column;align-items:center;vertical-align:middle;font-size:.86em;margin:0 .1em}
+    .frac>span{display:flex;align-items:center;gap:.1em;padding:0 .15em}
+    .frac>span+span{border-top:.06em solid currentColor;padding-top:.06em}
+    .raiz{display:inline-flex;align-items:stretch}
+    .rz-s{font-size:1.1em;line-height:1}
+    .rz-r{display:inline-flex;align-items:center;gap:.1em;border-top:.06em solid currentColor;padding:0 .1em}
+    .exp{display:inline-flex;gap:.05em;align-self:flex-start}
+
+    .simbolo{width:min(420px,100%);aspect-ratio:3/2;color:var(--ink)}
+    .simbolo .trazo{fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+    .simbolo .trazo *{vector-effect:non-scaling-stroke}
+
+    .pistas{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+    .pista{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:10px;font-size:13px;border:1px dashed var(--line);color:var(--muted)}
+    .pista.abierta{border-style:solid;border-color:color-mix(in srgb,var(--acento) 55%,var(--line));color:var(--ink);background:color-mix(in srgb,var(--acento) 10%,transparent)}
+
+    /* ---------- buscador ---------- */
+    .adivina{position:relative;display:flex;gap:8px;margin-bottom:14px}
+    .adivina input{flex:1;min-width:0;font:inherit;font-size:16px;color:var(--ink);background:var(--panel2);border:1.5px solid var(--line);border-radius:12px;padding:11px 14px}
+    .adivina input:focus{border-color:var(--acento2);outline:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--acento2) 25%,transparent)}
+    .boton{font-weight:800;border:0;border-radius:12px;padding:10px 16px;cursor:pointer;background:var(--panel2);border:1px solid var(--line)}
+    .boton.primario{background:var(--acento);color:var(--acento-ink);border-color:var(--acento)}
+    .boton:disabled{opacity:.5;cursor:default}
+    .sugs{position:absolute;z-index:5;left:0;right:0;top:calc(100% + 4px);margin:0;padding:4px;list-style:none;background:var(--panel);border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 34px #0003;max-height:330px;overflow:auto}
+    .sugs li{display:flex;justify-content:space-between;gap:10px;align-items:baseline;padding:8px 10px;border-radius:8px;cursor:pointer}
+    .sugs li small{color:var(--muted);font-size:12px;text-align:right}
+    .sugs li[aria-selected=true],.sugs li:hover{background:color-mix(in srgb,var(--acento2) 16%,transparent)}
+    .sugs li.vacia{cursor:default;color:var(--muted)}
+
+    /* ---------- intentos ---------- */
+    .tabla-wrap{overflow-x:auto;margin:0 -4px;padding:0 4px 4px}
+    .tabla{border-collapse:separate;border-spacing:5px;min-width:640px;width:100%;table-layout:fixed}
+    .tabla th{font-size:10.5px;letter-spacing:.04em;overflow-wrap:anywhere;cursor:help;text-transform:uppercase;color:var(--muted);font-weight:800;padding:0 2px 2px;border-bottom:2px solid var(--line)}
+    .tabla th:first-child{width:21%}
+    .tabla td{padding:0;height:62px}
+    /* El nombre del intento queda a la vista al desplazar la tabla. */
+    .tabla tr>:first-child{position:sticky;left:0;z-index:1;background:var(--panel)}
+    @media (max-width:560px){.tabla{min-width:620px}.celda{font-size:10.5px;padding:3px}.celda.nombre{font-size:11.5px}}
+    .celda{position:relative;height:100%;display:grid;place-items:center;text-align:center;padding:4px;border-radius:10px;color:var(--celda-ink);font-weight:750;font-size:12.5px;line-height:1.15;overflow:hidden;hyphens:manual;overflow-wrap:break-word}
+    .celda.si{background:var(--si)}.celda.casi{background:var(--casi)}.celda.no{background:var(--no)}
+    .celda.nombre{background:var(--panel2);color:var(--ink);border:1px solid var(--line);font-size:13px}
+    .celda .fl{position:absolute;inset:0;display:grid;place-items:center;font-size:44px;font-weight:900;opacity:.22;pointer-events:none}
+    .celda span{position:relative}
+    tr.nueva .celda{animation:voltea .5s both;animation-delay:calc(var(--i) * 140ms)}
+    @keyframes voltea{0%{transform:rotateX(90deg);filter:brightness(1.6)}100%{transform:none}}
+    .leyenda{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin:8px 2px 0}
+    .leyenda i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:5px;vertical-align:-1px}
+    .fallos{display:flex;flex-wrap:wrap;gap:6px;list-style:none;margin:0;padding:0}
+    .fallos li{padding:6px 11px;border-radius:999px;font-weight:700;font-size:13px;background:color-mix(in srgb,var(--no) 14%,transparent);color:var(--no);border:1px solid color-mix(in srgb,var(--no) 40%,transparent)}
+    .fallos li.nueva{animation:sacude .45s}
+    .fallos li.bien{background:color-mix(in srgb,var(--si) 16%,transparent);color:var(--si);border-color:color-mix(in srgb,var(--si) 45%,transparent)}
+    @keyframes sacude{0%,100%{transform:none}25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+    .contador{font-size:12px;color:var(--muted);margin:0 0 8px}
+
+    /* ---------- victoria ---------- */
+    .victoria{position:relative;margin:0 0 14px;padding:16px 16px 14px;border-radius:16px;border:1.5px solid color-mix(in srgb,var(--si) 55%,var(--line));background:color-mix(in srgb,var(--si) 9%,var(--panel));overflow:hidden}
+    .victoria h2{margin:0 0 2px;font-size:20px}
+    .victoria h2 span{color:var(--si)}
+    .victoria p{margin:4px 0}
+    .victoria .meta{font-weight:700}
+    .victoria .botones{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;align-items:center}
+    .cuenta{font:700 13px ui-monospace,Consolas,monospace;color:var(--muted)}
+    .chispas{position:absolute;left:28px;top:24px;pointer-events:none}
+    .chispas i{position:absolute;width:4px;height:12px;border-radius:2px;background:var(--acento);animation:chispa .8s ease-out forwards;transform-origin:50% 50%}
+    @keyframes chispa{0%{transform:rotate(var(--a)) translateY(0);opacity:1}100%{transform:rotate(var(--a)) translateY(-70px);opacity:0}}
+    @media (prefers-reduced-motion:reduce){.traza,tr.nueva .celda,.fallos li.nueva,.chispas i,.formula .var.nueva .tapa,.formula .var.nueva i{animation:none}}
+
+    .ayer{margin:14px 2px 0;font-size:13px;color:var(--muted)}
+    .ayer b{color:var(--ink)}
+    .nota{margin:10px 2px 0;font-size:12px;color:var(--muted)}
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="layout">
+      <main>
+        <div class="cab">
+          <div class="logo">
+            <svg viewBox="0 0 48 48" aria-hidden="true">
+              <rect x="2" y="2" width="44" height="44" rx="11" fill="var(--panel)" stroke="var(--line)"/>
+              <path class="traza" d="M6 30 Q11 14 16 30 T26 30 T36 30 T46 30"/>
+              <path d="M27 6 L16 26 H23 L19 42 L33 19 H25 Z" fill="var(--acento)" stroke="var(--ink)" stroke-width="1.4" stroke-linejoin="round"/>
+            </svg>
+            <div><h1>ELECTRO<span>DLE</span></h1><small>EL DESAFÍO ELÉCTRICO DEL DÍA</small></div>
+          </div>
+          <div class="chips">
+            <span id="racha" class="chip racha" title="Días seguidos completando los cuatro modos del día">🔥 0</span>
+            <span id="puntos" class="chip" title="Puntos acumulados en los desafíos diarios">⚡ 0 <small>pts</small></span>
+          </div>
+        </div>
+        <div class="tipo" role="tablist" aria-label="Tipo de partida">
+          <button type="button" role="tab" data-tipo="diario">Diario</button>
+          <button type="button" role="tab" data-tipo="practica">Práctica</button>
+        </div>
+        <div id="modos" class="modos" role="tablist" aria-label="Modo"></div>
+        <section id="panel" class="panel" aria-live="polite"></section>
+        <p id="ayer" class="ayer"></p>
+        <p id="nota" class="nota"></p>
+      </main>
+      <aside></aside>
+    </div>
+  </div>
+  <script src="datos.js?v=electro-1"></script>
+  <script src="simbolos.js?v=electro-1"></script>
+  <script src="motor.js?v=electro-1"></script>
+  <script src="game.js?v=electro-1"></script>
+</body>
+</html>
