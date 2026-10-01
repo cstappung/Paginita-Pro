@@ -107,3 +107,39 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #a9dcff; fon
 #llevo { position: absolute; bottom: 60px; width: 100%; text-align: center; font-size: 18px; font-weight: 800; color: #ffe066; }
 #tabla tr.rojo td:first-child span { color: #ff9a8c; }
 #tabla tr.azul td:first-child span { color: #8cc2ff; }
+
+/* ---------- Granadas y pantalla completa ---------- */
+#pausa .botones { display: flex; gap: 8px; justify-content: center; margin-top: 12px; flex-wrap: wrap; }
+#pausa .botones button { font: inherit; font-size: 14px; padding: 8px 14px; border-radius: 10px; border: 0; cursor: pointer;
+  background: #ffc21a; color: #3a2a1a; font-weight: 700; }
+#pausa .botones button[hidden] { display: none; }
+
+/* ---------- Autodestrucción ---------- */
+#auto { position: absolute; top: 60%; left: 50%; transform: translateX(-50%); text-align: center; font-weight: 800; color: #ff6b4a; }
+#auto div { width: 180px; height: 8px; margin: 6px auto 0; border-radius: 4px; background: rgba(0,0,0,0.45); overflow: hidden; }
+#auto i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #ffb300, #ff3b2f); }
+
+/* ---------- Arsenal: inventario, recargas, granadas, humo, cegadora, ajustes ---------- */
+#inv { display: flex; gap: 6px; justify-content: flex-end; margin-bottom: 6px; font-size: 13px; }
+#inv span { background: rgba(0,0,0,0.4); padding: 3px 8px; border-radius: 8px; opacity: 0.75; }
+#inv span.activa { opacity: 1; background: rgba(255, 194, 26, 0.85); color: #3a2a1a; font-weight: 800; text-shadow: none; }
+#inv span.vacia { opacity: 0.35; }
+#inv kbd { font: inherit; font-size: 11px; opacity: 0.8; margin-right: 2px; }
+#reservas { display: block; font-size: 13px; opacity: 0.9; }
+#reservas.vacio { color: #ff8a7a; }
+#granadas { display: flex; gap: 6px; justify-content: flex-end; align-items: center; margin-top: 6px; font-size: 13px; flex-wrap: wrap; }
+#granadas span { background: rgba(0,0,0,0.4); padding: 3px 8px; border-radius: 8px; opacity: 0.7; }
+#granadas span.sel { opacity: 1; outline: 2px solid #ffc21a; }
+#granadas small { width: 100%; text-align: right; opacity: 0.7; font-size: 11px; }
+#prompt { position: absolute; bottom: 92px; width: 100%; text-align: center; font-size: 17px; font-weight: 800; color: #fff; }
+#humo { position: absolute; inset: 0; opacity: 0; background: radial-gradient(circle, rgba(205,210,212,0.85), rgba(190,196,198,0.97)); pointer-events: none; }
+#cegado { position: absolute; inset: 0; opacity: 0; background: #ffffff; pointer-events: none; }
+#muerte-granadas { font-size: 14px; opacity: 0.9; }
+#muerte-granadas span { margin: 0 4px; }
+#muerte-granadas kbd, .ajustes kbd { font: inherit; background: rgba(255,255,255,0.18); padding: 0 5px; border-radius: 4px; }
+.ajustes { display: grid; gap: 8px; margin: 12px 0 4px; text-align: left; font-size: 13px; }
+.ajustes .aj { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ajustes input[type=range] { flex: 1; min-width: 120px; accent-color: #ffc21a; }
+.ajustes b[data-aj] { min-width: 3.2em; }
+.ajustes select { font: inherit; padding: 4px 6px; border-radius: 8px; border: 0; background: #fff8ec; color: #3a2a1a; }
+#menu .ajustes { margin-bottom: 14px; }

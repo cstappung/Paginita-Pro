@@ -118,6 +118,35 @@ const REGLAS = {
       ["El final", "Cuando ninguno de los dos puede jugar, gana quien tenga más fichas en el tablero."]
     ]
   },
+  ajedrez: {
+    lema: "El ajedrez de siempre, para dos.",
+    secciones: [
+      ["Mover", lista([
+        "Toca una pieza tuya y se marcan sus casillas: un punto si está vacía, un aro si capturas. Toca el destino, o arrastra la pieza hasta él.",
+        "Solo se ofrecen jugadas legales: ninguna puede dejar a tu propio rey en jaque.",
+        "Las blancas mueven primero. Quien abre la sala elige su color, o lo deja al azar."
+      ])],
+      ["Jugadas especiales", lista([
+        "<b>Enroque:</b> lleva el rey dos casillas hacia la torre y la torre salta a su otro lado. Ni el rey ni esa torre pueden haberse movido, no puede haber nada entre ellos, y el rey no puede estar en jaque ni pasar o caer en una casilla atacada.",
+        "<b>Al paso:</b> si un peón rival avanza dos casillas y queda al lado del tuyo, puedes capturarlo como si hubiera avanzado una, pero solo en la jugada siguiente.",
+        "<b>Coronación:</b> el peón que llega a la última fila se convierte en dama, torre, alfil o caballo; se te pregunta cuál."
+      ])],
+      ["El final", lista([
+        "<b>Jaque mate</b>: el rey está atacado y no hay jugada que lo salve. Gana quien lo da.",
+        "<b>Tablas</b> por rey ahogado (sin jugadas sin estar en jaque), por material insuficiente para dar mate, por <b>triple repetición</b> de la misma posición o por <b>cincuenta jugadas</b> de cada uno sin capturas ni movimientos de peón. Aquí estas dos últimas se aplican solas, sin reclamarlas.",
+        "Puedes <b>ofrecer tablas</b> una vez por jugada; si el otro mueve sin aceptar, la oferta queda rechazada. También puedes <b>rendirte</b> (hay que pulsar dos veces)."
+      ])],
+      ["Notación", "La hoja de jugadas usa las letras en español: <b>R</b> rey, <b>D</b> dama, <b>T</b> torre, <b>A</b> alfil, <b>C</b> caballo; el peón no lleva letra. «x» es captura, «+» jaque, «#» mate y O-O / O-O-O los enroques."],
+      ["Reloj", lista([
+        "Quien abre la sala elige el ritmo: <b>Bala</b> (1+0, 2+1), <b>Blitz</b> (3+0, 3+2, 5+0, 5+3), <b>Rápida</b> (10+0, 10+5, 15+10), <b>Clásica</b> (30+0, 30+20) o sin reloj. «3+2» son tres minutos para cada uno y dos segundos más por cada jugada que haces.",
+        "El reloj no corre hasta que cada uno ha hecho su primera jugada. Después corre el de quien tiene el turno.",
+        "Si se te acaba el tiempo, pierdes; pero si al rival solo le queda el rey, o el rey y un alfil o un caballo, no puede darte mate y la partida acaba en tablas.",
+        "Sin reloj, si el rival se queda dormido puedes proponer expulsarlo con ⏏ tras un rato sin movimiento: en un duelo eso te da la partida."
+      ])],
+      ["Premovimiento", "Mientras el rival piensa puedes dejar tu siguiente jugada apuntada: toca o arrastra una pieza como siempre y la casilla se marca en rojo. En cuanto él mueve, la tuya sale sola si sigue siendo legal; si no, se anula. Clic derecho, o tocar una casilla vacía, la cancela."],
+      ["Piezas", "Debajo de la hoja de jugadas eliges el dibujo de las piezas: Clásicas, Chessnut, Fantasía o Celtas. Se recuerda en este navegador."]
+    ]
+  },
   cadena: {
     lema: "Chain Reaction: carga, estalla y conquista.",
     secciones: [
@@ -382,20 +411,32 @@ const REGLAS = {
       ["Controles", lista([
         "Haz click en el juego para capturar el mouse; <b>Esc</b> lo suelta.",
         "<b>WASD</b> o flechas para moverte, <b>Espacio</b> para saltar, el mouse para mirar.",
-        "<b>Click</b> dispara, <b>R</b> recarga, <b>1 2 3</b> o la rueda cambian de arma y <b>Tab</b> muestra la tabla."
+        "<b>Click</b> dispara, <b>R</b> recarga, <b>1 2 3</b> o la rueda cambian de arma, <b>E</b> recoge o cambia un arma del piso, <b>G</b> lanza la granada elegida, <b>T</b> cambia cuál, y <b>Tab</b> muestra la tabla.",
+        "<b>Shift+F</b> (o ⛶ en la cabecera de la sala) pone el juego a pantalla completa: solo el juego, sin la página alrededor.",
+        "En la pausa (<b>Esc</b>) se ajusta la <b>sensibilidad del mouse</b>, se elige la <b>skin</b> y las granadas."
       ])],
       ["Las armas", lista([
-        "<b>1 · Batidora</b>: automática, 30 balas, 17 de daño.",
-        "<b>2 · Revuelta</b>: escopeta de 9 perdigones; de cerca fríe de un tiro, de lejos pierde fuerza.",
-        "<b>3 · Poché</b>: francotirador. <b>Click derecho</b> para la mira; 90 de daño al cuerpo y fríe de un tiro a la cabeza."
+        "Se parte con el <b>🔪 Cuchillo</b>: 55 de daño a menos de un brazo (más a la cabeza), y caminas un poco más rápido.",
+        "El resto aparece <b>tirado en el mapa</b> (arriba de la torre, de las plataformas y en cuatro puntos del suelo): pasa por encima para tomarla. Cuál sale en cada punto es al azar, la misma para todos, y vuelve a aparecer otra a los 18 segundos de que alguien se la lleve.",
+        "Se cargan <b>dos como mucho</b>, sin contar el cuchillo. Con dos, <b>E</b> cambia la que tienes en la mano por la del piso. Pasar por una que ya tienes te llena su munición.",
+        "<b>Batidora</b> (metralleta, automática, 30 balas), <b>Revuelta</b> (escopeta de 9 perdigones), <b>Poché</b> (sniper con mira, click derecho), <b>Benedictina</b> (bazuca: un cohete que revienta con lo que toca, 130 de daño) y <b>Pasado por agua</b> (pistola de 6 balas, 34 de daño).",
+        "Cada arma trae su cargador y <b>5 recargas por vida</b>. Sin recargas, toca buscar otra arma o usar el cuchillo.",
+        "<b>X · Autodestrucción</b>: mantén la X un segundo (si la sueltas antes, se cancela). Tu huevo pita y brilla en rojo —los demás también lo ven— y revienta: hasta 220 de daño a los rivales en unos seis metros, y tú mueres siempre."
+      ])],
+      ["Granadas", lista([
+        "Llevas <b>dos por vida</b> y eliges cuáles: <b>🥚 Huevo duro</b> (explota, hasta 140 de daño; a ti te hace la mitad), <b>💨 Humo</b> (una nube que tapa la vista unos doce segundos) o <b>💡 Cegadora</b> (encandila a quien la ve, más si está cerca y mirándola; a ti y a tu equipo también).",
+        "Se eligen en la pausa o, estando muerto, con <b>Z</b> y <b>C</b>. Valen desde la vida siguiente (o ya mismo, si en esta todavía no tiraste ninguna)."
       ])],
       ["Vida y muerte", lista([
         "Tienes 100 de vida. La parte de arriba del huevo es la cabeza y ahí el daño sube.",
-        "Al morir vuelves a los tres segundos, lo más lejos posible de tus rivales, con un segundo y medio de protección."
+        "Quien muere queda frito: en el piso aparece un huevo frito, clara y yema, que se va a los pocos segundos.",
+        "Al morir vuelves a los tres segundos, lo más lejos posible de tus rivales, con un segundo y medio de protección y <b>con las armas que tenías</b>.",
+        "Si te mataron, vuelves con vida, munición y granadas llenas. <b>Si te suicidaste</b> (tu granada, tu bazuca o la autodestrucción) y no te llevaste a nadie, vuelves con la vida, la munición y las granadas que tenías: suicidarse no recarga. Si tu suicidio frió a alguien, vuelves lleno."
       ])],
       ["Chat de voz", lista([
         "Arriba del juego está <b>🎙 Entrar a la voz</b>. La primera vez el navegador pide permiso para el micrófono.",
         "Por defecto se habla <b>manteniendo apretada la V</b>; en la barra se puede cambiar a micrófono abierto, y <b>🔈</b> silencia a los demás.",
+        "La voz sigue abierta cuando termina la partida y solo se corta al salir de la sala. Si piden revancha, quien estaba en la voz entra sola a la nueva.",
         "La voz va directo de navegador a navegador, sin pasar por el sitio. Si dos redes no dejan una conexión directa (pasa con algunas de celular), ese par no se oye y su nombre sale en rojo."
       ])],
       ["Sin servidor", "Cada navegador decide si lo alcanzaron y anota su propia muerte en el registro. Nadie puede anotarse una baja que no le dieron, pero un navegador modificado podría no morirse: es el mismo límite honesto del resto de los juegos."],
@@ -404,13 +445,14 @@ const REGLAS = {
     modos: {
       todos: { nombre: "Todos contra todos", secciones: [["Todos contra todos", "Cada uno por su cuenta. Gana el primero que llega a la meta de bajas: 10, 15 o 25 según el largo que eligió quien abrió la sala."]] },
       equipos: { nombre: "Duelo por equipos", secciones: [["Duelo por equipos", lista([
-        "Rojo contra azul: los asientos se reparten alternados, así que los equipos quedan parejos.",
+        "Rojo contra azul. Mientras la sala espera, cada uno elige su equipo arriba del juego; quien no elige queda en el que le toca por asiento (alternados). Si todos eligen el mismo, se reparten alternados.",
+        "El equipo queda fijo desde la primera baja.",
         "Las bajas suman para el equipo; gana el que llega primero a 20, 30 o 50.",
         "No hay fuego amigo: las balas atraviesan a los compañeros. Cada equipo aparece en su mitad del mapa.",
         "Si un equipo se queda sin nadie, gana el otro."
       ])]] },
       bandera: { nombre: "Captura la bandera", secciones: [["Captura la bandera", lista([
-        "Cada equipo tiene su bandera en su base: la roja al norte y la azul al sur.",
+        "Cada equipo tiene su bandera en su base: la roja al norte y la azul al sur. Los equipos se eligen igual que en el duelo por equipos.",
         "Pasa por encima de la bandera rival para tomarla y llévala a tu base. <b>Solo se captura si la tuya está en casa.</b>",
         "Quien muere con la bandera la suelta donde cayó. Si es la tuya, tócala para devolverla; si nadie la toca, vuelve sola a los 25 segundos.",
         "Gana el equipo que captura 1, 3 o 5 banderas, según el largo de la partida."
@@ -596,6 +638,20 @@ const REGLAS = {
       ["Clasificación", "El reloj corre desde el primer movimiento. Cada modo tiene su propia clasificación por tiempo, y tu mejor marca sale en la Clasificación del sitio junto a tu nombre."]
     ]
   },
+  bbtan: {
+    lema: "BBTAN: apunta, rebota y rompe los bloques antes de que toquen el suelo.",
+    secciones: [
+      ["Cómo se juega", "Arrastra (o mueve el ratón) para apuntar y suelta para lanzar todas tus pelotas en fila. Rebotan en las paredes y en los bloques; cada golpe le quita un punto al número del bloque y a cero revienta. Cuando vuelven todas, la fila entera baja un escalón y aparece otra arriba."],
+      ["Lo que se recoge", lista([
+        "<b>+1</b>: una pelota más para la próxima ronda.",
+        "<b>Láser</b> horizontal o vertical: cada pelota que lo cruza quita 4 a toda su fila o columna.",
+        "<b>Dispersor</b>: lanza hacia arriba, en un ángulo al azar, la pelota que lo toca.",
+        "Los láseres y el dispersor desaparecen al terminar la ronda en que se usaron.",
+        "Si rompes todos los bloques de la pantalla aparece <b>NICE!</b>."
+      ])],
+      ["Fin y clasificación", "La partida acaba cuando un bloque llega a la última fila. Lo que compite es la <b>ronda máxima</b> alcanzada: la mejor sale en la Clasificación del sitio y desbloquea logros cada tantas rondas."]
+    ]
+  },
   snake: {
     lema: "Snake Club: la serpiente de siempre, en siete modos y cuatro tamaños.",
     secciones: [
@@ -614,7 +670,7 @@ const REGLAS = {
   }
 };
 
-const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm" };
+const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN" };
 
 export const tieneReglas = juego => Object.prototype.hasOwnProperty.call(REGLAS, juego);
 

@@ -18,11 +18,11 @@ import { mezcla } from "./perfil.js";
 
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const EXTRA = { minas: { nombre: "Mina Club", color: "#eeb765" }, snake: { nombre: "Snake Club", color: "#4be9bc" }, tetrisclub: { nombre: "Tetris Club", color: "#b04ee8" }, sortem: { nombre: "sortEm", color: "#ff006e" } };
+const EXTRA = { minas: { nombre: "Mina Club", color: "#eeb765" }, snake: { nombre: "Snake Club", color: "#4be9bc" }, tetrisclub: { nombre: "Tetris Club", color: "#b04ee8" }, sortem: { nombre: "sortEm", color: "#ff006e" }, bbtan: { nombre: "BBTAN", color: "#c4f568" } };
 const info = j => JUEGOS[j] || EXTRA[j] || { nombre: j, color: "#888" };
 const MAX_NOMBRES = 8;
 
-export function crearLogros({ uid, watchLogros, perfil, orden }) {
+export function crearLogros({ uid, watchLogros, perfil, orden, icono = {} }) {
   let host = null, off = null, datos = null, fallo = null, firma = "";
   let juego = "";
   try { juego = localStorage.getItem("jg.logrosJuego") || ""; } catch (e) { /* sin almacenamiento */ }
@@ -87,7 +87,7 @@ export function crearLogros({ uid, watchLogros, perfil, orden }) {
         ${tarjeta("La joya", joyas[0] ? logroMini(joyas[0].j, joyas[0].x, `<i>Solo el ${joyas[0].p} % lo tiene${joyas[0].mio ? " — y tú eres de ellos" : ""}.</i>`) : "<p>Nadie tiene aún ningún logro. El primero se lleva la gloria.</p>", "joya")}
       </div>
       <div class="jg-lg-podio">${ranking(R.total).slice(0, 5).map(([u, n], k) =>
-        `<span class="${u === uid ? "yo" : ""}"><i>${["🥇", "🥈", "🥉", "4", "5"][k]}</i>${esc(nombreDe(u))}<b>${n}</b></span>`).join("") || "<em>Aún no hay nadie en la tabla de logros.</em>"}</div>
+        `<span class="${u === uid ? "yo" : ""}" data-perfil="${esc(u)}"><i>${["🥇", "🥈", "🥉", "4", "5"][k]}</i>${esc(nombreDe(u))}<b>${n}</b></span>`).join("") || "<em>Aún no hay nadie en la tabla de logros.</em>"}</div>
     </section>`;
   }
 
@@ -98,7 +98,7 @@ export function crearLogros({ uid, watchLogros, perfil, orden }) {
     return `<section class="jg-lg-juego" style="--c:${I.color}">
       <header><h2>${esc(I.nombre)}</h2><span>${mios}/10 tuyos · ${g} ${g === 1 ? "jugador" : "jugadores"}</span></header>
       <div class="jg-lg-lideres">${lideres.length ? lideres.map(([u, n], k) =>
-        `<span class="${u === uid ? "yo" : ""}"><i>${["🥇", "🥈", "🥉"][k]}</i>${esc(nombreDe(u))} <b>${n}/10</b></span>`).join("") : "<em>Nadie tiene todavía ningún logro de este juego.</em>"}</div>
+        `<span class="${u === uid ? "yo" : ""}" data-perfil="${esc(u)}"><i>${["🥇", "🥈", "🥉"][k]}</i>${esc(nombreDe(u))} <b>${n}/10</b></span>`).join("") : "<em>Nadie tiene todavía ningún logro de este juego.</em>"}</div>
       <ol class="jg-lg-lista">${lista.map(x => {
         const s = R.tiene[j][x.id], p = pct(j, x.id, R), mio = s.has(uid);
         const quienes = [...s].sort((a, b) => (b === uid) - (a === uid) || nombreDe(a).localeCompare(nombreDe(b)));
@@ -107,7 +107,7 @@ export function crearLogros({ uid, watchLogros, perfil, orden }) {
           <div class="jg-lg-txt">
             <b>${esc(x.n)}${x.m ? ` <em class="jg-lg-modo">${esc(x.m)}</em>` : ""}${mio ? ' <em class="jg-lg-ok">✓ tuyo</em>' : ""}</b>
             <span>${esc(x.d)}</span>
-            <div class="jg-lg-quien">${quienes.slice(0, MAX_NOMBRES).map(u => `<i class="${u === uid ? "yo" : ""}">${esc(nombreDe(u))}</i>`).join("")}${quienes.length > MAX_NOMBRES ? `<i class="mas">+${quienes.length - MAX_NOMBRES}</i>` : ""}</div>
+            <div class="jg-lg-quien">${quienes.slice(0, MAX_NOMBRES).map(u => `<i class="${u === uid ? "yo" : ""}" data-perfil="${esc(u)}">${esc(nombreDe(u))}</i>`).join("")}${quienes.length > MAX_NOMBRES ? `<i class="mas">+${quienes.length - MAX_NOMBRES}</i>` : ""}</div>
           </div>
           <div class="jg-lg-pct"><b>${p} %</b><span class="jg-lg-barra"><span style="width:${p}%"></span></span><small>${s.size} de ${g}</small></div>
         </li>`;
@@ -129,10 +129,14 @@ export function crearLogros({ uid, watchLogros, perfil, orden }) {
       ${desafio(R)}
       <nav class="jg-lg-chips" aria-label="Juego">${R.juegos.map(j => {
         const n = LOGROS[j].filter(x => R.tiene[j][x.id].has(uid)).length;
-        return `<button class="jg-lg-chip${j === juego ? " on" : ""}" data-j="${j}" style="--c:${info(j).color}">${esc(info(j).nombre)}<small>${n}/10</small></button>`;
+        return `<button class="jg-lg-chip${j === juego ? " on" : ""}${n === 10 ? " lleno" : ""}" data-j="${j}" style="--c:${info(j).color}"><i aria-hidden="true">${esc(icono[j] || "●")}</i>${esc(info(j).nombre)}<small>${n}/10</small></button>`;
       }).join("")}</nav>
       ${juegoHtml(R)}
     </div>`;
+    /* En el móvil los chips son una tira que se desliza: que el elegido
+       quede a la vista, o parece que no hay ninguno marcado. */
+    const tira = host.querySelector(".jg-lg-chips"), on = tira && tira.querySelector(".on");
+    if (on && tira.scrollWidth > tira.clientWidth) tira.scrollLeft = on.offsetLeft - tira.clientWidth / 2 + on.offsetWidth / 2;
     host.querySelectorAll("[data-j]").forEach(b => b.onclick = () => {
       juego = b.dataset.j;
       try { localStorage.setItem("jg.logrosJuego", juego); } catch (e) { /* nada */ }

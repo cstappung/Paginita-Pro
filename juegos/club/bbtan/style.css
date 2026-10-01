@@ -1,0 +1,139 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Press+Start+2P&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+:root{color-scheme:dark;--bg:#101113;--panel:#191c1e;--line:#2d3234;--muted:#949b9b;--text:#f1f0e9;--green:#c4f568;--purple:#b7a1f7;--font:'Space Grotesk',Arial,sans-serif}
+*{box-sizing:border-box}body{margin:0;min-height:100dvh;display:grid;place-items:center;background:radial-gradient(ellipse at center,#1a211b33,transparent 65%),var(--bg);color:var(--text);font:14px 'DM Sans',Arial,sans-serif;padding:20px 12px}button,input{font:inherit}button{cursor:pointer;transition:background .15s,border-color .15s}button:disabled{opacity:.35;cursor:default}button:hover:not(:disabled){filter:brightness(1.15)}button:focus-visible,input:focus-visible,canvas:focus-visible{outline:2px solid var(--green);outline-offset:3px}[hidden]{display:none!important}.game-shell{width:min(440px,calc((100dvh - 255px)*.724));max-width:100%;min-width:280px}.game-header{display:flex;align-items:center;justify-content:space-between;padding:0 2px 15px}h1{font:700 22px var(--font);letter-spacing:-1px;margin:0}h1 span,h2 span{color:var(--green)}.header-actions{display:flex;gap:9px;align-items:center}.icon-button{width:32px;height:32px;display:grid;place-items:center;background:transparent;border:1px solid var(--line);border-radius:50%;color:var(--text);font-size:18px;position:relative}.wardrobe-button{display:flex;align-items:center;gap:7px;color:var(--text);background:#1e2420;border:1px solid #3c4930;border-radius:20px;font-size:11px;padding:8px 12px}.wardrobe-button svg{width:15px;height:15px;fill:none;stroke:var(--green);stroke-width:1.5;stroke-linejoin:round}.sound-slash{position:absolute;width:19px;height:1px;background:var(--text);transform:rotate(-45deg)}[aria-pressed=true] .sound-slash{display:none}.score-strip{display:grid;grid-template-columns:1.3fr 1.3fr 1fr 1fr;gap:12px;padding:0 3px 16px}.score-strip>div{display:flex;flex-direction:column;gap:5px}.score-strip>div:nth-child(n+3){text-align:right}.score-strip span{color:var(--muted);font:500 8px var(--font);letter-spacing:1px}.score-strip strong{font:500 22px var(--font);font-variant-numeric:tabular-nums;letter-spacing:-.7px}#best{color:var(--green)}.play-section{border:1px solid #343a39;border-radius:11px;overflow:hidden;box-shadow:0 18px 65px #0003}.board-top,.board-bottom{display:flex;justify-content:space-between;align-items:center;background:#1b201e;font:500 8px var(--font);letter-spacing:1px;padding:9px 13px;color:var(--muted)}#status{color:var(--green)}#multiplier{font-size:10px}#remaining{color:var(--green)}#storage-notice{font-size:8px;letter-spacing:0}.canvas-wrap{position:relative;background:#141719}#game{width:100%;height:auto;display:block;touch-action:none;cursor:crosshair;aspect-ratio:420/580}.game-controls{display:flex;gap:7px;margin-top:11px}.control-button{border:1px solid var(--line);background:#16191a;color:var(--muted);border-radius:7px;padding:10px;font-size:10px;white-space:nowrap}.control-button[aria-pressed=true]{color:var(--green);border-color:#657b44;background:#222c1b}.restart-button{margin-left:auto;font-size:18px;line-height:13px}.toast{position:absolute;top:42%;left:50%;transform:translate(-50%,-8px);text-align:center;pointer-events:none;opacity:0;transition:opacity .2s,transform .2s;background:#101113eb;border:1px solid #657848;color:var(--green);padding:10px 13px;border-radius:8px;font:500 12px var(--font);white-space:nowrap}.toast.visible{opacity:1;transform:translate(-50%,0)}.overlay{position:absolute;inset:0;background:#101113e8;backdrop-filter:blur(7px);display:grid;place-items:center;padding:24px;text-align:center}.overlay-content{width:100%;max-width:290px}.eyebrow{font:500 9px var(--font);letter-spacing:1.6px;color:var(--muted)}h2{font:500 32px/1.15 var(--font);letter-spacing:-1px;margin:12px 0}.overlay p,dialog p{color:var(--muted);line-height:1.7;font-size:12px}.primary-button{display:block;background:var(--green);color:#17200d;border:0;border-radius:8px;padding:13px 18px;font-weight:700;font-size:12px}.overlay .primary-button{margin-top:24px;width:100%}.text-button{background:transparent;border:0;color:var(--muted);padding:15px}.result-score{font:500 49px var(--font);color:var(--green);margin:20px 0 6px}.result-detail{font:400 10px var(--font);color:var(--muted)}dialog{background:#171b1c;color:var(--text);border:1px solid #424b40;border-radius:18px;padding:28px;max-width:480px;width:calc(100% - 24px);max-height:calc(100dvh - 28px);box-shadow:0 30px 100px #0009}dialog::backdrop{background:#090b0edb;backdrop-filter:blur(8px)}.dialog-actions{display:flex;gap:12px;margin-top:24px}body:has(dialog[open]){overflow:hidden}
+#customizer-dialog{max-width:900px;padding:0;overflow:auto}.wardrobe-header{display:flex;justify-content:space-between;align-items:center;padding:24px 28px 20px;border-bottom:1px solid var(--line)}.wardrobe-header h2{margin:6px 0 0;font-size:29px}.wardrobe-layout{display:grid;grid-template-columns:280px 1fr}.character-stage{position:relative;background:radial-gradient(ellipse at 50% 55%,#35422b 0,transparent 65%),#1c241e;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:440px;border-right:1px solid #35402f;padding:20px 18px}.stage-tag{font:500 9px var(--font);letter-spacing:1.8px;color:#9aa990}.character-stage canvas{display:block;width:100%;max-width:240px;height:auto}.stage-caption{font:500 8px var(--font);letter-spacing:1px;color:#99a78c;text-align:center}.skin-control{display:flex;align-items:center;justify-content:center;gap:12px;color:#bdc7b6;font-size:11px;margin-top:20px}.wardrobe-options{padding:22px;min-width:0}.category-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;border-bottom:1px solid var(--line);padding-bottom:18px}.category-tabs button{border:1px solid transparent;border-radius:7px;background:#202526;color:var(--muted);font-size:11px;padding:10px 7px}.category-tabs button[aria-selected=true]{background:#2c3823;border-color:#627d3f;color:var(--green)}.option-heading{display:flex;justify-content:space-between;align-items:baseline;margin:20px 0 12px}.option-heading h3{font:500 16px var(--font);margin:0}.option-heading span{font-size:10px;color:var(--muted)}.style-options{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px}.style-choice{min-width:0;display:flex;flex-direction:column;align-items:center;background:#202526;border:1px solid #333c39;border-radius:8px;padding:4px 1px 7px;color:#aab4ae}.style-choice[aria-pressed=true]{border-color:var(--green);background:#2c3724;color:var(--green)}.style-choice canvas{width:100%;height:auto;max-width:66px;aspect-ratio:1/1}.style-choice span{font-size:8px;white-space:nowrap}.color-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:22px 0 12px;font-size:11px}.custom-color{display:flex;gap:8px;align-items:center}.custom-color span{font:400 9px var(--font);color:var(--muted)}input[type=color]{appearance:none;-webkit-appearance:none;width:29px;height:29px;border:1px solid #64705d;border-radius:7px;padding:3px;background:#1a211c;cursor:pointer}input[type=color]::-webkit-color-swatch-wrapper{padding:0}input[type=color]::-webkit-color-swatch{border:0;border-radius:3px}.color-swatches{display:grid;grid-template-columns:repeat(12,1fr);gap:7px}.color-swatches button{width:22px;max-width:100%;justify-self:center;height:22px;min-width:0;border:2px solid transparent;border-radius:50%;box-shadow:inset 0 0 0 1px #ffffff20}.color-swatches button[aria-pressed=true]{outline:2px solid var(--green);outline-offset:2px;border-color:#171b1c}.wardrobe-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:24px;padding-top:20px;border-top:1px solid var(--line)}.wardrobe-foot>span{font-size:9px;color:var(--muted);max-width:145px}.wardrobe-foot .primary-button{font-size:11px;white-space:nowrap}
+@media(max-width:650px){#customizer-dialog{max-width:430px}.wardrobe-header{padding:17px 20px}.wardrobe-header h2{font-size:25px}.wardrobe-layout{grid-template-columns:1fr}.character-stage{min-height:0;height:170px;padding:6px;border-right:0;border-bottom:1px solid #35402f}.character-stage canvas{width:125px;max-height:155px}.stage-tag{position:absolute;top:16px;left:16px;font-size:8px}.stage-caption{display:none}.skin-control{position:absolute;right:15px;bottom:15px;flex-direction:column;gap:6px}.wardrobe-options{padding:16px}.category-tabs{padding-bottom:12px}.category-tabs button{padding:8px 6px}.option-heading{margin-top:14px}.style-choice canvas{max-width:52px}.style-options{gap:6px}.color-heading{margin-top:15px}.wardrobe-foot{margin-top:17px;padding-top:14px}.color-swatches{gap:6px}}
+@media(max-width:450px){body{padding:12px 10px}.game-shell{width:min(100%,calc((100dvh - 220px)*.724));min-width:270px}.game-header{padding-bottom:12px}.score-strip{padding-bottom:12px}.score-strip strong{font-size:20px}.control-button{padding:10px 8px;font-size:9px}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+/* Toque retro: tipografía de 8 bits, esquinas rectas, sombras duras y una
+   pantalla con líneas de barrido. La jugabilidad no cambia. */
+:root{--pixel:'Press Start 2P',ui-monospace,monospace}
+h1{font:400 18px var(--pixel);letter-spacing:0;text-shadow:0 0 10px #c4f56866,2px 2px 0 #3d5a1c}
+h2{font-family:var(--pixel);font-size:20px;letter-spacing:0;line-height:1.4}
+.score-strip span{font:400 7px var(--pixel);letter-spacing:0}
+.score-strip strong{font:400 16px var(--pixel);letter-spacing:0;text-shadow:0 0 8px #ffffff22}
+#best{text-shadow:0 0 10px #c4f56877}
+.board-top,.board-bottom{font:400 7px var(--pixel);letter-spacing:0;border-color:#343a39}
+#multiplier{font-size:8px}
+.play-section{border:2px solid #3a4235;border-radius:0;box-shadow:0 0 0 2px #0b0c0d,6px 6px 0 #0b0c0d,0 18px 65px #0005}
+.canvas-wrap::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(to bottom,#0000 0 2px,#00000038 2px 3px),radial-gradient(ellipse at center,#0000 60%,#0000006b 100%)}
+.control-button,.wardrobe-button,.icon-button,.category-tabs button,.style-choice,input[type=color]{border-radius:0}
+.control-button{font:400 8px var(--pixel);box-shadow:3px 3px 0 #0b0c0d}
+.control-button:active:not(:disabled),.primary-button:active{transform:translate(2px,2px);box-shadow:1px 1px 0 #0b0c0d}
+.restart-button{font-size:14px}
+.primary-button{border-radius:0;font:400 9px var(--pixel);box-shadow:3px 3px 0 #3d5a1c}
+.toast{border-radius:0;font:400 9px var(--pixel);border-width:2px;box-shadow:3px 3px 0 #0b0c0d}
+.eyebrow{font:400 7px var(--pixel);letter-spacing:0}
+.result-score{font:400 34px var(--pixel);text-shadow:0 0 14px #c4f56866}
+.result-detail{font:400 7px var(--pixel);line-height:1.8}
+dialog{border-radius:0;border-width:2px;box-shadow:8px 8px 0 #000}
+.wardrobe-button{font:400 7px var(--pixel)}
+/* El descenso (descenso.js). Desde la ronda 100 game.js pone html.descenso y
+   escribe en el estilo del <html> los colores fundidos del piso en que va
+   (--bg, --barra, --borde…), así el marco entra de a poco igual que el
+   tablero. */
+html.descenso body{background:radial-gradient(ellipse at center,color-mix(in srgb,var(--halo) 30%,transparent),transparent 65%),var(--bg);transition:background .8s}
+html.descenso h1{text-shadow:0 0 12px var(--halo),2px 2px 0 var(--sombra)}
+html.descenso #best,html.descenso .result-score{text-shadow:0 0 12px var(--halo)}
+html.descenso .board-top,html.descenso .board-bottom{background:var(--barra);border-color:var(--line)}
+html.descenso .play-section{border-color:var(--borde);box-shadow:0 0 0 2px #050203,6px 6px 0 #050203,0 18px 80px var(--halo)}
+html.descenso .canvas-wrap{background:var(--lienzo)}
+html.descenso .canvas-wrap::after{background:repeating-linear-gradient(to bottom,#0000 0 2px,#00000055 2px 3px),radial-gradient(ellipse at center,#0000 50%,#1a0006b0 100%)}
+html.descenso .control-button{background:var(--panel);border-color:var(--line)}
+html.descenso .control-button[aria-pressed=true]{background:var(--barra);border-color:var(--borde)}
+html.descenso .primary-button{color:#0a0204;box-shadow:3px 3px 0 var(--sombra)}
+html.descenso .toast{background:#050203eb;border-color:var(--borde)}
+html.descenso .wardrobe-button{background:var(--panel);border-color:var(--line)}
+html.descenso .overlay{background:#050203ee}
+/* Lo que no es un color tampoco entra de golpe: game.js escribe --w2…--w5
+   (el peso de cada piso, 0..1, continuo) y cada efecto se multiplica por el
+   suyo. Nada aparece en la ronda 100 o 200; se va colando. */
+@property --w2{syntax:'<number>';inherits:true;initial-value:0}
+@property --w3{syntax:'<number>';inherits:true;initial-value:0}
+@property --w4{syntax:'<number>';inherits:true;initial-value:0}
+@property --w5{syntax:'<number>';inherits:true;initial-value:0}
+html{--w2:0;--w3:0;--w4:0;--w5:0;transition:--w2 3s,--w3 3s,--w4 3s,--w5 3s}
+/* 2 · la ruina: el marco se desportilla, mordisco a mordisco. */
+html.descenso .play-section{clip-path:polygon(-140px -140px,
+  calc(18% - 8px*var(--w2)) -140px,19.5% calc(5px*var(--w2)),calc(21% + 8px*var(--w2)) -140px,
+  calc(61% - 5px*var(--w2)) -140px,62% calc(4px*var(--w2)),calc(63% + 5px*var(--w2)) -140px,
+  calc(100% + 140px) -140px,calc(100% + 140px) calc(31% - 6px*var(--w3)),calc(100% - 4px*var(--w3)) 33%,calc(100% + 140px) calc(35% + 6px*var(--w3)),
+  calc(100% + 140px) calc(100% + 140px),calc(83% + 9px*var(--w2)) calc(100% + 140px),81% calc(100% - 5px*var(--w2)),calc(79% - 9px*var(--w2)) calc(100% + 140px),
+  calc(29% + 5px*var(--w4)) calc(100% + 140px),27% calc(100% - 4px*var(--w4)),calc(25% - 5px*var(--w4)) calc(100% + 140px),
+  -140px calc(100% + 140px),-140px calc(64% + 7px*var(--w3)),calc(5px*var(--w3)) 62%,-140px calc(60% - 7px*var(--w3)))}
+html.descenso .control-button{border-color:color-mix(in srgb,var(--line),#ff1a1a calc(var(--w4)*45%));transform:rotate(calc(var(--w5)*var(--giro,0)*1deg))}
+html.descenso .control-button:nth-child(1){--giro:-1.2}
+html.descenso .control-button:nth-child(3){--giro:.8}
+html.descenso .control-button:nth-child(4){--giro:2}
+/* 3 · la estática: colores corridos que se abren de a poco y un salto de vez en cuando. */
+html.descenso .play-section{box-shadow:calc(-3px*var(--w3)) 0 0 #ff003355,calc(3px*var(--w3)) 0 0 #00ffe033,6px 6px 0 #050203,0 18px 80px var(--halo);animation:bb-salto 7s steps(1) infinite}
+html.descenso h1,html.descenso #status{text-shadow:calc(-2px*var(--w3)) 0 #ff0033aa,calc(2px*var(--w3)) 0 #00ffe088,0 0 12px var(--halo)}
+html.descenso .canvas-wrap::after{background:repeating-linear-gradient(to bottom,#0000 0 1px,rgb(0 0 0/calc(.33 + .12*var(--w3))) 1px 3px),radial-gradient(ellipse at center,#0000 calc(50% - 10%*var(--w3)),#1a0006c0 100%)}
+@keyframes bb-salto{0%,91%,95%,100%{transform:rotate(calc(var(--w5)*-.6deg)) skewX(calc(var(--w5)*.4deg))}92%{transform:translate(calc(-3px*var(--w3)),calc(1px*var(--w3))) rotate(calc(var(--w5)*-.6deg))}93%{transform:translate(calc(4px*var(--w3)),calc(-1px*var(--w3))) skewX(calc(-1deg*var(--w3)))}94%{transform:translate(calc(-1px*var(--w3)),0)}}
+/* 4 · hostil: el borde late, el lienzo respira y el título titila. */
+html.descenso .play-section{animation:bb-salto 7s steps(1) infinite,bb-late 1.1s ease-in-out infinite}
+html.descenso .canvas-wrap{animation:bb-respira 2.2s ease-in-out infinite}
+html.descenso h1{animation:bb-parpadeo 3.3s steps(1) infinite,bb-invierte 4.1s steps(1) infinite}
+html.descenso body{background:radial-gradient(ellipse at center,color-mix(in srgb,var(--halo) 30%,transparent),transparent 65%),radial-gradient(ellipse at center,rgb(58 0 0/calc(var(--w4)*.27)),transparent 60%),repeating-linear-gradient(0deg,#0000 0 3px,rgb(26 0 0/calc(var(--w4)*.13)) 3px 4px),var(--bg)}
+@keyframes bb-late{0%,40%,100%{border-color:var(--borde);filter:none}10%{border-color:color-mix(in srgb,var(--borde),#ff1a1a calc(var(--w4)*100%));filter:drop-shadow(0 0 calc(var(--w4)*10px) #ff000088)}25%{border-color:color-mix(in srgb,var(--borde),#c01010 calc(var(--w4)*100%));filter:drop-shadow(0 0 calc(var(--w4)*5px) #ff000055)}}
+@keyframes bb-respira{0%,100%{transform:scale(1)}50%{transform:scale(calc(1 + .006*var(--w4)))}}
+@keyframes bb-parpadeo{0%,100%{opacity:1}12%{opacity:calc(1 - .75*var(--w4))}13%{opacity:1}57%{opacity:calc(1 - .4*var(--w4))}58%{opacity:calc(1 - var(--w4))}59%{opacity:1}}
+/* 5 · el vacío: la máquina está torcida y el título se da vuelta. */
+@keyframes bb-invierte{0%,100%{filter:none}33%{filter:invert(var(--w5))}34%{filter:none}71%{filter:invert(var(--w5)) hue-rotate(calc(90deg*var(--w5)))}72%{filter:none}}
+html.descenso h1 span{color:color-mix(in srgb,var(--green),#ff2020 calc(var(--w5)*100%))}
+html.descenso .score-strip span{transition:color .3s}
+html.descenso .score-strip span.susurro{color:#ff2a2a}
+@media(prefers-reduced-motion:reduce){html.descenso .play-section,html.descenso h1,html.descenso .canvas-wrap{animation:none}}
+/* La voz de cada 50 rondas (voz.js): el aviso se viste como suena. */
+.toast[data-voz]{white-space:normal;width:max-content;max-width:86%;line-height:1.8}
+.toast[data-voz=alegre]{color:#fff36a;border-color:#ffb300;animation:voz-salta .5s steps(3) infinite alternate}
+.toast[data-voz=roto]{color:#e8f8ff;border-color:#10e0ff;text-shadow:-2px 0 #ff1030,2px 0 #10e0ff;animation:voz-tiembla .14s steps(2) infinite}
+.toast[data-voz=susurro]{color:#ff3040;background:#000000d8;border-color:#3a0006;font-size:8px;letter-spacing:2px;text-shadow:0 0 6px #ff1030;animation:voz-late 2.4s ease-in-out infinite}
+@keyframes voz-salta{to{transform:translate(-50%,-5px) scale(1.04)}}
+@keyframes voz-tiembla{50%{transform:translate(calc(-50% + 2px),1px) skewX(-4deg)}}
+@keyframes voz-late{50%{opacity:.55;transform:translate(-50%,0) scale(.97)}}
+@media (prefers-reduced-motion:reduce){.toast[data-voz]{animation:none}}
+.toast[data-voz=giro]{color:#ff3040;background:#000000d8;border-color:#3a0006;animation:voz-giro 9s linear forwards}
+.toast[data-voz=perfecto]{color:#e0207a;background:#fffffff2;border-color:#ff8cc6;border-radius:999px;box-shadow:0 0 0 3px #fff,0 0 24px #ff7ab6aa;animation:voz-perfecto 1s ease-in-out infinite}
+@keyframes voz-giro{0%,45%{color:#ff3040;background:#000000d8;border-color:#3a0006}55%,100%{color:#e0207a;background:#fffffff2;border-color:#ff8cc6}}
+@keyframes voz-perfecto{50%{transform:translate(-50%,-3px) scale(1.03)}}
+@media (prefers-reduced-motion:reduce){.toast[data-voz=giro],.toast[data-voz=perfecto]{animation:none}}
+/* El mundo perfecto (desde la 350). game.js pone html.cielo y escribe --p1…--p3
+   (dulce, radiante, perfecto) y los colores; todo se funde con ellos. Es el
+   descenso al revés: redondo donde aquel se rompía, claro donde era oscuro, y
+   al final todo late junto, al mismo compás, con una sonrisa. */
+@property --p1{syntax:'<number>';inherits:true;initial-value:0}
+@property --p2{syntax:'<number>';inherits:true;initial-value:0}
+@property --p3{syntax:'<number>';inherits:true;initial-value:0}
+html{--p1:0;--p2:0;--p3:0;transition:--w2 3s,--w3 3s,--w4 3s,--w5 3s,--p1 3s,--p2 3s,--p3 3s}
+html.cielo{color-scheme:light}
+html.cielo body{background:radial-gradient(ellipse at 50% -10%,#fff 0,transparent 55%),radial-gradient(ellipse at center,color-mix(in srgb,var(--halo) 40%,transparent),transparent 70%),linear-gradient(180deg,color-mix(in srgb,#bfe6ff calc(var(--p1)*70%),var(--bg)),var(--bg));color:var(--text)}
+html.cielo h1{color:var(--green);text-shadow:2px 2px 0 var(--sombra),0 0 14px var(--halo)}
+html.cielo h1 span{color:var(--purple)}
+html.cielo .score-strip strong{color:var(--text);text-shadow:none}
+html.cielo #best,html.cielo .result-score{color:var(--green);text-shadow:0 0 12px var(--halo)}
+html.cielo .board-top,html.cielo .board-bottom{background:var(--barra);border-color:var(--line);color:var(--muted)}
+html.cielo #status,html.cielo #remaining{color:var(--green)}
+html.cielo .play-section{border-color:var(--borde);border-radius:calc(var(--p1)*16px);clip-path:none;
+  box-shadow:0 0 0 calc(3px*var(--p2)) #ff9ec9,0 0 0 calc(6px*var(--p2)) #ffd66b,0 0 0 calc(9px*var(--p2)) #9ef0b0,0 0 0 calc(12px*var(--p2)) #8fd3ff,0 10px 40px var(--halo)}
+html.cielo .canvas-wrap{background:var(--lienzo)}
+html.cielo .canvas-wrap::after{background:radial-gradient(ellipse at center,#fff0 60%,rgb(255 190 225/calc(var(--p1)*.35)) 100%)}
+html.cielo .control-button,html.cielo .wardrobe-button,html.cielo .icon-button{background:var(--panel);color:var(--text);border-color:var(--line);border-radius:calc(var(--p1)*999px);box-shadow:3px 3px 0 var(--sombra)}
+html.cielo .control-button[aria-pressed=true]{background:var(--barra);border-color:var(--borde);color:var(--green)}
+html.cielo .primary-button{background:var(--green);color:#fff;border-radius:calc(var(--p1)*999px);box-shadow:3px 3px 0 var(--sombra)}
+html.cielo .toast{background:#fffffff2;border-color:var(--borde);color:var(--green);border-radius:calc(var(--p1)*999px);box-shadow:0 4px 18px var(--halo)}
+html.cielo .overlay{background:color-mix(in srgb,var(--bg) 92%,transparent)}
+html.cielo .overlay p,html.cielo .eyebrow,html.cielo .result-detail,html.cielo .text-button{color:var(--muted)}
+html.cielo .overlay h2{color:var(--text)}
+html.cielo .sound-slash{background:var(--text)}
+html.cielo .club-ranking{background:#ffffff!important;color:var(--text)!important;border-color:var(--borde)!important;border-radius:calc(var(--p1)*14px)!important;box-shadow:4px 4px 0 var(--sombra)!important}
+html.cielo .club-ranking ol,html.cielo .club-ranking p{color:var(--muted)}
+html.cielo .club-ranking button{background:var(--barra);color:var(--green);border-color:var(--borde)}
+html.cielo .shell>.club-volver{color:var(--green)}
+/* Todo late junto, al mismo compás que los bloques (260 ms × 2π ≈ 1,63 s). */
+html.cielo .play-section{animation:cielo-late 1.63s ease-in-out infinite}
+html.cielo h1{animation:cielo-brinco 1.63s ease-in-out infinite}
+html.cielo .control-button{animation:cielo-brinco 1.63s ease-in-out infinite}
+@keyframes cielo-late{50%{transform:scale(calc(1 + .006*var(--p2) + .006*var(--p3)))}}
+@keyframes cielo-brinco{50%{transform:translateY(calc(-2px*var(--p2) - 2px*var(--p3)))}}
+@media(prefers-reduced-motion:reduce){html.cielo .play-section,html.cielo h1,html.cielo .control-button{animation:none}}

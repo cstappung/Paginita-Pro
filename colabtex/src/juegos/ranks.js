@@ -30,7 +30,7 @@ const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
 /* Los tres metales, en el orden del puesto. */
 const METAL = ["oro", "plata", "bronce"];
 const TITULO = ["Campeón", "Subcampeón", "Tercer puesto"];
-const EXTRA = { minas: { nombre: "Mina Club", color: "#eeb765" }, snake: { nombre: "Snake Club", color: "#4be9bc" }, tetrisclub: { nombre: "Tetris Club", color: "#b04ee8" }, sortem: { nombre: "sortEm", color: "#ff006e" } };
+const EXTRA = { minas: { nombre: "Mina Club", color: "#eeb765" }, snake: { nombre: "Snake Club", color: "#4be9bc" }, tetrisclub: { nombre: "Tetris Club", color: "#b04ee8" }, sortem: { nombre: "sortEm", color: "#ff006e" }, bbtan: { nombre: "BBTAN", color: "#c4f568" } };
 
 /* Las categorías de los juegos individuales, como botones y no como un
    desplegable: son pocas, se leen de un vistazo y cambiar de una a otra
@@ -44,6 +44,8 @@ const SOLO = {
     cat: s => `club-tetris-${s.n}` },
   sortem: { filas: [{ k: "n", t: "Números", ops: [["10", "Del 1 al 10"], ["20", "Del 1 al 20"]] }],
     cat: s => `club-sortem-${s.n}` },
+  bbtan: { filas: [{ k: "n", t: "Récord", ops: [["rondas", "Ronda máxima"]] }],
+    cat: s => `club-bbtan-${s.n}` },
   snake: { filas: [
       { k: "m", t: "Modo", ops: [["classic", "Clásico"], ["arcade", "Arcade"], ["portals", "Portales"], ["reloj", "Contrarreloj"], ["espejo", "Espejo"], ["laberinto", "Laberinto"]] },
       { k: "t", t: "Mapa", ops: [["chico", "Chico"], ["mediano", "Mediano"], ["grande", "Grande"], ["gigante", "Gigante"]] }],
@@ -78,7 +80,13 @@ export function crearRanks(ctx) {
   const perfil = ctx.perfil || (() => null);
 
   let host = null, muerto = false;
-  let juego = Object.keys(JUEGOS)[0];
+  /* Se abre en lo último que se miró —o en lo que pidió el vestíbulo al
+     tocar el podio de su tarjeta—, y si no, en la general: la pregunta
+     de quien entra aquí es «¿quién va ganando?», no «¿quién va ganando
+     a Órbita?», que era lo que contestaba por ser el primero del objeto. */
+  let juego = "general";
+  try { const g = localStorage.getItem("jg.rankJuego"); if (g && (g === "general" || JUEGOS[g] || EXTRA[g])) juego = g; } catch (e) { /* sin almacenamiento */ }
+  const icono = ctx.icono || {};
   let categoriaSolo = "";
   const eleccion = {};
   let filas = [];
@@ -106,7 +114,9 @@ export function crearRanks(ctx) {
         </p>
       </div>`;
     host.addEventListener("click", alClic);
+    if (esSolo(juego)) elige(juego);
     pintaBarra();
+    pintaCategorias();
     escucha();
   }
 
@@ -121,7 +131,9 @@ export function crearRanks(ctx) {
     if (parar) { try { parar(); } catch (e) {} parar = null; }
     cargando = true; fallo = ""; filas = []; pinta();
     const individual = esSolo(juego);
-    parar = (individual ? ctx.watchSolo : watchRanks)(individual ? categoriaSolo : juego, (lista, err) => {
+    const oye = juego === "general" ? (_, cb) => ctx.watchTodos((todo, err) => cb(suma(todo), err))
+      : individual ? ctx.watchSolo : watchRanks;
+    parar = oye(individual ? categoriaSolo : juego, (lista, err) => {
       if (muerto) return;
       cargando = false;
       fallo = err ? String(err.code || err.message || err) : "";
@@ -130,12 +142,42 @@ export function crearRanks(ctx) {
     });
   }
 
+  /* La general: cada jugador con lo de todos los juegos sumado. La racha
+     es la mejor de cualquiera de ellos (sumar rachas de juegos distintos
+     no significa nada) y «juegos» dice en cuántos tiene fila, que es lo
+     que distingue al que gana en todo del que solo juega a uno. */
+  function suma(todo) {
+    const t = {};
+    for (const [k, filas] of Object.entries(todo || {})) {
+      if (!JUEGOS[k]) continue;
+      for (const [u, f] of Object.entries(filas || {})) {
+        if (!f) continue;
+        const a = t[u] || (t[u] = { uid: u, nombre: "", foto: "", jugadas: 0, ganadas: 0, perdidas: 0, empates: 0, puntos: 0, mejorRacha: 0, juegos: 0, _at: -1 });
+        for (const c of ["jugadas", "ganadas", "perdidas", "empates", "puntos"]) a[c] += +f[c] || 0;
+        a.mejorRacha = Math.max(a.mejorRacha, +f.mejorRacha || 0);
+        a.juegos++;
+        if ((+f.at || 0) >= a._at) { a._at = +f.at || 0; a.nombre = f.nombre || a.nombre; a.foto = f.foto || a.foto; }
+      }
+    }
+    return Object.values(t);
+  }
+
+  /* 22 pastillas iguales, sin icono y en el orden del objeto, eran tres
+     filas de botones que no se distinguían. Ahora van en tres grupos
+     (general, en sala, de un jugador), cada uno con su icono y su color,
+     y los de sala por popularidad, como el catálogo. En el móvil es una
+     tira que se desliza en vez de medio metro de botones. */
   function pintaBarra() {
     const el = host && host.querySelector("#rkJuegos");
     if (!el) return;
-    el.innerHTML = Object.entries({ ...JUEGOS, ...EXTRA }).map(([k, j]) =>
-      `<button class="jg-tab${k === juego ? " on" : ""}" data-juego="${k}"
-         style="--c:${j.color}">${esc(j.nombre)}</button>`).join("");
+    const orden = ctx.orden ? ctx.orden().filter(k => JUEGOS[k]) : Object.keys(JUEGOS);
+    const boton = (k, j) => `<button class="jg-rk-sel${k === juego ? " on" : ""}" data-juego="${k}" style="--c:${j.color}"
+         ${k === juego ? 'aria-current="true"' : ""}><i aria-hidden="true">${esc(icono[k] || "●")}</i>${esc(j.nombre)}</button>`;
+    el.innerHTML = boton("general", { nombre: "General", color: "#7c5cff" }) +
+      `<span class="jg-rk-sep">En sala</span>` + orden.map(k => boton(k, JUEGOS[k])).join("") +
+      `<span class="jg-rk-sep">Un jugador</span>` + Object.entries(EXTRA).map(([k, j]) => boton(k, j)).join("");
+    const on = el.querySelector(".on");
+    if (on && el.scrollWidth > el.clientWidth) el.scrollLeft = on.offsetLeft - el.clientWidth / 2 + on.offsetWidth / 2;
   }
 
   function pinta() {
@@ -151,20 +193,23 @@ export function crearRanks(ctx) {
     if (!t) return;
     const solo = esSolo(juego);
     const orden = solo ? [...filas].sort((a,b)=>b.puntos-a.puntos||a.tiempo-b.tiempo||a.uid.localeCompare(b.uid)) : ordenaRanks(filas);
-    host.querySelector('.jg-nota-larga').textContent = solo ? 'Mejor récord por jugador y categoría. En empate, menor tiempo. Las puntuaciones se calculan en el navegador.' : 'Se suman 3 puntos por victoria y 1 por empate.';
+    const general = juego === "general";
+    host.querySelector('.jg-nota-larga').textContent = solo ? 'Mejor récord por jugador y categoría. En empate, menor tiempo. Las puntuaciones se calculan en el navegador.'
+      : general ? 'La general suma los puntos de todos los juegos en sala (3 por victoria, 1 por empate). «Juegos» dice en cuántos tiene fila cada uno.'
+      : 'Se suman 3 puntos por victoria y 1 por empate.';
     pintaEscena(solo ? orden : orden.map(f => mezcla(f, perfil(f.uid))), solo);
     if (!orden.length) {
       t.innerHTML = `<tr><td class="jg-vacio">${cargando ? "Cargando…"
         : "Todavía no ha terminado ninguna partida de este juego. Sé el primero."}</td></tr>`;
       return;
     }
-    if (solo) {t.innerHTML = `<thead><tr><th>#</th><th>Jugador</th><th>Récord</th><th>Tiempo</th></tr></thead><tbody>${orden.map((f,i)=>`<tr class="${f.uid===uid?'jg-yo':''}${i<3?' jg-rk-top':''}"><td class="jg-th-n">${puesto(i)}</td><td>${esc(f.nombre)}</td><td>${categoriaSolo.startsWith('club-minas-')?'Completado':categoriaSolo==='club-tetris-sprint'?'40 líneas':categoriaSolo.startsWith('club-sortem-')?f.puntos+' números':f.puntos}</td><td>${(f.tiempo/1000).toFixed(2)} s</td></tr>`).join('')}</tbody>`;return;}
+    if (solo) {t.innerHTML = `<thead><tr><th>#</th><th>Jugador</th><th>Récord</th><th>Tiempo</th></tr></thead><tbody>${orden.map((f,i)=>`<tr class="${f.uid===uid?'jg-yo':''}${i<3?' jg-rk-top':''}"><td class="jg-th-n">${puesto(i)}</td><td class="jg-jug" data-perfil="${esc(f.uid)}" data-nombre="${esc(f.nombre)}">${esc(f.nombre)}</td><td>${categoriaSolo.startsWith('club-minas-')?'Completado':categoriaSolo==='club-tetris-sprint'?'40 líneas':categoriaSolo.startsWith('club-sortem-')?f.puntos+' números':categoriaSolo.startsWith('club-bbtan-')?'Ronda '+f.puntos:f.puntos}</td><td>${(f.tiempo/1000).toFixed(2)} s</td></tr>`).join('')}</tbody>`;return;}
     t.innerHTML = `
       <thead><tr>
         <th class="jg-th-n">#</th><th>Jugador</th>
         <th class="jg-num">Jugadas</th><th class="jg-num">Ganadas</th>
         <th class="jg-num">Perdidas</th><th class="jg-num">Empates</th>
-        <th class="jg-num">%</th><th class="jg-num">Mejor racha</th>
+        <th class="jg-num">%</th>${general ? `<th class="jg-num">Juegos</th>` : ""}<th class="jg-num">Racha</th>
         <th class="jg-num jg-pts">Puntos</th>
       </tr></thead><tbody>${orden.map((f, i) => fila(f, i)).join("")}</tbody>`;
   }
@@ -175,7 +220,7 @@ export function crearRanks(ctx) {
     const pc = porcentaje(f);
     return `<tr class="${yo ? "jg-yo" : ""}${i < 3 ? " jg-rk-top" : ""}">
       <td class="jg-th-n">${puesto(i)}</td>
-      <td class="jg-jug">
+      <td class="jg-jug" data-perfil="${esc(f.uid)}" data-nombre="${esc(f.nombre || "")}">
         ${f.foto ? `<img class="jg-foto" src="${esc(f.foto)}" alt="" referrerpolicy="no-referrer">`
                  : `<span class="jg-foto jg-sin">${esc((f.nombre || "?").slice(0, 1).toUpperCase())}</span>`}
         <span>${esc(f.nombre || "Sin nombre")}${yo ? " <b>(tú)</b>" : ""}</span>
@@ -185,6 +230,7 @@ export function crearRanks(ctx) {
       <td class="jg-num">${f.perdidas || 0}</td>
       <td class="jg-num">${f.empates || 0}</td>
       <td class="jg-num"><span class="jg-barra-pc"><i style="width:${pc}%"></i></span>${pc}%</td>
+      ${juego === "general" ? `<td class="jg-num">${f.juegos || 0}</td>` : ""}
       <td class="jg-num">${f.mejorRacha || 0}</td>
       <td class="jg-num jg-pts">${f.puntos || 0}</td>
     </tr>`;
@@ -201,6 +247,9 @@ export function crearRanks(ctx) {
   function medida(solo) {
     if (solo && (categoriaSolo.startsWith("club-minas-") || categoriaSolo.startsWith("club-sortem-") || categoriaSolo === "club-tetris-sprint"))
       return { valor: f => (f.tiempo || 0) / 1000, txt: v => `${v.toFixed(2)} s`, unidad: "", menor: true };
+    /* BBTAN se mide en rondas alcanzadas, no en puntos. */
+    if (solo && categoriaSolo.startsWith("club-bbtan-"))
+      return { valor: f => f.puntos || 0, txt: v => `ronda ${v}`, unidad: "", menor: false };
     return { valor: f => f.puntos || 0, txt: v => String(v), unidad: "pts", menor: false };
   }
 
@@ -220,10 +269,11 @@ export function crearRanks(ctx) {
         <div class="jg-rk-pts">&nbsp;</div>
         ${bloque}</div>`;
     const detalle = solo ? (m.menor ? "mejor tiempo" : `${((f.tiempo || 0) / 1000).toFixed(1)} s`)
+      : juego === "general" ? `${f.ganadas || 0} G · ${plural(f.juegos || 0, "juego", "juegos")}`
       : `${f.ganadas || 0} G · ${porcentaje(f)} %${f.mejorRacha > 1 ? ` · racha ${f.mejorRacha}` : ""}`;
     return `<div class="${cls}">
         ${i === 0 ? CORONA : ""}
-        <div class="jg-rk-av">${avatar(f)}</div>
+        <div class="jg-rk-av" data-perfil="${esc(f.uid)}" data-nombre="${esc(f.nombre || "")}">${avatar(f)}</div>
         <b class="jg-rk-nom" title="${esc(f.nombre || "")}">${esc(f.nombre || "Sin nombre")}${f.uid === uid ? " <em>(tú)</em>" : ""}</b>
         <span class="jg-rk-tit">${TITULO[i]}</span>
         <div class="jg-rk-pts"><b>${m.txt(m.valor(f))}</b>${m.unidad ? ` ${m.unidad}` : ""}</div>
@@ -277,7 +327,7 @@ export function crearRanks(ctx) {
     const clave = solo ? categoriaSolo : juego;
     const entra = animado !== clave;
     animado = clave;
-    const j = JUEGOS[juego] || EXTRA[juego] || { nombre: juego };
+    const j = JUEGOS[juego] || EXTRA[juego] || { nombre: juego === "general" ? "Todos los juegos" : juego };
     const sub = solo ? subtitulo() : "";
     const html = `
       <div class="jg-rk-rayos"></div>
@@ -330,6 +380,7 @@ export function crearRanks(ctx) {
     const k = b.getAttribute("data-juego");
     if (k === juego) return;
     juego = k;
+    try { localStorage.setItem("jg.rankJuego", k); } catch (e) { /* nada */ }
     if (esSolo(k)) elige(k);
     pintaCategorias();
     pintaBarra();

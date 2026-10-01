@@ -33,12 +33,13 @@ import { crearSolo } from "./juegos/solo/club.js";
 import { watchAuth, loginGoogle, logout } from "./firebase.js";
 import * as fb from "./fb-juegos.js";
 import { escapeHtml, timeAgo, colorForUid } from "./util.js";
-import { JUEGOS, reducir, jugadasDe, acumula, cupoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, ganoEn } from "./juegos/motor.js";
+import { AJ_RITMOS, JUEGOS, reducir, jugadasDe, acumula, cupoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, ganoEn, ordenaRanks, novedades } from "./juegos/motor.js";
 import { crearEscondite } from "./juegos/escondite.js";
 import { crearCartas } from "./juegos/cartas.js";
 import { crearCuadritos } from "./juegos/cuadritos.js";
 import { crearOrbita } from "./juegos/orbita.js";
 import { crearReversi } from "./juegos/reversi.js";
+import { crearAjedrez, piezaSvg } from "./juegos/ajedrez.js";
 import { crearWorms } from "./juegos/worms.js";
 import { crearCadena } from "./juegos/cadena.js";
 import { crearFlip7 } from "./juegos/flip7.js";
@@ -55,6 +56,8 @@ import { crearRanks } from "./juegos/ranks.js";
 import { LOGROS, detecta, deFila, deMarca } from "./juegos/logros.js";
 import { crearLogros } from "./juegos/logros-vista.js";
 import { mezcla, abrePerfil } from "./juegos/perfil.js";
+import { abreMini, cierraMini, miniAbierta, crearPaginaPerfil, avatarMarco } from "./juegos/perfil-vista.js";
+import { estadisticas } from "./juegos/perfil-tarjeta.js";
 import { suena, silenciar, silenciado, ambientar, ajustarMusica, activarAudio } from "./juegos/sonido.js";
 import { montaReproductor } from "./juegos/reproductor.js";
 import { createReportWidget } from "./report-widget.js";
@@ -67,10 +70,14 @@ const FABRICAS = {
   orbita: crearOrbita, escondite: crearEscondite, cartas: crearCartas,
   cuadritos: crearCuadritos, reversi: crearReversi, worms: crearWorms,
   cadena: crearCadena, flip7: crearFlip7, cacho: crearCacho, uno: crearUno, catan: crearCatan,
-  presidente: crearPresidente, spicy: crearSpicy, tetris: crearTetris, yemas: crearYemas, clue: crearClue
+  presidente: crearPresidente, spicy: crearSpicy, tetris: crearTetris, yemas: crearYemas, clue: crearClue,
+  ajedrez: crearAjedrez
 };
 
-const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️" };
+const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞" };
+/* Los clubes de un jugador, con sus claves de la clasificación y los
+   mismos signos que llevan en su tarjeta del vestíbulo. */
+const ICONO_TODOS = { ...ICONO, general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●" };
 
 /* Lo que puede elegir quien abre la sala, por juego. Vive aquí y no en
    `motor.js` porque son controles y no reglas: el motor ya recorta lo
@@ -83,6 +90,14 @@ const cupos = k => Array.from({ length: JUEGOS[k].cupo - JUEGOS[k].minimo + 1 },
   (_, i) => ({ v: JUEGOS[k].minimo + i, t: JUEGOS[k].minimo + i + " jugadores" }));
 
 const OPCIONES = {
+  /* En el ajedrez lo único que se elige es el color de quien abre; «al
+     azar» lo decide la semilla de la sala, que nadie controla. */
+  ajedrez: [
+    { clave: "ritmo", etiqueta: "Ritmo", por: "10+0",
+      valores: [...Object.keys(AJ_RITMOS).map(v => ({ v, t: `${AJ_RITMOS[v]} · ${v}` })), { v: "libre", t: "Sin reloj" }] },
+    { clave: "color", etiqueta: "Color de quien abre", por: "azar",
+      valores: [{ v: "azar", t: "Al azar" }, { v: "blancas", t: "Blancas" }, { v: "negras", t: "Negras" }] }
+  ],
   cuadritos: [
     { clave: "cupo", etiqueta: "Jugadores", valores: cupos("cuadritos") },
     { clave: "lado", etiqueta: "Tablero", por: TAMANOS.mediano.lado,
@@ -171,7 +186,8 @@ const state = {
   fallo: null,            // por qué no se puede leer (reglas sin publicar, casi siempre)
   cargando: false,
   enCurso: [],            // partidas empezadas que se pueden mirar
-  popular: leePopular()   // juego → cuánto se ha jugado (ordena el catálogo)
+  popular: leePopular(),  // juego → cuánto se ha jugado (ordena el catálogo)
+  tablas: {}              // ranks/<juego>/<uid>, leído con la popularidad
 };
 
 /* El orden del catálogo es el de la última visita mientras llega el de
@@ -180,6 +196,9 @@ const state = {
 function leePopular() {
   try { return JSON.parse(localStorage.getItem("jg.popular") || "{}") || {}; } catch (e) { return {}; }
 }
+/* Los de un jugador, con su clave de popularidad. Cuentan como juegos en
+   la marquesina: el «18» fijo de antes se quedó atrás con cada club. */
+const CLUBES = ["club-minas", "club-snake", "club-tetris", "club-sortem", "club-bbtan"];
 function ordenPopular(claves) {
   const n = state.popular, pos = Object.fromEntries(claves.map((k, i) => [k, i]));
   return claves.slice().sort((a, b) => (n[b] || 0) - (n[a] || 0) || pos[a] - pos[b]);
@@ -196,6 +215,7 @@ let modulo = null, pidMontado = "", mirandoMontado = false;
 let vistaPintada = "";
 let ranks = null;
 let logrosVista = null;
+let paginaPerfil = null;
 let individual = null;
 let proximo = 0;          // el número de jugada que toca escribir
 const enVuelo = new Set(); // jugadas de esta pestaña aún sin confirmar (ver `terminar`)
@@ -237,6 +257,9 @@ function perfilDe(uid) {
       if (state.estado) vistePerfiles(state.estado);
       if (ranks) ranks.refresca();
       if (logrosVista) logrosVista.refresca();
+      if (paginaPerfil) paginaPerfil.refresca();
+      const mini = miniAbierta();
+      if (mini && mini.uid === uid) mini.refresca();
       render();
     }));
     perfiles.set(uid, perfiles.get(uid) || null);
@@ -274,12 +297,63 @@ function aplicaPropio() {
    vacía, y al pintar se superpone el perfil, que no tiene tope. */
 const fotoBreve = f => (typeof f === "string" && f.length <= 400 && !/^data:/.test(f)) ? f : "";
 
-function editaPerfil() {
+/* ---------- el perfil público ----------
+   La tarjeta y la página leen lo mismo que la pestaña de logros (ranks,
+   soloRanks y logros: `fb.watchLogros`), con una sola escucha para toda
+   la sesión que se abre la primera vez que alguien toca una foto. Firebase
+   junta las escuchas del mismo nodo, así que la pestaña de logros no lo
+   baja dos veces. */
+let datosP = null, offDatosP = null;
+const oyentesP = new Set();
+function datosPerfil(cb) {
+  oyentesP.add(cb);
+  if (!offDatosP) offDatosP = fb.watchLogros(d => {
+    datosP = { ranks: d.ranks, solo: d.solo, logros: d.logros };
+    for (const f of [...oyentesP]) f(datosP);
+  });
+  else if (datosP) setTimeout(() => { if (oyentesP.has(cb)) cb(datosP); }, 0);
+  return () => oyentesP.delete(cb);
+}
+const ctxPerfil = {
+  yo: () => state.user && state.user.uid,
+  perfil: uid => perfilDe(uid),
+  colorDe: uid => colorForUid(uid || ""),
+  datos: datosPerfil,
+  ir: h => ir(h),
+  editar: pestana => editaPerfil(pestana),
+  propio: () => state.base ? { nombre: state.base.name, foto: state.base.photo, color: state.base.color } : null
+};
+/* Cualquier foto o nombre con `data-perfil` abre la tarjeta; tocar la
+   misma otra vez la cierra. */
+function alTocarPerfil(e) {
+  const el = e.target.closest && e.target.closest("[data-perfil]");
+  if (!el || !state.user || el.closest(".jg-mini, .jg-modal")) return;
+  const uid = el.getAttribute("data-perfil");
+  if (!uid) return;
+  e.preventDefault();
+  const m = miniAbierta();
+  if (m && m.uid === uid) { cierraMini(); return; }
+  const pista = uid === state.user.uid ? ctxPerfil.propio()
+    : { nombre: el.getAttribute("data-nombre") || "", foto: el.getAttribute("data-foto") || "" };
+  abreMini(uid, el, ctxPerfil, pista);
+  suena("clic");
+}
+
+/* El editor necesita saber qué marcos tiene ganados: espera a los datos
+   (como mucho cuatro segundos; sin ellos, los que se ganan salen cerrados). */
+async function editaPerfil(pestana) {
   const b = state.base;
   if (!b) return;
+  const d = datosP || await new Promise(ok => {
+    let off = null;
+    const t = setTimeout(() => { if (off) off(); ok(null); }, 4000);
+    off = datosPerfil(x => { clearTimeout(t); setTimeout(() => off(), 0); ok(x); });
+  });
   abrePerfil({
     base: { nombre: b.name, foto: b.photo, color: b.color },
     perfil: perfiles.get(b.uid) || null,
+    est: d ? estadisticas(b.uid, d) : null,
+    uid: b.uid, colorDe: colorForUid, pestana,
     onGuardar: async p => {
       await fb.guardarPerfil(b.uid, p);
       /* La escucha traerá lo mismo en un instante; adelantarlo aquí
@@ -288,18 +362,20 @@ function editaPerfil() {
       aplicaPropio();
       if (state.estado) vistePerfiles(state.estado);
       if (ranks) ranks.refresca();
+      if (paginaPerfil) paginaPerfil.refresca();
       render();
       suena("clic");
     }
   });
 }
 
-/* ---------- sesión ---------- */
 function pintaUsuario() {
   const u = state.user;
   $("userName").textContent = u ? u.name : "";
   const av = $("userAvatar");
-  if (!u) { av.textContent = ""; return; }
+  if (!u) { av.textContent = ""; av.removeAttribute("data-perfil"); return; }
+  av.setAttribute("data-perfil", u.uid);
+  av.title = "Tu perfil";
   if (u.photo) av.innerHTML = `<img src="${escapeHtml(u.photo)}" alt="" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:cover">`;
   else { av.textContent = (u.name || "?").charAt(0).toUpperCase(); av.style.background = u.color; }
 }
@@ -463,9 +539,11 @@ function celebra(juego, id) {
    barra de direcciones. */
 function leerRuta() {
   const h = (location.hash || "").replace(/^#/, "");
-  if (/^solo\/(minas|snake|tetris|sortem)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
+  if (/^solo\/(minas|snake|tetris|sortem|bbtan)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
   if (h === "ranks") return { vista: "ranks", pid: "" };
   if (h === "logros") return { vista: "logros", pid: "" };
+  const pf = h.match(/^perfil\/([-\w]+)$/);
+  if (pf) return { vista: "perfil", pid: "", uid: pf[1] };
   const m = h.match(/^p\/([-\w]+)$/);
   if (m) return { vista: "partida", pid: m[1] };
   return { vista: "vestibulo", pid: "" };
@@ -478,9 +556,11 @@ function ir(hash) {
 
 function aplicaRuta() {
   const r = leerRuta();
-  if (r.vista === state.vista && r.pid === state.pid) return;
+  cierraMini();
+  if (r.vista === state.vista && r.pid === state.pid && (r.uid || "") === (state.perfilUid || "")) return;
   state.vista = r.vista;
   state.pid = r.pid;
+  state.perfilUid = r.uid || "";
   state.partida = null;
   state.estado = null;
   state.cargando = r.vista === "partida";
@@ -504,11 +584,12 @@ function engancharVestibulo() {
   });
   /* Sin reglas publicadas este nodo falla; no es motivo para tapar el
      vestíbulo con el aviso: la lista simplemente sale vacía. */
-  fb.leerPopularidad().then(n => {
+  fb.leerPopularidad().then(({ n, ranks }) => {
+    state.tablas = ranks;
     const cambio = JSON.stringify(n) !== JSON.stringify(state.popular);
     state.popular = n;
     try { localStorage.setItem("jg.popular", JSON.stringify(n)); } catch (e) {}
-    if (cambio && state.vista === "vestibulo") { vesFirma = ""; render(); }
+    if (state.vista === "vestibulo") { if (cambio) vesFirma = ""; render(); }
   }).catch(() => {});
   offEnCurso = fb.watchEnCurso(lista => {
     state.enCurso = lista || [];
@@ -741,12 +822,14 @@ function avisa(e, juego) {
 /* ---------- pintado: el armazón ---------- */
 function render() {
   if (!state.user) { if (individual) { individual.destruir(); individual = null; } return; }
-  if (state.vista !== vistaPintada) {
+  const clave = state.vista === "perfil" ? "perfil:" + state.perfilUid : state.vista;
+  if (clave !== vistaPintada) {
     if (individual) { individual.destruir(); individual = null; }
     if (vistaPintada === "ranks" && ranks) { ranks.destruir(); ranks = null; }
     if (vistaPintada === "logros" && logrosVista) { logrosVista.destruir(); logrosVista = null; }
+    if (paginaPerfil) { paginaPerfil.destruir(); paginaPerfil = null; }
     armazon();
-    vistaPintada = state.vista;
+    vistaPintada = clave;
   }
   if (state.vista === "vestibulo") pintaVestibulo();
   else if (state.vista === "partida") pintaPartida();
@@ -754,7 +837,7 @@ function render() {
 }
 
 function pintaTabs() {
-  $("tabJugar").classList.toggle("on", state.vista !== "ranks" && state.vista !== "logros");
+  $("tabJugar").classList.toggle("on", state.vista !== "ranks" && state.vista !== "logros" && state.vista !== "perfil");
   $("tabRanks").classList.toggle("on", state.vista === "ranks");
   $("tabLogros").classList.toggle("on", state.vista === "logros");
 }
@@ -796,6 +879,7 @@ function armazon() {
   if (state.vista.startsWith("solo-")) {
     const clave = state.vista.slice(5) === "tetris" ? "tetrisclub" : state.vista.slice(5);
     individual = crearSolo({juego:state.vista.slice(5),usuario:state.user,guardar:guardaConPodio,watch:fb.watchSolo,volver:()=>ir(""),
+      partida:{leer:()=>fb.leerPartidaClub(state.user.uid,state.vista.slice(5)),guardar:(d,at)=>fb.guardarPartidaClub(state.user.uid,state.vista.slice(5),d,at)},
       /* Un logro individual sale de la marca: se celebra el que esta
          partida da y la mejor marca guardada no daba ya. */
       alResultado: (d, previa) => { const antes = new Set(previa ? deMarca(clave, Object.assign({ categoria: d.categoria }, previa)) : []);
@@ -803,22 +887,29 @@ function armazon() {
     individual.montar(h);
     const juego = state.vista.slice(5), barra = document.createElement("div");
     barra.className = "jg-solo-barra";
-    barra.innerHTML = `<a class="btn2" href="#">← Juegos</a><div class="jg-solo-titulo"><small>UN JUGADOR · RANKING POR MODALIDAD</small><strong>${juego === "minas" ? "Buscaminas" : juego === "tetris" ? "Tetris" : juego === "sortem" ? "sortEm" : "Snake"}</strong></div><nav aria-label="Juegos individuales"><a class="btn2${juego === "minas" ? " on" : ""}" href="#solo/minas">Buscaminas</a><a class="btn2${juego === "snake" ? " on" : ""}" href="#solo/snake">Snake</a><a class="btn2${juego === "tetris" ? " on" : ""}" href="#solo/tetris">Tetris</a><a class="btn2${juego === "sortem" ? " on" : ""}" href="#solo/sortem">sortEm</a><button class="btn2" type="button">📖 Reglas</button></nav>`;
+    barra.innerHTML = `<a class="btn2" href="#">← Juegos</a><div class="jg-solo-titulo"><small>UN JUGADOR · RANKING POR MODALIDAD</small><strong>${juego === "minas" ? "Buscaminas" : juego === "tetris" ? "Tetris" : juego === "sortem" ? "sortEm" : juego === "bbtan" ? "BBTAN" : "Snake"}</strong></div><nav aria-label="Juegos individuales"><a class="btn2${juego === "minas" ? " on" : ""}" href="#solo/minas">Buscaminas</a><a class="btn2${juego === "snake" ? " on" : ""}" href="#solo/snake">Snake</a><a class="btn2${juego === "tetris" ? " on" : ""}" href="#solo/tetris">Tetris</a><a class="btn2${juego === "sortem" ? " on" : ""}" href="#solo/sortem">sortEm</a><a class="btn2${juego === "bbtan" ? " on" : ""}" href="#solo/bbtan">BBTAN</a><button class="btn2" type="button">📖 Reglas</button></nav>`;
     barra.querySelector("button").onclick = () => abreReglas(juego === "tetris" ? "tetrisclub" : juego);
     h.insertBefore(barra, h.firstChild);
     return;
   }
+  if (state.vista === "perfil") {
+    h.innerHTML = "";
+    paginaPerfil = crearPaginaPerfil({ uid: state.perfilUid, ctx: ctxPerfil });
+    paginaPerfil.montar(h);
+    return;
+  }
   if (state.vista === "logros") {
     h.innerHTML = "";
-    logrosVista = crearLogros({ uid: state.user.uid, watchLogros: fb.watchLogros, perfil: perfilDe,
-      orden: () => ordenPopular([...Object.keys(JUEGOS), "club-minas", "club-snake", "club-tetris", "club-sortem"])
-        .map(k => ({ "club-minas": "minas", "club-snake": "snake", "club-tetris": "tetrisclub", "club-sortem": "sortem" })[k] || k) });
+    logrosVista = crearLogros({ uid: state.user.uid, watchLogros: fb.watchLogros, perfil: perfilDe, icono: ICONO_TODOS,
+      orden: () => ordenPopular([...Object.keys(JUEGOS), ...CLUBES])
+        .map(k => ({ "club-minas": "minas", "club-snake": "snake", "club-tetris": "tetrisclub", "club-sortem": "sortem", "club-bbtan": "bbtan" })[k] || k) });
     logrosVista.montar(h);
     return;
   }
   if (state.vista === "ranks") {
     h.innerHTML = "";
-    ranks = crearRanks({ uid: state.user.uid, watchRanks: fb.watchRanks, watchSolo: fb.watchSolo, perfil: perfilDe });
+    ranks = crearRanks({ uid: state.user.uid, watchRanks: fb.watchRanks, watchSolo: fb.watchSolo, watchTodos: fb.watchRanksTodos,
+      perfil: perfilDe, icono: ICONO_TODOS, orden: () => ordenPopular(Object.keys(JUEGOS)) });
     ranks.montar(h);
     return;
   }
@@ -870,7 +961,13 @@ function armazon() {
          cualquier juego con chat: el campo abierto taparía el tablero. */
       else if (ok && enInmersivo()) chatAbierto(false);
     };
-    $("jgInm").onclick = () => ponInmersivo(!enInmersivo());
+    /* Un juego que sabe ponerse él solo a pantalla completa (Yemas pone
+       su marco, y así no queda nada de la página alrededor) lo hace; el
+       resto usa el modo inmersivo de la sala. */
+    $("jgInm").onclick = () => {
+      if (!enInmersivo() && modulo && modulo.pantallaCompleta && modulo.pantallaCompleta()) return;
+      ponInmersivo(!enInmersivo());
+    };
     $("jgChatAbre").onclick = () => chatAbierto(true);
     /* El campo se cierra solo al perder el foco vacío; con algo escrito
        se queda, que es texto que alguien quería mandar. */
@@ -893,6 +990,7 @@ function armazon() {
      espera, y con dos cajas habría acabado al final de la página. */
   h.innerHTML = `
     <div class="jg-ves">
+      ${novedadesHtml()}
       <section class="jg-marquesina">
         <div class="jg-mq-texto">
           <span class="jg-eyebrow">LABORATORIO · SALÓN DE JUEGOS</span>
@@ -901,7 +999,7 @@ function armazon() {
           <div class="jg-mq-cifras">
             <span><b id="vesNSalas">0</b>salas esperando</span>
             <span><b id="vesNMias">0</b>partidas tuyas</span>
-            <span><b>${String(Object.keys(JUEGOS).length + 2).padStart(2, "0")}</b>juegos</span>
+            <span><b>${Object.keys(JUEGOS).length + CLUBES.length}</b>juegos</span>
           </div>
           <div class="jg-mq-acciones">
             <button class="btn jg-mq-rapida" id="vesRapida"></button>
@@ -933,16 +1031,89 @@ function armazon() {
           </div></div>
         <div class="jg-elige" id="vesElige"></div>
         <div class="jg-section-title"><h2>Para jugar solo</h2><span>sin sala, cuando quieras</span></div>
-        <div class="sp-entradas"><a href="#solo/minas" class="sp-entrada sp-e-minas"><small>SINGLEPLAYER / ESTRATEGIA</small><strong>MINA CLUB <span>✦</span></strong><p>Piensa, explora y florece. Tres dificultades y música progresiva.</p><b>Explorar →</b></a><a href="#solo/snake" class="sp-entrada sp-e-snake"><small>SINGLEPLAYER / REFLEJOS</small><strong>SNAKE CLUB <span>ϟ</span></strong><p>Siete modos —contrarreloj, espejo, laberinto…— y cuatro tamaños de mapa.</p><b>Entrar al circuito →</b></a><a href="#solo/tetris" class="sp-entrada sp-e-tetris"><small>SINGLEPLAYER / REFLEJOS</small><strong>TETRIS CLUB <span>▤</span></strong><p>Maratón, Sprint de 40 líneas y Ultra de dos minutos.</p><b>Apilar →</b></a><a href="#solo/sortem" class="sp-entrada sp-e-sortem"><small>PLATANUS HACK 25 / PUZZLE</small><strong>sortEm <span>↔</span></strong><p>Mueve y fusiona los bloques hasta ordenar del 1 al 10 o al 20. Ranking por tiempo.</p><b>Ordenar →</b></a><a href="juegos/worms/index.html?v=worms-4" class="sp-entrada sp-e-worms"><small>LOCAL · BOTS / ARTILLERÍA</small><strong>CIRCUIT BREAKERS <span>💥</span></strong><p>Tu cuadrilla contra bots o amigos en el mismo equipo. En línea: abre una sala arriba.</p><b>Desplegar →</b></a></div>
+        <div class="sp-entradas"><a href="#solo/minas" class="sp-entrada sp-e-minas"><small>SINGLEPLAYER / ESTRATEGIA</small><strong>MINA CLUB <span>✦</span></strong><p>Piensa, explora y florece. Tres dificultades y música progresiva.</p><b>Explorar →</b></a><a href="#solo/snake" class="sp-entrada sp-e-snake"><small>SINGLEPLAYER / REFLEJOS</small><strong>SNAKE CLUB <span>ϟ</span></strong><p>Siete modos —contrarreloj, espejo, laberinto…— y cuatro tamaños de mapa.</p><b>Entrar al circuito →</b></a><a href="#solo/tetris" class="sp-entrada sp-e-tetris"><small>SINGLEPLAYER / REFLEJOS</small><strong>TETRIS CLUB <span>▤</span></strong><p>Maratón, Sprint de 40 líneas y Ultra de dos minutos.</p><b>Apilar →</b></a><a href="#solo/sortem" class="sp-entrada sp-e-sortem"><small>PLATANUS HACK 25 / PUZZLE</small><strong>sortEm <span>↔</span></strong><p>Mueve y fusiona los bloques hasta ordenar del 1 al 10 o al 20. Ranking por tiempo.</p><b>Ordenar →</b></a><a href="#solo/bbtan" class="sp-entrada sp-e-bbtan"><small>SINGLEPLAYER / ARCADE</small><strong>BBTAN <span>●</span></strong><p>Apunta, rebota y rompe los bloques antes de que lleguen abajo. Ranking por ronda máxima.</p><b>Lanzar →</b></a><a href="juegos/worms/index.html?v=worms-4" class="sp-entrada sp-e-worms"><small>LOCAL · BOTS / ARTILLERÍA</small><strong>CIRCUIT BREAKERS <span>💥</span></strong><p>Tu cuadrilla contra bots o amigos en el mismo equipo. En línea: abre una sala arriba.</p><b>Desplegar →</b></a></div>
       </div>
     </div>`;
   for (const b of h.querySelectorAll("[data-filtro]")) {
     b.onclick = () => { filtroVes = b.getAttribute("data-filtro"); aplicaFiltro(); };
   }
+  enganchaNovedades(h);
   h.querySelector(".jg-mq-link").onclick = ev => {
     ev.preventDefault();   // un #ancla cambiaría la ruta del hash
     $("vesCatalogo").scrollIntoView({ behavior: "smooth", block: "start" });
   };
+}
+
+/* ---------- novedades ----------
+   Lo primero del vestíbulo son los tres juegos que llegaron últimos, por
+   la fecha `alta` de `JUEGOS`: quien vuelve al salón tiene que ver qué
+   hay de nuevo sin recorrer el catálogo. La sala se abre con las
+   opciones por omisión —las mismas que trae preseleccionadas su tarjeta
+   del catálogo—, y «Opciones» lleva a esa tarjeta para elegir otras. */
+const fechaAlta = a => {
+  const d = new Date(a + "T12:00:00");
+  return isNaN(d) ? "" : d.toLocaleDateString("es", { day: "numeric", month: "long" });
+};
+const porOmision = k => Object.fromEntries((OPCIONES[k] || []).map(o => [o.clave, o.por || o.valores[0].v]));
+
+function novedadesHtml() {
+  const ks = novedades(3);
+  if (!ks.length) return "";
+  return `
+      <section class="jg-nov" aria-labelledby="vesNovT">
+        <header class="jg-nov-cab">
+          <span class="jg-eyebrow">RECIÉN LLEGADOS</span>
+          <h2 id="vesNovT">Novedades</h2>
+          <p>Los ${ks.length} últimos juegos en llegar al salón.</p>
+        </header>
+        <div class="jg-nov-lista">${ks.map((k, i) => {
+          const j = JUEGOS[k], grupo = j.cupo > 2;
+          const cupo = grupo ? (j.minimo || 2) + "–" + j.cupo + " jugadores" : "Duelo · 2 jugadores";
+          return `
+          <article class="jg-nov-c" style="--c:${j.color}">
+            <div class="jg-portada jg-portada-${k}" aria-hidden="true">${arteJuego(k)}</div>
+            <div class="jg-nov-cuerpo">
+              <div class="jg-nov-meta"><span class="jg-nov-sello">${i === 0 ? "★ Lo último" : "Nuevo"}</span><span>${escapeHtml(fechaAlta(j.alta))}</span></div>
+              <h3>${escapeHtml(j.nombre)}</h3>
+              <p>${escapeHtml(j.lema)}</p>
+              <small>${escapeHtml(cupo)}</small>
+              <div class="jg-nov-pie">
+                <button class="btn" data-nov-crear="${k}">Abrir sala <span aria-hidden="true">→</span></button>
+                ${OPCIONES[k] ? `<button class="btn2" data-nov-ver="${k}" title="Elegir las opciones en su tarjeta">Opciones</button>` : ""}
+                ${tieneReglas(k) ? `<button class="btn2" data-nov-reglas="${k}" title="Cómo se juega" aria-label="Reglas de ${escapeHtml(j.nombre)}">📖</button>` : ""}
+              </div>
+            </div>
+          </article>`;
+        }).join("")}</div>
+      </section>`;
+}
+
+function enganchaNovedades(h) {
+  for (const b of h.querySelectorAll("[data-nov-crear]")) {
+    const k = b.getAttribute("data-nov-crear");
+    b.onclick = () => crear(k, porOmision(k));
+  }
+  for (const b of h.querySelectorAll("[data-nov-reglas]")) {
+    const k = b.getAttribute("data-nov-reglas");
+    b.onclick = () => abreReglas(k, { modo: modoReglas(k, porOmision(k)), nombre: JUEGOS[k].nombre });
+  }
+  /* Lleva a la tarjeta del catálogo, abre sus opciones y la hace brillar
+     un momento para que se vea cuál es. Si el filtro la tenía escondida,
+     se vuelve a «Todos». */
+  for (const b of h.querySelectorAll("[data-nov-ver]")) {
+    b.onclick = () => {
+      const k = b.getAttribute("data-nov-ver");
+      const t = document.querySelector("#vesElige .jg-of-" + k);
+      if (!t) return;
+      if (t.hidden) { filtroVes = "todos"; aplicaFiltro(); }
+      const d = t.querySelector(".jg-of-ops");
+      if (d) d.open = true;
+      t.scrollIntoView({ behavior: "smooth", block: "center" });
+      t.classList.remove("jg-of-brilla");
+      void t.offsetWidth;
+      t.classList.add("jg-of-brilla");
+    };
+  }
 }
 
 /* El filtro solo esconde tarjetas: no se repinta nada, así que lo que
@@ -973,6 +1144,26 @@ function ordenaSolos() {
   if (nuevo.some((a, i) => a !== todas[i])) nuevo.forEach(a => caja.appendChild(a));
 }
 
+/* La tarjeta destacada ocupa dos columnas y le sobraba media tarjeta en
+   blanco. Ahí va su podio y dónde vas tú: es la razón para abrir una
+   sala de ese juego y no de otro. Sale de las filas que ya trajo la
+   lectura de popularidad, así que no cuesta otra consulta. */
+function pintaDestacado() {
+  const el = document.querySelector(".jg-of-podio");
+  if (!el) return;
+  const k = el.getAttribute("data-rk");
+  const orden = ordenaRanks(Object.entries(state.tablas[k] || {}).map(([uid, f]) => Object.assign({ uid }, f)));
+  if (!orden.length) { el.hidden = true; return; }
+  const nombre = f => mezcla(f, perfilDe(f.uid)).nombre || "Jugador";
+  const yo = orden.findIndex(f => f.uid === state.user.uid);
+  const html = `<span class="jg-of-podio-t">Salón de la fama <b>ver todo →</b></span><ol>${orden.slice(0, 3).map((f, i) =>
+    `<li class="${f.uid === state.user.uid ? "yo" : ""}"><i>${i + 1}</i><span>${escapeHtml(nombre(f))}</span><b>${f.puntos || 0}</b></li>`).join("")}</ol>` +
+    `<small>${yo < 0 ? "Aún no estás en la tabla de este juego." : yo < 3 ? "Estás en el podio. Defiéndelo." : `Vas #${yo + 1} de ${orden.length}.`}</small>`;
+  if (el.innerHTML !== html) el.innerHTML = html;
+  el.hidden = false;
+  el.onclick = () => { try { localStorage.setItem("jg.rankJuego", k); } catch (e) {} };
+}
+
 function pintaVestibulo() {
   $("vesAviso").innerHTML = state.fallo ? avisoReglas(state.fallo) : "";
 
@@ -998,6 +1189,7 @@ function pintaVestibulo() {
         <div class="jg-of-meta"><span class="jg-of-tipo">${grupo ? "En grupo" : "Duelo"}</span><span class="jg-of-cupo" title="Jugadores"><i aria-hidden="true"></i>${cupo}</span></div>
         <h3 class="jg-of-nombre">${escapeHtml(j.nombre)}</h3>
         <p class="jg-of-lema" title="${escapeHtml(j.lema)}">${escapeHtml(j.lema)}</p>
+        ${k === masJugado ? `<a class="jg-of-podio" href="#ranks" data-rk="${k}" hidden></a>` : ""}
         ${opcionesHtml(k)}
         <div class="jg-of-pie">
           <button class="btn jg-of-btn" data-crear="${k}">Abrir sala <span class="jg-of-flecha" aria-hidden="true">→</span></button>
@@ -1020,6 +1212,7 @@ function pintaVestibulo() {
   }
   }
   aplicaFiltro();
+  pintaDestacado();
 
   const mias = new Set(state.mias.map(x => x.id));
   const abiertas = state.salas.filter(s => s.anfitrion !== state.user.uid && !mias.has(s.id) && !s.origen);
@@ -1334,7 +1527,7 @@ const FANFARRIA = { gano: "victoria", perdi: "derrota", empate: "empate", mirand
    En cartas es el choque entero (`CHOQUE`, 2,6 s): la ronda que gana
    el trío se enseña igual que las demás. Worms no pone fanfarria — el
    marco tiene su propio audio y su propio final. */
-const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300, presidente: 1200, spicy: 1200, tetris: 1500, yemas: 1500, clue: 1800 };
+const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300, presidente: 1200, spicy: 1200, tetris: 1500, yemas: 1500, clue: 1800, ajedrez: 1300 };
 
 function pintaFin(p, est) {
   const caja = $("jgFin");
@@ -1458,7 +1651,16 @@ const RAZONES = {
   piedad: "Fue el último en pie: los demás llegaron a 25 cartas.",
   catan: "Llegó a los puntos de victoria antes que nadie.",
   agotado: "Se agotaron las llaves de los dados: ganó quien tenía más puntos.",
-  cierre: "La mesa votó acabar: ganó quien llevaba más puntos."
+  cierre: "La mesa votó acabar: ganó quien llevaba más puntos.",
+  mate: "Jaque mate.",
+  ahogado: "Rey ahogado: sin jugadas y sin estar en jaque.",
+  material: "No quedaba material para dar mate.",
+  repeticion: "La misma posición se repitió tres veces.",
+  cincuenta: "Cincuenta jugadas sin capturas ni movimientos de peón.",
+  acuerdo: "Tablas de mutuo acuerdo.",
+  rendicion: "El rival se rindió.",
+  tiempo: "Al rival se le acabó el tiempo.",
+  tiempomaterial: "Se acabó un reloj, pero el otro no tenía con qué dar mate: tablas."
 };
 const razon = m => RAZONES[m] || "";
 const nombreDe = (est, uid) => {
@@ -1518,7 +1720,7 @@ function pintaQuienes(p, est) {
   const duelo = activos.length <= 2;
   const puedoVotar = abierta && (!duelo || (!meToca(est, yo) && Date.now() - ultimoCambio >= VOTO_DUELO_MS));
   const votos = est.votos || {};
-  const firma = JSON.stringify([est.jugadores.map(x => [x.uid, x.nombre, x.color, x.foto]), [...fuera], votos, puedoVotar, hace]);
+  const firma = JSON.stringify([est.jugadores.map(x => [x.uid, x.nombre, x.color, x.foto, x.marco]), [...fuera], votos, puedoVotar, hace]);
   if (caja.dataset.firma === firma) return;
   caja.dataset.firma = firma;
   caja.innerHTML = (est.jugadores || []).map(x => {
@@ -1529,7 +1731,7 @@ function pintaQuienes(p, est) {
       ? `<button class="jg-voto${mio ? " on" : ""}" data-voto="${escapeHtml(x.uid)}" title="${mio ? "Retirar tu voto" : "Votar para expulsar a " + escapeHtml(x.nombre || "Alguien")}">${mio ? "↺" : "⏏"}</button>` : "";
     return `
     <span class="jg-quien-chip${out ? " fuera" : ""}" style="--c:${escapeHtml(x.color || "#888")}">
-      ${x.foto ? `<img src="${escapeHtml(x.foto)}" alt="" referrerpolicy="no-referrer">` : `<i>${escapeHtml((x.nombre || "?").charAt(0))}</i>`}
+      ${avatarMarco(x.foto, x.nombre, x.color, x.marco, 20, x.uid)}
       ${escapeHtml(x.nombre || "Alguien")}${x.uid === yo ? " (tú)" : ""}
       ${contra.length && !out ? `<small class="jg-voto-n" title="Votos para expulsar">⏏ ${contra.length}/${hace}</small>` : ""}
       ${boton}
@@ -1570,7 +1772,7 @@ function pintaChat() {
   const ahora = fb.ahora();
   lista.innerHTML = chatMsgs.length ? chatMsgs.map(m => `
     <div class="jg-chat-msg${m.uid === yo ? " mio" : ""}" style="--c:${escapeHtml(colorForUid(m.uid || ""))};--edad:${Math.max(0, Math.round((ahora - (Number(m.at) || ahora)) / 100) / 10)}s">
-      <b>${escapeHtml(m.nombre || "Alguien")}${jugadores[m.uid] ? "" : ' <small>mirando</small>'}</b>
+      <b data-perfil="${escapeHtml(m.uid || "")}" data-nombre="${escapeHtml(m.nombre || "")}">${escapeHtml(m.nombre || "Alguien")}${jugadores[m.uid] ? "" : ' <small>mirando</small>'}</b>
       <span>${escapeHtml(m.t || "")}</span>
     </div>`).join("")
     : `<div class="vacio">Nadie ha escrito todavía.</div>`;
@@ -1716,7 +1918,8 @@ function wire() {
     $("loginError").textContent = "No se pudo iniciar sesión: " + (e.code || e.message);
   });
   $("btnLogout").onclick = () => logout();
-  $("btnPerfil").onclick = editaPerfil;
+  $("btnPerfil").onclick = () => { if (state.user) ir("#perfil/" + state.user.uid); };
+  document.addEventListener("click", alTocarPerfil);
   pintaSonido();
   montaReproductor($("btnMusica"));
   document.addEventListener("pointerdown", activarAudio, { passive: true });
@@ -1764,7 +1967,7 @@ function wire() {
     engancharVestibulo();
     vistaPintada = "";
     const r = leerRuta();
-    state.vista = r.vista; state.pid = r.pid;
+    state.vista = r.vista; state.pid = r.pid; state.perfilUid = r.uid || "";
     state.cargando = r.vista === "partida";
     if (r.vista === "partida") engancharPartida(r.pid);
     render();
@@ -1787,6 +1990,7 @@ function arteJuego(k) {
   if (k === "tetris") return '<div class="jg-art-tt">' + ["....ll", "t..zll", "ttzzoo", "itsjoo", "issjjj"].map(f => [...f].map(c => '<i class="' + (c === "." ? "" : "p-" + c) + '"></i>').join("")).join("") + '<em>TETRIS</em></div>';
   if (k === "yemas") return '<div class="jg-art-ym"><i></i><i></i><i></i><b></b><em>YEMAS</em></div>';
   if (k === "clue") return '<div class="jg-art-cl"><i></i><i></i><i></i><b>✉</b><s>🔍</s><em>CLUE</em></div>';
+  if (k === "ajedrez") return '<div class="jg-art-aj">' + ["r", "Q", "n", "K", "p"].map(x => '<svg viewBox="0 0 100 100" aria-hidden="true">' + piezaSvg(x) + '</svg>').join("") + '</div>';
   if (k === "cuadritos") return '<div class="jg-art-dots">' + Array.from({ length: 9 }, (_, i) => '<i class="' + (i % 3 === 0 ? "llena" : "") + '"></i>').join("") + '</div>';
   return '<div class="jg-art-land"><i></i><i></i><i></i><b>⌖</b><span>ENCUENTRA LO INVISIBLE</span></div>';
 }

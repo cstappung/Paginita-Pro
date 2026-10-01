@@ -47,3 +47,14 @@ export const tetris=estado=>{
  return tablero('La pieza completa una fila; al borrarse, las celdas superiores bajan',8,6,c,col);
 };
 export const isla=tipo=>svg(tipo===2?'El ladrón bloquea el terreno: no produce recursos':'Trigo 8: poblado en vértice y camino en arista',`<path d="M240 35l92 53v106l-92 53-92-53V88z" fill="#bba563" stroke="#ead9a2" stroke-width="3"/>`+circle(240,128,26,'#fff0c7')+(tipo===2?circle(240,112,10,'#152139')+rect(227,123,26,27,'#152139','#fff',5):txt(240,136,'8',25,'#342a22','middle'))+line(148,88,240,35,C.azul,8)+`<path d="M137 76l11-10 11 10v17h-22z" fill="${C.azul}" stroke="#142139" stroke-width="2"/>`+(tipo>0?`<path d="M319 78h10V65h14v28h-24z" fill="${C.rojo}" stroke="#142139" stroke-width="2"/>`:'')+txt(24,30,tipo===0?'Vértice: poblado · Arista: camino':tipo===2?'Ladrón: terreno bloqueado':'Sale 8: producen los edificios vecinos',16)+(tipo>0?rect(12,198,456,34,'#142139','#142139',8):'')+(tipo===2?txt(240,219,'Este terreno no produce recursos',16,C.oro,'middle'):tipo>0?txt(24,219,'Poblado: 1 trigo',16,C.azul)+txt(290,219,'Ciudad: 2 trigo',16,C.rojo):''));
+/* Ajedrez: un trozo de tablero con piezas escritas en texto. Aquí el
+   manual sí usa caracteres, como el resto de ilustraciones; el peón negro
+   lleva el selector de texto para que ningún sistema lo pinte como emoji. */
+export const ajedrez=(nombre,cols,rows,celdas,marcas={})=>{
+ const z=Math.min(48,420/cols,214/rows),ox=(480-cols*z)/2,oy=(250-rows*z)/2;
+ return svg(nombre,Array.from({length:cols*rows},(_,i)=>{
+  const c=i%cols,f=Math.floor(i/cols),x=ox+c*z,y=oy+f*z,v=celdas[i]||'',m=marcas[i];
+  const fondo=m?C[m]:((c+f)%2?'#8a6a4c':'#d8c3a0');
+  return `<rect x="${x}" y="${y}" width="${z}" height="${z}" fill="${fondo}"/>`+(v?txt(x+z/2,y+z*.72,v==='♟'?'♟︎':v,z*.68,'#17120c','middle'):'');
+ }).join('')+`<rect x="${ox}" y="${oy}" width="${cols*z}" height="${rows*z}" fill="none" stroke="#465773" stroke-width="2"/>`);
+};

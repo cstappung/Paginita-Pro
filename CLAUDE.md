@@ -45,7 +45,7 @@ Six apps plus a small shared **Informes** page:
   collect by themselves, plus the bugs and ideas people write. See "Informes"
   below.
 - **Juegos** (`juegos.html` + `juegos-app.js`, entry
-  `colabtex/src/juegos-main.js`) — sixteen multiplayer games, on the same Google
+  `colabtex/src/juegos-main.js`) — seventeen multiplayer games, on the same Google
   account and the same Firebase project: **Escondite** (hide a person in a
   landscape, then cross the landscapes and race to find the other's),
   **Cartas de los tres elementos** (a Card-Jitsu duel), **Cuadritos** (dots and
@@ -65,8 +65,8 @@ Six apps plus a small shared **Informes** page:
   for two to eight squads, in an iframe), **Yemas** (a first-person
   egg shooter for two to eight in three modes, with voice chat, also in an
   iframe) and **Clue** (the deduction board game on a map of a real
-  university building, two to six, in an iframe, dealt with mental poker),
-  plus a **Clasificación** tab and a 📖 **Reglas**
+  university building, two to six, in an iframe, dealt with mental poker)
+  and **Ajedrez** (chess, the full rules, for two), plus a **Clasificación** tab and a 📖 **Reglas**
   manual for every game, solo ones included. See "Juegos" below.
 
 ColabTeX, ColabDraw, FiltroLab, AjusteLab, Juegos and Informes are authored in
@@ -1539,14 +1539,14 @@ Four decisions worth keeping:
 
 ## Juegos architecture
 
-Sixteen games, on the same Firebase project and the same Google session
+Seventeen games, on the same Firebase project and the same Google session
 as ColabTeX and ColabDraw. Turn-based on purpose (Tetris and Yemas are the
 real-time exceptions, and both still keep the log to what decides the game): with one move per turn the
 network carries a handful of fields and there is nothing to interpolate, so no
 game loop ever has to be synchronised.
 
 **How many people fit is a property of the room, not of the game.** `JUEGOS`
-declares `minimo` and `cupo` (escondite, cartas and reversi are duels by
+declares `minimo` and `cupo` (escondite, cartas, reversi and ajedrez are duels by
 construction — two landscapes, one clash, two colours), and whoever opens the
 room picks inside that range along with anything else the game offers;
 `crearPartida(juego, quien, extra)` writes those over the defaults, so a game
@@ -1636,6 +1636,17 @@ reads `est.puntos` before `est.cuenta`: `redCadena` returns `puntos` with **0
 for anyone `fuera` or `caido`**, because someone who abandons leaves their orbs
 on the board and `cuenta` showed an eliminated player with their score from
 before dying; `cadena.js`'s marcador does the same once the replay is over.
+
+**The lobby opens with *Novedades*, the three newest games** (`.jg-nov`,
+`novedadesHtml` in `juegos-main.js`). They come from `novedades(3)` in
+`motor.js`, which sorts by each game's `alta` (the date it arrived,
+`AAAA-MM-DD`, in `JUEGOS`), with ties going to the later row of the table.
+So a new game only has to bring its `alta`, and `tests/juegos.test.cjs`
+fails if one doesn't. *Abrir sala* there uses the same defaults its
+catalogue card has preselected (`porOmision`, read from `OPCIONES`), and
+*Opciones* scrolls to that card, opens its options and makes it glow
+(`.jg-of-brilla`), resetting the filter if it was hiding it. The section is
+an extra `nov` area spanning the whole first row of `.jg-ves`.
 
 **The lobby is a grid with the rooms on the right.** `.jg-ves` has the areas
 `"mq lado" "cat lado"`: the *marquesina* (title, counters, a quick-join button
@@ -1824,6 +1835,49 @@ fits a Google URL and no uploaded photo at all. Three consequences:
   validation — so this needed **no rules change**, which after Reversi is a
   feature in itself.
 
+**Everyone has a public profile: a card and a page** (`juegos/perfil-tarjeta.js`,
+pure, and `juegos/perfil-vista.js`, the DOM). Clicking any element with
+`data-perfil="<uid>"` opens the mini card. One document listener,
+`alTocarPerfil` in `juegos-main.js`, handles every such element: the header
+avatar, the room's player chips, chat names, ranking rows and podium, and
+the names in Logros. Tapping the same element again closes the card. On
+desktop it is anchored to the element; at ≤600 px it is a bottom sheet. It
+shows the background, the photo with its frame, the bio, three numbers and
+the first three pieces of the vitrina, plus **Ver perfil**, which opens
+`#perfil/<uid>`. The page holds the hero, five totals, the whole vitrina,
+every ranking table with its position, and the logros grouped by game.
+The header's **Perfil** goes to your own page, and **✎ Personalizar** opens
+`abrePerfil`. That editor has four tabs (datos, marco, fondo, vitrina) and a
+live preview of the card.
+
+Four decisions:
+
+- **No rules change.** The new fields `marco`, `fondo`, `bio` and `vitrina`
+  live in `users/<uid>/perfil` beside nick, foto and colour. Everything
+  else is computed from what Logros already reads (`fb.watchLogros`).
+  There is one shared listener per session (`datosPerfil`), opened the
+  first time someone touches a photo.
+- **Frames and backgrounds are CSS, not images.** A catalogue of ids
+  (`MARCOS`, `FONDOS`), with the `.jg-marco-<id>` classes in juegos.html
+  reading `--t` (size) and `--c` (colour). The same frame works on a 20 px
+  chip and a 116 px portrait. The laurel and the crown are inline SVG data
+  URIs, not emoji.
+- **Some are earned, and checked where they are seen.** A `req` is either a
+  number of logros or a podium / first place in a table of three or more.
+  `marcoVisible` and `fondoVisible` re-check it against the owner's stats
+  every time they paint. A frame written into the database by hand is
+  stored, but others see the plain ring.
+- **The vitrina stores keys, not copies.** `l:<juego>:<id>` is a logro,
+  `r:<juego>` a room ranking and `s:<categoría>` a club record. The keys
+  are resolved against live data (`vitrinaDe`), so the position shown is
+  today's, and anything gone drops out. Choosing nothing gives an
+  automatic vitrina: the best positions, then the rarest logros.
+  `limpiaPerfil` keeps only known ids, a bio of `LARGO_BIO` characters and
+  up to `MAX_VITRINA` keys.
+
+`tests/perfil.test.cjs` covers the stats, the requirements, the vitrina
+and the cleaning.
+
 **Voting someone out is a move, not a new mechanism** (`votacion` and
 `mayoriaExpulsion` in `motor.js`). A vote is `{t:"voto", uid, contra}`, and
 withdrawing it is another entry with `no:true`, so the log stays append-only
@@ -1967,14 +2021,14 @@ Modules in [colabtex/src/juegos/](colabtex/src/juegos/):
 - `paisaje.js` — draws the scene `motor.js` decided. Split from it because the
   only thing the two machines must share is the layout, and that is a number.
 - `escondite.js`, `cartas.js`, `cuadritos.js`, `reversi.js`, `cadena.js`,
-  `flip7.js`, `cacho.js`, `uno.js`, `catan.js`, `ranks.js` — one screen each.
+  `flip7.js`, `cacho.js`, `uno.js`, `catan.js`, `ajedrez.js`, `ranks.js` — one screen each.
 - `reglas.js` — the 📖 manual of every game (`abreReglas`, `tieneReglas`); see
   below.
 - `sonido.js` — the WebAudio synth and the mute flag. No DOM beyond the header
   button's state, no Firebase.
 - `perfil.js` — the profile editor: `COLORES`, `mezcla` (ficha + perfil → what
-  is painted, pure and verifiable in Node), `recorta` (the browser-side 96×96
-  centre crop to a JPEG data URL, which is what keeps the photo at ~10 kB) and
+  is painted, pure and verifiable in Node), `recorta` (the browser-side 160×160
+  centre crop to a JPEG data URL, which is what keeps the photo at ~15 kB) and
   `abrePerfil`, the modal.
 - All of them expose the **same shape**: `crearX(ctx)` with
   `ctx = {uid, pid, jugar, terminar, ahora}`, returning
@@ -2570,6 +2624,158 @@ fullscreen button on purpose: a focused button turned the game's Space into a
 fullscreen toggle. The `soloRanks` regex needed widening, so the rules must
 be re-published.
 
+**BBTAN (`juegos/club/bbtan/`) is a Solo Club game too**, on the same
+`conexion.js` protocol: plain files, no build, bump `?v=bbtan-N` in its
+`index.html` when they change (and `club-N` in `solo/club.js` for the iframe).
+Its one category is `club-bbtan-rondas` and `puntos` is the **highest round
+reached** (the time played rides along as the tiebreak), reported once per game
+on game over or on restart, and only from round 2. Its ten logros are round
+thresholds (`deMarca`). Two things not to break: the audio's `clear()` and the
+NICE! celebration are the original's and stay as they are; ball hits are a
+short rising sine through a low-pass (`bubble`) and a broken block is a noise
+burst + thump + arpeggio (`broken`), both throttled so a combo does not turn
+into a wall of sound. The retro look is Press Start 2P, notched pixel frames
+(`pixelFrame`), plus-shaped balls (`pixelBall`) and CSS scanlines on
+`.canvas-wrap::after`. The regex in `soloRanks` needed widening, so the rules
+must be re-published.
+
+**BBTAN's music is composed live from the board** (`musica.js`, UMD over
+`Chip`, tested by `musica.test.cjs`); it no longer loads `temas.js`, though
+`T.bbtan` stays in the songbook. `game.js` sends `BBTANAudio.mood({filas,
+bloques, ronda, disparando})` every 200 ms. `intensidad()` turns that into I
+in [0, 1], driven mostly by how many free rows are left above the floor and
+partly by how full the board is. The `Motor` smooths I (τ 1.6 s) and uses it
+to set the tempo, drums, arpeggio, filter cut-offs and a sidechain pump. In
+calm there is no snare and the melody is sparse; near the floor you get
+sixteenth hats, an alarm cluster and a heartbeat. The harmony switches to
+«filo» at I ≥ .7 and leaves it below .5. That hysteresis stops it flickering
+when a row goes back and forth. `duck()` lowers the music bus under the NICE!.
+
+**From round 50 the game descends five floors** (`descenso.js`, UMD on
+`BBTANDescenso`, loaded before `musica.js`): abismo from 50, ruina from 110,
+estática from 170, hostil from 230 and vacío from 290. None of them is a switch.
+`corrupcion(ronda)` rises by 1/60 per round over the sixty rounds after each
+threshold, and each fade starts where the last one ends, so it climbs without
+plateaus from 0 at round 49 to 5 at round 349, and **everything reads that one number** except the
+gameplay: blocks, balls, physics and aim stay as they are, so the game only
+gets more uncomfortable. The colours are `mezcla(c)`, a blend between the two
+floors' palettes (`ETAPAS`), and `paleta()` in `game.js` writes them into
+`colors` and into CSS variables on `<html>`. The floor adds the classes
+`descenso` and `desc-2…5`, and each one breaks the frame a bit more: chipped
+corners, chromatic glow, jitter, a heartbeat and a skewed shell. The
+reduced-motion setting turns those animations off. The canvas gets cracks,
+faint words, blinking eyes and static (`drawDescenso`, `drawEstatica`). The
+character's face turns evil with `pose.maldad` in `character.js`, adding in
+order: pallor, V brows, red eyes, streaks and a jagged grin. The whole body
+and outfit follow (`pose.t` animates them): the skin goes grey then blood red,
+the green shirt and blue jeans go black and burgundy, then come a stoop, a
+torn shirt and frayed hems, a tail, horns, veins, claws, a glowing pentagram,
+shoulder spikes and last bat wings, each over its own `m` range. The balls
+change too (`drawBola`, `drawEstelaBola`): a halo and embers, then an eye that
+looks where it flies and blinks, then a black core with a red rim, with a
+trail of rising embers and smoke. The texts come from
+`TEXTOS`, one column per floor, picked with `etapa(c)`, the nearest floor, so
+the tone flips mid-fade. They go from cheering to «NO TE QUEREMOS AQUÍ», and
+past floor 2 `corrompe` swaps letters with a seeded noise so the status bar
+does not flicker. «PANTALLA LIMPIA» and the NICE! are never touched. The music
+gets `descenso` in `mood()`, and `Motor` smooths it (`D`, τ 4 s). The first
+floor fades the harmony into the abyss's sub bass, saturated bass and detuned
+lead. Past that, the wrapper `eventos()` breaks what `base()` plays: bitcrush
+(`trituradora`), wrong notes and a wobbling lead in ruina, dropouts and
+crackle (`bat 'r'`) in estática, and in hostil a heartbeat that never stops
+plus a dissonant pad cluster. In vacío come silent bars and notes that fall
+an octave (`cae`). Each floor is slower.
+
+**The descent is never announced.** Nothing says «entering floor N»: no
+entry toast, no `presagio` sting (both removed), no class that flips on one
+round. The CSS reads continuous weights `--w2…--w5` that `paleta()` writes,
+and in `game.js` each effect fades in over its own corruption range
+(`lento(a, b)`), so things take over one by one rather than per floor. What
+creeps in: a face hidden in the dot grid (`CARA`) whose red pupils follow the
+highest ball, veins from the corners (`VENAS`), a faint pentagram, eyes that
+open on the blocks and follow the ball (`ojosDeBloque`), blood dripping from
+them (`gotea`). Labels change letter by letter (`ETIQUETAS`: PUNTAJE→PECADOS,
+RÉCORD→CONDENA, RONDA→CÍRCULO, BOLAS→ALMAS), the title turns BBTAN into
+SATAN (the `<h1>` and `document.title`), and a red `susurro` flashes in a
+label for a moment (`mutaciones`, every 120 ms).
+
+**The one exception is the voice, and it was asked for** (`voz.js`, UMD on
+`BBTANVoz`, tested by `voz.test.cjs`). Every 50 rounds the game speaks
+(`habla`) and the phrase is also shown as a toast (`hablaJuego` in `game.js`,
+`.toast[data-voz]`). It does not name the floor, it just changes mood: a
+fairground host at 50 and 100 (`alegre`), broken and absurd at 150 and 200
+(`roto`), whispering against the player at 250 and 300 (`susurro`), a
+whisper cut off by a sugary voice at 350 (`giro`) and a too-perfect chorus
+from 400 (`perfecto`). **It is recorded, not synthesised in the browser**:
+`speechSynthesis` did not exist on phones and sounded different, and bad, on
+every PC. `colabtex/scripts/bbtan-voz.py` renders each phrase of `FRASES`
+with Piper (voices `es_MX-claude-high` and `es_MX-ald-medium`, apache-2.0
+and unlicense datasets) into `assets/voz/v<nivel>-<i>.mp3` (~1.2 MB in
+all). Each mood has its own processing there. `alegre` is pitched up by
+synthesising slower and resampling faster. `roto` works in two- or
+three-word chunks, each in another voice and pitch; single words came out
+unintelligible. The stutter is spoken («cu, cu, cucharas»). `susurro` is a
+real whisper, an LPC vocoder excited with noise, over a growl seven
+semitones down. `perfecto` is a phase-vocoder chord (+4, +7, +12). The text
+in `FRASES` is both what is read and what was recorded: **change a phrase
+and re-run the script**. The test checks that there is one MP3 per phrase
+and none left over. `faster-whisper` transcribing the output is how
+intelligibility was checked. `audio.js` fetches a level's three files five
+rounds early (`prepara`), plays through WebAudio (`anuncio`), ducks the music
+and lays a bed under the voice. The beds are a fair arpeggio, glitch beeps,
+the breath and drone, or a music box that climbs. It reports the real
+duration back so the toast waits for the voice, and `vozSeq` drops a voice
+that arrives after a restart.
+
+**Past round 350 the descent is undone and the world turns perfect**
+(`descenso.js`). The descent does not stop; it is subtracted.
+`corrupcionVista = corrupcion × (1 − luz)`, with `luz` going 0 → 1 over
+350–364, so everything that reads `corr` rewinds by itself. That includes
+the character's evil, SATAN and the music's floors. `perfeccion(ronda)`
+(`cielo` in `game.js`) is 0 until 349, 1 at 369 (dulce enters fast because
+it is what sweeps the dark away), 2 at 449 (radiante) and 3 at 499
+(perfecto). It stays at 3 after that. The palettes are light candy colours
+(`CIELO`, blended over the fading descent by `mezclaCielo`). The CSS
+`html.cielo` gets `--p1…--p3` and one more palette key, `text`, because the
+page turns light. Texts come from `TEXTOS_CIELO` through `tx()`/`fundeTexto`.
+
+Like the descent it creeps in (`suave(a, b)`) and nothing is announced. In
+order:
+
+- a sky, a sun and clouds;
+- faces on the blocks (`carita`), rainbow balls that become hearts, and
+  confetti;
+- a rainbow, clouds that smile, and blocks, flowers and the page all bouncing
+  on the same 1.63 s beat;
+- at the end the sun grows, and every face stops following the ball and
+  stares at the player;
+- smiles grow wider than the faces, and background words appear («TODO ESTÁ
+  BIEN», «NO MIRES DEBAJO»);
+- very rarely, for 90 ms, the red face of the descent (`CARA`) flashes
+  underneath (`debajo`).
+
+The character comes back to normal and then gets «perfect» with
+`pose.perfecto`: pastel clothes, a flower crown, a halo, angel wings, blush,
+huge unblinking eyes and a grin that does not fit. Labels turn into
+ALEGRÍA/ORGULLO/SONRISA/AMIGOS and the title into «BBTAN :)».
+
+The music (`cielo()` in `musica.js`, `e.C`) is C major I–V–vi–IV with
+four-on-the-floor, claps and a glockenspiel. It enters phrase by phrase like
+the abyss. It is uncomfortable because it does not listen: above C = 2,
+danger makes it happier and faster instead of tense. Each 8-bar loop also
+modulates up a semitone, and a music box echoes the melody one step late.
+Gameplay is untouched here too.
+
+**A game in progress is saved per account** (`guarda`/`cargaPartida` in
+`game.js`). At the start of every round from round 2 the board is written to
+`localStorage` and sent with `Club.guardarPartida` to the parent, which
+stores `{d, at}` at `users/<uid>/club/bbtan` (`fb.guardarPartidaClub`). That
+node is the user's own, so **no rules change was needed**. On load the local
+copy restores first; then `Club.pedirPartida` asks for the cloud one, which
+wins if it is newer and nothing has been shot yet. A finished or restarted
+game writes `d: null` (a tombstone with its `at`), so a stale copy on another
+device does not come back. It resumes at the start of the saved round.
+
 **UNO No Mercy's roulette is played by its victim**: the victim picks the
 colour (not whoever threw the card) and then draws one card at a time with
 the button until that colour comes out.
@@ -2683,6 +2889,97 @@ needed**. `voz.js` takes the mailbox as a parameter, so it was tested with
 three instances in one page over real `RTCPeerConnection`s, a fake mailbox
 and oscillators as microphones.
 
+**The voice outlives the game, not the room.** At `fin` the postman deletes
+only the eggs (`fb.borraYemasVivo`, `vivo/<pid>/y`) and keeps the voice.
+`vivo/$pid/voz` has its own rule that lets players write after `fin` (a
+child grant, OR'ed with the parent's), so a reconnection still signals.
+Leaving the room (`destruir`) is what hangs up. Whoever was in the voice
+has the room's pid in `sessionStorage` (`yemas.voz`), and the postman
+re-enters by itself in a reload of the same room or in the rematch
+(`p.origen`). A re-entry without a gesture can leave remote audio
+blocked, so `voz.js` retries `play()` on every level check and it sounds
+from the first click anywhere, the game frame included. The rules must be
+re-published for the after-`fin` part; until then, established
+connections keep talking and only new signalling fails.
+
+**In the team variants each player picks a team** while the room waits:
+`{t:"equipo", uid, e}` from the picker the postman draws above the frame.
+`equiposYemas` starts from seat parity, applies the last choice of each
+player **before the first game event** (a death or a flag touch), so teams
+cannot change mid-game, and falls back to parity if a team ends up empty
+with two or more in the room. The frame gets the teams on every
+`marcador` and repaints the eggs when a colour changes.
+
+**Grenades** (`juegos/yemas/js/granada.js`, the *Huevo duro*, weapon index
+3, `YM_ARMAS`): two per life, `G` or `4`. The thrower's frame simulates it,
+decides where it bursts and whom it reaches (line of sight from the burst,
+damage falling linearly over `radio`), and sends the damage through the
+usual hits with `a: 3`. Self damage is half and applied directly, so a
+self-kill is a `muere` with `por` = oneself, which counts as a death and no
+kill. The state carries the last throw (`n: {i, o, v}`) and the last burst
+(`x2: {i, p}`). The others simulate the throw only to see it fly, and they
+burst it **where the owner said**, because two simulations with different
+frame rates do not land on exactly the same spot.
+
+**Self-destruct** (weapon index 4, `AUTO` in the frame's `main.js`): hold X
+for `AUTO.carga` (0.9 s); releasing earlier or losing focus cancels it, so it
+never fires by accident. While charging the state carries `ad: 1` and the
+other frames make that egg glow red and beep, which gives them a moment to
+run. It bursts like a grenade (same `alcanceExplosion`/`golpeaRivales`,
+published as `x2`) with its own radius and damage, and the player always dies
+with `por` = themselves.
+
+**The arsenal** (weapon ids in the frame's `armas.js`, never renumbered
+because the log names them: 0–2 the original three, 3 the grenade, 4 the
+self-destruct, 5 the knife, 6 the bazooka, 7 the pistol; `YM_ARMAS` = 8).
+Everyone starts with the knife and carries at most two more. The rest lie on
+`PUNTOS_ARMA` (frame's `mundo.js`, `YM_PUNTOS_ARMA` in `motor.js`, which must
+agree). **Which** weapon lies on point `s` at its appearance `g` comes from
+the room's seed (`armaEnPunto`, so every screen sees the same one, and the
+postman sends `semilla` in the config). **Who takes it** is game state:
+`{t:"recoge", uid, s, g}` counts only if `g` is the next appearance after the
+last one taken there, so two players grabbing at once are settled by the log.
+`est.armas` is `{s: {g, uid}}`, and the frame grants the weapon when it sees
+itself as the taker. Each screen brings the next appearance back
+`REAPARECE` (18 s) after seeing one taken; that timing is the screen's alone.
+Walking over a free slot or a weapon already owned picks it up (an owned one
+only refills it), and with both slots full `E` swaps the one in hand.
+Inventory and ammo live in the frame: every gun has its magazine plus
+`RECARGAS` (5) reloads per life, and weapons survive death. Respawn after
+being killed refills life, ammo and grenades. After a **suicide that killed
+nobody**, it restores the life, ammo and grenades held just before. A kill
+that arrives while dead, or within 300 ms before dying (practice resolves it
+synchronously), counts as having killed someone. The bazooka's rocket rides
+`granada.js` as kind `cohete`: it flies straight, and the owner's frame
+bursts it on a wall or an egg (`tocaHuevo`).
+
+**Grenades are a loadout**: two per life, each `duro`, `humo` or `luz`
+(`GRANADAS`), chosen in the pause card or with Z/C while dead, kept in
+`localStorage` (`yemas.pref`, with the mouse sensitivity and the skin). `T`
+picks which one `G` throws. Launches and bursts carry their kind (`n.k`,
+`x2.k`). Smoke is local sprites plus a grey overlay while the camera is
+inside the cloud; bullets go through it. The flash blinds each viewer by
+distance, line of sight and whether they were facing it, the thrower and
+teammates included.
+
+**Skins** (`SKINS` and `ponSkin` in the frame's `mundo.js`) are accessories
+hung off the egg's body; the shell keeps its seat or team colour. The state
+carries `sk`, and a remote egg whose skin changes is rebuilt.
+
+**A death leaves a fried egg** (`huevoFrito` in the frame's `main.js`): an
+irregular white `ShapeGeometry` over a golden crispy rim and a glossy
+half-dome yolk off-centre, grown in over a third of a second, with a sizzle
+(`sonido.fritura`), faded after 14 s, at most 30 on the floor.
+
+**Fullscreen is the frame's**, not the page's. The room header's ⛶ asks the
+module first (`modulo.pantallaCompleta()`, which `yemas.js` answers with
+`frame.requestFullscreen()`), and only a game without that hook falls back
+to the immersive mode. Inside the frame, `F` and a button on the pause card
+do the same with the frame's own document (Shift+F, not F alone, which sat
+next to G and fired by accident). The voice bar stays outside;
+`V` still reaches it, and the pause card has a **🎙 Entrar a la voz**
+button that asks the postman (`voz`).
+
 Opened on its own, `juegos/yemas/index.html` is practice against four bots
 with the same engine (`conectarLocal`), which is also the quickest place to
 test a change. The window hooks `__yemas.paso(dt)` step the game without
@@ -2763,6 +3060,64 @@ is only the postman, like Yemas'. Things that hold it together:
 end to end; `tests/clue-bots.test.cjs` plays full practice games;
 `tests/clue-red.test.cjs` runs several `red.js` frames against a fake room
 through a whole online game and checks the audit comes out clean.
+
+**Ajedrez (`ajedrez`) is the whole of FIDE's rules in the reducer**
+(`redAjedrez` and the `aj*` functions at the end of `motor.js`). A move is
+`{t:"m", uid, de:"e2", a:"e4", pr?}` and counts only if it is in the legal
+list of that position, so an illegal or out-of-turn move simply does not
+exist; the rest are `tablas` (offer), `acepta`, `rechaza` and `rinde`. Things
+worth knowing:
+
+- **The board is 64 letters, index 0 = a8**, upper case white, `.` empty,
+  English letters inside (FEN's) and **Spanish notation on screen** (R D T A
+  C, `AJ_LETRA`). `ajLegales` is pseudo-moves filtered by "does my king end up
+  attacked", and castling checks the squares the king crosses itself.
+  `tests/ajedrez.test.cjs` runs **perft** on five reference positions
+  (start, Kiwipete, the en-passant/pin one, promotions, position 5): any
+  change to move generation has to keep those numbers.
+- **Threefold repetition and the fifty-move rule are automatic**, not
+  claimed: with no arbiter, a claim would need the reducer to know about
+  time and intent. The repetition key carries the en-passant square only
+  when an en-passant capture is actually legal.
+- **Colours**: the host picks in the lobby card (`color`: azar/blancas/
+  negras, through `$otro`, so no rule for it); «al azar» is the room seed's
+  parity (`ajBandos`).
+- **The clock is replayed from the log too.** The room's `ritmo` («3+2»,
+  one of `AJ_RITMOS`, or `libre`) sets it; every move carries `at`
+  (`ctx.ahora()`, the server-corrected clock), and the reducer charges each
+  side the time since the previous move and adds the increment. It does not
+  run until both sides have made their first move, as on lichess. A move
+  that arrives past its time does not count and loses on time; if nobody
+  moves, either screen sends `{t:"tiempo", at}` when the flag falls, and the
+  reducer only accepts it if the time really ran out (the screen retries
+  every 1.5 s against clock skew). Flagging against a side that cannot mate
+  (`ajNoMata`: bare king, or king and one minor piece) is a draw,
+  `tiempomaterial`. The honest limit: `at` is written by the client, and the
+  rules only pin it to a few seconds of the server's `now` (scoped to chess
+  rooms, so the escondite's own `at` is untouched).
+- **Premoves are screen-only** (`pre` in `ajedrez.js`): during the
+  opponent's turn the same tap/drag records a move whose destinations are
+  the piece's geometric ones (own pieces block, enemy pieces do not), shown
+  in red, and it is sent the moment the turn arrives if it is legal in the
+  new position, or dropped with a notice. Right-click or tapping an empty
+  square cancels it.
+- **One draw offer per own move** (`ofrecio`); moving while an offer is in
+  front of you declines it, while the offerer moving keeps it standing.
+- The replay is memoised (`ajCache`) by the move list, since a repaint
+  happens on every tick.
+- **The pieces are free piece sets served as files**
+  (`juegos/ajedrez/piezas/<set>/wK.svg`: cburnett under BSD, chessnut under
+  Apache 2.0, fantasy and celtic under MIT, see `LICENCIAS.md` there; the
+  non-commercial lichess sets were left out on purpose), placed with
+  `<image>` by `piezaSvg`, which the lobby cover uses too. They are not
+  inlined because several carry their own `<style>` with ids that would
+  clash inside one SVG. The viewer picks a set (`jg.ajPiezas`). Moving is tap-tap
+  or drag over the same `sel`; promotion opens a picker and the reducer
+  refuses a promotion with no piece. The opponent's piece slides in from its
+  origin on an **inner** `<g>` (`.jg-aj-llega`), for the same reason as
+  Chain Reaction's nested orbs. `est.perdidas` (not `fuera`, which the header
+  reads as "players out") is what each side has lost, counted against the
+  starting set. The music borrows Reversi's harpsichord.
 
 **Mina Club's board fits its box; it never pushes past it** (`juegos/club/minas/`,
 plain files with no build, mounted by `solo/club.js` in an iframe whose `?v=`
@@ -2878,6 +3233,15 @@ one, or how far ahead you are if you already lead. The table stays below for
 everyone else. The entry animation plays **once per game** (`animado` holds
 the key) and the scene repaints by signature (`firma`), because `watchRanks`
 fires on every write and replaying the rise each time would make it twitch.
+
+**The Clasificación opens on a General table** (`ranks.js`, key `general`):
+the sum of every room game's `ranks` row (points, wins, games played, and a
+«Juegos» column counting in how many games each person has a row), read
+through `fb.watchRanksTodos`. The picker lists the games in the lobby's
+popularity order, room games and solo games under separate labels, and the
+choice persists in `jg.rankJuego`. The lobby's featured card carries that
+game's top three (`pintaDestacado`, from the `ranks` that
+`leerPopularidad()` now returns alongside the counts as `{n, ranks}`).
 
 **Logros: ten per game, three sources, one table** (`juegos/logros.js`,
 the view in `logros-vista.js`, the **Logros** tab at `#logros`). Four of

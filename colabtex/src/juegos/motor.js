@@ -36,114 +36,148 @@
    una apuesta ya no se puede calcular a ojo, que es todo el juego.
    Catan llega a seis, que es lo que admite la ampliación: pasado eso
    la isla grande no tiene costa para todos. */
+/* `alta` es el día en que el juego llegó al salón (AAAA-MM-DD): de ahí
+   sale la sección de novedades del vestíbulo. Un juego nuevo solo
+   tiene que traer la suya; a igual fecha manda el orden de esta tabla,
+   que es el orden en que se fueron añadiendo. */
 export const JUEGOS = {
-  orbita: { nombre: "Órbita", lema: "Lanza sondas con la gravedad, roba estrellas y derriba satélites", color: "#8860ed", minimo: 2, cupo: 4 },
+  orbita: { nombre: "Órbita", lema: "Lanza sondas con la gravedad, roba estrellas y derriba satélites", color: "#8860ed", minimo: 2, cupo: 4, alta: "2026-09-14" },
   escondite: {
     nombre: "Escondite",
     lema: "Esconde a tu persona en el paisaje y encuentra la del otro",
     color: "#e0653a",
     minimo: 2,
-    cupo: 2
+    cupo: 2,
+    alta: "2026-09-10"
   },
   cartas: {
     nombre: "Cartas de los tres elementos",
     lema: "Fuego, agua y nieve — tres cartas de tres colores y ganas",
     color: "#d4356b",
     minimo: 2,
-    cupo: 2
+    cupo: 2,
+    alta: "2026-09-10"
   },
   cuadritos: {
     nombre: "Cuadritos",
     lema: "Cierra más cajas que los demás, una raya por turno",
     color: "#0f62fe",
     minimo: 2,
-    cupo: 10
+    cupo: 10,
+    alta: "2026-09-10"
   },
   worms: {
     nombre: "Circuit Breakers",
     lema: "Cuadrillas eléctricas, terreno destructible y un disparo por turno",
     color: "#f2a33a",
     minimo: 2,
-    cupo: 8
+    cupo: 8,
+    alta: "2026-09-23"
   },
   reversi: {
     nombre: "Reversi",
     lema: "Atrapa las fichas del otro entre las tuyas y dales la vuelta",
     color: "#0d9488",
     minimo: 2,
-    cupo: 2
+    cupo: 2,
+    alta: "2026-09-10"
   },
   cadena: {
     nombre: "Reacción en cadena",
     lema: "Carga una celda hasta que estalle y conquista a sus vecinas en cadena",
     color: "#ff3d7f",
     minimo: 2,
-    cupo: 8
+    cupo: 8,
+    alta: "2026-09-23"
   },
   flip7: {
     nombre: "Flip 7",
     lema: "Pide carta o plántate: siete números distintos y te llevas el bono",
     color: "#e8a317",
     minimo: 2,
-    cupo: 10
+    cupo: 10,
+    alta: "2026-09-24"
   },
   cacho: {
     nombre: "Cacho",
     lema: "Dudo o calzo: cinco dados en el vaso y gana el último que conserve alguno",
     color: "#b5462c",
     minimo: 2,
-    cupo: 8
+    cupo: 8,
+    alta: "2026-09-25"
   },
   uno: {
     nombre: "UNO",
     lema: "Clásico, No Mercy, All Wild o Liar's: quédate sin cartas antes que nadie",
     color: "#e03a2f",
     minimo: 2,
-    cupo: 10
+    cupo: 10,
+    alta: "2026-09-26"
   },
   catan: {
     nombre: "Catan",
     lema: "Coloniza la isla, comercia y construye: el primero en llegar a la meta gana",
     color: "#d9822b",
     minimo: 2,
-    cupo: 6
+    cupo: 6,
+    alta: "2026-09-26"
   },
   presidente: {
     nombre: "Presidente",
     lema: "Deshazte de tus cartas primero: el Culo le da sus mejores al Presidente, ronda tras ronda",
     color: "#7c4dff",
     minimo: 3,
-    cupo: 10
+    cupo: 10,
+    alta: "2026-09-27"
   },
   spicy: {
     nombre: "Spicy",
     lema: "Bota cartas boca abajo, miente con cara de póker y duda del picante ajeno",
     color: "#e2412b",
     minimo: 2,
-    cupo: 6
+    cupo: 6,
+    alta: "2026-09-28"
   },
   tetris: {
     nombre: "Tetris",
     lema: "Todos a la vez con las mismas piezas: cada línea que limpias es basura para otro",
     color: "#22b8cf",
     minimo: 2,
-    cupo: 8
+    cupo: 8,
+    alta: "2026-09-28"
   },
   yemas: {
     nombre: "Yemas",
     lema: "Shooter de huevos en primera persona: el primero en freír a los demás hasta la meta gana",
     color: "#ffb300",
     minimo: 2,
-    cupo: 8
+    cupo: 8,
+    alta: "2026-09-28"
   },
   clue: {
     nombre: "Clue",
     lema: "Un crimen en el edificio: descubre quién, con qué y dónde antes que los demás",
     color: "#8e1b2b",
     minimo: 2,
-    cupo: 6
+    cupo: 6,
+    alta: "2026-09-29"
+  },
+  ajedrez: {
+    nombre: "Ajedrez",
+    lema: "El de siempre: enroque, al paso, coronación, tablas y jaque mate",
+    color: "#a0703c",
+    minimo: 2,
+    cupo: 2,
+    alta: "2026-09-30"
   }
 };
+
+/* Los `n` juegos más nuevos, del último al primero. */
+export function novedades(n = 3) {
+  return Object.keys(JUEGOS).map((k, i) => ({ k, i, alta: JUEGOS[k].alta || "" }))
+    .sort((a, b) => (a.alta < b.alta ? 1 : a.alta > b.alta ? -1 : b.i - a.i))
+    .slice(0, n).map(x => x.k);
+}
 
 /* Cuánta gente cabe en *esta* sala: lo que eligió quien la abrió,
    recortado a lo que el juego admite. Una partida creada antes de que
@@ -881,6 +915,7 @@ export function reducir(p) {
   if (p.juego === "tetris") return { ...base, ...redTetris(p, js, listos) };
   if (p.juego === "yemas") return { ...base, ...redYemas(p, js, listos) };
   if (p.juego === "clue") return { ...base, ...redClue(p, js, listos) };
+  if (p.juego === "ajedrez") return { ...base, ...redAjedrez(p, js) };
   return base;
 }
 
@@ -956,6 +991,9 @@ export function progreso(est, juego) {
     const lider = est.puntosEq ? Math.max(0, ...Object.values(est.puntosEq)) : Math.max(0, ...Object.values(est.bajas));
     return c(lider / (est.meta || YM_META));
   }
+  /* En el ajedrez, el material que ya salió del tablero: con las damas
+     cambiadas y media docena de piezas fuera es un final. */
+  if (juego === "ajedrez" && est.material) return c(1 - (est.material.w + est.material.b) / 78);
   if (juego === "cartas" && est.ganadas) return c(Math.max(0, ...Object.values(est.ganadas).map(g => g.length)) / 5);
   return 0;
 }
@@ -1059,6 +1097,19 @@ export const YM_VARIANTES = { todos: "Todos contra todos", equipos: "Duelo por e
 export const YM_LARGOS = { todos: [10, 15, 25], equipos: [20, 30, 50], bandera: [1, 3, 5] };
 export const YM_EQUIPOS = ["rojo", "azul"];
 export const YM_BASES = { rojo: [0, 29], azul: [0, -29] };
+/* El `a` de una muerte es el id del arma: Batidora, Revuelta, Poché, el
+   Huevo duro (la granada), la autodestrucción, el cuchillo, la bazuca y la
+   pistola, en ese orden. Los ids nunca se renumeran.
+
+   Las armas aparecen tiradas en `YM_PUNTOS_ARMA` puntos del mapa, y cuál
+   sale lo decide la semilla de la sala con el punto y el número de
+   aparición (en el marco). Quién se la lleva es estado de la partida, así
+   que va al registro: `{t:"recoge", uid, s, g}` toma la aparición `g` del
+   punto `s`, y vale solo si es la siguiente a la última tomada ahí; si dos
+   la agarran a la vez, la primera jugada se la lleva. Cuándo reaparece es
+   cosa de cada pantalla (unos segundos después de verla tomada). */
+export const YM_ARMAS = 8;
+export const YM_PUNTOS_ARMA = 8;
 export const YM_METAS = YM_LARGOS.todos;
 export const YM_META = 15;
 export function varianteYemas(p) {
@@ -1073,11 +1124,25 @@ export function metaYemas(p) {
   if (v === "todos" && YM_METAS.includes(m)) return m;
   return YM_LARGOS[v][1];
 }
-/* El equipo de cada uno, por asiento; `null` en todos contra todos. */
+/* El equipo de cada uno; `null` en todos contra todos. Por defecto sale
+   del asiento (pares rojo, impares azul), y cada jugador puede elegir el
+   suyo con `{t:"equipo", uid, e}` mientras la partida no haya empezado de
+   verdad: vale la última elección antes del primer suceso de juego
+   (una muerte o un toque de bandera), así que el equipo no se cambia a
+   media partida. Si al final un equipo queda vacío, con dos o más en la
+   sala, se vuelve al reparto por asiento: una partida de uno contra nadie
+   terminaría por abandono en el primer repintado. */
+const YM_SUCESOS = new Set(["muere", "toma", "devuelve", "captura"]);
 export function equiposYemas(p, js = jugadoresDe(p)) {
   if (varianteYemas(p) === "todos") return null;
-  const eq = {};
-  js.forEach((j, i) => { eq[j.uid] = YM_EQUIPOS[i % 2]; });
+  const porAsiento = {}, eq = {};
+  js.forEach((j, i) => { porAsiento[j.uid] = eq[j.uid] = YM_EQUIPOS[i % 2]; });
+  for (const j of jugadasDe(p)) {
+    if (YM_SUCESOS.has(j.t)) break;
+    if (j.t === "equipo" && eq[j.uid] && YM_EQUIPOS.includes(j.e)) eq[j.uid] = j.e;
+  }
+  const rojos = js.filter(j => eq[j.uid] === "rojo").length;
+  if (js.length >= 2 && (rojos === 0 || rojos === js.length)) return porAsiento;
   return eq;
 }
 /* ¿`uid` está entre los que ganaron? Sirve para todos los juegos. */
@@ -1102,6 +1167,7 @@ export function redYemas(p, js = jugadoresDe(p), listos = true) {
   const aBase = b => { banderas[b] = { e: "base", uid: "", x: YM_BASES[b][0], z: YM_BASES[b][1] }; };
   const num = (x, d) => Number.isFinite(+x) && Math.abs(+x) < 60 ? Math.round(+x * 100) / 100 : d;
   const hist = [];
+  const armas = {};
   let ganador = null, motivo = "", primera = "";
   for (const j of jugadasDe(p)) {
     if (ganador !== null) break;
@@ -1115,6 +1181,14 @@ export function redYemas(p, js = jugadoresDe(p), listos = true) {
     }
     if (!listos || !ids.has(j.uid) || fuera[j.uid]) continue;
     const u = j.uid;
+
+    if (j.t === "recoge") {
+      const s = j.s, g = j.g;
+      if (!Number.isInteger(s) || s < 0 || s >= YM_PUNTOS_ARMA || !Number.isInteger(g)) continue;
+      if (g !== (armas[s] ? armas[s].g : -1) + 1) continue;
+      armas[s] = { g, uid: u };
+      continue;
+    }
 
     if (variante === "bandera" && (j.t === "toma" || j.t === "devuelve" || j.t === "captura")) {
       const b = j.b;
@@ -1145,7 +1219,7 @@ export function redYemas(p, js = jugadoresDe(p), listos = true) {
       hist.push({ e: "suelta", uid: v, b });
     }
     const vale = typeof k === "string" && ids.has(k) && k !== v && !fuera[k] && (!eq || eq[k] !== eq[v]);
-    const a = Number.isInteger(j.a) && j.a >= 0 && j.a <= 2 ? j.a : 0;
+    const a = Number.isInteger(j.a) && j.a >= 0 && j.a <= YM_ARMAS - 1 ? j.a : 0;
     hist.push({ e: "baja", uid: vale ? k : "", v, a, cab: !!j.cab });
     if (!vale) continue;
     bajas[k]++;
@@ -1171,7 +1245,7 @@ export function redYemas(p, js = jugadoresDe(p), listos = true) {
     fase: !listos ? "espera" : ganador !== null ? "fin" : "jugando",
     turno: "", variante, meta, equipos: eq, bajas, muertes, cabezas, racha, mejorRacha, fuera, primera,
     puntosEq: eq ? (variante === "bandera" ? capturas : puntosEq) : null,
-    capturas: capturasDe, banderas: variante === "bandera" ? banderas : null,
+    capturas: capturasDe, banderas: variante === "bandera" ? banderas : null, armas,
     puntos: bajas,
     vivos: activos.map(j => j.uid),
     hist: hist.slice(-40),
@@ -6094,4 +6168,389 @@ export function blancoTetris(est, uid) {
   const i = ids.indexOf(uid);
   for (let k = 1; k < ids.length; k++) { const c = ids[(i + k) % ids.length]; if (!est.fuera[c]) return c; }
   return "";
+}
+
+/* ============================================================
+   Ajedrez
+
+   Las reglas enteras, en el reductor como todo lo demás: una jugada es
+   `{t:"m", uid, de:"e2", a:"e4", pr?}` y solo cuenta si está entre las
+   legales de esa posición, así que un cliente no puede mover un alfil
+   en línea recta ni dejar a su rey en jaque — la jugada sencillamente
+   no existe para nadie. Lo demás son `{t:"tablas"}` (ofrecer),
+   `{t:"acepta"}`, `{t:"rechaza"}` y `{t:"rinde"}`.
+
+   El tablero es un array de 64 letras, la casilla 0 es a8 y la 63 es h1
+   (la fila 0 es la de arriba vista desde las blancas). Mayúscula es
+   blanca y minúscula negra; «.» es vacía. Las letras son las inglesas
+   (PNBRQK) por dentro, porque así las escribe todo el mundo en FEN; la
+   notación que se enseña en pantalla es la española (R D T A C).
+
+   Las tablas que en un torneo se *reclaman* aquí son automáticas: la
+   triple repetición y los cincuenta movimientos sin captura ni peón.
+   Reclamarlas exigiría que el reductor supiera de intención, y sin
+   árbitro lo honrado es que la regla se aplique sola, igual en las dos
+   pantallas.
+
+   El reloj (`ritmo` de la sala, «3+2» = tres minutos y dos segundos de
+   incremento) se lleva con la hora que trae cada jugada (`at`, el reloj
+   del navegador corregido con el del servidor). Como en lichess, no
+   corre hasta que cada bando ha hecho su primera jugada. A cada jugada
+   se le descuenta lo que pasó desde la anterior y se le suma el
+   incremento; una que llega cuando ya no le quedaba tiempo no cuenta y
+   pierde por tiempo. Si nadie mueve, cualquiera de los dos manda
+   `{t:"tiempo", at}` al ver la aguja caer y el reductor lo comprueba.
+   El límite honrado: la hora la pone el cliente, y las reglas de la base
+   solo la acotan a unos segundos del reloj del servidor.
+   ============================================================ */
+/* Los ritmos que se ofrecen: minutos + segundos de incremento. */
+export const AJ_RITMOS = {
+  "1+0": "Bala", "2+1": "Bala", "3+0": "Blitz", "3+2": "Blitz", "5+0": "Blitz", "5+3": "Blitz",
+  "10+0": "Rápida", "10+5": "Rápida", "15+10": "Rápida", "30+0": "Clásica", "30+20": "Clásica"
+};
+/* El ritmo de la sala en milisegundos, o null si se juega sin reloj (o
+   la sala es de antes de que hubiera reloj). */
+export function ajRitmo(p) {
+  const r = p && p.ritmo;
+  if (!r || !AJ_RITMOS[r]) return null;
+  const [m, s] = r.split("+").map(Number);
+  return { base: m * 60000, inc: s * 1000 };
+}
+const AJ_INICIAL = "rnbqkbnrpppppppp" + ".".repeat(32) + "PPPPPPPPRNBQKBNR";
+const AJ_VALOR = { P: 1, N: 3, B: 3, R: 5, Q: 9, K: 0 };
+/* Español: rey, dama, torre, alfil, caballo. */
+export const AJ_LETRA = { K: "R", Q: "D", R: "T", B: "A", N: "C", P: "" };
+const AJ_RUMBOS = {
+  N: [[-1, -2], [1, -2], [-2, -1], [2, -1], [-2, 1], [2, 1], [-1, 2], [1, 2]],
+  B: [[1, 1], [1, -1], [-1, 1], [-1, -1]],
+  R: [[1, 0], [-1, 0], [0, 1], [0, -1]]
+};
+AJ_RUMBOS.Q = AJ_RUMBOS.K = [...AJ_RUMBOS.B, ...AJ_RUMBOS.R];
+
+export const ajColor = x => (!x || x === "." ? "" : x === x.toUpperCase() ? "w" : "b");
+export const ajNombre = i => "abcdefgh"[i & 7] + (8 - (i >> 3));
+export const ajIndice = s => (typeof s === "string" && /^[a-h][1-8]$/.test(s))
+  ? "abcdefgh".indexOf(s[0]) + (8 - Number(s[1])) * 8 : -1;
+const ajOtro = c => (c === "w" ? "b" : "w");
+const ajDentro = (f, c) => f >= 0 && f < 8 && c >= 0 && c < 8;
+
+export function ajPosInicial() {
+  return { tab: AJ_INICIAL.split(""), color: "w", enroque: "KQkq", alPaso: -1, medio: 0, n: 1 };
+}
+
+/* ¿Ataca `por` la casilla `i`? Se mira desde la casilla hacia fuera,
+   como si en ella hubiera cada tipo de pieza: es más barato que generar
+   todas las jugadas del rival y sirve igual para el jaque y el enroque. */
+export function ajAtacada(tab, i, por) {
+  const f = i >> 3, c = i & 7;
+  const es = (ff, cc, tipos) => {
+    if (!ajDentro(ff, cc)) return false;
+    const x = tab[ff * 8 + cc];
+    return x !== "." && ajColor(x) === por && tipos.includes(x.toUpperCase());
+  };
+  /* Un peón blanco ataca hacia arriba: a esta casilla la amenaza el que
+     está una fila por debajo (f + 1) en diagonal. */
+  const pf = por === "w" ? f + 1 : f - 1;
+  if (es(pf, c - 1, "P") || es(pf, c + 1, "P")) return true;
+  for (const [dc, df] of AJ_RUMBOS.N) if (es(f + df, c + dc, "N")) return true;
+  for (const [dc, df] of AJ_RUMBOS.K) if (es(f + df, c + dc, "K")) return true;
+  for (const [tipos, rumbos] of [["BQ", AJ_RUMBOS.B], ["RQ", AJ_RUMBOS.R]]) {
+    for (const [dc, df] of rumbos) {
+      for (let k = 1; ; k++) {
+        const ff = f + df * k, cc = c + dc * k;
+        if (!ajDentro(ff, cc)) break;
+        const x = tab[ff * 8 + cc];
+        if (x === ".") continue;
+        if (ajColor(x) === por && tipos.includes(x.toUpperCase())) return true;
+        break;
+      }
+    }
+  }
+  return false;
+}
+
+const ajRey = (tab, color) => tab.indexOf(color === "w" ? "K" : "k");
+export const ajEnJaque = pos => ajAtacada(pos.tab, ajRey(pos.tab, pos.color), ajOtro(pos.color));
+
+/* Las jugadas que respetan cómo se mueve cada pieza, sin mirar todavía
+   si dejan al propio rey en jaque. El enroque sí comprueba ya las
+   casillas por las que pasa el rey, porque eso no es «dejar en jaque»
+   sino una condición del propio enroque. */
+function ajPseudo(pos) {
+  const { tab, color } = pos, out = [];
+  const pon = (de, a, extra) => out.push(Object.assign({ de, a }, extra));
+  for (let i = 0; i < 64; i++) {
+    const x = tab[i];
+    if (x === "." || ajColor(x) !== color) continue;
+    const t = x.toUpperCase(), f = i >> 3, c = i & 7;
+    if (t === "P") {
+      const d = color === "w" ? -1 : 1, ini = color === "w" ? 6 : 1, ult = color === "w" ? 0 : 7;
+      const avanza = (a, extra) => {
+        if ((a >> 3) === ult) for (const pr of "qrbn") pon(i, a, Object.assign({ pr }, extra));
+        else pon(i, a, extra);
+      };
+      const f1 = f + d;
+      if (ajDentro(f1, c) && tab[f1 * 8 + c] === ".") {
+        avanza(f1 * 8 + c);
+        if (f === ini && tab[(f + 2 * d) * 8 + c] === ".") pon(i, (f + 2 * d) * 8 + c, { doble: true });
+      }
+      for (const dc of [-1, 1]) {
+        if (!ajDentro(f1, c + dc)) continue;
+        const a = f1 * 8 + c + dc, y = tab[a];
+        if (y !== "." && ajColor(y) !== color) avanza(a, { cap: y });
+        else if (a === pos.alPaso) pon(i, a, { cap: color === "w" ? "p" : "P", ep: true });
+      }
+      continue;
+    }
+    const desliza = t === "B" || t === "R" || t === "Q";
+    for (const [dc, df] of AJ_RUMBOS[t]) {
+      for (let k = 1; ; k++) {
+        const ff = f + df * k, cc = c + dc * k;
+        if (!ajDentro(ff, cc)) break;
+        const a = ff * 8 + cc, y = tab[a];
+        if (y === ".") pon(i, a);
+        else { if (ajColor(y) !== color) pon(i, a, { cap: y }); break; }
+        if (!desliza) break;
+      }
+    }
+    const base = color === "w" ? 56 : 0;
+    if (t === "K" && i === base + 4) {
+      const op = ajOtro(color), torre = color === "w" ? "R" : "r";
+      const [corto, largo] = color === "w" ? ["K", "Q"] : ["k", "q"];
+      const libres = qs => qs.every(q => tab[base + q] === ".");
+      const seguras = qs => !qs.some(q => ajAtacada(tab, base + q, op));
+      if (pos.enroque.includes(corto) && tab[base + 7] === torre && libres([5, 6]) && seguras([4, 5, 6]))
+        pon(i, base + 6, { enroque: "k" });
+      if (pos.enroque.includes(largo) && tab[base] === torre && libres([1, 2, 3]) && seguras([4, 3, 2]))
+        pon(i, base + 2, { enroque: "q" });
+    }
+  }
+  return out;
+}
+
+export function ajAplica(pos, m) {
+  const tab = pos.tab.slice(), color = pos.color, x = tab[m.de];
+  tab[m.a] = m.pr ? (color === "w" ? m.pr.toUpperCase() : m.pr) : x;
+  tab[m.de] = ".";
+  if (m.ep) tab[m.a + (color === "w" ? 8 : -8)] = ".";
+  if (m.enroque) {
+    const base = m.a & 56;
+    if (m.enroque === "k") { tab[base + 5] = tab[base + 7]; tab[base + 7] = "."; }
+    else { tab[base + 3] = tab[base]; tab[base] = "."; }
+  }
+  let enroque = pos.enroque;
+  const quita = s => { enroque = enroque.replace(s, ""); };
+  if (x === "K") { quita("K"); quita("Q"); }
+  if (x === "k") { quita("k"); quita("q"); }
+  /* Una torre que se mueve o a la que capturan se lleva su enroque. */
+  for (const q of [m.de, m.a]) {
+    if (q === 63) quita("K");
+    if (q === 56) quita("Q");
+    if (q === 7) quita("k");
+    if (q === 0) quita("q");
+  }
+  return {
+    tab, color: ajOtro(color), enroque,
+    alPaso: m.doble ? (m.de + m.a) / 2 : -1,
+    medio: x.toUpperCase() === "P" || m.cap ? 0 : pos.medio + 1,
+    n: pos.n + (color === "b" ? 1 : 0)
+  };
+}
+
+export function ajLegales(pos) {
+  return ajPseudo(pos).filter(m => {
+    const t = ajAplica(pos, m).tab;
+    return !ajAtacada(t, ajRey(t, pos.color), ajOtro(pos.color));
+  });
+}
+
+/* Notación algebraica, con las letras en español. Se desambigua por
+   columna, luego por fila y, si ninguna basta (tres damas), por las dos. */
+export function ajSan(pos, m, legales) {
+  if (m.enroque) return m.enroque === "k" ? "O-O" : "O-O-O";
+  const x = pos.tab[m.de], t = x.toUpperCase();
+  if (t === "P") return (m.cap ? ajNombre(m.de)[0] + "x" : "") + ajNombre(m.a) + (m.pr ? "=" + AJ_LETRA[m.pr.toUpperCase()] : "");
+  const otros = legales.filter(o => o.a === m.a && o.de !== m.de && pos.tab[o.de] === x);
+  let dis = "";
+  if (otros.length) {
+    const n = ajNombre(m.de);
+    if (!otros.some(o => (o.de & 7) === (m.de & 7))) dis = n[0];
+    else if (!otros.some(o => (o.de >> 3) === (m.de >> 3))) dis = n[1];
+    else dis = n;
+  }
+  return AJ_LETRA[t] + dis + (m.cap ? "x" : "") + ajNombre(m.a);
+}
+
+/* Material con el que nadie puede dar mate: reyes solos, rey y una
+   pieza menor contra rey, o solo alfiles y todos en casillas del mismo
+   color. Lo demás (dos caballos, por ejemplo) se deja jugar: el mate es
+   posible aunque haga falta la colaboración del rival. */
+export function ajInsuficiente(tab) {
+  const otras = [];
+  for (let i = 0; i < 64; i++) {
+    const x = tab[i];
+    if (x === "." || x === "K" || x === "k") continue;
+    if ("PpRrQq".includes(x)) return false;
+    otras.push(i);
+  }
+  if (otras.length <= 1) return true;
+  if (otras.every(i => tab[i].toUpperCase() === "B"))
+    return new Set(otras.map(i => ((i >> 3) + (i & 7)) % 2)).size === 1;
+  return false;
+}
+
+/* La posición a efectos de repetición: piezas, turno, enroques y el
+   al paso solo si de verdad se puede capturar así — un peón que avanza
+   dos sin nadie al lado no cambia la posición. */
+const ajClave = (pos, legales) =>
+  pos.tab.join("") + pos.color + pos.enroque + (legales.some(m => m.ep) ? pos.alPaso : "-");
+
+function ajMaterial(tab) {
+  const m = { w: 0, b: 0 };
+  for (const x of tab) if (x !== ".") m[ajColor(x)] += AJ_VALOR[x.toUpperCase()];
+  return m;
+}
+
+/* Lo que ya salió del tablero, por color de la pieza perdida. Se cuenta
+   contra la dotación inicial, así que una dama coronada «devuelve» el
+   peón que fue y no se apunta como captura de nadie. */
+function ajFuera(tab) {
+  const fuera = { w: [], b: [] };
+  for (const t of "QRBNP") {
+    for (const color of ["w", "b"]) {
+      const x = color === "w" ? t : t.toLowerCase();
+      const ini = [...AJ_INICIAL].filter(y => y === x).length;
+      const hay = tab.filter(y => y === x).length;
+      for (let k = hay; k < ini; k++) fuera[color].push(t);
+    }
+  }
+  return fuera;
+}
+
+/* Quién lleva blancas. Lo elige quien abre la sala (`color`) o, si deja
+   «al azar», la semilla de la partida, que es la misma en las dos
+   pantallas y nadie elige. */
+export function ajBandos(p, js) {
+  if (js.length < 2) return null;
+  const anf = js.some(j => j.uid === p.anfitrion) ? p.anfitrion : js[0].uid;
+  const otro = js.find(j => j.uid !== anf).uid;
+  const anfBlancas = p.color === "blancas" ? true : p.color === "negras" ? false
+    : ((Number(p.semilla) >>> 0) & 1) === 0;
+  return anfBlancas ? { w: anf, b: otro } : { w: otro, b: anf };
+}
+
+const ajCache = new Map();
+
+export function redAjedrez(p, js = jugadoresDe(p)) {
+  const bandos = ajBandos(p, js);
+  const jug = jugadasDe(p);
+  /* Rehacer cien jugadas con su generador de legales en cada repintado
+     es poco, pero repintar ocurre en cada tic; se recuerda la respuesta
+     por la lista de jugadas. */
+  const ritmo = ajRitmo(p);
+  const clave = (bandos ? bandos.w + "|" + bandos.b : "-") + "|" + (p.ritmo || "") + "|" +
+    jug.map(j => [j.t, j.uid, j.de, j.a, j.pr, j.at].join(",")).join(";");
+  if (ajCache.has(clave)) return ajCache.get(clave);
+  const r = ajRepasa(bandos, jug, ritmo);
+  if (ajCache.size > 24) ajCache.delete(ajCache.keys().next().value);
+  ajCache.set(clave, r);
+  return r;
+}
+
+/* ¿Puede `color` dar mate con lo que le queda? Si no (solo el rey, o el
+   rey y una pieza menor), quedarse sin tiempo frente a él son tablas. */
+function ajNoMata(tab, color) {
+  const suyas = tab.filter(x => x !== "." && ajColor(x) === color && x.toUpperCase() !== "K");
+  return suyas.length === 0 || (suyas.length === 1 && "NB".includes(suyas[0].toUpperCase()));
+}
+
+function ajRepasa(bandos, jug, ritmo = null) {
+  let pos = ajPosInicial();
+  let legales = ajLegales(pos);
+  const vistas = { [ajClave(pos, legales)]: 1 };
+  const movs = [];
+  let ganador = null, motivo = "", oferta = "", ultima = null;
+  const ofrecio = {};                 // uid → en qué medio movimiento ofreció
+  const colorDe = u => (!bandos ? "" : u === bandos.w ? "w" : u === bandos.b ? "b" : "");
+  const rival = u => (u === bandos.w ? bandos.b : bandos.w);
+  const reloj = ritmo ? { w: ritmo.base, b: ritmo.base } : null;
+  let desde = 0;                      // cuándo empezó el turno que corre
+  const corre = () => !!reloj && movs.length >= 2 && desde > 0;
+  /* Se le acabó el tiempo a `color`. */
+  const cae = color => {
+    reloj[color] = 0;
+    const otro = ajOtro(color);
+    if (ajNoMata(pos.tab, otro)) { ganador = ""; motivo = "tiempomaterial"; }
+    else { ganador = bandos[otro]; motivo = "tiempo"; }
+  };
+
+  if (bandos) for (const j of jug) {
+    if (ganador !== null) break;
+    const c = colorDe(j.uid);
+    if (j.t === "abandona") { if (c) { ganador = rival(j.uid); motivo = "abandono"; } continue; }
+    if (!c) continue;
+    if (j.t === "rinde") { ganador = rival(j.uid); motivo = "rendicion"; continue; }
+    /* Una oferta por jugada propia: ofrecer tablas en bucle es una forma
+       de no dejar pensar al otro. */
+    if (j.t === "tablas") {
+      if (!oferta && ofrecio[j.uid] !== movs.length) { oferta = j.uid; ofrecio[j.uid] = movs.length; }
+      continue;
+    }
+    if (j.t === "acepta") { if (oferta && oferta !== j.uid) { ganador = ""; motivo = "acuerdo"; } continue; }
+    if (j.t === "rechaza") { if (oferta) oferta = ""; continue; }
+    if (j.t === "tiempo") {
+      const at = Number(j.at);
+      if (corre() && Number.isFinite(at) && at - desde >= reloj[pos.color]) cae(pos.color);
+      continue;
+    }
+    if (j.t !== "m" || c !== pos.color) continue;
+    const de = ajIndice(j.de), a = ajIndice(j.a), pr = j.pr ? String(j.pr).toLowerCase() : "";
+    const m = legales.find(x => x.de === de && x.a === a && (x.pr || "") === pr);
+    if (!m) continue;                                  // no es legal: no existe
+    if (reloj) {
+      const at = Number(j.at);
+      if (corre()) {
+        if (!Number.isFinite(at)) continue;            // con reloj, una jugada sin hora no existe
+        const gasto = Math.max(0, at - desde);
+        if (gasto > reloj[c]) { cae(c); continue; }    // llegó tarde: pierde por tiempo
+        reloj[c] = reloj[c] - gasto + ritmo.inc;
+      }
+      if (Number.isFinite(at)) desde = Math.max(desde, at);
+    }
+    const san = ajSan(pos, m, legales);
+    const antes = pos;
+    pos = ajAplica(pos, m);
+    legales = ajLegales(pos);
+    const jaque = ajEnJaque(pos), mate = jaque && !legales.length;
+    movs.push({
+      san: san + (mate ? "#" : jaque ? "+" : ""), c, de: m.de, a: m.a,
+      pieza: antes.tab[m.de].toUpperCase(), cap: m.cap ? m.cap.toUpperCase() : "",
+      pr: m.pr || "", ep: !!m.ep, enroque: m.enroque || "", jaque, mate
+    });
+    ultima = { de: m.de, a: m.a };
+    /* Mover es contestar: si el que tenía la oferta delante juega, la
+       rechaza. La oferta propia sigue en pie mientras el otro piensa. */
+    if (oferta && oferta !== j.uid) oferta = "";
+    const k = ajClave(pos, legales);
+    vistas[k] = (vistas[k] || 0) + 1;
+    if (mate) { ganador = j.uid; motivo = "mate"; }
+    else if (!legales.length) { ganador = ""; motivo = "ahogado"; }
+    else if (ajInsuficiente(pos.tab)) { ganador = ""; motivo = "material"; }
+    else if (vistas[k] >= 3) { ganador = ""; motivo = "repeticion"; }
+    else if (pos.medio >= 100) { ganador = ""; motivo = "cincuenta"; }
+  }
+
+  const fin = ganador !== null;
+  return {
+    fase: !bandos ? "espera" : fin ? "fin" : "jugando",
+    blancas: bandos ? bandos.w : "", negras: bandos ? bandos.b : "",
+    tab: pos.tab, color: pos.color,
+    turno: bandos && !fin ? bandos[pos.color] : "",
+    legales: fin ? [] : legales,
+    jaque: ajEnJaque(pos), ultima, movs, oferta: fin ? "" : oferta,
+    perdidas: ajFuera(pos.tab), material: ajMaterial(pos.tab),
+    ofrecio, medio: pos.medio,
+    reloj: reloj ? { w: reloj.w, b: reloj.b, desde, corre: !fin && corre() ? pos.color : "", base: ritmo.base, inc: ritmo.inc } : null,
+    ganador, motivo
+  };
 }

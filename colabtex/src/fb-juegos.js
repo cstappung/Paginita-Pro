@@ -269,10 +269,18 @@ export async function leerPopularidad() {
   for (const [juego, filas] of Object.entries(r.val() || {}))
     n[juego] = Object.values(filas || {}).reduce((t, f) => t + (+(f && f.jugadas) || 0), 0);
   for (const [cat, filas] of Object.entries((s && s.val()) || {})) {
-    const m = /^club-(minas|snake|tetris|sortem)-/.exec(cat);
+    const m = /^club-(minas|snake|tetris|sortem|bbtan)-/.exec(cat);
     if (m) n["club-" + m[1]] = (n["club-" + m[1]] || 0) + Object.keys(filas || {}).length;
   }
-  return n;
+  /* Las filas ya están aquí, así que van también: con ellas el
+     vestíbulo pinta el podio del juego destacado sin otra lectura. */
+  return { n, ranks: r.val() || {} };
+}
+
+/* La clasificación general: todas las filas de todos los juegos, que es
+   lo que ya lee la pestaña de logros. Se suma al pintar. */
+export function watchRanksTodos(cb) {
+  return onValue(ref(db, R), s => cb(s.val() || {}, null), err => cb({}, err));
 }
 
 /* ---------- logros ----------
@@ -319,6 +327,16 @@ export const leerPerfil = uid =>
 export const guardarPerfil = (uid, p) =>
   set(ref(db, `${U}/${uid}/perfil`), Object.assign({}, p, { at: Date.now() }));
 
+/* La partida a medias de un juego del club (hoy, BBTAN), para seguirla otro
+   día. Va bajo users/<uid>, que ya solo escribe su dueño: no hizo falta tocar
+   las reglas. Con `d` nulo queda solo `at`, una lápida que le dice al otro
+   dispositivo que esa partida ya terminó. */
+export const leerPartidaClub = (uid, juego) =>
+  get(ref(db, `${U}/${uid}/club/${juego}`)).then(s => s.val());
+
+export const guardarPartidaClub = (uid, juego, d, at) =>
+  set(ref(db, `${U}/${uid}/club/${juego}`), { d: d || null, at: Number.isFinite(at) ? at : Date.now() });
+
 export function watchPerfil(uid, cb) {
   return onValue(ref(db, `${U}/${uid}/perfil`), s => cb(s.val(), null),
                  err => cb(null, err));
@@ -327,7 +345,7 @@ export function watchPerfil(uid, cb) {
 
 /* Lo que eligió quien abrió la sala y la revancha repite. Solo lo que
    existe: un `undefined` en un `set` hace fallar la escritura entera. */
-const opcionesDe = p => Object.fromEntries(["mapa", "escuadra", "tiempo", "malla", "modo", "sicil"]
+const opcionesDe = p => Object.fromEntries(["mapa", "escuadra", "tiempo", "malla", "modo", "sicil", "ritmo"]
   .filter(k => p[k] !== undefined && p[k] !== null).map(k => [k, p[k]]));
 
 /* Una única invitación por partida; las solicitudes simultáneas convergen. */
@@ -460,6 +478,11 @@ export function senalVoz(pid, uid) {
   };
 }
 export const borraVivo = pid => remove(ref(db, `vivo/${pid}`)).catch(() => {});
+/* Al acabar una partida de Yemas se borran los huevos pero no la voz:
+   la sala sigue abierta y la gente sigue hablando (y quizá pide la
+   revancha). `vivo/<pid>/voz` tiene su propia regla, que deja escribir a
+   los jugadores también con `fin`, y se vacía sola al desconectarse. */
+export const borraYemasVivo = pid => remove(ref(db, `vivo/${pid}/y`)).catch(() => {});
 
 /* ---------- el chat de la sala ----------
    `chat/<pid>` y no `partidas/<pid>/chat`: colgado de la partida, cada

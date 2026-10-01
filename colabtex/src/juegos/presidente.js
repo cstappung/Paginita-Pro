@@ -257,7 +257,7 @@ export function crearPresidente(ctx) {
     else f = est.turno === uid ? "Tu turno" : "Turno de " + nombre(est.turno);
     pon("prFase", esc(f));
     const n = est.R ? est.R.n : est.plantilla.length;
-    pon("prModo", esc(`Ronda ${est.ronda} · ${n} en la mesa${est.R && est.R.D > 54 ? " · dos barajas" : ""}`));
+    pon("prModo", esc(`Ronda ${est.ronda}${n ? ` · ${n} en la mesa` : ""}${est.R && est.R.D > 54 ? " · dos barajas" : ""}`));
   }
 
   function sentados() {
