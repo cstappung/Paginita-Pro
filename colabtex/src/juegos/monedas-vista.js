@@ -8,6 +8,10 @@ import {
   RECORD, diaChile, rachaHoy, pagoDia
 } from "./monedas.js";
 
+/* La moneda se dibuja: el emoji de la moneda es de 2020 y en Windows 10 y en
+   navegadores viejos sale como un cuadro vacío. */
+export const MONEDA = '<svg class="jg-moneda" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="#f5b819" stroke="#9a6a08" stroke-width="1.6"/><circle cx="10" cy="10" r="5.6" fill="#ffd54a" stroke="#c98d10" stroke-width="1.2"/><path d="M8.6 7.2v5.6M11.4 7.2v5.6" stroke="#9a6a08" stroke-width="1.4" stroke-linecap="round"/><path d="M5.2 6.4a6.2 6.2 0 0 1 3.6-2.5" stroke="#fff7d6" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg>';
+
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const NOMBRES_CLUB = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras" };
@@ -24,7 +28,7 @@ function fila(f, i, uid, perfil, colorDe, chico) {
   const med = i < 3 ? ["🥇", "🥈", "🥉"][i] : String(i + 1);
   return `<li class="${f.uid === uid ? "jg-yo" : ""}"><b class="jg-mo-pos">${med}</b>${avatarMarco(q.foto, q.nombre, q.color, "anillo", chico ? 26 : 34, f.uid)}
     <span class="jg-mo-nom" data-perfil="${esc(f.uid)}" data-nombre="${esc(q.nombre)}">${esc(q.nombre)}</span>
-    <strong class="jg-mo-cant">${formatoMonedas(f.total)} <span aria-hidden="true">🪙</span></strong></li>`;
+    <strong class="jg-mo-cant">${formatoMonedas(f.total)} ${MONEDA}</strong></li>`;
 }
 
 /* La caja del vestíbulo: los cinco primeros y, si no estás, tu puesto. */
@@ -39,9 +43,9 @@ export function topHtml(datos, uid, perfil, colorDe) {
 /* Lo que dice la racha de días hoy. */
 function rachaTexto(d, hoy) {
   const r = rachaHoy(d, hoy);
-  if (d && d.dia === hoy) return `🔥 <b>${r} ${r === 1 ? "día" : "días"}</b> seguidos · hoy ya contó. Mañana paga ${pagoDia(r + 1)} 🪙.`;
-  if (r) return `🔥 <b>${r} ${r === 1 ? "día" : "días"}</b> seguidos · termina una partida hoy para seguir (+${pagoDia(r + 1)} 🪙).`;
-  return `Termina una partida hoy para empezar una racha de días (+${pagoDia(1)} 🪙).`;
+  if (d && d.dia === hoy) return `🔥 <b>${r} ${r === 1 ? "día" : "días"}</b> seguidos · hoy ya contó. Mañana paga ${pagoDia(r + 1)} ${MONEDA}.`;
+  if (r) return `🔥 <b>${r} ${r === 1 ? "día" : "días"}</b> seguidos · termina una partida hoy para seguir (+${pagoDia(r + 1)} ${MONEDA}).`;
+  return `Termina una partida hoy para empezar una racha de días (+${pagoDia(1)} ${MONEDA}).`;
 }
 
 export function crearMonedas({ uid, datos, perfil, colorDe }) {
@@ -54,7 +58,7 @@ export function crearMonedas({ uid, datos, perfil, colorDe }) {
     const juegos = Object.keys(PESO).sort((a, b) => PESO[b] - PESO[a] || a.localeCompare(b));
     host.innerHTML = `<section class="jg-mo">
       <header class="jg-mo-hero">
-        <div><small>TUS MONEDAS</small><strong>${formatoMonedas(yo.total)} <span aria-hidden="true">🪙</span></strong>
+        <div><small>TUS MONEDAS</small><strong>${formatoMonedas(yo.total)} ${MONEDA}</strong>
           <p>${puesto ? `Puesto <b>${puesto}</b> de ${lista.length}` : "Todavía fuera del top"} · ${yo.logros} logros</p></div>
         <p class="jg-mo-racha">${rachaTexto(d, hoy)}</p>
       </header>
@@ -71,10 +75,10 @@ export function crearMonedas({ uid, datos, perfil, colorDe }) {
           <p>${TARIFA.partida} por partida, ${TARIFA.victoria} por victoria y ${TARIFA.empate} por empate, multiplicado por lo que pesa el juego:</p>
           <ul class="jg-mo-pesos">${juegos.map(j => `<li><span>${esc((JUEGOS[j] && JUEGOS[j].nombre) || j)}</span><b>×${PESO[j]}</b></li>`).join("")}</ul>
           <h3>Logros</h3>
-          <ul class="jg-mo-pesos">${[1, 2, 3, 4].map(n => `<li><span>${NOMBRE_NIVEL[n]}</span><b>${VALOR_NIVEL[n]} 🪙</b></li>`).join("")}</ul>
+          <ul class="jg-mo-pesos">${[1, 2, 3, 4].map(n => `<li><span>${NOMBRE_NIVEL[n]}</span><b>${VALOR_NIVEL[n]} ${MONEDA}</b></li>`).join("")}</ul>
           <h3>Récords del club</h3>
           <p>Una vez por cada modalidad en la que tengas marca (mejorarla no vuelve a pagar):</p>
-          <ul class="jg-mo-pesos">${Object.entries(RECORD).map(([j, v]) => `<li><span>${NOMBRES_CLUB[j] || j}</span><b>${v} 🪙</b></li>`).join("")}</ul>
+          <ul class="jg-mo-pesos">${Object.entries(RECORD).map(([j, v]) => `<li><span>${NOMBRES_CLUB[j] || j}</span><b>${v} ${MONEDA}</b></li>`).join("")}</ul>
           <p>Además, BBTAN paga 1 por cada 2 rondas de tu récord, y la Sopa diaria 10 por cada día de tu mejor racha.</p>
           <h3>Días seguidos</h3>
           <p>Cada día en que terminas una partida (de sala o del club) paga ${pagoDia(1)}, y la racha suma 5 por día hasta ${pagoDia(9)} desde el noveno. Si un día no juegas, vuelve a ${pagoDia(1)}. El día cambia a medianoche de Chile.</p>
