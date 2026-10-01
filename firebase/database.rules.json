@@ -5,8 +5,36 @@
 
     "users": {
       "$uid": {
-        ".read": "auth != null",
-        ".write": "auth != null && auth.uid === $uid"
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        "perfil": {
+          ".read": "auth != null",
+          "nick": { ".validate": "newData.isString() && newData.val().length <= 40" },
+          "foto": { ".validate": "newData.isString() && newData.val().length <= 60000 && (newData.val() === '' || newData.val().beginsWith('https://') || newData.val().beginsWith('data:image/jpeg;base64,') || newData.val().beginsWith('data:image/png;base64,') || newData.val().beginsWith('data:image/webp;base64,')) && !newData.val().contains('\"') && !newData.val().contains(\"'\") && !newData.val().contains('<') && !newData.val().contains('>') && !newData.val().contains('(') && !newData.val().contains(')') && !newData.val().contains(' ') && !newData.val().contains('\\\\')" },
+          "color": { ".validate": "newData.isString() && newData.val().matches(/^#[0-9a-fA-F]{6,6}$/)" },
+          "marco": { ".validate": "newData.isString() && newData.val().matches(/^[a-z]{1,20}$/)" },
+          "fondo": { ".validate": "newData.isString() && newData.val().matches(/^[a-z]{1,20}$/)" },
+          "bio": { ".validate": "newData.isString() && newData.val().length <= 200" },
+          "vitrina": {
+            "$i": { ".validate": "$i.matches(/^[0-9]$/) && newData.isString() && newData.val().length <= 60" }
+          },
+          "at": { ".validate": "newData.isNumber()" },
+          "$otro": { ".validate": false }
+        }
+      }
+    },
+
+    "admins": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": false
+      }
+    },
+
+    "confianza": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": false
       }
     },
 
@@ -22,6 +50,7 @@
     "tokenIndex": {
       "$token": {
         ".read": "auth != null",
+        ".validate": "newData.hasChildren(['pid', 'role']) && newData.child('pid').isString() && (newData.child('role').val() === 'edit' || newData.child('role').val() === 'view')",
         ".write": "auth != null && ((!data.exists() && newData.exists() && root.child('projects').child(newData.child('pid').val()).child('members').child(auth.uid).child('role').val() !== 'view' && root.child('projects').child(newData.child('pid').val()).child('members').child(auth.uid).exists()) || (data.exists() && root.child('projects').child(data.child('pid').val()).child('members').child(auth.uid).child('role').val() === 'owner') || (data.exists() && !root.child('projects').child(data.child('pid').val()).exists()))"
       }
     },
@@ -67,35 +96,48 @@
     "errors": {
       ".read": "auth != null",
       "$fp": {
-        ".write": "auth != null",
-        ".validate": "newData.hasChildren(['app', 'mensaje', 'at']) && newData.child('mensaje').isString() && newData.child('mensaje').val().length <= 400 && newData.child('app').val().length <= 20",
+        ".write": "auth != null && (newData.exists() || root.child('admins').child(auth.uid).val() === true)",
+        ".validate": "newData.hasChildren(['app', 'mensaje', 'at']) && newData.child('mensaje').isString() && newData.child('mensaje').val().length <= 400 && newData.child('app').isString() && newData.child('app').val().length <= 20 && $fp.length <= 120 && (!data.exists() || root.child('admins').child(auth.uid).val() === true || (newData.child('mensaje').val() === data.child('mensaje').val() && newData.child('app').val() === data.child('app').val() && (newData.child('veces').isNumber() ? (newData.child('veces').val() >= (data.child('veces').isNumber() ? data.child('veces').val() : 1) && newData.child('veces').val() <= (data.child('veces').isNumber() ? data.child('veces').val() : 1) + 1) : !data.child('veces').exists())))",
+        "app": { ".validate": "newData.isString()" },
+        "mensaje": { ".validate": "newData.isString()" },
         "pila": { ".validate": "newData.isString() && newData.val().length <= 600" },
         "donde": { ".validate": "newData.isString() && newData.val().length <= 120" },
         "nav": { ".validate": "newData.isString() && newData.val().length <= 80" },
         "ver": { ".validate": "newData.isString() && newData.val().length <= 40" },
         "veces": { ".validate": "newData.isNumber()" },
-        "quien": {
-          "$uid": { ".validate": "newData.isBoolean()" }
+        "at": { ".validate": "newData.isNumber()" },
+        "desde": { ".validate": "newData.isNumber()" },
+        "ctx": {
+          "$k": { ".validate": "$k.length <= 24 && ((newData.isString() && newData.val().length <= 140) || newData.isNumber() || newData.isBoolean())" }
         },
-        "$otro": { ".validate": true }
+        "quien": {
+          "$uid": { ".validate": "newData.isBoolean() && $uid.length <= 128" }
+        },
+        "$otro": { ".validate": false }
       }
     },
 
     "feedback": {
       ".read": "auth != null",
       "$id": {
-        ".write": "auth != null && ((!data.exists() && newData.child('uid').val() === auth.uid) || (data.exists() && data.child('uid').val() === auth.uid))",
+        ".write": "auth != null && ((!data.exists() && newData.child('uid').val() === auth.uid) || (data.exists() && data.child('uid').val() === auth.uid) || (data.exists() && !newData.exists() && root.child('admins').child(auth.uid).val() === true))",
         ".validate": "newData.hasChildren(['tipo', 'titulo', 'uid']) && newData.child('titulo').isString() && newData.child('titulo').val().length <= 200",
         "cuerpo": { ".validate": "newData.isString() && newData.val().length <= 4000" },
         "pasos": { ".validate": "newData.isString() && newData.val().length <= 2000" },
         "adjuntos": { ".validate": "newData.isString() && newData.val().length <= 4000" },
+        "tipo": { ".validate": "newData.val() === 'bug' || newData.val() === 'idea'" },
+        "app": { ".validate": "newData.isString() && newData.val().length <= 20" },
+        "userName": { ".validate": "newData.isString() && newData.val().length <= 120" },
+        "nav": { ".validate": "newData.isString() && newData.val().length <= 80" },
+        "ver": { ".validate": "newData.isString() && newData.val().length <= 40" },
+        "at": { ".validate": "newData.isNumber()" },
         "titulo": { ".validate": "newData.isString() && newData.val().length <= 200" },
         "uid": { ".validate": "newData.val() === auth.uid" },
         "estado": {
-          ".write": "auth != null",
+          ".write": "auth != null && (data.parent().child('uid').val() === auth.uid || root.child('admins').child(auth.uid).val() === true)",
           ".validate": "newData.val() === 'abierto' || newData.val() === 'hecho'"
         },
-        "$otro": { ".validate": true }
+        "$otro": { ".validate": false }
       }
     },
 
@@ -134,8 +176,8 @@
             ".write": "auth != null && auth.uid === $uid && !data.exists() && (root.child('partidas').child($pid).child('estado').val() === 'esperando' || (root.child('partidas').child($pid).child('juego').val() === 'presidente' && root.child('partidas').child($pid).child('estado').val() === 'jugando' && !root.child('partidas').child($pid).child('fin').exists())) && (!root.child('partidas').child($pid).child('origen').exists() || root.child('partidas').child(root.child('partidas').child($pid).child('origen').val()).child('jugadores').child(auth.uid).exists())",
             ".validate": "newData.hasChildren(['nombre', 'orden'])",
             "nombre": { ".validate": "newData.isString() && newData.val().length <= 80" },
-            "foto": { ".validate": "newData.isString() && newData.val().length <= 400" },
-            "color": { ".validate": "newData.isString() && newData.val().length <= 24" },
+            "color": { ".validate": "newData.isString() && newData.val().matches(/^#[0-9a-fA-F]{6,6}$/)" },
+            "foto": { ".validate": "newData.isString() && newData.val().length <= 400 && (newData.val() === '' || newData.val().beginsWith('https://')) && !newData.val().contains('\"') && !newData.val().contains(\"'\") && !newData.val().contains('<') && !newData.val().contains('>') && !newData.val().contains('(') && !newData.val().contains(')') && !newData.val().contains(' ')" },
             "orden": { ".validate": "newData.isNumber()" },
             "$otro": { ".validate": true }
           }
@@ -189,7 +231,7 @@
     },
 
     "discord": {
-      ".read": "auth != null",
+      ".read": "auth != null && (root.child('confianza').child(auth.uid).val() === true || root.child('admins').child(auth.uid).val() === true)",
       ".write": false
     },
 
@@ -259,7 +301,7 @@
           ".write": "auth != null && auth.uid === $uid",
           ".validate": "newData.hasChildren(['jugadas', 'ultima']) && newData.child('ultima').isString() && newData.child('ultima').val() !== data.child('ultima').val() && newData.child('jugadas').val() === (data.exists() ? data.child('jugadas').val() : 0) + 1 && newData.child('puntos').val() <= (data.exists() ? data.child('puntos').val() : 0) + 3 && root.child('partidas').child(newData.child('ultima').val()).child('juego').val() === $juego && root.child('partidas').child(newData.child('ultima').val()).child('fin').exists() && root.child('partidas').child(newData.child('ultima').val()).child('jugadores').child($uid).exists()",
           "nombre": { ".validate": "newData.isString() && newData.val().length <= 80" },
-          "foto": { ".validate": "newData.isString() && newData.val().length <= 400" },
+          "foto": { ".validate": "newData.isString() && newData.val().length <= 400 && (newData.val() === '' || newData.val().beginsWith('https://')) && !newData.val().contains('\"') && !newData.val().contains(\"'\") && !newData.val().contains('<') && !newData.val().contains('>') && !newData.val().contains('(') && !newData.val().contains(')') && !newData.val().contains(' ')" },
           "jugadas": { ".validate": "newData.isNumber()" },
           "ganadas": { ".validate": "newData.isNumber()" },
           "perdidas": { ".validate": "newData.isNumber()" },

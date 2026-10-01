@@ -1109,7 +1109,7 @@ function dondeEstamos() {
     if (!user) { state.user = null; showLogin(); return; }
     state.user = {
       uid: user.uid,
-      name: user.displayName || user.email || "Usuario",
+      name: user.displayName || "Usuario",
       photo: user.photoURL || "",
       color: colorForUid(user.uid)
     };

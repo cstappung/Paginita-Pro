@@ -58,6 +58,7 @@ import { crearLogros } from "./juegos/logros-vista.js";
 import { mezcla, abrePerfil } from "./juegos/perfil.js";
 import { abreMini, cierraMini, miniAbierta, crearPaginaPerfil, avatarMarco } from "./juegos/perfil-vista.js";
 import { estadisticas } from "./juegos/perfil-tarjeta.js";
+import { fotoSana } from "./juegos/sano.js";
 import { suena, silenciar, silenciado, ambientar, ajustarMusica, activarAudio } from "./juegos/sonido.js";
 import { montaReproductor } from "./juegos/reproductor.js";
 import { createReportWidget } from "./report-widget.js";
@@ -295,7 +296,7 @@ function aplicaPropio() {
    vea mal: la base **rechaza la escritura entera**, así que crear
    una sala con foto propia habría fallado con PERMISSION_DENIED. Va
    vacía, y al pintar se superpone el perfil, que no tiene tope. */
-const fotoBreve = f => (typeof f === "string" && f.length <= 400 && !/^data:/.test(f)) ? f : "";
+const fotoBreve = f => { const s = fotoSana(f, false); return s.length <= 400 ? s : ""; };
 
 /* ---------- el perfil público ----------
    La tarjeta y la página leen lo mismo que la pestaña de logros (ranks,
@@ -1955,7 +1956,7 @@ function wire() {
     }
     state.base = {
       uid: user.uid,
-      name: user.displayName || user.email || "Usuario",
+      name: user.displayName || "Usuario",
       photo: user.photoURL || "",
       color: colorForUid(user.uid)
     };

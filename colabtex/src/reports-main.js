@@ -20,6 +20,7 @@ const $ = id => document.getElementById(id);
 
 const state = {
   user: null,
+  admin: false,    // `admins/<uid>` en la base: solo se escribe a mano en la consola
   errores: [],
   feedback: [],
   tab: "err",
@@ -127,7 +128,7 @@ function pintaErrores(host) {
       <div class="row-top">
         ${pillApp(e.app)}${veces}
         <div class="row-title">${escapeHtml(e.mensaje)}</div>
-        <div class="row-acts"><button class="mini del" title="Quitar del informe">✕</button></div>
+        ${state.admin ? '<div class="row-acts"><button class="mini del" title="Quitar del informe">✕</button></div>' : ""}
       </div>
       <div class="row-meta">
         ${e.donde ? "Al " + escapeHtml(e.donde) + " · " : ""}${escapeHtml(e.nav || "")}
@@ -135,7 +136,8 @@ function pintaErrores(host) {
         ${e.ctx ? "<br>" + escapeHtml(Object.entries(e.ctx).map(([k, v]) => `${k}=${v}`).join(" · ")) : ""}
       </div>
       ${e.pila && e.pila.length ? `<div class="row-pre">${escapeHtml(e.pila.join("\n"))}</div>` : ""}`;
-    row.querySelector(".del").onclick = async () => {
+    const quita = row.querySelector(".del");
+    if (quita) quita.onclick = async () => {
       if (!confirm("¿Quitar este error del informe? Volverá a aparecer si se repite.")) return;
       try { await rep.deleteError(e.id); } catch (err) { alert("No se pudo: " + (err.message || err)); }
     };
@@ -154,6 +156,7 @@ function pintaFeedback(host) {
   }
   for (const f of lista) {
     const mio = state.user && f.uid === state.user.uid;
+    const puede = mio || state.admin;
     const hecho = f.estado === "hecho";
     const row = document.createElement("div");
     row.className = "row" + (hecho ? " hecho" : "");
@@ -163,15 +166,16 @@ function pintaFeedback(host) {
         ${pillApp(f.app)}${hecho ? '<span class="pill p-done">HECHO</span>' : ""}
         <div class="row-title">${escapeHtml(f.titulo)}</div>
         <div class="row-acts">
-          <button class="mini ok" title="${hecho ? "Volver a abrirlo" : "Marcar como resuelto"}">${hecho ? "↺" : "✓"}</button>
-          ${mio ? '<button class="mini del" title="Borrar">✕</button>' : ""}
+          ${puede ? `<button class="mini ok" title="${hecho ? "Volver a abrirlo" : "Marcar como resuelto"}">${hecho ? "↺" : "✓"}</button>` : ""}
+          ${puede ? '<button class="mini del" title="Borrar">✕</button>' : ""}
         </div>
       </div>
       <div class="row-meta">${escapeHtml(f.userName || "?")} · ${escapeHtml(timeAgo(f.at))}${f.nav ? " · " + escapeHtml(f.nav) : ""}</div>
       ${f.cuerpo ? `<div class="row-body">${escapeHtml(f.cuerpo)}</div>` : ""}
       ${f.pasos ? `<div class="row-body"><b>Pasos:</b>\n${escapeHtml(f.pasos)}</div>` : ""}
       ${f.adjuntos && f.adjuntos.length ? `<div class="row-pre">${escapeHtml(f.adjuntos.join("\n"))}</div>` : ""}`;
-    row.querySelector(".ok").onclick = async () => {
+    const ok = row.querySelector(".ok");
+    if (ok) ok.onclick = async () => {
       try { await rep.setFeedbackState(f.id, hecho ? "abierto" : "hecho"); }
       catch (err) { alert("No se pudo: " + (err.message || err)); }
     };
@@ -216,12 +220,12 @@ function wire() {
   });
   watchAuth(user => {
     if (!user) {
-      state.user = null; parar(); mostrar(false); pintaUsuario();
+      state.user = null; state.admin = false; parar(); mostrar(false); pintaUsuario();
       return;
     }
     state.user = {
       uid: user.uid,
-      name: user.displayName || user.email || "Usuario",
+      name: user.displayName || "Usuario",
       photo: user.photoURL || "",
       color: colorForUid(user.uid)
     };
@@ -229,5 +233,6 @@ function wire() {
     mostrar(true);
     escuchar();
     render();
+    rep.esAdmin(user.uid).then(a => { state.admin = a; render(); });
   });
 })();

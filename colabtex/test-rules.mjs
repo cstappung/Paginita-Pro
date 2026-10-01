@@ -107,6 +107,25 @@ await loginAs(B);
 await denied("B expulsado no lee el documento", () => get(ref(db, `projects/${pid}/doc/snapshot`)));
 await allowed("B se reincorpora con la invitación", () =>
   fb.joinWithToken(pid, invite.token, { uid: userB.uid, userName: "Beto" }));
+await denied("un editor no fabrica un enlace de dueño", () =>
+  set(ref(db, "tokenIndex/tokendueno"), { pid, role: "owner" }));
+await denied("ni se nombra dueño con él", () =>
+  set(ref(db, `projects/${pid}/members/${userB.uid}`), { name: "Beto", role: "owner", viaToken: "tokendueno" }));
+
+console.log("— Registro de usuario privado, perfil público —");
+await denied("B no lee el registro de A (su correo)", () => get(ref(db, `users/${userA.uid}`)));
+await allowed("B escribe su perfil", () =>
+  set(ref(db, `users/${userB.uid}/perfil`), { nick: "Beto", color: "#112233", at: Date.now() }));
+await denied("un color con HTML no cuela", () =>
+  set(ref(db, `users/${userB.uid}/perfil/color`), '"><img src=x onerror=alert(1)>'));
+await denied("una foto javascript: no cuela", () =>
+  set(ref(db, `users/${userB.uid}/perfil/foto`), "javascript:alert(1)"));
+await denied("un campo inventado no cuela", () =>
+  set(ref(db, `users/${userB.uid}/perfil/otro`), "x"));
+await loginAs(A);
+ok("A lee el perfil de B", (await get(ref(db, `users/${userB.uid}/perfil/nick`))).val() === "Beto");
+await denied("A no lee el registro entero de B", () => get(ref(db, `users/${userB.uid}`)));
+await loginAs(B);
 
 console.log("— Sincronización Yjs completa entre A y B (con reglas) —");
 const docB = new Y.Doc();
@@ -161,15 +180,21 @@ await denied("A no puede firmar algo con el uid de otro", () =>
 const userB2 = await loginAs(B);
 const todo = await rep.readAll();
 ok("B ve el informe entero", todo.errores.length >= 1 && todo.feedback.some(f => f.id === fbId));
-await allowed("B marca como resuelto lo de A", () => rep.setFeedbackState(fbId, "hecho"));
+await denied("B NO marca como resuelto lo de A (solo admins)", () => rep.setFeedbackState(fbId, "hecho"));
+await denied("B NO borra un error del informe", () => rep.deleteError("epruebas1"));
+await denied("B NO reescribe el mensaje de un error", () => set(ref(db, "errors/epruebas1/mensaje"), "otra cosa"));
+await denied("B NO infla el contador", () => set(ref(db, "errors/epruebas1/veces"), 1000));
+await allowed("B sí suma una vez", () => rep.publishError(errRec, userB2.uid));
+await denied("B no lee el webhook de Discord", () => get(ref(db, "discord")));
 await denied("B NO puede reescribir el texto de A", () =>
   set(ref(db, `feedback/${fbId}/titulo`), "secuestrado"));
 await denied("B NO puede borrar lo de A", () => rep.deleteFeedback(fbId));
 await denied("un estado inventado no cuela", () => set(ref(db, `feedback/${fbId}/estado`), "loquesea"));
 
 await loginAs(A);
+await allowed("A marca como resuelto lo suyo", () => rep.setFeedbackState(fbId, "hecho"));
 await allowed("A sí borra lo suyo", () => rep.deleteFeedback(fbId));
-await allowed("cualquiera puede quitar un error del informe", () => rep.deleteError("epruebas1"));
+await denied("sin ser admin no se quita un error", () => rep.deleteError("epruebas1"));
 
 await signOut(auth);
 await denied("sin sesión no se lee el informe", () => get(ref(db, "errors")));

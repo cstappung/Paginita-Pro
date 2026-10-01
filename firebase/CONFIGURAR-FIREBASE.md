@@ -8,6 +8,92 @@ Pasos en la [consola de Firebase](https://console.firebase.google.com/project/mi
 > **Publicar** en la consola — el deploy en GitHub Pages NO actualiza las
 > reglas de Firebase.
 
+## 0. Seguridad: lo que hay que hacer antes de abrir el sitio a más gente
+
+La configuración de `colabtex/src/firebase.js` (la `apiKey` incluida) es
+**pública por diseño**: va dentro de cada página y no se puede esconder, ni
+siquiera haciendo privado el repositorio. Lo que protege los datos son las
+**reglas** (este directorio) y unos ajustes de la consola. Lista de comprobación:
+
+1. **Publicar las dos reglas otra vez** (`database.rules.json` en Realtime
+   Database → Reglas y `storage.rules` en Storage → Reglas). La versión de
+   octubre de 2026 cierra:
+   - **Enlaces que daban rol de dueño.** Un editor podía fabricar un enlace
+     con rol `owner`, entrar con él y quedarse con el proyecto. Ahora un
+     enlace solo puede dar `edit` o `view`.
+   - **El correo de todo el mundo.** `users/<uid>` era legible por cualquiera
+     con sesión, y los uid de los demás están a la vista en cualquier sala de
+     juegos. Ahora cada registro es privado y solo `users/<uid>/perfil` (apodo,
+     foto, color, marco, bio) es público, con cada campo validado. ColabTeX y
+     ColabDraw ya no guardan el correo, y borran el que había al iniciar
+     sesión.
+   - **Código metido en un color o una foto.** El color y la foto de un perfil
+     o de una ficha de partida se pintan dentro de HTML. Las reglas solo
+     aceptan `#rrggbb` y URLs `https://` (o una foto subida como imagen JPEG,
+     PNG o WebP), y la web limpia además lo que lee (`juegos/sano.js`), lo que
+     cubre los datos viejos.
+   - **Informes.** Cualquiera podía borrar o reescribir los errores y marcar
+     como resuelto lo de otros. Ahora un error se crea y se cuenta, pero solo
+     un administrador lo borra. El estado de una sugerencia lo cambia quien la
+     escribió o un administrador.
+   - **El webhook de Discord.** Lo podía leer cualquiera con sesión (y mandar
+     spam al canal). Ahora solo lo leen las personas de confianza (ver punto 2).
+   - **Storage.** Cada archivo recuerda quién lo subió y solo esa persona lo
+     reemplaza o lo borra. No se aceptan HTML ni JavaScript, que servidos desde
+     un dominio de Google serían una página falsa gratis. Los archivos de antes
+     siguen como estaban. Si alguien del proyecto vuelve a exportar una figura
+     que subió otra persona, se guarda dentro de la base (si mide ≤ 3 MB). Si
+     es más grande, la web pide subirla con otro nombre.
+2. **Nombrarte administrador y de confianza.** Tu uid sale en
+   **Authentication → Users**, columna *User UID*. En **Realtime Database →
+   Datos**, crea en la raíz:
+   - `admins/<tu uid>` = `true` (booleano, no texto). Muestra ✕ y ✓ en
+     **Informes**.
+   - `confianza/<uid>` = `true` para cada persona cuyas salas quieras anunciar
+     en Discord (los administradores cuentan como de confianza). Las salas
+     abiertas por alguien que no está en la lista se juegan igual, solo que
+     no se anuncian.
+
+   Nadie puede escribir esos dos nodos desde la web; solo tú, en la consola.
+3. **Restringir la API key por dominio.** [Google Cloud → APIs y servicios →
+   Credenciales](https://console.cloud.google.com/apis/credentials?project=mi-pagina-pro)
+   → la clave *Browser key (auto created by Firebase)* → **Restricciones de
+   aplicaciones: Sitios web** y añade `https://<tu-usuario>.github.io/*`,
+   `http://localhost:8123/*` y `https://mi-pagina-pro.firebaseapp.com/*`
+   (lo usa el inicio de sesión). No impide que alguien use la clave desde un
+   script, pero sí desde otra web.
+4. **Dominios autorizados** (Authentication → Settings): deja solo los tuyos
+   (ver la sección 3).
+5. **Alertas de gasto.** Si el proyecto está en el plan Blaze, en Google Cloud
+   → Facturación → **Presupuestos y alertas**, pon un presupuesto bajo (p. ej.
+   5 USD) con aviso por correo. Un abuso se nota primero en la factura.
+6. **App Check (recomendado).** Hace que la base y Storage solo atiendan a
+   peticiones de tu página en un navegador real, no de un script que copió la
+   configuración.
+   1. Consola → **App Check** → registra la app web con **reCAPTCHA v3**.
+      Google te da una *clave de sitio*: regístrala para tu dominio de
+      GitHub Pages.
+   2. Pégala en `APP_CHECK_SITE_KEY`, en `colabtex/src/firebase.js`, y
+      ejecuta `npm run build` en `colabtex/`. Publica.
+   3. Para la vista previa local, abre `http://localhost:8123`. La consola
+      del navegador imprime un *debug token*: añádelo en App Check →
+      **Administrar tokens de depuración**.
+   4. Mira unos días las métricas de App Check (cuántas peticiones vienen
+      verificadas). Cuando casi todas lo estén, pulsa **Aplicar** en Realtime
+      Database y en Storage. Si lo aplicas antes de publicar el sitio con la
+      clave, la web se queda sin base.
+7. **Si se filtra el webhook de Discord**, bórralo en Discord, crea otro y
+   cambia `discord/webhook`. No hace falta tocar el código.
+
+Lo que las reglas **no** pueden impedir sin un servidor propio, dicho claro:
+un jugador con la consola abierta puede declararse ganador de una partida en
+la que está (`partidas/<pid>/fin`) y así sumar a su clasificación; cualquiera
+con sesión puede llenar el chat de una sala o mandar muchas sugerencias; y el
+elenco de Clue (`clueElenco`, nombres y fotos de personas reales) lo puede
+leer cualquiera con sesión, porque todos los jugadores de una sala tienen que
+ver los mismos personajes. Si eso último te preocupa, usa fotos que no sean
+de cara.
+
 ## 1. Reglas de Realtime Database (IMPORTANTE)
 
 Tu base de datos está ahora en **modo de prueba** (abierta a cualquiera).
@@ -23,6 +109,8 @@ Qué garantizan estas reglas:
 - Los de "solo lectura" no pueden modificar el documento (se valida en el servidor de Firebase, no solo en la interfaz).
 - Unirse por enlace exige un token válido de ese proyecto (`tokenIndex`).
 - Los lectores no pueden ver el token de edición.
+- Un enlace solo da `edit` o `view`, nunca `owner`.
+- `users/<uid>` es privado salvo `users/<uid>/perfil`.
 
 ### ⚠ Si vienes de una versión anterior: los informes
 
@@ -214,8 +302,10 @@ anuncian, y las salas abiertas desde `localhost` tampoco.
    Ponle nombre y foto si quieres (el mensaje firma como «Laboratorio ·
    Juegos») y pulsa **Copiar URL del webhook**.
 2. Publica las reglas otra vez (pegar `firebase/database.rules.json` entero y
-   **Publicar**). Traen un nodo nuevo, `discord`, que pueden leer los que
-   tienen sesión y no puede escribir nadie desde la web.
+   **Publicar**). Traen un nodo nuevo, `discord`, que solo pueden leer las
+   personas de `confianza/<uid>` y los `admins/<uid>` (sección 0), y que no
+   puede escribir nadie desde la web. Solo se anuncian las salas que abren
+   ellas.
 3. En **Realtime Database → Datos**, crea a mano, en la raíz:
    - `discord/webhook` = la URL copiada
      (`https://discord.com/api/webhooks/…`).

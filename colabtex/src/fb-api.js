@@ -14,7 +14,7 @@
    Storage (con respaldo base64 en RTDB si Storage no está disponible):
      projects/<pid>/assets/<nombre>
    ============================================================ */
-import { db, storage } from "./firebase.js";
+import { db, storage, auth } from "./firebase.js";
 import {
   ref, get, set, update, remove, push, serverTimestamp, onValue
 } from "firebase/database";
@@ -33,10 +33,13 @@ export const encKey = name => encodeURIComponent(name).replace(/\./g, "%2E");
 export const decKey = key => decodeURIComponent(key);
 
 /* ---------- usuarios ---------- */
+/* El correo ya no se guarda (y el que hubiera se borra): nadie lo leía, y
+   `users/<uid>` llegó a ser legible por cualquiera con sesión — y los uid
+   de los demás están a la vista en cualquier sala de juegos. */
 export async function ensureUserRecord(user, color) {
   await update(ref(db, "users/" + user.uid), {
-    name: user.displayName || user.email || "Usuario",
-    email: user.email || "",
+    name: user.displayName || "Usuario",
+    email: null,
     photo: user.photoURL || "",
     color,
     lastLogin: serverTimestamp()
@@ -245,7 +248,7 @@ export async function duplicateProject(pid, { uid, userName }) {
     } else {
       try {
         const bytes = await getBytes(sRef(storage, `projects/${pid}/assets/${decKey(key)}`));
-        await uploadBytes(sRef(storage, `projects/${newPid}/assets/${decKey(key)}`), bytes);
+        await sube(newPid, decKey(key), bytes);
         await set(ref(db, `projects/${newPid}/assetsIndex/${key}`), a);
       } catch (e) {}
     }
@@ -291,15 +294,39 @@ export async function createInvite(pid, { email, role }) {
 /* ---------- assets binarios ---------- */
 const RTDB_ASSET_LIMIT = 3 * 1024 * 1024; // 3 MB si hay que caer a base64
 
+/* Las reglas de Storage no pueden mirar la base de datos, así que no saben
+   quién es miembro de qué proyecto. Lo que sí pueden es exigir que cada
+   objeto diga quién lo subió (`customMetadata.uid`) y dejar reemplazarlo
+   o borrarlo solo a esa persona; y negarse a servir HTML o JavaScript, que
+   es lo que convertiría el bucket en un alojamiento de páginas falsas con
+   dominio de Google. El tipo se deduce de la extensión. */
+const TIPOS = {
+  png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif",
+  webp: "image/webp", svg: "image/svg+xml", pdf: "application/pdf",
+  eps: "application/postscript", ps: "application/postscript",
+  tif: "image/tiff", tiff: "image/tiff", bmp: "image/bmp",
+  ttf: "font/ttf", otf: "font/otf", woff: "font/woff", woff2: "font/woff2",
+  zip: "application/zip"
+};
+const metaSubida = name => ({
+  contentType: TIPOS[String(name).split(".").pop().toLowerCase()] || "application/octet-stream",
+  customMetadata: { uid: (auth.currentUser && auth.currentUser.uid) || "" }
+});
+const sube = (pid, name, bytes) =>
+  uploadBytes(sRef(storage, `projects/${pid}/assets/${name}`), bytes, metaSubida(name));
+
 export async function uploadAsset(pid, name, bytes) {
   const key = encKey(name);
   try {
-    await uploadBytes(sRef(storage, `projects/${pid}/assets/${name}`), bytes);
+    await sube(pid, name, bytes);
     await set(ref(db, `projects/${pid}/assetsIndex/${key}`), { name, size: bytes.byteLength, loc: "storage" });
   } catch (e) {
-    // Storage no disponible (p. ej. plan Spark sin bucket): respaldo en RTDB
+    /* Storage no disponible (p. ej. plan Spark sin bucket), o el archivo
+       que se quiere pisar lo subió otra persona: respaldo en RTDB. */
     if (bytes.byteLength > RTDB_ASSET_LIMIT)
-      throw new Error("Storage no disponible y el archivo supera 3 MB: " + name);
+      throw new Error(e && e.code === "storage/unauthorized"
+        ? `«${name}» lo subió otra persona del proyecto y solo ella puede reemplazarlo. Súbelo con otro nombre.`
+        : "Storage no disponible y el archivo supera 3 MB: " + name);
     const b64 = b64FromBytes(new Uint8Array(bytes));
     await set(ref(db, `projects/${pid}/assetsIndex/${key}`), { name, size: bytes.byteLength, loc: "rtdb", b64 });
   }
@@ -343,7 +370,7 @@ export async function renameAsset(pid, asset, newName) {
 
   if (node.loc === "storage") {
     const buf = await getBytes(sRef(storage, `projects/${pid}/assets/${asset.name}`));
-    await uploadBytes(sRef(storage, `projects/${pid}/assets/${newName}`), buf);
+    await sube(pid, newName, buf);
     await set(ref(db, `projects/${pid}/assetsIndex/${newKey}`),
       { name: newName, size: node.size || buf.byteLength, loc: "storage" });
     try { await deleteObject(sRef(storage, `projects/${pid}/assets/${asset.name}`)); } catch (e) {}

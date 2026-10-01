@@ -77,6 +77,13 @@ export function watchErrors(cb) {
   return off;
 }
 
+/* Borrar errores, y tocar el estado o borrar lo que escribió otra persona,
+   es solo de quien figure en `admins/<uid>` (se escribe a mano en la
+   consola; desde la web nadie puede nombrarse). Antes podía cualquiera con
+   sesión, que con un equipo pequeño daba igual y abierto a cualquiera no. */
+export const esAdmin = uid =>
+  get(ref(db, `admins/${uid}`)).then(s => s.val() === true, () => false);
+
 export const deleteError = id => remove(ref(db, `${ERRORES}/${id}`));
 
 export async function clearErrors(ids) {
