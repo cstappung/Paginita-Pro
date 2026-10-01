@@ -63,7 +63,7 @@ export const FONDOS = [
   { id: "oro", n: "Oro", oscuro: false, req: { podio: true }, css: () => "linear-gradient(120deg, #a86f10, #f4c542 40%, #fff6c4 50%, #f4c542 60%, #a86f10)" }
 ];
 
-const NOMBRES_EXTRA = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN" };
+const NOMBRES_EXTRA = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras" };
 export const nombreJuego = j => (JUEGOS[j] && JUEGOS[j].nombre) || NOMBRES_EXTRA[j] || j;
 
 /* Las partes de una categoría del club, para decirla en palabras. */
@@ -71,7 +71,8 @@ const PARTES = {
   easy: "Fácil", medium: "Medio", hard: "Difícil", maraton: "Maratón", sprint: "Sprint 40", ultra: "Ultra 2 min",
   rondas: "Ronda máxima", "10": "Del 1 al 10", "20": "Del 1 al 20", classic: "Clásico", arcade: "Arcade",
   portals: "Portales", reloj: "Contrarreloj", espejo: "Espejo", laberinto: "Laberinto", chico: "mapa chico",
-  mediano: "mapa mediano", grande: "mapa grande", gigante: "mapa gigante"
+  mediano: "mapa mediano", grande: "mapa grande", gigante: "mapa gigante",
+  racha: "Racha diaria", facil: "Fácil", medio: "Medio", dificil: "Difícil", "8": "8×8", "12": "12×12", "15": "15×15"
 };
 export const juegoDeCategoria = c => Object.keys(SOLO_PREFIJO).find(k => String(c).startsWith(SOLO_PREFIJO[k])) || "";
 export function nombreCategoria(c) {
@@ -81,11 +82,12 @@ export function nombreCategoria(c) {
   return `${nombreJuego(j)} · ${resto.join(", ")}`;
 }
 /* Cómo se dice una marca del club: las que se ganan por tiempo, en tiempo. */
-const porTiempo = c => /^club-(minas|sortem)-/.test(c) || c === "club-tetris-sprint";
+const porTiempo = c => /^club-(minas|sortem)-/.test(c) || c === "club-tetris-sprint" || (/^club-sopa-/.test(c) && c !== "club-sopa-racha");
 export function valorMarca(c, f) {
   if (!f) return "";
   if (porTiempo(c)) return `${((f.tiempo || 0) / 1000).toFixed(2)} s`;
   if (String(c).startsWith("club-bbtan-")) return `ronda ${f.puntos || 0}`;
+  if (c === "club-sopa-racha") return `${f.puntos || 0} ${f.puntos === 1 ? "día" : "días"}`;
   return `${f.puntos || 0} pts`;
 }
 // El mismo orden que la tabla del club (discord.js: ordenSolo).

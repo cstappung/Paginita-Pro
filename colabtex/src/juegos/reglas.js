@@ -652,6 +652,23 @@ const REGLAS = {
       ["Fin y clasificación", "La partida acaba cuando un bloque llega a la última fila. Lo que compite es la <b>ronda máxima</b> alcanzada: la mejor sale en la Clasificación del sitio y desbloquea logros cada tantas rondas."]
     ]
   },
+  sopa: {
+    lema: "Sopa de letras: encuentra todas las palabras escondidas en la grilla.",
+    secciones: [
+      ["Cómo se juega", "Arrastra con el ratón o con el dedo desde la primera letra de una palabra hasta la última, en línea recta: horizontal, vertical o diagonal. Si lo que marcaste (o su reverso) es una de las palabras de la lista, queda pintada con su color y se tacha abajo. Ganas al encontrarlas todas."],
+      ["Los modos", lista([
+        "<b>Diaria</b>: la misma sopa para todo el sitio, 12×12 y dificultad Media. La temática rota sola cada día y la sopa cambia a medianoche de Chile, aunque estés en otro huso horario. Se juega una vez al día.",
+        "<b>Libre</b>: eliges temática, dificultad y tamaño, y cada sopa es distinta. Cambiar un selector o pulsar «Nueva sopa» da otra."
+      ])],
+      ["Dificultad y tamaño", lista([
+        "<b>Fácil</b>: palabras hacia la derecha y hacia abajo.",
+        "<b>Medio</b>: agrega las diagonales.",
+        "<b>Difícil</b>: también al revés, en las ocho direcciones.",
+        "<b>Pequeño</b> 8×8 con 6 palabras, <b>Mediano</b> 12×12 con 10 y <b>Grande</b> 15×15 con 13."
+      ])],
+      ["Racha y clasificación", "La 🔥 racha cuenta los días seguidos que completas la sopa diaria: si ayer la hiciste, hoy sube uno; si te saltas un día, vuelve a empezar. Se guarda en tu navegador y, jugando con tu sesión, también en tu cuenta. En la Clasificación compite la mejor racha y, en el modo libre, el tiempo de cada dificultad y tamaño."]
+    ]
+  },
   snake: {
     lema: "Snake Club: la serpiente de siempre, en siete modos y cuatro tamaños.",
     secciones: [
@@ -670,7 +687,7 @@ const REGLAS = {
   }
 };
 
-const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN" };
+const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras" };
 
 export const tieneReglas = juego => Object.prototype.hasOwnProperty.call(REGLAS, juego);
 

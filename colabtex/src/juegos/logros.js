@@ -256,6 +256,20 @@ const SOLO = {
     { id: "r200", n: "Maquinita", d: "Llega a la ronda 200.", i: "🕹️", m: "Rondas", s: d => cat(/-rondas$/)(d) && d.puntos >= 200 },
     { id: "r300", n: "Insert coin", d: "Llega a la ronda 300.", i: "🪙", m: "Rondas", s: d => cat(/-rondas$/)(d) && d.puntos >= 300 },
     { id: "r500", n: "Leyenda del after hours", d: "Llega a la ronda 500.", i: "👾", m: "Rondas", s: d => cat(/-rondas$/)(d) && d.puntos >= 500 }
+  ],
+  /* La racha se lee de club-sopa-racha (puntos = días seguidos); el resto,
+     de las sopas libres, donde los puntos son fijos y manda el tiempo. */
+  sopa: [
+    { id: "dia1", n: "Sopa del día", d: "Completa una sopa diaria.", i: "🔤", m: "Diaria", s: cat(/-racha$/) },
+    { id: "racha3", n: "Tres al hilo", d: "Llega a una racha de 3 días.", i: "🔥", m: "Diaria", s: d => cat(/-racha$/)(d) && d.puntos >= 3 },
+    { id: "racha7", n: "Una semana entera", d: "Llega a una racha de 7 días.", i: "📅", m: "Diaria", s: d => cat(/-racha$/)(d) && d.puntos >= 7 },
+    { id: "racha30", n: "Un mes de sopas", d: "Llega a una racha de 30 días.", i: "🗓️", m: "Diaria", s: d => cat(/-racha$/)(d) && d.puntos >= 30 },
+    { id: "libre", n: "Por gusto", d: "Completa una sopa libre.", i: "🧩", m: "Libre", s: d => cat(/-\d+$/)(d) },
+    { id: "grande", n: "Sopa grande", d: "Completa una sopa libre de 15×15.", i: "🍜", m: "Libre", s: d => cat(/-15$/)(d) },
+    { id: "dificil", n: "Al derecho y al revés", d: "Completa una sopa libre en Difícil.", i: "🔄", m: "Difícil", s: d => cat(/-dificil-/)(d) },
+    { id: "maestro", n: "Maestro de la sopa", d: "Completa una Difícil de 15×15.", i: "👑", m: "Difícil", s: d => cat(/-dificil-15$/)(d) },
+    { id: "lince", n: "Ojo de lince", d: "Completa una de 12×12 en menos de 1 min.", i: "🐆", m: "Libre", s: d => cat(/-12$/)(d) && d.tiempo < 60000 },
+    { id: "rayo", n: "Relámpago", d: "Completa una de 8×8 en menos de 20 s.", i: "⚡", m: "Libre", s: d => cat(/-8$/)(d) && d.tiempo < 20000 }
   ]
 };
 
@@ -265,7 +279,7 @@ export const LOGROS = Object.fromEntries([
   ...Object.entries(SOLO)
 ]);
 /* Qué categorías de `soloRanks` alimentan cada juego individual. */
-export const SOLO_PREFIJO = { minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", sortem: "club-sortem-", bbtan: "club-bbtan-" };
+export const SOLO_PREFIJO = { minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-" };
 
 /* Los logros de partida que `uid` tiene ya en esta, según lo que se ve. */
 export function detecta(p, est, uid) {
