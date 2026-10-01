@@ -1547,7 +1547,9 @@ game loop ever has to be synchronised.
 
 **How many people fit is a property of the room, not of the game.** `JUEGOS`
 declares `minimo` and `cupo` (escondite, cartas, reversi and ajedrez are duels by
-construction — two landscapes, one clash, two colours), and whoever opens the
+construction — two landscapes, one clash, two colours; yemas has
+`minimo: 1`, but `minimoDe(p)` lowers it to one only for the zombies variant,
+which is the one that can be played alone), and whoever opens the
 room picks inside that range along with anything else the game offers;
 `crearPartida(juego, quien, extra)` writes those over the defaults, so a game
 that offers nothing passes nothing. The lobby's player-count options are
@@ -2935,6 +2937,19 @@ cost is a stray bite, not a broken game. Seven things hold it together:
   integers that only go up. The game ends the moment every player still in
   the room is fallen. The top `pts` wins, and `""` (a draw) if nobody
   scored. Being left alone is not a win by abandono.
+- **Before falling there is a last stand** (`cae`, `pasoAbatido`,
+  `ABATIDO` in the frame's `main.js`). Reaching 0 hp in zombies does not
+  write `muere`: the egg goes down (`yo.abatido`, still `vivo`, so it is
+  not in `caidos`) with the pistol — its own, or a borrowed one taken back
+  on getting up — crawling at a quarter of the speed, with no perks.
+  Zombies ignore it (`pasoZombis` passes `vivo: false`). The state carries
+  `ab` (seconds left), which tilts the egg in the other frames. A teammate
+  within 1.6 m holds E for 4 s (`pasoRevivir`) and sends a zero-damage hit
+  with `a: REVIVE` (99) that lifts it; only when the 30 s run out does it
+  `morir`. With nobody else standing the clock drops to 2 s, so a downed
+  team still loses. **Quick Revive halves the time it takes you to lift
+  others**, and **alone** it lifts you after 3 s, once (it is lost like
+  every perk). Alone without it you die at once.
 - **A fallen player waits for the round.** The frame only respawns when
   `marcador.ronda` grows, with the pan and the pistol and keeping the
   points. Those still standing get their grenades back. Health regenerates
@@ -2981,8 +2996,10 @@ Things to know:
   `armas.js` (double damage, a clip and a half). The box can give the Rayo
   batido (`10`), the Amasadora (`11`) and the Huevera (`12`), which exist
   only in zombies, and pulling the teddy bear moves it.
-- **Each dead zombie leaves a green egg** for `HUEVO_VIDA` seconds, drawn
-  in every frame from `zb.m`. In Pueblo, a zombie that steps in the `lava`
+- **Each dead zombie leaves a green fried egg** on the floor (`friteVerde`
+  in `zombis.js`: green white and rim, an orange yolk that pulses) for
+  `HUEVO_VIDA` seconds, fading over the last three, drawn in every frame
+  from `zb.m`. In Pueblo, a zombie that steps in the `lava`
   burns (`quema`) and explodes when it dies, hurting players near it.
 
 **A team win is `ganador: "eq:rojo"`**, and `ganoEn(p, ganador, uid)` in

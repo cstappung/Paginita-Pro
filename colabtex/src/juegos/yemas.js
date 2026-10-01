@@ -236,7 +236,7 @@ export function crearYemas({ uid, pid, jugar, terminar, mirando }) {
     const n = est.jugadores.length, cupo = est.cupo || n;
     aviso.hidden = !!est.listos;
     aviso.textContent = est.listos ? "" : "Esperando huevos… " + n + " de " + cupo +
-      (cupo > 2 && n >= 2 ? " · el anfitrión puede empezar ya" : "");
+      (n >= (est.variante === "zombis" ? 1 : 2) ? " · el anfitrión puede empezar ya" : "");
   }
 
   function montar(el) {
@@ -259,7 +259,7 @@ export function crearYemas({ uid, pid, jugar, terminar, mirando }) {
     window.addEventListener("message", mensaje);
     window.addEventListener("keydown", abajo);
     window.addEventListener("keyup", arriba);
-    frame.src = "juegos/yemas/index.html?modo=online&v=yemas-8";
+    frame.src = "juegos/yemas/index.html?modo=online&v=yemas-9";
     host.append(aviso, equiposEl, barra, frame);
   }
 

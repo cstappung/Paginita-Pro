@@ -33,7 +33,7 @@ import { crearSolo } from "./juegos/solo/club.js";
 import { watchAuth, loginGoogle, logout } from "./firebase.js";
 import * as fb from "./fb-juegos.js";
 import { escapeHtml, timeAgo, colorForUid } from "./util.js";
-import { AJ_RITMOS, JUEGOS, reducir, jugadasDe, acumula, cupoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, YM_MAPAS, ganoEn, ordenaRanks, novedades } from "./juegos/motor.js";
+import { AJ_RITMOS, JUEGOS, reducir, jugadasDe, acumula, cupoDe, minimoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, YM_MAPAS, ganoEn, ordenaRanks, novedades } from "./juegos/motor.js";
 import { crearEscondite } from "./juegos/escondite.js";
 import { crearCartas } from "./juegos/cartas.js";
 import { crearCuadritos } from "./juegos/cuadritos.js";
@@ -89,8 +89,12 @@ const ICONO_TODOS = { ...ICONO, general: "★", minas: "✦", snake: "ϟ", tetri
    aparezca aquí no ofrece nada y su tarjeta sale con el botón solo. */
 /* Cuántos pueden entrar, del mínimo al cupo del juego: sale de `JUEGOS`
    para que subir el tope de un juego sea cambiar un número en un sitio. */
-const cupos = k => Array.from({ length: JUEGOS[k].cupo - JUEGOS[k].minimo + 1 },
-  (_, i) => ({ v: JUEGOS[k].minimo + i, t: JUEGOS[k].minimo + i + " jugadores" }));
+/* El cupo es cuánta gente cabe, y una sala es para dos o más aunque el
+   juego deje empezar con uno (Yemas en zombis): el anfitrión arranca
+   con «Empezar con 1» sin esperar a nadie. */
+const cupoMin = k => Math.max(2, JUEGOS[k].minimo);
+const cupos = k => Array.from({ length: JUEGOS[k].cupo - cupoMin(k) + 1 },
+  (_, i) => ({ v: cupoMin(k) + i, t: cupoMin(k) + i + " jugadores" }));
 
 const OPCIONES = {
   /* En el ajedrez lo único que se elige es el color de quien abre; «al
@@ -1491,7 +1495,7 @@ function pintaPartida() {
 function panelEspera(p, est) {
   const cupo = est.cupo || 2;
   const dentro = (est.jugadores || []).length;
-  const min = (JUEGOS[p.juego] || {}).minimo || 2;
+  const min = minimoDe(p);
   const anfitrion = p.anfitrion === state.user.uid;
   const varios = cupo > min;
   return `

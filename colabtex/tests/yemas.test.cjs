@@ -300,3 +300,14 @@ test('yemas: muertes con la espátula dorada (8) cuentan; el mordisco (9) y el R
  e=muere(p,'c','b',{a:10});assert.equal(e.hist.at(-1).a,10);
  e=muere(p,'c','b',{a:13});assert.equal(e.hist.at(-1).a,0);
 });
+
+test('yemas: los zombis se juegan de a uno; los demás modos piden dos',()=>{
+ const z=sala(1,{variante:'zombis',cupo:4});
+ assert.equal(reducir(z).fase,'espera');
+ z.estado='jugando';const e=reducir(z);
+ assert.equal(e.fase,'jugando');assert.equal(e.ganador,null);
+ assert.equal(context.minimoDe(z),1);
+ const t=sala(1,{cupo:4,estado:'jugando'});
+ assert.equal(context.minimoDe(t),2);
+ assert.equal(reducir(t).fase,'espera');
+});
