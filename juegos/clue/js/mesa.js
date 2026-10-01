@@ -11,6 +11,7 @@
        suscribir(cb) → deja de escuchar          // cb({est, priv}) en cada cambio
        jugar(j) → Promise                         // una jugada mía, sin uid
        refutar(carta | null) → Promise            // responder a una sugerencia
+       ocupado(bool)                              // "estoy animando": la sala no tapa el final
      }
      priv = {
        mano: [cartas] | null,                     // lo mío
@@ -79,7 +80,9 @@
       return {
         mano: manos.yo.slice(),
         vistas: Object.assign({}, vistas.yo),
-        sobre: est.fase === "fin" ? sobre.slice() : null,
+        /* Al final lo ve todo el mundo; antes, solo quien acusó mal
+           (como en el juego de mesa: lo mira en secreto y queda fuera). */
+        sobre: est.fase === "fin" || est.eliminados.yo ? sobre.slice() : null,
         problemas: null,
         aviso: ""
       };
@@ -151,7 +154,7 @@
       modo: "practica", yo: "yo", mirando: false, jugadores, elenco, semilla,
       suscribir(cb) { oyentes.add(cb); cb({ est, priv: priv() }); return () => oyentes.delete(cb); },
       jugar(j) {
-        if (!j || typeof j !== "object" || !est.debe.includes("yo") && j.t !== "elige") return Promise.resolve(false);
+        if (!j || typeof j !== "object" || !est.debe.includes("yo") && !(est.fase === "elige" && (j.t === "elige" || j.t === "suelta"))) return Promise.resolve(false);
         escribe("yo", j);
         return Promise.resolve(true);
       },
@@ -165,6 +168,7 @@
       },
       /* Solo para pruebas y para el botón «rendirse»: la mesa entera. */
       depura: () => ({ sobre: sobre.slice(), manos, log }),
+      ocupado() {},
       destruir() { muerto = true; clearTimeout(reloj); oyentes.clear(); }
     };
     setTimeout(programa, 0);

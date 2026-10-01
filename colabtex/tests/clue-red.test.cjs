@@ -100,7 +100,7 @@ test('clue en línea: tres marcos reparten, juegan, acusan, revelan y la auditor
   assert.equal(e.fase, 'fin', 'la partida termina');
   /* Las manos que abrió cada marco son disjuntas y no tocan el sobre. */
   const manos = vistas.map(v => v.priv.mano);
-  assert.equal(new Set(manos.flat()).size, 18);
+  assert.equal(new Set(manos.flat()).size, M.NC - 3);
   /* Todos revelaron la semilla y todos auditan lo mismo, sin problemas. */
   for (const v of vistas) {
     assert.deepEqual(v.priv.problemas, []);
