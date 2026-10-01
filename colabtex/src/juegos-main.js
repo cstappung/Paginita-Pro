@@ -55,6 +55,8 @@ import { crearRanks } from "./juegos/ranks.js";
 import { LOGROS, detecta, deFila, deMarca } from "./juegos/logros.js";
 import { crearLogros } from "./juegos/logros-vista.js";
 import { mezcla, abrePerfil } from "./juegos/perfil.js";
+import { abreMini, cierraMini, miniAbierta, crearPaginaPerfil, avatarMarco } from "./juegos/perfil-vista.js";
+import { estadisticas } from "./juegos/perfil-tarjeta.js";
 import { suena, silenciar, silenciado, ambientar, ajustarMusica, activarAudio } from "./juegos/sonido.js";
 import { montaReproductor } from "./juegos/reproductor.js";
 import { createReportWidget } from "./report-widget.js";
@@ -203,6 +205,7 @@ let modulo = null, pidMontado = "", mirandoMontado = false;
 let vistaPintada = "";
 let ranks = null;
 let logrosVista = null;
+let paginaPerfil = null;
 let individual = null;
 let proximo = 0;          // el número de jugada que toca escribir
 const enVuelo = new Set(); // jugadas de esta pestaña aún sin confirmar (ver `terminar`)
@@ -244,6 +247,9 @@ function perfilDe(uid) {
       if (state.estado) vistePerfiles(state.estado);
       if (ranks) ranks.refresca();
       if (logrosVista) logrosVista.refresca();
+      if (paginaPerfil) paginaPerfil.refresca();
+      const mini = miniAbierta();
+      if (mini && mini.uid === uid) mini.refresca();
       render();
     }));
     perfiles.set(uid, perfiles.get(uid) || null);
@@ -281,12 +287,63 @@ function aplicaPropio() {
    vacía, y al pintar se superpone el perfil, que no tiene tope. */
 const fotoBreve = f => (typeof f === "string" && f.length <= 400 && !/^data:/.test(f)) ? f : "";
 
-function editaPerfil() {
+/* ---------- el perfil público ----------
+   La tarjeta y la página leen lo mismo que la pestaña de logros (ranks,
+   soloRanks y logros: `fb.watchLogros`), con una sola escucha para toda
+   la sesión que se abre la primera vez que alguien toca una foto. Firebase
+   junta las escuchas del mismo nodo, así que la pestaña de logros no lo
+   baja dos veces. */
+let datosP = null, offDatosP = null;
+const oyentesP = new Set();
+function datosPerfil(cb) {
+  oyentesP.add(cb);
+  if (!offDatosP) offDatosP = fb.watchLogros(d => {
+    datosP = { ranks: d.ranks, solo: d.solo, logros: d.logros };
+    for (const f of [...oyentesP]) f(datosP);
+  });
+  else if (datosP) setTimeout(() => { if (oyentesP.has(cb)) cb(datosP); }, 0);
+  return () => oyentesP.delete(cb);
+}
+const ctxPerfil = {
+  yo: () => state.user && state.user.uid,
+  perfil: uid => perfilDe(uid),
+  colorDe: uid => colorForUid(uid || ""),
+  datos: datosPerfil,
+  ir: h => ir(h),
+  editar: pestana => editaPerfil(pestana),
+  propio: () => state.base ? { nombre: state.base.name, foto: state.base.photo, color: state.base.color } : null
+};
+/* Cualquier foto o nombre con `data-perfil` abre la tarjeta; tocar la
+   misma otra vez la cierra. */
+function alTocarPerfil(e) {
+  const el = e.target.closest && e.target.closest("[data-perfil]");
+  if (!el || !state.user || el.closest(".jg-mini, .jg-modal")) return;
+  const uid = el.getAttribute("data-perfil");
+  if (!uid) return;
+  e.preventDefault();
+  const m = miniAbierta();
+  if (m && m.uid === uid) { cierraMini(); return; }
+  const pista = uid === state.user.uid ? ctxPerfil.propio()
+    : { nombre: el.getAttribute("data-nombre") || "", foto: el.getAttribute("data-foto") || "" };
+  abreMini(uid, el, ctxPerfil, pista);
+  suena("clic");
+}
+
+/* El editor necesita saber qué marcos tiene ganados: espera a los datos
+   (como mucho cuatro segundos; sin ellos, los que se ganan salen cerrados). */
+async function editaPerfil(pestana) {
   const b = state.base;
   if (!b) return;
+  const d = datosP || await new Promise(ok => {
+    let off = null;
+    const t = setTimeout(() => { if (off) off(); ok(null); }, 4000);
+    off = datosPerfil(x => { clearTimeout(t); setTimeout(() => off(), 0); ok(x); });
+  });
   abrePerfil({
     base: { nombre: b.name, foto: b.photo, color: b.color },
     perfil: perfiles.get(b.uid) || null,
+    est: d ? estadisticas(b.uid, d) : null,
+    uid: b.uid, colorDe: colorForUid, pestana,
     onGuardar: async p => {
       await fb.guardarPerfil(b.uid, p);
       /* La escucha traerá lo mismo en un instante; adelantarlo aquí
@@ -295,18 +352,20 @@ function editaPerfil() {
       aplicaPropio();
       if (state.estado) vistePerfiles(state.estado);
       if (ranks) ranks.refresca();
+      if (paginaPerfil) paginaPerfil.refresca();
       render();
       suena("clic");
     }
   });
 }
 
-/* ---------- sesión ---------- */
 function pintaUsuario() {
   const u = state.user;
   $("userName").textContent = u ? u.name : "";
   const av = $("userAvatar");
-  if (!u) { av.textContent = ""; return; }
+  if (!u) { av.textContent = ""; av.removeAttribute("data-perfil"); return; }
+  av.setAttribute("data-perfil", u.uid);
+  av.title = "Tu perfil";
   if (u.photo) av.innerHTML = `<img src="${escapeHtml(u.photo)}" alt="" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:cover">`;
   else { av.textContent = (u.name || "?").charAt(0).toUpperCase(); av.style.background = u.color; }
 }
@@ -473,6 +532,8 @@ function leerRuta() {
   if (/^solo\/(minas|snake|tetris|sortem|bbtan)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
   if (h === "ranks") return { vista: "ranks", pid: "" };
   if (h === "logros") return { vista: "logros", pid: "" };
+  const pf = h.match(/^perfil\/([-\w]+)$/);
+  if (pf) return { vista: "perfil", pid: "", uid: pf[1] };
   const m = h.match(/^p\/([-\w]+)$/);
   if (m) return { vista: "partida", pid: m[1] };
   return { vista: "vestibulo", pid: "" };
@@ -485,9 +546,11 @@ function ir(hash) {
 
 function aplicaRuta() {
   const r = leerRuta();
-  if (r.vista === state.vista && r.pid === state.pid) return;
+  cierraMini();
+  if (r.vista === state.vista && r.pid === state.pid && (r.uid || "") === (state.perfilUid || "")) return;
   state.vista = r.vista;
   state.pid = r.pid;
+  state.perfilUid = r.uid || "";
   state.partida = null;
   state.estado = null;
   state.cargando = r.vista === "partida";
@@ -749,12 +812,14 @@ function avisa(e, juego) {
 /* ---------- pintado: el armazón ---------- */
 function render() {
   if (!state.user) { if (individual) { individual.destruir(); individual = null; } return; }
-  if (state.vista !== vistaPintada) {
+  const clave = state.vista === "perfil" ? "perfil:" + state.perfilUid : state.vista;
+  if (clave !== vistaPintada) {
     if (individual) { individual.destruir(); individual = null; }
     if (vistaPintada === "ranks" && ranks) { ranks.destruir(); ranks = null; }
     if (vistaPintada === "logros" && logrosVista) { logrosVista.destruir(); logrosVista = null; }
+    if (paginaPerfil) { paginaPerfil.destruir(); paginaPerfil = null; }
     armazon();
-    vistaPintada = state.vista;
+    vistaPintada = clave;
   }
   if (state.vista === "vestibulo") pintaVestibulo();
   else if (state.vista === "partida") pintaPartida();
@@ -762,7 +827,7 @@ function render() {
 }
 
 function pintaTabs() {
-  $("tabJugar").classList.toggle("on", state.vista !== "ranks" && state.vista !== "logros");
+  $("tabJugar").classList.toggle("on", state.vista !== "ranks" && state.vista !== "logros" && state.vista !== "perfil");
   $("tabRanks").classList.toggle("on", state.vista === "ranks");
   $("tabLogros").classList.toggle("on", state.vista === "logros");
 }
@@ -815,6 +880,12 @@ function armazon() {
     barra.innerHTML = `<a class="btn2" href="#">← Juegos</a><div class="jg-solo-titulo"><small>UN JUGADOR · RANKING POR MODALIDAD</small><strong>${juego === "minas" ? "Buscaminas" : juego === "tetris" ? "Tetris" : juego === "sortem" ? "sortEm" : juego === "bbtan" ? "BBTAN" : "Snake"}</strong></div><nav aria-label="Juegos individuales"><a class="btn2${juego === "minas" ? " on" : ""}" href="#solo/minas">Buscaminas</a><a class="btn2${juego === "snake" ? " on" : ""}" href="#solo/snake">Snake</a><a class="btn2${juego === "tetris" ? " on" : ""}" href="#solo/tetris">Tetris</a><a class="btn2${juego === "sortem" ? " on" : ""}" href="#solo/sortem">sortEm</a><a class="btn2${juego === "bbtan" ? " on" : ""}" href="#solo/bbtan">BBTAN</a><button class="btn2" type="button">📖 Reglas</button></nav>`;
     barra.querySelector("button").onclick = () => abreReglas(juego === "tetris" ? "tetrisclub" : juego);
     h.insertBefore(barra, h.firstChild);
+    return;
+  }
+  if (state.vista === "perfil") {
+    h.innerHTML = "";
+    paginaPerfil = crearPaginaPerfil({ uid: state.perfilUid, ctx: ctxPerfil });
+    paginaPerfil.montar(h);
     return;
   }
   if (state.vista === "logros") {
@@ -1556,7 +1627,7 @@ function pintaQuienes(p, est) {
   const duelo = activos.length <= 2;
   const puedoVotar = abierta && (!duelo || (!meToca(est, yo) && Date.now() - ultimoCambio >= VOTO_DUELO_MS));
   const votos = est.votos || {};
-  const firma = JSON.stringify([est.jugadores.map(x => [x.uid, x.nombre, x.color, x.foto]), [...fuera], votos, puedoVotar, hace]);
+  const firma = JSON.stringify([est.jugadores.map(x => [x.uid, x.nombre, x.color, x.foto, x.marco]), [...fuera], votos, puedoVotar, hace]);
   if (caja.dataset.firma === firma) return;
   caja.dataset.firma = firma;
   caja.innerHTML = (est.jugadores || []).map(x => {
@@ -1567,7 +1638,7 @@ function pintaQuienes(p, est) {
       ? `<button class="jg-voto${mio ? " on" : ""}" data-voto="${escapeHtml(x.uid)}" title="${mio ? "Retirar tu voto" : "Votar para expulsar a " + escapeHtml(x.nombre || "Alguien")}">${mio ? "↺" : "⏏"}</button>` : "";
     return `
     <span class="jg-quien-chip${out ? " fuera" : ""}" style="--c:${escapeHtml(x.color || "#888")}">
-      ${x.foto ? `<img src="${escapeHtml(x.foto)}" alt="" referrerpolicy="no-referrer">` : `<i>${escapeHtml((x.nombre || "?").charAt(0))}</i>`}
+      ${avatarMarco(x.foto, x.nombre, x.color, x.marco, 20, x.uid)}
       ${escapeHtml(x.nombre || "Alguien")}${x.uid === yo ? " (tú)" : ""}
       ${contra.length && !out ? `<small class="jg-voto-n" title="Votos para expulsar">⏏ ${contra.length}/${hace}</small>` : ""}
       ${boton}
@@ -1608,7 +1679,7 @@ function pintaChat() {
   const ahora = fb.ahora();
   lista.innerHTML = chatMsgs.length ? chatMsgs.map(m => `
     <div class="jg-chat-msg${m.uid === yo ? " mio" : ""}" style="--c:${escapeHtml(colorForUid(m.uid || ""))};--edad:${Math.max(0, Math.round((ahora - (Number(m.at) || ahora)) / 100) / 10)}s">
-      <b>${escapeHtml(m.nombre || "Alguien")}${jugadores[m.uid] ? "" : ' <small>mirando</small>'}</b>
+      <b data-perfil="${escapeHtml(m.uid || "")}" data-nombre="${escapeHtml(m.nombre || "")}">${escapeHtml(m.nombre || "Alguien")}${jugadores[m.uid] ? "" : ' <small>mirando</small>'}</b>
       <span>${escapeHtml(m.t || "")}</span>
     </div>`).join("")
     : `<div class="vacio">Nadie ha escrito todavía.</div>`;
@@ -1754,7 +1825,8 @@ function wire() {
     $("loginError").textContent = "No se pudo iniciar sesión: " + (e.code || e.message);
   });
   $("btnLogout").onclick = () => logout();
-  $("btnPerfil").onclick = editaPerfil;
+  $("btnPerfil").onclick = () => { if (state.user) ir("#perfil/" + state.user.uid); };
+  document.addEventListener("click", alTocarPerfil);
   pintaSonido();
   montaReproductor($("btnMusica"));
   document.addEventListener("pointerdown", activarAudio, { passive: true });
@@ -1802,7 +1874,7 @@ function wire() {
     engancharVestibulo();
     vistaPintada = "";
     const r = leerRuta();
-    state.vista = r.vista; state.pid = r.pid;
+    state.vista = r.vista; state.pid = r.pid; state.perfilUid = r.uid || "";
     state.cargando = r.vista === "partida";
     if (r.vista === "partida") engancharPartida(r.pid);
     render();

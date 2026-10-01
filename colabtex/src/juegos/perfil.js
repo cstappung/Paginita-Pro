@@ -13,9 +13,9 @@
  * 2. **La foto se reduce aquí, en el navegador, antes de subir nada.**
  *    Una foto de móvil son tres megas, y esto no tiene Storage detrás:
  *    va como texto dentro de la base de datos, que es donde de verdad
- *    duele. `recorta` la deja en 96×96 recortada al centro y en JPEG,
- *    unos 10 kB — bastante para un círculo de 28 píxeles, y aún sobra
- *    para el de 44 de la clasificación.
+ *    duele. `recorta` la deja en 160×160 recortada al centro y en JPEG,
+ *    unos 15 kB — lo justo para el retrato de 116 píxeles de la página
+ *    del perfil en una pantalla de alta densidad.
  * 3. **Lo vacío y lo ausente no son lo mismo.** `nick: ""` y `foto`
  *    sin poner significan «usa lo de Google»; `foto: ""` significa
  *    «no quiero foto, pon la inicial». Sin esa distinción, quitarse la
@@ -30,8 +30,11 @@ export const COLORES = [
   "#be123c", "#b45309", "#475569", "#1e293b"
 ];
 
+import { MARCOS, FONDOS, LARGO_BIO, MAX_VITRINA, requisito, marcoDe, fondoDe, opcionesVitrina, limpiaPerfil } from "./perfil-tarjeta.js";
+import { avatarMarco, tarjetaHtml } from "./perfil-vista.js";
+
 export const LARGO_NICK = 24;
-const LADO_FOTO = 96;
+const LADO_FOTO = 160;
 
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -46,6 +49,7 @@ export function mezcla(ficha, perfil) {
   if (perfil.nick) r.nombre = perfil.nick;
   if (perfil.foto !== undefined && perfil.foto !== null) r.foto = perfil.foto;
   if (perfil.color) r.color = perfil.color;
+  if (perfil.marco) r.marco = perfil.marco;
   return r;
 }
 
@@ -84,9 +88,13 @@ function avatar(foto, nombre, color) {
 }
 
 /* El editor. `base` es lo que dice Google (el nombre y la foto de la
-   cuenta), `perfil` lo que hay guardado, y `onGuardar` recibe el
-   objeto que hay que escribir. Devuelve una función para cerrarlo. */
-export function abrePerfil({ base, perfil, onGuardar }) {
+   cuenta), `perfil` lo que hay guardado, `est` las estadísticas del dueño
+   (para saber qué marcos y fondos tiene ganados y qué puede exhibir) y
+   `onGuardar` recibe el objeto que hay que escribir. Cuatro pestañas —
+   datos, marco, fondo y vitrina— y a un lado la tarjeta tal como la verán
+   los demás, que se repinta con cada cambio. Devuelve una función para
+   cerrarlo. */
+export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar }) {
   const vieja = document.getElementById("jgPerfil");
   if (vieja) vieja.remove();
 
@@ -96,37 +104,62 @@ export function abrePerfil({ base, perfil, onGuardar }) {
   let foto = p.foto === undefined || p.foto === null ? null : p.foto;
   let color = p.color || (base && base.color) || COLORES[0];
   let nick = p.nick || "";
+  let bio = p.bio || "";
+  let marco = marcoDe(p.marco) ? p.marco : "anillo";
+  let fondo = fondoDe(p.fondo) ? p.fondo : "color";
+  const guardada = Array.isArray(p.vitrina) ? p.vitrina : p.vitrina && typeof p.vitrina === "object" ? Object.values(p.vitrina) : [];
+  let vitrina = guardada.slice(0, MAX_VITRINA);
+  let tab = ["datos", "marco", "fondo", "vitrina"].includes(pestana) ? pestana : "datos";
 
   const capa = document.createElement("div");
   capa.id = "jgPerfil";
   capa.className = "jg-modal-capa";
   capa.innerHTML = `
-    <div class="jg-modal jg-perfil">
+    <div class="jg-modal jg-perfil jg-perfil-ed" role="dialog" aria-label="Personaliza tu perfil">
       <button class="jg-fin-x" title="Cerrar">✕</button>
-      <div class="jg-modal-t">Tu perfil</div>
-      <p class="jg-modal-s">Así te ven los demás en las salas, en el tablero y en la
-        clasificación. Se guarda en tu cuenta, no en cada partida, así que al cambiarlo
-        cambia también en las partidas de ayer.</p>
-
-      <div class="jg-perfil-cuerpo">
-        <div class="jg-perfil-foto">
-          <div class="jg-perfil-av" id="pfAv"></div>
-          <button class="btn2" id="pfSubir">Cambiar foto</button>
-          <button class="btn-ghost" id="pfGoogle">Usar la de Google</button>
-          <button class="btn-ghost" id="pfQuitar">Quitar la foto</button>
-          <input type="file" id="pfArchivo" accept="image/*" hidden>
-        </div>
-        <div class="jg-perfil-campos">
-          <label class="jg-campo">
-            <span>Apodo</span>
-            <input type="text" id="pfNick" maxlength="${LARGO_NICK}" placeholder="${esc((base && base.nombre) || "Tu nombre")}">
-          </label>
-          <div class="jg-campo">
-            <span>Color</span>
-            <div class="jg-colores" id="pfColores"></div>
-            <label class="jg-color-libre">
-              <input type="color" id="pfColor"> otro color
-            </label>
+      <div class="jg-modal-t">Personaliza tu perfil</div>
+      <p class="jg-modal-s">Así te ven los demás al tocar tu foto. Se guarda en tu cuenta, así
+        que cambia también en las partidas de ayer.</p>
+      <div class="jg-ped">
+        <aside class="jg-ped-prev"><small>Vista previa</small><div class="jg-mini jg-mini-quieta" id="pfPrev"></div></aside>
+        <div class="jg-ped-main">
+          <div class="jg-ped-tabs" role="tablist">
+            ${[["datos", "Datos"], ["marco", "Marco"], ["fondo", "Fondo"], ["vitrina", "Vitrina"]].map(([k, t]) =>
+              `<button role="tab" data-tab="${k}">${t}</button>`).join("")}
+          </div>
+          <div class="jg-ped-panel" data-panel="datos">
+            <div class="jg-perfil-cuerpo">
+              <div class="jg-perfil-foto">
+                <div class="jg-perfil-av" id="pfAv"></div>
+                <button class="btn2" id="pfSubir">Cambiar foto</button>
+                <button class="btn-ghost" id="pfGoogle">Usar la de Google</button>
+                <button class="btn-ghost" id="pfQuitar">Quitar la foto</button>
+                <input type="file" id="pfArchivo" accept="image/*" hidden>
+              </div>
+              <div class="jg-perfil-campos">
+                <label class="jg-campo">
+                  <span>Apodo</span>
+                  <input type="text" id="pfNick" maxlength="${LARGO_NICK}" placeholder="${esc((base && base.nombre) || "Tu nombre")}">
+                </label>
+                <label class="jg-campo">
+                  <span>Sobre ti <small id="pfBioN"></small></span>
+                  <textarea id="pfBio" maxlength="${LARGO_BIO}" rows="2" placeholder="Una frase: tu juego favorito, tu grito de guerra…"></textarea>
+                </label>
+                <div class="jg-campo">
+                  <span>Color</span>
+                  <div class="jg-colores" id="pfColores"></div>
+                  <label class="jg-color-libre">
+                    <input type="color" id="pfColor"> otro color
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="jg-ped-panel" data-panel="marco"><div class="jg-ped-rejilla" id="pfMarcos"></div></div>
+          <div class="jg-ped-panel" data-panel="fondo"><div class="jg-ped-rejilla fondos" id="pfFondos"></div></div>
+          <div class="jg-ped-panel" data-panel="vitrina">
+            <p class="jg-ped-nota" id="pfVitNota"></p>
+            <div class="jg-ped-vit" id="pfVit"></div>
           </div>
         </div>
       </div>
@@ -140,10 +173,18 @@ export function abrePerfil({ base, perfil, onGuardar }) {
 
   const $ = s => capa.querySelector(s);
   const cierra = () => capa.remove();
+  const borrador = () => Object.assign({ nick, color, bio, marco, fondo, vitrina }, foto !== null ? { foto } : {});
+  const ops = opcionesVitrina(est);
+
+  function pintaPrevia() {
+    $("#pfPrev").innerHTML = tarjetaHtml({ uid, p: borrador(), est, pista: base, colorDe, yo: uid, editor: true });
+  }
 
   function pinta() {
     const nom = nick || (base && base.nombre) || "?";
     const f = foto === null ? (base && base.foto) || "" : foto;
+    for (const b of capa.querySelectorAll("[data-tab]")) b.setAttribute("aria-selected", String(b.getAttribute("data-tab") === tab));
+    for (const d of capa.querySelectorAll("[data-panel]")) d.hidden = d.getAttribute("data-panel") !== tab;
     $("#pfAv").innerHTML = avatar(f, nom, color);
     $("#pfColores").innerHTML = COLORES.map(c =>
       `<button class="jg-color${c.toLowerCase() === color.toLowerCase() ? " on" : ""}"
@@ -151,12 +192,37 @@ export function abrePerfil({ base, perfil, onGuardar }) {
     $("#pfColor").value = /^#[0-9a-f]{6}$/i.test(color) ? color : "#0d9488";
     $("#pfGoogle").style.display = (base && base.foto) ? "" : "none";
     $("#pfQuitar").style.display = (foto === "" ) ? "none" : "";
+    $("#pfBioN").textContent = `${bio.length}/${LARGO_BIO}`;
+    $("#pfMarcos").innerHTML = MARCOS.map(m => {
+      const r = requisito(m, est);
+      return `<button class="jg-ped-op${m.id === marco ? " on" : ""}${r.ok ? "" : " cerrado"}" data-marco="${m.id}" ${r.ok ? "" : "aria-disabled=\"true\""} title="${esc(r.ok ? m.n : "Se gana: " + r.falta)}">
+        ${avatarMarco(f, nom, color, m.id, 54)}<b>${esc(m.n)}</b>${r.ok ? "" : `<small>🔒 ${esc(r.falta)}</small>`}</button>`;
+    }).join("");
+    $("#pfFondos").innerHTML = FONDOS.map(o => {
+      const r = requisito(o, est);
+      return `<button class="jg-ped-op fondo${o.id === fondo ? " on" : ""}${r.ok ? "" : " cerrado"}" data-fondo="${o.id}" ${r.ok ? "" : "aria-disabled=\"true\""} title="${esc(r.ok ? o.n : "Se gana: " + r.falta)}">
+        <span class="jg-ped-muestra" style="background:${esc(o.css(color))}"></span><b>${esc(o.n)}</b>${r.ok ? "" : `<small>🔒 ${esc(r.falta)}</small>`}</button>`;
+    }).join("");
+    $("#pfVitNota").innerHTML = !est ? "Cargando tu historial…"
+      : !ops.length ? "Todavía no tienes logros ni puestos. Juega una partida y vuelve."
+      : vitrina.length ? `Elegidas <b>${vitrina.length}</b> de ${MAX_VITRINA}. Se muestran en este orden; las tres primeras salen en la tarjeta. <button class="btn2" id="pfVitAuto">Volver a automática</button>`
+      : `Automática: se muestran tus mejores puestos y tus logros más raros. Marca hasta ${MAX_VITRINA} para elegirlas tú.`;
+    $("#pfVit").innerHTML = ops.map(o => {
+      const k = vitrina.indexOf(o.clave);
+      return `<label class="jg-ped-vop${k >= 0 ? " on" : ""}"><input type="checkbox" data-vit="${esc(o.clave)}" ${k >= 0 ? "checked" : ""} ${k < 0 && vitrina.length >= MAX_VITRINA ? "disabled" : ""}>
+        <span class="jg-vit-i">${esc(o.i)}</span><span><b>${esc(o.t)}</b><small>${esc(o.s)}${o.x ? " · " + esc(o.x) : ""}</small></span>${k >= 0 ? `<em>${k + 1}</em>` : ""}</label>`;
+    }).join("");
+    const auto = $("#pfVitAuto");
+    if (auto) auto.onclick = e => { e.preventDefault(); vitrina = []; pinta(); };
+    pintaPrevia();
   }
 
   function falla(t) { $("#pfErr").textContent = t || ""; }
 
   $("#pfNick").value = nick;
   $("#pfNick").oninput = e => { nick = e.target.value.slice(0, LARGO_NICK); pinta(); };
+  $("#pfBio").value = bio;
+  $("#pfBio").oninput = e => { bio = e.target.value.slice(0, LARGO_BIO); $("#pfBioN").textContent = `${bio.length}/${LARGO_BIO}`; pintaPrevia(); };
   $("#pfColores").onclick = e => {
     const b = e.target.closest("[data-color]");
     if (!b) return;
@@ -174,6 +240,27 @@ export function abrePerfil({ base, perfil, onGuardar }) {
     try { foto = await recorta(f); pinta(); }
     catch (err) { falla(err && err.message ? err.message : String(err)); }
   };
+  capa.querySelector(".jg-ped-tabs").onclick = e => {
+    const b = e.target.closest("[data-tab]");
+    if (b) { tab = b.getAttribute("data-tab"); pinta(); }
+  };
+  $("#pfMarcos").onclick = e => {
+    const b = e.target.closest("[data-marco]");
+    if (!b || b.classList.contains("cerrado")) return;
+    marco = b.getAttribute("data-marco"); pinta();
+  };
+  $("#pfFondos").onclick = e => {
+    const b = e.target.closest("[data-fondo]");
+    if (!b || b.classList.contains("cerrado")) return;
+    fondo = b.getAttribute("data-fondo"); pinta();
+  };
+  $("#pfVit").onchange = e => {
+    const c = e.target.closest("[data-vit]");
+    if (!c) return;
+    const k = c.getAttribute("data-vit");
+    vitrina = c.checked ? [...vitrina.filter(x => x !== k), k].slice(0, MAX_VITRINA) : vitrina.filter(x => x !== k);
+    pinta();
+  };
 
   $(".jg-fin-x").onclick = cierra;
   $("#pfCancelar").onclick = cierra;
@@ -182,7 +269,8 @@ export function abrePerfil({ base, perfil, onGuardar }) {
   $("#pfGuardar").onclick = async e => {
     const b = e.currentTarget;
     b.disabled = true; falla("");
-    const salida = { nick: nick.trim().slice(0, LARGO_NICK), color };
+    const salida = Object.assign({ nick: nick.trim().slice(0, LARGO_NICK), color },
+      limpiaPerfil({ marco, fondo, bio, vitrina }));
     if (foto !== null) salida.foto = foto;
     try { await onGuardar(salida); cierra(); }
     catch (err) {
@@ -193,6 +281,6 @@ export function abrePerfil({ base, perfil, onGuardar }) {
 
   pinta();
   document.body.appendChild(capa);
-  setTimeout(() => { try { $("#pfNick").focus(); } catch (e) {} }, 30);
+  setTimeout(() => { try { (tab === "datos" ? $("#pfNick") : capa.querySelector(`[data-tab="${tab}"]`)).focus(); } catch (e) {} }, 30);
   return cierra;
 }

@@ -203,7 +203,7 @@ export function crearRanks(ctx) {
         : "Todavía no ha terminado ninguna partida de este juego. Sé el primero."}</td></tr>`;
       return;
     }
-    if (solo) {t.innerHTML = `<thead><tr><th>#</th><th>Jugador</th><th>Récord</th><th>Tiempo</th></tr></thead><tbody>${orden.map((f,i)=>`<tr class="${f.uid===uid?'jg-yo':''}${i<3?' jg-rk-top':''}"><td class="jg-th-n">${puesto(i)}</td><td>${esc(f.nombre)}</td><td>${categoriaSolo.startsWith('club-minas-')?'Completado':categoriaSolo==='club-tetris-sprint'?'40 líneas':categoriaSolo.startsWith('club-sortem-')?f.puntos+' números':categoriaSolo.startsWith('club-bbtan-')?'Ronda '+f.puntos:f.puntos}</td><td>${(f.tiempo/1000).toFixed(2)} s</td></tr>`).join('')}</tbody>`;return;}
+    if (solo) {t.innerHTML = `<thead><tr><th>#</th><th>Jugador</th><th>Récord</th><th>Tiempo</th></tr></thead><tbody>${orden.map((f,i)=>`<tr class="${f.uid===uid?'jg-yo':''}${i<3?' jg-rk-top':''}"><td class="jg-th-n">${puesto(i)}</td><td class="jg-jug" data-perfil="${esc(f.uid)}" data-nombre="${esc(f.nombre)}">${esc(f.nombre)}</td><td>${categoriaSolo.startsWith('club-minas-')?'Completado':categoriaSolo==='club-tetris-sprint'?'40 líneas':categoriaSolo.startsWith('club-sortem-')?f.puntos+' números':categoriaSolo.startsWith('club-bbtan-')?'Ronda '+f.puntos:f.puntos}</td><td>${(f.tiempo/1000).toFixed(2)} s</td></tr>`).join('')}</tbody>`;return;}
     t.innerHTML = `
       <thead><tr>
         <th class="jg-th-n">#</th><th>Jugador</th>
@@ -220,7 +220,7 @@ export function crearRanks(ctx) {
     const pc = porcentaje(f);
     return `<tr class="${yo ? "jg-yo" : ""}${i < 3 ? " jg-rk-top" : ""}">
       <td class="jg-th-n">${puesto(i)}</td>
-      <td class="jg-jug">
+      <td class="jg-jug" data-perfil="${esc(f.uid)}" data-nombre="${esc(f.nombre || "")}">
         ${f.foto ? `<img class="jg-foto" src="${esc(f.foto)}" alt="" referrerpolicy="no-referrer">`
                  : `<span class="jg-foto jg-sin">${esc((f.nombre || "?").slice(0, 1).toUpperCase())}</span>`}
         <span>${esc(f.nombre || "Sin nombre")}${yo ? " <b>(tú)</b>" : ""}</span>
@@ -273,7 +273,7 @@ export function crearRanks(ctx) {
       : `${f.ganadas || 0} G · ${porcentaje(f)} %${f.mejorRacha > 1 ? ` · racha ${f.mejorRacha}` : ""}`;
     return `<div class="${cls}">
         ${i === 0 ? CORONA : ""}
-        <div class="jg-rk-av">${avatar(f)}</div>
+        <div class="jg-rk-av" data-perfil="${esc(f.uid)}" data-nombre="${esc(f.nombre || "")}">${avatar(f)}</div>
         <b class="jg-rk-nom" title="${esc(f.nombre || "")}">${esc(f.nombre || "Sin nombre")}${f.uid === uid ? " <em>(tú)</em>" : ""}</b>
         <span class="jg-rk-tit">${TITULO[i]}</span>
         <div class="jg-rk-pts"><b>${m.txt(m.valor(f))}</b>${m.unidad ? ` ${m.unidad}` : ""}</div>

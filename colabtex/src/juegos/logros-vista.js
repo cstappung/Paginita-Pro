@@ -87,7 +87,7 @@ export function crearLogros({ uid, watchLogros, perfil, orden, icono = {} }) {
         ${tarjeta("La joya", joyas[0] ? logroMini(joyas[0].j, joyas[0].x, `<i>Solo el ${joyas[0].p} % lo tiene${joyas[0].mio ? " — y tú eres de ellos" : ""}.</i>`) : "<p>Nadie tiene aún ningún logro. El primero se lleva la gloria.</p>", "joya")}
       </div>
       <div class="jg-lg-podio">${ranking(R.total).slice(0, 5).map(([u, n], k) =>
-        `<span class="${u === uid ? "yo" : ""}"><i>${["🥇", "🥈", "🥉", "4", "5"][k]}</i>${esc(nombreDe(u))}<b>${n}</b></span>`).join("") || "<em>Aún no hay nadie en la tabla de logros.</em>"}</div>
+        `<span class="${u === uid ? "yo" : ""}" data-perfil="${esc(u)}"><i>${["🥇", "🥈", "🥉", "4", "5"][k]}</i>${esc(nombreDe(u))}<b>${n}</b></span>`).join("") || "<em>Aún no hay nadie en la tabla de logros.</em>"}</div>
     </section>`;
   }
 
@@ -98,7 +98,7 @@ export function crearLogros({ uid, watchLogros, perfil, orden, icono = {} }) {
     return `<section class="jg-lg-juego" style="--c:${I.color}">
       <header><h2>${esc(I.nombre)}</h2><span>${mios}/10 tuyos · ${g} ${g === 1 ? "jugador" : "jugadores"}</span></header>
       <div class="jg-lg-lideres">${lideres.length ? lideres.map(([u, n], k) =>
-        `<span class="${u === uid ? "yo" : ""}"><i>${["🥇", "🥈", "🥉"][k]}</i>${esc(nombreDe(u))} <b>${n}/10</b></span>`).join("") : "<em>Nadie tiene todavía ningún logro de este juego.</em>"}</div>
+        `<span class="${u === uid ? "yo" : ""}" data-perfil="${esc(u)}"><i>${["🥇", "🥈", "🥉"][k]}</i>${esc(nombreDe(u))} <b>${n}/10</b></span>`).join("") : "<em>Nadie tiene todavía ningún logro de este juego.</em>"}</div>
       <ol class="jg-lg-lista">${lista.map(x => {
         const s = R.tiene[j][x.id], p = pct(j, x.id, R), mio = s.has(uid);
         const quienes = [...s].sort((a, b) => (b === uid) - (a === uid) || nombreDe(a).localeCompare(nombreDe(b)));
@@ -107,7 +107,7 @@ export function crearLogros({ uid, watchLogros, perfil, orden, icono = {} }) {
           <div class="jg-lg-txt">
             <b>${esc(x.n)}${x.m ? ` <em class="jg-lg-modo">${esc(x.m)}</em>` : ""}${mio ? ' <em class="jg-lg-ok">✓ tuyo</em>' : ""}</b>
             <span>${esc(x.d)}</span>
-            <div class="jg-lg-quien">${quienes.slice(0, MAX_NOMBRES).map(u => `<i class="${u === uid ? "yo" : ""}">${esc(nombreDe(u))}</i>`).join("")}${quienes.length > MAX_NOMBRES ? `<i class="mas">+${quienes.length - MAX_NOMBRES}</i>` : ""}</div>
+            <div class="jg-lg-quien">${quienes.slice(0, MAX_NOMBRES).map(u => `<i class="${u === uid ? "yo" : ""}" data-perfil="${esc(u)}">${esc(nombreDe(u))}</i>`).join("")}${quienes.length > MAX_NOMBRES ? `<i class="mas">+${quienes.length - MAX_NOMBRES}</i>` : ""}</div>
           </div>
           <div class="jg-lg-pct"><b>${p} %</b><span class="jg-lg-barra"><span style="width:${p}%"></span></span><small>${s.size} de ${g}</small></div>
         </li>`;
