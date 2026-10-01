@@ -55,6 +55,8 @@ import { abreReglas, tieneReglas } from "./juegos/reglas.js";
 import { crearRanks } from "./juegos/ranks.js";
 import { LOGROS, detecta, deFila, deMarca } from "./juegos/logros.js";
 import { crearLogros } from "./juegos/logros-vista.js";
+import { monedasDe, formatoMonedas, valorLogro, registraDia, diaChile as diaMonedas } from "./juegos/monedas.js";
+import { crearMonedas, topHtml } from "./juegos/monedas-vista.js";
 import { mezcla, abrePerfil } from "./juegos/perfil.js";
 import { abreMini, cierraMini, miniAbierta, crearPaginaPerfil, avatarMarco } from "./juegos/perfil-vista.js";
 import { estadisticas } from "./juegos/perfil-tarjeta.js";
@@ -217,6 +219,7 @@ let vistaPintada = "";
 let ranks = null;
 let logrosVista = null;
 let paginaPerfil = null;
+let monedasVista = null;
 let individual = null;
 let proximo = 0;          // el número de jugada que toca escribir
 const enVuelo = new Set(); // jugadas de esta pestaña aún sin confirmar (ver `terminar`)
@@ -259,6 +262,7 @@ function perfilDe(uid) {
       if (ranks) ranks.refresca();
       if (logrosVista) logrosVista.refresca();
       if (paginaPerfil) paginaPerfil.refresca();
+      if (monedasVista) monedasVista.refresca();
       const mini = miniAbierta();
       if (mini && mini.uid === uid) mini.refresca();
       render();
@@ -309,7 +313,7 @@ const oyentesP = new Set();
 function datosPerfil(cb) {
   oyentesP.add(cb);
   if (!offDatosP) offDatosP = fb.watchLogros(d => {
-    datosP = { ranks: d.ranks, solo: d.solo, logros: d.logros };
+    datosP = { ranks: d.ranks, solo: d.solo, logros: d.logros, diario: d.diario };
     for (const f of [...oyentesP]) f(datosP);
   });
   else if (datosP) setTimeout(() => { if (oyentesP.has(cb)) cb(datosP); }, 0);
@@ -384,7 +388,7 @@ function pintaUsuario() {
 function mostrar(dentro) {
   $("viewLogin").style.display = dentro ? "none" : "grid";
   $("viewMain").style.display = dentro ? "" : "none";
-  for (const id of ["userName", "userAvatar", "btnPerfil", "btnLogout"]) $(id).style.display = dentro ? "" : "none";
+  for (const id of ["userName", "userAvatar", "btnPerfil", "btnLogout", "userMonedas"]) $(id).style.display = dentro ? "" : "none";
 }
 
 /* ---------- escribir en la partida ----------
@@ -486,10 +490,38 @@ async function anotar(p) {
       await fb.guardarRank(p.juego, u.uid, fila);
       const antes = new Set(deFila(previa));
       for (const id of deFila(fila)) if (!antes.has(id)) celebra(p.juego, id);
+      marcaDia();
     }
   } catch (e) {
     anotada = "";
     console.warn("[juegos] no se pudo apuntar la partida", e);
+  }
+}
+
+/* ---------- monedas ----------
+   El saldo se calcula (juegos/monedas.js) de las mismas cuatro lecturas
+   que usan el perfil y los logros, con la escucha compartida de
+   `datosPerfil`: el vestíbulo pinta el top y la cabecera tu saldo. Lo
+   único que se escribe es el día jugado, una vez al día, al terminar una
+   partida de sala o del club; la regla de `diario` comprueba el resto. */
+let offMonedas = null, datosMonedas = null, diaMarcado = -1;
+function pintaMonedas() {
+  const u = state.user, d = datosMonedas;
+  const chip = $("userMonedas");
+  if (chip) chip.textContent = u && d ? `🪙 ${formatoMonedas(monedasDe(u.uid, d).total)}` : "🪙 …";
+  const caja = $("vesMonedas");
+  if (caja && u && d) caja.innerHTML = topHtml(d, u.uid, perfilDe, colorForUid);
+}
+async function marcaDia() {
+  const u = state.user, hoy = diaMonedas();
+  if (!u || diaMarcado === hoy) return;
+  diaMarcado = hoy;
+  try {
+    const reg = registraDia(await fb.leerDiario(u.uid), hoy);
+    if (reg) await fb.apuntaDiario(u.uid, reg);
+  } catch (e) {
+    diaMarcado = -1;   // sin reglas publicadas, o sin red: se reintenta en la próxima partida
+    console.warn("[juegos] no se pudo apuntar el día", e);
   }
 }
 
@@ -526,7 +558,7 @@ function celebra(juego, id) {
     const t = document.createElement("div");
     t.className = "jg-logro-toast";
     t.setAttribute("role", "status");
-    t.innerHTML = `<span class="i">${x.i}</span><span><small>🏆 ¡Logro desbloqueado!</small><b>${escapeHtml(x.n)}</b><em>${escapeHtml(x.d)}</em></span>`;
+    t.innerHTML = `<span class="i">${x.i}</span><span><small>🏆 ¡Logro desbloqueado! · +${valorLogro(juego, id)} 🪙</small><b>${escapeHtml(x.n)}</b><em>${escapeHtml(x.d)}</em></span>`;
     t.onclick = () => ir("#logros");
     document.body.appendChild(t);
     suena("entra");
@@ -543,6 +575,7 @@ function leerRuta() {
   if (/^solo\/(minas|snake|tetris|sortem|bbtan|sopa)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
   if (h === "ranks") return { vista: "ranks", pid: "" };
   if (h === "logros") return { vista: "logros", pid: "" };
+  if (h === "monedas") return { vista: "monedas", pid: "" };
   const pf = h.match(/^perfil\/([-\w]+)$/);
   if (pf) return { vista: "perfil", pid: "", uid: pf[1] };
   const m = h.match(/^p\/([-\w]+)$/);
@@ -828,6 +861,7 @@ function render() {
     if (individual) { individual.destruir(); individual = null; }
     if (vistaPintada === "ranks" && ranks) { ranks.destruir(); ranks = null; }
     if (vistaPintada === "logros" && logrosVista) { logrosVista.destruir(); logrosVista = null; }
+    if (vistaPintada === "monedas" && monedasVista) { monedasVista.destruir(); monedasVista = null; }
     if (paginaPerfil) { paginaPerfil.destruir(); paginaPerfil = null; }
     armazon();
     vistaPintada = clave;
@@ -838,9 +872,10 @@ function render() {
 }
 
 function pintaTabs() {
-  $("tabJugar").classList.toggle("on", state.vista !== "ranks" && state.vista !== "logros" && state.vista !== "perfil");
+  $("tabJugar").classList.toggle("on", !["ranks", "logros", "perfil", "monedas"].includes(state.vista));
   $("tabRanks").classList.toggle("on", state.vista === "ranks");
   $("tabLogros").classList.toggle("on", state.vista === "logros");
+  $("tabMonedas").classList.toggle("on", state.vista === "monedas");
 }
 
 /* Guarda un récord de club y, si sube a su dueño al podio de la
@@ -883,7 +918,7 @@ function armazon() {
       partida:{leer:()=>fb.leerPartidaClub(state.user.uid,state.vista.slice(5)),guardar:(d,at)=>fb.guardarPartidaClub(state.user.uid,state.vista.slice(5),d,at)},
       /* Un logro individual sale de la marca: se celebra el que esta
          partida da y la mejor marca guardada no daba ya. */
-      alResultado: (d, previa) => { const antes = new Set(previa ? deMarca(clave, Object.assign({ categoria: d.categoria }, previa)) : []);
+      alResultado: (d, previa) => { marcaDia(); const antes = new Set(previa ? deMarca(clave, Object.assign({ categoria: d.categoria }, previa)) : []);
         for (const id of deMarca(clave, d)) if (!antes.has(id)) celebra(clave, id); }});
     individual.montar(h);
     const juego = state.vista.slice(5), barra = document.createElement("div");
@@ -905,6 +940,12 @@ function armazon() {
       orden: () => ordenPopular([...Object.keys(JUEGOS), ...CLUBES])
         .map(k => ({ "club-minas": "minas", "club-snake": "snake", "club-tetris": "tetrisclub", "club-sortem": "sortem", "club-bbtan": "bbtan", "club-sopa": "sopa" })[k] || k) });
     logrosVista.montar(h);
+    return;
+  }
+  if (state.vista === "monedas") {
+    h.innerHTML = "";
+    monedasVista = crearMonedas({ uid: state.user.uid, datos: datosPerfil, perfil: perfilDe, colorDe: colorForUid });
+    monedasVista.montar(h);
     return;
   }
   if (state.vista === "ranks") {
@@ -1014,6 +1055,10 @@ function armazon() {
         <section class="jg-lado-caja">
           <header><span class="jg-vivo" aria-hidden="true"></span><h2>Salas abiertas</h2><span class="jg-lado-n" id="vesCuenta">0</span></header>
           <div id="vesSalas"></div>
+        </section>
+        <section class="jg-lado-caja jg-mo-ves">
+          <header><span aria-hidden="true">🪙</span><h2>Top monedas</h2></header>
+          <div id="vesMonedas"><p class="jg-nada">Contando monedas…</p></div>
         </section>
         <section class="jg-lado-caja">
           <header><h2>Tus partidas</h2></header>
@@ -1167,6 +1212,7 @@ function pintaDestacado() {
 
 function pintaVestibulo() {
   $("vesAviso").innerHTML = state.fallo ? avisoReglas(state.fallo) : "";
+  pintaMonedas();
 
   ordenaSolos();
   const orden = ordenPopular(Object.keys(JUEGOS));
@@ -1929,6 +1975,8 @@ function wire() {
   $("tabJugar").onclick = () => ir(state.pid ? "#p/" + state.pid : "#");
   $("tabRanks").onclick = () => ir("#ranks");
   $("tabLogros").onclick = () => ir("#logros");
+  $("tabMonedas").onclick = () => ir("#monedas");
+  $("userMonedas").onclick = () => ir("#monedas");
   window.addEventListener("hashchange", aplicaRuta);
 }
 
@@ -1950,6 +1998,7 @@ function wire() {
       soltarPartida();
       for (const f of [offSalas, offMias, offReloj, offEnCurso]) { if (f) { try { f(); } catch (e) {} } }
       offSalas = offMias = offReloj = offEnCurso = null;
+      if (offMonedas) { offMonedas(); offMonedas = null; datosMonedas = null; }
       vistaPintada = "";
       mostrar(false); pintaUsuario();
       return;
@@ -1963,6 +2012,7 @@ function wire() {
     state.user = Object.assign({}, state.base);
     perfilDe(user.uid);          // abre la escucha; al llegar repinta
     aplicaPropio();
+    if (!offMonedas) offMonedas = datosPerfil(d => { datosMonedas = d; pintaMonedas(); });
     mostrar(true);
     if (!offReloj) offReloj = fb.seguirReloj();
     engancharVestibulo();

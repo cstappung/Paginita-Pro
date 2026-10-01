@@ -2742,6 +2742,49 @@ html[data-tema=oscuro] .jg-nov-c{background:var(--os-sup);border-color:var(--os-
 html[data-tema=oscuro] .jg-nov-c:hover{box-shadow:0 16px 34px #0008}
 html[data-tema=oscuro] .jg-nov-cuerpo p{color:var(--os-tx2)}
 html[data-tema=oscuro] .jg-nov-cab h2,html[data-tema=oscuro] .jg-nov-cuerpo h3{color:var(--os-tx)}
+
+/* ---- Monedas: saldo en la cabecera, top en el vestíbulo, pestaña #monedas ---- */
+.jg-saldo{color:#f5c542!important;font-weight:700;font-variant-numeric:tabular-nums}
+.jg-mo-ves header span{font-size:16px}
+.jg-lado-caja.jg-mo-ves>#vesMonedas{display:block;overflow:visible;padding:8px 10px 12px}
+#vesMonedas>.jg-nada{padding:10px 8px;margin:0}
+.jg-mo-top{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.jg-mo-top li{display:grid;grid-template-columns:30px auto minmax(0,1fr) auto;align-items:center;gap:9px;padding:6px 8px;border-radius:10px}
+.jg-mo-top li.jg-yo{background:#f5c54222;box-shadow:inset 0 0 0 1px #f5c54266}
+.jg-mo-top.chico li{grid-template-columns:24px auto minmax(0,1fr) auto;gap:8px;padding:4px 6px}
+.jg-mo-pos{text-align:center;font-size:13px;color:#8a8499;font-variant-numeric:tabular-nums}
+.jg-mo-nom{font-weight:600;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.jg-mo-cant{font-variant-numeric:tabular-nums;font-size:13.5px;color:#a8740f;white-space:nowrap}
+.jg-mo-tuyo{margin-top:6px;padding-top:6px;border-top:1px dashed #e4dfeb}
+.jg-mo-ver{display:block;margin:10px 6px 0;font-size:12.5px;font-weight:600;color:#7042df;text-decoration:none}
+.jg-mo-ver:hover{text-decoration:underline}
+.jg-mo{max-width:1100px;margin:0 auto;padding:8px 0 40px}
+.jg-mo-hero{display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:16px;padding:26px 28px;border-radius:22px;color:#fff;background:radial-gradient(circle at 85% 15%,#f5c54255,transparent 55%),linear-gradient(135deg,#2a1a52,#141029)}
+.jg-mo-hero small{letter-spacing:.14em;font-size:11px;color:#f5c542;font-weight:700}
+.jg-mo-hero strong{display:block;font-size:44px;line-height:1.05;font-variant-numeric:tabular-nums;margin:4px 0}
+.jg-mo-hero p{margin:0;color:#d9d2f0;font-size:14px}
+.jg-mo-racha{max-width:420px;background:#ffffff14;border:1px solid #ffffff22;border-radius:14px;padding:12px 14px}
+.jg-mo-partes{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:14px 0}
+.jg-mo-partes>div{display:grid;grid-template-columns:auto 1fr;column-gap:10px;align-items:center;background:#fff;border:1px solid #e4dfeb;border-radius:14px;padding:12px 14px}
+.jg-mo-partes span{grid-row:span 3;font-size:24px}
+.jg-mo-partes b{font-size:20px;font-variant-numeric:tabular-nums}
+.jg-mo-partes small{font-weight:700;font-size:12.5px}
+.jg-mo-partes em{font-style:normal;font-size:11.5px;color:#8a8499;line-height:1.35}
+.jg-mo-cols{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:14px;align-items:start}
+@media(max-width:900px){.jg-mo-cols{grid-template-columns:minmax(0,1fr)}.jg-mo-hero strong{font-size:36px}}
+.jg-mo-caja{background:#fff;border:1px solid #e4dfeb;border-radius:18px;padding:16px 18px}
+.jg-mo-caja h2{margin:0 0 10px;font-size:16px}
+.jg-mo-reglas h3{margin:14px 0 4px;font-size:13.5px}
+.jg-mo-reglas p{margin:4px 0;font-size:13px;line-height:1.55;color:#5a5569}
+.jg-mo-pesos{list-style:none;margin:6px 0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:4px 14px;font-size:12.5px}
+.jg-mo-pesos li{display:flex;justify-content:space-between;gap:8px;border-bottom:1px dotted #e4dfeb;padding:3px 0}
+.jg-mo-pesos b{font-variant-numeric:tabular-nums;color:#a8740f}
+html[data-tema=oscuro] .jg-mo-partes>div,html[data-tema=oscuro] .jg-mo-caja{background:var(--os-sup);border-color:var(--os-borde);color:var(--os-tx)}
+html[data-tema=oscuro] .jg-mo-reglas p,html[data-tema=oscuro] .jg-mo-partes em{color:var(--os-tx3)}
+html[data-tema=oscuro] .jg-mo-pesos li{border-color:var(--os-borde2)}
+html[data-tema=oscuro] .jg-mo-cant,html[data-tema=oscuro] .jg-mo-pesos b{color:#f5c542}
+html[data-tema=oscuro] .jg-mo-tuyo{border-color:var(--os-borde2)}
+html[data-tema=oscuro] .jg-mo-ver{color:#c4b1ff}
 </style>
 </head>
 <body>
@@ -2758,6 +2801,7 @@ html[data-tema=oscuro] .jg-nov-cab h2,html[data-tema=oscuro] .jg-nov-cuerpo h3{c
       <button class="btn-ghost jg-rep-btn" id="btnMusica">Música</button>
       <button class="btn-ghost" id="btnSonido" title="Sonido" aria-pressed="true">🔊</button>
       <button class="btn-ghost" id="btnTema" title="Modo oscuro" aria-pressed="false">☾</button>
+      <button class="btn-ghost jg-saldo" id="userMonedas" title="Tus monedas" style="display:none">🪙 …</button>
       <span id="userName"></span>
       <span class="avatar" id="userAvatar"></span>
       <button class="btn-ghost" id="btnPerfil" title="Tu perfil: foto, marco, fondo y vitrina">Perfil</button>
@@ -2782,10 +2826,11 @@ html[data-tema=oscuro] .jg-nov-cab h2,html[data-tema=oscuro] .jg-nov-cuerpo h3{c
       <button class="tab on" id="tabJugar">Jugar</button>
       <button class="tab" id="tabRanks">Clasificación</button>
       <button class="tab" id="tabLogros">Logros</button>
+      <button class="tab" id="tabMonedas">🪙 Monedas</button>
     </div>
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610010700"></script>
+<script src="juegos-app.js?v=202610010721"></script>
 </body>
 </html>
