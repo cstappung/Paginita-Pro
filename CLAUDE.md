@@ -45,7 +45,7 @@ Six apps plus a small shared **Informes** page:
   collect by themselves, plus the bugs and ideas people write. See "Informes"
   below.
 - **Juegos** (`juegos.html` + `juegos-app.js`, entry
-  `colabtex/src/juegos-main.js`) — sixteen multiplayer games, on the same Google
+  `colabtex/src/juegos-main.js`) — seventeen multiplayer games, on the same Google
   account and the same Firebase project: **Escondite** (hide a person in a
   landscape, then cross the landscapes and race to find the other's),
   **Cartas de los tres elementos** (a Card-Jitsu duel), **Cuadritos** (dots and
@@ -65,8 +65,8 @@ Six apps plus a small shared **Informes** page:
   for two to eight squads, in an iframe), **Yemas** (a first-person
   egg shooter for two to eight in three modes, with voice chat, also in an
   iframe) and **Clue** (the deduction board game on a map of a real
-  university building, two to six, in an iframe, dealt with mental poker),
-  plus a **Clasificación** tab and a 📖 **Reglas**
+  university building, two to six, in an iframe, dealt with mental poker)
+  and **Ajedrez** (chess, the full rules, for two), plus a **Clasificación** tab and a 📖 **Reglas**
   manual for every game, solo ones included. See "Juegos" below.
 
 ColabTeX, ColabDraw, FiltroLab, AjusteLab, Juegos and Informes are authored in
@@ -1539,14 +1539,14 @@ Four decisions worth keeping:
 
 ## Juegos architecture
 
-Sixteen games, on the same Firebase project and the same Google session
+Seventeen games, on the same Firebase project and the same Google session
 as ColabTeX and ColabDraw. Turn-based on purpose (Tetris and Yemas are the
 real-time exceptions, and both still keep the log to what decides the game): with one move per turn the
 network carries a handful of fields and there is nothing to interpolate, so no
 game loop ever has to be synchronised.
 
 **How many people fit is a property of the room, not of the game.** `JUEGOS`
-declares `minimo` and `cupo` (escondite, cartas and reversi are duels by
+declares `minimo` and `cupo` (escondite, cartas, reversi and ajedrez are duels by
 construction — two landscapes, one clash, two colours), and whoever opens the
 room picks inside that range along with anything else the game offers;
 `crearPartida(juego, quien, extra)` writes those over the defaults, so a game
@@ -1967,7 +1967,7 @@ Modules in [colabtex/src/juegos/](colabtex/src/juegos/):
 - `paisaje.js` — draws the scene `motor.js` decided. Split from it because the
   only thing the two machines must share is the layout, and that is a number.
 - `escondite.js`, `cartas.js`, `cuadritos.js`, `reversi.js`, `cadena.js`,
-  `flip7.js`, `cacho.js`, `uno.js`, `catan.js`, `ranks.js` — one screen each.
+  `flip7.js`, `cacho.js`, `uno.js`, `catan.js`, `ajedrez.js`, `ranks.js` — one screen each.
 - `reglas.js` — the 📖 manual of every game (`abreReglas`, `tieneReglas`); see
   below.
 - `sonido.js` — the WebAudio synth and the mute flag. No DOM beyond the header
@@ -2988,6 +2988,41 @@ is only the postman, like Yemas'. Things that hold it together:
 end to end; `tests/clue-bots.test.cjs` plays full practice games;
 `tests/clue-red.test.cjs` runs several `red.js` frames against a fake room
 through a whole online game and checks the audit comes out clean.
+
+**Ajedrez (`ajedrez`) is the whole of FIDE's rules in the reducer**
+(`redAjedrez` and the `aj*` functions at the end of `motor.js`). A move is
+`{t:"m", uid, de:"e2", a:"e4", pr?}` and counts only if it is in the legal
+list of that position, so an illegal or out-of-turn move simply does not
+exist; the rest are `tablas` (offer), `acepta`, `rechaza` and `rinde`. Things
+worth knowing:
+
+- **The board is 64 letters, index 0 = a8**, upper case white, `.` empty,
+  English letters inside (FEN's) and **Spanish notation on screen** (R D T A
+  C, `AJ_LETRA`). `ajLegales` is pseudo-moves filtered by "does my king end up
+  attacked", and castling checks the squares the king crosses itself.
+  `tests/ajedrez.test.cjs` runs **perft** on five reference positions
+  (start, Kiwipete, the en-passant/pin one, promotions, position 5): any
+  change to move generation has to keep those numbers.
+- **Threefold repetition and the fifty-move rule are automatic**, not
+  claimed: with no arbiter, a claim would need the reducer to know about
+  time and intent. The repetition key carries the en-passant square only
+  when an en-passant capture is actually legal.
+- **Colours**: the host picks in the lobby card (`color`: azar/blancas/
+  negras, through `$otro`, so no rule for it); «al azar» is the room seed's
+  parity (`ajBandos`). No clock, as everywhere: moves carry no time, and the
+  vote is the remedy for a sleeper.
+- **One draw offer per own move** (`ofrecio`); moving while an offer is in
+  front of you declines it, while the offerer moving keeps it standing.
+- The replay is memoised (`ajCache`) by the move list, since a repaint
+  happens on every tick.
+- The screen (`ajedrez.js`) **draws its own pieces** (`piezaSvg`, also used
+  by the lobby cover) because ♟ is an emoji on some phones. Moving is tap-tap
+  or drag over the same `sel`; promotion opens a picker and the reducer
+  refuses a promotion with no piece. The opponent's piece slides in from its
+  origin on an **inner** `<g>` (`.jg-aj-llega`), for the same reason as
+  Chain Reaction's nested orbs. `est.perdidas` (not `fuera`, which the header
+  reads as "players out") is what each side has lost, counted against the
+  starting set. The music borrows Reversi's harpsichord.
 
 **Mina Club's board fits its box; it never pushes past it** (`juegos/club/minas/`,
 plain files with no build, mounted by `solo/club.js` in an iframe whose `?v=`

@@ -118,6 +118,28 @@ const REGLAS = {
       ["El final", "Cuando ninguno de los dos puede jugar, gana quien tenga más fichas en el tablero."]
     ]
   },
+  ajedrez: {
+    lema: "El ajedrez de siempre, para dos.",
+    secciones: [
+      ["Mover", lista([
+        "Toca una pieza tuya y se marcan sus casillas: un punto si está vacía, un aro si capturas. Toca el destino, o arrastra la pieza hasta él.",
+        "Solo se ofrecen jugadas legales: ninguna puede dejar a tu propio rey en jaque.",
+        "Las blancas mueven primero. Quien abre la sala elige su color, o lo deja al azar."
+      ])],
+      ["Jugadas especiales", lista([
+        "<b>Enroque:</b> lleva el rey dos casillas hacia la torre y la torre salta a su otro lado. Ni el rey ni esa torre pueden haberse movido, no puede haber nada entre ellos, y el rey no puede estar en jaque ni pasar o caer en una casilla atacada.",
+        "<b>Al paso:</b> si un peón rival avanza dos casillas y queda al lado del tuyo, puedes capturarlo como si hubiera avanzado una, pero solo en la jugada siguiente.",
+        "<b>Coronación:</b> el peón que llega a la última fila se convierte en dama, torre, alfil o caballo; se te pregunta cuál."
+      ])],
+      ["El final", lista([
+        "<b>Jaque mate</b>: el rey está atacado y no hay jugada que lo salve. Gana quien lo da.",
+        "<b>Tablas</b> por rey ahogado (sin jugadas sin estar en jaque), por material insuficiente para dar mate, por <b>triple repetición</b> de la misma posición o por <b>cincuenta jugadas</b> de cada uno sin capturas ni movimientos de peón. Aquí estas dos últimas se aplican solas, sin reclamarlas.",
+        "Puedes <b>ofrecer tablas</b> una vez por jugada; si el otro mueve sin aceptar, la oferta queda rechazada. También puedes <b>rendirte</b> (hay que pulsar dos veces)."
+      ])],
+      ["Notación", "La hoja de jugadas usa las letras en español: <b>R</b> rey, <b>D</b> dama, <b>T</b> torre, <b>A</b> alfil, <b>C</b> caballo; el peón no lleva letra. «x» es captura, «+» jaque, «#» mate y O-O / O-O-O los enroques."],
+      ["Sin reloj", "No hay tiempo por jugada. Si el rival se queda dormido, puedes proponer expulsarlo con ⏏ tras un rato sin movimiento: en un duelo eso te da la partida."]
+    ]
+  },
   cadena: {
     lema: "Chain Reaction: carga, estalla y conquista.",
     secciones: [

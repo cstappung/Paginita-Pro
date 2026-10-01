@@ -47,6 +47,8 @@ const margen = (pts, c) => (pts[c.me] || 0) - Math.max(...c.otros.map(u => pts[u
 /* Órbita: algún suceso de los turnos recientes (cada entrada de `hist` es un turno). */
 const orEv = (c, f) => c.hist.some(h => h && Array.isArray(h.eventos) && h.eventos.some(f));
 const mias = (obj, me) => Object.keys(obj || {}).filter(k => obj[k] === me);
+/* Con qué color juega `me` en una partida de ajedrez ("" si mira). */
+const ajColorDe = c => (c.est.blancas === c.me ? "w" : c.est.negras === c.me ? "b" : "");
 const ladoMax = Math.max(...Object.values(TAMANOS).map(t => t.lado));
 
 const SALA = {
@@ -89,6 +91,16 @@ const SALA = {
     { id: "terremoto", n: "Terremoto", d: "Voltea 10 fichas en una jugada.", i: "🌋", x: c => { const u = c.est.ultima || {}; return (u.voltea || []).length >= 10 && (c.est.tab || {})[u.casilla] === c.me; } },
     { id: "ajustado", n: "Fotofinish", d: "Gana por 2 fichas o menos.", i: "📸", x: c => c.gano && margen(c.est.cuenta || {}, c) <= 2 },
     { id: "barrida", n: "Barrida", d: "Gana dejando al rival sin fichas.", i: "🧹", x: c => c.gano && c.rival && !((c.est.cuenta || {})[c.rival]) }
+  ],
+  /* Ajedrez: todo sale de `movs`, la hoja de la partida que el reductor
+     ya lleva entera, con el color de quien hizo cada jugada. */
+  ajedrez: [
+    { id: "mate", n: "Jaque mate", d: "Gana una partida dando mate.", i: "♚", x: c => c.gano && c.est.motivo === "mate" },
+    { id: "relampago", n: "Mate relámpago", d: "Da mate en 20 jugadas o menos.", i: "⚡", x: c => c.gano && c.est.motivo === "mate" && (c.est.movs || []).length <= 40 },
+    { id: "alpaso", n: "Al paso", d: "Captura un peón al paso.", i: "👣", x: c => (c.est.movs || []).some(m => m.ep && m.c === ajColorDe(c)) },
+    { id: "corona", n: "Coronación", d: "Corona un peón.", i: "👑", x: c => (c.est.movs || []).some(m => m.pr && m.c === ajColorDe(c)) },
+    { id: "caballo", n: "Subpromoción", d: "Corona un peón en algo que no sea dama.", i: "🐴", x: c => (c.est.movs || []).some(m => m.pr && m.pr !== "q" && m.c === ajColorDe(c)) },
+    { id: "remonta", n: "Remontada", d: "Da mate con menos material que el rival.", i: "🧗", x: c => { const col = ajColorDe(c), m = c.est.material || {}; return c.gano && c.est.motivo === "mate" && col && m[col] < m[col === "w" ? "b" : "w"]; } }
   ],
   cadena: [
     { id: "cadena10", n: "Reacción en cadena", d: "Una jugada tuya dispara 10 ondas.", i: "💣", x: c => { const u = c.est.ultima || {}; return u.uid === c.me && (u.ondas || []).length >= 10; } },

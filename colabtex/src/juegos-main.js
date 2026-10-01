@@ -39,6 +39,7 @@ import { crearCartas } from "./juegos/cartas.js";
 import { crearCuadritos } from "./juegos/cuadritos.js";
 import { crearOrbita } from "./juegos/orbita.js";
 import { crearReversi } from "./juegos/reversi.js";
+import { crearAjedrez, piezaSvg } from "./juegos/ajedrez.js";
 import { crearWorms } from "./juegos/worms.js";
 import { crearCadena } from "./juegos/cadena.js";
 import { crearFlip7 } from "./juegos/flip7.js";
@@ -67,10 +68,11 @@ const FABRICAS = {
   orbita: crearOrbita, escondite: crearEscondite, cartas: crearCartas,
   cuadritos: crearCuadritos, reversi: crearReversi, worms: crearWorms,
   cadena: crearCadena, flip7: crearFlip7, cacho: crearCacho, uno: crearUno, catan: crearCatan,
-  presidente: crearPresidente, spicy: crearSpicy, tetris: crearTetris, yemas: crearYemas, clue: crearClue
+  presidente: crearPresidente, spicy: crearSpicy, tetris: crearTetris, yemas: crearYemas, clue: crearClue,
+  ajedrez: crearAjedrez
 };
 
-const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️" };
+const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞" };
 /* Los clubes de un jugador, con sus claves de la clasificación y los
    mismos signos que llevan en su tarjeta del vestíbulo. */
 const ICONO_TODOS = { ...ICONO, general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●" };
@@ -86,6 +88,12 @@ const cupos = k => Array.from({ length: JUEGOS[k].cupo - JUEGOS[k].minimo + 1 },
   (_, i) => ({ v: JUEGOS[k].minimo + i, t: JUEGOS[k].minimo + i + " jugadores" }));
 
 const OPCIONES = {
+  /* En el ajedrez lo único que se elige es el color de quien abre; «al
+     azar» lo decide la semilla de la sala, que nadie controla. */
+  ajedrez: [
+    { clave: "color", etiqueta: "Color de quien abre", por: "azar",
+      valores: [{ v: "azar", t: "Al azar" }, { v: "blancas", t: "Blancas" }, { v: "negras", t: "Negras" }] }
+  ],
   cuadritos: [
     { clave: "cupo", etiqueta: "Jugadores", valores: cupos("cuadritos") },
     { clave: "lado", etiqueta: "Tablero", por: TAMANOS.mediano.lado,
@@ -1372,7 +1380,7 @@ const FANFARRIA = { gano: "victoria", perdi: "derrota", empate: "empate", mirand
    En cartas es el choque entero (`CHOQUE`, 2,6 s): la ronda que gana
    el trío se enseña igual que las demás. Worms no pone fanfarria — el
    marco tiene su propio audio y su propio final. */
-const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300, presidente: 1200, spicy: 1200, tetris: 1500, yemas: 1500, clue: 1800 };
+const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300, presidente: 1200, spicy: 1200, tetris: 1500, yemas: 1500, clue: 1800, ajedrez: 1300 };
 
 function pintaFin(p, est) {
   const caja = $("jgFin");
@@ -1496,7 +1504,14 @@ const RAZONES = {
   piedad: "Fue el último en pie: los demás llegaron a 25 cartas.",
   catan: "Llegó a los puntos de victoria antes que nadie.",
   agotado: "Se agotaron las llaves de los dados: ganó quien tenía más puntos.",
-  cierre: "La mesa votó acabar: ganó quien llevaba más puntos."
+  cierre: "La mesa votó acabar: ganó quien llevaba más puntos.",
+  mate: "Jaque mate.",
+  ahogado: "Rey ahogado: sin jugadas y sin estar en jaque.",
+  material: "No quedaba material para dar mate.",
+  repeticion: "La misma posición se repitió tres veces.",
+  cincuenta: "Cincuenta jugadas sin capturas ni movimientos de peón.",
+  acuerdo: "Tablas de mutuo acuerdo.",
+  rendicion: "El rival se rindió."
 };
 const razon = m => RAZONES[m] || "";
 const nombreDe = (est, uid) => {
@@ -1825,6 +1840,7 @@ function arteJuego(k) {
   if (k === "tetris") return '<div class="jg-art-tt">' + ["....ll", "t..zll", "ttzzoo", "itsjoo", "issjjj"].map(f => [...f].map(c => '<i class="' + (c === "." ? "" : "p-" + c) + '"></i>').join("")).join("") + '<em>TETRIS</em></div>';
   if (k === "yemas") return '<div class="jg-art-ym"><i></i><i></i><i></i><b></b><em>YEMAS</em></div>';
   if (k === "clue") return '<div class="jg-art-cl"><i></i><i></i><i></i><b>✉</b><s>🔍</s><em>CLUE</em></div>';
+  if (k === "ajedrez") return '<div class="jg-art-aj">' + ["r", "Q", "n", "K", "p"].map(x => '<svg viewBox="10 4 80 86" aria-hidden="true">' + piezaSvg(x) + '</svg>').join("") + '</div>';
   if (k === "cuadritos") return '<div class="jg-art-dots">' + Array.from({ length: 9 }, (_, i) => '<i class="' + (i % 3 === 0 ? "llena" : "") + '"></i>').join("") + '</div>';
   return '<div class="jg-art-land"><i></i><i></i><i></i><b>⌖</b><span>ENCUENTRA LO INVISIBLE</span></div>';
 }

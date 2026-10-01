@@ -142,6 +142,13 @@ export const JUEGOS = {
     color: "#8e1b2b",
     minimo: 2,
     cupo: 6
+  },
+  ajedrez: {
+    nombre: "Ajedrez",
+    lema: "El de siempre: enroque, al paso, coronación, tablas y jaque mate",
+    color: "#a0703c",
+    minimo: 2,
+    cupo: 2
   }
 };
 
@@ -881,6 +888,7 @@ export function reducir(p) {
   if (p.juego === "tetris") return { ...base, ...redTetris(p, js, listos) };
   if (p.juego === "yemas") return { ...base, ...redYemas(p, js, listos) };
   if (p.juego === "clue") return { ...base, ...redClue(p, js, listos) };
+  if (p.juego === "ajedrez") return { ...base, ...redAjedrez(p, js) };
   return base;
 }
 
@@ -956,6 +964,9 @@ export function progreso(est, juego) {
     const lider = est.puntosEq ? Math.max(0, ...Object.values(est.puntosEq)) : Math.max(0, ...Object.values(est.bajas));
     return c(lider / (est.meta || YM_META));
   }
+  /* En el ajedrez, el material que ya salió del tablero: con las damas
+     cambiadas y media docena de piezas fuera es un final. */
+  if (juego === "ajedrez" && est.material) return c(1 - (est.material.w + est.material.b) / 78);
   if (juego === "cartas" && est.ganadas) return c(Math.max(0, ...Object.values(est.ganadas).map(g => g.length)) / 5);
   return 0;
 }
@@ -6130,4 +6141,333 @@ export function blancoTetris(est, uid) {
   const i = ids.indexOf(uid);
   for (let k = 1; k < ids.length; k++) { const c = ids[(i + k) % ids.length]; if (!est.fuera[c]) return c; }
   return "";
+}
+
+/* ============================================================
+   Ajedrez
+
+   Las reglas enteras, en el reductor como todo lo demás: una jugada es
+   `{t:"m", uid, de:"e2", a:"e4", pr?}` y solo cuenta si está entre las
+   legales de esa posición, así que un cliente no puede mover un alfil
+   en línea recta ni dejar a su rey en jaque — la jugada sencillamente
+   no existe para nadie. Lo demás son `{t:"tablas"}` (ofrecer),
+   `{t:"acepta"}`, `{t:"rechaza"}` y `{t:"rinde"}`.
+
+   El tablero es un array de 64 letras, la casilla 0 es a8 y la 63 es h1
+   (la fila 0 es la de arriba vista desde las blancas). Mayúscula es
+   blanca y minúscula negra; «.» es vacía. Las letras son las inglesas
+   (PNBRQK) por dentro, porque así las escribe todo el mundo en FEN; la
+   notación que se enseña en pantalla es la española (R D T A C).
+
+   Las tablas que en un torneo se *reclaman* aquí son automáticas: la
+   triple repetición y los cincuenta movimientos sin captura ni peón.
+   Reclamarlas exigiría que el reductor supiera de tiempo y de intención,
+   y sin árbitro lo honrado es que la regla se aplique sola, igual en las
+   dos pantallas. No hay reloj por lo mismo que en el resto de juegos:
+   las jugadas no llevan hora y el reductor no puede contarla; para el
+   que se duerme está la votación.
+   ============================================================ */
+const AJ_INICIAL = "rnbqkbnrpppppppp" + ".".repeat(32) + "PPPPPPPPRNBQKBNR";
+const AJ_VALOR = { P: 1, N: 3, B: 3, R: 5, Q: 9, K: 0 };
+/* Español: rey, dama, torre, alfil, caballo. */
+export const AJ_LETRA = { K: "R", Q: "D", R: "T", B: "A", N: "C", P: "" };
+const AJ_RUMBOS = {
+  N: [[-1, -2], [1, -2], [-2, -1], [2, -1], [-2, 1], [2, 1], [-1, 2], [1, 2]],
+  B: [[1, 1], [1, -1], [-1, 1], [-1, -1]],
+  R: [[1, 0], [-1, 0], [0, 1], [0, -1]]
+};
+AJ_RUMBOS.Q = AJ_RUMBOS.K = [...AJ_RUMBOS.B, ...AJ_RUMBOS.R];
+
+export const ajColor = x => (!x || x === "." ? "" : x === x.toUpperCase() ? "w" : "b");
+export const ajNombre = i => "abcdefgh"[i & 7] + (8 - (i >> 3));
+export const ajIndice = s => (typeof s === "string" && /^[a-h][1-8]$/.test(s))
+  ? "abcdefgh".indexOf(s[0]) + (8 - Number(s[1])) * 8 : -1;
+const ajOtro = c => (c === "w" ? "b" : "w");
+const ajDentro = (f, c) => f >= 0 && f < 8 && c >= 0 && c < 8;
+
+export function ajPosInicial() {
+  return { tab: AJ_INICIAL.split(""), color: "w", enroque: "KQkq", alPaso: -1, medio: 0, n: 1 };
+}
+
+/* ¿Ataca `por` la casilla `i`? Se mira desde la casilla hacia fuera,
+   como si en ella hubiera cada tipo de pieza: es más barato que generar
+   todas las jugadas del rival y sirve igual para el jaque y el enroque. */
+export function ajAtacada(tab, i, por) {
+  const f = i >> 3, c = i & 7;
+  const es = (ff, cc, tipos) => {
+    if (!ajDentro(ff, cc)) return false;
+    const x = tab[ff * 8 + cc];
+    return x !== "." && ajColor(x) === por && tipos.includes(x.toUpperCase());
+  };
+  /* Un peón blanco ataca hacia arriba: a esta casilla la amenaza el que
+     está una fila por debajo (f + 1) en diagonal. */
+  const pf = por === "w" ? f + 1 : f - 1;
+  if (es(pf, c - 1, "P") || es(pf, c + 1, "P")) return true;
+  for (const [dc, df] of AJ_RUMBOS.N) if (es(f + df, c + dc, "N")) return true;
+  for (const [dc, df] of AJ_RUMBOS.K) if (es(f + df, c + dc, "K")) return true;
+  for (const [tipos, rumbos] of [["BQ", AJ_RUMBOS.B], ["RQ", AJ_RUMBOS.R]]) {
+    for (const [dc, df] of rumbos) {
+      for (let k = 1; ; k++) {
+        const ff = f + df * k, cc = c + dc * k;
+        if (!ajDentro(ff, cc)) break;
+        const x = tab[ff * 8 + cc];
+        if (x === ".") continue;
+        if (ajColor(x) === por && tipos.includes(x.toUpperCase())) return true;
+        break;
+      }
+    }
+  }
+  return false;
+}
+
+const ajRey = (tab, color) => tab.indexOf(color === "w" ? "K" : "k");
+export const ajEnJaque = pos => ajAtacada(pos.tab, ajRey(pos.tab, pos.color), ajOtro(pos.color));
+
+/* Las jugadas que respetan cómo se mueve cada pieza, sin mirar todavía
+   si dejan al propio rey en jaque. El enroque sí comprueba ya las
+   casillas por las que pasa el rey, porque eso no es «dejar en jaque»
+   sino una condición del propio enroque. */
+function ajPseudo(pos) {
+  const { tab, color } = pos, out = [];
+  const pon = (de, a, extra) => out.push(Object.assign({ de, a }, extra));
+  for (let i = 0; i < 64; i++) {
+    const x = tab[i];
+    if (x === "." || ajColor(x) !== color) continue;
+    const t = x.toUpperCase(), f = i >> 3, c = i & 7;
+    if (t === "P") {
+      const d = color === "w" ? -1 : 1, ini = color === "w" ? 6 : 1, ult = color === "w" ? 0 : 7;
+      const avanza = (a, extra) => {
+        if ((a >> 3) === ult) for (const pr of "qrbn") pon(i, a, Object.assign({ pr }, extra));
+        else pon(i, a, extra);
+      };
+      const f1 = f + d;
+      if (ajDentro(f1, c) && tab[f1 * 8 + c] === ".") {
+        avanza(f1 * 8 + c);
+        if (f === ini && tab[(f + 2 * d) * 8 + c] === ".") pon(i, (f + 2 * d) * 8 + c, { doble: true });
+      }
+      for (const dc of [-1, 1]) {
+        if (!ajDentro(f1, c + dc)) continue;
+        const a = f1 * 8 + c + dc, y = tab[a];
+        if (y !== "." && ajColor(y) !== color) avanza(a, { cap: y });
+        else if (a === pos.alPaso) pon(i, a, { cap: color === "w" ? "p" : "P", ep: true });
+      }
+      continue;
+    }
+    const desliza = t === "B" || t === "R" || t === "Q";
+    for (const [dc, df] of AJ_RUMBOS[t]) {
+      for (let k = 1; ; k++) {
+        const ff = f + df * k, cc = c + dc * k;
+        if (!ajDentro(ff, cc)) break;
+        const a = ff * 8 + cc, y = tab[a];
+        if (y === ".") pon(i, a);
+        else { if (ajColor(y) !== color) pon(i, a, { cap: y }); break; }
+        if (!desliza) break;
+      }
+    }
+    const base = color === "w" ? 56 : 0;
+    if (t === "K" && i === base + 4) {
+      const op = ajOtro(color), torre = color === "w" ? "R" : "r";
+      const [corto, largo] = color === "w" ? ["K", "Q"] : ["k", "q"];
+      const libres = qs => qs.every(q => tab[base + q] === ".");
+      const seguras = qs => !qs.some(q => ajAtacada(tab, base + q, op));
+      if (pos.enroque.includes(corto) && tab[base + 7] === torre && libres([5, 6]) && seguras([4, 5, 6]))
+        pon(i, base + 6, { enroque: "k" });
+      if (pos.enroque.includes(largo) && tab[base] === torre && libres([1, 2, 3]) && seguras([4, 3, 2]))
+        pon(i, base + 2, { enroque: "q" });
+    }
+  }
+  return out;
+}
+
+export function ajAplica(pos, m) {
+  const tab = pos.tab.slice(), color = pos.color, x = tab[m.de];
+  tab[m.a] = m.pr ? (color === "w" ? m.pr.toUpperCase() : m.pr) : x;
+  tab[m.de] = ".";
+  if (m.ep) tab[m.a + (color === "w" ? 8 : -8)] = ".";
+  if (m.enroque) {
+    const base = m.a & 56;
+    if (m.enroque === "k") { tab[base + 5] = tab[base + 7]; tab[base + 7] = "."; }
+    else { tab[base + 3] = tab[base]; tab[base] = "."; }
+  }
+  let enroque = pos.enroque;
+  const quita = s => { enroque = enroque.replace(s, ""); };
+  if (x === "K") { quita("K"); quita("Q"); }
+  if (x === "k") { quita("k"); quita("q"); }
+  /* Una torre que se mueve o a la que capturan se lleva su enroque. */
+  for (const q of [m.de, m.a]) {
+    if (q === 63) quita("K");
+    if (q === 56) quita("Q");
+    if (q === 7) quita("k");
+    if (q === 0) quita("q");
+  }
+  return {
+    tab, color: ajOtro(color), enroque,
+    alPaso: m.doble ? (m.de + m.a) / 2 : -1,
+    medio: x.toUpperCase() === "P" || m.cap ? 0 : pos.medio + 1,
+    n: pos.n + (color === "b" ? 1 : 0)
+  };
+}
+
+export function ajLegales(pos) {
+  return ajPseudo(pos).filter(m => {
+    const t = ajAplica(pos, m).tab;
+    return !ajAtacada(t, ajRey(t, pos.color), ajOtro(pos.color));
+  });
+}
+
+/* Notación algebraica, con las letras en español. Se desambigua por
+   columna, luego por fila y, si ninguna basta (tres damas), por las dos. */
+export function ajSan(pos, m, legales) {
+  if (m.enroque) return m.enroque === "k" ? "O-O" : "O-O-O";
+  const x = pos.tab[m.de], t = x.toUpperCase();
+  if (t === "P") return (m.cap ? ajNombre(m.de)[0] + "x" : "") + ajNombre(m.a) + (m.pr ? "=" + AJ_LETRA[m.pr.toUpperCase()] : "");
+  const otros = legales.filter(o => o.a === m.a && o.de !== m.de && pos.tab[o.de] === x);
+  let dis = "";
+  if (otros.length) {
+    const n = ajNombre(m.de);
+    if (!otros.some(o => (o.de & 7) === (m.de & 7))) dis = n[0];
+    else if (!otros.some(o => (o.de >> 3) === (m.de >> 3))) dis = n[1];
+    else dis = n;
+  }
+  return AJ_LETRA[t] + dis + (m.cap ? "x" : "") + ajNombre(m.a);
+}
+
+/* Material con el que nadie puede dar mate: reyes solos, rey y una
+   pieza menor contra rey, o solo alfiles y todos en casillas del mismo
+   color. Lo demás (dos caballos, por ejemplo) se deja jugar: el mate es
+   posible aunque haga falta la colaboración del rival. */
+export function ajInsuficiente(tab) {
+  const otras = [];
+  for (let i = 0; i < 64; i++) {
+    const x = tab[i];
+    if (x === "." || x === "K" || x === "k") continue;
+    if ("PpRrQq".includes(x)) return false;
+    otras.push(i);
+  }
+  if (otras.length <= 1) return true;
+  if (otras.every(i => tab[i].toUpperCase() === "B"))
+    return new Set(otras.map(i => ((i >> 3) + (i & 7)) % 2)).size === 1;
+  return false;
+}
+
+/* La posición a efectos de repetición: piezas, turno, enroques y el
+   al paso solo si de verdad se puede capturar así — un peón que avanza
+   dos sin nadie al lado no cambia la posición. */
+const ajClave = (pos, legales) =>
+  pos.tab.join("") + pos.color + pos.enroque + (legales.some(m => m.ep) ? pos.alPaso : "-");
+
+function ajMaterial(tab) {
+  const m = { w: 0, b: 0 };
+  for (const x of tab) if (x !== ".") m[ajColor(x)] += AJ_VALOR[x.toUpperCase()];
+  return m;
+}
+
+/* Lo que ya salió del tablero, por color de la pieza perdida. Se cuenta
+   contra la dotación inicial, así que una dama coronada «devuelve» el
+   peón que fue y no se apunta como captura de nadie. */
+function ajFuera(tab) {
+  const fuera = { w: [], b: [] };
+  for (const t of "QRBNP") {
+    for (const color of ["w", "b"]) {
+      const x = color === "w" ? t : t.toLowerCase();
+      const ini = [...AJ_INICIAL].filter(y => y === x).length;
+      const hay = tab.filter(y => y === x).length;
+      for (let k = hay; k < ini; k++) fuera[color].push(t);
+    }
+  }
+  return fuera;
+}
+
+/* Quién lleva blancas. Lo elige quien abre la sala (`color`) o, si deja
+   «al azar», la semilla de la partida, que es la misma en las dos
+   pantallas y nadie elige. */
+export function ajBandos(p, js) {
+  if (js.length < 2) return null;
+  const anf = js.some(j => j.uid === p.anfitrion) ? p.anfitrion : js[0].uid;
+  const otro = js.find(j => j.uid !== anf).uid;
+  const anfBlancas = p.color === "blancas" ? true : p.color === "negras" ? false
+    : ((Number(p.semilla) >>> 0) & 1) === 0;
+  return anfBlancas ? { w: anf, b: otro } : { w: otro, b: anf };
+}
+
+const ajCache = new Map();
+
+export function redAjedrez(p, js = jugadoresDe(p)) {
+  const bandos = ajBandos(p, js);
+  const jug = jugadasDe(p);
+  /* Rehacer cien jugadas con su generador de legales en cada repintado
+     es poco, pero repintar ocurre en cada tic; se recuerda la respuesta
+     por la lista de jugadas. */
+  const clave = (bandos ? bandos.w + "|" + bandos.b : "-") + "|" +
+    jug.map(j => [j.t, j.uid, j.de, j.a, j.pr].join(",")).join(";");
+  if (ajCache.has(clave)) return ajCache.get(clave);
+  const r = ajRepasa(bandos, jug);
+  if (ajCache.size > 24) ajCache.delete(ajCache.keys().next().value);
+  ajCache.set(clave, r);
+  return r;
+}
+
+function ajRepasa(bandos, jug) {
+  let pos = ajPosInicial();
+  let legales = ajLegales(pos);
+  const vistas = { [ajClave(pos, legales)]: 1 };
+  const movs = [];
+  let ganador = null, motivo = "", oferta = "", ultima = null;
+  const ofrecio = {};                 // uid → en qué medio movimiento ofreció
+  const colorDe = u => (!bandos ? "" : u === bandos.w ? "w" : u === bandos.b ? "b" : "");
+  const rival = u => (u === bandos.w ? bandos.b : bandos.w);
+
+  if (bandos) for (const j of jug) {
+    if (ganador !== null) break;
+    const c = colorDe(j.uid);
+    if (j.t === "abandona") { if (c) { ganador = rival(j.uid); motivo = "abandono"; } continue; }
+    if (!c) continue;
+    if (j.t === "rinde") { ganador = rival(j.uid); motivo = "rendicion"; continue; }
+    /* Una oferta por jugada propia: ofrecer tablas en bucle es una forma
+       de no dejar pensar al otro. */
+    if (j.t === "tablas") {
+      if (!oferta && ofrecio[j.uid] !== movs.length) { oferta = j.uid; ofrecio[j.uid] = movs.length; }
+      continue;
+    }
+    if (j.t === "acepta") { if (oferta && oferta !== j.uid) { ganador = ""; motivo = "acuerdo"; } continue; }
+    if (j.t === "rechaza") { if (oferta) oferta = ""; continue; }
+    if (j.t !== "m" || c !== pos.color) continue;
+    const de = ajIndice(j.de), a = ajIndice(j.a), pr = j.pr ? String(j.pr).toLowerCase() : "";
+    const m = legales.find(x => x.de === de && x.a === a && (x.pr || "") === pr);
+    if (!m) continue;                                  // no es legal: no existe
+    const san = ajSan(pos, m, legales);
+    const antes = pos;
+    pos = ajAplica(pos, m);
+    legales = ajLegales(pos);
+    const jaque = ajEnJaque(pos), mate = jaque && !legales.length;
+    movs.push({
+      san: san + (mate ? "#" : jaque ? "+" : ""), c, de: m.de, a: m.a,
+      pieza: antes.tab[m.de].toUpperCase(), cap: m.cap ? m.cap.toUpperCase() : "",
+      pr: m.pr || "", ep: !!m.ep, enroque: m.enroque || "", jaque, mate
+    });
+    ultima = { de: m.de, a: m.a };
+    /* Mover es contestar: si el que tenía la oferta delante juega, la
+       rechaza. La oferta propia sigue en pie mientras el otro piensa. */
+    if (oferta && oferta !== j.uid) oferta = "";
+    const k = ajClave(pos, legales);
+    vistas[k] = (vistas[k] || 0) + 1;
+    if (mate) { ganador = j.uid; motivo = "mate"; }
+    else if (!legales.length) { ganador = ""; motivo = "ahogado"; }
+    else if (ajInsuficiente(pos.tab)) { ganador = ""; motivo = "material"; }
+    else if (vistas[k] >= 3) { ganador = ""; motivo = "repeticion"; }
+    else if (pos.medio >= 100) { ganador = ""; motivo = "cincuenta"; }
+  }
+
+  const fin = ganador !== null;
+  return {
+    fase: !bandos ? "espera" : fin ? "fin" : "jugando",
+    blancas: bandos ? bandos.w : "", negras: bandos ? bandos.b : "",
+    tab: pos.tab, color: pos.color,
+    turno: bandos && !fin ? bandos[pos.color] : "",
+    legales: fin ? [] : legales,
+    jaque: ajEnJaque(pos), ultima, movs, oferta: fin ? "" : oferta,
+    perdidas: ajFuera(pos.tab), material: ajMaterial(pos.tab),
+    ofrecio, medio: pos.medio,
+    ganador, motivo
+  };
 }

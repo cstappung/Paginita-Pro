@@ -118,6 +118,15 @@ El arreglo es el de siempre: pegar `firebase/database.rules.json` entero y
 **Publicar**, o usar el botón **Copiar las reglas** del cartel de la página
 de juegos.
 
+### ⚠ El ajedrez pide publicar otra vez
+
+`'ajedrez'` tiene que estar en la lista del campo `juego` y en la de `logros`.
+No hay nodo nuevo: las jugadas van por `jugadas` como en Reversi, y el color
+de quien abre la sala (`color`) entra por `$otro`. Sin publicar, la sala de
+ajedrez no se puede crear. El arreglo es el de siempre: pegar
+`firebase/database.rules.json` entero y **Publicar**, o usar el botón
+**Copiar las reglas** del cartel de la página de juegos.
+
 ### ⚠ Clue pide publicar otra vez, y un elenco a mano
 
 `'clue'` tiene que estar en la lista del campo `juego` y en la de `logros`, y

@@ -1,4 +1,4 @@
-import {cart, dados, tablero, orbes, reversi, cajas, paisaje, tiro, orbita, serpiente, tetris, isla} from './reglas-ilustraciones.js';
+import {cart, dados, tablero, orbes, reversi, cajas, paisaje, tiro, orbita, serpiente, tetris, isla, ajedrez} from './reglas-ilustraciones.js';
 const p=(titulo,texto,imagen)=>({titulo,texto,imagen});
 const e=(id,titulo,...pasos)=>({id,titulo,pasos});
 const fichas=(titulo,...cs)=>cart([titulo,cs]);
@@ -38,6 +38,16 @@ export const EJEMPLOS={
   p('Busca una línea sin huecos','Juegas con las fichas negras. Tienes dos blancas rivales junto a una negra propia. Necesitas cerrar esa fila por el otro extremo.',reversi(0)),
   p('Coloca la ficha que cierra','La nueva negra encierra las dos blancas entre fichas tuyas. Lo mismo funciona en vertical y diagonal.',reversi(1)),
   p('Las encerradas cambian de dueño','Las dos blancas pasan a negras. Solo puedes colocar donde captures al menos una ficha; si no hay jugadas legales, pasas automáticamente.',reversi(2)))],
+ ajedrez:[e('enroque','El enroque corto',
+  p('Rey y torre sin haberse movido','Fila 1 de las blancas, de la e a la h. Entre el rey y la torre no hay nada, ninguno de los dos se ha movido y ninguna de esas casillas está atacada.',ajedrez('Rey en e1 y torre en h1 con f1 y g1 libres',4,1,['♔','','','♖'])),
+  p('El rey va dos casillas hacia la torre','Toca el rey y luego g1, o arrástralo hasta allí. La torre salta sola por encima a f1. Se anota O-O; el largo, hacia la dama, es O-O-O.',ajedrez('Tras el enroque: torre en f1 y rey en g1',4,1,['','♖','♔',''],{1:'verde',2:'verde'}))),
+ e('alpaso','Capturar al paso',
+  p('Tu peón ya está en la quinta','El peón blanco está en e5. El peón negro de d7 todavía no se ha movido, en la columna de al lado.',ajedrez('Peón negro en d7 y peón blanco en e5',2,3,['♟','','','','','♙'])),
+  p('El rival avanza dos de golpe','El peón negro salta de d7 a d5 y queda justo al lado del tuyo, como si hubiera querido esquivarlo.',ajedrez('El peón negro llega a d5, al lado del blanco',2,3,['','','','','♟','♙'],{4:'oro'})),
+  p('Captúralo como si hubiera ido a d6','En la jugada siguiente, y solo en esa, tu peón puede ir a d6 y llevarse el peón de d5. Se anota exd6.',ajedrez('El peón blanco captura al paso en d6',2,3,['','','♙','','',''],{2:'verde',4:'rojo'}))),
+ e('mate','Jaque mate en la última fila',
+  p('Un rey encerrado por los suyos','El rey negro está en g8 y sus propios peones le tapan la salida. No está en jaque todavía, pero no tiene a dónde ir.',ajedrez('Rey negro en g8 con peones en f7, g7 y h7',5,2,['','','','♚','','','','♟','♟','♟'])),
+  p('La torre llega a la octava','La torre blanca entra en d8: jaque por la fila, nada puede ponerse en medio ni capturarla, y el rey no tiene casilla libre. Es mate y la partida termina.',ajedrez('Torre blanca en d8 da mate al rey en g8',5,2,['♖','','','♚','','','','♟','♟','♟'],{0:'verde',3:'rojo'})))],
  cadena:[e('explosion','De una esquina a una reacción en cadena',
   p('La esquina aguanta un orbe','Puedes añadir en una celda vacía o propia. Esta esquina tiene dos vecinas y su masa crítica es dos.',orbes([1,0,0,0])),
   p('El segundo alcanza el límite','Al añadir otro orbe, la esquina estalla. Los bordes estallan con tres y el interior con cuatro.',orbes([2,0,0,0])),
