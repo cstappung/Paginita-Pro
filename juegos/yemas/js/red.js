@@ -4,10 +4,11 @@
 //   - local con bots, para practicar sin sala
 //
 // red:  yo, mirando, meta, variante, equipos (uid → 'rojo'|'azul', o null),
-//       jugadores (Map uid → {nombre, color}), publicar(estado),
-//       golpear(uid, golpe), morir(ev), accion(tipo, datos), hablar(on), tick(dt)
-// h:    alConfig(red), alJugador(uid, estado|null), alGolpe(g), alBaja(nombre),
-//       alFeed(item), alSuceso(item), alMarcador(m), alFin(f), alVoces(v)
+//       jugadores (Map uid → {nombre, color}, en orden de asiento), fuera (Set),
+//       publicar(estado), golpear(uid | 'z:<id>', golpe), morir(ev),
+//       accion(tipo, datos), hablar(on), tick(dt)
+// h:    alConfig(red), alJugador(uid, estado|null), alGolpe(g), alGolpeZombi(g),
+//       alBaja(nombre), alFeed(item), alSuceso(item), alMarcador(m), alFin(f), alVoces(v)
 import * as THREE from 'three';
 import { moverCuerpo, rayoMundo, SPAWNS, OJOS } from 'yemas/mundo';
 
@@ -40,6 +41,8 @@ export function conectarMarco(h) {
           if (!(id > vistoG[uid])) continue;
           vistoG[uid] = id;
           if (dest === red.yo) h.alGolpe({ de: uid, n: red.jugadores.get(uid).nombre, dmg: +dmg || 0, cab: !!cab, a: a | 0 });
+          // Un balazo a un zombi: lo aplica el director (main.js mira si es uno).
+          else if (typeof dest === 'string' && dest.startsWith('z:')) h.alGolpeZombi({ de: uid, id: +dest.slice(2), dmg: +dmg || 0, cab: !!cab, a: a | 0 });
         }
       }
       h.alJugador(uid, e);
@@ -59,7 +62,7 @@ export function conectarMarco(h) {
       const equipos = m.equipos && typeof m.equipos === 'object' ? m.equipos : null;
       red = {
         yo: m.yo, online: true, mirando: !!m.mirando, meta: m.meta | 0, semilla: (m.semilla >>> 0) || 1,
-        variante: ['todos', 'equipos', 'bandera'].includes(m.variante) ? m.variante : 'todos', equipos,
+        variante: ['todos', 'equipos', 'bandera', 'zombis'].includes(m.variante) ? m.variante : 'todos', equipos, fuera,
         jugadores: new Map(js.map((j, i) => [j.uid, {
           nombre: String(j.nombre || 'Huevo').slice(0, 20),
           color: equipos ? COLOR_EQUIPO[equipos[j.uid]] || PALETA[0] : PALETA[i % PALETA.length],
@@ -76,6 +79,8 @@ export function conectarMarco(h) {
         morir(ev) {
           const d = { por: ev.de || '', a: ev.a | 0, cab: !!ev.cab };
           if (ev.x !== undefined) { d.x = ev.x; d.z = ev.z; }
+          // En zombis cada muerte lleva los puntos, los zombis y la ronda.
+          if (ev.pts !== undefined) { d.pts = ev.pts | 0; d.zk = ev.zk | 0; d.r = ev.r | 0; }
           post('muere', d);
         },
         accion(tipo, datos) { if (!red.mirando) post(tipo, datos); },
@@ -96,7 +101,10 @@ export function conectarMarco(h) {
         red.equipos = m.equipos;
         for (const [u, f] of red.jugadores) f.color = COLOR_EQUIPO[m.equipos[u]] || f.color;
       }
-      h.alMarcador({ bajas: m.bajas || {}, muertes: m.muertes || {}, puntosEq: m.puntosEq || null, banderas: m.banderas || null, armas: m.armas || {} });
+      h.alMarcador({
+        bajas: m.bajas || {}, muertes: m.muertes || {}, puntosEq: m.puntosEq || null, banderas: m.banderas || null, armas: m.armas || {},
+        ronda: m.ronda | 0, caidos: lista(m.caidos), puntos: m.puntos || {},
+      });
       if (m.fin) h.alFin(m.fin);
     } else if (m.tipo === 'bajas') {
       if (m.viejas) return;
@@ -117,29 +125,34 @@ export function conectarMarco(h) {
 const BOTS = ['Huevo Duro', 'Tortilla', 'Yemita', 'Clarita'];
 const SKINS_BOTS = ['chef', 'vaquero', 'pirata', 'lana'];
 
-export function conectarLocal({ nombre, color, colisores }, h) {
-  const r = new RedLocal(nombre, color, colisores, h);
+export function conectarLocal({ nombre, color, colisores, variante }, h) {
+  const r = new RedLocal(nombre, color, colisores, h, variante === 'zombis' ? 'zombis' : 'todos');
   h.alConfig(r);
+  r.avisaMarcador();   // la ronda 1 de zombis arranca con el primer marcador
   r.tick(0);
   return r;
 }
 
 class RedLocal {
-  constructor(nombre, color, cols, h) {
+  constructor(nombre, color, cols, h, variante) {
     this.yo = 'yo';
     this.online = false;
     this.mirando = false;
     this.meta = 0;
     this.semilla = (Math.random() * 4294967295) >>> 0;
     this.armas = {};
-    this.variante = 'todos';
+    // En zombis se practica solo: sin bots, contra las oleadas.
+    this.variante = variante;
     this.equipos = null;
+    this.fuera = new Set();
+    this.ronda = 1;
+    this.caidos = new Set();
     this.cols = cols;
     this.h = h;
     this.estadoYo = null;
     this.jugadores = new Map([['yo', { nombre, color }]]);
     const libres = PALETA.filter(c => c !== color);
-    this.bots = BOTS.map((n, i) => {
+    this.bots = (variante === 'zombis' ? [] : BOTS).map((n, i) => {
       this.jugadores.set('bot' + i, { nombre: n, color: libres[i] });
       this.skinsBots = this.skinsBots || {};
       this.skinsBots['bot' + i] = SKINS_BOTS[i % SKINS_BOTS.length];
@@ -156,7 +169,9 @@ class RedLocal {
   }
 
   nombre(u) { return this.jugadores.get(u)?.nombre || ''; }
-  avisaMarcador() { this.h.alMarcador({ bajas: { ...this.bajas }, muertes: { ...this.muertes }, armas: { ...this.armas } }); }
+  avisaMarcador() {
+    this.h.alMarcador({ bajas: { ...this.bajas }, muertes: { ...this.muertes }, armas: { ...this.armas }, ronda: this.ronda, caidos: [...this.caidos], puntos: {} });
+  }
 
   // El spawn más lejos de todos, con algo de azar
   aparecer(b) {
@@ -182,6 +197,11 @@ class RedLocal {
   // Sin sala, las armas del piso se reparten aquí con la misma regla que el
   // reductor: vale la siguiente aparición de ese punto.
   accion(tipo, d) {
+    if (tipo === 'ronda' && this.variante === 'zombis' && d.r === this.ronda + 1 && !this.caidos.has('fin')) {
+      this.ronda = d.r;
+      this.caidos.clear();
+      this.avisaMarcador();
+    }
     if (tipo !== 'recoge') return;
     if (d.g !== (this.armas[d.s] ? this.armas[d.s].g : -1) + 1) return;
     this.armas[d.s] = { g: d.g, uid: 'yo' };
@@ -193,7 +213,8 @@ class RedLocal {
   golpear(dest, g) {
     const b = this.bots.find(x => x.id === dest);
     if (!b || !b.vivo) return;
-    b.hp -= g.dmg;
+    // La espátula dorada le quita la mitad de lo que le queda.
+    b.hp -= g.a === 8 ? Math.max(1, Math.ceil(b.hp / 2)) : g.dmg;
     b.visto = Math.max(b.visto, 0.3);   // se da vuelta a mirarte
     if (b.hp > 0) return;
     b.vivo = false; b.muerte = 3;
@@ -205,6 +226,15 @@ class RedLocal {
 
   morir(ev) {
     this.muertes.yo++;
+    if (this.variante === 'zombis') {
+      // Solo: caer es el fin de la práctica.
+      this.caidos.add('yo');
+      this.h.alFeed({ k: '', v: this.nombre('yo'), a: ev.a | 0, cab: false });
+      this.avisaMarcador();
+      this.caidos.add('fin');
+      this.h.alFin({ ganador: 'yo', motivo: 'zombis', ronda: ev.r | 0, puntos: { yo: ev.pts | 0 } });
+      return;
+    }
     if (ev.de !== 'yo' && this.bajas[ev.de] !== undefined) this.bajas[ev.de]++;   // la propia granada no es baja
     this.h.alFeed({ k: this.nombre(ev.de), v: this.nombre('yo'), a: ev.a | 0, cab: !!ev.cab });
     this.avisaMarcador();

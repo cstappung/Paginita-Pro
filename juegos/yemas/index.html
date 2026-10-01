@@ -4,17 +4,18 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Yemas</title>
-<link rel="stylesheet" href="estilo.css?v=yemas-6">
+<link rel="stylesheet" href="estilo.css?v=yemas-7">
 <!-- Los módulos llevan la versión aquí, en un solo sitio: GitHub Pages
      cachea diez minutos y un import sin ?v= serviría el archivo viejo. -->
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.min.js",
-  "yemas/mundo": "./js/mundo.js?v=yemas-6",
-  "yemas/armas": "./js/armas.js?v=yemas-6",
-  "yemas/audio": "./js/audio.js?v=yemas-6",
-  "yemas/red": "./js/red.js?v=yemas-6",
-  "yemas/granada": "./js/granada.js?v=yemas-6"
+  "yemas/mundo": "./js/mundo.js?v=yemas-7",
+  "yemas/armas": "./js/armas.js?v=yemas-7",
+  "yemas/audio": "./js/audio.js?v=yemas-7",
+  "yemas/red": "./js/red.js?v=yemas-7",
+  "yemas/granada": "./js/granada.js?v=yemas-7",
+  "yemas/zombis": "./js/zombis.js?v=yemas-7"
 } }
 </script>
 </head>
@@ -37,6 +38,8 @@
   <div id="llevo" hidden></div>
   <div id="auto" hidden><span>💥 Autodestrucción…</span><div><i id="auto-barra"></i></div></div>
   <div id="aviso" hidden></div>
+  <div id="ronda" hidden></div>
+  <div id="puntos-z" hidden></div>
   <div id="prompt" hidden></div>
   <div id="vida"><div id="vida-barra"></div><span id="vida-num">100</span></div>
   <div id="arma">
@@ -51,11 +54,11 @@
     </table>
   </div>
   <div id="muerte" hidden><h2>¡Te frieron!</h2><p id="muerte-txt"></p><p id="muerte-granadas"></p></div>
-  <div id="fin" hidden><h2>Fin de la partida</h2><p id="fin-txt"></p></div>
+  <div id="fin" hidden><h2>Fin de la partida</h2><p id="fin-txt"></p><button id="otra" type="button" hidden>Jugar otra vez</button></div>
   <div id="pausa" hidden>
     <h2>Haz click para jugar</h2>
     <p>Se captura el mouse para apuntar. <b>Esc</b> lo suelta.</p>
-    <p class="chico">WASD moverse · Shift correr · C deslizarse (corriendo) · Espacio saltar · Click disparar · Click der. mira · R recargar · 1 2 3 armas · E recoger/cambiar arma · G granada · T cambia granada · mantener X autodestrucción · Tab tabla · V hablar · Shift+F pantalla completa</p>
+    <p class="chico">WASD moverse · Shift correr · C deslizarse (corriendo) · Espacio saltar · Click disparar · Click der. mira · R recargar · 1 2 3 armas · E recoger/cambiar o comprar arma · Q espátula dorada · G granada · T cambia granada · mantener X autodestrucción · Tab tabla · V hablar · Shift+F pantalla completa</p>
     <div id="ajustes-pausa" class="ajustes"></div>
     <div class="botones">
       <button id="pantalla" type="button">⛶ Pantalla completa</button>
@@ -69,21 +72,27 @@
 <div id="menu">
   <a class="volver" href="../../juegos.html">← Juegos</a>
   <h1>YEMAS</h1>
-  <p class="sub">un shooter de huevos · práctica contra bots</p>
+  <p class="sub">un shooter de huevos · práctica</p>
   <label>Tu nombre <input id="nombre" maxlength="14" autocomplete="off"></label>
   <div class="etq">Color de cáscara</div>
   <div id="colores"></div>
+  <label>Modo
+    <select id="modo-practica">
+      <option value="todos">Todos contra todos (4 bots)</option>
+      <option value="zombis">Zombis (solo, contra las oleadas)</option>
+    </select>
+  </label>
   <div id="ajustes-menu" class="ajustes"></div>
   <button id="jugar">Jugar</button>
   <p id="modo">Para jugar con otros, abre una sala de Yemas en Juegos.</p>
   <div class="ayuda">
     <span>WASD</span> moverse · <span>Shift</span> correr · <span>C</span> deslizarse (corriendo) · <span>Espacio</span> saltar · <span>Click</span> disparar ·
     <span>Click der.</span> mira (Poché) · <span>R</span> recargar · <span>1 2 3</span> o rueda: armas ·
-    <span>E</span> recoger o cambiar arma · <span>G</span> granada · <span>T</span> cambia granada · <span>X</span> (mantener) autodestrucción ·
+    <span>E</span> recoger, cambiar o comprar arma · <span>Q</span> espátula dorada · <span>G</span> granada · <span>T</span> cambia granada · <span>X</span> (mantener) autodestrucción ·
     <span>Shift+F</span> pantalla completa · <span>Tab</span> tabla · <span>Esc</span> soltar mouse
   </div>
 </div>
 
-<script type="module" src="js/main.js?v=yemas-6"></script>
+<script type="module" src="js/main.js?v=yemas-7"></script>
 </body>
 </html>
