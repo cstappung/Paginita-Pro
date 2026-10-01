@@ -301,13 +301,23 @@ export function watchRanksTodos(cb) {
 export const leerMisLogros = (juego, uid) =>
   get(ref(db, `logros/${juego}/${uid}`)).then(s => s.val() || {}, () => ({}));
 export const otorgarLogro = (juego, uid, id) => set(ref(db, `logros/${juego}/${uid}/${id}`), serverTimestamp());
+/* También escucha `diario`, la racha de días jugando: con las cuatro
+   lecturas se calcula el saldo de monedas de cualquiera (juegos/monedas.js).
+   Antes de publicar las reglas `diario` falla sola y el resto sigue. */
 export function watchLogros(cb) {
-  const d = { ranks: {}, solo: {}, logros: {} }, err = {};
-  const oye = (nodo, k) => onValue(ref(db, nodo), s => { d[k] = s.val() || {}; err[k] = null; cb(d, err); },
+  const d = { ranks: {}, solo: {}, logros: {}, diario: {} }, err = {};
+  const oye = (nodo, k) => onValue(ref(db, nodo), s => { d[k] = (k === "ranks" ? saneaRanks(s.val()) : s.val()) || {}; err[k] = null; cb(d, err); },
     e => { err[k] = e; cb(d, err); });
-  const offs = [oye(R, "ranks"), oye("soloRanks", "solo"), oye("logros", "logros")];
+  const offs = [oye(R, "ranks"), oye("soloRanks", "solo"), oye("logros", "logros"), oye("diario", "diario")];
   return () => offs.forEach(f => f());
 }
+
+/* ---------- días jugando ----------
+   `diario/<uid>` = {dia, racha, mejor, dias, bono, at}. La regla exige que
+   `dia` sea hoy en Chile y que racha, días y bono sean los que tocan a
+   partir del registro anterior (juegos/monedas.js: registraDia). */
+export const leerDiario = uid => get(ref(db, `diario/${uid}`)).then(s => s.val());
+export const apuntaDiario = (uid, reg) => set(ref(db, `diario/${uid}`), Object.assign({}, reg, { at: serverTimestamp() }));
 
 export const leerRank = (juego, uid) => get(ref(db, `${R}/${juego}/${uid}`)).then(s => sanea(s.val()));
 export const guardarRank = (juego, uid, fila) => set(ref(db, `${R}/${juego}/${uid}`), fila);

@@ -196,6 +196,25 @@ await allowed("A marca como resuelto lo suyo", () => rep.setFeedbackState(fbId, 
 await allowed("A sí borra lo suyo", () => rep.deleteFeedback(fbId));
 await denied("sin ser admin no se quita un error", () => rep.deleteError("epruebas1"));
 
+console.log("— Monedas: días seguidos (diario) —");
+{
+  const { registraDia, diaChile } = await import("./src/juegos/monedas.js");
+  const { serverTimestamp } = await import("firebase/database");
+  const ua = await loginAs(A), hoy = diaChile();
+  const apunta = reg => set(ref(db, `diario/${ua.uid}`), Object.assign({}, reg, { at: serverTimestamp() }));
+  await remove(ref(db, `diario/${ua.uid}`)).catch(() => {});
+  await denied("no se empieza con una racha inventada", () => apunta({ dia: hoy, racha: 5, mejor: 5, dias: 5, bono: 150 }));
+  await denied("no se apunta mañana", () => apunta(registraDia(null, hoy + 1)));
+  await denied("ni un día de hace una semana", () => apunta(registraDia(null, hoy - 7)));
+  await allowed("A apunta hoy", () => apunta(registraDia(null, hoy)));
+  await denied("hoy no se apunta dos veces", () => apunta({ dia: hoy, racha: 2, mejor: 2, dias: 2, bono: 25 }));
+  await denied("un campo de más no cuela", () => set(ref(db, `diario/${ua.uid}/extra`), 1));
+  await loginAs(B);
+  ok("B lee el diario de A (para el top)", (await get(ref(db, `diario/${ua.uid}/bono`))).val() === 10);
+  await denied("B no escribe el diario de A", () => set(ref(db, `diario/${ua.uid}`), { dia: hoy, racha: 1, mejor: 1, dias: 1, bono: 10, at: serverTimestamp() }));
+  await loginAs(A);
+}
+
 await signOut(auth);
 await denied("sin sesión no se lee el informe", () => get(ref(db, "errors")));
 await denied("sin sesión no se escribe nada", () => set(ref(db, "feedback/x"), { tipo: "bug", titulo: "x", uid: "x" }));

@@ -3298,6 +3298,39 @@ the rarest logro anyone holds. The `logros` node needs the rules re-published.
 `tests/logros.test.cjs` checks ten unique ids per game and that the rules'
 whitelist names every room game.
 
+**Coins 🪙 are computed, never stored** (`juegos/monedas.js`, pure; the
+view in `monedas-vista.js`, the **🪙 Monedas** tab at `#monedas`, a
+*Top monedas* box in the lobby's sidebar and your balance in the header).
+A stored balance would be a number anyone with a console could rewrite. A
+sum of things the rules already check cannot be. So, like the fila and solo
+logros, the balance is derived from the same four reads the profile uses
+(`fb.watchLogros`, now also listening to `diario`, through `datosPerfil`):
+
+- **Room games** (`ranks`): `TARIFA` 5 per game, 15 per win, 5 per draw,
+  times the game's `PESO` (1 for a short duel up to 2.5 for Catan).
+- **Club records** (`soloRanks`): `RECORD[club]` once per modality with a
+  mark, so improving a mark never pays twice and the easy game cannot be
+  farmed. BBTAN adds 1 per 2 rounds, and the Sopa streak 10 per day.
+- **Logros**: by difficulty. `NIVEL[juego]` is one digit 1–4 per logro, in
+  `LOGROS[juego]` order (room games start with the fila's four, `F`), worth
+  `VALOR_NIVEL` 15/40/100/250. A new logro needs its digit, and
+  `tests/monedas.test.cjs` fails if a game's string does not match its list.
+  This is the big pot on purpose: hard things pay most.
+- **Days played** (`diario/<uid>` = `{dia, racha, mejor, dias, bono, at}`):
+  the only thing written. `marcaDia()` in `juegos-main.js` runs once per
+  Chile day after a room game is recorded or a club result arrives.
+  `registraDia` pays `pagoDia(racha)` = 10 + 5 per streak day, capped at 50,
+  and the rule recomputes exactly that from the previous record. `dia` is
+  the Chile date as a day number, because rules can compare numbers with
+  `now` but cannot format dates. The rule accepts it inside a 25-hour window
+  that covers UTC−3 and UTC−4. So a client can only record *today*, once,
+  with the right streak and sum. Deleting the node only loses coins.
+
+There is nothing to spend yet. A shop would need the spending stored, and
+validated against this sum. The `diario` node needs the rules re-published.
+`test-rules.mjs` covers it: no invented streak, no tomorrow, no twice a day,
+and nobody writes someone else's.
+
 **A new room is announced on Discord** (`juegos/discord.js`), with no bot
 and no server: a Discord *webhook* that the host's own browser POSTs to
 (Discord answers CORS for it) right after `crear()` in `juegos-main.js`.

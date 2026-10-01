@@ -91,6 +91,11 @@ de cara.
 
 ## 1. Reglas de Realtime Database (IMPORTANTE)
 
+> **Monedas (octubre de 2026):** la racha de días jugando vive en un nodo
+> nuevo, `diario`. Hasta volver a publicar las reglas, las monedas se ven
+> igual (salen de partidas, récords y logros), pero los días seguidos no
+> suman.
+
 > **Sopa de letras (octubre de 2026):** sus clasificaciones (`club-sopa-…`)
 > son categorías nuevas de `soloRanks`. Hasta volver a publicar las reglas, el
 > juego funciona igual, pero los récords se quedan en el dispositivo.
