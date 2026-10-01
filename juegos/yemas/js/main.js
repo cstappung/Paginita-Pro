@@ -12,6 +12,11 @@ import { conectarMarco, conectarLocal, PALETA, COLOR_EQUIPO } from 'yemas/red';
 import { crearGranadas, GRANADA } from 'yemas/granada';
 
 const VEL = 7, SALTO = 8, SENS = 0.0022, HZ_RED = 12, INVULNERABLE = 1.5;
+// Correr: Shift mientras se avanza. Deslizarse: C mientras se corre; sale
+// disparado en la dirección en que iba, frena solo y termina el sprint (para
+// volver a correr hay que soltar Shift y apretarlo de nuevo).
+const SPRINT = 1.6;
+const DESLIZ = { vel: 15, dura: 0.9, roce: 1.6, enfriar: 1.2, baja: 0.6 };
 const ONLINE = new URLSearchParams(location.search).get('modo') === 'online' && parent !== window;
 const $ = id => document.getElementById(id);
 document.documentElement.classList.toggle('en-sala', ONLINE);
@@ -135,6 +140,8 @@ const yo = {
   cargaAuto: -1,    // < 0: no se está cargando la autodestrucción
   // Si se suicidó: lo que tenía, para devolvérselo al revivir si no mató a nadie.
   suicidio: null, matoMuerto: false,
+  // Sprint y deslizamiento. `sinSprint`: ya se deslizó con este Shift apretado.
+  corriendo: false, sinSprint: false, deslizando: 0, cdDesliz: 0, sprintK: 0, agacho: 0,
 };
 // La autodestrucción: se mantiene X un momento (soltarla antes la cancela,
 // así no se dispara sin querer), el huevo pita y brilla —también en la
@@ -263,7 +270,7 @@ $('pausa').onclick = () => { sonido.iniciar(); bloquear(); };
 $('lienzo').onclick = () => { if (puedoJugar() && !bloqueado()) bloquear(); };
 document.addEventListener('pointerlockchange', () => {
   $('pausa').hidden = !puedoJugar() || bloqueado();
-  if (!bloqueado()) { teclas.clear(); gatillo = false; yo.apuntando = false; }
+  if (!bloqueado()) { teclas.clear(); gatillo = false; yo.apuntando = false; yo.sinSprint = false; }
 });
 
 addEventListener('keydown', e => {
@@ -283,6 +290,7 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyF' && e.shiftKey) pantallaCompleta();
   if (!yo.vivo && e.code === 'KeyZ') ciclaGranada(0);
   if (!yo.vivo && e.code === 'KeyC') ciclaGranada(1);
+  if (yo.vivo && e.code === 'KeyC') deslizar();
   if (/^Digit[123]$/.test(e.code)) cambiarArma(+e.code.slice(5) - 1);
 });
 addEventListener('keyup', e => {
@@ -290,9 +298,10 @@ addEventListener('keyup', e => {
   if (e.code === 'Tab') $('tabla').hidden = true;
   if (e.code === 'KeyV') red?.hablar(false);
   if (e.code === 'KeyX') yo.cargaAuto = -1;   // soltó antes de tiempo: no pasa nada
+  if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') yo.sinSprint = false;
 });
 // Soltar la V cuando se pierde el foco: si no, el micrófono queda abierto.
-addEventListener('blur', () => { red?.hablar(false); yo.cargaAuto = -1; });
+addEventListener('blur', () => { red?.hablar(false); yo.cargaAuto = -1; yo.sinSprint = false; });
 addEventListener('mousemove', e => {
   if (!bloqueado() || !yo.vivo) return;
   const s = SENS * pref.sens * (1 - yo.zoom * 0.7);
@@ -363,7 +372,7 @@ function disparar() {
   _u.set(0, 1, 0).cross(base).normalize();
   _v.copy(base).cross(_u).normalize();
   const moviendo = Math.hypot(yo.vel.x, yo.vel.z) > 1.5;
-  let disp = a.dispersion + (moviendo ? a.dispMov : 0) + (yo.enSuelo ? 0 : 0.04);
+  let disp = a.dispersion + (moviendo ? a.dispMov : 0) + (yo.enSuelo ? 0 : 0.04) + (yo.corriendo ? 0.03 : 0);
   if (a.zoom && yo.zoom > 0.9) disp = a.dispZoom + (moviendo ? 0.02 : 0);
 
   const golpes = new Map();
@@ -453,6 +462,21 @@ function lanzarCohete(a) {
 }
 
 // ---------- Vida y muerte ----------
+// C mientras se corre por el suelo: sale disparado en la dirección en que iba.
+function deslizar() {
+  if (!puedoJugar() || !yo.corriendo || !yo.enSuelo || yo.deslizando > 0 || yo.cdDesliz > 0) return;
+  const v = Math.hypot(yo.vel.x, yo.vel.z);
+  const dx = v > 0.5 ? yo.vel.x / v : -Math.sin(yo.yaw), dz = v > 0.5 ? yo.vel.z / v : -Math.cos(yo.yaw);
+  yo.vel.x = dx * DESLIZ.vel;
+  yo.vel.z = dz * DESLIZ.vel;
+  yo.deslizando = DESLIZ.dura;
+  yo.cdDesliz = DESLIZ.enfriar;
+  yo.corriendo = false;
+  yo.sinSprint = true;
+  sonido.desliza();
+  publicar();
+}
+
 function aparecer() {
   // En equipos cada uno aparece en su mitad del mapa: rojo al norte (z > 0).
   const lado = miEquipo() === 'rojo' ? 1 : miEquipo() === 'azul' ? -1 : 0;
@@ -489,6 +513,8 @@ function aparecer() {
   yo.hpAntes = yo.hp;
   yo.vivo = true;
   yo.recargando = 0;
+  yo.deslizando = 0;
+  yo.corriendo = false;
   yo.escudo = INVULNERABLE;
   $('muerte').hidden = true;
   publicar();
@@ -698,6 +724,8 @@ function alJugador(id, e) {
   // Está cargando su autodestrucción: brilla y pita (lo pinta el bucle).
   if (e.ad && !j.ad) sonido.pitido(0, j.mesh.position.distanceTo(yo.pos));
   j.ad = !!e.ad && j.vivo;
+  if (e.ds && !j.ds && j.vivo) sonido.desliza(j.mesh.position.distanceTo(yo.pos));
+  j.ds = !!e.ds && j.vivo;
   // Lo que lanzó (granada o cohete): se ve volar y revienta donde su dueño dice.
   if (e.n && e.n.i !== j.nI && Array.isArray(e.n.o) && Array.isArray(e.n.v)) {
     j.nI = e.n.i;
@@ -735,6 +763,7 @@ function publicar() {
   if (yo.disparo) e.s = { i: yo.disparo, e: yo.finales };
   if (yo.lanzo) e.n = yo.lanzo;
   if (yo.cargaAuto >= 0) e.ad = 1;
+  if (yo.deslizando > 0) e.ds = 1;
   if (yo.revento) e.x2 = yo.revento;
   red.publicar(e);
 }
@@ -1239,11 +1268,24 @@ function actualizar(dt) {
     if (teclas.has('KeyD') || teclas.has('ArrowRight')) _quiero.add(_derecha);
     if (teclas.has('KeyA') || teclas.has('ArrowLeft')) _quiero.sub(_derecha);
     if (_quiero.lengthSq() > 0) _quiero.normalize();
-    _quiero.multiplyScalar(VEL * (a.zoom && yo.zoom > 0.5 ? 0.5 : a.melee ? 1.1 : 1));
-    const k = 1 - Math.exp(-(yo.enSuelo ? 14 : 3) * dt);
-    yo.vel.x += (_quiero.x - yo.vel.x) * k;
-    yo.vel.z += (_quiero.z - yo.vel.z) * k;
-    if (teclas.has('Space') && yo.enSuelo) { yo.vel.y = SALTO; yo.enSuelo = false; }
+    const shift = teclas.has('ShiftLeft') || teclas.has('ShiftRight');
+    const avanza = (teclas.has('KeyW') || teclas.has('ArrowUp')) && !teclas.has('KeyS') && !teclas.has('ArrowDown');
+    const mira = a.zoom && yo.zoom > 0.5;
+    yo.corriendo = shift && !yo.sinSprint && avanza && !mira && yo.deslizando <= 0;
+    _quiero.multiplyScalar(VEL * (mira ? 0.5 : (a.melee ? 1.1 : 1) * (yo.corriendo ? SPRINT : 1)));
+    if (yo.deslizando > 0) {
+      // Deslizándose no se dobla: el roce frena hasta que vuelve a caminar.
+      yo.deslizando -= dt;
+      if (yo.enSuelo) { const f = Math.exp(-DESLIZ.roce * dt); yo.vel.x *= f; yo.vel.z *= f; }
+      if (yo.deslizando <= 0 || Math.hypot(yo.vel.x, yo.vel.z) < VEL * 0.55) yo.deslizando = 0;
+    } else {
+      const k = 1 - Math.exp(-(yo.enSuelo ? 14 : 3) * dt);
+      yo.vel.x += (_quiero.x - yo.vel.x) * k;
+      yo.vel.z += (_quiero.z - yo.vel.z) * k;
+    }
+    yo.cdDesliz = Math.max(0, yo.cdDesliz - dt);
+    // Saltar corta el deslizamiento, pero el impulso sigue en el aire.
+    if (teclas.has('Space') && yo.enSuelo) { yo.vel.y = SALTO; yo.enSuelo = false; yo.deslizando = 0; }
     moverCuerpo(yo, dt, colisores);
 
     yo.cadencia = Math.max(0, yo.cadencia - dt);
@@ -1259,15 +1301,19 @@ function actualizar(dt) {
   } else {
     yo.muerteT -= dt;
     yo.zoom = 0;
+    yo.corriendo = false;
+    yo.deslizando = 0;
     if (yo.muerteT <= 0) aparecer();
   }
+  yo.sprintK += ((yo.corriendo || yo.deslizando > 0 ? 1 : 0) - yo.sprintK) * (1 - Math.exp(-8 * dt));
+  yo.agacho += ((yo.deslizando > 0 ? 1 : 0) - yo.agacho) * (1 - Math.exp(-14 * dt));
 
   if (!red.mirando && !terminado) {
-    const alturaCam = yo.vivo ? OJOS : OJOS + Math.min(2.5, (3 - yo.muerteT) * 2);
+    const alturaCam = yo.vivo ? OJOS - DESLIZ.baja * yo.agacho : OJOS + Math.min(2.5, (3 - yo.muerteT) * 2);
     camara.position.set(yo.pos.x, yo.pos.y + alturaCam, yo.pos.z);
-    camara.rotation.set(yo.pitch, yo.yaw, 0);
+    camara.rotation.set(yo.pitch, yo.yaw, yo.agacho * 0.06);
   }
-  const fov = 75 - yo.zoom * (a.zoom ? 55 : 0);
+  const fov = 75 + 8 * yo.sprintK - yo.zoom * (a.zoom ? 55 : 0);
   if (Math.abs(camara.fov - fov) > 0.01) { camara.fov = fov; camara.updateProjectionMatrix(); }
 
   // Arma en mano
@@ -1281,9 +1327,11 @@ function actualizar(dt) {
   const bajar = yo.recargando > 0 ? Math.sin(Math.PI * (1 - yo.recargando / a.recarga)) : 0;
   m.position.copy(BASE_ARMA);
   m.position.x += Math.sin(yo.bob) * 0.012 * Math.min(1, vel / VEL) - yo.zoom * 0.24 - yo.tajo * 0.15;
-  m.position.y += Math.abs(Math.cos(yo.bob)) * 0.012 * Math.min(1, vel / VEL) - bajar * 0.15;
+  m.position.y += Math.abs(Math.cos(yo.bob)) * 0.012 * Math.min(1, vel / VEL) - bajar * 0.15 - yo.sprintK * 0.05;
   m.position.z += yo.retroceso * 0.07 - yo.tajo * 0.2;
-  m.rotation.set(yo.retroceso * 0.15 - bajar * 0.7, yo.tajo * 0.9, -yo.tajo * 0.5);
+  // Corriendo, el arma se baja y se cruza; deslizándose vuelve a apuntar.
+  const cruza = yo.corriendo ? yo.sprintK : 0;
+  m.rotation.set(yo.retroceso * 0.15 - bajar * 0.7 - cruza * 0.35, yo.tajo * 0.9 + cruza * 0.45, -yo.tajo * 0.5);
 
   actualizaBanderas();
   actualizaArmasSuelo();
@@ -1317,7 +1365,9 @@ function actualizar(dt) {
     const v = dt > 0 ? antes.distanceTo(j.mesh.position) / dt : 0;
     const c = j.mesh.userData.cuerpo;
     j.mesh.userData.casco.material.emissive.setRGB(j.ad ? 0.6 + 0.4 * Math.sin(t * 30) : 0, 0, 0);
-    c.rotation.z = Math.sin(t * 14) * 0.12 * Math.min(1, v / 5);
+    c.rotation.z = j.ds ? 0 : Math.sin(t * 14) * 0.12 * Math.min(1, v / 5);
+    // Deslizándose va echado hacia atrás.
+    c.rotation.x += ((j.ds ? 0.7 : 0) - c.rotation.x) * kp;
     c.position.y = Math.abs(Math.sin(t * 14)) * 0.08 * Math.min(1, v / 5);
   }
 
