@@ -305,7 +305,7 @@ export const CANCIONES = [
   { id: "orbita", nombre: "Deriva orbital", grupo: "De los juegos", desc: "Órbita · espacial, con eco", chip: "orbita", juegos: ["orbita"] },
   { id: "cartas", nombre: "Tres elementos", grupo: "De los juegos", desc: "Cartas · taiko y escala japonesa", chip: "cartas", juegos: ["cartas"] },
   { id: "cuadritos", nombre: "Cuadernillo", grupo: "De los juegos", desc: "Cuadritos · alegre, con swing", chip: "cuadritos", juegos: ["cuadritos"] },
-  { id: "reversi", nombre: "Clavecín", grupo: "De los juegos", desc: "Reversi · Re menor, casi barroco", chip: "reversi", juegos: ["reversi"] },
+  { id: "reversi", nombre: "Clavecín", grupo: "De los juegos", desc: "Reversi · Re menor, casi barroco", chip: "reversi", juegos: ["reversi", "ajedrez"] },
   { id: "cadena", nombre: "Reacción en cadena", grupo: "De los juegos", desc: "Chain Reaction · arpegios que suben", chip: "cadena", juegos: ["cadena"] },
   { id: "catan", nombre: "Tonada de puerto", grupo: "De los juegos", desc: "Catan · marcha con gaita", chip: "catan", juegos: ["catan"] },
   { id: "minas", nombre: "Campo minado", grupo: "De los juegos", desc: "Buscaminas · staccato nervioso", chip: "minas", juegos: ["minas"] },

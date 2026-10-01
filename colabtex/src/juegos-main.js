@@ -33,12 +33,13 @@ import { crearSolo } from "./juegos/solo/club.js";
 import { watchAuth, loginGoogle, logout } from "./firebase.js";
 import * as fb from "./fb-juegos.js";
 import { escapeHtml, timeAgo, colorForUid } from "./util.js";
-import { JUEGOS, reducir, jugadasDe, acumula, cupoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, ganoEn, ordenaRanks } from "./juegos/motor.js";
+import { AJ_RITMOS, JUEGOS, reducir, jugadasDe, acumula, cupoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, ganoEn, ordenaRanks, novedades } from "./juegos/motor.js";
 import { crearEscondite } from "./juegos/escondite.js";
 import { crearCartas } from "./juegos/cartas.js";
 import { crearCuadritos } from "./juegos/cuadritos.js";
 import { crearOrbita } from "./juegos/orbita.js";
 import { crearReversi } from "./juegos/reversi.js";
+import { crearAjedrez, piezaSvg } from "./juegos/ajedrez.js";
 import { crearWorms } from "./juegos/worms.js";
 import { crearCadena } from "./juegos/cadena.js";
 import { crearFlip7 } from "./juegos/flip7.js";
@@ -69,10 +70,11 @@ const FABRICAS = {
   orbita: crearOrbita, escondite: crearEscondite, cartas: crearCartas,
   cuadritos: crearCuadritos, reversi: crearReversi, worms: crearWorms,
   cadena: crearCadena, flip7: crearFlip7, cacho: crearCacho, uno: crearUno, catan: crearCatan,
-  presidente: crearPresidente, spicy: crearSpicy, tetris: crearTetris, yemas: crearYemas, clue: crearClue
+  presidente: crearPresidente, spicy: crearSpicy, tetris: crearTetris, yemas: crearYemas, clue: crearClue,
+  ajedrez: crearAjedrez
 };
 
-const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️" };
+const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞" };
 /* Los clubes de un jugador, con sus claves de la clasificación y los
    mismos signos que llevan en su tarjeta del vestíbulo. */
 const ICONO_TODOS = { ...ICONO, general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●" };
@@ -88,6 +90,14 @@ const cupos = k => Array.from({ length: JUEGOS[k].cupo - JUEGOS[k].minimo + 1 },
   (_, i) => ({ v: JUEGOS[k].minimo + i, t: JUEGOS[k].minimo + i + " jugadores" }));
 
 const OPCIONES = {
+  /* En el ajedrez lo único que se elige es el color de quien abre; «al
+     azar» lo decide la semilla de la sala, que nadie controla. */
+  ajedrez: [
+    { clave: "ritmo", etiqueta: "Ritmo", por: "10+0",
+      valores: [...Object.keys(AJ_RITMOS).map(v => ({ v, t: `${AJ_RITMOS[v]} · ${v}` })), { v: "libre", t: "Sin reloj" }] },
+    { clave: "color", etiqueta: "Color de quien abre", por: "azar",
+      valores: [{ v: "azar", t: "Al azar" }, { v: "blancas", t: "Blancas" }, { v: "negras", t: "Negras" }] }
+  ],
   cuadritos: [
     { clave: "cupo", etiqueta: "Jugadores", valores: cupos("cuadritos") },
     { clave: "lado", etiqueta: "Tablero", por: TAMANOS.mediano.lado,
@@ -980,6 +990,7 @@ function armazon() {
      espera, y con dos cajas habría acabado al final de la página. */
   h.innerHTML = `
     <div class="jg-ves">
+      ${novedadesHtml()}
       <section class="jg-marquesina">
         <div class="jg-mq-texto">
           <span class="jg-eyebrow">LABORATORIO · SALÓN DE JUEGOS</span>
@@ -1026,10 +1037,83 @@ function armazon() {
   for (const b of h.querySelectorAll("[data-filtro]")) {
     b.onclick = () => { filtroVes = b.getAttribute("data-filtro"); aplicaFiltro(); };
   }
+  enganchaNovedades(h);
   h.querySelector(".jg-mq-link").onclick = ev => {
     ev.preventDefault();   // un #ancla cambiaría la ruta del hash
     $("vesCatalogo").scrollIntoView({ behavior: "smooth", block: "start" });
   };
+}
+
+/* ---------- novedades ----------
+   Lo primero del vestíbulo son los tres juegos que llegaron últimos, por
+   la fecha `alta` de `JUEGOS`: quien vuelve al salón tiene que ver qué
+   hay de nuevo sin recorrer el catálogo. La sala se abre con las
+   opciones por omisión —las mismas que trae preseleccionadas su tarjeta
+   del catálogo—, y «Opciones» lleva a esa tarjeta para elegir otras. */
+const fechaAlta = a => {
+  const d = new Date(a + "T12:00:00");
+  return isNaN(d) ? "" : d.toLocaleDateString("es", { day: "numeric", month: "long" });
+};
+const porOmision = k => Object.fromEntries((OPCIONES[k] || []).map(o => [o.clave, o.por || o.valores[0].v]));
+
+function novedadesHtml() {
+  const ks = novedades(3);
+  if (!ks.length) return "";
+  return `
+      <section class="jg-nov" aria-labelledby="vesNovT">
+        <header class="jg-nov-cab">
+          <span class="jg-eyebrow">RECIÉN LLEGADOS</span>
+          <h2 id="vesNovT">Novedades</h2>
+          <p>Los ${ks.length} últimos juegos en llegar al salón.</p>
+        </header>
+        <div class="jg-nov-lista">${ks.map((k, i) => {
+          const j = JUEGOS[k], grupo = j.cupo > 2;
+          const cupo = grupo ? (j.minimo || 2) + "–" + j.cupo + " jugadores" : "Duelo · 2 jugadores";
+          return `
+          <article class="jg-nov-c" style="--c:${j.color}">
+            <div class="jg-portada jg-portada-${k}" aria-hidden="true">${arteJuego(k)}</div>
+            <div class="jg-nov-cuerpo">
+              <div class="jg-nov-meta"><span class="jg-nov-sello">${i === 0 ? "★ Lo último" : "Nuevo"}</span><span>${escapeHtml(fechaAlta(j.alta))}</span></div>
+              <h3>${escapeHtml(j.nombre)}</h3>
+              <p>${escapeHtml(j.lema)}</p>
+              <small>${escapeHtml(cupo)}</small>
+              <div class="jg-nov-pie">
+                <button class="btn" data-nov-crear="${k}">Abrir sala <span aria-hidden="true">→</span></button>
+                ${OPCIONES[k] ? `<button class="btn2" data-nov-ver="${k}" title="Elegir las opciones en su tarjeta">Opciones</button>` : ""}
+                ${tieneReglas(k) ? `<button class="btn2" data-nov-reglas="${k}" title="Cómo se juega" aria-label="Reglas de ${escapeHtml(j.nombre)}">📖</button>` : ""}
+              </div>
+            </div>
+          </article>`;
+        }).join("")}</div>
+      </section>`;
+}
+
+function enganchaNovedades(h) {
+  for (const b of h.querySelectorAll("[data-nov-crear]")) {
+    const k = b.getAttribute("data-nov-crear");
+    b.onclick = () => crear(k, porOmision(k));
+  }
+  for (const b of h.querySelectorAll("[data-nov-reglas]")) {
+    const k = b.getAttribute("data-nov-reglas");
+    b.onclick = () => abreReglas(k, { modo: modoReglas(k, porOmision(k)), nombre: JUEGOS[k].nombre });
+  }
+  /* Lleva a la tarjeta del catálogo, abre sus opciones y la hace brillar
+     un momento para que se vea cuál es. Si el filtro la tenía escondida,
+     se vuelve a «Todos». */
+  for (const b of h.querySelectorAll("[data-nov-ver]")) {
+    b.onclick = () => {
+      const k = b.getAttribute("data-nov-ver");
+      const t = document.querySelector("#vesElige .jg-of-" + k);
+      if (!t) return;
+      if (t.hidden) { filtroVes = "todos"; aplicaFiltro(); }
+      const d = t.querySelector(".jg-of-ops");
+      if (d) d.open = true;
+      t.scrollIntoView({ behavior: "smooth", block: "center" });
+      t.classList.remove("jg-of-brilla");
+      void t.offsetWidth;
+      t.classList.add("jg-of-brilla");
+    };
+  }
 }
 
 /* El filtro solo esconde tarjetas: no se repinta nada, así que lo que
@@ -1443,7 +1527,7 @@ const FANFARRIA = { gano: "victoria", perdi: "derrota", empate: "empate", mirand
    En cartas es el choque entero (`CHOQUE`, 2,6 s): la ronda que gana
    el trío se enseña igual que las demás. Worms no pone fanfarria — el
    marco tiene su propio audio y su propio final. */
-const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300, presidente: 1200, spicy: 1200, tetris: 1500, yemas: 1500, clue: 1800 };
+const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300, presidente: 1200, spicy: 1200, tetris: 1500, yemas: 1500, clue: 1800, ajedrez: 1300 };
 
 function pintaFin(p, est) {
   const caja = $("jgFin");
@@ -1567,7 +1651,16 @@ const RAZONES = {
   piedad: "Fue el último en pie: los demás llegaron a 25 cartas.",
   catan: "Llegó a los puntos de victoria antes que nadie.",
   agotado: "Se agotaron las llaves de los dados: ganó quien tenía más puntos.",
-  cierre: "La mesa votó acabar: ganó quien llevaba más puntos."
+  cierre: "La mesa votó acabar: ganó quien llevaba más puntos.",
+  mate: "Jaque mate.",
+  ahogado: "Rey ahogado: sin jugadas y sin estar en jaque.",
+  material: "No quedaba material para dar mate.",
+  repeticion: "La misma posición se repitió tres veces.",
+  cincuenta: "Cincuenta jugadas sin capturas ni movimientos de peón.",
+  acuerdo: "Tablas de mutuo acuerdo.",
+  rendicion: "El rival se rindió.",
+  tiempo: "Al rival se le acabó el tiempo.",
+  tiempomaterial: "Se acabó un reloj, pero el otro no tenía con qué dar mate: tablas."
 };
 const razon = m => RAZONES[m] || "";
 const nombreDe = (est, uid) => {
@@ -1897,6 +1990,7 @@ function arteJuego(k) {
   if (k === "tetris") return '<div class="jg-art-tt">' + ["....ll", "t..zll", "ttzzoo", "itsjoo", "issjjj"].map(f => [...f].map(c => '<i class="' + (c === "." ? "" : "p-" + c) + '"></i>').join("")).join("") + '<em>TETRIS</em></div>';
   if (k === "yemas") return '<div class="jg-art-ym"><i></i><i></i><i></i><b></b><em>YEMAS</em></div>';
   if (k === "clue") return '<div class="jg-art-cl"><i></i><i></i><i></i><b>✉</b><s>🔍</s><em>CLUE</em></div>';
+  if (k === "ajedrez") return '<div class="jg-art-aj">' + ["r", "Q", "n", "K", "p"].map(x => '<svg viewBox="0 0 100 100" aria-hidden="true">' + piezaSvg(x) + '</svg>').join("") + '</div>';
   if (k === "cuadritos") return '<div class="jg-art-dots">' + Array.from({ length: 9 }, (_, i) => '<i class="' + (i % 3 === 0 ? "llena" : "") + '"></i>').join("") + '</div>';
   return '<div class="jg-art-land"><i></i><i></i><i></i><b>⌖</b><span>ENCUENTRA LO INVISIBLE</span></div>';
 }

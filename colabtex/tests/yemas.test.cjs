@@ -208,3 +208,28 @@ test('yemas: la autodestrucción (arma 4) le suma al que revienta y su propia mu
  assert.equal(e.bajas.a,1);assert.equal(e.muertes.a,1);assert.equal(e.muertes.b,1);
  assert.equal(e.hist.at(-2).a,4);assert.equal(e.hist.at(-1).uid,'');
 });
+
+// ---------- armas tiradas en el mapa ----------
+test('yemas: las armas del piso se las lleva la primera jugada, una aparición a la vez',()=>{
+ const p=sala(3);
+ let e=mov(p,'recoge','a',{s:2,g:0});
+ assert.deepEqual(copia(e.armas),{2:{g:0,uid:'a'}});
+ e=mov(p,'recoge','b',{s:2,g:0});                    // tarde: ya la tomó a
+ assert.equal(e.armas[2].uid,'a');
+ e=mov(p,'recoge','b',{s:2,g:2});                    // se salta una aparición
+ assert.equal(e.armas[2].g,0);
+ e=mov(p,'recoge','b',{s:2,g:1});
+ assert.deepEqual(copia(e.armas[2]),{g:1,uid:'b'});
+ for(const m of [{s:8,g:0},{s:-1,g:0},{s:'1',g:0},{s:1,g:0.5}])mov(p,'recoge','c',m);
+ mov(p,'recoge','intruso',{s:1,g:0});
+ assert.equal(reducir(p).armas[1],undefined);
+});
+
+test('yemas: bajas con cuchillo, bazuca y pistola (armas 5, 6 y 7)',()=>{
+ const p=sala(3);
+ for(const a of [5,6,7])muere(p,'b','a',{a});
+ const e=reducir(p);
+ assert.equal(e.bajas.a,3);
+ assert.deepEqual(copia(e.hist.slice(-3).map(h=>h.a)),[5,6,7]);
+ assert.equal(muere(p,'c','a',{a:8}).hist.at(-1).a,0);
+});
