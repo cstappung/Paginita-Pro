@@ -145,7 +145,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #a9dcff; fon
 #menu .ajustes { margin-bottom: 14px; }
 
 /* ---------- Zombis y espátula ---------- */
-#menu select#modo-practica { width: 100%; font: inherit; font-size: 16px; padding: 10px 12px; margin-top: 6px;
+#menu select#modo-practica, #menu select#mapa-practica { width: 100%; font: inherit; font-size: 16px; padding: 10px 12px; margin-top: 6px;
   border: 2px solid transparent; border-radius: 10px; background: #fff8ec; color: #3a2a1a; }
 #puntos-z { position: absolute; left: 16px; bottom: 50px; font-size: 22px; font-weight: 800; color: #ffe066; }
 #puntos-z i { font-style: normal; font-size: 16px; margin-left: 8px; color: #b6f27a; animation: sube-pts 0.9s ease-out forwards; }
@@ -157,3 +157,8 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #a9dcff; fon
 #fin #otra { pointer-events: auto; font: inherit; font-size: 18px; font-weight: 700; padding: 10px 22px; border: 0; border-radius: 12px;
   cursor: pointer; background: #ffc21a; color: #3a2a1a; box-shadow: 0 4px 0 #b36b00; }
 #fin #otra[hidden] { display: none; }
+
+/* Las bebidas tomadas: una ficha del color de cada una, sobre la vida. */
+#bebidas { position: absolute; left: 16px; bottom: 84px; display: flex; gap: 6px; flex-wrap: wrap; max-width: 46vw; }
+#bebidas span { padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 800; color: #fff;
+  background: var(--c); box-shadow: 0 0 0 2px rgba(0,0,0,0.25), 0 0 10px var(--c); text-shadow: 0 1px 2px rgba(0,0,0,0.6); }

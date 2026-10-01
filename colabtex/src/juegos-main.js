@@ -33,7 +33,7 @@ import { crearSolo } from "./juegos/solo/club.js";
 import { watchAuth, loginGoogle, logout } from "./firebase.js";
 import * as fb from "./fb-juegos.js";
 import { escapeHtml, timeAgo, colorForUid } from "./util.js";
-import { AJ_RITMOS, JUEGOS, reducir, jugadasDe, acumula, cupoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, ganoEn, ordenaRanks, novedades } from "./juegos/motor.js";
+import { AJ_RITMOS, JUEGOS, reducir, jugadasDe, acumula, cupoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, YM_MAPAS, ganoEn, ordenaRanks, novedades } from "./juegos/motor.js";
 import { crearEscondite } from "./juegos/escondite.js";
 import { crearCartas } from "./juegos/cartas.js";
 import { crearCuadritos } from "./juegos/cuadritos.js";
@@ -167,7 +167,10 @@ const OPCIONES = {
        largo y el motor lo traduce con `YM_LARGOS`. */
     { clave: "largo", etiqueta: "Partida", por: 1,
       valores: ["Corta", "Normal", "Larga"].map((t, i) => ({ v: i,
-        t: `${t} (${YM_LARGOS.todos[i]} / ${YM_LARGOS.equipos[i]} bajas, ${YM_LARGOS.bandera[i]} 🚩)` })) }
+        t: `${t} (${YM_LARGOS.todos[i]} / ${YM_LARGOS.equipos[i]} bajas, ${YM_LARGOS.bandera[i]} 🚩)` })) },
+    /* El mapa solo cuenta en zombis; en las otras variantes se ignora. */
+    { clave: "mapa", etiqueta: "Mapa (zombis)", por: "nacht",
+      valores: Object.keys(YM_MAPAS).map(v => ({ v, t: YM_MAPAS[v] })) }
   ],
   clue: [{ clave: "cupo", etiqueta: "Detectives", por: 4, valores: cupos("clue") }]
 };

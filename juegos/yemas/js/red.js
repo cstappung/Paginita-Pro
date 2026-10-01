@@ -11,6 +11,7 @@
 //       alBaja(nombre), alFeed(item), alSuceso(item), alMarcador(m), alFin(f), alVoces(v)
 import * as THREE from 'three';
 import { moverCuerpo, rayoMundo, SPAWNS, OJOS } from 'yemas/mundo';
+import { MAPAS } from 'yemas/mapas';
 
 export const PALETA = ['#fff4e0', '#ffd54a', '#8fd3ff', '#ff9ec7', '#9be28f', '#c98b55', '#b99bff', '#ff8a4a'];
 // En las variantes por equipo el color es del equipo, no del asiento.
@@ -43,6 +44,9 @@ export function conectarMarco(h) {
           if (dest === red.yo) h.alGolpe({ de: uid, n: red.jugadores.get(uid).nombre, dmg: +dmg || 0, cab: !!cab, a: a | 0 });
           // Un balazo a un zombi: lo aplica el director (main.js mira si es uno).
           else if (typeof dest === 'string' && dest.startsWith('z:')) h.alGolpeZombi({ de: uid, id: +dest.slice(2), dmg: +dmg || 0, cab: !!cab, a: a | 0 });
+          // Una petición al director (abrir una puerta, la caja, una bebida…):
+          // viaja por el mismo canal que los golpes, sin regla nueva.
+          else if (typeof dest === 'string' && dest.startsWith('p:')) h.alPeticion?.({ de: uid, que: dest.slice(2) });
         }
       }
       h.alJugador(uid, e);
@@ -63,6 +67,7 @@ export function conectarMarco(h) {
       red = {
         yo: m.yo, online: true, mirando: !!m.mirando, meta: m.meta | 0, semilla: (m.semilla >>> 0) || 1,
         variante: ['todos', 'equipos', 'bandera', 'zombis'].includes(m.variante) ? m.variante : 'todos', equipos, fuera,
+        mapa: MAPAS[m.mapa] ? m.mapa : 'nacht',
         jugadores: new Map(js.map((j, i) => [j.uid, {
           nombre: String(j.nombre || 'Huevo').slice(0, 20),
           color: equipos ? COLOR_EQUIPO[equipos[j.uid]] || PALETA[0] : PALETA[i % PALETA.length],
@@ -125,8 +130,9 @@ export function conectarMarco(h) {
 const BOTS = ['Huevo Duro', 'Tortilla', 'Yemita', 'Clarita'];
 const SKINS_BOTS = ['chef', 'vaquero', 'pirata', 'lana'];
 
-export function conectarLocal({ nombre, color, colisores, variante }, h) {
+export function conectarLocal({ nombre, color, colisores, variante, mapa }, h) {
   const r = new RedLocal(nombre, color, colisores, h, variante === 'zombis' ? 'zombis' : 'todos');
+  r.mapa = MAPAS[mapa] ? mapa : 'nacht';
   h.alConfig(r);
   r.avisaMarcador();   // la ronda 1 de zombis arranca con el primer marcador
   r.tick(0);

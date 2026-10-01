@@ -198,7 +198,7 @@ test('yemas: una baja con granada (arma 3) cuenta y queda en el historial',()=>{
  const p=sala(3);
  const e=muere(p,'b','a',{a:3});
  assert.equal(e.bajas.a,1);assert.equal(e.hist.at(-1).a,3);
- assert.equal(muere(p,'c','a',{a:10}).hist.at(-1).a,0);
+ assert.equal(muere(p,'c','a',{a:13}).hist.at(-1).a,0);
 });
 
 test('yemas: la autodestrucción (arma 4) le suma al que revienta y su propia muerte a nadie',()=>{
@@ -231,7 +231,7 @@ test('yemas: bajas con sartén, bazuca y pistola (armas 5, 6 y 7)',()=>{
  const e=reducir(p);
  assert.equal(e.bajas.a,3);
  assert.deepEqual(copia(e.hist.slice(-3).map(h=>h.a)),[5,6,7]);
- assert.equal(muere(p,'c','a',{a:10}).hist.at(-1).a,0);
+ assert.equal(muere(p,'c','a',{a:13}).hist.at(-1).a,0);
 });
 
 const zsala=(n=3)=>sala(n,{variante:'zombis'});
@@ -293,9 +293,10 @@ test('yemas zombis: nadie se anota bajas, aunque la muerte nombre a otro',()=>{
  assert.equal(e.bajas.b,0);assert.equal(e.cabezas.b,0);assert.equal(e.hist.at(-1).uid,'');
 });
 
-test('yemas: muertes con la espátula dorada (8) cuentan; el mordisco (9) también se lee',()=>{
+test('yemas: muertes con la espátula dorada (8) cuentan; el mordisco (9) y el Rayo batido (10) también se leen',()=>{
  const p=sala(3);
  let e=muere(p,'b','a',{a:8});assert.equal(e.bajas.a,1);assert.equal(e.hist.at(-1).a,8);
  e=muere(p,'c','b',{a:9});assert.equal(e.hist.at(-1).a,9);
- e=muere(p,'c','b',{a:10});assert.equal(e.hist.at(-1).a,0);
+ e=muere(p,'c','b',{a:10});assert.equal(e.hist.at(-1).a,10);
+ e=muere(p,'c','b',{a:13});assert.equal(e.hist.at(-1).a,0);
 });

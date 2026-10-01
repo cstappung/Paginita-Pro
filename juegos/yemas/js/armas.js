@@ -52,6 +52,28 @@ export const ARMAS = {
     dispersion: 0.008, dispMov: 0.02, alcance: 120, caidaDesde: 999,
     retroceso: 0.03, color: '#d9a441',
   },
+  // Solo en zombis (la caja y las paredes). El rayo es un cohete verde que va
+  // casi recto y revienta en un área chica: la Ray Gun de Black Ops.
+  10: {
+    id: 10, nombre: 'Rayo batido', corto: 'Rayo', cohete: true, rayo: true,
+    danio: 120, radio: 3, pleno: 1.4, espoleta: 0.9, velocidad: 60,
+    cadencia: 0.33, cargador: 20, recarga: 3,
+    retroceso: 0.03, color: '#62e04a',
+  },
+  11: {
+    id: 11, nombre: 'Amasadora', corto: 'Ametralladora', auto: true,
+    danio: 24, cabeza: 1.5, perdigones: 1,
+    cadencia: 0.085, cargador: 100, recarga: 4.5,
+    dispersion: 0.02, dispMov: 0.05, alcance: 150, caidaDesde: 999,
+    retroceso: 0.014, color: '#8a6a3c',
+  },
+  12: {
+    id: 12, nombre: 'Huevera', corto: 'Fusil', auto: false,
+    danio: 55, cabeza: 2.5, perdigones: 1,
+    cadencia: 0.2, cargador: 8, recarga: 1.8,
+    dispersion: 0.006, dispMov: 0.03, alcance: 200, caidaDesde: 999,
+    retroceso: 0.035, color: '#c9b48a',
+  },
 };
 
 // Las que aparecen tiradas en el mapa.
@@ -61,6 +83,7 @@ export const EN_SUELO = [0, 1, 2, 6, 7];
 export const NOMBRE_ARMA = {
   0: 'Batidora', 1: 'Revuelta', 2: 'Poché', 3: 'Huevo duro', 4: 'Autodestrucción',
   5: 'Sartén', 6: 'Benedictina', 7: 'Pasado por agua', 8: 'Espátula dorada', 9: 'Zombi',
+  10: 'Rayo batido', 11: 'Amasadora', 12: 'Huevera',
 };
 
 // La espátula dorada: aparece rara vez en el mapa, solo en todos contra todos.
@@ -99,3 +122,35 @@ export function armaEnPunto(semilla, s, g, espatula = false) {
 // arma, y comprar una que ya se tiene llena su munición a mitad de precio.
 export const TIENDA = [7, 0, 1, 2, 6, 7, 0, 1];
 export const PRECIO = { 7: 500, 0: 1200, 1: 1000, 2: 1500, 6: 2500 };
+
+// ---------- Zombis a lo Black Ops ----------
+// La caja misteriosa: lo que puede salir (la pistola no: sería una estafa).
+export const CAJA_ARMAS = [0, 1, 2, 6, 10, 11, 12];
+export const CAJA_PRECIO = 950;
+// Pack-a-Punch: el doble de daño, cargador y medio, munición llena y otro
+// nombre, como en el original.
+export const PAP_PRECIO = 5000;
+export const PAP_NOMBRE = {
+  0: 'Licuadora infernal', 1: 'Revuelta del averno', 2: 'Poché eterno', 6: 'Benedictina suprema',
+  7: 'Hervido a presión', 10: 'Rayo batido de Porter', 11: 'Amasadora 9000', 12: 'Huevera de oro',
+};
+// Las bebidas: las ocho de Black Ops, con sus precios. `luz: false` es el
+// Quick Revive, que funciona sin electricidad (y cuesta 500 jugando solo).
+export const BEBIDAS = {
+  jugger: { nombre: 'Juggernog', precio: 2500, color: '#d8343a', texto: 'Aguantas el doble' },
+  speed: { nombre: 'Speed Cola', precio: 3000, color: '#3fbf4a', texto: 'Recargas el doble de rápido' },
+  doble: { nombre: 'Double Tap', precio: 2000, color: '#e8a23a', texto: 'Disparas más rápido' },
+  revive: { nombre: 'Quick Revive', precio: 1500, solo: 500, color: '#5ab4ff', texto: 'Te levantas solo una vez', luz: false },
+  stamina: { nombre: 'Stamin-Up', precio: 2000, color: '#f0d23a', texto: 'Corres más' },
+  phd: { nombre: 'PhD Flopper', precio: 2000, color: '#a050e0', texto: 'Tus explosiones no te dañan' },
+  deadshot: { nombre: 'Deadshot', precio: 1500, color: '#5a6a4a', texto: 'Apuntas más fino' },
+  mula: { nombre: 'Mule Kick', precio: 4000, color: '#3a8a5a', texto: 'Un arma más' },
+};
+// Con el arma ya en la mano, sus números con Pack-a-Punch.
+export function conPap(a) {
+  if (!a || a.melee) return a;
+  return {
+    ...a, pap: true, nombre: PAP_NOMBRE[a.id] || a.nombre,
+    danio: a.danio * 2, cargador: Math.ceil(a.cargador * 1.5), radio: a.radio ? a.radio * 1.3 : a.radio,
+  };
+}
