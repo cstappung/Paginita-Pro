@@ -22,7 +22,15 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
         await guardar(key,usuario.uid,{...dato,nombre:usuario.name.slice(0,80)});
         if(pendientes[key]?.partida===dato.partida){delete pendientes[key];persistir();}
         estado('Récord sincronizado con tu cuenta.',key);
-      }catch{estado('Récord guardado en este dispositivo. No se pudo sincronizar; puedes reintentar.',key);}
+      }catch(err){
+        /* PERMISSION_DENIED en una categoría nueva es casi siempre que las
+           reglas del repo aún no se publican en la consola: decirlo, porque
+           «puedes reintentar» no lo arregla. El récord sigue pendiente y
+           sube solo la próxima vez que se abra el juego. */
+        estado(/permission/i.test(String(err&&(err.code||err.message)||err))
+          ?'Récord guardado en este dispositivo. El servidor todavía no acepta esta clasificación (faltan publicar las reglas de Firebase); se subirá sola cuando estén.'
+          :'Récord guardado en este dispositivo. No se pudo sincronizar; puedes reintentar.',key);
+      }
     }
     guardando=false;
     if(!muerto&&Object.entries(pendientes).some(([key,dato])=>revisados[key]!==dato.partida))sincronizar();
@@ -75,7 +83,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
     temaObserver.observe(document.documentElement,{attributes:true,attributeFilter:['data-tema']});
     frame.allow='fullscreen';frame.setAttribute('allowfullscreen','');
     window.addEventListener('message',mensaje);
-    frame.src='juegos/club/'+juego+'/index.html?v=club-14&embed=1&cuenta='+encodeURIComponent(usuario.uid);
+    frame.src='juegos/club/'+juego+'/index.html?v=club-15&embed=1&cuenta='+encodeURIComponent(usuario.uid);
     host.appendChild(frame);
   }
   function destruir(){muerto=true;temaObserver?.disconnect();if(off)off();window.removeEventListener('message',mensaje);for(const [el,valor]of ocultos)el.style.display=valor;frame?.remove();host.innerHTML='';ambientar('');}
