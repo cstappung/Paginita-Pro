@@ -82,7 +82,7 @@ test('clue: el reparto cifrado da manos disjuntas y el sobre, uno de cada tipo',
     const manos = S.js.map((_, i) => manoDe(e, S, i));
     const todas = manos.flat();
     assert.ok(todas.every(c => c >= 0), 'cada uno abre sus cartas');
-    assert.equal(new Set(todas).size, 18);
+    assert.equal(new Set(todas).size, M.NC - 3);
     assert.ok(M.auditar(S.log, S.js, S.op).problemas.every(p => p.que === 'oculta'));
     const a = auditaYa(S);
     assert.deepEqual(a.problemas, []);
@@ -234,4 +234,42 @@ test('clue: reproducir el registro da el mismo estado', () => {
   const a = JSON.stringify(S.est());
   const b = JSON.stringify(M.reducir(S.log.map(x => ({ ...x })), S.js, S.op));
   assert.equal(a, b);
+});
+
+test('clue: en la elección se puede cambiar de personaje o soltarlo hasta que todos tengan uno', () => {
+  const S = sala(3, false);
+  let e = S.jugar('u0', { t: 'elige', r: 'a' });
+  e = S.jugar('u0', { t: 'elige', r: 'b' });             // cambia a otro libre
+  assert.equal(e.eleccion.u0, 'b');
+  e = S.jugar('u1', { t: 'elige', r: 'a' });             // 'a' quedó libre
+  assert.equal(e.eleccion.u1, 'a');
+  e = S.jugar('u0', { t: 'elige', r: 'a' });             // ocupado: no cambia
+  assert.equal(e.eleccion.u0, 'b');
+  e = S.jugar('u0', { t: 'suelta' });                    // lo suelta
+  assert.equal(e.eleccion.u0, undefined);
+  assert.ok(e.debe.includes('u0'));
+  e = S.jugar('u2', { t: 'elige', r: 'b' });             // otro toma el que soltó
+  assert.equal(e.fase, 'elige');
+  e = S.jugar('u0', { t: 'elige', r: 'c' });
+  assert.equal(e.fase, 'jugando');
+  e = S.jugar('u0', { t: 'suelta' });                    // ya empezó: no se suelta
+  assert.equal(e.eleccion.u0, 'c');
+  assert.deepEqual(e.personajes.slice(0, 3), ['c', 'a', 'b']);
+});
+
+test('clue: cada partida sortea nueve armas mezclando clásicas y eléctricas', () => {
+  const vistas = new Set();
+  for (let s = 0; s < 200; s++) {
+    const a = M.armasDePartida(s);
+    assert.equal(a.length, M.NA);
+    assert.equal(new Set(a).size, M.NA, 'sin repetir');
+    const clas = a.filter(id => M.ARMA_POR_ID[id].familia === 'clasica').length;
+    assert.ok(clas >= 3 && clas <= 5, 'entre 3 y 5 clásicas');
+    assert.deepEqual(M.armasDePartida(s), a, 'la misma semilla da las mismas');
+    a.forEach(id => vistas.add(id));
+  }
+  assert.equal(vistas.size, M.CATALOGO_ARMAS.length, 'todas salen alguna vez');
+  const e = M.reducir([], [{ uid: 'a' }, { uid: 'b' }], { semilla: 9 });
+  assert.deepEqual(e.armasPartida, M.armasDePartida(9));
+  assert.equal(M.nombreCarta(M.cartaA(2), null, e.armasPartida), M.arma(e.armasPartida, 2).n);
 });

@@ -29,8 +29,8 @@
   "use strict";
 
   /* ============================================================
-     Los datos. Una carta es un número: 0-5 sospechosos, 6-11 armas,
-     12-20 lugares.
+     Los datos. Una carta es un número: 0-5 sospechosos, 6-14 armas,
+     15-23 lugares.
 
      Los sospechosos son **seis puestos** con color fijo (la ficha del
      tablero), y quién ocupa cada uno lo elige cada partida: al empezar,
@@ -55,14 +55,56 @@
     { id: "malva", n: "Guardia Malva", c: "Malva", d: "Tiene la llave del montacargas y de todo lo demás." }
   ];
   const idValido = r => typeof r === "string" && /^[a-z0-9-]{1,24}$/.test(r);
-  const ARMAS = [
-    { n: "Extintor", i: "🧯", img: "extintor" },
-    { n: "Enceradora", i: "🌀", img: "enceradora" },
-    { n: "Manguera", i: "🚒", img: "manguera" },
-    { n: "Candado", i: "🔒", img: "candado" },
-    { n: "Trofeo", i: "🏆", img: "trofeo" },
-    { n: "Taburete", i: "🪑", img: "taburete" }
+  /* Las armas son **nueve puestos**, una por sala al empezar (como en el
+     Cluedo de 2008), y qué arma ocupa cada puesto lo sortea cada partida
+     del catálogo: las seis clásicas del edificio (con su foto del video)
+     y las nueve de Electricidad. `armasDePartida(semilla)` elige entre 3 y
+     5 clásicas y completa con eléctricas, así que se mezclan distinto en
+     cada sala y todas las pantallas ven las mismas. Para el motor y el
+     póquer mental una carta de arma sigue siendo solo su puesto (0-8).
+     `art` es el artículo («con la Carta de Smith»), `c` el nombre corto,
+     `i` el emoji de reserva y `foto` la imagen de las clásicas. El
+     dibujo y la escena del crimen de cada una viven en `armas.js`. */
+  const CATALOGO_ARMAS = [
+    { id: "extintor", n: "Extintor", c: "Extintor", art: "el", i: "🧯", familia: "clasica", foto: "img/armas/extintor.webp" },
+    { id: "enceradora", n: "Enceradora", c: "Enceradora", art: "la", i: "🌀", familia: "clasica", foto: "img/armas/enceradora.webp" },
+    { id: "manguera", n: "Manguera", c: "Manguera", art: "la", i: "🚒", familia: "clasica", foto: "img/armas/manguera.webp" },
+    { id: "candado", n: "Candado", c: "Candado", art: "el", i: "🔒", familia: "clasica", foto: "img/armas/candado.webp" },
+    { id: "trofeo", n: "Trofeo", c: "Trofeo", art: "el", i: "🏆", familia: "clasica", foto: "img/armas/trofeo.webp" },
+    { id: "taburete", n: "Taburete", c: "Taburete", art: "el", i: "🪑", familia: "clasica", foto: "img/armas/taburete.webp" },
+    { id: "smith", n: "Carta de Smith", c: "Smith", art: "la", i: "🎯" },
+    { id: "fourier", n: "Transformada de Fourier", c: "Fourier", art: "la", i: "〰️" },
+    { id: "resistencia", n: "Resistencia", c: "Resistencia", art: "la", i: "🟫" },
+    { id: "capacitor", n: "Capacitor", c: "Capacitor", art: "el", i: "🔋" },
+    { id: "inductor", n: "Inductor", c: "Inductor", art: "el", i: "🌀" },
+    { id: "transistor", n: "Transistor", c: "Transistor", art: "el", i: "🔌" },
+    { id: "fuente", n: "Fuente de poder", c: "Fuente", art: "la", i: "⚡" },
+    { id: "opamp", n: "Amplificador operacional", c: "Op-amp", art: "el", i: "🔺" },
+    { id: "led", n: "Diodo LED", c: "LED", art: "el", i: "💡" }
   ];
+  CATALOGO_ARMAS.forEach(a => { if (!a.familia) a.familia = "electrica"; });
+  const ARMA_POR_ID = {};
+  CATALOGO_ARMAS.forEach(a => { ARMA_POR_ID[a.id] = a; });
+  const NA = 9;
+  /* Las nueve de una partida, en orden de puesto: de la semilla de la
+     sala, entre 3 y 5 clásicas y el resto eléctricas, barajadas. */
+  const armasMemo = new Map();
+  function armasDePartida(semilla) {
+    const k = semilla >>> 0;
+    if (armasMemo.has(k)) return armasMemo.get(k);
+    const r = rng(k ^ 0x68e31da4);
+    const de = f => CATALOGO_ARMAS.filter(a => a.familia === f).map(a => a.id);
+    const clas = de("clasica"), elec = de("electrica");
+    const nClas = Math.min(clas.length, NA, 3 + Math.floor(r() * 3));
+    const elegidas = baraja(clas.length, r).slice(0, nClas).map(i => clas[i])
+      .concat(baraja(elec.length, r).slice(0, NA - nClas).map(i => elec[i]));
+    const v = baraja(NA, r).map(i => elegidas[i]);
+    if (armasMemo.size > 200) armasMemo.clear();
+    armasMemo.set(k, v);
+    return v;
+  }
+  /* El arma del puesto `a` en una partida (su entrada del catálogo). */
+  const arma = (armasPartida, a) => ARMA_POR_ID[(armasPartida || [])[a]] || { id: "", n: "Arma " + (a + 1), c: "Arma", art: "el", i: "❓", familia: "" };
   const LUGARES = [
     { n: "Pasillo de lockers", c: "Lockers", piso: 2, img: "lockers" },
     { n: "Rellano de emergencia", c: "Rellano", piso: 2, img: "rellano" },
@@ -74,16 +116,17 @@
     { n: "Laboratorio de robótica", c: "Laboratorio", piso: 1, img: "laboratorio" },
     { n: "Bodega", c: "Bodega", piso: 1, img: "bodega" }
   ];
-  const NS = COLORES.length, NA = ARMAS.length, NL = LUGARES.length;
-  const NC = NS + NA + NL;                       // 21 cartas
+  const NS = COLORES.length, NL = LUGARES.length;
+  const NC = NS + NA + NL;                       // 24 cartas
   const cartaS = i => i, cartaA = i => NS + i, cartaL = i => NS + NA + i;
   const tipoCarta = c => c < NS ? "s" : c < NS + NA ? "a" : "l";
-  /* `nombres`: el nombre de cada puesto (lo sabe la pantalla, que
-     tiene el elenco); sin él, el color del puesto. */
-  function nombreCarta(c, nombres) {
+  /* `nombres`: el nombre de cada puesto de sospechoso (lo sabe la
+     pantalla, que tiene el elenco); sin él, el color del puesto.
+     `armasPartida`: las de esta partida (`est.armasPartida`). */
+  function nombreCarta(c, nombres, armasPartida) {
     if (!Number.isInteger(c) || c < 0 || c >= NC) return "?";
     if (c < NS) return (nombres && nombres[c]) || "Sospechoso " + NOMBRE_COLOR[c];
-    if (c < NS + NA) return ARMAS[c - NS].n;
+    if (c < NS + NA) return arma(armasPartida, c - NS).n;
     return LUGARES[c - NS - NA].n;
   }
 
@@ -340,7 +383,7 @@
        rellenan los puestos libres; sin él quedan en "".
 
      Las jugadas (`t` cabe en los 16 caracteres que dejan las reglas):
-       elegir    {t:"elige", r}
+       elegir    {t:"elige", r}  {t:"suelta"}
        reparto   {t:"mezcla", c, pk}  {t:"revuelve", c}  {t:"quita", c}
        turno     {t:"mueve", a, v:"dado"|"pasadizo"}  {t:"sugiere", s, a}
                  {t:"acusa", s, a, l}  {t:"pasa"}
@@ -350,7 +393,7 @@
      Una jugada que no toca, o que no vale, no existe: se ignora.
      ============================================================ */
   const NUEVE = NL;
-  const SOBRE = [0, NS, NS + NA];                 // posiciones del sobre en el mazo de 21
+  const SOBRE = [0, NS, NS + NA];                 // posiciones del sobre en el mazo entero
   const RESTO = Array.from({ length: NC }, (_, i) => i).filter(i => !SOBRE.includes(i));
   const LARGO_VALOR = 64;                          // cada número cifrado, en base64url
 
@@ -409,8 +452,8 @@
       if (vivos.length === 0) { ganador = ""; motivo = "nadie"; return true; }
       return false;
     }
-    /* El reparto va en orden de asiento: 21 mezclas, 18 revueltas,
-       18 quitas. Quien debe la siguiente es el asiento `cr.orden`. */
+    /* El reparto va en orden de asiento: mezcla (las NC), revuelve y
+       quita (las NC - 3 que no van al sobre). Quien debe la siguiente es el asiento `cr.orden`. */
     const etapas = ["mezcla", "revuelve", "quita"];
     const debeReparto = () => cr.mesa[cr.orden] || "";
     const largoOk = (c, k) => typeof c === "string" && c.length === k * LARGO_VALOR && /^[A-Za-z0-9_-]+$/.test(c);
@@ -485,8 +528,18 @@
          volver a tirar los dados de los turnos siguientes. */
       const vale = () => { aceptadas++; huella = sha256hex(huella + "|" + resumen(j)); };
 
+      /* Mientras quede alguien eligiendo, se puede cambiar de personaje
+         (otro `elige` con uno libre) o soltarlo (`suelta`). La partida
+         arranca cuando todos tienen uno: desde ahí ya no se cambia. */
       if (fase === "elige") {
-        if (j.t !== "elige" || !activo(u) || eleccion[u] || !idValido(j.r) || Object.values(eleccion).includes(j.r)) continue;
+        if (!activo(u)) continue;
+        if (j.t === "suelta") {
+          if (!eleccion[u]) continue;
+          delete eleccion[u];
+          vale();
+          continue;
+        }
+        if (j.t !== "elige" || !idValido(j.r) || eleccion[u] === j.r || Object.values(eleccion).includes(j.r)) continue;
         eleccion[u] = j.r;
         vale();
         eligieron();
@@ -646,7 +699,7 @@
       dados: fin ? null : tirada, entro, sugirio,
       puedeSugerir: !fin && fase === "jugando" && !sugirio && turno !== "" && salaDe(pozo) >= 0 &&
         ((paso === "accion" && entro) || (paso === "inicio" && !!llamado[turno])),
-      eleccion, personajes,
+      eleccion, personajes, armasPartida: armasDePartida(semilla),
       fichas, armas, fuera, eliminados, llamado,
       sug, acu, sugerencias, acusaciones, hist: hist.slice(-80),
       cr, semillas,
@@ -668,10 +721,10 @@
      de residuos cuadráticos; cifrar es elevar a un exponente secreto, y
      elevar conmuta.
 
-     1. `mezcla` (en orden de asiento): cada uno cifra las 21 con su
+     1. `mezcla` (en orden de asiento): cada uno cifra las NC con su
         exponente k1 y baraja *dentro* de cada categoría. La primera de
-        cada una (posiciones 0, 6 y 12) es el sobre.
-     2. `revuelve` (en orden): las 18 restantes se cifran con k2 y se
+        cada una (posiciones 0, 6 y 15) es el sobre.
+     2. `revuelve` (en orden): las NC - 3 restantes se cifran con k2 y se
         barajan todas juntas, para que nadie sepa de qué tipo es la
         mano de nadie.
      3. `quita` (en orden): cada uno quita k1·k2 de las cartas que no
@@ -772,7 +825,7 @@
     const y = x.map(v => potMod(v, ll.k2, P));
     return ll.pr.map(de => cod(y[de])).join("");
   }
-  /* `mias`: las posiciones del resto (0-17) que son de quien quita. */
+  /* `mias`: las posiciones del resto (0 a NC - 4) que son de quien quita. */
   function quita(prev, ll, mias) {
     const x = trozos(prev, RESTO.length);
     if (!x) return null;
@@ -904,7 +957,7 @@
   }
 
   return {
-    COLORES, NOMBRE_COLOR, SOSPECHOSOS, idValido, ARMAS, LUGARES, NS, NA, NL, NC, cartaS, cartaA, cartaL, tipoCarta, nombreCarta,
+    COLORES, NOMBRE_COLOR, SOSPECHOSOS, idValido, CATALOGO_ARMAS, ARMA_POR_ID, armasDePartida, arma, LUGARES, NS, NA, NL, NC, cartaS, cartaA, cartaL, tipoCarta, nombreCarta,
     ANCHO, ALTO, SALA, RECT, PATIO, HUECOS, PUERTAS, PASADIZOS, SALIDAS, PUERTAS_DE,
     PASILLO, HUECO, CENTRO, pos, xy, enSala, salaDe, celda, esPasillo, pasadizoDe, vecinos,
     alcance, camino, destinoValido,

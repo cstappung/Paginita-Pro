@@ -174,7 +174,7 @@
             jugar(j) {
               if (!j || typeof j !== "object" || conexion.mirando) return Promise.resolve(false);
               const t = j.t;
-              if (!["elige", "mueve", "sugiere", "acusa", "pasa"].includes(t)) return Promise.resolve(false);
+              if (!["elige", "suelta", "mueve", "sugiere", "acusa", "pasa"].includes(t)) return Promise.resolve(false);
               return jugar(j);
             },
             refutar(c) {
@@ -185,6 +185,9 @@
               const clave = M.compartida(ll, est.cr.pk[est.sug.uid]);
               return jugar({ t: "muestra", x: M.cierraSobre(clave, est.sug.k, c) });
             },
+            /* La pantalla avisa que está animando algo que la sala no
+               debe tapar con el cartel del final (ver `clue.js`). */
+            ocupado(v) { manda("ocupado", { v: !!v }); },
             destruir() { raiz.removeEventListener("message", mensaje); oyentes.clear(); }
           };
           resolver(conexion);

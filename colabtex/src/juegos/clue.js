@@ -27,10 +27,16 @@ globalThis.ClueMotor = globalThis.ClueMotor || CM;
      semillas nadie puede auditar la mesa. Así que `terminar` se llama
      cuando todos los que siguen sentados revelaron la suya, o pasado
      `ESPERA_SEMILLAS`, y se reintenta cada segundo hasta que `fin`
-     exista de verdad. */
+     exista de verdad.
+   - **El cartel del final espera a la animación**: mientras el marco
+     avisa que está contando algo (la acusación, la escena del crimen)
+     `ocupado()` es verdad y la sala no tapa el tablero; al terminar se
+     llama a `listo()`, como en Chain Reaction. Si el marco nunca avisa
+     que terminó, `OCUPADO_MAX` lo suelta igual. */
 const PADRE = "clue-padre", HIJO = "clue-hijo";
 const ESPERA_SEMILLAS = 12000;
-const TIPOS = new Set(["elige", "mezcla", "revuelve", "quita", "mueve", "sugiere", "acusa", "pasa", "paso", "muestra", "abre", "veredicto", "s"]);
+const OCUPADO_MAX = 15000;
+const TIPOS = new Set(["elige", "suelta", "mezcla", "revuelve", "quita", "mueve", "sugiere", "acusa", "pasa", "paso", "muestra", "abre", "veredicto", "s"]);
 
 /* Lo que se deja pasar de cada jugada: los campos que el motor lee y
    nada más, con los mazos cifrados acotados a su largo. */
@@ -38,8 +44,8 @@ function limpia(j) {
   const r = { t: j.t };
   const texto = (v, max) => typeof v === "string" && v.length <= max && /^[A-Za-z0-9_-]*$/.test(v);
   if (j.t === "elige" && texto(j.r, 24)) r.r = j.r;
-  if (j.t === "mezcla" && texto(j.c, 21 * 64) && texto(j.pk, 64)) { r.c = j.c; r.pk = j.pk; }
-  if ((j.t === "revuelve" || j.t === "quita") && texto(j.c, 18 * 64)) r.c = j.c;
+  if (j.t === "mezcla" && texto(j.c, CM.NC * 64) && texto(j.pk, 64)) { r.c = j.c; r.pk = j.pk; }
+  if ((j.t === "revuelve" || j.t === "quita") && texto(j.c, (CM.NC - 3) * 64)) r.c = j.c;
   if (j.t === "abre" && texto(j.c, 3 * 64)) r.c = j.c;
   if (j.t === "mueve" && Number.isInteger(j.a)) { r.a = j.a; r.v = j.v === "pasadizo" ? "pasadizo" : "dado"; }
   if (j.t === "sugiere" && Number.isInteger(j.s) && Number.isInteger(j.a)) { r.s = j.s; r.a = j.a; }
@@ -50,9 +56,17 @@ function limpia(j) {
   return r;
 }
 
-export function crearClue({ uid, pid, jugar, terminar, mirando, secreto }) {
+export function crearClue({ uid, pid, jugar, terminar, mirando, secreto, listo: alListo }) {
   let host, frame, aviso, muerto = false, listo = false, configurado = false;
   let partida = null, est = null, ultimo = "", finDesde = 0, relojFin = null;
+  let animando = false, relojAnima = null;
+  function ocupa(v) {
+    clearTimeout(relojAnima);
+    const antes = animando;
+    animando = !!v;
+    if (animando) relojAnima = setTimeout(() => ocupa(false), OCUPADO_MAX);
+    else if (antes && alListo) alListo();
+  }
 
   const juego = () => !!est?.jugadores?.some(j => j.uid === uid) && !mirando;
 
@@ -95,6 +109,7 @@ export function crearClue({ uid, pid, jugar, terminar, mirando, secreto }) {
     if (muerto || e.source !== frame?.contentWindow || e.origin !== location.origin || e.data?.canal !== HIJO) return;
     const d = e.data;
     if (d.tipo === "listo") { listo = true; reenvia(); return; }
+    if (d.tipo === "ocupado") { ocupa(d.v); return; }
     if (!juego() || d.tipo !== "jugar" || !d.j || !TIPOS.has(d.j.t)) return;
     /* Tras el final solo se escribe la semilla (`jugar` deja pasar `s`). */
     if (partida?.fin && d.j.t !== "s") return;
@@ -120,7 +135,7 @@ export function crearClue({ uid, pid, jugar, terminar, mirando, secreto }) {
     frame.title = "Clue: partida en línea";
     frame.className = "jg-clue-marco";
     window.addEventListener("message", mensaje);
-    frame.src = "juegos/clue/index.html?modo=online&v=clue-1";
+    frame.src = "juegos/clue/index.html?modo=online&v=clue-4";
     host.append(aviso, frame);
   }
 
@@ -145,10 +160,11 @@ export function crearClue({ uid, pid, jugar, terminar, mirando, secreto }) {
   function destruir() {
     muerto = true;
     clearTimeout(relojFin);
+    clearTimeout(relojAnima);
     window.removeEventListener("message", mensaje);
     frame?.remove();
     if (host) host.innerHTML = "";
   }
 
-  return { montar, actualizar, destruir };
+  return { montar, actualizar, destruir, ocupado: () => animando };
 }
