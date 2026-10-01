@@ -2875,6 +2875,43 @@ run. It bursts like a grenade (same `alcanceExplosion`/`golpeaRivales`,
 published as `x2`) with its own radius and damage, and the player always dies
 with `por` = themselves.
 
+**The arsenal** (weapon ids in the frame's `armas.js`, never renumbered
+because the log names them: 0–2 the original three, 3 the grenade, 4 the
+self-destruct, 5 the knife, 6 the bazooka, 7 the pistol; `YM_ARMAS` = 8).
+Everyone starts with the knife and carries at most two more. The rest lie on
+`PUNTOS_ARMA` (frame's `mundo.js`, `YM_PUNTOS_ARMA` in `motor.js`, which must
+agree). **Which** weapon lies on point `s` at its appearance `g` comes from
+the room's seed (`armaEnPunto`, so every screen sees the same one, and the
+postman sends `semilla` in the config). **Who takes it** is game state:
+`{t:"recoge", uid, s, g}` counts only if `g` is the next appearance after the
+last one taken there, so two players grabbing at once are settled by the log.
+`est.armas` is `{s: {g, uid}}`, and the frame grants the weapon when it sees
+itself as the taker. Each screen brings the next appearance back
+`REAPARECE` (18 s) after seeing one taken; that timing is the screen's alone.
+Walking over a free slot or a weapon already owned picks it up (an owned one
+only refills it), and with both slots full `E` swaps the one in hand.
+Inventory and ammo live in the frame: every gun has its magazine plus
+`RECARGAS` (5) reloads per life, and weapons survive death. Respawn after
+being killed refills life, ammo and grenades. After a **suicide that killed
+nobody**, it restores the life, ammo and grenades held just before. A kill
+that arrives while dead, or within 300 ms before dying (practice resolves it
+synchronously), counts as having killed someone. The bazooka's rocket rides
+`granada.js` as kind `cohete`: it flies straight, and the owner's frame
+bursts it on a wall or an egg (`tocaHuevo`).
+
+**Grenades are a loadout**: two per life, each `duro`, `humo` or `luz`
+(`GRANADAS`), chosen in the pause card or with Z/C while dead, kept in
+`localStorage` (`yemas.pref`, with the mouse sensitivity and the skin). `T`
+picks which one `G` throws. Launches and bursts carry their kind (`n.k`,
+`x2.k`). Smoke is local sprites plus a grey overlay while the camera is
+inside the cloud; bullets go through it. The flash blinds each viewer by
+distance, line of sight and whether they were facing it, the thrower and
+teammates included.
+
+**Skins** (`SKINS` and `ponSkin` in the frame's `mundo.js`) are accessories
+hung off the egg's body; the shell keeps its seat or team colour. The state
+carries `sk`, and a remote egg whose skin changes is rebuilt.
+
 **A death leaves a fried egg** (`huevoFrito` in the frame's `main.js`): an
 irregular white `ShapeGeometry` over a golden crispy rim and a glossy
 half-dome yolk off-centre, grown in over a third of a second, with a sizzle
@@ -2884,7 +2921,8 @@ half-dome yolk off-centre, grown in over a third of a second, with a sizzle
 module first (`modulo.pantallaCompleta()`, which `yemas.js` answers with
 `frame.requestFullscreen()`), and only a game without that hook falls back
 to the immersive mode. Inside the frame, `F` and a button on the pause card
-do the same with the frame's own document. The voice bar stays outside;
+do the same with the frame's own document (Shift+F, not F alone, which sat
+next to G and fired by accident). The voice bar stays outside;
 `V` still reaches it, and the pause card has a **🎙 Entrar a la voz**
 button that asks the postman (`voz`).
 

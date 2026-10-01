@@ -62,13 +62,14 @@ export function crearYemas({ uid, pid, jugar, terminar, mirando }) {
       configurado = true;
       enviar("config", {
         yo: uid, mirando: !juego(), meta: est.meta, variante: est.variante, equipos: est.equipos || null,
+        semilla: (partida.semilla >>> 0) || 1,
         jugadores: est.jugadores.map((j, i) => ({ uid: j.uid, nombre: j.nombre || "Huevo", orden: i }))
       });
       offVivo = fb.watchYemasVivo(pid, v => enviar("vivo", { v }));
     }
     enviar("marcador", {
       bajas: est.bajas, muertes: est.muertes, meta: est.meta, equipos: est.equipos || null,
-      puntosEq: est.puntosEq || null, banderas: est.banderas || null,
+      puntosEq: est.puntosEq || null, banderas: est.banderas || null, armas: est.armas || {},
       fuera: Object.keys(est.fuera || {}),
       fin: est.fase === "fin" ? { ganador: est.ganador || "", motivo: est.motivo || "" } : null
     });
@@ -96,10 +97,12 @@ export function crearYemas({ uid, pid, jugar, terminar, mirando }) {
     if (d.tipo === "estado" && d.e && typeof d.e === "object") {
       fb.yemasVivo(pid, uid, d.e);
     } else if (d.tipo === "muere") {
-      const a = Number.isInteger(d.a) && d.a >= 0 && d.a <= 4 ? d.a : 0;
+      const a = Number.isInteger(d.a) && d.a >= 0 && d.a <= 7 ? d.a : 0;
       const j = { t: "muere", uid, por: typeof d.por === "string" ? d.por.slice(0, 64) : "", a, cab: !!d.cab };
       if (d.x !== undefined) { j.x = num(d.x); j.z = num(d.z); }
       anota(j);
+    } else if (d.tipo === "recoge" && Number.isInteger(d.s) && Number.isInteger(d.g)) {
+      anota({ t: "recoge", uid, s: d.s, g: d.g });
     } else if ((d.tipo === "toma" || d.tipo === "devuelve" || d.tipo === "captura") && bandera(d.b)) {
       const j = { t: d.tipo, uid, b: d.b };
       if (d.tipo === "devuelve" && d.auto) j.auto = true;
@@ -245,7 +248,7 @@ export function crearYemas({ uid, pid, jugar, terminar, mirando }) {
     window.addEventListener("message", mensaje);
     window.addEventListener("keydown", abajo);
     window.addEventListener("keyup", arriba);
-    frame.src = "juegos/yemas/index.html?modo=online&v=yemas-4";
+    frame.src = "juegos/yemas/index.html?modo=online&v=yemas-5";
     host.append(aviso, equiposEl, barra, frame);
   }
 

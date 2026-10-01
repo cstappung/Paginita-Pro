@@ -382,20 +382,27 @@ const REGLAS = {
       ["Controles", lista([
         "Haz click en el juego para capturar el mouse; <b>Esc</b> lo suelta.",
         "<b>WASD</b> o flechas para moverte, <b>Espacio</b> para saltar, el mouse para mirar.",
-        "<b>Click</b> dispara, <b>R</b> recarga, <b>1 2 3</b> o la rueda cambian de arma, <b>G</b> lanza una granada y <b>Tab</b> muestra la tabla.",
-        "<b>F</b> (o ⛶ en la cabecera de la sala) pone el juego a pantalla completa: solo el juego, sin la página alrededor."
+        "<b>Click</b> dispara, <b>R</b> recarga, <b>1 2 3</b> o la rueda cambian de arma, <b>E</b> recoge o cambia un arma del piso, <b>G</b> lanza la granada elegida, <b>T</b> cambia cuál, y <b>Tab</b> muestra la tabla.",
+        "<b>Shift+F</b> (o ⛶ en la cabecera de la sala) pone el juego a pantalla completa: solo el juego, sin la página alrededor.",
+        "En la pausa (<b>Esc</b>) se ajusta la <b>sensibilidad del mouse</b>, se elige la <b>skin</b> y las granadas."
       ])],
       ["Las armas", lista([
-        "<b>1 · Batidora</b>: automática, 30 balas, 17 de daño.",
-        "<b>2 · Revuelta</b>: escopeta de 9 perdigones; de cerca fríe de un tiro, de lejos pierde fuerza.",
-        "<b>3 · Poché</b>: francotirador. <b>Click derecho</b> para la mira; 90 de daño al cuerpo y fríe de un tiro a la cabeza.",
-        "<b>X · Autodestrucción</b>: mantén la X un segundo (si la sueltas antes, se cancela). Tu huevo pita y brilla en rojo —los demás también lo ven— y revienta: hasta 220 de daño a los rivales en unos seis metros (cerca, los fríe seguro), y tú mueres siempre. La baja es tuya; tu muerte no le suma a nadie.",
-        "<b>G · Huevo duro</b>: la granada. Dos por vida; rebota y revienta al segundo y medio largo. Hasta 140 de daño en el centro y nada detrás de una pared. <b>También te daña a ti</b> (la mitad), pero no a tus compañeros."
+        "Se parte con el <b>🔪 Cuchillo</b>: 55 de daño a menos de un brazo (más a la cabeza), y caminas un poco más rápido.",
+        "El resto aparece <b>tirado en el mapa</b> (arriba de la torre, de las plataformas y en cuatro puntos del suelo): pasa por encima para tomarla. Cuál sale en cada punto es al azar, la misma para todos, y vuelve a aparecer otra a los 18 segundos de que alguien se la lleve.",
+        "Se cargan <b>dos como mucho</b>, sin contar el cuchillo. Con dos, <b>E</b> cambia la que tienes en la mano por la del piso. Pasar por una que ya tienes te llena su munición.",
+        "<b>Batidora</b> (metralleta, automática, 30 balas), <b>Revuelta</b> (escopeta de 9 perdigones), <b>Poché</b> (sniper con mira, click derecho), <b>Benedictina</b> (bazuca: un cohete que revienta con lo que toca, 130 de daño) y <b>Pasado por agua</b> (pistola de 6 balas, 34 de daño).",
+        "Cada arma trae su cargador y <b>5 recargas por vida</b>. Sin recargas, toca buscar otra arma o usar el cuchillo.",
+        "<b>X · Autodestrucción</b>: mantén la X un segundo (si la sueltas antes, se cancela). Tu huevo pita y brilla en rojo —los demás también lo ven— y revienta: hasta 220 de daño a los rivales en unos seis metros, y tú mueres siempre."
+      ])],
+      ["Granadas", lista([
+        "Llevas <b>dos por vida</b> y eliges cuáles: <b>🥚 Huevo duro</b> (explota, hasta 140 de daño; a ti te hace la mitad), <b>💨 Humo</b> (una nube que tapa la vista unos doce segundos) o <b>💡 Cegadora</b> (encandila a quien la ve, más si está cerca y mirándola; a ti y a tu equipo también).",
+        "Se eligen en la pausa o, estando muerto, con <b>Z</b> y <b>C</b>. Valen desde la vida siguiente (o ya mismo, si en esta todavía no tiraste ninguna)."
       ])],
       ["Vida y muerte", lista([
         "Tienes 100 de vida. La parte de arriba del huevo es la cabeza y ahí el daño sube.",
         "Quien muere queda frito: en el piso aparece un huevo frito, clara y yema, que se va a los pocos segundos.",
-        "Al morir vuelves a los tres segundos, lo más lejos posible de tus rivales, con un segundo y medio de protección."
+        "Al morir vuelves a los tres segundos, lo más lejos posible de tus rivales, con un segundo y medio de protección y <b>con las armas que tenías</b>.",
+        "Si te mataron, vuelves con vida, munición y granadas llenas. <b>Si te suicidaste</b> (tu granada, tu bazuca o la autodestrucción) y no te llevaste a nadie, vuelves con la vida, la munición y las granadas que tenías: suicidarse no recarga. Si tu suicidio frió a alguien, vuelves lleno."
       ])],
       ["Chat de voz", lista([
         "Arriba del juego está <b>🎙 Entrar a la voz</b>. La primera vez el navegador pide permiso para el micrófono.",

@@ -58,7 +58,7 @@ export function conectarMarco(h) {
       const js = lista(m.jugadores).sort((a, b) => a.orden - b.orden);
       const equipos = m.equipos && typeof m.equipos === 'object' ? m.equipos : null;
       red = {
-        yo: m.yo, online: true, mirando: !!m.mirando, meta: m.meta | 0,
+        yo: m.yo, online: true, mirando: !!m.mirando, meta: m.meta | 0, semilla: (m.semilla >>> 0) || 1,
         variante: ['todos', 'equipos', 'bandera'].includes(m.variante) ? m.variante : 'todos', equipos,
         jugadores: new Map(js.map((j, i) => [j.uid, {
           nombre: String(j.nombre || 'Huevo').slice(0, 20),
@@ -96,7 +96,7 @@ export function conectarMarco(h) {
         red.equipos = m.equipos;
         for (const [u, f] of red.jugadores) f.color = COLOR_EQUIPO[m.equipos[u]] || f.color;
       }
-      h.alMarcador({ bajas: m.bajas || {}, muertes: m.muertes || {}, puntosEq: m.puntosEq || null, banderas: m.banderas || null });
+      h.alMarcador({ bajas: m.bajas || {}, muertes: m.muertes || {}, puntosEq: m.puntosEq || null, banderas: m.banderas || null, armas: m.armas || {} });
       if (m.fin) h.alFin(m.fin);
     } else if (m.tipo === 'bajas') {
       if (m.viejas) return;
@@ -115,6 +115,7 @@ export function conectarMarco(h) {
 
 // ---------- Local con bots ----------
 const BOTS = ['Huevo Duro', 'Tortilla', 'Yemita', 'Clarita'];
+const SKINS_BOTS = ['chef', 'vaquero', 'pirata', 'lana'];
 
 export function conectarLocal({ nombre, color, colisores }, h) {
   const r = new RedLocal(nombre, color, colisores, h);
@@ -129,6 +130,8 @@ class RedLocal {
     this.online = false;
     this.mirando = false;
     this.meta = 0;
+    this.semilla = (Math.random() * 4294967295) >>> 0;
+    this.armas = {};
     this.variante = 'todos';
     this.equipos = null;
     this.cols = cols;
@@ -138,6 +141,8 @@ class RedLocal {
     const libres = PALETA.filter(c => c !== color);
     this.bots = BOTS.map((n, i) => {
       this.jugadores.set('bot' + i, { nombre: n, color: libres[i] });
+      this.skinsBots = this.skinsBots || {};
+      this.skinsBots['bot' + i] = SKINS_BOTS[i % SKINS_BOTS.length];
       return {
         id: 'bot' + i, hp: 100, vivo: true, muerte: 0,
         pos: new THREE.Vector3(), vel: new THREE.Vector3(), enSuelo: false,
@@ -151,7 +156,7 @@ class RedLocal {
   }
 
   nombre(u) { return this.jugadores.get(u)?.nombre || ''; }
-  avisaMarcador() { this.h.alMarcador({ bajas: { ...this.bajas }, muertes: { ...this.muertes } }); }
+  avisaMarcador() { this.h.alMarcador({ bajas: { ...this.bajas }, muertes: { ...this.muertes }, armas: { ...this.armas } }); }
 
   // El spawn más lejos de todos, con algo de azar
   aparecer(b) {
@@ -168,13 +173,20 @@ class RedLocal {
   }
 
   estado(b) {
-    const e = { x: b.pos.x, y: b.pos.y, z: b.pos.z, ry: b.yaw, v: b.vivo ? 1 : 0, a: 0 };
+    const e = { x: b.pos.x, y: b.pos.y, z: b.pos.z, ry: b.yaw, v: b.vivo ? 1 : 0, a: 0, sk: this.skinsBots[b.id] };
     if (b.disparo) e.s = { i: b.disparo, e: b.finales };
     return e;
   }
 
   publicar(e) { this.estadoYo = e; }
-  accion() {}
+  // Sin sala, las armas del piso se reparten aquí con la misma regla que el
+  // reductor: vale la siguiente aparición de ese punto.
+  accion(tipo, d) {
+    if (tipo !== 'recoge') return;
+    if (d.g !== (this.armas[d.s] ? this.armas[d.s].g : -1) + 1) return;
+    this.armas[d.s] = { g: d.g, uid: 'yo' };
+    this.avisaMarcador();
+  }
   hablar() {}
   entrarVoz() {}
 
