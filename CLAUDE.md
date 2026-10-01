@@ -3004,6 +3004,16 @@ teammates included.
 hung off the egg's body; the shell keeps its seat or team colour. The state
 carries `sk`, and a remote egg whose skin changes is rebuilt.
 
+**Sprint and slide are the frame's alone** (`SPRINT`, `DESLIZ` and
+`deslizar()` in its `main.js`). Shift while moving forward runs ×1.6 with a
+wider FOV and a little more spread; C while running on the ground slides
+along the current velocity with friction until it is back to walking pace,
+lowering the camera. A slide ends the sprint, and `sinSprint` keeps it ended
+until Shift is released, so holding Shift does not chain slides. C still
+cycles the second grenade while dead. The state carries `ds: 1` while
+sliding, and the other frames tilt that egg back and play the scrape. Hit
+detection still uses the upright egg.
+
 **A death leaves a fried egg** (`huevoFrito` in the frame's `main.js`): an
 irregular white `ShapeGeometry` over a golden crispy rim and a glossy
 half-dome yolk off-centre, grown in over a third of a second, with a sizzle

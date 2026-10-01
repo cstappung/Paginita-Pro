@@ -411,6 +411,7 @@ const REGLAS = {
       ["Controles", lista([
         "Haz click en el juego para capturar el mouse; <b>Esc</b> lo suelta.",
         "<b>WASD</b> o flechas para moverte, <b>Espacio</b> para saltar, el mouse para mirar.",
+        "Mantén <b>Shift</b> mientras avanzas para <b>correr</b> (más rápido, pero disparas menos preciso). Corriendo, <b>C</b> te tira a <b>deslizarte</b>: sales disparado hacia donde ibas, más bajo, y puedes disparar mientras resbalas. Eso termina el sprint; para volver a correr suelta Shift y apriétalo de nuevo.",
         "<b>Click</b> dispara, <b>R</b> recarga, <b>1 2 3</b> o la rueda cambian de arma, <b>E</b> recoge o cambia un arma del piso, <b>G</b> lanza la granada elegida, <b>T</b> cambia cuál, y <b>Tab</b> muestra la tabla.",
         "<b>Shift+F</b> (o ⛶ en la cabecera de la sala) pone el juego a pantalla completa: solo el juego, sin la página alrededor.",
         "En la pausa (<b>Esc</b>) se ajusta la <b>sensibilidad del mouse</b>, se elige la <b>skin</b> y las granadas."

@@ -73,6 +73,7 @@ export const sonido = {
     const v = 1 / (1 + dist / 10);
     for (let k = 0; k < 16; k++) ruido(0.025 + Math.random() * 0.02, 7000, 0.07 * v, 0.15 + k * 0.08 + Math.random() * 0.05);
   },
+  desliza(dist = 0) { const v = 1 / (1 + dist / 12); ruido(0.55, 700, 0.4 * v); ruido(0.3, 2400, 0.12 * v, 0.05); },
   lanza() { tono(520, 260, 0.1, 0.1, 'triangle'); ruido(0.06, 2000, 0.15); },
   explosion(dist = 0) {
     const v = 1 / (1 + dist / 18);
