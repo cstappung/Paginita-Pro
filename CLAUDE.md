@@ -3323,12 +3323,15 @@ October 2026 pass settled, and must not regress:
   data URL in a profile), but rules lag behind publishing and old data stays.
   Read-side cleaning is what covers both. A new field that is painted into
   markup belongs in `sanea`.
-- **Privileges live in `admins/<uid>` and `confianza/<uid>`**, readable by
-  their owner and writable by nobody from the web (set by hand in the
-  console). Admins delete errors and change other people's feedback state
-  (`esAdmin` in `fb-reports.js`; Informes hides ✕/✓ for everyone else).
-  Only trusted people and admins read `discord/`, so only their rooms are
-  announced.
+- **Privileges live in `admins/<uid>`**, readable by its owner and writable
+  by nobody from the web (set by hand in the console). Admins delete errors
+  and change other people's feedback state (`esAdmin` in `fb-reports.js`;
+  Informes hides ✕/✓ for everyone else).
+- **`discord/` stays readable by anyone signed in, on purpose.** The owner
+  wants every room announced without keeping a list of people, and accepted
+  the risk: anyone with a session can copy the webhook and spam the channel.
+  The remedy is swapping `discord/webhook` in the console. A `confianza/<uid>`
+  allowlist was tried and dropped for that reason.
 - **Storage cannot see the database**, so it cannot check membership. Each
   object carries `customMetadata.uid` (`sube` in `fb-api.js`) and only its
   uploader may replace or delete it; HTML/JS content types are refused.
@@ -3340,7 +3343,7 @@ October 2026 pass settled, and must not regress:
 - **App Check is wired but off** (`APP_CHECK_SITE_KEY` in `firebase.js`).
 - Inherent limits, stated in `CONFIGURAR-FIREBASE.md` section 0: a player can
   write `fin` for a game they are in, chat and feedback can be spammed, and
-  `clueElenco` is readable by anyone signed in.
+  `clueElenco` and `discord/` are readable by anyone signed in.
 
 `tests/seguridad.test.cjs` checks the sanitiser and pins those rule shapes.
 
