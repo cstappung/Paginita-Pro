@@ -1,6 +1,6 @@
 import * as fb from "../fb-juegos.js";
 import { crearVoz } from "./voz.js";
-import { YM_ARMAS } from "./motor.js";
+import { YM_ARMAS, mapaYemas } from "./motor.js";
 
 /* Yemas — el cartero entre la sala y el juego.
 
@@ -67,6 +67,7 @@ export function crearYemas({ uid, pid, jugar, terminar, mirando }) {
       configurado = true;
       enviar("config", {
         yo: uid, mirando: !juego(), meta: est.meta, variante: est.variante, equipos: est.equipos || null,
+        mapa: mapaYemas(partida),
         semilla: (partida.semilla >>> 0) || 1,
         jugadores: est.jugadores.map((j, i) => ({ uid: j.uid, nombre: j.nombre || "Huevo", orden: i }))
       });
@@ -258,7 +259,7 @@ export function crearYemas({ uid, pid, jugar, terminar, mirando }) {
     window.addEventListener("message", mensaje);
     window.addEventListener("keydown", abajo);
     window.addEventListener("keyup", arriba);
-    frame.src = "juegos/yemas/index.html?modo=online&v=yemas-7";
+    frame.src = "juegos/yemas/index.html?modo=online&v=yemas-8";
     host.append(aviso, equiposEl, barra, frame);
   }
 

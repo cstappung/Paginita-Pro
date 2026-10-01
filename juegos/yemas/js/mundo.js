@@ -82,26 +82,263 @@ function texturaPiso() {
   return t;
 }
 
-export function crearMundo(escena) {
-  const colisores = [];
-  const piso = new THREE.Mesh(
-    new THREE.PlaneGeometry(2 * MITAD + 2, 2 * MITAD + 2),
-    new THREE.MeshLambertMaterial({ map: texturaPiso() })
-  );
-  piso.rotation.x = -Math.PI / 2;
-  piso.receiveShadow = true;
-  escena.add(piso);
+// Sin mapa, la arena de siempre (los modos de duelo). Con mapa (mapas.js),
+// el mapa de zombis: cajas sólidas, adornos, puertas que se quitan al
+// comprarlas y lo que solo se enciende con la electricidad. `colisores` es el
+// arreglo compartido con los demás módulos: se llena y se vacía en el lugar,
+// porque granadas, zombis y la física guardan la referencia.
+export function crearMundo(escena, mapa = null, colisores = []) {
+  const grupo = new THREE.Group();
+  escena.add(grupo);
+  const puertas = {};      // id → { mallas, cols }
+  const deLuz = [];        // [material, color encendido] o [luz, intensidad]
+  let encendido = false;
+  const lote = new Lote();
 
-  const materiales = new Map();
-  for (const [cx, cz, w, d, h, y0, color] of disenoCajas()) {
-    if (!materiales.has(color)) materiales.set(color, new THREE.MeshLambertMaterial({ color }));
-    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), materiales.get(color));
-    m.position.set(cx, y0 + h / 2, cz);
-    m.castShadow = m.receiveShadow = true;
-    escena.add(m);
-    colisores.push({ minx: cx - w / 2, maxx: cx + w / 2, miny: y0, maxy: y0 + h, minz: cz - d / 2, maxz: cz + d / 2 });
+  if (!mapa) {
+    const piso = new THREE.Mesh(
+      new THREE.PlaneGeometry(2 * MITAD + 2, 2 * MITAD + 2),
+      new THREE.MeshLambertMaterial({ map: texturaPiso() })
+    );
+    piso.rotation.x = -Math.PI / 2;
+    piso.receiveShadow = true;
+    grupo.add(piso);
+    for (const [cx, cz, w, d, h, y0, color] of disenoCajas()) {
+      lote.caja(color, cx - w / 2, y0, cz - d / 2, cx + w / 2, y0 + h, cz + d / 2);
+      colisores.push({ minx: cx - w / 2, maxx: cx + w / 2, miny: y0, maxy: y0 + h, minz: cz - d / 2, maxz: cz + d / 2 });
+    }
+    lote.monta(grupo);
+    return { quitaPuerta() {}, enciende() {}, desmonta: () => desmonta(), get luz() { return true; } };
   }
-  return { colisores };
+
+  const amb = mapa.ambiente || {};
+  const [sx0, sz0, sx1, sz1] = mapa.suelo || [-60, -60, 60, 60];
+  const piso = new THREE.Mesh(new THREE.PlaneGeometry(sx1 - sx0, sz1 - sz0), new THREE.MeshLambertMaterial({ map: texturaTierra(amb.piso || '#444', (sx1 - sx0) / 8, (sz1 - sz0) / 8) }));
+  piso.rotation.x = -Math.PI / 2;
+  piso.position.set((sx0 + sx1) / 2, 0, (sz0 + sz1) / 2);
+  piso.receiveShadow = true;
+  grupo.add(piso);
+
+  const dePuerta = id => (puertas[id] ||= { mallas: [], cols: [] });
+  // Lo que pertenece a una puerta o a la luz va suelto; lo demás, al lote.
+  const suelta = (geo, mat, o) => {
+    const m = new THREE.Mesh(geo, mat);
+    m.castShadow = m.receiveShadow = true;
+    grupo.add(m);
+    if (o?.puerta) dePuerta(o.puerta).mallas.push(m);
+    return m;
+  };
+  const material = (color, o) => {
+    if (o?.luz) {
+      const mat = o.brilla ? new THREE.MeshBasicMaterial({ color: '#222' }) : new THREE.MeshLambertMaterial({ color: '#222' });
+      deLuz.push([mat, new THREE.Color(color)]);
+      return mat;
+    }
+    return o?.brilla ? basico(color) : lambert(color);
+  };
+  // Una caja: al lote si es fija, suelta si depende de algo.
+  const pieza3 = (color, x0, y0, z0, x1, y1, z1, o, brilla = false) => {
+    if (!o?.puerta && !o?.luz) { lote.caja(color, x0, y0, z0, x1, y1, z1, brilla || o?.brilla); return; }
+    const m = suelta(new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0), material(color, { ...o, brilla: brilla || o?.brilla }), o);
+    m.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2);
+  };
+
+  for (const [x0, z0, x1, z1, y0, y1, color, o] of mapa.cajas) {
+    const c = { minx: x0, maxx: x1, miny: y0, maxy: y1, minz: z0, maxz: z1 };
+    if (o?.pasa) c.pasa = true;
+    if (o?.puerta) { c.puerta = o.puerta; dePuerta(o.puerta).cols.push(c); }
+    colisores.push(c);
+    if (!color) continue;
+    if (o?.puerta) {
+      // La puerta: tablones con travesaños, o un montón de escombros.
+      pieza3(color, x0, y0, z0, x1, y1, z1, o);
+      const ejeX = x1 - x0 > z1 - z0;
+      if (o.estilo === 'escombros') {
+        for (let i = 0; i < 7; i++) {
+          const f = (i * 0.37) % 1, h = (y1 - y0) * (0.25 + 0.6 * ((i * 0.61) % 1));
+          const a = ejeX ? x0 + (x1 - x0) * f : z0 + (z1 - z0) * f;
+          const m = suelta(new THREE.BoxGeometry(0.7, 0.5, 0.6), lambert(i & 1 ? '#5a4a3c' : '#7a6a58'), o);
+          m.position.set(ejeX ? a : (x0 + x1) / 2 + (i % 3 - 1) * 0.35, y0 + h, ejeX ? (z0 + z1) / 2 + (i % 3 - 1) * 0.35 : a);
+          m.rotation.set(i * 0.7, i * 1.3, i * 0.4);
+        }
+      } else {
+        for (const f of [0.25, 0.7]) {
+          const y = y0 + (y1 - y0) * f;
+          if (ejeX) pieza3('#3a2412', x0, y - 0.08, z0 - 0.05, x1, y + 0.08, z1 + 0.05, o);
+          else pieza3('#3a2412', x0 - 0.05, y - 0.08, z0, x1 + 0.05, y + 0.08, z1, o);
+        }
+      }
+      continue;
+    }
+    pieza3(color, x0, y0, z0, x1, y1, z1, o);
+  }
+
+  for (const d of mapa.decor) {
+    const t = d[0];
+    if (t === 'c' || t === 'brillo') {
+      const [, x0, z0, x1, z1, y0, y1, color, o] = d;
+      pieza3(color, x0, y0, z0, x1, y1, z1, o, t === 'brillo');
+    } else if (t === 'tubo') {
+      const [, x0, y0, z0, x1, y1, z1, r, color, o] = d;
+      const a = new THREE.Vector3(x0, y0, z0), b = new THREE.Vector3(x1, y1, z1);
+      const largo = a.distanceTo(b);
+      const geo = new THREE.CylinderGeometry(r, r, largo, r > 0.3 ? 16 : 8);
+      const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), b.clone().sub(a).normalize());
+      const mat4 = new THREE.Matrix4().compose(a.clone().add(b).multiplyScalar(0.5), q, new THREE.Vector3(1, 1, 1));
+      ponGeo(geo, mat4, color, o);
+    } else if (t === 'cil' || t === 'cono') {
+      const [, x, z, r, y0, y1, color, o] = d;
+      const geo = t === 'cil' ? new THREE.CylinderGeometry(r, r, y1 - y0, r > 0.5 ? 20 : 10) : new THREE.ConeGeometry(r, y1 - y0, 10);
+      ponGeo(geo, new THREE.Matrix4().makeTranslation(x, (y0 + y1) / 2, z), color, o);
+    } else if (t === 'esf') {
+      const [, x, y, z, r, color, o] = d;
+      ponGeo(new THREE.SphereGeometry(r, 12, 8), new THREE.Matrix4().makeTranslation(x, y, z), color, o);
+    } else if (t === 'rot') {
+      const [, x, y, z, ry, w, h, dd, color, o] = d;
+      const e = new THREE.Euler(o?.rx || 0, ry, o?.rz || 0, 'YXZ');
+      const mat4 = new THREE.Matrix4().compose(new THREE.Vector3(x, y, z), new THREE.Quaternion().setFromEuler(e), new THREE.Vector3(1, 1, 1));
+      ponGeo(new THREE.BoxGeometry(w, h, dd), mat4, color, o);
+    } else if (t === 'piso' || t === 'techo') {
+      const [, x0, z0, x1, z1, y, color] = d;
+      const geo = new THREE.PlaneGeometry(x1 - x0, z1 - z0);
+      const mat4 = new THREE.Matrix4().makeTranslation((x0 + x1) / 2, y, (z0 + z1) / 2)
+        .multiply(new THREE.Matrix4().makeRotationX(t === 'piso' ? -Math.PI / 2 : Math.PI / 2));
+      ponGeo(geo, mat4, color, null, false);
+    } else if (t === 'cartel') {
+      const [, x, y, z, ry, w, h, texto, fondo, tinta, o] = d;
+      const m = suelta(new THREE.PlaneGeometry(w, h), new THREE.MeshLambertMaterial({ map: texturaCartel(texto, w, h, fondo, tinta, o?.fuente), transparent: !fondo }), o);
+      m.castShadow = false;
+      m.position.set(x, y, z);
+      m.rotation.y = ry;
+    } else if (t === 'luz') {
+      const [, x, y, z, color, intensidad, alcance, o] = d;
+      // Luz física de three (r160): con decaimiento 1 y este factor, las
+      // intensidades de los mapas se leen como «tenue / normal / fuerte».
+      const l = new THREE.PointLight(color, o?.luz ? 0 : intensidad * LUX, alcance, 1);
+      l.position.set(x, y, z);
+      grupo.add(l);
+      if (o?.luz) deLuz.push([l, intensidad * LUX]);
+    }
+  }
+  lote.monta(grupo);
+  if (mapa.luzSiempre) enciende();
+
+  function ponGeo(geo, mat4, color, o, sombra = true) {
+    if (!o?.puerta && !o?.luz) { lote.agrega(color, geo, mat4, o?.brilla, sombra); return; }
+    const m = suelta(geo, material(color, o), o);
+    m.applyMatrix4(mat4);
+  }
+  function enciende() {
+    if (encendido) return;
+    encendido = true;
+    for (const [cosa, v] of deLuz) {
+      if (cosa.isLight) cosa.intensity = v;
+      else cosa.color.copy(v);
+    }
+  }
+  function quitaPuerta(id) {
+    const p = puertas[id];
+    if (!p) return;
+    for (const m of p.mallas) { grupo.remove(m); m.geometry.dispose(); }
+    for (const c of p.cols) { const i = colisores.indexOf(c); if (i >= 0) colisores.splice(i, 1); }
+    delete puertas[id];
+  }
+  function desmonta() {
+    escena.remove(grupo);
+    grupo.traverse(o => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material?.map) o.material.map.dispose();
+    });
+    colisores.length = 0;
+  }
+  return { quitaPuerta, enciende, desmonta, get luz() { return encendido; } };
+}
+
+const LUX = 6;
+const _lam = new Map(), _bas = new Map();
+const basico = color => { if (!_bas.has(color)) _bas.set(color, new THREE.MeshBasicMaterial({ color })); return _bas.get(color); };
+function lambertC(color) { if (!_lam.has(color)) _lam.set(color, new THREE.MeshLambertMaterial({ color })); return _lam.get(color); }
+
+// Junta todo lo fijo en una malla por material: un mapa son cientos de
+// piezas, y cientos de llamadas de dibujo (el doble con sombras) se notan.
+class Lote {
+  constructor() { this.g = new Map(); }
+  caja(color, x0, y0, z0, x1, y1, z1, brilla) {
+    const geo = new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0);
+    this.agrega(color, geo, new THREE.Matrix4().makeTranslation((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2), brilla, true);
+  }
+  agrega(color, geo, mat4, brilla, sombra) {
+    const k = `${color}|${brilla ? 1 : 0}|${sombra ? 1 : 0}`;
+    if (!this.g.has(k)) this.g.set(k, []);
+    const g = geo.index ? geo.toNonIndexed() : geo;
+    if (g !== geo) geo.dispose();
+    g.applyMatrix4(mat4);
+    this.g.get(k).push(g);
+  }
+  monta(grupo) {
+    for (const [k, geos] of this.g) {
+      const [color, brilla, sombra] = k.split('|');
+      let n = 0;
+      for (const g of geos) n += g.attributes.position.count;
+      const pos = new Float32Array(n * 3), nor = new Float32Array(n * 3);
+      let i = 0;
+      for (const g of geos) {
+        pos.set(g.attributes.position.array, i * 3);
+        nor.set(g.attributes.normal.array, i * 3);
+        i += g.attributes.position.count;
+        g.dispose();
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      geo.setAttribute('normal', new THREE.BufferAttribute(nor, 3));
+      geo.computeBoundingSphere();
+      const m = new THREE.Mesh(geo, brilla === '1' ? basico(color) : lambertC(color));
+      m.castShadow = sombra === '1';
+      m.receiveShadow = true;
+      grupo.add(m);
+    }
+    this.g.clear();
+  }
+}
+
+// El piso de un mapa: tierra o baldosa con algo de ruido para que no sea un plano liso.
+function texturaTierra(color, rx, rz) {
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 128;
+  const g = cv.getContext('2d');
+  g.fillStyle = color; g.fillRect(0, 0, 128, 128);
+  let s = 7;
+  const azar = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+  for (let i = 0; i < 260; i++) {
+    g.fillStyle = azar() < 0.5 ? 'rgba(0,0,0,0.10)' : 'rgba(255,255,255,0.06)';
+    const r = 1 + azar() * 4;
+    g.fillRect(azar() * 128, azar() * 128, r, r);
+  }
+  g.strokeStyle = 'rgba(0,0,0,0.12)'; g.lineWidth = 1; g.strokeRect(0, 0, 128, 128);
+  const t = new THREE.CanvasTexture(cv);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(rx, rz);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 8;
+  return t;
+}
+
+function texturaCartel(texto, w, h, fondo, tinta, fuente) {
+  const cv = document.createElement('canvas');
+  const px = 128;
+  cv.width = Math.max(64, Math.round(w * px)); cv.height = Math.max(32, Math.round(h * px));
+  const g = cv.getContext('2d');
+  if (fondo) { g.fillStyle = fondo; g.fillRect(0, 0, cv.width, cv.height); }
+  let tam = cv.height * 0.7;
+  g.font = `bold ${tam}px ${fuente || 'system-ui, sans-serif'}`;
+  const ancho = g.measureText(texto).width;
+  if (ancho > cv.width * 0.92) { tam *= cv.width * 0.92 / ancho; g.font = `bold ${tam}px ${fuente || 'system-ui, sans-serif'}`; }
+  g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillStyle = tinta || '#fff';
+  g.fillText(texto, cv.width / 2, cv.height / 2);
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
 }
 
 // ---------- Física ----------
@@ -170,11 +407,15 @@ function rayoCaja(o, d, b) {
   return tmin;
 }
 
-// Distancia hasta el primer obstáculo (piso o caja), o max si no hay nada
-export function rayoMundo(o, d, max, cols) {
+// Distancia hasta el primer obstáculo (piso o caja), o max si no hay nada.
+// Las ventanas tapiadas (`pasa`) frenan cuerpos, no balas; con `todos` también
+// cuentan (los zombis no ven a través de las tablas: si no, se pegaban a la
+// ventana del otro lado de la pared persiguiendo a quien estaba dentro).
+export function rayoMundo(o, d, max, cols, todos = false) {
   let t = max;
   if (d.y < -1e-6) t = Math.min(t, -o.y / d.y);
   for (const b of cols) {
+    if (b.pasa && !todos) continue;
     const tb = rayoCaja(o, d, b);
     if (tb !== null && tb < t) t = tb;
   }
@@ -198,7 +439,7 @@ export function rayoHuevo(o, d, p) {
 // ---------- El huevo ----------
 
 let geoHuevo = null;
-function geometriaHuevo() {
+export function geometriaHuevo() {
   if (geoHuevo) return geoHuevo;
   const pts = [];
   for (let i = 0; i <= 24; i++) {
@@ -210,7 +451,7 @@ function geometriaHuevo() {
   return geoHuevo;
 }
 
-function etiqueta(texto) {
+export function etiqueta(texto) {
   const cv = document.createElement('canvas');
   cv.width = 256; cv.height = 64;
   const g = cv.getContext('2d');
@@ -239,8 +480,8 @@ export const SKINS = {
   clasico: 'Clásico', chef: 'Chef', vaquero: 'Vaquero', pirata: 'Pirata',
   corona: 'Realeza', lentes: 'Lentes de sol', lana: 'Gorro de lana', manchas: 'Manchitas',
 };
-const lambert = color => new THREE.MeshLambertMaterial({ color });
-function pieza(geo, mat, x, y, z) {
+export const lambert = color => new THREE.MeshLambertMaterial({ color });
+export function pieza(geo, mat, x, y, z) {
   const m = new THREE.Mesh(geo, mat);
   m.position.set(x, y, z);
   m.castShadow = true;
@@ -366,24 +607,6 @@ export function crearZombi() {
   }
   g.userData = { cuerpo, casco };
   return g;
-}
-
-// Por dónde entran: dieciséis «ventanas» en los muros del borde.
-export const VENTANAS = [];
-for (const v of [-24, -8, 8, 24]) {
-  VENTANAS.push(new THREE.Vector3(v, 0, MITAD - 2), new THREE.Vector3(v, 0, -MITAD + 2));
-  VENTANAS.push(new THREE.Vector3(MITAD - 2, 0, v), new THREE.Vector3(-MITAD + 2, 0, v));
-}
-// Para subir a la torre y a las plataformas hay que pasar por su escala: si
-// el que persigue está arriba de una, el zombi va primero al pie de la
-// escala más cercana y la sube hasta la cima.
-// [minx, maxx, minz, maxz, alto, [[pie, cima], …]]
-const v3 = (x, z) => new THREE.Vector3(x, 0, z);
-export const ALTURAS = [
-  [-3, 3, -3, 3, 3, [[v3(0, 9.6), v3(0, 2.4)], [v3(0, -9.6), v3(0, -2.4)]]],
-];
-for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
-  ALTURAS.push([sx * 24 - 4, sx * 24 + 4, sz * 24 - 4, sz * 24 + 4, 2.5, [[v3(sx * 15.2, sz * 24), v3(sx * 20.6, sz * 24)]]]);
 }
 
 // ---------- Armas tiradas ----------

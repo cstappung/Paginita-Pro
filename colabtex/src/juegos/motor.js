@@ -1110,12 +1110,18 @@ export function redWorms(p, js = jugadoresDe(p), listos = true) {
    `ganoEn` es quien sabe que eso incluye a todo el equipo. */
 export const YM_VARIANTES = { todos: "Todos contra todos", equipos: "Duelo por equipos", bandera: "Captura la bandera", zombis: "Zombis" };
 export const YM_LARGOS = { todos: [10, 15, 25], equipos: [20, 30, 50], bandera: [1, 3, 5], zombis: [0, 0, 0] };
+/* Los mapas de zombis (los clásicos de Black Ops). Solo cuentan en la
+   variante zombis; la misma lista vive en juegos/yemas/js/mapas.js, que es
+   la que los arma. */
+export const YM_MAPAS = { nacht: "Nacht der Untoten", kino: "Kino der Toten", nuketown: "Nuketown Zombies", riese: "Der Riese", pueblo: "Pueblo" };
+export const mapaYemas = p => Object.prototype.hasOwnProperty.call(YM_MAPAS, p && p.mapa) ? p.mapa : "nacht";
 export const YM_EQUIPOS = ["rojo", "azul"];
 export const YM_BASES = { rojo: [0, 29], azul: [0, -29] };
 /* El `a` de una muerte es el id del arma: Batidora, Revuelta, Poché, el
    Huevo duro (la granada), la autodestrucción, la sartén (que fue un
    cuchillo, con el mismo id), la bazuca, la pistola, la espátula dorada y
-   el mordisco de un zombi, en ese orden. Los ids nunca se renumeran.
+   el mordisco de un zombi, en ese orden; después las tres que solo salen
+   en zombis (Rayo batido, Amasadora, Huevera). Los ids nunca se renumeran.
 
    Las armas aparecen tiradas en `YM_PUNTOS_ARMA` puntos del mapa, y cuál
    sale lo decide la semilla de la sala con el punto y el número de
@@ -1124,7 +1130,7 @@ export const YM_BASES = { rojo: [0, 29], azul: [0, -29] };
    punto `s`, y vale solo si es la siguiente a la última tomada ahí; si dos
    la agarran a la vez, la primera jugada se la lleva. Cuándo reaparece es
    cosa de cada pantalla (unos segundos después de verla tomada). */
-export const YM_ARMAS = 10;
+export const YM_ARMAS = 13;
 export const YM_PUNTOS_ARMA = 8;
 export const YM_METAS = YM_LARGOS.todos;
 export const YM_META = 15;

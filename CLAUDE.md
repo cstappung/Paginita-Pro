@@ -2912,8 +2912,8 @@ cost is a stray bite, not a broken game. Seven things hold it together:
 
 - **The zombies ride the director's own state**, as `zb: {r, q, p, e, z, m}`:
   round, how many are still to spawn, the start and between-round timers,
-  each zombie as `[id, x, y, z, ry, hp%, rising]`, and the last 20 deaths as
-  `[id, killer, head, weapon]`. The other frames only draw them
+  each zombie as `[id, x, y, z, ry, hp%, rising, burning, phase, window]`,
+  and the last 20 deaths as `[id, killer, head, weapon, explodes]`. The other frames only draw them
   (`desdeRed`). Firebase drops empty arrays, so `zb.z` can come back
   missing, and `lista()` reads that as no zombies.
 - **Shots at a zombie are ordinary hits** addressed to `z:<id>` in the
@@ -2925,9 +2925,9 @@ cost is a stray bite, not a broken game. Seven things hold it together:
   pays 10 and a kill 60, or 100 to the head, or 130 with the pan. A kill
   only pays when a death in `zb.m` names that player. Each `vivo` state
   carries `pz`/`zk` for the Tab table.
-- **The weapon points are shops** (`TIENDA`, `PRECIO` in `armas.js`): `E`
-  buys with points, and buying an owned gun refills it at half price. None
-  of that goes through the log, because a shop never runs out.
+- **What is bought is the map's** (see below): wall weapons, the box,
+  perks and Pack-a-Punch. `E` buys with points, and buying an owned wall gun
+  refills it at half price. None of that goes through the log.
 - **Rounds and falls are game state.** When a round is clear the director
   waits `ZB.pausa` and writes `{t:"ronda", r}`. `redYemas` accepts only the
   next round, and accepting it revives everyone who fell. In zombies a
@@ -2940,16 +2940,50 @@ cost is a stray bite, not a broken game. Seven things hold it together:
   points. Those still standing get their grenades back. Health regenerates
   after 4 s without damage, in zombies only. A reloaded tab whose player is
   in `caidos` stays fallen.
-- **Zombies climb.** If the target stands on the tower or a platform
-  (`ALTURAS` in `mundo.js`), a zombie walks to the foot of the nearest
-  stair and up its corridor to the top (`metaDe`). Otherwise it goes
-  straight, side-steps and jumps when stuck, and keeps clear of the others.
-  They enter through `VENTANAS` near the players, and per round
-  `hpRonda`, `totalRonda` and `velRonda` grow.
+- **Zombies walk the map's graph.** They spawn outside a window (or rise
+  from the ground on the open maps), tear its boards off one at a time,
+  climb in, and then go by `nodos`/`enlaces`. A link through a door only
+  counts once that door is open, so the distances are recomputed
+  (Floyd-Warshall, under fifty nodes) every time one opens. A zombie that
+  sees its prey chases it straight. Per round `hpRonda`, `totalRonda` and
+  `velRonda` grow.
 
 Practice can be zombies too: the menu's mode select gives `conectarLocal`
 `variante: 'zombis'`, `RedLocal` keeps the round and ends the run on the
 first death, and a button reloads it.
+
+**The zombies maps are Black Ops' five, as data** (`juegos/yemas/js/mapas.js`:
+`nacht`, `kino`, `nuketown`, `riese`, `pueblo`). A map is plain boxes,
+decoration, windows, a navigation graph, doors with prices and the zones
+they open, and where the perks, the box, the wall weapons, Pack-a-Punch, the
+power switch and the lava go. It has no THREE and no DOM, so Node can walk
+it. `mundo.js` draws it, `zombis.js` navigates it and
+`juegos/yemas/js/interactivo.js` owns everything that is bought or touched.
+Things to know:
+
+- **The map is chosen with the room** (`partida.mapa`, an option of the
+  yemas card). `mapaYemas` in `motor.js` clamps it to `YM_MAPAS`, the
+  config carries it into the frame, and `red.mapa` reads it. Practice uses
+  `#mapa-practica`. The rules do not validate `mapa`, so this needed no
+  rules change.
+- **What belongs to the room rides the director's `zb` too**, under keys
+  that do not clash with `zombis.js`'s: `o` open doors, `l` power, `k`
+  boards per window, `n` where the box is, `t`/`f`/`w` the teleporter.
+  Points, perks and weapons belong to each player and are paid and given
+  in their own frame.
+- **A non-director asks with a zero-damage hit to `p:<what>`.** `red.js`
+  hands it to `alPeticion`, which calls `inter.peticion`. The asking frame
+  applies a door or the power at once: those only go one way, so the
+  director has nothing to contradict. Boards go both ways, and there the
+  director's state wins.
+- **Perks need the power** except Quick Revive (500 alone, as in BO1). They
+  and Pack-a-Punch are lost on falling. Pack-a-Punch is `conPap` in
+  `armas.js` (double damage, a clip and a half). The box can give the Rayo
+  batido (`10`), the Amasadora (`11`) and the Huevera (`12`), which exist
+  only in zombies, and pulling the teddy bear moves it.
+- **Each dead zombie leaves a green egg** for `HUEVO_VIDA` seconds, drawn
+  in every frame from `zb.m`. In Pueblo, a zombie that steps in the `lava`
+  burns (`quema`) and explodes when it dies, hurting players near it.
 
 **A team win is `ganador: "eq:rojo"`**, and `ganoEn(p, ganador, uid)` in
 `motor.js` is the one place that knows it includes the whole team. `anotar`,
