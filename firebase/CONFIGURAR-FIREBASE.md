@@ -122,7 +122,11 @@ de juegos.
 
 `'ajedrez'` tiene que estar en la lista del campo `juego` y en la de `logros`.
 No hay nodo nuevo: las jugadas van por `jugadas` como en Reversi, y el color
-de quien abre la sala (`color`) entra por `$otro`. Sin publicar, la sala de
+y el ritmo de la sala (`color`, `ritmo`) entran por `$otro`. Con el reloj se
+añadió además una regla a `jugadas/$n/at`: en las salas de ajedrez la hora de
+cada jugada tiene que estar a pocos segundos de la del servidor (de 8 s antes
+a 3 s después). Sin publicarla el reloj funciona igual, pero esa hora no se
+comprueba. Sin publicar, la sala de
 ajedrez no se puede crear. El arreglo es el de siempre: pegar
 `firebase/database.rules.json` entero y **Publicar**, o usar el botón
 **Copiar las reglas** del cartel de la página de juegos.

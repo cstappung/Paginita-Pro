@@ -93,3 +93,33 @@ test('material insuficiente, progreso y votación',()=>{
  assert.ok(progreso(e,'ajedrez')>0);assert.equal(e.perdidas.b.join(),'P');
  e=juega(p,{t:'voto',uid:'a',contra:'b'});assert.equal(e.ganador,'a');assert.equal(e.motivo,'abandono');
 });
+
+/* Reloj: `at` en milisegundos; 3+2 = 180 000 ms y 2 000 de incremento. */
+function cronometrada(p,lista){let e=reducir(p);for(const [s,at] of lista)e=juega(p,{t:'m',uid:e.turno,de:s.slice(0,2),a:s.slice(2,4),at});return e;}
+test('reloj: no corre hasta la primera jugada de cada uno, descuenta e incrementa',()=>{
+ const p=sala({ritmo:'3+2'});let e=reducir(p);
+ assert.equal(e.reloj.w,180000);assert.equal(e.reloj.corre,'');
+ e=cronometrada(p,[['e2e4',1000],['e7e5',50000]]);
+ assert.equal(e.reloj.w,180000);assert.equal(e.reloj.b,180000,'las primeras jugadas no gastan');
+ assert.equal(e.reloj.corre,'w');assert.equal(e.reloj.desde,50000);
+ e=cronometrada(p,[['g1f3',60000]]);
+ assert.equal(e.reloj.w,180000-10000+2000);assert.equal(e.reloj.corre,'b');
+ const q=sala({ritmo:'nada'});assert.equal(reducir(q).reloj,null,'un ritmo desconocido es sin reloj');
+ assert.equal(reducir(sala()).reloj,null);
+});
+test('reloj: jugada tardía, reclamación y tablas por material',()=>{
+ const p=sala({ritmo:'1+0'});let e=cronometrada(p,[['e2e4',0],['e7e5',1000]]);
+ const antes=e.movs.length;
+ e=juega(p,{t:'m',uid:'a',de:'g1',a:'f3',at:1000+60001});
+ assert.equal(e.movs.length,antes,'la jugada tardía no entra');assert.equal(e.fase,'fin');
+ assert.equal(e.ganador,'b');assert.equal(e.motivo,'tiempo');
+ const q=sala({ritmo:'1+0'});cronometrada(q,[['e2e4',0],['e7e5',1000]]);
+ e=juega(q,{t:'tiempo',uid:'b',at:30000});assert.equal(e.fase,'jugando','reclamar antes de tiempo no vale');
+ e=juega(q,{t:'m',uid:'a',de:'g1',a:'f3'});assert.equal(e.movs.length,2,'con reloj, sin hora no hay jugada');
+ e=juega(q,{t:'tiempo',uid:'b',at:61000});assert.equal(e.ganador,'b');assert.equal(e.motivo,'tiempo');
+ /* Frente a quien no puede dar mate, quedarse sin tiempo son tablas. */
+ assert.ok(context.ajNoMata(fen('8/8/8/4k3/8/8/2N5/4K3 w - - 0 1').tab,'w'));
+ assert.ok(context.ajNoMata(fen('8/8/8/4k3/8/8/8/4K3 w - - 0 1').tab,'b'));
+ assert.ok(!context.ajNoMata(fen('8/8/8/4k3/8/8/2NN4/4K3 w - - 0 1').tab,'w'));
+ assert.ok(!context.ajNoMata(fen('8/8/8/4k3/8/8/2P5/4K3 w - - 0 1').tab,'w'));
+});

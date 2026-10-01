@@ -1,28 +1,37 @@
-/* Ajedrez — el de siempre, entre dos y por turnos.
+/* Ajedrez — el de siempre, entre dos y por turnos (o a reloj).
  *
- * Las reglas viven en `motor.js` (`redAjedrez`); esta pantalla solo
- * pinta la posición que sale de repasar el registro y manda jugadas que
- * el reductor ya sabe que son legales, porque las saca de `est.legales`.
+ * Las reglas y el reloj viven en `motor.js` (`redAjedrez`); esta
+ * pantalla pinta la posición que sale de repasar el registro y manda
+ * jugadas que el reductor ya sabe que son legales, porque las saca de
+ * `est.legales`.
  *
  * Decisiones de la pantalla:
  *
- * - **Las piezas se dibujan, no se escriben.** Los caracteres ♚♛♜ son
- *   emoji en algunos móviles (el peón negro sale de color en iOS) y cada
- *   sistema los pinta de un tamaño; como trazos SVG son iguales en todas
- *   partes y se pueden teñir.
+ * - **Las piezas son archivos SVG de juegos de piezas libres**
+ *   (`juegos/ajedrez/piezas/<juego>/wK.svg`, licencias en `LICENCIAS.md`
+ *   de esa carpeta), puestos con `<image>`. No se incrustan: varios
+ *   traen su propio `<style>` con ids, que chocarían entre sí dentro de
+ *   un mismo SVG, y así tampoco engordan el bundle. Cada uno elige el
+ *   suyo (`jg.ajPiezas` en localStorage) y se precargan al montar.
  * - **Se mueve con dos toques o arrastrando**, las dos cosas sobre el
  *   mismo estado `sel`. Tocar una pieza propia marca a dónde puede ir
- *   (punto en vacío, aro en captura); tocar el destino juega. Arrastrar
- *   es lo mismo con la pieza pegada al dedo.
- * - **Tu color va abajo.** Quien mira ve las blancas abajo; ⇅ gira el
- *   tablero para cualquiera.
- * - **La coronación pregunta.** Un peón que llega a la última fila abre
- *   un selector con las cuatro piezas; el reductor rechaza una
- *   coronación sin pieza elegida, así que no hay «dama por defecto».
- * - **La pieza que movió el otro se desliza** desde su casilla de
- *   origen. La animación va en un `<g>` interior: un `transform` de CSS
- *   reemplaza al atributo `transform`, y si fuera el mismo grupo la
- *   pieza saltaría a la esquina del tablero.
+ *   (punto en vacío, aro en captura); tocar el destino juega.
+ * - **Premovimiento.** Con el turno del rival, lo mismo deja una jugada
+ *   apuntada (`pre`): sus destinos son los geométricos de la pieza
+ *   (las piezas propias tapan, las ajenas no, porque pueden moverse) y
+ *   en cuanto llega el turno se manda si es legal en la posición nueva,
+ *   o se descarta con un aviso. Clic derecho o tocar fuera la anula. Es
+ *   solo de esta pantalla: el registro no sabe nada de premovimientos.
+ * - **El reloj se pinta, no se decide.** El tiempo que queda sale del
+ *   reductor (`est.reloj`) y aquí solo se le resta lo que lleva el turno
+ *   que corre, con `ctx.ahora()` (la hora del servidor). Cuando la aguja
+ *   cae, cualquiera de los dos manda `{t:"tiempo"}` y el reductor lo
+ *   comprueba; se reintenta cada segundo y medio por si llega antes de
+ *   tiempo por un desfase de reloj.
+ * - **Tu color va abajo.** Quien mira ve las blancas abajo; ⇅ gira.
+ * - **La coronación pregunta**, también en un premovimiento.
+ * - **La pieza que movió el otro se desliza** desde su origen, en un
+ *   `<g>` interior: un `transform` de CSS reemplaza al atributo.
  */
 import { ajNombre, ajColor } from "./motor.js";
 import { suena } from "./sonido.js";
@@ -32,46 +41,51 @@ const S = 100;
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
-/* ---------- las piezas ----------
-   Cada una en una caja de 100×100 con la base en y = 86. `d` son los
-   detalles: trazos sin relleno en el color contrario. */
-const BASE = '<path d="M24 86V82a4 4 0 0 1 4-4h44a4 4 0 0 1 4 4v4z"/>';
-const FORMAS = {
-  P: '<circle cx="50" cy="30" r="11"/><path d="M41 41h18l-3 6c6 4 10 14 12 31H32c2-17 6-27 12-31z"/>' + BASE,
-  R: '<path d="M30 18h8v7h6v-7h12v7h6v-7h8v15l-6 5v34H36V38l-6-5z"/>' + BASE + '<path class="d" d="M36 38h28M36 72h28"/>',
-  B: '<circle cx="50" cy="15" r="5"/><path d="M50 20c-12 9-14 21-10 30h20c4-9 2-21-10-30z"/><path d="M38 50h24l2 6H36z"/><path d="M38 56c-2 10-4 16-6 22h36c-2-6-4-12-6-22z"/>' + BASE + '<path class="d" d="M55 29l-9 11"/>',
-  N: '<path d="M34 78c0-12 5-18 12-24-6 0-11 4-17 4-6-2-7-8-3-12 6-6 12-12 14-20l-2-10c6 2 10 6 12 8 13 0 22 12 22 30 0 10-2 18-4 24z"/>' + BASE + '<circle class="d" cx="42" cy="33" r="2.4"/><path class="d" d="M57 34c4 6 5 14 4 22"/>',
-  Q: '<circle cx="23" cy="27" r="5"/><circle cx="36" cy="19" r="5"/><circle cx="50" cy="14" r="5"/><circle cx="64" cy="19" r="5"/><circle cx="77" cy="27" r="5"/>' +
-     '<path d="M24 31l9 29h34l9-29-14 15 1-22-9 19-4-23-4 23-9-19 1 22z"/><path d="M33 60h34l3 18H30z"/>' + BASE + '<path class="d" d="M34 66h32"/>',
-  K: '<path d="M47 7h6v6h6v6h-6v8h-6v-8h-6v-6h6z"/><path d="M50 30c-10-4-24 0-22 14 2 8 8 12 8 16h28c0-4 6-8 8-16 2-14-12-18-22-14z"/><path d="M36 60h28l4 18H32z"/>' + BASE + '<path class="d" d="M36 66h28M50 31v28"/>'
-};
-const TINTE = {
-  w: { fill: "#fbf7ee", stroke: "#1e1d22", d: "#1e1d22" },
-  b: { fill: "#2a2a30", stroke: "#0b0b0e", d: "#d8d2c4" }
-};
-export function piezaSvg(x) {
-  const c = ajColor(x), t = TINTE[c], f = FORMAS[x.toUpperCase()];
-  return `<g transform="translate(5 7) scale(.9)" fill="${t.fill}" stroke="${t.stroke}" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round">` +
-    f.replace(/class="d"/g, `fill="none" stroke="${t.d}"`) + "</g>";
+/* ---------- las piezas ---------- */
+export const JUEGOS_PIEZAS = { cburnett: "Clásicas", chessnut: "Chessnut", fantasy: "Fantasía", celtic: "Celtas" };
+let juegoPiezas = "cburnett";
+try { const g = localStorage.getItem("jg.ajPiezas"); if (JUEGOS_PIEZAS[g]) juegoPiezas = g; } catch (e) { /* sin almacenamiento */ }
+
+const urlPieza = (x, j = juegoPiezas) => `juegos/ajedrez/piezas/${j}/${ajColor(x)}${x.toUpperCase()}.svg`;
+/* Una pieza en una caja de 100×100, para meter dentro de un SVG. */
+export const piezaSvg = x => `<image href="${urlPieza(x)}" width="100" height="100"/>`;
+const mini = x => `<img class="jg-aj-mini" src="${urlPieza(x)}" alt="" aria-hidden="true">`;
+function precarga(j) {
+  for (const c of "wb") for (const t of "KQRBNP") { const im = new Image(); im.src = urlPieza(c === "w" ? t : t.toLowerCase(), j); }
 }
-const mini = x => `<svg class="jg-aj-mini" viewBox="10 4 80 86" aria-hidden="true">${piezaSvg(x)}</svg>`;
 
 const CLARA = "#eed9b4", OSCURA = "#b58863";
 const NOMBRE_PIEZA = { q: "Dama", r: "Torre", b: "Alfil", n: "Caballo" };
 const MOTIVO = {
   mate: "Jaque mate.", ahogado: "Tablas por rey ahogado.", material: "Tablas: no queda material para dar mate.",
   repeticion: "Tablas por triple repetición.", cincuenta: "Tablas por la regla de los cincuenta movimientos.",
-  acuerdo: "Tablas de mutuo acuerdo.", rendicion: "Abandono: se rindió.", abandono: "Partida abandonada."
+  acuerdo: "Tablas de mutuo acuerdo.", rendicion: "Abandono: se rindió.", abandono: "Partida abandonada.",
+  tiempo: "Sin tiempo.", tiempomaterial: "Tablas: se acabó el tiempo, pero el rival no tenía con qué dar mate."
 };
+const SALTOS = [[-1, -2], [1, -2], [-2, -1], [2, -1], [-2, 1], [2, 1], [-1, 2], [1, 2]];
+const RAYOS = { B: [[1, 1], [1, -1], [-1, 1], [-1, -1]], R: [[1, 0], [-1, 0], [0, 1], [0, -1]] };
+RAYOS.Q = [...RAYOS.B, ...RAYOS.R];
+
+/* El tiempo como se lee en un reloj de ajedrez: m:ss, y con décimas
+   por debajo de diez segundos, que es cuando importan. */
+function formato(ms) {
+  ms = Math.max(0, ms);
+  if (ms < 10000) return "0:0" + (Math.floor(ms / 100) / 10).toFixed(1);
+  const s = Math.ceil(ms / 1000), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60;
+  const ss = String(s % 60).padStart(2, "0");
+  return h ? `${h}:${String(m).padStart(2, "0")}:${ss}` : `${m}:${ss}`;
+}
 
 export function crearAjedrez(ctx) {
   const { uid, jugar, terminar } = ctx;
   const mirando = !!ctx.mirando;
+  const ahora = ctx.ahora || Date.now;
 
   let host = null, muerto = false;
   let p = null, est = null;
   let sel = -1;                 // casilla seleccionada
-  let corona = null;            // {de, a} mientras se elige pieza
+  let pre = null;               // premovimiento apuntado {de, a, pr}
+  let corona = null;            // {de, a, pre} mientras se elige pieza
   let girado = false;           // ⇅ a mano
   let enviando = false;
   let vistos = -1;              // movimientos vistos la última vez
@@ -79,6 +93,10 @@ export function crearAjedrez(ctx) {
   let propia = -1;              // índice de la jugada mía que no hay que animar
   let rindeHasta = 0, rindeReloj = 0;
   let arr = null;               // arrastre en curso
+  let nota = "", notaHasta = 0; // aviso pasajero en el pie
+  let reclamado = 0;            // última vez que se reclamó el tiempo
+  let avisoPoco = false;        // ya sonó el aviso de poco tiempo
+  let latido = 0;
   const firmas = {};
 
   function montar(donde) {
@@ -98,22 +116,31 @@ export function crearAjedrez(ctx) {
           </div>
           <div class="jg-aj-lado">
             <div id="ajOferta"></div>
-            <div class="jg-aj-hoja"><div class="jg-aj-hoja-t">Jugadas</div><ol class="jg-aj-movs" id="ajMovs"></ol></div>
+            <div class="jg-aj-hoja"><div class="jg-aj-hoja-t" id="ajRitmo">Jugadas</div><ol class="jg-aj-movs" id="ajMovs"></ol></div>
+            <label class="jg-aj-piezas"><span>Piezas</span><select id="ajPiezas">${Object.entries(JUEGOS_PIEZAS).map(([k, t]) =>
+              `<option value="${k}"${k === juegoPiezas ? " selected" : ""}>${t}</option>`).join("")}</select></label>
           </div>
         </div>
         <div class="jg-pie" id="ajPie"></div>
       </div>`;
     host.addEventListener("click", alClic);
     host.addEventListener("pointerdown", alPulsar);
+    host.addEventListener("contextmenu", alMenu);
+    host.addEventListener("change", alCambiar);
+    precarga(juegoPiezas);
+    latido = setInterval(tic, 100);
   }
 
   function destruir() {
     muerto = true;
     clearTimeout(rindeReloj);
+    clearInterval(latido);
     soltarArrastre();
     if (host) {
       host.removeEventListener("click", alClic);
       host.removeEventListener("pointerdown", alPulsar);
+      host.removeEventListener("contextmenu", alMenu);
+      host.removeEventListener("change", alCambiar);
       host.innerHTML = "";
     }
     host = null;
@@ -125,6 +152,7 @@ export function crearAjedrez(ctx) {
   const juego = () => !mirando && est && est.fase === "jugando" && !!miColor();
   const meToca = () => juego() && est.turno === uid;
   const abajo = () => { const c = miColor() || "w"; return girado ? (c === "w" ? "b" : "w") : c; };
+  const avisa = t => { nota = t; notaHasta = Date.now() + 4000; };
 
   function set(id, firma, html) {
     if (firmas[id] === firma) return false;
@@ -136,7 +164,41 @@ export function crearAjedrez(ctx) {
 
   /* Casilla → posición en pantalla según quién va abajo. */
   const pos = i => abajo() === "w" ? { x: (i & 7) * S, y: (i >> 3) * S } : { x: (7 - (i & 7)) * S, y: (7 - (i >> 3)) * S };
-  const destinos = de => (est.legales || []).filter(m => m.de === de);
+
+  /* A dónde puede ir la pieza de `de`: las legales si es tu turno, las
+     de un premovimiento si es el del otro. Para el premovimiento valen
+     las casillas que la pieza alcanza por geometría: una pieza propia
+     tapa (no se va a mover mientras juega el rival), una ajena no
+     (puede irse, o ser justo la que se captura). El enroque se ofrece
+     siempre desde la casilla del rey; si ya no vale, se descarta. */
+  function destinos(de) {
+    if (meToca()) return (est.legales || []).filter(m => m.de === de);
+    const tab = est.tab, x = tab[de], col = miColor(), out = [];
+    if (!x || x === "." || ajColor(x) !== col) return out;
+    const t = x.toUpperCase(), f = de >> 3, c = de & 7;
+    const mia = i => tab[i] !== "." && ajColor(tab[i]) === col;
+    const ult = col === "w" ? 0 : 7;
+    const pon = (ff, cc) => {
+      if (ff < 0 || ff > 7 || cc < 0 || cc > 7) return false;
+      const a = ff * 8 + cc;
+      if (mia(a)) return false;
+      out.push({ de, a, cap: tab[a] !== ".", pr: t === "P" && ff === ult ? "q" : "" });
+      return true;
+    };
+    if (t === "P") {
+      const d = col === "w" ? -1 : 1;
+      pon(f + d, c);
+      if (f === (col === "w" ? 6 : 1) && !mia((f + d) * 8 + c)) pon(f + 2 * d, c);
+      pon(f + d, c - 1); pon(f + d, c + 1);
+    } else if (t === "N") for (const [dc, df] of SALTOS) pon(f + df, c + dc);
+    else if (t === "K") {
+      for (const [dc, df] of RAYOS.Q) pon(f + df, c + dc);
+      if (f === (ult ^ 7) && c === 4) { pon(f, 6); pon(f, 2); }
+    } else for (const [dc, df] of RAYOS[t]) {
+      for (let k = 1; k < 8; k++) if (!pon(f + df * k, c + dc * k)) break;
+    }
+    return out;
+  }
 
   /* ---------- el tablero ---------- */
   function tablero() {
@@ -147,19 +209,20 @@ export function crearAjedrez(ctx) {
       const { x, y } = pos(i), clara = ((i >> 3) + (i & 7)) % 2 === 0;
       out.push(`<rect x="${x}" y="${y}" width="${S}" height="${S}" fill="${clara ? CLARA : OSCURA}"/>`);
       if (ult && (i === ult.de || i === ult.a)) out.push(`<rect class="jg-aj-ult" x="${x}" y="${y}" width="${S}" height="${S}"/>`);
-      if (i === sel) out.push(`<rect class="jg-aj-sel" x="${x}" y="${y}" width="${S}" height="${S}"/>`);
+      if (pre && (i === pre.de || i === pre.a)) out.push(`<rect class="jg-aj-pre" x="${x}" y="${y}" width="${S}" height="${S}"/>`);
+      if (i === sel) out.push(`<rect class="jg-aj-sel${meToca() ? "" : " pre"}" x="${x}" y="${y}" width="${S}" height="${S}"/>`);
       if (i === reyEnJaque) out.push(`<circle class="jg-aj-jaque" cx="${x + 50}" cy="${y + 50}" r="50"/>`);
     }
-    /* Coordenadas dentro del tablero, como en los tableros de madera:
-       las filas en la columna de la izquierda, las letras en la fila de
-       abajo, del color de la casilla contraria para que se lean. */
+    /* Coordenadas dentro del tablero, como en los de madera: las filas
+       en la columna de la izquierda y las letras en la fila de abajo, del
+       color de la casilla contraria para que se lean. */
     for (let k = 0; k < 8; k++) {
       const iz = abajo() === "w" ? k * 8 : (7 - k) * 8 + 7;
-      const fil = ajNombre(iz)[1], cl = ((iz >> 3) + (iz & 7)) % 2 === 0;
-      out.push(`<text class="jg-aj-coord" x="5" y="${k * S + 20}" fill="${cl ? OSCURA : CLARA}">${fil}</text>`);
+      const cl = ((iz >> 3) + (iz & 7)) % 2 === 0;
+      out.push(`<text class="jg-aj-coord" x="5" y="${k * S + 21}" fill="${cl ? OSCURA : CLARA}">${ajNombre(iz)[1]}</text>`);
       const ab = abajo() === "w" ? 56 + k : 7 - k;
-      const col = ajNombre(ab)[0], cl2 = ((ab >> 3) + (ab & 7)) % 2 === 0;
-      out.push(`<text class="jg-aj-coord" x="${k * S + 94}" y="795" text-anchor="end" fill="${cl2 ? OSCURA : CLARA}">${col}</text>`);
+      const cl2 = ((ab >> 3) + (ab & 7)) % 2 === 0;
+      out.push(`<text class="jg-aj-coord" x="${k * S + 95}" y="795" text-anchor="end" fill="${cl2 ? OSCURA : CLARA}">${ajNombre(ab)[0]}</text>`);
     }
     for (let i = 0; i < 64; i++) {
       const x = est.tab[i];
@@ -175,26 +238,27 @@ export function crearAjedrez(ctx) {
     }
     if (sel >= 0) for (const m of destinos(sel)) {
       if (m.pr && m.pr !== "q") continue;
-      const { x, y } = pos(m.a);
+      const { x, y } = pos(m.a), cl = meToca() ? "" : " pre";
       out.push(m.cap
-        ? `<circle class="jg-aj-cap" cx="${x + 50}" cy="${y + 50}" r="44"/>`
-        : `<circle class="jg-aj-punto" cx="${x + 50}" cy="${y + 50}" r="15"/>`);
+        ? `<circle class="jg-aj-cap${cl}" cx="${x + 50}" cy="${y + 50}" r="44"/>`
+        : `<circle class="jg-aj-punto${cl}" cx="${x + 50}" cy="${y + 50}" r="15"/>`);
     }
     out.push("</svg>");
     if (corona) {
       const c = miColor();
       out.push(`<div class="jg-aj-corona" role="dialog" aria-label="Elige la pieza de la coronación">
-        <div>Coronar en ${ajNombre(corona.a)}</div>
+        <div>${corona.pre ? "Premovimiento: coronar" : "Coronar"} en ${ajNombre(corona.a)}</div>
         <div class="jg-aj-corona-ops">${"qrbn".split("").map(t =>
-          `<button class="jg-aj-op" data-pr="${t}" title="${NOMBRE_PIEZA[t]}"><svg viewBox="10 4 80 86">${piezaSvg(c === "w" ? t.toUpperCase() : t)}</svg></button>`).join("")}</div>
+          `<button class="jg-aj-op" data-pr="${t}" title="${NOMBRE_PIEZA[t]}"><svg viewBox="0 0 100 100">${piezaSvg(c === "w" ? t.toUpperCase() : t)}</svg></button>`).join("")}</div>
         <button class="btn2 jg-aj-op-no" data-pr="">Cancelar</button>
       </div>`);
     }
     return out.join("");
   }
 
-  /* La placa de un jugador: nombre, bando, lo que lleva capturado y la
-     ventaja de material, que es lo que se mira para saber cómo va. */
+  /* La placa de un jugador: nombre, lo que lleva capturado, la ventaja
+     de material y su reloj. El número del reloj no entra en la firma:
+     lo cambia `tic` sin repintar la placa. */
   function placa(color) {
     const u = color === "w" ? est.blancas : est.negras;
     const j = jugadorDe(u);
@@ -203,12 +267,14 @@ export function crearAjedrez(ctx) {
     const ventaja = (est.material[color] || 0) - (est.material[color === "w" ? "b" : "w"] || 0);
     const turno = est.fase === "jugando" && est.turno === u;
     const foto = j.foto ? `<img src="${esc(j.foto)}" alt="">` : esc((j.nombre || "?").slice(0, 1).toUpperCase());
+    const reloj = est.reloj ? `<span class="jg-aj-reloj ${color}" data-c="${color}" role="timer" aria-label="Tiempo de ${color === "w" ? "blancas" : "negras"}">${formato(est.reloj[color])}</span>` : "";
     const html = `<span class="jg-aj-av" style="--c:${esc(j.color || "#888")}">${foto}</span>
       <span class="jg-aj-quien"><b>${esc(u === uid ? "Tú" : j.nombre)}</b>
         <span class="jg-aj-caps">${lleva.map(t => mini(color === "w" ? t.toLowerCase() : t)).join("")}${ventaja > 0 ? `<em>+${ventaja}</em>` : ""}</span></span>
       <span class="jg-grow"></span>
-      <span class="jg-aj-bando ${color}${turno ? " on" : ""}">${turno ? (u === uid ? "Te toca · " : "Le toca · ") : ""}${color === "w" ? "Blancas" : "Negras"}</span>`;
-    return { firma: [u, j.nombre, j.foto, j.color, lleva.join(""), ventaja, turno].join("|"), html };
+      <span class="jg-aj-bando ${color}${turno ? " on" : ""}">${turno ? (u === uid ? "Te toca · " : "Le toca · ") : ""}${color === "w" ? "Blancas" : "Negras"}</span>
+      ${reloj}`;
+    return { firma: [u, j.nombre, j.foto, j.color, lleva.join(""), ventaja, turno, !!est.reloj, juegoPiezas].join("|"), html };
   }
 
   function hoja() {
@@ -237,8 +303,8 @@ export function crearAjedrez(ctx) {
     else if (est.fase === "fin") {
       const m = MOTIVO[est.motivo] || "";
       if (!est.ganador) fase = m || "Tablas.";
-      else if (est.ganador === uid) fase = "🏆 Ganas. " + m;
-      else if (miColor() && !mirando) fase = "Pierdes. " + m;
+      else if (est.ganador === uid) fase = "🏆 Ganas. " + (est.motivo === "tiempo" ? "Al rival se le acabó el tiempo." : m);
+      else if (miColor() && !mirando) fase = "Pierdes. " + (est.motivo === "tiempo" ? "Se te acabó el tiempo." : m);
       else fase = `Gana ${nombreDe(est.ganador)}. ${m}`;
     } else if (meToca()) fase = est.jaque ? "¡Jaque! Te toca salir de él" : "Te toca mover";
     else fase = `Le toca a ${nombreDe(est.turno)}` + (est.jaque ? " (en jaque)" : "");
@@ -250,18 +316,21 @@ export function crearAjedrez(ctx) {
     set("ajArriba", pa.firma, pa.html);
     set("ajAbajo", pb.firma, pb.html);
 
-    const firmaTab = [est.tab.join(""), sel, est.ultima ? est.ultima.de + "-" + est.ultima.a : "", est.jaque, ab,
-      est.turno, est.fase, corona ? corona.de + "-" + corona.a : "", juego()].join("|");
+    const firmaTab = [est.tab.join(""), sel, pre ? pre.de + "-" + pre.a : "", est.ultima ? est.ultima.de + "-" + est.ultima.a : "",
+      est.jaque, ab, est.turno, est.fase, corona ? corona.de + "-" + corona.a : "", juego(), juegoPiezas].join("|");
     if (set("ajTab", firmaTab, tablero())) animar = null;
 
     if (set("ajMovs", String(est.movs.length), hoja())) {
       const ol = host.querySelector("#ajMovs");
       if (ol) ol.scrollTop = ol.scrollHeight;
     }
+    const r = est.reloj;
+    set("ajRitmo", r ? r.base + "+" + r.inc : "", r ? `Jugadas · ${r.base / 60000}+${r.inc / 1000}` : "Jugadas · sin reloj");
 
     let oferta = "";
+    const rival = uid === est.blancas ? est.negras : est.blancas;
     if (est.oferta && juego()) oferta = est.oferta === uid
-      ? `<div class="jg-aj-aviso">Has ofrecido tablas. Si ${esc(nombreDe(est.turno === uid ? (uid === est.blancas ? est.negras : est.blancas) : est.turno))} mueve, la rechaza.</div>`
+      ? `<div class="jg-aj-aviso">Has ofrecido tablas. Si ${esc(nombreDe(rival))} mueve, la rechaza.</div>`
       : `<div class="jg-aj-aviso on"><b>${esc(nombreDe(est.oferta))} ofrece tablas.</b>
           <span><button class="btn" data-acc="acepta">Aceptar</button><button class="btn2" data-acc="rechaza">Rechazar</button></span></div>`;
     else if (est.oferta) oferta = `<div class="jg-aj-aviso">${esc(nombreDe(est.oferta))} ha ofrecido tablas.</div>`;
@@ -270,40 +339,103 @@ export function crearAjedrez(ctx) {
     set("ajBtns", [juego(), est.oferta, (est.ofrecio || {})[uid], est.movs.length, enviando, Date.now() < rindeHasta].join("|"), botones());
 
     let pie;
-    if (est.fase === "espera") pie = "Pásale el enlace de la sala a quien quieras y empezáis.";
-    else if (est.fase === "fin") pie = `Partida terminada en ${Math.ceil(est.movs.length / 2)} jugadas.`;
+    if (Date.now() < notaHasta) pie = nota;
+    else if (est.fase === "espera") pie = "Pásale el enlace de la sala a quien quieras y empezáis.";
+    else if (est.fase === "fin") { const n = Math.ceil(est.movs.length / 2); pie = `Partida terminada en ${n} jugada${n === 1 ? "" : "s"}.`; }
     else if (mirando || !miColor()) pie = "Estás mirando la partida.";
     else if (meToca()) pie = sel >= 0 ? "Toca la casilla de destino, o arrastra la pieza." : "Toca una pieza tuya para ver a dónde puede ir, o arrástrala.";
-    else pie = `Juegas con ${miColor() === "w" ? "blancas" : "negras"}. Espera la jugada de ${nombreDe(est.turno)}.`;
+    else if (pre) pie = `Premovimiento apuntado: ${ajNombre(pre.de)}–${ajNombre(pre.a)}. Sale solo en cuanto te toque, si es legal. Clic derecho o toca fuera para anularlo.`;
+    else pie = `Juegas con ${miColor() === "w" ? "blancas" : "negras"}. Mientras ${nombreDe(est.turno)} piensa, puedes dejar un premovimiento.`;
+    if (est.fase === "jugando" && r && !r.corre && est.movs.length < 2 && !(Date.now() < notaHasta)) pie += " El reloj empieza cuando cada uno haya hecho su primera jugada.";
     if (est.fase === "jugando" && est.medio >= 80) pie += ` Quedan ${Math.ceil((100 - est.medio) / 2)} jugadas para tablas por la regla de los cincuenta movimientos.`;
     set("ajPie", pie, `<span class="jg-nota">${esc(pie)}</span>`);
+    tic();
+  }
+
+  /* ---------- el reloj ---------- */
+  const queda = c => {
+    const r = est && est.reloj;
+    if (!r) return 0;
+    return Math.max(0, r[c] - (r.corre === c ? Math.max(0, ahora() - r.desde) : 0));
+  };
+  function tic() {
+    if (!host || !est || !est.reloj) return;
+    const r = est.reloj, poco = Math.min(20000, Math.max(10000, r.base / 10));
+    for (const el of host.querySelectorAll(".jg-aj-reloj")) {
+      const c = el.getAttribute("data-c"), t = queda(c);
+      const txt = formato(t);
+      if (el.textContent !== txt) el.textContent = txt;
+      el.classList.toggle("on", r.corre === c);
+      el.classList.toggle("poco", t < poco && est.fase === "jugando");
+    }
+    if (est.fase !== "jugando" || !r.corre) return;
+    const t = queda(r.corre);
+    if (juego() && r.corre === miColor() && t < 10000 && !avisoPoco) { avisoPoco = true; suena("turno"); }
+    /* La aguja cayó: se reclama. El reductor solo lo acepta si de verdad
+       pasó el tiempo; si el reloj de este navegador iba adelantado, se
+       vuelve a intentar en un momento. */
+    if (t <= 0 && juego() && Date.now() - reclamado > 1500) {
+      reclamado = Date.now();
+      jugar({ t: "tiempo", uid, at: ahora() });
+    }
   }
 
   /* ---------- jugar ---------- */
   async function envia(j) {
-    if (enviando) return;
+    if (enviando) return false;
     enviando = true;
     pinta();
-    try { await jugar(Object.assign({ uid }, j)); }
-    finally { if (!muerto) { enviando = false; pinta(); } }
+    try { await jugar(Object.assign({ uid, at: ahora() }, j)); }
+    finally {
+      if (!muerto) {
+        enviando = false;
+        if (pre && meToca()) ejecutaPre();
+        pinta();
+      }
+    }
+    return true;
+  }
+
+  const mueve = (de, a, pr) => {
+    propia = est.movs.length;
+    envia(Object.assign({ t: "m", de: ajNombre(de), a: ajNombre(a) }, pr ? { pr } : {}));
+  };
+
+  /* El premovimiento sale en cuanto llega el turno, si es legal en la
+     posición nueva; si no, se descarta y se dice. */
+  function ejecutaPre() {
+    if (!pre || !meToca() || enviando) return;
+    const q = pre;
+    pre = null;
+    const m = (est.legales || []).find(x => x.de === q.de && x.a === q.a && (x.pr || "") === (q.pr || ""));
+    if (m) mueve(m.de, m.a, m.pr);
+    else avisa("El premovimiento ya no era legal y se anuló.");
   }
 
   function intenta(de, a) {
     const ms = destinos(de).filter(m => m.a === a);
     if (!ms.length) return false;
     sel = -1;
-    if (ms.some(m => m.pr)) { corona = { de, a }; pinta(); return true; }
-    propia = est.movs.length;
-    envia({ t: "m", de: ajNombre(de), a: ajNombre(a) });
+    const conPieza = ms.some(m => m.pr);
+    if (!meToca()) {
+      if (conPieza) corona = { de, a, pre: true };
+      else pre = { de, a };
+      pinta();
+      return true;
+    }
+    if (conPieza) { corona = { de, a }; pinta(); return true; }
+    mueve(de, a);
     pinta();
     return true;
   }
 
   function tocar(i) {
-    if (!meToca() || corona) return;
+    if (!juego() || corona) return;
     if (sel >= 0 && i !== sel && intenta(sel, i)) return;
     const x = est.tab[i];
-    sel = (x !== "." && ajColor(x) === miColor() && i !== sel && destinos(i).length) ? i : -1;
+    const otra = x !== "." && ajColor(x) === miColor() && i !== sel && destinos(i).length;
+    if (!otra && !meToca()) pre = null;          // tocar fuera anula el premovimiento
+    sel = otra ? i : -1;
     pinta();
   }
 
@@ -319,48 +451,65 @@ export function crearAjedrez(ctx) {
 
   function alClic(ev) {
     const b = ev.target.closest("[data-acc],[data-pr]");
-    if (b && host.contains(b)) {
-      if (b.hasAttribute("data-pr")) {
-        const pr = b.getAttribute("data-pr"), c = corona;
-        corona = null;
-        if (pr && c) { propia = est.movs.length; envia({ t: "m", de: ajNombre(c.de), a: ajNombre(c.a), pr }); }
-        pinta();
-        return;
+    if (!b || !host.contains(b)) return;
+    if (b.hasAttribute("data-pr")) {
+      const pr = b.getAttribute("data-pr"), c = corona;
+      corona = null;
+      if (pr && c) {
+        if (c.pre) { pre = { de: c.de, a: c.a, pr }; if (meToca()) ejecutaPre(); }
+        else if (meToca()) mueve(c.de, c.a, pr);
       }
-      const acc = b.getAttribute("data-acc");
-      if (acc === "girar") { girado = !girado; sel = -1; pinta(); return; }
-      if (!juego()) return;
-      if (acc === "tablas") envia({ t: "tablas" });
-      else if (acc === "acepta") envia({ t: "acepta" });
-      else if (acc === "rechaza") envia({ t: "rechaza" });
-      else if (acc === "rinde") {
-        if (Date.now() < rindeHasta) { rindeHasta = 0; envia({ t: "rinde" }); }
-        else {
-          rindeHasta = Date.now() + 3000;
-          clearTimeout(rindeReloj);
-          rindeReloj = setTimeout(() => { if (!muerto) pinta(); }, 3100);
-          pinta();
-        }
+      pinta();
+      return;
+    }
+    const acc = b.getAttribute("data-acc");
+    if (acc === "girar") { girado = !girado; sel = -1; pinta(); return; }
+    if (!juego()) return;
+    if (acc === "tablas") envia({ t: "tablas" });
+    else if (acc === "acepta") envia({ t: "acepta" });
+    else if (acc === "rechaza") envia({ t: "rechaza" });
+    else if (acc === "rinde") {
+      if (Date.now() < rindeHasta) { rindeHasta = 0; envia({ t: "rinde" }); }
+      else {
+        rindeHasta = Date.now() + 3000;
+        clearTimeout(rindeReloj);
+        rindeReloj = setTimeout(() => { if (!muerto) pinta(); }, 3100);
+        pinta();
       }
     }
   }
 
-  /* El arrastre. Se decide al soltar: si el puntero no se movió, fue
-     un toque (lo que haría el clic); si se movió, la pieza va a la
-     casilla de debajo o vuelve a la suya. Mientras tanto la pieza real
-     se esconde y una copia sigue al puntero. */
+  function alMenu(ev) {
+    if (!ev.target.closest("#ajSvg")) return;
+    ev.preventDefault();
+    if (pre || sel >= 0) { pre = null; sel = -1; soltarArrastre(); firmas.ajTab = ""; pinta(); }
+  }
+
+  function alCambiar(ev) {
+    if (ev.target.id !== "ajPiezas") return;
+    const j = ev.target.value;
+    if (!JUEGOS_PIEZAS[j]) return;
+    juegoPiezas = j;
+    try { localStorage.setItem("jg.ajPiezas", j); } catch (e) { /* sin almacenamiento */ }
+    precarga(j);
+    pinta();
+  }
+
+  /* El arrastre. Se decide al soltar: si el puntero no se movió, fue un
+     toque; si se movió, la pieza va a la casilla de debajo (jugada o
+     premovimiento) o vuelve a la suya. Mientras tanto la pieza real se
+     atenúa y una copia sigue al puntero. */
   function alPulsar(ev) {
     if (ev.button > 0 || !est || corona) return;
     if (!ev.target.closest("#ajSvg")) return;
     const i = casillaEn(ev);
-    if (i < 0 || !meToca()) return;
+    if (i < 0 || !juego()) return;
     ev.preventDefault();
     const x = est.tab[i];
     const propiaPieza = x !== "." && ajColor(x) === miColor() && destinos(i).length;
     if (!propiaPieza) { tocar(i); return; }
-    const svg = host.querySelector("#ajSvg");
-    arr = { de: i, x0: ev.clientX, y0: ev.clientY, mueve: false, era: sel, id: ev.pointerId, svg, fant: null };
-    if (sel !== i) { sel = i; pinta(); arr.svg = host.querySelector("#ajSvg"); }
+    arr = { de: i, x0: ev.clientX, y0: ev.clientY, mueve: false, era: sel, id: ev.pointerId, fant: null };
+    if (sel !== i) { sel = i; pinta(); }
     window.addEventListener("pointermove", alMover);
     window.addEventListener("pointerup", alSoltar);
     window.addEventListener("pointercancel", soltarArrastre);
@@ -382,7 +531,7 @@ export function crearAjedrez(ctx) {
       arr.fant.innerHTML = piezaSvg(est.tab[arr.de]);
       svg.appendChild(arr.fant);
     }
-    arr.fant.setAttribute("transform", `translate(${vx},${vy}) scale(1.08)`);
+    arr.fant.setAttribute("transform", `translate(${vx},${vy}) scale(1.1)`);
   }
 
   function alSoltar(ev) {
@@ -423,12 +572,15 @@ export function crearAjedrez(ctx) {
     if (vistos >= 0 && n > vistos) {
       const m = est.movs[n - 1];
       suenaJugada(m);
-      /* Mi jugada ya la vi moverse con el dedo; la suya se desliza. */
+      /* Mi jugada ya la vi moverse; la suya se desliza. */
       if (n - 1 !== propia && !document.hidden) animar = { de: m.de, a: m.a };
-      sel = -1; corona = null;
+      sel = -1;
+      if (corona && !corona.pre) corona = null;
+      if (est.reloj && est.reloj.corre === miColor() && queda(miColor()) >= 10000) avisoPoco = false;
     }
     vistos = n;
-    if (!meToca()) { sel = -1; corona = null; }
+    if (!juego()) { sel = -1; corona = null; pre = null; }
+    if (pre && meToca()) ejecutaPre();
     pinta();
     if (est.ganador !== null && est.ganador !== undefined && !(p.fin && p.fin.at)) {
       terminar(est.ganador, est.motivo);

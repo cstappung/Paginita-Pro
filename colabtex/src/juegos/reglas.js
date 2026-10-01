@@ -137,7 +137,14 @@ const REGLAS = {
         "Puedes <b>ofrecer tablas</b> una vez por jugada; si el otro mueve sin aceptar, la oferta queda rechazada. También puedes <b>rendirte</b> (hay que pulsar dos veces)."
       ])],
       ["Notación", "La hoja de jugadas usa las letras en español: <b>R</b> rey, <b>D</b> dama, <b>T</b> torre, <b>A</b> alfil, <b>C</b> caballo; el peón no lleva letra. «x» es captura, «+» jaque, «#» mate y O-O / O-O-O los enroques."],
-      ["Sin reloj", "No hay tiempo por jugada. Si el rival se queda dormido, puedes proponer expulsarlo con ⏏ tras un rato sin movimiento: en un duelo eso te da la partida."]
+      ["Reloj", lista([
+        "Quien abre la sala elige el ritmo: <b>Bala</b> (1+0, 2+1), <b>Blitz</b> (3+0, 3+2, 5+0, 5+3), <b>Rápida</b> (10+0, 10+5, 15+10), <b>Clásica</b> (30+0, 30+20) o sin reloj. «3+2» son tres minutos para cada uno y dos segundos más por cada jugada que haces.",
+        "El reloj no corre hasta que cada uno ha hecho su primera jugada. Después corre el de quien tiene el turno.",
+        "Si se te acaba el tiempo, pierdes; pero si al rival solo le queda el rey, o el rey y un alfil o un caballo, no puede darte mate y la partida acaba en tablas.",
+        "Sin reloj, si el rival se queda dormido puedes proponer expulsarlo con ⏏ tras un rato sin movimiento: en un duelo eso te da la partida."
+      ])],
+      ["Premovimiento", "Mientras el rival piensa puedes dejar tu siguiente jugada apuntada: toca o arrastra una pieza como siempre y la casilla se marca en rojo. En cuanto él mueve, la tuya sale sola si sigue siendo legal; si no, se anula. Clic derecho, o tocar una casilla vacía, la cancela."],
+      ["Piezas", "Debajo de la hoja de jugadas eliges el dibujo de las piezas: Clásicas, Chessnut, Fantasía o Celtas. Se recuerda en este navegador."]
     ]
   },
   cadena: {

@@ -33,7 +33,7 @@ import { crearSolo } from "./juegos/solo/club.js";
 import { watchAuth, loginGoogle, logout } from "./firebase.js";
 import * as fb from "./fb-juegos.js";
 import { escapeHtml, timeAgo, colorForUid } from "./util.js";
-import { JUEGOS, reducir, jugadasDe, acumula, cupoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, ganoEn, ordenaRanks, novedades } from "./juegos/motor.js";
+import { AJ_RITMOS, JUEGOS, reducir, jugadasDe, acumula, cupoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, ganoEn, ordenaRanks, novedades } from "./juegos/motor.js";
 import { crearEscondite } from "./juegos/escondite.js";
 import { crearCartas } from "./juegos/cartas.js";
 import { crearCuadritos } from "./juegos/cuadritos.js";
@@ -91,6 +91,8 @@ const OPCIONES = {
   /* En el ajedrez lo único que se elige es el color de quien abre; «al
      azar» lo decide la semilla de la sala, que nadie controla. */
   ajedrez: [
+    { clave: "ritmo", etiqueta: "Ritmo", por: "10+0",
+      valores: [...Object.keys(AJ_RITMOS).map(v => ({ v, t: `${AJ_RITMOS[v]} · ${v}` })), { v: "libre", t: "Sin reloj" }] },
     { clave: "color", etiqueta: "Color de quien abre", por: "azar",
       valores: [{ v: "azar", t: "Al azar" }, { v: "blancas", t: "Blancas" }, { v: "negras", t: "Negras" }] }
   ],
@@ -1585,7 +1587,9 @@ const RAZONES = {
   repeticion: "La misma posición se repitió tres veces.",
   cincuenta: "Cincuenta jugadas sin capturas ni movimientos de peón.",
   acuerdo: "Tablas de mutuo acuerdo.",
-  rendicion: "El rival se rindió."
+  rendicion: "El rival se rindió.",
+  tiempo: "Al rival se le acabó el tiempo.",
+  tiempomaterial: "Se acabó un reloj, pero el otro no tenía con qué dar mate: tablas."
 };
 const razon = m => RAZONES[m] || "";
 const nombreDe = (est, uid) => {
@@ -1914,7 +1918,7 @@ function arteJuego(k) {
   if (k === "tetris") return '<div class="jg-art-tt">' + ["....ll", "t..zll", "ttzzoo", "itsjoo", "issjjj"].map(f => [...f].map(c => '<i class="' + (c === "." ? "" : "p-" + c) + '"></i>').join("")).join("") + '<em>TETRIS</em></div>';
   if (k === "yemas") return '<div class="jg-art-ym"><i></i><i></i><i></i><b></b><em>YEMAS</em></div>';
   if (k === "clue") return '<div class="jg-art-cl"><i></i><i></i><i></i><b>✉</b><s>🔍</s><em>CLUE</em></div>';
-  if (k === "ajedrez") return '<div class="jg-art-aj">' + ["r", "Q", "n", "K", "p"].map(x => '<svg viewBox="10 4 80 86" aria-hidden="true">' + piezaSvg(x) + '</svg>').join("") + '</div>';
+  if (k === "ajedrez") return '<div class="jg-art-aj">' + ["r", "Q", "n", "K", "p"].map(x => '<svg viewBox="0 0 100 100" aria-hidden="true">' + piezaSvg(x) + '</svg>').join("") + '</div>';
   if (k === "cuadritos") return '<div class="jg-art-dots">' + Array.from({ length: 9 }, (_, i) => '<i class="' + (i % 3 === 0 ? "llena" : "") + '"></i>').join("") + '</div>';
   return '<div class="jg-art-land"><i></i><i></i><i></i><b>⌖</b><span>ENCUENTRA LO INVISIBLE</span></div>';
 }

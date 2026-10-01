@@ -147,6 +147,7 @@
             ".validate": "newData.hasChildren(['t', 'uid']) && newData.child('t').isString() && newData.child('t').val().length <= 16 && $n.length >= 4",
             "h": { ".validate": "newData.isString() && newData.val().length <= 80" },
             "sal": { ".validate": "newData.isString() && newData.val().length <= 40" },
+            "at": { ".validate": "root.child('partidas').child($pid).child('juego').val() !== 'ajedrez' || (newData.isNumber() && newData.val() <= now + 3000 && newData.val() >= now - 8000)" },
             "$otro": { ".validate": true }
           }
         },

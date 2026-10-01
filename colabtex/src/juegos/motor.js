@@ -6188,12 +6188,34 @@ export function blancoTetris(est, uid) {
 
    Las tablas que en un torneo se *reclaman* aquí son automáticas: la
    triple repetición y los cincuenta movimientos sin captura ni peón.
-   Reclamarlas exigiría que el reductor supiera de tiempo y de intención,
-   y sin árbitro lo honrado es que la regla se aplique sola, igual en las
-   dos pantallas. No hay reloj por lo mismo que en el resto de juegos:
-   las jugadas no llevan hora y el reductor no puede contarla; para el
-   que se duerme está la votación.
+   Reclamarlas exigiría que el reductor supiera de intención, y sin
+   árbitro lo honrado es que la regla se aplique sola, igual en las dos
+   pantallas.
+
+   El reloj (`ritmo` de la sala, «3+2» = tres minutos y dos segundos de
+   incremento) se lleva con la hora que trae cada jugada (`at`, el reloj
+   del navegador corregido con el del servidor). Como en lichess, no
+   corre hasta que cada bando ha hecho su primera jugada. A cada jugada
+   se le descuenta lo que pasó desde la anterior y se le suma el
+   incremento; una que llega cuando ya no le quedaba tiempo no cuenta y
+   pierde por tiempo. Si nadie mueve, cualquiera de los dos manda
+   `{t:"tiempo", at}` al ver la aguja caer y el reductor lo comprueba.
+   El límite honrado: la hora la pone el cliente, y las reglas de la base
+   solo la acotan a unos segundos del reloj del servidor.
    ============================================================ */
+/* Los ritmos que se ofrecen: minutos + segundos de incremento. */
+export const AJ_RITMOS = {
+  "1+0": "Bala", "2+1": "Bala", "3+0": "Blitz", "3+2": "Blitz", "5+0": "Blitz", "5+3": "Blitz",
+  "10+0": "Rápida", "10+5": "Rápida", "15+10": "Rápida", "30+0": "Clásica", "30+20": "Clásica"
+};
+/* El ritmo de la sala en milisegundos, o null si se juega sin reloj (o
+   la sala es de antes de que hubiera reloj). */
+export function ajRitmo(p) {
+  const r = p && p.ritmo;
+  if (!r || !AJ_RITMOS[r]) return null;
+  const [m, s] = r.split("+").map(Number);
+  return { base: m * 60000, inc: s * 1000 };
+}
 const AJ_INICIAL = "rnbqkbnrpppppppp" + ".".repeat(32) + "PPPPPPPPRNBQKBNR";
 const AJ_VALOR = { P: 1, N: 3, B: 3, R: 5, Q: 9, K: 0 };
 /* Español: rey, dama, torre, alfil, caballo. */
@@ -6425,16 +6447,24 @@ export function redAjedrez(p, js = jugadoresDe(p)) {
   /* Rehacer cien jugadas con su generador de legales en cada repintado
      es poco, pero repintar ocurre en cada tic; se recuerda la respuesta
      por la lista de jugadas. */
-  const clave = (bandos ? bandos.w + "|" + bandos.b : "-") + "|" +
-    jug.map(j => [j.t, j.uid, j.de, j.a, j.pr].join(",")).join(";");
+  const ritmo = ajRitmo(p);
+  const clave = (bandos ? bandos.w + "|" + bandos.b : "-") + "|" + (p.ritmo || "") + "|" +
+    jug.map(j => [j.t, j.uid, j.de, j.a, j.pr, j.at].join(",")).join(";");
   if (ajCache.has(clave)) return ajCache.get(clave);
-  const r = ajRepasa(bandos, jug);
+  const r = ajRepasa(bandos, jug, ritmo);
   if (ajCache.size > 24) ajCache.delete(ajCache.keys().next().value);
   ajCache.set(clave, r);
   return r;
 }
 
-function ajRepasa(bandos, jug) {
+/* ¿Puede `color` dar mate con lo que le queda? Si no (solo el rey, o el
+   rey y una pieza menor), quedarse sin tiempo frente a él son tablas. */
+function ajNoMata(tab, color) {
+  const suyas = tab.filter(x => x !== "." && ajColor(x) === color && x.toUpperCase() !== "K");
+  return suyas.length === 0 || (suyas.length === 1 && "NB".includes(suyas[0].toUpperCase()));
+}
+
+function ajRepasa(bandos, jug, ritmo = null) {
   let pos = ajPosInicial();
   let legales = ajLegales(pos);
   const vistas = { [ajClave(pos, legales)]: 1 };
@@ -6443,6 +6473,16 @@ function ajRepasa(bandos, jug) {
   const ofrecio = {};                 // uid → en qué medio movimiento ofreció
   const colorDe = u => (!bandos ? "" : u === bandos.w ? "w" : u === bandos.b ? "b" : "");
   const rival = u => (u === bandos.w ? bandos.b : bandos.w);
+  const reloj = ritmo ? { w: ritmo.base, b: ritmo.base } : null;
+  let desde = 0;                      // cuándo empezó el turno que corre
+  const corre = () => !!reloj && movs.length >= 2 && desde > 0;
+  /* Se le acabó el tiempo a `color`. */
+  const cae = color => {
+    reloj[color] = 0;
+    const otro = ajOtro(color);
+    if (ajNoMata(pos.tab, otro)) { ganador = ""; motivo = "tiempomaterial"; }
+    else { ganador = bandos[otro]; motivo = "tiempo"; }
+  };
 
   if (bandos) for (const j of jug) {
     if (ganador !== null) break;
@@ -6458,10 +6498,25 @@ function ajRepasa(bandos, jug) {
     }
     if (j.t === "acepta") { if (oferta && oferta !== j.uid) { ganador = ""; motivo = "acuerdo"; } continue; }
     if (j.t === "rechaza") { if (oferta) oferta = ""; continue; }
+    if (j.t === "tiempo") {
+      const at = Number(j.at);
+      if (corre() && Number.isFinite(at) && at - desde >= reloj[pos.color]) cae(pos.color);
+      continue;
+    }
     if (j.t !== "m" || c !== pos.color) continue;
     const de = ajIndice(j.de), a = ajIndice(j.a), pr = j.pr ? String(j.pr).toLowerCase() : "";
     const m = legales.find(x => x.de === de && x.a === a && (x.pr || "") === pr);
     if (!m) continue;                                  // no es legal: no existe
+    if (reloj) {
+      const at = Number(j.at);
+      if (corre()) {
+        if (!Number.isFinite(at)) continue;            // con reloj, una jugada sin hora no existe
+        const gasto = Math.max(0, at - desde);
+        if (gasto > reloj[c]) { cae(c); continue; }    // llegó tarde: pierde por tiempo
+        reloj[c] = reloj[c] - gasto + ritmo.inc;
+      }
+      if (Number.isFinite(at)) desde = Math.max(desde, at);
+    }
     const san = ajSan(pos, m, legales);
     const antes = pos;
     pos = ajAplica(pos, m);
@@ -6495,6 +6550,7 @@ function ajRepasa(bandos, jug) {
     jaque: ajEnJaque(pos), ultima, movs, oferta: fin ? "" : oferta,
     perdidas: ajFuera(pos.tab), material: ajMaterial(pos.tab),
     ofrecio, medio: pos.medio,
+    reloj: reloj ? { w: reloj.w, b: reloj.b, desde, corre: !fin && corre() ? pos.color : "", base: ritmo.base, inc: ritmo.inc } : null,
     ganador, motivo
   };
 }
