@@ -2825,7 +2825,18 @@ formulas, each with an `alias` list for search: «condensador», «termocupla»)
 (UMD `ElectroMotor`, tested by `tests/electro.test.cjs`) everything pure.
 Things that matter:
 
-- **Four modes a day.** Componente and Científico are attribute tables
+- **Three challenges on top** (`retos.js`, UMD `ElectroRetos`), whose target
+  is `"s" + seed` from the date: Bandas (a Mastermind of the resistor colour
+  code, E12 targets, Wordle-style marks per band plus a higher/lower arrow on
+  the value), Circuito (five resistor topologies; answer the current, Req or
+  a voltage within 1.5 %, six tries, the solution steps shown at the end) and
+  Conexiones (NYT Connections: one group per level from `GRUPOS`, no tile
+  repeated across the whole bank so the solution is unique, `choca` keeps
+  confusable groups apart, four mistakes). They can be lost (`hist` entries
+  carry a fourth field, won 0/1, and a lost one scores 0), they add points
+  (`M.puntos`) but **the streak only asks for the four classic modes**
+  (`CLASICOS`), so adding challenges did not break anyone's streak.
+- **Four classic modes a day.** Componente and Científico are attribute tables
   (green equal, yellow «something in common» for list columns, red different,
   with an up/down arrow on numbers and on the ordered `EPOCAS`). Fórmula shows
   the formula with every variable masked and uncovers one per miss, in an order

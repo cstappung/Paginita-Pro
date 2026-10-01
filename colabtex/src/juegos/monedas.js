@@ -68,7 +68,7 @@ export const RECORD = { minas: 30, snake: 8, tetrisclub: 25, sortem: 25, bbtan: 
 function extraRecord(cat, f) {
   if (cat === "club-bbtan-rondas") return Math.floor(Math.min(f.puntos || 0, 1000) / 2);
   if (cat === "club-sopa-racha" || cat === "club-electro-racha") return 10 * Math.min(f.puntos || 0, 60);
-  /* Un día perfecto de Electrodle son 400 puntos: 8 monedas. */
+  /* Un día perfecto de Electrodle son 700 puntos: 14 monedas. */
   if (cat === "club-electro-puntos") return Math.floor(Math.min(f.puntos || 0, 100000) / 50);
   return 0;
 }

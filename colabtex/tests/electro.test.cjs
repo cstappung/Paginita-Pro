@@ -6,6 +6,7 @@ const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const D=require('../../juegos/club/electro/datos.js');
 const S=require('../../juegos/club/electro/simbolos.js');
 const M=require('../../juegos/club/electro/motor.js');
+const X=require('../../juegos/club/electro/retos.js');
 const sin=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8').replace(/^import [\s\S]*?;$/mg,'').replace(/\bexport\s+/g,'');
 const ctx={};vm.createContext(ctx);
 vm.runInContext(sin('src/juegos/solo/club-datos.js')+';globalThis.__C={categoriaClub,resultadoClub};',ctx);
@@ -53,7 +54,7 @@ test('cada símbolo es de un componente y su foco cae dentro del dibujo',()=>{
 });
 
 test('el objetivo del día es el mismo para todos y no se repite en una vuelta',()=>{
- for(const m of M.MODOS){
+ for(const m of M.MODOS.filter(x=>!x.reto)){
   assert.equal(M.objetivoDelDia(m.id,'2026-10-01'),M.objetivoDelDia(m.id,'2026-10-01'));
   const N=m.objetivos.length,inicio=M.numeroDia('2026-01-01'),vistos=[];
   // Una vuelta completa, desde su primer día, trae a todos una vez.
@@ -122,7 +123,7 @@ test('puntos, pistas y buscador',()=>{
 
 test('racha, puntos y tiempo salen de lo terminado',()=>{
  let e=M.vacio();
- const todo=(e,f,n=1)=>{for(const m of M.IDS_MODOS)e=M.registra(e,f,m,n,1000);return e;};
+ const todo=(e,f,n=1)=>{for(const m of M.CLASICOS)e=M.registra(e,f,m,n,1000);return e;};
  e=todo(e,'2026-09-28');e=todo(e,'2026-09-29',3);
  assert.equal(M.racha(e,'2026-09-29'),2);
  assert.equal(M.racha(e,'2026-09-30'),2,'hoy sin terminar no corta la racha de ayer');
@@ -143,7 +144,7 @@ test('limpia descarta lo inválido y mezcla junta dos dispositivos',()=>{
  const sucio={hist:{'2026-02-30':{comp:[100,1,5]},'2026-10-01':{comp:[9999,2,5],nada:[1,1,1],cien:['x',0,1]}},
   prog:{fecha:'2026-10-01',m:{comp:{i:['resistencia','resistencia','inventado'],ms:-5}}}};
  const l=M.limpia(sucio);
- assert.deepEqual(l.hist,{'2026-10-01':{comp:[90,2,5]}},'los puntos se recalculan de los intentos');
+ assert.deepEqual(l.hist,{'2026-10-01':{comp:[90,2,5,1]}},'los puntos se recalculan de los intentos');
  assert.deepEqual(l.prog.m.comp,{i:['resistencia'],ms:0});
  assert.deepEqual(M.limpia(null),M.vacio());assert.deepEqual(M.limpia('basura'),M.vacio());
  const a={hist:{'2026-09-30':{comp:[100,1,10]}},prog:{fecha:'2026-10-01',m:{comp:{i:['led'],ms:5}}}};
@@ -178,4 +179,79 @@ test('las categorías del club, la regla y Discord',()=>{
  assert.match(marcaSolo('club-electro-puntos',{puntos:1200,tiempo:1}),/^⚡ 1.200 pts$/);
  const msg=mensajePodio({categoria:'club-electro-puntos',uid:'a',nombre:'Ana',puesto:1,filas:[{uid:'a',nombre:'Ana',puntos:400,tiempo:9000}],enlace:'https://x/juegos.html#solo/electro'});
  assert.ok(msg&&msg.content.includes('Electrodle · puntos totales'));
+});
+
+test('bandas: código, valor y marcas como en Wordle',()=>{
+ assert.equal(X.valor('472a'),4700);assert.equal(X.textoBandas('472a'),'4,7 kΩ ±5 %');
+ assert.equal(X.textoBandas('1051'),'1 MΩ ±1 %');assert.equal(X.textoBandas('1002'),'10 Ω ±2 %');
+ assert.ok(X.codigoValido('472a'));
+ for(const c of ['072a','4727','47a2','472','472aa',''])assert.ok(!X.codigoValido(c),c);
+ // El objetivo es siempre E12 y cabe en las bandas permitidas.
+ for(let s=1;s<300;s++){const t=X.bandasDe(s*7919);assert.ok(X.codigoValido(t),t);const d=X.deCodigo(t);assert.ok(X.E12.includes(10*d[0]+d[1]),t);}
+ assert.deepEqual(X.comparaBandas('472a','472a'),{e:['si','si','si','si'],flecha:'='});
+ // Rojo tres veces en el intento y dos en el objetivo (una ya verde): un solo
+ // amarillo para el rojo; el café final sí está, en la primera banda.
+ assert.deepEqual(X.comparaBandas('2221','1022').e,['casi','no','si','casi']);
+ assert.deepEqual(X.comparaBandas('2223','1022').e,['casi','no','si','no']);
+ assert.equal(X.comparaBandas('1021','472a').flecha,'↑');assert.equal(X.comparaBandas('1051','472a').flecha,'↓');
+});
+
+test('circuito: respuestas coherentes y lectura de números',()=>{
+ for(let s=1;s<400;s++){
+  const c=X.circuitoDe(s*104729);
+  assert.ok(Number.isFinite(c.resp)&&c.resp>0,c.topo);
+  assert.ok(c.pasos.length>=1&&c.pasos.every(p=>!/NaN|undefined/.test(p)));
+  const req=X.TOPOLOGIAS[c.topo].req(c.R);
+  if(c.pide==='I')assert.ok(Math.abs(c.resp-c.V/req*1000)<1e-9);
+  if(c.pide==='V')assert.ok(c.resp<c.V,'un voltaje interno no supera la fuente');
+  if(c.pide==='Req')assert.ok(Math.abs(c.resp*(c.unidad==='kΩ'?1000:1)-req)<1e-6);
+ }
+ // R1 + R2∥R3 con 1k, 2k2 y 2k2: 2,1 kΩ.
+ assert.equal(X.TOPOLOGIAS.serieparalelo.req([1000,2200,2200]),2100);
+ assert.equal(X.leeNumero('3,9'),3.9);assert.equal(X.leeNumero(' 12.50 '),12.5);
+ for(const t of ['','abc','1e3','-2','3,9,1','1/2'])assert.ok(Number.isNaN(X.leeNumero(t)),t);
+ assert.equal(X.evaluaCircuito('101',100).e,'si');assert.equal(X.evaluaCircuito('108',100).e,'casi');
+ const v=X.evaluaCircuito('50',100);assert.equal(v.e,'no');assert.equal(v.flecha,'↑');
+});
+
+test('conexiones: banco sin fichas repetidas, un grupo por nivel y solución única',()=>{
+ const todas=X.GRUPOS.flatMap(g=>g.f);
+ assert.equal(new Set(todas.map(M.normaliza)).size,todas.length,'ninguna ficha en dos grupos');
+ for(const n of [1,2,3,4])assert.ok(X.GRUPOS.filter(g=>g.nivel===n).length>=3,'nivel '+n);
+ for(const g of X.GRUPOS){assert.ok(g.f.length>=5,g.id);for(const c of g.choca||[])assert.ok(X.GRUPOS.some(h=>h.id===c),c);}
+ for(let s=1;s<300;s++){
+  const c=X.conexionesDe(s*31337);
+  assert.deepEqual(c.grupos.map(g=>g.nivel),[1,2,3,4]);
+  assert.equal(new Set(c.fichas).size,16);
+  for(const g of c.grupos)assert.ok(!(X.GRUPOS.find(h=>h.id===g.id).choca||[]).some(k=>c.grupos.some(h=>h.id===k)),'grupos que chocan');
+ }
+ const c=X.conexionesDe(42),ix=n=>c.fichas.indexOf(n),k=g=>X.claveIntento(g.f.map(ix));
+ assert.ok(X.intentoValido(k(c.grupos[0])));assert.ok(!X.intentoValido('3-1-2-0'));assert.ok(!X.intentoValido('1-1-2-3'));
+ const mal=X.claveIntento([...c.grupos[1].f.slice(0,3),c.grupos[2].f[0]].map(ix));
+ assert.equal(X.evaluaConexiones(c,mal).mejor,3);
+ let e=X.estadoConexiones(c,[k(c.grupos[0]),mal]);assert.deepEqual(e.hallados,[0]);assert.equal(e.errores,1);assert.ok(!e.gano&&!e.perdio);
+ e=X.estadoConexiones(c,c.grupos.map(k));assert.ok(e.gano);
+});
+
+test('los desafíos en el motor: estado, puntos y lo guardado',()=>{
+ assert.deepEqual(M.CLASICOS,['comp','cien','form','simb']);
+ const f='2026-10-01',ob=M.objetivoDelDia('band',f);
+ assert.equal(ob,M.objetivoDelDia('band',f));assert.notEqual(ob,M.objetivoDelDia('band','2026-10-02'));
+ const t=M.reto('band',ob);
+ assert.deepEqual(M.estado('band',ob,[t]),{fin:true,gano:true,fallos:0});
+ const malos=['1001','1011','1021','1031','1041','1051'].filter(x=>x!==t).slice(0,6);
+ assert.equal(M.estado('band',ob,malos).fin,malos.length>=6);
+ assert.equal(M.puntos('band',1,true),100);assert.equal(M.puntos('band',6,true),50);assert.equal(M.puntos('band',6,false),0);
+ assert.equal(M.puntos('conx',4,true),100);assert.equal(M.puntos('conx',7,true),40);assert.equal(M.puntos('comp',12,true),10);
+ assert.ok(M.valida('circ','3.9')&&!M.valida('circ','tres'));assert.ok(M.valida('band','472a')&&!M.valida('band','resistencia'));
+ // Un desafío perdido se guarda sin puntos y no toca la racha.
+ let e=M.registra(M.vacio(),f,'circ',6,1000,false);
+ assert.deepEqual(e.hist[f].circ,[0,6,1000,0]);assert.equal(M.total(e).puntos,0);
+ e=M.registra(e,f,'band',2,500,true);assert.equal(M.total(e).puntos,90);
+ for(const m of M.CLASICOS)e=M.registra(e,f,m,1,1);
+ assert.equal(M.racha(e,f),1,'la racha solo pide los cuatro clásicos');
+ // limpia recalcula los puntos con el campo «ganó» y respeta lo viejo de tres campos.
+ assert.deepEqual(M.limpia({hist:{[f]:{band:[999,3,10,1],comp:[1,2,3]}}}).hist[f],{band:[80,3,10,1],comp:[90,2,3,1]});
+ assert.deepEqual(M.limpia({prog:{fecha:f,m:{circ:{i:['3.9','x'],ms:1}}}}).prog.m.circ.i,['3.9']);
+ assert.match(M.resumen(e,f),/🔋 Circuito: ❌/);
 });

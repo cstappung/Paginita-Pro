@@ -26,7 +26,7 @@ export function resultadoClub(juego, dato) {
   if (juego === 'sopa' && dato.categoria !== 'club-sopa-racha' && dato.puntos !== {8:6,12:10,15:13}[dato.categoria.split('-').pop()]) return null;
   if (dato.categoria === 'club-sopa-racha' && dato.puntos > 1000) return null;
   /* Electrodle: la racha son días (dos años como mucho) y los puntos, la
-     suma de los desafíos diarios (400 por día, a lo más). */
+     suma de los siete modos diarios (700 por día, a lo más). */
   if (dato.categoria === 'club-electro-racha' && dato.puntos > 1000) return null;
   if (dato.categoria === 'club-electro-puntos' && dato.puntos > 1000000) return null;
   return {categoria:dato.categoria,puntos:dato.puntos,tiempo:dato.tiempo,partida:dato.partida};

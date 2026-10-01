@@ -691,7 +691,7 @@ const REGLAS = {
     ]
   },
   electro: {
-    lema: "Electrodle: adivina el componente, el científico, la fórmula y el símbolo eléctrico del día.",
+    lema: "Electrodle: adivina el componente, el científico, la fórmula y el símbolo del día, y resuelve tres desafíos eléctricos.",
     secciones: [
       ["Cómo se juega", "Escribe en el buscador y elige de la lista. Los intentos son ilimitados: cada uno te da información para el siguiente, y el modo termina cuando aciertas."],
       ["Los cuatro modos", lista([
@@ -700,13 +700,18 @@ const REGLAS = {
         "<b>Fórmula</b>: ves la fórmula con las variables tapadas. Cada intento fallido destapa una y, con más fallos, llegan pistas: el área y la inicial.",
         "<b>Símbolo</b>: ves un trozo del símbolo esquemático muy ampliado. Cada intento fallido aleja la vista hasta mostrarlo entero."
       ])],
+      ["Los tres desafíos", lista([
+        "<b>Bandas</b>: una resistencia oculta de la serie E12. Eliges el color de sus cuatro bandas (dos cifras, multiplicador y tolerancia). Cada banda se marca verde si el color va ahí, amarillo si está en otra banda y gris si no está; la flecha dice si el valor real es mayor o menor. Tienes 6 intentos.",
+        "<b>Circuito</b>: un circuito de resistencias con su fuente. Calculas lo que se pide (la corriente, la resistencia equivalente o un voltaje) en la unidad indicada. Verde es a menos de 1,5 %, amarillo a menos de 10 %, y la flecha dice hacia dónde está. Tienes 6 intentos y al final ves la solución paso a paso.",
+        "<b>Conexiones</b>: 16 fichas que forman cuatro grupos de cuatro (unidades, compuertas, colores…), de fácil a retorcido. Eliges cuatro y envías; si tres de ellas son de un mismo grupo te avisa. A la cuarta equivocación se acaba."
+      ])],
       ["Los colores", lista([
         "<b>Verde</b>: igual al correcto.",
         "<b>Amarillo</b>: en las columnas con varios valores (funciones, nacionalidad, área), tienen algo en común pero no todo.",
         "<b>Rojo</b>: distinto. En los números y en la época, la flecha ↑ o ↓ dice si el correcto es mayor o menor."
       ])],
       ["Diario y práctica", "El <b>Diario</b> es el mismo para todo el sitio y cambia a medianoche de Chile. La <b>Práctica</b> elige al azar, cuantas veces quieras, y no suma puntos."],
-      ["Puntos, racha y clasificación", "Cada modo del diario vale 100 puntos a la primera y 10 menos por cada intento extra, nunca menos de 10. Los puntos se acumulan día a día. La 🔥 racha cuenta los días seguidos en que completas los cuatro modos. En la Clasificación compiten los puntos totales y la racha; en empate gana quien tardó menos. Subir al podio se anuncia en Discord."]
+      ["Puntos, racha y clasificación", "Cada modo de adivinar vale 100 puntos a la primera y 10 menos por cada intento extra, nunca menos de 10. Bandas y Circuito valen lo mismo, con un mínimo de 50, y Conexiones 100 menos 20 por error; un desafío que se pierde no suma. Los puntos se acumulan día a día. La 🔥 racha cuenta los días seguidos en que completas los cuatro modos de adivinar (los desafíos son puntos extra). En la Clasificación compiten los puntos totales y la racha; en empate gana quien tardó menos. Subir al podio se anuncia en Discord."]
     ]
   },
   snake: {

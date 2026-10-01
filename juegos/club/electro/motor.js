@@ -6,15 +6,18 @@
    UMD: `ElectroMotor` en la página (después de datos.js y simbolos.js),
    `module.exports` en Node. */
 (function (raiz, fabrica) {
-  if (typeof module === "object" && module.exports) module.exports = fabrica(require("./datos.js"), require("./simbolos.js"));
-  else raiz.ElectroMotor = fabrica(raiz.ElectroDatos, raiz.ElectroSimbolos);
-})(typeof self !== "undefined" ? self : this, function (D, S) {
+  if (typeof module === "object" && module.exports) module.exports = fabrica(require("./datos.js"), require("./simbolos.js"), require("./retos.js"));
+  else raiz.ElectroMotor = fabrica(raiz.ElectroDatos, raiz.ElectroSimbolos, raiz.ElectroRetos);
+})(typeof self !== "undefined" ? self : this, function (D, S, X) {
   "use strict";
 
-  /* ---------- los cuatro modos ----------
-     `lista` es contra lo que se adivina (el buscador); `objetivos`, de
-     dónde sale el del día. En Símbolo se adivina entre todos los
-     componentes, pero solo sale uno que tenga símbolo dibujado. */
+  /* ---------- los modos ----------
+     Cuatro clásicos, de «adivina cuál es»: `lista` es contra lo que se
+     adivina (el buscador); `objetivos`, de dónde sale el del día. En
+     Símbolo se adivina entre todos los componentes, pero solo sale uno que
+     tenga símbolo dibujado. La racha cuenta solo estos cuatro.
+     Tres desafíos (`reto`), que salen de una semilla (retos.js) y se pueden
+     perder: Bandas, Circuito y Conexiones. Suman puntos, no racha. */
   const COLS = {
     comp: [
       { k: "f", t: "Familia", tipo: "cat" },
@@ -42,10 +45,17 @@
       consigna: "¿Qué fórmula es? Las variables están tapadas: cada intento fallido destapa una." },
     { id: "simb", nombre: "Símbolo", icono: "〰️", tipo: "simbolo", lista: D.COMPONENTES,
       objetivos: D.COMPONENTES.filter(c => S.SIMBOLOS[c.id]),
-      consigna: "¿De qué componente es este símbolo? Empieza muy de cerca y se aleja con cada intento fallido." }
+      consigna: "¿De qué componente es este símbolo? Empieza muy de cerca y se aleja con cada intento fallido." },
+    { id: "band", nombre: "Bandas", icono: "🎨", tipo: "bandas", reto: true, lista: [],
+      consigna: "Descubre las cuatro bandas de una resistencia de la serie E12. Cada banda te dice si el color va ahí (verde), está en otra banda (amarillo) o no está (gris), y la flecha, si el valor real es mayor o menor. Tienes 6 intentos." },
+    { id: "circ", nombre: "Circuito", icono: "🔋", tipo: "circuito", reto: true, lista: [],
+      consigna: "Resuelve el circuito. Cada respuesta te dice a cuánto estás: verde a menos de 1,5 %, amarillo a menos de 10 %. Tienes 6 intentos." },
+    { id: "conx", nombre: "Conexiones", icono: "🧩", tipo: "conexiones", reto: true, lista: [],
+      consigna: "Forma cuatro grupos de cuatro fichas que tengan algo en común. Elige cuatro y envía; puedes equivocarte tres veces, a la cuarta se acaba." }
   ];
   const MODO = Object.fromEntries(MODOS.map(m => [m.id, m]));
   const IDS_MODOS = MODOS.map(m => m.id);
+  const CLASICOS = MODOS.filter(m => !m.reto).map(m => m.id);
   for (const m of MODOS) { m.columnas = COLS[m.id] || []; m.objetivos = m.objetivos || m.lista; m.por = Object.fromEntries(m.lista.map(x => [x.id, x])); }
   const item = (modo, id) => (MODO[modo] && MODO[modo].por[id]) || null;
 
@@ -105,11 +115,13 @@
     return p;
   }
   function objetivoDelDia(modo, fecha) {
+    if (MODO[modo].reto) return "s" + hash(`electro:${modo}:${fecha}`);
     const N = MODO[modo].objetivos.length, d = numeroDia(fecha);
     return vuelta(modo, Math.floor(d / N))[((d % N) + N) % N];
   }
   /* La práctica: al azar, pero distinto del anterior. */
   function objetivoAlAzar(modo, rng, distinto) {
+    if (MODO[modo].reto) return "s" + Math.floor(rng() * 4294967296);
     const ids = MODO[modo].objetivos.map(x => x.id).filter(id => id !== distinto);
     return ids[Math.floor(rng() * ids.length)];
   }
@@ -195,6 +207,51 @@
      100 a la primera, 10 menos por cada intento más, nunca menos de 10. */
   const puntosDe = intentos => Math.max(10, 110 - 10 * Math.max(1, intentos));
 
+  /* ---------- los desafíos ----------
+     El objetivo de un desafío es «s» + su semilla; de ahí sale el reto. */
+  const cache = new Map();
+  function reto(modo, obj) {
+    const k = modo + obj;
+    if (!cache.has(k)) {
+      const sem = +String(obj).slice(1) >>> 0;
+      cache.set(k, modo === "band" ? X.bandasDe(sem) : modo === "circ" ? X.circuitoDe(sem) : X.conexionesDe(sem));
+      if (cache.size > 64) cache.delete(cache.keys().next().value);
+    }
+    return cache.get(k);
+  }
+  /* Si un intento tiene la forma que su modo espera. */
+  function valida(modo, x) {
+    if (modo === "band") return X.codigoValido(x);
+    if (modo === "circ") return typeof x === "string" && Number.isFinite(X.leeNumero(x));
+    if (modo === "conx") return X.intentoValido(x);
+    return !!item(modo, x);
+  }
+  /* Cómo va un modo con estos intentos: si terminó, si ganó y cuántos fallos. */
+  function estado(modo, obj, intentos) {
+    const n = intentos.length;
+    if (modo === "band") {
+      const gano = intentos.includes(reto(modo, obj));
+      return { fin: gano || n >= X.INTENTOS_BANDAS, gano, fallos: n - (gano ? 1 : 0) };
+    }
+    if (modo === "circ") {
+      const r = reto(modo, obj), gano = intentos.some(x => { const v = X.evaluaCircuito(x, r.resp); return v && v.e === "si"; });
+      return { fin: gano || n >= X.INTENTOS_CIRCUITO, gano, fallos: n - (gano ? 1 : 0) };
+    }
+    if (modo === "conx") {
+      const s = X.estadoConexiones(reto(modo, obj), intentos);
+      return { fin: s.gano || s.perdio, gano: s.gano, fallos: s.errores, hallados: s.hallados };
+    }
+    const gano = intentos.includes(obj);
+    return { fin: gano, gano, fallos: n - (gano ? 1 : 0) };
+  }
+  /* Los puntos de un modo terminado. Un desafío perdido no suma. */
+  function puntos(modo, n, gano) {
+    if (!MODO[modo].reto) return puntosDe(n);
+    if (!gano) return 0;
+    if (modo === "conx") return Math.max(40, 100 - 20 * Math.max(0, n - 4));
+    return Math.max(50, 110 - 10 * Math.max(1, n));
+  }
+
   /* ---------- buscador ----------
      Sin tildes ni mayúsculas; primero los que empiezan con lo escrito
      (o tienen una palabra que empieza así), después los que lo contienen. */
@@ -219,7 +276,7 @@
   }
 
   /* ---------- lo guardado ----------
-     e = { hist: { fecha: { modo: [puntos, intentos, ms] } },
+     e = { hist: { fecha: { modo: [puntos, intentos, ms, ganó] } },
            prog: { fecha, m: { modo: { i: [ids], ms } } } }
      `hist` es lo terminado (de ahí salen los puntos, la racha y el
      tiempo); `prog`, lo que va de hoy, para seguir en otro dispositivo. */
@@ -233,9 +290,9 @@
       const ok = {};
       for (const m of IDS_MODOS) {
         const v = dia[m];
-        if (Array.isArray(v) && v.length === 3) {
-          const n = entero(v[1], 999);
-          if (n >= 1) ok[m] = [puntosDe(n), n, entero(v[2], 86400000)];
+        if (Array.isArray(v) && (v.length === 3 || v.length === 4)) {
+          const n = entero(v[1], 999), g = !MODO[m].reto || v.length === 3 || v[3] === 1 ? 1 : 0;
+          if (n >= 1) ok[m] = [puntos(m, n, !!g), n, entero(v[2], 86400000), g];
         }
       }
       if (Object.keys(ok).length) r.hist[f] = ok;
@@ -246,7 +303,7 @@
       for (const m of IDS_MODOS) {
         const v = p.m[m];
         if (!v || !Array.isArray(v.i)) continue;
-        const i = [...new Set(v.i.filter(id => item(m, id)))].slice(0, 999);
+        const i = [...new Set(v.i.filter(x => valida(m, x)))].slice(0, 999);
         r.prog.m[m] = { i, ms: entero(v.ms, 86400000) };
       }
     }
@@ -278,14 +335,14 @@
     return r;
   }
   /* Un modo terminado hoy: va a `hist` y sale de `prog`. */
-  function registra(e, fecha, modo, intentos, ms) {
+  function registra(e, fecha, modo, intentos, ms, gano = true) {
     const r = limpia(e);
     const n = Math.max(1, intentos);
-    r.hist[fecha] = Object.assign({}, r.hist[fecha], { [modo]: [puntosDe(n), n, entero(ms, 86400000)] });
+    r.hist[fecha] = Object.assign({}, r.hist[fecha], { [modo]: [puntos(modo, n, gano), n, entero(ms, 86400000), gano ? 1 : 0] });
     return r;
   }
   const hecho = (e, fecha, modo) => !!(e.hist[fecha] && e.hist[fecha][modo]);
-  const diaCompleto = (e, fecha) => IDS_MODOS.every(m => hecho(e, fecha, m));
+  const diaCompleto = (e, fecha) => CLASICOS.every(m => hecho(e, fecha, m));
   function total(e) {
     let p = 0, ms = 0;
     for (const dia of Object.values(e.hist)) for (const v of Object.values(dia)) { p += v[0]; ms += v[2]; }
@@ -310,14 +367,15 @@
   function resumen(e, fecha) {
     const filas = MODOS.map(m => {
       const v = e.hist[fecha] && e.hist[fecha][m.id];
-      return `${m.icono} ${m.nombre}: ${v ? `${v[1]} ${v[1] === 1 ? "intento" : "intentos"} ${v[1] === 1 ? "⚡" : v[1] <= 3 ? "🟩" : v[1] <= 6 ? "🟨" : "🟥"}` : "-"}`;
+      if (v && m.reto && !v[3]) return `${m.icono} ${m.nombre}: ❌`;
+      return `${m.icono} ${m.nombre}: ${v ? `${v[1]} ${v[1] === 1 ? "intento" : "intentos"} ${v[1] === 1 ? "⚡" : v[0] >= 80 ? "🟩" : v[0] >= 50 ? "🟨" : "🟥"}` : "-"}`;
     });
     const pts = Object.values(e.hist[fecha] || {}).reduce((t, v) => t + v[0], 0);
     return `Electrodle ${fecha}\n${filas.join("\n")}\n${pts} pts · 🔥 ${racha(e, fecha)}`;
   }
 
   return {
-    MODOS, MODO, IDS_MODOS, item, mulberry32, hash, baraja,
+    MODOS, MODO, IDS_MODOS, CLASICOS, item, reto, valida, estado, puntos, X, mulberry32, hash, baraja,
     diaChile, faltaParaManana, numeroDia, diaAnterior, esFecha,
     objetivoDelDia, objetivoAlAzar, compara, esVariable, clave, variables, destapadas, ZOOM, vista, pistas,
     puntosDe, normaliza, sugerencias,
