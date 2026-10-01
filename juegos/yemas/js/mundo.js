@@ -231,7 +231,80 @@ const matPupila = new THREE.MeshBasicMaterial({ color: '#1b1b1b' });
 const matArma = new THREE.MeshLambertMaterial({ color: '#3a3a44' });
 
 // Mira hacia -z, igual que la cámara con yaw = 0
-export function crearHuevo(color, nombre) {
+// ---------- Skins ----------
+// Cada una es un accesorio armado con piezas simples, colgado del cuerpo para
+// que se bambolee con el huevo. La cáscara la sigue pintando el color (o el
+// del equipo), así una skin no confunde de qué lado está cada uno.
+export const SKINS = {
+  clasico: 'Clásico', chef: 'Chef', vaquero: 'Vaquero', pirata: 'Pirata',
+  corona: 'Realeza', lentes: 'Lentes de sol', lana: 'Gorro de lana', manchas: 'Manchitas',
+};
+const lambert = color => new THREE.MeshLambertMaterial({ color });
+function pieza(geo, mat, x, y, z) {
+  const m = new THREE.Mesh(geo, mat);
+  m.position.set(x, y, z);
+  m.castShadow = true;
+  return m;
+}
+function ponSkin(cuerpo, skin) {
+  if (skin === 'chef') {
+    const blanco = lambert('#ffffff');
+    cuerpo.add(pieza(new THREE.CylinderGeometry(0.27, 0.29, 0.28, 18), blanco, 0, 1.66, 0));
+    const copa = pieza(new THREE.SphereGeometry(0.34, 16, 10), blanco, 0, 1.88, 0);
+    copa.scale.y = 0.62;
+    cuerpo.add(copa);
+  } else if (skin === 'vaquero') {
+    const cafe = lambert('#8b5a2b');
+    cuerpo.add(pieza(new THREE.CylinderGeometry(0.56, 0.56, 0.03, 24), cafe, 0, 1.56, 0));
+    cuerpo.add(pieza(new THREE.CylinderGeometry(0.24, 0.29, 0.3, 18), cafe, 0, 1.72, 0));
+    cuerpo.add(pieza(new THREE.CylinderGeometry(0.295, 0.295, 0.06, 18), lambert('#3b2414'), 0, 1.61, 0));
+  } else if (skin === 'pirata') {
+    const negro = lambert('#1d1d22');
+    cuerpo.add(pieza(new THREE.CylinderGeometry(0.47, 0.47, 0.03, 3), negro, 0, 1.57, 0));
+    const copa = pieza(new THREE.SphereGeometry(0.3, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), negro, 0, 1.57, 0);
+    cuerpo.add(copa);
+    cuerpo.add(pieza(new THREE.SphereGeometry(0.05, 8, 6), lambert('#ffffff'), 0, 1.75, -0.24));
+    const parche = pieza(new THREE.CylinderGeometry(0.075, 0.075, 0.02, 14), negro, -0.15, 1.18, -0.47);
+    parche.rotation.x = Math.PI / 2;
+    cuerpo.add(parche);
+    const cinta = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.012, 6, 32), negro);
+    cinta.position.y = 1.25;
+    cinta.rotation.set(Math.PI / 2 + 0.25, 0, 0.2);
+    cuerpo.add(cinta);
+  } else if (skin === 'corona') {
+    const oro = new THREE.MeshPhongMaterial({ color: '#f2c230', specular: '#fff6cc', shininess: 80 });
+    cuerpo.add(pieza(new THREE.CylinderGeometry(0.25, 0.27, 0.16, 20, 1, true), oro, 0, 1.62, 0));
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      cuerpo.add(pieza(new THREE.ConeGeometry(0.05, 0.13, 8), oro, Math.cos(a) * 0.25, 1.76, Math.sin(a) * 0.25));
+    }
+    cuerpo.add(pieza(new THREE.SphereGeometry(0.04, 8, 6), lambert('#d6283a'), 0, 1.62, -0.27));
+  } else if (skin === 'lentes') {
+    const vidrio = new THREE.MeshPhongMaterial({ color: '#111118', specular: '#99aaff', shininess: 100 });
+    for (const sx of [-1, 1]) cuerpo.add(pieza(new THREE.BoxGeometry(0.17, 0.1, 0.03), vidrio, sx * 0.15, 1.2, -0.47));
+    cuerpo.add(pieza(new THREE.BoxGeometry(0.1, 0.02, 0.02), vidrio, 0, 1.22, -0.47));
+  } else if (skin === 'lana') {
+    const lana = lambert('#e2474b');
+    const gorro = pieza(new THREE.SphereGeometry(0.35, 18, 10, 0, Math.PI * 2, 0, Math.PI / 2), lana, 0, 1.4, 0);
+    cuerpo.add(gorro);
+    const borde = new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.05, 8, 24), lambert('#f4f0e6'));
+    borde.position.y = 1.42;
+    borde.rotation.x = Math.PI / 2;
+    cuerpo.add(borde);
+    cuerpo.add(pieza(new THREE.SphereGeometry(0.1, 10, 8), lambert('#f4f0e6'), 0, 1.78, 0));
+  } else if (skin === 'manchas') {
+    const mancha = lambert('#5a3a24');
+    for (const [y, a] of [[0.55, 0.4], [0.8, 2.1], [1.05, 4.0], [0.4, 3.1], [1.3, 1.2], [0.65, 5.2], [1.0, 5.9], [0.3, 1.6]]) {
+      const t = y / ALTO, u = 2 * t - 1;
+      const r = 0.5 * Math.sqrt(Math.max(0, 1 - u * u)) * (1 - 0.16 * u) * 0.97;
+      const m = pieza(new THREE.SphereGeometry(0.08, 10, 6), mancha, Math.cos(a) * r, y, Math.sin(a) * r);
+      m.scale.set(1, 1.2, 1);
+      cuerpo.add(m);
+    }
+  }
+}
+
+export function crearHuevo(color, nombre, skin = 'clasico') {
   const g = new THREE.Group();
   const cuerpo = new THREE.Group();
   g.add(cuerpo);
@@ -256,12 +329,32 @@ export function crearHuevo(color, nombre) {
   punta.position.set(0.32, 0.87, -0.82);
   cuerpo.add(punta);
 
+  ponSkin(cuerpo, skin);
+
   const tag = etiqueta(nombre);
-  tag.position.y = ALTO + 0.35;
+  tag.position.y = ALTO + (skin === 'chef' ? 0.6 : 0.35);
   g.add(tag);
 
-  g.userData = { cuerpo, punta };
+  g.userData = { cuerpo, punta, casco };
   return g;
+}
+
+// ---------- Armas tiradas ----------
+// Los puntos donde aparecen: arriba de la torre, arriba de las cuatro
+// plataformas y cuatro en el suelo. El orden es el `s` del registro (`recoge`),
+// así que no se reordena. Hay tantos como YM_PUNTOS_ARMA en motor.js.
+export const PUNTOS_ARMA = [
+  [0, 3, 0], [24, 2.5, 24], [-24, 2.5, 24], [24, 2.5, -24], [-24, 2.5, -24],
+  [20, 0, 10], [-20, 0, -10], [10, 0, -20],
+].map(([x, y, z]) => new THREE.Vector3(x, y, z));
+
+export function crearPedestal() {
+  const m = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.75, 0.75, 0.05, 28),
+    new THREE.MeshBasicMaterial({ color: '#ffe066', transparent: true, opacity: 0.45 })
+  );
+  m.position.y = 0.03;
+  return m;
 }
 
 // ---------- Captura la bandera ----------

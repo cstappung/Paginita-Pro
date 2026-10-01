@@ -1059,9 +1059,19 @@ export const YM_VARIANTES = { todos: "Todos contra todos", equipos: "Duelo por e
 export const YM_LARGOS = { todos: [10, 15, 25], equipos: [20, 30, 50], bandera: [1, 3, 5] };
 export const YM_EQUIPOS = ["rojo", "azul"];
 export const YM_BASES = { rojo: [0, 29], azul: [0, -29] };
-/* Batidora, Revuelta, Poché, el Huevo duro (la granada) y la
-   autodestrucción: el `a` de una muerte es el índice en ese orden. */
-export const YM_ARMAS = 5;
+/* El `a` de una muerte es el id del arma: Batidora, Revuelta, Poché, el
+   Huevo duro (la granada), la autodestrucción, el cuchillo, la bazuca y la
+   pistola, en ese orden. Los ids nunca se renumeran.
+
+   Las armas aparecen tiradas en `YM_PUNTOS_ARMA` puntos del mapa, y cuál
+   sale lo decide la semilla de la sala con el punto y el número de
+   aparición (en el marco). Quién se la lleva es estado de la partida, así
+   que va al registro: `{t:"recoge", uid, s, g}` toma la aparición `g` del
+   punto `s`, y vale solo si es la siguiente a la última tomada ahí; si dos
+   la agarran a la vez, la primera jugada se la lleva. Cuándo reaparece es
+   cosa de cada pantalla (unos segundos después de verla tomada). */
+export const YM_ARMAS = 8;
+export const YM_PUNTOS_ARMA = 8;
 export const YM_METAS = YM_LARGOS.todos;
 export const YM_META = 15;
 export function varianteYemas(p) {
@@ -1119,6 +1129,7 @@ export function redYemas(p, js = jugadoresDe(p), listos = true) {
   const aBase = b => { banderas[b] = { e: "base", uid: "", x: YM_BASES[b][0], z: YM_BASES[b][1] }; };
   const num = (x, d) => Number.isFinite(+x) && Math.abs(+x) < 60 ? Math.round(+x * 100) / 100 : d;
   const hist = [];
+  const armas = {};
   let ganador = null, motivo = "", primera = "";
   for (const j of jugadasDe(p)) {
     if (ganador !== null) break;
@@ -1132,6 +1143,14 @@ export function redYemas(p, js = jugadoresDe(p), listos = true) {
     }
     if (!listos || !ids.has(j.uid) || fuera[j.uid]) continue;
     const u = j.uid;
+
+    if (j.t === "recoge") {
+      const s = j.s, g = j.g;
+      if (!Number.isInteger(s) || s < 0 || s >= YM_PUNTOS_ARMA || !Number.isInteger(g)) continue;
+      if (g !== (armas[s] ? armas[s].g : -1) + 1) continue;
+      armas[s] = { g, uid: u };
+      continue;
+    }
 
     if (variante === "bandera" && (j.t === "toma" || j.t === "devuelve" || j.t === "captura")) {
       const b = j.b;
@@ -1188,7 +1207,7 @@ export function redYemas(p, js = jugadoresDe(p), listos = true) {
     fase: !listos ? "espera" : ganador !== null ? "fin" : "jugando",
     turno: "", variante, meta, equipos: eq, bajas, muertes, cabezas, racha, mejorRacha, fuera, primera,
     puntosEq: eq ? (variante === "bandera" ? capturas : puntosEq) : null,
-    capturas: capturasDe, banderas: variante === "bandera" ? banderas : null,
+    capturas: capturasDe, banderas: variante === "bandera" ? banderas : null, armas,
     puntos: bajas,
     vivos: activos.map(j => j.uid),
     hist: hist.slice(-40),
