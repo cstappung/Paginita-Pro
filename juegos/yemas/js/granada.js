@@ -65,7 +65,7 @@ function choca(p, v, b) {
 }
 
 // alReventar(p, dueno, id, propia, k). `tocaHuevo(p)` (solo para lo propio)
-// dice si el cohete le dio a alguien.
+// dice si el cohete le dio a alguien o le pasó lo bastante cerca.
 export function crearGranadas(escena, colisores, alReventar, tocaHuevo = () => false) {
   const vivas = new Map();   // id → {pos, vel, t, obj, propia, dueno, k}
 
@@ -96,8 +96,16 @@ export function crearGranadas(escena, colisores, alReventar, tocaHuevo = () => f
 
   function pasoCohete(id, g, h) {
     g.pos.addScaledVector(g.vel, h);
-    const choco = g.pos.y < 0.08 || colisores.some(b => dentro(g.pos, b, 0.05)) || (g.propia && tocaHuevo(g.pos));
+    const pared = g.pos.y < 0.08 || colisores.some(b => dentro(g.pos, b, 0.05));
+    const choco = pared || (g.propia && tocaHuevo(g.pos));
     if (!choco) return false;
+    // Contra una pared o el piso revienta un poco antes, afuera: desde dentro
+    // de la caja la pared le tapaba la explosión a todos y no le hacía daño a
+    // nadie aunque reventara al lado.
+    if (pared) {
+      g.pos.addScaledVector(g.vel.clone().normalize(), -0.35);
+      g.pos.y = Math.max(0.15, g.pos.y);
+    }
     // El propio revienta ahí; el ajeno se queda quieto esperando a que el
     // dueño diga dónde fue (llega en un instante).
     if (g.propia) revienta(id);

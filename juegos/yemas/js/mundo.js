@@ -339,6 +339,53 @@ export function crearHuevo(color, nombre, skin = 'clasico') {
   return g;
 }
 
+// ---------- Zombis ----------
+// Un huevo podrido: cáscara verdosa con manchas, ojos rojos que brillan y los
+// brazos estirados hacia adelante. Sin nombre ni arma. Mismo tamaño que un
+// huevo, así que las balas usan el mismo elipsoide (`rayoHuevo`).
+const matPodrido = new THREE.MeshLambertMaterial({ color: '#8fa36b' });
+const matMoho = new THREE.MeshLambertMaterial({ color: '#4f6136' });
+const matOjoZombi = new THREE.MeshBasicMaterial({ color: '#ff3b2f' });
+export function crearZombi() {
+  const g = new THREE.Group();
+  const cuerpo = new THREE.Group();
+  g.add(cuerpo);
+  const casco = new THREE.Mesh(geometriaHuevo(), matPodrido.clone());
+  casco.castShadow = true;
+  cuerpo.add(casco);
+  for (const [y, a, s] of [[0.5, 0.6, 0.11], [0.9, 2.4, 0.09], [1.25, 4.1, 0.08], [0.35, 3.3, 0.12], [1.05, 5.5, 0.1]]) {
+    const t = y / ALTO, u = 2 * t - 1;
+    const r = 0.5 * Math.sqrt(Math.max(0, 1 - u * u)) * (1 - 0.16 * u) * 0.97;
+    cuerpo.add(pieza(new THREE.SphereGeometry(s, 8, 6), matMoho, Math.cos(a) * r, y, Math.sin(a) * r));
+  }
+  for (const sx of [-1, 1]) {
+    cuerpo.add(pieza(new THREE.SphereGeometry(0.075, 10, 6), matOjoZombi, sx * 0.15, 1.16, -0.43));
+    const brazo = pieza(new THREE.CylinderGeometry(0.06, 0.07, 0.55, 8), matPodrido, sx * 0.36, 0.95, -0.42);
+    brazo.rotation.x = Math.PI / 2;
+    cuerpo.add(brazo);
+  }
+  g.userData = { cuerpo, casco };
+  return g;
+}
+
+// Por dónde entran: dieciséis «ventanas» en los muros del borde.
+export const VENTANAS = [];
+for (const v of [-24, -8, 8, 24]) {
+  VENTANAS.push(new THREE.Vector3(v, 0, MITAD - 2), new THREE.Vector3(v, 0, -MITAD + 2));
+  VENTANAS.push(new THREE.Vector3(MITAD - 2, 0, v), new THREE.Vector3(-MITAD + 2, 0, v));
+}
+// Para subir a la torre y a las plataformas hay que pasar por su escala: si
+// el que persigue está arriba de una, el zombi va primero al pie de la
+// escala más cercana y la sube hasta la cima.
+// [minx, maxx, minz, maxz, alto, [[pie, cima], …]]
+const v3 = (x, z) => new THREE.Vector3(x, 0, z);
+export const ALTURAS = [
+  [-3, 3, -3, 3, 3, [[v3(0, 9.6), v3(0, 2.4)], [v3(0, -9.6), v3(0, -2.4)]]],
+];
+for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
+  ALTURAS.push([sx * 24 - 4, sx * 24 + 4, sz * 24 - 4, sz * 24 + 4, 2.5, [[v3(sx * 15.2, sz * 24), v3(sx * 20.6, sz * 24)]]]);
+}
+
 // ---------- Armas tiradas ----------
 // Los puntos donde aparecen: arriba de la torre, arriba de las cuatro
 // plataformas y cuatro en el suelo. El orden es el `s` del registro (`recoge`),

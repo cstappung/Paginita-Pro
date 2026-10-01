@@ -6,10 +6,13 @@ import {
   crearMundo, moverCuerpo, rayoMundo, rayoHuevo, crearHuevo, crearBandera, crearBase, crearPedestal,
   SPAWNS, BASES, PUNTOS_ARMA, SKINS, ALTO, OJOS,
 } from 'yemas/mundo';
-import { ARMAS, CUCHILLO, RECARGAS, NOMBRE_ARMA, GRANADAS, TIPOS_GRANADA, caida, armaEnPunto } from 'yemas/armas';
+import {
+  ARMAS, SARTEN, ESPATULA, ZOMBI, ESPATULA_CFG, TIENDA, PRECIO, RECARGAS, NOMBRE_ARMA, GRANADAS, TIPOS_GRANADA, caida, armaEnPunto,
+} from 'yemas/armas';
 import { sonido } from 'yemas/audio';
 import { conectarMarco, conectarLocal, PALETA, COLOR_EQUIPO } from 'yemas/red';
 import { crearGranadas, GRANADA } from 'yemas/granada';
+import { crearZombis } from 'yemas/zombis';
 
 const VEL = 7, SALTO = 8, SENS = 0.0022, HZ_RED = 12, INVULNERABLE = 1.5;
 // Correr: Shift mientras se avanza. Deslizarse: C mientras se corre; sale
@@ -50,7 +53,8 @@ const camara = new THREE.PerspectiveCamera(75, 1, 0.05, 300);
 camara.rotation.order = 'YXZ';
 escena.add(camara);
 
-escena.add(new THREE.HemisphereLight('#ffffff', '#c9b28a', 1.6));
+const cielo = new THREE.HemisphereLight('#ffffff', '#c9b28a', 1.6);
+escena.add(cielo);
 const sol = new THREE.DirectionalLight('#fff3dd', 2.2);
 sol.position.set(20, 40, 12);
 sol.castShadow = true;
@@ -75,12 +79,33 @@ function construyeArma(id) {
   const a = ARMAS[id];
   const g = new THREE.Group();
   const oscuro = new THREE.MeshLambertMaterial({ color: '#2d2d35' });
+  if (id === ESPATULA) {
+    // La espátula dorada: mango redondo y una paleta plana con ranuras.
+    const oro = new THREE.MeshPhongMaterial({ color: '#f2c230', emissive: '#6b4a00', specular: '#fff6cc', shininess: 90 });
+    const mango = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.022, 0.26, 10), oro);
+    mango.rotation.x = Math.PI / 2;
+    mango.position.z = 0.06;
+    const paleta = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.012, 0.15), oro);
+    paleta.position.z = -0.14;
+    g.add(mango, paleta);
+    for (const x of [-0.03, 0, 0.03]) {
+      const ranura = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.014, 0.09), oscuro);
+      ranura.position.set(x, 0, -0.14);
+      g.add(ranura);
+    }
+    return g;
+  }
   if (a.melee) {
-    const hoja = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.06, 0.32), new THREE.MeshPhongMaterial({ color: a.color, specular: '#ffffff', shininess: 90 }));
-    hoja.position.z = -0.2;
-    const mango = new THREE.Mesh(new THREE.BoxGeometry(0.045, 0.07, 0.13), new THREE.MeshLambertMaterial({ color: '#5a3a24' }));
-    mango.position.z = 0.02;
-    g.add(hoja, mango);
+    // La sartén: el fondo negro, el borde y el mango de madera.
+    const fierro = new THREE.MeshPhongMaterial({ color: a.color, specular: '#888888', shininess: 40 });
+    const fondo = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.13, 0.035, 24), fierro);
+    fondo.position.z = -0.27;
+    const borde = new THREE.Mesh(new THREE.TorusGeometry(0.145, 0.012, 6, 24), fierro);
+    borde.rotation.x = Math.PI / 2;
+    borde.position.set(0, 0.018, -0.27);
+    const mango = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.03, 0.2), new THREE.MeshLambertMaterial({ color: '#5a3a24' }));
+    mango.position.z = -0.03;
+    g.add(fondo, borde, mango);
     return g;
   }
   const [largo, ancho, r] = MEDIDAS[id];
@@ -127,12 +152,13 @@ ajustar();
 // ---------- Estado ----------
 // `jugando` es que hay partida en pantalla; `terminado`, que la sala ya tiene ganador.
 let red = null, jugando = false, terminado = false;
+let zombis = null;   // el modo zombis (zombis.js), solo en esa variante
 let marcador = { bajas: {}, muertes: {}, puntosEq: null, banderas: null, armas: {} };
 const yo = {
   pos: new THREE.Vector3(), vel: new THREE.Vector3(), enSuelo: false,
   yaw: 0, pitch: 0, hp: 100, hpAntes: 100, vivo: false,
-  // Inventario: el cuchillo y dos huecos. `mun` por id: {c: en el cargador, r: recargas que quedan}.
-  inv: [CUCHILLO, null, null], sel: 0, mun: {},
+  // Inventario: la sartén y dos huecos. `mun` por id: {c: en el cargador, r: recargas que quedan}.
+  inv: [SARTEN, null, null], sel: 0, mun: {},
   recargando: 0, cadencia: 0, tajo: 0,
   zoom: 0, apuntando: false, escudo: 0, muerteT: 0, asesino: '',
   disparo: 0, finales: null, retroceso: 0, bob: 0,
@@ -142,6 +168,10 @@ const yo = {
   suicidio: null, matoMuerto: false,
   // Sprint y deslizamiento. `sinSprint`: ya se deslizó con este Shift apretado.
   corriendo: false, sinSprint: false, deslizando: 0, cdDesliz: 0, sprintK: 0, agacho: 0,
+  // La espátula dorada: si la lleva y, lanzada, la que va volando.
+  espatula: false, ep: null,
+  // Zombis: puntos para gastar, puntos ganados, zombis fritos y la ronda en que cayó.
+  pz: 0, pzT: 0, zk: 0, ultDanio: 0,
 };
 // La autodestrucción: se mantiene X un momento (soltarla antes la cancela,
 // así no se dispara sin querer), el huevo pita y brilla —también en la
@@ -151,7 +181,7 @@ const AUTO = { nombre: 'Autodestrucción', carga: 0.9, radio: 6.5, danio: 220 };
 const otros = new Map();
 const teclas = new Set();
 let gatillo = false, yaDisparo = false;
-const armaActual = () => ARMAS[yo.inv[yo.sel]] || ARMAS[CUCHILLO];
+const armaActual = () => ARMAS[yo.inv[yo.sel]] || ARMAS[SARTEN];
 const miNombre = () => red?.jugadores.get(red.yo)?.nombre || '';
 const miColor = () => red?.jugadores.get(red.yo)?.color || PALETA[0];
 const puedoJugar = () => jugando && !terminado && red && !red.mirando;
@@ -159,9 +189,11 @@ const EQUIPOS = ['rojo', 'azul'];
 const NOMBRE_EQ = { rojo: 'Rojo', azul: 'Azul' };
 const miEquipo = () => red?.equipos?.[red.yo] || '';
 const rival = () => miEquipo() === 'rojo' ? 'azul' : 'rojo';
-const aliado = id => !!red?.equipos && red.equipos[id] === miEquipo();
+// En zombis los demás jugadores son todos compañeros: no hay fuego amigo.
+const esZombis = () => red?.variante === 'zombis';
+const aliado = id => esZombis() || (!!red?.equipos && red.equipos[id] === miEquipo());
 
-const handlers = { alConfig, alJugador, alGolpe, alBaja, alFeed, alSuceso, alMarcador, alFin, alVoces };
+const handlers = { alConfig, alJugador, alGolpe, alGolpeZombi, alBaja, alFeed, alSuceso, alMarcador, alFin, alVoces };
 
 // ---------- Ajustes (menú de práctica y tarjeta de pausa) ----------
 // Los dos paneles comparten las mismas piezas: skin, sensibilidad y granadas.
@@ -218,6 +250,7 @@ if (ONLINE) {
 } else {
   const guardado = (() => { try { return JSON.parse(localStorage.getItem('yemas') || '{}'); } catch { return {}; } })();
   $('nombre').value = guardado.nombre || '';
+  if (guardado.modo === 'zombis') $('modo-practica').value = 'zombis';
   colorElegido = PALETA.includes(guardado.color) ? guardado.color : PALETA[Math.floor(Math.random() * PALETA.length)];
   for (const c of PALETA) {
     const b = document.createElement('button');
@@ -232,9 +265,10 @@ if (ONLINE) {
   }
   $('jugar').onclick = () => {
     const nombre = $('nombre').value.trim().slice(0, 14) || 'Huevo' + Math.floor(Math.random() * 1000);
-    try { localStorage.setItem('yemas', JSON.stringify({ nombre, color: colorElegido })); } catch {}
+    const variante = $('modo-practica').value === 'zombis' ? 'zombis' : 'todos';
+    try { localStorage.setItem('yemas', JSON.stringify({ nombre, color: colorElegido, modo: variante })); } catch {}
     sonido.iniciar();
-    conectarLocal({ nombre, color: colorElegido, colisores }, handlers);
+    conectarLocal({ nombre, color: colorElegido, colisores, variante }, handlers);
     bloquear();
   };
 }
@@ -244,7 +278,8 @@ function alConfig(r) {
   $('menu').hidden = true;
   $('espera').hidden = true;
   $('hud').hidden = false;
-  $('meta').textContent = !red.meta ? 'Práctica contra bots'
+  $('meta').textContent = esZombis() ? (red.online ? 'Zombis · aguanten juntos todas las rondas que puedan' : 'Práctica: zombis')
+    : !red.meta ? 'Práctica contra bots'
     : red.variante === 'bandera' ? `Captura la bandera · primero a ${red.meta} 🚩`
     : red.variante === 'equipos' ? `Duelo por equipos · primero a ${red.meta} bajas`
     : `Todos contra todos · primero a ${red.meta} bajas`;
@@ -252,6 +287,7 @@ function alConfig(r) {
   jugando = true;
   montaArmasSuelo();
   if (red.variante === 'bandera') montaBanderas();
+  if (esZombis()) montaZombis();
   if (miEquipo()) $('mi-equipo').textContent = `Equipo ${NOMBRE_EQ[miEquipo()]}`;
   $('mi-equipo').className = miEquipo();
   if (red.mirando) {
@@ -285,6 +321,7 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyG' || e.code === 'Digit4') lanzarGranada();
   if (e.code === 'KeyT') yo.grSel = yo.gr.length ? (yo.grSel + 1) % yo.gr.length : 0;
   if (e.code === 'KeyE') recogeCerca();
+  if (e.code === 'KeyQ') tirarEspatula();
   if (e.code === 'KeyX' && puedoJugar() && yo.vivo) yo.cargaAuto = 0;
   // Shift+F y no F sola: la F queda al lado de la G y se apretaba sin querer.
   if (e.code === 'KeyF' && e.shiftKey) pantallaCompleta();
@@ -345,7 +382,7 @@ function cambiarArma(i) {
 function recargar() {
   const a = armaActual(), m = yo.mun[a.id];
   if (!yo.vivo || a.melee || !m || yo.recargando > 0 || m.c === a.cargador) return;
-  if (m.r <= 0) { aviso('Sin recargas: busca otra arma o usa el cuchillo'); sonido.vacio(); return; }
+  if (m.r <= 0) { aviso(esZombis() ? 'Sin recargas: compra munición o usa la sartén' : 'Sin recargas: busca otra arma o usa la sartén'); sonido.vacio(); return; }
   yo.recargando = a.recarga;
   sonido.recarga();
 }
@@ -354,12 +391,12 @@ const _u = new THREE.Vector3(), _v = new THREE.Vector3();
 function disparar() {
   const a = armaActual();
   if (yo.recargando > 0 || yo.cadencia > 0) return;
-  if (a.melee) return cuchillazo(a);
+  if (a.melee) return sartenazo(a);
   const m = yo.mun[a.id];
   if (!m || m.c <= 0) {
     sonido.vacio();
     if (m && m.r > 0) recargar();
-    else aviso('Sin munición: busca otra arma o usa el cuchillo');
+    else aviso(esZombis() ? 'Sin munición: compra más o usa la sartén' : 'Sin munición: busca otra arma o usa la sartén');
     yo.cadencia = 0.3;
     return;
   }
@@ -382,28 +419,24 @@ function disparar() {
     const r = Math.sqrt(Math.random()) * disp, th = Math.random() * Math.PI * 2;
     const d = base.clone().addScaledVector(_u, r * Math.cos(th)).addScaledVector(_v, r * Math.sin(th)).normalize();
     let t = rayoMundo(o, d, a.alcance, colisores);
-    let quien = null;
-    for (const [id, j] of otros) {
-      if (!j.vivo || aliado(id)) continue;   // sin fuego amigo: la bala los atraviesa
-      const tj = rayoHuevo(o, d, j.mesh.position);
-      if (tj !== null && tj < t) { t = tj; quien = id; }
-    }
+    const quien = primerBlanco(o, d, t);
+    if (quien) t = quien.t;
     const fin = o.clone().addScaledVector(d, t);
     finales.push([+fin.x.toFixed(2), +fin.y.toFixed(2), +fin.z.toFixed(2)]);
     trazo(boca, fin, '#fff2a8');
     if (quien) {
-      const j = otros.get(quien);
-      const cab = fin.y - j.mesh.position.y > ALTO * 0.72;
-      const g = golpes.get(quien) || { dmg: 0, cab: false };
+      const j = quien;
+      const cab = fin.y - j.pos.y > ALTO * 0.72;
+      const g = golpes.get(j.id) || { dmg: 0, cab: false };
       g.dmg += a.danio * (cab ? a.cabeza : 1) * caida(a, t);
       g.cab = g.cab || cab;
-      golpes.set(quien, g);
+      golpes.set(j.id, g);
       chispa(fin, j.color);
     } else if (t < a.alcance) {
       chispa(fin, '#ffffff');
     }
   }
-  for (const [id, g] of golpes) red.golpear(id, { dmg: Math.round(g.dmg), cab: g.cab, a: a.id });
+  for (const [id, g] of golpes) pegaA(id, Math.round(g.dmg), g.cab, a.id);
   if (golpes.size) {
     const cab = [...golpes.values()].some(g => g.cab);
     marcaGolpe(cab);
@@ -418,27 +451,47 @@ function disparar() {
   publicar();
 }
 
-// El cuchillo: alcanza al primer huevo rival delante, a menos de un brazo y
+// El primer huevo que corta el rayo antes de `tope`: un rival o un zombi.
+// Devuelve {id, t, pos, color}; el id de un zombi es 'z:<n>'.
+function primerBlanco(o, d, tope) {
+  let mejor = null;
+  for (const [id, j] of otros) {
+    if (!j.vivo || aliado(id)) continue;   // sin fuego amigo: la bala los atraviesa
+    const t = rayoHuevo(o, d, j.mesh.position);
+    if (t !== null && t < (mejor ? mejor.t : tope)) mejor = { id, t, pos: j.mesh.position, color: j.color };
+  }
+  if (zombis) for (const [n, z] of zombis.lista) {
+    const t = rayoHuevo(o, d, z.mesh.position);
+    if (t !== null && t < (mejor ? mejor.t : tope)) mejor = { id: 'z:' + n, t, pos: z.mesh.position, color: '#b6d47a' };
+  }
+  return mejor;
+}
+// El daño a quien sea: a un jugador por los golpes de siempre, a un zombi por
+// el director (que puede ser uno mismo). Cada golpe a un zombi da 10 puntos.
+function pegaA(id, dmg, cab, a) {
+  if (!String(id).startsWith('z:')) { red.golpear(id, { dmg, cab, a }); return; }
+  sumaPuntos(10);
+  const n = +String(id).slice(2);
+  if (soyDirector()) zombis.golpe(n, dmg, red.yo, cab, a);
+  else red.golpear('z:' + n, { dmg, cab, a });
+}
+
+// La sartén: alcanza al primer huevo rival delante, a menos de un brazo y
 // sin pared en medio. Se manda como un disparo sin trazos, para que los demás
 // lo oigan.
-function cuchillazo(a) {
+function sartenazo(a) {
   yo.cadencia = a.cadencia;
   yo.tajo = 1;
   const o = camara.getWorldPosition(new THREE.Vector3());
   const d = camara.getWorldDirection(new THREE.Vector3());
   const tope = Math.min(a.alcance, rayoMundo(o, d, a.alcance, colisores));
-  let quien = null, tMin = tope;
-  for (const [id, j] of otros) {
-    if (!j.vivo || aliado(id)) continue;
-    const t = rayoHuevo(o, d, j.mesh.position);
-    if (t !== null && t < tMin) { tMin = t; quien = id; }
-  }
-  if (quien) {
-    const j = otros.get(quien), fin = o.clone().addScaledVector(d, tMin);
-    const cab = fin.y - j.mesh.position.y > ALTO * 0.72;
-    red.golpear(quien, { dmg: Math.round(a.danio * (cab ? a.cabeza : 1)), cab, a: a.id });
+  const j = primerBlanco(o, d, tope);
+  if (j) {
+    const fin = o.clone().addScaledVector(d, j.t);
+    const cab = fin.y - j.pos.y > ALTO * 0.72;
+    pegaA(j.id, Math.round(a.danio * (cab ? a.cabeza : 1)), cab, a.id);
     marcaGolpe(cab);
-    sonido.golpe(cab);
+    sonido.sarten();
     chispa(fin, j.color);
   }
   yo.disparo = Math.max(yo.disparo + 1, Date.now() % 1e9);
@@ -485,6 +538,7 @@ function aparecer() {
   for (const s of lugares) {
     let dMin = Infinity;
     for (const [id, j] of otros) if (j.vivo && !aliado(id)) dMin = Math.min(dMin, s.distanceTo(j.obj));
+    if (zombis) for (const z of zombis.lista.values()) dMin = Math.min(dMin, s.distanceTo(z.pos));
     dMin = Math.min(dMin, 60) + Math.random() * 10;
     if (dMin > dMejor) { dMejor = dMin; mejor = s; }
   }
@@ -496,7 +550,16 @@ function aparecer() {
   // vuelve como estaba (vida, munición y granadas): suicidarse no recarga. Si
   // su suicidio frió a alguien, o si lo mataron, vuelve lleno.
   const s = yo.suicidio;
-  if (s && !yo.matoMuerto) {
+  if (esZombis()) {
+    // En zombis se vuelve con la sartén y la pistola, como al empezar; los
+    // puntos se guardan.
+    yo.hp = 100;
+    yo.inv = [SARTEN, 7, null];
+    yo.mun = {};
+    llenaArma(7);
+    yo.sel = 1;
+    yo.gr = [...pref.granadas];
+  } else if (s && !yo.matoMuerto) {
     yo.hp = s.hp;
     yo.mun = s.mun;
     yo.gr = s.gr;
@@ -522,11 +585,25 @@ function aparecer() {
 
 function alGolpe(g) {
   if (!puedoJugar() || !yo.vivo || yo.escudo > 0) return;
+  // Un mordisco viaja como un golpe del director, pero no es baja de nadie.
+  if (g.a === ZOMBI) {
+    if (!esZombis()) return;
+    g = { ...g, de: '', n: 'Los zombis' };
+    sonido.mordida();
+  }
+  // La espátula dorada quita la mitad de lo que queda, sea cuanto sea.
+  const dmg = g.a === ESPATULA ? Math.max(1, Math.ceil(yo.hp / 2)) : g.dmg;
+  if (g.a === ESPATULA) sonido.espatulazo();
   yo.hpAntes = yo.hp;
-  yo.hp -= g.dmg;
+  yo.hp -= dmg;
+  yo.ultDanio = performance.now();
   danio = 1;
   sonido.dolor();
   if (yo.hp <= 0) morir(g);
+}
+// Un balazo de otro a un zombi: solo lo aplica el director.
+function alGolpeZombi(g) {
+  if (soyDirector()) zombis.golpe(g.id, g.dmg, g.de, g.cab, g.a);
 }
 
 let ultimaBaja = -1e9;
@@ -550,11 +627,14 @@ function morir(g) {
   yo.cargaAuto = -1;
   yo.muerteT = 3;
   yo.asesino = g.n;
+  yo.espatula = false;
   gatillo = false;
   yo.apuntando = false;
   // Quien lleva una bandera la suelta donde cae: el registro necesita el sitio.
   const llevo = marcador.banderas && EQUIPOS.some(b => marcador.banderas[b]?.uid === red.yo);
-  red.morir(llevo ? { ...g, x: r2(yo.pos.x), z: r2(yo.pos.z) } : g);
+  // En zombis cada muerte anota los puntos, los zombis fritos y la ronda.
+  const extra = esZombis() ? { pts: yo.pzT, zk: yo.zk, r: marcador.ronda || 1 } : {};
+  red.morir(llevo ? { ...g, x: r2(yo.pos.x), z: r2(yo.pos.z) } : { ...g, ...extra });
   explotar(yo.pos, miColor());
   pintaElegidas();
   $('muerte').hidden = false;
@@ -578,6 +658,7 @@ function alMarcador(m) {
     if (ahora !== 'suelo') enSuelo[b] = 0;
   }
   armasTomadas(m.armas || {});
+  if (esZombis()) marcadorZombis(m);
 }
 
 function alFin(f) {
@@ -589,6 +670,16 @@ function alFin(f) {
   $('muerte').hidden = true;
   $('hud').classList.add('terminado');
   const g = red.jugadores.get(f.ganador), eq = String(f.ganador).startsWith('eq:') ? f.ganador.slice(3) : '';
+  if (esZombis()) {
+    const r = f.ronda || marcador.ronda || 1, pts = f.puntos || marcador.puntos || {};
+    const suyos = u => u === red.yo ? yo.pzT : pts[u] ?? otros.get(u)?.pz ?? 0;
+    $('fin-txt').textContent = !red.online ? `Aguantaste hasta la ronda ${r} con ${yo.pzT} puntos y ${yo.zk} zombis fritos.`
+      : `Cayeron todos en la ronda ${r}. ` + (f.ganador === red.yo ? `¡Hiciste más puntos que nadie: ${suyos(red.yo)}!`
+        : g ? `${g.nombre} hizo más puntos (${suyos(f.ganador)}).` : 'Nadie hizo puntos.');
+    $('otra').hidden = red.online;
+    $('fin').hidden = false;
+    return;
+  }
   $('fin-txt').textContent = eq ? (eq === miEquipo() ? `¡Ganó tu equipo, el ${NOMBRE_EQ[eq]}!` : `Ganó el equipo ${NOMBRE_EQ[eq]}.`)
     : f.ganador === red.yo ? '¡Ganaste! Nadie te frió a tiempo.'
     : g ? `${g.nombre} llegó primero a la meta.` : 'La partida terminó.';
@@ -611,7 +702,8 @@ function montaArmasSuelo() {
     escena.add(ped);
   }
 }
-const tipoEn = (s, g) => armaEnPunto(red.semilla || 1, s, g);
+// La espátula dorada solo sale en todos contra todos.
+const tipoEn = (s, g) => armaEnPunto(red.semilla || 1, s, g, red.variante === 'todos');
 function quitaDelSuelo(st) {
   if (!st.obj) return;
   escena.remove(st.obj);
@@ -633,6 +725,12 @@ function armasTomadas(armas) {
   }
 }
 function otorgar(t, reemplaza) {
+  if (t === ESPATULA) {
+    yo.espatula = true;
+    sonido.recoge();
+    aviso('¡La espátula dorada! Apriétale Q para lanzarla');
+    return;
+  }
   const a = ARMAS[t];
   if (yo.inv.includes(t)) { llenaArma(t); aviso(`${a.nombre}: munición llena`); sonido.recoge(); return; }
   let i = yo.inv[1] === null ? 1 : yo.inv[2] === null ? 2 : (reemplaza || (yo.sel || 1));
@@ -652,9 +750,11 @@ function pideArma(s, g, reemplaza) {
 }
 function recogeCerca() {
   if (!cerca || !puedoJugar() || !yo.vivo) return;
+  if (esZombis()) return comprar(cerca);
   pideArma(cerca.s, cerca.g, yo.sel !== 0 ? yo.sel : 1);
 }
 function actualizaArmasSuelo() {
+  if (esZombis()) return actualizaTiendas();
   const ahora = performance.now(), t = ahora / 1000;
   cerca = null;
   for (let s = 0; s < suelo.length; s++) {
@@ -670,6 +770,8 @@ function actualizaArmasSuelo() {
     st.obj.rotation.y = t * 1.2 + s;
     if (!puedoJugar() || !yo.vivo) continue;
     if (Math.hypot(yo.pos.x - p.x, yo.pos.z - p.z) > TOCA_ARMA || Math.abs(yo.pos.y - p.y) > 1.2) continue;
+    // La espátula no ocupa hueco: se toma si no se lleva otra.
+    if (tipo === ESPATULA) { if (!yo.espatula && !yo.ep) pideArma(s, st.g, null); continue; }
     const libre = yo.inv[1] === null || yo.inv[2] === null;
     if (libre || yo.inv.includes(tipo)) pideArma(s, st.g, null);
     else cerca = { s, g: st.g, tipo };
@@ -681,17 +783,52 @@ function actualizaArmasSuelo() {
   }
 }
 
+// En zombis cada punto es una tienda que vende siempre la misma arma (TIENDA)
+// con los puntos de cada uno; no pasa por el registro, porque no se acaba.
+function actualizaTiendas() {
+  const t = performance.now() / 1000;
+  cerca = null;
+  for (let s = 0; s < suelo.length; s++) {
+    const st = suelo[s], p = PUNTOS_ARMA[s], tipo = TIENDA[s];
+    if (!st.obj) {
+      st.obj = construyeArma(tipo);
+      st.obj.scale.setScalar(1.8);
+      escena.add(st.obj);
+    }
+    st.obj.position.set(p.x, p.y + 0.9 + Math.sin(t * 2 + s) * 0.12, p.z);
+    st.obj.rotation.y = t * 1.2 + s;
+    if (!puedoJugar() || !yo.vivo) continue;
+    if (Math.hypot(yo.pos.x - p.x, yo.pos.z - p.z) > TOCA_ARMA || Math.abs(yo.pos.y - p.y) > 1.2) continue;
+    const tengo = yo.inv.includes(tipo);
+    cerca = { s, tipo, tengo, precio: tengo ? PRECIO[tipo] / 2 : PRECIO[tipo] };
+  }
+  $('prompt').hidden = !cerca;
+  if (!cerca) return;
+  const a = ARMAS[cerca.tipo], lleno = yo.inv[1] !== null && yo.inv[2] !== null;
+  const enMano = yo.sel !== 0 ? yo.inv[yo.sel] : yo.inv[1];
+  const que = cerca.tengo ? `munición de la ${a.nombre}`
+    : lleno ? `cambiar la ${NOMBRE_ARMA[enMano]} por la ${a.nombre} (${a.corto})` : `comprar la ${a.nombre} (${a.corto})`;
+  const falta = cerca.precio - yo.pz;
+  $('prompt').textContent = `E: ${que} · 💰 ${cerca.precio}` + (falta > 0 ? ` (te faltan ${falta})` : '');
+}
+function comprar(c) {
+  if (yo.pz < c.precio) { aviso(`Te faltan ${c.precio - yo.pz} puntos`); sonido.vacio(); return; }
+  yo.pz -= c.precio;
+  sonido.compra();
+  otorgar(c.tipo, yo.sel !== 0 ? yo.sel : 1);
+}
+
 // ---------- Los demás ----------
 function alJugador(id, e) {
   if (!red || id === red.yo) return;
   let j = otros.get(id);
   if (!e) {
-    if (j) { escena.remove(j.mesh); otros.delete(id); }
+    if (j) { escena.remove(j.mesh); quitaMalla(j.epMalla); otros.delete(id); }
     return;
   }
   const ficha = red.jugadores.get(id) || { nombre: 'Huevo', color: PALETA[0] };
   const skin = SKINS[e.sk] ? e.sk : 'clasico';
-  if (j && j.skin !== skin) { escena.remove(j.mesh); otros.delete(id); j = null; }
+  if (j && j.skin !== skin) { escena.remove(j.mesh); quitaMalla(j.epMalla); otros.delete(id); j = null; }
   if (!j) {
     j = {
       mesh: crearHuevo(ficha.color, ficha.nombre, skin), obj: new THREE.Vector3(e.x, e.y, e.z),
@@ -735,6 +872,22 @@ function alJugador(id, e) {
     j.xI = e.x2.i;
     granadas.revienta('r' + id + e.x2.i, e.x2.p.map(Number), e.x2.k || 'duro');
   }
+  // La espátula dorada que lanzó: se ve volar, y si viene por mí, aviso.
+  if (e.ep && Array.isArray(e.ep.p)) {
+    const q = new THREE.Vector3(...e.ep.p.map(Number));
+    if (!j.epMalla) { j.epMalla = mallaEspatula(); j.epMalla.position.copy(q); }
+    j.epObj = q;
+    if (e.ep.i !== j.epI) {
+      j.epI = e.ep.i;
+      if (e.ep.u === red.yo) { aviso(`¡${ficha.nombre} te tiró la espátula dorada! Te va a perseguir`); sonido.espatula(); }
+    }
+  } else if (j.epMalla) { quitaMalla(j.epMalla); j.epMalla = null; }
+  if (esZombis()) {
+    j.pz = e.pz | 0;
+    j.zk = e.zk | 0;
+    if (e.zb) ultimoZb.set(id, e.zb);
+    if (e.zb && id === director() && !soyDirector()) zombis.desdeRed(e.zb);
+  }
 }
 
 function alFeed(item) {
@@ -765,18 +918,26 @@ function publicar() {
   if (yo.cargaAuto >= 0) e.ad = 1;
   if (yo.deslizando > 0) e.ds = 1;
   if (yo.revento) e.x2 = yo.revento;
+  if (yo.ep) e.ep = { i: yo.ep.i, u: yo.ep.u, p: [r2(yo.ep.pos.x), r2(yo.ep.pos.y), r2(yo.ep.pos.z)] };
+  if (esZombis()) {
+    e.pz = yo.pzT;
+    e.zk = yo.zk;
+    if (soyDirector()) e.zb = zombis.estado();
+  }
   red.publicar(e);
 }
 
 // ---------- Granadas y cohetes ----------
-// ¿El cohete propio le dio a un rival? (elipsoide del huevo, como las balas)
+// ¿El cohete propio pasa pegado a un rival o a un zombi? El elipsoide del
+// huevo agrandado por la espoleta: revienta al lado, no hace falta acertarle.
 function tocaHuevo(p) {
-  for (const [id, j] of otros) {
-    if (!j.vivo || aliado(id)) continue;
-    const q = j.mesh.position;
-    const dx = (p.x - q.x) / 0.55, dy = (p.y - q.y - ALTO / 2) / (ALTO / 2 + 0.1), dz = (p.z - q.z) / 0.55;
-    if (dx * dx + dy * dy + dz * dz <= 1) return true;
-  }
+  const m = ARMAS[6].espoleta;
+  const cerca = q => {
+    const dx = (p.x - q.x) / (0.55 + m), dy = (p.y - q.y - ALTO / 2) / (ALTO / 2 + 0.1 + m), dz = (p.z - q.z) / (0.55 + m);
+    return dx * dx + dy * dy + dz * dz <= 1;
+  };
+  for (const [id, j] of otros) if (j.vivo && !aliado(id) && cerca(j.mesh.position)) return true;
+  if (zombis) for (const z of zombis.lista.values()) if (cerca(z.mesh.position)) return true;
   return false;
 }
 const granadas = crearGranadas(escena, colisores, reventar, tocaHuevo);
@@ -809,13 +970,13 @@ function reventar(p, dueno, id, propia, k) {
   if (!propia || !red) return;
   yo.revento = { i: id, p: [r2(p.x), r2(p.y), r2(p.z)], k };
   if (k === 'duro') danioExplosivo(p, GRANADA.radio, GRANADA.danio, 3, 'tu propio huevo duro');
-  else if (k === 'cohete') danioExplosivo(p, ARMAS[6].radio, ARMAS[6].danio, 6, 'tu propia bazuca');
+  else if (k === 'cohete') danioExplosivo(p, ARMAS[6].radio, ARMAS[6].danio, 6, 'tu propia bazuca', ARMAS[6].pleno);
   publicar();
 }
-function danioExplosivo(p, radio, danioMax, arma, comoMuero) {
-  golpeaRivales(p, radio, danioMax, arma);
+function danioExplosivo(p, radio, danioMax, arma, comoMuero, pleno = 0) {
+  golpeaRivales(p, radio, danioMax, arma, pleno);
   if (!yo.vivo || yo.escudo > 0) return;
-  const dmg = Math.round(alcanceExplosion(p, yo.pos.clone().add(new THREE.Vector3(0, ALTO / 2, 0)), radio, danioMax) / 2);
+  const dmg = Math.round(alcanceExplosion(p, yo.pos, radio, danioMax, pleno) / 2);
   if (dmg < 5) return;
   yo.hpAntes = yo.hp;
   yo.hp -= dmg;
@@ -823,20 +984,33 @@ function danioExplosivo(p, radio, danioMax, arma, comoMuero) {
   if (yo.hp <= 0) morir({ de: red.yo, n: comoMuero, dmg, cab: false, a: arma });
 }
 
-// Daño de una explosión en `p` sobre el punto `q`: lineal hasta `radio` y
-// nada si hay una pared en medio. Lo usan la granada, el cohete y la autodestrucción.
-function alcanceExplosion(p, q, radio, danioMax) {
-  const d = p.distanceTo(q);
-  if (d >= radio) return 0;
-  const dir = q.clone().sub(p).normalize();
-  if (rayoMundo(p.clone().addScaledVector(dir, 0.05), dir, d, colisores) < d - 0.3) return 0;   // tapado
-  return Math.round(danioMax * (1 - d / radio));
+// Daño de una explosión en `p` sobre el huevo parado en `pies`: entero hasta
+// `pleno` metros y lineal hasta `radio`. Se mide a los pies, al medio y a la
+// cabeza, y vale el mejor de los que no tienen una pared en medio: así un
+// huevo asomado detrás de un murete también lo siente. Lo usan la granada, el
+// cohete y la autodestrucción.
+function alcanceExplosion(p, pies, radio, danioMax, pleno = 0) {
+  let mejor = 0;
+  for (const h of [0.3, ALTO / 2, ALTO * 0.85]) {
+    const q = pies.clone();
+    q.y += h;
+    const d = p.distanceTo(q);
+    if (d >= radio) continue;
+    const dir = q.clone().sub(p).normalize();
+    if (rayoMundo(p.clone().addScaledVector(dir, 0.05), dir, d, colisores) < d - 0.3) continue;   // tapado
+    mejor = Math.max(mejor, d <= pleno ? 1 : 1 - (d - pleno) / (radio - pleno));
+  }
+  return Math.round(danioMax * mejor);
 }
-function golpeaRivales(p, radio, danioMax, arma) {
+function golpeaRivales(p, radio, danioMax, arma, pleno = 0) {
   for (const [idJ, j] of otros) {
     if (!j.vivo || aliado(idJ)) continue;
-    const dmg = alcanceExplosion(p, j.mesh.position.clone().add(new THREE.Vector3(0, ALTO / 2, 0)), radio, danioMax);
+    const dmg = alcanceExplosion(p, j.mesh.position, radio, danioMax, pleno);
     if (dmg >= 5) { red.golpear(idJ, { dmg, cab: false, a: arma }); marcaGolpe(false); }
+  }
+  if (zombis) for (const [n, z] of [...zombis.lista]) {
+    const dmg = alcanceExplosion(p, z.mesh.position, radio, danioMax, pleno);
+    if (dmg >= 5) { pegaA('z:' + n, dmg, false, arma); marcaGolpe(false); }
   }
 }
 
@@ -962,6 +1136,7 @@ function pantallaCompleta() {
   try { pide?.call(r, { navigationUI: 'hide' })?.catch?.(() => {}); } catch {}
 }
 $('pantalla').onclick = e => { e.stopPropagation(); pantallaCompleta(); };
+$('otra').onclick = () => location.reload();
 $('voz-entrar').onclick = e => { e.stopPropagation(); red?.entrarVoz(); };
 
 // ---------- Efectos ----------
@@ -1163,6 +1338,193 @@ function alSuceso(s) {
   setTimeout(() => div.remove(), 6000);
 }
 
+// ---------- Zombis ----------
+// Quién los mueve (el director), las rondas que llegan por el marcador, los
+// puntos de cada uno y el cartel de cada ronda. La simulación vive en zombis.js.
+let rondaVista = 0, eraDirector = false, ultimoDirector = '', primerMarcadorZ = true, cartelT = null;
+const ultimoZb = new Map();   // uid → el último `zb` que publicó
+const nActivos = () => [...red.jugadores.keys()].filter(u => !red.fuera?.has(u)).length;
+// El primer asiento que sigue en la sala y cuyo huevo se ve: si su pestaña se
+// cierra, su estado desaparece de `vivo` y dirige el siguiente.
+function director() {
+  if (!red) return '';
+  for (const u of red.jugadores.keys()) {
+    if (red.fuera?.has(u)) continue;
+    if (u === red.yo ? !red.mirando : otros.has(u)) return u;
+  }
+  return '';
+}
+const soyDirector = () => !!zombis && !terminado && director() === red.yo;
+
+function montaZombis() {
+  zombis = crearZombis(escena, colisores, {
+    alCaer: alCaeZombi,
+    pideRonda: r => red.accion('ronda', { r }),
+    grunido: p => sonido.grunido(p.distanceTo(camara.position)),
+  });
+  // De noche: el cielo morado, la niebla más cerca y menos luz.
+  escena.background.set('#2b2740');
+  escena.fog.color.set('#2b2740');
+  escena.fog.near = 22;
+  escena.fog.far = 85;
+  cielo.intensity = 0.85;
+  sol.intensity = 0.9;
+  sol.color.set('#c9bbff');
+  $('puntos-z').hidden = false;
+  $('puntos-z').innerHTML = '<b></b>';
+  $('tabla').querySelector('thead tr').innerHTML = '<th>Huevo</th><th>Puntos</th><th>Zombis</th><th>Caídas</th>';
+}
+
+function marcadorZombis(m) {
+  // Recargó la pestaña estando caído: sigue caído hasta la ronda siguiente.
+  if (primerMarcadorZ) {
+    primerMarcadorZ = false;
+    if (yo.vivo && (m.caidos || []).includes(red.yo)) { yo.vivo = false; yo.hp = 0; yo.muerteT = 0; $('muerte').hidden = false; publicar(); }
+  }
+  if (!m.ronda || m.ronda === rondaVista) return;
+  const primera = !rondaVista;
+  rondaVista = m.ronda;
+  if (soyDirector()) zombis.iniciaRonda(m.ronda, nActivos());
+  cartelRonda(m.ronda);
+  if (primera || !puedoJugar()) return;
+  // Ronda nueva: los caídos vuelven, y los que siguen en pie recuperan las granadas.
+  if (!yo.vivo) aparecer();
+  else { yo.gr = [...pref.granadas]; yo.grSel = 0; yo.grTiradas = 0; }
+}
+
+// Caído en zombis. Si los únicos que siguen en pie son jugadores que cerraron
+// la pestaña sin abandonar, el registro los cuenta vivos y la partida no se
+// acaba nunca: la sala tiene que expulsarlos con la votación de siempre.
+function textoCaido() {
+  const caidos = new Set(marcador.caidos || []);
+  const ausentes = [...red.jugadores.keys()].filter(u => u !== red.yo && !red.fuera?.has(u) && !caidos.has(u) && !otros.has(u));
+  const enPie = [...otros.values()].some(j => j.vivo);
+  if (!enPie && ausentes.length) {
+    const n = ausentes.map(u => red.jugadores.get(u)?.nombre || 'alguien').join(' y ');
+    return `${ausentes.length > 1 ? 'Solo siguen en pie ' + n + ', que se desconectaron' : 'Solo sigue en pie ' + n + ', que se desconectó'}. ` +
+      `Para cerrar la partida, voten para expulsar a ${n} con ⏏ en la cabecera de la sala.`;
+  }
+  const quien = !yo.asesino || yo.asesino === 'Los zombis' ? 'Los zombis te frieron' : `${yo.asesino} te frió`;
+  return `${quien}. Vuelves cuando empiece la ronda ${(marcador.ronda || 1) + 1}, si alguien aguanta.`;
+}
+
+function cartelRonda(r) {
+  const c = $('ronda');
+  c.textContent = `RONDA ${r}`;
+  c.hidden = true;
+  void c.offsetWidth;   // para que la animación vuelva a empezar
+  c.hidden = false;
+  clearTimeout(cartelT);
+  cartelT = setTimeout(() => { c.hidden = true; }, 3300);
+  sonido.ronda();
+}
+
+function sumaPuntos(n) {
+  yo.pz += n;
+  yo.pzT += n;
+  if (n <= 0) return;
+  const i = document.createElement('i');
+  i.textContent = '+' + n;
+  $('puntos-z').append(i);
+  setTimeout(() => i.remove(), 900);
+}
+
+function alCaeZombi({ pos, killer, cab, a }) {
+  explotar(pos, '#8fa36b');
+  if (killer !== red.yo) return;
+  yo.zk++;
+  sumaPuntos(cab ? 100 : a === SARTEN ? 130 : 60);
+}
+
+function pasoZombis(dt) {
+  if (!zombis) return;
+  const d = director(), soy = d === red.yo && !terminado;
+  if (soy && !eraDirector) {
+    zombis.adopta(ultimoZb.get(ultimoDirector) || null, nActivos());
+    if (marcador.ronda) zombis.iniciaRonda(marcador.ronda, nActivos());
+  }
+  eraDirector = soy;
+  if (d && d !== red.yo) ultimoDirector = d;
+  if (soy) {
+    const jug = [];
+    if (!red.mirando) jug.push({ uid: red.yo, pos: yo.pos, vivo: yo.vivo });
+    for (const [id, j] of otros) jug.push({ uid: id, pos: j.obj, vivo: j.vivo });
+    for (const m of zombis.paso(dt, jug, nActivos())) {
+      if (m.uid === red.yo) alGolpe({ de: '', n: 'Los zombis', dmg: m.dmg, cab: false, a: ZOMBI });
+      else red.golpear(m.uid, { dmg: m.dmg, cab: false, a: ZOMBI });
+    }
+  }
+  zombis.animar(dt, soy, camara.position);
+}
+
+// ---------- La espátula dorada ----------
+// Quien la lanza la simula: vuela hacia el rival más cerca de la mira, a
+// través de las paredes, y cada golpe (cada ESPATULA_CFG.cada segundos) le
+// quita la mitad de la vida que le queda, hasta que se muere. Los demás la ven
+// volar por el estado (`ep`).
+let epId = 0, mallaEp = null;
+function mallaEspatula() {
+  const m = construyeArma(ESPATULA);
+  m.scale.setScalar(2.2);
+  escena.add(m);
+  return m;
+}
+function quitaMalla(m) {
+  if (!m) return;
+  escena.remove(m);
+  m.traverse(o => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
+}
+function tirarEspatula() {
+  if (!puedoJugar() || !yo.vivo || !yo.espatula || yo.ep) return;
+  const o = camara.getWorldPosition(new THREE.Vector3()), d = camara.getWorldDirection(new THREE.Vector3());
+  let mejor = null, ang = Infinity;
+  for (const [id, j] of otros) {
+    if (!j.vivo || aliado(id)) continue;
+    const a = d.angleTo(j.obj.clone().setY(j.obj.y + ALTO * 0.6).sub(o));
+    if (a < ang) { ang = a; mejor = id; }
+  }
+  if (!mejor) { aviso('No hay a quién tirarle la espátula'); return; }
+  yo.espatula = false;
+  epId = Math.max(epId + 1, Date.now() % 1e9);
+  yo.ep = { i: epId, u: mejor, pos: o.addScaledVector(d, 0.8), t: 0, cd: 0 };
+  mallaEp = mallaEspatula();
+  mallaEp.position.copy(yo.ep.pos);
+  sonido.espatula();
+  aviso(`¡La espátula dorada va por ${red.jugadores.get(mejor)?.nombre || 'él'}!`);
+  publicar();
+}
+function terminaEspatula() {
+  quitaMalla(mallaEp);
+  mallaEp = null;
+  yo.ep = null;
+  publicar();
+}
+function pasoEspatula(dt) {
+  const e = yo.ep;
+  if (!e) return;
+  const j = otros.get(e.u);
+  e.t += dt;
+  e.cd -= dt;
+  if (!j || !j.vivo || terminado || e.t > ESPATULA_CFG.vida) { terminaEspatula(); return; }
+  const meta = j.mesh.position.clone();
+  meta.y += ALTO * 0.6;
+  const dir = meta.clone().sub(e.pos), dist = dir.length();
+  dir.normalize();
+  if (dist < ESPATULA_CFG.toca) {
+    if (e.cd <= 0) {
+      e.cd = ESPATULA_CFG.cada;
+      red.golpear(e.u, { dmg: 1, cab: false, a: ESPATULA });
+      marcaGolpe(false);
+      sonido.espatulazo(meta.distanceTo(yo.pos));
+      chispa(meta, '#ffd54a');
+      e.pos.addScaledVector(dir, -1.2);   // rebota y vuelve
+    }
+  } else e.pos.addScaledVector(dir, Math.min(dist, ESPATULA_CFG.vel * dt));
+  mallaEp.position.copy(e.pos);
+  mallaEp.rotation.y += dt * 14;
+  mallaEp.rotation.x = 0.6;
+}
+
 // ---------- Voz ----------
 // La voz la maneja la sala; aquí solo se pinta quién está y quién habla.
 function alVoces(v) {
@@ -1201,11 +1563,12 @@ function hud(dt) {
   $('municion').textContent = a.melee ? '∞' : yo.recargando > 0 ? 'recargando…' : `${m?.c ?? 0} / ${a.cargador}`;
   $('reservas').textContent = a.melee ? '' : `🔄 ${m?.r ?? 0} recargas`;
   $('reservas').classList.toggle('vacio', !a.melee && !(m?.r > 0));
-  const inv = yo.inv.map((id, i) => `${i}:${id}:${i === yo.sel}`).join() + '|' + yo.gr.join() + yo.grSel;
+  const inv = yo.inv.map((id, i) => `${i}:${id}:${i === yo.sel}`).join() + '|' + yo.gr.join() + yo.grSel + yo.espatula;
   if (inv !== firmaInv) {
     firmaInv = inv;
     $('inv').innerHTML = yo.inv.map((id, i) => `<span class="${i === yo.sel ? 'activa' : ''}${id === null ? ' vacia' : ''}">` +
-      `<kbd>${i + 1}</kbd> ${id === null ? '—' : i === 0 ? '🔪' : ARMAS[id].corto}</span>`).join('');
+      `<kbd>${i + 1}</kbd> ${id === null ? '—' : ARMAS[id].corto}</span>`).join('') +
+      (yo.espatula ? '<span class="oro"><kbd>Q</kbd> ✨ Espátula</span>' : '');
     $('granadas').innerHTML = yo.gr.length
       ? yo.gr.map((k, i) => `<span class="${i === yo.grSel ? 'sel' : ''}">${GRANADAS[k].icono} ${GRANADAS[k].nombre}</span>`).join('') + '<small>G lanza · T cambia</small>'
       : '<small>Sin granadas</small>';
@@ -1217,11 +1580,17 @@ function hud(dt) {
   const francotirador = a.zoom && yo.zoom > 0.85;
   $('mira-sniper').hidden = !francotirador;
   $('mira').hidden = francotirador || !yo.vivo;
-  if (!yo.vivo && !terminado) $('muerte-txt').textContent = `${yo.asesino} te frió. Vuelves en ${Math.ceil(yo.muerteT)}…`;
+  if (!yo.vivo && !terminado) $('muerte-txt').textContent = esZombis() ? textoCaido()
+    : `${yo.asesino} te frió. Vuelves en ${Math.ceil(yo.muerteT)}…`;
+  if (zombis) {
+    const b = $('puntos-z').firstChild;
+    if (b && b.textContent !== '💰 ' + yo.pz) b.textContent = '💰 ' + yo.pz;
+  }
 
   tablaT -= dt;
   if (tablaT > 0) return;
   tablaT = 0.25;
+  if (zombis) return tablaZombis();
   const filas = [...red.jugadores].map(([u, f]) => ({
     u, n: f.nombre, c: f.color, k: marcador.bajas[u] || 0, d: marcador.muertes[u] || 0,
   }));
@@ -1246,6 +1615,32 @@ function hud(dt) {
   const lider = filas[0], mio = filas.find(f => f.u === red.yo);
   $('marcador-mini').textContent = (mio ? `Tú ${mio.k}/${mio.d}` : 'Mirando') +
     (lider && lider !== mio ? ` · Líder: ${lider.n} (${lider.k})` : '');
+}
+// En zombis la tabla son los puntos, los zombis fritos y las caídas.
+function tablaZombis() {
+  const filas = [...red.jugadores].map(([u, f]) => {
+    const j = otros.get(u);
+    return {
+      u, n: f.nombre, c: f.color, d: marcador.muertes[u] || 0,
+      p: u === red.yo ? yo.pzT : j ? j.pz || 0 : marcador.puntos?.[u] || 0,
+      z: u === red.yo ? yo.zk : j ? j.zk || 0 : 0,
+    };
+  });
+  filas.sort((a, b) => b.p - a.p);
+  $('tabla-filas').innerHTML = '';
+  for (const f of filas) {
+    const tr = document.createElement('tr');
+    if (f.u === red.yo) tr.className = 'yo';
+    tr.innerHTML = '<td><i></i><span></span></td><td></td><td></td><td></td>';
+    tr.querySelector('i').style.background = f.c;
+    tr.querySelector('span').textContent = f.n;
+    tr.children[1].textContent = f.p;
+    tr.children[2].textContent = f.z;
+    tr.children[3].textContent = f.d;
+    $('tabla-filas').append(tr);
+  }
+  const r = zombis.ronda || marcador.ronda || 1, resp = zombis.respiro;
+  $('marcador-mini').textContent = `Ronda ${r} · ` + (resp > 0 ? `la siguiente en ${Math.ceil(resp)}…` : `quedan ${zombis.quedan} zombis`);
 }
 
 // ---------- Bucle ----------
@@ -1285,11 +1680,14 @@ function actualizar(dt) {
     }
     yo.cdDesliz = Math.max(0, yo.cdDesliz - dt);
     // Saltar corta el deslizamiento, pero el impulso sigue en el aire.
-    if (teclas.has('Space') && yo.enSuelo) { yo.vel.y = SALTO; yo.enSuelo = false; yo.deslizando = 0; }
+    // Saltando desde un deslizamiento se llega más alto.
+    if (teclas.has('Space') && yo.enSuelo) { yo.vel.y = SALTO * (yo.deslizando > 0 ? 1.3 : 1); yo.enSuelo = false; yo.deslizando = 0; }
     moverCuerpo(yo, dt, colisores);
 
     yo.cadencia = Math.max(0, yo.cadencia - dt);
     yo.escudo = Math.max(0, yo.escudo - dt);
+    // En zombis la vida se recupera sola si pasan unos segundos sin daño.
+    if (zombis && yo.hp < 100 && performance.now() - yo.ultDanio > 4000) yo.hp = Math.min(100, yo.hp + 30 * dt);
     if (yo.recargando > 0) {
       yo.recargando -= dt;
       const m = yo.mun[a.id];
@@ -1303,7 +1701,8 @@ function actualizar(dt) {
     yo.zoom = 0;
     yo.corriendo = false;
     yo.deslizando = 0;
-    if (yo.muerteT <= 0) aparecer();
+    // En zombis no se vuelve por tiempo: se vuelve con la ronda siguiente.
+    if (yo.muerteT <= 0 && !zombis) aparecer();
   }
   yo.sprintK += ((yo.corriendo || yo.deslizando > 0 ? 1 : 0) - yo.sprintK) * (1 - Math.exp(-8 * dt));
   yo.agacho += ((yo.deslizando > 0 ? 1 : 0) - yo.agacho) * (1 - Math.exp(-14 * dt));
@@ -1344,6 +1743,8 @@ function actualizar(dt) {
   $('auto').hidden = yo.cargaAuto < 0;
   if (yo.cargaAuto >= 0) $('auto-barra').style.width = Math.min(100, yo.cargaAuto / AUTO.carga * 100) + '%';
   granadas.paso(dt);
+  pasoZombis(dt);
+  pasoEspatula(dt);
   yo.cdGranada = Math.max(0, yo.cdGranada - dt);
   if (temblor > 0) {
     camara.position.x += (Math.random() - 0.5) * temblor * 0.3;
@@ -1369,6 +1770,7 @@ function actualizar(dt) {
     // Deslizándose va echado hacia atrás.
     c.rotation.x += ((j.ds ? 0.7 : 0) - c.rotation.x) * kp;
     c.position.y = Math.abs(Math.sin(t * 14)) * 0.08 * Math.min(1, v / 5);
+    if (j.epMalla && j.epObj) { j.epMalla.position.lerp(j.epObj, kp); j.epMalla.rotation.y += dt * 14; j.epMalla.rotation.x = 0.6; }
   }
 
   hud(dt);
@@ -1396,7 +1798,7 @@ requestAnimationFrame(bucle);
 
 // Para depurar desde la consola: __yemas.paso(dt) avanza el juego sin requestAnimationFrame
 window.__yemas = {
-  yo, otros, disparar, granadas, suelo, pref, nubes, get cegado() { return cegado; },
+  yo, otros, disparar, granadas, suelo, pref, nubes, tirarEspatula, director, get cegado() { return cegado; }, get zombis() { return zombis; },
   get red() { return red; }, get marcador() { return marcador; },
   paso(dt) { actualizar(dt); actualizarEfectos(dt); escena.updateMatrixWorld(); },
 };

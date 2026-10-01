@@ -80,4 +80,21 @@ export const sonido = {
     ruido(1.1, 700, 1.0 * v); ruido(0.35, 4500, 0.6 * v); tono(95, 28, 0.7, 0.55 * v, 'sine');
   },
   vacio() { tono(900, 900, 0.03, 0.08); },
+  // El sartenazo que da: un «clang» metálico con su eco.
+  sarten(dist = 0) {
+    const v = 1 / (1 + dist / 12);
+    tono(620, 600, 0.35, 0.16 * v, 'triangle'); tono(1490, 1460, 0.25, 0.08 * v, 'sine'); ruido(0.05, 5000, 0.25 * v);
+  },
+  // La espátula dorada: un silbido al lanzarla y una campanita en cada golpe.
+  espatula() { tono(700, 1700, 0.35, 0.1, 'sine'); ruido(0.3, 3000, 0.12); },
+  espatulazo(dist = 0) { const v = 1 / (1 + dist / 14); tono(2100, 2050, 0.4, 0.12 * v, 'sine'); tono(3150, 3100, 0.3, 0.06 * v, 'sine', 0.02); },
+  // Zombis: el gruñido de cada uno, el mordisco y la campana de cada ronda.
+  grunido(dist = 0) {
+    const v = 1 / (1 + dist / 8);
+    const f = 70 + Math.random() * 40;
+    tono(f * 1.4, f, 0.7 + Math.random() * 0.4, 0.16 * v, 'sawtooth'); ruido(0.5, 500, 0.12 * v);
+  },
+  mordida() { ruido(0.12, 1800, 0.5); tono(160, 70, 0.15, 0.25, 'sawtooth'); },
+  ronda() { for (const [f, t] of [[196, 0], [147, 0.45], [196, 0.9]]) { tono(f, f * 0.98, 1.6, 0.22, 'triangle', t); tono(f * 2.01, f * 2, 1.2, 0.06, 'sine', t); } },
+  compra() { tono(800, 1200, 0.07, 0.12, 'square'); tono(1200, 1600, 0.1, 0.1, 'square', 0.08); },
 };

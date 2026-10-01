@@ -170,6 +170,12 @@ const VENGANZA=[e('cero','El cero y el siete gafe',
  p('El trece es una excepción','En Vengeance puedes tener dos 13 sin pasarte. Esa excepción no convierte cualquier número repetido en válido.',fichas('Pareja permitida',['13','oro'],['13','oro'])),
  p('Los otros números siguen repitiéndose','Dos ochos todavía te hacen pasarte si no tienes protección. Super mantiene la excepción del 13, pero añade una familia 14 diferente.',fichas('Repetición peligrosa',['8','azul'],['8','rojo'])))];
 export const VARIANTES={
+ yemas:{
+  zombis:[e('zombis','Rondas, puntos y tiendas',
+   p('Cada golpe suma puntos','Pegarle a un zombi da 10 puntos y freírlo 60; a la cabeza son 100 y con la sartén 130. Los puntos sirven para comprar armas.',fichas('Puntos por zombi',['10','blanco','GOLPE'],['60','verde','FRITO'],['100','oro','CABEZA'])),
+   p('Compra en los puntos de armas','En zombis cada punto de armas es una tienda. Acércate y aprieta E: la pistola cuesta 500 y la bazuca 2.500; la munición de una que ya tienes, la mitad.',fichas('Tienda',['500','azul','PISTOLA'],['1200','rojo','METRALLETA'],['2500','oro','BAZUCA'])),
+   p('Si caes, vuelves en la ronda siguiente','Quien muere espera a que sus compañeros limpien la ronda. La partida termina cuando caen todos al mismo tiempo, y gana quien hizo más puntos.',fichas('Fin de la ronda',['↺','verde','VUELVEN'],['💀','rojo','TODOS CAEN'])))]
+ },
  uno:{
   clasico:[e('reto','El reto del comodín +4',
    p('Había rojo en la mesa','Quien juega +4 tenía un 3 rojo. El +4 era ilegal porque disponía de una carta del color anterior, aunque no fuera el mismo número.',cart(['Descarte anterior',[['7','rojo']]],['Mano de quien jugó +4',[['3','rojo','TENÍA ROJO'],['+4','violeta']]])),
