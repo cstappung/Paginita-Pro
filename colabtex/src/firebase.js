@@ -6,6 +6,7 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signO
 import { getDatabase, connectDatabaseEmulator } from "firebase/database";
 import { getStorage } from "firebase/storage";
 import { getAnalytics, isSupported as analyticsSupported } from "firebase/analytics";
+import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDxarTG8KMwolWzdYT8eLwgX1wReQLF8Bc",
@@ -19,6 +20,23 @@ const firebaseConfig = {
 };
 
 export const app = initializeApp(firebaseConfig);
+
+/* App Check: con él, la base y Storage solo atienden a peticiones que
+   vienen de ESTA página en un navegador de verdad (reCAPTCHA v3, invisible),
+   no a un script que copió la configuración de arriba — que es pública por
+   diseño y no se puede esconder. Vacío = apagado. Para encenderlo:
+   firebase/CONFIGURAR-FIREBASE.md, «App Check». Va antes de getDatabase y
+   getStorage para que sus primeras peticiones ya lleven el sello. En
+   localhost pide un token de depuración (sale en la consola la primera vez
+   y se registra en la consola de Firebase); sin él, con App Check
+   «aplicado», la vista previa local se quedaría sin base. */
+const APP_CHECK_SITE_KEY = "";
+if (APP_CHECK_SITE_KEY && typeof window !== "undefined" && typeof document !== "undefined") {
+  try {
+    if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+    initializeAppCheck(app, { provider: new ReCaptchaV3Provider(APP_CHECK_SITE_KEY), isTokenAutoRefreshEnabled: true });
+  } catch (e) { console.warn("App Check no arrancó:", e); }
+}
 export const auth = getAuth(app);
 export const db = getDatabase(app);
 export const storage = getStorage(app);

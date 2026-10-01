@@ -2817,7 +2817,7 @@ function dondeEstamos() {
   watchAuth(async user => {
     // si se está editando una carpeta local, no cambiar de vista por auth
     if (state.mode === "local" && state.dirHandle) {
-      state.user = user ? { uid: user.uid, name: user.displayName || user.email || "Usuario", photo: user.photoURL || "", color: colorForUid(user.uid) } : null;
+      state.user = user ? { uid: user.uid, name: user.displayName || "Usuario", photo: user.photoURL || "", color: colorForUid(user.uid) } : null;
       return;
     }
     if (!user) {
@@ -2827,7 +2827,7 @@ function dondeEstamos() {
     }
     state.user = {
       uid: user.uid,
-      name: user.displayName || user.email || "Usuario",
+      name: user.displayName || "Usuario",
       photo: user.photoURL || "",
       color: colorForUid(user.uid)
     };

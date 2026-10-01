@@ -68,8 +68,17 @@ import {
   cadenaCacho, CC_CADENA, sha256hex, arrUno, dhPublica, cadenaCatan, CT_CADENA,
   cadenaPr, PR_CADENA, arrSp
 } from "./juegos/motor.js";
+import { sanea, saneaPartida, colorSano, fotoSana } from "./juegos/sano.js";
 
 const P = "partidas", MIAS = "misPartidas", R = "ranks";
+
+/* `ranks/<juego>/<uid>` entero, con cada fila limpia (ver juegos/sano.js). */
+const saneaRanks = v => {
+  const out = v || {};
+  for (const filas of Object.values(out))
+    if (filas && typeof filas === "object") for (const f of Object.values(filas)) sanea(f);
+  return out;
+};
 
 /* ---------- reloj compartido ----------
    Los dos relojes de los dos ordenadores no coinciden, y el escondite
@@ -107,8 +116,8 @@ export async function crearPartida(juego, quien, extra) {
 
 const ficha = (q, orden, hmazo, extra) => Object.assign({
   nombre: q.nombre || "Alguien",
-  foto: q.foto || "",
-  color: q.color || "#0d9488",
+  foto: fotoSana(q.foto, false),
+  color: colorSano(q.color) || "#0d9488",
   orden,
   hmazo: hmazo || "",
   at: Date.now()
@@ -181,14 +190,14 @@ export async function unirse(pid, quien) {
 }
 
 export function watchPartida(pid, cb) {
-  return onValue(ref(db, `${P}/${pid}`), s => cb(s.val(), null), err => cb(null, err));
+  return onValue(ref(db, `${P}/${pid}`), s => cb(saneaPartida(s.val()), null), err => cb(null, err));
 }
 
 export function watchSalas(cb) {
   const q = query(ref(db, P), orderByChild("estado"), equalTo("esperando"));
   return onValue(q, s => {
     const v = s.val() || {};
-    cb(Object.entries(v).map(([id, x]) => Object.assign({ id }, x)), null);
+    cb(Object.entries(v).map(([id, x]) => Object.assign({ id }, saneaPartida(x))), null);
   }, err => cb([], err));
 }
 
@@ -254,7 +263,7 @@ export function watchMias(uid, cb) {
 export function watchRanks(juego, cb) {
   return onValue(ref(db, `${R}/${juego}`), s => {
     const v = s.val() || {};
-    cb(Object.entries(v).map(([uid, x]) => Object.assign({ uid }, x)), null);
+    cb(Object.entries(v).map(([uid, x]) => Object.assign({ uid }, sanea(x))), null);
   }, err => cb([], err));
 }
 
@@ -274,13 +283,13 @@ export async function leerPopularidad() {
   }
   /* Las filas ya están aquí, así que van también: con ellas el
      vestíbulo pinta el podio del juego destacado sin otra lectura. */
-  return { n, ranks: r.val() || {} };
+  return { n, ranks: saneaRanks(r.val()) };
 }
 
 /* La clasificación general: todas las filas de todos los juegos, que es
    lo que ya lee la pestaña de logros. Se suma al pintar. */
 export function watchRanksTodos(cb) {
-  return onValue(ref(db, R), s => cb(s.val() || {}, null), err => cb({}, err));
+  return onValue(ref(db, R), s => cb(saneaRanks(s.val()), null), err => cb({}, err));
 }
 
 /* ---------- logros ----------
@@ -300,7 +309,7 @@ export function watchLogros(cb) {
   return () => offs.forEach(f => f());
 }
 
-export const leerRank = (juego, uid) => get(ref(db, `${R}/${juego}/${uid}`)).then(s => s.val());
+export const leerRank = (juego, uid) => get(ref(db, `${R}/${juego}/${uid}`)).then(s => sanea(s.val()));
 export const guardarRank = (juego, uid, fila) => set(ref(db, `${R}/${juego}/${uid}`), fila);
 
 /* ---------- perfil ----------
@@ -322,7 +331,7 @@ export const guardarRank = (juego, uid, fila) => set(ref(db, `${R}/${juego}/${ui
 const U = "users";
 
 export const leerPerfil = uid =>
-  get(ref(db, `${U}/${uid}/perfil`)).then(s => s.val());
+  get(ref(db, `${U}/${uid}/perfil`)).then(s => sanea(s.val(), true));
 
 export const guardarPerfil = (uid, p) =>
   set(ref(db, `${U}/${uid}/perfil`), Object.assign({}, p, { at: Date.now() }));
@@ -338,7 +347,7 @@ export const guardarPartidaClub = (uid, juego, d, at) =>
   set(ref(db, `${U}/${uid}/club/${juego}`), { d: d || null, at: Number.isFinite(at) ? at : Date.now() });
 
 export function watchPerfil(uid, cb) {
-  return onValue(ref(db, `${U}/${uid}/perfil`), s => cb(s.val(), null),
+  return onValue(ref(db, `${U}/${uid}/perfil`), s => cb(sanea(s.val(), true), null),
                  err => cb(null, err));
 }
 
