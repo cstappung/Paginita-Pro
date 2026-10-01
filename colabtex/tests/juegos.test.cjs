@@ -214,3 +214,11 @@ test('cupos: cuadritos y flip7 hasta diez, worms, cadena y cacho hasta ocho, due
  }
  assert.equal(cupoDe({juego:'cadena',cupo:1}),2,'nunca menos de dos');
 });
+test('novedades: cada juego trae su fecha de alta y salen los tres últimos',()=>{
+ const JUEGOS=vm.runInContext('JUEGOS',context);
+ for(const [k,j] of Object.entries(JUEGOS))assert.match(j.alta||'',/^\d{4}-\d{2}-\d{2}$/,k);
+ const n=[...context.novedades(3)];assert.equal(n.length,3);assert.equal(new Set(n).size,3);
+ const altas=n.map(k=>JUEGOS[k].alta);assert.equal(altas.join(),[...altas].sort().reverse().join());
+ const resto=Object.keys(JUEGOS).filter(k=>!n.includes(k));
+ assert.ok(resto.every(k=>JUEGOS[k].alta<=altas[2]));
+});

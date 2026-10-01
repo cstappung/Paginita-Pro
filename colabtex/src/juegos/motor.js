@@ -36,121 +36,148 @@
    una apuesta ya no se puede calcular a ojo, que es todo el juego.
    Catan llega a seis, que es lo que admite la ampliación: pasado eso
    la isla grande no tiene costa para todos. */
+/* `alta` es el día en que el juego llegó al salón (AAAA-MM-DD): de ahí
+   sale la sección de novedades del vestíbulo. Un juego nuevo solo
+   tiene que traer la suya; a igual fecha manda el orden de esta tabla,
+   que es el orden en que se fueron añadiendo. */
 export const JUEGOS = {
-  orbita: { nombre: "Órbita", lema: "Lanza sondas con la gravedad, roba estrellas y derriba satélites", color: "#8860ed", minimo: 2, cupo: 4 },
+  orbita: { nombre: "Órbita", lema: "Lanza sondas con la gravedad, roba estrellas y derriba satélites", color: "#8860ed", minimo: 2, cupo: 4, alta: "2026-09-14" },
   escondite: {
     nombre: "Escondite",
     lema: "Esconde a tu persona en el paisaje y encuentra la del otro",
     color: "#e0653a",
     minimo: 2,
-    cupo: 2
+    cupo: 2,
+    alta: "2026-09-10"
   },
   cartas: {
     nombre: "Cartas de los tres elementos",
     lema: "Fuego, agua y nieve — tres cartas de tres colores y ganas",
     color: "#d4356b",
     minimo: 2,
-    cupo: 2
+    cupo: 2,
+    alta: "2026-09-10"
   },
   cuadritos: {
     nombre: "Cuadritos",
     lema: "Cierra más cajas que los demás, una raya por turno",
     color: "#0f62fe",
     minimo: 2,
-    cupo: 10
+    cupo: 10,
+    alta: "2026-09-10"
   },
   worms: {
     nombre: "Circuit Breakers",
     lema: "Cuadrillas eléctricas, terreno destructible y un disparo por turno",
     color: "#f2a33a",
     minimo: 2,
-    cupo: 8
+    cupo: 8,
+    alta: "2026-09-23"
   },
   reversi: {
     nombre: "Reversi",
     lema: "Atrapa las fichas del otro entre las tuyas y dales la vuelta",
     color: "#0d9488",
     minimo: 2,
-    cupo: 2
+    cupo: 2,
+    alta: "2026-09-10"
   },
   cadena: {
     nombre: "Reacción en cadena",
     lema: "Carga una celda hasta que estalle y conquista a sus vecinas en cadena",
     color: "#ff3d7f",
     minimo: 2,
-    cupo: 8
+    cupo: 8,
+    alta: "2026-09-23"
   },
   flip7: {
     nombre: "Flip 7",
     lema: "Pide carta o plántate: siete números distintos y te llevas el bono",
     color: "#e8a317",
     minimo: 2,
-    cupo: 10
+    cupo: 10,
+    alta: "2026-09-24"
   },
   cacho: {
     nombre: "Cacho",
     lema: "Dudo o calzo: cinco dados en el vaso y gana el último que conserve alguno",
     color: "#b5462c",
     minimo: 2,
-    cupo: 8
+    cupo: 8,
+    alta: "2026-09-25"
   },
   uno: {
     nombre: "UNO",
     lema: "Clásico, No Mercy, All Wild o Liar's: quédate sin cartas antes que nadie",
     color: "#e03a2f",
     minimo: 2,
-    cupo: 10
+    cupo: 10,
+    alta: "2026-09-26"
   },
   catan: {
     nombre: "Catan",
     lema: "Coloniza la isla, comercia y construye: el primero en llegar a la meta gana",
     color: "#d9822b",
     minimo: 2,
-    cupo: 6
+    cupo: 6,
+    alta: "2026-09-26"
   },
   presidente: {
     nombre: "Presidente",
     lema: "Deshazte de tus cartas primero: el Culo le da sus mejores al Presidente, ronda tras ronda",
     color: "#7c4dff",
     minimo: 3,
-    cupo: 10
+    cupo: 10,
+    alta: "2026-09-27"
   },
   spicy: {
     nombre: "Spicy",
     lema: "Bota cartas boca abajo, miente con cara de póker y duda del picante ajeno",
     color: "#e2412b",
     minimo: 2,
-    cupo: 6
+    cupo: 6,
+    alta: "2026-09-28"
   },
   tetris: {
     nombre: "Tetris",
     lema: "Todos a la vez con las mismas piezas: cada línea que limpias es basura para otro",
     color: "#22b8cf",
     minimo: 2,
-    cupo: 8
+    cupo: 8,
+    alta: "2026-09-28"
   },
   yemas: {
     nombre: "Yemas",
     lema: "Shooter de huevos en primera persona: el primero en freír a los demás hasta la meta gana",
     color: "#ffb300",
     minimo: 2,
-    cupo: 8
+    cupo: 8,
+    alta: "2026-09-28"
   },
   clue: {
     nombre: "Clue",
     lema: "Un crimen en el edificio: descubre quién, con qué y dónde antes que los demás",
     color: "#8e1b2b",
     minimo: 2,
-    cupo: 6
+    cupo: 6,
+    alta: "2026-09-29"
   },
   ajedrez: {
     nombre: "Ajedrez",
     lema: "El de siempre: enroque, al paso, coronación, tablas y jaque mate",
     color: "#a0703c",
     minimo: 2,
-    cupo: 2
+    cupo: 2,
+    alta: "2026-09-30"
   }
 };
+
+/* Los `n` juegos más nuevos, del último al primero. */
+export function novedades(n = 3) {
+  return Object.keys(JUEGOS).map((k, i) => ({ k, i, alta: JUEGOS[k].alta || "" }))
+    .sort((a, b) => (a.alta < b.alta ? 1 : a.alta > b.alta ? -1 : b.i - a.i))
+    .slice(0, n).map(x => x.k);
+}
 
 /* Cuánta gente cabe en *esta* sala: lo que eligió quien la abrió,
    recortado a lo que el juego admite. Una partida creada antes de que

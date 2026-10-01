@@ -33,7 +33,7 @@ import { crearSolo } from "./juegos/solo/club.js";
 import { watchAuth, loginGoogle, logout } from "./firebase.js";
 import * as fb from "./fb-juegos.js";
 import { escapeHtml, timeAgo, colorForUid } from "./util.js";
-import { JUEGOS, reducir, jugadasDe, acumula, cupoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, ganoEn, ordenaRanks } from "./juegos/motor.js";
+import { JUEGOS, reducir, jugadasDe, acumula, cupoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, ganoEn, ordenaRanks, novedades } from "./juegos/motor.js";
 import { crearEscondite } from "./juegos/escondite.js";
 import { crearCartas } from "./juegos/cartas.js";
 import { crearCuadritos } from "./juegos/cuadritos.js";
@@ -917,6 +917,7 @@ function armazon() {
      espera, y con dos cajas habría acabado al final de la página. */
   h.innerHTML = `
     <div class="jg-ves">
+      ${novedadesHtml()}
       <section class="jg-marquesina">
         <div class="jg-mq-texto">
           <span class="jg-eyebrow">LABORATORIO · SALÓN DE JUEGOS</span>
@@ -963,10 +964,83 @@ function armazon() {
   for (const b of h.querySelectorAll("[data-filtro]")) {
     b.onclick = () => { filtroVes = b.getAttribute("data-filtro"); aplicaFiltro(); };
   }
+  enganchaNovedades(h);
   h.querySelector(".jg-mq-link").onclick = ev => {
     ev.preventDefault();   // un #ancla cambiaría la ruta del hash
     $("vesCatalogo").scrollIntoView({ behavior: "smooth", block: "start" });
   };
+}
+
+/* ---------- novedades ----------
+   Lo primero del vestíbulo son los tres juegos que llegaron últimos, por
+   la fecha `alta` de `JUEGOS`: quien vuelve al salón tiene que ver qué
+   hay de nuevo sin recorrer el catálogo. La sala se abre con las
+   opciones por omisión —las mismas que trae preseleccionadas su tarjeta
+   del catálogo—, y «Opciones» lleva a esa tarjeta para elegir otras. */
+const fechaAlta = a => {
+  const d = new Date(a + "T12:00:00");
+  return isNaN(d) ? "" : d.toLocaleDateString("es", { day: "numeric", month: "long" });
+};
+const porOmision = k => Object.fromEntries((OPCIONES[k] || []).map(o => [o.clave, o.por || o.valores[0].v]));
+
+function novedadesHtml() {
+  const ks = novedades(3);
+  if (!ks.length) return "";
+  return `
+      <section class="jg-nov" aria-labelledby="vesNovT">
+        <header class="jg-nov-cab">
+          <span class="jg-eyebrow">RECIÉN LLEGADOS</span>
+          <h2 id="vesNovT">Novedades</h2>
+          <p>Los ${ks.length} últimos juegos en llegar al salón.</p>
+        </header>
+        <div class="jg-nov-lista">${ks.map((k, i) => {
+          const j = JUEGOS[k], grupo = j.cupo > 2;
+          const cupo = grupo ? (j.minimo || 2) + "–" + j.cupo + " jugadores" : "Duelo · 2 jugadores";
+          return `
+          <article class="jg-nov-c" style="--c:${j.color}">
+            <div class="jg-portada jg-portada-${k}" aria-hidden="true">${arteJuego(k)}</div>
+            <div class="jg-nov-cuerpo">
+              <div class="jg-nov-meta"><span class="jg-nov-sello">${i === 0 ? "★ Lo último" : "Nuevo"}</span><span>${escapeHtml(fechaAlta(j.alta))}</span></div>
+              <h3>${escapeHtml(j.nombre)}</h3>
+              <p>${escapeHtml(j.lema)}</p>
+              <small>${escapeHtml(cupo)}</small>
+              <div class="jg-nov-pie">
+                <button class="btn" data-nov-crear="${k}">Abrir sala <span aria-hidden="true">→</span></button>
+                ${OPCIONES[k] ? `<button class="btn2" data-nov-ver="${k}" title="Elegir las opciones en su tarjeta">Opciones</button>` : ""}
+                ${tieneReglas(k) ? `<button class="btn2" data-nov-reglas="${k}" title="Cómo se juega" aria-label="Reglas de ${escapeHtml(j.nombre)}">📖</button>` : ""}
+              </div>
+            </div>
+          </article>`;
+        }).join("")}</div>
+      </section>`;
+}
+
+function enganchaNovedades(h) {
+  for (const b of h.querySelectorAll("[data-nov-crear]")) {
+    const k = b.getAttribute("data-nov-crear");
+    b.onclick = () => crear(k, porOmision(k));
+  }
+  for (const b of h.querySelectorAll("[data-nov-reglas]")) {
+    const k = b.getAttribute("data-nov-reglas");
+    b.onclick = () => abreReglas(k, { modo: modoReglas(k, porOmision(k)), nombre: JUEGOS[k].nombre });
+  }
+  /* Lleva a la tarjeta del catálogo, abre sus opciones y la hace brillar
+     un momento para que se vea cuál es. Si el filtro la tenía escondida,
+     se vuelve a «Todos». */
+  for (const b of h.querySelectorAll("[data-nov-ver]")) {
+    b.onclick = () => {
+      const k = b.getAttribute("data-nov-ver");
+      const t = document.querySelector("#vesElige .jg-of-" + k);
+      if (!t) return;
+      if (t.hidden) { filtroVes = "todos"; aplicaFiltro(); }
+      const d = t.querySelector(".jg-of-ops");
+      if (d) d.open = true;
+      t.scrollIntoView({ behavior: "smooth", block: "center" });
+      t.classList.remove("jg-of-brilla");
+      void t.offsetWidth;
+      t.classList.add("jg-of-brilla");
+    };
+  }
 }
 
 /* El filtro solo esconde tarjetas: no se repinta nada, así que lo que

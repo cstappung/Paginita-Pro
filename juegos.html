@@ -2471,6 +2471,54 @@ html[data-tema=oscuro] .jg-aj-movs .on{color:#c4b1ff}
 html[data-tema=oscuro] .jg-aj-aviso.on{background:#2a2144;border-color:#4b3a7a;color:#e3d9ff}
 html[data-tema=oscuro] .jg-aj-bando{border-color:var(--os-borde2);color:var(--os-tx3)}
 html[data-tema=oscuro] .jg-aj-punto-t{border-color:#ffffff66}
+
+/* ============================================================
+   Novedades: los tres últimos juegos, lo primero del vestíbulo
+   ============================================================ */
+/* Ocupa las dos columnas de la rejilla, encima de la marquesina y de
+   las salas: va antes que nada porque es lo que cambia de una visita a
+   otra. Repite las áreas de `.jg-ves` con una fila más delante. */
+.jg-ves{grid-template-areas:"nov nov" "mq lado" "cat lado"}
+.jg-nov{grid-area:nov;margin-bottom:28px}
+.jg-nov-cab{display:flex;align-items:baseline;gap:6px 14px;flex-wrap:wrap;margin-bottom:14px}
+.jg-nov-cab .jg-eyebrow{flex-basis:100%;color:var(--jg-purple)}
+html[data-tema=oscuro] .jg-nov-cab .jg-eyebrow{color:#c4b1ff}
+.jg-nov-cab h2{margin:0;font-size:26px;letter-spacing:-.5px;color:var(--jg-ink)}
+.jg-nov-cab p{margin:0;font-size:13px;color:var(--jg-muted)}
+.jg-nov-lista{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.jg-nov-c{position:relative;display:flex;flex-direction:column;overflow:hidden;border:1px solid #e5e0ee;border-radius:18px;background:#fff;box-shadow:0 1px 2px #2a1e440a;transition:transform .22s cubic-bezier(.2,.8,.3,1),box-shadow .22s}
+.jg-nov-c:hover{transform:translateY(-4px);box-shadow:0 16px 34px #39226d16}
+.jg-nov-c:before{content:"";position:absolute;inset:0 0 auto;height:4px;background:var(--c);z-index:1}
+.jg-nov-c .jg-portada{height:150px;border-radius:0;flex-shrink:0}
+.jg-nov-c .jg-portada>*{zoom:.82}
+.jg-nov-cuerpo{display:flex;flex-direction:column;gap:6px;padding:14px 16px 16px;flex:1}
+.jg-nov-meta{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11.5px;color:var(--jg-muted)}
+.jg-nov-sello{font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:99px;color:#fff;background:var(--c)}
+.jg-nov-cuerpo h3{margin:2px 0 0;font-size:19px;letter-spacing:-.3px;color:var(--jg-ink)}
+.jg-nov-cuerpo p{margin:0;font-size:12.5px;line-height:1.5;color:#5f5a70;flex:1}
+.jg-nov-cuerpo small{font-size:11.5px;color:var(--jg-muted)}
+.jg-nov-pie{display:flex;gap:8px;margin-top:8px}
+.jg-nov-pie .btn{flex:1}
+/* La tarjeta del catálogo a la que lleva «Opciones» brilla un momento. */
+.jg-of-brilla{animation:jgOfBrilla 1.6s ease-out}
+@keyframes jgOfBrilla{0%,30%{box-shadow:0 0 0 4px var(--c),0 16px 34px #39226d22}100%{box-shadow:0 0 0 0 transparent}}
+@media(max-width:1080px){.jg-nov-c .jg-portada{height:126px}.jg-nov-c .jg-portada>*{zoom:.68}}
+@media(max-width:900px){
+  .jg-ves{grid-template-areas:"nov" "mq" "lado" "cat"}
+  .jg-nov-lista{grid-template-columns:1fr;gap:12px}
+  .jg-nov-c{flex-direction:row}
+  .jg-nov-c:hover{transform:none}
+  .jg-nov-c:before{inset:0 auto 0 0;width:4px;height:auto}
+  .jg-nov-c .jg-portada{width:118px;height:auto;min-height:100%}
+  .jg-nov-c .jg-portada>*{zoom:.5}
+  .jg-nov-cuerpo{padding:12px 14px}
+  .jg-nov-cuerpo p{font-size:12px}
+}
+@media (prefers-reduced-motion:reduce){.jg-nov-c,.jg-nov-c:hover{transition:none;transform:none}.jg-of-brilla{animation:none}}
+html[data-tema=oscuro] .jg-nov-c{background:var(--os-sup);border-color:var(--os-borde);box-shadow:none}
+html[data-tema=oscuro] .jg-nov-c:hover{box-shadow:0 16px 34px #0008}
+html[data-tema=oscuro] .jg-nov-cuerpo p{color:var(--os-tx2)}
+html[data-tema=oscuro] .jg-nov-cab h2,html[data-tema=oscuro] .jg-nov-cuerpo h3{color:var(--os-tx)}
 </style>
 </head>
 <body>
@@ -2515,6 +2563,6 @@ html[data-tema=oscuro] .jg-aj-punto-t{border-color:#ffffff66}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610010110"></script>
+<script src="juegos-app.js?v=202610010122"></script>
 </body>
 </html>

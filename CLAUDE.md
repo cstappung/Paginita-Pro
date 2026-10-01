@@ -1637,6 +1637,17 @@ for anyone `fuera` or `caido`**, because someone who abandons leaves their orbs
 on the board and `cuenta` showed an eliminated player with their score from
 before dying; `cadena.js`'s marcador does the same once the replay is over.
 
+**The lobby opens with *Novedades*, the three newest games** (`.jg-nov`,
+`novedadesHtml` in `juegos-main.js`). They come from `novedades(3)` in
+`motor.js`, which sorts by each game's `alta` (the date it arrived,
+`AAAA-MM-DD`, in `JUEGOS`), with ties going to the later row of the table.
+So a new game only has to bring its `alta`, and `tests/juegos.test.cjs`
+fails if one doesn't. *Abrir sala* there uses the same defaults its
+catalogue card has preselected (`porOmision`, read from `OPCIONES`), and
+*Opciones* scrolls to that card, opens its options and makes it glow
+(`.jg-of-brilla`), resetting the filter if it was hiding it. The section is
+an extra `nov` area spanning the whole first row of `.jg-ves`.
+
 **The lobby is a grid with the rooms on the right.** `.jg-ves` has the areas
 `"mq lado" "cat lado"`: the *marquesina* (title, counters, a quick-join button
 and the ring of game icons) and the catalogue on the left, and a **sticky**
