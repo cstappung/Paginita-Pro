@@ -127,7 +127,16 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver }) {
           if (e.enVenta[x.c]) throw new Error("Esa carta ya está a la venta.");
           if (!(p >= 1 && p <= MAX_PRECIO)) throw new Error(`El precio va de 1 a ${MAX_PRECIO.toLocaleString("es-CL")} monedas.`);
           if (cuenta().parada) throw new Error("Tu cuenta tiene una compra sin fondos: no puedes vender hasta ponerte al día.");
-          responde(true, await fb.publicarOferta(uid, x.c, p));
+          const id = await fb.publicarOferta(uid, x.c, p);
+          /* La oferta tiene que quedar válida en el recuento; si no (otra
+             pestaña la publicó a la vez, o la carta cambió de manos), se
+             retira en el acto para que no quede una oferta fantasma. */
+          const fin = economia(d).ofertas[id];
+          if (fin && fin.estado !== "activa") {
+            await fb.retirarOferta(id).catch(() => {});
+            throw new Error("Esa carta ya está a la venta o dejó de ser tuya.");
+          }
+          responde(true, id);
         } else if (x.accion === "retirar") {
           const o = e.ofertas[x.id];
           if (!o || o.u !== uid || o.estado !== "activa") throw new Error("Esa oferta ya no está a la venta.");
@@ -192,7 +201,7 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver }) {
       frame.title = "PRODROP — sobres y mercado de cartas";
       frame.allow = "fullscreen";
       window.addEventListener("message", mensaje);
-      frame.src = "juegos/prodrop/index.html?v=pd-4";
+      frame.src = "juegos/prodrop/index.html?v=pd-5";
       host.appendChild(frame);
       frame.addEventListener("load", () => frame.focus());
       off = datos(x => { d = x; enviaDatos(); });

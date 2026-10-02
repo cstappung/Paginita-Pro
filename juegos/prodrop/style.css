@@ -997,6 +997,8 @@ body[data-phase="opening"] #mktBtn, body[data-phase="reveal"] #mktBtn { opacity:
 .mk-tag span { display: inline-flex; align-items: center; gap: 4px; max-width: 100%; font-size: 10.5px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .mk-tag.caro { border-color: #ffffff22; }
 .mk-tag.caro b { color: #c9bde8; }
+.mk-tag.mia { border-color: #5ee0a0aa; background: linear-gradient(180deg, #123a2c, #0b2219); }
+.mk-tag.mia span { color: #8ff0bf; font-weight: 700; }
 .mk-vacio { grid-column: 1 / -1; display: grid; place-items: center; gap: 6px; padding: 60px 20px; text-align: center; color: var(--muted); }
 .mk-vacio b { font-size: 44px; opacity: .6; }
 .mk-vacio p { margin: 0; max-width: 380px; }
