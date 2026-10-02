@@ -181,3 +181,70 @@ test('exhibidas y drops: solo lo que vale, y la exhibida debe ser tuya ahora',()
  assert.equal(M.exhibidasDe('usrBBB',{cartas:['usrAAA~'+k+'.4']},v).length,1);
  assert.equal(M.mejoresDrops(Object.assign({},d,{completo:false})).length,0,'con la lectura a medias no se juzga a nadie');
 });
+
+/* ---------- re-roll ---------- */
+test('re-roll: la nota sale del promedio de las diez más un punto',()=>{
+ const d=PM.distribucionReroll([5,4,6,4,9,8,8,5,3,2]);
+ assert.ok(Math.abs(d.centro-6.4)<1e-9);
+ assert.ok(Math.abs(d.prob.reduce((s,x)=>s+x,0)-1)<1e-12);
+ const p=i=>d.prob[i-1];
+ assert.ok(p(6)+p(7)>.55&&p(6)+p(7)<.6,'6 o 7 es lo común: '+(p(6)+p(7)));
+ assert.ok(p(5)>.1&&p(8)>.1,'5 y 8 salen a menudo');
+ assert.ok(p(4)>.03&&p(9)>.03,'4 y 9 todavía salen');
+ assert.ok(p(1)+p(2)<.002,'1 o 2, casi nunca');
+ // todo 10: sale 10; todo 1: alrededor de 2
+ assert.ok(PM.distribucionReroll(Array(10).fill(10)).prob[9]>.6);
+ const bajo=PM.distribucionReroll(Array(10).fill(1)).prob;assert.ok(bajo[1]>bajo[0]&&bajo[1]>bajo[2]);
+ // la tabla de enteros es la campana de σ = 1,3
+ PM.PESO_REROLL.forEach((w,dd)=>assert.ok(Math.abs(w-1e6*Math.exp(-((dd/10)**2)/(2*1.69)))<=1,'peso '+dd));
+ // y lo que de verdad sale se reparte así
+ const n=20000,c=Array(11).fill(0);let suma=0;
+ for(let i=0;i<n;i++){const r=PM.reroll('usrAAAA','-Nrr'+i+'abcdef',1790000000000+i,0,[5,4,6,4,9,8,8,5,3,2]);c[r.g]++;suma+=r.g;
+  assert.equal(PM.CARDS[r.id].tier,1,'de común sale rara');}
+ assert.ok(Math.abs(suma/n-6.4)<.05,'media '+suma/n);
+ assert.ok(Math.abs((c[6]+c[7])/n-(p(6)+p(7)))<.015);
+});
+
+test('re-roll: la carta es una función de (uid, clave, hora, entradas)',()=>{
+ const a=PM.reroll('usrAAAA','-Nrrabcdefgh',1790000000000,2,Array(10).fill(7));
+ assert.deepEqual({...a},{...PM.reroll('usrAAAA','-Nrrabcdefgh',1790000000000,2,Array(10).fill(7))});
+ assert.equal(PM.CARDS[a.id].tier,3,'de épica sale legendaria');
+ const ids=new Set();for(let i=0;i<400;i++)ids.add(PM.reroll('usrAAAA','-Nrr'+i+'abcdefg',1790000000000,2,Array(10).fill(7)).id);
+ assert.equal(ids.size,17,'cualquiera de las 17 legendarias');
+});
+
+// una cuenta con muchas comunes, para cambiarlas
+function conComunes(u,n){
+ const s={};let t=1789000000000;const comunes=[];
+ for(let i=0;comunes.length<n;i++){const k=K(500+i);s[k]={at:t+i*1000,p:50};
+  PM.sobre(u,k,t+i*1000).cartas.forEach((c,j)=>{if(PM.CARDS[c.id].tier===0)comunes.push(`${u}~${k}.${j}`);});}
+ return {s:{[u]:s},comunes};
+}
+test('re-roll en la economía: diez de una rareza por una de la siguiente',()=>{
+ const u='usrAAAA',v='usrBBBB',{s,comunes}=conComunes(u,12),at=1789900000000,rk='-Nrr000000001';
+ const base=x=>conGanado({[u]:2000,[v]:2000},0,{cartas:{s,...x},mercado:{o:{},t:{}}});
+ const d=base({r:{[u]:{[rk]:{at,c:comunes.slice(0,10)}}}}),e=M.economia(d);
+ for(const cc of comunes.slice(0,10))assert.equal(e.dueno[cc],undefined,'las diez desaparecen');
+ assert.equal(e.dueno[comunes[10]],u,'las demás siguen');
+ const nueva=`${u}~${rk}.0`;assert.equal(e.dueno[nueva],u);
+ const notas=comunes.slice(0,10).map(cc=>{const [o,r]=cc.split('~'),[k,i]=r.split('.');return PM.sobre(o,k,s[o][k].at).cartas[+i].g;});
+ assert.deepEqual({...e.sobres[u+'~'+rk].r},{...PM.reroll(u,rk,at,0,notas)});
+ const mia=M.copiasDe(u,d).find(x=>x.c===nueva);assert.ok(mia&&mia.id!=null&&PM.CARDS[mia.id].tier===1);
+ assert.equal(M.monedasDe(u,d).gastadas,M.monedasDe(u,base({})).gastadas,'no cuesta monedas');
+ // no vale: nueve, repetidas, ajenas, a la venta, rarezas mezcladas
+ const vale=c=>!!M.economia(base({r:{[u]:{[rk]:{at,c}}}})).sobres[u+'~'+rk];
+ assert.equal(vale(comunes.slice(0,9)),false,'nueve no');
+ assert.equal(vale([...comunes.slice(0,9),comunes[0]]),false,'repetida no');
+ const otra=PM.sobre(u,Object.keys(s[u])[0],s[u][Object.keys(s[u])[0]].at).cartas.findIndex(c=>PM.CARDS[c.id].tier>=1);
+ if(otra>=0)assert.equal(vale([...comunes.slice(0,9),`${u}~${Object.keys(s[u])[0]}.${otra}`]),false,'mezclada no');
+ assert.equal(vale([...comunes.slice(0,9),`${v}~${K(1)}.0`]),false,'ajena no');
+ const enVenta=M.economia(base({r:{[u]:{[rk]:{at,c:comunes.slice(0,10)}}}}));void enVenta;
+ const dv=conGanado({[u]:2000},0,{cartas:{s,r:{[u]:{[rk]:{at,c:comunes.slice(0,10)}}}},mercado:{o:{'-Nof0000001':{u,c:comunes[0],p:5,at:at-1}},t:{}}});
+ assert.ok(!M.economia(dv).sobres[u+'~'+rk],'una a la venta no');
+ // las que se gastaron ya no sirven para otro
+ const dos=base({r:{[u]:{[rk]:{at,c:comunes.slice(0,10)},'-Nrr000000002':{at:at+5,c:comunes.slice(1,11)}}}});
+ assert.ok(!M.economia(dos).sobres[u+'~-Nrr000000002'],'no se usan dos veces');
+ // la nueva se puede graduar, vender y entra en los drops si es buena
+ const dg=base({r:{[u]:{[rk]:{at,c:comunes.slice(0,10)}}},g:{[u]:{[rk]:{0:{at:at+10,p:100}}}}});
+ assert.ok(M.economia(dg).graduada[nueva],'se gradúa');
+});

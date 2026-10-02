@@ -317,6 +317,25 @@ console.log("— Monedas: partidas del club y podios —");
   await loginAs(A);
 }
 
+console.log("— PRODROP: re-roll —");
+{
+  const { serverTimestamp } = await import("firebase/database");
+  const ua = await loginAs(A);
+  const diez = Array.from({ length: 10 }, (_, i) => `${ua.uid}~-Nk00000000${i}.${i % 5}`);
+  const r = push(ref(db, `cartas/r/${ua.uid}`));
+  await denied("nueve no son un re-roll", () => set(r, { at: serverTimestamp(), c: diez.slice(0, 9) }));
+  await denied("la hora no se inventa", () => set(r, { at: Date.now() - 5000, c: diez }));
+  await denied("ni una copia mal escrita", () => set(r, { at: serverTimestamp(), c: [...diez.slice(0, 9), "<script>"] }));
+  await allowed("A hace un re-roll con diez copias", () => set(r, { at: serverTimestamp(), c: diez }));
+  await denied("y no lo reescribe", () => set(ref(db, `cartas/r/${ua.uid}/${r.key}/c/0`), diez[1]));
+  await allowed("A gradúa la carta que salió", () => set(ref(db, `cartas/g/${ua.uid}/${r.key}/0`), { at: serverTimestamp(), p: 100 }));
+  await denied("pero un re-roll tiene una sola carta", () => set(ref(db, `cartas/g/${ua.uid}/${r.key}/1`), { at: serverTimestamp(), p: 100 }));
+  const ub = await loginAs(B);
+  await denied("B no escribe re-rolls de A", () => set(push(ref(db, `cartas/r/${ua.uid}`)), { at: serverTimestamp(), c: diez }));
+  await allowed("B gradúa la carta de A si la tiene (o = A)", () => set(ref(db, `cartas/g/${ub.uid}/${r.key}/0`), { at: serverTimestamp(), p: 100, o: ua.uid }));
+  await loginAs(A);
+}
+
 console.log("— Salas dormidas: se cierran solas a las seis horas —");
 {
   const { serverTimestamp } = await import("firebase/database");

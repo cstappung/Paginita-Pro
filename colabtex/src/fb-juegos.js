@@ -362,6 +362,16 @@ export async function sobreGratis(uid) {
   const x = (await get(ref(db, `cartas/s/${uid}/${k}`))).val();
   return { k, at: x.at, p: 0 };
 }
+/* Re-roll: `cartas/r/<uid>/<clave>` = {at, c}: diez copias de una misma
+   rareza a cambio de una de la siguiente. La carta nueva sale del motor
+   con `at`, la hora del servidor (la regla exige `at === now`), y la
+   economía comprueba que las diez fueran de quien lo escribe. */
+export async function rerollCartas(uid, c) {
+  const r = push(ref(db, `cartas/r/${uid}`));
+  await set(r, { at: serverTimestamp(), c });
+  const x = (await get(r)).val();
+  return { k: r.key, at: x.at };
+}
 /* Graduar la copia `o~k.i`. Si el sobre es de quien gradúa, `o` no se
    escribe (así eran las graduaciones de antes del mercado). */
 export const graduarCarta = (uid, o, k, i) =>

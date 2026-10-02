@@ -45,6 +45,7 @@
    por construcción y no por confianza.
    ============================================================ */
 import { LOGROS, SOLO_PREFIJO, deFila, deMarca } from "./logros.js";
+import PM from "../../../juegos/prodrop/motor.js";
 
 /* ---------- tarifas ---------- */
 export const TARIFA = { partida: 5, victoria: 15, empate: 5 };
@@ -228,7 +229,7 @@ export function economia(datos) {
   const d = datos || {};
   if (memoEco.has(d)) return memoEco.get(d);
   const c = d.cartas || {}, m = d.mercado || {}, ev = [];
-  const ORDEN = { s: 0, g: 1, o: 2, x: 3, v: 4, t: 5 };
+  const ORDEN = { s: 0, g: 1, r: 2, o: 3, x: 4, v: 5, t: 6 };
   for (const [u, l] of Object.entries(c.s || {}))
     for (const [k, x] of Object.entries(l || {}))
       if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) ev.push({ t: "s", at: x.at, u, k, p: num(x.p) });
@@ -237,6 +238,10 @@ export function economia(datos) {
       for (const [i, x] of Object.entries(porI || {}))
         if (CLAVE_SOBRE.test(k) && /^[0-4]$/.test(i) && x && Number.isFinite(x.at))
           ev.push({ t: "g", at: x.at, u, k, i: +i, p: num(x.p), copia: claveCopia(typeof x.o === "string" ? x.o : u, k, i) });
+  /* Los re-roll: `cartas/r/<uid>/<clave>` = {at, c: [diez copias]}. */
+  for (const [u, l] of Object.entries(c.r || {}))
+    for (const [k, x] of Object.entries(l || {}))
+      if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) ev.push({ t: "r", at: x.at, u, k, c: comoLista(x.c).map(String) });
   for (const [id, o] of Object.entries(m.o || {})) {
     if (!o || !Number.isFinite(o.at)) continue;
     ev.push({ t: "o", at: o.at, id, o });
@@ -258,6 +263,13 @@ export function economia(datos) {
     if (saldo(u) < p) { x.parada = true; x.falta += p - Math.max(0, saldo(u)); return false; }
     x.gastadas += p; return true;
   };
+  /* Lo que es una copia: {id, g, w}, de su sobre o de su re-roll. */
+  const ficha = cc => {
+    const q = leeCopia(cc), so = q && sobres[q.o + "~" + q.k];
+    if (!so) return null;
+    if (so.r) return q.i === 0 ? so.r : null;
+    return PM.sobre(q.o, q.k, so.at).cartas[q.i];
+  };
   for (const e of ev) {
     if (e.t === "s") {
       const x = U(e.u);
@@ -271,6 +283,22 @@ export function economia(datos) {
     } else if (e.t === "g") {
       if (dueno[e.copia] !== e.u || graduada[e.copia] || enVenta[e.copia] || e.p !== 100) continue;
       if (paga(e.u, 100)) graduada[e.copia] = e.at;
+    } else if (e.t === "r") {
+      /* Un re-roll vale si quien lo hace no está parado y las diez son
+         suyas, distintas, no están a la venta y son de la misma rareza
+         (menos que legendaria). Las diez desaparecen y queda una copia
+         nueva, `<uid>~<clave>.0`, cuya carta y nota salen del motor. */
+      const x = U(e.u), cs = e.c;
+      if (x.parada || cs.length !== PM.REROLL.n || new Set(cs).size !== cs.length) continue;
+      if (!cs.every(cc => dueno[cc] === e.u && !enVenta[cc])) continue;
+      const fs = cs.map(ficha);
+      if (fs.some(f => !f)) continue;
+      const tier = PM.CARDS[fs[0].id].tier;
+      if (tier >= 3 || fs.some(f => PM.CARDS[f.id].tier !== tier)) continue;
+      const res = PM.reroll(e.u, e.k, e.at, tier, fs.map(f => f.g));
+      for (const cc of cs) delete dueno[cc];
+      sobres[e.u + "~" + e.k] = { u: e.u, k: e.k, at: e.at, r: res, de: cs.slice(), tier };
+      dueno[claveCopia(e.u, e.k, 0)] = e.u;
     } else if (e.t === "o") {
       const o = e.o, copia = typeof o.c === "string" ? o.c : "", p = num(o.p);
       const ok = leeCopia(copia) && dueno[copia] === o.u && !enVenta[copia] && !U(o.u).parada && Number.isInteger(p) && p >= 1 && p <= 100000;
@@ -307,7 +335,8 @@ export function copiasDe(uid, datos) {
   for (const [cc, u] of Object.entries(e.dueno)) {
     if (u !== uid) continue;
     const q = leeCopia(cc), so = e.sobres[q.o + "~" + q.k];
-    if (so) out.push({ c: cc, o: q.o, k: q.k, i: q.i, at: so.at, gr: !!e.graduada[cc], venta: e.enVenta[cc] || "" });
+    if (so) out.push(Object.assign({ c: cc, o: q.o, k: q.k, i: q.i, at: so.at, gr: !!e.graduada[cc], venta: e.enVenta[cc] || "" },
+      so.r ? { id: so.r.id, g: so.r.g, w: so.r.w } : {}));
   }
   return out.sort((a, b) => a.at - b.at || (a.k < b.k ? -1 : 1) || a.i - b.i);
 }

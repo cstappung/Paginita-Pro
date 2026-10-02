@@ -25,8 +25,10 @@ export const ecoDe = datos => (datos && datos.completo ? economia(datos) : null)
 function copia(e, o, k, i) {
   const so = e.sobres[o + "~" + k];
   if (!so) return null;
-  const s = PM.sobre(o, k, so.at), c = s.cartas[i], cc = claveCopia(o, k, i);
-  return { uid: o, o, k, i, at: so.at, c: cc, id: c.id, g: c.g, gr: !!e.graduada[cc], dios: s.dios, carta: PM.CARDS[c.id], dueno: e.dueno[cc] };
+  /* Un re-roll es un «sobre» de una sola carta (la 0), sin god pack. */
+  const s = so.r ? null : PM.sobre(o, k, so.at), c = so.r ? (i === 0 ? so.r : null) : s.cartas[i], cc = claveCopia(o, k, i);
+  if (!c) return null;
+  return { uid: o, o, k, i, at: so.at, c: cc, id: c.id, g: c.g, gr: !!e.graduada[cc], dios: !!(s && s.dios), rr: !!so.r, carta: PM.CARDS[c.id], dueno: e.dueno[cc] };
 }
 export const copiaDe = (cc, datos) => { const e = ecoDe(datos), q = leeCopia(cc); return e && q ? copia(e, q.o, q.k, q.i) : null; };
 
@@ -53,6 +55,7 @@ export function mejoresDrops(datos, n = 8) {
   const e = ecoDe(datos), out = [];
   if (!e) return out;
   for (const so of Object.values(e.sobres)) {
+    if (so.r) { if (PM.CARDS[so.r.id].tier >= 2) out.push(copia(e, so.u, so.k, 0)); continue; }
     const s = PM.sobre(so.u, so.k, so.at);
     s.cartas.forEach((c, i) => { if (PM.CARDS[c.id].tier >= 2) out.push(copia(e, so.u, so.k, i)); });
   }
@@ -64,6 +67,7 @@ export function cifras(datos) {
   const e = ecoDe(datos);
   let sobres = 0, dioses = 0, leyendas = 0;
   for (const so of Object.values((e && e.sobres) || {})) {
+    if (so.r) continue;   // un re-roll no es un sobre abierto
     const s = PM.sobre(so.u, so.k, so.at);
     sobres++; if (s.dios) dioses++;
     leyendas += s.cartas.filter(c => PM.CARDS[c.id].tier === 3).length;
