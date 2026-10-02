@@ -18,6 +18,9 @@
           "vitrina": {
             "$i": { ".validate": "$i.matches(/^[0-9]$/) && newData.isString() && newData.val().length <= 60" }
           },
+          "cartas": {
+            "$i": { ".validate": "$i.matches(/^[0-3]$/) && newData.isString() && newData.val().matches(/^[-_A-Za-z0-9]{8,24}[.][0-4]$/)" }
+          },
           "at": { ".validate": "newData.isNumber()" },
           "$otro": { ".validate": false }
         }
@@ -241,6 +244,34 @@
         "bono": { ".validate": "newData.isNumber()" },
         "at": { ".validate": "newData.isNumber()" },
         "$otro": { ".validate": false }
+      }
+    },
+
+    "cartas": {
+      ".read": "auth != null",
+      "s": {
+        "$uid": {
+          "$k": {
+            ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists()",
+            ".validate": "$k.matches(/^[-_A-Za-z0-9]{8,24}$/) && newData.hasChildren(['at', 'p']) && newData.child('at').val() === now && newData.child('p').val() === (now < 1792119600000 ? 50 : 80)",
+            "at": { ".validate": "newData.isNumber()" },
+            "p": { ".validate": "newData.isNumber()" },
+            "$otro": { ".validate": false }
+          }
+        }
+      },
+      "g": {
+        "$uid": {
+          "$k": {
+            "$i": {
+              ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists() && root.child('cartas').child('s').child($uid).child($k).exists()",
+              ".validate": "$i.matches(/^[0-4]$/) && newData.hasChildren(['at', 'p']) && newData.child('at').val() === now && newData.child('p').val() === 100",
+              "at": { ".validate": "newData.isNumber()" },
+              "p": { ".validate": "newData.isNumber()" },
+              "$otro": { ".validate": false }
+            }
+          }
+        }
       }
     },
 

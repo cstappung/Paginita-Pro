@@ -2137,6 +2137,11 @@ html.jg-sortem,html.jg-sortem body{overflow:hidden;height:100%}
 html.jg-sortem .head,html.jg-sortem .bar,html.jg-sortem .rp-fab,html.jg-sortem .jg-solo-barra{display:none!important}
 html.jg-sortem #pantalla{position:fixed;inset:0;z-index:1;margin:0;max-width:none;padding:0;background:#10051f}
 html.jg-sortem .jg-solo-frame{height:100%!important}
+/* PRODROP: el abridor ocupa la ventana, como sortEm (su barra trae «← Juegos» y el saldo). */
+html.jg-prodrop,html.jg-prodrop body{overflow:hidden;height:100%}
+html.jg-prodrop .head,html.jg-prodrop .bar,html.jg-prodrop .rp-fab{display:none!important}
+html.jg-prodrop #pantalla{position:fixed;inset:0;z-index:1;margin:0;max-width:none;padding:0;background:#0d0820}
+.jg-prodrop-frame{display:block;width:100%;height:100%;border:0;background:#0d0820}
 @media(max-width:1050px){.jg-partida-layout{grid-template-columns:minmax(0,1fr)}.jg-partida-layout>.jg-chat{position:static;height:300px}.jg-solo-barra nav{margin-left:0}}
 /* ---------- logros ---------- */
 .jg-lg{display:grid;gap:18px;max-width:980px;margin:0 auto}
@@ -2788,6 +2793,47 @@ html[data-tema=oscuro] .jg-mo-pesos li{border-color:var(--os-borde2)}
 html[data-tema=oscuro] .jg-mo-cant,html[data-tema=oscuro] .jg-mo-pesos b{color:#f5c542}
 html[data-tema=oscuro] .jg-mo-tuyo{border-color:var(--os-borde2)}
 html[data-tema=oscuro] .jg-mo-ver{color:#c4b1ff}
+/* ---------- PRODROP fuera del abridor: cartas pequeñas, mejores drops, perfil ---------- */
+.jg-tab-cartas{white-space:nowrap}
+.jg-cc{position:relative;margin:0;aspect-ratio:5/7;border-radius:9px;overflow:hidden;background:#140c2b;border:2px solid var(--cc);box-shadow:0 4px 14px #0003;isolation:isolate}
+.jg-cc img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.jg-cc.t2{box-shadow:0 0 0 1px #fff3 inset,0 4px 18px #c26bff55}
+.jg-cc.t3{border-color:transparent;background:linear-gradient(#140c2b,#140c2b) padding-box,conic-gradient(from var(--jg-cc-a,0deg),#ffcc3d,#ff8ad8,#9be9ff,#a7ffcf,#ffcc3d) border-box;box-shadow:0 4px 22px #ffcc3d66}
+@property --jg-cc-a{syntax:'<angle>';inherits:false;initial-value:0deg}
+.jg-cc.t3{animation:jgCcGira 5s linear infinite}
+@keyframes jgCcGira{to{--jg-cc-a:360deg}}
+.jg-cc.t3::after{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;background:linear-gradient(115deg,transparent 35%,#ffffff55 48%,transparent 60%);background-size:250% 100%;animation:jgCcBrillo 3.2s ease-in-out infinite}
+@keyframes jgCcBrillo{0%{background-position:120% 0}60%,100%{background-position:-60% 0}}
+.jg-cc figcaption{position:absolute;left:0;right:0;bottom:0;z-index:2;padding:16px 6px 5px;background:linear-gradient(transparent,#000c 60%);color:#fff;line-height:1.15}
+.jg-cc figcaption b{display:block;font-size:10.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jg-cc figcaption small{display:block;font-size:9px;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--cc)}
+.jg-cc-nota{position:absolute;top:4px;right:4px;z-index:3;min-width:20px;height:20px;padding:0 4px;border-radius:6px;display:grid;place-items:center;font:800 12px/1 'IBM Plex Mono',monospace;color:#10051f;background:var(--gc);box-shadow:0 0 0 2px #fff,0 2px 8px #0006}
+.jg-cc-dios{position:absolute;top:4px;left:4px;z-index:3;padding:2px 5px;border-radius:5px;font:900 8.5px/1.2 system-ui,sans-serif;letter-spacing:.08em;color:#1a0b33;background:linear-gradient(90deg,#ffcc3d,#ff8ad8)}
+@media (prefers-reduced-motion:reduce){.jg-cc.t3,.jg-cc.t3::after{animation:none}}
+.jg-lado-caja.jg-drops-ves>#vesDrops{display:block;overflow:visible;padding:12px 14px 14px}
+.jg-drops-ves header>span{font-size:16px}
+.jg-drop-ir{text-decoration:none}
+.jg-drops{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 8px}
+.jg-drop{display:grid;gap:5px;min-width:0}
+.jg-drop-quien{display:flex;align-items:center;gap:5px;min-width:0;cursor:pointer;font-size:11px;color:var(--jg-muted)}
+.jg-drop-quien b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jg-drop-quien:hover b{color:var(--jg-ink);text-decoration:underline}
+.jg-drop-cifras{margin:10px 0 0;font-size:11.5px;color:var(--jg-muted);text-align:center}
+.jg-drop-abrir{display:flex;align-items:center;justify-content:center;width:100%;box-sizing:border-box;margin-top:10px;text-align:center;text-decoration:none;background:linear-gradient(90deg,#ffcc3d,#ff8ad8);color:#1a0b33;border:0}
+#vesDrops .jg-nada{margin:0;font-size:12.5px;text-align:center}
+@media(max-width:900px){.jg-lado-caja.jg-drops-ves>#vesDrops{display:block}.jg-drops{grid-template-columns:repeat(6,minmax(84px,1fr));overflow-x:auto;scrollbar-width:none}}
+.jg-mini-cartas{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding:8px 16px 0}
+.jg-mini-cartas .jg-cc figcaption{display:none}
+.jg-mini-cartas .jg-cc-nota{min-width:16px;height:16px;font-size:10px}
+.jg-pf-cartas-fila{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,190px));gap:16px}
+.jg-pf-cartas-fila .jg-cc{border-radius:12px;transition:transform .2s}
+.jg-pf-cartas-fila .jg-cc:hover{transform:translateY(-4px) rotate(-1deg)}
+.jg-pf-cartas-fila .jg-cc figcaption b{font-size:13px}
+.jg-pf-cartas-fila .jg-cc figcaption small{font-size:11px}
+.jg-pf-cartas-fila .jg-cc-nota{min-width:28px;height:28px;font-size:16px;top:7px;right:7px}
+.jg-pf-cartas header .btn2{text-decoration:none}
+.jg-mo-gasto{font-size:12.5px;opacity:.85}
+html[data-tema=oscuro] .jg-drop-quien:hover b{color:#fff}
 </style>
 </head>
 <body>
@@ -2830,10 +2876,11 @@ html[data-tema=oscuro] .jg-mo-ver{color:#c4b1ff}
       <button class="tab" id="tabRanks">Clasificación</button>
       <button class="tab" id="tabLogros">Logros</button>
       <button class="tab" id="tabMonedas"><svg class="jg-moneda" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="#f5b819" stroke="#9a6a08" stroke-width="1.6"/><circle cx="10" cy="10" r="5.6" fill="#ffd54a" stroke="#c98d10" stroke-width="1.2"/><path d="M8.6 7.2v5.6M11.4 7.2v5.6" stroke="#9a6a08" stroke-width="1.4" stroke-linecap="round"/><path d="M5.2 6.4a6.2 6.2 0 0 1 3.6-2.5" stroke="#fff7d6" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg> Monedas</button>
+      <button class="tab jg-tab-cartas" id="tabCartas">🃏 Sobres</button>
     </div>
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610010726"></script>
+<script src="juegos-app.js?v=202610020714"></script>
 </body>
 </html>

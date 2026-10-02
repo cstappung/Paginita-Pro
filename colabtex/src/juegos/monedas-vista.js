@@ -7,6 +7,7 @@ import {
   topMonedas, monedasDe, formatoMonedas, TARIFA, PESO, VALOR_NIVEL, NOMBRE_NIVEL,
   RECORD, diaChile, rachaHoy, pagoDia
 } from "./monedas.js";
+import { MOTOR } from "./prodrop-cartas.js";
 
 /* La moneda se dibuja: el emoji de la moneda es de 2020 y en Windows 10 y en
    navegadores viejos sale como un cuadro vacío. */
@@ -58,8 +59,9 @@ export function crearMonedas({ uid, datos, perfil, colorDe }) {
     const juegos = Object.keys(PESO).sort((a, b) => PESO[b] - PESO[a] || a.localeCompare(b));
     host.innerHTML = `<section class="jg-mo">
       <header class="jg-mo-hero">
-        <div><small>TUS MONEDAS</small><strong>${formatoMonedas(yo.total)} ${MONEDA}</strong>
-          <p>${puesto ? `Puesto <b>${puesto}</b> de ${lista.length}` : "Todavía fuera del top"} · ${yo.logros} logros</p></div>
+        <div><small>TUS MONEDAS</small><strong>${formatoMonedas(yo.saldo)} ${MONEDA}</strong>
+          <p>${puesto ? `Puesto <b>${puesto}</b> de ${lista.length}` : "Todavía fuera del top"} · ${yo.logros} logros</p>
+          ${yo.gastadas ? `<p class="jg-mo-gasto">Ganadas <b>${formatoMonedas(yo.total)}</b> · gastadas en PRODROP <b>${formatoMonedas(yo.gastadas)}</b></p>` : ""}</div>
         <p class="jg-mo-racha">${rachaTexto(d, hoy)}</p>
       </header>
       <div class="jg-mo-partes">${PARTES.map(([k, i, t, s]) =>
@@ -82,6 +84,12 @@ export function crearMonedas({ uid, datos, perfil, colorDe }) {
           <p>Además, BBTAN paga 1 por cada 2 rondas de tu récord, y la Sopa diaria 10 por cada día de tu mejor racha.</p>
           <h3>Días seguidos</h3>
           <p>Cada día en que terminas una partida (de sala o del club) paga ${pagoDia(1)}, y la racha suma 5 por día hasta ${pagoDia(9)} desde el noveno. Si un día no juegas, vuelve a ${pagoDia(1)}. El día cambia a medianoche de Chile.</p>
+          <h3>En qué se gastan</h3>
+          <ul class="jg-mo-pesos">
+            <li><span><a href="#cartas">Sobre de PRODROP</a></span><b>${Date.now() < MOTOR.PRECIO.promoHasta ? `<s>${MOTOR.PRECIO.normal}</s> ` : ""}${MOTOR.precioSobre(Date.now())} ${MONEDA}</b></li>
+            <li><span>Graduar una carta</span><b>${MOTOR.PRECIO.gradua} ${MONEDA}</b></li>
+          </ul>
+          <p>El top cuenta lo ganado, no lo que te queda: abrir sobres no te baja de puesto.</p>
         </section>
       </div>
     </section>`;

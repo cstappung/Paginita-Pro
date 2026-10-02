@@ -215,6 +215,34 @@ console.log("— Monedas: días seguidos (diario) —");
   await loginAs(A);
 }
 
+console.log("— PRODROP: sobres y graduaciones —");
+{
+  const { serverTimestamp, push } = await import("firebase/database");
+  const PM = (await import("../juegos/prodrop/motor.js")).default;
+  const ua = await loginAs(A), precio = PM.precioSobre(Date.now());
+  const sobre = (uid, p, extra) => set(push(ref(db, `cartas/s/${uid}`)), Object.assign({ at: serverTimestamp(), p }, extra || {}));
+  await allowed("A compra un sobre al precio de hoy", () => sobre(ua.uid, precio));
+  await denied("no se paga menos", () => sobre(ua.uid, precio - 1));
+  await denied("ni se elige la hora (sin `now`)", () => set(push(ref(db, `cartas/s/${ua.uid}`)), { at: 1700000000000, p: precio }));
+  await denied("ni se cuela un campo", () => sobre(ua.uid, precio, { dios: true }));
+  const k = Object.keys((await get(ref(db, `cartas/s/${ua.uid}`))).val())[0];
+  await denied("un sobre no se reescribe", () => set(ref(db, `cartas/s/${ua.uid}/${k}`), { at: serverTimestamp(), p: precio }));
+  await denied("ni se borra (es gasto)", () => remove(ref(db, `cartas/s/${ua.uid}/${k}`)));
+  const grad = (kk, i, p) => set(ref(db, `cartas/g/${ua.uid}/${kk}/${i}`), { at: serverTimestamp(), p });
+  await denied("graduar cuesta 100, no 1", () => grad(k, 0, 1));
+  await denied("no se gradúa la carta 7", () => grad(k, 7, 100));
+  await denied("ni una carta de un sobre que no existe", () => grad("noexisteeste", 0, 100));
+  await allowed("A gradúa la carta 4 de su sobre", () => grad(k, 4, 100));
+  await denied("la misma carta no se gradúa dos veces", () => grad(k, 4, 100));
+  await allowed("A exhibe esa carta en su perfil", () => set(ref(db, `users/${ua.uid}/perfil/cartas`), [k + ".4"]));
+  await denied("una clave rara no se exhibe", () => set(ref(db, `users/${ua.uid}/perfil/cartas`), ["<img>.4"]));
+  await loginAs(B);
+  ok("B ve los sobres de A (para los mejores drops)", !!(await get(ref(db, `cartas/s/${ua.uid}/${k}`))).val());
+  await denied("B no compra a nombre de A", () => sobre(ua.uid, precio));
+  await denied("B no gradúa las cartas de A", () => set(ref(db, `cartas/g/${ua.uid}/${k}/3`), { at: serverTimestamp(), p: 100 }));
+  await loginAs(A);
+}
+
 await signOut(auth);
 await denied("sin sesión no se lee el informe", () => get(ref(db, "errors")));
 await denied("sin sesión no se escribe nada", () => set(ref(db, "feedback/x"), { tipo: "bug", titulo: "x", uid: "x" }));

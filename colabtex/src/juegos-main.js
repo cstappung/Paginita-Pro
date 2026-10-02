@@ -57,8 +57,10 @@ import { LOGROS, detecta, deFila, deMarca } from "./juegos/logros.js";
 import { crearLogros } from "./juegos/logros-vista.js";
 import { monedasDe, formatoMonedas, valorLogro, registraDia, diaChile as diaMonedas } from "./juegos/monedas.js";
 import { crearMonedas, topHtml, MONEDA } from "./juegos/monedas-vista.js";
+import { crearProdrop } from "./juegos/prodrop.js";
+import { mejoresDrops, miniCarta, cifras as cifrasCartas } from "./juegos/prodrop-cartas.js";
 import { mezcla, abrePerfil } from "./juegos/perfil.js";
-import { abreMini, cierraMini, miniAbierta, crearPaginaPerfil, avatarMarco } from "./juegos/perfil-vista.js";
+import { abreMini, cierraMini, miniAbierta, crearPaginaPerfil, avatarMarco, quien } from "./juegos/perfil-vista.js";
 import { estadisticas } from "./juegos/perfil-tarjeta.js";
 import { fotoSana } from "./juegos/sano.js";
 import { suena, silenciar, silenciado, ambientar, ajustarMusica, activarAudio } from "./juegos/sonido.js";
@@ -220,6 +222,7 @@ let ranks = null;
 let logrosVista = null;
 let paginaPerfil = null;
 let monedasVista = null;
+let prodropVista = null;
 let individual = null;
 let proximo = 0;          // el número de jugada que toca escribir
 const enVuelo = new Set(); // jugadas de esta pestaña aún sin confirmar (ver `terminar`)
@@ -263,6 +266,7 @@ function perfilDe(uid) {
       if (logrosVista) logrosVista.refresca();
       if (paginaPerfil) paginaPerfil.refresca();
       if (monedasVista) monedasVista.refresca();
+      if (prodropVista && uid === (state.user && state.user.uid)) prodropVista.refresca();
       const mini = miniAbierta();
       if (mini && mini.uid === uid) mini.refresca();
       render();
@@ -313,7 +317,7 @@ const oyentesP = new Set();
 function datosPerfil(cb) {
   oyentesP.add(cb);
   if (!offDatosP) offDatosP = fb.watchLogros(d => {
-    datosP = { ranks: d.ranks, solo: d.solo, logros: d.logros, diario: d.diario };
+    datosP = { ranks: d.ranks, solo: d.solo, logros: d.logros, diario: d.diario, cartas: d.cartas, completo: !!d.completo };
     for (const f of [...oyentesP]) f(datosP);
   });
   else if (datosP) setTimeout(() => { if (oyentesP.has(cb)) cb(datosP); }, 0);
@@ -360,6 +364,10 @@ async function editaPerfil(pestana) {
     est: d ? estadisticas(b.uid, d) : null,
     uid: b.uid, colorDe: colorForUid, pestana,
     onGuardar: async p => {
+      /* El editor no conoce las cartas exhibidas (se eligen en PRODROP):
+         sin esto, guardar el perfil las borraría. */
+      const cartas = (perfiles.get(b.uid) || {}).cartas;
+      if (cartas) p = Object.assign({}, p, { cartas });
       await fb.guardarPerfil(b.uid, p);
       /* La escucha traerá lo mismo en un instante; adelantarlo aquí
          evita que el botón se cierre sobre el avatar de antes. */
@@ -508,9 +516,28 @@ let offMonedas = null, datosMonedas = null, diaMarcado = -1;
 function pintaMonedas() {
   const u = state.user, d = datosMonedas;
   const chip = $("userMonedas");
-  if (chip) chip.innerHTML = `${MONEDA} ${u && d ? formatoMonedas(monedasDe(u.uid, d).total) : "…"}`;
+  if (chip) chip.innerHTML = `${MONEDA} ${u && d && d.completo ? formatoMonedas(monedasDe(u.uid, d).saldo) : "…"}`;
   const caja = $("vesMonedas");
   if (caja && u && d) caja.innerHTML = topHtml(d, u.uid, perfilDe, colorForUid);
+  const drops = $("vesDrops");
+  if (drops && u && d && d.completo) drops.innerHTML = dropsHtml(d);
+}
+/* El nombre que alguien dejó en sus filas, si no tiene perfil. */
+function nombreEnDatos(uid, d) {
+  for (const t of [...Object.values(d.ranks || {}), ...Object.values(d.solo || {})]) if (t && t[uid] && t[uid].nombre) return t[uid].nombre;
+  return "";
+}
+/* Las mejores cartas sacadas en PRODROP: épicas y legendarias, con quién
+   las sacó. */
+function dropsHtml(d) {
+  const l = mejoresDrops(d, 6), n = cifrasCartas(d);
+  const pie = `<a class="btn jg-drop-abrir" href="#cartas">Abrir sobres →</a>`;
+  if (!l.length) return `<p class="jg-nada">Nadie ha sacado todavía una épica. ${n.sobres ? `Van ${n.sobres} sobres abiertos.` : "Estrena PRODROP."}</p>${pie}`;
+  return `<div class="jg-drops">${l.map(c => {
+    const q = quien(c.uid, perfilDe(c.uid), null, { nombre: nombreEnDatos(c.uid, d) }, colorForUid);
+    return `<div class="jg-drop">${miniCarta(c)}<span class="jg-drop-quien" data-perfil="${escapeHtml(c.uid)}" data-nombre="${escapeHtml(q.nombre)}">${avatarMarco(q.foto, q.nombre, q.color, "anillo", 18, c.uid)}<b>${escapeHtml(q.nombre)}</b></span></div>`;
+  }).join("")}</div>
+  <p class="jg-drop-cifras">${n.sobres} ${n.sobres === 1 ? "sobre abierto" : "sobres abiertos"} · ${n.leyendas} ${n.leyendas === 1 ? "legendaria" : "legendarias"}${n.dioses ? ` · ${n.dioses} god ${n.dioses === 1 ? "pack" : "packs"}` : ""}</p>${pie}`;
 }
 async function marcaDia() {
   const u = state.user, hoy = diaMonedas();
@@ -576,6 +603,7 @@ function leerRuta() {
   if (h === "ranks") return { vista: "ranks", pid: "" };
   if (h === "logros") return { vista: "logros", pid: "" };
   if (h === "monedas") return { vista: "monedas", pid: "" };
+  if (h === "cartas") return { vista: "cartas", pid: "" };
   const pf = h.match(/^perfil\/([-\w]+)$/);
   if (pf) return { vista: "perfil", pid: "", uid: pf[1] };
   const m = h.match(/^p\/([-\w]+)$/);
@@ -862,6 +890,7 @@ function render() {
     if (vistaPintada === "ranks" && ranks) { ranks.destruir(); ranks = null; }
     if (vistaPintada === "logros" && logrosVista) { logrosVista.destruir(); logrosVista = null; }
     if (vistaPintada === "monedas" && monedasVista) { monedasVista.destruir(); monedasVista = null; }
+    if (prodropVista) { prodropVista.destruir(); prodropVista = null; }
     if (paginaPerfil) { paginaPerfil.destruir(); paginaPerfil = null; }
     armazon();
     vistaPintada = clave;
@@ -872,7 +901,8 @@ function render() {
 }
 
 function pintaTabs() {
-  $("tabJugar").classList.toggle("on", !["ranks", "logros", "perfil", "monedas"].includes(state.vista));
+  $("tabJugar").classList.toggle("on", !["ranks", "logros", "perfil", "monedas", "cartas"].includes(state.vista));
+  $("tabCartas").classList.toggle("on", state.vista === "cartas");
   $("tabRanks").classList.toggle("on", state.vista === "ranks");
   $("tabLogros").classList.toggle("on", state.vista === "logros");
   $("tabMonedas").classList.toggle("on", state.vista === "monedas");
@@ -911,6 +941,7 @@ function armazon() {
   /* sortEm es solo el juego: el iframe ocupa la ventana, sin la cabecera
      del sitio ni la barra de juegos individuales. */
   document.documentElement.classList.toggle("jg-sortem", state.vista === "solo-sortem");
+  document.documentElement.classList.toggle("jg-prodrop", state.vista === "cartas");
   h.closest("main").classList.toggle("jg-ancho", state.vista === "partida" || state.vista.startsWith("solo-"));
   if (state.vista.startsWith("solo-")) {
     const clave = state.vista.slice(5) === "tetris" ? "tetrisclub" : state.vista.slice(5);
@@ -940,6 +971,12 @@ function armazon() {
       orden: () => ordenPopular([...Object.keys(JUEGOS), ...CLUBES])
         .map(k => ({ "club-minas": "minas", "club-snake": "snake", "club-tetris": "tetrisclub", "club-sortem": "sortem", "club-bbtan": "bbtan", "club-sopa": "sopa" })[k] || k) });
     logrosVista.montar(h);
+    return;
+  }
+  if (state.vista === "cartas") {
+    h.innerHTML = "";
+    prodropVista = crearProdrop({ usuario: state.user, datos: datosPerfil, perfil: perfilDe, fb, volver: () => ir("") });
+    prodropVista.montar(h);
     return;
   }
   if (state.vista === "monedas") {
@@ -1059,6 +1096,10 @@ function armazon() {
         <section class="jg-lado-caja jg-mo-ves">
           <header>${MONEDA}<h2>Top monedas</h2></header>
           <div id="vesMonedas"><p class="jg-nada">Contando monedas…</p></div>
+        </section>
+        <section class="jg-lado-caja jg-drops-ves">
+          <header><span aria-hidden="true">🃏</span><h2>Mejores drops</h2><a class="jg-lado-n jg-drop-ir" href="#cartas">PRODROP</a></header>
+          <div id="vesDrops"><p class="jg-nada">Buscando cartas…</p></div>
         </section>
         <section class="jg-lado-caja">
           <header><h2>Tus partidas</h2></header>
@@ -1976,6 +2017,7 @@ function wire() {
   $("tabRanks").onclick = () => ir("#ranks");
   $("tabLogros").onclick = () => ir("#logros");
   $("tabMonedas").onclick = () => ir("#monedas");
+  $("tabCartas").onclick = () => ir("#cartas");
   $("userMonedas").onclick = () => ir("#monedas");
   window.addEventListener("hashchange", aplicaRuta);
 }

@@ -22,8 +22,14 @@
    - La racha de la Sopa diaria y la ronda de BBTAN suman un extra sobre
      su récord, porque ahí la marca misma es la dificultad.
 
-   Gastar no existe todavía; si llega una tienda, el gasto sí tendrá que
-   guardarse (y validarse contra este cálculo).
+   **Gastar** sí se guarda, porque no se puede deducir de nada: cada sobre
+   de PRODROP (`cartas/s/<uid>/<clave>`, con su precio `p`) y cada carta
+   graduada (`cartas/g/<uid>/<clave>/<i>`). Las reglas comprueban el precio
+   de cada compra, pero no pueden sumar lo ganado — eso se calcula aquí —,
+   así que no pueden impedir gastar de más. Lo que sí garantiza el cálculo
+   es que se nota: lo ganado nunca baja, así que un saldo negativo es
+   prueba de haber comprado sin fondos, y las cartas de esa cuenta no se
+   exhiben en ninguna parte (juegos/cartas.js).
    ============================================================ */
 import { LOGROS, SOLO_PREFIJO, deFila, deMarca } from "./logros.js";
 
@@ -121,11 +127,23 @@ export function monedasDe(uid, datos) {
   const dia = (d.diario || {})[uid];
   if (dia) p.dias = num(dia.bono);
   for (const k of Object.keys(p)) p[k] = Math.round(p[k]);
-  return { total: Object.values(p).reduce((a, b) => a + b, 0), partes: p, logros: Object.values(tengo).reduce((a, s) => a + s.size, 0) };
+  const total = Object.values(p).reduce((a, b) => a + b, 0), gastadas = gastoDe(uid, d.cartas);
+  return { total, gastadas, saldo: total - gastadas, partes: p, logros: Object.values(tengo).reduce((a, s) => a + s.size, 0) };
 }
 
-/* Todos los que aparecen en alguna de las cuatro lecturas, con su saldo,
-   de más a menos (el uid desempata, para que el orden no baile). El
+/* Lo gastado en PRODROP: el precio anotado de cada sobre y de cada
+   graduación (`cartas` = {s, g}, ver fb-juegos.js). */
+export function gastoDe(uid, cartas) {
+  const c = cartas || {};
+  let t = 0;
+  for (const x of Object.values((c.s || {})[uid] || {})) t += num(x && x.p);
+  for (const porK of Object.values((c.g || {})[uid] || {})) for (const x of Object.values(porK || {})) t += num(x && x.p);
+  return Math.round(t);
+}
+
+/* Todos los que aparecen en alguna de las cuatro lecturas, con lo que
+   han ganado (no lo que les queda: gastar en sobres no baja a nadie del
+   top), de más a menos (el uid desempata, para que el orden no baile). El
    nombre sale de sus filas; la pantalla le superpone el perfil vivo. */
 export function topMonedas(datos) {
   const d = datos || {}, nombres = {};

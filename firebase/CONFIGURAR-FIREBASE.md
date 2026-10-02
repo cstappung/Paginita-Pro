@@ -89,7 +89,22 @@ leer cualquiera con sesión, porque todos los jugadores de una sala tienen que
 ver los mismos personajes. Si eso último te preocupa, usa fotos que no sean
 de cara.
 
+Y en PRODROP: las reglas comprueban el precio y la hora de cada sobre, pero
+no pueden sumar lo que alguien ganó, así que un cliente modificado podría
+comprar sin fondos. Se nota igual (lo ganado nunca baja, así que su saldo
+queda en negativo a la vista de todos) y sus cartas no se exhiben ni en el
+vestíbulo ni en los perfiles. Las imágenes de las cartas son personas reales
+y están en el repositorio público, como cualquier archivo del sitio.
+
 ## 1. Reglas de Realtime Database (IMPORTANTE)
+
+> **PRODROP (octubre de 2026):** los sobres y las graduaciones viven en un
+> nodo nuevo, `cartas`, y las cartas exhibidas en `users/<uid>/perfil/cartas`.
+> Hasta volver a publicar las reglas, comprar un sobre falla y el abridor
+> dice que faltan las reglas. La regla de `cartas/s` lleva escrita la fecha
+> en que termina el precio de lanzamiento (50 → 80): si se cambia en
+> `juegos/prodrop/motor.js` (`PRECIO.promoHasta`), hay que cambiarla también
+> en la regla y volver a publicar.
 
 > **Monedas (octubre de 2026):** la racha de días jugando vive en un nodo
 > nuevo, `diario`. Hasta volver a publicar las reglas, las monedas se ven

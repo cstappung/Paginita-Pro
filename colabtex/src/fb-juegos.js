@@ -305,12 +305,33 @@ export const otorgarLogro = (juego, uid, id) => set(ref(db, `logros/${juego}/${u
    lecturas se calcula el saldo de monedas de cualquiera (juegos/monedas.js).
    Antes de publicar las reglas `diario` falla sola y el resto sigue. */
 export function watchLogros(cb) {
-  const d = { ranks: {}, solo: {}, logros: {}, diario: {} }, err = {};
-  const oye = (nodo, k) => onValue(ref(db, nodo), s => { d[k] = (k === "ranks" ? saneaRanks(s.val()) : s.val()) || {}; err[k] = null; cb(d, err); },
-    e => { err[k] = e; cb(d, err); });
-  const offs = [oye(R, "ranks"), oye("soloRanks", "solo"), oye("logros", "logros"), oye("diario", "diario")];
+  const d = { ranks: {}, solo: {}, logros: {}, diario: {}, cartas: {} }, err = {}, llegados = new Set();
+  /* `completo`: ya llegaron las cinco al menos una vez. Antes de eso el
+     saldo sale de una suma a medias y podría parecer negativo. */
+  const oye = (nodo, k) => onValue(ref(db, nodo), s => {
+    d[k] = (k === "ranks" ? saneaRanks(s.val()) : s.val()) || {}; err[k] = null; llegados.add(k);
+    d.completo = llegados.size === 5; cb(d, err);
+  }, e => { err[k] = e; llegados.add(k); d.completo = llegados.size === 5; cb(d, err); });
+  const offs = [oye(R, "ranks"), oye("soloRanks", "solo"), oye("logros", "logros"), oye("diario", "diario"), oye("cartas", "cartas")];
   return () => offs.forEach(f => f());
 }
+
+/* ---------- PRODROP: sobres y graduaciones ----------
+   `cartas/s/<uid>/<clave>` = {at, p}: un sobre comprado. `at` lo pone el
+   servidor (la regla exige `at === now`) y el contenido sale de ahí
+   (juegos/prodrop/motor.js), así que nadie elige lo que trae. `p` es lo
+   que costó, y la regla comprueba que sea el precio de ese instante.
+   `cartas/g/<uid>/<clave>/<i>` = {at, p: 100}: la carta i de ese sobre,
+   graduada. Las dos se escriben una vez y no se borran: son el gasto. */
+export async function comprarSobre(uid, p) {
+  const r = push(ref(db, `cartas/s/${uid}`));
+  await set(r, { at: serverTimestamp(), p });
+  const x = (await get(r)).val();
+  return { k: r.key, at: x.at, p: x.p };
+}
+export const graduarCarta = (uid, k, i) => set(ref(db, `cartas/g/${uid}/${k}/${i}`), { at: serverTimestamp(), p: 100 });
+/* Las cartas que exhibe en su perfil: claves `<sobre>.<i>`. */
+export const exhibirCartas = (uid, lista) => set(ref(db, `${U}/${uid}/perfil/cartas`), lista.length ? lista : null);
 
 /* ---------- días jugando ----------
    `diario/<uid>` = {dia, racha, mejor, dias, bono, at}. La regla exige que
