@@ -33,7 +33,7 @@ import { crearSolo } from "./juegos/solo/club.js";
 import { watchAuth, loginGoogle, logout } from "./firebase.js";
 import * as fb from "./fb-juegos.js";
 import { escapeHtml, timeAgo, colorForUid } from "./util.js";
-import { AJ_RITMOS, JUEGOS, reducir, jugadasDe, acumula, cupoDe, minimoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, YM_MAPAS, mapaYemas, varianteYemas, ganoEn, ordenaRanks } from "./juegos/motor.js";
+import { AJ_RITMOS, JUEGOS, reducir, jugadasDe, acumula, cupoDe, minimoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, YM_MAPAS, mapaYemas, varianteYemas, ganoEn, ordenaRanks, salaInactiva, ultimaActividad, INACTIVA_MS } from "./juegos/motor.js";
 import { crearEscondite } from "./juegos/escondite.js";
 import { crearCartas } from "./juegos/cartas.js";
 import { crearCuadritos } from "./juegos/cuadritos.js";
@@ -456,10 +456,29 @@ async function jugar(jugada) {
   enVuelo.add(tarea);
   try {
     for (let i = 0; i < 25; i++, n++) {
-      if (await fb.jugar(pid, n, jugada)) { proximo = n + 1; return true; }
+      if (await fb.jugar(pid, n, jugada)) { proximo = n + 1; tocaSala(pid); return true; }
     }
     throw new Error("No se pudo escribir la jugada: la partida va demasiado rápida.");
   } finally { enVuelo.delete(tarea); suelta(); }
+}
+
+/* La sala sigue viva: se apunta la hora de la jugada (`toque`), como
+   mucho cada diez minutos por pestaña. Con seis horas sin toque la sala
+   se cierra sola (ver `salaInactiva`); diez minutos de holgura no
+   cambian nada y ahorran una escritura por jugada. */
+let ultimoToque = 0;
+function tocaSala(pid) {
+  if (Date.now() - ultimoToque < 10 * 60e3) return;
+  ultimoToque = Date.now();
+  fb.tocaSala(pid).catch(() => { ultimoToque = 0; });
+}
+/* Cerrar una sala dormida, una vez por sala y sesión. Sin las reglas
+   nuevas publicadas solo lo consigue alguien que juega en ella. */
+const cerrandoInactivas = new Set();
+function cierraInactiva(pid) {
+  if (cerrandoInactivas.has(pid)) return;
+  cerrandoInactivas.add(pid);
+  fb.cierraInactiva(pid).catch(e => console.warn("[juegos] no se pudo cerrar la sala dormida", e));
 }
 
 /* El módulo canta el ganador en cuanto lo ve; los dos lo cantan, y
@@ -500,6 +519,7 @@ async function anotar(p) {
   const u = state.user;
   if (!p || !p.fin || !u || anotada === state.pid) return;
   if (!(p.jugadores || {})[u.uid]) return;         // mirón: no juega, no puntúa
+  if (p.fin.motivo === "inactiva") return;          // se cerró sola: no se jugó
   anotada = state.pid;
   /* Yemas zombis no va a la tabla de Yemas: es cooperativo y lo que
      clasifica es la ronda a la que llegó la sala, por mapa, como un
@@ -717,6 +737,7 @@ function engancharVestibulo() {
     if (err) state.fallo = err;
     state.mias = (lista || []).sort((a, b) => (b.at || 0) - (a.at || 0));
     if (state.vista === "vestibulo") render();
+    revisaMias();
   });
   /* Sin reglas publicadas este nodo falla; no es motivo para tapar el
      vestíbulo con el aviso: la lista simplemente sale vacía. */
@@ -733,17 +754,45 @@ function engancharVestibulo() {
   });
 }
 
+/* «Tus partidas» se limpia sola: una sala a la que entraste hace más de
+   seis horas se mira (solo sus datos de cabecera, `fb.resumenSala`), y
+   si ya no existe, se cerró, o lleva seis horas sin una jugada, sale de
+   la lista. Si seguía abierta pero dormida, de paso se cierra. Una vez
+   por sala y sesión, de una en una. */
+const miasRevisadas = new Set();
+let revisandoMias = false;
+async function revisaMias() {
+  if (revisandoMias || !state.user) return;
+  revisandoMias = true;
+  try {
+    for (const m of state.mias.slice()) {
+      if (miasRevisadas.has(m.id) || fb.ahora() - (m.at || 0) < INACTIVA_MS) continue;
+      miasRevisadas.add(m.id);
+      const r = await fb.resumenSala(m.id).catch(() => undefined);
+      if (r === undefined) continue;
+      const ahora = fb.ahora();
+      const muerta = !r || (r.fin ? ahora - ultimaActividad(r) > INACTIVA_MS : salaInactiva(r, ahora));
+      if (!muerta) continue;
+      if (r && !r.fin) cierraInactiva(m.id);
+      if (state.pid !== m.id) await fb.olvidarMia(m.id, state.user.uid).catch(() => {});
+    }
+  } finally { revisandoMias = false; }
+}
+
 function engancharPartida(pid) {
   soltarPartida();
   proximo = 0; anotada = ""; finEnviado = ""; finCerrado = ""; dentroVistos = -1; tocaba = false;
   finVivo = ""; finDesde = 0; finSonado = ""; clearTimeout(finReloj);
-  jugadasVistas = -1; ultimoCambio = Date.now(); enCursoToque = 0;
+  jugadasVistas = -1; ultimoCambio = Date.now(); enCursoToque = 0; ultimoToque = 0;
   chatMsgs = []; chatFirma = "";
   offPartida = fb.watchPartida(pid, (p, err) => {
     state.cargando = false;
     if (err) { state.fallo = err; state.partida = null; render(); return; }
     state.partida = p;
     state.estado = p ? reducir(p) : null;
+    /* Una partida que el tablero ya da por acabada no se cierra como
+       dormida: la cierra el módulo con su ganador. */
+    if (p && salaInactiva(p, fb.ahora()) && !(state.estado && state.estado.fase === "fin")) cierraInactiva(pid);
     vistePerfiles(state.estado);
     if (p && !datosFin(p, state.estado)) finVivo = pid;
     if (p) {
@@ -1390,7 +1439,11 @@ function pintaVestibulo() {
   pintaDestacado();
 
   const mias = new Set(state.mias.map(x => x.id));
-  const abiertas = state.salas.filter(s => s.anfitrion !== state.user.uid && !mias.has(s.id) && !s.origen);
+  /* Una sala que lleva seis horas esperando sin que nadie entre se
+     cierra, y mientras tanto no se ofrece. */
+  const ahoraV = fb.ahora();
+  for (const s of state.salas) if (salaInactiva(s, ahoraV)) cierraInactiva(s.id);
+  const abiertas = state.salas.filter(s => s.anfitrion !== state.user.uid && !mias.has(s.id) && !s.origen && !salaInactiva(s, ahoraV));
   $("vesCuenta").textContent = abiertas.length;
   $("vesNSalas").textContent = abiertas.length;
   $("vesNMias").textContent = state.mias.length;
@@ -1713,7 +1766,7 @@ function pintaFin(p, est) {
      (llamará a `listo`), no ahora. */
   if (modulo && modulo.ocupado && modulo.ocupado()) { finDesde = 0; vacia(); return; }
   const vivo = finVivo === state.pid;
-  if (vivo && f.motivo !== "abandono") {
+  if (vivo && f.motivo !== "abandono" && f.motivo !== "inactiva") {
     /* Con la pestaña detrás no se ha visto nada: la pantalla se salta
        la animación y el reloj corre igual, así que al volver el cartel
        ya tapaba la jugada que decidió la partida — casi siempre la del
@@ -1735,7 +1788,8 @@ function pintaFin(p, est) {
   const yo = state.user.uid, g = f.ganador;
   const juega = !!(p.jugadores || {})[yo];
   const clase = !g ? "empate" : ganoEn(p, g, yo) ? "gano" : juega ? "perdi" : "mirando";
-  const titulo = clase === "gano" ? "¡Has ganado!"
+  const titulo = f.motivo === "inactiva" ? "Sala cerrada"
+    : clase === "gano" ? "¡Has ganado!"
     : clase === "perdi" ? "Has perdido"
     : clase === "empate" ? "Empate"
     : "Ganó " + nombreDe(est, g);
@@ -1746,7 +1800,7 @@ function pintaFin(p, est) {
   const firma = clase + titulo + sub + f.motivo + marca + expulsion + (p.revancha || "");
   if (caja.dataset.firma === firma) return;      // no repintar: reinicia la animación
   caja.dataset.firma = firma;
-  if (vivo && finSonado !== state.pid) {
+  if (vivo && finSonado !== state.pid && f.motivo !== "inactiva") {
     finSonado = state.pid;
     if (p.juego !== "worms") suena(FANFARRIA[clase]);
   }
@@ -1809,6 +1863,7 @@ const RAZONES = {
   estrellas: "Capturó más energía en las 36 estrellas.",
   encontrado: "Encontró al personaje escondido.",
   abandono: "La partida acabó por abandono.",
+  inactiva: "Se cerró sola: pasaron seis horas sin una jugada. No cuenta para la clasificación.",
   meta: "Llegó primero a la meta de bajas.",
   equipo: "Su equipo llegó primero a la meta de bajas.",
   bandera: "Su equipo capturó las banderas que pedía la meta.",

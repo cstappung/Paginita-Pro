@@ -191,6 +191,28 @@ export function minimoDe(p) {
   return j.minimo || 2;
 }
 
+/* ---------- salas dormidas ----------
+   Una sala de varios jugadores en la que nadie juega durante seis horas
+   se cierra sola (`fin.motivo = "inactiva"`). La última actividad es lo
+   más reciente entre la creación (`at`, del servidor), el último
+   `toque` — que escribe quien juega o entra, como mucho cada diez
+   minutos — y el cierre. Las salas de antes de `toque` no lo tienen,
+   así que para ellas cuentan también la hora de entrada de cada ficha y
+   el `at` que traen algunas jugadas (el ajedrez). Los juegos del club
+   (BBTAN, sortEm, la Sopa…) no tienen sala y esto no los toca. */
+export const INACTIVA_MS = 6 * 3600e3;
+export function ultimaActividad(p) {
+  if (!p) return 0;
+  let t = Math.max(+p.at || 0, +p.toque || 0, (p.fin && +p.fin.at) || 0);
+  for (const j of Object.values(p.jugadores || {})) t = Math.max(t, (j && +j.at) || 0);
+  if (!p.toque) for (const j of Object.values(p.jugadas || {})) if (j && typeof j.at === "number") t = Math.max(t, j.at);
+  return t;
+}
+export function salaInactiva(p, ahora) {
+  const t = ultimaActividad(p);
+  return !!p && !p.fin && t > 0 && ahora - t > INACTIVA_MS;
+}
+
 export function cupoDe(p) {
   const j = JUEGOS[p && p.juego] || {};
   const tope = j.cupo || 2, min = Math.max(2, j.minimo || 2);

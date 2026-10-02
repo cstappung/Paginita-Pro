@@ -136,7 +136,7 @@ function offCenter(c) {
    rehace con el motor desde su sobre: `key` = `<origen>~<sobre>.<i>`. */
 const cuenta = { uid: '', saldo: 0, parada: false, falta: 0, mias: [], sobres: {}, gratis: 0, ofertas: [], ventas: [], cambios: [],
   jugadores: {}, gente: {}, exh: [], listo: false, desfase: 0 };
-let col = {}, copies = {}, abriendo = '';   // el sobre en curso no entra a la colección hasta el resumen
+let col = {}, copies = {}, abriendo = new Set();   // los sobres en curso no entran a la colección hasta el resumen
 const ahora = () => Date.now() + cuenta.desfase;
 // una copia que llega de Juegos ({c, o, k, i, at, gr}) con su nota y su desgaste
 function copiaDe(x) {
@@ -146,7 +146,7 @@ function copiaDe(x) {
 function rehazColeccion() {
   col = {}; copies = {};
   for (const x of cuenta.mias) {
-    if (x.o === cuenta.uid && x.k === abriendo) continue;
+    if (x.o === cuenta.uid && abriendo.has(x.k)) continue;
     const cp = copiaDe(x), uid = M.CARDS[cp.id].uid;
     col[uid] = (col[uid] || 0) + 1;
     (copies[uid] = copies[uid] || []).push(cp);
@@ -623,17 +623,17 @@ let phase = 'pack', pull = [], els = [], current = 0, busy = false, tearP = 0, t
 const setPhase = p => { phase = p; document.body.dataset.phase = p; };
 const hint = txt => { $('#hint').textContent = txt; };
 
-// el sobre comprado: su contenido sale del motor (uid, clave, hora del servidor)
-let comprado = null;   // {k, at, dios}
-function cardsOf(k, at) {
+// los sobres comprados: su contenido sale del motor (uid, clave, hora del servidor)
+let comprados = [];   // [{k, at, dios}], de 1 a 3: se abren juntos
+const MAX_JUNTOS = 3;
+// «nueva» se mide contra lo que tenías antes y contra las cartas ya salidas de los sobres anteriores
+function cardsOf(k, at, s, antes, vistas) {
   const so = M.sobre(cuenta.uid, k, at);
-  const antes = new Set(Object.keys(col));
-  const vistas = new Set();
   return so.cartas.map((x, i) => {
     const base = CARDS[x.id], cp = { id: x.id, g: x.g, s: x.w, gr: 0, o: cuenta.uid, k, i, at, key: `${cuenta.uid}~${k}.${i}`, venta: '' };
     const nueva = !antes.has(base.uid) && !vistas.has(base.uid);
     vistas.add(base.uid);
-    return { ...base, grade: x.g, wseed: x.w, graded: false, _copy: cp, _new: nueva };
+    return { ...base, grade: x.g, wseed: x.w, graded: false, _copy: cp, _new: nueva, _sobre: s, _dios: so.dios };
   });
 }
 const preload = list => Promise.all(list.map(c => { const i = new Image(); i.src = c.img; return i.decode().catch(() => {}); }));
@@ -645,8 +645,13 @@ function showPack(drop) {
   hideBanner(); setDots();
   stack.getAnimations().forEach(a => a.cancel());
   stack.style.visibility = 'hidden'; stack.innerHTML = '';
-  els = pull.map((c, i) => { const el = makeCard(c, { down: true }); el.style.zIndex = 10 - i; stack.appendChild(el); return el; });
+  els = pull.map((c, i) => { const el = makeCard(c, { down: true }); el.style.zIndex = 100 - i; stack.appendChild(el); return el; });
   restack();
+  const n = phase === 'tienda' ? cantidad : Math.max(1, comprados.length);
+  $('#dots').innerHTML = '<i></i>'.repeat(pull.length || 5);
+  $('#dots').classList.toggle('muchos', pull.length > 5);
+  pintaKicker(n);
+  pintaExtras(n);
   if (drop) {
     const shinyFan = CARDS.filter(c => c.tier >= 2).sort(() => Math.random() - .5).slice(0, 3);
     packTop.innerHTML = packBottom.innerHTML = skinHTML(shinyFan);
@@ -657,30 +662,48 @@ function showPack(drop) {
       { transform: 'perspective(900px) translateY(-80vh) rotate(-14deg)', opacity: 0 },
       { transform: 'perspective(900px) translateY(0) rotate(0)', opacity: 1 },
     ], { duration: REDUCED ? 1 : 850, easing: 'cubic-bezier(.2,1.25,.4,1)' });
+    $('#packExtras').animate([{ transform: 'translateY(-80vh)', opacity: 0 }, { transform: 'none', opacity: 1 }],
+      { duration: REDUCED ? 1 : 850, delay: REDUCED ? 0 : 90, easing: 'cubic-bezier(.2,1.25,.4,1)', fill: 'backwards' });
     if (!REDUCED) setTimeout(() => Snd.land(), 450);
   }
   updateTear();
   setTilt(pack, pack, 1);
 }
+/* Los sobres de más se ven detrás del principal, en abanico: al rasgar
+   el de delante se abren todos a la vez. Son solo decorado; el corte y
+   las cartas son los del sobre principal. */
+function pintaExtras(n, forzar = true) {
+  const box = $('#packExtras');
+  if (!forzar && +box.dataset.n === n) return;
+  box.getAnimations({ subtree: true }).forEach(a => a.cancel());
+  const pos = n === 2 ? [[-1, 0]] : n >= 3 ? [[-1, 0], [1, 1]] : [];
+  box.innerHTML = pos.map(([lado, i]) => {
+    const fan = CARDS.filter(c => c.tier >= 1).sort(() => Math.random() - .5).slice(0, 3);
+    return `<div class="pack-extra" style="--lado:${lado};--i:${i}"><div class="pack-piece">${skinHTML(fan)}</div></div>`;
+  }).join('');
+  box.dataset.n = n;
+}
+const pintaKicker = n => { $('#kicker').textContent = n > 1 ? `${n} sobres · ${5 * n} cartas` : 'DIE COLLECTION · 5 cartas por sobre'; };
 function tienda(drop = true) {
   setPhase('tienda');
-  comprado = null; pull = []; abriendo = '';
+  comprados = []; pull = []; abriendo = new Set();
   rehazColeccion();
   showPack(drop);
   hint('');
   pintaCompra();
 }
-function newPack(k, at, drop = true) {
-  const so = M.sobre(cuenta.uid, k, at);
-  comprado = { k, at, dios: so.dios };
-  abriendo = k; rehazColeccion();        // «nueva» se mide contra lo que tenías antes de este sobre
-  pull = cardsOf(k, at);
-  try { localStorage.setItem(PENDIENTE(), k); } catch {}
+function newPacks(lista, drop = true) {
+  comprados = lista.map(({ k, at }) => ({ k, at, dios: M.sobre(cuenta.uid, k, at).dios }));
+  abriendo = new Set(); rehazColeccion();
+  const antes = new Set(Object.keys(col)), vistas = new Set();
+  pull = comprados.flatMap((x, s) => cardsOf(x.k, x.at, s, antes, vistas));
+  abriendo = new Set(comprados.map(x => x.k)); rehazColeccion();
+  try { localStorage.setItem(PENDIENTE(), comprados.map(x => x.k).join(',')); } catch {}
   preload(pull);
   setPhase('pack');
   showPack(drop);
   if (!drop) pack.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.06, .95)' }, { transform: 'none' }], { duration: 420, easing: 'cubic-bezier(.2,1.4,.4,1)' });
-  hint('Desliza por la línea punteada para abrir el sobre');
+  hint(comprados.length > 1 ? `Desliza por la línea punteada para abrir los ${comprados.length} sobres` : 'Desliza por la línea punteada para abrir el sobre');
   pintaCompra();
 }
 
@@ -762,18 +785,20 @@ async function openPack(force) {
   const r = pack.getBoundingClientRect(), ty = r.top + r.height * TEAR_Y / 100;
   for (let i = 0; i < 6; i++) burst(r.left + r.width * (i / 5), ty, { n: 10, colors: ['#fff', '#ffe08a', '#ff9ad5', '#9be9ff'], speed: 8, spread: 1.8, angle: -Math.PI / 2, kinds: ['spark', 'spark', 'star'] });
 
-  packTop.animate([
+  const tapa = packTop.animate([
     { transform: packTop.style.transform || 'none', opacity: 1 },
     { transform: 'translate(45%, -170%) rotate(32deg)', opacity: 0 },
   ], { duration: 750, easing: 'cubic-bezier(.25,.6,.35,1)', fill: 'forwards' });
-  $('#packLight').animate([{ opacity: 0, transform: 'translateY(-100%) scaleY(.2)' }, { opacity: 1, transform: 'translateY(-100%) scaleY(1)' }],
+  const luz = $('#packLight').animate([{ opacity: 0, transform: 'translateY(-100%) scaleY(.2)' }, { opacity: 1, transform: 'translateY(-100%) scaleY(1)' }],
     { duration: 500, easing: 'ease-out', fill: 'forwards' });
   pack.animate([
     { transform: 'perspective(900px) scale(1)' }, { transform: 'perspective(900px) scale(1.05, .96)' }, { transform: 'perspective(900px) scale(1)' },
   ], { duration: 420, easing: 'ease-out' });
   hint('');
+  abreExtras();
   await sleep(380);
-  if (comprado && comprado.dios) await godPack();
+  const dioses = comprados.filter(x => x.dios).length;
+  if (dioses) await godPack(dioses);
 
   // las cartas asoman desde dentro del sobre
   const cw = els[0].getBoundingClientRect().width;
@@ -784,14 +809,18 @@ async function openPack(force) {
   await sleep(120);
 
   // el sobre cae y el mazo baja al centro
-  pack.animate([
+  const caida = pack.animate([
     { transform: 'perspective(900px) translateY(0) rotate(0)', opacity: 1 },
     { transform: 'perspective(900px) translateY(85vh) rotate(9deg)', opacity: .6 },
   ], { duration: 650, easing: 'cubic-bezier(.55,0,.85,.4)', fill: 'forwards' });
   await stack.animate([{ transform: `translateY(${-cw * .5}px)` }, { transform: 'translateY(0)' }],
     { duration: 750, easing: 'cubic-bezier(.3,1.25,.5,1)', fill: 'forwards' }).finished;
   Snd.land();
+  /* Oculto ya, la caída se cancela: si se queda «rellenando», Chrome la
+     retira por su cuenta y su último fotograma queda aplicado, y el sobre
+     siguiente (Abrir otro) aparecía caído, fuera de la pantalla. */
   pack.hidden = true;
+  [caida, tapa, luz].forEach(a => a.cancel());
 
   setPhase('reveal'); setDots();
   hint('Toca la carta para darla vuelta');
@@ -799,10 +828,21 @@ async function openPack(force) {
   stack.focus({ preventScroll: true });
 }
 
+function abreExtras() {
+  for (const ex of $('#packExtras').children) {
+    const r = ex.getBoundingClientRect(), lado = +ex.style.getPropertyValue('--lado') || 1;
+    for (let i = 0; i < 3; i++) burst(r.left + r.width * (.2 + i * .3), r.top + r.height * TEAR_Y / 100, { n: 8, colors: ['#fff', '#ffe08a', '#ff9ad5'], speed: 7, spread: 1.8, angle: -Math.PI / 2, kinds: ['spark', 'star'] });
+    const base = getComputedStyle(ex).transform, desde = base === 'none' ? '' : base;
+    ex.animate([{ transform: desde || 'none', opacity: 1 }, { transform: `${desde} translate(${lado * 30}%, 70vh) rotate(${lado * 14}deg)`, opacity: 0 }],
+      { duration: REDUCED ? 1 : 900, delay: 250, easing: 'cubic-bezier(.55,0,.85,.4)', fill: 'forwards' });
+  }
+}
+
 /* ---------------- REVELADO ---------------- */
 function restack() {
   els.slice(current).forEach((el, j) => {
-    el.style.transform = j ? `translate(${j * 3}px, ${j * 4}px) rotate(${(j % 2 ? 1.6 : -1.4) * Math.min(j, 3)}deg)` : 'none';
+    const q = Math.min(j, 4);   // con tres sobres hay quince cartas: el fondo del mazo no se aleja más
+    el.style.transform = j ? `translate(${q * 3}px, ${q * 4}px) rotate(${(j % 2 ? 1.6 : -1.4) * Math.min(j, 3)}deg)` : 'none';
   });
 }
 function focusTop() {
@@ -822,7 +862,8 @@ function showBanner(c) {
   b.style.setProperty('--c', accentOf(c));
   b.querySelector('.b-tier').textContent = `${t.label.toUpperCase()} ${t.sym}`;
   b.querySelector('.b-name').textContent = c.name;
-  b.querySelector('.b-var').innerHTML = `${subtitle(c)} · N.º ${pad(c.num)}${c._new ? '<em>NUEVA</em>' : ''}`;
+  const deSobre = comprados.length > 1 ? ` · sobre ${c._sobre + 1} de ${comprados.length}` : '';
+  b.querySelector('.b-var').innerHTML = `${subtitle(c)} · N.º ${pad(c.num)}${deSobre}${c._new ? '<em>NUEVA</em>' : ''}`;
   requestAnimationFrame(() => b.classList.add('show'));
   document.body.classList.add('has-banner');
 }
@@ -979,22 +1020,32 @@ function showSummary() {
   setTilt(null, null); aura(false); hideBanner();
   document.body.classList.remove('dim');
   pull.forEach(record);
-  abriendo = ''; rehazColeccion(); updateColCount();
+  abriendo = new Set(); rehazColeccion(); updateColCount();
   try { localStorage.removeItem(PENDIENTE()); } catch {}
   pintaCompra();
   $('#tableView').hidden = true; $('#summary').hidden = false;
-  const box = $('#sumCards'); box.innerHTML = '';
+  const n = comprados.length, box = $('#sumCards'); box.innerHTML = '';
+  $('#summary').classList.toggle('multi', n > 1);
+  $('#summary').dataset.n = n;
+  $('#sumTitulo').textContent = n > 1 ? `Tus ${n} sobres` : 'Tu sobre';
+  /* Con varios sobres, una fila por sobre: se ve qué trajo cada uno. */
+  const grupos = n > 1 ? comprados.map((x, s) => {
+    const g = document.createElement('div'); g.className = 'sum-grupo';
+    g.innerHTML = `<p class="sum-grupo-t">Sobre ${s + 1}${x.dios ? ' <b>GOD PACK</b>' : ''}</p><div class="sum-fila"></div>`;
+    box.appendChild(g); return g.lastElementChild;
+  }) : [box];
   pull.forEach((c, i) => {
     const el = sumCard(c);
-    box.appendChild(el);
+    grupos[n > 1 ? c._sobre : 0].appendChild(el);
     el.animate([{ transform: 'translateY(70px) scale(.8) rotate(-4deg)', opacity: 0 }, { transform: 'none', opacity: 1 }],
-      { duration: 650, delay: i * 90, easing: 'cubic-bezier(.2,1.25,.4,1)', fill: 'backwards' });
+      { duration: 650, delay: i * (n > 1 ? 45 : 90), easing: 'cubic-bezier(.2,1.25,.4,1)', fill: 'backwards' });
   });
+  $('#summary').scrollTop = 0;
 }
 // tras graduar en el zoom, la carta del resumen pasa a su caja
 function refreshCard(c) {
   if (phase !== 'summary') return;
-  const old = [...$('#sumCards').children].find(e => e.card === c);
+  const old = [...$('#sumCards').querySelectorAll('.card')].find(e => e.card === c);
   if (old) old.replaceWith(sumCard(c));
 }
 $('#skipBtn').onclick = () => { if (phase === 'reveal' && !busy) showSummary(); };
@@ -1044,7 +1095,7 @@ function zoomUI(recien) {
     go.innerHTML = oddsHTML(c);
     if (recien && !REDUCED) go.animate([{ opacity: 0, transform: 'translateY(14px) scale(.96)' }, { opacity: 1, transform: 'none' }], { duration: 650, delay: 150, easing: 'cubic-bezier(.2,1.3,.4,1)', fill: 'backwards' });
   }
-  const enSobre = mio && !!abriendo && c._copy.k === abriendo && c._copy.o === cuenta.uid && phase !== 'summary';
+  const enSobre = mio && abriendo.has(c._copy.k) && c._copy.o === cuenta.uid && phase !== 'summary';
   // exhibir en el perfil (hasta MAX_EXH cartas)
   const sb = $('#showBtn'), key = mio && c._copy.key, puesta = !!key && cuenta.exh.includes(key);
   sb.hidden = !key || enSobre;
@@ -1094,7 +1145,7 @@ function refrescaZoom() {
   } else if (c._copy && !c._ajena) {
     const x = (copies[c.uid] || []).find(y => mismaCopia(y, c._copy));
     if (x) { c._copy = x; c.graded = !!x.gr; }
-    else if (!(abriendo && c._copy.k === abriendo)) { cierraZoom(); toast('Esa carta ya no está en tu colección.'); return; }
+    else if (!abriendo.has(c._copy.k)) { cierraZoom(); toast('Esa carta ya no está en tu colección.'); return; }
   }
   zoomUI();
 }
@@ -1436,9 +1487,10 @@ function alDatos(d) {
   rehazColeccion(); updateColCount(); pintaAvisos();
   if (primera) {
     $('#cargando').hidden = true;
-    let k = ''; try { k = localStorage.getItem(PENDIENTE()) || ''; } catch {}
-    // un sobre comprado y sin abrir (se cerró la pestaña): se sigue con ese, sin cobrar otra vez
-    if (k && cuenta.sobres[k]) newPack(k, cuenta.sobres[k]);
+    let ks = []; try { ks = (localStorage.getItem(PENDIENTE()) || '').split(',').filter(Boolean); } catch {}
+    // sobres comprados y sin abrir (se cerró la pestaña): se sigue con esos, sin cobrar otra vez
+    const vivos = ks.filter(k => cuenta.sobres[k]).slice(0, MAX_JUNTOS).map(k => ({ k, at: cuenta.sobres[k] }));
+    if (vivos.length) newPacks(vivos);
     else tienda();
     return;
   }
@@ -1459,25 +1511,44 @@ function cuentaAtras(t) {
   const m = Math.max(1, Math.ceil((t - ahora()) / 60000)), h = Math.floor(m / 60);
   return h ? `${h} h ${String(m % 60).padStart(2, '0')} min` : `${m} min`;
 }
+/* Cuántos sobres se abren juntos (1, 2 o 3). Se recuerda en este
+   navegador. Cada uno se cobra por separado y Juegos comprueba el saldo
+   antes de cada uno; si se acaba a mitad, se abren los que entraron. */
+let cantidad = 1;
+try { cantidad = clamp(+localStorage.getItem('prodrop.cantidad') || 1, 1, MAX_JUNTOS); } catch {}
+function pintaCantidad(box, p) {
+  box.innerHTML = [1, 2, 3].map(n => {
+    const no = cuenta.listo && (cuenta.saldo < n * p || cuenta.parada);
+    return `<button data-cant="${n}" aria-pressed="${n === cantidad}"${no && n > 1 ? ' class="corto" title="No te alcanza"' : ''}>×${n}</button>`;
+  }).join('');
+  box.querySelectorAll('[data-cant]').forEach(b => b.onclick = () => {
+    cantidad = +b.dataset.cant; Snd.init(); Snd.blip();
+    try { localStorage.setItem('prodrop.cantidad', cantidad); } catch {}
+    pintaCompra();
+  });
+}
+const sobresTxt = n => n === 1 ? 'sobre' : `${n} sobres`;
 function pintaCompra() {
-  const p = precio(), falta = p - cuenta.saldo, promo = p < M.PRECIO.normal, gl = gratisListo();
+  const p1 = precio(), p = p1 * cantidad, falta = p - cuenta.saldo, promo = p1 < M.PRECIO.normal, gl = gratisListo();
+  pintaCantidad($('#cant'), p1); pintaCantidad($('#cant2'), p1);
+  if (phase === 'tienda') { pintaExtras(cantidad, false); pintaKicker(cantidad); }
   $('#saldo').innerHTML = `${MONEDA}<b>${cuenta.listo ? fmt(cuenta.saldo) : '…'}</b>`;
   const f = $('#freeBtn');
   f.innerHTML = gl ? 'Sobre gratis 🎁' : cuenta.gratis ? `🎁 Gratis en ${cuentaAtras(cuenta.gratis)}` : '🎁 Sobre gratis';
   f.disabled = !gl || comprando;
   f.classList.toggle('listo', gl);
   const b = $('#buyBtn');
-  b.innerHTML = `Comprar sobre <span class="precio">${promo ? `<s>${M.PRECIO.normal}</s>` : ''}${MONEDA}${p}</span>`;
+  b.innerHTML = `Comprar ${sobresTxt(cantidad)} <span class="precio">${promo ? `<s>${M.PRECIO.normal * cantidad}</s>` : ''}${MONEDA}${p}</span>`;
   b.disabled = !cuenta.listo || falta > 0 || comprando || cuenta.parada;
   b.classList.toggle('primary', !gl); b.classList.toggle('sec', gl);
   const fin = new Date(M.PRECIO.promoHasta - 1).toLocaleDateString('es-CL', { day: 'numeric', month: 'long', timeZone: 'America/Santiago' });
   $('#buyInfo').innerHTML = !cuenta.listo ? 'Cargando tu cuenta…'
     : cuenta.parada ? `<span class="err">Una compra tuya quedó sin fondos y no vale: hasta que ganes ${fmt(cuenta.falta)} monedas más, no puedes gastar.</span>`
     : gl ? `Tu sobre gratis está listo. El siguiente, 6 horas después de abrirlo.`
-    : falta > 0 ? `Te faltan <b>${fmt(falta)}</b> monedas para comprar uno. Gánalas jugando en <a href="#" data-volver>Juegos</a>.`
-    : promo ? `Precio de lanzamiento hasta el ${fin} (después, ${M.PRECIO.normal}). Tienes ${fmt(cuenta.saldo)}.` : `Tienes ${fmt(cuenta.saldo)} monedas.`;
+    : falta > 0 ? `Te faltan <b>${fmt(falta)}</b> monedas para ${cantidad === 1 ? 'comprar uno' : `abrir ${cantidad} juntos`}. Gánalas jugando en <a href="#" data-volver>Juegos</a>.`
+    : promo ? `Precio de lanzamiento hasta el ${fin} (después, ${M.PRECIO.normal} cada uno). Tienes ${fmt(cuenta.saldo)}.` : `Tienes ${fmt(cuenta.saldo)} monedas.`;
   const a = $('#againBtn');
-  a.innerHTML = `Abrir otro sobre ✳ <span class="precio">${MONEDA}${p}</span>`;
+  a.innerHTML = `${cantidad === 1 ? 'Abrir otro sobre' : `Abrir otros ${cantidad}`} ✳ <span class="precio">${MONEDA}${p}</span>`;
   a.disabled = falta > 0 || comprando || cuenta.parada;
   a.title = falta > 0 ? `Te faltan ${fmt(falta)} monedas` : '';
   const ag = $('#againFreeBtn');
@@ -1488,22 +1559,33 @@ let comprando = false;
 async function comprar(drop, gratis) {
   if (comprando || !cuenta.listo) return;
   Snd.init();
-  if (gratis ? !gratisListo() : cuenta.parada || cuenta.saldo < precio()) { avisaCompra(); return; }
+  const n = gratis ? 1 : cantidad;
+  if (gratis ? !gratisListo() : cuenta.parada || cuenta.saldo < precio() * n) { avisaCompra(); return; }
   comprando = true; pintaCompra();
-  $('#buyInfo').textContent = gratis ? 'Abriendo tu sobre gratis…' : 'Comprando…';
-  try {
-    const r = await Red.pide(gratis ? 'gratis' : 'comprar', gratis ? {} : { p: precio() });
-    // la cuenta real llega sola; esto evita ver la vieja un instante
-    if (gratis) cuenta.gratis = r.at + 6 * 3600 * 1000; else cuenta.saldo -= r.p;
-    cuenta.sobres[r.k] = r.at;
-    Snd.coin();
-    comprando = false;
-    newPack(r.k, r.at, drop);
-  } catch (e) {
-    comprando = false; pintaCompra();
-    $('#buyInfo').innerHTML = `<span class="err">${esc(e.message || 'No se pudo comprar.')}</span>`;
-    if (phase === 'summary') toast(e.message || 'No se pudo comprar.', true);
+  $('#buyInfo').textContent = gratis ? 'Abriendo tu sobre gratis…' : n > 1 ? `Comprando ${n} sobres…` : 'Comprando…';
+  const lista = [];
+  let error = null;
+  /* Uno tras otro: Juegos comprueba el saldo antes de cada uno. */
+  for (let i = 0; i < n; i++) {
+    try {
+      const r = await Red.pide(gratis ? 'gratis' : 'comprar', gratis ? {} : { p: precio() });
+      // la cuenta real llega sola; esto evita ver la vieja un instante
+      if (gratis) cuenta.gratis = r.at + 6 * 3600 * 1000; else cuenta.saldo -= r.p;
+      cuenta.sobres[r.k] = r.at;
+      lista.push({ k: r.k, at: r.at });
+      if (n > 1) $('#buyInfo').textContent = `Comprando ${n} sobres… (${lista.length} de ${n})`;
+    } catch (e) { error = e; break; }
   }
+  comprando = false;
+  if (lista.length) {
+    Snd.coin();
+    newPacks(lista, drop);
+    if (error) toast(`Solo entraron ${lista.length} de ${n}: ${error.message || 'no se pudo comprar el resto.'}`, true);
+    return;
+  }
+  pintaCompra();
+  $('#buyInfo').innerHTML = `<span class="err">${esc((error && error.message) || 'No se pudo comprar.')}</span>`;
+  if (phase === 'summary') toast((error && error.message) || 'No se pudo comprar.', true);
 }
 function avisaCompra() {
   const b = phase === 'summary' ? $('#againBtn') : $('#buyBtn');
@@ -1516,8 +1598,9 @@ document.addEventListener('click', e => { const a = e.target.closest('[data-volv
 /* ---------------- GOD PACK ----------------
    2 % de los sobres: cinco épicas o mejores, como mucho una legendaria.
    Se anuncia al romper el sobre, antes de la primera carta. */
-async function godPack() {
+async function godPack(n = 1) {
   const g = $('#god');
+  g.querySelector('b').textContent = n > 1 ? `GOD PACK ×${n}` : 'GOD PACK';
   g.hidden = false;
   Snd.god(); buzz([40, 60, 40, 60, 120]);
   flash('#ffe27a', .95, 1200);

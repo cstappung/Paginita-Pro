@@ -101,6 +101,14 @@ y están en el repositorio público, como cualquier archivo del sitio.
 
 ## 1. Reglas de Realtime Database (IMPORTANTE)
 
+> **Salas dormidas (octubre de 2026):** una sala de juego en la que nadie
+> juega durante 6 horas se cierra sola (`fin.motivo = "inactiva"`). Cada
+> jugada apunta la hora en `partidas/<pid>/toque`, y la regla de `fin` deja
+> que cualquiera con sesión cierre una sala con 6 horas sin `toque`. Hasta
+> volver a publicar las reglas solo la cierran sus propios jugadores al
+> abrirla, y las salas viejas que nadie abre se quedan en el vestíbulo
+> (aunque ya no se ofrecen en «Salas abiertas»).
+
 > **Más monedas (octubre de 2026):** las partidas del club que pagan viven
 > en `clubJugadas` y los premios por quitarle un podio a alguien en
 > `podios`. Hasta volver a publicar las reglas, esas monedas no se suman

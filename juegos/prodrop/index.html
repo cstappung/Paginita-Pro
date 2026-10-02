@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,600;0,700;0,800;1,600;1,800&family=Rubik:wght@500;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=pd-5">
+<link rel="stylesheet" href="style.css?v=pd-6">
 </head>
 <body data-phase="pack">
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -40,11 +40,12 @@
 <main class="stage">
   <section id="tableView" class="table-view">
     <div class="top-line">
-      <p class="kicker">DIE COLLECTION · 5 cartas por sobre</p>
+      <p id="kicker" class="kicker">DIE COLLECTION · 5 cartas por sobre</p>
       <div id="dots" class="dots" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
     </div>
 
     <div id="wrap" class="wrap">
+      <div id="packExtras" class="pack-extras" aria-hidden="true"></div>
       <div id="stack" class="stack" aria-label="Tus cartas" tabindex="0"></div>
       <div id="pack" class="pack" aria-label="Sobre. Desliza por la línea para abrirlo">
         <div id="packBottom" class="pack-piece"></div>
@@ -65,6 +66,7 @@
     </div>
     <p id="hint" class="hint">Desliza por la línea punteada para abrir el sobre</p>
     <div class="buy">
+      <div id="cant" class="cant" role="group" aria-label="Cuántos sobres abrir juntos"></div>
       <div class="buy-btns"><button id="freeBtn" class="btn free">🎁 Sobre gratis</button><button id="buyBtn" class="btn primary">Comprar sobre</button></div>
       <p id="buyInfo" class="buy-info"></p>
     </div>
@@ -75,9 +77,10 @@
   </section>
 
   <section id="summary" class="summary" hidden>
-    <h2>Tu sobre</h2>
+    <h2 id="sumTitulo">Tu sobre</h2>
     <div id="sumCards" class="sum-cards"></div>
     <p class="sum-tip">Toca una carta para verla de cerca · cada carta trae un estado oculto: ábrela y gradúala para descubrir su nota (100 monedas cada una)</p>
+    <div id="cant2" class="cant" role="group" aria-label="Cuántos sobres abrir juntos"></div>
     <div class="sum-actions">
       <button id="againFreeBtn" class="btn free listo" hidden>Abrir tu sobre gratis 🎁</button>
       <button id="againBtn" class="btn primary">Abrir otro sobre ✳</button>
@@ -136,11 +139,11 @@
     <div class="col-bar"><i id="colBar"></i></div>
     <div id="colFilters" class="col-filters"></div>
     <div id="colGrid" class="col-grid"></div>
-    <p class="odds">Probabilidad por carta: Común 80% · Rara 17,4% · Épica 2,4% · Legendaria 0,2%. La quinta carta siempre es Rara o mejor (ahí: Rara 87% · Épica 12% · Legendaria 1%).<br>God pack: 2% de los sobres traen cinco Épicas o mejores (como mucho una Legendaria).<br>Estado oculto de 1 a 10 (la gran mayoría ronda el 7; 8% sale 10 GEM MINT y solo 2% sale 3 o menos). Se revela al graduar (100 monedas).<br>Un sobre gratis cada 6 horas. En el mercado cada quien pone el precio de sus cartas; los intercambios se hacen cuando la otra persona acepta.<br>Cada sobre queda anotado con la hora del servidor en que se compró, y su contenido sale de ahí: nadie puede elegir lo que trae, y cualquiera puede comprobarlo.</p>
+    <details class="odds"><summary>Probabilidades y reglas de los sobres</summary><p>Probabilidad por carta: Común 80% · Rara 17,4% · Épica 2,4% · Legendaria 0,2%. La quinta carta siempre es Rara o mejor (ahí: Rara 87% · Épica 12% · Legendaria 1%).<br>God pack: 2% de los sobres traen cinco Épicas o mejores (como mucho una Legendaria).<br>Estado oculto de 1 a 10 (la gran mayoría ronda el 7; 8% sale 10 GEM MINT y solo 2% sale 3 o menos). Se revela al graduar (100 monedas).<br>Un sobre gratis cada 6 horas. En el mercado cada quien pone el precio de sus cartas; los intercambios se hacen cuando la otra persona acepta.<br>Cada sobre queda anotado con la hora del servidor en que se compró, y su contenido sale de ahí: nadie puede elegir lo que trae, y cualquiera puede comprobarlo.</p></details>
   </div>
 </div>
 
-<script src="motor.js?v=pd-5"></script>
-<script src="app.js?v=pd-5"></script>
+<script src="motor.js?v=pd-6"></script>
+<script src="app.js?v=pd-6"></script>
 </body>
 </html>
