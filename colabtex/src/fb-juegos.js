@@ -305,14 +305,14 @@ export const otorgarLogro = (juego, uid, id) => set(ref(db, `logros/${juego}/${u
    lecturas se calcula el saldo de monedas de cualquiera (juegos/monedas.js).
    Antes de publicar las reglas `diario` falla sola y el resto sigue. */
 export function watchLogros(cb) {
-  const d = { ranks: {}, solo: {}, logros: {}, diario: {}, cartas: {} }, err = {}, llegados = new Set();
-  /* `completo`: ya llegaron las cinco al menos una vez. Antes de eso el
-     saldo sale de una suma a medias y podría parecer negativo. */
+  const d = { ranks: {}, solo: {}, logros: {}, diario: {}, cartas: {}, mercado: {} }, err = {}, llegados = new Set();
+  /* `completo`: ya llegaron las seis al menos una vez. Antes de eso el
+     saldo sale de una suma a medias. */
   const oye = (nodo, k) => onValue(ref(db, nodo), s => {
     d[k] = (k === "ranks" ? saneaRanks(s.val()) : s.val()) || {}; err[k] = null; llegados.add(k);
-    d.completo = llegados.size === 5; cb(d, err);
-  }, e => { err[k] = e; llegados.add(k); d.completo = llegados.size === 5; cb(d, err); });
-  const offs = [oye(R, "ranks"), oye("soloRanks", "solo"), oye("logros", "logros"), oye("diario", "diario"), oye("cartas", "cartas")];
+    d.completo = llegados.size === 6; cb(d, err);
+  }, e => { err[k] = e; llegados.add(k); d.completo = llegados.size === 6; cb(d, err); });
+  const offs = [oye(R, "ranks"), oye("soloRanks", "solo"), oye("logros", "logros"), oye("diario", "diario"), oye("cartas", "cartas"), oye("mercado", "mercado")];
   return () => offs.forEach(f => f());
 }
 
@@ -329,7 +329,42 @@ export async function comprarSobre(uid, p) {
   const x = (await get(r)).val();
   return { k: r.key, at: x.at, p: x.p };
 }
-export const graduarCarta = (uid, k, i) => set(ref(db, `cartas/g/${uid}/${k}/${i}`), { at: serverTimestamp(), p: 100 });
+/* El sobre gratis: el sobre con `p: 0` y `cartas/gratis/<uid>` = {at, k}
+   en una sola escritura; la regla mira en el segundo que hayan pasado 6
+   horas desde el anterior. */
+export async function sobreGratis(uid) {
+  const k = push(ref(db, `cartas/s/${uid}`)).key;
+  await update(ref(db), { [`cartas/s/${uid}/${k}`]: { at: serverTimestamp(), p: 0 }, [`cartas/gratis/${uid}`]: { at: serverTimestamp(), k } });
+  const x = (await get(ref(db, `cartas/s/${uid}/${k}`))).val();
+  return { k, at: x.at, p: 0 };
+}
+/* Graduar la copia `o~k.i`. Si el sobre es de quien gradúa, `o` no se
+   escribe (así eran las graduaciones de antes del mercado). */
+export const graduarCarta = (uid, o, k, i) =>
+  set(ref(db, `cartas/g/${uid}/${k}/${i}`), Object.assign({ at: serverTimestamp(), p: 100 }, o && o !== uid ? { o } : {}));
+
+/* ---------- el mercado de cartas ----------
+   `mercado/o/<id>` = {u, c, p, at}: una oferta (quien vende, la copia, el
+   precio). `x` = hora en que se retiró, `v` = {u, at}: quien compró. Las
+   reglas dejan que haya una sola de las dos, y una sola vez.
+   `mercado/t/<id>` = {de, para, dar, pedir, at}: un intercambio propuesto;
+   `ok` = hora en que `para` lo aceptó, `x` = hora en que alguien lo cerró.
+   Quién tiene qué y quién pagó a quién lo decide la economía
+   (juegos/monedas.js), que es la que sabe si había fondos y cartas. */
+export async function publicarOferta(uid, c, p) {
+  const r = push(ref(db, "mercado/o"));
+  await set(r, { u: uid, c, p, at: serverTimestamp() });
+  return r.key;
+}
+export const retirarOferta = id => set(ref(db, `mercado/o/${id}/x`), serverTimestamp());
+export const comprarOferta = (uid, id) => set(ref(db, `mercado/o/${id}/v`), { u: uid, at: serverTimestamp() });
+export async function proponerCambio(de, para, dar, pedir) {
+  const r = push(ref(db, "mercado/t"));
+  await set(r, Object.assign({ de, para, dar, at: serverTimestamp() }, pedir.length ? { pedir } : {}));
+  return r.key;
+}
+export const aceptarCambio = id => set(ref(db, `mercado/t/${id}/ok`), serverTimestamp());
+export const cerrarCambio = id => set(ref(db, `mercado/t/${id}/x`), serverTimestamp());
 /* Las cartas que exhibe en su perfil: claves `<sobre>.<i>`. */
 export const exhibirCartas = (uid, lista) => set(ref(db, `${U}/${uid}/perfil/cartas`), lista.length ? lista : null);
 

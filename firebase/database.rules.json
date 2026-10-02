@@ -19,7 +19,7 @@
             "$i": { ".validate": "$i.matches(/^[0-9]$/) && newData.isString() && newData.val().length <= 60" }
           },
           "cartas": {
-            "$i": { ".validate": "$i.matches(/^[0-3]$/) && newData.isString() && newData.val().matches(/^[-_A-Za-z0-9]{8,24}[.][0-4]$/)" }
+            "$i": { ".validate": "$i.matches(/^[0-3]$/) && newData.isString() && newData.val().matches(/^([A-Za-z0-9]{6,40}~)?[-_A-Za-z0-9]{8,24}[.][0-4]$/)" }
           },
           "at": { ".validate": "newData.isNumber()" },
           "$otro": { ".validate": false }
@@ -253,7 +253,7 @@
         "$uid": {
           "$k": {
             ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists()",
-            ".validate": "$k.matches(/^[-_A-Za-z0-9]{8,24}$/) && newData.hasChildren(['at', 'p']) && newData.child('at').val() === now && newData.child('p').val() === (now < 1791169200000 ? 50 : 80)",
+            ".validate": "$k.matches(/^[-_A-Za-z0-9]{8,24}$/) && newData.hasChildren(['at', 'p']) && newData.child('at').val() === now && (newData.child('p').val() === 0 ? newData.parent().parent().parent().child('gratis').child($uid).child('k').val() === $k && newData.parent().parent().parent().child('gratis').child($uid).child('at').val() === now : newData.child('p').val() === (now < 1791169200000 ? 50 : 80))",
             "at": { ".validate": "newData.isNumber()" },
             "p": { ".validate": "newData.isNumber()" },
             "$otro": { ".validate": false }
@@ -264,13 +264,73 @@
         "$uid": {
           "$k": {
             "$i": {
-              ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists() && root.child('cartas').child('s').child($uid).child($k).exists()",
+              ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists() && root.child('cartas').child('s').child(newData.child('o').exists() ? newData.child('o').val() : $uid).child($k).exists()",
               ".validate": "$i.matches(/^[0-4]$/) && newData.hasChildren(['at', 'p']) && newData.child('at').val() === now && newData.child('p').val() === 100",
               "at": { ".validate": "newData.isNumber()" },
               "p": { ".validate": "newData.isNumber()" },
+              "o": { ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9]{6,40}$/)" },
               "$otro": { ".validate": false }
             }
           }
+        }
+      },
+      "gratis": {
+        "$uid": {
+          ".write": "auth != null && auth.uid === $uid && newData.exists()",
+          ".validate": "newData.hasChildren(['at', 'k']) && newData.child('at').val() === now && (!data.exists() || now >= data.child('at').val() + 21600000) && newData.parent().parent().child('s').child($uid).child(newData.child('k').val()).child('p').val() === 0 && newData.parent().parent().child('s').child($uid).child(newData.child('k').val()).child('at').val() === now",
+          "at": { ".validate": "newData.isNumber()" },
+          "k": { ".validate": "newData.isString() && newData.val().matches(/^[-_A-Za-z0-9]{8,24}$/)" },
+          "$otro": { ".validate": false }
+        }
+      }
+    },
+
+    "mercado": {
+      ".read": "auth != null",
+      "o": {
+        "$id": {
+          ".write": "auth != null && !data.exists() && newData.child('u').val() === auth.uid",
+          ".validate": "$id.matches(/^[-_A-Za-z0-9]{8,24}$/) && newData.hasChildren(['u', 'c', 'p', 'at'])",
+          "u": { ".validate": "newData.isString()" },
+          "c": { ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9]{6,40}~[-_A-Za-z0-9]{8,24}[.][0-4]$/)" },
+          "p": { ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 1 && newData.val() <= 100000" },
+          "at": { ".validate": "newData.val() === now" },
+          "x": {
+            ".write": "auth != null && !data.exists() && newData.exists() && data.parent().child('u').val() === auth.uid && !data.parent().child('v').exists()",
+            ".validate": "newData.val() === now"
+          },
+          "v": {
+            ".write": "auth != null && !data.exists() && newData.exists() && data.parent().exists() && !data.parent().child('x').exists()",
+            ".validate": "newData.hasChildren(['u', 'at']) && newData.child('u').val() === auth.uid && newData.parent().child('u').val() !== auth.uid",
+            "u": { ".validate": "newData.isString()" },
+            "at": { ".validate": "newData.val() === now" },
+            "$otro": { ".validate": false }
+          },
+          "$otro": { ".validate": false }
+        }
+      },
+      "t": {
+        "$id": {
+          ".write": "auth != null && !data.exists() && newData.child('de').val() === auth.uid",
+          ".validate": "$id.matches(/^[-_A-Za-z0-9]{8,24}$/) && newData.hasChildren(['de', 'para', 'dar', 'at'])",
+          "de": { ".validate": "newData.isString()" },
+          "para": { ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9]{6,40}$/) && newData.val() !== newData.parent().child('de').val()" },
+          "dar": {
+            "$i": { ".validate": "$i.matches(/^[0-2]$/) && newData.isString() && newData.val().matches(/^[A-Za-z0-9]{6,40}~[-_A-Za-z0-9]{8,24}[.][0-4]$/)" }
+          },
+          "pedir": {
+            "$i": { ".validate": "$i.matches(/^[0-2]$/) && newData.isString() && newData.val().matches(/^[A-Za-z0-9]{6,40}~[-_A-Za-z0-9]{8,24}[.][0-4]$/)" }
+          },
+          "at": { ".validate": "newData.val() === now" },
+          "ok": {
+            ".write": "auth != null && !data.exists() && newData.exists() && data.parent().child('para').val() === auth.uid && !data.parent().child('x').exists()",
+            ".validate": "newData.val() === now && newData.parent().child('para').val() === auth.uid"
+          },
+          "x": {
+            ".write": "auth != null && !data.exists() && newData.exists() && (data.parent().child('de').val() === auth.uid || data.parent().child('para').val() === auth.uid) && !data.parent().child('ok').exists()",
+            ".validate": "newData.val() === now"
+          },
+          "$otro": { ".validate": false }
         }
       }
     },

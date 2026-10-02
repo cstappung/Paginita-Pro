@@ -89,15 +89,22 @@ leer cualquiera con sesión, porque todos los jugadores de una sala tienen que
 ver los mismos personajes. Si eso último te preocupa, usa fotos que no sean
 de cara.
 
-Y en PRODROP: las reglas comprueban el precio y la hora de cada sobre, pero
-no pueden sumar lo que alguien ganó. Por eso la web no se fía de lo escrito:
-una compra solo vale si lo ganado alcanzaba para ella (y para las anteriores).
-Una compra sin fondos que alguien escriba a mano no cuenta como gasto y su
-sobre no existe en ninguna parte, así que el saldo nunca baja de cero.
+Y en PRODROP: las reglas comprueban el precio y la hora de cada sobre, que
+una oferta tenga un solo comprador y que un intercambio lo acepte quien lo
+recibe, pero no pueden sumar lo que alguien ganó. Por eso la web no se fía
+de lo escrito: un gasto (sobre, graduación o compra en el mercado) solo vale
+si lo ganado alcanzaba para él. Uno sin fondos escrito a mano no cuenta, lo
+que compraba no existe (la carta se queda con quien la vendía) y esa cuenta
+queda parada hasta ganar lo que falta, así que el saldo nunca baja de cero.
 Las imágenes de las cartas son personas reales
 y están en el repositorio público, como cualquier archivo del sitio.
 
 ## 1. Reglas de Realtime Database (IMPORTANTE)
+
+> **Mercado de cartas (octubre de 2026):** las ventas e intercambios viven
+> en un nodo nuevo, `mercado`, y el sobre gratis cada 6 horas en
+> `cartas/gratis`. Hasta volver a publicar las reglas, vender, comprar a
+> otros, intercambiar y el sobre gratis fallan con un aviso.
 
 > **PRODROP (octubre de 2026):** los sobres y las graduaciones viven en un
 > nodo nuevo, `cartas`, y las cartas exhibidas en `users/<uid>/perfil/cartas`.

@@ -23,17 +23,19 @@
      Electrodle y la ronda de BBTAN suman un extra sobre su récord, porque
      ahí la marca misma es la dificultad.
 
-   **Gastar** sí se guarda, porque no se puede deducir de nada: cada sobre
-   de PRODROP (`cartas/s/<uid>/<clave>`, con su precio `p`) y cada carta
-   graduada (`cartas/g/<uid>/<clave>/<i>`). Las reglas comprueban el precio
-   y la hora de cada compra, pero no pueden sumar lo ganado, así que no
-   pueden impedir que un cliente modificado escriba una compra sin fondos.
-   Por eso **una compra solo vale si estaba pagada** (`libroCartas`): se
-   recorren en orden de hora y cada una se acepta solo si lo ganado alcanza
-   para ella y para todas las anteriores aceptadas. La que no alcanza no
-   cuenta como gasto, y su sobre no existe (no entra a la colección, ni al
-   perfil, ni a los mejores drops). El saldo es lo ganado menos lo aceptado,
-   así que **nunca es negativo**, por construcción y no por confianza.
+   **Gastar** sí se guarda, porque no se puede deducir de nada, y desde
+   que existe el mercado las monedas también **pasan de una cuenta a otra**.
+   Todo eso (`economia`) se reproduce en un solo recorrido, en orden de hora
+   del servidor: sobres (`cartas/s`, uno gratis cada 6 horas), graduaciones
+   (`cartas/g`), ventas del mercado (`mercado/o`) e intercambios
+   (`mercado/t`). Las reglas comprueban precios, horas y que cada cosa se
+   escriba una vez, pero no pueden sumar lo ganado, así que no pueden
+   impedir que un cliente modificado escriba un gasto sin fondos. Por eso
+   **un gasto solo vale si estaba pagado**: el que no alcanza no cuenta,
+   lo que compraba no existe, y la cuenta queda **parada** desde ahí (nada
+   de lo que haga después vale) hasta que gane lo que falta. El saldo es lo
+   ganado más lo cobrado menos lo pagado, así que **nunca es negativo**,
+   por construcción y no por confianza.
    ============================================================ */
 import { LOGROS, SOLO_PREFIJO, deFila, deMarca } from "./logros.js";
 
@@ -109,7 +111,7 @@ export const rachaHoy = (d, hoy) => (d && (d.dia === hoy || d.dia === hoy - 1) ?
 /* ---------- el saldo ----------
    `datos` = {ranks, solo, logros, diario}, las cuatro lecturas enteras. */
 const num = x => (Number.isFinite(+x) ? +x : 0);
-export function monedasDe(uid, datos) {
+export function ganadoDe(uid, datos) {
   const d = datos || {}, p = { partidas: 0, victorias: 0, records: 0, logros: 0, dias: 0 };
   const tengo = {};   // juego -> Set(id) de logros
   const pon = (j, id) => { (tengo[j] = tengo[j] || new Set()).add(id); };
@@ -133,44 +135,142 @@ export function monedasDe(uid, datos) {
   const dia = (d.diario || {})[uid];
   if (dia) p.dias = num(dia.bono);
   for (const k of Object.keys(p)) p[k] = Math.round(p[k]);
-  const total = Object.values(p).reduce((a, b) => a + b, 0), libro = libroCartas(uid, d.cartas, total);
-  return { total, gastadas: libro.gastadas, saldo: total - libro.gastadas, libro, partes: p, logros: Object.values(tengo).reduce((a, s) => a + s.size, 0) };
+  return { total: Object.values(p).reduce((a, b) => a + b, 0), partes: p, logros: Object.values(tengo).reduce((a, s) => a + s.size, 0) };
 }
 
-/* El libro de PRODROP de una cuenta: qué compras valen. `cartas` = {s, g}
-   (fb-juegos.js) y `ganado` lo que suma monedasDe. Se recorre en orden de
-   hora (a igual hora, el sobre antes que su graduación) y cada compra se
-   acepta solo si cabe en lo ganado; una graduación además necesita que su
-   sobre valga. Como lo ganado no baja, lo aceptado hoy sigue aceptado
-   mañana; una compra sin fondos queda en espera y vale el día en que lo
-   ganado alcance para ella y las anteriores. Devuelve los
-   sobres y graduaciones que valen, con la misma forma que en la base. */
+/* Lo ganado más lo que dice la economía: `gastadas` (sobres, graduaciones
+   y compras del mercado), `cobradas` (ventas), `saldo` y si la cuenta está
+   parada por un gasto sin fondos. */
+export function monedasDe(uid, datos) {
+  const g = ganadoDe(uid, datos), e = economia(datos).usuarios[uid];
+  const gastadas = e ? e.gastadas : 0, cobradas = e ? e.cobradas : 0;
+  return Object.assign(g, { gastadas, cobradas, saldo: g.total + cobradas - gastadas, parada: !!(e && e.parada), falta: e ? e.falta : 0 });
+}
+
+/* ---------- la economía de PRODROP ----------
+   Una copia de una carta se llama `<uid de origen>~<clave del sobre>.<i>`:
+   el sobre (y por tanto la carta, su nota y su desgaste) sale de quien lo
+   compró, pero la copia puede cambiar de dueño.
+
+   Las reglas del recorrido, en orden de hora (a igual hora: sobre,
+   graduación, oferta, retiro, venta, intercambio):
+   - **Gastar** (sobre, graduación, compra en el mercado) necesita que la
+     cuenta no esté parada y que el saldo alcance. Si no alcanza, el gasto
+     no vale y la cuenta queda parada desde ahí: es lo que hace que lo
+     aceptado solo crezca cuando lo ganado crece, sin que una compra barata
+     posterior pueda colarse hoy y salir mañana.
+   - Lo que **no vale por otra razón** (graduar una carta que ya no es tuya,
+     comprar una oferta ya retirada) simplemente no ocurre: no cobra ni para.
+   - Un **sobre gratis** (`p: 0`) vale si el anterior gratis válido de esa
+     cuenta fue hace 6 horas o más. No es gasto, así que no para a nadie.
+   - Una **oferta** vale si quien vende tiene la carta, no está parado y la
+     carta no está ya en venta. Mientras está en venta no se gradúa ni se
+     intercambia. Una **venta** a quien no puede pagar no vale: la carta se
+     queda con quien vendía y la oferta se cierra.
+   - Un **intercambio** vale al aceptarse si los dos tienen todavía sus
+     cartas, ninguna está en venta y ninguno está parado. */
+export const SEIS_HORAS = 6 * 3600 * 1000;
+const RE_COPIA = /^([A-Za-z0-9]{6,40})~([-_A-Za-z0-9]{8,24})\.([0-4])$/;
+export const claveCopia = (o, k, i) => o + "~" + k + "." + i;
+export const leeCopia = c => { const m = RE_COPIA.exec(String(c || "")); return m ? { o: m[1], k: m[2], i: +m[3] } : null; };
 const CLAVE_SOBRE = /^[-_A-Za-z0-9]{8,24}$/;
-export function libroCartas(uid, cartas, ganado) {
-  const c = cartas || {}, compras = [];
-  for (const [k, x] of Object.entries((c.s || {})[uid] || {}))
-    if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) compras.push({ t: 0, k, at: x.at, p: num(x.p), x });
-  for (const [k, porK] of Object.entries((c.g || {})[uid] || {}))
-    for (const [i, x] of Object.entries(porK || {}))
-      if (CLAVE_SOBRE.test(k) && /^[0-4]$/.test(i) && x && Number.isFinite(x.at)) compras.push({ t: 1, k, i, at: x.at, p: num(x.p), x });
-  compras.sort((a, b) => a.at - b.at || a.t - b.t || (a.k < b.k ? -1 : a.k > b.k ? 1 : 0) || (a.i || 0) - (b.i || 0));
-  const s = {}, g = {};
-  let gastadas = 0, n = 0;
-  /* Se aceptan en orden hasta la primera que no cabe, y ahí se para: si se
-     siguiera con las siguientes, una compra barata posterior podría entrar
-     hoy y salir mañana, cuando la anterior por fin alcanzara. Así lo
-     aceptado solo crece. */
-  for (; n < compras.length; n++) {
-    const x = compras[n];
-    // un precio que no es de la tienda (las reglas no lo dejarían) tampoco vale
-    const precioOk = x.t === 0 ? x.p === 50 || x.p === 80 : x.p === 100;
-    if (!precioOk || gastadas + x.p > ganado || (x.t === 1 && !s[x.k])) break;
-    gastadas += x.p;
-    if (x.t === 0) s[x.k] = x.x; else (g[x.k] = g[x.k] || {})[x.i] = x.x;
+const memoEco = new WeakMap();
+const comoLista = x => (Array.isArray(x) ? x : x && typeof x === "object" ? Object.values(x) : []);
+
+export function economia(datos) {
+  const d = datos || {};
+  if (memoEco.has(d)) return memoEco.get(d);
+  const c = d.cartas || {}, m = d.mercado || {}, ev = [];
+  const ORDEN = { s: 0, g: 1, o: 2, x: 3, v: 4, t: 5 };
+  for (const [u, l] of Object.entries(c.s || {}))
+    for (const [k, x] of Object.entries(l || {}))
+      if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) ev.push({ t: "s", at: x.at, u, k, p: num(x.p) });
+  for (const [u, l] of Object.entries(c.g || {}))
+    for (const [k, porI] of Object.entries(l || {}))
+      for (const [i, x] of Object.entries(porI || {}))
+        if (CLAVE_SOBRE.test(k) && /^[0-4]$/.test(i) && x && Number.isFinite(x.at))
+          ev.push({ t: "g", at: x.at, u, k, i: +i, p: num(x.p), copia: claveCopia(typeof x.o === "string" ? x.o : u, k, i) });
+  for (const [id, o] of Object.entries(m.o || {})) {
+    if (!o || !Number.isFinite(o.at)) continue;
+    ev.push({ t: "o", at: o.at, id, o });
+    if (Number.isFinite(o.x)) ev.push({ t: "x", at: o.x, id });
+    if (o.v && Number.isFinite(o.v.at)) ev.push({ t: "v", at: o.v.at, id, u: o.v.u });
   }
-  const espera = compras.slice(n);
-  const pendientes = espera.length, falta = espera.reduce((t, x) => t + x.p, 0);
-  return { s, g, gastadas: Math.round(gastadas), pendientes, falta: Math.round(falta) };
+  for (const [id, x] of Object.entries(m.t || {}))
+    if (x && Number.isFinite(x.ok) && !Number.isFinite(x.x)) ev.push({ t: "t", at: x.ok, id, x });
+  ev.sort((a, b) => a.at - b.at || ORDEN[a.t] - ORDEN[b.t] || ((a.id || a.k) < (b.id || b.k) ? -1 : (a.id || a.k) > (b.id || b.k) ? 1 : 0) || (a.i || 0) - (b.i || 0));
+
+  const usuarios = {}, dueno = {}, graduada = {}, enVenta = {}, sobres = {}, ofertas = {}, cambios = {};
+  const ganado = {};
+  const U = u => usuarios[u] || (usuarios[u] = { gastadas: 0, cobradas: 0, parada: false, falta: 0, gratis: -Infinity, sobres: {} });
+  const saldo = u => { if (!(u in ganado)) ganado[u] = ganadoDe(u, d).total; const x = U(u); return ganado[u] + x.cobradas - x.gastadas; };
+  /* Cobra `p` a `u`. Si no puede, la cuenta queda parada. */
+  const paga = (u, p) => {
+    const x = U(u);
+    if (x.parada) { x.falta += p; return false; }
+    if (saldo(u) < p) { x.parada = true; x.falta += p - Math.max(0, saldo(u)); return false; }
+    x.gastadas += p; return true;
+  };
+  for (const e of ev) {
+    if (e.t === "s") {
+      const x = U(e.u);
+      if (e.p === 0) {
+        if (x.parada || e.at - x.gratis < SEIS_HORAS) continue;
+        x.gratis = e.at;
+      } else if (!(e.p === 50 || e.p === 80) || !paga(e.u, e.p)) continue;
+      x.sobres[e.k] = e.at;
+      sobres[e.u + "~" + e.k] = { u: e.u, k: e.k, at: e.at, gratis: e.p === 0 };
+      for (let i = 0; i < 5; i++) dueno[claveCopia(e.u, e.k, i)] = e.u;
+    } else if (e.t === "g") {
+      if (dueno[e.copia] !== e.u || graduada[e.copia] || enVenta[e.copia] || e.p !== 100) continue;
+      if (paga(e.u, 100)) graduada[e.copia] = e.at;
+    } else if (e.t === "o") {
+      const o = e.o, copia = typeof o.c === "string" ? o.c : "", p = num(o.p);
+      const ok = leeCopia(copia) && dueno[copia] === o.u && !enVenta[copia] && !U(o.u).parada && Number.isInteger(p) && p >= 1 && p <= 100000;
+      ofertas[e.id] = { id: e.id, u: o.u, c: copia, p, at: e.at, estado: ok ? "activa" : "nula" };
+      if (ok) enVenta[copia] = e.id;
+    } else if (e.t === "x") {
+      const o = ofertas[e.id];
+      if (o && o.estado === "activa") { o.estado = "retirada"; o.fin = e.at; delete enVenta[o.c]; }
+    } else if (e.t === "v") {
+      const o = ofertas[e.id];
+      if (!o || o.estado !== "activa" || !e.u || e.u === o.u) continue;
+      delete enVenta[o.c];
+      o.fin = e.at;
+      if (paga(e.u, o.p)) { dueno[o.c] = e.u; U(o.u).cobradas += o.p; o.estado = "vendida"; o.comprador = e.u; }
+      else { o.estado = "impaga"; o.comprador = e.u; }
+    } else if (e.t === "t") {
+      const x = e.x, dar = comoLista(x.dar).map(String), pedir = comoLista(x.pedir).map(String), todas = [...dar, ...pedir];
+      const ok = x.de && x.para && x.de !== x.para && dar.length >= 1 && dar.length <= 3 && pedir.length <= 3 &&
+        new Set(todas).size === todas.length && !U(x.de).parada && !U(x.para).parada &&
+        dar.every(cc => dueno[cc] === x.de && !enVenta[cc]) && pedir.every(cc => dueno[cc] === x.para && !enVenta[cc]);
+      cambios[e.id] = { estado: ok ? "hecho" : "nulo", at: e.at };
+      if (ok) { for (const cc of dar) dueno[cc] = x.para; for (const cc of pedir) dueno[cc] = x.de; }
+    }
+  }
+  for (const [u, x] of Object.entries(usuarios)) { x.gastadas = Math.round(x.gastadas); x.cobradas = Math.round(x.cobradas); x.falta = Math.round(x.falta); void u; }
+  const res = { usuarios, dueno, graduada, enVenta, sobres, ofertas, cambios };
+  memoEco.set(d, res);
+  return res;
+}
+
+/* Las copias de una cuenta, ya resueltas a {o, k, at, i, gr, venta}. */
+export function copiasDe(uid, datos) {
+  const e = economia(datos), out = [];
+  for (const [cc, u] of Object.entries(e.dueno)) {
+    if (u !== uid) continue;
+    const q = leeCopia(cc), so = e.sobres[q.o + "~" + q.k];
+    if (so) out.push({ c: cc, o: q.o, k: q.k, i: q.i, at: so.at, gr: !!e.graduada[cc], venta: e.enVenta[cc] || "" });
+  }
+  return out.sort((a, b) => a.at - b.at || (a.k < b.k ? -1 : 1) || a.i - b.i);
+}
+
+/* Cuándo toca el próximo sobre gratis (0: ya). */
+export function proximoGratis(uid, datos, ahora) {
+  const x = economia(datos).usuarios[uid];
+  if (!x || !Number.isFinite(x.gratis)) return 0;
+  const t = x.gratis + SEIS_HORAS;
+  return t > ahora ? t : 0;
 }
 
 /* Todos los que aparecen en alguna de las cuatro lecturas, con lo que

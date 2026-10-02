@@ -3546,7 +3546,7 @@ logros, the balance is derived from the same four reads the profile uses
   with the right streak and sum. Deleting the node only loses coins.
 
 Coins are spent in PRODROP (below), and that spending **is** stored:
-`monedasDe` returns `total` (earned), `gastadas` and `saldo`. The header
+`monedasDe` returns `total` (earned from games), `gastadas`, `cobradas` (market sales) and `saldo`. The header
 chip shows `saldo`; the top orders by `total`, so buying packs never drops
 anyone a place. The `diario` node needs the rules re-published.
 `test-rules.mjs` covers it: no invented streak, no tomorrow, no twice a day,
@@ -3586,32 +3586,63 @@ other file of the site. Things that hold it together:
   grading `cartas/g/<uid>/<key>/<i>` = `{at: now, p: 100}`, only for a pack
   that exists. Both write-once, never deleted: they are the spending. The
   test pins the rule's timestamp to the motor's.
-- **The balance can never go negative, and a purchase without funds is
-  worth nothing.** The rules cannot add up what was earned, so they cannot
-  refuse an unfunded write from a modified client. So the page does not
-  trust the writes: `libroCartas` (monedas.js) walks the purchases in time
-  order (a pack before its own grading at the same instant) and accepts
-  them only while the earnings cover them, **stopping at the first one that
-  does not fit**; stopping (instead of skipping it) is what makes the
-  accepted set only grow as earnings grow, never lose a pack it had. A
-  purchase past that point is not spending and its pack does not exist:
-  not in the collection the frame receives, not on profiles, not in the
-  drops. It becomes valid the day the earnings reach it. A price that is
-  not the store's (50/80 a pack, 100 a grading) also stops the walk.
-  `saldo = total − accepted spending` is therefore ≥ 0 by construction.
-  On top of that, the frame disables the buttons and the postman re-checks
-  against the complete read (`watchLogros` sets `completo` once all five
-  nodes arrived) before every charge, so an honest client never writes an
-  unfunded purchase; two tabs buying at once with money for one is the only
-  way, and the postman then says that pack is on hold.
-- **The collection is the ledger**, not localStorage: the frame rebuilds it
-  with `M.coleccion(uid, s, g)`. A copy is `<key>.<i>`. The pack being
-  opened stays out of it (`abriendo`) until the summary, so the collection
-  count does not spoil it; a pack bought and not opened (tab closed) is
-  remembered in `localStorage` (`prodrop.pendiente.<uid>`) and resumed for
-  free.
-- **Exhibited cards** are `users/<uid>/perfil/cartas` (up to four keys,
-  validated by regex in the rules), toggled from the card's zoom. The
+- **Everything that moves coins or cards is one replay: `economia(datos)`**
+  (monedas.js, memoised per `datos` object). It walks, in server-time
+  order (ties: pack, grading, listing, withdrawal, sale, trade), packs
+  (`cartas/s`), gradings (`cartas/g`), market listings and sales
+  (`mercado/o`) and accepted trades (`mercado/t`), and produces who owns
+  every copy (`dueno`), which copies are graded or listed, which packs are
+  valid, and per account `gastadas`, `cobradas` and `parada`. A copy is
+  named `<origin uid>~<pack key>.<i>`: the pack (so the card, its hidden
+  grade and wear) belongs to whoever bought it, the copy can change hands.
+  `monedasDe` = earned from games (`ganadoDe`) + `cobradas` − `gastadas`.
+- **The balance can never go negative, and nothing is bought without
+  money.** The rules cannot add up what was earned, so they cannot refuse
+  an unfunded write from a modified client; the replay does not trust the
+  writes instead. A spend (pack, grading, market purchase) counts only if
+  the account is not stopped and the balance covers it; the first one that
+  does not fit is void (what it bought does not exist) and **stops** the
+  account from there on: none of its later actions count until its
+  earnings cover the gap. Stopping, rather than skipping, is what keeps
+  the accepted set growing monotonically as earnings grow. A void sale
+  leaves the card with the seller and closes the listing (`impaga`). On top
+  of that the frame disables the buttons and the postman re-checks every
+  action against the complete read (`watchLogros` sets `completo` once all
+  six nodes arrived), one at a time, so an honest client never writes an
+  unfunded spend. Honest screens never offer listings or trades with a
+  stopped account, which is what keeps a stopped account's later
+  un-stopping from rewriting anyone else's history.
+- **A free pack every 6 hours** (`p: 0`): written together with
+  `cartas/gratis/<uid>` = `{at, k}` in one multi-path update; the rule on
+  `gratis` demands 6 h since the previous one and that the pack it names is
+  this `p: 0` pack, and the rule on the pack demands that `gratis` names it.
+  The replay re-checks the spacing (`proximoGratis`).
+- **The market** (`mercado/o/<id>` = `{u, c, p, at}`, price 1–100 000 set by
+  the seller). `x` (withdrawn, by the seller) and `v` (`{u, at}`, bought,
+  by anyone else) are each write-once and exclude each other in the rules,
+  so a listing has at most one buyer. The replay accepts a listing only if
+  the seller owns the copy and it is not already listed; a listed card
+  cannot be graded or traded. The frame's market (🏪 Mercado) has three
+  tabs: *Comprar* (filters: rarity, graded / ungraded, minimum grade only
+  when graded, sort by price or newest, search by name), *Mis ventas* (my
+  listings and purchases) and *Intercambios*.
+- **Trades** (`mercado/t/<id>` = `{de, para, dar[1–3], pedir[0–3], at}`):
+  `ok` (only `para`) and `x` (either) are write-once and exclusive, and the
+  rules forbid creating one already accepted. The swap happens at `ok` if
+  both still own their cards, none is listed and neither is stopped.
+- **Grading** is `cartas/g/<grader>/<pack key>/<i>` with `o` (the origin)
+  when the pack is someone else's: whoever owns the copy grades it, and
+  the grade travels with it. There is no "grade the whole pack" button on
+  purpose: it made people spend 500 coins by accident.
+- **The collection comes from the replay**, not localStorage: the postman
+  sends `mias` (copies owned now, including bought or received ones), the
+  active listings, my sales and trades, and the cards of everyone else for
+  the trade composer. The pack being opened stays out of the collection
+  (`abriendo`) until the summary; a pack bought and not opened is
+  remembered in `localStorage` (`prodrop.pendiente.<uid>`) and resumed.
+- **Exhibited cards** are `users/<uid>/perfil/cartas` (up to four copy keys
+  `o~k.i`, or the old `k.i` meaning one's own pack; validated by regex in
+  the rules), shown only while that account still owns the copy, toggled from the card's zoom. The
   profile editor does not know them, so `editaPerfil` carries them over or
   saving the profile would erase them. They show on the profile page and
   the mini card through `exhibidasDe`, which only resolves keys that are
@@ -3621,7 +3652,7 @@ other file of the site. Things that hold it together:
   of valid packs only, in the order they came out (newest first), with who
   pulled them and when.
 
-The `cartas` node and `perfil/cartas` need the rules re-published.
+The `cartas` and `mercado` nodes and `perfil/cartas` need the rules re-published.
 
 **A new room is announced on Discord** (`juegos/discord.js`), with no bot
 and no server: a Discord *webhook* that the host's own browser POSTs to

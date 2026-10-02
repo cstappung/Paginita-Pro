@@ -130,20 +130,26 @@ function offCenter(c) {
 }
 
 /* ---------------- CUENTA Y COLECCIÓN ----------------
-   La colección no vive en este navegador: es la lista de sobres comprados
-   (`cartas/s/<uid>`) y de cartas graduadas (`cartas/g/<uid>`), que llega
-   desde Juegos. Cada copia sale de rehacer su sobre con el motor. Una
-   copia se identifica por `key` = `<clave del sobre>.<posición>`. */
-const cuenta = { uid: '', saldo: 0, s: {}, g: {}, exh: [], espera: { n: 0, falta: 0 }, listo: false, desfase: 0 };
+   La colección no vive en este navegador: llega desde Juegos, ya resuelta
+   por la economía (sobres válidos, más lo comprado en el mercado o
+   recibido en un intercambio, menos lo vendido o cambiado). Cada copia se
+   rehace con el motor desde su sobre: `key` = `<origen>~<sobre>.<i>`. */
+const cuenta = { uid: '', saldo: 0, parada: false, falta: 0, mias: [], sobres: {}, gratis: 0, ofertas: [], ventas: [], cambios: [],
+  jugadores: {}, gente: {}, exh: [], listo: false, desfase: 0 };
 let col = {}, copies = {}, abriendo = '';   // el sobre en curso no entra a la colección hasta el resumen
 const ahora = () => Date.now() + cuenta.desfase;
+// una copia que llega de Juegos ({c, o, k, i, at, gr}) con su nota y su desgaste
+function copiaDe(x) {
+  const so = M.sobre(x.o, x.k, x.at), c = so.cartas[x.i];
+  return { id: c.id, g: c.g, s: c.w, gr: x.gr ? 1 : 0, o: x.o, k: x.k, i: x.i, at: x.at, key: x.c || `${x.o}~${x.k}.${x.i}`, venta: x.venta || '', dios: so.dios };
+}
 function rehazColeccion() {
   col = {}; copies = {};
-  for (const x of M.coleccion(cuenta.uid, cuenta.s, cuenta.g)) {
-    if (x.k === abriendo) continue;
-    const uid = M.CARDS[x.id].uid;
+  for (const x of cuenta.mias) {
+    if (x.o === cuenta.uid && x.k === abriendo) continue;
+    const cp = copiaDe(x), uid = M.CARDS[cp.id].uid;
     col[uid] = (col[uid] || 0) + 1;
-    (copies[uid] = copies[uid] || []).push({ g: x.g, s: x.w, gr: x.gr ? 1 : 0, k: x.k, i: x.i, key: x.k + '.' + x.i });
+    (copies[uid] = copies[uid] || []).push(cp);
   }
 }
 const ownedCount = () => CARDS.filter(c => col[c.uid]).length;
@@ -624,7 +630,7 @@ function cardsOf(k, at) {
   const antes = new Set(Object.keys(col));
   const vistas = new Set();
   return so.cartas.map((x, i) => {
-    const base = CARDS[x.id], cp = { g: x.g, s: x.w, gr: 0, k, i, key: k + '.' + i };
+    const base = CARDS[x.id], cp = { id: x.id, g: x.g, s: x.w, gr: 0, o: cuenta.uid, k, i, at, key: `${cuenta.uid}~${k}.${i}`, venta: '' };
     const nueva = !antes.has(base.uid) && !vistas.has(base.uid);
     vistas.add(base.uid);
     return { ...base, grade: x.g, wseed: x.w, graded: false, _copy: cp, _new: nueva };
@@ -952,7 +958,7 @@ stack.addEventListener('pointerup', endDrag);
 stack.addEventListener('pointercancel', () => { if (drag) { drag.el.style.transition = ''; drag.el.style.transform = 'none'; drag = null; } });
 
 addEventListener('keydown', e => {
-  if (!$('#zoom').hidden || !$('#collection').hidden) { if (e.key === 'Escape') closeOverlays(); return; }
+  if (['zoom', 'collection', 'market', 'trade'].some(id => !$('#' + id).hidden)) { if (e.key === 'Escape') closeOverlays(); return; }
   if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowRight') {
     if (phase === 'pack' && e.target.tagName !== 'BUTTON') { e.preventDefault(); autoTear(); }
     else if (phase === 'reveal') { e.preventDefault(); act(); }
@@ -967,13 +973,6 @@ function sumCard(c) {
   el.addEventListener('click', () => openZoom(c));
   hoverTilt(el);
   return el;
-}
-function updateGradeAll() {
-  const n = pull.filter(c => !c.graded && c._copy).length, b = $('#gradeAllBtn'), cuesta = n * M.PRECIO.gradua;
-  b.hidden = !n;
-  b.innerHTML = `${n === 1 ? 'Graduar la carta' : `Graduar ${n} cartas`} 🔍 <span class="precio">${MONEDA}${fmt(cuesta)}</span>`;
-  b.disabled = cuenta.saldo < M.PRECIO.gradua;
-  b.title = cuenta.saldo < cuesta ? `Te alcanza para ${Math.floor(cuenta.saldo / M.PRECIO.gradua)}: se gradúan en orden hasta que se acaben las monedas` : '';
 }
 function showSummary() {
   setPhase('summary');
@@ -991,20 +990,19 @@ function showSummary() {
     el.animate([{ transform: 'translateY(70px) scale(.8) rotate(-4deg)', opacity: 0 }, { transform: 'none', opacity: 1 }],
       { duration: 650, delay: i * 90, easing: 'cubic-bezier(.2,1.25,.4,1)', fill: 'backwards' });
   });
-  updateGradeAll();
 }
 // tras graduar en el zoom, la carta del resumen pasa a su caja
 function refreshCard(c) {
   if (phase !== 'summary') return;
   const old = [...$('#sumCards').children].find(e => e.card === c);
   if (old) old.replaceWith(sumCard(c));
-  updateGradeAll();
 }
 $('#skipBtn').onclick = () => { if (phase === 'reveal' && !busy) showSummary(); };
 $('#againBtn').onclick = () => comprar(true);
+$('#againFreeBtn').onclick = () => comprar(true, true);
+$('#freeBtn').onclick = () => comprar(false, true);
 $('#autoBtn').onclick = () => autoTear();
 $('#buyBtn').onclick = () => comprar(false);
-$('#gradeAllBtn').onclick = () => gradeAll();
 
 /* ---------------- ZOOM ---------------- */
 let prevTilt = null, zoomC = null, grading = false, gradeSpeed = 1;
@@ -1020,14 +1018,23 @@ function openZoom(c) {
   setTilt(el.querySelector('.tilt'), el, 1.1);
   Snd.flip();
 }
+const nombreDe = u => (cuenta.gente[u] && cuenta.gente[u].n) || 'Alguien';
+const ofertaDe = id => cuenta.ofertas.find(o => o.id === id);
+// la más barata a la venta de esta misma carta (de otros), para orientar el precio
+const masBarata = (uid, sinId) => cuenta.ofertas.filter(o => o.id !== sinId && M.CARDS[M.sobre(o.o, o.k, o.at).cartas[o.i].id].uid === uid)
+  .reduce((m, o) => (!m || o.p < m.p ? o : m), null);
 function zoomUI(recien) {
-  const c = zoomC, t = TIERS[c.tier];
+  const c = zoomC, t = TIERS[c.tier], of = c._oferta, mio = !!c._copy && !c._ajena;
+  const venta = mio && c._copy.venta ? ofertaDe(c._copy.venta) : null;
   $('#zoomInfo').innerHTML = `<b>${c.name}</b> · ${subtitle(c)} · ${t.label} ${t.sym} · N.º ${pad(c.num)}/${TOTAL}` +
-    (c.graded ? `<br><b class="zi-grade" style="--gc:${gradeColor(c.grade)}">Nota ${c.grade} · ${GRADE_WORD[c.grade]}</b>` : c.grade ? '<br>Sin graduar · su estado es un misterio' : '');
+    (c.graded ? `<br><b class="zi-grade" style="--gc:${gradeColor(c.grade)}">Nota ${c.grade} · ${GRADE_WORD[c.grade]}</b>` : c.grade ? '<br>Sin graduar · su estado es un misterio' : '') +
+    (of ? `<br><span class="zi-venta">Vende <b>${esc(of.u === cuenta.uid ? 'tú' : nombreDe(of.u))}</b> · ${MONEDA}<b>${fmt(of.p)}</b></span>` : '') +
+    (venta ? `<br><span class="zi-venta">En el mercado por ${MONEDA}<b>${fmt(venta.p)}</b></span>` : '') +
+    (c._ajena ? `<br><span class="zi-venta">De <b>${esc(nombreDe(c._ajena))}</b></span>` : '');
   const gb = $('#gradeBtn');
-  gb.hidden = !c.grade || c.graded || !c._copy;
+  gb.hidden = !mio || !c.grade || c.graded || !!venta;
   gb.innerHTML = `Enviar a graduar 🔍 <span class="precio">${MONEDA}${M.PRECIO.gradua}</span>`;
-  gb.disabled = cuenta.saldo < M.PRECIO.gradua;
+  gb.disabled = cuenta.parada || cuenta.saldo < M.PRECIO.gradua;
   gb.title = gb.disabled ? `Te faltan ${M.PRECIO.gradua - cuenta.saldo} monedas` : '';
   $('#gradeSteps').hidden = true;
   // la probabilidad de algo así de bueno: se dice al graduar y queda a la vista
@@ -1037,39 +1044,133 @@ function zoomUI(recien) {
     go.innerHTML = oddsHTML(c);
     if (recien && !REDUCED) go.animate([{ opacity: 0, transform: 'translateY(14px) scale(.96)' }, { opacity: 1, transform: 'none' }], { duration: 650, delay: 150, easing: 'cubic-bezier(.2,1.3,.4,1)', fill: 'backwards' });
   }
+  const enSobre = mio && !!abriendo && c._copy.k === abriendo && c._copy.o === cuenta.uid && phase !== 'summary';
   // exhibir en el perfil (hasta MAX_EXH cartas)
-  const sb = $('#showBtn'), key = c._copy && c._copy.key, puesta = !!key && cuenta.exh.includes(key);
-  sb.hidden = !key || !!abriendo && c._copy.k === abriendo && phase !== 'summary';
+  const sb = $('#showBtn'), key = mio && c._copy.key, puesta = !!key && cuenta.exh.includes(key);
+  sb.hidden = !key || enSobre;
   sb.classList.toggle('on', puesta);
-  sb.innerHTML = puesta ? '★ En tu perfil' : '☆ Exhibir en mi perfil';
+  sb.innerHTML = puesta ? '★ En tu perfil' : '☆ Exhibir';
   sb.title = puesta ? 'Quitarla de tu perfil' : cuenta.exh.length >= MAX_EXH ? `Ya exhibes ${MAX_EXH}: quita una primero` : 'La verán todos en tu perfil de Juegos';
   sb.disabled = !puesta && cuenta.exh.length >= MAX_EXH;
+  // vender / retirar lo propio
+  const vb = $('#sellBtn');
+  vb.hidden = !mio || enSobre;
+  vb.innerHTML = venta ? 'Retirar del mercado' : '💰 Vender';
+  vb.classList.toggle('on', !!venta);
+  vb.disabled = !venta && cuenta.parada;
+  $('#sellBox').hidden = true;
+  // comprar (o retirar) desde el mercado
+  const bb = $('#buyCardBtn');
+  bb.hidden = !of;
+  if (of) {
+    const propia = of.u === cuenta.uid, falta = of.p - cuenta.saldo;
+    bb.innerHTML = propia ? 'Retirar del mercado' : `Comprar <span class="precio">${MONEDA}${fmt(of.p)}</span>`;
+    bb.disabled = !propia && (falta > 0 || cuenta.parada);
+    bb.title = !propia && falta > 0 ? `Te faltan ${fmt(falta)} monedas` : '';
+    bb.classList.toggle('primary', !propia);
+  }
   // otras copias de la misma carta
   const list = copies[c.uid] || [], base = CARDS.find(x => x.uid === c.uid), cp = $('#copies');
-  cp.innerHTML = list.length > 1 && c._copy ? `<span>Tus copias:</span>` + list.map((x, i) =>
-    `<button data-i="${i}" class="${mismaCopia(x, c._copy) ? 'on' : ''}"${x.gr ? ` style="--gc:${gradeColor(x.g)}"` : ''}>${x.gr ? `<b>${x.g}</b>` : 'Sin graduar'}</button>`).join('') : '';
+  cp.innerHTML = list.length > 1 && mio ? `<span>Tus copias:</span>` + list.map((x, i) =>
+    `<button data-i="${i}" class="${mismaCopia(x, c._copy) ? 'on' : ''}"${x.gr ? ` style="--gc:${gradeColor(x.g)}"` : ''}>${x.gr ? `<b>${x.g}</b>` : 'Sin graduar'}${x.venta ? ' 💰' : ''}</button>`).join('') : '';
   cp.querySelectorAll('button').forEach(b => b.onclick = () => {
     const x = list[+b.dataset.i]; if (grading || mismaCopia(x, c._copy)) return;
     const pc = pull.find(p => mismaCopia(p._copy, x));
     openZoom(pc || fromCopy(base, x));
   });
 }
+// llegaron datos nuevos con el zoom abierto: la carta pudo venderse, graduarse o cambiar de dueño
+function refrescaZoom() {
+  const c = zoomC;
+  if (c._oferta) {
+    const o = ofertaDe(c._oferta.id);
+    if (o) c._oferta = o;
+    else {
+      // ya no está a la venta: si es porque la compré yo, pasa a ser mía
+      const x = (copies[c.uid] || []).find(y => y.key === c._oferta.c);
+      if (!x) { cierraZoom(); toast('Esa carta ya no está a la venta.'); return; }
+      c._copy = x; c._oferta = null;
+    }
+  } else if (c._copy && !c._ajena) {
+    const x = (copies[c.uid] || []).find(y => mismaCopia(y, c._copy));
+    if (x) { c._copy = x; c.graded = !!x.gr; }
+    else if (!(abriendo && c._copy.k === abriendo)) { cierraZoom(); toast('Esa carta ya no está en tu colección.'); return; }
+  }
+  zoomUI();
+}
+let zoomVuelve = '';   // 'col' o 'mk': a dónde vuelve el zoom al cerrarse
+function cierraZoom() {
+  $('#zoom').hidden = true; setTilt(null, null);
+  if (zoomVuelve === 'col') { renderCollection(); $('#collection').hidden = false; $('#colGrid').scrollTop = colScroll; }
+  else if (zoomVuelve === 'mk') { renderMercado(); $('#market').hidden = false; $('#mkGrid').scrollTop = mkScroll; }
+  else if (prevTilt) { setTilt(...prevTilt); prevTilt = null; }
+  zoomVuelve = '';
+}
 function closeOverlays() {
   if (grading) return;
-  // el zoom abierto desde la colección vuelve a la colección (y a la vista de copias si venías de ahí)
-  if (colReturn && !$('#zoom').hidden) {
-    colReturn = false; $('#zoom').hidden = true; setTilt(null, null);
-    renderCollection(); $('#collection').hidden = false; $('#colGrid').scrollTop = colScroll;
-    return;
-  }
-  colReturn = false;
-  $('#zoom').hidden = true; $('#collection').hidden = true;
+  if (!$('#trade').hidden) { $('#trade').hidden = true; $('#market').hidden = false; return; }
+  if (!$('#zoom').hidden && zoomVuelve) { cierraZoom(); return; }
+  zoomVuelve = '';
+  $('#zoom').hidden = true; $('#collection').hidden = true; $('#market').hidden = true;
   if (prevTilt) { setTilt(...prevTilt); prevTilt = null; }
 }
 document.querySelectorAll('[data-close]').forEach(b => b.onclick = closeOverlays);
-$('#zoom').addEventListener('click', e => { if (e.target.id === 'zoom') closeOverlays(); });
-$('#collection').addEventListener('click', e => { if (e.target.id === 'collection') closeOverlays(); });
+for (const id of ['zoom', 'collection', 'market', 'trade']) $('#' + id).addEventListener('click', e => { if (e.target.id === id) closeOverlays(); });
 $('#gradeBtn').onclick = () => gradeCard();
+
+/* ---------------- VENDER ----------------
+   El precio lo pone quien vende. Se le muestra la más barata de la misma
+   carta en venta, como referencia; nada más. */
+$('#sellBtn').onclick = async () => {
+  const c = zoomC; if (!c || !c._copy || grading) return;
+  if (c._copy.venta) {
+    $('#sellBtn').disabled = true;
+    try { await Red.pide('retirar', { id: c._copy.venta }); Snd.flip(); toast('Retirada del mercado.'); }
+    catch (e) { avisoZoom(esc(e.message)); }
+    $('#sellBtn').disabled = false; return;
+  }
+  const box = $('#sellBox'), ref = masBarata(c.uid);
+  box.innerHTML = `<label>Precio de venta<span class="sell-campo">${MONEDA}<input id="sellPrecio" type="number" inputmode="numeric" min="1" max="100000" step="1" value="${ref ? ref.p : c.tier === 3 ? 1500 : c.tier === 2 ? 300 : c.tier === 1 ? 60 : 15}"></span></label>
+    <p class="sell-ref">${ref ? `La más barata a la venta: ${MONEDA}<b>${fmt(ref.p)}</b>${ref.gr ? ` (graduada, nota ${M.sobre(ref.o, ref.k, ref.at).cartas[ref.i].g})` : ''}` : 'Nadie más la vende ahora: tú pones el precio.'}${c.graded ? ' · La tuya va graduada.' : ''}</p>
+    <div class="sell-btns"><button class="btn primary" id="sellOk">Publicar</button><button class="btn" id="sellNo">Cancelar</button></div>`;
+  box.hidden = false;
+  const inp = $('#sellPrecio'); inp.focus(); inp.select();
+  $('#sellNo').onclick = () => { box.hidden = true; };
+  const publica = async () => {
+    const p = Math.round(+inp.value);
+    if (!(p >= 1 && p <= 100000)) { inp.animate([{ transform: 'translateX(-5px)' }, { transform: 'translateX(5px)' }, { transform: 'none' }], { duration: 250 }); return; }
+    $('#sellOk').disabled = true;
+    try { await Red.pide('vender', { c: c._copy.key, p }); Snd.coin(); box.hidden = true; toast(`Publicada por ${fmt(p)} monedas.`); }
+    catch (e) { $('#sellOk').disabled = false; box.querySelector('.sell-ref').innerHTML = `<span class="err">${esc(e.message)}</span>`; }
+  };
+  $('#sellOk').onclick = publica;
+  inp.onkeydown = e => { if (e.key === 'Enter') publica(); e.stopPropagation(); };
+};
+$('#buyCardBtn').onclick = async () => {
+  const c = zoomC, of = c && c._oferta; if (!of) return;
+  const b = $('#buyCardBtn'); b.disabled = true;
+  try {
+    if (of.u === cuenta.uid) { await Red.pide('retirar', { id: of.id }); toast('Retirada del mercado.'); cierraZoom(); return; }
+    await Red.pide('comprarCarta', { id: of.id });
+    Snd.coin(); Snd.reveal(Math.min(c.tier, 2));
+    const [x, y] = centerOf($('#zoomCard'));
+    burst(x, y, { n: 60, colors: [accentOf(c), '#ffcc3d', '#fff'], speed: 11, kinds: ['spark', 'star', 'confetti'], gravity: .15 });
+    toast(`¡Es tuya! Pagaste ${fmt(of.p)} monedas.`);
+    // pasa a ser una copia propia (si los datos nuevos no llegaron antes)
+    if (c._oferta) {
+      c._copy = (copies[c.uid] || []).find(y => y.key === of.c) || { id: c.n, g: c.grade, s: c.wseed, gr: c.graded ? 1 : 0, o: of.o, k: of.k, i: of.i, at: of.at, key: of.c, venta: '' };
+      c._oferta = null;
+    }
+    zoomUI();
+  } catch (e) { b.disabled = false; avisoZoom(esc(e.message)); }
+};
+
+/* Un aviso que aparece y se va. */
+function toast(t, err) {
+  const el = document.createElement('div');
+  el.className = 'toast' + (err ? ' err' : ''); el.textContent = t; document.body.appendChild(el);
+  setTimeout(() => { el.classList.add('sale'); setTimeout(() => el.remove(), 400); }, 3200);
+}
 
 /* ---------------- GRADUACIÓN ----------------
    inspección (escáner + lupa por superficie, esquinas, bordes y centrado) →
@@ -1081,9 +1182,9 @@ async function gradeCard() {
   if (cuenta.saldo < M.PRECIO.gradua) { avisoZoom(`Graduar cuesta ${M.PRECIO.gradua} ${MONEDA}: te faltan ${M.PRECIO.gradua - cuenta.saldo}.`); return false; }
   grading = true; Snd.init();
   const z = $('#zoom'), box = $('#zoomCard'), el = box.querySelector('.card'), tl = el.querySelector('.tilt'), sp = REDUCED ? .3 : gradeSpeed;
-  z.classList.add('grading'); $('#gradeBtn').hidden = true; $('#showBtn').hidden = true; $('#gradeOdds').hidden = true; $('#copies').innerHTML = '';
+  z.classList.add('grading'); $('#gradeBtn').hidden = true; $('#showBtn').hidden = true; $('#sellBtn').hidden = true; $('#sellBox').hidden = true; $('#gradeOdds').hidden = true; $('#copies').innerHTML = '';
   $('#zoomInfo').textContent = 'Pagando la graduación…';
-  try { await Red.pide('graduar', { k: c._copy.k, i: c._copy.i }); }
+  try { await Red.pide('graduar', { c: c._copy.key }); }
   catch (e) { grading = false; z.classList.remove('grading'); zoomUI(); avisoZoom(e.message || 'No se pudo pagar la graduación.'); return false; }
   Snd.coin();
   setTilt(null, null);
@@ -1203,24 +1304,8 @@ async function gradeCard() {
   refreshCard(c);
   return true;
 }
-// graduar todo el sobre, una carta tras otra
-async function gradeAll() {
-  const list = pull.filter(c => !c.graded);
-  gradeSpeed = .7;
-  for (const c of list) {
-    openZoom(c);
-    await sleep(600);
-    if ($('#zoom').hidden || zoomC !== c) break;
-    if (!await gradeCard()) { await sleep(2600); break; }
-    await sleep(2400);
-    if ($('#zoom').hidden) break;
-  }
-  gradeSpeed = 1;
-  closeOverlays();
-}
-
 /* ---------------- COLECCIÓN ---------------- */
-let colFilter = -1, colView = null, colReturn = false;
+let colFilter = -1, colView = null;
 // toca una carta: si tienes varias copias primero las ves todas; con una sola va directo al zoom
 const instOf = (c, cp) => pull.find(p => mismaCopia(p._copy, cp)) || fromCopy(c, cp);
 function colOpen(c) {
@@ -1230,7 +1315,7 @@ function colOpen(c) {
 }
 function zoomFromCol(inst) {
   colScroll = $('#colGrid').scrollTop;
-  $('#collection').hidden = true; colReturn = true; openZoom(inst);
+  $('#collection').hidden = true; zoomVuelve = 'col'; openZoom(inst);
 }
 let colScroll = 0;
 function renderCopies() {
@@ -1242,7 +1327,7 @@ function renderCopies() {
   const grid = $('#colGrid'); grid.innerHTML = ''; grid.classList.add('copies-view');
   list.forEach((cp, i) => {
     const inst = instOf(c, cp), el = makeCard(inst, { back: false, lazy: true });
-    el.insertAdjacentHTML('beforeend', `<span class="count cv"${cp.gr ? ` style="--gc:${gradeColor(cp.g)}"` : ''}>${cp.gr ? `Nota <b>${cp.g}</b>` : 'Sin graduar'}</span>`);
+    el.insertAdjacentHTML('beforeend', `<span class="count cv"${cp.gr ? ` style="--gc:${gradeColor(cp.g)}"` : ''}>${cp.gr ? `Nota <b>${cp.g}</b>` : 'Sin graduar'}</span>${cp.venta ? '<span class="cinta">💰 En venta</span>' : ''}`);
     el.addEventListener('click', () => zoomFromCol(inst));
     el.animate([{ transform: 'translateY(30px) scale(.9)', opacity: 0 }, { transform: 'none', opacity: 1 }],
       { duration: 420, delay: i * 50, easing: 'cubic-bezier(.2,1.2,.4,1)', fill: 'backwards' });
@@ -1269,6 +1354,7 @@ function renderCollection() {
       const el = makeCard(inst, { back: false, lazy: true });
       const n = (copies[c.uid] || []).length || col[c.uid];
       if (n > 1) el.insertAdjacentHTML('beforeend', `<span class="count">×${n}</span>`);
+      if ((copies[c.uid] || []).some(x => x.venta)) el.insertAdjacentHTML('beforeend', '<span class="cinta">💰 En venta</span>');
       el.addEventListener('click', () => colOpen(c));
       grid.appendChild(el);
     } else {
@@ -1279,7 +1365,7 @@ function renderCollection() {
 function openCollection() {
   prevTilt = prevTilt || [tilt.target, tilt.box, tilt.amp];
   setTilt(null, null);
-  colView = null; colReturn = false;
+  colView = null; zoomVuelve = '';
   renderCollection();
   $('#collection').hidden = false;
 }
@@ -1320,61 +1406,79 @@ addEventListener('message', e => {
 });
 function alDatos(d) {
   const primera = !cuenta.listo;
-  Object.assign(cuenta, { uid: d.uid, saldo: Math.max(0, d.saldo), s: d.s || {}, g: d.g || {}, exh: d.exh || [],
-    espera: d.espera || { n: 0, falta: 0 }, desfase: d.desfase || 0, listo: true });
-  rehazColeccion(); updateColCount();
+  Object.assign(cuenta, { uid: d.uid, saldo: Math.max(0, d.saldo), parada: !!d.parada, falta: d.falta || 0,
+    mias: d.mias || [], sobres: d.sobres || {}, gratis: d.gratis || 0, ofertas: d.ofertas || [], ventas: d.ventas || [],
+    cambios: d.cambios || [], jugadores: d.jugadores || {}, gente: d.gente || {}, exh: d.exh || [], desfase: d.desfase || 0, listo: true });
+  rehazColeccion(); updateColCount(); pintaAvisos();
   if (primera) {
     $('#cargando').hidden = true;
     let k = ''; try { k = localStorage.getItem(PENDIENTE()) || ''; } catch {}
     // un sobre comprado y sin abrir (se cerró la pestaña): se sigue con ese, sin cobrar otra vez
-    if (k && cuenta.s[k]) newPack(k, cuenta.s[k].at);
+    if (k && cuenta.sobres[k]) newPack(k, cuenta.sobres[k]);
     else tienda();
     return;
   }
   pintaCompra();
-  if (!$('#zoom').hidden && zoomC && !grading) zoomUI();
+  pintaAvisos();
+  if (!$('#zoom').hidden && zoomC && !grading) refrescaZoom();
   if (!$('#collection').hidden) renderCollection();
+  if (!$('#market').hidden) renderMercado();
 }
 
-/* ---------------- COMPRA ---------------- */
+/* ---------------- COMPRA ----------------
+   Un sobre gratis cada 6 horas (desde el último gratis que sacaste) y los
+   demás a precio. Ninguno se compra si no alcanza: el botón se apaga, y
+   Juegos lo vuelve a comprobar antes de cobrar. */
 const precio = () => M.precioSobre(ahora());
+const gratisListo = () => cuenta.listo && !cuenta.gratis && !cuenta.parada;
+function cuentaAtras(t) {
+  const m = Math.max(1, Math.ceil((t - ahora()) / 60000)), h = Math.floor(m / 60);
+  return h ? `${h} h ${String(m % 60).padStart(2, '0')} min` : `${m} min`;
+}
 function pintaCompra() {
-  const p = precio(), falta = p - cuenta.saldo, promo = p < M.PRECIO.normal;
+  const p = precio(), falta = p - cuenta.saldo, promo = p < M.PRECIO.normal, gl = gratisListo();
   $('#saldo').innerHTML = `${MONEDA}<b>${cuenta.listo ? fmt(cuenta.saldo) : '…'}</b>`;
+  const f = $('#freeBtn');
+  f.innerHTML = gl ? 'Sobre gratis 🎁' : cuenta.gratis ? `🎁 Gratis en ${cuentaAtras(cuenta.gratis)}` : '🎁 Sobre gratis';
+  f.disabled = !gl || comprando;
+  f.classList.toggle('listo', gl);
   const b = $('#buyBtn');
   b.innerHTML = `Comprar sobre <span class="precio">${promo ? `<s>${M.PRECIO.normal}</s>` : ''}${MONEDA}${p}</span>`;
-  b.disabled = !cuenta.listo || falta > 0 || comprando;
+  b.disabled = !cuenta.listo || falta > 0 || comprando || cuenta.parada;
+  b.classList.toggle('primary', !gl); b.classList.toggle('sec', gl);
   const fin = new Date(M.PRECIO.promoHasta - 1).toLocaleDateString('es-CL', { day: 'numeric', month: 'long', timeZone: 'America/Santiago' });
   $('#buyInfo').innerHTML = !cuenta.listo ? 'Cargando tu cuenta…'
-    : falta > 0 ? `Te faltan <b>${fmt(falta)}</b> monedas. Gánalas jugando en <a href="#" data-volver>Juegos</a>.`
+    : cuenta.parada ? `<span class="err">Una compra tuya quedó sin fondos y no vale: hasta que ganes ${fmt(cuenta.falta)} monedas más, no puedes gastar.</span>`
+    : gl ? `Tu sobre gratis está listo. El siguiente, 6 horas después de abrirlo.`
+    : falta > 0 ? `Te faltan <b>${fmt(falta)}</b> monedas para comprar uno. Gánalas jugando en <a href="#" data-volver>Juegos</a>.`
     : promo ? `Precio de lanzamiento hasta el ${fin} (después, ${M.PRECIO.normal}). Tienes ${fmt(cuenta.saldo)}.` : `Tienes ${fmt(cuenta.saldo)} monedas.`;
-  // compras escritas sin fondos (otra pestaña a la vez, o un cliente tramposo): no valen hasta que alcance
-  if (cuenta.listo && cuenta.espera.n) $('#buyInfo').insertAdjacentHTML('beforeend', `<br><span class="err">${cuenta.espera.n === 1 ? 'Una compra quedó' : `${cuenta.espera.n} compras quedaron`} sin fondos: no vale${cuenta.espera.n === 1 ? '' : 'n'} hasta que ganes ${fmt(Math.max(0, cuenta.espera.falta - cuenta.saldo))} monedas más.</span>`);
   const a = $('#againBtn');
   a.innerHTML = `Abrir otro sobre ✳ <span class="precio">${MONEDA}${p}</span>`;
-  a.disabled = falta > 0 || comprando;
+  a.disabled = falta > 0 || comprando || cuenta.parada;
   a.title = falta > 0 ? `Te faltan ${fmt(falta)} monedas` : '';
-  const n = pull.filter(c => !c.graded && c._copy).length;
-  updateGradeAll(n);
+  const ag = $('#againFreeBtn');
+  ag.hidden = !gl; ag.disabled = comprando;
 }
+setInterval(() => { if (cuenta.listo && cuenta.gratis && ahora() >= cuenta.gratis) cuenta.gratis = 0; if (cuenta.listo) pintaCompra(); }, 20000);
 let comprando = false;
-async function comprar(drop) {
+async function comprar(drop, gratis) {
   if (comprando || !cuenta.listo) return;
   Snd.init();
-  if (cuenta.saldo < precio()) { avisaCompra(); return; }
+  if (gratis ? !gratisListo() : cuenta.parada || cuenta.saldo < precio()) { avisaCompra(); return; }
   comprando = true; pintaCompra();
-  $('#buyInfo').textContent = 'Comprando…';
+  $('#buyInfo').textContent = gratis ? 'Abriendo tu sobre gratis…' : 'Comprando…';
   try {
-    const r = await Red.pide('comprar', { p: precio() });
-    cuenta.saldo -= r.p;   // la cuenta real llega sola; esto evita ver el saldo viejo un instante
-    cuenta.s[r.k] = { at: r.at, p: r.p };
+    const r = await Red.pide(gratis ? 'gratis' : 'comprar', gratis ? {} : { p: precio() });
+    // la cuenta real llega sola; esto evita ver la vieja un instante
+    if (gratis) cuenta.gratis = r.at + 6 * 3600 * 1000; else cuenta.saldo -= r.p;
+    cuenta.sobres[r.k] = r.at;
     Snd.coin();
     comprando = false;
     newPack(r.k, r.at, drop);
   } catch (e) {
     comprando = false; pintaCompra();
     $('#buyInfo').innerHTML = `<span class="err">${esc(e.message || 'No se pudo comprar.')}</span>`;
-    if (phase === 'summary') alert(e.message || 'No se pudo comprar.');
+    if (phase === 'summary') toast(e.message || 'No se pudo comprar.', true);
   }
 }
 function avisaCompra() {
@@ -1432,6 +1536,216 @@ $('#showBtn').onclick = async () => {
   catch (e) { cuenta.exh = antes; zoomUI(); avisoZoom(e.message || 'No se pudo guardar.'); }
 };
 function avisoZoom(t) { $('#zoomInfo').insertAdjacentHTML('beforeend', `<br><span class="err">${t}</span>`); }
+
+/* ---------------- MERCADO ----------------
+   Tres pestañas: comprar (lo que otros venden, con filtros), mis ventas
+   (y mis compras) e intercambios. Todo lo que se ve llega ya validado
+   desde Juegos (la economía): una oferta que se ve está a la venta de
+   verdad, y una carta de otro que se ve es suya de verdad. */
+const mk = { tab: 'comprar', rareza: -1, grad: 'todas', nota: 0, orden: 'barato', q: '', max: 48 };
+let mkScroll = 0;
+// una carta de otro (o una oferta) como carta del abridor
+function instDe(x) {
+  const cp = copiaDe(x), base = CARDS[cp.id];
+  return { ...base, grade: cp.g, wseed: cp.s, graded: !!cp.gr, _rec: true };
+}
+function avatarHTML(u, tam = 22) {
+  const g = cuenta.gente[u] || {}, n = g.n || '?', c = /^#[0-9a-f]{6}$/i.test(g.c || '') ? g.c : '#7c5cff';
+  const f = typeof g.f === 'string' && /^(https:\/\/|data:image\/(jpeg|png|webp);base64,)[^"'<>()\s\\]+$/.test(g.f) ? g.f : '';
+  return `<span class="av" style="--av:${c};width:${tam}px;height:${tam}px">${f ? `<img src="${f}" alt="" referrerpolicy="no-referrer">` : esc(n.trim().charAt(0).toUpperCase() || '?')}</span>`;
+}
+// miniatura: la imagen con el color de su rareza y su nota, si la tiene
+function thumbHTML(x, extra = '') {
+  const cp = copiaDe(x), c = CARDS[cp.id];
+  return `<span class="mini t${c.tier}" style="--accent:${accentOf(c)}" title="${esc(c.name + ' · ' + subtitle(c) + (cp.gr ? ' · nota ' + cp.g : ''))}">
+    <img src="${c.img}" alt="" loading="lazy" draggable="false">${cp.gr ? `<b style="--gc:${gradeColor(cp.g)}">${cp.g}</b>` : ''}${extra}
+    <small>${esc(c.name.split(' ')[0])}</small></span>`;
+}
+const pendientesMios = () => cuenta.cambios.filter(t => t.estado === 'pendiente' && t.para === cuenta.uid).length;
+function pintaAvisos() {
+  const n = pendientesMios();
+  $('#mktBadge').textContent = n || '';
+  $('#mktBadge').hidden = !n;
+}
+function openMercado(tab) {
+  prevTilt = prevTilt || [tilt.target, tilt.box, tilt.amp];
+  setTilt(null, null);
+  if (tab) mk.tab = tab;
+  zoomVuelve = '';
+  $('#collection').hidden = true;
+  renderMercado();
+  $('#market').hidden = false;
+  $('#mkGrid').scrollTop = 0;
+}
+$('#mktBtn').onclick = () => openMercado();
+function filtradas() {
+  const q = mk.q.trim().toLowerCase();
+  let l = cuenta.ofertas.filter(o => o.u !== cuenta.uid).map(o => ({ o, cp: copiaDe(o) }));
+  l = l.filter(({ cp }) => {
+    const c = CARDS[cp.id];
+    if (mk.rareza >= 0 && c.tier !== mk.rareza) return false;
+    if (mk.grad === 'si' && !cp.gr) return false;
+    if (mk.grad === 'no' && cp.gr) return false;
+    if (mk.grad === 'si' && mk.nota && cp.g < mk.nota) return false;
+    if (q && !(c.name + ' ' + subtitle(c)).toLowerCase().includes(q)) return false;
+    return true;
+  });
+  const ord = { barato: (a, b) => a.o.p - b.o.p || b.o.t - a.o.t, caro: (a, b) => b.o.p - a.o.p || b.o.t - a.o.t, nuevo: (a, b) => b.o.t - a.o.t };
+  return l.sort(ord[mk.orden]);
+}
+function renderMercado() {
+  const nOf = cuenta.ofertas.filter(o => o.u !== cuenta.uid).length, n = pendientesMios();
+  $('#mkSub').innerHTML = `${nOf} ${nOf === 1 ? 'carta' : 'cartas'} a la venta · tienes ${MONEDA}<b>${fmt(cuenta.saldo)}</b>`;
+  $('#mkTabs').innerHTML = [['comprar', 'Comprar'], ['ventas', 'Mis ventas'], ['cambios', `Intercambios${n ? ` <b>${n}</b>` : ''}`]]
+    .map(([k, t]) => `<button role="tab" aria-selected="${mk.tab === k}" data-tab="${k}">${t}</button>`).join('');
+  $('#mkTabs').querySelectorAll('button').forEach(b => b.onclick = () => { mk.tab = b.dataset.tab; mk.max = 48; renderMercado(); $('#mkGrid').scrollTop = 0; });
+  const grid = $('#mkGrid'), fil = $('#mkFiltros');
+  grid.className = 'mk-grid ' + mk.tab;
+  if (mk.tab === 'comprar') return renderComprar(fil, grid);
+  if (mk.tab === 'ventas') return renderVentas(fil, grid);
+  renderCambios(fil, grid);
+}
+function renderComprar(fil, grid) {
+  const enfocado = document.activeElement && document.activeElement.id === 'mkQ';
+  fil.innerHTML = `
+    <div class="mk-fila">${[[-1, 'Todas', ''], ...TIERS.map((t, i) => [i, t.label, t.sym])].map(([i, l, sy]) =>
+      `<button class="mk-chip${i === mk.rareza ? ' on' : ''}" data-r="${i}" style="--c:${i < 0 ? '#fff' : TIERS[i].color}">${sy ? `<i>${sy}</i>` : ''}${l}</button>`).join('')}</div>
+    <div class="mk-fila">
+      <div class="mk-seg" role="group" aria-label="Graduación">${[['todas', 'Todas'], ['si', 'Graduadas'], ['no', 'Sin graduar']].map(([k, t]) =>
+        `<button data-g="${k}" aria-pressed="${mk.grad === k}">${t}</button>`).join('')}</div>
+      ${mk.grad === 'si' ? `<label class="mk-sel">Calidad<select id="mkNota"><option value="0">Cualquier nota</option>${[10, 9, 8, 7, 6, 5].map(g =>
+        `<option value="${g}"${mk.nota === g ? ' selected' : ''}>${g === 10 ? '10 · GEM MINT' : `${g} o más · ${GRADE_WORD[g]}`}</option>`).join('')}</select></label>` : ''}
+      <label class="mk-sel">Ordenar<select id="mkOrden">${[['barato', 'Precio: menor a mayor'], ['caro', 'Precio: mayor a menor'], ['nuevo', 'Más recientes']].map(([k, t]) =>
+        `<option value="${k}"${mk.orden === k ? ' selected' : ''}>${t}</option>`).join('')}</select></label>
+      <input id="mkQ" class="mk-q" type="search" placeholder="Buscar por nombre…" value="${esc(mk.q)}">
+    </div>`;
+  fil.querySelectorAll('[data-r]').forEach(b => b.onclick = () => { mk.rareza = +b.dataset.r; mk.max = 48; renderMercado(); });
+  fil.querySelectorAll('[data-g]').forEach(b => b.onclick = () => { mk.grad = b.dataset.g; if (mk.grad !== 'si') mk.nota = 0; mk.max = 48; renderMercado(); });
+  const sn = $('#mkNota'); if (sn) sn.onchange = () => { mk.nota = +sn.value; renderMercado(); };
+  $('#mkOrden').onchange = e => { mk.orden = e.target.value; renderMercado(); };
+  const qi = $('#mkQ');
+  qi.oninput = () => { mk.q = qi.value; pintaGridComprar(grid); };
+  qi.onkeydown = e => e.stopPropagation();
+  if (enfocado) { qi.focus(); qi.setSelectionRange(qi.value.length, qi.value.length); }
+  pintaGridComprar(grid);
+}
+function pintaGridComprar(grid) {
+  const l = filtradas();
+  grid.innerHTML = '';
+  if (!l.length) {
+    grid.innerHTML = `<div class="mk-vacio"><b>🃏</b><p>${cuenta.ofertas.some(o => o.u !== cuenta.uid) ? 'Nada calza con esos filtros.' : 'Todavía nadie vende cartas. Pon una de las tuyas: ábrela en tu colección y toca «💰 Vender».'}</p></div>`;
+    return;
+  }
+  l.slice(0, mk.max).forEach(({ o }, i) => {
+    const inst = instDe(o), el = makeCard(inst, { back: false, lazy: true });
+    const caro = o.p > cuenta.saldo;
+    el.insertAdjacentHTML('beforeend', `<div class="mk-tag${caro ? ' caro' : ''}"><b>${MONEDA}${fmt(o.p)}</b><span>${avatarHTML(o.u, 16)}${esc(nombreDe(o.u))}</span></div>`);
+    if (inst.graded) el.classList.add('slabbed');
+    el.addEventListener('click', () => { mkScroll = grid.scrollTop; inst._oferta = o; $('#market').hidden = true; zoomVuelve = 'mk'; openZoom(inst); });
+    if (i < 24) el.animate([{ transform: 'translateY(24px) scale(.92)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 380, delay: i * 30, easing: 'cubic-bezier(.2,1.2,.4,1)', fill: 'backwards' });
+    grid.appendChild(el);
+  });
+  if (l.length > mk.max) {
+    const b = document.createElement('button'); b.className = 'btn mk-mas'; b.textContent = `Ver ${Math.min(48, l.length - mk.max)} más`;
+    b.onclick = () => { mk.max += 48; pintaGridComprar(grid); };
+    grid.appendChild(b);
+  }
+}
+const cuando = t => { const m = Math.round((ahora() - t) / 60000); return m < 1 ? 'recién' : m < 60 ? `hace ${m} min` : m < 1440 ? `hace ${Math.round(m / 60)} h` : `hace ${Math.round(m / 1440)} d`; };
+function renderVentas(fil, grid) {
+  fil.innerHTML = `<p class="mk-nota">Pon una carta a la venta desde tu colección: ábrela y toca «💰 Vender». Mientras está a la venta no se puede graduar ni intercambiar.</p>`;
+  const l = cuenta.ventas;
+  if (!l.length) { grid.innerHTML = `<div class="mk-vacio"><b>💰</b><p>Todavía no vendes ni compras nada.</p></div>`; return; }
+  const ESTADO = { activa: ['En venta', 'act'], vendida: ['Vendida', 'ok'], retirada: ['Retirada', ''], impaga: ['No se pagó', 'mal'] };
+  grid.innerHTML = l.map(o => {
+    const compra = o.comprador === cuenta.uid && o.u !== cuenta.uid, [et, cl] = compra ? ['Comprada', 'ok'] : ESTADO[o.estado] || [o.estado, ''];
+    const quien = compra ? `a ${avatarHTML(o.u, 16)}<b>${esc(nombreDe(o.u))}</b>` : o.estado === 'vendida' ? `a ${avatarHTML(o.comprador, 16)}<b>${esc(nombreDe(o.comprador))}</b>` : '';
+    return `<div class="mk-fila-v">${thumbHTML(o)}
+      <div class="mk-v-tx"><span class="mk-est ${cl}">${et}</span><b>${esc(CARDS[copiaDe(o).id].name)}</b><small>${esc(subtitle(CARDS[copiaDe(o).id]))} ${quien ? '· ' + quien : ''}</small><small>${cuando(o.fin || o.t)}</small></div>
+      <div class="mk-v-p">${compra ? '−' : o.estado === 'vendida' ? '+' : ''}${MONEDA}${fmt(o.p)}</div>
+      ${o.estado === 'activa' && o.u === cuenta.uid ? `<button class="btn mk-mini" data-retira="${esc(o.id)}">Retirar</button>` : ''}</div>`;
+  }).join('');
+  grid.querySelectorAll('[data-retira]').forEach(b => b.onclick = async () => {
+    b.disabled = true;
+    try { await Red.pide('retirar', { id: b.dataset.retira }); toast('Retirada del mercado.'); } catch (e) { b.disabled = false; toast(e.message, true); }
+  });
+}
+function lado(xs, quien, vacio) {
+  return `<div class="tc-lado"><small>${quien}</small><div class="tc-cartas">${xs.length ? xs.map(x => thumbHTML(x)).join('') : `<span class="tc-nada">${vacio}</span>`}</div></div>`;
+}
+function renderCambios(fil, grid) {
+  const otros = Object.keys(cuenta.jugadores).length, mias = cuenta.mias.filter(x => !x.venta).length;
+  fil.innerHTML = `<div class="mk-fila"><button class="btn primary" id="tcNuevo"${!otros || !mias || cuenta.parada ? ' disabled' : ''}>⇄ Proponer un intercambio</button>
+    <p class="mk-nota">${!mias ? 'Necesitas al menos una carta que no esté a la venta.' : !otros ? 'Todavía nadie más tiene cartas para cambiar.' : 'Ofrece de 1 a 3 cartas tuyas a cambio de hasta 3 de otra persona. Se hace cuando la otra persona acepta.'}</p></div>`;
+  $('#tcNuevo').onclick = () => abreTrato();
+  const l = cuenta.cambios;
+  if (!l.length) { grid.innerHTML = `<div class="mk-vacio"><b>⇄</b><p>No tienes intercambios todavía.</p></div>`; return; }
+  const ESTADO = { pendiente: ['Pendiente', 'act'], hecho: ['Hecho', 'ok'], nulo: ['No se pudo', 'mal'], cerrado: ['Cerrado', ''] };
+  grid.innerHTML = l.map(t => {
+    const yoDoy = t.de === cuenta.uid, otro = yoDoy ? t.para : t.de, [et, cl] = ESTADO[t.estado] || [t.estado, ''];
+    const deMi = yoDoy ? t.dar : t.pedir, deEl = yoDoy ? t.pedir : t.dar;
+    let acc = '';
+    if (t.estado === 'pendiente') acc = yoDoy
+      ? `<button class="btn mk-mini" data-cierra="${esc(t.id)}">Cancelar</button>`
+      : `<button class="btn primary mk-mini" data-acepta="${esc(t.id)}"${t.posible ? '' : ' disabled title="Alguna carta cambió de dueño o está a la venta"'}>Aceptar</button><button class="btn mk-mini" data-cierra="${esc(t.id)}">Rechazar</button>`;
+    return `<div class="tc-fila ${t.estado}">
+      <header><span class="mk-est ${cl}">${et}</span>${avatarHTML(otro, 20)}<b>${esc(nombreDe(otro))}</b><small>${yoDoy ? 'le propusiste' : 'te propone'} · ${cuando(t.fin || t.at)}</small></header>
+      <div class="tc-cuerpo">${lado(deMi, 'Tú das', 'nada')}<span class="tc-flecha" aria-hidden="true">⇄</span>${lado(deEl, `${esc(nombreDe(otro))} da`, 'nada (un regalo)')}</div>
+      ${t.estado === 'pendiente' && !t.posible ? '<p class="mk-nota err">Ya no se puede: alguna carta cambió de dueño o está a la venta.</p>' : ''}
+      ${acc ? `<div class="tc-acc">${acc}</div>` : ''}</div>`;
+  }).join('');
+  grid.querySelectorAll('[data-acepta]').forEach(b => b.onclick = async () => {
+    b.disabled = true;
+    try { await Red.pide('aceptar', { id: b.dataset.acepta }); Snd.reveal(1); toast('¡Intercambio hecho!'); } catch (e) { b.disabled = false; toast(e.message, true); }
+  });
+  grid.querySelectorAll('[data-cierra]').forEach(b => b.onclick = async () => {
+    b.disabled = true;
+    try { await Red.pide('cerrar', { id: b.dataset.cierra }); toast('Cerrado.'); } catch (e) { b.disabled = false; toast(e.message, true); }
+  });
+}
+
+/* ---------------- PROPONER UN INTERCAMBIO ---------------- */
+const trato = { para: '', dar: [], pedir: [] };
+const ordenCartas = l => [...l].sort((a, b) => { const ca = copiaDe(a), cb = copiaDe(b); return CARDS[cb.id].tier - CARDS[ca.id].tier || (cb.gr ? cb.g : 0) - (ca.gr ? ca.g : 0) || CARDS[ca.id].num - CARDS[cb.id].num; });
+function abreTrato(para) {
+  Object.assign(trato, { para: para || '', dar: [], pedir: [] });
+  $('#market').hidden = true; $('#trade').hidden = false;
+  pintaTrato();
+}
+function pintaTrato() {
+  const box = $('#tradeBody');
+  if (!trato.para) {
+    const js = Object.entries(cuenta.jugadores).sort((a, b) => nombreDe(a[0]).localeCompare(nombreDe(b[0])));
+    box.innerHTML = `<h3>¿Con quién?</h3><div class="tc-gente">${js.map(([u, l]) =>
+      `<button class="tc-persona" data-u="${esc(u)}">${avatarHTML(u, 34)}<b>${esc(nombreDe(u))}</b><small>${l.length} ${l.length === 1 ? 'carta' : 'cartas'}</small></button>`).join('')}</div>`;
+    box.querySelectorAll('[data-u]').forEach(b => b.onclick = () => { trato.para = b.dataset.u; pintaTrato(); });
+    return;
+  }
+  const mias = ordenCartas(cuenta.mias.filter(x => !x.venta)), suyas = ordenCartas(cuenta.jugadores[trato.para] || []);
+  const sel = (l, x) => l.includes(x.c);
+  const rej = (l, elegidas, d) => `<div class="tc-rejilla" data-lado="${d}">${l.map(x => `<button class="tc-elige${sel(elegidas, x) ? ' on' : ''}" data-c="${esc(x.c)}">${thumbHTML(x)}</button>`).join('') || '<p class="mk-nota">Nada para elegir.</p>'}</div>`;
+  box.innerHTML = `<div class="tc-cab"><button class="btn mk-mini" id="tcOtra">‹ Otra persona</button>${avatarHTML(trato.para, 26)}<b>${esc(nombreDe(trato.para))}</b></div>
+    <div class="tc-cols">
+      <section><h3>Tú das <small>${trato.dar.length}/3</small></h3>${rej(mias, trato.dar, 'dar')}</section>
+      <section><h3>Pides <small>${trato.pedir.length}/3</small></h3>${rej(suyas, trato.pedir, 'pedir')}</section>
+    </div>
+    <div class="tc-envio"><button class="btn primary" id="tcEnviar"${trato.dar.length ? '' : ' disabled'}>Enviar propuesta</button>
+      <span class="mk-nota">${trato.dar.length ? (trato.pedir.length ? '' : 'Sin pedir nada, es un regalo.') : 'Elige al menos una carta tuya.'}</span></div>`;
+  $('#tcOtra').onclick = () => { trato.para = ''; trato.dar = []; trato.pedir = []; pintaTrato(); };
+  box.querySelectorAll('.tc-rejilla').forEach(r => r.querySelectorAll('[data-c]').forEach(b => b.onclick = () => {
+    const l = trato[r.dataset.lado], c = b.dataset.c, i = l.indexOf(c);
+    if (i >= 0) l.splice(i, 1); else if (l.length < 3) l.push(c); else { b.animate([{ transform: 'translateX(-4px)' }, { transform: 'translateX(4px)' }, { transform: 'none' }], { duration: 220 }); return; }
+    Snd.blip(); const top = r.scrollTop; pintaTrato(); const r2 = box.querySelector(`.tc-rejilla[data-lado="${r.dataset.lado}"]`); if (r2) r2.scrollTop = top;
+  }));
+  $('#tcEnviar').onclick = async () => {
+    const b = $('#tcEnviar'); b.disabled = true;
+    try {
+      await Red.pide('proponer', { para: trato.para, dar: trato.dar, pedir: trato.pedir });
+      Snd.coin(); toast(`Propuesta enviada a ${nombreDe(trato.para)}.`);
+      $('#trade').hidden = true; mk.tab = 'cambios'; renderMercado(); $('#market').hidden = false;
+    } catch (e) { b.disabled = false; toast(e.message, true); }
+  };
+}
 
 /* ---------------- INICIO ----------------
    Se espera a la cuenta: sin ella no se sabe el saldo ni qué cartas tienes. */
