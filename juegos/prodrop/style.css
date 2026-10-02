@@ -606,7 +606,10 @@ body[data-phase="opening"] .controls, body[data-phase="opening"] .hint, body.has
   position: absolute; top: 14px; right: 14px; width: 40px; height: 40px; border-radius: 50%;
   border: 1px solid #ffffff2a; background: #ffffff14; font-size: 16px;
 }
-.zoom { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 16px; }
+.zoom { display: flex; flex-direction: column; align-items: center; justify-content: safe center; gap: 14px; padding: 16px; overflow-y: auto; }
+/* con la caja de precio abierta el zoom no cabe en un teléfono: se desplaza
+   en vez de dejarla fuera de la pantalla */
+.zoom > * { flex-shrink: 0; }
 .zoom-card { width: min(86vw, 420px, calc((100svh - 120px) / 1.4)); }
 .zoom-card .card { width: 100%; animation: zoomIn .45s var(--ease-out); }
 @keyframes zoomIn { from { transform: scale(.7) translateY(40px); opacity: 0; } }
