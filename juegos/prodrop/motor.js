@@ -219,6 +219,75 @@
   }
   const pDios = DIOS / 10000;
 
+  /* ---------- re-roll ----------
+     Diez cartas de una misma rareza se cambian por una de la rareza
+     siguiente, como el contrato de intercambio del CS2. Como el sobre, el
+     resultado no se tira: es una función pura de `(uid, clave, at)` y de
+     lo que entró, y `at` es la hora del servidor (la regla de `cartas/r`
+     exige `at === now`), así que nadie elige lo que sale y cualquiera puede
+     rehacerlo.
+
+     La carta nueva es una cualquiera de la rareza siguiente, todas con la
+     misma probabilidad. Su nota (oculta, como la de un sobre: se descubre
+     al graduarla) sale de las notas de las diez que entraron: una campana
+     centrada en su promedio **más un punto** (`REROLL.bono`), con σ = 1,3.
+     Diez notas de 5 4 6 4 9 8 8 5 3 2 promedian 5,4, así que el centro es
+     6,4: sale 6 o 7 el 57 % de las veces, 5 el 17 %, 8 el 14 %, 4 el 6 %,
+     9 el 4 %. Con diez entradas, el promedio en décimas es la suma de las
+     notas, y la campana va en una tabla de enteros (`PESO_REROLL`, la
+     distancia al centro en décimas): `Math.exp` no da el mismo último bit
+     en todos los navegadores, y dos navegadores no pueden ver notas
+     distintas de la misma carta. */
+  const REROLL = { n: 10, bono: 1, sigma: 1.3 };
+  const PESO_REROLL = [1000000,997046,988235,973724,953766,928705,898967,865048,827498,786907,743893,699081,653093,606531,559965,513924,468886,425271,383437,343679,306226,271245,238842,209069,181928,157377,135335,115694,98320,83062,69758,58239,48336,39879,32709,26669,21616,17417,13951,11109,8794,6920,5413,4209,3254,2501,1911,1451,1095,822,613,455,335,246,179,130,93,67,48,34,24,17,12,8,5,4,3,2,1,1,1];
+  /* El peso de cada nota 1…10 (índice 0…9), en enteros. */
+  function pesosReroll(notas) {
+    const suma = notas.reduce((t, g) => t + (g | 0), 0);
+    const centro = Math.round(suma * 10 / Math.max(1, notas.length)) + REROLL.bono * 10;   // en décimas
+    const pesos = [];
+    for (let g = 1; g <= 10; g++) pesos.push(PESO_REROLL[Math.abs(10 * g - centro)] || 0);
+    if (!pesos.some(Boolean)) pesos[centro >= 55 ? 9 : 0] = 1;   // centro fuera de la tabla: lo más cercano
+    return pesos;
+  }
+  /* Lo mismo como probabilidades (para enseñarlo), y el promedio esperado. */
+  function distribucionReroll(notas) {
+    const p = pesosReroll(notas), t = p.reduce((a, b) => a + b, 0);
+    const prob = p.map(x => x / t);
+    return { prob, media: prob.reduce((m, x, i) => m + x * (i + 1), 0), centro: notas.reduce((a, b) => a + b, 0) / notas.length + REROLL.bono };
+  }
+  /* La carta que sale: {id, g, w}. `tier` es la rareza de las diez que
+     entraron (0 a 2) y `notas` sus notas ocultas, en el orden escrito. */
+  /* El salto, en diez milésimas y por rareza de entrada (`SALTO_W[tier]`,
+     cada fila: subir una, dos, tres). De común: rara 92 %, épica 7,5 %,
+     legendaria 0,5 %. De rara: épica 96 %, legendaria 4 %. De épica:
+     siempre legendaria. Sale de su propio resumen, para que la carta y la
+     nota sigan saliendo del mismo generador de siempre, y solo cuenta
+     desde `SALTOS_DESDE`: un re-roll escrito antes vuelve a dar
+     exactamente la carta que dio. */
+  const SALTO_W = [[9200, 750, 50], [9600, 400], [10000]];
+  const SALTOS_DESDE = 1790960400000;
+  function saltoReroll(k, at, tier) {
+    if (at < SALTOS_DESDE) return 1;
+    return 1 + pesado(generador(sha256("prodrop-salto:" + k).slice(0, 4)), SALTO_W[tier]);
+  }
+  /* La probabilidad de cada rareza de salida para una rareza de entrada. */
+  function probSalida(tier) {
+    const p = [0, 0, 0, 0], w = SALTO_W[tier], t = w.reduce((a, b) => a + b, 0);
+    w.forEach((x, i) => { p[Math.min(3, tier + 1 + i)] += x / t; });
+    return p;
+  }
+  const memoR = new Map();
+  function reroll(uid, clave, at, tier, notas) {
+    const k = uid + "|" + clave + "|" + at + "|" + tier + "|" + notas.join(",");
+    if (memoR.has(k)) return memoR.get(k);
+    const r = generador(sha256("prodrop-reroll:" + k).slice(0, 4));
+    const posibles = POR_TIER[Math.min(3, tier + saltoReroll(k, at, tier))];
+    const c = posibles[r.entero(posibles.length)];
+    const res = { id: c.n, g: 1 + pesado(r, pesosReroll(notas)), w: (r.u32() & 0x7fffffff) | 1 };
+    memoR.set(k, res);
+    return res;
+  }
+
   /* ---------- lo de una cuenta ----------
      `s` = {clave: {at, p}} (los sobres), `g` = {clave: {i: {at, p}}} (lo
      graduado). Devuelve las copias, de la más vieja a la más nueva. */
@@ -241,6 +310,7 @@
 
   return {
     PEOPLE, SHINY, TIERS, VARIANTS, FOLDER, CARDS, TOTAL, POR_TIER, GRADE_W, GRADE_WORD, PRECIO, DIOS, ESPERADO,
-    subtitulo, acento, colorNota, precioSobre, sha256, generador, sobre, probabilidad, notaOMas, pDios, coleccion, gasto
+    subtitulo, acento, colorNota, precioSobre, sha256, generador, sobre, probabilidad, notaOMas, pDios, coleccion, gasto,
+    REROLL, PESO_REROLL, pesosReroll, distribucionReroll, reroll, SALTO_W, SALTOS_DESDE, probSalida
   };
 });

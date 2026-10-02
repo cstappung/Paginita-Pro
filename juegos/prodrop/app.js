@@ -136,17 +136,19 @@ function offCenter(c) {
    rehace con el motor desde su sobre: `key` = `<origen>~<sobre>.<i>`. */
 const cuenta = { uid: '', saldo: 0, parada: false, falta: 0, mias: [], sobres: {}, gratis: 0, ofertas: [], ventas: [], cambios: [],
   jugadores: {}, gente: {}, exh: [], listo: false, desfase: 0 };
-let col = {}, copies = {}, abriendo = '';   // el sobre en curso no entra a la colección hasta el resumen
+let col = {}, copies = {}, abriendo = new Set();   // los sobres en curso no entran a la colección hasta el resumen
 const ahora = () => Date.now() + cuenta.desfase;
 // una copia que llega de Juegos ({c, o, k, i, at, gr}) con su nota y su desgaste
 function copiaDe(x) {
+  // la de un re-roll llega con su carta: no sale de ningún sobre
+  if (x.id != null) return { id: x.id, g: x.g, s: x.w, gr: x.gr ? 1 : 0, o: x.o, k: x.k, i: x.i, at: x.at, key: x.c || `${x.o}~${x.k}.${x.i}`, venta: x.venta || '', dios: false, rr: true };
   const so = M.sobre(x.o, x.k, x.at), c = so.cartas[x.i];
   return { id: c.id, g: c.g, s: c.w, gr: x.gr ? 1 : 0, o: x.o, k: x.k, i: x.i, at: x.at, key: x.c || `${x.o}~${x.k}.${x.i}`, venta: x.venta || '', dios: so.dios };
 }
 function rehazColeccion() {
   col = {}; copies = {};
   for (const x of cuenta.mias) {
-    if (x.o === cuenta.uid && x.k === abriendo) continue;
+    if (x.o === cuenta.uid && abriendo.has(x.k)) continue;
     const cp = copiaDe(x), uid = M.CARDS[cp.id].uid;
     col[uid] = (col[uid] || 0) + 1;
     (copies[uid] = copies[uid] || []).push(cp);
@@ -623,17 +625,17 @@ let phase = 'pack', pull = [], els = [], current = 0, busy = false, tearP = 0, t
 const setPhase = p => { phase = p; document.body.dataset.phase = p; };
 const hint = txt => { $('#hint').textContent = txt; };
 
-// el sobre comprado: su contenido sale del motor (uid, clave, hora del servidor)
-let comprado = null;   // {k, at, dios}
-function cardsOf(k, at) {
+// los sobres comprados: su contenido sale del motor (uid, clave, hora del servidor)
+let comprados = [];   // [{k, at, dios}], de 1 a 3: se abren juntos
+const MAX_JUNTOS = 3;
+// «nueva» se mide contra lo que tenías antes y contra las cartas ya salidas de los sobres anteriores
+function cardsOf(k, at, s, antes, vistas) {
   const so = M.sobre(cuenta.uid, k, at);
-  const antes = new Set(Object.keys(col));
-  const vistas = new Set();
   return so.cartas.map((x, i) => {
     const base = CARDS[x.id], cp = { id: x.id, g: x.g, s: x.w, gr: 0, o: cuenta.uid, k, i, at, key: `${cuenta.uid}~${k}.${i}`, venta: '' };
     const nueva = !antes.has(base.uid) && !vistas.has(base.uid);
     vistas.add(base.uid);
-    return { ...base, grade: x.g, wseed: x.w, graded: false, _copy: cp, _new: nueva };
+    return { ...base, grade: x.g, wseed: x.w, graded: false, _copy: cp, _new: nueva, _sobre: s, _dios: so.dios };
   });
 }
 const preload = list => Promise.all(list.map(c => { const i = new Image(); i.src = c.img; return i.decode().catch(() => {}); }));
@@ -645,8 +647,13 @@ function showPack(drop) {
   hideBanner(); setDots();
   stack.getAnimations().forEach(a => a.cancel());
   stack.style.visibility = 'hidden'; stack.innerHTML = '';
-  els = pull.map((c, i) => { const el = makeCard(c, { down: true }); el.style.zIndex = 10 - i; stack.appendChild(el); return el; });
+  els = pull.map((c, i) => { const el = makeCard(c, { down: true }); el.style.zIndex = 100 - i; stack.appendChild(el); return el; });
   restack();
+  const n = phase === 'tienda' ? cantidad : Math.max(1, comprados.length);
+  $('#dots').innerHTML = '<i></i>'.repeat(pull.length || 5);
+  $('#dots').classList.toggle('muchos', pull.length > 5);
+  pintaKicker(n);
+  pintaExtras(n);
   if (drop) {
     const shinyFan = CARDS.filter(c => c.tier >= 2).sort(() => Math.random() - .5).slice(0, 3);
     packTop.innerHTML = packBottom.innerHTML = skinHTML(shinyFan);
@@ -657,30 +664,48 @@ function showPack(drop) {
       { transform: 'perspective(900px) translateY(-80vh) rotate(-14deg)', opacity: 0 },
       { transform: 'perspective(900px) translateY(0) rotate(0)', opacity: 1 },
     ], { duration: REDUCED ? 1 : 850, easing: 'cubic-bezier(.2,1.25,.4,1)' });
+    $('#packExtras').animate([{ transform: 'translateY(-80vh)', opacity: 0 }, { transform: 'none', opacity: 1 }],
+      { duration: REDUCED ? 1 : 850, delay: REDUCED ? 0 : 90, easing: 'cubic-bezier(.2,1.25,.4,1)', fill: 'backwards' });
     if (!REDUCED) setTimeout(() => Snd.land(), 450);
   }
   updateTear();
   setTilt(pack, pack, 1);
 }
+/* Los sobres de más se ven detrás del principal, en abanico: al rasgar
+   el de delante se abren todos a la vez. Son solo decorado; el corte y
+   las cartas son los del sobre principal. */
+function pintaExtras(n, forzar = true) {
+  const box = $('#packExtras');
+  if (!forzar && +box.dataset.n === n) return;
+  box.getAnimations({ subtree: true }).forEach(a => a.cancel());
+  const pos = n === 2 ? [[-1, 0]] : n >= 3 ? [[-1, 0], [1, 1]] : [];
+  box.innerHTML = pos.map(([lado, i]) => {
+    const fan = CARDS.filter(c => c.tier >= 1).sort(() => Math.random() - .5).slice(0, 3);
+    return `<div class="pack-extra" style="--lado:${lado};--i:${i}"><div class="pack-piece">${skinHTML(fan)}</div></div>`;
+  }).join('');
+  box.dataset.n = n;
+}
+const pintaKicker = n => { $('#kicker').textContent = n > 1 ? `${n} sobres · ${5 * n} cartas` : 'DIE COLLECTION · 5 cartas por sobre'; };
 function tienda(drop = true) {
   setPhase('tienda');
-  comprado = null; pull = []; abriendo = '';
+  comprados = []; pull = []; abriendo = new Set();
   rehazColeccion();
   showPack(drop);
   hint('');
   pintaCompra();
 }
-function newPack(k, at, drop = true) {
-  const so = M.sobre(cuenta.uid, k, at);
-  comprado = { k, at, dios: so.dios };
-  abriendo = k; rehazColeccion();        // «nueva» se mide contra lo que tenías antes de este sobre
-  pull = cardsOf(k, at);
-  try { localStorage.setItem(PENDIENTE(), k); } catch {}
+function newPacks(lista, drop = true) {
+  comprados = lista.map(({ k, at }) => ({ k, at, dios: M.sobre(cuenta.uid, k, at).dios }));
+  abriendo = new Set(); rehazColeccion();
+  const antes = new Set(Object.keys(col)), vistas = new Set();
+  pull = comprados.flatMap((x, s) => cardsOf(x.k, x.at, s, antes, vistas));
+  abriendo = new Set(comprados.map(x => x.k)); rehazColeccion();
+  try { localStorage.setItem(PENDIENTE(), comprados.map(x => x.k).join(',')); } catch {}
   preload(pull);
   setPhase('pack');
   showPack(drop);
   if (!drop) pack.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.06, .95)' }, { transform: 'none' }], { duration: 420, easing: 'cubic-bezier(.2,1.4,.4,1)' });
-  hint('Desliza por la línea punteada para abrir el sobre');
+  hint(comprados.length > 1 ? `Desliza por la línea punteada para abrir los ${comprados.length} sobres` : 'Desliza por la línea punteada para abrir el sobre');
   pintaCompra();
 }
 
@@ -762,18 +787,20 @@ async function openPack(force) {
   const r = pack.getBoundingClientRect(), ty = r.top + r.height * TEAR_Y / 100;
   for (let i = 0; i < 6; i++) burst(r.left + r.width * (i / 5), ty, { n: 10, colors: ['#fff', '#ffe08a', '#ff9ad5', '#9be9ff'], speed: 8, spread: 1.8, angle: -Math.PI / 2, kinds: ['spark', 'spark', 'star'] });
 
-  packTop.animate([
+  const tapa = packTop.animate([
     { transform: packTop.style.transform || 'none', opacity: 1 },
     { transform: 'translate(45%, -170%) rotate(32deg)', opacity: 0 },
   ], { duration: 750, easing: 'cubic-bezier(.25,.6,.35,1)', fill: 'forwards' });
-  $('#packLight').animate([{ opacity: 0, transform: 'translateY(-100%) scaleY(.2)' }, { opacity: 1, transform: 'translateY(-100%) scaleY(1)' }],
+  const luz = $('#packLight').animate([{ opacity: 0, transform: 'translateY(-100%) scaleY(.2)' }, { opacity: 1, transform: 'translateY(-100%) scaleY(1)' }],
     { duration: 500, easing: 'ease-out', fill: 'forwards' });
   pack.animate([
     { transform: 'perspective(900px) scale(1)' }, { transform: 'perspective(900px) scale(1.05, .96)' }, { transform: 'perspective(900px) scale(1)' },
   ], { duration: 420, easing: 'ease-out' });
   hint('');
+  abreExtras();
   await sleep(380);
-  if (comprado && comprado.dios) await godPack();
+  const dioses = comprados.filter(x => x.dios).length;
+  if (dioses) await godPack(dioses);
 
   // las cartas asoman desde dentro del sobre
   const cw = els[0].getBoundingClientRect().width;
@@ -784,14 +811,18 @@ async function openPack(force) {
   await sleep(120);
 
   // el sobre cae y el mazo baja al centro
-  pack.animate([
+  const caida = pack.animate([
     { transform: 'perspective(900px) translateY(0) rotate(0)', opacity: 1 },
     { transform: 'perspective(900px) translateY(85vh) rotate(9deg)', opacity: .6 },
   ], { duration: 650, easing: 'cubic-bezier(.55,0,.85,.4)', fill: 'forwards' });
   await stack.animate([{ transform: `translateY(${-cw * .5}px)` }, { transform: 'translateY(0)' }],
     { duration: 750, easing: 'cubic-bezier(.3,1.25,.5,1)', fill: 'forwards' }).finished;
   Snd.land();
+  /* Oculto ya, la caída se cancela: si se queda «rellenando», Chrome la
+     retira por su cuenta y su último fotograma queda aplicado, y el sobre
+     siguiente (Abrir otro) aparecía caído, fuera de la pantalla. */
   pack.hidden = true;
+  [caida, tapa, luz].forEach(a => a.cancel());
 
   setPhase('reveal'); setDots();
   hint('Toca la carta para darla vuelta');
@@ -799,10 +830,21 @@ async function openPack(force) {
   stack.focus({ preventScroll: true });
 }
 
+function abreExtras() {
+  for (const ex of $('#packExtras').children) {
+    const r = ex.getBoundingClientRect(), lado = +ex.style.getPropertyValue('--lado') || 1;
+    for (let i = 0; i < 3; i++) burst(r.left + r.width * (.2 + i * .3), r.top + r.height * TEAR_Y / 100, { n: 8, colors: ['#fff', '#ffe08a', '#ff9ad5'], speed: 7, spread: 1.8, angle: -Math.PI / 2, kinds: ['spark', 'star'] });
+    const base = getComputedStyle(ex).transform, desde = base === 'none' ? '' : base;
+    ex.animate([{ transform: desde || 'none', opacity: 1 }, { transform: `${desde} translate(${lado * 30}%, 70vh) rotate(${lado * 14}deg)`, opacity: 0 }],
+      { duration: REDUCED ? 1 : 900, delay: 250, easing: 'cubic-bezier(.55,0,.85,.4)', fill: 'forwards' });
+  }
+}
+
 /* ---------------- REVELADO ---------------- */
 function restack() {
   els.slice(current).forEach((el, j) => {
-    el.style.transform = j ? `translate(${j * 3}px, ${j * 4}px) rotate(${(j % 2 ? 1.6 : -1.4) * Math.min(j, 3)}deg)` : 'none';
+    const q = Math.min(j, 4);   // con tres sobres hay quince cartas: el fondo del mazo no se aleja más
+    el.style.transform = j ? `translate(${q * 3}px, ${q * 4}px) rotate(${(j % 2 ? 1.6 : -1.4) * Math.min(j, 3)}deg)` : 'none';
   });
 }
 function focusTop() {
@@ -822,7 +864,8 @@ function showBanner(c) {
   b.style.setProperty('--c', accentOf(c));
   b.querySelector('.b-tier').textContent = `${t.label.toUpperCase()} ${t.sym}`;
   b.querySelector('.b-name').textContent = c.name;
-  b.querySelector('.b-var').innerHTML = `${subtitle(c)} · N.º ${pad(c.num)}${c._new ? '<em>NUEVA</em>' : ''}`;
+  const deSobre = comprados.length > 1 ? ` · sobre ${c._sobre + 1} de ${comprados.length}` : '';
+  b.querySelector('.b-var').innerHTML = `${subtitle(c)} · N.º ${pad(c.num)}${deSobre}${c._new ? '<em>NUEVA</em>' : ''}`;
   requestAnimationFrame(() => b.classList.add('show'));
   document.body.classList.add('has-banner');
 }
@@ -958,7 +1001,7 @@ stack.addEventListener('pointerup', endDrag);
 stack.addEventListener('pointercancel', () => { if (drag) { drag.el.style.transition = ''; drag.el.style.transform = 'none'; drag = null; } });
 
 addEventListener('keydown', e => {
-  if (['zoom', 'collection', 'market', 'trade'].some(id => !$('#' + id).hidden)) { if (e.key === 'Escape') closeOverlays(); return; }
+  if (['zoom', 'collection', 'market', 'trade', 'reroll', 'ruleta'].some(id => !$('#' + id).hidden)) { if (e.key === 'Escape') closeOverlays(); return; }
   if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowRight') {
     if (phase === 'pack' && e.target.tagName !== 'BUTTON') { e.preventDefault(); autoTear(); }
     else if (phase === 'reveal') { e.preventDefault(); act(); }
@@ -979,22 +1022,32 @@ function showSummary() {
   setTilt(null, null); aura(false); hideBanner();
   document.body.classList.remove('dim');
   pull.forEach(record);
-  abriendo = ''; rehazColeccion(); updateColCount();
+  abriendo = new Set(); rehazColeccion(); updateColCount();
   try { localStorage.removeItem(PENDIENTE()); } catch {}
   pintaCompra();
   $('#tableView').hidden = true; $('#summary').hidden = false;
-  const box = $('#sumCards'); box.innerHTML = '';
+  const n = comprados.length, box = $('#sumCards'); box.innerHTML = '';
+  $('#summary').classList.toggle('multi', n > 1);
+  $('#summary').dataset.n = n;
+  $('#sumTitulo').textContent = n > 1 ? `Tus ${n} sobres` : 'Tu sobre';
+  /* Con varios sobres, una fila por sobre: se ve qué trajo cada uno. */
+  const grupos = n > 1 ? comprados.map((x, s) => {
+    const g = document.createElement('div'); g.className = 'sum-grupo';
+    g.innerHTML = `<p class="sum-grupo-t">Sobre ${s + 1}${x.dios ? ' <b>GOD PACK</b>' : ''}</p><div class="sum-fila"></div>`;
+    box.appendChild(g); return g.lastElementChild;
+  }) : [box];
   pull.forEach((c, i) => {
     const el = sumCard(c);
-    box.appendChild(el);
+    grupos[n > 1 ? c._sobre : 0].appendChild(el);
     el.animate([{ transform: 'translateY(70px) scale(.8) rotate(-4deg)', opacity: 0 }, { transform: 'none', opacity: 1 }],
-      { duration: 650, delay: i * 90, easing: 'cubic-bezier(.2,1.25,.4,1)', fill: 'backwards' });
+      { duration: 650, delay: i * (n > 1 ? 45 : 90), easing: 'cubic-bezier(.2,1.25,.4,1)', fill: 'backwards' });
   });
+  $('#summary').scrollTop = 0;
 }
 // tras graduar en el zoom, la carta del resumen pasa a su caja
 function refreshCard(c) {
   if (phase !== 'summary') return;
-  const old = [...$('#sumCards').children].find(e => e.card === c);
+  const old = [...$('#sumCards').querySelectorAll('.card')].find(e => e.card === c);
   if (old) old.replaceWith(sumCard(c));
 }
 $('#skipBtn').onclick = () => { if (phase === 'reveal' && !busy) showSummary(); };
@@ -1021,7 +1074,7 @@ function openZoom(c) {
 const nombreDe = u => (cuenta.gente[u] && cuenta.gente[u].n) || 'Alguien';
 const ofertaDe = id => cuenta.ofertas.find(o => o.id === id);
 // la más barata a la venta de esta misma carta (de otros), para orientar el precio
-const masBarata = (uid, sinId) => cuenta.ofertas.filter(o => o.id !== sinId && M.CARDS[M.sobre(o.o, o.k, o.at).cartas[o.i].id].uid === uid)
+const masBarata = (uid, sinId) => cuenta.ofertas.filter(o => o.id !== sinId && M.CARDS[copiaDe(o).id].uid === uid)
   .reduce((m, o) => (!m || o.p < m.p ? o : m), null);
 function zoomUI(recien) {
   const c = zoomC, t = TIERS[c.tier], of = c._oferta, mio = !!c._copy && !c._ajena;
@@ -1044,7 +1097,7 @@ function zoomUI(recien) {
     go.innerHTML = oddsHTML(c);
     if (recien && !REDUCED) go.animate([{ opacity: 0, transform: 'translateY(14px) scale(.96)' }, { opacity: 1, transform: 'none' }], { duration: 650, delay: 150, easing: 'cubic-bezier(.2,1.3,.4,1)', fill: 'backwards' });
   }
-  const enSobre = mio && !!abriendo && c._copy.k === abriendo && c._copy.o === cuenta.uid && phase !== 'summary';
+  const enSobre = mio && abriendo.has(c._copy.k) && c._copy.o === cuenta.uid && phase !== 'summary';
   // exhibir en el perfil (hasta MAX_EXH cartas)
   const sb = $('#showBtn'), key = mio && c._copy.key, puesta = !!key && cuenta.exh.includes(key);
   sb.hidden = !key || enSobre;
@@ -1094,7 +1147,7 @@ function refrescaZoom() {
   } else if (c._copy && !c._ajena) {
     const x = (copies[c.uid] || []).find(y => mismaCopia(y, c._copy));
     if (x) { c._copy = x; c.graded = !!x.gr; }
-    else if (!(abriendo && c._copy.k === abriendo)) { cierraZoom(); toast('Esa carta ya no está en tu colección.'); return; }
+    else if (!abriendo.has(c._copy.k)) { cierraZoom(); toast('Esa carta ya no está en tu colección.'); return; }
   }
   zoomUI();
 }
@@ -1111,11 +1164,12 @@ function closeOverlays() {
   if (!$('#trade').hidden) { $('#trade').hidden = true; $('#market').hidden = false; return; }
   if (!$('#zoom').hidden && zoomVuelve) { cierraZoom(); return; }
   zoomVuelve = '';
-  $('#zoom').hidden = true; $('#collection').hidden = true; $('#market').hidden = true;
+  if (!$('#ruleta').hidden) { if (!rl.girando) cierraRuleta(); return; }
+  $('#zoom').hidden = true; $('#collection').hidden = true; $('#market').hidden = true; $('#reroll').hidden = true;
   if (prevTilt) { setTilt(...prevTilt); prevTilt = null; }
 }
 document.querySelectorAll('[data-close]').forEach(b => b.onclick = closeOverlays);
-for (const id of ['zoom', 'collection', 'market', 'trade']) $('#' + id).addEventListener('click', e => { if (e.target.id === id) closeOverlays(); });
+for (const id of ['zoom', 'collection', 'market', 'trade', 'reroll']) $('#' + id).addEventListener('click', e => { if (e.target.id === id) closeOverlays(); });
 $('#gradeBtn').onclick = () => gradeCard();
 
 /* ---------------- VENDER ----------------
@@ -1131,7 +1185,7 @@ $('#sellBtn').onclick = async () => {
   }
   const box = $('#sellBox'), ref = masBarata(c.uid);
   box.innerHTML = `<label>Precio de venta<span class="sell-campo">${MONEDA}<input id="sellPrecio" type="number" inputmode="numeric" min="1" max="100000" step="1" value="${ref ? ref.p : c.tier === 3 ? 1500 : c.tier === 2 ? 300 : c.tier === 1 ? 60 : 15}"></span></label>
-    <p class="sell-ref">${ref ? `La más barata a la venta: ${MONEDA}<b>${fmt(ref.p)}</b>${ref.gr ? ` (graduada, nota ${M.sobre(ref.o, ref.k, ref.at).cartas[ref.i].g})` : ''}` : 'Nadie más la vende ahora: tú pones el precio.'}${c.graded ? ' · La tuya va graduada.' : ''}</p>
+    <p class="sell-ref">${ref ? `La más barata a la venta: ${MONEDA}<b>${fmt(ref.p)}</b>${ref.gr ? ` (graduada, nota ${copiaDe(ref).g})` : ''}` : 'Nadie más la vende ahora: tú pones el precio.'}${c.graded ? ' · La tuya va graduada.' : ''}</p>
     <div class="sell-btns"><button class="btn primary" id="sellOk">Publicar</button><button class="btn" id="sellNo">Cancelar</button></div>`;
   box.hidden = false;
   const inp = $('#sellPrecio'); inp.focus(); inp.select();
@@ -1396,6 +1450,244 @@ function openCollection() {
 $('#colBtn').onclick = openCollection;
 $('#colBtn2').onclick = openCollection;
 
+/* ---------------- RE-ROLL ----------------
+   Diez cartas de una misma rareza por una de la siguiente, como el
+   contrato de intercambio del CS2. La carta y su nota salen del motor
+   (`M.reroll`), con la hora del servidor, en Juegos: aquí solo se elige
+   qué entra y se cuenta lo que salió, con una ruleta que corre de derecha
+   a izquierda y se detiene en ella. Las notas ocultas de lo que entra no
+   se enseñan: la cuenta de la nota esperada solo se hace cuando las diez
+   están graduadas. */
+const NR = M.REROLL.n;
+const PLURAL = ['comunes', 'raras', 'épicas', 'legendarias'], UNA = ['común', 'rara', 'épica', 'legendaria'];
+const rr = { tier: 0, sel: [], seguro: false, enviando: false };
+const keyDe = cp => cp.key;
+// lo que se puede meter: mis copias de esa rareza que no están a la venta
+const elegibles = t => Object.values(copies).flat().filter(cp => CARDS[cp.id].tier === t && !cp.venta);
+/* El orden en que «Elegir automático» las toma: primero las repetidas (de
+   cada carta se guarda la mejor), las sin graduar antes que las graduadas,
+   y de las graduadas las de nota más baja; las exhibidas al final. */
+function ordenAuto(lista) {
+  const mejor = {};
+  for (const cp of lista) {
+    const u = CARDS[cp.id].uid, m = mejor[u];
+    if (!m || (cp.gr && (!m.gr || cp.g > m.g))) mejor[u] = cp;
+  }
+  const peso = cp => (mejor[CARDS[cp.id].uid] === cp ? 1000 : 0) + (cuenta.exh.includes(cp.key) ? 500 : 0) + (cp.gr ? 100 + cp.g : 0);
+  return lista.slice().sort((a, b) => peso(a) - peso(b));
+}
+function miniCp(cp, extra = '') {
+  const c = CARDS[cp.id];
+  return `<span class="mini t${c.tier}" style="--accent:${accentOf(c)}" title="${esc(c.name + ' · ' + subtitle(c) + (cp.gr ? ' · nota ' + cp.g : ' · sin graduar'))}">
+    <img src="${c.img}" alt="" loading="lazy" draggable="false">${cp.gr ? `<b style="--gc:${gradeColor(cp.g)}">${cp.g}</b>` : ''}${extra}
+    <small>${esc(c.name.split(' ')[0])}</small></span>`;
+}
+function abreReroll() {
+  if (!cuenta.listo) return;
+  prevTilt = prevTilt || [tilt.target, tilt.box, tilt.amp];
+  setTilt(null, null);
+  // abre en la rareza más baja que alcanza para un re-roll
+  const t = [0, 1, 2].find(i => elegibles(i).length >= NR);
+  if (t !== undefined && !elegibles(rr.tier).length) rr.tier = t;
+  rr.seguro = false;
+  $('#collection').hidden = true; $('#summary').hidden || 0;
+  renderReroll();
+  $('#reroll').hidden = false;
+}
+$('#rrBtn').onclick = abreReroll;
+$('#rrBtn2').onclick = abreReroll;
+function notaEsperadaHTML(cps) {
+  if (cps.length < NR) {
+    const gr = cps.filter(cp => cp.gr);
+    return `La nota de la nueva sale de las diez que entran: alrededor de su promedio <b>más un punto</b>.${gr.length ? ` Tus graduadas aquí promedian <b>${(gr.reduce((t, cp) => t + cp.g, 0) / gr.length).toFixed(1).replace('.', ',')}</b>.` : ''}`;
+  }
+  if (!cps.every(cp => cp.gr)) return 'La nota de la nueva sale de las diez: alrededor de su promedio <b>más un punto</b>. Algunas no están graduadas, así que la cuenta exacta queda oculta, como su nota.';
+  const d = M.distribucionReroll(cps.map(cp => cp.g)), max = Math.max(...d.prob);
+  return `Promedio de las diez <b>${(d.centro - M.REROLL.bono).toFixed(1).replace('.', ',')}</b> → la nueva sale cerca de <b>${d.centro.toFixed(1).replace('.', ',')}</b>:
+    <span class="rr-campana">${d.prob.map((p, i) => `<span title="Nota ${i + 1}: ${(p * 100).toFixed(1).replace('.', ',')} %"><i style="height:${Math.max(2, p / max * 100)}%;--gc:${gradeColor(i + 1)}"></i><small>${i + 1}</small></span>`).join('')}</span>`;
+}
+function renderReroll() {
+  const t = rr.tier, sig = TIERS[t + 1], lista = ordenAuto(elegibles(t));
+  rr.sel = rr.sel.filter(k => lista.some(cp => cp.key === k));
+  const sel = new Set(rr.sel), cps = rr.sel.map(k => lista.find(cp => cp.key === k));
+  $('#rrSub').innerHTML = `${NR} cartas ${PLURAL[t]} → 1 ${UNA[t + 1]} al azar. Las diez se pierden.`;
+  $('#rrTabs').innerHTML = [0, 1, 2].map(i => {
+    const n = elegibles(i).length;
+    return `<button role="tab" data-t="${i}" aria-selected="${i === t}">${TIERS[i].sym} ${TIERS[i].label} <span class="rr-flecha">→ ${TIERS[i + 1].sym}</span><b class="rr-n${n >= NR ? ' ok' : ''}">${n}</b></button>`;
+  }).join('');
+  $('#rrTabs').querySelectorAll('[data-t]').forEach(b => b.onclick = () => { rr.tier = +b.dataset.t; rr.sel = []; rr.seguro = false; renderReroll(); });
+  const posibles = M.POR_TIER[t + 1];
+  const huecos = Array.from({ length: NR }, (_, i) => cps[i] ? `<button class="rr-hueco lleno" data-quita="${esc(cps[i].key)}" title="Quitar">${miniCp(cps[i])}</button>` : `<span class="rr-hueco"></span>`).join('');
+  $('#rrBody').innerHTML = `
+    <div class="rr-flujo" style="--c:${TIERS[t].color};--c2:${accentOf(CARDS[posibles[0].n])}">
+      <div class="rr-huecos">${huecos}</div>
+      <span class="rr-a" aria-hidden="true">➜</span>
+      <span class="rr-sale t${t + 1}"><b>?</b><small>${sig.sym} ${sig.label}</small></span>
+    </div>
+    <p class="rr-sale-p">Sale ${M.probSalida(t).map((p, i) => p ? `<span style="--c:${TIERS[i].color}"><i>${TIERS[i].sym}</i> ${TIERS[i].label} <b>${(p * 100).toFixed(p < .01 ? 1 : p < .1 ? 1 : 0).replace('.', ',')} %</b></span>` : '').filter(Boolean).join('')}</p>
+    <p class="rr-nota">${notaEsperadaHTML(cps)}</p>
+    <div class="rr-acc">
+      <button class="btn mk-mini" id="rrAuto"${lista.length < NR ? ' disabled' : ''}>Elegir automático</button>
+      <button class="btn mk-mini" id="rrLimpia"${rr.sel.length ? '' : ' disabled'}>Quitar todas</button>
+      <span class="rr-cuenta"><b>${rr.sel.length}</b>/${NR}</span>
+    </div>
+    ${lista.length ? `<div class="tc-rejilla rr-rejilla">${lista.map(cp => `<button class="tc-elige${sel.has(cp.key) ? ' on' : ''}" data-c="${esc(cp.key)}">${miniCp(cp, cuenta.exh.includes(cp.key) ? '<em class="rr-exh">★</em>' : '')}</button>`).join('')}</div>`
+      : `<div class="mk-vacio"><b>${TIERS[t].sym}</b><p>No tienes cartas ${PLURAL[t]} libres. Abre sobres o retira del mercado las que tengas a la venta.</p></div>`}
+    <details class="rr-posibles"><summary>Puede salir cualquiera de estas ${posibles.length} (${(100 / posibles.length).toFixed(1).replace('.', ',')} % cada una)</summary>
+      <div class="rr-pos">${posibles.map(c => miniCp({ id: c.n, gr: 0 })).join('')}</div></details>
+    <div class="tc-envio rr-envio">
+      <button class="btn primary" id="rrGo"${rr.sel.length === NR && !rr.enviando ? '' : ' disabled'}>${rr.enviando ? 'Enviando…' : rr.seguro ? '¿Seguro? Toca otra vez' : `♻ Re-roll ${rr.sel.length}/${NR}`}</button>
+      <button class="chip rl-rapido" id="rrRapido" aria-pressed="${rlRapido}">⚡ Rápido</button>
+      <span class="mk-nota" id="rrMsg">${rr.seguro ? `Las ${NR} cartas se cambian por una ${UNA[t + 1]}. No se puede deshacer.` : lista.length < NR ? `Te faltan ${NR - lista.length} cartas ${PLURAL[t]}.` : ''}</span>
+    </div>`;
+  const toca = k => {
+    const i = rr.sel.indexOf(k);
+    if (i >= 0) rr.sel.splice(i, 1); else if (rr.sel.length < NR) rr.sel.push(k); else { Snd.blip(); return; }
+    rr.seguro = false; Snd.init(); Snd.tick(); renderRerollKeep();
+  };
+  $('#rrBody').querySelectorAll('.tc-elige').forEach(b => b.onclick = () => toca(b.dataset.c));
+  $('#rrBody').querySelectorAll('[data-quita]').forEach(b => b.onclick = () => toca(b.dataset.quita));
+  $('#rrAuto').onclick = () => { rr.sel = lista.slice(0, NR).map(keyDe); rr.seguro = false; Snd.init(); Snd.flip(); renderRerollKeep(); };
+  $('#rrLimpia').onclick = () => { rr.sel = []; rr.seguro = false; renderRerollKeep(); };
+  $('#rrRapido').onclick = cambiaRapido; pintaRapido();
+  $('#rrGo').onclick = () => {
+    if (rr.sel.length !== NR || rr.enviando) return;
+    if (!rr.seguro) { rr.seguro = true; renderRerollKeep(); return; }
+    hazReroll();
+  };
+}
+// repintar sin perder el desplazamiento de la rejilla
+function renderRerollKeep() {
+  const g = $('#rrBody .rr-rejilla'), y = g ? g.scrollTop : 0;
+  renderReroll();
+  const g2 = $('#rrBody .rr-rejilla'); if (g2) g2.scrollTop = y;
+}
+async function hazReroll() {
+  const usadas = rr.sel.slice(), t = rr.tier;
+  rr.enviando = true; renderRerollKeep();
+  try {
+    const r = await Red.pide('reroll', { c: usadas });
+    const nueva = !col[CARDS[r.id].uid];
+    // se anota aquí mismo; la cuenta real llega sola
+    cuenta.mias = cuenta.mias.filter(x => !usadas.includes(x.c || `${x.o}~${x.k}.${x.i}`));
+    cuenta.mias.push({ c: r.c, o: cuenta.uid, k: r.k, i: 0, at: r.at, gr: false, venta: '', id: r.id, g: r.g, w: r.w });
+    cuenta.exh = cuenta.exh.filter(k => !usadas.includes(k));
+    rehazColeccion(); updateColCount();
+    rr.sel = []; rr.seguro = false; rr.enviando = false;
+    $('#reroll').hidden = true;
+    ruleta(r, t, nueva);
+  } catch (e) {
+    rr.enviando = false; rr.seguro = false; renderRerollKeep();
+    $('#rrMsg').innerHTML = `<span class="err">${esc(e.message || 'No se pudo.')}</span>`;
+  }
+}
+
+/* La ruleta: una tira de cartas de la rareza que sale, que corre de
+   derecha a izquierda y frena hasta dejar la que tocó bajo la marca. Cada
+   carta que cruza la marca hace tic, cada vez más espaciado. */
+const rl = { girando: false, anim: null, raf: 0, r: null, nueva: false, t: 0 };
+/* Dos velocidades: la normal es larga a propósito (casi once segundos, cien
+   cartas), y «⚡ Rápido» —recordado en este navegador— la deja en dos y
+   medio. Apretarlo con la ruleta girando acelera esa misma tirada. */
+let rlRapido = false;
+try { rlRapido = localStorage.getItem('prodrop.rrRapido') === '1'; } catch {}
+const RL = () => rlRapido ? { n: 42, gana: 34, dur: 2600 } : { n: 100, gana: 90, dur: 10800 };
+function pintaRapido() {
+  for (const b of document.querySelectorAll('#rlRapido, #rrRapido')) {
+    b.setAttribute('aria-pressed', rlRapido); b.classList.toggle('on', rlRapido);
+    b.title = rlRapido ? 'Re-rolls rápidos (toca para la animación larga)' : 'Animación larga (toca para re-rolls rápidos)';
+  }
+}
+function cambiaRapido() {
+  rlRapido = !rlRapido;
+  try { localStorage.setItem('prodrop.rrRapido', rlRapido ? '1' : '0'); } catch {}
+  if (rl.anim && rl.girando) rl.anim.updatePlaybackRate(rlRapido ? 4 : 1);
+  Snd.init(); Snd.blip(); pintaRapido();
+}
+$('#rlRapido').onclick = cambiaRapido;
+pintaRapido();
+/* Una carta para la tira: casi siempre de la rareza que sale, y de vez en
+   cuando de las de más arriba, que es lo que da el «casi» al pasar. */
+function cartaTira(base) {
+  const x = Math.random(), t = Math.min(3, base + (x < .78 ? 0 : x < .96 ? 1 : 2)), l = M.POR_TIER[t];
+  return l[Math.floor(Math.random() * l.length)].n;
+}
+function ruleta(r, t, nueva) {
+  const sig = t + 1, tira = $('#rlTira'), { n: RL_N, gana: RL_GANA, dur: DUR } = RL();
+  rl.r = r; rl.nueva = nueva; rl.girando = true; rl.t = t;
+  $('#rlTitulo').innerHTML = `${NR} ${PLURAL[t]} → <b style="color:${TIERS[sig].color}">${TIERS[sig].sym} ${TIERS[sig].label}</b>`;
+  $('#rlFin').hidden = true; $('#rlFin').innerHTML = '';
+  $('#rlSaltar').hidden = false;
+  $('#ruleta').classList.remove('fin');
+  // la tira: cartas al azar desde esa rareza, sin repetir la vecina, y la que tocó en su lugar
+  const ids = [];
+  for (let i = 0; i < RL_N; i++) {
+    let id;
+    do { id = cartaTira(sig); } while (i && id === ids[i - 1]);
+    ids.push(id);
+  }
+  ids[RL_GANA] = r.id;
+  for (const j of [RL_GANA - 1, RL_GANA + 1]) while (ids[j] === r.id) ids[j] = cartaTira(sig);
+  tira.innerHTML = ids.map((id, i) => {
+    const c = CARDS[id];
+    return `<div class="rl-item t${c.tier}${i === RL_GANA ? ' gana' : ''}" style="--accent:${accentOf(c)}"><img src="${c.img}" alt="" draggable="false"><span>${esc(c.name)}</span></div>`;
+  }).join('');
+  $('#ruleta').hidden = false;
+  Snd.init(); Snd.whoosh(.12);
+  // medidas: el ancho de una carta con su hueco, y el centro de la ventana
+  const it = tira.children[0], paso = it.getBoundingClientRect().width + parseFloat(getComputedStyle(tira).columnGap || getComputedStyle(tira).gap || 0);
+  const ancho = tira.parentElement.getBoundingClientRect().width, centro = ancho / 2, w = it.getBoundingClientRect().width;
+  const desvio = (Math.random() - .5) * w * .7;   // no siempre al centro exacto: así se siente que pudo ser la de al lado
+  const x0 = centro - w / 2 - paso * 2, x1 = centro - (RL_GANA * paso + w / 2) - desvio;
+  const dur = REDUCED ? 700 : DUR;
+  rl.anim = tira.animate([{ transform: `translateX(${x0}px)` }, { transform: `translateX(${x1}px)` }],
+    { duration: dur, easing: rlRapido ? 'cubic-bezier(.12,.75,.2,1)' : 'cubic-bezier(.05,.68,.1,1)', fill: 'forwards' });
+  let ultimo = -1;
+  const mira = () => {
+    if (!rl.girando) return;
+    const m = new DOMMatrixReadOnly(getComputedStyle(tira).transform), x = m.m41;
+    const idx = Math.floor((centro - x) / paso);
+    if (idx !== ultimo) { if (ultimo >= 0) { Snd.tick(); buzz(3); } ultimo = idx; }
+    rl.raf = requestAnimationFrame(mira);
+  };
+  rl.raf = requestAnimationFrame(mira);
+  rl.anim.finished.then(() => finRuleta(), () => {});
+}
+$('#rlSaltar').onclick = () => { if (rl.anim && rl.girando) rl.anim.finish(); };
+function finRuleta() {
+  if (!rl.girando) return;
+  rl.girando = false; cancelAnimationFrame(rl.raf);
+  $('#rlSaltar').hidden = true;
+  const r = rl.r, c = CARDS[r.id], t = c.tier, gana = $('#rlTira .gana'), salto = t - rl.t;
+  $('#ruleta').classList.add('fin');
+  const [x, y] = centerOf(gana), pl = t >= 2 ? paletteOf(c) : [accentOf(c), '#fff'];
+  if (t >= 2 || salto > 1) flash(pl[0], t === 3 ? .9 : .6, t === 3 ? 1000 : 650);
+  burst(x, y, { n: t === 3 ? 140 : t === 2 ? 80 : 40, colors: [...pl, '#fff', '#ffcc3d'], speed: t === 3 ? 16 : 11, kinds: ['confetti', 'spark', 'star'], gravity: .15 });
+  Snd.reveal(t); buzz(t >= 2 ? [30, 60, 30, 60, 90] : [40]);
+  const cp = copiaDe(cuenta.mias.find(m => m.c === r.c) || { c: r.c, o: cuenta.uid, k: r.k, i: 0, at: r.at, id: r.id, g: r.g, w: r.w });
+  const inst = fromCopy(c, cp);
+  const fin = $('#rlFin');
+  fin.innerHTML = `<div class="rl-carta"></div>
+    <div class="rl-txt">${salto > 1 ? `<span class="rl-salto">¡SALTO! Subió ${salto === 2 ? 'dos' : 'tres'} calidades</span>` : ''}<span class="rl-tier" style="--c:${accentOf(c)}">${TIERS[t].label.toUpperCase()} ${TIERS[t].sym}</span>
+      <b>${esc(c.name)}</b><small>${esc(subtitle(c))} · N.º ${pad(c.num)}${rl.nueva ? ' <em>NUEVA</em>' : ''}</small>
+      <small>Su nota está oculta, como la de un sobre: gradúala para verla.</small></div>
+    <div class="rl-acc"><button class="btn primary" id="rlVer">Ver carta</button><button class="btn" id="rlOtro">♻ Otro re-roll</button><button class="btn" id="rlCerrar">Listo</button></div>`;
+  const el = makeCard(inst, { back: false });
+  light(el); hoverTilt(el);
+  fin.querySelector('.rl-carta').appendChild(el);
+  fin.hidden = false;
+  el.animate([{ transform: 'translateY(40px) scale(.6) rotate(-6deg)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 650, easing: 'cubic-bezier(.2,1.3,.4,1)' });
+  $('#rlVer').onclick = () => { cierraRuleta(); zoomVuelve = ''; openZoom(inst); };
+  $('#rlOtro').onclick = () => { cierraRuleta(); abreReroll(); };
+  $('#rlCerrar').onclick = cierraRuleta;
+}
+function cierraRuleta() {
+  if (rl.anim) { rl.anim.cancel(); rl.anim = null; }
+  rl.girando = false; cancelAnimationFrame(rl.raf);
+  $('#ruleta').hidden = true; $('#rlTira').innerHTML = ''; $('#rlFin').innerHTML = '';
+  if (prevTilt) { setTilt(...prevTilt); prevTilt = null; }
+}
+
 /* ---------------- RED (con Juegos) ----------------
    El abridor no toca Firebase: pide a la página que lo contiene que cobre
    y escriba, y recibe de ella la cuenta (saldo, sobres, graduadas). */
@@ -1436,9 +1728,10 @@ function alDatos(d) {
   rehazColeccion(); updateColCount(); pintaAvisos();
   if (primera) {
     $('#cargando').hidden = true;
-    let k = ''; try { k = localStorage.getItem(PENDIENTE()) || ''; } catch {}
-    // un sobre comprado y sin abrir (se cerró la pestaña): se sigue con ese, sin cobrar otra vez
-    if (k && cuenta.sobres[k]) newPack(k, cuenta.sobres[k]);
+    let ks = []; try { ks = (localStorage.getItem(PENDIENTE()) || '').split(',').filter(Boolean); } catch {}
+    // sobres comprados y sin abrir (se cerró la pestaña): se sigue con esos, sin cobrar otra vez
+    const vivos = ks.filter(k => cuenta.sobres[k]).slice(0, MAX_JUNTOS).map(k => ({ k, at: cuenta.sobres[k] }));
+    if (vivos.length) newPacks(vivos);
     else tienda();
     return;
   }
@@ -1459,25 +1752,44 @@ function cuentaAtras(t) {
   const m = Math.max(1, Math.ceil((t - ahora()) / 60000)), h = Math.floor(m / 60);
   return h ? `${h} h ${String(m % 60).padStart(2, '0')} min` : `${m} min`;
 }
+/* Cuántos sobres se abren juntos (1, 2 o 3). Se recuerda en este
+   navegador. Cada uno se cobra por separado y Juegos comprueba el saldo
+   antes de cada uno; si se acaba a mitad, se abren los que entraron. */
+let cantidad = 1;
+try { cantidad = clamp(+localStorage.getItem('prodrop.cantidad') || 1, 1, MAX_JUNTOS); } catch {}
+function pintaCantidad(box, p) {
+  box.innerHTML = [1, 2, 3].map(n => {
+    const no = cuenta.listo && (cuenta.saldo < n * p || cuenta.parada);
+    return `<button data-cant="${n}" aria-pressed="${n === cantidad}"${no && n > 1 ? ' class="corto" title="No te alcanza"' : ''}>×${n}</button>`;
+  }).join('');
+  box.querySelectorAll('[data-cant]').forEach(b => b.onclick = () => {
+    cantidad = +b.dataset.cant; Snd.init(); Snd.blip();
+    try { localStorage.setItem('prodrop.cantidad', cantidad); } catch {}
+    pintaCompra();
+  });
+}
+const sobresTxt = n => n === 1 ? 'sobre' : `${n} sobres`;
 function pintaCompra() {
-  const p = precio(), falta = p - cuenta.saldo, promo = p < M.PRECIO.normal, gl = gratisListo();
+  const p1 = precio(), p = p1 * cantidad, falta = p - cuenta.saldo, promo = p1 < M.PRECIO.normal, gl = gratisListo();
+  pintaCantidad($('#cant'), p1); pintaCantidad($('#cant2'), p1);
+  if (phase === 'tienda') { pintaExtras(cantidad, false); pintaKicker(cantidad); }
   $('#saldo').innerHTML = `${MONEDA}<b>${cuenta.listo ? fmt(cuenta.saldo) : '…'}</b>`;
   const f = $('#freeBtn');
   f.innerHTML = gl ? 'Sobre gratis 🎁' : cuenta.gratis ? `🎁 Gratis en ${cuentaAtras(cuenta.gratis)}` : '🎁 Sobre gratis';
   f.disabled = !gl || comprando;
   f.classList.toggle('listo', gl);
   const b = $('#buyBtn');
-  b.innerHTML = `Comprar sobre <span class="precio">${promo ? `<s>${M.PRECIO.normal}</s>` : ''}${MONEDA}${p}</span>`;
+  b.innerHTML = `Comprar ${sobresTxt(cantidad)} <span class="precio">${promo ? `<s>${M.PRECIO.normal * cantidad}</s>` : ''}${MONEDA}${p}</span>`;
   b.disabled = !cuenta.listo || falta > 0 || comprando || cuenta.parada;
   b.classList.toggle('primary', !gl); b.classList.toggle('sec', gl);
   const fin = new Date(M.PRECIO.promoHasta - 1).toLocaleDateString('es-CL', { day: 'numeric', month: 'long', timeZone: 'America/Santiago' });
   $('#buyInfo').innerHTML = !cuenta.listo ? 'Cargando tu cuenta…'
     : cuenta.parada ? `<span class="err">Una compra tuya quedó sin fondos y no vale: hasta que ganes ${fmt(cuenta.falta)} monedas más, no puedes gastar.</span>`
     : gl ? `Tu sobre gratis está listo. El siguiente, 6 horas después de abrirlo.`
-    : falta > 0 ? `Te faltan <b>${fmt(falta)}</b> monedas para comprar uno. Gánalas jugando en <a href="#" data-volver>Juegos</a>.`
-    : promo ? `Precio de lanzamiento hasta el ${fin} (después, ${M.PRECIO.normal}). Tienes ${fmt(cuenta.saldo)}.` : `Tienes ${fmt(cuenta.saldo)} monedas.`;
+    : falta > 0 ? `Te faltan <b>${fmt(falta)}</b> monedas para ${cantidad === 1 ? 'comprar uno' : `abrir ${cantidad} juntos`}. Gánalas jugando en <a href="#" data-volver>Juegos</a>.`
+    : promo ? `Precio de lanzamiento hasta el ${fin} (después, ${M.PRECIO.normal} cada uno). Tienes ${fmt(cuenta.saldo)}.` : `Tienes ${fmt(cuenta.saldo)} monedas.`;
   const a = $('#againBtn');
-  a.innerHTML = `Abrir otro sobre ✳ <span class="precio">${MONEDA}${p}</span>`;
+  a.innerHTML = `${cantidad === 1 ? 'Abrir otro sobre' : `Abrir otros ${cantidad}`} ✳ <span class="precio">${MONEDA}${p}</span>`;
   a.disabled = falta > 0 || comprando || cuenta.parada;
   a.title = falta > 0 ? `Te faltan ${fmt(falta)} monedas` : '';
   const ag = $('#againFreeBtn');
@@ -1488,22 +1800,33 @@ let comprando = false;
 async function comprar(drop, gratis) {
   if (comprando || !cuenta.listo) return;
   Snd.init();
-  if (gratis ? !gratisListo() : cuenta.parada || cuenta.saldo < precio()) { avisaCompra(); return; }
+  const n = gratis ? 1 : cantidad;
+  if (gratis ? !gratisListo() : cuenta.parada || cuenta.saldo < precio() * n) { avisaCompra(); return; }
   comprando = true; pintaCompra();
-  $('#buyInfo').textContent = gratis ? 'Abriendo tu sobre gratis…' : 'Comprando…';
-  try {
-    const r = await Red.pide(gratis ? 'gratis' : 'comprar', gratis ? {} : { p: precio() });
-    // la cuenta real llega sola; esto evita ver la vieja un instante
-    if (gratis) cuenta.gratis = r.at + 6 * 3600 * 1000; else cuenta.saldo -= r.p;
-    cuenta.sobres[r.k] = r.at;
-    Snd.coin();
-    comprando = false;
-    newPack(r.k, r.at, drop);
-  } catch (e) {
-    comprando = false; pintaCompra();
-    $('#buyInfo').innerHTML = `<span class="err">${esc(e.message || 'No se pudo comprar.')}</span>`;
-    if (phase === 'summary') toast(e.message || 'No se pudo comprar.', true);
+  $('#buyInfo').textContent = gratis ? 'Abriendo tu sobre gratis…' : n > 1 ? `Comprando ${n} sobres…` : 'Comprando…';
+  const lista = [];
+  let error = null;
+  /* Uno tras otro: Juegos comprueba el saldo antes de cada uno. */
+  for (let i = 0; i < n; i++) {
+    try {
+      const r = await Red.pide(gratis ? 'gratis' : 'comprar', gratis ? {} : { p: precio() });
+      // la cuenta real llega sola; esto evita ver la vieja un instante
+      if (gratis) cuenta.gratis = r.at + 6 * 3600 * 1000; else cuenta.saldo -= r.p;
+      cuenta.sobres[r.k] = r.at;
+      lista.push({ k: r.k, at: r.at });
+      if (n > 1) $('#buyInfo').textContent = `Comprando ${n} sobres… (${lista.length} de ${n})`;
+    } catch (e) { error = e; break; }
   }
+  comprando = false;
+  if (lista.length) {
+    Snd.coin();
+    newPacks(lista, drop);
+    if (error) toast(`Solo entraron ${lista.length} de ${n}: ${error.message || 'no se pudo comprar el resto.'}`, true);
+    return;
+  }
+  pintaCompra();
+  $('#buyInfo').innerHTML = `<span class="err">${esc((error && error.message) || 'No se pudo comprar.')}</span>`;
+  if (phase === 'summary') toast((error && error.message) || 'No se pudo comprar.', true);
 }
 function avisaCompra() {
   const b = phase === 'summary' ? $('#againBtn') : $('#buyBtn');
@@ -1516,8 +1839,9 @@ document.addEventListener('click', e => { const a = e.target.closest('[data-volv
 /* ---------------- GOD PACK ----------------
    2 % de los sobres: cinco épicas o mejores, como mucho una legendaria.
    Se anuncia al romper el sobre, antes de la primera carta. */
-async function godPack() {
+async function godPack(n = 1) {
   const g = $('#god');
+  g.querySelector('b').textContent = n > 1 ? `GOD PACK ×${n}` : 'GOD PACK';
   g.hidden = false;
   Snd.god(); buzz([40, 60, 40, 60, 120]);
   flash('#ffe27a', .95, 1200);

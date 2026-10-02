@@ -1935,6 +1935,26 @@ newer than `EN_CURSO_FRESCO` (15 min), so a tab that died mid-game drops
 out by itself. Nobody
 has to listen to `partidas` as a whole, which would download every move log.
 
+**Rooms close themselves after six hours without a move** (`salaInactiva`
+and `ultimaActividad` in `motor.js`, `INACTIVA_MS`). The last activity is the
+latest of the room's `at`, `toque` (the server time of the last move or join,
+written by `tocaSala` in `juegos-main.js` at most every ten minutes per tab,
+and by `fb.unirse`), each ficha's `at` and `fin.at`. Rooms from before `toque`
+also count the `at` some moves carry (chess). Closing writes
+`fin = {ganador: "", motivo: "inactiva"}` and then `estado = "fin"`
+(`fb.cierraInactiva`). The rules let anyone signed in do that only when `at`
+and `toque` are both six hours old, so nobody can close a live room that is
+not theirs. Three places trigger it: the lobby, for waiting rooms (which it
+also stops offering); a room on open, unless the board already says the game
+is over (then the module closes it with its winner); and «Tus partidas»
+(`revisaMias`), which looks at the header of every entry older than six hours
+through `fb.resumenSala` (never the move log) and drops from the list any room
+that is gone, closed or dormant. `anotar` skips `motivo: "inactiva"`: a room
+that closed itself was not played and does not count for the ranking. Solo
+club games (BBTAN, sortEm, the Sopa…) have no room and are untouched.
+`tests/salas-dormidas.test.cjs` covers the arithmetic and `test-rules.mjs` the
+rule.
+
 **The room chat lives outside the move log**, in `chat/<pid>`. The log is the
 state, and a «hola» must not change whose turn it is. Players and spectators
 both write to it, each message is written once and signed with the writer's
@@ -3688,6 +3708,57 @@ other file of the site. Things that hold it together:
   the trade composer. The pack being opened stays out of the collection
   (`abriendo`) until the summary; a pack bought and not opened is
   remembered in `localStorage` (`prodrop.pendiente.<uid>`) and resumed.
+- **One, two or three packs open together** (`cantidad`, the ×1/×2/×3
+  control above the buy button and in the summary, kept in
+  `localStorage` as `prodrop.cantidad`). They are bought one after another,
+  each checked by the postman; if the money runs out halfway, the ones that
+  went through are opened. The extra packs are decoration fanned behind the
+  main one (`pintaExtras`); tearing the main one opens all of them. The
+  cards go into one stack (`_sobre` says which pack each came from, and the
+  banner says so). The summary has one row per pack, scrolls, and on a
+  phone fits five cards to a row. `abriendo` is a Set of pack keys, and the
+  unopened-pack resume in `localStorage` holds a comma list. After the
+  opening, the pack's fall, its torn top and its light are **cancelled** once
+  it is hidden. Left «filling», Chrome retired them on its own and kept their
+  last frame. «Abrir otro sobre» then showed the next pack fallen off-screen,
+  with no top.
+- **Re-roll** (CS2's trade-up contract): ten copies of one rarity (común,
+  rara or épica) become one of a higher rarity, any card of it with equal
+  chance. Usually the next one: `SALTO_W[tier]` (ten-thousandths, one row
+  per input rarity) makes común go to rara / épica / legendaria 92 / 7.5 /
+  0.5 %, rara to épica / legendaria 96 / 4 %, and épica always legendary. The jump has its own hash stream
+  (`"prodrop-salto:" + key`), so card and grade come from the same stream
+  as before, and it applies only from `SALTOS_DESDE`: a reroll written
+  earlier keeps the card it already gave. `probSalida(tier)` is what the
+  panel shows. It is `cartas/r/<uid>/<push key>` = `{at: now, c: [ten copy
+  keys]}`, write-once and free. Like a pack, the result is derived, not
+  rolled: `PM.reroll(uid, key, at, tier, notas)` hashes all of that into
+  `{id, g, w}`. Its hidden grade is a bell centred on the ten inputs'
+  average **plus one** (`REROLL.bono`), σ 1.3. For 5 4 6 4 9 8 8 5 3 2,
+  the average is 5.4 and the result is 6 or 7 57 % of the time. The bell is
+  an integer table (`PESO_REROLL`, distance to the centre in tenths),
+  because `Math.exp` is not bit-identical across browsers. `economia`
+  accepts it (event `r`, between gradings and listings) only if the account
+  is not stopped and the ten are its own, distinct, not listed and of one
+  rarity below legendary. The ten leave `dueno`, and the new copy is
+  `<uid>~<key>.0`, registered in `e.sobres` with `r: {id, g, w}`. Every
+  reader of `sobres` branches on `r`: `copiasDe`, the postman's `copia`, and
+  `prodrop-cartas.js`'s `copia`, `mejoresDrops` (which marks it `rr`) and
+  `cifras` (which skips it). Copies sent to the frame carry `id/g/w`, and
+  the frame's `copiaDe` uses them instead of `M.sobre`. The grading rule
+  accepts `cartas/r` packs at index 0. The frame's panel (`#reroll`) picks
+  the ten («Elegir automático» takes duplicates first, keeps the best copy
+  of each card and leaves exhibited ones for last) and asks twice before
+  sending. It shows the expected-grade bell only when all ten are graded:
+  hidden grades stay hidden. The roulette (`#ruleta`, z-index 29, under the
+  effects canvas) is a strip of 100 cards, mostly of the next rarity with
+  some higher ones mixed in (78/18/4 %), with the winner at index 90. It
+  runs right to left for 10.8 s on `cubic-bezier(.05,.68,.1,1)`, ticks each
+  time a card crosses the marker (read off the live transform), and lands
+  slightly off-centre on purpose. **⚡ Rápido** (`prodrop.rrRapido` in
+  `localStorage`, in the panel and on the roulette) makes it 42 cards in
+  2.6 s; pressing it mid-spin sets the running animation's
+  `playbackRate` to 4. A jump of two or more tiers shows «¡SALTO!».
 - **Exhibited cards** are `users/<uid>/perfil/cartas` (up to four copy keys
   `o~k.i`, or the old `k.i` meaning one's own pack; validated by regex in
   the rules), shown only while that account still owns the copy, toggled from the card's zoom. The
