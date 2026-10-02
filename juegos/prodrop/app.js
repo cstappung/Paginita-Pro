@@ -141,7 +141,7 @@ const ahora = () => Date.now() + cuenta.desfase;
 // una copia que llega de Juegos ({c, o, k, i, at, gr}) con su nota y su desgaste
 function copiaDe(x) {
   // la de un re-roll llega con su carta: no sale de ningún sobre
-  if (x.id != null) return { id: x.id, g: x.g, s: x.w, gr: x.gr ? 1 : 0, o: x.o, k: x.k, i: x.i, at: x.at, key: x.c || `${x.o}~${x.k}.${x.i}`, venta: x.venta || '', dios: false, rr: true };
+  if (x.rr) return { id: x.rr.id, g: x.rr.g, s: x.rr.w, gr: x.gr ? 1 : 0, o: x.o, k: x.k, i: x.i, at: x.at, key: x.c || `${x.o}~${x.k}.${x.i}`, venta: x.venta || '', dios: false, rr: true };
   const so = M.sobre(x.o, x.k, x.at), c = so.cartas[x.i];
   return { id: c.id, g: c.g, s: c.w, gr: x.gr ? 1 : 0, o: x.o, k: x.k, i: x.i, at: x.at, key: x.c || `${x.o}~${x.k}.${x.i}`, venta: x.venta || '', dios: so.dios };
 }
@@ -1671,7 +1671,7 @@ function finRuleta() {
   if (t >= 2 || salto > 1) flash(pl[0], t === 3 ? .9 : .6, t === 3 ? 1000 : 650);
   burst(x, y, { n: t === 3 ? 140 : t === 2 ? 80 : 40, colors: [...pl, '#fff', '#ffcc3d'], speed: t === 3 ? 16 : 11, kinds: ['confetti', 'spark', 'star'], gravity: .15 });
   Snd.reveal(t); buzz(t >= 2 ? [30, 60, 30, 60, 90] : [40]);
-  const cp = copiaDe(cuenta.mias.find(m => m.c === r.c) || { c: r.c, o: cuenta.uid, k: r.k, i: 0, at: r.at, id: r.id, g: r.g, w: r.w });
+  const cp = copiaDe(cuenta.mias.find(m => m.c === r.c) || { c: r.c, o: cuenta.uid, k: r.k, i: 0, at: r.at, rr: { id: r.id, g: r.g, w: r.w } });
   const inst = fromCopy(c, cp);
   const fin = $('#rlFin');
   fin.innerHTML = `<div class="rl-carta"></div>
