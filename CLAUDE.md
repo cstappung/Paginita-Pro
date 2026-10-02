@@ -2834,8 +2834,18 @@ Things that matter:
   repeated across the whole bank so the solution is unique, `choca` keeps
   confusable groups apart, four mistakes). They can be lost (`hist` entries
   carry a fourth field, won 0/1, and a lost one scores 0), they add points
-  (`M.puntos`) but **the streak only asks for the four classic modes**
-  (`CLASICOS`), so adding challenges did not break anyone's streak.
+  (`M.puntos`) but **the streak only asks for the classic daily modes**
+  (`CLASICOS`: Componente, Fórmula, Símbolo), so adding challenges did not
+  break anyone's streak. Científico is `practica: true`: only in Práctica,
+  never in the daily (`DIARIOS`), the share text or the streak.
+- **The look is its own, like the *dle sites' themed pages**: always dark,
+  whatever the site theme. `escena.js` draws the background scene (PCB
+  traces with travelling pulses, a Tesla coil with random arcs, a power
+  tower) behind a single centred column: neon logo, modes as round LEDs on
+  a copper trace, a mode plate, a toolbar (Diario/Práctica switch, streak,
+  points, stats and help `<dialog>`s) and chassis panels with screws.
+  `ElectroEscena.descarga()` is the win flash. Reduced motion stops arcs,
+  pulses and the neon flicker.
 - **Four classic modes a day.** Componente and Científico are attribute tables
   (green equal, yellow «something in common» for list columns, red different,
   with an up/down arrow on numbers and on the ordered `EPOCAS`). Fórmula shows

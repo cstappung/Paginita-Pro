@@ -4,17 +4,18 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Electrodle</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;600;700;800&family=Orbitron:wght@700;900&family=Share+Tech+Mono&display=swap">
   <link rel="stylesheet" href="../conexion.css?v=club-1">
   <script src="../conexion.js?v=club-6"></script>
   <style>
-    /* Claro por omisión; oscuro si el sistema lo pide o si Juegos lo manda
-       (conexion.js escribe data-tema en <html> dentro del iframe). */
-    :root{--bg:#f3f5fa;--panel:#ffffff;--panel2:#f7f8fc;--ink:#172033;--muted:#5f6b82;--line:#dfe4ee;--acento:#e08a00;--acento2:#0b8fc7;--acento-ink:#fff;
-      --si:#1e9a55;--casi:#c99300;--no:#c8423b;--celda-ink:#fff;--traza:#0b8fc7;color-scheme:light}
-    @media (prefers-color-scheme:dark){:root:not([data-tema=claro]){--bg:#0c1120;--panel:#151c2e;--panel2:#1a2338;--ink:#e6ebf5;--muted:#93a0b9;--line:#283350;--acento:#fbbf24;--acento2:#38bdf8;--acento-ink:#141414;
-      --si:#1f9d57;--casi:#c49a06;--no:#c94640;--traza:#38bdf8;color-scheme:dark}}
-    :root[data-tema=oscuro]{--bg:#0c1120;--panel:#151c2e;--panel2:#1a2338;--ink:#e6ebf5;--muted:#93a0b9;--line:#283350;--acento:#fbbf24;--acento2:#38bdf8;--acento-ink:#141414;
-      --si:#1f9d57;--casi:#c49a06;--no:#c94640;--traza:#38bdf8;color-scheme:dark}
+    /* Electrodle tiene su propio mundo, como los fondos de LoLdle o Narutodle:
+       un taller eléctrico de noche, sea cual sea el tema del sitio. */
+    :root{--bg:#050a16;--panel:#0f1729;--panel2:#16213a;--ink:#e8eefc;--muted:#8fa0bf;--line:#253456;
+      --acento:#ffb020;--acento2:#22d3ee;--acento-ink:#1a1204;--cobre:#d08a4a;
+      --si:#159a4a;--casi:#c58f00;--no:#b8302a;--celda-ink:#fff;--traza:#22d3ee;color-scheme:dark;
+      --display:"Orbitron","Exo 2",system-ui,sans-serif;--mono:"Share Tech Mono",ui-monospace,Consolas,monospace}
     [hidden]{display:none!important}
     *{box-sizing:border-box}
     html,body{margin:0}
@@ -29,34 +30,6 @@
     .club-volver{color:var(--muted)}
     :focus-visible{outline:3px solid var(--acento2);outline-offset:2px}
     button{font:inherit;color:inherit}
-
-    /* ---------- cabecera ---------- */
-    .cab{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:2px 0 14px}
-    .logo{display:flex;align-items:center;gap:10px;margin:0}
-    .logo svg{width:42px;height:42px;flex:none}
-    .logo h1{margin:0;font-size:28px;line-height:1;letter-spacing:.02em;font-weight:900}
-    .logo h1 span{color:var(--acento)}
-    .logo small{display:block;font-size:11px;letter-spacing:.14em;color:var(--muted);font-weight:700;margin-top:4px}
-    .traza{fill:none;stroke:var(--traza);stroke-width:2;stroke-linecap:round;stroke-dasharray:60;animation:barre 2.6s linear infinite}
-    @keyframes barre{from{stroke-dashoffset:120}to{stroke-dashoffset:0}}
-    .chips{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}
-    .chip{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;font-weight:800;font-size:14px;border:1px solid var(--line);background:var(--panel);font-variant-numeric:tabular-nums}
-    .chip small{font-weight:600;color:var(--muted)}
-    .chip.racha.cero{filter:grayscale(1);opacity:.7}
-
-    /* ---------- tipo y modos ---------- */
-    .tipo{display:inline-flex;padding:3px;border-radius:12px;background:var(--panel);border:1px solid var(--line);margin-bottom:10px}
-    .tipo button{border:0;background:none;color:var(--muted);font-weight:700;font-size:14px;padding:7px 16px;border-radius:9px;cursor:pointer}
-    .tipo button[aria-selected=true]{background:var(--ink);color:var(--bg)}
-    .modos{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:14px}
-    .modo{position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;padding:10px 6px 9px;border-radius:14px;border:1px solid var(--line);background:var(--panel);cursor:pointer;transition:transform .15s,border-color .15s}
-    .modo:hover{transform:translateY(-2px)}
-    .modo .ico{font-size:22px;line-height:1.1}
-    .modo b{font-size:13px}
-    .modo i{font-style:normal;font-size:11px;color:var(--muted);font-weight:600}
-    .modo[aria-selected=true]{border-color:var(--acento);box-shadow:0 0 0 2px color-mix(in srgb,var(--acento) 35%,transparent)}
-    .modo.ok i{color:var(--si)}
-    @media (max-width:480px){.modos{gap:6px}.modo{padding:8px 3px 7px}.modo b{font-size:11px;max-width:100%;overflow:hidden;text-overflow:ellipsis}.modo i{font-size:10px}.modo .ico{font-size:19px}}
 
     /* ---------- panel ---------- */
     .panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px}
@@ -147,8 +120,6 @@
     @media (prefers-reduced-motion:reduce){.traza,tr.nueva .celda,.fallos li.nueva,.chispas i,.formula .var.nueva .tapa,.formula .var.nueva i{animation:none}}
 
     /* ---------- desafíos ---------- */
-    .modos-t{grid-column:1/-1;margin:2px 2px -2px;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
-    .modo.mal i{color:var(--no)}
     .victoria.perdio{border-color:color-mix(in srgb,var(--no) 55%,var(--line));background:color-mix(in srgb,var(--no) 8%,var(--panel))}
     .victoria.perdio h2 span{color:var(--no)}
     .aviso{min-height:1.2em;margin:4px 2px 8px;font-weight:700;font-size:13px;color:var(--acento2)}
@@ -210,42 +181,231 @@
     .ayer{margin:14px 2px 0;font-size:13px;color:var(--muted)}
     .ayer b{color:var(--ink)}
     .nota{margin:10px 2px 0;font-size:12px;color:var(--muted)}
+
+    /* ================= Tema eléctrico =================
+       Fondo de placa de circuito, escena (escena.js) a los lados, una
+       columna central como en los *dle, y paneles de chasis con tornillos. */
+    :root{--fondo:radial-gradient(ellipse 70% 38% at 50% 0%,#14386acc 0%,transparent 72%),radial-gradient(ellipse 45% 35% at 8% 28%,#3a1a6a66 0%,transparent 70%),radial-gradient(ellipse 45% 35% at 92% 32%,#0e4a5c66 0%,transparent 70%),url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220' viewBox='0 0 220 220'%3E%3Cg fill='none' stroke='%2322d3ee' stroke-opacity='.075' stroke-width='2'%3E%3Cpath d='M0 40H60L80 60H150L170 40H220M0 130H30L50 150V220M110 0V30L130 50V100M220 170H160L140 190V220M70 220V185L90 165H120M180 0V20L200 40'/%3E%3Ccircle cx='80' cy='60' r='4'/%3E%3Ccircle cx='150' cy='60' r='4'/%3E%3Ccircle cx='50' cy='150' r='4'/%3E%3Ccircle cx='130' cy='100' r='4'/%3E%3Ccircle cx='140' cy='190' r='4'/%3E%3Ccircle cx='120' cy='165' r='4'/%3E%3C/g%3E%3Cg fill='%23d08a4a' fill-opacity='.07'%3E%3Crect x='150' y='92' width='8' height='14' rx='2'/%3E%3Crect x='164' y='92' width='8' height='14' rx='2'/%3E%3Crect x='178' y='92' width='8' height='14' rx='2'/%3E%3Crect x='150' y='122' width='8' height='14' rx='2'/%3E%3Crect x='164' y='122' width='8' height='14' rx='2'/%3E%3Crect x='178' y='122' width='8' height='14' rx='2'/%3E%3C/g%3E%3Crect x='146' y='104' width='44' height='20' rx='3' fill='%23050a16' fill-opacity='.0' stroke='%2322d3ee' stroke-opacity='.06'/%3E%3C/svg%3E") 0 0/220px 220px,#050a16}
+    html,body{min-height:100%}
+    body,.club-integrado body,html.club-integrado body{position:relative;background:var(--fondo);font-family:"Exo 2",system-ui,sans-serif;color:var(--ink)}
+    .escena{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:0}
+    .shell,.club-integrado .shell{position:relative;z-index:1;max-width:1180px;margin:0 auto;padding:18px 16px 28px}
+    .layout,.club-integrado .layout,.club-integrado :is(.game-layout,.layout){grid-template-columns:minmax(0,1fr)!important;max-width:720px;margin:0 auto;gap:18px}
+    .layout>aside{display:block}
+
+    /* La escena: pistas con pulsos, bobina de Tesla y torre. */
+    .corrientes{position:absolute;left:0;top:0;width:100%;height:600px;opacity:.9}
+    .corrientes .pista{fill:none;stroke:#22d3ee;stroke-opacity:.14;stroke-width:2}
+    .corrientes .via{fill:#050a16;stroke:#22d3ee;stroke-opacity:.4;stroke-width:2}
+    .corrientes .pulso{fill:none;stroke-width:3;stroke-linecap:round;stroke-dasharray:70 1600;animation:corre 6.5s linear infinite}
+    .corrientes .p0{stroke:#ffb020;filter:drop-shadow(0 0 5px #ffb020)}
+    .corrientes .p1{stroke:#22d3ee;filter:drop-shadow(0 0 5px #22d3ee);animation-duration:8s}
+    .corrientes .p2{stroke:#a78bfa;filter:drop-shadow(0 0 5px #a78bfa);animation-duration:9.5s}
+    @keyframes corre{from{stroke-dashoffset:1670}to{stroke-dashoffset:0}}
+    .arte{position:absolute;overflow:visible}
+    .tesla{width:190px;top:150px;left:max(6px,calc(50% - 575px))}
+    .torre{width:180px;top:120px;right:max(6px,calc(50% - 570px))}
+    .espiras path{fill:none;stroke:#6b3412;stroke-width:1.3;opacity:.85}
+    .arco{fill:none;stroke:#f0f9ff;stroke-width:1.7;stroke-linejoin:round;filter:drop-shadow(0 0 3px #7dd3fc) drop-shadow(0 0 9px #a78bfa)}
+    .arco-halo{fill:none;stroke:#7dd3fc;stroke-opacity:.25;stroke-width:7;stroke-linejoin:round}
+    .arco.rama{stroke-width:1;opacity:.85}
+    .tesla .piloto{animation:parpadeo 1.2s steps(1) infinite}
+    .celosia{fill:none;stroke:#36527c;stroke-width:2.4;stroke-linejoin:round}
+    .cables{fill:none;stroke:#2a4268;stroke-width:1.6}
+    .aisladores{stroke:#5f84bd;stroke-width:1.5;fill:#1a2a46}
+    .aviso{fill:#ff4040;filter:drop-shadow(0 0 6px #ff4040);animation:parpadeo 1.6s steps(1) infinite}
+    @keyframes parpadeo{50%{opacity:.15}}
+    @media (max-width:1060px){.arte{opacity:.35}}
+    @media (max-width:760px){.arte{display:none}.corrientes{opacity:.6}}
+    body.destello::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:5;background:radial-gradient(circle at 50% 35%,#c8f1ffcc,#7dd3fc33 40%,transparent 70%);animation:destello .55s ease-out forwards}
+    @keyframes destello{from{opacity:1}to{opacity:0}}
+
+    /* Logo: el rayo con la sinusoide, y el nombre en tubo de neón. */
+    .cab{display:flex;justify-content:center;margin:6px 0 16px}
+    .logo{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center}
+    .logo svg{width:78px;height:78px;flex:none;filter:drop-shadow(0 0 16px #ffb02070)}
+    .logo h1{margin:0;font:900 clamp(34px,8.5vw,58px)/1 var(--display);letter-spacing:.06em;color:#eef9ff;
+      text-shadow:0 0 4px #bdf3ff,0 0 14px #22d3eecc,0 0 34px #22d3ee66;animation:neon 9s infinite}
+    .logo h1 span{color:#ffd88a;text-shadow:0 0 4px #ffe2a8,0 0 14px #ffb020dd,0 0 34px #ff8a0077}
+    .logo small{display:block;font:400 13px var(--mono);letter-spacing:.32em;color:#8fdcef}
+    @keyframes neon{0%,90%,100%{opacity:1}91%{opacity:.55}92%{opacity:1}94%{opacity:.7}95%{opacity:1}}
+    .traza{fill:none;stroke:var(--traza);stroke-width:2;stroke-linecap:round;stroke-dasharray:60;animation:barre 2.6s linear infinite}
+    @keyframes barre{from{stroke-dashoffset:120}to{stroke-dashoffset:0}}
+
+    /* Los modos: LEDs redondos unidos por una pista de cobre. */
+    .selector{display:flex;justify-content:center;align-items:flex-start;flex-wrap:wrap;gap:12px 26px;margin:0 0 14px}
+    .grupo{display:flex;flex-direction:column;align-items:center;gap:7px}
+    .grupo>small{font:12px var(--mono);letter-spacing:.2em;color:#8fdcef;text-transform:uppercase}
+    .fila{position:relative;display:flex;gap:14px;padding:0 4px}
+    .fila::before{content:"";position:absolute;left:-6px;right:-6px;top:50%;height:4px;margin-top:-2px;border-radius:2px;background:linear-gradient(90deg,transparent,#a8652c 12%,#e6a565 50%,#a8652c 88%,transparent)}
+    .led{position:relative;width:58px;height:58px;padding:0;border:0;border-radius:50%;cursor:pointer;display:grid;place-items:center;font-size:25px;transition:transform .15s,box-shadow .2s;
+      background:radial-gradient(circle at 50% 42%,#1f2d4b 0 54%,#0a1120 55% 61%,transparent 62%),conic-gradient(from 210deg,#53627e,#e4ecf8,#6c7b97,#26303f,#b3c1d8,#53627e);box-shadow:0 4px 12px #000a}
+    .led:hover{transform:translateY(-2px)}
+    .led[aria-selected=true]{box-shadow:0 0 0 3px #ffb020,0 0 18px #ffb020bb,0 0 40px #ffb02055;transform:scale(1.08)}
+    .led::after{content:"";position:absolute;top:2px;right:2px;width:11px;height:11px;border-radius:50%;background:#2a3550;box-shadow:inset 0 1px 2px #000}
+    .led.empezado::after{background:#f59e0b;box-shadow:0 0 8px #f59e0b}
+    .led.ok::after{background:#22c55e;box-shadow:0 0 9px #22c55e}
+    .led.mal::after{background:#ef4444;box-shadow:0 0 9px #ef4444}
+    @media (max-width:520px){.selector{gap:10px 14px}.fila{gap:9px}.led{width:46px;height:46px;font-size:20px}}
+
+    /* La placa del modo, como el cartel de modo de LoLdle. */
+    .placa{position:relative;display:flex;align-items:center;max-width:470px;margin:0 auto 14px;min-height:80px}
+    .placa .disco{position:relative;z-index:2;width:80px;height:80px;flex:none;border-radius:50%;display:grid;place-items:center;font-size:36px;
+      background:radial-gradient(circle at 50% 42%,#173a52 0 56%,#0a1120 57% 62%,transparent 63%),conic-gradient(from 210deg,#53627e,#e4ecf8,#6c7b97,#26303f,#b3c1d8,#53627e);box-shadow:0 0 0 3px #22d3ee,0 0 22px #22d3ee77}
+    .placa .rotulo{flex:1;margin-left:-30px;padding:12px 22px 12px 44px;border:2px solid #22d3ee;border-left:0;border-radius:0 16px 16px 0;background:linear-gradient(100deg,#0b2b40,#0b1830 70%);box-shadow:0 6px 18px #000a,inset 0 1px 0 #ffffff14}
+    .placa .rotulo b{display:block;font:700 23px/1.15 var(--display);letter-spacing:.03em;color:#f2fbff}
+    .placa .rotulo span{font-size:14px;color:#a9cde2}
+    .placa .cinta{position:absolute;top:6px;right:-8px;padding:3px 10px;font:12px var(--mono);letter-spacing:.14em;color:#1a1204;background:#ffb020;box-shadow:0 2px 6px #000a;transform:rotate(6deg)}
+
+    /* La barra de herramientas: interruptor diario/práctica y medidores. */
+    .herramientas{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;max-width:560px;margin:0 auto 16px;padding:9px 12px;border:2px solid #3a4b6b;border-radius:14px;background:linear-gradient(#151f35,#0c1322);box-shadow:inset 0 1px 0 #ffffff12,0 6px 18px #0009}
+    .interruptor{display:inline-flex;padding:3px;border-radius:999px;background:#060c18;border:1px solid #2c3c5e;box-shadow:inset 0 2px 6px #000}
+    .interruptor button{border:0;background:none;color:var(--muted);font:700 13px var(--display);letter-spacing:.06em;padding:8px 14px;border-radius:999px;cursor:pointer;text-transform:uppercase}
+    .interruptor button[aria-selected=true]{background:linear-gradient(#ffcb5a,#f29a00);color:#1a1204;box-shadow:0 0 12px #ffb02088}
+    .chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:10px;border:1px solid #2c3c5e;background:#08101f;font:700 15px var(--mono);color:#e6f6ff;font-variant-numeric:tabular-nums}
+    .chip small{color:var(--muted);font-size:12px}
+    .chip.racha.cero{filter:grayscale(1);opacity:.6}
+    .icono{width:40px;height:40px;border-radius:10px;border:1px solid #2c3c5e;background:#0f1729;font-size:18px;cursor:pointer;display:grid;place-items:center;transition:box-shadow .2s}
+    .icono:hover{box-shadow:0 0 0 2px #22d3ee88,0 0 14px #22d3ee55}
+
+    /* El chasis: placa de metal oscuro con cuatro tornillos. */
+    .panel,.club-ranking,.club-integrado .club-ranking,.mas{position:relative;background:linear-gradient(180deg,#131c31,#0b1221);border:2px solid #2c3d60;border-radius:16px;box-shadow:0 12px 32px #000b,inset 0 1px 0 #ffffff14;color:var(--ink)}
+    .panel{padding:22px 20px 18px}
+    .panel::before,.mas::before,.club-ranking::before{content:"";position:absolute;inset:7px;pointer-events:none;
+      background:radial-gradient(circle,#9aabc7 0 2px,#3b4a63 2.5px 3.5px,transparent 4px) 0 0/9px 9px no-repeat,radial-gradient(circle,#9aabc7 0 2px,#3b4a63 2.5px 3.5px,transparent 4px) 100% 0/9px 9px no-repeat,
+      radial-gradient(circle,#9aabc7 0 2px,#3b4a63 2.5px 3.5px,transparent 4px) 0 100%/9px 9px no-repeat,radial-gradient(circle,#9aabc7 0 2px,#3b4a63 2.5px 3.5px,transparent 4px) 100% 100%/9px 9px no-repeat}
+    .consigna{text-align:center;color:#b9c9e2;font-size:15px;margin:0 6px 14px}
+    .consigna b{color:#fff}
+    /* Pantallas de osciloscopio para la fórmula, el símbolo y el circuito. */
+    .visual{background:radial-gradient(ellipse at center,#0a2234 0%,#050d18 75%);border:2px solid #1d4660;box-shadow:inset 0 0 30px #000,0 0 0 4px #0b1424,0 0 18px #22d3ee22}
+    .visual::before{background-image:linear-gradient(#22d3ee1c 1px,transparent 1px),linear-gradient(90deg,#22d3ee1c 1px,transparent 1px);background-size:28px 28px;background-position:center;opacity:1}
+    .formula{color:#e9fbff;text-shadow:0 0 8px #22d3ee88}
+    .formula .tapa{background:linear-gradient(#ffcb5a,#f29a00);box-shadow:0 0 10px #ffb02088;text-shadow:none}
+    .simbolo{color:#a5f0ff;filter:drop-shadow(0 0 4px #22d3eeaa)}
+    .circuito{color:#c5f3ff}
+    .circuito .rv{fill:#7fa8c4}
+    .zoom{background:#06101c;border-color:#1d4660;color:#8fdcef;font-family:var(--mono)}
+    .pista{border-color:#2c3d60}
+    .pista.abierta{background:#3a2a0a;border-color:#b07a10;color:#ffe3a3}
+    /* El buscador: campo con borde cian y botón redondo de encendido. */
+    .adivina{align-items:center}
+    .adivina input{height:54px;background:#071020;border:2px solid #1f6f8b;color:#ecfbff;font-size:17px;border-radius:14px;box-shadow:inset 0 2px 8px #000}
+    .adivina input::placeholder{color:#6f8aa8}
+    .adivina input:focus{border-color:#22d3ee;box-shadow:inset 0 2px 8px #000,0 0 0 3px #22d3ee44,0 0 18px #22d3ee44}
+    .enviar{flex:none;width:58px;height:58px;border-radius:50%;cursor:pointer;font-size:22px;color:#1a1204;border:3px solid #0b1424;
+      background:radial-gradient(circle at 40% 35%,#ffe29a,#ffb020 45%,#c27200);box-shadow:0 0 0 2px #22d3ee,0 0 16px #ffb02088,0 4px 10px #000a;transition:transform .12s}
+    .enviar:hover{transform:scale(1.06)}.enviar:active{transform:scale(.95)}
+    .sugs{background:#0c1528;border:1px solid #2c4b70;box-shadow:0 16px 36px #000c}
+    .sugs li[aria-selected=true],.sugs li:hover{background:#12324a}
+    .boton{background:#16213a;border:1px solid #33466c;color:var(--ink)}
+    .boton.primario{background:linear-gradient(#ffcb5a,#f29a00);color:#1a1204;border-color:#c27200;box-shadow:0 0 14px #ffb02055}
+    /* Las celdas: paneles de LED con relieve y su brillo. */
+    .tabla th{font:12px var(--mono);letter-spacing:.06em;color:#8fdcef;border-bottom:2px solid #22d3ee55}
+    .tabla tr>:first-child{background:#0e1628}
+    .celda{border:1px solid #ffffff2a;box-shadow:inset 0 2px 0 #ffffff30,inset 0 -3px 0 #00000055;text-shadow:0 1px 2px #0008}
+    .celda.si{background:linear-gradient(#1fb85a,#11823d);box-shadow:inset 0 2px 0 #ffffff30,inset 0 -3px 0 #00000055,0 0 12px #22c55e55}
+    .celda.casi{background:linear-gradient(#e0a810,#a87800);box-shadow:inset 0 2px 0 #ffffff30,inset 0 -3px 0 #00000055,0 0 12px #f59e0b55}
+    .celda.no{background:linear-gradient(#d23c34,#952520);box-shadow:inset 0 2px 0 #ffffff30,inset 0 -3px 0 #00000055,0 0 10px #ef444444}
+    .celda.nombre{background:linear-gradient(#1b2945,#111b30);border-color:#2f4a72;color:#eaf6ff}
+    .fallos li{background:#3a1412;color:#ff9b93;border-color:#7a2a24}
+    .fallos li.bien{background:#0f3a22;color:#7ef0a9;border-color:#1f7a45}
+    .victoria{background:linear-gradient(180deg,#0d3324,#0b1f1b);border:2px solid #22c55e;box-shadow:0 0 22px #22c55e44}
+    .victoria h2{font:700 20px/1.3 var(--display);letter-spacing:.02em}
+    .victoria.perdio{background:linear-gradient(180deg,#3a1414,#1f0f12);border-color:#ef4444;box-shadow:0 0 22px #ef444444}
+    .cuenta{font-family:var(--mono);color:#8fdcef}
+    .contador{text-align:center;font-family:var(--mono);color:#7f97b8;letter-spacing:.04em}
+    .leyenda{justify-content:center}
+    .filas-banda li{background:#0e1628;border-color:#2c3d60}
+    .paleta button{background:#0e1628;border-color:#2c3d60}
+    .banda-tabs button{background:#0e1628;border-color:#2c3d60}
+    .ficha{background:linear-gradient(#1a2743,#111b30);border:1px solid #2f4a72;color:#eaf6ff;box-shadow:inset 0 1px 0 #ffffff1a}
+    .ficha.sel{background:linear-gradient(#ffcb5a,#f29a00);color:#1a1204;border-color:#c27200;box-shadow:0 0 14px #ffb02077}
+    .conx-grupo{box-shadow:inset 0 2px 0 #ffffff55,0 0 14px #0006}
+    /* Lo de ayer y los otros juegos, como el pie de LoLdle. */
+    .ayer{text-align:center;font-size:16px;color:#c7d5ea;margin:18px 0 4px}
+    .ayer b{color:#ffd88a;text-shadow:0 0 10px #ffb02066}
+    .mas{max-width:520px;margin:16px auto 0;padding:16px 18px 18px;text-align:center}
+    .mas h2{margin:0 0 2px;font:700 15px var(--display);color:#8fdcef;letter-spacing:.06em}
+    .mas p{margin:0 0 12px;color:#c7d5ea}
+    .mas div{display:flex;flex-wrap:wrap;justify-content:center;gap:12px}
+    .mas a{display:flex;flex-direction:column;align-items:center;gap:5px;width:70px;color:#dce8f8;text-decoration:none;font-size:12px;font-weight:700}
+    .mas a i{width:46px;height:46px;border-radius:50%;display:grid;place-items:center;font-style:normal;font-size:20px;font-weight:900;background:radial-gradient(circle at 50% 40%,#1f2d4b 0 58%,transparent 60%),conic-gradient(from 210deg,#53627e,#e4ecf8,#6c7b97,#26303f,#b3c1d8,#53627e);box-shadow:0 4px 10px #000a;transition:transform .15s}
+    .mas a:hover i{transform:translateY(-3px);box-shadow:0 0 0 2px #22d3ee,0 0 14px #22d3ee66}
+    .nota{text-align:center;color:#7f97b8}
+    .club-ranking,.club-integrado .club-ranking{margin:0;padding:20px}
+    .shell>.club-ranking{max-width:720px;margin:18px auto 0}
+    .club-ranking h2,.club-integrado .club-ranking h2{font:700 16px var(--display);letter-spacing:.04em;color:#8fdcef}
+    .club-ranking button{background:#16213a;border-color:#33466c;color:var(--ink)}
+    .club-volver{color:#8fdcef}
+    /* Los cuadros de estadísticas y de ayuda. */
+    .dialogo{width:min(540px,calc(100% - 32px));margin:70px auto auto;padding:22px;border:2px solid #22d3ee77;border-radius:18px;background:linear-gradient(180deg,#131c31,#0b1221);color:var(--ink);box-shadow:0 0 40px #22d3ee33,0 20px 60px #000}
+    .dialogo::backdrop{background:#020610cc}
+    .dialogo h2{margin:0 0 12px;font:700 20px var(--display);color:#f2fbff;letter-spacing:.03em}
+    .dialogo .cerrar{position:absolute;top:12px;right:12px}
+    .medidores{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:14px}
+    .medidores div{padding:10px 6px;border-radius:12px;background:#08101f;border:1px solid #2c3c5e;text-align:center}
+    .medidores b{display:block;font:700 24px var(--mono);color:#ffd88a;text-shadow:0 0 10px #ffb02066}
+    .medidores span{font-size:11px;color:var(--muted)}
+    .barras{display:grid;gap:5px;margin:8px 0 4px}
+    .barras div{display:grid;grid-template-columns:44px 1fr;align-items:center;gap:8px;font:13px var(--mono)}
+    .barras i{display:block;height:20px;min-width:24px;padding:0 8px;border-radius:6px;background:linear-gradient(90deg,#0e7490,#22d3ee);color:#03131c;font-style:normal;font-weight:700;text-align:right;line-height:20px;width:var(--w)}
+    .dialogo ul{padding-left:20px}.dialogo li{margin:4px 0}
+    @media (prefers-reduced-motion:reduce){.logo h1,.corrientes .pulso,.tesla .piloto,.aviso{animation:none}}
   </style>
 </head>
 <body>
+  <div id="escena" class="escena" aria-hidden="true"></div>
   <div class="shell">
     <div class="layout">
       <main>
-        <div class="cab">
+        <header class="cab">
           <div class="logo">
             <svg viewBox="0 0 48 48" aria-hidden="true">
-              <rect x="2" y="2" width="44" height="44" rx="11" fill="var(--panel)" stroke="var(--line)"/>
+              <rect x="2" y="2" width="44" height="44" rx="11" fill="#0f1729" stroke="#2f4a72"/>
               <path class="traza" d="M6 30 Q11 14 16 30 T26 30 T36 30 T46 30"/>
-              <path d="M27 6 L16 26 H23 L19 42 L33 19 H25 Z" fill="var(--acento)" stroke="var(--ink)" stroke-width="1.4" stroke-linejoin="round"/>
+              <path d="M27 6 L16 26 H23 L19 42 L33 19 H25 Z" fill="#ffb020" stroke="#fff3d6" stroke-width="1.2" stroke-linejoin="round"/>
             </svg>
-            <div><h1>ELECTRO<span>DLE</span></h1><small>EL DESAFÍO ELÉCTRICO DEL DÍA</small></div>
+            <h1>ELECTRO<span>DLE</span></h1>
+            <small id="numero">EL DESAFÍO ELÉCTRICO DEL DÍA</small>
           </div>
-          <div class="chips">
-            <span id="racha" class="chip racha" title="Días seguidos completando los cuatro modos del día">🔥 0</span>
-            <span id="puntos" class="chip" title="Puntos acumulados en los desafíos diarios">⚡ 0 <small>pts</small></span>
+        </header>
+        <nav id="modos" class="selector" aria-label="Modos de juego"></nav>
+        <section id="placa" class="placa" aria-live="polite"></section>
+        <div class="herramientas">
+          <div class="interruptor" role="tablist" aria-label="Tipo de partida">
+            <button type="button" role="tab" data-tipo="diario">Diario</button>
+            <button type="button" role="tab" data-tipo="practica">Práctica</button>
           </div>
+          <span id="racha" class="chip racha" title="Días seguidos completando los modos de adivinar del diario">🔥 0</span>
+          <span id="puntos" class="chip" title="Puntos acumulados en el diario">⚡ 0 <small>pts</small></span>
+          <button type="button" id="btnStats" class="icono" title="Estadísticas" aria-label="Estadísticas">📊</button>
+          <button type="button" id="btnAyuda" class="icono" title="Cómo se juega" aria-label="Cómo se juega">❓</button>
         </div>
-        <div class="tipo" role="tablist" aria-label="Tipo de partida">
-          <button type="button" role="tab" data-tipo="diario">Diario</button>
-          <button type="button" role="tab" data-tipo="practica">Práctica</button>
-        </div>
-        <div id="modos" class="modos" role="tablist" aria-label="Modo"></div>
         <section id="panel" class="panel" aria-live="polite"></section>
         <p id="ayer" class="ayer"></p>
+        <nav class="mas" aria-label="Otros juegos del Club">
+          <h2>¿QUIERES MÁS?</h2>
+          <p>Juega a los otros juegos del Club:</p>
+          <div>
+            <a href="../../../juegos.html#solo/sopa" target="_top"><i style="color:#7aa2ff">🔤</i>Sopa</a>
+            <a href="../../../juegos.html#solo/minas" target="_top"><i style="color:#eeb765">✦</i>Minas</a>
+            <a href="../../../juegos.html#solo/snake" target="_top"><i style="color:#4be9bc">ϟ</i>Snake</a>
+            <a href="../../../juegos.html#solo/tetris" target="_top"><i style="color:#c48bff">▤</i>Tetris</a>
+            <a href="../../../juegos.html#solo/bbtan" target="_top"><i style="color:#c4f568">●</i>BBTAN</a>
+            <a href="../../../juegos.html#solo/sortem" target="_top"><i style="color:#ff4f9a">↔</i>sortEm</a>
+          </div>
+        </nav>
         <p id="nota" class="nota"></p>
       </main>
       <aside></aside>
     </div>
   </div>
-  <script src="datos.js?v=electro-2"></script>
-  <script src="simbolos.js?v=electro-2"></script>
-  <script src="retos.js?v=electro-2"></script>
-  <script src="motor.js?v=electro-2"></script>
-  <script src="game.js?v=electro-2"></script>
+  <dialog id="dialogo" class="dialogo" aria-labelledby="dialogoT"></dialog>
+  <script src="datos.js?v=electro-3"></script>
+  <script src="simbolos.js?v=electro-3"></script>
+  <script src="retos.js?v=electro-3"></script>
+  <script src="motor.js?v=electro-3"></script>
+  <script src="game.js?v=electro-3"></script>
+  <script src="escena.js?v=electro-3"></script>
 </body>
 </html>

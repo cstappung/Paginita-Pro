@@ -25,6 +25,7 @@
   let est = M.limpia(lee("electro.estado", null));
   let tipo = lee("electro.tipo", "diario") === "practica" ? "practica" : "diario";
   let modo = M.MODO[lee("electro.modo", "comp")] ? lee("electro.modo", "comp") : "comp";
+  if (tipo === "diario" && M.MODO[modo].practica) modo = "comp";
   const prac = {};          // modo → {obj, i: [ids]} de la práctica, solo en memoria
   let animar = null;        // la fila (o el chip) recién agregada, para animarla una vez
   let celebrar = false;     // chispas en la próxima victoria pintada
@@ -78,7 +79,7 @@
     }
     animar = { modo, tipo, n: g.i.length + 1 };
     const s = M.estado(modo, g.obj, juego().i);
-    if (s.fin) { celebrar = s.gano; if (tipo === "diario") termina(s.gano); }
+    if (s.fin) { celebrar = s.gano; if (tipo === "diario") termina(s.gano); if (s.gano && window.ElectroEscena) window.ElectroEscena.descarga(); }
     if (tipo === "diario") { guardaLocal(); sube(); }
     pinta();
     const e = $("entrada");
@@ -175,7 +176,9 @@
   }
 
   /* ---------- dibujo: final ---------- */
-  function siguienteSinHacer() { return M.MODOS.find(x => x.id !== modo && !juego(x.id).fin); }
+  /* Los modos que se ven: el diario no trae los de solo práctica. */
+  const visibles = () => M.MODOS.filter(x => tipo === "practica" || !x.practica);
+  function siguienteSinHacer() { return visibles().find(x => x.id !== modo && !juego(x.id).fin); }
   function botonesFin() {
     const sig = siguienteSinHacer();
     let b = "";
@@ -263,7 +266,7 @@
   function circuitoHTML(g) {
     const c = M.reto("circ", g.obj), nueva = animar && animar.modo === "circ" && animar.tipo === tipo && animar.n === g.i.length;
     const pregunta = `¿Cuánto vale <b>${esc(c.et)}</b>, ${esc(c.dice)}? Responde en <b>${esc(c.unidad)}</b>.`;
-    const form = g.fin ? "" : `<form class="adivina" id="adivina-num" autocomplete="off"><input id="entrada" type="text" inputmode="decimal" placeholder="Tu respuesta en ${esc(c.unidad)}" aria-label="Tu respuesta en ${esc(c.unidad)}"><span class="unidad">${esc(c.unidad)}</span><button type="submit" class="boton primario">Probar</button></form>`;
+    const form = g.fin ? "" : `<form class="adivina" id="adivina-num" autocomplete="off"><input id="entrada" type="text" inputmode="decimal" placeholder="Tu respuesta en ${esc(c.unidad)}" aria-label="Tu respuesta en ${esc(c.unidad)}"><span class="unidad">${esc(c.unidad)}</span><button type="submit" class="enviar" aria-label="Probar" title="Probar">▶</button></form>`;
     const filas = g.i.slice().reverse().map((x, k) => {
       const v = X.evaluaCircuito(x, c.resp);
       return `<li class="${v.e}${k === 0 && nueva ? " nueva" : ""}"><b>${esc(X.num(X.leeNumero(x)))} ${esc(c.unidad)}</b><span>${v.e === "si" ? "¡exacto!" : `${v.err > 0 ? "+" : "−"}${X.num(Math.abs(v.err) * 100)} % ${v.flecha}`}</span></li>`;
@@ -309,14 +312,21 @@
     $("racha").innerHTML = `🔥 ${r}${mejor > r ? ` <small>· mejor ${mejor}</small>` : ""}`;
     $("racha").classList.toggle("cero", !r);
     $("puntos").innerHTML = `⚡ ${t.puntos.toLocaleString("es-CL")} <small>pts</small>`;
+    $("numero").textContent = tipo === "diario" ? `ELECTRODLE #${M.numeroElectrodle(hoy)} · ${hoy.split("-").reverse().join("/")}` : "MODO PRÁCTICA · SIN PUNTOS";
     for (const b of document.querySelectorAll("[data-tipo]")) b.setAttribute("aria-selected", String(b.dataset.tipo === tipo));
-    const boton = x => {
+    /* Cada modo es un LED: ámbar el elegido, y su lucecita dice cómo va. */
+    const led = x => {
       const g = juego(x.id), h = tipo === "diario" && est.hist[hoy] && est.hist[hoy][x.id];
-      const estado = g.fin ? (!g.gano ? "✗ sin acertar" : h ? `✓ ${h[1]} · +${h[0]}` : "✓ resuelto") : g.i.length ? plural(g.i.length, "intento", "intentos") : "sin jugar";
-      return `<button type="button" role="tab" class="modo${g.fin ? (g.gano ? " ok" : " mal") : ""}" data-modo="${x.id}" aria-selected="${x.id === modo}"><span class="ico" aria-hidden="true">${x.icono}</span><b>${esc(x.nombre)}</b><i>${estado}</i></button>`;
+      const estado = g.fin ? (!g.gano ? "sin acertar" : h ? `acertado en ${plural(h[1], "intento", "intentos")}, +${h[0]} pts` : "resuelto") : g.i.length ? plural(g.i.length, "intento", "intentos") : "sin jugar";
+      const cl = g.fin ? (g.gano ? " ok" : " mal") : g.i.length ? " empezado" : "";
+      return `<button type="button" class="led${cl}" data-modo="${x.id}" aria-selected="${x.id === modo}" aria-label="${esc(x.nombre)}: ${esc(estado)}" title="${esc(x.nombre)} · ${esc(estado)}"><span aria-hidden="true">${x.icono}</span></button>`;
     };
-    $("modos").innerHTML = `<p class="modos-t">Adivina · cuentan para la 🔥 racha</p>${M.MODOS.filter(x => !x.reto).map(boton).join("")}` +
-      `<p class="modos-t">Desafíos · puntos extra</p>${M.MODOS.filter(x => x.reto).map(boton).join("")}`;
+    const vis = visibles();
+    $("modos").innerHTML = `<div class="grupo"><small>Adivina</small><div class="fila">${vis.filter(x => !x.reto).map(led).join("")}</div></div>` +
+      `<div class="grupo"><small>Desafíos</small><div class="fila">${vis.filter(x => x.reto).map(led).join("")}</div></div>`;
+    const m = M.MODO[modo];
+    $("placa").innerHTML = `<div class="disco" aria-hidden="true">${m.icono}</div><div class="rotulo"><b>${esc(m.nombre)}</b><span>${esc(m.lema)}</span></div>` +
+      (tipo === "practica" ? `<span class="cinta">${m.practica ? "SOLO PRÁCTICA" : "PRÁCTICA"}</span>` : m.reto ? `<span class="cinta">PUNTOS EXTRA</span>` : "");
   }
   function pinta() {
     hoy = M.diaChile();
@@ -348,18 +358,23 @@
       ${g.fin ? victoriaHTML(modo, g) : `<form class="adivina" id="adivina" autocomplete="off">
         <input id="entrada" type="text" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="sugs"
           placeholder="${m.id === "cien" ? "Escribe un nombre…" : m.id === "form" ? "Escribe el nombre de la fórmula…" : "Escribe un componente…"}" aria-label="Tu intento">
-        <button type="submit" class="boton primario">Probar</button>
+        <button type="submit" class="enviar" aria-label="Probar" title="Probar">▶</button>
         <ul id="sugs" class="sugs" role="listbox" hidden></ul></form>`}
       ${g.i.length ? `<p class="contador">${plural(g.i.length, "intento", "intentos")}${tipo === "diario" && !g.fin ? ` · ahora vale ${M.puntosDe(g.i.length + 1)} pts` : ""}</p>` : tipo === "diario" ? `<p class="contador">A la primera vale 100 pts; cada intento más resta 10.</p>` : ""}
       ${m.tipo === "tabla" ? (g.i.length ? tablaHTML(modo, g) : "") : fallosHTML(modo, g)}`;
     if (m.tipo === "simbolo") animaZoom(g.obj, fallos, g.fin);
   }
-  /* Lo de ayer: los cuatro clásicos, la resistencia y la respuesta del circuito. */
+  /* Lo de ayer, del modo que se está viendo, como «Yesterday's champion was». */
   function pintaAyer() {
-    if (tipo !== "diario") { $("ayer").textContent = ""; return; }
-    const f = M.diaAnterior(hoy), c = M.reto("circ", M.objetivoDelDia("circ", f));
-    $("ayer").innerHTML = "Ayer eran: " + M.MODOS.filter(x => !x.reto).map(x => `${x.icono} <b>${esc(M.item(x.id, M.objetivoDelDia(x.id, f)).n)}</b>`).join(" · ") +
-      ` · 🎨 <b>${esc(X.textoBandas(M.reto("band", M.objetivoDelDia("band", f))))}</b> · 🔋 <b>${esc(c.et)} = ${esc(X.num(c.resp))} ${esc(c.unidad)}</b>`;
+    const m = M.MODO[modo];
+    if (tipo !== "diario" || m.practica) { $("ayer").textContent = ""; return; }
+    const f = M.diaAnterior(hoy), ob = M.objetivoDelDia(modo, f);
+    let txt;
+    if (modo === "band") txt = `La resistencia de ayer era <b>${esc(X.textoBandas(M.reto("band", ob)))}</b>`;
+    else if (modo === "circ") { const c = M.reto("circ", ob); txt = `La respuesta de ayer era <b>${esc(c.et)} = ${esc(X.num(c.resp))} ${esc(c.unidad)}</b>`; }
+    else if (modo === "conx") txt = `Ayer los grupos eran <b>${M.reto("conx", ob).grupos.map(g => esc(g.t)).join(" · ")}</b>`;
+    else txt = `${modo === "form" ? "La fórmula" : modo === "simb" ? "El símbolo" : "El componente"} de ayer era <b>${esc(M.item(modo, ob).n)}</b>`;
+    $("ayer").innerHTML = txt;
   }
 
   /* ---------- buscador ---------- */
@@ -447,7 +462,43 @@
 
   /* ---------- tipos y modos ---------- */
   function ponModo(m) { modo = m; guarda("electro.modo", m); animar = null; sugs = []; pinta(); }
-  function ponTipo(t) { tipo = t; guarda("electro.tipo", t); animar = null; sugs = []; pinta(); }
+  /* Científico no está en el diario: al volver al diario desde él, se pasa a Componente. */
+  function ponTipo(t) { tipo = t; guarda("electro.tipo", t); if (!visibles().some(x => x.id === modo)) modo = "comp"; animar = null; sugs = []; pinta(); }
+  /* ---------- estadísticas y ayuda ---------- */
+  const dialogo = $("dialogo");
+  function abre(html) {
+    dialogo.innerHTML = `<button type="button" class="icono cerrar" aria-label="Cerrar" data-cerrar>✕</button>${html}`;
+    dialogo.querySelector("[data-cerrar]").onclick = () => dialogo.close();
+    if (dialogo.showModal) dialogo.showModal(); else dialogo.setAttribute("open", "");
+  }
+  dialogo.addEventListener("click", ev => { if (ev.target === dialogo) dialogo.close(); });
+  function estadisticas() {
+    const t = M.total(est), dias = Object.keys(est.hist), m = M.MODO[modo];
+    const completos = dias.filter(f => M.diaCompleto(est, f)).length;
+    /* La distribución de intentos del modo que se está viendo, en el diario. */
+    const cubos = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, "6+": 0, "✗": 0 };
+    for (const f of dias) { const v = est.hist[f][modo]; if (!v) continue; cubos[!v[3] ? "✗" : v[1] >= 6 ? "6+" : v[1]]++; }
+    const max = Math.max(1, ...Object.values(cubos));
+    const barras = Object.entries(cubos).filter(([k]) => k !== "✗" || m.reto)
+      .map(([k, n]) => `<div><span>${k}</span><i style="--w:${Math.max(6, n / max * 100)}%">${n}</i></div>`).join("");
+    abre(`<h2 id="dialogoT">📊 Estadísticas</h2>
+      <div class="medidores"><div><b>${t.puntos.toLocaleString("es-CL")}</b><span>puntos</span></div><div><b>${M.racha(est, hoy)}</b><span>racha</span></div>
+      <div><b>${M.mejorRacha(est)}</b><span>mejor racha</span></div><div><b>${completos}</b><span>días completos</span></div></div>
+      <p><b>${m.icono} ${esc(m.nombre)}</b>: en cuántos intentos lo acertaste cada día${m.practica ? " (este modo ya no es del diario)" : ""}.</p>
+      <div class="barras">${barras}</div>`);
+  }
+  function ayuda() {
+    const m = M.MODO[modo];
+    abre(`<h2 id="dialogoT">❓ Cómo se juega · ${m.icono} ${esc(m.nombre)}</h2>
+      <p>${esc(m.consigna)}</p>
+      ${m.tipo === "tabla" ? `<ul><li><b style="color:#4ade80">Verde</b>: igual al correcto.</li><li><b style="color:#fbbf24">Amarillo</b>: tienen algo en común (en las columnas con varios valores).</li><li><b style="color:#f87171">Rojo</b>: distinto. La flecha ↑ ↓ dice si el correcto es mayor o menor.</li></ul>` : ""}
+      <ul><li><b>Diario</b>: el mismo para todos; cambia a medianoche de Chile. <b>Práctica</b>: al azar y sin puntos.</li>
+      <li>Adivinar vale 100 puntos a la primera y 10 menos por intento (mínimo 10). Bandas y Circuito, mínimo 50; Conexiones, 100 menos 20 por error. Un desafío perdido no suma.</li>
+      <li>La 🔥 racha cuenta los días en que aciertas Componente, Fórmula y Símbolo. Científico es solo de práctica.</li>
+      <li>Los puntos y la racha compiten en la Clasificación del sitio, y subir al podio se anuncia en Discord.</li></ul>`);
+  }
+  $("btnStats").onclick = estadisticas;
+  $("btnAyuda").onclick = ayuda;
   $("modos").addEventListener("click", ev => { const b = ev.target.closest("[data-modo]"); if (b) ponModo(b.dataset.modo); });
   for (const b of document.querySelectorAll("[data-tipo]")) b.onclick = () => ponTipo(b.dataset.tipo);
 
