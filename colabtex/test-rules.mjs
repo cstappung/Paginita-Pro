@@ -317,6 +317,35 @@ console.log("— Monedas: partidas del club y podios —");
   await loginAs(A);
 }
 
+console.log("— Salas dormidas: se cierran solas a las seis horas —");
+{
+  const { serverTimestamp } = await import("firebase/database");
+  const ua = await loginAs(A);
+  const SEIS = 6 * 3600e3;
+  const sala = async (at, extra) => {
+    const r = push(ref(db, "partidas"));
+    await set(r, Object.assign({ juego: "reversi", estado: "esperando", anfitrion: ua.uid, at, cupo: 2,
+      jugadores: { [ua.uid]: { nombre: "Ana", orden: 0 } } }, extra || {}));
+    return r.key;
+  };
+  const vieja = await sala(Date.now() - SEIS - 60e3), nueva = await sala(Date.now() - 60e3), tocada = await sala(Date.now() - SEIS - 60e3);
+  await allowed("un jugador apunta el toque de su sala", () => set(ref(db, `partidas/${tocada}/toque`), serverTimestamp()));
+  await denied("el toque no se inventa", () => set(ref(db, `partidas/${tocada}/toque`), Date.now() + SEIS));
+  await loginAs(B);
+  const cierra = (k, x) => set(ref(db, `partidas/${k}/fin`), Object.assign({ ganador: "", motivo: "inactiva", at: Date.now() }, x || {}));
+  await denied("B no apunta el toque de una sala ajena", () => set(ref(db, `partidas/${nueva}/toque`), serverTimestamp()));
+  await denied("B no cierra una sala reciente", () => cierra(nueva));
+  await denied("ni una vieja con jugadas recientes", () => cierra(tocada));
+  await denied("ni dándole la victoria a alguien", () => cierra(vieja, { ganador: ua.uid }));
+  await denied("ni con otro motivo", () => cierra(vieja, { motivo: "abandono" }));
+  await denied("no pone el estado en fin antes de cerrarla", () => set(ref(db, `partidas/${vieja}/estado`), "fin"));
+  await allowed("B cierra la sala dormida seis horas", () => cierra(vieja));
+  await allowed("y la saca del vestíbulo", () => set(ref(db, `partidas/${vieja}/estado`), "fin"));
+  await denied("pero no la reabre", () => set(ref(db, `partidas/${vieja}/estado`), "esperando"));
+  await denied("ni toca su cierre", () => cierra(vieja, { motivo: "inactiva", at: 1 }));
+  await loginAs(A);
+}
+
 await signOut(auth);
 await denied("sin sesión no se lee el informe", () => get(ref(db, "errors")));
 await denied("sin sesión no se escribe nada", () => set(ref(db, "feedback/x"), { tipo: "bug", titulo: "x", uid: "x" }));

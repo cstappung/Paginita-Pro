@@ -1935,6 +1935,26 @@ newer than `EN_CURSO_FRESCO` (15 min), so a tab that died mid-game drops
 out by itself. Nobody
 has to listen to `partidas` as a whole, which would download every move log.
 
+**Rooms close themselves after six hours without a move** (`salaInactiva`
+and `ultimaActividad` in `motor.js`, `INACTIVA_MS`). The last activity is the
+latest of the room's `at`, `toque` (the server time of the last move or join,
+written by `tocaSala` in `juegos-main.js` at most every ten minutes per tab,
+and by `fb.unirse`), each ficha's `at` and `fin.at`. Rooms from before `toque`
+also count the `at` some moves carry (chess). Closing writes
+`fin = {ganador: "", motivo: "inactiva"}` and then `estado = "fin"`
+(`fb.cierraInactiva`). The rules let anyone signed in do that only when `at`
+and `toque` are both six hours old, so nobody can close a live room that is
+not theirs. Three places trigger it: the lobby, for waiting rooms (which it
+also stops offering); a room on open, unless the board already says the game
+is over (then the module closes it with its winner); and «Tus partidas»
+(`revisaMias`), which looks at the header of every entry older than six hours
+through `fb.resumenSala` (never the move log) and drops from the list any room
+that is gone, closed or dormant. `anotar` skips `motivo: "inactiva"`: a room
+that closed itself was not played and does not count for the ranking. Solo
+club games (BBTAN, sortEm, the Sopa…) have no room and are untouched.
+`tests/salas-dormidas.test.cjs` covers the arithmetic and `test-rules.mjs` the
+rule.
+
 **The room chat lives outside the move log**, in `chat/<pid>`. The log is the
 state, and a «hola» must not change whose turn it is. Players and spectators
 both write to it, each message is written once and signed with the writer's
@@ -3674,6 +3694,20 @@ other file of the site. Things that hold it together:
   the trade composer. The pack being opened stays out of the collection
   (`abriendo`) until the summary; a pack bought and not opened is
   remembered in `localStorage` (`prodrop.pendiente.<uid>`) and resumed.
+- **One, two or three packs open together** (`cantidad`, the ×1/×2/×3
+  control above the buy button and in the summary, kept in
+  `localStorage` as `prodrop.cantidad`). They are bought one after another,
+  each checked by the postman; if the money runs out halfway, the ones that
+  went through are opened. The extra packs are decoration fanned behind the
+  main one (`pintaExtras`); tearing the main one opens all of them. The
+  cards go into one stack (`_sobre` says which pack each came from, and the
+  banner says so). The summary has one row per pack, scrolls, and on a
+  phone fits five cards to a row. `abriendo` is a Set of pack keys, and the
+  unopened-pack resume in `localStorage` holds a comma list. After the
+  opening, the pack's fall, its torn top and its light are **cancelled** once
+  it is hidden. Left «filling», Chrome retired them on its own and kept their
+  last frame. «Abrir otro sobre» then showed the next pack fallen off-screen,
+  with no top.
 - **Exhibited cards** are `users/<uid>/perfil/cartas` (up to four copy keys
   `o~k.i`, or the old `k.i` meaning one's own pack; validated by regex in
   the rules), shown only while that account still owns the copy, toggled from the card's zoom. The

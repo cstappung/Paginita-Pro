@@ -158,12 +158,16 @@
         "sicil": { ".validate": "newData.isNumber() && (newData.val() === 0 || newData.val() === 1)" },
 
         "estado": {
-          ".write": "auth != null && root.child('partidas').child($pid).child('jugadores').child(auth.uid).exists()",
+          ".write": "auth != null && (root.child('partidas').child($pid).child('jugadores').child(auth.uid).exists() || (newData.val() === 'fin' && root.child('partidas').child($pid).child('fin').child('motivo').val() === 'inactiva'))",
           ".validate": "newData.val() === 'esperando' || newData.val() === 'jugando' || newData.val() === 'fin'"
         },
 
+        "toque": {
+          ".write": "auth != null && root.child('partidas').child($pid).child('jugadores').child(auth.uid).exists() && !root.child('partidas').child($pid).child('fin').exists()",
+          ".validate": "newData.val() === now"
+        },
         "fin": {
-          ".write": "auth != null && root.child('partidas').child($pid).child('jugadores').child(auth.uid).exists() && (!data.exists() || data.child('ganador').val() === newData.child('ganador').val())",
+          ".write": "auth != null && ((root.child('partidas').child($pid).child('jugadores').child(auth.uid).exists() && (!data.exists() || data.child('ganador').val() === newData.child('ganador').val())) || (!data.exists() && newData.child('motivo').val() === 'inactiva' && newData.child('ganador').val() === '' && (root.child('partidas').child($pid).child('at').val() < now - 21600000 && (!root.child('partidas').child($pid).child('toque').exists() || root.child('partidas').child($pid).child('toque').val() < now - 21600000))))",
           "motivo": { ".validate": "newData.isString() && newData.val().length <= 120" },
           "$otro": { ".validate": true }
         },

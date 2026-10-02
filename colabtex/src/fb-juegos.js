@@ -184,6 +184,7 @@ export async function unirse(pid, quien) {
     if (!enMarcha && Object.keys(ya).length + 1 >= cupo) {
       await set(ref(db, `${P}/${pid}/estado`), "jugando");
     }
+    tocaSala(pid).catch(() => {});
   }
   await marcarMia(pid, p.juego, quien.uid);
   return p.juego;
@@ -230,6 +231,27 @@ export async function terminar(pid, ganador, motivo) {
 }
 
 export const borrarPartida = pid => remove(ref(db, `${P}/${pid}`));
+
+/* ---------- salas dormidas (motor.js: `salaInactiva`) ----------
+   `toque` es la hora del servidor de la última jugada o entrada; la
+   escribe un jugador mientras la partida no ha acabado. Con seis horas
+   sin toque, cualquiera con sesión puede cerrar la sala con
+   `fin.motivo = "inactiva"`: la regla de `fin` lo comprueba contra `at`
+   y `toque`, así que nadie puede cerrar una sala viva que no es suya. */
+export const tocaSala = pid => set(ref(db, `${P}/${pid}/toque`), serverTimestamp());
+export async function cierraInactiva(pid) {
+  await set(ref(db, `${P}/${pid}/fin`), { ganador: "", motivo: "inactiva", at: Date.now() });
+  try { await set(ref(db, `${P}/${pid}/estado`), "fin"); }
+  catch (e) { console.warn("[juegos] la sala quedó cerrada pero el estado no", e); }
+}
+/* Lo justo para saber si una sala de «Tus partidas» sigue viva, sin
+   bajar su registro de jugadas (en Circuit Breakers lleva el tablero
+   entero de cada turno). `null` si la sala ya no existe. */
+export async function resumenSala(pid) {
+  const lee = k => get(ref(db, `${P}/${pid}/${k}`)).then(s => s.val(), () => null);
+  const [juego, at, toque, fin, jugadores] = await Promise.all(["juego", "at", "toque", "fin", "jugadores"].map(lee));
+  return juego ? { juego, at, toque, fin, jugadores } : null;
+}
 
 /* Si el anfitrión cierra la pestaña con la sala vacía, la sala se
    borra sola: un vestíbulo lleno de salas fantasma no invita a nadie
