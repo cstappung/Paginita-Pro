@@ -88,7 +88,15 @@ test('double points applies to golden fruit', () => {
 });
 test('Arcade generates powers, golden fruit and obstacles at their milestones', () => {
   const g = game(); g.setMode('arcade');
-  for (let i = 0; i < 6; i++) { const h = g.get().snake[0]; g.patch({ fruit:{x:h.x+1,y:h.y} }); g.step(); }
+  // La fruta va justo delante de la cabeza. Si la dorada o el poder
+  // salieron por azar en esa misma casilla, se los comería con la fruta y
+  // el test fallaba de vez en cuando: se apartan antes del paso.
+  for (let i = 0; i < 6; i++) {
+    const h = g.get().snake[0], f = { x: h.x + 1, y: h.y };
+    g.patch({ fruit: f });
+    for (const k of ['bonus', 'pickup']) { const o = g.get()[k]; if (o && o.x === f.x && o.y === f.y) g.patch({ [k]: { ...o, ...g.freeCell() } }); }
+    g.step();
+  }
   const s = g.get(); assert.ok(s.pickup); assert.ok(s.bonus); assert.equal(s.obstacles.length, 1);
   assert.ok(!s.snake.some(p => p.x === s.obstacles[0].x && p.y === s.obstacles[0].y));
 });
