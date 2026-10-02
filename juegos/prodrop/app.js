@@ -1059,9 +1059,15 @@ $('#buyBtn').onclick = () => comprar(false);
 
 /* ---------------- ZOOM ---------------- */
 let prevTilt = null, zoomC = null, grading = false, gradeSpeed = 1;
+/* La copia para la que está abierta la caja de precio. Juegos manda datos
+   nuevos cada vez que cambia cualquier cosa de la economía (la compra de
+   otro, un logro), y cada uno repinta el zoom: si eso cerraba la caja,
+   «💰 Vender» parecía no hacer nada, porque se cerraba antes de poder
+   escribir el precio. Se cierra solo si la carta cambió o ya no se vende. */
+let sellPara = '';
 function openZoom(c) {
   prevTilt = prevTilt || [tilt.target, tilt.box, tilt.amp];
-  zoomC = c;
+  zoomC = c; sellPara = '';
   const z = $('#zoom'), box = $('#zoomCard');
   box.innerHTML = '';
   const el = makeCard(c, { back: false }); light(el);
@@ -1111,7 +1117,7 @@ function zoomUI(recien) {
   vb.innerHTML = venta ? 'Retirar del mercado' : '💰 Vender';
   vb.classList.toggle('on', !!venta);
   vb.disabled = !venta && cuenta.parada;
-  $('#sellBox').hidden = true;
+  if (vb.hidden || venta || vb.disabled || !key || sellPara !== key) { $('#sellBox').hidden = true; sellPara = ''; }
   // comprar (o retirar) desde el mercado
   const bb = $('#buyCardBtn');
   bb.hidden = !of;
@@ -1187,16 +1193,17 @@ $('#sellBtn').onclick = async () => {
   box.innerHTML = `<label>Precio de venta<span class="sell-campo">${MONEDA}<input id="sellPrecio" type="number" inputmode="numeric" min="1" max="100000" step="1" value="${ref ? ref.p : c.tier === 3 ? 1500 : c.tier === 2 ? 300 : c.tier === 1 ? 60 : 15}"></span></label>
     <p class="sell-ref">${ref ? `La más barata a la venta: ${MONEDA}<b>${fmt(ref.p)}</b>${ref.gr ? ` (graduada, nota ${copiaDe(ref).g})` : ''}` : 'Nadie más la vende ahora: tú pones el precio.'}${c.graded ? ' · La tuya va graduada.' : ''}</p>
     <div class="sell-btns"><button class="btn primary" id="sellOk">Publicar</button><button class="btn" id="sellNo">Cancelar</button></div>`;
-  box.hidden = false;
-  const inp = $('#sellPrecio'); inp.focus(); inp.select();
-  $('#sellNo').onclick = () => { box.hidden = true; };
+  box.hidden = false; sellPara = c._copy.key;
+  box.scrollIntoView({ block: 'nearest', behavior: REDUCED ? 'auto' : 'smooth' });
+  const inp = $('#sellPrecio'); inp.focus({ preventScroll: true }); inp.select();
+  $('#sellNo').onclick = () => { box.hidden = true; sellPara = ''; };
   const publica = async () => {
     const p = Math.round(+inp.value);
     if (!(p >= 1 && p <= 100000)) { inp.animate([{ transform: 'translateX(-5px)' }, { transform: 'translateX(5px)' }, { transform: 'none' }], { duration: 250 }); return; }
     $('#sellOk').disabled = true;
     try {
       const id = await Red.pide('vender', { c: c._copy.key, p });
-      Snd.coin(); box.hidden = true; toast(`Publicada por ${fmt(p)} monedas. Ya está en el mercado.`);
+      Snd.coin(); box.hidden = true; sellPara = ''; toast(`Publicada por ${fmt(p)} monedas. Ya está en el mercado.`);
       if (id) marcaVenta(c._copy.key, id, p);
     }
     catch (e) { $('#sellOk').disabled = false; box.querySelector('.sell-ref').innerHTML = `<span class="err">${esc(e.message)}</span>`; }

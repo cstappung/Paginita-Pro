@@ -423,8 +423,8 @@ export function rayoMundo(o, d, max, cols, todos = false) {
 }
 
 // Rayo contra el huevo aproximado como elipsoide; p = pies del huevo
-export function rayoHuevo(o, d, p) {
-  const rx = 0.5, ry = ALTO / 2;
+export function rayoHuevo(o, d, p, escala = 1) {
+  const rx = 0.5 * escala, ry = ALTO / 2 * escala;
   const ox = (o.x - p.x) / rx, oy = (o.y - p.y - ry) / ry, oz = (o.z - p.z) / rx;
   const dx = d.x / rx, dy = d.y / ry, dz = d.z / rx;
   const a = dx * dx + dy * dy + dz * dz;
@@ -587,11 +587,16 @@ export function crearHuevo(color, nombre, skin = 'clasico') {
 const matPodrido = new THREE.MeshLambertMaterial({ color: '#8fa36b' });
 const matMoho = new THREE.MeshLambertMaterial({ color: '#4f6136' });
 const matOjoZombi = new THREE.MeshBasicMaterial({ color: '#ff3b2f' });
-export function crearZombi() {
+// `tipo`: 'n' el de siempre, 'c' el corredor (más amarillento y flaco) y 'g'
+// el grandote (más oscuro y un 30 % más grande; las balas lo saben por
+// `userData.escala`).
+export function crearZombi(tipo = 'n') {
   const g = new THREE.Group();
   const cuerpo = new THREE.Group();
   g.add(cuerpo);
   const casco = new THREE.Mesh(geometriaHuevo(), matPodrido.clone());
+  if (tipo === 'c') { casco.material.color.set('#c2b357'); casco.scale.set(0.88, 1.04, 0.88); }
+  if (tipo === 'g') casco.material.color.set('#5d7a3c');
   casco.castShadow = true;
   cuerpo.add(casco);
   for (const [y, a, s] of [[0.5, 0.6, 0.11], [0.9, 2.4, 0.09], [1.25, 4.1, 0.08], [0.35, 3.3, 0.12], [1.05, 5.5, 0.1]]) {
@@ -607,7 +612,9 @@ export function crearZombi() {
     cuerpo.add(brazo);
     brazos.push(brazo);
   }
-  g.userData = { cuerpo, casco, brazos };
+  const escala = tipo === 'g' ? 1.3 : 1;
+  g.scale.setScalar(escala);
+  g.userData = { cuerpo, casco, brazos, escala };
   return g;
 }
 
