@@ -3708,6 +3708,33 @@ other file of the site. Things that hold it together:
   it is hidden. Left «filling», Chrome retired them on its own and kept their
   last frame. «Abrir otro sobre» then showed the next pack fallen off-screen,
   with no top.
+- **Re-roll** (CS2's trade-up contract): ten copies of one rarity (común,
+  rara or épica) become one of the next, any card of that rarity with equal
+  chance. It is `cartas/r/<uid>/<push key>` = `{at: now, c: [ten copy
+  keys]}`, write-once and free. Like a pack, the result is derived, not
+  rolled: `PM.reroll(uid, key, at, tier, notas)` hashes all of that into
+  `{id, g, w}`. Its hidden grade is a bell centred on the ten inputs'
+  average **plus one** (`REROLL.bono`), σ 1.3. For 5 4 6 4 9 8 8 5 3 2,
+  the average is 5.4 and the result is 6 or 7 57 % of the time. The bell is
+  an integer table (`PESO_REROLL`, distance to the centre in tenths),
+  because `Math.exp` is not bit-identical across browsers. `economia`
+  accepts it (event `r`, between gradings and listings) only if the account
+  is not stopped and the ten are its own, distinct, not listed and of one
+  rarity below legendary. The ten leave `dueno`, and the new copy is
+  `<uid>~<key>.0`, registered in `e.sobres` with `r: {id, g, w}`. Every
+  reader of `sobres` branches on `r`: `copiasDe`, the postman's `copia`, and
+  `prodrop-cartas.js`'s `copia`, `mejoresDrops` (which marks it `rr`) and
+  `cifras` (which skips it). Copies sent to the frame carry `id/g/w`, and
+  the frame's `copiaDe` uses them instead of `M.sobre`. The grading rule
+  accepts `cartas/r` packs at index 0. The frame's panel (`#reroll`) picks
+  the ten («Elegir automático» takes duplicates first, keeps the best copy
+  of each card and leaves exhibited ones for last) and asks twice before
+  sending. It shows the expected-grade bell only when all ten are graded:
+  hidden grades stay hidden. The roulette (`#ruleta`, z-index 29, under the
+  effects canvas) is a strip of 58 cards of the target rarity with the
+  winner at index 50. It runs right to left for 6.8 s on
+  `cubic-bezier(.08,.72,.16,1)`, ticks each time a card crosses the marker
+  (read off the live transform), and lands slightly off-centre on purpose.
 - **Exhibited cards** are `users/<uid>/perfil/cartas` (up to four copy keys
   `o~k.i`, or the old `k.i` meaning one's own pack; validated by regex in
   the rules), shown only while that account still owns the copy, toggled from the card's zoom. The

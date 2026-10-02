@@ -592,7 +592,7 @@ function dropsHtml(d) {
   }
   return l.map(c => {
     const q = quien(c.uid, perfilDe(c.uid), null, { nombre: nombreEnDatos(c.uid, d) }, colorForUid);
-    return `<div class="jg-drop">${miniCarta(c)}<span class="jg-drop-quien" data-perfil="${escapeHtml(c.uid)}" data-nombre="${escapeHtml(q.nombre)}">${avatarMarco(q.foto, q.nombre, q.color, "anillo", 18, c.uid)}<b>${escapeHtml(q.nombre)}</b></span><small class="jg-drop-cuando">${haceCuanto(c.at)}</small></div>`;
+    return `<div class="jg-drop">${miniCarta(c)}<span class="jg-drop-quien" data-perfil="${escapeHtml(c.uid)}" data-nombre="${escapeHtml(q.nombre)}">${avatarMarco(q.foto, q.nombre, q.color, "anillo", 18, c.uid)}<b>${escapeHtml(q.nombre)}</b></span><small class="jg-drop-cuando">${c.rr ? "♻ re-roll · " : ""}${haceCuanto(c.at)}</small></div>`;
   }).join("");
 }
 async function marcaDia() {

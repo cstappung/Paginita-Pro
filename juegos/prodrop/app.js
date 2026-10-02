@@ -140,6 +140,8 @@ let col = {}, copies = {}, abriendo = new Set();   // los sobres en curso no ent
 const ahora = () => Date.now() + cuenta.desfase;
 // una copia que llega de Juegos ({c, o, k, i, at, gr}) con su nota y su desgaste
 function copiaDe(x) {
+  // la de un re-roll llega con su carta: no sale de ningún sobre
+  if (x.id != null) return { id: x.id, g: x.g, s: x.w, gr: x.gr ? 1 : 0, o: x.o, k: x.k, i: x.i, at: x.at, key: x.c || `${x.o}~${x.k}.${x.i}`, venta: x.venta || '', dios: false, rr: true };
   const so = M.sobre(x.o, x.k, x.at), c = so.cartas[x.i];
   return { id: c.id, g: c.g, s: c.w, gr: x.gr ? 1 : 0, o: x.o, k: x.k, i: x.i, at: x.at, key: x.c || `${x.o}~${x.k}.${x.i}`, venta: x.venta || '', dios: so.dios };
 }
@@ -999,7 +1001,7 @@ stack.addEventListener('pointerup', endDrag);
 stack.addEventListener('pointercancel', () => { if (drag) { drag.el.style.transition = ''; drag.el.style.transform = 'none'; drag = null; } });
 
 addEventListener('keydown', e => {
-  if (['zoom', 'collection', 'market', 'trade'].some(id => !$('#' + id).hidden)) { if (e.key === 'Escape') closeOverlays(); return; }
+  if (['zoom', 'collection', 'market', 'trade', 'reroll', 'ruleta'].some(id => !$('#' + id).hidden)) { if (e.key === 'Escape') closeOverlays(); return; }
   if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowRight') {
     if (phase === 'pack' && e.target.tagName !== 'BUTTON') { e.preventDefault(); autoTear(); }
     else if (phase === 'reveal') { e.preventDefault(); act(); }
@@ -1072,7 +1074,7 @@ function openZoom(c) {
 const nombreDe = u => (cuenta.gente[u] && cuenta.gente[u].n) || 'Alguien';
 const ofertaDe = id => cuenta.ofertas.find(o => o.id === id);
 // la más barata a la venta de esta misma carta (de otros), para orientar el precio
-const masBarata = (uid, sinId) => cuenta.ofertas.filter(o => o.id !== sinId && M.CARDS[M.sobre(o.o, o.k, o.at).cartas[o.i].id].uid === uid)
+const masBarata = (uid, sinId) => cuenta.ofertas.filter(o => o.id !== sinId && M.CARDS[copiaDe(o).id].uid === uid)
   .reduce((m, o) => (!m || o.p < m.p ? o : m), null);
 function zoomUI(recien) {
   const c = zoomC, t = TIERS[c.tier], of = c._oferta, mio = !!c._copy && !c._ajena;
@@ -1162,11 +1164,12 @@ function closeOverlays() {
   if (!$('#trade').hidden) { $('#trade').hidden = true; $('#market').hidden = false; return; }
   if (!$('#zoom').hidden && zoomVuelve) { cierraZoom(); return; }
   zoomVuelve = '';
-  $('#zoom').hidden = true; $('#collection').hidden = true; $('#market').hidden = true;
+  if (!$('#ruleta').hidden) { if (!rl.girando) cierraRuleta(); return; }
+  $('#zoom').hidden = true; $('#collection').hidden = true; $('#market').hidden = true; $('#reroll').hidden = true;
   if (prevTilt) { setTilt(...prevTilt); prevTilt = null; }
 }
 document.querySelectorAll('[data-close]').forEach(b => b.onclick = closeOverlays);
-for (const id of ['zoom', 'collection', 'market', 'trade']) $('#' + id).addEventListener('click', e => { if (e.target.id === id) closeOverlays(); });
+for (const id of ['zoom', 'collection', 'market', 'trade', 'reroll']) $('#' + id).addEventListener('click', e => { if (e.target.id === id) closeOverlays(); });
 $('#gradeBtn').onclick = () => gradeCard();
 
 /* ---------------- VENDER ----------------
@@ -1182,7 +1185,7 @@ $('#sellBtn').onclick = async () => {
   }
   const box = $('#sellBox'), ref = masBarata(c.uid);
   box.innerHTML = `<label>Precio de venta<span class="sell-campo">${MONEDA}<input id="sellPrecio" type="number" inputmode="numeric" min="1" max="100000" step="1" value="${ref ? ref.p : c.tier === 3 ? 1500 : c.tier === 2 ? 300 : c.tier === 1 ? 60 : 15}"></span></label>
-    <p class="sell-ref">${ref ? `La más barata a la venta: ${MONEDA}<b>${fmt(ref.p)}</b>${ref.gr ? ` (graduada, nota ${M.sobre(ref.o, ref.k, ref.at).cartas[ref.i].g})` : ''}` : 'Nadie más la vende ahora: tú pones el precio.'}${c.graded ? ' · La tuya va graduada.' : ''}</p>
+    <p class="sell-ref">${ref ? `La más barata a la venta: ${MONEDA}<b>${fmt(ref.p)}</b>${ref.gr ? ` (graduada, nota ${copiaDe(ref).g})` : ''}` : 'Nadie más la vende ahora: tú pones el precio.'}${c.graded ? ' · La tuya va graduada.' : ''}</p>
     <div class="sell-btns"><button class="btn primary" id="sellOk">Publicar</button><button class="btn" id="sellNo">Cancelar</button></div>`;
   box.hidden = false;
   const inp = $('#sellPrecio'); inp.focus(); inp.select();
@@ -1446,6 +1449,217 @@ function openCollection() {
 }
 $('#colBtn').onclick = openCollection;
 $('#colBtn2').onclick = openCollection;
+
+/* ---------------- RE-ROLL ----------------
+   Diez cartas de una misma rareza por una de la siguiente, como el
+   contrato de intercambio del CS2. La carta y su nota salen del motor
+   (`M.reroll`), con la hora del servidor, en Juegos: aquí solo se elige
+   qué entra y se cuenta lo que salió, con una ruleta que corre de derecha
+   a izquierda y se detiene en ella. Las notas ocultas de lo que entra no
+   se enseñan: la cuenta de la nota esperada solo se hace cuando las diez
+   están graduadas. */
+const NR = M.REROLL.n;
+const PLURAL = ['comunes', 'raras', 'épicas', 'legendarias'], UNA = ['común', 'rara', 'épica', 'legendaria'];
+const rr = { tier: 0, sel: [], seguro: false, enviando: false };
+const keyDe = cp => cp.key;
+// lo que se puede meter: mis copias de esa rareza que no están a la venta
+const elegibles = t => Object.values(copies).flat().filter(cp => CARDS[cp.id].tier === t && !cp.venta);
+/* El orden en que «Elegir automático» las toma: primero las repetidas (de
+   cada carta se guarda la mejor), las sin graduar antes que las graduadas,
+   y de las graduadas las de nota más baja; las exhibidas al final. */
+function ordenAuto(lista) {
+  const mejor = {};
+  for (const cp of lista) {
+    const u = CARDS[cp.id].uid, m = mejor[u];
+    if (!m || (cp.gr && (!m.gr || cp.g > m.g))) mejor[u] = cp;
+  }
+  const peso = cp => (mejor[CARDS[cp.id].uid] === cp ? 1000 : 0) + (cuenta.exh.includes(cp.key) ? 500 : 0) + (cp.gr ? 100 + cp.g : 0);
+  return lista.slice().sort((a, b) => peso(a) - peso(b));
+}
+function miniCp(cp, extra = '') {
+  const c = CARDS[cp.id];
+  return `<span class="mini t${c.tier}" style="--accent:${accentOf(c)}" title="${esc(c.name + ' · ' + subtitle(c) + (cp.gr ? ' · nota ' + cp.g : ' · sin graduar'))}">
+    <img src="${c.img}" alt="" loading="lazy" draggable="false">${cp.gr ? `<b style="--gc:${gradeColor(cp.g)}">${cp.g}</b>` : ''}${extra}
+    <small>${esc(c.name.split(' ')[0])}</small></span>`;
+}
+function abreReroll() {
+  if (!cuenta.listo) return;
+  prevTilt = prevTilt || [tilt.target, tilt.box, tilt.amp];
+  setTilt(null, null);
+  // abre en la rareza más baja que alcanza para un re-roll
+  const t = [0, 1, 2].find(i => elegibles(i).length >= NR);
+  if (t !== undefined && !elegibles(rr.tier).length) rr.tier = t;
+  rr.seguro = false;
+  $('#collection').hidden = true; $('#summary').hidden || 0;
+  renderReroll();
+  $('#reroll').hidden = false;
+}
+$('#rrBtn').onclick = abreReroll;
+$('#rrBtn2').onclick = abreReroll;
+function notaEsperadaHTML(cps) {
+  if (cps.length < NR) {
+    const gr = cps.filter(cp => cp.gr);
+    return `La nota de la nueva sale de las diez que entran: alrededor de su promedio <b>más un punto</b>.${gr.length ? ` Tus graduadas aquí promedian <b>${(gr.reduce((t, cp) => t + cp.g, 0) / gr.length).toFixed(1).replace('.', ',')}</b>.` : ''}`;
+  }
+  if (!cps.every(cp => cp.gr)) return 'La nota de la nueva sale de las diez: alrededor de su promedio <b>más un punto</b>. Algunas no están graduadas, así que la cuenta exacta queda oculta, como su nota.';
+  const d = M.distribucionReroll(cps.map(cp => cp.g)), max = Math.max(...d.prob);
+  return `Promedio de las diez <b>${(d.centro - M.REROLL.bono).toFixed(1).replace('.', ',')}</b> → la nueva sale cerca de <b>${d.centro.toFixed(1).replace('.', ',')}</b>:
+    <span class="rr-campana">${d.prob.map((p, i) => `<span title="Nota ${i + 1}: ${(p * 100).toFixed(1).replace('.', ',')} %"><i style="height:${Math.max(2, p / max * 100)}%;--gc:${gradeColor(i + 1)}"></i><small>${i + 1}</small></span>`).join('')}</span>`;
+}
+function renderReroll() {
+  const t = rr.tier, sig = TIERS[t + 1], lista = ordenAuto(elegibles(t));
+  rr.sel = rr.sel.filter(k => lista.some(cp => cp.key === k));
+  const sel = new Set(rr.sel), cps = rr.sel.map(k => lista.find(cp => cp.key === k));
+  $('#rrSub').innerHTML = `${NR} cartas ${PLURAL[t]} → 1 ${UNA[t + 1]} al azar. Las diez se pierden.`;
+  $('#rrTabs').innerHTML = [0, 1, 2].map(i => {
+    const n = elegibles(i).length;
+    return `<button role="tab" data-t="${i}" aria-selected="${i === t}">${TIERS[i].sym} ${TIERS[i].label} <span class="rr-flecha">→ ${TIERS[i + 1].sym}</span><b class="rr-n${n >= NR ? ' ok' : ''}">${n}</b></button>`;
+  }).join('');
+  $('#rrTabs').querySelectorAll('[data-t]').forEach(b => b.onclick = () => { rr.tier = +b.dataset.t; rr.sel = []; rr.seguro = false; renderReroll(); });
+  const posibles = M.POR_TIER[t + 1];
+  const huecos = Array.from({ length: NR }, (_, i) => cps[i] ? `<button class="rr-hueco lleno" data-quita="${esc(cps[i].key)}" title="Quitar">${miniCp(cps[i])}</button>` : `<span class="rr-hueco"></span>`).join('');
+  $('#rrBody').innerHTML = `
+    <div class="rr-flujo" style="--c:${TIERS[t].color};--c2:${accentOf(CARDS[posibles[0].n])}">
+      <div class="rr-huecos">${huecos}</div>
+      <span class="rr-a" aria-hidden="true">➜</span>
+      <span class="rr-sale t${t + 1}"><b>?</b><small>${sig.sym} ${sig.label}</small></span>
+    </div>
+    <p class="rr-nota">${notaEsperadaHTML(cps)}</p>
+    <div class="rr-acc">
+      <button class="btn mk-mini" id="rrAuto"${lista.length < NR ? ' disabled' : ''}>Elegir automático</button>
+      <button class="btn mk-mini" id="rrLimpia"${rr.sel.length ? '' : ' disabled'}>Quitar todas</button>
+      <span class="rr-cuenta"><b>${rr.sel.length}</b>/${NR}</span>
+    </div>
+    ${lista.length ? `<div class="tc-rejilla rr-rejilla">${lista.map(cp => `<button class="tc-elige${sel.has(cp.key) ? ' on' : ''}" data-c="${esc(cp.key)}">${miniCp(cp, cuenta.exh.includes(cp.key) ? '<em class="rr-exh">★</em>' : '')}</button>`).join('')}</div>`
+      : `<div class="mk-vacio"><b>${TIERS[t].sym}</b><p>No tienes cartas ${PLURAL[t]} libres. Abre sobres o retira del mercado las que tengas a la venta.</p></div>`}
+    <details class="rr-posibles"><summary>Puede salir cualquiera de estas ${posibles.length} (${(100 / posibles.length).toFixed(1).replace('.', ',')} % cada una)</summary>
+      <div class="rr-pos">${posibles.map(c => miniCp({ id: c.n, gr: 0 })).join('')}</div></details>
+    <div class="tc-envio rr-envio">
+      <button class="btn primary" id="rrGo"${rr.sel.length === NR && !rr.enviando ? '' : ' disabled'}>${rr.enviando ? 'Enviando…' : rr.seguro ? '¿Seguro? Toca otra vez' : `♻ Re-roll ${rr.sel.length}/${NR}`}</button>
+      <span class="mk-nota" id="rrMsg">${rr.seguro ? `Las ${NR} cartas se cambian por una ${UNA[t + 1]}. No se puede deshacer.` : lista.length < NR ? `Te faltan ${NR - lista.length} cartas ${PLURAL[t]}.` : ''}</span>
+    </div>`;
+  const toca = k => {
+    const i = rr.sel.indexOf(k);
+    if (i >= 0) rr.sel.splice(i, 1); else if (rr.sel.length < NR) rr.sel.push(k); else { Snd.blip(); return; }
+    rr.seguro = false; Snd.init(); Snd.tick(); renderRerollKeep();
+  };
+  $('#rrBody').querySelectorAll('.tc-elige').forEach(b => b.onclick = () => toca(b.dataset.c));
+  $('#rrBody').querySelectorAll('[data-quita]').forEach(b => b.onclick = () => toca(b.dataset.quita));
+  $('#rrAuto').onclick = () => { rr.sel = lista.slice(0, NR).map(keyDe); rr.seguro = false; Snd.init(); Snd.flip(); renderRerollKeep(); };
+  $('#rrLimpia').onclick = () => { rr.sel = []; rr.seguro = false; renderRerollKeep(); };
+  $('#rrGo').onclick = () => {
+    if (rr.sel.length !== NR || rr.enviando) return;
+    if (!rr.seguro) { rr.seguro = true; renderRerollKeep(); return; }
+    hazReroll();
+  };
+}
+// repintar sin perder el desplazamiento de la rejilla
+function renderRerollKeep() {
+  const g = $('#rrBody .rr-rejilla'), y = g ? g.scrollTop : 0;
+  renderReroll();
+  const g2 = $('#rrBody .rr-rejilla'); if (g2) g2.scrollTop = y;
+}
+async function hazReroll() {
+  const usadas = rr.sel.slice(), t = rr.tier;
+  rr.enviando = true; renderRerollKeep();
+  try {
+    const r = await Red.pide('reroll', { c: usadas });
+    const nueva = !col[CARDS[r.id].uid];
+    // se anota aquí mismo; la cuenta real llega sola
+    cuenta.mias = cuenta.mias.filter(x => !usadas.includes(x.c || `${x.o}~${x.k}.${x.i}`));
+    cuenta.mias.push({ c: r.c, o: cuenta.uid, k: r.k, i: 0, at: r.at, gr: false, venta: '', id: r.id, g: r.g, w: r.w });
+    cuenta.exh = cuenta.exh.filter(k => !usadas.includes(k));
+    rehazColeccion(); updateColCount();
+    rr.sel = []; rr.seguro = false; rr.enviando = false;
+    $('#reroll').hidden = true;
+    ruleta(r, t, nueva);
+  } catch (e) {
+    rr.enviando = false; rr.seguro = false; renderRerollKeep();
+    $('#rrMsg').innerHTML = `<span class="err">${esc(e.message || 'No se pudo.')}</span>`;
+  }
+}
+
+/* La ruleta: una tira de cartas de la rareza que sale, que corre de
+   derecha a izquierda y frena hasta dejar la que tocó bajo la marca. Cada
+   carta que cruza la marca hace tic, cada vez más espaciado. */
+const rl = { girando: false, anim: null, raf: 0, r: null, nueva: false };
+const RL_N = 58, RL_GANA = 50;
+function ruleta(r, t, nueva) {
+  const sig = t + 1, posibles = M.POR_TIER[sig], tira = $('#rlTira');
+  rl.r = r; rl.nueva = nueva; rl.girando = true;
+  $('#rlTitulo').innerHTML = `${NR} ${PLURAL[t]} → <b style="color:${TIERS[sig].color}">${TIERS[sig].sym} ${TIERS[sig].label}</b>`;
+  $('#rlFin').hidden = true; $('#rlFin').innerHTML = '';
+  $('#rlSaltar').hidden = false;
+  $('#ruleta').classList.remove('fin');
+  // la tira: cartas al azar de esa rareza, sin repetir la vecina, y la que tocó en su lugar
+  const ids = [];
+  for (let i = 0; i < RL_N; i++) {
+    let id;
+    do { id = posibles[Math.floor(Math.random() * posibles.length)].n; } while (posibles.length > 2 && i && id === ids[i - 1]);
+    ids.push(id);
+  }
+  ids[RL_GANA] = r.id;
+  if (ids[RL_GANA - 1] === r.id) ids[RL_GANA - 1] = posibles.find(c => c.n !== r.id).n;
+  if (ids[RL_GANA + 1] === r.id) ids[RL_GANA + 1] = posibles.find(c => c.n !== r.id).n;
+  tira.innerHTML = ids.map((id, i) => {
+    const c = CARDS[id];
+    return `<div class="rl-item t${c.tier}${i === RL_GANA ? ' gana' : ''}" style="--accent:${accentOf(c)}"><img src="${c.img}" alt="" draggable="false"><span>${esc(c.name)}</span></div>`;
+  }).join('');
+  $('#ruleta').hidden = false;
+  Snd.init(); Snd.whoosh(.12);
+  // medidas: el ancho de una carta con su hueco, y el centro de la ventana
+  const it = tira.children[0], paso = it.getBoundingClientRect().width + parseFloat(getComputedStyle(tira).columnGap || getComputedStyle(tira).gap || 0);
+  const ancho = tira.parentElement.getBoundingClientRect().width, centro = ancho / 2, w = it.getBoundingClientRect().width;
+  const desvio = (Math.random() - .5) * w * .7;   // no siempre al centro exacto: así se siente que pudo ser la de al lado
+  const x0 = centro - w / 2 - paso * 2, x1 = centro - (RL_GANA * paso + w / 2) - desvio;
+  const dur = REDUCED ? 700 : 6800;
+  rl.anim = tira.animate([{ transform: `translateX(${x0}px)` }, { transform: `translateX(${x1}px)` }],
+    { duration: dur, easing: 'cubic-bezier(.08,.72,.16,1)', fill: 'forwards' });
+  let ultimo = -1;
+  const mira = () => {
+    if (!rl.girando) return;
+    const m = new DOMMatrixReadOnly(getComputedStyle(tira).transform), x = m.m41;
+    const idx = Math.floor((centro - x) / paso);
+    if (idx !== ultimo) { if (ultimo >= 0) { Snd.tick(); buzz(3); } ultimo = idx; }
+    rl.raf = requestAnimationFrame(mira);
+  };
+  rl.raf = requestAnimationFrame(mira);
+  rl.anim.finished.then(() => finRuleta(), () => {});
+}
+$('#rlSaltar').onclick = () => { if (rl.anim && rl.girando) rl.anim.finish(); };
+function finRuleta() {
+  if (!rl.girando) return;
+  rl.girando = false; cancelAnimationFrame(rl.raf);
+  $('#rlSaltar').hidden = true;
+  const r = rl.r, c = CARDS[r.id], t = c.tier, gana = $('#rlTira .gana');
+  $('#ruleta').classList.add('fin');
+  const [x, y] = centerOf(gana), pl = t >= 2 ? paletteOf(c) : [accentOf(c), '#fff'];
+  if (t >= 2) flash(pl[0], t === 3 ? .9 : .6, t === 3 ? 1000 : 650);
+  burst(x, y, { n: t === 3 ? 140 : t === 2 ? 80 : 40, colors: [...pl, '#fff', '#ffcc3d'], speed: t === 3 ? 16 : 11, kinds: ['confetti', 'spark', 'star'], gravity: .15 });
+  Snd.reveal(t); buzz(t >= 2 ? [30, 60, 30, 60, 90] : [40]);
+  const cp = copiaDe(cuenta.mias.find(m => m.c === r.c) || { c: r.c, o: cuenta.uid, k: r.k, i: 0, at: r.at, id: r.id, g: r.g, w: r.w });
+  const inst = fromCopy(c, cp);
+  const fin = $('#rlFin');
+  fin.innerHTML = `<div class="rl-carta"></div>
+    <div class="rl-txt"><span class="rl-tier" style="--c:${accentOf(c)}">${TIERS[t].label.toUpperCase()} ${TIERS[t].sym}</span>
+      <b>${esc(c.name)}</b><small>${esc(subtitle(c))} · N.º ${pad(c.num)}${rl.nueva ? ' <em>NUEVA</em>' : ''}</small>
+      <small>Su nota está oculta, como la de un sobre: gradúala para verla.</small></div>
+    <div class="rl-acc"><button class="btn primary" id="rlVer">Ver carta</button><button class="btn" id="rlOtro">♻ Otro re-roll</button><button class="btn" id="rlCerrar">Listo</button></div>`;
+  const el = makeCard(inst, { back: false });
+  light(el); hoverTilt(el);
+  fin.querySelector('.rl-carta').appendChild(el);
+  fin.hidden = false;
+  el.animate([{ transform: 'translateY(40px) scale(.6) rotate(-6deg)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 650, easing: 'cubic-bezier(.2,1.3,.4,1)' });
+  $('#rlVer').onclick = () => { cierraRuleta(); zoomVuelve = ''; openZoom(inst); };
+  $('#rlOtro').onclick = () => { cierraRuleta(); abreReroll(); };
+  $('#rlCerrar').onclick = cierraRuleta;
+}
+function cierraRuleta() {
+  if (rl.anim) { rl.anim.cancel(); rl.anim = null; }
+  rl.girando = false; cancelAnimationFrame(rl.raf);
+  $('#ruleta').hidden = true; $('#rlTira').innerHTML = ''; $('#rlFin').innerHTML = '';
+  if (prevTilt) { setTilt(...prevTilt); prevTilt = null; }
+}
 
 /* ---------------- RED (con Juegos) ----------------
    El abridor no toca Firebase: pide a la página que lo contiene que cobre
