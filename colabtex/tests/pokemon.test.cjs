@@ -221,7 +221,9 @@ test('validación, estadísticas y sprites', () => {
   assert.equal(st.spe, 333); assert.equal(st.atk, 359);
   assert.equal(PM.numeroSprite('Rotom-Wash'), 10009);
   assert.equal(PM.numeroSprite('Garchomp'), 445);
-  assert.match(PM.urlsSprite('Garchomp', {espalda: true})[0], /other\/showdown\/back\/445\.gif$/);
+  assert.match(PM.urlsSprite('Garchomp', {espalda: true})[0], /black-white\/animated\/back\/445\.gif$/);
+  assert.match(PM.urlsSprite('Garchomp', {fijo: true})[0], /sprites\/pokemon\/445\.png$/);
+  assert.ok(PM.urlsSprite('Gholdengo').every(u => !u.includes('showdown')));
   assert.ok(PM.aprende('Garchomp', 'gen9ou').includes('Earthquake'));
   assert.equal(PM.tipoEficacia('Ground', ['Steel', 'Ghost']), 2);
   assert.equal(PM.tipoEficacia('Ground', ['Flying']), 0);

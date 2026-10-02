@@ -3453,9 +3453,29 @@ reads `fase: "cargando"` and the screen calls `ctx.rehaz()` (a new hook in
   (`LATIDO_MS`) and retry (`REINTENTO_MS`). The narration is
   `pokemon/relato.js` (pure, Spanish sentences over Showdown's protocol;
   species, moves and items stay in English, as Showdown and Smogon write
-  them). Sprites are PokeAPI/sprites' copies of Showdown's animated ones
-  with fallbacks to the static PNGs (`urlsSprite`); forms map to PokeAPI ids
-  through `pokemon/formas.js`, generated from PokeAPI's `pokemon.csv`.
+  them). **Sprites are 2D only** (`urlsSprite`): PokeAPI/sprites'
+  Black/White-style animated GIFs (`versions/generation-v/black-white/
+  animated`, front and back) where they exist (`BW_FRENTE`/`BW_ESPALDA` in
+  `pokemon/formas.js`, generated from that repo's tree), else the static
+  2D PNG; minis ask for `fijo` and get the PNG straight away. Not
+  `other/showdown`: from gen 6 on those are renders of 3D models. Forms map
+  to PokeAPI ids through `pokemon/formas.js`, generated from PokeAPI's
+  `pokemon.csv`.
+- **The battle scene is built once and touched piece by piece**
+  (`asegurarCampo`, `ponSprite`, `ponFicha`): the sprite's `src` changes only
+  when the Pokémon does and the HP bar is always the same element, so its
+  transition shows; repainting by `innerHTML` cut every animation short. New
+  log lines become a **queue of steps** (`pasos`/`anima`): lunge on `move`,
+  type-coloured impact, shake and the bar dropping to that line's HP on
+  `-damage`, field shake on `-crit`, drop on `faint`, Poké Ball pop on
+  `switch`, sparkle on Tera, weather overlays, and the trainers' VS intro on
+  `start`, each step's sentence in the dialog box. Sprites and HP boxes wait
+  for the queue (`pintaEscena` only touches them when it is idle), **the move
+  menu too** (`pintaControl` shows "…" while `animando`), and `ocupado()`
+  keeps the fin cartel back until the last KO has been seen. A hidden tab
+  or more than `MAX_PASOS` steps skips straight to the end. The background
+  (`BIOMAS`) comes from the room's seed, so both players see the same
+  place. Trainers and party sit in a strip above the field (`.jg-pk-tira`).
   Trainer skins (`pokemon/entrenadores.js`) are the main-series
   protagonists, hot-linked from Showdown's trainer sprites because
   PokeAPI/sprites has none; if one fails, the initial is drawn.
