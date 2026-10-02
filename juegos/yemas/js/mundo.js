@@ -599,13 +599,15 @@ export function crearZombi() {
     const r = 0.5 * Math.sqrt(Math.max(0, 1 - u * u)) * (1 - 0.16 * u) * 0.97;
     cuerpo.add(pieza(new THREE.SphereGeometry(s, 8, 6), matMoho, Math.cos(a) * r, y, Math.sin(a) * r));
   }
+  const brazos = [];
   for (const sx of [-1, 1]) {
     cuerpo.add(pieza(new THREE.SphereGeometry(0.075, 10, 6), matOjoZombi, sx * 0.15, 1.16, -0.43));
     const brazo = pieza(new THREE.CylinderGeometry(0.06, 0.07, 0.55, 8), matPodrido, sx * 0.36, 0.95, -0.42);
     brazo.rotation.x = Math.PI / 2;
     cuerpo.add(brazo);
+    brazos.push(brazo);
   }
-  g.userData = { cuerpo, casco };
+  g.userData = { cuerpo, casco, brazos };
   return g;
 }
 

@@ -4,20 +4,21 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Yemas</title>
-<link rel="stylesheet" href="estilo.css?v=yemas-9">
+<link rel="stylesheet" href="estilo.css?v=yemas-10">
 <!-- Los módulos llevan la versión aquí, en un solo sitio: GitHub Pages
      cachea diez minutos y un import sin ?v= serviría el archivo viejo. -->
 <script type="importmap">
 { "imports": {
   "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.min.js",
-  "yemas/mundo": "./js/mundo.js?v=yemas-9",
-  "yemas/armas": "./js/armas.js?v=yemas-9",
-  "yemas/audio": "./js/audio.js?v=yemas-9",
-  "yemas/red": "./js/red.js?v=yemas-9",
-  "yemas/granada": "./js/granada.js?v=yemas-9",
-  "yemas/zombis": "./js/zombis.js?v=yemas-9",
-  "yemas/mapas": "./js/mapas.js?v=yemas-9",
-  "yemas/interactivo": "./js/interactivo.js?v=yemas-9"
+  "yemas/mundo": "./js/mundo.js?v=yemas-10",
+  "yemas/armas": "./js/armas.js?v=yemas-10",
+  "yemas/audio": "./js/audio.js?v=yemas-10",
+  "yemas/red": "./js/red.js?v=yemas-10",
+  "yemas/granada": "./js/granada.js?v=yemas-10",
+  "yemas/zombis": "./js/zombis.js?v=yemas-10",
+  "yemas/mapas": "./js/mapas.js?v=yemas-10",
+  "yemas/interactivo": "./js/interactivo.js?v=yemas-10",
+  "yemas/bonos": "./js/bonos.js?v=yemas-10"
 } }
 </script>
 </head>
@@ -46,6 +47,7 @@
   <div id="revive" hidden><span>🩹 Levantando…</span><div><i id="revive-barra"></i></div></div>
   <div id="prompt" hidden></div>
   <div id="bebidas" hidden></div>
+  <div id="bonos" hidden></div>
   <div id="vida"><div id="vida-barra"></div><span id="vida-num">100</span></div>
   <div id="arma">
     <div id="inv"></div>
@@ -101,6 +103,6 @@
   </div>
 </div>
 
-<script type="module" src="js/main.js?v=yemas-9"></script>
+<script type="module" src="js/main.js?v=yemas-10"></script>
 </body>
 </html>

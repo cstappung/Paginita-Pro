@@ -110,5 +110,6 @@ export const sonido = {
   teleport() { tono(200, 1600, 1.2, 0.15, 'sine'); ruido(1.2, 6000, 0.25); },
   puerta() { ruido(0.5, 900, 0.5); tono(110, 60, 0.4, 0.2, 'sawtooth'); },
   quema(dist = 0) { const v = 1 / (1 + dist / 12); ruido(0.4, 1500, 0.35 * v); },
+  bono() { for (const [f, t] of [[523, 0], [659, 0.1], [784, 0.2], [1047, 0.3]]) tono(f, f, 0.25, 0.1, 'square', t); ruido(0.5, 6000, 0.12, 0.3); },
   compra() { tono(800, 1200, 0.07, 0.12, 'square'); tono(1200, 1600, 0.1, 0.1, 'square', 0.08); },
 };

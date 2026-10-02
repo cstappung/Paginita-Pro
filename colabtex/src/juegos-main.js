@@ -33,7 +33,7 @@ import { crearSolo } from "./juegos/solo/club.js";
 import { watchAuth, loginGoogle, logout } from "./firebase.js";
 import * as fb from "./fb-juegos.js";
 import { escapeHtml, timeAgo, colorForUid } from "./util.js";
-import { AJ_RITMOS, JUEGOS, reducir, jugadasDe, acumula, cupoDe, minimoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, YM_MAPAS, ganoEn, ordenaRanks, novedades } from "./juegos/motor.js";
+import { AJ_RITMOS, JUEGOS, reducir, jugadasDe, acumula, cupoDe, minimoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, YM_MAPAS, mapaYemas, varianteYemas, ganoEn, ordenaRanks, novedades } from "./juegos/motor.js";
 import { crearEscondite } from "./juegos/escondite.js";
 import { crearCartas } from "./juegos/cartas.js";
 import { crearCuadritos } from "./juegos/cuadritos.js";
@@ -80,7 +80,7 @@ const FABRICAS = {
 const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞" };
 /* Los clubes de un jugador, con sus claves de la clasificación y los
    mismos signos que llevan en su tarjeta del vestíbulo. */
-const ICONO_TODOS = { ...ICONO, general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡" };
+const ICONO_TODOS = { ...ICONO, general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", yzombis: "🧟" };
 
 /* Lo que puede elegir quien abre la sala, por juego. Vive aquí y no en
    `motor.js` porque son controles y no reglas: el motor ya recorta lo
@@ -488,6 +488,19 @@ async function anotar(p) {
   if (!p || !p.fin || !u || anotada === state.pid) return;
   if (!(p.jugadores || {})[u.uid]) return;         // mirón: no juega, no puntúa
   anotada = state.pid;
+  /* Yemas zombis no va a la tabla de Yemas: es cooperativo y lo que
+     clasifica es la ronda a la que llegó la sala, por mapa, como un
+     récord del club (`yemas-zombis-<mapa>`). */
+  if (p.juego === "yemas" && varianteYemas(p) === "zombis") {
+    const ronda = (reducir(p) || {}).ronda || 0;
+    if (ronda < 1) return;
+    const tiempo = Math.min(604800000, Math.max(1, Math.round((+p.fin.at || 0) - (+p.at || 0)) || 1));
+    try {
+      await fb.guardarSolo(`yemas-zombis-${mapaYemas(p)}`, u.uid, { nombre: u.name, puntos: ronda, tiempo, partida: state.pid });
+      marcaDia();
+    } catch (e) { anotada = ""; console.warn("[juegos] no se pudo apuntar la ronda de zombis", e); }
+    return;
+  }
   const g = p.fin.ganador || "";
   const res = !g ? "empate" : (ganoEn(p, g, u.uid) ? "ganada" : "perdida");
   try {

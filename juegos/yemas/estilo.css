@@ -166,3 +166,12 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #a9dcff; fon
 #bebidas { position: absolute; left: 16px; bottom: 84px; display: flex; gap: 6px; flex-wrap: wrap; max-width: 46vw; }
 #bebidas span { padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 800; color: #fff;
   background: var(--c); box-shadow: 0 0 0 2px rgba(0,0,0,0.25), 0 0 10px var(--c); text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
+
+/* Las bonificaciones que duran (Insta-Kill, Máquina de muerte), arriba al centro. */
+#bonos { position: absolute; top: 64px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; pointer-events: none; }
+#bonos[hidden] { display: none; }
+#bonos span { display: flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; font-weight: 800; font-size: 14px;
+  color: #fff; background: rgba(10,10,14,0.65); box-shadow: 0 0 0 2px var(--c), 0 0 14px var(--c); text-shadow: 0 1px 2px #000; }
+#bonos span i { font-style: normal; font-size: 18px; }
+#bonos span.acaba { animation: bonoAcaba 0.4s steps(2) infinite; }
+@keyframes bonoAcaba { 50% { opacity: 0.35; } }

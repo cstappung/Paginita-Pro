@@ -4,12 +4,15 @@
 // 8 la espátula dorada y la 9 los zombis. Se parte con la sartén y el resto
 // aparece tirado en el mapa (EN_SUELO); se cargan dos como mucho, sin contar
 // la sartén. Cada arma de fuego trae su cargador y RECARGAS
-// cargadores de repuesto por vida. dispersion en radianes aprox; cadencia y
-// recarga en segundos.
-export const RECARGAS = 5;
+// cargadores de repuesto por vida (RECARGAS_ZOMBIS en zombis, donde las rondas
+// son largas y la munición se compra). dispersion en radianes aprox; cadencia
+// y recarga en segundos.
+export const RECARGAS = 8;
+export const RECARGAS_ZOMBIS = 14;
 export const SARTEN = 5;
 export const ESPATULA = 8;
 export const ZOMBI = 9;
+export const MAQUINA = 13;
 
 export const ARMAS = {
   5: {
@@ -56,7 +59,7 @@ export const ARMAS = {
   // casi recto y revienta en un área chica: la Ray Gun de Black Ops.
   10: {
     id: 10, nombre: 'Rayo batido', corto: 'Rayo', cohete: true, rayo: true,
-    danio: 120, radio: 3, pleno: 1.4, espoleta: 0.9, velocidad: 60,
+    danio: 320, radio: 3.5, pleno: 2, espoleta: 1, velocidad: 60,
     cadencia: 0.33, cargador: 20, recarga: 3,
     retroceso: 0.03, color: '#62e04a',
   },
@@ -74,6 +77,15 @@ export const ARMAS = {
     dispersion: 0.006, dispMov: 0.03, alcance: 200, caidaDesde: 999,
     retroceso: 0.035, color: '#c9b48a',
   },
+  // La Máquina de muerte: solo sale de la bonificación de zombis. Una
+  // ametralladora pesada de seis cañones, con munición infinita mientras dura.
+  13: {
+    id: 13, nombre: 'Máquina de muerte', corto: 'Minigun', auto: true, infinita: true,
+    danio: 150, cabeza: 1.5, perdigones: 1,
+    cadencia: 0.05, cargador: 999, recarga: 0,
+    dispersion: 0.03, dispMov: 0.03, alcance: 150, caidaDesde: 999,
+    retroceso: 0.006, color: '#3a3a42',
+  },
 };
 
 // Las que aparecen tiradas en el mapa.
@@ -83,7 +95,7 @@ export const EN_SUELO = [0, 1, 2, 6, 7];
 export const NOMBRE_ARMA = {
   0: 'Batidora', 1: 'Revuelta', 2: 'Poché', 3: 'Huevo duro', 4: 'Autodestrucción',
   5: 'Sartén', 6: 'Benedictina', 7: 'Pasado por agua', 8: 'Espátula dorada', 9: 'Zombi',
-  10: 'Rayo batido', 11: 'Amasadora', 12: 'Huevera',
+  10: 'Rayo batido', 11: 'Amasadora', 12: 'Huevera', 13: 'Máquina de muerte',
 };
 
 // La espátula dorada: aparece rara vez en el mapa, solo en todos contra todos.
@@ -139,13 +151,27 @@ export const PAP_NOMBRE = {
 export const BEBIDAS = {
   jugger: { nombre: 'Juggernog', precio: 2500, color: '#d8343a', texto: 'Aguantas el doble' },
   speed: { nombre: 'Speed Cola', precio: 3000, color: '#3fbf4a', texto: 'Recargas el doble de rápido' },
-  doble: { nombre: 'Double Tap', precio: 2000, color: '#e8a23a', texto: 'Disparas más rápido' },
+  doble: { nombre: 'Double Tap', precio: 2000, color: '#e8a23a', texto: 'Cada disparo sale doble' },
   revive: { nombre: 'Quick Revive', precio: 1500, solo: 500, color: '#5ab4ff', texto: 'Levantas más rápido a tus compañeros; jugando solo, te levanta cuando caes', luz: false },
   stamina: { nombre: 'Stamin-Up', precio: 2000, color: '#f0d23a', texto: 'Corres más' },
   phd: { nombre: 'PhD Flopper', precio: 2000, color: '#a050e0', texto: 'Tus explosiones no te dañan' },
   deadshot: { nombre: 'Deadshot', precio: 1500, color: '#5a6a4a', texto: 'Apuntas más fino' },
   mula: { nombre: 'Mule Kick', precio: 4000, color: '#3a8a5a', texto: 'Un arma más' },
 };
+// El símbolo de cada bebida, para la máquina y el HUD.
+export const ICONO_BEBIDA = {
+  jugger: '🛡', speed: '⚡', doble: '»', revive: '✚', stamina: '➶', phd: '✸', deadshot: '◎', mula: '✋',
+};
+// Las bonificaciones que sueltan los zombis al morir, como en Black Ops.
+// `dura` en segundos para las que duran; las demás pasan en el acto.
+export const BONOS = {
+  insta: { nombre: 'Insta-Kill', icono: '☠', color: '#e8e8e8', dura: 30 },
+  carpintero: { nombre: 'Carpintero', icono: '🔨', color: '#c9883a' },
+  kaboom: { nombre: 'Kaboom', icono: '💥', color: '#ff6a2a' },
+  municion: { nombre: 'Munición máxima', icono: '🎒', color: '#5ab4ff' },
+  maquina: { nombre: 'Máquina de muerte', icono: '⚙', color: '#9aa0aa', dura: 30 },
+};
+export const TIPOS_BONO = Object.keys(BONOS);
 // Con el arma ya en la mano, sus números con Pack-a-Punch.
 export function conPap(a) {
   if (!a || a.melee) return a;

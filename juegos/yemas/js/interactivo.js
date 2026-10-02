@@ -19,7 +19,7 @@
 import * as THREE from 'three';
 import { etiqueta } from 'yemas/mundo';
 import { huella, MEDIDA, zonaLibre } from 'yemas/mapas';
-import { ARMAS, BEBIDAS, CAJA_ARMAS, CAJA_PRECIO, PAP_PRECIO, NOMBRE_ARMA } from 'yemas/armas';
+import { ARMAS, BEBIDAS, CAJA_ARMAS, CAJA_PRECIO, PAP_PRECIO, NOMBRE_ARMA, ICONO_BEBIDA } from 'yemas/armas';
 import { sonido } from 'yemas/audio';
 
 export const TABLAS = 6;
@@ -164,6 +164,12 @@ export function crearInteractivo(escena, M, colisores, mundo, cb) {
     const nombre = cartel(b.nombre, ancho * 0.8, 0.34, { tinta: '#fff' });
     nombre.position.set(0, alto - 0.45, hondo / 2 + 0.035);
     g.add(nombre);
+    // El símbolo de la bebida, sobre un disco blanco: se reconoce de lejos.
+    const icono = cartel(ICONO_BEBIDA[tipo] || '?', 0.4, 0.4, { tinta: b.color, fuente: 'bold' });
+    const disco = new THREE.Mesh(new THREE.CircleGeometry(0.22, 24), new THREE.MeshBasicMaterial({ color: '#f4f0e6' }));
+    disco.position.set(0, alto - 0.98, hondo / 2 + 0.012);
+    icono.position.set(0, alto - 0.98, hondo / 2 + 0.02);
+    g.add(disco, icono);
     g.add(caja3(ancho * 0.55, 0.7, 0.03, new THREE.MeshLambertMaterial({ color: '#141414' }), 0, 1.05, hondo / 2 + 0.01));
     for (let j = 0; j < 3; j++) {
       const lata = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.16, 10), brillo);
@@ -328,8 +334,20 @@ export function crearInteractivo(escena, M, colisores, mundo, cb) {
     mod.position.set(x + Math.sin(ry) * 0.08, y + 0.08, z + Math.cos(ry) * 0.08);
     mod.rotation.set(0, ry + Math.PI / 2, 0);
     grupo.add(mod);
-    return { arma, precio, fx: x + Math.sin(ry) * 0.8, fz: z + Math.cos(ry) * 0.8, piso: y - 1.5 };
+    // Mientras no se compra, solo se ve su silueta, como dibujada en la pared.
+    const piezas = [];
+    mod.traverse(o => { if (o.isMesh) piezas.push([o, o.material]); });
+    return { arma, precio, fx: x + Math.sin(ry) * 0.8, fz: z + Math.cos(ry) * 0.8, piso: y - 1.5, piezas, silueta: null };
   });
+  const SILUETA = new THREE.MeshBasicMaterial({ color: '#0d0d0f', transparent: true, opacity: 0.85 });
+  function pintaParedes() {
+    for (const pw of paredes) {
+      const sil = !cb.arma.tiene(pw.arma);
+      if (pw.silueta === sil) continue;
+      pw.silueta = sil;
+      for (const [m, mat] of pw.piezas) { m.material = sil ? SILUETA : mat; m.castShadow = !sil; }
+    }
+  }
 
   // ---------- Pack-a-Punch ----------
   let pap = null;
@@ -652,6 +670,7 @@ export function crearInteractivo(escena, M, colisores, mundo, cb) {
     }
     pintaPap();
     pintaTele();
+    pintaParedes();
     pasoCaja(dt);
     pasoPap(dt);
     if (viaje > 0) {
@@ -676,7 +695,14 @@ export function crearInteractivo(escena, M, colisores, mundo, cb) {
     cb.prompt(texto(opcion));
   }
 
+  // Carpintero: todas las ventanas con sus tablas de nuevo.
+  function reparaTodo() {
+    for (let i = 0; i < tablas.length; i++) tablas[i] = TABLAS;
+    pintaTablas();
+  }
+
   function desmonta() {
+    for (const pw of paredes) for (const [m, mat] of pw.piezas) m.material = mat;
     if (giro) quitaModelo();
     if (pap?.mio) grupo.remove(pap.mio.m);
     escena.remove(grupo);
@@ -685,14 +711,16 @@ export function crearInteractivo(escena, M, colisores, mundo, cb) {
       if (o.material) { o.material.map?.dispose(); o.material.dispose?.(); }
     });
     for (const b of [...propios]) sacaChoque(b);
+    SILUETA.dispose();
   }
 
   ponCaja(0);
   pintaTablas();
   pintaMaquinas();
+  pintaParedes();
 
   return {
-    estado, desdeRed, peticion, usar, actualizar, desmonta, quitaTabla, zonaActiva,
+    estado, desdeRed, peticion, usar, actualizar, desmonta, quitaTabla, zonaActiva, reparaTodo,
     puertaAbierta: id => abiertas.has(id),
     enAislado: p => (M.aislado || []).some(([x0, x1, z0, z1]) => p.x > x0 && p.x < x1 && p.z > z0 && p.z < z1),
     enLava: p => p.y < 0.3 && (M.lava || []).some(([x0, x1, z0, z1]) => p.x > x0 && p.x < x1 && p.z > z0 && p.z < z1),
