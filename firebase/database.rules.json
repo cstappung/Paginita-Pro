@@ -335,6 +335,36 @@
       }
     },
 
+    "clubJugadas": {
+      ".read": "auth != null",
+      "$uid": {
+        "$juego": {
+          ".write": "auth != null && auth.uid === $uid && newData.exists()",
+          ".validate": "$juego.matches(/^(minas|snake|tetrisclub|sortem|bbtan|sopa|electro)$/) && newData.hasChildren(['dia', 'hoy', 'total', 'at']) && newData.child('at').val() === now && newData.child('dia').val() * 86400000 + 10800000 <= now && now < newData.child('dia').val() * 86400000 + 100800000 && newData.child('hoy').val() <= 10 && (data.exists() ? (newData.child('total').val() === data.child('total').val() + 1 && (newData.child('dia').val() === data.child('dia').val() ? newData.child('hoy').val() === data.child('hoy').val() + 1 : (newData.child('dia').val() > data.child('dia').val() && newData.child('hoy').val() === 1))) : (newData.child('total').val() === 1 && newData.child('hoy').val() === 1))",
+          "dia": { ".validate": "newData.isNumber() && newData.val() % 1 === 0" },
+          "hoy": { ".validate": "newData.isNumber()" },
+          "total": { ".validate": "newData.isNumber()" },
+          "at": { ".validate": "newData.isNumber()" },
+          "$otro": { ".validate": false }
+        }
+      }
+    },
+
+    "podios": {
+      ".read": "auth != null",
+      "$uid": {
+        "$p": {
+          ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists()",
+          ".validate": "$p.matches(/^[-_A-Za-z0-9]{6,80}$/) && newData.hasChildren(['c', 'p', 'q', 'at']) && newData.child('at').val() === now && root.child('soloRanks').child(newData.child('c').val()).child($uid).child('partida').val() === $p",
+          "c": { ".validate": "newData.isString() && newData.val().matches(/^(club-[a-z0-9-]+|yemas-zombis-[a-z]+)$/)" },
+          "p": { ".validate": "newData.isNumber() && (newData.val() === 1 || newData.val() === 2 || newData.val() === 3)" },
+          "q": { ".validate": "newData.isString() && newData.val().matches(/^[A-Za-z0-9]{6,40}$/) && newData.val() !== $uid" },
+          "at": { ".validate": "newData.isNumber()" },
+          "$otro": { ".validate": false }
+        }
+      }
+    },
+
     "enCurso": {
       ".read": "auth != null",
       ".indexOn": ["at"],

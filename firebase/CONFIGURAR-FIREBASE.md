@@ -101,6 +101,11 @@ y están en el repositorio público, como cualquier archivo del sitio.
 
 ## 1. Reglas de Realtime Database (IMPORTANTE)
 
+> **Más monedas (octubre de 2026):** las partidas del club que pagan viven
+> en `clubJugadas` y los premios por quitarle un podio a alguien en
+> `podios`. Hasta volver a publicar las reglas, esas monedas no se suman
+> (todo lo demás sigue igual).
+
 > **Mercado de cartas (octubre de 2026):** las ventas e intercambios viven
 > en un nodo nuevo, `mercado`, y el sobre gratis cada 6 horas en
 > `cartas/gratis`. Hasta volver a publicar las reglas, vender, comprar a
