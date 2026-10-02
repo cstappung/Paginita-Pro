@@ -1220,3 +1220,17 @@ body[data-phase="reveal"] .pack-extras, body[data-phase="summary"] .pack-extras 
   #rrTabs button { padding: 7px 9px; font-size: 12.5px; flex: 1 1 auto; }
   #rrTabs .rr-flecha { display: none; }
 }
+/* re-roll: velocidad, probabilidades de salida y salto */
+.rl-ctrl { display: flex; align-items: center; gap: 16px; }
+.chip.rl-rapido { font-size: 13px; padding: 6px 12px; }
+.chip.rl-rapido.on { background: #ffcc3d; color: #1a0b33; border-color: transparent; }
+.rr-sale-p { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; font-size: 13px; color: var(--muted); }
+.rr-sale-p span { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 99px; background: color-mix(in srgb, var(--c) 14%, transparent); border: 1px solid color-mix(in srgb, var(--c) 40%, transparent); color: var(--ink); }
+.rr-sale-p i { font-style: normal; color: var(--c); }
+.rr-sale-p b { color: var(--c); }
+.rl-salto {
+  justify-self: start; padding: 3px 10px; border-radius: 99px; font-weight: 900; font-size: 13px; letter-spacing: .04em; color: #1a0b33;
+  background: linear-gradient(90deg, #ffcc3d, #ff8ad8, #9be9ff); box-shadow: 0 0 22px #ffcc3d88; animation: saltoBrilla 1.2s ease-in-out infinite alternate;
+}
+@keyframes saltoBrilla { to { box-shadow: 0 0 36px #ff8ad8cc; } }
+@media (prefers-reduced-motion: reduce) { .rl-salto { animation: none; } }

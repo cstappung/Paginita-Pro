@@ -144,7 +144,7 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver }) {
             await new Promise(ok => setTimeout(ok, 100));
           }
           if (!so || !so.r) throw new Error("El re-roll no valió: alguna carta cambió de manos a la vez.");
-          responde(true, { k: r.k, at: r.at, c: nueva, id: so.r.id, g: so.r.g, w: so.r.w, tier: tier + 1 });
+          responde(true, { k: r.k, at: r.at, c: nueva, id: so.r.id, g: so.r.g, w: so.r.w, tier: MOTOR.CARDS[so.r.id].tier });
         } else if (x.accion === "exhibir") {
           const lista = (Array.isArray(x.lista) ? x.lista : []).map(String).filter(c => leeCopia(c) && mia(c));
           await fb.exhibirCartas(uid, [...new Set(lista)].slice(0, MAX_EXHIBIDAS));
@@ -229,7 +229,7 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver }) {
       frame.title = "PRODROP — sobres y mercado de cartas";
       frame.allow = "fullscreen";
       window.addEventListener("message", mensaje);
-      frame.src = "juegos/prodrop/index.html?v=pd-7";
+      frame.src = "juegos/prodrop/index.html?v=pd-8";
       host.appendChild(frame);
       frame.addEventListener("load", () => frame.focus());
       off = datos(x => { d = x; enviaDatos(); });
