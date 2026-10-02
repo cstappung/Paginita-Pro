@@ -40,6 +40,9 @@ import { crearCuadritos } from "./juegos/cuadritos.js";
 import { crearOrbita } from "./juegos/orbita.js";
 import { crearReversi } from "./juegos/reversi.js";
 import { crearAjedrez, piezaSvg } from "./juegos/ajedrez.js";
+import { crearPokemon } from "./juegos/pokemon.js";
+import { FORMATOS as PK_FORMATOS, FORMATO_POR as PK_FORMATO_POR } from "./juegos/pokemon/formatos.js";
+import { abreEquipos } from "./juegos/pokemon/equipos.js";
 import { crearWorms } from "./juegos/worms.js";
 import { crearCadena } from "./juegos/cadena.js";
 import { crearFlip7 } from "./juegos/flip7.js";
@@ -77,10 +80,10 @@ const FABRICAS = {
   cuadritos: crearCuadritos, reversi: crearReversi, worms: crearWorms,
   cadena: crearCadena, flip7: crearFlip7, cacho: crearCacho, uno: crearUno, catan: crearCatan,
   presidente: crearPresidente, spicy: crearSpicy, tetris: crearTetris, yemas: crearYemas, clue: crearClue,
-  ajedrez: crearAjedrez
+  ajedrez: crearAjedrez, pokemon: crearPokemon
 };
 
-const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞" };
+const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞", pokemon: "◓" };
 /* Los clubes de un jugador, con sus claves de la clasificación y los
    mismos signos que llevan en su tarjeta del vestíbulo. */
 const ICONO_TODOS = { ...ICONO, general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", yzombis: "🧟" };
@@ -179,7 +182,11 @@ const OPCIONES = {
     { clave: "mapa", etiqueta: "Mapa (zombis)", por: "nacht",
       valores: Object.keys(YM_MAPAS).map(v => ({ v, t: YM_MAPAS[v] })) }
   ],
-  clue: [{ clave: "cupo", etiqueta: "Detectives", por: 4, valores: cupos("clue") }]
+  clue: [{ clave: "cupo", etiqueta: "Detectives", por: 4, valores: cupos("clue") }],
+  /* El formato decide qué equipos valen (el validador de Showdown); se
+     guarda como `formato` y no como `modo`, que las reglas restringen. */
+  pokemon: [{ clave: "formato", etiqueta: "Formato", por: PK_FORMATO_POR,
+    valores: Object.entries(PK_FORMATOS).map(([v, t]) => ({ v, t })) }]
 };
 
 /* La pestaña del manual que abre cada sala: la de su variante. */
@@ -1417,6 +1424,7 @@ function pintaVestibulo() {
         ${opcionesHtml(k)}
         <div class="jg-of-pie">
           <button class="btn jg-of-btn" data-crear="${k}">Abrir sala <span class="jg-of-flecha" aria-hidden="true">→</span></button>
+          ${k === "pokemon" ? `<button class="btn2 jg-of-reglas" type="button" data-equipos="1" title="Mis equipos" aria-label="Mis equipos de Pokémon">📋</button>` : ""}
           ${tieneReglas(k) ? `<button class="btn2 jg-of-reglas" type="button" data-reglas="${k}" title="Cómo se juega" aria-label="Reglas de ${escapeHtml(j.nombre)}">📖</button>` : ""}
         </div>
       </div>
@@ -1425,6 +1433,13 @@ function pintaVestibulo() {
   $("vesElige").onchange = ev => { const d = ev.target.closest(".jg-of-ops"); if (d) resumeOpciones(d); };
   for (const b of $("vesElige").querySelectorAll("[data-crear]")) {
     b.onclick = () => crear(b.getAttribute("data-crear"), leeOpciones(b));
+  }
+  for (const b of $("vesElige").querySelectorAll("[data-equipos]")) {
+    b.onclick = () => {
+      if (!state.user) return;
+      const op = leeOpciones(b) || {};
+      abreEquipos({ uid: state.user.uid, formato: op.formato });
+    };
   }
   /* Desde el vestíbulo, el manual abre en la versión que está elegida
      en la tarjeta: es la que se va a jugar. */
@@ -1713,7 +1728,11 @@ function montaJuego(p) {
       ? fb.leerSecreto(state.pid, state.user.uid) : Promise.resolve(null),
     /* La pantalla avisa cuando acaba de contar una jugada: el cartel del
        final espera a que la cadena que ganó la partida se haya visto. */
-    listo: () => { if (state.partida && state.estado) { pintaRevancha(state.partida, state.estado); pintaFin(state.partida, state.estado); } }
+    listo: () => { if (state.partida && state.estado) { pintaRevancha(state.partida, state.estado); pintaFin(state.partida, state.estado); } },
+    /* Un juego cuyo reductor depende de algo que llega tarde (el
+       simulador de Pokémon, que se baja aparte) pide aquí que se vuelva
+       a reducir la partida en cuanto lo tiene. */
+    rehaz: () => { if (state.partida) { state.estado = reducir(state.partida); vistePerfiles(state.estado); render(); } }
   });
   modulo.montar($("jgHost"));
   pidMontado = state.pid;
@@ -1755,7 +1774,7 @@ const FANFARRIA = { gano: "victoria", perdi: "derrota", empate: "empate", mirand
    En cartas es el choque entero (`CHOQUE`, 2,6 s): la ronda que gana
    el trío se enseña igual que las demás. Worms no pone fanfarria — el
    marco tiene su propio audio y su propio final. */
-const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300, presidente: 1200, spicy: 1200, tetris: 1500, yemas: 1500, clue: 1800, ajedrez: 1300 };
+const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300, presidente: 1200, spicy: 1200, tetris: 1500, yemas: 1500, clue: 1800, ajedrez: 1300, pokemon: 1500 };
 
 function pintaFin(p, est) {
   const caja = $("jgFin");
@@ -2225,6 +2244,7 @@ function arteJuego(k) {
   if (k === "tetris") return '<div class="jg-art-tt">' + ["....ll", "t..zll", "ttzzoo", "itsjoo", "issjjj"].map(f => [...f].map(c => '<i class="' + (c === "." ? "" : "p-" + c) + '"></i>').join("")).join("") + '<em>TETRIS</em></div>';
   if (k === "yemas") return '<div class="jg-art-ym"><i></i><i></i><i></i><b></b><em>YEMAS</em></div>';
   if (k === "clue") return '<div class="jg-art-cl"><i></i><i></i><i></i><b>✉</b><s>🔍</s><em>CLUE</em></div>';
+  if (k === "pokemon") return '<div class="jg-art-pk"><i></i><b></b><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/6.gif" alt=""><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/showdown/back/9.gif" alt=""><em>POKÉMON</em></div>';
   if (k === "ajedrez") return '<div class="jg-art-aj">' + ["r", "Q", "n", "K", "p"].map(x => '<svg viewBox="0 0 100 100" aria-hidden="true">' + piezaSvg(x) + '</svg>').join("") + '</div>';
   if (k === "cuadritos") return '<div class="jg-art-dots">' + Array.from({ length: 9 }, (_, i) => '<i class="' + (i % 3 === 0 ? "llena" : "") + '"></i>').join("") + '</div>';
   return '<div class="jg-art-land"><i></i><i></i><i></i><b>⌖</b><span>ENCUENTRA LO INVISIBLE</span></div>';

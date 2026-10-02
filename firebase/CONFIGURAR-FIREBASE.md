@@ -271,6 +271,17 @@ ajedrez no se puede crear. El arreglo es el de siempre: pegar
 `firebase/database.rules.json` entero y **Publicar**, o usar el botón
 **Copiar las reglas** del cartel de la página de juegos.
 
+### ⚠ Pokémon pide publicar otra vez
+
+`'pokemon'` tiene que estar en la lista del campo `juego` y en la de
+`logros`. No hay nodo nuevo: las elecciones van por `jugadas` (promesa y
+revelación, ver `colabtex/src/juegos/pokemon/motor-pk.js`), el formato de la
+sala entra como `formato` por `$otro`, y los equipos de cada uno viven en
+`users/<uid>/pokemon`, que ya es solo de su dueño. Sin publicar, la sala de
+Pokémon no se puede crear. El arreglo es el de siempre: pegar
+`firebase/database.rules.json` entero y **Publicar**, o usar el botón
+**Copiar las reglas** del cartel de la página de juegos.
+
 ### ⚠ Clue pide publicar otra vez, y un elenco a mano
 
 `'clue'` tiene que estar en la lista del campo `juego` y en la de `logros`, y

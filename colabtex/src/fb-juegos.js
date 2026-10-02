@@ -66,7 +66,7 @@ import {
 import {
   claveJugada, semillaAleatoria, salAleatoria, compromiso, LADO, cupoDe,
   cadenaCacho, CC_CADENA, sha256hex, arrUno, dhPublica, cadenaCatan, CT_CADENA,
-  cadenaPr, PR_CADENA, arrSp
+  cadenaPr, PR_CADENA, arrSp, cadenaPk, PK_CADENA
 } from "./juegos/motor.js";
 import { sanea, saneaPartida, colorSano, fotoSana } from "./juegos/sano.js";
 
@@ -146,6 +146,7 @@ async function secreto(pid, uid, juego) {
     : juego === "catan" ? { hcad: cadenaCatan(sem, sal)[CT_CADENA] }
     : juego === "presidente" ? { hcad: cadenaPr(sem, sal)[PR_CADENA] }
     : juego === "spicy" ? { hcad: sha256hex(arrSp(sem, sal)) }
+    : juego === "pokemon" ? { hcad: cadenaPk(sem, sal)[PK_CADENA] }
     : {};
   return { sem, sal, h: await compromiso(sem, sal), extra };
 }
@@ -449,6 +450,24 @@ export const guardarPerfil = (uid, p) =>
    dispositivo que esa partida ya terminó. */
 export const leerPartidaClub = (uid, juego) =>
   get(ref(db, `${U}/${uid}/club/${juego}`)).then(s => s.val());
+
+/* ---------- Pokémon: los equipos de cada uno ----------
+   `users/<uid>/pokemon` = `{equipos: {<id>: {nombre, formato, eq, at}},
+   skin}`, donde `eq` es el equipo empaquetado de Showdown. Es un nodo del
+   propio usuario (solo él lo lee y lo escribe), así que no hizo falta
+   tocar las reglas. */
+export const leerPokemon = uid =>
+  get(ref(db, `${U}/${uid}/pokemon`)).then(s => s.val() || {});
+export const guardarEquipoPk = (uid, id, e) =>
+  set(ref(db, `${U}/${uid}/pokemon/equipos/${id}`), {
+    nombre: String(e.nombre || "Equipo").slice(0, 60),
+    formato: String(e.formato || "").slice(0, 40),
+    eq: String(e.eq || "").slice(0, 8000),
+    at: Date.now()
+  });
+export const borrarEquipoPk = (uid, id) => remove(ref(db, `${U}/${uid}/pokemon/equipos/${id}`));
+export const guardarSkinPk = (uid, skin) => set(ref(db, `${U}/${uid}/pokemon/skin`), String(skin || "").slice(0, 40));
+export const nuevoIdEquipo = () => push(ref(db, "x")).key;
 
 export const guardarPartidaClub = (uid, juego, d, at) =>
   set(ref(db, `${U}/${uid}/club/${juego}`), { d: d || null, at: Number.isFinite(at) ? at : Date.now() });

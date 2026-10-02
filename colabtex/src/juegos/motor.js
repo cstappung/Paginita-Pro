@@ -169,6 +169,14 @@ export const JUEGOS = {
     minimo: 2,
     cupo: 2,
     alta: "2026-09-30"
+  },
+  pokemon: {
+    nombre: "Pokémon",
+    lema: "Combates con el motor de Showdown: arma tu equipo, abre una sala y que gane el mejor entrenador",
+    color: "#e3350d",
+    minimo: 2,
+    cupo: 2,
+    alta: "2026-10-02"
   }
 };
 
@@ -949,6 +957,7 @@ export function reducir(p) {
   if (p.juego === "yemas") return { ...base, ...redYemas(p, js, listos) };
   if (p.juego === "clue") return { ...base, ...redClue(p, js, listos) };
   if (p.juego === "ajedrez") return { ...base, ...redAjedrez(p, js) };
+  if (p.juego === "pokemon") return { ...base, ...redPokemon(p, js, listos) };
   return base;
 }
 
@@ -2936,6 +2945,35 @@ export function cadenaCacho(sem, sal) {
 }
 /* La llave de la ronda `r` (la 0 es la del arranque). */
 export const llaveCacho = (cad, r) => cad[CC_CADENA - 1 - r];
+
+/* ---------- Pokémon ----------
+   La pelea la resuelve el simulador de Showdown, que vive en un bundle
+   aparte (`juegos-pokemon.js`, ver `pokemon/motor-pk.js`) y se cuelga de
+   `globalThis.PokeMotor` al cargarse. Lo que vive aquí es lo que hace
+   falta sin él: la cadena de llaves — que calcula `fb-juegos.js` al
+   entrar en la sala para publicar su punta (`hcad`) — y el reductor de
+   la sala, que mientras el bundle no ha llegado dice «cargando». Cada
+   punto de decisión de la pelea gasta una llave; la 0 es la del equipo. */
+export const PK_CADENA = 2000;
+const cadenasPk = new Map();
+export function cadenaPk(sem, sal) {
+  const k = (sem >>> 0) + ":" + (sal || "");
+  if (cadenasPk.has(k)) return cadenasPk.get(k);
+  const e = [sha256hex("pokemon:" + k)];
+  for (let i = 0; i < PK_CADENA; i++) e.push(sha256hex(e[i]));
+  cadenasPk.set(k, e);
+  return e;
+}
+export const llavePk = (cad, k) => cad[PK_CADENA - 1 - k];
+
+export function redPokemon(p, js = jugadoresDe(p), listos = true) {
+  const PM = globalThis.PokeMotor;
+  const vacio = f => ({ fase: f, turno: "", debe: [], ganador: null, motivo: "", lados: js.slice(0, 2).map(j => j.uid) });
+  if (!listos) return vacio("espera");
+  if (!PM) return vacio("cargando");
+  return PM.reducir(jugadasDe(p), js.map(j => ({ uid: j.uid, nombre: j.nombre, hcad: j.hcad || "" })),
+    { semilla: p.semilla, formato: p.formato, H: sha256hex });
+}
 
 /* Los `k` dados de un vaso: de la llave del dueño y la mezcla pública
    de la ronda. */

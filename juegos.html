@@ -2900,6 +2900,195 @@ html[data-tema=oscuro] .jg-tira{border-color:var(--os-borde)}
 .jg-pf-cartas header .btn2{text-decoration:none}
 .jg-mo-gasto{font-size:12.5px;opacity:.85}
 html[data-tema=oscuro] .jg-drop-quien:hover b{color:#fff}
+
+/* ============================================================
+   Pokémon (`juegos/pokemon.js` y `pokemon/equipos.js`)
+   La mesa y el editor son oscuros en los dos temas, como la del UNO:
+   los sprites de Showdown están pensados para un fondo de hierba y
+   cielo, y el panel de mandos imita al de un combate. Por eso no hay
+   gemelo `html[data-tema=oscuro] .jg-pk-*`; lo compartido (`.jg-barra`,
+   `.jg-pie`, `.jg-nota`) se repinta con `:root .jg-pk`, que gana a las
+   reglas (0,2,1) del bloque oscuro.
+   ============================================================ */
+.jg-portada-pokemon{background:radial-gradient(ellipse at 50% 65%,#4fb0e8,#16457a 72%)}
+.jg-art-pk{position:relative;width:100%;height:100%}
+.jg-art-pk i{position:absolute;left:12%;right:12%;bottom:16%;height:22%;border-radius:50%;background:#7fcf6a;box-shadow:0 0 0 6px #5aa64a55}
+.jg-art-pk b{position:absolute;top:10%;right:12%;width:44px;height:44px;border-radius:50%;background:linear-gradient(#e3350d 50%,#fff 50%);border:4px solid #222;box-shadow:inset 0 0 0 0 #222}
+.jg-art-pk b::after{content:"";position:absolute;left:50%;top:50%;width:12px;height:12px;margin:-6px;border-radius:50%;background:#fff;border:3px solid #222}
+.jg-art-pk img{position:absolute;image-rendering:pixelated;filter:drop-shadow(0 6px 4px #0006)}
+.jg-art-pk img:nth-of-type(1){right:16%;bottom:34%;height:62%}
+.jg-art-pk img:nth-of-type(2){left:12%;bottom:12%;height:52%}
+.jg-art-pk em{position:absolute;left:10px;top:8px;font:900 13px system-ui;letter-spacing:2px;color:#ffcb05;text-shadow:2px 2px 0 #2a75bb}
+
+.jg-pk{--pk-fondo:#121826;--pk-sup:#1a2234;--pk-sup2:#232d44;--pk-borde:#2e3a56;--pk-tx:#e8edf7;--pk-tx2:#a9b4c9;background:var(--pk-fondo);color:var(--pk-tx);border-radius:14px;overflow:hidden}
+:root .jg-pk .jg-barra{background:#0d1320;border:0;border-bottom:1px solid #ffffff12;border-radius:0;color:var(--pk-tx);gap:10px;flex-wrap:wrap}
+:root .jg-pk .jg-fase{color:var(--pk-tx);font-weight:600;display:flex;gap:8px;align-items:center}
+:root .jg-pk .jg-pie{background:transparent;border:0;color:var(--pk-tx2);min-height:40px;padding:8px 16px}
+:root .jg-pk .jg-nota{color:var(--pk-tx2)}
+.jg-pk .btn2,.jg-pk-ed .btn2{background:var(--pk-sup2,#232d44);border-color:#3a4766;color:#e8edf7}
+.jg-pk-peligro{color:#ff8a80!important}
+.jg-pk-fmt{font:600 11px 'IBM Plex Mono',monospace;padding:3px 8px;border-radius:99px;background:#2a75bb;color:#fff}
+.jg-pk-barbot{display:flex;gap:6px}
+.jg-pk-aviso{padding:46px 20px;text-align:center;color:var(--pk-tx2);display:grid;gap:10px;justify-items:center}
+.jg-pk-poke{width:40px;height:40px;border-radius:50%;background:linear-gradient(#e3350d 50%,#fff 50%);border:4px solid #222;animation:jgPkGira 1s linear infinite}
+@keyframes jgPkGira{to{transform:rotate(360deg)}}
+.jg-pk-lista{list-style:none;padding:0;margin:0 0 6px;display:grid;gap:6px}
+
+/* El campo */
+.jg-pk-escena{min-height:320px}
+.jg-pk-campo{position:relative;min-height:340px;background:linear-gradient(#7ec8f2 0,#bfe6fb 46%,#86cf73 46%,#5aa64a 100%);overflow:hidden}
+.jg-pk-campo::before,.jg-pk-campo::after{content:"";position:absolute;border-radius:50%;background:#4f9a42;box-shadow:inset 0 -8px 0 #3f8335}
+.jg-pk-campo::before{right:8%;top:40%;width:34%;height:15%}
+.jg-pk-campo::after{left:4%;bottom:5%;width:40%;height:16%}
+.jg-pk-clima{position:absolute;left:50%;top:8px;transform:translateX(-50%);display:flex;gap:6px;z-index:2}
+.jg-pk-chip{font-size:11px;padding:2px 8px;border-radius:99px;background:#0d1320cc;color:#fff;white-space:nowrap}
+.jg-pk-rival,.jg-pk-mio{position:absolute;inset:0;pointer-events:none}
+.jg-pk-rival>*,.jg-pk-mio>*{pointer-events:auto}
+.jg-pk-spr{position:absolute;z-index:1;display:grid;place-items:end center}
+.jg-pk-spr img{image-rendering:pixelated;filter:drop-shadow(0 8px 4px #0005)}
+.jg-pk-spr.suya{right:14%;top:12%;width:30%;height:36%}
+.jg-pk-spr.suya img{max-height:100%;transform:scale(1.5);transform-origin:bottom center}
+.jg-pk-spr.mia{left:8%;bottom:9%;width:34%;height:38%}
+.jg-pk-spr.mia img{max-height:100%;transform:scale(1.45);transform-origin:bottom center}
+.jg-pk-entra{animation:jgPkEntra .45s ease-out}
+@keyframes jgPkEntra{from{opacity:0;translate:0 12px}}
+.jg-pk-ficha{position:absolute;z-index:2;width:min(260px,44%);padding:8px 12px 9px;border-radius:12px;background:#f8f6eecc;color:#1e2330;box-shadow:0 4px 0 #0003;backdrop-filter:blur(2px);font-size:12px}
+.jg-pk-ficha.suya{left:4%;top:7%;border-bottom-right-radius:30px}
+.jg-pk-ficha.mia{right:4%;bottom:12%;border-top-left-radius:30px}
+.jg-pk-ficha small{display:block;margin-top:4px;color:#4b5263;line-height:1.3}
+.jg-pk-fnom{display:flex;gap:8px;align-items:baseline}.jg-pk-fnom b{font-size:14px}.jg-pk-fnom span{color:#4b5263}
+.jg-pk-tipos{display:flex;gap:4px;flex-wrap:wrap;margin:4px 0}
+.jg-pk-tipo{font:700 10px system-ui;letter-spacing:.3px;padding:2px 7px;border-radius:5px;background:var(--t);color:#fff;text-shadow:0 1px 1px #0006;text-transform:uppercase}
+.jg-pk-tera{font:700 10px system-ui;padding:2px 6px;border-radius:5px;background:linear-gradient(90deg,#9be7ff,#ffd6f6);color:#2a2f45}
+.jg-pk-vida{height:8px;border-radius:99px;background:#3b4152;overflow:hidden;box-shadow:inset 0 0 0 1px #0004}
+.jg-pk-vida i{display:block;height:100%;transition:width .7s ease,background .7s}
+.jg-pk-vnum{text-align:right;font:600 11px 'IBM Plex Mono',monospace;margin-top:2px}
+.jg-pk-estado{font:700 10px system-ui;padding:1px 6px;border-radius:4px;color:#fff;background:#888}
+.jg-pk-estado.e-brn{background:#ee8130}.jg-pk-estado.e-par{background:#d6b500}.jg-pk-estado.e-slp{background:#8a8a9c}.jg-pk-estado.e-frz{background:#5fb7d6}.jg-pk-estado.e-psn,.jg-pk-estado.e-tox{background:#a33ea1}
+.jg-pk-boosts{display:flex;gap:3px;flex-wrap:wrap;margin-top:3px}
+.jg-pk-boost{font:600 10px system-ui;padding:1px 5px;border-radius:4px}.jg-pk-boost.sube{background:#d6f5df;color:#17663a}.jg-pk-boost.baja{background:#fde0de;color:#9b1c14}
+.jg-pk-entren{position:absolute;z-index:2;display:flex;align-items:center;gap:6px;padding:4px 8px 4px 4px;border-radius:99px;background:#0d1320b3;color:#fff;font-size:12px;flex-wrap:wrap;max-width:60%}
+.jg-pk-rival .jg-pk-entren{right:8px;top:8px}
+.jg-pk-mio .jg-pk-entren{left:8px;bottom:8px}
+.jg-pk-ent{position:relative;display:inline-grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--c);overflow:hidden;flex-shrink:0}
+.jg-pk-ent img{position:absolute;inset:-6%;width:112%;height:112%;object-fit:contain;object-position:top;image-rendering:pixelated;z-index:1}
+.jg-pk-ent b{font:800 15px system-ui;color:#fff}
+.jg-pk-ent.chico{width:28px;height:28px}
+.jg-pk-bolas{display:flex;gap:2px}
+.jg-pk-bola{width:22px;height:22px;display:grid;place-items:center;border-radius:50%;background:#ffffff1c}
+.jg-pk-bola img.mini{max-width:30px;max-height:30px;margin:-4px;image-rendering:pixelated}
+.jg-pk-bola.ko{opacity:.35;filter:grayscale(1)}.jg-pk-bola.activo{box-shadow:0 0 0 2px #ffcb05}
+.jg-pk-ball{width:12px;height:12px;border-radius:50%;background:linear-gradient(#e3350d 50%,#fff 50%);border:2px solid #222}
+
+/* Los mandos */
+.jg-pk-abajo{display:grid;grid-template-columns:minmax(0,1fr) minmax(220px,320px);gap:0;border-top:1px solid #ffffff12}
+.jg-pk-control{padding:12px 14px;min-height:120px}
+.jg-pk-control h4{margin:10px 0 6px;font-size:12px;color:var(--pk-tx2);text-transform:uppercase;letter-spacing:.6px}
+.jg-pk-movs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.jg-pk-mov{position:relative;display:grid;gap:2px;text-align:left;padding:10px 12px;border-radius:10px;border:0;cursor:pointer;color:#fff;background:linear-gradient(135deg,var(--t),color-mix(in srgb,var(--t) 60%,#000));box-shadow:inset 0 -3px 0 #0003;transition:transform .12s}
+.jg-pk-mov:hover:not(:disabled){transform:translateY(-2px)}
+.jg-pk-mov:disabled{filter:grayscale(.9) brightness(.6);cursor:not-allowed}
+.jg-pk-mov b{font-size:14px;text-shadow:0 1px 1px #0006}.jg-pk-mov small{font-size:11px;opacity:.92}
+.jg-pk-mov .pp{position:absolute;right:10px;top:9px;font:600 11px 'IBM Plex Mono',monospace}
+.jg-pk-mov .ef{position:absolute;right:8px;bottom:8px;font:700 10px system-ui;padding:1px 6px;border-radius:4px;background:#0006}
+.jg-pk-mov .ef2,.jg-pk-mov .ef4{background:#1b8e3e}.jg-pk-mov .ef0{background:#5b1d1d}.jg-pk-mov .ef05,.jg-pk-mov .ef025{background:#6b4a1d}
+.jg-pk-extras{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;font-size:13px}
+.jg-pk-extras label{display:flex;gap:6px;align-items:center;cursor:pointer;padding:5px 10px;border-radius:8px;background:var(--pk-sup2)}
+.jg-pk-cambios{display:flex;gap:6px;flex-wrap:wrap}
+.jg-pk-cambio{position:relative;display:flex;align-items:center;gap:6px;padding:4px 10px 6px 4px;border-radius:10px;border:1px solid #3a4766;background:var(--pk-sup2);color:var(--pk-tx);cursor:pointer;font-size:12px;overflow:hidden}
+.jg-pk-cambio:hover{border-color:#ffcb05}
+.jg-pk-cambio.quieto{cursor:default}
+.jg-pk-cambio img.mini{width:36px;height:36px;object-fit:contain;image-rendering:pixelated}
+.jg-pk-cambio i{position:absolute;left:0;bottom:0;height:3px;width:var(--v);background:var(--col)}
+.jg-pk-hecho{margin:8px 0;padding:12px;border-radius:10px;background:var(--pk-sup2)}
+.jg-pk-relato{max-height:260px;overflow:auto;padding:10px 14px;background:#0d1320;border-left:1px solid #ffffff12;font-size:12.5px;line-height:1.45}
+.jg-pk-relato p{margin:0 0 3px;color:#cdd5e5}
+.jg-pk-relato p.turno{margin-top:8px;color:#ffcb05;font-weight:700}
+.jg-pk-relato p.gana{color:#8ff0a4;font-weight:700}
+
+/* Elegir equipo y entrenador */
+.jg-pk-elige{padding:16px;display:grid;gap:16px}
+.jg-pk-elige h3{margin:0 0 8px;font-size:15px}.jg-pk-elige h3 small{color:var(--pk-tx2);font-weight:500}
+.jg-pk-eqop{display:grid;grid-template-columns:auto 1fr auto;gap:2px 10px;align-items:center;padding:8px 12px;border-radius:10px;background:var(--pk-sup);border:1px solid var(--pk-borde);margin-bottom:6px;cursor:pointer}
+.jg-pk-eqop.on{border-color:#ffcb05;box-shadow:0 0 0 1px #ffcb05}
+.jg-pk-eqop.mal{opacity:.6;cursor:not-allowed}
+.jg-pk-eqop input{grid-row:span 2}.jg-pk-eqop small{color:var(--pk-tx2);font-size:11px}
+.jg-pk-eqop .jg-pk-minis{grid-row:span 2;grid-column:3}
+.jg-pk-eqop em{grid-column:2/4;font-size:11px;color:#ff9c8f;font-style:normal}
+.jg-pk-minis{display:flex}.jg-pk-minis img{width:34px;height:34px;object-fit:contain;image-rendering:pixelated;margin:-3px}
+.jg-pk-ents{display:flex;gap:6px;flex-wrap:wrap}
+.jg-pk-entop{display:grid;justify-items:center;gap:3px;padding:6px;border-radius:10px;border:1px solid var(--pk-borde);background:var(--pk-sup);color:var(--pk-tx);cursor:pointer;width:70px}
+.jg-pk-entop .jg-pk-ent{width:46px;height:46px}
+.jg-pk-entop.on{border-color:#ffcb05;box-shadow:0 0 0 1px #ffcb05}
+.jg-pk-entop small{font-size:10.5px}
+.jg-pk-listo{justify-self:start;height:40px;padding:0 20px;background:#e3350d}
+
+/* El editor de equipos */
+.jg-pk-capa{z-index:75}
+.jg-pk-ed{position:relative;width:1080px;max-width:100%;max-height:calc(100vh - 36px);display:flex;flex-direction:column;border-radius:14px;background:#121826;color:#e8edf7;border:1px solid #2e3a56;box-shadow:0 18px 50px #0008;overflow:hidden;--pk-sup:#1a2234;--pk-sup2:#232d44;--pk-borde:#2e3a56;--pk-tx2:#a9b4c9}
+.jg-pk-ed .jg-nota{color:#a9b4c9}
+.jg-pk-cargando{padding:40px;text-align:center}
+.jg-pk-edcab{display:flex;align-items:center;gap:14px;padding:12px 16px;border-bottom:1px solid #ffffff14}
+.jg-pk-edcab h2{margin:0;font-size:18px;flex:1}
+.jg-pk-entsel{display:flex;align-items:center;gap:8px}
+.jg-pk-x{border:0;background:transparent;color:#e8edf7;font-size:18px;cursor:pointer}
+.jg-pk-ed select,.jg-pk-ed input:not([type=checkbox]):not([type=radio]){height:32px;padding:0 8px;border-radius:7px;border:1px solid #3a4766;background:#0d1320;color:#e8edf7;font:inherit;font-size:13px;min-width:0}
+.jg-pk-edcuerpo{display:grid;grid-template-columns:260px minmax(0,1fr);min-height:0;flex:1}
+.jg-pk-eqlista{padding:12px;border-right:1px solid #ffffff14;overflow:auto;display:grid;align-content:start;gap:6px}
+.jg-pk-eqbotones{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+.jg-pk-eqfila{display:grid;gap:2px;text-align:left;padding:8px 10px;border-radius:10px;border:1px solid #2e3a56;background:#1a2234;color:#e8edf7;cursor:pointer}
+.jg-pk-eqfila.on{border-color:#ffcb05}.jg-pk-eqfila small{color:#a9b4c9;font-size:11px}
+.jg-pk-eqed{padding:14px 16px;overflow:auto;display:grid;align-content:start;gap:12px}
+.jg-pk-edfila{display:flex;gap:10px;flex-wrap:wrap}
+.jg-pk-edfila label,.jg-pk-movs label,.jg-pk-setdatos>label{display:grid;gap:3px;font-size:11px;color:#a9b4c9;flex:1;min-width:140px}
+.jg-pk-edfila label.corto{flex:0 0 auto;min-width:70px}
+.jg-pk-huecos{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}
+.jg-pk-hueco{display:grid;justify-items:center;gap:2px;padding:6px 4px;border-radius:10px;border:1px solid #2e3a56;background:#1a2234;color:#e8edf7;cursor:pointer;font-size:11px;min-height:70px;overflow:hidden}
+.jg-pk-hueco.on{border-color:#ffcb05;box-shadow:0 0 0 1px #ffcb05}
+.jg-pk-hueco img{width:46px;height:46px;object-fit:contain;image-rendering:pixelated}
+.jg-pk-hueco span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jg-pk-mas{font-size:22px;color:#6b7896;align-self:center}
+.jg-pk-set{display:grid;gap:10px;padding:12px;border-radius:12px;background:#1a2234;border:1px solid #2e3a56}
+.jg-pk-setcab{display:flex;gap:14px;align-items:center}
+.jg-pk-setspr{width:96px;height:96px;object-fit:contain;image-rendering:pixelated;flex-shrink:0}
+.jg-pk-setspr.vacio{display:grid;place-items:center;border-radius:12px;background:#0d1320;font-size:30px;color:#6b7896}
+.jg-pk-setdatos{flex:1;display:grid;gap:6px}
+.jg-pk-ed .jg-pk-movs{grid-template-columns:repeat(2,minmax(0,1fr))}
+.jg-pk-ed .jg-pk-movs small{display:flex;gap:6px;align-items:center;color:#a9b4c9}
+.jg-pk-stats{border-collapse:collapse;font-size:12px;width:100%}
+.jg-pk-stats th,.jg-pk-stats td{padding:3px 6px;text-align:left}
+.jg-pk-stats thead th{color:#a9b4c9;font-weight:500}
+.jg-pk-stats input{width:64px}
+.jg-pk-stats td:last-child{position:relative;min-width:120px}
+.jg-pk-stats td i{position:absolute;left:44px;top:50%;height:6px;margin-top:-3px;width:calc(var(--w) * .8);max-width:calc(100% - 50px);border-radius:3px;background:#5fc8f0}
+.jg-pk-stats b{display:inline-block;width:36px}
+.jg-pk-ed b.mal{color:#ff8a80}
+.jg-pk-valida{padding:10px 12px;border-radius:10px;font-size:12.5px}
+.jg-pk-valida.bien{background:#16351f;color:#a5ebb7}.jg-pk-valida.mal{background:#3d1418;color:#ffb4a8}
+.jg-pk-valida ul{margin:6px 0 0;padding-left:18px}
+.jg-pk-edacc{display:flex;gap:8px;flex-wrap:wrap}
+
+/* El tablero puede ser estrecho en una ventana ancha (el chat al lado),
+   así que manda su propio ancho y no el de la ventana. */
+.jg-pk{container-type:inline-size}
+@container (max-width:760px){
+  .jg-pk-abajo{grid-template-columns:1fr}
+  .jg-pk-relato{border-left:0;border-top:1px solid #ffffff12;max-height:180px}
+  .jg-pk-campo{min-height:300px}
+  .jg-pk-ficha{width:52%;font-size:11px;padding:6px 9px}
+  .jg-pk-ficha small{display:none}
+  .jg-pk-entren{max-width:70%;font-size:11px}
+}
+@container (max-width:420px){
+  .jg-pk-movs{grid-template-columns:1fr}
+  .jg-pk-ficha{width:60%}
+}
+@media (max-width:760px){
+  .jg-pk-edcuerpo{grid-template-columns:1fr}
+  .jg-pk-eqlista{border-right:0;border-bottom:1px solid #ffffff14;max-height:180px}
+  .jg-pk-huecos{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .jg-pk-ed .jg-pk-movs{grid-template-columns:1fr 1fr}
+}
 </style>
 </head>
 <body>
@@ -2947,6 +3136,6 @@ html[data-tema=oscuro] .jg-drop-quien:hover b{color:#fff}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610021720"></script>
+<script src="juegos-app.js?v=202610021814"></script>
 </body>
 </html>

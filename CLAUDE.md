@@ -45,7 +45,7 @@ Six apps plus a small shared **Informes** page:
   collect by themselves, plus the bugs and ideas people write. See "Informes"
   below.
 - **Juegos** (`juegos.html` + `juegos-app.js`, entry
-  `colabtex/src/juegos-main.js`) — seventeen multiplayer games, on the same Google
+  `colabtex/src/juegos-main.js`) — eighteen multiplayer games, on the same Google
   account and the same Firebase project: **Escondite** (hide a person in a
   landscape, then cross the landscapes and race to find the other's),
   **Cartas de los tres elementos** (a Card-Jitsu duel), **Cuadritos** (dots and
@@ -66,7 +66,8 @@ Six apps plus a small shared **Informes** page:
   egg shooter for two to eight in four modes, zombies included, with voice chat, also in an
   iframe) and **Clue** (the deduction board game on a map of a real
   university building, two to six, in an iframe, dealt with mental poker)
-  and **Ajedrez** (chess, the full rules, for two), plus a **Clasificación** tab and a 📖 **Reglas**
+  and **Ajedrez** (chess, the full rules, for two) and **Pokémon** (singles
+  battles on Pokémon Showdown's own simulator, with a team builder), plus a **Clasificación** tab and a 📖 **Reglas**
   manual for every game, solo ones included, coins, and **PRODROP**, a card-pack
   opener paid with them. See "Juegos" below.
 
@@ -1540,7 +1541,7 @@ Four decisions worth keeping:
 
 ## Juegos architecture
 
-Seventeen games, on the same Firebase project and the same Google session
+Eighteen games, on the same Firebase project and the same Google session
 as ColabTeX and ColabDraw. Turn-based on purpose (Tetris and Yemas are the
 real-time exceptions, and both still keep the log to what decides the game): with one move per turn the
 network carries a handful of fields and there is nothing to interpolate, so no
@@ -3409,6 +3410,70 @@ worth knowing:
   Chain Reaction's nested orbs. `est.perdidas` (not `fuera`, which the header
   reads as "players out") is what each side has lost, counted against the
   starting set. The music borrows Reversi's harpsichord.
+
+**Pokémon (`pokemon`) is Pokémon Showdown's simulator, not a rewrite**
+(`@pkmn/sim`, the MIT extraction of Showdown's `sim/`). Moves, abilities,
+items, natures, the type chart of each generation, stats, Tera/Mega/Z, the
+tiers and the team validator all come from it, so a battle here resolves
+exactly as on Showdown. It is a **separate bundle** (`juegos-pokemon.js`,
+~6 MB, ~1 MB gzipped, `npm run build:pokemon`, part of `build`) loaded the
+first time someone opens a Pokémon room or the team editor
+(`pokemon/carga.js`, with the page's `?v=`, like `colabdraw-math.js`; it is
+not in `PAGES`). It hangs off `globalThis.PokeMotor` and `redPokemon` in
+`motor.js` looks for it there, like Clue's `ClueMotor`; without it the room
+reads `fase: "cargando"` and the screen calls `ctx.rehaz()` (a new hook in
+`montaJuego`) to re-reduce once it lands. Things that hold it together:
+
+- **A battle is a list of decision points**, and each point is written
+  twice by *both* players: a promise `{t:"c", k, h}` with `h = H(choice +
+  "|" + key_k)` and, once both promises are in, the reveal `{t:"r", k, c,
+  l}`. Point 0 is the team (the packed Showdown team, plus `sk`, the trainer
+  skin); the rest are whatever Showdown asks both sides at once (team
+  preview, the turn's move or switch, a forced switch). Whoever has nothing
+  to decide writes `"-"` (`NADA`), sent by the screen without asking.
+- **The keys are a hash chain** (`cadenaPk`, `PK_CADENA` = 2000 in
+  `motor.js`), from the private seed in `misPartidas`, tip `hcad` in the
+  write-once ficha, as in cacho: H(key_k) must be the previous key. **The
+  PRNG seed of point k is H(semilla | k | key₁ | key₂)** (`battle.resetRNG`
+  before applying the choices), so nobody knows a crit or a miss before both
+  have committed — that is also why the non-deciding side commits too. A
+  reveal that does not match its promise or its chain is ignored and named
+  in `falsas`. An impossible choice becomes Showdown's `default`.
+- **Teams are public in the log** (the simulator needs both); the screen
+  shows only what Showdown would (species at preview, the rest as it is
+  revealed in the public log). That is the honest limit, and the manual says
+  it. Teams are still chosen blind, behind the promise.
+- `motor-pk.js` caches the live `Battle` per room and applies only the new
+  log entries; the cache is keyed by a **signature of the applied entries
+  that includes each `h`/`l`** — with type and author alone, two battles of
+  the same shape were taken for the same one.
+- The screen (`pokemon.js`) saves the promised choice in `localStorage`
+  (`pk.pend.<pid>.<uid>`) **before** writing the promise: after a reload,
+  that is the only way to reveal it. It has the usual heartbeat
+  (`LATIDO_MS`) and retry (`REINTENTO_MS`). The narration is
+  `pokemon/relato.js` (pure, Spanish sentences over Showdown's protocol;
+  species, moves and items stay in English, as Showdown and Smogon write
+  them). Sprites are PokeAPI/sprites' copies of Showdown's animated ones
+  with fallbacks to the static PNGs (`urlsSprite`); forms map to PokeAPI ids
+  through `pokemon/formas.js`, generated from PokeAPI's `pokemon.csv`.
+  Trainer skins (`pokemon/entrenadores.js`) are the main-series
+  protagonists, hot-linked from Showdown's trainer sprites because
+  PokeAPI/sprites has none; if one fails, the initial is drawn.
+- **Teams live in `users/<uid>/pokemon`** (`{equipos: {id: {nombre,
+  formato, eq}}, skin}`, owner-only already, so no rule) with a
+  `localStorage` copy. `pokemon/equipos.js` is the editor: paste/export
+  Showdown text, or build each set (species, item, ability, nature, EVs,
+  IVs, Tera, moves from the learnset), with live stats and the validator's
+  own messages. The room option is `formato` (not `modo`, which the rules
+  whitelist); the list is `pokemon/formatos.js`, shared with the lobby so it
+  does not need the bundle.
+
+`tests/pokemon.test.cjs` bundles the engine with esbuild and plays robot
+battles through the promise protocol, checking that a late tab replays the
+same battle, that a forged reveal or key does not count, that an illegal
+team loses, that an impossible choice falls back to default, and the
+narration. `'pokemon'` needed the rules' `juego` and `logros` whitelists, so
+they must be re-published.
 
 **Mina Club's board fits its box; it never pushes past it** (`juegos/club/minas/`,
 plain files with no build, mounted by `solo/club.js` in an iframe whose `?v=`

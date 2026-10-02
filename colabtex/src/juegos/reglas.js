@@ -147,6 +147,26 @@ const REGLAS = {
       ["Piezas", "Debajo de la hoja de jugadas eliges el dibujo de las piezas: Clásicas, Chessnut, Fantasía o Celtas. Se recuerda en este navegador."]
     ]
   },
+  pokemon: {
+    lema: "Combates individuales con el motor de Pokémon Showdown.",
+    secciones: [
+      ["Tu equipo", lista([
+        "Antes de abrir o entrar a una sala, arma tus equipos en <b>Mis equipos</b> (el botón de la tarjeta del juego, o dentro de la sala). Puedes pegar un equipo exportado de Showdown o armarlo Pokémon por Pokémon: especie, objeto, habilidad, naturaleza, EVs, IVs, tipo Tera y cuatro movimientos.",
+        "Cada sala tiene un formato (OU, Ubers, Little Cup, Monotype, National Dex, las OU de otras generaciones o Libre). El editor te dice si tu equipo vale ahí, con los mismos errores que daría Showdown.",
+        "Al empezar eliges equipo y entrenador (el aspecto de tu personaje). Los dos eligen a la vez y a ciegas: nadie puede armar un contraequipo después de ver el tuyo."
+      ])],
+      ["El combate", lista([
+        "Funciona igual que en Showdown porque es su mismo simulador: movimientos con todos sus efectos, habilidades, objetos, naturalezas, estadísticas, clima, terrenos, estados, cambios de estadística y Tera; en las OU de Gen 6 y 7, también megaevoluciones y movimientos Z.",
+        "En la vista previa ordenas tu equipo: el primero sale al campo. Cada turno eliges un movimiento o un cambio; con <b>Tera</b> marcado, el movimiento se hace teracristalizado.",
+        "Los dos eligen a la vez. Tu elección viaja cerrada con un candado y se abre sola cuando el rival también eligió. Nadie, ni siquiera tú, sabe cómo saldrán los golpes críticos o la precisión antes de que los dos hayan elegido."
+      ])],
+      ["El final", lista([
+        "Gana quien deja al rival sin Pokémon. Un equipo que no es legal en el formato de la sala pierde antes de empezar.",
+        "Puedes <b>rendirte</b> (hay que pulsar dos veces). Si el rival se queda dormido, propón expulsarlo con ⏏ tras un rato sin jugadas: en un duelo eso te da la partida."
+      ])],
+      ["Lo que se puede ver", "No hay servidor que guarde secretos, así que los equipos completos quedan en el registro de la partida. La pantalla solo te enseña lo que enseñaría Showdown (las especies en la vista previa, y el objeto, la habilidad y los movimientos del rival a medida que se ven), pero alguien que abra la consola del navegador puede leer más."]
+    ]
+  },
   cadena: {
     lema: "Chain Reaction: carga, estalla y conquista.",
     secciones: [

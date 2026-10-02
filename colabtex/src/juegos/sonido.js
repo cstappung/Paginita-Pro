@@ -339,7 +339,7 @@ export const CANCIONES = [
   { id: "pk-bosque", nombre: "Bosque espeso", grupo: "Pokémon", desc: "Homenaje · perdido entre árboles", chip: "pk-bosque" },
   { id: "pk-bici", nombre: "Cuesta abajo en bici", grupo: "Pokémon", desc: "Homenaje · la bici", chip: "pk-bici" },
   { id: "pk-salvaje", nombre: "¡Apareció uno salvaje!", grupo: "Pokémon", desc: "Homenaje · combate salvaje", chip: "pk-salvaje" },
-  { id: "pk-entrenador", nombre: "Duelo de entrenadores", grupo: "Pokémon", desc: "Homenaje · combate contra entrenador", chip: "pk-entrenador" },
+  { id: "pk-entrenador", nombre: "Duelo de entrenadores", grupo: "Pokémon", desc: "Homenaje · combate contra entrenador", chip: "pk-entrenador", juegos: ["pokemon"] },
   { id: "pk-gimnasio", nombre: "Líder de gimnasio", grupo: "Pokémon", desc: "Homenaje · el combate de medalla", chip: "pk-gimnasio" }
 ].filter(c => c.url || TEMAS[c.chip]);
 const POR_ID = Object.fromEntries(CANCIONES.map(c => [c.id, c]));
