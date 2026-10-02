@@ -67,7 +67,8 @@ Six apps plus a small shared **Informes** page:
   iframe) and **Clue** (the deduction board game on a map of a real
   university building, two to six, in an iframe, dealt with mental poker)
   and **Ajedrez** (chess, the full rules, for two), plus a **Clasificación** tab and a 📖 **Reglas**
-  manual for every game, solo ones included. See "Juegos" below.
+  manual for every game, solo ones included, coins, and **PRODROP**, a card-pack
+  opener paid with them. See "Juegos" below.
 
 ColabTeX, ColabDraw, FiltroLab, AjusteLab, Juegos and Informes are authored in
 **Spanish** — UI text, comments and identifiers alike. **CSV·Scope is the exception: it is in
@@ -3539,10 +3540,71 @@ logros, the balance is derived from the same four reads the profile uses
   that covers UTC−3 and UTC−4. So a client can only record *today*, once,
   with the right streak and sum. Deleting the node only loses coins.
 
-There is nothing to spend yet. A shop would need the spending stored, and
-validated against this sum. The `diario` node needs the rules re-published.
+Coins are spent in PRODROP (below), and that spending **is** stored:
+`monedasDe` returns `total` (earned), `gastadas` and `saldo`. The header
+chip shows `saldo`; the top orders by `total`, so buying packs never drops
+anyone a place. The `diario` node needs the rules re-published.
 `test-rules.mjs` covers it: no invented streak, no tomorrow, no twice a day,
 and nobody writes someone else's.
+
+**PRODROP is a card-pack opener paid in coins** (`juegos/prodrop/`, its
+own document in an iframe like Clue: `index.html`, `style.css`, `app.js`,
+the 153 webp cards in `cards/<rareza>/`, and `motor.js`, UMD on
+`ProdropMotor`, shared with the page and the tests). `#cartas` (tab 🃏
+Sobres) mounts it full-window (`html.jg-prodrop`, like sortEm), and
+`colabtex/src/juegos/prodrop.js` (`crearProdrop`) is the postman: it sends
+the account (`datos`: saldo, packs, graded, exhibited) whenever it changes
+and does the three writes the frame may ask for (`comprar`, `graduar`,
+`exhibir`), one at a time. The frame never touches Firebase. Plain files,
+no build: bump `?v=pd-N` on its two scripts/stylesheet and in `prodrop.js`.
+The cards are real people (teachers), served from the public repo like any
+other file of the site. Things that hold it together:
+
+- **A pack is derived, not rolled.** `cartas/s/<uid>/<push key>` = `{at,
+  p}`, and the rule demands `at === now`. The five cards (and each one's
+  hidden grade and wear seed) are `sobre(uid, key, at)`: SHA-256 of that,
+  seeding xoshiro128**, with integer weights (ten-thousandths for rarity,
+  thousandths for grade), so every browser rebuilds the same pack. The
+  buyer cannot pick the server's millisecond, so cannot pick the contents,
+  and anyone can verify anyone's legendary. The grade was decided at
+  purchase; grading only reveals it.
+- **Odds** (`TIERS`, `GRADE_W`, `DIOS`): 80 / 17.4 / 2.4 / 0.2 % per card,
+  the fifth card rare or better, and 2 % god packs (five epic or better, at
+  most one legendary: after the first legendary the rest are epic).
+  `ESPERADO` is the exact expected count of each rarity per pack, and
+  `probabilidad(id, g)` is what grading announces: a card of this rarity
+  or better with this grade or more, per card and per pack, plus this
+  exact card with that grade. `tests/prodrop.test.cjs` simulates 60 000
+  packs against those numbers.
+- **Prices live in the rule too.** `p === (now < 1792119600000 ? 50 : 80)`
+  (launch price until 16-10-2026 00:00 Chile, `PRECIO.promoHasta`) and
+  grading `cartas/g/<uid>/<key>/<i>` = `{at: now, p: 100}`, only for a pack
+  that exists. Both write-once, never deleted: they are the spending. The
+  test pins the rule's timestamp to the motor's.
+- **The balance cannot be checked by the rules** (they cannot add up what
+  was earned), so the postman re-checks it against the complete read
+  (`watchLogros` now sets `completo` once all five nodes arrived) before
+  every charge. A modified client could still overspend; what makes that
+  visible is that earnings never go down, so `saldo < 0` proves it, and
+  `prodrop-cartas.js` (`solvente`) shows nothing of such an account in the
+  lobby or on profiles.
+- **The collection is the ledger**, not localStorage: the frame rebuilds it
+  with `M.coleccion(uid, s, g)`. A copy is `<key>.<i>`. The pack being
+  opened stays out of it (`abriendo`) until the summary, so the collection
+  count does not spoil it; a pack bought and not opened (tab closed) is
+  remembered in `localStorage` (`prodrop.pendiente.<uid>`) and resumed for
+  free.
+- **Exhibited cards** are `users/<uid>/perfil/cartas` (up to four keys,
+  validated by regex in the rules), toggled from the card's zoom. The
+  profile editor does not know them, so `editaPerfil` carries them over or
+  saving the profile would erase them. They show on the profile page and
+  the mini card through `exhibidasDe`, which only resolves keys that are
+  packs of that account.
+- **Mejores drops** (lobby sidebar, `#vesDrops`): `mejoresDrops` lists
+  epics and legendaries only, legendaries first, then by revealed grade,
+  then newest, with who pulled them.
+
+The `cartas` node and `perfil/cartas` need the rules re-published.
 
 **A new room is announced on Discord** (`juegos/discord.js`), with no bot
 and no server: a Discord *webhook* that the host's own browser POSTs to

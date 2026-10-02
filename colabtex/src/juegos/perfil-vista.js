@@ -12,6 +12,7 @@
  * Los datos los da `ctx.datos(cb)` (la misma escucha que la pestaña de
  * logros, compartida), así que abrir diez tarjetas no son diez lecturas.
  */
+import { exhibidasDe, miniCarta } from "./prodrop-cartas.js";
 import { estadisticas, marcoVisible, fondoVisible, vitrinaDe, nombreJuego, nombreCategoria, oscurece } from "./perfil-tarjeta.js";
 import { LOGROS } from "./logros.js";
 
@@ -48,7 +49,7 @@ function pieza(v, grande) {
 }
 
 /* La tarjeta: la misma para el globo y para la vista previa del editor. */
-export function tarjetaHtml({ uid, p, est, pista, colorDe, yo, editor }) {
+export function tarjetaHtml({ uid, p, est, pista, colorDe, yo, editor, cartas }) {
   const q = quien(uid, p, est, pista, colorDe);
   const f = fondoVisible(p, est), marco = marcoVisible(p, est);
   const vit = est ? vitrinaDe(p, est, 3) : [];
@@ -66,6 +67,7 @@ export function tarjetaHtml({ uid, p, est, pista, colorDe, yo, editor }) {
     ${q.bio ? `<p class="jg-mini-bio">${esc(q.bio)}</p>` : `<p class="jg-mini-bio jg-nada">${uid === yo ? "Aún no escribes nada sobre ti." : "Sin descripción."}</p>`}
     <div class="jg-mini-num">${n.map(([a, b]) => `<span><b>${esc(a)}</b>${esc(b)}</span>`).join("")}</div>
     <div class="jg-mini-vit">${vit.length ? vit.map(v => pieza(v)).join("") : `<p class="jg-nada">${est ? "Todavía nada que exhibir." : "Cargando…"}</p>`}</div>
+    ${cartas && cartas.length ? `<div class="jg-mini-cartas">${cartas.map(c => miniCarta(c)).join("")}</div>` : ""}
     ${editor ? "" : `<div class="jg-mini-btns">
       <button class="btn" data-ir-perfil="${esc(uid)}">Ver perfil</button>
       ${uid === yo ? `<button class="btn2" data-editar-perfil>✎ Personalizar</button>` : ""}
@@ -82,10 +84,10 @@ export function abreMini(uid, ancla, ctx, pista) {
   caja.className = "jg-mini";
   caja.setAttribute("role", "dialog");
   caja.tabIndex = -1;
-  let est = null;
+  let est = null, dat = null;
   const pinta = () => {
     caja.innerHTML = `<button class="jg-mini-x" title="Cerrar" aria-label="Cerrar">✕</button>` +
-      tarjetaHtml({ uid, p: ctx.perfil(uid), est, pista, colorDe: ctx.colorDe, yo: ctx.yo() });
+      tarjetaHtml({ uid, p: ctx.perfil(uid), est, pista, colorDe: ctx.colorDe, yo: ctx.yo(), cartas: exhibidasDe(uid, ctx.perfil(uid), dat) });
     caja.setAttribute("aria-label", "Perfil de " + quien(uid, ctx.perfil(uid), est, pista).nombre);
     caja.querySelector(".jg-mini-x").onclick = cierraMini;
     const v = caja.querySelector("[data-ir-perfil]");
@@ -105,7 +107,7 @@ export function abreMini(uid, ancla, ctx, pista) {
     caja.style.left = x + "px"; caja.style.top = y + "px";
   };
   coloca();
-  const off = ctx.datos(d => { est = estadisticas(uid, d); pinta(); coloca(); });
+  const off = ctx.datos(d => { est = estadisticas(uid, d); dat = d; pinta(); coloca(); });
   const fuera = e => { if (!caja.contains(e.target) && !(ancla && ancla.contains(e.target))) cierraMini(); };
   const tecla = e => { if (e.key === "Escape") cierraMini(); };
   setTimeout(() => { document.addEventListener("pointerdown", fuera, true); document.addEventListener("keydown", tecla); }, 0);
@@ -127,13 +129,14 @@ export const miniAbierta = () => abierta;
 
 /* ---------- La página ---------- */
 export function crearPaginaPerfil({ uid, ctx }) {
-  let host = null, est = null, off = null, firma = "";
+  let host = null, est = null, off = null, firma = "", dat = null;
 
   function pinta() {
     if (!host) return;
     const p = ctx.perfil(uid) || {}, yo = ctx.yo();
     const pista = uid === yo ? ctx.propio() : null;
-    const f2 = JSON.stringify([p, est && [est.nLogros, est.tablas, est.victorias], yo]);
+    const cartas = exhibidasDe(uid, p, dat);
+    const f2 = JSON.stringify([p, est && [est.nLogros, est.tablas, est.victorias], yo, cartas.map(c => [c.k, c.i, c.gr])]);
     if (f2 === firma) return;
     firma = f2;
     const q = quien(uid, p, est, pista, ctx.colorDe);
@@ -161,6 +164,12 @@ export function crearPaginaPerfil({ uid, ctx }) {
         </div>
       </section>
       ${est ? `<div class="jg-pf-num">${numeros.map(([a, b]) => `<div><b>${a}</b><span>${esc(b)}</span></div>`).join("")}</div>` : `<div class="jg-nada jg-pf-carga">Cargando su historial…</div>`}
+      ${est && (cartas.length || propio) ? `
+      <section class="jg-pf-sec jg-pf-cartas">
+        <header><h2>Cartas en exhibición</h2>${propio ? `<a class="btn2" href="#cartas">🃏 Abrir PRODROP</a>` : ""}</header>
+        ${cartas.length ? `<div class="jg-pf-cartas-fila">${cartas.map(c => miniCarta(c)).join("")}</div>`
+          : `<p class="jg-nada">Abre sobres en PRODROP y exhibe aquí tus mejores cartas (en la carta: «☆ Exhibir en mi perfil»).</p>`}
+      </section>` : ""}
       ${est ? `
       <section class="jg-pf-sec">
         <header><h2>Vitrina</h2>${propio ? `<button class="btn2" data-editar="vitrina">Elegir qué mostrar</button>` : ""}</header>
@@ -206,7 +215,7 @@ export function crearPaginaPerfil({ uid, ctx }) {
   return {
     montar(h) {
       host = h;
-      off = ctx.datos(d => { est = estadisticas(uid, d); pinta(); });
+      off = ctx.datos(d => { est = estadisticas(uid, d); dat = d; pinta(); });
       pinta();
     },
     refresca() { firma = ""; pinta(); },
