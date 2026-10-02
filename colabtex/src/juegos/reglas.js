@@ -406,21 +406,23 @@ const REGLAS = {
     ]
   },
   yemas: {
-    lema: "Shooter de huevos en primera persona, de 2 a 8 jugadores, en tres modos.",
+    lema: "Shooter de huevos en primera persona, de 2 a 8 jugadores, en cuatro modos.",
     secciones: [
       ["Controles", lista([
         "Haz click en el juego para capturar el mouse; <b>Esc</b> lo suelta.",
         "<b>WASD</b> o flechas para moverte, <b>Espacio</b> para saltar, el mouse para mirar.",
-        "<b>Click</b> dispara, <b>R</b> recarga, <b>1 2 3</b> o la rueda cambian de arma, <b>E</b> recoge o cambia un arma del piso, <b>G</b> lanza la granada elegida, <b>T</b> cambia cuál, y <b>Tab</b> muestra la tabla.",
+        "Mantén <b>Shift</b> mientras avanzas para <b>correr</b> (más rápido, pero disparas menos preciso). Corriendo, <b>C</b> te tira a <b>deslizarte</b>: sales disparado hacia donde ibas, más bajo, y puedes disparar mientras resbalas. Eso termina el sprint; para volver a correr suelta Shift y apriétalo de nuevo. Si saltas mientras te deslizas, llegas bastante más alto.",
+        "<b>Click</b> dispara, <b>R</b> recarga, <b>1 2 3</b> o la rueda cambian de arma, <b>E</b> recoge o cambia un arma del piso (en zombis, la compra), <b>Q</b> lanza la espátula dorada si la tienes, <b>G</b> lanza la granada elegida, <b>T</b> cambia cuál, y <b>Tab</b> muestra la tabla.",
         "<b>Shift+F</b> (o ⛶ en la cabecera de la sala) pone el juego a pantalla completa: solo el juego, sin la página alrededor.",
         "En la pausa (<b>Esc</b>) se ajusta la <b>sensibilidad del mouse</b>, se elige la <b>skin</b> y las granadas."
       ])],
       ["Las armas", lista([
-        "Se parte con el <b>🔪 Cuchillo</b>: 55 de daño a menos de un brazo (más a la cabeza), y caminas un poco más rápido.",
+        "Se parte con la <b>🍳 Sartén</b>: 55 de daño a menos de un brazo (más a la cabeza), y caminas un poco más rápido.",
         "El resto aparece <b>tirado en el mapa</b> (arriba de la torre, de las plataformas y en cuatro puntos del suelo): pasa por encima para tomarla. Cuál sale en cada punto es al azar, la misma para todos, y vuelve a aparecer otra a los 18 segundos de que alguien se la lleve.",
-        "Se cargan <b>dos como mucho</b>, sin contar el cuchillo. Con dos, <b>E</b> cambia la que tienes en la mano por la del piso. Pasar por una que ya tienes te llena su munición.",
-        "<b>Batidora</b> (metralleta, automática, 30 balas), <b>Revuelta</b> (escopeta de 9 perdigones), <b>Poché</b> (sniper con mira, click derecho), <b>Benedictina</b> (bazuca: un cohete que revienta con lo que toca, 130 de daño) y <b>Pasado por agua</b> (pistola de 6 balas, 34 de daño).",
-        "Cada arma trae su cargador y <b>5 recargas por vida</b>. Sin recargas, toca buscar otra arma o usar el cuchillo.",
+        "Se cargan <b>dos como mucho</b>, sin contar la sartén. Con dos, <b>E</b> cambia la que tienes en la mano por la del piso. Pasar por una que ya tienes te llena su munición.",
+        "<b>Batidora</b> (metralleta, automática, 30 balas), <b>Revuelta</b> (escopeta de 9 perdigones), <b>Poché</b> (sniper con mira, click derecho), <b>Benedictina</b> (bazuca: un cohete con daño en área, ver abajo) y <b>Pasado por agua</b> (pistola de 6 balas, 34 de daño).",
+        "<b>La bazuca no necesita acertar</b>: el cohete revienta al chocar con algo o al pasar a un metro y medio de un rival. A menos de 2 metros de la explosión el daño es entero (150, más que una vida) y baja hasta los 6 metros. Te hace la mitad a ti, así que no la dispares a tus pies.",
+        "Cada arma trae su cargador y <b>5 recargas por vida</b>. Sin recargas, toca buscar otra arma o usar la sartén.",
         "<b>X · Autodestrucción</b>: mantén la X un segundo (si la sueltas antes, se cancela). Tu huevo pita y brilla en rojo —los demás también lo ven— y revienta: hasta 220 de daño a los rivales en unos seis metros, y tú mueres siempre."
       ])],
       ["Granadas", lista([
@@ -440,10 +442,17 @@ const REGLAS = {
         "La voz va directo de navegador a navegador, sin pasar por el sitio. Si dos redes no dejan una conexión directa (pasa con algunas de celular), ese par no se oye y su nombre sale en rojo."
       ])],
       ["Sin servidor", "Cada navegador decide si lo alcanzaron y anota su propia muerte en el registro. Nadie puede anotarse una baja que no le dieron, pero un navegador modificado podría no morirse: es el mismo límite honesto del resto de los juegos."],
-      ["Para practicar", "El juego suelto (<code>juegos/yemas/</code>) se juega contra cuatro bots, todos contra todos."]
+      ["Para practicar", "El juego suelto (<code>juegos/yemas/</code>) se juega contra cuatro bots, todos contra todos, o solo contra los zombis."]
     ],
     modos: {
-      todos: { nombre: "Todos contra todos", secciones: [["Todos contra todos", "Cada uno por su cuenta. Gana el primero que llega a la meta de bajas: 10, 15 o 25 según el largo que eligió quien abrió la sala."]] },
+      todos: { nombre: "Todos contra todos", secciones: [
+        ["Todos contra todos", "Cada uno por su cuenta. Gana el primero que llega a la meta de bajas: 10, 15 o 25 según el largo que eligió quien abrió la sala."],
+        ["La espátula dorada", lista([
+          "Solo en este modo, y rara vez, en uno de los puntos de armas aparece una <b>✨ espátula dorada</b>. No ocupa hueco: pasa por encima para tomarla.",
+          "Apriétale <b>Q</b> y sale volando hacia el rival que tengas <b>más cerca de la mira</b>. Lo persigue a través de las paredes y cada golpe le quita <b>la mitad de la vida que le queda</b>, una y otra vez, hasta que se muere (unos cuatro segundos).",
+          "A quien persigue le sale un aviso. Si se muere antes por otra cosa, la espátula se va. Se lleva una sola, y se pierde al morir sin haberla tirado."
+        ])]
+      ] },
       equipos: { nombre: "Duelo por equipos", secciones: [["Duelo por equipos", lista([
         "Rojo contra azul. Mientras la sala espera, cada uno elige su equipo arriba del juego; quien no elige queda en el que le toca por asiento (alternados). Si todos eligen el mismo, se reparten alternados.",
         "El equipo queda fijo desde la primera baja.",
@@ -456,6 +465,20 @@ const REGLAS = {
         "Pasa por encima de la bandera rival para tomarla y llévala a tu base. <b>Solo se captura si la tuya está en casa.</b>",
         "Quien muere con la bandera la suelta donde cayó. Si es la tuya, tócala para devolverla; si nadie la toca, vuelve sola a los 25 segundos.",
         "Gana el equipo que captura 1, 3 o 5 banderas, según el largo de la partida."
+      ])]] },
+      zombis: { nombre: "Zombis", secciones: [["Zombis", lista([
+        "Todos juntos contra oleadas de <b>huevos podridos</b>. No hay fuego amigo y el largo de la partida no cuenta: se juega hasta que caen todos.",
+        "Cada ronda trae más zombis, con más vida y más rápidos. Entran por los muros del borde y van por el que tengan más cerca; si te subes a la torre o a una plataforma, trepan por la escala o por el borde. Chocan contigo: no se les puede atravesar. Cada mordisco quita 40, y la vida se recupera sola si pasan cuatro segundos sin que te muerdan.",
+        "Se parte con la sartén y la pistola. Cada golpe a un zombi da <b>10 puntos</b>, freírlo da 60, a la cabeza 100 y con la sartén 130.",
+        "Los puntos de armas son <b>tiendas</b>: acércate y apriétale <b>E</b> para comprar el arma que vende cada uno (pistola 500, escopeta 1.000, metralleta 1.200, sniper 1.500, bazuca 2.500). Comprar una que ya tienes llena su munición a mitad de precio. Mientras no la compras, en la pared se ve solo su silueta.",
+        "Las <b>bebidas</b> llevan su icono en la máquina y en tu pantalla. <b>Double Tap</b> dispara dos balas por tiro. Las armas mejoradas con Pack-a-Punch salen metalizadas.",
+        "A veces un zombi suelta una <b>bonificación</b> que vale para todos: <b>Insta-Kill</b> (30 s matando de un golpe), <b>Carpintero</b> (repara todas las ventanas), <b>Kaboom</b> (fríe a todos los zombis a la vista), <b>Munición máxima</b> y la <b>Máquina de muerte</b>, una ametralladora pesada solo para quien la toma, durante 30 s.",
+        "Se puede jugar <b>solo</b>: quien abre la sala puede empezar sin esperar a nadie.",
+        "Si te quedas sin vida, <b>caes al suelo</b> con la pistola: te arrastras despacio y sigues disparando. Un compañero que se acerque y mantenga <b>E</b> cuatro segundos te levanta. Si pasan 30 segundos sin que nadie lo haga, mueres (y si no queda nadie en pie, en dos).",
+        "<b>Quick Revive</b> hace que levantes a tus compañeros en la mitad de tiempo. Jugando solo te levanta a ti mismo a los tres segundos de caer, una vez; sin él, solo, mueres en el acto.",
+        "Si mueres, quedas fuera hasta que empieza la ronda siguiente: vuelves con la sartén y la pistola, y con tus puntos. Al empezar cada ronda, los que siguen en pie recuperan sus granadas.",
+        "La partida se acaba cuando caen <b>todos a la vez</b>. En la sala gana quien hizo más puntos en total, aunque los haya gastado. En la clasificación, <b>Yemas zombis</b> va aparte, una tabla por mapa, ordenada por la ronda a la que llegaste.",
+        "A los zombis los mueve el navegador del primer jugador de la sala. Si se va, los toma el siguiente, así que la partida sigue."
       ])]] }
     }
   },
@@ -669,6 +692,30 @@ const REGLAS = {
       ["Racha y clasificación", "La 🔥 racha cuenta los días seguidos que completas la sopa diaria: si ayer la hiciste, hoy sube uno; si te saltas un día, vuelve a empezar. Se guarda en tu navegador y, jugando con tu sesión, también en tu cuenta. En la Clasificación compite la mejor racha y, en el modo libre, el tiempo de cada dificultad y tamaño."]
     ]
   },
+  electro: {
+    lema: "Electrodle: adivina el componente, la fórmula y el símbolo del día, y resuelve tres desafíos eléctricos.",
+    secciones: [
+      ["Cómo se juega", "Escribe en el buscador y elige de la lista. Los intentos son ilimitados: cada uno te da información para el siguiente, y el modo termina cuando aciertas."],
+      ["Los cuatro modos", lista([
+        "<b>Componente</b>: cada intento muestra una fila con su familia, sus funciones, cuántos terminales tiene su encapsulado típico, si es polarizado, su designador en un esquemático (R, C, Q…) y su época.",
+        "<b>Científico</b> (solo en Práctica): lo mismo con personas de la historia de la electricidad: nacionalidad, años de nacimiento y muerte, área, si una unidad lleva su nombre y si ganó el Nobel.",
+        "<b>Fórmula</b>: ves la fórmula con las variables tapadas. Cada intento fallido destapa una y, con más fallos, llegan pistas: el área y la inicial.",
+        "<b>Símbolo</b>: ves un trozo del símbolo esquemático muy ampliado. Cada intento fallido aleja la vista hasta mostrarlo entero."
+      ])],
+      ["Los tres desafíos", lista([
+        "<b>Bandas</b>: una resistencia oculta de la serie E12. Eliges el color de sus cuatro bandas (dos cifras, multiplicador y tolerancia). Cada banda se marca verde si el color va ahí, amarillo si está en otra banda y gris si no está; la flecha dice si el valor real es mayor o menor. Tienes 6 intentos.",
+        "<b>Circuito</b>: un circuito de resistencias con su fuente. Calculas lo que se pide (la corriente, la resistencia equivalente o un voltaje) en la unidad indicada. Verde es a menos de 1,5 %, amarillo a menos de 10 %, y la flecha dice hacia dónde está. Tienes 6 intentos y al final ves la solución paso a paso.",
+        "<b>Conexiones</b>: 16 fichas que forman cuatro grupos de cuatro (unidades, compuertas, colores…), de fácil a retorcido. Eliges cuatro y envías; si tres de ellas son de un mismo grupo te avisa. A la cuarta equivocación se acaba."
+      ])],
+      ["Los colores", lista([
+        "<b>Verde</b>: igual al correcto.",
+        "<b>Amarillo</b>: en las columnas con varios valores (funciones, nacionalidad, área), tienen algo en común pero no todo.",
+        "<b>Rojo</b>: distinto. En los números y en la época, la flecha ↑ o ↓ dice si el correcto es mayor o menor."
+      ])],
+      ["Diario y práctica", "El <b>Diario</b> es el mismo para todo el sitio y cambia a medianoche de Chile. La <b>Práctica</b> elige al azar, cuantas veces quieras, y no suma puntos."],
+      ["Puntos, racha y clasificación", "Cada modo de adivinar vale 100 puntos a la primera y 10 menos por cada intento extra, nunca menos de 10. Bandas y Circuito valen lo mismo, con un mínimo de 50, y Conexiones 100 menos 20 por error; un desafío que se pierde no suma. Los puntos se acumulan día a día. La 🔥 racha cuenta los días seguidos en que aciertas Componente, Fórmula y Símbolo (los desafíos son puntos extra). En la Clasificación compiten los puntos totales y la racha; en empate gana quien tardó menos. Subir al podio se anuncia en Discord."]
+    ]
+  },
   snake: {
     lema: "Snake Club: la serpiente de siempre, en siete modos y cuatro tamaños.",
     secciones: [
@@ -687,7 +734,7 @@ const REGLAS = {
   }
 };
 
-const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras" };
+const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle" };
 
 export const tieneReglas = juego => Object.prototype.hasOwnProperty.call(REGLAS, juego);
 

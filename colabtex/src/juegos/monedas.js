@@ -19,8 +19,9 @@
      en que terminas una partida (de sala o del club) paga 10, y la racha
      sube el pago 5 por día hasta 50 desde el noveno. Las reglas validan
      la fecha, la racha y la suma; el cliente solo puede apuntar *hoy*.
-   - La racha de la Sopa diaria y la ronda de BBTAN suman un extra sobre
-     su récord, porque ahí la marca misma es la dificultad.
+   - La racha de la Sopa diaria y la de Electrodle, los puntos de
+     Electrodle y la ronda de BBTAN suman un extra sobre su récord, porque
+     ahí la marca misma es la dificultad.
 
    **Gastar** sí se guarda, porque no se puede deducir de nada: cada sobre
    de PRODROP (`cartas/s/<uid>/<clave>`, con su precio `p`) y cada carta
@@ -59,7 +60,7 @@ export const NIVEL = {
   presidente: F + "113322", spicy: F + "122113", tetris: F + "131332",
   yemas: F + "133243", clue: F + "321233",
   minas: "1232323344", snake: "2222221334", tetrisclub: "1231234124",
-  sortem: "1121223434", bbtan: "1122333444", sopa: "1124112333"
+  sortem: "1121223434", bbtan: "1122333444", sopa: "1124112333", electro: "1123412334"
 };
 export function nivelDe(juego, id) {
   const l = LOGROS[juego] || [], i = l.findIndex(x => x.id === id);
@@ -69,10 +70,12 @@ export const valorLogro = (juego, id) => VALOR_NIVEL[nivelDe(juego, id)] || 0;
 
 /* Récords del club: lo que paga tener marca en una modalidad, y el extra
    que sale de la marca misma donde la marca es la dificultad. */
-export const RECORD = { minas: 30, snake: 8, tetrisclub: 25, sortem: 25, bbtan: 25, sopa: 15 };
+export const RECORD = { minas: 30, snake: 8, tetrisclub: 25, sortem: 25, bbtan: 25, sopa: 15, electro: 15 };
 function extraRecord(cat, f) {
   if (cat === "club-bbtan-rondas") return Math.floor(Math.min(f.puntos || 0, 1000) / 2);
-  if (cat === "club-sopa-racha") return 10 * Math.min(f.puntos || 0, 60);
+  if (cat === "club-sopa-racha" || cat === "club-electro-racha") return 10 * Math.min(f.puntos || 0, 60);
+  /* Un día perfecto de Electrodle son 700 puntos: 14 monedas. */
+  if (cat === "club-electro-puntos") return Math.floor(Math.min(f.puntos || 0, 100000) / 50);
   return 0;
 }
 const juegoDeCategoria = c => Object.keys(SOLO_PREFIJO).find(k => String(c).startsWith(SOLO_PREFIJO[k])) || "";

@@ -1,5 +1,6 @@
 import * as fb from "../fb-juegos.js";
 import { crearVoz } from "./voz.js";
+import { YM_ARMAS, mapaYemas } from "./motor.js";
 
 /* Yemas — el cartero entre la sala y el juego.
 
@@ -31,7 +32,11 @@ import { crearVoz } from "./voz.js";
    (`sessionStorage`, por el `origen` de la sala nueva) y al recargar.
 
    En las variantes por equipo, mientras la sala espera, cada uno elige el
-   suyo (`{t:"equipo", e}`); el reductor decide qué elección vale. */
+   suyo (`{t:"equipo", e}`); el reductor decide qué elección vale.
+
+   En zombis el marco que dirige escribe `{t:"ronda", r}` al limpiar una, y
+   cada `muere` lleva los puntos, los zombis fritos y la ronda; el marcador
+   le devuelve al marco la ronda vigente y quiénes están caídos. */
 const PADRE = "yemas-padre", HIJO = "yemas-hijo";
 const SUCESOS = new Set(["muere", "toma", "devuelve", "captura"]);
 const VOZ_RECUERDA = "yemas.voz";
@@ -62,6 +67,7 @@ export function crearYemas({ uid, pid, jugar, terminar, mirando }) {
       configurado = true;
       enviar("config", {
         yo: uid, mirando: !juego(), meta: est.meta, variante: est.variante, equipos: est.equipos || null,
+        mapa: mapaYemas(partida),
         semilla: (partida.semilla >>> 0) || 1,
         jugadores: est.jugadores.map((j, i) => ({ uid: j.uid, nombre: j.nombre || "Huevo", orden: i }))
       });
@@ -71,7 +77,8 @@ export function crearYemas({ uid, pid, jugar, terminar, mirando }) {
       bajas: est.bajas, muertes: est.muertes, meta: est.meta, equipos: est.equipos || null,
       puntosEq: est.puntosEq || null, banderas: est.banderas || null, armas: est.armas || {},
       fuera: Object.keys(est.fuera || {}),
-      fin: est.fase === "fin" ? { ganador: est.ganador || "", motivo: est.motivo || "" } : null
+      ronda: est.ronda || 0, caidos: est.caidos || [], puntos: est.variante === "zombis" ? est.puntos || {} : {},
+      fin: est.fase === "fin" ? { ganador: est.ganador || "", motivo: est.motivo || "", ronda: est.ronda || 0, puntos: est.puntos || {} } : null
     });
     const lista = [];
     for (const [idx, j] of registro(partida)) {
@@ -97,10 +104,14 @@ export function crearYemas({ uid, pid, jugar, terminar, mirando }) {
     if (d.tipo === "estado" && d.e && typeof d.e === "object") {
       fb.yemasVivo(pid, uid, d.e);
     } else if (d.tipo === "muere") {
-      const a = Number.isInteger(d.a) && d.a >= 0 && d.a <= 7 ? d.a : 0;
+      const a = Number.isInteger(d.a) && d.a >= 0 && d.a < YM_ARMAS ? d.a : 0;
       const j = { t: "muere", uid, por: typeof d.por === "string" ? d.por.slice(0, 64) : "", a, cab: !!d.cab };
       if (d.x !== undefined) { j.x = num(d.x); j.z = num(d.z); }
+      const ent = (x, max) => Number.isInteger(x) && x >= 0 && x <= max ? x : 0;
+      if (d.pts !== undefined) { j.pts = ent(d.pts, 1e8); j.zk = ent(d.zk, 1e6); j.r = ent(d.r, 1e4); }
       anota(j);
+    } else if (d.tipo === "ronda" && Number.isInteger(d.r) && d.r > 1 && d.r < 1e4) {
+      anota({ t: "ronda", uid, r: d.r });
     } else if (d.tipo === "recoge" && Number.isInteger(d.s) && Number.isInteger(d.g)) {
       anota({ t: "recoge", uid, s: d.s, g: d.g });
     } else if ((d.tipo === "toma" || d.tipo === "devuelve" || d.tipo === "captura") && bandera(d.b)) {
@@ -225,7 +236,7 @@ export function crearYemas({ uid, pid, jugar, terminar, mirando }) {
     const n = est.jugadores.length, cupo = est.cupo || n;
     aviso.hidden = !!est.listos;
     aviso.textContent = est.listos ? "" : "Esperando huevos… " + n + " de " + cupo +
-      (cupo > 2 && n >= 2 ? " · el anfitrión puede empezar ya" : "");
+      (n >= (est.variante === "zombis" ? 1 : 2) ? " · el anfitrión puede empezar ya" : "");
   }
 
   function montar(el) {
@@ -248,7 +259,7 @@ export function crearYemas({ uid, pid, jugar, terminar, mirando }) {
     window.addEventListener("message", mensaje);
     window.addEventListener("keydown", abajo);
     window.addEventListener("keyup", arriba);
-    frame.src = "juegos/yemas/index.html?modo=online&v=yemas-5";
+    frame.src = "juegos/yemas/index.html?modo=online&v=yemas-10";
     host.append(aviso, equiposEl, barra, frame);
   }
 

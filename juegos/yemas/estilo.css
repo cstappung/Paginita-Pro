@@ -131,6 +131,10 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #a9dcff; fon
 #granadas span { background: rgba(0,0,0,0.4); padding: 3px 8px; border-radius: 8px; opacity: 0.7; }
 #granadas span.sel { opacity: 1; outline: 2px solid #ffc21a; }
 #granadas small { width: 100%; text-align: right; opacity: 0.7; font-size: 11px; }
+#revive { position: absolute; top: 60%; left: 50%; transform: translateX(-50%); text-align: center; font-weight: 800; color: #7dffa0; }
+#revive div { width: 180px; height: 8px; margin: 6px auto 0; border-radius: 4px; background: rgba(0,0,0,0.45); overflow: hidden; }
+#revive i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #3fd06b, #b6ff6a); }
+#abatido { position: absolute; top: 34%; width: 100%; text-align: center; font-size: 20px; font-weight: 800; color: #ff5a4a; text-shadow: 0 2px 6px #000; }
 #prompt { position: absolute; bottom: 92px; width: 100%; text-align: center; font-size: 17px; font-weight: 800; color: #fff; }
 #humo { position: absolute; inset: 0; opacity: 0; background: radial-gradient(circle, rgba(205,210,212,0.85), rgba(190,196,198,0.97)); pointer-events: none; }
 #cegado { position: absolute; inset: 0; opacity: 0; background: #ffffff; pointer-events: none; }
@@ -143,3 +147,31 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #a9dcff; fon
 .ajustes b[data-aj] { min-width: 3.2em; }
 .ajustes select { font: inherit; padding: 4px 6px; border-radius: 8px; border: 0; background: #fff8ec; color: #3a2a1a; }
 #menu .ajustes { margin-bottom: 14px; }
+
+/* ---------- Zombis y espátula ---------- */
+#menu select#modo-practica, #menu select#mapa-practica { width: 100%; font: inherit; font-size: 16px; padding: 10px 12px; margin-top: 6px;
+  border: 2px solid transparent; border-radius: 10px; background: #fff8ec; color: #3a2a1a; }
+#puntos-z { position: absolute; left: 16px; bottom: 50px; font-size: 22px; font-weight: 800; color: #ffe066; }
+#puntos-z i { font-style: normal; font-size: 16px; margin-left: 8px; color: #b6f27a; animation: sube-pts 0.9s ease-out forwards; }
+@keyframes sube-pts { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-22px); } }
+#ronda { position: absolute; top: 20%; width: 100%; text-align: center; font-size: 64px; font-weight: 900; letter-spacing: 4px;
+  color: #d8352a; text-shadow: 0 0 18px rgba(0,0,0,0.85), 0 3px 0 #4a0d08; animation: cartel-ronda 3.2s ease-out forwards; }
+@keyframes cartel-ronda { 0% { opacity: 0; transform: scale(1.6); } 15% { opacity: 1; transform: scale(1); } 75% { opacity: 1; } 100% { opacity: 0; } }
+#inv span.oro { opacity: 1; background: linear-gradient(#ffe680, #e3a81c); color: #3a2a1a; font-weight: 800; text-shadow: none; }
+#fin #otra { pointer-events: auto; font: inherit; font-size: 18px; font-weight: 700; padding: 10px 22px; border: 0; border-radius: 12px;
+  cursor: pointer; background: #ffc21a; color: #3a2a1a; box-shadow: 0 4px 0 #b36b00; }
+#fin #otra[hidden] { display: none; }
+
+/* Las bebidas tomadas: una ficha del color de cada una, sobre la vida. */
+#bebidas { position: absolute; left: 16px; bottom: 84px; display: flex; gap: 6px; flex-wrap: wrap; max-width: 46vw; }
+#bebidas span { padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 800; color: #fff;
+  background: var(--c); box-shadow: 0 0 0 2px rgba(0,0,0,0.25), 0 0 10px var(--c); text-shadow: 0 1px 2px rgba(0,0,0,0.6); }
+
+/* Las bonificaciones que duran (Insta-Kill, Máquina de muerte), arriba al centro. */
+#bonos { position: absolute; top: 64px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; pointer-events: none; }
+#bonos[hidden] { display: none; }
+#bonos span { display: flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 999px; font-weight: 800; font-size: 14px;
+  color: #fff; background: rgba(10,10,14,0.65); box-shadow: 0 0 0 2px var(--c), 0 0 14px var(--c); text-shadow: 0 1px 2px #000; }
+#bonos span i { font-style: normal; font-size: 18px; }
+#bonos span.acaba { animation: bonoAcaba 0.4s steps(2) infinite; }
+@keyframes bonoAcaba { 50% { opacity: 0.35; } }

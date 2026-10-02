@@ -63,7 +63,7 @@ Six apps plus a small shared **Informes** page:
   game, two to six), **Tetris** (everyone plays at once and sends garbage to
   the next seat), **Circuit Breakers** (a Worms-style artillery game
   for two to eight squads, in an iframe), **Yemas** (a first-person
-  egg shooter for two to eight in three modes, with voice chat, also in an
+  egg shooter for two to eight in four modes, zombies included, with voice chat, also in an
   iframe) and **Clue** (the deduction board game on a map of a real
   university building, two to six, in an iframe, dealt with mental poker)
   and **Ajedrez** (chess, the full rules, for two), plus a **Clasificación** tab and a 📖 **Reglas**
@@ -1548,7 +1548,9 @@ game loop ever has to be synchronised.
 
 **How many people fit is a property of the room, not of the game.** `JUEGOS`
 declares `minimo` and `cupo` (escondite, cartas, reversi and ajedrez are duels by
-construction — two landscapes, one clash, two colours), and whoever opens the
+construction — two landscapes, one clash, two colours; yemas has
+`minimo: 1`, but `minimoDe(p)` lowers it to one only for the zombies variant,
+which is the one that can be played alone), and whoever opens the
 room picks inside that range along with anything else the game offers;
 `crearPartida(juego, quien, extra)` writes those over the defaults, so a game
 that offers nothing passes nothing. The lobby's player-count options are
@@ -2815,6 +2817,62 @@ matter:
   fila's `si`). The `soloRanks` regex was widened, so the rules must be
   re-published.
 
+**Electrodle (`juegos/club/electro/`) is a Solo Club game too**, a daily
+guessing game in the vein of Pokedle/Wordle on electrical things, on the same
+`conexion.js` protocol: plain files, no build (`?v=electro-N` on its four
+scripts). `datos.js` holds the three catalogues (43 components, 48 people, 46
+formulas, each with an `alias` list for search: «condensador», «termocupla»),
+`simbolos.js` hand-drawn schematic symbols in a 120 x 80 box, and `motor.js`
+(UMD `ElectroMotor`, tested by `tests/electro.test.cjs`) everything pure.
+Things that matter:
+
+- **Three challenges on top** (`retos.js`, UMD `ElectroRetos`), whose target
+  is `"s" + seed` from the date: Bandas (a Mastermind of the resistor colour
+  code, E12 targets, Wordle-style marks per band plus a higher/lower arrow on
+  the value), Circuito (five resistor topologies; answer the current, Req or
+  a voltage within 1.5 %, six tries, the solution steps shown at the end) and
+  Conexiones (NYT Connections: one group per level from `GRUPOS`, no tile
+  repeated across the whole bank so the solution is unique, `choca` keeps
+  confusable groups apart, four mistakes). They can be lost (`hist` entries
+  carry a fourth field, won 0/1, and a lost one scores 0), they add points
+  (`M.puntos`) but **the streak only asks for the classic daily modes**
+  (`CLASICOS`: Componente, Fórmula, Símbolo), so adding challenges did not
+  break anyone's streak. Científico is `practica: true`: only in Práctica,
+  never in the daily (`DIARIOS`), the share text or the streak.
+- **The look is its own, like the *dle sites' themed pages**: always dark,
+  whatever the site theme. `escena.js` draws the background scene (PCB
+  traces with travelling pulses, a Tesla coil with random arcs, a power
+  tower) behind a single centred column: neon logo, modes as round LEDs on
+  a copper trace, a mode plate, a toolbar (Diario/Práctica switch, streak,
+  points, stats and help `<dialog>`s) and chassis panels with screws.
+  `ElectroEscena.descarga()` is the win flash. Reduced motion stops arcs,
+  pulses and the neon flicker.
+- **Four classic modes a day.** Componente and Científico are attribute tables
+  (green equal, yellow «something in common» for list columns, red different,
+  with an up/down arrow on numbers and on the ordered `EPOCAS`). Fórmula shows
+  the formula with every variable masked and uncovers one per miss, in an order
+  seeded by the formula id. Símbolo starts zoomed x5 on the symbol's `foco` and
+  steps out through `ZOOM` on each miss. Hints unlock by misses (`pistas`).
+- **The daily target depends only on the Chile date**, like the Sopa:
+  each pass through a catalogue is a seeded shuffle (`vuelta`), so nothing
+  repeats until all came out, and a pass never starts with the previous one's
+  last. Símbolo only draws components that have a symbol. Práctica is random
+  and scores nothing.
+- **Scoring.** A mode is worth `puntosDe(n)` = 100 at the first try, 10 less
+  per extra try, never below 10. The saved state is
+  `{hist: {fecha: {modo: [puntos, intentos, ms]}}, prog}`; points, total time,
+  streak (days with all four modes) and best streak are all derived from
+  `hist`, so `mezcla` (union by day and mode) is all a second device needs.
+  It lives in `localStorage` under `Club.storageKey` and in
+  `users/<uid>/club/electro` through `Club.guardarPartida`.
+- **Ranking.** `club-electro-puntos` has `puntos` = the running total (it only
+  grows, so every solved mode is a new record) and `tiempo` = total solving
+  time; `club-electro-racha` is sent when the fourth mode of a day is solved.
+  Both feed the podium announcement on Discord, logros (`deMarca`) and coins
+  (`extraRecord`: 10 per streak day, 1 per 50 points). The `soloRanks` regex
+  was widened and `club-electro-puntos` got a 1 000 000 cap, so the rules must
+  be re-published.
+
 **UNO No Mercy's roulette is played by its victim**: the victim picks the
 colour (not whoever threw the card) and then draws one card at a time with
 the button until that colour comes out.
@@ -2886,9 +2944,9 @@ is the postman, like Circuit Breakers'. Four things hold it together:
   by key, for the kill feed; the first batch is flagged `viejas` and not
   announced.
 
-**Three variants over one reducer** (`variante` in the room, not `modo`,
+**Four variants over one reducer** (`variante` in the room, not `modo`,
 which the rules whitelist): `todos` (free-for-all), `equipos` (team
-deathmatch) and `bandera` (capture the flag). Teams are by seat parity
+deathmatch), `bandera` (capture the flag) and `zombis` (co-op waves, below). Teams are by seat parity
 (`equiposYemas`), so a room splits itself evenly as it fills. The room picks a
 `largo` (short/normal/long) rather than a number, because one select cannot
 change its options by another; `YM_LARGOS` turns it into 10/15/25 kills,
@@ -2902,6 +2960,125 @@ goes home when a teammate touches it or, after 25 s, when any teammate's
 frame sends `auto`. Bases are `YM_BASES` in `motor.js` and `BASES` in the
 frame's `mundo.js`, which must agree. There is no friendly fire (the frame
 skips teammates in the raycast), and each team spawns in its own half.
+
+**Zombies (`zombis`) are moved by one player's frame, the director**
+(`juegos/yemas/js/zombis.js`, wired in `main.js`). There is no server to
+run them, so the first seat still in the room whose egg is visible in `vivo`
+simulates them (`director()`). If that tab closes, its `vivo` entry goes
+with `onDisconnect` and the next seat takes over from the last `zb` it saw
+(`adopta`). Two frames may both direct for a moment while that settles; the
+cost is a stray bite, not a broken game. Seven things hold it together:
+
+- **The zombies ride the director's own state**, as `zb: {r, q, p, e, z, m}`:
+  round, how many are still to spawn, the start and between-round timers,
+  each zombie as `[id, x, y, z, ry, hp%, rising, burning, phase, window]`,
+  and the last 20 deaths as `[id, killer, head, weapon, explodes]`. The other frames only draw them
+  (`desdeRed`). Firebase drops empty arrays, so `zb.z` can come back
+  missing, and `lista()` reads that as no zombies.
+- **Shots at a zombie are ordinary hits** addressed to `z:<id>` in the
+  shooter's `g` list. `red.js` hands those to `alGolpeZombi`, and only the
+  director applies them. Bites go the other way: the director sends a hit
+  with weapon 9 (`ZOMBI`). The victim's frame turns it into a death with
+  `por: ""`, so it is nobody's kill.
+- **Points live in each frame** (`yo.pz` to spend, `yo.pzT` earned). A hit
+  pays 10 and a kill 60, or 100 to the head, or 130 with the pan. A kill
+  only pays when a death in `zb.m` names that player. Each `vivo` state
+  carries `pz`/`zk` for the Tab table.
+- **What is bought is the map's** (see below): wall weapons, the box,
+  perks and Pack-a-Punch. `E` buys with points, and buying an owned wall gun
+  refills it at half price. None of that goes through the log.
+- **Rounds and falls are game state.** When a round is clear the director
+  waits `ZB.pausa` and writes `{t:"ronda", r}`. `redYemas` accepts only the
+  next round, and accepting it revives everyone who fell. In zombies a
+  `muere` marks the player fallen and carries `pts`, `zk` and `r`, all
+  integers that only go up. The game ends the moment every player still in
+  the room is fallen. The top `pts` wins, and `""` (a draw) if nobody
+  scored. Being left alone is not a win by abandono.
+- **Before falling there is a last stand** (`cae`, `pasoAbatido`,
+  `ABATIDO` in the frame's `main.js`). Reaching 0 hp in zombies does not
+  write `muere`: the egg goes down (`yo.abatido`, still `vivo`, so it is
+  not in `caidos`) with the pistol — its own, or a borrowed one taken back
+  on getting up — crawling at a quarter of the speed, with no perks.
+  Zombies ignore it (`pasoZombis` passes `vivo: false`). The state carries
+  `ab` (seconds left), which tilts the egg in the other frames. A teammate
+  within 1.6 m holds E for 4 s (`pasoRevivir`) and sends a zero-damage hit
+  with `a: REVIVE` (99) that lifts it; only when the 30 s run out does it
+  `morir`. With nobody else standing the clock drops to 2 s, so a downed
+  team still loses. **Quick Revive halves the time it takes you to lift
+  others**, and **alone** it lifts you after 3 s, once (it is lost like
+  every perk). Alone without it you die at once.
+- **A fallen player waits for the round.** The frame only respawns when
+  `marcador.ronda` grows, with the pan and the pistol and keeping the
+  points. Those still standing get their grenades back. Health regenerates
+  after 4 s without damage, in zombies only. A reloaded tab whose player is
+  in `caidos` stays fallen.
+- **Zombies walk the map's graph.** They spawn outside a window (or rise
+  from the ground on the open maps), tear its boards off one at a time,
+  climb in, and then go by `nodos`/`enlaces`. A link through a door only
+  counts once that door is open, so the distances are recomputed
+  (Floyd-Warshall, under fifty nodes) every time one opens. A zombie that
+  sees its prey chases it straight. Per round `hpRonda`, `totalRonda` and
+  `velRonda` grow.
+
+Practice can be zombies too: the menu's mode select gives `conectarLocal`
+`variante: 'zombis'`, `RedLocal` keeps the round and ends the run on the
+first death, and a button reloads it.
+
+**The zombies maps are Black Ops' five, as data** (`juegos/yemas/js/mapas.js`:
+`nacht`, `kino`, `nuketown`, `riese`, `pueblo`). A map is plain boxes,
+decoration, windows, a navigation graph, doors with prices and the zones
+they open, and where the perks, the box, the wall weapons, Pack-a-Punch, the
+power switch and the lava go. It has no THREE and no DOM, so Node can walk
+it. `mundo.js` draws it, `zombis.js` navigates it and
+`juegos/yemas/js/interactivo.js` owns everything that is bought or touched.
+Things to know:
+
+- **The map is chosen with the room** (`partida.mapa`, an option of the
+  yemas card). `mapaYemas` in `motor.js` clamps it to `YM_MAPAS`, the
+  config carries it into the frame, and `red.mapa` reads it. Practice uses
+  `#mapa-practica`. The rules do not validate `mapa`, so this needed no
+  rules change.
+- **What belongs to the room rides the director's `zb` too**, under keys
+  that do not clash with `zombis.js`'s: `o` open doors, `l` power, `k`
+  boards per window, `n` where the box is, `t`/`f`/`w` the teleporter.
+  Points, perks and weapons belong to each player and are paid and given
+  in their own frame.
+- **A non-director asks with a zero-damage hit to `p:<what>`.** `red.js`
+  hands it to `alPeticion`, which calls `inter.peticion`. The asking frame
+  applies a door or the power at once: those only go one way, so the
+  director has nothing to contradict. Boards go both ways, and there the
+  director's state wins.
+- **Perks need the power** except Quick Revive (500 alone, as in BO1). They
+  and Pack-a-Punch are lost on falling. Pack-a-Punch is `conPap` in
+  `armas.js` (double damage, a clip and a half). The box can give the Rayo
+  batido (`10`), the Amasadora (`11`) and the Huevera (`12`), which exist
+  only in zombies, and pulling the teddy bear moves it.
+- **Each dead zombie leaves a green fried egg** on the floor (`friteVerde`
+  in `zombis.js`: green white and rim, an orange yolk that pulses) for
+  `HUEVO_VIDA` seconds, fading over the last three, drawn in every frame
+  from `zb.m`. In Pueblo, a zombie that steps in the `lava`
+  burns (`quema`) and explodes when it dies, hurting players near it.
+- **Power-ups** (`juegos/yemas/js/bonos.js`, `BONOS` in `armas.js`): a
+  dead zombie may drop Insta-Kill, Carpintero, Kaboom, Munición máxima or
+  the Máquina de muerte (weapon 13, a heavy minigun for 30 s, only for
+  whoever took it). They ride `zb` as `b` (on the floor) and `x` (the last
+  eight taken); a non-director asks with `p:bono:<id>` and hides it at
+  once, and every frame applies each `x` entry once.
+- **Zombies collide with players** (`chocaZombis` in `main.js`) and
+  **climb** rather than jump; a player standing on something makes them
+  replan towards the nearest climbable edge instead of piling up below.
+- An unbought wall weapon shows only its **silhouette**; Pack-a-Punched
+  weapons get a metallic material; drinking a perk plays an animation and
+  each perk has an icon on its machine and in the HUD. **Double Tap fires
+  two bullets**, not double damage.
+
+**Zombies rooms are ranked apart, by map and by round.** `anotar` in
+`juegos-main.js` does not write `ranks/yemas` for a `zombis` room: it calls
+`fb.guardarSolo("yemas-zombis-<mapa>", …)` with `puntos` = the round
+reached and `tiempo` = the game's length, so the table orders by round and
+then by time. `ranks.js` shows it as **Yemas zombis** (`EXTRA.yzombis`, in
+the «En sala» group) with a «Mapa» row. The `soloRanks` regex was widened,
+so the rules must be re-published.
 
 **A team win is `ganador: "eq:rojo"`**, and `ganoEn(p, ganador, uid)` in
 `motor.js` is the one place that knows it includes the whole team. `anotar`,
@@ -2968,10 +3145,20 @@ run. It bursts like a grenade (same `alcanceExplosion`/`golpeaRivales`,
 published as `x2`) with its own radius and damage, and the player always dies
 with `por` = themselves.
 
+**Explosions are measured at three points of each egg** (feet, middle,
+head; `alcanceExplosion`), and the best one with a clear line counts. Damage
+is full within `pleno` and falls linearly to `radio`. The rocket used to
+burst *inside* the box it hit, so the wall it touched blocked the line to
+every egg, and a rocket hitting the wall beside someone did nothing. That is
+why `granada.js` now backs the burst point out along the flight before
+bursting.
+
 **The arsenal** (weapon ids in the frame's `armas.js`, never renumbered
 because the log names them: 0–2 the original three, 3 the grenade, 4 the
-self-destruct, 5 the knife, 6 the bazooka, 7 the pistol; `YM_ARMAS` = 8).
-Everyone starts with the knife and carries at most two more. The rest lie on
+self-destruct, 5 the pan (it was a knife, same id), 6 the bazooka, 7 the
+pistol, 8 the golden spatula, 9 a zombie's bite, 10–12 the box's wonder weapons, 13 the
+Máquina de muerte; `YM_ARMAS` = 14).
+Everyone starts with the pan (`SARTEN`) and carries at most two more. The rest lie on
 `PUNTOS_ARMA` (frame's `mundo.js`, `YM_PUNTOS_ARMA` in `motor.js`, which must
 agree). **Which** weapon lies on point `s` at its appearance `g` comes from
 the room's seed (`armaEnPunto`, so every screen sees the same one, and the
@@ -2984,13 +3171,27 @@ itself as the taker. Each screen brings the next appearance back
 Walking over a free slot or a weapon already owned picks it up (an owned one
 only refills it), and with both slots full `E` swaps the one in hand.
 Inventory and ammo live in the frame: every gun has its magazine plus
-`RECARGAS` (5) reloads per life, and weapons survive death. Respawn after
+`RECARGAS` (8) reloads per life (`RECARGAS_ZOMBIS`, 14, in zombies), and weapons survive death. Respawn after
 being killed refills life, ammo and grenades. After a **suicide that killed
 nobody**, it restores the life, ammo and grenades held just before. A kill
 that arrives while dead, or within 300 ms before dying (practice resolves it
 synchronously), counts as having killed someone. The bazooka's rocket rides
-`granada.js` as kind `cohete`: it flies straight, and the owner's frame
-bursts it on a wall or an egg (`tocaHuevo`).
+`granada.js` as kind `cohete`. It flies straight, and the owner's frame
+bursts it on a wall, on the floor or **near** an egg: `tocaHuevo` inflates
+the egg's ellipsoid by `espoleta` (1.4 m). Within `pleno` (2.2 m) it does a
+full 150, so hitting the egg itself is not needed.
+
+**The golden spatula** (id 8, `ESPATULA_CFG` in `armas.js`) only appears in
+`todos`. `armaEnPunto(..., espatula)` makes one appearance in `rara` (16)
+the spatula, from a different slice of the same hash, so every other
+appearance stays the weapon it was. It is taken with the usual `recoge` but
+occupies no slot (`yo.espatula`), and it is lost on death. `Q` throws it at
+the living rival closest to the crosshair. The thrower's frame flies it
+through walls at 17 m/s. Every 0.55 s at touching distance it sends a hit
+with `a: 8`, and the **victim** takes half of whatever life it has left
+(`ceil(hp/2)`, so 100 dies on the seventh). It stops when the target dies,
+leaves or 20 s pass. The state carries `ep: {i, u, p}`, so the others see it
+fly and the target gets a warning.
 
 **Grenades are a loadout**: two per life, each `duro`, `humo` or `luz`
 (`GRANADAS`), chosen in the pause card or with Z/C while dead, kept in
@@ -3004,6 +3205,17 @@ teammates included.
 **Skins** (`SKINS` and `ponSkin` in the frame's `mundo.js`) are accessories
 hung off the egg's body; the shell keeps its seat or team colour. The state
 carries `sk`, and a remote egg whose skin changes is rebuilt.
+
+**Sprint and slide are the frame's alone** (`SPRINT`, `DESLIZ` and
+`deslizar()` in its `main.js`). Shift while moving forward runs ×1.6 with a
+wider FOV and a little more spread; C while running on the ground slides
+along the current velocity with friction until it is back to walking pace,
+lowering the camera. A slide ends the sprint, and `sinSprint` keeps it ended
+until Shift is released, so holding Shift does not chain slides. Jumping
+out of a slide jumps 1.3 times higher (and ends the slide, keeping the
+momentum). C still cycles the second grenade while dead. The state carries `ds: 1` while
+sliding, and the other frames tilt that egg back and play the scrape. Hit
+detection still uses the upright egg.
 
 **A death leaves a fried egg** (`huevoFrito` in the frame's `main.js`): an
 irregular white `ShapeGeometry` over a golden crispy rim and a glossy
@@ -3023,9 +3235,10 @@ Opened on its own, `juegos/yemas/index.html` is practice against four bots
 with the same engine (`conectarLocal`), which is also the quickest place to
 test a change. The window hooks `__yemas.paso(dt)` step the game without
 `requestAnimationFrame`, which is how it can be driven from a script while
-the tab is hidden. `tests/yemas.test.cjs` covers the reducer, the three
-variants and `ganoEn`. Practice is free-for-all only; the team modes were
-tested with four frames driven by a fake room that runs the real `reducir`.
+the tab is hidden. `tests/yemas.test.cjs` covers the reducer, the four
+variants and `ganoEn`. Practice is free-for-all or zombies. The team modes
+and online zombies were tested with several frames driven by a fake room
+that runs the real `reducir`.
 
 **Clue (`clue`) is a deduction game in an iframe, dealt with mental poker
 so that nobody (not even the host) knows the envelope.** `juegos/clue/` is

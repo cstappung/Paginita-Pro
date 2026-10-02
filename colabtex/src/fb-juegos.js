@@ -278,7 +278,7 @@ export async function leerPopularidad() {
   for (const [juego, filas] of Object.entries(r.val() || {}))
     n[juego] = Object.values(filas || {}).reduce((t, f) => t + (+(f && f.jugadas) || 0), 0);
   for (const [cat, filas] of Object.entries((s && s.val()) || {})) {
-    const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa)-/.exec(cat);
+    const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro)-/.exec(cat);
     if (m) n["club-" + m[1]] = (n["club-" + m[1]] || 0) + Object.keys(filas || {}).length;
   }
   /* Las filas ya están aquí, así que van también: con ellas el
@@ -385,7 +385,8 @@ export function watchPerfil(uid, cb) {
 
 /* Lo que eligió quien abrió la sala y la revancha repite. Solo lo que
    existe: un `undefined` en un `set` hace fallar la escritura entera. */
-const opcionesDe = p => Object.fromEntries(["mapa", "escuadra", "tiempo", "malla", "modo", "sicil", "ritmo"]
+const opcionesDe = p => Object.fromEntries(["mapa", "escuadra", "tiempo", "malla", "modo", "sicil", "ritmo",
+  "color", "variante", "largo", "meta", "exp", "baraja", "amable", "puerto"]
   .filter(k => p[k] !== undefined && p[k] !== null).map(k => [k, p[k]]));
 
 /* Una única invitación por partida; las solicitudes simultáneas convergen. */

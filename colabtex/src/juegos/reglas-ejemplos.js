@@ -142,6 +142,18 @@ export const EJEMPLOS={
  e('racha','La racha de la sopa diaria',
   p('Una sopa por día para todos','La diaria es igual en todo el sitio y cambia a medianoche de Chile. Completarla hoy, después de haberla hecho ayer, suma un día a tu racha.',fichas('Tu racha',['ayer','verde','HECHA'],['hoy','verde','HECHA'],['🔥 2','oro','DÍAS'])),
   p('Saltarse un día la reinicia','Si pasa un día entero sin completarla, la racha vuelve a cero y la siguiente diaria empieza de nuevo en uno. La mejor racha queda guardada.',fichas('Racha cortada',['lunes','verde','HECHA'],['martes','rojo','SIN HACER'],['🔥 1','oro','MIÉRCOLES'])))],
+ electro:[e('tabla','Leer los colores de un intento',
+  p('Prueba un componente','Escribes «Resistencia» y aparece su fila. Cada casilla compara un dato con el del componente del día: familia, funciones, terminales y más.',fichas('Resistencia contra el del día',['Pasivo','verde','FAMILIA'],['Limitar','oro','FUNCIÓN'],['2 ↑','rojo','TERMINALES'])),
+  p('Verde, amarillo y rojo','Verde es igual; amarillo, que comparten algo (Limitar es una de sus funciones, pero tiene otra); rojo, distinto. La flecha ↑ dice que el correcto tiene más terminales.',fichas('Qué dice cada color',['=','verde','IGUAL'],['≈','oro','EN COMÚN'],['≠','rojo','DISTINTO'])),
+  p('Acota y acierta','Un pasivo que limita la corriente, hace algo más y tiene más de dos terminales: el potenciómetro. Al acertar toda la fila sale verde y sumas los puntos de ese intento.',fichas('El acierto al tercer intento',['Potenciómetro','verde','¡ES ESTE!'],['+80','oro','PUNTOS']))),
+ e('formula','Fórmula tapada y símbolo ampliado',
+  p('Las variables empiezan tapadas','Ves la forma de la fórmula, con signos y fracciones, pero cada variable es un cuadro. Cada fallo destapa una; después del tercero llega el área.',fichas('Una fórmula tapada',['?','oro','VARIABLE'],['=','gris','SIGNO'],['?·?','oro','PRODUCTO'])),
+  p('El símbolo se aleja','En Símbolo empiezas viendo un trozo del dibujo aumentado cinco veces. Cada fallo aleja la vista, hasta verlo completo al sexto.',fichas('El zoom baja con cada fallo',['×5','violeta','INICIO'],['×2,6','violeta','2 FALLOS'],['×1','verde','COMPLETO'])),
+  p('Completa el día','Cuando aciertas Componente, Fórmula y Símbolo sube tu racha. Los puntos de cada modo se suman a tu total, que es lo que compite en la Clasificación.',fichas('Un día completo',['3 / 3','verde','MODOS'],['🔥 +1','oro','RACHA'])))
+ ,e('desafios','Los desafíos: bandas, circuito y conexiones',
+  p('Bandas como en Wordle','Pruebas amarillo, violeta, rojo y dorado (4,7 kΩ). El dorado sale verde: la tolerancia es esa. El rojo sale amarillo: está, pero en otra banda. La flecha ↑ dice que el valor real es mayor.',fichas('Tu intento contra la resistencia oculta',['Amarillo','gris','NO ESTÁ'],['Rojo','oro','OTRA BANDA'],['Dorado','verde','EN SU LUGAR'])),
+  p('El circuito pide un número','Si el circuito pide la corriente en mA y respondes 12, te dice, por ejemplo, +9 % ↓: estás cerca y por arriba. A menos de 1,5 % de la respuesta cuenta como acierto.',fichas('Tres respuestas',['15 mA','rojo','+36 % ↓'],['12 mA','oro','+9 % ↓'],['11 mA','verde','¡EXACTO!'])),
+  p('Conexiones de a cuatro','Eliges cuatro fichas que crees que van juntas, como AND, NOR, XOR y NOT. Si son un grupo quedan pintadas; si tres lo eran te avisa «a una de un grupo». Cuatro errores y se acaba.',fichas('Un grupo encontrado',['AND','verde','COMPUERTA'],['NOR','verde','COMPUERTA'],['XOR','verde','COMPUERTA'],['NOT','verde','COMPUERTA'])))],
  snake:[e('crecer','Comer, girar y dejar salida',
   p('Ve hacia la fruta','La cabeza es el círculo grande y la fruta el rombo. Usa flechas, WASD o un deslizamiento en móvil.',serpiente([18,17,16],20)),
   p('Comer alarga el cuerpo','Al llegar a la fruta, la serpiente crece. No puedes dar una media vuelta instantánea sobre tu propio cuerpo.',serpiente([20,19,18,17],12)),
@@ -170,6 +182,12 @@ const VENGANZA=[e('cero','El cero y el siete gafe',
  p('El trece es una excepción','En Vengeance puedes tener dos 13 sin pasarte. Esa excepción no convierte cualquier número repetido en válido.',fichas('Pareja permitida',['13','oro'],['13','oro'])),
  p('Los otros números siguen repitiéndose','Dos ochos todavía te hacen pasarte si no tienes protección. Super mantiene la excepción del 13, pero añade una familia 14 diferente.',fichas('Repetición peligrosa',['8','azul'],['8','rojo'])))];
 export const VARIANTES={
+ yemas:{
+  zombis:[e('zombis','Rondas, puntos y tiendas',
+   p('Cada golpe suma puntos','Pegarle a un zombi da 10 puntos y freírlo 60; a la cabeza son 100 y con la sartén 130. Los puntos sirven para comprar armas.',fichas('Puntos por zombi',['10','blanco','GOLPE'],['60','verde','FRITO'],['100','oro','CABEZA'])),
+   p('Compra en los puntos de armas','En zombis cada punto de armas es una tienda. Acércate y aprieta E: la pistola cuesta 500 y la bazuca 2.500; la munición de una que ya tienes, la mitad.',fichas('Tienda',['500','azul','PISTOLA'],['1200','rojo','METRALLETA'],['2500','oro','BAZUCA'])),
+   p('Si caes, vuelves en la ronda siguiente','Quien muere espera a que sus compañeros limpien la ronda. La partida termina cuando caen todos al mismo tiempo, y gana quien hizo más puntos.',fichas('Fin de la ronda',['↺','verde','VUELVEN'],['💀','rojo','TODOS CAEN'])))]
+ },
  uno:{
   clasico:[e('reto','El reto del comodín +4',
    p('Había rojo en la mesa','Quien juega +4 tenía un 3 rojo. El +4 era ilegal porque disponía de una carta del color anterior, aunque no fuera el mismo número.',cart(['Descarte anterior',[['7','rojo']]],['Mano de quien jugó +4',[['3','rojo','TENÍA ROJO'],['+4','violeta']]])),

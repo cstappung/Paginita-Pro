@@ -150,7 +150,7 @@ export const JUEGOS = {
     nombre: "Yemas",
     lema: "Shooter de huevos en primera persona: el primero en freír a los demás hasta la meta gana",
     color: "#ffb300",
-    minimo: 2,
+    minimo: 1,
     cupo: 8,
     alta: "2026-09-28"
   },
@@ -182,9 +182,18 @@ export function novedades(n = 3) {
 /* Cuánta gente cabe en *esta* sala: lo que eligió quien la abrió,
    recortado a lo que el juego admite. Una partida creada antes de que
    esto existiera no tiene `cupo` y se lee como dos, que es lo que era. */
+/* Cuántos hacen falta para empezar *esta* sala. Casi siempre es el
+   `minimo` del juego; Yemas admite 1 solo en zombis, porque un todos
+   contra todos con un único huevo se ganaría por abandono al empezar. */
+export function minimoDe(p) {
+  const j = JUEGOS[p && p.juego] || {};
+  if (p && p.juego === "yemas" && varianteYemas(p) !== "zombis") return 2;
+  return j.minimo || 2;
+}
+
 export function cupoDe(p) {
   const j = JUEGOS[p && p.juego] || {};
-  const tope = j.cupo || 2, min = j.minimo || 2;
+  const tope = j.cupo || 2, min = Math.max(2, j.minimo || 2);
   const n = Math.floor(Number(p && p.cupo)) || min;
   return Math.max(min, Math.min(tope, n));
 }
@@ -896,8 +905,10 @@ export function reducir(p) {
   p = V.p;
   const js = jugadoresDe(p);
   const cupo = cupoDe(p);
-  const min = (JUEGOS[p.juego] || {}).minimo || 2;
-  const listos = js.length >= min && (cupo === min || p.estado !== "esperando");
+  const min = minimoDe(p);
+  // Una sala de dos arranca sola al llenarse aunque admita empezar con
+  // uno (los zombis): ahí el «Empezar» del anfitrión es para jugar solo.
+  const listos = js.length >= min && (p.estado !== "esperando" || (cupo <= Math.max(min, 2) && js.length >= cupo));
   const base = { jugadores: js, cupo, listos, fin: p.fin || null, votos: V.votos, expulsados: V.expulsados };
   if (p.juego === "escondite") return { ...base, ...redEscondite(p, js) };
   if (p.juego === "cartas") return { ...base, ...redCartas(p, js) };
@@ -987,6 +998,8 @@ export function progreso(est, juego) {
   if (juego === "tetris" && est.caidos) return c(est.caidos.length / Math.max(1, (est.jugadores || []).length - 1));
   /* En Yemas, lo cerca de la meta que está quien más bajas lleva. */
   if (juego === "clue" && est.sugerencias && globalThis.ClueMotor) return c(globalThis.ClueMotor.progreso(est));
+  /* En zombis, cuántos están caídos: el apuro sube cuando quedan pocos. */
+  if (juego === "yemas" && est.variante === "zombis") return c((est.caidos || []).length / Math.max(1, (est.vivos || []).length));
   if (juego === "yemas" && est.bajas) {
     const lider = est.puntosEq ? Math.max(0, ...Object.values(est.puntosEq)) : Math.max(0, ...Object.values(est.bajas));
     return c(lider / (est.meta || YM_META));
@@ -1089,17 +1102,38 @@ export function redWorms(p, js = jugadoresDe(p), listos = true) {
      decide: si dos la toman a la vez, la primera jugada se la lleva y la
      segunda no existe.
 
+   - **zombis**: todos juntos contra oleadas de huevos podridos. A los
+     zombis los mueve el marco de uno de los jugadores (el «director»), así
+     que no pasan por aquí; lo que sí es estado de la partida son las
+     rondas y quién cayó. `{t:"ronda", r}` abre la ronda `r` (vale solo la
+     siguiente a la actual, la escriba quien la escriba) y en ese momento
+     todos los caídos vuelven. Cada `muere` deja al jugador caído y trae sus
+     puntos (`pts`), sus zombis fritos (`zk`) y la ronda (`r`), que solo
+     suben. Cuando todos los que siguen en la sala están caídos a la vez, se
+     acabó: gana quien hizo más puntos (empate si nadie hizo ninguno), con
+     `motivo: "zombis"`. Aquí nadie le hace bajas a nadie, y quedarse solo
+     no gana por abandono: se sigue hasta caer.
+
    `largo` (0, 1, 2: corta, normal, larga) elige la meta de la variante en
    `YM_LARGOS`; una sala de antes, sin variante ni largo, lee su `meta`.
+   Zombis no tiene meta.
    El ganador de las variantes por equipo es `"eq:rojo"` o `"eq:azul"`, y
    `ganoEn` es quien sabe que eso incluye a todo el equipo. */
-export const YM_VARIANTES = { todos: "Todos contra todos", equipos: "Duelo por equipos", bandera: "Captura la bandera" };
-export const YM_LARGOS = { todos: [10, 15, 25], equipos: [20, 30, 50], bandera: [1, 3, 5] };
+export const YM_VARIANTES = { todos: "Todos contra todos", equipos: "Duelo por equipos", bandera: "Captura la bandera", zombis: "Zombis" };
+export const YM_LARGOS = { todos: [10, 15, 25], equipos: [20, 30, 50], bandera: [1, 3, 5], zombis: [0, 0, 0] };
+/* Los mapas de zombis (los clásicos de Black Ops). Solo cuentan en la
+   variante zombis; la misma lista vive en juegos/yemas/js/mapas.js, que es
+   la que los arma. */
+export const YM_MAPAS = { nacht: "Nacht der Untoten", kino: "Kino der Toten", nuketown: "Nuketown Zombies", riese: "Der Riese", pueblo: "Pueblo" };
+export const mapaYemas = p => Object.prototype.hasOwnProperty.call(YM_MAPAS, p && p.mapa) ? p.mapa : "nacht";
 export const YM_EQUIPOS = ["rojo", "azul"];
 export const YM_BASES = { rojo: [0, 29], azul: [0, -29] };
 /* El `a` de una muerte es el id del arma: Batidora, Revuelta, Poché, el
-   Huevo duro (la granada), la autodestrucción, el cuchillo, la bazuca y la
-   pistola, en ese orden. Los ids nunca se renumeran.
+   Huevo duro (la granada), la autodestrucción, la sartén (que fue un
+   cuchillo, con el mismo id), la bazuca, la pistola, la espátula dorada y
+   el mordisco de un zombi, en ese orden; después las tres que solo salen
+   en zombis (Rayo batido, Amasadora, Huevera) y la Máquina de muerte de la
+   bonificación. Los ids nunca se renumeran.
 
    Las armas aparecen tiradas en `YM_PUNTOS_ARMA` puntos del mapa, y cuál
    sale lo decide la semilla de la sala con el punto y el número de
@@ -1108,7 +1142,7 @@ export const YM_BASES = { rojo: [0, 29], azul: [0, -29] };
    punto `s`, y vale solo si es la siguiente a la última tomada ahí; si dos
    la agarran a la vez, la primera jugada se la lleva. Cuándo reaparece es
    cosa de cada pantalla (unos segundos después de verla tomada). */
-export const YM_ARMAS = 8;
+export const YM_ARMAS = 14;
 export const YM_PUNTOS_ARMA = 8;
 export const YM_METAS = YM_LARGOS.todos;
 export const YM_META = 15;
@@ -1134,7 +1168,8 @@ export function metaYemas(p) {
    terminaría por abandono en el primer repintado. */
 const YM_SUCESOS = new Set(["muere", "toma", "devuelve", "captura"]);
 export function equiposYemas(p, js = jugadoresDe(p)) {
-  if (varianteYemas(p) === "todos") return null;
+  const v = varianteYemas(p);
+  if (v === "todos" || v === "zombis") return null;
   const porAsiento = {}, eq = {};
   js.forEach((j, i) => { porAsiento[j.uid] = eq[j.uid] = YM_EQUIPOS[i % 2]; });
   for (const j of jugadasDe(p)) {
@@ -1169,6 +1204,20 @@ export function redYemas(p, js = jugadoresDe(p), listos = true) {
   const hist = [];
   const armas = {};
   let ganador = null, motivo = "", primera = "";
+  // Zombis: la ronda, quién está caído y los puntos de cada uno.
+  const zombis = variante === "zombis";
+  let ronda = 1;
+  const caidos = {}, ptsZ = {}, zk = {};
+  for (const u of ids) { ptsZ[u] = 0; zk[u] = 0; }
+  const entero = (x, max) => Number.isInteger(x) && x >= 0 && x <= max ? x : 0;
+  const finZombis = () => {
+    const activos = js.filter(x => !fuera[x.uid]);
+    if (activos.length && !activos.every(x => caidos[x.uid])) return;
+    let mejor = "", max = 0;
+    for (const x of activos.length ? activos : js) if (ptsZ[x.uid] > max) { max = ptsZ[x.uid]; mejor = x.uid; }
+    ganador = mejor;
+    motivo = "zombis";
+  };
   for (const j of jugadasDe(p)) {
     if (ganador !== null) break;
     if (j.t === "abandona") {
@@ -1176,11 +1225,30 @@ export function redYemas(p, js = jugadoresDe(p), listos = true) {
         fuera[j.uid] = true;
         hist.push({ e: "sale", uid: j.uid });
         for (const b of YM_EQUIPOS) if (banderas[b].uid === j.uid) aBase(b);
+        if (zombis && listos) finZombis();
       }
       continue;
     }
     if (!listos || !ids.has(j.uid) || fuera[j.uid]) continue;
     const u = j.uid;
+
+    if (zombis) {
+      if (j.t === "ronda") {
+        if (j.r !== ronda + 1) continue;
+        ronda = j.r;
+        for (const k of Object.keys(caidos)) delete caidos[k];
+        hist.push({ e: "ronda", r: ronda });
+        continue;
+      }
+      if (j.t !== "muere") continue;
+      muertes[u]++;
+      caidos[u] = true;
+      ptsZ[u] = Math.max(ptsZ[u], entero(j.pts, 1e8));
+      zk[u] = Math.max(zk[u], entero(j.zk, 1e6));
+      hist.push({ e: "baja", uid: "", v: u, a: entero(j.a, YM_ARMAS - 1), cab: false });
+      finZombis();
+      continue;
+    }
 
     if (j.t === "recoge") {
       const s = j.s, g = j.g;
@@ -1232,7 +1300,7 @@ export function redYemas(p, js = jugadoresDe(p), listos = true) {
     if (variante === "equipos" && puntosEq[eq[k]] >= meta) { ganador = "eq:" + eq[k]; motivo = "equipo"; }
   }
   const activos = js.filter(j => !fuera[j.uid]);
-  if (ganador === null && listos) {
+  if (ganador === null && listos && !zombis) {
     if (activos.length <= 1) {
       ganador = activos.length ? activos[0].uid : "";
       motivo = "abandono";
@@ -1246,7 +1314,8 @@ export function redYemas(p, js = jugadoresDe(p), listos = true) {
     turno: "", variante, meta, equipos: eq, bajas, muertes, cabezas, racha, mejorRacha, fuera, primera,
     puntosEq: eq ? (variante === "bandera" ? capturas : puntosEq) : null,
     capturas: capturasDe, banderas: variante === "bandera" ? banderas : null, armas,
-    puntos: bajas,
+    ronda: zombis ? ronda : 0, caidos: zombis ? Object.keys(caidos) : [], zombis: zombis ? zk : null,
+    puntos: zombis ? ptsZ : bajas,
     vivos: activos.map(j => j.uid),
     hist: hist.slice(-40),
     ganador, motivo

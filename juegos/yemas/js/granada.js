@@ -1,5 +1,5 @@
-// Lo que se lanza: las tres granadas (Huevo duro, humo y cegadora) y el cohete
-// de la bazuca. Las granadas rebotan contra el piso y las cajas y revientan a
+// Lo que se lanza: las tres granadas (Huevo duro, humo y cegadora), el cohete
+// de la bazuca y el rayo verde del Rayo batido (un cohete más rápido y chico). Las granadas rebotan contra el piso y las cajas y revientan a
 // los `mecha` segundos; el cohete va derecho y revienta con lo primero que
 // toca.
 //
@@ -22,8 +22,18 @@ const COLORES = {
   luz: ['#f5f7ff', '#3b78ff'],
 };
 
+const esCohete = k => k === 'cohete' || k === 'rayo';
+
 function malla(k) {
   const g = new THREE.Group();
+  if (k === 'rayo') {
+    // El rayo: un óvalo verde que brilla, con su halo.
+    const nucleo = new THREE.Mesh(new THREE.SphereGeometry(0.09, 10, 8).scale(1, 1, 3.2), new THREE.MeshBasicMaterial({ color: '#d8ffc8' }));
+    const halo = new THREE.Mesh(new THREE.SphereGeometry(0.17, 10, 8).scale(1, 1, 2.6),
+      new THREE.MeshBasicMaterial({ color: '#4dff3a', transparent: true, opacity: 0.55, depthWrite: false }));
+    g.add(nucleo, halo);
+    return g;
+  }
   if (k === 'cohete') {
     const cuerpo = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 0.5, 10), new THREE.MeshLambertMaterial({ color: '#7d8f3c' }));
     cuerpo.rotation.x = Math.PI / 2;
@@ -65,7 +75,7 @@ function choca(p, v, b) {
 }
 
 // alReventar(p, dueno, id, propia, k). `tocaHuevo(p)` (solo para lo propio)
-// dice si el cohete le dio a alguien.
+// dice si el cohete le dio a alguien o le pasó lo bastante cerca.
 export function crearGranadas(escena, colisores, alReventar, tocaHuevo = () => false) {
   const vivas = new Map();   // id → {pos, vel, t, obj, propia, dueno, k}
 
@@ -74,7 +84,7 @@ export function crearGranadas(escena, colisores, alReventar, tocaHuevo = () => f
     const obj = malla(k);
     obj.position.set(o[0], o[1], o[2]);
     const vel = new THREE.Vector3(v[0], v[1], v[2]);
-    if (k === 'cohete') obj.lookAt(obj.position.clone().sub(vel));
+    if (esCohete(k)) obj.lookAt(obj.position.clone().sub(vel));
     escena.add(obj);
     vivas.set(id, { pos: obj.position, vel, t: 0, obj, propia, dueno, k });
   }
@@ -96,8 +106,17 @@ export function crearGranadas(escena, colisores, alReventar, tocaHuevo = () => f
 
   function pasoCohete(id, g, h) {
     g.pos.addScaledVector(g.vel, h);
-    const choco = g.pos.y < 0.08 || colisores.some(b => dentro(g.pos, b, 0.05)) || (g.propia && tocaHuevo(g.pos));
+    // Las ventanas tapiadas (`pasa`) frenan el cuerpo, no lo que vuela.
+    const pared = g.pos.y < 0.08 || colisores.some(b => !b.pasa && dentro(g.pos, b, 0.05));
+    const choco = pared || (g.propia && tocaHuevo(g.pos));
     if (!choco) return false;
+    // Contra una pared o el piso revienta un poco antes, afuera: desde dentro
+    // de la caja la pared le tapaba la explosión a todos y no le hacía daño a
+    // nadie aunque reventara al lado.
+    if (pared) {
+      g.pos.addScaledVector(g.vel.clone().normalize(), -0.35);
+      g.pos.y = Math.max(0.15, g.pos.y);
+    }
     // El propio revienta ahí; el ajeno se queda quieto esperando a que el
     // dueño diga dónde fue (llega en un instante).
     if (g.propia) revienta(id);
@@ -108,7 +127,7 @@ export function crearGranadas(escena, colisores, alReventar, tocaHuevo = () => f
   function paso(dt) {
     const pasos = Math.max(1, Math.ceil(dt * 120)), h = dt / pasos;
     for (const [id, g] of vivas) {
-      if (g.k === 'cohete') {
+      if (esCohete(g.k)) {
         for (let s = 0; s < pasos && vivas.has(id); s++) if (pasoCohete(id, g, h)) break;
         g.t += dt;
         if (vivas.has(id) && g.t >= VIDA_COHETE) { if (g.propia) revienta(id); else quita(id); }

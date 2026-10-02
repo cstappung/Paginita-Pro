@@ -198,7 +198,7 @@ test('yemas: una baja con granada (arma 3) cuenta y queda en el historial',()=>{
  const p=sala(3);
  const e=muere(p,'b','a',{a:3});
  assert.equal(e.bajas.a,1);assert.equal(e.hist.at(-1).a,3);
- assert.equal(muere(p,'c','a',{a:9}).hist.at(-1).a,0);
+ assert.equal(muere(p,'c','a',{a:14}).hist.at(-1).a,0);
 });
 
 test('yemas: la autodestrucción (arma 4) le suma al que revienta y su propia muerte a nadie',()=>{
@@ -225,11 +225,89 @@ test('yemas: las armas del piso se las lleva la primera jugada, una aparición a
  assert.equal(reducir(p).armas[1],undefined);
 });
 
-test('yemas: bajas con cuchillo, bazuca y pistola (armas 5, 6 y 7)',()=>{
+test('yemas: bajas con sartén, bazuca y pistola (armas 5, 6 y 7)',()=>{
  const p=sala(3);
  for(const a of [5,6,7])muere(p,'b','a',{a});
  const e=reducir(p);
  assert.equal(e.bajas.a,3);
  assert.deepEqual(copia(e.hist.slice(-3).map(h=>h.a)),[5,6,7]);
- assert.equal(muere(p,'c','a',{a:8}).hist.at(-1).a,0);
+ assert.equal(muere(p,'c','a',{a:14}).hist.at(-1).a,0);
+});
+
+const zsala=(n=3)=>sala(n,{variante:'zombis'});
+const cae=(p,v,pts,o={})=>mover(p,{t:'muere',uid:v,por:'',a:9,cab:false,pts,zk:Math.floor(pts/60),r:1,...o});
+
+test('yemas zombis: arranca en la ronda 1, sin equipos ni meta',()=>{
+ const e=reducir(zsala(3));
+ assert.equal(e.fase,'jugando');assert.equal(e.variante,'zombis');assert.equal(e.ronda,1);
+ assert.equal(e.equipos,null);assert.equal(e.meta,0);assert.deepEqual(copia(e.caidos),[]);
+});
+
+test('yemas zombis: una ronda vale solo si es la siguiente, y levanta a los caídos',()=>{
+ const p=zsala(3);
+ let e=cae(p,'a',120);
+ assert.deepEqual(copia(e.caidos),['a']);assert.equal(e.fase,'jugando');
+ e=mover(p,{t:'ronda',uid:'b',r:3});assert.equal(e.ronda,1);          // se salta una: no vale
+ e=mover(p,{t:'ronda',uid:'b',r:2});assert.equal(e.ronda,2);assert.deepEqual(copia(e.caidos),[]);
+ e=mover(p,{t:'ronda',uid:'c',r:2});assert.equal(e.ronda,2);          // repetida: no hace nada
+ assert.equal(e.hist.at(-1).e,'ronda');
+ assert.ok(progreso(e,'yemas')===0);
+ e=cae(p,'b',50);assert.ok(Math.abs(progreso(e,'yemas')-1/3)<1e-9);
+});
+
+test('yemas zombis: se acaba cuando caen todos a la vez y gana quien hizo más puntos',()=>{
+ const p=zsala(3);
+ cae(p,'a',300);cae(p,'b',900);
+ let e=mover(p,{t:'ronda',uid:'c',r:2});   // a y b vuelven
+ cae(p,'a',700,{r:2});cae(p,'c',200,{r:2});
+ e=reducir(p);assert.equal(e.fase,'jugando');   // b sigue en pie
+ e=cae(p,'b',1500,{r:2});
+ assert.equal(e.fase,'fin');assert.equal(e.motivo,'zombis');assert.equal(e.ganador,'b');
+ assert.equal(e.puntos.a,700);assert.equal(e.puntos.b,1500);assert.equal(e.ronda,2);
+ assert.equal(e.muertes.a,2);assert.deepEqual(copia(e.bajas),{a:0,b:0,c:0});
+ const antes=copia(e);cae(p,'a',99999);assert.deepEqual(copia(reducir(p)),antes);   // congelado
+});
+
+test('yemas zombis: los puntos solo suben, y sin puntos es empate',()=>{
+ const p=zsala(2);
+ cae(p,'a',400);mover(p,{t:'ronda',uid:'b',r:2});
+ cae(p,'a',100);cae(p,'b',0);
+ let e=reducir(p);assert.equal(e.puntos.a,400);assert.equal(e.ganador,'a');
+ const q=zsala(2);cae(q,'a',0);e=cae(q,'b',0);
+ assert.equal(e.fase,'fin');assert.equal(e.ganador,'');
+ for(const pts of [-5,1.5,'mil',1e12]){const r=zsala(2);assert.equal(cae(r,'a',pts).puntos.a,0);}
+});
+
+test('yemas zombis: quedarse solo no gana por abandono; caer solo sí termina',()=>{
+ const p=zsala(3);
+ mover(p,{t:'abandona',uid:'c'});let e=mover(p,{t:'abandona',uid:'b'});
+ assert.equal(e.fase,'jugando');
+ e=cae(p,'a',250);assert.equal(e.fase,'fin');assert.equal(e.ganador,'a');
+ const q=zsala(2);cae(q,'a',800);e=mover(q,{t:'abandona',uid:'b'});   // el que quedaba en pie se va
+ assert.equal(e.fase,'fin');assert.equal(e.ganador,'a');
+});
+
+test('yemas zombis: nadie se anota bajas, aunque la muerte nombre a otro',()=>{
+ const p=zsala(2);
+ const e=mover(p,{t:'muere',uid:'a',por:'b',a:0,cab:true,pts:10,zk:0,r:1});
+ assert.equal(e.bajas.b,0);assert.equal(e.cabezas.b,0);assert.equal(e.hist.at(-1).uid,'');
+});
+
+test('yemas: muertes con la espátula dorada (8) cuentan; el mordisco (9) y el Rayo batido (10) también se leen',()=>{
+ const p=sala(3);
+ let e=muere(p,'b','a',{a:8});assert.equal(e.bajas.a,1);assert.equal(e.hist.at(-1).a,8);
+ e=muere(p,'c','b',{a:9});assert.equal(e.hist.at(-1).a,9);
+ e=muere(p,'c','b',{a:10});assert.equal(e.hist.at(-1).a,10);
+ e=muere(p,'c','b',{a:14});assert.equal(e.hist.at(-1).a,0);
+});
+
+test('yemas: los zombis se juegan de a uno; los demás modos piden dos',()=>{
+ const z=sala(1,{variante:'zombis',cupo:4});
+ assert.equal(reducir(z).fase,'espera');
+ z.estado='jugando';const e=reducir(z);
+ assert.equal(e.fase,'jugando');assert.equal(e.ganador,null);
+ assert.equal(context.minimoDe(z),1);
+ const t=sala(1,{cupo:4,estado:'jugando'});
+ assert.equal(context.minimoDe(t),2);
+ assert.equal(reducir(t).fase,'espera');
 });

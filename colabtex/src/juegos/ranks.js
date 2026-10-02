@@ -30,7 +30,7 @@ const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
 /* Los tres metales, en el orden del puesto. */
 const METAL = ["oro", "plata", "bronce"];
 const TITULO = ["Campeón", "Subcampeón", "Tercer puesto"];
-const EXTRA = { minas: { nombre: "Mina Club", color: "#eeb765" }, snake: { nombre: "Snake Club", color: "#4be9bc" }, tetrisclub: { nombre: "Tetris Club", color: "#b04ee8" }, sortem: { nombre: "sortEm", color: "#ff006e" }, bbtan: { nombre: "BBTAN", color: "#c4f568" }, sopa: { nombre: "Sopa de letras", color: "#5b8cff" } };
+const EXTRA = { yzombis: { nombre: "Yemas zombis", color: "#7bd34a", sala: true }, minas: { nombre: "Mina Club", color: "#eeb765" }, snake: { nombre: "Snake Club", color: "#4be9bc" }, tetrisclub: { nombre: "Tetris Club", color: "#b04ee8" }, sortem: { nombre: "sortEm", color: "#ff006e" }, bbtan: { nombre: "BBTAN", color: "#c4f568" }, sopa: { nombre: "Sopa de letras", color: "#5b8cff" }, electro: { nombre: "Electrodle", color: "#f5a524" } };
 
 /* Las categorías de los juegos individuales, como botones y no como un
    desplegable: son pocas, se leen de un vistazo y cambiar de una a otra
@@ -38,6 +38,10 @@ const EXTRA = { minas: { nombre: "Mina Club", color: "#eeb765" }, snake: { nombr
    juegos que ya no están. Snake tiene dos filas (modo y mapa) porque su
    récord es de la pareja; Zen no puntúa y no sale. */
 const SOLO = {
+  /* Yemas zombis se juega en sala pero clasifica como un récord: la ronda
+     a la que llegó la sala, una tabla por mapa. */
+  yzombis: { filas: [{ k: "n", t: "Mapa", ops: [["nacht", "Nacht der Untoten"], ["kino", "Kino der Toten"], ["nuketown", "Nuketown"], ["riese", "Der Riese"], ["pueblo", "Pueblo"]] }],
+    cat: s => `yemas-zombis-${s.n}` },
   minas: { filas: [{ k: "n", t: "Dificultad", ops: [["easy", "Fácil"], ["medium", "Medio"], ["hard", "Difícil"]] }],
     cat: s => `club-minas-${s.n}` },
   tetrisclub: { filas: [{ k: "n", t: "Modo", ops: [["maraton", "Maratón"], ["sprint", "Sprint 40"], ["ultra", "Ultra 2 min"]] }],
@@ -52,6 +56,9 @@ const SOLO = {
       { k: "m", t: "Tabla", ops: [["racha", "Racha diaria"], ["facil", "Libre · Fácil"], ["medio", "Libre · Medio"], ["dificil", "Libre · Difícil"]] },
       { k: "t", t: "Tamaño", ops: [["8", "8×8"], ["12", "12×12"], ["15", "15×15"]], si: e => e.m !== "racha" }],
     cat: s => s.m === "racha" ? "club-sopa-racha" : `club-sopa-${s.m}-${s.t}`, def: { t: "12" } },
+  /* Electrodle: los puntos que se acumulan día a día, o la racha. */
+  electro: { filas: [{ k: "n", t: "Tabla", ops: [["puntos", "Puntos totales"], ["racha", "Racha diaria"]] }],
+    cat: s => `club-electro-${s.n}` },
   snake: { filas: [
       { k: "m", t: "Modo", ops: [["classic", "Clásico"], ["arcade", "Arcade"], ["portals", "Portales"], ["reloj", "Contrarreloj"], ["espejo", "Espejo"], ["laberinto", "Laberinto"]] },
       { k: "t", t: "Mapa", ops: [["chico", "Chico"], ["mediano", "Mediano"], ["grande", "Grande"], ["gigante", "Gigante"]] }],
@@ -180,8 +187,8 @@ export function crearRanks(ctx) {
     const boton = (k, j) => `<button class="jg-rk-sel${k === juego ? " on" : ""}" data-juego="${k}" style="--c:${j.color}"
          ${k === juego ? 'aria-current="true"' : ""}><i aria-hidden="true">${esc(icono[k] || "●")}</i>${esc(j.nombre)}</button>`;
     el.innerHTML = boton("general", { nombre: "General", color: "#7c5cff" }) +
-      `<span class="jg-rk-sep">En sala</span>` + orden.map(k => boton(k, JUEGOS[k])).join("") +
-      `<span class="jg-rk-sep">Un jugador</span>` + Object.entries(EXTRA).map(([k, j]) => boton(k, j)).join("");
+      `<span class="jg-rk-sep">En sala</span>` + orden.map(k => boton(k, JUEGOS[k]) + (k === "yemas" ? boton("yzombis", EXTRA.yzombis) : "")).join("") +
+      `<span class="jg-rk-sep">Un jugador</span>` + Object.entries(EXTRA).filter(([, j]) => !j.sala).map(([k, j]) => boton(k, j)).join("");
     const on = el.querySelector(".on");
     if (on && el.scrollWidth > el.clientWidth) el.scrollLeft = on.offsetLeft - el.clientWidth / 2 + on.offsetWidth / 2;
   }
@@ -209,7 +216,7 @@ export function crearRanks(ctx) {
         : "Todavía no ha terminado ninguna partida de este juego. Sé el primero."}</td></tr>`;
       return;
     }
-    if (solo) {t.innerHTML = `<thead><tr><th>#</th><th>Jugador</th><th>Récord</th><th>Tiempo</th></tr></thead><tbody>${orden.map((f,i)=>`<tr class="${f.uid===uid?'jg-yo':''}${i<3?' jg-rk-top':''}"><td class="jg-th-n">${puesto(i)}</td><td class="jg-jug" data-perfil="${esc(f.uid)}" data-nombre="${esc(f.nombre)}">${esc(f.nombre)}</td><td>${categoriaSolo.startsWith('club-minas-')?'Completado':categoriaSolo==='club-tetris-sprint'?'40 líneas':categoriaSolo.startsWith('club-sortem-')?f.puntos+' números':categoriaSolo.startsWith('club-bbtan-')?'Ronda '+f.puntos:f.puntos}</td><td>${(f.tiempo/1000).toFixed(2)} s</td></tr>`).join('')}</tbody>`;return;}
+    if (solo) {t.innerHTML = `<thead><tr><th>#</th><th>Jugador</th><th>Récord</th><th>Tiempo</th></tr></thead><tbody>${orden.map((f,i)=>`<tr class="${f.uid===uid?'jg-yo':''}${i<3?' jg-rk-top':''}"><td class="jg-th-n">${puesto(i)}</td><td class="jg-jug" data-perfil="${esc(f.uid)}" data-nombre="${esc(f.nombre)}">${esc(f.nombre)}</td><td>${categoriaSolo.startsWith('club-minas-')?'Completado':categoriaSolo==='club-tetris-sprint'?'40 líneas':categoriaSolo.startsWith('club-sortem-')?f.puntos+' números':categoriaSolo.startsWith('club-bbtan-')||categoriaSolo.startsWith('yemas-zombis-')?'Ronda '+f.puntos:/-racha$/.test(categoriaSolo)?f.puntos+(f.puntos===1?' día':' días'):f.puntos}</td><td>${(f.tiempo/1000).toFixed(2)} s</td></tr>`).join('')}</tbody>`;return;}
     t.innerHTML = `
       <thead><tr>
         <th class="jg-th-n">#</th><th>Jugador</th>
@@ -255,9 +262,9 @@ export function crearRanks(ctx) {
         (categoriaSolo.startsWith("club-sopa-") && categoriaSolo !== "club-sopa-racha")))
       return { valor: f => (f.tiempo || 0) / 1000, txt: v => `${v.toFixed(2)} s`, unidad: "", menor: true };
     /* BBTAN se mide en rondas alcanzadas, no en puntos. */
-    if (solo && categoriaSolo.startsWith("club-bbtan-"))
+    if (solo && (categoriaSolo.startsWith("club-bbtan-") || categoriaSolo.startsWith("yemas-zombis-")))
       return { valor: f => f.puntos || 0, txt: v => `ronda ${v}`, unidad: "", menor: false };
-    if (solo && categoriaSolo === "club-sopa-racha")
+    if (solo && (categoriaSolo === "club-sopa-racha" || categoriaSolo === "club-electro-racha"))
       return { valor: f => f.puntos || 0, txt: v => `${v} ${v === 1 ? "día" : "días"}`, unidad: "", menor: false };
     return { valor: f => f.puntos || 0, txt: v => String(v), unidad: "pts", menor: false };
   }
