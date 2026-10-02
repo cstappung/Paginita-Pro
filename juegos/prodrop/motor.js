@@ -95,7 +95,7 @@
      El sobre cuesta 50 los primeros días y 80 después. La regla de
      `cartas/s` compara con el mismo instante, así que el precio que se
      cobra es el de la hora del servidor, no el del reloj de cada uno. */
-  const PRECIO = { promo: 50, normal: 80, gradua: 100, promoHasta: 1792119600000 };   // 16-10-2026 00:00 Chile
+  const PRECIO = { promo: 50, normal: 80, gradua: 100, promoHasta: 1791169200000 };   // hasta el 4-10-2026 inclusive (5-10 00:00 Chile)
   const precioSobre = ms => (ms < PRECIO.promoHasta ? PRECIO.promo : PRECIO.normal);
 
   /* El god pack: 2 % de los sobres. Trae cinco épicas o mejores, y como

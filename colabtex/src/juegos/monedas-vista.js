@@ -61,7 +61,8 @@ export function crearMonedas({ uid, datos, perfil, colorDe }) {
       <header class="jg-mo-hero">
         <div><small>TUS MONEDAS</small><strong>${formatoMonedas(yo.saldo)} ${MONEDA}</strong>
           <p>${puesto ? `Puesto <b>${puesto}</b> de ${lista.length}` : "Todavía fuera del top"} · ${yo.logros} logros</p>
-          ${yo.gastadas ? `<p class="jg-mo-gasto">Ganadas <b>${formatoMonedas(yo.total)}</b> · gastadas en PRODROP <b>${formatoMonedas(yo.gastadas)}</b></p>` : ""}</div>
+          ${yo.gastadas ? `<p class="jg-mo-gasto">Ganadas <b>${formatoMonedas(yo.total)}</b> · gastadas en PRODROP <b>${formatoMonedas(yo.gastadas)}</b></p>` : ""}
+          ${yo.libro.pendientes ? `<p class="jg-mo-gasto">${yo.libro.pendientes} ${yo.libro.pendientes === 1 ? "compra quedó" : "compras quedaron"} sin fondos y no vale${yo.libro.pendientes === 1 ? "" : "n"} todavía.</p>` : ""}</div>
         <p class="jg-mo-racha">${rachaTexto(d, hoy)}</p>
       </header>
       <div class="jg-mo-partes">${PARTES.map(([k, i, t, s]) =>
@@ -89,7 +90,7 @@ export function crearMonedas({ uid, datos, perfil, colorDe }) {
             <li><span><a href="#cartas">Sobre de PRODROP</a></span><b>${Date.now() < MOTOR.PRECIO.promoHasta ? `<s>${MOTOR.PRECIO.normal}</s> ` : ""}${MOTOR.precioSobre(Date.now())} ${MONEDA}</b></li>
             <li><span>Graduar una carta</span><b>${MOTOR.PRECIO.gradua} ${MONEDA}</b></li>
           </ul>
-          <p>El top cuenta lo ganado, no lo que te queda: abrir sobres no te baja de puesto.</p>
+          <p>El top cuenta lo ganado, no lo que te queda: abrir sobres no te baja de puesto. Tu saldo nunca baja de cero: una compra que no alcanzas a pagar no vale (ni su sobre existe) hasta que ganes lo que falta.</p>
         </section>
       </div>
     </section>`;

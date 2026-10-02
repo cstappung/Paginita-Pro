@@ -4,13 +4,10 @@
    (juegos/prodrop/motor.js), así que una carta se rehace aquí igual que
    allá: de su sobre, nunca de algo que alguien haya escrito a mano.
 
-   Dos reglas que valen en las dos listas:
-   - **Solo cuenta lo que existe en el libro de compras.** Una clave
-     exhibida que no es un sobre de esa cuenta no se pinta.
-   - **Una cuenta con saldo negativo no exhibe nada.** Lo ganado nunca
-     baja, así que estar en negativo solo pasa comprando sin fondos (con
-     un cliente modificado: la página no deja). Esas cartas existen para
-     su dueño, pero no se presumen. */
+   **Solo cuenta lo que vale en el libro** (`libroCartas`, en monedas.js):
+   un sobre comprado sin fondos no existe para nadie — ni en el perfil, ni
+   en los mejores drops — hasta el día en que lo ganado alcance para él.
+   Una clave exhibida que no es un sobre válido de esa cuenta no se pinta. */
 import PM from "../../../juegos/prodrop/motor.js";
 import { monedasDe } from "./monedas.js";
 
@@ -20,11 +17,15 @@ export const MAX_EXHIBIDAS = 4;
 const CLAVE = /^[-_A-Za-z0-9]{8,24}$/;
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
-/* ¿Puede exhibir? Hace falta la lectura completa: con la mitad de los
-   nodos el saldo sale de una suma a medias. */
-export function solvente(uid, datos) {
-  if (!datos || !datos.completo) return false;
-  return monedasDe(uid, datos).saldo >= 0;
+/* El libro de una cuenta: lo que vale. Hace falta la lectura completa:
+   con la mitad de los nodos lo ganado sale de una suma a medias. */
+const memoLibro = new WeakMap();
+export function libroDe(uid, datos) {
+  if (!datos || !datos.completo) return null;
+  let m = memoLibro.get(datos);
+  if (!m) memoLibro.set(datos, m = new Map());
+  if (!m.has(uid)) m.set(uid, monedasDe(uid, datos).libro);
+  return m.get(uid);
 }
 
 /* Una copia: {uid, k, i, at, id, g, gr, dios} con lo del catálogo. */
@@ -36,10 +37,10 @@ function copia(uid, k, i, x, g) {
 
 /* Las que exhibe, en el orden que eligió. */
 export function exhibidasDe(uid, perfil, datos) {
-  const lista = perfil && perfil.cartas, cs = (datos && datos.cartas) || {};
-  if (!lista || !solvente(uid, datos)) return [];
+  const lista = perfil && perfil.cartas, libro = libroDe(uid, datos);
+  if (!lista || !libro) return [];
   const claves = Array.isArray(lista) ? lista : Object.values(lista);
-  const s = (cs.s || {})[uid] || {}, g = (cs.g || {})[uid] || {}, out = [];
+  const s = libro.s, g = libro.g, out = [];
   for (const key of claves.slice(0, MAX_EXHIBIDAS)) {
     const m = /^([-_A-Za-z0-9]{8,24})\.([0-4])$/.exec(String(key));
     if (!m || !s[m[1]]) continue;
@@ -49,15 +50,15 @@ export function exhibidasDe(uid, perfil, datos) {
   return out;
 }
 
-/* Las mejores sacadas por todos: solo épicas y legendarias. Primero las
-   legendarias, después las graduadas con mejor nota, después lo más
-   reciente. */
+/* Lo que han sacado todos, solo épicas y legendarias, en orden de salida:
+   la más reciente primero (a igual sobre, la mejor carta primero). */
 export function mejoresDrops(datos, n = 8) {
   const cs = (datos && datos.cartas) || {}, out = [];
-  for (const [uid, sobres] of Object.entries(cs.s || {})) {
-    if (!solvente(uid, datos)) continue;
-    const g = (cs.g || {})[uid] || {};
-    for (const [k, x] of Object.entries(sobres || {})) {
+  for (const uid of Object.keys(cs.s || {})) {
+    const libro = libroDe(uid, datos);
+    if (!libro) continue;
+    const g = libro.g;
+    for (const [k, x] of Object.entries(libro.s)) {
       if (!CLAVE.test(k) || !x || !Number.isFinite(x.at)) continue;
       const so = PM.sobre(uid, k, x.at);
       so.cartas.forEach((c, i) => {
@@ -65,9 +66,8 @@ export function mejoresDrops(datos, n = 8) {
       });
     }
   }
-  const nota = c => (c.gr ? c.g : 0);
   return out.filter(Boolean)
-    .sort((a, b) => b.carta.tier - a.carta.tier || nota(b) - nota(a) || b.at - a.at || (a.k < b.k ? -1 : 1))
+    .sort((a, b) => b.at - a.at || (a.k < b.k ? -1 : a.k > b.k ? 1 : 0) || b.i - a.i)
     .slice(0, n);
 }
 
@@ -75,7 +75,7 @@ export function mejoresDrops(datos, n = 8) {
 export function cifras(datos) {
   const cs = (datos && datos.cartas) || {};
   let sobres = 0, dioses = 0, leyendas = 0;
-  for (const [uid, l] of Object.entries(cs.s || {})) for (const [k, x] of Object.entries(l || {})) {
+  for (const uid of Object.keys(cs.s || {})) for (const [k, x] of Object.entries((libroDe(uid, datos) || { s: {} }).s)) {
     if (!CLAVE.test(k) || !x || !Number.isFinite(x.at)) continue;
     const so = PM.sobre(uid, k, x.at);
     sobres++; if (so.dios) dioses++;

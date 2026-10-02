@@ -8,7 +8,7 @@ const PM=require('../../juegos/prodrop/motor.js');
 const sin=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8').replace(/^import [\s\S]*?;$/mg,'').replace(/\bexport\s+/g,'');
 const ctx={__PM:PM};vm.createContext(ctx);
 vm.runInContext('const PM=__PM;'+sin('src/juegos/motor.js')+'\n'+sin('src/juegos/logros.js')+'\n'+sin('src/juegos/monedas.js')+'\n'+sin('src/juegos/prodrop-cartas.js')+
- ';globalThis.__M={monedasDe,gastoDe,topMonedas,exhibidasDe,mejoresDrops,solvente,cifras,miniCarta}',ctx);
+ ';globalThis.__M={monedasDe,libroCartas,topMonedas,exhibidasDe,mejoresDrops,libroDe,cifras,miniCarta}',ctx);
 const M=ctx.__M;
 
 test('el catálogo: 17 personas por 9 variantes, con su imagen',()=>{
@@ -80,12 +80,38 @@ test('lo gastado se resta del saldo, no de lo ganado',()=>{
  assert.equal(m.total,sinGasto.total);
  assert.equal(m.gastadas,230);
  assert.equal(m.saldo,m.total-230);
- assert.equal(M.gastoDe('b',d.cartas),0);
+ assert.equal(M.libroCartas('b',d.cartas,1000).gastadas,0);
  assert.equal(M.topMonedas(d)[0].total,m.total,'el top ordena por lo ganado');
 });
 
-test('exhibidas y mejores drops: solo lo que existe, y nada de quien está en negativo',()=>{
- // un sobre con épica o mejor para que salga en los drops
+test('el saldo nunca es negativo: una compra sin fondos no vale',()=>{
+ const sobres={},n=40;
+ for(let i=0;i<n;i++)sobres['-Nk'+String(i).padStart(9,'0')]={at:1000+i,p:50};
+ const cartas={s:{a:sobres},g:{a:{'-Nk000000001':{2:{at:1001,p:100}},'-Nk000000030':{0:{at:5000,p:100}}}}};
+ // a igual hora el sobre va antes que su graduación
+ let L=M.libroCartas('a',cartas,175);
+ assert.equal(L.gastadas,100,'dos sobres; la graduación del segundo (100) ya no cabe y ahí se para');
+ assert.equal(Object.keys(L.s).length,2);
+ assert.equal(L.pendientes,n-2+2);
+ L=M.libroCartas('a',cartas,250);
+ assert.equal(L.gastadas,250);assert.ok(L.g['-Nk000000001'][2],'con 250 entra la graduación');
+ // nunca se salta una compra: lo aceptado solo crece al ganar más
+ let antes=new Set();
+ for(let ganado=0;ganado<=3000;ganado+=37){
+  const l=M.libroCartas('a',cartas,ganado),ahora=new Set(Object.keys(l.s));
+  assert.ok(l.gastadas<=ganado,'nunca se gasta más de lo ganado');
+  for(const k of antes)assert.ok(ahora.has(k),'un sobre aceptado no vuelve a quedar fuera');
+  antes=ahora;
+ }
+ // con cualquier dato, saldo >= 0
+ const pobre=M.monedasDe('a',datos({ranks:{},cartas}));
+ assert.equal(pobre.saldo,0);assert.equal(pobre.gastadas,0);assert.equal(Object.keys(pobre.libro.s).length,0);
+ // un precio que no es de la tienda no vale (ni regala monedas)
+ const raro=M.libroCartas('a',{s:{a:{'-Nkraroraro1':{at:1,p:-500}}}},100);
+ assert.equal(raro.gastadas,0);assert.equal(Object.keys(raro.s).length,0);
+});
+
+test('exhibidas y mejores drops: solo lo que vale en el libro',()=>{
  let k='',at=0;
  for(let i=0;!k;i++){const kk='-Nkb'+String(i).padStart(8,'0'),s=PM.sobre('a',kk,1790000000000+i);if(PM.CARDS[s.cartas[4].id].tier>=2){k=kk;at=1790000000000+i;}}
  const d=datos({cartas:{s:{a:{[k]:{at,p:50}}},g:{a:{[k]:{4:{at:at+1,p:100}}}}}});
@@ -93,12 +119,15 @@ test('exhibidas y mejores drops: solo lo que existe, y nada de quien está en ne
  assert.equal(ex.length,1);assert.equal(ex[0].gr,true);assert.equal(ex[0].id,PM.sobre('a',k,at).cartas[4].id);
  const top=M.mejoresDrops(d);
  assert.ok(top.length>=1&&top.every(c=>c.carta.tier>=2));
- assert.ok(top.every((c,i)=>!i||top[i-1].carta.tier>=c.carta.tier),'las legendarias primero');
+ assert.ok(top.every((c,i)=>!i||top[i-1].at>=c.at),'en orden de salida, la más reciente primero');
  assert.ok(M.miniCarta(top[0]).includes('juegos/prodrop/cards/'));
  const pobre=datos({ranks:{},cartas:d.cartas});
- assert.equal(M.solvente('a',pobre),false,'compró sin haber ganado nada');
- assert.equal(M.exhibidasDe('a',{cartas:[k+'.4']},pobre).length,0);
+ assert.equal(M.exhibidasDe('a',{cartas:[k+'.4']},pobre).length,0,'sin fondos el sobre no existe');
  assert.equal(M.mejoresDrops(pobre).length,0);
+ assert.equal(M.cifras(pobre).sobres,0);
+ const justo=datos({ranks:{juego:{a:{jugadas:10}}},cartas:d.cartas});   // 50: paga el sobre, no la graduación
+ const ej=M.exhibidasDe('a',{cartas:[k+'.4']},justo);
+ assert.equal(ej.length,1);assert.equal(ej[0].gr,false,'la graduación sin pagar no cuenta');
  assert.equal(M.mejoresDrops(Object.assign({},d,{completo:false})).length,0,'con la lectura a medias no se juzga a nadie');
  assert.equal(M.cifras(d).sobres,1);
 });

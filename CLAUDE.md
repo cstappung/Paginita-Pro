@@ -1640,8 +1640,13 @@ for anyone `fuera` or `caido`**, because someone who abandons leaves their orbs
 on the board and `cuenta` showed an eliminated player with their score from
 before dying; `cadena.js`'s marcador does the same once the replay is over.
 
-**The lobby opens with *Novedades*, the three newest games** (`.jg-nov`,
-`novedadesHtml` in `juegos-main.js`). They come from `novedades(3)` in
+**The lobby opens with *Novedades*, a hand-written list** (`NOVEDADES`
+in `juegos-main.js`, `.jg-nov`), because what is new is not always a room
+game: today Yemas' zombie mode (opens a yemas room with `variante:
+"zombis"`), PRODROP (`#cartas`) and BBTAN (`#solo/bbtan`), each with its
+own cover (`arteNovedad`). The paragraph below describes the older,
+date-driven version, which `novedades()` in `motor.js` still implements
+(`novedadesHtml` in `juegos-main.js` no longer calls it). They come from `novedades(3)` in
 `motor.js`, which sorts by each game's `alta` (the date it arrived,
 `AAAA-MM-DD`, in `JUEGOS`), with ties going to the later row of the table.
 So a new game only has to bring its `alta`, and `tests/juegos.test.cjs`
@@ -3576,18 +3581,29 @@ other file of the site. Things that hold it together:
   or better with this grade or more, per card and per pack, plus this
   exact card with that grade. `tests/prodrop.test.cjs` simulates 60 000
   packs against those numbers.
-- **Prices live in the rule too.** `p === (now < 1792119600000 ? 50 : 80)`
-  (launch price until 16-10-2026 00:00 Chile, `PRECIO.promoHasta`) and
+- **Prices live in the rule too.** `p === (now < 1791169200000 ? 50 : 80)`
+  (launch price through 4-10-2026, until 5-10 00:00 Chile, `PRECIO.promoHasta`) and
   grading `cartas/g/<uid>/<key>/<i>` = `{at: now, p: 100}`, only for a pack
   that exists. Both write-once, never deleted: they are the spending. The
   test pins the rule's timestamp to the motor's.
-- **The balance cannot be checked by the rules** (they cannot add up what
-  was earned), so the postman re-checks it against the complete read
-  (`watchLogros` now sets `completo` once all five nodes arrived) before
-  every charge. A modified client could still overspend; what makes that
-  visible is that earnings never go down, so `saldo < 0` proves it, and
-  `prodrop-cartas.js` (`solvente`) shows nothing of such an account in the
-  lobby or on profiles.
+- **The balance can never go negative, and a purchase without funds is
+  worth nothing.** The rules cannot add up what was earned, so they cannot
+  refuse an unfunded write from a modified client. So the page does not
+  trust the writes: `libroCartas` (monedas.js) walks the purchases in time
+  order (a pack before its own grading at the same instant) and accepts
+  them only while the earnings cover them, **stopping at the first one that
+  does not fit**; stopping (instead of skipping it) is what makes the
+  accepted set only grow as earnings grow, never lose a pack it had. A
+  purchase past that point is not spending and its pack does not exist:
+  not in the collection the frame receives, not on profiles, not in the
+  drops. It becomes valid the day the earnings reach it. A price that is
+  not the store's (50/80 a pack, 100 a grading) also stops the walk.
+  `saldo = total − accepted spending` is therefore ≥ 0 by construction.
+  On top of that, the frame disables the buttons and the postman re-checks
+  against the complete read (`watchLogros` sets `completo` once all five
+  nodes arrived) before every charge, so an honest client never writes an
+  unfunded purchase; two tabs buying at once with money for one is the only
+  way, and the postman then says that pack is on hold.
 - **The collection is the ledger**, not localStorage: the frame rebuilds it
   with `M.coleccion(uid, s, g)`. A copy is `<key>.<i>`. The pack being
   opened stays out of it (`abriendo`) until the summary, so the collection
@@ -3600,9 +3616,10 @@ other file of the site. Things that hold it together:
   saving the profile would erase them. They show on the profile page and
   the mini card through `exhibidasDe`, which only resolves keys that are
   packs of that account.
-- **Mejores drops** (lobby sidebar, `#vesDrops`): `mejoresDrops` lists
-  epics and legendaries only, legendaries first, then by revealed grade,
-  then newest, with who pulled them.
+- **Últimos drops** (`#vesDrops`, a horizontal strip right under
+  Novedades, grid area `tira`): `mejoresDrops` lists epics and legendaries
+  of valid packs only, in the order they came out (newest first), with who
+  pulled them and when.
 
 The `cartas` node and `perfil/cartas` need the rules re-published.
 

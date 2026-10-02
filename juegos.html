@@ -2710,7 +2710,7 @@ html[data-tema=oscuro] .jg-aj-punto-t{border-color:#ffffff66}
 /* Ocupa las dos columnas de la rejilla, encima de la marquesina y de
    las salas: va antes que nada porque es lo que cambia de una visita a
    otra. Repite las áreas de `.jg-ves` con una fila más delante. */
-.jg-ves{grid-template-areas:"nov nov" "mq lado" "cat lado"}
+.jg-ves{grid-template-areas:"nov nov" "tira tira" "mq lado" "cat lado"}
 .jg-nov{grid-area:nov;margin-bottom:28px}
 .jg-nov-cab{display:flex;align-items:baseline;gap:6px 14px;flex-wrap:wrap;margin-bottom:14px}
 .jg-nov-cab .jg-eyebrow{flex-basis:100%;color:var(--jg-purple)}
@@ -2736,7 +2736,7 @@ html[data-tema=oscuro] .jg-nov-cab .jg-eyebrow{color:#c4b1ff}
 @keyframes jgOfBrilla{0%,30%{box-shadow:0 0 0 4px var(--c),0 16px 34px #39226d22}100%{box-shadow:0 0 0 0 transparent}}
 @media(max-width:1080px){.jg-nov-c .jg-portada{height:126px}.jg-nov-c .jg-portada>*{zoom:.68}}
 @media(max-width:900px){
-  .jg-ves{grid-template-areas:"nov" "mq" "lado" "cat"}
+  .jg-ves{grid-template-areas:"nov" "tira" "mq" "lado" "cat"}
   .jg-nov-lista{grid-template-columns:1fr;gap:12px}
   .jg-nov-c{flex-direction:row}
   .jg-nov-c:hover{transform:none}
@@ -2814,18 +2814,47 @@ html[data-tema=oscuro] .jg-mo-ver{color:#c4b1ff}
 .jg-cc-nota{position:absolute;top:4px;right:4px;z-index:3;min-width:20px;height:20px;padding:0 4px;border-radius:6px;display:grid;place-items:center;font:800 12px/1 'IBM Plex Mono',monospace;color:#10051f;background:var(--gc);box-shadow:0 0 0 2px #fff,0 2px 8px #0006}
 .jg-cc-dios{position:absolute;top:4px;left:4px;z-index:3;padding:2px 5px;border-radius:5px;font:900 8.5px/1.2 system-ui,sans-serif;letter-spacing:.08em;color:#1a0b33;background:linear-gradient(90deg,#ffcc3d,#ff8ad8)}
 @media (prefers-reduced-motion:reduce){.jg-cc.t3,.jg-cc.t3::after{animation:none}}
-.jg-lado-caja.jg-drops-ves>#vesDrops{display:block;overflow:visible;padding:12px 14px 14px}
-.jg-drops-ves header>span{font-size:16px}
-.jg-drop-ir{text-decoration:none}
-.jg-drops{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 8px}
-.jg-drop{display:grid;gap:5px;min-width:0}
+.jg-drop{display:grid;gap:4px;min-width:0;flex:0 0 112px;scroll-snap-align:start}
+.jg-drop-cuando{font-size:10.5px;color:var(--jg-muted);padding-left:23px;margin-top:-3px}
+.jg-tira{grid-area:tira;margin:-6px 0 28px;padding:14px 16px 12px;border:1px solid #e4dfeb;border-radius:18px;background:linear-gradient(120deg,#160b2e,#2a1150 55%,#3b1660);color:#fff;min-width:0}
+.jg-tira header{display:flex;align-items:baseline;gap:4px 12px;flex-wrap:wrap;margin-bottom:10px}
+.jg-tira h2{margin:0;font-size:17px;letter-spacing:-.2px;color:#fff}
+.jg-tira header small{flex:1;font-size:12px;color:#c9bde8}
+.jg-tira header a{font-size:12.5px;font-weight:700;color:#ffcc3d;text-decoration:none}
+.jg-tira header a:hover{text-decoration:underline}
+.jg-tira-fila{display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x proximity;padding:2px 2px 8px;scrollbar-width:thin;scrollbar-color:#ffffff40 transparent}
+.jg-tira .jg-drop-quien{color:#d9cff5}.jg-tira .jg-drop-quien:hover b{color:#fff}
+.jg-tira .jg-drop-cuando{color:#a99fcb}
+.jg-tira .jg-nada{margin:4px 0;color:#c9bde8;font-size:13px}.jg-tira .jg-nada a{color:#ffcc3d}
+html[data-tema=oscuro] .jg-tira{border-color:var(--os-borde)}
+.jg-nov-arte{position:relative;overflow:hidden}
+.jg-nov-c .jg-nov-arte>*{zoom:1}
+.jg-nov-arte-zb>.jg-art-ym{zoom:.8}
+.jg-nov-arte-zb .jg-art-ym em{display:none}
+.jg-nov-arte .jg-nov-arte-bb{place-items:stretch}
+.jg-nov-pie a.btn{display:flex;align-items:center;justify-content:center;gap:6px;flex:1;text-decoration:none}
+@media(max-width:700px){.jg-tira header small{flex-basis:100%;order:3}.jg-tira{padding:12px}}
+@media(max-width:700px){.jg-nov-arte-zb>.jg-art-ym{zoom:.5}}
+.jg-nov-arte-zb,.jg-nov-arte-pd,.jg-nov-arte-bb{position:absolute;inset:0;display:grid;place-items:center}
+.jg-nov-arte-zb{background:radial-gradient(ellipse at 50% 110%,#7fbf3a 0,#2f4d14 45%,#0f1a08 100%)}
+.jg-nov-arte-zb>.jg-art-ym{filter:hue-rotate(55deg) saturate(.8)}
+.jg-nov-arte-zb>b{position:absolute;bottom:10px;left:0;right:0;text-align:center;font:900 26px/1 system-ui,sans-serif;letter-spacing:.18em;color:#c8f56b;text-shadow:0 3px 0 #1d2b06,0 0 18px #9be04a99}
+.jg-nov-arte-pd{background:radial-gradient(ellipse at 50% 60%,#5a2aa8,#170a33 75%)}
+.jg-nov-arte-pd img{position:absolute;top:18px;width:74px;aspect-ratio:5/7;object-fit:cover;border-radius:7px;box-shadow:0 8px 20px #0008;border:2px solid #fff3}
+.jg-nov-arte-pd img:nth-child(1){transform:translateX(-58px) rotate(-12deg)}
+.jg-nov-arte-pd img:nth-child(2){z-index:1;top:10px;width:84px;border-color:#ffcc3d;box-shadow:0 0 22px #ffcc3d88}
+.jg-nov-arte-pd img:nth-child(3){transform:translateX(58px) rotate(12deg)}
+.jg-nov-arte-pd>b{position:absolute;bottom:8px;z-index:2;font:900 22px/1 system-ui,sans-serif;color:#fff;letter-spacing:-.02em;text-shadow:0 2px 10px #000a}
+.jg-nov-arte-pd>b span{color:transparent;background:linear-gradient(90deg,#ff5fb0,#ffcc3d);-webkit-background-clip:text;background-clip:text}
+.jg-nov-arte-bb{background:repeating-linear-gradient(0deg,#0000 0 3px,#0003 3px 4px),radial-gradient(ellipse at right,#3d5a12,#0c1629 75%);grid-template-columns:repeat(3,38px);grid-auto-rows:26px;gap:5px;place-content:center;align-content:start;padding-top:16px}
+.jg-nov-arte-bb i{background:#ff5fa2;border-radius:4px;box-shadow:inset 0 -3px #0004;display:grid}
+.jg-nov-arte-bb i:nth-child(2n){background:#c4f568}.jg-nov-arte-bb i:nth-child(3n){background:#5cc8ff}
+.jg-nov-arte-bb em{position:absolute;bottom:34px;left:50%;width:10px;height:10px;margin-left:-5px;border-radius:50%;background:#fff;box-shadow:0 0 10px #fff}
+.jg-nov-arte-bb>b{position:absolute;bottom:8px;left:0;right:0;text-align:center;font:400 16px/1 "Press Start 2P",ui-monospace,monospace;color:#c4f568;text-shadow:2px 2px #1d2b06}
+@media(max-width:700px){.jg-nov-arte-pd img{width:46px;top:12px}.jg-nov-arte-pd img:nth-child(2){width:52px}.jg-nov-arte-pd img:nth-child(1){transform:translateX(-30px) rotate(-12deg)}.jg-nov-arte-pd img:nth-child(3){transform:translateX(30px) rotate(12deg)}.jg-nov-arte-pd>b{font-size:14px}.jg-nov-arte-bb{grid-template-columns:repeat(3,22px);grid-auto-rows:16px}.jg-nov-arte-zb>b{font-size:14px}.jg-nov-arte-bb>b{font-size:10px}}
 .jg-drop-quien{display:flex;align-items:center;gap:5px;min-width:0;cursor:pointer;font-size:11px;color:var(--jg-muted)}
 .jg-drop-quien b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .jg-drop-quien:hover b{color:var(--jg-ink);text-decoration:underline}
-.jg-drop-cifras{margin:10px 0 0;font-size:11.5px;color:var(--jg-muted);text-align:center}
-.jg-drop-abrir{display:flex;align-items:center;justify-content:center;width:100%;box-sizing:border-box;margin-top:10px;text-align:center;text-decoration:none;background:linear-gradient(90deg,#ffcc3d,#ff8ad8);color:#1a0b33;border:0}
-#vesDrops .jg-nada{margin:0;font-size:12.5px;text-align:center}
-@media(max-width:900px){.jg-lado-caja.jg-drops-ves>#vesDrops{display:block}.jg-drops{grid-template-columns:repeat(6,minmax(84px,1fr));overflow-x:auto;scrollbar-width:none}}
 .jg-mini-cartas{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding:8px 16px 0}
 .jg-mini-cartas .jg-cc figcaption{display:none}
 .jg-mini-cartas .jg-cc-nota{min-width:16px;height:16px;font-size:10px}
@@ -2885,6 +2914,6 @@ html[data-tema=oscuro] .jg-drop-quien:hover b{color:#fff}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610020715"></script>
+<script src="juegos-app.js?v=202610020729"></script>
 </body>
 </html>

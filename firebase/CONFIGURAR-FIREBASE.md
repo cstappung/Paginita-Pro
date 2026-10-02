@@ -90,10 +90,11 @@ ver los mismos personajes. Si eso último te preocupa, usa fotos que no sean
 de cara.
 
 Y en PRODROP: las reglas comprueban el precio y la hora de cada sobre, pero
-no pueden sumar lo que alguien ganó, así que un cliente modificado podría
-comprar sin fondos. Se nota igual (lo ganado nunca baja, así que su saldo
-queda en negativo a la vista de todos) y sus cartas no se exhiben ni en el
-vestíbulo ni en los perfiles. Las imágenes de las cartas son personas reales
+no pueden sumar lo que alguien ganó. Por eso la web no se fía de lo escrito:
+una compra solo vale si lo ganado alcanzaba para ella (y para las anteriores).
+Una compra sin fondos que alguien escriba a mano no cuenta como gasto y su
+sobre no existe en ninguna parte, así que el saldo nunca baja de cero.
+Las imágenes de las cartas son personas reales
 y están en el repositorio público, como cualquier archivo del sitio.
 
 ## 1. Reglas de Realtime Database (IMPORTANTE)
@@ -102,7 +103,7 @@ y están en el repositorio público, como cualquier archivo del sitio.
 > nodo nuevo, `cartas`, y las cartas exhibidas en `users/<uid>/perfil/cartas`.
 > Hasta volver a publicar las reglas, comprar un sobre falla y el abridor
 > dice que faltan las reglas. La regla de `cartas/s` lleva escrita la fecha
-> en que termina el precio de lanzamiento (50 → 80): si se cambia en
+> en que termina el precio de lanzamiento (50 hasta el 4 de octubre, luego 80): si se cambia en
 > `juegos/prodrop/motor.js` (`PRECIO.promoHasta`), hay que cambiarla también
 > en la regla y volver a publicar.
 
