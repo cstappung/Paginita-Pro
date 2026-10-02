@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,600;0,700;0,800;1,600;1,800&family=Rubik:wght@500;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=pd-3">
+<link rel="stylesheet" href="style.css?v=pd-4">
 </head>
 <body data-phase="pack">
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -31,6 +31,7 @@
   <div class="top-left"><button id="volverBtn" class="chip" hidden title="Volver a Juegos">←<span class="lg"> Juegos</span></button><div class="logo">PRO<span>DROP</span></div></div>
   <div class="top-actions">
     <span id="saldo" class="chip saldo" title="Tus monedas de Juegos"></span>
+    <button id="mktBtn" class="chip mkt" title="Mercado e intercambios"><span class="lg">Mercado</span><span class="sm" aria-hidden="true">🏪</span><b id="mktBadge" class="badge" hidden></b></button>
     <button id="colBtn" class="chip" title="Colección"><span class="lg">Colección</span><span class="sm" aria-hidden="true">🗂</span> <b id="colCount">0/153</b></button>
     <button id="soundBtn" class="chip icon" aria-pressed="true" title="Sonido">♪</button>
   </div>
@@ -64,7 +65,7 @@
     </div>
     <p id="hint" class="hint">Desliza por la línea punteada para abrir el sobre</p>
     <div class="buy">
-      <button id="buyBtn" class="btn primary">Comprar sobre</button>
+      <div class="buy-btns"><button id="freeBtn" class="btn free">🎁 Sobre gratis</button><button id="buyBtn" class="btn primary">Comprar sobre</button></div>
       <p id="buyInfo" class="buy-info"></p>
     </div>
     <div class="controls">
@@ -76,9 +77,9 @@
   <section id="summary" class="summary" hidden>
     <h2>Tu sobre</h2>
     <div id="sumCards" class="sum-cards"></div>
-    <p class="sum-tip">Toca una carta para verla de cerca · cada carta trae un estado oculto: gradúala para descubrir su nota</p>
+    <p class="sum-tip">Toca una carta para verla de cerca · cada carta trae un estado oculto: ábrela y gradúala para descubrir su nota (100 monedas cada una)</p>
     <div class="sum-actions">
-      <button id="gradeAllBtn" class="btn grade">Graduar cartas 🔍</button>
+      <button id="againFreeBtn" class="btn free listo" hidden>Abrir tu sobre gratis 🎁</button>
       <button id="againBtn" class="btn primary">Abrir otro sobre ✳</button>
       <button id="colBtn2" class="btn">Ver colección</button>
     </div>
@@ -93,9 +94,34 @@
   <div id="copies" class="copies"></div>
   <div class="zoom-actions">
     <button id="gradeBtn" class="btn grade" hidden>Enviar a graduar 🔍</button>
-    <button id="showBtn" class="btn show" hidden>☆ Exhibir en mi perfil</button>
+    <button id="showBtn" class="btn show" hidden>☆ Exhibir</button>
+    <button id="sellBtn" class="btn show" hidden>💰 Vender</button>
+    <button id="buyCardBtn" class="btn primary" hidden>Comprar</button>
   </div>
+  <div id="sellBox" class="sell" hidden></div>
   <button class="close" data-close aria-label="Cerrar">✕</button>
+</div>
+
+<div id="market" class="overlay mk" hidden>
+  <div class="mk-panel">
+    <div class="mk-head">
+      <div><h2>Mercado</h2><p id="mkSub"></p></div>
+      <button class="close" data-close aria-label="Cerrar">✕</button>
+    </div>
+    <div id="mkTabs" class="mk-tabs" role="tablist"></div>
+    <div id="mkFiltros" class="mk-filtros"></div>
+    <div id="mkGrid" class="mk-grid"></div>
+  </div>
+</div>
+
+<div id="trade" class="overlay mk" hidden>
+  <div class="mk-panel">
+    <div class="mk-head">
+      <div><h2>Proponer un intercambio</h2><p>De 1 a 3 cartas tuyas por hasta 3 de la otra persona.</p></div>
+      <button class="close" data-close aria-label="Cerrar">✕</button>
+    </div>
+    <div id="tradeBody" class="tc-body"></div>
+  </div>
 </div>
 
 <div id="god" class="god" hidden aria-live="assertive"><b>GOD PACK</b><span>cinco cartas épicas o mejores</span></div>
@@ -110,11 +136,11 @@
     <div class="col-bar"><i id="colBar"></i></div>
     <div id="colFilters" class="col-filters"></div>
     <div id="colGrid" class="col-grid"></div>
-    <p class="odds">Probabilidad por carta: Común 80% · Rara 17,4% · Épica 2,4% · Legendaria 0,2%. La quinta carta siempre es Rara o mejor (ahí: Rara 87% · Épica 12% · Legendaria 1%).<br>God pack: 2% de los sobres traen cinco Épicas o mejores (como mucho una Legendaria).<br>Estado oculto de 1 a 10 (la gran mayoría ronda el 7; 8% sale 10 GEM MINT y solo 2% sale 3 o menos). Se revela al graduar (100 monedas).<br>Cada sobre queda anotado con la hora del servidor en que se compró, y su contenido sale de ahí: nadie puede elegir lo que trae, y cualquiera puede comprobarlo.</p>
+    <p class="odds">Probabilidad por carta: Común 80% · Rara 17,4% · Épica 2,4% · Legendaria 0,2%. La quinta carta siempre es Rara o mejor (ahí: Rara 87% · Épica 12% · Legendaria 1%).<br>God pack: 2% de los sobres traen cinco Épicas o mejores (como mucho una Legendaria).<br>Estado oculto de 1 a 10 (la gran mayoría ronda el 7; 8% sale 10 GEM MINT y solo 2% sale 3 o menos). Se revela al graduar (100 monedas).<br>Un sobre gratis cada 6 horas. En el mercado cada quien pone el precio de sus cartas; los intercambios se hacen cuando la otra persona acepta.<br>Cada sobre queda anotado con la hora del servidor en que se compró, y su contenido sale de ahí: nadie puede elegir lo que trae, y cualquiera puede comprobarlo.</p>
   </div>
 </div>
 
-<script src="motor.js?v=pd-3"></script>
-<script src="app.js?v=pd-3"></script>
+<script src="motor.js?v=pd-4"></script>
+<script src="app.js?v=pd-4"></script>
 </body>
 </html>

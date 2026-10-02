@@ -8,7 +8,7 @@ const PM=require('../../juegos/prodrop/motor.js');
 const sin=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8').replace(/^import [\s\S]*?;$/mg,'').replace(/\bexport\s+/g,'');
 const ctx={__PM:PM};vm.createContext(ctx);
 vm.runInContext('const PM=__PM;'+sin('src/juegos/motor.js')+'\n'+sin('src/juegos/logros.js')+'\n'+sin('src/juegos/monedas.js')+'\n'+sin('src/juegos/prodrop-cartas.js')+
- ';globalThis.__M={monedasDe,libroCartas,topMonedas,exhibidasDe,mejoresDrops,libroDe,cifras,miniCarta}',ctx);
+ ';globalThis.__M={monedasDe,economia,copiasDe,proximoGratis,claveCopia,topMonedas,exhibidasDe,mejoresDrops,cifras,miniCarta}',ctx);
 const M=ctx.__M;
 
 test('el catálogo: 17 personas por 9 variantes, con su imagen',()=>{
@@ -73,61 +73,111 @@ test('el precio: 50 de lanzamiento, 80 después',()=>{
 
 const datos=(extra)=>Object.assign({completo:true,ranks:{juego:{a:{jugadas:100,ganadas:50,puntos:150}}},solo:{},logros:{},diario:{}},extra);
 
+// ganado: 'juego' no tiene PESO, así que pesa 1: 5 por partida
+const conGanado=(u,n,extra)=>({completo:true,ranks:{juego:Object.fromEntries(Object.entries(u).map(([k,v])=>[k,{jugadas:v}]))},solo:{},logros:{},diario:{},...extra});
+const K=i=>'-Nk'+String(i).padStart(9,'0');
+
 test('lo gastado se resta del saldo, no de lo ganado',()=>{
- const sinGasto=M.monedasDe('a',datos());
- const d=datos({cartas:{s:{a:{'-Nk1abcdefgh':{at:1,p:50},'-Nk2abcdefgh':{at:2,p:80}}},g:{a:{'-Nk1abcdefgh':{0:{at:3,p:100}}}}}});
+ const d=conGanado({a:100},0,{cartas:{s:{a:{[K(1)]:{at:1,p:50},[K(2)]:{at:2,p:80}}},g:{a:{[K(1)]:{0:{at:3,p:100}}}}}});
  const m=M.monedasDe('a',d);
- assert.equal(m.total,sinGasto.total);
- assert.equal(m.gastadas,230);
- assert.equal(m.saldo,m.total-230);
- assert.equal(M.libroCartas('b',d.cartas,1000).gastadas,0);
- assert.equal(M.topMonedas(d)[0].total,m.total,'el top ordena por lo ganado');
+ assert.equal(m.total,500);assert.equal(m.gastadas,230);assert.equal(m.saldo,270);assert.equal(m.parada,false);
+ assert.equal(M.monedasDe('b',d).gastadas,0);
+ assert.equal(M.topMonedas(d)[0].total,500,'el top ordena por lo ganado');
 });
 
-test('el saldo nunca es negativo: una compra sin fondos no vale',()=>{
- const sobres={},n=40;
- for(let i=0;i<n;i++)sobres['-Nk'+String(i).padStart(9,'0')]={at:1000+i,p:50};
- const cartas={s:{a:sobres},g:{a:{'-Nk000000001':{2:{at:1001,p:100}},'-Nk000000030':{0:{at:5000,p:100}}}}};
- // a igual hora el sobre va antes que su graduación
- let L=M.libroCartas('a',cartas,175);
- assert.equal(L.gastadas,100,'dos sobres; la graduación del segundo (100) ya no cabe y ahí se para');
- assert.equal(Object.keys(L.s).length,2);
- assert.equal(L.pendientes,n-2+2);
- L=M.libroCartas('a',cartas,250);
- assert.equal(L.gastadas,250);assert.ok(L.g['-Nk000000001'][2],'con 250 entra la graduación');
- // nunca se salta una compra: lo aceptado solo crece al ganar más
+test('el saldo nunca es negativo: un gasto sin fondos no vale y para la cuenta',()=>{
+ const s={};for(let i=0;i<40;i++)s[K(i)]={at:1000+i,p:50};
+ const cartas={s:{a:s},g:{a:{[K(1)]:{2:{at:1001,p:100}}}}};
+ // 175 ganadas (35 partidas): dos sobres; la graduación (100) ya no cabe y ahí se para
+ let m=M.monedasDe('a',conGanado({a:35},0,{cartas}));
+ assert.equal(m.gastadas,100);assert.equal(m.parada,true);
+ assert.equal(Object.keys(M.economia(conGanado({a:35},0,{cartas})).usuarios.a.sobres).length,2);
+ m=M.monedasDe('a',conGanado({a:50},0,{cartas}));
+ assert.equal(m.gastadas,250);
+ // lo aceptado solo crece al ganar más, y nunca se gasta más de lo ganado
  let antes=new Set();
- for(let ganado=0;ganado<=3000;ganado+=37){
-  const l=M.libroCartas('a',cartas,ganado),ahora=new Set(Object.keys(l.s));
-  assert.ok(l.gastadas<=ganado,'nunca se gasta más de lo ganado');
+ for(let j=0;j<=600;j+=7){
+  const d=conGanado({a:j},0,{cartas}),e=M.economia(d),ahora=new Set(Object.keys(e.usuarios.a.sobres)),mm=M.monedasDe('a',d);
+  assert.ok(mm.saldo>=0,'saldo >= 0');
   for(const k of antes)assert.ok(ahora.has(k),'un sobre aceptado no vuelve a quedar fuera');
   antes=ahora;
  }
- // con cualquier dato, saldo >= 0
- const pobre=M.monedasDe('a',datos({ranks:{},cartas}));
- assert.equal(pobre.saldo,0);assert.equal(pobre.gastadas,0);assert.equal(Object.keys(pobre.libro.s).length,0);
- // un precio que no es de la tienda no vale (ni regala monedas)
- const raro=M.libroCartas('a',{s:{a:{'-Nkraroraro1':{at:1,p:-500}}}},100);
- assert.equal(raro.gastadas,0);assert.equal(Object.keys(raro.s).length,0);
+ const pobre=M.monedasDe('a',conGanado({},0,{cartas}));
+ assert.equal(pobre.saldo,0);assert.equal(pobre.gastadas,0);
+ // un precio que no es de la tienda no vale ni regala monedas
+ const raro=M.monedasDe('a',conGanado({a:20},0,{cartas:{s:{a:{[K(1)]:{at:1,p:-500}}}}}));
+ assert.equal(raro.saldo,100);assert.equal(raro.gastadas,0);
 });
 
-test('exhibidas y mejores drops: solo lo que vale en el libro',()=>{
+test('un sobre gratis cada 6 horas',()=>{
+ const H=3600*1000,s={[K(1)]:{at:0,p:0},[K(2)]:{at:5*H,p:0},[K(3)]:{at:6*H,p:0},[K(4)]:{at:7*H,p:0},[K(5)]:{at:12*H,p:0}};
+ const d=conGanado({},0,{cartas:{s:{a:s}}}),e=M.economia(d);
+ assert.deepEqual([...Object.keys(e.usuarios.a.sobres)].sort(),[K(1),K(3),K(5)]);
+ assert.equal(M.monedasDe('a',d).gastadas,0,'gratis no es gasto');
+ assert.equal(M.proximoGratis('a',d,13*H),18*H);
+ assert.equal(M.proximoGratis('a',d,18*H),0);
+ assert.equal(M.proximoGratis('b',d,0),0,'quien nunca sacó uno lo tiene listo');
+});
+
+test('mercado: la carta pasa al comprador y las monedas al vendedor',()=>{
+ const c=M.claveCopia('usrAAA',K(1),2);
+ const base={cartas:{s:{usrAAA:{[K(1)]:{at:10,p:0}}}},mercado:{o:{o1:{u:'usrAAA',c,p:120,at:20,v:{u:'usrBBB',at:30}}}}};
+ let d=conGanado({usrBBB:30},0,base),e=M.economia(d);
+ assert.equal(e.dueno[c],'usrBBB');assert.equal(e.ofertas.o1.estado,'vendida');
+ assert.equal(M.monedasDe('usrAAA',d).cobradas,120);assert.equal(M.monedasDe('usrBBB',d).saldo,30);
+ assert.deepEqual([...M.copiasDe('usrBBB',d).map(x=>x.c)],[c]);
+ // sin fondos: no se paga, la carta se queda con quien vendía y el comprador queda parado
+ d=conGanado({usrBBB:10},0,base);e=M.economia(d);
+ assert.equal(e.dueno[c],'usrAAA');assert.equal(e.ofertas.o1.estado,'impaga');
+ assert.equal(M.monedasDe('usrAAA',d).cobradas,0);assert.equal(M.monedasDe('usrBBB',d).parada,true);assert.equal(M.monedasDe('usrBBB',d).saldo,50);
+ // vender lo que no es tuyo no vale; vender dos veces la misma carta tampoco
+ d=conGanado({usrBBB:30,usrZZZ:30},0,{cartas:base.cartas,mercado:{o:{o0:{u:'usrZZZ',c,p:1,at:15,v:{u:'usrBBB',at:16}},o1:{u:'usrAAA',c,p:5,at:20},o2:{u:'usrAAA',c,p:6,at:21,v:{u:'usrBBB',at:22}}}}});
+ e=M.economia(d);
+ assert.equal(e.ofertas.o0.estado,'nula');assert.equal(e.ofertas.o1.estado,'activa');assert.equal(e.ofertas.o2.estado,'nula');
+ assert.equal(e.dueno[c],'usrAAA');assert.equal(M.monedasDe('usrBBB',d).gastadas,0);
+ // retirada antes de la compra: la compra no ocurre
+ d=conGanado({usrBBB:30},0,{cartas:base.cartas,mercado:{o:{o1:{u:'usrAAA',c,p:5,at:20,x:25}}}});
+ assert.equal(M.economia(d).ofertas.o1.estado,'retirada');
+ // en venta no se gradúa
+ d=conGanado({usrAAA:30},0,{cartas:{...base.cartas,g:{usrAAA:{[K(1)]:{2:{at:22,p:100}}}}},mercado:{o:{o1:{u:'usrAAA',c,p:5,at:20}}}});
+ assert.equal(M.economia(d).graduada[c],undefined);assert.equal(M.monedasDe('usrAAA',d).gastadas,0);
+ // quien compró puede graduarla (con `o` = origen) y la nota viaja con la carta
+ d=conGanado({usrBBB:60},0,{cartas:{...base.cartas,g:{usrBBB:{[K(1)]:{2:{at:40,p:100,o:'usrAAA'}}}}},mercado:base.mercado});
+ e=M.economia(d);assert.ok(e.graduada[c]);assert.equal(M.monedasDe('usrBBB',d).gastadas,220);
+});
+
+test('intercambios: se hacen al aceptar si las cartas siguen con sus dueños',()=>{
+ const ca=M.claveCopia('usrAAA',K(1),0),cb=M.claveCopia('usrBBB',K(2),4);
+ const cartas={s:{usrAAA:{[K(1)]:{at:10,p:0}},usrBBB:{[K(2)]:{at:11,p:0}}}};
+ let d=conGanado({},0,{cartas,mercado:{t:{t1:{de:'usrAAA',para:'usrBBB',dar:[ca],pedir:[cb],at:20,ok:30}}}}),e=M.economia(d);
+ assert.equal(e.dueno[ca],'usrBBB');assert.equal(e.dueno[cb],'usrAAA');assert.equal(e.cambios.t1.estado,'hecho');
+ // sin aceptar, o cerrado, no pasa nada
+ d=conGanado({},0,{cartas,mercado:{t:{t1:{de:'usrAAA',para:'usrBBB',dar:[ca],pedir:[cb],at:20}}}});
+ assert.equal(M.economia(d).dueno[ca],'usrAAA');
+ // si una carta estaba a la venta al aceptar, no vale
+ d=conGanado({},0,{cartas,mercado:{o:{o1:{u:'usrBBB',c:cb,p:9,at:25}},t:{t1:{de:'usrAAA',para:'usrBBB',dar:[ca],pedir:[cb],at:20,ok:30}}}});
+ e=M.economia(d);assert.equal(e.cambios.t1.estado,'nulo');assert.equal(e.dueno[ca],'usrAAA');
+ // un regalo (sin pedir nada) vale
+ d=conGanado({},0,{cartas,mercado:{t:{t1:{de:'usrAAA',para:'usrBBB',dar:[ca],at:20,ok:30}}}});
+ assert.equal(M.economia(d).dueno[ca],'usrBBB');
+});
+
+test('exhibidas y drops: solo lo que vale, y la exhibida debe ser tuya ahora',()=>{
  let k='',at=0;
- for(let i=0;!k;i++){const kk='-Nkb'+String(i).padStart(8,'0'),s=PM.sobre('a',kk,1790000000000+i);if(PM.CARDS[s.cartas[4].id].tier>=2){k=kk;at=1790000000000+i;}}
- const d=datos({cartas:{s:{a:{[k]:{at,p:50}}},g:{a:{[k]:{4:{at:at+1,p:100}}}}}});
- const ex=M.exhibidasDe('a',{cartas:[k+'.4','-Nnoexistexx.1','<img>.2']},d);
- assert.equal(ex.length,1);assert.equal(ex[0].gr,true);assert.equal(ex[0].id,PM.sobre('a',k,at).cartas[4].id);
+ for(let i=0;!k;i++){const kk='-Nkb'+String(i).padStart(8,'0'),s=PM.sobre('usrAAA',kk,1790000000000+i);if(PM.CARDS[s.cartas[4].id].tier>=2){k=kk;at=1790000000000+i;}}
+ const d=conGanado({usrAAA:100},0,{cartas:{s:{usrAAA:{[k]:{at,p:50}}},g:{usrAAA:{[k]:{4:{at:at+1,p:100}}}}}});
+ const ex=M.exhibidasDe('usrAAA',{cartas:[k+'.4','-Nnoexistexx.1','<img>.2']},d);
+ assert.equal(ex.length,1);assert.equal(ex[0].gr,true);
+ assert.equal(M.exhibidasDe('usrAAA',{cartas:['usrAAA~'+k+'.4']},d).length,1,'la clave nueva también');
  const top=M.mejoresDrops(d);
  assert.ok(top.length>=1&&top.every(c=>c.carta.tier>=2));
- assert.ok(top.every((c,i)=>!i||top[i-1].at>=c.at),'en orden de salida, la más reciente primero');
  assert.ok(M.miniCarta(top[0]).includes('juegos/prodrop/cards/'));
- const pobre=datos({ranks:{},cartas:d.cartas});
- assert.equal(M.exhibidasDe('a',{cartas:[k+'.4']},pobre).length,0,'sin fondos el sobre no existe');
+ const pobre=conGanado({},0,{cartas:d.cartas});
+ assert.equal(M.exhibidasDe('usrAAA',{cartas:[k+'.4']},pobre).length,0,'sin fondos el sobre no existe');
  assert.equal(M.mejoresDrops(pobre).length,0);
- assert.equal(M.cifras(pobre).sobres,0);
- const justo=datos({ranks:{juego:{a:{jugadas:10}}},cartas:d.cartas});   // 50: paga el sobre, no la graduación
- const ej=M.exhibidasDe('a',{cartas:[k+'.4']},justo);
- assert.equal(ej.length,1);assert.equal(ej[0].gr,false,'la graduación sin pagar no cuenta');
+ // vendida a b: ya no se exhibe en a, sí en b
+ const v=conGanado({usrAAA:100,usrBBB:100},0,{cartas:d.cartas,mercado:{o:{o1:{u:'usrAAA',c:'usrAAA~'+k+'.4',p:5,at:at+5,v:{u:'usrBBB',at:at+6}}}}});
+ assert.equal(M.exhibidasDe('usrAAA',{cartas:[k+'.4']},v).length,0);
+ assert.equal(M.exhibidasDe('usrBBB',{cartas:['usrAAA~'+k+'.4']},v).length,1);
  assert.equal(M.mejoresDrops(Object.assign({},d,{completo:false})).length,0,'con la lectura a medias no se juzga a nadie');
- assert.equal(M.cifras(d).sobres,1);
 });

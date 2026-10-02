@@ -243,6 +243,50 @@ console.log("— PRODROP: sobres y graduaciones —");
   await loginAs(A);
 }
 
+console.log("— PRODROP: sobre gratis, mercado e intercambios —");
+{
+  const { serverTimestamp, push, update } = await import("firebase/database");
+  const ua = await loginAs(A);
+  const gratis = () => { const k = push(ref(db, `cartas/s/${ua.uid}`)).key;
+    return update(ref(db), { [`cartas/s/${ua.uid}/${k}`]: { at: serverTimestamp(), p: 0 }, [`cartas/gratis/${ua.uid}`]: { at: serverTimestamp(), k } }); };
+  await remove(ref(db, `cartas/gratis/${ua.uid}`)).catch(() => {});
+  await denied("un sobre a 0 sin el registro de gratis no cuela", () => set(push(ref(db, `cartas/s/${ua.uid}`)), { at: serverTimestamp(), p: 0 }));
+  await allowed("A saca su sobre gratis", gratis);
+  await denied("y otro gratis antes de 6 horas, no", gratis);
+  await denied("el registro de gratis no se borra para empezar de nuevo", () => remove(ref(db, `cartas/gratis/${ua.uid}`)));
+  const k = Object.keys((await get(ref(db, `cartas/s/${ua.uid}`))).val())[0], copia = `${ua.uid}~${k}.3`;
+  const oferta = push(ref(db, "mercado/o"));
+  await denied("no se vende a nombre de otro", () => set(oferta, { u: "otro123456", c: copia, p: 10, at: serverTimestamp() }));
+  await denied("ni a precio 0", () => set(oferta, { u: ua.uid, c: copia, p: 0, at: serverTimestamp() }));
+  await denied("ni con una venta ya puesta", () => set(oferta, { u: ua.uid, c: copia, p: 10, at: serverTimestamp(), v: { u: ua.uid, at: serverTimestamp() } }));
+  await allowed("A pone una carta a la venta", () => set(oferta, { u: ua.uid, c: copia, p: 120, at: serverTimestamp() }));
+  await denied("el precio no se cambia", () => set(ref(db, `mercado/o/${oferta.key}/p`), 1));
+  await denied("A no se compra a sí mismo", () => set(ref(db, `mercado/o/${oferta.key}/v`), { u: ua.uid, at: serverTimestamp() }));
+  const ub = await loginAs(B);
+  await denied("B no retira la oferta de A", () => set(ref(db, `mercado/o/${oferta.key}/x`), serverTimestamp()));
+  await denied("B no compra a nombre de otro", () => set(ref(db, `mercado/o/${oferta.key}/v`), { u: ua.uid, at: serverTimestamp() }));
+  await allowed("B compra la oferta de A", () => set(ref(db, `mercado/o/${oferta.key}/v`), { u: ub.uid, at: serverTimestamp() }));
+  await denied("nadie la compra dos veces", () => set(ref(db, `mercado/o/${oferta.key}/v`), { u: ub.uid, at: serverTimestamp() }));
+  await loginAs(A);
+  await denied("vendida, ya no se retira", () => set(ref(db, `mercado/o/${oferta.key}/x`), serverTimestamp()));
+  const o2 = push(ref(db, "mercado/o"));
+  await allowed("A pone otra", () => set(o2, { u: ua.uid, c: `${ua.uid}~${k}.2`, p: 50, at: serverTimestamp() }));
+  await allowed("y la retira", () => set(ref(db, `mercado/o/${o2.key}/x`), serverTimestamp()));
+  await loginAs(B);
+  await denied("retirada, ya no se compra", () => set(ref(db, `mercado/o/${o2.key}/v`), { u: ub.uid, at: serverTimestamp() }));
+  await loginAs(A);
+  const t = push(ref(db, "mercado/t"));
+  await denied("un intercambio no nace aceptado", () => set(t, { de: ua.uid, para: ub.uid, dar: [`${ua.uid}~${k}.1`], at: serverTimestamp(), ok: serverTimestamp() }));
+  await denied("ni con uno mismo", () => set(t, { de: ua.uid, para: ua.uid, dar: [`${ua.uid}~${k}.1`], at: serverTimestamp() }));
+  await allowed("A propone un intercambio a B", () => set(t, { de: ua.uid, para: ub.uid, dar: [`${ua.uid}~${k}.1`], pedir: [`${ua.uid}~${k}.3`], at: serverTimestamp() }));
+  await denied("A no acepta por B", () => set(ref(db, `mercado/t/${t.key}/ok`), serverTimestamp()));
+  await loginAs(B);
+  await allowed("B lo acepta", () => set(ref(db, `mercado/t/${t.key}/ok`), serverTimestamp()));
+  await denied("aceptado, ya no se cierra", () => set(ref(db, `mercado/t/${t.key}/x`), serverTimestamp()));
+  await allowed("B gradúa una carta de un sobre de A (o = A)", () => set(ref(db, `cartas/g/${ub.uid}/${k}/3`), { at: serverTimestamp(), p: 100, o: ua.uid }));
+  await loginAs(A);
+}
+
 await signOut(auth);
 await denied("sin sesión no se lee el informe", () => get(ref(db, "errors")));
 await denied("sin sesión no se escribe nada", () => set(ref(db, "feedback/x"), { tipo: "bug", titulo: "x", uid: "x" }));

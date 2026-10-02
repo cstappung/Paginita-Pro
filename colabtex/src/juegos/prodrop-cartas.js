@@ -4,82 +4,69 @@
    (juegos/prodrop/motor.js), así que una carta se rehace aquí igual que
    allá: de su sobre, nunca de algo que alguien haya escrito a mano.
 
-   **Solo cuenta lo que vale en el libro** (`libroCartas`, en monedas.js):
-   un sobre comprado sin fondos no existe para nadie — ni en el perfil, ni
-   en los mejores drops — hasta el día en que lo ganado alcance para él.
-   Una clave exhibida que no es un sobre válido de esa cuenta no se pinta. */
+   **Solo cuenta lo que vale en la economía** (`economia`, en monedas.js):
+   un sobre comprado sin fondos no existe para nadie, y una carta se muestra
+   en el perfil de quien la tiene *ahora* (puede haberla comprado en el
+   mercado o recibido en un intercambio). */
 import PM from "../../../juegos/prodrop/motor.js";
-import { monedasDe } from "./monedas.js";
+import { economia, leeCopia, claveCopia } from "./monedas.js";
 
 export const MOTOR = PM;
 export const RAIZ = "juegos/prodrop/";
 export const MAX_EXHIBIDAS = 4;
-const CLAVE = /^[-_A-Za-z0-9]{8,24}$/;
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
-/* El libro de una cuenta: lo que vale. Hace falta la lectura completa:
-   con la mitad de los nodos lo ganado sale de una suma a medias. */
-const memoLibro = new WeakMap();
-export function libroDe(uid, datos) {
-  if (!datos || !datos.completo) return null;
-  let m = memoLibro.get(datos);
-  if (!m) memoLibro.set(datos, m = new Map());
-  if (!m.has(uid)) m.set(uid, monedasDe(uid, datos).libro);
-  return m.get(uid);
-}
+/* La economía, solo con la lectura completa: con la mitad de los nodos
+   lo ganado sale de una suma a medias. */
+export const ecoDe = datos => (datos && datos.completo ? economia(datos) : null);
 
-/* Una copia: {uid, k, i, at, id, g, gr, dios} con lo del catálogo. */
-function copia(uid, k, i, x, g) {
-  if (!CLAVE.test(k) || !x || !Number.isFinite(x.at) || !(i >= 0 && i < 5)) return null;
-  const so = PM.sobre(uid, k, x.at), c = so.cartas[i];
-  return { uid, k, i, at: x.at, id: c.id, g: c.g, gr: !!(g && g[k] && g[k][i]), dios: so.dios, carta: PM.CARDS[c.id] };
+/* Una copia resuelta: {uid (quien la sacó), o, k, i, at, id, g, gr, dios,
+   carta}. `uid` es el origen: los drops hablan de quien abrió el sobre. */
+function copia(e, o, k, i) {
+  const so = e.sobres[o + "~" + k];
+  if (!so) return null;
+  const s = PM.sobre(o, k, so.at), c = s.cartas[i], cc = claveCopia(o, k, i);
+  return { uid: o, o, k, i, at: so.at, c: cc, id: c.id, g: c.g, gr: !!e.graduada[cc], dios: s.dios, carta: PM.CARDS[c.id], dueno: e.dueno[cc] };
 }
+export const copiaDe = (cc, datos) => { const e = ecoDe(datos), q = leeCopia(cc); return e && q ? copia(e, q.o, q.k, q.i) : null; };
 
-/* Las que exhibe, en el orden que eligió. */
+/* Las que exhibe, en el orden que eligió, si todavía son suyas. Acepta la
+   clave vieja `<sobre>.<i>` (de antes del mercado: el origen es el dueño). */
 export function exhibidasDe(uid, perfil, datos) {
-  const lista = perfil && perfil.cartas, libro = libroDe(uid, datos);
-  if (!lista || !libro) return [];
-  const claves = Array.isArray(lista) ? lista : Object.values(lista);
-  const s = libro.s, g = libro.g, out = [];
-  for (const key of claves.slice(0, MAX_EXHIBIDAS)) {
-    const m = /^([-_A-Za-z0-9]{8,24})\.([0-4])$/.exec(String(key));
-    if (!m || !s[m[1]]) continue;
-    const c = copia(uid, m[1], +m[2], s[m[1]], g);
-    if (c) out.push(c);
+  const l = perfil && perfil.cartas, e = ecoDe(datos);
+  if (!l || !e) return [];
+  const out = [];
+  for (const key of (Array.isArray(l) ? l : Object.values(l)).slice(0, MAX_EXHIBIDAS)) {
+    const vieja = /^([-_A-Za-z0-9]{8,24})\.([0-4])$/.exec(String(key));
+    const q = vieja ? { o: uid, k: vieja[1], i: +vieja[2] } : leeCopia(key);
+    if (!q) continue;
+    const c = copia(e, q.o, q.k, q.i);
+    if (c && c.dueno === uid) out.push(c);
   }
   return out;
 }
 
-/* Lo que han sacado todos, solo épicas y legendarias, en orden de salida:
-   la más reciente primero (a igual sobre, la mejor carta primero). */
+/* Lo que han sacado todos al abrir sobres, solo épicas y legendarias, en
+   orden de salida: la más reciente primero (a igual sobre, la mejor carta
+   primero). */
 export function mejoresDrops(datos, n = 8) {
-  const cs = (datos && datos.cartas) || {}, out = [];
-  for (const uid of Object.keys(cs.s || {})) {
-    const libro = libroDe(uid, datos);
-    if (!libro) continue;
-    const g = libro.g;
-    for (const [k, x] of Object.entries(libro.s)) {
-      if (!CLAVE.test(k) || !x || !Number.isFinite(x.at)) continue;
-      const so = PM.sobre(uid, k, x.at);
-      so.cartas.forEach((c, i) => {
-        if (PM.CARDS[c.id].tier >= 2) out.push(copia(uid, k, i, x, g));
-      });
-    }
+  const e = ecoDe(datos), out = [];
+  if (!e) return out;
+  for (const so of Object.values(e.sobres)) {
+    const s = PM.sobre(so.u, so.k, so.at);
+    s.cartas.forEach((c, i) => { if (PM.CARDS[c.id].tier >= 2) out.push(copia(e, so.u, so.k, i)); });
   }
-  return out.filter(Boolean)
-    .sort((a, b) => b.at - a.at || (a.k < b.k ? -1 : a.k > b.k ? 1 : 0) || b.i - a.i)
-    .slice(0, n);
+  return out.filter(Boolean).sort((a, b) => b.at - a.at || (a.k < b.k ? -1 : a.k > b.k ? 1 : 0) || b.i - a.i).slice(0, n);
 }
 
 /* Cuántos sobres se han abierto, en total y god packs. */
 export function cifras(datos) {
-  const cs = (datos && datos.cartas) || {};
+  const e = ecoDe(datos);
   let sobres = 0, dioses = 0, leyendas = 0;
-  for (const uid of Object.keys(cs.s || {})) for (const [k, x] of Object.entries((libroDe(uid, datos) || { s: {} }).s)) {
-    if (!CLAVE.test(k) || !x || !Number.isFinite(x.at)) continue;
-    const so = PM.sobre(uid, k, x.at);
-    sobres++; if (so.dios) dioses++;
-    leyendas += so.cartas.filter(c => PM.CARDS[c.id].tier === 3).length;
+  for (const so of Object.values((e && e.sobres) || {})) {
+    const s = PM.sobre(so.u, so.k, so.at);
+    sobres++; if (s.dios) dioses++;
+    leyendas += s.cartas.filter(c => PM.CARDS[c.id].tier === 3).length;
   }
   return { sobres, dioses, leyendas };
 }

@@ -273,7 +273,7 @@ function perfilDe(uid) {
       if (logrosVista) logrosVista.refresca();
       if (paginaPerfil) paginaPerfil.refresca();
       if (monedasVista) monedasVista.refresca();
-      if (prodropVista && uid === (state.user && state.user.uid)) prodropVista.refresca();
+      if (prodropVista) prodropVista.refresca();
       const mini = miniAbierta();
       if (mini && mini.uid === uid) mini.refresca();
       render();
@@ -1000,7 +1000,8 @@ function armazon() {
   }
   if (state.vista === "cartas") {
     h.innerHTML = "";
-    prodropVista = crearProdrop({ usuario: state.user, datos: datosPerfil, perfil: perfilDe, fb, volver: () => ir("") });
+    prodropVista = crearProdrop({ usuario: state.user, datos: datosPerfil, perfil: perfilDe, fb, volver: () => ir(""),
+      quien: u => quien(u, perfilDe(u), null, { nombre: nombreEnDatos(u, datosP || {}) }, colorForUid) });
     prodropVista.montar(h);
     return;
   }
@@ -1170,8 +1171,8 @@ const NOVEDADES = [
   { id: "zombis", color: "#4f8a2b", alta: "2026-10-01", titulo: "Yemas · modo Zombis",
     lema: "Todos juntos contra oleadas de huevos podridos, en cinco mapas clásicos: bebidas, la caja misteriosa, armas en la pared y Pack-a-Punch. Se puede jugar solo.",
     sub: "1–8 jugadores · cooperativo", sala: { k: "yemas", ops: { variante: "zombis" } }, reglas: ["yemas", "zombis"] },
-  { id: "prodrop", color: "#9b4dff", alta: "2026-10-02", titulo: "PRODROP · sobres de cartas",
-    lema: "Gasta tus monedas en sobres de cinco cartas de los profes, gradúalas y exhibe las mejores en tu perfil. Un 2 % de los sobres es un god pack.",
+  { id: "prodrop", color: "#9b4dff", alta: "2026-10-02", titulo: "PRODROP · sobres y mercado",
+    lema: "Sobres de cinco cartas de los profes, uno gratis cada 6 horas. Gradúalas, exhíbelas en tu perfil, véndelas en el mercado o cámbialas con otros.",
     sub: () => { const a = fb.ahora(), p = MOTOR.precioSobre(a);
       return a < MOTOR.PRECIO.promoHasta ? `Sobre a ${p} monedas hasta el 4 de octubre (después, ${MOTOR.PRECIO.normal})` : `Sobre a ${p} monedas · graduar, ${MOTOR.PRECIO.gradua}`; },
     ruta: "#cartas", boton: "Abrir sobres" },
