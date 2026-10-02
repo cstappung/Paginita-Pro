@@ -1125,7 +1125,7 @@ $('#sellBtn').onclick = async () => {
   const c = zoomC; if (!c || !c._copy || grading) return;
   if (c._copy.venta) {
     $('#sellBtn').disabled = true;
-    try { await Red.pide('retirar', { id: c._copy.venta }); Snd.flip(); toast('Retirada del mercado.'); }
+    try { const id = c._copy.venta; await Red.pide('retirar', { id }); Snd.flip(); toast('Retirada del mercado.'); quitaVenta(id); }
     catch (e) { avisoZoom(esc(e.message)); }
     $('#sellBtn').disabled = false; return;
   }
@@ -1140,17 +1140,41 @@ $('#sellBtn').onclick = async () => {
     const p = Math.round(+inp.value);
     if (!(p >= 1 && p <= 100000)) { inp.animate([{ transform: 'translateX(-5px)' }, { transform: 'translateX(5px)' }, { transform: 'none' }], { duration: 250 }); return; }
     $('#sellOk').disabled = true;
-    try { await Red.pide('vender', { c: c._copy.key, p }); Snd.coin(); box.hidden = true; toast(`Publicada por ${fmt(p)} monedas.`); }
+    try {
+      const id = await Red.pide('vender', { c: c._copy.key, p });
+      Snd.coin(); box.hidden = true; toast(`Publicada por ${fmt(p)} monedas. Ya está en el mercado.`);
+      if (id) marcaVenta(c._copy.key, id, p);
+    }
     catch (e) { $('#sellOk').disabled = false; box.querySelector('.sell-ref').innerHTML = `<span class="err">${esc(e.message)}</span>`; }
   };
   $('#sellOk').onclick = publica;
   inp.onkeydown = e => { if (e.key === 'Enter') publica(); e.stopPropagation(); };
 };
+/* Lo que se acaba de publicar o retirar se anota aquí mismo, sin esperar a
+   que Juegos mande los datos nuevos: si no, durante ese rato la carta seguía
+   ofreciendo «💰 Vender» y no aparecía en la tienda. Los datos que lleguen
+   después mandan. */
+function marcaVenta(key, id, p) {
+  const x = cuenta.mias.find(y => (y.c || `${y.o}~${y.k}.${y.i}`) === key);
+  if (!x) return;
+  x.venta = id;
+  if (!cuenta.ofertas.some(o => o.id === id))
+    cuenta.ofertas.push({ c: key, o: x.o, k: x.k, i: x.i, at: x.at, gr: !!x.gr, id, u: cuenta.uid, p, t: ahora(), estado: 'activa', fin: 0, comprador: '' });
+  rehazColeccion();
+  if (!$('#zoom').hidden && zoomC && !grading) refrescaZoom();
+  if (!$('#market').hidden) renderMercado();
+}
+function quitaVenta(id) {
+  cuenta.ofertas = cuenta.ofertas.filter(o => o.id !== id);
+  for (const x of cuenta.mias) if (x.venta === id) x.venta = '';
+  rehazColeccion();
+  if (!$('#zoom').hidden && zoomC && !grading && !zoomC._oferta) refrescaZoom();
+}
 $('#buyCardBtn').onclick = async () => {
   const c = zoomC, of = c && c._oferta; if (!of) return;
   const b = $('#buyCardBtn'); b.disabled = true;
   try {
-    if (of.u === cuenta.uid) { await Red.pide('retirar', { id: of.id }); toast('Retirada del mercado.'); cierraZoom(); return; }
+    if (of.u === cuenta.uid) { await Red.pide('retirar', { id: of.id }); toast('Retirada del mercado.'); quitaVenta(of.id); cierraZoom(); if (!$('#market').hidden) renderMercado(); return; }
     await Red.pide('comprarCarta', { id: of.id });
     Snd.coin(); Snd.reveal(Math.min(c.tier, 2));
     const [x, y] = centerOf($('#zoomCard'));
@@ -1580,7 +1604,8 @@ function openMercado(tab) {
 $('#mktBtn').onclick = () => openMercado();
 function filtradas() {
   const q = mk.q.trim().toLowerCase();
-  let l = cuenta.ofertas.filter(o => o.u !== cuenta.uid).map(o => ({ o, cp: copiaDe(o) }));
+  // las propias también: quien vende tiene que ver que su carta está en la tienda
+  let l = cuenta.ofertas.map(o => ({ o, cp: copiaDe(o) }));
   l = l.filter(({ cp }) => {
     const c = CARDS[cp.id];
     if (mk.rareza >= 0 && c.tier !== mk.rareza) return false;
@@ -1594,8 +1619,8 @@ function filtradas() {
   return l.sort(ord[mk.orden]);
 }
 function renderMercado() {
-  const nOf = cuenta.ofertas.filter(o => o.u !== cuenta.uid).length, n = pendientesMios();
-  $('#mkSub').innerHTML = `${nOf} ${nOf === 1 ? 'carta' : 'cartas'} a la venta · tienes ${MONEDA}<b>${fmt(cuenta.saldo)}</b>`;
+  const nOf = cuenta.ofertas.length, nMias = cuenta.ofertas.filter(o => o.u === cuenta.uid).length, n = pendientesMios();
+  $('#mkSub').innerHTML = `${nOf} ${nOf === 1 ? 'carta' : 'cartas'} a la venta${nMias ? ` (${nMias} ${nMias === 1 ? 'tuya' : 'tuyas'})` : ''} · tienes ${MONEDA}<b>${fmt(cuenta.saldo)}</b>`;
   $('#mkTabs').innerHTML = [['comprar', 'Comprar'], ['ventas', 'Mis ventas'], ['cambios', `Intercambios${n ? ` <b>${n}</b>` : ''}`]]
     .map(([k, t]) => `<button role="tab" aria-selected="${mk.tab === k}" data-tab="${k}">${t}</button>`).join('');
   $('#mkTabs').querySelectorAll('button').forEach(b => b.onclick = () => { mk.tab = b.dataset.tab; mk.max = 48; renderMercado(); $('#mkGrid').scrollTop = 0; });
@@ -1633,13 +1658,13 @@ function pintaGridComprar(grid) {
   const l = filtradas();
   grid.innerHTML = '';
   if (!l.length) {
-    grid.innerHTML = `<div class="mk-vacio"><b>🃏</b><p>${cuenta.ofertas.some(o => o.u !== cuenta.uid) ? 'Nada calza con esos filtros.' : 'Todavía nadie vende cartas. Pon una de las tuyas: ábrela en tu colección y toca «💰 Vender».'}</p></div>`;
+    grid.innerHTML = `<div class="mk-vacio"><b>🃏</b><p>${cuenta.ofertas.length ? 'Nada calza con esos filtros.' : 'Todavía nadie vende cartas. Pon una de las tuyas: ábrela en tu colección y toca «💰 Vender».'}</p></div>`;
     return;
   }
   l.slice(0, mk.max).forEach(({ o }, i) => {
     const inst = instDe(o), el = makeCard(inst, { back: false, lazy: true });
-    const caro = o.p > cuenta.saldo;
-    el.insertAdjacentHTML('beforeend', `<div class="mk-tag${caro ? ' caro' : ''}"><b>${MONEDA}${fmt(o.p)}</b><span>${avatarHTML(o.u, 16)}${esc(nombreDe(o.u))}</span></div>`);
+    const propia = o.u === cuenta.uid, caro = !propia && o.p > cuenta.saldo;
+    el.insertAdjacentHTML('beforeend', `<div class="mk-tag${caro ? ' caro' : ''}${propia ? ' mia' : ''}"><b>${MONEDA}${fmt(o.p)}</b><span>${propia ? 'Tu oferta' : `${avatarHTML(o.u, 16)}${esc(nombreDe(o.u))}`}</span></div>`);
     if (inst.graded) el.classList.add('slabbed');
     el.addEventListener('click', () => { mkScroll = grid.scrollTop; inst._oferta = o; $('#market').hidden = true; zoomVuelve = 'mk'; openZoom(inst); });
     if (i < 24) el.animate([{ transform: 'translateY(24px) scale(.92)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 380, delay: i * 30, easing: 'cubic-bezier(.2,1.2,.4,1)', fill: 'backwards' });

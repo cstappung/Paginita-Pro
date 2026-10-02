@@ -3653,7 +3653,13 @@ other file of the site. Things that hold it together:
   cannot be graded or traded. The frame's market (🏪 Mercado) has three
   tabs: *Comprar* (filters: rarity, graded / ungraded, minimum grade only
   when graded, sort by price or newest, search by name), *Mis ventas* (my
-  listings and purchases) and *Intercambios*.
+  listings and purchases) and *Intercambios*. *Comprar* shows the seller's
+  own listings too, tagged «Tu oferta» (opening one offers Retirar): hiding
+  them made sellers think the listing never reached the store. A sale or a
+  withdrawal is marked in the frame at once (`marcaVenta`/`quitaVenta`)
+  rather than waiting for the next `datos`, so the card cannot be offered
+  for sale twice in between, and the postman withdraws a listing that the
+  replay does not accept as `activa` right after writing it.
 - **Trades** (`mercado/t/<id>` = `{de, para, dar[1–3], pedir[0–3], at}`):
   `ok` (only `para`) and `x` (either) are write-once and exclusive, and the
   rules forbid creating one already accepted. The swap happens at `ok` if
