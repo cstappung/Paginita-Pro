@@ -35,8 +35,9 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver }) {
   function copia(e, c) {
     const q = leeCopia(c), so = q && e.sobres[q.o + "~" + q.k];
     if (!so || (so.r && q.i !== 0)) return null;
-    // la de un re-roll no se rehace con un sobre: va con su carta
-    return Object.assign({ c, o: q.o, k: q.k, i: q.i, at: so.at, gr: !!e.graduada[c] }, so.r ? { id: so.r.id, g: so.r.g, w: so.r.w } : {});
+    // la de un re-roll no se rehace con un sobre: va con su carta, en `rr`
+    // (no en `id`, que en el mercado es el de la oferta)
+    return Object.assign({ c, o: q.o, k: q.k, i: q.i, at: so.at, gr: !!e.graduada[c] }, so.r ? { rr: { id: so.r.id, g: so.r.g, w: so.r.w } } : {});
   }
   function enviaDatos() {
     if (!listo || !d || !d.completo) return;
@@ -129,7 +130,7 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver }) {
           if (cs.length !== MOTOR.REROLL.n) throw new Error(`Elige ${MOTOR.REROLL.n} cartas distintas.`);
           if (!cs.every(c => leeCopia(c) && mia(c))) throw new Error("Alguna de esas cartas ya no es tuya.");
           if (cs.some(c => e.enVenta[c])) throw new Error("Retira del mercado las cartas que quieras usar.");
-          const fichas = cs.map(c => { const y = copia(e, c); return y && (y.id != null ? y : MOTOR.sobre(y.o, y.k, y.at).cartas[y.i]); });
+          const fichas = cs.map(c => { const y = copia(e, c); return y && (y.rr ? y.rr : MOTOR.sobre(y.o, y.k, y.at).cartas[y.i]); });
           if (fichas.some(f => !f)) throw new Error("Alguna de esas cartas ya no existe.");
           const tier = MOTOR.CARDS[fichas[0].id].tier;
           if (tier >= 3) throw new Error("Las legendarias no se pueden cambiar: no hay nada por encima.");
@@ -229,7 +230,7 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver }) {
       frame.title = "PRODROP — sobres y mercado de cartas";
       frame.allow = "fullscreen";
       window.addEventListener("message", mensaje);
-      frame.src = "juegos/prodrop/index.html?v=pd-9";
+      frame.src = "juegos/prodrop/index.html?v=pd-10";
       host.appendChild(frame);
       frame.addEventListener("load", () => frame.focus());
       off = datos(x => { d = x; enviaDatos(); });

@@ -3730,8 +3730,10 @@ other file of the site. Things that hold it together:
   `<uid>~<key>.0`, registered in `e.sobres` with `r: {id, g, w}`. Every
   reader of `sobres` branches on `r`: `copiasDe`, the postman's `copia`, and
   `prodrop-cartas.js`'s `copia`, `mejoresDrops` (which marks it `rr`) and
-  `cifras` (which skips it). Copies sent to the frame carry `id/g/w`, and
-  the frame's `copiaDe` uses them instead of `M.sobre`. The grading rule
+  `cifras` (which skips it). Copies sent to the frame carry `rr: {id, g, w}`, and
+  the frame's `copiaDe` uses it instead of `M.sobre`. Not a top-level `id`:
+  a market row is the copy plus the listing, whose `id` is the offer's, and
+  that made every listing read as a re-roll and broke the market. The grading rule
   accepts `cartas/r` packs at index 0. The frame's panel (`#reroll`) picks
   the ten («Elegir automático» takes duplicates first, keeps the best copy
   of each card and leaves exhibited ones for last) and asks twice before
