@@ -15,7 +15,8 @@
      Cuatro clásicos, de «adivina cuál es»: `lista` es contra lo que se
      adivina (el buscador); `objetivos`, de dónde sale el del día. En
      Símbolo se adivina entre todos los componentes, pero solo sale uno que
-     tenga símbolo dibujado. La racha cuenta solo estos cuatro.
+     tenga símbolo dibujado. Científico es solo de práctica (`practica`):
+     no sale en el diario, así que la racha cuenta los otros tres.
      Tres desafíos (`reto`), que salen de una semilla (retos.js) y se pueden
      perder: Bandas, Circuito y Conexiones. Suman puntos, no racha. */
   const COLS = {
@@ -37,25 +38,27 @@
     ]
   };
   const MODOS = [
-    { id: "comp", nombre: "Componente", icono: "🔌", tipo: "tabla", lista: D.COMPONENTES,
+    { id: "comp", nombre: "Componente", icono: "🔌", lema: "Pistas en cada intento", tipo: "tabla", lista: D.COMPONENTES,
       consigna: "Adivina el componente electrónico del día. Cada intento te dice qué tiene en común con el correcto." },
-    { id: "cien", nombre: "Científico", icono: "🧑‍🔬", tipo: "tabla", lista: D.CIENTIFICOS,
+    { id: "cien", nombre: "Científico", icono: "🧑‍🔬", lema: "Por su país, sus años y su área", tipo: "tabla", practica: true, lista: D.CIENTIFICOS,
       consigna: "Adivina quién es el científico o la científica del día, por su nacionalidad, sus años y su área." },
-    { id: "form", nombre: "Fórmula", icono: "🧮", tipo: "formula", lista: D.FORMULAS,
+    { id: "form", nombre: "Fórmula", icono: "🧮", lema: "Las variables se destapan", tipo: "formula", lista: D.FORMULAS,
       consigna: "¿Qué fórmula es? Las variables están tapadas: cada intento fallido destapa una." },
-    { id: "simb", nombre: "Símbolo", icono: "〰️", tipo: "simbolo", lista: D.COMPONENTES,
+    { id: "simb", nombre: "Símbolo", icono: "〰️", lema: "Un trozo del esquemático", tipo: "simbolo", lista: D.COMPONENTES,
       objetivos: D.COMPONENTES.filter(c => S.SIMBOLOS[c.id]),
       consigna: "¿De qué componente es este símbolo? Empieza muy de cerca y se aleja con cada intento fallido." },
-    { id: "band", nombre: "Bandas", icono: "🎨", tipo: "bandas", reto: true, lista: [],
+    { id: "band", nombre: "Bandas", icono: "🎨", lema: "El código de colores, como Wordle", tipo: "bandas", reto: true, lista: [],
       consigna: "Descubre las cuatro bandas de una resistencia de la serie E12. Cada banda te dice si el color va ahí (verde), está en otra banda (amarillo) o no está (gris), y la flecha, si el valor real es mayor o menor. Tienes 6 intentos." },
-    { id: "circ", nombre: "Circuito", icono: "🔋", tipo: "circuito", reto: true, lista: [],
+    { id: "circ", nombre: "Circuito", icono: "🔋", lema: "Calcula y acierta", tipo: "circuito", reto: true, lista: [],
       consigna: "Resuelve el circuito. Cada respuesta te dice a cuánto estás: verde a menos de 1,5 %, amarillo a menos de 10 %. Tienes 6 intentos." },
-    { id: "conx", nombre: "Conexiones", icono: "🧩", tipo: "conexiones", reto: true, lista: [],
+    { id: "conx", nombre: "Conexiones", icono: "🧩", lema: "Cuatro grupos de cuatro", tipo: "conexiones", reto: true, lista: [],
       consigna: "Forma cuatro grupos de cuatro fichas que tengan algo en común. Elige cuatro y envía; puedes equivocarte tres veces, a la cuarta se acaba." }
   ];
   const MODO = Object.fromEntries(MODOS.map(m => [m.id, m]));
   const IDS_MODOS = MODOS.map(m => m.id);
-  const CLASICOS = MODOS.filter(m => !m.reto).map(m => m.id);
+  /* Los del diario, y de ellos los que cuentan para la racha. */
+  const DIARIOS = MODOS.filter(m => !m.practica).map(m => m.id);
+  const CLASICOS = MODOS.filter(m => !m.reto && !m.practica).map(m => m.id);
   for (const m of MODOS) { m.columnas = COLS[m.id] || []; m.objetivos = m.objetivos || m.lista; m.por = Object.fromEntries(m.lista.map(x => [x.id, x])); }
   const item = (modo, id) => (MODO[modo] && MODO[modo].por[id]) || null;
 
@@ -99,6 +102,8 @@
   const numeroDia = f => Math.round(Date.UTC(+f.slice(0, 4), +f.slice(5, 7) - 1, +f.slice(8, 10)) / 864e5);
   const deNumero = n => new Date(n * 864e5).toISOString().slice(0, 10);
   const diaAnterior = f => deNumero(numeroDia(f) - 1);
+  /* El número del día, como el #1547 de LoLdle: el 1 es el estreno. */
+  const numeroElectrodle = f => numeroDia(f) - numeroDia("2026-10-01") + 1;
   const esFecha = f => typeof f === "string" && /^\d{4}-\d{2}-\d{2}$/.test(f) && deNumero(numeroDia(f)) === f;
 
   /* ---------- el objetivo del día ----------
@@ -365,17 +370,17 @@
 
   /* El texto para compartir el día, sin decir los objetivos. */
   function resumen(e, fecha) {
-    const filas = MODOS.map(m => {
+    const filas = MODOS.filter(m => !m.practica).map(m => {
       const v = e.hist[fecha] && e.hist[fecha][m.id];
       if (v && m.reto && !v[3]) return `${m.icono} ${m.nombre}: ❌`;
       return `${m.icono} ${m.nombre}: ${v ? `${v[1]} ${v[1] === 1 ? "intento" : "intentos"} ${v[1] === 1 ? "⚡" : v[0] >= 80 ? "🟩" : v[0] >= 50 ? "🟨" : "🟥"}` : "-"}`;
     });
     const pts = Object.values(e.hist[fecha] || {}).reduce((t, v) => t + v[0], 0);
-    return `Electrodle ${fecha}\n${filas.join("\n")}\n${pts} pts · 🔥 ${racha(e, fecha)}`;
+    return `Electrodle #${numeroElectrodle(fecha)} · ${fecha}\n${filas.join("\n")}\n${pts} pts · 🔥 ${racha(e, fecha)}`;
   }
 
   return {
-    MODOS, MODO, IDS_MODOS, CLASICOS, item, reto, valida, estado, puntos, X, mulberry32, hash, baraja,
+    MODOS, MODO, IDS_MODOS, DIARIOS, CLASICOS, numeroElectrodle, item, reto, valida, estado, puntos, X, mulberry32, hash, baraja,
     diaChile, faltaParaManana, numeroDia, diaAnterior, esFecha,
     objetivoDelDia, objetivoAlAzar, compara, esVariable, clave, variables, destapadas, ZOOM, vista, pistas,
     puntosDe, normaliza, sugerencias,

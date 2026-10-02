@@ -134,10 +134,11 @@ test('racha, puntos y tiempo salen de lo terminado',()=>{
  e=todo(e,'2026-10-02');
  assert.equal(M.racha(e,'2026-10-02'),1);assert.equal(M.mejorRacha(e),2);
  const t=M.total(e);
- assert.equal(t.puntos,400+4*80+90+400);
- assert.equal(t.ms,12*1000+500);
- assert.equal(M.tiempoDia(e,'2026-09-29'),4000);
- assert.match(M.resumen(e,'2026-10-02'),/Electrodle 2026-10-02[\s\S]*400 pts · 🔥 1/);
+ assert.equal(t.puntos,300+3*80+90+300);
+ assert.equal(t.ms,9*1000+500);
+ assert.equal(M.tiempoDia(e,'2026-09-29'),3000);
+ assert.match(M.resumen(e,'2026-10-02'),/Electrodle #2 · 2026-10-02[\s\S]*300 pts · 🔥 1/);
+ assert.doesNotMatch(M.resumen(e,'2026-10-02'),/Científico/);
 });
 
 test('limpia descarta lo inválido y mezcla junta dos dispositivos',()=>{
@@ -234,7 +235,9 @@ test('conexiones: banco sin fichas repetidas, un grupo por nivel y solución ún
 });
 
 test('los desafíos en el motor: estado, puntos y lo guardado',()=>{
- assert.deepEqual(M.CLASICOS,['comp','cien','form','simb']);
+ assert.deepEqual(M.CLASICOS,['comp','form','simb'],'Científico es solo de práctica');
+ assert.deepEqual(M.DIARIOS,['comp','form','simb','band','circ','conx']);
+ assert.equal(M.numeroElectrodle('2026-10-01'),1);assert.equal(M.numeroElectrodle('2026-10-02'),2);
  const f='2026-10-01',ob=M.objetivoDelDia('band',f);
  assert.equal(ob,M.objetivoDelDia('band',f));assert.notEqual(ob,M.objetivoDelDia('band','2026-10-02'));
  const t=M.reto('band',ob);
@@ -249,7 +252,7 @@ test('los desafíos en el motor: estado, puntos y lo guardado',()=>{
  assert.deepEqual(e.hist[f].circ,[0,6,1000,0]);assert.equal(M.total(e).puntos,0);
  e=M.registra(e,f,'band',2,500,true);assert.equal(M.total(e).puntos,90);
  for(const m of M.CLASICOS)e=M.registra(e,f,m,1,1);
- assert.equal(M.racha(e,f),1,'la racha solo pide los cuatro clásicos');
+ assert.equal(M.racha(e,f),1,'la racha solo pide los tres clásicos del diario');
  // limpia recalcula los puntos con el campo «ganó» y respeta lo viejo de tres campos.
  assert.deepEqual(M.limpia({hist:{[f]:{band:[999,3,10,1],comp:[1,2,3]}}}).hist[f],{band:[80,3,10,1],comp:[90,2,3,1]});
  assert.deepEqual(M.limpia({prog:{fecha:f,m:{circ:{i:['3.9','x'],ms:1}}}}).prog.m.circ.i,['3.9']);

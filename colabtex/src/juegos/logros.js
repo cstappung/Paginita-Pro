@@ -274,7 +274,7 @@ const SOLO = {
   /* La racha sale de club-electro-racha (días con los cuatro modos); el
      resto, de club-electro-puntos, la suma de todos los días. */
   electro: [
-    { id: "dia1", n: "Circuito cerrado", d: "Completa los cuatro desafíos de un día.", i: "🔌", m: "Racha", s: cat(/-racha$/) },
+    { id: "dia1", n: "Circuito cerrado", d: "Acierta los modos de adivinar de un día.", i: "🔌", m: "Racha", s: cat(/-racha$/) },
     { id: "racha3", n: "Corriente continua", d: "Llega a una racha de 3 días.", i: "🔋", m: "Racha", s: d => cat(/-racha$/)(d) && d.puntos >= 3 },
     { id: "racha7", n: "Una semana enchufado", d: "Llega a una racha de 7 días.", i: "📅", m: "Racha", s: d => cat(/-racha$/)(d) && d.puntos >= 7 },
     { id: "racha14", n: "Dos semanas en fase", d: "Llega a una racha de 14 días.", i: "〰️", m: "Racha", s: d => cat(/-racha$/)(d) && d.puntos >= 14 },
