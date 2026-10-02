@@ -296,6 +296,20 @@ const SOLO = {
     { id: "p5000", n: "Media tensión", d: "Junta 5000 puntos.", i: "🗼", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 5000 },
     { id: "p15000", n: "Alta tensión", d: "Junta 15 000 puntos.", i: "🏭", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 15000 },
     { id: "p40000", n: "Rayo", d: "Junta 40 000 puntos.", i: "🌩️", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 40000 }
+  ],
+  /* La racha sale de las seis tablas instalación × nivel; el total de
+     victorias, de club-frontera-victorias. */
+  frontera: [
+    { id: "r7", n: "Primer símbolo… casi", d: "Gana una serie entera de 7 combates.", i: "🏰", m: "Racha", s: d => cat(/-(torre|palacio|fabrica)-/)(d) && d.puntos >= 7 },
+    { id: "r21", n: "Tercera serie", d: "Llega a 21 victorias seguidas.", i: "🗼", m: "Racha", s: d => cat(/-(torre|palacio|fabrica)-/)(d) && d.puntos >= 21 },
+    { id: "r35", n: "Cerebro de la Frontera", d: "Llega a 35 victorias seguidas (la Torre te espera ahí).", i: "🧠", m: "Racha", s: d => cat(/-(torre|palacio|fabrica)-/)(d) && d.puntos >= 35 },
+    { id: "r70", n: "Símbolo de oro", d: "Llega a 70 victorias seguidas.", i: "🥇", m: "Racha", s: d => cat(/-(torre|palacio|fabrica)-/)(d) && d.puntos >= 70 },
+    { id: "r100", n: "Leyenda de la Frontera", d: "Llega a 100 victorias seguidas.", i: "👑", m: "Racha", s: d => cat(/-(torre|palacio|fabrica)-/)(d) && d.puntos >= 100 },
+    { id: "pal21", n: "Confianza ciega", d: "21 seguidas en el Palacio Batalla.", i: "🏯", m: "Palacio", s: d => cat(/-palacio-/)(d) && d.puntos >= 21 },
+    { id: "fab21", n: "Alquilado y ganado", d: "21 seguidas en la Fábrica Batalla.", i: "🏭", m: "Fábrica", s: d => cat(/-fabrica-/)(d) && d.puntos >= 21 },
+    { id: "v10", n: "Habitual", d: "Gana 10 combates en la Frontera.", i: "🎫", m: "Victorias", s: d => cat(/-victorias$/)(d) && d.puntos >= 10 },
+    { id: "v100", n: "Veterano", d: "Gana 100 combates en la Frontera.", i: "🎖️", m: "Victorias", s: d => cat(/-victorias$/)(d) && d.puntos >= 100 },
+    { id: "v500", n: "Residente", d: "Gana 500 combates en la Frontera.", i: "🏆", m: "Victorias", s: d => cat(/-victorias$/)(d) && d.puntos >= 500 }
   ]
 };
 
@@ -305,7 +319,7 @@ export const LOGROS = Object.fromEntries([
   ...Object.entries(SOLO)
 ]);
 /* Qué categorías de `soloRanks` alimentan cada juego individual. */
-export const SOLO_PREFIJO = { minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-", electro: "club-electro-" };
+export const SOLO_PREFIJO = { minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-", electro: "club-electro-", frontera: "club-frontera-" };
 
 /* Los logros de partida que `uid` tiene ya en esta, según lo que se ve. */
 export function detecta(p, est, uid) {

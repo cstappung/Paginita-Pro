@@ -63,7 +63,7 @@ export const FONDOS = [
   { id: "oro", n: "Oro", oscuro: false, req: { podio: true }, css: () => "linear-gradient(120deg, #a86f10, #f4c542 40%, #fff6c4 50%, #f4c542 60%, #a86f10)" }
 ];
 
-const NOMBRES_EXTRA = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle" };
+const NOMBRES_EXTRA = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla" };
 export const nombreJuego = j => (JUEGOS[j] && JUEGOS[j].nombre) || NOMBRES_EXTRA[j] || j;
 
 /* Las partes de una categoría del club, para decirla en palabras. */
@@ -72,7 +72,8 @@ const PARTES = {
   rondas: "Ronda máxima", "10": "Del 1 al 10", "20": "Del 1 al 20", classic: "Clásico", arcade: "Arcade",
   portals: "Portales", reloj: "Contrarreloj", espejo: "Espejo", laberinto: "Laberinto", chico: "mapa chico",
   mediano: "mapa mediano", grande: "mapa grande", gigante: "mapa gigante",
-  racha: "Racha diaria", puntos: "Puntos totales", facil: "Fácil", medio: "Medio", dificil: "Difícil", "8": "8×8", "12": "12×12", "15": "15×15"
+  racha: "Racha diaria", puntos: "Puntos totales", facil: "Fácil", medio: "Medio", dificil: "Difícil", "8": "8×8", "12": "12×12", "15": "15×15",
+  torre: "Torre Batalla", palacio: "Palacio Batalla", fabrica: "Fábrica Batalla", "50": "Nivel 50", abierto: "Nivel Abierto", victorias: "Victorias totales"
 };
 export const juegoDeCategoria = c => Object.keys(SOLO_PREFIJO).find(k => String(c).startsWith(SOLO_PREFIJO[k])) || "";
 export function nombreCategoria(c) {
@@ -87,6 +88,7 @@ export function valorMarca(c, f) {
   if (!f) return "";
   if (porTiempo(c)) return `${((f.tiempo || 0) / 1000).toFixed(2)} s`;
   if (String(c).startsWith("club-bbtan-")) return `ronda ${f.puntos || 0}`;
+  if (String(c).startsWith("club-frontera-")) return `${f.puntos || 0} ${f.puntos === 1 ? "victoria" : "victorias"}`;
   if (c === "club-sopa-racha" || c === "club-electro-racha") return `${f.puntos || 0} ${f.puntos === 1 ? "día" : "días"}`;
   return `${f.puntos || 0} pts`;
 }

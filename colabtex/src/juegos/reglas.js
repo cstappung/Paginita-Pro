@@ -737,6 +737,26 @@ const REGLAS = {
       ["Puntos, racha y clasificación", "Cada modo de adivinar vale 100 puntos a la primera y 10 menos por cada intento extra, nunca menos de 10. Bandas y Circuito valen lo mismo, con un mínimo de 50, y Conexiones 100 menos 20 por error; un desafío que se pierde no suma. Los puntos se acumulan día a día. La 🔥 racha cuenta los días seguidos en que aciertas Componente, Fórmula y Símbolo (los desafíos son puntos extra). En la Clasificación compiten los puntos totales y la racha; en empate gana quien tardó menos. Subir al podio se anuncia en Discord."]
     ]
   },
+  frontera: {
+    lema: "Frontera Batalla: la de Pokémon Esmeralda. Rachas de combates individuales 3 contra 3, cada vez más difíciles.",
+    secciones: [
+      ["Cómo se juega", "Eliges una instalación y un nivel, llevas tres Pokémon y combates contra entrenadores controlados por la máquina, uno tras otro. Los combates van en <b>series de siete</b>: al terminar una puedes seguir o guardar y salir, y la racha queda esperándote en tu cuenta. Una derrota (o retirarte) termina la racha y empiezas desde cero."],
+      ["Las tres instalaciones", lista([
+        "<b>Torre Batalla</b>: combates normales con tu propio equipo. Tú decides cada movimiento y cada cambio.",
+        "<b>Palacio Batalla</b>: tus Pokémon actúan solos. Cada uno elige entre atacar, defenderse o apoyar según su naturaleza y según le quede más o menos de la mitad de la vida (la tabla del Palacio de Esmeralda). Nadie cambia de Pokémon por voluntad propia, tampoco el rival.",
+        "<b>Fábrica Batalla</b>: no usas tus equipos. Eliges tres de seis Pokémon de alquiler y, después de cada victoria, puedes cambiar uno de los tuyos por uno del rival que acabas de vencer."
+      ])],
+      ["Nivel 50 y Nivel Abierto", "En <b>Nivel 50</b> todos los Pokémon combaten a nivel 50; en <b>Nivel Abierto</b>, a nivel 100. Cada instalación y nivel tiene su propia racha y su propia clasificación."],
+      ["Tu equipo", lista([
+        "Exactamente tres Pokémon, de tus equipos guardados (los mismos de los duelos de Pokémon; ✎ abre el editor).",
+        "Sin especies repetidas ni objetos repetidos.",
+        "Sin legendarios mayores ni Pokémon singulares, sin Megaevolución, movimientos Z ni Teracristal.",
+        "Se combate sin vista previa del equipo rival: lo conoces cuando sale al campo."
+      ])],
+      ["Los rivales", "La dificultad sube con cada serie: los rivales tienen especies más fuertes, mejores IV y EV, objetos, naturalezas a medida y una IA más lista. Primero aparecen entrenadores genéricos; luego Entrenadores Guay, líderes de gimnasio, rivales y protagonistas, el Alto Mando y los campeones, que cierran series. Los <b>Ases de la Frontera</b> aparecen donde en Esmeralda: Anabel en la Torre en los combates 35 (símbolo de plata) y 70 (oro), Spenser en el Palacio y Noland en la Fábrica en los combates 21 y 42."],
+      ["Monedas y clasificación", "Cada victoria suma a tu total de victorias, que tiene su propia tabla. La mejor racha de cada instalación y nivel compite en la Clasificación y, al batirla, cobras las monedas de cada combate de esa racha: más por combate cuanto más alta la serie, y un extra por cada séptimo combate. Llegar al podio se anuncia en Discord."]
+    ]
+  },
   snake: {
     lema: "Snake Club: la serpiente de siempre, en siete modos y cuatro tamaños.",
     secciones: [
@@ -755,7 +775,7 @@ const REGLAS = {
   }
 };
 
-const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle" };
+const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla" };
 
 export const tieneReglas = juego => Object.prototype.hasOwnProperty.call(REGLAS, juego);
 

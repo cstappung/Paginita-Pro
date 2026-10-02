@@ -29,3 +29,29 @@ export function htmlEntrenador(id, clase = "") {
   return `<span class="jg-pk-ent ${clase}" style="--c:${colorRegion(e.id)}" title="${e.n} · ${REGIONES[e.g]}">` +
     `<img src="${urlEntrenador(e.id)}" alt="${e.n}" loading="lazy" onerror="this.remove()"><b>${e.n.charAt(0)}</b></span>`;
 }
+
+/* Los rivales de la Frontera Batalla: cualquier sprite de entrenador de
+   Showdown (genéricos, líderes, Alto Mando, campeones, Ases). Se prueba
+   el id, luego su versión de tercera y cuarta generación, y si ninguno
+   carga queda la inicial. En el estado de la pelea viajan como skin
+   `x:<id>:<nombre>`, para no confundirlos con los protagonistas. */
+const escH = t => String(t == null ? "" : t).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+export const urlsRival = id => {
+  const b = String(id || "").toLowerCase().replace(/[^a-z0-9-]/g, "");
+  const u = n => `https://play.pokemonshowdown.com/sprites/trainers/${n}.png`;
+  return b.endsWith("-gen3") || b.endsWith("-gen4") ? [u(b)] : [u(b), u(b + "-gen3"), u(b + "-gen4")];
+};
+export function htmlRival(id, nombre, clase = "") {
+  const urls = urlsRival(id);
+  return `<span class="jg-pk-ent ${clase}" style="--c:#5c6bc0" title="${escH(nombre)}">` +
+    `<img src="${urls[0]}" alt="${escH(nombre)}" loading="lazy" data-urls="${escH(JSON.stringify(urls.slice(1)))}" ` +
+    `onerror="var u=JSON.parse(this.dataset.urls||'[]');if(u.length){this.dataset.urls=JSON.stringify(u.slice(1));this.src=u[0]}else{this.remove()}">` +
+    `<b>${escH(String(nombre || "?").charAt(0))}</b></span>`;
+}
+export const skinRival = (id, nombre) => `x:${id}:${nombre}`;
+/* Un skin cualquiera del estado: protagonista o rival de la Frontera. */
+export function htmlSkin(sk, clase = "") {
+  const s = String(sk || "");
+  if (s.startsWith("x:")) { const i = s.indexOf(":", 2); return htmlRival(s.slice(2, i < 0 ? undefined : i), i < 0 ? "" : s.slice(i + 1), clase); }
+  return htmlEntrenador(s || SKIN_POR, clase);
+}

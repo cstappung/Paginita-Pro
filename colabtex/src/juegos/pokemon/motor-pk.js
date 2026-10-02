@@ -57,6 +57,7 @@ import { Battle, Dex, Teams, TeamValidator, toID } from "@pkmn/sim";
 import { FORMAS, BW_FRENTE, BW_ESPALDA } from "./formas.js";
 
 import { FORMATOS, FORMATO_POR, formatoDe, genDe } from "./formatos.js";
+import FRONTERA from "./frontera-motor.js";
 export { FORMATOS, FORMATO_POR, formatoDe, genDe };
 
 /* Lo que decide quien no tiene nada que decidir. */
@@ -433,7 +434,8 @@ const PokeMotor = {
   importa, exporta, empaqueta, desempaqueta, valida,
   numeroSprite, urlsSprite, urlObjetoPokeapi,
   reducir, opciones, lineasPara, dexDe, tipoEficacia, estadisticas, aprende,
-  Dex, Teams, toID
+  Dex, Teams, toID,
+  frontera: FRONTERA
 };
 if (typeof globalThis !== "undefined") globalThis.PokeMotor = globalThis.PokeMotor || PokeMotor;
 export default PokeMotor;

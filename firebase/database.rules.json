@@ -358,7 +358,7 @@
       "$uid": {
         "$juego": {
           ".write": "auth != null && auth.uid === $uid && newData.exists()",
-          ".validate": "$juego.matches(/^(minas|snake|tetrisclub|sortem|bbtan|sopa|electro)$/) && newData.hasChildren(['dia', 'hoy', 'total', 'at']) && newData.child('at').val() === now && newData.child('dia').val() * 86400000 + 10800000 <= now && now < newData.child('dia').val() * 86400000 + 100800000 && newData.child('hoy').val() <= 10 && (data.exists() ? (newData.child('total').val() === data.child('total').val() + 1 && (newData.child('dia').val() === data.child('dia').val() ? newData.child('hoy').val() === data.child('hoy').val() + 1 : (newData.child('dia').val() > data.child('dia').val() && newData.child('hoy').val() === 1))) : (newData.child('total').val() === 1 && newData.child('hoy').val() === 1))",
+          ".validate": "$juego.matches(/^(minas|snake|tetrisclub|sortem|bbtan|sopa|electro|frontera)$/) && newData.hasChildren(['dia', 'hoy', 'total', 'at']) && newData.child('at').val() === now && newData.child('dia').val() * 86400000 + 10800000 <= now && now < newData.child('dia').val() * 86400000 + 100800000 && newData.child('hoy').val() <= 10 && (data.exists() ? (newData.child('total').val() === data.child('total').val() + 1 && (newData.child('dia').val() === data.child('dia').val() ? newData.child('hoy').val() === data.child('hoy').val() + 1 : (newData.child('dia').val() > data.child('dia').val() && newData.child('hoy').val() === 1))) : (newData.child('total').val() === 1 && newData.child('hoy').val() === 1))",
           "dia": { ".validate": "newData.isNumber() && newData.val() % 1 === 0" },
           "hoy": { ".validate": "newData.isNumber()" },
           "total": { ".validate": "newData.isNumber()" },
@@ -405,7 +405,7 @@
         ],
         "$uid": {
           ".write": "auth != null && auth.uid === $uid",
-          ".validate": "$categoria.matches(/^(club-minas-(easy|medium|hard)|club-snake-(classic|arcade|portals|reloj|espejo|laberinto)-(chico|mediano|grande|gigante)|club-tetris-(maraton|sprint|ultra)|club-sortem-(10|20|30)|club-bbtan-rondas|club-sopa-(racha|(facil|medio|dificil)-(8|12|15))|club-electro-(racha|puntos)|yemas-zombis-(nacht|kino|nuketown|riese|pueblo))$/) && newData.hasChildren(['nombre','puntos','tiempo','partida']) && (!data.exists() || newData.child('puntos').val() > data.child('puntos').val() || (newData.child('puntos').val() === data.child('puntos').val() && newData.child('tiempo').val() < data.child('tiempo').val()))",
+          ".validate": "$categoria.matches(/^(club-minas-(easy|medium|hard)|club-snake-(classic|arcade|portals|reloj|espejo|laberinto)-(chico|mediano|grande|gigante)|club-tetris-(maraton|sprint|ultra)|club-sortem-(10|20|30)|club-bbtan-rondas|club-sopa-(racha|(facil|medio|dificil)-(8|12|15))|club-electro-(racha|puntos)|club-frontera-((torre|palacio|fabrica)-(50|abierto)|victorias)|yemas-zombis-(nacht|kino|nuketown|riese|pueblo))$/) && newData.hasChildren(['nombre','puntos','tiempo','partida']) && (!data.exists() || newData.child('puntos').val() > data.child('puntos').val() || (newData.child('puntos').val() === data.child('puntos').val() && newData.child('tiempo').val() < data.child('tiempo').val()))",
           "nombre": {
             ".validate": "newData.isString() && newData.val().length <= 80"
           },
