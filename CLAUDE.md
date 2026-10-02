@@ -3709,8 +3709,14 @@ other file of the site. Things that hold it together:
   last frame. «Abrir otro sobre» then showed the next pack fallen off-screen,
   with no top.
 - **Re-roll** (CS2's trade-up contract): ten copies of one rarity (común,
-  rara or épica) become one of the next, any card of that rarity with equal
-  chance. It is `cartas/r/<uid>/<push key>` = `{at: now, c: [ten copy
+  rara or épica) become one of a higher rarity, any card of it with equal
+  chance. Usually the next one; `SALTO_W` = 9200/750/50 makes it jump one,
+  two or three tiers 92 / 7.5 / 0.5 % of the time (capped at legendary, so
+  from épica it is always legendary). The jump has its own hash stream
+  (`"prodrop-salto:" + key`), so card and grade come from the same stream
+  as before, and it applies only from `SALTOS_DESDE`: a reroll written
+  earlier keeps the card it already gave. `probSalida(tier)` is what the
+  panel shows. It is `cartas/r/<uid>/<push key>` = `{at: now, c: [ten copy
   keys]}`, write-once and free. Like a pack, the result is derived, not
   rolled: `PM.reroll(uid, key, at, tier, notas)` hashes all of that into
   `{id, g, w}`. Its hidden grade is a bell centred on the ten inputs'
@@ -3731,10 +3737,14 @@ other file of the site. Things that hold it together:
   of each card and leaves exhibited ones for last) and asks twice before
   sending. It shows the expected-grade bell only when all ten are graded:
   hidden grades stay hidden. The roulette (`#ruleta`, z-index 29, under the
-  effects canvas) is a strip of 58 cards of the target rarity with the
-  winner at index 50. It runs right to left for 6.8 s on
-  `cubic-bezier(.08,.72,.16,1)`, ticks each time a card crosses the marker
-  (read off the live transform), and lands slightly off-centre on purpose.
+  effects canvas) is a strip of 100 cards, mostly of the next rarity with
+  some higher ones mixed in (78/18/4 %), with the winner at index 90. It
+  runs right to left for 10.8 s on `cubic-bezier(.05,.68,.1,1)`, ticks each
+  time a card crosses the marker (read off the live transform), and lands
+  slightly off-centre on purpose. **⚡ Rápido** (`prodrop.rrRapido` in
+  `localStorage`, in the panel and on the roulette) makes it 42 cards in
+  2.6 s; pressing it mid-spin sets the running animation's
+  `playbackRate` to 4. A jump of two or more tiers shows «¡SALTO!».
 - **Exhibited cards** are `users/<uid>/perfil/cartas` (up to four copy keys
   `o~k.i`, or the old `k.i` meaning one's own pack; validated by regex in
   the rules), shown only while that account still owns the copy, toggled from the card's zoom. The

@@ -1524,6 +1524,7 @@ function renderReroll() {
       <span class="rr-a" aria-hidden="true">➜</span>
       <span class="rr-sale t${t + 1}"><b>?</b><small>${sig.sym} ${sig.label}</small></span>
     </div>
+    <p class="rr-sale-p">Sale ${M.probSalida(t).map((p, i) => p ? `<span style="--c:${TIERS[i].color}"><i>${TIERS[i].sym}</i> ${TIERS[i].label} <b>${(p * 100).toFixed(p < .01 ? 1 : p < .1 ? 1 : 0).replace('.', ',')} %</b></span>` : '').filter(Boolean).join('')}</p>
     <p class="rr-nota">${notaEsperadaHTML(cps)}</p>
     <div class="rr-acc">
       <button class="btn mk-mini" id="rrAuto"${lista.length < NR ? ' disabled' : ''}>Elegir automático</button>
@@ -1536,6 +1537,7 @@ function renderReroll() {
       <div class="rr-pos">${posibles.map(c => miniCp({ id: c.n, gr: 0 })).join('')}</div></details>
     <div class="tc-envio rr-envio">
       <button class="btn primary" id="rrGo"${rr.sel.length === NR && !rr.enviando ? '' : ' disabled'}>${rr.enviando ? 'Enviando…' : rr.seguro ? '¿Seguro? Toca otra vez' : `♻ Re-roll ${rr.sel.length}/${NR}`}</button>
+      <button class="chip rl-rapido" id="rrRapido" aria-pressed="${rlRapido}">⚡ Rápido</button>
       <span class="mk-nota" id="rrMsg">${rr.seguro ? `Las ${NR} cartas se cambian por una ${UNA[t + 1]}. No se puede deshacer.` : lista.length < NR ? `Te faltan ${NR - lista.length} cartas ${PLURAL[t]}.` : ''}</span>
     </div>`;
   const toca = k => {
@@ -1547,6 +1549,7 @@ function renderReroll() {
   $('#rrBody').querySelectorAll('[data-quita]').forEach(b => b.onclick = () => toca(b.dataset.quita));
   $('#rrAuto').onclick = () => { rr.sel = lista.slice(0, NR).map(keyDe); rr.seguro = false; Snd.init(); Snd.flip(); renderRerollKeep(); };
   $('#rrLimpia').onclick = () => { rr.sel = []; rr.seguro = false; renderRerollKeep(); };
+  $('#rrRapido').onclick = cambiaRapido; pintaRapido();
   $('#rrGo').onclick = () => {
     if (rr.sel.length !== NR || rr.enviando) return;
     if (!rr.seguro) { rr.seguro = true; renderRerollKeep(); return; }
@@ -1582,25 +1585,49 @@ async function hazReroll() {
 /* La ruleta: una tira de cartas de la rareza que sale, que corre de
    derecha a izquierda y frena hasta dejar la que tocó bajo la marca. Cada
    carta que cruza la marca hace tic, cada vez más espaciado. */
-const rl = { girando: false, anim: null, raf: 0, r: null, nueva: false };
-const RL_N = 58, RL_GANA = 50;
+const rl = { girando: false, anim: null, raf: 0, r: null, nueva: false, t: 0 };
+/* Dos velocidades: la normal es larga a propósito (casi once segundos, cien
+   cartas), y «⚡ Rápido» —recordado en este navegador— la deja en dos y
+   medio. Apretarlo con la ruleta girando acelera esa misma tirada. */
+let rlRapido = false;
+try { rlRapido = localStorage.getItem('prodrop.rrRapido') === '1'; } catch {}
+const RL = () => rlRapido ? { n: 42, gana: 34, dur: 2600 } : { n: 100, gana: 90, dur: 10800 };
+function pintaRapido() {
+  for (const b of document.querySelectorAll('#rlRapido, #rrRapido')) {
+    b.setAttribute('aria-pressed', rlRapido); b.classList.toggle('on', rlRapido);
+    b.title = rlRapido ? 'Re-rolls rápidos (toca para la animación larga)' : 'Animación larga (toca para re-rolls rápidos)';
+  }
+}
+function cambiaRapido() {
+  rlRapido = !rlRapido;
+  try { localStorage.setItem('prodrop.rrRapido', rlRapido ? '1' : '0'); } catch {}
+  if (rl.anim && rl.girando) rl.anim.updatePlaybackRate(rlRapido ? 4 : 1);
+  Snd.init(); Snd.blip(); pintaRapido();
+}
+$('#rlRapido').onclick = cambiaRapido;
+pintaRapido();
+/* Una carta para la tira: casi siempre de la rareza que sale, y de vez en
+   cuando de las de más arriba, que es lo que da el «casi» al pasar. */
+function cartaTira(base) {
+  const x = Math.random(), t = Math.min(3, base + (x < .78 ? 0 : x < .96 ? 1 : 2)), l = M.POR_TIER[t];
+  return l[Math.floor(Math.random() * l.length)].n;
+}
 function ruleta(r, t, nueva) {
-  const sig = t + 1, posibles = M.POR_TIER[sig], tira = $('#rlTira');
-  rl.r = r; rl.nueva = nueva; rl.girando = true;
+  const sig = t + 1, tira = $('#rlTira'), { n: RL_N, gana: RL_GANA, dur: DUR } = RL();
+  rl.r = r; rl.nueva = nueva; rl.girando = true; rl.t = t;
   $('#rlTitulo').innerHTML = `${NR} ${PLURAL[t]} → <b style="color:${TIERS[sig].color}">${TIERS[sig].sym} ${TIERS[sig].label}</b>`;
   $('#rlFin').hidden = true; $('#rlFin').innerHTML = '';
   $('#rlSaltar').hidden = false;
   $('#ruleta').classList.remove('fin');
-  // la tira: cartas al azar de esa rareza, sin repetir la vecina, y la que tocó en su lugar
+  // la tira: cartas al azar desde esa rareza, sin repetir la vecina, y la que tocó en su lugar
   const ids = [];
   for (let i = 0; i < RL_N; i++) {
     let id;
-    do { id = posibles[Math.floor(Math.random() * posibles.length)].n; } while (posibles.length > 2 && i && id === ids[i - 1]);
+    do { id = cartaTira(sig); } while (i && id === ids[i - 1]);
     ids.push(id);
   }
   ids[RL_GANA] = r.id;
-  if (ids[RL_GANA - 1] === r.id) ids[RL_GANA - 1] = posibles.find(c => c.n !== r.id).n;
-  if (ids[RL_GANA + 1] === r.id) ids[RL_GANA + 1] = posibles.find(c => c.n !== r.id).n;
+  for (const j of [RL_GANA - 1, RL_GANA + 1]) while (ids[j] === r.id) ids[j] = cartaTira(sig);
   tira.innerHTML = ids.map((id, i) => {
     const c = CARDS[id];
     return `<div class="rl-item t${c.tier}${i === RL_GANA ? ' gana' : ''}" style="--accent:${accentOf(c)}"><img src="${c.img}" alt="" draggable="false"><span>${esc(c.name)}</span></div>`;
@@ -1612,9 +1639,9 @@ function ruleta(r, t, nueva) {
   const ancho = tira.parentElement.getBoundingClientRect().width, centro = ancho / 2, w = it.getBoundingClientRect().width;
   const desvio = (Math.random() - .5) * w * .7;   // no siempre al centro exacto: así se siente que pudo ser la de al lado
   const x0 = centro - w / 2 - paso * 2, x1 = centro - (RL_GANA * paso + w / 2) - desvio;
-  const dur = REDUCED ? 700 : 6800;
+  const dur = REDUCED ? 700 : DUR;
   rl.anim = tira.animate([{ transform: `translateX(${x0}px)` }, { transform: `translateX(${x1}px)` }],
-    { duration: dur, easing: 'cubic-bezier(.08,.72,.16,1)', fill: 'forwards' });
+    { duration: dur, easing: rlRapido ? 'cubic-bezier(.12,.75,.2,1)' : 'cubic-bezier(.05,.68,.1,1)', fill: 'forwards' });
   let ultimo = -1;
   const mira = () => {
     if (!rl.girando) return;
@@ -1631,17 +1658,17 @@ function finRuleta() {
   if (!rl.girando) return;
   rl.girando = false; cancelAnimationFrame(rl.raf);
   $('#rlSaltar').hidden = true;
-  const r = rl.r, c = CARDS[r.id], t = c.tier, gana = $('#rlTira .gana');
+  const r = rl.r, c = CARDS[r.id], t = c.tier, gana = $('#rlTira .gana'), salto = t - rl.t;
   $('#ruleta').classList.add('fin');
   const [x, y] = centerOf(gana), pl = t >= 2 ? paletteOf(c) : [accentOf(c), '#fff'];
-  if (t >= 2) flash(pl[0], t === 3 ? .9 : .6, t === 3 ? 1000 : 650);
+  if (t >= 2 || salto > 1) flash(pl[0], t === 3 ? .9 : .6, t === 3 ? 1000 : 650);
   burst(x, y, { n: t === 3 ? 140 : t === 2 ? 80 : 40, colors: [...pl, '#fff', '#ffcc3d'], speed: t === 3 ? 16 : 11, kinds: ['confetti', 'spark', 'star'], gravity: .15 });
   Snd.reveal(t); buzz(t >= 2 ? [30, 60, 30, 60, 90] : [40]);
   const cp = copiaDe(cuenta.mias.find(m => m.c === r.c) || { c: r.c, o: cuenta.uid, k: r.k, i: 0, at: r.at, id: r.id, g: r.g, w: r.w });
   const inst = fromCopy(c, cp);
   const fin = $('#rlFin');
   fin.innerHTML = `<div class="rl-carta"></div>
-    <div class="rl-txt"><span class="rl-tier" style="--c:${accentOf(c)}">${TIERS[t].label.toUpperCase()} ${TIERS[t].sym}</span>
+    <div class="rl-txt">${salto > 1 ? `<span class="rl-salto">¡SALTO! Subió ${salto === 2 ? 'dos' : 'tres'} calidades</span>` : ''}<span class="rl-tier" style="--c:${accentOf(c)}">${TIERS[t].label.toUpperCase()} ${TIERS[t].sym}</span>
       <b>${esc(c.name)}</b><small>${esc(subtitle(c))} · N.º ${pad(c.num)}${rl.nueva ? ' <em>NUEVA</em>' : ''}</small>
       <small>Su nota está oculta, como la de un sobre: gradúala para verla.</small></div>
     <div class="rl-acc"><button class="btn primary" id="rlVer">Ver carta</button><button class="btn" id="rlOtro">♻ Otro re-roll</button><button class="btn" id="rlCerrar">Listo</button></div>`;
