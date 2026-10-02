@@ -249,10 +249,10 @@ test('re-roll en la economía: diez de una rareza por una de la siguiente',()=>{
  assert.ok(M.economia(dg).graduada[nueva],'se gradúa');
 });
 
-test('re-roll: a veces sube dos o tres calidades (92 / 7,5 / 0,5 %)',()=>{
- assert.deepEqual([...PM.SALTO_W],[9200,750,50]);
+test('re-roll: a veces sube dos o tres calidades (común 92/7,5/0,5 %, rara 96/4 %)',()=>{
+ assert.deepEqual(PM.SALTO_W.map(f=>[...f]),[[9200,750,50],[9600,400],[10000]]);
  assert.deepEqual([...PM.probSalida(0)].map(x=>+x.toFixed(4)),[0,.92,.075,.005]);
- assert.deepEqual([...PM.probSalida(1)].map(x=>+x.toFixed(4)),[0,0,.92,.08],'de rara, lo que pasaría de legendaria se queda en legendaria');
+ assert.deepEqual([...PM.probSalida(1)].map(x=>+x.toFixed(4)),[0,0,.96,.04],'de rara: épica 96 %, legendaria 4 %');
  assert.deepEqual([...PM.probSalida(2)],[0,0,0,1]);
  const n=40000,c=[0,0,0,0];
  for(let i=0;i<n;i++)c[PM.CARDS[PM.reroll('usrAAAA','-Ns'+i+'abcdefgh',PM.SALTOS_DESDE+i,0,Array(10).fill(7)).id].tier]++;
@@ -260,5 +260,9 @@ test('re-roll: a veces sube dos o tres calidades (92 / 7,5 / 0,5 %)',()=>{
  assert.ok(Math.abs(c[2]/n-.075)<.005,'épica '+c[2]/n);
  assert.ok(Math.abs(c[3]/n-.005)<.0015,'legendaria '+c[3]/n);
  // antes del corte, un re-roll da lo que siempre dio: una sola rareza más
+ const c1=[0,0,0,0];
+ for(let i=0;i<n;i++)c1[PM.CARDS[PM.reroll('usrAAAA','-Nr'+i+'abcdefgh',PM.SALTOS_DESDE+i,1,Array(10).fill(7)).id].tier]++;
+ assert.ok(Math.abs(c1[2]/n-.96)<.005,'épica desde rara '+c1[2]/n);
+ assert.ok(Math.abs(c1[3]/n-.04)<.005,'legendaria desde rara '+c1[3]/n);
  for(let i=0;i<300;i++)assert.equal(PM.CARDS[PM.reroll('usrAAAA','-Nv'+i+'abcdefgh',PM.SALTOS_DESDE-1-i,0,Array(10).fill(7)).id].tier,1);
 });
