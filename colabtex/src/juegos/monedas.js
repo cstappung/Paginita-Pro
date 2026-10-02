@@ -55,7 +55,7 @@ export const TARIFA = { partida: 5, victoria: 15, empate: 5 };
 export const PESO = {
   escondite: 1, cartas: 1, cuadritos: 1, reversi: 1.2, orbita: 1.2, cadena: 1,
   flip7: 1.3, cacho: 1.3, uno: 1.3, spicy: 1.3, tetris: 1, yemas: 1.2,
-  worms: 1.5, presidente: 1.5, ajedrez: 1.6, clue: 2.2, catan: 2.5
+  worms: 1.5, presidente: 1.5, ajedrez: 1.6, pokemon: 1.6, clue: 2.2, catan: 2.5
 };
 
 /* Lo que vale un logro según su nivel: 1 fácil … 4 legendario. */
@@ -68,6 +68,7 @@ const F = "1322";
 export const NIVEL = {
   orbita: F + "212233", escondite: F + "322311", cartas: F + "222132",
   cuadritos: F + "123233", reversi: F + "331324", ajedrez: F + "132233",
+  pokemon: F + "112323",
   cadena: F + "132232", worms: F + "132323", flip7: F + "221232",
   cacho: F + "212132", uno: F + "121223", catan: F + "122213",
   presidente: F + "113322", spicy: F + "122113", tetris: F + "131332",

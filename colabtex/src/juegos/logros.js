@@ -51,6 +51,8 @@ const mias = (obj, me) => Object.keys(obj || {}).filter(k => obj[k] === me);
 const ajColorDe = c => (c.est.blancas === c.me ? "w" : c.est.negras === c.me ? "b" : "");
 const ladoMax = Math.max(...Object.values(TAMANOS).map(t => t.lado));
 
+/* Pokémon: el resumen que el motor saca del registro de Showdown. */
+const pkDe = c => { const i = (c.est.lados || []).indexOf(c.me); return (i >= 0 && c.est.resumen && c.est.resumen[i]) || {}; };
 const SALA = {
   orbita: [
     { id: "racimo", n: "Racimo", d: "Captura 3 estrellas o más con un solo lanzamiento.", i: "✨", x: c => orEv(c, e => e.k === "estrella" && e.nueva && e.u === c.me && e.n >= 3) },
@@ -94,6 +96,16 @@ const SALA = {
   ],
   /* Ajedrez: todo sale de `movs`, la hoja de la partida que el reductor
      ya lleva entera, con el color de quien hizo cada jugada. */
+  /* Pokémon: todo sale de `resumen`, que el motor cuenta leyendo el
+     registro público de la pelea (críticos, Tera, debilitados). */
+  pokemon: [
+    { id: "tera", n: "Teracristal", d: "Teracristaliza a uno de tus Pokémon.", i: "💎", x: c => pkDe(c).tera > 0 },
+    { id: "critico", n: "Golpe crítico", d: "Asesta un golpe crítico.", i: "💥", x: c => pkDe(c).crit > 0 },
+    { id: "ohko", n: "De un golpe", d: "Debilita de un solo ataque a un Pokémon que tenía la vida llena.", i: "⚡", x: c => pkDe(c).ohko > 0 },
+    { id: "barredor", n: "Barredor", d: "Un mismo Pokémon tuyo debilita a tres rivales en una pelea.", i: "🧹", x: c => pkDe(c).maxKo >= 3 },
+    { id: "limite", n: "Al límite", d: "Gana con un solo Pokémon en pie.", i: "🫀", x: c => c.gano && c.est.motivo === "ko" && pkDe(c).vivos === 1 },
+    { id: "impecable", n: "Impecable", d: "Gana sin que se debilite ninguno de tus Pokémon.", i: "👑", x: c => c.gano && c.est.motivo === "ko" && pkDe(c).perdidos === 0 }
+  ],
   ajedrez: [
     { id: "mate", n: "Jaque mate", d: "Gana una partida dando mate.", i: "♚", x: c => c.gano && c.est.motivo === "mate" },
     { id: "relampago", n: "Mate relámpago", d: "Da mate en 20 jugadas o menos.", i: "⚡", x: c => c.gano && c.est.motivo === "mate" && (c.est.movs || []).length <= 40 },
