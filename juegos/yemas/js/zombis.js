@@ -33,7 +33,34 @@ export const hpRonda = r => r <= 9 ? 60 + 45 * (r - 1) : Math.round(420 * Math.p
 export const totalRonda = (r, n) => Math.min(90, Math.round((4 + 3 * r) * (1 + 0.5 * (Math.max(1, n) - 1))));
 export const velRonda = r => Math.min(6.2, 2.2 + 0.45 * r);
 const cadaSpawn = r => Math.max(0.45, 2.1 - 0.15 * r);
-const maxVivos = n => Math.min(24, 8 + 3 * Math.max(1, n));
+// Cada ronda deja más en pie a la vez, y el mordisco pega más fuerte: 35 en
+// la primera, 50 en la cuarta (dos mordiscos y caes) y hasta 80.
+const maxVivos = (n, r = 1) => Math.min(30, 6 + 3 * Math.max(1, n) + r);
+export const mordidaRonda = r => Math.min(80, 30 + 5 * Math.max(1, r));
+// Tres clases de zombi, para que las rondas no sean solo «lo mismo con más
+// vida». El corredor (desde la ronda 3) va más rápido que alguien caminando:
+// hay que correr o pararlo. El grandote (desde la 5) es lento, aguanta el
+// triple y muerde más fuerte. Cuántos de cada uno sube con la ronda.
+// El índice viaja por la red: lo nuevo va al final.
+export const TIPOS = ['n', 'c', 'g'];
+export const CLASE = {
+  n: { hp: 1, mordida: 1, puntos: 60 },
+  c: { hp: 0.7, mordida: 1, puntos: 80 },
+  g: { hp: 3, mordida: 1.6, puntos: 150 },
+};
+const velDe = (tipo, r) => tipo === 'c' ? Math.min(9, 5.8 + 0.3 * r) * (0.95 + Math.random() * 0.1)
+  : tipo === 'g' ? 2.3 + Math.random() * 0.3 : velRonda(r) * (0.85 + Math.random() * 0.3);
+export function tipoRonda(r, azar = Math.random()) {
+  const g = r >= 5 ? Math.min(0.2, 0.05 * (r - 4)) : 0;
+  const c = r >= 3 ? Math.min(0.5, 0.12 * (r - 2)) : 0;
+  return azar < g ? 'g' : azar < g + c ? 'c' : 'n';
+}
+// Lo que se avisa al empezar las rondas que traen algo nuevo.
+export const NOVEDAD_RONDA = {
+  3: '¡Cuidado: ahora algunos corren!',
+  5: '¡Llegan los grandotes: lentos, pero aguantan el triple!',
+  10: '¡Ronda 10: los corredores ya son más rápidos que tú caminando!',
+};
 const r1 = x => Math.round(x * 10) / 10;
 // Firebase devuelve los arreglos como objetos y se come los vacíos.
 const lista = x => Array.isArray(x) ? x : Object.values(x || {});
@@ -172,14 +199,15 @@ export function crearZombis(escena, colisores, cb) {
   }
 
   // ---------- Los zombis ----------
-  function nuevo(id, x, y, z, hp, max, fase = 'dentro', v = -1) {
-    const mesh = crearZombi();
+  function nuevo(id, x, y, z, hp, max, fase = 'dentro', v = -1, tipo = 'n') {
+    const mesh = crearZombi(tipo);
     const zb = {
+      tipo,
       id, mesh, pos: new THREE.Vector3(x, y, z), vel: new THREE.Vector3(), enSuelo: true,
       obj: new THREE.Vector3(x, y, z), ry: 0, hp, max, sube: fase === 'brote' ? 0 : 1,
       fase, v, t: 0, de: null, nodo: -1, meta: -1, ve: false, replan: 0, lejos: 0, quema: 0,
       cd: 0.6, prep: -1, atasco: 0, lado: 1, desvio: 0, golpeT: 0, grunido: 2 + Math.random() * 6,
-      vel0: velRonda(Math.max(1, ronda)) * (0.85 + Math.random() * 0.3),
+      vel0: velDe(tipo, Math.max(1, ronda)),
     };
     mesh.position.set(x, y - (zb.sube < 1 ? ALTO : 0), z);
     escena.add(mesh);
@@ -217,7 +245,7 @@ export function crearZombis(escena, colisores, cb) {
     const pos = z.mesh.position.clone();
     if (z.sube < 1) pos.y = z.pos.y;
     ponHuevo(pos);
-    cb.alCaer({ id: z.id, pos, killer, cab, a, explota });
+    cb.alCaer({ id: z.id, pos, killer, cab, a, explota, tipo: z.tipo || 'n' });
   }
 
   // ---------- Director ----------
@@ -232,8 +260,8 @@ export function crearZombis(escena, colisores, cb) {
     nJug = n;
     if (!zb) return;
     ronda = zb.r | 0; q = Math.max(0, zb.q | 0); pausa = +zb.p || 0; entre = +zb.e || 0; pedida = 0;
-    const max = hpRonda(Math.max(1, ronda));
     for (const z of zs.values()) {
+      const max = hpRonda(Math.max(1, ronda)) * CLASE[z.tipo || 'n'].hp;
       z.max = max;
       z.hp = Math.max(1, Math.round((z.pct ?? 100) / 100 * max));
       z.pos.copy(z.mesh.position);
@@ -297,15 +325,15 @@ export function crearZombis(escena, colisores, cb) {
     const todos = jug.filter(j => j.vivo);
     // Salen de a uno, por las ventanas o del suelo.
     if (pausa > 0) pausa -= dt;
-    else if (q > 0 && zs.size < maxVivos(n)) {
+    else if (q > 0 && zs.size < maxVivos(n, ronda)) {
       cdSpawn -= dt;
       if (cdSpawn <= 0 && todos.length) {
         cdSpawn = cadaSpawn(ronda);
         const s = sitioSpawn(vivos.length ? vivos : todos);
         if (s) {
-          const hp = hpRonda(ronda);
-          if (s.i >= 0) nuevo(sigId, s.x + (Math.random() - 0.5) * 1.2, s.y + 0.02, s.z + (Math.random() - 0.5) * 1.2, hp, hp, 'fuera', s.i);
-          else nuevo(sigId, s.x + (Math.random() - 0.5) * 1.5, 0, s.z + (Math.random() - 0.5) * 1.5, hp, hp, 'brote');
+          const tipo = tipoRonda(ronda), hp = Math.round(hpRonda(ronda) * CLASE[tipo].hp);
+          if (s.i >= 0) nuevo(sigId, s.x + (Math.random() - 0.5) * 1.2, s.y + 0.02, s.z + (Math.random() - 0.5) * 1.2, hp, hp, 'fuera', s.i, tipo);
+          else nuevo(sigId, s.x + (Math.random() - 0.5) * 1.5, 0, s.z + (Math.random() - 0.5) * 1.5, hp, hp, 'brote', -1, tipo);
           q--;
         }
       }
@@ -461,7 +489,9 @@ export function crearZombis(escena, colisores, cb) {
             if (morder) {
               const ojo = _m.copy(z.pos).setY(z.pos.y + 1.2), q2 = t.pos.clone().setY(t.pos.y + 1);
               const dir = q2.sub(ojo), dd = dir.length();
-              if (rayoMundo(ojo, dir.normalize(), dd, colisores) >= dd - 0.2) mordidas.push({ uid: t.uid, dmg: ZB.mordida });
+              // Nunca de un mordisco con la vida llena: se alcanza a reaccionar.
+              const dmg = Math.min(95, Math.round(mordidaRonda(ronda) * CLASE[z.tipo || 'n'].mordida));
+              if (rayoMundo(ojo, dir.normalize(), dd, colisores) >= dd - 0.2) mordidas.push({ uid: t.uid, dmg });
             }
           }
         } else if (morder && z.cd <= 0) z.prep = ZB.preparar;
@@ -487,7 +517,7 @@ export function crearZombis(escena, colisores, cb) {
   // revienta y se lleva a los que tenga al lado.
   function muere(z, killer, cab, a) {
     const explota = z.quema > 0 ? 1 : 0;
-    muertes = [...muertes, [z.id, killer || '', cab ? 1 : 0, a | 0, explota]].slice(-20);
+    muertes = [...muertes, [z.id, killer || '', cab ? 1 : 0, a | 0, explota, TIPOS.indexOf(z.tipo || 'n')]].slice(-20);
     vistos.add(z.id);
     quita(z.id);
     cae(z, killer || '', !!cab, a | 0, !!explota);
@@ -518,7 +548,7 @@ export function crearZombis(escena, colisores, cb) {
       r: ronda, q, p: r1(Math.max(0, pausa)), e: r1(Math.max(0, entre)),
       z: [...zs.values()].map(z => [z.id, r1(z.pos.x), r1(z.pos.y), r1(z.pos.z), r1(z.ry),
         Math.max(1, Math.round(z.hp / z.max * 100)), z.sube < 1 ? 1 : 0, z.quema > 0 ? 1 : 0,
-        FASES.indexOf(z.fase), z.v]),
+        FASES.indexOf(z.fase), z.v, TIPOS.indexOf(z.tipo || 'n')]),
       m: muertes,
     };
   }
@@ -533,17 +563,18 @@ export function crearZombis(escena, colisores, cb) {
       vistos.add(id);
       sigId = Math.max(sigId, id + 1);
       const z = quita(id);
-      if (z) cae(z, String(m[1] || ''), !!m[2], m[3] | 0, !!m[4]);
+      if (z) { z.tipo = TIPOS[m[5] | 0] || z.tipo; cae(z, String(m[1] || ''), !!m[2], m[3] | 0, !!m[4]); }
     }
     const ahora = new Set();
     for (const e of lista(zb.z)) {
       if (!Array.isArray(e)) continue;
-      const [id, x, y, zz, ry, pct, sube, quema, fase, v] = e.map(Number);
+      const [id, x, y, zz, ry, pct, sube, quema, fase, v, ti] = e.map(Number);
+      const tipo = TIPOS[ti | 0] || 'n';
       if (vistos.has(id)) continue;
       ahora.add(id);
       let z = zs.get(id);
       const f = FASES[fase | 0] || 'dentro';
-      if (!z) z = nuevo(id, x, y, zz, 1, 1, sube ? 'brote' : f, Number.isFinite(v) ? v : -1);
+      if (!z) z = nuevo(id, x, y, zz, 1, 1, sube ? 'brote' : f, Number.isFinite(v) ? v : -1, tipo);
       z.obj.set(x, y, zz);
       z.pos.set(x, y, zz);
       z.ry = ry;

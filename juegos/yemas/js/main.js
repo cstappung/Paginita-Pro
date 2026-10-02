@@ -13,7 +13,7 @@ import {
 import { sonido } from 'yemas/audio';
 import { conectarMarco, conectarLocal, PALETA, COLOR_EQUIPO } from 'yemas/red';
 import { crearGranadas, GRANADA } from 'yemas/granada';
-import { crearZombis, ZB } from 'yemas/zombis';
+import { crearZombis, ZB, CLASE, NOVEDAD_RONDA } from 'yemas/zombis';
 import { MAPAS, LISTA_MAPAS } from 'yemas/mapas';
 import { crearInteractivo } from 'yemas/interactivo';
 import { crearBonos } from 'yemas/bonos';
@@ -599,7 +599,7 @@ function disparar() {
     trazo(p >= a.perdigones ? boca.clone().add(_u.clone().multiplyScalar(-0.05)) : boca, fin, '#fff2a8');
     if (quien) {
       const j = quien;
-      const cab = fin.y - j.pos.y > ALTO * 0.72;
+      const cab = fin.y - j.pos.y > ALTO * 0.72 * (j.esc || 1);
       const g = golpes.get(j.id) || { dmg: 0, cab: false };
       g.dmg += a.danio * (cab ? a.cabeza : 1) * caida(a, t);
       g.cab = g.cab || cab;
@@ -634,8 +634,9 @@ function primerBlanco(o, d, tope) {
     if (t !== null && t < (mejor ? mejor.t : tope)) mejor = { id, t, pos: j.mesh.position, color: j.color };
   }
   if (zombis) for (const [n, z] of zombis.lista) {
-    const t = rayoHuevo(o, d, z.mesh.position);
-    if (t !== null && t < (mejor ? mejor.t : tope)) mejor = { id: 'z:' + n, t, pos: z.mesh.position, color: '#b6d47a' };
+    const esc = z.mesh.userData.escala || 1;
+    const t = rayoHuevo(o, d, z.mesh.position, esc);
+    if (t !== null && t < (mejor ? mejor.t : tope)) mejor = { id: 'z:' + n, t, pos: z.mesh.position, color: '#b6d47a', esc };
   }
   return mejor;
 }
@@ -662,7 +663,7 @@ function sartenazo(a) {
   const j = primerBlanco(o, d, tope);
   if (j) {
     const fin = o.clone().addScaledVector(d, j.t);
-    const cab = fin.y - j.pos.y > ALTO * 0.72;
+    const cab = fin.y - j.pos.y > ALTO * 0.72 * (j.esc || 1);
     pegaA(j.id, Math.round(a.danio * (cab ? a.cabeza : 1)), cab, a.id);
     marcaGolpe(cab);
     sonido.sarten();
@@ -1645,6 +1646,7 @@ function marcadorZombis(m) {
   rondaVista = m.ronda;
   if (soyDirector()) zombis.iniciaRonda(m.ronda, nActivos());
   cartelRonda(m.ronda);
+  if (NOVEDAD_RONDA[m.ronda]) setTimeout(() => aviso(NOVEDAD_RONDA[m.ronda]), 1200);
   if (primera || !puedoJugar()) return;
   // Ronda nueva: los caídos vuelven, y los que siguen en pie recuperan las granadas.
   if (!yo.vivo) aparecer();
@@ -1688,7 +1690,7 @@ function sumaPuntos(n) {
   setTimeout(() => i.remove(), 900);
 }
 
-function alCaeZombi({ pos, killer, cab, a, explota }) {
+function alCaeZombi({ pos, killer, cab, a, explota, tipo }) {
   explotar(pos, '#8fa36b', false);
   if (killer && soyDirector()) bonos?.suelta(pos);
   // En Pueblo el que pisó la lava revienta en llamas y quema lo que tenga cerca.
@@ -1700,7 +1702,9 @@ function alCaeZombi({ pos, killer, cab, a, explota }) {
   }
   if (killer !== red.yo) return;
   yo.zk++;
-  sumaPuntos(cab ? 100 : a === SARTEN ? 130 : 60);
+  // El grandote vale más; la cabeza suma 40 y la sartén 70, como siempre.
+  const base = CLASE[tipo]?.puntos || 60;
+  sumaPuntos(base + (cab ? 40 : a === SARTEN ? 70 : 0));
 }
 
 // Una bonificación tomada por alguien de la sala. Las que tocan a la sala

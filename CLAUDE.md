@@ -3042,8 +3042,22 @@ cost is a stray bite, not a broken game. Seven things hold it together:
   climb in, and then go by `nodos`/`enlaces`. A link through a door only
   counts once that door is open, so the distances are recomputed
   (Floyd-Warshall, under fifty nodes) every time one opens. A zombie that
-  sees its prey chases it straight. Per round `hpRonda`, `totalRonda` and
-  `velRonda` grow.
+  sees its prey chases it straight.
+- **Every round is harder, and not only in numbers.** `hpRonda`,
+  `totalRonda` and `velRonda` grow as before. On top of that,
+  `maxVivos(n, r)` lets one more zombie stand at a time per round, and the
+  bite (`mordidaRonda`) goes from 35 in round 1 to 50 in round 4 (two bites
+  and you fall), up to 80. There are three kinds too (`TIPOS`, `CLASE`,
+  `tipoRonda`). The runner (`c`) shows up from round 3, has 70 % of the
+  life and runs faster than a player walking (5.8 m/s plus 0.3 per round,
+  up to 9). The big one (`g`) shows up from round 5: slow, three times the
+  life, a 1.6× bite and 30 % bigger. Its `userData.escala` widens the
+  bullets' ellipsoid (`rayoHuevo(..., escala)`) and raises the head line.
+  No bite takes more than 95, so a full-health player is never killed in
+  one go. The kind travels at the end of each `zb.z` entry and of each
+  death in `zb.m`, and a kill pays `CLASE[t].puntos` (60, 80, 150), plus 40
+  for the head or 70 for the pan. `NOVEDAD_RONDA` warns at rounds 3, 5 and
+  10.
 
 Practice can be zombies too: the menu's mode select gives `conectarLocal`
 `variante: 'zombis'`, `RedLocal` keeps the round and ends the run on the
