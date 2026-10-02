@@ -80,7 +80,7 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver }) {
     const mio = e.usuarios[uid];
     manda({ tipo: "datos", uid, saldo: m.saldo, parada: m.parada, falta: m.falta,
       mias: copiasDe(uid, d).map(x => Object.assign({ c: x.c, o: x.o, k: x.k, i: x.i, at: x.at, gr: x.gr, venta: x.venta },
-        x.id != null ? { id: x.id, g: x.g, w: x.w } : {})),
+        x.id != null ? { rr: { id: x.id, g: x.g, w: x.w } } : {})),
       sobres: (mio && mio.sobres) || {}, gratis: proximoGratis(uid, d, fb.ahora()),
       ofertas, ventas: mias.sort((a, b) => (b.fin || b.t) - (a.fin || a.t)).slice(0, 40), cambios: cambios.slice(0, 40), jugadores, gente,
       exh: exhibidas(), desfase: fb.ahora() - Date.now() });
