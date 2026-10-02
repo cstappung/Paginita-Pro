@@ -3529,7 +3529,26 @@ logros, the balance is derived from the same four reads the profile uses
   times the game's `PESO` (1 for a short duel up to 2.5 for Catan).
 - **Club records** (`soloRanks`): `RECORD[club]` once per modality with a
   mark, so improving a mark never pays twice and the easy game cannot be
-  farmed. BBTAN adds 1 per 2 rounds, and the Sopa streak 10 per day.
+  farmed. On top of the record: BBTAN pays ⌊n/4⌋ for every round n up to
+  the record (`monedasBbtan`, closed form, capped at round 1000: reaching
+  round 5 pays 2, round 100 pays 1 225), sortEm pays the mode's blocks
+  plus 2 per second under 3 s per block (`monedasSortem`), and the Sopa and
+  Electrodle streaks 10 per day.
+- **Club plays** (`clubJugadas/<uid>/<juego>` = `{dia, hoy, total, at}`):
+  every club game that ends with a result pays `PAGO_CLUB` (8), up to
+  `TOPE_CLUB_DIA` (10) per game per Chile day. `marcaJugadaClub` in
+  `juegos-main.js` writes it from `alResultado`, chained so two results do
+  not read the same counter; the rule recomputes exactly what
+  `registraJugadaClub` does (today only, `total` up by one, `hoy` ≤ 10).
+- **Podiums** (`podios/<uid>/<partida>` = `{c, p, q, at}`): taking the
+  1st, 2nd or 3rd place of a club table (or a Yemas zombies one) from
+  *someone else* pays 500, 250 or 100 (`PODIO`), every time it happens.
+  `guardaConPodio` writes it right after the record transaction commits,
+  when the place improved to 1–3 and someone else held it; the rule demands
+  that `soloRanks/<c>/<uid>/partida` is the claim's key, so there is one
+  claim per record write. `podioValido` re-checks that both have a row in
+  that table and that it is not oneself. Club marks are client-claimed
+  (the honest limit of every solo game), so this is no weaker than them.
 - **Logros**: by difficulty. `NIVEL[juego]` is one digit 1–4 per logro, in
   `LOGROS[juego]` order (room games start with the fila's four, `F`), worth
   `VALOR_NIVEL` 15/40/100/250. A new logro needs its digit, and
@@ -3546,9 +3565,18 @@ logros, the balance is derived from the same four reads the profile uses
   with the right streak and sum. Deleting the node only loses coins.
 
 Coins are spent in PRODROP (below), and that spending **is** stored:
-`monedasDe` returns `total` (earned from games), `gastadas`, `cobradas` (market sales) and `saldo`. The header
-chip shows `saldo`; the top orders by `total`, so buying packs never drops
-anyone a place. The `diario` node needs the rules re-published.
+`monedasDe` returns `total` (earned, `ganadoDe`), `gastadas`, `cobradas`
+(market sales) and `saldo`. **The header chip and the top both show
+`saldo`**: the top used to order by `total`, and the mismatch with the
+header read as "the top is not updating". `datosPerfil` hands every node
+`watchLogros` reads (`Object.assign({}, d)`), not a hand-picked list: a
+list that forgot `mercado` silently ran the economy without the market.
+The streak is shown loudly: a card in the lobby's coins box and on the
+coins page (`rachaHtml`: days, today counted or not, what tomorrow pays,
+seven bars), a 🔥N next to the header balance that blinks while today is
+still missing, and a toast when the day is recorded (`avisaMonedas`, the
+same queue as the logros toast, also used for club plays and podiums).
+The `diario`, `clubJugadas` and `podios` nodes need the rules re-published.
 `test-rules.mjs` covers it: no invented streak, no tomorrow, no twice a day,
 and nobody writes someone else's.
 

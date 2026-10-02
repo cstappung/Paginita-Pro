@@ -287,6 +287,36 @@ console.log("— PRODROP: sobre gratis, mercado e intercambios —");
   await loginAs(A);
 }
 
+console.log("— Monedas: partidas del club y podios —");
+{
+  const { registraJugadaClub, diaChile } = await import("./src/juegos/monedas.js");
+  const { serverTimestamp } = await import("firebase/database");
+  const ua = await loginAs(A), hoy = diaChile();
+  const apunta = reg => set(ref(db, `clubJugadas/${ua.uid}/bbtan`), Object.assign({}, reg, { at: serverTimestamp() }));
+  await remove(ref(db, `clubJugadas/${ua.uid}/bbtan`)).catch(() => {});
+  await denied("no se empieza con muchas partidas", () => apunta({ dia: hoy, hoy: 1, total: 50 }));
+  await denied("ni en un juego que no es del club", () => set(ref(db, `clubJugadas/${ua.uid}/uno`), { dia: hoy, hoy: 1, total: 1, at: serverTimestamp() }));
+  let reg = registraJugadaClub(null, hoy);
+  await allowed("A apunta su primera partida del club", () => apunta(reg));
+  await denied("no se salta de a dos", () => apunta({ dia: hoy, hoy: reg.hoy + 2, total: reg.total + 2 }));
+  for (let i = 0; i < 9; i++) { reg = registraJugadaClub(reg, hoy); await set(ref(db, `clubJugadas/${ua.uid}/bbtan`), Object.assign({}, reg, { at: serverTimestamp() })); }
+  ok("diez partidas hoy", reg.hoy === 10);
+  await denied("la undécima de hoy ya no paga", () => apunta({ dia: hoy, hoy: 11, total: reg.total + 1 }));
+  await denied("ni mañana", () => apunta({ dia: hoy + 1, hoy: 1, total: reg.total + 1 }));
+  // podios: solo justo después del récord que nombra
+  await set(ref(db, `soloRanks/club-bbtan-rondas/${ua.uid}`), { nombre: "A", puntos: 7, tiempo: 1000, partida: "partidaA1" }).catch(() => {});
+  const fila = (await get(ref(db, `soloRanks/club-bbtan-rondas/${ua.uid}`))).val() || {};
+  const cobra = (k, x) => set(ref(db, `podios/${ua.uid}/${k}`), Object.assign({ at: serverTimestamp() }, x));
+  await denied("no se cobra un podio de un récord que no existe", () => cobra("otraPartida", { c: "club-bbtan-rondas", p: 1, q: "usuarioOtro1" }));
+  await denied("ni a uno mismo", () => cobra(fila.partida, { c: "club-bbtan-rondas", p: 1, q: ua.uid }));
+  await denied("ni un puesto 4", () => cobra(fila.partida, { c: "club-bbtan-rondas", p: 4, q: "usuarioOtro1" }));
+  await allowed("A cobra el podio de su récord", () => cobra(fila.partida, { c: "club-bbtan-rondas", p: 1, q: "usuarioOtro1" }));
+  await denied("y no lo cobra dos veces", () => cobra(fila.partida, { c: "club-bbtan-rondas", p: 1, q: "usuarioOtro2" }));
+  await loginAs(B);
+  await denied("B no cobra a nombre de A", () => set(ref(db, `podios/${ua.uid}/x123456`), { c: "club-bbtan-rondas", p: 1, q: "usuarioOtro1", at: serverTimestamp() }));
+  await loginAs(A);
+}
+
 await signOut(auth);
 await denied("sin sesión no se lee el informe", () => get(ref(db, "errors")));
 await denied("sin sesión no se escribe nada", () => set(ref(db, "feedback/x"), { tipo: "bug", titulo: "x", uid: "x" }));

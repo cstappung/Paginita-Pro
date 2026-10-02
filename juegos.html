@@ -2754,6 +2754,39 @@ html[data-tema=oscuro] .jg-nov-cab h2,html[data-tema=oscuro] .jg-nov-cuerpo h3{c
 
 /* ---- Monedas: saldo en la cabecera, top en el vestíbulo, pestaña #monedas ---- */
 .jg-saldo{color:#f5c542!important;font-weight:700;font-variant-numeric:tabular-nums}
+.jg-racha-chip{display:inline-flex;align-items:center;margin-left:7px;padding:1px 7px 1px 5px;border-radius:99px;background:#ff7a1a26;color:#ff9a3d;font-size:12px;font-weight:800}
+.jg-racha-chip.falta{filter:grayscale(.6);animation:jgRachaTitila 1.6s ease-in-out infinite}
+@keyframes jgRachaTitila{50%{filter:none;background:#ff7a1a44}}
+.jg-racha{display:grid;grid-template-columns:auto 1fr;grid-template-areas:"f t" "d d";gap:6px 10px;align-items:center;margin:0 0 10px;padding:10px 12px;border-radius:14px;text-decoration:none!important;color:#7a2e05;background:linear-gradient(120deg,#fff3e0,#ffe2c2);border:1px solid #ffc78a}
+.jg-racha:hover{border-color:#ff9a3d}
+.jg-racha-fuego{grid-area:f;font-size:28px;line-height:1;filter:drop-shadow(0 2px 6px #ff7a1a66)}
+.jg-racha.lista .jg-racha-fuego{animation:jgFuego 1.8s ease-in-out infinite}
+.jg-racha:not(.lista):not(.peligro) .jg-racha-fuego{filter:grayscale(1);opacity:.6}
+@keyframes jgFuego{50%{transform:scale(1.12) rotate(-4deg)}}
+.jg-racha-tx{grid-area:t;display:grid;gap:1px;min-width:0}
+.jg-racha-tx b{font-size:15px;color:#b4410a}
+.jg-racha-tx small{display:flex;align-items:center;gap:3px;flex-wrap:wrap;font-size:12px;color:#8a4a1e}
+.jg-racha-tx .jg-moneda{width:1em;height:1em}
+.jg-racha-dias{grid-area:d;display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
+.jg-racha-dias i{height:6px;border-radius:3px;background:#ffd9b0}
+.jg-racha-dias i.on{background:linear-gradient(90deg,#ff7a1a,#ffb23d)}
+.jg-racha-dias i.hoy{background:#ffb23d;animation:jgRachaTitila 1.2s ease-in-out infinite}
+.jg-racha.peligro{border-color:#ff9a3d;box-shadow:0 0 0 3px #ff9a3d22}
+html[data-tema=oscuro] .jg-racha{background:linear-gradient(120deg,#3a1d0a,#4a250c);border-color:#7a3a10;color:#ffd2a8}
+html[data-tema=oscuro] .jg-racha-tx b{color:#ffb070}
+html[data-tema=oscuro] .jg-racha-tx small{color:#e8b48a}
+html[data-tema=oscuro] .jg-racha-dias i{background:#5a3015}
+html[data-tema=oscuro] .jg-racha-dias i.on{background:linear-gradient(90deg,#ff7a1a,#ffb23d)}
+html[data-tema=oscuro] .jg-racha-dias i.hoy{background:#ffb23d}
+.jg-mo-racha-c{min-width:min(100%,340px)}
+.jg-mo-racha-c .jg-racha{margin:0}
+.jg-mo-hero .jg-racha small{letter-spacing:0;text-transform:none;font-weight:500;font-size:12px;opacity:1}
+.jg-mo-toast.racha{background:linear-gradient(135deg,#7a2e05,#ff7a1a)}
+.jg-mo-toast.podio{background:linear-gradient(135deg,#7a5a00,#e8a317)}
+.jg-mo-toast.club{background:linear-gradient(135deg,#123a4a,#1f8a9a)}
+.jg-mo-toast small{display:flex;align-items:center;gap:4px}
+.jg-mo-toast .jg-moneda{width:1.05em;height:1.05em}
+@media (prefers-reduced-motion:reduce){.jg-racha-chip.falta,.jg-racha.lista .jg-racha-fuego,.jg-racha-dias i.hoy{animation:none}}
 .jg-moneda{width:1.1em;height:1.1em;vertical-align:-.2em;flex:none;display:inline-block}
 .jg-mo-ves header .jg-moneda{width:20px;height:20px}
 .jg-mo-hero strong .jg-moneda{width:.8em;height:.8em;vertical-align:-.05em}
@@ -2914,6 +2947,6 @@ html[data-tema=oscuro] .jg-drop-quien:hover b{color:#fff}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610020758"></script>
+<script src="juegos-app.js?v=202610021428"></script>
 </body>
 </html>

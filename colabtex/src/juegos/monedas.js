@@ -20,8 +20,15 @@
      sube el pago 5 por día hasta 50 desde el noveno. Las reglas validan
      la fecha, la racha y la suma; el cliente solo puede apuntar *hoy*.
    - La racha de la Sopa diaria y la de Electrodle, los puntos de
-     Electrodle y la ronda de BBTAN suman un extra sobre su récord, porque
-     ahí la marca misma es la dificultad.
+     Electrodle, la ronda de BBTAN y la rapidez en sortEm suman un extra
+     sobre su récord, porque ahí la marca misma es la dificultad.
+   - **Partidas del club** (`clubJugadas/<uid>/<juego>`): cada partida que
+     termina con resultado paga `PAGO_CLUB`, hasta `TOPE_CLUB_DIA` por juego
+     y por día. Las reglas validan el día y que el contador suba de a uno.
+   - **Podios** (`podios/<uid>/<partida>`): quitarle a otra persona el
+     primer, segundo o tercer puesto de una tabla del club paga 500, 250 o
+     100, cada vez. Se escribe justo después del récord que lo logró, y la
+     regla exige que ese récord exista y sea el suyo.
 
    **Gastar** sí se guarda, porque no se puede deducir de nada, y desde
    que existe el mercado las monedas también **pasan de una cuenta a otra**.
@@ -75,9 +82,23 @@ export const valorLogro = (juego, id) => VALOR_NIVEL[nivelDe(juego, id)] || 0;
 
 /* Récords del club: lo que paga tener marca en una modalidad, y el extra
    que sale de la marca misma donde la marca es la dificultad. */
-export const RECORD = { minas: 30, snake: 8, tetrisclub: 25, sortem: 25, bbtan: 25, sopa: 15, electro: 15 };
+export const RECORD = { minas: 60, snake: 20, tetrisclub: 50, sortem: 50, bbtan: 50, sopa: 30, electro: 30 };
+/* BBTAN: cada ronda n paga ⌊n/4⌋, acumulado hasta la ronda del récord
+   (1 a 3 no pagan, 4 y 5 pagan 1 cada una: llegar a la 5 da 2). */
+export function monedasBbtan(ronda) {
+  const R = Math.max(0, Math.floor(Math.min(+ronda || 0, 1000))), q = Math.floor(R / 4), r = R % 4;
+  return 2 * q * (q - 1) + q * (r + 1);
+}
+/* sortEm: los bloques de la modalidad, más 2 por cada segundo bajo un
+   ritmo de 3 s por bloque (30 s para el 1–10, 60 s para el 1–20). */
+export function monedasSortem(n, ms) {
+  const N = +n || 0, seg = (+ms || 0) / 1000;
+  return Math.round(N + 2 * Math.max(0, 3 * N - seg));
+}
 function extraRecord(cat, f) {
-  if (cat === "club-bbtan-rondas") return Math.floor(Math.min(f.puntos || 0, 1000) / 2);
+  if (cat === "club-bbtan-rondas") return monedasBbtan(f.puntos);
+  const so = /^club-sortem-(\d+)$/.exec(cat);
+  if (so) return monedasSortem(+so[1], f.tiempo);
   if (cat === "club-sopa-racha" || cat === "club-electro-racha") return 10 * Math.min(f.puntos || 0, 60);
   /* Un día perfecto de Electrodle son 700 puntos: 14 monedas. */
   if (cat === "club-electro-puntos") return Math.floor(Math.min(f.puntos || 0, 100000) / 50);
@@ -105,6 +126,29 @@ export function registraDia(prev, dia) {
   const racha = dia === prev.dia + 1 ? prev.racha + 1 : 1;
   return { dia, racha, mejor: Math.max(prev.mejor, racha), dias: prev.dias + 1, bono: prev.bono + pagoDia(racha) };
 }
+/* ---------- partidas del club ----------
+   `clubJugadas/<uid>/<juego>` = {dia, hoy, total, at}. Lo que paga es
+   `total`: la regla solo deja sumar de a uno y hasta `TOPE_CLUB_DIA` en el
+   mismo día (Chile). Las mismas cuentas que la regla: */
+export const PAGO_CLUB = 8, TOPE_CLUB_DIA = 10;
+export const JUEGOS_CLUB = ["minas", "snake", "tetrisclub", "sortem", "bbtan", "sopa", "electro"];
+export function registraJugadaClub(prev, dia) {
+  if (!prev || !Number.isInteger(prev.dia)) return { dia, hoy: 1, total: 1 };
+  if (dia < prev.dia) return null;
+  if (dia === prev.dia) return prev.hoy >= TOPE_CLUB_DIA ? null : { dia, hoy: prev.hoy + 1, total: prev.total + 1 };
+  return { dia, hoy: 1, total: prev.total + 1 };
+}
+/* ---------- podios ----------
+   `podios/<uid>/<partida>` = {c: categoría, p: puesto 1–3, q: a quién se
+   lo quitó, at}. Vale si la categoría es del club (o de Yemas zombis), los
+   dos tienen fila en ella y no es a uno mismo. */
+export const PODIO = [0, 500, 250, 100];
+const CAT_PODIO = /^(club-[a-z0-9-]+|yemas-zombis-[a-z]+)$/;
+export function podioValido(uid, x, solo) {
+  return !!(x && CAT_PODIO.test(String(x.c)) && PODIO[x.p] && x.p === Math.floor(x.p) && typeof x.q === "string" && x.q !== uid &&
+    solo && solo[x.c] && solo[x.c][uid] && solo[x.c][x.q]);
+}
+
 /* La racha que se ve hoy: si ayer no jugaste, ya no hay. */
 export const rachaHoy = (d, hoy) => (d && (d.dia === hoy || d.dia === hoy - 1) ? d.racha : 0);
 
@@ -112,7 +156,7 @@ export const rachaHoy = (d, hoy) => (d && (d.dia === hoy || d.dia === hoy - 1) ?
    `datos` = {ranks, solo, logros, diario}, las cuatro lecturas enteras. */
 const num = x => (Number.isFinite(+x) ? +x : 0);
 export function ganadoDe(uid, datos) {
-  const d = datos || {}, p = { partidas: 0, victorias: 0, records: 0, logros: 0, dias: 0 };
+  const d = datos || {}, p = { partidas: 0, victorias: 0, records: 0, club: 0, podios: 0, logros: 0, dias: 0 };
   const tengo = {};   // juego -> Set(id) de logros
   const pon = (j, id) => { (tengo[j] = tengo[j] || new Set()).add(id); };
   for (const [j, filas] of Object.entries(d.ranks || {})) {
@@ -134,6 +178,9 @@ export function ganadoDe(uid, datos) {
   for (const [j, ids] of Object.entries(tengo)) for (const id of ids) p.logros += valorLogro(j, id);
   const dia = (d.diario || {})[uid];
   if (dia) p.dias = num(dia.bono);
+  for (const [j, x] of Object.entries((d.clubJugadas || {})[uid] || {}))
+    if (JUEGOS_CLUB.includes(j) && x) p.club += PAGO_CLUB * Math.max(0, Math.floor(num(x.total)));
+  for (const x of Object.values((d.podios || {})[uid] || {})) if (podioValido(uid, x, d.solo)) p.podios += PODIO[x.p];
   for (const k of Object.keys(p)) p[k] = Math.round(p[k]);
   return { total: Object.values(p).reduce((a, b) => a + b, 0), partes: p, logros: Object.values(tengo).reduce((a, s) => a + s.size, 0) };
 }
@@ -273,9 +320,9 @@ export function proximoGratis(uid, datos, ahora) {
   return t > ahora ? t : 0;
 }
 
-/* Todos los que aparecen en alguna de las cuatro lecturas, con lo que
-   han ganado (no lo que les queda: gastar en sobres no baja a nadie del
-   top), de más a menos (el uid desempata, para que el orden no baile). El
+/* Todos los que aparecen en alguna lectura, con las monedas que tienen
+   **ahora** (el saldo, lo mismo que dice la cabecera de cada uno), de más
+   a menos (el uid desempata, para que el orden no baile). El
    nombre sale de sus filas; la pantalla le superpone el perfil vivo. */
 export function topMonedas(datos) {
   const d = datos || {}, nombres = {};
@@ -283,11 +330,11 @@ export function topMonedas(datos) {
   for (const filas of Object.values(d.ranks || {})) mira(filas);
   for (const filas of Object.values(d.solo || {})) mira(filas);
   for (const porUid of Object.values(d.logros || {})) for (const u of Object.keys(porUid || {})) if (!(u in nombres)) nombres[u] = "";
-  for (const u of Object.keys(d.diario || {})) if (!(u in nombres)) nombres[u] = "";
+  for (const nodo of [d.diario, d.clubJugadas, d.podios, (d.cartas || {}).s]) for (const u of Object.keys(nodo || {})) if (!(u in nombres)) nombres[u] = "";
   return Object.keys(nombres)
     .map(uid => Object.assign({ uid, nombre: nombres[uid] }, monedasDe(uid, d)))
-    .filter(x => x.total > 0)
-    .sort((a, b) => b.total - a.total || a.uid.localeCompare(b.uid));
+    .filter(x => x.saldo > 0)
+    .sort((a, b) => b.saldo - a.saldo || b.total - a.total || a.uid.localeCompare(b.uid));
 }
 
 export const formatoMonedas = n => Math.round(n || 0).toLocaleString("es-CL");

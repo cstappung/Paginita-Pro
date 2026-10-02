@@ -304,15 +304,17 @@ export const otorgarLogro = (juego, uid, id) => set(ref(db, `logros/${juego}/${u
 /* También escucha `diario`, la racha de días jugando: con las cuatro
    lecturas se calcula el saldo de monedas de cualquiera (juegos/monedas.js).
    Antes de publicar las reglas `diario` falla sola y el resto sigue. */
+const NODOS_MONEDAS = 8;
 export function watchLogros(cb) {
-  const d = { ranks: {}, solo: {}, logros: {}, diario: {}, cartas: {}, mercado: {} }, err = {}, llegados = new Set();
-  /* `completo`: ya llegaron las seis al menos una vez. Antes de eso el
+  const d = { ranks: {}, solo: {}, logros: {}, diario: {}, cartas: {}, mercado: {}, clubJugadas: {}, podios: {} }, err = {}, llegados = new Set();
+  /* `completo`: ya llegaron todas al menos una vez. Antes de eso el
      saldo sale de una suma a medias. */
   const oye = (nodo, k) => onValue(ref(db, nodo), s => {
     d[k] = (k === "ranks" ? saneaRanks(s.val()) : s.val()) || {}; err[k] = null; llegados.add(k);
-    d.completo = llegados.size === 6; cb(d, err);
-  }, e => { err[k] = e; llegados.add(k); d.completo = llegados.size === 6; cb(d, err); });
-  const offs = [oye(R, "ranks"), oye("soloRanks", "solo"), oye("logros", "logros"), oye("diario", "diario"), oye("cartas", "cartas"), oye("mercado", "mercado")];
+    d.completo = llegados.size === NODOS_MONEDAS; cb(d, err);
+  }, e => { err[k] = e; llegados.add(k); d.completo = llegados.size === NODOS_MONEDAS; cb(d, err); });
+  const offs = [oye(R, "ranks"), oye("soloRanks", "solo"), oye("logros", "logros"), oye("diario", "diario"), oye("cartas", "cartas"), oye("mercado", "mercado"),
+    oye("clubJugadas", "clubJugadas"), oye("podios", "podios")];
   return () => offs.forEach(f => f());
 }
 
@@ -373,6 +375,13 @@ export const exhibirCartas = (uid, lista) => set(ref(db, `${U}/${uid}/perfil/car
    `dia` sea hoy en Chile y que racha, días y bono sean los que tocan a
    partir del registro anterior (juegos/monedas.js: registraDia). */
 export const leerDiario = uid => get(ref(db, `diario/${uid}`)).then(s => s.val());
+
+/* Las partidas del club que pagan (juegos/monedas.js: registraJugadaClub),
+   y el premio por quitarle un podio a alguien: `podios/<uid>/<partida>`,
+   escrito justo después del récord cuya `partida` nombra. */
+export const leerJugadasClub = (uid, juego) => get(ref(db, `clubJugadas/${uid}/${juego}`)).then(s => s.val());
+export const apuntaJugadaClub = (uid, juego, reg) => set(ref(db, `clubJugadas/${uid}/${juego}`), Object.assign({}, reg, { at: serverTimestamp() }));
+export const cobraPodio = (uid, partida, x) => set(ref(db, `podios/${uid}/${partida}`), { c: x.c, p: x.p, q: x.q, at: serverTimestamp() });
 export const apuntaDiario = (uid, reg) => set(ref(db, `diario/${uid}`), Object.assign({}, reg, { at: serverTimestamp() }));
 
 export const leerRank = (juego, uid) => get(ref(db, `${R}/${juego}/${uid}`)).then(s => sanea(s.val()));

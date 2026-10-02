@@ -5,7 +5,7 @@ const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const sin=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8').replace(/^import [\s\S]*?;$/mg,'').replace(/\bexport\s+/g,'');
 const ctx={};vm.createContext(ctx);
 vm.runInContext(sin('src/juegos/motor.js')+'\n'+sin('src/juegos/logros.js')+'\n'+sin('src/juegos/monedas.js')+
- ';globalThis.__M={JUEGOS,LOGROS,NIVEL,PESO,VALOR_NIVEL,TARIFA,RECORD,monedasDe,topMonedas,registraDia,rachaHoy,pagoDia,diaChile,valorLogro,nivelDe}',ctx);
+ ';globalThis.__M={JUEGOS,LOGROS,NIVEL,PESO,VALOR_NIVEL,TARIFA,RECORD,monedasDe,topMonedas,registraDia,rachaHoy,pagoDia,diaChile,valorLogro,nivelDe,monedasBbtan,monedasSortem,registraJugadaClub,PAGO_CLUB,TOPE_CLUB_DIA,PODIO,podioValido}',ctx);
 const M=ctx.__M;
 
 test('cada logro tiene su nivel, y cada juego de sala su peso',()=>{
@@ -52,22 +52,55 @@ test('el saldo suma partidas, victorias, récords, logros y días',()=>{
  const a=M.monedasDe('a',datos);
  assert.equal(a.partes.partidas,Math.round(5*1.3*10+5*2.5*2));
  assert.equal(a.partes.victorias,Math.round(1.3*(15*3+5*1)+2.5*15));
- // minas easy: récord 30; logros easy (1) y easy10 (2) en minas
- assert.equal(a.partes.records,30);
+ // minas easy: récord 60; logros easy (1) y easy10 (2) en minas
+ assert.equal(a.partes.records,60);
  // logros: uno primera (15) + pilla (15) · catan primera (15) · minas easy (15) + easy10 (40)
  assert.equal(a.partes.logros,15+15+15+15+40);
  assert.equal(a.partes.dias,25);
  assert.equal(a.total,Object.values(a.partes).reduce((x,y)=>x+y,0));
  const c=M.monedasDe('c',datos);
- assert.equal(c.partes.records,25+60+15+40,'BBTAN 25 + 120/2, sopa 15 + 10 por día de racha');
+ assert.equal(c.partes.records,50+M.monedasBbtan(120)+30+40,'BBTAN 50 + ⌊n/4⌋ por ronda, sopa 30 + 10 por día de racha');
  assert.equal(M.monedasDe('nadie',datos).total,0);
 });
 
-test('el top va de más a menos y deja fuera a quien no tiene nada',()=>{
+test('el top va de más a menos según lo que cada uno tiene ahora',()=>{
  const t=M.topMonedas(datos);
- assert.deepEqual([...t.map(x=>x.uid)],['a','c','b','d'].sort((x,y)=>M.monedasDe(y,datos).total-M.monedasDe(x,datos).total||x.localeCompare(y)));
+ assert.deepEqual([...t.map(x=>x.uid)],['a','c','b','d'].sort((x,y)=>M.monedasDe(y,datos).saldo-M.monedasDe(x,datos).saldo||x.localeCompare(y)));
  assert.equal(t.find(x=>x.uid==='a').nombre,'Ana');
- assert.ok(t.every(x=>x.total>0));
+ assert.ok(t.every(x=>x.saldo>0));
+ // gastar baja en el top: el top es el saldo, lo mismo que la cabecera
+ const gasto=Object.assign({},datos,{cartas:{s:{a:{'-Nkgasto0001':{at:1,p:80}}}}});
+ assert.equal(M.topMonedas(gasto).find(x=>x.uid==='a').saldo,M.monedasDe('a',datos).saldo-80);
+});
+
+test('BBTAN paga ⌊n/4⌋ por cada ronda hasta el récord; sortEm, por rapidez',()=>{
+ assert.deepEqual([1,2,3,4,5,8].map(M.monedasBbtan),[0,0,0,1,2,6],'llegar a la 5 da 2');
+ let suma=0;for(let n=1;n<=137;n++)suma+=Math.floor(n/4);
+ assert.equal(M.monedasBbtan(137),suma);
+ assert.equal(M.monedasBbtan(5000),M.monedasBbtan(1000),'con tope');
+ assert.equal(M.monedasSortem(10,30000),10);assert.equal(M.monedasSortem(10,10000),50);assert.equal(M.monedasSortem(20,90000),20);
+});
+
+test('partidas del club: 8 cada una, hasta 10 al día por juego, como la regla',()=>{
+ let r=M.registraJugadaClub(null,100);assert.deepEqual({...r},{dia:100,hoy:1,total:1});
+ for(let i=0;i<9;i++)r=M.registraJugadaClub(r,100);
+ assert.equal(r.hoy,10);assert.equal(M.registraJugadaClub(r,100),null,'la undécima de hoy no paga');
+ r=M.registraJugadaClub(r,101);assert.deepEqual({...r},{dia:101,hoy:1,total:11});
+ const d=Object.assign({},datos,{clubJugadas:{a:{bbtan:{dia:101,hoy:1,total:11},uno:{total:99}}}});
+ assert.equal(M.monedasDe('a',d).partes.club,11*M.PAGO_CLUB,'solo los juegos del club');
+ const R=JSON.parse(fs.readFileSync(path.join(__dirname,'../../firebase/database.rules.json'),'utf8')).rules;
+ assert.match(R.clubJugadas.$uid.$juego['.validate'],new RegExp("'hoy'\\)\\.val\\(\\) <= "+M.TOPE_CLUB_DIA));
+});
+
+test('podios: 500, 250 y 100 por quitarle el puesto a otra persona',()=>{
+ assert.deepEqual([...M.PODIO],[0,500,250,100]);
+ const solo={'club-bbtan-rondas':{a:{puntos:9},b:{puntos:5}}};
+ const d=Object.assign({},datos,{solo:Object.assign({},datos.solo,solo),podios:{a:{
+   p1:{c:'club-bbtan-rondas',p:1,q:'b',at:1},p2:{c:'club-bbtan-rondas',p:2,q:'b',at:2},
+   mal1:{c:'club-bbtan-rondas',p:1,q:'a',at:3},mal2:{c:'club-bbtan-rondas',p:1,q:'zz',at:4},mal3:{c:'club-bbtan-rondas',p:4,q:'b',at:5}}}});
+ assert.equal(M.monedasDe('a',d).partes.podios,750,'a uno mismo, a quien no está en la tabla o un puesto 4 no pagan');
+ const R=JSON.parse(fs.readFileSync(path.join(__dirname,'../../firebase/database.rules.json'),'utf8')).rules;
+ assert.match(R.podios.$uid.$p['.validate'],/soloRanks/);
 });
 
 test('la regla de diario es la que calcula registraDia',()=>{

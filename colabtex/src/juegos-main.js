@@ -55,13 +55,14 @@ import { abreReglas, tieneReglas } from "./juegos/reglas.js";
 import { crearRanks } from "./juegos/ranks.js";
 import { LOGROS, detecta, deFila, deMarca } from "./juegos/logros.js";
 import { crearLogros } from "./juegos/logros-vista.js";
-import { monedasDe, formatoMonedas, valorLogro, registraDia, diaChile as diaMonedas } from "./juegos/monedas.js";
+import { monedasDe, formatoMonedas, valorLogro, registraDia, diaChile as diaMonedas, pagoDia, rachaHoy,
+  registraJugadaClub, PAGO_CLUB, TOPE_CLUB_DIA, PODIO } from "./juegos/monedas.js";
 import { crearMonedas, topHtml, MONEDA } from "./juegos/monedas-vista.js";
 import { crearProdrop } from "./juegos/prodrop.js";
 import { mejoresDrops, miniCarta, cifras as cifrasCartas, MOTOR } from "./juegos/prodrop-cartas.js";
 import { mezcla, abrePerfil } from "./juegos/perfil.js";
 import { abreMini, cierraMini, miniAbierta, crearPaginaPerfil, avatarMarco, quien } from "./juegos/perfil-vista.js";
-import { estadisticas } from "./juegos/perfil-tarjeta.js";
+import { estadisticas, nombreCategoria } from "./juegos/perfil-tarjeta.js";
 import { fotoSana } from "./juegos/sano.js";
 import { suena, silenciar, silenciado, ambientar, ajustarMusica, activarAudio } from "./juegos/sonido.js";
 import { montaReproductor } from "./juegos/reproductor.js";
@@ -324,7 +325,11 @@ const oyentesP = new Set();
 function datosPerfil(cb) {
   oyentesP.add(cb);
   if (!offDatosP) offDatosP = fb.watchLogros(d => {
-    datosP = { ranks: d.ranks, solo: d.solo, logros: d.logros, diario: d.diario, cartas: d.cartas, completo: !!d.completo };
+    /* Todos los nodos que lee `watchLogros` (las monedas los necesitan
+       todos: el mercado y las partidas del club también mueven el saldo),
+       en un objeto nuevo por llegada, que es lo que invalida las memorias
+       de juegos/monedas.js. */
+    datosP = Object.assign({}, d, { completo: !!d.completo });
     for (const f of [...oyentesP]) f(datosP);
   });
   else if (datosP) setTimeout(() => { if (oyentesP.has(cb)) cb(datosP); }, 0);
@@ -504,7 +509,7 @@ async function anotar(p) {
     if (ronda < 1) return;
     const tiempo = Math.min(604800000, Math.max(1, Math.round((+p.fin.at || 0) - (+p.at || 0)) || 1));
     try {
-      await fb.guardarSolo(`yemas-zombis-${mapaYemas(p)}`, u.uid, { nombre: u.name, puntos: ronda, tiempo, partida: state.pid });
+      await guardaConPodio(`yemas-zombis-${mapaYemas(p)}`, u.uid, { nombre: u.name, puntos: ronda, tiempo, partida: state.pid }, false);
       marcaDia();
     } catch (e) { anotada = ""; console.warn("[juegos] no se pudo apuntar la ronda de zombis", e); }
     return;
@@ -536,7 +541,13 @@ let offMonedas = null, datosMonedas = null, diaMarcado = -1;
 function pintaMonedas() {
   const u = state.user, d = datosMonedas;
   const chip = $("userMonedas");
-  if (chip) chip.innerHTML = `${MONEDA} ${u && d && d.completo ? formatoMonedas(monedasDe(u.uid, d).saldo) : "…"}`;
+  if (chip) {
+    /* La racha va pegada al saldo: 🔥 encendida si hoy ya contó, apagada
+       (y titilando) si todavía falta jugar hoy para no perderla. */
+    const di = u && d ? (d.diario || {})[u.uid] : null, hoy = diaMonedas(), r = rachaHoy(di, hoy), ya = !!(di && di.dia === hoy);
+    chip.innerHTML = `${MONEDA} ${u && d && d.completo ? formatoMonedas(monedasDe(u.uid, d).saldo) : "…"}` +
+      (r ? `<span class="jg-racha-chip${ya ? "" : " falta"}" title="${r} ${r === 1 ? "día seguido" : "días seguidos"}${ya ? "" : " · juega hoy para no perder la racha"}">🔥${r}</span>` : "");
+  }
   const caja = $("vesMonedas");
   if (caja && u && d) caja.innerHTML = topHtml(d, u.uid, perfilDe, colorForUid);
   const drops = $("vesDrops");
@@ -570,11 +581,49 @@ async function marcaDia() {
   diaMarcado = hoy;
   try {
     const reg = registraDia(await fb.leerDiario(u.uid), hoy);
-    if (reg) await fb.apuntaDiario(u.uid, reg);
+    if (reg) {
+      await fb.apuntaDiario(u.uid, reg);
+      avisaMonedas("🔥", reg.racha > 1 ? `¡${reg.racha} días seguidos jugando!` : "¡Primer día de tu racha!",
+        `+${pagoDia(reg.racha)} monedas hoy · mañana +${pagoDia(reg.racha + 1)} si vuelves`, pagoDia(reg.racha), "racha");
+      pintaMonedas();
+    }
   } catch (e) {
     diaMarcado = -1;   // sin reglas publicadas, o sin red: se reintenta en la próxima partida
     console.warn("[juegos] no se pudo apuntar el día", e);
   }
+}
+
+/* Un aviso de monedas, en la misma cola que los logros para que no se
+   pisen: la racha del día, una partida del club, un podio. */
+function avisaMonedas(icono, titulo, detalle, monto, tipo) {
+  toastCola = toastCola.then(() => new Promise(fin => {
+    const t = document.createElement("div");
+    t.className = "jg-logro-toast jg-mo-toast" + (tipo ? " " + tipo : "");
+    t.setAttribute("role", "status");
+    t.innerHTML = `<span class="i">${icono}</span><span><small>${monto ? `+${formatoMonedas(monto)} ${MONEDA}` : ""}</small><b>${escapeHtml(titulo)}</b><em>${escapeHtml(detalle)}</em></span>`;
+    t.onclick = () => ir("#monedas");
+    document.body.appendChild(t);
+    suena("entra");
+    setTimeout(() => { t.classList.add("sale"); setTimeout(() => { t.remove(); fin(); }, 400); }, tipo === "club" ? 2400 : 4200);
+  }));
+}
+
+/* Cada partida del club que termina con resultado paga PAGO_CLUB, hasta
+   TOPE_CLUB_DIA por juego al día (la regla de `clubJugadas` comprueba lo
+   mismo que `registraJugadaClub`). Se encadenan para que dos resultados
+   seguidos no lean el mismo contador. */
+let jugadasClubCola = Promise.resolve();
+function marcaJugadaClub(juego) {
+  const u = state.user;
+  if (!u) return;
+  jugadasClubCola = jugadasClubCola.then(async () => {
+    try {
+      const reg = registraJugadaClub(await fb.leerJugadasClub(u.uid, juego), diaMonedas());
+      if (!reg) return;
+      await fb.apuntaJugadaClub(u.uid, juego, reg);
+      avisaMonedas("🕹️", "Partida del club", `${reg.hoy} de ${TOPE_CLUB_DIA} que pagan hoy en este juego`, PAGO_CLUB, "club");
+    } catch (e) { console.warn("[juegos] no se pudo apuntar la partida del club", e); }
+  });
 }
 
 /* ---------- logros ----------
@@ -940,7 +989,7 @@ function pintaTabs() {
    escribió de verdad (otra pestaña pudo guardar una marca mejor) y si
    el puesto mejoró: repetir el segundo lugar con mejor tiempo no es
    noticia. El aviso nunca estorba al guardado. */
-async function guardaConPodio(categoria, uid, dato) {
+async function guardaConPodio(categoria, uid, dato, anunciar = true) {
   const antes = await fb.leerSolo(categoria).catch(() => null);
   const res = await fb.guardarSolo(categoria, uid, dato);
   if (!antes || !res || !res.committed) return res;
@@ -949,13 +998,23 @@ async function guardaConPodio(categoria, uid, dato) {
   if (puesto >= 1 && puesto <= 3 && (!previo || puesto < previo)) {
     const sitio = antes.slice().sort(ordenSolo)[puesto - 1];
     const u = state.user || {};
-    const juego = categoria.split("-")[1];
-    anunciaPodio({
-      categoria, uid, nombre: dato.nombre || u.name, foto: fotoBreve(u.photo),
-      puesto, antes: previo, filas,
-      desbancado: sitio && sitio.uid !== uid ? sitio.nombre || "" : "",
-      enlace: location.origin + location.pathname + "#solo/" + juego
-    });
+    /* Quitarle el puesto a otra persona paga (500, 250 o 100), cada vez;
+       llegar a un puesto que nadie tenía no. La regla de `podios` pide que
+       el récord que se acaba de guardar sea el que nombra esta partida. */
+    if (sitio && sitio.uid && sitio.uid !== uid && dato.partida && /^[-_A-Za-z0-9]{6,80}$/.test(dato.partida)) {
+      fb.cobraPodio(uid, dato.partida, { c: categoria, p: puesto, q: sitio.uid }).then(() =>
+        avisaMonedas(["", "👑", "🥈", "🥉"][puesto], `¡Le quitaste el puesto ${puesto} a ${sitio.nombre || "alguien"}!`, categoria.startsWith("yemas-zombis-") ? `Yemas zombis · ${YM_MAPAS[categoria.slice(13)] || categoria.slice(13)}` : nombreCategoria(categoria), PODIO[puesto], "podio"),
+        e => console.warn("[juegos] no se pudo cobrar el podio", e));
+    }
+    if (anunciar) {
+      const juego = categoria.split("-")[1];
+      anunciaPodio({
+        categoria, uid, nombre: dato.nombre || u.name, foto: fotoBreve(u.photo),
+        puesto, antes: previo, filas,
+        desbancado: sitio && sitio.uid !== uid ? sitio.nombre || "" : "",
+        enlace: location.origin + location.pathname + "#solo/" + juego
+      });
+    }
   }
   return res;
 }
@@ -974,7 +1033,7 @@ function armazon() {
       partida:{leer:()=>fb.leerPartidaClub(state.user.uid,state.vista.slice(5)),guardar:(d,at)=>fb.guardarPartidaClub(state.user.uid,state.vista.slice(5),d,at)},
       /* Un logro individual sale de la marca: se celebra el que esta
          partida da y la mejor marca guardada no daba ya. */
-      alResultado: (d, previa) => { marcaDia(); const antes = new Set(previa ? deMarca(clave, Object.assign({ categoria: d.categoria }, previa)) : []);
+      alResultado: (d, previa) => { marcaDia(); marcaJugadaClub(clave); const antes = new Set(previa ? deMarca(clave, Object.assign({ categoria: d.categoria }, previa)) : []);
         for (const id of deMarca(clave, d)) if (!antes.has(id)) celebra(clave, id); }});
     individual.montar(h);
     const juego = state.vista.slice(5), barra = document.createElement("div");
