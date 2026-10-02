@@ -1132,7 +1132,8 @@ export const YM_BASES = { rojo: [0, 29], azul: [0, -29] };
    Huevo duro (la granada), la autodestrucción, la sartén (que fue un
    cuchillo, con el mismo id), la bazuca, la pistola, la espátula dorada y
    el mordisco de un zombi, en ese orden; después las tres que solo salen
-   en zombis (Rayo batido, Amasadora, Huevera). Los ids nunca se renumeran.
+   en zombis (Rayo batido, Amasadora, Huevera) y la Máquina de muerte de la
+   bonificación. Los ids nunca se renumeran.
 
    Las armas aparecen tiradas en `YM_PUNTOS_ARMA` puntos del mapa, y cuál
    sale lo decide la semilla de la sala con el punto y el número de
@@ -1141,7 +1142,7 @@ export const YM_BASES = { rojo: [0, 29], azul: [0, -29] };
    punto `s`, y vale solo si es la siguiente a la última tomada ahí; si dos
    la agarran a la vez, la primera jugada se la lleva. Cuándo reaparece es
    cosa de cada pantalla (unos segundos después de verla tomada). */
-export const YM_ARMAS = 13;
+export const YM_ARMAS = 14;
 export const YM_PUNTOS_ARMA = 8;
 export const YM_METAS = YM_LARGOS.todos;
 export const YM_META = 15;

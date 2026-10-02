@@ -8,7 +8,7 @@ import {
 } from 'yemas/mundo';
 import {
   ARMAS, SARTEN, ESPATULA, ZOMBI, ESPATULA_CFG, RECARGAS, NOMBRE_ARMA, GRANADAS, TIPOS_GRANADA, caida, armaEnPunto,
-  BEBIDAS, conPap,
+  BEBIDAS, conPap, RECARGAS_ZOMBIS, MAQUINA, ICONO_BEBIDA, BONOS,
 } from 'yemas/armas';
 import { sonido } from 'yemas/audio';
 import { conectarMarco, conectarLocal, PALETA, COLOR_EQUIPO } from 'yemas/red';
@@ -16,6 +16,7 @@ import { crearGranadas, GRANADA } from 'yemas/granada';
 import { crearZombis, ZB } from 'yemas/zombis';
 import { MAPAS, LISTA_MAPAS } from 'yemas/mapas';
 import { crearInteractivo } from 'yemas/interactivo';
+import { crearBonos } from 'yemas/bonos';
 
 const VEL = 7, SALTO = 8, SENS = 0.0022, HZ_RED = 12, INVULNERABLE = 1.5;
 // Correr: Shift mientras se avanza. Deslizarse: C mientras se corre; sale
@@ -71,6 +72,7 @@ escena.add(sol);
 const colisores = [];
 let mundo = crearMundo(escena, null, colisores);
 let inter = null;   // lo que se compra y se toca en zombis (interactivo.js)
+let bonos = null;   // las bonificaciones que sueltan los zombis (bonos.js)
 
 // El arma en primera persona va en su propia escena para que no atraviese paredes
 const escenaArma = new THREE.Scene();
@@ -101,6 +103,37 @@ function construyeArma(id) {
       ranura.position.set(x, 0, -0.14);
       g.add(ranura);
     }
+    return g;
+  }
+  if (id === MAQUINA) {
+    // La Máquina de muerte: una ametralladora pesada de seis cañones que giran.
+    const fierro = new THREE.MeshPhongMaterial({ color: a.color, specular: '#aaaaaa', shininess: 60 });
+    const caja = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.16, 0.34), fierro);
+    caja.position.z = 0.02;
+    const giro = new THREE.Group();
+    giro.position.set(0, 0.01, -0.18);
+    for (let i = 0; i < 6; i++) {
+      const th = i / 6 * Math.PI * 2;
+      const c = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.6, 8), oscuro);
+      c.rotation.x = Math.PI / 2;
+      c.position.set(Math.cos(th) * 0.045, Math.sin(th) * 0.045, -0.3);
+      giro.add(c);
+    }
+    for (const z of [-0.05, -0.4, -0.58]) {
+      const aro = new THREE.Mesh(new THREE.CylinderGeometry(0.068, 0.068, 0.03, 16), fierro);
+      aro.rotation.x = Math.PI / 2;
+      aro.position.z = z;
+      giro.add(aro);
+    }
+    const asa = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.04, 0.22), oscuro);
+    asa.position.set(0, 0.12, -0.02);
+    const cinta = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.12, 0.12), new THREE.MeshLambertMaterial({ color: '#6a5a2a' }));
+    cinta.position.set(-0.13, -0.04, 0.02);
+    const mango = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.16, 0.07), oscuro);
+    mango.position.set(0, -0.14, 0.1);
+    mango.rotation.x = 0.3;
+    g.add(caja, giro, asa, cinta, mango);
+    g.userData.giro = giro;
     return g;
   }
   if (a.melee) {
@@ -145,6 +178,100 @@ for (const id of Object.keys(ARMAS)) {
 }
 // La bazuca es grande: en la mano va más chica y más abajo, o tapa media pantalla.
 modelos[6].scale.setScalar(0.7);
+modelos[MAQUINA].scale.setScalar(0.85);
+
+// Con Pack-a-Punch el arma se ve metalizada: un cromo con un brillo violeta
+// que va cambiando de tono, para que se note desde lejos que es especial.
+const matsPap = [];
+function metaliza(g) {
+  g.traverse(o => {
+    if (!o.isMesh) return;
+    const base = o.material.color ? o.material.color.clone() : new THREE.Color('#888888');
+    const c = base.lerp(new THREE.Color('#b8bcd8'), 0.55);
+    o.material = new THREE.MeshPhongMaterial({ color: c, specular: '#ffffff', shininess: 160, emissive: '#3a1a80', emissiveIntensity: 0.5 });
+    matsPap.push(o.material);
+  });
+  return g;
+}
+const modelosPap = {};
+for (const id of Object.keys(ARMAS)) {
+  if (ARMAS[id].melee || +id === MAQUINA || +id === ESPATULA) continue;
+  modelosPap[id] = metaliza(construyeArma(+id));
+  modelosPap[id].visible = false;
+  modelosPap[id].scale.copy(modelos[id].scale);
+  escenaArma.add(modelosPap[id]);
+}
+const _tono = new THREE.Color();
+function brilloPap() {
+  const t = performance.now() / 1000;
+  _tono.setHSL((0.72 + 0.12 * Math.sin(t * 1.3)) % 1, 0.9, 0.35 + 0.1 * Math.sin(t * 3.1));
+  for (const mt of matsPap) mt.emissive.copy(_tono);
+}
+
+// La bebida: una botella que sube a la boca, se empina y se baja. Mientras
+// se toma no hay arma en la mano (ni disparos).
+const BEBER = 1.4;
+const botella = new THREE.Group();
+const vidrio = new THREE.MeshPhongMaterial({ color: '#ffffff', specular: '#ffffff', shininess: 120, transparent: true, opacity: 0.92 });
+{
+  const cuerpo = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.17, 14), vidrio);
+  const hombro = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.045, 0.05, 14), vidrio);
+  hombro.position.y = 0.11;
+  const cuello = new THREE.Mesh(new THREE.CylinderGeometry(0.016, 0.016, 0.06, 10), vidrio);
+  cuello.position.y = 0.16;
+  const tapa = new THREE.Mesh(new THREE.CylinderGeometry(0.019, 0.019, 0.015, 10), new THREE.MeshPhongMaterial({ color: '#d8d8d8', shininess: 80 }));
+  tapa.position.y = 0.195;
+  const etiqueta = new THREE.Mesh(new THREE.CylinderGeometry(0.047, 0.047, 0.07, 14), new THREE.MeshLambertMaterial({ color: '#f4efe0' }));
+  botella.add(cuerpo, hombro, cuello, tapa, etiqueta);
+}
+botella.visible = false;
+escenaArma.add(botella);
+function pasoBotella(ver) {
+  botella.visible = ver;
+  if (!ver) return;
+  vidrio.color.set(yo.bebidaColor);
+  const t = 1 - yo.bebiendo / BEBER;
+  // Sube (0–0.25), se empina (0.25–0.8) y baja (0.8–1).
+  const sube = Math.min(1, t / 0.25), baja = Math.max(0, (t - 0.8) / 0.2);
+  const k = sube * (1 - baja);
+  const empina = Math.min(1, Math.max(0, (t - 0.2) / 0.2)) * (1 - baja);
+  botella.position.set(0.22 - 0.2 * k, -0.45 + 0.33 * k, -0.45 + 0.1 * k);
+  botella.rotation.set(-0.15 - 1.9 * empina, 0, 0.25 * (1 - k));
+}
+function beber(color) {
+  yo.bebiendo = BEBER;
+  yo.bebidaColor = color || '#ffffff';
+  yo.recargando = 0;
+  yo.zoom = 0;
+}
+
+// Los zombis son cuerpos: no se los atraviesa. Se empuja al jugador hacia
+// afuera en el plano; si está casi encima de uno (al caerle desde arriba),
+// se lo deja apoyado sobre la cabeza en vez de hundirlo.
+const RADIO_CHOQUE = 0.85;
+function chocaZombis() {
+  for (const z of zombis.lista.values()) {
+    if (z.sube < 1 || z.fase !== 'dentro') continue;
+    const p = z.mesh.position;
+    const dy = yo.pos.y - p.y;
+    if (dy < -1.6 || dy > ALTO) continue;
+    let dx = yo.pos.x - p.x, dz = yo.pos.z - p.z;
+    const d = Math.hypot(dx, dz);
+    if (d >= RADIO_CHOQUE) continue;
+    if (dy > ALTO * 0.75 && yo.vel.y <= 0) {
+      // Encima de la cabeza: se resbala hacia un lado.
+      yo.pos.y = p.y + ALTO;
+      yo.vel.y = 0;
+      yo.enSuelo = true;
+    }
+    if (d < 1e-3) { dx = Math.sin(yo.yaw); dz = Math.cos(yo.yaw); } else { dx /= d; dz /= d; }
+    const empuja = RADIO_CHOQUE - (d < 1e-3 ? 0 : d);
+    yo.pos.x += dx * empuja;
+    yo.pos.z += dz * empuja;
+    const v = yo.vel.x * dx + yo.vel.z * dz;
+    if (v < 0) { yo.vel.x -= v * dx; yo.vel.z -= v * dz; }
+  }
+}
 const BASE_ARMA = new THREE.Vector3(0.2, -0.19, -0.62);
 
 function ajustar() {
@@ -186,6 +313,9 @@ const yo = {
   // morir), si se levanta solo (Quick Revive jugando solo), con qué lo
   // tumbaron y si la pistola era prestada.
   abatido: 0, autoLevanta: false, tumbo: null, pistolaPrestada: false,
+  // Zombis: tomándose una bebida (segundos que quedan, de qué color era) y la
+  // Máquina de muerte de la bonificación (segundos que le quedan en la mano).
+  bebiendo: 0, bebidaColor: '#ffffff', maquina: 0,
 };
 // En el suelo, como en Black Ops: se aguanta ABATIDO.dura segundos con la
 // pistola mientras un compañero llega y mantiene E (ABATIDO.revive, la mitad
@@ -203,7 +333,7 @@ const teclas = new Set();
 let gatillo = false, yaDisparo = false;
 // Los números de un arma tal como la lleva uno: con Pack-a-Punch si se lo hizo.
 const armaDe = id => ARMAS[id] && yo.pap.has(id) ? conPap(ARMAS[id]) : ARMAS[id];
-const armaActual = () => (yo.abatido > 0 ? armaDe(7) : armaDe(yo.inv[yo.sel])) || ARMAS[SARTEN];
+const armaActual = () => (yo.abatido > 0 ? armaDe(7) : yo.maquina > 0 ? ARMAS[MAQUINA] : armaDe(yo.inv[yo.sel])) || ARMAS[SARTEN];
 const miNombre = () => red?.jugadores.get(red.yo)?.nombre || '';
 const miColor = () => red?.jugadores.get(red.yo)?.color || PALETA[0];
 const puedoJugar = () => jugando && !terminado && red && !red.mirando;
@@ -216,7 +346,7 @@ const esZombis = () => red?.variante === 'zombis';
 const aliado = id => esZombis() || (!!red?.equipos && red.equipos[id] === miEquipo());
 
 const handlers = { alConfig, alJugador, alGolpe, alGolpeZombi, alBaja, alFeed, alSuceso, alMarcador, alFin, alVoces,
-  alPeticion: ({ que }) => inter?.peticion(que) };
+  alPeticion: ({ de, que }) => String(que).startsWith('bono:') ? bonos?.peticion(String(que).slice(5), de) : inter?.peticion(que) };
 
 // ---------- Ajustes (menú de práctica y tarjeta de pausa) ----------
 // Los dos paneles comparten las mismas piezas: skin, sensibilidad y granadas.
@@ -318,6 +448,7 @@ function alConfig(r) {
   if (esZombis()) {
     // Fuera la arena: se arma el mapa clásico elegido en la sala.
     inter?.desmonta();
+    bonos?.desmonta();
     mundo.desmonta();
     mundo = crearMundo(escena, MAPAS[red.mapa] || MAPAS.nacht, colisores);
   } else montaArmasSuelo();
@@ -402,11 +533,11 @@ addEventListener('wheel', e => {
 // ---------- Armas ----------
 function llenaArma(id) {
   const a = armaDe(id);
-  if (a && !a.melee) yo.mun[id] = { c: a.cargador, r: RECARGAS };
+  if (a && !a.melee) yo.mun[id] = { c: a.cargador, r: esZombis() ? RECARGAS_ZOMBIS : RECARGAS };
 }
 
 function cambiarArma(i) {
-  if (i === yo.sel || !yo.vivo || yo.abatido > 0 || i >= yo.inv.length || yo.inv[i] === null) return;
+  if (i === yo.sel || !yo.vivo || yo.abatido > 0 || yo.maquina > 0 || yo.bebiendo > 0 || i >= yo.inv.length || yo.inv[i] === null) return;
   yo.sel = i;
   yo.recargando = 0;
   yo.zoom = 0;
@@ -427,7 +558,8 @@ function disparar() {
   const a = armaActual();
   if (yo.recargando > 0 || yo.cadencia > 0) return;
   if (a.melee) return sartenazo(a);
-  const m = yo.mun[a.id];
+  if (yo.bebiendo > 0) return;
+  const m = a.infinita ? { c: 1, r: 0 } : yo.mun[a.id];
   if (!m || m.c <= 0) {
     sonido.vacio();
     if (m && m.r > 0) recargar();
@@ -435,9 +567,14 @@ function disparar() {
     yo.cadencia = 0.3;
     return;
   }
-  m.c--;
-  yo.cadencia = a.cadencia * (yo.perks.has('doble') ? 0.67 : 1);
-  if (a.cohete) return lanzarCohete(a);
+  if (!a.infinita) m.c--;
+  yo.cadencia = a.cadencia;
+  // Double Tap: cada disparo sale doble (dos balas por bala), no más daño.
+  const doble = yo.perks.has('doble') ? 2 : 1;
+  if (a.cohete) {
+    if (doble > 1) setTimeout(() => { if (yo.vivo && armaActual().id === a.id) lanzarCohete(a, 0.035); }, 70);
+    return lanzarCohete(a);
+  }
 
   const o = camara.getWorldPosition(new THREE.Vector3());
   const base = camara.getWorldDirection(new THREE.Vector3());
@@ -451,15 +588,15 @@ function disparar() {
   const golpes = new Map();
   const finales = [];
   const boca = camara.localToWorld(new THREE.Vector3(0.22, -0.2, -0.7));
-  for (let p = 0; p < a.perdigones; p++) {
-    const r = Math.sqrt(Math.random()) * disp, th = Math.random() * Math.PI * 2;
+  for (let p = 0; p < a.perdigones * doble; p++) {
+    const r = Math.sqrt(Math.random()) * Math.max(disp, doble > 1 && a.perdigones === 1 ? 0.006 : 0), th = Math.random() * Math.PI * 2;
     const d = base.clone().addScaledVector(_u, r * Math.cos(th)).addScaledVector(_v, r * Math.sin(th)).normalize();
     let t = rayoMundo(o, d, a.alcance, colisores);
     const quien = primerBlanco(o, d, t);
     if (quien) t = quien.t;
     const fin = o.clone().addScaledVector(d, t);
     finales.push([+fin.x.toFixed(2), +fin.y.toFixed(2), +fin.z.toFixed(2)]);
-    trazo(boca, fin, '#fff2a8');
+    trazo(p >= a.perdigones ? boca.clone().add(_u.clone().multiplyScalar(-0.05)) : boca, fin, '#fff2a8');
     if (quien) {
       const j = quien;
       const cab = fin.y - j.pos.y > ALTO * 0.72;
@@ -507,6 +644,7 @@ function primerBlanco(o, d, tope) {
 function pegaA(id, dmg, cab, a) {
   if (!String(id).startsWith('z:')) { red.golpear(id, { dmg, cab, a }); return; }
   sumaPuntos(10);
+  if (bonos?.insta) dmg = 1e6;
   const n = +String(id).slice(2);
   if (soyDirector()) zombis.golpe(n, dmg, red.yo, cab, a);
   else red.golpear('z:' + n, { dmg, cab, a });
@@ -536,8 +674,9 @@ function sartenazo(a) {
   publicar();
 }
 
-function lanzarCohete(a) {
+function lanzarCohete(a, desvio = 0) {
   const dir = camara.getWorldDirection(new THREE.Vector3());
+  if (desvio) dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), desvio).normalize();
   const o = camara.localToWorld(new THREE.Vector3(0.2, -0.15, -0.9));
   const v = dir.multiplyScalar(a.velocidad);
   const id = Math.max((yo.lanzo?.i || 0) + 1, Date.now() % 1e9);
@@ -679,6 +818,7 @@ function cae(g) {
   yo.autoLevanta = solo;
   yo.abatido = solo ? ABATIDO.solo : ABATIDO.dura;
   yo.cargaAuto = -1;
+  yo.maquina = 0;
   yo.corriendo = false;
   yo.deslizando = 0;
   yo.recargando = 0;
@@ -717,6 +857,7 @@ function morir(g) {
   yo.hp = 0;
   yo.vivo = false;
   yo.cargaAuto = -1;
+  yo.maquina = 0;
   yo.muerteT = 3;
   yo.asesino = g.n;
   yo.espatula = false;
@@ -949,7 +1090,7 @@ function alJugador(id, e) {
     j.pz = e.pz | 0;
     j.zk = e.zk | 0;
     if (e.zb) ultimoZb.set(id, e.zb);
-    if (e.zb && id === director() && !soyDirector()) { zombis.desdeRed(e.zb); inter?.desdeRed(e.zb); }
+    if (e.zb && id === director() && !soyDirector()) { zombis.desdeRed(e.zb); inter?.desdeRed(e.zb); bonos?.desdeRed(e.zb); }
   }
 }
 
@@ -986,7 +1127,7 @@ function publicar() {
   if (esZombis()) {
     e.pz = yo.pzT;
     e.zk = yo.zk;
-    if (soyDirector()) e.zb = { ...zombis.estado(), ...(inter?.estado() || {}) };
+    if (soyDirector()) e.zb = { ...zombis.estado(), ...(inter?.estado() || {}), ...(bonos?.estado() || {}) };
   }
   red.publicar(e);
 }
@@ -1228,7 +1369,7 @@ function chispa(p, color) {
 const geoCascara = new THREE.BoxGeometry(0.14, 0.03, 0.11);
 const geoYema = new THREE.SphereGeometry(0.09, 8, 6);
 const manchas = [];
-function explotar(p, color) {
+function explotar(p, color, frito = true) {
   for (let i = 0; i < 22; i++) {
     const yema = i >= 14;
     const mat = new THREE.MeshLambertMaterial({ color: yema ? '#ffb300' : color, transparent: true });
@@ -1242,10 +1383,13 @@ function explotar(p, color) {
       giro: (Math.random() - 0.5) * 16,
     });
   }
-  const frito = huevoFrito(p);
-  escena.add(frito);
-  manchas.push({ obj: frito, t: 14 });
-  if (manchas.length > 30) quitaFrito(manchas.shift().obj);
+  // El zombi deja su propio huevo frito, verde (zombis.js): aquí no va otro.
+  if (frito) {
+    const f = huevoFrito(p);
+    escena.add(f);
+    manchas.push({ obj: f, t: 14 });
+    if (manchas.length > 30) quitaFrito(manchas.shift().obj);
+  }
   sonido.crack(p.distanceTo(yo.pos));
   sonido.fritura(p.distanceTo(yo.pos));
 }
@@ -1466,7 +1610,8 @@ function montaZombis() {
         if (t === 'jugger') { yo.maxHp = 250; yo.hp = 250; }
         if (t === 'mula' && yo.inv.length < 4) yo.inv.push(null);
         sonido.bebida();
-        aviso(`${BEBIDAS[t].nombre}: ${BEBIDAS[t].texto}`);
+        beber(BEBIDAS[t].color);
+        aviso(`${ICONO_BEBIDA[t]} ${BEBIDAS[t].nombre}: ${BEBIDAS[t].texto}`);
       },
     },
     recalcula: () => zombis?.recalcula(),
@@ -1476,6 +1621,14 @@ function montaZombis() {
     prompt: t => { $('prompt').hidden = !t; if (t) $('prompt').textContent = t; },
   });
   zombis.ponMapa(M, inter);
+  bonos = crearBonos(escena, {
+    director: soyDirector,
+    yo: () => red.yo,
+    pos: () => yo.pos,
+    puedo: () => puedoJugar() && yo.vivo && !yo.abatido,
+    envia: q => red.golpear('p:' + q, { dmg: 0 }),
+    efecto: alBono,
+  });
   $('puntos-z').hidden = false;
   $('puntos-z').innerHTML = '<b></b>';
   $('tabla').querySelector('thead tr').innerHTML = '<th>Huevo</th><th>Puntos</th><th>Zombis</th><th>Caídas</th>';
@@ -1536,7 +1689,8 @@ function sumaPuntos(n) {
 }
 
 function alCaeZombi({ pos, killer, cab, a, explota }) {
-  explotar(pos, '#8fa36b');
+  explotar(pos, '#8fa36b', false);
+  if (killer && soyDirector()) bonos?.suelta(pos);
   // En Pueblo el que pisó la lava revienta en llamas y quema lo que tenga cerca.
   if (explota) {
     sonido.quema(pos.distanceTo(yo.pos));
@@ -1547,6 +1701,31 @@ function alCaeZombi({ pos, killer, cab, a, explota }) {
   if (killer !== red.yo) return;
   yo.zk++;
   sumaPuntos(cab ? 100 : a === SARTEN ? 130 : 60);
+}
+
+// Una bonificación tomada por alguien de la sala. Las que tocan a la sala
+// (Carpintero, Kaboom) las hace el director; los puntos y la munición, cada uno.
+function alBono(ti, uid) {
+  const b = BONOS[ti];
+  if (!b) return;
+  const quien = uid === red.yo ? '' : ` (${red.jugadores.get(uid)?.nombre || 'alguien'})`;
+  sonido.bono();
+  if (ti === 'carpintero') {
+    if (soyDirector()) inter?.reparaTodo();
+    if (puedoJugar()) sumaPuntos(200);
+  } else if (ti === 'kaboom') {
+    if (soyDirector()) zombis?.kaboom();
+    if (puedoJugar()) sumaPuntos(400);
+  } else if (ti === 'municion') {
+    if (yo.vivo) {
+      for (const id of yo.inv) if (id !== null && id !== undefined) llenaArma(id);
+      yo.gr = [...pref.granadas]; yo.grSel = 0; yo.grTiradas = 0;
+    }
+  } else if (ti === 'maquina') {
+    if (uid === red.yo && yo.vivo && !yo.abatido) { yo.maquina = b.dura; yo.recargando = 0; }
+    else { aviso(`${b.icono} ${b.nombre}${quien}`); return; }
+  }
+  aviso(`${b.icono} ¡${b.nombre}!${quien}`);
 }
 
 // El reloj del que está en el suelo: se levanta solo (Quick Revive jugando
@@ -1732,8 +1911,14 @@ function hud(dt) {
       ? yo.gr.map((k, i) => `<span class="${i === yo.grSel ? 'sel' : ''}">${GRANADAS[k].icono} ${GRANADAS[k].nombre}</span>`).join('') + '<small>G lanza · T cambia</small>'
       : '<small>Sin granadas</small>';
     $('bebidas').hidden = !yo.perks.size;
-    $('bebidas').innerHTML = [...yo.perks].map(t => `<span style="--c:${BEBIDAS[t].color}" title="${BEBIDAS[t].texto}">${BEBIDAS[t].nombre}</span>`).join('');
+    $('bebidas').innerHTML = [...yo.perks].map(t => `<span style="--c:${BEBIDAS[t].color}" title="${BEBIDAS[t].nombre}: ${BEBIDAS[t].texto}"><i>${ICONO_BEBIDA[t]}</i>${BEBIDAS[t].nombre}</span>`).join('');
   }
+  const activos = [];
+  if (bonos?.insta) activos.push(['insta', bonos.instaT]);
+  if (yo.maquina > 0) activos.push(['maquina', yo.maquina]);
+  $('bonos').hidden = !activos.length;
+  if (activos.length) $('bonos').innerHTML = activos.map(([t, s]) =>
+    `<span class="${s < 5 ? 'acaba' : ''}" style="--c:${BONOS[t].color}"><i>${BONOS[t].icono}</i>${BONOS[t].nombre} ${Math.ceil(s)}</span>`).join('');
   danio = Math.max(0, danio - dt * 2.5);
   $('danio').style.opacity = danio * 0.7;
   marcaT -= dt;
@@ -1878,8 +2063,14 @@ function actualizar(dt) {
     // Saltando desde un deslizamiento se llega más alto.
     if (teclas.has('Space') && yo.enSuelo && !yo.abatido) { yo.vel.y = SALTO * (yo.deslizando > 0 ? 1.3 : 1); yo.enSuelo = false; yo.deslizando = 0; }
     moverCuerpo(yo, dt, colisores);
+    if (zombis) chocaZombis();
 
     yo.cadencia = Math.max(0, yo.cadencia - dt);
+    if (yo.bebiendo > 0) yo.bebiendo = Math.max(0, yo.bebiendo - dt);
+    if (yo.maquina > 0) {
+      yo.maquina -= dt;
+      if (yo.maquina <= 0) { yo.maquina = 0; yo.cadencia = Math.max(yo.cadencia, 0.35); aviso('Se acabó la Máquina de muerte'); }
+    }
     yo.escudo = Math.max(0, yo.escudo - dt);
     // En zombis la vida se recupera sola si pasan unos segundos sin daño.
     if (zombis && !yo.abatido && yo.hp < yo.maxHp && performance.now() - yo.ultDanio > 4000) yo.hp = Math.min(yo.maxHp, yo.hp + 30 * dt);
@@ -1920,8 +2111,12 @@ function actualizar(dt) {
 
   // Arma en mano
   const enMano = yo.vivo && !red.mirando && !terminado;
-  for (const [id, m] of Object.entries(modelos)) m.visible = enMano && +id === a.id && yo.zoom < 0.8;
-  const m = modelos[a.id];
+  const bebe = yo.bebiendo > 0;
+  const m = (a.pap && modelosPap[a.id]) || modelos[a.id];
+  for (const x of [...Object.values(modelos), ...Object.values(modelosPap)]) x.visible = enMano && !bebe && x === m && yo.zoom < 0.8;
+  pasoBotella(enMano && bebe);
+  if (a.pap) brilloPap();
+  if (a.id === MAQUINA) m.userData.giro.rotation.z += dt * (gatillo ? 40 : 6);
   const vel = Math.hypot(yo.vel.x, yo.vel.z);
   if (yo.enSuelo) yo.bob += dt * vel * 1.6;
   yo.retroceso = Math.max(0, yo.retroceso - dt * 8);
@@ -1940,6 +2135,7 @@ function actualizar(dt) {
   actualizaArmasSuelo();
   const reviveA = zombis && !terminado ? buscaCaido() : null;
   inter?.actualizar(dt, teclas.has('KeyE') && !reviveA);
+  bonos?.actualizar(dt);
   if (zombis) pasoRevivir(dt, reviveA);
   if (yo.cargaAuto >= 0) {
     const antes = Math.floor(yo.cargaAuto / 0.2);

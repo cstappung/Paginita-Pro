@@ -3047,6 +3047,27 @@ Things to know:
   `HUEVO_VIDA` seconds, fading over the last three, drawn in every frame
   from `zb.m`. In Pueblo, a zombie that steps in the `lava`
   burns (`quema`) and explodes when it dies, hurting players near it.
+- **Power-ups** (`juegos/yemas/js/bonos.js`, `BONOS` in `armas.js`): a
+  dead zombie may drop Insta-Kill, Carpintero, Kaboom, Munición máxima or
+  the Máquina de muerte (weapon 13, a heavy minigun for 30 s, only for
+  whoever took it). They ride `zb` as `b` (on the floor) and `x` (the last
+  eight taken); a non-director asks with `p:bono:<id>` and hides it at
+  once, and every frame applies each `x` entry once.
+- **Zombies collide with players** (`chocaZombis` in `main.js`) and
+  **climb** rather than jump; a player standing on something makes them
+  replan towards the nearest climbable edge instead of piling up below.
+- An unbought wall weapon shows only its **silhouette**; Pack-a-Punched
+  weapons get a metallic material; drinking a perk plays an animation and
+  each perk has an icon on its machine and in the HUD. **Double Tap fires
+  two bullets**, not double damage.
+
+**Zombies rooms are ranked apart, by map and by round.** `anotar` in
+`juegos-main.js` does not write `ranks/yemas` for a `zombis` room: it calls
+`fb.guardarSolo("yemas-zombis-<mapa>", …)` with `puntos` = the round
+reached and `tiempo` = the game's length, so the table orders by round and
+then by time. `ranks.js` shows it as **Yemas zombis** (`EXTRA.yzombis`, in
+the «En sala» group) with a «Mapa» row. The `soloRanks` regex was widened,
+so the rules must be re-published.
 
 **A team win is `ganador: "eq:rojo"`**, and `ganoEn(p, ganador, uid)` in
 `motor.js` is the one place that knows it includes the whole team. `anotar`,
@@ -3124,7 +3145,8 @@ bursting.
 **The arsenal** (weapon ids in the frame's `armas.js`, never renumbered
 because the log names them: 0–2 the original three, 3 the grenade, 4 the
 self-destruct, 5 the pan (it was a knife, same id), 6 the bazooka, 7 the
-pistol, 8 the golden spatula, 9 a zombie's bite; `YM_ARMAS` = 10).
+pistol, 8 the golden spatula, 9 a zombie's bite, 10–12 the box's wonder weapons, 13 the
+Máquina de muerte; `YM_ARMAS` = 14).
 Everyone starts with the pan (`SARTEN`) and carries at most two more. The rest lie on
 `PUNTOS_ARMA` (frame's `mundo.js`, `YM_PUNTOS_ARMA` in `motor.js`, which must
 agree). **Which** weapon lies on point `s` at its appearance `g` comes from
@@ -3138,7 +3160,7 @@ itself as the taker. Each screen brings the next appearance back
 Walking over a free slot or a weapon already owned picks it up (an owned one
 only refills it), and with both slots full `E` swaps the one in hand.
 Inventory and ammo live in the frame: every gun has its magazine plus
-`RECARGAS` (5) reloads per life, and weapons survive death. Respawn after
+`RECARGAS` (8) reloads per life (`RECARGAS_ZOMBIS`, 14, in zombies), and weapons survive death. Respawn after
 being killed refills life, ammo and grenades. After a **suicide that killed
 nobody**, it restores the life, ammo and grenades held just before. A kill
 that arrives while dead, or within 300 ms before dying (practice resolves it

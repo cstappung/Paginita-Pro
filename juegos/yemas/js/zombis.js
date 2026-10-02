@@ -14,7 +14,8 @@
 // vuelven (main.js lo ve en el marcador).
 //
 // Cómo caminan, como en Black Ops: aparecen fuera de una ventana (o salen del
-// suelo en los mapas abiertos), arrancan las tablas de a una, saltan adentro y
+// suelo en los mapas abiertos), arrancan las tablas de a una, trepan por la
+// ventana y
 // desde ahí van por el grafo del mapa (`nodos`/`enlaces` de mapas.js). Un
 // enlace que pasa por una puerta solo vale con la puerta abierta, así que las
 // distancias se recalculan (Floyd-Warshall, son menos de cincuenta nodos) cada
@@ -25,7 +26,7 @@ import { moverCuerpo, rayoMundo, crearZombi, ALTO } from 'yemas/mundo';
 
 export const ZB = {
   mordida: 40, alcance: 1.3, cadencia: 1.1, preparar: 0.35, sube: 0.9, pausa: 9, arranque: 3,
-  tabla: 1.0, entra: 0.9, quema: 4, explota: 3, danioExplota: 50,
+  tabla: 1.0, entra: 1.6, trepa: 2.4, quema: 4, explota: 3, danioExplota: 50,
 };
 // Vida, cuántos salen y qué tan rápido, por ronda (y por jugadores, cuántos).
 export const hpRonda = r => r <= 9 ? 60 + 45 * (r - 1) : Math.round(420 * Math.pow(1.1, r - 9));
@@ -37,8 +38,9 @@ const r1 = x => Math.round(x * 10) / 10;
 // Firebase devuelve los arreglos como objetos y se come los vacíos.
 const lista = x => Array.isArray(x) ? x : Object.values(x || {});
 // La fase viaja como número: dentro, fuera (camino a la ventana), rompiendo
-// tablas, saltando adentro, saliendo del suelo.
-const FASES = ['dentro', 'fuera', 'rompe', 'entra', 'brote'];
+// tablas, trepando por la ventana, saliendo del suelo y trepando a algo. Los
+// índices viajan por la red: lo nuevo va al final.
+const FASES = ['dentro', 'fuera', 'rompe', 'entra', 'brote', 'trepa'];
 
 // El huevo verde que deja cada zombi al morir.
 const HUEVOS_MAX = 40, HUEVO_VIDA = 20;
@@ -237,6 +239,7 @@ export function crearZombis(escena, colisores, cb) {
       z.pos.copy(z.mesh.position);
       if (z.sube < 1) z.pos.y = z.obj.y;
       if (z.fase === 'entra') { z.de = z.pos.clone(); z.t = 0; }
+      if (z.fase === 'trepa') { z.fase = 'dentro'; z.enSuelo = false; }
       if (z.fase === 'rompe') z.t = ZB.tabla;
       z.replan = 0;
       if (z.fase === 'dentro') z.nodo = cercano(z.pos);
@@ -261,6 +264,28 @@ export function crearZombis(escena, colisores, cb) {
   }
 
   const enLava = p => p.y < 0.3 && (mapa?.lava || []).some(([x0, x1, z0, z1]) => p.x > x0 && p.x < x1 && p.z > z0 && p.z < z1);
+
+  // ¿Se puede trepar lo que hay delante? Rayos hacia abajo un poco más allá
+  // de la pared: el techo más alto entre 0.3 y 3.5 m sobre los pies, con
+  // lugar para el cuerpo encima. Devuelve {y, p} (la altura y dónde pararse).
+  const _ab = new THREE.Vector3(0, -1, 0), _ro = new THREE.Vector3();
+  function trepable(z, dx, dz, dy) {
+    let mejor = null;
+    for (const a of [0.6, 0.85, 1.15]) {
+      _ro.set(z.pos.x + dx * a, z.pos.y + 4, z.pos.z + dz * a);
+      const d = rayoMundo(_ro, _ab, 4, colisores, true);
+      const y = _ro.y - d, sobre = y - z.pos.y;
+      if (sobre < 0.3 || sobre > 3.5) continue;
+      // Que haya lugar arriba: nada en los 1.6 m siguientes.
+      _o.set(_ro.x, y + 0.05, _ro.z);
+      if (rayoMundo(_o, _v.set(0, 1, 0), 1.6, colisores, true) < 1.55) continue;
+      if (!mejor || y > mejor.y) mejor = { y, p: new THREE.Vector3(_ro.x, y, _ro.z) };
+    }
+    // Sin nadie arriba, solo trepa lo bajo (una mesa, un auto): un muro alto
+    // lo rodea por el grafo.
+    if (mejor && dy < 0.5 && mejor.y - z.pos.y > 1.3) return null;
+    return mejor;
+  }
 
   const _d = new THREE.Vector3(), _m = new THREE.Vector3();
   // jug: [{uid, pos (pies), vivo}]. Devuelve los mordiscos [{uid, dmg}].
@@ -345,12 +370,31 @@ export function crearZombis(escena, colisores, cb) {
         if (t && Math.hypot(t.pos.x - z.pos.x, t.pos.z - z.pos.z) < 1.7 && Math.abs(t.pos.y - z.pos.y) < 1.3) morder = true;
       } else if (z.fase === 'entra') {
         const v = mapa.ventanas[z.v];
+        // Trepa: sube al alféizar agarrado, pasa el cuerpo y se deja caer.
         z.t += dt / ZB.entra;
         const k = Math.min(1, z.t);
-        z.pos.set(z.de.x + (v.ix - z.de.x) * k, v.y + Math.sin(Math.PI * k) * 0.7, z.de.z + (v.iz - z.de.z) * k);
+        const sube = Math.min(1, k / 0.45), pasa = Math.max(0, Math.min(1, (k - 0.45) / 0.3)), baja = Math.max(0, (k - 0.75) / 0.25);
+        const alto = 0.9 * (1 - (1 - sube) * (1 - sube)) * (1 - baja * baja);
+        const kx = 0.15 * sube + 0.85 * pasa;
+        z.pos.set(z.de.x + (v.ix - z.de.x) * kx, v.y + alto, z.de.z + (v.iz - z.de.z) * kx);
         z.vel.set(0, 0, 0);
         z.ry = Math.atan2(v.nx, v.nz);
         if (k >= 1) { z.fase = 'dentro'; z.pos.y = v.y; z.nodo = cercano(z.pos); z.replan = 0; }
+        z.obj.copy(z.pos);
+        continue;
+      } else if (z.fase === 'trepa') {
+        // Trepando a una caja, un muro o un auto: sube pegado a la pared y,
+        // arriba, se arrastra por encima del borde.
+        z.vel.set(0, 0, 0);
+        if (z.pos.y < z.cima) {
+          z.pos.y = Math.min(z.cima, z.pos.y + ZB.trepa * dt);
+          z.t = 0;
+        } else {
+          z.t += dt / 0.35;
+          const k = Math.min(1, z.t);
+          z.pos.set(z.de.x + (z.arriba.x - z.de.x) * k, z.cima, z.de.z + (z.arriba.z - z.de.z) * k);
+          if (k >= 1) { z.fase = 'dentro'; z.enSuelo = true; z.replan = 0; z.nodo = cercano(z.pos); z.atasco = 0; }
+        }
         z.obj.copy(z.pos);
         continue;
       } else if (t) {
@@ -359,7 +403,10 @@ export function crearZombis(escena, colisores, cb) {
         z.replan -= dt;
         if (z.replan <= 0) {
           z.replan = 0.3 + Math.random() * 0.1;
-          z.ve = Math.abs(dy) < 1 && ve(z.pos, t.pos);
+          // Si está arriba de algo y cerca, va derecho y trepa: buscarlo por
+          // el grafo lo dejaba dando vueltas abajo con los demás amontonados.
+          const h0 = Math.hypot(t.pos.x - z.pos.x, t.pos.z - z.pos.z);
+          z.ve = (Math.abs(dy) < 1 && ve(z.pos, t.pos)) || (dy > 0.5 && h0 < 6 && ve(_m.set(z.pos.x, t.pos.y, z.pos.z), t.pos, [1]));
           z.meta = -1;
           if (!z.ve && N) {
             const meta = metaDe(t);
@@ -378,7 +425,7 @@ export function crearZombis(escena, colisores, cb) {
         const cerca = h < ZB.alcance && Math.abs(dy) < 1.3;
         if (cerca) z.ry = Math.atan2(-(t.pos.x - z.pos.x), -(t.pos.z - z.pos.z));
         if (h < 0.85 && Math.abs(dy) < 1.3) quiero.set(0, 0, 0);
-        // Se trabó contra algo: se corre de lado un rato y prueba saltar.
+        // Se trabó contra algo: trepa si se puede, si no se corre de lado.
         if (z.desvio > 0) {
           z.desvio -= dt;
           const c = Math.cos(1.3 * z.lado), s = Math.sin(1.3 * z.lado);
@@ -386,15 +433,21 @@ export function crearZombis(escena, colisores, cb) {
         }
         quiero.multiplyScalar(z.vel0);
         if (!cerca && Math.hypot(z.vel.x, z.vel.z) < z.vel0 * 0.3) z.atasco += dt; else z.atasco = Math.max(0, z.atasco - dt);
-        // Si el que persigue está arriba (encima de un muro o una caja), el
-        // salto es de trepar: si no, bastaba subirse a un muro para que no
-        // pudieran tocarte nunca.
-        if (z.atasco > 0.6) {
-          const arriba = dy > 0.8 && h < 3;
-          z.atasco = 0; z.lado = Math.random() < 0.5 ? -1 : 1;
-          z.desvio = arriba ? 0 : 1.1;
-          z.replan = 0;
-          if (z.enSuelo) z.vel.y = arriba ? 11.5 : 8;
+        // Trabado: si lo que tiene delante se puede trepar (y el que persigue
+        // está arriba, o el camino sigue por encima), trepa. Si no, se corre de
+        // lado. Antes saltaba, y subirse a un muro bastaba para que se
+        // amontonaran todos abajo sin tocarte nunca.
+        if (z.atasco > 0.5 && z.enSuelo) {
+          z.atasco = 0; z.replan = 0;
+          const c = largo > 0.01 ? trepable(z, quiero.x / z.vel0, quiero.z / z.vel0, dy) : null;
+          if (c) {
+            z.fase = 'trepa'; z.cima = c.y; z.de = z.pos.clone(); z.arriba = c.p; z.t = 0;
+            z.ry = Math.atan2(-quiero.x, -quiero.z);
+            z.vel.set(0, 0, 0); z.obj.copy(z.pos);
+            continue;
+          }
+          z.lado = Math.random() < 0.5 ? -1 : 1;
+          z.desvio = 1.1;
         }
         morder = cerca;
       }
@@ -415,7 +468,7 @@ export function crearZombis(escena, colisores, cb) {
       }
       // Que no se amontonen todos en el mismo punto.
       for (const o of zs.values()) {
-        if (o === z || o.fase === 'entra') continue;
+        if (o === z || o.fase === 'entra' || o.fase === 'trepa') continue;
         const dx = z.pos.x - o.pos.x, dz = z.pos.z - o.pos.z, d = Math.hypot(dx, dz);
         if (d > 0.01 && d < 0.9 && Math.abs(z.pos.y - o.pos.y) < 1.5) { quiero.x += dx / d * 2.5; quiero.z += dz / d * 2.5; }
       }
@@ -451,6 +504,12 @@ export function crearZombis(escena, colisores, cb) {
     if (z.hp > 0) return false;
     muere(z, killer, cab, a);
     return true;
+  }
+
+  // Kaboom: revientan todos los que están en pie (solo en el director). Sin
+  // asesino, así que no dan puntos por cabeza ni sueltan bonificaciones.
+  function kaboom() {
+    for (const z of [...zs.values()]) if (z.fase !== 'brote' || z.sube > 0.3) muere(z, '', false, 0);
   }
 
   // Lo que el director publica.
@@ -528,7 +587,7 @@ export function crearZombis(escena, colisores, cb) {
       const baja = z.sube < 1 ? ALTO * (1 - z.sube) : 0;
       if (director) z.mesh.position.set(z.pos.x, z.pos.y - baja, z.pos.z);
       else {
-        const k = z.fase === 'entra' ? 1 - Math.exp(-20 * dt) : kp;
+        const k = z.fase === 'entra' || z.fase === 'trepa' ? 1 - Math.exp(-20 * dt) : kp;
         z.mesh.position.x += (z.obj.x - z.mesh.position.x) * k;
         z.mesh.position.z += (z.obj.z - z.mesh.position.z) * k;
         z.mesh.position.y += (z.obj.y - baja - z.mesh.position.y) * k;
@@ -540,7 +599,16 @@ export function crearZombis(escena, colisores, cb) {
       const fase = t * 9 + z.id;
       c.rotation.z = Math.sin(fase) * 0.16;
       // Arrancando tablas: tirones hacia adelante.
-      c.rotation.x = z.fase === 'rompe' ? 0.3 + Math.max(0, Math.sin(t * 7 + z.id)) * 0.5 : 0.18 + (z.prep >= 0 ? 0.45 : 0);
+      // Trepando: pegado a la pared, los brazos arriba tirando de a uno.
+      const trepa = z.fase === 'trepa' || z.fase === 'entra';
+      c.rotation.x = z.fase === 'rompe' ? 0.3 + Math.max(0, Math.sin(t * 7 + z.id)) * 0.5
+        : trepa ? 0.5 + Math.sin(t * 10 + z.id) * 0.12 : 0.18 + (z.prep >= 0 ? 0.45 : 0);
+      if (trepa) c.rotation.z = Math.sin(t * 10 + z.id) * 0.1;
+      const brazos = z.mesh.userData.brazos || [];
+      brazos.forEach((b, i) => {
+        const obj = trepa ? Math.PI / 2 + 0.9 + Math.sin(t * 10 + z.id + i * Math.PI) * 0.35 : Math.PI / 2;
+        b.rotation.x += (obj - b.rotation.x) * kp;
+      });
       z.golpeT = Math.max(0, z.golpeT - dt);
       const e = z.mesh.userData.casco.material.emissive;
       if (z.golpeT > 0) e.setRGB(0.7, 0, 0);
@@ -569,7 +637,7 @@ export function crearZombis(escena, colisores, cb) {
   }
 
   return {
-    lista: zs, iniciaRonda, adopta, paso, golpe, estado, desdeRed, animar, ponMapa, recalcula, vacia,
+    lista: zs, iniciaRonda, adopta, paso, golpe, kaboom, estado, desdeRed, animar, ponMapa, recalcula, vacia,
     get ronda() { return ronda; },
     get quedan() { return zs.size + q; },
     get respiro() { return q === 0 && zs.size === 0 ? Math.max(0, entre) : 0; },
