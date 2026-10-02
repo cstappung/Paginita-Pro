@@ -51,7 +51,8 @@ siquiera haciendo privado el repositorio. Lo que protege los datos son las
 3. **Restringir la API key por dominio.** [Google Cloud → APIs y servicios →
    Credenciales](https://console.cloud.google.com/apis/credentials?project=mi-pagina-pro)
    → la clave *Browser key (auto created by Firebase)* → **Restricciones de
-   aplicaciones: Sitios web** y añade `https://<tu-usuario>.github.io/*`,
+   aplicaciones: Sitios web** y añade `https://www.paginita-pro.cl/*`, `https://paginita-pro.cl/*`,
+   `https://<tu-usuario>.github.io/*`,
    `http://localhost:8123/*` y `https://mi-pagina-pro.firebaseapp.com/*`
    (lo usa el inicio de sesión). No impide que alguien use la clave desde un
    script, pero sí desde otra web.
@@ -398,7 +399,7 @@ autorizar el dominio en el bucket **una sola vez**:
    cat > cors.json <<'EOF'
    [
      {
-       "origin": ["https://cstappung.github.io", "http://localhost:8123", "http://127.0.0.1:8123"],
+       "origin": ["https://www.paginita-pro.cl", "https://paginita-pro.cl", "https://cstappung.github.io", "http://localhost:8123", "http://127.0.0.1:8123"],
        "method": ["GET", "HEAD"],
        "maxAgeSeconds": 3600,
        "responseHeader": ["Content-Type", "Content-Range", "Accept-Ranges", "Content-Length"]
@@ -430,6 +431,7 @@ paso 3.
 
 Consola → **Authentication** → **Settings** → **Authorized domains** → *Add domain*:
 
+- `www.paginita-pro.cl` y `paginita-pro.cl`  ← el dominio propio del sitio
 - `TU-USUARIO.github.io`  ← el dominio de GitHub Pages donde publiques
 
 (`localhost` ya viene autorizado, así que la vista previa local funciona sin más.)
@@ -446,6 +448,26 @@ git push -u origin main
 Luego en GitHub: **Settings → Pages → Source: Deploy from a branch →
 Branch: main / (root) → Save**. En un par de minutos el sitio queda en
 `https://TU-USUARIO.github.io/NOMBRE-REPO/`.
+
+### Dominio propio (www.paginita-pro.cl)
+
+1. **DNS** (donde se administren los DNS del dominio; NIC Chile solo delega a
+   unos servidores de nombres): un `CNAME` de `www` → `cstappung.github.io.`, y
+   para el dominio desnudo cuatro `A` → `185.199.108.153`, `185.199.109.153`,
+   `185.199.110.153`, `185.199.111.153` (y si se quiere IPv6, `AAAA` →
+   `2606:50c0:8000::153` … `2606:50c0:8003::153`). Con Cloudflare, el registro
+   va en «Solo DNS» (nube gris) hasta que GitHub emita el certificado.
+2. GitHub → **Settings → Pages → Custom domain**: `www.paginita-pro.cl` →
+   *Save*. Eso crea el archivo `CNAME` en la raíz del repo; no hay que
+   borrarlo. Cuando el chequeo de DNS pase, marcar **Enforce HTTPS**.
+3. Añadir el dominio en los tres sitios que dependen del origen: dominios
+   autorizados del login (sección 3), CORS de Storage (sección 2b, paso 3) y la
+   restricción de la API key (sección 0, punto 3).
+
+Lo que el navegador guarda por origen (`localStorage`, IndexedDB, la sesión de
+Google) no viaja al dominio nuevo: hay que iniciar sesión otra vez, y las
+carpetas enlazadas con «Abrir en VS Code» se vuelven a elegir. Lo que vive en
+Firebase (proyectos, partidas, monedas, cartas) sigue igual.
 
 Avisos:
 - El repo pesa ~220 MB por el motor LaTeX (`vendor/busytex/`). El archivo
