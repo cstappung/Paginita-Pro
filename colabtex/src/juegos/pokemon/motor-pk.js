@@ -54,7 +54,7 @@
    demás: nadie puede armar un contraequipo después de ver el del otro.
    ============================================================ */
 import { Battle, Dex, Teams, TeamValidator, toID } from "@pkmn/sim";
-import { FORMAS, SIN_ESPALDA } from "./formas.js";
+import { FORMAS, BW_FRENTE, BW_ESPALDA } from "./formas.js";
 
 import { FORMATOS, FORMATO_POR, formatoDe, genDe } from "./formatos.js";
 export { FORMATOS, FORMATO_POR, formatoDe, genDe };
@@ -91,26 +91,33 @@ export function valida(formato, sets) {
 }
 
 /* ---------- sprites ----------
-   De github.com/PokeAPI/sprites, servidos por raw.githubusercontent.com.
-   Los animados son los de Showdown que ese repo guarda bajo
-   `other/showdown`; los que no están caen al PNG estático (la pantalla lo
-   hace con `onerror`, en `urlsSprite`). */
+   Solo 2D, de github.com/PokeAPI/sprites (raw.githubusercontent.com):
+   el animado al estilo Negro/Blanco (`versions/generation-v/black-white/
+   animated`) cuando existe, y si no el PNG fijo (`pokemon/<n>.png`). No
+   se usan los animados de `other/showdown`: de la 6.ª generación en
+   adelante son renders de modelos 3D y desentonan con el resto. Las
+   miniaturas (`fijo`) van siempre al PNG, que pesa 1–3 KB. Lo que falla
+   prueba la siguiente URL (la pantalla lo hace con `onerror`). */
 const BASE_SPR = "https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/";
+const BW = BASE_SPR + "pokemon/versions/generation-v/black-white/animated/";
 export function numeroSprite(especie) {
   const s = Dex.species.get(especie);
   if (!s.exists) return 0;
   return FORMAS[s.id] || FORMAS[toID(s.baseSpecies) + toID(s.forme)] || s.num || 0;
 }
-/* Las URLs a probar en orden: animado, estático, y el de la especie base. */
-export function urlsSprite(especie, { espalda = false, shiny = false } = {}) {
+/* Las URLs a probar en orden: animado 2D, PNG fijo, y el de la especie base. */
+export function urlsSprite(especie, { espalda = false, shiny = false, fijo = false } = {}) {
   const s = Dex.species.get(especie);
   const n = numeroSprite(especie), base = s.exists ? s.num : 0;
   if (!n) return [BASE_SPR + "pokemon/0.png"];
-  const sh = shiny ? "shiny/" : "";
+  const sh = shiny ? "shiny/" : "", lado = espalda ? "back/" : "";
   const urls = [];
-  if (!(espalda && SIN_ESPALDA.has(n))) urls.push(`${BASE_SPR}pokemon/other/showdown/${espalda ? "back/" : ""}${sh}${n}.gif`);
-  urls.push(`${BASE_SPR}pokemon/${espalda ? "back/" : ""}${sh}${n}.png`);
-  if (base && base !== n) urls.push(`${BASE_SPR}pokemon/${espalda ? "back/" : ""}${base}.png`);
+  const hay = espalda ? BW_ESPALDA : BW_FRENTE;
+  if (!fijo && hay.has(n)) urls.push(`${BW}${lado}${sh}${n}.gif`);
+  if (!fijo && n !== base && base && hay.has(base) && !hay.has(n)) urls.push(`${BW}${lado}${sh}${base}.gif`);
+  urls.push(`${BASE_SPR}pokemon/${lado}${sh}${n}.png`);
+  if (base && base !== n) urls.push(`${BASE_SPR}pokemon/${lado}${sh}${base}.png`);
+  if (shiny) urls.push(`${BASE_SPR}pokemon/${lado}${n}.png`);
   return urls;
 }
 /* PokeAPI nombra los objetos con guiones («choice-scarf»); Showdown, sin

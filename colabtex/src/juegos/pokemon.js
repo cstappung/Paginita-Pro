@@ -28,8 +28,10 @@ import { cadenaPk, llavePk, sha256hex } from "./motor.js";
 import { suena } from "./sonido.js";
 import { cargaMotor, motorListo } from "./pokemon/carga.js";
 import { abreEquipos, misEquipos } from "./pokemon/equipos.js";
-import { relataTodo, TIPOS, COLOR_TIPO, ESTADOS, STATS_CORTO } from "./pokemon/relato.js";
-import { ENTRENADORES, REGIONES, skinSana, htmlEntrenador, SKIN_POR } from "./pokemon/entrenadores.js";
+import { relata, relataTodo, TIPOS, COLOR_TIPO, ESTADOS, STATS_CORTO } from "./pokemon/relato.js";
+import { ENTRENADORES, REGIONES, skinSana, htmlEntrenador, SKIN_POR, colorRegion } from "./pokemon/entrenadores.js";
+
+const toID = t => String(t || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
 
 const LATIDO_MS = 2000;
 const REINTENTO_MS = 9000;
@@ -41,7 +43,7 @@ const CORTO_ESTADO = { brn: "QUE", par: "PAR", slp: "DOR", frz: "CON", psn: "ENV
 const colorVida = p => (p > 50 ? "#3fd47a" : p > 20 ? "#f2c037" : "#ef5350");
 
 export function crearPokemon(ctx) {
-  const { uid, pid, jugar, terminar, mirando, secreto, rehaz } = ctx;
+  const { uid, pid, jugar, terminar, mirando, secreto, rehaz, listo } = ctx;
   let host = null, muerto = false, latido = 0;
   let p = null, est = null, PM = motorListo();
   let cadena = null, cargandoSecreto = false;
@@ -92,7 +94,7 @@ export function crearPokemon(ctx) {
 
   function destruir() {
     muerto = true;
-    clearInterval(latido);
+    clearInterval(latido); clearTimeout(reloj);
     if (host) { host.removeEventListener("click", alClic); host.removeEventListener("change", alCambio); host.innerHTML = ""; }
     host = null;
   }
@@ -177,6 +179,8 @@ export function crearPokemon(ctx) {
       return;
     }
     if (est.fase === "equipos" || (est.fase === "fin" && !est.battle)) { pintaEquipos(); return; }
+    if (est.battle) asegurarCampo();
+    anima();
     pintaEscena();
     pintaControl();
     pintaRelato();
@@ -206,43 +210,72 @@ export function crearPokemon(ctx) {
       ${puede && est.fase === "jugando" ? `<button class="btn2 jg-pk-peligro" data-x="rinde">${rindeArmado ? "¿Seguro? Pulsa otra vez" : "🏳 Rendirse"}</button>` : ""}`);
   }
 
-  /* --- elegir equipo y entrenador --- */
+  /* --- elegir equipo y entrenador ---
+     Una pantalla de «antes del combate»: a la izquierda tu ficha de
+     entrenador con el sprite grande y la lista de protagonistas, a la
+     derecha tus equipos como tarjetas con sus seis sprites, y debajo el
+     enfrentamiento: tú contra el rival, con su candado cuando ya eligió. */
+  function versus(miSkin, listoYo) {
+    const i = yo() >= 0 ? yo() : 0, o = 1 - i, ru = est.lados[o];
+    const rivalListo = !!(est.prometido && est.prometido[ru]);
+    const lado = (sk, nom, ok, rival) => `<div class="jg-pk-vs-lado${rival ? " rival" : ""}">
+        <div class="jg-pk-vs-ent">${sk ? htmlEntrenador(sk, "grande") : `<span class="jg-pk-ent grande sombra"><b>?</b></span>`}</div>
+        <b>${esc(nom)}</b><small>${ok ? "🔒 Listo" : "Eligiendo…"}</small></div>`;
+    return `<div class="jg-pk-vs">${lado(miSkin, yo() >= 0 ? "Tú" : nombreLado(i), listoYo, false)}<span class="jg-pk-vs-x">VS</span>${lado("", nombreLado(o), rivalListo, true)}</div>`;
+  }
+
   function pintaEquipos() {
     const fmt = PM.formatoDe(p.formato);
     const invalidos = est.invalidos || {};
     if (!juego() || est.prometido[uid] || est.fase === "fin") {
-      const lineas = est.lados.map((u, i) => {
-        const estado = est.fase === "fin" ? (invalidos[u] ? "❌ Equipo no válido: " + invalidos[u].slice(0, 3).join(" · ") : "✓") : est.prometido[u] ? "🔒 Equipo elegido" : "Eligiendo…";
-        return `<li><b>${esc(nombreLado(i))}</b> · ${esc(estado)}</li>`;
-      }).join("");
-      set("pkEscena", "eqv|" + JSON.stringify(est.prometido) + est.fase, `<div class="jg-pk-aviso"><ul class="jg-pk-lista">${lineas}</ul>
-        <small>Los dos eligen a ciegas: lo elegido viaja cerrado y se abre cuando están los dos.</small></div>`);
+      const fin = est.fase === "fin" ? est.lados.map((u, i) => invalidos[u]
+        ? `<p class="jg-pk-mal">❌ El equipo de ${esc(nombreLado(i))} no vale en ${esc(PM.FORMATOS[fmt])}: ${esc(invalidos[u].slice(0, 2).join(" · "))}</p>` : "").join("") : "";
+      set("pkEscena", "eqv|" + JSON.stringify(est.prometido) + est.fase + skin, `<div class="jg-pk-espera">
+        ${versus(juego() ? skin : "", !!est.prometido[uid])}
+        <p>${est.fase === "fin" ? "" : "Los dos eligen a ciegas: lo elegido viaja cerrado y se abre cuando están los dos."}</p>${fin}</div>`);
       set("pkControl", "eqv", ""); set("pkRelato", "eqv", ""); set("pkPie", "eqv", "");
       return;
     }
     const lista = equipos ? Object.entries(equipos.equipos || {}).sort((a, b) => (b[1].at || 0) - (a[1].at || 0)) : null;
-    const filas = (lista || []).map(([id, e]) => {
+    const tarjetas = (lista || []).map(([id, e]) => {
       const sets = PM.desempaqueta(e.eq);
       const errs = PM.valida(fmt, sets);
-      return `<label class="jg-pk-eqop${errs.length ? " mal" : ""}${elegido === id ? " on" : ""}">
-        <input type="radio" name="pkEq" value="${esc(id)}"${elegido === id ? " checked" : ""}${errs.length ? " disabled" : ""}>
-        <b>${esc(e.nombre || "Equipo")}</b><small>${esc(PM.FORMATOS[e.formato] || e.formato)}</small>
-        <span class="jg-pk-minis">${sets.map(s => img(s.species)).join("")}</span>
-        ${errs.length ? `<em>No vale aquí: ${esc(errs[0])}</em>` : ""}</label>`;
+      return `<button class="jg-pk-eqcarta${errs.length ? " mal" : ""}${elegido === id ? " on" : ""}" data-eq="${esc(id)}"${errs.length ? ` title="${esc(errs[0])}"` : ""}>
+        <span class="jg-pk-eqcab"><b>${esc(e.nombre || "Equipo")}</b><small>${esc(PM.FORMATOS[e.formato] || e.formato)}</small>${errs.length ? `<em>No vale aquí</em>` : `<i>✓</i>`}</span>
+        <span class="jg-pk-eqfila6">${Array.from({ length: 6 }, (_, k) => sets[k] ? `<span>${img(sets[k].species, { fijo: true })}</span>` : `<span class="vacio"></span>`).join("")}</span>
+        ${errs.length ? `<small class="jg-pk-eqerr">${esc(errs[0])}</small>` : ""}</button>`;
     }).join("");
-    const ents = ENTRENADORES.map(e => `<button class="jg-pk-entop${e.id === skin ? " on" : ""}" data-skin="${e.id}" title="${esc(e.n)} · ${REGIONES[e.g]}">${htmlEntrenador(e.id)}<small>${esc(e.n)}</small></button>`).join("");
-    set("pkEscena", "eq|" + elegido + "|" + skin + "|" + (lista ? lista.map(x => x[0] + x[1].at).join() : "…"), `
+    const elegidoE = elegido && equipos && equipos.equipos[elegido];
+    const previa = elegidoE ? `<div class="jg-pk-previa">${PM.desempaqueta(elegidoE.eq).map(s => {
+      const sp = PM.dexDe(fmt).species.get(s.species);
+      return `<div class="jg-pk-previa-pk">${img(s.species, { shiny: s.shiny })}<b>${esc(s.name || s.species)}</b>
+        <span class="jg-pk-tipos">${(sp.exists ? sp.types : []).map(chipTipo).join("")}</span><small>${esc(s.item || "Sin objeto")}</small></div>`;
+    }).join("")}</div>` : "";
+    const e = ENTRENADORES.find(x => x.id === skin) || ENTRENADORES[0];
+    const ents = ENTRENADORES.map(x => `<button class="jg-pk-entop${x.id === skin ? " on" : ""}" data-skin="${x.id}" title="${esc(x.n)} · ${REGIONES[x.g]}">${htmlEntrenador(x.id)}</button>`).join("");
+    set("pkEscena", "eq|" + elegido + "|" + skin + "|" + (lista ? lista.map(x => x[0] + x[1].at).join() : "…") + JSON.stringify(est.prometido), `
       <div class="jg-pk-elige">
-        <section><h3>Tu equipo <small>para ${esc(PM.FORMATOS[fmt])}</small></h3>
-          ${lista === null ? `<p class="jg-nota">Cargando tus equipos…</p>` : filas || `<p class="jg-nota">No tienes equipos todavía. Ábrelos con «📋 Mis equipos»: puedes pegar uno exportado de Showdown.</p>`}
+        <section class="jg-pk-tarjeta-ent" style="--c:${colorRegion(e.id)}">
+          <div class="jg-pk-te-cab"><small>Entrenador</small><b>${esc(e.n)}</b><span>${esc(REGIONES[e.g])}</span></div>
+          <div class="jg-pk-te-img">${htmlEntrenador(e.id, "enorme")}</div>
+          <div class="jg-pk-ents">${ents}</div>
         </section>
-        <section><h3>Tu entrenador</h3><div class="jg-pk-ents">${ents}</div></section>
-        <button class="btn jg-pk-listo" data-x="listo"${elegido ? "" : " disabled"}>Listo: usar este equipo</button>
+        <section class="jg-pk-te-equipos">
+          <h3>Tu equipo <small>para ${esc(PM.FORMATOS[fmt])}</small></h3>
+          <div class="jg-pk-eqcartas">${lista === null ? `<p class="jg-nota">Cargando tus equipos…</p>` : tarjetas || `<p class="jg-nota">No tienes equipos todavía. Ábrelos con «📋 Mis equipos»: puedes pegar uno exportado de Showdown.</p>`}</div>
+          ${previa}
+        </section>
+        <footer class="jg-pk-elige-pie">${versus(skin, false)}
+          <button class="btn jg-pk-listo" data-x="listo"${elegido ? "" : " disabled"}>¡Listo para combatir!</button></footer>
       </div>`);
     set("pkControl", "eq", ""); set("pkRelato", "eq", ""); set("pkPie", "eq", `<span class="jg-nota">El rival no verá tu equipo hasta que los dos hayáis elegido.</span>`);
   }
 
-  /* --- el campo --- */
+  /* --- el campo ---
+     La escena se monta una vez y después se toca pieza a pieza: el sprite
+     cambia de `src` solo cuando cambia el Pokémon, y la barra de vida es
+     siempre el mismo elemento, así su transición se ve. Repintarla entera
+     en cada cambio cortaba las animaciones a la mitad. */
   function revelados() {
     // Lo que cada lado ha enseñado: movimientos, objeto y habilidad.
     const out = [{}, {}];
@@ -269,28 +302,9 @@ export function crearPokemon(ctx) {
     return out;
   }
 
-  function img(especie, { espalda = false, shiny = false, clase = "" } = {}) {
-    const urls = PM.urlsSprite(especie, { espalda, shiny });
+  function img(especie, { espalda = false, shiny = false, clase = "", fijo = false } = {}) {
+    const urls = PM.urlsSprite(especie, { espalda, shiny, fijo });
     return `<img class="${clase}" src="${esc(urls[0])}" alt="${esc(especie)}" data-urls="${esc(JSON.stringify(urls.slice(1)))}" onerror="var u=JSON.parse(this.dataset.urls||'[]');if(u.length){this.dataset.urls=JSON.stringify(u.slice(1));this.src=u[0]}else{this.onerror=null;this.style.visibility='hidden'}">`;
-  }
-
-  function ficha(pk, i, propio, rev) {
-    if (!pk) return "";
-    const v = pct(pk.hp, pk.maxhp);
-    const tipos = pk.terastallized ? [pk.terastallized] : pk.getTypes ? pk.getTypes() : pk.species.types;
-    const boosts = Object.entries(pk.boosts || {}).filter(([, n]) => n).map(([k, n]) => `<span class="jg-pk-boost ${n > 0 ? "sube" : "baja"}">${esc(STATS_CORTO[k] || k)} ${n > 0 ? "+" : ""}${n}</span>`).join("");
-    const r = rev && rev[pk.name];
-    const extra = propio
-      ? `<small>${esc(pk.item ? pk.getItem().name : "Sin objeto")} · ${esc(pk.getAbility().name)}</small>`
-      : r ? `<small>${esc([r.item, r.ability, [...r.moves].join(", ")].filter(Boolean).join(" · "))}</small>` : "";
-    return `<div class="jg-pk-ficha ${propio ? "mia" : "suya"}">
-      <div class="jg-pk-fnom"><b>${esc(pk.name)}</b><span>Nv. ${pk.level}</span>${pk.status ? `<span class="jg-pk-estado e-${esc(pk.status)}" title="${esc(ESTADOS[pk.status] || pk.status)}">${esc(CORTO_ESTADO[pk.status] || pk.status)}</span>` : ""}</div>
-      <div class="jg-pk-tipos">${tipos.map(chipTipo).join("")}${pk.terastallized ? `<span class="jg-pk-tera">Tera</span>` : ""}</div>
-      <div class="jg-pk-vida"><i style="width:${v}%;background:${colorVida(v)}"></i></div>
-      <div class="jg-pk-vnum">${propio ? `${pk.hp} / ${pk.maxhp} PS` : `${v} %`}</div>
-      ${boosts ? `<div class="jg-pk-boosts">${boosts}</div>` : ""}
-      ${extra}
-    </div>`;
   }
 
   /* El equipo de un lado en fila. Del rival solo se ven las especies
@@ -300,38 +314,273 @@ export function crearPokemon(ctx) {
     return `<div class="jg-pk-bolas">${side.pokemon.map(pk => {
       const v = pct(pk.hp, pk.maxhp);
       const visto = propio || vistos.has(pk.species.name) || vistos.has(pk.baseSpecies.name);
-      return `<span class="jg-pk-bola${pk.fainted ? " ko" : ""}${pk.isActive ? " activo" : ""}" title="${visto ? esc(pk.species.name) + (pk.fainted ? " (debilitado)" : ` · ${v} %`) : "Sin revelar"}">${visto ? img(pk.species.name, { clase: "mini" }) : `<i class="jg-pk-ball"></i>`}</span>`;
+      return `<span class="jg-pk-bola${pk.fainted ? " ko" : ""}${pk.isActive ? " activo" : ""}" title="${visto ? esc(pk.species.name) + (pk.fainted ? " (debilitado)" : ` · ${v} %`) : "Sin revelar"}">${visto ? img(pk.species.name, { clase: "mini", fijo: true }) : `<i class="jg-pk-ball"></i>`}</span>`;
     }).join("")}</div>`;
   }
 
-  function pintaEscena() {
+  /* Los fondos: uno por sala, sacado de su semilla, para que los dos
+     vean el mismo sitio. Son gradientes de CSS, nada que descargar. */
+  const BIOMAS = ["pradera", "playa", "cueva", "nieve", "atardecer", "gimnasio"];
+  const pos = i => (i === (yo() >= 0 ? yo() : 0) ? "mia" : "suya");
+  const $c = sel => host && host.querySelector(sel);
+
+  function asegurarCampo() {
+    if ($c("#pkCampo")) return;
+    const bioma = BIOMAS[((p && p.semilla) >>> 0) % BIOMAS.length];
+    const lado = l => `
+      <div class="jg-pk-base ${l}"></div>
+      <div class="jg-pk-spr ${l}"><div class="jg-pk-anim"><img alt=""></div><div class="jg-pk-fx"></div></div>
+      <div class="jg-pk-ficha ${l}" hidden>
+        <div class="jg-pk-fnom"><b class="n"></b><span class="lv"></span><span class="st"></span></div>
+        <div class="jg-pk-tipos"></div>
+        <div class="jg-pk-vida"><i></i></div>
+        <div class="jg-pk-vnum"></div>
+        <div class="jg-pk-boosts"></div><small class="ex"></small>
+      </div>
+`;
+    firmas.pkEscena = "campo";
+    const el = $c("#pkEscena");
+    el.innerHTML = `<div class="jg-pk-tira"><div class="jg-pk-entren mia"></div><div class="jg-pk-entren suya"></div></div>
+      <div class="jg-pk-campo bioma-${bioma}" id="pkCampo">
+        <div class="jg-pk-nubes"></div><div class="jg-pk-clima-fx"></div>
+        <div class="jg-pk-clima"></div>
+        ${lado("suya")}${lado("mia")}
+        <div class="jg-pk-intro" hidden></div>
+        <div class="jg-pk-cuadro" id="pkCuadro"></div>
+      </div>`;
+    spritesVistos = { mia: "", suya: "" };
+  }
+  let spritesVistos = { mia: "", suya: "" };
+
+  /* Pone el sprite de un lado. `entra` hace la salida de la Poké Ball. */
+  function ponSprite(l, especie, { shiny = false, entra = false } = {}) {
+    const caja = $c(`.jg-pk-spr.${l}`);
+    if (!caja) return;
+    const clave = especie ? especie + (shiny ? "*" : "") : "";
+    if (spritesVistos[l] !== clave) {
+      spritesVistos[l] = clave;
+      const im = caja.querySelector("img");
+      if (especie) {
+        const urls = PM.urlsSprite(especie, { espalda: l === "mia", shiny });
+        im.style.visibility = "";
+        im.dataset.urls = JSON.stringify(urls.slice(1));
+        im.onerror = () => { const u = JSON.parse(im.dataset.urls || "[]"); if (u.length) { im.dataset.urls = JSON.stringify(u.slice(1)); im.src = u[0]; } else im.style.visibility = "hidden"; };
+        im.src = urls[0]; im.alt = especie;
+      }
+    }
+    caja.classList.toggle("vacia", !especie);
+    if (entra && especie) reanima(caja.querySelector(".jg-pk-anim"), "sale");
+  }
+  /* Reinicia una animación de CSS: quitar la clase, forzar un reflow y
+     volver a ponerla. */
+  function reanima(el, clase) {
+    if (!el) return;
+    el.classList.remove(clase); void el.offsetWidth; el.classList.add(clase);
+  }
+
+  function ponFicha(l, d) {
+    const f = $c(`.jg-pk-ficha.${l}`);
+    if (!f) return;
+    f.hidden = !d;
+    if (!d) return;
+    const v = d.v;
+    f.querySelector(".n").textContent = d.nombre;
+    f.querySelector(".lv").textContent = "Nv. " + d.nivel;
+    f.querySelector(".st").innerHTML = d.estado ? `<span class="jg-pk-estado e-${esc(d.estado)}" title="${esc(ESTADOS[d.estado] || d.estado)}">${esc(CORTO_ESTADO[d.estado] || d.estado)}</span>` : "";
+    const tipos = d.tipos.map(chipTipo).join("") + (d.tera ? `<span class="jg-pk-tera">Tera</span>` : "");
+    const ti = f.querySelector(".jg-pk-tipos");
+    if (ti.dataset.f !== tipos) { ti.dataset.f = tipos; ti.innerHTML = tipos; }
+    const bar = f.querySelector(".jg-pk-vida i");
+    bar.style.width = v + "%"; bar.style.background = colorVida(v);
+    f.querySelector(".jg-pk-vnum").textContent = d.num;
+    if (d.boosts != null) f.querySelector(".jg-pk-boosts").innerHTML = d.boosts;
+    if (d.extra != null) f.querySelector(".ex").textContent = d.extra;
+  }
+
+  /* La escena según el estado final del simulador. Mientras corre la
+     cola de animaciones no se toca: la cola lleva la escena paso a paso
+     y al acabar llama aquí para dejarla exacta. */
+  function pintaEscena(forzar) {
     const B = est.battle;
     if (!B) return;
+    asegurarCampo();
     const me = yo() >= 0 ? yo() : 0, op = 1 - me;
     const S = B.sides;
-    const act = i => S[i].active[0] && !S[i].active[0].fainted ? S[i].active[0] : null;
-    const a = act(me), b = act(op);
     const rev = revelados();
-    const clima = B.field.weather ? `<span class="jg-pk-chip">${esc(B.field.getWeather().name)}</span>` : "";
-    const campo = B.field.terrain ? `<span class="jg-pk-chip">${esc(B.field.getTerrain().name)}</span>` : "";
-    const lado = i => Object.keys(S[i].sideConditions || {}).map(k => `<span class="jg-pk-chip">${esc(B.dex.conditions.get(k).name || k)}</span>`).join("");
-    const firma = [me, a && a.name + a.hp + a.status + JSON.stringify(a.boosts) + a.terastallized, b && b.name + b.hp + b.status + JSON.stringify(b.boosts) + b.terastallized,
-      S.map(s => s.pokemon.map(x => x.hp + (x.fainted ? "k" : "")).join(",")).join("/"), B.field.weather, B.field.terrain,
-      S.map(s => Object.keys(s.sideConditions).join(",")).join("/"), est.ronda, JSON.stringify(rev[op], (k, v) => v instanceof Set ? [...v] : v)].join("|");
-    set("pkEscena", firma, `
-      <div class="jg-pk-campo">
-        <div class="jg-pk-clima">${clima}${campo}</div>
-        <div class="jg-pk-rival">
-          <div class="jg-pk-entren">${htmlEntrenador(est.skins[est.lados[op]] || SKIN_POR)}<b>${esc(nombreLado(op))}</b>${bolas(S[op], false, rev.vistos[op])}${lado(op)}</div>
-          ${ficha(b, op, false, rev[op])}
-          <div class="jg-pk-spr suya">${b ? img(b.species.name, { shiny: b.set && b.set.shiny, clase: "jg-pk-entra" }) : ""}</div>
-        </div>
-        <div class="jg-pk-mio">
-          <div class="jg-pk-spr mia">${a ? img(a.species.name, { espalda: true, shiny: a.set && a.set.shiny, clase: "jg-pk-entra" }) : ""}</div>
-          ${ficha(a, me, yo() >= 0, rev[me])}
-          <div class="jg-pk-entren">${htmlEntrenador(est.skins[est.lados[me]] || SKIN_POR)}<b>${esc(yo() >= 0 ? "Tú" : nombreLado(me))}</b>${bolas(S[me], yo() >= 0, rev.vistos[me])}${lado(me)}</div>
-        </div>
-      </div>`);
+    const quieta = !animando || forzar;
+    const campo = $c("#pkCampo");
+    const clima = B.field.weather ? toID(B.field.weather) : "", terreno = B.field.terrain ? toID(B.field.terrain) : "";
+    if (quieta) { campo.dataset.clima = clima; campo.dataset.terreno = terreno; }
+    const chips = [B.field.weather && B.field.getWeather().name, B.field.terrain && B.field.getTerrain().name].filter(Boolean);
+    const cl = $c(".jg-pk-clima"); const fc = chips.join("|");
+    if (cl.dataset.f !== fc) { cl.dataset.f = fc; cl.innerHTML = chips.map(x => `<span class="jg-pk-chip">${esc(x)}</span>`).join(""); }
+    for (const i of [me, op]) {
+      const l = pos(i), side = S[i], pk = side.active[0] && !side.active[0].fainted ? side.active[0] : null;
+      const propio = i === yo();
+      if (quieta) ponSprite(l, pk && pk.species.name, { shiny: !!(pk && pk.set && pk.set.shiny) });
+      if (!quieta) { /* la cola lleva sprites y fichas */ }
+      else if (pk) {
+        const v = pct(pk.hp, pk.maxhp);
+        const r = rev[i] && rev[i][pk.name];
+        ponFicha(l, {
+          nombre: pk.name, nivel: pk.level, estado: pk.status, v,
+          tipos: pk.terastallized ? [pk.terastallized] : pk.getTypes(), tera: !!pk.terastallized,
+          num: propio ? `${pk.hp} / ${pk.maxhp} PS` : `${v} %`,
+          boosts: Object.entries(pk.boosts || {}).filter(([, n]) => n).map(([k, n]) => `<span class="jg-pk-boost ${n > 0 ? "sube" : "baja"}">${esc(STATS_CORTO[k] || k)} ${n > 0 ? "+" : ""}${n}</span>`).join(""),
+          extra: propio ? `${pk.item ? pk.getItem().name : "Sin objeto"} · ${pk.getAbility().name}` : r ? [r.item, r.ability, [...r.moves].join(", ")].filter(Boolean).join(" · ") : ""
+        });
+      } else ponFicha(l, null);
+      const conds = Object.keys(side.sideConditions || {}).map(k => `<span class="jg-pk-chip">${esc(B.dex.conditions.get(k).name || k)}</span>`).join("");
+      const ent = `${htmlEntrenador(est.skins[est.lados[i]] || SKIN_POR)}<b>${esc(i === yo() ? "Tú" : nombreLado(i))}</b>${bolas(side, propio, rev.vistos[i])}${conds}`;
+      const eel = $c(`.jg-pk-entren.${l}`);
+      if (eel.dataset.f !== ent) { eel.dataset.f = ent; eel.innerHTML = ent; }
+    }
+  }
+
+  /* ---------- la cola de animaciones ----------
+     Lo nuevo del registro se cuenta paso a paso: quien ataca se lanza,
+     al golpeado le tiembla el sprite y le baja la barra al valor que dice
+     esa línea, el crítico sacude el campo, el debilitado cae, el cambio
+     sale de su Poké Ball. Lo que dice cada paso aparece en el cuadro de
+     abajo, como en los juegos. El estado final ya está calculado: la cola
+     solo lo enseña en orden, y al terminar `pintaEscena(true)` lo deja
+     exacto. Una pestaña oculta, o un tramo de más de `MAX_PASOS`, salta
+     al final sin animar. */
+  const MAX_PASOS = 70;
+  let animando = false, animDesde = -1, cola = [], reloj = 0, genAnim = 0;
+
+  function decir(t) {
+    const c = $c("#pkCuadro");
+    if (!c || !t) return;
+    c.innerHTML = `<p>${esc(t)}</p>`;
+    reanima(c.firstElementChild, "aparece");
+  }
+
+  function pasos(lineas, i) {
+    const me = yo() >= 0 ? yo() : 0;
+    const nombres = est.lados.map((u, k) => (k === yo() ? "Tú" : nombreLado(k)));
+    const D = PM.dexDe(p.formato);
+    const lado = id => pos(Number(String(id).charAt(1)) - 1);
+    const out = [];
+    for (const l of lineas) {
+      const c = l.split("|"), t = c[1];
+      const txt = relata(l, yo(), nombres);
+      const sinOrigen = !c.slice(4).some(x => x.startsWith("[from]"));
+      if (t === "start") out.push({ ms: 2200, f: () => intro() });
+      else if (t === "switch" || t === "drag" || t === "replace") {
+        const L = lado(c[2]), det = c[3] || "", esp = det.split(",")[0], nv = (/, L(\d+)/.exec(det) || [, 100])[1];
+        const [hp, st] = (c[4] || "100/100").split(" ");
+        const [a, m] = hp.split("/").map(Number);
+        const v = /fnt/.test(st || "") ? 0 : pct(a, m || 100);
+        const sp = D.species.get(esp);
+        out.push({ ms: 900, txt, f: () => {
+          ponSprite(L, esp, { shiny: /shiny/.test(det), entra: true });
+          ponFicha(L, { nombre: c[2].replace(/^p\d[a-z]?: /, ""), nivel: nv, estado: st && st !== "fnt" ? st : "", v,
+            tipos: sp.exists ? sp.types : [], tera: false, num: L === "mia" && yo() >= 0 ? `${a} / ${m} PS` : `${v} %`, boosts: "", extra: "" });
+          suena("ficha");
+        } });
+      } else if (t === "move") {
+        const L = lado(c[2]), mv = D.moves.get(c[3]);
+        const objetivo = c[4] && /^p\d/.test(c[4]) ? lado(c[4]) : "";
+        const fallo = c.slice(4).includes("[miss]") || c.slice(4).includes("[still]");
+        out.push({ ms: 700, txt, f: () => {
+          const an = $c(`.jg-pk-spr.${L} .jg-pk-anim`);
+          if (an) reanima(an, mv.category === "Status" ? "concentra" : "ataca");
+          if (objetivo && objetivo !== L && mv.category !== "Status" && !fallo) {
+            const fx = $c(`.jg-pk-spr.${objetivo} .jg-pk-fx`);
+            if (fx) { fx.style.setProperty("--t", COLOR_TIPO[mv.type] || "#fff"); reanima(fx, "impacto"); }
+          }
+        } });
+      } else if (t === "-damage" || t === "-heal" || t === "-sethp") {
+        const L = lado(c[2]);
+        const [hp, st] = (c[3] || "").split(" ");
+        const [a, m0] = hp.split("/").map(Number);
+        const m = m0 || 100;
+        const v = /fnt/.test(st || "") || !a ? 0 : pct(a, m);
+        out.push({ ms: t === "-damage" && sinOrigen ? 650 : 450, txt, f: () => {
+          const f = $c(`.jg-pk-ficha.${L}`);
+          if (f) {
+            const bar = f.querySelector(".jg-pk-vida i");
+            bar.style.width = v + "%"; bar.style.background = colorVida(v);
+            f.querySelector(".jg-pk-vnum").textContent = L === "mia" && yo() >= 0 && m0 && m0 !== 100 ? `${a} / ${m0} PS` : `${v} %`;
+          }
+          if (t === "-damage") reanima($c(`.jg-pk-spr.${L} .jg-pk-anim`), sinOrigen ? "golpe" : "parpadea");
+          else reanima($c(`.jg-pk-spr.${L} .jg-pk-fx`), "cura");
+          if (t === "-damage" && sinOrigen) suena("golpe");
+        } });
+      } else if (t === "-crit") out.push({ ms: 500, txt, f: () => reanima($c("#pkCampo"), "sacude") });
+      else if (t === "-supereffective") out.push({ ms: 550, txt, f: () => reanima($c("#pkCampo"), "destello") });
+      else if (t === "faint") {
+        const L = lado(c[2]);
+        out.push({ ms: 900, txt, f: () => { reanima($c(`.jg-pk-spr.${L} .jg-pk-anim`), "cae"); suena("pierde"); } });
+        out.push({ ms: 0, f: () => { ponSprite(L, ""); spritesVistos[L] = "ko"; ponFicha(L, null); } });
+      } else if (t === "-boost" || t === "-unboost") {
+        const L = lado(c[2]);
+        out.push({ ms: 650, txt, f: () => reanima($c(`.jg-pk-spr.${L} .jg-pk-fx`), t === "-boost" ? "sube" : "baja") });
+      } else if (t === "-terastallize") {
+        const L = lado(c[2]);
+        out.push({ ms: 1000, txt, f: () => { const fx = $c(`.jg-pk-spr.${L} .jg-pk-fx`); if (fx) { fx.style.setProperty("--t", COLOR_TIPO[c[3]] || "#9be7ff"); reanima(fx, "tera"); } suena("gana"); } });
+      } else if (t === "-status") {
+        const L = lado(c[2]);
+        out.push({ ms: 600, txt, f: () => { const st = $c(`.jg-pk-ficha.${L} .st`); if (st) st.innerHTML = `<span class="jg-pk-estado e-${esc(c[3])}">${esc(CORTO_ESTADO[c[3]] || c[3])}</span>`; reanima($c(`.jg-pk-spr.${L} .jg-pk-fx`), "estado"); } });
+      } else if (t === "-weather") {
+        out.push({ ms: c.includes("[upkeep]") ? 350 : 700, txt, f: () => { const cp = $c("#pkCampo"); if (cp) cp.dataset.clima = c[2] === "none" ? "" : toID(c[2]); } });
+      } else if (t === "turn") out.push({ ms: 250, txt });
+      else if (t === "win" || t === "tie") out.push({ ms: 1200, txt });
+      else if (txt) out.push({ ms: 450, txt });
+    }
+    return out;
+  }
+
+  function intro() {
+    const it = $c(".jg-pk-intro");
+    if (!it) return;
+    const me = yo() >= 0 ? yo() : 0, op = 1 - me;
+    it.innerHTML = `<div class="jg-pk-intro-ent suya">${htmlEntrenador(est.skins[est.lados[op]] || SKIN_POR, "enorme")}<b>${esc(nombreLado(op))}</b></div>
+      <div class="jg-pk-intro-vs">VS</div>
+      <div class="jg-pk-intro-ent mia">${htmlEntrenador(est.skins[est.lados[me]] || SKIN_POR, "enorme")}<b>${esc(yo() >= 0 ? "Tú" : nombreLado(me))}</b></div>`;
+    it.hidden = false;
+    decir(`¡${yo() >= 0 ? nombreLado(op) + " te desafía" : nombreLado(0) + " contra " + nombreLado(1)}!`);
+    setTimeout(() => { if (it) it.hidden = true; }, 2100);
+  }
+
+  function anima() {
+    if (!est.battle) return;
+    const log = est.log;
+    if (animDesde < 0 || animDesde > log.length) {
+      // Primera vez: si la pelea acaba de empezar se cuenta desde el
+      // principio (con la presentación); si ya iba avanzada, no.
+      animDesde = est.punto <= 2 ? 0 : log.length;
+    }
+    if (log.length === animDesde) return;
+    const nuevas = PM.lineasPara(log, yo() >= 0 ? yo() : -1, animDesde);
+    animDesde = log.length;
+    const ps = pasos(nuevas);
+    if (!ps.length) return;
+    if (document.hidden || ps.length + cola.length > MAX_PASOS) {
+      cola = []; animando = false; clearTimeout(reloj); genAnim++;
+      pintaEscena(true);
+      const ult = ps.filter(x => x.txt).pop();
+      if (ult) decir(ult.txt);
+      return;
+    }
+    cola.push(...ps);
+    if (!animando) { animando = true; siguiente(genAnim); }
+  }
+
+  function siguiente(g) {
+    if (muerto || g !== genAnim) return;
+    const paso = cola.shift();
+    if (!paso) {
+      animando = false;
+      firmas.pkControl = "";
+      pinta();
+      if (listo) listo();
+      return;
+    }
+    try { if (paso.f) paso.f(); } catch (e) { /* un paso que falla no para la cola */ }
+    if (paso.txt) decir(paso.txt);
+    reloj = setTimeout(() => siguiente(g), paso.ms);
   }
 
   /* --- los botones del turno --- */
@@ -340,6 +589,8 @@ export function crearPokemon(ctx) {
     if (i < 0) { set("pkControl", "mira", `<p class="jg-nota">Estás mirando el combate.</p>`); return; }
     const req = est.peticion[i];
     if (est.fase !== "jugando") { set("pkControl", "fin", ""); return; }
+    // Como en los juegos: el menú vuelve cuando se acabó de contar el turno.
+    if (animando) { set("pkControl", "anim", `<p class="jg-nota jg-pk-esperaanim">…</p>`); return; }
     if (!est.decide[uid]) { set("pkControl", "nada" + est.punto, `<p class="jg-nota">Esperando a que ${esc(nombreLado(1 - i))} elija…</p>`); return; }
     if (est.prometido[uid]) {
       const pd = pendiente();
@@ -351,7 +602,7 @@ export function crearPokemon(ctx) {
       const eq = req.side.pokemon;
       set("pkControl", firma, `<h4>Vista previa: ¿quién sale primero?</h4><div class="jg-pk-cambios">${eq.map((pk, k) => {
         const nom = pk.details.split(",")[0];
-        return `<button class="jg-pk-cambio" data-c="team ${[k + 1, ...eq.map((_, j) => j + 1).filter(j => j !== k + 1)].join("")}">${img(nom, { clase: "mini" })}<b>${esc(nom)}</b></button>`;
+        return `<button class="jg-pk-cambio" data-c="team ${[k + 1, ...eq.map((_, j) => j + 1).filter(j => j !== k + 1)].join("")}">${img(nom, { clase: "mini", fijo: true })}<b>${esc(nom)}</b></button>`;
       }).join("")}</div>${previaRival()}`);
       return;
     }
@@ -382,7 +633,7 @@ export function crearPokemon(ctx) {
       const nom = pk.details.split(",")[0];
       const [hp, max] = pk.condition.split(" ")[0].split("/").map(Number);
       const v = pct(hp, max);
-      return `<button class="jg-pk-cambio" data-c="${o.c}">${img(nom, { clase: "mini" })}<b>${esc(nom)}</b><i style="--v:${v}%;--col:${colorVida(v)}"></i></button>`;
+      return `<button class="jg-pk-cambio" data-c="${o.c}">${img(nom, { clase: "mini", fijo: true })}<b>${esc(nom)}</b><i style="--v:${v}%;--col:${colorVida(v)}"></i></button>`;
     }).join("")}</div>` : (req.active && req.active[0] && req.active[0].trapped ? `<p class="jg-nota">Está atrapado: no puede cambiar.</p>` : "");
     set("pkControl", firma, movs + sw);
   }
@@ -391,7 +642,7 @@ export function crearPokemon(ctx) {
     const i = yo(), B = est.battle;
     if (!B) return "";
     const S = B.sides[1 - i];
-    return `<h4>El equipo de ${esc(nombreLado(1 - i))}</h4><div class="jg-pk-cambios">${S.pokemon.map(pk => `<span class="jg-pk-cambio quieto">${img(pk.species.name, { clase: "mini" })}<b>${esc(pk.species.name)}</b></span>`).join("")}</div>`;
+    return `<h4>El equipo de ${esc(nombreLado(1 - i))}</h4><div class="jg-pk-cambios">${S.pokemon.map(pk => `<span class="jg-pk-cambio quieto">${img(pk.species.name, { clase: "mini", fijo: true })}<b>${esc(pk.species.name)}</b></span>`).join("")}</div>`;
   }
 
   function describe(c, req) {
@@ -450,6 +701,11 @@ export function crearPokemon(ctx) {
       return;
     }
     if (!juego()) return;
+    if (b.dataset.eq) {
+      if (b.classList.contains("mal")) return;
+      elegido = b.dataset.eq; firmas.pkEscena = ""; pinta();
+      return;
+    }
     if (b.dataset.skin) {
       skin = skinSana(b.dataset.skin);
       firmas.pkEscena = ""; pinta();
@@ -495,5 +751,6 @@ export function crearPokemon(ctx) {
     }
   }
 
-  return { montar, actualizar, destruir };
+  /* El cartel del final espera a que se vea el último golpe. */
+  return { montar, actualizar, destruir, ocupado: () => animando };
 }

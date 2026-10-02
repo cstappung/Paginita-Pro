@@ -2934,46 +2934,129 @@ html[data-tema=oscuro] .jg-drop-quien:hover b{color:#fff}
 @keyframes jgPkGira{to{transform:rotate(360deg)}}
 .jg-pk-lista{list-style:none;padding:0;margin:0 0 6px;display:grid;gap:6px}
 
-/* El campo */
+/* El campo: la escena se monta una vez (ver `asegurarCampo`). Los
+   sprites son 2D, se escalan por enteros y con `pixelated` para que el
+   pixel art no se emborrone. La escala va en el <img>; las animaciones,
+   en la capa `.jg-pk-anim` de encima, para no pisarse los `transform`. */
 .jg-pk-escena{min-height:320px}
-.jg-pk-campo{position:relative;min-height:340px;background:linear-gradient(#7ec8f2 0,#bfe6fb 46%,#86cf73 46%,#5aa64a 100%);overflow:hidden}
-.jg-pk-campo::before,.jg-pk-campo::after{content:"";position:absolute;border-radius:50%;background:#4f9a42;box-shadow:inset 0 -8px 0 #3f8335}
-.jg-pk-campo::before{right:8%;top:40%;width:34%;height:15%}
-.jg-pk-campo::after{left:4%;bottom:5%;width:40%;height:16%}
-.jg-pk-clima{position:absolute;left:50%;top:8px;transform:translateX(-50%);display:flex;gap:6px;z-index:2}
+.jg-pk-campo{--cielo1:#8fd3ff;--cielo2:#d9f1ff;--suelo1:#9bd77d;--suelo2:#5fae4f;--base:#6cbf55;--borde:#3f8a35;
+  position:relative;height:430px;overflow:hidden;background:linear-gradient(var(--cielo1),var(--cielo2) 40%,var(--suelo1) 40%,var(--suelo2));image-rendering:pixelated}
+.jg-pk-campo.bioma-playa{--cielo1:#6ec6ff;--cielo2:#c8ecff;--suelo1:#f4dc9c;--suelo2:#e3bf6f;--base:#eccb7e;--borde:#c39a49}
+.jg-pk-campo.bioma-playa::after{content:"";position:absolute;left:0;right:0;top:40%;height:7%;background:repeating-linear-gradient(90deg,#3d9be0 0 18px,#5fb3ef 18px 30px);opacity:.9}
+.jg-pk-campo.bioma-cueva{--cielo1:#2c2533;--cielo2:#4a3f52;--suelo1:#6b5a4d;--suelo2:#3e332b;--base:#7c6a5b;--borde:#4a3c31}
+.jg-pk-campo.bioma-nieve{--cielo1:#b9d7ee;--cielo2:#eef6fc;--suelo1:#f3f8fc;--suelo2:#cfe1ee;--base:#e6f0f8;--borde:#9fbcd2}
+.jg-pk-campo.bioma-atardecer{--cielo1:#ff9a62;--cielo2:#ffd59a;--suelo1:#a4b85f;--suelo2:#6b7f3a;--base:#8fa252;--borde:#5c6d2d}
+.jg-pk-campo.bioma-gimnasio{--cielo1:#3a4a6b;--cielo2:#6a7fa6;--suelo1:#c9ccd6;--suelo2:#9ea3b3;--base:#e9ebf2;--borde:#7c8296}
+.jg-pk-campo.bioma-gimnasio .jg-pk-base{background:radial-gradient(closest-side,#fff 0 30%,transparent 31%),radial-gradient(closest-side,var(--base) 0 96%,var(--borde) 97%)}
+.jg-pk-nubes{position:absolute;inset:0 0 56% 0;background:radial-gradient(28px 12px at 15% 30%,#fffc 60%,transparent 62%),radial-gradient(40px 14px at 22% 34%,#fffc 60%,transparent 62%),radial-gradient(34px 12px at 70% 22%,#fffb 60%,transparent 62%),radial-gradient(46px 15px at 78% 26%,#fffb 60%,transparent 62%);animation:jgPkNubes 60s linear infinite;opacity:.9}
+.bioma-cueva .jg-pk-nubes,.bioma-gimnasio .jg-pk-nubes{display:none}
+@keyframes jgPkNubes{from{background-position:0 0}to{background-position:600px 0}}
+.jg-pk-base{position:absolute;border-radius:50%;background:radial-gradient(closest-side,var(--base) 0 93%,var(--borde) 94%);box-shadow:inset 0 -10px 0 #0002}
+.jg-pk-base.suya{right:7%;top:37%;width:36%;height:14%}
+.jg-pk-base.mia{left:3%;bottom:6%;width:46%;height:17%}
+/* Clima: capas encima del cielo. */
+.jg-pk-clima-fx{position:absolute;inset:0;pointer-events:none;z-index:3;opacity:0;transition:opacity .6s}
+[data-clima=raindance] .jg-pk-clima-fx,[data-clima=primordialsea] .jg-pk-clima-fx{opacity:.55;background:repeating-linear-gradient(105deg,transparent 0 9px,#d6ecff 9px 10px,transparent 10px 22px);background-size:200px 200px;animation:jgPkLluvia .4s linear infinite}
+@keyframes jgPkLluvia{to{background-position:-40px 200px}}
+[data-clima=sunnyday] .jg-pk-clima-fx,[data-clima=desolateland] .jg-pk-clima-fx{opacity:1;background:radial-gradient(circle at 85% 8%,#fff7c2cc,#ffd25a55 20%,transparent 45%)}
+[data-clima=sandstorm] .jg-pk-clima-fx{opacity:.6;background:repeating-linear-gradient(170deg,#d8b06a55 0 6px,transparent 6px 14px),#c9a25f44;animation:jgPkLluvia 1.2s linear infinite}
+[data-clima=hail] .jg-pk-clima-fx,[data-clima=snow] .jg-pk-clima-fx{opacity:.8;background-image:radial-gradient(#fff 1.5px,transparent 2px),radial-gradient(#fff 1px,transparent 1.5px);background-size:40px 40px,26px 26px;animation:jgPkNieve 3s linear infinite}
+@keyframes jgPkNieve{to{background-position:20px 120px,-10px 80px}}
+[data-terreno=electricterrain] .jg-pk-base{box-shadow:0 0 0 3px #f7d02c88,inset 0 -10px 0 #0002}
+[data-terreno=grassyterrain] .jg-pk-base{box-shadow:0 0 0 3px #7ac74c99,inset 0 -10px 0 #0002}
+[data-terreno=psychicterrain] .jg-pk-base{box-shadow:0 0 0 3px #f9558799,inset 0 -10px 0 #0002}
+[data-terreno=mistyterrain] .jg-pk-base{box-shadow:0 0 0 3px #f4b6dd99,inset 0 -10px 0 #0002}
+.jg-pk-clima{position:absolute;left:50%;top:8px;transform:translateX(-50%);display:flex;gap:6px;z-index:6}
 .jg-pk-chip{font-size:11px;padding:2px 8px;border-radius:99px;background:#0d1320cc;color:#fff;white-space:nowrap}
-.jg-pk-rival,.jg-pk-mio{position:absolute;inset:0;pointer-events:none}
-.jg-pk-rival>*,.jg-pk-mio>*{pointer-events:auto}
-.jg-pk-spr{position:absolute;z-index:1;display:grid;place-items:end center}
-.jg-pk-spr img{image-rendering:pixelated;filter:drop-shadow(0 8px 4px #0005)}
-.jg-pk-spr.suya{right:14%;top:12%;width:30%;height:36%}
-.jg-pk-spr.suya img{max-height:100%;transform:scale(1.5);transform-origin:bottom center}
-.jg-pk-spr.mia{left:8%;bottom:9%;width:34%;height:38%}
-.jg-pk-spr.mia img{max-height:100%;transform:scale(1.45);transform-origin:bottom center}
-.jg-pk-entra{animation:jgPkEntra .45s ease-out}
-@keyframes jgPkEntra{from{opacity:0;translate:0 12px}}
-.jg-pk-ficha{position:absolute;z-index:2;width:min(260px,44%);padding:8px 12px 9px;border-radius:12px;background:#f8f6eecc;color:#1e2330;box-shadow:0 4px 0 #0003;backdrop-filter:blur(2px);font-size:12px}
-.jg-pk-ficha.suya{left:4%;top:7%;border-bottom-right-radius:30px}
-.jg-pk-ficha.mia{right:4%;bottom:12%;border-top-left-radius:30px}
+/* Los sprites */
+.jg-pk-spr{position:absolute;z-index:2;display:grid;place-items:end center}
+.jg-pk-spr.suya{right:11%;top:10%;width:30%;height:31%}
+.jg-pk-spr.mia{left:8%;bottom:11%;width:38%;height:38%}
+.jg-pk-spr.vacia img{visibility:hidden}
+.jg-pk-anim{position:relative;display:grid;place-items:end center;width:100%;height:100%}
+.jg-pk-spr img{image-rendering:pixelated;transform-origin:bottom center;max-width:none}
+.jg-pk-spr.suya img{transform:scale(2)}
+.jg-pk-spr.mia img{transform:scale(2.5)}
+.jg-pk-anim.sale{animation:jgPkSale .7s cubic-bezier(.2,1.5,.4,1)}
+@keyframes jgPkSale{0%{transform:scale(.05);filter:brightness(6)}55%{filter:brightness(3)}100%{transform:none;filter:none}}
+.jg-pk-spr.mia .jg-pk-anim.ataca{animation:jgPkAtacaMia .55s ease-in-out}
+.jg-pk-spr.suya .jg-pk-anim.ataca{animation:jgPkAtacaSuya .55s ease-in-out}
+@keyframes jgPkAtacaMia{40%{transform:translate(18%,-10%)}}
+@keyframes jgPkAtacaSuya{40%{transform:translate(-18%,10%)}}
+.jg-pk-anim.concentra{animation:jgPkConc .6s ease-in-out}
+@keyframes jgPkConc{30%,70%{transform:translateY(-6%);filter:brightness(1.6)}}
+.jg-pk-anim.golpe{animation:jgPkGolpe .55s steps(1)}
+@keyframes jgPkGolpe{0%,40%,80%{opacity:0}20%,60%,100%{opacity:1}10%,50%{transform:translateX(-4%)}30%,70%{transform:translateX(4%)}}
+.jg-pk-anim.parpadea{animation:jgPkParp .4s steps(1)}
+@keyframes jgPkParp{0%,50%{opacity:.25}25%,75%{opacity:1}}
+.jg-pk-anim.cae{animation:jgPkCae .8s ease-in forwards}
+@keyframes jgPkCae{to{transform:translateY(60%);opacity:0;clip-path:inset(0 0 60% 0)}}
+.jg-pk-fx{position:absolute;inset:0;pointer-events:none;border-radius:50%;opacity:0}
+.jg-pk-fx.impacto{animation:jgPkImpacto .45s ease-out}
+@keyframes jgPkImpacto{0%{background:radial-gradient(circle,var(--t) 0 10%,transparent 11%);opacity:1}100%{background:radial-gradient(circle,transparent 0 40%,var(--t) 41% 46%,transparent 47%);opacity:0}}
+.jg-pk-fx.cura{animation:jgPkCura .6s ease-out}
+@keyframes jgPkCura{0%{opacity:1;box-shadow:inset 0 0 0 0 #7cf2a3aa}50%{box-shadow:inset 0 0 40px 10px #7cf2a3aa}100%{box-shadow:none}}
+.jg-pk-fx.sube{animation:jgPkSube .65s linear;background:repeating-linear-gradient(0deg,transparent 0 10px,#ff9b5a66 10px 14px)}
+.jg-pk-fx.baja{animation:jgPkBaja .65s linear;background:repeating-linear-gradient(0deg,transparent 0 10px,#5ab4ff66 10px 14px)}
+@keyframes jgPkSube{from{background-position:0 0;opacity:1}to{background-position:0 -60px;opacity:0}}
+@keyframes jgPkBaja{from{background-position:0 0;opacity:1}to{background-position:0 60px;opacity:0}}
+.jg-pk-fx.tera{animation:jgPkTera 1s ease-out}
+@keyframes jgPkTera{0%{opacity:1;box-shadow:0 0 0 0 var(--t);background:radial-gradient(circle,#fff,transparent 60%)}60%{box-shadow:0 0 50px 20px var(--t)}100%{box-shadow:none;background:none}}
+.jg-pk-fx.estado{animation:jgPkCura .6s ease-out;filter:hue-rotate(200deg)}
+.jg-pk-campo.sacude{animation:jgPkSacude .4s}
+@keyframes jgPkSacude{20%{transform:translate(-6px,3px)}40%{transform:translate(6px,-3px)}60%{transform:translate(-4px,2px)}80%{transform:translate(3px,-1px)}}
+.jg-pk-campo.destello{animation:jgPkDest .4s}
+@keyframes jgPkDest{30%{filter:brightness(1.6) saturate(1.4)}}
+/* Las fichas, al estilo de las cajas de los juegos. */
+.jg-pk-ficha{position:absolute;z-index:4;width:min(250px,44%);padding:7px 12px 8px;border-radius:10px;background:#f8f8f0;color:#1e2330;border:3px solid #39404e;box-shadow:4px 4px 0 #0004;font-size:12px}
+.jg-pk-ficha[hidden]{display:none}
+.jg-pk-ficha.suya{left:4%;top:5%;border-radius:10px 22px 10px 10px}
+.jg-pk-ficha.mia{right:4%;bottom:19%;border-radius:22px 10px 10px 10px}
 .jg-pk-ficha small{display:block;margin-top:4px;color:#4b5263;line-height:1.3}
-.jg-pk-fnom{display:flex;gap:8px;align-items:baseline}.jg-pk-fnom b{font-size:14px}.jg-pk-fnom span{color:#4b5263}
+.jg-pk-ficha small:empty,.jg-pk-boosts:empty{display:none}
+.jg-pk-fnom{display:flex;gap:8px;align-items:baseline}.jg-pk-fnom b{font-size:14px}.jg-pk-fnom .lv{color:#4b5263}
 .jg-pk-tipos{display:flex;gap:4px;flex-wrap:wrap;margin:4px 0}
 .jg-pk-tipo{font:700 10px system-ui;letter-spacing:.3px;padding:2px 7px;border-radius:5px;background:var(--t);color:#fff;text-shadow:0 1px 1px #0006;text-transform:uppercase}
 .jg-pk-tera{font:700 10px system-ui;padding:2px 6px;border-radius:5px;background:linear-gradient(90deg,#9be7ff,#ffd6f6);color:#2a2f45}
-.jg-pk-vida{height:8px;border-radius:99px;background:#3b4152;overflow:hidden;box-shadow:inset 0 0 0 1px #0004}
-.jg-pk-vida i{display:block;height:100%;transition:width .7s ease,background .7s}
+.jg-pk-vida{position:relative;height:9px;border-radius:5px;background:#4b5263;overflow:hidden;border:2px solid #39404e}
+.jg-pk-vida::before{content:"PS";position:absolute;left:-1px;top:-2px;font:800 8px system-ui;color:#f2c037;z-index:1;display:none}
+.jg-pk-vida i{display:block;height:100%;transition:width .8s ease,background .8s}
 .jg-pk-vnum{text-align:right;font:600 11px 'IBM Plex Mono',monospace;margin-top:2px}
 .jg-pk-estado{font:700 10px system-ui;padding:1px 6px;border-radius:4px;color:#fff;background:#888}
 .jg-pk-estado.e-brn{background:#ee8130}.jg-pk-estado.e-par{background:#d6b500}.jg-pk-estado.e-slp{background:#8a8a9c}.jg-pk-estado.e-frz{background:#5fb7d6}.jg-pk-estado.e-psn,.jg-pk-estado.e-tox{background:#a33ea1}
 .jg-pk-boosts{display:flex;gap:3px;flex-wrap:wrap;margin-top:3px}
 .jg-pk-boost{font:600 10px system-ui;padding:1px 5px;border-radius:4px}.jg-pk-boost.sube{background:#d6f5df;color:#17663a}.jg-pk-boost.baja{background:#fde0de;color:#9b1c14}
-.jg-pk-entren{position:absolute;z-index:2;display:flex;align-items:center;gap:6px;padding:4px 8px 4px 4px;border-radius:99px;background:#0d1320b3;color:#fff;font-size:12px;flex-wrap:wrap;max-width:60%}
-.jg-pk-rival .jg-pk-entren{right:8px;top:8px}
-.jg-pk-mio .jg-pk-entren{left:8px;bottom:8px}
+/* Los entrenadores y su equipo, en una franja encima del campo: dentro
+   tapaban los sprites. */
+.jg-pk-tira{display:flex;justify-content:space-between;gap:8px;padding:6px 8px;background:#0d1320;border-bottom:1px solid #ffffff12;flex-wrap:wrap}
+.jg-pk-entren{display:flex;align-items:center;gap:6px;padding:3px 10px 3px 3px;border-radius:99px;background:#1a2234;color:#fff;font-size:12px;flex-wrap:wrap}
+.jg-pk-entren.suya{flex-direction:row-reverse;padding:3px 3px 3px 10px}
+/* El cuadro de diálogo, abajo, como en los juegos. */
+.jg-pk-cuadro{position:absolute;left:8px;right:8px;bottom:8px;z-index:7;min-height:46px;padding:9px 14px;border-radius:10px;background:#1d2433f2;color:#fff;border:3px solid #c9d2e4;box-shadow:inset 0 0 0 2px #39404e;font:600 14px system-ui;display:flex;align-items:center}
+.jg-pk-cuadro:empty{display:none}
+.jg-pk-cuadro p{margin:0}
+.jg-pk-cuadro p.aparece{animation:jgPkTexto .35s steps(14)}
+@keyframes jgPkTexto{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+.jg-pk-spr.mia{bottom:18%}.jg-pk-base.mia{bottom:12%}
+/* La presentación: los dos entrenadores frente a frente. */
+.jg-pk-intro{position:absolute;inset:0;z-index:8;display:flex;align-items:center;justify-content:space-around;background:linear-gradient(115deg,#e3350dee 0 49.6%,#fff 49.6% 50.4%,#2a75bbee 50.4%);animation:jgPkIntro 2.1s ease-in-out forwards}
+.jg-pk-intro[hidden]{display:none}
+@keyframes jgPkIntro{0%{clip-path:inset(0 50% 0 50%)}15%,85%{clip-path:inset(0 0 0 0)}100%{clip-path:inset(0 0 0 0);opacity:0}}
+.jg-pk-intro-ent{display:grid;justify-items:center;gap:6px;color:#fff;font:800 18px system-ui;text-shadow:2px 2px 0 #0006}
+.jg-pk-intro-ent.suya{animation:jgPkDesdeIzq .5s ease-out}.jg-pk-intro-ent.mia{animation:jgPkDesdeDer .5s ease-out}
+@keyframes jgPkDesdeIzq{from{transform:translateX(-120%)}}@keyframes jgPkDesdeDer{from{transform:translateX(120%)}}
+.jg-pk-intro-vs{font:900 54px system-ui;color:#ffcb05;text-shadow:3px 3px 0 #2a75bb,-2px -2px 0 #fff;animation:jgPkSale .6s .3s both}
+/* Entrenadores: sprites 2D de Showdown, a escala entera. */
 .jg-pk-ent{position:relative;display:inline-grid;place-items:center;width:34px;height:34px;border-radius:50%;background:var(--c);overflow:hidden;flex-shrink:0}
-.jg-pk-ent img{position:absolute;inset:-6%;width:112%;height:112%;object-fit:contain;object-position:top;image-rendering:pixelated;z-index:1}
+.jg-pk-ent img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;object-position:50% 12%;image-rendering:pixelated;z-index:1}
 .jg-pk-ent b{font:800 15px system-ui;color:#fff}
 .jg-pk-ent.chico{width:28px;height:28px}
+.jg-pk-ent.grande{width:96px;height:96px;border-radius:16px;background:radial-gradient(circle at 50% 35%,#fff6,transparent 70%),var(--c)}
+.jg-pk-ent.grande img,.jg-pk-ent.enorme img{object-fit:contain;object-position:bottom}
+.jg-pk-ent.grande b{font-size:34px}
+.jg-pk-ent.enorme{width:160px;height:160px;border-radius:0;background:none;overflow:visible}
+.jg-pk-ent.enorme b{font-size:60px;width:120px;height:120px;border-radius:50%;display:grid;place-items:center;background:var(--c)}
+.jg-pk-ent.sombra{background:#2a3247}
 .jg-pk-bolas{display:flex;gap:2px}
 .jg-pk-bola{width:22px;height:22px;display:grid;place-items:center;border-radius:50%;background:#ffffff1c}
 .jg-pk-bola img.mini{max-width:30px;max-height:30px;margin:-4px;image-rendering:pixelated}
@@ -3006,22 +3089,46 @@ html[data-tema=oscuro] .jg-drop-quien:hover b{color:#fff}
 .jg-pk-relato p.turno{margin-top:8px;color:#ffcb05;font-weight:700}
 .jg-pk-relato p.gana{color:#8ff0a4;font-weight:700}
 
-/* Elegir equipo y entrenador */
-.jg-pk-elige{padding:16px;display:grid;gap:16px}
-.jg-pk-elige h3{margin:0 0 8px;font-size:15px}.jg-pk-elige h3 small{color:var(--pk-tx2);font-weight:500}
-.jg-pk-eqop{display:grid;grid-template-columns:auto 1fr auto;gap:2px 10px;align-items:center;padding:8px 12px;border-radius:10px;background:var(--pk-sup);border:1px solid var(--pk-borde);margin-bottom:6px;cursor:pointer}
-.jg-pk-eqop.on{border-color:#ffcb05;box-shadow:0 0 0 1px #ffcb05}
-.jg-pk-eqop.mal{opacity:.6;cursor:not-allowed}
-.jg-pk-eqop input{grid-row:span 2}.jg-pk-eqop small{color:var(--pk-tx2);font-size:11px}
-.jg-pk-eqop .jg-pk-minis{grid-row:span 2;grid-column:3}
-.jg-pk-eqop em{grid-column:2/4;font-size:11px;color:#ff9c8f;font-style:normal}
-.jg-pk-minis{display:flex}.jg-pk-minis img{width:34px;height:34px;object-fit:contain;image-rendering:pixelated;margin:-3px}
-.jg-pk-ents{display:flex;gap:6px;flex-wrap:wrap}
-.jg-pk-entop{display:grid;justify-items:center;gap:3px;padding:6px;border-radius:10px;border:1px solid var(--pk-borde);background:var(--pk-sup);color:var(--pk-tx);cursor:pointer;width:70px}
-.jg-pk-entop .jg-pk-ent{width:46px;height:46px}
-.jg-pk-entop.on{border-color:#ffcb05;box-shadow:0 0 0 1px #ffcb05}
-.jg-pk-entop small{font-size:10.5px}
-.jg-pk-listo{justify-self:start;height:40px;padding:0 20px;background:#e3350d}
+/* Elegir equipo y entrenador: ficha de entrenador a la izquierda,
+   equipos a la derecha, el enfrentamiento abajo. */
+.jg-pk-elige{display:grid;grid-template-columns:minmax(220px,300px) minmax(0,1fr);gap:16px;padding:16px;background:radial-gradient(circle at 10% 0,#24324f,transparent 60%),#121826}
+.jg-pk-tarjeta-ent{display:grid;gap:10px;align-content:start;padding:14px;border-radius:16px;background:linear-gradient(160deg,color-mix(in srgb,var(--c) 55%,#121826),#1a2234 70%);border:2px solid color-mix(in srgb,var(--c) 70%,#fff 10%);box-shadow:0 10px 30px #0006}
+.jg-pk-te-cab{display:grid}.jg-pk-te-cab small{font-size:10px;letter-spacing:2px;text-transform:uppercase;opacity:.7}.jg-pk-te-cab b{font-size:22px}.jg-pk-te-cab span{font-size:12px;opacity:.8}
+.jg-pk-te-img{display:grid;place-items:center;height:170px;border-radius:12px;background:radial-gradient(ellipse at 50% 90%,#0004 0 30%,transparent 31%),radial-gradient(circle at 50% 40%,#ffffff22,transparent 65%)}
+.jg-pk-ents{display:grid;grid-template-columns:repeat(auto-fill,minmax(44px,1fr));gap:5px}
+.jg-pk-entop{padding:3px;border-radius:10px;border:2px solid transparent;background:#0d132055;cursor:pointer;display:grid;place-items:center}
+.jg-pk-entop .jg-pk-ent{width:38px;height:38px}
+.jg-pk-entop:hover{border-color:#ffffff55}
+.jg-pk-entop.on{border-color:#ffcb05;box-shadow:0 0 12px #ffcb0577}
+.jg-pk-te-equipos h3{margin:0 0 10px;font-size:16px}.jg-pk-te-equipos h3 small{color:var(--pk-tx2);font-weight:500}
+.jg-pk-eqcartas{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px}
+.jg-pk-eqcarta{display:grid;gap:6px;text-align:left;padding:10px 12px;border-radius:14px;border:2px solid #2e3a56;background:linear-gradient(#1f2940,#182032);color:#e8edf7;cursor:pointer;transition:transform .15s,border-color .15s}
+.jg-pk-eqcarta:hover{transform:translateY(-2px);border-color:#4a5b82}
+.jg-pk-eqcarta.on{border-color:#ffcb05;box-shadow:0 0 0 1px #ffcb05,0 8px 24px #ffcb0533}
+.jg-pk-eqcarta.mal{opacity:.55;cursor:not-allowed}
+.jg-pk-eqcab{display:flex;align-items:baseline;gap:8px}.jg-pk-eqcab b{font-size:14px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.jg-pk-eqcab small{font-size:10.5px;color:#a9b4c9}
+.jg-pk-eqcab i{font-style:normal;color:#7ef0a0;font-weight:800}.jg-pk-eqcab em{font-style:normal;font-size:10.5px;color:#ff9c8f}
+.jg-pk-eqfila6{display:grid;grid-template-columns:repeat(6,1fr);gap:4px}
+.jg-pk-eqfila6 span{min-width:0;aspect-ratio:1;display:grid;place-items:center;border-radius:50%;background:radial-gradient(circle,#ffffff14,#ffffff05);overflow:hidden}
+.jg-pk-eqfila6 span.vacio{background:none;box-shadow:inset 0 0 0 2px #ffffff10;transform:scale(.55)}
+.jg-pk-eqfila6 img{width:100%;height:100%;object-fit:contain;image-rendering:pixelated;transform:scale(1.25)}
+.jg-pk-eqerr{font-size:10.5px;color:#ff9c8f}
+.jg-pk-previa{margin-top:12px;display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
+.jg-pk-previa-pk{display:grid;justify-items:center;gap:3px;padding:8px 6px;border-radius:12px;background:#1a2234;border:1px solid #2e3a56;text-align:center}
+.jg-pk-previa-pk img{height:80px;image-rendering:pixelated}
+.jg-pk-previa-pk b{font-size:12px}.jg-pk-previa-pk small{font-size:10.5px;color:#a9b4c9}
+.jg-pk-elige-pie{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding-top:6px;border-top:1px solid #ffffff12}
+.jg-pk-listo{height:46px;padding:0 26px;font-size:15px;background:linear-gradient(#ff5a36,#e3350d);border-radius:12px;box-shadow:0 4px 0 #9b2208}
+.jg-pk-listo:disabled{opacity:.45;box-shadow:none}
+.jg-pk-vs{display:flex;align-items:center;gap:14px}
+.jg-pk-vs-lado{display:grid;justify-items:center;gap:2px;font-size:12px}
+.jg-pk-vs-lado small{color:var(--pk-tx2)}
+.jg-pk-vs-ent .jg-pk-ent.grande{width:64px;height:64px}
+.jg-pk-vs-x{font:900 22px system-ui;color:#ffcb05;text-shadow:2px 2px 0 #2a75bb}
+.jg-pk-espera{display:grid;justify-items:center;gap:12px;padding:40px 16px;text-align:center;color:var(--pk-tx2);background:radial-gradient(circle at 50% 30%,#24324f,#121826 70%)}
+.jg-pk-espera .jg-pk-vs-ent .jg-pk-ent.grande{width:110px;height:110px}
+.jg-pk-espera .jg-pk-vs-x{font-size:36px}
+.jg-pk-mal{color:#ffb4a8;margin:0}
 
 /* El editor de equipos */
 .jg-pk-capa{z-index:75}
@@ -3072,12 +3179,16 @@ html[data-tema=oscuro] .jg-drop-quien:hover b{color:#fff}
    así que manda su propio ancho y no el de la ventana. */
 .jg-pk{container-type:inline-size}
 @container (max-width:760px){
+  .jg-pk-elige{grid-template-columns:1fr}
+  .jg-pk-campo{height:320px}
+  .jg-pk-spr.suya img{transform:scale(1.5)}
+  .jg-pk-spr.mia img{transform:scale(2)}
   .jg-pk-abajo{grid-template-columns:1fr}
   .jg-pk-relato{border-left:0;border-top:1px solid #ffffff12;max-height:180px}
   .jg-pk-campo{min-height:300px}
   .jg-pk-ficha{width:52%;font-size:11px;padding:6px 9px}
   .jg-pk-ficha small{display:none}
-  .jg-pk-entren{max-width:70%;font-size:11px}
+  .jg-pk-entren{font-size:11px}
 }
 @container (max-width:420px){
   .jg-pk-movs{grid-template-columns:1fr}
@@ -3136,6 +3247,6 @@ html[data-tema=oscuro] .jg-drop-quien:hover b{color:#fff}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610021814"></script>
+<script src="juegos-app.js?v=202610021921"></script>
 </body>
 </html>
