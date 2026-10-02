@@ -10,6 +10,8 @@ export function categoriaClub(juego, categoria) {
     ? /^club-sopa-(racha|(facil|medio|dificil)-(8|12|15))$/.test(categoria)
     : juego === 'electro'
     ? /^club-electro-(racha|puntos)$/.test(categoria)
+    : juego === 'frontera'
+    ? /^club-frontera-((torre|palacio|fabrica)-(50|abierto)|victorias)$/.test(categoria)
     : juego === 'tetris'
     ? /^club-tetris-(maraton|sprint|ultra)$/.test(categoria)
     : /^club-snake-(classic|arcade|portals|reloj|espejo|laberinto)-(chico|mediano|grande|gigante)$/.test(categoria));
@@ -29,6 +31,9 @@ export function resultadoClub(juego, dato) {
      suma de los siete modos diarios (700 por día, a lo más). */
   if (dato.categoria === 'club-electro-racha' && dato.puntos > 1000) return null;
   if (dato.categoria === 'club-electro-puntos' && dato.puntos > 1000000) return null;
+  /* Frontera: la racha y las victorias son combates; 100 000 es el tope
+     de la regla. */
+  if (juego === 'frontera' && dato.puntos > 100000) return null;
   return {categoria:dato.categoria,puntos:dato.puntos,tiempo:dato.tiempo,partida:dato.partida};
 }
 export const mejorClub = (a,b) => !b || a.puntos > b.puntos || a.puntos === b.puntos && a.tiempo < b.tiempo;

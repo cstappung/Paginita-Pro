@@ -74,7 +74,8 @@ export const NIVEL = {
   presidente: F + "113322", spicy: F + "122113", tetris: F + "131332",
   yemas: F + "133243", clue: F + "321233",
   minas: "1232323344", snake: "2222221334", tetrisclub: "1231234124",
-  sortem: "1121223434", bbtan: "1122333444", sopa: "1124112333", electro: "1123412334"
+  sortem: "1121223434", bbtan: "1122333444", sopa: "1124112333", electro: "1123412334",
+  frontera: "1234422134"
 };
 export function nivelDe(juego, id) {
   const l = LOGROS[juego] || [], i = l.findIndex(x => x.id === id);
@@ -84,7 +85,7 @@ export const valorLogro = (juego, id) => VALOR_NIVEL[nivelDe(juego, id)] || 0;
 
 /* Récords del club: lo que paga tener marca en una modalidad, y el extra
    que sale de la marca misma donde la marca es la dificultad. */
-export const RECORD = { minas: 60, snake: 20, tetrisclub: 50, sortem: 50, bbtan: 50, sopa: 30, electro: 30 };
+export const RECORD = { minas: 60, snake: 20, tetrisclub: 50, sortem: 50, bbtan: 50, sopa: 30, electro: 30, frontera: 40 };
 /* BBTAN: cada ronda n paga ⌊n/4⌋, acumulado hasta la ronda del récord
    (1 a 3 no pagan, 4 y 5 pagan 1 cada una: llegar a la 5 da 2). */
 export function monedasBbtan(ronda) {
@@ -97,7 +98,24 @@ export function monedasSortem(n, ms) {
   const N = +n || 0, seg = (+ms || 0) / 1000;
   return Math.round(N + 2 * Math.max(0, 3 * N - seg));
 }
+/* Frontera Batalla: lo que paga el combate n de una racha (la misma
+   cuenta que `monedasCombate` en pokemon/frontera-motor.js, copiada aquí
+   porque este módulo no puede cargar el simulador; el test comprueba que
+   coinciden). La serie sube el pago y el séptimo, el del rival fuerte,
+   paga 10 más. */
+export function monedasCombateFrontera(n) {
+  const k = Math.max(1, Math.floor(+n || 0)), serie = Math.floor((k - 1) / 7);
+  return 4 + 2 * Math.min(10, serie) + (k % 7 === 0 ? 10 : 0);
+}
+/* Lo acumulado por una racha de n: la suma de cada combate, hasta 500. */
+export function monedasRachaFrontera(n) {
+  let t = 0;
+  for (let k = 1; k <= Math.min(Math.floor(+n || 0), 500); k++) t += monedasCombateFrontera(k);
+  return t;
+}
 function extraRecord(cat, f) {
+  if (/^club-frontera-(torre|palacio|fabrica)-(50|abierto)$/.test(cat)) return monedasRachaFrontera(f.puntos);
+  if (cat === "club-frontera-victorias") return 3 * Math.min(f.puntos || 0, 100000);
   if (cat === "club-bbtan-rondas") return monedasBbtan(f.puntos);
   const so = /^club-sortem-(\d+)$/.exec(cat);
   if (so) return monedasSortem(+so[1], f.tiempo);
@@ -133,7 +151,7 @@ export function registraDia(prev, dia) {
    `total`: la regla solo deja sumar de a uno y hasta `TOPE_CLUB_DIA` en el
    mismo día (Chile). Las mismas cuentas que la regla: */
 export const PAGO_CLUB = 8, TOPE_CLUB_DIA = 10;
-export const JUEGOS_CLUB = ["minas", "snake", "tetrisclub", "sortem", "bbtan", "sopa", "electro"];
+export const JUEGOS_CLUB = ["minas", "snake", "tetrisclub", "sortem", "bbtan", "sopa", "electro", "frontera"];
 export function registraJugadaClub(prev, dia) {
   if (!prev || !Number.isInteger(prev.dia)) return { dia, hoy: 1, total: 1 };
   if (dia < prev.dia) return null;

@@ -148,6 +148,11 @@ y están en el repositorio público, como cualquier archivo del sitio.
 > juego funciona igual, pero los récords se quedan en el dispositivo y se
 > sincronizan solos la próxima vez que se abra después de publicarlas.
 
+> **Frontera Batalla (octubre de 2026):** `club-frontera-…` son categorías
+> nuevas de `soloRanks` y `frontera` un juego nuevo de `clubJugadas`. Hasta
+> volver a publicar las reglas se juega igual, pero las rachas no llegan a la
+> clasificación ni pagan las monedas por combate.
+
 Tu base de datos está ahora en **modo de prueba** (abierta a cualquiera).
 Antes de publicar el sitio:
 

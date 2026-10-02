@@ -29,7 +29,7 @@ import { suena } from "./sonido.js";
 import { cargaMotor, motorListo } from "./pokemon/carga.js";
 import { abreEquipos, misEquipos } from "./pokemon/equipos.js";
 import { relata, relataTodo, TIPOS, COLOR_TIPO, ESTADOS, STATS_CORTO } from "./pokemon/relato.js";
-import { ENTRENADORES, REGIONES, skinSana, htmlEntrenador, SKIN_POR, colorRegion } from "./pokemon/entrenadores.js";
+import { ENTRENADORES, REGIONES, skinSana, htmlEntrenador, htmlSkin, SKIN_POR, colorRegion } from "./pokemon/entrenadores.js";
 
 const toID = t => String(t || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
 
@@ -42,8 +42,13 @@ const pct = (hp, max) => (max ? Math.max(0, Math.min(100, Math.ceil(hp / max * 1
 const CORTO_ESTADO = { brn: "QUE", par: "PAR", slp: "DOR", frz: "CON", psn: "ENV", tox: "TÓX" };
 const colorVida = p => (p > 50 ? "#3fd47a" : p > 20 ? "#f2c037" : "#ef5350");
 
+/* `ctx.local` es la Frontera Batalla: la pelea corre contra la IA en
+   este mismo navegador (`frontera-motor.js`), sin registro ni promesas.
+   Trae `elige(c)`, `rinde()`, `titulo`, `palacio` y `desdeCero` (contar
+   la pelea desde la presentación); quien la monta vuelve a llamar a
+   `actualizar` con el estado nuevo después de cada elección. */
 export function crearPokemon(ctx) {
-  const { uid, pid, jugar, terminar, mirando, secreto, rehaz, listo } = ctx;
+  const { uid, pid, jugar, terminar, mirando, secreto, rehaz, listo, local } = ctx;
   let host = null, muerto = false, latido = 0;
   let p = null, est = null, PM = motorListo();
   let cadena = null, cargandoSecreto = false;
@@ -88,7 +93,7 @@ export function crearPokemon(ctx) {
       cargaMotor().then(m => { PM = m; if (!muerto) { rehaz && rehaz(); pinta(); } })
         .catch(e => { if (!muerto) set("pkEscena", "error", `<div class="jg-pk-aviso">${esc(e.message)}</div>`); });
     }
-    if (!mirando) misEquipos(uid).then(d => { equipos = d; skin = skinSana(d.skin); if (!muerto) pinta(); }).catch(() => {});
+    if (!mirando && !local) misEquipos(uid).then(d => { equipos = d; skin = skinSana(d.skin); if (!muerto) pinta(); }).catch(() => {});
     latido = setInterval(() => { if (!muerto) { automatismos(); } }, LATIDO_MS);
   }
 
@@ -118,6 +123,7 @@ export function crearPokemon(ctx) {
 
   async function promete(c, sk) {
     if (!est || muerto) return;
+    if (local) { local.elige(c); return; }
     const k = est.punto;
     if (yaMandado(k, "c")) return;
     const l = await llave(k);
@@ -149,7 +155,7 @@ export function crearPokemon(ctx) {
 
   let aviso = "";
   function automatismos() {
-    if (!est || !PM || !juego()) return;
+    if (!est || !PM || !juego() || local) return;
     if (est.fase !== "equipos" && est.fase !== "jugando") return;
     const todos = est.lados.every(u => est.prometido[u]);
     if (!est.prometido[uid]) {
@@ -189,7 +195,7 @@ export function crearPokemon(ctx) {
 
   function pintaFase() {
     let t;
-    const fmt = PM.FORMATOS[PM.formatoDe(p.formato)] || "";
+    const fmt = local ? local.titulo || "" : PM.FORMATOS[PM.formatoDe(p.formato)] || "";
     if (est.fase === "fin") {
       const g = est.ganador;
       const motivo = { rinde: " (rendición)", abandono: " (abandono)", equipo: " (equipo no válido)", equipos: " (ningún equipo era válido)", tope: " (demasiado largo)" }[est.motivo] || "";
@@ -205,8 +211,8 @@ export function crearPokemon(ctx) {
 
   function pintaBotones() {
     const puede = juego() && (est.fase === "equipos" || est.fase === "jugando");
-    set("pkBotones", (puede ? "1" : "0") + rindeArmado + est.fase, `
-      <button class="btn2" data-x="equipos">📋 Mis equipos</button>
+    set("pkBotones", (puede ? "1" : "0") + rindeArmado + est.fase + (animando ? "a" : ""), `
+      ${local ? (animando ? `<button class="btn2" data-x="salta">⏩ Saltar</button>` : "") : `<button class="btn2" data-x="equipos">📋 Mis equipos</button>`}
       ${puede && est.fase === "jugando" ? `<button class="btn2 jg-pk-peligro" data-x="rinde">${rindeArmado ? "¿Seguro? Pulsa otra vez" : "🏳 Rendirse"}</button>` : ""}`);
   }
 
@@ -431,7 +437,7 @@ export function crearPokemon(ctx) {
         });
       } else ponFicha(l, null);
       const conds = Object.keys(side.sideConditions || {}).map(k => `<span class="jg-pk-chip">${esc(B.dex.conditions.get(k).name || k)}</span>`).join("");
-      const ent = `${htmlEntrenador(est.skins[est.lados[i]] || SKIN_POR)}<b>${esc(i === yo() ? "Tú" : nombreLado(i))}</b>${bolas(side, propio, rev.vistos[i])}${conds}`;
+      const ent = `${htmlSkin(est.skins[est.lados[i]])}<b>${esc(i === yo() ? "Tú" : nombreLado(i))}</b>${bolas(side, propio, rev.vistos[i])}${conds}`;
       const eel = $c(`.jg-pk-entren.${l}`);
       if (eel.dataset.f !== ent) { eel.dataset.f = ent; eel.innerHTML = ent; }
     }
@@ -536,9 +542,9 @@ export function crearPokemon(ctx) {
     const it = $c(".jg-pk-intro");
     if (!it) return;
     const me = yo() >= 0 ? yo() : 0, op = 1 - me;
-    it.innerHTML = `<div class="jg-pk-intro-ent suya">${htmlEntrenador(est.skins[est.lados[op]] || SKIN_POR, "enorme")}<b>${esc(nombreLado(op))}</b></div>
+    it.innerHTML = `<div class="jg-pk-intro-ent suya">${htmlSkin(est.skins[est.lados[op]], "enorme")}<b>${esc(nombreLado(op))}</b></div>
       <div class="jg-pk-intro-vs">VS</div>
-      <div class="jg-pk-intro-ent mia">${htmlEntrenador(est.skins[est.lados[me]] || SKIN_POR, "enorme")}<b>${esc(yo() >= 0 ? "Tú" : nombreLado(me))}</b></div>`;
+      <div class="jg-pk-intro-ent mia">${htmlSkin(est.skins[est.lados[me]], "enorme")}<b>${esc(yo() >= 0 ? "Tú" : nombreLado(me))}</b></div>`;
     it.hidden = false;
     decir(`¡${yo() >= 0 ? nombreLado(op) + " te desafía" : nombreLado(0) + " contra " + nombreLado(1)}!`);
     setTimeout(() => { if (it) it.hidden = true; }, 2100);
@@ -550,14 +556,14 @@ export function crearPokemon(ctx) {
     if (animDesde < 0 || animDesde > log.length) {
       // Primera vez: si la pelea acaba de empezar se cuenta desde el
       // principio (con la presentación); si ya iba avanzada, no.
-      animDesde = est.punto <= 2 ? 0 : log.length;
+      animDesde = local ? (local.desdeCero ? 0 : log.length) : est.punto <= 2 ? 0 : log.length;
     }
     if (log.length === animDesde) return;
     const nuevas = PM.lineasPara(log, yo() >= 0 ? yo() : -1, animDesde);
     animDesde = log.length;
     const ps = pasos(nuevas);
     if (!ps.length) return;
-    if (document.hidden || ps.length + cola.length > MAX_PASOS) {
+    if (document.hidden || (!local && ps.length + cola.length > MAX_PASOS)) {
       cola = []; animando = false; clearTimeout(reloj); genAnim++;
       pintaEscena(true);
       const ult = ps.filter(x => x.txt).pop();
@@ -591,6 +597,7 @@ export function crearPokemon(ctx) {
     if (est.fase !== "jugando") { set("pkControl", "fin", ""); return; }
     // Como en los juegos: el menú vuelve cuando se acabó de contar el turno.
     if (animando) { set("pkControl", "anim", `<p class="jg-nota jg-pk-esperaanim">…</p>`); return; }
+    if (local && local.palacio) { set("pkControl", "palacio", `<p class="jg-nota">En el Palacio tus Pokémon deciden solos, según su naturaleza y la vida que les queda.</p>`); return; }
     if (!est.decide[uid]) { set("pkControl", "nada" + est.punto, `<p class="jg-nota">Esperando a que ${esc(nombreLado(1 - i))} elija…</p>`); return; }
     if (est.prometido[uid]) {
       const pd = pendiente();
@@ -676,7 +683,7 @@ export function crearPokemon(ctx) {
     if (est.fase === "fin") t = "Combate terminado.";
     else if (aviso) t = aviso;
     else if (Object.keys(est.falsas || {}).length) t = "⚠️ Llegó una revelación que no casa con lo prometido: no cuenta, y la mesa espera la buena.";
-    else t = juego() ? "Las elecciones se revelan solas cuando los dos han elegido." : "";
+    else t = local ? "" : juego() ? "Las elecciones se revelan solas cuando los dos han elegido." : "";
     set("pkPie", t, t ? `<span class="jg-nota">${esc(t)}</span>` : "");
   }
 
@@ -694,10 +701,14 @@ export function crearPokemon(ctx) {
       abreEquipos({ uid, formato: p && p.formato, alCerrar: d => { equipos = d; skin = skinSana(d.skin); firmas.pkEscena = ""; pinta(); } });
       return;
     }
+    if (b.dataset.x === "salta") {
+      if (animando) { cola = []; genAnim++; clearTimeout(reloj); pintaEscena(true); siguiente(genAnim); }
+      return;
+    }
     if (b.dataset.x === "rinde") {
       if (!rindeArmado) { rindeArmado = 1; setTimeout(() => { rindeArmado = 0; if (!muerto) { firmas.pkBotones = ""; pinta(); } }, 3000); pinta(); return; }
       rindeArmado = 0;
-      jugar({ t: "rinde", uid });
+      if (local) local.rinde(); else jugar({ t: "rinde", uid });
       return;
     }
     if (!juego()) return;
@@ -746,7 +757,7 @@ export function crearPokemon(ctx) {
     }
     pinta();
     automatismos();
-    if (est && est.fase === "fin" && est.ganador !== null && est.ganador !== undefined && !(p.fin && p.fin.at)) {
+    if (!local && est && est.fase === "fin" && est.ganador !== null && est.ganador !== undefined && !(p.fin && p.fin.at)) {
       terminar(est.ganador, est.motivo);
     }
   }

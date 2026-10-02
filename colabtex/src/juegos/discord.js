@@ -121,7 +121,8 @@ const MODALIDADES = {
   espejo: "Espejo", laberinto: "Laberinto",
   10: "del 1 al 10", 20: "del 1 al 20", 30: "del 1 al 30", rondas: "ronda máxima",
   chico: "tablero chico", mediano: "tablero mediano", grande: "tablero grande", gigante: "tablero gigante",
-  racha: "racha diaria", puntos: "puntos totales", facil: "Fácil", medio: "Medio", dificil: "Difícil", 8: "8×8", 12: "12×12", 15: "15×15"
+  racha: "racha diaria", puntos: "puntos totales", facil: "Fácil", medio: "Medio", dificil: "Difícil", 8: "8×8", 12: "12×12", 15: "15×15",
+  torre: "Torre Batalla", palacio: "Palacio Batalla", fabrica: "Fábrica Batalla", 50: "Nivel 50", abierto: "Nivel Abierto", victorias: "victorias totales"
 };
 const CLUBS = {
   minas: { nombre: "Mina Club", juego: "Buscaminas", icono: "💣", ruta: "minas" },
@@ -130,12 +131,13 @@ const CLUBS = {
   sortem: { nombre: "sortEm", juego: "sortEm", icono: "🔢", ruta: "sortem" },
   bbtan: { nombre: "BBTAN", juego: "BBTAN", icono: "🟩", ruta: "bbtan" },
   sopa: { nombre: "Sopa de letras", juego: "Sopa de letras", icono: "🔤", ruta: "sopa" },
-  electro: { nombre: "Electrodle", juego: "Electrodle", icono: "⚡", ruta: "electro" }
+  electro: { nombre: "Electrodle", juego: "Electrodle", icono: "⚡", ruta: "electro" },
+  frontera: { nombre: "Frontera Batalla", juego: "Frontera Batalla", icono: "🏰", ruta: "frontera" }
 };
 
 /* "club-snake-arcade-grande" → {club, modalidad: "Arcade · tablero grande"} */
 export function categoriaLegible(cat) {
-  const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro)-(.+)$/.exec(String(cat || ""));
+  const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera)-(.+)$/.exec(String(cat || ""));
   if (!m) return null;
   return { club: CLUBS[m[1]], modalidad: m[2].split("-").map(k => MODALIDADES[k] || k).join(" · ") };
 }
@@ -148,6 +150,8 @@ const reloj = ms => {
    tiempo (los puntos son fijos), en el resto los puntos. */
 export function marcaSolo(cat, f) {
   if (cat === "club-sopa-racha" || cat === "club-electro-racha") return `🔥 ${f.puntos} ${f.puntos === 1 ? "día" : "días"} seguidos`;
+  if (cat === "club-frontera-victorias") return `🏰 ${Number(f.puntos).toLocaleString("es-CL")} victorias`;
+  if (/^club-frontera-/.test(cat)) return `🏰 ${f.puntos} ${f.puntos === 1 ? "combate seguido" : "combates seguidos"}`;
   if (cat === "club-electro-puntos") return `⚡ ${Number(f.puntos).toLocaleString("es-CL")} pts`;
   if (/^club-minas-|^club-sortem-|^club-sopa-|^club-tetris-sprint$/.test(cat)) return `⏱️ ${reloj(f.tiempo)}`;
   if (/^club-bbtan-/.test(cat)) return `🟩 Ronda ${f.puntos}`;
