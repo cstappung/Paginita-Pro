@@ -3710,9 +3710,9 @@ other file of the site. Things that hold it together:
   with no top.
 - **Re-roll** (CS2's trade-up contract): ten copies of one rarity (común,
   rara or épica) become one of a higher rarity, any card of it with equal
-  chance. Usually the next one; `SALTO_W` = 9200/750/50 makes it jump one,
-  two or three tiers 92 / 7.5 / 0.5 % of the time (capped at legendary, so
-  from épica it is always legendary). The jump has its own hash stream
+  chance. Usually the next one: `SALTO_W[tier]` (ten-thousandths, one row
+  per input rarity) makes común go to rara / épica / legendaria 92 / 7.5 /
+  0.5 %, rara to épica / legendaria 96 / 4 %, and épica always legendary. The jump has its own hash stream
   (`"prodrop-salto:" + key`), so card and grade come from the same stream
   as before, and it applies only from `SALTOS_DESDE`: a reroll written
   earlier keeps the card it already gave. `probSalida(tier)` is what the

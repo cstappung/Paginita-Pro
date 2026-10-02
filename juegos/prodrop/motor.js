@@ -257,24 +257,23 @@
   }
   /* La carta que sale: {id, g, w}. `tier` es la rareza de las diez que
      entraron (0 a 2) y `notas` sus notas ocultas, en el orden escrito. */
-  /* El salto: casi siempre sube una rareza, a veces dos y muy rara vez
-     tres (de común a legendaria), en diez milésimas: 92 % / 7,5 % / 0,5 %.
-     Lo que no cabe por encima de legendaria se queda en legendaria, así
-     que de una rara sale épica el 92 % y legendaria el 8 %, y de una épica
+  /* El salto, en diez milésimas y por rareza de entrada (`SALTO_W[tier]`,
+     cada fila: subir una, dos, tres). De común: rara 92 %, épica 7,5 %,
+     legendaria 0,5 %. De rara: épica 96 %, legendaria 4 %. De épica:
      siempre legendaria. Sale de su propio resumen, para que la carta y la
      nota sigan saliendo del mismo generador de siempre, y solo cuenta
      desde `SALTOS_DESDE`: un re-roll escrito antes vuelve a dar
      exactamente la carta que dio. */
-  const SALTO_W = [9200, 750, 50];
+  const SALTO_W = [[9200, 750, 50], [9600, 400], [10000]];
   const SALTOS_DESDE = 1790960400000;
-  function saltoReroll(k, at) {
+  function saltoReroll(k, at, tier) {
     if (at < SALTOS_DESDE) return 1;
-    return 1 + pesado(generador(sha256("prodrop-salto:" + k).slice(0, 4)), SALTO_W);
+    return 1 + pesado(generador(sha256("prodrop-salto:" + k).slice(0, 4)), SALTO_W[tier]);
   }
   /* La probabilidad de cada rareza de salida para una rareza de entrada. */
   function probSalida(tier) {
-    const p = [0, 0, 0, 0], t = SALTO_W.reduce((a, b) => a + b, 0);
-    SALTO_W.forEach((w, i) => { p[Math.min(3, tier + 1 + i)] += w / t; });
+    const p = [0, 0, 0, 0], w = SALTO_W[tier], t = w.reduce((a, b) => a + b, 0);
+    w.forEach((x, i) => { p[Math.min(3, tier + 1 + i)] += x / t; });
     return p;
   }
   const memoR = new Map();
@@ -282,7 +281,7 @@
     const k = uid + "|" + clave + "|" + at + "|" + tier + "|" + notas.join(",");
     if (memoR.has(k)) return memoR.get(k);
     const r = generador(sha256("prodrop-reroll:" + k).slice(0, 4));
-    const posibles = POR_TIER[Math.min(3, tier + saltoReroll(k, at))];
+    const posibles = POR_TIER[Math.min(3, tier + saltoReroll(k, at, tier))];
     const c = posibles[r.entero(posibles.length)];
     const res = { id: c.n, g: 1 + pesado(r, pesosReroll(notas)), w: (r.u32() & 0x7fffffff) | 1 };
     memoR.set(k, res);
