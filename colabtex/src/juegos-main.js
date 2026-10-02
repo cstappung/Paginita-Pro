@@ -33,7 +33,7 @@ import { crearSolo } from "./juegos/solo/club.js";
 import { watchAuth, loginGoogle, logout } from "./firebase.js";
 import * as fb from "./fb-juegos.js";
 import { escapeHtml, timeAgo, colorForUid } from "./util.js";
-import { AJ_RITMOS, JUEGOS, reducir, jugadasDe, acumula, cupoDe, minimoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, YM_MAPAS, mapaYemas, varianteYemas, ganoEn, ordenaRanks, novedades } from "./juegos/motor.js";
+import { AJ_RITMOS, JUEGOS, reducir, jugadasDe, acumula, cupoDe, minimoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, YM_MAPAS, mapaYemas, varianteYemas, ganoEn, ordenaRanks } from "./juegos/motor.js";
 import { crearEscondite } from "./juegos/escondite.js";
 import { crearCartas } from "./juegos/cartas.js";
 import { crearCuadritos } from "./juegos/cuadritos.js";
@@ -58,7 +58,7 @@ import { crearLogros } from "./juegos/logros-vista.js";
 import { monedasDe, formatoMonedas, valorLogro, registraDia, diaChile as diaMonedas } from "./juegos/monedas.js";
 import { crearMonedas, topHtml, MONEDA } from "./juegos/monedas-vista.js";
 import { crearProdrop } from "./juegos/prodrop.js";
-import { mejoresDrops, miniCarta, cifras as cifrasCartas } from "./juegos/prodrop-cartas.js";
+import { mejoresDrops, miniCarta, cifras as cifrasCartas, MOTOR } from "./juegos/prodrop-cartas.js";
 import { mezcla, abrePerfil } from "./juegos/perfil.js";
 import { abreMini, cierraMini, miniAbierta, crearPaginaPerfil, avatarMarco, quien } from "./juegos/perfil-vista.js";
 import { estadisticas } from "./juegos/perfil-tarjeta.js";
@@ -547,17 +547,22 @@ function nombreEnDatos(uid, d) {
   for (const t of [...Object.values(d.ranks || {}), ...Object.values(d.solo || {})]) if (t && t[uid] && t[uid].nombre) return t[uid].nombre;
   return "";
 }
-/* Las mejores cartas sacadas en PRODROP: épicas y legendarias, con quién
-   las sacó. */
+/* Los últimos drops de PRODROP, en orden de salida (la más reciente
+   primero): solo épicas y legendarias, con quién las sacó y cuándo. */
+const haceCuanto = at => {
+  const m = Math.max(0, Math.round((fb.ahora() - at) / 60000));
+  return m < 1 ? "recién" : m < 60 ? `hace ${m} min` : m < 1440 ? `hace ${Math.round(m / 60)} h` : `hace ${Math.round(m / 1440)} d`;
+};
 function dropsHtml(d) {
-  const l = mejoresDrops(d, 6), n = cifrasCartas(d);
-  const pie = `<a class="btn jg-drop-abrir" href="#cartas">Abrir sobres →</a>`;
-  if (!l.length) return `<p class="jg-nada">Nadie ha sacado todavía una épica. ${n.sobres ? `Van ${n.sobres} sobres abiertos.` : "Estrena PRODROP."}</p>${pie}`;
-  return `<div class="jg-drops">${l.map(c => {
+  const l = mejoresDrops(d, 24);
+  if (!l.length) {
+    const n = cifrasCartas(d);
+    return `<p class="jg-nada">Nadie ha sacado todavía una épica. ${n.sobres ? `Van ${n.sobres} sobres abiertos.` : "Estrena PRODROP."} <a href="#cartas">Abrir un sobre →</a></p>`;
+  }
+  return l.map(c => {
     const q = quien(c.uid, perfilDe(c.uid), null, { nombre: nombreEnDatos(c.uid, d) }, colorForUid);
-    return `<div class="jg-drop">${miniCarta(c)}<span class="jg-drop-quien" data-perfil="${escapeHtml(c.uid)}" data-nombre="${escapeHtml(q.nombre)}">${avatarMarco(q.foto, q.nombre, q.color, "anillo", 18, c.uid)}<b>${escapeHtml(q.nombre)}</b></span></div>`;
-  }).join("")}</div>
-  <p class="jg-drop-cifras">${n.sobres} ${n.sobres === 1 ? "sobre abierto" : "sobres abiertos"} · ${n.leyendas} ${n.leyendas === 1 ? "legendaria" : "legendarias"}${n.dioses ? ` · ${n.dioses} god ${n.dioses === 1 ? "pack" : "packs"}` : ""}</p>${pie}`;
+    return `<div class="jg-drop">${miniCarta(c)}<span class="jg-drop-quien" data-perfil="${escapeHtml(c.uid)}" data-nombre="${escapeHtml(q.nombre)}">${avatarMarco(q.foto, q.nombre, q.color, "anillo", 18, c.uid)}<b>${escapeHtml(q.nombre)}</b></span><small class="jg-drop-cuando">${haceCuanto(c.at)}</small></div>`;
+  }).join("");
 }
 async function marcaDia() {
   const u = state.user, hoy = diaMonedas();
@@ -1117,10 +1122,6 @@ function armazon() {
           <header>${MONEDA}<h2>Top monedas</h2></header>
           <div id="vesMonedas"><p class="jg-nada">Contando monedas…</p></div>
         </section>
-        <section class="jg-lado-caja jg-drops-ves">
-          <header><span aria-hidden="true">🃏</span><h2>Mejores drops</h2><a class="jg-lado-n jg-drop-ir" href="#cartas">PRODROP</a></header>
-          <div id="vesDrops"><p class="jg-nada">Buscando cartas…</p></div>
-        </section>
         <section class="jg-lado-caja">
           <header><h2>Tus partidas</h2></header>
           <div id="vesMias"></div>
@@ -1152,74 +1153,80 @@ function armazon() {
 }
 
 /* ---------- novedades ----------
-   Lo primero del vestíbulo son los tres juegos que llegaron últimos, por
-   la fecha `alta` de `JUEGOS`: quien vuelve al salón tiene que ver qué
-   hay de nuevo sin recorrer el catálogo. La sala se abre con las
-   opciones por omisión —las mismas que trae preseleccionadas su tarjeta
-   del catálogo—, y «Opciones» lleva a esa tarjeta para elegir otras. */
+   Lo primero del vestíbulo es lo que llegó último, para que quien vuelve
+   al salón lo vea sin recorrer el catálogo; justo debajo, la tira de los
+   últimos drops de PRODROP. */
 const fechaAlta = a => {
   const d = new Date(a + "T12:00:00");
   return isNaN(d) ? "" : d.toLocaleDateString("es", { day: "numeric", month: "long" });
 };
 const porOmision = k => Object.fromEntries((OPCIONES[k] || []).map(o => [o.clave, o.por || o.valores[0].v]));
 
+/* Lo que se destaca a mano: no siempre lo nuevo es un juego de sala
+   (PRODROP es una tienda, BBTAN un juego del club, zombis un modo de
+   Yemas), así que la lista se escribe aquí en vez de salir de las fechas
+   `alta` de JUEGOS. El primero lleva «★ Lo último». */
+const NOVEDADES = [
+  { id: "zombis", color: "#4f8a2b", alta: "2026-10-01", titulo: "Yemas · modo Zombis",
+    lema: "Todos juntos contra oleadas de huevos podridos, en cinco mapas clásicos: bebidas, la caja misteriosa, armas en la pared y Pack-a-Punch. Se puede jugar solo.",
+    sub: "1–8 jugadores · cooperativo", sala: { k: "yemas", ops: { variante: "zombis" } }, reglas: ["yemas", "zombis"] },
+  { id: "prodrop", color: "#9b4dff", alta: "2026-10-02", titulo: "PRODROP · sobres de cartas",
+    lema: "Gasta tus monedas en sobres de cinco cartas de los profes, gradúalas y exhibe las mejores en tu perfil. Un 2 % de los sobres es un god pack.",
+    sub: () => { const a = fb.ahora(), p = MOTOR.precioSobre(a);
+      return a < MOTOR.PRECIO.promoHasta ? `Sobre a ${p} monedas hasta el 4 de octubre (después, ${MOTOR.PRECIO.normal})` : `Sobre a ${p} monedas · graduar, ${MOTOR.PRECIO.gradua}`; },
+    ruta: "#cartas", boton: "Abrir sobres" },
+  { id: "bbtan", color: "#6aa514", alta: "2026-09-30", titulo: "BBTAN",
+    lema: "Apunta, rebota y rompe los bloques antes de que toquen el suelo. Y no te quedes mucho rato: más abajo, algo cambia.",
+    sub: "Un jugador · ranking por ronda máxima", ruta: "#solo/bbtan", boton: "Lanzar", reglas: ["bbtan"] }
+];
+function arteNovedad(n) {
+  if (n.id === "zombis") return `<div class="jg-nov-arte-zb">${arteJuego("yemas")}<b>ZOMBIS</b></div>`;
+  if (n.id === "prodrop") {
+    const cs = ["javier-pereda-torres-gta", "claudia-prieto-shiny", "david-watts-casino"];
+    return `<div class="jg-nov-arte-pd">${cs.map((c, i) => `<img src="juegos/prodrop/cards/${i === 1 ? "legendarias" : "epicas"}/${c}.webp" alt="" loading="lazy">`).join("")}<b>PRO<span>DROP</span></b></div>`;
+  }
+  return `<div class="jg-nov-arte-bb"><i></i><i></i><i></i><i></i><i></i><i></i><em></em><b>BBTAN</b></div>`;
+}
+
 function novedadesHtml() {
-  const ks = novedades(3);
-  if (!ks.length) return "";
   return `
       <section class="jg-nov" aria-labelledby="vesNovT">
         <header class="jg-nov-cab">
-          <span class="jg-eyebrow">RECIÉN LLEGADOS</span>
+          <span class="jg-eyebrow">RECIÉN LLEGADO</span>
           <h2 id="vesNovT">Novedades</h2>
-          <p>Los ${ks.length} últimos juegos en llegar al salón.</p>
+          <p>Lo último que llegó al salón.</p>
         </header>
-        <div class="jg-nov-lista">${ks.map((k, i) => {
-          const j = JUEGOS[k], grupo = j.cupo > 2;
-          const cupo = grupo ? (j.minimo || 2) + "–" + j.cupo + " jugadores" : "Duelo · 2 jugadores";
-          return `
-          <article class="jg-nov-c" style="--c:${j.color}">
-            <div class="jg-portada jg-portada-${k}" aria-hidden="true">${arteJuego(k)}</div>
+        <div class="jg-nov-lista">${NOVEDADES.map((n, i) => `
+          <article class="jg-nov-c" style="--c:${n.color}">
+            <div class="jg-portada jg-nov-arte" aria-hidden="true">${arteNovedad(n)}</div>
             <div class="jg-nov-cuerpo">
-              <div class="jg-nov-meta"><span class="jg-nov-sello">${i === 0 ? "★ Lo último" : "Nuevo"}</span><span>${escapeHtml(fechaAlta(j.alta))}</span></div>
-              <h3>${escapeHtml(j.nombre)}</h3>
-              <p>${escapeHtml(j.lema)}</p>
-              <small>${escapeHtml(cupo)}</small>
+              <div class="jg-nov-meta"><span class="jg-nov-sello">${i === 0 ? "★ Lo último" : "Nuevo"}</span><span>${escapeHtml(fechaAlta(n.alta))}</span></div>
+              <h3>${escapeHtml(n.titulo)}</h3>
+              <p>${escapeHtml(n.lema)}</p>
+              <small>${escapeHtml(typeof n.sub === "function" ? n.sub() : n.sub)}</small>
               <div class="jg-nov-pie">
-                <button class="btn" data-nov-crear="${k}">Abrir sala <span aria-hidden="true">→</span></button>
-                ${OPCIONES[k] ? `<button class="btn2" data-nov-ver="${k}" title="Elegir las opciones en su tarjeta">Opciones</button>` : ""}
-                ${tieneReglas(k) ? `<button class="btn2" data-nov-reglas="${k}" title="Cómo se juega" aria-label="Reglas de ${escapeHtml(j.nombre)}">📖</button>` : ""}
+                ${n.sala ? `<button class="btn" data-nov-crear="${n.id}">Abrir sala <span aria-hidden="true">→</span></button>`
+                  : `<a class="btn" href="${n.ruta}">${escapeHtml(n.boton)} <span aria-hidden="true">→</span></a>`}
+                ${n.reglas ? `<button class="btn2" data-nov-reglas="${n.id}" title="Cómo se juega" aria-label="Reglas de ${escapeHtml(n.titulo)}">📖</button>` : ""}
               </div>
             </div>
-          </article>`;
-        }).join("")}</div>
+          </article>`).join("")}</div>
+      </section>
+      <section class="jg-tira" aria-labelledby="vesTiraT">
+        <header><h2 id="vesTiraT">🃏 Últimos drops</h2><small>épicas y legendarias de PRODROP, de la más reciente a la más antigua</small><a href="#cartas">Abrir sobres →</a></header>
+        <div id="vesDrops" class="jg-tira-fila"><p class="jg-nada">Buscando cartas…</p></div>
       </section>`;
 }
 
 function enganchaNovedades(h) {
+  const de = id => NOVEDADES.find(n => n.id === id);
   for (const b of h.querySelectorAll("[data-nov-crear]")) {
-    const k = b.getAttribute("data-nov-crear");
-    b.onclick = () => crear(k, porOmision(k));
+    const n = de(b.getAttribute("data-nov-crear"));
+    b.onclick = () => crear(n.sala.k, Object.assign(porOmision(n.sala.k), n.sala.ops));
   }
   for (const b of h.querySelectorAll("[data-nov-reglas]")) {
-    const k = b.getAttribute("data-nov-reglas");
-    b.onclick = () => abreReglas(k, { modo: modoReglas(k, porOmision(k)), nombre: JUEGOS[k].nombre });
-  }
-  /* Lleva a la tarjeta del catálogo, abre sus opciones y la hace brillar
-     un momento para que se vea cuál es. Si el filtro la tenía escondida,
-     se vuelve a «Todos». */
-  for (const b of h.querySelectorAll("[data-nov-ver]")) {
-    b.onclick = () => {
-      const k = b.getAttribute("data-nov-ver");
-      const t = document.querySelector("#vesElige .jg-of-" + k);
-      if (!t) return;
-      if (t.hidden) { filtroVes = "todos"; aplicaFiltro(); }
-      const d = t.querySelector(".jg-of-ops");
-      if (d) d.open = true;
-      t.scrollIntoView({ behavior: "smooth", block: "center" });
-      t.classList.remove("jg-of-brilla");
-      void t.offsetWidth;
-      t.classList.add("jg-of-brilla");
-    };
+    const n = de(b.getAttribute("data-nov-reglas")), [k, modo] = n.reglas;
+    b.onclick = () => abreReglas(k, modo ? { modo, nombre: JUEGOS[k] ? JUEGOS[k].nombre : n.titulo } : undefined);
   }
 }
 

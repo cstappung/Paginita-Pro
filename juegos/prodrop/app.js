@@ -134,7 +134,7 @@ function offCenter(c) {
    (`cartas/s/<uid>`) y de cartas graduadas (`cartas/g/<uid>`), que llega
    desde Juegos. Cada copia sale de rehacer su sobre con el motor. Una
    copia se identifica por `key` = `<clave del sobre>.<posición>`. */
-const cuenta = { uid: '', saldo: 0, s: {}, g: {}, exh: [], listo: false, desfase: 0 };
+const cuenta = { uid: '', saldo: 0, s: {}, g: {}, exh: [], espera: { n: 0, falta: 0 }, listo: false, desfase: 0 };
 let col = {}, copies = {}, abriendo = '';   // el sobre en curso no entra a la colección hasta el resumen
 const ahora = () => Date.now() + cuenta.desfase;
 function rehazColeccion() {
@@ -1320,7 +1320,8 @@ addEventListener('message', e => {
 });
 function alDatos(d) {
   const primera = !cuenta.listo;
-  Object.assign(cuenta, { uid: d.uid, saldo: d.saldo, s: d.s || {}, g: d.g || {}, exh: d.exh || [], desfase: d.desfase || 0, listo: true });
+  Object.assign(cuenta, { uid: d.uid, saldo: Math.max(0, d.saldo), s: d.s || {}, g: d.g || {}, exh: d.exh || [],
+    espera: d.espera || { n: 0, falta: 0 }, desfase: d.desfase || 0, listo: true });
   rehazColeccion(); updateColCount();
   if (primera) {
     $('#cargando').hidden = true;
@@ -1347,6 +1348,8 @@ function pintaCompra() {
   $('#buyInfo').innerHTML = !cuenta.listo ? 'Cargando tu cuenta…'
     : falta > 0 ? `Te faltan <b>${fmt(falta)}</b> monedas. Gánalas jugando en <a href="#" data-volver>Juegos</a>.`
     : promo ? `Precio de lanzamiento hasta el ${fin} (después, ${M.PRECIO.normal}). Tienes ${fmt(cuenta.saldo)}.` : `Tienes ${fmt(cuenta.saldo)} monedas.`;
+  // compras escritas sin fondos (otra pestaña a la vez, o un cliente tramposo): no valen hasta que alcance
+  if (cuenta.listo && cuenta.espera.n) $('#buyInfo').insertAdjacentHTML('beforeend', `<br><span class="err">${cuenta.espera.n === 1 ? 'Una compra quedó' : `${cuenta.espera.n} compras quedaron`} sin fondos: no vale${cuenta.espera.n === 1 ? '' : 'n'} hasta que ganes ${fmt(Math.max(0, cuenta.espera.falta - cuenta.saldo))} monedas más.</span>`);
   const a = $('#againBtn');
   a.innerHTML = `Abrir otro sobre ✳ <span class="precio">${MONEDA}${p}</span>`;
   a.disabled = falta > 0 || comprando;

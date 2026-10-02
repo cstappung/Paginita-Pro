@@ -26,11 +26,14 @@
    **Gastar** sí se guarda, porque no se puede deducir de nada: cada sobre
    de PRODROP (`cartas/s/<uid>/<clave>`, con su precio `p`) y cada carta
    graduada (`cartas/g/<uid>/<clave>/<i>`). Las reglas comprueban el precio
-   de cada compra, pero no pueden sumar lo ganado — eso se calcula aquí —,
-   así que no pueden impedir gastar de más. Lo que sí garantiza el cálculo
-   es que se nota: lo ganado nunca baja, así que un saldo negativo es
-   prueba de haber comprado sin fondos, y las cartas de esa cuenta no se
-   exhiben en ninguna parte (juegos/cartas.js).
+   y la hora de cada compra, pero no pueden sumar lo ganado, así que no
+   pueden impedir que un cliente modificado escriba una compra sin fondos.
+   Por eso **una compra solo vale si estaba pagada** (`libroCartas`): se
+   recorren en orden de hora y cada una se acepta solo si lo ganado alcanza
+   para ella y para todas las anteriores aceptadas. La que no alcanza no
+   cuenta como gasto, y su sobre no existe (no entra a la colección, ni al
+   perfil, ni a los mejores drops). El saldo es lo ganado menos lo aceptado,
+   así que **nunca es negativo**, por construcción y no por confianza.
    ============================================================ */
 import { LOGROS, SOLO_PREFIJO, deFila, deMarca } from "./logros.js";
 
@@ -130,18 +133,44 @@ export function monedasDe(uid, datos) {
   const dia = (d.diario || {})[uid];
   if (dia) p.dias = num(dia.bono);
   for (const k of Object.keys(p)) p[k] = Math.round(p[k]);
-  const total = Object.values(p).reduce((a, b) => a + b, 0), gastadas = gastoDe(uid, d.cartas);
-  return { total, gastadas, saldo: total - gastadas, partes: p, logros: Object.values(tengo).reduce((a, s) => a + s.size, 0) };
+  const total = Object.values(p).reduce((a, b) => a + b, 0), libro = libroCartas(uid, d.cartas, total);
+  return { total, gastadas: libro.gastadas, saldo: total - libro.gastadas, libro, partes: p, logros: Object.values(tengo).reduce((a, s) => a + s.size, 0) };
 }
 
-/* Lo gastado en PRODROP: el precio anotado de cada sobre y de cada
-   graduación (`cartas` = {s, g}, ver fb-juegos.js). */
-export function gastoDe(uid, cartas) {
-  const c = cartas || {};
-  let t = 0;
-  for (const x of Object.values((c.s || {})[uid] || {})) t += num(x && x.p);
-  for (const porK of Object.values((c.g || {})[uid] || {})) for (const x of Object.values(porK || {})) t += num(x && x.p);
-  return Math.round(t);
+/* El libro de PRODROP de una cuenta: qué compras valen. `cartas` = {s, g}
+   (fb-juegos.js) y `ganado` lo que suma monedasDe. Se recorre en orden de
+   hora (a igual hora, el sobre antes que su graduación) y cada compra se
+   acepta solo si cabe en lo ganado; una graduación además necesita que su
+   sobre valga. Como lo ganado no baja, lo aceptado hoy sigue aceptado
+   mañana; una compra sin fondos queda en espera y vale el día en que lo
+   ganado alcance para ella y las anteriores. Devuelve los
+   sobres y graduaciones que valen, con la misma forma que en la base. */
+const CLAVE_SOBRE = /^[-_A-Za-z0-9]{8,24}$/;
+export function libroCartas(uid, cartas, ganado) {
+  const c = cartas || {}, compras = [];
+  for (const [k, x] of Object.entries((c.s || {})[uid] || {}))
+    if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) compras.push({ t: 0, k, at: x.at, p: num(x.p), x });
+  for (const [k, porK] of Object.entries((c.g || {})[uid] || {}))
+    for (const [i, x] of Object.entries(porK || {}))
+      if (CLAVE_SOBRE.test(k) && /^[0-4]$/.test(i) && x && Number.isFinite(x.at)) compras.push({ t: 1, k, i, at: x.at, p: num(x.p), x });
+  compras.sort((a, b) => a.at - b.at || a.t - b.t || (a.k < b.k ? -1 : a.k > b.k ? 1 : 0) || (a.i || 0) - (b.i || 0));
+  const s = {}, g = {};
+  let gastadas = 0, n = 0;
+  /* Se aceptan en orden hasta la primera que no cabe, y ahí se para: si se
+     siguiera con las siguientes, una compra barata posterior podría entrar
+     hoy y salir mañana, cuando la anterior por fin alcanzara. Así lo
+     aceptado solo crece. */
+  for (; n < compras.length; n++) {
+    const x = compras[n];
+    // un precio que no es de la tienda (las reglas no lo dejarían) tampoco vale
+    const precioOk = x.t === 0 ? x.p === 50 || x.p === 80 : x.p === 100;
+    if (!precioOk || gastadas + x.p > ganado || (x.t === 1 && !s[x.k])) break;
+    gastadas += x.p;
+    if (x.t === 0) s[x.k] = x.x; else (g[x.k] = g[x.k] || {})[x.i] = x.x;
+  }
+  const espera = compras.slice(n);
+  const pendientes = espera.length, falta = espera.reduce((t, x) => t + x.p, 0);
+  return { s, g, gastadas: Math.round(gastadas), pendientes, falta: Math.round(falta) };
 }
 
 /* Todos los que aparecen en alguna de las cuatro lecturas, con lo que

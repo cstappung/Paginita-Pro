@@ -253,7 +253,7 @@
         "$uid": {
           "$k": {
             ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists()",
-            ".validate": "$k.matches(/^[-_A-Za-z0-9]{8,24}$/) && newData.hasChildren(['at', 'p']) && newData.child('at').val() === now && newData.child('p').val() === (now < 1792119600000 ? 50 : 80)",
+            ".validate": "$k.matches(/^[-_A-Za-z0-9]{8,24}$/) && newData.hasChildren(['at', 'p']) && newData.child('at').val() === now && newData.child('p').val() === (now < 1791169200000 ? 50 : 80)",
             "at": { ".validate": "newData.isNumber()" },
             "p": { ".validate": "newData.isNumber()" },
             "$otro": { ".validate": false }
