@@ -212,6 +212,26 @@
         ".write": "auth != null && root.child('partidas').child($pid).child('jugadores').child(auth.uid).exists() && (!root.child('partidas').child($pid).child('fin').exists() || !newData.exists())",
         "voz": {
           ".write": "auth != null && root.child('partidas').child($pid).child('jugadores').child(auth.uid).exists()"
+        },
+        "y": {
+          ".write": "auth != null && root.child('partidas').child($pid).child('jugadores').child(auth.uid).exists() && !newData.exists()"
+        },
+        "rtc": {
+          "en": {
+            "$u": {
+              ".write": "auth != null && auth.uid === $u && root.child('partidas').child($pid).exists() && (!root.child('partidas').child($pid).child('fin').exists() || !newData.exists())",
+              ".validate": "newData.isString() && newData.val().length <= 16"
+            }
+          },
+          "b": {
+            "$para": {
+              ".write": "auth != null && auth.uid === $para && !newData.exists()",
+              "$m": {
+                ".write": "auth != null && (newData.exists() ? newData.child('de').val() === auth.uid && root.child('partidas').child($pid).exists() && !root.child('partidas').child($pid).child('fin').exists() : auth.uid === $para)",
+                ".validate": "newData.hasChildren(['de', 't']) && newData.child('t').isString()"
+              }
+            }
+          }
         }
       }
     },

@@ -3024,10 +3024,46 @@ is the postman, like Circuit Breakers'. Four things hold it together:
   adds a death and no kill. Nobody can write a kill for themselves: the
   honest limit, said in the manual, is that a modified client could refuse
   to die.
-- **Movement goes through `vivo/<pid>/y/<uid>`**, about twelve writes a
-  second (`fb.yemasVivo`, which also arms an `onDisconnect` remove so a
-  closed tab does not leave a frozen egg to farm). It is the existing `vivo`
-  node, so it needed no new rule, and whoever sees `fin` deletes it.
+- **Movement goes browser to browser, not through the database.** The
+  frame publishes its state about twelve times a second, and the postman
+  sends it over a WebRTC data-channel mesh (`juegos/malla.js`, `voz.js`'s
+  sibling, signalled through the same kind of mailbox at
+  `vivo/<pid>/rtc`, `fb.senalMalla`). Through RTDB this was N² downloads at
+  12 Hz, with the zombies director's `zb` at 2–3 KB each, and it used up
+  the daily download quota. The channel is unordered with no retransmits
+  (an old state is worthless once the next one is out), negotiated with
+  `id: 0` on both sides, and each attempt carries a number `k`, so ICE
+  candidates from a dropped attempt are ignored. The offerer re-offers on
+  failure (4 s after a channel that had opened, backing off from 10 s for
+  one that never did). Spectators connect to players only. «Healthy» means
+  the channel is open and the connection is not cut, not «something
+  arrived recently»: a hidden tab stops sending but stays healthy, as its
+  database entry used to stay.
+- **`vivo/<pid>/y/<uid>` is the fallback** (`fb.yemasVivo`, still with its
+  `onDisconnect` remove), and `juegos/yemas-red.js` (pure, tested by
+  `tests/yemas-red.test.cjs`) decides what goes where:
+  - Everyone always writes their own entry, but slowly (a state different
+    from the last one written, at most every `LENTO_MS`). It writes at
+    12 Hz only after missing a channel with some peer for `GRACIA_MS`.
+  - Readers listen **one egg at a time** (`fb.watchYemasUno`), and only to
+    the eggs that do not reach them through the mesh. With everyone
+    connected, nobody listens and the game downloads nothing.
+  - An old cached client never joins the mesh, so to the new ones it is a
+    peer without a channel and it keeps working.
+  - The frame sees, per egg, the highest `q` (a per-sender counter that
+    only grows) from either path. A mesh state keeps counting
+    `PUENTE_MS` after the channel drops, until the database answers. A
+    closed tab is then gone from the database, which is how zombies still
+    change director.
+  - Before leaving, states are **thinned** (`adelgaza`): hits travel only
+    their first `VIDA_GOLPE` ms, and `s`/`n`/`x2` only their first
+    `VIDA_SUCESO`. A single burst used to ride every state at 12 Hz until
+    the next one. `ep` is never thinned, because the frame removes the
+    spatula when it is missing.
+  - `rtc` has its own rule, so a spectator can sign up and sign its
+    messages (`de === auth.uid`). Until the rules are re-published,
+    spectators read the fallback. `y` gained a delete rule, so the
+    clean-up at `fin` works while `voz` is still alive.
 - **Hits have no channel of their own.** Each egg's state carries its last
   eight hits (`g`, `[id, target, damage, head, weapon]`, ids from
   `Date.now()` so a reloaded tab keeps climbing) and each frame applies the
