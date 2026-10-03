@@ -3,7 +3,7 @@
 // la sala le pasa los demás jugadores y anota las muertes en el registro.
 import * as THREE from 'three';
 import {
-  crearMundo, moverCuerpo, rayoMundo, rayoHuevo, crearHuevo, crearBandera, crearBase, crearPedestal,
+  crearMundo, moverCuerpo, empujaCuerpo, metido, rayoMundo, rayoHuevo, crearHuevo, crearBandera, crearBase, crearPedestal,
   SPAWNS, BASES, PUNTOS_ARMA, SKINS, ALTO, OJOS,
 } from 'yemas/mundo';
 import {
@@ -235,8 +235,11 @@ function pasoBotella(ver) {
   const sube = Math.min(1, t / 0.25), baja = Math.max(0, (t - 0.8) / 0.2);
   const k = sube * (1 - baja);
   const empina = Math.min(1, Math.max(0, (t - 0.2) / 0.2)) * (1 - baja);
-  botella.position.set(0.22 - 0.2 * k, -0.45 + 0.33 * k, -0.45 + 0.1 * k);
-  botella.rotation.set(-0.15 - 1.9 * empina, 0, 0.25 * (1 - k));
+  // El cuello mira a la cámara (+z) y el fondo se levanta: girar hacia el
+  // lado negativo empinaba la botella con el cuello alejándose y el fondo
+  // contra la cara, que en pantalla se leía como una botella al revés.
+  botella.position.set(0.22 - 0.2 * k, -0.45 + 0.36 * k, -0.45 + 0.08 * k);
+  botella.rotation.set(0.1 + 1.95 * empina, 0, 0.25 * (1 - k));
 }
 function beber(color) {
   yo.bebiendo = BEBER;
@@ -248,8 +251,16 @@ function beber(color) {
 // Los zombis son cuerpos: no se los atraviesa. Se empuja al jugador hacia
 // afuera en el plano; si está casi encima de uno (al caerle desde arriba),
 // se lo deja apoyado sobre la cabeza en vez de hundirlo.
-const RADIO_CHOQUE = 0.85;
+//
+// El empujón se suma de todos los zombis y se aplica con `empujaCuerpo`, que
+// choca con las paredes como caminar. Antes se sumaba a la posición a pelo:
+// rodeado contra un muro, el empujón te metía dentro de la pared y la física
+// te sacaba por arriba, parado sobre el muro y fuera del mapa. Con el tope
+// por cuadro, una horda que aprieta desde todos lados te deja quieto en vez
+// de lanzarte.
+const RADIO_CHOQUE = 0.85, EMPUJE_MAX = 0.25;
 function chocaZombis() {
+  let ex = 0, ez = 0;
   for (const z of zombis.lista.values()) {
     if (z.sube < 1 || z.fase !== 'dentro') continue;
     const p = z.mesh.position;
@@ -259,18 +270,23 @@ function chocaZombis() {
     const d = Math.hypot(dx, dz);
     if (d >= RADIO_CHOQUE) continue;
     if (dy > ALTO * 0.75 && yo.vel.y <= 0) {
-      // Encima de la cabeza: se resbala hacia un lado.
+      // Encima de la cabeza: se apoya, si arriba hay lugar.
+      const y0 = yo.pos.y;
       yo.pos.y = p.y + ALTO;
-      yo.vel.y = 0;
-      yo.enSuelo = true;
+      if (metido(yo.pos, colisores)) yo.pos.y = y0;
+      else { yo.vel.y = 0; yo.enSuelo = true; }
     }
     if (d < 1e-3) { dx = Math.sin(yo.yaw); dz = Math.cos(yo.yaw); } else { dx /= d; dz /= d; }
     const empuja = RADIO_CHOQUE - (d < 1e-3 ? 0 : d);
-    yo.pos.x += dx * empuja;
-    yo.pos.z += dz * empuja;
+    ex += dx * empuja;
+    ez += dz * empuja;
     const v = yo.vel.x * dx + yo.vel.z * dz;
     if (v < 0) { yo.vel.x -= v * dx; yo.vel.z -= v * dz; }
   }
+  const l = Math.hypot(ex, ez);
+  if (l < 1e-6) return;
+  if (l > EMPUJE_MAX) { ex *= EMPUJE_MAX / l; ez *= EMPUJE_MAX / l; }
+  empujaCuerpo(yo, ex, ez, colisores);
 }
 const BASE_ARMA = new THREE.Vector3(0.2, -0.19, -0.62);
 
@@ -2207,7 +2223,7 @@ requestAnimationFrame(bucle);
 
 // Para depurar desde la consola: __yemas.paso(dt) avanza el juego sin requestAnimationFrame
 window.__yemas = {
-  yo, otros, disparar, granadas, suelo, pref, alGolpe, nubes, tirarEspatula, director, get cegado() { return cegado; }, get zombis() { return zombis; },
+  yo, otros, disparar, beber, granadas, suelo, pref, alGolpe, nubes, tirarEspatula, director, get cegado() { return cegado; }, get zombis() { return zombis; },
   get inter() { return inter; }, get mundo() { return mundo; },
   get red() { return red; }, get marcador() { return marcador; },
   paso(dt) { actualizar(dt); actualizarEfectos(dt); escena.updateMatrixWorld(); },

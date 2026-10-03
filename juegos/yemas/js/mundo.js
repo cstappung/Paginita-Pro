@@ -376,17 +376,44 @@ export function moverCuerpo(c, dt, cols) {
     c.vel.y -= GRAVEDAD * h;
     moverEje(c, 'x', c.vel.x * h, cols);
     moverEje(c, 'z', c.vel.z * h, cols);
+    const y0 = c.pos.y;
     c.pos.y += c.vel.y * h;
     c.enSuelo = false;
     if (c.pos.y <= 0) { c.pos.y = 0; c.vel.y = 0; c.enSuelo = true; }
     for (const b of cols) {
       if (!solapa(c.pos, b)) continue;
-      if (c.vel.y <= 0) { c.pos.y = b.maxy; c.enSuelo = true; }
-      else c.pos.y = b.miny - ALTO - 1e-4;
-      c.vel.y = 0;
+      // Solo se apoya encima quien venía de arriba (o a un escalón), y solo
+      // se frena contra el techo quien venía de abajo. Un cuerpo que quedó
+      // metido dentro de una caja por otra cosa (un empujón) se saca hacia
+      // el costado más cercano: subirlo arriba de todo era dejarlo parado
+      // sobre un muro de cuatro metros, fuera del mapa.
+      if (c.vel.y <= 0 && y0 >= b.maxy - PASO) { c.pos.y = b.maxy; c.enSuelo = true; c.vel.y = 0; }
+      else if (c.vel.y > 0 && y0 + ALTO <= b.miny + 1e-3) { c.pos.y = b.miny - ALTO - 1e-4; c.vel.y = 0; }
+      else sacaDeCaja(c, b);
     }
   }
 }
+
+// Saca el cuerpo de la caja por el lado más cercano, en el plano.
+function sacaDeCaja(c, b) {
+  const o = [
+    [b.maxx + RADIO + 1e-4 - c.pos.x, 'x'], [b.minx - RADIO - 1e-4 - c.pos.x, 'x'],
+    [b.maxz + RADIO + 1e-4 - c.pos.z, 'z'], [b.minz - RADIO - 1e-4 - c.pos.z, 'z'],
+  ].sort((a, d) => Math.abs(a[0]) - Math.abs(d[0]))[0];
+  c.pos[o[1]] += o[0];
+  if (Math.sign(c.vel[o[1]]) === -Math.sign(o[0])) c.vel[o[1]] = 0;
+}
+
+/* Un empujón (un zombi que se te mete encima) que respeta las paredes: se
+   aplica a pasos cortos con el mismo choque que caminar, así que nunca
+   atraviesa un muro ni deja el cuerpo metido en una caja. */
+export function empujaCuerpo(c, dx, dz, cols) {
+  const n = Math.max(1, Math.ceil(Math.hypot(dx, dz) / 0.05));
+  for (let i = 0; i < n; i++) { moverEje(c, 'x', dx / n, cols); moverEje(c, 'z', dz / n, cols); }
+}
+
+// ¿El cuerpo está dentro de alguna caja?
+export const metido = (p, cols) => cols.some(b => solapa(p, b));
 
 // ---------- Rayos ----------
 

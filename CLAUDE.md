@@ -3039,31 +3039,42 @@ is the postman, like Circuit Breakers'. Four things hold it together:
   the channel is open and the connection is not cut, not «something
   arrived recently»: a hidden tab stops sending but stays healthy, as its
   database entry used to stay.
-- **`vivo/<pid>/y/<uid>` is the fallback** (`fb.yemasVivo`, still with its
-  `onDisconnect` remove), and `juegos/yemas-red.js` (pure, tested by
-  `tests/yemas-red.test.cjs`) decides what goes where:
-  - Everyone always writes their own entry, but slowly (a state different
-    from the last one written, at most every `LENTO_MS`). It writes at
-    12 Hz only after missing a channel with some peer for `GRACIA_MS`.
-  - Readers listen **one egg at a time** (`fb.watchYemasUno`), and only to
-    the eggs that do not reach them through the mesh. With everyone
-    connected, nobody listens and the game downloads nothing.
-  - An old cached client never joins the mesh, so to the new ones it is a
-    peer without a channel and it keeps working.
+- **There is no database fallback, on purpose.** An earlier version kept
+  `vivo/<pid>/y/<uid>` as a backup for pairs without a channel, and
+  listening to it was exactly what drained the quota. It is gone from the
+  client, and the rules refuse any write there (`y/$u` `.validate: false`,
+  deletes still allowed to clean up old leftovers), so not even a stale
+  cached client can bring it back. `juegos/yemas-red.js` (pure, tested by
+  `tests/yemas-red.test.cjs`) decides the rest:
+  - **A pair without a channel is served by a third peer.** Every peer
+    announces, once a second and whenever a channel changes, whom it has a
+    healthy channel with (`{y:"ok", l}`). States travel as `{y:"e", o, e}`.
+    When the state of O reaches me *directly* and a peer T I am connected
+    to has announced it lacks O, I forward it to T, but only if I am the
+    lowest uid among the peers connected to both (`destinos`). Two who both
+    think they are the chosen one just send T a duplicate, which the `q`
+    drops. Only direct states are forwarded, so it is one hop and never
+    loops. Spectators relay too.
+  - **With nobody in common there is no way to see each other** (a duel
+    between two networks that refuse a direct connection). The room says
+    so above the frame after `AVISO_MS` (`inalcanzables`, `pintaRed` in
+    `yemas.js`), and tells apart someone who left the mesh («no está en la
+    partida») from a network problem.
   - The frame sees, per egg, the highest `q` (a per-sender counter that
-    only grows) from either path. A mesh state keeps counting
-    `PUENTE_MS` after the channel drops, until the database answers. A
-    closed tab is then gone from the database, which is how zombies still
-    change director.
+    only grows), direct or relayed. It stays visible while there is a path
+    (a direct channel, or a connected peer announcing one) and for
+    `PUENTE_MS` after losing it. A closed tab loses every channel, which is
+    how zombies still change director.
   - Before leaving, states are **thinned** (`adelgaza`): hits travel only
     their first `VIDA_GOLPE` ms, and `s`/`n`/`x2` only their first
     `VIDA_SUCESO`. A single burst used to ride every state at 12 Hz until
     the next one. `ep` is never thinned, because the frame removes the
     spatula when it is missing.
+  - Packets without `y` come from the previous version (a bare state) and
+    count as the sender's own.
   - `rtc` has its own rule, so a spectator can sign up and sign its
-    messages (`de === auth.uid`). Until the rules are re-published,
-    spectators read the fallback. `y` gained a delete rule, so the
-    clean-up at `fin` works while `voz` is still alive.
+    messages (`de === auth.uid`). Until the rules are re-published, a
+    spectator cannot join the mesh and sees nothing.
 - **Hits have no channel of their own.** Each egg's state carries its last
   eight hits (`g`, `[id, target, damage, head, weapon]`, ids from
   `Date.now()` so a reloaded tab keeps climbing) and each frame applies the
@@ -3150,21 +3161,26 @@ cost is a stray bite, not a broken game. Seven things hold it together:
   counts once that door is open, so the distances are recomputed
   (Floyd-Warshall, under fifty nodes) every time one opens. A zombie that
   sees its prey chases it straight.
-- **Every round is harder, and not only in numbers.** `hpRonda`,
-  `totalRonda` and `velRonda` grow as before. On top of that,
-  `maxVivos(n, r)` lets one more zombie stand at a time per round, and the
-  bite (`mordidaRonda`) goes from 35 in round 1 to 50 in round 4 (two bites
-  and you fall), up to 80. There are three kinds too (`TIPOS`, `CLASE`,
-  `tipoRonda`). The runner (`c`) shows up from round 3, has 70 % of the
-  life and runs faster than a player walking (5.8 m/s plus 0.3 per round,
-  up to 9). The big one (`g`) shows up from round 5: slow, three times the
-  life, a 1.6× bite and 30 % bigger. Its `userData.escala` widens the
+- **Every round is harder, slowly.** The curve is Black Ops' stretched
+  out, so the pressure arrives around rounds 10–15 rather than by round 5
+  (players complained it climbed too fast). `hpRonda` is 60 + 35 per round
+  up to round 9 and then ×1.09; `velRonda` goes from 2 m/s by 0.25 per
+  round up to 5.5, so common zombies never catch a walking player (7 m/s).
+  **At most 24 stand at once** (`MAX_ZOMBIS`, as in Call of Duty), however
+  many players and whatever the round; below that, `maxVivos(n, r)` = 5 +
+  2·players + one per two rounds, and the rest wait their turn. The bite
+  (`mordidaRonda`) is 30 in round 1 (four to fall), reaches 50 at round 9
+  and tops out at 75. There are three kinds too (`TIPOS`, `CLASE`,
+  `tipoRonda`). The runner (`c`) shows up from round 5, has 70 % of the
+  life and runs at `velCorredor` (5.5 m/s plus 0.2 per round, up to 8.5),
+  so it catches a walking player from round 13. The big one (`g`) shows up
+  from round 8: slow, three times the life, a 1.6× bite and 30 % bigger. Its `userData.escala` widens the
   bullets' ellipsoid (`rayoHuevo(..., escala)`) and raises the head line.
   No bite takes more than 95, so a full-health player is never killed in
   one go. The kind travels at the end of each `zb.z` entry and of each
   death in `zb.m`, and a kill pays `CLASE[t].puntos` (60, 80, 150), plus 40
-  for the head or 70 for the pan. `NOVEDAD_RONDA` warns at rounds 3, 5 and
-  10.
+  for the head or 70 for the pan. `NOVEDAD_RONDA` warns at rounds 5, 8 and
+  13. `tests/yemas-zombis.test.cjs` pins the curve and the cap.
 
 Practice can be zombies too: the menu's mode select gives `conectarLocal`
 `variante: 'zombis'`, `RedLocal` keeps the round and ends the run on the
@@ -3210,7 +3226,15 @@ Things to know:
   whoever took it). They ride `zb` as `b` (on the floor) and `x` (the last
   eight taken); a non-director asks with `p:bono:<id>` and hides it at
   once, and every frame applies each `x` entry once.
-- **Zombies collide with players** (`chocaZombis` in `main.js`) and
+- **Zombies collide with players** (`chocaZombis` in `main.js`). The push
+  from every zombie is summed, capped at `EMPUJE_MAX` per frame, and applied
+  through `empujaCuerpo` in `mundo.js`, which collides with walls like
+  walking does. It used to be added to the position directly: a horde
+  against a wall pushed you *inside* it, and `moverCuerpo` resolved the
+  overlap by lifting you onto the top of the box, i.e. standing on a 4 m
+  wall, out of the map. `moverCuerpo` now only rests a body on top if it
+  came from above (or a step up), and pushes anything else out sideways
+  (`sacaDeCaja`). Zombies
   **climb** rather than jump; a player standing on something makes them
   replan towards the nearest climbable edge instead of piling up below.
 - An unbought wall weapon shows only its **silhouette**; Pack-a-Punched

@@ -29,18 +29,27 @@ export const ZB = {
   tabla: 1.0, entra: 1.6, trepa: 2.4, quema: 4, explota: 3, danioExplota: 50,
 };
 // Vida, cuántos salen y qué tan rápido, por ronda (y por jugadores, cuántos).
-export const hpRonda = r => r <= 9 ? 60 + 45 * (r - 1) : Math.round(420 * Math.pow(1.1, r - 9));
-export const totalRonda = (r, n) => Math.min(90, Math.round((4 + 3 * r) * (1 + 0.5 * (Math.max(1, n) - 1))));
-export const velRonda = r => Math.min(6.2, 2.2 + 0.45 * r);
-const cadaSpawn = r => Math.max(0.45, 2.1 - 0.15 * r);
-// Cada ronda deja más en pie a la vez, y el mordisco pega más fuerte: 35 en
-// la primera, 50 en la cuarta (dos mordiscos y caes) y hasta 80.
-const maxVivos = (n, r = 1) => Math.min(30, 6 + 3 * Math.max(1, n) + r);
-export const mordidaRonda = r => Math.min(80, 30 + 5 * Math.max(1, r));
+// La curva es la de Black Ops pero estirada: las primeras rondas son para
+// aprender el mapa y juntar puntos, y la presión llega hacia la 10–15. Antes
+// a la ronda 5 los comunes ya iban casi al paso del jugador, salían corredores
+// desde la 3 y grandotes desde la 5, y dos mordiscos tumbaban desde la 4.
+export const hpRonda = r => r <= 9 ? 60 + 35 * (r - 1) : Math.round(340 * Math.pow(1.09, r - 9));
+export const totalRonda = (r, n) => Math.min(90, Math.round((4 + 2.4 * r) * (1 + 0.5 * (Math.max(1, n) - 1))));
+export const velRonda = r => Math.min(5.5, 2 + 0.25 * (Math.max(1, r) - 1));
+const cadaSpawn = r => Math.max(0.6, 2.3 - 0.1 * r);
+// Como en Call of Duty, nunca hay más de 24 en pie a la vez, juegue quien
+// juegue y sea la ronda que sea: el resto espera su turno para salir. Por
+// debajo del tope, cada dos rondas cabe uno más.
+export const MAX_ZOMBIS = 24;
+export const maxVivos = (n, r = 1) => Math.min(MAX_ZOMBIS, 5 + 2 * Math.max(1, n) + Math.floor(Math.max(1, r) / 2));
+// El mordisco: 30 en la primera (cuatro para caer), 50 hacia la novena y como
+// mucho 75.
+export const mordidaRonda = r => Math.min(75, 30 + 2.5 * (Math.max(1, r) - 1));
 // Tres clases de zombi, para que las rondas no sean solo «lo mismo con más
-// vida». El corredor (desde la ronda 3) va más rápido que alguien caminando:
-// hay que correr o pararlo. El grandote (desde la 5) es lento, aguanta el
-// triple y muerde más fuerte. Cuántos de cada uno sube con la ronda.
+// vida». El corredor (desde la ronda 5) es más rápido que los comunes y desde
+// la 13 te alcanza caminando: hay que correr o pararlo. El grandote (desde la
+// 8) es lento, aguanta el triple y muerde más fuerte. Cuántos de cada uno
+// sube con la ronda.
 // El índice viaja por la red: lo nuevo va al final.
 export const TIPOS = ['n', 'c', 'g'];
 export const CLASE = {
@@ -48,18 +57,19 @@ export const CLASE = {
   c: { hp: 0.7, mordida: 1, puntos: 80 },
   g: { hp: 3, mordida: 1.6, puntos: 150 },
 };
-const velDe = (tipo, r) => tipo === 'c' ? Math.min(9, 5.8 + 0.3 * r) * (0.95 + Math.random() * 0.1)
+export const velCorredor = r => Math.min(8.5, 5.5 + 0.2 * (Math.max(5, r) - 5));
+const velDe = (tipo, r) => tipo === 'c' ? velCorredor(r) * (0.95 + Math.random() * 0.1)
   : tipo === 'g' ? 2.3 + Math.random() * 0.3 : velRonda(r) * (0.85 + Math.random() * 0.3);
 export function tipoRonda(r, azar = Math.random()) {
-  const g = r >= 5 ? Math.min(0.2, 0.05 * (r - 4)) : 0;
-  const c = r >= 3 ? Math.min(0.5, 0.12 * (r - 2)) : 0;
+  const g = r >= 8 ? Math.min(0.18, 0.04 * (r - 7)) : 0;
+  const c = r >= 5 ? Math.min(0.4, 0.07 * (r - 4)) : 0;
   return azar < g ? 'g' : azar < g + c ? 'c' : 'n';
 }
 // Lo que se avisa al empezar las rondas que traen algo nuevo.
 export const NOVEDAD_RONDA = {
-  3: '¡Cuidado: ahora algunos corren!',
-  5: '¡Llegan los grandotes: lentos, pero aguantan el triple!',
-  10: '¡Ronda 10: los corredores ya son más rápidos que tú caminando!',
+  5: '¡Cuidado: ahora algunos corren!',
+  8: '¡Llegan los grandotes: lentos, pero aguantan el triple!',
+  13: '¡Ronda 13: los corredores ya te alcanzan caminando!',
 };
 const r1 = x => Math.round(x * 10) / 10;
 // Firebase devuelve los arreglos como objetos y se come los vacíos.

@@ -566,24 +566,11 @@ export const tetrisVivo = (pid, uid, d) => set(ref(db, `vivo/${pid}/t/${uid}`), 
 export function watchTetrisVivo(pid, cb) {
   return onValue(ref(db, `vivo/${pid}/t`), s => cb(s.val() || {}), () => {});
 }
-/* Cada huevo de Yemas: `vivo/<pid>/y/<uid>`. Ya no es el canal principal:
-   el directo va de navegador a navegador por la malla (`juegos/malla.js`,
-   señalizada en `vivo/<pid>/rtc`), y esto queda de respaldo para quien no
-   tiene canal directo con alguien. Se reescribe poco (unas cuatro veces por
-   segundo, doce solo si a uno le falta un canal) y cuesta descarga solo a
-   quien lo escucha, que escucha **un huevo a la vez** (`watchYemasUno`) y
-   solo los que no le llegan por la malla. Se borra solo al desconectarse,
-   porque un huevo congelado en medio del mapa sería una baja gratis para el
-   resto. Tampoco es estado: las bajas van al registro. */
-const yemasDesconexion = new Set();
-export function yemasVivo(pid, uid, d) {
-  const r = ref(db, `vivo/${pid}/y/${uid}`);
-  if (!yemasDesconexion.has(pid)) { yemasDesconexion.add(pid); onDisconnect(r).remove().catch(() => {}); }
-  return set(r, d).catch(() => {});
-}
-export function watchYemasUno(pid, uid, cb) {
-  return onValue(ref(db, `vivo/${pid}/y/${uid}`), s => cb(s.val()), () => {});
-}
+/* Yemas ya no escribe ni escucha su directo en la base: va de navegador a
+   navegador por la malla (`juegos/malla.js`, señalizada en `vivo/<pid>/rtc`).
+   `vivo/<pid>/y` era el respaldo, y escucharlo era lo que se comía la cuota
+   de descarga; las reglas ya no dejan escribir ahí, solo borrar lo que quede
+   de versiones anteriores. */
 /* El elenco de Clue: nombres y fotos de gente de verdad, así que no
    viven en el repositorio (que es público) sino aquí, legibles solo con
    sesión iniciada y escritos a mano en la consola, como el webhook de
@@ -632,7 +619,8 @@ function buzon(base, uid) {
   };
 }
 export const borraVivo = pid => remove(ref(db, `vivo/${pid}`)).catch(() => {});
-/* Al acabar una partida de Yemas se borran los huevos y la malla, pero no la voz:
+/* Al acabar una partida de Yemas se borran la malla (y los huevos que
+   hubiera dejado una versión anterior), pero no la voz:
    la sala sigue abierta y la gente sigue hablando (y quizá pide la
    revancha). `vivo/<pid>/voz` tiene su propia regla, que deja escribir a
    los jugadores también con `fin`, y se vacía sola al desconectarse. */

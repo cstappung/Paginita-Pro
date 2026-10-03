@@ -214,7 +214,10 @@
           ".write": "auth != null && root.child('partidas').child($pid).child('jugadores').child(auth.uid).exists()"
         },
         "y": {
-          ".write": "auth != null && root.child('partidas').child($pid).child('jugadores').child(auth.uid).exists() && !newData.exists()"
+          ".write": "auth != null && root.child('partidas').child($pid).child('jugadores').child(auth.uid).exists() && !newData.exists()",
+          "$u": {
+            ".validate": "false"
+          }
         },
         "rtc": {
           "en": {
