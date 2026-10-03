@@ -140,7 +140,11 @@ const ficha = (q, orden, hmazo, extra) => Object.assign({
    el Presidente, la de las llaves de cada reparto (`redPresidente`). */
 async function secreto(pid, uid, juego) {
   const sem = semillaAleatoria(), sal = salAleatoria();
-  await set(ref(db, `${MIAS}/${uid}/${pid}/sec`), { sem, sal });
+  /* Con `juego` y `at` en la misma escritura: una entrada de
+     `misPartidas` que solo tuviera `sec` parecería, a `revisaMias`, una
+     sala vieja (sin `at`) que ya no existe (la sala aún no está
+     escrita), y la borraría con la semilla dentro. */
+  await update(ref(db, `${MIAS}/${uid}/${pid}`), { sec: { sem, sal }, juego, at: Date.now() });
   const extra = juego === "cacho" ? { hcad: cadenaCacho(sem, sal)[CC_CADENA] }
     : juego === "uno" ? { hcad: sha256hex(arrUno(sem, sal)), pk: dhPublica(sem, sal) }
     : juego === "catan" ? { hcad: cadenaCatan(sem, sal)[CT_CADENA] }

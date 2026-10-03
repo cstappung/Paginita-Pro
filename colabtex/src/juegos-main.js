@@ -819,7 +819,11 @@ async function revisaMias() {
   revisandoMias = true;
   try {
     for (const m of state.mias.slice()) {
-      if (miasRevisadas.has(m.id) || fb.ahora() - (m.at || 0) < INACTIVA_MS) continue;
+      /* Sin `at` es una entrada a medio escribir (la semilla llega antes
+         que la sala): mirarla ahora la daría por muerta y borrarla se
+         llevaría la semilla, y con ella la mano de toda la partida. */
+      if (!m.at || !m.juego) continue;
+      if (miasRevisadas.has(m.id) || fb.ahora() - m.at < INACTIVA_MS) continue;
       miasRevisadas.add(m.id);
       const r = await fb.resumenSala(m.id).catch(() => undefined);
       if (r === undefined) continue;
