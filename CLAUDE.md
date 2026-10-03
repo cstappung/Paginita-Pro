@@ -3882,6 +3882,17 @@ other file of the site. Things that hold it together:
   saving the profile would erase them. They show on the profile page and
   the mini card through `exhibidasDe`, which only resolves keys that are
   packs of that account.
+- **Two card tables in the Clasificación** (the **Cartas** button under
+  PRODROP; the key is `prodrop`, because `cartas` is already Cartas de los
+  tres elementos). Both come from the economy replay through `ctx.datos`
+  (`datosPerfil`), never from `ranks`, and both use the owner of *now*
+  (`e.dueno`, so a card bought or traded moves with its buyer).
+  `rankingColeccion` is the top 10 by distinct cards owned out of
+  `PM.TOTAL` (repeats count once; ties: more legendaries, then more
+  copies). `cartasMasRaras` is the top 10 **graded** copies by
+  `probabilidad(id, g).exacta`, the chance grading announces of pulling that
+  card with that grade or better; an ungraded grade is hidden, so it does
+  not rank.
 - **Últimos drops** (`#vesDrops`, a horizontal strip right under
   Novedades, grid area `tira`): `mejoresDrops` lists epics and legendaries
   of valid packs only, in the order they came out (newest first), with who
