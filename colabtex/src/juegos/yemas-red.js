@@ -1,60 +1,55 @@
-/* El directo de Yemas: qué se manda, por dónde y qué ve el marco.
+/* El directo de Yemas: qué se manda, a quién y qué ve el marco.
 
-   Puro (sin DOM, sin Firebase, el reloj se inyecta) para poder probarlo en
-   Node; `yemas.js` lo conecta con la malla y con la base.
+   Puro (sin DOM, sin Firebase, el reloj y la malla se inyectan) para poder
+   probarlo en Node; `yemas.js` lo conecta con la malla (`malla.js`).
 
-   Dos caminos para el estado de cada huevo:
+   **El directo va solo por la malla, nunca por la base.** Antes había un
+   respaldo en `vivo/<pid>/y`: el par que no lograba canal directo escribía y
+   escuchaba su estado por Firebase doce veces por segundo, que es justo lo
+   que se comía la cuota diaria de descarga. Ya no existe, ni en el cliente
+   ni en las reglas (que rechazan escribir ahí).
 
-   - **La malla** (`malla.js`): cada estado, doce veces por segundo, a cada
-     par con canal sano. No cuesta descarga.
-   - **La base** (`vivo/<pid>/y/<uid>`): de respaldo. Cada uno escribe el
-     suyo siempre, pero poco: un estado distinto del último escrito, como
-     mucho cada `LENTO_MS`. Doce veces por segundo (`rapido`) solo cuando le
-     falta canal con algún par desde hace `GRACIA_MS`; ese par, por su lado,
-     ve lo mismo y lo está escuchando. Escribir no gasta la cuota; lo que la
-     gasta es escuchar, y aquí cada uno escucha **solo los huevos que no le
-     llegan por la malla, uno por uno** (`subs`). Con todos conectados nadie
-     escucha nada y la base no descarga un byte por el juego.
+   **El par sin canal se sirve por un tercero.** Cada uno anuncia por la
+   malla, cada segundo, con quién tiene canal sano (`{y:"ok", l}`). Cuando
+   me llega por canal directo el estado de O y sé que T (con quien sí tengo
+   canal) no lo tiene a O, se lo reenvío a T — pero solo si soy el de uid
+   menor entre los que tienen canal con los dos, así un estado no viaja
+   reenviado por todos a la vez. Si dos creen ser el elegido (uno no sabe
+   del otro), T recibe dos copias y se queda con una por el `q`. Solo se
+   reenvía lo que llegó directo, un salto: no hay bucles. Lo que no tiene
+   arreglo es un par que no conecta y no tiene a nadie en común (un duelo
+   entre dos redes que no se dejan conectar): ese par no se ve, y
+   `inalcanzables` lo dice para que la pantalla lo avise en vez de callar.
 
-   Un jugador con una versión vieja (cacheada) no se presenta en la malla:
-   para los nuevos es un par sin canal, así que lo escuchan por la base y le
-   escriben rápido. Sigue funcionando.
-
-   **El estado se adelgaza antes de salir** (`adelgaza`), por los dos
-   caminos: los golpes (`g`) viajan solo sus primeros `VIDA_GOLPE` ms y el
-   último disparo, granada o explosión (`s`, `n`, `x2`) solo sus primeros
-   `VIDA_SUCESO` ms. Antes iban en cada estado hasta que salía el siguiente,
-   así que un huevo que disparó una vez seguía mandando los doce puntos de
-   impacto de esa ráfaga doce veces por segundo para siempre. El marco ya
+   **El estado se adelgaza antes de salir** (`adelgaza`): los golpes (`g`)
+   viajan solo sus primeros `VIDA_GOLPE` ms y el último disparo, granada o
+   explosión (`s`, `n`, `x2`) solo sus primeros `VIDA_SUCESO` ms. El marco ya
    compara por `.i` y por el id del golpe, así que dejar de mandarlos no
-   cambia nada de lo que ve; en ese tiempo salen decenas de copias por la
-   malla y varias por la base, y basta con que llegue una.
+   cambia nada de lo que ve; en ese tiempo salen decenas de copias.
 
-   **Qué ve el marco** (`mapa`): de cada huevo, el estado de mayor `q` entre
-   lo que llegó por la malla y lo que llegó por la base. La malla vale
-   mientras el canal está sano; al caerse, vale lo último que trajo hasta
-   que la base conteste (un par que cerró la pestaña ya no está en la base,
-   por su `onDisconnect`, y entonces desaparece del mapa, que es lo que
-   necesita el marco para cambiar de director en zombis). */
+   **Qué ve el marco** (`mapa`): de cada huevo, el estado de mayor `q` que
+   llegó, directo o reenviado. Vale mientras haya camino hasta él (canal
+   directo, o alguien con canal conmigo que dice tenerlo) o, recién cortado,
+   durante `PUENTE_MS`. Un par que cerró la pestaña pierde todos sus canales
+   y desaparece del mapa, que es lo que necesita el marco para cambiar de
+   director en zombis.
 
-export const LENTO_MS = 250;       // ritmo de la base cuando nadie la necesita
-export const GRACIA_MS = 3000;     // sin canal tanto tiempo → la base va rápida
-export const SOLAPE_MS = 1500;     // se sigue escuchando la base tras recuperar el canal
-export const PUENTE_MS = 4000;     // lo último de la malla vale mientras la base no contesta
+   Los paquetes sin `y` son de la versión anterior (el estado pelado, sin
+   origen): valen como estado de quien los manda. */
+
+export const PUENTE_MS = 4000;     // lo último que llegó vale tanto tras perder el camino
+export const AVISO_MS = 8000;      // sin camino tanto tiempo → se avisa en pantalla
 export const VIDA_GOLPE = 3000;
 export const VIDA_SUCESO = 1500;
+export const OK_MS = 1000;         // cada cuánto se anuncia con quién hay canal
 const SUCESOS = ["s", "n", "x2"];
 
-export function crearDirecto({ ahora = () => Date.now() } = {}) {
-  let q = 0, ultimoJson = "", ultimaT = -Infinity;
+export function crearDirecto({ uid, ahora = () => Date.now(), sano = () => false, conectados = () => [] } = {}) {
+  let q = 0;
   const vistos = new Map();        // "s:<i>" → cuándo salió por primera vez
-  const pares = new Map();         // uid → {p2p, fb, fbListo, malDesde, buenoDesde}
-
-  const par = u => {
-    let p = pares.get(u);
-    if (!p) pares.set(u, p = { p2p: null, fb: null, fbListo: false, sub: false, malDesde: 0, buenoDesde: 0 });
-    return p;
-  };
+  const mejor = new Map();         // origen → {q, e, t}
+  const oks = new Map();           // par → Set de con quién tiene canal
+  const sinCamino = new Map();     // origen → desde cuándo no hay camino
 
   function adelgaza(e, t) {
     const o = { ...e };
@@ -75,87 +70,76 @@ export function crearDirecto({ ahora = () => Date.now() } = {}) {
     return o;
   }
 
-  /* Un estado mío que sale del marco. `rapido` lo decide `decide`.
-     Devuelve lo que va por la malla y, si toca, lo que se escribe en la base. */
-  function sale(e, rapido) {
+  // Un estado mío que sale del marco: el paquete que va a cada par.
+  function sale(e) {
     const t = ahora();
     q = Math.max(q + 1, t);
     const o = adelgaza(e, t);
-    const json = JSON.stringify(o);
     o.q = q;
-    let escribir = null;
-    if (json !== ultimoJson && (rapido || t - ultimaT >= LENTO_MS)) {
-      escribir = o;
-      ultimoJson = json;
-      ultimaT = t;
-    }
-    return { paquete: o, escribir };
+    return { y: "e", o: uid, e: o };
   }
 
-  function recibeMalla(u, e) {
-    if (!e || typeof e !== "object" || Array.isArray(e)) return false;
+  // Lo que anuncio: con quién tengo canal sano.
+  const anuncio = () => ({ y: "ok", l: conectados() });
+
+  const tiene = (r, u) => !!oks.get(r)?.has(u);
+
+  // A quién le reenvío el estado de `o` que me llegó directo de él.
+  function destinos(o) {
+    const out = [];
+    for (const t of conectados()) {
+      if (t === o || !oks.has(t) || tiene(t, o)) continue;   // sin anuncio todavía, o ya lo tiene
+      let elegido = uid;
+      for (const r of conectados()) {
+        if (r !== o && r !== t && r < elegido && tiene(r, o) && tiene(r, t)) elegido = r;
+      }
+      if (elegido === uid) out.push(t);
+    }
+    return out;
+  }
+
+  /* Un paquete que llegó por el canal de `de`. Devuelve si cambia lo que ve
+     el marco y a quién hay que reenviarle qué. */
+  function recibe(de, d) {
+    if (!d || typeof d !== "object" || Array.isArray(d)) return { cambio: false, reenvia: null };
+    if (d.y === "ok") {
+      oks.set(de, new Set(Array.isArray(d.l) ? d.l.filter(x => typeof x === "string") : []));
+      return { cambio: false, reenvia: null };
+    }
+    const o = d.y === "e" ? d.o : de, e = d.y === "e" ? d.e : d;
+    if (typeof o !== "string" || o === uid || !e || typeof e !== "object" || Array.isArray(e)) return { cambio: false, reenvia: null };
     const n = +e.q;
-    if (!Number.isFinite(n)) return false;
-    const p = par(u);
-    if (p.p2p && n <= p.p2p.q) return false;   // llegó tarde: ya hay uno más nuevo
-    p.p2p = { q: n, e, t: ahora() };
-    return true;
+    if (!Number.isFinite(n)) return { cambio: false, reenvia: null };
+    const m = mejor.get(o);
+    if (m && n <= m.q) return { cambio: false, reenvia: null };   // llegó tarde o repetido
+    mejor.set(o, { q: n, e, t: ahora() });
+    const a = de === o ? destinos(o) : [];
+    return { cambio: true, reenvia: a.length ? { a, d: { y: "e", o, e } } : null };
   }
 
-  function recibeBase(u, v) {
-    const p = par(u);
-    if (!p.sub) return false;
-    p.fbListo = true;
-    // Una versión vieja no manda `q`: vale igual, porque con ella no hay malla.
-    p.fb = v && typeof v === "object" ? { q: Number.isFinite(+v.q) ? +v.q : 0, e: v } : null;
-    return true;
-  }
+  // ¿Hay camino hasta `o`? Canal directo, o alguien conectado conmigo que lo tiene.
+  const camino = o => sano(o) || conectados().some(r => r !== o && tiene(r, o));
 
-  /* Cada tanto (y con cada estado propio): quién está sano, a quién hay
-     que escuchar por la base y si la mía tiene que ir rápida.
-     `otros`: los uids que me importan (los jugadores, menos yo y los que se
-     fueron), `mirones`: los que se presentaron en la malla sin ser
-     jugadores, `sano(u)`: si el canal con u está abierto. */
-  function decide({ otros, mirones = [], sano, soyJugador }) {
-    const t = ahora();
-    let rapido = false;
-    const subs = new Set();
-    const marca = u => {
-      const p = par(u), ok = sano(u);
-      if (ok) { p.malDesde = 0; if (!p.buenoDesde) p.buenoDesde = t; }
-      else { p.buenoDesde = 0; if (!p.malDesde) p.malDesde = t; }
-      return { p, ok };
-    };
-    for (const u of otros) {
-      const { p, ok } = marca(u);
-      if (!ok || t - p.buenoDesde < SOLAPE_MS) subs.add(u);
-      if (!ok && soyJugador && t - p.malDesde >= GRACIA_MS) rapido = true;
-    }
-    // Un mirón sin canal lee la base; no se le puede servir de otra forma.
-    for (const u of mirones) {
-      const { p, ok } = marca(u);
-      if (!ok && soyJugador && t - p.malDesde >= GRACIA_MS) rapido = true;
-    }
-    for (const [u, p] of pares) {
-      const quiero = subs.has(u);
-      if (p.sub && !quiero) { p.sub = false; p.fb = null; p.fbListo = false; }
-      else if (!p.sub && quiero) p.sub = true;
-    }
-    return { rapido, subs };
-  }
-
-  function mapa({ otros, sano }) {
+  function mapa(otros) {
     const t = ahora(), v = {};
-    for (const u of otros) {
-      const p = pares.get(u);
-      if (!p) continue;
-      let mejor = null;
-      if (p.p2p && (sano(u) || (!p.fbListo && t - p.p2p.t < PUENTE_MS))) mejor = p.p2p;
-      if (p.sub && p.fb && (!mejor || p.fb.q > mejor.q)) mejor = p.fb;
-      if (mejor) v[u] = mejor.e;
+    for (const o of otros) {
+      const m = mejor.get(o);
+      if (m && (camino(o) || t - m.t < PUENTE_MS)) v[o] = m.e;
     }
     return v;
   }
 
-  return { sale, recibeMalla, recibeBase, decide, mapa, adelgaza };
+  // Los que hace rato no tienen camino: para avisarlo en pantalla.
+  function inalcanzables(otros) {
+    const t = ahora(), out = [];
+    for (const o of otros) {
+      if (camino(o)) { sinCamino.delete(o); continue; }
+      if (!sinCamino.has(o)) sinCamino.set(o, t);
+      if (t - sinCamino.get(o) >= AVISO_MS) out.push(o);
+    }
+    for (const o of [...sinCamino.keys()]) if (!otros.includes(o)) sinCamino.delete(o);
+    return out;
+  }
+
+  return { sale, anuncio, recibe, mapa, inalcanzables, adelgaza, destinos };
 }

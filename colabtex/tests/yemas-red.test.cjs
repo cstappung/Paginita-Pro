@@ -1,106 +1,117 @@
-// El directo de Yemas (`yemas-red.js`): qué sale por la malla y por la base,
-// a quién se escucha y qué ve el marco.
+// El directo de Yemas (`yemas-red.js`): qué sale por la malla, quién le
+// reenvía a quién el estado de un par sin canal y qué ve el marco. No hay
+// respaldo por la base.
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),vm=require('node:vm');
 const sin=f=>fs.readFileSync(f,'utf8').replace(/^import .*$/mg,'').replace(/\bexport\s+/g,'');
 const context={};vm.createContext(context);
-vm.runInContext(sin('src/juegos/yemas-red.js')+'\n;globalThis.__R={crearDirecto,LENTO_MS,GRACIA_MS,SOLAPE_MS,PUENTE_MS,VIDA_GOLPE,VIDA_SUCESO};',context);
+vm.runInContext(sin('src/juegos/yemas-red.js')+'\n;globalThis.__R={crearDirecto,PUENTE_MS,AVISO_MS,VIDA_GOLPE,VIDA_SUCESO};',context);
 const R=context.__R;
 const reloj=()=>{const r={t:1e12};r.ahora=()=>r.t;return r;};
 const plano=x=>JSON.parse(JSON.stringify(x));
 
+// Una red de mentira: `canal` es el conjunto de pares con canal sano.
+function red(uids,rotos=[]){
+ const r=reloj(),roto=new Set(rotos.map(([a,b])=>[a,b].sort().join('|')));
+ const sano=(a,b)=>a!==b&&!roto.has([a,b].sort().join('|'));
+ const n={};
+ for(const u of uids)n[u]=R.crearDirecto({uid:u,ahora:r.ahora,sano:v=>sano(u,v),conectados:()=>uids.filter(v=>sano(u,v))});
+ // Todos anuncian a todos los que tienen canal.
+ const anuncia=()=>{for(const u of uids)for(const v of uids)if(sano(u,v))n[v].recibe(u,n[u].anuncio());};
+ // Manda un estado de `u` y entrega los reenvíos; devuelve cuántas veces llegó a cada uno.
+ const manda=(u,e)=>{
+  const p=n[u].sale(e),llega={};
+  const entrega=(de,a,d)=>{const x=n[a].recibe(de,plano(d));if(x.cambio)llega[a]=(llega[a]||0)+1;
+   if(x.reenvia)for(const t of x.reenvia.a){assert.ok(sano(a,t),'solo se reenvía por un canal sano');entrega(a,t,x.reenvia.d);}};
+  for(const v of uids)if(sano(u,v))entrega(u,v,p);
+  return llega;
+ };
+ return {r,n,anuncia,manda};
+}
+
 test('los golpes y los sucesos viejos dejan de viajar',()=>{
- const r=reloj(),d=R.crearDirecto({ahora:r.ahora});
+ const r=reloj(),d=R.crearDirecto({uid:'a',ahora:r.ahora});
  const e={x:1,s:{i:7,e:[[1,2,3]]},n:{i:3,o:[0,0,0],v:[1,1,1]},g:[[r.t-5000,'b',10,0,0],[r.t-10,'b',20,1,0]],ep:{i:1,u:'b',p:[0,0,0]}};
- let o=d.sale(e,false).paquete;
+ let o=d.sale(e).e;
  assert.equal(o.g.length,1);assert.equal(o.g[0][2],20);
  assert.ok(o.s&&o.n&&o.ep);
  r.t+=R.VIDA_SUCESO+1;
- o=d.sale(e,false).paquete;
+ o=d.sale(e).e;
  assert.equal(o.s,undefined);assert.equal(o.n,undefined);assert.ok(o.ep,'la espátula no es un suceso: si falta, el marco la quita');
- // Un disparo nuevo vuelve a viajar.
- o=d.sale({...e,s:{i:8,e:[]}},false).paquete;
+ o=d.sale({...e,s:{i:8,e:[]}}).e;
  assert.equal(o.s.i,8);
  r.t+=R.VIDA_GOLPE+1;
- assert.equal(d.sale(e,false).paquete.g,undefined);
+ assert.equal(d.sale(e).e.g,undefined);
 });
 
-test('q siempre crece y la base se escribe poco, distinta y rápida solo si hace falta',()=>{
- const r=reloj(),d=R.crearDirecto({ahora:r.ahora});
- let a=d.sale({x:1},false);
- assert.ok(a.escribir);
- let b=d.sale({x:2},false);
- assert.ok(b.paquete.q>a.paquete.q);
- assert.equal(b.escribir,null,'antes de LENTO_MS no se escribe');
- assert.ok(d.sale({x:3},true).escribir,'rápido escribe cada estado distinto');
- assert.equal(d.sale({x:3},true).escribir,null,'igual al último escrito no se escribe');
- r.t+=R.LENTO_MS;
- assert.equal(d.sale({x:3},false).escribir,null,'quieto no gasta escrituras');
- assert.equal(d.sale({x:4},false).escribir.x,4);
+test('q siempre crece y lo que llega tarde no pisa lo nuevo',()=>{
+ const {n,r}=red(['a','b']);
+ const p1=n.a.sale({x:1}),p2=n.a.sale({x:2});
+ assert.ok(p2.e.q>p1.e.q);assert.equal(p1.o,'a');
+ assert.equal(n.b.recibe('a',plano(p2)).cambio,true);
+ assert.equal(n.b.recibe('a',plano(p1)).cambio,false);
+ assert.equal(n.b.mapa(['a']).a.x,2);
+ // Un paquete de la versión anterior (el estado pelado) vale como de quien lo manda.
+ assert.equal(n.b.recibe('a',{x:3,q:p2.e.q+1}).cambio,true);
+ assert.equal(n.b.mapa(['a']).a.x,3);
+ r.t+=1;
 });
 
-test('a quién se escucha por la base y cuándo la mía va rápida',()=>{
- const r=reloj(),d=R.crearDirecto({ahora:r.ahora});
- const sanos=new Set();const sano=u=>sanos.has(u);
- let x=d.decide({otros:['b','c'],sano,soyJugador:true});
- assert.deepEqual([...x.subs].sort(),['b','c']);assert.equal(x.rapido,false);
- sanos.add('b');sanos.add('c');
- r.t+=500;
- x=d.decide({otros:['b','c'],sano,soyJugador:true});
- assert.deepEqual([...x.subs].sort(),['b','c'],'se solapa un rato tras abrir el canal');
- r.t+=R.SOLAPE_MS;
- x=d.decide({otros:['b','c'],sano,soyJugador:true});
- assert.equal(x.subs.size,0,'con todos conectados no se escucha nada');assert.equal(x.rapido,false);
- sanos.delete('c');
- x=d.decide({otros:['b','c'],sano,soyJugador:true});
- assert.deepEqual([...x.subs],['c']);assert.equal(x.rapido,false,'hay gracia');
- r.t+=R.GRACIA_MS;
- x=d.decide({otros:['b','c'],sano,soyJugador:true});
- assert.equal(x.rapido,true);
- assert.equal(d.decide({otros:['b','c'],sano,soyJugador:false}).rapido,false,'un mirón no escribe');
- // Un mirón presente sin canal también acelera la base.
- sanos.add('c');r.t+=R.SOLAPE_MS;
- d.decide({otros:['b','c'],mirones:['m'],sano,soyJugador:true});
- r.t+=R.GRACIA_MS;
- assert.equal(d.decide({otros:['b','c'],mirones:['m'],sano,soyJugador:true}).rapido,true);
+test('con todos conectados nadie reenvía nada',()=>{
+ const {anuncia,manda}=red(['a','b','c','d']);
+ anuncia();
+ assert.deepEqual(plano(manda('a',{x:1})),{b:1,c:1,d:1});
 });
 
-test('el marco ve el estado más nuevo de los dos caminos y pierde a quien se fue',()=>{
- const r=reloj(),d=R.crearDirecto({ahora:r.ahora});
- const sanos=new Set(['b']);const sano=u=>sanos.has(u);
- const otros=['b'];
- d.decide({otros,sano,soyJugador:true});
- assert.ok(d.recibeMalla('b',{q:10,x:1}));
- assert.ok(!d.recibeMalla('b',{q:9,x:0}),'un paquete atrasado se tira');
- assert.ok(!d.recibeMalla('b',{x:5}),'sin q no vale');
- d.recibeBase('b',{q:8,x:-1});
- assert.equal(d.mapa({otros,sano}).b.x,1);
- d.recibeBase('b',{q:12,x:2});
- assert.equal(d.mapa({otros,sano}).b.x,2,'la base gana si trae algo más nuevo');
- r.t+=R.SOLAPE_MS;d.decide({otros,sano,soyJugador:true});
- assert.ok(!d.recibeBase('b',{q:99,x:9}),'sin escucharla, la base no cuenta');
- assert.equal(d.mapa({otros,sano}).b.x,1);
- // Se cae el canal: vale lo último de la malla hasta que la base conteste.
- sanos.clear();
- d.decide({otros,sano,soyJugador:true});
- assert.equal(d.mapa({otros,sano}).b.x,1);
- d.recibeBase('b',null);   // cerró la pestaña: su onDisconnect lo borró
- assert.equal(d.mapa({otros,sano}).b,undefined);
- // Sin respuesta de la base, el puente dura PUENTE_MS.
- const d2=R.crearDirecto({ahora:r.ahora});
- sanos.add('b');d2.decide({otros,sano,soyJugador:true});d2.recibeMalla('b',{q:1,x:1});
- sanos.clear();d2.decide({otros,sano,soyJugador:true});
- assert.equal(d2.mapa({otros,sano}).b.x,1);
- r.t+=R.PUENTE_MS;
- assert.equal(d2.mapa({otros,sano}).b,undefined);
+test('el par sin canal se sirve por un tercero, uno solo',()=>{
+ const {n,anuncia,manda}=red(['a','b','c','d'],[['a','d']]);
+ anuncia();
+ // b es el menor entre los que tienen canal con a y con d: reenvía solo él.
+ assert.deepEqual(plano(manda('a',{x:1})),{b:1,c:1,d:1});
+ assert.deepEqual(plano(n.b.destinos('a')),['d']);
+ assert.deepEqual(plano(n.c.destinos('a')),[]);
+ assert.equal(n.d.mapa(['a','b','c']).a.x,1);
+ // Y al revés: lo de d le llega a a.
+ assert.deepEqual(plano(manda('d',{y:5})),{a:1,b:1,c:1});
+ assert.equal(n.a.mapa(['b','c','d']).d.y,5);
+ assert.deepEqual(plano(n.a.inalcanzables(['b','c','d'])),[]);
 });
 
-test('una versión vieja sin q se ve por la base',()=>{
- const r=reloj(),d=R.crearDirecto({ahora:r.ahora});
- const sano=()=>false,otros=['viejo'];
- d.decide({otros,sano,soyJugador:true});
- d.recibeBase('viejo',{x:3,y:0,z:1});
- assert.deepEqual(plano(d.mapa({otros,sano})),{viejo:{x:3,y:0,z:1}});
- assert.deepEqual(plano(d.mapa({otros:[],sano})),{},'solo jugadores de la sala');
+test('un golpe dirigido viaja reenviado igual que el resto del estado',()=>{
+ const {r,n,anuncia,manda}=red(['a','b','c'],[['a','c']]);
+ anuncia();
+ manda('a',{x:1,g:[[r.t,'c',30,0,1]]});
+ assert.equal(n.c.mapa(['a','b']).a.g[0][1],'c');
+});
+
+test('sin nadie en común no hay camino: se deja de ver y se avisa',()=>{
+ const {r,n,anuncia,manda}=red(['a','b'],[['a','b']]);
+ anuncia();
+ assert.deepEqual(plano(manda('a',{x:1})),{});
+ assert.deepEqual(plano(n.b.mapa(['a'])),{});
+ assert.deepEqual(plano(n.b.inalcanzables(['a'])),[],'recién cortado todavía no se avisa');
+ r.t+=R.AVISO_MS;
+ assert.deepEqual(plano(n.b.inalcanzables(['a'])),['a']);
+});
+
+test('lo último que llegó vale un rato tras perder el camino y luego se va',()=>{
+ const r=reloj();let ok=true;
+ const b=R.crearDirecto({uid:'b',ahora:r.ahora,sano:()=>ok,conectados:()=>ok?['a']:[]});
+ const a=R.crearDirecto({uid:'a',ahora:r.ahora});
+ b.recibe('a',plano(a.sale({x:1})));
+ ok=false;
+ r.t+=R.PUENTE_MS-1;
+ assert.equal(b.mapa(['a']).a.x,1);
+ r.t+=2;
+ assert.deepEqual(plano(b.mapa(['a'])),{},'quien cerró la pestaña desaparece: así cambia el director en zombis');
+});
+
+test('un camino por un tercero mantiene a la vista a quien no manda (pestaña oculta)',()=>{
+ const {r,n,anuncia,manda}=red(['a','b','c'],[['a','c']]);
+ anuncia();
+ manda('a',{x:1});
+ r.t+=60000;
+ anuncia();
+ assert.equal(n.c.mapa(['a','b']).a.x,1,'b sigue diciendo que tiene canal con a');
 });

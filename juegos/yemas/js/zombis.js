@@ -27,40 +27,120 @@ import { moverCuerpo, rayoMundo, crearZombi, ALTO } from 'yemas/mundo';
 export const ZB = {
   mordida: 40, alcance: 1.3, cadencia: 1.1, preparar: 0.35, sube: 0.9, pausa: 9, arranque: 3,
   tabla: 1.0, entra: 1.6, trepa: 2.4, quema: 4, explota: 3, danioExplota: 50,
+  gas: 2.6, danioGas: 18, perro: 1.8, danioPerro: 15,
 };
 // Vida, cuántos salen y qué tan rápido, por ronda (y por jugadores, cuántos).
-export const hpRonda = r => r <= 9 ? 60 + 45 * (r - 1) : Math.round(420 * Math.pow(1.1, r - 9));
-export const totalRonda = (r, n) => Math.min(90, Math.round((4 + 3 * r) * (1 + 0.5 * (Math.max(1, n) - 1))));
-export const velRonda = r => Math.min(6.2, 2.2 + 0.45 * r);
-const cadaSpawn = r => Math.max(0.45, 2.1 - 0.15 * r);
-// Cada ronda deja más en pie a la vez, y el mordisco pega más fuerte: 35 en
-// la primera, 50 en la cuarta (dos mordiscos y caes) y hasta 80.
-const maxVivos = (n, r = 1) => Math.min(30, 6 + 3 * Math.max(1, n) + r);
-export const mordidaRonda = r => Math.min(80, 30 + 5 * Math.max(1, r));
-// Tres clases de zombi, para que las rondas no sean solo «lo mismo con más
-// vida». El corredor (desde la ronda 3) va más rápido que alguien caminando:
-// hay que correr o pararlo. El grandote (desde la 5) es lento, aguanta el
-// triple y muerde más fuerte. Cuántos de cada uno sube con la ronda.
-// El índice viaja por la red: lo nuevo va al final.
-export const TIPOS = ['n', 'c', 'g'];
+// La curva es la de Black Ops pero estirada: las primeras rondas son para
+// aprender el mapa y juntar puntos, y la presión llega hacia la 10–15. Antes
+// a la ronda 5 los comunes ya iban casi al paso del jugador, salían corredores
+// desde la 3 y grandotes desde la 5, y dos mordiscos tumbaban desde la 4.
+export const hpRonda = r => r <= 9 ? 60 + 35 * (r - 1) : Math.round(340 * Math.pow(1.09, r - 9));
+export const totalRonda = (r, n) => Math.min(90, Math.round((4 + 2.4 * r) * (1 + 0.5 * (Math.max(1, n) - 1))));
+export const velRonda = r => Math.min(5.5, 2 + 0.25 * (Math.max(1, r) - 1));
+const cadaSpawn = r => Math.max(0.6, 2.3 - 0.1 * r);
+// Como en Call of Duty, nunca hay más de 24 en pie a la vez, juegue quien
+// juegue y sea la ronda que sea: el resto espera su turno para salir. Por
+// debajo del tope, cada dos rondas cabe uno más.
+export const MAX_ZOMBIS = 24;
+export const maxVivos = (n, r = 1) => Math.min(MAX_ZOMBIS, 5 + 2 * Math.max(1, n) + Math.floor(Math.max(1, r) / 2));
+// El mordisco: 30 en la primera (cuatro para caer), 50 hacia la novena y como
+// mucho 75.
+export const mordidaRonda = r => Math.min(75, 30 + 2.5 * (Math.max(1, r) - 1));
+// Las clases de zombi, para que las rondas no sean solo «lo mismo con más
+// vida»: cada pocas rondas llega algo nuevo hasta pasada la 30, como en Black
+// Ops. El índice en TIPOS viaja por la red: lo nuevo va siempre al final.
+//   n común · c corredor (5) · g grandote (8) · p perro infernal (rondas de
+//   perros: 6, 11, 16…) · t tóxico (10: se arrastra y revienta en gas) ·
+//   f napalm (15: arde siempre, quema al que se arrima y explota) · x chillón
+//   (18: su grito ciega) · j el Mutante (jefe de las rondas 20, 25, 30…) ·
+//   k con casco (22: a la cabeza no le duele hasta romperlo).
+export const TIPOS = ['n', 'c', 'g', 'p', 't', 'f', 'x', 'j', 'k'];
 export const CLASE = {
   n: { hp: 1, mordida: 1, puntos: 60 },
   c: { hp: 0.7, mordida: 1, puntos: 80 },
   g: { hp: 3, mordida: 1.6, puntos: 150 },
+  p: { hp: 0.45, mordida: 0.55, puntos: 70 },
+  t: { hp: 0.8, mordida: 0.8, puntos: 90 },
+  f: { hp: 2, mordida: 1.2, puntos: 120 },
+  x: { hp: 1.2, mordida: 0.9, puntos: 100 },
+  j: { hp: 1, mordida: 1.5, puntos: 1000 },   // su vida va aparte: jefeHp
+  k: { hp: 1.2, mordida: 1.1, puntos: 100 },
 };
-const velDe = (tipo, r) => tipo === 'c' ? Math.min(9, 5.8 + 0.3 * r) * (0.95 + Math.random() * 0.1)
-  : tipo === 'g' ? 2.3 + Math.random() * 0.3 : velRonda(r) * (0.85 + Math.random() * 0.3);
-export function tipoRonda(r, azar = Math.random()) {
-  const g = r >= 5 ? Math.min(0.2, 0.05 * (r - 4)) : 0;
-  const c = r >= 3 ? Math.min(0.5, 0.12 * (r - 2)) : 0;
-  return azar < g ? 'g' : azar < g + c ? 'c' : 'n';
+// La forma de cada uno: `e` la escala y `a` el alto relativo. Es lo que mide
+// el blanco de los balazos (rayoHuevo), la línea de la cabeza y el choque: un
+// perro o un tóxico que se arrastra no tienen la cabeza a 1.2 m.
+export const FORMA = {
+  n: { e: 1, a: 1 }, c: { e: 1, a: 1 }, g: { e: 1.3, a: 1 }, p: { e: 1.1, a: 0.37 }, t: { e: 1, a: 0.42 },
+  f: { e: 1.12, a: 1 }, x: { e: 0.95, a: 1 }, j: { e: 1.9, a: 1 }, k: { e: 1.05, a: 1 },
+};
+export const forma = t => FORMA[t] || FORMA.n;
+export const velCorredor = r => Math.min(8.5, 5.5 + 0.2 * (Math.max(5, r) - 5));
+// Las rondas especiales: perros cada cinco desde la 6 (6, 11, 16, 21, 26…),
+// el Mutante cada cinco desde la 20 (dos desde la 30 si juegan varios).
+export const esPerros = r => r >= 6 && (r - 6) % 5 === 0;
+export const esJefe = r => r >= 20 && r % 5 === 0;
+export const jefesRonda = (r, n) => esJefe(r) ? (r >= 30 && Math.max(1, n) >= 2 ? 2 : 1) : 0;
+export const jefeHp = (r, n) => Math.round(hpRonda(r) * (4 + 2 * Math.max(1, n)));
+export const totalPerros = (r, n) => Math.min(40, Math.round((5 + 0.5 * r) * (1 + 0.5 * (Math.max(1, n) - 1))));
+export const maxPerros = (n, r) => Math.min(MAX_ZOMBIS, 2 + 2 * Math.max(1, n) + Math.floor(r / 10));
+export const velPerro = r => Math.min(8.5, 6.2 + 0.12 * (Math.max(6, r) - 6));
+export const maxDe = (tipo, r, n) => tipo === 'j' ? jefeHp(r, n) : Math.round(hpRonda(r) * (CLASE[tipo] || CLASE.n).hp);
+function velDe(tipo, r) {
+  const a = Math.random();
+  switch (tipo) {
+    case 'c': return velCorredor(r) * (0.95 + a * 0.1);
+    case 'g': return 2.3 + a * 0.3;
+    case 'p': return velPerro(r) * (0.95 + a * 0.1);
+    case 't': return Math.min(4.6, velRonda(r) * 1.2) * (0.9 + a * 0.2);
+    case 'f': return 2.8 + a * 0.3;
+    case 'x': return Math.min(6, velRonda(r) * 1.1) * (0.9 + a * 0.2);
+    case 'j': return 2.7;
+    default: return velRonda(r) * (0.85 + a * 0.3);
+  }
 }
+// La mezcla de cada ronda: [tipo, desde, cuánto sube por ronda, tope]. Los
+// raros van primero. Desde la 28 (élite) los especiales pesan la mitad más y
+// casi no quedan comunes.
+const MEZCLA = [
+  ['k', 22, 0.03, 0.15], ['x', 18, 0.02, 0.07], ['f', 15, 0.02, 0.07], ['t', 10, 0.025, 0.1],
+  ['g', 8, 0.04, 0.16], ['c', 5, 0.07, 0.38],
+];
+const ESPECIAL = new Set(['k', 'x', 'f', 't']);
+export function tipoRonda(r, azar = Math.random()) {
+  const elite = r >= 28 ? 1.5 : 1;
+  let acc = 0;
+  for (const [t, desde, paso, tope] of MEZCLA) {
+    if (r < desde) continue;
+    const k = ESPECIAL.has(t) ? elite : 1;
+    acc += Math.min(tope * k, paso * (r - desde + 1) * k);
+    if (azar < acc) return t;
+  }
+  return 'n';
+}
+// Cuántos de cada especial pueden estar en pie a la vez: diez napalm juntos
+// no son una ronda difícil, son una pared de fuego.
+export const TOPE_VIVOS = { t: 4, f: 2, x: 2, k: 8 };
 // Lo que se avisa al empezar las rondas que traen algo nuevo.
 export const NOVEDAD_RONDA = {
-  3: '¡Cuidado: ahora algunos corren!',
-  5: '¡Llegan los grandotes: lentos, pero aguantan el triple!',
-  10: '¡Ronda 10: los corredores ya son más rápidos que tú caminando!',
+  5: '¡Cuidado: ahora algunos corren!',
+  6: '¡Ronda de perros infernales! Salen de un rayo, cerca tuyo. El último suelta munición',
+  8: '¡Llegan los grandotes: lentos, pero aguantan el triple!',
+  10: '¡Tóxicos! Se arrastran y revientan en gas verde: no los mates encima',
+  13: '¡Ronda 13: los corredores ya te alcanzan caminando!',
+  15: '¡Napalm! Arden siempre, queman al que se arrima y explotan al morir',
+  18: '¡Chillones! Su grito te deja ciego un momento',
+  20: '¡EL MUTANTE! Aguanta lo que una horda y embiste si lo hieres',
+  22: '¡Llegan con casco: a la cabeza no les duele hasta romperlo!',
+  25: 'El Mutante vuelve, más duro',
+  28: 'Ronda de élite: ya casi no quedan zombis comunes',
+  30: '¡Ronda 30! Si son más de uno, vienen dos Mutantes',
 };
+export function novedadRonda(r) {
+  if (NOVEDAD_RONDA[r]) return NOVEDAD_RONDA[r];
+  if (esPerros(r)) return '¡Ronda de perros infernales!';
+  if (esJefe(r)) return '¡Vuelve el Mutante!';
+  return '';
+}
 const r1 = x => Math.round(x * 10) / 10;
 // Firebase devuelve los arreglos como objetos y se come los vacíos.
 const lista = x => Array.isArray(x) ? x : Object.values(x || {});
@@ -68,6 +148,12 @@ const lista = x => Array.isArray(x) ? x : Object.values(x || {});
 // tablas, trepando por la ventana, saliendo del suelo y trepando a algo. Los
 // índices viajan por la red: lo nuevo va al final.
 const FASES = ['dentro', 'fuera', 'rompe', 'entra', 'brote', 'trepa'];
+// Cuánto tarda en salir del suelo: el perro aparece en un rayo y el Mutante
+// se toma su tiempo.
+const subeEn = t => t === 'p' ? 0.35 : t === 'j' ? 2 : ZB.sube;
+// Hasta dónde llega su mordisco y a qué distancia se planta: el Mutante es
+// casi dos veces más grande.
+const alcanceDe = t => t === 'j' ? 1.6 : 1;
 
 // El huevo verde que deja cada zombi al morir.
 const HUEVOS_MAX = 40, HUEVO_VIDA = 20;
@@ -106,12 +192,16 @@ const geoLlama = new THREE.ConeGeometry(0.22, 0.7, 7);
 const matLlama = new THREE.MeshBasicMaterial({ color: '#ff8a1c', transparent: true, opacity: 0.85, depthWrite: false });
 const matLlama2 = new THREE.MeshBasicMaterial({ color: '#ffd23a', transparent: true, opacity: 0.8, depthWrite: false });
 
-// cb: alCaer({id, pos, killer, cab, a, explota}), pideRonda(r), grunido(pos),
-//     rompe(pos) (una tabla arrancada)
+// cb: alCaer({id, pos, killer, cab, a, explota, tipo}), pideRonda(r), grunido(pos),
+//     rompe(pos) (una tabla arrancada), aparece(tipo, pos), finPerros(pos),
+//     chilla(pos), ruge(pos), casco(pos)
+// `explota` al morir: 0 nada, 1 fuego (lava o napalm), 2 gas (tóxico), 3 el
+// fogonazo de un perro. Los marcos viejos lo leían como verdadero o falso.
 export function crearZombis(escena, colisores, cb) {
   const zs = new Map();         // id → zombi
   const vistos = new Set();     // muertes ya anunciadas
   let muertes = [];             // [[id, killer, cab, a, explota]] las últimas, para la red
+  let qj = 0;                   // Mutantes que faltan por salir esta ronda
   let ronda = 0, q = 0, pausa = 0, cdSpawn = 0, entre = 0, pedida = 0, sigId = 1, nJug = 1;
   let mapa = null, inter = null;
   let nodos = [], N = 0, Dist = null, hop = null;
@@ -201,6 +291,7 @@ export function crearZombis(escena, colisores, cb) {
   // ---------- Los zombis ----------
   function nuevo(id, x, y, z, hp, max, fase = 'dentro', v = -1, tipo = 'n') {
     const mesh = crearZombi(tipo);
+    const fo = forma(tipo);
     const zb = {
       tipo,
       id, mesh, pos: new THREE.Vector3(x, y, z), vel: new THREE.Vector3(), enSuelo: true,
@@ -208,11 +299,15 @@ export function crearZombis(escena, colisores, cb) {
       fase, v, t: 0, de: null, nodo: -1, meta: -1, ve: false, replan: 0, lejos: 0, quema: 0,
       cd: 0.6, prep: -1, atasco: 0, lado: 1, desvio: 0, golpeT: 0, grunido: 2 + Math.random() * 6,
       vel0: velDe(tipo, Math.max(1, ronda)),
+      // Cuánto mide hacia arriba (lo que baja bajo tierra al salir del suelo).
+      alto: ALTO * fo.e * fo.a, esc: fo.e,
+      casco: tipo === 'k' ? 1 : 0, carga: 0, cdCarga: 4, grita: 0, cdGrito: 3, aura: 1,
     };
-    mesh.position.set(x, y - (zb.sube < 1 ? ALTO : 0), z);
+    mesh.position.set(x, y - (zb.sube < 1 ? zb.alto : 0), z);
     escena.add(mesh);
     zs.set(id, zb);
     sigId = Math.max(sigId, id + 1);
+    cb.aparece?.(tipo, zb.pos);
     return zb;
   }
   function quita(id) {
@@ -252,17 +347,19 @@ export function crearZombis(escena, colisores, cb) {
   function iniciaRonda(r, n) {
     if (r === ronda) return;
     ronda = r; nJug = n;
-    q = totalRonda(r, n);
+    q = esPerros(r) ? totalPerros(r, n) : totalRonda(r, n);
+    qj = jefesRonda(r, n);
     pausa = ZB.arranque; entre = 0; pedida = 0;
   }
   // Toma el último estado que publicó el director anterior.
   function adopta(zb, n) {
     nJug = n;
     if (!zb) return;
-    ronda = zb.r | 0; q = Math.max(0, zb.q | 0); pausa = +zb.p || 0; entre = +zb.e || 0; pedida = 0;
+    ronda = zb.r | 0; q = Math.max(0, zb.q | 0); qj = Math.max(0, zb.j | 0); pausa = +zb.p || 0; entre = +zb.e || 0; pedida = 0;
     for (const z of zs.values()) {
-      const max = hpRonda(Math.max(1, ronda)) * CLASE[z.tipo || 'n'].hp;
+      const max = maxDe(z.tipo || 'n', Math.max(1, ronda), n);
       z.max = max;
+      if (z.casco) z.casco = Math.round(max * 0.6);
       z.hp = Math.max(1, Math.round((z.pct ?? 100) / 100 * max));
       z.pos.copy(z.mesh.position);
       if (z.sube < 1) z.pos.y = z.obj.y;
@@ -290,6 +387,22 @@ export function crearZombis(escena, colisores, cb) {
     cand.sort((a, b) => d(a) - d(b));
     return cand[Math.floor(Math.random() * Math.min(4, cand.length))];
   }
+
+  // Dónde sale un perro o el Mutante: dentro del mapa (el lado de adentro de
+  // las ventanas de zonas abiertas, y los brotes), ni encima de nadie ni
+  // lejísimos. El perro, más cerca; el Mutante, a distancia de verlo venir.
+  function sitioDentro(vivos, min, max) {
+    const cand = [];
+    (mapa?.ventanas || []).forEach(v => { if (activa(v.zona)) cand.push({ x: v.ix, z: v.iz, y: v.y }); });
+    for (const [x, z, zona] of mapa?.brotes || []) if (activa(zona)) cand.push({ x, z, y: 0 });
+    if (!cand.length) return null;
+    const d = c => Math.min(999, ...vivos.map(j => Math.hypot(j.pos.x - c.x, j.pos.z - c.z) + Math.abs(j.pos.y - c.y) * 3));
+    const bien = cand.filter(c => { const k = d(c); return k >= min && k <= max; });
+    if (bien.length) return bien[Math.floor(Math.random() * bien.length)];
+    const lejos = cand.filter(c => d(c) >= min).sort((a, b) => d(a) - d(b));
+    return lejos[0] || cand.sort((a, b) => d(b) - d(a))[0];
+  }
+  const cuantos = t => { let k = 0; for (const z of zs.values()) if (z.tipo === t) k++; return k; };
 
   const enLava = p => p.y < 0.3 && (mapa?.lava || []).some(([x0, x1, z0, z1]) => p.x > x0 && p.x < x1 && p.z > z0 && p.z < z1);
 
@@ -324,22 +437,37 @@ export function crearZombis(escena, colisores, cb) {
     const vivos = persigue(jug);
     const todos = jug.filter(j => j.vivo);
     // Salen de a uno, por las ventanas o del suelo.
+    const perros = esPerros(ronda);
+    const tope = (perros ? maxPerros(n, ronda) : maxVivos(n, ronda)) + (qj > 0 ? 1 : 0);
     if (pausa > 0) pausa -= dt;
-    else if (q > 0 && zs.size < maxVivos(n, ronda)) {
+    else if ((q > 0 || qj > 0) && zs.size < tope) {
       cdSpawn -= dt;
       if (cdSpawn <= 0 && todos.length) {
-        cdSpawn = cadaSpawn(ronda);
-        const s = sitioSpawn(vivos.length ? vivos : todos);
-        if (s) {
-          const tipo = tipoRonda(ronda), hp = Math.round(hpRonda(ronda) * CLASE[tipo].hp);
-          if (s.i >= 0) nuevo(sigId, s.x + (Math.random() - 0.5) * 1.2, s.y + 0.02, s.z + (Math.random() - 0.5) * 1.2, hp, hp, 'fuera', s.i, tipo);
-          else nuevo(sigId, s.x + (Math.random() - 0.5) * 1.5, 0, s.z + (Math.random() - 0.5) * 1.5, hp, hp, 'brote', -1, tipo);
-          q--;
+        cdSpawn = perros ? 1.1 : cadaSpawn(ronda);
+        const gente = vivos.length ? vivos : todos;
+        if (qj > 0) {
+          // El Mutante sale primero, del suelo, a distancia de verlo venir.
+          const s = sitioDentro(gente, 10, 24);
+          if (s) { const hp = maxDe('j', ronda, n); nuevo(sigId, s.x, s.y, s.z, hp, hp, 'brote', -1, 'j'); qj--; cdSpawn = 4; }
+        } else if (perros) {
+          const s = sitioDentro(gente, 5, 16);
+          if (s) { const hp = maxDe('p', ronda, n); nuevo(sigId, s.x + (Math.random() - 0.5) * 1.5, s.y, s.z + (Math.random() - 0.5) * 1.5, hp, hp, 'brote', -1, 'p'); q--; }
+        } else {
+          const s = sitioSpawn(gente);
+          if (s) {
+            let tipo = tipoRonda(ronda);
+            if (TOPE_VIVOS[tipo] && cuantos(tipo) >= TOPE_VIVOS[tipo]) tipo = ronda >= 5 ? 'c' : 'n';
+            const hp = maxDe(tipo, ronda, n);
+            const z = s.i >= 0 ? nuevo(sigId, s.x + (Math.random() - 0.5) * 1.2, s.y + 0.02, s.z + (Math.random() - 0.5) * 1.2, hp, hp, 'fuera', s.i, tipo)
+              : nuevo(sigId, s.x + (Math.random() - 0.5) * 1.5, 0, s.z + (Math.random() - 0.5) * 1.5, hp, hp, 'brote', -1, tipo);
+            if (tipo === 'k') z.casco = Math.round(hp * 0.6);
+            q--;
+          }
         }
       }
     }
     // Ronda limpia: unos segundos de respiro y se pide la siguiente.
-    if (q === 0 && zs.size === 0 && pausa <= 0) {
+    if (q === 0 && qj === 0 && zs.size === 0 && pausa <= 0) {
       if (entre <= 0 && !pedida) entre = ZB.pausa;
       entre -= dt;
       if (entre <= 0 && performance.now() - pedida > 3000) { pedida = performance.now(); cb.pideRonda(ronda + 1); }
@@ -347,7 +475,7 @@ export function crearZombis(escena, colisores, cb) {
     const caidos = [];
     for (const z of [...zs.values()]) {
       // La lava: prende fuego y quema un 15 % de la vida por segundo.
-      if (enLava(z.pos)) z.quema = ZB.quema;
+      if (enLava(z.pos) && z.tipo !== 'f') z.quema = ZB.quema;
       if (z.quema > 0) {
         z.quema -= dt;
         z.hp -= z.max * 0.15 * dt;
@@ -356,7 +484,7 @@ export function crearZombis(escena, colisores, cb) {
       // El que se quedó lejos de todos (un rincón sin salida, un mapa grande)
       // se borra y vuelve a salir por otro lado.
       if (todos.every(j => j.pos.distanceTo(z.pos) > 35)) z.lejos += dt; else z.lejos = 0;
-      if (z.lejos > 20) { quita(z.id); vistos.add(z.id); q++; continue; }
+      if (z.lejos > 20) { quita(z.id); vistos.add(z.id); if (z.tipo === 'j') qj++; else q++; continue; }
 
       let t = null, dt2 = Infinity;
       for (const j of vivos) {
@@ -367,7 +495,7 @@ export function crearZombis(escena, colisores, cb) {
       let morder = false;
 
       if (z.fase === 'brote') {
-        z.sube = Math.min(1, z.sube + dt / ZB.sube);
+        z.sube = Math.min(1, z.sube + dt / subeEn(z.tipo));
         if (z.sube >= 1) { z.fase = 'dentro'; z.nodo = cercano(z.pos); }
         continue;
       }
@@ -450,16 +578,43 @@ export function crearZombis(escena, colisores, cb) {
         if (largo > 0.01) quiero.divideScalar(largo);
         const h = Math.hypot(t.pos.x - z.pos.x, t.pos.z - z.pos.z);
         z.ry = z.ve ? Math.atan2(-(t.pos.x - z.pos.x), -(t.pos.z - z.pos.z)) : Math.atan2(-quiero.x, -quiero.z);
-        const cerca = h < ZB.alcance && Math.abs(dy) < 1.3;
+        const al = alcanceDe(z.tipo);
+        const cerca = h < ZB.alcance * al && Math.abs(dy) < 1.3 * al;
         if (cerca) z.ry = Math.atan2(-(t.pos.x - z.pos.x), -(t.pos.z - z.pos.z));
-        if (h < 0.85 && Math.abs(dy) < 1.3) quiero.set(0, 0, 0);
+        if (h < 0.85 * al && Math.abs(dy) < 1.3 * al) quiero.set(0, 0, 0);
+        // El Mutante embiste: cada tanto, o antes si le pegan, corre derecho
+        // hacia su presa casi tres veces más rápido.
+        if (z.tipo === 'j') {
+          z.cdCarga -= dt;
+          if (z.carga > 0) z.carga -= dt;
+          else if (z.cdCarga <= 0 && z.ve && h > 4 && h < 18) { z.carga = 1.5; z.cdCarga = 8; cb.ruge?.(z.pos); }
+        }
+        // El chillón grita si te tiene cerca y a la vista: ciega a todos los
+        // que estén a menos de 9 m (el marco de cada uno lo aplica).
+        if (z.tipo === 'x') {
+          z.cdGrito -= dt;
+          if (z.grita > 0) z.grita -= dt;
+          if (z.cdGrito <= 0 && z.ve && h < 7) {
+            z.cdGrito = 9 + Math.random() * 3; z.grita = 1.2;
+            for (const j of vivos) if (j.pos.distanceTo(z.pos) < 9) mordidas.push({ uid: j.uid, dmg: 0, grito: true });
+          }
+        }
+        // El napalm quema al que se le arrima, aunque no muerda.
+        if (z.tipo === 'f') {
+          z.aura -= dt;
+          if (z.aura <= 0) {
+            z.aura = 1;
+            for (const j of vivos) if (Math.hypot(j.pos.x - z.pos.x, j.pos.z - z.pos.z) < 2.2 && Math.abs(j.pos.y - z.pos.y) < 1.5)
+              mordidas.push({ uid: j.uid, dmg: 6 + Math.floor(ronda / 5), fuego: true });
+          }
+        }
         // Se trabó contra algo: trepa si se puede, si no se corre de lado.
         if (z.desvio > 0) {
           z.desvio -= dt;
           const c = Math.cos(1.3 * z.lado), s = Math.sin(1.3 * z.lado);
           quiero.set(quiero.x * c - quiero.z * s, 0, quiero.x * s + quiero.z * c);
         }
-        quiero.multiplyScalar(z.vel0);
+        quiero.multiplyScalar(z.vel0 * (z.carga > 0 ? 3.2 : 1));
         if (!cerca && Math.hypot(z.vel.x, z.vel.z) < z.vel0 * 0.3) z.atasco += dt; else z.atasco = Math.max(0, z.atasco - dt);
         // Trabado: si lo que tiene delante se puede trepar (y el que persigue
         // está arriba, o el camino sigue por encima), trepa. Si no, se corre de
@@ -500,7 +655,12 @@ export function crearZombis(escena, colisores, cb) {
       for (const o of zs.values()) {
         if (o === z || o.fase === 'entra' || o.fase === 'trepa') continue;
         const dx = z.pos.x - o.pos.x, dz = z.pos.z - o.pos.z, d = Math.hypot(dx, dz);
-        if (d > 0.01 && d < 0.9 && Math.abs(z.pos.y - o.pos.y) < 1.5) { quiero.x += dx / d * 2.5; quiero.z += dz / d * 2.5; }
+        const lejos = 0.45 * ((z.esc || 1) + (o.esc || 1));
+        if (d > 0.01 && d < lejos && Math.abs(z.pos.y - o.pos.y) < 1.5) {
+          // El Mutante embistiendo no se aparta: aparta.
+          const f = z.carga > 0 ? 0.3 : 2.5;
+          quiero.x += dx / d * f; quiero.z += dz / d * f;
+        }
       }
       if (z.fase === 'rompe') quiero.multiplyScalar(0.3);
       const k = 1 - Math.exp(-(z.enSuelo ? 8 : 2) * dt);
@@ -516,12 +676,14 @@ export function crearZombis(escena, colisores, cb) {
   // Muere en el director: se anuncia, deja su huevo y, si venía ardiendo,
   // revienta y se lleva a los que tenga al lado.
   function muere(z, killer, cab, a) {
-    const explota = z.quema > 0 ? 1 : 0;
+    const explota = z.tipo === 't' ? 2 : z.tipo === 'p' ? 3 : z.quema > 0 || z.tipo === 'f' ? 1 : 0;
     muertes = [...muertes, [z.id, killer || '', cab ? 1 : 0, a | 0, explota, TIPOS.indexOf(z.tipo || 'n')]].slice(-20);
     vistos.add(z.id);
     quita(z.id);
-    cae(z, killer || '', !!cab, a | 0, !!explota);
-    if (!explota) return;
+    cae(z, killer || '', !!cab, a | 0, explota);
+    // El último perro de la ronda suelta una Munición máxima, como en Black Ops.
+    if (z.tipo === 'p' && esPerros(ronda) && q === 0 && ![...zs.values()].some(o => o.tipo === 'p')) cb.finPerros?.(z.pos.clone());
+    if (explota !== 1) return;
     const cerca = [...zs.values()].filter(o => o.pos.distanceTo(z.pos) < ZB.explota);
     for (const o of cerca) golpe(o.id, o.max * 0.6, killer, false, a);
   }
@@ -529,6 +691,16 @@ export function crearZombis(escena, colisores, cb) {
   function golpe(id, dmg, killer, cab, a) {
     const z = zs.get(id);
     if (!z) return false;
+    // El casco: a la cabeza le hace poco hasta que se rompe, y mientras no
+    // cuenta como tiro a la cabeza.
+    if (z.casco > 0 && cab) {
+      z.casco -= dmg;
+      dmg *= 0.15; cab = false;
+      if (z.casco <= 0) { z.casco = 0; cb.casco?.(z.pos); }
+    }
+    // Al Mutante no lo tumba un solo golpe (ni el Insta-Kill, ni la cadena de
+    // fuego), y cada balazo le acorta las ganas de embestir.
+    if (z.tipo === 'j') { dmg = Math.min(dmg, z.max * 0.08); z.cdCarga -= dmg / (z.max * 0.02); }
     z.hp -= dmg;
     z.golpeT = 0.12;
     if (z.hp > 0) return false;
@@ -539,16 +711,18 @@ export function crearZombis(escena, colisores, cb) {
   // Kaboom: revientan todos los que están en pie (solo en el director). Sin
   // asesino, así que no dan puntos por cabeza ni sueltan bonificaciones.
   function kaboom() {
-    for (const z of [...zs.values()]) if (z.fase !== 'brote' || z.sube > 0.3) muere(z, '', false, 0);
+    for (const z of [...zs.values()]) if (z.tipo !== 'j' && (z.fase !== 'brote' || z.sube > 0.3)) muere(z, '', false, 0);
   }
 
   // Lo que el director publica.
   function estado() {
     return {
-      r: ronda, q, p: r1(Math.max(0, pausa)), e: r1(Math.max(0, entre)),
+      r: ronda, q, j: qj, p: r1(Math.max(0, pausa)), e: r1(Math.max(0, entre)),
       z: [...zs.values()].map(z => [z.id, r1(z.pos.x), r1(z.pos.y), r1(z.pos.z), r1(z.ry),
         Math.max(1, Math.round(z.hp / z.max * 100)), z.sube < 1 ? 1 : 0, z.quema > 0 ? 1 : 0,
-        FASES.indexOf(z.fase), z.v, TIPOS.indexOf(z.tipo || 'n')]),
+        FASES.indexOf(z.fase), z.v, TIPOS.indexOf(z.tipo || 'n'),
+        // Marcas: 1 tiene el casco puesto, 2 embiste, 4 está gritando.
+        (z.casco > 0 ? 1 : 0) | (z.carga > 0 ? 2 : 0) | (z.grita > 0 ? 4 : 0)]),
       m: muertes,
     };
   }
@@ -556,19 +730,19 @@ export function crearZombis(escena, colisores, cb) {
   // Lo que dibuja quien no dirige, desde el `zb` del director.
   function desdeRed(zb) {
     if (!zb || typeof zb !== 'object') return;
-    ronda = zb.r | 0; q = zb.q | 0; pausa = +zb.p || 0; entre = +zb.e || 0;
+    ronda = zb.r | 0; q = zb.q | 0; qj = zb.j | 0; pausa = +zb.p || 0; entre = +zb.e || 0;
     for (const m of lista(zb.m)) {
       if (!Array.isArray(m) || vistos.has(+m[0])) continue;
       const id = +m[0];
       vistos.add(id);
       sigId = Math.max(sigId, id + 1);
       const z = quita(id);
-      if (z) { z.tipo = TIPOS[m[5] | 0] || z.tipo; cae(z, String(m[1] || ''), !!m[2], m[3] | 0, !!m[4]); }
+      if (z) { z.tipo = TIPOS[m[5] | 0] || z.tipo; cae(z, String(m[1] || ''), !!m[2], m[3] | 0, m[4] | 0); }
     }
     const ahora = new Set();
     for (const e of lista(zb.z)) {
       if (!Array.isArray(e)) continue;
-      const [id, x, y, zz, ry, pct, sube, quema, fase, v, ti] = e.map(Number);
+      const [id, x, y, zz, ry, pct, sube, quema, fase, v, ti, marcas] = e.map(Number);
       const tipo = TIPOS[ti | 0] || 'n';
       if (vistos.has(id)) continue;
       ahora.add(id);
@@ -582,6 +756,7 @@ export function crearZombis(escena, colisores, cb) {
       z.pct = pct;
       z.remotoSube = !!sube;
       z.quema = quema ? 1 : 0;
+      z.casco = marcas & 1; z.carga = marcas & 2 ? 1 : 0; z.grita = marcas & 4 ? 1 : 0;
       if (!sube) z.fase = f;
       z.v = Number.isFinite(v) ? v : -1;
     }
@@ -614,8 +789,8 @@ export function crearZombis(escena, colisores, cb) {
   function animar(dt, director, ojo) {
     const t = performance.now() / 1000, kp = 1 - Math.exp(-12 * dt);
     for (const z of zs.values()) {
-      if (!director && z.sube < 1) z.sube = Math.min(z.remotoSube ? 0.95 : 1, z.sube + dt / (z.remotoSube ? ZB.sube : 0.2));
-      const baja = z.sube < 1 ? ALTO * (1 - z.sube) : 0;
+      if (!director && z.sube < 1) z.sube = Math.min(z.remotoSube ? 0.95 : 1, z.sube + dt / (z.remotoSube ? subeEn(z.tipo) : 0.2));
+      const baja = z.sube < 1 ? (z.alto || ALTO) * (1 - z.sube) : 0;
       if (director) z.mesh.position.set(z.pos.x, z.pos.y - baja, z.pos.z);
       else {
         const k = z.fase === 'entra' || z.fase === 'trepa' ? 1 - Math.exp(-20 * dt) : kp;
@@ -633,8 +808,22 @@ export function crearZombis(escena, colisores, cb) {
       // Trepando: pegado a la pared, los brazos arriba tirando de a uno.
       const trepa = z.fase === 'trepa' || z.fase === 'entra';
       c.rotation.x = z.fase === 'rompe' ? 0.3 + Math.max(0, Math.sin(t * 7 + z.id)) * 0.5
-        : trepa ? 0.5 + Math.sin(t * 10 + z.id) * 0.12 : 0.18 + (z.prep >= 0 ? 0.45 : 0);
+        : trepa ? 0.5 + Math.sin(t * 10 + z.id) * 0.12 : (z.carga > 0 ? 0.5 : 0.18) + (z.prep >= 0 ? 0.45 : 0);
       if (trepa) c.rotation.z = Math.sin(t * 10 + z.id) * 0.1;
+      const ud = z.mesh.userData;
+      // Los perros galopan y el tóxico se arrastra: ni se bambolean ni se
+      // inclinan como uno que camina.
+      if (ud.patas) {
+        c.rotation.z = 0; c.rotation.x = z.prep >= 0 ? 0.25 : 0;
+        c.position.y = Math.abs(Math.sin(t * 13 + z.id)) * 0.08;
+        ud.patas.forEach((pa, i) => { pa.rotation.x = Math.sin(t * 13 + z.id + (i % 2 ? Math.PI : 0) + (i > 1 ? 0.6 : 0)) * 0.7; });
+      }
+      if (ud.repta) { c.rotation.z = Math.sin(t * 5 + z.id) * 0.06; c.rotation.x = 0; c.position.z = Math.sin(t * 5 + z.id) * 0.06; }
+      if (ud.yelmo) ud.yelmo.visible = z.casco > 0;
+      if (ud.boca) ud.boca.scale.y = z.grita > 0 ? 1.6 + Math.sin(t * 40) * 0.3 : 0.5;
+      if (z.grita > 0 && !z.gritaba && ojo) cb.chilla?.(z.mesh.position);
+      z.gritaba = z.grita > 0;
+      if (ud.ojos && z.tipo === 'j') ud.ojos.forEach(o => o.material.emissiveIntensity = z.carga > 0 ? 2.5 : 1);
       const brazos = z.mesh.userData.brazos || [];
       brazos.forEach((b, i) => {
         const obj = trepa ? Math.PI / 2 + 0.9 + Math.sin(t * 10 + z.id + i * Math.PI) * 0.35 : Math.PI / 2;
@@ -643,9 +832,10 @@ export function crearZombis(escena, colisores, cb) {
       z.golpeT = Math.max(0, z.golpeT - dt);
       const e = z.mesh.userData.casco.material.emissive;
       if (z.golpeT > 0) e.setRGB(0.7, 0, 0);
-      else if (z.quema > 0) { const p = 0.5 + 0.3 * Math.sin(t * 25 + z.id); e.setRGB(p, p * 0.35, 0); }
+      else if (z.quema > 0 || z.tipo === 'f') { const p = 0.5 + 0.3 * Math.sin(t * 25 + z.id); e.setRGB(p, p * 0.35, 0); }
+      else if (z.mesh.userData.base) e.copy(z.mesh.userData.base);
       else e.setRGB(0, 0, 0);
-      llamas(z, z.quema > 0);
+      llamas(z, z.quema > 0 || z.tipo === 'f');
       z.grunido -= dt;
       if (z.grunido <= 0) {
         z.grunido = 4 + Math.random() * 7;

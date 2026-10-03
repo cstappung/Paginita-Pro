@@ -189,7 +189,10 @@ export function crearMundo(escena, mapa = null, colisores = []) {
     } else if (t === 'cil' || t === 'cono') {
       const [, x, z, r, y0, y1, color, o] = d;
       const geo = t === 'cil' ? new THREE.CylinderGeometry(r, r, y1 - y0, r > 0.5 ? 20 : 10) : new THREE.ConeGeometry(r, y1 - y0, 10);
-      ponGeo(geo, new THREE.Matrix4().makeTranslation(x, (y0 + y1) / 2, z), color, o);
+      const m4 = new THREE.Matrix4().makeTranslation(x, (y0 + y1) / 2, z);
+      // rx tumba el cilindro (la puerta redonda de la bóveda, un reflector).
+      if (o?.rx) m4.multiply(new THREE.Matrix4().makeRotationX(o.rx));
+      ponGeo(geo, m4, color, o);
     } else if (t === 'esf') {
       const [, x, y, z, r, color, o] = d;
       ponGeo(new THREE.SphereGeometry(r, 12, 8), new THREE.Matrix4().makeTranslation(x, y, z), color, o);
@@ -376,17 +379,44 @@ export function moverCuerpo(c, dt, cols) {
     c.vel.y -= GRAVEDAD * h;
     moverEje(c, 'x', c.vel.x * h, cols);
     moverEje(c, 'z', c.vel.z * h, cols);
+    const y0 = c.pos.y;
     c.pos.y += c.vel.y * h;
     c.enSuelo = false;
     if (c.pos.y <= 0) { c.pos.y = 0; c.vel.y = 0; c.enSuelo = true; }
     for (const b of cols) {
       if (!solapa(c.pos, b)) continue;
-      if (c.vel.y <= 0) { c.pos.y = b.maxy; c.enSuelo = true; }
-      else c.pos.y = b.miny - ALTO - 1e-4;
-      c.vel.y = 0;
+      // Solo se apoya encima quien venía de arriba (o a un escalón), y solo
+      // se frena contra el techo quien venía de abajo. Un cuerpo que quedó
+      // metido dentro de una caja por otra cosa (un empujón) se saca hacia
+      // el costado más cercano: subirlo arriba de todo era dejarlo parado
+      // sobre un muro de cuatro metros, fuera del mapa.
+      if (c.vel.y <= 0 && y0 >= b.maxy - PASO) { c.pos.y = b.maxy; c.enSuelo = true; c.vel.y = 0; }
+      else if (c.vel.y > 0 && y0 + ALTO <= b.miny + 1e-3) { c.pos.y = b.miny - ALTO - 1e-4; c.vel.y = 0; }
+      else sacaDeCaja(c, b);
     }
   }
 }
+
+// Saca el cuerpo de la caja por el lado más cercano, en el plano.
+function sacaDeCaja(c, b) {
+  const o = [
+    [b.maxx + RADIO + 1e-4 - c.pos.x, 'x'], [b.minx - RADIO - 1e-4 - c.pos.x, 'x'],
+    [b.maxz + RADIO + 1e-4 - c.pos.z, 'z'], [b.minz - RADIO - 1e-4 - c.pos.z, 'z'],
+  ].sort((a, d) => Math.abs(a[0]) - Math.abs(d[0]))[0];
+  c.pos[o[1]] += o[0];
+  if (Math.sign(c.vel[o[1]]) === -Math.sign(o[0])) c.vel[o[1]] = 0;
+}
+
+/* Un empujón (un zombi que se te mete encima) que respeta las paredes: se
+   aplica a pasos cortos con el mismo choque que caminar, así que nunca
+   atraviesa un muro ni deja el cuerpo metido en una caja. */
+export function empujaCuerpo(c, dx, dz, cols) {
+  const n = Math.max(1, Math.ceil(Math.hypot(dx, dz) / 0.05));
+  for (let i = 0; i < n; i++) { moverEje(c, 'x', dx / n, cols); moverEje(c, 'z', dz / n, cols); }
+}
+
+// ¿El cuerpo está dentro de alguna caja?
+export const metido = (p, cols) => cols.some(b => solapa(p, b));
 
 // ---------- Rayos ----------
 
@@ -423,8 +453,9 @@ export function rayoMundo(o, d, max, cols, todos = false) {
 }
 
 // Rayo contra el huevo aproximado como elipsoide; p = pies del huevo
-export function rayoHuevo(o, d, p, escala = 1) {
-  const rx = 0.5 * escala, ry = ALTO / 2 * escala;
+// `alto` achata el elipsoide (un perro, uno que se arrastra) sin cambiar el ancho.
+export function rayoHuevo(o, d, p, escala = 1, alto = 1) {
+  const rx = 0.5 * escala, ry = ALTO / 2 * escala * alto;
   const ox = (o.x - p.x) / rx, oy = (o.y - p.y - ry) / ry, oz = (o.z - p.z) / rx;
   const dx = d.x / rx, dy = d.y / ry, dz = d.z / rx;
   const a = dx * dx + dy * dy + dz * dz;
@@ -587,34 +618,131 @@ export function crearHuevo(color, nombre, skin = 'clasico') {
 const matPodrido = new THREE.MeshLambertMaterial({ color: '#8fa36b' });
 const matMoho = new THREE.MeshLambertMaterial({ color: '#4f6136' });
 const matOjoZombi = new THREE.MeshBasicMaterial({ color: '#ff3b2f' });
-// `tipo`: 'n' el de siempre, 'c' el corredor (más amarillento y flaco) y 'g'
-// el grandote (más oscuro y un 30 % más grande; las balas lo saben por
-// `userData.escala`).
+const matCarbon = new THREE.MeshLambertMaterial({ color: '#2a1a14' });
+const matBrasa = new THREE.MeshBasicMaterial({ color: '#ff7a1a' });
+const matAcero = new THREE.MeshPhongMaterial({ color: '#8d949c', specular: '#ffffff', shininess: 70 });
+const matGas = new THREE.MeshBasicMaterial({ color: '#7dff3a', transparent: true, opacity: 0.85 });
+const matBoca = new THREE.MeshBasicMaterial({ color: '#1a0606' });
+// El color de la cáscara y cuánto brilla, por tipo (TIPOS en zombis.js).
+const PIEL = {
+  n: ['#8fa36b'], c: ['#c2b357'], g: ['#5d7a3c'], p: ['#4a1f17', '#3a0800'], t: ['#a7c43a', '#2f6a10'],
+  f: ['#c24a1a', '#6a1d00'], x: ['#e3dcc8'], j: ['#5b4a63', '#1a0a20'], k: ['#7d9460'],
+};
+// La forma la dibuja este archivo, pero la medida de las balas (`escala`,
+// `alto`) es la de FORMA en zombis.js: aquí se copia para no importar al revés.
+const MEDIDA_Z = { g: [1.3, 1], p: [1.1, 0.37], t: [1, 0.42], f: [1.12, 1], x: [0.95, 1], j: [1.9, 1], k: [1.05, 1] };
+
+// `tipo`: ver TIPOS en zombis.js. Todos guardan en `userData` lo que anima
+// zombis.js: `cuerpo` (se bambolea), `casco` (la cáscara, la que destella al
+// recibir un balazo), `brazos`, y según el tipo `patas`, `repta`, `yelmo`,
+// `boca` y `ojos`.
 export function crearZombi(tipo = 'n') {
   const g = new THREE.Group();
   const cuerpo = new THREE.Group();
   g.add(cuerpo);
+  const [color, brillo] = PIEL[tipo] || PIEL.n;
   const casco = new THREE.Mesh(geometriaHuevo(), matPodrido.clone());
-  if (tipo === 'c') { casco.material.color.set('#c2b357'); casco.scale.set(0.88, 1.04, 0.88); }
-  if (tipo === 'g') casco.material.color.set('#5d7a3c');
+  casco.material.color.set(color);
+  if (brillo) casco.material.emissive?.set(brillo);
   casco.castShadow = true;
-  cuerpo.add(casco);
-  for (const [y, a, s] of [[0.5, 0.6, 0.11], [0.9, 2.4, 0.09], [1.25, 4.1, 0.08], [0.35, 3.3, 0.12], [1.05, 5.5, 0.1]]) {
-    const t = y / ALTO, u = 2 * t - 1;
-    const r = 0.5 * Math.sqrt(Math.max(0, 1 - u * u)) * (1 - 0.16 * u) * 0.97;
-    cuerpo.add(pieza(new THREE.SphereGeometry(s, 8, 6), matMoho, Math.cos(a) * r, y, Math.sin(a) * r));
+  const ud = { cuerpo, casco, brazos: [], base: casco.material.emissive.clone() };
+  const [escala, alto] = MEDIDA_Z[tipo] || [1, 1];
+  ud.escala = escala; ud.alto = alto;
+
+  if (tipo === 'p') {
+    // El perro infernal: el huevo acostado, chamuscado, en cuatro patas, con
+    // brasas en el lomo, orejas de cuerno y los ojos encendidos.
+    casco.rotation.x = -Math.PI / 2;
+    casco.scale.set(0.78, 0.72, 0.7);
+    casco.position.set(0, 0.5, 0.61);
+    cuerpo.add(casco);
+    ud.patas = [];
+    for (const [x, z] of [[-0.2, -0.32], [0.2, -0.32], [-0.2, 0.36], [0.2, 0.36]]) {
+      const pata = new THREE.Group();
+      pata.position.set(x, 0.42, z);
+      pata.add(pieza(new THREE.CylinderGeometry(0.06, 0.045, 0.42, 6), matCarbon, 0, -0.21, 0));
+      cuerpo.add(pata);
+      ud.patas.push(pata);
+    }
+    for (const sx of [-1, 1]) {
+      cuerpo.add(pieza(new THREE.SphereGeometry(0.06, 8, 6), matOjoZombi, sx * 0.12, 0.66, -0.66));
+      const oreja = pieza(new THREE.ConeGeometry(0.06, 0.22, 6), matCarbon, sx * 0.14, 0.82, -0.5);
+      oreja.rotation.z = -sx * 0.4;
+      cuerpo.add(oreja);
+    }
+    for (const [x, z] of [[0, 0.1], [0.08, -0.15], [-0.07, 0.3], [0, -0.35]]) cuerpo.add(pieza(new THREE.SphereGeometry(0.05, 6, 5), matBrasa, x, 0.78, z));
+    const cola = pieza(new THREE.CylinderGeometry(0.02, 0.05, 0.4, 6), matCarbon, 0, 0.65, 0.72);
+    cola.rotation.x = -0.9;
+    cuerpo.add(cola);
+  } else if (tipo === 't') {
+    // El tóxico: un huevo verde chillón que se arrastra con los brazos, con
+    // burbujas de gas que le revientan en la cáscara.
+    const tendido = new THREE.Group();
+    tendido.rotation.x = -1.32;
+    tendido.position.set(0, 0.3, 0.75);
+    casco.scale.set(0.95, 0.95, 0.85);
+    tendido.add(casco);
+    for (const [y, a, r] of [[0.5, 0.4, 0.09], [0.8, 2.1, 0.07], [1.1, 3.9, 0.08], [1.3, 5.2, 0.06], [0.3, 1.2, 0.07]])
+      tendido.add(pieza(new THREE.SphereGeometry(r, 8, 6), matGas, Math.cos(a) * 0.4, y, Math.sin(a) * 0.4));
+    cuerpo.add(tendido);
+    for (const sx of [-1, 1]) {
+      cuerpo.add(pieza(new THREE.SphereGeometry(0.07, 10, 6), matOjoZombi, sx * 0.14, 0.45, -0.95));
+      const brazo = pieza(new THREE.CylinderGeometry(0.06, 0.07, 0.6, 8), casco.material, sx * 0.34, 0.12, -1.0);
+      brazo.rotation.x = Math.PI / 2;
+      cuerpo.add(brazo);
+    }
+    ud.repta = true;
+  } else {
+    cuerpo.add(casco);
+    if (tipo === 'c') casco.scale.set(0.88, 1.04, 0.88);
+    if (tipo === 'x') casco.scale.set(0.82, 1.08, 0.82);
+    const manchas = tipo === 'f' ? matCarbon : matMoho;
+    for (const [y, a, s] of [[0.5, 0.6, 0.11], [0.9, 2.4, 0.09], [1.25, 4.1, 0.08], [0.35, 3.3, 0.12], [1.05, 5.5, 0.1]]) {
+      const t = y / ALTO, u = 2 * t - 1;
+      const r = 0.5 * Math.sqrt(Math.max(0, 1 - u * u)) * (1 - 0.16 * u) * 0.97;
+      cuerpo.add(pieza(new THREE.SphereGeometry(s, 8, 6), manchas, Math.cos(a) * r, y, Math.sin(a) * r));
+    }
+    // El Mutante tiene ojos propios (se encienden al embestir).
+    const ojo = tipo === 'j' ? () => new THREE.MeshLambertMaterial({ color: '#ffd23a', emissive: '#ffb000', emissiveIntensity: 1 }) : () => matOjoZombi;
+    ud.ojos = [];
+    for (const sx of [-1, 1]) {
+      const o = pieza(new THREE.SphereGeometry(0.075, 10, 6), ojo(), sx * 0.15, 1.16, -0.43);
+      cuerpo.add(o); ud.ojos.push(o);
+      const grueso = tipo === 'j' ? 1.6 : 1;
+      const brazo = pieza(new THREE.CylinderGeometry(0.06 * grueso, 0.07 * grueso, 0.55, 8), tipo === 'j' ? matCarbon : matPodrido, sx * 0.36, 0.95, -0.42);
+      brazo.rotation.x = Math.PI / 2;
+      cuerpo.add(brazo);
+      ud.brazos.push(brazo);
+    }
+    if (tipo === 'f') for (const [x, y, z] of [[0.2, 0.7, -0.38], [-0.3, 1.0, -0.25], [0.1, 1.35, -0.3], [-0.1, 0.45, 0.42], [0.35, 1.1, 0.2]])
+      cuerpo.add(pieza(new THREE.SphereGeometry(0.06, 6, 5), matBrasa, x, y, z));
+    if (tipo === 'x') {
+      // El chillón: una boca enorme que se abre al gritar.
+      ud.boca = pieza(new THREE.SphereGeometry(0.13, 12, 8), matBoca, 0, 0.92, -0.42);
+      ud.boca.scale.set(1.1, 0.5, 0.4);
+      cuerpo.add(ud.boca);
+    }
+    if (tipo === 'k') {
+      // Un casco de acero que salta al romperse.
+      const yelmo = new THREE.Group();
+      yelmo.add(pieza(new THREE.SphereGeometry(0.4, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2), matAcero, 0, 1.3, 0));
+      yelmo.add(pieza(new THREE.CylinderGeometry(0.47, 0.47, 0.04, 18), matAcero, 0, 1.31, 0));
+      cuerpo.add(yelmo);
+      ud.yelmo = yelmo;
+    }
+    if (tipo === 'j') {
+      // El Mutante: púas en el lomo, placas de hierro y una cicatriz.
+      for (let i = 0; i < 5; i++) {
+        const pua = pieza(new THREE.ConeGeometry(0.07, 0.32, 6), matAcero, 0, 0.55 + i * 0.22, 0.42 - Math.abs(i - 2) * 0.03);
+        pua.rotation.x = 0.9;
+        cuerpo.add(pua);
+      }
+      for (const sx of [-1, 1]) cuerpo.add(pieza(new THREE.BoxGeometry(0.22, 0.12, 0.3), matAcero, sx * 0.42, 1.2, 0));
+      cuerpo.add(pieza(new THREE.BoxGeometry(0.5, 0.05, 0.02), matBoca, 0, 1.0, -0.46));
+    }
   }
-  const brazos = [];
-  for (const sx of [-1, 1]) {
-    cuerpo.add(pieza(new THREE.SphereGeometry(0.075, 10, 6), matOjoZombi, sx * 0.15, 1.16, -0.43));
-    const brazo = pieza(new THREE.CylinderGeometry(0.06, 0.07, 0.55, 8), matPodrido, sx * 0.36, 0.95, -0.42);
-    brazo.rotation.x = Math.PI / 2;
-    cuerpo.add(brazo);
-    brazos.push(brazo);
-  }
-  const escala = tipo === 'g' ? 1.3 : 1;
-  g.scale.setScalar(escala);
-  g.userData = { cuerpo, casco, brazos, escala };
+  g.scale.setScalar(tipo === 'p' || tipo === 't' ? 1 : escala);
+  g.userData = ud;
   return g;
 }
 

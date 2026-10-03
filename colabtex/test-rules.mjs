@@ -396,12 +396,15 @@ console.log("— Salas dormidas: se cierran solas a las seis horas —");
 
 console.log("— Yemas: la malla del directo (vivo/<pid>/rtc) —");
 {
+  const { update } = await import("firebase/database");
   const ua = await loginAs(A);
   const r = push(ref(db, "partidas"));
   await set(r, { juego: "yemas", estado: "esperando", anfitrion: ua.uid, at: Date.now(), cupo: 2,
     jugadores: { [ua.uid]: { nombre: "Ana", orden: 0 } } });
   const k = r.key;
-  await allowed("el jugador escribe su huevo de respaldo", () => set(ref(db, `vivo/${k}/y/${ua.uid}`), { x: 1, q: 1 }));
+  await denied("el jugador ya no escribe su huevo en la base (el respaldo viejo)", () => set(ref(db, `vivo/${k}/y/${ua.uid}`), { x: 1, q: 1 }));
+  await denied("ni de un golpe, escribiendo todo el nodo", () => set(ref(db, `vivo/${k}/y`), { [ua.uid]: { x: 1 } }));
+  await denied("ni por un update al padre", () => update(ref(db, `vivo/${k}`), { [`y/${ua.uid}`]: { x: 1 } }));
   await allowed("el jugador se presenta en la malla", () => set(ref(db, `vivo/${k}/rtc/en/${ua.uid}`), "s1"));
   const ub = await loginAs(B);
   await allowed("un mirón se presenta en la malla", () => set(ref(db, `vivo/${k}/rtc/en/${ub.uid}`), "s2"));
@@ -410,7 +413,7 @@ console.log("— Yemas: la malla del directo (vivo/<pid>/rtc) —");
   await denied("el mirón no presenta a otro", () => set(ref(db, `vivo/${k}/rtc/en/${ua.uid}`), "x"));
   await denied("el mirón no escribe huevos", () => set(ref(db, `vivo/${k}/y/${ub.uid}`), { x: 1 }));
   await denied("ni borra los de la sala", () => remove(ref(db, `vivo/${k}/y`)));
-  await allowed("el mirón lee el respaldo", () => get(ref(db, `vivo/${k}/y/${ua.uid}`)));
+  await allowed("el mirón lee vivo (vacío: no hay respaldo que descargar)", () => get(ref(db, `vivo/${k}/y/${ua.uid}`)));
   await allowed("y se va de la malla", () => remove(ref(db, `vivo/${k}/rtc/en/${ub.uid}`)));
   await loginAs(A);
   await allowed("el jugador lee y borra su buzón", () => remove(ref(db, `vivo/${k}/rtc/b/${ua.uid}`)));

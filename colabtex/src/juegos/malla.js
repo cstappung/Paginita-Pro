@@ -26,8 +26,8 @@
      sigue sano, igual que antes su entrada en la base seguía ahí.
 
    El límite es el de la voz: solo STUN. El par que no logra conectarse no
-   se queda sin ver al otro: `sano(u)` lo dice y el cartero lo trae por la
-   base (ver `yemas-red.js`). */
+   pasa por la base: se lo sirve un tercero que tenga canal con los dos
+   (ver `yemas-red.js`). */
 
 const ICE = [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302"] }];
 const LLENO = 1 << 18;          // lo que se deja en cola sin enviar antes de saltarse estados
@@ -188,9 +188,11 @@ export function crearMalla({ uid, senal, quiere = () => true, alDatos = () => {}
     alCambiar();
   }
 
-  function envia(obj) {
+  // A todos los pares con canal sano, o solo a los de `a`.
+  function envia(obj, a = null) {
     let txt = null;
-    for (const x of pares.values()) {
+    for (const [u, x] of pares) {
+      if (a && !a.includes(u)) continue;
       if (!sanoX(x) || x.dc.bufferedAmount > LLENO) continue;
       if (txt === null) txt = JSON.stringify(obj);
       try { x.dc.send(txt); } catch {}
@@ -202,5 +204,6 @@ export function crearMalla({ uid, senal, quiere = () => true, alDatos = () => {}
     activa: () => !!sesion,
     sano: u => sanoX(pares.get(u)),
     presentes: () => [...presentes.keys()],
+    conectados: () => [...pares].filter(([, x]) => sanoX(x)).map(([u]) => u),
   };
 }

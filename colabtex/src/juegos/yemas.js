@@ -1,7 +1,7 @@
 import * as fb from "../fb-juegos.js";
 import { crearVoz } from "./voz.js";
 import { crearMalla } from "./malla.js";
-import { crearDirecto } from "./yemas-red.js";
+import { crearDirecto, OK_MS } from "./yemas-red.js";
 import { YM_ARMAS, mapaYemas } from "./motor.js";
 
 /* Yemas — el cartero entre la sala y el juego.
@@ -10,15 +10,16 @@ import { YM_ARMAS, mapaYemas } from "./motor.js";
    su física, sus bots de práctica) y entra aquí en un iframe, igual que
    Circuit Breakers. Este módulo no simula nada: traduce.
 
-   - **El directo no pasa por la base**: el `estado` de mi huevo (unas doce
-     veces por segundo, lo decide el marco) va de navegador a navegador por
-     una malla WebRTC (`malla.js`), y la base (`vivo/<pid>/y/<uid>`) queda
-     de respaldo para el par que no logra canal directo. Qué va por dónde y
+   - **El directo no pasa por la base, nunca**: el `estado` de mi huevo
+     (unas doce veces por segundo, lo decide el marco) va de navegador a
+     navegador por una malla WebRTC (`malla.js`). El par que no logra canal
+     directo se sirve por un tercero que tenga canal con los dos; si no hay
+     ninguno, la pantalla avisa con quién no hay conexión. Qué se reenvía y
      qué ve el marco lo decide `yemas-red.js`.
    - **Lo del marco hacia el registro**: cada `muere`, `toma`, `devuelve` o
      `captura` es una jugada, escrita por quien la hace.
-   - **Lo de la sala hacia el marco**: los huevos de los demás (por la malla
-     o por la base, el más nuevo), el marcador que sale del reductor (bajas, muertes,
+   - **Lo de la sala hacia el marco**: los huevos de los demás (el estado
+     más nuevo de cada uno, directo o reenviado), el marcador que sale del reductor (bajas, muertes,
      equipos, banderas, quién se fue, si ya hay ganador) y cada suceso del
      registro una sola vez, por su clave, para el feed. La primera tanda va
      marcada como `viejas`: son las de antes de abrir la pestaña y no se
@@ -49,15 +50,17 @@ const recuerdaVoz = pid => { try { if (pid) sessionStorage.setItem(VOZ_RECUERDA,
 const vozRecordada = () => { try { return sessionStorage.getItem(VOZ_RECUERDA) || ""; } catch { return ""; } };
 
 export function crearYemas({ uid, pid, jugar, terminar, mirando }) {
-  let host, frame, aviso, barra, equiposEl, muerto = false, listo = false, configurado = false, autoVoz = false;
+  let host, frame, aviso, redEl, barra, equiposEl, muerto = false, listo = false, configurado = false, autoVoz = false;
   let partida = null, est = null, borrado = false, primeraTanda = true;
   let voz = null, vozEstado = null;
   const enviadas = new Set();
-  // El directo: la malla, lo que decide qué va por dónde y los huevos que se
-  // escuchan por la base (uid → cómo dejar de escucharlo).
-  let malla = null, reloj = null, pendiente = null, parado = false, rosterFirma = "";
-  const directo = crearDirecto();
-  const escuchados = new Map();
+  // El directo: la malla y lo que decide qué se reenvía y qué ve el marco.
+  let malla = null, reloj = null, pendiente = null, parado = false, rosterFirma = "", sinMalla = false;
+  const directo = crearDirecto({
+    uid,
+    sano: u => !!malla?.sano(u),
+    conectados: () => malla?.conectados() || [],
+  });
 
   const juego = () => !!est?.jugadores?.some(j => j.uid === uid) && !mirando;
   const esJugador = u => !!est?.jugadores?.some(j => j.uid === u);
@@ -113,9 +116,7 @@ export function crearYemas({ uid, pid, jugar, terminar, mirando }) {
     if (partida?.fin || !juego()) return;   // un mirón no escribe
     const anota = j => jugar(j).catch(err => console.warn("[yemas] no se pudo anotar", j.t, err));
     if (d.tipo === "estado" && d.e && typeof d.e === "object") {
-      const { paquete, escribir } = directo.sale(d.e, decideAhora().rapido);
-      malla?.envia(paquete);
-      if (escribir) fb.yemasVivo(pid, uid, escribir);
+      malla?.envia(directo.sale(d.e));
     } else if (d.tipo === "muere") {
       const a = Number.isInteger(d.a) && d.a >= 0 && d.a < YM_ARMAS ? d.a : 0;
       const j = { t: "muere", uid, por: typeof d.por === "string" ? d.por.slice(0, 64) : "", a, cab: !!d.cab };
@@ -137,45 +138,60 @@ export function crearYemas({ uid, pid, jugar, terminar, mirando }) {
   // ---------- el directo ----------
   // Los jugadores que me importan: todos menos yo y los que se fueron.
   const otros = () => (est?.jugadores || []).map(j => j.uid).filter(u => u !== uid && !est.fuera?.[u]);
-  const sano = u => !!malla?.sano(u);
 
-  function decideAhora() {
-    const r = directo.decide({
-      otros: otros(), sano, soyJugador: juego(),
-      mirones: malla ? malla.presentes().filter(u => !esJugador(u)) : [],
-    });
-    for (const u of r.subs) {
-      if (!escuchados.has(u)) escuchados.set(u, fb.watchYemasUno(pid, u, v => { if (directo.recibeBase(u, v)) programa(); }));
-    }
-    for (const [u, off] of [...escuchados]) if (!r.subs.has(u)) { off(); escuchados.delete(u); }
-    return r;
-  }
   // Varios estados que llegan juntos van al marco en un solo mensaje.
   function programa() {
     if (pendiente || parado) return;
     pendiente = setTimeout(() => {
       pendiente = null;
-      if (configurado && !parado) enviar("vivo", { v: directo.mapa({ otros: otros(), sano }) });
+      if (configurado && !parado) enviar("vivo", { v: directo.mapa(otros()) });
     }, 16);
   }
+  const anuncia = () => malla?.envia(directo.anuncio());
+
+  // Con quién no hay forma de verse: dicho, en vez de un huevo que no aparece.
+  function pintaRed() {
+    if (!redEl) return;
+    let txt = "";
+    if (sinMalla) txt = "No se pudo entrar al directo de la partida: recarga la página.";
+    else if (configurado && !parado) {
+      const malos = directo.inalcanzables(otros()), estan = new Set(malla?.presentes() || []);
+      const idos = malos.filter(u => !estan.has(u)), red = malos.filter(u => estan.has(u));
+      const lista = us => us.map(nombre).join(", ");
+      const partes = [];
+      if (idos.length) partes.push(lista(idos) + (idos.length > 1 ? " no están" : " no está") + " en la partida ahora (cerró la pestaña o se quedó sin internet).");
+      if (red.length) partes.push("Sin conexión con " + lista(red) +
+        ": sus redes no dejan una conexión directa y no hay nadie en común que la reenvíe. Prueben otra red (los datos del celular suelen bloquearla).");
+      txt = partes.join(" ");
+    }
+    redEl.hidden = !txt;
+    if (redEl.textContent !== txt) redEl.textContent = txt;
+  }
+
   function arrancaDirecto() {
     if (malla || parado) return;
     malla = crearMalla({
       uid, senal: fb.senalMalla(pid, uid),
       // Un mirón se conecta a los jugadores, no a los otros mirones.
       quiere: u => juego() || esJugador(u),
-      alDatos: (u, d) => { if (directo.recibeMalla(u, d)) programa(); },
+      alDatos: (u, d) => {
+        const r = directo.recibe(u, d);
+        if (r.reenvia) malla.envia(r.reenvia.d, r.reenvia.a);
+        if (r.cambio) programa();
+      },
+      // Un canal que abre o se cae cambia con quién tengo camino: se anuncia ya.
+      alCambiar: () => { anuncia(); programa(); },
     });
-    malla.entrar().catch(err => console.warn("[yemas] malla", err));
-    reloj = setInterval(() => { decideAhora(); programa(); }, 500);
+    malla.entrar().then(ok => { if (!ok && !parado) { sinMalla = true; pintaRed(); } },
+      err => { console.warn("[yemas] malla", err); sinMalla = true; pintaRed(); });
+    reloj = setInterval(() => { anuncia(); programa(); pintaRed(); }, OK_MS);
   }
   function paraDirecto() {
     parado = true;
     malla?.salir();
     clearInterval(reloj);
     clearTimeout(pendiente);
-    for (const off of escuchados.values()) off();
-    escuchados.clear();
+    pintaRed();
   }
 
   // ---------- la barra de voz ----------
@@ -302,6 +318,10 @@ export function crearYemas({ uid, pid, jugar, terminar, mirando }) {
     aviso.className = "jg-yemas-aviso";
     aviso.setAttribute("role", "status");
     aviso.hidden = true;
+    redEl = document.createElement("p");
+    redEl.className = "jg-yemas-aviso jg-yemas-red";
+    redEl.setAttribute("role", "status");
+    redEl.hidden = true;
     barra = document.createElement("div");
     barra.className = "jg-voz";
     barra.hidden = true;
@@ -316,8 +336,8 @@ export function crearYemas({ uid, pid, jugar, terminar, mirando }) {
     window.addEventListener("message", mensaje);
     window.addEventListener("keydown", abajo);
     window.addEventListener("keyup", arriba);
-    frame.src = "juegos/yemas/index.html?modo=online&v=yemas-11";
-    host.append(aviso, equiposEl, barra, frame);
+    frame.src = "juegos/yemas/index.html?modo=online&v=yemas-13";
+    host.append(aviso, redEl, equiposEl, barra, frame);
   }
 
   function actualizar(p, estado) {
