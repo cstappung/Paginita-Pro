@@ -394,6 +394,32 @@ console.log("— Salas dormidas: se cierran solas a las seis horas —");
   await loginAs(A);
 }
 
+console.log("— Yemas: la malla del directo (vivo/<pid>/rtc) —");
+{
+  const ua = await loginAs(A);
+  const r = push(ref(db, "partidas"));
+  await set(r, { juego: "yemas", estado: "esperando", anfitrion: ua.uid, at: Date.now(), cupo: 2,
+    jugadores: { [ua.uid]: { nombre: "Ana", orden: 0 } } });
+  const k = r.key;
+  await allowed("el jugador escribe su huevo de respaldo", () => set(ref(db, `vivo/${k}/y/${ua.uid}`), { x: 1, q: 1 }));
+  await allowed("el jugador se presenta en la malla", () => set(ref(db, `vivo/${k}/rtc/en/${ua.uid}`), "s1"));
+  const ub = await loginAs(B);
+  await allowed("un mirón se presenta en la malla", () => set(ref(db, `vivo/${k}/rtc/en/${ub.uid}`), "s2"));
+  await allowed("el mirón le manda señal al jugador", () => set(push(ref(db, `vivo/${k}/rtc/b/${ua.uid}`)), { de: ub.uid, t: "ice", s: "s2" }));
+  await denied("el mirón no firma por otro", () => set(push(ref(db, `vivo/${k}/rtc/b/${ua.uid}`)), { de: ua.uid, t: "ice" }));
+  await denied("el mirón no presenta a otro", () => set(ref(db, `vivo/${k}/rtc/en/${ua.uid}`), "x"));
+  await denied("el mirón no escribe huevos", () => set(ref(db, `vivo/${k}/y/${ub.uid}`), { x: 1 }));
+  await denied("ni borra los de la sala", () => remove(ref(db, `vivo/${k}/y`)));
+  await allowed("el mirón lee el respaldo", () => get(ref(db, `vivo/${k}/y/${ua.uid}`)));
+  await allowed("y se va de la malla", () => remove(ref(db, `vivo/${k}/rtc/en/${ub.uid}`)));
+  await loginAs(A);
+  await allowed("el jugador lee y borra su buzón", () => remove(ref(db, `vivo/${k}/rtc/b/${ua.uid}`)));
+  await set(ref(db, `partidas/${k}/fin`), { ganador: ua.uid, motivo: "bajas", at: Date.now() });
+  await denied("con fin no se escribe el huevo", () => set(ref(db, `vivo/${k}/y/${ua.uid}`), { x: 2 }));
+  await allowed("con fin se borran los huevos", () => remove(ref(db, `vivo/${k}/y`)));
+  await allowed("y la malla", () => remove(ref(db, `vivo/${k}/rtc`)));
+}
+
 await signOut(auth);
 await denied("sin sesión no se lee el informe", () => get(ref(db, "errors")));
 await denied("sin sesión no se escribe nada", () => set(ref(db, "feedback/x"), { tipo: "bug", titulo: "x", uid: "x" }));
