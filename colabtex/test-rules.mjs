@@ -215,6 +215,25 @@ console.log("— Monedas: días seguidos (diario) —");
   await loginAs(A);
 }
 
+console.log("— Tienda del perfil —");
+{
+  const { serverTimestamp } = await import("firebase/database");
+  const ua = await loginAs(A);
+  const compra = (uid, item, p, extra) => set(ref(db, `tienda/${uid}/${item}`), Object.assign({ at: serverTimestamp(), p }, extra || {}));
+  await denied("no se paga menos", () => compra(ua.uid, "cometa", 1));
+  await denied("ni se compra lo que no existe", () => compra(ua.uid, "dorado", 5000));
+  await denied("ni se elige la hora", () => set(ref(db, `tienda/${ua.uid}/cometa`), { at: 1700000000000, p: 5000 }));
+  await denied("ni se cuela un campo", () => compra(ua.uid, "cometa", 5000, { gratis: true }));
+  await allowed("A compra un marco", () => compra(ua.uid, "cometa", 5000));
+  await denied("una compra no se reescribe", () => compra(ua.uid, "cometa", 5000));
+  await denied("ni se borra (es gasto)", () => remove(ref(db, `tienda/${ua.uid}/cometa`)));
+  const ub = await loginAs(B);
+  ok("B lee la compra de A (para ver su marco)", (await get(ref(db, `tienda/${ua.uid}/cometa/p`))).val() === 5000);
+  await denied("B no compra a nombre de A", () => compra(ua.uid, "olas", 5000));
+  await allowed("B compra un fondo", () => compra(ub.uid, "olas", 5000));
+  await loginAs(A);
+}
+
 console.log("— PRODROP: sobres y graduaciones —");
 {
   const { serverTimestamp, push } = await import("firebase/database");

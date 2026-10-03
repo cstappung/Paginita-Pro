@@ -368,6 +368,18 @@
       }
     },
 
+    "tienda": {
+      ".read": "auth != null",
+      "$uid": {
+        "$item": {
+          ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists()",
+          ".validate": "$item.matches(/^(cometa|vortice|sakura|plasma|mariposas|estrellas|olas|lluvia|fuegos|holo)$/) && newData.hasChildren(['at', 'p']) && newData.child('at').val() === now && newData.child('p').val() === 5000",
+          "at": { ".validate": "newData.isNumber()" },
+          "p": { ".validate": "newData.isNumber()" },
+          "$otro": { ".validate": false }
+        }
+      }
+    },
     "podios": {
       ".read": "auth != null",
       "$uid": {

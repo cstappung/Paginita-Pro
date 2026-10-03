@@ -25,12 +25,17 @@
  */
 import { JUEGOS, ordenaRanks } from "./motor.js";
 import { LOGROS, SOLO_PREFIJO, reparto } from "./logros.js";
+import { TIENDA, PRECIO_TIENDA } from "./tienda.js";
 
 export const LARGO_BIO = 120;
 export const MAX_VITRINA = 6;
 
 /* req: {logros: n} pide n logros; {podio: true} un puesto 1–3 en una tabla
-   de al menos tres personas; {primero: true} el primer puesto en una así. */
+   de al menos tres personas; {primero: true} el primer puesto en una así;
+   {top: <juego>} ser el n.º 1 de alguna tabla de ese juego (de dos o más
+   personas; ver `campeones`); {tienda: true} haberlo comprado.
+   `anim`: el marco es un dibujo animado (juegos/marcos-animados.js) que
+   va encima de la foto, no solo CSS. */
 export const MARCOS = [
   { id: "nada", n: "Sin marco" },
   { id: "anillo", n: "Anillo" },
@@ -43,7 +48,26 @@ export const MARCOS = [
   { id: "escarcha", n: "Escarcha", req: { logros: 15 } },
   { id: "galaxia", n: "Galaxia", req: { logros: 30 } },
   { id: "laurel", n: "Laurel", req: { podio: true } },
-  { id: "corona", n: "Corona", req: { primero: true } }
+  { id: "corona", n: "Corona", req: { primero: true } },
+  /* La tienda: 5.000 monedas cada uno. */
+  { id: "cometa", n: "Cometa", anim: true, req: { tienda: true } },
+  { id: "vortice", n: "Vórtice", anim: true, req: { tienda: true } },
+  { id: "sakura", n: "Sakura", anim: true, req: { tienda: true } },
+  { id: "plasma", n: "Plasma", anim: true, req: { tienda: true } },
+  { id: "mariposas", n: "Mariposas", anim: true, req: { tienda: true } },
+  /* Uno por juego, para quien es n.º 1 en cualquiera de sus tablas. */
+  ...[
+    ["tsnake", "snake", "Serpiente"], ["tminas", "minas", "Campo minado"], ["ttetris", "tetris", "Tetrominós"],
+    ["tsortem", "sortem", "Bloques en orden"], ["tbbtan", "bbtan", "Bola retro"], ["tsopa", "sopa", "Sopa de letras"],
+    ["telectro", "electro", "Circuito"], ["tfrontera", "frontera", "Símbolos de la Frontera"], ["tpokemon", "pokemon", "Poké Ball"],
+    ["tescondite", "escondite", "Escondidos"], ["tcartas", "cartas", "Tres elementos"], ["tcuadritos", "cuadritos", "Puntos y cajas"],
+    ["treversi", "reversi", "Fichas que giran"], ["torbita", "orbita", "Órbitas"], ["tcadena", "cadena", "Reacción en cadena"],
+    ["tflip", "flip7", "Siete cartas"], ["tcacho", "cacho", "Cubilete"], ["tuno", "uno", "Sentido de juego"],
+    ["tcatan", "catan", "Hexágonos"], ["tpresidente", "presidente", "Banda presidencial"], ["tspicy", "spicy", "Picante"],
+    ["tworms", "worms", "Artillería"], ["tyemas", "yemas", "Huevos en guerra"], ["tzombis", "zombis", "Horda"],
+    ["tclue", "clue", "Pistas"], ["tajedrez", "ajedrez", "Caballo de oro"], ["tmonedas", "monedas", "Tesoro"],
+    ["tprodrop", "prodrop", "Coleccionista"]
+  ].map(([id, top, n]) => ({ id, n, anim: true, req: { top } }))
 ];
 
 /* Los fondos son el `background` de la cabecera de la tarjeta y de la
@@ -60,7 +84,14 @@ export const FONDOS = [
   { id: "papel", n: "Papel", oscuro: false, css: () => "repeating-linear-gradient(0deg, #e8e2d4 0 1px, transparent 1px 22px), #fbf8f1" },
   { id: "galaxia", n: "Galaxia", oscuro: true, req: { logros: 10 }, css: () => "radial-gradient(1px 1px at 20% 30%, #fff, transparent), radial-gradient(1px 1px at 70% 60%, #fff, transparent), radial-gradient(1.5px 1.5px at 40% 80%, #fff, transparent), radial-gradient(1px 1px at 85% 20%, #fff, transparent), radial-gradient(ellipse at 30% 40%, #7b2ff766, transparent 60%), linear-gradient(160deg, #0b0320, #1c0b45)" },
   { id: "lava", n: "Lava", oscuro: true, req: { logros: 20 }, css: () => "radial-gradient(ellipse at 30% 110%, #ffb000, transparent 45%), radial-gradient(ellipse at 80% 100%, #ff4d00, transparent 50%), linear-gradient(180deg, #1a0500, #5a1400)" },
-  { id: "oro", n: "Oro", oscuro: false, req: { podio: true }, css: () => "linear-gradient(120deg, #a86f10, #f4c542 40%, #fff6c4 50%, #f4c542 60%, #a86f10)" }
+  { id: "oro", n: "Oro", oscuro: false, req: { podio: true }, css: () => "linear-gradient(120deg, #a86f10, #f4c542 40%, #fff6c4 50%, #f4c542 60%, #a86f10)" },
+  /* La tienda. `anim`: además del fondo va una capa animada
+     (`.jg-fanim-<id>`, en juegos.html) encima. */
+  { id: "estrellas", n: "Lluvia de estrellas", oscuro: true, anim: true, req: { tienda: true }, css: () => "radial-gradient(ellipse at 70% 0%, #3b2a7a, transparent 60%), linear-gradient(180deg, #070b24, #151a45)" },
+  { id: "olas", n: "Marea", oscuro: true, anim: true, req: { tienda: true }, css: () => "radial-gradient(circle at 80% 25%, #fff7d6 0 6%, transparent 7%), linear-gradient(180deg, #0ea5e9, #38bdf8 45%, #0369a1)" },
+  { id: "lluvia", n: "Lluvia digital", oscuro: true, anim: true, req: { tienda: true }, css: () => "radial-gradient(ellipse at 50% 120%, #14532d, transparent 60%), #020a05" },
+  { id: "fuegos", n: "Fuegos artificiales", oscuro: true, anim: true, req: { tienda: true }, css: () => "radial-gradient(ellipse at 50% 130%, #4c1d95, transparent 60%), linear-gradient(180deg, #050314, #1b0f3d)" },
+  { id: "holo", n: "Holográfico", oscuro: false, anim: true, req: { tienda: true }, css: () => "linear-gradient(115deg, #ffc6f0, #fff1b8, #b9f3ff, #c8ffd9, #e2c8ff)" }
 ];
 
 const NOMBRES_EXTRA = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla" };
@@ -82,6 +113,17 @@ export function nombreCategoria(c) {
   const resto = String(c).slice(SOLO_PREFIJO[j].length).split("-").map(p => PARTES[p] || p);
   return `${nombreJuego(j)} · ${resto.join(", ")}`;
 }
+/* Lo que se dice de un top: «Sé el n.º 1 de …». */
+export function nombreTop(k) {
+  if (k === "monedas") return "Top monedas";
+  if (k === "prodrop") return "la colección de PRODROP";
+  if (k === "zombis") return "Yemas zombis";
+  return nombreJuego(k);
+}
+/* Qué top da cada categoría del club: Tetris Club comparte marco con
+   las salas de Tetris, y los mapas de zombis tienen el suyo. */
+export const topDeCategoria = c => /^yemas-zombis-/.test(String(c)) ? "zombis" : ({ tetrisclub: "tetris" })[juegoDeCategoria(c)] || juegoDeCategoria(c);
+
 /* Cómo se dice una marca del club: las que se ganan por tiempo, en tiempo. */
 const porTiempo = c => /^club-(minas|sortem)-/.test(c) || c === "club-tetris-sprint" || (/^club-sopa-/.test(c) && c !== "club-sopa-racha");
 export function valorMarca(c, f) {
@@ -95,11 +137,47 @@ export function valorMarca(c, f) {
 // El mismo orden que la tabla del club (discord.js: ordenSolo).
 const ordenMarca = (a, b) => b.puntos - a.puntos || a.tiempo - b.tiempo || String(a.uid).localeCompare(String(b.uid));
 
+/* Los n.º 1: uid → Set de tops (el juego, "zombis", "monedas" o
+   "prodrop"). Solo cuentan las tablas de dos o más personas (ser primero
+   solo no es ganarle a nadie), y en las salas, con algún punto. Los de
+   monedas y PRODROP no salen de aquí (piden la economía entera): los
+   trae `datos.lideres` = {monedas: uid, prodrop: uid} ya calculados. */
+const memoTops = new WeakMap(), memoReparto = new WeakMap(), memoEst = new WeakMap();
+export function campeones(datos) {
+  const d = datos || {};
+  if (memoTops.has(d)) return memoTops.get(d);
+  const m = new Map(), pon = (u, k) => { if (!m.has(u)) m.set(u, new Set()); m.get(u).add(k); };
+  for (const [j, filas] of Object.entries(d.ranks || {})) {
+    const orden = ordenaRanks(Object.entries(filas || {}).map(([u, f]) => Object.assign({ uid: u }, f)));
+    if (orden.length >= 2 && (orden[0].puntos || 0) > 0) pon(orden[0].uid, j);
+  }
+  for (const [c, filas] of Object.entries(d.solo || {})) {
+    const k = topDeCategoria(c);
+    if (!k) continue;
+    const orden = Object.entries(filas || {}).map(([u, f]) => Object.assign({ uid: u, puntos: 0, tiempo: 0 }, f)).sort(ordenMarca);
+    if (orden.length >= 2) pon(orden[0].uid, k);
+  }
+  for (const [k, u] of Object.entries(d.lideres || {})) if (u) pon(u, k);
+  memoTops.set(d, m);
+  return m;
+}
+
 /* Lo que se sabe de alguien a partir de las tres lecturas: sus logros,
-   cada tabla en la que aparece con su puesto, y los totales. */
+   cada tabla en la que aparece con su puesto, y los totales. Se recuerda
+   por objeto de datos: cada llegada de Firebase trae uno nuevo, y con
+   decenas de fotos con marco en una tabla el reparto se pedía por cada una. */
 export function estadisticas(uid, datos) {
   const d = datos || {};
-  const { tiene, gente } = reparto(d.ranks, d.solo, d.logros);
+  let porUid = memoEst.get(d);
+  if (!porUid) memoEst.set(d, porUid = new Map());
+  if (porUid.has(uid)) return porUid.get(uid);
+  const est = calculaEstadisticas(uid, d);
+  porUid.set(uid, est);
+  return est;
+}
+function calculaEstadisticas(uid, d) {
+  if (!memoReparto.has(d)) memoReparto.set(d, reparto(d.ranks, d.solo, d.logros));
+  const { tiene, gente } = memoReparto.get(d);
   const logros = [];
   for (const j of Object.keys(LOGROS)) for (const x of LOGROS[j]) {
     if (!tiene[j][x.id].has(uid)) continue;
@@ -135,7 +213,13 @@ export function estadisticas(uid, datos) {
     totalLogros: Object.values(LOGROS).reduce((t, l) => t + l.length, 0),
     podios: serias.filter(t => t.puesto <= 3).length,
     primeros: serias.filter(t => t.puesto === 1).length,
-    mejorPuesto: tablas.length ? tablas[0].puesto : 0
+    mejorPuesto: tablas.length ? tablas[0].puesto : 0,
+    tops: [...(campeones(d).get(uid) || [])],
+    /* Lo comprado en la tienda: lo que la economía aceptó (`compras`), o
+       lo escrito tal cual mientras no hay economía. */
+    compras: (d.compras || d.tienda || {})[uid] || {},
+    /* Sin todas las lecturas todavía, lo que se gana no se puede negar. */
+    parcial: d.completo === false
   };
 }
 
@@ -147,6 +231,8 @@ export function requisito(item, est) {
   if (r.logros) return est.nLogros >= r.logros ? { ok: true, falta: "" } : { ok: false, falta: `${r.logros} logros (llevas ${est.nLogros})` };
   if (r.primero) return est.primeros > 0 ? { ok: true, falta: "" } : { ok: false, falta: "Sé el n.º 1 de una clasificación de 3 o más" };
   if (r.podio) return est.podios > 0 ? { ok: true, falta: "" } : { ok: false, falta: "Sube al podio de una clasificación de 3 o más" };
+  if (r.top) return (est.tops || []).includes(r.top) ? { ok: true, falta: "" } : { ok: false, falta: `Sé el n.º 1 de ${nombreTop(r.top)}` };
+  if (r.tienda) return est.compras && est.compras[item.id] ? { ok: true, falta: "" } : { ok: false, falta: `🪙 ${PRECIO_TIENDA.toLocaleString("es-CL")} en la tienda`, tienda: true };
   return { ok: false, falta: "" };
 }
 
@@ -156,12 +242,14 @@ export const fondoDe = id => FONDOS.find(f => f.id === id) || null;
    estadísticas todavía (una ficha, un chip) se confía en lo guardado. */
 export function marcoVisible(perfil, est) {
   const m = marcoDe(perfil && perfil.marco) || marcoDe("anillo");
-  return !est || requisito(m, est).ok ? m.id : "anillo";
+  return !est || est.parcial || requisito(m, est).ok ? m.id : "anillo";
 }
 export function fondoVisible(perfil, est) {
   const f = fondoDe(perfil && perfil.fondo) || fondoDe("color");
-  return !est || requisito(f, est).ok ? f : fondoDe("color");
+  return !est || est.parcial || requisito(f, est).ok ? f : fondoDe("color");
 }
+/* Para pruebas y para la tienda: lo que se vende, ya con su catálogo. */
+export const enTienda = id => !!TIENDA[id];
 
 /* Todo lo que se puede exhibir, ya resuelto y con su texto. */
 export function opcionesVitrina(est) {

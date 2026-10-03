@@ -46,6 +46,7 @@
    ============================================================ */
 import { LOGROS, SOLO_PREFIJO, deFila, deMarca } from "./logros.js";
 import PM from "../../../juegos/prodrop/motor.js";
+import { TIENDA, PRECIO_TIENDA } from "./tienda.js";
 
 /* ---------- tarifas ---------- */
 export const TARIFA = { partida: 5, victoria: 15, empate: 5 };
@@ -248,7 +249,7 @@ export function economia(datos) {
   const d = datos || {};
   if (memoEco.has(d)) return memoEco.get(d);
   const c = d.cartas || {}, m = d.mercado || {}, ev = [];
-  const ORDEN = { s: 0, g: 1, r: 2, o: 3, x: 4, v: 5, t: 6 };
+  const ORDEN = { s: 0, g: 1, r: 2, o: 3, x: 4, v: 5, t: 6, c: 7 };
   for (const [u, l] of Object.entries(c.s || {}))
     for (const [k, x] of Object.entries(l || {}))
       if (CLAVE_SOBRE.test(k) && x && Number.isFinite(x.at)) ev.push({ t: "s", at: x.at, u, k, p: num(x.p) });
@@ -269,11 +270,15 @@ export function economia(datos) {
   }
   for (const [id, x] of Object.entries(m.t || {}))
     if (x && Number.isFinite(x.ok) && !Number.isFinite(x.x)) ev.push({ t: "t", at: x.ok, id, x });
+  /* La tienda del perfil: `tienda/<uid>/<artículo>` = {at, p}. */
+  for (const [u, l] of Object.entries(d.tienda || {}))
+    for (const [k, x] of Object.entries(l || {}))
+      if (x && Number.isFinite(x.at)) ev.push({ t: "c", at: x.at, u, k, p: num(x.p) });
   ev.sort((a, b) => a.at - b.at || ORDEN[a.t] - ORDEN[b.t] || ((a.id || a.k) < (b.id || b.k) ? -1 : (a.id || a.k) > (b.id || b.k) ? 1 : 0) || (a.i || 0) - (b.i || 0));
 
   const usuarios = {}, dueno = {}, graduada = {}, enVenta = {}, sobres = {}, ofertas = {}, cambios = {};
   const ganado = {};
-  const U = u => usuarios[u] || (usuarios[u] = { gastadas: 0, cobradas: 0, parada: false, falta: 0, gratis: -Infinity, sobres: {} });
+  const U = u => usuarios[u] || (usuarios[u] = { gastadas: 0, cobradas: 0, parada: false, falta: 0, gratis: -Infinity, sobres: {}, tienda: {} });
   const saldo = u => { if (!(u in ganado)) ganado[u] = ganadoDe(u, d).total; const x = U(u); return ganado[u] + x.cobradas - x.gastadas; };
   /* Cobra `p` a `u`. Si no puede, la cuenta queda parada. */
   const paga = (u, p) => {
@@ -333,6 +338,10 @@ export function economia(datos) {
       o.fin = e.at;
       if (paga(e.u, o.p)) { dueno[o.c] = e.u; U(o.u).cobradas += o.p; o.estado = "vendida"; o.comprador = e.u; }
       else { o.estado = "impaga"; o.comprador = e.u; }
+    } else if (e.t === "c") {
+      /* Un marco o un fondo de la tienda: una vez por cuenta, al precio. */
+      if (!TIENDA[e.k] || e.p !== PRECIO_TIENDA || U(e.u).tienda[e.k]) continue;
+      if (paga(e.u, PRECIO_TIENDA)) U(e.u).tienda[e.k] = e.at;
     } else if (e.t === "t") {
       const x = e.x, dar = comoLista(x.dar).map(String), pedir = comoLista(x.pedir).map(String), todas = [...dar, ...pedir];
       const ok = x.de && x.para && x.de !== x.para && dar.length >= 1 && dar.length <= 3 && pedir.length <= 3 &&
@@ -378,7 +387,7 @@ export function topMonedas(datos) {
   for (const filas of Object.values(d.ranks || {})) mira(filas);
   for (const filas of Object.values(d.solo || {})) mira(filas);
   for (const porUid of Object.values(d.logros || {})) for (const u of Object.keys(porUid || {})) if (!(u in nombres)) nombres[u] = "";
-  for (const nodo of [d.diario, d.clubJugadas, d.podios, (d.cartas || {}).s]) for (const u of Object.keys(nodo || {})) if (!(u in nombres)) nombres[u] = "";
+  for (const nodo of [d.diario, d.clubJugadas, d.podios, (d.cartas || {}).s, d.tienda]) for (const u of Object.keys(nodo || {})) if (!(u in nombres)) nombres[u] = "";
   return Object.keys(nombres)
     .map(uid => Object.assign({ uid, nombre: nombres[uid] }, monedasDe(uid, d)))
     .filter(x => x.saldo > 0)

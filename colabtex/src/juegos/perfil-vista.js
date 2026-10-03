@@ -15,18 +15,28 @@
 import { exhibidasDe, miniCarta } from "./prodrop-cartas.js";
 import { estadisticas, marcoVisible, fondoVisible, vitrinaDe, nombreJuego, nombreCategoria, oscurece } from "./perfil-tarjeta.js";
 import { LOGROS } from "./logros.js";
+import { adorno, tieneAdorno } from "./marcos-animados.js";
 
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
 /* La foto con su marco. Vale para cualquier tamaño: el marco es CSS y
-   lee `--t` (el lado) y `--c` (el color de la persona). */
+   lee `--t` (el lado) y `--c` (el color de la persona). Los animados
+   (campeones y tienda) son además un SVG encima (`adorno`). */
 export function avatarMarco(foto, nombre, color, marco, tam, uid) {
+  const id = marco || "anillo", anim = tieneAdorno(id);
   const dentro = foto
     ? `<img src="${esc(foto)}" alt="" referrerpolicy="no-referrer">`
     : `<i>${esc((nombre || "?").charAt(0).toUpperCase())}</i>`;
-  return `<span class="jg-av jg-marco-${esc(marco || "anillo")}" style="--c:${esc(color || "#0d9488")};--t:${tam}px"${uid ? ` data-perfil="${esc(uid)}" data-nombre="${esc(nombre || "")}"` : ""}>${dentro}</span>`;
+  return `<span class="jg-av jg-marco-${esc(id)}${anim ? " jg-marco-anim" : ""}" style="--c:${esc(color || "#0d9488")};--t:${tam}px"${uid ? ` data-perfil="${esc(uid)}" data-nombre="${esc(nombre || "")}"` : ""}>${dentro}${anim ? adorno(id) : ""}</span>`;
 }
+
+/* La capa que se mueve de un fondo de la tienda (vacía si no es animado). */
+/* El marco que se ve en la foto de alguien en cualquier lista: el de su
+   perfil, comprobado contra lo que tiene ganado (sin datos todavía, se
+   confía en lo guardado, como en `marcoVisible`). */
+export const marcoDeUid = (uid, perfil, datos) => marcoVisible(perfil, datos ? estadisticas(uid, datos) : null);
+export const capaFondo = f => f && f.anim ? `<i class="jg-fanim jg-fanim-${esc(f.id)}" aria-hidden="true"><b></b><b></b><b></b></i>` : "";
 
 /* Quién es, con lo que haya: su perfil manda, luego lo que trae quien
    pregunta (la ficha que se tocó, la cuenta de Google si es uno mismo),
@@ -59,7 +69,7 @@ export function tarjetaHtml({ uid, p, est, pista, colorDe, yo, editor, cartas })
     [est.mejorPuesto ? "#" + est.mejorPuesto : "—", "mejor puesto"]
   ] : [["…", "logros"], ["…", "victorias"], ["…", "mejor puesto"]];
   return `
-    <div class="jg-mini-fondo${f.oscuro ? " oscuro" : ""}" style="background:${esc(f.css(q.color))}"></div>
+    <div class="jg-mini-fondo${f.oscuro ? " oscuro" : ""}" style="background:${esc(f.css(q.color))}">${capaFondo(f)}</div>
     <div class="jg-mini-cab">
       ${avatarMarco(q.foto, q.nombre, q.color, marco, 76)}
       <div class="jg-mini-id"><b>${esc(q.nombre)}</b>${uid === yo ? "<small>tú</small>" : ""}</div>
@@ -136,7 +146,7 @@ export function crearPaginaPerfil({ uid, ctx }) {
     const p = ctx.perfil(uid) || {}, yo = ctx.yo();
     const pista = uid === yo ? ctx.propio() : null;
     const cartas = exhibidasDe(uid, p, dat);
-    const f2 = JSON.stringify([p, est && [est.nLogros, est.tablas, est.victorias], yo, cartas.map(c => [c.k, c.i, c.gr])]);
+    const f2 = JSON.stringify([p, est && [est.nLogros, est.tablas, est.victorias, est.tops, est.compras, est.parcial], yo, cartas.map(c => [c.k, c.i, c.gr])]);
     if (f2 === firma) return;
     firma = f2;
     const q = quien(uid, p, est, pista, ctx.colorDe);
@@ -154,7 +164,7 @@ export function crearPaginaPerfil({ uid, ctx }) {
         <span class="grow"></span>
         <button class="btn2" data-copiar>🔗 Copiar enlace</button>
         ${propio ? `<button class="btn" data-editar>✎ Personalizar</button>` : ""}</div>
-      <section class="jg-pf-hero${fondo.oscuro ? " oscuro" : ""}" style="background:${esc(fondo.css(q.color))}">
+      <section class="jg-pf-hero${fondo.oscuro ? " oscuro" : ""}" style="background:${esc(fondo.css(q.color))}">${capaFondo(fondo)}
         <div class="jg-pf-hero-in">
           ${avatarMarco(q.foto, q.nombre, q.color, marco, 116)}
           <div class="jg-pf-id">

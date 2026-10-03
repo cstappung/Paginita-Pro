@@ -327,9 +327,9 @@ export const otorgarLogro = (juego, uid, id) => set(ref(db, `logros/${juego}/${u
 /* También escucha `diario`, la racha de días jugando: con las cuatro
    lecturas se calcula el saldo de monedas de cualquiera (juegos/monedas.js).
    Antes de publicar las reglas `diario` falla sola y el resto sigue. */
-const NODOS_MONEDAS = 8;
+const NODOS_MONEDAS = 9;
 export function watchLogros(cb) {
-  const d = { ranks: {}, solo: {}, logros: {}, diario: {}, cartas: {}, mercado: {}, clubJugadas: {}, podios: {} }, err = {}, llegados = new Set();
+  const d = { ranks: {}, solo: {}, logros: {}, diario: {}, cartas: {}, mercado: {}, clubJugadas: {}, podios: {}, tienda: {} }, err = {}, llegados = new Set();
   /* `completo`: ya llegaron todas al menos una vez. Antes de eso el
      saldo sale de una suma a medias. */
   const oye = (nodo, k) => onValue(ref(db, nodo), s => {
@@ -337,8 +337,14 @@ export function watchLogros(cb) {
     d.completo = llegados.size === NODOS_MONEDAS; cb(d, err);
   }, e => { err[k] = e; llegados.add(k); d.completo = llegados.size === NODOS_MONEDAS; cb(d, err); });
   const offs = [oye(R, "ranks"), oye("soloRanks", "solo"), oye("logros", "logros"), oye("diario", "diario"), oye("cartas", "cartas"), oye("mercado", "mercado"),
-    oye("clubJugadas", "clubJugadas"), oye("podios", "podios")];
+    oye("clubJugadas", "clubJugadas"), oye("podios", "podios"), oye("tienda", "tienda")];
   return () => offs.forEach(f => f());
+}
+
+/* La tienda del perfil: `tienda/<uid>/<artículo>` = {at, p}. La regla
+   exige `at === now` y el precio; el saldo lo repasa `economia()`. */
+export async function comprarTienda(uid, item, p) {
+  await set(ref(db, `tienda/${uid}/${item}`), { at: serverTimestamp(), p });
 }
 
 /* ---------- PRODROP: sobres y graduaciones ----------

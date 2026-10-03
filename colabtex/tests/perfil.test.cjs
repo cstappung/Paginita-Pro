@@ -3,7 +3,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs'),vm=require('node:vm');
 const sin=f=>fs.readFileSync(f,'utf8').replace(/^import [\s\S]*?;$/mg,'').replace(/\bexport\s+/g,'');
 const context={crypto:require('node:crypto').webcrypto,TextEncoder};vm.createContext(context);
-vm.runInContext(sin('src/juegos/motor.js')+'\n'+sin('src/juegos/logros.js')+'\n'+sin('src/juegos/perfil-tarjeta.js')+
+vm.runInContext(sin('src/juegos/motor.js')+'\n'+sin('src/juegos/logros.js')+'\n'+sin('src/juegos/tienda.js')+'\n'+sin('src/juegos/perfil-tarjeta.js')+
  '\n;globalThis.__P={MARCOS,FONDOS,estadisticas,requisito,marcoVisible,fondoVisible,opcionesVitrina,vitrinaDe,limpiaPerfil,nombreCategoria,valorMarca,oscurece,MAX_VITRINA,LOGROS};',context);
 const P=context.__P;
 
