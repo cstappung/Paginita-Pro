@@ -3720,8 +3720,10 @@ sum of things the rules already check cannot be. So, like the fila and solo
 logros, the balance is derived from the same four reads the profile uses
 (`fb.watchLogros`, now also listening to `diario`, through `datosPerfil`):
 
-- **Room games** (`ranks`): `TARIFA` 5 per game, 15 per win, 5 per draw,
-  times the game's `PESO` (1 for a short duel up to 2.5 for Catan).
+- **Room games** (`ranks`): `TARIFA` 20 per game, 40 per win, 20 per draw,
+  times the game's `PESO` (1 for a short duel up to 3 for Catan). No daily
+  cap: a room needs someone else, and playing is what is meant to be
+  farmable. The tariffs are retroactive, like everything derived.
 - **Club records** (`soloRanks`): `RECORD[club]` once per modality with a
   mark, so improving a mark never pays twice and the easy game cannot be
   farmed. On top of the record: BBTAN pays ⌊n/4⌋ for every round n up to
@@ -3730,11 +3732,14 @@ logros, the balance is derived from the same four reads the profile uses
   plus 2 per second under 3 s per block (`monedasSortem`), and the Sopa and
   Electrodle streaks 10 per day.
 - **Club plays** (`clubJugadas/<uid>/<juego>` = `{dia, hoy, total, at}`):
-  every club game that ends with a result pays `PAGO_CLUB` (8), up to
-  `TOPE_CLUB_DIA` (10) per game per Chile day. `marcaJugadaClub` in
+  every club game that ends with a result pays `PAGO_CLUB[juego]` (15 to 25
+  by how long a game lasts), up to `TOPE_CLUB_DIA` (15) per game per Chile
+  day. **BBTAN stays at 8 and 10 a day** (`topeClub`): its record already
+  pays every round, and that is what cannot be farmed. `marcaJugadaClub` in
   `juegos-main.js` writes it from `alResultado`, chained so two results do
   not read the same counter; the rule recomputes exactly what
-  `registraJugadaClub` does (today only, `total` up by one, `hoy` ≤ 10).
+  `registraJugadaClub` does (today only, `total` up by one, `hoy` ≤ 10 for
+  bbtan and ≤ 15 for the rest).
 - **Podiums** (`podios/<uid>/<partida>` = `{c, p, q, at}`): taking the
   1st, 2nd or 3rd place of a club table (or a Yemas zombies one) from
   *someone else* pays 500, 250 or 100 (`PODIO`), every time it happens.
@@ -3749,11 +3754,14 @@ logros, the balance is derived from the same four reads the profile uses
   `VALOR_NIVEL` 15/40/100/250. A new logro needs its digit, and
   `tests/monedas.test.cjs` fails if a game's string does not match its list.
   This is the big pot on purpose: hard things pay most.
-- **Days played** (`diario/<uid>` = `{dia, racha, mejor, dias, bono, at}`):
-  the only thing written. `marcaDia()` in `juegos-main.js` runs once per
-  Chile day after a room game is recorded or a club result arrives.
-  `registraDia` pays `pagoDia(racha)` = 10 + 5 per streak day, capped at 50,
-  and the rule recomputes exactly that from the previous record. `dia` is
+- **The daily reward** (`diario/<uid>` = `{dia, racha, mejor, dias, bono, at}`):
+  claimed with a **button** (`data-reclama-dia`, drawn by `rachaHtml` above
+  the lobby's *Top monedas* and on the coins page; `reclamaDia()` in
+  `juegos-main.js` answers it through one document listener). Playing no
+  longer records the day. `registraDia` pays `pagoDia(racha)` = 250 × the
+  streak day, capped at 1000 from the fourth (`PAGO_DIA`, `TOPE_DIA`), and
+  the rule recomputes exactly that from the previous record. `bono` is a
+  running sum, so what was paid under the old 10–50 scale stays valid. `dia` is
   the Chile date as a day number, because rules can compare numbers with
   `now` but cannot format dates. The rule accepts it inside a 25-hour window
   that covers UTC−3 and UTC−4. So a client can only record *today*, once,
@@ -3767,9 +3775,9 @@ header read as "the top is not updating". `datosPerfil` hands every node
 `watchLogros` reads (`Object.assign({}, d)`), not a hand-picked list: a
 list that forgot `mercado` silently ran the economy without the market.
 The streak is shown loudly: a card in the lobby's coins box and on the
-coins page (`rachaHtml`: days, today counted or not, what tomorrow pays,
-seven bars), a 🔥N next to the header balance that blinks while today is
-still missing, and a toast when the day is recorded (`avisaMonedas`, the
+coins page (`rachaHtml`: days, the claim button or what tomorrow pays,
+four steps 250/500/750/1000), a 🔥N next to the header balance that blinks
+while today is still unclaimed, and a toast when it is claimed (`avisaMonedas`, the
 same queue as the logros toast, also used for club plays and podiums).
 The `diario`, `clubJugadas` and `podios` nodes need the rules re-published.
 `test-rules.mjs` covers it: no invented streak, no tomorrow, no twice a day,
