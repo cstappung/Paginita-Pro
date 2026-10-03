@@ -24,6 +24,7 @@
     "@codemirror/search": "^6.7.1",
     "@codemirror/state": "^6.7.1",
     "@codemirror/view": "^6.43.6",
+    "@pkmn/randoms": "^0.10.11",
     "@pkmn/sim": "^0.10.11",
     "codemirror": "^6.0.2",
     "express": "^5.2.1",

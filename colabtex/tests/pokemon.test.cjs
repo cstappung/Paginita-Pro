@@ -97,7 +97,7 @@ function juega(formato, equipos, elige, max = 3000) {
     for (const [i, u] of ['a', 'b'].entries()) {
       if (est.prometido[u]) continue;
       let c;
-      if (k === 0) c = PM.empaqueta(PM.importa(equipos[i]));
+      if (k === 0) c = equipos ? PM.empaqueta(PM.importa(equipos[i])) : PM.NADA;
       else c = est.decide[u] ? elige(est.peticion[i], u) : PM.NADA;
       const l = llavePk(cad[u], k);
       pend[u] = {c, l};
@@ -141,6 +141,23 @@ test('una pelea entera con robots termina y el registro la reproduce', () => {
     assert.equal(e2.ganador, est.ganador);
     const limpio = l => l.filter(x => !x.startsWith('|t:|')).join('\n');
     assert.equal(limpio(e2.log), limpio(est.log));
+  }
+});
+
+test('Random Battle: los equipos salen del generador de Showdown, iguales en toda pestaña', () => {
+  for (const f of ['gen9randombattle', 'gen8randombattle', 'gen7randombattle']) {
+    const r = azar(5);
+    const {p, est} = juega(f, null, req => { const o = PM.opciones(req); return o[Math.floor(r() * o.length)].c; });
+    assert.equal(est.fase, 'fin', f);
+    assert.notEqual(est.motivo, 'equipo');
+    const eqA = PM.desempaqueta(est.equipos.a), eqB = PM.desempaqueta(est.equipos.b);
+    assert.equal(eqA.length, 6); assert.equal(eqB.length, 6);
+    assert.notEqual(est.equipos.a, est.equipos.b);
+    const e2 = PM.reducir(Object.entries(p.jugadas).map(([k, v]) => ({k, ...v})), [
+      {uid: 'a', nombre: 'Ana', hcad: p.jugadores.a.hcad}, {uid: 'b', nombre: 'Beto', hcad: p.jugadores.b.hcad}],
+      {semilla: p.semilla, formato: f, H: sha256hex, clave: 'otra-' + f});
+    assert.equal(e2.equipos.a, est.equipos.a);
+    assert.equal(e2.ganador, est.ganador);
   }
 });
 

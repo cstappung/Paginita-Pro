@@ -153,6 +153,7 @@ const REGLAS = {
       ["Tu equipo", lista([
         "Antes de abrir o entrar a una sala, arma tus equipos en <b>Mis equipos</b> (el botón de la tarjeta del juego, o dentro de la sala). Puedes pegar un equipo exportado de Showdown o armarlo Pokémon por Pokémon: especie, objeto, habilidad, naturaleza, EVs, IVs, tipo Tera y cuatro movimientos.",
         "Cada sala tiene un formato (OU, Ubers, Little Cup, Monotype, National Dex, las OU de otras generaciones o Libre). El editor te dice si tu equipo vale ahí, con los mismos errores que daría Showdown.",
+        "En Random Battle (generaciones 9, 8 y 7) no se elige equipo: cada uno recibe seis Pokémon del generador de Random Battle de Showdown, con sus sets curados. La semilla mezcla las llaves de los dos, así que nadie lo elige ni lo ve antes de que ambos estén listos.",
         "Al empezar eliges equipo y entrenador (el aspecto de tu personaje). Los dos eligen a la vez y a ciegas: nadie puede armar un contraequipo después de ver el tuyo."
       ])],
       ["El combate", lista([
