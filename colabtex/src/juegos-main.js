@@ -60,13 +60,14 @@ import { crearRanks } from "./juegos/ranks.js";
 import { LOGROS, detecta, deFila, deMarca } from "./juegos/logros.js";
 import { crearLogros } from "./juegos/logros-vista.js";
 import { monedasDe, formatoMonedas, valorLogro, registraDia, diaChile as diaMonedas, pagoDia, rachaHoy,
-  registraJugadaClub, PAGO_CLUB, TOPE_CLUB_DIA, PODIO } from "./juegos/monedas.js";
+  registraJugadaClub, PAGO_CLUB, TOPE_CLUB_DIA, PODIO, topMonedas, economia } from "./juegos/monedas.js";
+import { PRECIO_TIENDA } from "./juegos/tienda.js";
 import { crearMonedas, topHtml, MONEDA } from "./juegos/monedas-vista.js";
 import { crearProdrop } from "./juegos/prodrop.js";
-import { mejoresDrops, miniCarta, cifras as cifrasCartas, MOTOR } from "./juegos/prodrop-cartas.js";
+import { mejoresDrops, miniCarta, cifras as cifrasCartas, MOTOR, rankingColeccion } from "./juegos/prodrop-cartas.js";
 import { mezcla, abrePerfil } from "./juegos/perfil.js";
 import { abreMini, cierraMini, miniAbierta, crearPaginaPerfil, avatarMarco, quien } from "./juegos/perfil-vista.js";
-import { estadisticas, nombreCategoria } from "./juegos/perfil-tarjeta.js";
+import { estadisticas, nombreCategoria, marcoVisible } from "./juegos/perfil-tarjeta.js";
 import { fotoSana } from "./juegos/sano.js";
 import { suena, silenciar, silenciado, ambientar, ajustarMusica, activarAudio } from "./juegos/sonido.js";
 import { montaReproductor } from "./juegos/reproductor.js";
@@ -337,12 +338,40 @@ function datosPerfil(cb) {
        todos: el mercado y las partidas del club también mueven el saldo),
        en un objeto nuevo por llegada, que es lo que invalida las memorias
        de juegos/monedas.js. */
-    datosP = Object.assign({}, d, { completo: !!d.completo });
+    datosP = conDerivados(Object.assign({}, d, { completo: !!d.completo }));
     for (const f of [...oyentesP]) f(datosP);
   });
   else if (datosP) setTimeout(() => { if (oyentesP.has(cb)) cb(datosP); }, 0);
   return () => oyentesP.delete(cb);
 }
+/* Lo que el perfil necesita y no está en ningún nodo: el n.º 1 de monedas
+   y el de la colección de PRODROP (piden la economía entera) y lo que la
+   economía aceptó de la tienda. Perezosos y no enumerables: se calculan la
+   primera vez que alguien pinta un marco, una vez por llegada. */
+function conDerivados(d) {
+  let lid = null, com = null;
+  Object.defineProperty(d, "lideres", { enumerable: false, get: () => lid || (lid = lideresDe(d)) });
+  Object.defineProperty(d, "compras", { enumerable: false, get: () => com || (com = comprasDe(d)) });
+  return d;
+}
+function lideresDe(d) {
+  if (!d.completo) return {};
+  const m = topMonedas(d), c = rankingColeccion(d, 2) || [];
+  return {
+    monedas: m.length >= 2 ? m[0].uid : "",
+    prodrop: c.length >= 2 && c[0].tiene > 0 ? c[0].uid : ""
+  };
+}
+function comprasDe(d) {
+  if (!d.completo) return d.tienda || {};
+  const out = {};
+  for (const [u, x] of Object.entries(economia(d).usuarios || {})) if (x.tienda && Object.keys(x.tienda).length) out[u] = x.tienda;
+  return out;
+}
+/* El marco que se ve en una foto cualquiera (tops, chips, tiras): el del
+   perfil vivo, comprobado contra lo que esa persona tiene ganado. */
+const marcoDeUid = uid => uid ? marcoVisible(perfilDe(uid), datosP ? estadisticas(uid, datosP) : null) : "anillo";
+
 const ctxPerfil = {
   yo: () => state.user && state.user.uid,
   perfil: uid => perfilDe(uid),
@@ -383,6 +412,8 @@ async function editaPerfil(pestana) {
     perfil: perfiles.get(b.uid) || null,
     est: d ? estadisticas(b.uid, d) : null,
     uid: b.uid, colorDe: colorForUid, pestana,
+    saldo: () => datosP && datosP.completo ? monedasDe(b.uid, datosP).saldo : null,
+    onComprar: async id => { await fb.comprarTienda(b.uid, id, PRECIO_TIENDA); },
     onGuardar: async p => {
       /* El editor no conoce las cartas exhibidas (se eligen en PRODROP):
          sin esto, guardar el perfil las borraría. */
@@ -600,7 +631,7 @@ function dropsHtml(d) {
   }
   return l.map(c => {
     const q = quien(c.uid, perfilDe(c.uid), null, { nombre: nombreEnDatos(c.uid, d) }, colorForUid);
-    return `<div class="jg-drop">${miniCarta(c)}<span class="jg-drop-quien" data-perfil="${escapeHtml(c.uid)}" data-nombre="${escapeHtml(q.nombre)}">${avatarMarco(q.foto, q.nombre, q.color, "anillo", 18, c.uid)}<b>${escapeHtml(q.nombre)}</b></span><small class="jg-drop-cuando">${c.rr ? "♻ re-roll · " : ""}${haceCuanto(c.at)}</small></div>`;
+    return `<div class="jg-drop">${miniCarta(c)}<span class="jg-drop-quien" data-perfil="${escapeHtml(c.uid)}" data-nombre="${escapeHtml(q.nombre)}">${avatarMarco(q.foto, q.nombre, q.color, marcoDeUid(c.uid), 18, c.uid)}<b>${escapeHtml(q.nombre)}</b></span><small class="jg-drop-cuando">${c.rr ? "♻ re-roll · " : ""}${haceCuanto(c.at)}</small></div>`;
   }).join("");
 }
 async function marcaDia() {
@@ -1144,7 +1175,7 @@ function armazon() {
   if (state.vista === "ranks") {
     h.innerHTML = "";
     ranks = crearRanks({ uid: state.user.uid, watchRanks: fb.watchRanks, watchSolo: fb.watchSolo, watchTodos: fb.watchRanksTodos,
-      perfil: perfilDe, icono: Object.assign({ prodrop: "🃏" }, ICONO_TODOS), orden: () => ordenPopular(Object.keys(JUEGOS)),
+      perfil: perfilDe, colorDe: colorForUid, icono: Object.assign({ prodrop: "🃏" }, ICONO_TODOS), orden: () => ordenPopular(Object.keys(JUEGOS)),
       datos: datosPerfil, quien: u => quien(u, perfilDe(u), null, { nombre: datosP ? nombreEnDatos(u, datosP) : "" }, colorForUid) });
     ranks.montar(h);
     return;
@@ -1401,9 +1432,10 @@ function pintaDestacado() {
   const orden = ordenaRanks(Object.entries(state.tablas[k] || {}).map(([uid, f]) => Object.assign({ uid }, f)));
   if (!orden.length) { el.hidden = true; return; }
   const nombre = f => mezcla(f, perfilDe(f.uid)).nombre || "Jugador";
+  const cara = f => { const q = mezcla(f, perfilDe(f.uid)); return avatarMarco(q.foto, q.nombre, q.color || colorForUid(f.uid), marcoDeUid(f.uid), 20); };
   const yo = orden.findIndex(f => f.uid === state.user.uid);
   const html = `<span class="jg-of-podio-t">Salón de la fama <b>ver todo →</b></span><ol>${orden.slice(0, 3).map((f, i) =>
-    `<li class="${f.uid === state.user.uid ? "yo" : ""}"><i>${i + 1}</i><span>${escapeHtml(nombre(f))}</span><b>${f.puntos || 0}</b></li>`).join("")}</ol>` +
+    `<li class="${f.uid === state.user.uid ? "yo" : ""}"><i>${i + 1}</i>${cara(f)}<span>${escapeHtml(nombre(f))}</span><b>${f.puntos || 0}</b></li>`).join("")}</ol>` +
     `<small>${yo < 0 ? "Aún no estás en la tabla de este juego." : yo < 3 ? "Estás en el podio. Defiéndelo." : `Vas #${yo + 1} de ${orden.length}.`}</small>`;
   if (el.innerHTML !== html) el.innerHTML = html;
   el.hidden = false;
@@ -1985,7 +2017,7 @@ function pintaQuienes(p, est) {
   const duelo = activos.length <= 2;
   const puedoVotar = abierta && (!duelo || (!meToca(est, yo) && Date.now() - ultimoCambio >= VOTO_DUELO_MS));
   const votos = est.votos || {};
-  const firma = JSON.stringify([est.jugadores.map(x => [x.uid, x.nombre, x.color, x.foto, x.marco]), [...fuera], votos, puedoVotar, hace]);
+  const firma = JSON.stringify([est.jugadores.map(x => [x.uid, x.nombre, x.color, x.foto, marcoDeUid(x.uid)]), [...fuera], votos, puedoVotar, hace]);
   if (caja.dataset.firma === firma) return;
   caja.dataset.firma = firma;
   caja.innerHTML = (est.jugadores || []).map(x => {
@@ -1996,7 +2028,7 @@ function pintaQuienes(p, est) {
       ? `<button class="jg-voto${mio ? " on" : ""}" data-voto="${escapeHtml(x.uid)}" title="${mio ? "Retirar tu voto" : "Votar para expulsar a " + escapeHtml(x.nombre || "Alguien")}">${mio ? "↺" : "⏏"}</button>` : "";
     return `
     <span class="jg-quien-chip${out ? " fuera" : ""}" style="--c:${escapeHtml(x.color || "#888")}">
-      ${avatarMarco(x.foto, x.nombre, x.color, x.marco, 20, x.uid)}
+      ${avatarMarco(x.foto, x.nombre, x.color, marcoDeUid(x.uid), 20, x.uid)}
       ${escapeHtml(x.nombre || "Alguien")}${x.uid === yo ? " (tú)" : ""}
       ${contra.length && !out ? `<small class="jg-voto-n" title="Votos para expulsar">⏏ ${contra.length}/${hace}</small>` : ""}
       ${boton}

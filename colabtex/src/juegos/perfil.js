@@ -31,7 +31,8 @@ export const COLORES = [
 ];
 
 import { MARCOS, FONDOS, LARGO_BIO, MAX_VITRINA, requisito, marcoDe, fondoDe, opcionesVitrina, limpiaPerfil } from "./perfil-tarjeta.js";
-import { avatarMarco, tarjetaHtml } from "./perfil-vista.js";
+import { avatarMarco, tarjetaHtml, capaFondo } from "./perfil-vista.js";
+import { PRECIO_TIENDA } from "./tienda.js";
 
 export const LARGO_NICK = 24;
 const LADO_FOTO = 160;
@@ -93,8 +94,11 @@ function avatar(foto, nombre, color) {
    `onGuardar` recibe el objeto que hay que escribir. Cuatro pestañas —
    datos, marco, fondo y vitrina— y a un lado la tarjeta tal como la verán
    los demás, que se repinta con cada cambio. Devuelve una función para
-   cerrarlo. */
-export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar }) {
+   cerrarlo.
+   La tienda vive aquí mismo: un marco o fondo de la tienda sin comprar se
+   toca para comprarlo (`onComprar(id)`, que escribe la compra), y `saldo()`
+   dice cuánto hay (null mientras la economía no ha llegado entera). */
+export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar, onComprar, saldo }) {
   const vieja = document.getElementById("jgPerfil");
   if (vieja) vieja.remove();
 
@@ -110,6 +114,8 @@ export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar
   const guardada = Array.isArray(p.vitrina) ? p.vitrina : p.vitrina && typeof p.vitrina === "object" ? Object.values(p.vitrina) : [];
   let vitrina = guardada.slice(0, MAX_VITRINA);
   let tab = ["datos", "marco", "fondo", "vitrina"].includes(pestana) ? pestana : "datos";
+  let comprando = false;
+  const miles = n => Math.round(n).toLocaleString("es-CL");
 
   const capa = document.createElement("div");
   capa.id = "jgPerfil";
@@ -193,16 +199,21 @@ export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar
     $("#pfGoogle").style.display = (base && base.foto) ? "" : "none";
     $("#pfQuitar").style.display = (foto === "" ) ? "none" : "";
     $("#pfBioN").textContent = `${bio.length}/${LARGO_BIO}`;
-    $("#pfMarcos").innerHTML = MARCOS.map(m => {
-      const r = requisito(m, est);
-      return `<button class="jg-ped-op${m.id === marco ? " on" : ""}${r.ok ? "" : " cerrado"}" data-marco="${m.id}" ${r.ok ? "" : "aria-disabled=\"true\""} title="${esc(r.ok ? m.n : "Se gana: " + r.falta)}">
-        ${avatarMarco(f, nom, color, m.id, 54)}<b>${esc(m.n)}</b>${r.ok ? "" : `<small>🔒 ${esc(r.falta)}</small>`}</button>`;
-    }).join("");
-    $("#pfFondos").innerHTML = FONDOS.map(o => {
-      const r = requisito(o, est);
-      return `<button class="jg-ped-op fondo${o.id === fondo ? " on" : ""}${r.ok ? "" : " cerrado"}" data-fondo="${o.id}" ${r.ok ? "" : "aria-disabled=\"true\""} title="${esc(r.ok ? o.n : "Se gana: " + r.falta)}">
-        <span class="jg-ped-muestra" style="background:${esc(o.css(color))}"></span><b>${esc(o.n)}</b>${r.ok ? "" : `<small>🔒 ${esc(r.falta)}</small>`}</button>`;
-    }).join("");
+    /* Tres grupos: los de siempre, la tienda y los de campeón (los que
+       ya tienes, primero). Un cerrado de la tienda no es un candado: es
+       un botón de compra. */
+    const op = (it, actual, attr, dentro) => {
+      const r = requisito(it, est), venta = !r.ok && r.tienda;
+      return `<button class="jg-ped-op${attr === "fondo" ? " fondo" : ""}${it.id === actual ? " on" : ""}${r.ok ? "" : " cerrado"}${venta ? " venta" : ""}" data-${attr}="${it.id}" ${r.ok || venta ? "" : "aria-disabled=\"true\""} title="${esc(r.ok ? it.n : venta ? `Comprar «${it.n}» por ${miles(PRECIO_TIENDA)} monedas` : "Se gana: " + r.falta)}">
+        ${dentro}<b>${esc(it.n)}</b>${r.ok ? (it.req && it.req.tienda ? `<small class="jg-ped-tuyo">✓ Comprado</small>` : "") : venta ? `<small class="jg-ped-precio">🪙 ${miles(PRECIO_TIENDA)} · tocar para comprar</small>` : `<small>🔒 ${esc(r.falta)}</small>`}</button>`;
+    };
+    const grupos = (lista, actual, attr, dentro) => [
+      ["", lista.filter(it => !it.req || !(it.req.tienda || it.req.top))],
+      [`Tienda · 🪙 ${miles(PRECIO_TIENDA)} cada uno`, lista.filter(it => it.req && it.req.tienda)],
+      ["Campeones · solo para el n.º 1 de cada juego", lista.filter(it => it.req && it.req.top).sort((a, b) => requisito(b, est).ok - requisito(a, est).ok)]
+    ].filter(([, l]) => l.length).map(([t, l]) => (t ? `<h4 class="jg-ped-grupo">${t}</h4>` : "") + l.map(it => op(it, actual, attr, dentro(it))).join("")).join("");
+    $("#pfMarcos").innerHTML = grupos(MARCOS, marco, "marco", m => avatarMarco(f, nom, color, m.id, 54));
+    $("#pfFondos").innerHTML = grupos(FONDOS, fondo, "fondo", o => `<span class="jg-ped-muestra" style="background:${esc(o.css(color))}">${capaFondo(o)}</span>`);
     $("#pfVitNota").innerHTML = !est ? "Cargando tu historial…"
       : !ops.length ? "Todavía no tienes logros ni puestos. Juega una partida y vuelve."
       : vitrina.length ? `Elegidas <b>${vitrina.length}</b> de ${MAX_VITRINA}. Se muestran en este orden; las tres primeras salen en la tarjeta. <button class="btn2" id="pfVitAuto">Volver a automática</button>`
@@ -244,15 +255,40 @@ export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar
     const b = e.target.closest("[data-tab]");
     if (b) { tab = b.getAttribute("data-tab"); pinta(); }
   };
+  /* Comprar en la tienda: se mira el saldo antes de escribir (la economía
+     anularía una compra sin fondos, pero mejor no hacerla), se pregunta
+     una vez y, hecha, se da por tuyo aquí mismo sin esperar a la lectura. */
+  async function compra(it, alHacerla) {
+    if (comprando) return;
+    if (!onComprar) { falla("La tienda no está disponible aquí."); return; }
+    const s = saldo ? saldo() : null;
+    if (s === null || s === undefined) { falla("Todavía se están contando tus monedas; prueba en unos segundos."); return; }
+    if (s < PRECIO_TIENDA) { falla(`«${it.n}» cuesta ${miles(PRECIO_TIENDA)} 🪙 y tienes ${miles(s)}: te faltan ${miles(PRECIO_TIENDA - s)}.`); return; }
+    if (!confirm(`¿Comprar «${it.n}» por ${miles(PRECIO_TIENDA)} monedas?\nTe quedarán ${miles(s - PRECIO_TIENDA)}. Es para siempre.`)) return;
+    comprando = true; falla("");
+    try {
+      await onComprar(it.id);
+      est = Object.assign({}, est, { compras: Object.assign({}, est && est.compras, { [it.id]: { p: PRECIO_TIENDA } }) });
+      alHacerla(); pinta();
+    } catch (err) {
+      falla("No se pudo comprar: " + (err && (err.code || err.message) ? String(err.code || err.message) : String(err)));
+    } finally { comprando = false; }
+  }
   $("#pfMarcos").onclick = e => {
     const b = e.target.closest("[data-marco]");
-    if (!b || b.classList.contains("cerrado")) return;
-    marco = b.getAttribute("data-marco"); pinta();
+    if (!b) return;
+    const id = b.getAttribute("data-marco");
+    if (b.classList.contains("venta")) return compra(marcoDe(id), () => { marco = id; });
+    if (b.classList.contains("cerrado")) return;
+    marco = id; pinta();
   };
   $("#pfFondos").onclick = e => {
     const b = e.target.closest("[data-fondo]");
-    if (!b || b.classList.contains("cerrado")) return;
-    fondo = b.getAttribute("data-fondo"); pinta();
+    if (!b) return;
+    const id = b.getAttribute("data-fondo");
+    if (b.classList.contains("venta")) return compra(fondoDe(id), () => { fondo = id; });
+    if (b.classList.contains("cerrado")) return;
+    fondo = id; pinta();
   };
   $("#pfVit").onchange = e => {
     const c = e.target.closest("[data-vit]");

@@ -24,6 +24,7 @@
 import { JUEGOS, ordenaRanks, porcentaje } from "./motor.js";
 import { mezcla } from "./perfil.js";
 import { rankingColeccion, cartasMasRaras, miniCarta, MOTOR } from "./prodrop-cartas.js";
+import { avatarMarco, marcoDeUid } from "./perfil-vista.js";
 
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -157,8 +158,10 @@ export function crearRanks(ctx) {
   function escucha() {
     if (parar) { try { parar(); } catch (e) {} parar = null; }
     cargando = true; fallo = ""; filas = [];
+    /* Los datos de todo (los mismos del vestíbulo) hacen falta en
+       cualquier tabla: con ellos se comprueba el marco de cada foto. */
+    if (!pararC && ctx.datos) pararC = ctx.datos(d => { if (!muerto) { datosC = d; pinta(); } });
     if (juego === CARTAS) {
-      if (!pararC && ctx.datos) pararC = ctx.datos(d => { if (!muerto) { datosC = d; pinta(); } });
       pinta();
       return;
     }
@@ -231,7 +234,7 @@ export function crearRanks(ctx) {
     const t = host.querySelector("#rkTabla");
     if (!t) return;
     const solo = esSolo(juego);
-    const orden = solo ? [...filas].sort((a,b)=>b.puntos-a.puntos||a.tiempo-b.tiempo||a.uid.localeCompare(b.uid)) : ordenaRanks(filas);
+    const orden = solo ? [...filas].sort((a,b)=>b.puntos-a.puntos||a.tiempo-b.tiempo||a.uid.localeCompare(b.uid)).map(f => mezcla(f, perfil(f.uid))) : ordenaRanks(filas);
     const general = juego === "general";
     host.querySelector('.jg-nota-larga').textContent = solo ? 'Mejor récord por jugador y categoría. En empate, menor tiempo. Las puntuaciones se calculan en el navegador.'
       : general ? 'La general suma los puntos de todos los juegos en sala (3 por victoria, 1 por empate). «Juegos» dice en cuántos tiene fila cada uno.'
@@ -242,7 +245,7 @@ export function crearRanks(ctx) {
         : "Todavía no ha terminado ninguna partida de este juego. Sé el primero."}</td></tr>`;
       return;
     }
-    if (solo) {t.innerHTML = `<thead><tr><th>#</th><th>Jugador</th><th>Récord</th><th>Tiempo</th></tr></thead><tbody>${orden.map((f,i)=>`<tr class="${f.uid===uid?'jg-yo':''}${i<3?' jg-rk-top':''}"><td class="jg-th-n">${puesto(i)}</td><td class="jg-jug" data-perfil="${esc(f.uid)}" data-nombre="${esc(f.nombre)}">${esc(f.nombre)}</td><td>${categoriaSolo.startsWith('club-minas-')?'Completado':categoriaSolo==='club-tetris-sprint'?'40 líneas':categoriaSolo.startsWith('club-sortem-')?f.puntos+' números':categoriaSolo.startsWith('club-bbtan-')||categoriaSolo.startsWith('yemas-zombis-')?'Ronda '+f.puntos:categoriaSolo.startsWith('club-frontera-')?f.puntos+(f.puntos===1?' victoria':' victorias'):/-racha$/.test(categoriaSolo)?f.puntos+(f.puntos===1?' día':' días'):f.puntos}</td><td>${(f.tiempo/1000).toFixed(2)} s</td></tr>`).join('')}</tbody>`;return;}
+    if (solo) {t.innerHTML = `<thead><tr><th>#</th><th>Jugador</th><th>Récord</th><th>Tiempo</th></tr></thead><tbody>${orden.map((f,i)=>`<tr class="${f.uid===uid?'jg-yo':''}${i<3?' jg-rk-top':''}"><td class="jg-th-n">${puesto(i)}</td><td class="jg-jug" data-perfil="${esc(f.uid)}" data-nombre="${esc(f.nombre)}">${foto(f, 26)}<span>${esc(f.nombre)}</span></td><td>${categoriaSolo.startsWith('club-minas-')?'Completado':categoriaSolo==='club-tetris-sprint'?'40 líneas':categoriaSolo.startsWith('club-sortem-')?f.puntos+' números':categoriaSolo.startsWith('club-bbtan-')||categoriaSolo.startsWith('yemas-zombis-')?'Ronda '+f.puntos:categoriaSolo.startsWith('club-frontera-')?f.puntos+(f.puntos===1?' victoria':' victorias'):/-racha$/.test(categoriaSolo)?f.puntos+(f.puntos===1?' día':' días'):f.puntos}</td><td>${(f.tiempo/1000).toFixed(2)} s</td></tr>`).join('')}</tbody>`;return;}
     t.innerHTML = `
       <thead><tr>
         <th class="jg-th-n">#</th><th>Jugador</th>
@@ -260,8 +263,7 @@ export function crearRanks(ctx) {
     return `<tr class="${yo ? "jg-yo" : ""}${i < 3 ? " jg-rk-top" : ""}">
       <td class="jg-th-n">${puesto(i)}</td>
       <td class="jg-jug" data-perfil="${esc(f.uid)}" data-nombre="${esc(f.nombre || "")}">
-        ${f.foto ? `<img class="jg-foto" src="${esc(f.foto)}" alt="" referrerpolicy="no-referrer">`
-                 : `<span class="jg-foto jg-sin">${esc((f.nombre || "?").slice(0, 1).toUpperCase())}</span>`}
+        ${foto(f, 26)}
         <span>${esc(f.nombre || "Sin nombre")}${yo ? " <b>(tú)</b>" : ""}</span>
       </td>
       <td class="jg-num">${f.jugadas || 0}</td>
@@ -278,13 +280,12 @@ export function crearRanks(ctx) {
   /* ---- PRODROP: colección y cartas más raras ---- */
   function nombreDe(u) {
     const q = ctx.quien ? ctx.quien(u) : mezcla({ uid: u, nombre: "" }, perfil(u));
-    return { nombre: (q && q.nombre) || "Sin nombre", foto: (q && q.foto) || "" };
+    return { nombre: (q && q.nombre) || "Sin nombre", foto: (q && q.foto) || "", color: q && q.color };
   }
   function quienHtml(u) {
     const q = nombreDe(u);
     return `<span class="jg-jug jg-rkc-quien" data-perfil="${esc(u)}" data-nombre="${esc(q.nombre)}">
-      ${q.foto ? `<img class="jg-foto" src="${esc(q.foto)}" alt="" referrerpolicy="no-referrer">`
-               : `<span class="jg-foto jg-sin">${esc(q.nombre.slice(0, 1).toUpperCase())}</span>`}
+      ${foto({ uid: u, nombre: q.nombre, foto: q.foto, color: q.color }, 26)}
       <span>${esc(q.nombre)}${u === uid ? " <b>(tú)</b>" : ""}</span></span>`;
   }
   const unoEn = p => { const n = Math.round(1 / p); return n >= 1e6 ? `${(n / 1e6).toLocaleString("es-CL", { maximumFractionDigits: 1 })} millones` : n.toLocaleString("es-CL"); };
@@ -341,7 +342,18 @@ export function crearRanks(ctx) {
     return { valor: f => f.puntos || 0, txt: v => String(v), unidad: "pts", menor: false };
   }
 
+  /* La foto de una fila, con el marco que esa persona lleva (comprobado
+     contra lo que tiene ganado: un marco de campeón escrito a mano se ve
+     como el anillo de siempre). El `data-perfil` va en la celda. */
+  const marcoDe = u => marcoDeUid(u, perfil(u), datosC);
+  function foto(f, tam) {
+    return avatarMarco(f.foto, f.nombre, f.color || (ctx.colorDe ? ctx.colorDe(f.uid) : ""), marcoDe(f.uid), tam);
+  }
+  /* En el podio el anillo de metal ya es el marco; quien lleva otro lo
+     luce encima en lugar del metal. */
+  const conMarco = f => !["anillo", "nada"].includes(marcoDe(f.uid));
   function avatar(f) {
+    if (conMarco(f)) return foto(f, 58);
     return f.foto
       ? `<img src="${esc(f.foto)}" alt="" referrerpolicy="no-referrer">`
       : `<span>${esc((f.nombre || "?").slice(0, 1).toUpperCase())}</span>`;
@@ -361,7 +373,7 @@ export function crearRanks(ctx) {
       : `${f.ganadas || 0} G · ${porcentaje(f)} %${f.mejorRacha > 1 ? ` · racha ${f.mejorRacha}` : ""}`;
     return `<div class="${cls}">
         ${i === 0 ? CORONA : ""}
-        <div class="jg-rk-av" data-perfil="${esc(f.uid)}" data-nombre="${esc(f.nombre || "")}">${avatar(f)}</div>
+        <div class="jg-rk-av${conMarco(f) ? " con-marco" : ""}" data-perfil="${esc(f.uid)}" data-nombre="${esc(f.nombre || "")}">${avatar(f)}</div>
         <b class="jg-rk-nom" title="${esc(f.nombre || "")}">${esc(f.nombre || "Sin nombre")}${f.uid === uid ? " <em>(tú)</em>" : ""}</b>
         <span class="jg-rk-tit">${TITULO[i]}</span>
         <div class="jg-rk-pts"><b>${m.txt(m.valor(f))}</b>${m.unidad ? ` ${m.unidad}` : ""}</div>

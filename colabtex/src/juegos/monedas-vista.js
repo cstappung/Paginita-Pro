@@ -2,7 +2,7 @@
    pestaña #monedas (tu saldo, de dónde sale, el top entero y la tabla de
    tarifas). El cálculo es de monedas.js; aquí solo se dibuja. */
 import { JUEGOS } from "./motor.js";
-import { avatarMarco, quien } from "./perfil-vista.js";
+import { avatarMarco, quien, marcoDeUid } from "./perfil-vista.js";
 import {
   topMonedas, monedasDe, formatoMonedas, TARIFA, PESO, VALOR_NIVEL, NOMBRE_NIVEL,
   RECORD, diaChile, rachaHoy, pagoDia, PAGO_CLUB, TOPE_CLUB_DIA, PODIO
@@ -26,10 +26,10 @@ const PARTES = [
   ["dias", "🔥", "Días seguidos", "10 por día jugado, +5 por día de racha"]
 ];
 
-function fila(f, i, uid, perfil, colorDe, chico) {
+function fila(f, i, uid, perfil, colorDe, chico, datos) {
   const q = quien(f.uid, perfil(f.uid), null, { nombre: f.nombre }, colorDe);
   const med = i < 3 ? ["🥇", "🥈", "🥉"][i] : String(i + 1);
-  return `<li class="${f.uid === uid ? "jg-yo" : ""}"><b class="jg-mo-pos">${med}</b>${avatarMarco(q.foto, q.nombre, q.color, "anillo", chico ? 26 : 34, f.uid)}
+  return `<li class="${f.uid === uid ? "jg-yo" : ""}"><b class="jg-mo-pos">${med}</b>${avatarMarco(q.foto, q.nombre, q.color, marcoDeUid(f.uid, perfil(f.uid), datos), chico ? 26 : 34, f.uid)}
     <span class="jg-mo-nom" data-perfil="${esc(f.uid)}" data-nombre="${esc(q.nombre)}">${esc(q.nombre)}</span>
     <strong class="jg-mo-cant">${formatoMonedas(f.saldo)} ${MONEDA}</strong></li>`;
 }
@@ -39,8 +39,8 @@ export function topHtml(datos, uid, perfil, colorDe) {
   const lista = topMonedas(datos), mio = lista.findIndex(f => f.uid === uid);
   const racha = rachaHtml((datos.diario || {})[uid], diaChile());
   if (!lista.length) return racha + `<p class="jg-nada">Nadie tiene monedas todavía. Termina una partida y estrena el top.</p>`;
-  let html = racha + `<ol class="jg-mo-top chico">${lista.slice(0, 5).map((f, i) => fila(f, i, uid, perfil, colorDe, true)).join("")}</ol>`;
-  if (mio >= 5) html += `<ol class="jg-mo-top chico jg-mo-tuyo" start="${mio + 1}">${fila(lista[mio], mio, uid, perfil, colorDe, true)}</ol>`;
+  let html = racha + `<ol class="jg-mo-top chico">${lista.slice(0, 5).map((f, i) => fila(f, i, uid, perfil, colorDe, true, datos)).join("")}</ol>`;
+  if (mio >= 5) html += `<ol class="jg-mo-top chico jg-mo-tuyo" start="${mio + 1}">${fila(lista[mio], mio, uid, perfil, colorDe, true, datos)}</ol>`;
   return html + `<a class="jg-mo-ver" href="#monedas">Ver el top y cómo se ganan →</a>`;
 }
 
@@ -82,7 +82,7 @@ export function crearMonedas({ uid, datos, perfil, colorDe }) {
         `<div><span>${i}</span><b>${formatoMonedas(yo.partes[k])}</b><small>${t}</small><em>${s}</em></div>`).join("")}</div>
       <div class="jg-mo-cols">
         <section class="jg-mo-caja"><h2>Top de monedas</h2>
-          ${lista.length ? `<ol class="jg-mo-top">${lista.slice(0, 50).map((f, i) => fila(f, i, uid, perfil, colorDe, false)).join("")}</ol>`
+          ${lista.length ? `<ol class="jg-mo-top">${lista.slice(0, 50).map((f, i) => fila(f, i, uid, perfil, colorDe, false, ultimo)).join("")}</ol>`
             : `<p class="jg-nada">Nadie tiene monedas todavía.</p>`}
         </section>
         <section class="jg-mo-caja jg-mo-reglas"><h2>Cómo se ganan</h2>

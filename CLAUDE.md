@@ -1874,7 +1874,8 @@ Four decisions:
   chip and a 116 px portrait. The laurel and the crown are inline SVG data
   URIs, not emoji.
 - **Some are earned, and checked where they are seen.** A `req` is either a
-  number of logros or a podium / first place in a table of three or more.
+  number of logros, a podium / first place in a table of three or more, a
+  n.º 1 of a given game (`top`) or a shop purchase (`tienda`).
   `marcoVisible` and `fondoVisible` re-check it against the owner's stats
   every time they paint. A frame written into the database by hand is
   stored, but others see the plain ring.
@@ -1888,6 +1889,52 @@ Four decisions:
 
 `tests/perfil.test.cjs` covers the stats, the requirements, the vitrina
 and the cleaning.
+
+**Champion frames, the shop and animated backgrounds.** Three more kinds of
+frame and background:
+
+- **Champion frames** (`req: {top}`). There is one per game, not one per
+  modality: every room game, every club game (Tetris Club shares Tetris's),
+  Yemas zombies apart from Yemas, plus the coins leader (`tmonedas`) and the
+  PRODROP collector (`tprodrop`).
+- **Shop items** (`req: {tienda}`). There are five frames and five
+  backgrounds at `PRECIO_TIENDA` (5000) each. They are listed in
+  `juegos/tienda.js`, which is pure so monedas, perfil and the tests share it.
+
+The animated frames are SVG drawings in `juegos/marcos-animados.js`, and
+`adorno(id)` returns them. Each drawing is a
+`<b class="jg-av-ad">` that `avatarMarco` adds over the photo (inset −20 %,
+so it overflows), with the class `.jg-marco-anim` hiding the static
+`::before/::after`. The CSS animates them through `.jg-av-ad [class]` and
+`--d`, with keyframes `ja*`. Never use `.jg-av-ad *`: it would also move
+the positional `<g>`s. Animated backgrounds add a layer (`capaFondo`,
+`.jg-fanim-<id>`, keyframes `jf*`). Things that hold it together:
+
+- **A n.º 1 counts only against someone.** `campeones(datos)` takes the
+  first of each table with two or more rows (room tables also need a
+  point). The coins and PRODROP leaders need the whole economy, so
+  `juegos-main.js` derives them once (`lideresDe`) and hands them in as
+  `datos.lideres`. The purchases are under `datos.compras` (`comprasDe`, what
+  `economia()` accepted). Both are lazy getters on `datosP`.
+- **A purchase is `tienda/<uid>/<item>` = {at: now, p: 5000}**, write-once
+  and never deleted, like a PRODROP pack. The rules cannot add up earnings,
+  so `economia()` replays it with the rest of the spending (event `c`). It
+  counts only if the balance covers it, and otherwise it stops the account.
+  `monedasDe`'s `saldo` includes it.
+- **The rules re-check everything where a frame is seen**: `marcoVisible`
+  with `estadisticas(...).tops/compras`. Losing a n.º 1 shows the plain
+  ring until you win it back. While the reads are partial (`parcial`), the
+  stored choice is trusted, so a frame does not flicker on load.
+- **Every top shows the photo with its frame**: the Clasificación (podium,
+  tables, solo tables, the card tables), the coins tops (lobby and page),
+  the featured podium, the drops strip and the room chips. All of them go
+  through `marcoDeUid`. Child selectors (`li>i`, `li>span`) keep the
+  host lists' styles out of the avatar's insides, and `.jg-av>.jg-av-ad`
+  resets with `!important` whatever a host might put on a `<b>`.
+
+The `tienda` node needs the rules re-published. `tests/tienda.test.cjs`
+covers the charge, the champion rules and that every animated frame has its
+drawing.
 
 **Voting someone out is a move, not a new mechanism** (`votacion` and
 `mayoriaExpulsion` in `motor.js`). A vote is `{t:"voto", uid, contra}`, and
