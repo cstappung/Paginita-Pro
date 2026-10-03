@@ -110,29 +110,58 @@ export function crearPokemon(ctx) {
   const juego = () => !mirando && yo() >= 0;
   const nombreLado = i => (est && est.nombres && est.nombres[i]) || "Entrenador";
 
+  /* La cadena de llaves sale del secreto de `misPartidas`, que se lee una
+     vez. Antes, mientras esa lectura estaba en vuelo, cualquier otra
+     llamada devolvía `null` sin esperar, y si la lectura fallaba (sin red
+     un momento, la base tardando) el «Listo» se perdía en silencio: el
+     botón quedaba desactivado y la pantalla en «Eligiendo…» para siempre.
+     Ahora todas esperan la misma lectura, y un fallo se puede reintentar. */
+  let cargaCadena = null;
   async function llave(k) {
-    if (!cadena && !cargandoSecreto) {
-      cargandoSecreto = true;
-      try { const s = await secreto(); if (s) cadena = cadenaPk(s.sem, s.sal); }
-      finally { cargandoSecreto = false; }
+    if (!cadena) {
+      if (!cargaCadena) {
+        cargandoSecreto = true;
+        cargaCadena = Promise.resolve().then(() => secreto())
+          .then(s => { if (s && s.sem != null) cadena = cadenaPk(s.sem, s.sal); })
+          .catch(e => { console.warn("[pokemon] secreto", e); })
+          .finally(() => { cargandoSecreto = false; cargaCadena = null; });
+      }
+      await cargaCadena;
     }
     return cadena ? llavePk(cadena, k) : null;
   }
+  const SIN_LLAVE = "No se pudo leer tu llave secreta de esta sala (¿sin conexión?). Se reintenta sola; si sigue, recarga la página.";
 
   /* ---------- lo que la pantalla manda sola ---------- */
   const yaMandado = (k, t) => enviado[k + ":" + t] && Date.now() - enviado[k + ":" + t] < REINTENTO_MS;
 
+  /* La elección se guarda ANTES de buscar la llave: si algo falla por el
+     camino, el latido (`automatismos`) la vuelve a mandar sola en vez de
+     dejar la mesa esperando un «Listo» que nunca se escribió. */
   async function promete(c, sk) {
     if (!est || muerto) return;
     if (local) { local.elige(c); return; }
     const k = est.punto;
     if (yaMandado(k, "c")) return;
-    const l = await llave(k);
-    if (!l) return;
-    guardaPend({ k, c, sk: sk || "" });       // antes de escribir: ver la cabecera
+    const pd = pendiente();
+    if (!pd || pd.k !== k || pd.c !== c) guardaPend({ k, c, sk: sk || "" });
     enviado[k + ":c"] = Date.now();
-    const ok = await jugar({ t: "c", uid, k, h: sha256hex(c + "|" + l) });
-    if (!ok) delete enviado[k + ":c"];
+    let ok = false;
+    try {
+      const l = await llave(k);
+      if (!l) { aviso = SIN_LLAVE; return; }
+      if (aviso === SIN_LLAVE) aviso = "";
+      ok = await jugar({ t: "c", uid, k, h: sha256hex(c + "|" + l) });
+    } catch (e) {
+      console.warn("[pokemon] promesa", e);
+    } finally {
+      if (!ok) {
+        // Se reintenta en el próximo latido, no a los nueve segundos.
+        delete enviado[k + ":c"];
+        firmas.pkEscena = ""; firmas.pkControl = "";
+        if (!muerto) pinta();
+      }
+    }
   }
 
   async function revela() {
@@ -145,13 +174,18 @@ export function crearPokemon(ctx) {
       if (est.decide[uid]) { aviso = "Se perdió tu elección de este turno en este navegador: la mesa queda esperando."; return; }
       pd = { k, c: PM ? PM.NADA : "-", sk: "" };
     }
-    const l = await llave(k);
-    if (!l) return;
     enviado[k + ":r"] = Date.now();
-    const j = { t: "r", uid, k, c: pd.c, l };
-    if (k === 0) j.sk = skinSana(pd.sk);
-    const ok = await jugar(j);
-    if (!ok) delete enviado[k + ":r"];
+    let ok = false;
+    try {
+      const l = await llave(k);
+      if (!l) { aviso = SIN_LLAVE; return; }
+      if (aviso === SIN_LLAVE) aviso = "";
+      const j = { t: "r", uid, k, c: pd.c, l };
+      if (k === 0) j.sk = skinSana(pd.sk);
+      ok = await jugar(j);
+    } catch (e) {
+      console.warn("[pokemon] revelación", e);
+    } finally { if (!ok) { delete enviado[k + ":r"]; if (!muerto) pinta(); } }
   }
 
   let aviso = "";
@@ -164,8 +198,10 @@ export function crearPokemon(ctx) {
       else {
         // Una promesa escrita que no llegó a la base (recarga a mitad):
         // se rehace con la misma elección guardada.
+        // Una elección guardada cuya promesa no llegó a la base (recarga a
+        // mitad, red caída, llave que tardó): se rehace con lo guardado.
         const pd = pendiente();
-        if (pd && pd.k === est.punto && enviado[est.punto + ":c"] && !yaMandado(est.punto, "c")) promete(pd.c, pd.sk);
+        if (pd && pd.k === est.punto && !yaMandado(est.punto, "c")) promete(pd.c, pd.sk);
       }
     } else if (todos && !est.revelado[uid]) revela();
   }
@@ -242,7 +278,7 @@ export function crearPokemon(ctx) {
       set("pkEscena", "eqv|" + JSON.stringify(est.prometido) + est.fase + skin, `<div class="jg-pk-espera">
         ${versus(juego() ? skin : "", !!est.prometido[uid])}
         <p>${est.fase === "fin" ? "" : "Los dos eligen a ciegas: lo elegido viaja cerrado y se abre cuando están los dos."}</p>${fin}</div>`);
-      set("pkControl", "eqv", ""); set("pkRelato", "eqv", ""); set("pkPie", "eqv", "");
+      set("pkControl", "eqv", ""); set("pkRelato", "eqv", ""); set("pkPie", "eqv" + aviso, aviso ? `<span class="jg-nota">${esc(aviso)}</span>` : "");
       return;
     }
     const rand = PM.esAleatorio(fmt);
@@ -279,7 +315,7 @@ export function crearPokemon(ctx) {
         <footer class="jg-pk-elige-pie">${versus(skin, false)}
           <button class="btn jg-pk-listo" data-x="listo"${elegido || rand ? "" : " disabled"}>¡Listo para combatir!</button></footer>
       </div>`);
-    set("pkControl", "eq", ""); set("pkRelato", "eq", ""); set("pkPie", "eq" + rand, `<span class="jg-nota">${rand ? "Los equipos se reparten cuando los dos estén listos." : "El rival no verá tu equipo hasta que los dos hayáis elegido."}</span>`);
+    set("pkControl", "eq", ""); set("pkRelato", "eq", ""); set("pkPie", "eq" + rand + aviso, `<span class="jg-nota">${aviso ? esc(aviso) : rand ? "Los equipos se reparten cuando los dos estén listos." : "El rival no verá tu equipo hasta que los dos hayáis elegido."}</span>`);
   }
 
   /* --- el campo ---
