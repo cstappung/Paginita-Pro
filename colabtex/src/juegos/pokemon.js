@@ -369,6 +369,9 @@ export function crearPokemon(ctx) {
       if (especie) {
         const urls = PM.urlsSprite(especie, { espalda: l === "mia", shiny });
         im.style.visibility = "";
+        im.style.removeProperty("--pie");
+        im.crossOrigin = "anonymous";
+        im.onload = () => apoya(im);
         im.dataset.urls = JSON.stringify(urls.slice(1));
         im.onerror = () => { const u = JSON.parse(im.dataset.urls || "[]"); if (u.length) { im.dataset.urls = JSON.stringify(u.slice(1)); im.src = u[0]; } else im.style.visibility = "hidden"; };
         im.src = urls[0]; im.alt = especie;
@@ -376,6 +379,26 @@ export function crearPokemon(ctx) {
     }
     caja.classList.toggle("vacia", !especie);
     if (entra && especie) reanima(caja.querySelector(".jg-pk-anim"), "sale");
+  }
+  /* Los PNG fijos de PokeAPI (los Pokémon sin GIF animado) vienen en un
+     lienzo de 96×96 con hasta 26 px vacíos bajo los pies; ampliados, el
+     Pokémon quedaba flotando sobre su plataforma. Se mide la última fila
+     con tinta y se baja la imagen eso (`--pie`, en píxeles de la imagen:
+     el `translateY` va después del `scale`). Los GIF ya vienen recortados. */
+  function apoya(im) {
+    try {
+      const w = im.naturalWidth, h = im.naturalHeight;
+      if (!w || !h) return;
+      const cv = document.createElement("canvas");
+      cv.width = w; cv.height = h;
+      const cx = cv.getContext("2d", { willReadFrequently: true });
+      cx.drawImage(im, 0, 0);
+      const d = cx.getImageData(0, 0, w, h).data;
+      let y = h - 1;
+      fila: for (; y >= 0; y--) for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3] > 16) break fila;
+      const vacio = y < 0 ? 0 : h - 1 - y;
+      im.style.setProperty("--pie", vacio + "px");
+    } catch (e) { /* lienzo contaminado: se queda como estaba */ }
   }
   /* Reinicia una animación de CSS: quitar la clase, forzar un reflow y
      volver a ponerla. */

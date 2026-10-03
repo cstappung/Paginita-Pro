@@ -2978,8 +2978,8 @@ html[data-tema=oscuro] .jg-drop-quien:hover b{color:#fff}
 .jg-pk-spr.vacia img{visibility:hidden}
 .jg-pk-anim{position:relative;display:grid;place-items:end center;width:100%;height:100%}
 .jg-pk-spr img{image-rendering:pixelated;transform-origin:bottom center;max-width:none}
-.jg-pk-spr.suya img{transform:scale(2)}
-.jg-pk-spr.mia img{transform:scale(2.5)}
+.jg-pk-spr.suya img{transform:scale(2) translateY(var(--pie,0px))}
+.jg-pk-spr.mia img{transform:scale(2.5) translateY(var(--pie,0px))}
 .jg-pk-anim.sale{animation:jgPkSale .7s cubic-bezier(.2,1.5,.4,1)}
 @keyframes jgPkSale{0%{transform:scale(.05);filter:brightness(6)}55%{filter:brightness(3)}100%{transform:none;filter:none}}
 .jg-pk-spr.mia .jg-pk-anim.ataca{animation:jgPkAtacaMia .55s ease-in-out}
@@ -3248,8 +3248,8 @@ html[data-tema=oscuro] .jg-drop-quien:hover b{color:#fff}
 @container (max-width:760px){
   .jg-pk-elige{grid-template-columns:1fr}
   .jg-pk-campo{height:320px}
-  .jg-pk-spr.suya img{transform:scale(1.5)}
-  .jg-pk-spr.mia img{transform:scale(2)}
+  .jg-pk-spr.suya img{transform:scale(1.5) translateY(var(--pie,0px))}
+  .jg-pk-spr.mia img{transform:scale(2) translateY(var(--pie,0px))}
   .jg-pk-abajo{grid-template-columns:1fr}
   .jg-pk-relato{border-left:0;border-top:1px solid #ffffff12;max-height:180px}
   .jg-pk-campo{min-height:300px}
@@ -3314,6 +3314,6 @@ html[data-tema=oscuro] .jg-drop-quien:hover b{color:#fff}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610022016"></script>
+<script src="juegos-app.js?v=202610030045"></script>
 </body>
 </html>
