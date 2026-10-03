@@ -268,13 +268,13 @@ export function crearAjedrez(ctx) {
     const turno = est.fase === "jugando" && est.turno === u;
     const foto = j.foto ? `<img src="${esc(j.foto)}" alt="">` : esc((j.nombre || "?").slice(0, 1).toUpperCase());
     const reloj = est.reloj ? `<span class="jg-aj-reloj ${color}" data-c="${color}" role="timer" aria-label="Tiempo de ${color === "w" ? "blancas" : "negras"}">${formato(est.reloj[color])}</span>` : "";
-    const html = `<span class="jg-aj-av" style="--c:${esc(j.color || "#888")}">${foto}</span>
+    const html = `${ctx.avatar ? `<span class="jg-aj-av jg-con-marco">${ctx.avatar(j, 34)}</span>` : `<span class="jg-aj-av" style="--c:${esc(j.color || "#888")}">${foto}</span>`}
       <span class="jg-aj-quien"><b>${esc(u === uid ? "Tú" : j.nombre)}</b>
         <span class="jg-aj-caps">${lleva.map(t => mini(color === "w" ? t.toLowerCase() : t)).join("")}${ventaja > 0 ? `<em>+${ventaja}</em>` : ""}</span></span>
       <span class="jg-grow"></span>
       <span class="jg-aj-bando ${color}${turno ? " on" : ""}">${turno ? (u === uid ? "Te toca · " : "Le toca · ") : ""}${color === "w" ? "Blancas" : "Negras"}</span>
       ${reloj}`;
-    return { firma: [u, j.nombre, j.foto, j.color, lleva.join(""), ventaja, turno, !!est.reloj, juegoPiezas].join("|"), html };
+    return { firma: [u, j.nombre, j.foto, j.marco, j.color, lleva.join(""), ventaja, turno, !!est.reloj, juegoPiezas].join("|"), html };
   }
 
   function hoja() {

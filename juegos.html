@@ -1045,7 +1045,7 @@ try { var t = localStorage.getItem("jg.tema");
     .jg-f7-lema-m{display:none}
     #f7Asientos{position:relative;z-index:4;width:100%;display:grid;grid-template-columns:1fr 1fr;gap:8px}
     .jg-f7-asiento,.jg-f7-yo,.jg-f7-sala[data-n] .jg-f7-asiento{position:static;transform:none;width:auto;min-width:0}.jg-f7-yo{grid-column:1/-1;order:99}
-    .jg-f7-jug{padding:7px 8px;border-radius:12px}.jg-f7-total b{font-size:14px}.jg-f7-ava{width:24px;height:24px;font-size:11px}
+    .jg-f7-jug{padding:7px 8px;border-radius:12px}.jg-f7-total b{font-size:14px}.jg-f7-ava{width:24px;height:24px;font-size:11px}.jg-f7-ava.jg-con-marco>.jg-av{--t:24px!important}
     .jg-f7-quien b{font-size:12.5px}
     .jg-f7-turno::before{inset:-10px}
     .jg-f7-asiento:not(.jg-f7-yo) .jg-f7-c:not(.jg-f7-mini),.jg-f7-asiento:not(.jg-f7-yo) .jg-f7-vacia{width:34px;height:48px}.jg-f7-asiento:not(.jg-f7-yo) .jg-f7-cifra{font-size:16px}.jg-f7-asiento:not(.jg-f7-yo) .jg-f7-lema,.jg-f7-asiento:not(.jg-f7-yo) .jg-f7-esq,.jg-f7-asiento:not(.jg-f7-yo) .jg-f7-esq2{display:none}
@@ -2374,13 +2374,13 @@ html[data-tema=oscuro] .jg-guia{--gv-borde:#46405a;--gv-papel:#262236;--gv-tinta
 .jg-rkc-cuenta{font-variant-numeric:tabular-nums;font-size:15px}
 .jg-rkc-extra{grid-column:2/-1;margin-top:-4px;color:var(--jg-muted);font-size:11.5px}
 .jg-rkc-raras li{grid-template-columns:34px 52px minmax(0,1fr) minmax(0,1fr)}
-.jg-rkc-carta .jg-cc{width:52px}
-.jg-rkc-carta .jg-cc figcaption{display:none}
+.jg-rkc-carta .jg-pdc{width:52px}
+.jg-rkc-carta .jg-pdc figcaption{display:none}
 .jg-rkc-info{display:grid;min-width:0}
 .jg-rkc-info b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .jg-rkc-info small{color:var(--jg-muted);font-size:12px}
 @media (max-width:600px){.jg-rkc{padding:12px}.jg-rkc-lista li{grid-template-columns:28px minmax(0,1fr) auto}.jg-rkc-barra{grid-column:2/-1;grid-row:2}.jg-rkc-extra{grid-row:3}
-  .jg-rkc-raras li{grid-template-columns:28px 46px minmax(0,1fr)}.jg-rkc-raras .jg-rkc-quien{grid-column:3}.jg-rkc-carta .jg-cc{width:46px}}
+  .jg-rkc-raras li{grid-template-columns:28px 46px minmax(0,1fr)}.jg-rkc-raras .jg-rkc-quien{grid-column:3}.jg-rkc-carta .jg-pdc{width:46px}}
 html[data-tema=oscuro] .jg-rkc{background:var(--os-sup);border-color:var(--os-borde)}
 html[data-tema=oscuro] .jg-rkc-lista li{background:#ffffff08}
 html[data-tema=oscuro] .jg-rkc-barra{background:#ffffff14}
@@ -2480,6 +2480,11 @@ html[data-tema=oscuro] .jg-ym-eq.azul.mio{color:#8cc2ff}
 .jg-marco-anim::before,.jg-marco-anim::after{display:none}
 .jg-av>.jg-av-ad{position:absolute!important;inset:-20%!important;width:auto!important;height:auto!important;margin:0!important;padding:0!important;background:none!important;border:0!important;box-shadow:none!important;flex:none!important;overflow:visible!important;z-index:2;pointer-events:none;display:block}
 .jg-av-ad svg{width:100%;height:100%;display:block;overflow:visible}
+/* La foto con marco dentro de las mesas (`ctx.avatar`): el hueco redondo de
+   cada juego deja de recortar y de pintar su propio fondo y anillo, y el
+   marco del perfil ocupa su lugar. */
+.jg-con-marco{overflow:visible!important;background:none!important;box-shadow:none!important;border-radius:0!important}
+.jg-con-marco>.jg-av{font-size:inherit}
 /* Solo lo que tiene clase: un `<g transform>` de posición con
    transform-origin:center giraría alrededor de su caja y se iría de sitio. */
 .jg-av-ad [class]{transform-box:fill-box;transform-origin:center;animation-duration:var(--d,2s);animation-iteration-count:infinite;animation-timing-function:ease-in-out}
@@ -2987,21 +2992,21 @@ html[data-tema=oscuro] .jg-mo-tuyo{border-color:var(--os-borde2)}
 html[data-tema=oscuro] .jg-mo-ver{color:#c4b1ff}
 /* ---------- PRODROP fuera del abridor: cartas pequeñas, mejores drops, perfil ---------- */
 .jg-tab-cartas{white-space:nowrap}
-.jg-cc{position:relative;margin:0;aspect-ratio:5/7;border-radius:9px;overflow:hidden;background:#140c2b;border:2px solid var(--cc);box-shadow:0 4px 14px #0003;isolation:isolate}
-.jg-cc img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
-.jg-cc.t2{box-shadow:0 0 0 1px #fff3 inset,0 4px 18px #c26bff55}
-.jg-cc.t3{border-color:transparent;background:linear-gradient(#140c2b,#140c2b) padding-box,conic-gradient(from var(--jg-cc-a,0deg),#ffcc3d,#ff8ad8,#9be9ff,#a7ffcf,#ffcc3d) border-box;box-shadow:0 4px 22px #ffcc3d66}
-@property --jg-cc-a{syntax:'<angle>';inherits:false;initial-value:0deg}
-.jg-cc.t3{animation:jgCcGira 5s linear infinite}
-@keyframes jgCcGira{to{--jg-cc-a:360deg}}
-.jg-cc.t3::after{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;background:linear-gradient(115deg,transparent 35%,#ffffff55 48%,transparent 60%);background-size:250% 100%;animation:jgCcBrillo 3.2s ease-in-out infinite}
-@keyframes jgCcBrillo{0%{background-position:120% 0}60%,100%{background-position:-60% 0}}
-.jg-cc figcaption{position:absolute;left:0;right:0;bottom:0;z-index:2;padding:16px 6px 5px;background:linear-gradient(transparent,#000c 60%);color:#fff;line-height:1.15}
-.jg-cc figcaption b{display:block;font-size:10.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.jg-cc figcaption small{display:block;font-size:9px;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--cc)}
-.jg-cc-nota{position:absolute;top:4px;right:4px;z-index:3;min-width:20px;height:20px;padding:0 4px;border-radius:6px;display:grid;place-items:center;font:800 12px/1 'IBM Plex Mono',monospace;color:#10051f;background:var(--gc);box-shadow:0 0 0 2px #fff,0 2px 8px #0006}
-.jg-cc-dios{position:absolute;top:4px;left:4px;z-index:3;padding:2px 5px;border-radius:5px;font:900 8.5px/1.2 system-ui,sans-serif;letter-spacing:.08em;color:#1a0b33;background:linear-gradient(90deg,#ffcc3d,#ff8ad8)}
-@media (prefers-reduced-motion:reduce){.jg-cc.t3,.jg-cc.t3::after{animation:none}}
+.jg-pdc{position:relative;margin:0;aspect-ratio:5/7;border-radius:9px;overflow:hidden;background:#140c2b;border:2px solid var(--cc);box-shadow:0 4px 14px #0003;isolation:isolate}
+.jg-pdc img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.jg-pdc.t2{box-shadow:0 0 0 1px #fff3 inset,0 4px 18px #c26bff55}
+.jg-pdc.t3{border-color:transparent;background:linear-gradient(#140c2b,#140c2b) padding-box,conic-gradient(from var(--jg-pdc-a,0deg),#ffcc3d,#ff8ad8,#9be9ff,#a7ffcf,#ffcc3d) border-box;box-shadow:0 4px 22px #ffcc3d66}
+@property --jg-pdc-a{syntax:'<angle>';inherits:false;initial-value:0deg}
+.jg-pdc.t3{animation:jgPdcGira 5s linear infinite}
+@keyframes jgPdcGira{to{--jg-pdc-a:360deg}}
+.jg-pdc.t3::after{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;background:linear-gradient(115deg,transparent 35%,#ffffff55 48%,transparent 60%);background-size:250% 100%;animation:jgPdcBrillo 3.2s ease-in-out infinite}
+@keyframes jgPdcBrillo{0%{background-position:120% 0}60%,100%{background-position:-60% 0}}
+.jg-pdc figcaption{position:absolute;left:0;right:0;bottom:0;z-index:2;padding:16px 6px 5px;background:linear-gradient(transparent,#000c 60%);color:#fff;line-height:1.15}
+.jg-pdc figcaption b{display:block;font-size:10.5px;font-weight:800;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jg-pdc figcaption small{display:block;font-size:9px;opacity:.85;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--cc)}
+.jg-pdc-nota{position:absolute;top:4px;right:4px;z-index:3;min-width:20px;height:20px;padding:0 4px;border-radius:6px;display:grid;place-items:center;font:800 12px/1 'IBM Plex Mono',monospace;color:#10051f;background:var(--gc);box-shadow:0 0 0 2px #fff,0 2px 8px #0006}
+.jg-pdc-dios{position:absolute;top:4px;left:4px;z-index:3;padding:2px 5px;border-radius:5px;font:900 8.5px/1.2 system-ui,sans-serif;letter-spacing:.08em;color:#1a0b33;background:linear-gradient(90deg,#ffcc3d,#ff8ad8)}
+@media (prefers-reduced-motion:reduce){.jg-pdc.t3,.jg-pdc.t3::after{animation:none}}
 .jg-drop{display:grid;gap:4px;min-width:0;flex:0 0 112px;scroll-snap-align:start}
 .jg-drop-cuando{font-size:10.5px;color:var(--jg-muted);padding-left:23px;margin-top:-3px}
 .jg-tira{grid-area:tira;margin:-6px 0 28px;padding:14px 16px 12px;border:1px solid #e4dfeb;border-radius:18px;background:linear-gradient(120deg,#160b2e,#2a1150 55%,#3b1660);color:#fff;min-width:0}
@@ -3044,14 +3049,14 @@ html[data-tema=oscuro] .jg-tira{border-color:var(--os-borde)}
 .jg-drop-quien>b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .jg-drop-quien:hover>b{color:var(--jg-ink);text-decoration:underline}
 .jg-mini-cartas{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;padding:8px 16px 0}
-.jg-mini-cartas .jg-cc figcaption{display:none}
-.jg-mini-cartas .jg-cc-nota{min-width:16px;height:16px;font-size:10px}
+.jg-mini-cartas .jg-pdc figcaption{display:none}
+.jg-mini-cartas .jg-pdc-nota{min-width:16px;height:16px;font-size:10px}
 .jg-pf-cartas-fila{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,190px));gap:16px}
-.jg-pf-cartas-fila .jg-cc{border-radius:12px;transition:transform .2s}
-.jg-pf-cartas-fila .jg-cc:hover{transform:translateY(-4px) rotate(-1deg)}
-.jg-pf-cartas-fila .jg-cc figcaption b{font-size:13px}
-.jg-pf-cartas-fila .jg-cc figcaption small{font-size:11px}
-.jg-pf-cartas-fila .jg-cc-nota{min-width:28px;height:28px;font-size:16px;top:7px;right:7px}
+.jg-pf-cartas-fila .jg-pdc{border-radius:12px;transition:transform .2s}
+.jg-pf-cartas-fila .jg-pdc:hover{transform:translateY(-4px) rotate(-1deg)}
+.jg-pf-cartas-fila .jg-pdc figcaption b{font-size:13px}
+.jg-pf-cartas-fila .jg-pdc figcaption small{font-size:11px}
+.jg-pf-cartas-fila .jg-pdc-nota{min-width:28px;height:28px;font-size:16px;top:7px;right:7px}
 .jg-pf-cartas header .btn2{text-decoration:none}
 .jg-mo-gasto{font-size:12.5px;opacity:.85}
 html[data-tema=oscuro] .jg-drop-quien:hover>b{color:#fff}
@@ -3492,6 +3497,6 @@ html[data-tema=oscuro] .jg-drop-quien:hover>b{color:#fff}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610031933"></script>
+<script src="juegos-app.js?v=202610031952"></script>
 </body>
 </html>
