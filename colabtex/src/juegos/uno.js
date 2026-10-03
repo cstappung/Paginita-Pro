@@ -107,6 +107,13 @@ const TRAMPA = {
 
 export function crearUno(ctx) {
   const { uid, jugar, terminar, secreto } = ctx;
+  const fotoSola = j => j.foto && /^(https?:|data:image\/)/.test(j.foto)
+    ? `<img src="${esc(j.foto)}" alt="" referrerpolicy="no-referrer">` : esc((j.nombre || "?").charAt(0).toUpperCase());
+  /* La foto con el marco del perfil, si la sala lo da (`ctx.avatar`); sin
+     él, la foto sola, como siempre. */
+  const ava = j => ctx.avatar
+    ? `<span class="jg-un-ava jg-con-marco">${ctx.avatar(j, 28)}</span>`
+    : `<span class="jg-un-ava">${fotoSola(j)}</span>`;
 
   let host = null, muerto = false;
   let p = null, est = null;
@@ -339,8 +346,6 @@ export function crearUno(ctx) {
       const turno = est.fase === "jugando" && esperaA(u);
       const cls = ["jg-un-asiento", u === uid ? "yo" : "", turno ? "turno" : "", fuera ? "fuera" : "", elim ? "elim" : "",
         est.fase === "fin" && est.ganador === u ? "gana" : "", n === 1 && !fuera && !elim ? "uno" : ""].filter(Boolean).join(" ");
-      const foto = j.foto && /^(https?:|data:image\/)/.test(j.foto)
-        ? `<img src="${esc(j.foto)}" alt="" referrerpolicy="no-referrer">` : esc((j.nombre || "?").charAt(0).toUpperCase());
       const a = (90 + k * 360 / N) * Math.PI / 180;
       const x = (50 + 50 * Math.cos(a)).toFixed(2), y = (50 + 50 * Math.sin(a)).toFixed(2);
       const na = fuera || elim ? 0 : Math.min(n, 10);
@@ -366,7 +371,7 @@ export function crearUno(ctx) {
       }
       h += `<div class="${cls}" data-asiento="${esc(u)}" style="--c:${esc(j.color || "#888")};--x:${x}%;--y:${y}%">
         ${abanico}
-        <div class="jg-un-placa"><span class="jg-un-ava">${foto}</span><span class="jg-un-nom">${esc(u === uid ? "Tú" : j.nombre || "?")}</span><b class="jg-un-n" title="${elim || fuera ? "" : esc(nc(n))}">${elim || fuera ? "—" : n}</b>${turno ? `<span class="jg-un-piensa"><i></i><i></i><i></i></span>` : ""}</div>
+        <div class="jg-un-placa">${ava(j)}<span class="jg-un-nom">${esc(u === uid ? "Tú" : j.nombre || "?")}</span><b class="jg-un-n" title="${elim || fuera ? "" : esc(nc(n))}">${elim || fuera ? "—" : n}</b>${turno ? `<span class="jg-un-piensa"><i></i><i></i><i></i></span>` : ""}</div>
         ${marcas.length ? `<div class="jg-un-marcas">${marcas.join("")}</div>` : ""}
         ${tapa}
       </div>`;

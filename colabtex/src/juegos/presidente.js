@@ -285,7 +285,7 @@ export function crearPresidente(ctx) {
       const na = Math.min(12, n);
       h += `<div class="${cls}" data-asiento="${esc(u)}" style="--c:${esc(j.color || "#888")};--x:${x}%;--y:${y}%">
         ${u === uid ? "" : `<div class="jg-un-abanico" style="--n:${na}">${Array.from({ length: na }, (_, i) => `<i style="--k:${i}"></i>`).join("")}</div>`}
-        <div class="jg-un-placa"><span class="jg-un-ava">${foto}</span><span class="jg-un-nom">${esc(u === uid ? "Tú" : j.nombre || "?")}</span><b class="jg-un-n">${R ? n : ""}</b>
+        <div class="jg-un-placa">${ctx.avatar ? `<span class="jg-un-ava jg-con-marco">${ctx.avatar(j, 28)}</span>` : `<span class="jg-un-ava">${foto}</span>`}<span class="jg-un-nom">${esc(u === uid ? "Tú" : j.nombre || "?")}</span><b class="jg-un-n">${R ? n : ""}</b>
         ${est.turno === u ? `<span class="jg-un-piensa"><i></i><i></i><i></i></span>` : ""}</div>
         <div class="jg-un-marcas">${marcas.join("")}</div></div>`;
     });

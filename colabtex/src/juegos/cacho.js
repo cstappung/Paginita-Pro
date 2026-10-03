@@ -87,6 +87,13 @@ function nuevosDe(prev, cur) {
 
 export function crearCacho(ctx) {
   const { uid, jugar, terminar, secreto } = ctx;
+  const fotoSola = j => j.foto && /^(https?:|data:image\/)/.test(j.foto)
+    ? `<img src="${esc(j.foto)}" alt="" referrerpolicy="no-referrer">` : esc((j.nombre || "?").charAt(0).toUpperCase());
+  /* La foto con el marco del perfil, si la sala lo da (`ctx.avatar`); sin
+     él, la foto sola, como siempre. */
+  const ava = j => ctx.avatar
+    ? `<span class="jg-cc-ava jg-con-marco">${ctx.avatar(j, 24)}</span>`
+    : `<span class="jg-cc-ava">${fotoSola(j)}</span>`;
 
   let host = null, muerto = false;
   let p = null, est = null;
@@ -324,11 +331,9 @@ export function crearCacho(ctx) {
         `<div class="${cls}"><div class="jg-cc-dados">${dh}</div><div class="jg-cc-vaso"><b></b></div></div>`);
 
       /* Nombre, foto y si se le espera. */
-      const foto = j.foto && /^(https?:|data:image\/)/.test(j.foto)
-        ? `<img src="${esc(j.foto)}" alt="" referrerpolicy="no-referrer">` : esc((j.nombre || "?").charAt(0).toUpperCase());
       const espera = faltan.includes(w) && !u;
-      set("ccQ" + i, [j.nombre, j.foto, espera, w === uid].join("|"),
-        `<span class="jg-cc-ava">${foto}</span><span class="jg-cc-nom">${esc(w === uid ? "Tú" : j.nombre || "?")}</span>${espera ? `<span class="jg-cc-reloj" title="Falta su llave">⏳</span>` : ""}`);
+      set("ccQ" + i, [j.nombre, j.foto, j.marco, espera, w === uid].join("|"),
+        `${ava(j)}<span class="jg-cc-nom">${esc(w === uid ? "Tú" : j.nombre || "?")}</span>${espera ? `<span class="jg-cc-reloj" title="Falta su llave">⏳</span>` : ""}`);
 
       /* Los dados que le quedan, como cinco puntos. */
       let antes = nd, despues = nd;

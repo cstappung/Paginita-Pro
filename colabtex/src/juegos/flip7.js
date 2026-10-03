@@ -245,6 +245,13 @@ function nuevosDe(prev, cur) {
 
 export function crearFlip7(ctx) {
   const { uid, jugar, terminar, secreto } = ctx;
+  const fotoSola = j => j.foto && /^(https?:|data:image\/)/.test(j.foto)
+    ? `<img src="${esc(j.foto)}" alt="" referrerpolicy="no-referrer">` : esc((j.nombre || "?").charAt(0).toUpperCase());
+  /* La foto con el marco del perfil, si la sala lo da (`ctx.avatar`); sin
+     él, la foto sola, como siempre. */
+  const ava = j => ctx.avatar
+    ? `<span class="jg-f7-ava jg-con-marco">${ctx.avatar(j, 30)}</span>`
+    : `<span class="jg-f7-ava">${fotoSola(j)}</span>`;
 
   let host = null, muerto = false;
   let p = null, est = null, M = null;
@@ -592,13 +599,11 @@ export function crearFlip7(ctx) {
         const ok = puede.includes(id), s = sel1 && sel1.id === id && sel1.u === j.uid;
         return htmlCarta(carta(id), "jg-f7-mini" + (ok ? " jg-f7-elegible" : "") + (s ? " jg-f7-sel" : ""), ok || s ? `data-u="${esc(j.uid)}" data-id="${id}"` : "");
       }).join("") + (l.seg != null ? htmlCarta(carta(l.seg), "jg-f7-mini jg-f7-guardada") : "");
-      const foto = j.foto && /^(https?:|data:image\/)/.test(j.foto)
-        ? `<img src="${esc(j.foto)}" alt="" referrerpolicy="no-referrer">` : esc((j.nombre || "?").charAt(0).toUpperCase());
-      const firma = [fant, j.nombre, j.color, j.foto, l.nums.map(id => id + "=" + (com[id] ?? "")).join(","), l.mods.join(","), l.seg, l.estado, l.f7, l.congelado, pts,
+      const firma = [fant, j.nombre, j.color, j.foto, j.marco, l.nums.map(id => id + "=" + (com[id] ?? "")).join(","), l.mods.join(","), l.seg, l.estado, l.f7, l.congelado, pts,
         vale, golpe, turno, apunta, txtApunta, sel, puede.join(","), sel1 && sel1.u === j.uid ? sel1.id : "", fuera, est.reparte === j.uid].join(":");
       set("f7S" + i, firma, `<div class="${cls}" style="--c:${esc(j.color || "#888")}" ${apunta ? `data-apunta="${esc(j.uid)}"` : ""}>
         <div class="jg-f7-placa">
-          <span class="jg-f7-ava">${foto}</span>
+          ${ava(j)}
           <span class="jg-f7-quien"><b>${esc(j.uid === uid ? "Tú" : j.nombre)}</b><span class="jg-f7-est">${esc(estado)}</span></span>
           ${est.reparte === j.uid && est.ronda ? `<span class="jg-f7-dealer" title="Reparte esta ronda">D</span>` : ""}
           <span class="jg-f7-total${pts < 0 ? " jg-f7-total-neg" : ""}" title="Puntos de la partida"><b>${signo(pts)}</b>/${est.meta}</span>

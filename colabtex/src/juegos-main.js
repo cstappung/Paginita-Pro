@@ -68,7 +68,7 @@ import { mejoresDrops, miniCarta, cifras as cifrasCartas, MOTOR, rankingColeccio
 import { mezcla, abrePerfil } from "./juegos/perfil.js";
 import { abreMini, cierraMini, miniAbierta, crearPaginaPerfil, avatarMarco, quien } from "./juegos/perfil-vista.js";
 import { estadisticas, nombreCategoria, marcoVisible } from "./juegos/perfil-tarjeta.js";
-import { fotoSana } from "./juegos/sano.js";
+import { fotoSana, colorSano } from "./juegos/sano.js";
 import { suena, silenciar, silenciado, ambientar, ajustarMusica, activarAudio } from "./juegos/sonido.js";
 import { montaReproductor } from "./juegos/reproductor.js";
 import { createReportWidget } from "./report-widget.js";
@@ -301,6 +301,9 @@ function vistePerfiles(est) {
   for (const j of (est && est.jugadores) || []) {
     const p = perfilDe(j.uid);
     if (p) Object.assign(j, mezcla(j, p));
+    /* El marco va en la ficha para que entre en la firma de repintado de
+       cada pantalla: si llega tarde (el perfil, o lo ganado), se repinta. */
+    j.marco = marcoDeUid(j.uid);
   }
 }
 
@@ -1790,6 +1793,10 @@ function montaJuego(p) {
     mirando: !soyJugador(),
     /* Un espectador no tiene mano propia, y leer `misPartidas` de una
        partida en la que no está solo devolvería vacío tras un viaje. */
+    /* La foto de un jugador con el marco de su perfil, para que las mesas
+       la pinten igual que la cabecera. Sin `data-perfil`: dentro de un
+       juego un clic en un asiento puede ser una jugada. */
+    avatar: (j, tam, color) => avatarMarco(fotoSana(j.foto, true), j.nombre, color || colorSano(j.color) || colorForUid(j.uid || ""), j.marco || marcoDeUid(j.uid), tam),
     secreto: () => soyJugador()
       ? fb.leerSecreto(state.pid, state.user.uid) : Promise.resolve(null),
     /* La pantalla avisa cuando acaba de contar una jugada: el cartel del

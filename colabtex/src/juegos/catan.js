@@ -645,10 +645,10 @@ export function crearCatan(ctx) {
       const islas = Object.keys((est.islas || {})[u] || {}).length;
       if (islas) ins.push(`<span class="jg-ct-ins" title="Islas colonizadas (+2 cada una)">${ico("ct-b-isla")}×${islas}</span>`);
       const lleno = Math.min(100, Math.round(100 * (est.vp[u] || 0) / est.meta));
-      return { firma: [u, j.nombre, j.foto, fuera, turno, est.vp[u], est.cartas[u], est.desN[u], est.caballeros[u], est.rutas[u], estado, ins.length, est.largoDe, est.ejercito, islas].join("|"),
+      return { firma: [u, j.nombre, j.foto, j.marco, fuera, turno, est.vp[u], est.cartas[u], est.desN[u], est.caballeros[u], est.rutas[u], estado, ins.length, est.largoDe, est.ejercito, islas].join("|"),
         html: `<div class="jg-ct-jug${turno ? " on" : ""}${fuera ? " fuera" : ""}${u === uid ? " yo" : ""}" style="--c:${colorDe(u)}">
           <div class="jg-ct-cab">
-            <span class="jg-ct-av">${j.foto ? `<img src="${esc(j.foto)}" alt="" referrerpolicy="no-referrer">` : esc((j.nombre || "?").charAt(0))}</span>
+            ${ctx.avatar ? `<span class="jg-ct-av jg-con-marco">${ctx.avatar(j, 26, colorDe(u))}</span>` : `<span class="jg-ct-av">${j.foto ? `<img src="${esc(j.foto)}" alt="" referrerpolicy="no-referrer">` : esc((j.nombre || "?").charAt(0))}</span>`}
             <b>${esc(j.nombre || "Alguien")}${u === uid ? " <small>(tú)</small>" : ""}</b>
             <span class="jg-ct-vp" title="Puntos de victoria a la vista">${est.vp[u] || 0}</span>
           </div>

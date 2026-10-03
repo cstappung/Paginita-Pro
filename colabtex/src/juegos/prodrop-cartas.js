@@ -127,10 +127,10 @@ export function cifras(datos) {
    rareza en el borde y, si está graduada, su nota en una etiqueta. */
 export function miniCarta(c, extra = "") {
   const t = PM.TIERS[c.carta.tier], cc = c.carta;
-  const nota = c.gr ? `<span class="jg-cc-nota" style="--gc:${PM.colorNota(c.g)}" title="${esc(PM.GRADE_WORD[c.g])}">${c.g}</span>` : "";
-  return `<figure class="jg-cc t${cc.tier}" style="--cc:${PM.acento(cc)}" title="${esc(cc.name + " · " + PM.subtitulo(cc) + " · " + t.label + (c.gr ? " · nota " + c.g : ""))}">
+  const nota = c.gr ? `<span class="jg-pdc-nota" style="--gc:${PM.colorNota(c.g)}" title="${esc(PM.GRADE_WORD[c.g])}">${c.g}</span>` : "";
+  return `<figure class="jg-pdc t${cc.tier}" style="--cc:${PM.acento(cc)}" title="${esc(cc.name + " · " + PM.subtitulo(cc) + " · " + t.label + (c.gr ? " · nota " + c.g : ""))}">
     <img src="${RAIZ}${esc(cc.img)}" alt="${esc(cc.name + ", " + PM.subtitulo(cc))}" loading="lazy" draggable="false">
-    ${nota}${c.dios ? `<span class="jg-cc-dios" title="Salió de un god pack">GOD</span>` : ""}
+    ${nota}${c.dios ? `<span class="jg-pdc-dios" title="Salió de un god pack">GOD</span>` : ""}
     <figcaption><b>${esc(cc.name)}</b><small>${esc(t.sym)} ${esc(PM.subtitulo(cc))}</small></figcaption>${extra}
   </figure>`;
 }
