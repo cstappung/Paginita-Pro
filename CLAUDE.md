@@ -3112,10 +3112,14 @@ with `onDisconnect` and the next seat takes over from the last `zb` it saw
 (`adopta`). Two frames may both direct for a moment while that settles; the
 cost is a stray bite, not a broken game. Seven things hold it together:
 
-- **The zombies ride the director's own state**, as `zb: {r, q, p, e, z, m}`:
-  round, how many are still to spawn, the start and between-round timers,
-  each zombie as `[id, x, y, z, ry, hp%, rising, burning, phase, window]`,
-  and the last 20 deaths as `[id, killer, head, weapon, explodes]`. The other frames only draw them
+- **The zombies ride the director's own state**, as `zb: {r, q, j, p, e, z, m}`:
+  round, how many are still to spawn (`j`: bosses still to spawn), the start
+  and between-round timers, each zombie as `[id, x, y, z, ry, hp%, rising,
+  burning, phase, window, kind, marks]` (marks: 1 helmet on, 2 charging, 4
+  screaming), and the last 20 deaths as `[id, killer, head, weapon, explodes,
+  kind]`, where `explodes` is 0, 1 fire, 2 toxic gas or 3 a dog's burst.
+  Fields only ever go on the end, so an older frame still reads the state
+  (an unknown kind draws as a common one). The other frames only draw them
   (`desdeRed`). Firebase drops empty arrays, so `zb.z` can come back
   missing, and `lista()` reads that as no zombies.
 - **Shots at a zombie are ordinary hits** addressed to `z:<id>` in the
@@ -3170,17 +3174,43 @@ cost is a stray bite, not a broken game. Seven things hold it together:
   many players and whatever the round; below that, `maxVivos(n, r)` = 5 +
   2·players + one per two rounds, and the rest wait their turn. The bite
   (`mordidaRonda`) is 30 in round 1 (four to fall), reaches 50 at round 9
-  and tops out at 75. There are three kinds too (`TIPOS`, `CLASE`,
-  `tipoRonda`). The runner (`c`) shows up from round 5, has 70 % of the
-  life and runs at `velCorredor` (5.5 m/s plus 0.2 per round, up to 8.5),
-  so it catches a walking player from round 13. The big one (`g`) shows up
-  from round 8: slow, three times the life, a 1.6× bite and 30 % bigger. Its `userData.escala` widens the
-  bullets' ellipsoid (`rayoHuevo(..., escala)`) and raises the head line.
-  No bite takes more than 95, so a full-health player is never killed in
-  one go. The kind travels at the end of each `zb.z` entry and of each
-  death in `zb.m`, and a kill pays `CLASE[t].puntos` (60, 80, 150), plus 40
-  for the head or 70 for the pan. `NOVEDAD_RONDA` warns at rounds 5, 8 and
-  13. `tests/yemas-zombis.test.cjs` pins the curve and the cap.
+  and tops out at 75. No bite takes more than 95, so a full-health player
+  is never killed in one go. A kill pays `CLASE[t].puntos`, plus 40 for
+  the head or 70 for the pan.
+- **Something new arrives every few rounds until past round 30**, as in
+  Black Ops: nine kinds (`TIPOS`, `CLASE`, `FORMA`), mixed in by
+  `tipoRonda` from `MEZCLA` (rare kinds first, each growing per round up
+  to a cap) and limited by `TOPE_VIVOS` so ten napalms are never a wall of
+  fire. The runner (`c`, round 5, `velCorredor`, catches a walking player
+  from 13). The big one (`g`, 8: slow, three times the life). The toxic
+  one (`t`, 10: crawls, and bursts into gas that hurts whoever is within
+  `ZB.gas`). Napalm (`f`, 15: always burning, scorches whoever stands
+  close every second, immune to lava, explodes on death). The shrieker
+  (`x`, 18: its scream is a zero-damage hit with `a: GRITO` (98) that
+  blinds for 1.3 s). The helmeted one (`k`, 22: headshots do 15 % and
+  count as body shots until the helmet, 60 % of its life, breaks). From
+  round 28 the specials weigh half again and commons nearly vanish.
+  **Two kinds of round break the routine**: dog rounds (`esPerros`: 6,
+  11, 16…) spawn only hellhounds (`p`), out of a lightning strike a few
+  metres from a player under orange fog, and the last one drops a Max
+  Ammo; boss rounds (`esJefe`: 20, 25, 30…) open with the Mutante (`j`,
+  two from round 30 with two or more players), whose life is `jefeHp`,
+  that no single hit can take more than 8 % of (so no Insta-Kill
+  one-shot, and Kaboom skips it), that charges at ×3.2 when hurt
+  (`carga`, `cdCarga`), shakes the screen, shows a bar (`#jefe`, painted
+  by `pintaJefe`) and always drops a power-up. A round is only clear when
+  `q`, `qj` and the field are all empty. `novedadRonda(r)` announces each
+  of these, and the test checks there is never a gap of more than three
+  rounds from 5 to 30.
+- **A zombie's shape is what gets shot.** `FORMA` (scale `e`, relative
+  height `a`) and `MEDIDA_Z` in `mundo.js` must agree (the test compares
+  them): `rayoHuevo(o, d, p, escala, alto)` flattens the ellipsoid of a
+  dog or a crawling toxic, the head line is `alto`-scaled in both
+  `primerBlanco` and the hit, and `chocaZombis` scales radius and height
+  too. The models (`crearZombi` in `mundo.js`) carry what `animar` moves:
+  `patas` (a dog's gallop), `repta`, `yelmo`, `boca`, `ojos`.
+  `tests/yemas-zombis.test.cjs` pins the curve, the cap, the round each
+  kind arrives in and the special rounds.
 
 Practice can be zombies too: the menu's mode select gives `conectarLocal`
 `variante: 'zombis'`, `RedLocal` keeps the round and ends the run on the
@@ -3237,6 +3267,26 @@ Things to know:
   (`sacaDeCaja`). Zombies
   **climb** rather than jump; a player standing on something makes them
   replan towards the nearest climbable edge instead of piling up below.
+- **Every map is checked by walking it** (`tests/yemas-mapas.test.cjs`):
+  each link of the graph is walked like a body would walk it (0.3 m wide,
+  steps up to 0.6 m, falls when the floor ends, the link's own door open)
+  in both directions, and must reach the other node's height; every node,
+  spawn and ground spawn must be clear; the graph must be connected; and
+  every window must land near a node. It found tables, a fence, a
+  mannequin and the Der Riese generator standing on links, where zombies
+  used to pile up. A prop that only decorates goes in `decor` (no
+  collision); a `caja` must not touch a link.
+- **The maps carry the originals' landmarks**: Nacht's barbed-wire ring,
+  searchlight and craters; Kino's marquee with its bulbs, an open-air
+  alley with a fire escape, the lobby's rope posts, the mannequins on the
+  stage and the film reels; Nuketown's burnt, smoking bus, porches,
+  mailboxes, the garage hoop, a swing and a picnic table per yard and the
+  countdown clock; Der Riese's catwalk across the courtyard, the
+  hellhound cages in the lab, the cables from the mainframe, the Gruppe
+  935 eagle, the chimneys, the crane and the wagons; Pueblo's parked
+  TranZit bus with its stop, the water tower, telephone poles and the
+  round vault door (which goes with the `boveda` door). A `cil` decor
+  takes `o.rx` to lie down.
 - An unbought wall weapon shows only its **silhouette**; Pack-a-Punched
   weapons get a metallic material; drinking a perk plays an animation and
   each perk has an icon on its machine and in the HUD. **Double Tap fires

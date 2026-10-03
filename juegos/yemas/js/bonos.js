@@ -67,9 +67,13 @@ export function crearBonos(escena, cb) {
   }
 
   // Un zombi muerto puede soltar una (solo el director lo decide).
-  function suelta(pos) {
-    if (!cb.director() || suelos.size >= BONO.max || Math.random() >= BONO.prob) return;
-    pon(nuevoId(), TIPOS_BONO[Math.floor(Math.random() * TIPOS_BONO.length)], pos.x, pos.y, pos.z);
+  // `forzado`: el tipo que tiene que salir (la munición del último perro), o
+  // true para uno cualquiera sin tirar la suerte (el Mutante).
+  function suelta(pos, forzado) {
+    if (!cb.director()) return;
+    if (!forzado && (suelos.size >= BONO.max || Math.random() >= BONO.prob)) return;
+    const ti = typeof forzado === 'string' && TIPOS_BONO.includes(forzado) ? forzado : TIPOS_BONO[Math.floor(Math.random() * TIPOS_BONO.length)];
+    pon(nuevoId(), ti, pos.x, pos.y, pos.z);
   }
 
   function registra(id, ti, uid) {

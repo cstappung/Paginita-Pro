@@ -109,6 +109,12 @@ export const sonido = {
   pap() { for (const [f, t] of [[220, 0], [277, 0.3], [330, 0.6], [440, 0.9]]) tono(f, f, 0.5, 0.12, 'square', t); ruido(1.4, 900, 0.3, 0.2); },
   teleport() { tono(200, 1600, 1.2, 0.15, 'sine'); ruido(1.2, 6000, 0.25); },
   puerta() { ruido(0.5, 900, 0.5); tono(110, 60, 0.4, 0.2, 'sawtooth'); },
+  // Lo de los zombis especiales: el rayo del perro, el grito del chillón, el
+  // rugido del Mutante y el casco que salta.
+  trueno(dist = 0) { const v = 1 / (1 + dist / 18); ruido(0.08, 8000, 0.7 * v); ruido(1.1, 500, 0.5 * v, 0.05); tono(70, 40, 0.9, 0.25 * v, 'sawtooth', 0.05); },
+  chillido(dist = 0) { const v = 1 / (1 + dist / 14); tono(1400, 2300, 0.5, 0.18 * v, 'sawtooth'); tono(1900, 1500, 0.7, 0.12 * v, 'square', 0.1); ruido(0.7, 5000, 0.25 * v); },
+  ruge(dist = 0) { const v = 1 / (1 + dist / 20); tono(90, 55, 1.3, 0.35 * v, 'sawtooth'); tono(140, 70, 1.1, 0.2 * v, 'square', 0.08); ruido(1.1, 700, 0.4 * v); },
+  casco(dist = 0) { const v = 1 / (1 + dist / 12); tono(2400, 2300, 0.25, 0.15 * v, 'triangle'); tono(3600, 3500, 0.2, 0.08 * v, 'sine', 0.02); },
   quema(dist = 0) { const v = 1 / (1 + dist / 12); ruido(0.4, 1500, 0.35 * v); },
   bono() { for (const [f, t] of [[523, 0], [659, 0.1], [784, 0.2], [1047, 0.3]]) tono(f, f, 0.25, 0.1, 'square', t); ruido(0.5, 6000, 0.12, 0.3); },
   compra() { tono(800, 1200, 0.07, 0.12, 'square'); tono(1200, 1600, 0.1, 0.1, 'square', 0.08); },

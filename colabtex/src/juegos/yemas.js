@@ -336,7 +336,7 @@ export function crearYemas({ uid, pid, jugar, terminar, mirando }) {
     window.addEventListener("message", mensaje);
     window.addEventListener("keydown", abajo);
     window.addEventListener("keyup", arriba);
-    frame.src = "juegos/yemas/index.html?modo=online&v=yemas-12";
+    frame.src = "juegos/yemas/index.html?modo=online&v=yemas-13";
     host.append(aviso, redEl, equiposEl, barra, frame);
   }
 

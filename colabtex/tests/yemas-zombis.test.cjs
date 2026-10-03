@@ -6,7 +6,7 @@ const fs=require('node:fs'),vm=require('node:vm');
 const leer=(f,de,a)=>{const s=fs.readFileSync(f,'utf8');const i=s.indexOf(de),j=s.indexOf(a,i);assert.ok(i>=0&&j>i,f+': no encuentro '+de);return s.slice(i,j).replace(/\bexport\s+/g,'');};
 const ctx={};vm.createContext(ctx);
 vm.runInContext(leer('../juegos/yemas/js/zombis.js','export const ZB','const r1 =')+
- '\n;globalThis.__Z={hpRonda,totalRonda,velRonda,maxVivos,MAX_ZOMBIS,mordidaRonda,tipoRonda,velCorredor,NOVEDAD_RONDA};',ctx);
+ '\n;globalThis.__Z={hpRonda,totalRonda,velRonda,maxVivos,MAX_ZOMBIS,mordidaRonda,tipoRonda,velCorredor,NOVEDAD_RONDA,novedadRonda,TIPOS,CLASE,FORMA,esPerros,esJefe,jefesRonda,jefeHp,totalPerros,maxPerros,velPerro,maxDe,TOPE_VIVOS};',ctx);
 vm.runInContext(leer('../juegos/yemas/js/mundo.js','export const ALTO','const MITAD')+
  leer('../juegos/yemas/js/mundo.js','function solapa','// ---------- Rayos')+
  '\n;globalThis.__M={moverCuerpo,empujaCuerpo,metido,ALTO,RADIO};',ctx);
@@ -36,6 +36,50 @@ test('la dificultad sube despacio',()=>{
  assert.ok(Z.mordidaRonda(500)<=75);
  assert.ok(Z.totalRonda(1,1)<=7&&Z.totalRonda(10,1)<=30);
  for(const r of Object.keys(Z.NOVEDAD_RONDA))assert.ok(+r>=5,'los avisos coinciden con la curva');
+});
+
+test('cada clase nueva llega en su ronda, como en Black Ops',()=>{
+ const desde={c:5,g:8,t:10,f:15,x:18,k:22};
+ const azares=[...Array(200).keys()].map(i=>i/200);
+ for(let r=1;r<=40;r++){
+  const salen=new Set(azares.map(a=>Z.tipoRonda(r,a)));
+  for(const [t,d] of Object.entries(desde))assert.equal(salen.has(t),r>=d,`${t} en la ronda ${r}`);
+  assert.ok(!salen.has('p')&&!salen.has('j'),'perros y Mutante no salen en la mezcla');
+ }
+ // Élite: desde la 28 casi no quedan comunes.
+ assert.ok(azares.filter(a=>Z.tipoRonda(30,a)==='n').length===0);
+ assert.ok(azares.filter(a=>Z.tipoRonda(20,a)==='n').length>40);
+});
+
+test('rondas de perros y del Mutante',()=>{
+ const perros=[...Array(40).keys()].map(i=>i+1).filter(Z.esPerros);
+ assert.deepEqual(perros,[6,11,16,21,26,31,36]);
+ const jefes=[...Array(40).keys()].map(i=>i+1).filter(Z.esJefe);
+ assert.deepEqual(jefes,[20,25,30,35,40]);
+ assert.ok(!perros.some(r=>Z.esJefe(r)),'nunca coinciden');
+ assert.equal(Z.jefesRonda(20,4),1);assert.equal(Z.jefesRonda(30,1),1);assert.equal(Z.jefesRonda(30,2),2);assert.equal(Z.jefesRonda(21,4),0);
+ assert.ok(Z.jefeHp(20,4)>Z.jefeHp(20,1),'más jugadores, más vida');
+ assert.ok(Z.jefeHp(20,1)>=5*Z.hpRonda(20),"aguanta lo que una horda");
+ for(let n=1;n<=8;n++)for(let r=6;r<=60;r+=5){assert.ok(Z.maxPerros(n,r)<=Z.MAX_ZOMBIS);assert.ok(Z.totalPerros(r,n)<=40);}
+ assert.ok(Z.velPerro(6)<7&&Z.velPerro(26)>=7,'al principio se les escapa corriendo');
+ assert.equal(Z.maxDe('j',20,2),Z.jefeHp(20,2));
+ assert.equal(Z.maxDe('g',10,1),Math.round(Z.hpRonda(10)*3));
+});
+
+test('hay algo nuevo hasta pasada la ronda 30 y la red no se rompe',()=>{
+ // Nunca pasan más de tres rondas sin un aviso de algo nuevo, de la 5 a la 31.
+ let ultima=0;
+ for(let r=5;r<=31;r++){if(Z.novedadRonda(r)){assert.ok(r-ultima<=3||ultima===0,`hueco antes de la ${r}`);ultima=r;}}
+ assert.ok(ultima>=30);
+ // Los índices de TIPOS viajan por la red: los tres primeros no se mueven.
+ assert.deepEqual([...Z.TIPOS.slice(0,3)],['n','c','g']);
+ for(const t of Z.TIPOS){assert.ok(Z.CLASE[t]&&Z.FORMA[t],t);assert.ok(Z.CLASE[t].mordida*Z.mordidaRonda(200)<=120);}
+ assert.equal(new Set(Z.TIPOS).size,Z.TIPOS.length);
+ // Las formas de mundo.js (MEDIDA_Z) son las de zombis.js.
+ const mundo=fs.readFileSync('../juegos/yemas/js/mundo.js','utf8');
+ const m=/MEDIDA_Z = (\{[^}]*\})/.exec(mundo);assert.ok(m);
+ const med=vm.runInNewContext('('+m[1]+')');
+ for(const t of Z.TIPOS){const [e,a]=med[t]||[1,1];assert.equal(e,Z.FORMA[t].e,t);assert.equal(a,Z.FORMA[t].a,t);}
 });
 
 // Un muro de 4 m en x ∈ [5, 5.4] y un jugador apretado contra él.

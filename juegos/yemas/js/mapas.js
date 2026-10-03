@@ -299,6 +299,31 @@ function nacht() {
   sacos(M, 12, 13, 15, 13.8);
   sacos(M, 26, -4, 26.8, -1);
   sacos(M, -15, -2, -14.2, 2);
+  // El alambre de púas que rodea el búnker y el reflector de vigilancia.
+  const cerco = [[-16, 14], [-16, -24], [28, -24], [28, 14]];
+  for (let i = 0; i < 4; i++) {
+    const [ax, az] = cerco[i], [bx, bz] = cerco[(i + 1) % 4], L = Math.hypot(bx - ax, bz - az);
+    for (let t = 0; t <= L; t += 4) {
+      const x = ax + (bx - ax) * t / L, z = az + (bz - az) * t / L;
+      D(M, 'cil', x, z, 0.06, 0, 1.6, '#4a3a2a');
+    }
+    for (const y of [0.6, 1.1, 1.5]) D(M, 'tubo', ax, y, az, bx, y, bz, 0.012, '#5a5a5a');
+  }
+  for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) D(M, 'tubo', -24 + dx, 0, -18 + dz, -24 + dx * 0.6, 7, -18 + dz * 0.6, 0.08, '#4a3a2a');
+  D(M, 'c', -25, -19, -23, -17, 7, 7.2, '#4a3a2a');
+  D(M, 'cil', -24, -18, 0.4, 7.2, 7.9, '#2a2a2a', { rx: 0.5 });
+  D(M, 'esf', -24, 7.6, -17.65, 0.26, '#fff4d0', { brilla: true });
+  D(M, 'luz', -22, 6, -14, '#e8f0ff', 0.8, 22, null);
+  // Los cráteres de los bombardeos y las cajas de munición caídas.
+  for (const [x, z, r] of [[-20, -12, 2.4], [12, 22, 2], [34, 8, 2.8], [-8, -28, 2.2]]) {
+    D(M, 'piso', x - r, z - r, x + r, z + r, 0.01, '#1e2018');
+    D(M, 'cil', x, z, r, -0.2, 0.15, '#3a3a2c');
+  }
+  for (const [x, z] of [[24, -10], [-13, 6]]) dc(M, x - 0.5, z - 0.3, x + 0.5, z + 0.3, 0, 0.45, '#4a5a3a');
+  // Adentro: las manchas en el piso y los tablones que sobraron.
+  for (const [x, z, r] of [[-1, 6, 0.8], [6, -5, 0.6], [15, 5, 0.7], [1, -13, 0.5]]) D(M, 'piso', x - r, z - r * 0.7, x + r, z + r * 0.7, 0.012, '#3a1414');
+  for (const [x, z, r] of [[-8.8, 4, 0.3], [8.6, -2.5, -0.5], [20.5, 2, 1.1]]) D(M, 'rot', x, 0.05, z, r, 1.6, 0.06, 0.22, '#6a4a2a');
+  D(M, 'cartel', 21.74, 3.6, 5.6, -P2, 1.8, 1.2, 'HILFE', null, '#7a0d0d', { fuente: 'serif' });
   // El cartel del camino.
   D(M, 'cil', -14, 11, 0.07, 0, 2.2, '#4a3524');
   D(M, 'cartel', -14, 2.0, 11.08, 0, 1.6, 0.5, 'NACHT', '#5c4a32', '#e8dcc0', {});
@@ -377,7 +402,8 @@ function kino() {
     { t: 'v', en: -20, w: 1.6, fuera: 1, zona: 'teatro' },
   ] });
   muro(M, -18.2, -28, 18.2, -28, { alto: 9, g, color: teatro });
-  D(M, 'techo', -26, 4, 26, 18, 6, '#2a1c18');
+  // El callejón es al aire libre: el techo del frente llega hasta su muro.
+  D(M, 'techo', -26, 4, 8, 18, 6, '#2a1c18');
   D(M, 'techo', -18, -28, 18, 4, 9, '#1e1416');
   // Pisos: alfombra roja en el vestíbulo, madera en el teatro.
   D(M, 'piso', -8, 4, 8, 18, 0.005, '#5e1a1c');
@@ -417,6 +443,29 @@ function kino() {
   cajon(M, 11.3, 16.9, 1.0, '#7a5c32');
   barril(M, 24.8, 16.8);
   barril(M, 24, 17.2, '#6a3a2a');
+  // La escalera de incendios del callejón, contra el muro del teatro.
+  for (const [y, x0, x1] of [[2.6, 18.4, 25.6], [5.2, 18.4, 25.6]]) {
+    dc(M, x0, 4.2, x1, 5.4, y, y + 0.08, '#2a2a2c');
+    D(M, 'tubo', x0, y + 1, 5.4, x1, y + 1, 5.4, 0.03, '#3a3a3c');
+    for (let x = x0; x <= x1; x += 1.2) D(M, 'tubo', x, y, 5.4, x, y + 1, 5.4, 0.02, '#3a3a3c');
+  }
+  D(M, 'tubo', 19, 2.68, 5.0, 24, 5.2, 5.0, 0.05, '#3a3a3c');
+  D(M, 'tubo', 24.6, 0, 5.1, 24.6, 2.6, 5.1, 0.03, '#3a3a3c');
+  for (const [x, z] of [[9.4, 7.5], [9.2, 8.6], [25.2, 7.6]]) D(M, 'esf', x, 0.32, z, 0.38, '#1e1e1e');
+  D(M, 'piso', 12, 9, 15, 11.5, 0.012, '#26303a');
+  D(M, 'cartel', 25.78, 3.0, 13, -P2, 2.0, 0.6, 'ALLEY', '#1e1e1e', '#c8c8c0', {});
+  // La marquesina de la entrada con sus bombillas.
+  dc(M, -7, 18.2, 7, 21.2, 4.6, 5.0, '#2a1410');
+  for (let x = -6.6; x <= 6.6; x += 0.6) D(M, 'esf', x, 4.55, 21.25, 0.07, '#ffe6a0', { brilla: true });
+  D(M, 'cartel', 0, 5.6, 21.2, 0, 8, 1.1, 'KINO DER TOTEN', '#3a0e10', '#f2d27a', {});
+  for (const x of [-6.6, 6.6]) D(M, 'cil', x, 21, 0.1, 0, 4.6, '#2a1a14');
+  D(M, 'cartel', -11, 2.4, 18.22, 0, 1.4, 2.0, 'HEUTE', '#2a1a14', '#e8c060', {});
+  D(M, 'cartel', 11, 2.4, 18.22, 0, 1.4, 2.0, 'ZOMBIE', '#2a1a14', '#e8c060', {});
+  // Los postes con cordón rojo del vestíbulo (no chocan).
+  for (const s of [-1, 1]) {
+    for (const z of [7, 9.5]) { D(M, 'cil', s * 2.6, z, 0.05, 0, 0.95, '#c8a050'); D(M, 'esf', s * 2.6, 0.98, z, 0.07, '#c8a050'); }
+    D(M, 'tubo', s * 2.6, 0.85, 7, s * 2.6, 0.85, 9.5, 0.03, '#8b0f14');
+  }
   // El escenario.
   caja(M, -14, -27.8, 14, -18, 0, 1.2, '#4a2c1a');
   dc(M, -14.05, -18.08, 14.05, -18, 0, 1.2, '#3a2010');
@@ -451,6 +500,14 @@ function kino() {
   dc(M, -0.6, 2.8, 0.6, 3.6, 3, 4.4, '#2a2a2e');
   D(M, 'tubo', 0, 4.0, 2.8, 0, 4.0, 2.3, 0.18, '#1a1a1a');
   D(M, 'esf', 0, 4.0, 2.25, 0.14, '#cfe0ff', { brilla: true, luz: true });
+  // Los maniquíes del escenario y los rollos de película del proyector.
+  for (const [x, z, r] of [[-7, -25, 0.3], [-4.5, -26.5, -0.4], [6.5, -25.5, 2.8], [9, -24, 3.4]]) {
+    D(M, 'cil', x, z, 0.04, 1.2, 2.1, '#555');
+    D(M, 'rot', x, 2.4, z, r, 0.45, 0.7, 0.25, '#d8c7a8');
+    D(M, 'esf', x, 2.92, z, 0.16, '#d8c7a8');
+  }
+  for (const [x, z] of [[-3.5, 3.2], [-2.6, 3.4], [3.2, 3.2]]) D(M, 'cil', x, z, 0.45, 3, 3.08, '#3a3a3e');
+  D(M, 'cil', 4.6, 2.2, 0.35, 3, 3.6, '#4a4a50');
   // Los apliques de las paredes del teatro.
   for (const z of [-24, -14, -4]) for (const s of [-1, 1]) D(M, 'esf', s * 17.7, 5.5, z, 0.18, '#ffcf8a', { brilla: true, luz: true });
   D(M, 'luz', 0, 7.5, -22, '#ffd8a8', 2.2, 26, { luz: true });
@@ -559,7 +616,7 @@ function nuketown() {
   // Postes de luz y cables.
   for (const x of [-26, -10, 10, 26]) { poste(M, x, -6.6); poste(M, -x, 6.6); }
   // Los maniquíes, desparramados por los patios.
-  for (const [x, z, r] of [[-6, -10, 0.4], [-27, -12, 2], [-2, -20, -1], [-10, -27.5, 1.2], [-30, -26, 0.2], [-30, 9, 2.4]]) {
+  for (const [x, z, r] of [[-5.5, -18, 0.4], [-27, -12, 2], [-2, -20, -1], [-10, -29.1, 1.2], [-30, -26, 0.2], [-30, 9, 2.4]]) {
     muneco(M, x, z, r);
     muneco(M, -x, -z, r + PI);
   }
@@ -567,10 +624,18 @@ function nuketown() {
   coche(M, -16, 3.6, true, '#6a8aa8', { techo: '#4a6a88' });
   coche(M, 16, -3.6, true, '#a85a4a', { techo: '#884a3a' });
   // Arbolitos en los patios.
-  for (const [x, z] of [[-4, -26], [-31, -14], [-4, -9], [-31, 22], [-20, 12], [-10, 24]]) {
+  for (const [x, z] of [[-4, -26], [-32.7, -14], [-4, -9], [-31, 22], [-20, 12], [-10, 24]]) {
     arbol(M, x, z, { alto: 4, copa: '#6a7a3a' });
     arbol(M, -x, -z, { alto: 4, copa: '#6a7a3a' });
   }
+  // El bus está quemado: la pintura ampollada y el humo que no se va.
+  dc(M, -5.56, -1.46, 5.56, 1.46, 0.4, 0.9, '#3a2e24');
+  for (const [x, y] of [[-2, 3.4], [-1.4, 4.4], [-2.4, 5.6], [-1.8, 6.9]]) D(M, 'esf', x, y, 0, 0.5 + y * 0.08, '#4a4440');
+  // El reloj de la cuenta regresiva y el cartel de la casa de muestra.
+  D(M, 'cil', -31.5, 8.5, 0.1, 0, 3.4, '#555');
+  D(M, 'c', -32.4, 8.4, -30.6, 8.6, 3.4, 4.4, '#2a2a2a');
+  D(M, 'brillo', -32.2, 8.62, -30.8, 8.66, 3.6, 4.2, '#ff3a2a');
+  D(M, 'cartel', -31.5, 3.9, 8.7, 0, 1.3, 0.5, '00:00', null, '#ff8a6a', {});
   // Más allá del cerco: el desierto del sitio de pruebas.
   for (const [x, z, s] of [[-50, -40, 8], [55, -30, 12], [40, 50, 9], [-45, 45, 14], [0, -60, 10], [60, 20, 7]]) {
     D(M, 'cono', x, z, s, 0, s * 0.8, '#8a6a48');
@@ -580,14 +645,14 @@ function nuketown() {
     A: [-30.5, 0], B: [-14, 0], C: [-8, -3.8], E: [-8, 3.8],
     Y1: [-12, -7.5], Y2: [-12, -11], Y3: [-14, -15], Y4: [-14, -19], Y5: [-13, -23.5], Y6: [-16, -28],
     Y7: [-20, -7.5], Y8: [-20, -15], Y9: [-9.6, -10.4], Y10: [-9.6, -16.5, 3.2], Y11: [-13.5, -19, 3.2],
-    Y12: [-26, -7.5], Y13: [-26, -24], Y14: [-31, -18], Y15: [-31, -6], Y16: [-2, -28], Y17: [-5, -14],
-    Q1: [-27, 15], Q2: [-20, 18],
+    Y12: [-26, -7.5], Y13: [-26, -24], Yh: [-26.2, -18], Y14: [-31, -18], Y15: [-31, -6], Y16: [-2, -28], Y17: [-5, -14],
+    Q1: [-27, 15], Q2: [-20, 18], Yg: [-16, -25],
   };
   const L = [
     ['A', 'B'], ['B', 'C'], ['B', 'E'], ['C', 'E'], ['C', 'mE'],
     ['Y1', 'Y2'], ['Y1', 'B'], ['Y1', 'C'], ['Y1', 'Y7'], ['Y2', 'Y3'], ['Y2', 'Y9'], ['Y3', 'Y4'], ['Y3', 'Y8'],
-    ['Y4', 'Y5'], ['Y5', 'Y13'], ['Y5', 'Y6'], ['Y6', 'Y16'], ['Y7', 'Y8'], ['Y7', 'Y12'], ['Y9', 'Y10'], ['Y10', 'Y11'],
-    ['Y12', 'Y13'], ['Y12', 'Y15'], ['Y13', 'Y14'], ['Y14', 'Y15'], ['Y15', 'A'], ['Y16', 'Y17'], ['Y17', 'C'], ['Y17', 'mE'],
+    ['Y4', 'Y5'], ['Y5', 'Y13'], ['Y5', 'Yg'], ['Yg', 'Y6'], ['Y6', 'Y16'], ['Y7', 'Y8'], ['Y7', 'Y12'], ['Y9', 'Y10'], ['Y10', 'Y11'],
+    ['Y12', 'Y13'], ['Y12', 'Y15'], ['Y13', 'Yh'], ['Yh', 'Y14'], ['Yh', 'Y12'], ['Y14', 'Y15'], ['Y15', 'A'], ['Y16', 'Y17'], ['Y17', 'C'], ['Y17', 'mE'],
     ['A', 'Q1'], ['Q1', 'Q2'], ['Q2', 'E'],
   ];
   // La mitad verde: los mismos nodos girados (x, z) → (−x, −z).
@@ -676,6 +741,19 @@ function casaNuke(M, s, color, oscuro) {
   C(-24, -6.8, -19.4, -4.8, 0.4, 1.6, s > 0 ? '#5a6a7a' : '#7a3a2a');
   C(-24, -6.8, -19.4, -4.8, 0, 0.4, null);
   C(-24, -6.8, -22, -4.8, 1.6, 2.4, s > 0 ? '#4a5a6a' : '#6a2a1a');
+  // El porche de la entrada, el buzón y el aro de básquet sobre el garaje.
+  d(-14, -8.8, -10, -7.2, 2.8, 3.0, oscuro);
+  for (const x of [-13.8, -10.2]) D(M, 'cil', X(x), Z(-7.4), 0.08, 0, 2.8, '#f2ece0');
+  D(M, 'cil', X(-7), Z(-7.3), 0.05, 0, 1.1, '#555');
+  d(-7.25, -7.45, -6.75, -7.15, 1.1, 1.4, s > 0 ? '#3a5a8a' : '#8a3a3a');
+  d(-21.3, -9.05, -19.9, -8.95, 4.0, 4.9, '#f2f2f2');
+  D(M, 'tubo', X(-20.6), 4.2, Z(-8.95), X(-20.6), 4.2, Z(-8.45), 0.25, '#e05a2a');
+  // La hamaca y la mesa de picnic del patio.
+  for (const x of [-22, -18.5]) for (const dz of [-0.6, 0.6]) D(M, 'tubo', X(x), 0, Z(-28.6 + dz), X(x), 2.4, Z(-28.6), 0.05, '#c8c8c8');
+  D(M, 'tubo', X(-22), 2.4, Z(-28.6), X(-18.5), 2.4, Z(-28.6), 0.05, '#c8c8c8');
+  for (const x of [-21.2, -19.3]) d(x - 0.3, -28.75, x + 0.3, -28.45, 0.5, 0.56, '#7a3a2a');
+  const px = [X(-9), X(-7)].sort((a, b) => a - b), pz = [Z(-24.6), Z(-23.4)].sort((a, b) => a - b);
+  mesa(M, px[0], pz[0], px[1], pz[1], { h: 0.75, color: '#8a5a3a' });
   // El pasto de los patios.
   d(-34, -30, -4, -26, -0.02, 0.004, '#6a6a3a');
   d(-34, -26, -24, -7, -0.02, 0.004, '#6a6a3a');
@@ -780,16 +858,59 @@ function riese() {
   D(M, 'esf', 21.25, 3.6, -11, 0.25, '#ffcf6a', { luz: true, brilla: true });
   D(M, 'luz', 19, 6, -6, '#ffd890', 1.4, 18, { luz: true });
   // El laboratorio: mesas con frascos.
-  for (const z of [5, 12]) {
-    mesa(M, -24, z - 0.8, -14, z + 0.8, { h: 0.95, color: '#5a5a58', patas: '#2a2a2a' });
-    for (let x = -23; x <= -15; x += 1.6) D(M, 'cil', x, z, 0.12, 0.95, 1.3, ['#6ad08a', '#d0c06a', '#6aa0d0'][Math.round(x) & 1 ? 0 : 1]);
+  // Dos filas de mesas con un pasillo en medio (x = −19), por donde se camina.
+  for (const z of [5, 12]) for (const [x0, x1] of [[-25, -20.6], [-17.4, -13]]) {
+    mesa(M, x0, z - 0.8, x1, z + 0.8, { h: 0.95, color: '#5a5a58', patas: '#2a2a2a' });
+    for (let x = x0 + 0.6; x <= x1 - 0.4; x += 1.1) D(M, 'cil', x, z, 0.12, 0.95, 1.3, ['#6ad08a', '#d0c06a', '#6aa0d0'][Math.abs(Math.round(x * 3)) % 3]);
   }
+  // Las jaulas de los perros del infierno, contra la pared del oeste.
+  for (const z of [12.6, 14.6, 16.6]) {
+    caja(M, -27.75, z - 0.9, -26.2, z + 0.9, 0, 1.6, null);
+    dc(M, -27.75, z - 0.9, -26.2, z + 0.9, 0, 0.08, '#2a2a28');
+    dc(M, -27.75, z - 0.9, -26.2, z + 0.9, 1.55, 1.62, '#3a3a36');
+    for (let k = -0.8; k <= 0.81; k += 0.2) D(M, 'cil', -26.22, z + k, 0.025, 0, 1.6, '#555550');
+    D(M, 'rot', -27, 0.12, z, 0.3, 0.6, 0.12, 0.25, '#6a5a48');
+  }
+  D(M, 'cartel', -27.74, 2.4, 14.6, P2, 2.6, 0.6, 'TIERVERSUCHE', '#2a2a2a', '#c8b890', {});
   D(M, 'luz', -19, 6.5, 9, '#c8ffd8', 1.2, 18, { luz: true });
   // El almacén: cajones y barriles por todos lados.
   for (const [x, z, s] of [[12, 16.6, 1.3], [13.4, 16.8, 1.0], [24, 3, 1.3], [26.6, 13, 1.2], [15, 2, 1.0], [21, 13, 1.4]]) cajon(M, x, z, s);
   cajon(M, 21, 13, 1.0, '#7a5c32', 1.4);
   for (const [x, z] of [[26.8, 16.8], [26, 17.2], [12, 2]]) barril(M, x, z);
   D(M, 'luz', 19, 6.5, 9, '#ffd8a8', 1.0, 18, null);
+  // La pasarela de hierro que cruza el patio de lado a lado, como la del
+  // original (aquí no se sube: es el techo de lo que se recorre abajo).
+  dc(M, -10, 13.2, 10, 14.8, 4.6, 4.8, '#3e3a34');
+  for (let x = -9.5; x <= 9.5; x += 1) dc(M, x - 0.03, 13.2, x + 0.03, 14.8, 4.55, 4.6, '#2a2824');
+  for (const z of [13.2, 14.8]) {
+    D(M, 'tubo', -10, 5.8, z, 10, 5.8, z, 0.04, '#5a544a');
+    for (let x = -9; x <= 9; x += 2) D(M, 'tubo', x, 4.8, z, x, 5.8, z, 0.03, '#5a544a');
+  }
+  for (const x of [-9.75, 9.75]) D(M, 'tubo', x, 0, 14, x, 4.6, 14, 0.12, '#4a463e');
+  // Los cables gordos que salen del mainframe hacia los teletransportadores.
+  for (const [x, z] of [[-19, -10], [19, -6], [-19, 9]]) {
+    D(M, 'tubo', 0, 6.2, -8, x * 0.5, 7.4, (z - 8) * 0.5, 0.09, '#1e1e20');
+    D(M, 'tubo', x * 0.5, 7.4, (z - 8) * 0.5, x, 7.6, z, 0.09, '#1e1e20');
+  }
+  D(M, 'cartel', 0, 4.2, -15.73, 0, 3.4, 0.7, 'PACK-A-PUNCH', '#1a1a1e', '#9fb8ff', {});
+  // El águila de Gruppe 935 sobre la entrada del patio.
+  D(M, 'rot', 0, 7.0, 17.7, 0, 3.2, 0.6, 0.15, '#2a2a2a');
+  D(M, 'esf', 0, 7.0, 17.65, 0.45, '#8a7a5a');
+  for (const s of [-1, 1]) D(M, 'rot', s * 1.1, 7.15, 17.66, 0, 1.6, 0.3, 0.1, '#8a7a5a', { rz: s * 0.35 });
+  // Afuera: las chimeneas del horno, la grúa y los vagones.
+  for (const [x, z, h] of [[-32, -12, 18], [-34, -6, 15]]) {
+    D(M, 'cil', x, z, 1.1, 0, h, '#5a4a40');
+    D(M, 'cil', x, z, 1.25, h - 0.6, h, '#3a302a');
+  }
+  for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) D(M, 'tubo', 36 + dx, 0, 24 + dz, 36 + dx * 0.4, 20, 24 + dz * 0.4, 0.08, '#6a5a3a');
+  D(M, 'c', 35.4, 23.4, 36.6, 24.6, 20, 21, '#6a5a3a');
+  D(M, 'rot', 30, 21.4, 24, 0, 14, 0.5, 0.6, '#6a5a3a');
+  D(M, 'tubo', 25, 21.2, 24, 25, 12, 24, 0.02, '#222');
+  for (const x of [-20, -8]) {
+    D(M, 'c', x - 3, 23, x + 3, 25.4, 0.5, 3.2, '#4a3e34');
+    D(M, 'c', x - 3.1, 22.9, x + 3.1, 25.5, 3.2, 3.4, '#3a3028');
+  }
+  D(M, 'piso', -30, 23.6, 10, 24.8, 0.01, '#3a3632');
 
   M.puertas.push(
     { id: 'lab', nombre: 'Laboratorio', precio: 1000, abre: ['lab'] },
@@ -802,16 +923,16 @@ function riese() {
   );
   grafo(M, {
     r0: [0, 14.6], r1: [-7, 9], r2: [7, 9], r3: [0, 2.5], r4: [0, -3], r5: [-7.5, -8], r6: [7.5, -8], r7: [0, -12.5],
-    r8: [0, -19], r9: [-12, 9], r10: [-19, 9], r11: [-19, 2.5], r12: [-25, 15], r13: [-19, -2.5], r14: [-15, -8],
+    r8: [0, -19], r9: [-12, 9], r10: [-19, 9], r11: [-19, 2.5], r12: [-19, 15.5], r13: [-19, -2.5], r14: [-15, -8],
     r15: [-12, -8], r16: [-23.5, -9],
-    r17: [12, 9], r18: [19, 9], r19: [19, 2.5], r20: [25, 15], r21: [19, -2.5], r22: [15, -8], r23: [12, -8], r24: [25, -14],
+    r17: [12, 9], r18: [19, 9], r19: [19, 2.5], r20: [25, 15], r21: [19, -2.5], r22: [15, -8], r23: [12, -8], r24: [25, -14], r25: [25, -6], r26: [17, -14.2],
   }, [
     ['r0', 'r1'], ['r0', 'r2'], ['r1', 'r3'], ['r2', 'r3'], ['r3', 'r4'], ['r4', 'r5'], ['r4', 'r6'], ['r5', 'r7'], ['r6', 'r7'],
     ['r7', 'r8', 'pap'],
     ['r1', 'r9', 'lab'], ['r9', 'r10'], ['r10', 'r11'], ['r10', 'r12'], ['r11', 'r13', 'horno'], ['r13', 'r14'], ['r13', 'r16'],
     ['r14', 'r15'], ['r14', 'r16'], ['r15', 'r5', 'horno-mf'],
-    ['r2', 'r17', 'almacen'], ['r17', 'r18'], ['r18', 'r19'], ['r18', 'r20'], ['r19', 'r21', 'generador'], ['r21', 'r22'], ['r21', 'r24'],
-    ['r22', 'r23'], ['r22', 'r24'], ['r23', 'r6', 'gen-mf'],
+    ['r2', 'r17', 'almacen'], ['r17', 'r18'], ['r18', 'r19'], ['r18', 'r20'], ['r19', 'r21', 'generador'], ['r21', 'r22'], ['r21', 'r25'], ['r25', 'r24'],
+    ['r22', 'r23'], ['r22', 'r26'], ['r26', 'r24'], ['r23', 'r6', 'gen-mf'],
   ]);
   M.bebidas.push(
     ['revive', -9.3, 14, P2],
@@ -879,10 +1000,11 @@ function pueblo() {
   dc(M, 7.6, -26.4, 26.4, -7.6, 5.5, 5.8, '#5a4e44');
   D(M, 'piso', 8, -26, 26, -8, 0.006, '#6a6258');
   D(M, 'cartel', 17, 4.4, -7.77, 0, 4, 0.9, 'BANCO', '#2a2624', '#e8d8a8', {});
-  // El mostrador de cajeros, las rejas y la bóveda.
-  caja(M, 9, -14.5, 16, -13.7, 0, 1.15, '#5a4030');
-  for (let x = 9.2; x < 16; x += 0.5) D(M, 'cil', x, -14.1, 0.02, 1.15, 2.2, '#b8a060');
-  D(M, 'cil', 22, -16.35, 1.0, 0.2, 2.4, '#8a8a90', { rx: P2 });
+  // El mostrador de cajeros con sus rejas (y el portillo abierto), la bóveda.
+  caja(M, 9, -14.5, 12.6, -13.7, 0, 1.15, '#5a4030');
+  for (let x = 9.2; x < 12.6; x += 0.5) D(M, 'cil', x, -14.1, 0.02, 1.15, 2.2, '#b8a060');
+  D(M, 'cil', 22, -15.62, 1.05, 1.18, 1.42, '#8a8a90', { rx: P2, puerta: 'boveda' });
+  D(M, 'cil', 22, -15.45, 0.35, 1.25, 1.35, '#b8b8c0', { rx: P2, puerta: 'boveda' });
   for (const [x, z] of [[19, -25], [20.4, -25], [25, -18]]) cajon(M, x, z, 0.9, '#b8a050');
   D(M, 'luz', 13, 4.6, -18, '#ffd8a0', 1.0, 16, null);
   // EL BAR, de dos pisos.
@@ -917,8 +1039,8 @@ function pueblo() {
   for (let z = -20; z <= -14; z += 1.5) D(M, 'cil', -18.8, z, 0.2, 0, 0.75, '#6a3a2a');
   dc(M, -25.95, -22, -25.75, -12, 1.2, 2.6, '#5a3a28');
   for (let z = -21.5; z <= -12.5; z += 0.5) D(M, 'cil', -25.6, z, 0.06, 1.5, 1.85, ['#3a6a3a', '#8a5a2a', '#6a2a2a'][Math.abs(Math.round(z * 2)) % 3]);
-  mesa(M, -12.5, -14.5, -10.5, -12.5, { h: 0.8 });
-  mesa(M, -13, -19.5, -11, -17.5, { h: 0.8 });
+  mesa(M, -11.4, -14.5, -9.6, -12.7, { h: 0.8 });
+  mesa(M, -15.4, -21.6, -13.8, -20, { h: 0.8 });
   D(M, 'luz', -13, 5.5, -16, '#ffb070', 1.3, 18, null);
   // LA CASA del Quick Revive.
   const casa = '#7a6a5a';
@@ -929,7 +1051,7 @@ function pueblo() {
   D(M, 'techo', 8, 8, 24, 24, 4.5, '#2a2422');
   dc(M, 7.6, 7.6, 24.4, 24.4, 4.5, 4.8, '#4a3e36');
   D(M, 'piso', 8, 8, 24, 24, 0.006, '#5a4a3a');
-  mesa(M, 14, 14, 16.5, 16, { h: 0.8 });
+  mesa(M, 20, 21, 22.4, 22.8, { h: 0.8 });
   caja(M, 9, 22.4, 12, 23.6, 0, 0.8, '#6a3a3a');
   cajon(M, 22.8, 9.3, 1.0);
   D(M, 'luz', 16, 3.8, 16, '#ffd0a0', 1.0, 14, null);
@@ -950,7 +1072,6 @@ function pueblo() {
   dc(M, 26.5, -32, 32, -26.5, 0, 9, '#45382f');
   dc(M, -32, -32, -29.5, -26.5, 0, 8, '#4a3d36');
   // Autos quemados, faroles y escombros.
-  coche(M, -18, 4.5, true);
   coche(M, 24, 4.2, true, '#3a2a24');
   coche(M, 4.6, -18, false);
   coche(M, -4.6, 26, false, '#2e2622');
@@ -960,6 +1081,27 @@ function pueblo() {
     D(M, 'rot', x + 0.6, s * 0.2, z - 0.4, z, s * 1.2, s * 0.4, s, '#5a4a40', { rx: 0.5 });
   }
   barril(M, -6.8, 18, '#6a3a2a');
+  // El autobús de TranZit, detenido en la parada del oeste, y su cartel.
+  caja(M, -29.4, 3.9, -19.6, 6.5, 0.45, 3.1, '#3a4a5a');
+  caja(M, -29.4, 3.9, -19.6, 6.5, 0, 0.45, null);
+  dc(M, -29.45, 3.85, -19.55, 6.55, 1.7, 2.5, '#1e2a32');
+  dc(M, -29.45, 3.85, -19.55, 6.55, 1.0, 1.15, '#c8a03a');
+  dc(M, -29.5, 4.1, -29.4, 6.3, 0.6, 2.8, '#2a3440');
+  dc(M, -19.6, 4.05, -19.3, 6.35, 0.5, 1.4, '#2a2a2a');
+  for (const x of [-27.6, -21.4]) for (const z of [3.9, 6.5]) D(M, 'tubo', x, 0.45, z - 0.15, x, 0.45, z + 0.15, 0.45, '#151515');
+  D(M, 'cartel', -24.5, 2.9, 3.84, PI, 3.4, 0.5, 'TRANZIT', '#1e2a32', '#e8c060', {});
+  D(M, 'cil', -30.6, 7.2, 0.06, 0, 2.6, '#555');
+  D(M, 'cartel', -30.6, 2.5, 7.27, 0, 1.0, 0.6, 'BUS', '#2a5a8a', '#f2f2e8', {});
+  // El letrero del pueblo y el tanque de agua sobre los techos.
+  D(M, 'cartel', 0, 3.8, -31.77, 0, 7, 1.2, 'BIENVENIDOS AL PUEBLO', '#3a2a20', '#e8c890', {});
+  for (const [dx, dz] of [[-2, -2], [2, -2], [-2, 2], [2, 2]]) D(M, 'tubo', 44 + dx, 0, -44 + dz, 44 + dx * 0.6, 14, -44 + dz * 0.6, 0.12, '#4a3a30');
+  D(M, 'cil', 44, -44, 3, 14, 19, '#6a5a4a');
+  D(M, 'cono', 44, -44, 3.3, 19, 21, '#4a3e36');
+  D(M, 'cartel', 44, 16.5, -40.95, 0, 4, 1, 'PUEBLO', '#6a5a4a', '#f2e8d0', {});
+  // Postes de teléfono con cables por las calles, y brasas que vuelan del pozo.
+  for (const x of [-28, -18, 18, 28]) poste(M, x, -7.6, 7);
+  for (const z of [-28, -18, 18, 28]) poste(M, -7.6, z, 7);
+  for (const [x, y, z] of [[0.6, 1.2, 0.4], [-0.8, 2.0, -0.6], [0.2, 3.1, 0.9], [-0.4, 4.2, 0.1], [16, 1.4, 0.3]]) D(M, 'esf', x, y, z, 0.06, '#ffb030', { brilla: true });
   barril(M, 6.8, -26, '#5a4a3a');
 
   M.puertas.push(

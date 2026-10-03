@@ -175,3 +175,9 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #a9dcff; fon
 #bonos span i { font-style: normal; font-size: 18px; }
 #bonos span.acaba { animation: bonoAcaba 0.4s steps(2) infinite; }
 @keyframes bonoAcaba { 50% { opacity: 0.35; } }
+
+/* La vida del Mutante, el jefe de las rondas 20, 25, 30… */
+#jefe { position: absolute; top: 46px; left: 50%; transform: translateX(-50%); width: min(420px, 70vw); text-align: center;
+  font-weight: 900; letter-spacing: 3px; color: #e6c3ff; text-shadow: 0 2px 6px rgba(0,0,0,0.9); }
+#jefe div { height: 12px; margin-top: 4px; border-radius: 6px; background: rgba(0,0,0,0.55); border: 1px solid rgba(230,195,255,0.5); overflow: hidden; }
+#jefe i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #7a1fa8, #d34aff); transition: width 0.15s; }

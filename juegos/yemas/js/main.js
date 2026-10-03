@@ -13,7 +13,7 @@ import {
 import { sonido } from 'yemas/audio';
 import { conectarMarco, conectarLocal, PALETA, COLOR_EQUIPO } from 'yemas/red';
 import { crearGranadas, GRANADA } from 'yemas/granada';
-import { crearZombis, ZB, CLASE, NOVEDAD_RONDA } from 'yemas/zombis';
+import { crearZombis, ZB, CLASE, novedadRonda, esPerros } from 'yemas/zombis';
 import { MAPAS, LISTA_MAPAS } from 'yemas/mapas';
 import { crearInteractivo } from 'yemas/interactivo';
 import { crearBonos } from 'yemas/bonos';
@@ -263,21 +263,24 @@ function chocaZombis() {
   let ex = 0, ez = 0;
   for (const z of zombis.lista.values()) {
     if (z.sube < 1 || z.fase !== 'dentro') continue;
-    const p = z.mesh.position;
+    const p = z.mesh.position, ud = z.mesh.userData;
+    // El Mutante ocupa casi el doble; un perro, la mitad de alto.
+    const e = ud.escala || 1, al = ALTO * e * (ud.alto || 1), radio = RADIO_CHOQUE * Math.max(0.9, e * 0.85);
     const dy = yo.pos.y - p.y;
-    if (dy < -1.6 || dy > ALTO) continue;
+    if (dy < -1.6 || dy > al) continue;
     let dx = yo.pos.x - p.x, dz = yo.pos.z - p.z;
     const d = Math.hypot(dx, dz);
-    if (d >= RADIO_CHOQUE) continue;
-    if (dy > ALTO * 0.75 && yo.vel.y <= 0) {
+    if (d >= radio) continue;
+    if (dy > al * 0.75 && yo.vel.y <= 0) {
       // Encima de la cabeza: se apoya, si arriba hay lugar.
       const y0 = yo.pos.y;
-      yo.pos.y = p.y + ALTO;
+      yo.pos.y = p.y + al;
       if (metido(yo.pos, colisores)) yo.pos.y = y0;
       else { yo.vel.y = 0; yo.enSuelo = true; }
     }
     if (d < 1e-3) { dx = Math.sin(yo.yaw); dz = Math.cos(yo.yaw); } else { dx /= d; dz /= d; }
-    const empuja = RADIO_CHOQUE - (d < 1e-3 ? 0 : d);
+    // El Mutante embistiendo empuja de verdad (con el mismo tope por cuadro).
+    const empuja = (radio - (d < 1e-3 ? 0 : d)) * (z.carga > 0 ? 3 : 1);
     ex += dx * empuja;
     ez += dz * empuja;
     const v = yo.vel.x * dx + yo.vel.z * dz;
@@ -337,6 +340,7 @@ const yo = {
 // pistola mientras un compañero llega y mantiene E (ABATIDO.revive, la mitad
 // con Quick Revive). Si no queda nadie en pie, se termina de morir enseguida.
 const ABATIDO = { dura: 30, sinNadie: 2, revive: 4, alcance: 1.6, solo: 3, vel: 0.25, ojos: 0.35 };
+const GRITO = 98;    // el grito de un chillón: daño 0, ciega
 const REVIVE = 99;   // el «golpe» que levanta a un compañero: viaja con daño 0
 let reviviendo = { uid: '', t: 0 };
 // La autodestrucción: se mantiene X un momento (soltarla antes la cancela,
@@ -615,7 +619,7 @@ function disparar() {
     trazo(p >= a.perdigones ? boca.clone().add(_u.clone().multiplyScalar(-0.05)) : boca, fin, '#fff2a8');
     if (quien) {
       const j = quien;
-      const cab = fin.y - j.pos.y > ALTO * 0.72 * (j.esc || 1);
+      const cab = fin.y - j.pos.y > ALTO * 0.72 * (j.esc || 1) * (j.alto || 1);
       const g = golpes.get(j.id) || { dmg: 0, cab: false };
       g.dmg += a.danio * (cab ? a.cabeza : 1) * caida(a, t);
       g.cab = g.cab || cab;
@@ -650,9 +654,9 @@ function primerBlanco(o, d, tope) {
     if (t !== null && t < (mejor ? mejor.t : tope)) mejor = { id, t, pos: j.mesh.position, color: j.color };
   }
   if (zombis) for (const [n, z] of zombis.lista) {
-    const esc = z.mesh.userData.escala || 1;
-    const t = rayoHuevo(o, d, z.mesh.position, esc);
-    if (t !== null && t < (mejor ? mejor.t : tope)) mejor = { id: 'z:' + n, t, pos: z.mesh.position, color: '#b6d47a', esc };
+    const esc = z.mesh.userData.escala || 1, alto = z.mesh.userData.alto || 1;
+    const t = rayoHuevo(o, d, z.mesh.position, esc, alto);
+    if (t !== null && t < (mejor ? mejor.t : tope)) mejor = { id: 'z:' + n, t, pos: z.mesh.position, color: '#b6d47a', esc, alto };
   }
   return mejor;
 }
@@ -679,7 +683,7 @@ function sartenazo(a) {
   const j = primerBlanco(o, d, tope);
   if (j) {
     const fin = o.clone().addScaledVector(d, j.t);
-    const cab = fin.y - j.pos.y > ALTO * 0.72 * (j.esc || 1);
+    const cab = fin.y - j.pos.y > ALTO * 0.72 * (j.esc || 1) * (j.alto || 1);
     pegaA(j.id, Math.round(a.danio * (cab ? a.cabeza : 1)), cab, a.id);
     marcaGolpe(cab);
     sonido.sarten();
@@ -788,6 +792,8 @@ function alGolpe(g) {
   if (g.a === REVIVE) { if (yo.abatido > 0) levantarse(`${g.n} te levantó`); return; }
   // En el suelo los zombis ya no muerden y nada más duele: solo corre el reloj.
   if (!yo.vivo || yo.escudo > 0 || yo.abatido > 0) return;
+  // El grito de un chillón no duele: deja ciego un momento.
+  if (g.a === GRITO) { if (esZombis()) chillido(); return; }
   // Un mordisco viaja como un golpe del director, pero no es baja de nadie.
   if (g.a === ZOMBI) {
     if (!esZombis()) return;
@@ -1589,6 +1595,12 @@ function montaZombis() {
     pideRonda: r => red.accion('ronda', { r }),
     grunido: p => sonido.grunido(p.distanceTo(camara.position)),
     rompe: p => sonido.rompe(p.distanceTo(camara.position)),
+    aparece: alAparecerZombi,
+    // El último perro de la ronda suelta una Munición máxima.
+    finPerros: p => { if (soyDirector()) bonos?.suelta(p, 'municion'); },
+    chilla: p => sonido.chillido(p.distanceTo(camara.position)),
+    ruge: p => { sonido.ruge(p.distanceTo(camara.position)); temblor = Math.max(temblor, Math.max(0, 1 - p.distanceTo(yo.pos) / 25) * 0.6); },
+    casco: p => sonido.casco(p.distanceTo(camara.position)),
   });
   // Cada mapa trae su cielo, su niebla y su luz.
   const M = MAPAS[red.mapa] || MAPAS.nacht, am = M.ambiente || {};
@@ -1598,6 +1610,7 @@ function montaZombis() {
   cielo.intensity = am.cielo ?? 0.85;
   sol.intensity = am.sol ?? 0.9;
   sol.color.set(am.solColor || '#c9bbff');
+  nieblaBase = { near: escena.fog.near, far: escena.fog.far, color: escena.fog.color.clone() };
   inter = crearInteractivo(escena, M, colisores, mundo, {
     pos: () => yo.pos,
     puedo: () => puedoJugar() && yo.vivo && !yo.abatido,
@@ -1662,7 +1675,9 @@ function marcadorZombis(m) {
   rondaVista = m.ronda;
   if (soyDirector()) zombis.iniciaRonda(m.ronda, nActivos());
   cartelRonda(m.ronda);
-  if (NOVEDAD_RONDA[m.ronda]) setTimeout(() => aviso(NOVEDAD_RONDA[m.ronda]), 1200);
+  nieblaRonda(m.ronda);
+  const nov = novedadRonda(m.ronda);
+  if (nov) setTimeout(() => aviso(nov), 1200);
   if (primera || !puedoJugar()) return;
   // Ronda nueva: los caídos vuelven, y los que siguen en pie recuperan las granadas.
   if (!yo.vivo) aparecer();
@@ -1683,6 +1698,41 @@ function textoCaido() {
   }
   const quien = !yo.asesino || yo.asesino === 'Los zombis' ? 'Los zombis te frieron' : `${yo.asesino} te frió`;
   return `${quien}. Vuelves cuando empiece la ronda ${(marcador.ronda || 1) + 1}, si alguien aguanta.`;
+}
+
+// En las rondas de perros el mapa se cierra en una niebla anaranjada, como el
+// aviso de Black Ops de que viene algo distinto; la siguiente la despeja.
+let nieblaBase = null;
+const NIEBLA_PERROS = new THREE.Color('#5a2a14');
+function nieblaRonda(r) {
+  if (!nieblaBase) return;
+  const perros = esPerros(r);
+  escena.fog.near = perros ? Math.min(nieblaBase.near, 10) : nieblaBase.near;
+  escena.fog.far = perros ? Math.min(nieblaBase.far, 42) : nieblaBase.far;
+  escena.fog.color.copy(perros ? NIEBLA_PERROS : nieblaBase.color);
+  escena.background.copy(escena.fog.color);
+}
+
+// Un zombi que aparece: el perro cae en un rayo y el Mutante sale rugiendo.
+function alAparecerZombi(tipo, pos) {
+  if (tipo === 'p') {
+    sonido.trueno(pos.distanceTo(camara.position));
+    const rayo = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.2, 30, 6),
+      new THREE.MeshBasicMaterial({ color: '#dfe8ff', transparent: true, opacity: 0.95 }));
+    rayo.position.set(pos.x, pos.y + 15, pos.z);
+    escena.add(rayo);
+    efectos.push({ obj: rayo, vida: 0.3, max: 0.3 });
+  } else if (tipo === 'j') {
+    sonido.ruge(pos.distanceTo(camara.position));
+    temblor = Math.max(temblor, Math.max(0, 1 - pos.distanceTo(yo.pos) / 30));
+    aviso('¡Llegó el Mutante!');
+  }
+}
+
+// El grito de un chillón: encandila como una cegadora corta.
+function chillido() {
+  cegado = Math.max(cegado, 1.3);
+  sonido.chillido(0);
 }
 
 function cartelRonda(r) {
@@ -1707,14 +1757,27 @@ function sumaPuntos(n) {
 }
 
 function alCaeZombi({ pos, killer, cab, a, explota, tipo }) {
-  explotar(pos, '#8fa36b', false);
-  if (killer && soyDirector()) bonos?.suelta(pos);
-  // En Pueblo el que pisó la lava revienta en llamas y quema lo que tenga cerca.
-  if (explota) {
-    sonido.quema(pos.distanceTo(yo.pos));
+  explotar(pos, tipo === 'p' ? '#4a1f17' : tipo === 't' ? '#a7c43a' : '#8fa36b', false);
+  // El Mutante siempre suelta algo; los demás, con la suerte de siempre.
+  if (soyDirector() && (tipo === 'j' || killer)) bonos?.suelta(pos, tipo === 'j' || undefined);
+  if (tipo === 'j') { explosion(pos, 3); aviso('¡Cayó el Mutante!'); }
+  const d = pos.distanceTo(yo.pos);
+  // El que ardía (la lava de Pueblo, el napalm) revienta en llamas y quema lo
+  // que tenga cerca; el tóxico suelta su gas (PhD no lo para) y el perro, un
+  // fogonazo más chico.
+  if (explota === 1 || explota === true) {
+    sonido.quema(d);
     explosion(pos, ZB.explota);
-    if (yo.vivo && !yo.perks.has('phd') && pos.distanceTo(yo.pos) < ZB.explota)
+    if (yo.vivo && !yo.perks.has('phd') && d < ZB.explota)
       alGolpe({ de: '', n: 'Un zombi en llamas', dmg: ZB.danioExplota, cab: false, a: ZOMBI });
+  } else if (explota === 2) {
+    explosion(pos, ZB.gas, true);
+    if (yo.vivo && d < ZB.gas) alGolpe({ de: '', n: 'El gas de un tóxico', dmg: ZB.danioGas, cab: false, a: ZOMBI });
+  } else if (explota === 3) {
+    sonido.quema(d);
+    explosion(pos, ZB.perro);
+    if (yo.vivo && !yo.perks.has('phd') && d < ZB.perro)
+      alGolpe({ de: '', n: 'Un perro infernal', dmg: ZB.danioPerro, cab: false, a: ZOMBI });
   }
   if (killer !== red.yo) return;
   yo.zk++;
@@ -1807,11 +1870,25 @@ function pasoZombis(dt) {
     if (!red.mirando) jug.push({ uid: red.yo, pos: yo.pos, vivo: yo.vivo && !yo.abatido });
     for (const [id, j] of otros) jug.push({ uid: id, pos: j.obj, vivo: j.vivo && !j.ab });
     for (const m of zombis.paso(dt, jug, nActivos())) {
-      if (m.uid === red.yo) alGolpe({ de: '', n: 'Los zombis', dmg: m.dmg, cab: false, a: ZOMBI });
-      else red.golpear(m.uid, { dmg: m.dmg, cab: false, a: ZOMBI });
+      const a = m.grito ? GRITO : ZOMBI;
+      if (m.uid === red.yo) alGolpe({ de: '', n: 'Los zombis', dmg: m.dmg, cab: false, a });
+      else red.golpear(m.uid, { dmg: m.dmg, cab: false, a });
     }
   }
   zombis.animar(dt, soy, camara.position);
+  pintaJefe(soy);
+}
+// La barra de vida del Mutante, arriba al centro, mientras haya uno en pie
+// (con dos, la del más entero).
+let jefeVisto = -1;
+function pintaJefe(soy) {
+  let pct = -1;
+  for (const z of zombis.lista.values()) if (z.tipo === 'j') pct = Math.max(pct, soy ? z.hp / z.max * 100 : z.pct ?? 100);
+  pct = pct < 0 ? -1 : Math.max(0, Math.round(pct));
+  if (pct === jefeVisto) return;
+  jefeVisto = pct;
+  $('jefe').hidden = pct < 0;
+  if (pct >= 0) $('jefe-barra').style.width = pct + '%';
 }
 
 // ---------- La espátula dorada ----------
