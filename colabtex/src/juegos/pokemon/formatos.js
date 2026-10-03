@@ -13,6 +13,9 @@ export const FORMATOS = {
   gen9nationaldex: "Gen 9 · National Dex",
   gen9anythinggoes: "Gen 9 · Anything Goes",
   gen9customgame: "Libre (sin reglas de tier)",
+  gen9randombattle: "Gen 9 · Random Battle",
+  gen8randombattle: "Gen 8 · Random Battle",
+  gen7randombattle: "Gen 7 · Random Battle",
   gen8ou: "Gen 8 · OU",
   gen7ou: "Gen 7 · OU",
   gen6ou: "Gen 6 · OU",
@@ -26,3 +29,6 @@ export const FORMATO_POR = "gen9ou";
 export const formatoDe = f => (FORMATOS[f] ? f : FORMATO_POR);
 export const genDe = f => Number((/^gen(\d+)/.exec(formatoDe(f)) || [])[1] || 9);
 
+/* Random Battle: el equipo no se elige, lo arma el generador de
+   Showdown (`@pkmn/randoms`, los mismos sets curados del servidor). */
+export const esAleatorio = f => /randombattle$/.test(formatoDe(f));

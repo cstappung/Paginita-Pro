@@ -243,7 +243,8 @@ export function crearPokemon(ctx) {
       set("pkControl", "eqv", ""); set("pkRelato", "eqv", ""); set("pkPie", "eqv", "");
       return;
     }
-    const lista = equipos ? Object.entries(equipos.equipos || {}).sort((a, b) => (b[1].at || 0) - (a[1].at || 0)) : null;
+    const rand = PM.esAleatorio(fmt);
+    const lista = rand ? [] : equipos ? Object.entries(equipos.equipos || {}).sort((a, b) => (b[1].at || 0) - (a[1].at || 0)) : null;
     const tarjetas = (lista || []).map(([id, e]) => {
       const sets = PM.desempaqueta(e.eq);
       const errs = PM.valida(fmt, sets);
@@ -252,7 +253,7 @@ export function crearPokemon(ctx) {
         <span class="jg-pk-eqfila6">${Array.from({ length: 6 }, (_, k) => sets[k] ? `<span>${img(sets[k].species, { fijo: true })}</span>` : `<span class="vacio"></span>`).join("")}</span>
         ${errs.length ? `<small class="jg-pk-eqerr">${esc(errs[0])}</small>` : ""}</button>`;
     }).join("");
-    const elegidoE = elegido && equipos && equipos.equipos[elegido];
+    const elegidoE = !rand && elegido && equipos && equipos.equipos[elegido];
     const previa = elegidoE ? `<div class="jg-pk-previa">${PM.desempaqueta(elegidoE.eq).map(s => {
       const sp = PM.dexDe(fmt).species.get(s.species);
       return `<div class="jg-pk-previa-pk">${img(s.species, { shiny: s.shiny })}<b>${esc(s.name || s.species)}</b>
@@ -269,13 +270,14 @@ export function crearPokemon(ctx) {
         </section>
         <section class="jg-pk-te-equipos">
           <h3>Tu equipo <small>para ${esc(PM.FORMATOS[fmt])}</small></h3>
-          <div class="jg-pk-eqcartas">${lista === null ? `<p class="jg-nota">Cargando tus equipos…</p>` : tarjetas || `<p class="jg-nota">No tienes equipos todavía. Ábrelos con «📋 Mis equipos»: puedes pegar uno exportado de Showdown.</p>`}</div>
+          ${rand ? `<p class="jg-nota">🎲 <b>Equipo aleatorio de Showdown.</b> Cada uno recibe seis Pokémon con los sets del generador de Random Battle de Showdown (los mismos del servidor: Pokémon, movimientos, objeto y nivel posibles en una partida normal). Sale de las llaves de los dos, así que nadie lo elige ni lo conoce hasta que ambos estén listos.</p>` : ""}
+          <div class="jg-pk-eqcartas"${rand ? " hidden" : ""}>${lista === null ? `<p class="jg-nota">Cargando tus equipos…</p>` : tarjetas || `<p class="jg-nota">No tienes equipos todavía. Ábrelos con «📋 Mis equipos»: puedes pegar uno exportado de Showdown.</p>`}</div>
           ${previa}
         </section>
         <footer class="jg-pk-elige-pie">${versus(skin, false)}
-          <button class="btn jg-pk-listo" data-x="listo"${elegido ? "" : " disabled"}>¡Listo para combatir!</button></footer>
+          <button class="btn jg-pk-listo" data-x="listo"${elegido || rand ? "" : " disabled"}>¡Listo para combatir!</button></footer>
       </div>`);
-    set("pkControl", "eq", ""); set("pkRelato", "eq", ""); set("pkPie", "eq", `<span class="jg-nota">El rival no verá tu equipo hasta que los dos hayáis elegido.</span>`);
+    set("pkControl", "eq", ""); set("pkRelato", "eq", ""); set("pkPie", "eq" + rand, `<span class="jg-nota">${rand ? "Los equipos se reparten cuando los dos estén listos." : "El rival no verá tu equipo hasta que los dos hayáis elegido."}</span>`);
   }
 
   /* --- el campo ---
@@ -799,6 +801,7 @@ export function crearPokemon(ctx) {
       return;
     }
     if (b.dataset.x === "listo" && est.fase === "equipos" && !est.prometido[uid]) {
+      if (PM.esAleatorio(p.formato)) { b.disabled = true; promete(PM.NADA, skin); return; }
       const e = equipos && equipos.equipos[elegido];
       if (!e) return;
       b.disabled = true;

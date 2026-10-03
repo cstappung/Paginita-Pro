@@ -3510,6 +3510,12 @@ reads `fase: "cargando"` and the screen calls `ctx.rehaz()` (a new hook in
   own messages. The room option is `formato` (not `modo`, which the rules
   whitelist); the list is `pokemon/formatos.js`, shared with the lobby so it
   does not need the bundle.
+- **Random Battle formats** (`gen9/8/7randombattle`, `esAleatorio`) use
+  Showdown's own generator (`@pkmn/randoms`, the curated sets of the real
+  server), never arbitrary Pokémon. At point 0 both sides promise `NADA`, and
+  side i's team is `getTeamGenerator(formato, "sodium," + H(semilla|eq|i|both
+  keys))`, so nobody knows or steers it until both committed. Generated teams
+  are not validated.
 
 `tests/pokemon.test.cjs` bundles the engine with esbuild and plays robot
 battles through the promise protocol, checking that a late tab replays the

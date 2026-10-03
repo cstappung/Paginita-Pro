@@ -56,7 +56,8 @@
 import { Battle, Dex, Teams, TeamValidator, toID } from "@pkmn/sim";
 import { FORMAS, BW_FRENTE, BW_ESPALDA } from "./formas.js";
 
-import { FORMATOS, FORMATO_POR, formatoDe, genDe } from "./formatos.js";
+import { FORMATOS, FORMATO_POR, formatoDe, genDe, esAleatorio } from "./formatos.js";
+import { TeamGenerators } from "@pkmn/randoms";
 import FRONTERA from "./frontera-motor.js";
 export { FORMATOS, FORMATO_POR, formatoDe, genDe };
 
@@ -207,14 +208,28 @@ function semillaPunto(S) {
   return "sodium," + S.H(S.semilla + "|" + S.punto + "|" + S.uids.map(u => S.rev[u].l).join("|"));
 }
 
+function equipoAleatorio(S, i) {
+  const semilla = "sodium," + S.H(S.semilla + "|eq|" + i + "|" + S.uids.map(u => S.rev[u].l).join("|"));
+  return Teams.pack(TeamGenerators.getTeamGenerator(S.formato, semilla).getTeam());
+}
+
 function resuelve(S) {
   const [a, b] = S.uids;
   if (S.punto === 0) {
-    const sets = {}, errores = {};
+    const sets = {}, errores = {}, rand = esAleatorio(S.formato);
     for (const u of S.uids) {
+      S.skins[u] = S.rev[u].sk;
+      if (rand) {
+        // Random Battle: el equipo sale del generador de Showdown con una
+        // semilla que mezcla las dos llaves del punto 0, así que nadie lo
+        // conoce (ni lo puede pescar) hasta que ambos se comprometieron.
+        // El generador es el del servidor: no hace falta validarlo.
+        S.rev[u].c = equipoAleatorio(S, S.uids.indexOf(u));
+        errores[u] = [];
+        continue;
+      }
       sets[u] = desempaqueta(S.rev[u].c);
       errores[u] = valida(S.formato, sets[u]);
-      S.skins[u] = S.rev[u].sk;
     }
     S.invalidos = {};
     for (const u of S.uids) if (errores[u].length) S.invalidos[u] = errores[u].slice(0, 6);
@@ -274,7 +289,7 @@ function vista(S) {
     if (fase !== "fin" && decide[u] && !S.com[u]) debe.push(u);
   });
   return {
-    fase, punto: S.punto, formato: S.formato,
+    fase, punto: S.punto, formato: S.formato, aleatorio: esAleatorio(S.formato),
     lados: S.uids.slice(), nombres: S.nombres.slice(),
     prometido: Object.fromEntries(Object.keys(S.com).map(u => [u, true])),
     revelado: Object.fromEntries(Object.keys(S.rev).map(u => [u, true])),
@@ -430,7 +445,7 @@ export function aprende(especie, formato) {
 export { Dex, Teams, toID };
 
 const PokeMotor = {
-  FORMATOS, FORMATO_POR, formatoDe, genDe, NADA, PK_TOPE,
+  FORMATOS, FORMATO_POR, formatoDe, genDe, esAleatorio, NADA, PK_TOPE,
   importa, exporta, empaqueta, desempaqueta, valida,
   numeroSprite, urlsSprite, urlObjetoPokeapi,
   reducir, opciones, lineasPara, dexDe, tipoEficacia, estadisticas, aprende,
