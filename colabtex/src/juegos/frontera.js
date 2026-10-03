@@ -48,6 +48,7 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, v
   let pk = null, pelea = null, chequeo = 0, cerrado = false, inicioPelea = 0;
   let resultado = null;              // lo que muestra la pantalla de resultado
   let cambio = { mio: -1, suyo: -1 };
+  let sinReglas = false;             // la clasificación rechazó una escritura
   const desuscribe = [];
 
   /* ---------- guardar y leer ---------- */
@@ -64,9 +65,27 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, v
     if (!d || typeof d !== "object" || d.v !== 1) return null;
     d.runs = d.runs && typeof d.runs === "object" ? d.runs : {};
     d.mejor = d.mejor && typeof d.mejor === "object" ? d.mejor : {};
+    d.pend = d.pend && typeof d.pend === "object" ? d.pend : {};
+    d.tMejor = d.tMejor && typeof d.tMejor === "object" ? d.tMejor : {};
     d.victorias = Math.max(0, Math.floor(+d.victorias || 0));
     d.tiempoTot = Math.max(0, Math.floor(+d.tiempoTot || 0));
     return d;
+  }
+  /* Una marca para la clasificación queda pendiente (`datos.pend`) hasta
+     que la base la acepta. Antes se mandaba una sola vez y, si fallaba
+     (reglas sin publicar, sin red), el récord ya figuraba en `mejor` y no
+     volvía a subir nunca: el menú lo mostraba y la tabla no. */
+  function sube(cat, dato) {
+    datos.pend[cat] = dato;
+    persiste();
+    const nombre = String(usuario.name || "Jugador").slice(0, 80);
+    return guardar(cat, uid, Object.assign({ nombre }, dato)).then(() => {
+      if (datos.pend[cat] === dato) { delete datos.pend[cat]; persiste(); }
+      if (sinReglas) { sinReglas = false; if (!muerto) pinta(); }
+    }, err => {
+      console.warn("[frontera] clasificación", cat, err);
+      if (/permission/i.test(String(err && (err.code || err.message)))) { sinReglas = true; if (!muerto) pinta(); }
+    });
   }
   async function carga() {
     let d = sano(leeLocal());
@@ -81,13 +100,31 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, v
     }
     if (d) datos = d;
     // Lo que diga la clasificación también cuenta: nunca menos que ella.
-    const mira = (cat, f) => {
-      const off = watch(cat, filas => { const yo = (filas || []).find(x => x.uid === uid); if (yo) f(yo); if (!muerto) pinta(); });
+    /* La primera lectura de cada tabla también repara: si aquí hay una
+       marca mejor que la de la tabla, se vuelve a subir. */
+    const revisado = new Set();
+    const mira = (cat, f, local) => {
+      const off = watch(cat, filas => {
+        const yo = (filas || []).find(x => x.uid === uid);
+        if (yo) f(yo);
+        if (!revisado.has(cat)) {
+          revisado.add(cat);
+          const l = local();
+          if (datos.pend[cat] && (!yo || datos.pend[cat].puntos > (yo.puntos || 0))) sube(cat, datos.pend[cat]);
+          else if (l && (!yo || l.puntos > (yo.puntos || 0))) sube(cat, l);
+          else if (datos.pend[cat]) { delete datos.pend[cat]; persiste(); }
+        }
+        if (!muerto) pinta();
+      });
       if (typeof off === "function") desuscribe.push(off);
     };
-    mira("club-frontera-victorias", yo => { datos.victorias = Math.max(datos.victorias, yo.puntos || 0); });
-    for (const i of Object.keys(F.INSTALACIONES)) for (const n of Object.keys(F.NIVELES))
-      mira(`club-frontera-${i}-${n}`, yo => { datos.mejor[`${i}-${n}`] = Math.max(datos.mejor[`${i}-${n}`] || 0, yo.puntos || 0); });
+    mira("club-frontera-victorias", yo => { datos.victorias = Math.max(datos.victorias, yo.puntos || 0); },
+      () => datos.victorias ? { puntos: datos.victorias, tiempo: Math.max(1, Math.min(TOPE_MS, datos.tiempoTot || TOPE_MS)), partida: `frv-${datos.victorias}-${uid.slice(0, 8)}` } : null);
+    for (const i of Object.keys(F.INSTALACIONES)) for (const n of Object.keys(F.NIVELES)) {
+      const kk = `${i}-${n}`;
+      mira(`club-frontera-${kk}`, yo => { datos.mejor[kk] = Math.max(datos.mejor[kk] || 0, yo.puntos || 0); },
+        () => datos.mejor[kk] ? { puntos: datos.mejor[kk], tiempo: Math.max(1, Math.min(TOPE_MS, datos.tMejor[kk] || TOPE_MS)), partida: `fr-${kk}-${datos.mejor[kk]}-${uid.slice(0, 8)}` } : null);
+    }
   }
 
   /* ---------- montar ---------- */
@@ -165,7 +202,8 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, v
       <div class="jg-fr-insts">${insts}</div>
       <section class="jg-fr-info">
         <div><h4>Tu Frontera</h4><p><b>${datos.victorias}</b> combates ganados en total.</p>
-          <p class="jg-nota">Cada racha y el total de victorias van a la Clasificación (Juegos individuales → Frontera Batalla).</p></div>
+          <p class="jg-nota">Cada racha y el total de victorias van a la Clasificación (Juegos individuales → Frontera Batalla).</p>
+          ${sinReglas ? `<p class="jg-fr-aviso">⚠ La clasificación rechazó tu marca (PERMISSION_DENIED): faltan publicar las reglas de Firebase con la Frontera. Queda guardada aquí y se sube sola en cuanto se publiquen.</p>` : Object.keys(datos.pend).length ? `<p class="jg-nota">Subiendo tus marcas a la clasificación…</p>` : ""}</div>
         <div><h4>Monedas 🪙</h4><p class="jg-nota">Cada victoria paga 3. Cuando superas tu récord de racha, cada combate nuevo paga lo de la tabla (el séptimo de cada serie, el del rival fuerte, paga 10 más).</p>
           <table class="jg-fr-tabla"><thead><tr><th>Combate</th><th>Serie</th><th>Paga</th></tr></thead><tbody>${filas}</tbody></table></div>
       </section>`;
@@ -339,7 +377,6 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, v
     const dura = Math.max(1000, Math.min(MAX_PELEA_MS, Date.now() - inicioPelea));
     if (pk) { pk.destruir(); pk = null; }
     pelea = null;
-    const nombre = String(usuario.name || "Jugador").slice(0, 80);
     const kk = k(), previoMejor = datos.mejor[kk] || 0;
     const lista = [];
     if (gano) {
@@ -348,15 +385,15 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, v
       datos.victorias += 1;
       datos.tiempoTot = Math.min(TOPE_MS, datos.tiempoTot + dura);
       const record = n > previoMejor;
-      if (record) datos.mejor[kk] = n;
+      if (record) { datos.mejor[kk] = n; datos.tMejor[kk] = Math.max(1, r.tiempo); }
       const dRacha = { categoria: `club-frontera-${kk}`, puntos: n, tiempo: Math.max(1, r.tiempo), partida: `${r.semilla}-${n}` };
       const dVict = { categoria: "club-frontera-victorias", puntos: datos.victorias, tiempo: Math.max(1, datos.tiempoTot), partida: `${r.semilla}-${n}v` };
       if (record) {
         lista.push({ d: dRacha, previa: previoMejor ? { puntos: previoMejor } : null });
-        guardar(dRacha.categoria, uid, { puntos: n, tiempo: dRacha.tiempo, nombre, partida: dRacha.partida }).catch(err => console.warn("[frontera] récord", err));
+        sube(dRacha.categoria, { puntos: n, tiempo: dRacha.tiempo, partida: dRacha.partida });
       }
       lista.push({ d: dVict, previa: datos.victorias > 1 ? { puntos: datos.victorias - 1 } : null });
-      guardar(dVict.categoria, uid, { puntos: datos.victorias, tiempo: dVict.tiempo, nombre, partida: dVict.partida }).catch(err => console.warn("[frontera] victorias", err));
+      sube(dVict.categoria, { puntos: datos.victorias, tiempo: dVict.tiempo, partida: dVict.partida });
       const extra = record ? F.monedasCombate(n) + (previoMejor ? 0 : 40) : 0;
       const I = F.INSTALACIONES[sel.inst];
       resultado = {

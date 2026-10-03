@@ -28,7 +28,7 @@ import { cadenaPk, llavePk, sha256hex } from "./motor.js";
 import { suena } from "./sonido.js";
 import { cargaMotor, motorListo } from "./pokemon/carga.js";
 import { abreEquipos, misEquipos } from "./pokemon/equipos.js";
-import { relata, relataTodo, TIPOS, COLOR_TIPO, ESTADOS, STATS_CORTO } from "./pokemon/relato.js";
+import { relata, relataTodo, TIPOS, COLOR_TIPO, ESTADOS, STATS, STATS_CORTO } from "./pokemon/relato.js";
 import { ENTRENADORES, REGIONES, skinSana, htmlEntrenador, htmlSkin, SKIN_POR, colorRegion } from "./pokemon/entrenadores.js";
 
 const toID = t => String(t || "").toLowerCase().replace(/[^a-z0-9]+/g, "");
@@ -55,6 +55,7 @@ export function crearPokemon(ctx) {
   let equipos = null;            // mis equipos (lo de `misEquipos`)
   let skin = SKIN_POR;
   let elegido = "";              // id del equipo marcado antes de prometer
+  let verCambio = null;          // {k: punto, c: "switch N"}: la ficha abierta antes de cambiar
   const enviado = {};            // "k:t" → hora en que se mandó
   const firmas = {};
   let lineasVistas = 0, relatoYo = null, turnoVisto = 0, caidasVistas = 0;
@@ -369,6 +370,9 @@ export function crearPokemon(ctx) {
       if (especie) {
         const urls = PM.urlsSprite(especie, { espalda: l === "mia", shiny });
         im.style.visibility = "";
+        im.style.removeProperty("--pie");
+        im.crossOrigin = "anonymous";
+        im.onload = () => apoya(im);
         im.dataset.urls = JSON.stringify(urls.slice(1));
         im.onerror = () => { const u = JSON.parse(im.dataset.urls || "[]"); if (u.length) { im.dataset.urls = JSON.stringify(u.slice(1)); im.src = u[0]; } else im.style.visibility = "hidden"; };
         im.src = urls[0]; im.alt = especie;
@@ -377,11 +381,42 @@ export function crearPokemon(ctx) {
     caja.classList.toggle("vacia", !especie);
     if (entra && especie) reanima(caja.querySelector(".jg-pk-anim"), "sale");
   }
+  /* Los PNG fijos de PokeAPI (los Pokémon sin GIF animado) vienen en un
+     lienzo de 96×96 con hasta 26 px vacíos bajo los pies; ampliados, el
+     Pokémon quedaba flotando sobre su plataforma. Se mide la última fila
+     con tinta y se baja la imagen eso (`--pie`, en píxeles de la imagen:
+     el `translateY` va después del `scale`). Los GIF ya vienen recortados. */
+  function apoya(im) {
+    try {
+      const w = im.naturalWidth, h = im.naturalHeight;
+      if (!w || !h) return;
+      const cv = document.createElement("canvas");
+      cv.width = w; cv.height = h;
+      const cx = cv.getContext("2d", { willReadFrequently: true });
+      cx.drawImage(im, 0, 0);
+      const d = cx.getImageData(0, 0, w, h).data;
+      let y = h - 1;
+      fila: for (; y >= 0; y--) for (let x = 0; x < w; x++) if (d[(y * w + x) * 4 + 3] > 16) break fila;
+      const vacio = y < 0 ? 0 : h - 1 - y;
+      im.style.setProperty("--pie", vacio + "px");
+    } catch (e) { /* lienzo contaminado: se queda como estaba */ }
+  }
   /* Reinicia una animación de CSS: quitar la clase, forzar un reflow y
      volver a ponerla. */
   function reanima(el, clase) {
     if (!el) return;
     el.classList.remove(clase); void el.offsetWidth; el.classList.add(clase);
+  }
+
+  /* Un letrero que sube (o cae) sobre el Pokémon: «▲ Ataque +2». */
+  function rotulo(l, clase, texto) {
+    const spr = $c(`.jg-pk-spr.${l}`);
+    if (!spr) return;
+    const r = document.createElement("div");
+    r.className = "jg-pk-rotulo " + clase;
+    r.textContent = texto;
+    spr.appendChild(r);
+    setTimeout(() => r.remove(), 1500);
   }
 
   function ponFicha(l, d) {
@@ -522,7 +557,14 @@ export function crearPokemon(ctx) {
         out.push({ ms: 0, f: () => { ponSprite(L, ""); spritesVistos[L] = "ko"; ponFicha(L, null); } });
       } else if (t === "-boost" || t === "-unboost") {
         const L = lado(c[2]);
-        out.push({ ms: 650, txt, f: () => reanima($c(`.jg-pk-spr.${L} .jg-pk-fx`), t === "-boost" ? "sube" : "baja") });
+        const k = t === "-boost" ? "sube" : "baja", n = Number(c[4]) || 0;
+        out.push({ ms: n ? 1150 : 650, txt, f: () => {
+          if (!n) return;
+          reanima($c(`.jg-pk-spr.${L} .jg-pk-fx`), k);
+          reanima($c(`.jg-pk-spr.${L} .jg-pk-anim`), "t" + k);
+          rotulo(L, k, `${k === "sube" ? "▲" : "▼"} ${STATS[c[3]] || c[3]} ${k === "sube" ? "+" : "−"}${n}`);
+          suena(k === "sube" ? "entra" : "pierde");
+        } });
       } else if (t === "-terastallize") {
         const L = lado(c[2]);
         out.push({ ms: 1000, txt, f: () => { const fx = $c(`.jg-pk-spr.${L} .jg-pk-fx`); if (fx) { fx.style.setProperty("--t", COLOR_TIPO[c[3]] || "#9be7ff"); reanima(fx, "tera"); } suena("gana"); } });
@@ -604,7 +646,8 @@ export function crearPokemon(ctx) {
       set("pkControl", "hecho" + est.punto, `<p class="jg-pk-hecho">🔒 Elegiste <b>${esc(describe(pd && pd.c, req))}</b>. Se revela cuando ${esc(nombreLado(1 - i))} también elija.</p>`);
       return;
     }
-    const firma = "req" + est.punto + JSON.stringify(toggles);
+    const visto = verCambio && verCambio.k === est.punto ? verCambio.c : "";
+    const firma = "req" + est.punto + JSON.stringify(toggles) + visto;
     if (req && req.teamPreview) {
       const eq = req.side.pokemon;
       set("pkControl", firma, `<h4>Vista previa: ¿quién sale primero?</h4><div class="jg-pk-cambios">${eq.map((pk, k) => {
@@ -640,9 +683,42 @@ export function crearPokemon(ctx) {
       const nom = pk.details.split(",")[0];
       const [hp, max] = pk.condition.split(" ")[0].split("/").map(Number);
       const v = pct(hp, max);
-      return `<button class="jg-pk-cambio" data-c="${o.c}">${img(nom, { clase: "mini", fijo: true })}<b>${esc(nom)}</b><i style="--v:${v}%;--col:${colorVida(v)}"></i></button>`;
-    }).join("")}</div>` : (req.active && req.active[0] && req.active[0].trapped ? `<p class="jg-nota">Está atrapado: no puede cambiar.</p>` : "");
+      return `<button class="jg-pk-cambio${visto === o.c ? " sel" : ""}" data-ver="${o.c}">${img(nom, { clase: "mini", fijo: true })}<b>${esc(nom)}</b><i style="--v:${v}%;--col:${colorVida(v)}"></i></button>`;
+    }).join("")}</div>${fichaCambio(cambios.find(o => o.c === visto), req, D)}` : (req.active && req.active[0] && req.active[0].trapped ? `<p class="jg-nota">Está atrapado: no puede cambiar.</p>` : "");
     set("pkControl", firma, movs + sw);
+  }
+
+  /* La ficha del Pokémon que se va a sacar: se mira primero y se
+     confirma con «Cambiar», para no mandarlo al combate de un toque. */
+  function fichaCambio(o, req, D) {
+    if (!o) return "";
+    const rp = req.side.pokemon[o.cambio];
+    const B = est.battle, bp = B && B.sides[yo()] && B.sides[yo()].pokemon[o.cambio];
+    const nom = rp.details.split(",")[0];
+    const nivel = (/, L(\d+)/.exec(rp.details) || [, 100])[1];
+    const [hp, max] = rp.condition.split(" ")[0].split("/").map(Number);
+    const estado = rp.condition.split(" ")[1] || "";
+    const v = pct(hp, max);
+    const tipos = bp ? bp.getTypes() : (D.species.get(nom).types || []);
+    const objeto = rp.item ? (D.items.get(rp.item).name || rp.item) : "Sin objeto";
+    const hab = rp.ability || rp.baseAbility;
+    const st = rp.stats || {};
+    const movs = (rp.moves || []).map(id => {
+      const mv = D.moves.get(id);
+      const tipo = mv.exists ? mv.type : "Normal";
+      return `<span class="jg-pk-fmov" style="--t:${COLOR_TIPO[tipo] || "#888"}">${esc(mv.exists ? mv.name : id)}</span>`;
+    }).join("");
+    return `<div class="jg-pk-fcambio">
+      <div class="jg-pk-fcab">${img(nom, { clase: "mini", fijo: true })}<div><b>${esc(nom)}</b> <small>Nv. ${esc(nivel)}</small>
+        ${estado ? `<span class="jg-pk-estado e-${esc(estado)}">${esc(CORTO_ESTADO[estado] || estado)}</span>` : ""}
+        <div class="jg-pk-tipos">${tipos.map(chipTipo).join("")}</div></div></div>
+      <div class="jg-pk-vida"><i style="width:${v}%;background:${colorVida(v)}"></i></div>
+      <p class="jg-pk-fps">${hp} / ${max} PS</p>
+      <p class="jg-pk-fdat">${esc(hab ? (D.abilities.get(hab).name || hab) : "")} · ${esc(objeto)}</p>
+      <div class="jg-pk-fstats">${["atk", "def", "spa", "spd", "spe"].map(k => `<span><small>${esc(STATS_CORTO[k])}</small>${st[k] != null ? st[k] : "?"}</span>`).join("")}</div>
+      <div class="jg-pk-fmovs">${movs}</div>
+      <div class="jg-pk-facc"><button class="jg-pk-fno" data-ver="">Volver</button><button class="jg-pk-fsi" data-c="${o.c}">Cambiar</button></div>
+    </div>`;
   }
 
   function previaRival() {
@@ -730,6 +806,12 @@ export function crearPokemon(ctx) {
       return;
     }
     if (est.fase !== "jugando" || !est.decide[uid] || est.prometido[uid]) return;
+    if (b.dataset.ver != null) {
+      verCambio = b.dataset.ver && !(verCambio && verCambio.k === est.punto && verCambio.c === b.dataset.ver) ? { k: est.punto, c: b.dataset.ver } : null;
+      suena("clic");
+      pintaControl();
+      return;
+    }
     let c = b.dataset.c || "";
     if (b.dataset.mov) {
       c = "move " + b.dataset.mov;
@@ -741,6 +823,7 @@ export function crearPokemon(ctx) {
     }
     if (!c) return;
     toggles = { tera: false, mega: false, dynamax: false, z: false };
+    verCambio = null;
     suena("clic");
     promete(c);
   }
