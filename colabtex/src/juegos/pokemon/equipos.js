@@ -34,9 +34,16 @@ function guardaLocal(uid, datos) {
 
 /* Los equipos y el entrenador de `uid`: lo de la base si llega, lo
    local si no. */
+const conTope = (pr, ms) => new Promise((ok, mal) => {
+  const t = setTimeout(() => mal(new Error("tiempo agotado")), ms);
+  Promise.resolve(pr).then(v => { clearTimeout(t); ok(v); }, e => { clearTimeout(t); mal(e); });
+});
 export async function misEquipos(uid) {
   let d = null;
-  try { d = await fb.leerPokemon(uid); } catch (e) { d = null; }
+  /* Con tope: una lectura que no vuelve nunca (conexión a medias) dejaba
+     la Frontera en «Abriendo las puertas…» y la sala en «Cargando tus
+     equipos…» para siempre. Sin respuesta en 8 s vale la copia local. */
+  try { d = await conTope(fb.leerPokemon(uid), 8000); } catch (e) { d = null; }
   const local = leeLocal(uid);
   if (!d || (!d.equipos && local && local.equipos)) d = local || {};
   d.equipos = d.equipos || {};

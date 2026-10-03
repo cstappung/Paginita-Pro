@@ -49,6 +49,7 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, v
   let resultado = null;              // lo que muestra la pantalla de resultado
   let cambio = { mio: -1, suyo: -1 };
   let sinReglas = false;             // la clasificación rechazó una escritura
+  let avisoFr = "";                  // un fallo que se explica en el menú
   const desuscribe = [];
 
   /* ---------- guardar y leer ---------- */
@@ -67,10 +68,37 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, v
     d.mejor = d.mejor && typeof d.mejor === "object" ? d.mejor : {};
     d.pend = d.pend && typeof d.pend === "object" ? d.pend : {};
     d.tMejor = d.tMejor && typeof d.tMejor === "object" ? d.tMejor : {};
+    /* Cada racha se revisa una por una: una sola rota (de otra versión,
+       de otro aparato a medio escribir) hacía fallar el menú entero, o el
+       combate que se retoma solo al entrar, y la Frontera no se abría
+       nunca más para esa cuenta. Lo que no se entiende se descarta. */
+    const runs = {};
+    for (const [kk, r] of Object.entries(d.runs)) { const b = runSano(r); if (b && kk === `${b.inst}-${b.nivel}`) runs[kk] = b; }
+    d.runs = runs;
+    for (const o of [d.mejor, d.tMejor]) for (const kk of Object.keys(o)) { const v = Math.floor(+o[kk]); if (Number.isFinite(v) && v > 0) o[kk] = v; else delete o[kk]; }
     d.victorias = Math.max(0, Math.floor(+d.victorias || 0));
     d.tiempoTot = Math.max(0, Math.floor(+d.tiempoTot || 0));
     return d;
   }
+  function runSano(r) {
+    if (!r || typeof r !== "object") return null;
+    if (!F || !F.INSTALACIONES[r.inst] || !F.NIVELES[r.nivel]) return null;
+    if (typeof r.semilla !== "string" || !r.semilla) return null;
+    const n = Math.floor(+r.n);
+    if (!Number.isFinite(n) || n < 1) return null;
+    const setOk = x => x && typeof x === "object" && typeof x.species === "string" && x.species;
+    const equipo = Array.isArray(r.equipo) && r.equipo.length === 3 && r.equipo.every(setOk) ? r.equipo : null;
+    const ultimo = Array.isArray(r.ultimoRival) && r.ultimoRival.every(setOk) ? r.ultimoRival : null;
+    const elecciones = Array.isArray(r.elecciones) && r.elecciones.every(c => typeof c === "string") ? r.elecciones : [];
+    return Object.assign({}, r, { n, equipo, ultimoRival: ultimo, elecciones, enPelea: !!(r.enPelea && equipo),
+      tiempo: Math.max(0, Math.floor(+r.tiempo || 0)) });
+  }
+  /* Una lectura que no vuelve (la conexión a medias) no puede dejar la
+     Frontera en «Abriendo las puertas…» para siempre. */
+  const conTope = (pr, ms) => new Promise((ok, mal) => {
+    const t = setTimeout(() => mal(new Error("tiempo agotado")), ms);
+    Promise.resolve(pr).then(v => { clearTimeout(t); ok(v); }, e => { clearTimeout(t); mal(e); });
+  });
   /* Una marca para la clasificación queda pendiente (`datos.pend`) hasta
      que la base la acepta. Antes se mandaba una sola vez y, si fallaba
      (reglas sin publicar, sin red), el récord ya figuraba en `mejor` y no
@@ -88,11 +116,13 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, v
     });
   }
   async function carga() {
-    let d = sano(leeLocal());
+    let d = null;
+    try { d = sano(leeLocal()); } catch (e) { d = null; }
     if (partida) {
       try {
-        const r = await partida.leer();
-        const nube = r && typeof r.d === "string" ? sano(JSON.parse(r.d)) : null;
+        const r = await conTope(partida.leer(), 8000);
+        let nube = null;
+        try { nube = r && typeof r.d === "string" ? sano(JSON.parse(r.d)) : null; } catch (e) { nube = null; }
         if (nube && (!d || (nube.at || 0) > (d.at || 0))) d = nube;
         // Una racha terminada en otro aparato deja la lápida `d: null`.
         if (r && r.d === null && d && (r.at || 0) > (d.at || 0)) d = null;
@@ -104,7 +134,8 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, v
        marca mejor que la de la tabla, se vuelve a subir. */
     const revisado = new Set();
     const mira = (cat, f, local) => {
-      const off = watch(cat, filas => {
+      let off = null;
+      try { off = watch(cat, filas => {
         const yo = (filas || []).find(x => x.uid === uid);
         if (yo) f(yo);
         if (!revisado.has(cat)) {
@@ -115,7 +146,7 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, v
           else if (datos.pend[cat]) { delete datos.pend[cat]; persiste(); }
         }
         if (!muerto) pinta();
-      });
+      }); } catch (e) { console.warn("[frontera] clasificación", cat, e); }
       if (typeof off === "function") desuscribe.push(off);
     };
     mira("club-frontera-victorias", yo => { datos.victorias = Math.max(datos.victorias, yo.puntos || 0); },
@@ -134,16 +165,17 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, v
     host.addEventListener("click", alClic);
     cargaMotor().then(async m => {
       PM = m; F = m.frontera;
-      await carga();
+      try { await carga(); } catch (e) { console.warn("[frontera] carga", e); }
       try { const e = await misEquipos(uid); equipos = e.equipos || {}; skin = e.skin || "red"; } catch (e) { equipos = {}; }
       if (muerto) return;
       vista = "menu";
-      // Un combate a medias se retoma solo.
+      // Un combate a medias se retoma solo… salvo que no se pueda.
       const r = Object.values(datos.runs).find(x => x && x.enPelea);
       if (r) { sel = { inst: r.inst, nivel: r.nivel }; empiezaPelea(); return; }
       pinta();
     }).catch(e => {
-      if (host) host.innerHTML = `<div class="jg-fr"><div class="jg-pk-aviso">${esc(e.message)}<button class="btn" data-x="reintenta">Reintentar</button></div></div>`;
+      console.warn("[frontera]", e);
+      if (host && !muerto) host.innerHTML = `<div class="jg-fr" id="frRaiz"><div class="jg-pk-aviso">No se pudo abrir la Frontera: ${esc(e && e.message || e)}<button class="btn" data-x="reintenta">Reintentar</button></div></div>`;
     });
   }
   function destruir() {
@@ -175,9 +207,18 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, v
   }
   function pinta() {
     const r = raiz();
-    if (!r || muerto || !F || vista === "pelea") return;
-    r.innerHTML = vista === "menu" ? htmlMenu() : vista === "equipo" ? htmlEquipo() : vista === "rival" ? htmlRivalVista()
+    if (!r || muerto || !F || vista === "pelea" || vista === "carga") return;
+    try {
+      r.innerHTML = vista === "menu" ? htmlMenu() : vista === "equipo" ? htmlEquipo() : vista === "rival" ? htmlRivalVista()
       : vista === "resultado" ? htmlResultado() : vista === "cambio" ? htmlCambio() : "";
+    } catch (e) {
+      // Una vista que no se puede pintar no deja la pantalla en blanco:
+      // se vuelve al menú, que solo lee números.
+      console.warn("[frontera] pintar", vista, e);
+      if (vista === "menu") { r.innerHTML = `<div class="jg-pk-aviso">No se pudo pintar el menú: ${esc(e.message)}<button class="btn" data-x="reintenta">Reintentar</button></div>`; return; }
+      avisoFr = "Algo falló al abrir esa pantalla; vuelve a intentarlo.";
+      vista = "menu"; pinta(); return;
+    }
     arreglaSprites();
   }
   const cabecera = (titulo, sub) => `<header class="jg-fr-cab"><button class="btn2" data-x="${vista === "menu" ? "volver" : "menu"}">← ${vista === "menu" ? "Juegos" : "Instalaciones"}</button>
@@ -199,6 +240,7 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, v
     return `${cabecera("Elige una instalación", "Tres Pokémon, siete combates por serie, y cada serie el rival aprieta más.")}
       <div class="jg-fr-nivel" role="radiogroup" aria-label="Nivel">${Object.entries(F.NIVELES).map(([n, t]) =>
         `<button class="btn2${sel.nivel === n ? " on" : ""}" data-x="nivel" data-n="${n}" role="radio" aria-checked="${sel.nivel === n}">${esc(t)}</button>`).join("")}</div>
+      ${avisoFr ? `<p class="jg-fr-aviso">⚠ ${esc(avisoFr)}</p>` : ""}
       <div class="jg-fr-insts">${insts}</div>
       <section class="jg-fr-info">
         <div><h4>Tu Frontera</h4><p><b>${datos.victorias}</b> combates ganados en total.</p>
@@ -322,7 +364,31 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, v
   }
 
   /* ---------- el combate ---------- */
+  /* Un combate que no se puede montar (unas elecciones guardadas que el
+     simulador ya no acepta, un equipo de otra versión) no puede dejar la
+     cuenta atrapada: antes se retomaba solo al entrar, fallaba, y la
+     Frontera no pasaba nunca de ahí. Se empieza ese combate de cero y,
+     si tampoco, se vuelve al menú explicándolo. */
   function empiezaPelea() {
+    try { montaPelea(); }
+    catch (e) {
+      console.warn("[frontera] combate", e);
+      if (pk) { try { pk.destruir(); } catch (_) {} pk = null; }
+      pelea = null; clearInterval(chequeo);
+      const r = run();
+      if (r && r.elecciones && r.elecciones.length) {
+        r.elecciones = []; r.enPelea = false; persiste();
+        try { montaPelea(); return; } catch (e2) { console.warn("[frontera] combate de cero", e2); if (pk) { try { pk.destruir(); } catch (_) {} pk = null; } pelea = null; }
+      }
+      if (r) { r.enPelea = false; r.elecciones = []; if (!r.equipo) r.equipo = null; persiste(); }
+      avisoFr = "No se pudo montar el combate (" + (e && e.message || e) + "). Si se repite, retírate de esa racha y empieza otra.";
+      vista = "menu";
+      const caja = raiz();
+      if (caja) caja.innerHTML = "";
+      pinta();
+    }
+  }
+  function montaPelea() {
     const r = run();
     if (!r || !r.equipo) { vista = "menu"; pinta(); return; }
     const R = F.rivalDe(sel.inst, r.n, r.semilla);
@@ -417,12 +483,21 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, v
 
   /* ---------- clics ---------- */
   function alClic(ev) {
+    try { clic(ev); }
+    catch (e) {
+      console.warn("[frontera] clic", e);
+      avisoFr = "Algo falló: " + (e && e.message || e);
+      if (vista !== "pelea") { vista = "menu"; pinta(); }
+    }
+  }
+  function clic(ev) {
     const b = ev.target.closest("[data-x]");
     if (!b || !host || !host.contains(b) || b.disabled) return;
     const x = b.dataset.x;
     if (x === "reintenta") { host.removeEventListener("click", alClic); montar(host); return; }
     if (x === "volver") { volver && volver(); return; }
     if (x === "reglas") { import("./reglas.js").then(m => m.abreReglas("frontera")); return; }
+    if (x !== "reglas" && x !== "volver") avisoFr = "";
     if (x === "menu") { vista = "menu"; resultado = null; pinta(); return; }
     if (x === "nivel") { sel.nivel = b.dataset.n; pinta(); return; }
     if (x === "inst") { if (ev.target.closest("button")) return; sel.inst = b.dataset.i; pinta(); return; }
