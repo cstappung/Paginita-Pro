@@ -178,13 +178,15 @@ export function crearPokemon(ctx) {
       set("pkEscena", "carga", `<div class="jg-pk-aviso"><div class="jg-pk-poke"></div>Descargando el motor de combate (≈1 MB, solo la primera vez)…</div>`);
       return;
     }
-    pintaFase();
-    pintaBotones();
     if (est.fase === "espera") {
+      set("pkFase", "espera", "Esperando rival");
+      set("pkBotones", "espera", `<button class="btn2" data-x="equipos">📋 Mis equipos</button>`);
       set("pkEscena", "espera", `<div class="jg-pk-aviso">Esperando a que entre un rival. Pásale el enlace de la sala.<br><small>Formato: ${esc(PM.FORMATOS[PM.formatoDe(p.formato)])}</small></div>`);
       set("pkControl", "espera", ""); set("pkRelato", "espera", "");
       return;
     }
+    pintaFase();
+    pintaBotones();
     if (est.fase === "equipos" || (est.fase === "fin" && !est.battle)) { pintaEquipos(); return; }
     if (est.battle) asegurarCampo();
     anima();

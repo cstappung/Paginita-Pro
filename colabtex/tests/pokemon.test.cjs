@@ -126,6 +126,20 @@ test('sin el motor cargado, la sala dice que carga', () => {
   assert.equal(ctx2.__R(p).fase, 'cargando');
 });
 
+test('la sala esperando al rival trae los mapas que lee la pantalla', () => {
+  // La pantalla lee `decide[uid]` y `prometido[uid]` sin comprobar que
+  // existan: sin ellos, esperar al rival tiraba «Cannot read properties
+  // of undefined (reading '<uid>')».
+  const ctx2 = {crypto: require('node:crypto').webcrypto, TextEncoder}; vm.createContext(ctx2);
+  vm.runInContext(sin('src/juegos/motor.js') + '\n;globalThis.__R=reducir;', ctx2);
+  const {p} = sala();
+  delete p.jugadores.b; p.estado = 'esperando';
+  for (const est of [ctx2.__R(p), reducir(p)]) {
+    for (const k of ['decide', 'prometido', 'revelado', 'skins']) assert.equal(typeof est[k], 'object', k);
+    assert.ok(Array.isArray(est.lados) && Array.isArray(est.nombres));
+  }
+});
+
 test('una pelea entera con robots termina y el registro la reproduce', () => {
   for (let s = 1; s <= 4; s++) {
     const r = azar(s);

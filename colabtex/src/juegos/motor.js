@@ -2968,7 +2968,11 @@ export const llavePk = (cad, k) => cad[PK_CADENA - 1 - k];
 
 export function redPokemon(p, js = jugadoresDe(p), listos = true) {
   const PM = globalThis.PokeMotor;
-  const vacio = f => ({ fase: f, turno: "", debe: [], ganador: null, motivo: "", lados: js.slice(0, 2).map(j => j.uid) });
+  // Con los mismos mapas que la vista del motor, aunque vacíos: la
+  // pantalla lee `decide[uid]` o `prometido[uid]` sin preguntar antes
+  // si existen, y en la sala esperando al rival eso tiraba la pantalla.
+  const vacio = f => ({ fase: f, turno: "", debe: [], ganador: null, motivo: "", lados: js.slice(0, 2).map(j => j.uid),
+    nombres: js.slice(0, 2).map(j => j.nombre || ""), prometido: {}, revelado: {}, decide: {}, skins: {}, peticion: [null, null] });
   if (!listos) return vacio("espera");
   if (!PM) return vacio("cargando");
   return PM.reducir(jugadasDe(p), js.map(j => ({ uid: j.uid, nombre: j.nombre, hcad: j.hcad || "" })),
