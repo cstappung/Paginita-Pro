@@ -5,7 +5,7 @@ const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const sin=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8').replace(/^import [\s\S]*?;$/mg,'').replace(/\bexport\s+/g,'');
 const ctx={};vm.createContext(ctx);
 vm.runInContext(sin('src/juegos/motor.js')+'\n'+sin('src/juegos/logros.js')+'\n'+sin('src/juegos/tienda.js')+'\n'+sin('src/juegos/monedas.js')+
- ';globalThis.__M={JUEGOS,LOGROS,NIVEL,PESO,VALOR_NIVEL,TARIFA,RECORD,monedasDe,topMonedas,registraDia,rachaHoy,pagoDia,diaChile,valorLogro,nivelDe,monedasBbtan,monedasSortem,registraJugadaClub,PAGO_CLUB,TOPE_CLUB_DIA,PODIO,podioValido}',ctx);
+ ';globalThis.__M={JUEGOS,LOGROS,NIVEL,PESO,VALOR_NIVEL,TARIFA,RECORD,monedasDe,topMonedas,registraDia,rachaHoy,pagoDia,diaChile,valorLogro,nivelDe,monedasBbtan,monedasSortem,registraJugadaClub,PAGO_CLUB,TOPE_CLUB_DIA,TOPE_BBTAN_DIA,topeClub,JUEGOS_CLUB,PODIO,podioValido}',ctx);
 const M=ctx.__M;
 
 test('cada logro tiene su nivel, y cada juego de sala su peso',()=>{
@@ -21,14 +21,14 @@ test('cada logro tiene su nivel, y cada juego de sala su peso',()=>{
  assert.equal(M.nivelDe('orbita','no-existe'),0);
 });
 
-test('la racha de días: paga 10 y sube 5 por día hasta 50',()=>{
- assert.deepEqual([1,2,3,9,10,40].map(M.pagoDia),[10,15,20,50,50,50]);
- let r=M.registraDia(null,100);assert.deepEqual({...r},{dia:100,racha:1,mejor:1,dias:1,bono:10});
+test('la recompensa diaria: 250 y 250 más por día seguido, hasta 1000',()=>{
+ assert.deepEqual([0,1,2,3,4,5,40].map(M.pagoDia),[250,250,500,750,1000,1000,1000]);
+ let r=M.registraDia(null,100);assert.deepEqual({...r},{dia:100,racha:1,mejor:1,dias:1,bono:250});
  assert.equal(M.registraDia(r,100),null,'el mismo día no cuenta dos veces');
  assert.equal(M.registraDia(r,99),null);
  for(let d=101;d<=110;d++)r=M.registraDia(r,d);
  assert.equal(r.racha,11);assert.equal(r.dias,11);
- assert.equal(r.bono,10+15+20+25+30+35+40+45+50+50+50);
+ assert.equal(r.bono,250+500+750+1000*8);
  r=M.registraDia(r,113);assert.equal(r.racha,1);assert.equal(r.mejor,11);assert.equal(r.dias,12);
  assert.equal(M.rachaHoy(r,113),1);assert.equal(M.rachaHoy(r,114),1);assert.equal(M.rachaHoy(r,115),0);
 });
@@ -50,8 +50,9 @@ const datos={
 
 test('el saldo suma partidas, victorias, récords, logros y días',()=>{
  const a=M.monedasDe('a',datos);
- assert.equal(a.partes.partidas,Math.round(5*1.3*10+5*2.5*2));
- assert.equal(a.partes.victorias,Math.round(1.3*(15*3+5*1)+2.5*15));
+ const T=M.TARIFA,P=M.PESO;
+ assert.equal(a.partes.partidas,Math.round(T.partida*P.uno*10+T.partida*P.catan*2));
+ assert.equal(a.partes.victorias,Math.round(P.uno*(T.victoria*3+T.empate*1)+P.catan*T.victoria));
  // minas easy: récord 60; logros easy (1) y easy10 (2) en minas
  assert.equal(a.partes.records,60);
  // logros: uno primera (15) + pilla (15) · catan primera (15) · minas easy (15) + easy10 (40)
@@ -81,15 +82,21 @@ test('BBTAN paga ⌊n/4⌋ por cada ronda hasta el récord; sortEm, por rapidez'
  assert.equal(M.monedasSortem(10,30000),10);assert.equal(M.monedasSortem(10,10000),50);assert.equal(M.monedasSortem(20,90000),20);
 });
 
-test('partidas del club: 8 cada una, hasta 10 al día por juego, como la regla',()=>{
- let r=M.registraJugadaClub(null,100);assert.deepEqual({...r},{dia:100,hoy:1,total:1});
- for(let i=0;i<9;i++)r=M.registraJugadaClub(r,100);
- assert.equal(r.hoy,10);assert.equal(M.registraJugadaClub(r,100),null,'la undécima de hoy no paga');
- r=M.registraJugadaClub(r,101);assert.deepEqual({...r},{dia:101,hoy:1,total:11});
- const d=Object.assign({},datos,{clubJugadas:{a:{bbtan:{dia:101,hoy:1,total:11},uno:{total:99}}}});
- assert.equal(M.monedasDe('a',d).partes.club,11*M.PAGO_CLUB,'solo los juegos del club');
+test('partidas del club: cada juego paga lo suyo, con tope al día, como la regla',()=>{
+ for(const j of M.JUEGOS_CLUB)assert.ok(M.PAGO_CLUB[j]>0,'falta PAGO_CLUB de '+j);
+ assert.equal(M.PAGO_CLUB.bbtan,8,'BBTAN queda como estaba');assert.equal(M.topeClub('bbtan'),10);
+ let r=M.registraJugadaClub(null,100,'bbtan');assert.deepEqual({...r},{dia:100,hoy:1,total:1});
+ for(let i=0;i<9;i++)r=M.registraJugadaClub(r,100,'bbtan');
+ assert.equal(r.hoy,10);assert.equal(M.registraJugadaClub(r,100,'bbtan'),null,'la undécima de BBTAN no paga');
+ assert.equal(M.registraJugadaClub(r,100,'minas').hoy,11,'en otro juego sí');
+ let m=r;for(let i=0;i<5;i++)m=M.registraJugadaClub(m,100,'minas');
+ assert.equal(m.hoy,M.TOPE_CLUB_DIA);assert.equal(M.registraJugadaClub(m,100,'minas'),null);
+ r=M.registraJugadaClub(r,101,'bbtan');assert.deepEqual({...r},{dia:101,hoy:1,total:11});
+ const d=Object.assign({},datos,{clubJugadas:{a:{bbtan:{dia:101,hoy:1,total:11},minas:{total:3},uno:{total:99}}}});
+ assert.equal(M.monedasDe('a',d).partes.club,11*M.PAGO_CLUB.bbtan+3*M.PAGO_CLUB.minas,'solo los juegos del club');
  const R=JSON.parse(fs.readFileSync(path.join(__dirname,'../../firebase/database.rules.json'),'utf8')).rules;
- assert.match(R.clubJugadas.$uid.$juego['.validate'],new RegExp("'hoy'\\)\\.val\\(\\) <= "+M.TOPE_CLUB_DIA));
+ assert.ok(R.clubJugadas.$uid.$juego['.validate'].includes("'hoy').val() <= ($juego === 'bbtan' ? "+M.TOPE_BBTAN_DIA+" : "+M.TOPE_CLUB_DIA+")"));
+ assert.ok(R.diario.$uid['.validate'].includes("250 * (newData.child('racha').val() > 4 ? 4 : newData.child('racha').val())"),'la regla del diario paga lo mismo que pagoDia');
 });
 
 test('podios: 500, 250 y 100 por quitarle el puesto a otra persona',()=>{
@@ -106,7 +113,7 @@ test('podios: 500, 250 y 100 por quitarle el puesto a otra persona',()=>{
 test('la regla de diario es la que calcula registraDia',()=>{
  const R=JSON.parse(fs.readFileSync(path.join(__dirname,'../../firebase/database.rules.json'),'utf8')).rules;
  const v=R.diario.$uid['.validate'];
- assert.match(v,/=== now/);assert.match(v,/10 \+ 5 \*/);assert.match(v,/> 9 \? 8/);
+ assert.match(v,/=== now/);assert.match(v,/\+ 250 \* \(/);assert.match(v,/> 4 \? 4/);assert.match(v,/'bono'\)\.val\(\) === 250\)/);
  assert.equal(R.diario['.read'],'auth != null');
  assert.equal(R.diario.$uid['.write'],'auth != null && auth.uid === $uid');
 });

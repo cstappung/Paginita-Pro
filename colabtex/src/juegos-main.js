@@ -60,7 +60,7 @@ import { crearRanks } from "./juegos/ranks.js";
 import { LOGROS, detecta, deFila, deMarca } from "./juegos/logros.js";
 import { crearLogros } from "./juegos/logros-vista.js";
 import { monedasDe, formatoMonedas, valorLogro, registraDia, diaChile as diaMonedas, pagoDia, rachaHoy,
-  registraJugadaClub, PAGO_CLUB, TOPE_CLUB_DIA, PODIO, topMonedas, economia } from "./juegos/monedas.js";
+  registraJugadaClub, PAGO_CLUB, topeClub, PODIO, topMonedas, economia } from "./juegos/monedas.js";
 import { PRECIO_TIENDA } from "./juegos/tienda.js";
 import { crearMonedas, topHtml, MONEDA } from "./juegos/monedas-vista.js";
 import { crearProdrop } from "./juegos/prodrop.js";
@@ -569,7 +569,6 @@ async function anotar(p) {
     const tiempo = Math.min(604800000, Math.max(1, Math.round((+p.fin.at || 0) - (+p.at || 0)) || 1));
     try {
       await guardaConPodio(`yemas-zombis-${mapaYemas(p)}`, u.uid, { nombre: u.name, puntos: ronda, tiempo, partida: state.pid }, false);
-      marcaDia();
     } catch (e) { anotada = ""; console.warn("[juegos] no se pudo apuntar la ronda de zombis", e); }
     return;
   }
@@ -582,7 +581,6 @@ async function anotar(p) {
       await fb.guardarRank(p.juego, u.uid, fila);
       const antes = new Set(deFila(previa));
       for (const id of deFila(fila)) if (!antes.has(id)) celebra(p.juego, id);
-      marcaDia();
     }
   } catch (e) {
     anotada = "";
@@ -605,7 +603,7 @@ function pintaMonedas() {
        (y titilando) si todavía falta jugar hoy para no perderla. */
     const di = u && d ? (d.diario || {})[u.uid] : null, hoy = diaMonedas(), r = rachaHoy(di, hoy), ya = !!(di && di.dia === hoy);
     chip.innerHTML = `${MONEDA} ${u && d && d.completo ? formatoMonedas(monedasDe(u.uid, d).saldo) : "…"}` +
-      (r ? `<span class="jg-racha-chip${ya ? "" : " falta"}" title="${r} ${r === 1 ? "día seguido" : "días seguidos"}${ya ? "" : " · juega hoy para no perder la racha"}">🔥${r}</span>` : "");
+      (r ? `<span class="jg-racha-chip${ya ? "" : " falta"}" title="${r} ${r === 1 ? "día seguido" : "días seguidos"}${ya ? "" : " · reclama hoy tu recompensa diaria para no perder la racha"}">🔥${r}</span>` : "");
   }
   const caja = $("vesMonedas");
   if (caja && u && d) caja.innerHTML = topHtml(d, u.uid, perfilDe, colorForUid);
@@ -634,23 +632,39 @@ function dropsHtml(d) {
     return `<div class="jg-drop">${miniCarta(c)}<span class="jg-drop-quien" data-perfil="${escapeHtml(c.uid)}" data-nombre="${escapeHtml(q.nombre)}">${avatarMarco(q.foto, q.nombre, q.color, marcoDeUid(c.uid), 18, c.uid)}<b>${escapeHtml(q.nombre)}</b></span><small class="jg-drop-cuando">${c.rr ? "♻ re-roll · " : ""}${haceCuanto(c.at)}</small></div>`;
   }).join("");
 }
-async function marcaDia() {
+/* La recompensa diaria se reclama con un clic (el botón de `rachaHtml`,
+   sobre el top de monedas y en la pestaña #monedas). Lee el registro
+   fresco, porque la caja puede estar pintada desde ayer, y escribe lo
+   mismo que comprueba la regla de `diario/$uid`. */
+async function reclamaDia(btn) {
   const u = state.user, hoy = diaMonedas();
   if (!u || diaMarcado === hoy) return;
   diaMarcado = hoy;
+  document.querySelectorAll("[data-reclama-dia]").forEach(b => { b.disabled = true; b.textContent = "Cobrando…"; });
   try {
     const reg = registraDia(await fb.leerDiario(u.uid), hoy);
     if (reg) {
       await fb.apuntaDiario(u.uid, reg);
-      avisaMonedas("🔥", reg.racha > 1 ? `¡${reg.racha} días seguidos jugando!` : "¡Primer día de tu racha!",
-        `+${pagoDia(reg.racha)} monedas hoy · mañana +${pagoDia(reg.racha + 1)} si vuelves`, pagoDia(reg.racha), "racha");
-      pintaMonedas();
+      suena("gana");
+      avisaMonedas("🔥", reg.racha > 1 ? `¡${reg.racha} días seguidos!` : "¡Recompensa diaria!",
+        `+${formatoMonedas(pagoDia(reg.racha))} monedas hoy · mañana +${formatoMonedas(pagoDia(reg.racha + 1))} si vuelves`, pagoDia(reg.racha), "racha");
     }
   } catch (e) {
-    diaMarcado = -1;   // sin reglas publicadas, o sin red: se reintenta en la próxima partida
-    console.warn("[juegos] no se pudo apuntar el día", e);
+    diaMarcado = -1;   // sin reglas publicadas, o sin red: el botón vuelve
+    console.warn("[juegos] no se pudo cobrar la recompensa diaria", e);
+    if (esPermiso(e)) capaReglas((e && (e.code || e.message)) || "", null); else alert("No se pudo cobrar la recompensa diaria. Revisa la conexión e inténtalo otra vez.");
   }
+  if (datosMonedas && state.user) {
+    /* Pinta ya con lo escrito; el listener de `diario` lo confirma enseguida. */
+    try { const di = await fb.leerDiario(u.uid); datosMonedas = Object.assign({}, datosMonedas, { diario: Object.assign({}, datosMonedas.diario, { [u.uid]: di }) }); } catch (e) { /* queda el listener */ }
+  }
+  pintaMonedas();
+  if (monedasVista) monedasVista.refresca();
 }
+document.addEventListener("click", ev => {
+  const b = ev.target.closest && ev.target.closest("[data-reclama-dia]");
+  if (b && !b.disabled) { ev.preventDefault(); reclamaDia(b); }
+});
 
 /* Un aviso de monedas, en la misma cola que los logros para que no se
    pisen: la racha del día, una partida del club, un podio. */
@@ -667,8 +681,8 @@ function avisaMonedas(icono, titulo, detalle, monto, tipo) {
   }));
 }
 
-/* Cada partida del club que termina con resultado paga PAGO_CLUB, hasta
-   TOPE_CLUB_DIA por juego al día (la regla de `clubJugadas` comprueba lo
+/* Cada partida del club que termina con resultado paga PAGO_CLUB[juego],
+   hasta topeClub(juego) al día (la regla de `clubJugadas` comprueba lo
    mismo que `registraJugadaClub`). Se encadenan para que dos resultados
    seguidos no lean el mismo contador. */
 let jugadasClubCola = Promise.resolve();
@@ -677,10 +691,10 @@ function marcaJugadaClub(juego) {
   if (!u) return;
   jugadasClubCola = jugadasClubCola.then(async () => {
     try {
-      const reg = registraJugadaClub(await fb.leerJugadasClub(u.uid, juego), diaMonedas());
+      const reg = registraJugadaClub(await fb.leerJugadasClub(u.uid, juego), diaMonedas(), juego);
       if (!reg) return;
       await fb.apuntaJugadaClub(u.uid, juego, reg);
-      avisaMonedas("🕹️", "Partida del club", `${reg.hoy} de ${TOPE_CLUB_DIA} que pagan hoy en este juego`, PAGO_CLUB, "club");
+      avisaMonedas("🕹️", "Partida del club", `${reg.hoy} de ${topeClub(juego)} que pagan hoy en este juego`, PAGO_CLUB[juego], "club");
     } catch (e) { console.warn("[juegos] no se pudo apuntar la partida del club", e); }
   });
 }
@@ -1121,7 +1135,7 @@ function armazon() {
     h.innerHTML = "";
     individual = crearFrontera({ usuario: state.user, guardar: guardaConPodio, watch: fb.watchSolo, volver: () => ir(""),
       partida: { leer: () => fb.leerPartidaClub(state.user.uid, "frontera"), guardar: (d, at) => fb.guardarPartidaClub(state.user.uid, "frontera", d, at) },
-      alResultado: lista => { marcaDia(); marcaJugadaClub("frontera");
+      alResultado: lista => { marcaJugadaClub("frontera");
         for (const { d, previa } of lista || []) {
           const antes = new Set(previa ? deMarca("frontera", Object.assign({ categoria: d.categoria }, previa)) : []);
           for (const id of deMarca("frontera", d)) if (!antes.has(id)) celebra("frontera", id);
@@ -1135,7 +1149,7 @@ function armazon() {
       partida:{leer:()=>fb.leerPartidaClub(state.user.uid,state.vista.slice(5)),guardar:(d,at)=>fb.guardarPartidaClub(state.user.uid,state.vista.slice(5),d,at)},
       /* Un logro individual sale de la marca: se celebra el que esta
          partida da y la mejor marca guardada no daba ya. */
-      alResultado: (d, previa) => { marcaDia(); marcaJugadaClub(clave); const antes = new Set(previa ? deMarca(clave, Object.assign({ categoria: d.categoria }, previa)) : []);
+      alResultado: (d, previa) => { marcaJugadaClub(clave); const antes = new Set(previa ? deMarca(clave, Object.assign({ categoria: d.categoria }, previa)) : []);
         for (const id of deMarca(clave, d)) if (!antes.has(id)) celebra(clave, id); }});
     individual.montar(h);
     const juego = state.vista.slice(5), barra = document.createElement("div");

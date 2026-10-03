@@ -8,7 +8,7 @@ const PM=require('../../juegos/prodrop/motor.js');
 const sin=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8').replace(/^import [\s\S]*?;$/mg,'').replace(/\bexport\s+/g,'');
 const ctx={__PM:PM};vm.createContext(ctx);
 vm.runInContext('const PM=__PM;'+sin('src/juegos/motor.js')+'\n'+sin('src/juegos/logros.js')+'\n'+sin('src/juegos/tienda.js')+'\n'+sin('src/juegos/monedas.js')+'\n'+sin('src/juegos/prodrop-cartas.js')+
- ';globalThis.__M={monedasDe,economia,copiasDe,proximoGratis,claveCopia,topMonedas,exhibidasDe,mejoresDrops,cifras,miniCarta,rankingColeccion,cartasMasRaras}',ctx);
+ ';globalThis.__M={TARIFA,monedasDe,economia,copiasDe,proximoGratis,claveCopia,topMonedas,exhibidasDe,mejoresDrops,cifras,miniCarta,rankingColeccion,cartasMasRaras}',ctx);
 const M=ctx.__M;
 
 test('el catálogo: 17 personas por 9 variantes, con su imagen',()=>{
@@ -73,8 +73,9 @@ test('el precio: 50 de lanzamiento, 80 después',()=>{
 
 const datos=(extra)=>Object.assign({completo:true,ranks:{juego:{a:{jugadas:100,ganadas:50,puntos:150}}},solo:{},logros:{},diario:{}},extra);
 
-// ganado: 'juego' no tiene PESO, así que pesa 1: 5 por partida
-const conGanado=(u,n,extra)=>({completo:true,ranks:{juego:Object.fromEntries(Object.entries(u).map(([k,v])=>[k,{jugadas:v}]))},solo:{},logros:{},diario:{},...extra});
+// ganado: 'juego' no tiene PESO, así que pesa 1. Los números de abajo
+// están en «partidas de 5»: v vale 5·v monedas, sea cual sea la tarifa.
+const conGanado=(u,n,extra)=>({completo:true,ranks:{juego:Object.fromEntries(Object.entries(u).map(([k,v])=>[k,{jugadas:v*5/M.TARIFA.partida}]))},solo:{},logros:{},diario:{},...extra});
 const K=i=>'-Nk'+String(i).padStart(9,'0');
 
 test('lo gastado se resta del saldo, no de lo ganado',()=>{

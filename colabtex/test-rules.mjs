@@ -203,15 +203,16 @@ console.log("— Monedas: días seguidos (diario) —");
   const ua = await loginAs(A), hoy = diaChile();
   const apunta = reg => set(ref(db, `diario/${ua.uid}`), Object.assign({}, reg, { at: serverTimestamp() }));
   await remove(ref(db, `diario/${ua.uid}`)).catch(() => {});
-  await denied("no se empieza con una racha inventada", () => apunta({ dia: hoy, racha: 5, mejor: 5, dias: 5, bono: 150 }));
+  await denied("ni con el pago viejo de 10", () => apunta({ dia: hoy, racha: 1, mejor: 1, dias: 1, bono: 10 }));
+  await denied("no se empieza con una racha inventada", () => apunta({ dia: hoy, racha: 5, mejor: 5, dias: 5, bono: 2500 }));
   await denied("no se apunta mañana", () => apunta(registraDia(null, hoy + 1)));
   await denied("ni un día de hace una semana", () => apunta(registraDia(null, hoy - 7)));
   await allowed("A apunta hoy", () => apunta(registraDia(null, hoy)));
-  await denied("hoy no se apunta dos veces", () => apunta({ dia: hoy, racha: 2, mejor: 2, dias: 2, bono: 25 }));
+  await denied("hoy no se apunta dos veces", () => apunta({ dia: hoy, racha: 2, mejor: 2, dias: 2, bono: 750 }));
   await denied("un campo de más no cuela", () => set(ref(db, `diario/${ua.uid}/extra`), 1));
   await loginAs(B);
-  ok("B lee el diario de A (para el top)", (await get(ref(db, `diario/${ua.uid}/bono`))).val() === 10);
-  await denied("B no escribe el diario de A", () => set(ref(db, `diario/${ua.uid}`), { dia: hoy, racha: 1, mejor: 1, dias: 1, bono: 10, at: serverTimestamp() }));
+  ok("B lee el diario de A (para el top)", (await get(ref(db, `diario/${ua.uid}/bono`))).val() === 250);
+  await denied("B no escribe el diario de A", () => set(ref(db, `diario/${ua.uid}`), { dia: hoy, racha: 1, mejor: 1, dias: 1, bono: 250, at: serverTimestamp() }));
   await loginAs(A);
 }
 
@@ -315,13 +316,22 @@ console.log("— Monedas: partidas del club y podios —");
   await remove(ref(db, `clubJugadas/${ua.uid}/bbtan`)).catch(() => {});
   await denied("no se empieza con muchas partidas", () => apunta({ dia: hoy, hoy: 1, total: 50 }));
   await denied("ni en un juego que no es del club", () => set(ref(db, `clubJugadas/${ua.uid}/uno`), { dia: hoy, hoy: 1, total: 1, at: serverTimestamp() }));
-  let reg = registraJugadaClub(null, hoy);
+  let reg = registraJugadaClub(null, hoy, "bbtan");
   await allowed("A apunta su primera partida del club", () => apunta(reg));
   await denied("no se salta de a dos", () => apunta({ dia: hoy, hoy: reg.hoy + 2, total: reg.total + 2 }));
-  for (let i = 0; i < 9; i++) { reg = registraJugadaClub(reg, hoy); await set(ref(db, `clubJugadas/${ua.uid}/bbtan`), Object.assign({}, reg, { at: serverTimestamp() })); }
+  for (let i = 0; i < 9; i++) { reg = registraJugadaClub(reg, hoy, "bbtan"); await set(ref(db, `clubJugadas/${ua.uid}/bbtan`), Object.assign({}, reg, { at: serverTimestamp() })); }
   ok("diez partidas hoy", reg.hoy === 10);
   await denied("la undécima de hoy ya no paga", () => apunta({ dia: hoy, hoy: 11, total: reg.total + 1 }));
   await denied("ni mañana", () => apunta({ dia: hoy + 1, hoy: 1, total: reg.total + 1 }));
+  {
+    const minas = r => set(ref(db, `clubJugadas/${ua.uid}/minas`), Object.assign({}, r, { at: serverTimestamp() }));
+    await remove(ref(db, `clubJugadas/${ua.uid}/minas`)).catch(() => {});
+    let m = registraJugadaClub(null, hoy, "minas");
+    await minas(m);
+    for (let i = 0; i < 14; i++) { m = registraJugadaClub(m, hoy, "minas"); await minas(m); }
+    ok("en Mina Club pagan quince al día", m.hoy === 15);
+    await denied("la decimosexta ya no", () => minas({ dia: hoy, hoy: 16, total: m.total + 1 }));
+  }
   // podios: solo justo después del récord que nombra
   await set(ref(db, `soloRanks/club-bbtan-rondas/${ua.uid}`), { nombre: "A", puntos: 7, tiempo: 1000, partida: "partidaA1" }).catch(() => {});
   const fila = (await get(ref(db, `soloRanks/club-bbtan-rondas/${ua.uid}`))).val() || {};

@@ -5,7 +5,7 @@ import { JUEGOS } from "./motor.js";
 import { avatarMarco, quien, marcoDeUid } from "./perfil-vista.js";
 import {
   topMonedas, monedasDe, formatoMonedas, TARIFA, PESO, VALOR_NIVEL, NOMBRE_NIVEL,
-  RECORD, diaChile, rachaHoy, pagoDia, PAGO_CLUB, TOPE_CLUB_DIA, PODIO
+  RECORD, diaChile, rachaHoy, pagoDia, PAGO_DIA, TOPE_DIA, PAGO_CLUB, TOPE_CLUB_DIA, TOPE_BBTAN_DIA, PODIO
 } from "./monedas.js";
 import { MOTOR } from "./prodrop-cartas.js";
 
@@ -17,13 +17,13 @@ const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const NOMBRES_CLUB = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla" };
 const PARTES = [
-  ["partidas", "🎮", "Partidas", "5 por partida de sala, por el peso del juego"],
-  ["victorias", "🏆", "Victorias", "15 por victoria y 5 por empate, por el peso"],
+  ["partidas", "🎮", "Partidas", `${TARIFA.partida} por partida de sala, por el peso del juego`],
+  ["victorias", "🏆", "Victorias", `${TARIFA.victoria} por victoria y ${TARIFA.empate} por empate, por el peso`],
   ["records", "📈", "Récords", "una vez por modalidad del club con marca"],
-  ["club", "🕹️", "Partidas del club", "8 por partida, hasta 10 al día por juego"],
+  ["club", "🕹️", "Partidas del club", `de 15 a 25 por partida, hasta ${TOPE_CLUB_DIA} al día por juego`],
   ["podios", "👑", "Podios", "500 · 250 · 100 por quitarle el puesto a alguien"],
   ["logros", "🎖️", "Logros", "15 · 40 · 100 · 250 según dificultad"],
-  ["dias", "🔥", "Días seguidos", "10 por día jugado, +5 por día de racha"]
+  ["dias", "🔥", "Recompensa diaria", `${pagoDia(1)} el primer día, +${PAGO_DIA} por día seguido hasta ${pagoDia(TOPE_DIA)}`]
 ];
 
 function fila(f, i, uid, perfil, colorDe, chico, datos) {
@@ -44,22 +44,30 @@ export function topHtml(datos, uid, perfil, colorDe) {
   return html + `<a class="jg-mo-ver" href="#monedas">Ver el top y cómo se ganan →</a>`;
 }
 
-/* La racha de días, bien a la vista en el vestíbulo: cuántos llevas, si
-   hoy ya contó y cuánto paga el siguiente. Siete llamas, una por día de la
-   semana que viene, encendidas las que ya llevas. */
+/* La recompensa diaria, bien a la vista en el vestíbulo, sobre el top: un
+   botón que se aprieta una vez por día de Chile. Paga 250 el primer día de
+   racha y 250 más por cada día seguido, hasta 1000 desde el cuarto. Los
+   cuatro peldaños se ven, encendidos los que ya llevas. El clic lo atiende
+   juegos-main.js (`data-reclama-dia`). */
 export function rachaHtml(d, hoy) {
   const r = rachaHoy(d, hoy), contado = !!(d && d.dia === hoy);
-  const enSemana = r ? ((r - 1) % 7) + 1 : 0;   // cuántas de las siete llamas van encendidas
-  const llamas = Array.from({ length: 7 }, (_, i) =>
-    `<i class="${i < enSemana ? "on" : ""}${!contado && i === enSemana ? " hoy" : ""}"></i>`).join("");
-  const titulo = r ? `${r} ${r === 1 ? "día seguido" : "días seguidos"}` : "Racha de días";
-  const sub = contado ? `Hoy ya sumaste +${pagoDia(r)} ${MONEDA} · mañana +${pagoDia(r + 1)}`
-    : r ? `¡Juega hoy para no perderla! +${pagoDia(r + 1)} ${MONEDA}`
-    : `Termina una partida hoy: +${pagoDia(1)} ${MONEDA}, y sube cada día`;
-  return `<a class="jg-racha${contado ? " lista" : r ? " peligro" : ""}" href="#monedas" title="Cada día seguido que juegas paga más, hasta ${pagoDia(9)} por día">
+  const sig = contado ? r : r + 1;   // el día de racha que se cobra (o se cobró) hoy
+  const pelda = Array.from({ length: TOPE_DIA }, (_, i) => {
+    const n = i + 1, on = n <= Math.min(r, TOPE_DIA), hoyEs = !contado && n === Math.min(sig, TOPE_DIA);
+    return `<i class="${on ? "on" : ""}${hoyEs ? " hoy" : ""}">${formatoMonedas(pagoDia(n))}</i>`;
+  }).join("");
+  const titulo = r ? `${r} ${r === 1 ? "día seguido" : "días seguidos"}` : "Recompensa diaria";
+  const sub = contado ? `Mañana +${formatoMonedas(pagoDia(r + 1))} ${MONEDA} si vuelves`
+    : r ? `¡Reclámala hoy para no perder la racha!`
+    : `Cada día seguido paga ${PAGO_DIA} más, hasta ${formatoMonedas(pagoDia(TOPE_DIA))}`;
+  const boton = contado
+    ? `<button type="button" class="jg-racha-btn hecho" disabled>✓ Cobrada hoy · +${formatoMonedas(pagoDia(r))}</button>`
+    : `<button type="button" class="jg-racha-btn" data-reclama-dia>Reclamar +${formatoMonedas(pagoDia(sig))} ${MONEDA}</button>`;
+  return `<div class="jg-racha${contado ? " lista" : r ? " peligro" : ""}" title="Un clic al día. Cada día seguido paga más, hasta ${formatoMonedas(pagoDia(TOPE_DIA))} por día">
     <span class="jg-racha-fuego" aria-hidden="true">🔥</span>
     <span class="jg-racha-tx"><b>${titulo}</b><small>${sub}</small></span>
-    <span class="jg-racha-dias" aria-hidden="true">${llamas}</span></a>`;
+    ${boton}
+    <span class="jg-racha-dias" aria-hidden="true">${pelda}</span></div>`;
 }
 
 export function crearMonedas({ uid, datos, perfil, colorDe }) {
@@ -97,12 +105,13 @@ export function crearMonedas({ uid, datos, perfil, colorDe }) {
           <ul class="jg-mo-pesos">${Object.entries(RECORD).map(([j, v]) => `<li><span>${NOMBRES_CLUB[j] || j}</span><b>${v} ${MONEDA}</b></li>`).join("")}</ul>
           <p>Además, BBTAN paga ⌊n/4⌋ por cada ronda n hasta tu récord (llegar a la 5 da 2, a la 50 da 300, a la 100 da 1.225), sortEm paga los bloques de la modalidad más 2 por cada segundo bajo 3 s por bloque, la Sopa diaria y Electrodle 10 por cada día de tu mejor racha, y Electrodle 1 más por cada 50 puntos.</p>
           <h3>Partidas del club</h3>
-          <p>Cada partida de un juego individual que termina con resultado paga ${PAGO_CLUB} ${MONEDA}, hasta ${TOPE_CLUB_DIA} partidas al día por juego.</p>
+          <p>Cada partida de un juego individual que termina con resultado paga según lo que dura, hasta ${TOPE_CLUB_DIA} partidas al día por juego (BBTAN, ${TOPE_BBTAN_DIA}: lo suyo lo paga el récord):</p>
+          <ul class="jg-mo-pesos">${Object.entries(PAGO_CLUB).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([j, v]) => `<li><span>${NOMBRES_CLUB[j] || j}</span><b>${v} ${MONEDA}</b></li>`).join("")}</ul>
           <h3>Podios</h3>
           <p>Quitarle a otra persona un puesto del podio de una tabla del club (o de Yemas zombis) paga, cada vez:</p>
           <ul class="jg-mo-pesos">${[1, 2, 3].map(n => `<li><span>${["", "🥇 Primer", "🥈 Segundo", "🥉 Tercer"][n]} puesto</span><b>${PODIO[n]} ${MONEDA}</b></li>`).join("")}</ul>
-          <h3>🔥 Días seguidos</h3>
-          <p>Cada día en que terminas una partida (de sala o del club) paga ${pagoDia(1)}, y la racha suma 5 por día hasta ${pagoDia(9)} desde el noveno. Si un día no juegas, vuelve a ${pagoDia(1)}. El día cambia a medianoche de Chile.</p>
+          <h3>🔥 Recompensa diaria</h3>
+          <p>Se reclama con el botón de arriba del top de monedas, una vez al día. El primer día paga ${pagoDia(1)}, y cada día seguido ${PAGO_DIA} más: ${[1, 2, 3, 4].map(n => formatoMonedas(pagoDia(n))).join(", ")} y desde ahí ${formatoMonedas(pagoDia(TOPE_DIA))} cada día. Si un día no la reclamas, vuelve a ${pagoDia(1)}. El día cambia a medianoche de Chile.</p>
           <h3>En qué se gastan</h3>
           <ul class="jg-mo-pesos">
             <li><span><a href="#cartas">Sobre de PRODROP</a></span><b>${Date.now() < MOTOR.PRECIO.promoHasta ? `<s>${MOTOR.PRECIO.normal}</s> ` : ""}${MOTOR.precioSobre(Date.now())} ${MONEDA}</b></li>

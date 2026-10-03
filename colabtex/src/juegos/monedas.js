@@ -15,16 +15,20 @@
      que no se puede «farmear» repitiendo la partida fácil.
    - **Logros**: según su dificultad, en cuatro niveles (`NIVEL`). Es la
      fuente grande a propósito: lo difícil es lo que más paga.
-   - **Días seguidos jugando** (`diario/<uid>`): lo único nuevo. Cada día
-     en que terminas una partida (de sala o del club) paga 10, y la racha
-     sube el pago 5 por día hasta 50 desde el noveno. Las reglas validan
-     la fecha, la racha y la suma; el cliente solo puede apuntar *hoy*.
+   - **La recompensa diaria** (`diario/<uid>`): se reclama con un botón
+     sobre el top de monedas, una vez por día de Chile. Paga 250 el primer
+     día de racha y 250 más cada día seguido, hasta 1000 desde el cuarto;
+     saltarse un día vuelve a 250. Las reglas validan la fecha, la racha y
+     la suma; el cliente solo puede apuntar *hoy*.
    - La racha de la Sopa diaria y la de Electrodle, los puntos de
      Electrodle, la ronda de BBTAN y la rapidez en sortEm suman un extra
      sobre su récord, porque ahí la marca misma es la dificultad.
    - **Partidas del club** (`clubJugadas/<uid>/<juego>`): cada partida que
-     termina con resultado paga `PAGO_CLUB`, hasta `TOPE_CLUB_DIA` por juego
-     y por día. Las reglas validan el día y que el contador suba de a uno.
+     termina con resultado paga `PAGO_CLUB[juego]`, hasta `TOPE_CLUB_DIA`
+     por juego y por día. Esta es la fuente que se puede «farmear» a
+     propósito: lo que paga cada juego depende de lo que dura una partida.
+     BBTAN queda en 8 y 10 al día, porque lo suyo ya lo paga el récord.
+     Las reglas validan el día y que el contador suba de a uno.
    - **Podios** (`podios/<uid>/<partida>`): quitarle a otra persona el
      primer, segundo o tercer puesto de una tabla del club paga 500, 250 o
      100, cada vez. Se escribe justo después del récord que lo logró, y la
@@ -49,14 +53,17 @@ import PM from "../../../juegos/prodrop/motor.js";
 import { TIENDA, PRECIO_TIENDA } from "./tienda.js";
 
 /* ---------- tarifas ---------- */
-export const TARIFA = { partida: 5, victoria: 15, empate: 5 };
+/* Jugar es lo que se puede repetir, y se paga: una partida corta a dos
+   ronda las 20 monedas perdida y las 60 ganada; una tarde de Catan, 60 y
+   180. Sin tope diario, porque una sala necesita a otra persona. */
+export const TARIFA = { partida: 20, victoria: 40, empate: 20 };
 
 /* Cuánto pesa una partida de cada juego: lo que dura y lo que cuesta
    ganarla. 1 es una partida corta a dos. */
 export const PESO = {
-  escondite: 1, cartas: 1, cuadritos: 1, reversi: 1.2, orbita: 1.2, cadena: 1,
-  flip7: 1.3, cacho: 1.3, uno: 1.3, spicy: 1.3, tetris: 1, yemas: 1.2,
-  worms: 1.5, presidente: 1.5, ajedrez: 1.6, pokemon: 1.6, clue: 2.2, catan: 2.5
+  escondite: 1, cartas: 1, cuadritos: 1, cadena: 1, tetris: 1, reversi: 1.2, orbita: 1.2,
+  yemas: 1.3, spicy: 1.4, flip7: 1.5, cacho: 1.5, uno: 1.5, ajedrez: 1.6,
+  worms: 1.8, presidente: 1.8, pokemon: 1.8, clue: 2.5, catan: 3
 };
 
 /* Lo que vale un logro según su nivel: 1 fácil … 4 legendario. */
@@ -137,8 +144,11 @@ export function diaChile(ms) {
   for (const x of FORMATO.formatToParts(new Date(ms == null ? Date.now() : ms))) p[x.type] = x.value;
   return Math.round(Date.UTC(+p.year, +p.month - 1, +p.day) / 864e5);
 }
-/* Lo que paga el día número `racha` de una racha: 10, 15, … 50. */
-export const pagoDia = racha => 10 + 5 * Math.min(Math.max(racha, 1) - 1, 8);
+/* Lo que paga el día número `racha` de una racha: 250, 500, 750 y, desde
+   el cuarto, 1000. (Antes eran 10 a 50 por día jugado; lo ya cobrado sigue
+   sumado en `bono`, que es una suma y no se recalcula.) */
+export const PAGO_DIA = 250, TOPE_DIA = 4;
+export const pagoDia = racha => PAGO_DIA * Math.min(Math.max(racha, 1), TOPE_DIA);
 /* El registro de hoy a partir del anterior; null si hoy ya está apuntado.
    Es exactamente lo que comprueba la regla de `diario/$uid`. */
 export function registraDia(prev, dia) {
@@ -149,14 +159,19 @@ export function registraDia(prev, dia) {
 }
 /* ---------- partidas del club ----------
    `clubJugadas/<uid>/<juego>` = {dia, hoy, total, at}. Lo que paga es
-   `total`: la regla solo deja sumar de a uno y hasta `TOPE_CLUB_DIA` en el
-   mismo día (Chile). Las mismas cuentas que la regla: */
-export const PAGO_CLUB = 8, TOPE_CLUB_DIA = 10;
+   `total`: la regla solo deja sumar de a uno y hasta `topeClub(juego)` en
+   el mismo día (Chile). Cada juego paga según lo que dura una partida: un
+   sortEm es un minuto, una Sopa libre o un Tetris maratón son varios.
+   BBTAN se queda donde estaba (8, y 10 al día): su récord ya paga cada
+   ronda y es lo que no se puede repetir. Las mismas cuentas que la regla: */
+export const PAGO_CLUB = { minas: 20, snake: 15, tetrisclub: 25, sortem: 15, bbtan: 8, sopa: 25, electro: 20, frontera: 20 };
+export const TOPE_CLUB_DIA = 15, TOPE_BBTAN_DIA = 10;
+export const topeClub = juego => (juego === "bbtan" ? TOPE_BBTAN_DIA : TOPE_CLUB_DIA);
 export const JUEGOS_CLUB = ["minas", "snake", "tetrisclub", "sortem", "bbtan", "sopa", "electro", "frontera"];
-export function registraJugadaClub(prev, dia) {
+export function registraJugadaClub(prev, dia, juego) {
   if (!prev || !Number.isInteger(prev.dia)) return { dia, hoy: 1, total: 1 };
   if (dia < prev.dia) return null;
-  if (dia === prev.dia) return prev.hoy >= TOPE_CLUB_DIA ? null : { dia, hoy: prev.hoy + 1, total: prev.total + 1 };
+  if (dia === prev.dia) return prev.hoy >= topeClub(juego) ? null : { dia, hoy: prev.hoy + 1, total: prev.total + 1 };
   return { dia, hoy: 1, total: prev.total + 1 };
 }
 /* ---------- podios ----------
@@ -200,7 +215,7 @@ export function ganadoDe(uid, datos) {
   const dia = (d.diario || {})[uid];
   if (dia) p.dias = num(dia.bono);
   for (const [j, x] of Object.entries((d.clubJugadas || {})[uid] || {}))
-    if (JUEGOS_CLUB.includes(j) && x) p.club += PAGO_CLUB * Math.max(0, Math.floor(num(x.total)));
+    if (JUEGOS_CLUB.includes(j) && x) p.club += PAGO_CLUB[j] * Math.max(0, Math.floor(num(x.total)));
   for (const x of Object.values((d.podios || {})[uid] || {})) if (podioValido(uid, x, d.solo)) p.podios += PODIO[x.p];
   for (const k of Object.keys(p)) p[k] = Math.round(p[k]);
   return { total: Object.values(p).reduce((a, b) => a + b, 0), partes: p, logros: Object.values(tengo).reduce((a, s) => a + s.size, 0) };
