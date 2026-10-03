@@ -23,6 +23,7 @@
  */
 import { JUEGOS, ordenaRanks, porcentaje } from "./motor.js";
 import { mezcla } from "./perfil.js";
+import { rankingColeccion, cartasMasRaras, miniCarta, MOTOR } from "./prodrop-cartas.js";
 
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -87,6 +88,8 @@ const CORONA = `<svg class="jg-rk-corona" viewBox="0 0 64 44" aria-hidden="true"
 
 /* Cuántas victorias son `n` puntos: cada una vale 3. */
 const victorias = n => Math.max(1, Math.ceil(n / 3));
+/* No «cartas»: esa clave ya es la de Cartas de los tres elementos. */
+const CARTAS = "prodrop";
 const plural = (n, uno, varios) => `${n} ${n === 1 ? uno : varios}`;
 
 export function crearRanks(ctx) {
@@ -104,7 +107,7 @@ export function crearRanks(ctx) {
      de quien entra aquí es «¿quién va ganando?», no «¿quién va ganando
      a Órbita?», que era lo que contestaba por ser el primero del objeto. */
   let juego = "general";
-  try { const g = localStorage.getItem("jg.rankJuego"); if (g && (g === "general" || JUEGOS[g] || EXTRA[g])) juego = g; } catch (e) { /* sin almacenamiento */ }
+  try { const g = localStorage.getItem("jg.rankJuego"); if (g && (g === "general" || g === CARTAS || JUEGOS[g] || EXTRA[g])) juego = g; } catch (e) { /* sin almacenamiento */ }
   const icono = ctx.icono || {};
   let categoriaSolo = "";
   const eleccion = {};
@@ -117,6 +120,9 @@ export function crearRanks(ctx) {
      tabla y cada uno repinta, y el podio no puede estar subiendo sin fin. */
   let animado = "";
   let firma = "";
+  /* La pestaña de cartas no lee `ranks`: sale de la economía de PRODROP
+     (`ctx.datos`, la misma lectura que usa el vestíbulo). */
+  let datosC = null, pararC = null, firmaC = "";
 
   function montar(donde) {
     host = donde;
@@ -124,6 +130,7 @@ export function crearRanks(ctx) {
       <div class="jg-ranks">
         <div class="jg-bar-juegos" id="rkJuegos"></div>
         <div id="rkSolo"></div><div id="rkAviso"></div>
+        <div id="rkCartas" hidden></div>
         <section class="jg-rk" id="rkEscena"></section>
         <div class="jg-tabla-caja"><table class="jg-tabla" id="rkTabla"></table></div>
         <p class="jg-nota-larga">
@@ -142,13 +149,20 @@ export function crearRanks(ctx) {
   function destruir() {
     muerto = true;
     if (parar) { try { parar(); } catch (e) {} parar = null; }
+    if (pararC) { try { pararC(); } catch (e) {} pararC = null; }
     if (host) { host.removeEventListener("click", alClic); host.innerHTML = ""; }
     host = null;
   }
 
   function escucha() {
     if (parar) { try { parar(); } catch (e) {} parar = null; }
-    cargando = true; fallo = ""; filas = []; pinta();
+    cargando = true; fallo = ""; filas = [];
+    if (juego === CARTAS) {
+      if (!pararC && ctx.datos) pararC = ctx.datos(d => { if (!muerto) { datosC = d; pinta(); } });
+      pinta();
+      return;
+    }
+    pinta();
     const individual = esSolo(juego);
     const oye = juego === "general" ? (_, cb) => ctx.watchTodos((todo, err) => cb(suma(todo), err))
       : individual ? ctx.watchSolo : watchRanks;
@@ -194,13 +208,19 @@ export function crearRanks(ctx) {
          ${k === juego ? 'aria-current="true"' : ""}><i aria-hidden="true">${esc(icono[k] || "●")}</i>${esc(j.nombre)}</button>`;
     el.innerHTML = boton("general", { nombre: "General", color: "#7c5cff" }) +
       `<span class="jg-rk-sep">En sala</span>` + orden.map(k => boton(k, JUEGOS[k]) + (k === "yemas" ? boton("yzombis", EXTRA.yzombis) : "")).join("") +
-      `<span class="jg-rk-sep">Un jugador</span>` + Object.entries(EXTRA).filter(([, j]) => !j.sala).map(([k, j]) => boton(k, j)).join("");
+      `<span class="jg-rk-sep">Un jugador</span>` + Object.entries(EXTRA).filter(([, j]) => !j.sala).map(([k, j]) => boton(k, j)).join("") +
+      (ctx.datos ? `<span class="jg-rk-sep">PRODROP</span>` + boton(CARTAS, { nombre: "Cartas", color: "#c084fc" }) : "");
     const on = el.querySelector(".on");
     if (on && el.scrollWidth > el.clientWidth) el.scrollLeft = on.offsetLeft - el.clientWidth / 2 + on.offsetWidth / 2;
   }
 
   function pinta() {
     if (!host) return;
+    const deCartas = juego === CARTAS;
+    for (const sel of ["#rkEscena", ".jg-tabla-caja", ".jg-nota-larga"]) { const x = host.querySelector(sel); if (x) x.hidden = deCartas; }
+    const caja = host.querySelector("#rkCartas");
+    if (caja) caja.hidden = !deCartas;
+    if (deCartas) { const av = host.querySelector("#rkAviso"); if (av) av.innerHTML = ""; pintaCartas(caja); return; }
     const av = host.querySelector("#rkAviso");
     if (av) av.innerHTML = fallo
       ? `<div class="jg-aviso">No se puede leer la clasificación (<code>${esc(fallo)}</code>).
@@ -253,6 +273,50 @@ export function crearRanks(ctx) {
       <td class="jg-num">${f.mejorRacha || 0}</td>
       <td class="jg-num jg-pts">${f.puntos || 0}</td>
     </tr>`;
+  }
+
+  /* ---- PRODROP: colección y cartas más raras ---- */
+  function nombreDe(u) {
+    const q = ctx.quien ? ctx.quien(u) : mezcla({ uid: u, nombre: "" }, perfil(u));
+    return { nombre: (q && q.nombre) || "Sin nombre", foto: (q && q.foto) || "" };
+  }
+  function quienHtml(u) {
+    const q = nombreDe(u);
+    return `<span class="jg-jug jg-rkc-quien" data-perfil="${esc(u)}" data-nombre="${esc(q.nombre)}">
+      ${q.foto ? `<img class="jg-foto" src="${esc(q.foto)}" alt="" referrerpolicy="no-referrer">`
+               : `<span class="jg-foto jg-sin">${esc(q.nombre.slice(0, 1).toUpperCase())}</span>`}
+      <span>${esc(q.nombre)}${u === uid ? " <b>(tú)</b>" : ""}</span></span>`;
+  }
+  const unoEn = p => { const n = Math.round(1 / p); return n >= 1e6 ? `${(n / 1e6).toLocaleString("es-CL", { maximumFractionDigits: 1 })} millones` : n.toLocaleString("es-CL"); };
+  function pintaCartas(el) {
+    if (!el) return;
+    const col = rankingColeccion(datosC), raras = cartasMasRaras(datosC);
+    if (!col || !raras) { el.innerHTML = `<p class="jg-vacio">Cargando las cartas…</p>`; return; }
+    const html = `
+      <section class="jg-rkc">
+        <h2>Colección más completa</h2>
+        <p class="jg-rkc-sub">Cartas distintas que cada uno tiene ahora, de ${col[0] ? col[0].total : ""} en total. Las repetidas cuentan una vez.</p>
+        ${col.length ? `<ol class="jg-rkc-lista">${col.map((f, i) => `
+          <li class="${f.uid === uid ? "jg-yo" : ""}">
+            <span class="jg-rkc-n">${puesto(i)}</span>${quienHtml(f.uid)}
+            <span class="jg-rkc-barra" title="${f.tiene} de ${f.total}"><i style="width:${(100 * f.tiene / f.total).toFixed(1)}%"></i></span>
+            <b class="jg-rkc-cuenta">${f.tiene}/${f.total}</b>
+            <small class="jg-rkc-extra">${f.leyendas ? `${esc(MOTOR.TIERS[3].sym)} ${f.leyendas} ${f.leyendas === 1 ? "legendaria" : "legendarias"} · ` : ""}${f.copias} ${f.copias === 1 ? "copia" : "copias"}</small>
+          </li>`).join("")}</ol>` : `<p class="jg-vacio">Nadie tiene cartas todavía. <a href="#cartas">Abrir un sobre →</a></p>`}
+      </section>
+      <section class="jg-rkc">
+        <h2>Las cartas más raras</h2>
+        <p class="jg-rkc-sub">Solo graduadas. Más rara es la que menos probabilidad tenía de salir con esa nota o más.</p>
+        ${raras.length ? `<ol class="jg-rkc-lista jg-rkc-raras">${raras.map((c, i) => `
+          <li class="${c.dueno === uid ? "jg-yo" : ""}">
+            <span class="jg-rkc-n">${puesto(i)}</span>
+            <span class="jg-rkc-carta">${miniCarta(c)}</span>
+            <span class="jg-rkc-info"><b>${esc(c.carta.name)}</b><small>${esc(MOTOR.TIERS[c.carta.tier].label)} · ${esc(MOTOR.subtitulo(c.carta))}</small><small>Nota ${c.g} · 1 en ${unoEn(c.p)} sobres</small></span>
+            ${quienHtml(c.dueno)}
+          </li>`).join("")}</ol>` : `<p class="jg-vacio">Todavía nadie ha graduado una carta.</p>`}
+      </section>`;
+    /* Por firma: llegan perfiles uno a uno y cada uno repinta. */
+    if (html !== firmaC) { firmaC = html; el.innerHTML = html; }
   }
 
   function puesto(i) {

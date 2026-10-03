@@ -1144,7 +1144,8 @@ function armazon() {
   if (state.vista === "ranks") {
     h.innerHTML = "";
     ranks = crearRanks({ uid: state.user.uid, watchRanks: fb.watchRanks, watchSolo: fb.watchSolo, watchTodos: fb.watchRanksTodos,
-      perfil: perfilDe, icono: ICONO_TODOS, orden: () => ordenPopular(Object.keys(JUEGOS)) });
+      perfil: perfilDe, icono: Object.assign({ prodrop: "🃏" }, ICONO_TODOS), orden: () => ordenPopular(Object.keys(JUEGOS)),
+      datos: datosPerfil, quien: u => quien(u, perfilDe(u), null, { nombre: datosP ? nombreEnDatos(u, datosP) : "" }, colorForUid) });
     ranks.montar(h);
     return;
   }

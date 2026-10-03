@@ -8,7 +8,7 @@ const PM=require('../../juegos/prodrop/motor.js');
 const sin=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8').replace(/^import [\s\S]*?;$/mg,'').replace(/\bexport\s+/g,'');
 const ctx={__PM:PM};vm.createContext(ctx);
 vm.runInContext('const PM=__PM;'+sin('src/juegos/motor.js')+'\n'+sin('src/juegos/logros.js')+'\n'+sin('src/juegos/monedas.js')+'\n'+sin('src/juegos/prodrop-cartas.js')+
- ';globalThis.__M={monedasDe,economia,copiasDe,proximoGratis,claveCopia,topMonedas,exhibidasDe,mejoresDrops,cifras,miniCarta}',ctx);
+ ';globalThis.__M={monedasDe,economia,copiasDe,proximoGratis,claveCopia,topMonedas,exhibidasDe,mejoresDrops,cifras,miniCarta,rankingColeccion,cartasMasRaras}',ctx);
 const M=ctx.__M;
 
 test('el catálogo: 17 personas por 9 variantes, con su imagen',()=>{
@@ -265,4 +265,28 @@ test('re-roll: a veces sube dos o tres calidades (común 92/7,5/0,5 %, rara 96/4
  assert.ok(Math.abs(c1[2]/n-.96)<.005,'épica desde rara '+c1[2]/n);
  assert.ok(Math.abs(c1[3]/n-.04)<.005,'legendaria desde rara '+c1[3]/n);
  for(let i=0;i<300;i++)assert.equal(PM.CARDS[PM.reroll('usrAAAA','-Nv'+i+'abcdefgh',PM.SALTOS_DESDE-1-i,0,Array(10).fill(7)).id].tier,1);
+});
+
+test('clasificación de cartas: colección (distintas) y las graduadas más raras, con su dueño de ahora',()=>{
+ const u='usrAAAA',v='usrBBBB';
+ const ka='-Nka000000000000a',kb='-Nka000000000000b',kc='-Nkb000000000000c';
+ const s={[u]:{[ka]:{at:100,p:0},[kb]:{at:200,p:50}},[v]:{[kc]:{at:300,p:50}}};
+ const d=conGanado({[u]:2000,[v]:2000},0,{cartas:{s,g:{[u]:{[ka]:{0:{at:400,p:100},3:{at:401,p:100}}},[v]:{[kc]:{2:{at:402,p:100}}}}},mercado:{o:{},t:{}}});
+ const col=M.rankingColeccion(d);
+ const distintas=(o,ks)=>new Set(ks.flatMap(k=>PM.sobre(o,k,s[o][k].at).cartas.map(c=>c.id))).size;
+ const fu=col.find(f=>f.uid===u),fv=col.find(f=>f.uid===v);
+ assert.equal(fu.tiene,distintas(u,[ka,kb]));assert.equal(fu.copias,10);assert.equal(fu.total,153);
+ assert.equal(fv.tiene,distintas(v,[kc]));assert.equal(fv.copias,5);
+ assert.ok(col[0].tiene>=col[1].tiene,'ordenada por cartas distintas');
+ const r=M.cartasMasRaras(d);
+ assert.equal(r.length,3,'solo las tres graduadas');
+ assert.ok(r.every(c=>c.gr));
+ for(let i=1;i<r.length;i++)assert.ok(r[i-1].p<=r[i].p,'de más rara a menos rara');
+ for(const c of r)assert.equal(c.p,PM.probabilidad(c.id,c.g).exacta);
+ assert.equal(JSON.stringify(r.map(c=>c.dueno).sort()),JSON.stringify([u,u,v].sort()));
+ // vendida en el mercado, la carta pasa a su comprador y la tabla lo dice
+ const cc=u+'~'+ka+'.0';
+ const d2=conGanado({[u]:2000,[v]:2000},0,{cartas:d.cartas,mercado:{o:{o1:{u,c:cc,p:10,at:500,v:{u:v,at:600}}},t:{}}});
+ assert.equal(M.cartasMasRaras(d2).find(c=>c.c===cc).dueno,v);
+ assert.equal(M.rankingColeccion({completo:false}),null);
 });

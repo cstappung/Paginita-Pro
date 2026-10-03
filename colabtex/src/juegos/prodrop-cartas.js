@@ -62,6 +62,54 @@ export function mejoresDrops(datos, n = 8) {
   return out.filter(Boolean).sort((a, b) => b.at - a.at || (a.k < b.k ? -1 : a.k > b.k ? 1 : 0) || b.i - a.i).slice(0, n);
 }
 
+/* Para las dos tablas de cartas de la Clasificación: cada copia que
+   existe ahora, con su dueño de *ahora* (la compró, la recibió o la sacó
+   del sobre). Una por `datos`, que es lo que invalida la economía. */
+const memoCopias = new WeakMap();
+function copiasVivas(datos) {
+  const e = ecoDe(datos);
+  if (!e) return null;
+  if (memoCopias.has(e)) return memoCopias.get(e);
+  const out = [];
+  for (const [cc, u] of Object.entries(e.dueno)) {
+    const q = leeCopia(cc), c = q && copia(e, q.o, q.k, q.i);
+    if (c && u) out.push(c);
+  }
+  memoCopias.set(e, out);
+  return out;
+}
+
+/* Top de colección: cuántas cartas distintas de las TOTAL tiene cada
+   cuenta ahora (graduadas o no; repetidas cuentan una vez). En empate,
+   más legendarias, luego más copias. */
+export function rankingColeccion(datos, n = 10) {
+  const l = copiasVivas(datos);
+  if (!l) return null;
+  const por = {};
+  for (const c of l) {
+    const a = por[c.dueno] || (por[c.dueno] = { uid: c.dueno, ids: new Set(), copias: 0, leyendas: new Set() });
+    a.ids.add(c.id); a.copias++;
+    if (c.carta.tier === 3) a.leyendas.add(c.id);
+  }
+  return Object.values(por)
+    .map(a => ({ uid: a.uid, tiene: a.ids.size, total: PM.TOTAL, copias: a.copias, leyendas: a.leyendas.size }))
+    .sort((a, b) => b.tiene - a.tiene || b.leyendas - a.leyendas || b.copias - a.copias || (a.uid < b.uid ? -1 : 1))
+    .slice(0, n);
+}
+
+/* Top de cartas más raras: solo las graduadas (la nota de una sin graduar
+   nadie la conoce). Lo raro se mide con lo mismo que anuncia el abridor
+   al graduar: la probabilidad de sacar *esa* carta con esa nota o más en
+   un sobre (`probabilidad(id, g).exacta`); cuanto menor, más rara. */
+export function cartasMasRaras(datos, n = 10) {
+  const l = copiasVivas(datos);
+  if (!l) return null;
+  return l.filter(c => c.gr)
+    .map(c => Object.assign({}, c, { p: PM.probabilidad(c.id, c.g).exacta }))
+    .sort((a, b) => a.p - b.p || b.g - a.g || b.carta.tier - a.carta.tier || a.at - b.at || (a.c < b.c ? -1 : 1))
+    .slice(0, n);
+}
+
 /* Cuántos sobres se han abierto, en total y god packs. */
 export function cifras(datos) {
   const e = ecoDe(datos);

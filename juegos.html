@@ -2350,6 +2350,30 @@ html[data-tema=oscuro] .jg-guia{--gv-borde:#46405a;--gv-papel:#262236;--gv-tinta
 /* Selector de la clasificación y de los logros: pastillas con el icono del
    juego y su color, en el orden de popularidad del vestíbulo. En el móvil
    son una tira que se desliza en vez de cuatro filas de botones. */
+.jg-rkc{background:#fff;border:1px solid #0000001a;border-radius:16px;padding:16px 18px;margin:0 0 16px}
+.jg-rkc h2{margin:0 0 2px;font-size:18px}
+.jg-rkc-sub{margin:0 0 12px;color:var(--jg-muted);font-size:13px}
+.jg-rkc-lista{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.jg-rkc-lista li{display:grid;grid-template-columns:34px minmax(0,1fr) minmax(80px,1.2fr) auto;align-items:center;gap:10px;padding:7px 10px;border-radius:12px;background:#00000006}
+.jg-rkc-lista li.jg-yo{background:color-mix(in srgb,#c084fc 16%,transparent)}
+.jg-rkc-n{text-align:center;font-weight:700}
+.jg-rkc-quien{display:flex;align-items:center;gap:8px;min-width:0;cursor:pointer}
+.jg-rkc-quien>span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jg-rkc-barra{height:10px;border-radius:99px;background:#0000000f;overflow:hidden}
+.jg-rkc-barra i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#7c5cff,#c084fc,#f5c542)}
+.jg-rkc-cuenta{font-variant-numeric:tabular-nums;font-size:15px}
+.jg-rkc-extra{grid-column:2/-1;margin-top:-4px;color:var(--jg-muted);font-size:11.5px}
+.jg-rkc-raras li{grid-template-columns:34px 52px minmax(0,1fr) minmax(0,1fr)}
+.jg-rkc-carta .jg-cc{width:52px}
+.jg-rkc-carta .jg-cc figcaption{display:none}
+.jg-rkc-info{display:grid;min-width:0}
+.jg-rkc-info b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jg-rkc-info small{color:var(--jg-muted);font-size:12px}
+@media (max-width:600px){.jg-rkc{padding:12px}.jg-rkc-lista li{grid-template-columns:28px minmax(0,1fr) auto}.jg-rkc-barra{grid-column:2/-1;grid-row:2}.jg-rkc-extra{grid-row:3}
+  .jg-rkc-raras li{grid-template-columns:28px 46px minmax(0,1fr)}.jg-rkc-raras .jg-rkc-quien{grid-column:3}.jg-rkc-carta .jg-cc{width:46px}}
+html[data-tema=oscuro] .jg-rkc{background:var(--os-sup);border-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-rkc-lista li{background:#ffffff08}
+html[data-tema=oscuro] .jg-rkc-barra{background:#ffffff14}
 .jg-rk-sel{display:inline-flex;align-items:center;gap:7px;padding:7px 13px 7px 9px;border:1px solid #0000001a;border-radius:999px;background:#fff;color:var(--jg-ink);font:inherit;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;transition:background .15s,transform .15s}
 .jg-rk-sel i{font-style:normal;display:grid;place-items:center;width:22px;height:22px;border-radius:50%;background:color-mix(in srgb,var(--c) 18%,transparent);font-size:12px;line-height:1}
 .jg-rk-sel:hover{background:color-mix(in srgb,var(--c) 10%,#fff);transform:translateY(-1px)}
@@ -3340,6 +3364,6 @@ html[data-tema=oscuro] .jg-drop-quien:hover b{color:#fff}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610030111"></script>
+<script src="juegos-app.js?v=202610030237"></script>
 </body>
 </html>
