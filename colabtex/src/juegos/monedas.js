@@ -83,7 +83,10 @@ export const NIVEL = {
   yemas: F + "133243", clue: F + "321233",
   minas: "1232323344", snake: "2222221334", tetrisclub: "1231234124",
   sortem: "1121223434", bbtan: "1122333444", sopa: "1124112333", electro: "1123412334",
-  frontera: "1234422134"
+  frontera: "1234422134",
+  /* Sudoku Arcade, en el orden de LOGROS.sudoku: dia1 racha3 racha7
+     racha30 · facil experto medio5 dificil10 · a10000 a25000. */
+  sudoku: "1124133324"
 };
 export function nivelDe(juego, id) {
   const l = LOGROS[juego] || [], i = l.findIndex(x => x.id === id);
@@ -93,7 +96,7 @@ export const valorLogro = (juego, id) => VALOR_NIVEL[nivelDe(juego, id)] || 0;
 
 /* Récords del club: lo que paga tener marca en una modalidad, y el extra
    que sale de la marca misma donde la marca es la dificultad. */
-export const RECORD = { minas: 60, snake: 20, tetrisclub: 50, sortem: 50, bbtan: 50, sopa: 30, electro: 30, frontera: 40 };
+export const RECORD = { minas: 60, snake: 20, tetrisclub: 50, sortem: 50, bbtan: 50, sopa: 30, electro: 30, frontera: 40, sudoku: 40 };
 /* BBTAN: cada ronda n paga ⌊n/4⌋, acumulado hasta la ronda del récord
    (1 a 3 no pagan, 4 y 5 pagan 1 cada una: llegar a la 5 da 2). */
 export function monedasBbtan(ronda) {
@@ -127,7 +130,10 @@ function extraRecord(cat, f) {
   if (cat === "club-bbtan-rondas") return monedasBbtan(f.puntos);
   const so = /^club-sortem-(\d+)$/.exec(cat);
   if (so) return monedasSortem(+so[1], f.tiempo);
-  if (cat === "club-sopa-racha" || cat === "club-electro-racha") return 10 * Math.min(f.puntos || 0, 60);
+  if (cat === "club-sopa-racha" || cat === "club-electro-racha" || cat === "club-sudoku-racha") return 10 * Math.min(f.puntos || 0, 60);
+  /* Sudoku Arcade: el récord del arcade paga 1 moneda por cada 1000
+     puntos (con tope, para que una marca absurda no compre la tienda). */
+  if (cat === "club-sudoku-arcade") return Math.floor(Math.min(f.puntos || 0, 200000) / 1000);
   /* Un día perfecto de Electrodle son 700 puntos: 14 monedas. */
   if (cat === "club-electro-puntos") return Math.floor(Math.min(f.puntos || 0, 100000) / 50);
   return 0;
@@ -164,10 +170,10 @@ export function registraDia(prev, dia) {
    sortEm es un minuto, una Sopa libre o un Tetris maratón son varios.
    BBTAN se queda donde estaba (8, y 10 al día): su récord ya paga cada
    ronda y es lo que no se puede repetir. Las mismas cuentas que la regla: */
-export const PAGO_CLUB = { minas: 20, snake: 15, tetrisclub: 25, sortem: 15, bbtan: 8, sopa: 25, electro: 20, frontera: 20 };
+export const PAGO_CLUB = { minas: 20, snake: 15, tetrisclub: 25, sortem: 15, bbtan: 8, sopa: 25, electro: 20, frontera: 20, sudoku: 20 };
 export const TOPE_CLUB_DIA = 15, TOPE_BBTAN_DIA = 10;
 export const topeClub = juego => (juego === "bbtan" ? TOPE_BBTAN_DIA : TOPE_CLUB_DIA);
-export const JUEGOS_CLUB = ["minas", "snake", "tetrisclub", "sortem", "bbtan", "sopa", "electro", "frontera"];
+export const JUEGOS_CLUB = ["minas", "snake", "tetrisclub", "sortem", "bbtan", "sopa", "electro", "frontera", "sudoku"];
 export function registraJugadaClub(prev, dia, juego) {
   if (!prev || !Number.isInteger(prev.dia)) return { dia, hoy: 1, total: 1 };
   if (dia < prev.dia) return null;

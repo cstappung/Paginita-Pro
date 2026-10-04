@@ -64,3 +64,12 @@ test('fuera del podio o categoría rara, no hay mensaje; tiempos en buscaminas y
  assert.equal(marcaSolo('club-bbtan-rondas',{puntos:42,tiempo:1}),'🟩 Ronda 42');
  assert.ok(mensajePodio({categoria:'club-sortem-10',uid:'a',nombre:'Ana',puesto:1,filas:[{uid:'a',nombre:'Ana',puntos:10,tiempo:9000}],enlace:'https://x/juegos.html#solo/sortem'}));
 });
+test('Sudoku Arcade: nombre, modalidades y marcas',()=>{
+ assert.equal(categoriaLegible('club-sudoku-arcade').club.nombre,'Sudoku Arcade');
+ assert.equal(categoriaLegible('club-sudoku-experto').modalidad,'Experto');
+ assert.equal(categoriaLegible('club-sudoku-racha').modalidad,'racha diaria');
+ assert.equal(marcaSolo('club-sudoku-racha',{puntos:1,tiempo:1}),'🔥 1 día seguidos');
+ assert.equal(marcaSolo('club-sudoku-dificil',{puntos:1,tiempo:83450}),'⏱️ 1:23.45');
+ assert.match(marcaSolo('club-sudoku-arcade',{puntos:12500,tiempo:1}),/^🕹️ 12.500 pts$/);
+ assert.ok(mensajePodio({categoria:'club-sudoku-arcade',uid:'a',nombre:'Ana',puesto:1,filas:[{uid:'a',nombre:'Ana',puntos:900,tiempo:9000}],enlace:'https://x/juegos.html#solo/sudoku'}));
+});

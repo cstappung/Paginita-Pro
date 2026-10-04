@@ -32,7 +32,7 @@ const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
 /* Los tres metales, en el orden del puesto. */
 const METAL = ["oro", "plata", "bronce"];
 const TITULO = ["Campeón", "Subcampeón", "Tercer puesto"];
-const EXTRA = { yzombis: { nombre: "Yemas zombis", color: "#7bd34a", sala: true }, minas: { nombre: "Mina Club", color: "#eeb765" }, snake: { nombre: "Snake Club", color: "#4be9bc" }, tetrisclub: { nombre: "Tetris Club", color: "#b04ee8" }, sortem: { nombre: "sortEm", color: "#ff006e" }, bbtan: { nombre: "BBTAN", color: "#c4f568" }, sopa: { nombre: "Sopa de letras", color: "#5b8cff" }, electro: { nombre: "Electrodle", color: "#f5a524" }, frontera: { nombre: "Frontera Batalla", color: "#e0743a" } };
+const EXTRA = { yzombis: { nombre: "Yemas zombis", color: "#7bd34a", sala: true }, minas: { nombre: "Mina Club", color: "#eeb765" }, snake: { nombre: "Snake Club", color: "#4be9bc" }, tetrisclub: { nombre: "Tetris Club", color: "#b04ee8" }, sortem: { nombre: "sortEm", color: "#ff006e" }, bbtan: { nombre: "BBTAN", color: "#c4f568" }, sopa: { nombre: "Sopa de letras", color: "#5b8cff" }, electro: { nombre: "Electrodle", color: "#f5a524" }, frontera: { nombre: "Frontera Batalla", color: "#e0743a" }, sudoku: { nombre: "Sudoku Arcade", color: "#ff2fb4" } };
 
 /* Las categorías de los juegos individuales, como botones y no como un
    desplegable: son pocas, se leen de un vistazo y cambiar de una a otra
@@ -67,6 +67,11 @@ const SOLO = {
       { k: "i", t: "Instalación", ops: [["torre", "Torre Batalla"], ["palacio", "Palacio Batalla"], ["fabrica", "Fábrica Batalla"], ["victorias", "Victorias totales"]] },
       { k: "n", t: "Nivel", ops: [["50", "Nivel 50"], ["abierto", "Nivel Abierto"]], si: e => e.i !== "victorias" }],
     cat: s => s.i === "victorias" ? "club-frontera-victorias" : `club-frontera-${s.i}-${s.n}`, def: { n: "50" } },
+  /* Sudoku Arcade: la racha del diario (días), el arcade (puntos) y el
+     clásico por dificultad (tiempo). Una sola fila: cada opción ya es
+     una tabla. */
+  sudoku: { filas: [{ k: "m", t: "Tabla", ops: [["racha", "Racha diaria"], ["arcade", "Arcade"], ["facil", "Clásico · Fácil"], ["medio", "Clásico · Medio"], ["dificil", "Clásico · Difícil"], ["experto", "Clásico · Experto"]] }],
+    cat: s => `club-sudoku-${s.m}` },
   snake: { filas: [
       { k: "m", t: "Modo", ops: [["classic", "Clásico"], ["arcade", "Arcade"], ["portals", "Portales"], ["reloj", "Contrarreloj"], ["espejo", "Espejo"], ["laberinto", "Laberinto"]] },
       { k: "t", t: "Mapa", ops: [["chico", "Chico"], ["mediano", "Mediano"], ["grande", "Grande"], ["gigante", "Gigante"]] }],
@@ -330,14 +335,15 @@ export function crearRanks(ctx) {
      buscaminas se ganan por tiempo (menos es mejor); el resto, por puntos. */
   function medida(solo) {
     if (solo && (categoriaSolo.startsWith("club-minas-") || categoriaSolo.startsWith("club-sortem-") || categoriaSolo === "club-tetris-sprint" ||
-        (categoriaSolo.startsWith("club-sopa-") && categoriaSolo !== "club-sopa-racha")))
+        (categoriaSolo.startsWith("club-sopa-") && categoriaSolo !== "club-sopa-racha") ||
+        /^club-sudoku-(facil|medio|dificil|experto)$/.test(categoriaSolo)))
       return { valor: f => (f.tiempo || 0) / 1000, txt: v => `${v.toFixed(2)} s`, unidad: "", menor: true };
     /* BBTAN se mide en rondas alcanzadas, no en puntos. */
     if (solo && (categoriaSolo.startsWith("club-bbtan-") || categoriaSolo.startsWith("yemas-zombis-")))
       return { valor: f => f.puntos || 0, txt: v => `ronda ${v}`, unidad: "", menor: false };
     if (solo && categoriaSolo.startsWith("club-frontera-"))
       return { valor: f => f.puntos || 0, txt: v => `${v} ${v === 1 ? "victoria" : "victorias"}`, unidad: "", menor: false };
-    if (solo && (categoriaSolo === "club-sopa-racha" || categoriaSolo === "club-electro-racha"))
+    if (solo && (categoriaSolo === "club-sopa-racha" || categoriaSolo === "club-electro-racha" || categoriaSolo === "club-sudoku-racha"))
       return { valor: f => f.puntos || 0, txt: v => `${v} ${v === 1 ? "día" : "días"}`, unidad: "", menor: false };
     return { valor: f => f.puntos || 0, txt: v => String(v), unidad: "pts", menor: false };
   }

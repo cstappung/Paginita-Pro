@@ -310,6 +310,22 @@ const SOLO = {
     { id: "v10", n: "Habitual", d: "Gana 10 combates en la Frontera.", i: "🎫", m: "Victorias", s: d => cat(/-victorias$/)(d) && d.puntos >= 10 },
     { id: "v100", n: "Veterano", d: "Gana 100 combates en la Frontera.", i: "🎖️", m: "Victorias", s: d => cat(/-victorias$/)(d) && d.puntos >= 100 },
     { id: "v500", n: "Residente", d: "Gana 500 combates en la Frontera.", i: "🏆", m: "Victorias", s: d => cat(/-victorias$/)(d) && d.puntos >= 500 }
+  ],
+  /* Sudoku Arcade. La racha sale de club-sudoku-racha (puntos = días
+     seguidos con el diario resuelto); los del clásico, de las cuatro
+     tablas por dificultad (puntos fijos en 1: lo que cuenta es el tiempo,
+     en ms); los del arcade, de club-sudoku-arcade (puntos de la partida). */
+  sudoku: [
+    { id: "dia1", n: "Sudoku del día", d: "Resuelve un sudoku diario.", i: "🔢", m: "Diario", s: cat(/-racha$/) },
+    { id: "racha3", n: "Tres al hilo", d: "Llega a una racha de 3 días.", i: "🔥", m: "Diario", s: d => cat(/-racha$/)(d) && d.puntos >= 3 },
+    { id: "racha7", n: "Semana de nueve en nueve", d: "Llega a una racha de 7 días.", i: "📅", m: "Diario", s: d => cat(/-racha$/)(d) && d.puntos >= 7 },
+    { id: "racha30", n: "Un mes de cuadrículas", d: "Llega a una racha de 30 días.", i: "🗓️", m: "Diario", s: d => cat(/-racha$/)(d) && d.puntos >= 30 },
+    { id: "facil", n: "Insert coin", d: "Resuelve un clásico en Fácil.", i: "🪙", m: "Clásico", s: cat(/-facil$/) },
+    { id: "experto", n: "Nivel experto", d: "Resuelve un clásico en Experto.", i: "🧠", m: "Clásico", s: cat(/-experto$/) },
+    { id: "medio5", n: "Contra el reloj", d: "Resuelve un clásico Medio en menos de 5 min.", i: "⏱️", m: "Clásico", s: d => cat(/-medio$/)(d) && d.tiempo < 300000 },
+    { id: "dificil10", n: "Sangre fría", d: "Resuelve un clásico Difícil en menos de 10 min.", i: "🧊", m: "Clásico", s: d => cat(/-dificil$/)(d) && d.tiempo < 600000 },
+    { id: "a10000", n: "Combo arcade", d: "Haz 10 000 puntos en una partida arcade.", i: "🕹️", m: "Arcade", s: d => cat(/-arcade$/)(d) && d.puntos >= 10000 },
+    { id: "a25000", n: "Récord de recreativa", d: "Haz 25 000 puntos en una partida arcade.", i: "👾", m: "Arcade", s: d => cat(/-arcade$/)(d) && d.puntos >= 25000 }
   ]
 };
 
@@ -319,7 +335,7 @@ export const LOGROS = Object.fromEntries([
   ...Object.entries(SOLO)
 ]);
 /* Qué categorías de `soloRanks` alimentan cada juego individual. */
-export const SOLO_PREFIJO = { minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-", electro: "club-electro-", frontera: "club-frontera-" };
+export const SOLO_PREFIJO = { minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-", electro: "club-electro-", frontera: "club-frontera-", sudoku: "club-sudoku-" };
 
 /* Los logros de partida que `uid` tiene ya en esta, según lo que se ve. */
 export function detecta(p, est, uid) {

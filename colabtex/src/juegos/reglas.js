@@ -739,6 +739,40 @@ const REGLAS = {
       ["Puntos, racha y clasificación", "Cada modo de adivinar vale 100 puntos a la primera y 10 menos por cada intento extra, nunca menos de 10. Bandas y Circuito valen lo mismo, con un mínimo de 50, y Conexiones 100 menos 20 por error; un desafío que se pierde no suma. Los puntos se acumulan día a día. La 🔥 racha cuenta los días seguidos en que aciertas Componente, Fórmula y Símbolo (los desafíos son puntos extra). En la Clasificación compiten los puntos totales y la racha; en empate gana quien tardó menos. Subir al podio se anuncia en Discord."]
     ]
   },
+  /* Sudoku Arcade (juegos/club/sudoku/): lo que dice aquí tiene que
+     coincidir con su motor.js (puntos del arcade, racha) y su game.js
+     (teclas, pistas). */
+  sudoku: {
+    lema: "Sudoku Arcade: llena la cuadrícula de 9×9 sin repetir números, en un diario, en el clásico o contra el marcador.",
+    secciones: [
+      ["Cómo se juega", "La cuadrícula tiene 9 filas, 9 columnas y 9 cajas de 3×3. Cada una tiene que llevar del 1 al 9 una sola vez. Los números que vienen puestos son pistas y no se pueden cambiar. Elige una casilla y escribe un número: con el teclado de abajo, con las teclas del 1 al 9 o con el teclado numérico. Cada sudoku tiene una sola solución, así que nunca hace falta adivinar."],
+      ["Los modos", lista([
+        "<b>Diario</b>: un sudoku de dificultad Media, el mismo para todo el sitio. Cambia a medianoche de Chile, aunque estés en otro huso horario, y se juega una vez al día. Si lo dejas a medias, al volver sigue donde estaba.",
+        "<b>Clásico</b>: un sudoku nuevo cada vez, en Fácil, Medio, Difícil o Experto. No hay vidas: un número que choca con otro se marca en rojo y puedes corregirlo. Compite el tiempo.",
+        "<b>Arcade</b>: dificultad Media y tres vidas. Aquí solo entra el número correcto; los puntos dependen de lo seguido que aciertes."
+      ])],
+      ["Las dificultades", lista([
+        "<b>Fácil</b>: se resuelve buscando el único número que cabe en una casilla o el único sitio de un número en una fila, columna o caja.",
+        "<b>Medio</b>: además hay que descartar números que una caja «empuja» a una fila o columna, y pares de casillas que se reparten dos números.",
+        "<b>Difícil</b>: pide pares ocultos y tríos.",
+        "<b>Experto</b>: pide técnicas avanzadas como el X-Wing, el XY-Wing o el Swordfish. Lo que cuenta es la técnica que exige el sudoku, no cuántas pistas trae."
+      ])],
+      ["Arcade: vidas, combo y bonus", lista([
+        "Un número equivocado <b>no se coloca</b>: se ve un instante en rojo, pierdes una ❤ y el combo vuelve a cero. Con las tres vidas perdidas se acaba la partida, pero los puntos que hiciste cuentan igual.",
+        "Cada acierto vale 50 puntos por el <b>combo</b>: el primero ×1 y cada acierto seguido suma un 25 %, hasta ×4.",
+        "Completar una <b>fila, columna o caja</b> da 150 más, y cerrar las tres de una vez, 300 extra, todo multiplicado por el combo.",
+        "Al terminar el sudoku sumas un <b>bonus de tiempo</b> (5 puntos por cada segundo por debajo de 10 minutos) y 500 por cada vida que te quede."
+      ])],
+      ["Notas, deshacer y pistas", "Con <b>Notas</b> (o la tecla N) escribes candidatos pequeños en vez del número; al poner un número se borra de las notas de su fila, columna y caja. <b>Deshacer</b> (U o Ctrl+Z) vuelve atrás la última jugada; en Arcade solo deshace notas, porque lo colocado ya es correcto. En el Clásico hay <b>pistas</b> (H): ponen el número correcto, pero cada una suma 30 segundos a tu tiempo."],
+      ["Controles", lista([
+        "Clic o toque en una casilla para elegirla; las flechas del teclado la mueven.",
+        "1 a 9 escriben; repetir el mismo número lo borra, igual que Retroceso, Supr o 0 (en Arcade lo acertado ya no se borra).",
+        "N cambia a notas, U o Ctrl+Z deshacen y H pide una pista en el Clásico.",
+        "El botón de sonido apaga la música y los efectos."
+      ])],
+      ["Racha y clasificación", "La 🔥 racha cuenta los días seguidos que resuelves el diario: si ayer lo hiciste, hoy sube uno; si te saltas un día, vuelve a empezar. Se guarda en tu navegador y, con tu sesión, también en tu cuenta. En la Clasificación hay una tabla para la racha, una para el Arcade (por puntos) y una por cada dificultad del Clásico (por tiempo: gana quien tarda menos). Subir al podio se anuncia en Discord."]
+    ]
+  },
   frontera: {
     lema: "Frontera Batalla: la de Pokémon Esmeralda. Rachas de combates individuales 3 contra 3, cada vez más difíciles.",
     secciones: [
@@ -777,7 +811,7 @@ const REGLAS = {
   }
 };
 
-const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla" };
+const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade" };
 
 export const tieneReglas = juego => Object.prototype.hasOwnProperty.call(REGLAS, juego);
 

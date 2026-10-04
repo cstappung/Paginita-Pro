@@ -7,7 +7,7 @@ vm.runInContext(sin('src/juegos/motor.js')+'\n'+sin('src/juegos/logros.js')+'\n;
 const {LOGROS,detecta,deFila,deMarca,reparto,reducir,JUEGOS}=context.__L;
 
 test('diez logros por juego, con ids válidos y únicos',()=>{
- const juegos=[...Object.keys(JUEGOS),'minas','snake','tetrisclub','sortem','bbtan','sopa','electro','frontera'];
+ const juegos=[...Object.keys(JUEGOS),'minas','snake','tetrisclub','sortem','bbtan','sopa','electro','frontera','sudoku'];
  for(const j of juegos){
   assert.ok(LOGROS[j],j);assert.equal(LOGROS[j].length,10,j);
   const ids=LOGROS[j].map(x=>x.id);assert.equal(new Set(ids).size,10,j);
@@ -49,4 +49,10 @@ test('sortEm: los logros salen del modo y del tiempo',()=>{
  assert.deepEqual([...deMarca('sortem',{categoria:'club-sortem-10',puntos:10,tiempo:14000})],['d10','d10t30','d10t15']);
  assert.deepEqual([...deMarca('bbtan',{categoria:'club-bbtan-rondas',puntos:32,tiempo:60000})],['r10','r20','r30']);
  assert.deepEqual([...deMarca('sortem',{categoria:'club-sortem-20',puntos:20,tiempo:35000})],['d20','d20t60','d20t40']);
+});
+test('Sudoku Arcade: racha, clásico por tiempo y arcade por puntos',()=>{
+ assert.deepEqual([...deMarca('sudoku',{categoria:'club-sudoku-racha',puntos:7,tiempo:1})],['dia1','racha3','racha7']);
+ assert.deepEqual([...deMarca('sudoku',{categoria:'club-sudoku-medio',puntos:1,tiempo:240000})],['medio5']);
+ assert.deepEqual([...deMarca('sudoku',{categoria:'club-sudoku-experto',puntos:1,tiempo:3600000})],['experto']);
+ assert.deepEqual([...deMarca('sudoku',{categoria:'club-sudoku-arcade',puntos:26000,tiempo:1})],['a10000','a25000']);
 });

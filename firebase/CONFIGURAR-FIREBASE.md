@@ -153,6 +153,14 @@ y están en el repositorio público, como cualquier archivo del sitio.
 > volver a publicar las reglas se juega igual, pero las rachas no llegan a la
 > clasificación ni pagan las monedas por combate.
 
+> **Sudoku Arcade (octubre de 2026):** `club-sudoku-racha`,
+> `club-sudoku-arcade` y `club-sudoku-facil|medio|dificil|experto` son
+> categorías nuevas de `soloRanks` (el arcade, con tope de 1 000 000; el
+> clásico, con los puntos fijos en 1 porque compite el tiempo) y `sudoku` un
+> juego nuevo de `clubJugadas`. Hasta volver a publicar las reglas se juega
+> igual, pero los récords se quedan en el dispositivo (se sincronizan solos
+> después de publicarlas) y las partidas no pagan monedas.
+
 Tu base de datos está ahora en **modo de prueba** (abierta a cualquiera).
 Antes de publicar el sitio:
 

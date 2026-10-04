@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+<script src="../../../i18n.js?v=202610040605"></script>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Sudoku Arcade</title>
+  <meta name="description" content="Sudoku con alma de recreativa: diario con racha, clásico en cuatro dificultades y arcade con vidas y combos.">
+  <!-- Icono de la pestaña: una celda rosa neón con un 9, dibujada en SVG para no depender de un archivo. -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%230b0716'/%3E%3Crect x='3' y='3' width='26' height='26' fill='none' stroke='%23ff2fb4' stroke-width='3'/%3E%3Ctext x='10' y='24' font-size='19' font-family='monospace' font-weight='bold' fill='%2322e6ff'%3E9%3C/text%3E%3C/svg%3E">
+  <!-- La fuente pixel de recreativa, solo para títulos y marcador (las cifras del tablero van en una fuente legible). -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap">
+  <!-- Lo común del Club (volver, ranking lateral, modo integrado). Va ANTES del estilo propio para que este gane. -->
+  <link rel="stylesheet" href="../conexion.css?v=club-1">
+  <!-- conexion.js pide club-7: el archivo aprendió a escribir las marcas del sudoku y no debe salir del caché viejo. -->
+  <script src="../conexion.js?v=club-7"></script>
+  <style>
+    /* ================================================================
+       Sudoku Arcade — la piel.
+       Resumen: una máquina recreativa de neón (rosa #ff2fb4 y cian
+       #22e6ff) sobre un fondo de tubo CRT con líneas de barrido suaves.
+       Sigue el patrón de las otras páginas del Club (.shell > .layout >
+       main + aside, variables en :root, tema claro/oscuro con data-tema
+       que manda conexion.js). En claro hay una versión pálida y legible:
+       los neones se oscurecen para tener contraste sobre fondo blanco.
+       ================================================================ */
+
+    /* --- Paleta clara (por omisión) --- */
+    :root{
+      --bg:#f6f1ff;              /* fondo de la página */
+      --panel:#ffffff;           /* tarjetas y marcador */
+      --panel2:#f0e8ff;          /* botones y pestañas */
+      --ink:#1d1433;             /* texto principal */
+      --muted:#6a5d8a;           /* texto secundario */
+      --line:#d9cdf2;            /* bordes suaves */
+      --rosa:#c8107e;            /* neón rosa, oscurecido para fondo claro */
+      --cian:#0b7d96;            /* neón cian, oscurecido para fondo claro */
+      --amarillo:#a66b00;        /* combo y récords */
+      --mal:#d11a3d;             /* errores y conflictos */
+      --ok:#0f8a4a;              /* victoria */
+      --celda:#ffffff;           /* fondo de cada celda */
+      --fina:#e3d9f7;            /* línea fina entre celdas */
+      --caja:#5b3f99;            /* línea gruesa entre cajas 3×3 */
+      --zona:#efe6ff;            /* fila/columna/caja de la celda elegida */
+      --igual:#ffd6ee;           /* celdas con el mismo número */
+      --sel:#ffb3df;             /* la celda elegida */
+      --brillo:0 0 0 transparent;/* sin halo de neón en claro */
+      --barrido:.035;            /* intensidad de las líneas de barrido */
+      --pixel:"Press Start 2P",ui-monospace,monospace; /* fuente arcade */
+      color-scheme:light;
+    }
+    /* --- Paleta oscura: si el sistema la pide y Juegos no mandó «claro» --- */
+    @media (prefers-color-scheme:dark){:root:not([data-tema=claro]){
+      --bg:#0b0716;--panel:#150f26;--panel2:#1d1535;--ink:#f2eaff;--muted:#a497c4;--line:#3a2c63;
+      --rosa:#ff2fb4;--cian:#22e6ff;--amarillo:#ffe14d;--mal:#ff4d6d;--ok:#4dff9a;
+      --celda:#120c22;--fina:#2a2047;--caja:#ff2fb4;--zona:#1c1438;--igual:#3d1240;--sel:#5a1a5e;
+      --brillo:0 0 12px;--barrido:.12;color-scheme:dark}}
+    /* --- Paleta oscura forzada por Juegos (conexion.js escribe data-tema) --- */
+    :root[data-tema=oscuro]{
+      --bg:#0b0716;--panel:#150f26;--panel2:#1d1535;--ink:#f2eaff;--muted:#a497c4;--line:#3a2c63;
+      --rosa:#ff2fb4;--cian:#22e6ff;--amarillo:#ffe14d;--mal:#ff4d6d;--ok:#4dff9a;
+      --celda:#120c22;--fina:#2a2047;--caja:#ff2fb4;--zona:#1c1438;--igual:#3d1240;--sel:#5a1a5e;
+      --brillo:0 0 12px;--barrido:.12;color-scheme:dark}
+
+    /* --- Base común del Club --- */
+    [hidden]{display:none!important}                      /* lo oculto se oculta siempre, aunque sea flex */
+    *{box-sizing:border-box}
+    html,body{margin:0}
+    body{background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+    .shell{max-width:1000px;margin:0 auto;padding:16px}    /* columna centrada */
+    .layout{display:grid;grid-template-columns:minmax(0,1fr) 285px;gap:24px;align-items:start} /* juego + ranking */
+    .layout>aside:empty{display:none}                     /* fuera de Juegos el aside queda vacío */
+    @media (max-width:850px){.layout{grid-template-columns:minmax(0,1fr)}}
+    .club-integrado body{background:transparent}         /* dentro de Juegos manda el fondo de la sala */
+    :focus-visible{outline:3px solid var(--cian);outline-offset:2px} /* foco siempre visible */
+    .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+    /* El panel de ranking del Club, pintado con la piel arcade.
+       html.club-integrado[data-tema] gana a las reglas de conexion.css. */
+    .club-ranking,.club-integrado .club-ranking,html.club-integrado[data-tema] .club-ranking{background:var(--panel);color:var(--ink);border:2px solid var(--line);border-radius:0;box-shadow:4px 4px 0 var(--line)}
+    .club-ranking h2{font:400 11px/1.6 var(--pixel)!important;color:var(--rosa);text-transform:uppercase}
+    .club-ranking ol,.club-ranking p{color:var(--muted)}
+    .club-ranking button{background:var(--panel2);color:var(--ink);border:2px solid var(--line);border-radius:0;font:600 12px system-ui,sans-serif}
+    .club-volver{color:var(--muted)}
+
+    /* Esquinas «pixel»: se recortan cuatro muescas de 4 px, como un sprite. */
+    .pix{clip-path:polygon(0 4px,4px 4px,4px 0,calc(100% - 4px) 0,calc(100% - 4px) 4px,100% 4px,100% calc(100% - 4px),calc(100% - 4px) calc(100% - 4px),calc(100% - 4px) 100%,4px 100%,4px calc(100% - 4px),0 calc(100% - 4px))}
+
+    /* --- Cabecera: título pixel y racha --- */
+    .cab{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:4px 0 14px}
+    .titulo{margin:0;font:400 clamp(16px,3.6vw,24px)/1.3 var(--pixel);letter-spacing:.02em}
+    .titulo .r{color:var(--rosa);text-shadow:var(--brillo) var(--rosa)}  /* «SUDOKU» en rosa */
+    .titulo .c{color:var(--cian);text-shadow:var(--brillo) var(--cian)}  /* «ARCADE» en cian */
+    .racha{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;background:var(--panel);border:2px solid var(--amarillo);color:var(--amarillo);font:400 9px/1.4 var(--pixel)}
+    .racha.cero{filter:grayscale(1);opacity:.7}           /* racha en 0: apagada */
+    .racha small{font:600 11px system-ui,sans-serif;opacity:.85}
+
+    /* --- Pestañas de modo --- */
+    .modos{display:inline-flex;gap:4px;padding:4px;background:var(--panel);border:2px solid var(--line);margin-bottom:10px;flex-wrap:wrap}
+    .modos button{border:0;background:none;color:var(--muted);font:400 10px/1 var(--pixel);padding:10px 12px;cursor:pointer;text-transform:uppercase}
+    .modos button:hover{color:var(--ink)}
+    .modos button[aria-selected=true]{background:var(--rosa);color:#fff;box-shadow:var(--brillo) var(--rosa)}
+    .info{margin:0 0 10px;color:var(--muted);font-size:14px}
+    .info b{color:var(--ink)}
+
+    /* --- Selector de dificultad (solo Clásico) --- */
+    .selectores{display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin-bottom:12px}
+    .selectores label{display:grid;gap:4px;font:400 8px/1.4 var(--pixel);color:var(--muted);text-transform:uppercase}
+    select,.boton{font:600 14px system-ui,sans-serif;color:var(--ink);background:var(--panel2);border:2px solid var(--line);border-radius:0;padding:8px 12px}
+    .boton{cursor:pointer}
+    .boton:hover{border-color:var(--cian)}
+    .boton.primario{background:var(--cian);border-color:var(--cian);color:#061018;font:400 10px/1.4 var(--pixel);text-transform:uppercase}
+
+    /* --- Marcador (la .scorebar que conexion.js reconoce) --- */
+    .scorebar,.club-integrado .scorebar,html.club-integrado[data-tema] .scorebar{display:flex;align-items:center;gap:18px;flex-wrap:wrap;width:min(500px,100%);margin:0 auto 8px;padding:10px 14px;background:var(--panel);border:2px solid var(--line);color:var(--ink)}
+    .dato{display:grid;gap:4px;min-width:0}
+    .dato small{font:400 7px/1 var(--pixel);color:var(--muted);letter-spacing:.06em}
+    .dato strong{font:400 13px/1 var(--pixel);font-variant-numeric:tabular-nums;white-space:nowrap}
+    #reloj{color:var(--cian);text-shadow:var(--brillo) var(--cian)}
+    #vidas{color:var(--mal);letter-spacing:.1em;font-family:system-ui,sans-serif;font-size:17px}   /* corazones legibles */
+    #vidas.pierde{animation:latido .45s steps(2) 2}       /* el corazón perdido parpadea */
+    #combo{color:var(--amarillo)}
+    #combo.sube{animation:salta .25s ease-out}            /* el combo da un saltito al subir */
+    #puntos{color:var(--rosa);text-shadow:var(--brillo) var(--rosa)}
+    #sound-button{margin-left:auto;width:38px;height:38px;padding:8px;background:var(--panel2);border:2px solid var(--line);color:var(--ink);cursor:pointer;border-radius:0}
+    #sound-button svg{width:100%;height:100%;display:block}
+    #sound-button[aria-pressed=false] .ondas{display:none}  /* silencio: sin ondas */
+    #sound-button[aria-pressed=true] .cruz{display:none}    /* con sonido: sin cruz */
+
+    /* --- El marco del tablero, con barrido CRT encima --- */
+    .marco{position:relative;width:min(500px,100%);margin:0 auto;padding:6px;background:var(--caja);box-shadow:var(--brillo) var(--caja)}
+    .marco::after{content:"";position:absolute;inset:0;pointer-events:none;  /* líneas de barrido: 1 px de cada 3 */
+      background:repeating-linear-gradient(to bottom,rgba(0,0,0,var(--barrido)) 0 1px,transparent 1px 3px)}
+    .tablero{display:grid;grid-template-columns:repeat(9,1fr);grid-template-rows:repeat(9,1fr);aspect-ratio:1;container-type:inline-size;background:var(--fina);user-select:none;-webkit-user-select:none;touch-action:manipulation}
+
+    /* --- Cada celda es un botón --- */
+    .celda{position:relative;display:grid;place-items:center;min-width:0;min-height:0;padding:0;margin:0;border:0;
+      border-right:1px solid var(--fina);border-bottom:1px solid var(--fina);background:var(--celda);color:var(--cian);
+      font:700 calc(100cqi / 9 * .56)/1 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-variant-numeric:tabular-nums;cursor:pointer}
+    .celda.c2,.celda.c5{border-right:3px solid var(--caja)}    /* línea gruesa tras la 3.ª y 6.ª columna */
+    .celda.f2,.celda.f5{border-bottom:3px solid var(--caja)}   /* línea gruesa tras la 3.ª y 6.ª fila */
+    .celda.c8{border-right:0}.celda.f8{border-bottom:0}         /* el borde exterior lo pone el marco */
+    .celda.fija{color:var(--ink)}                              /* pistas del puzzle: color de texto */
+    .celda.ayuda{color:var(--amarillo)}                        /* pistas pedidas: amarillas */
+    .celda.zona{background:var(--zona)}                        /* misma fila, columna o caja */
+    .celda.igual{background:var(--igual)}                      /* mismo número que la elegida */
+    .celda.sel{background:var(--sel);box-shadow:inset 0 0 0 2px var(--rosa)} /* la elegida */
+    .celda.mal{color:var(--mal)}                               /* número que choca con otro */
+    .celda.mal.fija{text-decoration:underline wavy var(--mal) 2px}
+    .celda.pon{animation:pon .22s ease-out}                    /* número recién puesto */
+    .celda.falla{animation:tiembla .4s linear;background:color-mix(in srgb,var(--mal) 30%,var(--celda))} /* error en Arcade */
+    .celda.brilla{animation:brilla .7s ease-out var(--d,0s) both} /* unidad completa: ola de luz */
+    .celda:focus-visible{outline:3px solid var(--cian);outline-offset:-3px;z-index:1}
+    /* Notas (lápiz): una mini cuadrícula 3×3 dentro de la celda */
+    .notas{position:absolute;inset:6%;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);
+      font:600 calc(100cqi / 9 * .24)/1 system-ui,sans-serif;color:var(--muted)}
+    .notas span{display:grid;place-items:center}
+    .notas span.igual{color:var(--rosa);font-weight:800}      /* la nota del número elegido destaca */
+
+    /* --- Texto flotante «+120» sobre el tablero --- */
+    .flota{position:absolute;pointer-events:none;font:400 12px/1 var(--pixel);color:var(--amarillo);text-shadow:var(--brillo) var(--amarillo),1px 1px 0 #000;
+      transform:translate(-50%,-50%);animation:flota .9s ease-out forwards;white-space:nowrap;z-index:3}
+
+    /* --- Pantalla de victoria / derrota, encima del tablero --- */
+    .final{position:absolute;inset:6px;z-index:4;display:grid;place-items:center;text-align:center;padding:18px;
+      background:color-mix(in srgb,var(--bg) 88%,transparent);animation:aparece .35s ease-out}
+    .final h2{margin:0 0 12px;font:400 clamp(16px,5cqi,26px)/1.3 var(--pixel);color:var(--ok);text-shadow:var(--brillo) var(--ok)}
+    .final.pierde h2{color:var(--mal);text-shadow:var(--brillo) var(--mal)}
+    .final p{margin:0 0 6px;color:var(--ink)}
+    .final .cifras{font:400 10px/2 var(--pixel);color:var(--muted)}
+    .final .cifras b{color:var(--amarillo);font-weight:400}
+    .final .botones{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px}
+    .marco{container-type:inline-size}                         /* la pantalla final escala con el marco */
+
+    /* --- Teclado numérico en pantalla --- */
+    .teclado{display:grid;grid-template-columns:repeat(9,1fr);gap:5px;width:min(500px,100%);margin:10px auto 0}
+    .tecla{position:relative;aspect-ratio:1/1.15;padding:0;border:2px solid var(--line);border-radius:0;background:var(--panel);color:var(--cian);
+      font:700 clamp(18px,4.6vw,26px)/1 system-ui,sans-serif;cursor:pointer;box-shadow:0 3px 0 var(--line)}
+    .tecla:hover{border-color:var(--cian)}
+    .tecla:active{transform:translateY(2px);box-shadow:0 1px 0 var(--line)}
+    .tecla small{position:absolute;right:3px;bottom:2px;font:400 7px/1 var(--pixel);color:var(--muted)} /* cuántos faltan */
+    .tecla.agotada{opacity:.35}                                /* ya están los nueve */
+    .tecla.igual{border-color:var(--rosa);color:var(--rosa)}   /* el número de la celda elegida */
+    .teclado.notas-on .tecla{color:var(--muted);border-style:dashed} /* en modo notas las teclas se ven «a lápiz» */
+
+    /* --- Acciones: notas, borrar, deshacer, pista, nueva --- */
+    .acciones{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;width:min(500px,100%);margin:10px auto 0}
+    .accion{display:inline-flex;align-items:center;gap:6px;padding:9px 11px;border:2px solid var(--line);border-radius:0;background:var(--panel2);color:var(--ink);
+      font:400 8px/1.3 var(--pixel);text-transform:uppercase;cursor:pointer}
+    .accion:hover{border-color:var(--cian)}
+    .accion[aria-pressed=true]{background:var(--cian);border-color:var(--cian);color:#061018} /* notas encendidas */
+    .accion:disabled{opacity:.4;cursor:default}
+    .accion kbd{font:600 10px system-ui,sans-serif;opacity:.7}
+
+    .nota{width:min(500px,100%);margin:14px auto 0;font-size:12px;color:var(--muted);text-align:center}
+    .nota kbd{font:600 11px system-ui,sans-serif;padding:1px 5px;border:1px solid var(--line);background:var(--panel)}
+
+    /* --- Animaciones --- */
+    @keyframes pon{0%{transform:scale(1.35)}100%{transform:scale(1)}}
+    @keyframes tiembla{20%{transform:translateX(-4px)}40%{transform:translateX(4px)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
+    @keyframes brilla{0%{background:var(--celda)}35%{background:color-mix(in srgb,var(--cian) 55%,var(--celda));color:#fff}100%{}}
+    @keyframes flota{0%{opacity:0;margin-top:6px}15%{opacity:1}100%{opacity:0;margin-top:-34px}}
+    @keyframes salta{50%{transform:scale(1.35)}}
+    @keyframes latido{50%{opacity:.2}}
+    @keyframes aparece{from{opacity:0;transform:scale(.96)}}
+    /* Quien pide menos movimiento no ve ninguna animación ni transición. */
+    @media (prefers-reduced-motion:reduce){
+      *,*::before,*::after{animation:none!important;transition:none!important}
+      .flota{display:none}
+    }
+    @media (max-width:420px){.scorebar{gap:12px}.dato strong{font-size:11px}.teclado{gap:3px}}
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <div class="layout">
+      <main>
+        <!-- Cabecera: no es .shell>header ni .intro, porque conexion.css las oculta dentro de Juegos. -->
+        <div class="cab">
+          <h1 class="titulo"><span class="r">SUDOKU</span> <span class="c">ARCADE</span></h1>
+          <span id="racha" class="racha cero" title="Días seguidos completando el sudoku diario">🔥 0 días</span>
+        </div>
+
+        <!-- Tres modos: el diario (igual para todos), el clásico (al azar) y el arcade (vidas y puntos). -->
+        <div class="modos" role="tablist" aria-label="Modo de juego">
+          <button type="button" role="tab" data-modo="diario" aria-selected="false">Diario</button>
+          <button type="button" role="tab" data-modo="clasico" aria-selected="false">Clásico</button>
+          <button type="button" role="tab" data-modo="arcade" aria-selected="false">Arcade</button>
+        </div>
+        <p id="info" class="info"></p>
+
+        <!-- Solo en Clásico: la dificultad y una partida nueva. -->
+        <div id="selectores" class="selectores" hidden>
+          <label>Dificultad<select id="selDif"></select></label>
+          <button type="button" id="nueva" class="boton primario">Nueva partida</button>
+        </div>
+
+        <!-- Marcador. conexion.js mueve aquí #sound-button dentro de Juegos. -->
+        <div class="scorebar pix" role="group" aria-label="Marcador">
+          <div class="dato"><small>TIEMPO</small><strong id="reloj" translate="no">0:00</strong></div>
+          <div class="dato"><small>FALTAN</small><strong id="faltan" translate="no">0</strong></div>
+          <div class="dato" id="datoVidas" hidden><small>VIDAS</small><strong id="vidas" translate="no" aria-label="3 vidas">♥♥♥</strong></div>
+          <div class="dato" id="datoCombo" hidden><small>COMBO</small><strong id="combo" translate="no">×1</strong></div>
+          <div class="dato" id="datoPuntos" hidden><small>PUNTOS</small><strong id="puntos" translate="no">0</strong></div>
+          <button type="button" id="sound-button" aria-pressed="true" aria-label="Desactivar música y efectos" title="Música y efectos">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor"/>
+              <path class="ondas" d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/>
+              <path class="cruz" d="m16 9 6 6m0-6-6 6"/>
+            </svg>
+          </button>
+        </div>
+
+        <!-- El tablero: 81 botones que game.js crea. translate="no": i18n.js no debe tocar cifras ni notas. -->
+        <div id="marco" class="marco pix">
+          <div id="tablero" class="tablero" role="group" aria-label="Tablero de sudoku: elige una celda y escribe un número" translate="no"></div>
+          <div id="final" class="final" role="dialog" aria-modal="false" aria-labelledby="finalTitulo" hidden></div>
+        </div>
+
+        <!-- Teclado numérico en pantalla: cada tecla dice cuántos de ese número faltan. -->
+        <div id="teclado" class="teclado" role="group" aria-label="Números" translate="no"></div>
+
+        <!-- Herramientas. -->
+        <div class="acciones">
+          <button type="button" id="btnNotas" class="accion" aria-pressed="false" title="Modo notas (N)">✎ Notas <kbd>N</kbd></button>
+          <button type="button" id="btnBorrar" class="accion" title="Borrar la celda (Supr)">⌫ Borrar</button>
+          <button type="button" id="btnDeshacer" class="accion" title="Deshacer (Ctrl+Z)">↶ Deshacer</button>
+          <button type="button" id="btnPista" class="accion" title="Pista: pone un número correcto y suma 30 s (H)" hidden>💡 Pista +30 s</button>
+          <button type="button" id="btnOtra" class="accion" title="Empezar otra partida" hidden>↻ Otra</button>
+        </div>
+
+        <!-- Avisos para lectores de pantalla (combos, errores, unidades completas). -->
+        <div id="aviso" class="sr-only" role="status" aria-live="polite"></div>
+        <p class="nota" id="nota"></p>
+      </main>
+      <!-- Aquí conexion.js pone la clasificación del modo dentro de Juegos. -->
+      <aside></aside>
+    </div>
+  </div>
+  <!-- El chip de sonido y el cancionero compartidos de la sala, el motor puro y la pantalla. -->
+  <script src="../../audio/chip.js?v=sudoku-1"></script>
+  <script src="../../audio/temas.js?v=sudoku-1"></script>
+  <script src="motor.js?v=sudoku-1"></script>
+  <script src="game.js?v=sudoku-1"></script>
+</body>
+</html>

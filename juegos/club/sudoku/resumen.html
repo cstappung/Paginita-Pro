@@ -1,0 +1,424 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sudoku Arcade · Plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+/* Resumen de cómo se construyó Sudoku Arcade: investigación, plan, marco,
+   orquestador y estado. Página estática, sin scripts externos. */
+:root{
+  --bg:#f6f4fb;--panel:#ffffff;--panel2:#f0edf8;--ink:#1d1830;--muted:#6a6385;--line:#e2dcef;
+  --rosa:#c4127f;--cian:#007c93;--ok:#13804a;--pend:#a35a00;--run:#1a5fd1;
+  --sombra:0 1px 0 #0000000a,0 8px 24px -16px #2a1a4a40;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#0c0a16;--panel:#151126;--panel2:#1c1733;--ink:#ece8ff;--muted:#a49dc4;--line:#2c2550;
+  --rosa:#ff2fb4;--cian:#22e6ff;--ok:#54e39a;--pend:#ffb347;--run:#7aa8ff;
+  --sombra:0 0 0 1px #ffffff08,0 12px 30px -18px #ff2fb455;color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0c0a16;--panel:#151126;--panel2:#1c1733;--ink:#ece8ff;--muted:#a49dc4;--line:#2c2550;
+  --rosa:#ff2fb4;--cian:#22e6ff;--ok:#54e39a;--pend:#ffb347;--run:#7aa8ff;
+  --sombra:0 0 0 1px #ffffff08,0 12px 30px -18px #ff2fb455;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1040px;margin:0 auto;padding:28px 16px 60px}
+.pixel{font-family:"Press Start 2P",ui-monospace,monospace;letter-spacing:.02em}
+a{color:var(--cian)}
+code{font:13px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:var(--panel2);padding:1px 5px;border-radius:5px;border:1px solid var(--line)}
+
+/* Portada */
+.hero{display:grid;grid-template-columns:1fr auto;gap:28px;align-items:center;padding:28px;border-radius:18px;background:
+  radial-gradient(circle at 90% 10%,color-mix(in srgb,var(--rosa) 22%,transparent),transparent 55%),
+  radial-gradient(circle at 10% 100%,color-mix(in srgb,var(--cian) 18%,transparent),transparent 55%),var(--panel);
+  border:1px solid var(--line);box-shadow:var(--sombra)}
+.hero small{display:block;color:var(--muted);font-size:10px;letter-spacing:.18em;margin-bottom:10px}
+.hero h1{margin:0 0 14px;font-size:clamp(20px,4vw,30px);line-height:1.35;color:var(--rosa);text-shadow:0 0 18px color-mix(in srgb,var(--rosa) 45%,transparent)}
+.hero h1 span{color:var(--cian)}
+.hero p{margin:0;max-width:56ch;color:var(--muted)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:16px}
+.chip{font-size:12px;font-weight:650;padding:3px 10px;border-radius:999px;border:1px solid var(--line);background:var(--panel2)}
+@media (max-width:720px){.hero{grid-template-columns:1fr}.mini{justify-self:center}}
+
+/* Mini tablero de muestra (el ejemplo de Wikipedia) */
+.mini{display:grid;grid-template-columns:repeat(9,22px);grid-template-rows:repeat(9,22px);border:2px solid var(--rosa);border-radius:6px;overflow:hidden;box-shadow:0 0 22px -6px var(--rosa)}
+.mini i{font-style:normal;display:grid;place-items:center;font:700 12px ui-monospace,monospace;border-right:1px solid var(--line);border-bottom:1px solid var(--line);color:var(--ink);background:var(--panel)}
+.mini i.p{color:var(--cian)}
+.mini i:nth-child(9n+3),.mini i:nth-child(9n+6){border-right:2px solid var(--rosa)}
+.mini i:nth-child(n+19):nth-child(-n+27),.mini i:nth-child(n+46):nth-child(-n+54){border-bottom:2px solid var(--rosa)}
+
+/* Índice */
+nav.toc{display:flex;flex-wrap:wrap;gap:8px;margin:18px 0 6px}
+nav.toc a{font-size:13px;font-weight:650;text-decoration:none;color:var(--ink);padding:6px 12px;border-radius:9px;border:1px solid var(--line);background:var(--panel)}
+nav.toc a:hover{border-color:var(--rosa)}
+
+section{margin-top:34px}
+h2{font-size:15px;margin:0 0 14px;color:var(--cian);display:flex;align-items:center;gap:10px}
+h2::before{content:"";width:10px;height:10px;background:var(--rosa);box-shadow:0 0 10px var(--rosa)}
+h3{font-size:15px;margin:18px 0 8px}
+.lead{color:var(--muted);margin:-6px 0 14px;max-width:72ch}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;box-shadow:var(--sombra)}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+ul.lista{margin:0;padding-left:20px}
+ul.lista li{margin:4px 0}
+
+/* Estado del orquestador */
+.flujo{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+@media (max-width:760px){.flujo{grid-template-columns:1fr}}
+.fase{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px}
+.fase h3{margin:0 0 4px;font-size:13px}
+.fase p{margin:0 0 10px;font-size:13px;color:var(--muted)}
+.agente{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:var(--panel2);margin-top:6px;font-size:14px}
+.agente b{flex:1;font-weight:650}
+.est{font-size:12px;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap}
+.ok{color:var(--ok);background:color-mix(in srgb,var(--ok) 14%,transparent)}
+.run{color:var(--run);background:color-mix(in srgb,var(--run) 14%,transparent)}
+.run::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:currentColor;margin-right:6px;animation:late 1.2s infinite}
+.pend{color:var(--pend);background:color-mix(in srgb,var(--pend) 14%,transparent)}
+@keyframes late{50%{opacity:.25}}
+@media (prefers-reduced-motion:reduce){.run::before{animation:none}}
+.nota{font-size:13px;color:var(--muted);margin-top:10px}
+
+/* Tablas */
+.tabla{width:100%;border-collapse:collapse;font-size:14px}
+.tabla th,.tabla td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+.tabla th{font-size:12px;color:var(--muted);font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.tabla td:first-child{font-weight:650;white-space:nowrap}
+.scroll{overflow-x:auto}
+.nivel{display:inline-block;font-size:12px;font-weight:700;padding:1px 8px;border-radius:999px;color:#fff}
+.n1{background:#1f9d55}.n2{background:#2a6fdb}.n3{background:#b8590b}.n4{background:#b3127a}
+
+/* Plan */
+ol.pasos{counter-reset:p;list-style:none;margin:0;padding:0;display:grid;gap:10px}
+ol.pasos>li{counter-increment:p;position:relative;padding:14px 16px 14px 58px;background:var(--panel);border:1px solid var(--line);border-radius:12px}
+ol.pasos>li::before{content:counter(p);position:absolute;left:14px;top:13px;width:30px;height:30px;display:grid;place-items:center;font:12px "Press Start 2P",monospace;color:var(--bg);background:var(--rosa);border-radius:6px}
+ol.pasos b{display:block;margin-bottom:2px}
+ol.pasos span{color:var(--muted);font-size:14px}
+
+/* Marco: diagrama de archivos */
+.arbol{font:13px/1.7 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;white-space:pre;overflow-x:auto;margin:0;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:14px}
+.arbol .r{color:var(--rosa)}.arbol .c{color:var(--cian)}.arbol .m{color:var(--muted)}
+.modo{border-top:3px solid var(--rosa)}
+.modo:nth-child(2){border-top-color:var(--cian)}
+.modo:nth-child(3){border-top-color:var(--pend)}
+.modo h3{margin-top:0}
+.modo .cat{font-size:12px}
+
+/* Logros: una ficha por logro, con la dificultad en el color de la etiqueta */
+.logros{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px}
+.logro{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.logro>i{font-style:normal;font-size:24px;width:42px;height:42px;display:grid;place-items:center;border-radius:10px;background:var(--panel2);flex:none}
+.logro div{flex:1;min-width:0}
+.logro b{display:block;font-size:14px}
+.logro span{display:block;font-size:13px;color:var(--muted)}
+.logro em{font-style:normal;font-size:11px;font-weight:700;padding:3px 8px;border-radius:999px;color:#fff;white-space:nowrap}
+.m1{background:#1f9d55}.m2{background:#2a6fdb}.m3{background:#b8590b}.m4{background:#b3127a}
+.aviso{border-left:4px solid var(--pend);background:color-mix(in srgb,var(--pend) 10%,var(--panel))}
+.fuentes{columns:2 300px;font-size:13px;margin:0;padding-left:18px}
+.fuentes li{break-inside:avoid;margin:3px 0}
+footer{margin-top:40px;color:var(--muted);font-size:12px;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Portada con un sudoku de muestra -->
+  <header class="hero">
+    <div>
+      <small class="pixel">JUEGOS · SOLO CLUB · RESUMEN DEL PROYECTO</small>
+      <h1 class="pixel">SUDOKU <span>ARCADE</span></h1>
+      <p>Cómo se investigó, planificó, construyó y verificó el nuevo juego del Club: un sudoku con estética neón, música chiptune propia, un diario igual para todos, un modo clásico por tiempo y un modo arcade con vidas y combos. Todo lo hizo un orquestador de 7 agentes.</p>
+      <div class="chips"><span class="chip">#solo/sudoku</span><span class="chip">juegos/club/sudoku/</span><span class="chip">🎵 Mi mayor · 134 bpm</span><span class="chip">3 modos</span><a class="chip" href="#logros" style="color:inherit;text-decoration:none">🏆 10 logros</a></div>
+    </div>
+    <div class="mini" aria-label="Sudoku de ejemplo de Wikipedia">
+      <i class="p">5</i><i class="p">3</i><i></i><i></i><i class="p">7</i><i></i><i></i><i></i><i></i>
+      <i class="p">6</i><i></i><i></i><i class="p">1</i><i class="p">9</i><i class="p">5</i><i></i><i></i><i></i>
+      <i></i><i class="p">9</i><i class="p">8</i><i></i><i></i><i></i><i></i><i class="p">6</i><i></i>
+      <i class="p">8</i><i></i><i></i><i></i><i class="p">6</i><i></i><i></i><i></i><i class="p">3</i>
+      <i class="p">4</i><i></i><i></i><i class="p">8</i><i></i><i class="p">3</i><i></i><i></i><i class="p">1</i>
+      <i class="p">7</i><i></i><i></i><i></i><i class="p">2</i><i></i><i></i><i></i><i class="p">6</i>
+      <i></i><i class="p">6</i><i></i><i></i><i></i><i></i><i class="p">2</i><i class="p">8</i><i></i>
+      <i></i><i></i><i></i><i class="p">4</i><i class="p">1</i><i class="p">9</i><i></i><i></i><i class="p">5</i>
+      <i></i><i></i><i></i><i></i><i class="p">8</i><i></i><i></i><i class="p">7</i><i class="p">9</i>
+    </div>
+  </header>
+
+  <nav class="toc" aria-label="Secciones">
+    <a href="#estado">Estado</a><a href="#investigacion">Investigación</a><a href="#plan">Plan</a><a href="#marco">Marco</a><a href="#logros">Logros</a><a href="#musica">Música</a><a href="#orquestador">Orquestador</a><a href="#pendiente">Pendiente</a>
+  </nav>
+
+  <!-- Estado del orquestador -->
+  <section id="estado">
+    <h2 class="pixel">ESTADO</h2>
+    <p class="lead">Actualizado el 4 de octubre de 2026, 06:10 UTC: el orquestador terminó, con 7 agentes y 0 errores, en unos 45 minutos. Esta máquina tiene 4 CPU, así que el orquestador corre como mucho 2 agentes a la vez y el resto espera en cola.</p>
+    <div class="flujo">
+      <div class="fase">
+        <h3>1 · Investigar</h3><p>Internet y mapa del código, en paralelo.</p>
+        <div class="agente"><b>🌐 Internet</b><span class="est ok">Hecho</span></div>
+        <div class="agente"><b>🗺️ Código</b><span class="est ok">Hecho</span></div>
+      </div>
+      <div class="fase">
+        <h3>2 · Construir</h3><p>Cuatro piezas con archivos separados.</p>
+        <div class="agente"><b>⚙️ Motor + test</b><span class="est ok">Hecho</span></div>
+        <div class="agente"><b>🕹️ Pantalla</b><span class="est ok">Hecho</span></div>
+        <div class="agente"><b>🎵 Música</b><span class="est ok">Hecho</span></div>
+        <div class="agente"><b>🔌 Integración</b><span class="est ok">Hecho</span></div>
+      </div>
+      <div class="fase">
+        <h3>3 · Verificar</h3><p>Tests, build, navegador y arreglos.</p>
+        <div class="agente"><b>✅ Verificador</b><span class="est ok">Hecho</span></div>
+        <div class="agente"><b>📦 Commit, PR y merge</b><span class="est run">En curso</span></div>
+      </div>
+    </div>
+    <div class="grid3" style="margin-top:12px">
+      <div class="card"><h3 style="margin-top:0">🧪 Tests</h3><ul class="lista"><li><code>test:juegos</code>: <b>311/311</b></li><li>Sudoku y música: <b>14/14</b></li><li>Logros, monedas, tienda, Discord, seguridad y más: <b>82/82</b></li><li>Reglas de Firebase en el emulador: <b>185/185</b>, más 10/10 propias del Sudoku</li></ul></div>
+      <div class="card"><h3 style="margin-top:0">📦 Build</h3><ul class="lista"><li><code>npm run build</code> sin errores.</li><li><code>juegos-app.js</code> regenerado, con el tema <code>sudoku</code> dentro.</li><li>La misma regex de categorías en los 7 archivos que la usan.</li></ul></div>
+      <div class="card"><h3 style="margin-top:0">🕹️ Navegador</h3><ul class="lista"><li>Diario, notas y deshacer funcionan.</li><li>Arcade: un error quita una vida; un tablero perfecto dio 30 690 puntos; tres errores, GAME OVER.</li><li>Clásico Fácil completo → victoria.</li><li>Sin scroll lateral a 1280 y 390 px, en claro y oscuro.</li></ul></div>
+    </div>
+    <p class="nota">Arreglos del final: el manual decía que en Arcade se podía borrar un número acertado (no se puede), y el marcador mostraba la racha cruda de aciertos («x50») en vez del multiplicador real, que llega como mucho a ×4.</p>
+  </section>
+
+  <!-- Investigación -->
+  <section id="investigacion">
+    <h2 class="pixel">INVESTIGACIÓN</h2>
+    <p class="lead">Lo que encontró el agente de internet. El proxy del entorno bloqueó varias páginas (Wikipedia, SudokuWiki); lo que no se pudo leer completo está marcado como conocimiento general.</p>
+
+    <div class="grid2">
+      <div class="card">
+        <h3 style="margin-top:0">Las reglas</h3>
+        <ul class="lista">
+          <li>Cuadrícula de 9×9 con 9 cajas de 3×3. Filas, columnas y cajas son las 27 <em>unidades</em>.</li>
+          <li>Cada unidad lleva del 1 al 9 <b>sin repetir</b>, así que cada celda tiene 20 vecinas que no puede copiar.</li>
+          <li>Las <b>pistas</b> son fijas. Un buen sudoku tiene <b>una sola solución</b>.</li>
+          <li><b>El mínimo es 17 pistas.</b> McGuire, Tugemann y Civario demostraron en 2012 que no existe ninguno de 16, tras unos 7 millones de horas de CPU.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0">Cómo se genera uno</h3>
+        <ul class="lista">
+          <li><b>1.</b> Llenar un tablero completo al azar probando y retrocediendo cuando un número no cabe (<em>backtracking</em>).</li>
+          <li><b>2.</b> Quitar pistas de a pares simétricos (giro de 180°). Si al quitar aparece una segunda solución, se devuelven.</li>
+          <li>Para saber si es única basta un resolvedor que <b>para al encontrar la segunda</b> solución.</li>
+          <li>Todo sale de un generador con semilla: el diario usa <code>"sudoku:" + fecha de Chile</code> y es igual en todos los navegadores.</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3>La dificultad depende de las técnicas, no de las pistas</h3>
+    <div class="card scroll">
+      <table class="tabla">
+        <thead><tr><th>Técnica</th><th>En simple</th><th>Nivel en el juego</th></tr></thead>
+        <tbody>
+          <tr><td>Único oculto / desnudo</td><td>En esta celda solo cabe un número, o este número solo cabe en una celda de la fila.</td><td><span class="nivel n1">Fácil</span></td></tr>
+          <tr><td>Apuntador / caja-línea</td><td>Dentro de una caja, un número solo puede ir en una fila: entonces se borra del resto de esa fila.</td><td><span class="nivel n2">Medio</span></td></tr>
+          <tr><td>Par desnudo</td><td>Dos celdas de una fila solo admiten {3, 7}: ningún otro lugar de la fila puede tener un 3 o un 7.</td><td><span class="nivel n2">Medio</span></td></tr>
+          <tr><td>Par oculto, tríos</td><td>Lo mismo con 2 o 3 números escondidos entre otros candidatos.</td><td><span class="nivel n3">Difícil</span></td></tr>
+          <tr><td>X-Wing, Swordfish, XY-Wing</td><td>Patrones en rectángulo o en cadena entre varias filas y columnas.</td><td><span class="nivel n4">Experto</span></td></tr>
+        </tbody>
+      </table>
+      <p class="nota">Escalas de referencia: Sudoku Explainer (1.0 a 12.0, manda la técnica más difícil) y HoDoKu (cinco niveles con puntaje por paso).</p>
+    </div>
+
+    <div class="grid2" style="margin-top:14px">
+      <div class="card">
+        <h3 style="margin-top:0">Buenas prácticas de las apps</h3>
+        <ul class="lista">
+          <li>Resaltar fila, columna, caja y números iguales.</li>
+          <li>Notas a lápiz que se borran solas al colocar un número.</li>
+          <li>Deshacer sin miedo, contador por número y teclado grande en móvil.</li>
+          <li>Errores marcados con algo más que color, y respeto a <em>reducir movimiento</em>.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0">Ideas arcade que se tomaron</h3>
+        <ul class="lista">
+          <li><b>3 vidas</b>, como Sudoku.com (pierdes al pasar de 3 errores).</li>
+          <li><b>Combo</b> que multiplica los puntos y se rompe con un error.</li>
+          <li><b>Bonus</b> por completar fila, columna o caja, y por tiempo al terminar.</li>
+          <li>Música que se acelera cuando quedan pocas vidas, el «hurry up» de los arcades.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- Plan -->
+  <section id="plan">
+    <h2 class="pixel">PLAN</h2>
+    <p class="lead">Los pasos que siguió el orquestador. Los 3 a 6 trabajan sobre archivos distintos, así que pueden ir en paralelo sin pisarse.</p>
+    <ol class="pasos">
+      <li><b>Investigar cómo funcionan los sudokus</b><span>Reglas, generación con solución única, dificultad por técnicas, buenas prácticas e ideas arcade.</span></li>
+      <li><b>Mapear el Club de Juegos</b><span>Todos los archivos donde se registra un juego nuevo, tomando la Sopa y Electrodle como molde.</span></li>
+      <li><b>Motor</b><span><code>motor.js</code>: resolvedor, calificador «humano», generador con simetría, diario, racha y puntos del arcade, más su test.</span></li>
+      <li><b>Pantalla arcade</b><span><code>index.html</code> y <code>game.js</code>: tablero, notas, deshacer, pistas, vidas, combo, efectos y guardado en la cuenta.</span></li>
+      <li><b>Música</b><span>Tema chiptune <code>sudoku</code> en <code>temas.js</code> con capas que crecen al avanzar.</span></li>
+      <li><b>Integración</b><span>Ranking, logros, monedas, marco de campeón, Discord, manual de reglas, reglas de Firebase y la tarjeta del vestíbulo.</span></li>
+      <li><b>Verificar</b><span>Instalar dependencias, correr los 37 tests, <code>npm run build</code>, jugar en Chromium y arreglar.</span></li>
+      <li><b>Publicar</b><span>Commit, PR a <code>main</code> y merge. Después, republicar las reglas de Firebase en la consola.</span></li>
+    </ol>
+  </section>
+
+  <!-- Marco -->
+  <section id="marco">
+    <h2 class="pixel">MARCO</h2>
+    <p class="lead">La estructura del juego: los modos, qué se guarda en el ranking y cómo encajan los archivos.</p>
+
+    <div class="grid3">
+      <div class="card modo">
+        <h3>📅 Diario</h3>
+        <p>El mismo sudoku Medio para todos; cambia a medianoche de Chile. Completarlo seguido suma días a la racha 🔥, que también se guarda en tu cuenta.</p>
+        <code class="cat">club-sudoku-racha</code> <span class="nota">· puntos = días</span>
+      </div>
+      <div class="card modo">
+        <h3>⏱️ Clásico</h3>
+        <p>Fácil, Medio, Difícil o Experto, al azar. Con notas y pistas (cada pista suma 30 s). Gana el menor tiempo.</p>
+        <code class="cat">club-sudoku-facil … -experto</code> <span class="nota">· puntos = 1, manda el tiempo</span>
+      </div>
+      <div class="card modo">
+        <h3>🕹️ Arcade</h3>
+        <p>3 vidas ♥. Cada acierto vale 50 × combo (de ×1 a ×4); cerrar una unidad, +150; las tres a la vez, +300. Al final, bonus por tiempo y 500 por vida.</p>
+        <code class="cat">club-sudoku-arcade</code> <span class="nota">· puntos = puntaje</span>
+      </div>
+    </div>
+
+    <h3>Archivos</h3>
+<pre class="arbol"><span class="r">juegos/club/sudoku/</span>          <span class="m">el juego, archivos planos sin build</span>
+├─ <span class="c">index.html</span>              <span class="m">piel neón/CRT, Press Start 2P, claro y oscuro</span>
+├─ <span class="c">game.js</span>                 <span class="m">pantalla: tablero, teclas, vidas, combo, audio, guardado</span>
+├─ <span class="c">motor.js</span>                <span class="m">SudokuMotor, puro y determinista (también corre en Node)</span>
+└─ <span class="c">resumen.html</span>            <span class="m">esta página</span>
+<span class="r">juegos/audio/temas.js</span>         <span class="m">tema «sudoku» del cancionero</span>
+<span class="r">juegos/club/conexion.js</span>       <span class="m">cómo se muestra cada marca en el ranking lateral</span>
+<span class="r">colabtex/src/juegos/</span>          <span class="m">integración (se compila a juegos-app.js)</span>
+├─ solo/club.js, club-datos.js  <span class="m">iframe y validación de resultados</span>
+├─ ranks.js, logros.js          <span class="m">Clasificación y 10 logros</span>
+├─ monedas.js                   <span class="m">récord 40, 20 por partida, 10 por día de racha</span>
+├─ perfil-tarjeta.js, marcos-animados.js  <span class="m">marco de campeón «tsudoku»</span>
+├─ reglas.js, reglas-ejemplos.js         <span class="m">manual 📖 con ejemplos</span>
+└─ discord.js                   <span class="m">anuncio de podio</span>
+<span class="r">firebase/database.rules.json</span>  <span class="m">soloRanks y clubJugadas aceptan sudoku</span>
+<span class="r">colabtex/tests/sudoku.test.cjs</span> <span class="m">11 pruebas del motor</span></pre>
+
+    <h3>API del motor</h3>
+    <div class="card scroll">
+      <table class="tabla">
+        <thead><tr><th>Función</th><th>Qué hace</th></tr></thead>
+        <tbody>
+          <tr><td><code>resolver(t, 2)</code></td><td>Cuenta soluciones (0, 1 o «2 o más»), probando primero la celda con menos opciones.</td></tr>
+          <tr><td><code>califica(t)</code></td><td>Resuelve como una persona y dice la dificultad según la técnica más difícil que necesitó.</td></tr>
+          <tr><td><code>generar({dificultad, rng})</code></td><td>Sudoku con solución única, simetría de 180° y la dificultad pedida.</td></tr>
+          <tr><td><code>sudokuDiario(fecha)</code></td><td>El diario: semilla <code>"sudoku:" + fecha</code>.</td></tr>
+          <tr><td><code>conflictos</code>, <code>candidatos</code>, <code>unidadesCompletas</code></td><td>Ayudas para la pantalla: errores, notas y unidades cerradas.</td></tr>
+          <tr><td><code>puntosArcade</code>, <code>bonoTiempo</code></td><td>Puntaje del modo arcade.</td></tr>
+          <tr><td><code>registraDiaria</code>, <code>mezclaRacha</code></td><td>La racha, y cómo juntarla entre el celular y el PC.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- Logros -->
+  <section id="logros">
+    <h2 class="pixel">LOGROS</h2>
+    <p class="lead">Los diez logros del Sudoku, en <code>colabtex/src/juegos/logros.js</code>. Salen de tus mejores marcas en el ranking, así que se ganan solos al jugar y cuentan hacia atrás si ya tenías la marca. Cada uno paga monedas según su dificultad (<code>monedas.js</code>).</p>
+    <div class="logros">
+      <div class="logro"><i>🔢</i><div><b>Sudoku del día</b><span>Resuelve un sudoku diario.</span></div><em class="m1">Diario · 15 🪙</em></div>
+      <div class="logro"><i>🔥</i><div><b>Tres al hilo</b><span>Llega a una racha de 3 días.</span></div><em class="m1">Diario · 15 🪙</em></div>
+      <div class="logro"><i>📅</i><div><b>Semana de nueve en nueve</b><span>Llega a una racha de 7 días.</span></div><em class="m2">Diario · 40 🪙</em></div>
+      <div class="logro"><i>🗓️</i><div><b>Un mes de cuadrículas</b><span>Llega a una racha de 30 días.</span></div><em class="m4">Diario · 250 🪙</em></div>
+      <div class="logro"><i>🪙</i><div><b>Insert coin</b><span>Resuelve un clásico en Fácil.</span></div><em class="m1">Clásico · 15 🪙</em></div>
+      <div class="logro"><i>🧠</i><div><b>Nivel experto</b><span>Resuelve un clásico en Experto.</span></div><em class="m3">Clásico · 100 🪙</em></div>
+      <div class="logro"><i>⏱️</i><div><b>Contra el reloj</b><span>Resuelve un clásico Medio en menos de 5 min.</span></div><em class="m3">Clásico · 100 🪙</em></div>
+      <div class="logro"><i>🧊</i><div><b>Sangre fría</b><span>Resuelve un clásico Difícil en menos de 10 min.</span></div><em class="m3">Clásico · 100 🪙</em></div>
+      <div class="logro"><i>🕹️</i><div><b>Combo arcade</b><span>Haz 10 000 puntos en una partida arcade.</span></div><em class="m2">Arcade · 40 🪙</em></div>
+      <div class="logro"><i>👾</i><div><b>Récord de recreativa</b><span>Haz 25 000 puntos en una partida arcade.</span></div><em class="m4">Arcade · 250 🪙</em></div>
+    </div>
+    <div class="card" style="margin-top:14px">
+      <h3 style="margin-top:0">Otras monedas del Sudoku</h3>
+      <ul class="lista">
+        <li><b>Récord:</b> 40 🪙 la primera vez que dejas una marca en cada tabla (diario, arcade y cada dificultad del clásico).</li>
+        <li><b>Partida:</b> 20 🪙 por cada sudoku terminado, hasta 15 al día.</li>
+        <li><b>Racha:</b> 10 🪙 por día de racha (hasta 60 días).</li>
+        <li><b>Arcade:</b> 1 🪙 por cada 1000 puntos de tu mejor marca (hasta 200 000 puntos).</li>
+        <li><b>Marco de campeón «Cuadrícula arcade»:</b> para quien esté n.º 1 en una tabla del Sudoku: un anillo neón con mini cuadrículas que titilan.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- Música -->
+  <section id="musica">
+    <h2 class="pixel">MÚSICA</h2>
+    <div class="card">
+      <p style="margin-top:0">Tema <code>sudoku</code>: chiptune arcade en <b>Mi mayor a 134 bpm</b>, un tempo que no usa ningún otro tema del sitio. La melodía es original y va en grupos de tres notas, como las celdas de una caja.</p>
+      <ul class="lista">
+        <li><b>Instrumentos:</b> lead de pulso con eco, bajo triangular que rebota en octavas y arpegio fino.</li>
+        <li><b>Forma:</b> intro, A, B en el relativo menor y un clímax que la segunda vez sube un tono.</li>
+        <li><b>Capas:</b> el arpegio entra al 25 % del tablero y la batería al 55 %.</li>
+        <li><b>Prisa:</b> en Arcade, con 1 vida u 8 celdas o menos, el tempo sube un 14 %.</li>
+        <li><b>Efectos:</b> cada dígito suena como una nota de la escala; hay sonidos para error, unidad cerrada, combo, victoria y derrota.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- Orquestador -->
+  <section id="orquestador">
+    <h2 class="pixel">ORQUESTADOR</h2>
+    <p class="lead">Guardado en <code>.claude/workflows/sudoku-arcade-club.js</code>. Es un script que reparte el trabajo entre agentes y junta los resultados.</p>
+    <div class="grid2">
+      <div class="card">
+        <h3 style="margin-top:0">Cómo funciona</h3>
+        <ul class="lista">
+          <li>Un <b>contrato común</b> fija la API del motor, los modos y las categorías. Por eso la pantalla se escribe contra un motor que aún no existe.</li>
+          <li>Cada constructor recibe <b>sus archivos</b> y no toca los ajenos, así no se pisan.</li>
+          <li>Cada agente devuelve un informe con forma fija (archivos, resumen, comprobaciones y pendientes).</li>
+          <li>El verificador recibe todos los informes y revisa el conjunto.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3 style="margin-top:0">Lo que se aprendió</h3>
+        <ul class="lista">
+          <li>Con 4 CPU solo corren 2 agentes a la vez: los 4 constructores se fueron turnando de 2 en 2.</li>
+          <li>La integración fue la pieza más lenta: unos 20 archivos y el repaso completo de tests.</li>
+          <li>Sin <code>node_modules</code> faltaba <code>esbuild</code>, y 5 tests no podían correr hasta instalarlo.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- Pendiente -->
+  <section id="pendiente">
+    <h2 class="pixel">PENDIENTE</h2>
+    <div class="card aviso">
+      <ul class="lista">
+        <li><b>Commit, PR y merge</b> a <code>main</code>. El merge publica el sitio en GitHub Pages.</li>
+        <li><b>Republicar las reglas de Firebase a mano</b> en la consola (<code>firebase/CONFIGURAR-FIREBASE.md</code>). Mientras tanto el juego funciona, pero los récords, las monedas y la racha en la nube del Sudoku quedan guardados en el dispositivo y suben solos cuando las reglas estén.</li>
+        <li><b>Sin probar con sesión:</b> la tarjeta del vestíbulo, la Clasificación, los Logros y el marco necesitan login con Google, que no hay en este entorno. Sus tests sí pasan.</li>
+        <li><b>Test de reglas:</b> <code>test-rules.mjs</code> todavía no tiene casos del Sudoku; la comprobación del emulador fue un script aparte.</li>
+        <li>Ideas para después: pistas que enseñen la técnica («único oculto en la caja 5») y un modo contrarreloj que recargue tiempo con los aciertos.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="fuentes">
+    <h2 class="pixel">FUENTES</h2>
+    <ul class="fuentes">
+      <li><a href="https://arxiv.org/abs/1201.0749">McGuire et al. — There is no 16-Clue Sudoku (2012)</a></li>
+      <li><a href="https://www.technologyreview.com/2012/12/27/180994/best-of-2012-mathematicians-solve-minimum-sudoku-problem">MIT Technology Review — Minimum Sudoku problem</a></li>
+      <li><a href="https://hodoku.sourceforge.net/en/docs_cre.php">HoDoKu — Creating Sudokus (niveles y puntaje)</a></li>
+      <li><a href="https://www.fi.muni.cz/~xpelanek/publications/flairs-sudoku.pdf">Pelánek — Difficulty rating of Sudoku puzzles</a></li>
+      <li><a href="https://en.wikipedia.org/wiki/Mathematics_of_Sudoku">Wikipedia — Mathematics of Sudoku</a></li>
+      <li><a href="https://en.wikipedia.org/wiki/Glossary_of_Sudoku">Wikipedia — Glossary of Sudoku</a></li>
+      <li><a href="https://www.sudokuwiki.org/The_Logic_of_Sudoku?talk">SudokuWiki — The Logic of Sudoku</a></li>
+      <li><a href="https://ocf.berkeley.edu/~jchu/publicportal/sudoku/sudoku.paper.html">Berkeley — Dancing Links para sudoku</a></li>
+      <li><a href="https://dobeit.atlassian.net/wiki/spaces/PDSD/pages/1474574/Sudoku+Scoring">Sudoku Scoring — puntos por celda y multiplicador</a></li>
+      <li><a href="https://apps.apple.com/app/id1551669399">Good Sudoku (Zach Gage) — modos Good, Arcade y Eternal</a></li>
+      <li><a href="https://apps.apple.com/gb/app/sudoku-com-number-puzzle/id1193508329">Sudoku.com — 3 errores y fuera</a></li>
+      <li><a href="https://toucharcade.com/games/dual-match-3">Dual Match 3 — combos que suman tiempo</a></li>
+    </ul>
+  </section>
+
+  <footer>Sudoku Arcade · Laboratorio / Juegos · generado con Claude Code</footer>
+</div>
+</body>
+</html>

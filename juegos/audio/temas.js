@@ -15,6 +15,8 @@
  *   catan      Re mayor, 116 con swing — tonada de puerto, el bajo como tambor de marcha.
  *   snake      Do dórico, 150 — funk: bajo con octavas y caja a contratiempo.
  *   bbtan      Do mayor, 142 — arcade saltarín: bajo que rebota en octavas.
+ *   sudoku     Mi mayor, 134 — arcade de cuadrícula: la melodía va en grupos
+ *              de tres notas, como las cajas de 3×3; el clímax sube un tono.
  *   worms-menu / worms-combate  Mi mayor tranquilo y Si menor de batalla.
  *
  * Y los que no son de ningún juego, para el reproductor de la cabecera:
@@ -234,6 +236,59 @@
         "R . O . R . O . F . O . R . O .", "k.hks.h.k.hks.hx", 2)
     },
     orden: "I A A B A B+2 A"
+  };
+
+  /* Sudoku Arcade: Mi mayor a 134, tonalidad y tempo que no usa ningún otro
+     tema del cancionero (Mi mayor solo lo tiene el menú de Circuit Breakers,
+     y a 100). Melodía original. La idea musical es la cuadrícula: en A los
+     compases se cuentan 3+3+3 (tres notas repetidas tres veces, como las tres
+     celdas de una fila dentro de una caja) y luego se resuelven en 7 pasos.
+     B baja al relativo menor (Do# menor) para que respire, y C es el clímax
+     de ocho compases que trepa por las octavas como una racha de aciertos.
+     La segunda vuelta de C sube un tono (C+2) para que la partida larga no
+     suene igual que al principio. Las capas (arp, bat) las abre game.js con
+     el avance del tablero, igual que hace Mina Club. */
+  T.sudoku = {
+    bpm: 134, // tempo propio: ningún otro tema va a 134
+    // Pulso 25 % con un eco corto: brillante y de máquina recreativa.
+    lead: { onda: "p25", vol: .14, vib: .005, sus: .55, eco: { t: .1, fb: .2, mezcla: .18 } },
+    // Bajo de triángulo que rebota fundamental-octava-quinta.
+    bajo: { onda: "tri", vol: .21 },
+    // Arpegio fino de 12 % una octava arriba: el «tintineo» de las celdas.
+    arp: { onda: "p12", vol: .045, oct: 5, paso: .03 },
+    bat: { vol: .3 },
+    secciones: {
+      // Intro de dos compases: solo bajo, arpegio y batería, sin melodía.
+      I: sec("E B", "", "R . O . F . O . R . O . F . O .", "k.h.k.h.s.h.k.hh", 2),
+      // A: el motivo de tres notas (grupos de 3, como las cajas de 3×3).
+      A: sec("E C#m A B",
+        "E5 G#5 B5 E5 G#5 B5 E5 G#5 B5*2 C#6 B5 G#5*2 E5*2 " +
+        "C#5 E5 G#5 C#5 E5 G#5 C#5 E5 G#5*2 B5 A5 G#5*4 " +
+        "A4 C#5 E5 A4 C#5 E5 A4 C#5 E5*2 F#5 G#5 A5*4 " +
+        "B5*2 A5*2 G#5*2 F#5*2 D#5*4 F#5*2 B4*2",
+        "R . O . F . O . R . O . F . O .", "k.h.s.hkk.h.s.hh", 2),
+      // B: al relativo menor, frases más largas para «pensar la jugada».
+      B: sec("C#m A F#m B",
+        "G#5*4 C#6*4 B5*2 A5*2 G#5*4 " +
+        "A5*6 G#5*2 E5*4 C#5*4 " +
+        "F#5*2 A5*2 C#6*4 B5*2 A5*2 F#5*4 " +
+        "D#5*2 F#5*2 B5*4 A5*2 G#5*2 F#5*4",
+        "R . R F . R O . R . R F . R O .", "k.h.s.h.k.hks.h.", 2),
+      // C: clímax de ocho compases que sube por las octavas, como un combo.
+      C: sec("A B G#m C#m F#m B E E",
+        "C#6 . E6 . C#6 . A5 . E6*2 C#6*2 A5*4 " +
+        "D#6 . F#6 . D#6 . B5 . F#6*2 D#6*2 B5*4 " +
+        "B5 . D#6 . G#6*4 F#6*2 D#6*2 B5*4 " +
+        "C#6*2 E6*2 G#6*4 E6*2 C#6*2 G#5*4 " +
+        "A5*2 C#6*2 F#6*4 E6*2 C#6*2 A5*4 " +
+        "B5*2 D#6*2 F#6*4 A6*4 F#6*4 " +
+        "G#6*4 E6*2 B5*2 G#5*2 B5*2 E6*4 " +
+        "E6*8 B5*4 .*4",
+        "R . O . F . O . R . O . F . O .", "k.hks.hkk.hks.hx", 2)
+    },
+    // Intro, el motivo dos veces, el respiro, el motivo, el clímax y, de
+    // vuelta, el respiro y el clímax un tono más arriba.
+    orden: "I A A B A C A B C+2"
   };
 
   T["worms-menu"] = {
