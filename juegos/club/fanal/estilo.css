@@ -95,7 +95,7 @@ button{font:inherit;color:inherit}
 :root[data-acto="4"] .dato strong{text-shadow:0 0 8px #ffd27a88}
 
 /* --- La pantalla de juego --- */
-.pantalla{position:relative;width:100%;aspect-ratio:3/4;background:#000;overflow:hidden;border:2px solid var(--linea);box-shadow:0 10px 40px #0008;user-select:none;-webkit-user-select:none;touch-action:none;transition:border-color 1.6s}
+.pantalla{position:relative;width:100%;aspect-ratio:3/4;background:#000;overflow:hidden;border:2px solid var(--linea);box-shadow:0 10px 40px #0008;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;touch-action:none;transition:border-color 1.6s}
 #lienzo{display:block;width:100%;height:100%;outline:none}
 .vineta{position:absolute;inset:0;pointer-events:none;background:radial-gradient(ellipse at 50% 62%,#0000 42%,rgba(0,0,0,var(--vineta)) 100%);transition:background 1.2s}
 html.ultima-llama .vineta{background:radial-gradient(ellipse at 50% 88%,#0000 30%,rgba(0,0,0,.85) 85%)}
@@ -189,7 +189,10 @@ html.sin-lineas .lineas{display:none}
 .opciones input[type=checkbox]{width:18px;height:18px;accent-color:var(--acento)}
 
 /* Controles táctiles: solo donde hay dedo. */
-.tactil{display:none;gap:8px;margin-top:8px}
+.tactil{display:none;gap:8px;margin-top:8px;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;touch-action:none}
+/* En iPhone una pulsación larga seleccionaba el texto del botón y abría el menú,
+   que se quedaba con el dedo: nunca llegaba el pointerup y el botón seguía apretado. */
+.tactil button,.tactil button *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
 .tactil button{flex:1;height:58px;background:var(--panel);border:2px solid var(--linea);color:var(--acento);font-size:22px;touch-action:none}
 .tactil button.fuego{flex:1.4}
 .tactil button.activo{background:var(--panel2);border-color:var(--acento)}

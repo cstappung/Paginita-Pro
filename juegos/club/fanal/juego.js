@@ -1454,10 +1454,22 @@
     });
     const fin = () => { teclas[t] = false; b.classList.remove("activo"); };
     b.addEventListener("pointerup", fin); b.addEventListener("pointercancel", fin); b.addEventListener("lostpointercapture", fin);
+    // iOS: sin esto, una pulsación larga selecciona el texto o abre el menú y se
+    // queda con el dedo, y el pointerup no llega nunca. touchend llega siempre.
+    b.addEventListener("touchstart", ev => ev.preventDefault(), { passive: false });
+    b.addEventListener("touchend", fin); b.addEventListener("touchcancel", fin);
+    b.addEventListener("contextmenu", ev => ev.preventDefault());
+    b.addEventListener("selectstart", ev => ev.preventDefault());
   }
+  // Red de seguridad: si ningún dedo queda en pantalla, ningún botón puede seguir apretado.
+  const sueltaBotones = () => {
+    for (const b of document.querySelectorAll("#tactil [data-tecla].activo")) { b.classList.remove("activo"); teclas[b.dataset.tecla] = false; }
+  };
+  document.addEventListener("touchend", ev => { if (!ev.touches.length) sueltaBotones(); });
+  document.addEventListener("touchcancel", ev => { if (!ev.touches.length) sueltaBotones(); });
   // Si se va la pestaña o el foco, se pausa: nadie debería perder una llama sin estar mirando.
-  document.addEventListener("visibilitychange", () => { if (document.hidden) { if (estado === "juego") pausa(); for (const k in teclas) teclas[k] = false; toque = null; } });
-  window.addEventListener("blur", () => { for (const k in teclas) teclas[k] = false; toque = null; if (estado === "juego") pausa(); });
+  document.addEventListener("visibilitychange", () => { if (document.hidden) { if (estado === "juego") pausa(); for (const k in teclas) teclas[k] = false; toque = null; sueltaBotones(); } });
+  window.addEventListener("blur", () => { for (const k in teclas) teclas[k] = false; toque = null; sueltaBotones(); if (estado === "juego") pausa(); });
 
   /* ================================================================
      HUD
