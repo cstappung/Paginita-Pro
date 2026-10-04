@@ -1302,8 +1302,17 @@ body[data-phase="elige"] .top-line { opacity: 0; }
 .slot small { font-size: 11px; font-weight: 600; opacity: .8; text-align: center; padding: 0 6px; line-height: 1.1; }
 .mk-chip.mk-col { --c: #fff; }
 
-/* cartas de componentes con marco: el componente va centrado en la ventana */
-.col-comp .fr-art img { object-position: 50% 52%; }
+/* cartas de componentes con marco: la imagen es vertical y la ventana
+   apaisada, así que va entera y centrada (contain), y los costados se
+   rellenan con la misma imagen desenfocada, como un marco translúcido */
+.col-comp .fr-art .win-bg {
+  position: absolute; inset: -12%; width: 124%; height: 124%; object-fit: cover;
+  filter: blur(2.6cqw) brightness(.8) saturate(1.15); transform: scale(1.05);
+}
+.col-comp .fr-art .win > img:not(.win-bg) {
+  position: relative; object-fit: contain; object-position: 50% 50%;
+  filter: drop-shadow(0 0 1.6cqw #0009);
+}
 .v-realista { --panel: linear-gradient(180deg, #eef0f2, #c9ced6); --energy: #f5b819; --energy-d: #8a5d00; }
 .v-bioware { --panel: linear-gradient(180deg, #f0ddd0, #c69c87); --energy: #b5543e; --energy-d: #5a1f14; }
 .v-esquematico {
@@ -1333,3 +1342,7 @@ body[data-phase="elige"] .top-line { opacity: 0; }
 .bk-comp .bk::before { background: repeating-conic-gradient(#b8ffd910 0 7deg, #fff0 7deg 15deg); }
 .bk-comp .bk-ring { background: radial-gradient(circle at 35% 30%, #fff3b0, #ffb340 45%, #c2560c); border-color: #6dffb0; box-shadow: 0 0 0 1.4cqw #06321f, 0 0 8cqw #6dffb099; font-weight: 900; }
 .bk-comp .bk b { color: #6dffb0; text-shadow: 0 .6cqw 0 #06321f; }
+/* las realistas son fotos de producto sobre blanco: el relleno queda blanco y sin sombra, así no se nota la franja */
+.v-realista .fr-art .win-bg { display: none; }
+.v-realista .fr-art .win { background: #fff; }
+.v-realista .fr-art .win > img:not(.win-bg) { filter: none; }

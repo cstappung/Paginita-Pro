@@ -238,7 +238,7 @@ function frontHTML(c, lazy) {
         <b class="fr-name${c.name.length > 15 ? ' long' : ''}">${c.name}</b>
         <span class="fr-hp"><small>PS</small>${c.hp}</span><i class="nrg big">${v.icon}</i>
       </div>
-      <div class="fr-art"><div class="win"><img src="${c.img}" alt="${alt}" draggable="false"${ld}><div class="holo"></div></div></div>
+      <div class="fr-art"><div class="win">${c.col === 'comp' ? `<img class="win-bg" src="${c.img}" alt="" aria-hidden="true" draggable="false"${ld}>` : ''}<img src="${c.img}" alt="${alt}" draggable="false"${ld}><div class="holo"></div></div></div>
       <div class="fr-strip">${v.label} · Tipo ${v.type} · N.º ${pad(c.num)}</div>
       <div class="fr-moves">
         <div class="mv"><span class="cost">${nrg}</span><b>${m1[0]}</b><span class="dmg">${m1[1]}</span></div>

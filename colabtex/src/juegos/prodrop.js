@@ -236,7 +236,7 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver }) {
       frame.title = "PRODROP — sobres y mercado de cartas";
       frame.allow = "fullscreen";
       window.addEventListener("message", mensaje);
-      frame.src = "juegos/prodrop/index.html?v=pd-12";
+      frame.src = "juegos/prodrop/index.html?v=pd-13";
       host.appendChild(frame);
       frame.addEventListener("load", () => frame.focus());
       off = datos(x => { d = x; enviaDatos(); });
