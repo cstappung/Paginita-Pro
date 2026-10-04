@@ -2,52 +2,62 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-<script src="../../../i18n.js?v=202610041956"></script>
+<script src="../../../i18n.js?v=202610042133"></script>
 <script src="../../audio/mando.js?v=mando-2"></script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#0a0f1c">
   <title>Tetris Club — Apila.</title>
-  <link rel="stylesheet" href="style.css?v=club-3">
+  <link rel="stylesheet" href="style.css?v=club-4">
   <link rel="stylesheet" href="../conexion.css?v=club-2">
   <script src="../../audio/volumen.js?v=vol-1"></script>
   <script src="../conexion.js?v=club-9"></script>
 </head>
 <body>
-  <div class="shell">
+  <div class="shell" id="tt">
     <header class="tt-cab">
       <div class="tt-marca"><span class="tt-logo"><i></i><i></i><i></i><i></i></span>TETRIS<b>CLUB</b></div>
       <button id="sonido" class="tt-ico" type="button" title="Sonido">🔊</button>
     </header>
-    <nav class="tt-modos" role="group" aria-label="Modo">
-      <button data-modo="maraton" class="activo"><b>Maratón</b><small>Hasta que no quepa nada</small></button>
-      <button data-modo="sprint"><b>Sprint</b><small>40 líneas, contra el reloj</small></button>
-      <button data-modo="ultra"><b>Ultra</b><small>Dos minutos, todos los puntos</small></button>
-    </nav>
-    <main class="tt-juego">
-      <aside class="tt-lado">
-        <div class="tt-caja"><small>Guardada</small><canvas id="guarda" width="100" height="70"></canvas></div>
-        <div class="tt-caja tt-datos">
-          <p><small id="etqA">Puntos</small><b id="datoA">0</b></p>
-          <p><small>Líneas</small><b id="datoL">0</b></p>
-          <p><small>Nivel</small><b id="datoN">1</b></p>
-          <p><small id="etqT">Tiempo</small><b id="datoT">0:00</b></p>
-          <p><small>Récord</small><b id="record">—</b></p>
+    <section class="tt-escena">
+      <nav class="tt-modos" role="group" aria-label="Modo">
+        <button data-modo="maraton" class="activo"><b>Maratón</b><small>Hasta que no quepa nada</small></button>
+        <button data-modo="sprint"><b>Sprint</b><small>40 líneas, contra el reloj</small></button>
+        <button data-modo="ultra"><b>Ultra</b><small>Dos minutos, todos los puntos</small></button>
+      </nav>
+      <div class="layout tt-layout">
+        <div class="tt-centro">
+          <main class="tt-juego">
+            <aside class="tt-lado">
+              <div class="tt-caja"><small>Guardada</small><canvas id="guarda" width="100" height="70"></canvas></div>
+              <div class="tt-caja tt-datos">
+                <p><small id="etqA">Puntos</small><b id="datoA">0</b></p>
+                <p><small>Líneas</small><b id="datoL">0</b></p>
+                <p><small>Nivel</small><b id="datoN">1</b></p>
+                <p><small id="etqT">Tiempo</small><b id="datoT">0:00</b></p>
+                <p class="tt-rec"><small>Récord</small><b id="record">—</b></p>
+              </div>
+            </aside>
+            <div class="tt-pozo">
+              <canvas id="pozo" width="300" height="600" tabindex="0" aria-label="Pozo de Tetris"></canvas>
+              <div id="aviso" class="tt-aviso"></div>
+              <div id="capa" class="tt-capa">
+                <h2 id="capaT">Apila<span>.</span></h2>
+                <p id="capaP">Completa filas. Que no llegue arriba.</p>
+                <button id="jugar" type="button">Jugar</button>
+                <small>o pulsa <kbd>Espacio</kbd></small>
+              </div>
+            </div>
+            <aside class="tt-lado"><div class="tt-caja tt-sig"><small>Siguientes</small><canvas id="cola" width="100" height="320"></canvas></div></aside>
+          </main>
+          <div class="tt-pie">
+            <p class="tt-teclas"><span id="teclasTxt"></span></p>
+            <div class="tt-ctl"><button id="teclas" type="button">⌨ Configurar teclas</button><span data-volumen></span></div>
+          </div>
+          <div class="tt-tactil"><button data-a="contragira">⟲</button><button data-a="izq">◀</button><button data-a="blando">▼</button><button data-a="der">▶</button><button data-a="gira">⟳</button><button data-a="caer">⤓</button><button data-a="guarda">⇄</button></div>
         </div>
-      </aside>
-      <div class="tt-pozo">
-        <canvas id="pozo" width="300" height="600" tabindex="0" aria-label="Pozo de Tetris"></canvas>
-        <div id="aviso" class="tt-aviso"></div>
-        <div id="capa" class="tt-capa">
-          <h2 id="capaT">Apila<span>.</span></h2>
-          <p id="capaP">Completa filas. Que no llegue arriba.</p>
-          <button id="jugar" type="button">Jugar</button>
-          <small>o pulsa <kbd>Espacio</kbd></small>
-        </div>
+        <aside class="tt-rank"></aside>
       </div>
-      <aside class="tt-lado"><div class="tt-caja"><small>Siguientes</small><canvas id="cola" width="100" height="320"></canvas></div></aside>
-    </main>
-    <p class="tt-teclas"><span id="teclasTxt"></span> <button id="teclas" type="button">⌨ Configurar teclas</button> <span data-volumen></span></p>
-    <div class="tt-tactil"><button data-a="contragira">⟲</button><button data-a="izq">◀</button><button data-a="blando">▼</button><button data-a="der">▶</button><button data-a="gira">⟳</button><button data-a="caer">⤓</button><button data-a="guarda">⇄</button></div>
+    </section>
   </div>
   <script src="../../audio/chip.js?v=snake-audio-1"></script><script src="../../audio/temas.js?v=snake-audio-1"></script>
   <script src="motor.js?v=club-3"></script><script src="game.js?v=club-4"></script>

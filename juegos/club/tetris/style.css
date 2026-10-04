@@ -1,37 +1,103 @@
-:root{--fondo:#0a0f1c;--caja:#111829;--borde:#273248;--tinta:#e9edf5;--apagado:#8fa0bb;--acento:#2fd3e8}
+:root{--fondo:#0a0f1c;--caja:#111829;--caja2:#161f35;--borde:#273248;--tinta:#e9edf5;--apagado:#8fa0bb;--acento:#2fd3e8;--morado:#b04ee8}
 *{box-sizing:border-box}
 body{margin:0;background:var(--fondo);color:var(--tinta);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
 button{font:inherit;color:inherit;cursor:pointer}
-.shell{max-width:760px;margin:auto;padding:12px 16px 24px}
-.tt-cab{display:flex;justify-content:space-between;align-items:center;padding:10px 0 14px;border-bottom:1px solid var(--borde)}
+.shell{max-width:1040px;margin:auto;padding:12px 16px 24px}
+.tt-cab{display:flex;justify-content:space-between;align-items:center;padding:10px 0 14px}
 .tt-marca{display:flex;align-items:center;gap:10px;font:800 24px/1 "IBM Plex Mono",ui-monospace,monospace;letter-spacing:2px}.tt-marca b{color:var(--acento);font-weight:400}
-.tt-logo{display:grid;grid-template-columns:repeat(3,9px);gap:2px}.tt-logo i{width:9px;height:9px;background:#b04ee8;border-radius:2px}.tt-logo i:first-child{grid-column:2}
+.tt-logo{display:grid;grid-template-columns:repeat(3,9px);gap:2px}.tt-logo i{width:9px;height:9px;background:var(--morado);border-radius:2px}.tt-logo i:first-child{grid-column:2}
 .tt-ico{background:var(--caja);border:1px solid var(--borde);border-radius:10px;width:40px;height:40px}
-.tt-modos{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:14px 0}
-.tt-modos button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:10px 12px;border-radius:12px;background:var(--caja);border:1px solid var(--borde);text-align:left}
+
+/* La escena: una consola oscura que ocupa todo el ancho que tenga, también
+   dentro de Juegos, donde la página de alrededor puede ser clara. Sin ella
+   el pozo quedaba solo en el centro y los modos estirados de lado a lado
+   sobre un fondo blanco. */
+.tt-escena{position:relative;overflow:hidden;border-radius:22px;border:1px solid #1f2a40;padding:18px 20px 16px;color:var(--tinta);
+  background:
+    radial-gradient(ellipse 60% 55% at 50% 38%,#2fd3e81a,transparent 70%),
+    radial-gradient(ellipse 45% 50% at 8% 100%,#b04ee81f,transparent 70%),
+    radial-gradient(ellipse 40% 45% at 100% 0%,#ff4fa31a,transparent 70%),
+    linear-gradient(#ffffff06 1px,transparent 1px) 0 0/28px 28px,
+    linear-gradient(90deg,#ffffff06 1px,transparent 1px) 0 0/28px 28px,
+    linear-gradient(180deg,#0d1424,#080c17);
+  box-shadow:0 24px 60px #0a0f1c40,inset 0 1px 0 #ffffff0d}
+.tt-escena::before{content:"";position:absolute;inset:auto -10% -40px;height:120px;background:radial-gradient(ellipse at center,#2fd3e826,transparent 70%);pointer-events:none}
+
+/* Los modos: una barra segmentada, no tres tarjetas a todo lo ancho. */
+.tt-modos{position:relative;display:grid;grid-template-columns:repeat(3,1fr);gap:4px;max-width:620px;margin:0 auto 18px;padding:4px;border-radius:16px;background:#060a14b3;border:1px solid var(--borde)}
+.tt-modos button{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 10px;border-radius:12px;background:transparent;border:1px solid transparent;text-align:center;transition:background .15s,border-color .15s}
+.tt-modos button b{font-size:14px}
 .tt-modos button small{color:var(--apagado);font-size:11px}
-.tt-modos button.activo{border-color:var(--acento);box-shadow:0 0 0 1px var(--acento),0 0 18px #2fd3e833}
-.tt-modos button:disabled{opacity:.5;cursor:default}
-.tt-juego{display:flex;gap:12px;justify-content:center;align-items:flex-start}
-.tt-lado{display:flex;flex-direction:column;gap:10px;width:110px}
-.tt-caja{background:var(--caja);border:1px solid var(--borde);border-radius:12px;padding:8px;display:flex;flex-direction:column;align-items:center;gap:4px}
-.tt-caja small{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--apagado)}
+.tt-modos button:hover:not(:disabled):not(.activo){background:#ffffff0a}
+.tt-modos button.activo{background:linear-gradient(180deg,#1b3a4d,#13283a);border-color:#2fd3e899;box-shadow:0 0 18px #2fd3e833,inset 0 1px 0 #ffffff14}
+.tt-modos button.activo b{color:#fff}.tt-modos button.activo small{color:#a9e9f2}
+.tt-modos button:disabled{opacity:.45;cursor:default}
+
+.tt-layout{position:relative;display:grid;grid-template-columns:minmax(0,1fr);gap:22px;align-items:start}
+.tt-layout:has(.tt-rank:not(:empty)){grid-template-columns:minmax(0,1fr) 270px}
+.tt-rank:empty{display:none}
+.tt-centro{min-width:0}
+
+.tt-juego{display:flex;gap:14px;justify-content:center;align-items:flex-start}
+.tt-lado{display:flex;flex-direction:column;gap:12px;width:122px}
+.tt-caja{background:linear-gradient(180deg,var(--caja2),var(--caja));border:1px solid var(--borde);border-radius:14px;padding:10px 8px;display:flex;flex-direction:column;align-items:center;gap:6px;box-shadow:inset 0 1px 0 #ffffff0a}
+.tt-caja small{font-size:10px;letter-spacing:.16em;text-transform:uppercase;color:var(--apagado)}
 .tt-caja canvas{max-width:100%}
-.tt-datos{align-items:stretch}.tt-datos p{margin:0 0 6px;display:flex;flex-direction:column}.tt-datos b{font:800 18px "IBM Plex Mono",ui-monospace,monospace}
-.tt-pozo{position:relative}
-.tt-pozo canvas{display:block;width:min(300px,56vw);height:auto;border-radius:8px;box-shadow:0 0 0 2px var(--borde),0 18px 40px #000a;outline:none}
-.tt-capa{position:absolute;inset:0;border-radius:8px;background:#0a0f1ce6;backdrop-filter:blur(6px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;padding:16px}
+.tt-datos{align-items:stretch;padding:12px}.tt-datos p{margin:0 0 9px;display:flex;flex-direction:column;gap:1px}.tt-datos p:last-child{margin:0}
+.tt-datos b{font:800 19px "IBM Plex Mono",ui-monospace,monospace;font-variant-numeric:tabular-nums}
+.tt-datos .tt-rec{padding-top:9px;border-top:1px dashed var(--borde)}.tt-datos .tt-rec b{color:#ffe14d}
+.tt-pozo{position:relative;padding:6px;border-radius:14px;background:linear-gradient(180deg,#1d2942,#0e1526);box-shadow:0 0 0 1px #2fd3e840,0 0 34px #2fd3e81f,0 22px 50px #000b}
+.tt-pozo canvas{display:block;width:min(320px,56vw);height:auto;border-radius:9px;outline:none;background:#070b15}
+.tt-capa{position:absolute;inset:6px;border-radius:9px;background:#0a0f1ce0;backdrop-filter:blur(6px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;padding:16px}
 .tt-capa[hidden]{display:none}
 .tt-capa h2{margin:0;font:900 38px/1 "IBM Plex Mono",ui-monospace,monospace}.tt-capa h2 span{color:var(--acento)}
 .tt-capa p{margin:0;color:var(--apagado);font-size:13px}.tt-capa small{color:var(--apagado);font-size:11px}
-.tt-capa button{margin-top:6px;padding:10px 26px;border-radius:999px;border:0;background:var(--acento);color:#06121a;font-weight:800;font-size:16px}
+.tt-capa button{margin-top:6px;padding:10px 28px;border-radius:999px;border:0;background:var(--acento);color:#06121a;font-weight:800;font-size:16px;box-shadow:0 0 22px #2fd3e866;transition:transform .12s}
+.tt-capa button:hover{transform:translateY(-1px) scale(1.03)}
 .tt-aviso{position:absolute;left:0;right:0;top:36%;text-align:center;font:900 20px "IBM Plex Mono",ui-monospace,monospace;color:#ffe14d;text-shadow:0 2px 0 #000,0 0 18px #ffe14d99;opacity:0;pointer-events:none}
 .tt-aviso.ve{animation:aviso 1.4s ease-out}
 @keyframes aviso{0%{opacity:0;transform:scale(.6)}15%{opacity:1;transform:scale(1.15)}30%{transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:translateY(-30px)}}
-.tt-teclas{text-align:center;color:var(--apagado);font-size:12px;margin:14px 0 0}
+
+.tt-pie{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:8px 14px;margin:16px 0 0}
+.tt-teclas{margin:0;text-align:center;color:var(--apagado);font-size:12px;max-width:560px}
+.tt-ctl{display:flex;align-items:center;gap:8px}
+.tt-ctl>button{background:#ffffff08;color:var(--apagado);border:1px solid var(--borde);border-radius:999px;padding:6px 12px;font-size:12px}.tt-ctl>button:hover{color:#fff;border-color:var(--acento)}
+.tt-ctl .vj-ctl{color:var(--tinta)}
 kbd{display:inline-block;min-width:20px;padding:1px 5px;border:1px solid var(--borde);border-bottom-width:2px;border-radius:5px;background:var(--caja);font:600 11px ui-monospace,monospace;color:var(--tinta)}
-.tt-tactil{display:none;justify-content:center;gap:6px;flex-wrap:wrap;margin:12px 0;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;touch-action:none}
+.tt-tactil{display:none;justify-content:center;gap:6px;flex-wrap:wrap;margin:12px 0 0;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;touch-action:none}
 .tt-tactil button{font-size:22px;min-width:48px;min-height:48px;border-radius:12px;border:1px solid var(--borde);background:var(--caja);touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
-@media(pointer:coarse){.tt-tactil{display:flex}.tt-teclas{display:none}}
-@media(max-width:560px){.tt-lado{width:78px}.tt-datos b{font-size:14px}.tt-modos small{display:none}}
-.tt-teclas button{margin-left:8px;background:transparent;color:inherit;border:1px solid currentColor;border-radius:8px;padding:3px 9px;font:inherit;cursor:pointer}.tt-teclas button:hover{color:#fff}
+/* En táctil sobran las teclas, no el volumen. */
+@media(pointer:coarse){.tt-tactil{display:flex}.tt-teclas,.tt-ctl>button{display:none}}
+
+/* La clasificación, dentro de la consola y con su mismo traje (conexion.css
+   la pinta blanca para los juegos claros del club). */
+#tt .club-ranking{margin:18px 0 0;padding:16px;border-radius:16px;border:1px solid var(--borde);background:linear-gradient(180deg,var(--caja2),var(--caja));color:var(--tinta);font:13px system-ui,-apple-system,"Segoe UI",sans-serif;box-shadow:inset 0 1px 0 #ffffff0a}
+#tt .club-ranking h2{margin:0 0 10px;font:800 13px "IBM Plex Mono",ui-monospace,monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--acento)}
+#tt .club-ranking ol{margin:0;padding:0;list-style:none;counter-reset:pos;font-size:13px;line-height:1.4}
+#tt .club-ranking li{counter-increment:pos;display:flex;gap:10px;align-items:baseline;padding:7px 4px;border-bottom:1px solid #ffffff0d}
+#tt .club-ranking li::before{content:counter(pos);min-width:22px;font:800 13px "IBM Plex Mono",ui-monospace,monospace;color:var(--apagado)}
+#tt .club-ranking li:nth-child(1)::before{color:#ffd54a}#tt .club-ranking li:nth-child(2)::before{color:#cfd8e6}#tt .club-ranking li:nth-child(3)::before{color:#e59b5b}
+#tt .club-ranking p{margin:8px 0 0;font-size:12px;line-height:1.5;color:var(--apagado)}
+#tt .club-ranking p:empty{display:none}
+#tt .club-ranking .club-propio{margin:0 0 8px;color:#ffe14d}
+#tt .club-ranking button{margin-top:10px;background:#ffffff08;border:1px solid var(--borde);border-radius:9px;padding:7px 11px;color:var(--apagado);font-size:12px}
+#tt .club-ranking button:hover{color:#fff;border-color:var(--acento)}
+
+#tt .tt-rank .club-ranking{margin:0}
+/* Dentro de Juegos, la consola es todo el documento. */
+.club-integrado .tt-escena{border-radius:20px}
+.club-integrado .tt-layout:has(.tt-rank:not(:empty)){grid-template-columns:minmax(0,1fr) 270px}
+
+@media(max-width:860px){
+  .tt-layout:has(.tt-rank:not(:empty)),.club-integrado .tt-layout:has(.tt-rank:not(:empty)){grid-template-columns:minmax(0,1fr)}
+  .club-integrado .tt-layout>aside.tt-rank{display:block}
+  .tt-rank{max-width:560px;width:100%;margin:0 auto}
+}
+@media(max-width:560px){
+  .tt-escena{padding:12px 8px;border-radius:16px}
+  .tt-juego{gap:6px}.tt-lado{width:70px;gap:8px}.tt-caja{padding:7px 5px}.tt-caja small{font-size:9px;letter-spacing:.08em}
+  .tt-datos{padding:7px}.tt-datos p{margin-bottom:6px}.tt-datos .tt-rec{padding-top:6px}.tt-datos b{font-size:14px}
+  .tt-modos small{display:none}.tt-modos button{padding:9px 6px}
+  /* Lo que dejan las dos columnas y los márgenes: el pozo nunca empuja a los lados. */
+  .tt-pozo{padding:4px}.tt-pozo canvas{width:min(320px,calc(100vw - 172px))}.tt-capa{inset:4px;padding:10px}.tt-capa h2{font-size:26px}
+}
