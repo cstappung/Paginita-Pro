@@ -1250,13 +1250,13 @@ function armazon() {
     individual.montar(h);
     /* La barra de arriba sale del mismo catálogo que el salón, así que un
        juego nuevo del club aparece aquí sin tocar esta línea. */
-    const club = SOLOS.filter(x => x.tipo === "club"), este = club.find(x => x.id === juego) || {};
-    const corto = { minas: "Buscaminas", snake: "Snake", tetris: "Tetris", sopa: "Sopa", sudoku: "Sudoku", frontera: "Frontera" };
+    const club = SOLOS.filter(x => x.tipo === "club"), este = club.find(x => x.ruta === "#solo/" + juego) || {};
+    const corto = { minas: "Buscaminas", snake: "Snake", sopa: "Sopa", sudoku: "Sudoku", frontera: "Frontera" };
     const barra = document.createElement("div");
     barra.className = "jg-solo-barra";
     barra.innerHTML = `<a class="btn2" href="#">← Juegos</a><div class="jg-solo-titulo"><small>${state.invitado ? "UN JUGADOR · MODO INVITADO, NO SE GUARDA" : "UN JUGADOR · RANKING POR MODALIDAD"}</small><strong>${escapeHtml(este.nombre || juego)}</strong></div>` +
       (state.invitado ? '<button class="btn jg-solo-entrar" type="button" data-login>Iniciar sesión</button>' : "") +
-      `<nav aria-label="Juegos individuales">${club.map(x => `<a class="btn2${x.id === juego ? " on" : ""}" href="${x.ruta}">${escapeHtml(corto[x.id] || x.nombre)}</a>`).join("")}` +
+      `<nav aria-label="Juegos individuales">${club.map(x => `<a class="btn2${x === este ? " on" : ""}" href="${x.ruta}">${escapeHtml(corto[x.id] || x.nombre)}</a>`).join("")}` +
       `<button class="btn2" type="button" data-reglas-solo>📖 Reglas</button></nav>`;
     barra.querySelector("[data-reglas-solo]").onclick = () => abreReglas(clave);
     h.insertBefore(barra, h.firstChild);
