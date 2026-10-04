@@ -30,8 +30,8 @@ button{font:inherit;color:inherit;cursor:pointer}
 @keyframes aviso{0%{opacity:0;transform:scale(.6)}15%{opacity:1;transform:scale(1.15)}30%{transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:translateY(-30px)}}
 .tt-teclas{text-align:center;color:var(--apagado);font-size:12px;margin:14px 0 0}
 kbd{display:inline-block;min-width:20px;padding:1px 5px;border:1px solid var(--borde);border-bottom-width:2px;border-radius:5px;background:var(--caja);font:600 11px ui-monospace,monospace;color:var(--tinta)}
-.tt-tactil{display:none;justify-content:center;gap:6px;flex-wrap:wrap;margin:12px 0}
-.tt-tactil button{font-size:22px;min-width:48px;min-height:48px;border-radius:12px;border:1px solid var(--borde);background:var(--caja);touch-action:manipulation}
+.tt-tactil{display:none;justify-content:center;gap:6px;flex-wrap:wrap;margin:12px 0;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;touch-action:none}
+.tt-tactil button{font-size:22px;min-width:48px;min-height:48px;border-radius:12px;border:1px solid var(--borde);background:var(--caja);touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
 @media(pointer:coarse){.tt-tactil{display:flex}.tt-teclas{display:none}}
 @media(max-width:560px){.tt-lado{width:78px}.tt-datos b{font-size:14px}.tt-modos small{display:none}}
 .tt-teclas button{margin-left:8px;background:transparent;color:inherit;border:1px solid currentColor;border-radius:8px;padding:3px 9px;font:inherit;cursor:pointer}.tt-teclas button:hover{color:#fff}

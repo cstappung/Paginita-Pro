@@ -517,6 +517,12 @@
   document.querySelectorAll('[data-direction]').forEach(b => b.addEventListener('pointerdown', e => {
     e.preventDefault(); if (state === 'ready' || state === 'over') start(); enqueue(b.dataset.direction);
   }));
+  /* iOS: que una pulsación larga no seleccione la flecha ni abra el menú. */
+  document.querySelectorAll('[data-direction]').forEach(b => {
+    b.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+    b.addEventListener('contextmenu', e => e.preventDefault());
+    b.addEventListener('selectstart', e => e.preventDefault());
+  });
   window.addEventListener('keydown', e => {
     if (e.ctrlKey || e.metaKey || e.altKey || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
     const key = e.key.toLowerCase();

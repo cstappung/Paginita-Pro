@@ -95,15 +95,22 @@ export function crearTetris(ctx) {
       if (a === "blando" || a === "izq" || a === "der") {
         if (a === "blando") mando.blando = true;
         else { mando.lado = a === "izq" ? -1 : 1; mando.t = 0; mando.repite = false; if (TM.accion(s, a)) suena("clic"); }
+        /* iOS: si una pulsación larga abría el menú, el pointerup no llegaba
+           nunca; touchend y blur sueltan igual. */
+        const EVS = ["pointerup", "pointercancel", "touchend", "touchcancel", "blur"];
         const off = () => {
           if (a === "blando") mando.blando = false; else mando.lado = 0;
-          removeEventListener("pointerup", off); removeEventListener("pointercancel", off);
+          for (const ev of EVS) removeEventListener(ev, off);
         };
-        addEventListener("pointerup", off); addEventListener("pointercancel", off);
+        for (const ev of EVS) addEventListener(ev, off);
         return;
       }
       TM.accion(s, a);
     });
+    const tactil = raiz.querySelector("#ttTactil");
+    tactil.addEventListener("touchstart", e => { if (e.target.closest("button[data-a]")) e.preventDefault(); }, { passive: false });
+    tactil.addEventListener("contextmenu", e => e.preventDefault());
+    tactil.addEventListener("selectstart", e => e.preventDefault());
     document.addEventListener("keydown", teclaAbajo);
     document.addEventListener("keyup", teclaArriba);
     document.addEventListener("visibilitychange", alOcultar);
