@@ -93,6 +93,10 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver }) {
     if (falta(p)) throw new Error(`${que} cuesta ${p}: te faltan ${falta(p)} monedas.`);
   }
   const mia = c => economia(d).dueno[c] === uid;
+  /* El prefijo de la colección que pide el abridor. Uno viejo (de antes de
+     las colecciones, en caché) no la manda: su sobre va sin prefijo y sale
+     del catálogo que ese abridor conoce. */
+  const prefijo = col => (MOTOR.COL[col] ? MOTOR.COL[col].prefijo : "");
 
   /* Una petición a la vez: dos compras seguidas con el saldo justo para
      una no deben pasar las dos el control. */
@@ -105,13 +109,13 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver }) {
         if (x.accion === "comprar") {
           const p = MOTOR.precioSobre(fb.ahora());
           pagable(p, "Un sobre");
-          const r = await fb.comprarSobre(uid, p);
+          const r = await fb.comprarSobre(uid, p, prefijo(x.col));
           if (!(economia(d).sobres[uid + "~" + r.k])) throw new Error("Otra pestaña gastó tus monedas a la vez: este sobre no vale hasta que ganes las que faltan.");
           responde(true, r);
         } else if (x.accion === "gratis") {
           if (proximoGratis(uid, d, fb.ahora())) throw new Error("Tu sobre gratis todavía no está listo.");
           if (cuenta().parada) throw new Error("Tu cuenta tiene una compra sin fondos: hasta que ganes lo que falta, no se abren sobres.");
-          const r = await fb.sobreGratis(uid);
+          const r = await fb.sobreGratis(uid, prefijo(x.col));
           responde(true, r);
         } else if (x.accion === "graduar") {
           const q = leeCopia(x.c);
@@ -135,8 +139,10 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver }) {
           const tier = MOTOR.CARDS[fichas[0].id].tier;
           if (tier >= 3) throw new Error("Las legendarias no se pueden cambiar: no hay nada por encima.");
           if (fichas.some(f => MOTOR.CARDS[f.id].tier !== tier)) throw new Error("Las diez tienen que ser de la misma rareza.");
+          const col = MOTOR.CARDS[fichas[0].id].col;
+          if (fichas.some(f => MOTOR.CARDS[f.id].col !== col)) throw new Error("Las diez tienen que ser de la misma colección.");
           if (cuenta().parada) throw new Error("Tu cuenta tiene una compra sin fondos: hasta que ganes lo que falta, no se puede.");
-          const r = await fb.rerollCartas(uid, cs);
+          const r = await fb.rerollCartas(uid, cs, MOTOR.COL[col].prefijo);
           const nueva = claveCopia(uid, r.k, 0);
           let so = null;
           for (let i = 0; i < 30 && !(so = economia(d).sobres[uid + "~" + r.k]); i++) {
@@ -230,7 +236,7 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver }) {
       frame.title = "PRODROP — sobres y mercado de cartas";
       frame.allow = "fullscreen";
       window.addEventListener("message", mensaje);
-      frame.src = "juegos/prodrop/index.html?v=pd-11";
+      frame.src = "juegos/prodrop/index.html?v=pd-12";
       host.appendChild(frame);
       frame.addEventListener("load", () => frame.focus());
       off = datos(x => { d = x; enviaDatos(); });

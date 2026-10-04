@@ -11,13 +11,20 @@ vm.runInContext('const PM=__PM;'+sin('src/juegos/motor.js')+'\n'+sin('src/juegos
  ';globalThis.__M={TARIFA,monedasDe,economia,copiasDe,proximoGratis,claveCopia,topMonedas,exhibidasDe,mejoresDrops,cifras,miniCarta,rankingColeccion,cartasMasRaras}',ctx);
 const M=ctx.__M;
 
-test('el catálogo: 17 personas por 9 variantes, con su imagen',()=>{
- assert.equal(PM.TOTAL,153);
- assert.deepEqual(PM.POR_TIER.map(l=>l.length),[51,34,51,17]);
+test('el catálogo: profes (17 personas por 10 variantes) y componentes (25 por 11 temáticas), con su imagen',()=>{
+ assert.equal(PM.TOTAL,170+275);
+ assert.deepEqual(PM.POR_TIER.map(l=>l.length),[51,34,68,17]);
+ assert.deepEqual(PM.POOL.legado.map(l=>l.length),[51,34,51,17],'los sobres de antes salen de las 153 de antes');
+ assert.deepEqual(PM.POOL.comp.map(l=>l.length),[75,75,75,50]);
+ assert.equal(PM.POR_COL.profes.length,170);assert.equal(PM.POR_COL.comp.length,275);
+ // las 153 de antes conservan su número, que es lo que guarda cada sobre
+ assert.ok(PM.CARDS.slice(0,153).every((c,i)=>c.n===i&&c.col==='profes'&&!/starwars/.test(c.uid)));
+ assert.ok(PM.CARDS.slice(153,170).every(c=>c.vkey==='starwars'&&c.tier===2));
  assert.equal(PM.TIERS.reduce((s,t)=>s+t.w,0),10000);
  assert.equal(PM.GRADE_W.reduce((s,w)=>s+w,0),1000);
  for(const c of PM.CARDS)assert.ok(fs.existsSync(path.join(__dirname,'../../juegos/prodrop',c.img)),'falta '+c.img);
- assert.equal(new Set(PM.CARDS.map(c=>c.uid)).size,153);
+ assert.equal(new Set(PM.CARDS.map(c=>c.uid)).size,PM.TOTAL);
+ assert.equal(new Set(PM.CARDS.map(c=>c.col+c.num)).size,PM.TOTAL,'cada colección numera sus cartas sin repetir');
 });
 
 test('SHA-256 es el de verdad',()=>{
@@ -276,7 +283,7 @@ test('clasificación de cartas: colección (distintas) y las graduadas más rara
  const col=M.rankingColeccion(d);
  const distintas=(o,ks)=>new Set(ks.flatMap(k=>PM.sobre(o,k,s[o][k].at).cartas.map(c=>c.id))).size;
  const fu=col.find(f=>f.uid===u),fv=col.find(f=>f.uid===v);
- assert.equal(fu.tiene,distintas(u,[ka,kb]));assert.equal(fu.copias,10);assert.equal(fu.total,153);
+ assert.equal(fu.tiene,distintas(u,[ka,kb]));assert.equal(fu.copias,10);assert.equal(fu.total,PM.TOTAL);
  assert.equal(fv.tiene,distintas(v,[kc]));assert.equal(fv.copias,5);
  assert.ok(col[0].tiene>=col[1].tiene,'ordenada por cartas distintas');
  const r=M.cartasMasRaras(d);
@@ -290,4 +297,51 @@ test('clasificación de cartas: colección (distintas) y las graduadas más rara
  const d2=conGanado({[u]:2000,[v]:2000},0,{cartas:d.cartas,mercado:{o:{o1:{u,c:cc,p:10,at:500,v:{u:v,at:600}}},t:{}}});
  assert.equal(M.cartasMasRaras(d2).find(c=>c.c===cc).dueno,v);
  assert.equal(M.rankingColeccion({completo:false}),null);
+});
+
+test('colecciones: el prefijo de la clave dice de qué colección es el sobre',()=>{
+ assert.equal(PM.coleccionDe('-Nabcdefgh'),'profes');assert.equal(PM.coleccionDe('p-Nabcdefgh'),'profes');assert.equal(PM.coleccionDe('c-Nabcdefgh'),'comp');
+ const N=30000,t=[0,0,0,0];let navidad=0,leg=0,dios=0;
+ for(let i=0;i<N;i++){
+  const so=PM.sobre('u'+(i%11),'c-Nk'+i+'abcdefg',1792000000000+i*7);
+  assert.equal(so.col,'comp');
+  assert.ok(so.cartas.every(x=>PM.CARDS[x.id].col==='comp'),'un sobre de componentes solo trae componentes');
+  assert.equal(new Set(so.cartas.map(x=>x.id)).size,5);
+  if(so.dios)dios++;
+  for(const x of so.cartas){const c=PM.CARDS[x.id];t[c.tier]++;if(c.tier===3){leg++;if(c.vkey==='navidad')navidad++;}}
+ }
+ t.forEach((n,i)=>assert.ok(Math.abs(n/N-PM.ESPERADO[i])<Math.max(.012,PM.ESPERADO[i]*.15),`rareza ${i}: ${n/N} vs ${PM.ESPERADO[i]}`));
+ assert.ok(Math.abs(dios/N-.02)<.005,'god packs: '+dios/N);
+ assert.ok(leg>200&&Math.abs(navidad/leg-.25)<.06,'Navidad es una de cada cuatro legendarias: '+navidad/leg);
+ // los de profes nuevos incluyen Star Wars; los de antes, nunca
+ let sw=0,swViejo=0;
+ for(let i=0;i<20000;i++){
+  if(PM.sobre('u1','p-Nk'+i+'abcdefg',1792000000000+i).cartas.some(x=>PM.CARDS[x.id].vkey==='starwars'))sw++;
+  if(PM.sobre('u1','-Nk'+i+'abcdefg',1792000000000+i).cartas.some(x=>x.id>=PM.LEGADO))swViejo++;
+ }
+ assert.ok(sw>0);assert.equal(swViejo,0,'un sobre sin prefijo sale del catálogo de antes');
+ // la probabilidad exacta cuenta el peso: una navideña es tres veces más rara que una quemada
+ const nav=PM.CARDS.find(c=>c.vkey==='navidad'),que=PM.CARDS.find(c=>c.vkey==='quemado');
+ assert.ok(Math.abs(PM.probabilidad(que.n,5).exacta/PM.probabilidad(nav.n,5).exacta-3)<1e-9);
+ const pc=PM.POR_COL.comp.reduce((s,c)=>s+PM.probabilidad(c.n,1).exacta,0);
+ assert.ok(Math.abs(pc-5)<1e-9,'las exactas de una colección suman cinco cartas por sobre');
+});
+
+test('colecciones: un re-roll da una carta de la colección de su clave, y no mezcla',()=>{
+ for(let i=0;i<500;i++){
+  const r=PM.reroll('usrAAAA','c-Nrr'+i+'abcdef',PM.SALTOS_DESDE+i,1,Array(10).fill(6));
+  assert.equal(PM.CARDS[r.id].col,'comp');assert.ok(PM.CARDS[r.id].tier>=2);
+ }
+ // en la economía: diez comunes de componentes con una clave de profes no valen
+ const u='usrAAAA',s={},comunes=[];
+ for(let i=0;comunes.length<10;i++){const k='c-Nk'+String(i).padStart(9,'0');s[k]={at:1792000000000+i*1000,p:80};
+  PM.sobre(u,k,s[k].at).cartas.forEach((c,j)=>{if(PM.CARDS[c.id].tier===0&&comunes.length<10)comunes.push(`${u}~${k}.${j}`);});}
+ const at=1792900000000;
+ const d=rk=>conGanado({[u]:9000},0,{cartas:{s:{[u]:s},r:{[u]:{[rk]:{at,c:comunes}}}},mercado:{o:{},t:{}}});
+ assert.ok(M.economia(d('c-Nrr000000001')).sobres[u+'~c-Nrr000000001'],'con la clave de su colección vale');
+ assert.equal(PM.CARDS[M.economia(d('c-Nrr000000001')).sobres[u+'~c-Nrr000000001'].r.id].col,'comp');
+ assert.ok(!M.economia(d('p-Nrr000000001')).sobres[u+'~p-Nrr000000001'],'con clave de profes no');
+ assert.ok(!M.economia(d('-Nrr0000000001')).sobres[u+'~-Nrr0000000001'],'ni con una clave de antes');
+ // y los sobres con prefijo se cobran igual que los de siempre
+ assert.equal(M.monedasDe(u,d('c-Nrr000000001')).gastadas,Object.keys(s).length*80);
 });

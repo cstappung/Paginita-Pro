@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0d0820">
-<title>PRODROP · DIE COLLECTION</title>
+<title>PRODROP · Sobres de cartas</title>
 <link rel="icon" href="favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,600;0,700;0,800;1,600;1,800&family=Rubik:wght@500;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=pd-11">
+<link rel="stylesheet" href="style.css?v=pd-12">
 </head>
 <body data-phase="pack">
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -32,12 +32,17 @@
   <div class="top-actions">
     <span id="saldo" class="chip saldo" title="Tus monedas de Juegos"></span>
     <button id="mktBtn" class="chip mkt" title="Mercado e intercambios"><span class="lg">Mercado</span><span class="sm" aria-hidden="true">🏪</span><b id="mktBadge" class="badge" hidden></b></button>
-    <button id="colBtn" class="chip" title="Colección"><span class="lg">Colección</span><span class="sm" aria-hidden="true">🗂</span> <b id="colCount">0/153</b></button>
+    <button id="colBtn" class="chip" title="Colección"><span class="lg">Colección</span><span class="sm" aria-hidden="true">🗂</span> <b id="colCount">0</b></button>
     <button id="soundBtn" class="chip icon" aria-pressed="true" title="Sonido">♪</button>
   </div>
 </header>
 
 <main class="stage">
+  <section id="chooser" class="chooser" hidden>
+    <h2>Elige tu sobre</h2>
+    <p class="ch-sub">Cada colección tiene sus propias cartas, rarezas y animaciones. Mismo precio, mismo sobre gratis.</p>
+    <div id="chooserPacks" class="ch-packs"></div>
+  </section>
   <section id="tableView" class="table-view">
     <div class="top-line">
       <p id="kicker" class="kicker">DIE COLLECTION · 5 cartas por sobre</p>
@@ -69,6 +74,7 @@
       <div id="cant" class="cant" role="group" aria-label="Cuántos sobres abrir juntos"></div>
       <div class="buy-btns"><button id="freeBtn" class="btn free">🎁 Sobre gratis</button><button id="buyBtn" class="btn primary">Comprar sobre</button></div>
       <p id="buyInfo" class="buy-info"></p>
+      <button id="cambiaBtn" class="link cambia">⇄ Cambiar sobre</button>
     </div>
     <div class="controls">
       <button id="autoBtn" class="link">Abrir automáticamente</button>
@@ -86,6 +92,7 @@
       <button id="againBtn" class="btn primary">Abrir otro sobre ✳</button>
       <button id="colBtn2" class="btn">Ver colección</button>
       <button id="rrBtn2" class="btn rr-btn">♻ Re-roll</button>
+      <button id="cambiaBtn2" class="btn">Cambiar sobre</button>
     </div>
   </section>
 </main>
@@ -134,6 +141,7 @@
       <div><h2>Re-roll</h2><p id="rrSub">Diez cartas de una rareza por una de la siguiente.</p></div>
       <button class="close" data-close aria-label="Cerrar">✕</button>
     </div>
+    <div id="rrCols" class="mk-tabs col-tabs" role="tablist" aria-label="Colección"></div>
     <div id="rrTabs" class="mk-tabs" role="tablist"></div>
     <div id="rrBody" class="rr-body"></div>
   </div>
@@ -154,14 +162,16 @@
       <div class="col-head-acc"><button id="rrBtn" class="btn rr-btn" title="Diez cartas de una rareza por una de la siguiente">♻ Re-roll</button>
       <button class="close" data-close aria-label="Cerrar">✕</button></div>
     </div>
+    <div id="colTabs" class="mk-tabs col-tabs" role="tablist" aria-label="Colección"></div>
     <div class="col-bar"><i id="colBar"></i></div>
     <div id="colFilters" class="col-filters"></div>
     <div id="colGrid" class="col-grid"></div>
-    <details class="odds"><summary>Probabilidades y reglas de los sobres</summary><p>Probabilidad por carta: Común 80% · Rara 17,4% · Épica 2,4% · Legendaria 0,2%. La quinta carta siempre es Rara o mejor (ahí: Rara 87% · Épica 12% · Legendaria 1%).<br>God pack: 2% de los sobres traen cinco Épicas o mejores (como mucho una Legendaria).<br>Estado oculto de 1 a 10 (la gran mayoría ronda el 7; 8% sale 10 GEM MINT y solo 2% sale 3 o menos). Se revela al graduar (100 monedas).<br>Un sobre gratis cada 6 horas. En el mercado cada quien pone el precio de sus cartas; los intercambios se hacen cuando la otra persona acepta.<br>Cada sobre queda anotado con la hora del servidor en que se compró, y su contenido sale de ahí: nadie puede elegir lo que trae, y cualquiera puede comprobarlo.<br>Re-roll: diez cartas de una misma rareza (común, rara o épica) se cambian por una de rareza superior: de común sale rara el 92 % de las veces, épica el 7,5 % y legendaria el 0,5 %; de rara, épica el 96 % y legendaria el 4 %; de épica, siempre legendaria. Dentro de la rareza, cualquier carta con la misma probabilidad. Su nota oculta sale de las diez que entraron: alrededor de su promedio más un punto (con diez notas que promedian 5,4, sale 6 o 7 el 57 % de las veces, 5 u 8 el 31 %, 4 o 9 el 10 %).</p></details>
+    <details class="odds"><summary>Probabilidades y reglas de los sobres</summary><p>Dos colecciones, cada una con su sobre: <b>Profes</b> (170 cartas: Original, Dibujo y Anime comunes; Calvo y Springfield raras; Los Santos, Cyberpunk, High Roller y Star Wars épicas; Shiny legendarias) y <b>Componentes</b> (275 cartas, 25 componentes en 11 temáticas: Realista, Bioware y Esquemático comunes; Pixel Art, Void y Bélico raras; Halloween, Dieciochero y Arcano épicas; Quemado y Navidad legendarias, y de cada cuatro legendarias de componentes solo una es de Navidad). El sobre trae cartas solo de su colección; el re-roll toma diez de una misma colección y da una de esa colección.<br>Probabilidad por carta: Común 80% · Rara 17,4% · Épica 2,4% · Legendaria 0,2%. La quinta carta siempre es Rara o mejor (ahí: Rara 87% · Épica 12% · Legendaria 1%).<br>God pack: 2% de los sobres traen cinco Épicas o mejores (como mucho una Legendaria).<br>Estado oculto de 1 a 10 (la gran mayoría ronda el 7; 8% sale 10 GEM MINT y solo 2% sale 3 o menos). Se revela al graduar (100 monedas).<br>Un sobre gratis cada 6 horas. En el mercado cada quien pone el precio de sus cartas; los intercambios se hacen cuando la otra persona acepta.<br>Cada sobre queda anotado con la hora del servidor en que se compró, y su contenido sale de ahí: nadie puede elegir lo que trae, y cualquiera puede comprobarlo.<br>Re-roll: diez cartas de una misma rareza (común, rara o épica) se cambian por una de rareza superior: de común sale rara el 92 % de las veces, épica el 7,5 % y legendaria el 0,5 %; de rara, épica el 96 % y legendaria el 4 %; de épica, siempre legendaria. Dentro de la rareza, cualquier carta con la misma probabilidad. Su nota oculta sale de las diez que entraron: alrededor de su promedio más un punto (con diez notas que promedian 5,4, sale 6 o 7 el 57 % de las veces, 5 u 8 el 31 %, 4 o 9 el 10 %).</p></details>
   </div>
 </div>
 
-<script src="motor.js?v=pd-11"></script>
-<script src="app.js?v=pd-11"></script>
+<script src="motor.js?v=pd-12"></script>
+<script src="app.js?v=pd-12"></script>
+<script src="revela.js?v=pd-12"></script>
 </body>
 </html>

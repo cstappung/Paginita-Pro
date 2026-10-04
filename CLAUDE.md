@@ -3895,7 +3895,8 @@ and nobody writes someone else's.
 
 **PRODROP is a card-pack opener paid in coins** (`juegos/prodrop/`, its
 own document in an iframe like Clue: `index.html`, `style.css`, `app.js`,
-the 153 webp cards in `cards/<rareza>/`, and `motor.js`, UMD on
+the webp cards in `cards/<rareza>/` and `cards/componentes/<tema>/`, `revela.js` (the
+reveal animations), and `motor.js`, UMD on
 `ProdropMotor`, shared with the page and the tests). `#cartas` (tab 🃏
 Sobres) mounts it full-window (`html.jg-prodrop`, like sortEm), and
 `colabtex/src/juegos/prodrop.js` (`crearProdrop`) is the postman: it sends
@@ -3906,6 +3907,38 @@ no build: bump `?v=pd-N` on its two scripts/stylesheet and in `prodrop.js`.
 The cards are real people (teachers), served from the public repo like any
 other file of the site. Things that hold it together:
 
+- **Two collections, chosen per pack** (`COLECCIONES`): **Profes** (`profes`,
+  17 people x 10 variants = 170, Star Wars being the tenth, epic) and
+  **Componentes** (`comp`, 25 components x 11 themes = 275: realista,
+  bioware, esquemático common; pixelart, void, bélico rare; halloween,
+  dieciochero, arcano epic; quemado and navidad legendary). The opener asks
+  which pack first (`eligeSobre`, phase `elige`), and «Cambiar sobre» goes
+  back to it. **The collection is the first letter of the pack key**: the
+  postman writes `p` or `c` + the push key (`fb.comprarSobre(uid, p, pre)`,
+  same for `sobreGratis` and `rerollCartas`), so no rule changed (the key
+  regex already allows it) and the buyer still cannot pick the contents.
+  `poolDe(key)` picks the cards: `c` the components, `p` all 170 profes,
+  and a key with no prefix (every pack written before collections, and
+  whatever a cached old opener writes) the first `LEGADO` = 153 cards, so
+  **every old pack and re-roll rebuilds exactly as before** (new cards are
+  only ever appended to `CARDS`, never inserted). Inside a rarity the
+  card is uniform as before, unless the pool has weights: `peso` is 3 for
+  quemado and 1 for navidad, so one components legendary in four is a
+  Christmas one (`elige`, and `probabilidad(...).exacta` divides by the
+  pool's weight). A re-roll's ten inputs must all be of its key's
+  collection (`economia` checks it; no prefix means profes), and the new
+  card comes from that collection. Each collection numbers its own cards
+  (`num`, N.º 12/275), the collection view has a tab per collection with a
+  section per variant or theme, and the market filters by collection.
+- **Reveal animations are per collection and rarity** (`revela.js`,
+  `REVELA.de(card)` gives `{antes, despues}`; its particles carry their own
+  `draw` and the `fxStep` loop paints them). Profes: chalk on a
+  blackboard (rare), a hyperspace jump (epic), a shiny prism (legendary).
+  Componentes: an oscilloscope trace that bursts into pixels (rare), Tesla
+  coil arcs and an arcane seal (epic), and a short circuit (legendary):
+  50 Hz hum, sparks from the corners, flickering lights, a blackout and
+  the spark flash, then snow and Jingle Bells for navidad or embers for
+  quemado. A navidad card's resting aura snows instead of burning.
 - **A pack is derived, not rolled.** `cartas/s/<uid>/<push key>` = `{at,
   p}`, and the rule demands `at === now`. The five cards (and each one's
   hidden grade and wear seed) are `sobre(uid, key, at)`: SHA-256 of that,

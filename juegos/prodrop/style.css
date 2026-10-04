@@ -1237,3 +1237,99 @@ body[data-phase="reveal"] .pack-extras, body[data-phase="summary"] .pack-extras 
 }
 @keyframes saltoBrilla { to { box-shadow: 0 0 36px #ff8ad8cc; } }
 @media (prefers-reduced-motion: reduce) { .rl-salto { animation: none; } }
+
+/* =====================================================
+   COLECCIONES: elegir sobre, envoltorio de componentes,
+   pestañas de colección y cartas de componentes
+   ===================================================== */
+.chooser { display: flex; flex-direction: column; align-items: center; gap: 10px; width: 100%; max-width: 760px; }
+.chooser h2 { margin: 0; font-weight: 900; font-size: clamp(26px, 6vw, 34px); letter-spacing: -.02em; }
+.ch-sub { margin: 0 0 6px; color: var(--muted); font-size: 14px; text-align: center; max-width: 440px; }
+.ch-packs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(12px, 4vw, 34px); width: 100%; max-width: 640px; }
+.ch-pack {
+  --mx: 50%; --my: 50%;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  border: 0; background: none; padding: 0; text-align: center;
+}
+.ch-skin {
+  position: relative; display: block; width: min(100%, 250px, calc((100svh - 280px) * .663)); aspect-ratio: .663; margin-bottom: 10px;
+  filter: drop-shadow(0 22px 30px #0009); transition: transform .3s var(--ease-out), filter .3s;
+}
+.ch-pack:hover .ch-skin, .ch-pack:focus-visible .ch-skin { transform: translateY(-8px) rotate(-1.5deg) scale(1.03); filter: drop-shadow(0 30px 34px #000b) brightness(1.08); }
+.ch-pack.ultimo .ch-skin::after {
+  content: 'LA ÚLTIMA'; position: absolute; left: 50%; bottom: -9px; transform: translateX(-50%); z-index: 3;
+  font: 800 11px/1 "Barlow Condensed"; letter-spacing: .2em; color: #1a1030; background: var(--gold); padding: 4px 9px; border-radius: 99px;
+}
+.ch-pack > b { font-size: clamp(18px, 4.6vw, 24px); font-weight: 900; color: var(--ink); }
+.ch-pack > small { color: var(--muted); font-size: 12.5px; }
+.ch-pack .ch-temas { font-size: 11.5px; opacity: .8; max-width: 240px; line-height: 1.3; }
+.ch-tengo { display: block; width: min(80%, 180px); height: 5px; border-radius: 9px; background: #ffffff18; overflow: hidden; margin-top: 5px; }
+.ch-tengo i { display: block; height: 100%; background: linear-gradient(90deg, #5cc8ff, #c26bff, #ffcc3d); }
+body[data-phase="elige"] .top-line { opacity: 0; }
+.cambia { margin-top: 2px; }
+
+/* el envoltorio de componentes: una placa verde con pistas de cobre */
+.skin-comp {
+  background:
+    radial-gradient(circle at 50% 56%, #ffffff26 0, transparent 42%),
+    linear-gradient(165deg, #04140f 0%, #0b4a35 34%, #0f7a50 62%, #c98a2c 100%);
+}
+.skin-comp .skin-foil { opacity: .45; }
+.skin-pcb {
+  position: absolute; inset: 0; opacity: .5; pointer-events: none;
+  background:
+    radial-gradient(circle, #e6b25a 0 1.1cqw, #0000 1.3cqw) 0 0 / 14cqw 14cqw,
+    repeating-linear-gradient(90deg, #0000 0 13.2cqw, #d9a24a88 13.2cqw 14cqw),
+    repeating-linear-gradient(0deg, #0000 0 20.2cqw, #d9a24a66 20.2cqw 21cqw),
+    repeating-linear-gradient(45deg, #0000 0 26cqw, #e6b25a55 26cqw 26.8cqw);
+  -webkit-mask: radial-gradient(ellipse 70% 60% at 50% 55%, #0000 30%, #000 75%); mask: radial-gradient(ellipse 70% 60% at 50% 55%, #0000 30%, #000 75%);
+}
+.skin-comp .skin-logo { text-shadow: 0 .7cqw 0 #ffb340, 0 1.4cqw 0 #0b6b47, 0 3cqw 5cqw #0007; }
+.skin-comp .skin-badge { background: #6dffb0; color: #06321f; }
+.skin-comp .skin-rays { background: repeating-conic-gradient(#b8ffd914 0 6deg, #fff0 6deg 14deg); }
+
+/* pestañas de colección (colección y re-roll) */
+.col-tabs { flex: none; }
+.col-tabs button b { background: #ffffff22; color: inherit; }
+.col-tabs button[aria-selected="true"] b { background: #1a1030; color: #fff; }
+.col-sec {
+  grid-column: 1 / -1; margin: 10px 0 0; display: flex; align-items: baseline; gap: 8px;
+  font-size: 16px; font-weight: 900; letter-spacing: -.01em; border-bottom: 1px solid #ffffff14; padding-bottom: 4px;
+}
+.col-sec:first-child { margin-top: 0; }
+.col-sec i { font-style: normal; color: var(--c); }
+.col-sec small { margin-left: auto; font-size: 12px; font-weight: 600; color: var(--muted); }
+.slot small { font-size: 11px; font-weight: 600; opacity: .8; text-align: center; padding: 0 6px; line-height: 1.1; }
+.mk-chip.mk-col { --c: #fff; }
+
+/* cartas de componentes con marco: el componente va centrado en la ventana */
+.col-comp .fr-art img { object-position: 50% 52%; }
+.v-realista { --panel: linear-gradient(180deg, #eef0f2, #c9ced6); --energy: #f5b819; --energy-d: #8a5d00; }
+.v-bioware { --panel: linear-gradient(180deg, #f0ddd0, #c69c87); --energy: #b5543e; --energy-d: #5a1f14; }
+.v-esquematico {
+  --panel:
+    repeating-linear-gradient(0deg, #fff0 0 4.4cqw, #ffffff1f 4.4cqw 4.6cqw),
+    repeating-linear-gradient(90deg, #fff0 0 4.4cqw, #ffffff1f 4.4cqw 4.6cqw),
+    linear-gradient(180deg, #2c5fae, #1b3f7a);
+  --energy: #7fb4ff; --energy-d: #1d4c99;
+  color: #eef4ff;
+}
+.v-pixelart { --panel: linear-gradient(180deg, #ffe7c2, #f2b46a); --energy: #ff7a1f; --energy-d: #8a3300; }
+.v-void { --panel: linear-gradient(180deg, #d9d2ff, #8f80d6); --energy: #7a5cff; --energy-d: #2a1677; }
+.v-belico { --panel: linear-gradient(180deg, #e3e4cf, #a6ab7c); --energy: #6f7d3a; --energy-d: #2f3714; }
+@media (max-width: 520px) {
+  .ch-packs { gap: 10px; }
+  .ch-pack .ch-temas { display: none; }
+  .col-tabs { grid-template-columns: repeat(2, 1fr) !important; }
+}
+/* reverso de componentes: placa verde, pistas de cobre y un rayo */
+.back.bk-comp { background: linear-gradient(160deg, #1d7a52, #0a3a27); }
+.bk-comp .bk {
+  background:
+    radial-gradient(circle, #e6b25a 0 1.2cqw, #0000 1.4cqw) 0 0 / 16cqw 16cqw,
+    repeating-linear-gradient(90deg, #0000 0 15.2cqw, #d9a24a55 15.2cqw 16cqw),
+    radial-gradient(circle at 50% 46%, #23b77a 0%, #0c5a3b 45%, #04170f 100%);
+}
+.bk-comp .bk::before { background: repeating-conic-gradient(#b8ffd910 0 7deg, #fff0 7deg 15deg); }
+.bk-comp .bk-ring { background: radial-gradient(circle at 35% 30%, #fff3b0, #ffb340 45%, #c2560c); border-color: #6dffb0; box-shadow: 0 0 0 1.4cqw #06321f, 0 0 8cqw #6dffb099; font-weight: 900; }
+.bk-comp .bk b { color: #6dffb0; text-shadow: 0 .6cqw 0 #06321f; }

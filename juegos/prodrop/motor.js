@@ -59,7 +59,9 @@
   ];
   /* Las variantes: el orden fija el N.º de cada carta, y la clave
      (`<persona>-<variante>`) no se cambia nunca. Los ataques de las
-     comunes y las raras son cosa del abridor, no del motor. */
+     comunes y las raras son cosa del abridor, no del motor. Star Wars
+     llegó después: va al final para que las 153 de antes conserven su
+     número (`n`), que es lo que guarda cada sobre. */
   const VARIANTS = [
     { key: "original", tier: 0, label: "Original" },
     { key: "dibujo", tier: 0, label: "Dibujo" },
@@ -69,20 +71,104 @@
     { key: "gta", tier: 2, label: "Los Santos" },
     { key: "cyberpunk", tier: 2, label: "Cyberpunk" },
     { key: "casino", tier: 2, label: "High Roller" },
-    { key: "shiny", tier: 3, label: "Shiny" }
+    { key: "shiny", tier: 3, label: "Shiny" },
+    { key: "starwars", tier: 2, label: "Star Wars" }
   ];
   const FOLDER = ["comunes", "raras", "epicas", "legendarias"];
+  /* Las cartas que existían antes de las colecciones: un sobre de antes
+     (su clave no lleva prefijo de colección) sale solo de estas. */
+  const LEGADO = 153;
+
+  /* ---------- la colección de componentes ----------
+     25 componentes por 11 temáticas. La temática fija la rareza y el
+     `peso` de la carta dentro de ella: Navidad pesa 1 y Quemado 3, así
+     que de cada cuatro legendarias de componentes, una es navideña. */
+  const COMPONENTES = [
+    ["resistencia", "Resistencia", "Pasivo"],
+    ["condensador-electrolitico", "Electrolítico", "Pasivo"],
+    ["inductor-toroidal", "Inductor Toroidal", "Pasivo"],
+    ["led", "LED", "Optoelectrónico"],
+    ["transistor-bjt", "Transistor BJT", "Activo"],
+    ["mosfet-potencia", "MOSFET", "Activo"],
+    ["timer-555", "Timer 555", "Integrado"],
+    ["microcontrolador", "Microcontrolador", "Integrado"],
+    ["fotoresistencia-ldr", "Fotorresistencia", "Sensor"],
+    ["sensor-ultrasonico", "Sensor Ultrasónico", "Sensor"],
+    ["condensador-ceramico", "Cerámico", "Pasivo"],
+    ["potenciometro", "Potenciómetro", "Pasivo"],
+    ["cristal-oscilador", "Cristal de Cuarzo", "Pasivo"],
+    ["diodo-rectificador", "Diodo Rectificador", "Activo"],
+    ["mosfet-sic-to247", "MOSFET SiC", "Activo"],
+    ["gate-driver", "Gate Driver", "Integrado"],
+    ["amplificador-operacional", "Op-Amp", "Integrado"],
+    ["regulador-7805", "Regulador 7805", "Integrado"],
+    ["esp32", "ESP32", "Integrado"],
+    ["transformador-laminado", "Transformador", "Magnético"],
+    ["transformador-ferrita", "Trafo de Ferrita", "Magnético"],
+    ["sensor-temperatura-humedad", "Sensor de Humedad", "Sensor"],
+    ["sensor-pir", "Sensor PIR", "Sensor"],
+    ["rele", "Relé", "Electromecánico"],
+    ["sensor-imu", "IMU 6 Ejes", "Sensor"]
+  ];
+  const TEMAS = [
+    { key: "realista", tier: 0, label: "Realista", color: "#dfe3ee" },
+    { key: "bioware", tier: 0, label: "Bioware", color: "#c9a27e" },
+    { key: "esquematico", tier: 0, label: "Esquemático", color: "#7fb4ff" },
+    { key: "pixelart", tier: 1, label: "Pixel Art", color: "#ff9f43" },
+    { key: "void", tier: 1, label: "Void", color: "#9d7bff" },
+    { key: "belico", tier: 1, label: "Bélico", color: "#9fb35a" },
+    { key: "halloween", tier: 2, label: "Halloween", color: "#ff8a1f" },
+    { key: "dieciochero", tier: 2, label: "Dieciochero", color: "#ff4b5c" },
+    { key: "arcano", tier: 2, label: "Arcano", color: "#b86bff" },
+    { key: "quemado", tier: 3, label: "Quemado", color: "#ff5a1f", peso: 3 },
+    { key: "navidad", tier: 3, label: "Navidad", color: "#4dffb0", peso: 1 }
+  ];
+
+  /* Las colecciones. El sobre dice de cuál es con la primera letra de su
+     clave (`prefijo` + la clave de push): la regla ya acepta esas claves
+     y quien compra no elige el contenido igual, porque sigue saliendo de
+     la hora del servidor. */
+  const COLECCIONES = [
+    { key: "profes", prefijo: "p", label: "Profes", nombre: "DIE Collection", serie: "S01" },
+    { key: "comp", prefijo: "c", label: "Componentes", nombre: "Componentes", serie: "S02" }
+  ];
+  const COL = Object.fromEntries(COLECCIONES.map(c => [c.key, c]));
+
   const CARDS = [];
   VARIANTS.forEach(v => PEOPLE.forEach(([id, name, sh]) => {
+    const n = CARDS.length;
     CARDS.push({
-      n: CARDS.length, uid: id + "-" + v.key, person: id, num: CARDS.length + 1, name, vkey: v.key, vlabel: v.label,
-      tier: v.tier, shiny: SHINY[sh], img: "cards/" + FOLDER[v.tier] + "/" + id + "-" + v.key + ".webp"
+      n, uid: id + "-" + v.key, person: id, num: n + 1, name, vkey: v.key, vlabel: v.label, col: "profes", peso: 1,
+      tier: v.tier, shiny: SHINY[sh], img: "cards/" + FOLDER[v.tier] + "/" + id + "-" + v.key + ".webp",
+      sub: v.tier === 3 ? "Shiny " + SHINY[sh][0] : v.label,
+      acc: v.tier === 3 ? SHINY[sh][1] : v.tier === 2 ? "#d49bff" : TIERS[v.tier].color
+    });
+  }));
+  const BASE_COMP = CARDS.length;
+  TEMAS.forEach(te => COMPONENTES.forEach(([id, name, tipo]) => {
+    const n = CARDS.length;
+    CARDS.push({
+      n, uid: id + "-" + te.key, person: id, num: n - BASE_COMP + 1, name, tipo, vkey: te.key, vlabel: te.label, col: "comp",
+      peso: te.peso || 1, tier: te.tier, img: "cards/componentes/" + te.key + "/" + id + ".webp",
+      sub: te.label, acc: te.tier >= 2 ? te.color : TIERS[te.tier].color, tema: te.color
     });
   }));
   const TOTAL = CARDS.length;
-  const POR_TIER = TIERS.map((_, t) => CARDS.filter(c => c.tier === t));
-  const subtitulo = c => c.tier === 3 ? "Shiny " + c.shiny[0] : c.vlabel;
-  const acento = c => c.tier === 3 ? c.shiny[1] : c.tier === 2 ? "#d49bff" : TIERS[c.tier].color;
+  const POR_COL = Object.fromEntries(COLECCIONES.map(c => [c.key, CARDS.filter(x => x.col === c.key)]));
+  const pool = lista => {
+    const t = TIERS.map((_, i) => lista.filter(c => c.tier === i));
+    t.uniforme = lista.every(c => c.peso === 1);
+    t.peso = t.map(l => l.reduce((s, c) => s + c.peso, 0));
+    return t;
+  };
+  const POOL = { legado: pool(CARDS.slice(0, LEGADO)), profes: pool(POR_COL.profes), comp: pool(POR_COL.comp) };
+  const POR_TIER = POOL.profes;
+  /* De qué colección es un sobre o un re-roll, por su clave. Las claves
+     de push empiezan con «-», así que lo de antes nunca lleva prefijo. */
+  const coleccionDe = clave => (String(clave)[0] === "c" ? "comp" : "profes");
+  const poolDe = clave => { const p = String(clave)[0]; return p === "c" ? POOL.comp : p === "p" ? POOL.profes : POOL.legado; };
+  const subtitulo = c => c.sub;
+  const acento = c => c.acc;
 
   /* ---------- la nota oculta ----------
      Campana angosta en 7, en milésimas (suman 1000): del 1 al 3 suman 2 %,
@@ -164,6 +250,10 @@
     return pesos.length - 1;
   }
 
+  /* Una carta de la lista: todas iguales (como siempre fue en los profes,
+     y así un sobre de antes sale idéntico) o según su `peso`. */
+  const elige = (r, l, uniforme) => (uniforme ? l[r.entero(l.length)] : l[pesado(r, l.map(c => c.peso))]);
+
   /* ---------- el sobre ----------
      Cinco cartas distintas, de la peor a la mejor. La quinta (antes de
      ordenar) es Rara o mejor. En un god pack las cinco son épicas o
@@ -173,7 +263,7 @@
     const k = uid + "|" + clave + "|" + at;
     if (memo.has(k)) return memo.get(k);
     const h = sha256("prodrop:" + k), r = generador(h.slice(0, 4));
-    const dios = r.entero(10000) < DIOS;
+    const dios = r.entero(10000) < DIOS, P = poolDe(clave);
     const usadas = new Set(), cartas = [];
     let leyenda = false;
     for (let i = 0; i < 5; i++) {
@@ -181,13 +271,13 @@
       if (dios) t = leyenda ? 2 : 2 + pesado(r, [TIERS[2].w, TIERS[3].w]);
       else t = i === 4 ? 1 + pesado(r, TIERS.slice(1).map(x => x.w)) : pesado(r, TIERS.map(x => x.w));
       if (t === 3) leyenda = true;
-      const libres = POR_TIER[t].filter(c => !usadas.has(c.n));
-      const c = libres[r.entero(libres.length)];
+      const libres = P[t].filter(c => !usadas.has(c.n));
+      const c = elige(r, libres, P.uniforme);
       usadas.add(c.n);
       cartas.push({ id: c.n, g: 1 + pesado(r, GRADE_W), w: (r.u32() & 0x7fffffff) | 1 });
     }
     cartas.sort((a, b) => CARDS[a.id].tier - CARDS[b.id].tier);   // estable: lo mejor al final
-    const res = { dios, cartas };
+    const res = { dios, cartas, col: coleccionDe(clave) };
     memo.set(k, res);
     if (memo.size > 20000) memo.delete(memo.keys().next().value);
     return res;
@@ -208,13 +298,14 @@
   const ESPERADO = esperadoPorSobre();
   const notaOMas = g => GRADE_W.slice(Math.max(1, g) - 1).reduce((s, w) => s + w, 0) / 1000;
   /* «Una carta así de buena»: de esta rareza o mejor y con esta nota o
-     más. `exacta` es la misma carta (persona y variante) con esa nota. */
+     más. `exacta` es la misma carta (persona y variante) con esa nota, en
+     un sobre de su colección. */
   function probabilidad(id, g) {
     const c = CARDS[id], pg = notaOMas(g);
     let porSobre = 0;
     for (let t = c.tier; t < TIERS.length; t++) porSobre += ESPERADO[t];
     porSobre *= pg;
-    const exacta = ESPERADO[c.tier] / POR_TIER[c.tier].length * pg;
+    const P = POOL[c.col], exacta = ESPERADO[c.tier] * c.peso / P.peso[c.tier] * pg;
     return { porCarta: porSobre / 5, porSobre, exacta, nota: pg };
   }
   const pDios = DIOS / 10000;
@@ -227,8 +318,10 @@
      exige `at === now`), así que nadie elige lo que sale y cualquiera puede
      rehacerlo.
 
-     La carta nueva es una cualquiera de la rareza siguiente, todas con la
-     misma probabilidad. Su nota (oculta, como la de un sobre: se descubre
+     La carta nueva es una cualquiera de la rareza siguiente de la
+     colección que dice la clave del re-roll (las diez que entran tienen
+     que ser de esa colección), todas con la misma probabilidad salvo el
+     `peso` de los componentes. Su nota (oculta, como la de un sobre: se descubre
      al graduarla) sale de las notas de las diez que entraron: una campana
      centrada en su promedio **más un punto** (`REROLL.bono`), con σ = 1,3.
      Diez notas de 5 4 6 4 9 8 8 5 3 2 promedian 5,4, así que el centro es
@@ -281,8 +374,8 @@
     const k = uid + "|" + clave + "|" + at + "|" + tier + "|" + notas.join(",");
     if (memoR.has(k)) return memoR.get(k);
     const r = generador(sha256("prodrop-reroll:" + k).slice(0, 4));
-    const posibles = POR_TIER[Math.min(3, tier + saltoReroll(k, at, tier))];
-    const c = posibles[r.entero(posibles.length)];
+    const P = poolDe(clave), posibles = P[Math.min(3, tier + saltoReroll(k, at, tier))];
+    const c = elige(r, posibles, P.uniforme);
     const res = { id: c.n, g: 1 + pesado(r, pesosReroll(notas)), w: (r.u32() & 0x7fffffff) | 1 };
     memoR.set(k, res);
     return res;
@@ -309,7 +402,8 @@
   };
 
   return {
-    PEOPLE, SHINY, TIERS, VARIANTS, FOLDER, CARDS, TOTAL, POR_TIER, GRADE_W, GRADE_WORD, PRECIO, DIOS, ESPERADO,
+    PEOPLE, SHINY, TIERS, VARIANTS, FOLDER, CARDS, TOTAL, POR_TIER, LEGADO, COMPONENTES, TEMAS, COLECCIONES, COL, POR_COL, POOL,
+    coleccionDe, poolDe, GRADE_W, GRADE_WORD, PRECIO, DIOS, ESPERADO,
     subtitulo, acento, colorNota, precioSobre, sha256, generador, sobre, probabilidad, notaOMas, pDios, coleccion, gasto,
     REROLL, PESO_REROLL, pesosReroll, distribucionReroll, reroll, SALTO_W, SALTOS_DESDE, probSalida
   };
