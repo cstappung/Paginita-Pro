@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610040344"></script>
+<script src="i18n.js?v=202610040605"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Laboratorio</title>
 <script>
@@ -1644,6 +1644,11 @@ try { var t = localStorage.getItem("jg.tema");
 .sp-e-frontera{background:radial-gradient(circle at 85% 20%,#f9731655,transparent 52%),radial-gradient(circle at 10% 110%,#7c3aed55,transparent 55%),linear-gradient(135deg,#2a1206,#120a24 72%)}
 .sp-e-frontera strong{color:#ffe8d0}
 .sp-e-frontera strong span{color:#fb923c}
+/* Sudoku Arcade: una cuadrícula de neón (cajas de 3×3 en rosa sobre celdas cian) en una sala de recreativas. */
+.sp-e-sudoku{background:radial-gradient(circle at 88% 16%,#ff2fb455,transparent 50%),radial-gradient(circle at 8% 110%,#22e6ff33,transparent 55%),repeating-linear-gradient(90deg,#ff2fb42e 0 2px,#0000 2px 66px),repeating-linear-gradient(0deg,#ff2fb42e 0 2px,#0000 2px 66px),repeating-linear-gradient(90deg,#22e6ff12 0 1px,#0000 1px 22px),repeating-linear-gradient(0deg,#22e6ff12 0 1px,#0000 1px 22px),linear-gradient(135deg,#1f0626,#0a0f24 72%)}
+.sp-e-sudoku strong{letter-spacing:.03em;color:#ffe3f4;text-shadow:0 0 10px #ff2fb4aa,2px 2px #3a0a2c}
+.sp-e-sudoku strong span{color:#22e6ff;text-shadow:0 0 10px #22e6ffaa}
+.sp-e-sudoku>b{color:#7cf3ff}
 .sp-e-sopa strong span{color:#ffb070}.sp-e-worms{background:radial-gradient(ellipse at right,#7a3b14,#0c1629 75%)}.sp-e-worms strong span{color:#f2a33a}.sp-entrada:hover{transform:translateY(-4px)}.sp-entrada small{font-size:9px;letter-spacing:.16em;color:#abbccc}.sp-entrada strong{display:block;font-size:30px;letter-spacing:-.05em;font-style:italic;margin:14px 0}.sp-entrada strong span{float:right;color:#f6bc64}.sp-e-snake strong span{color:#58f5c0}.sp-entrada p{font-size:12px;color:#adbdd1}.sp-entrada>b{font-size:12px}
 @keyframes sp-entrada{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}@keyframes sp-revela{from{transform:scale(.8);filter:brightness(1.8)}to{transform:scale(1);filter:brightness(1)}}
 @media(max-width:900px){.sp-layout{grid-template-columns:1fr}.sp-ranking{width:auto}.sp-hero{padding:24px}.sp-ranking ol{display:grid;grid-template-columns:1fr 1fr;gap:0 20px}}@media(max-width:580px){.sp-layout{padding:12px;gap:16px}.sp-entradas{grid-template-columns:1fr}.sp-hud{gap:10px;padding:12px}.sp-hud b{font-size:19px}.sp-scroll{padding:8px}.sp-config>button{width:100%}.sp-ranking ol{display:block}.sp-hero .sp-link{margin-bottom:20px}.sp-hero h1{font-size:43px}}
@@ -3499,6 +3504,6 @@ html[data-tema=oscuro] .jg-drop-quien:hover>b{color:#fff}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610040422"></script>
+<script src="juegos-app.js?v=202610040605"></script>
 </body>
 </html>

@@ -117,3 +117,10 @@ test('la regla de diario es la que calcula registraDia',()=>{
  assert.equal(R.diario['.read'],'auth != null');
  assert.equal(R.diario.$uid['.write'],'auth != null && auth.uid === $uid');
 });
+test('Sudoku Arcade: récord, racha, arcade y partidas del club',()=>{
+ assert.ok(M.JUEGOS_CLUB.includes('sudoku'));assert.ok(M.PAGO_CLUB.sudoku>0);
+ const d={solo:{'club-sudoku-racha':{a:{puntos:5,tiempo:1}},'club-sudoku-arcade':{a:{puntos:12345,tiempo:1}},'club-sudoku-medio':{a:{puntos:1,tiempo:400000}}}};
+ // tres modalidades con marca (40 cada una), 10 por día de racha y 1 por cada 1000 puntos del arcade
+ assert.equal(M.monedasDe('a',d).partes.records,3*M.RECORD.sudoku+50+12);
+ assert.equal(M.nivelDe('sudoku','a25000'),4);
+});

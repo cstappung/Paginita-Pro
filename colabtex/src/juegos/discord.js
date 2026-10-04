@@ -122,7 +122,8 @@ const MODALIDADES = {
   10: "del 1 al 10", 20: "del 1 al 20", 30: "del 1 al 30", rondas: "ronda máxima",
   chico: "tablero chico", mediano: "tablero mediano", grande: "tablero grande", gigante: "tablero gigante",
   racha: "racha diaria", puntos: "puntos totales", facil: "Fácil", medio: "Medio", dificil: "Difícil", 8: "8×8", 12: "12×12", 15: "15×15",
-  torre: "Torre Batalla", palacio: "Palacio Batalla", fabrica: "Fábrica Batalla", 50: "Nivel 50", abierto: "Nivel Abierto", victorias: "victorias totales"
+  torre: "Torre Batalla", palacio: "Palacio Batalla", fabrica: "Fábrica Batalla", 50: "Nivel 50", abierto: "Nivel Abierto", victorias: "victorias totales",
+  experto: "Experto"  // la dificultad más alta del clásico de Sudoku Arcade
 };
 const CLUBS = {
   minas: { nombre: "Mina Club", juego: "Buscaminas", icono: "💣", ruta: "minas" },
@@ -132,12 +133,13 @@ const CLUBS = {
   bbtan: { nombre: "BBTAN", juego: "BBTAN", icono: "🟩", ruta: "bbtan" },
   sopa: { nombre: "Sopa de letras", juego: "Sopa de letras", icono: "🔤", ruta: "sopa" },
   electro: { nombre: "Electrodle", juego: "Electrodle", icono: "⚡", ruta: "electro" },
-  frontera: { nombre: "Frontera Batalla", juego: "Frontera Batalla", icono: "🏰", ruta: "frontera" }
+  frontera: { nombre: "Frontera Batalla", juego: "Frontera Batalla", icono: "🏰", ruta: "frontera" },
+  sudoku: { nombre: "Sudoku Arcade", juego: "Sudoku Arcade", icono: "🔢", ruta: "sudoku" }
 };
 
 /* "club-snake-arcade-grande" → {club, modalidad: "Arcade · tablero grande"} */
 export function categoriaLegible(cat) {
-  const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera)-(.+)$/.exec(String(cat || ""));
+  const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku)-(.+)$/.exec(String(cat || ""));
   if (!m) return null;
   return { club: CLUBS[m[1]], modalidad: m[2].split("-").map(k => MODALIDADES[k] || k).join(" · ") };
 }
@@ -149,11 +151,14 @@ const reloj = ms => {
 /* Lo que se lee de una marca: en el buscaminas y el sprint manda el
    tiempo (los puntos son fijos), en el resto los puntos. */
 export function marcaSolo(cat, f) {
-  if (cat === "club-sopa-racha" || cat === "club-electro-racha") return `🔥 ${f.puntos} ${f.puntos === 1 ? "día" : "días"} seguidos`;
+  if (cat === "club-sopa-racha" || cat === "club-electro-racha" || cat === "club-sudoku-racha") return `🔥 ${f.puntos} ${f.puntos === 1 ? "día" : "días"} seguidos`;
   if (cat === "club-frontera-victorias") return `🏰 ${Number(f.puntos).toLocaleString("es-CL")} victorias`;
   if (/^club-frontera-/.test(cat)) return `🏰 ${f.puntos} ${f.puntos === 1 ? "combate seguido" : "combates seguidos"}`;
   if (cat === "club-electro-puntos") return `⚡ ${Number(f.puntos).toLocaleString("es-CL")} pts`;
-  if (/^club-minas-|^club-sortem-|^club-sopa-|^club-tetris-sprint$/.test(cat)) return `⏱️ ${reloj(f.tiempo)}`;
+  // El arcade del sudoku se lee en puntos, con su mando de recreativa.
+  if (cat === "club-sudoku-arcade") return `🕹️ ${Number(f.puntos).toLocaleString("es-CL")} pts`;
+  // El clásico del sudoku (puntos fijos en 1) compite por tiempo, como el buscaminas.
+  if (/^club-minas-|^club-sortem-|^club-sopa-|^club-sudoku-(facil|medio|dificil|experto)$|^club-tetris-sprint$/.test(cat)) return `⏱️ ${reloj(f.tiempo)}`;
   if (/^club-bbtan-/.test(cat)) return `🟩 Ronda ${f.puntos}`;
   return `${Number(f.puntos).toLocaleString("es-CL")} pts`;
 }

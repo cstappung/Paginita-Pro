@@ -147,6 +147,27 @@ function electro() {
     en(64, 0, an("p", 2.2, rayo));
 }
 
+/* Sudoku Arcade: un anillo de neón rosa con cuatro mini cuadrículas de
+   3×3 (una casilla de cada una se enciende en cian por turnos), una
+   corona de dígitos que gira despacio y un trazo cian que fluye. */
+function sudoku() {
+  // Una mini cuadrícula de 3×3 (12×12, casillas de 4): marco rosa, líneas
+  // finas y una casilla `luz` que titila en cian con su propio retraso.
+  const mini = (luz, ret) => rect(12, 12, 1.4, "#1a0620", `stroke="#ff2fb4" stroke-width="1"`) +
+    `<path d="M-2-6V6M2-6V6M-6-2H6M-6 2H6" stroke="#ff2fb4" stroke-width=".45" opacity=".75"/>` +
+    // La casilla encendida: su centro está en (−4, 0 o 4) según la posición 0..8.
+    `<g transform="translate(${(luz % 3 - 1) * 4} ${(Math.floor(luz / 3) - 1) * 4})">` +
+    an("t", 1.1, `<rect x="-1.8" y="-1.8" width="3.6" height="3.6" rx=".6" fill="#22e6ff"/>`, ret) + `</g>`;
+  // Los nueve dígitos de la corona, en rosa y cian alternados.
+  const corona = cada(9, (i, ang) => en(60, ang + 20, tx(String(i + 1), 6.5, i % 2 ? "#22e6ff" : "#ff8ad8"), ang + 20));
+  return aro(60, "#14041c", 18) +                                       // la banda oscura del anillo
+    aro(51.5, "#ff2fb4", 1.4) + aro(68.5, "#ff2fb4", 1.4) +             // los dos bordes de neón rosa
+    `<g class="fl" style="--d:1.4s">${aro(68.5, "#22e6ff", 1.6, `stroke-dasharray="3 9" stroke-linecap="round"`)}</g>` + // trazo cian que corre
+    gira(30, corona) +                                                  // la corona de dígitos gira despacio
+    [0, 90, 180, 270].map((ang, i) => en(60, ang, mini([4, 0, 8, 2][i], n1(-i * .35)), ang)).join("") + // cuatro mini cuadrículas
+    chispas([[66, 45, 2.4, 1.6, 0], [66, 225, 2.4, 1.6, -.8]], "#ffe3f4"); // dos destellos sueltos
+}
+
 function frontera() {
   const sim = [
     `<path d="M0-2.8L.8-.8L2.8-.8L1.2.5L1.8 2.6L0 1.3L-1.8 2.6L-1.2.5L-2.8-.8L-.8-.8Z"/>`,
@@ -413,7 +434,7 @@ const DIBUJOS = {
   telectro: electro, tfrontera: frontera, tpokemon: pokemon, tescondite: escondite, tcartas: cartas,
   tcuadritos: cuadritos, treversi: reversi, torbita: orbita, tcadena: cadena, tflip: flip, tcacho: cacho,
   tuno: uno, tcatan: catan, tpresidente: presidente, tspicy: spicy, tworms: worms, tyemas: yemas,
-  tzombis: zombis, tclue: clue, tajedrez: ajedrez, tmonedas: monedas, tprodrop: prodrop,
+  tzombis: zombis, tclue: clue, tajedrez: ajedrez, tmonedas: monedas, tprodrop: prodrop, tsudoku: sudoku,
   cometa, vortice, sakura, plasma, mariposas
 };
 

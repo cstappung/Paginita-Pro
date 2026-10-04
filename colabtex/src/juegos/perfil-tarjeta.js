@@ -66,7 +66,7 @@ export const MARCOS = [
     ["tcatan", "catan", "Hexágonos"], ["tpresidente", "presidente", "Banda presidencial"], ["tspicy", "spicy", "Picante"],
     ["tworms", "worms", "Artillería"], ["tyemas", "yemas", "Huevos en guerra"], ["tzombis", "zombis", "Horda"],
     ["tclue", "clue", "Pistas"], ["tajedrez", "ajedrez", "Caballo de oro"], ["tmonedas", "monedas", "Tesoro"],
-    ["tprodrop", "prodrop", "Coleccionista"]
+    ["tprodrop", "prodrop", "Coleccionista"], ["tsudoku", "sudoku", "Cuadrícula arcade"]
   ].map(([id, top, n]) => ({ id, n, anim: true, req: { top } }))
 ];
 
@@ -94,7 +94,7 @@ export const FONDOS = [
   { id: "holo", n: "Holográfico", oscuro: false, anim: true, req: { tienda: true }, css: () => "linear-gradient(115deg, #ffc6f0, #fff1b8, #b9f3ff, #c8ffd9, #e2c8ff)" }
 ];
 
-const NOMBRES_EXTRA = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla" };
+const NOMBRES_EXTRA = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade" };
 export const nombreJuego = j => (JUEGOS[j] && JUEGOS[j].nombre) || NOMBRES_EXTRA[j] || j;
 
 /* Las partes de una categoría del club, para decirla en palabras. */
@@ -104,7 +104,8 @@ const PARTES = {
   portals: "Portales", reloj: "Contrarreloj", espejo: "Espejo", laberinto: "Laberinto", chico: "mapa chico",
   mediano: "mapa mediano", grande: "mapa grande", gigante: "mapa gigante",
   racha: "Racha diaria", puntos: "Puntos totales", facil: "Fácil", medio: "Medio", dificil: "Difícil", "8": "8×8", "12": "12×12", "15": "15×15",
-  torre: "Torre Batalla", palacio: "Palacio Batalla", fabrica: "Fábrica Batalla", "50": "Nivel 50", abierto: "Nivel Abierto", victorias: "Victorias totales"
+  torre: "Torre Batalla", palacio: "Palacio Batalla", fabrica: "Fábrica Batalla", "50": "Nivel 50", abierto: "Nivel Abierto", victorias: "Victorias totales",
+  experto: "Experto"  // la dificultad más alta del clásico de Sudoku Arcade
 };
 export const juegoDeCategoria = c => Object.keys(SOLO_PREFIJO).find(k => String(c).startsWith(SOLO_PREFIJO[k])) || "";
 export function nombreCategoria(c) {
@@ -125,13 +126,14 @@ export function nombreTop(k) {
 export const topDeCategoria = c => /^yemas-zombis-/.test(String(c)) ? "zombis" : ({ tetrisclub: "tetris" })[juegoDeCategoria(c)] || juegoDeCategoria(c);
 
 /* Cómo se dice una marca del club: las que se ganan por tiempo, en tiempo. */
-const porTiempo = c => /^club-(minas|sortem)-/.test(c) || c === "club-tetris-sprint" || (/^club-sopa-/.test(c) && c !== "club-sopa-racha");
+const porTiempo = c => /^club-(minas|sortem)-/.test(c) || c === "club-tetris-sprint" || (/^club-sopa-/.test(c) && c !== "club-sopa-racha") ||
+  /^club-sudoku-(facil|medio|dificil|experto)$/.test(c);  // el clásico del sudoku compite por tiempo
 export function valorMarca(c, f) {
   if (!f) return "";
   if (porTiempo(c)) return `${((f.tiempo || 0) / 1000).toFixed(2)} s`;
   if (String(c).startsWith("club-bbtan-")) return `ronda ${f.puntos || 0}`;
   if (String(c).startsWith("club-frontera-")) return `${f.puntos || 0} ${f.puntos === 1 ? "victoria" : "victorias"}`;
-  if (c === "club-sopa-racha" || c === "club-electro-racha") return `${f.puntos || 0} ${f.puntos === 1 ? "día" : "días"}`;
+  if (c === "club-sopa-racha" || c === "club-electro-racha" || c === "club-sudoku-racha") return `${f.puntos || 0} ${f.puntos === 1 ? "día" : "días"}`;
   return `${f.puntos || 0} pts`;
 }
 // El mismo orden que la tabla del club (discord.js: ordenSolo).

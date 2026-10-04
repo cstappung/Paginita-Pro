@@ -12,6 +12,10 @@ export function categoriaClub(juego, categoria) {
     ? /^club-electro-(racha|puntos)$/.test(categoria)
     : juego === 'frontera'
     ? /^club-frontera-((torre|palacio|fabrica)-(50|abierto)|victorias)$/.test(categoria)
+    // Sudoku Arcade: la racha del diario, el arcade por puntos y el
+    // clásico en sus cuatro dificultades (este último, por tiempo).
+    : juego === 'sudoku'
+    ? /^club-sudoku-(racha|arcade|facil|medio|dificil|experto)$/.test(categoria)
     : juego === 'tetris'
     ? /^club-tetris-(maraton|sprint|ultra)$/.test(categoria)
     : /^club-snake-(classic|arcade|portals|reloj|espejo|laberinto)-(chico|mediano|grande|gigante)$/.test(categoria));
@@ -31,6 +35,12 @@ export function resultadoClub(juego, dato) {
      suma de los siete modos diarios (700 por día, a lo más). */
   if (dato.categoria === 'club-electro-racha' && dato.puntos > 1000) return null;
   if (dato.categoria === 'club-electro-puntos' && dato.puntos > 1000000) return null;
+  /* Sudoku Arcade: en el clásico compite el tiempo, así que los puntos
+     valen 1 fijo (como en Mina Club); la racha son días (dos años como
+     mucho) y el arcade, una puntuación con tope 1 000 000. */
+  if (juego === 'sudoku' && /^club-sudoku-(facil|medio|dificil|experto)$/.test(dato.categoria) && dato.puntos !== 1) return null;
+  if (dato.categoria === 'club-sudoku-racha' && dato.puntos > 1000) return null;
+  if (dato.categoria === 'club-sudoku-arcade' && dato.puntos > 1000000) return null;
   /* Frontera: la racha y las victorias son combates; 100 000 es el tope
      de la regla. */
   if (juego === 'frontera' && dato.puntos > 100000) return null;
