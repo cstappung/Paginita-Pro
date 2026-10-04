@@ -1,4 +1,4 @@
-import {cart, dados, tablero, orbes, reversi, cajas, paisaje, tiro, orbita, serpiente, tetris, isla, ajedrez} from './reglas-ilustraciones.js';
+import {cart, dados, tablero, orbes, reversi, cajas, paisaje, tiro, orbita, serpiente, tetris, isla, ajedrez, fanal} from './reglas-ilustraciones.js';
 const p=(titulo,texto,imagen)=>({titulo,texto,imagen});
 const e=(id,titulo,...pasos)=>({id,titulo,pasos});
 const fichas=(titulo,...cs)=>cart([titulo,cs]);
@@ -174,6 +174,15 @@ export const EJEMPLOS={
  e('racha','La racha del sudoku diario',
   p('Un diario por día para todos','El diario es el mismo en todo el sitio y cambia a medianoche de Chile. Resolverlo hoy, después de haberlo hecho ayer, suma un día a tu racha.',fichas('Tu racha',['ayer','verde','HECHO'],['hoy','verde','HECHO'],['🔥 2','oro','DÍAS'])),
   p('Saltarse un día la reinicia','Si pasa un día entero sin resolverlo, la racha vuelve a cero y el siguiente diario empieza de nuevo en uno. La mejor racha queda guardada.',fichas('Racha cortada',['lunes','verde','HECHO'],['martes','rojo','SIN HACER'],['🔥 1','oro','MIÉRCOLES'])))],
+ fanal:[e('pulso','Disparar al pulso de la música',
+  p('El metrónomo de abajo','La música marca pulsos irregulares, en compases de 7, 5, 11 o 9 corcheas. La llama del fanal late con cada pulso y el metrónomo de abajo enciende el que suena. Un disparo fuera del pulso sale normal.',fanal(0)),
+  p('Afinado','Si disparas justo en un pulso, el tiro sale dorado: hace el doble de daño y atraviesa a la primera polilla. Cada cuatro polillas apagadas con tiros afinados sube la Resonancia, el multiplicador de puntos, hasta ×8. Un golpe la devuelve a ×1.',fanal(1))),
+ e('jefes','Leer a los jefes antes de que ataquen',
+  p('El barrido del Faro','El Faro Ciego dibuja dos líneas punteadas antes de encender su haz: el sector entre ellas se va a iluminar. Sal de ese sector o quédate bajo un casco, que da sombra. En su segunda fase son dos haces y lo seguro queda en el medio.',fanal(2)),
+  p('El acertijo de la Esfinge','La Esfinge baja un muro de polvo que cruza la pantalla con un solo hueco, y su marca de hueso lo señala desde arriba. Este muro no se rompe a tiros: hay que pasar por el hueco. Antes de caer en picada marca la columna con dos puntos.',fanal(3))),
+ e('poderes','Poderes, cartas y llamas',
+  p('Lo que sueltan las polillas','A veces una polilla apagada suelta un frasco. Pabilo doble: dos tiros por disparo. Lente: los tiros atraviesan todo. Campana: aguanta un golpe. Aceite: una llama más. Destello: apaga la fila más baja.',fichas('Los poderes',['Pabilo','oro','DOS TIROS'],['Lente','azul','ATRAVIESA'],['Campana','blanco','UN GOLPE'],['Aceite','verde','+1 LLAMA'])),
+  p('La Mensajera y sus cartas','Una polilla grande y pálida cruza por arriba de vez en cuando con una carta. Si la alcanzas, la carta queda en tu Bitácora para siempre y se lee al final de la jornada. Hay trece, y cada acto deja leer las suyas.',fichas('Una carta recuperada',['✉','oro','CARTA'],['+300','verde','PUNTOS'],['VI','violeta','DE XIII'])))],
  frontera:[e('racha','Una racha de siete en siete',
   p('Elige instalación y nivel','Torre, Palacio o Fábrica, en Nivel 50 o Abierto. Cada combinación guarda su propia racha, así que puedes llevar varias a la vez.',fichas('Tu elección',['Torre','azul','INSTALACIÓN'],['50','verde','NIVEL'],['3','oro','POKÉMON'])),
   p('Gana siete seguidos','Cada serie son siete combates. Al séptimo del 21, 42 o 35 y 70 en la Torre te espera un As de la Frontera, y vencerlo da su símbolo.',fichas('Serie 3',['15–20','verde','GANADOS'],['21','rojo','AS'],['🥈','oro','SÍMBOLO'])),

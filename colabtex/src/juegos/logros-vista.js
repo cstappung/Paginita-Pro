@@ -18,7 +18,7 @@ import { mezcla } from "./perfil.js";
 
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const EXTRA = { minas: { nombre: "Mina Club", color: "#eeb765" }, snake: { nombre: "Snake Club", color: "#4be9bc" }, tetrisclub: { nombre: "Tetris Club", color: "#b04ee8" }, sortem: { nombre: "sortEm", color: "#ff006e" }, bbtan: { nombre: "BBTAN", color: "#c4f568" }, sopa: { nombre: "Sopa de letras", color: "#5b8cff" }, electro: { nombre: "Electrodle", color: "#f5a524" }, frontera: { nombre: "Frontera Batalla", color: "#e0743a" }, sudoku: { nombre: "Sudoku Arcade", color: "#ff2fb4" } };
+const EXTRA = { minas: { nombre: "Mina Club", color: "#eeb765" }, snake: { nombre: "Snake Club", color: "#4be9bc" }, tetrisclub: { nombre: "Tetris Club", color: "#b04ee8" }, sortem: { nombre: "sortEm", color: "#ff006e" }, bbtan: { nombre: "BBTAN", color: "#c4f568" }, sopa: { nombre: "Sopa de letras", color: "#5b8cff" }, electro: { nombre: "Electrodle", color: "#f5a524" }, frontera: { nombre: "Frontera Batalla", color: "#e0743a" }, sudoku: { nombre: "Sudoku Arcade", color: "#ff2fb4" }, fanal: { nombre: "FANAL", color: "#d9a85b" } };
 const info = j => JUEGOS[j] || EXTRA[j] || { nombre: j, color: "#888" };
 const MAX_NOMBRES = 8;
 

@@ -326,6 +326,22 @@ const SOLO = {
     { id: "dificil10", n: "Sangre fría", d: "Resuelve un clásico Difícil en menos de 10 min.", i: "🧊", m: "Clásico", s: d => cat(/-dificil$/)(d) && d.tiempo < 600000 },
     { id: "a10000", n: "Combo arcade", d: "Haz 10 000 puntos en una partida arcade.", i: "🕹️", m: "Arcade", s: d => cat(/-arcade$/)(d) && d.puntos >= 10000 },
     { id: "a25000", n: "Récord de recreativa", d: "Haz 25 000 puntos en una partida arcade.", i: "👾", m: "Arcade", s: d => cat(/-arcade$/)(d) && d.puntos >= 25000 }
+  ],
+  /* FANAL. Los de la historia salen de club-fanal-jornadas (puntos =
+     jornadas completadas: 4 es la Nodriza, 8 el Faro Ciego, 11 la Esfinge
+     y 13 el cruce con el Alba; más allá, el sin fin); los de puntos, de
+     club-fanal-travesia y club-fanal-sinfin. */
+  fanal: [
+    { id: "j4", n: "Madre del enjambre", d: "Apaga a la Nodriza (completa la jornada 4).", i: "🦋", m: "Travesía", s: d => cat(/-jornadas$/)(d) && d.puntos >= 4 },
+    { id: "j8", n: "Faro ciego", d: "Apaga al Faro Ciego (completa la jornada 8).", i: "🗼", m: "Travesía", s: d => cat(/-jornadas$/)(d) && d.puntos >= 8 },
+    { id: "j11", n: "La más vieja de la noche", d: "Apaga a la Esfinge (completa la jornada 11).", i: "🌑", m: "Travesía", s: d => cat(/-jornadas$/)(d) && d.puntos >= 11 },
+    { id: "alba", n: "El alba", d: "Crúzate con el Alba y termina la travesía.", i: "🌅", m: "Travesía", s: d => cat(/-jornadas$/)(d) && d.puntos >= 13 },
+    { id: "sf20", n: "Sigue", d: "Llega a la jornada 20 de la travesía sin fin.", i: "🪔", m: "Sin fin", s: d => cat(/-jornadas$/)(d) && d.puntos >= 20 },
+    { id: "sf30", n: "La noche no tiene fondo", d: "Llega a la jornada 30 de la travesía sin fin.", i: "🌌", m: "Sin fin", s: d => cat(/-jornadas$/)(d) && d.puntos >= 30 },
+    { id: "p20k", n: "Brasas", d: "Haz 20 000 puntos en una travesía.", i: "🔥", m: "Puntos", s: d => cat(/-travesia$/)(d) && d.puntos >= 20000 },
+    { id: "p60k", n: "Resonancia", d: "Haz 60 000 puntos en una travesía.", i: "🎐", m: "Puntos", s: d => cat(/-travesia$/)(d) && d.puntos >= 60000 },
+    { id: "s100k", n: "Una luz que se ve de lejos", d: "Haz 100 000 puntos en la travesía sin fin.", i: "✨", m: "Puntos", s: d => cat(/-sinfin$/)(d) && d.puntos >= 100000 },
+    { id: "s250k", n: "Nadie llega, algunas se cruzan", d: "Haz 250 000 puntos en la travesía sin fin.", i: "🌠", m: "Puntos", s: d => cat(/-sinfin$/)(d) && d.puntos >= 250000 }
   ]
 };
 
@@ -335,7 +351,7 @@ export const LOGROS = Object.fromEntries([
   ...Object.entries(SOLO)
 ]);
 /* Qué categorías de `soloRanks` alimentan cada juego individual. */
-export const SOLO_PREFIJO = { minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-", electro: "club-electro-", frontera: "club-frontera-", sudoku: "club-sudoku-" };
+export const SOLO_PREFIJO = { minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-", electro: "club-electro-", frontera: "club-frontera-", sudoku: "club-sudoku-", fanal: "club-fanal-" };
 
 /* Los logros de partida que `uid` tiene ya en esta, según lo que se ve. */
 export function detecta(p, est, uid) {

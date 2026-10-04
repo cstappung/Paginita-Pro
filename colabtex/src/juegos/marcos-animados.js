@@ -168,6 +168,25 @@ function sudoku() {
     chispas([[66, 45, 2.4, 1.6, 0], [66, 225, 2.4, 1.6, -.8]], "#ffe3f4"); // dos destellos sueltos
 }
 
+/* FANAL: un anillo de noche índigo con estrellas que titilan, un farol
+   abajo con su llama viva y tres polillas que dan vueltas hacia la luz. */
+function fanal() {
+  // Una polilla vista desde arriba, con las alas que aletean.
+  const polilla = c => an("wg", .38, `<path d="M0 3.4L-1.2 .2L-5.6-3.4L-6.6 1.8L-1.4 2.4ZM0 3.4L1.2 .2L5.6-3.4L6.6 1.8L1.4 2.4Z" fill="${c}"/>`) +
+    `<path d="M0-3.6V3.6" stroke="#3a2a22" stroke-width="1.6" stroke-linecap="round"/>`;
+  // El farol: cuerpo de vidrio con marco de bronce, la llama y la barca.
+  const farol = `<path d="M-8 9H8L6 12H-6Z" fill="#6b4a32"/>` +
+    rect(9, 11, 1.4, "#2a1a10", `stroke="#d9a85b" stroke-width="1.3"`) +
+    `<path d="M-5.5-6.5H5.5M-2.5-9H2.5" stroke="#d9a85b" stroke-width="1.5" stroke-linecap="round"/>` +
+    an("t", .6, llama("#ffcf6b", .85)) + an("l", 1.3, `<circle r="2.2" cy="1" fill="#fff6d8"/>`);
+  return aro(60, "#0b0a1c", 18) +                                        // la banda de noche
+    aro(51.5, "#d9a85b", 1.2) + aro(68.5, "#6b4a32", 1.4) +              // bordes de bronce y madera
+    `<g class="fl" style="--d:2.2s">${aro(68.5, "#ffcf6b", 1.3, `stroke-dasharray="2 10" stroke-linecap="round"`)}</g>` + // la luz que corre por el borde
+    chispas([[60, 300, 2.2, 1.6, 0], [61, 330, 1.6, 2.1, -.6], [59, 20, 2, 1.8, -1.1], [60, 55, 1.5, 2.4, -.3], [61, 90, 1.8, 1.7, -1.5]], "#ffe8c2") +
+    gira(9, [0, 120, 240].map((a, i) => en(60, a, polilla(["#b8a088", "#c47a3c", "#9a4a62"][i]), a + 90)).join("")) + // las polillas giran
+    en(61, 180, farol);                                                  // el farol, abajo
+}
+
 function frontera() {
   const sim = [
     `<path d="M0-2.8L.8-.8L2.8-.8L1.2.5L1.8 2.6L0 1.3L-1.8 2.6L-1.2.5L-2.8-.8L-.8-.8Z"/>`,
@@ -434,7 +453,7 @@ const DIBUJOS = {
   telectro: electro, tfrontera: frontera, tpokemon: pokemon, tescondite: escondite, tcartas: cartas,
   tcuadritos: cuadritos, treversi: reversi, torbita: orbita, tcadena: cadena, tflip: flip, tcacho: cacho,
   tuno: uno, tcatan: catan, tpresidente: presidente, tspicy: spicy, tworms: worms, tyemas: yemas,
-  tzombis: zombis, tclue: clue, tajedrez: ajedrez, tmonedas: monedas, tprodrop: prodrop, tsudoku: sudoku,
+  tzombis: zombis, tclue: clue, tajedrez: ajedrez, tmonedas: monedas, tprodrop: prodrop, tsudoku: sudoku, tfanal: fanal,
   cometa, vortice, sakura, plasma, mariposas
 };
 

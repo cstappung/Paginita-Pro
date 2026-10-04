@@ -73,3 +73,10 @@ test('Sudoku Arcade: nombre, modalidades y marcas',()=>{
  assert.match(marcaSolo('club-sudoku-arcade',{puntos:12500,tiempo:1}),/^🕹️ 12.500 pts$/);
  assert.ok(mensajePodio({categoria:'club-sudoku-arcade',uid:'a',nombre:'Ana',puesto:1,filas:[{uid:'a',nombre:'Ana',puntos:900,tiempo:9000}],enlace:'https://x/juegos.html#solo/sudoku'}));
 });
+test('FANAL: nombre, modalidades y marcas',()=>{
+ assert.equal(categoriaLegible('club-fanal-travesia').club.nombre,'FANAL');
+ assert.equal(categoriaLegible('club-fanal-sinfin').modalidad,'travesía sin fin');
+ assert.equal(marcaSolo('club-fanal-jornadas',{puntos:13,tiempo:1}),'🪔 Jornada 13');
+ assert.match(marcaSolo('club-fanal-travesia',{puntos:45210,tiempo:1}),/^🪔 45.210 pts$/);
+ assert.ok(mensajePodio({categoria:'club-fanal-travesia',uid:'a',nombre:'Ana',puesto:1,filas:[{uid:'a',nombre:'Ana',puntos:900,tiempo:9000}],enlace:'https://x/juegos.html#solo/fanal'}));
+});

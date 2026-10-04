@@ -7,7 +7,7 @@ vm.runInContext(sin('src/juegos/motor.js')+'\n'+sin('src/juegos/logros.js')+'\n;
 const {LOGROS,detecta,deFila,deMarca,reparto,reducir,JUEGOS}=context.__L;
 
 test('diez logros por juego, con ids válidos y únicos',()=>{
- const juegos=[...Object.keys(JUEGOS),'minas','snake','tetrisclub','sortem','bbtan','sopa','electro','frontera','sudoku'];
+ const juegos=[...Object.keys(JUEGOS),'minas','snake','tetrisclub','sortem','bbtan','sopa','electro','frontera','sudoku','fanal'];
  for(const j of juegos){
   assert.ok(LOGROS[j],j);assert.equal(LOGROS[j].length,10,j);
   const ids=LOGROS[j].map(x=>x.id);assert.equal(new Set(ids).size,10,j);
@@ -55,4 +55,14 @@ test('Sudoku Arcade: racha, clásico por tiempo y arcade por puntos',()=>{
  assert.deepEqual([...deMarca('sudoku',{categoria:'club-sudoku-medio',puntos:1,tiempo:240000})],['medio5']);
  assert.deepEqual([...deMarca('sudoku',{categoria:'club-sudoku-experto',puntos:1,tiempo:3600000})],['experto']);
  assert.deepEqual([...deMarca('sudoku',{categoria:'club-sudoku-arcade',puntos:26000,tiempo:1})],['a10000','a25000']);
+});
+test('FANAL: la travesía por jornadas y los puntos de cada modo',()=>{
+ // Jornadas completadas: 4 la Nodriza, 8 el Faro, 11 la Esfinge, 13 el Alba.
+ assert.deepEqual([...deMarca('fanal',{categoria:'club-fanal-jornadas',puntos:8,tiempo:1})],['j4','j8']);
+ assert.deepEqual([...deMarca('fanal',{categoria:'club-fanal-jornadas',puntos:13,tiempo:1})],['j4','j8','j11','alba']);
+ assert.deepEqual([...deMarca('fanal',{categoria:'club-fanal-jornadas',puntos:31,tiempo:1})],['j4','j8','j11','alba','sf20','sf30']);
+ assert.deepEqual([...deMarca('fanal',{categoria:'club-fanal-travesia',puntos:61000,tiempo:1})],['p20k','p60k']);
+ assert.deepEqual([...deMarca('fanal',{categoria:'club-fanal-sinfin',puntos:120000,tiempo:1})],['s100k']);
+ // Los puntos del sin fin no dan logros de la travesía, ni al revés.
+ assert.deepEqual([...deMarca('fanal',{categoria:'club-fanal-sinfin',puntos:61000,tiempo:1})],[]);
 });

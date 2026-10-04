@@ -1645,9 +1645,9 @@ before dying; `cadena.js`'s marcador does the same once the replay is over.
 
 **The lobby opens with *Novedades*, a hand-written list** (`NOVEDADES`
 in `juegos-main.js`, `.jg-nov`), because what is new is not always a room
-game: today Yemas' zombie mode (opens a yemas room with `variante:
-"zombis"`), PRODROP (`#cartas`) and BBTAN (`#solo/bbtan`), each with its
-own cover (`arteNovedad`). The paragraph below describes the older,
+game: today FANAL (`#solo/fanal`), Yemas' zombie mode (opens a yemas room
+with `variante: "zombis"`) and PRODROP (`#cartas`), each with its own
+cover (`arteNovedad`). The paragraph below describes the older,
 date-driven version, which `novedades()` in `motor.js` still implements
 (`novedadesHtml` in `juegos-main.js` no longer calls it). They come from `novedades(3)` in
 `motor.js`, which sorts by each game's `alta` (the date it arrived,
@@ -2983,6 +2983,84 @@ and synthesised effects. Things that matter:
   Discord podium, the 📖 manual and its illustrated examples. The `soloRanks`
   and `clubJugadas` regexes were widened (the classic tables also demand
   `puntos === 1` in the rule), so the rules must be re-published.
+
+**FANAL (`juegos/club/fanal/`) is a Solo Club game too**, a Space Invaders
+retold as a lonely voyage: you carry the last light (a lantern on a boat)
+through the night towards «el Alba», and the invaders are moths drawn to
+it. Plain files, no build (`?v=fanal-N` on its five scripts and its
+stylesheet): `relato.js` (every text: the per-jornada log, the 13 letters
+the Mensajera carries, the revelation, the ending, the endless «ecos»),
+`motor.js` (pure: jornadas, difficulty, points, the pulse judgement, the
+progress merge), `sprites.js` (pixel art), `musica.js` (a procedural
+music engine) and `juego.js` (the screen). The first four are UMD and run
+in Node, so `tests/fanal.test.cjs` covers them without a browser. The
+story is 13 jornadas in four acts (enjambre, niebla, oscuro, alba): nine
+waves and four encounters (la Nodriza, el Faro Ciego, la Esfinge, el
+Alba); finishing it unlocks the endless mode, which cycles the first three
+acts in blocks of three waves and their returning boss (`jornada(n)`).
+Things that matter:
+
+- **The counter «✦ luces» is the twist made visible.** It starts at 430,
+  and each background star *is* one of those lights: killing a moth puts
+  out a star (`apagaEstrella`), from the first shot. The revelation after
+  the Faro says what they were; the surviving moths rise and become stars
+  again (the counter goes up), and the Esfinge's death puts out every star
+  left (`apagaTodas`, counter to 1). The last encounter is won by **not**
+  shooting: every shot that hits the Alba pushes it back (`EMPUJE_ALBA`)
+  and comes back at you; it closes in on its own. The crossing reveals a
+  sky full of wings (`cielo.lleno`). The 📖 manual describes the rules but
+  not these twists.
+- **The light is layered and pixel art too.** The game draws at 240×320 and
+  is scaled ×3 without smoothing. Over it goes a darkness mask with holes
+  where there is light (`dibujaOscuridad`), **posterized against the act's
+  own darkness level, not against black**: measured against black, the
+  uniform darkness of the first act came out as a Bayer screen door over
+  the whole screen; against its own level it stays flat and only the edge
+  of each light is dithered. An additive `luz` layer gives the glows and
+  the bloom (two downscales, smoothed back up); chromatic aberration (red
+  and cyan copies of the frame) only runs while a hit lasts. In the dark
+  act the moths glow faintly, like distant stars, so the act is hard but
+  not blind, and escamas always carry light.
+- **The music keeps the clock.** `musica.js` counts eighth notes on the
+  **game** clock and schedules audio from it, so pulses exist with the
+  sound off: the formation lurches on each pulse (`form.empuje`, the
+  original's heartbeat, faster as it thins), the flame beats, the
+  metronome at the bottom lights, and a shot is judged *afinado* against
+  `pulsoCercano(t − latency)`. Each act has its scale in cents (pélog,
+  frigia dominante, menor húngara, lidia aumentada; sléndro and a rotation
+  in the endless) and an irregular meter (7/8, 5/4, 11/8, 9/8, 13/8);
+  layers follow tension, danger and the boss (`capas`, pure), boss
+  leitmotifs transform with its life (`leitmotiv`), and a hit distorts the
+  music through one shared detune source (`curvaBend`). The drone had a
+  sine at ~37 Hz: inaudible on a laptop speaker and it ate the headroom the
+  bells needed, so nothing goes below ~70 Hz (measured with `nivel()`, an
+  analyser on the output).
+- **Delayed things run on a game-time agenda** (`programa`/`corre`), never
+  `setTimeout`: a pause right after the last moth used to start the transit
+  under the pause panel, and a timer from a run that had died opened the
+  game-over screen over the next run. The agenda stops in pause and drops
+  whatever belongs to another run.
+- **Every attack is announced.** The Faro's beam sweeps a *sector* marked
+  by two dotted lines (it used to sweep the whole screen faster than the
+  boat can row, so only a wreck could save you); wrecks cast shadows that
+  block it. The Esfinge marks a dive's column and the only gap of its dust
+  wall, which shots cannot break.
+- **Categories**: `club-fanal-travesia` and `club-fanal-sinfin` (points,
+  capped at 1 000 000) and `club-fanal-jornadas` (the furthest jornada
+  completed: 13 is the end of the story). `jornadas` is only sent when it
+  improves, because every result counts as a club play and pays coins.
+  Ten logros (`deMarca`), coins (10 per jornada, 1 per 1000 points), the
+  `tfanal` champion frame, the Discord podium and the manual are wired
+  like Sudoku Arcade's. Read letters, the ending seen, the act checkpoint
+  and local records travel as one blob in `users/<uid>/club/fanal`
+  (`Club.guardarPartida`, merged with `mezclaProgreso`). The `soloRanks`
+  and `clubJugadas` regexes were widened, so the rules must be
+  re-published.
+- The log and the revelation are written as whole lines and revealed with
+  CSS, never letter by letter: `i18n.js` would translate every fragment.
+  `window.__fanal` (`salta(n)`, `sigue()`, `estado()`, `mundo()`…) drives
+  the game from a script, which is how the story and the bosses were
+  played through in Chromium.
 
 **Frontera Batalla (`#solo/frontera`) is Emerald's Battle Frontier as a
 Solo Club game**, played locally on the same `@pkmn/sim` bundle as the

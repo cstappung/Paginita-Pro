@@ -123,7 +123,8 @@ const MODALIDADES = {
   chico: "tablero chico", mediano: "tablero mediano", grande: "tablero grande", gigante: "tablero gigante",
   racha: "racha diaria", puntos: "puntos totales", facil: "Fácil", medio: "Medio", dificil: "Difícil", 8: "8×8", 12: "12×12", 15: "15×15",
   torre: "Torre Batalla", palacio: "Palacio Batalla", fabrica: "Fábrica Batalla", 50: "Nivel 50", abierto: "Nivel Abierto", victorias: "victorias totales",
-  experto: "Experto"  // la dificultad más alta del clásico de Sudoku Arcade
+  experto: "Experto",  // la dificultad más alta del clásico de Sudoku Arcade
+  travesia: "travesía", sinfin: "travesía sin fin", jornadas: "jornada más lejana"  // FANAL
 };
 const CLUBS = {
   minas: { nombre: "Mina Club", juego: "Buscaminas", icono: "💣", ruta: "minas" },
@@ -134,12 +135,13 @@ const CLUBS = {
   sopa: { nombre: "Sopa de letras", juego: "Sopa de letras", icono: "🔤", ruta: "sopa" },
   electro: { nombre: "Electrodle", juego: "Electrodle", icono: "⚡", ruta: "electro" },
   frontera: { nombre: "Frontera Batalla", juego: "Frontera Batalla", icono: "🏰", ruta: "frontera" },
-  sudoku: { nombre: "Sudoku Arcade", juego: "Sudoku Arcade", icono: "🔢", ruta: "sudoku" }
+  sudoku: { nombre: "Sudoku Arcade", juego: "Sudoku Arcade", icono: "🔢", ruta: "sudoku" },
+  fanal: { nombre: "FANAL", juego: "FANAL", icono: "🪔", ruta: "fanal" }
 };
 
 /* "club-snake-arcade-grande" → {club, modalidad: "Arcade · tablero grande"} */
 export function categoriaLegible(cat) {
-  const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku)-(.+)$/.exec(String(cat || ""));
+  const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal)-(.+)$/.exec(String(cat || ""));
   if (!m) return null;
   return { club: CLUBS[m[1]], modalidad: m[2].split("-").map(k => MODALIDADES[k] || k).join(" · ") };
 }
@@ -160,6 +162,9 @@ export function marcaSolo(cat, f) {
   // El clásico del sudoku (puntos fijos en 1) compite por tiempo, como el buscaminas.
   if (/^club-minas-|^club-sortem-|^club-sopa-|^club-sudoku-(facil|medio|dificil|experto)$|^club-tetris-sprint$/.test(cat)) return `⏱️ ${reloj(f.tiempo)}`;
   if (/^club-bbtan-/.test(cat)) return `🟩 Ronda ${f.puntos}`;
+  // FANAL: la jornada más lejana se dice en jornadas; la travesía y el sin fin, en puntos.
+  if (cat === "club-fanal-jornadas") return `🪔 Jornada ${f.puntos}`;
+  if (/^club-fanal-/.test(cat)) return `🪔 ${Number(f.puntos).toLocaleString("es-CL")} pts`;
   return `${Number(f.puntos).toLocaleString("es-CL")} pts`;
 }
 

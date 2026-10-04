@@ -16,6 +16,10 @@ export function categoriaClub(juego, categoria) {
     // clásico en sus cuatro dificultades (este último, por tiempo).
     : juego === 'sudoku'
     ? /^club-sudoku-(racha|arcade|facil|medio|dificil|experto)$/.test(categoria)
+    // FANAL: la travesía (puntos), el sin fin (puntos) y la jornada más
+    // lejana a la que se llegó (jornadas completadas).
+    : juego === 'fanal'
+    ? /^club-fanal-(travesia|sinfin|jornadas)$/.test(categoria)
     : juego === 'tetris'
     ? /^club-tetris-(maraton|sprint|ultra)$/.test(categoria)
     : /^club-snake-(classic|arcade|portals|reloj|espejo|laberinto)-(chico|mediano|grande|gigante)$/.test(categoria));
@@ -41,6 +45,10 @@ export function resultadoClub(juego, dato) {
   if (juego === 'sudoku' && /^club-sudoku-(facil|medio|dificil|experto)$/.test(dato.categoria) && dato.puntos !== 1) return null;
   if (dato.categoria === 'club-sudoku-racha' && dato.puntos > 1000) return null;
   if (dato.categoria === 'club-sudoku-arcade' && dato.puntos > 1000000) return null;
+  /* FANAL: los puntos de una travesía (o del sin fin) con tope 1 000 000,
+     como el arcade del sudoku; las jornadas, con el tope común de 100 000. */
+  if (juego === 'fanal' && dato.categoria !== 'club-fanal-jornadas' && dato.puntos > 1000000) return null;
+  if (dato.categoria === 'club-fanal-jornadas' && dato.puntos > 100000) return null;
   /* Frontera: la racha y las victorias son combates; 100 000 es el tope
      de la regla. */
   if (juego === 'frontera' && dato.puntos > 100000) return null;

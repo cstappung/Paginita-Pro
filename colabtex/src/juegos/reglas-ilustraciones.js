@@ -58,3 +58,33 @@ export const ajedrez=(nombre,cols,rows,celdas,marcas={})=>{
   return `<rect x="${x}" y="${y}" width="${z}" height="${z}" fill="${fondo}"/>`+(v?txt(x+z/2,y+z*.72,v==='♟'?'♟︎':v,z*.68,'#17120c','middle'):'');
  }).join('')+`<rect x="${ox}" y="${oy}" width="${cols*z}" height="${rows*z}" fill="none" stroke="#465773" stroke-width="2"/>`);
 };
+/* FANAL: la formación de polillas, los cascos, el fanal con su llama y el
+   metrónomo de abajo. `etapa`: 0 tiro fuera del pulso, 1 tiro afinado, 2 el
+   barrido del Faro con su sector, 3 el muro de la Esfinge con su hueco. */
+const polillaF=(x,y,c='#b8a088')=>`<path d="M${x} ${y+6}l-2-6l-9-6l-2 9l9 1zM${x} ${y+6}l2-6l9-6l2 9l-9 1z" fill="${c}"/><path d="M${x} ${y-5}v11" stroke="#3a2a22" stroke-width="2.4" stroke-linecap="round"/>`;
+const farolF=(x,y)=>`<path d="M${x-16} ${y+10}h32l-5 7h-22z" fill="#6b4a32"/>`+rect(x-7,y-10,14,20,'#2a1a10','#d9a85b',3)+`<path d="M${x} ${y+5}c-5-4-4-9 0-13c4 4 5 9 0 13z" fill="#ffcf6b"/>`;
+const cascoF=x=>`<path d="M${x-26} 196q26-30 52 0v8h-12q-14-10-28 0h-12z" fill="#5a4232" stroke="#7d5c40" stroke-width="2"/>`;
+export const fanal=etapa=>{
+ const nombre=['El tiro sale fuera del pulso: un tiro normal','El tiro cae en el pulso: sale afinado, dorado, y el multiplicador sube','El Faro anuncia su barrido con dos líneas: el sector entre ellas se ilumina','La Esfinge baja un muro de polvo con un solo hueco, que su marca señala'][etapa];
+ let cuerpo=`<rect x="0" y="0" width="480" height="250" rx="14" fill="#0e0b1e"/>`;
+ if(etapa<2){
+  cuerpo+=[0,1,2,3,4,5].map(i=>polillaF(130+i*44,46,i%2?'#c47a3c':'#b8a088')).join('')+[0,1,2,3,4,5].map(i=>polillaF(130+i*44,82,'#9a4a62')).join('');
+  cuerpo+=cascoF(150)+cascoF(330)+farolF(240,216);
+  cuerpo+=etapa===1?line(240,180,240,120,C.oro,6)+circle(240,118,7,'#fff6d8'):line(240,180,240,130,'#ffe6a8',3);
+  // El metrónomo: corcheas chicas, pulsos grandes; el que suena, encendido.
+  [0,1,2,3,4,5,6].forEach(i=>{const pulso=[0,2,4].includes(i),on=i===2;cuerpo+=`<rect x="${330+i*16}" y="${pulso?226:231}" width="${on?6:4}" height="${pulso?12:7}" fill="${on?(etapa===1?C.oro:'#fff6d8'):'#8a7a9a'}"/>`;});
+  cuerpo+=txt(24,34,etapa===1?'Afinado: doble daño y atraviesa':'Fuera del pulso',17,etapa===1?C.oro:C.blanco)+txt(330,218,'pulso',12,C.gris)+(etapa===1?txt(24,236,'multiplicador ×2',16,C.oro):'');
+ }else if(etapa===2){
+  cuerpo+=`<rect x="226" y="20" width="28" height="40" rx="4" fill="#2e4442" stroke="#b08a50" stroke-width="3"/>`+circle(240,40,7,'#e6f2d8');
+  cuerpo+=`<path d="M240 44L470 235L300 235Z" fill="#e6f6dc" opacity=".22"/>`;
+  for(let k=0;k<14;k++){cuerpo+=circle(240+k*16.4,44+k*13.6,2,'#e6f6dc');cuerpo+=circle(240+k*4.3,44+k*13.6,1.6,'#e6f6dc88');}
+  cuerpo+=cascoF(330)+`<path d="M318 204L344 204L392 250L355 250Z" fill="#0e0b1e" opacity=".85"/>`+farolF(120,216);
+  cuerpo+=txt(24,34,'Sal del sector o escóndete tras un casco',16,C.verde);
+ }else{
+  cuerpo+=`<path d="M170 34q70-30 140 0l-20 10q-50-16-100 0z" fill="#241a2c" stroke="#9a86b8" stroke-width="2"/>`;
+  for(let i=0;i<24;i++)if(i<14||i>16)cuerpo+=`<rect x="${12+i*19}" y="120" width="12" height="8" fill="#8a5cff"/>`;
+  cuerpo+=`<path d="M${12+15*19+6} 92l-9-10h18z" fill="#e8dcc8"/>`+circle(12+15*19+6,76,9,'#e8dcc855');
+  cuerpo+=farolF(12+15*19+6,216)+txt(24,34,'Busca el hueco que señala la marca',16,C.violeta);
+ }
+ return svg(nombre,cuerpo);
+};
