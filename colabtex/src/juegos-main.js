@@ -1026,7 +1026,10 @@ async function copiaReglas(b) {
     if (!r.ok) throw new Error("HTTP " + r.status);
     await navigator.clipboard.writeText(await r.text());
     b.textContent = "Copiado ✓";
-    setTimeout(() => { if (b.textContent === "Copiado ✓") b.textContent = antes; }, 2500);
+    // Una marca, no el texto: el selector de idioma lo traduce en el DOM.
+    const marca = String(Date.now());
+    b.dataset.copiado = marca;
+    setTimeout(() => { if (b.dataset.copiado === marca) { delete b.dataset.copiado; b.textContent = antes; } }, 2500);
   } catch (e) {
     b.textContent = "Ábrelo en otra pestaña ↗";
     b.onclick = () => window.open(URL_REGLAS, "_blank", "noopener");
@@ -1220,7 +1223,7 @@ function armazon() {
       <div id="jgFin"></div>
       </div><section class="jg-chat" id="jgChat" aria-label="Chat de la partida">
         <header><h2>Chat de la sala</h2><small>lo leen jugadores y espectadores</small></header>
-        <div class="jg-chat-lista" id="jgChatLista" aria-live="polite"></div>
+        <div class="jg-chat-lista" id="jgChatLista" aria-live="polite" translate="no"></div>
         <button class="jg-chat-abre" id="jgChatAbre" type="button" title="Escribir en el chat (Intro)" aria-label="Escribir en el chat">💬</button>
         <form class="jg-chat-form" id="jgChatForm" autocomplete="off">
           <input class="inp" id="jgChatTxt" maxlength="${fb.CHAT_LARGO}" placeholder="Escribe algo…">

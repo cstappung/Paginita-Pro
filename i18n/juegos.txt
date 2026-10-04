@@ -1,0 +1,444 @@
+# Juegos: vestíbulo, cabecera, sala, clasificación, perfil, monedas. Formato: es || en || it
+Ritmo || Time control || Cadenza
+Sin reloj || No clock || Senza orologio
+Color de quien abre || Host's colour || Colore di chi apre
+Al azar || Random || Casuale
+Blancas || White || Bianco
+Negras || Black || Nero
+Jugadores || Players || Giocatori
+Tablero || Board || Tavoliere
+Cuadrillas || Squads || Squadre
+Mapa || Map || Mappa
+Robots por cuadrilla || Bots per squad || Bot per squadra
+Tiempo por turno || Time per turn || Tempo per turno
+Modo || Mode || Modalità
+Partida || Game || Partita
+Siciliana || Sicilian || Siciliana
+Versión || Version || Versione
+Expansión || Expansion || Espansione
+Dados || Dice || Dadi
+Dos dados || Two dice || Due dadi
+Baraja de eventos || Event deck || Mazzo eventi
+Ladrón || Robber || Brigante
+Amistoso || Friendly || Amichevole
+Puertos || Harbours || Porti
+Normales || Normal || Normali
+Maestro del puerto || Harbormaster || Signore del porto
+Estándar || Standard || Standard
+Corta (−2 puntos) || Short (−2 points) || Corta (−2 punti)
+Larga (+2 puntos) || Long (+2 points) || Lunga (+2 punti)
+Asientos || Seats || Posti
+Corta || Short || Corta
+Larga || Long || Lunga
+Formato || Format || Formato
+Tu perfil || Your profile || Il tuo profilo
+recién || just now || adesso
+hace {} min || {} min ago || {} min fa
+hace {} h || {} h ago || {} h fa
+hace {} d || {} d ago || {} g fa
+Abrir un sobre → || Open a pack → || Apri una bustina →
+Cobrando… || Claiming… || Riscatto…
+¡{} días seguidos! || {} days in a row! || {} giorni di fila!
+¡Recompensa diaria! || Daily reward! || Ricompensa giornaliera!
++{} monedas hoy · mañana +{} si vuelves || +{} coins today · tomorrow +{} if you come back || +{} monete oggi · domani +{} se torni
+Partida del club || Club game || Partita del club
+🏆 ¡Logro desbloqueado! · +{} {} || 🏆 Achievement unlocked! · +{} {} || 🏆 Obiettivo sbloccato! · +{} {}
+● Tu turno · || ● Your turn · || ● Tocca a te ·
+Copiando… || Copying… || Copia in corso…
+Copiado ✓ || Copied ✓ || Copiato ✓
+Faltan reglas por publicar || Rules not yet published || Regole non ancora pubblicate
+Copiar las reglas || Copy the rules || Copia le regole
+Abrir la consola || Open the console || Apri la console
+¡Le quitaste el puesto {} a {}! || You took place {} from {}! || Hai tolto il posto {} a {}!
+← Juegos || ← Games || ← Giochi
+UN JUGADOR · RANKING POR MODALIDAD || SINGLE PLAYER · RANKING BY MODE || GIOCATORE SINGOLO · CLASSIFICA PER MODALITÀ
+Buscaminas || Minesweeper || Campo minato
+Sopa || Word search || Crucipuzzle
+Frontera || Frontier || Frontiera
+📖 Reglas || 📖 Rules || 📖 Regole
+Vestíbulo || Lobby || Atrio
+Reglas || Rules || Regole
+Abandonar || Leave || Abbandona
+Chat de la sala || Room chat || Chat della stanza
+lo leen jugadores y espectadores || read by players and spectators || la leggono giocatori e spettatori
+LABORATORIO · SALÓN DE JUEGOS || LABORATORIO · GAME ROOM || LABORATORIO · SALA GIOCHI
+¿A qué jugamos? || What shall we play? || A cosa giochiamo?
+Elige un juego, abre la sala y pasa el enlace. O entra en una que ya esté esperando. || Pick a game, open a room and share the link. Or join one that is already waiting. || Scegli un gioco, apri la stanza e condividi il link. Oppure entra in una che sta già aspettando.
+salas esperando || rooms waiting || stanze in attesa
+partidas tuyas || your games || tue partite
+Ver el catálogo ↓ || See the catalogue ↓ || Vedi il catalogo ↓
+Salas abiertas || Open rooms || Stanze aperte
+Top monedas || Top coins || Top monete
+Contando monedas… || Counting coins… || Conto le monete…
+Tus partidas || Your games || Le tue partite
+En juego ahora || Playing now || In corso ora
+Multijugador || Multiplayer || Multigiocatore
+Duelos || Duels || Duelli
+En grupo || Groups || In gruppo
+Todos || All || Tutti
+Para jugar solo || Play solo || Per giocare da solo
+sin sala, cuando quieras || no room, whenever you like || senza stanza, quando vuoi
+SINGLEPLAYER / ESTRATEGIA || SINGLEPLAYER / STRATEGY || GIOCATORE SINGOLO / STRATEGIA
+Piensa, explora y florece. Tres dificultades y música progresiva. || Think, explore and bloom. Three difficulties and progressive music. || Pensa, esplora e fiorisci. Tre difficoltà e musica progressiva.
+Explorar → || Explore → || Esplora →
+SINGLEPLAYER / REFLEJOS || SINGLEPLAYER / REFLEXES || GIOCATORE SINGOLO / RIFLESSI
+Siete modos —contrarreloj, espejo, laberinto…— y cuatro tamaños de mapa. || Seven modes —time attack, mirror, maze…— and four map sizes. || Sette modalità —contro il tempo, specchio, labirinto…— e quattro dimensioni di mappa.
+Entrar al circuito → || Enter the circuit → || Entra nel circuito →
+Maratón, Sprint de 40 líneas y Ultra de dos minutos. || Marathon, 40-line Sprint and two-minute Ultra. || Maratona, Sprint da 40 linee e Ultra di due minuti.
+Apilar → || Stack → || Impila →
+Mueve y fusiona los bloques hasta ordenar del 1 al 10 o al 20. Ranking por tiempo. || Move and merge the blocks until they are sorted from 1 to 10 or 20. Ranked by time. || Sposta e unisci i blocchi fino a ordinarli da 1 a 10 o a 20. Classifica per tempo.
+Ordenar → || Sort → || Ordina →
+SINGLEPLAYER / ARCADE || SINGLEPLAYER / ARCADE || GIOCATORE SINGOLO / ARCADE
+Apunta, rebota y rompe los bloques antes de que lleguen abajo. Ranking por ronda máxima. || Aim, bounce and break the blocks before they reach the bottom. Ranked by highest round. || Mira, rimbalza e rompi i blocchi prima che arrivino in fondo. Classifica per round massimo.
+Lanzar → || Launch → || Lancia →
+SINGLEPLAYER / PALABRAS || SINGLEPLAYER / WORDS || GIOCATORE SINGOLO / PAROLE
+SOPA DE LETRAS || WORD SEARCH || CRUCIPUZZLE
+Una sopa diaria igual para todos, con racha de días seguidos, y sopas libres por temática. || A daily puzzle, the same for everyone, with a streak of consecutive days, plus free puzzles by theme. || Un puzzle giornaliero uguale per tutti, con serie di giorni consecutivi, e puzzle liberi per tema.
+Buscar → || Search → || Cerca →
+SINGLEPLAYER / DIARIO · NUEVO || SINGLEPLAYER / DAILY · NEW || GIOCATORE SINGOLO / GIORNALIERO · NUOVO
+Adivina el componente, el científico, la fórmula y el símbolo eléctrico del día. Puntos, racha y podio. || Guess the component, the scientist, the formula and the electrical symbol of the day. Points, streak and podium. || Indovina il componente, lo scienziato, la formula e il simbolo elettrico del giorno. Punti, serie e podio.
+Adivinar → || Guess → || Indovina →
+POKÉMON / FRONTERA BATALLA · NUEVO || POKÉMON / BATTLE FRONTIER · NEW || POKÉMON / PARCO LOTTA · NUOVO
+FRONTERA BATALLA || BATTLE FRONTIER || PARCO LOTTA
+Frontera Batalla || Battle Frontier || Parco Lotta
+Torre, Palacio y Fábrica de Esmeralda: rachas de 7 combates contra entrenadores cada vez más duros y los Ases. || Emerald's Tower, Palace and Factory: streaks of 7 battles against ever tougher trainers and the Frontier Brains. || Torre, Palazzo e Fabbrica di Smeraldo: serie di 7 lotte contro allenatori sempre più forti e gli Assi.
+Desafiar → || Challenge → || Sfida →
+LOCAL · BOTS / ARTILLERÍA || LOCAL · BOTS / ARTILLERY || LOCALE · BOT / ARTIGLIERIA
+Tu cuadrilla contra bots o amigos en el mismo equipo. En línea: abre una sala arriba. || Your squad against bots, or friends on the same computer. Online: open a room above. || La tua squadra contro bot o amici sullo stesso computer. Online: apri una stanza sopra.
+Desplegar → || Deploy → || Schiera →
+Yemas · modo Zombis || Yemas · Zombies mode || Yemas · modalità Zombi
+Todos juntos contra oleadas de huevos podridos, en cinco mapas clásicos: bebidas, la caja misteriosa, armas en la pared y Pack-a-Punch. Se puede jugar solo. || Everyone together against waves of rotten eggs on five classic maps: perks, the mystery box, wall weapons and Pack-a-Punch. Can be played solo. || Tutti insieme contro ondate di uova marce, in cinque mappe classiche: bevande, la cassa misteriosa, armi a muro e Pack-a-Punch. Si può giocare da soli.
+1–8 jugadores · cooperativo || 1–8 players · co-op || 1–8 giocatori · cooperativo
+PRODROP · sobres y mercado || PRODROP · packs and market || PRODROP · bustine e mercato
+Sobres de cinco cartas de los profes, uno gratis cada 6 horas. Gradúalas, exhíbelas en tu perfil, véndelas en el mercado o cámbialas con otros. || Five-card packs of the teachers, one free every 6 hours. Grade them, show them on your profile, sell them on the market or trade them. || Bustine da cinque carte dei prof, una gratis ogni 6 ore. Valutale, esponile nel profilo, vendile al mercato o scambiale.
+Abrir sobres || Open packs || Apri bustine
+Abrir sobres → || Open packs → || Apri bustine →
+Apunta, rebota y rompe los bloques antes de que toquen el suelo. Y no te quedes mucho rato: más abajo, algo cambia. || Aim, bounce and break the blocks before they hit the floor. And don't stay too long: further down, something changes. || Mira, rimbalza e rompi i blocchi prima che tocchino terra. E non restare troppo: più giù, qualcosa cambia.
+Un jugador · ranking por ronda máxima || Single player · ranked by highest round || Giocatore singolo · classifica per round massimo
+Lanzar || Launch || Lancia
+RECIÉN LLEGADO || JUST ARRIVED || APPENA ARRIVATO
+Novedades || What's new || Novità
+Lo último que llegó al salón. || The latest arrivals in the game room. || Le ultime novità della sala.
+★ Lo último || ★ Latest || ★ Ultime novità
+Nuevo || New || Nuovo
+Abrir sala || Open room || Apri stanza
+🃏 Últimos drops || 🃏 Latest drops || 🃏 Ultimi drop
+épicas y legendarias de PRODROP, de la más reciente a la más antigua || PRODROP epics and legendaries, newest first || epiche e leggendarie di PRODROP, dalla più recente
+Buscando cartas… || Looking for cards… || Cerco carte…
+Jugador || Player || Giocatore
+Salón de la fama || Hall of fame || Albo d'oro
+ver todo → || see all → || vedi tutto →
+Más jugado || Most played || Più giocato
+Mis equipos || My teams || Le mie squadre
+Mis equipos de Pokémon || My Pokémon teams || Le mie squadre Pokémon
+Cómo se juega || How to play || Come si gioca
+Reglas de {} || Rules of {} || Regole di {}
+Unirme a {} || Join {} || Unisciti a {}
+Abrir una sala || Open a room || Apri una stanza
+Entrar || Enter || Entra
+No hay ninguna sala abierta ahora mismo. || There are no open rooms right now. || Non ci sono stanze aperte in questo momento.
+Abre tú una y pasa el enlace. || Open one yourself and share the link. || Aprine una e condividi il link.
+Abrir || Open || Apri
+Todavía no has jugado ninguna partida. || You haven't played any games yet. || Non hai ancora giocato nessuna partita.
+Mirar || Watch || Guarda
+No hay partidas en juego ahora mismo. || No games in progress right now. || Nessuna partita in corso al momento.
+Opciones || Options || Opzioni
+No se puede leer la base de datos. || The database cannot be read. || Impossibile leggere il database.
+Abriendo… || Opening… || Apertura…
+Esa partida ya no existe || That game no longer exists || Quella partita non esiste più
+La sala se cerró o el enlace no es correcto. || The room was closed or the link is wrong. || La stanza è stata chiusa o il link non è corretto.
+Te han invitado a jugar || You've been invited to play || Sei stato invitato a giocare
+Únete para comenzar la partida con quienes están dentro. || Join to start the game with those inside. || Unisciti per iniziare la partita con chi è dentro.
+Unirse a la partida || Join the game || Unisciti alla partita
+Estás mirando esta partida. || You are watching this game. || Stai guardando questa partita.
+Copiado || Copied || Copiato
+Copia a mano ↑ || Copy by hand ↑ || Copia a mano ↑
+Falta el otro jugador. || Waiting for the other player. || Manca l'altro giocatore.
+Pásale este enlace a quien quieras: en cuanto entre, || Send this link to anyone: as soon as they join, || Manda questo link a chi vuoi: appena entra,
+Ese juego no existe en esta versión. || That game doesn't exist in this version. || Questo gioco non esiste in questa versione.
+Sala cerrada || Room closed || Stanza chiusa
+¡Has ganado! || You won! || Hai vinto!
+Has perdido || You lost || Hai perso
+Empate || Draw || Pareggio
+Ganó || Winner || Ha vinto
+Aceptar revancha || Accept rematch || Accetta rivincita
+Pedir revancha || Ask for a rematch || Chiedi la rivincita
+Capturó más energía en las 36 estrellas. || Captured more energy from the 36 stars. || Ha catturato più energia dalle 36 stelle.
+Encontró al personaje escondido. || Found the hidden character. || Ha trovato il personaggio nascosto.
+La partida acabó por abandono. || The game ended by forfeit. || La partita è finita per abbandono.
+Se cerró sola: pasaron seis horas sin una jugada. No cuenta para la clasificación. || It closed itself: six hours passed without a move. It doesn't count for the ranking. || Si è chiusa da sola: sei ore senza una mossa. Non conta per la classifica.
+Llegó primero a la meta de bajas. || Reached the kill target first. || Ha raggiunto per primo l'obiettivo di uccisioni.
+Su equipo llegó primero a la meta de bajas. || Their team reached the kill target first. || La sua squadra ha raggiunto per prima l'obiettivo di uccisioni.
+Su equipo capturó las banderas que pedía la meta. || Their team captured the required flags. || La sua squadra ha catturato le bandiere richieste.
+Reunió tres cartas del mismo elemento en tres colores distintos. || Gathered three cards of the same element in three different colours. || Ha riunito tre carte dello stesso elemento in tre colori diversi.
+Cerró más cajas que nadie. || Closed more boxes than anyone. || Ha chiuso più caselle di tutti.
+Acabó con más fichas sobre el tablero. || Ended with more discs on the board. || Ha finito con più pedine sul tavoliere.
+Nadie sacó ventaja. || Nobody got ahead. || Nessuno ha preso vantaggio.
+Su cuadrilla fue la última en pie. || Their squad was the last one standing. || La sua squadra è stata l'ultima in piedi.
+Apagón total: no quedó ninguna cuadrilla en pie. || Total blackout: no squad left standing. || Blackout totale: nessuna squadra rimasta in piedi.
+Su reacción en cadena se tragó a todos los demás. || Their chain reaction swallowed everyone else. || La sua reazione a catena ha inghiottito tutti gli altri.
+Pasó de 200 puntos con más que nadie. || Passed 200 points with more than anyone. || Ha superato i 200 punti con più di tutti.
+Fue el último en conservar dados en el vaso. || Was the last one with dice in the cup. || È stato l'ultimo a conservare dadi nel bicchiere.
+Se quedó sin cartas antes que nadie. || Ran out of cards before anyone else. || È rimasto senza carte prima di tutti.
+Llegó a los puntos de victoria antes que nadie. || Reached the victory points before anyone else. || Ha raggiunto i punti vittoria prima di tutti.
+Jaque mate. || Checkmate. || Scacco matto.
+Rey ahogado: sin jugadas y sin estar en jaque. || Stalemate: no moves and not in check. || Stallo: nessuna mossa e nessuno scacco.
+No quedaba material para dar mate. || Insufficient material to mate. || Materiale insufficiente per dare matto.
+La misma posición se repitió tres veces. || The same position was repeated three times. || La stessa posizione si è ripetuta tre volte.
+Cincuenta jugadas sin capturas ni movimientos de peón. || Fifty moves without captures or pawn moves. || Cinquanta mosse senza catture né mosse di pedone.
+Tablas de mutuo acuerdo. || Draw by agreement. || Patta di comune accordo.
+El rival se rindió. || The opponent resigned. || L'avversario si è arreso.
+Al rival se le acabó el tiempo. || The opponent ran out of time. || L'avversario ha finito il tempo.
+Rojo || Red || Rosso
+Azul || Blue || Blu
+¿Abandonar la partida? Cuenta como derrota. || Leave the game? It counts as a loss. || Abbandonare la partita? Conta come sconfitta.
+Votos para expulsar || Votes to kick || Voti per espellere
+¿Retirar tu voto contra {}? || Withdraw your vote against {}? || Ritirare il tuo voto contro {}?
+¿Expulsar a {}? Sale de la partida al momento, como si hubiera abandonado. || Kick {}? They leave the game at once, as if they had quit. || Espellere {}? Esce subito dalla partita, come se avesse abbandonato.
+Nadie ha escrito todavía. || Nobody has written yet. || Nessuno ha ancora scritto.
+Pantalla completa || Full screen || Schermo intero
+Salir de la pantalla completa (Esc) || Exit full screen (Esc) || Esci da schermo intero (Esc)
+Jugar a pantalla completa || Play full screen || Gioca a schermo intero
+Modo oscuro — pulsa para el claro || Dark mode — click for light || Modalità scura — clicca per la chiara
+Modo claro — pulsa para el oscuro || Light mode — click for dark || Modalità chiara — clicca per la scura
+No se pudo iniciar sesión: || Could not sign in: || Accesso non riuscito:
+Usuario || User || Utente
+ENCUENTRA LO INVISIBLE || FIND THE INVISIBLE || TROVA L'INVISIBILE
+Preparando revancha… || Preparing rematch… || Preparo la rivincita…
+Hay una revancha esperándote || A rematch is waiting for you || Ti aspetta una rivincita
+¿Nos damos otra oportunidad? || Another round? || Ci diamo un'altra possibilità?
+Únete a la nueva sala con los mismos participantes. || Join the new room with the same players. || Unisciti alla nuova stanza con gli stessi partecipanti.
+Invita a los participantes a repetir este juego. || Invite the players to play again. || Invita i partecipanti a rigiocare.
+Órbita || Orbit || Orbita
+Lanza sondas con la gravedad, roba estrellas y derriba satélites || Launch probes with gravity, steal stars and shoot down satellites || Lancia sonde con la gravità, ruba stelle e abbatti satelliti
+Escondite || Hide and seek || Nascondino
+Esconde a tu persona en el paisaje y encuentra la del otro || Hide your person in the landscape and find the other's || Nascondi la tua persona nel paesaggio e trova quella dell'altro
+Cartas de los tres elementos || Three Elements Cards || Carte dei tre elementi
+Fuego, agua y nieve — tres cartas de tres colores y ganas || Fire, water and snow — three cards in three colours and you win || Fuoco, acqua e neve — tre carte di tre colori e vinci
+Cuadritos || Dots and Boxes || Quadratini
+Cierra más cajas que los demás, una raya por turno || Close more boxes than the others, one line per turn || Chiudi più caselle degli altri, una linea per turno
+Cuadrillas eléctricas, terreno destructible y un disparo por turno || Electric squads, destructible terrain and one shot per turn || Squadre elettriche, terreno distruttibile e un colpo per turno
+Atrapa las fichas del otro entre las tuyas y dales la vuelta || Trap the other's discs between yours and flip them || Intrappola le pedine dell'altro tra le tue e girale
+Reacción en cadena || Chain Reaction || Reazione a catena
+Carga una celda hasta que estalle y conquista a sus vecinas en cadena || Load a cell until it bursts and conquer its neighbours in a chain || Carica una cella finché esplode e conquista le vicine a catena
+Pide carta o plántate: siete números distintos y te llevas el bono || Hit or stay: seven different numbers and you take the bonus || Chiedi carta o stai: sette numeri diversi e prendi il bonus
+Dudo o calzo: cinco dados en el vaso y gana el último que conserve alguno || Doubt or call: five dice in the cup and the last one with dice wins || Dubito o calzo: cinque dadi nel bicchiere e vince l'ultimo che ne conserva
+Clásico, No Mercy, All Wild o Liar's: quédate sin cartas antes que nadie || Classic, No Mercy, All Wild or Liar's: run out of cards first || Classico, No Mercy, All Wild o Liar's: resta senza carte per primo
+Coloniza la isla, comercia y construye: el primero en llegar a la meta gana || Settle the island, trade and build: the first to reach the goal wins || Colonizza l'isola, commercia e costruisci: vince il primo che arriva alla meta
+Presidente || President || Presidente
+Deshazte de tus cartas primero: el Culo le da sus mejores al Presidente, ronda tras ronda || Get rid of your cards first: the Scum gives their best to the President, round after round || Liberati delle carte per primo: lo Schiavo dà le sue migliori al Presidente, round dopo round
+Bota cartas boca abajo, miente con cara de póker y duda del picante ajeno || Play cards face down, lie with a poker face and doubt the others' spice || Gioca carte coperte, menti con faccia da poker e dubita del piccante altrui
+Todos a la vez con las mismas piezas: cada línea que limpias es basura para otro || Everyone at once with the same pieces: every line you clear is garbage for someone else || Tutti insieme con gli stessi pezzi: ogni linea che pulisci è spazzatura per un altro
+Shooter de huevos en primera persona: el primero en freír a los demás hasta la meta gana || First-person egg shooter: the first to fry the others up to the target wins || Sparatutto di uova in prima persona: vince il primo che frigge gli altri fino alla meta
+Un crimen en el edificio: descubre quién, con qué y dónde antes que los demás || A crime in the building: find out who, with what and where before the others || Un crimine nell'edificio: scopri chi, con cosa e dove prima degli altri
+Ajedrez || Chess || Scacchi
+El de siempre: enroque, al paso, coronación, tablas y jaque mate || The classic: castling, en passant, promotion, draws and checkmate || Il solito: arrocco, en passant, promozione, patta e scacco matto
+Combates con el motor de Showdown: arma tu equipo, abre una sala y que gane el mejor entrenador || Battles on the Showdown engine: build your team, open a room and may the best trainer win || Lotte con il motore di Showdown: crea la tua squadra, apri una stanza e vinca il migliore allenatore
+Fuego || Fire || Fuoco
+Agua || Water || Acqua
+Nieve || Snow || Neve
+Pequeño || Small || Piccolo
+Mediano || Medium || Medio
+Grande || Large || Grande
+Todos contra todos || Free for all || Tutti contro tutti
+Duelo por equipos || Team deathmatch || Deathmatch a squadre
+Captura la bandera || Capture the flag || Cattura la bandiera
+Zombis || Zombies || Zombi
+Chica || Small || Piccola
+Clásica || Classic || Classica
+Clásico || Classic || Classico
+Abierto || Open || Aperto
+Cerrado || Closed || Chiuso
+Torbellino || Whirlwind || Vortice
+No Mercy + expansión || No Mercy + expansion || No Mercy + espansione
+Caballero || Knight || Cavaliere
+Punto de victoria || Victory point || Punto vittoria
+Construcción de carreteras || Road building || Costruzione di strade
+Año de la abundancia || Year of plenty || Anno dell'abbondanza
+Monopolio || Monopoly || Monopolio
+Navegantes || Seafarers || Navigatori
+Vicepresidente || Vice president || Vicepresidente
+Viceculo || Vice scum || Vice schiavo
+Culo || Scum || Schiavo
+Rápida || Rapid || Rapida
+Campeón || Champion || Campione
+Subcampeón || Runner-up || Secondo
+Tercer puesto || Third place || Terzo posto
+Yemas zombis || Yemas zombies || Yemas zombi
+Sopa de letras || Word search || Crucipuzzle
+Dificultad || Difficulty || Difficoltà
+Fácil || Easy || Facile
+Medio || Medium || Medio
+Difícil || Hard || Difficile
+Maratón || Marathon || Maratona
+Del 1 al 10 || 1 to 10 || Da 1 a 10
+Del 1 al 20 || 1 to 20 || Da 1 a 20
+Récord || Record || Record
+Ronda máxima || Highest round || Round massimo
+Tabla || Table || Tabella
+Racha diaria || Daily streak || Serie giornaliera
+Libre · Fácil || Free · Easy || Libero · Facile
+Libre · Medio || Free · Medium || Libero · Medio
+Libre · Difícil || Free · Hard || Libero · Difficile
+Tamaño || Size || Dimensione
+Puntos totales || Total points || Punti totali
+Instalación || Facility || Struttura
+Torre Batalla || Battle Tower || Torre Lotta
+Palacio Batalla || Battle Palace || Palazzo Lotta
+Fábrica Batalla || Battle Factory || Fabbrica Lotta
+Victorias totales || Total wins || Vittorie totali
+Nivel || Level || Livello
+Nivel 50 || Level 50 || Livello 50
+Nivel Abierto || Open level || Livello libero
+Portales || Portals || Portali
+Contrarreloj || Time attack || Contro il tempo
+Espejo || Mirror || Specchio
+Laberinto || Maze || Labirinto
+Chico || Small || Piccolo
+Gigante || Giant || Gigante
+General || Overall || Generale
+En sala || In rooms || In stanza
+Un jugador || Single player || Giocatore singolo
+Cartas || Cards || Carte
+Se suman 3 puntos por victoria y 1 por empate. || 3 points per win and 1 per draw. || 3 punti per vittoria e 1 per pareggio.
+Tiempo || Time || Tempo
+Completado || Completed || Completato
+40 líneas || 40 lines || 40 linee
+números || numbers || numeri
+Ronda || Round || Round
+día || day || giorno
+días || days || giorni
+Jugadas || Played || Giocate
+Ganadas || Won || Vinte
+Perdidas || Lost || Perse
+Empates || Draws || Pareggi
+Racha || Streak || Serie
+Sin nombre || No name || Senza nome
+Cargando las cartas… || Loading cards… || Carico le carte…
+Colección más completa || Most complete collection || Collezione più completa
+Las cartas más raras || The rarest cards || Le carte più rare
+ronda {} || round {} || round {}
+Puesto libre || Free spot || Posto libero
+mejor tiempo || best time || miglior tempo
+El trono está vacío || The throne is empty || Il trono è vuoto
+Todavía no estás en la tabla || You're not on the table yet || Non sei ancora in classifica
+Llevas la corona || You wear the crown || Hai la corona
+Nadie te la disputa todavía. || Nobody is challenging you yet. || Nessuno te la contende ancora.
+Vas #{} || You're #{} || Sei #{}
+Todos los juegos || All games || Tutti i giochi
+Fallo o idea || Bug or idea || Bug o idea
+Contar un fallo, sugerir una mejora o ver el informe || Report a bug, suggest an improvement or see the report || Segnala un bug, suggerisci un miglioramento o vedi il resoconto
+Contar un fallo o sugerir una mejora || Report a bug or suggest an improvement || Segnala un bug o suggerisci un miglioramento
+⚠ Contar un fallo || ⚠ Report a bug || ⚠ Segnala un bug
+Algo no funciona como debería. || Something doesn't work as it should. || Qualcosa non funziona come dovrebbe.
+💡 Sugerir una mejora || 💡 Suggest an improvement || 💡 Suggerisci un miglioramento
+Algo que falta o que se puede hacer mejor. || Something missing or that could be better. || Qualcosa che manca o che si può fare meglio.
+📋 Ver el informe || 📋 See the report || 📋 Vedi il resoconto
+Todo lo recogido, y cómo exportarlo. || Everything collected, and how to export it. || Tutto ciò che è stato raccolto, e come esportarlo.
+⚠ Un fallo || ⚠ A bug || ⚠ Un bug
+💡 Una idea || 💡 An idea || 💡 Un'idea
+PASOS PARA REPRODUCIRLO (opcional) || STEPS TO REPRODUCE (optional) || PASSI PER RIPRODURLO (facoltativo)
+Cancelar || Cancel || Annulla
+EN QUÉ APLICACIÓN || WHICH APP || IN QUALE APP
+EN UNA LÍNEA || IN ONE LINE || IN UNA RIGA
+Contar un fallo || Report a bug || Segnala un bug
+Sugerir una mejora || Suggest an improvement || Suggerisci un miglioramento
+Enviando… || Sending… || Invio…
+¡Enviado! Gracias. || Sent! Thanks. || Inviato! Grazie.
+No se pudo enviar: || Could not send: || Invio non riuscito:
+⤓ Descargar || ⤓ Download || ⤓ Scarica
+Sin sesión || Not signed in || Senza sessione
+Fallo || Bug || Bug
+Sugerencia || Suggestion || Suggerimento
+Fallos y sugerencias pendientes || Pending bugs and suggestions || Bug e suggerimenti in sospeso
+Ya resueltos || Already solved || Già risolti
+Alguien || Someone || Qualcuno
+Esa partida ya no existe. || That game no longer exists. || Quella partita non esiste più.
+Esa partida ya terminó. || That game is already over. || Quella partita è già finita.
+La sala está llena. || The room is full. || La stanza è piena.
+Equipo || Team || Squadra
+← Todos los juegos || ← All games || ← Tutti i giochi
+RÉCORD PERSONAL || PERSONAL BEST || RECORD PERSONALE
+Pausar || Pause || Pausa
+Elige un modo y comienza. || Pick a mode and start. || Scegli una modalità e inizia.
+Continuar || Continue || Continua
+En pausa. || Paused. || In pausa.
+Jugar otra vez ↗ || Play again ↗ || Gioca ancora ↗
+Ver tablero || See board || Vedi tavoliere
+Reintentar || Retry || Riprova
+Tu color || Your colour || Il tuo colore
+✎ Personalizar || ✎ Customize || ✎ Personalizza
+← Volver || ← Back || ← Indietro
+🔗 Copiar enlace || 🔗 Copy link || 🔗 Copia link
+✓ Copiado || ✓ Copied || ✓ Copiato
+Personaliza tu perfil || Customize your profile || Personalizza il tuo profilo
+Vista previa || Preview || Anteprima
+Cambiar foto || Change photo || Cambia foto
+Usar la de Google || Use Google's || Usa quella di Google
+Quitar la foto || Remove photo || Rimuovi foto
+Partidas || Games || Partite
+Victorias || Wins || Vittorie
+Récords || Records || Record
+Partidas del club || Club games || Partite del club
+Podios || Podiums || Podi
+Recompensa diaria || Daily reward || Ricompensa giornaliera
+TUS MONEDAS || YOUR COINS || LE TUE MONETE
+Top de monedas || Coin leaderboard || Classifica monete
+Cómo se ganan || How to earn them || Come si guadagnano
+En qué se gastan || What to spend them on || Come si spendono
+Sobre de PRODROP || PRODROP pack || Bustina PRODROP
+Graduar una carta || Grade a card || Valuta una carta
+Sobre gratis || Free pack || Bustina gratis
+cada 6 horas || every 6 hours || ogni 6 ore
+🎯 Tu desafío || 🎯 Your challenge || 🎯 La tua sfida
+Tienes || You have || Hai
+Cargando logros… || Loading achievements… || Carico gli obiettivi…
+✓ tuyo || ✓ yours || ✓ tuo
+Sin música || No music || Senza musica
+Música · auto || Music · auto || Musica · auto
+Sonando: || Playing: || In riproduzione:
+Elegir música || Choose music || Scegli la musica
+Automático || Automatic || Automatico
+Reproductor de música || Music player || Lettore musicale
+En pausa || Paused || In pausa
+Sonando || Playing || In riproduzione
+Logros || Achievements || Obiettivi
+Clasificación || Leaderboard || Classifica
+Monedas || Coins || Monete
+🪙 Monedas || 🪙 Coins || 🪙 Monete
+Sobres || Packs || Bustine
+Perfil || Profile || Profilo
+Salir || Sign out || Esci
+Entrar con Google || Sign in with Google || Accedi con Google
+Iniciar sesión con Google || Sign in with Google || Accedi con Google
+Empezar || Start || Inizia
+Esperando jugadores… || Waiting for players… || In attesa di giocatori…
+Esperando || Waiting || In attesa
+Jugando || Playing || In gioco
+Terminada || Finished || Terminata
+Tu turno || Your turn || Tocca a te
+Turno de {} || {}'s turn || Turno di {}
+Escribe un mensaje… || Write a message… || Scrivi un messaggio…
+Enviar || Send || Invia
+Cerrar || Close || Chiudi
+Entendido || Got it || Capito
+Guardar || Save || Salva
+Borrar || Delete || Elimina
+Aceptar || OK || OK
+Sí || Yes || Sì
+No || No || No
+Volver || Back || Indietro
+Siguiente || Next || Avanti
+Anterior || Previous || Precedente
+Cargando… || Loading… || Caricamento…
+Puntos || Points || Punti
+puntos || points || punti
+monedas || coins || monete
+espectador || spectator || spettatore
+Espectadores || Spectators || Spettatori
+Pasar || Pass || Passa
+Robar || Draw || Pesca
+Plantarse || Stay || Stai
+Pedir carta || Hit || Chiedi carta
+Rendirse || Resign || Arrenditi
+Ofrecer tablas || Offer a draw || Offri patta

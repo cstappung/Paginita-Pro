@@ -47,4 +47,29 @@ for (const page of PAGES) {
   console.log(`stamp-version: ${page.bundle}?v=${v}`);
 }
 
+/* i18n.js y su diccionario (i18n-datos.js hereda este mismo ?v=) van en
+   todas las páginas, también en las de los juegos que viven en un iframe,
+   con la ruta relativa que les toque. */
+const I18N_PAGINAS = [
+  "Inicio.dc.html", "index.html", "colabtex.html", "colabdraw.html", "informes.html",
+  "juegos.html", "CSV Oscilloscope.dc.html", "Filtros.dc.html", "Ajustes.dc.html",
+  ...["juegos", "juegos/club"].flatMap((d) =>
+    fs.readdirSync(path.join(ROOT, d), { withFileTypes: true })
+      .filter((e) => e.isDirectory() && fs.existsSync(path.join(ROOT, d, e.name, "index.html")))
+      .map((e) => d + "/" + e.name + "/index.html"))
+];
+for (const html of I18N_PAGINAS) {
+  const file = path.join(ROOT, html);
+  const src = fs.readFileSync(file, "utf8");
+  const patron = /src="((?:\.\.\/)*)i18n\.js(\?v=[^"]*)?"/;
+  if (!patron.test(src)) {
+    console.error(`stamp-version: no se encontró la etiqueta de i18n.js en ${html}`);
+    failed = true;
+    continue;
+  }
+  const out = src.replace(patron, (_, pre) => `src="${pre}i18n.js?v=${v}"`);
+  if (out !== src) fs.writeFileSync(file, out);
+}
+console.log(`stamp-version: i18n.js?v=${v} en ${I18N_PAGINAS.length} páginas`);
+
 if (failed) process.exit(1);

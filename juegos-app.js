@@ -1301,7 +1301,7 @@ Te quedar\xE1n ${A(Q-5e3)}. Es para siempre.`)){y=!0,S("");try{await r(x.id),a=O
     <div class="jg-fin-m">Se arregla una sola vez: copia el archivo
       <code>firebase/database.rules.json</code> de este repositorio, p\xE9galo en la
       consola de Firebase en <b>Realtime Database \u2192 Reglas</b> y pulsa
-      <b>Publicar</b>. Est\xE1 contado en <code>firebase/CONFIGURAR-FIREBASE.md</code>.</div>`}async function vF(t){t.disabled=!0;let e=t.textContent;t.textContent="Copiando\u2026";try{let a=await fetch(Tj,{cache:"no-store"});if(!a.ok)throw new Error("HTTP "+a.status);await navigator.clipboard.writeText(await a.text()),t.textContent="Copiado \u2713",setTimeout(()=>{t.textContent==="Copiado \u2713"&&(t.textContent=e)},2500)}catch{t.textContent="\xC1brelo en otra pesta\xF1a \u2197",t.onclick=()=>window.open(Tj,"_blank","noopener")}t.disabled=!1}function XA(t,e){let a=document.getElementById("jgReglas");a&&a.remove();let n=document.createElement("div");n.id="jgReglas",n.className="jg-fin-capa",n.innerHTML=`<div class="jg-fin jg-fin-empate jg-reglas">
+      <b>Publicar</b>. Est\xE1 contado en <code>firebase/CONFIGURAR-FIREBASE.md</code>.</div>`}async function vF(t){t.disabled=!0;let e=t.textContent;t.textContent="Copiando\u2026";try{let a=await fetch(Tj,{cache:"no-store"});if(!a.ok)throw new Error("HTTP "+a.status);await navigator.clipboard.writeText(await a.text()),t.textContent="Copiado \u2713";let n=String(Date.now());t.dataset.copiado=n,setTimeout(()=>{t.dataset.copiado===n&&(delete t.dataset.copiado,t.textContent=e)},2500)}catch{t.textContent="\xC1brelo en otra pesta\xF1a \u2197",t.onclick=()=>window.open(Tj,"_blank","noopener")}t.disabled=!1}function XA(t,e){let a=document.getElementById("jgReglas");a&&a.remove();let n=document.createElement("div");n.id="jgReglas",n.className="jg-fin-capa",n.innerHTML=`<div class="jg-fin jg-fin-empate jg-reglas">
     <button class="jg-fin-x" title="Cerrar">\u2715</button>
     <div class="jg-fin-cara">\u{1F512}</div>
     <div class="jg-fin-t">Faltan reglas por publicar</div>
@@ -1328,7 +1328,7 @@ Te quedar\xE1n ${A(Q-5e3)}. Es para siempre.`)){y=!0,S("");try{await r(x.id),a=O
       <div id="jgFin"></div>
       </div><section class="jg-chat" id="jgChat" aria-label="Chat de la partida">
         <header><h2>Chat de la sala</h2><small>lo leen jugadores y espectadores</small></header>
-        <div class="jg-chat-lista" id="jgChatLista" aria-live="polite"></div>
+        <div class="jg-chat-lista" id="jgChatLista" aria-live="polite" translate="no"></div>
         <button class="jg-chat-abre" id="jgChatAbre" type="button" title="Escribir en el chat (Intro)" aria-label="Escribir en el chat">\u{1F4AC}</button>
         <form class="jg-chat-form" id="jgChatForm" autocomplete="off">
           <input class="inp" id="jgChatTxt" maxlength="${Ym}" placeholder="Escribe algo\u2026">

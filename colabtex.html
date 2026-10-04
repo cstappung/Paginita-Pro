@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
+<script src="i18n.js?v=202610040344"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ColabTeX — Editor LaTeX colaborativo</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -440,7 +441,8 @@
       </a>
       <nav class="dash-nav"><span class="active">Proyectos</span></nav>
       <div style="margin-left:auto;display:flex;align-items:center;gap:14px">
-        <span id="dashUserName" style="font-size:12px;color:#9fb5b2"></span>
+        <span data-i18n-selector></span>
+        <span id="dashUserName" translate="no" style="font-size:12px;color:#9fb5b2"></span>
         <span id="dashUserAvatar" class="user-avatar"></span>
         <button id="btnLogout" class="btn-ghost-dark" title="Cerrar sesión" style="font-size:12px">Salir</button>
       </div>
@@ -482,7 +484,7 @@
     <header class="ed-header">
       <button id="btnBackDash" class="btn-ghost-dark" title="Volver a proyectos">← Proyectos</button>
       <span class="vsep"></span>
-      <span id="edTitle"></span>
+      <span id="edTitle" translate="no"></span>
       <span id="syncBadge">Conectando…</span>
       <span id="readOnlyBadge" style="display:none">Solo lectura</span>
       <div class="ed-right">
@@ -755,6 +757,6 @@
   </div>
 </div>
 
-<script src="colabtex-app.js?v=202610030518"></script>
+<script src="colabtex-app.js?v=202610040344"></script>
 </body>
 </html>
