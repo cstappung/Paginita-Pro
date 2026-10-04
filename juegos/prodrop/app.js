@@ -24,20 +24,64 @@ const VARIANTS = [
     moves: [['Reflejo cegador', 30, 'El rival no puede atacar durante su próximo turno.'], ['Cabezazo pulido', 70]] },
   { key: 'simpson', type: 'Amarillo', icon: '◉', hp: 80, weak: '✎',
     moves: [["¡D'oh!", 30, 'Se golpea la frente. El rival se ríe tanto que pierde su próximo turno.'], ['Rosquilla glaseada', 60]] },
-  { key: 'gta' }, { key: 'cyberpunk' }, { key: 'casino' }, { key: 'shiny' },
+  { key: 'gta' }, { key: 'cyberpunk' }, { key: 'casino' }, { key: 'shiny' }, { key: 'starwars' },
 ].map(v => Object.assign(v, M.VARIANTS.find(x => x.key === v.key)));
 const hash = s => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
 
+/* Los componentes: el tipo, el ícono y la debilidad salen de la temática
+   (las comunes y las raras llevan marco), y los ataques del componente. */
+const TEMA_V = {
+  realista: { type: 'Eléctrico', icon: 'Ω', weak: '◐' },
+  bioware: { type: 'Orgánico', icon: '✺', weak: '▦' },
+  esquematico: { type: 'Plano', icon: '⌁', weak: '✺' },
+  pixelart: { type: '8 bits', icon: '▦', weak: 'Ω' },
+  void: { type: 'Vacío', icon: '◐', weak: '✠' },
+  belico: { type: 'Blindado', icon: '✠', weak: '⌁' },
+};
+const ATAQUES = {
+  'resistencia': [['Ley de Ohm', 20, 'Divide el daño del próximo ataque rival por su resistencia. Redondea hacia abajo.'], ['Disipación térmica', 40]],
+  'condensador-electrolitico': [['Carga acumulada', 10, 'Guarda energía: su próximo ataque hace 30 más. Conectado al revés, explota.'], ['Descarga súbita', 60]],
+  'inductor-toroidal': [['Oposición al cambio', 20, 'El rival no puede cambiar de carta durante su próximo turno.'], ['Fuerza contraelectromotriz', 50]],
+  'led': [['Destello', 10, 'Lanza una moneda. Si sale cara, el rival queda encandilado y no ataca.'], ['Rayo de 20 mA', 40]],
+  'transistor-bjt': [['Amplificación β', 20, 'Si el rival tiene menos de 30 PS, este ataque hace 100 veces más.'], ['Saturación', 50]],
+  'mosfet-potencia': [['Conmutación rápida', 30, 'Ataca dos veces si la puerta del rival quedó abierta.'], ['Avalancha', 70]],
+  'timer-555': [['Modo astable', 20, 'Repite este ataque cada turno sin gastar energía.'], ['Pulso monoestable', 50]],
+  'microcontrolador': [['Interrupción', 20, 'Detiene el turno del rival para atender esta carta primero.'], ['Bucle infinito', 60]],
+  'fotoresistencia-ldr': [['Ojo de cadmio', 10, 'En la oscuridad su resistencia sube a un megaohm: no recibe daño.'], ['Apagón', 40]],
+  'sensor-ultrasonico': [['Eco a 40 kHz', 20, 'Ve al rival aunque esté boca abajo.'], ['Trig y echo', 40]],
+  'condensador-ceramico': [['Desacople', 10, 'Quita el ruido: anula el efecto del último ataque rival.'], ['104 nF', 30]],
+  'potenciometro': [['Girar la perilla', 20, 'Elige el daño de este ataque, de 0 a 60.'], ['Divisor de voltaje', 40]],
+  'cristal-oscilador': [['Piezoeléctrico', 20, 'Vibra 16 millones de veces por segundo: el rival queda mareado.'], ['Reloj preciso', 50]],
+  'diodo-rectificador': [['Media onda', 20, 'Durante el próximo turno solo recibe daño en un sentido.'], ['Puente de Graetz', 60]],
+  'mosfet-sic-to247': [['Banda ancha', 40, 'Aguanta el calor: no le afecta Quemado.'], ['Bloqueo de 1200 V', 80]],
+  'gate-driver': [['Bootstrap', 20, 'Le presta voltaje a un MOSFET aliado: su próximo ataque hace 40 más.'], ['Tiempo muerto', 50]],
+  'amplificador-operacional': [['Tierra virtual', 20, 'El rival pierde su referencia y ataca al azar.'], ['Lazo abierto', 70]],
+  'regulador-7805': [['Cinco voltios firmes', 30, 'Ningún ataque deja sus PS por debajo de 5.'], ['Disipador caliente', 40]],
+  'esp32': [['Wi-Fi y Bluetooth', 30, 'Mira la mano del rival: se conectó sin pedir permiso.'], ['Doble núcleo', 60]],
+  'transformador-laminado': [['Relación de vueltas', 30, 'Duplica o divide a la mitad el daño que recibe. Tú eliges.'], ['Corrientes de Foucault', 70]],
+  'transformador-ferrita': [['Alta frecuencia', 30, 'Ataca cien mil veces por segundo, pero muy despacito.'], ['Flyback', 60]],
+  'sensor-temperatura-humedad': [['Punto de rocío', 10, 'Moja al rival. Si es un Relé, se oxida.'], ['Lectura cada 2 s', 30]],
+  'sensor-pir': [['Detección de movimiento', 20, 'Si el rival se mueve, se prende la luz del pasillo.'], ['Lente de Fresnel', 40]],
+  'rele': [['Clic', 20, 'Hace clic. Es muy satisfactorio.'], ['Contacto NA', 50]],
+  'sensor-imu': [['Giroscopio', 20, 'Sabe dónde está el rival aunque gire.'], ['Caída libre', 50]],
+};
 const CARDS = M.CARDS.map(m => {
+  if (m.col === 'comp') {
+    const te = TEMA_V[m.vkey] || {}, h = hash(m.person + m.vkey);
+    const v = { key: m.vkey, label: m.vlabel, type: te.type, icon: te.icon, weak: te.weak, moves: ATAQUES[m.person] };
+    return Object.assign({}, m, { v, hp: (m.tier ? 80 : 50) + (h % 4) * 10, retreat: 1 + (h % 3) });
+  }
   const v = VARIANTS.find(x => x.key === m.vkey), h = hash(m.person + v.key);
-  return { uid: m.uid, n: m.n, num: m.num, name: m.name, v, tier: m.tier, img: m.img,
-    shiny: m.shiny, hp: (v.hp || 0) + (h % 3) * 10, retreat: 1 + (h % 3) };
+  return Object.assign({}, m, { v, hp: (v.hp || 0) + (h % 3) * 10, retreat: 1 + (h % 3) });
 });
 const TOTAL = CARDS.length;
+// cada colección numera sus cartas: N.º 12/170 en los profes, N.º 12/275 en componentes
+const totalDe = c => M.POR_COL[c.col].length;
+const COLS = M.COLECCIONES;
 const pad = n => String(n).padStart(3, '0');
-const subtitle = c => c.tier === 3 ? `Shiny ${c.shiny[0]}` : c.v.label;
+const subtitle = c => M.subtitulo(c);
 // Colores dominantes de cada imagen épica/legendaria (extraídos de las imágenes)
-const PAL = {"angel-abusleme-gta":["#066cf7","#ffe871","#f7461f"],"angel-abusleme-shiny":["#42f77c","#f79963"],"christian-oberli-gta":["#67abf7","#fff27b","#f73618"],"christian-oberli-shiny":["#ff7b86","#f7dd78"],"claudia-prieto-gta":["#ff4c61","#71efff","#ff6300"],"claudia-prieto-shiny":["#f72000","#ffb90c"],"cristian-garces-gta":["#59d7ff","#f72a0f","#ffdb53"],"cristian-garces-shiny":["#64bcf7","#f774a5"],"cristian-tejos-gta":["#77d9ff","#f76203","#7183f7"],"cristian-tejos-shiny":["#f7cd00","#6fa3f7","#f7483c"],"david-watts-gta":["#74ddff","#ffdf6b","#f74134"],"david-watts-shiny":["#f77300"],"felipe-nunez-gta":["#6eb0f7","#ffde7c","#f76183"],"felipe-nunez-shiny":["#09ecf7","#f720d2","#205cf7"],"felix-rojasv2-gta":["#6ad4ff","#6a87f7","#f7d263"],"felix-rojasv2-shiny":["#9e4bf7","#f76177","#f76fde"],"javier-pereda-torres-gta":["#46daff","#5e8ef7","#ffde65"],"javier-pereda-torres-shiny":["#114bf7","#8720f7","#ff5e58"],"marilyn-cruces-gta":["#00e7ff","#ff8900","#ebf765"],"marilyn-cruces-shiny":["#00bbf7","#f72514","#6990f7"],"mario-gac-gta":["#3be0ff","#f7da5c","#f75344"],"mario-gac-shiny":["#f7695b"],"miguel-gutierrez-gta":["#ffdf72","#f75c4f"],"miguel-gutierrez-shiny":["#f70075","#3102f7","#15f700"],"pablo-irarrazaval-gta":["#64a4f7","#ffdf6a","#f72518"],"pablo-irarrazaval-shiny":["#75f700","#00c3f7","#f7cb17"],"rene-botnar-gta":["#58a4f7","#ffdb5d","#f73c2b"],"rene-botnar-shiny":["#f76c00","#f7000c"],"rodrigo-cadiz-gta":["#57e1ff","#ffde65","#f7311d"],"rodrigo-cadiz-shiny":["#00c7f7","#3e79f7","#00f78f"],"rolando-dunner-gta":["#57a5f7","#f7d157","#f76274"],"rolando-dunner-shiny":["#ff798b","#f7d44e"],"tito-arevalo-gta":["#f7425a","#ffdd60","#85d7ff"],"tito-arevalo-shiny":["#f83c44","#85ffeb"],"angel-abusleme-casino":["#f78347"],"christian-oberli-casino":["#f7875e","#f741c5"],"claudia-prieto-casino":["#f79c63"],"cristian-garces-casino":["#f79463"],"cristian-tejos-casino":["#f79863","#3780f7"],"david-watts-casino":["#f79960"],"felipe-nunez-casino":["#f77644"],"felix-rojasv2-casino":["#f79763","#f752bb"],"javier-pereda-torres-casino":["#f7915d"],"marilyn-cruces-casino":["#f78351"],"mario-gac-casino":["#f76d29"],"miguel-gutierrez-casino":["#46b5f7","#c356f7","#f78163"],"pablo-irarrazaval-casino":["#f79657"],"rene-botnar-casino":["#f79863","#5495f7"],"rodrigo-cadiz-casino":["#f79a63"],"rolando-dunner-casino":["#f79a56"],"tito-arevalo-casino":["#f78d5e"],"angel-abusleme-cyberpunk":["#4d92f7","#f78563"],"christian-oberli-cyberpunk":["#f78852","#5dd2f7"],"claudia-prieto-cyberpunk":["#f78663","#f763d2","#8a63f7"],"cristian-garces-cyberpunk":["#f79063","#7cf763"],"cristian-tejos-cyberpunk":["#f79063","#6397f7","#63f7eb"],"david-watts-cyberpunk":["#f79963"],"felipe-nunez-cyberpunk":["#f77c5f"],"felix-rojasv2-cyberpunk":["#f78d5d","#4dd1f7"],"javier-pereda-torres-cyberpunk":["#f78e5a","#6394f7"],"marilyn-cruces-cyberpunk":["#f77d63","#639bf7"],"mario-gac-cyberpunk":["#f79d5b"],"miguel-gutierrez-cyberpunk":["#f78963","#c158f7","#e7f74f"],"pablo-irarrazaval-cyberpunk":["#f79163","#63d8f7"],"rene-botnar-cyberpunk":["#f78263","#63bef7"],"rodrigo-cadiz-cyberpunk":["#f7885c","#cd5bf7"],"rolando-dunner-cyberpunk":["#637af7"],"tito-arevalo-cyberpunk":["#f77a63","#c263f7"]};
+const PAL = {"angel-abusleme-gta":["#066cf7","#ffe871","#f7461f"],"angel-abusleme-shiny":["#42f77c","#f79963"],"christian-oberli-gta":["#67abf7","#fff27b","#f73618"],"christian-oberli-shiny":["#ff7b86","#f7dd78"],"claudia-prieto-gta":["#ff4c61","#71efff","#ff6300"],"claudia-prieto-shiny":["#f72000","#ffb90c"],"cristian-garces-gta":["#59d7ff","#f72a0f","#ffdb53"],"cristian-garces-shiny":["#64bcf7","#f774a5"],"cristian-tejos-gta":["#77d9ff","#f76203","#7183f7"],"cristian-tejos-shiny":["#f7cd00","#6fa3f7","#f7483c"],"david-watts-gta":["#74ddff","#ffdf6b","#f74134"],"david-watts-shiny":["#f77300"],"felipe-nunez-gta":["#6eb0f7","#ffde7c","#f76183"],"felipe-nunez-shiny":["#09ecf7","#f720d2","#205cf7"],"felix-rojasv2-gta":["#6ad4ff","#6a87f7","#f7d263"],"felix-rojasv2-shiny":["#9e4bf7","#f76177","#f76fde"],"javier-pereda-torres-gta":["#46daff","#5e8ef7","#ffde65"],"javier-pereda-torres-shiny":["#114bf7","#8720f7","#ff5e58"],"marilyn-cruces-gta":["#00e7ff","#ff8900","#ebf765"],"marilyn-cruces-shiny":["#00bbf7","#f72514","#6990f7"],"mario-gac-gta":["#3be0ff","#f7da5c","#f75344"],"mario-gac-shiny":["#f7695b"],"miguel-gutierrez-gta":["#ffdf72","#f75c4f"],"miguel-gutierrez-shiny":["#f70075","#3102f7","#15f700"],"pablo-irarrazaval-gta":["#64a4f7","#ffdf6a","#f72518"],"pablo-irarrazaval-shiny":["#75f700","#00c3f7","#f7cb17"],"rene-botnar-gta":["#58a4f7","#ffdb5d","#f73c2b"],"rene-botnar-shiny":["#f76c00","#f7000c"],"rodrigo-cadiz-gta":["#57e1ff","#ffde65","#f7311d"],"rodrigo-cadiz-shiny":["#00c7f7","#3e79f7","#00f78f"],"rolando-dunner-gta":["#57a5f7","#f7d157","#f76274"],"rolando-dunner-shiny":["#ff798b","#f7d44e"],"tito-arevalo-gta":["#f7425a","#ffdd60","#85d7ff"],"tito-arevalo-shiny":["#f83c44","#85ffeb"],"angel-abusleme-casino":["#f78347"],"christian-oberli-casino":["#f7875e","#f741c5"],"claudia-prieto-casino":["#f79c63"],"cristian-garces-casino":["#f79463"],"cristian-tejos-casino":["#f79863","#3780f7"],"david-watts-casino":["#f79960"],"felipe-nunez-casino":["#f77644"],"felix-rojasv2-casino":["#f79763","#f752bb"],"javier-pereda-torres-casino":["#f7915d"],"marilyn-cruces-casino":["#f78351"],"mario-gac-casino":["#f76d29"],"miguel-gutierrez-casino":["#46b5f7","#c356f7","#f78163"],"pablo-irarrazaval-casino":["#f79657"],"rene-botnar-casino":["#f79863","#5495f7"],"rodrigo-cadiz-casino":["#f79a63"],"rolando-dunner-casino":["#f79a56"],"tito-arevalo-casino":["#f78d5e"],"angel-abusleme-cyberpunk":["#4d92f7","#f78563"],"christian-oberli-cyberpunk":["#f78852","#5dd2f7"],"claudia-prieto-cyberpunk":["#f78663","#f763d2","#8a63f7"],"cristian-garces-cyberpunk":["#f79063","#7cf763"],"cristian-tejos-cyberpunk":["#f79063","#6397f7","#63f7eb"],"david-watts-cyberpunk":["#f79963"],"felipe-nunez-cyberpunk":["#f77c5f"],"felix-rojasv2-cyberpunk":["#f78d5d","#4dd1f7"],"javier-pereda-torres-cyberpunk":["#f78e5a","#6394f7"],"marilyn-cruces-cyberpunk":["#f77d63","#639bf7"],"mario-gac-cyberpunk":["#f79d5b"],"miguel-gutierrez-cyberpunk":["#f78963","#c158f7","#e7f74f"],"pablo-irarrazaval-cyberpunk":["#f79163","#63d8f7"],"rene-botnar-cyberpunk":["#f78263","#63bef7"],"rodrigo-cadiz-cyberpunk":["#f7885c","#cd5bf7"],"rolando-dunner-cyberpunk":["#637af7"],"tito-arevalo-cyberpunk":["#f77a63","#c263f7"],"angel-abusleme-starwars":["#ed6822"],"christian-oberli-starwars":["#eb7113"],"claudia-prieto-starwars":["#f0764b"],"cristian-garces-starwars":["#ef8043"],"cristian-tejos-starwars":["#f0944b"],"david-watts-starwars":["#f08f4b"],"felipe-nunez-starwars":["#eb4f13"],"felix-rojasv2-starwars":["#eb131e"],"javier-pereda-torres-starwars":["#f0884b"],"marilyn-cruces-starwars":["#1363eb"],"mario-gac-starwars":["#f09049"],"miguel-gutierrez-starwars":[],"pablo-irarrazaval-starwars":["#ed4f20"],"rene-botnar-starwars":[],"rodrigo-cadiz-starwars":[],"rolando-dunner-starwars":[],"tito-arevalo-starwars":["#ed5026","#eb1315"],"resistencia-halloween":["#f64608"],"condensador-electrolitico-halloween":["#eb2e13","#ebf04b"],"inductor-toroidal-halloween":["#eb5713"],"led-halloween":["#eb3513","#eb1329"],"transistor-bjt-halloween":["#eb3d13"],"mosfet-potencia-halloween":["#eb4413"],"timer-555-halloween":["#eb5613"],"microcontrolador-halloween":["#eb5913"],"fotoresistencia-ldr-halloween":["#eb3313","#f0a24b"],"sensor-ultrasonico-halloween":["#eb4013"],"condensador-ceramico-halloween":["#eb5113"],"potenciometro-halloween":["#eb5013"],"cristal-oscilador-halloween":["#eb131e","#f08e47","#eb1713"],"diodo-rectificador-halloween":["#eb4e13"],"mosfet-sic-to247-halloween":["#eb5a13"],"gate-driver-halloween":["#eb4813"],"amplificador-operacional-halloween":["#eb4413"],"regulador-7805-halloween":["#ed8a25","#9ceb13"],"esp32-halloween":["#eb2213","#f0b44b"],"transformador-laminado-halloween":["#ec7f1b"],"transformador-ferrita-halloween":["#edef43","#eb4e13"],"sensor-temperatura-humedad-halloween":["#ec4819"],"sensor-pir-halloween":["#f08a4b","#eb1318"],"rele-halloween":["#076ef7","#eb3713","#eb131d"],"sensor-imu-halloween":["#eb4413","#fab041"],"resistencia-dieciochero":["#eb5113","#499cf0","#eba313"],"condensador-electrolitico-dieciochero":["#eb5113"],"inductor-toroidal-dieciochero":["#eb5e13","#eb131a"],"led-dieciochero":["#eb6a13","#f30e0b"],"transistor-bjt-dieciochero":["#f0984b","#eb1314"],"mosfet-potencia-dieciochero":["#f09c4b","#eb131c"],"timer-555-dieciochero":["#f09c4b","#4b96f0","#eb1913"],"microcontrolador-dieciochero":["#f0944b","#ec2716","#eb1318"],"fotoresistencia-ldr-dieciochero":["#f0924b","#4b90f0"],"sensor-ultrasonico-dieciochero":["#eb3d13","#4b92f0"],"condensador-ceramico-dieciochero":["#f0924b"],"potenciometro-dieciochero":["#ee8139"],"cristal-oscilador-dieciochero":["#eb5a13"],"diodo-rectificador-dieciochero":["#eb6b13","#4396ef"],"mosfet-sic-to247-dieciochero":["#f09e4b","#eb1315"],"gate-driver-dieciochero":["#eb5813","#eb1317"],"amplificador-operacional-dieciochero":["#f0994b","#eb131a"],"regulador-7805-dieciochero":["#eb4b13"],"esp32-dieciochero":["#f09a4b","#eb1315"],"transformador-laminado-dieciochero":["#eb8913","#eb2913","#eb1317"],"transformador-ferrita-dieciochero":["#eb5413","#f0cf4b"],"sensor-temperatura-humedad-dieciochero":["#ed4925"],"sensor-pir-dieciochero":["#ebb013","#eb131a","#eb2513"],"rele-dieciochero":["#f0a04b","#047efa","#eb2a13"],"sensor-imu-dieciochero":["#096ef5","#f83233","#ec3f1a"],"resistencia-arcano":["#eb4c13"],"condensador-electrolitico-arcano":["#eb5d13","#1330eb"],"inductor-toroidal-arcano":["#f0874b","#4b71f0"],"led-arcano":["#eb5f13"],"transistor-bjt-arcano":["#ee7134"],"mosfet-potencia-arcano":["#eb5e13"],"timer-555-arcano":["#ec781e"],"microcontrolador-arcano":["#ef803d"],"fotoresistencia-ldr-arcano":["#f08949"],"sensor-ultrasonico-arcano":["#2865ed","#eb6a13"],"condensador-ceramico-arcano":["#ec791e"],"potenciometro-arcano":["#eb5c13"],"cristal-oscilador-arcano":[],"diodo-rectificador-arcano":["#eb4e13"],"mosfet-sic-to247-arcano":["#eb5b13"],"gate-driver-arcano":["#ec7d20","#1352eb"],"amplificador-operacional-arcano":["#eb5d13"],"regulador-7805-arcano":["#eb5813"],"esp32-arcano":["#f0994b"],"transformador-laminado-arcano":["#f0ac4a","#1351eb"],"transformador-ferrita-arcano":["#c544ef","#f04b64","#fcd53f"],"sensor-temperatura-humedad-arcano":["#f07e4b","#eb1324"],"sensor-pir-arcano":["#eb4313","#eb1319"],"rele-arcano":["#1373eb","#eb6013"],"sensor-imu-arcano":["#ed8a23","#1366eb"],"resistencia-quemado":["#eb3813"],"condensador-electrolitico-quemado":["#eb3213"],"inductor-toroidal-quemado":["#eb1f13"],"led-quemado":["#eb1913","#eb1328"],"transistor-bjt-quemado":["#eb2213"],"mosfet-potencia-quemado":["#eb1813"],"timer-555-quemado":["#eb2813"],"microcontrolador-quemado":[],"fotoresistencia-ldr-quemado":["#eb3913"],"sensor-ultrasonico-quemado":["#eb1e13"],"condensador-ceramico-quemado":["#eb4213","#eb131c"],"potenciometro-quemado":[],"cristal-oscilador-quemado":["#eb3c13"],"diodo-rectificador-quemado":["#eb1330"],"mosfet-sic-to247-quemado":[],"gate-driver-quemado":[],"amplificador-operacional-quemado":["#eb4c13"],"regulador-7805-quemado":["#eb4313"],"esp32-quemado":["#eb5913"],"transformador-laminado-quemado":["#eb4513"],"transformador-ferrita-quemado":["#eb9413","#eb4413"],"sensor-temperatura-humedad-quemado":["#f0a24b","#eb3513"],"sensor-pir-quemado":["#eb5b13"],"rele-quemado":["#1374eb","#eb131f"],"sensor-imu-quemado":["#eb1713"],"resistencia-navidad":["#f0604b","#1367eb"],"condensador-electrolitico-navidad":["#eb7313","#eb1c13"],"inductor-toroidal-navidad":["#eb6013"],"led-navidad":["#eb7613","#eb2213"],"transistor-bjt-navidad":["#f0904b","#eb1e13"],"mosfet-potencia-navidad":["#eb5213"],"timer-555-navidad":["#eb5713"],"microcontrolador-navidad":["#ec6a17"],"fotoresistencia-ldr-navidad":["#eb5a13"],"sensor-ultrasonico-navidad":["#eb5e13"],"condensador-ceramico-navidad":["#eb8213","#eb2513"],"potenciometro-navidad":["#eb7013"],"cristal-oscilador-navidad":[],"diodo-rectificador-navidad":["#eb6013"],"mosfet-sic-to247-navidad":["#138beb","#f0824b"],"gate-driver-navidad":["#eb5d13"],"amplificador-operacional-navidad":["#f0864b","#eb1314"],"regulador-7805-navidad":["#eb5513"],"esp32-navidad":["#f0964b","#eb2413"],"transformador-laminado-navidad":["#efa844","#ec2112"],"transformador-ferrita-navidad":["#f0514b","#fddc3e","#f0954b"],"sensor-temperatura-humedad-navidad":["#eb3813"],"sensor-pir-navidad":["#f07e4b"],"rele-navidad":["#067cf8","#ee8131","#eb1a13"],"sensor-imu-navidad":["#eb5813","#1375eb"]};
 const paletteOf = c => {
   const p = [...(PAL[c.uid] || [])], a = accentOf(c);
   if (!p.length) p.push(a);
@@ -45,7 +89,7 @@ const paletteOf = c => {
   if (p.length < 3) p.push('#ffffff');
   return p;
 };
-const accentOf = c => c.tier === 3 ? c.shiny[1] : c.tier === 2 ? '#d49bff' : TIERS[c.tier].color;
+const accentOf = c => M.acento(c);
 
 /* ---------------- ESTADO DE LA CARTA (nota oculta 1..10) ----------------
    Cada carta sale con una nota que no se muestra: solo se nota por el desgaste
@@ -168,10 +212,13 @@ function bestCopy(uid) {
 function updateColCount() { $('#colCount').textContent = `${ownedCount()}/${TOTAL}`; }
 
 /* ---------------- RENDER DE CARTAS ---------------- */
-const backHTML = () => `<div class="face back"><div class="bk"><div class="bk-ring">✳</div><b>PRODROP</b></div></div>`;
+// el reverso es de la colección: el de componentes es una placa con un rayo
+const backHTML = c => c.col === 'comp'
+  ? `<div class="face back bk-comp"><div class="bk"><div class="bk-ring">ϟ</div><b>PRODROP</b></div></div>`
+  : `<div class="face back"><div class="bk"><div class="bk-ring">✳</div><b>PRODROP</b></div></div>`;
 
 function frontHTML(c, lazy) {
-  const t = TIERS[c.tier], v = c.v, no = `${pad(c.num)}/${TOTAL}`, ld = lazy ? ' loading="lazy"' : '';
+  const t = TIERS[c.tier], v = c.v, no = `${pad(c.num)}/${totalDe(c)}`, ld = lazy ? ' loading="lazy"' : '';
   const alt = `${c.name} — ${subtitle(c)}`;
   if (c.tier >= 2) {
     return `<div class="face front full ${t.key}" style="--accent:${accentOf(c)}">
@@ -183,7 +230,7 @@ function frontHTML(c, lazy) {
     </div>`;
   }
   const [m1, m2] = v.moves, nrg = `<i class="nrg">${v.icon}</i>`;
-  return `<div class="face front framed ${t.key} v-${v.key}">
+  return `<div class="face front framed ${t.key} v-${v.key} col-${c.col}">
     ${c.tier === 1 ? `<img class="fr-bg" src="${c.img}" alt="" draggable="false"${ld}><i class="fr-glass"></i>` : ''}
     <div class="fr-in"${offCenter(c)}>
       <div class="fr-head">
@@ -212,7 +259,7 @@ function slabHTML(c) {
   return {
     back: `<div class="slab-back"></div>`,
     front: `<div class="slab-label${g ? ` g${g}` : ''}" style="--gc:${g ? gradeColor(g) : '#fff'}">
-      <div class="sl-l"><small>PRODROP GRADING</small><b>${c.name}</b><span>S01 · #${pad(c.num)} · ${subtitle(c)}</span><i class="sl-code"></i></div>
+      <div class="sl-l"><small>PRODROP GRADING</small><b>${c.name}</b><span>${M.COL[c.col].serie} · #${pad(c.num)} · ${subtitle(c)}</span><i class="sl-code"></i></div>
       <div class="sl-r"><span class="g-word">${g ? GRADE_WORD[g] : ''}</span><b class="g-num">${g || ''}</b></div>
     </div><div class="slab-front"></div>`,
   };
@@ -230,7 +277,7 @@ function makeCard(c, { down = false, back = true, lazy = false } = {}) {
   if (c.tier >= 2) paletteOf(c).forEach((col, i) => el.style.setProperty(`--c${i + 1}`, col));
   if (c.grade && c.grade < 6) { el.classList.add('faded'); el.style.setProperty('--fade', (c.grade <= 3 ? .25 + (3 - c.grade) * .3 : (6 - c.grade) * .06).toFixed(2)); }
   const sl = c.grade ? slabHTML(c) : { back: '', front: '' };
-  el.innerHTML = `${auraFxHTML(c)}<div class="tilt">${sl.back}<div class="flip${down ? ' down' : ''}">${back ? backHTML() : ''}${frontHTML(c, lazy)}</div>${sl.front}</div>`;
+  el.innerHTML = `${auraFxHTML(c)}<div class="tilt">${sl.back}<div class="flip${down ? ' down' : ''}">${back ? backHTML(c) : ''}${frontHTML(c, lazy)}</div>${sl.front}</div>`;
   el.card = c;
   return el;
 }
@@ -247,6 +294,8 @@ const Aura = {
   cfg: {
     3: { flame: 170, smoke: 8, ember: 26, star: 5, burst: 110 },
     2: { mote: 14, star: 5, burst: 30 },
+    // las legendarias de Navidad no arden: les nieva alrededor
+    nieve: { snow: 34, star: 7, burst: 40, primero: 'snow' },
   },
   sprite(col, kind) {
     const key = kind + col;
@@ -268,7 +317,7 @@ const Aura = {
     if (REDUCED || el._aura || el.card.tier < 2) return;
     const fx = el.querySelector('.aura-fx'); if (!fx) return;
     const cv = document.createElement('canvas'); cv.className = 'af-canvas'; fx.prepend(cv);
-    el._aura = { cv, ctx: cv.getContext('2d'), parts: [], w: 0, h: 0, acc: {}, pal: paletteOf(el.card), tier: el.card.tier, fresh: true };
+    el._aura = { cv, ctx: cv.getContext('2d'), parts: [], w: 0, h: 0, acc: {}, pal: paletteOf(el.card), tier: el.card.vkey === 'navidad' ? 'nieve' : el.card.tier, fresh: true };
     this.cards.add(el);
     if (!this.raf) { this.last = performance.now(); this.raf = requestAnimationFrame(t => this.step(t)); }
   },
@@ -305,6 +354,11 @@ const Aura = {
       Object.assign(P, { x: e.x + e.nx * w * .06, y: e.y, vx: e.nx * rnd(10, 45) * k, vy: -rnd(110, 230) * k,
         life: rnd(.8, 1.6), r0: w * rnd(.025, .04), r1: w * .012, a: 1,
         spr: this.sprite(pick(pal), 'hot'), op: 'lighter' });
+    } else if (kind === 'snow') {   // copos que caen por delante y por los lados
+      const x = a.px + rnd(-.45, 1.45) * w;
+      Object.assign(P, { x, y: a.pt * rnd(.1, .6), vx: rnd(-6, 6) * k, vy: rnd(28, 60) * k,
+        life: rnd(2.4, 3.8), r0: w * rnd(.012, .03), r1: w * rnd(.012, .03), a: rnd(.6, .95),
+        spr: this.sprite(Math.random() < .7 ? '#ffffff' : pick(pal), 'soft'), op: 'lighter' });
     } else if (kind === 'mote') {
       const e = this.edge(a, 1, .5, .2);
       Object.assign(P, { x: e.x + e.nx * w * .1, y: e.y, vx: e.nx * rnd(8, 26) * k, vy: -rnd(18, 50) * k,
@@ -327,9 +381,9 @@ const Aura = {
       if (!w || !el.classList.contains('lit')) continue;           // oculto (overlay cerrado, etc.)
       if (w !== a.w || h !== a.h) this.resize(a, w, h);
       const k = w / 300, cfg = this.cfg[a.tier];
-      if (a.fresh) { a.fresh = false; for (let i = 0; i < cfg.burst; i++) this.spawn(a, a.tier === 3 ? 'flame' : 'mote', k * 1.6); }
+      if (a.fresh) { a.fresh = false; for (let i = 0; i < cfg.burst; i++) this.spawn(a, cfg.primero || (a.tier === 3 ? 'flame' : 'mote'), k * 1.6); }
       for (const kind in cfg) {
-        if (kind === 'burst') continue;
+        if (kind === 'burst' || kind === 'primero') continue;
         a.acc[kind] = (a.acc[kind] || 0) + cfg[kind] * dt * Math.max(.45, k);
         while (a.acc[kind] >= 1) { a.acc[kind]--; this.spawn(a, kind, k); }
       }
@@ -368,6 +422,7 @@ const Aura = {
           p.vx *= 1 - 1.4 * dt;
           if (p.kind === 'flame') p.vy -= 40 * k * dt;                         // el calor acelera hacia arriba
         } else if (p.kind === 'mote') p.vx += Math.sin(t * 1.7 + p.seed) * 14 * k * dt;
+        else if (p.kind === 'snow') p.vx = Math.sin(t * 1.3 + p.seed) * 12 * k;
         p.x += p.vx * dt; p.y += p.vy * dt;
       }
     }
@@ -523,6 +578,12 @@ function fxStep(t) {
   cx.clearRect(0, 0, W, H);
   for (let i = parts.length - 1; i >= 0; i--) {
     const p = parts[i];
+    // las de revela.js se pintan solas (rayos, anillos, nieve…) y dicen si siguen vivas
+    if (p.draw) {
+      cx.save(); const viva = p.draw(cx); cx.restore();
+      if (!viva) parts.splice(i, 1);
+      continue;
+    }
     if (p.k === 'in') {
       const px = p.x, py = p.y;
       p.x += (p.tx - p.x) * p.sp * dt * 1.6; p.y += (p.ty - p.y) * p.sp * dt * 1.6;
@@ -608,20 +669,32 @@ const TEAR_Y = 13; // % de la altura del sobre
   packTop.style.clipPath = `polygon(0% 0%, 100% 0%, ${[...pts].reverse().join(',')})`;
   packBottom.style.clipPath = `polygon(${pts.join(',')}, 100% 100%, 0% 100%)`;
 })();
-function skinHTML(fan) {
-  return `<div class="skin">
-    <div class="skin-rays"></div><div class="skin-foil"></div>
+/* El envoltorio de cada colección: el de los profes es el de siempre; el de
+   componentes es una placa de circuito con pistas de cobre. */
+const SKIN = {
+  profes: { badge: 'SERIE 01', sub: 'DIE COLLECTION', meta: '5 CARTAS · EDICIÓN HOLO' },
+  comp: { badge: 'SERIE 02', sub: 'COMPONENTES', meta: '5 CARTAS · EDICIÓN PCB' },
+};
+const fanDe = (col, tier = 2) => CARDS.filter(c => c.tier >= tier && c.col === col).sort(() => Math.random() - .5).slice(0, 3);
+function skinHTML(fan, col = coleccion) {
+  const k = SKIN[col] || SKIN.profes;
+  return `<div class="skin skin-${col}">
+    <div class="skin-rays"></div><div class="skin-foil"></div>${col === 'comp' ? '<div class="skin-pcb"></div>' : ''}
     <div class="crimp t"></div>
-    <div class="skin-badge">SERIE 01</div>
-    <div class="skin-logo">PRO<br>DROP<small>DIE COLLECTION</small></div>
+    <div class="skin-badge">${k.badge}</div>
+    <div class="skin-logo">PRO<br>DROP<small>${k.sub}</small></div>
     <div class="skin-fan">${fan.map(c => `<img src="${c.img}" alt="" draggable="false">`).join('')}</div>
-    <div class="skin-meta">5 CARTAS · EDICIÓN HOLO</div>
+    <div class="skin-meta">${k.meta}</div>
     <div class="skin-sheen"></div>
     <div class="crimp b"></div>
   </div>`;
 }
 
 let phase = 'pack', pull = [], els = [], current = 0, busy = false, tearP = 0, tearing = false, lastX = 0, lastTick = 0;
+/* La colección del sobre que se va a abrir. Al entrar se elige (se
+   recuerda la última para marcarla); «Cambiar sobre» vuelve a elegir. */
+let coleccion = 'profes';
+try { if (M.COL[localStorage.getItem('prodrop.coleccion')]) coleccion = localStorage.getItem('prodrop.coleccion'); } catch {}
 const setPhase = p => { phase = p; document.body.dataset.phase = p; };
 const hint = txt => { $('#hint').textContent = txt; };
 
@@ -655,8 +728,7 @@ function showPack(drop) {
   pintaKicker(n);
   pintaExtras(n);
   if (drop) {
-    const shinyFan = CARDS.filter(c => c.tier >= 2).sort(() => Math.random() - .5).slice(0, 3);
-    packTop.innerHTML = packBottom.innerHTML = skinHTML(shinyFan);
+    packTop.innerHTML = packBottom.innerHTML = skinHTML(fanDe(coleccion));
     [pack, packTop, $('#packLight')].forEach(e => e.getAnimations().forEach(a => a.cancel()));
     packTop.style.transform = ''; pack.hidden = false;
     pack.classList.remove('started', 'tearing');
@@ -680,14 +752,53 @@ function pintaExtras(n, forzar = true) {
   box.getAnimations({ subtree: true }).forEach(a => a.cancel());
   const pos = n === 2 ? [[-1, 0]] : n >= 3 ? [[-1, 0], [1, 1]] : [];
   box.innerHTML = pos.map(([lado, i]) => {
-    const fan = CARDS.filter(c => c.tier >= 1).sort(() => Math.random() - .5).slice(0, 3);
-    return `<div class="pack-extra" style="--lado:${lado};--i:${i}"><div class="pack-piece">${skinHTML(fan)}</div></div>`;
+    return `<div class="pack-extra" style="--lado:${lado};--i:${i}"><div class="pack-piece">${skinHTML(fanDe(coleccion, 1))}</div></div>`;
   }).join('');
   box.dataset.n = n;
 }
-const pintaKicker = n => { $('#kicker').textContent = n > 1 ? `${n} sobres · ${5 * n} cartas` : 'DIE COLLECTION · 5 cartas por sobre'; };
+const pintaKicker = n => { $('#kicker').textContent = n > 1 ? `${SKIN[coleccion].sub} · ${n} sobres · ${5 * n} cartas` : `${SKIN[coleccion].sub} · 5 cartas por sobre`; };
+/* ---------------- ELEGIR SOBRE ----------------
+   Lo primero al entrar: qué sobre abrir. Cada colección muestra tres de
+   sus mejores cartas, cuántas tienes de ella y qué trae. */
+function eligeSobre() {
+  setPhase('elige');
+  comprados = []; pull = []; abriendo = new Set();
+  rehazColeccion();
+  pack.hidden = true; stack.innerHTML = ''; $('#packExtras').innerHTML = '';
+  $('#summary').hidden = true; $('#tableView').hidden = true; $('#chooser').hidden = false;
+  hideBanner(); setTilt(null, null);
+  const box = $('#chooserPacks');
+  box.innerHTML = COLS.map(co => {
+    const todas = M.POR_COL[co.key], tengo = todas.filter(c => col[c.uid]).length, k = SKIN[co.key];
+    const temas = co.key === 'comp' ? '11 temáticas · Bioware, Pixel Art, Void, Arcano, Quemado, Navidad…' : 'Original, Simpson, GTA, Cyberpunk, Star Wars, Shiny…';
+    return `<button class="ch-pack${co.key === coleccion ? ' ultimo' : ''}" data-col="${co.key}">
+      <span class="ch-skin">${skinHTML(fanDe(co.key), co.key)}</span>
+      <b>${co.label}</b><small>${k.badge} · ${todas.length} cartas</small>
+      <small class="ch-temas">${temas}</small>
+      <span class="ch-tengo"><i style="width:${(tengo / todas.length * 100).toFixed(1)}%"></i></span><small>Tienes ${tengo}/${todas.length}</small>
+    </button>`;
+  }).join('');
+  box.querySelectorAll('[data-col]').forEach(b => {
+    b.onclick = () => {
+      coleccion = b.dataset.col; Snd.init(); Snd.flip();
+      try { localStorage.setItem('prodrop.coleccion', coleccion); } catch {}
+      tienda();
+    };
+    b.addEventListener('pointermove', e => {
+      const r = b.getBoundingClientRect();
+      b.style.setProperty('--mx', `${((e.clientX - r.left) / r.width * 100).toFixed(1)}%`);
+      b.style.setProperty('--my', `${((e.clientY - r.top) / r.height * 100).toFixed(1)}%`);
+    });
+  });
+  pintaCompra();
+  if (!REDUCED) [...box.children].forEach((b, i) => b.animate([{ transform: 'translateY(60px) rotate(-3deg)', opacity: 0 }, { transform: 'none', opacity: 1 }],
+    { duration: 700, delay: i * 110, easing: 'cubic-bezier(.2,1.25,.4,1)', fill: 'backwards' }));
+}
+$('#cambiaBtn').onclick = () => { if (phase === 'tienda' && !comprando) eligeSobre(); };
+$('#cambiaBtn2').onclick = () => { if (phase === 'summary' && !comprando) eligeSobre(); };
 function tienda(drop = true) {
   setPhase('tienda');
+  $('#chooser').hidden = true; $('#tableView').hidden = false;
   comprados = []; pull = []; abriendo = new Set();
   rehazColeccion();
   showPack(drop);
@@ -695,6 +806,8 @@ function tienda(drop = true) {
   pintaCompra();
 }
 function newPacks(lista, drop = true) {
+  coleccion = M.coleccionDe(lista[0].k);   // un sobre retomado puede ser de la otra colección
+  $('#chooser').hidden = true;
   comprados = lista.map(({ k, at }) => ({ k, at, dios: M.sobre(cuenta.uid, k, at).dios }));
   abriendo = new Set(); rehazColeccion();
   const antes = new Set(Object.keys(col)), vistas = new Set();
@@ -893,25 +1006,15 @@ function shakeFrames(strength, n = 26) {
 
 async function reveal(el) {
   busy = true;
-  const c = el.card, t = c.tier, [x, y, r] = centerOf(el), pl = t >= 2 ? paletteOf(c) : [], colors = t >= 2 ? [...pl, '#fff'] : [accentOf(c), '#fff', TIERS[t].color];
+  const c = el.card, t = c.tier, [x, y, r] = centerOf(el), pl = t >= 2 ? paletteOf(c) : [];
   setTilt(null, null);
   const tl = el.querySelector('.tilt'); tl.style.setProperty('--rx', '0deg'); tl.style.setProperty('--ry', '0deg');
 
-  if (t >= 2) {
-    // suspenso: la carta tiembla, se oscurece la sala y aparece el aura
-    const ms = REDUCED ? 300 : t === 3 ? 1900 : 1150;
-    document.body.classList.add('dim');
-    aura(true, c, t === 3);
-    const a = $('#aura');
-    a.animate([{ opacity: 0, transform: 'scale(.4)' }, { opacity: 1, transform: 'scale(1)' }], { duration: ms, easing: 'ease-in', fill: 'forwards' });
-    Snd.charge(t, ms); buzz(t === 3 ? [30, 60, 30, 60, 30, 40, 60] : [30, 60, 30]);
-    const iv = setInterval(() => suck(x, y, r.width * 1.1, colors, t === 3 ? 7 : 4), 40);
-    await el.animate(shakeFrames(t === 3 ? 22 : 12), { duration: ms, easing: 'ease-in', fill: 'forwards' }).finished;
-    clearInterval(iv);
-    flash(pl[0], t === 3 ? .95 : .7, t === 3 ? 1000 : 650);
-  } else if (t === 1) {
-    burst(x, y, { n: 16, colors: ['#5cc8ff', '#fff'], speed: 5, kinds: ['star'], gravity: 0 });
-  }
+  /* El suspenso y el estallido de las raras, épicas y legendarias son de
+     su colección (revela.js): tiza o hiperespacio para los profes,
+     osciloscopio, bobina de Tesla o cortocircuito para los componentes. */
+  const an = window.REVELA && REVELA.de(c), k = { el, c, t, x, y, r, pl: t >= 2 ? pl : [accentOf(c), '#fff'] };
+  if (an) await an.antes(k);
 
   record(c);
   Snd.flip();
@@ -927,16 +1030,8 @@ async function reveal(el) {
 
   setTimeout(() => {
     Snd.reveal(t);
-    if (t === 3) {
-      burst(x, y, { n: 120, colors: [...pl, '#fff', '#ffcc3d'], speed: 17, kinds: ['confetti', 'spark', 'star'], gravity: .2, life: .8 });
-      setTimeout(() => burst(x, y - 40, { n: 60, colors: [pl[1], '#fff'], speed: 12, kinds: ['star', 'spark'], gravity: .05 }), 300);
-    } else if (t === 2) {
-      burst(x, y, { n: 70, colors: [...pl, '#fff'], speed: 13, kinds: ['spark', 'star', 'confetti'], gravity: .15 });
-    } else if (t === 1) {
-      burst(x, y, { n: 26, colors: ['#5cc8ff', '#fff', '#b4e8ff'], speed: 8, kinds: ['spark', 'star'] });
-    } else {
-      burst(x, y, { n: 12, colors: ['#fff', '#ffe9a8'], speed: 6, kinds: ['star'], gravity: .02 });
-    }
+    if (an) an.despues(k);
+    else burst(x, y, { n: 12, colors: ['#fff', '#ffe9a8'], speed: 6, kinds: ['star'], gravity: .02 });
   }, t >= 2 ? 60 : 180);
 
   showBanner(c); setDots();
@@ -1020,6 +1115,7 @@ function sumCard(c) {
 function showSummary() {
   setPhase('summary');
   setTilt(null, null); aura(false); hideBanner();
+  $('#cambiaBtn2').textContent = `Cambiar sobre (${M.COL[coleccion].label})`;
   document.body.classList.remove('dim');
   pull.forEach(record);
   abriendo = new Set(); rehazColeccion(); updateColCount();
@@ -1029,7 +1125,7 @@ function showSummary() {
   const n = comprados.length, box = $('#sumCards'); box.innerHTML = '';
   $('#summary').classList.toggle('multi', n > 1);
   $('#summary').dataset.n = n;
-  $('#sumTitulo').textContent = n > 1 ? `Tus ${n} sobres` : 'Tu sobre';
+  $('#sumTitulo').textContent = `${n > 1 ? `Tus ${n} sobres` : 'Tu sobre'} · ${M.COL[coleccion].label}`;
   /* Con varios sobres, una fila por sobre: se ve qué trajo cada uno. */
   const grupos = n > 1 ? comprados.map((x, s) => {
     const g = document.createElement('div'); g.className = 'sum-grupo';
@@ -1085,7 +1181,7 @@ const masBarata = (uid, sinId) => cuenta.ofertas.filter(o => o.id !== sinId && M
 function zoomUI(recien) {
   const c = zoomC, t = TIERS[c.tier], of = c._oferta, mio = !!c._copy && !c._ajena;
   const venta = mio && c._copy.venta ? ofertaDe(c._copy.venta) : null;
-  $('#zoomInfo').innerHTML = `<b>${c.name}</b> · ${subtitle(c)} · ${t.label} ${t.sym} · N.º ${pad(c.num)}/${TOTAL}` +
+  $('#zoomInfo').innerHTML = `<b>${c.name}</b> · ${subtitle(c)} · ${t.label} ${t.sym} · N.º ${pad(c.num)}/${totalDe(c)}` +
     (c.graded ? `<br><b class="zi-grade" style="--gc:${gradeColor(c.grade)}">Nota ${c.grade} · ${GRADE_WORD[c.grade]}</b>` : c.grade ? '<br>Sin graduar · su estado es un misterio' : '') +
     (of ? `<br><span class="zi-venta">Vende <b>${esc(of.u === cuenta.uid ? 'tú' : nombreDe(of.u))}</b> · ${MONEDA}<b>${fmt(of.p)}</b></span>` : '') +
     (venta ? `<br><span class="zi-venta">En el mercado por ${MONEDA}<b>${fmt(venta.p)}</b></span>` : '') +
@@ -1419,21 +1515,39 @@ function renderCopies() {
     grid.appendChild(el);
   });
 }
+/* La colección se ve por colección (pestañas arriba), y dentro de cada una
+   por rareza; la rejilla va en secciones, una por variante o temática, con
+   las que tienes y los huecos de las que faltan. */
+let colCol = '';
 function renderCollection() {
   if (colView) return renderCopies();
+  if (!M.COL[colCol]) colCol = coleccion;
   $('#colGrid').classList.remove('copies-view');
-  const owned = ownedCount();
-  const gn = gradedCount();
-  $('#colProgress').textContent = `${owned} de ${TOTAL} cartas descubiertas${gn ? ` · ${gn} graduada${gn > 1 ? 's' : ''}` : ''}`;
-  $('#colBar').style.width = `${owned / TOTAL * 100}%`;
+  const todas = M.POR_COL[colCol].map(m => CARDS[m.n]), deCol = todas.filter(c => col[c.uid]).length;
+  const gn = Object.values(copies).flat().filter(cp => cp.gr && CARDS[cp.id].col === colCol).length;
+  $('#colProgress').textContent = `${M.COL[colCol].label}: ${deCol} de ${todas.length} cartas descubiertas${gn ? ` · ${gn} graduada${gn > 1 ? 's' : ''}` : ''} · en total ${ownedCount()}/${TOTAL}`;
+  $('#colBar').style.width = `${deCol / todas.length * 100}%`;
+  $('#colTabs').innerHTML = COLS.map(co => {
+    const l = M.POR_COL[co.key], n = l.filter(c => col[c.uid]).length;
+    return `<button role="tab" data-col="${co.key}" aria-selected="${co.key === colCol}">${co.label}<b>${n}/${l.length}</b></button>`;
+  }).join('');
+  $('#colTabs').querySelectorAll('[data-col]').forEach(b => b.onclick = () => { colCol = b.dataset.col; renderCollection(); $('#colGrid').scrollTop = 0; });
   $('#colFilters').innerHTML = [[-1, 'Todas', ''], ...TIERS.map((t, i) => [i, t.label, t.sym])]
     .map(([i, l, s]) => {
-      const n = i < 0 ? owned : CARDS.filter(c => c.tier === i && col[c.uid]).length, tot = i < 0 ? TOTAL : CARDS.filter(c => c.tier === i).length;
+      const n = todas.filter(c => (i < 0 || c.tier === i) && col[c.uid]).length, tot = todas.filter(c => i < 0 || c.tier === i).length;
       return `<button data-f="${i}" class="${i === colFilter ? 'on' : ''}" style="--c:${i < 0 ? '#fff' : TIERS[i].color}">${s ? `<i>${s}</i>` : ''}${l} ${n}/${tot}</button>`;
     }).join('');
   $('#colFilters').querySelectorAll('button').forEach(b => b.onclick = () => { colFilter = +b.dataset.f; renderCollection(); });
   const grid = $('#colGrid'); grid.innerHTML = '';
-  CARDS.filter(c => colFilter < 0 || c.tier === colFilter).forEach(c => {
+  // de la peor rareza a la mejor; dentro, en el orden del catálogo (por variante o temática)
+  const lista = todas.filter(c => colFilter < 0 || c.tier === colFilter).sort((a, b) => a.tier - b.tier || a.n - b.n);
+  let seccion = '';
+  lista.forEach(c => {
+    if (c.vkey !== seccion) {
+      seccion = c.vkey;
+      const de = lista.filter(x => x.vkey === seccion), n = de.filter(x => col[x.uid]).length;
+      grid.insertAdjacentHTML('beforeend', `<h3 class="col-sec" style="--c:${TIERS[c.tier].color}"><i>${TIERS[c.tier].sym}</i>${esc(c.vlabel)}<small>${TIERS[c.tier].label} · ${n}/${de.length}</small></h3>`);
+    }
     if (col[c.uid]) {
       const cp = bestCopy(c.uid), inst = cp ? fromCopy(c, cp) : c;
       const el = makeCard(inst, { back: false, lazy: true });
@@ -1443,14 +1557,14 @@ function renderCollection() {
       el.addEventListener('click', () => colOpen(c));
       grid.appendChild(el);
     } else {
-      grid.insertAdjacentHTML('beforeend', `<div class="slot" style="--c:${TIERS[c.tier].color}"><b>${TIERS[c.tier].sym}</b>N.º ${pad(c.num)}</div>`);
+      grid.insertAdjacentHTML('beforeend', `<div class="slot" style="--c:${TIERS[c.tier].color}"><b>${TIERS[c.tier].sym}</b>N.º ${pad(c.num)}<small>${esc(c.name)}</small></div>`);
     }
   });
 }
 function openCollection() {
   prevTilt = prevTilt || [tilt.target, tilt.box, tilt.amp];
   setTilt(null, null);
-  colView = null; zoomVuelve = '';
+  colView = null; zoomVuelve = ''; colCol = coleccion;
   renderCollection();
   $('#collection').hidden = false;
 }
@@ -1467,10 +1581,10 @@ $('#colBtn2').onclick = openCollection;
    están graduadas. */
 const NR = M.REROLL.n;
 const PLURAL = ['comunes', 'raras', 'épicas', 'legendarias'], UNA = ['común', 'rara', 'épica', 'legendaria'];
-const rr = { tier: 0, sel: [], seguro: false, enviando: false };
+const rr = { tier: 0, col: 'profes', sel: [], seguro: false, enviando: false };
 const keyDe = cp => cp.key;
-// lo que se puede meter: mis copias de esa rareza que no están a la venta
-const elegibles = t => Object.values(copies).flat().filter(cp => CARDS[cp.id].tier === t && !cp.venta);
+// lo que se puede meter: mis copias de esa rareza y esa colección que no están a la venta
+const elegibles = (t, co = rr.col) => Object.values(copies).flat().filter(cp => CARDS[cp.id].tier === t && CARDS[cp.id].col === co && !cp.venta);
 /* El orden en que «Elegir automático» las toma: primero las repetidas (de
    cada carta se guarda la mejor), las sin graduar antes que las graduadas,
    y de las graduadas las de nota más baja; las exhibidas al final. */
@@ -1493,9 +1607,11 @@ function abreReroll() {
   if (!cuenta.listo) return;
   prevTilt = prevTilt || [tilt.target, tilt.box, tilt.amp];
   setTilt(null, null);
-  // abre en la rareza más baja que alcanza para un re-roll
+  // abre en la colección del sobre, o en la otra si solo ahí alcanza, y en la rareza más baja que alcanza
+  const alcanza = co => [0, 1, 2].some(i => elegibles(i, co).length >= NR);
+  rr.col = alcanza(coleccion) || !COLS.some(co => alcanza(co.key)) ? coleccion : COLS.find(co => alcanza(co.key)).key;
   const t = [0, 1, 2].find(i => elegibles(i).length >= NR);
-  if (t !== undefined && !elegibles(rr.tier).length) rr.tier = t;
+  if (t !== undefined && elegibles(rr.tier).length < NR) rr.tier = t;
   rr.seguro = false;
   $('#collection').hidden = true; $('#summary').hidden || 0;
   renderReroll();
@@ -1517,13 +1633,21 @@ function renderReroll() {
   const t = rr.tier, sig = TIERS[t + 1], lista = ordenAuto(elegibles(t));
   rr.sel = rr.sel.filter(k => lista.some(cp => cp.key === k));
   const sel = new Set(rr.sel), cps = rr.sel.map(k => lista.find(cp => cp.key === k));
-  $('#rrSub').innerHTML = `${NR} cartas ${PLURAL[t]} → 1 ${UNA[t + 1]} al azar. Las diez se pierden.`;
+  $('#rrSub').innerHTML = `${NR} cartas ${PLURAL[t]} de ${M.COL[rr.col].label} → 1 ${UNA[t + 1]} de ${M.COL[rr.col].label} al azar. Las diez se pierden.`;
+  $('#rrCols').innerHTML = COLS.map(co => {
+    const n = [0, 1, 2].reduce((m, i) => Math.max(m, elegibles(i, co.key).length), 0);
+    return `<button role="tab" data-col="${co.key}" aria-selected="${co.key === rr.col}">${co.label}<b class="rr-n${n >= NR ? ' ok' : ''}">${n >= NR ? '♻' : '·'}</b></button>`;
+  }).join('');
+  $('#rrCols').querySelectorAll('[data-col]').forEach(b => b.onclick = () => { rr.col = b.dataset.col; rr.sel = []; rr.seguro = false; renderReroll(); });
   $('#rrTabs').innerHTML = [0, 1, 2].map(i => {
     const n = elegibles(i).length;
     return `<button role="tab" data-t="${i}" aria-selected="${i === t}">${TIERS[i].sym} ${TIERS[i].label} <span class="rr-flecha">→ ${TIERS[i + 1].sym}</span><b class="rr-n${n >= NR ? ' ok' : ''}">${n}</b></button>`;
   }).join('');
   $('#rrTabs').querySelectorAll('[data-t]').forEach(b => b.onclick = () => { rr.tier = +b.dataset.t; rr.sel = []; rr.seguro = false; renderReroll(); });
-  const posibles = M.POR_TIER[t + 1];
+  const P = M.POOL[rr.col], posibles = P[t + 1];
+  // con pesos (Navidad sale menos), cada temática dice su probabilidad
+  const pesoTxt = P.uniforme ? `(${(100 / posibles.length).toFixed(1).replace('.', ',')} % cada una)`
+    : `(${[...new Set(posibles.map(c => c.vkey))].map(k => { const c = posibles.find(x => x.vkey === k); return `${c.vlabel} ${(c.peso / P.peso[t + 1] * 100).toFixed(1).replace('.', ',')} %`; }).join(' · ')} cada una)`;
   const huecos = Array.from({ length: NR }, (_, i) => cps[i] ? `<button class="rr-hueco lleno" data-quita="${esc(cps[i].key)}" title="Quitar">${miniCp(cps[i])}</button>` : `<span class="rr-hueco"></span>`).join('');
   $('#rrBody').innerHTML = `
     <div class="rr-flujo" style="--c:${TIERS[t].color};--c2:${accentOf(CARDS[posibles[0].n])}">
@@ -1539,8 +1663,8 @@ function renderReroll() {
       <span class="rr-cuenta"><b>${rr.sel.length}</b>/${NR}</span>
     </div>
     ${lista.length ? `<div class="tc-rejilla rr-rejilla">${lista.map(cp => `<button class="tc-elige${sel.has(cp.key) ? ' on' : ''}" data-c="${esc(cp.key)}">${miniCp(cp, cuenta.exh.includes(cp.key) ? '<em class="rr-exh">★</em>' : '')}</button>`).join('')}</div>`
-      : `<div class="mk-vacio"><b>${TIERS[t].sym}</b><p>No tienes cartas ${PLURAL[t]} libres. Abre sobres o retira del mercado las que tengas a la venta.</p></div>`}
-    <details class="rr-posibles"><summary>Puede salir cualquiera de estas ${posibles.length} (${(100 / posibles.length).toFixed(1).replace('.', ',')} % cada una)</summary>
+      : `<div class="mk-vacio"><b>${TIERS[t].sym}</b><p>No tienes cartas ${PLURAL[t]} de ${M.COL[rr.col].label} libres. Abre sobres o retira del mercado las que tengas a la venta.</p></div>`}
+    <details class="rr-posibles"><summary>Puede salir cualquiera de estas ${posibles.length} ${pesoTxt}</summary>
       <div class="rr-pos">${posibles.map(c => miniCp({ id: c.n, gr: 0 })).join('')}</div></details>
     <div class="tc-envio rr-envio">
       <button class="btn primary" id="rrGo"${rr.sel.length === NR && !rr.enviando ? '' : ' disabled'}>${rr.enviando ? 'Enviando…' : rr.seguro ? '¿Seguro? Toca otra vez' : `♻ Re-roll ${rr.sel.length}/${NR}`}</button>
@@ -1592,7 +1716,7 @@ async function hazReroll() {
 /* La ruleta: una tira de cartas de la rareza que sale, que corre de
    derecha a izquierda y frena hasta dejar la que tocó bajo la marca. Cada
    carta que cruza la marca hace tic, cada vez más espaciado. */
-const rl = { girando: false, anim: null, raf: 0, r: null, nueva: false, t: 0 };
+const rl = { girando: false, anim: null, raf: 0, r: null, nueva: false, t: 0, col: 'profes' };
 /* Dos velocidades: la normal es larga a propósito (casi once segundos, cien
    cartas), y «⚡ Rápido» —recordado en este navegador— la deja en dos y
    medio. Apretarlo con la ruleta girando acelera esa misma tirada. */
@@ -1616,12 +1740,12 @@ pintaRapido();
 /* Una carta para la tira: casi siempre de la rareza que sale, y de vez en
    cuando de las de más arriba, que es lo que da el «casi» al pasar. */
 function cartaTira(base) {
-  const x = Math.random(), t = Math.min(3, base + (x < .78 ? 0 : x < .96 ? 1 : 2)), l = M.POR_TIER[t];
+  const x = Math.random(), t = Math.min(3, base + (x < .78 ? 0 : x < .96 ? 1 : 2)), l = M.POOL[rl.col][t];
   return l[Math.floor(Math.random() * l.length)].n;
 }
 function ruleta(r, t, nueva) {
   const sig = t + 1, tira = $('#rlTira'), { n: RL_N, gana: RL_GANA, dur: DUR } = RL();
-  rl.r = r; rl.nueva = nueva; rl.girando = true; rl.t = t;
+  rl.r = r; rl.nueva = nueva; rl.girando = true; rl.t = t; rl.col = CARDS[r.id].col;
   $('#rlTitulo').innerHTML = `${NR} ${PLURAL[t]} → <b style="color:${TIERS[sig].color}">${TIERS[sig].sym} ${TIERS[sig].label}</b>`;
   $('#rlFin').hidden = true; $('#rlFin').innerHTML = '';
   $('#rlSaltar').hidden = false;
@@ -1739,7 +1863,7 @@ function alDatos(d) {
     // sobres comprados y sin abrir (se cerró la pestaña): se sigue con esos, sin cobrar otra vez
     const vivos = ks.filter(k => cuenta.sobres[k]).slice(0, MAX_JUNTOS).map(k => ({ k, at: cuenta.sobres[k] }));
     if (vivos.length) newPacks(vivos);
-    else tienda();
+    else eligeSobre();
     return;
   }
   pintaCompra();
@@ -1816,7 +1940,7 @@ async function comprar(drop, gratis) {
   /* Uno tras otro: Juegos comprueba el saldo antes de cada uno. */
   for (let i = 0; i < n; i++) {
     try {
-      const r = await Red.pide(gratis ? 'gratis' : 'comprar', gratis ? {} : { p: precio() });
+      const r = await Red.pide(gratis ? 'gratis' : 'comprar', gratis ? { col: coleccion } : { p: precio(), col: coleccion });
       // la cuenta real llega sola; esto evita ver la vieja un instante
       if (gratis) cuenta.gratis = r.at + 6 * 3600 * 1000; else cuenta.saldo -= r.p;
       cuenta.sobres[r.k] = r.at;
@@ -1897,7 +2021,7 @@ function avisoZoom(t) { $('#zoomInfo').insertAdjacentHTML('beforeend', `<br><spa
    (y mis compras) e intercambios. Todo lo que se ve llega ya validado
    desde Juegos (la economía): una oferta que se ve está a la venta de
    verdad, y una carta de otro que se ve es suya de verdad. */
-const mk = { tab: 'comprar', rareza: -1, grad: 'todas', nota: 0, orden: 'barato', q: '', max: 48 };
+const mk = { tab: 'comprar', col: '', rareza: -1, grad: 'todas', nota: 0, orden: 'barato', q: '', max: 48 };
 let mkScroll = 0;
 // una carta de otro (o una oferta) como carta del abridor
 function instDe(x) {
@@ -1939,6 +2063,7 @@ function filtradas() {
   let l = cuenta.ofertas.map(o => ({ o, cp: copiaDe(o) }));
   l = l.filter(({ cp }) => {
     const c = CARDS[cp.id];
+    if (mk.col && c.col !== mk.col) return false;
     if (mk.rareza >= 0 && c.tier !== mk.rareza) return false;
     if (mk.grad === 'si' && !cp.gr) return false;
     if (mk.grad === 'no' && cp.gr) return false;
@@ -1964,6 +2089,8 @@ function renderMercado() {
 function renderComprar(fil, grid) {
   const enfocado = document.activeElement && document.activeElement.id === 'mkQ';
   fil.innerHTML = `
+    <div class="mk-fila">${[['', 'Todas las colecciones'], ...COLS.map(co => [co.key, co.label])].map(([k, l]) =>
+      `<button class="mk-chip mk-col${k === mk.col ? ' on' : ''}" data-colk="${k}">${l}</button>`).join('')}</div>
     <div class="mk-fila">${[[-1, 'Todas', ''], ...TIERS.map((t, i) => [i, t.label, t.sym])].map(([i, l, sy]) =>
       `<button class="mk-chip${i === mk.rareza ? ' on' : ''}" data-r="${i}" style="--c:${i < 0 ? '#fff' : TIERS[i].color}">${sy ? `<i>${sy}</i>` : ''}${l}</button>`).join('')}</div>
     <div class="mk-fila">
@@ -1976,6 +2103,7 @@ function renderComprar(fil, grid) {
       <input id="mkQ" class="mk-q" type="search" placeholder="Buscar por nombre…" value="${esc(mk.q)}">
     </div>`;
   fil.querySelectorAll('[data-r]').forEach(b => b.onclick = () => { mk.rareza = +b.dataset.r; mk.max = 48; renderMercado(); });
+  fil.querySelectorAll('[data-colk]').forEach(b => b.onclick = () => { mk.col = b.dataset.colk; mk.max = 48; renderMercado(); });
   fil.querySelectorAll('[data-g]').forEach(b => b.onclick = () => { mk.grad = b.dataset.g; if (mk.grad !== 'si') mk.nota = 0; mk.max = 48; renderMercado(); });
   const sn = $('#mkNota'); if (sn) sn.onchange = () => { mk.nota = +sn.value; renderMercado(); };
   $('#mkOrden').onchange = e => { mk.orden = e.target.value; renderMercado(); };
