@@ -34,6 +34,15 @@ test('cada juego de un jugador tiene adónde ir, manual y fecha',()=>{
  }
 });
 
+/* La ficha se busca por `data-id` en las dos listas, primero en la de un
+   jugador: Tetris Club con id "tetris" hacía que la tarjeta del Tetris
+   multijugador abriera la ficha del club. */
+test('ninguna tarjeta del salón comparte id con otra',()=>{
+ const {multi,solos}=S.entradasSalon(J);
+ const ids=[...solos,...multi].map(e=>e.id);
+ assert.deepEqual(ids.filter((x,i)=>ids.indexOf(x)!==i),[]);
+});
+
 test('todos los multijugador entran en el salón, con género y cupo',()=>{
  const {multi,solos}=S.entradasSalon(J);
  assert.deepEqual([...multi.map(m=>m.id)].sort(),Object.keys(J).sort());
