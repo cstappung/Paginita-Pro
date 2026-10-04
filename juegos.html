@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610040707"></script>
+<script src="i18n.js?v=202610041150"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Laboratorio</title>
 <script>
@@ -1614,6 +1614,11 @@ try { var t = localStorage.getItem("jg.tema");
 .sp-e-sudoku strong{letter-spacing:.03em;color:#ffe3f4;text-shadow:0 0 10px #ff2fb4aa,2px 2px #3a0a2c}
 .sp-e-sudoku strong span{color:#22e6ff;text-shadow:0 0 10px #22e6ffaa}
 .sp-e-sudoku>b{color:#7cf3ff}
+/* FANAL: la noche, unas pocas estrellas y la luz de un farol abajo, a la derecha. */
+.sp-e-fanal{background:radial-gradient(circle at 84% 96%,#ffcf6b70 0,#ff9a3c26 16%,transparent 40%),radial-gradient(1.5px 1.5px at 18% 26%,#ffe8c2 98%,transparent),radial-gradient(1px 1px at 58% 16%,#ffe8c2 98%,transparent),radial-gradient(1.5px 1.5px at 76% 40%,#ffc98a 98%,transparent),radial-gradient(1px 1px at 34% 60%,#ffe8c2 98%,transparent),radial-gradient(1px 1px at 90% 12%,#ffe8c2 98%,transparent),linear-gradient(160deg,#1c1332,#0b0a1c 70%)}
+.sp-e-fanal strong{font-family:"Jacquarda Bastarda 9",Georgia,serif;font-style:normal;letter-spacing:.06em;color:#d9a85b;text-shadow:0 0 14px #ff9a3c66}
+.sp-e-fanal strong span{color:#ffcf6b}
+.sp-e-fanal>b{color:#ffcf6b}
 .sp-e-sopa strong span{color:#ffb070}.sp-e-worms{background:radial-gradient(ellipse at right,#7a3b14,#0c1629 75%)}.sp-e-worms strong span{color:#f2a33a}.sp-e-snake strong span{color:#58f5c0}
 @keyframes sp-entrada{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}@keyframes sp-revela{from{transform:scale(.8);filter:brightness(1.8)}to{transform:scale(1);filter:brightness(1)}}
 @media(max-width:900px){.sp-layout{grid-template-columns:1fr}.sp-ranking{width:auto}.sp-hero{padding:24px}.sp-ranking ol{display:grid;grid-template-columns:1fr 1fr;gap:0 20px}}@media(max-width:580px){.sp-layout{padding:12px;gap:16px}.sp-hud{gap:10px;padding:12px}.sp-hud b{font-size:19px}.sp-scroll{padding:8px}.sp-config>button{width:100%}.sp-ranking ol{display:block}.sp-hero .sp-link{margin-bottom:20px}.sp-hero h1{font-size:43px}}
@@ -2937,6 +2942,16 @@ html[data-tema=oscuro] .jg-tira{border-color:var(--os-borde)}
 @media(max-width:700px){.jg-nov-arte-zb>.jg-art-ym{zoom:.5}}
 .jg-nov-arte-zb,.jg-nov-arte-pd,.jg-nov-arte-bb{position:absolute;inset:0;display:grid;place-items:center}
 .jg-nov-arte-zb{background:radial-gradient(ellipse at 50% 110%,#7fbf3a 0,#2f4d14 45%,#0f1a08 100%)}
+/* FANAL en Novedades: un farol abajo y cinco polillas que bajan hacia su luz. */
+.jg-nov-arte-fn{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 104%,#ffcf6b99 0,#ff9a3c40 20%,transparent 52%),linear-gradient(#0b0a1c,#24163a 80%)}
+.jg-nov-arte-fn i{position:absolute;width:18px;height:12px;background:#b8a088;clip-path:polygon(50% 100%,44% 62%,14% 78%,0 18%,38% 36%,46% 0,54% 0,62% 36%,100% 18%,86% 78%,56% 62%);animation:jg-fn-alas .5s steps(2) infinite}
+.jg-nov-arte-fn i:nth-child(1){left:18%;top:18%}.jg-nov-arte-fn i:nth-child(2){left:62%;top:12%;background:#c47a3c;animation-delay:-.2s}
+.jg-nov-arte-fn i:nth-child(3){left:40%;top:34%;background:#9a4a62;animation-delay:-.35s}.jg-nov-arte-fn i:nth-child(4){left:74%;top:44%;animation-delay:-.1s}
+.jg-nov-arte-fn i:nth-child(5){left:12%;top:52%;background:#c47a3c;animation-delay:-.4s}
+@keyframes jg-fn-alas{50%{transform:scaleX(.7)}}
+.jg-nov-arte-fn em{position:absolute;left:50%;bottom:30px;width:8px;height:12px;margin-left:-4px;border-radius:50% 50% 45% 45%/70% 70% 30% 30%;background:radial-gradient(circle at 50% 70%,#fff6d8 0 25%,#ffcf6b 26% 60%,#ff9a3c 61%);box-shadow:0 0 18px 6px #ff9a3c88}
+.jg-nov-arte-fn>b{position:absolute;bottom:6px;left:0;right:0;text-align:center;font:400 20px/1 "Jacquarda Bastarda 9",Georgia,serif;letter-spacing:.12em;color:#d9a85b;text-shadow:0 0 10px #ff9a3c99}
+@media (prefers-reduced-motion:reduce){.jg-nov-arte-fn i{animation:none}}
 .jg-nov-arte-zb>.jg-art-ym{filter:hue-rotate(55deg) saturate(.8)}
 .jg-nov-arte-zb>b{position:absolute;bottom:10px;left:0;right:0;text-align:center;font:900 26px/1 system-ui,sans-serif;letter-spacing:.18em;color:#c8f56b;text-shadow:0 3px 0 #1d2b06,0 0 18px #9be04a99}
 .jg-nov-arte-pd{background:radial-gradient(ellipse at 50% 60%,#5a2aa8,#170a33 75%)}
@@ -3767,6 +3782,6 @@ html[data-tema=oscuro] .jg-lado-cuenta>ul{color:var(--os-tx)}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610040707"></script>
+<script src="juegos-app.js?v=202610041150"></script>
 </body>
 </html>

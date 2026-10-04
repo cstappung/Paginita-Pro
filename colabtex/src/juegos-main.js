@@ -90,7 +90,7 @@ const FABRICAS = {
 const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞", pokemon: "◓" };
 /* Los clubes de un jugador, con sus claves de la clasificación y los
    mismos signos que llevan en su tarjeta del vestíbulo. */
-const ICONO_TODOS = { ...ICONO, general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", frontera: "🏰", sudoku: "🔢", yzombis: "🧟" };
+const ICONO_TODOS = { ...ICONO, general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", frontera: "🏰", sudoku: "🔢", fanal: "🪔", yzombis: "🧟" };
 
 /* Lo que puede elegir quien abre la sala, por juego. Vive aquí y no en
    `motor.js` porque son controles y no reglas: el motor ya recorta lo
@@ -223,7 +223,7 @@ function leePopular() {
 }
 /* Los de un jugador, con su clave de popularidad. Cuentan como juegos en
    la marquesina: el «18» fijo de antes se quedó atrás con cada club. */
-const CLUBES = ["club-minas", "club-snake", "club-tetris", "club-sortem", "club-bbtan", "club-sopa", "club-electro", "club-frontera", "club-sudoku"];
+const CLUBES = ["club-minas", "club-snake", "club-tetris", "club-sortem", "club-bbtan", "club-sopa", "club-electro", "club-frontera", "club-sudoku", "club-fanal"];
 function ordenPopular(claves) {
   const n = state.popular, pos = Object.fromEntries(claves.map((k, i) => [k, i]));
   return claves.slice().sort((a, b) => (n[b] || 0) - (n[a] || 0) || pos[a] - pos[b]);
@@ -813,7 +813,7 @@ function celebra(juego, id) {
    barra de direcciones. */
 function leerRuta() {
   const h = (location.hash || "").replace(/^#/, "");
-  if (/^solo\/(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
+  if (/^solo\/(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
   if (h === "ranks") return { vista: "ranks", pid: "" };
   if (h === "logros") return { vista: "logros", pid: "" };
   if (h === "monedas") return { vista: "monedas", pid: "" };
@@ -1272,7 +1272,7 @@ function armazon() {
     h.innerHTML = "";
     logrosVista = crearLogros({ uid: state.user.uid, watchLogros: fb.watchLogros, perfil: perfilDe, icono: ICONO_TODOS,
       orden: () => ordenPopular([...Object.keys(JUEGOS), ...CLUBES])
-        .map(k => ({ "club-minas": "minas", "club-snake": "snake", "club-tetris": "tetrisclub", "club-sortem": "sortem", "club-bbtan": "bbtan", "club-sopa": "sopa", "club-electro": "electro", "club-frontera": "frontera", "club-sudoku": "sudoku" })[k] || k) });
+        .map(k => ({ "club-minas": "minas", "club-snake": "snake", "club-tetris": "tetrisclub", "club-sortem": "sortem", "club-bbtan": "bbtan", "club-sopa": "sopa", "club-electro": "electro", "club-frontera": "frontera", "club-sudoku": "sudoku", "club-fanal": "fanal" })[k] || k) });
     logrosVista.montar(h);
     return;
   }
@@ -1475,6 +1475,9 @@ const porOmision = k => Object.fromEntries((OPCIONES[k] || []).map(o => [o.clave
    Yemas), así que la lista se escribe aquí en vez de salir de las fechas
    `alta` de JUEGOS. El primero lleva «★ Lo último». */
 const NOVEDADES = [
+  { id: "fanal", color: "#d9a85b", alta: "2026-10-04", titulo: "FANAL",
+    lema: "Llevas la última luz a través de la noche, hacia el Alba. Las polillas bajan en formación hacia ella. Dispara al pulso de la música… y averigua qué estás apagando.",
+    sub: "Un jugador · trece jornadas, tres jefes y una travesía sin fin", ruta: "#solo/fanal", boton: "Encender", reglas: ["fanal"], modo: "solo" },
   { id: "zombis", color: "#4f8a2b", alta: "2026-10-01", titulo: "Yemas · modo Zombis",
     lema: "Todos juntos contra oleadas de huevos podridos, en cinco mapas clásicos: bebidas, la caja misteriosa, armas en la pared y Pack-a-Punch. Se puede jugar solo.",
     sub: "1–8 jugadores · cooperativo", sala: { k: "yemas", ops: { variante: "zombis" } }, reglas: ["yemas", "zombis"],
@@ -1483,12 +1486,11 @@ const NOVEDADES = [
     lema: "Sobres de cinco cartas de los profes, uno gratis cada 6 horas. Gradúalas, exhíbelas en tu perfil, véndelas en el mercado o cámbialas con otros.",
     sub: () => { const a = fb.ahora(), p = MOTOR.precioSobre(a);
       return a < MOTOR.PRECIO.promoHasta ? `Sobre a ${p} monedas hasta el 4 de octubre (después, ${MOTOR.PRECIO.normal})` : `Sobre a ${p} monedas · graduar, ${MOTOR.PRECIO.gradua}`; },
-    ruta: "#cartas", boton: "Abrir sobres", cuenta: true },
-  { id: "bbtan", color: "#6aa514", alta: "2026-09-30", titulo: "BBTAN",
-    lema: "Apunta, rebota y rompe los bloques antes de que toquen el suelo. Y no te quedes mucho rato: más abajo, algo cambia.",
-    sub: "Un jugador · ranking por ronda máxima", ruta: "#solo/bbtan", boton: "Lanzar", reglas: ["bbtan"], modo: "solo" }
+    ruta: "#cartas", boton: "Abrir sobres", cuenta: true }
 ];
 function arteNovedad(n) {
+  // FANAL: un farol que alumbra la noche y unas polillas que bajan hacia él.
+  if (n.id === "fanal") return `<div class="jg-nov-arte-fn"><i></i><i></i><i></i><i></i><i></i><em></em><b>FANAL</b></div>`;
   if (n.id === "zombis") return `<div class="jg-nov-arte-zb">${arteJuego("yemas")}<b>ZOMBIS</b></div>`;
   if (n.id === "prodrop") {
     const cs = ["javier-pereda-torres-gta", "claudia-prieto-shiny", "david-watts-casino"];

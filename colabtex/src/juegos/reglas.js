@@ -773,6 +773,43 @@ const REGLAS = {
       ["Racha y clasificación", "La 🔥 racha cuenta los días seguidos que resuelves el diario: si ayer lo hiciste, hoy sube uno; si te saltas un día, vuelve a empezar. Se guarda en tu navegador y, con tu sesión, también en tu cuenta. En la Clasificación hay una tabla para la racha, una para el Arcade (por puntos) y una por cada dificultad del Clásico (por tiempo: gana quien tarda menos). Subir al podio se anuncia en Discord."]
     ]
   },
+  /* FANAL (juegos/club/fanal/): lo que dice aquí tiene que coincidir con
+     motor.js (jornadas, puntos, Resonancia, llamas) y juego.js (teclas,
+     poderes, jefes). No cuenta los giros de la historia: eso es del juego. */
+  fanal: {
+    lema: "FANAL: llevas la última luz a través de la noche, hacia el Alba. Las polillas bajan en formación hacia ella.",
+    secciones: [
+      ["Cómo se juega", "Rema de un lado a otro con ← → (o A y D) y dispara con Espacio; mantenerlo apretado dispara solo. En una pantalla táctil, arrastra el dedo para remar y toca para disparar. Las polillas bajan en formación, marchando al compás de la música y cada vez más rápido cuanto menos quedan. Si una escama te toca, si una polilla en picada llega a tu llama o si la formación alcanza la línea del fanal, pierdes una llama. Sin llamas, el fanal se apaga. Los cascos hundidos que flotan sobre ti te cubren, pero se rompen con cada golpe (también con los tuyos)."],
+      ["Al pulso", lista([
+        "La música marca pulsos en compases irregulares (7, 5, 11, 9 o 13 corcheas). La llama late con cada pulso y el metrónomo de abajo enciende el que suena.",
+        "Un disparo justo en un pulso sale <b>afinado</b>: dorado, con el doble de daño, y atraviesa a la primera polilla.",
+        "Cada cuatro polillas apagadas con tiros afinados sube la <b>Resonancia</b>, el multiplicador de puntos, hasta ×8. Un disparo fuera del pulso pierde lo que llevabas hacia la próxima; un golpe la devuelve a ×1.",
+        "Moverte también suena: el disparo es más agudo cuanto más a la derecha estás."
+      ])],
+      ["La travesía", lista([
+        "Son trece jornadas en cuatro actos: <b>El enjambre</b>, <b>La niebla</b>, <b>Lo oscuro</b> y <b>El alba</b>. Cada acto tiene su cielo, sus polillas, su escala y su compás.",
+        "Al final de cada acto hay un encuentro grande: <b>la Nodriza</b>, <b>el Faro Ciego</b> y <b>la Esfinge</b>. El último encuentro no se gana como los otros: lee la bitácora.",
+        "Entre jornadas se lee la bitácora de quien lleva el fanal y las cartas que hayas recuperado. Al empezar cada acto se guarda un punto de control: si el fanal se apaga, puedes volver a encender desde ahí.",
+        "Al terminar la travesía se abre la <b>travesía sin fin</b>: las jornadas siguen, cada una más dura, y los jefes vuelven."
+      ])],
+      ["Los jefes", lista([
+        "<b>La Nodriza</b> levanta las alas antes de soltar un abanico de escamas, pone larvas que caen hacia tu luz y, con un aleteo, empuja el fanal hacia un costado.",
+        "<b>El Faro Ciego</b> anuncia su haz con dos líneas punteadas: el sector entre ellas se ilumina. Sal de él o quédate bajo un casco. Un enjambre lo rodea y se lleva los tiros.",
+        "<b>La Esfinge</b> se esconde en lo oscuro. Enciende sus marcas antes de atacar: dos puntos señalan la columna de su picada; una marca arriba, el único hueco de un muro de polvo que no se rompe a tiros. A veces oscurece tu luz."
+      ])],
+      ["Poderes y cartas", lista([
+        "<b>Pabilo doble</b> (12 s): dos tiros por disparo. <b>Lente</b> (8 s): los tiros atraviesan todo. <b>Campana</b>: aguanta un golpe. <b>Aceite</b>: una llama más (hasta cinco). <b>Destello</b>: apaga la fila más baja y se lleva las escamas.",
+        "La <b>Mensajera</b> cruza arriba de vez en cuando. Si la alcanzas suelta una carta, que queda en la Bitácora para siempre (hay trece), y paga entre 100 y 500 puntos.",
+        "Ganas una llama extra a los 30 000, 80 000 y 150 000 puntos, y luego cada 100 000."
+      ])],
+      ["Puntos y clasificación", "Cada polilla vale según su tipo y su acto, multiplicado por la Resonancia, y la mitad más si el tiro fue afinado. Cada jornada suma un bonus por no recibir daño y por puntería, y cada jefe, el suyo. En la Clasificación compiten los puntos de la travesía, los del sin fin y la jornada más lejana a la que llegaste. Subir al podio se anuncia en Discord."],
+      ["Controles", lista([
+        "← → o A D: remar. Espacio, Z, ↑ o W: disparar.",
+        "P o Esc: pausa. M: sonido.",
+        "En Opciones: líneas de barrido, aberración en los golpes, menos destellos, sacudida de pantalla y volumen de música y efectos."
+      ])]
+    ]
+  },
   frontera: {
     lema: "Frontera Batalla: la de Pokémon Esmeralda. Rachas de combates individuales 3 contra 3, cada vez más difíciles.",
     secciones: [
@@ -811,7 +848,7 @@ const REGLAS = {
   }
 };
 
-const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade" };
+const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL" };
 
 export const tieneReglas = juego => Object.prototype.hasOwnProperty.call(REGLAS, juego);
 

@@ -124,3 +124,10 @@ test('Sudoku Arcade: récord, racha, arcade y partidas del club',()=>{
  assert.equal(M.monedasDe('a',d).partes.records,3*M.RECORD.sudoku+50+12);
  assert.equal(M.nivelDe('sudoku','a25000'),4);
 });
+test('FANAL: récord, jornadas, puntos y partidas del club',()=>{
+ assert.ok(M.JUEGOS_CLUB.includes('fanal'));assert.ok(M.PAGO_CLUB.fanal>0);
+ const d={solo:{'club-fanal-travesia':{a:{puntos:45000,tiempo:1}},'club-fanal-jornadas':{a:{puntos:13,tiempo:1}}}};
+ // dos modalidades con marca (40 cada una), 10 por jornada completada y 1 por cada 1000 puntos
+ assert.equal(M.monedasDe('a',d).partes.records,2*M.RECORD.fanal+130+45);
+ assert.equal(M.nivelDe('fanal','alba'),3);assert.equal(M.nivelDe('fanal','s250k'),4);
+});

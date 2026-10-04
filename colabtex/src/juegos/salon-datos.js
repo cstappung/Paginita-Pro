@@ -63,6 +63,10 @@ export const SOLOS = [
     ruta: "#solo/sudoku", reglas: "sudoku", popular: "club-sudoku", ranking: true, diario: true,
     lema: "Diario con racha, clásico en cuatro dificultades y arcade con vidas y combos.",
     modos: ["Diario", "Clásico", "Arcade"] },
+  { id: "fanal", tipo: "club", nombre: "FANAL", genero: "Arcade", icono: "🪔", alta: "2026-10-04",
+    ruta: "#solo/fanal", reglas: "fanal", popular: "club-fanal", ranking: true,
+    lema: "Llevas la última luz a través de la noche, hacia el Alba. Dispara al pulso de la música.",
+    modos: ["Travesía", "Sin fin"] },
   { id: "frontera", tipo: "club", nombre: "Frontera Batalla", genero: "Pokémon", icono: "🏰", alta: "2026-10-02",
     ruta: "#solo/frontera", reglas: "frontera", popular: "club-frontera", ranking: true,
     lema: "Torre, Palacio y Fábrica de Esmeralda: rachas de siete combates contra entrenadores cada vez más duros.",
@@ -144,7 +148,7 @@ export function entradasSalon(juegos, orden = Object.keys(juegos)) {
 /* El acento de cada juego del club, el mismo de su portada. */
 export const COLOR_SOLO = {
   minas: "#f6bc64", snake: "#58f5c0", tetris: "#2fd3e8", sortem: "#00f5ff", bbtan: "#c4f568",
-  sopa: "#ffb070", electro: "#fbbf24", sudoku: "#ff2fb4", frontera: "#fb923c"
+  sopa: "#ffb070", electro: "#fbbf24", sudoku: "#ff2fb4", fanal: "#d9a85b", frontera: "#fb923c"
 };
 
 /* Si el invitado puede abrirla. Un multijugador necesita cuenta siempre;

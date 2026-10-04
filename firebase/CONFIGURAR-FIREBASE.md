@@ -161,6 +161,13 @@ y están en el repositorio público, como cualquier archivo del sitio.
 > igual, pero los récords se quedan en el dispositivo (se sincronizan solos
 > después de publicarlas) y las partidas no pagan monedas.
 
+> **FANAL (octubre de 2026):** `club-fanal-travesia`, `club-fanal-sinfin`
+> (puntos, con tope de 1 000 000) y `club-fanal-jornadas` (la jornada más
+> lejana completada) son categorías nuevas de `soloRanks`, y `fanal` un juego
+> nuevo de `clubJugadas`. Hasta volver a publicar las reglas se juega igual,
+> pero los récords se quedan en el dispositivo (se sincronizan solos después
+> de publicarlas) y las partidas no pagan monedas.
+
 Tu base de datos está ahora en **modo de prueba** (abierta a cualquiera).
 Antes de publicar el sitio:
 
