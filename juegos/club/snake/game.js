@@ -548,5 +548,13 @@
   canvas.addEventListener('pointercancel', () => { touch = null; });
   document.addEventListener('visibilitychange', () => { if (document.hidden && state === 'playing') pause(); });
   window.addEventListener('blur', () => { if (state === 'playing') pause(); });
+  /* Mando de consola (juegos/audio/mando.js): cruceta o stick para moverse,
+     A empieza o pausa como Espacio, Start pausa, X reinicia. Select da el
+     cursor para tocar los ajustes. */
+  if (window.Mando) window.Mando.configura({
+    botones: { a: 'Space', start: 'KeyP', x: 'KeyR' },
+    pistas: [['dpad stickL', 'moverte'], ['a', 'empezar'], ['start', 'pausa'], ['x', 'reinicia']],
+    zonas: [{ sel: '.controls-caption' }, { sel: '#keyboard-start', prefijo: 'o pulsa ', pistas: [['a', '']] }]
+  });
   applySize(); syncSettings(); ready(); requestAnimationFrame(frame);
 })();

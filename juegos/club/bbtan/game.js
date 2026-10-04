@@ -882,6 +882,15 @@
     if(key==='m')$('sound').click();
     if(key==='r')openDialog('restart-dialog');
   });
+  /* Mando de consola (juegos/audio/mando.js): la cruceta o el stick apuntan
+     (repitiendo rápido, como mantener la flecha), A lanza, X recoge las
+     bolas, B acelera. En pausa o al perder, el cursor toca el botón. */
+  if(window.Mando)window.Mando.configura({
+    botones:{izq:{tecla:'ArrowLeft',rep:22,retardo:120},der:{tecla:'ArrowRight',rep:22,retardo:120},a:'Space',start:'KeyP',y:'KeyM',
+      x:()=>$('recall').click(),b:()=>$('speed').click()},
+    menu:()=>paused||state==='over',inicio:'#resume',junto:'.canvas-wrap',
+    pistas:[['dpad stickL','apuntar'],['a','lanzar'],['x','recoger'],['b','velocidad'],['y','sonido'],['start','pausa']]
+  });
   document.addEventListener('visibilitychange',()=>{if(document.hidden && !paused && state!=='over')pause(true);if(document.hidden)BBTANAudio.music(false);uiDirty=true;});
   window.addEventListener('pagehide',()=>{best=Math.max(best,score);persist();});
   function resize() {const ratio=Math.min(window.devicePixelRatio||1,2);canvas.width=Math.round(W*ratio);canvas.height=Math.round(H*ratio);ctx.setTransform(ratio,0,0,ratio,0,0);draw();}

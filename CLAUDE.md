@@ -4327,6 +4327,46 @@ the controls come from:
   effects volumes; it loads `volumen.js` anyway so the mute is one click).
   Clue, Sopa and Electrodle make no sound.
 
+## Mandos (`juegos/audio/mando.js`)
+
+PS4/PS5, Xbox and Switch Pro controllers work everywhere in Juegos. Each
+document that has a game loads `juegos/audio/mando.js` (`?v=mando-N`, bump it
+by hand in every page when it changes). It reads the Gamepad API in its own
+`requestAnimationFrame` and **turns buttons into the keys the game already
+understands**: synthetic `KeyboardEvent`s with `key`, `code` and `keyCode`
+(Phaser reads `keyCode`, Worms `key`, Yemas `code`) and a `__mando` flag,
+dispatched to `cfg.objetivo()` or `document.body`. So a game learns nothing
+about the controller; it declares a mapping with `Mando.configura({botones,
+stick, pistas, menu, inicio, zonas, junto, objetivo})`. A binding is a code
+(`'Space'`), `{tecla, rep, retardo}` for auto-repeat, a function, or
+`{baja, sube}`. Things to keep:
+
+- **Buttons are logical by position**: `a` is always the bottom face button.
+  On a Switch Pro the confirm button is on the right, so `normaliza` swaps
+  a/b and the glyphs follow the family (✕ ○ □ △, A B X Y, or Nintendo's).
+  The family is matched **Xbox first**: its id also says «Wireless
+  Controller», which is DualShock 4's name.
+- **Where there is no config, or `menu()` is true, or a `<dialog>` is open,
+  the controller drives a cursor** (stick moves it, d-pad jumps between
+  buttons, A clicks, B goes back, Start clicks `inicio` or falls back to the
+  `start` binding). Select toggles cursor/game by hand. Room games, Clue,
+  PRODROP, Electrodle and the Sopa use only the cursor.
+- **The keyboard hints are swapped while a controller is connected**: the
+  elements in `zonas` (or a `<p>` after `junto`) are hidden and replaced by
+  the controller's `pistas`, in the connected family's glyphs. A config
+  change removes the previous one's hints. The top page steps aside while an
+  iframe with its own copy is the one being played, so a button never acts
+  twice.
+- **Analog input is read by the game itself** through `Mando.estado()`:
+  Yemas looks with the right stick, shoots with RT and aims with LT
+  (`pasoMando` in its `main.js`), and needs no pointer lock with a
+  controller; Start opens its pause, where the cursor takes over.
+- Tetris (room and club) derives its mapping from the remappable keys
+  (`mandoTetris` in the club's `motor.js`), so a remap moves the controller
+  too.
+
+`tests/mando.test.cjs` covers the pure part (`Mando._p`) and Tetris' mapping.
+
 ## Idiomas (`i18n.js`)
 
 Every page loads `i18n.js` right after `<meta charset>` (`../../i18n.js` or
