@@ -325,7 +325,7 @@ export function economia(datos) {
     } else if (e.t === "r") {
       /* Un re-roll vale si quien lo hace no está parado y las diez son
          suyas, distintas, no están a la venta y son de la misma rareza
-         (menos que legendaria). Las diez desaparecen y queda una copia
+         (menos que legendaria) y de la colección de su clave. Las diez desaparecen y queda una copia
          nueva, `<uid>~<clave>.0`, cuya carta y nota salen del motor. */
       const x = U(e.u), cs = e.c;
       if (x.parada || cs.length !== PM.REROLL.n || new Set(cs).size !== cs.length) continue;
@@ -334,6 +334,8 @@ export function economia(datos) {
       if (fs.some(f => !f)) continue;
       const tier = PM.CARDS[fs[0].id].tier;
       if (tier >= 3 || fs.some(f => PM.CARDS[f.id].tier !== tier)) continue;
+      // y de la colección que dice su clave (antes de las colecciones, todo era de los profes)
+      if (fs.some(f => PM.CARDS[f.id].col !== PM.coleccionDe(e.k))) continue;
       const res = PM.reroll(e.u, e.k, e.at, tier, fs.map(f => f.g));
       for (const cc of cs) delete dueno[cc];
       sobres[e.u + "~" + e.k] = { u: e.u, k: e.k, at: e.at, r: res, de: cs.slice(), tier };

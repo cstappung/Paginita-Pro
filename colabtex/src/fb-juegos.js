@@ -358,8 +358,11 @@ export async function comprarTienda(uid, item, p) {
    que costó, y la regla comprueba que sea el precio de ese instante.
    `cartas/g/<uid>/<clave>/<i>` = {at, p: 100}: la carta i de ese sobre,
    graduada. Las dos se escriben una vez y no se borran: son el gasto. */
-export async function comprarSobre(uid, p) {
-  const r = push(ref(db, `cartas/s/${uid}`));
+/* `pre` es la colección (`p` profes, `c` componentes): va delante de la
+   clave de push, y el motor la lee de ahí. Sin prefijo, el sobre es de
+   los de antes de las colecciones. */
+export async function comprarSobre(uid, p, pre = "") {
+  const r = ref(db, `cartas/s/${uid}/${pre}${push(ref(db, `cartas/s/${uid}`)).key}`);
   await set(r, { at: serverTimestamp(), p });
   const x = (await get(r)).val();
   return { k: r.key, at: x.at, p: x.p };
@@ -367,8 +370,8 @@ export async function comprarSobre(uid, p) {
 /* El sobre gratis: el sobre con `p: 0` y `cartas/gratis/<uid>` = {at, k}
    en una sola escritura; la regla mira en el segundo que hayan pasado 6
    horas desde el anterior. */
-export async function sobreGratis(uid) {
-  const k = push(ref(db, `cartas/s/${uid}`)).key;
+export async function sobreGratis(uid, pre = "") {
+  const k = pre + push(ref(db, `cartas/s/${uid}`)).key;
   await update(ref(db), { [`cartas/s/${uid}/${k}`]: { at: serverTimestamp(), p: 0 }, [`cartas/gratis/${uid}`]: { at: serverTimestamp(), k } });
   const x = (await get(ref(db, `cartas/s/${uid}/${k}`))).val();
   return { k, at: x.at, p: 0 };
@@ -377,8 +380,8 @@ export async function sobreGratis(uid) {
    rareza a cambio de una de la siguiente. La carta nueva sale del motor
    con `at`, la hora del servidor (la regla exige `at === now`), y la
    economía comprueba que las diez fueran de quien lo escribe. */
-export async function rerollCartas(uid, c) {
-  const r = push(ref(db, `cartas/r/${uid}`));
+export async function rerollCartas(uid, c, pre = "") {
+  const r = ref(db, `cartas/r/${uid}/${pre}${push(ref(db, `cartas/r/${uid}`)).key}`);
   await set(r, { at: serverTimestamp(), c });
   const x = (await get(r)).val();
   return { k: r.key, at: x.at };
