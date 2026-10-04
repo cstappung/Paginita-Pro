@@ -2207,3 +2207,11 @@ function playCasinoWin(scene) {
   siren.stop(ctx.currentTime + 0.6);
 }
 
+
+// Mando de consola (juegos/audio/mando.js): la cruceta o el stick eligen el
+// bloque, A lo toma o lo suelta (como Espacio) y Start reinicia (Enter).
+if (window.Mando) window.Mando.configura({
+  botones: { izq: { tecla: 'ArrowLeft', rep: 140 }, der: { tecla: 'ArrowRight', rep: 140 }, a: 'Space', start: 'Enter' },
+  junto: '.marco',
+  pistas: [['dpad stickL', 'elegir bloque'], ['a', 'tomar / soltar'], ['start', 'reiniciar']]
+});

@@ -331,6 +331,19 @@
   $('restart').addEventListener('click',()=>reset());$('play-again').addEventListener('click',()=>{reset();focusCell(0,true);});
   $('view-board').addEventListener('click',()=>{$('result').close();focusCell(focusedIndex,true);});
   $('pause').addEventListener('click',()=>togglePause());$('resume').addEventListener('click',()=>togglePause(false));
+  /* Mando de consola (juegos/audio/mando.js): la cruceta o el stick
+     recorren las casillas (las teclas van a la casilla enfocada, que es
+     donde el teclado las espera), A descubre, X pone bandera. */
+  if (window.Mando) window.Mando.configura({
+    botones: {
+      arriba: { tecla: 'ArrowUp', rep: 110 }, abajo: { tecla: 'ArrowDown', rep: 110 },
+      izq: { tecla: 'ArrowLeft', rep: 110 }, der: { tecla: 'ArrowRight', rep: 110 },
+      a: 'Enter', x: 'KeyF', y: 'KeyR', start: 'KeyP'
+    },
+    objetivo: () => buttons[focusedIndex] || board,
+    pistas: [['dpad stickL', 'moverte'], ['a', 'explorar'], ['x', 'bandera'], ['start', 'pausa'], ['y', 'reiniciar']],
+    zonas: [{ sel: '.underboard > span:first-child' }]
+  });
   function ponModo(bandera, avisar = true) {
     flagMode = bandera;
     document.querySelectorAll('#modo-toque [data-modo]').forEach(b => b.setAttribute('aria-checked', String((b.dataset.modo === 'bandera') === flagMode)));

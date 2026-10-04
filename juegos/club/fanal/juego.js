@@ -1431,6 +1431,15 @@
     }
   });
   document.addEventListener("keyup", e => { const t = TECLA[e.code]; if (t) teclas[t] = false; });
+  /* Mando de consola (juegos/audio/mando.js): la cruceta o el stick reman,
+     A dispara (mantenido, como Espacio), Start pausa. En la portada, el fin
+     y los paneles manda el cursor. */
+  if (window.Mando) window.Mando.configura({
+    botones: { a: "Space", rt: "Space", start: "KeyP", y: "KeyM" },
+    menu: () => estado === "portada" || estado === "fin" || estado === "final" || estado === "pausa" || !!panel,
+    pistas: [["dpad stickL", "remar"], ["a rt", "disparar al pulso"], ["start", "pausa"], ["y", "sonido"]],
+    zonas: [{ sel: ".pie" }]
+  });
   // El dedo (o el ratón) sobre el lienzo: rema hasta donde está y dispara al tocar.
   const aLogico = ev => { const r = lienzo.getBoundingClientRect(); return ((ev.clientX - r.left) / r.width) * W; };
   lienzo.addEventListener("pointerdown", ev => {

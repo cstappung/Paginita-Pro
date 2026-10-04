@@ -58,6 +58,13 @@ export function crearTetris(ctx) {
     mando.baja(e);
   };
   const teclaArriba = e => mando.sube(e);
+  // Mando de consola (juegos/audio/mando.js): botones → las mismas teclas.
+  let cfgMando = null;
+  const ponMando = t => {
+    if (!window.Mando) return;
+    cfgMando = Object.assign(TM.mandoTetris(t), { menu: () => !juego() || configurando || !s || s.fin, zonas: [{ sel: "#ttTeclasTxt" }] });
+    window.Mando.configura(cfgMando);
+  };
   const alOcultar = () => { if (document.hidden) mando.suelta(); };
 
   function montar(host) {
@@ -79,10 +86,10 @@ export function crearTetris(ctx) {
       <div id="ttHist" class="jg-tt-hist"></div>`;
     host.appendChild(raiz);
     const pintaTeclas = () => { raiz.querySelector("#ttTeclasTxt").textContent = TM.textoTeclas(); };
-    pintaTeclas();
+    pintaTeclas(); ponMando();
     raiz.querySelector("#ttTeclas").addEventListener("click", () => {
       configurando = true; mando.suelta();
-      TM.panelTeclas(document, t => { mando.recarga(t); pintaTeclas(); }, () => { configurando = false; });
+      TM.panelTeclas(document, t => { mando.recarga(t); pintaTeclas(); ponMando(t); }, () => { configurando = false; });
     });
     raiz.querySelector("#ttTactil").addEventListener("pointerdown", e => {
       const b = e.target.closest("button[data-a]");
@@ -276,6 +283,7 @@ export function crearTetris(ctx) {
     clearTimeout(avisoT);
     document.removeEventListener("keydown", teclaAbajo);
     document.removeEventListener("keyup", teclaArriba);
+    if (window.Mando && cfgMando) window.Mando.libera(cfgMando);
     document.removeEventListener("visibilitychange", alOcultar);
     if (desVivo) desVivo();
     if (raiz) raiz.remove();

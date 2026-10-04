@@ -130,11 +130,15 @@
   const mando = TM.crearMando(acciones);
   let configurando = false;
   const pintaTeclas = () => { $('teclasTxt').textContent = TM.textoTeclas(); };
-  pintaTeclas();
+  // Mando de consola: mismas acciones que el teclado (ver TM.mandoTetris).
+  const ponMando = t => window.Mando && window.Mando.configura(Object.assign(TM.mandoTetris(t), {
+    menu: () => estado !== 'jugando' || configurando, inicio: '#jugar', zonas: [{ sel: '#teclasTxt' }]
+  }));
+  pintaTeclas(); ponMando();
   $('teclas').addEventListener('click', () => {
     if (estado === 'jugando') pausa();
     configurando = true; mando.suelta();
-    TM.panelTeclas(document, t => { mando.recarga(t); pintaTeclas(); }, () => { configurando = false; });
+    TM.panelTeclas(document, t => { mando.recarga(t); pintaTeclas(); ponMando(t); }, () => { configurando = false; });
   });
   document.addEventListener('keydown', e => {
     if (configurando) return;

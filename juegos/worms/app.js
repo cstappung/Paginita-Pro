@@ -77,5 +77,16 @@ if(online){
   input:updateInputs,rebuild:()=>renderer.buildTerrain(),hud:()=>{updateHUD();processEvents();},notice:text=>showNotice(text,4)
  });
 }
+/* Mando: el stick izquierdo camina (A/D), la cruceta apunta y regula la
+   potencia (flechas), ✕/A salta, □/X o R2 cargan y sueltan el disparo, L1/R1
+   pasan de arma saltando las que no tienen munición. */
+function cambiaArma(d){if(!game||overlay||!mine())return;const n=WEAPONS.length;for(let i=1;i<=n;i++){if(game.selectWeapon(((game.weapon+d*i)%n+n)%n)){updateHUD();return;}}}
+if(window.Mando)Mando.configura({
+ stick:{izq:'KeyA',der:'KeyD'},
+ botones:{a:'KeyW',x:'Space',rt:'Space',lb:()=>cambiaArma(-1),rb:()=>cambiaArma(1),y:'KeyQ',r3:'KeyC',start:'Escape'},
+ menu:()=>!game||!!overlay,
+ zonas:[{sel:'.key-guide'}],
+ pistas:[['stickL','mover'],['a','saltar'],['izq der','apuntar'],['arriba abajo','potencia'],['x rt','mantener para cargar'],['lb rb','arma'],['y','mapa'],['r3','seguir'],['start','pausa']]
+});
 requestAnimationFrame(frame);
 })(window);

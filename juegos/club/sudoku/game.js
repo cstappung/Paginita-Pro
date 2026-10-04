@@ -921,6 +921,30 @@
     elige(f * 9 + c, true);
   });
 
+  /* Mando de consola (juegos/audio/mando.js). No hay diez botones para diez
+     cifras, así que LB/RB eligen la cifra (se ilumina en el teclado de
+     pantalla) y A la escribe en la celda: la cruceta o el stick mueven. */
+  let cifraMando = 1;
+  const marcaCifra = () => teclas.forEach((b, k) => b.classList.toggle("mando-cifra", window.Mando && window.Mando.conectado() && k + 1 === cifraMando));
+  const cambiaCifra = d => { cifraMando = (cifraMando + d + 8) % 9 + 1; marcaCifra(); };
+  if (window.Mando) {
+    window.Mando.configura({
+      botones: {
+        arriba: { tecla: "ArrowUp", rep: 120 }, abajo: { tecla: "ArrowDown", rep: 120 },
+        izq: { tecla: "ArrowLeft", rep: 120 }, der: { tecla: "ArrowRight", rep: 120 },
+        lb: () => cambiaCifra(-1), rb: () => cambiaCifra(1),
+        a: () => escribe(cifraMando), x: "Backspace", y: "KeyN", b: "KeyU", rt: "KeyH"
+      },
+      menu: () => !$("final").hidden,
+      pistas: [["dpad stickL", "moverte"], ["lb rb", "elegir cifra"], ["a", "escribir"], ["x", "borrar"], ["y", "notas"], ["b", "deshacer"], ["rt", "pista"]],
+      zonas: [{ sel: "#nota" }]
+    });
+    window.Mando.alCambiar(marcaCifra);
+    const st = document.createElement("style");
+    st.textContent = ".tecla.mando-cifra{outline:3px solid var(--cian);outline-offset:2px;background:var(--line)}";
+    document.head.appendChild(st);
+  }
+
   /* ---------- Arranque ---------- */
   $("nota").innerHTML = "Teclas: <kbd>1</kbd>–<kbd>9</kbd> escriben, flechas para moverte, <kbd>Supr</kbd> borra, <kbd>N</kbd> notas, <kbd>Ctrl</kbd>+<kbd>Z</kbd> deshace, <kbd>H</kbd> pista (Clásico). " +
     (Club && document.documentElement.classList.contains("club-integrado")

@@ -437,6 +437,21 @@
     pinta(); doc.body.appendChild(capa);
     return { cierra };
   }
+  /* La asignación del mando de consola (juegos/audio/mando.js): cada botón
+     manda la *primera* tecla configurada de su acción, así que remapear el
+     teclado no rompe el mando. El stick no suelta la pieza hacia arriba: un
+     roce del pulgar la dejaría caer sin querer. */
+  function mandoTetris(t) {
+    t = t || leeTeclas();
+    const k = a => (t[a] && t[a][0]) || TECLAS_DEFECTO[a][0];
+    return {
+      botones: { izq: k("izq"), der: k("der"), abajo: k("blando"), arriba: k("caer"), y: k("caer"),
+        a: k("gira"), b: k("contragira"), x: k("guarda"), lb: k("guarda"), rb: k("guarda"), start: k("pausa") },
+      stick: { izq: k("izq"), der: k("der"), abajo: k("blando") },
+      pistas: [["izq der", "mover"], ["abajo", "bajar"], ["arriba y", "soltar"], ["a", "girar"], ["b", "contragiro"],
+        ["x lb rb", "guardar"], ["start", "pausa"]]
+    };
+  }
   /* Aplica una acción del mando a una partida. */
   function accion(s, a) {
     if (a === "izq") return mover(s, -1);
@@ -451,6 +466,6 @@
   return {
     W, H, OCULTAS, PIEZAS, COLOR, rng, bolsa, gravedad, crear, cabe, mover, rotar, fantasma, caer, guardar,
     avanza, recibe, pendiente, resumen, accion, pintaPozo, pintaPieza, pintaResumen, crearMando, celdas,
-    ACCIONES, TECLAS_DEFECTO, leeTeclas, guardaTeclas, nombreTecla, panelTeclas, textoTeclas
+    ACCIONES, TECLAS_DEFECTO, leeTeclas, guardaTeclas, nombreTecla, panelTeclas, textoTeclas, mandoTetris
   };
 });

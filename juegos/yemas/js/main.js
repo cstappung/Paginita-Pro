@@ -550,6 +550,63 @@ addEventListener('wheel', e => {
   }
 });
 
+// ---------- Mando ----------
+// Las teclas las manda Mando como si fueran del teclado (el stick izquierdo
+// es WASD); lo analógico se lee aquí cada cuadro: el stick derecho mira, R2
+// dispara y L2 apunta. Con mando no hace falta capturar el mouse: «Options»
+// abre y cierra la pausa, y en la pausa el mando maneja el cursor.
+let padPausa = false, padActivo = false, padGatillo = false, padMira = false;
+const padJuega = () => !!(window.Mando && Mando.conectado()) && jugando && puedoJugar() && !padPausa;
+function rueda(paso) {
+  const n = yo.inv.length;
+  for (let k = 1; k < n; k++) {
+    const i = ((yo.sel + paso * k) % n + n) % n;
+    if (yo.inv[i] !== null) { cambiarArma(i); break; }
+  }
+}
+function pasoMando(dt) {
+  const hay = !!(window.Mando && Mando.conectado()) && jugando && puedoJugar();
+  if (!hay) {
+    if (padActivo) {   // se desconectó: todo vuelve a depender del mouse
+      padActivo = false; padPausa = false;
+      if (padGatillo) { gatillo = false; yaDisparo = false; padGatillo = false; }
+      if (padMira) { yo.apuntando = false; padMira = false; }
+      $('pausa').hidden = !puedoJugar() || bloqueado();
+    }
+    return;
+  }
+  padActivo = true;
+  $('pausa').hidden = bloqueado() || !padPausa;
+  const st = Mando.estado();
+  if (!st || padPausa || st.modo === 'cursor') return;
+  const tira = st.b.rt > 0.4, mira = st.b.lt > 0.4;
+  if (tira !== padGatillo) { padGatillo = tira; gatillo = tira; if (!tira) yaDisparo = false; }
+  if (mira !== padMira) { padMira = mira; yo.apuntando = mira; }
+  if (!yo.vivo) return;
+  const r = 3.2 * pref.sens * (1 - yo.zoom * 0.7) * dt;
+  yo.yaw -= st.ejes.rx * Math.abs(st.ejes.rx) * r;
+  yo.pitch = Math.max(-1.5, Math.min(1.5, yo.pitch - st.ejes.ry * Math.abs(st.ejes.ry) * r * 0.8));
+}
+if (window.Mando) Mando.configura({
+  stick: { izq: 'KeyA', der: 'KeyD', arriba: 'KeyW', abajo: 'KeyS' },
+  botones: {
+    a: 'Space', b: 'KeyC', x: 'KeyR', y: () => rueda(1), lb: 'KeyG', rb: 'KeyE',
+    l3: 'ShiftLeft', r3: 'KeyQ',
+    arriba: 'KeyT', abajo: 'Tab', izq: 'KeyX', der: 'KeyV',
+    start: () => {
+      padPausa = !padPausa;
+      if (!padPausa) sonido.iniciar();
+      else if (document.pointerLockElement) document.exitPointerLock();   // si no, la pausa queda tapada
+    },
+  },
+  menu: () => !jugando || padPausa || !puedoJugar(),
+  inicio: '#jugar',
+  zonas: [{ sel: '#pausa .chico' }, { sel: '#menu .ayuda' }],
+  pistas: [['stickL', 'moverte'], ['stickR', 'mirar'], ['rt', 'disparar'], ['lt', 'mira'], ['a', 'saltar'],
+    ['l3', 'correr'], ['b', 'deslizarse'], ['x', 'recargar'], ['y', 'arma'], ['lb', 'granada'], ['arriba', 'cambia granada'],
+    ['rb', 'usar / recoger'], ['r3', 'espátula'], ['izq', 'mantener: autodestrucción'], ['abajo', 'tabla'], ['der', 'hablar'], ['start', 'pausa']],
+});
+
 // ---------- Armas ----------
 function llenaArma(id) {
   const a = armaDe(id);
@@ -2282,6 +2339,7 @@ function bucle(ahora) {
   requestAnimationFrame(bucle);
   const dt = Math.min(0.05, (ahora - reloj) / 1000);
   reloj = ahora;
+  pasoMando(dt);
   if (jugando) actualizar(dt);
   else {
     const t = ahora / 1000 * 0.08;
@@ -2301,7 +2359,7 @@ requestAnimationFrame(bucle);
 // Para depurar desde la consola: __yemas.paso(dt) avanza el juego sin requestAnimationFrame
 window.__yemas = {
   yo, otros, disparar, beber, granadas, suelo, pref, alGolpe, nubes, tirarEspatula, director, get cegado() { return cegado; }, get zombis() { return zombis; },
-  get inter() { return inter; }, get mundo() { return mundo; },
+  get inter() { return inter; }, get mundo() { return mundo; }, get pad() { return { padPausa, padActivo }; },
   get red() { return red; }, get marcador() { return marcador; },
   paso(dt) { actualizar(dt); actualizarEfectos(dt); escena.updateMatrixWorld(); },
 };
