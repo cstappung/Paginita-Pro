@@ -19,6 +19,10 @@
  *   watch(categoria, cb)           → las filas de esa tabla
  *   partida = {leer(), guardar(d, at)}  → `users/<uid>/club/frontera`
  *   alResultado([{d, previa}])     → días, partidas del club y logros
+ *
+ * Con `usuario.invitado` (el modo invitado del salón) se juega igual,
+ * pero nada sale del navegador: ni la clasificación ni la racha en la
+ * cuenta, y el menú dice por qué en vez de prometer una tabla.
  */
 import { cargaMotor, motorListo } from "./pokemon/carga.js";
 import { crearPokemon } from "./pokemon.js";
@@ -38,9 +42,12 @@ const TEXTO = {
 const ICONO = { torre: "🗼", palacio: "🏯", fabrica: "🏭" };
 
 export function crearFrontera({ usuario, guardar, watch, partida, alResultado, volver }) {
-  const uid = usuario.uid;
+  const uid = usuario.uid, invitado = !!usuario.invitado;
   let host = null, muerto = false, PM = null, F = null;
-  let datos = { v: 1, runs: {}, mejor: {}, victorias: 0, tiempoTot: 0, at: 0 };
+  /* Con todas las piezas que `sano` garantiza a lo que se carga: quien
+     entra por primera vez (y todo invitado) no tiene nada guardado, y sin
+     `pend` el menú no se podía pintar. */
+  let datos = { v: 1, runs: {}, mejor: {}, pend: {}, tMejor: {}, victorias: 0, tiempoTot: 0, at: 0 };
   let vista = "carga", sel = { inst: "torre", nivel: "50" };
   let equipos = null, skin = "red";
   let elegidos = [];                 // índices elegidos (equipo propio o alquiler)
@@ -104,6 +111,7 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, v
      (reglas sin publicar, sin red), el récord ya figuraba en `mejor` y no
      volvía a subir nunca: el menú lo mostraba y la tabla no. */
   function sube(cat, dato) {
+    if (invitado) return Promise.resolve();
     datos.pend[cat] = dato;
     persiste();
     const nombre = String(usuario.name || "Jugador").slice(0, 80);
@@ -149,6 +157,7 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, v
       }); } catch (e) { console.warn("[frontera] clasificación", cat, e); }
       if (typeof off === "function") desuscribe.push(off);
     };
+    if (invitado) return;
     mira("club-frontera-victorias", yo => { datos.victorias = Math.max(datos.victorias, yo.puntos || 0); },
       () => datos.victorias ? { puntos: datos.victorias, tiempo: Math.max(1, Math.min(TOPE_MS, datos.tiempoTot || TOPE_MS)), partida: `frv-${datos.victorias}-${uid.slice(0, 8)}` } : null);
     for (const i of Object.keys(F.INSTALACIONES)) for (const n of Object.keys(F.NIVELES)) {
@@ -244,7 +253,7 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, v
       <div class="jg-fr-insts">${insts}</div>
       <section class="jg-fr-info">
         <div><h4>Tu Frontera</h4><p><b>${datos.victorias}</b> combates ganados en total.</p>
-          <p class="jg-nota">Cada racha y el total de victorias van a la Clasificación (Juegos individuales → Frontera Batalla).</p>
+          <p class="jg-nota">${invitado ? "Modo invitado: tus rachas valen en esta visita, pero no se guardan ni entran en la Clasificación, y no pagan monedas. Inicia sesión para que cuenten." : "Cada racha y el total de victorias van a la Clasificación (Juegos individuales → Frontera Batalla)."}</p>
           ${sinReglas ? `<p class="jg-fr-aviso">⚠ La clasificación rechazó tu marca (PERMISSION_DENIED): faltan publicar las reglas de Firebase con la Frontera. Queda guardada aquí y se sube sola en cuanto se publiquen.</p>` : Object.keys(datos.pend).length ? `<p class="jg-nota">Subiendo tus marcas a la clasificación…</p>` : ""}</div>
         <div><h4>Monedas 🪙</h4><p class="jg-nota">Cada victoria paga 3. Cuando superas tu récord de racha, cada combate nuevo paga lo de la tabla (el séptimo de cada serie, el del rival fuerte, paga 10 más).</p>
           <table class="jg-fr-tabla"><thead><tr><th>Combate</th><th>Serie</th><th>Paga</th></tr></thead><tbody>${filas}</tbody></table></div>

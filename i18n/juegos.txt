@@ -442,3 +442,32 @@ Plantarse || Stay || Stai
 Pedir carta || Hit || Chiedi carta
 Rendirse || Resign || Arrenditi
 Ofrecer tablas || Offer a draw || Offri patta
+# El salón (vestíbulo rediseñado) y el modo invitado
+Solo || Solo || Da solo
+Multi || Multi || Multi
+1 jugador || 1 player || 1 giocatore
+{} jugadores || {} players || {} giocatori
+Contra bots || Vs bots || Contro i bot
+Requiere cuenta || Account required || Serve un account
+Iniciar sesión || Sign in || Accedi
+Acceder || Sign in || Accedi
+Iniciar sesión y jugar || Sign in and play || Accedi e gioca
+Seguir como invitado || Continue as guest || Continua come ospite
+Estás como invitado. || You're playing as a guest. || Stai giocando come ospite.
+Modo de juego || Game mode || Modalità di gioco
+Ver todos || See all || Vedi tutti
+Ver opciones y abrir sala → || See options and open a room → || Vedi opzioni e apri una stanza →
+Reto diario || Daily challenge || Sfida del giorno
+Ranking || Ranking || Classifica
+Sin ranking || No ranking || Senza classifica
+Practicar || Practice || Allenati
+Duelo || Duel || Duello
+Unirme || Join || Unisciti
+Abrir sala e invitar || Open a room and invite || Apri una stanza e invita
+Opciones de la sala || Room options || Opzioni della stanza
+Probar solo || Try it solo || Provalo da solo
+Sala || Room || Stanza
+Juega con otros || Play with others || Gioca con altri
+Volver al salón || Back to the lobby || Torna alla sala giochi
+Este juego es multijugador y necesita una cuenta || This is a multiplayer game and needs an account || Questo gioco è multigiocatore e richiede un account
+Mientras tanto, practícalo solo contra bots → || Meanwhile, practise it solo against bots → || Nel frattempo, allenati da solo contro i bot →

@@ -20,6 +20,13 @@ import * as fb from "../../fb-juegos.js";
 import { cargaMotor } from "./carga.js";
 import { TIPOS, COLOR_TIPO, STATS_CORTO } from "./relato.js";
 import { ENTRENADORES, REGIONES, skinSana, htmlEntrenador } from "./entrenadores.js";
+import { UID_INVITADO } from "../salon-datos.js";
+
+/* El invitado (la Frontera sin cuenta) guarda sus equipos solo en este
+   navegador: la base no le deja leer ni escribir, y preguntarle igual
+   costaba ocho segundos de espera por lectura y un aviso de error por
+   cada equipo guardado. */
+const soloLocal = uid => uid === UID_INVITADO;
 
 const esc = t => String(t == null ? "" : t).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const STATS = ["hp", "atk", "def", "spa", "spd", "spe"];
@@ -43,7 +50,7 @@ export async function misEquipos(uid) {
   /* Con tope: una lectura que no vuelve nunca (conexión a medias) dejaba
      la Frontera en «Abriendo las puertas…» y la sala en «Cargando tus
      equipos…» para siempre. Sin respuesta en 8 s vale la copia local. */
-  try { d = await conTope(fb.leerPokemon(uid), 8000); } catch (e) { d = null; }
+  if (!soloLocal(uid)) try { d = await conTope(fb.leerPokemon(uid), 8000); } catch (e) { d = null; }
   const local = leeLocal(uid);
   if (!d || (!d.equipos && local && local.equipos)) d = local || {};
   d.equipos = d.equipos || {};
@@ -288,7 +295,7 @@ export async function abreEquipos({ uid, formato = "", alCerrar } = {}) {
     if (el.dataset.x === "skin") {
       datos.skin = skinSana(el.value);
       guardaLocal(uid, datos);
-      fb.guardarSkinPk(uid, datos.skin).catch(() => {});
+      if (!soloLocal(uid)) fb.guardarSkinPk(uid, datos.skin).catch(() => {});
       pinta(); sprites(); return;
     }
     if (el.dataset.x === "nombre") { nombre = el.value; sucio = true; return; }
@@ -330,14 +337,14 @@ export async function abreEquipos({ uid, formato = "", alCerrar } = {}) {
       datos.equipos[id] = e;
       guardaLocal(uid, datos);
       b.disabled = true;
-      try { await fb.guardarEquipoPk(uid, id, e); }
+      if (!soloLocal(uid)) try { await fb.guardarEquipoPk(uid, id, e); }
       catch (er) { alert("Se guardó en este navegador, pero no en tu cuenta: " + (er.message || er)); }
       carga(id); pinta(); sprites();
     } else if (x === "borrar") {
       if (!sel || !confirm(`¿Borrar «${datos.equipos[sel] && datos.equipos[sel].nombre}»?`)) return;
       delete datos.equipos[sel];
       guardaLocal(uid, datos);
-      fb.borrarEquipoPk(uid, sel).catch(() => {});
+      if (!soloLocal(uid)) fb.borrarEquipoPk(uid, sel).catch(() => {});
       sel = ""; sets = []; sucio = false; pinta();
     }
   });
