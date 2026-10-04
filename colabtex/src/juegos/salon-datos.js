@@ -39,7 +39,7 @@ export const SOLOS = [
     ruta: "#solo/snake", reglas: "snake", popular: "club-snake", ranking: true,
     lema: "Siete modos —contrarreloj, espejo, laberinto…— y cuatro tamaños de mapa.",
     modos: ["Clásico", "Portales", "Ruinas", "Zen"] },
-  { id: "tetris", tipo: "club", nombre: "Tetris Club", genero: "Reflejos", icono: "▤", alta: "2026-09-28",
+  { id: "tetrisclub", tipo: "club", nombre: "Tetris Club", genero: "Reflejos", icono: "▤", alta: "2026-09-28",
     ruta: "#solo/tetris", reglas: "tetrisclub", popular: "club-tetris", ranking: true,
     lema: "Maratón, Sprint de 40 líneas y Ultra de dos minutos.",
     modos: ["Maratón", "Sprint 40", "Ultra 2 min"] },
@@ -147,7 +147,7 @@ export function entradasSalon(juegos, orden = Object.keys(juegos)) {
 
 /* El acento de cada juego del club, el mismo de su portada. */
 export const COLOR_SOLO = {
-  minas: "#f6bc64", snake: "#58f5c0", tetris: "#2fd3e8", sortem: "#00f5ff", bbtan: "#c4f568",
+  minas: "#f6bc64", snake: "#58f5c0", tetrisclub: "#2fd3e8", sortem: "#00f5ff", bbtan: "#c4f568",
   sopa: "#ffb070", electro: "#fbbf24", sudoku: "#ff2fb4", fanal: "#d9a85b", frontera: "#fb923c"
 };
 
