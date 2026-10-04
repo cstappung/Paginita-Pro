@@ -150,19 +150,33 @@
   document.addEventListener('visibilitychange', () => { if (document.hidden && estado === 'jugando') pausa(); });
 
   /* Botones táctiles: ◀ ▶ se repiten al mantener, ▼ es bajada blanda. */
+  const sueltas = [];
   document.querySelectorAll('.tt-tactil [data-a]').forEach(b => {
     const a = b.dataset.a;
     let rep = null;
     const suelta = () => { clearInterval(rep); clearTimeout(rep); rep = null; if (a === 'blando') mando.blando = false; };
     b.addEventListener('pointerdown', e => {
       e.preventDefault(); iniciaAudio();
+      try { b.setPointerCapture(e.pointerId); } catch (_) {}
       if (estado !== 'jugando') return;
       if (a === 'blando') { mando.blando = true; return; }
       acciones(a);
       if (a === 'izq' || a === 'der') rep = setTimeout(() => { rep = setInterval(() => acciones(a), 50); }, 170);
     });
-    ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => b.addEventListener(ev, suelta));
+    ['pointerup', 'pointercancel', 'pointerleave', 'lostpointercapture', 'touchend', 'touchcancel'].forEach(ev => b.addEventListener(ev, suelta));
+    /* iOS: una pulsación larga seleccionaba el botón o abría el menú, que se
+       quedaba con el dedo; el pointerup no llegaba y la pieza seguía corriendo. */
+    b.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+    b.addEventListener('contextmenu', e => e.preventDefault());
+    b.addEventListener('selectstart', e => e.preventDefault());
+    sueltas.push(suelta);
   });
+  /* Red de seguridad: sin dedos en pantalla, ningún botón sigue apretado. */
+  const sueltaTodo = () => sueltas.forEach(f => f());
+  document.addEventListener('touchend', e => { if (!e.touches.length) sueltaTodo(); });
+  document.addEventListener('touchcancel', e => { if (!e.touches.length) sueltaTodo(); });
+  window.addEventListener('blur', sueltaTodo);
+  document.addEventListener('visibilitychange', () => { if (document.hidden) sueltaTodo(); });
 
   $('jugar').addEventListener('click', () => estado === 'pausa' ? pausa() : empieza());
   $('sonido').addEventListener('click', () => {
