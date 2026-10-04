@@ -471,3 +471,9 @@ Juega con otros || Play with others || Gioca con altri
 Volver al salón || Back to the lobby || Torna alla sala giochi
 Este juego es multijugador y necesita una cuenta || This is a multiplayer game and needs an account || Questo gioco è multigiocatore e richiede un account
 Mientras tanto, practícalo solo contra bots → || Meanwhile, practise it solo against bots → || Nel frattempo, allenati da solo contro i bot →
+Volumen || Volume || Volume
+Silenciar || Mute || Disattiva audio
+Activar el sonido || Unmute || Attiva audio
+Volumen del juego || Game volume || Volume del gioco
+Efectos || Effects || Effetti
+Volumen de los efectos || Effects volume || Volume degli effetti

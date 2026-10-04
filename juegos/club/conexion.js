@@ -28,6 +28,8 @@
     if(invitado){panel.classList.add('club-invitado');panel.querySelector('button').hidden=true;}
     if(!embebido){estado.textContent='Abre este juego desde Juegos para sincronizar tu clasificación con tu cuenta.';}else window.Club.category(categoria);
     if(embebido){const sonido=document.getElementById('sound-button');if(sonido)shell.querySelector('.scorebar')?.appendChild(sonido);}
+    // Volumen y silencio (../../audio/volumen.js): si el juego no le dio un sitio, junto al marcador o flotando en una esquina.
+    if(window.VolumenJuego&&!document.querySelector('.vj-ctl')){const barra=shell.querySelector('.scorebar');if(barra)VolumenJuego.control(barra);else{const f=document.createElement('div');f.className='club-vol-flota';document.body.appendChild(f);VolumenJuego.control(f);}}
     let alto=0;const medir=()=>{const nuevo=Math.ceil(shell.getBoundingClientRect().bottom+32);if(nuevo!==alto){alto=nuevo;enviar({tipo:'alto',alto});}};
     new ResizeObserver(medir).observe(shell);medir();
   });

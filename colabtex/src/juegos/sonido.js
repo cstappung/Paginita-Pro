@@ -66,10 +66,21 @@ function contexto() {
    «gana» suena de la misma familia que el tema que tiene debajo, en vez de
    un pitido de seno pegado encima de otra cosa. */
 let bus = null, busFx = null;
+/* El volumen de los efectos va aparte del de la música (`jg.volEfectos`,
+   0–1): bajar uno no tiene por qué callar el otro. */
+let volEfectos = 1;
+try { const v = localStorage.getItem("jg.volEfectos"); if (v !== null && Number.isFinite(Number(v))) volEfectos = Math.max(0, Math.min(1, Number(v))); } catch (e) {}
+const GANANCIA_FX = 0.9;
+export const volumenEfectos = () => volEfectos;
+export function configurarEfectos(v) {
+  volEfectos = Math.max(0, Math.min(1, Number(v) || 0));
+  try { localStorage.setItem("jg.volEfectos", String(volEfectos)); } catch (e) {}
+  if (busFx && ctx) busFx.gain.setTargetAtTime(volEfectos * GANANCIA_FX, ctx.currentTime, 0.05);
+}
 function fx() {
   const a = motor();
   if (!a) return null;
-  if (!busFx) { busFx = a.createGain(); busFx.gain.value = 0.9; busFx.connect(a.destination); }
+  if (!busFx) { busFx = a.createGain(); busFx.gain.value = volEfectos * GANANCIA_FX; busFx.connect(a.destination); }
   return a;
 }
 const P = (a, t, f, dur, o = {}) => Chip.voz(a, busFx, Object.assign({ t, f, dur, vol: 0.1, onda: "p25", sus: 0.8 }, o));

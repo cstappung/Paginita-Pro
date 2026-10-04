@@ -10,7 +10,8 @@
 "use strict";
 import {
   CANCIONES, GRUPOS, MODOS_LISTA, estadoMusica, alCambiarMusica, elegirCancion,
-  siguienteCancion, modoMusica, configurarMusica, activarAudio
+  siguienteCancion, modoMusica, configurarMusica, activarAudio,
+  volumenEfectos, configurarEfectos
 } from "./sonido.js";
 
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -63,12 +64,15 @@ export function montaReproductor(boton) {
         <button class="jg-rep-b" data-rep="sig" title="Siguiente" aria-label="Siguiente">⏭</button>
         <label class="jg-rep-vol"><span aria-hidden="true">🔉</span><input type="range" min="0" max="100" data-rep="vol" aria-label="Volumen de la música"></label>
       </div>
+      <label class="jg-rep-vol jg-rep-fx"><span>Efectos</span><input type="range" min="0" max="100" data-rep="fx" aria-label="Volumen de los efectos"></label>
       <div class="jg-rep-modos" role="radiogroup" aria-label="Al terminar la canción">
         ${Object.entries(MODOS_LISTA).map(([k, v]) => `<button role="radio" data-modo="${k}">${k === "repite" ? "🔁" : k === "lista" ? "➡" : "🔀"} ${esc(v)}</button>`).join("")}
       </div>
       <div class="jg-rep-aviso" hidden>Este juego trae su propia música; la tuya vuelve al salir.</div>
       <div class="jg-rep-lista">${lista(e)}</div>`;
     panel.querySelector('[data-rep="vol"]').value = Math.round(e.volumen * 100);
+    panel.querySelector('[data-rep="fx"]').value = Math.round(volumenEfectos() * 100);
+    panel.querySelector('[data-rep="fx"]').addEventListener("input", ev => { activarAudio(); configurarEfectos(Number(ev.target.value) / 100); });
     document.body.appendChild(panel);
     panel.addEventListener("click", alClic);
     panel.querySelector('[data-rep="vol"]').addEventListener("input", ev => {

@@ -2,10 +2,11 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="../../i18n.js?v=202610041307"></script>
+<script src="../../i18n.js?v=202610041921"></script>
+<script src="../audio/volumen.js?v=vol-1"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Yemas</title>
-<link rel="stylesheet" href="estilo.css?v=yemas-13">
+<link rel="stylesheet" href="estilo.css?v=yemas-14">
 <!-- Los módulos llevan la versión aquí, en un solo sitio: GitHub Pages
      cachea diez minutos y un import sin ?v= serviría el archivo viejo. -->
 <script type="importmap">
@@ -69,6 +70,7 @@
     <p>Se captura el mouse para apuntar. <b>Esc</b> lo suelta.</p>
     <p class="chico">WASD moverse · Shift correr · C deslizarse (corriendo) · Espacio saltar · Click disparar · Click der. mira · R recargar · 1 2 3 4 armas · E recoger/cambiar · E usar/comprar (zombis: puertas, caja, bebidas, paredes, Pack-a-Punch, electricidad) · Q espátula dorada · G granada · T cambia granada · mantener X autodestrucción · Tab tabla · V hablar · Shift+F pantalla completa</p>
     <div id="ajustes-pausa" class="ajustes"></div>
+    <div class="vol-pausa" data-volumen></div>
     <div class="botones">
       <button id="pantalla" type="button">⛶ Pantalla completa</button>
       <button id="voz-entrar" type="button" hidden>🎙 Entrar a la voz</button>
@@ -95,6 +97,7 @@
     <select id="mapa-practica"></select>
   </label>
   <div id="ajustes-menu" class="ajustes"></div>
+  <div class="vol-pausa" data-volumen></div>
   <button id="jugar">Jugar</button>
   <p id="modo">Para jugar con otros, abre una sala de Yemas en Juegos.</p>
   <div class="ayuda">

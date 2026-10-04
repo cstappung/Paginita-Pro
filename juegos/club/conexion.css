@@ -19,3 +19,6 @@
 .club-integrado[data-tema=oscuro] .difficulty small,.club-integrado[data-tema=oscuro] .mode-card small,.club-integrado[data-tema=oscuro] .tip-card p,.club-integrado[data-tema=oscuro] .tip-example,.club-integrado[data-tema=oscuro] .music-top p{color:#b2bed0}
 @media(max-width:850px){.club-integrado :is(.game-layout,.layout){grid-template-columns:minmax(0,1fr)}.club-integrado :is(.game-layout,.layout)>aside{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.club-integrado .club-ranking{grid-column:1/-1}.club-integrado :is(.game-layout,.layout)>aside>section{margin-top:0}}
 @media(max-width:540px){.club-integrado :is(.game-layout,.layout)>aside{grid-template-columns:minmax(0,1fr)}.club-integrado :is(.game-layout,.layout){gap:16px}}
+/* El control de volumen común (juegos/audio/volumen.js) cuando el juego no le dejó sitio. */
+.club-vol-flota{position:fixed;right:10px;bottom:10px;z-index:50;color:#e8ecf4}.club-vol-flota .vj-ctl{background:rgba(16,18,28,.78);border-color:rgba(255,255,255,.18);backdrop-filter:blur(6px)}
+.scorebar .vj-ctl{flex-shrink:0}
