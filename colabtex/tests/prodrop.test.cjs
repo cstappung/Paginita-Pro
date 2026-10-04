@@ -25,6 +25,8 @@ test('el catálogo: profes (17 personas por 10 variantes) y componentes (25 por 
  for(const c of PM.CARDS)assert.ok(fs.existsSync(path.join(__dirname,'../../juegos/prodrop',c.img)),'falta '+c.img);
  assert.equal(new Set(PM.CARDS.map(c=>c.uid)).size,PM.TOTAL);
  assert.equal(new Set(PM.CARDS.map(c=>c.col+c.num)).size,PM.TOTAL,'cada colección numera sus cartas sin repetir');
+ // las comunes y raras de componentes llevan además su arte apaisado para la ventana con marco
+ for(const c of PM.POR_COL.comp.filter(c=>c.tier<2)){const a=c.img.replace(/\/([^/]+)$/,'/ancho/$1');assert.ok(fs.existsSync(path.join(__dirname,'../../juegos/prodrop',a)),'falta '+a);}
 });
 
 test('SHA-256 es el de verdad',()=>{
