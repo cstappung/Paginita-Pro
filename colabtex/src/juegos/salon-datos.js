@@ -1,0 +1,185 @@
+/*
+ * El salón de juegos, en datos: qué hay para jugar solo, qué es
+ * multijugador, qué es nuevo y qué puede abrir un invitado.
+ *
+ * Es la mitad pura del vestíbulo (la otra, `salon.js`, pinta). No importa
+ * nada —los juegos multijugador llegan como parámetro, desde la tabla
+ * `JUEGOS` de `motor.js`— y así `tests/salon.test.cjs` lo carga en Node
+ * sin navegador, igual que a `motor.js`.
+ *
+ * Tres decisiones:
+ *
+ * - **Una sola forma de entrada para los dos modos.** Un juego de un
+ *   jugador y uno multijugador se describen con los mismos campos
+ *   (`entradasSalon`), porque la miniatura es la misma pieza: lo que
+ *   cambia es la insignia de modo, no la tarjeta entera. Antes eran dos
+ *   componentes distintos y los de un jugador quedaban como un apéndice.
+ * - **«Nuevo» es una regla, no una lista a mano** (`nuevos`): los cuatro
+ *   que llegaron últimos, si llegaron hace menos de dos semanas. Con un
+ *   juego nuevo cada pocos días, «todo lo de este mes» habría puesto la
+ *   etiqueta a media tienda, y una etiqueta que lo marca todo no marca nada.
+ * - **El invitado ve todo y juega lo que no necesita cuenta** (`bloqueado`).
+ *   Un multijugador escribe en la base de datos (salas, jugadas, ranking),
+ *   y la base solo deja escribir a quien inició sesión; uno de un jugador
+ *   corre entero en el navegador. Esconder los multijugador al invitado
+ *   le escondería también la razón para crearse una cuenta.
+ */
+
+/* Los juegos de un jugador. `tipo: "club"` es un juego del Solo Club, con
+   su clasificación por modalidad; `tipo: "bots"` es la práctica suelta de
+   un juego multijugador (su propia página, contra la máquina), que no
+   puntúa en ninguna tabla. `popular` es la clave con la que la
+   popularidad del vestíbulo cuenta sus partidas; `reglas` la del manual. */
+export const SOLOS = [
+  { id: "minas", tipo: "club", nombre: "Mina Club", genero: "Estrategia", icono: "✦", alta: "2026-09-20",
+    ruta: "#solo/minas", reglas: "minas", popular: "club-minas", ranking: true,
+    lema: "Buscaminas en tres dificultades, con variante táctica y música que crece contigo.",
+    modos: ["Explorador", "Veterano", "Leyenda"] },
+  { id: "snake", tipo: "club", nombre: "Snake Club", genero: "Reflejos", icono: "ϟ", alta: "2026-09-20",
+    ruta: "#solo/snake", reglas: "snake", popular: "club-snake", ranking: true,
+    lema: "Siete modos —contrarreloj, espejo, laberinto…— y cuatro tamaños de mapa.",
+    modos: ["Clásico", "Portales", "Ruinas", "Zen"] },
+  { id: "tetris", tipo: "club", nombre: "Tetris Club", genero: "Reflejos", icono: "▤", alta: "2026-09-28",
+    ruta: "#solo/tetris", reglas: "tetrisclub", popular: "club-tetris", ranking: true,
+    lema: "Maratón, Sprint de 40 líneas y Ultra de dos minutos.",
+    modos: ["Maratón", "Sprint 40", "Ultra 2 min"] },
+  { id: "sortem", tipo: "club", nombre: "sortEm", genero: "Puzzle", icono: "↔", alta: "2026-09-29",
+    ruta: "#solo/sortem", reglas: "sortem", popular: "club-sortem", ranking: true,
+    lema: "Mueve y fusiona los bloques hasta ordenarlos del 1 al 10 o al 20, contra el reloj.",
+    modos: ["10 bloques", "20 bloques"] },
+  { id: "bbtan", tipo: "club", nombre: "BBTAN", genero: "Arcade", icono: "●", alta: "2026-09-30",
+    ruta: "#solo/bbtan", reglas: "bbtan", popular: "club-bbtan", ranking: true,
+    lema: "Apunta, rebota y rompe los bloques antes de que toquen el suelo. Y no te quedes mucho rato.",
+    modos: ["Ranking por ronda máxima"] },
+  { id: "sopa", tipo: "club", nombre: "Sopa de letras", genero: "Palabras", icono: "🔤", alta: "2026-10-01",
+    ruta: "#solo/sopa", reglas: "sopa", popular: "club-sopa", ranking: true, diario: true,
+    lema: "Una sopa diaria igual para todos, con racha de días seguidos, y sopas libres por temática.",
+    modos: ["Sopa del día", "Libre"] },
+  { id: "electro", tipo: "club", nombre: "Electrodle", genero: "Adivinanza", icono: "⚡", alta: "2026-10-01",
+    ruta: "#solo/electro", reglas: "electro", popular: "club-electro", ranking: true, diario: true,
+    lema: "Adivina el componente, la fórmula y el símbolo eléctrico del día. Puntos, racha y podio.",
+    modos: ["Componente", "Fórmula", "Símbolo", "Retos"] },
+  { id: "sudoku", tipo: "club", nombre: "Sudoku Arcade", genero: "Lógica", icono: "🔢", alta: "2026-10-04",
+    ruta: "#solo/sudoku", reglas: "sudoku", popular: "club-sudoku", ranking: true, diario: true,
+    lema: "Diario con racha, clásico en cuatro dificultades y arcade con vidas y combos.",
+    modos: ["Diario", "Clásico", "Arcade"] },
+  { id: "fanal", tipo: "club", nombre: "FANAL", genero: "Arcade", icono: "🪔", alta: "2026-10-04",
+    ruta: "#solo/fanal", reglas: "fanal", popular: "club-fanal", ranking: true,
+    lema: "Llevas la última luz a través de la noche, hacia el Alba. Dispara al pulso de la música.",
+    modos: ["Travesía", "Sin fin"] },
+  { id: "frontera", tipo: "club", nombre: "Frontera Batalla", genero: "Pokémon", icono: "🏰", alta: "2026-10-02",
+    ruta: "#solo/frontera", reglas: "frontera", popular: "club-frontera", ranking: true,
+    lema: "Torre, Palacio y Fábrica de Esmeralda: rachas de siete combates contra entrenadores cada vez más duros.",
+    modos: ["Torre", "Palacio", "Fábrica"] },
+  { id: "bots-worms", tipo: "bots", juego: "worms", nombre: "Circuit Breakers", genero: "Artillería", icono: "💥", alta: "2026-09-23",
+    url: "juegos/worms/index.html?v=worms-4", reglas: "worms",
+    lema: "Tu cuadrilla contra bots, o contra amigos turnándose en el mismo equipo.",
+    modos: ["Contra bots", "Mismo equipo"] },
+  { id: "bots-yemas", tipo: "bots", juego: "yemas", nombre: "Yemas · práctica", genero: "Acción", icono: "🥚", alta: "2026-09-28",
+    url: "juegos/yemas/index.html", reglas: "yemas",
+    lema: "El shooter de huevos contra cuatro bots, o las oleadas de zombis en cinco mapas.",
+    modos: ["Todos contra todos", "Zombis"] },
+  { id: "bots-clue", tipo: "bots", juego: "clue", nombre: "Clue · práctica", genero: "Deducción", icono: "🕵️", alta: "2026-09-29",
+    url: "juegos/clue/index.html", reglas: "clue",
+    lema: "Resuelve el crimen del edificio contra detectives automáticos.",
+    modos: ["Contra bots"] }
+];
+
+/* El género que lleva la miniatura de cada multijugador, junto al número
+   de jugadores: con dieciocho juegos, «Cartas» o «Tablero» ayuda a
+   elegir más que el nombre solo. */
+export const GENERO = {
+  orbita: "Física", escondite: "Búsqueda", cartas: "Cartas", cuadritos: "Tablero",
+  worms: "Artillería", reversi: "Tablero", cadena: "Estrategia", flip7: "Cartas",
+  cacho: "Dados", uno: "Cartas", catan: "Tablero", presidente: "Cartas",
+  spicy: "Faroleo", tetris: "Reflejos", yemas: "Acción", clue: "Deducción",
+  ajedrez: "Tablero", pokemon: "Combate"
+};
+
+/* La práctica contra bots de un multijugador, si la tiene: la ficha la
+   ofrece al lado de «Abrir sala», y al invitado como salida cuando el
+   juego le pide cuenta. */
+export const practicaDe = juego => SOLOS.find(s => s.tipo === "bots" && s.juego === juego) || null;
+
+const DIA = 86400000;
+/* Días desde una fecha `AAAA-MM-DD` (mediodía, para que el huso no la
+   corra al día anterior). Una fecha ilegible cuenta como muy vieja. */
+export function diasDesde(alta, ahora) {
+  const t = Date.parse(alta + "T12:00:00");
+  return Number.isFinite(t) ? Math.floor((ahora - t) / DIA) : Infinity;
+}
+
+/* Qué entradas llevan la etiqueta «Nuevo»: las `max` más recientes que
+   llegaron hace `dias` o menos. Los empates (dos juegos del mismo día)
+   los resuelve el orden de la lista, así que el resultado no cambia de
+   una visita a otra. */
+export function nuevos(entradas, ahora, { max = 4, dias = 14 } = {}) {
+  return new Set(entradas
+    .map((e, i) => ({ id: e.id, i, d: diasDesde(e.alta, ahora) }))
+    .filter(x => x.d >= 0 && x.d <= dias)
+    .sort((a, b) => a.d - b.d || a.i - b.i)
+    .slice(0, max)
+    .map(x => x.id));
+}
+
+/* «2», «2–10» o «1–8»: cuántos caben en una sala de ese juego. */
+export const cupoTexto = j => (j.minimo || 2) === j.cupo ? String(j.cupo) : `${j.minimo || 2}–${j.cupo}`;
+
+/* Todas las entradas del salón con la misma forma. `modo` es lo que
+   distingue la miniatura: "solo" (juego del club), "bots" (práctica de un
+   multijugador) o "multi" (sala en línea). `orden` es la lista de claves
+   multijugador ya ordenada por popularidad (la decide `juegos-main.js`). */
+export function entradasSalon(juegos, orden = Object.keys(juegos)) {
+  const multi = orden.filter(k => juegos[k]).map(k => {
+    const j = juegos[k];
+    return {
+      id: k, modo: "multi", nombre: j.nombre, lema: j.lema, color: j.color, alta: j.alta,
+      genero: GENERO[k] || "", cupo: cupoTexto(j), grupo: j.cupo > 2, reglas: k,
+      practica: practicaDe(k) ? practicaDe(k).id : ""
+    };
+  });
+  const solos = SOLOS.map(s => Object.assign({}, s, {
+    modo: s.tipo === "bots" ? "bots" : "solo",
+    color: s.juego && juegos[s.juego] ? juegos[s.juego].color : COLOR_SOLO[s.id] || "#f6bc64"
+  }));
+  return { solos, multi };
+}
+
+/* El acento de cada juego del club, el mismo de su portada. */
+export const COLOR_SOLO = {
+  minas: "#f6bc64", snake: "#58f5c0", tetris: "#2fd3e8", sortem: "#00f5ff", bbtan: "#c4f568",
+  sopa: "#ffb070", electro: "#fbbf24", sudoku: "#ff2fb4", fanal: "#d9a85b", frontera: "#fb923c"
+};
+
+/* Si el invitado puede abrirla. Un multijugador necesita cuenta siempre;
+   lo de un jugador nunca: corre en el navegador y, sin cuenta, solo deja
+   de guardar el récord. */
+export const bloqueado = (entrada, invitado) => !!invitado && entrada.modo === "multi";
+
+/* El modo de juego que elige la barra del salón. `todos` muestra las dos
+   secciones; los otros dos esconden la que sobra (las novedades se
+   quedan siempre: son el escaparate). Lo guardado que no sea uno de los
+   tres vuelve a `todos`. */
+export const MODOS_SALON = ["todos", "solo", "multi"];
+export const modoSalon = m => MODOS_SALON.includes(m) ? m : "todos";
+
+/* Lo que un invitado deja en `localStorage` y hay que borrar al empezar
+   otra visita, porque «como invitado no se guarda nada» tiene que ser
+   verdad también en este navegador: los juegos del club guardan por
+   cuenta (`Club.storageKey`, sufijo `.cuenta.invitado`), la Frontera su
+   racha (`frontera.invitado`) y los equipos de Pokémon su copia local. */
+export const UID_INVITADO = "invitado";
+export const esClaveInvitado = k => typeof k === "string" && (
+  k.endsWith(".cuenta." + UID_INVITADO) || k === "frontera." + UID_INVITADO ||
+  k === "pk.equipos." + UID_INVITADO || k.startsWith("jg.club.pendientes." + UID_INVITADO + "."));
+
+/* Las vistas que un invitado no puede ver y por qué: el texto del
+   aviso que las sustituye. Todas leen o escriben en la base de datos. */
+export const MOTIVO_CUENTA = {
+  partida: { t: "Te invitaron a una partida", d: "Las partidas en línea son entre cuentas: así cada jugada queda firmada por quien la hizo. Inicia sesión y entras directo a esta sala." },
+  ranks: { t: "La clasificación es para quien tiene cuenta", d: "Cada fila es una persona con sus victorias, y como invitado tus partidas no se guardan. Inicia sesión y empieza a sumar." },
+  logros: { t: "Los logros se ganan con cuenta", d: "Se guardan en tu perfil y se ven en tu página pública. Como invitado juegas igual, pero no quedan registrados." },
+  monedas: { t: "Las monedas viven en tu cuenta", d: "Se ganan jugando, con la recompensa diaria y con los récords, y se gastan en sobres de PRODROP. Sin cuenta no hay dónde guardarlas." },
+  cartas: { t: "PRODROP necesita una cuenta", d: "Los sobres se pagan con monedas y las cartas quedan en tu colección. Inicia sesión para abrir el primero, que cada 6 horas es gratis." },
+  perfil: { t: "Los perfiles son de quien tiene cuenta", d: "Inicia sesión para ver el perfil de los demás y armar el tuyo: foto, marco, fondo y vitrina." }
+};

@@ -2,19 +2,26 @@ import {ambientar} from '../sonido.js';
 import {categoriaClub,resultadoClub,mejorClub} from './club-datos.js';
 
 /* El documento del juego conserva su CSS, su audio y sus animaciones.
-   Solo este adaptador conoce la cuenta y escribe en Firebase. */
+   Solo este adaptador conoce la cuenta y escribe en Firebase.
+
+   Sin `usuario` es el modo invitado del salón: el juego es el mismo, pero
+   no se escucha ninguna clasificación (la base no deja leerla sin sesión),
+   no se guarda ningún récord ni partida a medias, y el panel del juego
+   dice por qué en vez de ofrecer «reintentar». El juego guarda lo suyo con
+   la cuenta «invitado», que el salón borra al empezar otra visita. */
 export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partida}) {
   let host,frame,off,temaObserver,categoria='',muerto=false,pendientes={},guardando=false,propios={};
-  const clave='jg.club.pendientes.'+usuario.uid+'.'+juego;
+  const invitado=!usuario,cuenta=invitado?'invitado':usuario.uid;
+  const clave='jg.club.pendientes.'+cuenta+'.'+juego;
   const ocultos=[];
-  try { const valor=JSON.parse(localStorage.getItem(clave)||'{}');
+  if(!invitado) try { const valor=JSON.parse(localStorage.getItem(clave)||'{}');
     for (const [k,v] of Object.entries(valor||{})) { const dato=resultadoClub(juego,v);if(dato&&k===dato.categoria)pendientes[k]=dato; }
   } catch {}
   function persistir(){try{localStorage.setItem(clave,JSON.stringify(pendientes));}catch{}}
   function enviar(dato){if(!muerto)frame.contentWindow?.postMessage({canal:'club-parent',...dato},location.origin);}
   function estado(texto,key=categoria){enviar({tipo:'estado',categoria:key,texto});}
   async function sincronizar(){
-    if(guardando||muerto)return;guardando=true;const revisados={};
+    if(guardando||muerto||invitado)return;guardando=true;const revisados={};
     for(const [key,dato] of Object.entries(pendientes)){
       if(muerto)break;revisados[key]=dato.partida;
       estado('Sincronizando tu récord…',key);
@@ -37,6 +44,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
   }
   function escuchar(key){
     if(off)off();categoria=key;
+    if(invitado){off=null;estado('Modo invitado: esta partida no se guarda ni entra en la clasificación. Inicia sesión en Juegos para competir.',key);return;}
     off=watch(key,(filas,error)=>{
       if(muerto||categoria!==key)return;
       const orden=(filas||[]).sort((a,b)=>b.puntos-a.puntos||a.tiempo-b.tiempo||a.uid.localeCompare(b.uid));
@@ -65,6 +73,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
     }
     if(d.tipo==='resultado'){
       const dato=resultadoClub(juego,d);if(!dato)return;
+      if(invitado){estado('Buena partida. Como invitado no se guarda: inicia sesión para que tus récords entren en la clasificación.',dato.categoria);return;}
       if(alResultado){try{alResultado(dato,propios[dato.categoria]||pendientes[dato.categoria]||null);}catch(err){/* un logro no debe romper la partida */}}
       if(mejorClub(dato,pendientes[dato.categoria])){pendientes[dato.categoria]=dato;persistir();}
       sincronizar();
@@ -83,7 +92,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
     temaObserver.observe(document.documentElement,{attributes:true,attributeFilter:['data-tema']});
     frame.allow='fullscreen';frame.setAttribute('allowfullscreen','');
     window.addEventListener('message',mensaje);
-    frame.src='juegos/club/'+juego+'/index.html?v=club-18&embed=1&cuenta='+encodeURIComponent(usuario.uid);
+    frame.src='juegos/club/'+juego+'/index.html?v=club-19&embed=1&cuenta='+encodeURIComponent(cuenta)+(invitado?'&invitado=1':'');
     host.appendChild(frame);
   }
   function destruir(){muerto=true;temaObserver?.disconnect();if(off)off();window.removeEventListener('message',mensaje);for(const [el,valor]of ocultos)el.style.display=valor;frame?.remove();host.innerHTML='';ambientar('');}

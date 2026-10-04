@@ -3,11 +3,15 @@
   const embebido=window.parent!==window;
   if(embebido)document.documentElement.classList.add('club-integrado');
   const cuenta=new URLSearchParams(location.search).get('cuenta')||'local';
+  // Modo invitado (el salón sin sesión): se juega igual, pero la tabla no
+  // se lee ni se escribe; el panel lo dice y no ofrece «reintentar».
+  const invitado=new URLSearchParams(location.search).get('invitado')==='1';
+  const AVISO_INVITADO='Modo invitado: esta partida no se guarda ni entra en la clasificación. Inicia sesión en Juegos para competir.';
   let categoria='',lista,estado,propio,alPartida=null;
   const enviar=d=>{if(embebido)parent.postMessage({canal:'club-child',...d},location.origin);};
   window.Club={
     storageKey:key=>key+'.cuenta.'+cuenta,
-    category(key){categoria=key;enviar({tipo:'categoria',categoria:key});if(lista)lista.replaceChildren();if(estado)estado.textContent=key==='zen'?'Zen es libre: conserva tu récord local, sin clasificación competitiva.':'Clasificación por modalidad · cargando…';},
+    category(key){categoria=key;enviar({tipo:'categoria',categoria:key});if(lista)lista.replaceChildren();if(estado)estado.textContent=invitado?AVISO_INVITADO:key==='zen'?'Zen es libre: conserva tu récord local, sin clasificación competitiva.':'Clasificación por modalidad · cargando…';},
     result(dato){enviar({tipo:'resultado',...dato,partida:crypto.randomUUID()});},
     // La partida a medias, en la cuenta (solo dentro de Juegos).
     guardarPartida(texto){enviar({tipo:'partida-guardar',d:texto||null,at:Date.now()});},
@@ -21,6 +25,7 @@
     panel.innerHTML='<h2>Clasificación de este modo</h2><p class="club-propio"></p><ol></ol><p role="status" aria-live="polite"></p><button type="button">Reintentar sincronización</button>';
     const lateral=embebido?shell.querySelector(':is(.game-layout,.layout)>aside'):null;
     (lateral||shell).appendChild(panel);lista=panel.querySelector('ol');estado=panel.querySelector('[role=status]');propio=panel.querySelector('.club-propio');panel.querySelector('button').onclick=()=>enviar({tipo:'reintentar'});
+    if(invitado){panel.classList.add('club-invitado');panel.querySelector('button').hidden=true;}
     if(!embebido){estado.textContent='Abre este juego desde Juegos para sincronizar tu clasificación con tu cuenta.';}else window.Club.category(categoria);
     if(embebido){const sonido=document.getElementById('sound-button');if(sonido)shell.querySelector('.scorebar')?.appendChild(sonido);}
     let alto=0;const medir=()=>{const nuevo=Math.ceil(shell.getBoundingClientRect().bottom+32);if(nuevo!==alto){alto=nuevo;enviar({tipo:'alto',alto});}};

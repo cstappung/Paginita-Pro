@@ -71,7 +71,8 @@ Six apps plus a small shared **Informes** page:
   **Frontera Batalla**, Emerald's Battle Frontier played solo with the same
   teams, plus a **Clasificación** tab and a 📖 **Reglas**
   manual for every game, solo ones included, coins, and **PRODROP**, a card-pack
-  opener paid with them. See "Juegos" below.
+  opener paid with them. Without a session it opens in **guest mode**: every
+  single-player game is playable and nothing is saved. See "Juegos" below.
 
 ColabTeX, ColabDraw, FiltroLab, AjusteLab, Juegos and Informes are authored in
 **Spanish** — UI text, comments and identifiers alike. **CSV·Scope is the exception: it is in
@@ -1643,41 +1644,101 @@ for anyone `fuera` or `caido`**, because someone who abandons leaves their orbs
 on the board and `cuenta` showed an eliminated player with their score from
 before dying; `cadena.js`'s marcador does the same once the replay is over.
 
-**The lobby opens with *Novedades*, a hand-written list** (`NOVEDADES`
-in `juegos-main.js`, `.jg-nov`), because what is new is not always a room
-game: today FANAL (`#solo/fanal`), Yemas' zombie mode (opens a yemas room
-with `variante: "zombis"`) and PRODROP (`#cartas`), each with its own
-cover (`arteNovedad`). The paragraph below describes the older,
-date-driven version, which `novedades()` in `motor.js` still implements
-(`novedadesHtml` in `juegos-main.js` no longer calls it). They come from `novedades(3)` in
-`motor.js`, which sorts by each game's `alta` (the date it arrived,
-`AAAA-MM-DD`, in `JUEGOS`), with ties going to the later row of the table.
-So a new game only has to bring its `alta`, and `tests/juegos.test.cjs`
-fails if one doesn't. *Abrir sala* there uses the same defaults its
-catalogue card has preselected (`porOmision`, read from `OPCIONES`), and
-*Opciones* scrolls to that card, opens its options and makes it glow
-(`.jg-of-brilla`), resetting the filter if it was hiding it. The section is
-an extra `nov` area spanning the whole first row of `.jg-ves`.
+**The lobby is the *salón*** (`juegos/salon-datos.js`, pure, and
+`juegos/salon.js`, the DOM; the proposal behind it, with screenshots, is
+[docs/salon-rediseno.md](docs/salon-rediseno.md)). Mobile first, top to
+bottom: a greeting, the **mode bar** (Todos · 1 jugador · Multijugador,
+sticky, remembered in `jg.modoSalon`), the guest notice, *Novedades*, **«Para
+jugar solo» as a carousel right at the entrance** (it used to be a block at
+the very end that nobody reached), the rooms column, the **multiplayer**
+grid with its Todos/Duelos/En grupo filter, and the PRODROP drops strip.
+`.jg-sal` places them by grid areas; from 901 px the rooms column
+(`aside.jg-ves-lado`, sticky) sits to the right of the two game sections. A
+mode only hides the section that does not apply (`data-modo` on
+`.jg-sal`); *Novedades* is never hidden.
 
-**The lobby is a grid with the rooms on the right.** `.jg-ves` has the areas
-`"mq lado" "cat lado"`: the *marquesina* (title, counters, a quick-join button
-and the ring of game icons) and the catalogue on the left, and a **sticky**
-`aside.jg-ves-lado` with *Salas abiertas* and *Tus partidas* spanning both rows
-on the right — scrolling the catalogue must not take the rooms out of view. At
-≤900 px it collapses to `"mq" "lado" "cat"`, so on a phone the open rooms sit
-between the header and the catalogue rather than after seven cards. The quick
-button (`#vesRapida`) joins the **oldest** waiting room — the one that has
-waited longest — or scrolls to the catalogue when there is none. The
-Todos/Duelos/En grupo chips only toggle `hidden` on the cards (`aplicaFiltro`)
-and never repaint them, so the options already picked in a card's selects
-survive a filter change. "Ver el catálogo" scrolls by hand instead of following
-its `#vesCatalogo` anchor, because a hash change is a route change here.
+- **One thumbnail for both modes** (`.jg-mn`, `tarjeta()`): a 4:3 cover
+  (`arteJuego` for room games and their bot practice, the `.sp-e-<id>`
+  backgrounds for the club), the name, and one meta line (genre, then
+  open rooms / «Duelo» / «En grupo» for multiplayer, «🏆 Ranking» / «📅 Reto
+  diario» / «Sin ranking» for solo). What tells the modes apart at a glance
+  is the **mode badge** on the cover: one person and «1 jugador» in amber, or
+  two people and «2–10 jugadores» in violet — colour never on its own. The
+  card and its cover are size containers: `75cqw` is the cover's height
+  (where the ▶ sits) and container queries scale the fixed-px art.
+- **Card states**: *nuevo* (green tag; `nuevos()` = the four most recent
+  `alta`s of the last 14 days, so the tag cannot spread to half the shop),
+  *más jugado* (gold, a star only on narrow cards), *seleccionada* (`.sel`,
+  ring in the game's colour, `aria-expanded`, while its ficha is open) and
+  *bloqueada* (guest + multiplayer: greyed cover, padlock, «Requiere
+  cuenta»).
+- **Tapping a card opens its ficha; it never plays or opens a room** —
+  opening a room lists it for everyone and announces it on Discord, so it
+  cannot happen from a thumb brushing past. **▶ plays at once**, and only
+  solo cards have it (it is a real link). **Long-press opens the same
+  ficha** (with a short vibration): no action lives only behind a gesture.
+  Hover (pointer devices only) lifts the card and shows «Ver opciones y
+  abrir sala →» on multiplayer covers.
+- **The ficha** (`.jg-hoja`) is a modal bottom sheet up to 720 px — close
+  with ✕, the backdrop, Escape or by dragging it down; buttons at the
+  bottom, where the thumb is — and a non-modal panel on the right above
+  that, starting at 76 px so the header and the mode bar stay usable;
+  clicking another card swaps it. It carries the game's open rooms
+  («Unirme» to the oldest), the room options (the old `<details>` in each
+  card; remembered per game for the visit), the hall of fame
+  (`podioHtml`, from the `ranks` `leerPopularidad()` already brought), 📖
+  Reglas (in the variant chosen), 📋 Equipos for Pokémon, and «Abrir sala e
+  invitar». The capa ignores taps while it closes (230 ms), or the invisible
+  backdrop swallowed the next card's tap.
+- **Two class names were already taken**: `.jg-mini` is the profile mini
+  card and `.jg-ficha` a chip in `cartas.js`. That is why the thumbnail is
+  `.jg-mn` and the sheet `.jg-hoja`; check before naming a new piece.
+
+*Novedades* is still a hand-written list (`NOVEDADES` in `juegos-main.js`),
+because what is new is not always a room game (today FANAL, Yemas' zombie
+mode and PRODROP, each with its own cover in `arteNovedad`); each entry may
+carry `modo` (the same badge as the thumbnails), and `cuenta`/`practica`
+say what a guest gets instead. On a phone it is a carousel of whole cards.
+`novedades()` in `motor.js` is the older date-driven version and is no
+longer called.
+
+**Without a session the lobby opens in guest mode** (`state.invitado`), with
+no login wall: everything single-player is playable (the ten club games and
+the bot practice of Circuit Breakers, Yemas and Clue, which are `SOLOS` in
+`salon-datos.js`), and nothing is saved — no ranking, logros, coins or cloud
+save. It needs **no rules change**: the guest never touches the database.
+
+- Multiplayer cards are shown locked, not hidden (they are the reason for an
+  account). Their ficha explains why, offers «Iniciar sesión y jugar», the
+  bot practice if there is one, and «Seguir como invitado». Every
+  `[data-login]` goes through `entrarConGoogle(juego)`, which remembers the
+  game and **reopens its ficha unlocked** once the account arrives. A shared
+  `#p/<pid>` shows a gate (`puertaHtml`, texts in `MOTIVO_CUENTA`), and after
+  logging in the unchanged hash drops you into that room.
+- Ranks, logros, coins, PRODROP and profiles show the same gate; their tabs
+  wear a padlock. «Iniciar sesión» is always in reach: the header
+  (`#btnEntrar`), the sticky mode bar, the solo bar, every gate.
+- `crearSolo({usuario: null})` is the club's guest mode: it watches and writes
+  nothing, answers `partida-pedir` with null and loads the frame with
+  `cuenta=invitado&invitado=1`, which `conexion.js` (`?v=club-8`) reads to
+  replace the ranking panel with the notice. The Frontera gets the
+  `INVITADO` user (`usuario.invitado`): no ranking, no cloud run, and
+  `pokemon/equipos.js` keeps uid `invitado`'s teams in `localStorage` only.
+- What a guest leaves in `localStorage` (`*.cuenta.invitado`,
+  `frontera.invitado`, `pk.equipos.invitado`: `esClaveInvitado`) is wiped
+  once per tab session (`limpiaInvitado`, flag in `sessionStorage`), so a
+  reload mid-game survives but the next visit starts clean.
+
+**On a phone the tabs are a bottom bar** in the menu views (`html[data-vista]`,
+set by `render()`): icon plus a short label (`.tab-c`, «Ranking»), fixed above
+the safe area, with the ⚑ report button lifted above it. In a room or a club
+game they are hidden — those screens have their own «volver».
 
 `juegos.html` carries the whole `.jg-*` stylesheet — unlike CSV·Scope this is a
 plain page, not a generated `.dc.html` with nowhere to put it, so the skin
-caches with the page instead of being injected on every load. Its header and
-login card are a **deliberate copy** of `informes.html`'s: the shared part is a
-dozen rules, and a common file for that costs more than it saves.
+caches with the page instead of being injected on every load. Its header is a
+**deliberate copy** of `informes.html`'s: the shared part is a dozen rules, and
+a common file for that costs more than it saves.
 
 **The room has an immersive mode** (⛶ in its header, `ponInmersivo` in
 `juegos-main.js`): `html.jg-inm` turns `#pantalla` into a `position:fixed;
@@ -1689,14 +1750,6 @@ since `at`, from `fb.ahora()`) and a 10 s animation starts at
 `-var(--edad)`, so an old message does not relight on repaint. 💬 or Intro
 opens it to write, Escape closes it or leaves the mode. Leaving the room
 always leaves the mode (`armazon`).
-
-**Lobby cards** are cover on top, body below (`.jg-of-cuerpo`), options
-folded into a `<details>` whose summary shows what is chosen
-(`resumeOpciones`), and a dark-ink button: several games' colours are
-yellows, and a button filled with `--c` was unreadable with white text. On a
-phone the card is a row with a 108 px cover (`zoom` on the art, which is
-fixed-px), and at ≤900 px the sidebar's room lists become horizontal
-carousels, with empty boxes other than «Salas abiertas» hidden.
 
 **Dark mode is one block at the end of that stylesheet**, every rule prefixed
 `html[data-tema=oscuro]`. The prefix out-ranks the light rule without touching
@@ -3091,9 +3144,9 @@ the button until that colour comes out.
 modal hanging off `<body>` in `position:fixed` at z-index 80 — above the fin
 cartel (60) and `jg-modal-capa` (70), because the question «what did this card
 do?» comes up exactly when the cartel is on screen. It opens from three
-places: the room header (mid-game, which is when people ask), the footer of
-every lobby card (before opening a room — `leeOpciones` hands it the variant
-picked in that card's select), and a bar above the solo games' iframe (Mina
+places: the room header (mid-game, which is when people ask), the ficha of
+every game in the lobby (before opening a room — it opens on the variant
+picked in the ficha's options), and a bar above the solo games' iframe (Mina
 Club, Snake Club). Games with variants (UNO, Flip 7, cacho with or without
 *siciliana*) get one tab per variant and open on the room's: whoever is
 playing No Mercy need not read the whole classic first. The text describes
@@ -3915,8 +3968,8 @@ the sum of every room game's `ranks` row (points, wins, games played, and a
 «Juegos» column counting in how many games each person has a row), read
 through `fb.watchRanksTodos`. The picker lists the games in the lobby's
 popularity order, room games and solo games under separate labels, and the
-choice persists in `jg.rankJuego`. The lobby's featured card carries that
-game's top three (`pintaDestacado`, from the `ranks` that
+choice persists in `jg.rankJuego`. Each game's ficha in the lobby carries
+that game's top three (`podioHtml`, from the `ranks` that
 `leerPopularidad()` now returns alongside the counts as `{n, ranks}`).
 
 **Logros: ten per game, three sources, one table** (`juegos/logros.js`,
