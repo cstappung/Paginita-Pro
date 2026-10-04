@@ -1,0 +1,210 @@
+# ColabTeX y ColabDraw (textos generados en JS). Formato: es || en || it
+Propietario || Owner || Proprietario
+Cargando proyectos… || Loading projects… || Carico i progetti…
+Error al cargar proyectos: {} || Error loading projects: {} || Errore nel caricare i progetti: {}
+No hay proyectos todavía. Crea el primero con «Nuevo proyecto +». || No projects yet. Create the first one with “New project +”. || Ancora nessun progetto. Crea il primo con «Nuovo progetto +».
+¿Eliminar el proyecto "{}"? Esta acción no se puede deshacer. || Delete the project "{}"? This cannot be undone. || Eliminare il progetto "{}"? L'azione non si può annullare.
+No tienes acceso a este proyecto (o el enlace no es válido). || You don't have access to this project (or the link is invalid). || Non hai accesso a questo progetto (o il link non è valido).
+Clic para renombrar || Click to rename || Clic per rinominare
+Guardado || Saved || Salvato
+Sin conexión || Offline || Offline
+✗ SIN GUARDAR en la nube || ✗ NOT SAVED to the cloud || ✗ NON SALVATO nel cloud
+✗ No se pudo guardar en la nube: || ✗ Could not save to the cloud: || ✗ Impossibile salvare nel cloud:
+Página {} / {} || Page {} / {} || Pagina {} / {}
+Motor LaTeX listo — pulsa Compilar || LaTeX engine ready — press Compile || Motore LaTeX pronto — premi Compila
+Error al cargar el motor LaTeX || Error loading the LaTeX engine || Errore nel caricare il motore LaTeX
+Cargando motor LaTeX en tu navegador… || Loading the LaTeX engine in your browser… || Carico il motore LaTeX nel browser…
+Descargando motor LaTeX (solo la primera vez)… || Downloading the LaTeX engine (first time only)… || Scarico il motore LaTeX (solo la prima volta)…
+Ya hay una compilación en curso || A compilation is already running || C'è già una compilazione in corso
+Renombrar o mover || Rename or move || Rinomina o sposta
+Eliminar archivo || Delete file || Elimina file
+¿Eliminar "{}" del DISCO? Esta acción no se puede deshacer. || Delete "{}" from DISK? This cannot be undone. || Eliminare "{}" dal DISCO? L'azione non si può annullare.
+¿Eliminar "{}" del proyecto? || Delete "{}" from the project? || Eliminare "{}" dal progetto?
+No se pudo eliminar: || Could not delete: || Impossibile eliminare:
+Nuevo archivo aquí || New file here || Nuovo file qui
+Subir archivos aquí || Upload files here || Carica file qui
+Eliminar carpeta || Delete folder || Elimina cartella
+Nombre del nuevo archivo (p. ej. seccion1.tex): || Name of the new file (e.g. section1.tex): || Nome del nuovo file (es. sezione1.tex):
+Ya existe un archivo con ese nombre. || A file with that name already exists. || Esiste già un file con quel nome.
+Nombre de la nueva carpeta (puede anidar: cap1/figuras): || Name of the new folder (can be nested: ch1/figures): || Nome della nuova cartella (può essere annidata: cap1/figure):
+No se pudo crear la carpeta: || Could not create the folder: || Impossibile creare la cartella:
+No se pudo eliminar la carpeta: || Could not delete the folder: || Impossibile eliminare la cartella:
+Moviendo «{}»… || Moving “{}”… || Sposto «{}»…
+No se pudo mover: || Could not move: || Impossibile spostare:
+Nuevo nombre de la carpeta (puede llevar ruta): || New folder name (may include a path): || Nuovo nome della cartella (può includere un percorso):
+Nuevo nombre del archivo (puede llevar ruta): || New file name (may include a path): || Nuovo nome del file (può includere un percorso):
+No se pudo renombrar: || Could not rename: || Impossibile rinominare:
+Abre un archivo .tex para insertar la referencia. || Open a .tex file to insert the reference. || Apri un file .tex per inserire il riferimento.
+No se pudo descargar el proyecto: || Could not download the project: || Impossibile scaricare il progetto:
+{} archivos en el .zip || {} files in the .zip || {} file nello .zip
+No se pudo crear el .zip || Could not create the .zip || Impossibile creare lo .zip
+No se pudo crear el .zip: || Could not create the .zip: || Impossibile creare lo .zip:
+Todavía no hay ninguno. || None yet. || Ancora nessuno.
+Vinculando… || Linking… || Collegamento…
+Listo: sus figuras ya están en el árbol de archivos. || Done: its figures are now in the file tree. || Fatto: le sue figure sono ora nell'albero dei file.
+No se pudo vincular: || Could not link: || Impossibile collegare:
+Tu navegador no permite abrir carpetas locales. || Your browser can't open local folders. || Il tuo browser non può aprire cartelle locali.
+Local · en tu disco || Local · on your disk || Locale · sul tuo disco
+modo local (sin colaboración) || local mode (no collaboration) || modalità locale (senza collaborazione)
+Guardando… || Saving… || Salvataggio…
+Guardado en disco || Saved to disk || Salvato su disco
+Error al guardar || Error saving || Errore di salvataggio
+✗ No se pudo guardar en disco: || ✗ Could not save to disk: || ✗ Impossibile salvare su disco:
+Recargado desde disco || Reloaded from disk || Ricaricato dal disco
+No se pudo recargar: || Could not reload: || Impossibile ricaricare:
+Copiando al disco… || Copying to disk… || Copia su disco…
+Error al enlazar || Error linking || Errore di collegamento
+Sincronizado || Synced || Sincronizzato
+Importando {}… || Importing {}… || Importo {}…
+Importado: {} || Imported: {} || Importato: {}
+Nombre del proyecto: || Project name: || Nome del progetto:
+Importando… || Importing… || Importazione…
+Ln {}, Col {} || Ln {}, Col {} || Rg {}, Col {}
+Compila primero para poder sincronizar con el PDF || Compile first to sync with the PDF || Compila prima per sincronizzare con il PDF
+Línea {} → página {} || Line {} → page {} || Riga {} → pagina {}
+Ir al primer problema || Go to the first problem || Vai al primo problema
+Preparando la vista visual… || Preparing the visual view… || Preparo la vista visuale…
+Vista visual activa || Visual view on || Vista visuale attiva
+solo tú en línea || only you online || solo tu online
+● en línea || ● online || ● online
+Enlace de invitación || Invitation link || Link di invito
+Enviar correo || Send email || Invia email
+Todavía no hay dibujos. Crea el primero con «Nuevo proyecto +». || No drawings yet. Create the first one with “New project +”. || Ancora nessun disegno. Crea il primo con «Nuovo progetto +».
+Nombre del proyecto de dibujo: || Drawing project name: || Nome del progetto di disegno:
+Figuras del artículo || Article figures || Figure dell'articolo
+No se pudo importar el SVG: || Could not import the SVG: || Impossibile importare l'SVG:
+No hay dibujos todavía. || No drawings yet. || Ancora nessun disegno.
+Renombrar || Rename || Rinomina
+Duplicar || Duplicate || Duplica
+Eliminar || Delete || Elimina
+Nuevo nombre del dibujo: || New drawing name: || Nuovo nome del disegno:
+Ya existe un dibujo con ese nombre. || A drawing with that name already exists. || Esiste già un disegno con quel nome.
+¿Eliminar el dibujo "{}"? Esta acción no se puede deshacer. || Delete the drawing "{}"? This cannot be undone. || Eliminare il disegno "{}"? L'azione non si può annullare.
+Abriendo {}… || Opening {}… || Apro {}…
+No se pudo abrir: || Could not open: || Impossibile aprire:
+Nombre del nuevo dibujo: || Name of the new drawing: || Nome del nuovo disegno:
+Solo se pueden importar archivos .svg. || Only .svg files can be imported. || Si possono importare solo file .svg.
+Importado || Imported || Importato
+Abre un dibujo primero. || Open a drawing first. || Apri prima un disegno.
+Dibujo: {} || Drawing: {} || Disegno: {}
+Elige al menos un formato. || Choose at least one format. || Scegli almeno un formato.
+Exportando… || Exporting… || Esportazione…
+Listo: {}. || Done: {}. || Fatto: {}.
+No se pudo exportar: || Could not export: || Impossibile esportare:
+¡Copiado! || Copied! || Copiato!
+Guardados || Saved || Salvati
+＋ Guardar || ＋ Save || ＋ Salva
+Guardar este color en la paleta del proyecto || Save this colour to the project palette || Salva questo colore nella tavolozza del progetto
+✓ Guardado || ✓ Saved || ✓ Salvato
+Quitar de la paleta || Remove from palette || Rimuovi dalla tavolozza
+Plano || Flat || Piatto
+Degradado || Gradient || Sfumatura
+Sin color || No colour || Nessun colore
+sin color || no colour || nessun colore
+Lineal || Linear || Lineare
+Dirección || Direction || Direzione
+Centro || Centre || Centro
+Colores || Colours || Colori
+＋ Añadir color || ＋ Add colour || ＋ Aggiungi colore
+⇄ Invertir || ⇄ Reverse || ⇄ Inverti
+Quitar este color || Remove this colour || Rimuovi questo colore
+Capa {} || Layer {} || Livello {}
+Capa || Layer || Livello
+El dibujo está vacío. || The drawing is empty. || Il disegno è vuoto.
+Fórmula || Formula || Formula
+Insertar || Insert || Inserisci
+Nueva fórmula || New formula || Nuova formula
+Editar fórmula || Edit formula || Modifica formula
+La fórmula está vacía. || The formula is empty. || La formula è vuota.
+La fórmula no compila. || The formula does not compile. || La formula non compila.
+Rectángulo || Rectangle || Rettangolo
+Círculo || Circle || Cerchio
+Elipse || Ellipse || Ellisse
+Línea || Line || Linea
+Polilínea || Polyline || Polilinea
+Polígono || Polygon || Poligono
+Trazado || Path || Tracciato
+Imagen || Image || Immagine
+Copia || Copy || Copia
+Dibujo || Drawing || Disegno
+Grupo ({}) || Group ({}) || Gruppo ({})
+Curva || Curve || Curva
+Plegar || Collapse || Comprimi
+Desplegar || Expand || Espandi
+Ocultar || Hide || Nascondi
+Bloquear || Lock || Blocca
+Renombrar… || Rename… || Rinomina…
+Pegar || Paste || Incolla
+Nombre: || Name: || Nome:
+Selecciona algo primero. || Select something first. || Seleziona prima qualcosa.
+Sin punta || No arrowhead || Senza punta
+Flecha al final || Arrow at the end || Freccia alla fine
+Flecha al principio || Arrow at the start || Freccia all'inizio
+Flecha en los dos || Arrow at both ends || Freccia alle due estremità
+Triángulo || Triangle || Triangolo
+Rombo || Diamond || Rombo
+Barra || Bar || Barra
+Ajustar a la ventana || Fit to window || Adatta alla finestra
+Redondo || Round || Arrotondato
+Cuadrado || Square || Quadrato
+Continua || Solid || Continua
+Guiones || Dashes || Trattini
+Grosor || Width || Spessore
+Extremos || Caps || Estremità
+Uniones || Joins || Giunzioni
+Puntas || Arrowheads || Punte
+Tipo || Type || Tipo
+Fuente || Font || Carattere
+Cuerpo || Size || Corpo
+Negrita || Bold || Grassetto
+Cursiva || Italic || Corsivo
+Alinear a la izquierda || Align left || Allinea a sinistra
+Centrar || Centre || Centra
+Alinear a la derecha || Align right || Allinea a destra
+✎ Editar fórmula || ✎ Edit formula || ✎ Modifica formula
+Con sombra || With shadow || Con ombra
+Difuminado || Blur || Sfocatura
+Color || Colour || Colore
+Opacidad || Opacity || Opacità
+Esquinas || Corners || Angoli
+Curvatura || Curvature || Curvatura
+Curvas || Curves || Curve
+Traer al frente (Mayús+RePág) || Bring to front (Shift+PgUp) || Porta in primo piano (Maiusc+PagSu)
+Subir (RePág) || Raise (PgUp) || Alza (PagSu)
+Bajar (AvPág) || Lower (PgDn) || Abbassa (PagGiù)
+Enviar al fondo (Mayús+AvPág) || Send to back (Shift+PgDn) || Porta in fondo (Maiusc+PagGiù)
+✓ Listo || ✓ Done || ✓ Fatto
+Descartar los cambios || Discard changes || Scarta le modifiche
+Texto || Text || Testo
+Relleno || Fill || Riempimento
+Trazo || Stroke || Contorno
+Tipo de línea || Line style || Tipo di linea
+Puntas de flecha || Arrowheads || Punte di freccia
+Lados || Sides || Lati
+Estrella || Star || Stella
+Seguir dibujando || Keep drawing || Continua a disegnare
+Eso no se puede pegar aquí. || That can't be pasted here. || Questo non si può incollare qui.
+No había nada que pegar. || There was nothing to paste. || Non c'era niente da incollare.
+💬 Comentar || 💬 Comment || 💬 Commenta
+Comentar el texto seleccionado || Comment on the selected text || Commenta il testo selezionato
+¿Eliminar este comentario y todas sus respuestas? || Delete this comment and all its replies? || Eliminare questo commento e tutte le risposte?
+Responder… || Reply… || Rispondi…
+Reabrir || Reopen || Riapri
+Resolver || Resolve || Risolvi
+Comentar || Comment || Commenta
+El nombre no puede quedar vacío. || The name cannot be empty. || Il nome non può essere vuoto.
+Arrastra para redimensionar · doble clic para restablecer || Drag to resize · double-click to reset || Trascina per ridimensionare · doppio clic per ripristinare
+Proyecto importado || Project imported || Progetto importato
+El proyecto está vacío. || The project is empty. || Il progetto è vuoto.
+Reuniendo archivos… || Gathering files… || Raccolgo i file…
+Comprimiendo… || Compressing… || Compressione…
+Negro || Black || Nero
+Gris || Grey || Grigio
+Naranja || Orange || Arancione
+Marrón || Brown || Marrone
+Verde || Green || Verde
+Cian || Cyan || Ciano
+Violeta || Violet || Viola
+Púrpura || Purple || Porpora
+Rosa || Pink || Rosa
+Proyecto || Project || Progetto

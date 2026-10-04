@@ -1,0 +1,376 @@
+# Textos fijos de las páginas (HTML). Formato: castellano || inglés || italiano
+# {} es un hueco (nombre, número…); {1} {2} lo reordenan en la traducción.
+Sonido || Sound || Suono
+Modo oscuro || Dark mode || Modalità scura
+Tus monedas || Your coins || Le tue monete
+Tu perfil: foto, marco, fondo y vitrina || Your profile: photo, frame, background and showcase || Il tuo profilo: foto, cornice, sfondo e vetrina
+Juegos — Laboratorio || Games — Laboratorio || Giochi — Laboratorio
+Juegos || Games || Giochi
+Informes || Reports || Segnalazioni
+Música || Music || Musica
+Perfil || Profile || Profilo
+Salir || Sign out || Esci
+Juegos del Laboratorio || Laboratorio Games || Giochi del Laboratorio
+Entra con la misma cuenta de Google que usas en ColabTeX. Se juega por turnos: abres una sala, eliges las opciones si el juego las tiene, le pasas el enlace a quien quieras y jugáis. || Sign in with the same Google account you use in ColabTeX. Games are turn-based: you open a room, pick the options if the game has any, send the link to whoever you want and play. || Accedi con lo stesso account Google che usi in ColabTeX. Si gioca a turni: apri una stanza, scegli le opzioni se il gioco ne ha, mandi il link a chi vuoi e giocate.
+Entrar con Google || Sign in with Google || Accedi con Google
+Jugar || Play || Gioca
+Clasificación || Leaderboard || Classifica
+Logros || Achievements || Obiettivi
+Monedas || Coins || Monete
+Sobres || Packs || Bustine
+Buscar… || Search… || Cerca…
+Un archivo .md legible, pensado para pasárselo a quien lo va a arreglar || A readable .md file, meant to be handed to whoever is going to fix it || Un file .md leggibile, pensato per passarlo a chi lo sistemerà
+Los mismos datos en crudo || The same data, raw || Gli stessi dati grezzi
+Informes — Laboratorio || Reports — Laboratorio || Segnalazioni — Laboratorio
+Informes del Laboratorio || Laboratorio Reports || Segnalazioni del Laboratorio
+Inicia sesión con la misma cuenta de Google que usas en ColabTeX para ver los fallos y las sugerencias de todo el equipo. || Sign in with the same Google account you use in ColabTeX to see the whole team's bugs and suggestions. || Accedi con lo stesso account Google che usi in ColabTeX per vedere i bug e i suggerimenti di tutto il team.
+Todo lo que se rompe y todo lo que pedís, en un sitio. Los errores los recoge la aplicación sola y se agrupan por causa; los fallos y las sugerencias los escribís vosotros con el botón || Everything that breaks and everything you ask for, in one place. Errors are collected by the app itself and grouped by cause; bugs and suggestions are written by you with the button || Tutto ciò che si rompe e tutto ciò che chiedete, in un unico posto. Gli errori li raccoglie l'app da sola e li raggruppa per causa; bug e suggerimenti li scrivete voi con il pulsante
+que hay abajo a la derecha en todas las páginas. Cuando quieras arreglarlo, descarga el informe y pásalo entero. || at the bottom right of every page. When you want to fix it, download the report and hand it over whole. || in basso a destra in ogni pagina. Quando vuoi sistemarlo, scarica il rapporto e passalo per intero.
+Errores recogidos || Collected errors || Errori raccolti
+Fallos y sugerencias || Bugs and suggestions || Bug e suggerimenti
+Todas las apps || All apps || Tutte le app
+Informe (.md) || Report (.md) || Rapporto (.md)
+Editar una carpeta de tu disco, sin nube ni cuenta || Edit a folder on your disk, no cloud or account || Modifica una cartella del tuo disco, senza cloud né account
+Volver al menú principal || Back to the main menu || Torna al menu principale
+Cerrar sesión || Sign out || Esci
+Crear un proyecto desde un .zip (p. ej. export de Overleaf) || Create a project from a .zip (e.g. an Overleaf export) || Crea un progetto da un .zip (es. un export di Overleaf)
+Editar una carpeta de tu disco, sin nube || Edit a folder on your disk, no cloud || Modifica una cartella del tuo disco, senza cloud
+Errores recogidos, fallos y sugerencias de todo el equipo || Collected errors, bugs and suggestions from the whole team || Errori raccolti, bug e suggerimenti di tutto il team
+Buscar en todos los proyectos… || Search all projects… || Cerca in tutti i progetti…
+Volver a proyectos || Back to projects || Torna ai progetti
+Volver a leer los archivos desde el disco || Re-read the files from disk || Rileggi i file dal disco
+Comentarios (selecciona texto y coméntalo) || Comments (select text and comment on it) || Commenti (seleziona del testo e commentalo)
+Asistente IA y editores de tu PC || AI assistant and your PC's editors || Assistente IA ed editor del tuo PC
+Configuración del proyecto || Project settings || Impostazioni del progetto
+Nuevo archivo || New file || Nuovo file
+Nueva carpeta || New folder || Nuova cartella
+Subir archivos (imágenes, PDF, .tex…) || Upload files (images, PDF, .tex…) || Carica file (immagini, PDF, .tex…)
+Importar un .zip (p. ej. export de Overleaf) || Import a .zip (e.g. an Overleaf export) || Importa un .zip (es. un export di Overleaf)
+Descargar todo el proyecto en un .zip || Download the whole project as a .zip || Scarica l'intero progetto in un .zip
+Vincular figuras de ColabDraw || Link ColabDraw figures || Collega figure di ColabDraw
+Vista con fórmulas y formato ya representados || View with formulas and formatting rendered || Vista con formule e formattazione già resi
+Errores de la última compilación || Errors from the last compile || Errori dell'ultima compilazione
+Negrita — \textbf{…}  (Ctrl+B) || Bold — \textbf{…}  (Ctrl+B) || Grassetto — \textbf{…}  (Ctrl+B)
+Cursiva — \textit{…}  (Ctrl+I) || Italic — \textit{…}  (Ctrl+I) || Corsivo — \textit{…}  (Ctrl+I)
+Subrayado — \underline{…}  (Ctrl+U) || Underline — \underline{…}  (Ctrl+U) || Sottolineato — \underline{…}  (Ctrl+U)
+Color del texto — \textcolor{…}{…} || Text colour — \textcolor{…}{…} || Colore del testo — \textcolor{…}{…}
+Ir a esta línea en el PDF (Ctrl+Alt+J · o doble clic) || Go to this line in the PDF (Ctrl+Alt+J · or double-click) || Vai a questa riga nel PDF (Ctrl+Alt+J · o doppio clic)
+Tema de color del editor || Editor colour theme || Tema di colori dell'editor
+Alejar (Ctrl + rueda) || Zoom out (Ctrl + wheel) || Rimpicciolisci (Ctrl + rotella)
+Acercar (Ctrl + rueda) || Zoom in (Ctrl + wheel) || Ingrandisci (Ctrl + rotella)
+Ajustar al panel || Fit to panel || Adatta al pannello
+Insertar en el archivo activo || Insert into the active file || Inserisci nel file attivo
+Descargar el archivo || Download the file || Scarica il file
+Cerrar la vista previa || Close the preview || Chiudi l'anteprima
+Otro color — \textcolor[HTML]{…} || Other colour — \textcolor[HTML]{…} || Altro colore — \textcolor[HTML]{…}
+Quitar el \textcolor de la selección || Remove \textcolor from the selection || Rimuovi \textcolor dalla selezione
+Recompilar || Recompile || Ricompila
+Alejar (o Ctrl + rueda del ratón sobre el PDF) || Zoom out (or Ctrl + mouse wheel over the PDF) || Rimpicciolisci (o Ctrl + rotella sul PDF)
+Ctrl + rueda del ratón sobre el PDF para acercar y alejar || Ctrl + mouse wheel over the PDF to zoom in and out || Ctrl + rotella sul PDF per ingrandire e rimpicciolire
+Acercar (o Ctrl + rueda del ratón sobre el PDF) || Zoom in (or Ctrl + mouse wheel over the PDF) || Ingrandisci (o Ctrl + rotella sul PDF)
+Descargar PDF || Download PDF || Scarica PDF
+Registro de compilación || Compile log || Log di compilazione
+Cambiar proveedor / API key || Change provider / API key || Cambia provider / API key
+Cerrar || Close || Chiudi
+Proveedor de IA || AI provider || Provider IA
+Modelo || Model || Modello
+Borrar la clave de este navegador || Delete the key from this browser || Elimina la chiave da questo browser
+Pide algo… (Enter para enviar, Shift+Enter salto de línea) || Ask for something… (Enter to send, Shift+Enter for a new line) || Chiedi qualcosa… (Invio per inviare, Shift+Invio per andare a capo)
+Enviar || Send || Invia
+correo@ejemplo.com || email@example.com || email@esempio.com
+ColabTeX — Editor LaTeX colaborativo || ColabTeX — Collaborative LaTeX editor || ColabTeX — Editor LaTeX collaborativo
+Editor LaTeX colaborativo. || Collaborative LaTeX editor. || Editor LaTeX collaborativo.
+Compila en tu navegador, colabora en tiempo real e invita con un enlace. || Compile in your browser, collaborate in real time and invite with a link. || Compila nel browser, collabora in tempo reale e invita con un link.
+Continuar con Google || Continue with Google || Continua con Google
+Tu cuenta se crea automáticamente la primera vez que entras. || Your account is created automatically the first time you sign in. || Il tuo account viene creato automaticamente al primo accesso.
+o sin cuenta || or without an account || o senza account
+Abrir una carpeta local || Open a local folder || Apri una cartella locale
+Edita y compila en tu equipo. Sin colaboración ni respaldo en la nube. || Edit and compile on your computer. No collaboration or cloud backup. || Modifica e compila sul tuo computer. Niente collaborazione né backup nel cloud.
+Proyectos || Projects || Progetti
+Nuevo proyecto + || New project + || Nuovo progetto +
+Nuevo proyecto || New project || Nuovo progetto
+Importar .zip || Import .zip || Importa .zip
+Abrir carpeta local || Open local folder || Apri cartella locale
+Todos los proyectos || All projects || Tutti i progetti
+Tus proyectos || Your projects || I tuoi progetti
+Compartidos contigo || Shared with you || Condivisi con te
+TÍTULO || TITLE || TITOLO
+PROPIETARIO || OWNER || PROPRIETARIO
+MODIFICADO || MODIFIED || MODIFICATO
+ACCIONES || ACTIONS || AZIONI
+Proyectos || Projects || Progetti
+Conectando… || Connecting… || Connessione…
+Solo lectura || Read only || Sola lettura
+Recargar || Reload || Ricarica
+Comentarios || Comments || Commenti
+IA || AI || IA
+Asistente IA || AI assistant || Assistente IA
+Escribe y corrige dentro de la página. Necesita una API key tuya. || Writes and corrects inside the page. Needs your own API key. || Scrive e corregge dentro la pagina. Serve una tua API key.
+Escribir la ruta de la carpeta || Type the folder path || Scrivi il percorso della cartella
+Alternativa al doble clic en el .bat. || Alternative to double-clicking the .bat. || Alternativa al doppio clic sul .bat.
+Detener la sincronización || Stop syncing || Interrompi la sincronizzazione
+Los archivos se quedan en tu disco. || The files stay on your disk. || I file restano sul tuo disco.
+Configuración || Settings || Impostazioni
+Compartir || Share || Condividi
+Compilar || Compile || Compila
+ARCHIVOS || FILES || FILE
+Código || Code || Codice
+Visual || Visual || Visuale
+Ajustar || Fit || Adatta
+Insertar || Insert || Inserisci
+Otro color… || Other colour… || Altro colore…
+Quitar || Remove || Rimuovi
+Registro || Log || Log
+Aún no hay PDF. || No PDF yet. || Ancora nessun PDF.
+Pulsa || Press || Premi
+para generar el documento. || to generate the document. || per generare il documento.
+La primera compilación descarga el motor LaTeX (~150 MB) y puede tardar un poco; después queda en caché. || The first compile downloads the LaTeX engine (~150 MB) and may take a while; after that it is cached. || La prima compilazione scarica il motore LaTeX (~150 MB) e può richiedere un po'; poi resta in cache.
+Guardar y activar || Save and enable || Salva e attiva
+Borrar clave || Delete key || Elimina chiave
+Sin resolver || Unresolved || Irrisolti
+Todos || All || Tutti
+Listo || Ready || Pronto
+Figuras de ColabDraw || ColabDraw figures || Figure di ColabDraw
+Al vincular un proyecto de dibujo, sus figuras exportadas aparecen en el árbol de archivos y se insertan con || When you link a drawing project, its exported figures appear in the file tree and are inserted with || Collegando un progetto di disegno, le sue figure esportate compaiono nell'albero dei file e si inseriscono con
+como cualquier otra imagen. || like any other image. || come qualsiasi altra immagine.
+Todo el equipo del artículo pasa a tener acceso al proyecto de dibujo || The article's whole team gets access to the drawing project || Tutto il team dell'articolo ottiene accesso al progetto di disegno
+, y lo que se exporte allí se actualiza aquí solo. || , and whatever is exported there updates here by itself. || , e ciò che viene esportato lì si aggiorna qui da solo.
+VINCULADOS || LINKED || COLLEGATI
+VINCULAR UN PROYECTO || LINK A PROJECT || COLLEGA UN PROGETTO
+Cargando… || Loading… || Caricamento…
+El equipo puede editarlo || The team can edit it || Il team può modificarlo
+El equipo solo lo ve || The team can only view it || Il team può solo vederlo
+Vincular || Link || Collega
+Compartir proyecto || Share project || Condividi progetto
+Cualquiera con el enlace || Anyone with the link || Chiunque abbia il link
+puede editar || can edit || può modificare
+Copiar enlace || Copy link || Copia link
+puede ver || can view || può vedere
+INVITAR POR CORREO || INVITE BY EMAIL || INVITA PER EMAIL
+Puede editar || Can edit || Può modificare
+Puede ver || Can view || Può vedere
+Invitar || Invite || Invita
+MIEMBROS || MEMBERS || MEMBRI
+GENERAL || GENERAL || GENERALE
+Nombre del proyecto || Project name || Nome del progetto
+Archivo principal de compilación || Main compile file || File principale di compilazione
+Guardar cambios || Save changes || Salva modifiche
+ZONA DE PELIGRO || DANGER ZONE || ZONA PERICOLOSA
+Ir a ColabTeX || Go to ColabTeX || Vai a ColabTeX
+Crear un proyecto a partir de un archivo .svg || Create a project from an .svg file || Crea un progetto da un file .svg
+Volver a los proyectos || Back to projects || Torna ai progetti
+Deshacer (Ctrl+Z) || Undo (Ctrl+Z) || Annulla (Ctrl+Z)
+Rehacer (Ctrl+Mayús+Z) || Redo (Ctrl+Shift+Z) || Ripeti (Ctrl+Maiusc+Z)
+Exportar a SVG o PNG || Export to SVG or PNG || Esporta in SVG o PNG
+Compartir el proyecto || Share the project || Condividi il progetto
+Seleccionar y transformar (S) — Ctrl+clic entra en el grupo, Alt+clic va bajando por las figuras superpuestas || Select and transform (S) — Ctrl+click enters the group, Alt+click steps down through overlapping shapes || Seleziona e trasforma (S) — Ctrl+clic entra nel gruppo, Alt+clic scende tra le forme sovrapposte
+Rectángulo (R) — Mayús: cuadrado, Alt: desde el centro || Rectangle (R) — Shift: square, Alt: from the centre || Rettangolo (R) — Maiusc: quadrato, Alt: dal centro
+Elipse (E) — Mayús: círculo, Alt: desde el centro || Ellipse (E) — Shift: circle, Alt: from the centre || Ellisse (E) — Maiusc: cerchio, Alt: dal centro
+Línea y flecha (L) — la punta se elige en la barra de arriba; Mayús: ángulos de 15°, Alt: desde el centro || Line and arrow (L) — the arrowhead is chosen in the bar above; Shift: 15° angles, Alt: from the centre || Linea e freccia (L) — la punta si sceglie nella barra in alto; Maiusc: angoli di 15°, Alt: dal centro
+Curva y flecha curva (C) — la curvatura y el número de curvas se eligen en la barra de arriba, y se pueden corregir después en el panel de la derecha; Mayús: ángulos de 15°, Alt: desde el centro || Curve and curved arrow (C) — the curvature and number of curves are chosen in the bar above, and can be corrected later in the right panel; Shift: 15° angles, Alt: from the centre || Curva e freccia curva (C) — curvatura e numero di curve si scelgono nella barra in alto e si possono correggere dopo nel pannello a destra; Maiusc: angoli di 15°, Alt: dal centro
+Polígono y estrella (G) — el número de lados se elige en la barra de arriba; Mayús: regular, Alt: desde el centro || Polygon and star (G) — the number of sides is chosen in the bar above; Shift: regular, Alt: from the centre || Poligono e stella (G) — il numero di lati si sceglie nella barra in alto; Maiusc: regolare, Alt: dal centro
+Texto (T) — pulsa en el lienzo y escribe || Text (T) — click on the canvas and type || Testo (T) — clicca sulla tela e scrivi
+Fórmula LaTeX (F) — pulsa en el lienzo y escríbela; doble clic para corregirla || LaTeX formula (F) — click on the canvas and type it; double-click to correct it || Formula LaTeX (F) — clicca sulla tela e scrivila; doppio clic per correggerla
+Tamaño del papel (P) — arrastra los bordes para recortar, como en una foto || Paper size (P) — drag the edges to crop, like a photo || Dimensione del foglio (P) — trascina i bordi per ritagliare, come una foto
+Agrupar (Ctrl+G) || Group (Ctrl+G) || Raggruppa (Ctrl+G)
+Desagrupar (Ctrl+Mayús+G) || Ungroup (Ctrl+Shift+G) || Separa (Ctrl+Maiusc+G)
+Duplicar (Ctrl+D) || Duplicate (Ctrl+D) || Duplica (Ctrl+D)
+Eliminar (Supr) || Delete (Del) || Elimina (Canc)
+Ajustar la página a la ventana (3) || Fit the page to the window (3) || Adatta la pagina alla finestra (3)
+Importar un .svg como dibujo nuevo || Import an .svg as a new drawing || Importa un .svg come nuovo disegno
+Importar un .svg DENTRO del dibujo abierto: sus capas se añaden a las de este (también se puede soltar el archivo sobre el lienzo) || Import an .svg INTO the open drawing: its layers are added to this one's (you can also drop the file on the canvas) || Importa un .svg DENTRO il disegno aperto: i suoi livelli si aggiungono a quelli di questo (puoi anche trascinare il file sulla tela)
+Nuevo dibujo || New drawing || Nuovo disegno
+Mover la selección a la capa activa || Move the selection to the active layer || Sposta la selezione nel livello attivo
+Subir la capa activa || Raise the active layer || Alza il livello attivo
+Bajar la capa activa || Lower the active layer || Abbassa il livello attivo
+Eliminar la capa activa || Delete the active layer || Elimina il livello attivo
+Nueva capa || New layer || Nuovo livello
+Alejar || Zoom out || Rimpicciolisci
+Escribe el zoom (por ejemplo 250) y pulsa Intro || Type the zoom (e.g. 250) and press Enter || Scrivi lo zoom (ad es. 250) e premi Invio
+Acercar || Zoom in || Ingrandisci
+Tamaño real (100 %) || Actual size (100 %) || Dimensione reale (100 %)
+ColabDraw — Editor SVG colaborativo || ColabDraw — Collaborative SVG editor || ColabDraw — Editor SVG collaborativo
+Editor de dibujos vectoriales. || Vector drawing editor. || Editor di disegni vettoriali.
+Figuras para tus artículos, exportables a SVG y PNG, con la misma cuenta de ColabTeX. || Figures for your papers, exportable to SVG and PNG, with the same ColabTeX account. || Figure per i tuoi articoli, esportabili in SVG e PNG, con lo stesso account di ColabTeX.
+Si ya has entrado en ColabTeX, es la misma cuenta. || If you have already signed in to ColabTeX, it is the same account. || Se hai già fatto l'accesso a ColabTeX, è lo stesso account.
+Dibujos || Drawings || Disegni
+Importar .svg || Import .svg || Importa .svg
+Tuyos || Yours || Tuoi
+Los dibujos se guardan en la nube y se pueden vincular desde un proyecto de ColabTeX. || Drawings are saved in the cloud and can be linked from a ColabTeX project. || I disegni si salvano nel cloud e si possono collegare da un progetto di ColabTeX.
+Proyectos de dibujo || Drawing projects || Progetti di disegno
+Exportar || Export || Esporta
+OBJETOS || OBJECTS || OGGETTI
+Suelta el .svg para importarlo en este dibujo || Drop the .svg to import it into this drawing || Rilascia il .svg per importarlo in questo disegno
+Crea un dibujo con ＋ para empezar. || Create a drawing with ＋ to start. || Crea un disegno con ＋ per iniziare.
+Rejilla || Grid || Griglia
+Imán || Snap || Calamita
+Paso || Step || Passo
+Exportar dibujo || Export drawing || Esporta disegno
+FORMATOS || FORMATS || FORMATI
+SVG — vectorial, el original || SVG — vector, the original || SVG — vettoriale, l'originale
+PNG — imagen, para \includegraphics || PNG — image, for \includegraphics || PNG — immagine, per \includegraphics
+Resolución del PNG || PNG resolution || Risoluzione del PNG
+150 ppp — borrador || 150 dpi — draft || 150 dpi — bozza
+300 ppp — impresión (recomendado) || 300 dpi — print (recommended) || 300 dpi — stampa (consigliato)
+600 ppp — máxima calidad || 600 dpi — maximum quality || 600 dpi — qualità massima
+Fondo blanco en el PNG (sin marcar sale transparente) || White background in the PNG (unchecked it comes out transparent) || Sfondo bianco nel PNG (se non selezionato esce trasparente)
+DESTINO || DESTINATION || DESTINAZIONE
+Guardarlo en el proyecto (para vincularlo desde ColabTeX) || Save it in the project (to link it from ColabTeX) || Salvalo nel progetto (per collegarlo da ColabTeX)
+Descargarlo a mi equipo || Download it to my computer || Scaricalo sul mio computer
+ENLACE PARA EDITAR || EDIT LINK || LINK PER MODIFICARE
+Copiar || Copy || Copia
+ENLACE DE SOLO LECTURA || READ-ONLY LINK || LINK DI SOLA LETTURA
+Menú principal || Main menu || Menu principale
+Guardar la vista activa como PNG || Save the active view as PNG || Salva la vista attiva come PNG
+Descargar etapas, respuesta y señales en CSV || Download stages, response and signals as CSV || Scarica stadi, risposta e segnali in CSV
+Límite de la banda de paso — se admite 1k, 2.5k, 20M… || Passband edge — 1k, 2.5k, 20M… are accepted || Limite della banda passante — si accetta 1k, 2.5k, 20M…
+Bajar el orden || Lower the order || Riduci l'ordine
+Subir el orden || Raise the order || Aumenta l'ordine
+Llevar la señal al centro de la banda de paso || Move the signal to the centre of the passband || Porta il segnale al centro della banda passante
+Llevar la señal justo al límite de la banda de paso || Move the signal right to the passband edge || Porta il segnale proprio al limite della banda passante
+Llevar la señal a la banda eliminada || Move the signal into the stopband || Porta il segnale nella banda attenuata
+diseño y simulación de filtros activos · Butterworth · Chebyshev · Bessel || active filter design and simulation · Butterworth · Chebyshev · Bessel || progettazione e simulazione di filtri attivi · Butterworth · Chebyshev · Bessel
+Señal || Signal || Segnale
+Etapas || Stages || Stadi
+Exportar CSV || Export CSV || Esporta CSV
+Tipo de filtro || Filter type || Tipo di filtro
+Paso bajo || Low-pass || Passa-basso
+Paso alto || High-pass || Passa-alto
+Paso banda || Band-pass || Passa-banda
+Respuesta || Response || Risposta
+Banda de paso || Passband || Banda passante
+Aten. máx. || Max atten. || Atten. max
+Banda eliminada || Stopband || Banda attenuata
+Aten. mín. || Min atten. || Atten. min
+Orden y ganancia || Order and gain || Ordine e guadagno
+Orden automático (el mínimo que cumple) || Automatic order (the minimum that meets it) || Ordine automatico (il minimo che rispetta)
+Orden || Order || Ordine
+Ganancia || Gain || Guadagno
+La ganancia total se reparte por igual entre las etapas. || The total gain is split equally between the stages. || Il guadagno totale si ripartisce in parti uguali tra gli stadi.
+Resultado || Result || Risultato
+Ejemplos || Examples || Esempi
+Red 50 Hz || 50 Hz mains || Rete 50 Hz
+Banda 1–10 k || Band 1–10 k || Banda 1–10 k
+Corta DC || DC block || Blocca DC
+Eje f || f axis || Asse f
+Plantilla || Template || Maschera
+Etapas sueltas || Individual stages || Stadi singoli
+Armónicos de la señal || Signal harmonics || Armoniche del segnale
+Retardo de grupo || Group delay || Ritardo di gruppo
+Espectro || Spectrum || Spettro
+Eje f lineal || Linear f axis || Asse f lineare
+Eje f logarítmico || Logarithmic f axis || Asse f logaritmico
+Eje Y en dB || Y axis in dB || Asse Y in dB
+Eje Y lineal || Linear Y axis || Asse Y lineare
+Hasta || Up to || Fino a
+Unir los armónicos || Join the harmonics || Unisci le armoniche
+Etapas en cascada · de menor a mayor Q || Cascaded stages · from lowest to highest Q || Stadi in cascata · dal Q minore al maggiore
+Copiar tabla || Copy table || Copia tabella
+Sección || Section || Sezione
+Polos σ ± jω (÷2π) || Poles σ ± jω (÷2π) || Poli σ ± jω (÷2π)
+Ceros || Zeros || Zeri
+Señal de entrada || Input signal || Segnale d'ingresso
+Forma || Shape || Forma
+Senoidal || Sine || Sinusoidale
+Triangular || Triangle || Triangolare
+Diente de sierra || Sawtooth || Dente di sega
+Cuadrada || Square || Quadra
+Senoidal rectificada · onda completa || Rectified sine · full wave || Sinusoide raddrizzata · onda intera
+Senoidal rectificada · media onda || Rectified sine · half wave || Sinusoide raddrizzata · semionda
+Frecuencia || Frequency || Frequenza
+Amplitud || Amplitude || Ampiezza
+Simetría || Symmetry || Simmetria
+Ciclos || Cycles || Cicli
+f de paso || pass f || f di passaggio
+f de corte || cutoff f || f di taglio
+f eliminada || stop f || f attenuata
+Medidas || Measurements || Misure
+Entrada || Input || Ingresso
+Salida || Output || Uscita
+med || avg || med
+Cómo se calcula || How it is computed || Come si calcola
+La salida es el || The output is the || L'uscita è il
+régimen permanente || steady state || regime permanente
+: cada armónico de la entrada se multiplica por la H(jω) del diseño, sin transitorio de arranque. La ventana abarca un número entero de ciclos, así que el espectro no tiene fuga y sus rayas son los armónicos. || : each input harmonic is multiplied by the design's H(jω), with no start-up transient. The window spans a whole number of cycles, so the spectrum has no leakage and its lines are the harmonics. || : ogni armonica dell'ingresso viene moltiplicata per la H(jω) del progetto, senza transitorio iniziale. La finestra copre un numero intero di cicli, quindi lo spettro non ha dispersione e le sue righe sono le armoniche.
+Figura en SVG, en milímetros, lista para abrir en ColabDraw || SVG figure, in millimetres, ready to open in ColabDraw || Figura in SVG, in millimetri, pronta da aprire in ColabDraw
+Figura en PNG a 300 ppp para el artículo || 300 dpi PNG figure for the paper || Figura PNG a 300 dpi per l'articolo
+Datos, ajuste y residuos en CSV || Data, fit and residuals as CSV || Dati, fit e residui in CSV
+Abrir un CSV — el de un osciloscopio también || Open a CSV — an oscilloscope's too || Apri un CSV — anche quello di un oscilloscopio
+Escribir o pegar los datos a mano || Type or paste the data by hand || Scrivi o incolla i dati a mano
+En función de x; todo lo demás que escribas es un parámetro || As a function of x; anything else you write is a parameter || In funzione di x; tutto il resto che scrivi è un parametro
+No se ajusta: se queda en el valor escrito || Not fitted: it stays at the value typed || Non si adatta: resta al valore scritto
+Volver a estimar los valores de partida a partir de los datos || Re-estimate the starting values from the data || Ristima i valori iniziali dai dati
+Con varios valores de partida que corregir, reajustar en cada uno los va moviendo mientras escribes los demás || With several starting values to correct, refitting on each one moves them while you type the others || Con diversi valori iniziali da correggere, riadattare su ognuno li sposta mentre scrivi gli altri
+ajuste de curvas con incertidumbres · parámetros ± σ · χ² · tabla y figura para el informe || curve fitting with uncertainties · parameters ± σ · χ² · table and figure for the report || fit di curve con incertezze · parametri ± σ · χ² · tabella e figura per la relazione
+Ajuste || Fit || Fit
+Datos || Data || Dati
+Informe || Report || Relazione
+Abrir CSV || Open CSV || Apri CSV
+Escribir || Type || Scrivi
+Ejemplo || Example || Esempio
+Ley de Ohm (recta) || Ohm's law (line) || Legge di Ohm (retta)
+Descarga de un RC || RC discharge || Scarica di un RC
+Péndulo: T frente a L || Pendulum: T versus L || Pendolo: T in funzione di L
+Resonancia (lorentziana) || Resonance (Lorentzian) || Risonanza (lorentziana)
+Columnas || Columns || Colonne
+valor || value || valore
+Sin σ el ajuste sale igual, pero las incertidumbres de los parámetros se estiman de la dispersión de los propios puntos. || Without σ the fit comes out the same, but the parameter uncertainties are estimated from the scatter of the points themselves. || Senza σ il fit viene uguale, ma le incertezze dei parametri si stimano dalla dispersione dei punti stessi.
+Recta · a·x + b || Line · a·x + b || Retta · a·x + b
+Por el origen · a·x || Through the origin · a·x || Per l'origine · a·x
+Polinomio de grado n || Polynomial of degree n || Polinomio di grado n
+Logarítmico · a + b·ln x || Logarithmic · a + b·ln x || Logaritmico · a + b·ln x
+Exponencial · a·e^(b·x) || Exponential · a·e^(b·x) || Esponenziale · a·e^(b·x)
+Descarga · a·e^(−x/τ) + c || Decay · a·e^(−x/τ) + c || Scarica · a·e^(−x/τ) + c
+Potencia · a·x^b || Power · a·x^b || Potenza · a·x^b
+Senoidal · A·sin(2πf·x + φ) + c || Sine · A·sin(2πf·x + φ) + c || Sinusoidale · A·sin(2πf·x + φ) + c
+Gaussiana || Gaussian || Gaussiana
+Lorentziana || Lorentzian || Lorentziana
+Saturación · a·x/(b + x) || Saturation · a·x/(b + x) || Saturazione · a·x/(b + x)
+Fórmula libre… || Custom formula… || Formula libera…
+Grado || Degree || Grado
+Parámetros de partida || Starting parameters || Parametri iniziali
+Valor inicial || Initial value || Valore iniziale
+Fijo || Fixed || Fisso
+Estimar || Estimate || Stima
+Reajustar al escribir un valor || Refit when a value is typed || Riadatta quando scrivi un valore
+Eje x lineal || Linear x axis || Asse x lineare
+Eje x logarítmico || Logarithmic x axis || Asse x logaritmico
+Eje y lineal || Linear y axis || Asse y lineare
+Eje y logarítmico || Logarithmic y axis || Asse y logaritmico
+Banda ±1σ del ajuste || ±1σ band of the fit || Banda ±1σ del fit
+Residuos normalizados || Normalised residuals || Residui normalizzati
+Clic en un punto para dejarlo fuera del ajuste || Click a point to leave it out of the fit || Clicca su un punto per escluderlo dal fit
+Escribir o pegar || Type or paste || Scrivi o incolla
+Usar estos datos || Use this data || Usa questi dati
+Separadas por tabuladores, comas, punto y coma o espacios. La primera fila puede ser la de los nombres. || Separated by tabs, commas, semicolons or spaces. The first row may hold the names. || Separate da tabulazioni, virgole, punti e virgola o spazi. La prima riga può essere quella dei nomi.
+Puntos || Points || Punti
+Ninguno || None || Nessuno
+Números || Numbers || Numeri
+Sencillo || Simple || Semplice
+Incluir la tabla de datos || Include the data table || Includi la tabella dei dati
+Descargar .tex || Download .tex || Scarica .tex
+Parámetros || Parameters || Parametri
+Calidad del ajuste || Goodness of fit || Bontà del fit
+Correlación entre parámetros || Correlation between parameters || Correlazione tra parametri
+±1 quiere decir que los dos parámetros dicen lo mismo: el ajuste no puede separarlos. || ±1 means the two parameters say the same thing: the fit cannot tell them apart. || ±1 significa che i due parametri dicono la stessa cosa: il fit non può separarli.
+Magnitudes derivadas || Derived quantities || Grandezze derivate
+Su σ se propaga con la matriz de covarianza entera, correlaciones incluidas — no sumando las σ por separado. || Their σ is propagated with the whole covariance matrix, correlations included — not by adding the σ separately. || La loro σ si propaga con l'intera matrice di covarianza, correlazioni incluse — non sommando le σ separatamente.
+estación de trabajo local · aplicaciones || local workstation · applications || postazione di lavoro locale · applicazioni
+Aplicaciones || Applications || Applicazioni
+Elige una herramienta para empezar a trabajar. || Choose a tool to start working. || Scegli uno strumento per iniziare a lavorare.
+Osciloscopio offline para capturas CSV: cursores, trigger, FFT, armónicos con THD y TDD (IEEE 519), canales matemáticos, XY. || Offline oscilloscope for CSV captures: cursors, trigger, FFT, harmonics with THD and TDD (IEEE 519), math channels, XY. || Oscilloscopio offline per acquisizioni CSV: cursori, trigger, FFT, armoniche con THD e TDD (IEEE 519), canali matematici, XY.
+OPERATIVO || LIVE || OPERATIVO
+Editor LaTeX colaborativo: proyectos, edición en tiempo real, compilación a PDF y control de versiones. || Collaborative LaTeX editor: projects, real-time editing, PDF compilation and version control. || Editor LaTeX collaborativo: progetti, modifica in tempo reale, compilazione in PDF e controllo di versione.
+LaTeX · PDF · Colaboración || LaTeX · PDF · Collaboration || LaTeX · PDF · Collaborazione
+Editor de dibujos vectoriales al estilo Inkscape: figuras para tus artículos, exportables a SVG y PNG, con la misma cuenta de ColabTeX. || Inkscape-style vector drawing editor: figures for your papers, exportable to SVG and PNG, with the same ColabTeX account. || Editor di disegni vettoriali in stile Inkscape: figure per i tuoi articoli, esportabili in SVG e PNG, con lo stesso account di ColabTeX.
+SVG · PNG · Colaboración || SVG · PNG · Collaboration || SVG · PNG · Collaborazione
+Los errores que recogen las aplicaciones y los fallos y sugerencias que escribe el equipo, en un sitio y exportables a un archivo. || The errors the apps collect and the bugs and suggestions the team writes, in one place and exportable to a file. || Gli errori raccolti dalle app e i bug e suggerimenti scritti dal team, in un unico posto ed esportabili in un file.
+Errores · Sugerencias || Errors · Suggestions || Errori · Suggerimenti
+Diseño de filtros activos a partir de la plantilla de bandas: orden mínimo, f₀ y Q de cada etapa, Bode — y cómo queda tu señal de prueba al pasar por él. || Active filter design from the band template: minimum order, f₀ and Q of each stage, Bode — and what your test signal looks like after going through it. || Progettazione di filtri attivi a partire dalla maschera di banda: ordine minimo, f₀ e Q di ogni stadio, Bode — e come esce il tuo segnale di prova dopo averlo attraversato.
+Bode · Etapas · Señal || Bode · Stages · Signal || Bode · Stadi · Segnale
+Ajusta un modelo a tus medidas: parámetros con su σ, χ² y residuos, magnitudes derivadas con la incertidumbre propagada — y de ahí, la tabla en LaTeX y la figura del informe. || Fit a model to your measurements: parameters with their σ, χ² and residuals, derived quantities with propagated uncertainty — and from there, the LaTeX table and the report figure. || Adatta un modello alle tue misure: parametri con la loro σ, χ² e residui, grandezze derivate con l'incertezza propagata — e da lì la tabella in LaTeX e la figura della relazione.
+Cuatro juegos por turnos con la misma cuenta: esconder a alguien en un paisaje, un juego de cartas de tres elementos, cuadritos (hasta seis jugadores y tres tamaños de tablero) y reversi. Con su clasificación. || Multiplayer games with the same account: hide-and-seek in a landscape, cards, dots and boxes, reversi, UNO, Catan, chess, Pokémon and many more. With leaderboards. || Giochi multigiocatore con lo stesso account: nascondino in un paesaggio, carte, punti e quadrati, reversi, UNO, Catan, scacchi, Pokémon e molti altri. Con classifiche.
+Dos jugadores · Clasificación || Multiplayer · Leaderboard || Multigiocatore · Classifica
+Nueva aplicación || New application || Nuova applicazione
+Laboratorio · entorno local || Laboratorio · local environment || Laboratorio · ambiente locale
+Idioma || Language || Lingua
