@@ -4295,6 +4295,38 @@ everything fails with `PERMISSION_DENIED`, and the lobby says so in plain
 language instead of looking broken (`avisoReglas()` in `juegos-main.js`, and
 the same in `ranks.js`).
 
+## Every game can be muted and turned down (a rule, not a nicety)
+
+**Every game must offer both a mute and a volume control that are visible
+where it is played**: in the room, in the Solo Club iframe and in fullscreen.
+A control that exists only in the standalone page does not count. Tetris Club
+had a 🔊 in its own header, and that header is exactly what
+`.club-integrado .shell>header` hides inside Juegos, so nobody could turn
+it down. A new game, or new audio in an old one, must keep this true. Where
+the controls come from:
+
+- **Room games** (the ones painted by the page itself) go through the
+  header's ♪ player. It holds the music volume (`jg.volumen`) and, below
+  it, an **Efectos** slider (`configurarEfectos`, `jg.volEfectos`, applied to
+  `busFx` in `sonido.js`). The 🔊 next to it mutes the effects (`jg.sonido`).
+  New sounds must go through `busFx` or the music `bus`, never straight to
+  `ctx.destination`, or they escape both sliders.
+- **Games in their own document** (the Club's, Yemas, PRODROP) load
+  `juegos/audio/volumen.js` **before any of their own scripts**. It wraps
+  `AudioContext` so that `destination` is a gain node of its own, and scales
+  `<audio>.volume`. Whatever the game connects «to the speaker» is therefore
+  governed without the game knowing. It draws a 🔊 button plus a slider in
+  every `[data-volumen]` slot. In the Club, `conexion.js` puts one next to the
+  `.scorebar`, or floats it in a corner when the game left no slot. The
+  setting is `jg.club.volumen`/`jg.club.mudo`, shared by all of them and
+  synced across tabs. Each game's own sound button stays: that one turns
+  the game's sound off, while this one sets how loud it is.
+- Games that already had both controls keep their own and do not load
+  `volumen.js`: Mina Club (toggle + slider), Circuit Breakers (music,
+  effects, volume in its settings) and FANAL (its options have music and
+  effects volumes; it loads `volumen.js` anyway so the mute is one click).
+  Clue, Sopa and Electrodle make no sound.
+
 ## Idiomas (`i18n.js`)
 
 Every page loads `i18n.js` right after `<meta charset>` (`../../i18n.js` or

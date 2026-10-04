@@ -1335,3 +1335,7 @@ body[data-phase="elige"] .top-line { opacity: 0; }
 .bk-comp .bk b { color: #6dffb0; text-shadow: 0 .6cqw 0 #06321f; }
 /* la tira bajo la imagen es clara: en el panel azul del esquemático su texto va oscuro */
 .v-esquematico .fr-strip, .v-esquematico .fr-stage { color: #1c1a17; }
+/* Volumen y silencio (juegos/audio/volumen.js), entre los chips de arriba. */
+.vol-top { display: flex; align-items: center; }
+.vol-top .vj-ctl { color: #fff; }
+@media (max-width: 640px) { .vol-top .vj-ctl input { width: 56px; } .vol-top .vj-ctl output { display: none; } }

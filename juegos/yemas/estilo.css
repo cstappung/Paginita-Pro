@@ -181,3 +181,5 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #a9dcff; fon
   font-weight: 900; letter-spacing: 3px; color: #e6c3ff; text-shadow: 0 2px 6px rgba(0,0,0,0.9); }
 #jefe div { height: 12px; margin-top: 4px; border-radius: 6px; background: rgba(0,0,0,0.55); border: 1px solid rgba(230,195,255,0.5); overflow: hidden; }
 #jefe i { display: block; height: 100%; width: 100%; background: linear-gradient(90deg, #7a1fa8, #d34aff); transition: width 0.15s; }
+/* Volumen y silencio (juegos/audio/volumen.js). */
+.vol-pausa { margin: 8px 0 2px; }
