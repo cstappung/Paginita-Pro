@@ -22,3 +22,6 @@ ui-debug.log
 # exportaciones de la base para auditar trampas (traen nombres y uids)
 auditoria/
 *.export.json
+
+# copias de trabajo de los agentes
+.claude/worktrees/
