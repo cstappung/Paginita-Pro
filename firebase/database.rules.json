@@ -380,7 +380,7 @@
       ".read": "auth != null",
       "$uid": {
         "$juego": {
-          ".write": "auth != null && auth.uid === $uid && newData.exists()",
+          ".write": "auth != null && auth.uid === $uid && newData.exists() && !root.child('vetados').child(auth.uid).exists()",
           ".validate": "$juego.matches(/^(minas|snake|tetrisclub|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|metrorush)$/) && newData.hasChildren(['dia', 'hoy', 'total', 'at']) && newData.child('at').val() === now && newData.child('dia').val() * 86400000 + 10800000 <= now && now < newData.child('dia').val() * 86400000 + 100800000 && newData.child('hoy').val() <= ($juego === 'bbtan' ? 10 : 15) && (data.exists() ? (newData.child('total').val() === data.child('total').val() + 1 && (newData.child('dia').val() === data.child('dia').val() ? newData.child('hoy').val() === data.child('hoy').val() + 1 : (newData.child('dia').val() > data.child('dia').val() && newData.child('hoy').val() === 1))) : (newData.child('total').val() === 1 && newData.child('hoy').val() === 1))",
           "dia": { ".validate": "newData.isNumber() && newData.val() % 1 === 0" },
           "hoy": { ".validate": "newData.isNumber()" },
@@ -407,7 +407,7 @@
       ".read": "auth != null",
       "$uid": {
         "$p": {
-          ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists()",
+          ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists() && !root.child('vetados').child(auth.uid).exists()",
           ".validate": "$p.matches(/^[-_A-Za-z0-9]{6,80}$/) && newData.hasChildren(['c', 'p', 'q', 'at']) && newData.child('at').val() === now && root.child('soloRanks').child(newData.child('c').val()).child($uid).child('partida').val() === $p",
           "c": { ".validate": "newData.isString() && newData.val().matches(/^(club-[a-z0-9-]+|yemas-zombis-[a-z]+)$/)" },
           "p": { ".validate": "newData.isNumber() && (newData.val() === 1 || newData.val() === 2 || newData.val() === 3)" },
@@ -439,8 +439,8 @@
           "puntos"
         ],
         "$uid": {
-          ".write": "auth != null && auth.uid === $uid",
-          ".validate": "$categoria.matches(/^(club-minas-(easy|medium|hard)|club-snake-(classic|arcade|portals|reloj|espejo|laberinto)-(chico|mediano|grande|gigante)|club-tetris-(maraton|sprint|ultra)|club-sortem-(10|20|30)|club-bbtan-rondas|club-sopa-(racha|(facil|medio|dificil)-(8|12|15))|club-electro-(racha|puntos)|club-frontera-((torre|palacio|fabrica)-(50|abierto)|victorias)|club-sudoku-(racha|arcade|facil|medio|dificil|experto)|club-fanal-(travesia|sinfin|jornadas)|club-atasco-estrellas|club-metrorush-(carrera|distancia)|yemas-zombis-(nacht|kino|nuketown|riese|pueblo))$/) && newData.hasChildren(['nombre','puntos','tiempo','partida']) && (!data.exists() || newData.child('puntos').val() > data.child('puntos').val() || (newData.child('puntos').val() === data.child('puntos').val() && newData.child('tiempo').val() < data.child('tiempo').val()))",
+          ".write": "auth != null && ((auth.uid === $uid && !root.child('vetados').child(auth.uid).exists()) || (!newData.exists() && root.child('admins').child(auth.uid).val() === true))",
+          ".validate": "$categoria.matches(/^(club-minas-(easy|medium|hard)|club-snake-(classic|arcade|portals|reloj|espejo|laberinto)-(chico|mediano|grande|gigante)|club-tetris-(maraton|sprint|ultra)|club-sortem-(10|20|30)|club-bbtan-rondas|club-sopa-(racha|(facil|medio|dificil)-(8|12|15))|club-electro-(racha|puntos)|club-frontera-((torre|palacio|fabrica)-(50|abierto)|victorias)|club-sudoku-(racha|arcade|facil|medio|dificil|experto)|club-fanal-(travesia|sinfin|jornadas)|club-atasco-estrellas|club-metrorush-(carrera|distancia)|yemas-zombis-(nacht|kino|nuketown|riese|pueblo))$/) && newData.hasChildren(['nombre','puntos','tiempo','partida']) && (!data.exists() || newData.child('puntos').val() > data.child('puntos').val() || (newData.child('puntos').val() === data.child('puntos').val() && newData.child('tiempo').val() < data.child('tiempo').val())) && ($categoria.beginsWith('yemas-zombis-') || root.child('soloPruebas').child($categoria).child($uid).child(newData.child('partida').val()).exists()) && (!$categoria.matches(/^club-(sopa|sudoku|electro)-racha$/) || newData.child('puntos').val() <= root.child('rachasClub').child($uid).child($categoria).child('n').val())",
           "nombre": {
             ".validate": "newData.isString() && newData.val().length <= 80"
           },
@@ -457,6 +457,62 @@
             ".validate": false
           }
         }
+      }
+    },
+
+    "soloPruebas": {
+      ".read": "auth != null",
+      "$categoria": {
+        "$uid": {
+          "$partida": {
+            ".write": "auth != null && ((auth.uid === $uid && !data.exists() && newData.exists()) || (!newData.exists() && root.child('admins').child(auth.uid).val() === true))",
+            ".validate": "$categoria.matches(/^(club-minas-(easy|medium|hard)|club-snake-(classic|arcade|portals|reloj|espejo|laberinto)-(chico|mediano|grande|gigante)|club-tetris-(maraton|sprint|ultra)|club-sortem-(10|20|30)|club-bbtan-rondas|club-sopa-(racha|(facil|medio|dificil)-(8|12|15))|club-electro-(racha|puntos)|club-frontera-((torre|palacio|fabrica)-(50|abierto)|victorias)|club-sudoku-(racha|arcade|facil|medio|dificil|experto)|club-fanal-(travesia|sinfin|jornadas)|club-atasco-estrellas|club-metrorush-(carrera|distancia))$/) && $partida.matches(/^[-a-zA-Z0-9]{1,80}$/) && newData.hasChildren(['v', 'd', 'at'])",
+            "v": { ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 0 && newData.val() <= 1000" },
+            "d": { ".validate": "newData.isString() && newData.val().length <= 200000" },
+            "at": { ".validate": "newData.val() === now" },
+            "$otro": { ".validate": false }
+          }
+        }
+      }
+    },
+    "rachasClub": {
+      ".read": "auth != null",
+      "$uid": {
+        "$categoria": {
+          ".write": "auth != null && auth.uid === $uid && newData.exists() && !root.child('vetados').child(auth.uid).exists()",
+          ".validate": "$categoria.matches(/^club-(sopa|sudoku|electro)-racha$/) && newData.hasChildren(['dia', 'n', 'at']) && newData.child('at').val() === now && newData.child('dia').val() * 86400000 + 10800000 <= now && now < newData.child('dia').val() * 86400000 + 100800000 && (data.exists() ? (newData.child('dia').val() > data.child('dia').val() && newData.child('n').val() === (newData.child('dia').val() === data.child('dia').val() + 1 ? data.child('n').val() + 1 : 1)) : (newData.child('n').val() === 1 || (root.child('soloRanks').child($categoria).child($uid).exists() && newData.child('n').val() >= 1 && newData.child('n').val() <= root.child('soloRanks').child($categoria).child($uid).child('puntos').val() + 1)))",
+          "dia": { ".validate": "newData.isNumber() && newData.val() % 1 === 0" },
+          "n": { ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 1 && newData.val() <= 1001" },
+          "at": { ".validate": "newData.isNumber()" },
+          "$otro": { ".validate": false }
+        }
+      }
+    },
+    "sospechas": {
+      ".read": "auth != null && root.child('admins').child(auth.uid).val() === true",
+      "$uid": {
+        ".write": "auth != null && !newData.exists() && root.child('admins').child(auth.uid).val() === true",
+        "$id": {
+          ".write": "auth != null && auth.uid === $uid && !data.exists() && newData.exists()",
+          ".validate": "newData.hasChildren(['c', 'm', 'at'])",
+          "c": { ".validate": "newData.isString() && newData.val().length <= 60" },
+          "m": { ".validate": "newData.isString() && newData.val().length <= 300" },
+          "p": { ".validate": "newData.isNumber()" },
+          "t": { ".validate": "newData.isNumber()" },
+          "d": { ".validate": "newData.isString() && newData.val().length <= 20" },
+          "at": { ".validate": "newData.val() === now" },
+          "$otro": { ".validate": false }
+        }
+      }
+    },
+    "vetados": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": "auth != null && root.child('admins').child(auth.uid).val() === true",
+        ".validate": "newData.hasChildren(['at']) && newData.child('at').val() === now",
+        "at": { ".validate": "newData.isNumber()" },
+        "m": { ".validate": "newData.isString() && newData.val().length <= 300" },
+        "$otro": { ".validate": false }
       }
     },
 

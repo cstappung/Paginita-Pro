@@ -14,11 +14,21 @@
  * combate (`nuevaPelea` es determinista), así que recargar la página no
  * vuelve a tirar los dados: sigue exactamente donde estaba.
  *
- * `crearFrontera({usuario, guardar, watch, partida, alResultado, volver})`
- *   guardar(categoria, uid, dato)  → la tabla del club (con podio)
+ * Esa misma receta es la prueba de las marcas (antitrampas, ver
+ * docs/antitrampas/frontera.md): cada racha guarda en `h` el ordinal,
+ * las elecciones y los toques (cuándo y con qué se hizo cada clic) de
+ * cada combate ganado, y cada victoria entra en el libro `vl` hasta que
+ * la tabla la cuenta. Antes de subir nada se pasa por `verificaClub`,
+ * que vuelve a jugar esos combates; lo que no se gana, o no lo jugó una
+ * persona, no sube, y queda un aviso para los administradores.
+ *
+ * `crearFrontera({usuario, guardar, watch, partida, alResultado, reportaSospecha, volver})`
+ *   guardar(categoria, uid, dato, prueba) → la tabla del club (con podio)
  *   watch(categoria, cb)           → las filas de esa tabla
  *   partida = {leer(), guardar(d, at)}  → `users/<uid>/club/frontera`
  *   alResultado([{d, previa}])     → días, partidas del club y logros
+ *   reportaSospecha({c, m, p, t, d, vivo}) → una marca que la verificación
+ *                                    rechazó (`vivo`: de la victoria recién ganada)
  *
  * Con `usuario.invitado` (el modo invitado del salón) se juega igual,
  * pero nada sale del navegador: ni la clasificación ni la racha en la
@@ -29,11 +39,24 @@ import { crearPokemon } from "./pokemon.js";
 import { misEquipos, abreEquipos } from "./pokemon/equipos.js";
 import { htmlRival, skinRival, htmlEntrenador } from "./pokemon/entrenadores.js";
 import { suena } from "./sonido.js";
+import { verificaClub, PRUEBA_MAX } from "./solo/verifica.js";
 
 const esc = t => String(t == null ? "" : t).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const CLAVE = uid => "frontera." + uid;
 const TOPE_MS = 604800000;          // el tope de `tiempo` en las reglas
 const MAX_PELEA_MS = 3600000;       // un combate no suma más de una hora
+const TOPE_LIBRO_LOCAL = 3000;      // victorias sin subir que se guardan aquí
+/* Quién hizo un clic de combate, para la prueba: una persona
+   (`isTrusted`), el mando (mando.js despacha clics sintéticos marcados
+   `__mando`, y solo valen con un mando conectado) o un script. */
+function origenDe(ev) {
+  if (!ev) return "script";
+  if (ev.isTrusted) return "persona";
+  if (ev.__mando) {
+    try { if (Array.from(navigator.getGamepads ? navigator.getGamepads() : []).some(g => g && g.connected)) return "mando"; } catch (e) { /* sin API de mandos */ }
+  }
+  return "script";
+}
 const TEXTO = {
   torre: "Combates individuales con tus propios Pokémon. Siete por serie; el As te espera en los combates 35 y 70.",
   palacio: "Tus Pokémon luchan solos, según su naturaleza y la vida que les queda. Tú solo miras… y confías.",
@@ -41,22 +64,27 @@ const TEXTO = {
 };
 const ICONO = { torre: "🗼", palacio: "🏯", fabrica: "🏭" };
 
-export function crearFrontera({ usuario, guardar, watch, partida, alResultado, volver }) {
+export function crearFrontera({ usuario, guardar, watch, partida, alResultado, reportaSospecha, volver }) {
   const uid = usuario.uid, invitado = !!usuario.invitado;
   let host = null, muerto = false, PM = null, F = null;
   /* Con todas las piezas que `sano` garantiza a lo que se carga: quien
      entra por primera vez (y todo invitado) no tiene nada guardado, y sin
      `pend` el menú no se podía pintar. */
-  let datos = { v: 1, runs: {}, mejor: {}, pend: {}, tMejor: {}, victorias: 0, tiempoTot: 0, at: 0 };
+  let datos = { v: 1, runs: {}, mejor: {}, pend: {}, tMejor: {}, victorias: 0, tiempoTot: 0, at: 0, oMax: 0, vl: [] };
   let vista = "carga", sel = { inst: "torre", nivel: "50" };
   let equipos = null, skin = "red";
   let elegidos = [];                 // índices elegidos (equipo propio o alquiler)
   let equipoSel = "";                // id del equipo guardado elegido
-  let pk = null, pelea = null, chequeo = 0, cerrado = false, inicioPelea = 0;
+  let pk = null, pelea = null, chequeo = 0, cerrado = false, inicioPelea = 0, ultimoToque = 0;
   let resultado = null;              // lo que muestra la pantalla de resultado
   let cambio = { mio: -1, suyo: -1 };
   let sinReglas = false;             // la clasificación rechazó una escritura
   let avisoFr = "";                  // un fallo que se explica en el menú
+  /* Lo que dice la base de las tablas propias (null: aún no se sabe).
+     De aquí, y no de `datos` (que se edita a mano), sale la base del
+     total de victorias que se sube. */
+  let filaV = null;
+  const filaR = {};
   const desuscribe = [];
 
   /* ---------- guardar y leer ---------- */
@@ -85,6 +113,17 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, v
     for (const o of [d.mejor, d.tMejor]) for (const kk of Object.keys(o)) { const v = Math.floor(+o[kk]); if (Number.isFinite(v) && v > 0) o[kk] = v; else delete o[kk]; }
     d.victorias = Math.max(0, Math.floor(+d.victorias || 0));
     d.tiempoTot = Math.max(0, Math.floor(+d.tiempoTot || 0));
+    d.oMax = Math.max(0, Math.floor(+d.oMax || 0)) || 0;
+    /* Lo pendiente lleva su prueba; una marca de antes, sin ella, ya no
+       se puede subir (la tabla la rechazaría) y se descarta. */
+    for (const cat of Object.keys(d.pend)) {
+      const x = d.pend[cat];
+      if (!x || typeof x !== "object" || !x.d || typeof x.d !== "object" || !x.p || typeof x.p !== "object") delete d.pend[cat];
+    }
+    const entrada = e => Array.isArray(e) && e.length === 7 && typeof e[0] === "string" && typeof e[1] === "string" &&
+      Number.isSafeInteger(e[2]) && Number.isSafeInteger(e[3]) && e[3] > 0 && typeof e[4] === "string" &&
+      (typeof e[5] === "string" || Array.isArray(e[5])) && (e[6] === null || typeof e[6] === "string");
+    d.vl = Array.isArray(d.vl) ? d.vl.filter(entrada).slice(-TOPE_LIBRO_LOCAL) : [];
     return d;
   }
   function runSano(r) {
@@ -97,8 +136,23 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, v
     const equipo = Array.isArray(r.equipo) && r.equipo.length === 3 && r.equipo.every(setOk) ? r.equipo : null;
     const ultimo = Array.isArray(r.ultimoRival) && r.ultimoRival.every(setOk) ? r.ultimoRival : null;
     const elecciones = Array.isArray(r.elecciones) && r.elecciones.every(c => typeof c === "string") ? r.elecciones : [];
+    /* La historia de la racha (la prueba de su récord): un combate ganado
+       por entrada, `[o, elecciones, cambio, toques]`. Una racha sin ella
+       —empezada antes de la prueba— se sigue jugando, pero ya no puede
+       subir récords. */
+    const paso = x => Array.isArray(x) && x.length === 4 && Number.isSafeInteger(x[0]) && x[0] >= 0 &&
+      (typeof x[1] === "string" || Array.isArray(x[1])) && (x[2] === "" || /^[0-2][0-2]$/.test(x[2])) && (x[3] === null || typeof x[3] === "string");
+    let h = Array.isArray(r.h) && r.h.length === n - 1 && r.h.every(paso) ? r.h : undefined;
+    const t = typeof r.t === "string" && /^[0-5]{3}$/.test(r.t) ? r.t : undefined;
+    if (r.inst === "fabrica" && equipo && !t) h = undefined;
+    // Una racha de antes que aún no ganó nada no tiene nada que probar.
+    if (!h && n === 1 && (r.inst !== "fabrica" || !equipo || t)) h = [];
+    const o = Math.max(0, Math.floor(+r.o || 0)) || 0;
+    const sw = typeof r.sw === "string" && /^[0-2][0-2]$/.test(r.sw) ? r.sw : "";
+    // Los toques del combate en curso van a la par de sus elecciones.
+    const z = Array.isArray(r.z) && r.z.length === elecciones.length && r.z.every(x => typeof x === "string") ? r.z : null;
     return Object.assign({}, r, { n, equipo, ultimoRival: ultimo, elecciones, enPelea: !!(r.enPelea && equipo),
-      tiempo: Math.max(0, Math.floor(+r.tiempo || 0)) });
+      tiempo: Math.max(0, Math.floor(+r.tiempo || 0)), h, t, o, sw, z });
   }
   /* Una lectura que no vuelve (la conexión a medias) no puede dejar la
      Frontera en «Abriendo las puertas…» para siempre. */
@@ -106,22 +160,94 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, v
     const t = setTimeout(() => mal(new Error("tiempo agotado")), ms);
     Promise.resolve(pr).then(v => { clearTimeout(t); ok(v); }, e => { clearTimeout(t); mal(e); });
   });
-  /* Una marca para la clasificación queda pendiente (`datos.pend`) hasta
-     que la base la acepta. Antes se mandaba una sola vez y, si fallaba
-     (reglas sin publicar, sin red), el récord ya figuraba en `mejor` y no
-     volvía a subir nunca: el menú lo mostraba y la tabla no. */
-  function sube(cat, dato) {
-    if (invitado) return Promise.resolve();
-    datos.pend[cat] = dato;
-    persiste();
+  const repinta = () => { if (!muerto && vista !== "pelea") pinta(); };
+  /* Una marca, con su prueba: primero se comprueba (se vuelven a jugar
+     sus combates) y solo entonces va a la tabla. Devuelve
+     `{estado: "ok" | "rechazo" | "pendiente", committed}`. «pendiente» es
+     lo que no se pudo ni comprobar ni escribir ahora (sin red, sin el
+     motor, reglas sin publicar): se reintenta, y no acusa a nadie. `vivo`
+     dice que la marca sale de la victoria que se acaba de ganar: solo un
+     rechazo así castiga (castigo.js); lo pendiente que se re-verifica al
+     entrar y el libro de victorias pudieron jugarse con otra versión. */
+  async function verificaYGuarda(cat, dato, prueba, vivo = false) {
+    const motivo = await verificaClub("frontera", Object.assign({ categoria: cat }, dato), prueba, { uid });
+    if (motivo) {
+      if (/^No se pudo comprobar/.test(motivo)) {
+        console.warn("[frontera] verificación", cat, motivo);
+        avisoFr = "No se pudo comprobar tu marca ahora; se vuelve a intentar la próxima vez que entres.";
+        repinta();
+        return { estado: "pendiente" };
+      }
+      avisoFr = "Tu marca no se subió a la clasificación: " + motivo;
+      if (reportaSospecha) Promise.resolve().then(() => reportaSospecha({ c: cat, m: motivo, p: dato.puntos, t: dato.tiempo, d: dato.partida, vivo })).catch(() => {});
+      repinta();
+      return { estado: "rechazo" };
+    }
     const nombre = String(usuario.name || "Jugador").slice(0, 80);
-    return guardar(cat, uid, Object.assign({ nombre }, dato)).then(() => {
-      if (datos.pend[cat] === dato) { delete datos.pend[cat]; persiste(); }
-      if (sinReglas) { sinReglas = false; if (!muerto) pinta(); }
-    }, err => {
+    try {
+      const res = await guardar(cat, uid, Object.assign({ nombre }, dato), prueba);
+      if (sinReglas) { sinReglas = false; repinta(); }
+      return { estado: "ok", committed: !!(res && res.committed) };
+    } catch (err) {
       console.warn("[frontera] clasificación", cat, err);
-      if (/permission/i.test(String(err && (err.code || err.message)))) { sinReglas = true; if (!muerto) pinta(); }
-    });
+      if (/permission/i.test(String(err && (err.code || err.message)))) { sinReglas = true; repinta(); }
+      return { estado: "pendiente" };
+    }
+  }
+  /* Un récord de racha queda pendiente (`datos.pend`, con su prueba)
+     hasta que la base lo acepta. Antes se mandaba una sola vez y, si
+     fallaba (reglas sin publicar, sin red), el récord ya figuraba en
+     `mejor` y no volvía a subir nunca: el menú lo mostraba y la tabla no. */
+  async function sube(cat, dato, prueba, vivo = false) {
+    if (invitado) return { estado: "pendiente" };
+    if (JSON.stringify(prueba).length > PRUEBA_MAX) {
+      avisoFr = "Esta racha es tan larga que su prueba ya no cabe: el récord queda aquí, pero no sube a la clasificación.";
+      repinta();
+      return { estado: "pendiente" };
+    }
+    const x = { d: dato, p: prueba };
+    datos.pend[cat] = x;
+    persiste();
+    const r = await verificaYGuarda(cat, dato, prueba, vivo);
+    if (r.estado !== "pendiente" && datos.pend[cat] === x) { delete datos.pend[cat]; persiste(); }
+    return r;
+  }
+  /* El total de victorias: la base es la fila de la tabla (lo que la
+     base dice, no `datos`), y la prueba trae solo las victorias del libro
+     que la tabla aún no cuenta. Devuelve lo que subió, para los logros. */
+  const altoDe = f => { const m = /^fv-(\d+)$/.exec(String(f && f.partida || "")); return m ? +m[1] : 0; };
+  let subiendoV = false, otraV = false;
+  async function subeVictorias() {
+    if (invitado || !filaV || !F) return [];
+    if (subiendoV) { otraV = true; return []; }
+    subiendoV = true;
+    const hechas = [];
+    try {
+      for (let vuelta = 0; vuelta < 50; vuelta++) {
+        otraV = false;
+        const B = Math.max(0, Math.floor(+filaV.puntos || 0)), H = altoDe(filaV);
+        const x = F.pruebaVictorias(B, H, datos.vl);
+        if (x.descartar.length) { const fuera = new Set(x.descartar); datos.vl = datos.vl.filter(e => !fuera.has(e)); persiste(); }
+        if (!x.usadas) break;
+        const cat = "club-frontera-victorias";
+        const dato = { puntos: x.puntos, tiempo: Math.max(1, Math.min(TOPE_MS, datos.tiempoTot || 1)), partida: x.partida };
+        const r = await verificaYGuarda(cat, dato, x.prueba);
+        const usadas = new Set(x.prueba.l.map(f => f[3]));
+        if (r.estado === "rechazo") { datos.vl = datos.vl.filter(e => !usadas.has(e[3])); persiste(); break; }
+        // Sin escribir: la tabla ya tiene más (otro aparato, o la escritura
+        // anterior aún no vuelve por el watch). Se espera a la fila nueva.
+        if (r.estado !== "ok" || !r.committed) break;
+        datos.vl = datos.vl.filter(e => !usadas.has(e[3]));
+        hechas.push({ d: Object.assign({ categoria: cat }, dato), previa: B ? { puntos: B } : null });
+        filaV = { puntos: x.puntos, partida: x.partida };
+        datos.victorias = Math.max(datos.victorias, x.puntos);
+        persiste();
+        if (!datos.vl.length) break;
+      }
+    } finally { subiendoV = false; }
+    if (otraV) subeVictorias();
+    repinta();
+    return hechas;
   }
   async function carga() {
     let d = null;
@@ -140,30 +266,35 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, v
     // Lo que diga la clasificación también cuenta: nunca menos que ella.
     /* La primera lectura de cada tabla también repara: si aquí hay una
        marca mejor que la de la tabla, se vuelve a subir. */
+    /* Ya no se sube lo que solo diga `datos` (`mejor`, `victorias`): no
+       trae prueba, y es justo lo que se edita a mano. Solo lo pendiente
+       con su prueba, y el libro de victorias. */
     const revisado = new Set();
-    const mira = (cat, f, local) => {
+    const mira = (cat, f) => {
       let off = null;
-      try { off = watch(cat, filas => {
-        const yo = (filas || []).find(x => x.uid === uid);
-        if (yo) f(yo);
+      try { off = watch(cat, (filas, err) => {
+        if (err) { if (!muerto) pinta(); return; }
+        const yo = (filas || []).find(x => x.uid === uid) || null;
+        f(yo);
         if (!revisado.has(cat)) {
           revisado.add(cat);
-          const l = local();
-          if (datos.pend[cat] && (!yo || datos.pend[cat].puntos > (yo.puntos || 0))) sube(cat, datos.pend[cat]);
-          else if (l && (!yo || l.puntos > (yo.puntos || 0))) sube(cat, l);
-          else if (datos.pend[cat]) { delete datos.pend[cat]; persiste(); }
+          const x = datos.pend[cat];
+          if (x && (!yo || x.d.puntos > (yo.puntos || 0))) sube(cat, x.d, x.p);
+          else if (x) { delete datos.pend[cat]; persiste(); }
         }
         if (!muerto) pinta();
       }); } catch (e) { console.warn("[frontera] clasificación", cat, e); }
       if (typeof off === "function") desuscribe.push(off);
     };
     if (invitado) return;
-    mira("club-frontera-victorias", yo => { datos.victorias = Math.max(datos.victorias, yo.puntos || 0); },
-      () => datos.victorias ? { puntos: datos.victorias, tiempo: Math.max(1, Math.min(TOPE_MS, datos.tiempoTot || TOPE_MS)), partida: `frv-${datos.victorias}-${uid.slice(0, 8)}` } : null);
+    mira("club-frontera-victorias", yo => {
+      filaV = yo ? { puntos: yo.puntos || 0, partida: yo.partida || "" } : { puntos: 0, partida: "" };
+      datos.victorias = Math.max(datos.victorias, filaV.puntos);
+      if (datos.vl.length) subeVictorias();
+    });
     for (const i of Object.keys(F.INSTALACIONES)) for (const n of Object.keys(F.NIVELES)) {
       const kk = `${i}-${n}`;
-      mira(`club-frontera-${kk}`, yo => { datos.mejor[kk] = Math.max(datos.mejor[kk] || 0, yo.puntos || 0); },
-        () => datos.mejor[kk] ? { puntos: datos.mejor[kk], tiempo: Math.max(1, Math.min(TOPE_MS, datos.tMejor[kk] || TOPE_MS)), partida: `fr-${kk}-${datos.mejor[kk]}-${uid.slice(0, 8)}` } : null);
+      mira(`club-frontera-${kk}`, yo => { filaR[kk] = yo ? yo.puntos || 0 : 0; if (yo) datos.mejor[kk] = Math.max(datos.mejor[kk] || 0, yo.puntos || 0); });
     }
   }
 
@@ -243,6 +374,7 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, v
         <dl><div><dt>Récord</dt><dd>${mejor}</dd></div><div><dt>Racha</dt><dd>${r ? r.n - 1 : "—"}</dd></div></dl>
         <button class="btn" data-x="${r ? "sigue" : "nueva"}" data-i="${id}">${r ? `Continuar (combate ${r.n})` : "Empezar racha"}</button>
         ${r ? `<button class="btn2 jg-fr-mini" data-x="retira" data-i="${id}">Retirarse</button>` : ""}
+        ${r && !r.h && !invitado ? `<small class="jg-nota">Racha empezada antes de que la Frontera guardara sus combates: se puede seguir, pero ya no sube récords. Sus victorias sí suman al total.</small>` : ""}
       </article>`;
     }).join("");
     const filas = [1, 7, 8, 14, 21, 35, 49, 70].map(n => `<tr><td>${n}</td><td>${n % 7 === 0 ? "★ " : ""}${F.serieDe(n) + 1}</td><td>+${F.monedasCombate(n)} 🪙</td></tr>`).join("");
@@ -323,7 +455,8 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, v
           <p>Racha: <b>${x.n}</b>${x.record ? " · ¡nuevo récord!" : ""}</p>
           <p class="jg-fr-monedas">+${x.monedas} 🪙 <small>(${x.detalle})</small></p>
           ${x.simbolo ? `<p class="jg-fr-aviso">🥇 ¡Símbolo de ${x.simbolo} de la ${esc(I.n)}!</p>` : ""}
-          ${x.finSerie ? `<p class="jg-nota">Serie ${F.serieDe(x.n) + 1} completada. La próxima es más dura.</p>` : ""}</div>
+          ${x.finSerie ? `<p class="jg-nota">Serie ${F.serieDe(x.n) + 1} completada. La próxima es más dura.</p>` : ""}
+          ${avisoFr ? `<p class="jg-fr-aviso">⚠ ${esc(avisoFr)}</p>` : ""}</div>
         <footer class="jg-fr-pie"><button class="btn2" data-x="menu">Guardar y salir</button>
           <button class="btn" data-x="${sel.inst === "fabrica" ? "acambio" : "siguiente"}">${sel.inst === "fabrica" ? "Cambiar Pokémon →" : "Siguiente combate →"}</button></footer>`;
     }
@@ -354,7 +487,7 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, v
   }
   function nuevaRacha(inst) {
     sel.inst = inst;
-    datos.runs[k()] = { inst, nivel: sel.nivel, semilla: semillaNueva(), n: 1, equipo: null, elecciones: [], enPelea: false, tiempo: 0 };
+    datos.runs[k()] = { inst, nivel: sel.nivel, semilla: semillaNueva(), n: 1, equipo: null, elecciones: [], enPelea: false, tiempo: 0, h: [], o: 0, z: [] };
     elegidos = []; equipoSel = sel.inst === "fabrica" ? "" : Object.keys(equipos || {})[0] || "";
     persiste();
     vista = "equipo"; pinta();
@@ -364,6 +497,8 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, v
     if (sets.length !== 3 || F.validaFrontera(sets).length) return;
     const r = run();
     r.equipo = F.aNivel(sets, sel.nivel);
+    // En la Fábrica la prueba dice cuáles de los seis de alquiler, no los sets.
+    if (sel.inst === "fabrica") r.t = elegidos.join("");
     persiste();
     vista = "rival"; pinta();
   }
@@ -403,14 +538,24 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, v
     const R = F.rivalDe(sel.inst, r.n, r.semilla);
     const riv = F.equipoRival(sel.inst, sel.nivel, r.n, r.semilla);
     const continua = r.enPelea;
-    if (!continua) { r.enPelea = true; r.elecciones = []; persiste(); }
+    /* Cada combate nuevo lleva el ordinal de la victoria que daría (el
+       siguiente a todo lo ya repartido y a lo que la tabla ya cuenta), y
+       ese número entra en su semilla: es lo que impide contar dos veces la
+       misma victoria en el total. Un combate a medias de antes no tiene
+       ordinal y sigue con la semilla de entonces. */
+    if (!continua) {
+      r.enPelea = true; r.elecciones = []; r.z = [];
+      r.o = 1 + Math.max(datos.oMax || 0, altoDe(filaV));
+      datos.oMax = r.o;
+      persiste();
+    }
     pelea = F.nuevaPelea({
-      semilla: `${r.semilla}|${r.n}`, sets: [r.equipo, riv.sets],
+      semilla: F.semillaPelea(r.semilla, r.n, r.o || 0), sets: [r.equipo, riv.sets],
       nombres: [usuario.name ? String(usuario.name).slice(0, 18) : "Tú", R.nombre],
       skins: [skin, skinRival(R.id, R.nombre)], lados: ["tú", "cpu"],
       iq: F.iqDe(r.n), palacio: sel.inst === "palacio", elecciones: r.elecciones
     });
-    inicioPelea = Date.now(); cerrado = false;
+    inicioPelea = ultimoToque = Date.now(); cerrado = false;
     vista = "pelea";
     const caja = raiz();
     caja.innerHTML = `<div class="jg-fr-hud"><span>${ICONO[sel.inst]} ${esc(F.INSTALACIONES[sel.inst].n)} · ${esc(F.NIVELES[sel.nivel])}</span>
@@ -424,7 +569,16 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, v
       local: {
         titulo: `${F.INSTALACIONES[sel.inst].corto || F.INSTALACIONES[sel.inst].n} · combate ${r.n}`,
         palacio: sel.inst === "palacio", desdeCero: !continua || sel.inst === "palacio",
-        elige: c => { if (pelea.elige(c)) { r.elecciones = pelea.elecciones.slice(); persiste(); } refresca(); },
+        elige: (c, ev) => {
+          const ahora = Date.now();
+          if (pelea.elige(c)) {
+            r.elecciones = pelea.elecciones.slice();
+            if (r.z) r.z.push(F.toque(ahora - ultimoToque, origenDe(ev)));
+            ultimoToque = ahora;
+            persiste();
+          }
+          refresca();
+        },
         rinde: () => { pelea.rinde(); r.elecciones = pelea.elecciones.slice(); persiste(); refresca(); }
       }
     });
@@ -450,6 +604,10 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, v
     const R = F.rivalDe(sel.inst, r.n, r.semilla);
     const gano = e.ganador === "tú";
     const dura = Math.max(1000, Math.min(MAX_PELEA_MS, Date.now() - inicioPelea));
+    const elecc = pelea ? pelea.elecciones : r.elecciones || [];
+    const cod = F.codificaElecciones(elecc);
+    // Sin toques a la par (un combate empezado antes de anotarlos) va null.
+    const z = r.z && r.z.length === elecc.length ? r.z.join(".") : null;
     if (pk) { pk.destruir(); pk = null; }
     pelea = null;
     const kk = k(), previoMejor = datos.mejor[kk] || 0;
@@ -461,14 +619,19 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, v
       datos.tiempoTot = Math.min(TOPE_MS, datos.tiempoTot + dura);
       const record = n > previoMejor;
       if (record) { datos.mejor[kk] = n; datos.tMejor[kk] = Math.max(1, r.tiempo); }
-      const dRacha = { categoria: `club-frontera-${kk}`, puntos: n, tiempo: Math.max(1, r.tiempo), partida: `${r.semilla}-${n}` };
-      const dVict = { categoria: "club-frontera-victorias", puntos: datos.victorias, tiempo: Math.max(1, datos.tiempoTot), partida: `${r.semilla}-${n}v` };
-      if (record) {
-        lista.push({ d: dRacha, previa: previoMejor ? { puntos: previoMejor } : null });
-        sube(dRacha.categoria, { puntos: n, tiempo: dRacha.tiempo, partida: dRacha.partida });
+      // La historia de la racha y el libro de victorias: la prueba.
+      if (Array.isArray(r.h) && r.h.length === n - 1 && (z !== null || !r.o)) r.h.push([r.o || 0, cod, r.sw || "", z]);
+      else r.h = undefined;
+      r.sw = "";
+      if (r.o && z !== null && !invitado) {
+        datos.vl.push([kk, r.semilla, n, r.o, PM.empaqueta(r.equipo), cod, z]);
+        if (datos.vl.length > TOPE_LIBRO_LOCAL) datos.vl = datos.vl.slice(-TOPE_LIBRO_LOCAL);
       }
-      lista.push({ d: dVict, previa: datos.victorias > 1 ? { puntos: datos.victorias - 1 } : null });
-      sube(dVict.categoria, { puntos: datos.victorias, tiempo: dVict.tiempo, partida: dVict.partida });
+      /* Sube si supera lo que dice la tabla (o, si aún no se sabe, lo de
+         aquí); `guardar` lo vuelve a mirar. */
+      const tabla = filaR[kk] != null ? filaR[kk] : previoMejor;
+      const dRacha = { categoria: `club-frontera-${kk}`, puntos: n, tiempo: Math.max(1, r.tiempo), partida: `${r.semilla}-${n}` };
+      const prueba = n > tabla && r.h ? F.pruebaRacha(r) : null;
       const extra = record ? F.monedasCombate(n) + (previoMejor ? 0 : 40) : 0;
       const I = F.INSTALACIONES[sel.inst];
       resultado = {
@@ -477,15 +640,26 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, v
         monedas: 3 + extra, detalle: record ? `3 por la victoria y ${extra} por el récord` : "3 por la victoria; el récord de racha paga cuando lo superas"
       };
       if (sel.inst === "fabrica") r.ultimoRival = F.aNivel(F.equipoRival(sel.inst, sel.nivel, n, r.semilla).sets, sel.nivel);
-      r.n = n + 1; r.enPelea = false; r.elecciones = [];
+      r.n = n + 1; r.enPelea = false; r.elecciones = []; r.z = []; r.o = 0;
       persiste();
       suena("victoria");
+      /* Primero se comprueba y se sube; los logros y la partida del club
+         solo salen de lo que pasó la comprobación. */
+      (async () => {
+        if (prueba) {
+          const s = await sube(dRacha.categoria, { puntos: n, tiempo: dRacha.tiempo, partida: dRacha.partida }, prueba, true);
+          if (s.estado === "ok") lista.push({ d: dRacha, previa: previoMejor ? { puntos: previoMejor } : null });
+        }
+        lista.push(...await subeVictorias());
+      })().catch(err => console.warn("[frontera] subir", err)).then(() => {
+        try { alResultado && alResultado(lista); } catch (err) { /* un logro no debe romper la racha */ }
+      });
     } else {
       resultado = { gano: false, n: r.n - 1, rival: R.nombre, rendido: e.motivo === "rinde", mejor: datos.mejor[kk] || 0 };
       termina(r);
       suena("derrota");
+      try { alResultado && alResultado(lista); } catch (err) { /* un logro no debe romper la racha */ }
     }
-    try { alResultado && alResultado(lista); } catch (err) { /* un logro no debe romper la racha */ }
     vista = "resultado";
     pinta();
   }
@@ -553,7 +727,7 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, v
       // La Fábrica no admite repetidos: si el cambio los crea, no se hace.
       const err = F.validaFrontera(nuevo);
       if (err.length) { alert(err.join("\n")); return; }
-      r.equipo = nuevo; r.ultimoRival = null; persiste();
+      r.equipo = nuevo; r.ultimoRival = null; r.sw = `${cambio.mio}${cambio.suyo}`; persiste();
       vista = "rival"; pinta(); return;
     }
   }

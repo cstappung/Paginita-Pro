@@ -125,7 +125,13 @@ await denied("un campo inventado no cuela", () =>
 await loginAs(A);
 ok("A lee el perfil de B", (await get(ref(db, `users/${userB.uid}/perfil/nick`))).val() === "Beto");
 await denied("A no lee el registro entero de B", () => get(ref(db, `users/${userB.uid}`)));
+/* El castigo del antitrampas (juegos/castigo.js) cuelga del registro
+   privado: lo escribe y lo lee su dueño, y nadie más. */
+await allowed("A apunta su castigo del antitrampas", () => set(ref(db, `users/${userA.uid}/castigo`), { at: Date.now() }));
+ok("y lo vuelve a leer al cargar", (await get(ref(db, `users/${userA.uid}/castigo/at`))).val() > 0);
 await loginAs(B);
+await denied("B no lee el castigo de A", () => get(ref(db, `users/${userA.uid}/castigo`)));
+await denied("ni se lo borra", () => set(ref(db, `users/${userA.uid}/castigo`), null));
 
 console.log("— Sincronización Yjs completa entre A y B (con reglas) —");
 const docB = new Y.Doc();
@@ -332,6 +338,30 @@ console.log("— Monedas: partidas del club y podios —");
     ok("en Mina Club pagan quince al día", m.hoy === 15);
     await denied("la decimosexta ya no", () => minas({ dia: hoy, hoy: 16, total: m.total + 1 }));
   }
+  // antitrampas: una fila del club necesita su prueba (docs/antitrampas.md)
+  const prueba = (c, k, x) => set(ref(db, `soloPruebas/${c}/${ua.uid}/${k}`), Object.assign({ v: 1, d: "{}", at: serverTimestamp() }, x));
+  await denied("una fila sin prueba no entra", () => set(ref(db, `soloRanks/club-bbtan-rondas/${ua.uid}`), { nombre: "A", puntos: 5, tiempo: 1000, partida: "sinPrueba1" }));
+  await denied("la prueba no inventa la hora", () => prueba("club-bbtan-rondas", "partidaA1", { at: Date.now() - 9000 }));
+  await denied("ni pasa del tamaño", () => prueba("club-bbtan-rondas", "partidaA1", { d: "x".repeat(200001) }));
+  await denied("ni es de una categoría inventada", () => prueba("club-inventada-x", "partidaA1", {}));
+  await allowed("A guarda la prueba de su partida", () => prueba("club-bbtan-rondas", "partidaA1", {}));
+  await denied("y no la reescribe", () => prueba("club-bbtan-rondas", "partidaA1", { d: "[]" }));
+  await allowed("A sospechosa se apunta a sí misma", () => set(push(ref(db, `sospechas/${ua.uid}`)), { c: "club-bbtan-rondas", m: "prueba", at: serverTimestamp() }));
+  await denied("pero no lee la lista de sospechas", () => get(ref(db, "sospechas")));
+  await denied("ni se veta ni se desveta sola", () => set(ref(db, `vetados/${ua.uid}`), { at: serverTimestamp() }));
+  // rachas diarias del club: solo suben de a uno por día, y la tabla no pasa de ellas
+  const racha = (c, x) => set(ref(db, `rachasClub/${ua.uid}/${c}`), Object.assign({ at: serverTimestamp() }, x));
+  await denied("una racha no arranca en 5", () => racha("club-sopa-racha", { dia: hoy, n: 5 }));
+  await denied("ni se apunta mañana", () => racha("club-sopa-racha", { dia: hoy + 1, n: 1 }));
+  await denied("ni en una categoría que no es racha", () => racha("club-sopa-facil-8", { dia: hoy, n: 1 }));
+  await allowed("A empieza su racha de la sopa", () => racha("club-sopa-racha", { dia: hoy, n: 1 }));
+  await denied("y no la sube dos veces el mismo día", () => racha("club-sopa-racha", { dia: hoy, n: 2 }));
+  await prueba("club-sopa-racha", "rachaA1", {});
+  const filaRacha = (c, puntos, partida) => set(ref(db, `soloRanks/${c}/${ua.uid}`), { nombre: "A", puntos, tiempo: 1000, partida });
+  await denied("la tabla no pasa de la racha contada", () => filaRacha("club-sopa-racha", 3, "rachaA1"));
+  await allowed("pero sí la iguala", () => filaRacha("club-sopa-racha", 1, "rachaA1"));
+  await prueba("club-sudoku-racha", "rachaA2", {});
+  await denied("sin racha contada no hay fila de racha", () => filaRacha("club-sudoku-racha", 1, "rachaA2"));
   // podios: solo justo después del récord que nombra
   await set(ref(db, `soloRanks/club-bbtan-rondas/${ua.uid}`), { nombre: "A", puntos: 7, tiempo: 1000, partida: "partidaA1" }).catch(() => {});
   const fila = (await get(ref(db, `soloRanks/club-bbtan-rondas/${ua.uid}`))).val() || {};

@@ -4,7 +4,8 @@
 
    **Las armas se ganan con el multiplicador**, como en el original: cada
    baja sube el multiplicador en uno y rellena la barra de combo; la barra se
-   vacía sola y, si llega a cero, el multiplicador vuelve a ×1. Lo que se
+   vacía sola y, cada vez que llega a cero, el multiplicador baja uno y la
+   barra se rellena a medias (`bajadaCombo`), hasta volver a ×1. Lo que se
    desbloquea no se pierde: cuenta el multiplicador más alto alcanzado.
    En el modo versus se empieza con todo.
 
@@ -25,33 +26,101 @@
     { id: 2, nombre: 'Escopeta', tipo: 'perdigon', d: 9, cad: 0.75, ini: 25, caja: 15, max: 60, alc: 220, perdigones: 7, abre: 0.42, desbloquea: 10 },
     { id: 3, nombre: 'Barriles', tipo: 'objeto', obj: 'barril', d: 120, r: 84, cad: 0.4, ini: 5, caja: 3, max: 15, desbloquea: 15 },
     { id: 4, nombre: 'Granadas', tipo: 'granada', d: 90, r: 70, cad: 0.6, ini: 10, caja: 5, max: 30, desbloquea: 20 },
-    { id: 5, nombre: 'Muro falso', tipo: 'objeto', obj: 'muro', cad: 0.35, ini: 10, caja: 5, max: 30, desbloquea: 25 },
+    { id: 5, nombre: 'Muro falso', tipo: 'objeto', obj: 'muro', vida: 160, cad: 0.35, ini: 10, caja: 5, max: 30, desbloquea: 25 },
     { id: 6, nombre: 'Cohetes', tipo: 'cohete', d: 110, r: 72, cad: 0.9, ini: 10, caja: 5, max: 30, vel: 380, desbloquea: 30 },
     { id: 7, nombre: 'Cargas', tipo: 'objeto', obj: 'carga', d: 150, r: 96, cad: 0.35, ini: 5, caja: 3, max: 15, desbloquea: 40 }
   ];
 
-  /* Las mejoras caen entre arma y arma: el multiplicador siempre promete algo. */
-  const MEJORAS = [
-    { m: 8, id: 'pistola-rapida', arma: 0, txt: 'Pistola: disparo rápido', cad: 0.18 },
-    { m: 12, id: 'uzi-cargador', arma: 1, txt: 'Uzi: más munición', max: 800, caja: 200 },
-    { m: 18, id: 'escopeta-ancha', arma: 2, txt: 'Escopeta: más perdigones', perdigones: 11 },
-    { m: 22, id: 'uzi-perfora', arma: 1, txt: 'Uzi: balas más fuertes', d: 14 },
-    { m: 28, id: 'barril-grande', arma: 3, txt: 'Barriles: explosión mayor', r: 110 },
-    { m: 35, id: 'granada-grande', arma: 4, txt: 'Granadas: explosión mayor', r: 96 },
-    { m: 45, id: 'cohete-rapido', arma: 6, txt: 'Cohetes: recarga rápida', cad: 0.45 },
-    { m: 50, id: 'escopeta-rapida', arma: 2, txt: 'Escopeta: recarga rápida', cad: 0.45 },
-    { m: 60, id: 'carga-grande', arma: 7, txt: 'Cargas: explosión mayor', r: 130 }
-  ];
+  /* **Cada nivel de multiplicador que no trae arma trae una mejora**, y van
+     rotando entre las armas ya ganadas (en orden de id, la última recién
+     ganada entra en la rueda sola). Cada arma tiene su lista de mejoras
+     (`PASOS`), que recorre en ciclo: más daño, más cadencia, más
+     perdigones o más dispersión en la escopeta, explosiones mayores…
+     Son multiplicativas y acumulativas, con un tope por estadística; una
+     que ya llegó al tope se salta, y un arma con todo al tope sale de la
+     rueda. Cada mejora guarda el valor *absoluto* que deja, así `arma()`
+     solo tiene que aplicarlas en orden. Se generan una vez, al cargar:
+     todos los navegadores sacan la misma lista. */
+  const PASOS = {
+    0: [['d', 1.15, 'más daño'], ['cad', 0.88, 'disparo más rápido'], ['alc', 1.1, 'más alcance']],
+    1: [['d', 1.12, 'más daño'], ['cad', 0.9, 'más cadencia'], ['desv', 0.8, 'más precisión'], ['max', 1.25, 'más munición']],
+    2: [['d', 1.12, 'más daño'], ['perdigones', 1, 'más perdigones'], ['cad', 0.88, 'recarga más rápida'], ['abre', 1.12, 'más dispersión'], ['alc', 1.1, 'más alcance']],
+    3: [['r', 1.12, 'explosión mayor'], ['d', 1.15, 'más daño'], ['max', 1.3, 'más munición']],
+    4: [['r', 1.1, 'explosión mayor'], ['d', 1.15, 'más daño'], ['cad', 0.88, 'lanzamiento más rápido'], ['max', 1.3, 'más munición']],
+    5: [['vida', 1.3, 'muros más resistentes'], ['max', 1.3, 'más munición']],
+    6: [['d', 1.15, 'más daño'], ['r', 1.1, 'explosión mayor'], ['cad', 0.88, 'recarga más rápida'], ['vel', 1.15, 'cohetes más rápidos']],
+    7: [['d', 1.15, 'más daño'], ['r', 1.1, 'explosión mayor'], ['max', 1.3, 'más munición']]
+  };
+  /* Topes: cad como mucho baja a un tercio, d hasta ×4 (y 500), r 200… */
+  function tope(a, k) {
+    const b = ARMAS[a.id];
+    switch (k) {
+      case 'd': return Math.min(b.d * 4, 500);
+      case 'cad': return Math.max(b.cad / 3, 0.04);
+      case 'alc': return 640;
+      case 'desv': return 0.012;
+      case 'perdigones': return 16;
+      case 'abre': return 1.1;
+      case 'r': return 200;
+      case 'vel': return 900;
+      case 'max': return b.max * 5;
+      case 'vida': return 1200;
+    }
+    return Infinity;
+  }
+  const baja = k => k === 'cad' || k === 'desv';
+  const MULTI_MEJORAS = 200;
+  function generaMejoras() {
+    const out = [], est = {}, ciclo = {}, armasEn = new Set(ARMAS.map(a => a.desbloquea));
+    for (const a of ARMAS) { est[a.id] = Object.assign({}, a); ciclo[a.id] = 0; }
+    let cursor = -1;
+    for (let m = 2; m <= MULTI_MEJORAS; m++) {
+      if (armasEn.has(m)) continue;
+      const libres = ARMAS.filter(a => a.desbloquea < m).map(a => a.id);
+      let hecho = false;
+      for (let intento = 0; intento < libres.length && !hecho; intento++) {
+        const i = libres.find(x => x > cursor);
+        const id = i === undefined ? libres[0] : i;
+        cursor = id;
+        const a = est[id], lista = PASOS[id];
+        for (let j = 0; j < lista.length && !hecho; j++) {
+          const [k, f, txt] = lista[(ciclo[id] + j) % lista.length];
+          const lim = tope(a, k), antes = a[k];
+          let v = k === 'perdigones' ? antes + 1 : antes * f;
+          v = baja(k) ? Math.max(v, lim) : Math.min(v, lim);
+          if (k === 'perdigones' || k === 'max' || k === 'vida' || k === 'd' || k === 'alc' || k === 'vel' || k === 'r') v = Math.round(v);
+          else v = Math.round(v * 1000) / 1000;
+          if (v === antes) continue;
+          ciclo[id] = (ciclo[id] + j + 1) % lista.length;
+          a[k] = v;
+          const valores = { [k]: v };
+          if (k === 'max' && a.caja) { a.caja = Math.round(a.caja * f); valores.caja = a.caja; }
+          out.push(Object.assign({ m, id: 'm' + m, arma: id, k, txt: a.nombre + ': ' + txt }, valores));
+          hecho = true;
+        }
+      }
+    }
+    return out;
+  }
+  const MEJORAS = generaMejoras();
+  const CAMPOS = ['d', 'cad', 'alc', 'desv', 'perdigones', 'abre', 'r', 'vel', 'max', 'caja', 'vida'];
 
   /* Un arma con las mejoras que ya se tienen aplicadas. */
   function arma(id, mejoras) {
     const base = ARMAS[id];
     if (!base) return null;
     const a = Object.assign({}, base);
-    for (const m of MEJORAS) if (m.arma === id && mejoras && mejoras.has(m.id)) {
-      for (const k of ['cad', 'max', 'caja', 'perdigones', 'd', 'r']) if (m[k] !== undefined) a[k] = m[k];
+    if (mejoras && mejoras.size) for (const m of MEJORAS) if (m.arma === id && mejoras.has(m.id)) {
+      for (const k of CAMPOS) if (m[k] !== undefined) a[k] = m[k];
     }
     return a;
+  }
+
+  /* Cuántas mejoras tiene cada arma (para el inventario). */
+  function nivelArma(id, mejoras) {
+    let n = 0;
+    if (mejoras) for (const m of MEJORAS) if (m.arma === id && mejoras.has(m.id)) n++;
+    return n;
   }
 
   /* Lo que se gana al llegar a `mul` por primera vez. */
@@ -64,6 +133,8 @@
 
   /* El combo: cuánto dura la barra llena con este multiplicador. */
   const duracionCombo = mul => Math.max(1.6, 4 - mul * 0.04);
+  /* Al vaciarse, el multiplicador baja uno y la barra vuelve a la mitad. */
+  const bajadaCombo = mul => duracionCombo(mul) * 0.5;
   const PUNTOS = [10, 20];   // zombi, diablo (× multiplicador)
 
   /* ---------- enemigos ---------- */
@@ -248,7 +319,7 @@
   const dirDe = (dx, dy) => (Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) + 8) % 8;
 
   return {
-    TS, ARMAS, MEJORAS, arma, premios, duracionCombo, PUNTOS, ENEMIGOS, vidaEnemigo, velEnemigo,
+    TS, ARMAS, MEJORAS, PASOS, arma, nivelArma, premios, duracionCombo, bajadaCombo, PUNTOS, ENEMIGOS, vidaEnemigo, velEnemigo,
     totalNivel, parteDiablos, maxVivos, ritmoNivel, SKINS, skin, MAPAS, ORDEN_MAPAS, mapaValido,
     cargaMapa, DIRS, dirDe
   };

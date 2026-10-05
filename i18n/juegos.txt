@@ -503,3 +503,5 @@ Siguiente ▶ || Next ▶ || Avanti ▶
 La calle || The street || La strada
 Subterráneo {} || Basement {} || Interrato {}
 La bóveda || The vault || Il caveau
+El antitrampas rechazó tu partida. Quedas retenido: no puedes usar Juegos hasta que termine la cuenta atrás. || The anti-cheat rejected your game. You are held: you can't use Games until the countdown ends. || L'anti-cheat ha rifiutato la tua partita. Sei trattenuto: non puoi usare Giochi finché non finisce il conto alla rovescia.
+¿No eres tú? Entra con tu cuenta || Not you? Sign in with your account || Non sei tu? Accedi con il tuo account

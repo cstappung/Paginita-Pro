@@ -69,3 +69,24 @@ export function resultadoClub(juego, dato) {
   return {categoria:dato.categoria,puntos:dato.puntos,tiempo:dato.tiempo,partida:dato.partida};
 }
 export const mejorClub = (a,b) => !b || a.puntos > b.puntos || a.puntos === b.puntos && a.tiempo < b.tiempo;
+
+/* Las rachas diarias (Sopa, Sudoku, Electrodle) no se creen al juego: el
+   número sale del blob que escribe el propio usuario. La cuenta buena es
+   `rachasClub/<uid>/<categoría>` = {dia, n, at}, que las reglas solo dejan
+   subir de a uno por día de Chile (como el `diario` de las monedas), y la
+   fila de la tabla no puede pasar de `n`.
+
+   `rachaClub(prev, dia, previa)` dice qué escribir hoy: null si ya se
+   apuntó (se usa `prev.n`), o el registro nuevo. Si no había registro, la
+   racha arranca en 1, o sigue la que ya estaba en la tabla (`previa`, los
+   puntos de la fila guardada) + 1: así nadie honesto pierde la racha que
+   traía al estrenar esto. La regla acepta lo mismo. */
+export const esRachaClub = c => /^club-(sopa|sudoku|electro)-racha$/.test(String(c || ''));
+export function rachaClub(prev, dia, previa) {
+  if (prev && Number.isInteger(prev.dia) && Number.isInteger(prev.n)) {
+    if (dia <= prev.dia) return null;
+    return {dia, n: dia === prev.dia + 1 ? prev.n + 1 : 1};
+  }
+  const antes = Number.isSafeInteger(previa) && previa > 0 ? Math.min(previa, 1000) : 0;
+  return {dia, n: antes + 1};
+}

@@ -9,14 +9,17 @@
   const AVISO_INVITADO='Modo invitado: esta partida no se guarda ni entra en la clasificación. Inicia sesión en Juegos para competir.';
   let categoria='',lista,estado,propio,alPartida=null;
   const enviar=d=>{if(embebido)parent.postMessage({canal:'club-child',...d},location.origin);};
-  window.Club={
+  /* `result(dato, prueba)`: la prueba es lo que el verificador de cada juego
+     necesita para rehacer la partida (docs/antitrampas.md). Si la página
+     la rechaza, llega un `rechazo` y se avisa con el evento `club-rechazo`. */
+  window.Club=Object.freeze({
     storageKey:key=>key+'.cuenta.'+cuenta,
     category(key){categoria=key;enviar({tipo:'categoria',categoria:key});if(lista)lista.replaceChildren();if(estado)estado.textContent=invitado?AVISO_INVITADO:key==='zen'?'Zen es libre: conserva tu récord local, sin clasificación competitiva.':'Clasificación por modalidad · cargando…';},
-    result(dato){enviar({tipo:'resultado',...dato,partida:crypto.randomUUID()});},
+    result(dato,prueba){const {prueba:p0,...resto}=dato||{};enviar({tipo:'resultado',...resto,partida:crypto.randomUUID(),prueba:prueba===undefined?p0:prueba});},
     // La partida a medias, en la cuenta (solo dentro de Juegos).
     guardarPartida(texto){enviar({tipo:'partida-guardar',d:texto||null,at:Date.now()});},
     pedirPartida(cb){if(!embebido){cb(null);return;}alPartida=cb;enviar({tipo:'partida-pedir'});}
-  };
+  });
   document.addEventListener('DOMContentLoaded',()=>{
     const shell=document.querySelector('.site-shell,.shell');
     const volver=document.createElement('a');volver.textContent='← Volver a Juegos';volver.href='../../../juegos.html';volver.className='club-volver';
@@ -38,6 +41,7 @@
     const d=e.data;
     if(d.tipo==='tema'){document.documentElement.dataset.tema=d.oscuro?'oscuro':'claro';return;}
     if(d.tipo==='partida'){const f=alPartida;alPartida=null;if(f)f(d.error?null:d.dato||null);return;}
+    if(d.tipo==='rechazo'){window.dispatchEvent(new CustomEvent('club-rechazo',{detail:{categoria:d.categoria,partida:d.partida,motivo:d.motivo}}));if(d.categoria===categoria&&estado)estado.textContent='Esta partida no se guardó: '+d.motivo;return;}
     if(d.categoria!==categoria)return;
     if(d.tipo==='estado'&&estado){estado.textContent=d.texto;return;}
     if(d.tipo!=='ranking'||!lista)return;

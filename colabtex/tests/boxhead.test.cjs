@@ -91,3 +91,25 @@ test('boxhead: en cada mapa se llega de los jugadores a todas las entradas',()=>
   }
  }
 });
+
+test('boxhead: una mejora en cada multiplicador sin arma, rotando y con tope',()=>{
+ const armas=new Set(D.ARMAS.map(a=>a.desbloquea));
+ const ms=new Set(D.MEJORAS.map(m=>m.m));
+ for(let m=2;m<=60;m++)if(!armas.has(m))assert.ok(ms.has(m),'falta mejora en ×'+m);
+ const usadas=new Set(D.MEJORAS.filter(m=>m.m<=60).map(m=>m.arma));
+ assert.ok(usadas.size>=6,'las mejoras rotan entre armas');
+ const todas=new Set(D.MEJORAS.map(m=>m.id));
+ for(const a of D.ARMAS){
+  const f=D.arma(a.id,todas);
+  if(a.d)assert.ok(f.d>=a.d&&f.d<=a.d*4,a.nombre+' daño con tope');
+  if(a.cad)assert.ok(f.cad<=a.cad&&f.cad>0,a.nombre+' cadencia');
+  if(a.id===2)assert.ok(f.perdigones>a.perdigones&&f.abre!==a.abre,'la escopeta mejora perdigones y apertura');
+ }
+});
+
+test('boxhead: el combo baja de a uno con barras más cortas',()=>{
+ for(let m=2;m<60;m++){
+  assert.ok(D.bajadaCombo(m)>0);
+  assert.ok(D.bajadaCombo(m)<=D.duracionCombo(m));
+ }
+});

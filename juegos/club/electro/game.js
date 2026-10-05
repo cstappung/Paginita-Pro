@@ -32,6 +32,39 @@
   let vistaPrevia = null;   // el último viewBox del símbolo, para el zoom suave
   let sugs = [], activa = -1;
 
+  /* ---------- la forma de jugar (antitrampas) ----------
+     Cómo se hizo cada intento, para la prueba (M.prueba): cuánto tiempo
+     visible pasó desde el anterior (o desde que se abrió el modo) y
+     cuántas acciones de verdad lo armaron (teclas, toques, clics, texto).
+     Un script que despacha eventos da isTrusted falso: eso se cuenta
+     aparte (`u`, teclas, toques, clics y envíos), salvo que lo marque
+     mando.js con un mando conectado de verdad (`mc`); un envío de
+     formulario que sigue a un clic del mando también es suyo. Un clic de
+     verdad cuenta como acción aunque no traiga pointerdown: así activa
+     un lector de pantalla. */
+  const mandoConectado = () => { try { return [...(navigator.getGamepads ? navigator.getGamepads() : [])].some(g => g && g.connected); } catch (e) { return false; } };
+  let visible = 0, desde = performance.now();
+  const relojVisible = () => visible + (document.hidden ? 0 : performance.now() - desde);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) visible += performance.now() - desde; else desde = performance.now();
+  });
+  const sensor = { t0: 0, a: 0, u: 0, mc: 0, ultMando: -1e9 };
+  for (const tipo of ["pointerdown", "keydown", "input", "click", "submit"]) document.addEventListener(tipo, ev => {
+    if (ev.isTrusted) { if (tipo !== "submit") sensor.a++; return; }
+    if (ev.__mando && mandoConectado()) { sensor.ultMando = performance.now(); if (tipo === "pointerdown") sensor.mc++; return; }
+    /* Un `input` sintético no cuenta: algunas extensiones (correctores,
+       autocompletar) los despachan, y por sí solo no intenta nada; para
+       intentar hay que enviar o hacer clic, y eso sí se cuenta. */
+    if (tipo === "input" || (tipo === "submit" && performance.now() - sensor.ultMando < 1000)) return;
+    sensor.u++;
+  }, true);
+  /* Lo juntado desde el último intento, y empezar de cero. */
+  function cortaSensor() {
+    const ahora = relojVisible(), r = { dt: Math.round(ahora - sensor.t0), a: sensor.a + sensor.mc, u: sensor.u, mc: sensor.mc };
+    sensor.t0 = ahora; sensor.a = sensor.u = sensor.mc = 0;
+    return r;
+  }
+
   /* ---------- estado ---------- */
   function asegurarHoy() { if (est.prog.fecha !== hoy) est.prog = { fecha: hoy, m: {} }; }
   const guardaLocal = () => guarda("electro.estado", est);
@@ -71,10 +104,16 @@
   function intenta(x) {
     const g = juego();
     if (g.fin || !M.valida(modo, x) || g.i.includes(x)) return false;
+    const s0 = cortaSensor();
     if (tipo === "practica") prac[modo].i.push(x);
     else {
       asegurarHoy();
       const pr = est.prog.m[modo] || (est.prog.m[modo] = { i: [], ms: 0 });
+      /* La forma va a la par de lo intentado; si no venía (lo de antes de
+         guardarla), ese modo queda sin ella. */
+      if (pr.t !== null && (pr.t || []).length === pr.i.length) pr.t = (pr.t || []).concat([[s0.dt, s0.a]]);
+      else pr.t = null;
+      pr.u = (pr.u || 0) + s0.u; pr.mc = (pr.mc || 0) + s0.mc;
       pr.i.push(x);
     }
     animar = { modo, tipo, n: g.i.length + 1 };
@@ -90,15 +129,17 @@
 
   /* Un modo del diario terminado: pasa a la cuenta de puntos y, si era el
      cuarto clásico del día, a la racha. Los dos van a la Clasificación; un
-     desafío perdido no suma, así que no hay récord que mandar. */
+     desafío perdido no suma, así que no hay récord que mandar. Lo
+     intentado queda en `hist` y cada récord viaja con su prueba (M.prueba):
+     los puntos, con todo el historial; la racha, con lo de hoy. */
   function termina(gano) {
     const pr = est.prog.m[modo], completoAntes = M.diaCompleto(est, hoy);
-    est = M.registra(est, hoy, modo, pr.i.length, pr.ms, gano);
+    est = M.registra(est, hoy, modo, pr.i, pr.ms, gano, pr);
     if (!Club) return;
     const t = M.total(est);
-    if (gano) Club.result({ categoria: "club-electro-puntos", puntos: t.puntos, tiempo: Math.min(TOPE_TIEMPO, Math.max(1, t.ms)) });
+    if (gano) Club.result({ categoria: "club-electro-puntos", puntos: t.puntos, tiempo: Math.min(TOPE_TIEMPO, Math.max(1, t.ms)) }, M.prueba(est, hoy));
     if (!completoAntes && M.diaCompleto(est, hoy))
-      Club.result({ categoria: "club-electro-racha", puntos: M.racha(est, hoy), tiempo: Math.min(TOPE_TIEMPO, Math.max(1, M.tiempoDia(est, hoy))) });
+      Club.result({ categoria: "club-electro-racha", puntos: M.racha(est, hoy), tiempo: Math.min(TOPE_TIEMPO, Math.max(1, M.tiempoDia(est, hoy))) }, M.prueba(est, hoy, true));
   }
 
   /* ---------- dibujo: fórmula ---------- */
@@ -461,9 +502,9 @@
   }
 
   /* ---------- tipos y modos ---------- */
-  function ponModo(m) { modo = m; guarda("electro.modo", m); animar = null; sugs = []; pinta(); }
+  function ponModo(m) { modo = m; guarda("electro.modo", m); animar = null; sugs = []; cortaSensor(); pinta(); }
   /* Científico no está en el diario: al volver al diario desde él, se pasa a Componente. */
-  function ponTipo(t) { tipo = t; guarda("electro.tipo", t); if (!visibles().some(x => x.id === modo)) modo = "comp"; animar = null; sugs = []; pinta(); }
+  function ponTipo(t) { tipo = t; guarda("electro.tipo", t); cortaSensor(); if (!visibles().some(x => x.id === modo)) modo = "comp"; animar = null; sugs = []; pinta(); }
   /* ---------- estadísticas y ayuda ---------- */
   const dialogo = $("dialogo");
   function abre(html) {

@@ -31,14 +31,25 @@
   let theme = THEMES[saved.theme] ? saved.theme : 'lime';
   let sound = saved.sound === true;
   let records = saved.records && typeof saved.records === 'object' ? saved.records : {};
-  let state = 'ready', snake = [], previous = [], direction = DIRS.right, queue = [];
-  let score = 0, eaten = 0, fruit = null, bonus = null, pickup = null, obstacles = [], portals = [];
-  let timeLeft = 0, mirrored = false, level = 1;
-  let activePower = null, particles = [], combo = 0, lastEat = -100, gameTime = 0;
+  /* La partida vive en el motor puro (motor.js, `SnakeMotor`): la
+     serpiente, la fruta, los poderes, el reloj de juego. Aquí queda el
+     estado de la pantalla (lista, jugando, en pausa, terminada), el dibujo
+     y el sonido. */
+  const Motor = window.SnakeMotor;
+  let m = Motor.crear({ mode, size, speed, semilla: 0 });
+  let state = 'ready', previous = [], particles = [];
+  /* Prueba antitrampas (docs/antitrampas/snake.md): la semilla y cada giro
+     que entró en la cola, con el tic en que entró. Con eso el verificador
+     rehace la partida tic a tic con el mismo motor y saca los puntos y el
+     tiempo. `muroMs` son los ms de reloj de pared (Date.now) que pasaron
+     jugando, contados fotograma a fotograma con tope de 100 ms cada uno:
+     si el reloj del juego avanza mucho menos que eso, alguien frenó el
+     tiempo para jugar en cámara lenta. */
+  const cuenta = new URLSearchParams(location.search).get('cuenta') || '';
+  let giros = '', ultimoGiro = 0, muroMs = 0, muroAntes = 0, pausas = 0;
   let accumulator = 0, lastFrame = 0, visualTime = 0, deathAt = 0, oldBest = 0;
   let cell = 28, width = 784, height = 616, toastTimer, audioContext;
-  const same = (a, b) => a && b && a.x === b.x && a.y === b.y;
-  const copy = p => ({ x: p.x, y: p.y });
+  const same = Motor.same, copy = Motor.copy;
   const bestKey = () => `${mode}-${size}`;
   const category = () => `club-snake-${mode}-${size}`;
   const getBest = () => Number(records[bestKey()]) || 0;
@@ -88,9 +99,9 @@
     }
     if (musicFresh) { r.reinicia(); musicFresh = false; }
     musicPlaying = true;
-    r.tempo = TEMPO[speed] * (activePower?.type === 'slow' ? .82 : 1) + (mode === 'zen' ? 0 : Math.min(eaten * .002, .06));
+    r.tempo = TEMPO[speed] * (m.activePower?.type === 'slow' ? .82 : 1) + (mode === 'zen' ? 0 : Math.min(m.eaten * .002, .06));
     r.capas.bat = mode === 'zen' ? 0 : 1;
-    r.capas.arp = mode === 'zen' || eaten >= 6 || activePower?.type === 'double' ? 1 : 0;
+    r.capas.arp = mode === 'zen' || m.eaten >= 6 || m.activePower?.type === 'double' ? 1 : 0;
     try { r.tick(.2); } catch (_) { /* Sound never blocks the game. */ }
   }
   /** Efectos de 8 bits; `n` afina algunos (el combo sube el bocado). */
@@ -148,57 +159,12 @@
     $('sound-waves').setAttribute('d', sound ? 'M15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14' : 'm16 9 6 6m0-6-6 6');
   }
 
-  function freeCell(extra = []) {
-    const occupied = [...snake, ...obstacles, ...portals, ...extra, fruit, bonus, pickup].filter(Boolean);
-    const free = [];
-    for (let y = 1; y < ROWS - 1; y++) for (let x = 1; x < COLS - 1; x++) {
-      const p = { x, y };
-      if (!occupied.some(o => same(o, p))) free.push(p);
-    }
-    // The outer ring becomes available when the inner board fills up.
-    if (!free.length) for (let y = 0; y < ROWS; y++) for (let x = 0; x < COLS; x++) {
-      const p = { x, y };
-      if (!occupied.some(o => same(o, p))) free.push(p);
-    }
-    return free.length ? free[Math.floor(Math.random() * free.length)] : null;
-  }
-  /* Los muros del laberinto: el nivel n suma los patrones 1..n (dos barras,
-     una columna con paso, esquinas en L, un marco con puertas) y, pasado el
-     cuarto, bloques sueltos. Nunca caen sobre la serpiente ni en las tres
-     casillas que tiene delante: un muro que aparece bajo la cabeza sería una
-     muerte que nadie pudo evitar. */
-  function mazeWalls(n) {
-    const w = [], add = (x, y) => { if (x >= 0 && y >= 0 && x < COLS && y < ROWS) w.push({ x, y }); };
-    const mx = Math.floor(COLS * .25), my = Math.floor(ROWS / 3), cx = Math.floor(COLS / 2), cy = Math.floor(ROWS / 2);
-    if (n >= 1) for (let x = mx; x < COLS - mx; x++) { add(x, my); add(x, ROWS - 1 - my); }
-    if (n >= 2) for (let y = 2; y < ROWS - 2; y++) if (Math.abs(y - cy) > 1 && y !== my && y !== ROWS - 1 - my) add(cx, y);
-    if (n >= 3) { const l = Math.max(2, Math.floor(COLS / 8)); for (let i = 0; i < l; i++) for (const [sx, sy] of [[2, 2], [COLS - 3, 2], [2, ROWS - 3], [COLS - 3, ROWS - 3]]) { add(sx + (sx < cx ? i : -i), sy); add(sx, sy + (sy < cy ? i : -i)); } }
-    if (n >= 4) { for (let x = 0; x < COLS; x++) if (Math.abs(x - cx) > 1) { add(x, 0); add(x, ROWS - 1); } for (let y = 0; y < ROWS; y++) if (Math.abs(y - cy) > 1) { add(0, y); add(COLS - 1, y); } }
-    const seen = new Set(), out = [], head = snake[0];
-    const ahead = head ? [1, 2, 3].map(k => ({ x: (head.x + direction.x * k + COLS) % COLS, y: (head.y + direction.y * k + ROWS) % ROWS })) : [];
-    for (const p of w) { const k = p.x + ',' + p.y; if (seen.has(k) || snake.some(s => same(s, p)) || ahead.some(a => same(a, p))) continue; seen.add(k); out.push(p); }
-    for (let i = 0; i < (n - 4) * 3 && n > 4; i++) { const p = freeCell([...out, ...ahead]); if (p) out.push(p); }
-    return out;
-  }
-  function movePortals() {
-    const a = freeCell(); if (!a) return;
-    let b = null;
-    for (let i = 0; i < 30; i++) { const p = freeCell([a]); if (p && Math.abs(p.x - a.x) + Math.abs(p.y - a.y) > (COLS + ROWS) / 3) { b = p; break; } b = b || p; }
-    if (b) portals = [a, b];
-  }
   function reset() {
     window.Club?.category(mode === 'zen' ? 'zen' : category());
-    const my = Math.floor(ROWS / 2);
-    snake = Array.from({ length: 5 }, (_, i) => ({ x: 6 - i, y: my }));
-    previous = snake.map(copy); direction = DIRS.right; queue = [];
-    score = 0; eaten = 0; gameTime = 0; combo = 0; lastEat = -100;
-    fruit = null; bonus = null; pickup = null; activePower = null; obstacles = [];
-    const px = Math.floor(COLS * .22), py = Math.floor(ROWS * .23);
-    portals = mode === 'portals' ? [{ x: px, y: py }, { x: COLS - 1 - px, y: ROWS - 1 - py }] : [];
+    m = Motor.crear({ mode, size, speed, semilla: Motor.nuevaSemilla() });
+    previous = m.snake.map(copy);
+    giros = ''; ultimoGiro = 0; muroMs = 0; muroAntes = 0; pausas = 0;
     particles = []; accumulator = 0; oldBest = getBest();
-    timeLeft = 40; mirrored = false; level = 1;
-    fruit = { x: COLS - 6, y: my };
-    if (mode === 'laberinto') { obstacles = mazeWalls(1); if (obstacles.some(o => same(o, fruit))) fruit = freeCell(); }
     $('board-wrap').classList.remove('mirror');
     $('score').textContent = '000'; $('best').textContent = pad(getBest());
     $('power-status').textContent = '';
@@ -234,128 +200,87 @@
   function pause() {
     if (state !== 'playing' && state !== 'paused') return;
     if (state === 'playing') {
-      state = 'paused'; status('EN PAUSA');
+      state = 'paused'; pausas++; status('EN PAUSA');
       $('pause-button').setAttribute('aria-label', 'Continuar partida');
       setOverlay('TÓMATE TU TIEMPO', 'Respira.<br><span>Seguimos.</span>', 'Tu serpiente te espera justo aquí.', 'Continuar');
       announce('Juego en pausa.');
     } else {
-      state = 'playing'; accumulator = 0; previous = snake.map(copy);
+      state = 'playing'; accumulator = 0; muroAntes = 0; previous = m.snake.map(copy);
       $('overlay').classList.add('hidden'); $('overlay').inert = true; $('overlay').setAttribute('aria-hidden', 'true'); status(mode === 'zen' ? 'TODO FLUYE' : 'EN JUEGO');
       $('pause-button').setAttribute('aria-label', 'Pausar partida');
       canvas.focus({ preventScroll: true }); initAudio();
     }
   }
+  function prueba() {
+    return Object.assign({ v: 1, m: mode, t: size, r: speed, s: m.semilla, n: m.ticks, g: giros, w: Math.round(muroMs), p: pausas }, cuenta ? { u: cuenta } : {});
+  }
   function finish(win = false) {
     if (state !== 'playing') return;
     state = 'over'; deathAt = visualTime;
-    if (mode !== 'zen' && score > 0) window.Club?.result({categoria:category(),puntos:score,tiempo:Math.max(1,Math.round(gameTime*1000))});
+    const score = m.score, eaten = m.eaten, gameTime = m.gameTime;
+    if (mode !== 'zen' && score > 0) window.Club?.result({categoria:category(),puntos:score,tiempo:Math.max(1,Math.round(gameTime*1000))},prueba());
     $('pause-button').disabled = true;
     if (score > getBest()) { records[bestKey()] = score; save(); }
     const newRecord = score > oldBest;
     $('best').textContent = pad(getBest());
     status(newRecord ? 'NUEVO RÉCORD' : 'BUENA PARTIDA');
     if (!reducedMotion) { $('board-wrap').classList.remove('hit'); void $('board-wrap').offsetWidth; $('board-wrap').classList.add('hit'); }
-    burst(snake[0], win ? THEMES[theme][0] : '#f19a7e', 28);
+    burst(m.snake[0], win ? THEMES[theme][0] : '#f19a7e', 28);
     tickMusic(); sfx(win || newRecord ? 'record' : 'die');
     setOverlay(win ? 'TE QUEDASTE CON TODO EL TABLERO' : newRecord ? '✦ NUEVO RÉCORD PERSONAL ✦' : 'LAS BUENAS PARTIDAS PIDEN OTRA', win ? 'Qué<br><span>leyenda.</span>' : '¿Una<br><span>más?</span>', `<strong style="color:#edf4df;font-size:24px">${score} puntos</strong><br>${eaten} bocados · ${Math.floor(gameTime / 60)}:${String(Math.floor(gameTime % 60)).padStart(2, '0')} de puro juego`, 'Volver a jugar');
     announce(`Partida terminada. ${score} puntos.${newRecord ? ' Nuevo récord.' : ''}`);
   }
-  function enqueue(name) {
-    if (state !== 'playing' || queue.length >= 2) return;
-    if (mirrored) name = { left: 'right', right: 'left', up: 'down', down: 'up' }[name];
-    const next = DIRS[name], last = queue.length ? queue[queue.length - 1] : direction;
-    if (!next || same(next, last) || (next.x === -last.x && next.y === -last.y)) return;
-    queue.push(next);
+  /* mando.js despacha teclas sintéticas marcadas con __mando: son
+     legítimas si hay un mando conectado de verdad. Un script que despacha
+     teclas (isTrusted falso) queda marcado X en la prueba. */
+  function hayMando() { try { return Array.from(navigator.getGamepads?.() || []).some(p => p && p.connected !== false); } catch (_) { return false; } }
+  function marcas(event) {
+    if (!event) return '';
+    const toque = event.type && event.type.startsWith('pointer') ? 'T' : '';
+    return toque + (event.__mando && hayMando() ? 'M' : event.isTrusted === false ? 'X' : '');
   }
-  function interval() {
-    const base = { chill: .175, normal: .125, fast: .087 }[speed];
-    const acceleration = mode === 'zen' ? 0 : Math.min(eaten * .0015, .038);
-    return Math.max(.055, base - acceleration) * (activePower?.type === 'slow' ? 1.65 : 1);
+  function enqueue(name, event) {
+    if (state !== 'playing') return;
+    // Solo se anota lo que entró en la cola; el motor aplica el espejo.
+    if (m.enqueue(name)) { giros += Motor.codificaGiro(ultimoGiro, m.ticks, name, marcas(event)); ultimoGiro = m.ticks; }
   }
-  function addPoints(amount) {
-    const multiplier = (activePower?.type === 'double' ? 2 : 1) * SPEED_MULT[speed];
-    const total = amount * multiplier;
-    score += total; $('score').textContent = pad(score);
-    if (score > getBest()) { records[bestKey()] = score; $('best').textContent = pad(score); save(); }
+  function interval() { return m.interval(); }
+  function freeCell(extra) { return m.freeCell(extra); }
+  function showPoints(total) {
+    $('score').textContent = pad(m.score);
+    if (m.score > getBest()) { records[bestKey()] = m.score; $('best').textContent = pad(m.score); save(); }
     $('score-pop').textContent = `+${total}`;
     $('score-pop').classList.remove('pop'); void $('score-pop').offsetWidth; $('score-pop').classList.add('pop');
   }
-  function spawnArcadeExtras() {
-    if (eaten % 3 === 0 && !pickup) {
-      const p = freeCell();
-      if (p) pickup = { ...p, type: ['shield', 'slow', 'double'][Math.floor(Math.random() * 3)], expires: gameTime + 14 };
-    }
-    if (eaten % 4 === 0 && !bonus) { const p = freeCell(); if (p) bonus = { ...p, expires: gameTime + 9 }; }
-    if (eaten % 6 === 0 && obstacles.length < 24) {
-      const candidates = [];
-      for (let n = 0; n < 40; n++) {
-        const p = freeCell(candidates);
-        if (p && Math.abs(p.x - snake[0].x) + Math.abs(p.y - snake[0].y) > 6) { candidates.push(p); break; }
-      }
-      if (candidates.length) { obstacles.push(...candidates); burst(candidates[0], '#829477', 10); toast('Nuevo obstáculo. ¡Busca otro camino!'); }
-    }
-  }
+  /* Un tic del motor y lo que eso pinta y suena. Los avisos de combo y de
+     bocados van al final, como antes, para que tapen a los demás. */
   function step() {
-    previous = snake.map(copy);
-    if (queue.length) direction = queue.shift();
-    let head = { x: snake[0].x + direction.x, y: snake[0].y + direction.y };
-    const outside = head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS;
-    const shield = activePower?.type === 'shield';
-    if (outside) {
-      if (mode === 'zen' || mode === 'portals' || mode === 'laberinto' || shield) {
-        head.x = (head.x + COLS) % COLS; head.y = (head.y + ROWS) % ROWS;
-        if (shield && mode === 'arcade') consumeShield();
-      } else { finish(); return; }
-    }
-    if (mode === 'portals') {
-      const portalIndex = portals.findIndex(p => same(p, head));
-      if (portalIndex !== -1) { burst(head, '#9b91f1', 14); head = copy(portals[1 - portalIndex]); burst(head, '#83dfcc', 14); sfx('portal'); }
-    }
-    const eatsFruit = same(head, fruit), eatsBonus = same(head, bonus), grows = eatsFruit || eatsBonus;
-    const body = grows ? snake : snake.slice(0, -1);
-    const bodyHit = body.some(p => same(p, head)), obstacleHit = obstacles.some(p => same(p, head));
-    if (mode !== 'zen' && (bodyHit || obstacleHit)) {
-      if (activePower?.type === 'shield') {
-        consumeShield();
-        if (bodyHit) snake = snake.slice(0, Math.max(1, snake.findIndex(p => same(p, head))));
-        if (obstacleHit) obstacles = obstacles.filter(p => !same(p, head));
-      } else { finish(); return; }
-    }
-    snake.unshift(head);
-    if (!grows) snake.pop();
-    // Keep Zen bounded for indefinitely long sessions, without ending the run.
-    if (mode === 'zen' && snake.length > 130) snake.pop();
-    if (eatsFruit) {
-      eaten++; combo = gameTime - lastEat < 4 ? Math.min(combo + 1, 5) : 1; lastEat = gameTime;
-      addPoints(mode === 'arcade' ? 10 + (combo - 1) * 2 : mode === 'espejo' && mirrored ? 15 : 10);
-      if (mode === 'reloj') timeLeft = Math.min(60, timeLeft + 2.5);
-      burst(head, '#f2a086', 13); sfx('eat', combo);
-      fruit = null; fruit = freeCell();
-      if (!fruit) { finish(true); return; }
-      if (mode === 'reloj' && eaten % 5 === 0 && !bonus) { const p = freeCell(); if (p) bonus = { ...p, expires: gameTime + 8 }; }
-      if (mode === 'portals' && eaten % 4 === 0) { burst(portals[0], '#9b91f1', 10); burst(portals[1], '#83dfcc', 10); movePortals(); toast('Los portales se movieron.'); }
-      if (mode === 'espejo' && eaten % 5 === 0) {
-        mirrored = !mirrored; queue = [];
-        $('board-wrap').classList.toggle('mirror', mirrored); sfx('portal');
-        toast(mirrored ? '¡Espejo! Los controles se invierten.' : 'Todo vuelve a su sitio.');
+    if (state !== 'playing') return;
+    previous = m.snake.map(copy);
+    m.tick();
+    let comio = null;
+    for (const e of m.ev.splice(0)) {
+      if (e.k === 'puntos') showPoints(e.n);
+      else if (e.k === 'portal') { burst(e.de, '#9b91f1', 14); burst(e.a, '#83dfcc', 14); sfx('portal'); }
+      else if (e.k === 'escudo') { burst(e.p, '#80dbef', 20); toast('¡El escudo te salvó!'); sfx('shield'); }
+      else if (e.k === 'come') { burst(e.p, '#f2a086', 13); sfx('eat', e.combo); comio = e; }
+      else if (e.k === 'portales') { burst(e.antes[0], '#9b91f1', 10); burst(e.antes[1], '#83dfcc', 10); toast('Los portales se movieron.'); }
+      else if (e.k === 'espejo') {
+        $('board-wrap').classList.toggle('mirror', e.on); sfx('portal');
+        toast(e.on ? '¡Espejo! Los controles se invierten.' : 'Todo vuelve a su sitio.');
       }
-      if (mode === 'laberinto' && eaten % 6 === 0) {
-        level++; obstacles = mazeWalls(level); addPoints(25 * level); sfx('power');
-        if (obstacles.some(o => same(o, fruit))) fruit = freeCell();
-        toast(`Nivel ${level}. Más muros.`);
-      }
-      if (mode === 'arcade') { spawnArcadeExtras(); if (combo >= 3) toast(`¡Combo ×${combo}! +${10 + (combo - 1) * 2} puntos base`); }
+      else if (e.k === 'nivel') { sfx('power'); toast(`Nivel ${e.n}. Más muros.`); }
+      else if (e.k === 'obstaculo') { burst(e.p, '#829477', 10); toast('Nuevo obstáculo. ¡Busca otro camino!'); }
+      else if (e.k === 'dorada') { burst(e.p, '#f7d776', 24); sfx('bonus'); toast(e.reloj ? 'Reloj dorado. ¡+6 segundos!' : 'Fruta dorada. ¡+50 puntos base!'); }
+      else if (e.k === 'poder') { burst(e.p, POWER_TYPES[e.type].color, 22); sfx('power'); toast(`${POWER_TYPES[e.type].label} · 10 segundos`); }
+      else if (e.k === 'fin') finish(e.win);
+    }
+    if (comio && state === 'playing') {
+      const eaten = m.eaten, combo = comio.combo;
+      if (mode === 'arcade' && combo >= 3) toast(`¡Combo ×${combo}! +${10 + (combo - 1) * 2} puntos base`);
       if (eaten === 10 || eaten === 25 || eaten === 50) toast(eaten === 10 ? '10 bocados. Ya le pillaste el ritmo.' : `${eaten} bocados. ¡No hay quien te pare!`);
     }
-    if (eatsBonus && mode === 'reloj') { addPoints(30); timeLeft = Math.min(60, timeLeft + 6); burst(head, '#f7d776', 24); bonus = null; sfx('bonus'); toast('Reloj dorado. ¡+6 segundos!'); }
-    else if (eatsBonus) { addPoints(50); burst(head, '#f7d776', 24); bonus = null; sfx('bonus'); toast('Fruta dorada. ¡+50 puntos base!'); }
-    if (same(head, pickup)) {
-      activePower = { type: pickup.type, expires: gameTime + 10 }; pickup = null;
-      burst(head, POWER_TYPES[activePower.type].color, 22); sfx('power');
-      toast(`${POWER_TYPES[activePower.type].label} · 10 segundos`);
-    }
   }
-  function consumeShield() { activePower = null; burst(snake[0], '#80dbef', 20); toast('¡El escudo te salvó!'); sfx('shield'); }
 
   function burst(p, color, count) {
     if (reducedMotion) return;
@@ -393,9 +318,10 @@
     circle(0, 0, cell * .19, color + '22'); ctx.restore();
   }
   function drawPickup() {
+    const pickup = m.pickup;
     if (!pickup) return;
     const info = POWER_TYPES[pickup.type], x = (pickup.x + .5) * cell, y = (pickup.y + .5) * cell;
-    if (pickup.expires - gameTime < 3 && Math.sin(visualTime * 12) < 0) return;
+    if (pickup.expires - m.gameTime < 3 && Math.sin(visualTime * 12) < 0) return;
     ctx.save(); ctx.translate(x, y); ctx.rotate(Math.PI / 4);
     ctx.shadowColor = info.color; ctx.shadowBlur = cell * .4;
     roundRect(-cell * .31, -cell * .31, cell * .62, cell * .62, cell * .12, info.color);
@@ -421,7 +347,7 @@
     }
     const head = points[0], hx = (head.x + .5) * cell, hy = (head.y + .5) * cell;
     circle(hx, hy, cell * .385, colors[0]);
-    if (activePower?.type === 'shield' && state !== 'ready') {
+    if (m.activePower?.type === 'shield' && state !== 'ready') {
       ctx.strokeStyle = '#a6e9f7'; ctx.lineWidth = cell * .06;
       ctx.beginPath(); ctx.arc(hx, hy, cell * .52, 0, Math.PI * 2); ctx.stroke();
     }
@@ -451,22 +377,22 @@
     const vignette = ctx.createRadialGradient(width / 2, height / 2, width * .1, width / 2, height / 2, width * .65);
     vignette.addColorStop(0, '#00000000'); vignette.addColorStop(1, '#07160c45'); ctx.fillStyle = vignette; ctx.fillRect(0, 0, width, height);
     if (state === 'ready') { idleSnake(); return; }
-    portals.forEach(drawPortal);
-    for (const p of obstacles) {
+    m.portals.forEach(drawPortal);
+    for (const p of m.obstacles) {
       roundRect((p.x + .13) * cell, (p.y + .13) * cell, cell * .74, cell * .74, cell * .16, '#63745a');
       roundRect((p.x + .24) * cell, (p.y + .24) * cell, cell * .52, cell * .11, cell * .04, '#829375');
     }
-    if (mirrored) { ctx.fillStyle = '#9b91f114'; ctx.fillRect(0, 0, width, height); }
-    drawFruit(fruit);
-    if (bonus && (bonus.expires - gameTime > 3 || Math.sin(visualTime * 12) > 0)) drawFruit(bonus, true);
+    if (m.mirrored) { ctx.fillStyle = '#9b91f114'; ctx.fillRect(0, 0, width, height); }
+    drawFruit(m.fruit);
+    if (m.bonus && (m.bonus.expires - m.gameTime > 3 || Math.sin(visualTime * 12) > 0)) drawFruit(m.bonus, true);
     drawPickup();
     const alpha = state === 'playing' ? Math.min(1, accumulator / interval()) : 1;
-    const points = snake.map((p, i) => {
+    const points = m.snake.map((p, i) => {
       const old = previous[Math.min(i, previous.length - 1)] || p;
       if (Math.abs(old.x - p.x) + Math.abs(old.y - p.y) > 1.8) return p;
       return { x: old.x + (p.x - old.x) * alpha, y: old.y + (p.y - old.y) * alpha };
     });
-    drawSnake(points, direction, state === 'over' ? .6 : 1);
+    drawSnake(points, m.direction, state === 'over' ? .6 : 1);
     for (const p of particles) { ctx.globalAlpha = Math.max(0, p.life / p.max); circle(p.x * cell, p.y * cell, p.size * cell, p.color); }
     ctx.globalAlpha = 1;
     if (!reducedMotion && state === 'over' && visualTime - deathAt < .35) { ctx.fillStyle = `rgba(240,153,123,${(.35 - (visualTime - deathAt)) * .35})`; ctx.fillRect(0, 0, width, height); }
@@ -474,14 +400,15 @@
   function frame(time) {
     const dt = Math.min((time - (lastFrame || time)) / 1000, .06); lastFrame = time; visualTime += dt;
     if (state === 'playing') {
-      gameTime += dt; accumulator += dt;
-      if (activePower && gameTime >= activePower.expires) activePower = null;
-      if (bonus && gameTime >= bonus.expires) bonus = null;
-      if (pickup && gameTime >= pickup.expires) pickup = null;
-      if (mode === 'reloj') { timeLeft -= dt; if (timeLeft <= 0) { timeLeft = 0; finish(); } }
-      $('power-status').textContent = mode === 'reloj' ? `⏱ ${timeLeft.toFixed(1)}s` : mode === 'laberinto' ? `NIVEL ${level}` : mode === 'espejo' && mirrored ? '⇄ CONTROLES INVERTIDOS' : activePower ? `${POWER_TYPES[activePower.type].icon} ${POWER_TYPES[activePower.type].label} ${Math.ceil(activePower.expires - gameTime)}s` : '';
+      accumulator += dt;
+      const ahora = Date.now();
+      if (muroAntes) muroMs += Math.min(100, Math.max(0, ahora - muroAntes));
+      muroAntes = ahora;
       let tick = interval();
       while (accumulator >= tick && state === 'playing') { accumulator -= tick; step(); tick = interval(); }
+      // El contrarreloj baja de a tic en el motor; aquí se muestra continuo.
+      const ap = m.activePower, resta = Math.max(0, m.timeLeft - (state === 'playing' ? accumulator : 0));
+      $('power-status').textContent = mode === 'reloj' ? `⏱ ${resta.toFixed(1)}s` : mode === 'laberinto' ? `NIVEL ${m.level}` : mode === 'espejo' && m.mirrored ? '⇄ CONTROLES INVERTIDOS' : ap ? `${POWER_TYPES[ap.type].icon} ${POWER_TYPES[ap.type].label} ${Math.ceil(ap.expires - m.gameTime)}s` : '';
     }
     if (state !== 'paused') {
       for (const p of particles) { p.life -= dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= Math.pow(.2, dt); p.vy *= Math.pow(.2, dt); }
@@ -515,7 +442,7 @@
   }));
   document.querySelectorAll('[data-theme]').forEach(b => b.addEventListener('click', () => { theme = b.dataset.theme; syncSettings(); save(); }));
   document.querySelectorAll('[data-direction]').forEach(b => b.addEventListener('pointerdown', e => {
-    e.preventDefault(); if (state === 'ready' || state === 'over') start(); enqueue(b.dataset.direction);
+    e.preventDefault(); if (state === 'ready' || state === 'over') start(); enqueue(b.dataset.direction, e);
   }));
   /* iOS: que una pulsación larga no seleccione la flecha ni abra el menú. */
   document.querySelectorAll('[data-direction]').forEach(b => {
@@ -527,7 +454,7 @@
     if (e.ctrlKey || e.metaKey || e.altKey || /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
     const key = e.key.toLowerCase();
     const map = { arrowup: 'up', w: 'up', arrowdown: 'down', s: 'down', arrowleft: 'left', a: 'left', arrowright: 'right', d: 'right' };
-    if (map[key]) { e.preventDefault(); enqueue(map[key]); }
+    if (map[key]) { e.preventDefault(); enqueue(map[key], e); }
     else if (key === ' ') {
       if (e.target.tagName === 'BUTTON' && !['play-button', 'pause-button'].includes(e.target.id)) return;
       e.preventDefault(); if (e.repeat) return;
@@ -541,7 +468,7 @@
     if (!touch) return;
     const dx = e.clientX - touch.x, dy = e.clientY - touch.y;
     if (Math.max(Math.abs(dx), Math.abs(dy)) < 15) return;
-    enqueue(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'));
+    enqueue(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'), e);
     touch = { x: e.clientX, y: e.clientY };
   });
   canvas.addEventListener('pointerup', () => { touch = null; });

@@ -17,7 +17,7 @@ export const CONTROLES = {
   "catan": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
   "clue": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
   "cuadritos": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
-  "electro": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
+  "electro": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
   "escondite": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
   "fanal": {"movil":true,"pc":true,"pide":"","por":"escucha toques"},
   "flip7": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},

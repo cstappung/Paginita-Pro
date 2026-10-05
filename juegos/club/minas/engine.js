@@ -58,5 +58,23 @@
     }
     get progress() { return this.revealed / (this.cells.length - this.mines); }
   }
-  return { Game, LEVELS };
+  /* El reparto de minas sale de una semilla (mulberry32), no de
+     Math.random: así la partida se puede rehacer entera a partir de la
+     semilla y las jugadas, que es la prueba que el verificador antitrampas
+     (colabtex/src/juegos/solo/verifica/minas.js) repite con este mismo
+     motor. La semilla la elige el navegador; da igual: igual hay que jugar
+     el tablero que sale de ella. */
+  function azar(semilla) {
+    let a = semilla >>> 0;
+    return () => {
+      a = (a + 0x6D2B79F5) >>> 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function nuevaSemilla() {
+    try { return crypto.getRandomValues(new Uint32Array(1))[0]; } catch { return Math.floor(Math.random() * 4294967296) >>> 0; }
+  }
+  return { Game, LEVELS, azar, nuevaSemilla };
 });

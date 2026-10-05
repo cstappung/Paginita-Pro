@@ -262,9 +262,50 @@
     r.punto = Number.isInteger(pt.j) && pt.j > 0
       ? { j: pt.j, puntos: Math.max(0, +pt.puntos || 0), llamas: Math.max(1, Math.min(LLAMAS_MAX, +pt.llamas || LLAMAS_INICIO)), at: +pt.at || 0 }
       : { j: 0, at: +pt.at || 0 };
+    if (r.punto.j > 0 && Number.isFinite(+pt.luces)) r.punto.luces = Math.max(0, Math.round(+pt.luces));
+    // La prueba de lo jugado hasta el punto de control (ver prueba.js): sin
+    // ella, seguir desde aquí no entra en la clasificación. Se guarda tal
+    // cual (el verificador la rehace entera) si tiene la forma y cabe.
+    const pr = pt.pr;
+    if (r.punto.j > 0 && pr && typeof pr === "object" && typeof pr.id === "string" && Array.isArray(pr.J)) {
+      let largo = Infinity;
+      try { largo = JSON.stringify(pr).length; } catch (e) { /* una prueba que no se puede escribir no se guarda */ }
+      if (largo <= PRUEBA_PUNTO_MAX) r.punto.pr = pr;
+    }
     const ma = limpio(x.mejor), mb = limpio(y.mejor);
     for (const k of ["travesia", "sinfin", "jornada"]) r.mejor[k] = Math.max(0, +ma[k] || 0, +mb[k] || 0);
     return r;
+  }
+
+  /* Lo más que ocupa la prueba guardada con el punto de control: el
+     progreso entero viaja a la cuenta en un blob de menos de 200 000
+     caracteres, y once jornadas reales ocupan unas decenas de miles. */
+  const PRUEBA_PUNTO_MAX = 150000;
+
+  /* Un hash de texto de 53 bits (cyrb53), en base 36. No es una firma: lo
+     que hace es encadenar las jornadas de la prueba (cada una lleva el
+     hash de la anterior), para que una jornada no se pueda cambiar, quitar
+     ni mover sin rehacer todas las que siguen. */
+  function hashTexto(texto, semilla) {
+    let h1 = 0xdeadbeef ^ (semilla || 0), h2 = 0x41c6ce57 ^ (semilla || 0);
+    const s = String(texto);
+    for (let i = 0; i < s.length; i++) {
+      const c = s.charCodeAt(i);
+      h1 = Math.imul(h1 ^ c, 2654435761);
+      h2 = Math.imul(h2 ^ c, 1597334677);
+    }
+    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+    return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+  }
+
+  /* Lo que paga la Mensajera número `k` (0, 1…) de la jornada `n` en la
+     partida `id`. Sale de la semilla de la partida y no de Math.random,
+     para que el verificador lo pueda recalcular: si no, cada Mensajera de
+     la prueba podría declararse de 500. */
+  function valorMensajera(id, n, k) {
+    const r = mulberry32(parseInt(hashTexto(id + ":" + n + ":" + k).slice(-6), 36))();
+    return PUNTOS_MENSAJERA[Math.floor(r * PUNTOS_MENSAJERA.length)];
   }
 
   /* Un generador con semilla (mulberry32): mismas estrellas, mismas
@@ -287,6 +328,6 @@
     JORNADAS, JORNADAS_HISTORIA, INICIO_ACTO,
     dificultad, jornada, actoDe, vidaJefe, formacion, polillasDe,
     resonancia, puntosPolilla, bonusJornada, llamasGanadas, juzgaPulso, latido,
-    progresoVacio, mezclaProgreso, mulberry32
+    progresoVacio, mezclaProgreso, mulberry32, hashTexto, valorMensajera, PRUEBA_PUNTO_MAX
   };
 });

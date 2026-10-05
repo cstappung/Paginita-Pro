@@ -21,3 +21,7 @@ export function cargaMotor() {
   return promesa;
 }
 export const motorListo = () => globalThis.PokeMotor || null;
+/* La dirección completa del motor, con el mismo `?v=`: el verificador de
+   la Frontera lo carga en un Worker propio, con su copia limpia del
+   simulador (ver solo/verifica/frontera.js). */
+export const urlMotor = () => new URL("juegos-pokemon.js" + (VER ? "?v=" + VER : ""), location.href).href;
