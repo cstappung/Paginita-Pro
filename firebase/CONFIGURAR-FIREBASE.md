@@ -82,7 +82,8 @@ siquiera haciendo privado el repositorio. Lo que protege los datos son las
 Lo que las reglas **no** pueden impedir sin un servidor propio, dicho claro:
 un jugador con la consola abierta puede declararse ganador de una partida en
 la que está (`partidas/<pid>/fin`) y así sumar a su clasificación; cualquiera
-con sesión puede llenar el chat de una sala o mandar muchas sugerencias;
+con sesión puede llenar el chat de una sala o mandar muchas sugerencias (el
+chat general, al menos, solo deja un mensaje cada 20 s por cuenta);
 cualquiera con sesión puede leer el webhook de Discord (a propósito, para que
 se anuncie la sala de cualquiera) y mandar spam al canal; y el
 elenco de Clue (`clueElenco`, nombres y fotos de personas reales) lo puede
@@ -395,6 +396,31 @@ Hasta publicar, los récords se siguen guardando con las reglas viejas,
 pero sin prueba que auditar. Para vetar a alguien, en la consola:
 `vetados/<uid>` = `{"at": <ms de ahora>, "m": "motivo"}`, y borrar sus filas
 de `soloRanks`.
+
+### ⚠ Los rieles del salón (chat general y mejores partidas) piden publicar otra vez
+
+Tres nodos nuevos, para lo que se ve a los lados del salón en un PC ancho
+(`colabtex/src/juegos/rieles.js`):
+
+- `chatGeneral/<id>` — el chat general. Lo lee cualquiera con sesión; cada
+  mensaje lo escribe su dueño **una vez**, 200 caracteres como mucho, y una
+  cuenta vetada no escribe. Un administrador borra cualquier mensaje, y
+  cualquiera con sesión puede borrar los de **más de un día** (el salón barre
+  unos pocos al abrirse, para que el nodo no crezca para siempre).
+- `chatGeneralUlt/<uid>` — `{at, k}`, el último mensaje de cada cuenta. Se
+  escribe en la misma actualización que el mensaje, y la regla exige **20 s
+  desde el anterior**: la espera la pone la base, no la página. Solo lo lee
+  su dueño.
+- `repeticiones/<categoría>/<uid>` — la mejor partida del día de cada cuenta
+  en Tetris Maratón, Snake clásico mediano, sortEm de 20 y el buscaminas
+  medio, con su prueba antitrampas para que el salón la repita. Solo esas
+  cuatro categorías, solo el día de hoy (en Chile), y solo si mejora la que
+  ya había; `o` (la clave por la que se ordena) la recalcula la regla.
+
+Sin publicar, el chat dice que espera las reglas y el riel de la izquierda
+repite el récord histórico de cada tabla (que ya está en `soloPruebas`). El
+arreglo es el de siempre: pegar `firebase/database.rules.json` entero y
+**Publicar**.
 
 ### Aviso de salas nuevas en Discord (opcional)
 

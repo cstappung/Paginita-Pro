@@ -61,7 +61,7 @@ import { db } from "./firebase.js";
 import {
   ref, get, set, update, push, remove, onValue, onDisconnect,
   runTransaction, query, orderByChild, equalTo, serverTimestamp, onChildAdded,
-  limitToLast, startAt
+  limitToLast, limitToFirst, startAt, endAt
 } from "firebase/database";
 import {
   claveJugada, semillaAleatoria, salAleatoria, compromiso, LADO, cupoDe,
@@ -597,6 +597,63 @@ export function guardarSolo(categoria, uid, dato) {
     if (previo && (previo.puntos > dato.puntos || previo.puntos === dato.puntos && previo.tiempo <= dato.tiempo)) return;
     return {nombre:dato.nombre, puntos:dato.puntos, tiempo:dato.tiempo, partida:dato.partida};
   }, {applyLocally:false});
+}
+
+/* ---------- los rieles del salón (juegos/rieles.js) ----------
+   `repeticiones/<categoría>/<uid>`: la mejor partida del día de cada
+   cuenta en los cuatro juegos del riel, con su prueba antitrampas para
+   rehacerla (rieles-datos.js). La consulta trae solo las tres con la
+   clave de orden más alta, que son las mejores del último día con
+   partidas: nunca la categoría entera, que traería cada prueba. */
+export const leerRepeticion = (categoria, uid) =>
+  get(ref(db, `repeticiones/${categoria}/${uid}`)).then(s => s.val());
+export const guardarRepeticion = (categoria, uid, e) =>
+  set(ref(db, `repeticiones/${categoria}/${uid}`), Object.assign({}, e, { at: serverTimestamp() }));
+export function watchRepeticiones(categoria, cb) {
+  let filas = null;
+  const emite = () => { if (filas) cb(filas.filter(f => !vetadosSet.has(f.uid)), null); };
+  const offV = vigilaVetados(emite);
+  const off = onValue(query(ref(db, `repeticiones/${categoria}`), orderByChild("o"), limitToLast(3)), s => {
+    filas = [];
+    s.forEach(h => { filas.push(Object.assign({}, h.val(), { uid: h.key })); });
+    filas.reverse();
+    emite();
+  }, e => cb([], e));
+  return () => { off(); offV(); };
+}
+
+/* El chat general: `chatGeneral/<id>` y `chatGeneralUlt/<uid>` van en una
+   sola actualización, y la regla del segundo exige 20 s desde el último
+   mensaje de esa cuenta (rieles-datos.js). Se escuchan los de los últimos
+   minutos (con tope), y la escucha se rehace de vez en cuando para que la
+   ventana no crezca con la sesión. */
+export function mandaChatGeneral(quien, texto, largo) {
+  const k = push(ref(db, "chatGeneral")).key;
+  return update(ref(db), {
+    [`chatGeneral/${k}`]: { uid: quien.uid, n: String(quien.nombre || "Jugador").slice(0, 80), t: String(texto).slice(0, largo), at: serverTimestamp() },
+    [`chatGeneralUlt/${quien.uid}`]: { at: serverTimestamp(), k }
+  });
+}
+export const leerUltimoChatGeneral = uid => get(ref(db, `chatGeneralUlt/${uid}`)).then(s => s.val());
+export function watchChatGeneral(desde, max, cb) {
+  let v = null;
+  const emite = () => { if (v) cb(v.filter(m => !vetadosSet.has(m.uid)), null); };
+  const offV = vigilaVetados(emite);
+  const q = query(ref(db, "chatGeneral"), orderByChild("at"), startAt(desde), limitToLast(max));
+  const off = onValue(q, s => {
+    v = [];
+    s.forEach(h => { v.push(Object.assign({ id: h.key }, h.val())); });
+    emite();
+  }, err => cb([], err));
+  return () => { off(); offV(); };
+}
+/* Los de hace más de un día los puede borrar cualquiera con sesión: el
+   salón barre unos pocos al abrirse, así el nodo no crece para siempre. */
+export async function barreChatGeneral(antesDe, cuantos) {
+  const s = await get(query(ref(db, "chatGeneral"), orderByChild("at"), endAt(antesDe), limitToFirst(cuantos)));
+  const borra = {};
+  s.forEach(h => { borra[`chatGeneral/${h.key}`] = null; });
+  if (Object.keys(borra).length) await update(ref(db), borra);
 }
 
 /* ---------- el directo de Circuit Breakers ----------
