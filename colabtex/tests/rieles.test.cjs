@@ -118,9 +118,9 @@ test('Una prueba ilegible no da reproductor (y no lanza)',()=>{
   assert.equal(crearRepro('minas',null),null);
 });
 test('Pintar no lanza con un contexto 2D de mentira',()=>{
-  const ctx=new Proxy({},{get:(o,k)=>k in o?o[k]:(()=>{}),set:(o,k,v)=>(o[k]=v,true)});
+  const ctx=new Proxy({},{get:(o,k)=>k in o?o[k]:(()=>({addColorStop(){},width:10})),set:(o,k,v)=>(o[k]=v,true)});
   for(const r of [crearRepro('tetris',tetris(3)),crearRepro('snake',snake(1).prueba),crearRepro('sortem',sortem(5).prueba),crearRepro('minas',minas(2).prueba)])
-    for(const ms of [0,r.dur/3,r.dur])for(const [w,h] of [[300,150],[180,120],[40,30]]){r.en(ms);r.pinta(ctx,w,h);}
+    {assert.ok(r.aspecto>0.3&&r.aspecto<2,'aspecto de la escena');for(const ms of [0,r.dur/3,r.dur])for(const [w,h] of [[300,150],[180,120],[40,30]]){r.en(ms);r.pinta(ctx,w,h,ms/1000);}}
 });
 
 test('La clave de orden: el día manda, después los puntos o el tiempo',()=>{

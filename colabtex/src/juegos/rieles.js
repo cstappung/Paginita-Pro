@@ -28,6 +28,9 @@ import {
   CHAT_VENTANA_MS, CHAT_LARGO, CHAT_MAX, CHAT_VIEJO_MS, chatVisibles, esperaChat, limpiaChat, sinLeer
 } from "./rieles-datos.js";
 
+/* Alto / ancho de cada escena (repeticion.js: `aspecto`), para repartir el
+   riel antes de que llegue la partida. */
+const ASPECTO = { tetris: 1.01, snake: 0.89, sortem: 0.65, minas: 0.95 };
 /* El corte de «PC ancho». Debe coincidir con el `@media` de juegos.html. */
 export const ANCHO = "(min-width: 1400px)";
 const CUADRO_MS = 33, PIE_MS = 400, RELEE_CHAT_MS = 10 * 60 * 1000, REPINTA_CHAT_MS = 15000;
@@ -84,18 +87,16 @@ export function crearRieles(ctx) {
     const el = document.createElement("article");
     el.className = "jg-rp cargando";
     el.dataset.cat = rep.cat;
-    el.innerHTML = `<a class="jg-rp-cab" href="${rep.ruta}" title="Jugar a ${escapeHtml(rep.titulo)}"><b>${escapeHtml(rep.titulo)}</b><span>${escapeHtml(rep.modo)}</span><em class="jg-rp-dia"></em></a>
-      <div class="jg-rp-lienzo"><canvas aria-hidden="true"></canvas>
-        <button class="jg-rp-pausa" type="button" aria-label="Pausar la repetición">❚❚</button>
-        <span class="jg-rp-vel" hidden></span><p class="jg-rp-msg">Buscando la mejor partida…</p></div>
-      <div class="jg-rp-barra" aria-hidden="true"><i></i></div>
-      <div class="jg-rp-pie"></div>`;
+    el.style.flexGrow = String(ASPECTO[rep.juego] || 1);
+    el.innerHTML = `<div class="jg-rp-cab"><a href="${rep.ruta}" title="Jugar a ${escapeHtml(rep.titulo)}"><b>${escapeHtml(rep.titulo)}</b><span>${escapeHtml(rep.modo)}</span></a><span class="jg-rp-quien"></span></div>
+      <div class="jg-rp-lienzo" title="Pausar o seguir"><canvas aria-hidden="true"></canvas>
+        <button class="jg-rp-pausa" type="button" aria-label="Seguir la repetición">▶</button>
+        <p class="jg-rp-msg">Buscando la mejor partida…</p></div>`;
     lista.appendChild(el);
     const t = {
-      rep, el, canvas: el.querySelector("canvas"), msg: el.querySelector(".jg-rp-msg"), barra: el.querySelector(".jg-rp-barra i"),
-      pie: el.querySelector(".jg-rp-pie"), dia: el.querySelector(".jg-rp-dia"), vel: el.querySelector(".jg-rp-vel"),
-      pausaBtn: el.querySelector(".jg-rp-pausa"),
-      off: null, gen: 0, repro: null, entrada: null, v: 1, t0: 0, pausado: false, enPausa: 0, pieFirma: "", w: 0, h: 0, lado: null
+      rep, el, canvas: el.querySelector("canvas"), msg: el.querySelector(".jg-rp-msg"), quien: el.querySelector(".jg-rp-quien"),
+      pausaBtn: el.querySelector(".jg-rp-pausa"), origen: "",
+      off: null, gen: 0, repro: null, entrada: null, v: 1, t0: 0, pausado: false, enPausa: 0, pieFirma: "", w: 0, h: 0
     };
     t.pausaBtn.onclick = () => pausa(t, !t.pausado);
     el.querySelector(".jg-rp-lienzo").addEventListener("click", ev => { if (ev.target === t.canvas) pausa(t, !t.pausado); });
@@ -112,8 +113,6 @@ export function crearRieles(ctx) {
     if (si) t.enPausa = ahora; else t.t0 += ahora - t.enPausa;
     t.pausado = si;
     t.el.classList.toggle("pausada", si);
-    t.pausaBtn.textContent = si ? "▶" : "❚❚";
-    t.pausaBtn.setAttribute("aria-label", si ? "Seguir la repetición" : "Pausar la repetición");
     pintaTarjeta(t, ahora, true);
   }
 
@@ -164,10 +163,10 @@ export function crearRieles(ctx) {
       t.repro = null; t.entrada = null;
       t.el.classList.remove("cargando");
       t.el.classList.add("vacia");
-      t.msg.textContent = error && esPermiso(error) ? "Las repeticiones esperan que se publiquen las reglas de Firebase." : "Nadie ha jugado todavía. ¡Estrena la tabla!";
-      t.pie.innerHTML = `<a class="jg-rp-jugar" href="${t.rep.ruta}">Jugar ahora →</a>`;
+      t.msg.innerHTML = (error && esPermiso(error) ? "Las repeticiones esperan que se publiquen las reglas de Firebase." : "Nadie ha jugado todavía. ¡Estrena la tabla!") +
+        `<a class="jg-rp-jugar" href="${t.rep.ruta}">Jugar ahora →</a>`;
+      t.quien.innerHTML = "";
       t.pieFirma = "";
-      t.dia.textContent = "";
       limpiaLienzo(t);
       return;
     }
@@ -175,20 +174,19 @@ export function crearRieles(ctx) {
     const firma = `${fila.uid}:${fila.p}:${fila.t}:${fila.o || ""}`;
     t.el.classList.remove("cargando", "vacia");
     t.msg.textContent = "";
-    t.dia.textContent = origen === "record" ? "Récord histórico" : etiquetaDia(fila.dia, ctx.dia());
+    t.origen = origen === "record" ? "Récord histórico" : etiquetaDia(fila.dia, ctx.dia());
     if (t.entrada && t.entrada.firma === firma && t.repro) return;
     t.repro = crearRepro(t.rep.juego, prueba);
     t.entrada = { uid: fila.uid, n: fila.n, p: fila.p, t: fila.t, firma };
     t.v = velocidadRep(t.repro.dur);
-    t.vel.hidden = t.v === 1;
-    t.vel.textContent = "×" + String(t.v).replace(".", ",");
+    t.el.style.flexGrow = String(t.repro.aspecto);
     t.t0 = performance.now();
     t.pieFirma = "";
     /* Con «reducir movimiento» la tarjeta se queda quieta en el tablero
        final; ▶ la pone en marcha. */
     if (reduce.matches || t.pausado) {
       t.enPausa = t.t0; t.t0 -= t.repro.dur / t.v; t.pausado = true;
-      t.el.classList.add("pausada"); t.pausaBtn.textContent = "▶"; t.pausaBtn.setAttribute("aria-label", "Seguir la repetición");
+      t.el.classList.add("pausada");
     }
     pintaTarjeta(t, performance.now(), true);
   }
@@ -221,25 +219,27 @@ export function crearRieles(ctx) {
     const ms = instante(t, ahora);
     t.repro.en(ms);
     const g = t.canvas.getContext("2d");
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.clearRect(0, 0, t.canvas.width, t.canvas.height);
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    t.repro.pinta(g, w, h);
-    t.barra.style.width = (ms / t.repro.dur * 100).toFixed(2) + "%";
-    t.el.classList.toggle("final", ms >= t.repro.dur);
+    // Lo que en el juego se mueve solo (la cuadrícula de sortEm, la fruta
+    // que late) sigue moviéndose con la repetición en pausa.
+    t.repro.pinta(g, w, h, ahora / 1000);
     if (pie) pintaPie(t);
   }
 
+  /* Arriba de la escena, quién la jugó y su marca final; el «hoy, ayer,
+     récord» va en el título, para no cargar la línea. */
   function pintaPie(t) {
-    const e = t.entrada, m = t.repro.marcador();
+    const e = t.entrada;
     const p = mezcla({ nombre: e.n || "Jugador" }, ctx.perfil(e.uid));
     const nombre = p.nombre || "Jugador";
-    const valor = t.rep.menor ? formatoTiempo(m.tiempo) : formatoPuntos(m.puntos);
-    const final = t.rep.menor ? formatoTiempo(e.t) : formatoPuntos(e.p) + " pts";
-    const firma = [nombre, p.foto, p.color, ctx.marco(e.uid), valor, m.extra, final].join("|");
+    const final = t.rep.menor ? formatoTiempo(e.t) : formatoPuntos(e.p);
+    const firma = [nombre, p.foto, p.color, ctx.marco(e.uid), final, t.origen].join("|");
     if (firma === t.pieFirma) return;
     t.pieFirma = firma;
-    t.pie.innerHTML = `${avatarMarco(p.foto, nombre, p.color || ctx.colorDe(e.uid), ctx.marco(e.uid), 26, e.uid)}
-      <span class="jg-rp-quien"><b translate="no" data-perfil="${escapeHtml(e.uid)}" data-nombre="${escapeHtml(nombre)}">${escapeHtml(nombre)}</b><small>${escapeHtml(m.extra)}</small></span>
-      <span class="jg-rp-marca"><b>${escapeHtml(valor)}</b><small>${escapeHtml(final)}</small></span>`;
+    t.quien.title = `${t.origen}: ${nombre} · ${final}${t.rep.menor ? "" : " pts"}`;
+    t.quien.innerHTML = `${avatarMarco(p.foto, nombre, p.color || ctx.colorDe(e.uid), ctx.marco(e.uid), 18, e.uid)}<b translate="no" data-perfil="${escapeHtml(e.uid)}" data-nombre="${escapeHtml(nombre)}">${escapeHtml(nombre)}</b>`;
   }
 
   function cuadro(ahora) {
@@ -250,7 +250,7 @@ export function crearRieles(ctx) {
     ultimoCuadro = ahora;
     const pie = ahora - ultimoPie > PIE_MS;
     if (pie) ultimoPie = ahora;
-    for (const t of tarjetas) if (t.repro && (!t.pausado || t.w !== t.canvas.parentElement.clientWidth)) pintaTarjeta(t, ahora, pie);
+    for (const t of tarjetas) if (t.repro) pintaTarjeta(t, ahora, pie);
   }
   const arranca = () => { if (!raf && activo && ancho.matches && !document.hidden) raf = requestAnimationFrame(cuadro); };
 

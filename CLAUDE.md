@@ -2127,6 +2127,15 @@ on a phone. Things to keep:
   same engine, copying each verifier's loop (`crearRepro`: `dur`, `en(ms)`,
   `pinta(ctx, w, h)`, `marcador()`). Going backwards rebuilds from the start.
   A game longer than two minutes plays faster (`velocidadRep`, up to ×4).
+- **Each scene is drawn like its game**, not as a generic grid: Tetris'
+  well with its Guardada/Siguientes boxes and numbers, Snake's lime stroke
+  body (interpolated between ticks) under its light score bar, sortEm's
+  neon 800-wide scene cropped to the «Time:» and the blocks, and Mina
+  Club's garden with its flags/time bar. The colours and shapes are copied
+  from each game's `game.js`/`style.css`, so a reskin of a game has to be
+  mirrored there. There is no card box: each entry is only a title row
+  (game · player) and the scene, transparent around it, and the rail
+  splits its height by each scene's `aspecto`.
   `tests/rieles.test.cjs` plays robot games of each and checks the replay
   reaches the engine's own final score.
 - **`repeticiones/<cat>/<uid>`** = `{dia, o, p, t, n, v, d, at}`: each

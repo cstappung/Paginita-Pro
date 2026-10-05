@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610051844"></script>
+<script src="i18n.js?v=202610051859"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Laboratorio</title>
@@ -3942,33 +3942,26 @@ html[data-tema=oscuro] .jg-lado-cuenta>ul{color:var(--os-tx)}
 .jg-riel-puerta{display:grid;gap:10px;justify-items:start;padding:16px;font-size:12.5px;line-height:1.5;color:var(--jg-muted,#6b6679);background:#fff;border:1px solid #e4dfeb;border-radius:16px}
 .jg-riel-puerta p{margin:0}
 .jg-riel-izq.invitado .jg-rp-lista{display:none}
-.jg-rp-lista{flex:1;min-height:0;display:grid;grid-template-rows:repeat(4,minmax(168px,1fr));gap:10px;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin}
-.jg-rp{display:grid;grid-template-rows:auto minmax(0,1fr) 3px auto;min-height:0;background:#fff;border:1px solid #e4dfeb;border-radius:16px;overflow:hidden}
-.jg-rp-cab{display:flex;align-items:baseline;gap:7px;padding:8px 12px 7px;color:inherit;min-width:0}
-.jg-rp-cab:hover{text-decoration:none}.jg-rp-cab:hover b{color:var(--jg-purple,#6d3fd4)}
+.jg-rp-lista{flex:1;min-height:0;display:flex;flex-direction:column;gap:14px;overflow:auto;overscroll-behavior:contain;scrollbar-width:none}
+.jg-rp-lista::-webkit-scrollbar{display:none}
+/* Sin caja: arriba el juego y quién lo jugó, debajo la escena tal cual. */
+.jg-rp{flex:1 1 0;min-height:118px;display:flex;flex-direction:column;gap:5px}
+.jg-rp-cab{display:flex;align-items:center;gap:8px;padding:0 2px;min-width:0;flex-shrink:0}
+.jg-rp-cab>a{display:flex;align-items:baseline;gap:6px;color:inherit;min-width:0;overflow:hidden}
+.jg-rp-cab>a:hover{text-decoration:none}.jg-rp-cab>a:hover b{color:var(--jg-purple,#6d3fd4)}
 .jg-rp-cab b{font-size:13px;white-space:nowrap}
-.jg-rp-cab span{font-size:11px;color:var(--jg-muted,#6b6679);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.jg-rp-dia{font:600 9.5px 'IBM Plex Mono',monospace;font-style:normal;letter-spacing:.3px;color:#6d3fd4;background:#efe9fb;border-radius:99px;padding:2px 8px;white-space:nowrap}
-.jg-rp-dia:empty{display:none}
-.jg-rp-lienzo{position:relative;background:#0b0f1a;min-height:0;overflow:hidden;cursor:pointer}
+.jg-rp-cab>a span{font-size:11px;color:var(--jg-muted,#6b6679);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.jg-rp-quien{display:flex;align-items:center;gap:6px;min-width:0;max-width:58%;margin-left:auto;font-size:12px;flex-shrink:0}
+.jg-rp-quien .jg-av{flex-shrink:0}
+.jg-rp-quien b{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.jg-rp-lienzo{position:relative;flex:1;min-height:0;cursor:pointer}
 .jg-rp-lienzo canvas{position:absolute;inset:0;display:block}
-.jg-rp-msg{position:absolute;inset:0;margin:0;display:grid;place-items:center;padding:12px;text-align:center;font-size:12px;line-height:1.45;color:#c9c3dc}
+.jg-rp-msg{position:absolute;inset:0;margin:0;display:grid;place-content:center;gap:8px;padding:12px;text-align:center;font-size:12px;line-height:1.45;color:var(--jg-muted,#6b6679);border:1px dashed #d8d2e4;border-radius:12px}
 .jg-rp-msg:empty{display:none}
 .jg-rp.cargando .jg-rp-msg{animation:jgRpLate 1.4s ease-in-out infinite}
 @keyframes jgRpLate{50%{opacity:.45}}
-.jg-rp-pausa{position:absolute;right:6px;bottom:6px;width:28px;height:28px;border:0;border-radius:8px;background:#0009;color:#fff;font-size:11px;cursor:pointer;opacity:0;transition:opacity .15s}
-.jg-rp:hover .jg-rp-pausa,.jg-rp.pausada .jg-rp-pausa,.jg-rp-pausa:focus-visible{opacity:1}
-.jg-rp.vacia .jg-rp-pausa,.jg-rp.cargando .jg-rp-pausa{display:none}
-.jg-rp-vel{position:absolute;left:6px;top:6px;font:600 10px 'IBM Plex Mono',monospace;color:#fff;background:#0008;border-radius:6px;padding:2px 6px;pointer-events:none}
-.jg-rp-barra{background:#efebf5}.jg-rp-barra i{display:block;height:100%;width:0;background:linear-gradient(90deg,#7c4dff,#22c55e)}
-.jg-rp-pie{display:flex;align-items:center;gap:8px;padding:7px 12px 8px;min-height:44px;min-width:0}
-.jg-rp-pie .jg-av{flex-shrink:0}
-.jg-rp-quien{flex:1;min-width:0;display:grid}
-.jg-rp-quien b,.jg-rp-quien small{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.jg-rp-quien b{font-size:12.5px;cursor:pointer}.jg-rp-quien small,.jg-rp-marca small{font-size:10.5px;color:var(--jg-muted,#6b6679)}
-.jg-rp-marca{display:grid;justify-items:end;flex-shrink:0}
-.jg-rp-marca b{font:600 13px 'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}
-.jg-rp.final .jg-rp-marca b{color:#16a34a}
+.jg-rp-pausa{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:44px;height:44px;border:0;border-radius:50%;background:#000a;color:#fff;font-size:16px;cursor:pointer;display:none}
+.jg-rp.pausada .jg-rp-pausa{display:block}
 .jg-rp-jugar{font-size:12px;font-weight:600}
 
 .jg-cg{flex-direction:column;background:#fff;border:1px solid #e4dfeb;border-radius:16px;overflow:hidden}
@@ -4023,12 +4016,10 @@ html[data-tema=oscuro] .jg-lado-cuenta>ul{color:var(--os-tx)}
 @keyframes jgCgSube{from{transform:translateY(40px);opacity:.4}}
 @media (prefers-reduced-motion:reduce){.jg-rp.cargando .jg-rp-msg,html.jg-rieles.jg-cg-abierto .jg-cg{animation:none}}
 
-html[data-tema=oscuro] .jg-rp,html[data-tema=oscuro] .jg-cg,html[data-tema=oscuro] .jg-riel-puerta{background:var(--os-sup);border-color:var(--os-borde)}
-html[data-tema=oscuro] .jg-riel-cab small,html[data-tema=oscuro] .jg-rp-cab span,html[data-tema=oscuro] .jg-rp-quien small,html[data-tema=oscuro] .jg-rp-marca small,html[data-tema=oscuro] .jg-riel-puerta,html[data-tema=oscuro] .jg-cg-msg time,html[data-tema=oscuro] .jg-cg-cierra{color:var(--os-tx3)}
-html[data-tema=oscuro] .jg-rp-dia{background:#2d2347;color:#c9b6ff}
-html[data-tema=oscuro] .jg-rp-cab:hover b{color:#c9b6ff}
-html[data-tema=oscuro] .jg-rp-barra{background:var(--os-sup3)}
-html[data-tema=oscuro] .jg-rp.final .jg-rp-marca b{color:#4ade80}
+html[data-tema=oscuro] .jg-cg,html[data-tema=oscuro] .jg-riel-puerta{background:var(--os-sup);border-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-riel-cab small,html[data-tema=oscuro] .jg-rp-cab>a span,html[data-tema=oscuro] .jg-rp-msg,html[data-tema=oscuro] .jg-riel-puerta,html[data-tema=oscuro] .jg-cg-msg time,html[data-tema=oscuro] .jg-cg-cierra{color:var(--os-tx3)}
+html[data-tema=oscuro] .jg-rp-msg{border-color:var(--os-borde2)}
+html[data-tema=oscuro] .jg-rp-cab>a:hover b{color:#c9b6ff}
 html[data-tema=oscuro] .jg-cg>.jg-riel-cab,html[data-tema=oscuro] .jg-cg-form{border-color:var(--os-borde)}
 html[data-tema=oscuro] .jg-cg-msg{color:var(--os-tx2)}
 html[data-tema=oscuro] .jg-cg-msg b{color:color-mix(in srgb,var(--c,#aaa) 70%,#fff)}
@@ -4076,6 +4067,6 @@ html[data-tema=oscuro] .jg-cg-n{box-shadow:0 0 0 2px var(--os-fondo)}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610051844"></script>
+<script src="juegos-app.js?v=202610051859"></script>
 </body>
 </html>
