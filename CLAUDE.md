@@ -2126,7 +2126,9 @@ on a phone. Things to keep:
   deterministic, so `repeticion.js` replays the proof step by step with the
   same engine, copying each verifier's loop (`crearRepro`: `dur`, `en(ms)`,
   `pinta(ctx, w, h)`, `marcador()`). Going backwards rebuilds from the start.
-  A game longer than two minutes plays faster (`velocidadRep`, up to ×4).
+  It always plays at the speed it was played, however long: an earlier
+  version sped games over two minutes up to ×4, and a Tetris Maratón
+  stopped looking like Tetris.
 - **Each scene is drawn like its game**, not as a generic grid: Tetris'
   well with its Guardada/Siguientes boxes and numbers, Snake's lime stroke
   body (interpolated between ticks) under its light score bar, sortEm's

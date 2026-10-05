@@ -144,11 +144,8 @@ test('La clave de orden: el día manda, después los puntos o el tiempo',()=>{
   assert.equal(D.etiquetaDia(hoy-1,hoy),'Mejor de ayer');
   assert.equal(D.etiquetaDia(hoy-9,hoy),'Última mejor partida');
 });
-test('El bucle de una partida larga se acelera, como mucho ×4',()=>{
-  assert.equal(D.velocidadRep(30000),1);
-  assert.equal(D.velocidadRep(170000),1.5);
-  assert.equal(D.velocidadRep(240000),2);
-  assert.equal(D.velocidadRep(3600000),4);
+test('El tiempo de una partida, como en el club; la repetición no se acelera',()=>{
+  assert.equal(D.velocidadRep,undefined,'cada partida se repite a la velocidad a la que se jugó');
   assert.equal(D.formatoTiempo(38240),'38,2 s');
   assert.equal(D.formatoTiempo(247000),'4:07');
 });
