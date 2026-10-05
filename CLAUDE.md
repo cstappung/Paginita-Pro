@@ -2857,7 +2857,20 @@ a metal impact when the rows rise. The sound is **not** the site's chip: the
 pit is an instrument (each column a note of A minor pentatonic, panned where
 the piece is; each clear the next chord of Am–F–C–G, FM bells through an echo).
 In the room it goes through `salidaFx()` from `sonido.js` (the page's effects
-bus), in the Club through its own `fx` gain.
+bus), in the Club through its own `fx` gain. Falls are dry and punchy (a kick,
+a click and a square pluck), and each lock that comes within `RACHA_S` of the
+previous one steps the pluck up the scale, so playing fast climbs an arpeggio;
+clears are a drum hit plus a 1/32 sawtooth arpeggio on the chord.
+
+**The room's `cae` is written from `paso()`, not only inside the `!s.fin`
+branch** (`tetris.js`). Most losses come from a key (a hard drop or a spawn
+that no longer fits), and keys run outside the loop: the loop then saw
+`s.fin` already set, skipped the branch, and the room said «Quedan N en pie»
+forever. `avisaCaida` retries until the reducer marks the player `fuera` (a
+`jugar` that gives up returns false without throwing). A hidden tab gets no
+`requestAnimationFrame`, so `alOcultar` drives the pit with a 1 s interval
+cut into 100 ms steps: in a simultaneous game the well keeps falling, and
+someone who switched tabs still loses.
 
 **sortEm (`juegos/club/sortem/`) is a Solo Club game too**, on the same
 `conexion.js` protocol as Mina Club: no ranking of its own, only
