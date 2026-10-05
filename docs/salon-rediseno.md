@@ -148,6 +148,10 @@ La lista vive en `MOVIL` (`salon-datos.js`), y la prueba del salón falla si
 un juego nuevo no está en ella: nadie recibe la etiqueta sin que se haya
 probado en un teléfono.
 
+| La etiqueta en las miniaturas | Ficha de un juego que no va en el celular |
+|---|---|
+| ![Etiqueta Celular bajo la insignia de modo](salon/movil-etiqueta-celular.png) | ![Aviso «Solo en computador» en la ficha de Yemas](salon/movil-ficha-solo-computador.png) |
+
 ![Rejilla multijugador con sesión en el celular](salon/movil-multijugador.png)
 
 ### Interacción
