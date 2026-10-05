@@ -73,30 +73,37 @@
     <div class="aviso" id="aviso" role="status" aria-live="polite"></div>
 
     <!-- Cargando. -->
-    <section class="capa portada" id="capaCarga">
-      <div class="caja"><h2 class="titulo" translate="no">VÍA LIBRE</h2><p id="cargaTexto">Preparando la vía…</p></div>
+    <section class="capa carga" id="capaCarga">
+      <div class="logo" translate="no" aria-label="Vía Libre"><span class="l1" data-t="VÍA">VÍA</span><span class="l2" data-t="LIBRE">LIBRE</span><em>Línea 3</em></div>
+      <p class="carga-texto" id="cargaTexto">Preparando la vía…</p>
     </section>
 
-    <!-- La portada. -->
+    <!-- La portada, armada como el inicio de Subway Surfers: el logo arriba a la
+         izquierda, los contadores arriba a la derecha, el corredor al centro
+         (de frente, saludando), «toca para correr» y una barra de botones
+         grandes abajo. Tocar cualquier parte vacía también empieza. -->
     <section class="capa portada" id="capaPortada" hidden>
-      <div class="caja">
-        <div class="cabeza-portada">
-        <p class="pre">Línea 3 · Centro</p>
-        <h2 class="titulo" translate="no">VÍA LIBRE</h2>
-        <div class="menu">
-          <button type="button" class="opcion principal" data-accion="jugar">Correr</button>
-          <button type="button" class="opcion" data-accion="retos">Retos</button>
-          <button type="button" class="opcion" data-accion="tienda">Tienda</button>
-          <button type="button" class="opcion" data-accion="libreta">Libreta</button>
-          <button type="button" class="opcion" data-accion="opciones">Opciones</button>
-          <button type="button" class="opcion" data-accion="ayuda">Cómo se juega</button>
+      <div class="p-arriba">
+        <div class="p-izq">
+          <div class="logo" translate="no" aria-label="Vía Libre"><span class="l1" data-t="VÍA">VÍA</span><span class="l2" data-t="LIBRE">LIBRE</span><em>Línea 3</em></div>
+          <div class="fichas">
+            <span class="pildora" title="Tu mejor carrera"><i data-icono="trofeo"></i><b id="portadaRecord" translate="no">0</b></span>
+            <span class="pildora base" title="El multiplicador base: sube al cumplir los tres retos"><i data-icono="estrella"></i><b id="portadaMult" translate="no">×1</b></span>
+          </div>
         </div>
-        </div>
-        <div class="pie-portada">
-          <p class="records" id="records"></p>
-          <ol class="retos mini" id="portadaRetos" aria-label="Retos"></ol>
+        <div class="p-der">
+          <span class="pildora oro" title="Tus monedas"><i data-icono="moneda"></i><b id="portadaMonedas" translate="no">0</b></span>
+          <button type="button" class="redondo" data-accion="opciones" aria-label="Opciones" title="Opciones"><i data-icono="engranaje"></i></button>
+          <button type="button" class="redondo" data-accion="ayuda" aria-label="Cómo se juega" title="Cómo se juega"><i data-icono="ayuda"></i></button>
         </div>
       </div>
+      <button type="button" class="tocar" data-accion="jugar"><span>¡Toca para correr!</span></button>
+      <nav class="p-barra" aria-label="Menú">
+        <button type="button" class="b-azul" data-accion="retos"><i data-icono="retos"></i><span>Retos</span><em class="globo" id="portadaRetosN" translate="no">0/3</em></button>
+        <button type="button" class="b-morado" data-accion="personajes"><i data-icono="personaje"></i><span>Personaje</span></button>
+        <button type="button" class="b-verde" data-accion="tienda"><i data-icono="tienda"></i><span>Tienda</span></button>
+        <button type="button" class="b-naranja" data-accion="libreta"><i data-icono="boleto"></i><span>Libreta</span><em class="globo" id="portadaBoletos" translate="no">0/7</em></button>
+      </nav>
     </section>
 
     <!-- La primera vez: de qué se trata. -->
@@ -147,14 +154,31 @@
       </div>
     </section>
 
-    <section class="capa panel tienda" id="capaTienda" hidden>
-      <div class="caja">
-        <h2>Tienda <span class="saldo">🪙 <b id="tiendaMonedas" translate="no">0</b></span></h2>
-        <h3>Poderes (cada mejora los alarga 2,5 s)</h3>
-        <ul class="articulos" id="tiendaPoderes"></ul>
-        <h3>Aspectos</h3>
-        <ul class="articulos" id="tiendaAspectos"></ul>
-        <div class="menu"><button type="button" class="opcion principal" data-accion="volver">Volver</button></div>
+    <!-- La tienda: dos pestañas. En «Mejoras», tarjetas grandes con cada poder,
+         sus cinco niveles y el precio. En «Personajes», el corredor queda a la
+         vista (la cámara lo corre a un lado) y se prueba la ropa al tocarla. -->
+    <section class="capa tienda" id="capaTienda" data-pestana="mejoras" hidden>
+      <header class="t-cab">
+        <button type="button" class="redondo" data-accion="volver" aria-label="Volver" title="Volver"><i data-icono="atras"></i></button>
+        <h2 class="t-titulo">Tienda</h2>
+        <span class="pildora oro" title="Tus monedas"><i data-icono="moneda"></i><b id="tiendaMonedas" translate="no">0</b></span>
+      </header>
+      <nav class="t-pestanas" role="tablist" aria-label="Secciones de la tienda">
+        <button type="button" role="tab" data-pestana="mejoras" aria-selected="true"><i data-icono="rayo"></i>Mejoras</button>
+        <button type="button" role="tab" data-pestana="personajes" aria-selected="false"><i data-icono="personaje"></i>Personajes</button>
+      </nav>
+      <div class="t-mejoras" role="tabpanel">
+        <p class="t-nota">Cada mejora hace que el poder dure 2,5 s más.</p>
+        <ul class="t-lista" id="tiendaPoderes"></ul>
+      </div>
+      <div class="t-personajes" role="tabpanel">
+        <div class="t-ficha">
+          <button type="button" class="flecha" data-flecha="-1" aria-label="Anterior"><i data-icono="atras"></i></button>
+          <div class="t-nombre"><strong id="tiendaNombre"></strong><small id="tiendaEstado"></small></div>
+          <button type="button" class="flecha der" data-flecha="1" aria-label="Siguiente"><i data-icono="atras"></i></button>
+        </div>
+        <div class="t-accion" id="tiendaAccion"></div>
+        <ul class="t-ropa" id="tiendaAspectos" aria-label="Aspectos"></ul>
       </div>
     </section>
 

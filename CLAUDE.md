@@ -3272,9 +3272,23 @@ Things that matter:
   story of the last night of Line 3 (`BOLETOS`, read in the Libreta);
   collecting all seven unlocks the Inspector outfit, the Konami code the
   golden one, and a ghost train crosses the sky in Estación Fantasma.
-- **The world is built to run on a phone.** Every prop is merged per
-  material with vertex colours (`Arma`), pooled (`kit.saca`/`guarda`), and
-  coins and sleepers are `InstancedMesh`es; scrolling is texture offsets.
+- **The world is built to run on a phone, and the cost is draw calls.**
+  Every prop is merged per material with vertex colours (`Arma`), pooled
+  (`kit.saca`/`guarda`), and coins and sleepers are `InstancedMesh`es;
+  scrolling is texture offsets. Measuring with `desglose()` found ~470
+  visible meshes in `baja`, and four changes took it to ~170:
+  buildings come in **blocks** of two or three (`edificio` → `unEdificio`,
+  one awning colour per block, shop signs in **one atlas** texture through
+  `franja`), so a block costs what one building did; trees, lamps and
+  catenary posts are **instanced** (`Serie`, written every frame like the
+  coins; not in neon, whose lamps and posts carry glowing edges and sprites);
+  the 49 cloud puffs are one mesh; and the pixel style in `baja` skips its
+  pass (which draws the scene twice, once for the edges) and renders at
+  pixel resolution instead (`proporcion`). **A station's kit is freed** when
+  the next one takes over (`liberaKits` → `Kit.libera`, keeping the active
+  one and the one being preloaded): each used to stay on the GPU, four by
+  Óxido. The runner rebuilt for each kit or outfit frees its geometry too
+  (`suelta3D`).
   Each station palette builds its own kit, prepared a few steps per frame
   ahead of time (`precarga`, 4 ms budget) and compiled inside the tunnel, so
   the switch does not stutter. Quality `alta`/`media`/`baja` sets pixel
@@ -3286,6 +3300,23 @@ Things that matter:
   original), its tempo rising with speed (×0.92 → ×1.15). Effects are
   synthesised in `audio.js`, everything goes through `destination`, so
   `volumen.js` governs it; coins climb a semitone per coin in a streak.
+- **The menus are dressed like Subway Surfers' home screen**: the logo top
+  left (two layers of the same text: a thick navy stroke underneath and a
+  gradient fill in an `::after` on top; with the outline in a negative
+  z-index `::before` the background clipped to the text painted first and was
+  covered), counters top right, «¡Toca para correr!» (any empty spot of the
+  title screen starts too) and a bottom bar of four chunky buttons with
+  badges. Everything is sized in `--m` (1 % of the stage's height or 0.9 % of
+  its width, whichever is smaller); `--mt` floors it at 4.6 px for what a
+  finger touches, and the shop floors its own `--m`, or a vertical phone got
+  7 px text. Icons are drawn SVG (`ICONOS` in `juego.js`, filled into
+  `[data-icono]`), never emoji. **On the menus the camera moves in front of
+  the runner**, who turns round and waves (`e.menu` → pose `menu`), so the
+  runner has a face it never shows while running; in the shop's
+  *Personajes* tab the camera shifts it aside and it tries on whatever outfit
+  is tapped, and leaving the shop (`saleTienda`) puts back what it really
+  wears. Two class names were already taken by the HUD (`.moneda`, `.mult`):
+  the pills are `.oro` and `.base`.
 - **Mobile**: swipes (26 px) and a double tap for the skateboard; a
   portrait screen gets a 3:4 stage and the camera moves back
   (`ajusteRetrato`). Controllers go through `mando.js`.
@@ -3297,8 +3328,12 @@ Things that matter:
   Discord podium and the manual are wired like FANAL's; the `soloRanks` and
   `clubJugadas` regexes were widened, so the rules must be re-published.
 - `window.__vialibre` (`estado()`, `puntos(n)`, `inmortal()`, `poder(k)`,
-  `avanza(seg)`…) drives a run from a script; `avanza` steps the game
-  without drawing, which is how every station was visited in Chromium.
+  `avanza(seg)`, `calidad(n)`, `logica(n)`…) drives a run from a script;
+  `avanza` steps the game without drawing, which is how every station was
+  visited in Chromium, and `estado().info` reports draw calls, triangles,
+  geometries and textures. Those counts are for the **whole frame**:
+  `renderer.info.autoReset` is off and `dibuja()` resets it once, because
+  with post-processing every pass reset it and the reading was always 1.
 
 **Frontera Batalla (`#solo/frontera`) is Emerald's Battle Frontier as a
 Solo Club game**, played locally on the same `@pkmn/sim` bundle as the

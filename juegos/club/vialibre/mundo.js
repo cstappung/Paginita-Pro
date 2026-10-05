@@ -465,6 +465,35 @@ function gradToon() {
 let _texBrillo = null;
 const texBrillo = () => (_texBrillo ||= aTextura(TEX.brillo(), { repetir: false }));
 
+/** Lleva las coordenadas v de una geometría a la franja `i` de `n` de un atlas
+    apilado de arriba abajo (con un margen, para que el filtrado no traiga el
+    color de la franja vecina). Ejemplo: el letrero 2 de 5 usa v de 0,4 a 0,6. */
+function franja(geo, i, n) {
+  const uv = geo.attributes.uv, m = 0.02;
+  for (let k = 0; k < uv.count; k++) uv.setY(k, 1 - (i + 1 - m) / n + uv.getY(k) * (1 - 2 * m) / n);
+  return geo;
+}
+
+/** Muchos objetos iguales (árboles, faroles, postes) dibujados de una vez:
+    una InstancedMesh por material del modelo. Sin esto cada farol eran tres
+    llamadas al GPU; así son tres para todos los faroles de un lado.
+    Uso: serie.empieza(); serie.pon(matriz) por cada uno; serie.termina(). */
+class Serie {
+  constructor(grupo, max = 48) {
+    this.max = max; this.n = 0; this.mallas = []; this.raiz = new THREE.Group();
+    grupo.traverse(m => {
+      if (!m.isMesh) return;
+      const im = new THREE.InstancedMesh(m.geometry, m.material, max);
+      im.castShadow = m.castShadow; im.receiveShadow = m.receiveShadow; im.count = 0;
+      im.frustumCulled = false;                                                // la caja de la geometría base no sirve para todas las copias
+      this.mallas.push(im); this.raiz.add(im);
+    });
+  }
+  empieza() { this.n = 0; }
+  pon(m) { if (this.n >= this.max) return; for (const im of this.mallas) im.setMatrixAt(this.n, m); this.n++; }
+  termina() { for (const im of this.mallas) { im.count = this.n; im.instanceMatrix.needsUpdate = true; } }
+}
+
 class Kit {
   constructor(mundo, clave, pal) {
     this.mundo = mundo; this.clave = clave; this.pal = pal; this.c = pal.c;
@@ -472,7 +501,7 @@ class Kit {
     this.az = azarDe(0xC17A + clave.length * 131 + clave.charCodeAt(0));   // la ciudad sale igual en cada visita
     this.mats = new Map(); this.texs = new Map(); this.lineasMat = new Map();
     this.reserva = new Map();          // tipo → objetos guardados para reusar
-    this.almacen = new THREE.Group(); this.almacen.visible = false;   // donde esperan los objetos guardados
+    this.almacen = new THREE.Group(); this.almacen.visible = false; this.almacen.name = 'almacen:' + clave;   // donde esperan los objetos guardados
     this.listo = false;
   }
   /* ---- materiales ----
@@ -508,6 +537,14 @@ class Kit {
     this.mats.set(clave, m);
     return m;
   }
+  /** El lienzo de un letrero de tienda (el color sale del texto, así es siempre el mismo). */
+  lienzoCartel(texto) {
+    const c = this.c, px = this.pixel;
+    const k = [...texto].reduce((s, ch) => s + ch.charCodeAt(0), 0);
+    const fondo = this.neon ? '#0a0418' : hexCss([0x23304a, 0xfff6e6, 0x2a6df4, 0xe8463b][k % 4]);
+    const tinta = this.neon ? hexCss([0xff2bd6, 0x22e5ff, 0xffe14d, ...(c.ventanas || [])][k % 3]) : (k % 4 === 1 ? '#23304a' : '#ffffff');
+    return TEX.cartel(texto, fondo, tinta, this.neon ? '700 80px Orbitron, sans-serif' : px ? '54px "Press Start 2P", monospace' : '86px "Lilita One", "Arial Black", sans-serif', this.neon);
+  }
   /* ---- texturas (se dibujan una vez y se reusan) ---- */
   tex(nombre) {
     if (this.texs.has(nombre)) return this.texs.get(nombre);
@@ -532,13 +569,11 @@ class Kit {
       case 'caja': t = aTextura(TEX.caja(), { repetir: false, pixel: px }); break;
       case 'boleto': t = aTextura(TEX.boleto(), { repetir: false, pixel: px }); break;
       case 'toldo': { const [c1, c2] = c.toldos[+arg[0] % c.toldos.length]; t = aTextura(TEX.toldo(c1, c2, this.neon ? 0.45 : 1), { pixel: px }); break; }
-      case 'cartel': {
-        const texto = arg[0];
-        const k = [...texto].reduce((s, ch) => s + ch.charCodeAt(0), 0);
-        const fondo = this.neon ? '#0a0418' : hexCss([0x23304a, 0xfff6e6, 0x2a6df4, 0xe8463b][k % 4]);
-        const tinta = this.neon ? hexCss([0xff2bd6, 0x22e5ff, 0xffe14d, ...(c.ventanas || [])][k % 3]) : (k % 4 === 1 ? '#23304a' : '#ffffff');
-        t = aTextura(TEX.cartel(texto, fondo, tinta, this.neon ? '700 80px Orbitron, sans-serif' : px ? '54px "Press Start 2P", monospace' : '86px "Lilita One", "Arial Black", sans-serif', this.neon), { repetir: false, pixel: px });
-        break;
+      case 'cartel': t = aTextura(this.lienzoCartel(arg[0]), { repetir: false, pixel: px }); break;
+      case 'carteles': {                                                       // todos los letreros de la paleta en una textura, uno debajo del otro
+        const lista = this.pal.carteles, [cv, x] = lienzo(512, 128 * lista.length);
+        lista.forEach((texto, i) => x.drawImage(this.lienzoCartel(texto), 0, i * 128));
+        t = aTextura(cv, { repetir: false, pixel: px }); break;
       }
       case 'graf': { const g = this.pal.grafitis[+arg[0] % this.pal.grafitis.length]; t = aTextura(TEX.grafiti(az, g[0], g[1], g[2], this.neon ? 0.85 : 1), { repetir: false, pixel: px }); break; }
       default: t = null;
@@ -577,6 +612,27 @@ class Kit {
     if (!this.reserva.has(t)) this.reserva.set(t, []);
     this.reserva.get(t).push(o);
   }
+  /** Devuelve todo lo del kit a la tarjeta de video: geometrías, materiales y
+      texturas. Se llama cuando su estación ya pasó (liberaKits). */
+  libera() {
+    const geos = new Set(), mats = new Set();
+    const junta = o => o && o.traverse(x => {
+      if (x.isSprite) { if (x.material) mats.add(x.material); return; }          // la geometría del sprite es de three.js, compartida
+      if (x.isInstancedMesh) x.dispose();                                      // las matrices de las instancias
+      if (x.geometry) geos.add(x.geometry);
+      if (x.material) for (const m of [].concat(x.material)) mats.add(m);
+    });
+    for (const lista of this.reserva.values()) for (const o of lista) { junta(o); o.parent?.remove(o); }
+    junta(this.almacen); this.almacen.parent?.remove(this.almacen);
+    for (const o of [this.via, this.cielo, this.monedas, this.seriesRaiz]) { junta(o); o?.parent?.remove(o); }
+    for (const m of this.mats.values()) mats.add(m);
+    for (const m of this.lineasMat.values()) mats.add(m);
+    const brillo = texBrillo();
+    for (const m of mats) { if (m.map && m.map !== brillo && ![...this.texs.values()].includes(m.map)) m.map.dispose(); m.dispose(); }
+    for (const t of this.texs.values()) t && t.dispose();
+    for (const g of geos) g.dispose();
+    this.reserva.clear(); this.mats.clear(); this.texs.clear(); this.lineasMat.clear(); this.listo = false;
+  }
   /** Llena las reservas por adelantado (para que no se trabe en plena carrera).
       Devuelve una lista de pasos chicos: el mundo los va haciendo de a poco. */
   pasosDePreparacion() {
@@ -584,10 +640,23 @@ class Kit {
     const pre = (tipo, fab, n) => { for (let i = 0; i < n; i++) pasos.push(() => { const o = fab(); o.visible = false; o.userData.tipoReserva = tipo; this.almacen.add(o); if (!this.reserva.has(tipo)) this.reserva.set(tipo, []); this.reserva.get(tipo).push(o); }); };
     for (let i = 0; i < 3; i++) pre('tren' + i, () => this.tren(i), 3);
     pre('rampa', () => this.rampa(), 3); pre('bajo', () => this.barreraBaja(), 5); pre('alto', () => this.barreraAlta(), 5);
-    for (const lado of [-1, 1]) { pre('edificio' + lado, () => this.edificio(lado), 14); pre('farol' + lado, () => this.farol(lado), 6); pre('poste' + lado, () => this.poste(lado), 4); pre('graf' + lado, () => this.grafiti(lado), 3); if (!this.neon) pre('arbol', () => this.arbol(), 6); }
+    for (const lado of [-1, 1]) {
+      pre('edificio' + lado, () => this.edificio(lado), 7); pre('graf' + lado, () => this.grafiti(lado), 3);
+      if (this.neon) { pre('farol' + lado, () => this.farol(lado), 6); pre('poste' + lado, () => this.poste(lado), 4); }
+    }
+    if (!this.neon) pasos.push(() => {                                         // árboles, faroles y postes: instancias
+      const libres = []; const serie = (g, max) => { const s = new Serie(g, max); libres.push(s); return s; };
+      this.series = {
+        arbol: [0, 1, 2].map(() => { const g = this.arbol(); g.scale.setScalar(1); return serie(g, 40); }),   // tres árboles distintos, cada uno muchas veces
+        farol: { [-1]: serie(this.farol(-1), 24), [1]: serie(this.farol(1), 24) },
+        poste: { [-1]: serie(this.poste(-1), 14), [1]: serie(this.poste(1), 14) }
+      };
+      this.listaSeries = libres;
+      this.seriesRaiz = new THREE.Group(); this.seriesRaiz.name = 'series:' + this.clave; for (const s of libres) this.seriesRaiz.add(s.raiz);
+    });
     for (const cl of ['iman', 'mochila', 'zapatillas', 'doble', 'caja']) pre('poder-' + cl, () => this.poder(cl), 1);
     pre('estrella', () => this.estrella(), 2); pre('boleto', () => this.boleto(), 1);
-    pasos.push(() => { this.via = this.armaVia(); this.cielo = this.armaCielo(); this.monedas = this.armaMonedas(); this.listo = true; });
+    pasos.push(() => { this.via = this.armaVia(); this.cielo = this.armaCielo(); this.monedas = this.armaMonedas(); this.via.name = 'via:' + this.clave; this.cielo.name = 'cielo:' + this.clave; this.listo = true; });
     return pasos;
   }
 
@@ -713,8 +782,33 @@ class Kit {
     return g;
   }
   /** Un edificio para el costado `lado` (−1 izquierda, 1 derecha). Su origen es el centro de la base. */
+  /** Una cuadra: dos o tres edificios seguidos en una sola pieza (un toldo
+      del mismo color para toda la cuadra y los letreros en un atlas). Cada
+      edificio suelto eran ~7 llamadas al GPU, una por material; la cuadra
+      entera usa casi los mismos materiales, así que cuesta lo de uno. */
   edificio(lado) {
-    const c = this.c, az = this.az, a = new Arma(this);
+    const az = this.az, a = new Arma(this), n = az() < 0.65 ? 3 : 2;
+    const toldo = Math.floor(az() * this.c.toldos.length);
+    const partes = [];
+    let z = 0;
+    for (let i = 0; i < n; i++) {
+      const sub = { pon: null }, inicio = z;
+      const p = this.unEdificio(sub, lado, toldo);
+      partes.push({ p, inicio });
+      z += p.d + 0.8 + az() * 1.6;
+    }
+    const L = z - 0.8;                                                         // el largo de la cuadra (sin el último hueco)
+    for (const { p, inicio } of partes) {                                      // cada edificio con la fachada en x = 0 y en su tramo de la cuadra
+      const ox = lado * p.w / 2, oz = -L / 2 + inicio + p.d / 2;
+      for (const [geo, clave, col, pos, rot, esc, borde] of p.piezas) a.pon(geo, clave, col, [pos[0] + ox, pos[1], pos[2] + oz], rot, esc, borde);
+    }
+    const g = a.hecho();
+    g.userData.largo = L / 2; g.userData.ancho = 0;
+    return g;
+  }
+  /** Un edificio: anota sus piezas (no las arma) para que la cuadra las ponga en su lugar. */
+  unEdificio(sub, lado, toldoCuadra) {
+    const c = this.c, az = this.az, piezas = [], a = { pon: (...x) => { piezas.push(x); return a; } };
     const pisos = this.neon ? 3 + Math.floor(az() * 5) : 2 + Math.floor(az() * 4);
     const w = 5 + az() * 3, d = 6 + az() * 4.5, PISO = 3, h = pisos * PISO + 0.6;
     const fx = -lado * (w / 2);                                                // la fachada que mira a la vía
@@ -729,9 +823,9 @@ class Kit {
     a.pon(CAJA, 'plano', c.marco, [fx - lado * 0.02, 2.3, -d * 0.1], null, [0.1, 0.12, d * 0.5 + 0.2]);
     a.pon(CAJA, this.neon ? 'luz' : 'plano', this.neon ? 0x22e5ff : 0x5a3b2c, [fx, 1.1, d * 0.32], null, [0.1, 2.2, 1.0]);
     const toldo = uvMundo(new THREE.BoxGeometry(1.1, 0.08, d * 0.62), 1);
-    a.pon(toldo, (this.neon ? 'texluz:toldo|' : 'tex:toldo|') + Math.floor(az() * c.toldos.length), 0xffffff, [fx - lado * 0.5, 2.85, -d * 0.1], [0, 0, lado * 0.32]);
-    const texto = this.pal.carteles[Math.floor(az() * this.pal.carteles.length)];
-    a.pon(new THREE.PlaneGeometry(Math.min(d * 0.55, 4), 0.75), (this.neon ? 'texluz:cartel|' : 'tex:cartel|') + texto, 0xffffff, [fx - lado * 0.06, 3.55, -d * 0.1], [0, -lado * Math.PI / 2, 0]);
+    a.pon(toldo, (this.neon ? 'texluz:toldo|' : 'tex:toldo|') + toldoCuadra, 0xffffff, [fx - lado * 0.5, 2.85, -d * 0.1], [0, 0, lado * 0.32]);
+    const nc = this.pal.carteles.length, ic = Math.floor(az() * nc);
+    a.pon(franja(new THREE.PlaneGeometry(Math.min(d * 0.55, 4), 0.75), ic, nc), this.neon ? 'texluz:carteles' : 'tex:carteles', 0xffffff, [fx - lado * 0.06, 3.55, -d * 0.1], [0, -lado * Math.PI / 2, 0]);
     // ventanas de los pisos de arriba: marco, vidrio y alféizar
     const cols = Math.max(2, Math.floor(d / 2.1));
     for (let f = 1; f < pisos; f++) for (let k = 0; k < cols; k++) {
@@ -753,9 +847,7 @@ class Kit {
         for (const [p, q] of [[-.5, -.5], [.5, -.5], [-.5, .5], [.5, .5]]) a.pon(CAJA, 'metal', 0x55505a, [tx + p, h + 0.6, tz + q], null, [0.08, 0.8, 0.08]);
       } else a.pon(redonda(1.1, 0.6, 0.8, 0.08), 'metal', 0xc9ccd2, [tx, h + 0.5, tz]);
     }
-    const g = a.hecho();
-    g.userData.largo = d / 2; g.userData.ancho = w;
-    return g;
+    return { piezas, w, d };
   }
   /** Un árbol low-poly: tronco y tres copas facetadas. */
   arbol() {
@@ -888,13 +980,14 @@ class Kit {
     const domo = new THREE.Mesh(new THREE.SphereGeometry(200, 32, 16), mat); domo.renderOrder = -2; g.add(domo);
     const az = azarDe(77);
     if (pal.extras.nubes) {                                                   // nubes esponjosas
-      const mn = new THREE.MeshStandardMaterial({ color: pal.c.nube, roughness: 1, emissive: pal.c.nube, emissiveIntensity: 0.3, fog: false });
-      const geoN = this.pixel ? new THREE.IcosahedronGeometry(1, 0) : new THREE.SphereGeometry(1, 14, 10);
+      // las 49 bolitas de las siete nubes van fundidas en una sola malla (eran 49 llamadas al GPU)
+      const mn = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, emissive: pal.c.nube, emissiveIntensity: 0.3, fog: false });
+      const geoN = this.pixel ? new THREE.IcosahedronGeometry(1, 0) : new THREE.SphereGeometry(1, 14, 10), bolitas = [];
       for (let i = 0; i < 7; i++) {
-        const n = new THREE.Group(); n.position.set(-36 + i * 12 + az() * 6, 15 + az() * 7, -120 - az() * 25);
-        for (let k = 0; k < 7; k++) { const s = new THREE.Mesh(geoN, mn); s.position.set((k - 3) * 1.3, Math.sin(k * 1.3) * 0.5 + (k % 3 === 0 ? 0.8 : 0), az()); s.scale.setScalar(1.3 + az() * 1.1); n.add(s); }
-        g.add(n);
+        const cx = -36 + i * 12 + az() * 6, cy = 15 + az() * 7, cz = -120 - az() * 25;
+        for (let k = 0; k < 7; k++) bolitas.push(prepara(geoN, pal.c.nube, matriz([cx + (k - 3) * 1.3, cy + Math.sin(k * 1.3) * 0.5 + (k % 3 === 0 ? 0.8 : 0), cz + az()], null, 1.3 + az() * 1.1)));
       }
+      g.add(new THREE.Mesh(funde(bolitas), mn)); geoN.dispose();
     }
     if (pal.extras.disco) { const d = new THREE.Mesh(new THREE.CircleGeometry(11, 24), new THREE.MeshBasicMaterial({ color: pal.cielo.sol, fog: false })); d.position.set(-8, 7, -170); g.add(d); }
     if (pal.extras.synth) {
@@ -922,11 +1015,6 @@ class Kit {
     const im = new THREE.InstancedMesh(geo, mat, 400);
     im.count = 0; im.castShadow = true; im.frustumCulled = false;
     return im;
-  }
-  /** Libera todo lo de este kit en la GPU (cuando ya no se usará). */
-  libera() {
-    for (const m of this.mats.values()) m.dispose();
-    for (const t of this.texs.values()) if (t) t.dispose();
   }
 }
 
@@ -996,7 +1084,18 @@ function armaCorredor(kit, asp) {
   parte(cab, a => {
     a.pon(ESFERA, 'personaje', piel, [0, 0, 0], null, [0.4, 0.42, 0.4]);
     for (const s of [-1, 1]) a.pon(ESFERA, 'personaje', piel, [s * 0.198, -0.01, 0.01], null, [0.05, 0.1, 0.08]);
-    a.pon(new THREE.SphereGeometry(0.208, 22, 14, 0, Math.PI * 2, Math.PI * 0.32, Math.PI * 0.42), 'personaje', pelo, [0, 0, 0.01]);
+    // el pelo solo atrás y a los lados (deja libre la cara: 120° de frente, hacia -z)
+    a.pon(new THREE.SphereGeometry(0.208, 22, 14, Math.PI * 11 / 6, Math.PI * 4 / 3, Math.PI * 0.32, Math.PI * 0.42), 'personaje', pelo, [0, 0, 0.01]);
+    /* La cara. Corriendo nunca se ve (va de espaldas), pero en el menú el
+       corredor se da vuelta y saluda, y sin cara era una bola con gorra. */
+    for (const s of [-1, 1]) {
+      a.pon(ESFERA, 'personaje', 0xffffff, [s * 0.068, 0.022, -0.168], null, [0.07, 0.082, 0.05]);           // el blanco del ojo
+      a.pon(ESFERA, 'personaje', 0x1d1a2a, [s * 0.064, 0.016, -0.19], null, [0.036, 0.046, 0.024]);          // la pupila
+      a.pon(ESFERA, 'personaje', 0xffffff, [s * 0.058 + 0.01, 0.03, -0.2], null, 0.012);                     // el brillo
+      a.pon(CAJA, 'personaje', pelo, [s * 0.072, 0.092, -0.176], [0, 0, -s * 0.18], [0.07, 0.016, 0.02]);    // la ceja
+    }
+    a.pon(ESFERA, 'personaje', new THREE.Color(piel).multiplyScalar(0.88).getHex(), [0, -0.03, -0.196], null, [0.04, 0.034, 0.03]);   // la nariz
+    a.pon(new THREE.TorusGeometry(0.046, 0.011, 6, 14, Math.PI), 'personaje', 0x8a2a1e, [0, -0.072, -0.176], [0.25, 0, Math.PI]);    // la sonrisa
     a.pon(new THREE.SphereGeometry(0.218, 22, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), 'personaje', asp.gorra, [0, 0.03, 0]);
     a.pon(new THREE.CylinderGeometry(0.17, 0.17, 0.025, 20, 1, false, -Math.PI / 2, Math.PI), 'personaje', asp.gorra, [0, 0.04, 0.13], [-0.14, 0, 0]);
     a.pon(ESFERA, 'personaje', asp.gorra, [0, 0.25, 0], null, 0.05);
@@ -1015,13 +1114,14 @@ function armaCorredor(kit, asp) {
   aura.geometry = prepara(aura.geometry, 0xff5a5a); aura.rotation.x = Math.PI / 2; aura.position.y = 1.0; aura.visible = false; raiz.add(aura);
   // la sombra redonda bajo los pies (en calidad baja, que no tiene sombras de verdad)
   const sombra = new THREE.Mesh(new THREE.CircleGeometry(0.45, 20), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.28, depthWrite: false }));
+  sombra.material.userData.propio = true;                                      // es solo de este corredor: se suelta con él
   sombra.rotation.x = -Math.PI / 2; sombra.position.y = 0.01;
   raiz.scale.setScalar(0.95);
   return { raiz, cuerpo, pelvis, torso, cab, piernas, brazos, cohete, llamas, tabla, aura, sombra };
 }
 
 /** Pone la pose del corredor según lo que está haciendo.
-    p = {modo: 'correr'|'saltar'|'rodar'|'volar'|'tropezar'|'caer'|'quieto', fase, t, vy, ladeo} */
+    p = {modo: 'correr'|'saltar'|'rodar'|'volar'|'tropezar'|'caer'|'quieto'|'menu', fase, t, vy, ladeo} */
 function posa(r, p) {
   const s = Math.sin(p.fase || 0), c = Math.cos(p.fase || 0);
   const [pi, pd] = r.piernas, [bi, bd] = r.brazos;
@@ -1029,6 +1129,7 @@ function posa(r, p) {
   r.cuerpo.position.y = 0;
   r.pelvis.position.y = 0.78;
   bi.hombro.rotation.z = -0.15; bd.hombro.rotation.z = 0.15;
+  pi.cadera.rotation.z = pd.cadera.rotation.z = 0;                             // la pose del menú las abre un poco: se cierran antes de cualquier otra
   if (p.modo === 'correr' || p.modo === 'quieto') {
     const k = p.modo === 'quieto' ? 0.15 : 1;
     pi.cadera.rotation.x = 0.75 * s * k; pd.cadera.rotation.x = -0.75 * s * k;
@@ -1060,6 +1161,22 @@ function posa(r, p) {
     r.cuerpo.rotation.x = -0.14 - 0.5 * k; r.cuerpo.rotation.z = (p.ladeo || 0) + 0.3 * k;
     bi.hombro.rotation.x = -1.4 * k; bd.hombro.rotation.x = -1.4 * k; bi.hombro.rotation.z = -1.2 * k; bd.hombro.rotation.z = 1.2 * k;
     pi.cadera.rotation.x = 0.6 * s; pd.cadera.rotation.x = -0.6 * s;
+  } else if (p.modo === 'menu') {
+    /* En el menú: de pie, mirando a la cámara, con un balanceo de peso de
+       una pierna a la otra y, cada cinco segundos, un saludo con la mano
+       derecha (como el personaje del inicio de Subway Surfers, que nunca
+       está quieto del todo). `t` = segundos desde que empezó el juego. */
+    const t = p.t || 0, peso = Math.sin(t * 1.6);
+    r.cuerpo.rotation.set(0.02, 0, 0.035 * peso);
+    r.cuerpo.position.y = 0.012 * Math.abs(Math.cos(t * 1.6));
+    pi.cadera.rotation.set(0.04, 0, -0.06); pd.cadera.rotation.set(-0.04, 0, 0.06);
+    pi.rodilla.rotation.x = -0.05 - 0.08 * Math.max(0, peso); pd.rodilla.rotation.x = -0.05 - 0.08 * Math.max(0, -peso);
+    pi.tobillo.rotation.x = 0; pd.tobillo.rotation.x = 0;
+    bi.hombro.rotation.set(0.12, 0, -0.22); bi.codo.rotation.x = 0.35;          // el brazo izquierdo, suelto
+    const ciclo = t % 5, saluda = ciclo < 1.7;                                  // 1,7 s de saludo cada 5 s
+    const sube = saluda ? Math.min(1, ciclo / 0.25, (1.7 - ciclo) / 0.25) : 0;  // sube y baja el brazo sin saltos
+    bd.hombro.rotation.set(0.12 - 0.1 * sube, 0, 0.22 + 2.35 * sube + (saluda ? 0.28 * Math.sin(t * 13) * sube : 0));
+    bd.codo.rotation.x = 0.35 + 0.25 * sube;
   } else if (p.modo === 'caer') {
     const k = Math.min(1, (p.t || 0) / 0.5);
     r.cuerpo.rotation.x = 0.3 + 1.2 * k;                                       // cae de espaldas, hacia la cámara
@@ -1128,10 +1245,11 @@ function armaTunel() {
 /** Crea el mundo sobre un canvas. Devuelve lo que la pantalla necesita para dibujar. */
 export function crearMundo(canvas) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
+  renderer.info.autoReset = false;                                            // se reinicia a mano en dibuja(): con post-proceso, cada pasada la borraba
   renderer.shadowMap.enabled = true;
   const escena = new THREE.Scene();
   const camara = new THREE.PerspectiveCamera(40, 16 / 9, 0.1, 240);
-  const vivos = new THREE.Group(); escena.add(vivos);                       // lo que está en pantalla y se mueve
+  const vivos = new THREE.Group(); vivos.name = 'vivos'; escena.add(vivos);                       // lo que está en pantalla y se mueve
   const pm = new THREE.PMREMGenerator(renderer);
   const ambiente = pm.fromScene(new RoomEnvironment(renderer), 0.04).texture;   // reflejos para los materiales PBR
   const mundo = { vivos, resolucion: new THREE.Vector2(1280, 720) };
@@ -1173,12 +1291,12 @@ export function crearMundo(canvas) {
         paisaje.push({ obj: o, d: d0 + dl / 2, largo: dl / 2, k: kit });
         frente.e[lado] = d0 + dl + 0.8 + kit.az() * 2.2;
       }
-      if (!kit.neon) while (frente.arbol[lado] < hasta) {                     // árboles en la vereda
+      if (kit.series) while (frente.arbol[lado] < hasta) {                    // árboles en la vereda (instancias)
         const d = frente.arbol[lado];
         frente.arbol[lado] = d + 9 + kit.az() * 8;
         if (enTunel(d - 2, d + 2)) continue;
-        const o = kit.saca('arbol', () => kit.arbol()); o.position.set(lado * (5.45 + kit.az() * 0.3), SUELO, 0);
-        paisaje.push({ obj: o, d, largo: 1.5, k: kit });
+        const v = kit.series.arbol[Math.floor(kit.az() * 3)];
+        paisaje.push({ serie: v, x: lado * (5.45 + kit.az() * 0.3), y: SUELO, rot: kit.az() * 6.28, esc: 0.9 + kit.az() * 0.35, d, largo: 1.5, k: kit });
       }
       while (frente.graf[lado] < hasta) {                                     // grafitis en el muro
         const d = frente.graf[lado];
@@ -1191,23 +1309,35 @@ export function crearMundo(canvas) {
     while (frente.farol < hasta) {                                            // faroles, alternando lados
       const d = frente.farol; frente.farol = d + 13;
       if (enTunel(d - 1, d + 1)) continue;
-      for (const lado of [-1, 1]) { const o = kit.saca('farol' + lado, () => kit.farol(lado)); o.position.set(lado * 4.55, SUELO, 0); paisaje.push({ obj: o, d: d + lado * 3, largo: 1, k: kit }); }
+      for (const lado of [-1, 1]) {
+        if (kit.series) { paisaje.push({ serie: kit.series.farol[lado], x: lado * 4.55, y: SUELO, rot: 0, esc: 1, d: d + lado * 3, largo: 1, k: kit }); continue; }
+        const o = kit.saca('farol' + lado, () => kit.farol(lado)); o.position.set(lado * 4.55, SUELO, 0); paisaje.push({ obj: o, d: d + lado * 3, largo: 1, k: kit });
+      }
     }
     while (frente.poste < hasta) {                                            // postes de catenaria
       const d = frente.poste; frente.poste = d + 24;
       if (enTunel(d - 1, d + 1)) continue;
-      for (const lado of [-1, 1]) { const o = kit.saca('poste' + lado, () => kit.poste(lado)); o.position.set(lado * 3.45, 0, 0); paisaje.push({ obj: o, d, largo: 0.6, k: kit }); }
+      for (const lado of [-1, 1]) {
+        if (kit.series) { paisaje.push({ serie: kit.series.poste[lado], x: lado * 3.45, y: 0, rot: 0, esc: 1, d, largo: 0.6, k: kit }); continue; }
+        const o = kit.saca('poste' + lado, () => kit.poste(lado)); o.position.set(lado * 3.45, 0, 0); paisaje.push({ obj: o, d, largo: 0.6, k: kit });
+      }
     }
   }
+  const _mS = new THREE.Matrix4(), _qS = new THREE.Quaternion(), _eS = new THREE.Euler(), _pS = new THREE.Vector3(), _sS = new THREE.Vector3();
   function mueveCiudad(D) {
     for (let i = paisaje.length - 1; i >= 0; i--) {
       const p = paisaje[i];
-      if (p.d + p.largo < D - DETRAS) { p.k.guarda(p.obj); paisaje.splice(i, 1); continue; }   // ya quedó atrás: a la reserva
-      p.obj.position.z = -(p.d - D);
+      if (p.d + p.largo < D - DETRAS) { if (p.obj) p.k.guarda(p.obj); paisaje.splice(i, 1); continue; }   // ya quedó atrás: a la reserva
+      if (p.obj) p.obj.position.z = -(p.d - D);
+    }
+    if (kit && kit.listaSeries) {                                              // las instancias se escriben de nuevo cada cuadro, como las monedas
+      for (const s of kit.listaSeries) s.empieza();
+      for (const p of paisaje) if (p.serie) p.serie.pon(_mS.compose(_pS.set(p.x, p.y, -(p.d - D)), _qS.setFromEuler(_eS.set(0, p.rot, 0)), _sS.setScalar(p.esc)));
+      for (const s of kit.listaSeries) s.termina();
     }
   }
   function vaciaCiudad(desde) {
-    for (const p of paisaje) p.k.guarda(p.obj);
+    for (const p of paisaje) if (p.obj) p.k.guarda(p.obj);
     paisaje.length = 0;
     frente.e[-1] = frente.e[1] = frente.farol = frente.poste = desde;
     frente.arbol[-1] = frente.arbol[1] = frente.graf[-1] = frente.graf[1] = desde;
@@ -1219,7 +1349,8 @@ export function crearMundo(canvas) {
   function nuevo(o) {
     if (o.vis || !kit || !kit.listo) return;
     if (o.tipo === 'moneda') { o.vis = { moneda: true }; monedas.add(o); return; }
-    if (o.tipo === 'tunel') { tunelObj = o; sinPaisaje.push([o.d0, o.d0 + o.largo]); return; }
+    // el túnel se anota una sola vez (o.vis marcado): antes se volvía a pedir en cada cuadro y sinPaisaje crecía sin parar
+    if (o.tipo === 'tunel') { if (tunelObj !== o) { tunelObj = o; sinPaisaje.push([o.d0, o.d0 + o.largo]); } o.vis = { tunel: true }; return; }
     let obj;
     if (o.tipo === 'tren') { const i = (o.id || 0) % 3; obj = kit.saca('tren' + i, () => kit.tren(i)); obj.position.x = CARRILES[o.carril]; }
     else if (o.tipo === 'rampa') { obj = kit.saca('rampa', () => kit.rampa()); obj.position.x = CARRILES[o.carril]; obj.position.y = SUELO; }
@@ -1264,12 +1395,17 @@ export function crearMundo(canvas) {
       }`
   };
   function armaComposer() {
-    if (composer) { composer.dispose?.(); composer = null; }
+    // cada pasada tiene sus propias texturas (el bloom, la oclusión…): composer.dispose() solo suelta las suyas
+    if (composer) { for (const ps of composer.passes) ps.dispose?.(); composer.dispose?.(); composer = null; }
     if (!kit) return;
     const A = AJUSTES[calidad], pal = kit.pal;
     renderer.toneMapping = kit.pixel ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = pal.exposicion;
-    if (calidad === 'baja' && !kit.pixel) return;                             // en baja se dibuja directo, sin post-proceso
+    /* En baja se dibuja directo, sin post-proceso. El estilo pixelado tampoco
+       usa su pasada (que dibuja la escena dos veces, una para los bordes): el
+       lienzo se dibuja a la resolución de los píxeles (pixelRatio < 1, ver
+       proporcion) y el navegador lo agranda sin suavizar. */
+    if (calidad === 'baja') return;
     const c = new EffectComposer(renderer);
     c.setPixelRatio(renderer.getPixelRatio()); c.setSize(ancho, alto);
     if (kit.pixel) {
@@ -1309,7 +1445,8 @@ export function crearMundo(canvas) {
     if (kit) for (const m of kit.mats.values()) m.needsUpdate = true;          // los materiales cambian de programa
   }
   function ponEspejo() {
-    if (espejo) { escena.remove(espejo); espejo.dispose?.(); espejo = null; }
+    // se suelta entero (el Reflector suelta su textura y su material, pero no la geometría; una malla simple, nada)
+    if (espejo) { escena.remove(espejo); espejo.dispose?.(); espejo.geometry.dispose(); espejo.material?.dispose?.(); espejo = null; }
     if (!kit || !kit.neon) return;
     if (AJUSTES[calidad].espejo) {
       espejo = new Reflector(new THREE.PlaneGeometry(240, 300), { clipBias: 0.003, textureWidth: Math.round(ancho / 2), textureHeight: Math.round(alto / 2), color: 0x2a2a3c });
@@ -1328,9 +1465,28 @@ export function crearMundo(canvas) {
     }
     return kits.get(clave);
   }
+  /** Devuelve a la tarjeta de video las geometrías de unos objetos que ya no
+      se usan (los materiales son del kit y se van con él). Los sprites
+      comparten una geometría de three.js para todos: esa no se toca. */
+  function suelta3D(...objs) {
+    for (const o of objs) o && o.traverse(x => { if (x.isSprite || !x.geometry) return; x.geometry.dispose(); if (x.material && x.material.userData && x.material.userData.propio) x.material.dispose(); });
+  }
+  /* Libera los kits que ya no sirven: todos menos el activo y el que se está
+     precargando para la estación que viene. Sin esto cada estación dejaba su
+     ciudad entera en la tarjeta de video: al llegar a Óxido había cuatro
+     (de 685 geometrías se pasaba a 1743). Si una estación vuelve (las
+     vueltas desde los 12 M), su kit se arma de nuevo. */
+  let kitPrecarga = null;
+  function liberaKits() {
+    for (const [clave, k] of kits) {
+      if (k === kit || k === kitPrecarga || (k.preparando && !k.listo)) continue;
+      k.libera(); kits.delete(clave);
+    }
+  }
   /** Prepara el kit de una estación de a poco (sin trabar la carrera). */
   function precarga(estacion) {
     const k = kitDe(estacion);
+    kitPrecarga = k;
     if (k.listo || k.preparando) return;
     k.preparando = true;
     pasosPendientes.push(...k.pasosDePreparacion());
@@ -1350,9 +1506,10 @@ export function crearMundo(canvas) {
     }
     sueltaTodo();
     vaciaCiudad(desde);
-    if (kit && kit !== k) { escena.remove(kit.via); escena.remove(kit.cielo); kit.monedas.parent?.remove(kit.monedas); }
+    if (kit && kit !== k) { escena.remove(kit.via); escena.remove(kit.cielo); kit.monedas.parent?.remove(kit.monedas); if (kit.seriesRaiz) escena.remove(kit.seriesRaiz); }
     kit = k;
-    escena.add(kit.via); escena.add(kit.cielo); escena.add(kit.monedas);
+    escena.add(kit.via); escena.add(kit.cielo); escena.add(kit.monedas); if (kit.seriesRaiz) escena.add(kit.seriesRaiz);
+    liberaKits();
     for (const l of luces) escena.remove(l, l.target || l);
     luces = [];
     const pal = kit.pal;
@@ -1368,9 +1525,9 @@ export function crearMundo(canvas) {
       escena.add(l, l.target); luces.push(l);
     }
     // el corredor y el perseguidor se rearman con los materiales del kit nuevo
-    if (corredor) escena.remove(corredor.raiz, corredor.sombra);
+    if (corredor) { escena.remove(corredor.raiz, corredor.sombra); suelta3D(corredor.raiz, corredor.sombra); }
     corredor = armaCorredor(kit, aspecto); escena.add(corredor.raiz, corredor.sombra);
-    if (perse) escena.remove(perse.r.raiz, perse.perro);
+    if (perse) { escena.remove(perse.r.raiz, perse.perro); suelta3D(perse.r.raiz, perse.perro); }
     perse = armaPerseguidor(kit); perse.r.raiz.visible = perse.perro.visible = false; escena.add(perse.r.raiz, perse.perro);
     // partículas del ambiente
     if (particulas) { escena.remove(particulas); particulas = null; }
@@ -1388,9 +1545,8 @@ export function crearMundo(canvas) {
       trenFantasma = new THREE.Mesh(geoTren(L_VAGON * 3), new THREE.MeshBasicMaterial({ color: 0x7dffcf, transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
       trenFantasma.visible = false; escena.add(trenFantasma);
     }
-    ponEspejo();
     aplicaSombras();
-    armaComposer();
+    tamano(ancho, alto);                                                       // la proporción depende del estilo (pixelado en baja) y rearma el post-proceso
     try { renderer.compile(escena, camara); } catch (e) { /* si no se puede compilar antes, se compila al dibujar */ }
   }
 
@@ -1439,6 +1595,9 @@ export function crearMundo(canvas) {
     if (corredor) {
       const r = corredor, P = e.poderes || {};
       r.raiz.position.set(e.x, e.y + SUELO + (P.patineta ? 0.12 : 0), 0);
+      // en el menú se da vuelta y mira a la cámara (en la tienda gira despacio, como en un probador)
+      const giro = !e.menu ? 0 : Math.PI + (e.menu === 'tienda' ? Math.sin(e.t * 0.55) * 0.5 : Math.sin(e.t * 0.4) * 0.12);
+      r.raiz.rotation.y += (giro - r.raiz.rotation.y) * (1 - Math.exp(-7 * (e.dt || 0.016)));
       posa(r, e.pose || { modo: 'correr', fase: 0 });
       r.cohete.visible = !!P.mochila;
       r.llamas.scale.y = 0.7 + Math.random() * 0.6;
@@ -1467,8 +1626,22 @@ export function crearMundo(canvas) {
     // con la mochila lo sigue metro a metro, o el corredor se sale por arriba
     const yC = e.y > 4.8 ? 3.6 + (e.y - 4.8) : e.y > 1 ? e.y * 0.75 : e.y * 0.4;
     const k = 1 - Math.exp(-6 * dt);
-    camPos.lerp(_v.set(e.x * 0.45, 4.7 + yC + ajusteRetrato.y, 8.6 + ajusteRetrato.z), k);
-    camMira.lerp(_v.set(e.x * 0.3, 0.4 + yC * 1.05, -9), k);
+    if (e.menu) {
+      /* La cámara del menú, delante del corredor y a la altura del pecho.
+         Portada: el corredor al centro, ocupando casi la mitad del alto.
+         Tienda: corrido a la izquierda (en vertical, arriba), para que la
+         lista quede al lado (o debajo) sin taparlo. Al empezar a correr la
+         cámara vuelve sola detrás de él con el mismo suavizado. */
+      const vertical = ancho / alto < 1;
+      const [px, py, pz, my] = e.menu === 'tienda'
+        ? (vertical ? [0, 0.81, 4.5, -0.39] : [1.3, 1.2, 4.0, 0.95])
+        : (vertical ? [0, 1.2, 2.7, 0.95] : [0, 1.25, 4.45, 0.95]);
+      camPos.lerp(_v.set(e.x + px, py, pz), k);
+      camMira.lerp(_v.set(e.x + px, my, 0), k);
+    } else {
+      camPos.lerp(_v.set(e.x * 0.45, 4.7 + yC + ajusteRetrato.y, 8.6 + ajusteRetrato.z), k);
+      camMira.lerp(_v.set(e.x * 0.3, 0.4 + yC * 1.05, -9), k);
+    }
     camara.position.copy(camPos);
     if (sacudida > 0) { camara.position.x += (Math.random() - .5) * sacudida; camara.position.y += (Math.random() - .5) * sacudida; sacudida = Math.max(0, sacudida - dt * 2.5); }
     camara.lookAt(camMira);
@@ -1505,11 +1678,16 @@ export function crearMundo(canvas) {
   const matChispa = col => { if (!matsChispa.has(col)) matsChispa.set(col, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending })); return matsChispa.get(col); };
 
   /* ---- tamaño de la pantalla ---- */
+  /** Cuántos píxeles del lienzo por píxel de la pantalla. En baja con estilo
+      pixelado, ~270 filas en total (el mismo tamaño de píxel que la pasada). */
+  function proporcion() {
+    if (calidad === 'baja' && kit && kit.pixel) return 1 / Math.max(2, Math.round(alto / 270));
+    return Math.min(window.devicePixelRatio || 1, AJUSTES[calidad].dpr);
+  }
   const ajusteRetrato = { y: 0, z: 0 };
   function tamano(w, h) {
     ancho = Math.max(1, w | 0); alto = Math.max(1, h | 0);
-    const A = AJUSTES[calidad];
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, A.dpr));
+    renderer.setPixelRatio(proporcion());
     renderer.setSize(ancho, alto, false);
     const asp = ancho / alto;
     // el ángulo de visión se ajusta para que siempre quepan los tres carriles (en un celular vertical, más abierto)
@@ -1530,7 +1708,8 @@ export function crearMundo(canvas) {
     listo: estacion => kitDe(estacion).listo,
     nuevo, suelta, sueltaTodo,
     paso,
-    dibuja() { if (composer) composer.render(); else renderer.render(escena, camara); },
+    // la cuenta de llamadas se reinicia una vez por cuadro (no en cada pasada del post-proceso), para que sume todo lo que de verdad cuesta
+    dibuja() { renderer.info.reset(); if (composer) composer.render(); else renderer.render(escena, camara); },
     tamano,
     /** Cambia la calidad: 'alta' | 'media' | 'baja'. */
     calidad(nivel) { if (!AJUSTES[nivel] || nivel === calidad) return; calidad = nivel; vista = nivel === 'baja' ? 125 : VISTA; ajustaNiebla(); tamano(ancho, alto); aplicaSombras(); },
@@ -1538,7 +1717,7 @@ export function crearMundo(canvas) {
     get vista() { return vista; },
     get nivelCalidad() { return calidad; },
     /** Cambia los colores del corredor (aspecto de la tienda). */
-    aspecto(asp) { aspecto = asp; if (kit && corredor) { escena.remove(corredor.raiz, corredor.sombra); corredor = armaCorredor(kit, aspecto); escena.add(corredor.raiz, corredor.sombra); aplicaSombras(); } },
+    aspecto(asp) { aspecto = asp; if (kit && corredor) { escena.remove(corredor.raiz, corredor.sombra); suelta3D(corredor.raiz, corredor.sombra); corredor = armaCorredor(kit, aspecto); escena.add(corredor.raiz, corredor.sombra); aplicaSombras(); } },
     /** Sacude la cámara (un choque). */
     sacude(f) { sacudida = Math.max(sacudida, f); },
     /** Un brillito donde se tomó una moneda o un poder. */
@@ -1553,7 +1732,20 @@ export function crearMundo(canvas) {
     },
     /** Olvida los túneles ya pasados (para que la ciudad vuelva a ponerse ahí si se reinicia). */
     reinicia() { sinPaisaje.length = 0; tunelObj = null; tunel.visible = false; sueltaTodo(); vaciaCiudad(0); },
+    /** Para depurar: cuántas mallas visibles hay, agrupadas por qué son (edificio, árbol, tren…). */
+    desglose() {
+      const n = {};
+      const visible = o => { for (let x = o; x; x = x.parent) if (!x.visible) return false; return true; };
+      escena.traverse(o => {
+        if (!o.isMesh || !visible(o)) return;
+        let t = 'otro'; for (let x = o; x; x = x.parent) if (x.userData && x.userData.tipoReserva) { t = x.userData.tipoReserva; break; }
+        if (t === 'otro' && kit) { if (o === kit.monedas) t = 'monedas'; else for (let x = o; x; x = x.parent) { if (x === kit.via) { t = 'via'; break; } if (x === kit.cielo) { t = 'cielo'; break; } if (corredor && x === corredor.raiz) { t = 'corredor'; break; } } }
+        n[t] = (n[t] || 0) + 1;
+      });
+      return n;
+    },
     /** Para depurar: cuántas llamadas al GPU hizo el último cuadro. */
-    info: () => ({ llamadas: renderer.info.render.calls, triangulos: renderer.info.render.triangles, kit: kit && kit.clave, calidad })
+    info: () => ({ llamadas: renderer.info.render.calls, triangulos: renderer.info.render.triangles, kit: kit && kit.clave, calidad,
+      geometrias: renderer.info.memory.geometries, texturas: renderer.info.memory.textures, programas: (renderer.info.programs || []).length, kits: kits.size })
   };
 }

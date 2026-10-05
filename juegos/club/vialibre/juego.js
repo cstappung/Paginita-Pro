@@ -565,7 +565,10 @@ function cuadro(ahora) {
   if (estado === 'jugando' || estado === 'muerte') actualiza(dt);
   // lo que el mundo necesita para dibujar este cuadro
   const r = c ? c.r : null;
-  const pose = !c ? { modo: 'quieto', fase: tiempoTotal * 3 }
+  // en la portada y en la tienda la cámara se pone delante del corredor, que mira y saluda
+  const menu = panel === 'capaTienda' ? 'tienda' : estado === 'portada' ? 'portada' : null;
+  const pose = menu ? { modo: 'menu', t: tiempoTotal }
+    : !c ? { modo: 'quieto', fase: tiempoTotal * 3 }
     : estado === 'muerte' || (estado === 'fin' && c.muerte) ? { modo: 'caer', t: c.muerte ? c.muerte.t : 1 }
       : r.tropezarT >= 0 ? { modo: 'tropezar', t: r.tropezarT, fase: r.fase, ladeo: r.ladeo }
         : c.poderes.mochila > 0 ? { modo: 'volar', fase: r.fase }
@@ -575,7 +578,7 @@ function cuadro(ahora) {
   mundo.paso({
     D: c ? c.D : 0, x: r ? r.x : 0, y: r ? r.y : 0, suelo: r ? r.suelo : 0, v: c ? c.V : 0, dt, t: tiempoTotal, pose,
     poderes: c ? { iman: c.poderes.iman > 0, mochila: c.poderes.mochila > 0, zapatillas: c.poderes.zapatillas > 0, patineta: c.poderes.patineta > 0 } : {},
-    perseguidor: c ? c.perseguidor : 0
+    perseguidor: c && !menu ? c.perseguidor : 0, menu
   });
   mundo.dibuja();
   sonido.tick(c && estado === 'jugando' ? c.V : 13);
@@ -638,22 +641,68 @@ function banner(titulo, sub) {
 /* ===================================================================
    7. LOS MENÚS (portada, tienda, retos, libreta, opciones, ayuda)
    =================================================================== */
+/* Los íconos del menú y la tienda, dibujados en SVG con el mismo trazo azul
+   marino grueso de todo el menú. No son emojis a propósito: cada sistema
+   dibuja 🧲 o 🛹 a su manera (y de distinto tamaño), y en un menú de juego eso
+   se ve barato. Los elementos con data-icono="x" se rellenan solos al
+   arrancar (ponIconos); la tienda los usa directo desde ICONOS. */
+const T = 'stroke="#142357" stroke-width="2.4" stroke-linejoin="round"';      // el trazo de siempre
+const svg = cuerpo => `<svg viewBox="0 0 32 32" aria-hidden="true" focusable="false">${cuerpo}</svg>`;
+const ICONOS = {
+  moneda: svg(`<circle cx="16" cy="16" r="13" fill="#ffc81e" stroke="#8a5a00" stroke-width="2.5"/><circle cx="16" cy="16" r="8.6" fill="none" stroke="#fff3a6" stroke-width="2"/><path d="M13 10.5h6M16 10.5v11M13 21.5h6" stroke="#b37a00" stroke-width="2.6" stroke-linecap="round"/>`),
+  trofeo: svg(`<path d="M9 7H5v2a5 5 0 0 0 5 5M23 7h4v2a5 5 0 0 1-5 5" fill="none" ${T}/><path d="M9 4h14v7a7 7 0 0 1-14 0z" fill="#ffd23f" ${T}/><path d="M14 18h4v5h-4z" fill="#ffd23f" ${T}/><path d="M9.5 27.5h13v-4.5h-13z" fill="#ff8a1f" ${T}/>`),
+  estrella: svg(`<path d="M16 3.5l3.8 7.9 8.6 1.2-6.2 6 1.5 8.6L16 23.1l-7.7 4.1 1.5-8.6-6.2-6 8.6-1.2z" fill="#ffd23f" ${T}/>`),
+  engranaje: svg(`<path d="M16 3v4M16 25v4M3 16h4M25 16h4M6.8 6.8l2.8 2.8M22.4 22.4l2.8 2.8M6.8 25.2l2.8-2.8M22.4 9.6l2.8-2.8" stroke="#142357" stroke-width="5.2" stroke-linecap="round"/><circle cx="16" cy="16" r="9" fill="#eaf1fb" stroke="#142357" stroke-width="2.6"/><circle cx="16" cy="16" r="3.5" fill="#142357"/>`),
+  ayuda: svg(`<path d="M11 12a5 5 0 1 1 7.5 4.3c-1.6.9-2.5 2-2.5 3.7v1" fill="none" stroke="#142357" stroke-width="4" stroke-linecap="round"/><circle cx="16" cy="26.2" r="2.5" fill="#142357"/>`),
+  retos: svg(`<rect x="6" y="5" width="20" height="24" rx="3" fill="#fff" ${T}/><rect x="11" y="2.5" width="10" height="5.5" rx="2" fill="#ffd23f" ${T}/><path d="M10.5 16.5l3.5 3.5 7.5-8" fill="none" stroke="#2fb52f" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/><path d="M10.5 25h11" stroke="#9fb3d9" stroke-width="2.4" stroke-linecap="round"/>`),
+  personaje: svg(`<path d="M11 4.5c1 2.5 3 3.6 5 3.6s4-1.1 5-3.6l6 3 2.5 7.2-4 1.4V28H6.5V16.1l-4-1.4L5 7.5z" fill="#ff6a3d" ${T}/><path d="M12 16.5h8v5h-8z" fill="#e0502a" stroke="#142357" stroke-width="2"/>`),
+  tienda: svg(`<path d="M6 11h20l-1.5 17h-17z" fill="#ffd23f" ${T}/><path d="M11.5 14V9a4.5 4.5 0 0 1 9 0v5" fill="none" stroke="#142357" stroke-width="2.6" stroke-linecap="round"/><circle cx="16" cy="20.5" r="3.2" fill="#ff8a1f" stroke="#142357" stroke-width="2"/>`),
+  boleto: svg(`<path d="M3.5 9.5h25v4.5a2.5 2.5 0 0 0 0 5v4.5h-25V19a2.5 2.5 0 0 0 0-5z" fill="#ffd23f" ${T}/><path d="M20.5 10.5v12" stroke="#142357" stroke-width="2" stroke-dasharray="2 2"/><path d="M8 14.5h8M8 18.5h5.5" stroke="#b37a00" stroke-width="2.3" stroke-linecap="round"/>`),
+  atras: svg(`<path d="M19.5 6.5 10 16l9.5 9.5" fill="none" stroke="#142357" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>`),
+  rayo: svg(`<path d="M18.5 3 7 18h7.5l-2 11L24 14h-7.5z" fill="#ffd23f" ${T}/>`),
+  iman: svg(`<path d="M5.5 5h7.5v11a3 3 0 0 0 6 0V5h7.5v11a10.5 10.5 0 0 1-21 0z" fill="#ff3d4f" ${T}/><path d="M5.5 5H13v5.5H5.5zM19 5h7.5v5.5H19z" fill="#e6eef8" ${T}/>`),
+  mochila: svg(`<path d="M9.5 24.5l2 5.5 2-5.5M18.5 24.5l2 5.5 2-5.5" fill="#ff8a1f" stroke="#ff8a1f" stroke-width="1.6" stroke-linejoin="round"/><rect x="6" y="5" width="9.5" height="20" rx="4.7" fill="#d5dfee" ${T}/><rect x="16.5" y="5" width="9.5" height="20" rx="4.7" fill="#d5dfee" ${T}/><path d="M6.5 12.5h8.5M17 12.5h8.5" stroke="#ff3d4f" stroke-width="2.8"/>`),
+  zapatilla: svg(`<path d="M3 24.5v-10l6.5-3.5 3 4 6 1.5 6.5 2.3c2.6.9 4 2.6 4 5.2v.5z" fill="#4fd36b" ${T}/><path d="M3.5 22h25.5" stroke="#fff" stroke-width="2.6"/><path d="M12.5 15.8l-1.2 3M16.2 16.7l-1.2 3" stroke="#142357" stroke-width="1.8" stroke-linecap="round"/>`),
+  doble: svg(`<rect x="2.5" y="6" width="27" height="20" rx="6" fill="#8b5cf6" ${T}/><path d="M8 12l6 8M14 12l-6 8" stroke="#fff" stroke-width="3" stroke-linecap="round"/><path d="M17 13.6c.6-1.6 2-2.3 3.6-2.3 2 0 3.4 1.2 3.4 3 0 2.4-3 3.6-6.8 5.9h7" fill="none" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>`),
+  patineta: svg(`<path d="M3 13.5c0-2 1.5-3 3.5-3h19c2 0 3.5 1 3.5 3s-1.5 3-3.5 3h-19c-2 0-3.5-1-3.5-3z" fill="#7b2ff7" ${T}/><path d="M6.5 13.5h19" stroke="#00f5d4" stroke-width="2"/><circle cx="9" cy="22" r="3.2" fill="#ffd23f" ${T}/><circle cx="23" cy="22" r="3.2" fill="#ffd23f" ${T}/>`),
+  candado: svg(`<path d="M10 14v-3a6 6 0 0 1 12 0v3" fill="none" stroke="#142357" stroke-width="3"/><rect x="7" y="14" width="18" height="14" rx="3" fill="#ffd23f" ${T}/><circle cx="16" cy="21" r="2.2" fill="#142357"/>`),
+  check: svg(`<path d="M7 16.5l6 6 12-13" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>`)
+};
+const ICONO_PODER = { iman: 'iman', mochila: 'mochila', zapatillas: 'zapatilla', doble: 'doble' };
+const TINTE_PODER = { iman: '#ffd5d9', mochila: '#d7e6ff', zapatillas: '#d3f6db', doble: '#e6dcff' };
+function ponIconos(raiz = document) {
+  for (const el of raiz.querySelectorAll('[data-icono]')) if (!el.firstElementChild) el.innerHTML = ICONOS[el.dataset.icono] || '';
+}
+
 function muestraCapa(id) {
   for (const el of document.querySelectorAll('.capa')) el.hidden = el.id !== id;
 }
-function abrePanel(id) { panel = id; for (const el of document.querySelectorAll('.capa')) el.hidden = el.id !== id; }
+function abrePanel(id) { if (panel === 'capaTienda' && id !== 'capaTienda') saleTienda(); panel = id; for (const el of document.querySelectorAll('.capa')) el.hidden = el.id !== id; }
 function cierraPanel() {
   if (!panel) return;
+  if (panel === 'capaTienda') saleTienda();
   panel = null;
   muestraCapa(estado === 'pausa' ? 'capaPausa' : estado === 'fin' ? 'capaFin' : estado === 'portada' ? 'capaPortada' : null);
 }
 function pintaPortada() {
-  $('records').innerHTML = `Récord <b translate="no">${fmt(progreso.records.puntos)}</b> · Distancia <b translate="no">${fmt(progreso.records.distancia)} m</b> · Multiplicador base <b translate="no">×${progreso.retos.nivel}</b>`;
+  ponTexto('portadaRecord', fmt(progreso.records.puntos));
+  ponTexto('portadaMult', '×' + progreso.retos.nivel);
+  ponTexto('portadaMonedas', fmt(progreso.monedas));
+  // los globitos de la barra: cuántos retos van cumplidos y cuántos boletos tienes
+  const lista = M.retosDeNivel(progreso.retos.nivel);
+  const hechos = lista.filter((r, i) => progreso.retos.avance[i] >= r.meta).length;
+  ponTexto('portadaRetosN', `${hechos}/${lista.length}`);
+  ponTexto('portadaBoletos', `${progreso.boletos.length}/7`);
   ponTexto('barRecord', fmt(progreso.records.puntos));
   ponTexto('barMonedas', fmt(progreso.monedas));
   ponTexto('barMult', '×' + progreso.retos.nivel);
-  pintaRetos($('portadaRetos'), false);
 }
+/* Tocar cualquier parte vacía de la portada empieza a correr, como «toca
+   para jugar»: solo los botones y los contadores no cuentan. */
+$('capaPortada').addEventListener('click', e => {
+  if (estado !== 'portada' || panel || e.target.closest('button, .pildora, .logo')) return;
+  empezar();
+});
 /** Los tres retos con su barra de avance (en la portada, en el panel y en el fin). */
 function pintaRetos(el, conCarrera) {
   const lista = M.retosDeNivel(progreso.retos.nivel);
@@ -668,25 +717,57 @@ function abreRetos() {
   pintaRetos($('listaRetos'), false);
   abrePanel('capaRetos');
 }
-function abreTienda() { pintaTienda(); abrePanel('capaTienda'); }
+/* La tienda. Dos pestañas: «mejoras» (los poderes y la patineta) y
+   «personajes» (los aspectos). En personajes el corredor se prueba la ropa
+   que tocas aunque no sea tuya; al salir de la tienda vuelve a lo puesto. */
+let tiendaPestana = 'mejoras';                                 // la pestaña abierta
+let tiendaVer = null;                                          // el aspecto que se está probando
+let aspectoMostrado = null;                                    // el que lleva el corredor en pantalla
+function abreTienda(pestana = 'mejoras') {
+  tiendaPestana = pestana; tiendaVer = progreso.aspecto;
+  pintaTienda(); abrePanel('capaTienda');
+}
+function saleTienda() {                                        // vuelve a la ropa que de verdad lleva puesta
+  if (aspectoMostrado && aspectoMostrado !== progreso.aspecto) mundo.aspecto(M.ASPECTOS[progreso.aspecto] || M.ASPECTOS.clasico);
+  aspectoMostrado = progreso.aspecto;
+}
 function pintaTienda() {
+  const cap = $('capaTienda');
+  cap.dataset.pestana = tiendaPestana;
+  for (const b of cap.querySelectorAll('[role="tab"]')) b.setAttribute('aria-selected', String(b.dataset.pestana === tiendaPestana));
   $('tiendaMonedas').textContent = fmt(progreso.monedas);
-  $('tiendaPoderes').innerHTML = Object.entries(M.PODERES).map(([k, p]) => {
+  // las mejoras: una tarjeta por poder, con sus cinco niveles y el precio del siguiente
+  const tarjetas = Object.entries(M.PODERES).map(([k, p]) => {
     const n = progreso.mejoras[k], precio = M.precioMejora(n);
-    const barras = Array.from({ length: M.MAX_MEJORA }, (_, i) => `<i class="${i < n ? 'si' : ''}"></i>`).join('');
-    return `<li><b>${p.icono}</b><div><strong>${p.nombre}</strong><small>${M.duracionPoder(k, n)} s${precio ? ` → ${M.duracionPoder(k, n + 1)} s` : ''}</small><span class="niveles">${barras}</span></div>
-      <button type="button" class="opcion" data-comprar="${k}" ${precio == null || progreso.monedas < precio ? 'disabled' : ''}>${precio == null ? 'Al máximo' : fmt(precio) + ' 🪙'}</button></li>`;
-  }).join('') + `<li><b>🛹</b><div><strong>Patineta</strong><small>Tienes ${progreso.patinetas}. Te salva de un choque (30 s).</small></div>
-      <button type="button" class="opcion" data-comprar="patineta" ${progreso.monedas < M.PRECIO_PATINETA ? 'disabled' : ''}>${M.PRECIO_PATINETA} 🪙</button></li>`;
+    const niveles = Array.from({ length: M.MAX_MEJORA }, (_, i) => `<i class="${i < n ? 'si' : ''}"></i>`).join('');
+    const boton = precio == null ? '<span class="t-max">MÁX</span>'
+      : `<button type="button" class="t-precio" data-comprar="${k}" ${progreso.monedas < precio ? 'disabled' : ''} aria-label="Mejorar ${p.nombre} por ${fmt(precio)} monedas">${ICONOS.moneda}<b translate="no">${fmt(precio)}</b></button>`;
+    return `<li class="t-tarjeta" style="--tinte:${TINTE_PODER[k] || '#e3ecfb'}"><span class="t-ico">${ICONOS[ICONO_PODER[k]] || ''}</span>
+      <div class="t-info"><strong>${p.nombre}</strong><small translate="no">${M.duracionPoder(k, n)} s${precio != null ? ` → ${M.duracionPoder(k, n + 1)} s` : ''}</small><span class="t-niveles" aria-label="Nivel ${n} de ${M.MAX_MEJORA}">${niveles}</span></div>${boton}</li>`;
+  });
+  tarjetas.push(`<li class="t-tarjeta" style="--tinte:#ecdfff"><span class="t-ico">${ICONOS.patineta}</span>
+      <div class="t-info"><strong>Patineta</strong><small>Te salva de un choque (30 s)</small><span class="t-cuenta">Tienes <b translate="no">${progreso.patinetas}</b></span></div>
+      <button type="button" class="t-precio" data-comprar="patineta" ${progreso.monedas < M.PRECIO_PATINETA ? 'disabled' : ''} aria-label="Comprar una patineta por ${M.PRECIO_PATINETA} monedas">${ICONOS.moneda}<b translate="no">${M.PRECIO_PATINETA}</b></button></li>`);
+  $('tiendaPoderes').innerHTML = tarjetas.join('');
+  // los personajes: la ropa en fila, y la ficha del que se está probando
+  if (!M.ASPECTOS[tiendaVer]) tiendaVer = progreso.aspecto;
   $('tiendaAspectos').innerHTML = Object.entries(M.ASPECTOS).map(([k, a]) => {
-    const tiene = progreso.aspectos.includes(k), puesto = progreso.aspecto === k;
-    const muestra = `<span class="muestra" style="--a:#${a.sudadera.toString(16).padStart(6, '0')};--b:#${a.gorra.toString(16).padStart(6, '0')};--c:#${a.mochila.toString(16).padStart(6, '0')}"></span>`;
-    const accion = puesto ? '<button type="button" class="opcion" disabled>Puesto</button>'
-      : tiene ? `<button type="button" class="opcion" data-poner="${k}">Ponerme</button>`
-        : a.precio != null ? `<button type="button" class="opcion" data-aspecto="${k}" ${progreso.monedas < a.precio ? 'disabled' : ''}>${fmt(a.precio)} 🪙</button>`
-          : `<small class="secreto">🔒 ${a.secreto}</small>`;
-    return `<li>${muestra}<div><strong>${a.nombre}</strong></div>${accion}</li>`;
+    const tiene = progreso.aspectos.includes(k), puesto = progreso.aspecto === k, secreto = !tiene && a.precio == null;
+    const hex = n => '#' + n.toString(16).padStart(6, '0');
+    const marca = puesto ? `<em class="ok">${ICONOS.check}</em>` : secreto ? `<em class="cerrado">${ICONOS.candado}</em>` : '';
+    return `<li><button type="button" class="t-traje${k === tiendaVer ? ' sel' : ''}${secreto ? ' secreto' : ''}" data-ver="${k}" aria-pressed="${k === tiendaVer}">
+      <span class="t-muestra" style="--a:${hex(a.sudadera)};--b:${hex(a.gorra)};--c:${hex(a.jeans)};--d:${hex(a.mochila)}"><i></i></span><span class="t-n">${a.nombre}</span>${marca}</button></li>`;
   }).join('');
+  const a = M.ASPECTOS[tiendaVer], tiene = progreso.aspectos.includes(tiendaVer), puesto = progreso.aspecto === tiendaVer;
+  $('tiendaNombre').textContent = a.nombre;
+  $('tiendaEstado').textContent = puesto ? 'Lo llevas puesto' : tiene ? 'Es tuyo' : a.precio != null ? 'En venta' : 'Secreto';
+  $('tiendaAccion').innerHTML = puesto ? `<span class="t-puesto">${ICONOS.check}<span>Puesto</span></span>`
+    : tiene ? `<button type="button" class="t-boton verde" data-poner="${tiendaVer}">Ponérmelo</button>`
+      : a.precio != null ? `<button type="button" class="t-precio grande" data-aspecto="${tiendaVer}" ${progreso.monedas < a.precio ? 'disabled' : ''}>${ICONOS.moneda}<b translate="no">${fmt(a.precio)}</b></button>`
+        : `<p class="t-secreto">${ICONOS.candado}<span>${a.secreto}</span></p>`;
+  // el corredor se lo prueba (solo en la pestaña de personajes; en mejoras lleva lo suyo)
+  const mostrar = tiendaPestana === 'personajes' ? tiendaVer : progreso.aspecto;
+  if (mundo && mostrar !== aspectoMostrado) { mundo.aspecto(M.ASPECTOS[mostrar]); aspectoMostrado = mostrar; }
 }
 document.addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
@@ -697,14 +778,20 @@ document.addEventListener('click', e => {
     else { const p = M.precioMejora(progreso.mejoras[k]); if (p != null && progreso.monedas >= p) { progreso.monedas -= p; progreso.mejoras[k]++; sonido.poder(); } }
     guardar(); pintaTienda(); pintaPortada(); return;
   }
-  if (b.dataset.aspecto) { const a = M.ASPECTOS[b.dataset.aspecto]; if (a && a.precio != null && progreso.monedas >= a.precio) { progreso.monedas -= a.precio; progreso.aspectos.push(b.dataset.aspecto); progreso.aspecto = b.dataset.aspecto; mundo.aspecto(a); sonido.poder(); guardar(); pintaTienda(); pintaPortada(); } return; }
-  if (b.dataset.poner) { progreso.aspecto = b.dataset.poner; mundo.aspecto(M.ASPECTOS[b.dataset.poner]); guardar(); pintaTienda(); return; }
+  if (b.dataset.aspecto) { const a = M.ASPECTOS[b.dataset.aspecto]; if (a && a.precio != null && progreso.monedas >= a.precio) { progreso.monedas -= a.precio; progreso.aspectos.push(b.dataset.aspecto); progreso.aspecto = b.dataset.aspecto; mundo.aspecto(a); aspectoMostrado = b.dataset.aspecto; sonido.poder(); guardar(); pintaTienda(); pintaPortada(); } return; }
+  if (b.dataset.poner) { progreso.aspecto = b.dataset.poner; mundo.aspecto(M.ASPECTOS[b.dataset.poner]); aspectoMostrado = b.dataset.poner; sonido.reto(); guardar(); pintaTienda(); return; }
+  if (b.dataset.pestana && b.getAttribute('role') === 'tab') { tiendaPestana = b.dataset.pestana; sonido.carril(); pintaTienda(); return; }
+  if (b.dataset.ver) { tiendaVer = b.dataset.ver; sonido.carril(); pintaTienda(); return; }
+  if (b.dataset.flecha) {                                       // las flechas pasan de un aspecto al siguiente
+    const ids = Object.keys(M.ASPECTOS), i = ids.indexOf(tiendaVer);
+    tiendaVer = ids[(i + Number(b.dataset.flecha) + ids.length) % ids.length]; sonido.carril(); pintaTienda(); return;
+  }
   const accion = b.dataset.accion;
   if (!accion) return;
   ({
     jugar: empezar, otra: otraCarrera, portada: aPortada, seguir: seguirJugando, seguirChoque: seguirTrasChoque,
     abandonar: () => { muere('abandono'); c.muerte.t = 2; muestraFin(); },
-    tienda: abreTienda, retos: abreRetos, libreta: abreLibreta, opciones: abreOpciones, ayuda: () => abrePanel('capaAyuda'),
+    tienda: () => abreTienda('mejoras'), personajes: () => abreTienda('personajes'), retos: abreRetos, libreta: abreLibreta, opciones: abreOpciones, ayuda: () => abrePanel('capaAyuda'),
     volver: cierraPanel, relatoListo: () => { progreso.intro = true; guardar(); panel = null; empezar(); }
   })[accion]?.();
 });
@@ -753,6 +840,7 @@ function desbloquea(aspecto, texto) {
 /* ===================================================================
    8. ARRANQUE
    =================================================================== */
+ponIconos();
 async function arranca() {
   // las fuentes del marcador y de los letreros (con un tope: si no llegan, se usa la de respaldo)
   const fuentes = Promise.all(['100px "Lilita One"', '700 60px Orbitron', '20px "Press Start 2P"'].map(f => document.fonts.load(f).catch(() => null)));
@@ -767,7 +855,7 @@ async function arranca() {
   mundo.calidad(calidadInicial());
   const ajusta = () => { const r = pantalla.getBoundingClientRect(); mundo.tamano(r.width, r.height); };
   new ResizeObserver(ajusta).observe(pantalla); ajusta();
-  mundo.aspecto(M.ASPECTOS[progreso.aspecto] || M.ASPECTOS.clasico);
+  mundo.aspecto(M.ASPECTOS[progreso.aspecto] || M.ASPECTOS.clasico); aspectoMostrado = progreso.aspecto;
   const inicio = estacionVisual(M.ESTACIONES[0]);
   mundo.activa(inicio, 0);
   pantalla.dataset.estilo = inicio.estilo;
@@ -795,6 +883,12 @@ window.__vialibre = {
   poder: k => c && activaPoder(k),
   inmortal: (s = 9999) => { if (c) c.invulnerable = s; },
   empezar, progreso: () => progreso,
+  /** Fija la calidad gráfica (sin la automática), para medir cada una. */
+  calidad: n => { opciones.calidad = n; mundo.calidad(n); },
+  desglose: () => mundo.desglose(),
+  mundo: () => mundo,
+  /** Cuánto tarda la lógica de un cuadro (física, choques, generación), en ms, promediando `n` pasos. */
+  logica: (n = 600) => { if (estado !== 'jugando') return null; const t0 = performance.now(); let k = 0; for (; k < n && estado === 'jugando'; k++) actualiza(1 / 60); return (performance.now() - t0) / Math.max(1, k); },
   /** Adelanta `seg` segundos de juego sin dibujar (para probar túneles y estaciones desde un script). */
   avanza: (seg = 5) => { for (let i = 0; i < seg * 60 && estado === 'jugando'; i++) { actualiza(1 / 60); tiempoTotal += 1 / 60; } }
 };
