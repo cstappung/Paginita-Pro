@@ -88,3 +88,23 @@ export const fanal=etapa=>{
  }
  return svg(nombre,cuerpo);
 };
+/* Atasco: el estacionamiento de 6×6 visto desde arriba, con la salida a la
+   derecha de la 3.ª fila. Un ejemplo de cuatro movidas: `etapa` 0 el auto
+   rojo encerrado, 1 el camino abierto (tres movidas), 2 el rojo saliendo. */
+const vehA=(x,y,w,h,color,rojo)=>rect(x+3,y+3,w-6,h-6,color,'#1d2330',9)+(rojo?`<path d="M${x+10} ${y+h/2-4}H${x+w-10}M${x+10} ${y+h/2+4}H${x+w-10}" stroke="#fff" stroke-width="3"/>`:'');
+export const atasco=etapa=>{
+ const nombre=['El auto rojo está encerrado por un auto, un camión y un furgón','Tres movidas abren el camino: el furgón a la izquierda, el camión abajo y el auto arriba','La cuarta movida saca al auto rojo por la salida: cuatro movidas, tres estrellas'][etapa];
+ const z=34,ox=28,oy=22,X=c=>ox+c*z,Y=f=>oy+f*z;
+ let cuerpo=rect(ox-8,oy-8,6*z+16,6*z+16,'#c9cdd4','#f5b700',12)+`<rect x="${ox}" y="${oy}" width="${6*z}" height="${6*z}" rx="6" fill="#474c56"/>`;
+ for(let c=1;c<6;c++)cuerpo+=line(X(c),oy,X(c),oy+6*z,'#ffffff2e',2);
+ cuerpo+=`<rect x="${X(6)-2}" y="${Y(2)}" width="14" height="${z}" fill="#474c56"/>`+`<path d="M${X(6)+8} ${Y(2)}v${z}" stroke="#e8322f" stroke-width="5" stroke-dasharray="6 5"${etapa===2?' transform="rotate(-80 '+(X(6)+8)+' '+Y(2)+')"':''}/>`;
+ // Posiciones: D (furgón, fila 5), C (camión de pie, col 4), B (auto de pie, col 3), A (el rojo, fila 2).
+ const d=etapa?2:3,cf=etapa?3:2,bf=etapa?0:1,ac=etapa===2?4:0;
+ cuerpo+=vehA(X(d),Y(5),2*z,z,'#ff8a1e')+vehA(X(4),Y(cf),z,3*z,'#2a9d8f')+vehA(X(3),Y(bf),z,2*z,'#2f7de1');
+ cuerpo+=vehA(X(ac),Y(2),2*z,z,'#e8322f',true);
+ if(etapa===1){cuerpo+=line(X(4)+z/2,Y(2)+10,X(4)+z/2,Y(3)+z/2,C.oro,3)+line(X(3)+z/2,Y(2)+z-8,X(3)+z/2,Y(1)+z/2,C.oro,3)+line(X(5)-6,Y(5)+z/2,X(4)+6,Y(5)+z/2,C.oro,3);}
+ if(etapa===2)cuerpo+=line(X(1),Y(2)+z/2,X(3)+8,Y(2)+z/2,C.oro,3);
+ const textos=[['El auto rojo','está encerrado.','Mínimo: 4 movidas'],['Abre el camino','sin sacar nada','del estacionamiento.'],['¡Afuera!','4 movidas:','★★★']][etapa];
+ cuerpo+=txt(272,90,textos[0],22,etapa===2?C.oro:C.blanco)+txt(272,122,textos[1],17)+txt(272,150,textos[2],17,etapa===2?C.oro:C.verde);
+ return svg(nombre,cuerpo);
+};

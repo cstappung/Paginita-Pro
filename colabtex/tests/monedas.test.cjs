@@ -131,3 +131,10 @@ test('FANAL: récord, jornadas, puntos y partidas del club',()=>{
  assert.equal(M.monedasDe('a',d).partes.records,2*M.RECORD.fanal+130+45);
  assert.equal(M.nivelDe('fanal','alba'),3);assert.equal(M.nivelDe('fanal','s250k'),4);
 });
+test('Atasco: récord, 4 monedas por estrella y partidas del club',()=>{
+ assert.ok(M.JUEGOS_CLUB.includes('atasco'));assert.ok(M.PAGO_CLUB.atasco>0);
+ const d={solo:{'club-atasco-estrellas':{a:{puntos:150,tiempo:600000}}}};
+ // una modalidad con marca (40) y 4 por estrella
+ assert.equal(M.monedasDe('a',d).partes.records,M.RECORD.atasco+600);
+ assert.equal(M.nivelDe('atasco','e1'),1);assert.equal(M.nivelDe('atasco','e720'),4);
+});

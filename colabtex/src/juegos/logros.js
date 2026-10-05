@@ -342,6 +342,20 @@ const SOLO = {
     { id: "p60k", n: "Resonancia", d: "Haz 60 000 puntos en una travesía.", i: "🎐", m: "Puntos", s: d => cat(/-travesia$/)(d) && d.puntos >= 60000 },
     { id: "s100k", n: "Una luz que se ve de lejos", d: "Haz 100 000 puntos en la travesía sin fin.", i: "✨", m: "Puntos", s: d => cat(/-sinfin$/)(d) && d.puntos >= 100000 },
     { id: "s250k", n: "Nadie llega, algunas se cruzan", d: "Haz 250 000 puntos en la travesía sin fin.", i: "🌠", m: "Puntos", s: d => cat(/-sinfin$/)(d) && d.puntos >= 250000 }
+  ],
+  /* Atasco. Todos salen de club-atasco-estrellas (puntos = estrellas
+     juntadas en todos los niveles, tres por nivel, 720 con los 240). */
+  atasco: [
+    { id: "e1", n: "Primera salida", d: "Saca el auto rojo por primera vez.", i: "🚗", m: "Estrellas", s: d => cat(/-estrellas$/)(d) && d.puntos >= 1 },
+    { id: "e30", n: "Licencia de conducir", d: "Junta 30 estrellas.", i: "🪪", m: "Estrellas", s: d => cat(/-estrellas$/)(d) && d.puntos >= 30 },
+    { id: "e60", n: "Bajando al subterráneo", d: "Junta 60 estrellas (las que abren el Subterráneo 1).", i: "🅿️", m: "Estrellas", s: d => cat(/-estrellas$/)(d) && d.puntos >= 60 },
+    { id: "e120", n: "Estacionado en paralelo", d: "Junta 120 estrellas.", i: "🚙", m: "Estrellas", s: d => cat(/-estrellas$/)(d) && d.puntos >= 120 },
+    { id: "e180", n: "Valet", d: "Junta 180 estrellas.", i: "🔑", m: "Estrellas", s: d => cat(/-estrellas$/)(d) && d.puntos >= 180 },
+    { id: "e270", n: "Hora punta", d: "Junta 270 estrellas.", i: "🚦", m: "Estrellas", s: d => cat(/-estrellas$/)(d) && d.puntos >= 270 },
+    { id: "e360", n: "Medio edificio", d: "Junta 360 estrellas, la mitad de todas.", i: "🏢", m: "Estrellas", s: d => cat(/-estrellas$/)(d) && d.puntos >= 360 },
+    { id: "e480", n: "Jefe de estacionamiento", d: "Junta 480 estrellas.", i: "🦺", m: "Estrellas", s: d => cat(/-estrellas$/)(d) && d.puntos >= 480 },
+    { id: "e600", n: "Sin un bocinazo", d: "Junta 600 estrellas.", i: "📯", m: "Estrellas", s: d => cat(/-estrellas$/)(d) && d.puntos >= 600 },
+    { id: "e720", n: "La bóveda abierta", d: "Junta las 720 estrellas: los 240 niveles con el mínimo de movidas.", i: "🏆", m: "Estrellas", s: d => cat(/-estrellas$/)(d) && d.puntos >= 720 }
   ]
 };
 
@@ -351,7 +365,7 @@ export const LOGROS = Object.fromEntries([
   ...Object.entries(SOLO)
 ]);
 /* Qué categorías de `soloRanks` alimentan cada juego individual. */
-export const SOLO_PREFIJO = { minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-", electro: "club-electro-", frontera: "club-frontera-", sudoku: "club-sudoku-", fanal: "club-fanal-" };
+export const SOLO_PREFIJO = { minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-", electro: "club-electro-", frontera: "club-frontera-", sudoku: "club-sudoku-", fanal: "club-fanal-", atasco: "club-atasco-" };
 
 /* Los logros de partida que `uid` tiene ya en esta, según lo que se ve. */
 export function detecta(p, est, uid) {

@@ -168,6 +168,14 @@ y están en el repositorio público, como cualquier archivo del sitio.
 > pero los récords se quedan en el dispositivo (se sincronizan solos después
 > de publicarlas) y las partidas no pagan monedas.
 
+> **Atasco (octubre de 2026):** `club-atasco-estrellas` (las estrellas
+> juntadas en todos los niveles, con el tope común de 100 000) es una
+> categoría nueva de `soloRanks`, y `atasco` un juego nuevo de
+> `clubJugadas`. El progreso de cada nivel va en `users/<uid>/club/atasco`,
+> que ya era de su dueño, así que eso no necesita nada. Hasta volver a
+> publicar las reglas se juega igual, pero las estrellas no entran en la
+> clasificación (se mandan solas después de publicarlas) y no pagan monedas.
+
 Tu base de datos está ahora en **modo de prueba** (abierta a cualquiera).
 Antes de publicar el sitio:
 
