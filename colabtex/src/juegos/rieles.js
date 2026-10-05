@@ -24,7 +24,7 @@ import { mezcla } from "./perfil.js";
 import { verificaClub } from "./solo/verifica.js";
 import { crearRepro } from "./repeticion.js";
 import {
-  REPES, etiquetaDia, velocidadRep, PAUSA_FINAL_MS, formatoTiempo, formatoPuntos,
+  REPES, etiquetaDia, PAUSA_FINAL_MS, formatoTiempo, formatoPuntos,
   CHAT_VENTANA_MS, CHAT_LARGO, CHAT_MAX, CHAT_VIEJO_MS, chatVisibles, esperaChat, limpiaChat, sinLeer
 } from "./rieles-datos.js";
 
@@ -178,14 +178,13 @@ export function crearRieles(ctx) {
     if (t.entrada && t.entrada.firma === firma && t.repro) return;
     t.repro = crearRepro(t.rep.juego, prueba);
     t.entrada = { uid: fila.uid, n: fila.n, p: fila.p, t: fila.t, firma };
-    t.v = velocidadRep(t.repro.dur);
     t.el.style.flexGrow = String(t.repro.aspecto);
     t.t0 = performance.now();
     t.pieFirma = "";
     /* Con «reducir movimiento» la tarjeta se queda quieta en el tablero
        final; ▶ la pone en marcha. */
     if (reduce.matches || t.pausado) {
-      t.enPausa = t.t0; t.t0 -= t.repro.dur / t.v; t.pausado = true;
+      t.enPausa = t.t0; t.t0 -= t.repro.dur; t.pausado = true;
       t.el.classList.add("pausada");
     }
     pintaTarjeta(t, performance.now(), true);
@@ -196,13 +195,13 @@ export function crearRieles(ctx) {
     if (g) g.clearRect(0, 0, t.canvas.width, t.canvas.height);
   }
 
-  /* El instante de la partida que toca ahora: el bucle es la partida
-     (acelerada si es larga) más una pausa con el tablero final. */
+  /* El instante de la partida que toca ahora: el bucle es la partida,
+     a su velocidad real, más una pausa con el tablero final. */
   function instante(t, ahora) {
     const reloj = (t.pausado ? t.enPausa : ahora) - t.t0;
-    const vuelta = t.repro.dur / t.v + PAUSA_FINAL_MS;
+    const vuelta = t.repro.dur + PAUSA_FINAL_MS;
     if (reloj >= vuelta) { t.t0 += Math.floor(reloj / vuelta) * vuelta; return instante(t, ahora); }
-    return Math.min(t.repro.dur, reloj * t.v);
+    return Math.min(t.repro.dur, reloj);
   }
 
   function pintaTarjeta(t, ahora, pie) {

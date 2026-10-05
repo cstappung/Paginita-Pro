@@ -71,14 +71,9 @@ export function etiquetaDia(dia, hoy) {
   return "Última mejor partida";
 }
 
-/* El bucle no puede durar media hora: una Maratón de Tetris larga se
-   acelera hasta que la vuelta quepa en unos dos minutos, de a pasos
-   redondos y como mucho ×4 (más rápido ya no se entiende nada). */
-export const VUELTA_MS = 120000, VELOCIDADES = [1, 1.5, 2, 3, 4];
-export function velocidadRep(dur) {
-  for (const v of VELOCIDADES) if (dur / v <= VUELTA_MS) return v;
-  return VELOCIDADES[VELOCIDADES.length - 1];
-}
+/* La repetición va siempre a la velocidad a la que se jugó, aunque la
+   partida dure media hora: acelerada (lo hacía hasta ×4 con las de más de
+   dos minutos), una Maratón de Tetris dejaba de parecerse a jugarla. */
 /* Lo que se queda quieto el tablero final antes de volver a empezar. */
 export const PAUSA_FINAL_MS = 2600;
 
