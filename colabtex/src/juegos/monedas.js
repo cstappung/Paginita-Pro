@@ -51,6 +51,7 @@
 import { LOGROS, SOLO_PREFIJO, deFila, deMarca } from "./logros.js";
 import PM from "../../../juegos/prodrop/motor.js";
 import { TIENDA, PRECIO_TIENDA } from "./tienda.js";
+import { CORTES } from "./cortes.js";
 
 /* ---------- tarifas ---------- */
 /* Jugar es lo que se puede repetir, y se paga: una partida corta a dos
@@ -312,12 +313,23 @@ export function economia(datos) {
   const usuarios = {}, dueno = {}, graduada = {}, enVenta = {}, sobres = {}, ofertas = {}, cambios = {};
   const ganado = {};
   const U = u => usuarios[u] || (usuarios[u] = { gastadas: 0, cobradas: 0, parada: false, falta: 0, gratis: -Infinity, sobres: {}, tienda: {} });
-  const saldo = u => { if (!(u in ganado)) ganado[u] = ganadoDe(u, d).total; const x = U(u); return ganado[u] + x.cobradas - x.gastadas; };
-  /* Cobra `p` a `u`. Si no puede, la cuenta queda parada. */
+  /* Un corte (cortes.js) congela lo que la cuenta ganó hasta `hasta` en
+     `tope`: lo que gastó antes se mide contra eso y, si no alcanzaba, se
+     anula sin parar la cuenta. Lo que gane después ya no tapa nada viejo. */
+  const cortes = d.cortes || CORTES;
+  let ahora = 0;
+  const enCorte = u => { const k = cortes[u]; return k && ahora <= k.hasta ? k : null; };
+  const saldo = u => {
+    if (!(u in ganado)) ganado[u] = ganadoDe(u, d).total;
+    const x = U(u), k = enCorte(u);
+    return (k ? Math.min(ganado[u], k.tope) : ganado[u]) + x.cobradas - x.gastadas;
+  };
+  /* Cobra `p` a `u`. Si no puede, la cuenta queda parada (dentro de un
+     corte, solo no vale). */
   const paga = (u, p) => {
     const x = U(u);
     if (x.parada) { x.falta += p; return false; }
-    if (saldo(u) < p) { x.parada = true; x.falta += p - Math.max(0, saldo(u)); return false; }
+    if (saldo(u) < p) { if (enCorte(u)) return false; x.parada = true; x.falta += p - Math.max(0, saldo(u)); return false; }
     x.gastadas += p; return true;
   };
   /* Lo que es una copia: {id, g, w}, de su sobre o de su re-roll. */
@@ -328,6 +340,7 @@ export function economia(datos) {
     return PM.sobre(q.o, q.k, so.at).cartas[q.i];
   };
   for (const e of ev) {
+    ahora = e.at;
     if (e.t === "s") {
       const x = U(e.u);
       if (e.p === 0) {

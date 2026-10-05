@@ -4497,6 +4497,13 @@ client or a bot can still produce a valid proof; only a server (Cloud
 Functions) closes that. Each game's specifics are in
 `docs/antitrampas/<juego>.md`.
 
+**Deleting fake records can leave an account *parada*** (its earnings drop
+retroactively, an old purchase becomes unfunded and every later coin goes to
+cover it). `juegos/cortes.js` fixes that without debt: `<uid>: {hasta,
+tope}` makes `economia()` judge that account's spending up to `hasta`
+against `tope` and simply void what did not fit instead of stopping it.
+`colabtex/scripts/cortes.cjs` computes them from a console export.
+
 **A rejected game is also punished** (`juegos/castigo.js`, assets in
 `juegos/castigo/`, `docs/antitrampas.md` §6): `sospechaClub` calls
 `castiga` when `esTrampa(s)` — a fake Windows blue screen for

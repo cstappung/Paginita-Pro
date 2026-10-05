@@ -234,3 +234,35 @@ igualmente no subió: el castigo es la parte que disuade, el rechazo es la
 que protege la tabla. `tests/castigo.test.cjs` cubre qué cuenta como
 trampa, de quién es la retención, el recorrido entero con el reloj en la
 mano y que esté conectado donde se rechaza una partida.
+
+## Cuentas paradas: los cortes
+
+Borrar récords falsos baja lo ganado hacia atrás. El recorrido de
+`economia()` (juegos/monedas.js) encuentra entonces compras de PRODROP o de
+la tienda que nunca se pudieron pagar y **para** la cuenta: esa compra y todo
+lo que compró después no vale, no puede vender ni intercambiar, y todo lo que
+gane desde ahí se va a tapar el hueco, porque lo ganado no tiene fecha y se
+mide entero contra el pasado.
+
+Un **corte** (`colabtex/src/juegos/cortes.js`) lo arregla sin deuda:
+`<uid>: {hasta, tope}`. Hasta `hasta`, la cuenta gasta contra `tope` (lo que
+ganaba al limpiarla, o menos si después se borra algo más) y una compra que
+no alcanzaba **se anula sin parar la cuenta**: el sobre no existe, la
+graduación no se hizo, la compra en el mercado se cae y la carta se queda
+con quien vendía. Desde `hasta`, lo que gana es suyo y se mide normal. Es lo
+mismo que anular una a una, en orden, las compras impagas (se comprobó con
+los datos reales: 2 073 compras anuladas dan el mismo estado que dos cortes).
+
+Va en el código, no en Firebase: no cuesta descargas ni reglas. Después de
+una limpieza:
+
+```
+cd colabtex
+node scripts/cortes.cjs ../auditoria/export.json            # mira qué pasaría
+node scripts/cortes.cjs ../auditoria/export.json --escribe  # lo agrega a cortes.js
+npm run build
+```
+
+`--hasta AAAA-MM-DD` fija el final del corte (por omisión, mañana en Chile).
+Tiene que caer **después** de publicar el cambio: lo que la cuenta compre
+antes de que llegue la versión nueva también queda cubierto.
