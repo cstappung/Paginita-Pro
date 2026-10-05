@@ -264,6 +264,8 @@ npm run build
 ```
 
 `--hasta AAAA-MM-DD` (o `AAAA-MM-DDTHH:MM`, hora de Chile) fija el final del corte (por omisión, el fin de mañana).
+`--desde AAAA-MM-DDTHH:MM` perdona lo comprado antes de esa hora: vale entero
+aunque no alcanzara, el saldo queda en cero, y solo se anula lo de después.
 Tiene que caer **después** de la última compra impaga de la cuenta; desde
 ahí lo que gane se mide normal. Si siguió comprando sin fondos después, el
 script lo dice (la cuenta seguiría parada) y hay que correr el corte.
