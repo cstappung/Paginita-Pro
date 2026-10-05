@@ -3281,7 +3281,8 @@ Things that matter:
   one awning colour per block, shop signs in **one atlas** texture through
   `franja`), so a block costs what one building did; trees, lamps and
   catenary posts are **instanced** (`Serie`, written every frame like the
-  coins; not in neon, whose lamps and posts carry glowing edges and sprites);
+  coins; in neon, where edge lines and halo sprites cannot be instanced,
+  the instanced pole is a glowing tube instead, `farol(lado, true)`);
   the 49 cloud puffs are one mesh; and the pixel style in `baja` skips its
   pass (which draws the scene twice, once for the edges) and renders at
   pixel resolution instead (`proporcion`). **A station's kit is freed** when

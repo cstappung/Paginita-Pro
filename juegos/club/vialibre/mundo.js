@@ -642,14 +642,13 @@ class Kit {
     pre('rampa', () => this.rampa(), 3); pre('bajo', () => this.barreraBaja(), 5); pre('alto', () => this.barreraAlta(), 5);
     for (const lado of [-1, 1]) {
       pre('edificio' + lado, () => this.edificio(lado), 7); pre('graf' + lado, () => this.grafiti(lado), 3);
-      if (this.neon) { pre('farol' + lado, () => this.farol(lado), 6); pre('poste' + lado, () => this.poste(lado), 4); }
     }
-    if (!this.neon) pasos.push(() => {                                         // árboles, faroles y postes: instancias
+    pasos.push(() => {                                                         // árboles, faroles y postes: instancias
       const libres = []; const serie = (g, max) => { const s = new Serie(g, max); libres.push(s); return s; };
       this.series = {
-        arbol: [0, 1, 2].map(() => { const g = this.arbol(); g.scale.setScalar(1); return serie(g, 40); }),   // tres árboles distintos, cada uno muchas veces
-        farol: { [-1]: serie(this.farol(-1), 24), [1]: serie(this.farol(1), 24) },
-        poste: { [-1]: serie(this.poste(-1), 14), [1]: serie(this.poste(1), 14) }
+        arbol: this.neon ? [] : [0, 1, 2].map(() => { const g = this.arbol(); g.scale.setScalar(1); return serie(g, 40); }),   // tres árboles distintos, cada uno muchas veces (en neón no hay)
+        farol: { [-1]: serie(this.farol(-1, true), 24), [1]: serie(this.farol(1, true), 24) },
+        poste: { [-1]: serie(this.poste(-1, true), 14), [1]: serie(this.poste(1, true), 14) }
       };
       this.listaSeries = libres;
       this.seriesRaiz = new THREE.Group(); this.seriesRaiz.name = 'series:' + this.clave; for (const s of libres) this.seriesRaiz.add(s.raiz);
@@ -866,21 +865,23 @@ class Kit {
     return g;
   }
   /** Un farol de la vereda, con el brazo hacia la vía. */
-  farol(lado) {
+  farol(lado, enSerie = false) {
     const c = this.c, a = new Arma(this);
-    a.pon(CILINDRO_CHICO, 'metal', c.poste, [0, 2.3, 0], null, [0.14, 4.6, 0.14], 0xff2bd6);
+    // instanciado en neón: el poste es un tubo de luz (las líneas de borde y el halo no se pueden instanciar)
+    if (enSerie && this.neon) a.pon(CILINDRO_CHICO, 'luz', 0xff2bd6, [0, 2.3, 0], null, [0.1, 4.6, 0.1]);
+    else a.pon(CILINDRO_CHICO, 'metal', c.poste, [0, 2.3, 0], null, [0.14, 4.6, 0.14], 0xff2bd6);
     a.pon(CAJA, 'metal', c.poste, [-lado * 0.42, 4.6, 0], null, [0.9, 0.08, 0.1]);
     a.pon(redonda(0.5, 0.16, 0.3, 0.06), 'plano', c.poste, [-lado * 0.82, 4.52, 0]);
     a.pon(CAJA, 'luz', c.farol, [-lado * 0.82, 4.43, 0], null, [0.4, 0.04, 0.22]);
     const g = a.hecho();
-    if (this.neon) g.add(sprite(c.farol, 3.2, [-lado * 0.82, 4.35, 0], 0.9));
+    if (this.neon && !enSerie) g.add(sprite(c.farol, 3.2, [-lado * 0.82, 4.35, 0], 0.9));
     return g;
   }
   /** Un poste de catenaria, con su brazo sobre la vía. */
-  poste(lado) {
-    const c = this.c, a = new Arma(this);
-    a.pon(CAJA, 'metal', c.catenaria, [0, 3.15, 0], null, [0.2, 6.3, 0.2], c.catenaria);
-    a.pon(CAJA, 'metal', c.catenaria, [-lado * 1.72, 5.95, 0], null, [3.45, 0.12, 0.12], c.catenaria);
+  poste(lado, enSerie = false) {
+    const c = this.c, a = new Arma(this), mat = enSerie && this.neon ? 'luz' : 'metal';
+    a.pon(CAJA, mat, c.catenaria, [0, 3.15, 0], null, [0.2, 6.3, 0.2], enSerie ? null : c.catenaria);
+    a.pon(CAJA, mat, c.catenaria, [-lado * 1.72, 5.95, 0], null, [3.45, 0.12, 0.12], enSerie ? null : c.catenaria);
     return a.hecho();
   }
   /** Un grafiti pintado en el muro de la vía. */
@@ -1291,7 +1292,7 @@ export function crearMundo(canvas) {
         paisaje.push({ obj: o, d: d0 + dl / 2, largo: dl / 2, k: kit });
         frente.e[lado] = d0 + dl + 0.8 + kit.az() * 2.2;
       }
-      if (kit.series) while (frente.arbol[lado] < hasta) {                    // árboles en la vereda (instancias)
+      if (kit.series && kit.series.arbol.length) while (frente.arbol[lado] < hasta) {   // árboles en la vereda (instancias)
         const d = frente.arbol[lado];
         frente.arbol[lado] = d + 9 + kit.az() * 8;
         if (enTunel(d - 2, d + 2)) continue;
