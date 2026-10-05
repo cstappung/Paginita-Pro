@@ -20,3 +20,13 @@ test('Antitrampas: el registro rechaza lo que no se puede leer y nunca lanza',as
   if(v.PRUEBA>0)assert.match(await V.verificaClub(j,{...dato,categoria:'club-'+j+'-x'},null),/sin prueba/,j);
  }
 });
+const C=carga('src/juegos/solo/club-datos.js');
+test('Antitrampas: la racha contada sube de a uno por día y arranca de la tabla',()=>{
+ assert.ok(C.esRachaClub('club-sopa-racha'));assert.ok(C.esRachaClub('club-electro-racha'));assert.equal(C.esRachaClub('club-sopa-facil-8'),false);
+ assert.deepEqual(C.rachaClub(null,100,0),{dia:100,n:1});
+ assert.deepEqual(C.rachaClub(null,100,40),{dia:100,n:41},'quien ya traía 40 sigue');
+ assert.equal(C.rachaClub({dia:100,n:5},100,0),null,'dos veces el mismo día no suma');
+ assert.equal(C.rachaClub({dia:100,n:5},99,0),null,'ni hacia atrás');
+ assert.deepEqual(C.rachaClub({dia:100,n:5},101,0),{dia:101,n:6});
+ assert.deepEqual(C.rachaClub({dia:100,n:5},103,0),{dia:103,n:1},'un día saltado la corta');
+});

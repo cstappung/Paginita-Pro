@@ -4416,7 +4416,10 @@ before the row, and only when the row improves; the rules refuse a
 with `colabtex/scripts/auditar-club.cjs` over a console export (never
 commit an export: the repo is public). Admins delete rows and set
 `vetados/<uid>`; a vetted account cannot write records, club plays or
-podiums, and `watchSolo`/`leerSolo` hide it. The honest limit: a rewritten
+podiums, and `watchSolo`/`leerSolo` hide it. Daily streaks (`club-*-racha`)
+are capped by `rachasClub/<uid>/<cat>` = `{dia, n}`, which the rules only
+let grow by one per Chile day (`rachaClub` in `club-datos.js`; a first
+write may continue the streak already in the table). The honest limit: a rewritten
 client or a bot can still produce a valid proof; only a server (Cloud
 Functions) closes that. Each game's specifics are in
 `docs/antitrampas/<juego>.md`.

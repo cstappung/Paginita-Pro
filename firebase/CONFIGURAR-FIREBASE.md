@@ -384,7 +384,9 @@ juegos.
 ### ⚠ El antitrampas del Solo Club pide publicar otra vez
 
 `soloRanks` ahora exige que cada fila tenga su prueba en `soloPruebas`, y
-hay tres nodos nuevos: `soloPruebas` (la prueba de cada récord),
+hay cuatro nodos nuevos: `rachasClub` (la racha diaria de verdad de la
+Sopa, el Sudoku y Electrodle, que solo sube de a uno por día),
+`soloPruebas` (la prueba de cada récord),
 `sospechas` (las partidas que el verificador rechazó; solo las leen los
 administradores) y `vetados` (cuentas que ya no pueden escribir récords;
 solo las escribe un administrador). Ver `docs/antitrampas.md`.

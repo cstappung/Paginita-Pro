@@ -114,7 +114,7 @@ paso: el verificador es un módulo puro que corre igual en Node.
   solo si mejora la marca guardada (una prueba por récord, no por partida).
 - `fb-juegos.js`: `guardarPruebaSolo`, `leerPruebaSolo`, `reportaSospecha`,
   y `watchSolo`/`leerSolo` ya no muestran cuentas vetadas.
-- Reglas: `soloPruebas` (escribe su dueño, una vez; lee cualquiera con
+- Reglas: `rachasClub` (la racha contada, ver §4), `soloPruebas` (escribe su dueño, una vez; lee cualquiera con
   sesión, para poder auditar), `sospechas` (escribe su dueño, una vez; lee
   solo un admin), `vetados` (escribe solo un admin), `soloRanks` exige la
   prueba y deja borrar a un admin. **Hay que publicarlas a mano** en la
@@ -157,8 +157,13 @@ que se espera de cada uno:
 
 Las **rachas** (Sopa, Sudoku, Electrodle) son un caso aparte: el número
 sale de un blob que el propio usuario escribe (`users/<uid>/club/<juego>`).
-La vía buena es la del `diario` de las monedas: un nodo que las reglas solo
-dejan subir de a uno por día de Chile.
+Ya están resueltas de forma común, como el `diario` de las monedas:
+`rachasClub/<uid>/<categoría>` = `{dia, n, at}` solo sube de a uno por día
+de Chile (la regla lo comprueba; un día saltado vuelve a 1), y la fila de
+`club-*-racha` no puede pasar de `n` (`guardaClub` la recorta;
+`club-datos.js: rachaClub`). Quien ya tenía una racha en la tabla la sigue
+desde ahí al estrenarlo. El verificador de cada juego solo tiene que
+probar que el diario de hoy se resolvió de verdad.
 
 ## 5. Qué hacer con los que ya están en las tablas
 

@@ -567,6 +567,12 @@ export const guardarPruebaSolo = (categoria, uid, partida, v, texto) =>
   set(ref(db, `soloPruebas/${categoria}/${uid}/${partida}`), { v: Number.isSafeInteger(v) ? v : 0, d: String(texto || ""), at: serverTimestamp() });
 export const leerPruebaSolo = (categoria, uid, partida) =>
   get(ref(db, `soloPruebas/${categoria}/${uid}/${partida}`)).then(s => s.val());
+/* La racha diaria de verdad de un juego del club (club-datos.js:
+   rachaClub). La regla solo deja subir `n` de a uno por día de Chile. */
+export const leerRachaClub = (uid, categoria) =>
+  get(ref(db, `rachasClub/${uid}/${categoria}`)).then(s => s.val());
+export const apuntaRachaClub = (uid, categoria, r) =>
+  set(ref(db, `rachasClub/${uid}/${categoria}`), { dia: r.dia, n: r.n, at: serverTimestamp() });
 /* Una partida que el verificador rechazó, para que la vean los
    administradores en Informes. Solo la puede escribir su dueño, y solo
    la leen ellos. */

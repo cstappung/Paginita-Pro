@@ -1,4 +1,5 @@
 import { crearSolo } from "./juegos/solo/club.js";
+import { esRachaClub, rachaClub } from "./juegos/solo/club-datos.js";
 import { VERIFICADORES, juegoDeCategoria, textoPrueba } from "./juegos/solo/verifica.js";
 import { crearFrontera } from "./juegos/frontera.js";
 "use strict";
@@ -1234,6 +1235,18 @@ async function guardaClub(categoria, uid, dato, prueba) {
   const juego = juegoDeCategoria(categoria);
   if (juego) {
     const previa = await fb.leerSolo(categoria).then(f => f.find(x => x.uid === uid), () => null);
+    /* Una racha diaria no pasa de la que cuenta `rachasClub`, que solo sube
+       de a uno por día (club-datos.js: rachaClub). Si las reglas aún no la
+       conocen, se sigue como antes. */
+    if (esRachaClub(categoria)) {
+      const sinReglas = e => { if (!/permission/i.test(String(e && (e.code || e.message)))) throw e; return undefined; };
+      const prev = await fb.leerRachaClub(uid, categoria).catch(sinReglas);
+      if (prev !== undefined) {
+        const reg = rachaClub(prev, diaMonedas(), previa ? previa.puntos : 0);
+        const escrita = reg ? await fb.apuntaRachaClub(uid, categoria, reg).then(() => true, sinReglas) : true;
+        if (escrita) dato = Object.assign({}, dato, { puntos: Math.min(dato.puntos, (reg || prev).n) });
+      }
+    }
     if (previa && (previa.puntos > dato.puntos || previa.puntos === dato.puntos && previa.tiempo <= dato.tiempo)) return { committed: false };
     await fb.guardarPruebaSolo(categoria, uid, dato.partida, VERIFICADORES[juego].PRUEBA, textoPrueba(prueba) || "").catch(e => {
       if (!/permission/i.test(String(e && (e.code || e.message)))) throw e;

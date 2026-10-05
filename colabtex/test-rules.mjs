@@ -343,6 +343,19 @@ console.log("— Monedas: partidas del club y podios —");
   await allowed("A sospechosa se apunta a sí misma", () => set(push(ref(db, `sospechas/${ua.uid}`)), { c: "club-bbtan-rondas", m: "prueba", at: serverTimestamp() }));
   await denied("pero no lee la lista de sospechas", () => get(ref(db, "sospechas")));
   await denied("ni se veta ni se desveta sola", () => set(ref(db, `vetados/${ua.uid}`), { at: serverTimestamp() }));
+  // rachas diarias del club: solo suben de a uno por día, y la tabla no pasa de ellas
+  const racha = (c, x) => set(ref(db, `rachasClub/${ua.uid}/${c}`), Object.assign({ at: serverTimestamp() }, x));
+  await denied("una racha no arranca en 5", () => racha("club-sopa-racha", { dia: hoy, n: 5 }));
+  await denied("ni se apunta mañana", () => racha("club-sopa-racha", { dia: hoy + 1, n: 1 }));
+  await denied("ni en una categoría que no es racha", () => racha("club-sopa-facil-8", { dia: hoy, n: 1 }));
+  await allowed("A empieza su racha de la sopa", () => racha("club-sopa-racha", { dia: hoy, n: 1 }));
+  await denied("y no la sube dos veces el mismo día", () => racha("club-sopa-racha", { dia: hoy, n: 2 }));
+  await prueba("club-sopa-racha", "rachaA1", {});
+  const filaRacha = (c, puntos, partida) => set(ref(db, `soloRanks/${c}/${ua.uid}`), { nombre: "A", puntos, tiempo: 1000, partida });
+  await denied("la tabla no pasa de la racha contada", () => filaRacha("club-sopa-racha", 3, "rachaA1"));
+  await allowed("pero sí la iguala", () => filaRacha("club-sopa-racha", 1, "rachaA1"));
+  await prueba("club-sudoku-racha", "rachaA2", {});
+  await denied("sin racha contada no hay fila de racha", () => filaRacha("club-sudoku-racha", 1, "rachaA2"));
   // podios: solo justo después del récord que nombra
   await set(ref(db, `soloRanks/club-bbtan-rondas/${ua.uid}`), { nombre: "A", puntos: 7, tiempo: 1000, partida: "partidaA1" }).catch(() => {});
   const fila = (await get(ref(db, `soloRanks/club-bbtan-rondas/${ua.uid}`))).val() || {};
