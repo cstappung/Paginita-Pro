@@ -182,9 +182,12 @@ function inhumano(dias) {
   return null;
 }
 
-/* `ahora` (una Date) es para las pruebas; en el juego es el reloj. */
-export function verifica(dato, prueba, ahora) {
-  const r = rehaz(prueba, ahora);
+/* El tercer argumento es el `ctx` de verificaClub ({uid}); las pruebas
+   pasan en su lugar una Date (o {ahora}) para fijar el día. Sin ella
+   manda el reloj. */
+const ahoraDe = ctx => ctx instanceof Date ? ctx : ctx && ctx.ahora instanceof Date ? ctx.ahora : null;
+export function verifica(dato, prueba, ctx) {
+  const r = rehaz(prueba, ahoraDe(ctx));
   if (typeof r === 'string') return r;
   const {f, dias} = r;
   if (dato.categoria === 'club-electro-racha') {
@@ -221,7 +224,8 @@ export function maximoPuntos(hoy) {
 }
 
 /* Una fila guardada sin prueba: ¿más de lo que permite el calendario? */
-export function sospecha(categoria, fila, ahora) {
+export function sospecha(categoria, fila, ctx) {
+  const ahora = ahoraDe(ctx);
   const hoy = M.diaChile(ahora == null ? new Date() : ahora);
   const p = fila && fila.puntos, t = fila && fila.tiempo;
   if (!Number.isFinite(p)) return null;

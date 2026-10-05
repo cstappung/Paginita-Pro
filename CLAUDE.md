@@ -3026,6 +3026,16 @@ Things that matter:
   was widened and `club-electro-puntos` got a 1 000 000 cap, so the rules must
   be re-published.
 
+**Electrodle's anti-cheat proof** (`docs/antitrampas/electro.md`): each
+`hist` entry is now `[pts, n, ms, g, [tries], forma]`, and the proof carries
+every day's tries (the shape of each try only for the last 30 days), so
+`verifica/electro.js` recomputes every day's points from the real targets.
+**A catalogue entry is only ever appended, with `desde`**: inserting one
+moves the targets of past days and would reject everyone's history (a test
+pins the target fingerprint). Days after `CORTE` (2026-10-12) must carry
+their tries, so move `CORTE` if this ships later than a week after
+2026-10-05.
+
 **Sudoku Arcade (`juegos/club/sudoku/`) is a Solo Club game too**, on the
 same `conexion.js` protocol: plain files, no build (`?v=sudoku-N` on its
 scripts, `club-7` for `conexion.js`, `club-N` in `solo/club.js` for the
