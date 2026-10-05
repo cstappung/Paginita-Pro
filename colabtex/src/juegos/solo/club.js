@@ -28,7 +28,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
   const cargados=invitado?Promise.resolve():(async()=>{
     let valor={};try{valor=JSON.parse(localStorage.getItem(clave)||'{}')||{};}catch{}
     for (const [k,v] of Object.entries(valor)) { const dato=resultadoClub(juego,v);if(!dato||k!==dato.categoria)continue;
-      const motivo=await verificaClub(juego,dato,v.prueba);
+      const motivo=await verificaClub(juego,dato,v.prueba,{uid:cuenta});
       if(motivo){sospecha(dato,motivo,'pendiente');continue;}
       if(mejorClub(dato,pendientes[k]))pendientes[k]={...dato,prueba:v.prueba};
     }
@@ -98,7 +98,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
       const dato=resultadoClub(juego,d);if(!dato)return;
       if(invitado){estado('Buena partida. Como invitado no se guarda: inicia sesión para que tus récords entren en la clasificación.',dato.categoria);return;}
       const prueba=d.prueba;
-      verificaClub(juego,dato,prueba).then(motivo=>{
+      verificaClub(juego,dato,prueba,{uid:cuenta}).then(motivo=>{
         if(muerto)return;
         if(motivo){
           sospecha(dato,motivo,'en vivo');
@@ -125,7 +125,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
     temaObserver.observe(document.documentElement,{attributes:true,attributeFilter:['data-tema']});
     frame.allow='fullscreen';frame.setAttribute('allowfullscreen','');
     window.addEventListener('message',mensaje);
-    frame.src='juegos/club/'+juego+'/index.html?v=club-25&embed=1&cuenta='+encodeURIComponent(cuenta)+(invitado?'&invitado=1':'');
+    frame.src='juegos/club/'+juego+'/index.html?v=club-26&embed=1&cuenta='+encodeURIComponent(cuenta)+(invitado?'&invitado=1':'');
     host.appendChild(frame);
   }
   function destruir(){muerto=true;temaObserver?.disconnect();if(off)off();window.removeEventListener('message',mensaje);for(const [el,valor]of ocultos)el.style.display=valor;frame?.remove();host.innerHTML='';ambientar('');}

@@ -16,7 +16,7 @@
        varias veces el de ellos. Es una señal más débil —alguien puede ser
        muy bueno— y por eso va aparte, como «anómala».
 
-   Uso:  node scripts/auditar-club.cjs export.json [--json] [--categoria club-minas-easy]
+   Uso:  node scripts/auditar-club.cjs export.json [--json] [--todo] [--categoria club-minas-easy]
 
    La exportación trae nombres y uids: no se sube al repositorio (es
    público). Se deja fuera del árbol o en una carpeta ignorada. */
@@ -92,7 +92,7 @@ async function main() {
         if (p) {
           let prueba = null;
           try { prueba = p.d ? JSON.parse(p.d) : null; } catch { motivos.push('prueba ilegible'); }
-          const m = await verificaClub(juego, { categoria, puntos: fila.puntos, tiempo: fila.tiempo, partida: fila.partida }, prueba);
+          const m = await verificaClub(juego, { categoria, puntos: fila.puntos, tiempo: fila.tiempo, partida: fila.partida }, prueba, { uid });
           if (m) motivos.push('la prueba no cuadra: ' + m);
         } else if (VERIFICADORES[juego].PRUEBA > 0) {
           motivos.push('sin prueba (anterior a la verificación, o escrita a mano)');
@@ -103,10 +103,18 @@ async function main() {
   }
 
   if (soloJson) { console.log(JSON.stringify(hallazgos, null, 2)); return; }
+  /* Una fila cuyo único motivo es no tener prueba suele ser anterior a la
+     verificación de su juego: se cuenta aparte, para no tapar lo que sí
+     llama la atención (con --todo se listan igual). */
+  const SIN_PRUEBA = /^sin prueba/;
+  const soloSinPrueba = hallazgos.filter(h => h.motivos.every(m => SIN_PRUEBA.test(m)));
+  if (!args.includes('--todo')) hallazgos.splice(0, hallazgos.length, ...hallazgos.filter(h => !soloSinPrueba.includes(h)));
   const porUid = {};
   for (const h of hallazgos) (porUid[h.uid] = porUid[h.uid] || { nombre: h.nombre, filas: [] }).filas.push(h);
   const total = Object.values(ranks).reduce((n, f) => n + Object.keys(f || {}).length, 0);
-  console.log(`${hallazgos.length} filas sospechosas de ${total}, en ${Object.keys(porUid).length} cuentas.\n`);
+  console.log(`${hallazgos.length} filas sospechosas de ${total}, en ${Object.keys(porUid).length} cuentas.`);
+  if (soloSinPrueba.length && !args.includes('--todo')) console.log(`(${soloSinPrueba.length} filas más no tienen prueba y no llaman la atención por otra cosa: anteriores a la verificación. --todo las lista.)`);
+  console.log('');
   for (const [uid, c] of Object.entries(porUid).sort((a, b) => b[1].filas.length - a[1].filas.length)) {
     const nombres = [...new Set(Object.values(ranks).map(f => (f || {})[uid]).filter(Boolean).map(f => f.nombre))];
     console.log(`■ ${nombres.join(' / ') || '?'} (${uid})${vetados[uid] ? ' — ya vetada' : ''}: ${c.filas.length} filas`);

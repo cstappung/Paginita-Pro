@@ -47,10 +47,12 @@ export function textoPrueba(prueba) {
   try { const t = JSON.stringify(prueba); return typeof t === 'string' ? t : ''; } catch { return null; }
 }
 
-/* ¿Vale este resultado? null si sí; el motivo, si no. Nunca lanza: un
+/* ¿Vale este resultado? null si sí; el motivo, si no. `ctx` = {uid}: de
+   quién es la partida, para que una prueba copiada de otra cuenta no
+   valga (los juegos que lo usan meten la cuenta en la prueba). Nunca lanza: un
    verificador que falla también rechaza (con el error como motivo),
    porque aceptar por las dudas es justo el agujero que se quiere cerrar. */
-export async function verificaClub(juego, dato, prueba) {
+export async function verificaClub(juego, dato, prueba, ctx = {}) {
   const v = VERIFICADORES[juego];
   if (!v) return null;
   const texto = textoPrueba(prueba);
@@ -58,7 +60,7 @@ export async function verificaClub(juego, dato, prueba) {
   if (texto.length > PRUEBA_MAX) return 'La prueba de la partida es demasiado grande.';
   if (v.PRUEBA > 0 && !texto) return 'La partida llegó sin prueba (¿una versión vieja del juego? recarga la página).';
   try {
-    const motivo = await v.verifica(dato, texto ? JSON.parse(texto) : null);
+    const motivo = await v.verifica(dato, texto ? JSON.parse(texto) : null, ctx || {});
     return motivo ? String(motivo).slice(0, 300) : null;
   } catch (e) {
     return ('No se pudo comprobar la partida: ' + (e && e.message || e)).slice(0, 300);

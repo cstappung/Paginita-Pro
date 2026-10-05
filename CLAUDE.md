@@ -2783,6 +2783,18 @@ into a wall of sound. The retro look is Press Start 2P, notched pixel frames
 `.canvas-wrap::after`. The regex in `soloRanks` needed widening, so the rules
 must be re-published.
 
+**Everything that decides a BBTAN game lives in `motor.js`** (UMD
+`BBTANMotor`; `physics.js` and `rules.js` are gone): fixed 1/60 s ticks
+whatever the speed or FPS, only `+ − × ÷` and `Math.sqrt` plus its own
+sine/cosine (no `Math.sin/cos/atan2/random`, so Node and every browser
+replay the same game), integer aim angles and mulberry32 per round. That is
+what lets `verifica/bbtan.js` replay a whole game from the seed and the
+shots (`M.prueba(E)`, see `docs/antitrampas/bbtan.md`). The saved game is
+v2: the motor's state *plus* the shots so far, so a resumed game is proven
+from round 1; a save whose round does not match its shots is refused, and an
+old v1 save can be finished but is not reported. `game.js` only draws and
+plays sound.
+
 **BBTAN's music is composed live from the board** (`musica.js`, UMD over
 `Chip`, tested by `musica.test.cjs`); it no longer loads `temas.js`, though
 `T.bbtan` stays in the songbook. `game.js` sends `BBTANAudio.mood({filas,
