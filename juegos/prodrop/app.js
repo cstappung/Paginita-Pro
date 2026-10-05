@@ -209,7 +209,8 @@ function bestCopy(uid) {
   const l = copies[uid] || [], gr = l.filter(cp => cp.gr).sort((a, b) => b.g - a.g);
   return gr[0] || l[l.length - 1];
 }
-function updateColCount() { $('#colCount').textContent = `${ownedCount()}/${TOTAL}`; }
+/* El total va aparte: en un teléfono de 320 px solo cabe cuántas tienes. */
+function updateColCount() { $('#colCount').innerHTML = `${ownedCount()}<span class="col-tot">/${TOTAL}</span>`; }
 
 /* ---------------- RENDER DE CARTAS ---------------- */
 // el reverso es de la colección: el de componentes es una placa con un rayo

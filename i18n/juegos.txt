@@ -477,11 +477,14 @@ Activar el sonido || Unmute || Attiva audio
 Volumen del juego || Game volume || Volume del gioco
 Efectos || Effects || Effetti
 Volumen de los efectos || Effects volume || Volume degli effetti
-# Etiqueta de los juegos que se juegan en el celular (MOVIL en salon-datos.js)
+# Etiquetas de dónde se juega (CONTROLES, generado por colabtex/scripts/build-controles.js)
 Celular || Mobile || Cellulare
-Funciona en el celular || Works on mobile || Funziona sul cellulare
-Solo en computador: se juega con teclado || Computer only: needs a keyboard || Solo su computer: serve la tastiera
-Solo en computador: se juega con teclado y ratón || Computer only: needs a keyboard and mouse || Solo su computer: servono tastiera e mouse
+PC || PC || PC
+Se juega en el celular y en el PC || Plays on mobile and PC || Si gioca su cellulare e PC
+Se juega en el celular || Plays on mobile || Si gioca su cellulare
+Solo en PC || PC only || Solo su PC
+Solo en PC: se juega con teclado || PC only: needs a keyboard || Solo su PC: serve la tastiera
+Solo en PC: se juega con teclado y ratón || PC only: needs a keyboard and mouse || Solo su PC: servono tastiera e mouse
 # Atasco (juegos/club/atasco/): marcador, botones, pisos y pantalla final.
 Saca el auto rojo del estacionamiento || Get the red car out of the car park || Porta fuori l'auto rossa dal parcheggio
 NIVEL || LEVEL || LIVELLO

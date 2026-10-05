@@ -1,4 +1,9 @@
 // sortEm - Instant zen mode puzzle with retro vibes
+//
+// @controles: teclado
+// (Lo lee colabtex/scripts/build-controles.js para las etiquetas del salón:
+// el único `pointerdown` de abajo elige el modo en la portada, y el juego en
+// sí se mueve solo con flechas y espacio, así que no va en el celular.)
 
 // =============================================================================
 // ARCADE BUTTON MAPPING

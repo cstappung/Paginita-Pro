@@ -261,9 +261,9 @@ export function crearRanks(ctx) {
     t.innerHTML = `
       <thead><tr>
         <th class="jg-th-n">#</th><th>Jugador</th>
-        <th class="jg-num">Jugadas</th><th class="jg-num">Ganadas</th>
-        <th class="jg-num">Perdidas</th><th class="jg-num">Empates</th>
-        <th class="jg-num">%</th>${general ? `<th class="jg-num">Juegos</th>` : ""}<th class="jg-num">Racha</th>
+        <th class="jg-num jg-opc">Jugadas</th><th class="jg-num jg-opc">Ganadas</th>
+        <th class="jg-num jg-opc">Perdidas</th><th class="jg-num jg-opc">Empates</th>
+        <th class="jg-num jg-opc">%</th>${general ? `<th class="jg-num jg-opc">Juegos</th>` : ""}<th class="jg-num jg-opc">Racha</th>
         <th class="jg-num jg-pts">Puntos</th>
       </tr></thead><tbody>${orden.map((f, i) => fila(f, i)).join("")}</tbody>`;
   }
@@ -276,15 +276,15 @@ export function crearRanks(ctx) {
       <td class="jg-th-n">${puesto(i)}</td>
       <td class="jg-jug" data-perfil="${esc(f.uid)}" data-nombre="${esc(f.nombre || "")}">
         ${foto(f, 26)}
-        <span>${esc(f.nombre || "Sin nombre")}${yo ? " <b>(tú)</b>" : ""}</span>
+        <span>${esc(f.nombre || "Sin nombre")}${yo ? " <b>(tú)</b>" : ""}<small class="jg-jug-sub">${f.jugadas || 0} jugadas · ${f.ganadas || 0} ganadas</small></span>
       </td>
-      <td class="jg-num">${f.jugadas || 0}</td>
-      <td class="jg-num jg-gan">${f.ganadas || 0}</td>
-      <td class="jg-num">${f.perdidas || 0}</td>
-      <td class="jg-num">${f.empates || 0}</td>
-      <td class="jg-num"><span class="jg-barra-pc"><i style="width:${pc}%"></i></span>${pc}%</td>
-      ${juego === "general" ? `<td class="jg-num">${f.juegos || 0}</td>` : ""}
-      <td class="jg-num">${f.mejorRacha || 0}</td>
+      <td class="jg-num jg-opc">${f.jugadas || 0}</td>
+      <td class="jg-num jg-gan jg-opc">${f.ganadas || 0}</td>
+      <td class="jg-num jg-opc">${f.perdidas || 0}</td>
+      <td class="jg-num jg-opc">${f.empates || 0}</td>
+      <td class="jg-num jg-opc"><span class="jg-barra-pc"><i style="width:${pc}%"></i></span>${pc}%</td>
+      ${juego === "general" ? `<td class="jg-num jg-opc">${f.juegos || 0}</td>` : ""}
+      <td class="jg-num jg-opc">${f.mejorRacha || 0}</td>
       <td class="jg-num jg-pts">${f.puntos || 0}</td>
     </tr>`;
   }

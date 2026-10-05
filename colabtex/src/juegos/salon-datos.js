@@ -2,10 +2,11 @@
  * El salón de juegos, en datos: qué hay para jugar solo, qué es
  * multijugador, qué es nuevo y qué puede abrir un invitado.
  *
- * Es la mitad pura del vestíbulo (la otra, `salon.js`, pinta). No importa
- * nada —los juegos multijugador llegan como parámetro, desde la tabla
- * `JUEGOS` de `motor.js`— y así `tests/salon.test.cjs` lo carga en Node
- * sin navegador, igual que a `motor.js`.
+ * Es la mitad pura del vestíbulo (la otra, `salon.js`, pinta). Solo
+ * importa la tabla generada de controles —los juegos multijugador llegan
+ * como parámetro, desde la tabla `JUEGOS` de `motor.js`— y así
+ * `tests/salon.test.cjs` lo carga en Node sin navegador, igual que a
+ * `motor.js`.
  *
  * Tres decisiones:
  *
@@ -24,6 +25,7 @@
  *   corre entero en el navegador. Esconder los multijugador al invitado
  *   le escondería también la razón para crearse una cuenta.
  */
+import { CONTROLES } from "./controles-datos.js";
 
 /* Los juegos de un jugador. `tipo: "club"` es un juego del Solo Club, con
    su clasificación por modalidad; `tipo: "bots"` es la práctica suelta de
@@ -143,11 +145,11 @@ export function entradasSalon(juegos, orden = Object.keys(juegos)) {
     return {
       id: k, modo: "multi", nombre: j.nombre, lema: j.lema, color: j.color, alta: j.alta,
       genero: GENERO[k] || "", cupo: cupoTexto(j), grupo: j.cupo > 2, reglas: k,
-      practica: practicaDe(k) ? practicaDe(k).id : "", movil: enMovil(k), pide: pideEnVez(k)
+      practica: practicaDe(k) ? practicaDe(k).id : "", movil: enMovil(k), pc: enPc(k), pide: pideEnVez(k)
     };
   });
   const solos = SOLOS.map(s => Object.assign({}, s, {
-    modo: s.tipo === "bots" ? "bots" : "solo", movil: enMovil(s.id), pide: pideEnVez(s.id),
+    modo: s.tipo === "bots" ? "bots" : "solo", movil: enMovil(s.id), pc: enPc(s.id), pide: pideEnVez(s.id),
     color: s.juego && juegos[s.juego] ? juegos[s.juego].color : COLOR_SOLO[s.id] || "#f6bc64"
   }));
   return { solos, multi };
@@ -159,37 +161,31 @@ export const COLOR_SOLO = {
   sopa: "#ffb070", electro: "#fbbf24", sudoku: "#ff2fb4", fanal: "#d9a85b", atasco: "#e8322f", frontera: "#fb923c"
 };
 
-/* Si se puede jugar en un celular: con el dedo y en una pantalla de 390 px.
-   Se decidió jugando cada uno en un teléfono emulado (táctil, 390 × 844),
-   no mirando el tamaño de su pantalla: un juego que cabe pero solo se mueve
-   con flechas no se puede jugar. `true` es que sí (tiene botones táctiles,
-   como Tetris, Snake o FANAL, o se juega tocando, como las cartas y los
-   tableros); un texto es que no, y dice qué hace falta en su lugar.
+/* Dónde se juega cada entrada: en el celular (con el dedo), en el PC
+   (teclado o ratón) o en los dos. No es una lista a mano: la escribe
+   `scripts/build-controles.js` en cada `npm run build`, leyendo con qué
+   escucha el código de cada juego (toques, puntero, clics, flechas, ratón
+   de mira), así que un juego nuevo trae sus etiquetas sin que nadie se
+   acuerde de ponérselas. Cuando la lectura se equivoca, el juego lo corrige
+   con un comentario `@controles:` en su propio código (sortEm lo hace).
+   Una clave que no está en la tabla no se promete: ni etiqueta ni aviso. */
+const plataforma = id => (typeof CONTROLES !== "undefined" && CONTROLES[id]) || null;
+export const enMovil = id => !!(plataforma(id) && plataforma(id).movil);
+export const enPc = id => !!(plataforma(id) && plataforma(id).pc);
+/* Lo que pide en lugar del dedo («teclado», «teclado y ratón»), solo para
+   lo que no va en el celular. */
+export const pideEnVez = id => plataforma(id) && !plataforma(id).movil ? plataforma(id).pide : "";
 
-   Todos los juegos del salón tienen que estar aquí, multijugador y de un
-   jugador: `tests/salon.test.cjs` falla si alguno falta. Así un juego nuevo
-   no recibe la etiqueta 📱 sin que alguien lo haya probado en un teléfono,
-   ni la pierde en silencio. */
-export const MOVIL = {
-  // Multijugador (las salas de `JUEGOS`)
-  orbita: true, escondite: true, cartas: true, cuadritos: true, worms: true,
-  reversi: true, cadena: true, flip7: true, cacho: true, uno: true,
-  catan: true, presidente: true, spicy: true, tetris: true, clue: true,
-  ajedrez: true, pokemon: true,
-  yemas: "teclado y ratón",   // disparos en primera persona: captura el cursor y se mueve con WASD
-  boxhead: "teclado",         // se mueve y dispara solo con el teclado
-  // Un jugador (`SOLOS`)
-  minas: true, snake: true, tetrisclub: true, bbtan: true, sopa: true,
-  electro: true, sudoku: true, fanal: true, atasco: true, frontera: true,
-  "bots-worms": true, "bots-clue": true,
-  sortem: "teclado",          // flechas y espacio, sin controles en pantalla
-  "bots-yemas": "teclado y ratón",
-  "bots-boxhead": "teclado"
-};
-/* Si va en el celular, y si no, qué pide en su lugar («teclado»). Una
-   clave que no está en la tabla no se promete: ni etiqueta ni aviso. */
-export const enMovil = id => MOVIL[id] === true;
-export const pideEnVez = id => typeof MOVIL[id] === "string" ? MOVIL[id] : "";
+/* A qué juego del salón se refiere una novedad, para ponerle las mismas
+   etiquetas: el que nombra (`juego`), el de la sala que abre (`sala.k`) o
+   el de un jugador cuya ruta lleva (`#solo/atasco`). PRODROP no es un
+   juego del salón y se queda sin ellas. */
+export function juegoDeNovedad(n) {
+  if (n.juego) return n.juego;
+  if (n.sala && n.sala.k) return n.sala.k;
+  const s = n.ruta ? SOLOS.find(x => x.ruta === n.ruta) : null;
+  return s ? s.id : "";
+}
 
 /* Si el invitado puede abrirla. Un multijugador necesita cuenta siempre;
    lo de un jugador nunca: corre en el navegador y, sin cuenta, solo deja

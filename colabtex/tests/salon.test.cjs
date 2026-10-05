@@ -7,7 +7,8 @@ const fs=require('node:fs'),vm=require('node:vm');
 const sin=f=>fs.readFileSync(f,'utf8').replace(/^import [\s\S]*?;$/mg,'').replace(/\bexport\s+/g,'');
 const ctx={crypto:require('node:crypto').webcrypto};vm.createContext(ctx);
 vm.runInContext(sin('src/juegos/motor.js')+'\n;globalThis.__J=JUEGOS;',ctx);
-vm.runInContext(sin('src/juegos/salon-datos.js')+'\n;globalThis.__S={SOLOS,GENERO,practicaDe,diasDesde,nuevos,cupoTexto,entradasSalon,bloqueado,modoSalon,esClaveInvitado,MOTIVO_CUENTA,COLOR_SOLO,MOVIL,enMovil,pideEnVez};',ctx);
+vm.runInContext(sin('src/juegos/controles-datos.js'),ctx);
+vm.runInContext(sin('src/juegos/salon-datos.js')+'\n;globalThis.__S={SOLOS,GENERO,practicaDe,diasDesde,nuevos,cupoTexto,entradasSalon,bloqueado,modoSalon,esClaveInvitado,MOTIVO_CUENTA,COLOR_SOLO,CONTROLES,enMovil,enPc,pideEnVez,juegoDeNovedad};',ctx);
 const S=ctx.__S,J=ctx.__J;
 const main=fs.readFileSync('src/juegos-main.js','utf8');
 const reglas=fs.readFileSync('src/juegos/reglas.js','utf8');
@@ -83,21 +84,28 @@ test('el modo guardado vuelve a «todos» si no es uno de los tres',()=>{
  assert.equal(S.modoSalon('x'),'todos');assert.equal(S.modoSalon(null),'todos');
 });
 
-test('cada juego dice si va en el celular, y los que no dicen qué piden',()=>{
+test('cada juego dice dónde se juega, y los que no van en el celular dicen qué piden',()=>{
  const {multi,solos}=S.entradasSalon(J);
- /* Un juego nuevo tiene que declararse en MOVIL: sin eso no recibiría la
-    etiqueta aunque funcionara, o la recibiría sin que nadie lo probara. */
+ /* La tabla la escribe el build leyendo el código (tests/controles.test.cjs
+    comprueba que está al día); aquí, que el salón la usa entera. */
  for(const e of [...multi,...solos]){
-  const v=S.MOVIL[e.id];
-  assert.ok(v===true||(typeof v==='string'&&v.length>0),e.id+': falta decidir si va en el celular (MOVIL en salon-datos.js)');
-  assert.equal(e.movil,v===true,e.id);assert.equal(e.pide,v===true?'':v,e.id);
+  const c=S.CONTROLES[e.id];
+  assert.ok(c,e.id+': no está en controles-datos.js (corre npm run build)');
+  assert.equal(e.movil,c.movil,e.id);assert.equal(e.pc,c.pc,e.id);
+  assert.equal(e.pide,c.movil?'':c.pide,e.id);
+  if(!e.movil)assert.match(e.pide,/^teclado( y ratón)?$/,e.id+': no va en el celular y no dice qué pide');
  }
- /* Y nada sobra: una clave que no es un juego del salón es un error de tipeo. */
- const ids=new Set([...multi,...solos].map(e=>e.id));
- for(const k of Object.keys(S.MOVIL))assert.ok(ids.has(k),'MOVIL nombra un juego que no está en el salón: '+k);
- /* Los que se juegan con teclado (o teclado y ratón) no llevan la etiqueta. */
- for(const k of ['yemas','bots-yemas','boxhead','bots-boxhead','sortem'])assert.equal(S.enMovil(k),false,k);
- assert.equal(S.pideEnVez('yemas'),'teclado y ratón');assert.equal(S.pideEnVez('sortem'),'teclado');
- for(const k of ['uno','ajedrez','tetris','minas','snake','tetrisclub','fanal','bots-worms'])assert.equal(S.enMovil(k),true,k);
- assert.equal(S.enMovil('no-existe'),false);assert.equal(S.pideEnVez('no-existe'),'');
+ assert.equal(S.enMovil('no-existe'),false);assert.equal(S.enPc('no-existe'),false);assert.equal(S.pideEnVez('no-existe'),'');
+ assert.equal(S.pideEnVez('uno'),'','lo que va en el celular no pide nada');
+});
+
+test('una novedad lleva las etiquetas del juego al que lleva',()=>{
+ assert.equal(S.juegoDeNovedad({juego:'fanal'}),'fanal');
+ assert.equal(S.juegoDeNovedad({sala:{k:'boxhead'}}),'boxhead');
+ assert.equal(S.juegoDeNovedad({ruta:'#solo/atasco'}),'atasco');
+ assert.equal(S.juegoDeNovedad({ruta:'#solo/tetris'}),'tetrisclub','la ruta del club lleva a su entrada, no al Tetris de sala');
+ assert.equal(S.juegoDeNovedad({ruta:'#cartas'}),'','PRODROP no es un juego del salón');
+ /* Y las de verdad: cada novedad que abre una sala o un juego del club lo encuentra. */
+ const nov=main.slice(main.indexOf('const NOVEDADES'),main.indexOf('];',main.indexOf('const NOVEDADES')));
+ for(const m of nov.matchAll(/ruta: "(#solo\/\w+)"|sala: \{ k: "(\w+)"/g)){const n=m[1]?{ruta:m[1]}:{sala:{k:m[2]}};assert.ok(S.CONTROLES[S.juegoDeNovedad(n)],JSON.stringify(n));}
 });

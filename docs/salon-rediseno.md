@@ -129,28 +129,38 @@ los juegos de un jugador tienen el botón redondo ▶.
 | **Nueva** | etiqueta verde «NUEVO» con un brillo que pasa cada tanto | los 4 juegos que llegaron últimos, si llegaron hace menos de 14 días |
 | **Más jugado** | etiqueta dorada «★ Más jugado» (solo ★ en tarjetas angostas) | el multijugador con más partidas |
 | **Bloqueada para invitados** | portada en gris oscuro, candado y «Requiere cuenta» | invitado + juego multijugador |
-| **Celular** | etiqueta blanca con un teléfono celeste, bajo la insignia de modo | el juego se puede jugar con el dedo en un teléfono |
+| **Celular · PC** | píldora blanca bajo la insignia de modo: un teléfono celeste y una pantalla gris | dónde se puede jugar: con el dedo en un teléfono, con teclado o ratón en un PC |
 
-### La etiqueta «Celular»
+### Las etiquetas «Celular» y «PC»
 
-Dice qué juegos funcionan en un teléfono. Se decidió **jugando cada uno en
-un celular emulado** (táctil, 390 × 844), no mirando si su pantalla cabe:
-sortEm, por ejemplo, cabe entero, pero solo se mueve con las flechas.
+Dicen dónde se puede jugar cada juego, en una sola píldora bajo la insignia
+de modo: **«Celular · PC»** si va en los dos, o solo **«PC»** si pide
+teclado. La ficha lo dice en una frase: «Se juega en el celular y en el PC»
+o «Solo en PC: se juega con teclado (y ratón)».
 
-- **Sí (28)**: los que tienen botones táctiles (Tetris, Snake, FANAL,
-  Circuit Breakers…) y los que se juegan tocando (cartas, tableros, Pokémon,
-  Clue, Mina Club, la Sopa…).
-- **No (5)**: Yemas y su práctica (teclado y ratón, con el cursor
-  capturado), Boxhead y su práctica (teclado) y sortEm (teclado). Su ficha lo
-  avisa: «Solo en computador: se juega con teclado».
+**No hay una lista a mano.** `colabtex/scripts/build-controles.js` lee, en
+cada `npm run build`, el código de cada juego y mira con qué escucha:
 
-La lista vive en `MOVIL` (`salon-datos.js`), y la prueba del salón falla si
-un juego nuevo no está en ella: nadie recibe la etiqueta sin que se haya
-probado en un teléfono.
+- toques (`touchstart`, `pointer:coarse`) o puntero y clics → va en el
+  celular;
+- ratón de mira (`requestPointerLock`) sin toques → no: «teclado y ratón»
+  (Yemas);
+- flechas o WASD sin toques ni puntero → no: «teclado» (Boxhead).
 
-| La etiqueta en las miniaturas | Ficha de un juego que no va en el celular |
+Con eso escribe `controles-datos.js`, que es lo que lee el salón. Un juego
+nuevo trae sus etiquetas solo. Cuando la lectura se equivoca, el juego lo
+corrige con un comentario `@controles:` en su propio código: sortEm escucha
+un `pointerdown`, pero solo para elegir el modo en la portada, y se juega
+con flechas, así que lleva `// @controles: teclado`.
+
+La lectura se comprobó contra lo que se probó a mano jugando cada juego en
+un celular emulado (táctil, 390 × 844): acierta en los 34. Si un juego
+cambia de controles, la prueba `tests/controles.test.cjs` avisa de que la
+tabla quedó vieja hasta que se corra el build.
+
+| Las etiquetas en las miniaturas | Ficha de un juego que no va en el celular |
 |---|---|
-| ![Etiqueta Celular bajo la insignia de modo](salon/movil-etiqueta-celular.png) | ![Aviso «Solo en computador» en la ficha de Yemas](salon/movil-ficha-solo-computador.png) |
+| ![Etiquetas Celular y PC bajo la insignia de modo](salon/movil-etiqueta-celular.png) | ![Aviso «Solo en PC» en la ficha de Yemas](salon/movil-ficha-solo-computador.png) |
 
 ![Rejilla multijugador con sesión en el celular](salon/movil-multijugador.png)
 
