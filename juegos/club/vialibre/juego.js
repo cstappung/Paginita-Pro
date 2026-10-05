@@ -99,7 +99,8 @@ function nuevaCarrera() {
     cuenta: { monedas: 0, saltos: 0, rodadas: 0, distancia: 0, puntos: 0, poderes: 0, techos: 0, estrellas: 0, esquivar: 0, patinetas: 0, mochilas: 0 },
     techos: new Set(), esquivados: new Set(), avisados: new Set(),
     estacion: M.estacionDe(0), cambio: null, banner: 2.5,
-    seguirVeces: 0, muerte: null, recordAvisado: false, finalizada: false, quieto: 0
+    seguirVeces: 0, muerte: null, recordAvisado: false, finalizada: false, quieto: 0,
+    extra: 0, potVentana: 6, potUsado: {}           // el potenciador de puntos (+5), y cuánto quedan los botones de potenciadores
   };
 }
 
@@ -114,6 +115,7 @@ document.addEventListener('keydown', e => {
   // el código secreto de siempre, en la portada: desbloquea el aspecto dorado
   if (estado === 'portada' && !panel) { konami = e.code === KONAMI[konami] ? konami + 1 : (e.code === KONAMI[0] ? 1 : 0); if (konami === KONAMI.length) { konami = 0; desbloquea('dorado', '¡Código secreto! Aspecto Dorado desbloqueado'); } }
   if (e.code === 'KeyM') { alternaSonido(); return; }
+  if ((e.code === 'Digit1' || e.code === 'Digit2') && estado === 'jugando') { usaPotenciador(Object.keys(M.POTENCIADORES)[e.code === 'Digit1' ? 0 : 1]); return; }
   if (e.code === 'KeyP' || e.code === 'Escape') { if (estado === 'jugando') pausar(); else if (estado === 'pausa' && !panel) seguirJugando(); else if (panel) cierraPanel(); e.preventDefault(); return; }
   if ((e.code === 'Enter' || e.code === 'Space') && estado === 'portada' && !panel) { e.preventDefault(); empezar(); return; }
   const a = TECLA[e.code];
@@ -339,7 +341,31 @@ function recoge(dt) {
     }
   }
 }
-const multiplicador = () => M.multiplicador({ base: progreso.retos.nivel, estrellas: c.estrellas, doble: c.poderes.doble > 0 });
+const multiplicador = () => M.multiplicador({ base: progreso.retos.nivel, estrellas: c.estrellas, doble: c.poderes.doble > 0, extra: c.extra });
+
+/* ---- potenciadores (Arranque y Potenciador +5) ----
+   Los primeros segundos de la carrera aparecen dos botones (o las teclas 1
+   y 2) con los que tengas. Usarlos los gasta. */
+function pintaPots() {
+  const el = $('hudPots'), hay = c && c.potVentana > 0 && Object.keys(M.POTENCIADORES).some(k => progreso.potenciadores[k] > 0 && !c.potUsado[k]);
+  el.hidden = !hay;
+  if (!hay) return;
+  el.innerHTML = Object.entries(M.POTENCIADORES).map(([k, P], i) => progreso.potenciadores[k] > 0 && !c.potUsado[k]
+    ? `<button type="button" data-pot="${k}" aria-label="${P.nombre} (tecla ${i + 1})"><i>${ICONOS[k === 'arranque' ? 'cohete' : 'mas5']}</i><span>${P.nombre}</span><b translate="no">×${progreso.potenciadores[k]}</b><kbd>${i + 1}</kbd></button>` : '').join('');
+}
+function usaPotenciador(k) {
+  if (!c || estado !== 'jugando' || c.potVentana <= 0 || c.potUsado[k] || !(progreso.potenciadores[k] > 0)) return;
+  progreso.potenciadores[k]--; c.potUsado[k] = true; guardar();
+  if (k === 'arranque') {                                       // empezar volando con la mochila, sin chocar con nada
+    const seg = M.POTENCIADORES.arranque.seg;
+    c.poderes.mochila = seg; c.invulnerable = Math.max(c.invulnerable, seg + 1.5);
+    c.activos.push(...c.gen.monedasCielo(c.D + 12, c.D + 12 + c.V * seg, c.r.carril));
+    sonido.mochila(true); sonido.poder(); aviso('¡Arranque! A volar');
+  } else {                                                      // +5 al multiplicador durante toda la carrera
+    c.extra = M.POTENCIADORES.puntos.extra; sonido.multiplicador(); aviso(`Potenciador: multiplicador ×${multiplicador()}`);
+  }
+  pintaPots();
+}
 
 /* ---- el paso de una carrera ---- */
 function actualiza(dt) {
@@ -385,6 +411,7 @@ function actualiza(dt) {
     if (c.introPersecucion > 0) { c.introPersecucion -= dt; if (c.introPersecucion <= 0 && c.tropiezo <= 0) c.perseguidorObj = 0; }
     estaciones();
     retosEnVivo(dt);
+    if (c.potVentana > 0) { c.potVentana -= dt; if (c.potVentana <= 0) pintaPots(); }
   } else {
     c.muerte.t += Math.max(dt, dtRealUltimo);                     // en un aparato lento la pausa tras el choque no se alarga
     if (c.muerte.t > 1.4 && estado === 'muerte') muestraFin();
@@ -464,6 +491,7 @@ function empezar() {
   banner(c.estacion.nombre, c.estacion.lema);
   if (esTactil && progreso.totales.carreras < 3) aviso('Desliza el dedo: ← → carril · ↑ saltar · ↓ rodar');
   if (Club) Club.category('club-vialibre-carrera');
+  pintaPots();
   lienzo.focus({ preventScroll: true });
   midiendo = { t: 0, n: 0, suma: 0 };
 }
@@ -525,10 +553,13 @@ function cierraCarrera() {
   progreso.records.puntos = Math.max(progreso.records.puntos, puntos);
   progreso.records.distancia = Math.max(progreso.records.distancia, metros);
   progreso.records.monedas = Math.max(progreso.records.monedas, c.monedas);
+  const nivelAntes = progreso.retos.nivel;
   const res = M.avanzaRetos(progreso.retos, c.cuenta, true);
   progreso.retos = res.retos;
+  const premio = res.subio ? M.premioSet(nivelAntes) : 0;         // completar el set también paga
+  progreso.monedas += premio;
   guardar();
-  if (res.subio) { sonido.multiplicador(); aviso(`¡Retos cumplidos! Multiplicador base ×${progreso.retos.nivel}`); }
+  if (res.subio) { sonido.multiplicador(); aviso(`¡Set completo! Multiplicador ×${progreso.retos.nivel} y +${fmt(premio)} monedas`); }
   // a la clasificación: la carrera siempre (cuenta como partida del club); la distancia, solo si es récord
   if (Club && Club.result && puntos >= 1) {
     Club.result({ categoria: 'club-vialibre-carrera', puntos: Math.min(1e9, puntos), tiempo: ms });
@@ -616,7 +647,7 @@ function pintaHud(dt) {
   const lista = [];
   for (const [kk, v] of Object.entries(c.poderes)) if (v > 0) {
     const total = kk === 'patineta' ? M.DURACION_PATINETA : M.duracionPoder(kk, progreso.mejoras[kk]);
-    lista.push(`<li class="p-${kk}"><b>${kk === 'patineta' ? '🛹' : M.PODERES[kk].icono}</b><span><i style="--k:${(v / total).toFixed(3)}"></i></span></li>`);
+    lista.push(`<li class="p-${kk}"><b>${ICONOS[kk === 'patineta' ? 'patineta' : ICONO_PODER[kk]]}</b><span><i style="--k:${(v / total).toFixed(3)}"></i></span></li>`);
   }
   const html = lista.join('');
   if (hudCache.poderes !== html.replace(/--k:[\d.]+/g, '')) { hudCache.poderes = html.replace(/--k:[\d.]+/g, ''); $('hudPoderes').innerHTML = html; }
@@ -666,8 +697,19 @@ const ICONOS = {
   doble: svg(`<rect x="2.5" y="6" width="27" height="20" rx="6" fill="#8b5cf6" ${T}/><path d="M8 12l6 8M14 12l-6 8" stroke="#fff" stroke-width="3" stroke-linecap="round"/><path d="M17 13.6c.6-1.6 2-2.3 3.6-2.3 2 0 3.4 1.2 3.4 3 0 2.4-3 3.6-6.8 5.9h7" fill="none" stroke="#fff" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"/>`),
   patineta: svg(`<path d="M3 13.5c0-2 1.5-3 3.5-3h19c2 0 3.5 1 3.5 3s-1.5 3-3.5 3h-19c-2 0-3.5-1-3.5-3z" fill="#7b2ff7" ${T}/><path d="M6.5 13.5h19" stroke="#00f5d4" stroke-width="2"/><circle cx="9" cy="22" r="3.2" fill="#ffd23f" ${T}/><circle cx="23" cy="22" r="3.2" fill="#ffd23f" ${T}/>`),
   candado: svg(`<path d="M10 14v-3a6 6 0 0 1 12 0v3" fill="none" stroke="#142357" stroke-width="3"/><rect x="7" y="14" width="18" height="14" rx="3" fill="#ffd23f" ${T}/><circle cx="16" cy="21" r="2.2" fill="#142357"/>`),
-  check: svg(`<path d="M7 16.5l6 6 12-13" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>`)
+  check: svg(`<path d="M7 16.5l6 6 12-13" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>`),
+  play: svg(`<path d="M10 6.5v19l15-9.5z" fill="#fff" stroke="#0e5a10" stroke-width="2.4" stroke-linejoin="round"/>`),
+  cohete: svg(`<path d="M16 2.5c5 3.5 7 9 6.5 15.5H9.5C9 11.5 11 6 16 2.5z" fill="#eaf1fb" ${T}/><circle cx="16" cy="11.5" r="2.8" fill="#5cc0ff" stroke="#142357" stroke-width="2"/><path d="M9.5 15l-4 5 4 1M22.5 15l4 5-4 1" fill="#ff3d4f" ${T}/><path d="M12.5 21.5c.5 3 2 5.5 3.5 8 1.5-2.5 3-5 3.5-8z" fill="#ff8a1f" stroke="#c4500a" stroke-width="1.6" stroke-linejoin="round"/>`),
+  mas5: svg(`<rect x="2.5" y="6" width="27" height="20" rx="6" fill="#ffd23f" ${T}/><path d="M7 16h7M10.5 12.5v7" stroke="#142357" stroke-width="3" stroke-linecap="round"/><path d="M24 11.3h-5.2l-.6 4.3c.7-.5 1.5-.7 2.4-.7 2 0 3.4 1.3 3.4 3.1s-1.5 3.2-3.6 3.2c-1.4 0-2.6-.6-3.1-1.6" fill="none" stroke="#142357" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>`),
+  flecha: svg(`<path d="M4 16h20M17 8l8 8-8 8" fill="none" stroke="#fff" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/>`),
+  tren: svg(`<rect x="6" y="3.5" width="20" height="23" rx="6" fill="#ffb21f" ${T}/><rect x="9" y="7.5" width="14" height="8" rx="2" fill="#5cc0ff" stroke="#142357" stroke-width="2"/><circle cx="11" cy="21" r="2" fill="#fff6c9" stroke="#142357" stroke-width="1.6"/><circle cx="21" cy="21" r="2" fill="#fff6c9" stroke="#142357" stroke-width="1.6"/><path d="M9 26.5l-2.5 3M23 26.5l2.5 3" stroke="#142357" stroke-width="2.4" stroke-linecap="round"/>`),
+  salto: svg(`<path d="M16 26V8M8.5 14.5 16 7l7.5 7.5" fill="none" stroke="#2fb52f" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 28.5h20" stroke="#142357" stroke-width="2.6" stroke-linecap="round"/>`),
+  rueda: svg(`<path d="M16 5v18M8.5 16.5 16 24l7.5-7.5" fill="none" stroke="#1f7ae0" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 3.5h20" stroke="#142357" stroke-width="2.6" stroke-linecap="round"/>`),
+  bandera: svg(`<path d="M8 29V4" stroke="#142357" stroke-width="2.8" stroke-linecap="round"/><path d="M8.5 5h17l-3.5 5 3.5 5h-17z" fill="#ff3d4f" ${T}/>`)
 };
+/* El ícono de cada clase de misión. */
+const ICONO_RETO = { monedas: 'moneda', monedasTotal: 'moneda', saltos: 'salto', rodadas: 'rueda', distancia: 'bandera', puntos: 'estrella',
+  poderes: 'rayo', techos: 'tren', estrellas: 'estrella', esquivar: 'tren', patinetas: 'patineta', mochilas: 'mochila' };
 const ICONO_PODER = { iman: 'iman', mochila: 'mochila', zapatillas: 'zapatilla', doble: 'doble' };
 const TINTE_PODER = { iman: '#ffd5d9', mochila: '#d7e6ff', zapatillas: '#d3f6db', doble: '#e6dcff' };
 function ponIconos(raiz = document) {
@@ -692,6 +734,9 @@ function pintaPortada() {
   const lista = M.retosDeNivel(progreso.retos.nivel);
   const hechos = lista.filter((r, i) => progreso.retos.avance[i] >= r.meta).length;
   ponTexto('portadaRetosN', `${hechos}/${lista.length}`);
+  $('portadaMisBarra').style.setProperty('--k', (hechos / lista.length).toFixed(3));
+  // el globito «!» de Misiones: hay algo que hacer ahí (una misión se puede saltar con lo que tienes, o el set está a una misión)
+  $('portadaRetosG').hidden = !(progreso.retos.nivel < M.MAX_BASE && (hechos === 2 || progreso.monedas >= M.costoSaltar(progreso.retos.nivel)));
   ponTexto('portadaBoletos', `${progreso.boletos.length}/7`);
   ponTexto('barRecord', fmt(progreso.records.puntos));
   ponTexto('barMonedas', fmt(progreso.monedas));
@@ -700,7 +745,7 @@ function pintaPortada() {
 /* Tocar cualquier parte vacía de la portada empieza a correr, como «toca
    para jugar»: solo los botones y los contadores no cuentan. */
 $('capaPortada').addEventListener('click', e => {
-  if (estado !== 'portada' || panel || e.target.closest('button, .pildora, .logo')) return;
+  if (estado !== 'portada' || panel || e.target.closest('button, .contador, .p-record, .logo')) return;
   empezar();
 });
 /** Los tres retos con su barra de avance (en la portada, en el panel y en el fin). */
@@ -712,10 +757,37 @@ function pintaRetos(el, conCarrera) {
     return `<li class="${ok ? 'ok' : ''}"><span>${ok ? '✔ ' : ''}${r.texto}</span><i style="--k:${(v / r.meta).toFixed(3)}"></i><small translate="no">${fmt(v)} / ${fmt(r.meta)}</small></li>`;
   }).join('');
 }
-function abreRetos() {
-  $('retosNivel').textContent = `Multiplicador base: ×${progreso.retos.nivel}` + (progreso.retos.nivel >= M.MAX_BASE ? ' (el máximo)' : ` · cumple los tres para llegar a ×${progreso.retos.nivel + 1}`);
-  pintaRetos($('listaRetos'), false);
-  abrePanel('capaRetos');
+function abreRetos() { pintaMisiones(); abrePanel('capaRetos'); }
+/** El panel de misiones: el multiplicador de ahora y el que viene, el premio
+    del set y las tres misiones con su barra y el botón «Saltar». Durante una
+    carrera (en pausa) no se puede saltar: la carrera en curso se aplicaría a
+    las misiones del set siguiente. */
+function pintaMisiones() {
+  const n = progreso.retos.nivel, max = n >= M.MAX_BASE;
+  $('retosSet').textContent = `Set ${n}`;
+  $('retosDe').textContent = '×' + n;
+  $('retosA').textContent = max ? 'MÁX' : '×' + (n + 1);
+  $('retosPremio').innerHTML = max ? 'Llegaste al multiplicador máximo. Las misiones siguen dando premio.'
+    : `Completa las tres para subir a <b translate="no">×${n + 1}</b> y ganar ${ICONOS.moneda}<b translate="no">${fmt(M.premioSet(n))}</b>`;
+  const lista = M.retosDeNivel(n), vivo = progreso.retos.avance, costo = M.costoSaltar(n), enCarrera = estado === 'pausa';
+  $('listaRetos').innerHTML = lista.map((r, i) => {
+    const v = Math.min(r.meta, vivo[i] || 0), ok = v >= r.meta;
+    const fin = ok ? `<em class="m-ok">${ICONOS.check}</em>`
+      : `<button type="button" class="m-saltar" data-saltar="${i}" ${enCarrera || progreso.monedas < costo ? 'disabled' : ''} title="${enCarrera ? 'Termina la carrera para saltar misiones' : 'Saltar esta misión'}">Saltar<span>${ICONOS.moneda}<b translate="no">${fmt(costo)}</b></span></button>`;
+    return `<li class="m-fila${ok ? ' ok' : ''}"><span class="m-ico">${ICONOS[ICONO_RETO[r.tipo]] || ICONOS.estrella}</span>
+      <div class="m-txt"><b>${r.texto}</b><span class="m-barra"><i style="--k:${(v / r.meta).toFixed(3)}"></i></span><small translate="no">${fmt(v)} / ${fmt(r.meta)}</small></div>${fin}</li>`;
+  }).join('');
+}
+/** Salta una misión pagando; si era la que faltaba, el set se completa ahí mismo. */
+function saltarMision(i) {
+  const n = progreso.retos.nivel, costo = M.costoSaltar(n);
+  if (estado === 'pausa' || progreso.monedas < costo) return;
+  progreso.monedas -= costo;
+  const r = M.saltaReto(progreso.retos, i);
+  progreso.retos = r.retos;
+  if (r.subio) { const premio = M.premioSet(n); progreso.monedas += premio; sonido.multiplicador(); aviso(`¡Set completo! Multiplicador ×${progreso.retos.nivel} y +${fmt(premio)} monedas`); }
+  else sonido.reto();
+  guardar(); pintaMisiones(); pintaPortada();
 }
 /* La tienda. Dos pestañas: «mejoras» (los poderes y la patineta) y
    «personajes» (los aspectos). En personajes el corredor se prueba la ropa
@@ -748,6 +820,9 @@ function pintaTienda() {
   tarjetas.push(`<li class="t-tarjeta" style="--tinte:#ecdfff"><span class="t-ico">${ICONOS.patineta}</span>
       <div class="t-info"><strong>Patineta</strong><small>Te salva de un choque (30 s)</small><span class="t-cuenta">Tienes <b translate="no">${progreso.patinetas}</b></span></div>
       <button type="button" class="t-precio" data-comprar="patineta" ${progreso.monedas < M.PRECIO_PATINETA ? 'disabled' : ''} aria-label="Comprar una patineta por ${M.PRECIO_PATINETA} monedas">${ICONOS.moneda}<b translate="no">${M.PRECIO_PATINETA}</b></button></li>`);
+  for (const [k, P] of Object.entries(M.POTENCIADORES)) tarjetas.push(`<li class="t-tarjeta" style="--tinte:${k === 'arranque' ? '#dff1ff' : '#fff1c4'}"><span class="t-ico">${ICONOS[k === 'arranque' ? 'cohete' : 'mas5']}</span>
+      <div class="t-info"><strong>${P.nombre}</strong><small>${P.texto}</small><span class="t-cuenta">Tienes <b translate="no">${progreso.potenciadores[k]}</b></span></div>
+      <button type="button" class="t-precio" data-comprar="pot:${k}" ${progreso.monedas < P.precio ? 'disabled' : ''} aria-label="Comprar ${P.nombre} por ${fmt(P.precio)} monedas">${ICONOS.moneda}<b translate="no">${fmt(P.precio)}</b></button></li>`);
   $('tiendaPoderes').innerHTML = tarjetas.join('');
   // los personajes: la ropa en fila, y la ficha del que se está probando
   if (!M.ASPECTOS[tiendaVer]) tiendaVer = progreso.aspecto;
@@ -775,11 +850,14 @@ document.addEventListener('click', e => {
   if (b.dataset.comprar) {
     const k = b.dataset.comprar;
     if (k === 'patineta') { if (progreso.monedas >= M.PRECIO_PATINETA) { progreso.monedas -= M.PRECIO_PATINETA; progreso.patinetas++; sonido.poder(); } }
+    else if (k.startsWith('pot:')) { const id = k.slice(4), P = M.POTENCIADORES[id]; if (P && progreso.monedas >= P.precio) { progreso.monedas -= P.precio; progreso.potenciadores[id]++; sonido.poder(); } }
     else { const p = M.precioMejora(progreso.mejoras[k]); if (p != null && progreso.monedas >= p) { progreso.monedas -= p; progreso.mejoras[k]++; sonido.poder(); } }
     guardar(); pintaTienda(); pintaPortada(); return;
   }
   if (b.dataset.aspecto) { const a = M.ASPECTOS[b.dataset.aspecto]; if (a && a.precio != null && progreso.monedas >= a.precio) { progreso.monedas -= a.precio; progreso.aspectos.push(b.dataset.aspecto); progreso.aspecto = b.dataset.aspecto; mundo.aspecto(a); aspectoMostrado = b.dataset.aspecto; sonido.poder(); guardar(); pintaTienda(); pintaPortada(); } return; }
   if (b.dataset.poner) { progreso.aspecto = b.dataset.poner; mundo.aspecto(M.ASPECTOS[b.dataset.poner]); aspectoMostrado = b.dataset.poner; sonido.reto(); guardar(); pintaTienda(); return; }
+  if (b.dataset.saltar != null) { saltarMision(Number(b.dataset.saltar)); return; }
+  if (b.dataset.pot) { usaPotenciador(b.dataset.pot); return; }
   if (b.dataset.pestana && b.getAttribute('role') === 'tab') { tiendaPestana = b.dataset.pestana; sonido.carril(); pintaTienda(); return; }
   if (b.dataset.ver) { tiendaVer = b.dataset.ver; sonido.carril(); pintaTienda(); return; }
   if (b.dataset.flecha) {                                       // las flechas pasan de un aspecto al siguiente

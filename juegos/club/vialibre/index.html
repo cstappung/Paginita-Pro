@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="../../../i18n.js?v=202610050521"></script>
+<script src="../../../i18n.js?v=202610050545"></script>
 <script src="../../audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#14182b">
@@ -67,7 +67,9 @@
         <button type="button" class="pausa" id="hudPausa" aria-label="Pausa"><b></b></button>
       </div>
       <ul class="poderes" id="hudPoderes" aria-label="Poderes activos"></ul>
-      <div class="patinetas" title="Patinetas: H o dos toques"><span aria-hidden="true">🛹</span><b id="hudPatinetas" translate="no">0</b></div>
+      <div class="patinetas" title="Patinetas: H o dos toques"><i data-icono="patineta"></i><b id="hudPatinetas" translate="no">0</b></div>
+      <!-- Los potenciadores: aparecen los primeros segundos de la carrera, si tienes alguno (teclas 1 y 2). -->
+      <div class="pots" id="hudPots" hidden></div>
     </div>
     <div class="banner" id="banner" aria-live="polite"><strong id="bannerTitulo"></strong><span id="bannerSub"></span></div>
     <div class="aviso" id="aviso" role="status" aria-live="polite"></div>
@@ -78,31 +80,34 @@
       <p class="carga-texto" id="cargaTexto">Preparando la vía…</p>
     </section>
 
-    <!-- La portada, armada como el inicio de Subway Surfers: el logo arriba a la
-         izquierda, los contadores arriba a la derecha, el corredor al centro
-         (de frente, saludando), «toca para correr» y una barra de botones
-         grandes abajo. Tocar cualquier parte vacía también empieza. -->
+    <!-- La portada, como el inicio de Subway Surfers: arriba a la izquierda tu
+         récord y el multiplicador (con el avance de las misiones), al centro
+         el logo, arriba a la derecha las monedas y las opciones; el corredor
+         de frente, saludando; el botón grande de jugar y la barra de abajo de
+         lado a lado. Tocar cualquier parte vacía también empieza. -->
     <section class="capa portada" id="capaPortada" hidden>
       <div class="p-arriba">
-        <div class="p-izq">
-          <div class="logo" translate="no" aria-label="Vía Libre"><span class="l1" data-t="VÍA">VÍA</span><span class="l2" data-t="LIBRE">LIBRE</span><em>Línea 3</em></div>
-          <div class="fichas">
-            <span class="pildora" title="Tu mejor carrera"><i data-icono="trofeo"></i><b id="portadaRecord" translate="no">0</b></span>
-            <span class="pildora base" title="El multiplicador base: sube al cumplir los tres retos"><i data-icono="estrella"></i><b id="portadaMult" translate="no">×1</b></span>
-          </div>
+        <div class="p-perfil">
+          <div class="p-record" title="Tu mejor carrera"><i data-icono="trofeo"></i><span><small>Mejor</small><b id="portadaRecord" translate="no">0</b></span></div>
+          <button type="button" class="p-mult" data-accion="retos" title="El multiplicador: sube al completar las tres misiones">
+            <span class="p-mult-n" id="portadaMult" translate="no">×1</span>
+            <span class="p-mult-txt"><small>Multiplicador</small><span class="p-mult-barra"><i id="portadaMisBarra"></i></span><em id="portadaRetosN" translate="no">0/3</em></span>
+          </button>
         </div>
+        <div class="logo chico" translate="no" aria-label="Vía Libre"><span class="l1" data-t="VÍA">VÍA</span><span class="l2" data-t="LIBRE">LIBRE</span></div>
         <div class="p-der">
-          <span class="pildora oro" title="Tus monedas"><i data-icono="moneda"></i><b id="portadaMonedas" translate="no">0</b></span>
-          <button type="button" class="redondo" data-accion="opciones" aria-label="Opciones" title="Opciones"><i data-icono="engranaje"></i></button>
-          <button type="button" class="redondo" data-accion="ayuda" aria-label="Cómo se juega" title="Cómo se juega"><i data-icono="ayuda"></i></button>
+          <span class="contador" title="Tus monedas"><i data-icono="moneda"></i><b id="portadaMonedas" translate="no">0</b><button type="button" class="mas" data-accion="tienda" aria-label="Ir a la tienda">+</button></span>
+          <button type="button" class="redondo azul" data-accion="opciones" aria-label="Opciones" title="Opciones"><i data-icono="engranaje"></i></button>
+          <button type="button" class="redondo azul" data-accion="ayuda" aria-label="Cómo se juega" title="Cómo se juega"><i data-icono="ayuda"></i></button>
         </div>
       </div>
-      <button type="button" class="tocar" data-accion="jugar"><span>¡Toca para correr!</span></button>
+      <button type="button" class="jugar" data-accion="jugar"><i data-icono="play"></i><span>¡Jugar!</span></button>
+      <p class="tocar-txt">o toca la pantalla</p>
       <nav class="p-barra" aria-label="Menú">
-        <button type="button" class="b-azul" data-accion="retos"><i data-icono="retos"></i><span>Retos</span><em class="globo" id="portadaRetosN" translate="no">0/3</em></button>
-        <button type="button" class="b-morado" data-accion="personajes"><i data-icono="personaje"></i><span>Personaje</span></button>
-        <button type="button" class="b-verde" data-accion="tienda"><i data-icono="tienda"></i><span>Tienda</span></button>
-        <button type="button" class="b-naranja" data-accion="libreta"><i data-icono="boleto"></i><span>Libreta</span><em class="globo" id="portadaBoletos" translate="no">0/7</em></button>
+        <button type="button" data-accion="retos"><span class="tile"><i data-icono="retos"></i></span><span class="nom">Misiones</span><em class="globo" id="portadaRetosG" translate="no" hidden>!</em></button>
+        <button type="button" data-accion="personajes"><span class="tile"><i data-icono="personaje"></i></span><span class="nom">Personaje</span></button>
+        <button type="button" data-accion="tienda"><span class="tile"><i data-icono="tienda"></i></span><span class="nom">Tienda</span></button>
+        <button type="button" data-accion="libreta"><span class="tile"><i data-icono="boleto"></i></span><span class="nom">Libreta</span><em class="globo" id="portadaBoletos" translate="no">0/7</em></button>
       </nav>
     </section>
 
@@ -144,13 +149,19 @@
       </div>
     </section>
 
-    <section class="capa panel" id="capaRetos" hidden>
+    <!-- Las misiones, como en Subway Surfers: tres por set; completar el set sube
+         el multiplicador en 1 (hasta ×30) y paga monedas. Se puede saltar una
+         misión pagando. -->
+    <section class="capa panel misiones" id="capaRetos" hidden>
       <div class="caja">
-        <h2>Retos</h2>
-        <p class="detalle" id="retosNivel"></p>
-        <ol class="retos" id="listaRetos"></ol>
-        <p class="nota">Cada metro vale 10 puntos × el multiplicador. El multiplicador es el base de tus retos más las estrellas que juntes en la carrera, y el poder 2× lo duplica.</p>
-        <div class="menu"><button type="button" class="opcion principal" data-accion="volver">Volver</button></div>
+        <div class="m-cab"><h2>Misiones</h2><span class="m-set" id="retosSet" translate="no">Set 1</span></div>
+        <div class="m-mult" aria-label="Multiplicador">
+          <span class="m-de" id="retosDe" translate="no">×1</span><i data-icono="flecha"></i><span class="m-a" id="retosA" translate="no">×2</span>
+        </div>
+        <p class="m-premio" id="retosPremio"></p>
+        <ol class="m-lista" id="listaRetos"></ol>
+        <p class="nota">Cada metro vale 10 puntos × el multiplicador: el de tus misiones, más las estrellas de la carrera y el potenciador; el poder 2× lo duplica.</p>
+        <div class="menu"><button type="button" class="opcion principal" data-accion="volver">Listo</button></div>
       </div>
     </section>
 

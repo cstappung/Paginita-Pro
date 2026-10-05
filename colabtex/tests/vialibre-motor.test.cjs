@@ -208,3 +208,32 @@ test('progreso: limpiar lo que viene de afuera y mezclar dos aparatos', () => {
   assert.deepEqual(m.records, { puntos: 70000, distancia: 900, monedas: 99 });
   assert.deepEqual(M.mezclaProgreso(cel, pc), m, 'da lo mismo el orden');
 });
+
+test('saltar misiones, premio por set y potenciadores', () => {
+  // saltar una misión la da por cumplida; si era la última que faltaba, el set se completa en el acto
+  const L = M.retosDeNivel(3);
+  const r1 = M.saltaReto({ nivel: 3, avance: [0, 0, 0] }, 1);
+  assert.equal(r1.subio, false);
+  assert.deepEqual(r1.retos, { nivel: 3, avance: [0, L[1].meta, 0] });
+  const r2 = M.saltaReto({ nivel: 3, avance: [L[0].meta, 0, L[2].meta] }, 1);
+  assert.equal(r2.subio, true);
+  assert.deepEqual(r2.retos, { nivel: 4, avance: [0, 0, 0] });
+  // en ×30 ya no sube más
+  const L30 = M.retosDeNivel(30);
+  assert.equal(M.saltaReto({ nivel: 30, avance: [L30[0].meta, L30[1].meta, 0] }, 2).subio, false);
+  // un índice que no existe no cambia nada
+  assert.deepEqual(M.saltaReto({ nivel: 2, avance: [5, 0, 0] }, 7).retos, { nivel: 2, avance: [5, 0, 0] });
+  // saltar y el premio crecen con el multiplicador
+  assert.ok(M.costoSaltar(10) > M.costoSaltar(1));
+  assert.ok(M.premioSet(20) > M.premioSet(2));
+  // el potenciador suma al multiplicador (antes del ×2), con tope
+  assert.equal(M.multiplicador({ base: 5, estrellas: 3, extra: 5, doble: true }), 26);
+  assert.equal(M.multiplicador({ base: 1, extra: 99 }), 11);
+  // los potenciadores se guardan, se limpian y se mezclan como algo gastable (manda el más reciente)
+  assert.deepEqual(M.progresoNuevo().potenciadores, { arranque: 1, puntos: 0 });
+  assert.deepEqual(M.limpiaProgreso({ potenciadores: { arranque: '3', puntos: -2, raro: 5 } }).potenciadores, { arranque: 3, puntos: 0 });
+  const viejo = Object.assign(M.progresoNuevo(), { at: 1, potenciadores: { arranque: 9, puntos: 9 } });
+  const nuevo = Object.assign(M.progresoNuevo(), { at: 2, potenciadores: { arranque: 0, puntos: 1 } });
+  assert.deepEqual(M.mezclaProgreso(viejo, nuevo).potenciadores, { arranque: 0, puntos: 1 });
+  for (const k of Object.keys(M.POTENCIADORES)) assert.ok(M.POTENCIADORES[k].precio > 0 && M.POTENCIADORES[k].nombre);
+});

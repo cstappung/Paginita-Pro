@@ -80,10 +80,11 @@
   const MAX_BASE = 30;           // el multiplicador base (el de los retos) llega a ×30
   const MAX_ESTRELLAS = 29;      // las estrellas de una carrera suman hasta +29
 
-  /** El multiplicador total: base de los retos + estrellas de la carrera, y
-      ×2 si el poder 2× está activo. Ejemplo: base 5, 3 estrellas y 2× → 16. */
-  function multiplicador({ base = 1, estrellas = 0, doble = false } = {}) {
-    const m = limita(base, 1, MAX_BASE) + limita(estrellas, 0, MAX_ESTRELLAS);
+  /** El multiplicador total: base de los retos + estrellas de la carrera +
+      el potenciador (si se usó uno al empezar), y ×2 si el poder 2× está
+      activo. Ejemplo: base 5, 3 estrellas, potenciador +5 y 2× → 26. */
+  function multiplicador({ base = 1, estrellas = 0, doble = false, extra = 0 } = {}) {
+    const m = limita(base, 1, MAX_BASE) + limita(estrellas, 0, MAX_ESTRELLAS) + limita(extra | 0, 0, 10);
     return m * (doble ? 2 : 1);
   }
   /** Puntos que da avanzar `metros` con ese multiplicador. */
@@ -159,6 +160,17 @@
   const duracionPoder = (clase, nivel) => (PODERES[clase] ? PODERES[clase].base : 0) + SEG_POR_NIVEL * limita(nivel | 0, 0, MAX_MEJORA);
   /** Cuánto cuesta la próxima mejora si vas en `nivel` (null si ya está al máximo). */
   const precioMejora = nivel => (nivel >= MAX_MEJORA ? null : PRECIOS_MEJORA[Math.max(0, nivel | 0)]);
+  /* Los potenciadores, como los de Subway Surfers: se compran en la tienda,
+     se guardan y se usan al empezar una carrera (aparecen dos botones los
+     primeros segundos). Se gastan al usarlos. */
+  const POTENCIADORES = {
+    arranque: { nombre: "Arranque", precio: 1500, seg: 10, texto: "Empiezas la carrera volando con la mochila cohete, 10 s" },
+    puntos: { nombre: "Potenciador +5", precio: 2500, extra: 5, texto: "+5 al multiplicador durante toda una carrera" }
+  };
+  /** Saltar una misión cuesta más mientras más alto el multiplicador. Ejemplo: en ×1, 550; en ×10, 1900. */
+  const costoSaltar = nivel => 400 + 150 * limita(nivel | 0, 1, MAX_BASE);
+  /** Lo que paga completar un set de tres misiones (además de subir el multiplicador). Ejemplo: el set de ×4 paga 450. */
+  const premioSet = nivel => 250 + 50 * limita(nivel | 0, 1, MAX_BASE);
   /** Seguir después de chocar: 500, 1000, 2000… monedas (se duplica en cada carrera). */
   const costoSeguir = veces => 500 * Math.pow(2, Math.max(0, veces | 0));
 
@@ -242,6 +254,20 @@
     return { retos: { nivel: prev.nivel, avance }, cumplidos, subio: false };
   }
 
+  /** Salta la misión `i` (la da por cumplida). Si con eso quedan las tres
+      cumplidas, el set se completa en el acto: sube el multiplicador base.
+      Devuelve {retos, subio}. No modifica lo que recibe. Ejemplo: en ×3
+      con las misiones 0 y 2 cumplidas, saltar la 1 deja {nivel: 4, avance: [0,0,0]}. */
+  function saltaReto(retosPrev, i) {
+    const prev = retosPrev && retosPrev.nivel ? retosPrev : { nivel: 1, avance: [0, 0, 0] };
+    const lista = retosDeNivel(prev.nivel);
+    const avance = [0, 1, 2].map(k => prev.avance[k] || 0);
+    if (!lista[i]) return { retos: { nivel: prev.nivel, avance }, subio: false };
+    avance[i] = lista[i].meta;                                    // cumplida
+    if (lista.every((r, k) => avance[k] >= r.meta) && prev.nivel < MAX_BASE) return { retos: { nivel: prev.nivel + 1, avance: [0, 0, 0] }, subio: true };
+    return { retos: { nivel: prev.nivel, avance }, subio: false };
+  }
+
   /* ---------- El progreso guardado ---------- */
 
   /** El progreso de alguien que nunca jugó. */
@@ -250,6 +276,7 @@
       v: 1, at: 0,                                           // versión y cuándo se guardó (ms)
       monedas: 0, patinetas: 1,                              // una patineta de regalo para probarla
       mejoras: { iman: 0, mochila: 0, zapatillas: 0, doble: 0 },
+      potenciadores: { arranque: 1, puntos: 0 },             // un arranque de regalo para probarlo
       retos: { nivel: 1, avance: [0, 0, 0] },
       boletos: [],                                           // números de boleto encontrados
       aspectos: ["clasico"], aspecto: "clasico",             // los desbloqueados y el que lleva puesto
@@ -267,6 +294,7 @@
     p.at = entero(x.at, 0, 1e15);
     p.monedas = entero(x.monedas, 0, 1e9);
     p.patinetas = entero(x.patinetas, 0, 999);
+    if (x.potenciadores && typeof x.potenciadores === "object") for (const k of Object.keys(p.potenciadores)) p.potenciadores[k] = entero(x.potenciadores[k], 0, 999);
     for (const k of Object.keys(p.mejoras)) p.mejoras[k] = entero(x.mejoras && x.mejoras[k], 0, MAX_MEJORA);
     if (x.retos) p.retos = { nivel: entero(x.retos.nivel, 1, MAX_BASE), avance: [0, 1, 2].map(i => entero(x.retos.avance && x.retos.avance[i], 0, 1e9)) };
     p.boletos = Array.isArray(x.boletos) ? [...new Set(x.boletos.map(Number).filter(n => Number.isInteger(n) && n >= 1 && n <= 7))].sort((a, b) => a - b) : [];   // solo boletos que existen (1 a 7)
@@ -278,7 +306,7 @@
     return p;
   }
   /** Mezcla dos progresos (el del aparato y el de la nube).
-      - Lo que se gasta (monedas, patinetas, aspecto puesto) viene del más reciente.
+      - Lo que se gasta (monedas, patinetas, potenciadores, aspecto puesto) viene del más reciente.
       - Lo que solo crece (mejoras, nivel de retos, boletos, aspectos, récords) se queda con lo mayor.
       Ejemplo: en el celular tienes el boleto 2 y en el PC el 1 → quedan los dos. */
   function mezclaProgreso(a, b) {
@@ -521,6 +549,7 @@
     PUNTOS_POR_METRO, MAX_BASE, MAX_ESTRELLAS, multiplicador, puntosPorTramo,
     ESTACIONES, estacionDe, siguienteUmbral, VUELTA_DESDE, VUELTA_CADA, INTRO, BOLETOS,
     PODERES, SEG_POR_NIVEL, MAX_MEJORA, PRECIOS_MEJORA, PRECIO_PATINETA, DURACION_PATINETA, duracionPoder, precioMejora, costoSeguir,
+    POTENCIADORES, costoSaltar, premioSet, saltaReto,
     ASPECTOS, cajaMisteriosa,
     RETOS, retosDeNivel, avanzaRetos,
     progresoNuevo, limpiaProgreso, mezclaProgreso,

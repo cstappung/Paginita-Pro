@@ -899,7 +899,7 @@ const REGLAS = {
       ])],
       ["Puntos y multiplicador", lista([
         "Cada metro vale 10 puntos × el <b>multiplicador</b>.",
-        "El multiplicador es el base de tus retos (de ×1 a ×30) más las <b>estrellas</b> que juntas en la carrera: +1 cada una, hasta +29.",
+        "El multiplicador es el base de tus misiones (de ×1 a ×30) más las <b>estrellas</b> que juntas en la carrera: +1 cada una, hasta +29, más el <b>Potenciador +5</b> si usaste uno.",
         "El poder <b>2×</b> lo duplica mientras dura.",
         "Las <b>monedas</b> no dan puntos: se gastan en la tienda."
       ])],
@@ -912,7 +912,17 @@ const REGLAS = {
         "<b>Patineta</b> (H, dos toques rápidos o X en el mando): dura 30 s y, si chocas, se rompe ella en vez de terminar la carrera.",
         "En la <b>tienda</b> cada poder tiene 5 mejoras, que lo alargan 2,5 s por nivel, y se compran patinetas."
       ])],
-      ["Retos", "Siempre hay tres retos a la vista. Cumplir los tres sube en 1 el multiplicador base, hasta ×30."],
+      ["Misiones", lista([
+        "Siempre hay un <b>set de tres misiones</b> (en la portada, el botón Misiones o la tarjeta amarilla del multiplicador). Completar las tres sube en 1 el multiplicador base, hasta ×30, y paga monedas: 250 más 50 por cada nivel del multiplicador.",
+        "Algunas se cumplen en una sola carrera y otras se van sumando entre carreras.",
+        "Una misión se puede <b>saltar</b> pagando monedas (más caro mientras más alto el multiplicador). Si era la última que faltaba, el set se completa en el acto. Durante una carrera, en pausa, no se puede saltar."
+      ])],
+      ["Potenciadores", lista([
+        "Se compran en la tienda y se guardan. Al empezar una carrera aparecen unos segundos dos botones (o las teclas 1 y 2) para usar los que tengas.",
+        "<b>Arranque</b>: empiezas volando con la mochila cohete, 10 s y sin chocar.",
+        "<b>Potenciador +5</b>: suma 5 al multiplicador durante toda la carrera.",
+        "Empiezas con un Arranque de regalo."
+      ])],
       ["Estaciones", lista([
         "El paisaje cambia con los puntos de la carrera, siempre pasando por un túnel: <b>Barrio Estación</b> (desde 0, la ciudad de día), <b>Ocaso</b> (50 000, retro pixelado al atardecer), <b>Línea Neón</b> (200 000, noche synthwave), <b>Estación Fantasma</b> (1 000 000), <b>Invierno</b> (2 500 000), <b>Óxido</b> (5 000 000) y <b>Fin de la Línea</b> (10 000 000). Después vuelven a girar.",
         "En cada estación hay un <b>boleto dorado</b> con un trozo de la historia. Los que encuentres se leen en la <b>Libreta</b>.",

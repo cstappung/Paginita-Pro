@@ -3262,6 +3262,17 @@ Things that matter:
   Speed goes from 13 to 30 m/s (`velocidad`, τ 150 s). A newcomer makes
   ~25 k in two minutes, a great run reaches 1 M in 6–7 minutes, and a
   veteran at ×30 in about three.
+- **Progress is Subway Surfers' own loop.** Missions come in sets of three
+  (`retosDeNivel`); a completed set raises the base multiplier by one (up to
+  ×30) and pays `premioSet(n)` coins, and a mission can be **skipped** for
+  `costoSaltar(n)` coins (`saltaReto`; skipping the last one completes the
+  set on the spot). Skipping is refused during a paused run: the run in
+  progress would then be applied to the next set's missions. The yellow
+  multiplier card on the title screen shows the set's progress and opens the
+  missions. **Boosters** (`POTENCIADORES`: *Arranque*, start flying with the
+  jetpack for 10 s; *Potenciador +5*, +5 to the multiplier for the run) are
+  bought in the shop, kept in `progreso.potenciadores`, and offered by two
+  HUD buttons (keys 1 and 2) during the first 6 s of a run.
 - **Power-ups**: magnet 10 s, jetpack 8 s (coins in the sky at 8.5 m),
   super sneakers 10 s (jumps 4.1 m), 2× 12 s, each +2.5 s per shop level
   (five levels); mystery box (coins, a skateboard or a jackpot); skateboard
