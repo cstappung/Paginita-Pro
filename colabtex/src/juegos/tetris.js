@@ -31,7 +31,8 @@ const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&a
 export function crearTetris(ctx) {
   const { uid, pid, jugar, terminar } = ctx;
   let raiz = null, p = null, est = null, s = null, muerto = false;
-  let raf = 0, t0 = 0, vivoT = 0, aplicada = 0, caidaEnviada = false, finPedido = false;
+  let raf = 0, t0 = 0, vivoT = 0, aplicada = 0, finPedido = false, fondoT = 0;
+  let caidaSonada = false, caidaEnVuelo = false, caidaOtra = 0;
   let vivos = {}, desVivo = null, visto = -1;
   const firmas = {};
   const W = TM.W, HV = TM.H - TM.OCULTAS;
@@ -77,7 +78,22 @@ export function crearTetris(ctx) {
     cfgMando = Object.assign(TM.mandoTetris(t), { menu: () => !juego() || configurando || !s || s.fin, zonas: [{ sel: "#ttTeclasTxt" }] });
     window.Mando.configura(cfgMando);
   };
-  const alOcultar = () => { if (document.hidden) mando.suelta(); };
+  /* Una pestaña oculta no recibe `requestAnimationFrame`, y antes eso
+     congelaba su pozo: quien cambiaba de pestaña no perdía nunca y la sala
+     no se acababa. En una partida a la vez el pozo sigue cayendo: oculta,
+     la avanza un temporizador (el navegador lo frena a uno por segundo, y
+     `paso` trocea lo que pasó en tramos de 100 ms). */
+  const alOcultar = () => {
+    clearInterval(fondoT); fondoT = 0;
+    if (!document.hidden) { t0 = performance.now(); return; }
+    mando.suelta();
+    fondoT = setInterval(() => {
+      const ahora = performance.now();
+      let falta = Math.min(60000, ahora - t0);
+      t0 = ahora;
+      while (falta > 0 && !muerto) { const d = Math.min(100, falta); falta -= d; paso(ahora, d); }
+    }, 1000);
+  };
 
   function montar(host) {
     raiz = document.createElement("div");
@@ -135,6 +151,7 @@ export function crearTetris(ctx) {
     document.addEventListener("visibilitychange", alOcultar);
     desVivo = fb.watchTetrisVivo(pid, v => { vivos = v || {}; pintaRivales(); });
     t0 = performance.now();
+    alOcultar();
     raf = requestAnimationFrame(bucle);
   }
 
@@ -153,12 +170,27 @@ export function crearTetris(ctx) {
     t0 = ahora;
     if (!s || !est) return;
     fx.paso(dt);
-    if (juego() && !s.fin) {
-      const deben = est.basura[uid] || 0;
-      if (deben > aplicada) { const n = deben - aplicada; TM.recibe(s, n); aplicada = deben; if (s.tiempo > 500) { fx.amenaza(n); son("alarma", n); } }
-      mando.paso(dt);
-      s.blando = mando.blando;
-      TM.avanza(s, dt);
+    paso(ahora, dt);
+    dibuja();
+  }
+
+  /* Un tramo de partida. Fuera del `!s.fin` a propósito: casi siempre se
+     pierde con una tecla (caída instantánea o un giro que ya no cabe), y
+     las teclas corren fuera del bucle. Antes el aviso de que me ahogué
+     solo salía si el pozo se llenaba por gravedad dentro de este tramo;
+     perdiendo con una tecla, el tramo siguiente veía `s.fin` y se lo
+     saltaba entero, así que el `cae` no se escribía nunca y la sala seguía
+     diciendo que todos estaban en pie. */
+  function paso(ahora, dt) {
+    if (!s || !est) return;
+    if (juego()) {
+      if (!s.fin) {
+        const deben = est.basura[uid] || 0;
+        if (deben > aplicada) { const n = deben - aplicada; TM.recibe(s, n); aplicada = deben; if (s.tiempo > 500) { fx.amenaza(n); son("alarma", n); } }
+        mando.paso(dt);
+        s.blando = mando.blando;
+        TM.avanza(s, dt);
+      }
       eventos();
       if (s.salida > 0) {
         const n = Math.min(12, s.salida);
@@ -166,18 +198,28 @@ export function crearTetris(ctx) {
         const a = blancoTetris(est, uid);
         if (a) { jugar({ t: "ataque", uid, a, n }).catch(() => {}); son("envia", n); misil(uid, a, n); }
       }
-      latido(dt);
-      if (s.fin && !caidaEnviada) {
-        caidaEnviada = true;
-        son("fin");
-        jugar({ t: "cae", uid, l: s.lineas, p: s.puntos }).catch(() => { caidaEnviada = false; });
-      }
+      if (!s.fin) latido(dt);
+      else avisaCaida();
       if (ahora - vivoT > VIVO_MS) {
         vivoT = ahora;
         fb.tetrisVivo(pid, uid, { r: TM.resumen(s), l: s.lineas, p: s.puntos, n: s.nivel, f: s.fin ? 1 : 0 });
       }
     } else if (s && !s.fin && est.fuera[uid]) s.fin = true;
-    dibuja();
+  }
+
+  /* El `cae` se insiste hasta que el reductor me cuente fuera (entonces
+     `juego()` deja de llamar aquí): una escritura que falla o que `jugar`
+     abandona devuelve false sin lanzar, y antes eso dejaba la caída sin
+     escribir para siempre. Un `cae` repetido no hace nada en el reductor. */
+  function avisaCaida() {
+    const t = performance.now();
+    if (caidaEnVuelo || t < caidaOtra) return;
+    if (!caidaSonada) { caidaSonada = true; son("fin"); }
+    caidaEnVuelo = true;
+    Promise.resolve(jugar({ t: "cae", uid, l: s.lineas, p: s.puntos }))
+      .then(ok => { caidaOtra = performance.now() + (ok ? 3000 : 1500); },
+        () => { caidaOtra = performance.now() + 1500; })
+      .then(() => { caidaEnVuelo = false; });
   }
 
   function eventos() {
@@ -366,7 +408,7 @@ export function crearTetris(ctx) {
   function destruir() {
     muerto = true;
     cancelAnimationFrame(raf);
-    clearTimeout(avisoT); clearTimeout(alertaT);
+    clearTimeout(avisoT); clearTimeout(alertaT); clearInterval(fondoT);
     document.removeEventListener("keydown", teclaAbajo);
     document.removeEventListener("keyup", teclaArriba);
     if (window.Mando && cfgMando) window.Mando.libera(cfgMando);
