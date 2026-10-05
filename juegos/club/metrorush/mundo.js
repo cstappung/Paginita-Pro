@@ -54,6 +54,15 @@ const MOTOR = window.MetroRushMotor;                // el motor (motor.js), carg
 const CARRILES = MOTOR.CARRILES;                   // x de cada carril
 const L_VAGON = MOTOR.LARGO_VAGON;                 // largo de un vagón
 const TECHO = MOTOR.ALTO_TECHO;                    // altura del techo de un tren
+/* La catenaria va alta, por encima de lo que pasa en los techos: de pie
+   sobre un vagón la cabeza llega a 5,05 m y un salto desde ahí a 6,55, y la
+   cámara de los techos va a 7,2 (7,9 con el celular en vertical). Con los
+   cables a 5,4 el corredor los atravesaba en cuanto subía a un vagón. Por
+   arriba, la mochila cohete vuela a 8,5: el brazo del poste queda justo
+   debajo de sus pies. */
+const ALTO_CABLE = 7.8;                            // los cables de la catenaria
+const ALTO_BRAZO = 8.3;                            // el brazo del poste que los sostiene
+const ALTO_POSTE = 8.6;                            // el poste entero
 const VISTA = 195;                                 // hasta cuántos metros por delante se dibujan las cosas
 const DETRAS = 16;                                 // cuántos metros por detrás siguen existiendo
 const SUELO = 0.14;                                // la vía (el balasto) está 14 cm sobre el piso: ahí pisa el corredor
@@ -1012,8 +1021,8 @@ class Kit {
   poste(lado, enSerie = false) {
     const c = this.c, a = new Arma(this), mat = enSerie && this.neon ? 'luz' : 'metal';
     const col = enSerie && this.neon ? this.tenue(c.catenaria) : c.catenaria;     // en neón es un tubo de luz: atenuado, como los faroles
-    a.pon(CAJA, mat, col, [0, 3.15, 0], null, [0.2, 6.3, 0.2], enSerie ? null : c.catenaria);
-    a.pon(CAJA, mat, col, [-lado * 1.72, 5.95, 0], null, [3.45, 0.12, 0.12], enSerie ? null : c.catenaria);
+    a.pon(CAJA, mat, col, [0, ALTO_POSTE / 2, 0], null, [0.2, ALTO_POSTE, 0.2], enSerie ? null : c.catenaria);
+    a.pon(CAJA, mat, col, [-lado * 1.72, ALTO_BRAZO, 0], null, [3.45, 0.12, 0.12], enSerie ? null : c.catenaria);
     return a.hecho();
   }
   /** Un grafiti pintado en el muro de la vía. */
@@ -1088,10 +1097,10 @@ class Kit {
     const xCables = this.neon ? CARRILES : [-1.5 * entreVias, -0.5 * entreVias, 0.5 * entreVias, 1.5 * entreVias];
     if (!this.pixel) for (const x of xCables) {
       if (this.neon) {
-        const lg = new LineSegmentsGeometry(); lg.setPositions([x, 5.4, 30, x, 5.4, -260]);
+        const lg = new LineSegmentsGeometry(); lg.setPositions([x, ALTO_CABLE, 30, x, ALTO_CABLE, -260]);
         const lm = new LineMaterial({ color: 0xff7ae0, linewidth: 1.1, worldUnits: false }); lm.resolution.copy(this.mundo.resolucion);
         const l = new LineSegments2(lg, lm); l.frustumCulled = false; g.add(l); this.lineasMat.set('cable' + x, lm);
-      } else tira(CILINDRO_CHICO.clone().rotateX(Math.PI / 2).scale(0.028, 0.028, LARGO), 'metal', 0x2a2f36, [x, 5.4, ZC]);
+      } else tira(CILINDRO_CHICO.clone().rotateX(Math.PI / 2).scale(0.028, 0.028, LARGO), 'metal', 0x2a2f36, [x, ALTO_CABLE, ZC]);
     }
     g.userData.texturas = texturas;
     for (const m of g.children) m.frustumCulled = false;

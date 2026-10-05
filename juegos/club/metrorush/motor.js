@@ -66,6 +66,73 @@
   /** Velocidad inicial para subir hasta `altura` con esa gravedad: v = √(2·g·h). */
   const impulso = altura => Math.sqrt(2 * FISICA.gravedad * altura);
 
+  /* ---------- Lo que pisa el corredor y lo que lo choca ----------
+     Puro (sin pantalla) para poder probarlo en Node: `juego.js` lo llama en
+     cada cuadro. D es la distancia del corredor en la pista (metros) e y su
+     altura sobre la vía.
+
+     La regla que importa: el techo de un vagón tiene que sostenerte en TODO
+     el tramo en que el vagón ya te puede chocar. El choque cuenta desde
+     MEDIO_LARGO (0,3 m) antes del vagón, porque el corredor ocupa 0,3 m
+     hacia adelante. El techo sostenía recién desde 0,2 m antes, y en esos
+     10 cm el corredor seguía en la rampa, un poco más bajo que el techo:
+     el juego lo daba por chocado contra el frente del vagón. Pasaba entre
+     un tercio y casi todas las veces según los cuadros por segundo, justo
+     al subir de la rampa al vagón. Por eso MARGEN_TECHO es mayor que
+     MEDIO_LARGO, adelante y atrás. Ejemplo: vagón desde D = 25. El choque
+     cuenta desde D = 24,7 y el techo sostiene desde D = 24,6. */
+  const MEDIO_LARGO = 0.3;               // cuánto ocupa el corredor hacia adelante (y hacia atrás) de D
+  const MARGEN_TECHO = 0.4;              // desde cuánto antes (y hasta cuánto después) sostiene el techo de un vagón
+  const MARGEN_RAMPA = 0.4;              // lo mismo para la rampa: su caja también choca hasta 0,3 m después de su final
+
+  /** La altura de la rampa `o` en la distancia D (0 al pie, ALTO_TECHO arriba). */
+  const alturaRampa = (o, D) => ALTO_TECHO * limita((D - o.d0) / o.largo, 0, 1);
+
+  /** Lo que sostiene al corredor en (x, D, y): {h, tren}. `h` es la altura
+      del suelo bajo sus pies (0, la rampa o el techo) y `tren`, el vagón que
+      pisa (si pisa uno). `Dantes` es la D del cuadro anterior: un cuadro
+      puede durar hasta 50 ms y a 30 m/s eso es 1,5 m de pista, así que la
+      rampa se mira también donde estaba el corredor, no solo donde está. */
+  function soporte(objs, x, D, y, Dantes = D) {
+    let rampa = 0, subida = 0, h = 0, tren = null;
+    // 1) las rampas primero: el techo de más abajo necesita saber si vienes subiendo por una
+    for (const o of objs) {
+      if (o.tipo !== 'rampa') continue;
+      const fin = o.d0 + o.largo;
+      // ni la pisas ni la acabas de pasar en este cuadro (un cuadro largo puede saltar su final entero)
+      if (D < o.d0 - MARGEN_RAMPA || Dantes > fin + MARGEN_RAMPA) continue;
+      if (Math.abs(x - CARRILES[o.carril]) > 1.05) continue;                      // no está en mi carril
+      const hs = alturaRampa(o, D);                                               // pasado el final, queda en ALTO_TECHO
+      // la sigues si ibas sobre ella: tu altura alcanza la de la rampa donde estabas en el cuadro anterior
+      const antes = Math.min(hs, alturaRampa(o, Dantes));
+      if (y < antes - 0.7) continue;                                              // vienes por debajo (de lado, o desde el suelo a media rampa)
+      if (hs > subida) subida = hs;                                               // hasta dónde te subió en este cuadro
+      if (D <= fin + MARGEN_RAMPA && hs > rampa) rampa = hs;                      // y si sigues sobre ella, te sostiene
+    }
+    h = rampa;
+    // 2) los vagones: te sostienen si vas a la altura del techo, o si la rampa ya te subió a ella
+    const yEf = Math.max(y, subida);
+    for (const o of objs) {
+      if (o.tipo !== 'tren') continue;
+      if (D < o.d0 - MARGEN_TECHO || D > o.d0 + o.largo + MARGEN_TECHO) continue;
+      if (Math.abs(x - CARRILES[o.carril]) > 1.05) continue;
+      if (yEf >= ALTO_TECHO - 0.5 && ALTO_TECHO >= h) { h = ALTO_TECHO; tren = o; }
+    }
+    return { h, tren };
+  }
+
+  /** La caja que ocupa el obstáculo `o` cuando el corredor va en D:
+      {z0, z1} en la pista, {y0, y1} en altura y `w`, su medio ancho. Null si
+      no choca (monedas, poderes…). */
+  function caja(o, D) {
+    if (o.tipo === 'tren') return { z0: o.d0, z1: o.d0 + o.largo, y0: 0, y1: ALTO_TECHO, w: 0.98 };
+    if (o.tipo === 'bajo') return { z0: o.d - 0.12, z1: o.d + 0.12, y0: 0, y1: 0.95, w: 0.95 };
+    if (o.tipo === 'alto') return { z0: o.d - 0.12, z1: o.d + 0.12, y0: 1.0, y1: 2.35, w: 0.95 };
+    // la rampa solo choca por debajo de su superficie (si te metes de lado bajo ella)
+    if (o.tipo === 'rampa') return { z0: o.d0, z1: o.d0 + o.largo, y0: 0, y1: alturaRampa(o, D) - 0.6, w: 0.95 };
+    return null;
+  }
+
   /** Velocidad de la carrera (m/s) a los `t` segundos: parte en 13 y se acerca
       a 30 sin llegar nunca, como una curva de carga. A los 2 min va a ~22,
       a los 5 min a ~28. Así el comienzo se aprende y el final se sufre. */
@@ -559,6 +626,7 @@
   return {
     rng, lerp, limita,
     CARRILES, LARGO_VAGON, ALTO_TECHO, LARGO_RAMPA, FISICA, impulso, velocidad, velocidadEn, VEL_TREN, APARECE, dificultad,
+    MEDIO_LARGO, MARGEN_TECHO, MARGEN_RAMPA, alturaRampa, soporte, caja,
     PUNTOS_POR_METRO, MAX_BASE, MAX_ESTRELLAS, multiplicador, puntosPorTramo,
     ESTACIONES, estacionDe, siguienteUmbral, VUELTA_DESDE, VUELTA_CADA, INTRO, BOLETOS,
     PODERES, SEG_POR_NIVEL, MAX_MEJORA, PRECIOS_MEJORA, PRECIO_PATINETA, DURACION_PATINETA, duracionPoder, precioMejora, costoSeguir,

@@ -192,21 +192,10 @@ if (window.Mando) window.Mando.configura({
 
 /* ---- la física ---- */
 
-/** Qué hay bajo los pies del corredor en (x, D) estando a la altura y:
-    el suelo (0), una rampa (sube de 0 al techo) o el techo de un tren. */
-function soporte(x, D, y) {
-  let h = 0, tren = null;
-  for (const o of c.activos) {
-    if (o.tipo !== 'tren' && o.tipo !== 'rampa') continue;
-    if (D < o.d0 - 0.2 || D > o.d0 + o.largo + 0.2) continue;   // no está a mi altura en la pista
-    if (Math.abs(x - M.CARRILES[o.carril]) > 1.05) continue;    // no está en mi carril
-    if (o.tipo === 'rampa') {
-      const hs = M.ALTO_TECHO * Math.max(0, Math.min(1, (D - o.d0) / o.largo));
-      if (y >= hs - 0.7 && hs > h) h = hs;
-    } else if (y >= M.ALTO_TECHO - 0.5 && M.ALTO_TECHO >= h) { h = M.ALTO_TECHO; tren = o; }
-  }
-  return { h, tren };
-}
+/** Qué hay bajo los pies del corredor: el suelo (0), una rampa o el techo
+    de un tren. Lo decide `M.soporte` (motor.js), que se prueba en Node; aquí
+    solo se le pasan la pista y la D del cuadro anterior. */
+const soporte = (x, D, y) => M.soporte(c.activos, x, D, y, c.Dantes);
 /** Mueve al corredor un paso de `dt` segundos. */
 function fisica(dt) {
   const r = c.r;
@@ -261,14 +250,8 @@ function fisica(dt) {
 
 /* ---- choques ---- */
 
-/** El alto que ocupa cada obstáculo [abajo, arriba] y su medio ancho. */
-function caja(o) {
-  if (o.tipo === 'tren') return { z0: o.d0, z1: o.d0 + o.largo, y0: 0, y1: M.ALTO_TECHO, w: 0.98 };
-  if (o.tipo === 'bajo') return { z0: o.d - 0.12, z1: o.d + 0.12, y0: 0, y1: 0.95, w: 0.95 };
-  if (o.tipo === 'alto') return { z0: o.d - 0.12, z1: o.d + 0.12, y0: 1.0, y1: 2.35, w: 0.95 };
-  if (o.tipo === 'rampa') { const hs = M.ALTO_TECHO * Math.max(0, Math.min(1, (c.D - o.d0) / o.largo)); return { z0: o.d0, z1: o.d0 + o.largo, y0: 0, y1: hs - 0.6, w: 0.95 }; }
-  return null;
-}
+/** El alto que ocupa cada obstáculo [abajo, arriba] y su medio ancho (motor.js). */
+const caja = o => M.caja(o, c.D);
 function choques() {
   const r = c.r;
   if (c.poderes.mochila > 0 || r.y > 6) return;                // volando, por encima de todo
@@ -276,7 +259,7 @@ function choques() {
   for (const o of c.activos) {
     const k = caja(o);
     if (!k || k.y1 <= k.y0) continue;
-    if (c.D + 0.3 < k.z0 || c.D - 0.3 > k.z1) continue;          // no está a mi altura en la pista
+    if (c.D + M.MEDIO_LARGO < k.z0 || c.D - M.MEDIO_LARGO > k.z1) continue;   // no está a mi altura en la pista
     const X = M.CARRILES[o.carril], lim = k.w + F.medioAncho;
     if (Math.abs(r.x - X) >= lim) continue;                     // no está en mi carril
     if (yb >= k.y1 || yt <= k.y0) continue;                     // lo paso por arriba o por abajo
@@ -414,6 +397,7 @@ function actualiza(dt) {
   const muriendo = estado === 'muerte';
   c.V = muriendo ? Math.max(0, c.V - 60 * dt) : M.velocidad(c.t);
   const dD = c.V * dt;
+  c.Dantes = c.D;                                               // dónde iba en el cuadro anterior (para seguir la rampa)
   c.D += dD;
   if (!muriendo) {
     // los puntos: 10 por metro × el multiplicador
