@@ -527,18 +527,61 @@ export async function pedirRevancha(pid, quien) {
   return elegida;
 }
 
+/* Las cuentas vetadas por trampa (`vetados/<uid>`, que solo escribe un
+   administrador) no aparecen en ninguna tabla del club. Un solo oyente
+   por sesión; antes de publicar las reglas la lectura falla y no se veta
+   a nadie. */
+let vetadosSet = new Set(), vetadosOff = null;
+const vetadosOyentes = new Set();
+function vigilaVetados(cb) {
+  vetadosOyentes.add(cb);
+  if (!vetadosOff) vetadosOff = onValue(ref(db, "vetados"), s => {
+    vetadosSet = new Set(Object.keys(s.val() || {}));
+    for (const f of vetadosOyentes) f();
+  }, () => {});
+  return () => vetadosOyentes.delete(cb);
+}
+export const estaVetado = uid => vetadosSet.has(uid);
+
 /* Récord por categoría; la transacción conserva el mejor entre pestañas. */
 export function watchSolo(categoria, cb) {
-  return onValue(ref(db, `soloRanks/${categoria}`), s => {
-    cb(Object.entries(s.val() || {}).map(([uid, fila]) => ({...fila, uid})), null);
+  let filas = null;
+  const emite = () => { if (filas) cb(filas.filter(f => !vetadosSet.has(f.uid)), null); };
+  const offV = vigilaVetados(emite);
+  const off = onValue(ref(db, `soloRanks/${categoria}`), s => {
+    filas = Object.entries(s.val() || {}).map(([uid, fila]) => ({...fila, uid}));
+    emite();
   }, e => cb([], e));
+  return () => { off(); offV(); };
 }
 /* La tabla de una modalidad, una vez: el aviso del podio la necesita
    *antes* del récord para saber de qué puesto venía. */
 export async function leerSolo(categoria) {
   const s = await get(ref(db, `soloRanks/${categoria}`));
-  return Object.entries(s.val() || {}).map(([uid, fila]) => ({...fila, uid}));
+  return Object.entries(s.val() || {}).map(([uid, fila]) => ({...fila, uid})).filter(f => !vetadosSet.has(f.uid));
 }
+/* La prueba de un récord del club (docs/antitrampas.md), guardada por su
+   partida antes que la fila: la regla de `soloRanks` no acepta una fila
+   cuya prueba no exista. Se escribe una vez y no se reescribe. */
+export const guardarPruebaSolo = (categoria, uid, partida, v, texto) =>
+  set(ref(db, `soloPruebas/${categoria}/${uid}/${partida}`), { v: Number.isSafeInteger(v) ? v : 0, d: String(texto || ""), at: serverTimestamp() });
+export const leerPruebaSolo = (categoria, uid, partida) =>
+  get(ref(db, `soloPruebas/${categoria}/${uid}/${partida}`)).then(s => s.val());
+/* La racha diaria de verdad de un juego del club (club-datos.js:
+   rachaClub). La regla solo deja subir `n` de a uno por día de Chile. */
+export const leerRachaClub = (uid, categoria) =>
+  get(ref(db, `rachasClub/${uid}/${categoria}`)).then(s => s.val());
+export const apuntaRachaClub = (uid, categoria, r) =>
+  set(ref(db, `rachasClub/${uid}/${categoria}`), { dia: r.dia, n: r.n, at: serverTimestamp() });
+/* Una partida que el verificador rechazó, para que la vean los
+   administradores en Informes. Solo la puede escribir su dueño, y solo
+   la leen ellos. */
+export const reportaSospecha = (uid, s) =>
+  set(push(ref(db, `sospechas/${uid}`)), {
+    c: String(s.c || "").slice(0, 60), m: String(s.m || "").slice(0, 300),
+    p: Number.isFinite(s.p) ? s.p : 0, t: Number.isFinite(s.t) ? s.t : 0,
+    d: String(s.d || "").slice(0, 20), at: serverTimestamp()
+  });
 export function guardarSolo(categoria, uid, dato) {
   return runTransaction(ref(db, `soloRanks/${categoria}/${uid}`), previo => {
     if (previo && (previo.puntos > dato.puntos || previo.puntos === dato.puntos && previo.tiempo <= dato.tiempo)) return;

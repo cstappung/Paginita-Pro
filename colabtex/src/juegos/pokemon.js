@@ -138,9 +138,10 @@ export function crearPokemon(ctx) {
   /* La elección se guarda ANTES de buscar la llave: si algo falla por el
      camino, el latido (`automatismos`) la vuelve a mandar sola en vez de
      dejar la mesa esperando un «Listo» que nunca se escribió. */
-  async function promete(c, sk) {
+  async function promete(c, sk, ev) {
     if (!est || muerto) return;
-    if (local) { local.elige(c); return; }
+    // La Frontera anota el clic (quién lo dio y cuándo): es parte de su prueba.
+    if (local) { local.elige(c, ev); return; }
     const k = est.punto;
     if (yaMandado(k, "c")) return;
     const pd = pendiente();
@@ -866,7 +867,7 @@ export function crearPokemon(ctx) {
     toggles = { tera: false, mega: false, dynamax: false, z: false };
     verCambio = null;
     suena("clic");
-    promete(c);
+    promete(c, undefined, ev);
   }
 
   /* ---------- actualizar ---------- */

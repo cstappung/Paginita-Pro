@@ -111,6 +111,47 @@
   let elapsed = 0, startedAt = 0, resultTimeout, animationId = 0, focusedIndex = 0;
   let pending = [], particles = [], lastFrame = 0, longPress = null, touchStart = null, suppressClickUntil = 0, traspuesto = false;
 
+  /* Prueba antitrampas (docs/antitrampas/minas.md). Un récord no se cree:
+     viaja con lo necesario para rehacer la partida — la semilla del
+     reparto y cada jugada que cambió algo — y el verificador de la página la
+     repite con este mismo motor antes de guardarla. Cada jugada son seis
+     números: el código (casilla·2, +1 si es bandera; −1 marca una pausa),
+     los ms de juego desde la anterior (el mismo reloj del marcador, sin las
+     pausas), los ms de reloj de pared (Date.now) desde la anterior, y cómo
+     llegó: el origen (bits: 1 evento sintético, 2 mando, 4 teclado,
+     8 táctil), los pointermove entre que se apretó y se soltó, y cuánto
+     duró ese gesto en ms (−1 si no aplica). Los dos relojes deben avanzar
+     igual mientras se juega: si el del juego va más lento, alguien frenó
+     performance.now. Lo del gesto es para los bots: un script que despacha
+     clics da isTrusted=false, y uno que los inyecta «de verdad» los da
+     instantáneos y a ritmo de metrónomo. Las jugadas sin efecto (un número
+     sin sus banderas, una casilla con bandera) no se anotan. */
+  const cuenta = new URLSearchParams(location.search).get('cuenta') || '';
+  let semilla = 0, jugadas = [], ultimaActiva = 0, ultimoMuro = 0, gesto = null, puntero = null;
+  function anota(codigo, activo, muro = Date.now()) {
+    const [o, mv, du] = codigo < 0 || !gesto ? [0, 0, -1] : gesto;
+    jugadas.push(codigo, activo - ultimaActiva, jugadas.length ? muro - ultimoMuro : 0, o, mv, du);
+    ultimaActiva = activo; ultimoMuro = muro;
+  }
+  /* mando.js despacha teclas sintéticas marcadas con __mando: son legítimas
+     si hay un mando conectado de verdad. */
+  function hayMando() { try { return Array.from(navigator.getGamepads?.() || []).some(p => p && p.connected !== false); } catch { return false; } }
+  function origen(event) {
+    let o = 0, mv = 0, du = -1;
+    if (event.__mando && hayMando()) o |= 2; else if (!event.isTrusted) o |= 1;
+    if (event.type === 'keydown') o |= 4;
+    else if (puntero && performance.now() - (puntero.fin ?? puntero.t) < 1500) {
+      if (puntero.tipo !== 'mouse') o |= 8;
+      mv = Math.min(255, puntero.mv); du = Math.min(9999, Math.round((puntero.fin ?? performance.now()) - puntero.t));
+    }
+    return [o, mv, du];
+  }
+  // Una jugada con su origen: el gesto vale solo para ella.
+  function con(event, fn) { gesto = origen(event); try { fn(); } finally { gesto = null; } }
+  // Los ms de juego en el instante `ahora` (performance.now), redondeados.
+  const activo = ahora => Math.round((elapsed + (game.state === 'playing' && !paused ? (ahora - startedAt) / 1000 : 0)) * 1000);
+  const prueba = () => Object.assign({ v: 1, n: level, s: semilla, e: jugadas.slice() }, cuenta ? { u: cuenta } : {});
+
   /* El tablero cabe siempre en su caja. Antes tenía un ancho mínimo de
      26 px por columna: el medio pedía 468 px y el difícil 624, y en una
      tablet o dentro del marco de Juegos la caja era más angosta, así que la
@@ -188,7 +229,8 @@
     pending.forEach(clearTimeout); pending = []; clearTimeout(resultTimeout); clearTimeout(longPress); longPress = null;
     soundtrack.stop(); soundtrack.progress = 0;
     $('result').close(); $('help-dialog').close(); particles = []; cancelAnimationFrame(animationId); animationId = 0; ctx.clearRect(0,0,viewWidth,viewHeight);
-    level = nextLevel; window.Club?.category(`club-minas-${level}`); game = new Mina.Game(level); paused = false; elapsed = 0; startedAt = 0; focusedIndex = 0;
+    level = nextLevel; window.Club?.category(`club-minas-${level}`); semilla = Mina.nuevaSemilla(); game = new Mina.Game(level, Mina.azar(semilla)); paused = false; elapsed = 0; startedAt = 0; focusedIndex = 0;
+    jugadas = []; ultimaActiva = 0; ultimoMuro = 0;
     $('field').classList.remove('shake', 'defeat'); $('result').classList.remove('defeat'); $('pause-screen').hidden = true; $('pause').textContent = 'Ⅱ'; $('pause').setAttribute('aria-label','Pausar');
     $('status').textContent = 'Todo empieza con un clic.'; $('field-caption').innerHTML = '<span>✦</span> Tu primera jugada siempre es segura.';
         const fragment = document.createDocumentFragment();
@@ -216,17 +258,22 @@
   }
   function flag(i) {
     if (paused) return; soundtrack.unlock();
-    if (game.flag(i)) { paint(i); soundtrack.effect(game.cells[i].flag ? 'flag' : 'unflag'); updateHUD(); $('status').textContent = game.cells[i].flag ? 'Una sospecha bien marcada.' : 'Volvemos a mirar con otros ojos.'; }
+    const t = activo(performance.now()), muro = Date.now();
+    if (game.flag(i)) { anota(i * 2 + 1, t, muro); paint(i); soundtrack.effect(game.cells[i].flag ? 'flag' : 'unflag'); updateHUD(); $('status').textContent = game.cells[i].flag ? 'Una sospecha bien marcada.' : 'Volvemos a mirar con otros ojos.'; }
     else if (game.flags === game.mines && !game.cells[i].open && game.state !== 'won' && game.state !== 'lost') $('status').textContent = 'Retira una bandera para colocar otra.';
   }
   function open(i) {
     if (paused || ['won','lost'].includes(game.state)) return;
+    // Un solo instante para la jugada y para el reloj: así el tiempo que se
+    // declara al ganar es exactamente el de la última jugada de la prueba.
+    const ahora = performance.now(), muro = Date.now(), t = activo(ahora);
     soundtrack.unlock(); const before = game.state; const changed = game.open(i);
-    if (before === 'ready' && game.state !== 'ready') { startedAt = performance.now(); soundtrack.start(); }
+    if (before === 'ready' && game.state !== 'ready') { startedAt = ahora; soundtrack.start(); }
+    if (changed.length) anota(i * 2, t, muro);
     changed.forEach((n,j) => paint(n,Math.min(350,j*8)));
     if (!changed.length) return;
     soundtrack.progress = game.progress;
-    if (game.state === 'won' || game.state === 'lost') { elapsed += (performance.now()-startedAt)/1000; finish(); }
+    if (game.state === 'won' || game.state === 'lost') { elapsed += (ahora-startedAt)/1000; finish(); }
     else {
       soundtrack.effect('open',changed.length); soundtrack.updateUI();
       $('status').textContent = changed.length > 5 ? `¡${changed.length} casillas de un solo clic!` : game.progress > .8 ? 'Un poquito más. Ya casi florece.' : 'Sigue las pistas. Encuentra tu camino.';
@@ -237,7 +284,7 @@
   }
   function finish() {
     const won = game.state === 'won';
-    if(won)window.Club?.result({categoria:`club-minas-${level}`,puntos:1,tiempo:Math.max(1,Math.round(elapsed*1000))}); soundtrack.stop(); soundtrack.effect(won ? 'win' : 'lose');
+    if(won)window.Club?.result({categoria:`club-minas-${level}`,puntos:1,tiempo:Math.max(1,Math.round(elapsed*1000))},prueba()); soundtrack.stop(); soundtrack.effect(won ? 'win' : 'lose');
     $('status').textContent = won ? '¡El jardín es todo tuyo!' : 'Una sorpresa en el camino. ¿Otra vez?';
     $('field-caption').textContent = won ? '✿ Todas las casillas a salvo. Bien jugado.' : 'Las mejores aventuras merecen otro intento.';
     let newBest = false;
@@ -275,7 +322,7 @@
   function togglePause(force) {
     if(game.state!=='playing')return;
     const next=typeof force==='boolean'?force:!paused;if(next===paused)return;
-    if(next){elapsed+=(performance.now()-startedAt)/1000;soundtrack.stop();}else{startedAt=performance.now();soundtrack.start();}
+    if(next){elapsed+=(performance.now()-startedAt)/1000;anota(-1,Math.round(elapsed*1000));soundtrack.stop();}else{startedAt=performance.now();soundtrack.start();}
     paused=next;$('pause-screen').hidden=!paused;$('pause').textContent=paused?'▷':'Ⅱ';$('pause').setAttribute('aria-label',paused?'Continuar':'Pausar');
     $('status').textContent=paused?'Un respiro también cuenta.':'Seguimos donde lo dejamos.';
     if(paused)$('resume').focus();else focusCell(focusedIndex,true);
@@ -301,12 +348,16 @@
   /* En modo bandera, tocar un número ya abierto sigue abriendo sus vecinas:
      ponerle bandera a una casilla abierta no significa nada. */
   function tocar(i, alReves = false) { if ((flagMode !== alReves) && !game.cells[i].open) flag(i); else open(i); }
-  board.addEventListener('click',event=>{const i=cellIndex(event);if(i===null||performance.now()<suppressClickUntil)return;focusCell(i);tocar(i);});
-  board.addEventListener('contextmenu',event=>{event.preventDefault();const i=cellIndex(event);if(i!==null){focusCell(i);if(performance.now()>=suppressClickUntil)flag(i);}});
+  board.addEventListener('click',event=>{const i=cellIndex(event);if(i===null||performance.now()<suppressClickUntil)return;focusCell(i);con(event,()=>tocar(i));});
+  board.addEventListener('contextmenu',event=>{event.preventDefault();const i=cellIndex(event);if(i!==null){focusCell(i);if(performance.now()>=suppressClickUntil)con(event,()=>flag(i));}});
+  // La forma del gesto, para la prueba: cuándo se apretó, cuánto se movió.
+  board.addEventListener('pointerdown',event=>{puntero={t:performance.now(),mv:0,tipo:event.pointerType,fin:undefined};},true);
+  board.addEventListener('pointermove',()=>{if(puntero&&puntero.fin===undefined)puntero.mv++;},true);
+  board.addEventListener('pointerup',()=>{if(puntero&&puntero.fin===undefined)puntero.fin=performance.now();},true);
   board.addEventListener('pointerdown',event=>{
     if(event.pointerType==='mouse')return;const i=cellIndex(event);if(i===null)return;
     clearTimeout(longPress);touchStart={x:event.clientX,y:event.clientY};
-    longPress=setTimeout(()=>{focusCell(i);tocar(i,true);suppressClickUntil=performance.now()+800;longPress=null;},430);
+    longPress=setTimeout(()=>{focusCell(i);con(event,()=>tocar(i,true));suppressClickUntil=performance.now()+800;longPress=null;},430);
   });
   board.addEventListener('pointermove',event=>{if(touchStart&&Math.hypot(event.clientX-touchStart.x,event.clientY-touchStart.y)>9){clearTimeout(longPress);longPress=null;}});
   ['pointerup','pointercancel','pointerleave'].forEach(type=>board.addEventListener(type,()=>{clearTimeout(longPress);longPress=null;touchStart=null;}));
@@ -319,8 +370,10 @@
     else if(flecha==='ArrowRight')next=row*game.cols+Math.min(game.cols-1,col+1);
     else if(flecha==='ArrowUp')next=Math.max(0,row-1)*game.cols+col;
     else if(flecha==='ArrowDown')next=Math.min(game.rows-1,row+1)*game.cols+col;
-    else if(event.key.toLowerCase()==='f'){event.preventDefault();flag(i);return;}
-    else if(event.key==='Enter'||event.key===' '){event.preventDefault();tocar(i);return;}else return;
+    // Mantener apretada F (o Enter) no repite: la bandera parpadeaba a 30
+    // por segundo, y esa ráfaga parecería un bot en la prueba.
+    else if(event.key.toLowerCase()==='f'){event.preventDefault();if(!event.repeat)con(event,()=>flag(i));return;}
+    else if(event.key==='Enter'||event.key===' '){event.preventDefault();if(!event.repeat)con(event,()=>tocar(i));return;}else return;
     event.preventDefault();focusCell(next,true);buttons[next].scrollIntoView({block:'nearest',inline:'nearest'});
   });
   document.addEventListener('keydown',event=>{

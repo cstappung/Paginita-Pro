@@ -2811,6 +2811,18 @@ into a wall of sound. The retro look is Press Start 2P, notched pixel frames
 `.canvas-wrap::after`. The regex in `soloRanks` needed widening, so the rules
 must be re-published.
 
+**Everything that decides a BBTAN game lives in `motor.js`** (UMD
+`BBTANMotor`; `physics.js` and `rules.js` are gone): fixed 1/60 s ticks
+whatever the speed or FPS, only `+ − × ÷` and `Math.sqrt` plus its own
+sine/cosine (no `Math.sin/cos/atan2/random`, so Node and every browser
+replay the same game), integer aim angles and mulberry32 per round. That is
+what lets `verifica/bbtan.js` replay a whole game from the seed and the
+shots (`M.prueba(E)`, see `docs/antitrampas/bbtan.md`). The saved game is
+v2: the motor's state *plus* the shots so far, so a resumed game is proven
+from round 1; a save whose round does not match its shots is refused, and an
+old v1 save can be finished but is not reported. `game.js` only draws and
+plays sound.
+
 **BBTAN's music is composed live from the board** (`musica.js`, UMD over
 `Chip`, tested by `musica.test.cjs`); it no longer loads `temas.js`, though
 `T.bbtan` stays in the songbook. `game.js` sends `BBTANAudio.mood({filas,
@@ -3042,6 +3054,16 @@ Things that matter:
   was widened and `club-electro-puntos` got a 1 000 000 cap, so the rules must
   be re-published.
 
+**Electrodle's anti-cheat proof** (`docs/antitrampas/electro.md`): each
+`hist` entry is now `[pts, n, ms, g, [tries], forma]`, and the proof carries
+every day's tries (the shape of each try only for the last 30 days), so
+`verifica/electro.js` recomputes every day's points from the real targets.
+**A catalogue entry is only ever appended, with `desde`**: inserting one
+moves the targets of past days and would reject everyone's history (a test
+pins the target fingerprint). Days after `CORTE` (2026-10-12) must carry
+their tries, so move `CORTE` if this ships later than a week after
+2026-10-05.
+
 **Sudoku Arcade (`juegos/club/sudoku/`) is a Solo Club game too**, on the
 same `conexion.js` protocol: plain files, no build (`?v=sudoku-N` on its
 scripts, `club-7` for `conexion.js`, `club-N` in `solo/club.js` for the
@@ -3220,6 +3242,12 @@ progress), `niveles.js` (generated), `dibujo.js` (the vehicles as SVG) and
   Vehicles are sticker-style SVG (thick dark outline); the red car carries
   white racing stripes. Its music is `T.atasco` in the songbook (B-flat
   major, 124 bpm with swing, a car-horn motif), also in the header player.
+
+**Atasco's anti-cheat proof** (`docs/antitrampas/atasco.md`) stores, next
+to the progress (`prog.p`), the move list of each level's best attempt, and
+`verifica/atasco.js` replays them with the same engine. **Regenerating
+`niveles.js` invalidates every stored proof**: a level whose layout changes
+no longer replays, so its stars stop counting until it is won again.
 
 **Frontera Batalla (`#solo/frontera`) is Emerald's Battle Frontier as a
 Solo Club game**, played locally on the same `@pkmn/sim` bundle as the
@@ -4443,6 +4471,31 @@ exactly like the reports' (`firebase/CONFIGURAR-FIREBASE.md`). Until then
 everything fails with `PERMISSION_DENIED`, and the lobby says so in plain
 language instead of looking broken (`avisoReglas()` in `juegos-main.js`, and
 the same in `ranks.js`).
+
+## Antitrampas del Solo Club (`docs/antitrampas.md`)
+
+**A club record is not believed, it is checked.** `Club.result(dato,
+prueba)` sends a *proof* (seed, moves with their instant…) and
+`solo/club.js` runs it through `verificaClub` (`solo/verifica.js`, one
+module per game in `solo/verifica/<juego>.js`: `PRUEBA`, `verifica`,
+`sospecha`) **before** anything is saved, paid or turned into a logro. A
+rejected result is not saved, the frame gets `club-rechazo`, and a
+`sospechas/<uid>` entry is written for the admins. A verifier that throws
+rejects. What waits in `localStorage` (`jg.club.pendientes.*`) is verified
+again on load, because that store can be edited by hand. `guardaClub` in
+`juegos-main.js` writes the proof (`soloPruebas/<cat>/<uid>/<partida>`)
+before the row, and only when the row improves; the rules refuse a
+`soloRanks` row without its proof, so every record can be audited later
+with `colabtex/scripts/auditar-club.cjs` over a console export (never
+commit an export: the repo is public). Admins delete rows and set
+`vetados/<uid>`; a vetted account cannot write records, club plays or
+podiums, and `watchSolo`/`leerSolo` hide it. Daily streaks (`club-*-racha`)
+are capped by `rachasClub/<uid>/<cat>` = `{dia, n}`, which the rules only
+let grow by one per Chile day (`rachaClub` in `club-datos.js`; a first
+write may continue the streak already in the table). The honest limit: a rewritten
+client or a bot can still produce a valid proof; only a server (Cloud
+Functions) closes that. Each game's specifics are in
+`docs/antitrampas/<juego>.md`.
 
 ## Every game can be muted and turned down (a rule, not a nicety)
 

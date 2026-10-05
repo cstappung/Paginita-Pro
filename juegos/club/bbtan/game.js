@@ -2,8 +2,12 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const canvas = $('game'), ctx = canvas.getContext('2d');
-  const { clamp, stepBall } = BBTANPhysics;
-  const { grid, ballRadius, initialBalls, createRow: makeRow, enterPickup, activatePowerup, keepPickupNextRound, shotPace, aimVisibility, hasClearedBoard } = BBTANRules;
+  /* Lo que decide la partida está en motor.js (BBTANMotor): filas, bolas,
+     choques y bonos con tiempo fijo y azar con semilla, para que el
+     verificador antitrampas pueda rehacerla desde la prueba. Aquí solo se
+     dibuja, se suena y se cuenta el tiempo. */
+  const M = BBTANMotor;
+  const { clamp, grid, ballRadius, shotPace, aimVisibility, hasClearedBoard } = M;
   const W = grid.width, H = 580, FLOOR = 540, SIZE = grid.size, TOP = grid.top, ROW = grid.size;
   const bounds = { width: W, floor: FLOOR, radius: ballRadius };
   const colors = { lime: '#c4f568', purple: '#b7a1f7', orange: '#ffa675', cyan: '#77d9d2' };
@@ -110,17 +114,56 @@
   let sound = saved.sound !== false, fast = false;
   let tocando = false; // la canción empieza con el primer tiro de cada partida
   let state, paused = false, pauseBeforeDialog = false, score, round, count, blocks, pickups, balls, particles, rings, floaters;
-  let launchX, nextX, angle, queue, launchTimer, returned, gained, combo, mult, roundTimer, shotTime, shotRealTime, archived;
+  let launchX, nextX, angle, queue, returned, gained, combo, mult, roundTimer, shotTime, shotRealTime, archived;
+  // E es la partida del motor; las variables de arriba son su reflejo para
+  // dibujar (sincroniza). `ang` es el ángulo entero del motor y `angle` el
+  // mismo en radianes, para el brazo del personaje. `acumulado` es el tiempo
+  // de juego que todavía no completa un tick.
+  let E, ang = M.ANG_INICIAL, acumulado = 0;
   let pointerDown = false, toastTime = 0, time = 0, lastFrame = 0, uiDirty = true, aimPoints = [], aimDirty = true;
   let hintSeen = false, clearCelebrated = false, clearTime = 0;
-  let characterX = W / 2, throwKick = 0, sombraX = W / 2, idSeq = 0, disparoDesdeCarga = false;
+  let characterX = W / 2, throwKick = 0, sombraX = W / 2, disparoDesdeCarga = false;
   // Tiempo jugado sin pausas, para desempatar en la clasificación.
   let activo = 0, reportada = false;
+  /* Una partida que viene de una versión sin prueba (o cuya partida guardada
+     no cuadra) se puede terminar, pero no se reporta: el verificador la
+     rechazaría y quedaría como sospecha contra alguien honesto. */
+  let sinPrueba = false;
+  // La cuenta entra en la semilla: la prueba de una persona no vale en otra.
+  const CUENTA = Club && Club.storageKey ? Club.storageKey('').replace(/^\.cuenta\./, '') : 'local';
+  const nuevaSemilla = () => { try { return crypto.getRandomValues(new Uint32Array(1))[0]; } catch { return Math.floor(Math.random() * 4294967296); } };
   // La clasificación es por ronda máxima alcanzada; el tiempo solo desempata.
+  // La prueba (semilla + ángulo e instante de cada tiro) deja rehacerla.
   function reportar() {
     if (reportada || !Club || round < 2) return;
     reportada = true;
-    try { Club.result({ categoria: CATEGORIA, puntos: round, tiempo: Math.max(1, Math.round(activo * 1000)) }); } catch {}
+    if (sinPrueba) { toast('Partida de una versión anterior: no entra en la clasificación', 4); return; }
+    try { Club.result({ categoria: CATEGORIA, puntos: round, tiempo: Math.max(1, Math.round(activo * 1000)) }, M.prueba(E)); } catch {}
+  }
+  /* Cómo se apuntó y se lanzó cada tiro, para la prueba (el verificador lo
+     usa para separar a una persona de un script): de dónde vino el disparo
+     (r ratón o lápiz, t dedo, k teclado, m mando conectado, x un evento
+     sintético sin mando), cuánto se esperó desde que el tablero quedó
+     quieto, cuántas veces cambió el ángulo y cuánto duró el gesto de
+     apuntar. Un script que despacha eventos (dispatchEvent) da
+     isTrusted = false; mando.js también, pero marca los suyos con
+     `__mando` y entonces tiene que haber un mando conectado. */
+  const hayMando = () => { try { return [...(navigator.getGamepads ? navigator.getGamepads() : [])].some(g => g && g.connected); } catch { return false; } };
+  const origen = ev => !ev ? 'x' : ev.isTrusted ? (ev.pointerType === 'touch' ? 't' : /^key/.test(ev.type) ? 'k' : 'r') : ev.__mando && hayMando() ? 'm' : 'x';
+  let gesto = { desde: 0, n: 0, primero: -1, raro: false };
+  const nuevoGesto = () => { gesto = { desde: performance.now(), n: 0, primero: -1, raro: false }; };
+  function anotaApunte(ev, cambio) {
+    if (origen(ev) === 'x') gesto.raro = true;
+    if (cambio) { gesto.n++; if (gesto.primero < 0) gesto.primero = performance.now(); }
+  }
+  function textoGesto(ev) {
+    const ahora = performance.now(), o = gesto.raro ? 'x' : origen(ev), b = n => Math.max(0, Math.min(2e9, Math.round(n))).toString(36);
+    return o + b(ahora - gesto.desde) + '.' + b(gesto.n) + '.' + b(gesto.primero < 0 ? 0 : ahora - gesto.primero);
+  }
+  window.addEventListener('club-rechazo', e => { if (e.detail && e.detail.categoria === CATEGORIA) toast('No se guardó: ' + e.detail.motivo, 6); });
+  function sincroniza() {
+    state = E.state; score = E.score; round = E.round; count = E.count; blocks = E.blocks; pickups = E.pickups; balls = E.balls;
+    queue = E.queue; returned = E.returned; gained = E.gained; combo = E.combo; mult = E.mult; nextX = E.nextX; launchX = E.launchX;
   }
 
   function persist() {
@@ -148,16 +191,12 @@
   function toast(message, secs = 2) { delete $('toast').dataset.voz; $('toast').textContent = message; $('toast').classList.add('visible'); toastTime = secs; }
   function blockColor(block) { return block.reinforced ? colors.orange : block.max >= 24 ? colors.orange : block.max >= 14 ? colors.purple : block.max >= 8 ? colors.cyan : colors.lime; }
   function pickupColor(p) { return p.kind === 'ball' ? colors.lime : p.kind === 'laser-h' ? colors.purple : p.kind === 'laser-v' ? colors.cyan : colors.orange; }
-  function createRow(y) {
-    const row = makeRow(round, y);
-    for (const b of row.blocks) b.id = idSeq++;
-    blocks.push(...row.blocks); pickups.push(...row.pickups);
-  }
   function reset() {
-    state = 'aim'; paused = false; tocando = false; score = 0; round = 1; count = initialBalls; blocks = []; pickups = []; balls = []; particles = []; rings = []; floaters = [];
-    launchX = W / 2; nextX = null; angle = -Math.PI / 2 - .26; queue = 0; returned = 0; gained = 0; combo = 0; mult = 1; shotTime = 0; shotRealTime = 0; roundTimer = 0; archived = false; activo = 0; reportada = false; fast = false; clearCelebrated = false; clearTime = 0; idSeq = 0;
+    E = M.nueva(nuevaSemilla(), CUENTA); sincroniza(); fotoRonda = null; sinPrueba = false;
+    paused = false; tocando = false; particles = []; rings = []; floaters = [];
+    ang = M.ANG_INICIAL; angle = ang / M.ANG; acumulado = 0; shotTime = 0; shotRealTime = 0; roundTimer = 0; archived = false; activo = 0; reportada = false; fast = false; clearCelebrated = false; clearTime = 0;
     pointerDown = false; toastTime = 0; $('toast').classList.remove('visible'); BBTANAudio.calla();
-    createRow(TOP); characterX = sombraX = launchX; throwKick = 0; hintSeen = false; paleta(); animoEn = 0;
+    characterX = sombraX = launchX; throwKick = 0; hintSeen = false; paleta(); animoEn = 0; nuevoGesto();
     $('overlay').hidden = true; $('pause').disabled = false; $('speed').setAttribute('aria-pressed','false'); $('speed-label').textContent = 'Velocidad ×1';
     aimDirty = true; uiDirty = true; updateUI();
   }
@@ -192,17 +231,16 @@
     }
     if (particles.length > 350) particles.splice(0, particles.length - 350);
   }
-  function damage(block, amount = 1) {
-    if (block.hp <= 0) return;
-    const hits = Math.min(block.hp, amount); block.hp -= hits; block.flash = .12; score += hits * 10 * mult;
-    if (block.hp <= 0) {
-      score += 50 * mult; combo++;
+  /* Lo que el motor avisa mientras corre un tiro: el daño y el puntaje ya
+     los contó él; aquí solo se ve y se oye. */
+  function alDano(block, muere, multAntes, sube) {
+    block.flash = .12;
+    if (muere) {
       burst(block.x + SIZE/2, block.y + SIZE/2, blockColor(block));
-      floaters.push({ x:block.x+SIZE/2, y:block.y+SIZE/2, text:cielo>.5?(cielo>2.4&&Math.random()<.35?'¡GRACIAS!':`+${50*mult} ♥`):roto(`+${50*mult}`), color:blockColor(block), life:cielo>2.4?1.1:.7 });
-      const next = Math.min(5, 1 + Math.floor(combo / 5));
-      BBTANAudio.broken(combo);
-      if (next > mult) { mult = next; toast(tx('combo')(mult)); BBTANAudio.combo(mult); }
-      if (hasClearedBoard(blocks, clearCelebrated)) celebrateClear();
+      floaters.push({ x:block.x+SIZE/2, y:block.y+SIZE/2, text:cielo>.5?(cielo>2.4&&Math.random()<.35?'¡GRACIAS!':`+${50*multAntes} ♥`):roto(`+${50*multAntes}`), color:blockColor(block), life:cielo>2.4?1.1:.7 });
+      BBTANAudio.broken(E.combo);
+      if (sube) { toast(tx('combo')(E.mult)); BBTANAudio.combo(E.mult); }
+      if (hasClearedBoard(E.blocks, clearCelebrated)) celebrateClear();
     } else BBTANAudio.hit(block.hp);
     uiDirty = true;
   }
@@ -212,35 +250,32 @@
     for (let x = 55; x < W; x += 65) burst(x, 170 + Math.random() * 140, [colors.lime, colors.purple, colors.cyan][Math.floor(x / 65) % 3], 9);
     uiDirty = true;
   }
-  function collect(ball) {
-    for (const p of pickups) {
-      if (!enterPickup(ball, p, bounds.radius)) continue;
-      const color = pickupColor(p);
-      burst(p.x,p.y,color,8); BBTANAudio.pickup(p.kind);
-      if (p.kind === 'ball') {
-        gained++; floaters.push({x:p.x,y:p.y,text:roto('+1 BOLA'),color,life:1});
-      } else {
-        activatePowerup(ball, p, blocks, damage);
-        // Refresh a beam instead of accumulating one effect per ball.
-        const effect = rings.find(r => r.pickup === p);
-        if (effect) effect.life = .35;
-        else rings.push({kind:p.kind,pickup:p,x:p.x,y:p.y,life:.35,color});
-      }
-      uiDirty = true;
+  function alItem(ball, p) {
+    const color = pickupColor(p);
+    burst(p.x,p.y,color,8); BBTANAudio.pickup(p.kind);
+    if (p.kind === 'ball') floaters.push({x:p.x,y:p.y,text:roto('+1 BOLA'),color,life:1});
+    else {
+      // Refresh a beam instead of accumulating one effect per ball.
+      const effect = rings.find(r => r.pickup === p);
+      if (effect) effect.life = .35;
+      else rings.push({kind:p.kind,pickup:p,x:p.x,y:p.y,life:.35,color});
     }
+    uiDirty = true;
   }
-  function fire() {
+  const EV = { dano: alDano, item: alItem, lanza: () => { throwKick = 1; } };
+  function fire(ev) {
     if (state !== 'aim' || paused || document.querySelector('dialog[open]')) return;
-    BBTANAudio.unlock(); tocando = true; disparoDesdeCarga = true; state = 'shoot'; queue = count; launchTimer = 0; returned = 0; gained = 0; combo = 0; mult = 1; nextX = null; shotTime = 0; shotRealTime = 0; hintSeen = true; uiDirty = true;
+    // El instante va a la prueba: tiempo jugado, el mismo que se reporta.
+    if (!M.dispara(E, ang, Math.round(activo * 1000), EV, textoGesto(ev))) return;
+    sincroniza(); guardaTiro();
+    BBTANAudio.unlock(); tocando = true; disparoDesdeCarga = true; acumulado = 0; shotTime = 0; shotRealTime = 0; hintSeen = true; uiDirty = true;
     canvas.focus({preventScroll:true}); BBTANAudio.launch();
   }
+  // El motor ya cerró el tiro (todas volvieron, se recogieron o pasó el tope).
   function finishShot() {
-    launchX = nextX === null ? launchX : clamp(nextX,26,W-26); count += gained; gained = 0;
-    blocks = blocks.filter(b=>b.hp>0); pickups = pickups.filter(keepPickupNextRound);
-    // Used beams and dispersers expire at the round transition, after every ball has returned.
-    pickups = pickups.filter(p=>p.y+ROW<FLOOR-15);
+    sincroniza();
     best = Math.max(best,score); persist();
-    state = 'descend'; roundTimer = 0; blocks.forEach(b=>b.startY=b.y); pickups.forEach(p=>p.startY=p.y); updateSpeedLabel(); uiDirty=true;
+    roundTimer = 0; updateSpeedLabel(); uiDirty=true;
   }
   function gameOver() {
     state = 'over'; archive(); reportar(); borraPartida(); $('overlay').hidden = false;
@@ -265,8 +300,8 @@
   }
   function recall() {
     if (state !== 'shoot' || paused) return;
-    if (nextX === null) nextX = balls.length ? balls[0].x : launchX;
-    balls.forEach(b=>burst(b.x,b.y,'#e5f2d6',3)); balls=[]; queue=0; returned=count;
+    balls.forEach(b=>burst(b.x,b.y,'#e5f2d6',3));
+    M.recoge(E, true); guardaTiro();
     toast(tx('recall')); finishShot();
   }
   function update(dt) {
@@ -284,19 +319,21 @@
     if (state==='shoot') {
       shotRealTime += dt;
       const elapsed = dt * shotPace(shotRealTime, fast);
-      shotTime += elapsed; launchTimer -= elapsed;
+      shotTime += elapsed;
       updateSpeedLabel();
-      while(queue>0 && launchTimer<=0) {
-        balls.push({x:launchX,y:FLOOR-1,vx:Math.cos(angle)*620,vy:Math.sin(angle)*620,trail:[]});queue--;launchTimer+=.065;throwKick=1;
-      }
-      for(let i=balls.length-1;i>=0;i--) {
-        const b=balls[i]; b.trail.unshift({x:b.x,y:b.y});if(b.trail.length>largoEstela())b.trail.pop();
-        if(stepBall(b,elapsed,blocks,bounds,damage,collect)) {
-          if(nextX===null)nextX=b.x; returned++; balls.splice(i,1); uiDirty=true;
-        }
-      }
-      if(queue===0 && balls.length===0)finishShot();
-      else if(shotTime>35)recall();
+      // La velocidad solo decide cuántos ticks fijos del motor caben en este
+      // cuadro; lo que pasa en cada uno es siempre lo mismo.
+      const largo = largoEstela();
+      for (const b of E.balls) { b.trail || (b.trail = []); b.trail.unshift({x:b.x,y:b.y}); if (b.trail.length > largo) b.trail.pop(); }
+      const antes = E.returned;
+      acumulado += elapsed;
+      while (acumulado >= M.TICK && E.state === 'shoot') { M.tick(E); acumulado -= M.TICK; }
+      for (const b of E.balls) b.trail || (b.trail = []);
+      if (E.returned !== antes) uiDirty = true;
+      if (E.state !== 'shoot') {
+        if (E.ticks >= M.TOPE) { balls.forEach(b=>burst(b.x,b.y,'#e5f2d6',3)); toast(tx('recall')); }
+        finishShot();
+      } else sincroniza();
     } else if(state==='descend') {
       // Abajo, los bloques dejan de bajar juntos: cada uno llega cuando
       // quiere y a tirones. Terminan en el mismo sitio; solo cambia el viaje.
@@ -304,8 +341,9 @@
       const baja=(o,sem)=>{const tb=clamp((roundTimer-lag*sem)/.4,0,1);o.y=o.startY+ROW*(tb>=1?1:1-Math.pow(1-tb,3)+wj*.12*Math.sin(tb*Math.PI)*Math.sin(tb*9));};
       blocks.forEach(b=>baja(b,hsh(b.id)));pickups.forEach(p=>baja(p,hsh(p.x|0)));
       if(roundTimer>=.4+lag) {
-        if(blocks.some(b=>b.hp>0 && b.y+b.h>=FLOOR-12))gameOver();
-        else { round++;clearCelebrated=false;paleta();createRow(TOP);characterX=launchX;state='aim';aimDirty=true;uiDirty=true; if(BBTANVoz.habla(round))hablaJuego();else if(round%5===0){const a=tx('animo');toast(roto(`RONDA ${round} · ${a[(round/5)%a.length]}`));} if((round+5)%50===0)BBTANAudio.prepara(round+5); guarda(); }
+        const fin = M.baja(E); sincroniza();
+        if(fin==='over')gameOver();
+        else { clearCelebrated=false;paleta();characterX=launchX;aimDirty=true;uiDirty=true;nuevoGesto(); if(BBTANVoz.habla(round))hablaJuego();else if(round%5===0){const a=tx('animo');toast(roto(`RONDA ${round} · ${a[(round/5)%a.length]}`));} if((round+5)%50===0)BBTANAudio.prepara(round+5); guarda(); }
       }
     }
   }
@@ -353,9 +391,10 @@
   }
   function drawAim() {
     if(aimDirty) {
-      aimPoints=[];const ghost={x:launchX,y:FLOOR-1,vx:Math.cos(angle)*620,vy:Math.sin(angle)*620};let hits=0, randomized=false;
+      const [dx,dy]=M.direccion(ang);
+      aimPoints=[];const ghost={x:launchX,y:FLOOR-1,vx:dx*M.VEL,vy:dy*M.VEL};let hits=0, randomized=false;
       for(let i=0;i<145;i++) {
-        const landed=stepBall(ghost,.008,blocks,bounds,()=>hits++,p=>{
+        const landed=M.stepBall(E,ghost,.008,()=>hits++,p=>{
           if(pickups.some(extra=>extra.alive && extra.kind==='scatter' && Math.hypot(p.x-extra.x,p.y-extra.y)<=bounds.radius+11))randomized=true;
         });
         if(i%3===0)aimPoints.push({x:ghost.x,y:ghost.y});
@@ -588,52 +627,88 @@
     if (TITULO && TITULO.firstChild && TITULO.firstChild.nodeValue !== nombre) { TITULO.firstChild.nodeValue = nombre; document.title = nombre; }
   }
   /* La partida guardada: se escribe al empezar cada ronda (desde la 2) en el
-     navegador y, dentro de Juegos, en la cuenta (users/<uid>/club/bbtan). Se
-     vuelve al principio de esa ronda; al terminar la partida se borra. */
+     navegador y, dentro de Juegos, en la cuenta (users/<uid>/club/bbtan); al
+     terminar la partida se borra. Es el estado del motor más la prueba hasta
+     ahí, así que una partida reanudada se puede probar entera. Editarla a
+     mano no sirve de nada: lo que se verifica es la prueba, y una ronda que
+     sus tiros no alcanzan no se carga.
+
+     Al lanzar (y al recoger) se reescribe, solo en el navegador, con el tiro
+     pendiente: si se recarga a media jugada ese tiro se juega igual, de una
+     vez, en vez de volver al principio de la ronda a probar otro ángulo. */
   const PARTIDA = Club && Club.storageKey ? Club.storageKey('bbtan-partida-v1') : 'bbtan-partida-v1';
-  function foto() {
-    return { v: 1, at: Date.now(), score, round, count, launchX, angle, activo, reportada, clearCelebrated, idSeq,
-      blocks: blocks.filter(b => b.hp > 0).map(b => ({ x: b.x, y: b.y, w: b.w, h: b.h, hp: b.hp, max: b.max, reinforced: b.reinforced, id: b.id })),
-      pickups: pickups.filter(p => p.alive).map(p => ({ x: p.x, y: p.y, kind: p.kind })) };
-  }
+  let fotoRonda = null;
+  function foto() { return { v: 2, at: Date.now(), e: M.exporta(E), ang, activo, clearCelebrated, sp: sinPrueba ? 1 : 0 }; }
   function guarda() {
     if (round < 2 || state === 'over') return;
-    const txt = JSON.stringify(foto());
+    fotoRonda = foto();
+    const txt = JSON.stringify(fotoRonda);
     try { localStorage.setItem(PARTIDA, txt); } catch {}
     try { Club && Club.guardarPartida && Club.guardarPartida(txt); } catch {}
   }
+  function guardaTiro() {
+    if (!fotoRonda || fotoRonda.e.round !== E.round || !E.tiros.length) return;
+    try { localStorage.setItem(PARTIDA, JSON.stringify({ ...fotoRonda, at: Date.now(), p: E.tiros[E.tiros.length - 1].slice(), ph: E.gestos[E.gestos.length - 1] })); } catch {}
+  }
   function borraPartida() {
+    fotoRonda = null;
     try { localStorage.removeItem(PARTIDA); } catch {}
     try { Club && Club.guardarPartida && Club.guardarPartida(null); } catch {}
   }
   const fin = v => Number.isFinite(+v);
-  function valida(d) {
+  // La de la versión 1 (antes de la prueba): se puede terminar, sin reportar.
+  function valida1(d) {
     return !!d && d.v === 1 && Number.isInteger(d.round) && d.round >= 2 && [d.score, d.count, d.launchX, d.angle, d.at].every(fin)
       && Array.isArray(d.blocks) && Array.isArray(d.pickups) && d.blocks.every(b => b && [b.x, b.y, b.hp, b.max].every(fin)) && d.pickups.every(p => p && fin(p.x) && fin(p.y) && typeof p.kind === 'string');
   }
+  const valida = d => valida1(d) || (!!d && d.v === 2 && !!d.e && typeof d.e === 'object' && fin(d.at));
   function lee(txt) { try { const d = typeof txt === 'string' ? JSON.parse(txt) : txt; return valida(d) ? d : null; } catch { return null; } }
+  function legado(d) {
+    const e = M.nueva(nuevaSemilla(), CUENTA);
+    Object.assign(e, { round: d.round, count: Math.max(1, d.count | 0), score: +d.score, launchX: clamp(+d.launchX, 26, W - 26),
+      blocks: d.blocks.map(b => ({ x: +b.x, y: +b.y, w: SIZE, h: SIZE, hp: +b.hp, max: +b.max, reinforced: !!b.reinforced, id: b.id | 0, flash: 0 })),
+      pickups: d.pickups.map(p => ({ x: +p.x, y: +p.y, kind: p.kind, alive: true })), _celdas: null });
+    e.idSeq = Math.max(d.idSeq | 0, ...e.blocks.map(b => b.id + 1));
+    return e;
+  }
   function restaura(d) {
-    state = 'aim'; paused = false; score = +d.score; round = d.round; count = Math.max(1, d.count | 0);
-    launchX = clamp(+d.launchX, 26, W - 26); angle = clamp(+d.angle, -Math.PI + .15, -.15); nextX = null; queue = 0;
-    activo = fin(d.activo) ? +d.activo : 0; reportada = !!d.reportada; clearCelebrated = !!d.clearCelebrated; archived = false;
-    blocks = d.blocks.map(b => ({ x: +b.x, y: +b.y, w: SIZE, h: SIZE, hp: +b.hp, max: +b.max, reinforced: !!b.reinforced, id: b.id | 0, flash: 0 }));
-    idSeq = Math.max(d.idSeq | 0, ...blocks.map(b => b.id + 1));
-    pickups = d.pickups.map(p => ({ x: +p.x, y: +p.y, kind: p.kind, alive: true }));
-    balls = []; particles = []; rings = []; floaters = [];
+    const sp = d.v !== 2 || !!d.sp;
+    let e = d.v === 2 ? M.importa(d.e, sp) : legado(d);
+    if (!e) return false;
+    let act = fin(d.activo) ? +d.activo : 0, pendiente = false;
+    // El tiro que quedó a medias se juega entero, tal como habría salido. El
+    // tiempo avanza lo mínimo que ese tiro y la bajada tardan a ×4.
+    if (Array.isArray(d.p)) {
+      const antes = M.exporta(e), r = M.juegaTiro(e, d.p, typeof d.ph === 'string' ? d.ph : '');
+      if (typeof r === 'number') { pendiente = true; act = Math.max(act, (d.p[1] + r * 1000 / (60 * M.PACE_MAX) + 450) / 1000); }
+      else e = M.importa(antes, sp);
+    }
+    E = e; sinPrueba = sp; sincroniza();
+    paused = false; acumulado = 0; activo = act; reportada = false; clearCelebrated = !!d.clearCelebrated && !pendiente; archived = false;
+    // Con el tiro pendiente jugado, el ángulo es el de ese tiro, como si no se hubiera recargado.
+    ang = clamp(pendiente ? d.p[0] : d.v === 2 ? d.ang | 0 : Math.round(+d.angle * M.ANG), M.ANG_MIN, M.ANG_MAX); angle = ang / M.ANG; nuevoGesto();
+    particles = []; rings = []; floaters = [];
     characterX = sombraX = launchX; hintSeen = true; $('overlay').hidden = true; $('pause').disabled = false;
-    paleta(); aimDirty = true; uiDirty = true; updateUI(); toast(`Partida recuperada · ronda ${round}`);
+    paleta(); aimDirty = true; uiDirty = true;
+    if (state === 'over') { fotoRonda = null; gameOver(); return true; }
+    updateUI(); toast(sinPrueba ? `Partida recuperada · ronda ${round} · sin clasificación` : `Partida recuperada · ronda ${round}`);
+    // Con el tiro pendiente ya jugado empieza otra ronda: se guarda como tal.
+    if (pendiente) guarda(); else fotoRonda = foto();
     const prox = Math.ceil((round + 1) / 50) * 50; if (prox - round <= 5) BBTANAudio.prepara(prox);
+    return true;
   }
   function cargaPartida() {
     let local = null;
     try { local = lee(localStorage.getItem(PARTIDA)); } catch {}
-    if (local) restaura(local);
+    if (local && !restaura(local)) { try { localStorage.removeItem(PARTIDA); } catch {} local = null; }
     const localAt = local ? local.at : 0;
     if (!Club || !Club.pedirPartida) return;
     Club.pedirPartida(dato => {
-      if (disparoDesdeCarga || !dato || !(dato.at > localAt)) return;
+      // Si la partida local terminó al cargar (su tiro pendiente perdía), la
+      // lápida que esa misma derrota mandó a la nube no es otra partida.
+      if (disparoDesdeCarga || state === 'over' || !dato || !(dato.at > localAt)) return;
       const nube = lee(dato.d);
-      if (nube) { restaura(nube); try { localStorage.setItem(PARTIDA, dato.d); } catch {} }
+      if (nube) { if (restaura(nube)) try { localStorage.setItem(PARTIDA, dato.d); } catch {} }
       else if (dato.d == null && local) { try { localStorage.removeItem(PARTIDA); } catch {} reset(); }
     });
   }
@@ -851,11 +926,12 @@
   function aim(event) {
     if(state!=='aim'||paused)return false;
     const p=point(event);if(p.y>FLOOR-12)return false;
-    angle=clamp(Math.atan2(p.y-FLOOR,p.x-launchX),-Math.PI+.15,-.15);aimDirty=true;return true;
+    const nuevo=clamp(Math.round(Math.atan2(p.y-FLOOR,p.x-launchX)*M.ANG),M.ANG_MIN,M.ANG_MAX);
+    anotaApunte(event,nuevo!==ang);ang=nuevo;angle=ang/M.ANG;aimDirty=true;return true;
   }
   canvas.addEventListener('pointerdown',event=>{if(event.button!==0 || state!=='aim'||paused)return;pointerDown=true;canvas.setPointerCapture(event.pointerId);aim(event);});
   canvas.addEventListener('pointermove',event=>{if(event.pointerType==='mouse'||pointerDown)aim(event);});
-  canvas.addEventListener('pointerup',event=>{if(!pointerDown)return;pointerDown=false;const valid=aim(event);if(canvas.hasPointerCapture(event.pointerId))canvas.releasePointerCapture(event.pointerId);if(valid)fire();});
+  canvas.addEventListener('pointerup',event=>{if(!pointerDown)return;pointerDown=false;const valid=aim(event);if(canvas.hasPointerCapture(event.pointerId))canvas.releasePointerCapture(event.pointerId);if(valid)fire(event);});
   canvas.addEventListener('pointercancel',()=>pointerDown=false);
   $('pause').addEventListener('click',()=>pause(!paused));
   $('resume').addEventListener('click',()=>state==='over'?reset():pause(false));
@@ -874,8 +950,8 @@
     const key=event.key.toLowerCase();
     if(['arrowleft','arrowright',' '].includes(key)&&event.target.tagName!=='BUTTON') {
       event.preventDefault();
-      if(key===' ') {if(!event.repeat)fire();}
-      else if(state==='aim'&&!paused){angle=clamp(angle+(key==='arrowleft'?-.035:.035),-Math.PI+.15,-.15);aimDirty=true;}
+      if(key===' ') {if(!event.repeat)fire(event);}
+      else if(state==='aim'&&!paused){const nuevo=clamp(ang+(key==='arrowleft'?-M.ANG_PASO:M.ANG_PASO),M.ANG_MIN,M.ANG_MAX);anotaApunte(event,nuevo!==ang);ang=nuevo;angle=ang/M.ANG;aimDirty=true;}
     }
     if(event.repeat)return;
     if(key==='p'||key==='escape')pause(!paused);

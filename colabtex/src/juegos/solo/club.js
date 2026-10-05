@@ -1,5 +1,6 @@
 import {ambientar} from '../sonido.js';
 import {categoriaClub,resultadoClub,mejorClub} from './club-datos.js';
+import {verificaClub} from './verifica.js';
 
 /* El documento del juego conserva su CSS, su audio y sus animaciones.
    Solo este adaptador conoce la cuenta y escribe en Firebase.
@@ -8,25 +9,51 @@ import {categoriaClub,resultadoClub,mejorClub} from './club-datos.js';
    no se escucha ninguna clasificación (la base no deja leerla sin sesión),
    no se guarda ningún récord ni partida a medias, y el panel del juego
    dice por qué en vez de ofrecer «reintentar». El juego guarda lo suyo con
-   la cuenta «invitado», que el salón borra al empezar otra visita. */
-export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partida}) {
+   la cuenta «invitado», que el salón borra al empezar otra visita.
+
+   Antes de guardar nada, el resultado pasa por el verificador de su juego
+   (verifica.js, docs/antitrampas.md) con la prueba que mandó el juego. Si
+   no cuadra, no se guarda, no paga y no da logros: el juego se entera
+   (`rechazo`) y queda un aviso en `sospechas` (`reportaSospecha`). Lo que
+   había pendiente en localStorage se vuelve a verificar al cargarlo
+   (con la hora en que se jugó, `h`: un diario de ayer sigue valiendo),
+   porque ese almacén también se puede editar a mano. `guardar` recibe la
+   prueba como cuarto argumento, para escribirla junto al récord. */
+export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partida,reportaSospecha}) {
   let host,frame,off,temaObserver,categoria='',muerto=false,pendientes={},guardando=false,propios={};
   const invitado=!usuario,cuenta=invitado?'invitado':usuario.uid;
   const clave='jg.club.pendientes.'+cuenta+'.'+juego;
   const ocultos=[];
-  if(!invitado) try { const valor=JSON.parse(localStorage.getItem(clave)||'{}');
-    for (const [k,v] of Object.entries(valor||{})) { const dato=resultadoClub(juego,v);if(dato&&k===dato.categoria)pendientes[k]=dato; }
-  } catch {}
+  /* Lo pendiente se vuelve a verificar al cargarlo: hasta que eso termina,
+     sincronizar() espera. */
+  const cargados=invitado?Promise.resolve():(async()=>{
+    let valor={};try{valor=JSON.parse(localStorage.getItem(clave)||'{}')||{};}catch{}
+    for (const [k,v] of Object.entries(valor)) { const dato=resultadoClub(juego,v);if(!dato||k!==dato.categoria)continue;
+      /* Un pendiente de antes de la verificación (sin prueba) se descarta en
+         silencio: no es trampa, es una versión vieja. */
+      if(v.prueba===undefined||v.prueba===null)continue;
+      const motivo=await verificaClub(juego,dato,v.prueba,{uid:cuenta,ahora:Number.isFinite(v.h)&&v.h<=Date.now()&&Date.now()-v.h<3*864e5?v.h:undefined});
+      if(motivo){sospecha(dato,motivo,'pendiente');continue;}
+      if(mejorClub(dato,pendientes[k]))pendientes[k]={...dato,prueba:v.prueba,h:v.h};
+    }
+    persistir();
+  })();
   function persistir(){try{localStorage.setItem(clave,JSON.stringify(pendientes));}catch{}}
+  function sospecha(dato,motivo,donde){
+    console.warn('[club] partida rechazada',juego,dato.categoria,motivo);
+    if(reportaSospecha&&!invitado)Promise.resolve().then(()=>reportaSospecha({c:dato.categoria,m:motivo,p:dato.puntos,t:dato.tiempo,d:donde})).catch(()=>{});
+  }
   function enviar(dato){if(!muerto)frame.contentWindow?.postMessage({canal:'club-parent',...dato},location.origin);}
   function estado(texto,key=categoria){enviar({tipo:'estado',categoria:key,texto});}
   async function sincronizar(){
     if(guardando||muerto||invitado)return;guardando=true;const revisados={};
+    await cargados;
     for(const [key,dato] of Object.entries(pendientes)){
       if(muerto)break;revisados[key]=dato.partida;
       estado('Sincronizando tu récord…',key);
       try{
-        await guardar(key,usuario.uid,{...dato,nombre:usuario.name.slice(0,80)});
+        const {prueba,h,...fila}=dato;
+        await guardar(key,usuario.uid,{...fila,nombre:usuario.name.slice(0,80)},prueba);
         if(pendientes[key]?.partida===dato.partida){delete pendientes[key];persistir();}
         estado('Récord sincronizado con tu cuenta.',key);
       }catch(err){
@@ -74,9 +101,19 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
     if(d.tipo==='resultado'){
       const dato=resultadoClub(juego,d);if(!dato)return;
       if(invitado){estado('Buena partida. Como invitado no se guarda: inicia sesión para que tus récords entren en la clasificación.',dato.categoria);return;}
-      if(alResultado){try{alResultado(dato,propios[dato.categoria]||pendientes[dato.categoria]||null);}catch(err){/* un logro no debe romper la partida */}}
-      if(mejorClub(dato,pendientes[dato.categoria])){pendientes[dato.categoria]=dato;persistir();}
-      sincronizar();
+      const prueba=d.prueba;
+      verificaClub(juego,dato,prueba,{uid:cuenta}).then(motivo=>{
+        if(muerto)return;
+        if(motivo){
+          sospecha(dato,motivo,'en vivo');
+          estado('Esta partida no se guardó: '+motivo,dato.categoria);
+          enviar({tipo:'rechazo',categoria:dato.categoria,partida:dato.partida,motivo});
+          return;
+        }
+        if(alResultado){try{alResultado(dato,propios[dato.categoria]||pendientes[dato.categoria]||null);}catch(err){/* un logro no debe romper la partida */}}
+        if(mejorClub(dato,pendientes[dato.categoria])){pendientes[dato.categoria]={...dato,prueba,h:Date.now()};persistir();}
+        sincronizar();
+      });
     }
   }
   function montar(el){
@@ -92,7 +129,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
     temaObserver.observe(document.documentElement,{attributes:true,attributeFilter:['data-tema']});
     frame.allow='fullscreen';frame.setAttribute('allowfullscreen','');
     window.addEventListener('message',mensaje);
-    frame.src='juegos/club/'+juego+'/index.html?v=club-24&embed=1&cuenta='+encodeURIComponent(cuenta)+(invitado?'&invitado=1':'');
+    frame.src='juegos/club/'+juego+'/index.html?v=club-31&embed=1&cuenta='+encodeURIComponent(cuenta)+(invitado?'&invitado=1':'');
     host.appendChild(frame);
   }
   function destruir(){muerto=true;temaObserver?.disconnect();if(off)off();window.removeEventListener('message',mensaje);for(const [el,valor]of ocultos)el.style.display=valor;frame?.remove();host.innerHTML='';ambientar('');}

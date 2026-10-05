@@ -701,6 +701,111 @@
   }
 
   /* ================================================================
+     La prueba de una partida (docs/antitrampas/sudoku.md)
+     ================================================================ */
+
+  /* Lo que hace falta para rehacer una partida: qué sudoku era (`f`, la
+     fecha del diario; `s`, la semilla del clásico o del arcade, y `d`, la
+     dificultad del clásico) y `j`, las jugadas en un arreglo plano de
+     quíntuplos [celda, valor, Δt, g, f]: Δt en ms de reloj de juego desde
+     la anterior; `g`, los ms desde la entrada anterior (el clic en la
+     celda, la flecha, otra tecla) hasta la que hizo esta jugada, y `f`,
+     banderas (1 = evento sintético sin mando, 2 = mando conectado, 4 =
+     pestaña oculta): la forma humana de la jugada, para la capa anti-bot
+     del verificador. Las notas no van: no cambian el tablero.
+     - Diario y clásico: cada cambio de una celda, con el valor que le
+       quedó (0 = borrada; también lo que deshace un «deshacer»). Una pista
+       es 10 + el dígito, y su Δt ya trae los 30 s que suma.
+     - Arcade: cada número que se intentó poner, bien o mal: el motor sabe
+       cuál era el bueno, y de ahí salen las vidas, el combo y los puntos.
+     La pantalla la arma y el verificador la rehace con `rehace`, así que
+     las dos cuentan con las mismas reglas. */
+  const PRUEBA_V = 1;
+  const PASO = 5;                                              // números por jugada en `j`
+  const PENALIZA_PISTA = 30000;
+  const VIDAS_ARCADE = 3;
+  const MODOS_PRUEBA = { d: "diario", c: "clasico", a: "arcade" };
+
+  /* El sudoku que dice la prueba: {pistas, solucion, dificultad} o null. */
+  function sudokuDePrueba(p) {
+    if (p.m === "d") return typeof p.f === "string" && /^\d{4}-\d{2}-\d{2}$/.test(p.f) ? sudokuDiario(p.f) : null;
+    if (!Number.isSafeInteger(p.s) || p.s < 0 || p.s > 0xFFFFFFFF) return null;
+    if (p.m === "a") return generar({ dificultad: "medio", rng: mulberry32(p.s) });
+    if (p.m === "c" && DIFICULTADES[p.d] && Object.prototype.hasOwnProperty.call(DIFICULTADES, p.d)) return generar({ dificultad: p.d, rng: mulberry32(p.s) });
+    return null;
+  }
+
+  /* Rehace la partida. Devuelve {error} o:
+     - `sudoku`: el puzzle; `resuelto`: si el tablero quedó igual a la
+       solución; `fin`: ms del reloj en la última jugada;
+     - `finales`: los instantes en que cada celda tomó su valor final
+       (sin las puestas por pista): lo que se mira para el ritmo humano;
+     - `acciones`: [{t, dt, g, f}] de cada jugada, en orden;
+     - `pistas` (clásico);
+     - arcade: `puntos` de las jugadas (sin los bonos del final), `vidas`,
+       `gana` y `pierde`. */
+  function rehace(p) {
+    if (!p || typeof p !== "object" || p.v !== PRUEBA_V) return { error: "La prueba no es de esta versión del sudoku." };
+    if (!MODOS_PRUEBA[p.m]) return { error: "La prueba no dice el modo de juego." };
+    const s = sudokuDePrueba(p);
+    if (!s) return { error: "La prueba no dice qué sudoku era." };
+    return Object.assign({ sudoku: s }, repasa(s, p.m, p.j));
+  }
+
+  /* Las jugadas `j` sobre un sudoku ya conocido ({pistas, solucion}), en
+     el modo `m` ("d", "c" o "a"). Es la mitad de `rehace` que no genera:
+     la pantalla la usa para comprobar, al retomar una partida guardada,
+     que sus jugadas den justo el tablero guardado. */
+  function repasa(s, m, j) {
+    if (!Array.isArray(j) || j.length % PASO || j.length > PASO * 20000) return { error: "Las jugadas de la prueba no se pueden leer." };
+    const arcade = m === "a";
+    const tab = s.pistas.slice(), cuando = new Array(81).fill(-1), ayuda = new Set();
+    let t = 0, pistas = 0, vidas = VIDAS_ARCADE, combo = 0, puntos = 0, gana = false, pierde = false;
+    const acciones = [];
+    for (let k = 0; k < j.length; k += PASO) {
+      const i = j[k], v = j[k + 1], dt = j[k + 2], g = j[k + 3], f = j[k + 4];
+      if (!Number.isInteger(i) || i < 0 || i > 80 || !Number.isInteger(v) || ![dt, g].every(x => Number.isSafeInteger(x) && x >= 0) ||
+        !Number.isInteger(f) || f < 0 || f > 7) return { error: "Las jugadas de la prueba no se pueden leer." };
+      t += dt;
+      acciones.push({ t, dt, g, f });
+      if (gana || pierde) return { error: "Hay jugadas después del final de la partida." };
+      if (s.pistas[i] || ayuda.has(i)) return { error: "Una jugada toca una celda fija." };
+      if (arcade) {
+        if (v < 1 || v > 9 || tab[i]) return { error: "Una jugada del arcade no se pudo hacer." };
+        if (v === s.solucion[i]) {
+          tab[i] = v; cuando[i] = t; combo++;
+          const u = unidadesCompletas(tab, i);
+          puntos += puntosArcade({ combo, unidades: u });
+          if (tab.every((x, q) => x === s.solucion[q])) gana = true;
+        } else {
+          combo = 0;
+          if (--vidas <= 0) pierde = true;
+        }
+      } else if (v >= 11 && v <= 19) {                         // una pista (solo el clásico)
+        if (m !== "c" || v - 10 !== s.solucion[i]) return { error: "Una pista de la prueba no es la del sudoku." };
+        if (dt < PENALIZA_PISTA) return { error: "Una pista no sumó sus 30 segundos." };
+        tab[i] = v - 10; ayuda.add(i); pistas++;
+      } else {
+        if (v > 9 || tab[i] === v) return { error: "Una jugada del tablero no se pudo hacer." };
+        tab[i] = v; cuando[i] = t;
+      }
+    }
+    const resuelto = tab.every((x, q) => x === s.solucion[q]);
+    const finales = [];
+    for (let i = 0; i < 81; i++) if (!s.pistas[i] && !ayuda.has(i) && tab[i] && cuando[i] >= 0) finales.push(cuando[i]);
+    finales.sort((a, b) => a - b);
+    return { resuelto, tablero: tab, ayudas: [...ayuda], fin: t, finales, acciones, pistas, puntos, vidas, gana, pierde };
+  }
+
+  /* Los puntos del arcade al terminar: los de las jugadas y, si se ganó,
+     el bono de tiempo (con el tiempo entero que va al ranking) y el de las
+     vidas que sobran. La pantalla y el verificador usan esta misma. */
+  function puntosFinalArcade(puntos, gana, vidas, tiempo) {
+    const extra = gana ? bonoTiempo(tiempo, "medio") + Math.max(0, vidas) * PUNTOS.vida : 0;
+    return Math.max(0, Math.min(1000000, Math.round(puntos + extra)));
+  }
+
+  /* ================================================================
      Lo que se exporta
      ================================================================ */
   return {
@@ -715,6 +820,8 @@
     // arcade
     puntosArcade, bonoTiempo, multiplicador,
     // racha
-    rachaVacia, limpiaRacha, rachaVisible, registraDiaria, mezclaRacha
+    rachaVacia, limpiaRacha, rachaVisible, registraDiaria, mezclaRacha,
+    // la prueba de la partida (antitrampas)
+    PRUEBA_V, PASO, PENALIZA_PISTA, VIDAS_ARCADE, sudokuDePrueba, rehace, repasa, puntosFinalArcade
   };
 });

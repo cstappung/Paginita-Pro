@@ -99,6 +99,58 @@
   let generacion = 0;                                 // invalida una generación que llega tarde
   let records = lee("sudoku.records", {});            // mejores marcas locales por categoría
   let ultimaSubida = "";                              // lo último que se mandó a la cuenta (evita repetir)
+  /* La prueba de la partida (motor.js, `rehace`; docs/antitrampas/sudoku.md):
+     qué sudoku es y cada cambio del tablero (o, en Arcade, cada número
+     intentado) como [celda, valor, Δt]. `sombra` es el tablero tal como
+     quedó apuntado, para anotar solo lo que cambió. Una partida retomada
+     de una versión anterior, que no guardaba sus jugadas, no se puede
+     probar (`sinPrueba`): se termina igual, pero no va al ranking. */
+  let jugadas = [], tUlt = 0, sombra = null, sinPrueba = false;
+  /* La forma humana de cada jugada, para la capa anti-bot: `ent` es la
+     última entrada (clic, tecla, botón del mando) con los ms desde la
+     anterior (`g`) y si fue de confianza (`f`: 1 = evento sintético, que
+     es lo que despacha un script; 2 = de juegos/audio/mando.js con un mando
+     conectado, que también es sintético pero legítimo). */
+  let ent = { t: performance.now(), g: 0, f: 0 };
+  const mandoConectado = () => { try { return [...(navigator.getGamepads ? navigator.getGamepads() : [])].some(g => g && g.connected); } catch (e) { return false; } };
+  function entrada(e) {                               // e = el evento; null = un botón del mando sin evento
+    const ahora = performance.now();
+    const f = e ? (e.isTrusted ? 0 : e.__mando && mandoConectado() ? 2 : 1) : (mandoConectado() ? 2 : 1);
+    ent = { t: ahora, g: ahora - ent.t, f };
+  }
+  const forma = () => [Math.max(0, Math.round(ent.g)), ent.f | (document.hidden ? 4 : 0)];
+
+  /** Lleva el reloj hasta este instante (el intervalo solo lo hace cada 250 ms). */
+  function actualiza() {
+    const ahora = performance.now();
+    if (corriendo && juego && !document.hidden) ms += ahora - marca;
+    marca = ahora;
+  }
+  /** Anota en la prueba lo que cambió en el tablero desde la última vez. */
+  function apunta(esPista) {
+    if (!sombra) return;
+    actualiza();
+    const t = Math.round(ms);
+    for (let i = 0; i < 81; i++) if (tab[i] !== sombra[i]) {
+      jugadas.push(i, esPista ? 10 + tab[i] : tab[i], Math.max(0, t - tUlt), ...forma());
+      tUlt = Math.max(tUlt, t);
+    }
+    sombra = tab.slice();
+  }
+  /** Arcade: cada número intentado, bien o mal, va a la prueba. */
+  function apuntaIntento(i, n) {
+    actualiza();
+    const t = Math.round(ms);
+    jugadas.push(i, n, Math.max(0, t - tUlt), ...forma());
+    tUlt = Math.max(tUlt, t);
+  }
+  /** La prueba tal como la manda Club.result. */
+  function prueba() {
+    const p = { v: M.PRUEBA_V, m: { diario: "d", clasico: "c", arcade: "a" }[juego.modo], j: jugadas };
+    if (juego.modo === "diario") p.f = juego.fecha; else p.s = juego.semilla;
+    if (juego.modo === "clasico") p.d = juego.dif;
+    return p;
+  }
 
   /* ---------- Construcción del DOM: 81 celdas y 9 teclas ---------- */
   const tablero = $("tablero"), teclado = $("teclado"), marco = $("marco");
@@ -438,6 +490,7 @@
       if (hechas.length) { olaDeLuz(i, hechas); sonido.efecto("unidad", hechas.length); avisa(textoUnidades(hechas.length)); }
     }
     historial.push(cambios);
+    apunta(false);
     pinta();
     if (resuelto()) termina(true); else guardaProgreso();
   }
@@ -445,6 +498,7 @@
   /** Arcade: un acierto suma (con combo), un error quita una vida. */
   function escribeArcade(i, n) {
     if (tab[i]) return;                               // lo puesto en Arcade ya es correcto y queda fijo
+    apuntaIntento(i, n);
     if (n === juego.solucion[i]) {                    // --- acierto ---
       tab[i] = n; notas[i] = 0;
       limpiaNotasVecinas(i, n, null);                 // limpia notas vecinas (sin deshacer)
@@ -495,6 +549,7 @@
     if (!tab[i] && !notas[i]) return;                 // nada que borrar
     historial.push([[i, tab[i], notas[i]]]);
     tab[i] = 0; notas[i] = 0;
+    apunta(false);
     sonido.efecto("borra");
     pinta(); guardaProgreso();
   }
@@ -507,6 +562,7 @@
       const [j, v, nt] = cambios[k];
       tab[j] = v; notas[j] = nt;
     }
+    apunta(false);
     sonido.efecto("borra");
     pinta(); guardaProgreso();
   }
@@ -532,7 +588,9 @@
     const n = juego.solucion[i];
     tab[i] = n; notas[i] = 0; ayudas.add(i);
     limpiaNotasVecinas(i, n, null);
+    actualiza();                                      // el reloj al día antes de sumar
     ms += PENALIZA_PISTA; pistasUsadas++;             // la penalización: 30 s más
+    apunta(true);                                     // la pista va a la prueba con sus 30 s
     sel = i;
     sonido.efecto("pista");
     anima(i, "pon", 230);
@@ -570,6 +628,18 @@
     ayudas = new Set(estado && estado.ayudas ? estado.ayudas.filter(i => Number.isInteger(i) && i >= 0 && i < 81) : []);
     ms = estado && Number.isFinite(estado.ms) ? Math.max(0, estado.ms) : 0;
     pistasUsadas = ayudas.size;
+    /* Las jugadas guardadas tienen que rehacer justo el tablero (y las
+       pistas) guardados; si no cuadran, o la partida no trae su semilla,
+       esta ya no se puede probar. */
+    jugadas = []; tUlt = 0; sinPrueba = false;
+    if (estado && !estado.hecha) {
+      const r = M.repasa(p, { diario: "d", clasico: "c", arcade: "a" }[p.modo], Array.isArray(estado.j) ? estado.j : []);
+      const cuadra = !r.error && r.tablero.every((v, i) => v === tab[i]) && r.ayudas.length === ayudas.size && r.ayudas.every(i => ayudas.has(i));
+      if (cuadra && (p.modo === "diario" || Number.isSafeInteger(p.semilla))) { jugadas = estado.j.slice(); tUlt = r.fin; }
+      else sinPrueba = true;
+    }
+    sombra = tab.slice();
+    ent = { t: performance.now(), g: 0, f: 0 };       // la primera jugada se mide desde que aparece el tablero
     historial = []; fallo = null; notasOn = false;
     vidas = VIDAS; combo = 0; mejorCombo = 0; puntos = 0;
     terminada = !!(estado && estado.hecha);
@@ -594,6 +664,7 @@
       const semilla = crypto.getRandomValues(new Uint32Array(1))[0]; // semilla al azar (no Math.random)
       const p = M.generar({ dificultad: d, rng: M.mulberry32(semilla) });
       if (mia !== generacion) return;
+      p.semilla = semilla;                            // va a la prueba: el verificador lo regenera
       listo(p);
     }, 40);
   }
@@ -610,7 +681,7 @@
     if (hecha) estado = { tab: p.solucion, hecha: true, ms: prog && prog.fecha === p.fecha ? prog.ms : 0 };
     else if (prog && prog.fecha === p.fecha) {
       const t = deTexto(prog.tab);
-      if (encaja(t, p.pistas)) estado = { tab: t, notas: notasValidas(prog.notas), ms: prog.ms };
+      if (encaja(t, p.pistas)) estado = { tab: t, notas: notasValidas(prog.notas), ms: prog.ms, j: prog.j };
     }
     empieza(p, estado);
     pintaInfo();
@@ -623,13 +694,13 @@
     if (!nueva && g && g.dif === dif) {
       const pistas = deTexto(g.pistas), sol = deTexto(g.sol), t = deTexto(g.tab);
       if (pistas && sol && t && encaja(t, pistas) && sol.every(v => v >= 1)) {
-        empieza({ modo: "clasico", dif, pistas, solucion: sol }, { tab: t, notas: notasValidas(g.notas), ms: g.ms, ayudas: g.ayudas });
+        empieza({ modo: "clasico", dif, pistas, solucion: sol, semilla: g.s }, { tab: t, notas: notasValidas(g.notas), ms: g.ms, ayudas: g.ayudas, j: g.j });
         pintaInfo();
         return;
       }
     }
     genera(dif, p => {                                // no había nada que retomar: una nueva
-      empieza({ modo: "clasico", dif, pistas: p.pistas, solucion: p.solucion });
+      empieza({ modo: "clasico", dif, pistas: p.pistas, solucion: p.solucion, semilla: p.semilla });
       pintaInfo();
       guardaProgreso();
     });
@@ -638,7 +709,7 @@
   /** Arcade: siempre una partida nueva en dificultad media. */
   function nuevaArcade() {
     genera("medio", p => {
-      empieza({ modo: "arcade", dif: "medio", pistas: p.pistas, solucion: p.solucion });
+      empieza({ modo: "arcade", dif: "medio", pistas: p.pistas, solucion: p.solucion, semilla: p.semilla });
       pintaInfo();
     });
   }
@@ -646,8 +717,9 @@
   /** Guarda la partida a medias (Diario y Clásico; el Arcade se juega de una vez). */
   function guardaProgreso() {
     if (!juego || terminada) return;
-    if (juego.modo === "diario") guarda("sudoku.diario", { fecha: juego.fecha, tab: aTexto(tab), notas, ms: Math.round(ms) });
-    else if (juego.modo === "clasico") guarda("sudoku.clasico", { dif: juego.dif, pistas: aTexto(juego.pistas), sol: aTexto(juego.solucion), tab: aTexto(tab), notas, ms: Math.round(ms), ayudas: [...ayudas] });
+    const j = sinPrueba ? [] : jugadas;               // sin prueba no tiene sentido guardar jugadas
+    if (juego.modo === "diario") guarda("sudoku.diario", { fecha: juego.fecha, tab: aTexto(tab), notas, ms: Math.round(ms), j });
+    else if (juego.modo === "clasico") guarda("sudoku.clasico", { dif: juego.dif, pistas: aTexto(juego.pistas), sol: aTexto(juego.solucion), tab: aTexto(tab), notas, ms: Math.round(ms), ayudas: [...ayudas], s: juego.semilla, j });
   }
 
   /** Fin de partida: ranking, racha, récords, sonido y pantalla final. */
@@ -665,26 +737,27 @@
       pintaRacha();
       if (racha.ult !== antes) {                      // solo la primera vez del día cuenta para el ranking
         subeNube(true);
-        if (Club) Club.result({ categoria: "club-sudoku-racha", puntos: entero(cuentaRacha(racha), 1, 1000), tiempo });
+        if (Club && !sinPrueba) Club.result({ categoria: "club-sudoku-racha", puntos: entero(cuentaRacha(racha), 1, 1000), tiempo }, prueba());
       }
       muestraFinal("diario", { tiempo });
     } else if (juego.modo === "clasico") {
       borra("sudoku.clasico");                        // ya no hay nada que retomar
       const cat = `club-sudoku-${juego.dif}`;
       const nuevo = anotaRecord(cat, { puntos: 1, tiempo }); // ¿mejor tiempo local?
-      if (Club) Club.result({ categoria: cat, puntos: 1, tiempo }); // en Clásico manda el tiempo
+      if (Club && !sinPrueba) Club.result({ categoria: cat, puntos: 1, tiempo }, prueba()); // en Clásico manda el tiempo
       muestraFinal("clasico", { tiempo, nuevo });
     } else {
       let bono = 0;
       if (gana) {                                     // el bonus de tiempo solo si se completa
-        try { bono = Math.round(M.bonoTiempo(ms, "medio")) || 0; } catch (e) { bono = 0; }
+        // Con el tiempo entero que va al ranking: el verificador cuenta con ese.
+        try { bono = Math.round(M.bonoTiempo(tiempo, "medio")) || 0; } catch (e) { bono = 0; }
         bono = Math.max(0, bono);
       }
       // Cada vida que sobra también suma (la tarifa la da el motor: M.PUNTOS.vida).
       const bonoVidas = gana ? Math.max(0, vidas) * ((M.PUNTOS && M.PUNTOS.vida) || 0) : 0;
       puntos = entero(puntos + bono + bonoVidas, 0, 1000000);
       const nuevo = puntos >= 1 && anotaRecord("club-sudoku-arcade", { puntos, tiempo });
-      if (Club && puntos >= 1) Club.result({ categoria: "club-sudoku-arcade", puntos, tiempo }); // aunque pierdas, si sumaste
+      if (Club && puntos >= 1) Club.result({ categoria: "club-sudoku-arcade", puntos, tiempo }, prueba()); // aunque pierdas, si sumaste
       muestraFinal(gana ? "arcade" : "pierde", { tiempo, bono, bonoVidas, nuevo });
     }
     pinta();
@@ -737,6 +810,8 @@
       if (gana && d.bonoVidas) cifras.push(cifra("BONUS VIDAS", `+${d.bonoVidas}`));
       botones = `<button type="button" class="boton primario" data-accion="otra">Otra vez</button><button type="button" class="boton" data-accion="ver">Ver tablero</button>`;
     }
+    if (sinPrueba && Club && (tipo === "diario" || tipo === "clasico"))
+      texto += " Esta partida se empezó con una versión anterior del juego: no entra en la clasificación" + (tipo === "diario" ? ", pero suma a tu racha." : ".");
     f.className = "final" + (tipo === "pierde" ? " pierde" : "");
     f.innerHTML = `<div><h2 id="finalTitulo">${titulo}</h2><p>${texto}</p>${cifras.length ? `<p class="cifras">${cifras.join(" · ")}</p>` : ""}<div class="botones">${botones}</div></div>`;
     f.hidden = false;
@@ -837,11 +912,7 @@
      El reloj solo corre con la pestaña a la vista. Cada medio minuto se
      mira si en Chile ya es otro día: si el diario estaba terminado o sin
      tocar, llega el nuevo. */
-  setInterval(() => {
-    const ahora = performance.now();
-    if (corriendo && juego && !document.hidden) { ms += ahora - marca; $("reloj").textContent = reloj(ms); }
-    marca = ahora;
-  }, 250);
+  setInterval(() => { actualiza(); if (corriendo && juego) $("reloj").textContent = reloj(ms); }, 250);
   setInterval(guardaProgreso, 5000);                  // guardado periódico por si se cierra de golpe
   document.addEventListener("visibilitychange", () => {
     marca = performance.now();
@@ -863,16 +934,16 @@
      ==================================================================== */
   tablero.addEventListener("click", e => {           // tocar una celda la elige
     const b = e.target.closest(".celda");
-    if (b) elige(+b.dataset.i);
+    if (b) { entrada(e); elige(+b.dataset.i); }
   });
   teclado.addEventListener("click", e => {           // el teclado en pantalla escribe
     const b = e.target.closest(".tecla");
-    if (b) escribe(+b.dataset.n);
+    if (b) { entrada(e); escribe(+b.dataset.n); }
   });
-  $("btnNotas").onclick = alternaNotas;
-  $("btnBorrar").onclick = borraCelda;
-  $("btnDeshacer").onclick = deshacer;
-  $("btnPista").onclick = pista;
+  $("btnNotas").onclick = e => { entrada(e); alternaNotas(); };
+  $("btnBorrar").onclick = e => { entrada(e); borraCelda(); };
+  $("btnDeshacer").onclick = e => { entrada(e); deshacer(); };
+  $("btnPista").onclick = e => { entrada(e); pista(); };
   $("btnOtra").onclick = otraPartida;
   $("nueva").onclick = otraPartida;
   $("selDif").onchange = () => {                      // otra dificultad: otra categoría y otra partida
@@ -898,6 +969,7 @@
     const t = e.target;
     if (t && (t.tagName === "SELECT" || t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return; // no robar teclas a los campos
     if (t && t.closest && (t.closest(".modos") || t.closest("#final") || t.closest(".club-ranking"))) return; // ahí mandan sus propios botones
+    entrada(e);                                       // cada tecla cuenta para la forma de la jugada
     if (e.ctrlKey) {                                  // Ctrl+Z deshace
       if (e.key === "z" || e.key === "Z") { e.preventDefault(); deshacer(); }
       return;
@@ -932,8 +1004,8 @@
       botones: {
         arriba: { tecla: "ArrowUp", rep: 120 }, abajo: { tecla: "ArrowDown", rep: 120 },
         izq: { tecla: "ArrowLeft", rep: 120 }, der: { tecla: "ArrowRight", rep: 120 },
-        lb: () => cambiaCifra(-1), rb: () => cambiaCifra(1),
-        a: () => escribe(cifraMando), x: "Backspace", y: "KeyN", b: "KeyU", rt: "KeyH"
+        lb: () => { entrada(null); cambiaCifra(-1); }, rb: () => { entrada(null); cambiaCifra(1); },
+        a: () => { entrada(null); escribe(cifraMando); }, x: "Backspace", y: "KeyN", b: "KeyU", rt: "KeyH"
       },
       menu: () => !$("final").hidden,
       pistas: [["dpad stickL", "moverte"], ["lb rb", "elegir cifra"], ["a", "escribir"], ["x", "borrar"], ["y", "notas"], ["b", "deshacer"], ["rt", "pista"]],

@@ -29,7 +29,7 @@
   if (window.__fanalCargado) return;
   window.__fanalCargado = true;
 
-  const M = window.FanalMotor, R = window.FanalRelato, S = window.FanalSprites, MU = window.FanalMusica;
+  const M = window.FanalMotor, R = window.FanalRelato, S = window.FanalSprites, MU = window.FanalMusica, FP = window.FanalPrueba;
   const Club = window.Club || null;
   const W = M.ANCHO, H = M.ALTO, K = 3;          // lienzo lógico y cuántas veces se agranda
   const $ = id => document.getElementById(id);
@@ -219,6 +219,51 @@
   let toque = null;             // el dedo que rema (x lógica) o null
   let autoT = 0;                // espera del disparo automático
 
+  /* ================================================================
+     La prueba de la partida (prueba.js, docs/antitrampas/fanal.md)
+     ================================================================
+     Cada jornada se anota mientras se juega: los tiros, lo que toca cada
+     bala, los golpes, los poderes y los pulsos de la música. Con eso el
+     club rehace los puntos antes de guardar un récord. Una partida en la
+     que se usó __fanal (o que siguió de un punto de control sin prueba) se
+     juega igual, pero no se manda a la clasificación. */
+  let tocada = false;           // ¿se usó __fanal en esta página? Desde entonces nada cuenta
+  const cuentaUrl = new URLSearchParams(location.search).get("cuenta") || "local";
+  function nuevoId() {
+    const a = new Uint32Array(3);
+    try { crypto.getRandomValues(a); } catch (e) { for (let i = 0; i < 3; i++) a[i] = Math.floor(Math.random() * 4294967296); }
+    return Array.from(a, x => x.toString(36).padStart(7, "0")).join("").slice(0, 18);
+  }
+  const latMs = () => Math.round((musica.latencia || 0) * 1000);
+  function regAbre(n) {
+    if (!P || !P.prueba) return;
+    P.reg = FP.abre(n, tMusica, performance.now(), P.tiempo, latMs());
+    anotaPulsos();
+  }
+  // Los pulsos que la música programó desde la última vez.
+  function anotaPulsos() {
+    const r = P && P.reg;
+    if (!r) return;
+    for (const p of musica.pulsosDesde(r.pn)) { r.pn = p.n; FP.pulso(r, p.t); }
+  }
+  function anota(letra, bala) { if (P && P.reg) FP.evento(P.reg, letra, tMusica, bala ? bala.k : 0); }
+  function regCierra(fin) {
+    if (!P || !P.reg) return;
+    FP.cierra(P.prueba, P.reg, fin, tMusica, performance.now(), P.tiempo, P.puntos, P.llamas, { b: P.sinteticas - P.sintAntes, d: P.mando - P.mandoAntes });
+    P.sintAntes = P.sinteticas; P.mandoAntes = P.mando;
+    P.reg = null;
+  }
+  /* Las entradas que no hizo una persona: un script que despacha teclas o
+     toques da isTrusted falso. El mando (juegos/audio/mando.js) también
+     despacha teclas, marcadas con __mando: esas valen si de verdad hay un
+     mando conectado. */
+  function cuentaEntrada(e) {
+    if (!P || !e || e.isTrusted) return;
+    let mando = false;
+    try { mando = !!e.__mando && Array.from((navigator.getGamepads && navigator.getGamepads()) || []).some(g => g && g.connected); } catch (err) { mando = false; }
+    if (mando) P.mando++; else P.sinteticas++;
+  }
+
   function nuevaPartida(modo) {
     return {
       modo,                       // "travesia" o "sinfin"
@@ -229,7 +274,8 @@
       mensajerasRest: 0, tMensajera: 0, fuegoAcum: 0, picadaAcum: 0,
       acogidas: 0, apagadasLumbre: 0, albaGolpes: 0, tiempo: 0, reintentos: 0,
       stats: { disparos: 0, aciertos: 0, afinados: 0, apagadas: 0, mejorRes: 1, danios: 0, cartas: 0 },
-      terminando: 0, fuentes: {}
+      terminando: 0, fuentes: {},
+      prueba: null, reg: null, msjK: 0, tocada: false, legado: false, sinteticas: 0, mando: 0, sintAntes: 0, mandoAntes: 0
     };
   }
   function nuevoFanal() {
@@ -399,7 +445,7 @@
       escamas.push(nuevaEscama(p.x + p.w / 2, p.y + p.h, 0, 92));
     }
     // Si llega a la llama, se quema en ella, y la llama se resiente.
-    if (estado === "juego" && Math.abs(p.x + p.w / 2 - F.x) < 8 && Math.abs(p.y + p.h / 2 - (M.Y_FANAL - 3)) < 7) { mata(p, null); golpeFanal("picada"); return; }
+    if (estado === "juego" && Math.abs(p.x + p.w / 2 - F.x) < 8 && Math.abs(p.y + p.h / 2 - (M.Y_FANAL - 3)) < 7) { mata(p, null, "quema"); golpeFanal("picada"); return; }
     if (p.y > H + 12) { p.estado = "vuelve"; p.t = 0; p.ox = hueco(p).x; p.oy = -16; p.x = p.ox; p.y = p.oy; }
   }
   function nuevaEscama(x, y, vx, vy, extra) {
@@ -436,7 +482,8 @@
   /* La Mensajera alcanzada: puntos y una carta. En la historia, el próximo
      fragmento que el acto permite; en el sin fin, un eco. */
   function alcanzaMensajera() {
-    const pts = M.PUNTOS_MENSAJERA[Math.floor(Math.random() * M.PUNTOS_MENSAJERA.length)];
+    // El valor sale de la semilla de la partida (no de Math.random): así la prueba lo puede recalcular.
+    const pts = M.valorMensajera(P.prueba ? P.prueba.id : "fanal", P.jornada, P.msjK++);
     suma(pts, msj.x, msj.y, true);
     chispas(msj.x, msj.y, 22, ["#fff4e0", "#efe6d6", "#fff0c8"], 60, 0.9, "polvo");
     destella(msj.x, msj.y, 34, 1, 0.4);
@@ -468,6 +515,7 @@
     poderes.push({ x, y, tipo, t: 0 });
   }
   function tomaPoder(p) {
+    anota({ pabilo: "p", lente: "l", campana: "c", aceite: "a", destello: "d" }[p.tipo]);
     musica.sfx.poder();
     anillo(F.x, M.Y_FANAL - 2, "#ffd27a", 18);
     const nombres = { pabilo: "Pabilo doble", lente: "Lente", campana: "Campana de vidrio", aceite: "Aceite: una llama", destello: "Destello" };
@@ -481,7 +529,7 @@
       escamas = escamas.filter(e => e.muro);                           // se lleva todas las escamas (no los muros)
       const bajas = polillas.filter(q => q.viva && q.estado !== "entrando");
       const maxY = Math.max(-1, ...bajas.map(q => q.y));
-      for (const q of bajas) if (q.y >= maxY - 3) mata(q, null);        // la fila más baja
+      for (const q of bajas) if (q.y >= maxY - 3) mata(q, null, "destello"); // la fila más baja
       for (const l of larvas) l.vida = 0;
     }
   }
@@ -509,9 +557,11 @@
     }
   }
   /* Una polilla apagada. */
-  function mata(p, bala) {
+  function mata(p, bala, causa) {
     if (!p.viva) return;
     p.viva = false;
+    const i = "abc".indexOf(p.tipo);
+    anota((bala ? "ABC" : causa === "quema" ? "JKL" : "GHI")[i < 0 ? 0 : i], bala);
     const acto = actoVisual(P.j);
     if (bala) subeNota(bala.afinado);
     const pts = M.puntosPolilla(acto, p.tipo, multiplicador(), bala && bala.afinado, P.j.vuelta);
@@ -537,6 +587,7 @@
       return;
     }
     P.llamas--; P.notas = 0; P.cadena = 0; P.sinDanio = false; P.stats.danios++;
+    anota("g");
     P.fuentes[fuente || "?"] = (P.fuentes[fuente || "?"] || 0) + 1;
     if (window.__fanalTraza) window.__fanalTraza.push({ fuente, x: +F.x.toFixed(1), vx: Math.round(F.vx), cerca: escamas.filter(e => Math.abs(e.x - F.x) < 20 && e.y > 250).map(e => [Math.round(e.x), Math.round(e.y), Math.round(e.vx), Math.round(e.vy), e.estilo]) });
     F.invul = 2.2;
@@ -560,7 +611,8 @@
     const t = tMusica - musica.latencia, pc = musica.pulsoCercano(t);
     const afinado = M.juzgaPulso(t, pc.previo, pc.siguiente).afinado;
     const vel = F.lente > 0 ? -380 : -300;
-    const nueva = dx => balas.push({ x: F.x + dx, y: M.Y_FANAL - 9, vy: vel, afinado, perfora: F.lente > 0 ? 99 : afinado ? 1 : 0, dano: afinado ? 2 : 1, tocados: new Set() });
+    const k = P.reg ? FP.disparo(P.reg, afinado, tMusica, latMs()) : 0;   // la bala recuerda su tiro (para la prueba)
+    const nueva = dx => balas.push({ x: F.x + dx, y: M.Y_FANAL - 9, vy: vel, afinado, perfora: F.lente > 0 ? 99 : afinado ? 1 : 0, dano: afinado ? 2 : 1, tocados: new Set(), k });
     if (F.pabilo > 0) { nueva(-3); nueva(3); } else nueva(0);
     F.cool = 0.16;
     P.stats.disparos++; P.disparosJ++;
@@ -584,7 +636,7 @@
         }
       }
       // La Mensajera.
-      if (!fuera && msj && Math.abs(b.x - msj.x) < 9 && Math.abs(b.y - msj.y) < 6) { P.aciertosJ++; P.stats.aciertos++; alcanzaMensajera(); fuera = !b.perfora; }
+      if (!fuera && msj && Math.abs(b.x - msj.x) < 9 && Math.abs(b.y - msj.y) < 6) { P.aciertosJ++; P.stats.aciertos++; anota("M", b); alcanzaMensajera(); fuera = !b.perfora; }
       // El jefe y lo suyo.
       if (!fuera && jefe && golpeaJefe(b)) fuera = b.perfora-- <= 0;
       // Las polillas.
@@ -595,7 +647,7 @@
           P.aciertosJ++; P.stats.aciertos++;
           p.vida -= b.dano; p.flash = 0.08;
           if (p.vida <= 0) mata(p, b);
-          else { musica.sfx.roce(p.x); chispas(b.x, b.y, 4, ["#ffffff"], 30, 0.25); }
+          else { anota("N", b); musica.sfx.roce(p.x); chispas(b.x, b.y, 4, ["#ffffff"], 30, 0.25); }
           if (b.perfora-- <= 0) { fuera = true; break; }
         }
       }
@@ -613,19 +665,19 @@
      alba y sombras. Devuelve si la bala se gastó. */
   function golpeaMenores(b) {
     for (const l of larvas) if (l.vida > 0 && Math.abs(b.x - l.x) < 4 && Math.abs(b.y - l.y) < 4) {
-      l.vida = 0; P.aciertosJ++; P.stats.aciertos++; subeNota(b.afinado);
+      l.vida = 0; P.aciertosJ++; P.stats.aciertos++; anota("O", b); subeNota(b.afinado);
       suma(10 * multiplicador(), l.x, l.y); musica.sfx.muerte(l.x, ++P.cadena, false);
       chispas(l.x, l.y, 8, ["#c8a07a", "#fff0c8"], 35, 0.5, "polvo");
       return b.perfora-- <= 0;
     }
     for (const l of lumbres) if (l.viva && Math.abs(b.x - l.x) < 6 && Math.abs(b.y - l.y) < 5) {
-      l.viva = false; P.apagadasLumbre++; P.aciertosJ++; P.stats.aciertos++;
+      l.viva = false; P.apagadasLumbre++; P.aciertosJ++; P.stats.aciertos++; anota("Q", b);
       suma(5, l.x, l.y); musica.sfx.muerte(l.x, 0, false);
       chispas(l.x, l.y, 16, ["#fff6e0", "#ffd27a"], 40, 0.9, "polvo");
       return b.perfora-- <= 0;
     }
     for (const s of sombras) if (s.viva && Math.abs(b.x - s.x) < 6 && Math.abs(b.y - s.y) < 5) {
-      s.viva = false; P.aciertosJ++; P.stats.aciertos++; subeNota(b.afinado);
+      s.viva = false; P.aciertosJ++; P.stats.aciertos++; anota("R", b); subeNota(b.afinado);
       suma(25 * multiplicador(), s.x, s.y); musica.sfx.muerte(s.x, ++P.cadena, false);
       chispas(s.x, s.y, 12, ["#2a1e30", "#6a4a7a"], 40, 0.6, "polvo");
       return b.perfora-- <= 0;
@@ -715,7 +767,7 @@
       for (const o of jefe.orbita) if (o.viva) {
         const ox = jefe.x + Math.cos(o.a) * o.r, oy = jefe.y + Math.sin(o.a) * o.r * 0.7;
         if (Math.abs(b.x - ox) < 4.5 && Math.abs(b.y - oy) < 4) {
-          o.viva = false; P.aciertosJ++; P.stats.aciertos++; subeNota(b.afinado);
+          o.viva = false; P.aciertosJ++; P.stats.aciertos++; anota("V", b); subeNota(b.afinado);
           suma(15 * multiplicador(), ox, oy); musica.sfx.muerte(ox, ++P.cadena, false);
           chispas(ox, oy, 8, ["#a9d6a2", "#e6f2d8"], 35, 0.5, "polvo");
           return true;
@@ -727,7 +779,7 @@
       if (Math.abs(b.x - jefe.x) < w / 2 && Math.abs(b.y - jefe.y) < h / 2) {
         // Todo lo que lances, volverá: el tiro empuja al Alba y vuelve hacia ti.
         jefe.dist = Math.min(M.DISTANCIA_ALBA, jefe.dist + M.EMPUJE_ALBA);
-        P.albaGolpes++;
+        P.albaGolpes++; anota("Z", b);
         escamas.push(nuevaEscama(jefe.x, jefe.y + h / 2, (F.x - jefe.x) * 0.45, 105, { devuelta: true, estilo: 4 }));
         musica.sfx.empuje(); chispas(b.x, b.y, 10, ["#fff6d8", "#ffd27a"], 40, 0.5);
         return true;
@@ -738,7 +790,7 @@
     if (jefe.entrando > 0 || (t === "esfinge" && jefe.oculta)) return false;
     if (Math.abs(b.x - jefe.x) < caja[0] && Math.abs(b.y - (jefe.y + caja[2])) < caja[1]) {
       jefe.vida -= b.dano; jefe.flash = 0.07; b.tocados.add(jefe);
-      P.aciertosJ++; P.stats.aciertos++; subeNota(b.afinado);
+      P.aciertosJ++; P.stats.aciertos++; anota("X", b); subeNota(b.afinado);
       suma(5 * multiplicador(), null, null);
       musica.sfx.jefeGolpe(); chispas(b.x, b.y, 4, ["#ffffff", "#ffd27a"], 30, 0.3);
       pintaVidaJefe();
@@ -993,6 +1045,7 @@
     escamas = escamas.filter(e => !e.jefe);
     larvas.forEach(l => (l.vida = 0));
     fx.eclipseObj = 1; F.viento = 0;
+    anota("j");
     suma(M.PUNTOS_JEFE[jefe.tipo] * (P.j.vuelta ? 1 + 0.25 * P.j.vuelta : 1), jefe.x, jefe.y, true);
     sacude(0.7); relampago("#fff6d8", 0.6); fx.aberr = 0.4;
     chispas(jefe.x, jefe.y, 90, ["#fff6d8", "#ffd27a", S.PALETAS[actoVisual(P.j)].acento], 90, 1.6, "polvo");
@@ -1026,7 +1079,7 @@
       const cx = F.x, cy = M.Y_FANAL - 46;
       l.x = cx + Math.cos(l.a) * l.r; l.y = cy + Math.sin(l.a) * l.r * 0.62 + Math.sin(tMusica * 2 + l.f) * 3;
       if (Math.hypot(l.x - F.x, l.y - (M.Y_FANAL - 6)) < 9 || l.r < 4) {   // llega a tu luz y se queda
-        l.viva = false; P.acogidas++; F.radioExtra += 1.6;
+        l.viva = false; P.acogidas++; F.radioExtra += 1.6; anota("q");
         musica.sfx.nota(P.acogidas % 7, 2, 0.06); anillo(F.x, M.Y_FANAL - 6, "#fff6d8", 12);
       }
     }
@@ -1044,7 +1097,7 @@
     const j = M.jornada(n);
     P.jornada = n; P.j = j; P.acto = j.acto === 5 ? 5 : j.acto;
     P.sinDanio = true; P.disparosJ = 0; P.aciertosJ = 0; P.fragJ = []; P.ecoJ = []; P.ecoMostrar = null; P.terminando = 0;
-    P.fuegoAcum = 0; P.picadaAcum = 0;
+    P.fuegoAcum = 0; P.picadaAcum = 0; P.msjK = 0;
     limpiaEntidades();
     naufragios = j.tipo === "lumbre" || j.jefe === "alba" ? [] : creaNaufragios(actoVisual(j));
     if (j.tipo === "oleada") { empiezaOleada(j); P.mensajerasRest = j.mensajeras; P.tMensajera = azar(9, 17); }
@@ -1057,6 +1110,7 @@
     $("hudSup").hidden = false;
     pintaHud(true);
     lienzo.focus({ preventScroll: true });
+    regAbre(n);
   }
   function terminaJornada() {
     if (!P || estado === "fin" || estado === "muriendo") return;
@@ -1064,6 +1118,7 @@
     if (P.j.tipo !== "lumbre") suma(b.total);
     P.completadas = Math.max(P.completadas, P.jornada);
     if (P.j.tipo === "lumbre") P.piedadJ = P.apagadasLumbre === 0;
+    regCierra("c");
     // Las cartas leídas en la jornada quedan en la bitácora para siempre.
     if (P.fragJ.length || P.ecoJ.length) { prog.frag = [...new Set([...prog.frag, ...P.fragJ])].sort((a, c) => a - c); prog.ecos = [...new Set([...prog.ecos, ...P.ecoJ])].sort((a, c) => a - c); guardaProgreso(); }
     transito(P.jornada + 1, P.j.tipo === "lumbre" ? null : b);
@@ -1090,6 +1145,8 @@
     // El punto de control: al empezar un acto de la historia.
     if (P.modo === "travesia" && Object.values(M.INICIO_ACTO).includes(nSig) && nSig > 1) {
       prog.punto = { j: nSig, puntos: P.puntos, llamas: P.llamas, luces: P.luces, at: Date.now() };
+      // Con la prueba de lo jugado: sin ella, seguir desde aquí no cuenta.
+      if (P.prueba && !P.legado) prog.punto.pr = Object.assign({ v: P.prueba.v, m: "t", id: P.prueba.id, J: P.prueba.J.slice() }, P.tocada ? { x: 1 } : {});
       guardaProgreso();
     }
     const lineas = [];
@@ -1188,6 +1245,7 @@
     relatoListo = 2.2 + lineas.length * 2.4 + 1;
     relatoAuto = 0;
     // Bonus por haber llegado, y por no haber lanzado nada contra el Alba.
+    anota("f");
     suma(M.PUNTOS_JEFE.alba + (P.albaGolpes === 0 ? 5000 : 0));
     prog.alba = true; if (piedad) prog.piedad = true;
     prog.punto = { j: 0, at: Date.now() };                             // la historia terminó: se borra el punto de control
@@ -1210,17 +1268,27 @@
   function enviaResultados(completa) {
     if (!P || P.enviado) return;
     P.enviado = true;
+    regCierra(completa ? "f" : F.apagado ? "m" : "a");
+    const prueba = P.prueba ? FP.ajusta(JSON.parse(JSON.stringify(P.prueba))) : null;
+    const cuenta = !!prueba && !P.tocada && !P.legado;                // ¿entra en la clasificación?
+    if (prueba && cuenta) {
+      // El juego se revisa a sí mismo con lo mismo que usará el club: si no
+      // cuadra es un error de este archivo, y conviene verlo en la consola.
+      const r = FP.rehace(prueba);
+      if (r.motivo || r.puntos !== Math.round(P.puntos)) console.warn("FANAL: la prueba no cuadra con la partida", r, Math.round(P.puntos));
+    }
     const tiempo = Math.max(1, Math.round(P.tiempo * 1000));
     const cat = P.modo === "sinfin" ? "club-fanal-sinfin" : "club-fanal-travesia";
     const puntos = Math.round(P.puntos);
     const jornadas = P.modo === "sinfin" ? P.completadas : (completa ? M.JORNADAS_HISTORIA : P.completadas);
     const m = prog.mejor;
-    if (Club) {
-      if (puntos >= 1) Club.result({ categoria: cat, puntos: Math.min(1000000, puntos), tiempo });
+    if (Club && cuenta) {
+      if (puntos >= 1) Club.result({ categoria: cat, puntos: Math.min(1000000, puntos), tiempo }, prueba);
       // La jornada solo se manda cuando mejora: cada resultado cuenta como
       // una partida del club (y paga monedas), y una partida es una sola.
-      if (jornadas >= 1 && jornadas > m.jornada) Club.result({ categoria: "club-fanal-jornadas", puntos: jornadas, tiempo });
+      if (jornadas >= 1 && jornadas > m.jornada) Club.result({ categoria: "club-fanal-jornadas", puntos: jornadas, tiempo }, prueba);
     }
+    if (P.tocada) return;                                              // una partida de prueba tampoco toca los récords locales
     // Los récords locales.
     P.nuevoRecord = puntos > (P.modo === "sinfin" ? m.sinfin : m.travesia);
     P.nuevaJornada = jornadas > m.jornada;
@@ -1237,9 +1305,22 @@
     P = nuevaPartida(modo); F = nuevoFanal(); agenda = [];
     particulas = []; flotantes = []; destellos = [];
     html.classList.remove("ultima-llama");
+    P.prueba = FP.nueva(modo, nuevoId(), cuentaUrl);
+    P.tocada = tocada;
     if (modo === "travesia" && desde && desde.j > 1) {               // desde el punto de control
       P.puntos = desde.puntos || 0; P.llamas = Math.max(1, desde.llamas || 3); P.luces = desde.luces || 200; P.reintentos = 1;
       P.completadas = desde.j - 1;
+      // Lo jugado hasta el punto de control viaja con él: la prueba sigue
+      // desde ahí. Sin eso (un punto de una versión anterior, o tocado a
+      // mano) la travesía se juega igual, pero no cuenta.
+      const pr = desde.pr, ultima = pr && Array.isArray(pr.J) && pr.J[pr.J.length - 1];
+      let sigue = false;
+      if (ultima && !pr.x && ultima.n === desde.j - 1) {
+        const prueba = { v: FP.VERSION, m: "t", id: pr.id, u: cuentaUrl, k: pr.J.length, J: pr.J.slice() };
+        const r = FP.rehace(prueba);
+        if (!r.motivo) { P.prueba = prueba; P.puntos = r.puntos; P.llamas = Math.max(1, ultima.v); sigue = true; }
+      }
+      if (!sigue) { P.legado = true; if (pr && pr.x) P.tocada = true; }
     }
     const primera = modo === "sinfin" ? M.JORNADAS_HISTORIA + 1 : desde && desde.j > 1 ? desde.j : 1;
     cielo.estrellas = creaEstrellas(Math.min(P.luces, 430), modo === "sinfin" ? 99 : 7);
@@ -1342,6 +1423,9 @@
     const s = P.stats, prec = s.disparos ? Math.round((s.aciertos / s.disparos) * 100) : 0, af = s.disparos ? Math.round((s.afinados / s.disparos) * 100) : 0;
     $("finTitulo").textContent = completa ? "La travesía" : "El fanal se apagó";
     $("finLinea").textContent = completa ? "Cruzaste el alba. La noche sigue, y ahora sabes lo que hay en ella." : R.APAGADO[Math.floor(Math.random() * R.APAGADO.length)];
+    if (P.tocada || P.legado) $("finLinea").textContent += P.tocada
+      ? " (Partida de prueba: se usó __fanal, no entra en la clasificación.)"
+      : " (Siguió desde un punto de control de una versión anterior, sin prueba: no entra en la clasificación.)";
     const min = Math.floor(P.tiempo / 60), seg = Math.floor(P.tiempo % 60);
     const filas = [
       ["Puntos", Math.round(P.puntos).toLocaleString("es-CL"), P.nuevoRecord],
@@ -1416,6 +1500,7 @@
   document.addEventListener("keydown", e => {
     if (e.target && /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
     const t = TECLA[e.code];
+    if (t) cuentaEntrada(e);
     if (e.code === "KeyP" || e.code === "Escape") {
       e.preventDefault();
       if (panel) cierraPanel(); else if (estado === "pausa") sigue(); else pausa();
@@ -1443,6 +1528,7 @@
   // El dedo (o el ratón) sobre el lienzo: rema hasta donde está y dispara al tocar.
   const aLogico = ev => { const r = lienzo.getBoundingClientRect(); return ((ev.clientX - r.left) / r.width) * W; };
   lienzo.addEventListener("pointerdown", ev => {
+    cuentaEntrada(ev);
     if (estado === "relato") { sigueRelato(); return; }
     if (estado !== "juego") return;
     ev.preventDefault(); lienzo.setPointerCapture(ev.pointerId);
@@ -1455,6 +1541,7 @@
   for (const b of document.querySelectorAll("#tactil [data-tecla]")) {
     const t = b.dataset.tecla;
     b.addEventListener("pointerdown", ev => {
+      cuentaEntrada(ev);
       ev.preventDefault(); b.setPointerCapture(ev.pointerId); b.classList.add("activo");
       musica.iniciar();
       if (estado === "relato") { sigueRelato(); return; }
@@ -2096,6 +2183,7 @@
     if (estado !== "pausa") {
       tMusica += dt;
       musica.avanza(tMusica, dt);
+      anotaPulsos();
       for (const p of musica.consumePulsos(tMusica)) alPulso(p);
       actualiza(dt);
     }
@@ -2120,8 +2208,20 @@
   });
 
   /* Ganchos para probar desde la consola o un script (como __yemas):
-     saltar a una jornada, ver el estado y avanzar el juego sin pantalla. */
-  window.__fanal = {
+     saltar a una jornada, ver el estado y avanzar el juego sin pantalla.
+     Siguen sirviendo para probar, pero tocar cualquiera (también leer el
+     mundo, que es lo que necesita un bot) marca la página: desde entonces
+     ninguna partida se manda a la clasificación (ver `tocada`). */
+  function toca() {
+    if (!tocada) console.info("FANAL: se usó __fanal. Desde ahora, ninguna partida de esta página entra en la clasificación.");
+    tocada = true;
+    if (P) P.tocada = true;
+  }
+  const marcado = o => new Proxy(o, {
+    get(t, k) { toca(); const v = Reflect.get(t, k, t); return typeof v === "function" ? v.bind(t) : v; },
+    set(t, k, v) { toca(); t[k] = v; return true; }
+  });
+  const ganchos = {
     salta(n, modo) { empieza(modo || (n > M.JORNADAS_HISTORIA ? "sinfin" : "travesia"), { j: n, puntos: 0, llamas: 3, luces: 200 }); },
     sigue: () => { relatoListo = 0; sigueRelato(); },
     paso: dt => paso(dt || 1 / 60),
@@ -2138,4 +2238,11 @@
     mundo: () => ({ x: F.x, llamas: P && P.llamas, polillas: polillas.filter(p => p.viva).map(p => ({ x: p.x + p.w / 2, y: p.y + p.h, e: p.estado })), escamas: escamas.map(e => ({ x: e.x, y: e.y, vx: e.vx, vy: e.vy })), larvas: larvas.filter(l => l.vida > 0).map(l => ({ x: l.x, y: l.y })), jefe: jefe && { x: jefe.x, y: jefe.y, tipo: jefe.tipo, haz: !!jefe.haz }, estado, pulso: musica.pulsoCercano(tMusica), t: tMusica }),
     musica
   };
+  window.__fanal = {};
+  for (const [k, v] of Object.entries(ganchos)) window.__fanal[k] = typeof v === "function" ? (...a) => { toca(); return v(...a); } : v;
+  window.__fanal.teclas = marcado(teclas);
+  window.__fanal.musica = marcado(musica);
+  Object.freeze(window.__fanal);
+  // Si el club rechaza la partida, se dice también sobre el juego.
+  window.addEventListener("club-rechazo", e => { const m = e.detail && e.detail.motivo; if (m) avisa("No entró en la clasificación: " + m); });
 })();

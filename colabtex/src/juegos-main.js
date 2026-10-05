@@ -1,4 +1,6 @@
 import { crearSolo } from "./juegos/solo/club.js";
+import { esRachaClub, rachaClub } from "./juegos/solo/club-datos.js";
+import { VERIFICADORES, juegoDeCategoria, textoPrueba } from "./juegos/solo/verifica.js";
 import { crearFrontera } from "./juegos/frontera.js";
 "use strict";
 /* ============================================================
@@ -1223,6 +1225,37 @@ async function guardaConPodio(categoria, uid, dato, anunciar = true) {
   return res;
 }
 
+/* Un récord del club ya verificado (verifica.js): primero su prueba, por
+   su partida, y después la fila. La regla de `soloRanks` pide que la
+   prueba exista; si las reglas nuevas aún no se publican, escribir la
+   prueba falla con PERMISSION_DENIED y la fila se intenta igual (con las
+   viejas, no la pide). Solo se escribe si mejora la marca guardada: una
+   prueba por cada récord, no por cada partida. */
+async function guardaClub(categoria, uid, dato, prueba) {
+  const juego = juegoDeCategoria(categoria);
+  if (juego) {
+    const previa = await fb.leerSolo(categoria).then(f => f.find(x => x.uid === uid), () => null);
+    /* Una racha diaria no pasa de la que cuenta `rachasClub`, que solo sube
+       de a uno por día (club-datos.js: rachaClub). Si las reglas aún no la
+       conocen, se sigue como antes. */
+    if (esRachaClub(categoria)) {
+      const sinReglas = e => { if (!/permission/i.test(String(e && (e.code || e.message)))) throw e; return undefined; };
+      const prev = await fb.leerRachaClub(uid, categoria).catch(sinReglas);
+      if (prev !== undefined) {
+        const reg = rachaClub(prev, diaMonedas(), previa ? previa.puntos : 0);
+        const escrita = reg ? await fb.apuntaRachaClub(uid, categoria, reg).then(() => true, sinReglas) : true;
+        if (escrita) dato = Object.assign({}, dato, { puntos: Math.min(dato.puntos, (reg || prev).n) });
+      }
+    }
+    if (previa && (previa.puntos > dato.puntos || previa.puntos === dato.puntos && previa.tiempo <= dato.tiempo)) return { committed: false };
+    await fb.guardarPruebaSolo(categoria, uid, dato.partida, VERIFICADORES[juego].PRUEBA, textoPrueba(prueba) || "").catch(e => {
+      if (!/permission/i.test(String(e && (e.code || e.message)))) throw e;
+    });
+  }
+  return guardaConPodio(categoria, uid, dato);
+}
+const sospechaClub = s => state.user ? fb.reportaSospecha(state.user.uid, s) : Promise.resolve();
+
 function armazon() {
   const h = $("pantalla");
   if (state.vista !== "partida") ponInmersivo(false);
@@ -1241,7 +1274,7 @@ function armazon() {
        Pokémon en modo local, con sus propias rachas. Como invitado juega
        igual, con el usuario `INVITADO`, y no escribe nada fuera. */
     h.innerHTML = "";
-    individual = crearFrontera({ usuario: u || INVITADO, guardar: guardaConPodio, watch: fb.watchSolo, volver: () => ir(""),
+    individual = crearFrontera({ usuario: u || INVITADO, guardar: guardaClub, reportaSospecha: sospechaClub, watch: fb.watchSolo, volver: () => ir(""),
       partida: u ? { leer: () => fb.leerPartidaClub(u.uid, "frontera"), guardar: (d, at) => fb.guardarPartidaClub(u.uid, "frontera", d, at) } : null,
       alResultado: u ? lista => { marcaJugadaClub("frontera");
         for (const { d, previa } of lista || []) {
@@ -1256,7 +1289,7 @@ function armazon() {
     const clave = juego === "tetris" ? "tetrisclub" : juego;
     /* Sin cuenta (`usuario: null`) el club juega en modo invitado: ni
        clasificación, ni partida a medias en la nube, ni logros. */
-    individual = crearSolo({ juego, usuario: u, guardar: guardaConPodio, watch: fb.watchSolo, volver: () => ir(""),
+    individual = crearSolo({ juego, usuario: u, guardar: guardaClub, reportaSospecha: sospechaClub, watch: fb.watchSolo, volver: () => ir(""),
       partida: u ? { leer: () => fb.leerPartidaClub(u.uid, juego), guardar: (d, at) => fb.guardarPartidaClub(u.uid, juego, d, at) } : null,
       /* Un logro individual sale de la marca: se celebra el que esta
          partida da y la mejor marca guardada no daba ya. */
