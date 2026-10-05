@@ -82,18 +82,22 @@ export const SOLOS = [
   { id: "bots-clue", tipo: "bots", juego: "clue", nombre: "Clue · práctica", genero: "Deducción", icono: "🕵️", alta: "2026-09-29",
     url: "juegos/clue/index.html", reglas: "clue",
     lema: "Resuelve el crimen del edificio contra detectives automáticos.",
-    modos: ["Contra bots"] }
+    modos: ["Contra bots"] },
+  { id: "bots-boxhead", tipo: "bots", juego: "boxhead", nombre: "Boxhead · práctica", genero: "Acción", icono: "▣", alta: "2026-10-05",
+    url: "juegos/boxhead/index.html", reglas: "boxhead",
+    lema: "Tú solo contra los zombis y los diablos, en cualquiera de los cinco mapas.",
+    modos: ["Supervivencia"] }
 ];
 
 /* El género que lleva la miniatura de cada multijugador, junto al número
-   de jugadores: con dieciocho juegos, «Cartas» o «Tablero» ayuda a
+   de jugadores: con diecinueve juegos, «Cartas» o «Tablero» ayuda a
    elegir más que el nombre solo. */
 export const GENERO = {
   orbita: "Física", escondite: "Búsqueda", cartas: "Cartas", cuadritos: "Tablero",
   worms: "Artillería", reversi: "Tablero", cadena: "Estrategia", flip7: "Cartas",
   cacho: "Dados", uno: "Cartas", catan: "Tablero", presidente: "Cartas",
   spicy: "Faroleo", tetris: "Reflejos", yemas: "Acción", clue: "Deducción",
-  ajedrez: "Tablero", pokemon: "Combate"
+  ajedrez: "Tablero", pokemon: "Combate", boxhead: "Acción"
 };
 
 /* La práctica contra bots de un multijugador, si la tiene: la ficha la

@@ -45,7 +45,7 @@ Six apps plus a small shared **Informes** page:
   collect by themselves, plus the bugs and ideas people write. See "Informes"
   below.
 - **Juegos** (`juegos.html` + `juegos-app.js`, entry
-  `colabtex/src/juegos-main.js`) — eighteen multiplayer games, on the same Google
+  `colabtex/src/juegos-main.js`) — nineteen multiplayer games, on the same Google
   account and the same Firebase project: **Escondite** (hide a person in a
   landscape, then cross the landscapes and race to find the other's),
   **Cartas de los tres elementos** (a Card-Jitsu duel), **Cuadritos** (dots and
@@ -67,7 +67,9 @@ Six apps plus a small shared **Informes** page:
   iframe) and **Clue** (the deduction board game on a map of a real
   university building, two to six, in an iframe, dealt with mental poker)
   and **Ajedrez** (chess, the full rules, for two) and **Pokémon** (singles
-  battles on Pokémon Showdown's own simulator, with a team builder), plus
+  battles on Pokémon Showdown's own simulator, with a team builder) and
+  **Boxhead** (top-down zombie survival or versus, one to eight, in an
+  iframe), plus
   **Frontera Batalla**, Emerald's Battle Frontier played solo with the same
   teams, plus a **Clasificación** tab and a 📖 **Reglas**
   manual for every game, solo ones included, coins, and **PRODROP**, a card-pack
@@ -1544,7 +1546,7 @@ Four decisions worth keeping:
 
 ## Juegos architecture
 
-Eighteen games, on the same Firebase project and the same Google session
+Nineteen games, on the same Firebase project and the same Google session
 as ColabTeX and ColabDraw. Turn-based on purpose (Tetris and Yemas are the
 real-time exceptions, and both still keep the log to what decides the game): with one move per turn the
 network carries a handful of fields and there is nothing to interpolate, so no
@@ -3699,6 +3701,32 @@ is only the postman, like Yemas'. Things that hold it together:
 end to end; `tests/clue-bots.test.cjs` plays full practice games;
 `tests/clue-red.test.cjs` runs several `red.js` frames against a fake room
 through a whole online game and checks the audit comes out clean.
+
+**Boxhead (`boxhead`) is a top-down shooter in an iframe, Yemas' sibling.**
+An original recreation of *Boxhead: The 2Play Rooms* (its weapons, unlock
+multipliers, enemies, skins and five maps, `juegos/boxhead/js/datos.js`, UMD
+`BoxheadDatos`), but the room holds one to eight rather than two:
+`JUEGOS.boxhead` has `minimo: 1, cupo: 8`, and `minimoDe` raises it to two for
+`versus`. `juegos/boxhead/` is the document (`js/juego.js` the canvas game,
+also playable alone as practice); `colabtex/src/juegos/boxhead.js`
+(`crearBoxhead`) is the postman, on the same WebRTC mesh as Yemas
+(`malla.js` + `crearDirecto`, mailbox `vivo/<pid>/rtc`). The first seat still
+standing directs the enemies, as in Yemas' zombies. Things to keep:
+
+- **The log carries only what decides the game**: `{t:"muere", uid, por, a,
+  pts?, k?, n?}` written by whoever died and, in coop, `{t:"nivel", n}`
+  written by the director when a level is cleared. `redBoxhead` accepts only
+  the next level, and a new level revives the fallen. Coop ends when every
+  player still in the room is down; the most points wins. Versus counts kills
+  to `meta` (5/10/20, `BX_METAS`); a self-kill or a kill by someone gone counts
+  a death and no kill.
+- **Weapons unlock with the highest multiplier reached** (`ARMAS[i].mul`),
+  never lost; ids 0–7 never renumber, 8 is a bite and 9 a devil's fireball
+  (`BX_ARMAS`).
+- Room options: `variante` (coop/versus), `mapa` (`BX_MAPAS`, must match
+  `ORDEN_MAPAS`) and `meta` — not `modo`. `'boxhead'` was added to the
+  rules' `juego` and `logros` whitelists, so they must be re-published.
+  `tests/boxhead.test.cjs` covers the reducer and walks every map.
 
 **Ajedrez (`ajedrez`) is the whole of FIDE's rules in the reducer**
 (`redAjedrez` and the `aj*` functions at the end of `motor.js`). A move is

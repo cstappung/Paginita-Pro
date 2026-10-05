@@ -359,6 +359,18 @@ function yemas() {
     C.map((c, i) => en(62, 72 + i * 54, huevo(c, i))).join("") + en(64, 0, frito) + gira(7, en(60, 40, mira));
 }
 
+/* Boxhead: cabezas cuadradas en el anillo, un barril que tiembla y
+   casquillos que caen. */
+function boxhead() {
+  const cabeza = (c, i) => an("hop", 1.4, `<rect x="-5" y="-5" width="10" height="10" rx="1" fill="${c}" stroke="#3b2a12" stroke-width=".8"/><rect x="-3" y="-1.6" width="1.6" height="1.6" fill="#111"/><rect x="1.4" y="-1.6" width="1.6" height="1.6" fill="#111"/><rect x="-2" y="2" width="4" height=".9" fill="#3b2a12"/>`, n1(-i * .25));
+  const barril = an("z", .5, `<rect x="-4" y="-6" width="8" height="12" rx="1.6" fill="#b91c1c" stroke="#450a0a" stroke-width=".8"/><path d="M-4-2H4M-4 2H4" stroke="#450a0a" stroke-width=".7"/>`);
+  const casquillo = ret => an("dr", 1.6, `<rect x="-.7" y="-1.6" width="1.4" height="3.2" rx=".4" fill="#f2c14e"/>`, ret);
+  const C = ["#e8c9a0", "#7fb069", "#d94b3d", "#e8c9a0"];
+  return aro(53, "#c8892f", 3) + aro(60, "#2a2112", 10, `opacity=".5"`) + aro(66, "#f2c14e", 1.4, `stroke-dasharray="3 3"`) +
+    C.map((c, i) => en(61, 45 + i * 70, cabeza(c, i))).join("") + en(62, 0, barril) +
+    gira(9, en(67, 20, casquillo(0)) + en(67, 140, casquillo(-.6)) + en(67, 260, casquillo(-1.1)));
+}
+
 function zombis() {
   const gota = (ret) => an("dr", 2, `<path d="M0-2.4C1.6 0 2 1 2 2A2 2 0 0 1-2 2C-2 1-1.6 0 0-2.4Z" fill="#4ade80"/>`, ret);
   const mano = `<path d="M-3 7V0L-4.4-4.6L-3.2-5L-2-1V-6.4L-.8-6.6L-.4-1.4V-7L.8-7.1L1.2-1.4V-6.2L2.4-6L2.6-.6L4-3L5-2.4L3 3V7Z" fill="#65a30d" stroke="#1a2e05" stroke-width=".6"/>`;
@@ -453,7 +465,7 @@ const DIBUJOS = {
   telectro: electro, tfrontera: frontera, tpokemon: pokemon, tescondite: escondite, tcartas: cartas,
   tcuadritos: cuadritos, treversi: reversi, torbita: orbita, tcadena: cadena, tflip: flip, tcacho: cacho,
   tuno: uno, tcatan: catan, tpresidente: presidente, tspicy: spicy, tworms: worms, tyemas: yemas,
-  tzombis: zombis, tclue: clue, tajedrez: ajedrez, tmonedas: monedas, tprodrop: prodrop, tsudoku: sudoku, tfanal: fanal,
+  tzombis: zombis, tclue: clue, tajedrez: ajedrez, tmonedas: monedas, tprodrop: prodrop, tsudoku: sudoku, tfanal: fanal, tboxhead: boxhead,
   cometa, vortice, sakura, plasma, mariposas
 };
 

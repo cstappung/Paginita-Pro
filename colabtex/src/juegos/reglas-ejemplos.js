@@ -1,4 +1,4 @@
-import {cart, dados, tablero, orbes, reversi, cajas, paisaje, tiro, orbita, serpiente, tetris, isla, ajedrez, fanal} from './reglas-ilustraciones.js';
+import {cart, dados, tablero, orbes, reversi, cajas, paisaje, tiro, orbita, serpiente, tetris, isla, ajedrez, fanal, boxhead} from './reglas-ilustraciones.js';
 const p=(titulo,texto,imagen)=>({titulo,texto,imagen});
 const e=(id,titulo,...pasos)=>({id,titulo,pasos});
 const fichas=(titulo,...cs)=>cart([titulo,cs]);
@@ -91,6 +91,12 @@ export const EJEMPLOS={
  e('diez','Cómo continuar después de un diez',
   p('La pila llegó a diez','Se mantiene la especia del anuncio, pero ya no se pide un número mayor que diez.',fichas('Último anuncio',['10','rojo','AJÍ'])),
   p('Reinicia con uno, dos o tres','Puedes anunciar 1, 2 o 3 de ají. Con la pila vacía también abres del 1 al 3, pero eliges la especia.',fichas('Próximos anuncios válidos',['1','rojo','AJÍ'],['2','rojo','AJÍ'],['3','rojo','AJÍ'])))],
+ boxhead:[e('combo','Encadenar bajas para subir el multiplicador',
+  p('Cada baja suma uno','Cada zombi o diablo que cae sube el multiplicador en uno y llena la barra de combo. Los puntos de la baja se multiplican por él.',boxhead(0)),
+  p('No dejes que la barra se vacíe','La barra baja sola y más rápido cuanto más alto vas. Si llega a cero, el multiplicador vuelve a ×1, pero las armas ya ganadas se quedan.',boxhead(2))),
+ e('barril','Usar los barriles contra un grupo',
+  p('Déjalo en el camino','Con los barriles elegidos, Espacio deja uno en el suelo delante de ti. Aléjate antes de que lleguen los enemigos.',boxhead(1)),
+  p('Dispárale cuando estén encima','Una bala lo hace reventar y la explosión daña a todos los que estén cerca, también a ti y a tus compañeros: mantén la distancia.',boxhead(1)))],
  tetris:[TETRIS,e('basura','Ataques y basura pendiente',
   p('Más líneas, más ataque','Un doble envía una línea de basura, un triple dos y un Tetris cuatro. Los combos y otras jugadas especiales pueden añadir más.',fichas('Filas borradas → basura base',['2→1','azul','DOBLE'],['3→2','verde','TRIPLE'],['4→4','oro','TETRIS'])),
   p('Defiéndete antes de que llegue','La barra roja avisa de basura pendiente. Limpiar líneas ayuda a cancelarla; el ataque que sobre continúa hacia el siguiente jugador en pie.',fichas('Prioridad: defender tu pozo',['↓','rojo','PENDIENTE'],['−','verde','CANCELAR'],['→','azul','SOBRANTE'])))],
@@ -227,6 +233,14 @@ export const VARIANTES={
    p('Cada golpe suma puntos','Pegarle a un zombi da 10 puntos y freírlo 60; a la cabeza son 100 y con la sartén 130. Los puntos sirven para comprar armas.',fichas('Puntos por zombi',['10','blanco','GOLPE'],['60','verde','FRITO'],['100','oro','CABEZA'])),
    p('Compra en los puntos de armas','En zombis cada punto de armas es una tienda. Acércate y aprieta E: la pistola cuesta 500 y la bazuca 2.500; la munición de una que ya tienes, la mitad.',fichas('Tienda',['500','azul','PISTOLA'],['1200','rojo','METRALLETA'],['2500','oro','BAZUCA'])),
    p('Si caes, vuelves en la ronda siguiente','Quien muere espera a que sus compañeros limpien la ronda. La partida termina cuando caen todos al mismo tiempo, y gana quien hizo más puntos.',fichas('Fin de la ronda',['↺','verde','VUELVEN'],['💀','rojo','TODOS CAEN'])))]
+ },
+ boxhead:{
+  coop:[e('caer','Caer y volver en supervivencia',
+   p('Quien cae espera al equipo','Si te matan, quedas fuera hasta que tus compañeros limpien el nivel. No reapareces en medio de la oleada.',boxhead(3)),
+   p('Todos caídos, fin de la partida','Si caen todos a la vez, la partida termina y gana quien hizo más puntos. Mientras quede uno en pie, el equipo sigue.',boxhead(3)))],
+  versus:[e('meta','Ganar el versus por bajas',
+   p('Todas las armas desde el principio','En versus no hay que subir el multiplicador para armarse: se empieza con las ocho. Tus disparos dañan a los rivales.',boxhead(2)),
+   p('Llegar primero a la meta','Cada rival que matas es una baja. Gana el primero en llegar a 5, 10 o 20; morir por tu propia explosión no le da la baja a nadie.',boxhead(4)))]
  },
  uno:{
   clasico:[e('reto','El reto del comodín +4',
