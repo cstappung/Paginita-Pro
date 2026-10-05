@@ -114,3 +114,12 @@ test('un corte anula lo que no se pudo pagar sin parar la cuenta, y lo ganado de
  assert.equal(Object.keys(e.tienda).length,Math.min(3,Math.floor(g2/5000)),'con menos ganado cabe menos');
  assert.ok(T.monedasDe('a',d).saldo>=0);
 });
+
+test('con «desde», lo comprado antes vale entero y el saldo queda en cero, no negativo',()=>{
+ const tres={a:{cometa:{at:1,p:5000},olas:{at:2,p:5000},holo:{at:3,p:5000},fuegos:{at:6,p:5000}}};
+ const g=T.monedasDe('a',conTienda(tres)).total;
+ const d=Object.assign(conTienda(tres),{cortes:{a:{desde:4,hasta:8,tope:g}}}),e=T.economia(d).usuarios.a;
+ assert.ok(e.tienda.cometa&&e.tienda.olas&&e.tienda.holo,'antes de «desde» todo vale');
+ assert.ok(!e.tienda.fuegos,'entre «desde» y «hasta» lo que no alcanza se anula');assert.ok(!e.parada);
+ assert.equal(T.monedasDe('a',d).saldo,0,'lo que no alcanzaba se perdona: el saldo queda en cero');
+});

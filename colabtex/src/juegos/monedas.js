@@ -315,7 +315,9 @@ export function economia(datos) {
   const U = u => usuarios[u] || (usuarios[u] = { gastadas: 0, cobradas: 0, parada: false, falta: 0, gratis: -Infinity, sobres: {}, tienda: {} });
   /* Un corte (cortes.js) congela lo que la cuenta ganó hasta `hasta` en
      `tope`: lo que gastó antes se mide contra eso y, si no alcanzaba, se
-     anula sin parar la cuenta. Lo que gane después ya no tapa nada viejo. */
+     anula sin parar la cuenta. Lo que gane después ya no tapa nada viejo.
+     Antes de `desde` (si lo hay) todo lo comprado vale igual: lo que no
+     alcanzaba se perdona y el saldo queda en cero, no en negativo. */
   const cortes = d.cortes || CORTES;
   let ahora = 0;
   const enCorte = u => { const k = cortes[u]; return k && ahora <= k.hasta ? k : null; };
@@ -329,7 +331,9 @@ export function economia(datos) {
   const paga = (u, p) => {
     const x = U(u);
     if (x.parada) { x.falta += p; return false; }
-    if (saldo(u) < p) { if (enCorte(u)) return false; x.parada = true; x.falta += p - Math.max(0, saldo(u)); return false; }
+    const k = enCorte(u);
+    if (k && ahora < (k.desde || 0)) { x.gastadas += Math.min(p, Math.max(0, saldo(u))); return true; }
+    if (saldo(u) < p) { if (k) return false; x.parada = true; x.falta += p - Math.max(0, saldo(u)); return false; }
     x.gastadas += p; return true;
   };
   /* Lo que es una copia: {id, g, w}, de su sobre o de su re-roll. */

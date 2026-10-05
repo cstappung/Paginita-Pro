@@ -2,7 +2,7 @@
 /* Propone los cortes de las cuentas paradas (juegos/cortes.js,
    docs/antitrampas.md) y cuenta qué pierde cada una.
 
-   Uso:  node scripts/cortes.cjs export.json [--hasta AAAA-MM-DD[THH:MM]] [--escribe]
+   Uso:  node scripts/cortes.cjs export.json [--desde AAAA-MM-DDTHH:MM] [--hasta AAAA-MM-DD[THH:MM]] [--escribe]
 
    `export.json` es la exportación de la raíz de la base (o de los nodos que
    lee la economía). Para cada cuenta parada, `tope` es lo que gana hoy y
@@ -18,7 +18,7 @@ const mod = { exports: {} };
 new Function('module', 'exports', 'require', code)(mod, mod.exports, require);
 const M = mod.exports;
 
-const args = process.argv.slice(2), archivo = args.find((a, i) => !a.startsWith('--') && args[i - 1] !== '--hasta');
+const args = process.argv.slice(2), archivo = args.find((a, i) => !a.startsWith('--') && args[i - 1] !== '--hasta' && args[i - 1] !== '--desde');
 if (!archivo) { console.error('Uso: node scripts/cortes.cjs export.json [--hasta AAAA-MM-DD] [--escribe]'); process.exit(2); }
 const raiz = JSON.parse(fs.readFileSync(archivo, 'utf8'));
 const datos = extra => Object.assign({ ranks: raiz.ranks || {}, solo: raiz.soloRanks || {}, logros: raiz.logros || {}, diario: raiz.diario || {},
@@ -30,11 +30,14 @@ const nombre = u => (((raiz.users || {})[u] || {}).perfil || {}).nick || '';
 const dia = args.includes('--hasta') ? args[args.indexOf('--hasta') + 1] : new Date(Date.now() + 864e5 - 3 * 36e5).toISOString().slice(0, 10);
 const hasta = Date.parse(dia.includes('T') ? dia + ':00-03:00' : dia + 'T23:59:59.999-03:00');
 if (!Number.isFinite(hasta)) { console.error('Fecha inválida:', dia); process.exit(2); }
+// Con --desde, lo comprado antes de esa hora (Chile) vale entero y se perdona.
+const desde = args.includes('--desde') ? Date.parse(args[args.indexOf('--desde') + 1] + ':00-03:00') : 0;
+if (args.includes('--desde') && !Number.isFinite(desde)) { console.error('Fecha inválida en --desde'); process.exit(2); }
 
 const ya = datos();
 const antes = M.economia(ya);
 const cortes = {};
-for (const [u, x] of Object.entries(antes.usuarios)) if (x.parada) cortes[u] = { hasta, tope: M.monedasDe(u, ya).total };
+for (const [u, x] of Object.entries(antes.usuarios)) if (x.parada) cortes[u] = Object.assign(desde ? { desde } : {}, { hasta, tope: M.monedasDe(u, ya).total });
 if (!Object.keys(cortes).length) { console.log('Ninguna cuenta parada.'); process.exit(0); }
 const previos = (() => { const c = esbuild.buildSync({ entryPoints: [ARCHIVO], bundle: true, format: 'cjs', platform: 'node', write: false }).outputFiles[0].text;
   const m = { exports: {} }; new Function('module', 'exports', c)(m, m.exports); return m.exports.CORTES; })();
@@ -56,7 +59,7 @@ for (const u of new Set([...Object.keys(antes.usuarios), ...Object.keys(despues.
 if (args.includes('--escribe')) {
   const texto = fs.readFileSync(ARCHIVO, 'utf8');
   const nuevos = Object.entries(cortes).filter(([u]) => !texto.includes(JSON.stringify(u)));
-  const lineas = nuevos.map(([u, k]) => `  ${JSON.stringify(u)}: { hasta: ${k.hasta}, tope: ${k.tope} }, // ${dia}`).join('\n');
+  const lineas = nuevos.map(([u, k]) => `  ${JSON.stringify(u)}: { ${k.desde ? `desde: ${k.desde}, ` : ''}hasta: ${k.hasta}, tope: ${k.tope} }, // ${dia}`).join('\n');
   if (lineas) fs.writeFileSync(ARCHIVO, texto.replace(/\n\};\s*$/, '\n' + lineas + '\n};\n'));
   console.log(`\n${nuevos.length} cortes nuevos escritos en ${path.relative(process.cwd(), ARCHIVO)}.`);
 }
