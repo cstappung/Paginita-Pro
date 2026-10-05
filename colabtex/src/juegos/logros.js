@@ -98,6 +98,16 @@ const SALA = {
      ya lleva entera, con el color de quien hizo cada jugada. */
   /* Pokémon: todo sale de `resumen`, que el motor cuenta leyendo el
      registro público de la pelea (críticos, Tera, debilitados). */
+  /* Boxhead: el registro solo lleva niveles y muertes; los puntos y las
+     bajas de cooperativo llegan al caer (`muere` los trae). */
+  boxhead: [
+    { id: "nivel5", n: "Aguante", d: "Llega al nivel 5 en cooperativo.", i: "🧱", m: "Cooperativo", x: c => c.est.variante === "coop" && (c.est.nivel || 1) >= 5 },
+    { id: "nivel10", n: "Fortín", d: "Llega al nivel 10 en cooperativo.", i: "🏰", m: "Cooperativo", x: c => c.est.variante === "coop" && (c.est.nivel || 1) >= 10 },
+    { id: "cien", n: "Carnicero", d: "Haz 100 bajas en una partida cooperativa.", i: "🪓", m: "Cooperativo", x: c => c.est.variante === "coop" && ((c.est.kills || {})[c.me] || 0) >= 100 },
+    { id: "puntos", n: "Multiplicador", d: "Termina una partida cooperativa con 5000 puntos.", i: "✖️", m: "Cooperativo", x: c => c.est.variante === "coop" && ((c.est.puntos || {})[c.me] || 0) >= 5000 },
+    { id: "equipo", n: "Pelotón", d: "Llega al nivel 3 con 4 jugadores o más.", i: "👥", m: "Cooperativo", x: c => c.est.variante === "coop" && c.n >= 4 && (c.est.nivel || 1) >= 3 },
+    { id: "intacto", n: "Intocable", d: "Gana un versus sin morir ni una vez.", i: "🛡️", m: "Versus", x: c => c.gano && c.est.variante === "versus" && c.est.motivo === "meta" && !((c.est.muertes || {})[c.me]) }
+  ],
   pokemon: [
     { id: "tera", n: "Teracristal", d: "Teracristaliza a uno de tus Pokémon.", i: "💎", x: c => pkDe(c).tera > 0 },
     { id: "critico", n: "Golpe crítico", d: "Asesta un golpe crítico.", i: "💥", x: c => pkDe(c).crit > 0 },

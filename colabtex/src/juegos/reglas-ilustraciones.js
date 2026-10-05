@@ -88,3 +88,16 @@ export const fanal=etapa=>{
  }
  return svg(nombre,cuerpo);
 };
+/* Boxhead: vista de arriba, cabezas cuadradas, combo y explosiones. */
+const cabeza=(x,y,col,dir='→')=>rect(x-11,y-11,22,22,col,'#142139',3)+txt(x,y+5,dir,13,'#142139','middle');
+export const boxhead=etapa=>{
+ const nombres=['Una baja tras otra sube el multiplicador','El barril revienta y se lleva a todos los cercanos','Las armas llegan con el multiplicador más alto','En supervivencia, quien cae vuelve en el nivel siguiente','En versus gana el primero en llegar a la meta de bajas'];
+ const suelo=rect(18,18,444,214,'#4a4536','#6b6450',12)+[60,140,220,300,380].map(x=>line(x,30,x,220,'#57513f',1)).join('');
+ let c='';
+ if(etapa===0){c=cabeza(90,125,C.azul)+line(104,125,230,125,C.oro,3)+[250,300,350].map((x,i)=>circle(x,125-(i%2)*20,11,i?'#7fa36a':'#7fa36a88')).join('')+rect(300,190,150,26,'#142139','#465773',6)+rect(304,195,100,16,C.oro,'none',3)+txt(428,209,'×3',16,C.oro,'middle');}
+ else if(etapa===1){c=cabeza(80,170,C.azul,'↗')+rect(232,92,26,32,'#c0563f','#142139',4)+circle(245,108,62,'#ffb34744')+circle(245,108,30,'#ffd36b88')+[[205,80],[290,95],[250,160],[200,140]].map(([x,y])=>circle(x,y,10,'#7fa36a')).join('')+line(96,158,232,112,C.oro,3);}
+ else if(etapa===2){c=['PISTOLA ×1','UZI ×5','ESCOPETA ×10','BARRILES ×15','GRANADAS ×20','MURO ×25','COHETES ×30','CARGAS ×40'].map((t,i)=>rect(34+(i%4)*108,60+Math.floor(i/4)*80,96,56,i<3?C.oro:'#273650','#465773',6)+txt(82+(i%4)*108,93+Math.floor(i/4)*80,t,12,i<3?'#142139':C.gris,'middle')).join('');}
+ else if(etapa===3){c=cabeza(120,120,C.azul)+cabeza(190,140,C.verde)+rect(300,110,22,22,'#55606b','#142139',3)+txt(311,160,'CAÍDO',12,C.rojo,'middle')+txt(240,215,'Nivel limpio → vuelve al empezar el siguiente',15,C.verde,'middle');}
+ else {c=cabeza(120,125,C.azul,'→')+cabeza(330,125,C.rojo,'←')+line(134,125,316,125,C.oro,3)+txt(120,170,'A: 9',16,C.azul,'middle')+txt(330,170,'B: 7',16,C.rojo,'middle')+txt(240,215,'Meta: 10 bajas',16,C.oro,'middle');}
+ return svg(nombres[etapa],suelo+c);
+};
