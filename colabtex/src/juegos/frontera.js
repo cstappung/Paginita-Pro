@@ -166,7 +166,7 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, r
      lo que no se pudo ni comprobar ni escribir ahora (sin red, sin el
      motor, reglas sin publicar): se reintenta, y no acusa a nadie. */
   async function verificaYGuarda(cat, dato, prueba) {
-    const motivo = await verificaClub("frontera", Object.assign({ categoria: cat }, dato), prueba);
+    const motivo = await verificaClub("frontera", Object.assign({ categoria: cat }, dato), prueba, { uid });
     if (motivo) {
       if (/^No se pudo comprobar/.test(motivo)) {
         console.warn("[frontera] verificación", cat, motivo);
