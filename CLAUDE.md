@@ -3138,7 +3138,8 @@ progress), `niveles.js` (generated), `dibujo.js` (the vehicles as SVG) and
   by minimum; `escribir` re-solves every level with the game's own engine and
   refuses to write if they disagree. Do not edit `niveles.js` by hand.
 - **Stars**: ★★★ with the minimum, ★★ up to `min + max(2, ⌈min/3⌉)`, ★
-  otherwise; a hint caps the level at ★★ (`anota(…, tope)`). The margin of
+  otherwise. **There are no hints, on purpose**: finding the way out is the
+  game (an earlier version had one and the owner asked for it to go). The margin of
   two is what guarantees every level can be finished with exactly two stars
   (one back-and-forth). `tests/atasco.test.cjs` **plays every level three
   times through the engine** (optimal, optimal plus one back-and-forth,
@@ -3152,6 +3153,19 @@ progress), `niveles.js` (generated), `dibujo.js` (the vehicles as SVG) and
   resizes without recomputing anything.
 - **Unlocking**: levels open in order inside a floor; a floor opens with
   half the stars of the previous one (`pisoAbierto`).
+- **Phones are first-class**, and `tests/atasco.test.cjs` pins the rules:
+  vehicles are `touch-action:none` (dragging never scrolls the page) while
+  the asphalt is `manipulation` (a swipe on an empty bay still scrolls);
+  nothing on the board is selectable and `-webkit-touch-callout:none`,
+  because on iPhone a long press opened the callout, swallowed the
+  `pointerup` and left the car glued to the finger (`lostpointercapture`
+  releases it anyway). Hover rules live in `@media (hover:hover)`, buttons
+  are 46 px on coarse pointers, and the yellow selection is painted only
+  for keyboard or gamepad play (`porTeclado`), never after a tap. The board
+  is capped by the **top** window's height (`--alto-pantalla`, read from
+  `window.top`, since the iframe grows with its content), and a short
+  landscape screen gets `html.apaisado`: board on the left, scoreboard and
+  buttons in a column beside it. Android vibrates briefly on each move.
 - **Ranking**: one table, `club-atasco-estrellas` (`puntos` = total stars,
   `tiempo` = sum of best times), sent **only when the total grows** because
   every result is a paid club play. Progress `{v, n: {i: [stars, moves,

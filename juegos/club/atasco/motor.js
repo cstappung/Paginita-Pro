@@ -226,11 +226,10 @@
     }
     return { v: 1, n };
   }
-  /* Anota un nivel terminado y dice si fue un récord de estrellas.
-     `tope` limita las estrellas (con pista se ganan como mucho dos). */
-  function anota(prog, i, movs, ms, optimo, tope) {
+  /* Anota un nivel terminado y dice si fue un récord de estrellas. */
+  function anota(prog, i, movs, ms, optimo) {
     const p = limpiaProgreso(prog);
-    const e = Math.min(estrellas(movs, optimo), tope || 3), antes = p.n[i];
+    const e = estrellas(movs, optimo), antes = p.n[i];
     const mejora = !antes || e > antes[0];                          // ¿más estrellas que antes?
     const t = Math.max(1, Math.round(ms));
     p.n[i] = antes

@@ -857,7 +857,8 @@ const REGLAS = {
     ]
   },
   /* Atasco (juegos/club/atasco/): lo que dice aquí tiene que coincidir con
-     motor.js (movidas, estrellas, pisos) y game.js (controles, pista). */
+     motor.js (movidas, estrellas, pisos) y game.js (controles). No hay pistas:
+     el juego es encontrar la salida uno mismo. */
   atasco: {
     lema: "Atasco: estás encerrado en el auto rojo y la salida está a la derecha. Abre el camino moviendo a los demás.",
     secciones: [
@@ -866,7 +867,7 @@ const REGLAS = {
         "Una <b>movida</b> es soltar un vehículo en otra casilla, aunque haya avanzado varias. Soltarlo donde estaba no cuenta.",
         "Cada nivel muestra su <b>mínimo</b>, el número más bajo de movidas con que se puede resolver (calculado por la máquina, revisando todas las posibilidades).",
         "<b>★★★</b> con el mínimo. <b>★★</b> con un tercio más de movidas, y al menos dos de margen. <b>★</b> sacando el auto como sea. El marcador avisa cuando ya no alcanzan para la siguiente.",
-        "<b>Deshacer</b> devuelve la última movida y la descuenta. <b>Reiniciar</b> empieza el nivel de nuevo. La <b>pista</b> marca la mejor movida desde donde estás, pero con pista el nivel da <b>★★ como mucho</b>."
+        "<b>Deshacer</b> devuelve la última movida y la descuenta. <b>Reiniciar</b> empieza el nivel de nuevo. No hay pistas: la salida la encuentras tú."
       ])],
       ["Los seis pisos", lista([
         "Son 240 niveles en seis pisos de 40: <b>La calle</b>, los <b>Subterráneos 1 a 4</b> y <b>La bóveda</b>. Cada piso pide más movidas que el anterior.",
@@ -875,8 +876,8 @@ const REGLAS = {
       ])],
       ["Controles", lista([
         "Arrastra un vehículo con el dedo o el ratón a lo largo de su carril; al soltarlo cae en la casilla más cercana.",
-        "Teclado: flechas (o Q y E, uno por uno) para elegir un vehículo, Espacio (o Intro) para tomarlo, flechas para moverlo y Espacio para soltarlo. Z deshace, R reinicia, H pide pista y Esc vuelve a los pisos.",
-        "Con mando: la cruceta elige y mueve, LB y RB cambian de vehículo, A toma y suelta, B deshace, Y pide pista y X reinicia."
+        "Teclado: flechas (o Q y E, uno por uno) para elegir un vehículo, Espacio (o Intro) para tomarlo, flechas para moverlo y Espacio para soltarlo. Z deshace, R reinicia y Esc vuelve a los pisos.",
+        "Con mando: la cruceta elige y mueve, LB y RB cambian de vehículo, A toma y suelta, B deshace y X reinicia."
       ])],
       ["Clasificación", "La tabla de Atasco cuenta las <b>estrellas</b> juntadas en todos los niveles; a igualdad, gana quien sumó menos tiempo en sus mejores intentos. Solo se manda cuando el total sube, así que repetir un nivel ya ganado no cuesta nada. Tus estrellas se guardan en este navegador y, con tu sesión, también en tu cuenta."]
     ]

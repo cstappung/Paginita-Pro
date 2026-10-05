@@ -487,7 +487,6 @@ ESTRELLAS || STARS || STELLE
 Niveles || Levels || Livelli
 Deshacer || Undo || Annulla
 Reiniciar || Restart || Ricomincia
-Pista || Hint || Suggerimento
 Repetir || Retry || Riprova
 Siguiente ▶ || Next ▶ || Avanti ▶
 ¡Afuera! || You're out! || Fuori!
@@ -496,4 +495,3 @@ Siguiente ▶ || Next ▶ || Avanti ▶
 La calle || The street || La strada
 Subterráneo {} || Basement {} || Interrato {}
 La bóveda || The vault || Il caveau
-Con pista, como mucho ★★ || With a hint, ★★ at most || Con un suggerimento, al massimo ★★

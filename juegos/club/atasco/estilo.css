@@ -55,7 +55,7 @@ body{background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system
 .club-integrado body{background:transparent}          /* dentro de Juegos manda el fondo de la sala */
 :focus-visible{outline:3px solid var(--azul);outline-offset:2px} /* foco siempre visible */
 .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-button{font:inherit;color:inherit}
+button{font:inherit;color:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 
 /* El panel de ranking del Club, con la piel del juego. */
 .club-ranking,.club-integrado .club-ranking,html.club-integrado[data-tema] .club-ranking{background:var(--panel);color:var(--ink);border:2px solid var(--line);border-radius:16px;box-shadow:var(--sombra)}
@@ -98,7 +98,7 @@ button{font:inherit;color:inherit}
 .puesto.siguiente{outline:3px solid var(--amarillo);outline-offset:2px;animation:late 1.4s ease-in-out infinite}
 .puesto:disabled{cursor:default;background:var(--cerrado);color:#ffffffaa}
 .puesto:disabled b::after{content:"🔒";display:block;font-size:12px;margin-top:2px}
-.puesto:not(:disabled):hover{transform:translateY(-2px)}
+@media (hover:hover){.puesto:not(:disabled):hover{transform:translateY(-2px)}}
 
 /* ================================================================
    Vista de juego: marcador
@@ -118,7 +118,7 @@ button{font:inherit;color:inherit}
 /* ================================================================
    El estacionamiento
    ================================================================ */
-.marco{position:relative;width:min(560px,100%);margin:0 auto;container-type:inline-size}
+.marco{position:relative;width:min(560px,100%,calc((var(--alto-pantalla,100vh) - 230px) / .95));min-width:min(280px,100%);margin:0 auto;container-type:inline-size} /* .95: el cordón hace el marco un poco menos alto que ancho */
 /* El cordón de concreto: franjas amarillas y negras por dentro, y más
    espacio a la derecha para la barrera de salida. */
 .cordon{position:relative;padding:4cqi 9cqi 4cqi 4cqi;border-radius:4cqi;
@@ -128,7 +128,7 @@ button{font:inherit;color:inherit}
   background:repeating-linear-gradient(45deg,#f5b700 0 2.2cqi,#1d2330 2.2cqi 4.4cqi);
   -webkit-mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);padding:1.2cqi}
 /* El asfalto: manchas suaves y las líneas de los 36 puestos. */
-.lote{position:relative;aspect-ratio:1;border-radius:1.5cqi;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none;
+.lote{position:relative;aspect-ratio:1;border-radius:1.5cqi;overflow:visible;touch-action:manipulation;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;
   background:
     radial-gradient(circle at 23% 31%,var(--asfalto2) 0 4%,#0000 9%),
     radial-gradient(circle at 71% 64%,var(--asfalto2) 0 5%,#0000 11%),
@@ -140,7 +140,7 @@ button{font:inherit;color:inherit}
   background:
     linear-gradient(90deg,#ffffff38 0 .45cqi,#0000 .45cqi) 0 0/calc(100%/6) 100%,
     linear-gradient(#ffffff1c 0 .3cqi,#0000 .3cqi) 0 0/100% calc(100%/6)}
-/* La pista de salida: flechas amarillas pintadas en la fila del auto rojo. */
+/* El carril de salida: flechas amarillas pintadas en la fila del auto rojo. */
 .lineas::after{content:"› › ›";position:absolute;right:2%;top:calc(100%/6*2);height:calc(100%/6);display:flex;align-items:center;
   font:400 6cqi/1 var(--cartel);letter-spacing:1cqi;color:#f5b70055}
 .vehiculos{position:absolute;inset:0}
@@ -148,15 +148,16 @@ button{font:inherit;color:inherit}
 /* Un vehículo: una caja del tamaño de sus casillas que se mueve con transform. */
 .veh{position:absolute;left:0;top:0;padding:.9cqi;cursor:grab;transition:transform .14s cubic-bezier(.3,.9,.4,1.1),filter .15s;
   filter:drop-shadow(0 .9cqi 0 #0006);will-change:transform;touch-action:none}
+/* En iPhone una pulsación larga seleccionaba el dibujo y abría el menú; el
+   menú se quedaba con el dedo, no llegaba el pointerup y el auto seguía
+   «agarrado». Nada del estacionamiento se puede seleccionar. */
+.veh,.veh *,.puesto,.puesto *,.accion,.boton,.piso,.piso *{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
 .veh svg{display:block;width:100%;height:100%;overflow:visible}
 .veh.arrastra{transition:filter .15s;cursor:grabbing;filter:drop-shadow(0 2cqi 1cqi #0008);z-index:3}
 .veh.sel{filter:drop-shadow(0 .9cqi 0 #0006) drop-shadow(0 0 1.2cqi #ffd84d)}   /* elegido con el teclado */
 .veh.tomado{filter:drop-shadow(0 2cqi 1cqi #0008) drop-shadow(0 0 1.4cqi #ffd84d);z-index:3}
 .veh.choca{animation:choca .18s ease-out}
-.veh.pista{animation:pista 1s ease-in-out infinite;z-index:2}
 .veh.sale{transition:transform .75s cubic-bezier(.5,0,.8,.6),opacity .25s .6s;opacity:0;z-index:4} /* sale y se esfuma pasado el cordón */
-/* Dónde termina la movida que sugiere la pista. */
-.fantasma{position:absolute;left:0;top:0;border:.7cqi dashed #ffd84d;border-radius:2cqi;background:#ffd84d22;pointer-events:none;animation:late 1s ease-in-out infinite}
 
 /* La salida: el hueco del cordón a la altura de la 3.ª fila. */
 .salida{position:absolute;right:0;width:9cqi;top:calc(4cqi + (100cqi - 13cqi) / 6 * 2);height:calc((100cqi - 13cqi) / 6);pointer-events:none}
@@ -173,48 +174,70 @@ button{font:inherit;color:inherit}
 .barrera.abierta .brazo{transform:rotate(-82deg)}
 
 /* --- Pantalla de nivel superado, encima del estacionamiento --- */
-.final{position:absolute;inset:0;z-index:6;display:grid;place-items:center;padding:4cqi;border-radius:4cqi;
+.final{position:absolute;inset:0;z-index:6;display:grid;place-items:center;padding:3cqi;border-radius:4cqi;overflow:auto;
   background:color-mix(in srgb,#11151d 72%,transparent);animation:aparece .3s ease-out}
-.final .tarjeta{width:min(100%,380px);padding:20px 18px;border-radius:18px;background:var(--panel);color:var(--ink);text-align:center;border:3px solid var(--contorno);box-shadow:0 8px 0 #0006}
-.final h2{margin:0 0 6px;font:400 30px/1.1 var(--cartel);color:var(--rojo);-webkit-text-stroke:1px var(--contorno);paint-order:stroke fill}
+.final .tarjeta{width:min(100%,380px);padding:clamp(10px,4cqi,20px) clamp(10px,3.5cqi,18px);border-radius:18px;background:var(--panel);color:var(--ink);text-align:center;border:3px solid var(--contorno);box-shadow:0 8px 0 #0006}
+.final h2{margin:0 0 6px;font:400 clamp(20px,6.5cqi,30px)/1.1 var(--cartel);color:var(--rojo);-webkit-text-stroke:1px var(--contorno);paint-order:stroke fill}
 .final .estrellas{display:flex;justify-content:center;gap:8px;margin:6px 0 10px}
-.final .estrellas span{font-size:44px;line-height:1;color:#c9ced8;-webkit-text-stroke:2px var(--contorno);transform:scale(.4);opacity:0;animation:estrella .45s cubic-bezier(.3,1.6,.5,1) forwards}
+.final .estrellas span{font-size:clamp(28px,8.5cqi,44px);line-height:1;color:#c9ced8;-webkit-text-stroke:2px var(--contorno);transform:scale(.4);opacity:0;animation:estrella .45s cubic-bezier(.3,1.6,.5,1) forwards}
 .final .estrellas span.on{color:var(--amarillo)}
-.final .estrellas span:nth-child(2){animation-delay:.25s;font-size:56px;margin-top:-8px}
+.final .estrellas span:nth-child(2){animation-delay:.25s;font-size:clamp(34px,10.5cqi,56px);margin-top:-8px}
 .final .estrellas span:nth-child(3){animation-delay:.5s}
-.final p{margin:4px 0;color:var(--muted)}
+.final p{margin:4px 0;color:var(--muted);font-size:clamp(12px,3.3cqi,15px)}
 .final p b{color:var(--ink)}
 .final .record{color:var(--verde);font-weight:800}
-.final .botones{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:14px}
+.final .botones{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:clamp(8px,3cqi,14px)}
 
 /* --- Botones de acción --- */
 .acciones{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;width:min(560px,100%);margin:12px auto 0}
 .accion,.boton{display:inline-flex;align-items:center;gap:6px;padding:9px 13px;border:2px solid var(--line);border-radius:12px;background:var(--panel);color:var(--ink);
   font:400 15px/1 var(--cartel);cursor:pointer;box-shadow:var(--sombra)}
-.accion:hover,.boton:hover{border-color:var(--azul)}
+@media (hover:hover){.accion:hover,.boton:hover{border-color:var(--azul)}}
 .accion:active,.boton:active{transform:translateY(2px);box-shadow:0 2px 0 #1d233022}
 .accion:disabled{opacity:.45;cursor:default;transform:none}
 .accion kbd{font:700 11px system-ui,sans-serif;opacity:.6}
 .boton.primario{background:var(--rojo);border-color:var(--contorno);color:#fff}
-.accion.usada{border-color:var(--amarillo)}
 
 .nota{width:min(560px,100%);margin:14px auto 0;font-size:13px;color:var(--muted);text-align:center}
 .nota kbd{font:700 11px system-ui,sans-serif;padding:1px 5px;border:1px solid var(--line);border-radius:4px;background:var(--panel)}
 
-/* Mensaje corto encima del estacionamiento («Con pista: como mucho ★★»). */
-.globo{position:absolute;left:50%;top:6cqi;z-index:5;transform:translateX(-50%);padding:6px 12px;border-radius:10px;background:var(--contorno);color:#fff;
-  font:400 15px/1.2 var(--cartel);white-space:nowrap;pointer-events:none;animation:globo 1.8s ease-out forwards}
 
 /* --- Animaciones --- */
 @keyframes late{50%{opacity:.55}}
 @keyframes choca{30%{translate:var(--cx,0) var(--cy,0)}}
-@keyframes pista{50%{filter:drop-shadow(0 .9cqi 0 #0006) drop-shadow(0 0 2cqi #ffd84d)}}
 @keyframes aparece{from{opacity:0}}
 @keyframes estrella{to{transform:scale(1);opacity:1}}
-@keyframes globo{0%{opacity:0;margin-top:6px}12%{opacity:1;margin-top:0}80%{opacity:1}100%{opacity:0}}
 /* Quien pide menos movimiento no ve animaciones: todo aparece en su sitio. */
 @media (prefers-reduced-motion:reduce){
   *,*::before,*::after{animation:none!important;transition:none!important}
   .final .estrellas span{transform:none;opacity:1}
 }
-@media (max-width:420px){.scorebar{gap:6px 12px}.dato strong{font-size:17px}.dato.metas{display:none}.accion{padding:8px 10px;font-size:14px}}
+@media (max-width:420px){.scorebar{gap:6px 12px}.dato strong{font-size:17px}.dato.metas strong{font-size:12px}}
+
+/* ---------- Pantallas táctiles ----------
+   Botones de 46 px como mínimo (lo que pide un dedo), sin las teclas
+   escritas al lado, y los pisos en una sola fila que se desliza. */
+@media (pointer:coarse){
+  .accion,.boton{min-height:46px;padding:10px 16px}
+  .accion kbd{display:none}
+  .piso{min-height:50px}
+  .final .botones .boton{min-height:42px;padding:8px 12px}
+}
+@media (max-width:640px){
+  .pisos{flex-wrap:nowrap;overflow-x:auto;padding:2px 2px 8px;scrollbar-width:thin;-webkit-overflow-scrolling:touch}
+  .piso{flex:0 0 auto}
+}
+
+/* ---------- Teléfono acostado ----------
+   game.js pone .apaisado cuando la pantalla es más ancha que alta y baja:
+   el tablero va a la izquierda, del alto de la pantalla, y el marcador,
+   los botones y la ayuda en una columna a su derecha. */
+html.apaisado .layout,html.apaisado.club-integrado .layout{grid-template-columns:minmax(0,1fr)}
+html.apaisado .cab{margin-bottom:6px}
+html.apaisado .logo{font-size:24px}
+html.apaisado .lema{display:none}
+html.apaisado #vistaJuego:not([hidden]){display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-areas:"marco marcador" "marco acciones" "marco nota";gap:8px 14px;align-items:start}
+html.apaisado #vistaJuego .marco{grid-area:marco;width:min(560px,calc((var(--alto-pantalla,100vh) - 20px) / .95));margin:0}
+html.apaisado #vistaJuego .scorebar{grid-area:marcador;width:100%;margin:0}
+html.apaisado #vistaJuego .acciones{grid-area:acciones;width:100%;margin:0;justify-content:flex-start}
+html.apaisado #vistaJuego .nota{grid-area:nota;width:100%;margin:0;text-align:left}

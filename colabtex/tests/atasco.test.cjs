@@ -110,9 +110,8 @@ test('las estrellas: tres con el mínimo, dos con un tercio más (y al menos dos
  assert.deepEqual(M.limites(12),{tres:12,dos:16});
  assert.deepEqual(M.limites(40),{tres:40,dos:54});
  assert.equal(M.estrellas(12,12),3);assert.equal(M.estrellas(13,12),2);assert.equal(M.estrellas(16,12),2);assert.equal(M.estrellas(17,12),1);
- // Con pista, como mucho dos aunque se haga con el mínimo.
- assert.equal(M.anota(null,0,12,1000,12,2).estrellas,2);
  assert.equal(M.anota(null,0,12,1000,12).estrellas,3);
+ assert.equal(M.anota(null,0,14,1000,12).estrellas,2);
 });
 
 test('los niveles: seis pisos de 40, ordenados del más corto al más largo y sin repetidos',()=>{
@@ -223,4 +222,20 @@ test('las estrellas pasan por el club, por las reglas y por la página',()=>{
  // Cada id que game.js busca existe en la página.
  const js=fs.readFileSync(path.join(D,'game.js'),'utf8');
  for(const [,id] of js.matchAll(/\$\("([A-Za-z-]+)"\)/g))assert.match(html,new RegExp(`id="${id}"`),'falta #'+id);
+});
+
+test('sin pistas, y hecho para el dedo (reglas táctiles que no deben perderse)',()=>{
+ const html=fs.readFileSync(path.join(D,'index.html'),'utf8'),js=fs.readFileSync(path.join(D,'game.js'),'utf8'),css=fs.readFileSync(path.join(D,'estilo.css'),'utf8');
+ // Las pistas se quitaron a pedido: ni botón, ni tecla, ni tope de estrellas.
+ assert.doesNotMatch(html,/btnPista|fantasma/);assert.doesNotMatch(js,/pista\(|btnPista|KeyH|globo\(/);
+ assert.equal(M.anota.length,5,'anota ya no recibe un tope');
+ // Los autos no dejan desplazar la página al arrastrarlos; el asfalto vacío sí.
+ assert.match(css,/\.veh\{[^}]*touch-action:none/);assert.match(css,/\.lote\{[^}]*touch-action:manipulation/);
+ // iPhone: ni selección ni menú de pulsación larga (dejaba el auto pegado al dedo).
+ assert.match(css,/-webkit-touch-callout:none/);assert.match(css,/\.veh,\.veh \*[^{]*\{[^}]*user-select:none/);
+ assert.match(js,/lostpointercapture/);assert.match(js,/contextmenu/);
+ // El «hover» solo donde hay ratón, botones de 46 px para el dedo y el tablero a lo alto de la pantalla.
+ assert.doesNotMatch(css.replace(/@media \(hover:hover\)\{[^{}]*\{[^}]*\}\}/g,''),/:hover\{/);
+ assert.match(css,/@media \(pointer:coarse\)\{[^]*min-height:46px/);
+ assert.match(css,/--alto-pantalla/);assert.match(js,/window\.top\.innerHeight/);assert.match(css,/html\.apaisado #vistaJuego/);
 });

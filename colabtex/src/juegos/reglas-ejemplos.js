@@ -195,7 +195,7 @@ export const EJEMPLOS={
   p('Sácalo','Con la fila libre, el auto rojo avanza hasta la barrera. Cuatro movidas es el mínimo de este estacionamiento, así que da las tres estrellas.',atasco(2))),
  e('estrellas','Cuántas estrellas da cada nivel',
   p('Las cuentas del marcador','Cada nivel dice su mínimo. Con ese mínimo, tres estrellas; con un tercio más (y al menos dos movidas de margen), dos; sacando el auto como sea, una.',fichas('Un nivel de mínimo 4',['4','oro','★★★'],['5–6','verde','★★'],['7 o más','gris','★'])),
-  p('Arrastrar lejos cuenta una','Una movida es soltar un vehículo en otra casilla, aunque haya avanzado tres. Deshacer devuelve la movida; usar la pista deja el nivel en dos estrellas como mucho.',fichas('Qué cuenta',['3 casillas','verde','1 MOVIDA'],['↶','azul','DESHACER'],['💡','oro','MÁX. ★★']))),
+  p('Arrastrar lejos cuenta una','Una movida es soltar un vehículo en otra casilla, aunque haya avanzado tres. Deshacer devuelve esa movida y la descuenta; Reiniciar vuelve al principio con cero movidas.',fichas('Qué cuenta',['3 casillas','verde','1 MOVIDA'],['↶','azul','−1 MOVIDA'],['↺','oro','DESDE 0']))),
  e('pisos','Seis pisos que se abren con estrellas',
   p('Cada piso pide la mitad','Los 240 niveles están en seis pisos de 40. Un piso se abre cuando el anterior junta la mitad de sus estrellas: 60 de 120.',fichas('Abrir el Subterráneo 1',['La calle','verde','60 / 120 ★'],['Subt. 1','oro','ABIERTO'],['Subt. 2','gris','CERRADO'])),
   p('Dentro de un piso, en orden','Cada nivel se abre al sacar el auto en el anterior, con las estrellas que sean. Volver a un nivel para mejorarlo no cuesta nada y suma a la clasificación.',fichas('Tu avance',['12','oro','★★★'],['13','verde','★'],['14','azul','SIGUIENTE'])))],

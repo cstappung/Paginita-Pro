@@ -47,13 +47,15 @@
   let ultimaSubida = "";                                               // lo último mandado a la cuenta
 
   /* ---------- Estado de la partida ---------- */
-  let J = null;           // el nivel en juego: {i, nivel, pos, movs, hist, pista, ganado, acum, desde}
+  let J = null;           // el nivel en juego: {i, nivel, pos, movs, hist, ganado, acum, desde}
   let elems = [];         // un elemento por vehículo, en el orden del motor
   let sel = 0;            // vehículo elegido con el teclado
   let tomado = false;     // ¿el vehículo elegido está agarrado (teclado/mando)?
   let tomadoDesde = 0;    // dónde estaba al agarrarlo
   let arrastre = null;    // el arrastre con el dedo o el ratón en curso
   let reloj = 0;          // intervalo que repinta el tiempo
+  let porTeclado = false; // ¿se está jugando con teclado o mando? (con el dedo no se pinta la selección)
+  const tactil = matchMedia("(pointer: coarse)").matches;          // teléfono o tableta
   const avisa = t => { $("aviso").textContent = t; };                 // lectores de pantalla
 
   /* ====================================================================
@@ -155,9 +157,6 @@
         case "deshace":                                              // deshacer: un blip que baja
           this.nota({ t, f: hz(76), f1: hz(64), dur: .07, vol: .05, onda: "p25" });
           break;
-        case "pista":                                                // pista: destellos de triángulo
-          [88, 93, 100].forEach((n, k) => this.nota({ t: t + k * .06, f: hz(n), dur: .12, vol: .05, onda: "tri" }));
-          break;
         case "bocina": {                                             // la bocina del auto rojo: dos tonos a la vez, dos veces
           for (const k of [0, .2]) {
             this.nota({ t: t + k, f: 370, dur: .14, vol: .06, onda: "p50", sus: .9 });
@@ -229,6 +228,9 @@
       b.onclick = () => { pisoVisto = j; guarda("atasco.piso", j); pintaPisos(); };
       cont.appendChild(b);
     });
+    // En el teléfono los pisos son una fila que se desliza: el elegido, a la vista.
+    const activo = cont.querySelector("[aria-selected=true]");
+    if (activo && cont.scrollWidth > cont.clientWidth) cont.scrollLeft = Math.max(0, activo.offsetLeft - cont.offsetLeft - 16);
     const p = PISOS[pisoVisto], abierto = M.pisoAbierto(prog, PISOS, pisoVisto);
     $("pisoDesc").textContent = abierto ? p.desc
       : `Cerrado: junta ${faltanPara(pisoVisto)} estrellas más en ${PISOS[pisoVisto - 1].nombre} para abrirlo.`;
@@ -268,19 +270,18 @@
     if (i < 0 || i >= TOTAL || !M.nivelAbierto(prog, PISOS, i)) { sonido.efecto("no"); return; }
     const n = NIVELES[i];
     const nivel = M.lee(n.texto);
-    J = { i, nivel, pos: nivel.pos.slice(), movs: 0, hist: [], pista: false, ganado: false, acum: 0, desde: 0 };
+    J = { i, nivel, pos: nivel.pos.slice(), movs: 0, hist: [], ganado: false, acum: 0, desde: 0 };
     sel = 0; tomado = false; arrastre = null;
     if (pisoVisto !== n.piso) { pisoVisto = n.piso; guarda("atasco.piso", n.piso); }
     $("vistaPisos").hidden = true;
     $("vistaJuego").hidden = false;
     $("final").hidden = true;
     $("barrera").classList.remove("abierta");
-    $("btnPista").classList.remove("usada");
-    quitaPista();
     armaVehiculos();
     pintaMarcador();
     paraReloj();
     $("lote").focus({ preventScroll: true });
+    if (tactil) $("vistaJuego").scrollIntoView({ block: "nearest" });   // en el teléfono, el tablero a la vista
     avisa(`Nivel ${i + 1}. Mínimo ${n.optimo} movidas.`);
   }
 
@@ -329,8 +330,12 @@
     if (sinAnimar) { void el.offsetWidth; el.style.transition = ""; }  // fuerza el estilo antes de devolver la animación
   }
   function colocaTodos(sinAnimar) { for (let i = 0; i < elems.length; i++) colocaUno(i, sinAnimar); pintaSeleccion(); }
+  /* La selección amarilla es del teclado y del mando: con el dedo o el
+     ratón no hace falta, y en un teléfono quedaba encendida sobre el auto
+     rojo sin que nadie la hubiera pedido. */
   function pintaSeleccion() {
-    const teclado = document.activeElement === $("lote") && !J?.ganado;
+    const conMando = !!(window.Mando && window.Mando.conectado && window.Mando.conectado());
+    const teclado = (porTeclado || conMando) && document.activeElement === $("lote") && !J?.ganado;
     elems.forEach((el, i) => {
       el.classList.toggle("sel", teclado && i === sel && !tomado);
       el.classList.toggle("tomado", teclado && i === sel && tomado);
@@ -347,7 +352,6 @@
     $("nMetas").textContent = J.movs <= l.tres ? `★★★ ≤ ${l.tres}` : J.movs <= l.dos ? `★★ ≤ ${l.dos}` : "★";
     $("btnDeshacer").disabled = !J.hist.length || J.ganado;
     $("btnReiniciar").disabled = !J.movs || J.ganado;
-    $("btnPista").disabled = J.ganado;
     sonido.tension = J.movs >= l.dos ? 2 : J.movs >= l.tres ? 1 : 0;
     pintaTiempo();
   }
@@ -368,13 +372,13 @@
   /* ---------- Una movida ---------- */
   function mueve(i, d) {
     if (!J || J.ganado || !M.puede(J.nivel, J.pos, i, d)) return false;
-    quitaPista();
     J.hist.push(J.pos.slice());                                        // para deshacer
     J.pos = M.aplica(J.pos, i, d);
     J.movs++;
     arrancaReloj();
     colocaUno(i);
     sonido.efecto("desliza", Math.abs(d));
+    vibra(8);
     pintaMarcador();
     avisa(`${D.nombre(J.nivel.vehiculos[i])}: ${Math.abs(d)} ${Math.abs(d) === 1 ? "casilla" : "casillas"}. Movida ${J.movs}.`);
     if (M.resuelto(J.pos)) gana();
@@ -383,7 +387,6 @@
   function deshace() {
     if (!J || J.ganado || !J.hist.length) return;
     tomado = false;
-    quitaPista();
     J.pos = J.hist.pop();
     J.movs--;
     colocaTodos();
@@ -394,43 +397,11 @@
   function reinicia() {
     if (!J || J.ganado || !J.movs) return;
     tomado = false;
-    quitaPista();
     J.pos = J.nivel.pos.slice(); J.movs = 0; J.hist = []; J.acum = 0; J.desde = 0;
     colocaTodos();
     sonido.efecto("deshace");
     pintaMarcador();
     avisa("Nivel desde el principio.");
-  }
-
-  /* ---------- La pista: la primera movida de la mejor solución desde aquí ---------- */
-  function pista() {
-    if (!J || J.ganado) return;
-    const sol = M.resuelve(J.nivel, J.pos);
-    if (!sol || !sol.length) return;
-    const [i, d] = sol[0], v = J.nivel.vehiculos[i];
-    quitaPista();
-    if (!J.pista) globo("Con pista, como mucho ★★");
-    J.pista = true;
-    $("btnPista").classList.add("usada");
-    elems[i].classList.add("pista");
-    const f = $("fantasma");                                            // el contorno de dónde debe quedar
-    f.style.width = elems[i].style.width; f.style.height = elems[i].style.height;
-    f.style.transform = traslado(v, J.pos[i] + d);
-    f.hidden = false;
-    sel = i;
-    pintaSeleccion();
-    sonido.efecto("pista");
-    avisa(`Pista: mueve ${D.nombre(v)} ${Math.abs(d)} ${Math.abs(d) === 1 ? "casilla" : "casillas"} hacia ${v.h ? (d > 0 ? "la derecha" : "la izquierda") : (d > 0 ? "abajo" : "arriba")}.`);
-  }
-  function quitaPista() {
-    $("fantasma").hidden = true;
-    for (const el of elems) el.classList.remove("pista");
-  }
-  function globo(texto) {
-    const g = document.createElement("div");
-    g.className = "globo"; g.textContent = texto;
-    $("marco").appendChild(g);
-    setTimeout(() => g.remove(), 1900);
   }
 
   /* ---------- Arrastrar con el dedo o el ratón ---------- */
@@ -444,6 +415,7 @@
     sel = i; tomado = false;
     elems[i].classList.add("arrastra");
     try { elems[i].setPointerCapture(e.pointerId); } catch (_) { /* nada */ }
+    porTeclado = false;
     sonido.efecto("toma");
     pintaSeleccion();
     if (i === 0 && !atras && !adelante) sonido.efecto("bocina");       // el rojo encerrado toca la bocina
@@ -454,7 +426,7 @@
     const bruto = a.v.h ? e.clientX - a.x0 : e.clientY - a.y0;        // solo cuenta el eje de su carril
     const min = -a.atras * a.cs, max = a.adelante * a.cs;
     a.px = Math.max(min, Math.min(max, bruto));
-    if ((bruto < min - a.cs * .3 || bruto > max + a.cs * .3) && !a.choco) { a.choco = true; sonido.efecto("choca"); } // empuja contra algo
+    if ((bruto < min - a.cs * .3 || bruto > max + a.cs * .3) && !a.choco) { a.choco = true; sonido.efecto("choca"); vibra(25); } // empuja contra algo
     if (bruto >= min && bruto <= max) a.choco = false;
     elems[a.i].style.transform = traslado(a.v, J.pos[a.i], Math.round(a.px));
   });
@@ -468,6 +440,18 @@
   };
   window.addEventListener("pointerup", sueltaArrastre);
   window.addEventListener("pointercancel", sueltaArrastre);
+  /* Si el navegador quita la captura sin mandar pointerup (en iPhone pasaba
+     con el menú de la pulsación larga), el auto no puede quedarse pegado al
+     dedo: se suelta igual. */
+  $("vehiculos").addEventListener("lostpointercapture", sueltaArrastre);
+  $("lote").addEventListener("contextmenu", e => e.preventDefault()); // sin menú al mantener apretado
+
+  /* Una vibración corta en los teléfonos que la tienen (Android): al mover
+     y al chocar. iPhone no la ofrece a las páginas, y ahí no pasa nada. */
+  function vibra(ms) {
+    if (!tactil || !sonido.on || !navigator.vibrate) return;
+    try { navigator.vibrate(ms); } catch (_) { /* nada */ }
+  }
 
   /* ---------- Teclado (y mando, que llega como teclas) ---------- */
   /* Elige el vehículo siguiente en esa dirección. Primero los que están
@@ -508,6 +492,7 @@
   }
   $("lote").addEventListener("keydown", e => {
     if (!J || J.ganado) return;
+    if (!porTeclado) { porTeclado = true; pintaSeleccion(); }        // desde ahora se ve qué está elegido
     if ((e.key === "q" || e.key === "e" || e.key === "Q" || e.key === "E") && !e.ctrlKey && !e.metaKey && !e.altKey) {
       e.preventDefault();
       eligeSiguiente(e.key.toLowerCase() === "e" ? 1 : -1);
@@ -559,11 +544,11 @@
     if (!$("final").hidden) {                                          // en la pantalla final
       if (k === "enter" && e.target === document.body) { e.preventDefault(); $("final").querySelector(".primario")?.click(); }
       if (k === "escape") muestraPisos();
+      if (k === "enter" && e.target === $("lote")) { e.preventDefault(); $("final").querySelector(".primario")?.click(); }
       return;
     }
     if (k === "z" && !e.altKey) { e.preventDefault(); if (tomado) soltarTeclado(); deshace(); }   // Z o Ctrl+Z
     else if (k === "r" && !e.ctrlKey && !e.metaKey) { e.preventDefault(); reinicia(); }
-    else if (k === "h") { e.preventDefault(); pista(); }
     else if (k === "escape") { if (tomado) { soltarTeclado(); } else muestraPisos(); }
   });
 
@@ -573,7 +558,6 @@
   $("btnNiveles").onclick = () => muestraPisos();
   $("btnDeshacer").onclick = yAlLote(deshace);
   $("btnReiniciar").onclick = yAlLote(reinicia);
-  $("btnPista").onclick = yAlLote(pista);
 
   /* ====================================================================
      GANAR
@@ -585,7 +569,7 @@
     const n = NIVELES[J.i];
     const antesTotales = M.totales(prog);
     const pisosAntes = PISOS.map((_, j) => M.pisoAbierto(prog, PISOS, j));
-    const r = M.anota(prog, J.i, J.movs, ms, n.optimo, J.pista ? 2 : 3);
+    const r = M.anota(prog, J.i, J.movs, ms, n.optimo);
     prog = r.prog;
     guarda("atasco.progreso", prog);
     subeNube();
@@ -617,8 +601,7 @@
       <h2 id="finalTitulo">${titulos[e]}</h2>
       <div class="estrellas" aria-label="${e} ${e === 1 ? "estrella" : "estrellas"}">${[1, 2, 3].map(k => `<span class="${k <= e ? "on" : ""}">★</span>`).join("")}</div>
       <p translate="no"><b>${J.movs}</b> movidas · mínimo <b>${n.optimo}</b> · ${formato(ms)}</p>
-      ${J.pista ? `<p>Usaste una pista: el nivel da como mucho ★★.</p>`
-        : e < 3 ? `<p>Para ★★★ hay que sacarlo en <b>${l.tres}</b> movidas${e < 2 ? `, y para ★★ en <b>${l.dos}</b>` : ""}.</p>` : `<p>Con el mínimo de movidas posible.</p>`}
+      ${e < 3 ? `<p>Para ★★★ hay que sacarlo en <b>${l.tres}</b> movidas${e < 2 ? `, y para ★★ en <b>${l.dos}</b>` : ""}.</p>` : `<p>Con el mínimo de movidas posible.</p>`}
       ${r.mejora && estrellasDe(J.i) === e && e > 1 ? `<p class="record">¡Récord en este nivel!</p>` : ""}
       ${abrio >= 0 ? `<p class="record">🔓 Se abrió ${PISOS[abrio].nombre}.</p>` : ""}
       <div class="botones">
@@ -630,7 +613,8 @@
     fin.querySelector("[data-ir=sig]")?.addEventListener("click", () => abreNivel(sig));
     fin.querySelector("[data-ir=otra]").addEventListener("click", () => abreNivel(J.i));
     fin.querySelector("[data-ir=pisos]").addEventListener("click", () => muestraPisos());
-    fin.querySelector(".primario").focus({ preventScroll: true });
+    // Con teclado o mando el foco salta al botón principal (Intro sigue); con el dedo no, o queda un anillo azul que nadie pidió.
+    if (porTeclado || (window.Mando && window.Mando.conectado && window.Mando.conectado())) fin.querySelector(".primario").focus({ preventScroll: true });
     for (let k = 0; k < e; k++) setTimeout(() => sonido.efecto("estrella", k), 120 + k * 250); // una campanita por estrella, con la animación
     setTimeout(() => sonido.efecto(abrio >= 0 ? "abre" : "victoria"), 120 + e * 250);
     avisa(`Nivel superado con ${e} ${e === 1 ? "estrella" : "estrellas"}, en ${J.movs} movidas.`);
@@ -676,34 +660,54 @@
 
   /* ---------- Mando de consola (juegos/audio/mando.js) ----------
      La cruceta y el stick son las flechas, A agarra y suelta (Espacio),
-     B deshace, Y pide pista, X reinicia y LB/RB cambian de vehículo. En el edificio y en la
+     B deshace, X reinicia y LB/RB cambian de vehículo. En el edificio y en la
      pantalla final el mando mueve el cursor de siempre. */
   if (window.Mando) {
     window.Mando.configura({
       botones: {
         arriba: { tecla: "ArrowUp", rep: 160 }, abajo: { tecla: "ArrowDown", rep: 160 },
         izq: { tecla: "ArrowLeft", rep: 160 }, der: { tecla: "ArrowRight", rep: 160 },
-        a: "Space", b: "KeyZ", y: "KeyH", x: "KeyR", lb: "KeyQ", rb: "KeyE"
+        a: "Space", b: "KeyZ", x: "KeyR", lb: "KeyQ", rb: "KeyE"
       },
       stick: "flechas",
       objetivo: () => $("lote"),
       menu: () => !J || !$("final").hidden,
-      pistas: [["dpad stickL", "elegir / mover"], ["lb rb", "otro vehículo"], ["a", "tomar y soltar"], ["b", "deshacer"], ["y", "pista"], ["x", "reiniciar"]],
+      pistas: [["dpad stickL", "elegir / mover"], ["lb rb", "otro vehículo"], ["a", "tomar y soltar"], ["b", "deshacer"], ["x", "reiniciar"]],
       zonas: [{ sel: "#nota" }]
     });
   }
 
   /* ---------- Arranque ---------- */
-  $("nota").innerHTML = "Arrastra cada vehículo por su carril hasta abrirle paso al auto rojo. Teclado: flechas (o <kbd>Q</kbd>/<kbd>E</kbd>) para elegir, <kbd>Espacio</kbd> para tomar y soltar, <kbd>Z</kbd> deshace, <kbd>R</kbd> reinicia, <kbd>H</kbd> pista, <kbd>Esc</kbd> vuelve a los pisos. " +
+  $("nota").innerHTML = (tactil
+      ? "Arrastra cada vehículo con el dedo, por su carril, hasta abrirle paso al auto rojo. ↶ deshace la última movida y ↺ empieza el nivel de nuevo. "
+      : "Arrastra cada vehículo por su carril hasta abrirle paso al auto rojo. Teclado: flechas (o <kbd>Q</kbd>/<kbd>E</kbd>) para elegir, <kbd>Espacio</kbd> para tomar y soltar, <kbd>Z</kbd> deshace, <kbd>R</kbd> reinicia, <kbd>Esc</kbd> vuelve a los pisos. ") +
     (Club && document.documentElement.classList.contains("club-integrado")
       ? "Tus estrellas se guardan en este navegador y en tu cuenta."
       : "Tus estrellas viven en este navegador; juega desde Juegos para que te sigan a otros dispositivos.");
+  /* El tamaño de la pantalla de verdad. Dentro de Juegos este documento es
+     un iframe que crece con su contenido, así que su propio alto no dice
+     nada: se mira el de la página de arriba (mismo origen), como Mina Club.
+     Con eso el tablero cabe a lo alto y, con el teléfono acostado, el
+     marcador y los botones pasan a una columna al lado del tablero. */
+  function ajustaPantalla() {
+    let w = innerWidth, h = innerHeight;
+    try { w = window.top.innerWidth; h = window.top.innerHeight; } catch (_) { /* otra página: la propia */ }
+    const raiz = document.documentElement;
+    raiz.style.setProperty("--alto-pantalla", h + "px");
+    raiz.classList.toggle("apaisado", w > h && h < 560);
+  }
+  ajustaPantalla();
+  addEventListener("resize", ajustaPantalla);
+  addEventListener("orientationchange", ajustaPantalla);
+  try { if (window.top !== window) window.top.addEventListener("resize", ajustaPantalla); } catch (_) { /* nada */ }
+  addEventListener("keydown", () => { if (window.Mando) pintaSeleccion(); });   // el mando llega como teclas
+
   if (Club) Club.category(CATEGORIA);                                  // el ranking lateral escucha esta tabla
   muestraPisos();
 
   /* Ganchos para probar desde la consola o un script (como __fanal). */
   window.__atasco = {
-    estado: () => J && { nivel: J.i, pos: J.pos.slice(), movs: J.movs, ganado: J.ganado, pista: J.pista },
+    estado: () => J && { nivel: J.i, pos: J.pos.slice(), movs: J.movs, ganado: J.ganado },
     abre: i => abreNivel(i),
     mueve: (i, d) => mueve(i, d),
     resuelve: () => J && M.resuelve(J.nivel, J.pos),
