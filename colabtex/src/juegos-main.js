@@ -1,3 +1,6 @@
+/* El medidor de descarga va antes que todo: tiene que estar puesto antes
+   de que el SDK abra su primera conexión con la base. */
+import { crearMedidor, alDescargar, enMB } from "./consumo.js";
 import { crearSolo } from "./juegos/solo/club.js";
 import { esRachaClub, rachaClub } from "./juegos/solo/club-datos.js";
 import { VERIFICADORES, juegoDeCategoria, textoPrueba } from "./juegos/solo/verifica.js";
@@ -1319,6 +1322,68 @@ const sospechaClub = s => {
   return fb.reportaSospecha(uid, s);
 };
 
+/* ---------- el medidor de descarga (consumo.js) ----------
+   Cuánto bajó de la base este navegador y esta cuenta hoy. Lo raro va a
+   `sospechas/<uid>` (una vez por día y tipo); en el tope se corta la
+   conexión y la página queda tapada hasta la medianoche de Chile. */
+const MOTIVO_CONSUMO = {
+  dia: e => `Descarga inusual: ${enMB(e.total)} MB de la base en el día (aviso desde ${enMB(e.limites.aviso)} MB).`,
+  rafaga: e => `Ráfaga de descarga: ${enMB(e.rafaga)} MB en ${Math.round(e.limites.ventana / 60000)} min en una pestaña.`,
+  tope: e => `Llegó al tope diario de descarga: ${enMB(e.total)} MB (tope ${enMB(e.limites.tope)} MB). Se cortó la conexión.`
+};
+let marcasConsumo = [], envioConsumo = Promise.resolve(), offConsumo = null;
+let apuntadoConsumo = 0, apunteConsumoAt = 0, cortadoConsumo = false;
+const medidor = crearMedidor({
+  alMarca: (tipo, e) => { marcasConsumo.push({ tipo, e }); vaciaMarcasConsumo(); },
+  alTope: e => { cortaPorConsumo(e); }
+});
+alDescargar(n => medidor.cuenta(n));
+/* Las marcas que llegan antes de saber de quién es la sesión esperan. */
+function vaciaMarcasConsumo() {
+  if (!state.user || !marcasConsumo.length) return envioConsumo;
+  const uid = state.user.uid, van = marcasConsumo;
+  marcasConsumo = [];
+  envioConsumo = Promise.all(van.map(({ tipo, e }) => fb.reportaSospecha(uid, {
+    c: "red-descarga", m: MOTIVO_CONSUMO[tipo](e), p: enMB(e.total), t: enMB(e.rafaga), d: tipo
+  }).catch(err => console.warn("[consumo]", err))));
+  return envioConsumo;
+}
+function apuntaConsumo(e, forzado) {
+  if (!state.user || !e.mios) return Promise.resolve();
+  const t = Date.now();
+  if (!forzado && (e.mios - apuntadoConsumo < 256 * 1024 || t - apunteConsumoAt < 30000)) return Promise.resolve();
+  apuntadoConsumo = e.mios; apunteConsumoAt = t;
+  return fb.apuntaConsumo(state.user.uid, e.dia, e.pestaña, e.mios).catch(err => console.warn("[consumo]", err));
+}
+function tickConsumo() {
+  const e = medidor.tick();
+  /* Pasó la medianoche con la página cortada: se vuelve a empezar. */
+  if (cortadoConsumo && !e.cortado) { location.reload(); return; }
+  if (!e.cortado) apuntaConsumo(e, false);
+}
+async function cortaPorConsumo(e) {
+  cortadoConsumo = true;
+  /* Primero el aviso y lo bajado, para que lleguen antes de cortar (a lo
+     más cuatro segundos: sin red, se corta igual). */
+  if (state.user) await Promise.race([Promise.all([vaciaMarcasConsumo(), apuntaConsumo(e, true)]), new Promise(r => setTimeout(r, 4000))]);
+  try { fb.desconecta(); } catch (err) { console.warn("[consumo]", err); }
+  pintaTopeConsumo(e);
+}
+function pintaTopeConsumo(e) {
+  if (document.getElementById("jgTopeDatos")) return;
+  const capa = document.createElement("div");
+  capa.id = "jgTopeDatos";
+  capa.className = "jg-fin-capa";
+  capa.style.zIndex = "95";
+  capa.innerHTML = `<div class="jg-fin jg-fin-empate" role="alertdialog" aria-modal="true">
+    <div class="jg-fin-cara">📶</div>
+    <div class="jg-fin-t">Llegaste al límite de datos de hoy</div>
+    <div class="jg-fin-sub">Hoy esta cuenta bajó ${enMB(e.total)} MB de la base de datos de Juegos, y el máximo es ${enMB(e.limites.tope)} MB por jugador al día.</div>
+    <div class="jg-fin-m">El sitio comparte un cupo diario entre todos; el tope es para que nadie lo agote. Se libera a medianoche (hora de Chile). Los juegos que ya estaban abiertos dejan de guardar.</div>
+  </div>`;
+  document.body.appendChild(capa);
+}
+
 function armazon() {
   const h = $("pantalla");
   if (state.vista !== "partida") ponInmersivo(false);
@@ -2513,6 +2578,8 @@ function wire() {
 
 (function boot() {
   wire();
+  tickConsumo();
+  setInterval(tickConsumo, 2000);
   /* El castigo del antitrampas se mira antes que la sesión: el registro
      local basta para tapar Juegos desde el primer momento al recargar. */
   configuraCastigo({ ahora: fb.ahora, entrar: () => entrarConGoogle(),
@@ -2543,6 +2610,8 @@ function wire() {
       for (const f of [offSalas, offMias, offReloj, offEnCurso, offCastigo]) { if (f) { try { f(); } catch (e) {} } }
       offSalas = offMias = offReloj = offEnCurso = offCastigo = null;
       revisaCastigo({ uid: null, cuenta: 0 });
+      if (offConsumo) { try { offConsumo(); } catch (e) {} offConsumo = null; }
+      medidor.ponCuenta(null); apuntadoConsumo = 0;
       if (offMonedas) { offMonedas(); offMonedas = null; datosMonedas = null; }
       limpiaInvitado();
       mostrar(); pintaUsuario();
@@ -2570,6 +2639,12 @@ function wire() {
     if (offCastigo) { try { offCastigo(); } catch (e) {} }
     revisaCastigo({ uid: user.uid, cuenta: 0 });
     offCastigo = fb.watchCastigo(user.uid, v => revisaCastigo({ cuenta: hastaDeCuenta(v) }));
+    /* Lo que la cuenta bajó hoy en sus otros aparatos y pestañas: el tope
+       es por jugador, no por navegador. */
+    if (offConsumo) { try { offConsumo(); } catch (e) {} }
+    apuntadoConsumo = 0;
+    offConsumo = fb.watchConsumo(user.uid, v => { medidor.ponCuenta(v); tickConsumo(); });
+    vaciaMarcasConsumo();
     perfilDe(user.uid);          // abre la escucha; al llegar repinta
     aplicaPropio();
     if (!offMonedas) offMonedas = datosPerfil(d => { datosMonedas = d; pintaMonedas(); });

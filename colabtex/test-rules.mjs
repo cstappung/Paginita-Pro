@@ -2,7 +2,7 @@
    (Auth + Database emulados; FIREBASE_EMU=1). */
 import { auth, db } from "./src/firebase.js";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "firebase/auth";
-import { ref, get, set, push, remove } from "firebase/database";
+import { ref, get, set, push, remove, query, orderByChild, equalTo } from "firebase/database";
 import * as Y from "yjs";
 import * as fb from "./src/fb-api.js";
 import * as rep from "./src/fb-reports.js";
@@ -444,6 +444,15 @@ console.log("— Yemas: la malla del directo (vivo/<pid>/rtc) —");
   await denied("el mirón no escribe huevos", () => set(ref(db, `vivo/${k}/y/${ub.uid}`), { x: 1 }));
   await denied("ni borra los de la sala", () => remove(ref(db, `vivo/${k}/y`)));
   await allowed("el mirón lee vivo (vacío: no hay respaldo que descargar)", () => get(ref(db, `vivo/${k}/y/${ua.uid}`)));
+  /* Nada de bajar colecciones enteras (consumo.js): solo la consulta del
+     vestíbulo, y cada sala, chat o pizarra por su pid. */
+  await allowed("el vestíbulo consulta las salas que esperan", () => get(query(ref(db, "partidas"), orderByChild("estado"), equalTo("esperando"))));
+  await denied("pero no baja todas las partidas", () => get(ref(db, "partidas")));
+  await denied("ni otra consulta sobre partidas", () => get(query(ref(db, "partidas"), orderByChild("estado"), equalTo("jugando"))));
+  await allowed("una sala sí, por su pid", () => get(ref(db, `partidas/${k}`)));
+  await denied("ni vivo entero", () => get(ref(db, "vivo")));
+  await denied("ni todo el chat", () => get(ref(db, "chat")));
+  await denied("ni todas las pruebas del club", () => get(ref(db, "soloPruebas")));
   await allowed("y se va de la malla", () => remove(ref(db, `vivo/${k}/rtc/en/${ub.uid}`)));
   await loginAs(A);
   await allowed("el jugador lee y borra su buzón", () => remove(ref(db, `vivo/${k}/rtc/b/${ua.uid}`)));

@@ -61,7 +61,7 @@ import { db } from "./firebase.js";
 import {
   ref, get, set, update, push, remove, onValue, onDisconnect,
   runTransaction, query, orderByChild, equalTo, serverTimestamp, onChildAdded,
-  limitToLast, limitToFirst, startAt, endAt
+  limitToLast, limitToFirst, startAt, endAt, goOffline
 } from "firebase/database";
 import {
   claveJugada, semillaAleatoria, salAleatoria, compromiso, LADO, cupoDe,
@@ -585,6 +585,21 @@ export const reportaSospecha = (uid, s) =>
     p: Number.isFinite(s.p) ? s.p : 0, t: Number.isFinite(s.t) ? s.t : 0,
     d: String(s.d || "").slice(0, 20), at: serverTimestamp()
   });
+/* El medidor de descarga (consumo.js): lo que cada pestaña de esta
+   cuenta bajó hoy, en `users/<uid>/consumo` = {dia, t: {pestaña: bytes}}.
+   Es nodo del dueño, sin reglas nuevas. Una transacción, porque varias
+   pestañas y aparatos escriben a la vez, y el primero de un día nuevo
+   tira lo del anterior en vez de dejarlo crecer. */
+export const apuntaConsumo = (uid, dia, pestaña, bytes) =>
+  runTransaction(ref(db, `users/${uid}/consumo`), v => {
+    const t = v && v.dia === dia && v.t && typeof v.t === "object" ? Object.assign({}, v.t) : {};
+    t[pestaña] = Math.max(Number(t[pestaña]) || 0, Math.round(bytes));
+    return { dia, t };
+  }, { applyLocally: false });
+export const watchConsumo = (uid, cb) =>
+  onValue(ref(db, `users/${uid}/consumo`), s => cb(s.val()), () => cb(null));
+/* Llegado el tope: la conexión se corta y no vuelve sola. */
+export const desconecta = () => goOffline(db);
 /* El castigo del antitrampas (juegos/castigo.js): la hora *del servidor*
    en que empezó. Vive bajo `users/<uid>`, que ya es solo del dueño, así
    que no necesita reglas nuevas; se escucha para que llegue en vivo a las
