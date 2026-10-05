@@ -3359,10 +3359,30 @@ Things that matter:
   blocks it; every obstacle reserves its lane up to where it ends
   (`libre[c]`), so two things never overlap. Blocks are a row, a convoy (a
   ramp plus two to four cars with coins on the roofs), a breather (zigzag
-  coins) and the tunnel. Moving trains only start moving `APARECE` (120 m)
-  before they arrive, which is what keeps their reservations short. The test
-  runs a simulated player over 12 seeds × 12 km and checks it never meets
-  an unavoidable obstacle.
+  coins) and the tunnel. Moving trains (11 m/s) only start moving `APARECE`
+  (170 m) before they arrive, which keeps their reservations short, but
+  they must wait **out of view**: with 120 m they waited stopped 156 m
+  away at top speed, inside the 195 m that is drawn, looked parked, and
+  nobody noticed that trains came head-on. The test runs a simulated player
+  over 12 seeds × 12 km and checks it never meets an unavoidable obstacle.
+- **The catenary is high on purpose** (`ALTO_CABLE` 7.8 m, `ALTO_BRAZO`
+  8.3, `ALTO_POSTE` 8.6 in `mundo.js`): standing on a roof the head is at
+  5.05 m and a jump from there reaches 6.55, and the roof camera sits at 7.2
+  (7.9 in portrait). At 5.4 m the runner went through the wires as soon as
+  it climbed a car. The arm stays just under the jetpack's 8.5 m.
+- **What the runner stands on and what hits it is pure** (`M.soporte`,
+  `M.caja`, in `motor.js`; `juego.js` only calls them). The rule: a roof
+  holds you over the whole stretch in which its car can hit you, so
+  `MARGEN_TECHO` (0.4 m) is larger than `MEDIO_LARGO` (0.3 m, how far the
+  runner reaches ahead for collisions). With 0.2 there was a 10 cm gap at
+  the top of every ramp where the car already hit and the roof did not hold
+  yet, and climbing a ramp killed you from a third to nearly all of the time
+  depending on the frame rate. At the top of a ramp the roof counts the
+  ramp's height, and the ramp is followed between the previous frame's D
+  and this one (`c.Dantes`), because a 50 ms frame at full speed is 1.5 m of
+  track. `tests/metrorush-motor.test.cjs` climbs it at 20–144 fps and every
+  speed, and checks that a car's front, a low jump into it and a side entry
+  under a ramp still crash.
 - **The score decides the scenery.** `ESTACIONES`: Barrio Estación (0,
   toy-like), Ocaso (50 k, pixel), Línea Neón (200 k, neon), Estación
   Fantasma (1 M), Invierno (2.5 M), Óxido (5 M) and Fin de la Línea
@@ -3378,7 +3398,11 @@ Things that matter:
   times the multiplier. The base multiplier goes ×1 → ×30 by completing
   missions (three per level, `retosDeNivel(nivel)`, seeded); each star picked
   up adds +1 for the run (up to +29) and the 2× power-up doubles the lot.
-  Speed goes from 13 to 30 m/s (`velocidad`, τ 150 s). A newcomer makes
+  Speed goes from 15 to 34 m/s (`velocidad`, τ 130 s; it was 13→30 with τ
+  150 and felt slow). The curve lives once, in `M.VELOCIDAD`: `velocidad`,
+  the anti-cheat's `metrosEntre` and the generator's `velocidadEn` all come
+  from it, so changing the speed is one edit (plus the proof's `VERSION`,
+  because old proofs no longer replay). A newcomer makes
   ~25 k in two minutes, a great run reaches 1 M in 6–7 minutes, and a
   veteran at ×30 in about three.
 - **Progress is Subway Surfers' own loop.** Missions come in sets of three
@@ -3389,12 +3413,13 @@ Things that matter:
   progress would then be applied to the next set's missions. The yellow
   multiplier card on the title screen shows the set's progress and opens the
   missions. **Boosters** (`POTENCIADORES`: *Despegue*, start flying with the
-  jetpack for 10 s; *Potenciador +5*, +5 to the multiplier for the run) are
+  jetpack for 7 s; *Potenciador +5*, +5 to the multiplier for the run) are
   bought in the shop, kept in `progreso.potenciadores`, and offered by two
   HUD buttons (keys 1 and 2) during the first 6 s of a run.
-- **Power-ups**: magnet 10 s, jetpack 8 s (coins in the sky at 8.5 m),
-  super sneakers 10 s (jumps 4.1 m), 2× 12 s, each +2.5 s per shop level
-  (five levels); mystery box (coins, a skateboard or a jackpot); skateboard
+- **Power-ups**: magnet 10 s, jetpack 5 s (coins in the sky at 8.5 m;
+  short and frantic, +1 s per level, up to 10), super sneakers 10 s (jumps
+  4.1 m), 2× 12 s, the others +2.5 s per shop level (five levels; a power's
+  own `paso` overrides it); mystery box (coins, a skateboard or a jackpot); skateboard
   (300 coins, 30 s, survives one crash); continue after a crash for
   500 × 2^k coins, offered for 5 s by a round «¿Seguir corriendo?»
   button before the summary (`abreSalvar`), as in Subway Surfers. The
