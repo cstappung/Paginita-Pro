@@ -101,3 +101,13 @@ kbd{display:inline-block;min-width:20px;padding:1px 5px;border:1px solid var(--b
   /* Lo que dejan las dos columnas y los márgenes: el pozo nunca empuja a los lados. */
   .tt-pozo{padding:4px}.tt-pozo canvas{width:min(320px,calc(100vw - 172px))}.tt-capa{inset:4px;padding:10px}.tt-capa h2{font-size:26px}
 }
+
+/* Los avisos se tiñen según lo que fue (fx.js manda el tipo en data-k). */
+.tt-pozo canvas{will-change:transform}
+.tt-aviso[data-k=tetris]{color:#8ff6ff;text-shadow:0 2px 0 #000,0 0 22px #2fd3e8;font-size:26px;letter-spacing:.06em}
+.tt-aviso[data-k=pc]{color:#fff;text-shadow:0 2px 0 #000,0 0 14px #ff4fa3,0 0 28px #2fd3e8;font-size:24px}
+.tt-aviso[data-k=ts]{color:#e7b3ff;text-shadow:0 2px 0 #000,0 0 18px #b04ee8}
+.tt-aviso[data-k=nivel]{color:#a6ffbc;text-shadow:0 2px 0 #000,0 0 18px #46d160}
+.tt-aviso[data-k=tetris].ve,.tt-aviso[data-k=pc].ve{animation:avisoGrande 1.5s cubic-bezier(.2,.9,.3,1.2)}
+@keyframes avisoGrande{0%{opacity:0;transform:scale(2.2);filter:blur(4px)}12%{opacity:1;transform:scale(.92);filter:none}22%{transform:scale(1.06)}32%{transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:translateY(-34px) scale(1.05)}}
+@media (prefers-reduced-motion:reduce){.tt-aviso.ve,.tt-aviso[data-k].ve{animation:aviso 1.4s linear}}
