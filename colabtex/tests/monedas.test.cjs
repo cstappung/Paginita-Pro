@@ -78,7 +78,10 @@ test('BBTAN paga ⌊n/4⌋ por cada ronda hasta el récord; sortEm, por rapidez'
  assert.deepEqual([1,2,3,4,5,8].map(M.monedasBbtan),[0,0,0,1,2,6],'llegar a la 5 da 2');
  let suma=0;for(let n=1;n<=137;n++)suma+=Math.floor(n/4);
  assert.equal(M.monedasBbtan(137),suma);
- assert.equal(M.monedasBbtan(5000),M.monedasBbtan(1000),'con tope');
+ let tope=0;for(let n=1;n<=600;n++)tope+=Math.floor(Math.min(n,450)/4);
+ assert.equal(M.monedasBbtan(600),tope,'satura en 450: 112 por ronda hasta la 600');
+ assert.equal(M.monedasBbtan(451)-M.monedasBbtan(450),112);
+ assert.equal(M.monedasBbtan(5000),M.monedasBbtan(600),'pasada la 600 no paga más');
  assert.equal(M.monedasSortem(10,30000),10);assert.equal(M.monedasSortem(10,10000),50);assert.equal(M.monedasSortem(20,90000),20);
 });
 

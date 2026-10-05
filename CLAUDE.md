@@ -4181,8 +4181,9 @@ logros, the balance is derived from the same four reads the profile uses
 - **Club records** (`soloRanks`): `RECORD[club]` once per modality with a
   mark, so improving a mark never pays twice and the easy game cannot be
   farmed. On top of the record: BBTAN pays ⌊n/4⌋ for every round n up to
-  the record (`monedasBbtan`, closed form, capped at round 1000: reaching
-  round 5 pays 2, round 100 pays 1 225), sortEm pays the mode's blocks
+  the record (`monedasBbtan`, closed form: reaching round 5 pays 2, round
+  100 pays 1 225; the per-round pay stops growing at round 450, 112 a round
+  from there, and nothing past round 600 pays), sortEm pays the mode's blocks
   plus 2 per second under 3 s per block (`monedasSortem`), and the Sopa and
   Electrodle streaks 10 per day.
 - **Club plays** (`clubJugadas/<uid>/<juego>` = `{dia, hoy, total, at}`):
