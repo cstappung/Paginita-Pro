@@ -109,9 +109,17 @@
   /* ---------- el objetivo del día ----------
      Cada «vuelta» por el catálogo es una baraja con semilla, así que no se
      repite ninguno hasta que salen todos; y la primera de una vuelta nunca
-     es la última de la anterior. */
-  function vuelta(modo, n) {
-    const ids = MODO[modo].objetivos.map(x => x.id);
+     es la última de la anterior.
+     OJO al tocar los catálogos: el objetivo de un día pasado sale del
+     catálogo de *hoy*, y el verificador antitrampas rehace con él todo el
+     historial de cada cuenta (docs/antitrampas/electro.md). Cambiar el
+     orden o agregar una ficha sin más movería los objetivos de los días
+     ya jugados y dejaría a todos sin poder subir su total. Una ficha nueva
+     va al final de su lista y con `desde: "AAAA-MM-DD"` (el primer día en
+     que puede salir): los días anteriores se calculan como antes.
+     tests/antitrampas-electro.test.cjs fija la huella de los objetivos. */
+  const objetivosEn = (modo, fecha) => MODO[modo].objetivos.filter(x => !x.desde || x.desde <= fecha).map(x => x.id);
+  function vuelta(modo, n, ids) {
     const p = baraja(ids, mulberry32(hash(`electro:${modo}:${n}`)));
     if (n > 0) {
       const prev = baraja(ids, mulberry32(hash(`electro:${modo}:${n - 1}`)));
@@ -121,8 +129,8 @@
   }
   function objetivoDelDia(modo, fecha) {
     if (MODO[modo].reto) return "s" + hash(`electro:${modo}:${fecha}`);
-    const N = MODO[modo].objetivos.length, d = numeroDia(fecha);
-    return vuelta(modo, Math.floor(d / N))[((d % N) + N) % N];
+    const ids = objetivosEn(modo, fecha), N = ids.length, d = numeroDia(fecha);
+    return vuelta(modo, Math.floor(d / N), ids)[((d % N) + N) % N];
   }
   /* La práctica: al azar, pero distinto del anterior. */
   function objetivoAlAzar(modo, rng, distinto) {
@@ -281,12 +289,27 @@
   }
 
   /* ---------- lo guardado ----------
-     e = { hist: { fecha: { modo: [puntos, intentos, ms, ganó] } },
-           prog: { fecha, m: { modo: { i: [ids], ms } } } }
+     e = { hist: { fecha: { modo: [puntos, intentos, ms, ganó, [lo intentado], forma] } },
+           prog: { fecha, m: { modo: { i: [ids], ms, t, u, mc } } } }
      `hist` es lo terminado (de ahí salen los puntos, la racha y el
-     tiempo); `prog`, lo que va de hoy, para seguir en otro dispositivo. */
+     tiempo); `prog`, lo que va de hoy, para seguir en otro dispositivo.
+     El quinto campo, lo que se intentó, es lo que respalda los puntos ante
+     el verificador antitrampas (`prueba`); lo guardado antes de que
+     existiera no lo tiene. La `forma` ({t, u, mc}) es cómo se hizo cada
+     intento, para distinguir a una persona de un bot: `t` lleva por intento
+     [ms visibles desde el anterior (o desde que se abrió el modo), acciones
+     de verdad (teclas, toques, clics) en ese lapso]; `u`, las acciones
+     sintéticas (isTrusted falso sin un mando conectado) y `mc`, las del
+     mando. */
   const vacio = () => ({ hist: {}, prog: { fecha: "", m: {} } });
   const entero = (v, max) => (Number.isFinite(v) ? Math.max(0, Math.min(max, Math.round(v))) : 0);
+  /* La forma de un modo, si cuadra con `n` intentos; si no, null. */
+  const TOPE_DT = 3600000;
+  function limpiaForma(f, n) {
+    if (!f || typeof f !== "object" || !Array.isArray(f.t) || f.t.length !== n) return null;
+    if (!f.t.every(x => Array.isArray(x) && x.length === 2 && x.every(Number.isFinite))) return null;
+    return { t: f.t.map(([dt, a]) => [entero(dt, TOPE_DT), entero(a, 100000)]), u: entero(f.u, 100000), mc: entero(f.mc, 100000) };
+  }
   function limpia(e) {
     const r = vacio();
     if (!e || typeof e !== "object") return r;
@@ -295,9 +318,17 @@
       const ok = {};
       for (const m of IDS_MODOS) {
         const v = dia[m];
-        if (Array.isArray(v) && (v.length === 3 || v.length === 4)) {
+        if (Array.isArray(v) && v.length >= 3 && v.length <= 6) {
           const n = entero(v[1], 999), g = !MODO[m].reto || v.length === 3 || v[3] === 1 ? 1 : 0;
-          if (n >= 1) ok[m] = [puntos(m, n, !!g), n, entero(v[2], 86400000), g];
+          if (n < 1) continue;
+          ok[m] = [puntos(m, n, !!g), n, entero(v[2], 86400000), g];
+          /* Lo intentado se queda solo si cuadra con el número de intentos. */
+          const i = v[4];
+          if (Array.isArray(i) && i.length === n && i.every(x => valida(m, x))) {
+            ok[m].push(i.slice());
+            const f = limpiaForma(v[5], n);
+            if (f) ok[m].push(f);
+          }
         }
       }
       if (Object.keys(ok).length) r.hist[f] = ok;
@@ -310,6 +341,9 @@
         if (!v || !Array.isArray(v.i)) continue;
         const i = [...new Set(v.i.filter(x => valida(m, x)))].slice(0, 999);
         r.prog.m[m] = { i, ms: entero(v.ms, 86400000) };
+        /* La forma sigue solo si lo intentado quedó tal cual. */
+        const f = i.length === v.i.length ? limpiaForma(v, i.length) : null;
+        if (f) Object.assign(r.prog.m[m], f);
       }
     }
     return r;
@@ -324,7 +358,8 @@
       const x = a.hist[f] || {}, y = b.hist[f] || {};
       r.hist[f] = {};
       for (const m of IDS_MODOS) {
-        const v = !x[m] ? y[m] : !y[m] ? x[m] : (y[m][0] > x[m][0] ? y[m] : x[m]);
+        /* A igual puntaje, el que trae lo intentado: es el que respalda el día. */
+        const v = !x[m] ? y[m] : !y[m] ? x[m] : (y[m][0] > x[m][0] || (y[m][0] === x[m][0] && y[m][4] && !x[m][4]) ? y[m] : x[m]);
         if (v) r.hist[f][m] = v;
       }
     }
@@ -339,11 +374,18 @@
     }
     return r;
   }
-  /* Un modo terminado hoy: va a `hist` y sale de `prog`. */
-  function registra(e, fecha, modo, intentos, ms, gano = true) {
-    const r = limpia(e);
-    const n = Math.max(1, intentos);
-    r.hist[fecha] = Object.assign({}, r.hist[fecha], { [modo]: [puntos(modo, n, gano), n, entero(ms, 86400000), gano ? 1 : 0] });
+  /* Un modo terminado hoy: va a `hist` y sale de `prog`. `intentos` es lo
+     intentado (y entonces queda guardado, para la prueba) o solo cuántos. */
+  function registra(e, fecha, modo, intentos, ms, gano = true, forma = null) {
+    const r = limpia(e), lista = Array.isArray(intentos) ? intentos.slice() : null;
+    const n = Math.max(1, lista ? lista.length : intentos);
+    const v = [puntos(modo, n, gano), n, entero(ms, 86400000), gano ? 1 : 0];
+    if (lista && lista.length) {
+      v.push(lista);
+      const f = limpiaForma(forma, n);
+      if (f) v.push(f);
+    }
+    r.hist[fecha] = Object.assign({}, r.hist[fecha], { [modo]: v });
     return r;
   }
   const hecho = (e, fecha, modo) => !!(e.hist[fecha] && e.hist[fecha][modo]);
@@ -379,7 +421,76 @@
     return `Electrodle #${numeroElectrodle(fecha)} · ${fecha}\n${filas.join("\n")}\n${pts} pts · 🔥 ${racha(e, fecha)}`;
   }
 
+  /* ---------- la prueba (antitrampas) ----------
+     Lo que viaja con cada récord para que el verificador
+     (colabtex/src/juegos/solo/verifica/electro.js) rehaga los puntos: cada
+     día con lo que se intentó en cada modo. Como el objetivo de un día sale
+     solo de la fecha, rehacer es comprobar que lo intentado termina el modo
+     (acertando el objetivo de *esa* fecha, o perdiendo el desafío) justo en
+     el último intento; los puntos salen de ahí, no de lo guardado.
+       { v: 1, f: "AAAA-MM-DD"  (el día en que se mandó),
+         m: [modos, en el orden de las columnas],
+         d: [[n.º del día (1 = estreno), …una columna por modo]] }
+     Cada columna: 0 (no jugado), [ms, "lo intentado", "forma", u, mc] o,
+     lo guardado antes de la prueba, [ms, intentos, ganó]. La forma va solo
+     en los últimos VENTANA días (un bot se ve en lo reciente; lo viejo ya
+     se revisó con los récords de entonces, y así la prueba no se dobla):
+     "dt.a,dt.a,…" por intento, y `u`/`mc` (ver `limpiaForma`) al final si
+     no son cero. Lo intentado va compacto: en los
+     clásicos, el índice de cada ficha en su lista con un carácter base 64
+     (dos si la lista pasa de 64); en Bandas, los cuatro caracteres de cada
+     código; en Conexiones, cuatro cifras hexadecimales por intento; en
+     Circuito, los números separados por «;». Un año de juego ocupa unos
+     55 000 caracteres, de los 200 000 que admite la prueba. */
+  const B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+  const ancho = modo => (MODO[modo].lista.length <= 64 ? 1 : 2);
+  function codificaIntentos(modo, lista) {
+    if (modo === "band") return lista.join("");
+    if (modo === "circ") return lista.join(";");
+    if (modo === "conx") return lista.map(s => s.split("-").map(k => (+k).toString(16)).join("")).join("");
+    const w = ancho(modo), L = MODO[modo].lista;
+    return lista.map(id => {
+      const k = L.findIndex(x => x.id === id);
+      return w === 1 ? B64[k] : B64[k >> 6] + B64[k & 63];
+    }).join("");
+  }
+  /* Lo inverso; null si el texto no se puede leer. */
+  function decodificaIntentos(modo, s) {
+    if (typeof s !== "string" || !MODO[modo] || s.length > 20000) return null;
+    const trozos = (t, k) => (t.length % k ? null : Array.from({ length: t.length / k }, (_, i) => t.slice(i * k, i * k + k)));
+    if (modo === "band") return trozos(s, 4);
+    if (modo === "circ") return s ? s.split(";") : [];
+    if (modo === "conx") {
+      const l = trozos(s, 4);
+      return l && l.map(t => t.split("").map(c => parseInt(c, 16)).sort((a, b) => a - b).join("-"));
+    }
+    const w = ancho(modo), l = trozos(s, w), L = MODO[modo].lista;
+    if (!l) return null;
+    const ids = l.map(t => { const k = w === 1 ? B64.indexOf(t) : B64.indexOf(t[0]) * 64 + B64.indexOf(t[1]); return k >= 0 && L[k] ? L[k].id : null; });
+    return ids.includes(null) ? null : ids;
+  }
+  /* La prueba de lo guardado hasta `fecha`. Con `soloDia`, solo ese día
+     (la de la racha: lo que hay que probar es que hoy se jugó de verdad). */
+  const VENTANA = 30;
+  function prueba(e, fecha, soloDia) {
+    const dias = Object.keys(e.hist).filter(f => (soloDia ? f === fecha : true)).sort();
+    const m = IDS_MODOS.filter(id => dias.some(f => e.hist[f][id]));
+    const d = dias.map(f => [numeroElectrodle(f)].concat(m.map(id => {
+      const v = e.hist[f][id];
+      if (!v) return 0;
+      if (!v[4]) return [v[2], v[1], v[3] ? 1 : 0];
+      const c = [v[2], codificaIntentos(id, v[4])], fm = v[5];
+      if (fm && numeroDia(fecha) - numeroDia(f) < VENTANA) {
+        c.push(fm.t.map(x => x.join(".")).join(","));
+        if (fm.u || fm.mc) c.push(fm.u, fm.mc);
+      }
+      return c;
+    })));
+    return { v: 1, f: fecha, m, d };
+  }
+
   return {
+    objetivosEn, codificaIntentos, decodificaIntentos, prueba, VENTANA, limpiaForma,
     MODOS, MODO, IDS_MODOS, DIARIOS, CLASICOS, numeroElectrodle, item, reto, valida, estado, puntos, X, mulberry32, hash, baraja,
     diaChile, faltaParaManana, numeroDia, diaAnterior, esFecha,
     objetivoDelDia, objetivoAlAzar, compara, esVariable, clave, variables, destapadas, ZOOM, vista, pistas,
