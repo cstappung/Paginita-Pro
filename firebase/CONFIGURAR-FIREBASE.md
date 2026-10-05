@@ -64,15 +64,23 @@ siquiera haciendo privado el repositorio. Lo que protege los datos son las
 6. **App Check (recomendado).** Hace que la base y Storage solo atiendan a
    peticiones de tu página en un navegador real, no de un script que copió la
    configuración.
-   1. Consola → **App Check** → registra la app web con **reCAPTCHA v3**.
-      Google te da una *clave de sitio*: regístrala para tu dominio de
-      GitHub Pages.
-   2. Pégala en `APP_CHECK_SITE_KEY`, en `colabtex/src/firebase.js`, y
-      ejecuta `npm run build` en `colabtex/`. Publica.
-   3. Para la vista previa local, abre `http://localhost:8123`. La consola
+   1. Crea la clave en <https://www.google.com/recaptcha/admin/create>:
+      tipo **reCAPTCHA v3** (basado en puntuación, sin casillas) y como
+      dominios `paginita-pro.cl`, `www.paginita-pro.cl` y
+      `cstappung.github.io` (localhost no hace falta: usa el token de
+      depuración del paso 3). Google te da dos claves: la *de sitio*
+      (pública) y la *secreta*.
+   2. Consola de Firebase → **App Check** → **Apps** → la app web →
+      **reCAPTCHA** → pega la clave **secreta** y guarda. No pulses
+      «Aplicar» todavía (paso 4).
+   3. Pega la clave **de sitio** en `APP_CHECK_SITE_KEY`, en
+      `colabtex/src/firebase.js`, y ejecuta `npm run build` en `colabtex/`.
+      Publica. Con eso todas las apps del sitio (Juegos, ColabTeX,
+      ColabDraw, Informes) mandan su sello: comparten ese único archivo.
+   4. Para la vista previa local, abre `http://localhost:8123`. La consola
       del navegador imprime un *debug token*: añádelo en App Check →
       **Administrar tokens de depuración**.
-   4. Mira unos días las métricas de App Check (cuántas peticiones vienen
+   5. Mira unos días las métricas de App Check (cuántas peticiones vienen
       verificadas). Cuando casi todas lo estén, pulsa **Aplicar** en Realtime
       Database y en Storage. Si lo aplicas antes de publicar el sitio con la
       clave, la web se queda sin base.

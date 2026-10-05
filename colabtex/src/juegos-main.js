@@ -83,7 +83,7 @@ import { crearRieles } from "./juegos/rieles.js";
 import { repDe, entradaRep, mejoraRep } from "./juegos/rieles-datos.js";
 import { anunciaSala, anunciaPodio, puestoSolo, conRecord, ordenSolo } from "./juegos/discord.js";
 import { crearSalon, ICONO_SOLO, ICONO_MULTI, CANDADO, plataformas } from "./juegos/salon.js";
-import { SOLOS, entradasSalon, nuevos, modoSalon, esClaveInvitado, UID_INVITADO, MOTIVO_CUENTA, enMovil, enPc, juegoDeNovedad } from "./juegos/salon-datos.js";
+import { SOLOS, entradasSalon, nuevos, modoSalon, esClaveInvitado, UID_INVITADO, MOTIVO_CUENTA, enMovil, enPc, juegoDeNovedad, rutaLibre } from "./juegos/salon-datos.js";
 
 const $ = id => document.getElementById(id);
 const VER = (document.currentScript && document.currentScript.src.split("?v=")[1]) || "";
@@ -536,7 +536,7 @@ function puertaHtml(m) {
       <button class="btn" type="button" data-login>Iniciar sesión con Google</button>
       <a class="btn2" href="#">Volver al salón</a>
     </div>
-    <p class="jg-puerta-nota">Sin cuenta puedes jugar, como invitado, a todos los juegos de un jugador.</p>
+    <p class="jg-puerta-nota">Sin cuenta puedes jugar, como invitado, a Snake, Buscaminas, Tetris y sortEm.</p>
   </section>`;
 }
 
@@ -1389,7 +1389,10 @@ function armazon() {
   if (state.vista !== "partida") ponInmersivo(false);
   /* Como invitado, lo que lee o escribe la base (una partida, la
      clasificación, los sobres…) se cambia por una puerta que lo explica. */
-  const motivo = state.invitado ? MOTIVO_CUENTA[state.vista] : null;
+  const motivo = !state.invitado ? null : MOTIVO_CUENTA[state.vista] ||
+    /* Y de los juegos de un jugador, solo los cuatro libres (`rutaLibre`):
+       una ruta escrita a mano a cualquier otro también da con la puerta. */
+    (state.vista.startsWith("solo-") && !rutaLibre(state.vista.slice(5)) ? MOTIVO_CUENTA.solo : null);
   /* sortEm es solo el juego: el iframe ocupa la ventana, sin la cabecera
      del sitio ni la barra de juegos individuales. */
   document.documentElement.classList.toggle("jg-sortem", state.vista === "solo-sortem");
@@ -1572,14 +1575,14 @@ function armazon() {
         ${inv ? '<button class="btn jg-modos-entrar" type="button" data-login><span class="mo-l">Iniciar sesión</span><span class="mo-c">Acceder</span></button>' : ""}
       </nav>
       <div class="jg-sal-avisos">
-        ${inv ? `<p class="jg-invitado-aviso" role="note"><span class="jg-invitado-ico" aria-hidden="true">${ICONO_SOLO}</span><span><b>Estás como invitado.</b> Juegas a todo lo de un jugador, pero nada se guarda ni cuenta para rankings, logros ni monedas.</span><button type="button" data-login>Iniciar sesión</button></p>` : ""}
+        ${inv ? `<p class="jg-invitado-aviso" role="note"><span class="jg-invitado-ico" aria-hidden="true">${ICONO_SOLO}</span><span><b>Estás como invitado.</b> Juegas a Snake, Buscaminas, Tetris y sortEm, pero nada se guarda ni cuenta para rankings, logros ni monedas. El resto necesita cuenta.</span><button type="button" data-login>Iniciar sesión</button></p>` : ""}
         <div id="vesAviso"></div>
       </div>
       ${novedadesHtml()}
       <section class="jg-sal-sec jg-sal-solo" aria-labelledby="vesSoloT">
         <header class="jg-sal-tit">
           <span class="jg-sal-ico m-solo" aria-hidden="true">${ICONO_SOLO}</span>
-          <div><h2 id="vesSoloT">Para jugar solo</h2><p>Sin sala ni espera: toca ▶ y juegas.${inv ? " Todos funcionan sin cuenta." : ""}</p></div>
+          <div><h2 id="vesSoloT">Para jugar solo</h2><p>Sin sala ni espera: toca ▶ y juegas.${inv ? " Sin cuenta: Snake, Buscaminas, Tetris y sortEm." : ""}</p></div>
           <button class="jg-sal-ver" type="button" data-ver-solo>Ver todos</button>
           <button class="jg-desliza" type="button" data-desliza="-1" aria-label="Anteriores">‹</button><button class="jg-desliza" type="button" data-desliza="1" aria-label="Siguientes">›</button>
         </header>
@@ -1657,14 +1660,14 @@ const NOVEDADES = [
   { id: "boxhead", color: "#c8892f", alta: "2026-10-05", titulo: "Boxhead",
     lema: "Zombis y diablos vistos desde arriba. Cada baja sube el multiplicador y con él llegan la Uzi, la escopeta, los barriles, las cargas y el cohete. Cooperativo o versus, con los que entren a la sala.",
     sub: "1–8 jugadores · cinco mapas", sala: { k: "boxhead", ops: { variante: "coop" } }, reglas: ["boxhead", "coop"],
-    modo: "multi", jugadores: "1–8 jugadores", cuenta: true, practica: "juegos/boxhead/index.html" },
+    modo: "multi", jugadores: "1–8 jugadores", cuenta: true },
   { id: "fanal", color: "#d9a85b", alta: "2026-10-04", titulo: "FANAL",
     lema: "Llevas la última luz a través de la noche, hacia el Alba. Las polillas bajan en formación hacia ella. Dispara al pulso de la música… y averigua qué estás apagando.",
     sub: "Un jugador · trece jornadas, tres jefes y una travesía sin fin", ruta: "#solo/fanal", boton: "Encender", reglas: ["fanal"], modo: "solo" },
   { id: "zombis", color: "#4f8a2b", alta: "2026-10-01", titulo: "Yemas · modo Zombis",
     lema: "Todos juntos contra oleadas de huevos podridos, en cinco mapas clásicos: bebidas, la caja misteriosa, armas en la pared y Pack-a-Punch. Se puede jugar solo.",
     sub: "1–8 jugadores · cooperativo", sala: { k: "yemas", ops: { variante: "zombis" } }, reglas: ["yemas", "zombis"],
-    modo: "multi", jugadores: "1–8 jugadores", cuenta: true, practica: "juegos/yemas/index.html" },
+    modo: "multi", jugadores: "1–8 jugadores", cuenta: true },
   { id: "prodrop", color: "#9b4dff", alta: "2026-10-02", titulo: "PRODROP · sobres y mercado",
     lema: "Sobres de cinco cartas de los profes, uno gratis cada 6 horas. Gradúalas, exhíbelas en tu perfil, véndelas en el mercado o cámbialas con otros.",
     sub: () => { const a = fb.ahora(), p = MOTOR.precioSobre(a);
@@ -1702,14 +1705,15 @@ function novedadesHtml() {
           <p>Lo último que llegó al salón.</p>
         </header>
         <div class="jg-nov-lista">${NOVEDADES.map((n, i) => {
-          const cuenta = inv && n.cuenta;
+          /* Como invitado solo se abren los cuatro juegos libres; lo demás
+             (también las prácticas contra bots) pide iniciar sesión. */
+          const cuenta = inv && (n.cuenta || !(n.ruta && n.ruta.startsWith("#solo/") && rutaLibre(n.ruta.slice(6))));
           const insignia = (n.modo ? `<span class="jg-mn-modo m-${n.modo}">${n.modo === "solo" ? ICONO_SOLO + "1 jugador" : ICONO_MULTI + escapeHtml(n.jugadores)}</span>` : "") +
             /* Las mismas etiquetas que la miniatura, de la misma tabla (`CONTROLES`),
                para el juego al que lleva la novedad. */
             plataformas(plataformaDe(juegoDeNovedad(n)));
           const accion = cuenta
-            ? (n.practica ? `<a class="btn" href="${n.practica}">Probar solo <span aria-hidden="true">→</span></a><button class="btn2 jg-nov-candado" type="button" data-login title="La sala en línea necesita cuenta">${CANDADO} Sala</button>`
-              : `<button class="btn" type="button" data-login><span class="jg-nov-candado">${CANDADO}</span> Iniciar sesión</button>`)
+            ? `<button class="btn" type="button" data-login><span class="jg-nov-candado">${CANDADO}</span> Iniciar sesión</button>`
             : n.sala ? `<button class="btn" data-nov-crear="${n.id}">Abrir sala <span aria-hidden="true">→</span></button>`
             : `<a class="btn" href="${n.ruta}">${escapeHtml(n.boton)} <span aria-hidden="true">→</span></a>`;
           return `
