@@ -16,9 +16,12 @@
    El sonido no es el chip de 8 bits del resto de Juegos: el pozo es un
    instrumento. Cada columna es una nota de la pentatónica de La menor (la
    tonalidad de «Neón 84») y suena en estéreo donde está la pieza; cada
-   limpieza toca el acorde siguiente de La m – Fa – Do – Sol con campanas
-   FM y un eco con realimentación, de modo que una racha de líneas va
-   armando una progresión; el combo la sube de octava. Lo que llega del
+   pieza que cae es un bombo seco con un punteo que sube un paso de la
+   escala si cae rápido tras la anterior (jugar deprisa toca un arpegio
+   que trepa); cada limpieza es un golpe de batería con un arpegio de
+   sierra a fusas sobre el acorde siguiente de La m – Fa – Do – Sol, de
+   modo que una racha de líneas va armando una progresión; el combo la
+   sube de octava. Lo que llega del
    rival suena a metal y a alarma, no a música. */
 (function (raiz, fabrica) {
   const M = fabrica();
@@ -404,11 +407,11 @@
       comp.threshold.value = -14; comp.knee.value = 10; comp.ratio.value = 4; comp.attack.value = 0.003; comp.release.value = 0.2;
       sal0.connect(comp); comp.connect(destino);
     } catch (e) { sal0.connect(destino); }
-    /* El eco: una corchea con puntillo a 104 (la de «Neón 84»), filtrado y
-       realimentado. Es lo que hace que una limpieza siga sonando un
-       momento en vez de cortarse en seco como un pitido de chip. */
+    /* El eco: una corchea a 104 (la de «Neón 84»), filtrado y poco
+       realimentado, para que no emborrone el ritmo. Lo usan las
+       limpiezas; las caídas van secas. */
     const envio = ac.createGain(), eco = ac.createDelay(1.5), realim = ac.createGain(), filtro = ac.createBiquadFilter(), ecoSal = ac.createGain();
-    eco.delayTime.value = 0.433; realim.gain.value = 0.33; filtro.type = "lowpass"; filtro.frequency.value = 2600; ecoSal.gain.value = 0.5;
+    eco.delayTime.value = 0.2885; realim.gain.value = 0.22; filtro.type = "lowpass"; filtro.frequency.value = 2600; ecoSal.gain.value = 0.5;
     envio.connect(eco); eco.connect(filtro); filtro.connect(realim); realim.connect(eco); filtro.connect(ecoSal); ecoSal.connect(salida);
     const largo = ac.sampleRate;
     const bufRuido = ac.createBuffer(1, largo, ac.sampleRate), datos = bufRuido.getChannelData(0);
@@ -469,48 +472,77 @@
       src.onended = () => { try { g.disconnect(); } catch (e) {} };
     }
     const lado = x => Math.max(-1, Math.min(1, ((x == null ? 3 : x) + 1 - 4.5) / 4.5));
-    let prog = 0, ultMueve = 0, ultGira = 0;
+    let prog = 0, ultMueve = -1, ultGira = -1, racha = 0, ultFija = -9;
     const seguro = f => (...a) => { try { if (ac.state === "running") f(...a); } catch (e) { /* el sonido nunca para el juego */ } };
+    /* El bombo y el chasquido de toda pieza que cae. Secos, sin eco y sin
+       tono propio: el «bloop» de antes caía en una altura cualquiera y
+       desafinaba con la música. */
+    const bombo = (t, f0, dur, vol, x) => tono({ t, f: f0, f1: 42, glide: dur * 0.7, dur, vol, pan: lado(x) * 0.4 });
+    const chasquido = (t, dur, vol, x, f) => ruido({ t, dur, vol, tipo: "highpass", f: f || 4500, q: 0.8, pan: lado(x) * 0.5 });
+    /* La racha: cada pieza que se fija antes de RACHA_S de la anterior sube
+       un paso de la pentatónica. Jugando rápido, las caídas suben solas
+       como un arpegio; al parar, vuelve a empezar abajo. */
+    const RACHA_S = 1.3;
+    const pulsa = t => { racha = t - ultFija < RACHA_S ? Math.min(PENTA.length - 1, racha + 1) : 0; ultFija = t; return PENTA[racha]; };
+    const punteo = (t, m, vol, x) => tono({ t, f: hz(m), dur: 0.07, vol, tipo: "square", corte: 3200, corte1: 900, pan: lado(x) * 0.6 });
 
     return {
       ctx: ac,
       mueve: seguro(x => {
         const t = ahora(); if (t - ultMueve < 0.03) return; ultMueve = t;
         const i = Math.max(0, Math.min(9, (x == null ? 3 : x) + 1));
-        tono({ t, f: hz(PENTA[i] + 12), dur: 0.05, vol: 0.03, tipo: "triangle", pan: lado(x) });
+        tono({ t, f: hz(PENTA[i] + 24), dur: 0.018, vol: 0.03, tipo: "square", corte: 5000, pan: lado(x) });
       }),
       gira: seguro((pieza, x) => {
         const t = ahora(); if (t - ultGira < 0.03) return; ultGira = t;
-        campana({ t, f: hz(DE_PIEZA[pieza] || 81), r: 3.01, i: 1.3, dur: 0.18, vol: 0.045, pan: lado(x), eco: 0.12 });
+        const m = DE_PIEZA[pieza] || 81;
+        tono({ t, f: hz(m), f1: hz(m + 7), glide: 0.035, dur: 0.05, vol: 0.045, tipo: "triangle", pan: lado(x) });
+        chasquido(t, 0.012, 0.03, x, 6000);
       }),
       guarda: seguro(() => {
-        tono({ f: hz(69), f1: hz(81), dur: 0.14, vol: 0.06, eco: 0.2 });
-        ruido({ dur: 0.13, vol: 0.04, tipo: "bandpass", f: 700, f1: 4200, q: 2 });
+        const t = ahora();
+        tono({ t, f: hz(69), dur: 0.045, vol: 0.045, tipo: "square", corte: 2600 });
+        tono({ t: t + 0.05, f: hz(81), dur: 0.06, vol: 0.045, tipo: "square", corte: 2600 });
       }),
-      /* alto: 0 (pozo vacío) a 1 (al techo). Cuanto más alta la pila, más aguda. */
+      /* alto: 0 (pozo vacío) a 1 (al techo): con la pila alta el golpe es
+         más seco y agudo, más nervioso. */
       fija: seguro((alto, x) => {
-        tono({ f: 140 + alto * 160, f1: 48, glide: 0.07, dur: 0.11, vol: 0.2, pan: lado(x) * 0.6 });
-        ruido({ dur: 0.035, vol: 0.06, tipo: "lowpass", f: 2600, pan: lado(x) * 0.6 });
+        const t = ahora(), m = pulsa(t);
+        bombo(t, 150 + alto * 40, 0.08, 0.32, x);
+        chasquido(t, 0.02, 0.05 + alto * 0.03, x);
+        punteo(t, m + 12, 0.04, x);
       }),
+      /* La caída instantánea: un zumbido que baja en picado, bombo fuerte
+         y un golpe de caja. Cuanto más lejos cayó, más fuerte. */
       seco: seguro((dist, x) => {
-        const k = Math.min(1, dist / 18);
-        ruido({ dur: 0.08 + k * 0.08, vol: 0.04 + k * 0.05, tipo: "bandpass", f: 5200, f1: 380, q: 1.3, pan: lado(x) * 0.6 });
-        tono({ f: 105 + 45 * k, f1: 36, glide: 0.13, dur: 0.17, vol: 0.24 + k * 0.08, dist: k > 0.5, pan: lado(x) * 0.4 });
+        const t = ahora(), k = Math.min(1, dist / 18), m = pulsa(t);
+        tono({ t, f: 900 + 900 * k, f1: 110, glide: 0.055, dur: 0.07, vol: 0.05 + k * 0.03, tipo: "sawtooth", corte: 3500, pan: lado(x) * 0.5 });
+        bombo(t + 0.035, 190, 0.11, 0.32 + k * 0.06, x);
+        ruido({ t: t + 0.035, dur: 0.06, vol: 0.09 + k * 0.05, tipo: "bandpass", f: 1900, q: 1.2, pan: lado(x) * 0.5 });
+        punteo(t + 0.035, m + 12, 0.045, x);
+        punteo(t + 0.07, m + 24, 0.03, x);
       }),
+      /* Las líneas: golpe de batería, un arpegio de sierra a fusas sobre el
+         acorde que toca y campanas cortas encima. */
       linea: seguro((n, combo, ts, pc, b2b) => {
         const t = ahora(), acorde = ACORDES[prog++ % ACORDES.length], oct = combo >= 3 ? 24 : 12;
         const notas = acorde.slice(0, Math.min(4, n + 1)).map(m => m + oct);
-        notas.forEach((m, i) => campana({ t: t + i * 0.03, f: hz(m), r: 2, i: 2.4, dur: 0.85 + n * 0.15, vol: 0.06, pan: (i - (notas.length - 1) / 2) * 0.4, eco: 0.5 }));
-        if (n >= 2) notas.slice(0, 3).forEach((m, i) => tono({ t, f: hz(m - 12), dur: 0.45 + n * 0.1, vol: 0.03, tipo: "sawtooth", det: (i - 1) * 9, corte: 380, corte1: 4200, q: 5, eco: 0.3 }));
-        ruido({ t, dur: 0.22 + n * 0.06, vol: 0.04 + n * 0.012, tipo: "highpass", f: 3200, q: 0.7, eco: 0.25 });
-        if (combo > 0) campana({ t: t + 0.1, f: hz(PENTA[Math.min(9, combo)] + 24), r: 3.5, i: 1, dur: 0.3, vol: 0.04, eco: 0.45 });
-        if (n >= 4) {
-          tono({ t, f: 88, f1: 30, glide: 0.5, dur: 0.6, vol: 0.28, dist: true });
-          ruido({ t, dur: 0.5, vol: 0.07, tipo: "bandpass", f: 260, f1: 6500, q: 1 });
+        bombo(t, 170, 0.14, 0.32, 4);
+        ruido({ t, dur: 0.12 + n * 0.03, vol: 0.1 + n * 0.02, tipo: "bandpass", f: 2100, q: 0.9 });
+        const pasos = n >= 4 ? 12 : 3 + n * 2, paso = 0.045;
+        for (let k = 0; k < pasos; k++) {
+          const m = acorde[k % acorde.length] + 12 * Math.floor(k / acorde.length) + oct - 12;
+          tono({ t: t + k * paso, f: hz(m), dur: paso * 1.6, vol: 0.04, tipo: "sawtooth", corte: 1800 + k * 300, corte1: 700, q: 3, pan: ((k % 4) - 1.5) / 2, eco: 0.12 });
         }
-        if (ts) tono({ t, f: hz(57), f1: hz(81), glide: 0.25, dur: 0.36, vol: 0.06, tipo: "sawtooth", corte: 300, corte1: 3400, q: 9, eco: 0.4 });
-        if (b2b) campana({ t: t + 0.06, f: hz(notas[0] + 12), r: 4, i: 1.2, dur: 0.6, vol: 0.035, eco: 0.5 });
-        if (pc) PENTA.forEach((m, i) => campana({ t: t + 0.18 + i * 0.05, f: hz(m + 24), r: 2, i: 1.5, dur: 0.4, vol: 0.035, pan: (i - 4.5) / 4.5, eco: 0.5 }));
+        notas.forEach((m, i) => campana({ t: t + i * 0.02, f: hz(m), r: 2, i: 2.2, dur: 0.4 + n * 0.08, vol: 0.05, pan: (i - (notas.length - 1) / 2) * 0.4, eco: 0.25 }));
+        if (combo > 0) campana({ t: t + pasos * paso, f: hz(PENTA[Math.min(9, combo)] + 24), r: 3.5, i: 1, dur: 0.25, vol: 0.045, eco: 0.3 });
+        if (n >= 4) {
+          tono({ t, f: 88, f1: 30, glide: 0.4, dur: 0.5, vol: 0.28, dist: true });
+          ruido({ t, dur: 0.6, vol: 0.06, tipo: "highpass", f: 5000, q: 0.6, eco: 0.2 });
+        }
+        if (ts) tono({ t, f: hz(57), f1: hz(81), glide: 0.18, dur: 0.24, vol: 0.06, tipo: "sawtooth", corte: 400, corte1: 4000, q: 9, eco: 0.25 });
+        if (b2b) campana({ t: t + 0.06, f: hz(notas[0] + 12), r: 4, i: 1.2, dur: 0.4, vol: 0.035, eco: 0.3 });
+        if (pc) PENTA.forEach((m, i) => campana({ t: t + 0.15 + i * 0.04, f: hz(m + 24), r: 2, i: 1.5, dur: 0.3, vol: 0.035, pan: (i - 4.5) / 4.5, eco: 0.3 }));
       }),
       nivel: seguro(() => {
         const t = ahora();
