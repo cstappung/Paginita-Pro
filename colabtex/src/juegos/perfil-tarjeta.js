@@ -67,7 +67,7 @@ export const MARCOS = [
     ["tworms", "worms", "Artillería"], ["tyemas", "yemas", "Huevos en guerra"], ["tzombis", "zombis", "Horda"],
     ["tclue", "clue", "Pistas"], ["tajedrez", "ajedrez", "Caballo de oro"], ["tmonedas", "monedas", "Tesoro"],
     ["tprodrop", "prodrop", "Coleccionista"], ["tsudoku", "sudoku", "Cuadrícula arcade"], ["tfanal", "fanal", "Última luz"], ["tboxhead", "boxhead", "Cabeza cuadrada"], ["tatasco", "atasco", "Luz verde"],
-    ["tvialibre", "vialibre", "Maquinista"]
+    ["tmetrorush", "metrorush", "Maquinista"]
   ].map(([id, top, n]) => ({ id, n, anim: true, req: { top } }))
 ];
 
@@ -95,7 +95,7 @@ export const FONDOS = [
   { id: "holo", n: "Holográfico", oscuro: false, anim: true, req: { tienda: true }, css: () => "linear-gradient(115deg, #ffc6f0, #fff1b8, #b9f3ff, #c8ffd9, #e2c8ff)" }
 ];
 
-const NOMBRES_EXTRA = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", vialibre: "Vía Libre" };
+const NOMBRES_EXTRA = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", metrorush: "Metro Rush" };
 export const nombreJuego = j => (JUEGOS[j] && JUEGOS[j].nombre) || NOMBRES_EXTRA[j] || j;
 
 /* Las partes de una categoría del club, para decirla en palabras. */
@@ -109,7 +109,7 @@ const PARTES = {
   experto: "Experto",  // la dificultad más alta del clásico de Sudoku Arcade
   travesia: "Travesía", sinfin: "Sin fin", jornadas: "Jornada más lejana",  // FANAL
   estrellas: "Estrellas",  // Atasco
-  carrera: "Mejor carrera", distancia: "Distancia"  // Vía Libre
+  carrera: "Mejor carrera", distancia: "Distancia"  // Metro Rush
 };
 export const juegoDeCategoria = c => Object.keys(SOLO_PREFIJO).find(k => String(c).startsWith(SOLO_PREFIJO[k])) || "";
 export function nombreCategoria(c) {
@@ -139,8 +139,8 @@ export function valorMarca(c, f) {
   if (String(c).startsWith("club-frontera-")) return `${f.puntos || 0} ${f.puntos === 1 ? "victoria" : "victorias"}`;
   if (c === "club-fanal-jornadas") return `jornada ${f.puntos || 0}`;
   if (c === "club-atasco-estrellas") return `${f.puntos || 0} ★`;
-  // Vía Libre: la distancia es en metros (la mejor carrera sigue en puntos).
-  if (c === "club-vialibre-distancia") return `${(f.puntos || 0).toLocaleString("es-CL")} m`;
+  // Metro Rush: la distancia es en metros (la mejor carrera sigue en puntos).
+  if (c === "club-metrorush-distancia") return `${(f.puntos || 0).toLocaleString("es-CL")} m`;
   if (c === "club-sopa-racha" || c === "club-electro-racha" || c === "club-sudoku-racha") return `${f.puntos || 0} ${f.puntos === 1 ? "día" : "días"}`;
   return `${f.puntos || 0} pts`;
 }

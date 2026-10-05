@@ -1,4 +1,4 @@
-/* Vía Libre — el mundo 3D (todo lo que se dibuja).
+/* Metro Rush — el mundo 3D (todo lo que se dibuja).
 
    QUÉ HACE, EN GLOBAL
    Dibuja la carrera con Three.js: la vía, la ciudad a los costados, los
@@ -50,7 +50,7 @@ import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 
-const MOTOR = window.ViaLibreMotor;                // el motor (motor.js), cargado antes como script
+const MOTOR = window.MetroRushMotor;                // el motor (motor.js), cargado antes como script
 const CARRILES = MOTOR.CARRILES;                   // x de cada carril
 const L_VAGON = MOTOR.LARGO_VAGON;                 // largo de un vagón
 const TECHO = MOTOR.ALTO_TECHO;                    // altura del techo de un tren
@@ -398,7 +398,7 @@ const BASE_JUGUETE = {
     barrera: 0xe8463b, barrera2: 0xffffff, ambar: 0xffa424, rampa: 0xd9dde2, oro: 0xffc63a, iman: 0xe5332a, cromo: 0xf2f5f8, nube: 0xffffff, basurero: 0x2f8f5a
   },
   carteles: ['CAFÉ', 'PAN', 'FARMACIA', 'LIBROS', 'HELADOS', 'FRUTAS', 'MÚSICA'],
-  grafitis: [['¡CORRE!', 0xff5a8a, 0xffd23f], ['VÍA LIBRE', 0x3fd0ff, 0x7a5cff], ['LAB', 0x8aff6a, 0x19b37a], ['ZOOM', 0xffa23a, 0xff3d6e]],
+  grafitis: [['¡CORRE!', 0xff5a8a, 0xffd23f], ['METRO RUSH', 0x3fd0ff, 0x7a5cff], ['LAB', 0x8aff6a, 0x19b37a], ['ZOOM', 0xffa23a, 0xff3d6e]],
   extras: { nubes: true },
   // de día casi todo se lee bien; solo la niebla clara se comía los trenes lejanos (en Invierno, sobre todo)
   legible: { brillo: 0, niebla: 1.6 }
@@ -448,7 +448,7 @@ const BASE_NEON = {
     tubo: 0xff2bd6                 // los postes de luz de los faroles (instanciados)
   },
   carteles: ['BAR', '24H', 'ARCADE', 'RAMEN', 'KARAOKE', 'DISCO'],
-  grafitis: [['NEÓN', 0xff2bd6, 0x22e5ff], ['VÍA LIBRE', 0x22e5ff, 0x7b5cff]],
+  grafitis: [['NEÓN', 0xff2bd6, 0x22e5ff], ['METRO RUSH', 0x22e5ff, 0x7b5cff]],
   extras: { synth: ['#ffe46b', '#ff6a9a', '#ff2bd6'], estrellas: true },
   /* El cuerpo de los objetos del juego brilla a un 32 % de su color (un tren
      magenta se ve magenta, no negro con borde), la niebla les llega más
@@ -565,7 +565,7 @@ function realza(m, brillo, niebla) {
     if (niebla !== 1) sh.fragmentShader = sh.fragmentShader.replace('#include <fog_fragment>',
       THREE.ShaderChunk.fog_fragment.replace('fogColor, fogFactor', `fogColor, pow( fogFactor, ${n} )`));
   };
-  m.customProgramCacheKey = () => `vialibre-realce-${b}-${n}`;
+  m.customProgramCacheKey = () => `metrorush-realce-${b}-${n}`;
 }
 
 /** Lleva las coordenadas v de una geometría a la franja `i` de `n` de un atlas
@@ -1562,7 +1562,7 @@ export function crearMundo(canvas) {
         ao.updateGtaoMaterial({ radius: 0.8, distanceExponent: 1.4, thickness: 2, scale: 1.3, samples: 12, distanceFallOff: 1 });
         ao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 5, rings: 2, samples: 12 });
         c.addPass(ao);
-      } catch (e) { console.warn('Vía Libre: sin oclusión ambiental', e); }
+      } catch (e) { console.warn('Metro Rush: sin oclusión ambiental', e); }
     }
     if (A.bloom && pal.post.bloom) c.addPass(new UnrealBloomPass(new THREE.Vector2(ancho / 2, alto / 2), ...pal.post.bloom));
     c.addPass(new OutputPass());

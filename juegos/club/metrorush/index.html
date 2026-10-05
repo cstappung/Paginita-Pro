@@ -2,11 +2,11 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="../../../i18n.js?v=202610050638"></script>
+<script src="../../../i18n.js?v=202610050651"></script>
 <script src="../../audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#14182b">
-<title>Vía Libre</title>
+<title>Metro Rush</title>
 <meta name="description" content="Corre la Línea 3 antes de que la cierren: esquiva trenes, junta monedas y llega a la Estación Fantasma.">
 <!-- Icono de la pestaña: el frente de un tren con sus dos focos, en SVG para no depender de un archivo. -->
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%23ff6a3d'/%3E%3Crect x='8' y='6' width='16' height='18' rx='4' fill='%232c7be0'/%3E%3Crect x='10.5' y='9' width='11' height='6' rx='1.5' fill='%23cfe9ff'/%3E%3Ccircle cx='12' cy='19.5' r='1.8' fill='%23fff4d6'/%3E%3Ccircle cx='20' cy='19.5' r='1.8' fill='%23fff4d6'/%3E%3Cpath d='M9 28l3-4h8l3 4' stroke='%23fff' stroke-width='1.6' fill='none'/%3E%3C/svg%3E">
@@ -16,12 +16,12 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Orbitron:wght@700&family=Press+Start+2P&display=swap">
 <!-- Lo común del Club (volver, ranking lateral, modo integrado) va antes del estilo propio, para que este gane. -->
 <link rel="stylesheet" href="../conexion.css?v=club-2">
-<link rel="stylesheet" href="estilo.css?v=vialibre-1">
+<link rel="stylesheet" href="estilo.css?v=metrorush-1">
 <script src="../../audio/volumen.js?v=vol-1"></script>
 <script src="../conexion.js?v=club-9"></script>
-<script src="../../audio/chip.js?v=vialibre-1"></script>
-<script src="../../audio/temas.js?v=vialibre-1"></script>
-<script src="motor.js?v=vialibre-1"></script>
+<script src="../../audio/chip.js?v=metrorush-1"></script>
+<script src="../../audio/temas.js?v=metrorush-1"></script>
+<script src="motor.js?v=metrorush-1"></script>
 <!-- Three.js (el mismo de Yemas: la misma dirección, así el navegador ya lo tiene guardado). -->
 <script type="importmap">
 { "imports": {
@@ -29,15 +29,15 @@
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
 } }
 </script>
-<link rel="modulepreload" href="mundo.js?v=vialibre-1">
-<link rel="modulepreload" href="audio.js?v=vialibre-1">
-<script type="module" src="juego.js?v=vialibre-1"></script>
+<link rel="modulepreload" href="mundo.js?v=metrorush-1">
+<link rel="modulepreload" href="audio.js?v=metrorush-1">
+<script type="module" src="juego.js?v=metrorush-1"></script>
 </head>
 <body>
 <div class="shell"><div class="layout">
-<main class="vl" aria-label="Vía Libre">
+<main class="vl" aria-label="Metro Rush">
   <header class="cab">
-    <h1 class="marca" translate="no">Vía Libre</h1>
+    <h1 class="marca" translate="no">Metro Rush</h1>
     <p class="lema">corre la Línea 3 antes de que la cierren</p>
   </header>
 
@@ -76,7 +76,7 @@
 
     <!-- Cargando. -->
     <section class="capa carga" id="capaCarga">
-      <div class="logo" translate="no" aria-label="Vía Libre"><span class="l1" data-t="VÍA">VÍA</span><span class="l2" data-t="LIBRE">LIBRE</span><em>Línea 3</em></div>
+      <div class="logo" translate="no" aria-label="Metro Rush"><span class="l1" data-t="METRO">METRO</span><span class="l2" data-t="RUSH">RUSH</span><em>Línea 3</em></div>
       <p class="carga-texto" id="cargaTexto">Preparando la vía…</p>
     </section>
 
@@ -94,7 +94,7 @@
             <span class="p-mult-txt"><small>Multiplicador</small><span class="p-mult-barra"><i id="portadaMisBarra"></i></span><em id="portadaRetosN" translate="no">0/3</em></span>
           </button>
         </div>
-        <div class="logo chico" translate="no" aria-label="Vía Libre"><span class="l1" data-t="VÍA">VÍA</span><span class="l2" data-t="LIBRE">LIBRE</span></div>
+        <div class="logo chico" translate="no" aria-label="Metro Rush"><span class="l1" data-t="METRO">METRO</span><span class="l2" data-t="RUSH">RUSH</span></div>
         <div class="p-der">
           <span class="contador" title="Tus monedas"><i data-icono="moneda"></i><b id="portadaMonedas" translate="no">0</b><button type="button" class="mas" data-accion="tienda" aria-label="Ir a la tienda">+</button></span>
           <button type="button" class="redondo azul" data-accion="opciones" aria-label="Opciones" title="Opciones"><i data-icono="engranaje"></i></button>

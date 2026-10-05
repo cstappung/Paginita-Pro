@@ -121,7 +121,7 @@ export const atasco=etapa=>{
  cuerpo+=txt(272,90,textos[0],22,etapa===2?C.oro:C.blanco)+txt(272,122,textos[1],17)+txt(272,150,textos[2],17,etapa===2?C.oro:C.verde);
  return svg(nombre,cuerpo);
 };
-/* Vía Libre: el corredor visto de costado (salta la barrera baja, rueda
+/* Metro Rush: el corredor visto de costado (salta la barrera baja, rueda
    bajo la alta, sube por la rampa y corre por los techos) y, de espaldas,
    las tres vías con un tren que viene de frente. `etapa`: 0 barrera baja,
    1 barrera alta, 2 tren de frente, 3 la rampa, 4 los techos con monedas. */
@@ -143,7 +143,7 @@ const vagonV=(x,w,frente=false)=>rect(x,118,w,74,VL.tren,VL.trenOsc,6)+`<rect x=
  Array.from({length:Math.floor((w-20)/34)},(_,i)=>`<rect x="${x+14+i*34}" y="132" width="24" height="22" rx="3" fill="${VL.vidrio}"/>`).join('')+
  circle(x+22,194,8,'#3a3f4a','#9aa3b3')+circle(x+w-22,194,8,'#3a3f4a','#9aa3b3')+(frente?circle(x+w-6,180,4,'#fff6c2'):'');
 const monedaV=(x,y,r=8)=>circle(x,y,r,'#ffc83d','#b07a10')+`<rect x="${x-1.5}" y="${y-r/2}" width="3" height="${r}" fill="#d99a1c"/>`;
-export const vialibre=etapa=>{
+export const metrorush=etapa=>{
  const nombre=['La barrera baja, a rayas y a la altura de la cintura, se salta','La barrera alta, con una flecha hacia abajo, se pasa rodando','Un tren que viene de frente por tu carril: cambia de carril para esquivarlo','Un tren detenido con rampa: corre por ella y subes al techo','Por los techos de los trenes, con una fila de monedas encima'][etapa];
  // El cielo de tarde: una banda cálida sobre el azul del manual.
  let cuerpo=`<rect x="0" y="0" width="480" height="250" rx="14" fill="#1d2440"/><rect x="0" y="120" width="480" height="80" fill="#3a2a4a" opacity=".55"/>`;

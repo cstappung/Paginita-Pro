@@ -126,7 +126,7 @@ const MODALIDADES = {
   experto: "Experto",  // la dificultad más alta del clásico de Sudoku Arcade
   travesia: "travesía", sinfin: "travesía sin fin", jornadas: "jornada más lejana",  // FANAL
   estrellas: "estrellas",  // Atasco
-  carrera: "mejor carrera", distancia: "distancia"  // Vía Libre
+  carrera: "mejor carrera", distancia: "distancia"  // Metro Rush
 };
 const CLUBS = {
   minas: { nombre: "Mina Club", juego: "Buscaminas", icono: "💣", ruta: "minas" },
@@ -140,12 +140,12 @@ const CLUBS = {
   sudoku: { nombre: "Sudoku Arcade", juego: "Sudoku Arcade", icono: "🔢", ruta: "sudoku" },
   fanal: { nombre: "FANAL", juego: "FANAL", icono: "🪔", ruta: "fanal" },
   atasco: { nombre: "Atasco", juego: "Atasco", icono: "🚗", ruta: "atasco" },
-  vialibre: { nombre: "Vía Libre", juego: "Vía Libre", icono: "🚇", ruta: "vialibre" }
+  metrorush: { nombre: "Metro Rush", juego: "Metro Rush", icono: "🚇", ruta: "metrorush" }
 };
 
 /* "club-snake-arcade-grande" → {club, modalidad: "Arcade · tablero grande"} */
 export function categoriaLegible(cat) {
-  const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|vialibre)-(.+)$/.exec(String(cat || ""));
+  const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|metrorush)-(.+)$/.exec(String(cat || ""));
   if (!m) return null;
   return { club: CLUBS[m[1]], modalidad: m[2].split("-").map(k => MODALIDADES[k] || k).join(" · ") };
 }
@@ -171,9 +171,9 @@ export function marcaSolo(cat, f) {
   if (/^club-fanal-/.test(cat)) return `🪔 ${Number(f.puntos).toLocaleString("es-CL")} pts`;
   // Atasco: las estrellas juntadas en todos los niveles.
   if (cat === "club-atasco-estrellas") return `🚗 ${f.puntos} ★`;
-  // Vía Libre: la distancia se dice en metros; la mejor carrera, en puntos.
-  if (cat === "club-vialibre-distancia") return `🚇 ${Number(f.puntos).toLocaleString("es-CL")} m`;
-  if (cat === "club-vialibre-carrera") return `🚇 ${Number(f.puntos).toLocaleString("es-CL")} pts`;
+  // Metro Rush: la distancia se dice en metros; la mejor carrera, en puntos.
+  if (cat === "club-metrorush-distancia") return `🚇 ${Number(f.puntos).toLocaleString("es-CL")} m`;
+  if (cat === "club-metrorush-carrera") return `🚇 ${Number(f.puntos).toLocaleString("es-CL")} pts`;
   return `${Number(f.puntos).toLocaleString("es-CL")} pts`;
 }
 

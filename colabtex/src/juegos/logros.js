@@ -367,11 +367,11 @@ const SOLO = {
     { id: "e600", n: "Sin un bocinazo", d: "Junta 600 estrellas.", i: "📯", m: "Estrellas", s: d => cat(/-estrellas$/)(d) && d.puntos >= 600 },
     { id: "e720", n: "La bóveda abierta", d: "Junta las 720 estrellas: los 240 niveles con el mínimo de movidas.", i: "🏆", m: "Estrellas", s: d => cat(/-estrellas$/)(d) && d.puntos >= 720 }
   ],
-  /* Vía Libre. Los de puntos salen de club-vialibre-carrera (puntos de la
+  /* Metro Rush. Los de puntos salen de club-metrorush-carrera (puntos de la
      mejor carrera: 1 000 000 es donde empieza la Estación Fantasma y
      10 000 000 el Fin de la Línea); los de distancia, de
-     club-vialibre-distancia (metros de la carrera más larga). */
-  vialibre: [
+     club-metrorush-distancia (metros de la carrera más larga). */
+  metrorush: [
     { id: "c50k", n: "Primer andén", d: "Haz 50 000 puntos en una carrera.", i: "🚉", m: "Carrera", s: d => cat(/-carrera$/)(d) && d.puntos >= 50000 },
     { id: "c250k", n: "Hora punta", d: "Haz 250 000 puntos en una carrera.", i: "🚇", m: "Carrera", s: d => cat(/-carrera$/)(d) && d.puntos >= 250000 },
     { id: "c1m", n: "Estación Fantasma", d: "Haz 1 000 000 de puntos en una carrera.", i: "👻", m: "Carrera", s: d => cat(/-carrera$/)(d) && d.puntos >= 1000000 },
@@ -391,7 +391,7 @@ export const LOGROS = Object.fromEntries([
   ...Object.entries(SOLO)
 ]);
 /* Qué categorías de `soloRanks` alimentan cada juego individual. */
-export const SOLO_PREFIJO = { minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-", electro: "club-electro-", frontera: "club-frontera-", sudoku: "club-sudoku-", fanal: "club-fanal-", atasco: "club-atasco-", vialibre: "club-vialibre-" };
+export const SOLO_PREFIJO = { minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-", electro: "club-electro-", frontera: "club-frontera-", sudoku: "club-sudoku-", fanal: "club-fanal-", atasco: "club-atasco-", metrorush: "club-metrorush-" };
 
 /* Los logros de partida que `uid` tiene ya en esta, según lo que se ve. */
 export function detecta(p, est, uid) {

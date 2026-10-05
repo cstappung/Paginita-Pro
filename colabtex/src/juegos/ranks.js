@@ -32,7 +32,7 @@ const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
 /* Los tres metales, en el orden del puesto. */
 const METAL = ["oro", "plata", "bronce"];
 const TITULO = ["Campeón", "Subcampeón", "Tercer puesto"];
-const EXTRA = { yzombis: { nombre: "Yemas zombis", color: "#7bd34a", sala: true }, minas: { nombre: "Mina Club", color: "#eeb765" }, snake: { nombre: "Snake Club", color: "#4be9bc" }, tetrisclub: { nombre: "Tetris Club", color: "#b04ee8" }, sortem: { nombre: "sortEm", color: "#ff006e" }, bbtan: { nombre: "BBTAN", color: "#c4f568" }, sopa: { nombre: "Sopa de letras", color: "#5b8cff" }, electro: { nombre: "Electrodle", color: "#f5a524" }, frontera: { nombre: "Frontera Batalla", color: "#e0743a" }, sudoku: { nombre: "Sudoku Arcade", color: "#ff2fb4" }, fanal: { nombre: "FANAL", color: "#d9a85b" }, atasco: { nombre: "Atasco", color: "#e8322f" }, vialibre: { nombre: "Vía Libre", color: "#ff6a3d" } };
+const EXTRA = { yzombis: { nombre: "Yemas zombis", color: "#7bd34a", sala: true }, minas: { nombre: "Mina Club", color: "#eeb765" }, snake: { nombre: "Snake Club", color: "#4be9bc" }, tetrisclub: { nombre: "Tetris Club", color: "#b04ee8" }, sortem: { nombre: "sortEm", color: "#ff006e" }, bbtan: { nombre: "BBTAN", color: "#c4f568" }, sopa: { nombre: "Sopa de letras", color: "#5b8cff" }, electro: { nombre: "Electrodle", color: "#f5a524" }, frontera: { nombre: "Frontera Batalla", color: "#e0743a" }, sudoku: { nombre: "Sudoku Arcade", color: "#ff2fb4" }, fanal: { nombre: "FANAL", color: "#d9a85b" }, atasco: { nombre: "Atasco", color: "#e8322f" }, metrorush: { nombre: "Metro Rush", color: "#ff6a3d" } };
 
 /* Las categorías de los juegos individuales, como botones y no como un
    desplegable: son pocas, se leen de un vistazo y cambiar de una a otra
@@ -79,10 +79,10 @@ const SOLO = {
   /* Atasco: una sola tabla, las estrellas de todos los niveles. */
   atasco: { filas: [{ k: "n", t: "Tabla", ops: [["estrellas", "Estrellas"]] }],
     cat: s => `club-atasco-${s.n}` },
-  /* Vía Libre: la mejor carrera por puntos y la carrera más larga en
+  /* Metro Rush: la mejor carrera por puntos y la carrera más larga en
      metros. Dos tablas, una fila. */
-  vialibre: { filas: [{ k: "m", t: "Tabla", ops: [["carrera", "Mejor carrera"], ["distancia", "Distancia"]] }],
-    cat: s => `club-vialibre-${s.m}` },
+  metrorush: { filas: [{ k: "m", t: "Tabla", ops: [["carrera", "Mejor carrera"], ["distancia", "Distancia"]] }],
+    cat: s => `club-metrorush-${s.m}` },
   snake: { filas: [
       { k: "m", t: "Modo", ops: [["classic", "Clásico"], ["arcade", "Arcade"], ["portals", "Portales"], ["reloj", "Contrarreloj"], ["espejo", "Espejo"], ["laberinto", "Laberinto"]] },
       { k: "t", t: "Mapa", ops: [["chico", "Chico"], ["mediano", "Mediano"], ["grande", "Grande"], ["gigante", "Gigante"]] }],
@@ -356,8 +356,8 @@ export function crearRanks(ctx) {
       return { valor: f => f.puntos || 0, txt: v => `${v} ★`, unidad: "", menor: false };
     if (solo && categoriaSolo === "club-fanal-jornadas")
       return { valor: f => f.puntos || 0, txt: v => `jornada ${v}`, unidad: "", menor: false };
-    /* La distancia de Vía Libre se dice en metros, con separador de miles. */
-    if (solo && categoriaSolo === "club-vialibre-distancia")
+    /* La distancia de Metro Rush se dice en metros, con separador de miles. */
+    if (solo && categoriaSolo === "club-metrorush-distancia")
       return { valor: f => f.puntos || 0, txt: v => `${v.toLocaleString("es-CL")} m`, unidad: "", menor: false };
     if (solo && categoriaSolo.startsWith("club-frontera-"))
       return { valor: f => f.puntos || 0, txt: v => `${v} ${v === 1 ? "victoria" : "victorias"}`, unidad: "", menor: false };

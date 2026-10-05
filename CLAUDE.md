@@ -71,7 +71,7 @@ Six apps plus a small shared **Informes** page:
   **Boxhead** (top-down zombie survival or versus, one to eight, in an
   iframe), plus
   **Frontera Batalla**, Emerald's Battle Frontier played solo with the same
-  teams, and **Vía Libre**, a 3D endless runner in three styles, plus a **Clasificación** tab and a 📖 **Reglas**
+  teams, and **Metro Rush**, a 3D endless runner in three styles, plus a **Clasificación** tab and a 📖 **Reglas**
   manual for every game, solo ones included, coins, and **PRODROP**, a card-pack
   opener paid with them. Without a session it opens in **guest mode**: every
   single-player game is playable and nothing is saved. See "Juegos" below.
@@ -1722,7 +1722,7 @@ mode only hides the section that does not apply (`data-modo` on
   `.jg-mn` and the sheet `.jg-hoja`; check before naming a new piece.
 
 *Novedades* is still a hand-written list (`NOVEDADES` in `juegos-main.js`),
-because what is new is not always a room game (today Vía Libre, FANAL and
+because what is new is not always a room game (today Metro Rush, FANAL and
 PRODROP, each with its own cover in `arteNovedad`); each entry may
 carry `modo` (the same badge as the thumbnails), and `cuenta`/`practica`
 say what a guest gets instead. On a phone it is a carousel of whole cards.
@@ -3221,16 +3221,16 @@ progress), `niveles.js` (generated), `dibujo.js` (the vehicles as SVG) and
   white racing stripes. Its music is `T.atasco` in the songbook (B-flat
   major, 124 bpm with swing, a car-horn motif), also in the header player.
 
-**Vía Libre (`juegos/club/vialibre/`) is a Solo Club endless runner in
+**Metro Rush (`juegos/club/metrorush/`) is a Solo Club endless runner in
 3D**, in the vein of Subway Surfers: three lanes, trains, low and high
 barriers, ramps up onto the roofs, coins, power-ups, a multiplier and an
 inspector with his dog who catch you after two stumbles. Plain files, no
-build (`?v=vialibre-N` on its scripts, its stylesheet and the
+build (`?v=metrorush-N` on its scripts, its stylesheet and the
 `modulepreload`s, `club-N` in `solo/club.js` for the iframe). Three.js r160
 comes from jsDelivr through an import map, the same URL Yemas uses, so the
-browser cache shares it. Five files: `motor.js` (UMD `ViaLibreMotor`, pure:
+browser cache shares it. Five files: `motor.js` (UMD `MetroRushMotor`, pure:
 the track generator, physics constants, scoring, stations, story, shop,
-missions and the progress merge, tested by `tests/vialibre-motor.test.cjs`),
+missions and the progress merge, tested by `tests/metrorush-motor.test.cjs`),
 `mundo.js` (the 3D world, an ES module), `audio.js` (music and synthesised
 effects), `juego.js` (the loop, input, HUD and menus) and `estilo.css`.
 Things that matter:
@@ -3322,7 +3322,7 @@ Things that matter:
   are pale (mint, ice, lilac) with dark windows, and Óxido's are patina
   rather than an orange the fog swallowed. A new prop that you must dodge
   or pick up needs the `!`.
-- **Music is one chip theme per station** (`vialibre-*` in `temas.js`, all
+- **Music is one chip theme per station** (`metrorush-*` in `temas.js`, all
   original), its tempo rising with speed (×0.92 → ×1.15). Effects are
   synthesised in `audio.js`, everything goes through `destination`, so
   `volumen.js` governs it; coins climb a semitone per coin in a streak.
@@ -3346,14 +3346,14 @@ Things that matter:
 - **Mobile**: swipes (26 px) and a double tap for the skateboard; a
   portrait screen gets a 3:4 stage and the camera moves back
   (`ajusteRetrato`). Controllers go through `mando.js`.
-- **Categories**: `club-vialibre-carrera` (points of the run, sent at the end
-  of every run, capped at 1e9) and `club-vialibre-distancia` (metres, only
+- **Categories**: `club-metrorush-carrera` (points of the run, sent at the end
+  of every run, capped at 1e9) and `club-metrorush-distancia` (metres, only
   when it improves). Progress (coins, upgrades, outfits, tickets, mission
-  level, records) is one blob in `users/<uid>/club/vialibre` merged with
-  `mezclaProgreso`. Logros, coins, the `tvialibre` champion frame, the
+  level, records) is one blob in `users/<uid>/club/metrorush` merged with
+  `mezclaProgreso`. Logros, coins, the `tmetrorush` champion frame, the
   Discord podium and the manual are wired like FANAL's; the `soloRanks` and
   `clubJugadas` regexes were widened, so the rules must be re-published.
-- `window.__vialibre` (`estado()`, `puntos(n)`, `inmortal()`, `poder(k)`,
+- `window.__metrorush` (`estado()`, `puntos(n)`, `inmortal()`, `poder(k)`,
   `avanza(seg)`, `calidad(n)`, `logica(n)`…) drives a run from a script;
   `avanza` steps the game without drawing, which is how every station was
   visited in Chromium, and `estado().info` reports draw calls, triangles,

@@ -23,9 +23,9 @@ export function categoriaClub(juego, categoria) {
     // Atasco: una sola tabla, las estrellas juntadas en todos los niveles.
     : juego === 'atasco'
     ? categoria === 'club-atasco-estrellas'
-    // Vía Libre: la mejor carrera (puntos) y la carrera más larga (metros).
-    : juego === 'vialibre'
-    ? /^club-vialibre-(carrera|distancia)$/.test(categoria)
+    // Metro Rush: la mejor carrera (puntos) y la carrera más larga (metros).
+    : juego === 'metrorush'
+    ? /^club-metrorush-(carrera|distancia)$/.test(categoria)
     : juego === 'tetris'
     ? /^club-tetris-(maraton|sprint|ultra)$/.test(categoria)
     : /^club-snake-(classic|arcade|portals|reloj|espejo|laberinto)-(chico|mediano|grande|gigante)$/.test(categoria));
@@ -58,11 +58,11 @@ export function resultadoClub(juego, dato) {
   /* Atasco: tres estrellas por nivel; 3000 deja sitio para más pisos
      sin aceptar números absurdos (hoy son 240 niveles, 720 estrellas). */
   if (juego === 'atasco' && dato.puntos > 3000) return null;
-  /* Vía Libre: una carrera pasa del millón de puntos sin esfuerzo, así que
+  /* Metro Rush: una carrera pasa del millón de puntos sin esfuerzo, así que
      su tope es el de la regla (1 000 000 000); la distancia son metros,
      hasta 1 000 000 (mil kilómetros en una carrera). */
-  if (dato.categoria === 'club-vialibre-carrera' && dato.puntos > 1000000000) return null;
-  if (dato.categoria === 'club-vialibre-distancia' && dato.puntos > 1000000) return null;
+  if (dato.categoria === 'club-metrorush-carrera' && dato.puntos > 1000000000) return null;
+  if (dato.categoria === 'club-metrorush-distancia' && dato.puntos > 1000000) return null;
   /* Frontera: la racha y las victorias son combates; 100 000 es el tope
      de la regla. */
   if (juego === 'frontera' && dato.puntos > 100000) return null;

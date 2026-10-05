@@ -1,4 +1,4 @@
-/* Vía Libre — el juego (la carrera, los controles, el marcador y los menús).
+/* Metro Rush — el juego (la carrera, los controles, el marcador y los menús).
 
    QUÉ HACE, EN GLOBAL
    Une las tres piezas: el motor (motor.js, las reglas y la pista), el mundo
@@ -24,10 +24,10 @@
    - Se perdona el salto un poco antes de tocar el suelo y un poco después
      de dejarlo (búfer y "tiempo de coyote"): sin eso el salto se siente
      "comido" a toda velocidad. */
-import { crearMundo, PALETAS } from './mundo.js?v=vialibre-1';
-import { Sonido } from './audio.js?v=vialibre-1';
+import { crearMundo, PALETAS } from './mundo.js?v=metrorush-1';
+import { Sonido } from './audio.js?v=metrorush-1';
 
-const M = window.ViaLibreMotor;                               // el motor (motor.js)
+const M = window.MetroRushMotor;                               // el motor (motor.js)
 const Club = window.Club || null;                             // la conexión con la sección Juegos (puede faltar)
 const F = M.FISICA;                                           // las constantes de la física
 const $ = id => document.getElementById(id);                  // atajo para buscar en la página
@@ -36,8 +36,8 @@ const fmt = n => Math.floor(n).toLocaleString('es-CL');       // 128450 → "128
 /* ===================================================================
    1. GUARDADO: progreso (cuenta) y opciones (este aparato)
    =================================================================== */
-const CLAVE = Club && Club.storageKey ? Club.storageKey('vialibre.progreso') : 'vialibre.progreso';
-const CLAVE_OPC = 'vialibre.opciones';
+const CLAVE = Club && Club.storageKey ? Club.storageKey('metrorush.progreso') : 'metrorush.progreso';
+const CLAVE_OPC = 'metrorush.opciones';
 const lee = (k, def) => { try { const t = localStorage.getItem(k); return t ? JSON.parse(t) : def; } catch (e) { return def; } };
 const escribe = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* sin almacenamiento: se juega igual */ } };
 let progreso = M.limpiaProgreso(lee(CLAVE, null));            // lo que se gana y se compra (va a la cuenta)
@@ -498,7 +498,7 @@ function empezar() {
   sonido.tocaTema(c.estacion.musica);
   banner(c.estacion.nombre, c.estacion.lema);
   if (esTactil && progreso.totales.carreras < 3) aviso('Desliza el dedo: ← → carril · ↑ saltar · ↓ rodar');
-  if (Club) Club.category('club-vialibre-carrera');
+  if (Club) Club.category('club-metrorush-carrera');
   pintaPots();
   lienzo.focus({ preventScroll: true });
   midiendo = { t: 0, n: 0, suma: 0 };
@@ -622,8 +622,8 @@ function cierraCarrera() {
   if (res.subio) sonido.multiplicador();
   // a la clasificación: la carrera siempre (cuenta como partida del club); la distancia, solo si es récord
   if (Club && Club.result && puntos >= 1) {
-    Club.result({ categoria: 'club-vialibre-carrera', puntos: Math.min(1e9, puntos), tiempo: ms });
-    if (recordDist && metros >= 1) Club.result({ categoria: 'club-vialibre-distancia', puntos: Math.min(1e6, metros), tiempo: ms });
+    Club.result({ categoria: 'club-metrorush-carrera', puntos: Math.min(1e9, puntos), tiempo: ms });
+    if (recordDist && metros >= 1) Club.result({ categoria: 'club-metrorush-distancia', puntos: Math.min(1e6, metros), tiempo: ms });
   }
   c.cierre = { puntos, metros, monedas: c.monedas, mult, recordAntes, subio: res.subio, premio, nivelRetos: nivelAntes, avanceRetos };
   return c.cierre;
@@ -634,7 +634,7 @@ function aPortada() {
   $('hud').hidden = true;
   mundo.reinicia(); mundo.activa(estacionVisual(M.ESTACIONES[0]), 0);
   pantalla.dataset.estilo = estacionVisual(M.ESTACIONES[0]).estilo;
-  sonido.tocaTema('vialibre-barrio');
+  sonido.tocaTema('metrorush-barrio');
   pintaPortada(); muestraCapa('capaPortada');
 }
 function otraCarrera() { cierraCarrera(); empezar(); }
@@ -1016,19 +1016,19 @@ async function arranca() {
   for (const o of vitrina.generarHasta(200, { V: 13 })) if (o.tipo !== 'moneda' && o.d0 > 30) mundo.nuevo(o);
   estado = 'portada';
   pintaPortada(); muestraCapa('capaPortada');
-  if (Club) Club.category('club-vialibre-carrera');
-  sonido.tocaTema('vialibre-barrio');
+  if (Club) Club.category('club-metrorush-carrera');
+  sonido.tocaTema('metrorush-barrio');
   requestAnimationFrame(t => { prevT = t; cuadro(t); });
   // se precarga el kit de la segunda estación cuando el navegador esté libre
   setTimeout(() => mundo.precarga(estacionVisual(M.ESTACIONES[1])), 4000);
 }
 window.addEventListener('club-record', e => {                    // el récord de la nube, por si es mayor que el de aquí
   const d = e.detail; if (!d) return;
-  if (d.categoria === 'club-vialibre-carrera' && d.puntos > progreso.records.puntos) { progreso.records.puntos = d.puntos; pintaPortada(); }
-  if (d.categoria === 'club-vialibre-distancia' && d.puntos > progreso.records.distancia) { progreso.records.distancia = d.puntos; pintaPortada(); }
+  if (d.categoria === 'club-metrorush-carrera' && d.puntos > progreso.records.puntos) { progreso.records.puntos = d.puntos; pintaPortada(); }
+  if (d.categoria === 'club-metrorush-distancia' && d.puntos > progreso.records.distancia) { progreso.records.distancia = d.puntos; pintaPortada(); }
 });
 // Para probar desde la consola o desde un script: estado, saltar a puntos, etc.
-window.__vialibre = {
+window.__metrorush = {
   estado: () => ({ estado, puntos: c && c.puntos, D: c && c.D, V: c && c.V, estacion: c && c.estacion.nombre, info: mundo && mundo.info() }),
   puntos: n => { if (c) c.puntos = n; },
   pulsa: a => pedidos.push(a),

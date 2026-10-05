@@ -210,11 +210,11 @@ function atasco() {
     chispas([[66, 70, 2, 1.6, 0], [66, 290, 2, 1.9, -.7]], "#fff3b0");  // dos destellos de faros
 }
 
-/* Vía Libre: un anillo de vía (balasto, durmientes de madera y dos rieles
+/* Metro Rush: un anillo de vía (balasto, durmientes de madera y dos rieles
    de acero) por el que da vueltas un trencito naranja, visto desde arriba,
    con los focos encendidos, persiguiendo una moneda dorada que gira; un
    brillo corre por el riel y salta un destello suelto. */
-function vialibre() {
+function metrorush() {
   // Los durmientes: tablas atravesadas bajo los dos rieles (el eje y del
   // dibujo es el radio, así que una tabla alta queda de través).
   const durmientes = cada(24, (i, a) => en(60, a, rect(3.2, 16, .6, "#8a5e3c", `stroke="#4a3020" stroke-width=".5"`), a));
@@ -526,7 +526,7 @@ const DIBUJOS = {
   tcuadritos: cuadritos, treversi: reversi, torbita: orbita, tcadena: cadena, tflip: flip, tcacho: cacho,
   tuno: uno, tcatan: catan, tpresidente: presidente, tspicy: spicy, tworms: worms, tyemas: yemas,
   tzombis: zombis, tclue: clue, tajedrez: ajedrez, tmonedas: monedas, tprodrop: prodrop, tsudoku: sudoku, tfanal: fanal, tboxhead: boxhead, tatasco: atasco,
-  tvialibre: vialibre,
+  tmetrorush: metrorush,
   cometa, vortice, sakura, plasma, mariposas
 };
 

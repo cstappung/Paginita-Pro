@@ -86,11 +86,11 @@ test('Atasco: nombre, tabla y marca en estrellas',()=>{
  assert.equal(marcaSolo('club-atasco-estrellas',{puntos:312,tiempo:1}),'🚗 312 ★');
  assert.ok(mensajePodio({categoria:'club-atasco-estrellas',uid:'a',nombre:'Ana',puesto:1,filas:[{uid:'a',nombre:'Ana',puntos:300,tiempo:9000}],enlace:'https://x/juegos.html#solo/atasco'}));
 });
-test('Vía Libre: nombre, modalidades y marcas',()=>{
- assert.equal(categoriaLegible('club-vialibre-carrera').club.nombre,'Vía Libre');
- assert.equal(categoriaLegible('club-vialibre-carrera').modalidad,'mejor carrera');
- assert.equal(categoriaLegible('club-vialibre-distancia').modalidad,'distancia');
- assert.match(marcaSolo('club-vialibre-carrera',{puntos:1250000,tiempo:1}),/^🚇 1.250.000 pts$/);
- assert.match(marcaSolo('club-vialibre-distancia',{puntos:4321,tiempo:1}),/^🚇 4.321 m$/);
- assert.ok(mensajePodio({categoria:'club-vialibre-distancia',uid:'a',nombre:'Ana',puesto:1,filas:[{uid:'a',nombre:'Ana',puntos:900,tiempo:9000}],enlace:'https://x/juegos.html#solo/vialibre'}));
+test('Metro Rush: nombre, modalidades y marcas',()=>{
+ assert.equal(categoriaLegible('club-metrorush-carrera').club.nombre,'Metro Rush');
+ assert.equal(categoriaLegible('club-metrorush-carrera').modalidad,'mejor carrera');
+ assert.equal(categoriaLegible('club-metrorush-distancia').modalidad,'distancia');
+ assert.match(marcaSolo('club-metrorush-carrera',{puntos:1250000,tiempo:1}),/^🚇 1.250.000 pts$/);
+ assert.match(marcaSolo('club-metrorush-distancia',{puntos:4321,tiempo:1}),/^🚇 4.321 m$/);
+ assert.ok(mensajePodio({categoria:'club-metrorush-distancia',uid:'a',nombre:'Ana',puesto:1,filas:[{uid:'a',nombre:'Ana',puntos:900,tiempo:9000}],enlace:'https://x/juegos.html#solo/metrorush'}));
 });

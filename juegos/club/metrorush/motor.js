@@ -1,4 +1,4 @@
-/* Vía Libre — el motor (todo lo que no dibuja).
+/* Metro Rush — el motor (todo lo que no dibuja).
 
    QUÉ HACE, EN GLOBAL
    Aquí vive la parte "pura" del juego: números y reglas, sin pantalla ni
@@ -8,9 +8,9 @@
    tienda y cómo se guarda (y se mezcla) el progreso entre dos aparatos.
 
    POR QUÉ ESTÁ SEPARADO
-   - Se puede probar en Node sin navegador (colabtex/tests/vialibre-motor.test.cjs):
+   - Se puede probar en Node sin navegador (colabtex/tests/metrorush-motor.test.cjs):
      por ejemplo, que el generador NUNCA deja una fila imposible de pasar.
-   - Es un UMD: en la página queda en `window.ViaLibreMotor`; en Node, en
+   - Es un UMD: en la página queda en `window.MetroRushMotor`; en Node, en
      `module.exports`. Así lo usan la pantalla y los tests sin copiar nada.
    - Todo lo aleatorio sale de un generador con semilla (mulberry32): la misma
      semilla da la misma pista, lo que permite comprobarla en los tests.
@@ -22,7 +22,7 @@
 (function (raiz, fabrica) {
   const M = fabrica();                                                    // construye el motor una sola vez
   if (typeof module === "object" && module.exports) module.exports = M;   // Node (los tests)
-  else raiz.ViaLibreMotor = M;                                           // navegador (la pantalla)
+  else raiz.MetroRushMotor = M;                                           // navegador (la pantalla)
 })(typeof self !== "undefined" ? self : this, function () {
   "use strict";
 
@@ -96,13 +96,13 @@
      historia. Se entra a cada una por un túnel. Después de la última, las
      tres primeras vuelven a girar cada 2 millones ("vuelta 2", "vuelta 3"…). */
   const ESTACIONES = [
-    { id: "barrio", nombre: "Barrio Estación", desde: 0, estilo: "juguete", paleta: "barrio", musica: "vialibre-barrio", lema: "Donde empieza la Línea 3", boleto: 1 },
-    { id: "ocaso", nombre: "Ocaso", desde: 50000, estilo: "pixel", paleta: "ocaso", musica: "vialibre-ocaso", lema: "El sol se pone en píxeles", boleto: 2 },
-    { id: "neon", nombre: "Línea Neón", desde: 200000, estilo: "neon", paleta: "neon", musica: "vialibre-neon", lema: "De noche la vía se enciende sola", boleto: 3 },
-    { id: "fantasma", nombre: "Estación Fantasma", desde: 1000000, estilo: "neon", paleta: "fantasma", musica: "vialibre-fantasma", lema: "Nadie había corrido tanto", boleto: 4 },
-    { id: "invierno", nombre: "Invierno", desde: 2500000, estilo: "juguete", paleta: "invierno", musica: "vialibre-invierno", lema: "Nieva sobre los rieles", boleto: 5 },
-    { id: "oxido", nombre: "Óxido", desde: 5000000, estilo: "pixel", paleta: "oxido", musica: "vialibre-oxido", lema: "Más allá del mapa", boleto: 6 },
-    { id: "fin", nombre: "Fin de la Línea", desde: 10000000, estilo: "juguete", paleta: "alba", musica: "vialibre-fin", lema: "Aquí se acaban las vías… ¿o no?", boleto: 7 }
+    { id: "barrio", nombre: "Barrio Estación", desde: 0, estilo: "juguete", paleta: "barrio", musica: "metrorush-barrio", lema: "Donde empieza la Línea 3", boleto: 1 },
+    { id: "ocaso", nombre: "Ocaso", desde: 50000, estilo: "pixel", paleta: "ocaso", musica: "metrorush-ocaso", lema: "El sol se pone en píxeles", boleto: 2 },
+    { id: "neon", nombre: "Línea Neón", desde: 200000, estilo: "neon", paleta: "neon", musica: "metrorush-neon", lema: "De noche la vía se enciende sola", boleto: 3 },
+    { id: "fantasma", nombre: "Estación Fantasma", desde: 1000000, estilo: "neon", paleta: "fantasma", musica: "metrorush-fantasma", lema: "Nadie había corrido tanto", boleto: 4 },
+    { id: "invierno", nombre: "Invierno", desde: 2500000, estilo: "juguete", paleta: "invierno", musica: "metrorush-invierno", lema: "Nieva sobre los rieles", boleto: 5 },
+    { id: "oxido", nombre: "Óxido", desde: 5000000, estilo: "pixel", paleta: "oxido", musica: "metrorush-oxido", lema: "Más allá del mapa", boleto: 6 },
+    { id: "fin", nombre: "Fin de la Línea", desde: 10000000, estilo: "juguete", paleta: "alba", musica: "metrorush-fin", lema: "Aquí se acaban las vías… ¿o no?", boleto: 7 }
   ];
   const VUELTA_DESDE = 12000000, VUELTA_CADA = 2000000;   // desde 12 M, una estación de las tres primeras cada 2 M
 

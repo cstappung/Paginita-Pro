@@ -20,7 +20,7 @@
  *   atasco     Si bemol mayor, 124 con swing — funk de hora punta con un
  *              motivo de bocina («pi, pi») y palmas en el 2 y el 4.
  *   worms-menu / worms-combate  Mi mayor tranquilo y Si menor de batalla.
- *   vialibre-*  uno por estación de Vía Libre: barrio (Sol mayor, 124),
+ *   metrorush-*  uno por estación de Metro Rush: barrio (Sol mayor, 124),
  *              ocaso (Si menor, 132), neon (Do menor, 138), fantasma (Mi
  *              frigio, 126), invierno (La mayor, 136), oxido (Si bemol
  *              menor, 150) y fin (Fa mayor, 128).
@@ -870,17 +870,17 @@
     orden: "A B A B"
   };
 
-  /* ---------- Vía Libre: un tema por estación ----------
+  /* ---------- Metro Rush: un tema por estación ----------
      El corredor cambia de estación según los puntos, y la música cambia con
      él: al salir de cada túnel suena otro sitio. Todos son melodías propias.
-     El juego (juegos/club/vialibre/audio.js) acelera el tempo con la
+     El juego (juegos/club/metrorush/audio.js) acelera el tempo con la
      velocidad de la carrera, de ×0,92 a ×1,15, así que se escriben un pelo
      por debajo del pulso que se quiere oír a media carrera. */
 
   /* Barrio Estación: Sol mayor a 124 con un poco de swing. La melodía va
      saltando por el acorde como quien salta de vagón en vagón, y el bajo
      pisa fundamental, quinta y octava: calle, mañana y ganas de correr. */
-  T["vialibre-barrio"] = {
+  T["metrorush-barrio"] = {
     bpm: 124, swing: .1,
     lead: { onda: "p25", vol: .14, vib: .008, sus: .6, eco: { t: .12, fb: .2, mezcla: .18 } },
     bajo: { onda: "tri", vol: .22 }, arp: { onda: "p12", vol: .045, oct: 5, paso: .03 }, bat: { vol: .32 },
@@ -901,7 +901,7 @@
   /* Ocaso: Si menor a 132, pulso cuadrado de consola de 8 bits (el estilo
      pixelado de esa estación). La tarde se va: la melodía cae al final de
      cada frase y en B sube hasta el Fa# mayor, como el último rayo de sol. */
-  T["vialibre-ocaso"] = {
+  T["metrorush-ocaso"] = {
     bpm: 132,
     lead: { onda: "p50", vol: .13, vib: .006, sus: .65, eco: { t: .14, fb: .25, mezcla: .2 } },
     bajo: { onda: "tri", vol: .21 }, arp: { onda: "p25", vol: .045, oct: 4, paso: .035 }, bat: { vol: .3 },
@@ -922,7 +922,7 @@
   /* Línea Neón: Do menor a 138, sierra desafinada y filtrada, bajo de
      octavas en semicorcheas y un bombeo suave: synthwave con prisa, de
      noche, con la vía encendida. */
-  T["vialibre-neon"] = {
+  T["metrorush-neon"] = {
     bpm: 138, bombeo: .3,
     lead: { onda: "saw", vol: .1, vib: .006, desafina: 10, filtro: 2600, eco: { fb: .38, mezcla: .3 } },
     bajo: { onda: "saw", vol: .12, filtro: 560, q: 3 },
@@ -945,7 +945,7 @@
   /* Estación Fantasma (el millón de puntos): Mi frigio a 126. El acorde de
      Fa sobre el Mi es lo que da escalofrío; el pulso fino tiembla con mucho
      vibrato y deja un eco largo, como si alguien más corriera detrás. */
-  T["vialibre-fantasma"] = {
+  T["metrorush-fantasma"] = {
     bpm: 126,
     lead: { onda: "p12", vol: .13, vib: .02, sus: .7, eco: { fb: .5, mezcla: .42 } },
     bajo: { onda: "tri", vol: .22 }, arp: { onda: "sine", vol: .06, oct: 4, paso: .09, sus: .5 }, bat: { vol: .3 },
@@ -966,7 +966,7 @@
   /* Invierno: La mayor a 136, de cascabeles. El charles no para (los
      cascabeles del trineo) y el arpegio va una octava arriba como una caja
      de música; la melodía es la más alegre del juego. */
-  T["vialibre-invierno"] = {
+  T["metrorush-invierno"] = {
     bpm: 136,
     lead: { onda: "p50", vol: .13, vib: .01, sus: .6, eco: { t: .11, fb: .22, mezcla: .2 } },
     bajo: { onda: "tri", vol: .21 }, arp: { onda: "p12", vol: .045, oct: 5, paso: .04 }, bat: { vol: .3 },
@@ -987,7 +987,7 @@
   /* Óxido (más allá del mapa): Si bemol menor a 150. Bajo de sierra
      cerrado, caja seca y una melodía de cuadrado ancho que golpea como
      chapa: la estación más dura, donde ya no queda ciudad. */
-  T["vialibre-oxido"] = {
+  T["metrorush-oxido"] = {
     bpm: 150,
     lead: { onda: "p50", vol: .12, vib: .003, sus: .5, eco: { t: .1, fb: .18, mezcla: .15 } },
     bajo: { onda: "saw", vol: .12, filtro: 650, q: 4 },
@@ -1009,7 +1009,7 @@
   /* Fin de la Línea (diez millones): Fa mayor a 128, el himno. Sierra
      ancha y desafinada, la melodía que sube por el acorde y un final (C)
      que trepa hasta el Do más agudo del juego: llegaste al alba. */
-  T["vialibre-fin"] = {
+  T["metrorush-fin"] = {
     bpm: 128,
     lead: { onda: "saw", vol: .1, vib: .007, desafina: 12, filtro: 3000, eco: { fb: .32, mezcla: .26 } },
     bajo: { onda: "tri", vol: .22 },

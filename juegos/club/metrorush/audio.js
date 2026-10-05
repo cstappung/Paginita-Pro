@@ -1,8 +1,8 @@
-/* Vía Libre — el sonido (música y efectos).
+/* Metro Rush — el sonido (música y efectos).
 
    QUÉ HACE, EN GLOBAL
    - La MÚSICA: cada estación tiene su tema en el cancionero común
-     (juegos/audio/temas.js: "vialibre-barrio", "vialibre-ocaso"…) y lo toca
+     (juegos/audio/temas.js: "metrorush-barrio", "metrorush-ocaso"…) y lo toca
      Chip.Reproductor, el mismo motor chiptune de toda la sala de juegos. El
      tempo sube con la velocidad de la carrera (más rápido = más apuro) y al
      cambiar de estación el tema se cambia con un fundido.

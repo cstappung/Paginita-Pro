@@ -1,4 +1,4 @@
-/* Vía Libre: el motor (juegos/club/vialibre/motor.js).
+/* Metro Rush: el motor (juegos/club/metrorush/motor.js).
 
    Lo más importante que se comprueba aquí es que el generador nunca deja una
    carrera imposible: un "jugador" simulado recorre la pista metro a metro y,
@@ -9,7 +9,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('path');
-const M = require(path.join(__dirname, '../../juegos/club/vialibre/motor.js'));
+const M = require(path.join(__dirname, '../../juegos/club/metrorush/motor.js'));
 
 /* Recorre una pista generada con una semilla durante `metros`, como la recorre el juego
    (generando siempre 230 m por delante con la velocidad real), y devuelve los objetos. */

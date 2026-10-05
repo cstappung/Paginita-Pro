@@ -882,11 +882,11 @@ const REGLAS = {
       ["Clasificación", "La tabla de Atasco cuenta las <b>estrellas</b> juntadas en todos los niveles; a igualdad, gana quien sumó menos tiempo en sus mejores intentos. Solo se manda cuando el total sube, así que repetir un nivel ya ganado no cuesta nada. Tus estrellas se guardan en este navegador y, con tu sesión, también en tu cuenta."]
     ]
   },
-  /* Vía Libre (juegos/club/vialibre/): lo que dice aquí tiene que
+  /* Metro Rush (juegos/club/metrorush/): lo que dice aquí tiene que
      coincidir con su motor.js (puntos, multiplicador, poderes, estaciones,
      tropiezos) y su juego.js (teclas, gestos y mando). */
-  vialibre: {
-    lema: "Vía Libre: corre por las vías, esquiva los trenes y llega lo más lejos que puedas antes de que el inspector te atrape.",
+  metrorush: {
+    lema: "Metro Rush: corre por las vías, esquiva los trenes y llega lo más lejos que puedas antes de que el inspector te atrape.",
     secciones: [
       ["Cómo se juega", "Corres solo, siempre hacia adelante, por tres carriles de vía. Cambia de carril con ← → (o A y D), salta con ↑, W o Espacio y rueda por el suelo con ↓ o S; si ruedas en el aire, bajas de golpe. En una pantalla táctil, desliza el dedo a la izquierda, a la derecha, arriba o abajo. Por el camino hay monedas, estrellas y poderes, y siempre tienes tres misiones. La carrera termina cuando chocas de frente o cuando el inspector te atrapa."],
       ["Obstáculos", lista([
@@ -974,7 +974,7 @@ const REGLAS = {
   }
 };
 
-const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", vialibre: "Vía Libre" };
+const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", metrorush: "Metro Rush" };
 
 export const tieneReglas = juego => Object.prototype.hasOwnProperty.call(REGLAS, juego);
 
