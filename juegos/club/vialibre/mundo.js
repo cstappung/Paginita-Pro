@@ -11,8 +11,10 @@
    Cada estación usa una de tres maneras de dibujar, con su paleta:
    - "juguete": materiales con reflejos (PBR), sombras suaves y, en calidad
      alta, oclusión ambiental (GTAO) y un poco de brillo.
-   - "neon": todo oscuro con bordes y luces que brillan (bloom), piso de
-     espejo mojado y un sol synthwave.
+   - "neon": la ciudad oscura con bordes y luces que brillan (bloom), piso
+     de espejo mojado y un sol synthwave; los trenes, barreras, rampas y
+     poderes, en cambio, brillan en su propio color para que se lean sobre
+     lo oscuro (ver "LEGIBILIDAD" en las paletas).
    - "pixel": sombreado por escalones (toon) dibujado a baja resolución por
      RenderPixelatedPass, que además marca los bordes con un píxel.
    Un "kit" es todo lo que hace falta para una estación: materiales,
@@ -201,20 +203,38 @@ const TEX = {
     x.fillStyle = 'rgba(60,55,50,.45)'; for (let k = 0; k < 512; k += 128) x.fillRect(k, 0, 3, 256);
     return c;
   },
-  /** Rayas diagonales de dos colores (barreras, cintas de peligro). */
-  rayas(c1, c2, n = 8) {
+  /** Rayas diagonales de dos colores (barreras, cintas de peligro).
+      Con `marco`, un borde oscuro alrededor (los tableros de las barreras):
+      separa las rayas claras de un fondo claro, como la nieve de Invierno o
+      el cielo del amanecer, sin cambiar los colores de la barrera. */
+  rayas(c1, c2, n = 8, marco = null) {
     const [c, x] = lienzo(256, 64);
     x.fillStyle = hexCss(c2); x.fillRect(0, 0, 256, 64);
     x.fillStyle = hexCss(c1);
     const paso = 256 / n;
     for (let k = -1; k < n + 1; k++) { x.beginPath(); x.moveTo(k * paso, 64); x.lineTo(k * paso + paso / 2, 64); x.lineTo(k * paso + paso / 2 + 32, 0); x.lineTo(k * paso + 32, 0); x.fill(); }
+    if (marco != null) { x.strokeStyle = hexCss(marco); x.lineWidth = 12; x.strokeRect(0, 0, 256, 64); }
     return c;
   },
-  /** Rejilla metálica (la superficie de la rampa). */
+  /** Rejilla metálica (la superficie de la rampa). Clara a propósito: a más
+      de diez metros el enrejado no se distingue y la rampa se ve del color
+      PROMEDIO de la textura; con la rejilla gris de antes (fondo #9aa3ae,
+      líneas #5d6672) ese promedio oscurecía cualquier color de rampa a la
+      mitad, y en Invierno una rampa naranja salía café sobre el balasto café. */
   rejilla() {
     const [c, x] = lienzo(128, 128);
-    x.fillStyle = '#9aa3ae'; x.fillRect(0, 0, 128, 128);
-    x.strokeStyle = '#5d6672'; x.lineWidth = 5;
+    x.fillStyle = '#dfe4ea'; x.fillRect(0, 0, 128, 128);
+    x.strokeStyle = '#9aa3ae'; x.lineWidth = 5;
+    for (let k = -128; k < 256; k += 22) { x.beginPath(); x.moveTo(k, 0); x.lineTo(k + 128, 128); x.stroke(); x.beginPath(); x.moveTo(k + 128, 0); x.lineTo(k, 128); x.stroke(); }
+    return c;
+  },
+  /** La rejilla de la rampa en neón: líneas que brillan sobre un fondo tenue.
+      Se usa sin sombreado ('texluz') y la tiñe el color de la rampa, así que
+      es lo único que hay en blanco y gris. */
+  rejillaNeon() {
+    const [c, x] = lienzo(128, 128);
+    x.fillStyle = '#6a6a6a'; x.fillRect(0, 0, 128, 128);
+    x.strokeStyle = '#ffffff'; x.lineWidth = 5;
     for (let k = -128; k < 256; k += 22) { x.beginPath(); x.moveTo(k, 0); x.lineTo(k + 128, 128); x.stroke(); x.beginPath(); x.moveTo(k + 128, 0); x.lineTo(k, 128); x.stroke(); }
     return c;
   },
@@ -375,7 +395,7 @@ const BASE_JUGUETE = {
     marco: 0xf6f3ec, vidrioEd: 0x2a3d58, cornisa: 0xe9e3d8, vitrina: 0x6a5444,
     toldos: [[0xe8463b, 0xffffff], [0x2f7fe0, 0xffffff], [0x2fb59a, 0xf6f2e8], [0xf2b233, 0x6a4632]],
     arboles: [0x3fa34d, 0x5bbd5c, 0x2f8c45], tronco: 0x7a5236, poste: 0x48525e, farol: 0xe8e0c8, catenaria: 0x55606c,
-    barrera: 0xe8463b, barrera2: 0xffffff, ambar: 0xffa424, rampa: 0xffffff, oro: 0xffc63a, iman: 0xe5332a, cromo: 0xf2f5f8, nube: 0xffffff, basurero: 0x2f8f5a
+    barrera: 0xe8463b, barrera2: 0xffffff, ambar: 0xffa424, rampa: 0xd9dde2, oro: 0xffc63a, iman: 0xe5332a, cromo: 0xf2f5f8, nube: 0xffffff, basurero: 0x2f8f5a
   },
   carteles: ['CAFÉ', 'PAN', 'FARMACIA', 'LIBROS', 'HELADOS', 'FRUTAS', 'MÚSICA'],
   grafitis: [['¡CORRE!', 0xff5a8a, 0xffd23f], ['VÍA LIBRE', 0x3fd0ff, 0x7a5cff], ['LAB', 0x8aff6a, 0x19b37a], ['ZOOM', 0xffa23a, 0xff3d6e]],
@@ -424,6 +444,7 @@ const BASE_NEON = {
     arboles: [0xff2bd6], tronco: 0xff2bd6, poste: 0x2a1a50, farol: 0xff7ae0, catenaria: 0xff2bd6, rejilla: 0xb01f96,
     barrera: 0xff3d6e, barrera2: 0xffe14d, ambar: 0xffb020, rampa: 0x22e5ff, oro: 0xffe14d, iman: 0xff3d6e, cromo: 0xffffff, nube: 0xffffff, basurero: 0x22e5ff,
     rampaBorde: 0xffffff,          // las aristas de la rampa, blancas: cian sobre la rejilla cian no dibujaban la cuña
+    marcoBarrera: null,            // el tablero ya brilla sobre lo oscuro: un marco oscuro solo lo achicaría
     tubo: 0xff2bd6                 // los postes de luz de los faroles (instanciados)
   },
   carteles: ['BAR', '24H', 'ARCADE', 'RAMEN', 'KARAOKE', 'DISCO'],
@@ -431,8 +452,8 @@ const BASE_NEON = {
   extras: { synth: ['#ffe46b', '#ff6a9a', '#ff2bd6'], estrellas: true },
   /* El cuerpo de los objetos del juego brilla a un 32 % de su color (un tren
      magenta se ve magenta, no negro con borde), la niebla les llega más
-     tarde (potencia 2) y los postes de luz bajan a la mitad. */
-  legible: { brillo: 0.32, niebla: 2, decorado: 0.5 }
+     tarde (potencia 2) y los postes de luz bajan a un tercio. */
+  legible: { brillo: 0.32, niebla: 2, decorado: 0.35 }
 };
 /** Copia una paleta base y cambia lo que se indique (también dentro de `c`). */
 function variante(base, cambios) {
@@ -446,8 +467,8 @@ export const PALETAS = {
   barrio: BASE_JUGUETE,
   ocaso: BASE_PIXEL,
   neon: BASE_NEON,
-  /* Estación Fantasma: el neón se vuelve verde espectral, con niebla verde y un tren fantasma en el cielo. */
-  /* Los trenes eran verde menta y cian, los mismos tonos de la ciudad, los
+  /* Estación Fantasma: el neón se vuelve verde espectral, con niebla verde y un tren fantasma en el cielo.
+     Los trenes eran verde menta y cian, los mismos tonos de la ciudad, los
      rieles y los bordillos: todo era del mismo verde y un tren no se
      separaba de nada. Ahora son trenes fantasma de verdad: cuerpo pálido
      (menta casi blanca, hielo, lila), ventanas apagadas (oscuras, como un
@@ -461,7 +482,7 @@ export const PALETAS = {
       riel: 0x7dffcf, bordillo: 0x7dffcf, rampa: 0xffc56b, tubo: 0x2bd6a0,
       edificios: [0x2bd6a0, 0x3dd6ff, 0x7dffcf], ventanas: [0x7dffcf, 0x3dd6ff, 0xb6fff0, 0x0a1e1a, 0x0a1e1a, 0x0a1e1a], cornisa: 0x2bd6a0, catenaria: 0x3dd6ff, farol: 0x9fffe6, rejilla: 0x1a7a60, traviesa: 0x10403a, vitrina: 0x0f3a30 },
     // los cuerpos pálidos ya son claros: con menos brillo propio no se queman a blanco
-    legible: { brillo: 0.24, niebla: 2, decorado: 0.5 },
+    legible: { brillo: 0.24, niebla: 2, decorado: 0.35 },
     carteles: ['ADIÓS', 'ÚLTIMO TREN', 'BOLETERÍA', 'ANDÉN 0'],
     grafitis: [['1 000 000', 0x7dffcf, 0x3dd6ff], ['HOLA', 0xb6fff0, 0x2bd6a0]],
     extras: { synth: ['#d6fff2', '#7dffcf', '#1f8a6a'], estrellas: true, espectros: true, trenFantasma: true }
@@ -470,13 +491,16 @@ export const PALETAS = {
   invierno: variante(BASE_JUGUETE, {
     cielo: { arriba: 0x8aa4c0, horizonte: 0xe6edf3, sol: 0xffffff }, niebla: [40, 150],
     sol: [0xeaf2ff, 2.0, [-16, 26, 14]], hemi: [0xeef4ff, 0xa0a8b8, 0.75],
-    /* Sobre la nieve lo blanco desaparece: las barreras rojas y blancas
-       quedaban como rayas rojas sueltas en el aire, sus patas blancas no se
-       veían y la rampa (rejilla blanca) era invisible. Las rayas pasan a
-       rojo y azul marino, las patas a marino y la rampa a naranja. */
+    /* Sobre la nieve lo blanco desaparece: las patas blancas de las
+       barreras no se veían y la rampa (rejilla blanca) se confundía con la
+       nieve de los costados. Las patas pasan a azul marino y la rampa a
+       naranja. Las rayas siguen rojas y blancas: delante de una barrera lo
+       que hay es el balasto café, donde el blanco es lo que más se lee (se
+       probó rojo con marino y sobre el balasto quedaba oscuro sobre oscuro);
+       el marco oscuro del tablero (ver TEX.rayas) la separa de la nieve. */
     c: { grava: 0xe8edf2, tierra: 0xf2f5f8, acera: 0xf0f3f6, bordillo: 0xd6dde6, muro: 0xeef1f4, arboles: [0x2e6b4a, 0x3a7d58, 0x24583c],
       edificios: [0xc9d6e3, 0xe8c9b5, 0xb8c9b0, 0xd9c2e0, 0xf2e6d8], ladrillo: 0x9c5a4a, cornisa: 0xffffff, techoTren: 0xffffff,
-      barrera: 0xe8463b, barrera2: 0x1f2c4a, pata: 0x1f2c4a, rampa: 0xff8a2a },
+      pata: 0x1f2c4a, rampa: 0xff8a2a },
     carteles: ['CHOCOLATE', 'SOPAIPILLAS', 'BUFANDAS', 'CAFÉ'],
     extras: { nubes: true, nieve: true }
   }),
@@ -642,8 +666,10 @@ class Kit {
       case 'acera': t = aTextura(TEX.ruido(az), { pixel: px }); break;
       case 'muro': t = aTextura(TEX.muro(az), { pixel: px }); break;
       case 'rejilla': t = aTextura(TEX.rejilla(), { pixel: px, rep: [2.5, 2.5] }); break;
-      case 'rayasRB': t = aTextura(TEX.rayas(c.barrera, c.barrera2, 7), { pixel: px }); break;
-      case 'rayasRB8': t = aTextura(TEX.rayas(c.barrera, c.barrera2, 8), { pixel: px }); break;
+      case 'rejillaNeon': t = aTextura(TEX.rejillaNeon(), { rep: [2.5, 2.5] }); break;
+      // el marco del tablero: oscuro salvo que la paleta diga otro (o null, sin marco)
+      case 'rayasRB': t = aTextura(TEX.rayas(c.barrera, c.barrera2, 7, c.marcoBarrera === undefined ? 0x1d2233 : c.marcoBarrera), { pixel: px }); break;
+      case 'rayasRB8': t = aTextura(TEX.rayas(c.barrera, c.barrera2, 8, c.marcoBarrera === undefined ? 0x1d2233 : c.marcoBarrera), { pixel: px }); break;
       case 'rayasNA': t = aTextura(TEX.rayas(0x1d1f26, 0xffd23f, 6), { pixel: px }); break;
       case 'chevron': t = aTextura(TEX.rayas(0x1d1f26, 0xffd23f, 10), { pixel: px, rep: [1, 1] }); break;
       case 'flecha': t = aTextura(TEX.flecha(this.neon), { repetir: false, pixel: px }); break;
@@ -790,15 +816,16 @@ class Kit {
   /** La rampa: una cuña de rejilla con bordes de cinta de peligro. Su origen es el pie (z=0) y sube hacia −z.
       En neón era 'plano' (casi negra) y solo la delataban sus aristas cian:
       delante de un tren oscuro no se veía dónde empezaba la subida. Ahora es
-      la misma rejilla de las otras estaciones, en el color de rampa de la
-      paleta y con brillo propio, y sus aristas van en otro color (`rampaBorde`)
-      para que no se fundan con la rejilla. */
+      una rejilla que brilla en el color de rampa de la paleta, con las
+      aristas en otro color (`rampaBorde`) para que no se fundan con ella.
+      En las demás estaciones es mate ('tex', no 'texmetal'): el metal
+      reflejaba el cielo y oscurecía el color justo en la cara que se ve. */
   rampa() {
     const largo = MOTOR.LARGO_RAMPA, alto = TECHO, a = new Arma(this), c = this.c;
     const s = new THREE.Shape(); s.moveTo(0, 0); s.lineTo(largo, 0); s.lineTo(largo, alto); s.closePath();
     const geo = new THREE.ExtrudeGeometry(s, { depth: 1.8, bevelEnabled: false });
     geo.rotateY(Math.PI / 2); geo.translate(-0.9, 0, 0);
-    a.pon(geo, 'texmetal:rejilla!', c.rampa, [0, 0, 0], null, 1, c.rampaBorde || 0x22e5ff);
+    a.pon(geo, this.neon ? 'texluz:rejillaNeon!' : 'tex:rejilla!', c.rampa, [0, 0, 0], null, 1, c.rampaBorde || 0x22e5ff);
     const ang = Math.atan2(alto, largo), lg = Math.hypot(largo, alto);
     for (const sx of [-0.84, 0.84]) a.pon(CAJA, this.neon ? 'texluz:chevron!' : 'tex:chevron!', 0xffffff, [sx, alto / 2 + 0.04, -largo / 2], [ang, 0, 0], [0.14, 0.05, lg]);
     return a.hecho();
@@ -1022,14 +1049,19 @@ class Kit {
       tira(uvMundo(new THREE.BoxGeometry(240, 0.02, LARGO), 2), this.pixel ? 'plano' : 'tex:gravaSuelo', this.pixel ? c.tierra : 0xffffff, [0, -0.01, ZC], 2, 'v');
       for (const x of CARRILES) tira(uvMundo(new THREE.BoxGeometry(2.0, SUELO, LARGO), 2), this.pixel ? 'plano' : 'tex:grava', this.pixel ? c.grava : 0xffffff, [x, SUELO / 2, ZC], 2, 'v');
     }
-    // durmientes: una sola InstancedMesh que se corre de a un paso
+    /* durmientes: una sola InstancedMesh que se corre de a un paso.
+       En neón no hay balasto: lo único que dice dónde está cada carril son
+       los durmientes (los seis rieles brillan igual y están casi a la misma
+       distancia, así que por sí solos no se agrupan de a dos). A 0,35 de su
+       color eran casi negros; a 0,75 cada carril se lee como una escalera
+       violeta entre franjas negras. */
     const paso = 0.72, n = Math.ceil(LARGO / paso);
     const geoT = prepara(CAJA, c.traviesa, matriz([0, 0, 0], null, [1.9, 0.09, 0.24]));
     const trav = new THREE.InstancedMesh(geoT, this.neon ? this.mat('luz') : this.mat('plano'), n * 3);
     const m4 = new THREE.Matrix4(), col = new THREE.Color(); let i = 0;
     for (const x of CARRILES) for (let k = 0; k < n; k++) {
       m4.makeTranslation(x, this.neon ? 0.05 : SUELO + 0.045, 30 - k * paso); trav.setMatrixAt(i, m4);
-      trav.setColorAt(i, col.setScalar(this.neon ? 0.35 : 0.88 + this.az() * 0.12)); i++;
+      trav.setColorAt(i, col.setScalar(this.neon ? 0.75 : 0.88 + this.az() * 0.12)); i++;
     }
     trav.receiveShadow = true; trav.frustumCulled = false;
     this.durmientes = trav; this.pasoDurmientes = paso; g.add(trav);
