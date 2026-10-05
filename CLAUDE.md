@@ -4578,6 +4578,31 @@ moving the clock forward does not shorten it) and in `localStorage`
 not **another account** on the same browser. Both are the player's own, so
 a console can delete them: the punishment deters, the rejection protects.
 
+## Download cap (`src/consumo.js`)
+
+The free plan gives the whole site ~360 MB of RTDB download a day, and the
+database has no per-user quota, so **each player is capped at 80 MB a day**
+on the client. `consumo.js` is imported **first** in `juegos-main.js`: the
+SDK captures the `WebSocket` class when it is evaluated, but sets
+`onmessage` on every new connection, so wrapping the *setter* on
+`WebSocket.prototype` counts every frame from `firebaseio.com` /
+`firebasedatabase.app` (long-polling is not measured). Bytes are summed per
+Chile day across tabs (`localStorage` `fb.consumo.d.<day>.<tab>`) and across
+devices of the same account (`users/<uid>/consumo` = `{dia, t: {tab:
+bytes}}`, a transaction every ≥30 s and ≥256 KB; owner-only node, no rule
+change). `crearMedidor` is pure (clock and store injected) and covered by
+`tests/consumo.test.cjs`. Over `LIMITES.aviso` (40 MB) in the day, over
+`rafaga` (15 MB) in five minutes in one tab, or at `tope`, it writes
+`sospechas/<uid>` with `c: "red-descarga"`, once per day and kind; at the
+cap it writes that first (≤4 s), then `goOffline` (`fb.desconecta`) and an
+overlay until midnight, when the page reloads itself. It is a client-side
+limit: a rewritten client or the REST API skips it. What the **server**
+enforces is that no whole collection can be read: `partidas` only through
+the lobby query (`orderByChild('estado')` + `equalTo('esperando')`) or by
+pid, and `vivo`, `chat`, `soloPruebas` only by key (`test-rules.mjs` pins
+it). A new node that clients read by key should get its `.read` at the key
+level, not on the collection.
+
 ## Every game can be muted and turned down (a rule, not a nicety)
 
 **Every game must offer both a mute and a volume control that are visible

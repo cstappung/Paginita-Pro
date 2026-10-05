@@ -344,6 +344,31 @@ segundo y recibe la de los demás. Con seis en la sala son del orden de
 plan gratuito (10 GB al mes) alcanza para varias decenas de horas de partidas
 al mes; si se juega mucho conviene mirar el uso en la consola.
 
+### ⚠ El tope de descarga pide publicar otra vez
+
+El plan gratuito trae unos 360 MB de descarga al día para todo el sitio.
+Dos cosas lo protegen:
+
+- **Las reglas ya no dejan bajar colecciones enteras.** `partidas` solo se
+  puede leer con la consulta del vestíbulo (`orderByChild('estado')` +
+  `equalTo('esperando')`) o sala por sala; `vivo`, `chat` y `soloPruebas`
+  solo por su clave. Antes, una línea en la consola (`get(ref(db,
+  'partidas'))`) bajaba el registro de jugadas de todas las partidas de la
+  historia. **Esto es lo único que el servidor hace cumplir**, y hay que
+  publicar las reglas para que valga.
+- **Cada jugador tiene un tope de 80 MB al día** (`colabtex/src/consumo.js`).
+  Juegos mide lo que baja por el WebSocket de la base, lo suma entre
+  pestañas y aparatos de la misma cuenta (`users/<uid>/consumo`, que no
+  necesita reglas nuevas) y, al llegar al tope, corta la conexión y tapa la
+  página hasta la medianoche de Chile. Pasar de 40 MB en el día, 15 MB en
+  cinco minutos en una pestaña, o llegar al tope deja un aviso en
+  `sospechas/<uid>` con `c: "red-descarga"` (`p` = MB del día, `t` = MB de la
+  ráfaga, `d` = `dia` / `rafaga` / `tope`). Los números están en `LIMITES`.
+  Este tope corre en el navegador: quien reescribe el cliente o usa la API
+  REST con su token lo salta. Frena el consumo descontrolado normal y deja
+  el rastro; para lo demás están las reglas de arriba, App Check
+  (sección 0) y vetar la cuenta (`vetados/<uid>`).
+
 ### ⚠ Chain Reaction (cadena) pide publicar otra vez
 
 El mismo caso otra vez: `'cadena'` tiene que estar en la lista del campo

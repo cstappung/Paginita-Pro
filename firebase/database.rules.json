@@ -139,9 +139,10 @@
     },
 
     "partidas": {
-      ".read": "auth != null",
+      ".read": "auth != null && query.orderByChild === 'estado' && query.equalTo === 'esperando'",
       ".indexOn": ["estado"],
       "$pid": {
+        ".read": "auth != null",
         ".write": "auth != null && ((!data.exists() && newData.child('anfitrion').val() === auth.uid && newData.child('jugadores').child(auth.uid).exists()) || (!newData.exists() && data.child('anfitrion').val() === auth.uid && !data.child('fin').exists()))",
         ".validate": "newData.hasChildren(['juego', 'estado', 'anfitrion'])",
 
@@ -207,8 +208,8 @@
     },
 
     "vivo": {
-      ".read": "auth != null",
       "$pid": {
+        ".read": "auth != null",
         ".write": "auth != null && root.child('partidas').child($pid).child('jugadores').child(auth.uid).exists() && (!root.child('partidas').child($pid).child('fin').exists() || !newData.exists())",
         "voz": {
           ".write": "auth != null && root.child('partidas').child($pid).child('jugadores').child(auth.uid).exists()"
@@ -240,8 +241,8 @@
     },
 
     "chat": {
-      ".read": "auth != null",
       "$pid": {
+        ".read": "auth != null",
         "$id": {
           ".write": "auth != null && !data.exists() && newData.child('uid').val() === auth.uid && root.child('partidas').child($pid).exists()",
           ".validate": "newData.hasChildren(['uid', 'nombre', 't', 'at'])",
@@ -505,10 +506,10 @@
     },
 
     "soloPruebas": {
-      ".read": "auth != null",
       "$categoria": {
         "$uid": {
           "$partida": {
+            ".read": "auth != null",
             ".write": "auth != null && ((auth.uid === $uid && !data.exists() && newData.exists()) || (!newData.exists() && root.child('admins').child(auth.uid).val() === true))",
             ".validate": "$categoria.matches(/^(club-minas-(easy|medium|hard)|club-snake-(classic|arcade|portals|reloj|espejo|laberinto)-(chico|mediano|grande|gigante)|club-tetris-(maraton|sprint|ultra)|club-sortem-(10|20|30)|club-bbtan-rondas|club-sopa-(racha|(facil|medio|dificil)-(8|12|15))|club-electro-(racha|puntos)|club-frontera-((torre|palacio|fabrica)-(50|abierto)|victorias)|club-sudoku-(racha|arcade|facil|medio|dificil|experto)|club-fanal-(travesia|sinfin|jornadas)|club-atasco-estrellas)$/) && $partida.matches(/^[-a-zA-Z0-9]{1,80}$/) && newData.hasChildren(['v', 'd', 'at'])",
             "v": { ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 0 && newData.val() <= 1000" },
