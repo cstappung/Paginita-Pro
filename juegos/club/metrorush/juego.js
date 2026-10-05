@@ -100,7 +100,9 @@ function nuevaCarrera() {
     techos: new Set(), esquivados: new Set(), avisados: new Set(),
     estacion: M.estacionDe(0), cambio: null, banner: 2.5,
     seguirVeces: 0, muerte: null, recordAvisado: false, finalizada: false, quieto: 0,
-    extra: 0, potVentana: 6, potUsado: {}           // el potenciador de puntos (+5), y cuánto quedan los botones de potenciadores
+    extra: 0, potVentana: 6, potUsado: {},          // el potenciador de puntos (+5), y cuánto quedan los botones de potenciadores
+    tutorial: progreso.totales.carreras < 2 ? { bajo: 0, alto: 0, tren: 0 } : null,   // las pistas de las dos primeras carreras
+    pista: null                                      // la pista que se está mostrando ({tipo, o})
   };
 }
 
@@ -286,6 +288,7 @@ function muere(motivo) {
   c.r.vy = Math.min(0, c.r.vy); c.r.rodar = 0;                   // si chocó saltando, cae (no sigue subiendo)
   c.perseguidorObj = 1;
   c.potVentana = 0; pintaPots();                                // los botones de potenciadores se van (y no vuelven al seguir)
+  ocultaPista();
   sonido.choque(); sonido.mochila(false);
   if (opciones.sacudida) mundo.sacude(0.8);
 }
@@ -354,6 +357,7 @@ const multiplicador = () => M.multiplicador({ base: progreso.retos.nivel, estrel
 function pintaPots() {
   const el = $('hudPots'), hay = c && c.potVentana > 0 && Object.keys(M.POTENCIADORES).some(k => progreso.potenciadores[k] > 0 && !c.potUsado[k]);
   el.hidden = !hay;
+  pantalla.classList.toggle('con-pots', hay);                     // la pista de las primeras carreras sube para no taparlos
   if (!hay) return;
   el.innerHTML = Object.entries(M.POTENCIADORES).map(([k, P], i) => progreso.potenciadores[k] > 0 && !c.potUsado[k]
     ? `<button type="button" data-pot="${k}" aria-label="${P.nombre} (tecla ${i + 1})"><i>${ICONOS[k === 'despegue' ? 'cohete' : 'mas5']}</i><span>${P.nombre}</span><b translate="no">×${progreso.potenciadores[k]}</b><kbd>${i + 1}</kbd></button>` : '').join('');
@@ -416,6 +420,7 @@ function actualiza(dt) {
     if (c.introPersecucion > 0) { c.introPersecucion -= dt; if (c.introPersecucion <= 0 && c.tropiezo <= 0) c.perseguidorObj = 0; }
     estaciones();
     retosEnVivo(dt);
+    pistas(dt);
     if (c.potVentana > 0) { c.potVentana -= dt; if (c.potVentana <= 0) pintaPots(); }
   } else {
     const r = c.r;                                               // chocó en el aire: cae hasta el suelo (o el techo) antes de quedar tendido
@@ -478,6 +483,52 @@ function retosEnVivo(dt) {
   }
 }
 
+/* ---- las pistas de las primeras carreras ----
+   Como el tutorial de Subway Surfers, pero sin detener nada: en las dos
+   primeras carreras, cuando por tu carril viene una barrera o un tren, aparece
+   en grande qué hacer (en un celular, hacia dónde deslizar; en un PC, qué
+   tecla). Cada clase se explica dos veces por carrera como mucho, y la pista
+   se va cuando el obstáculo quedó atrás o te cambiaste de carril.
+   Ejemplo: a 13 m/s, una barrera baja a 20 m (1,5 s) muestra «Desliza hacia
+   arriba: ¡salta!» hasta que la pasas. */
+const PISTAS = {
+  bajo: { ico: 'salto', tactil: 'Desliza hacia arriba: ¡salta!', teclas: '↑ o Espacio: ¡salta!' },
+  alto: { ico: 'rueda', tactil: 'Desliza hacia abajo: ¡rueda!', teclas: '↓ o S: ¡rueda!' },
+  tren: { ico: 'lados', tactil: 'Desliza a un lado: ¡esquiva!', teclas: '← o →: ¡esquiva!' }
+};
+let relojPista = 0;
+function ocultaPista() { if (c) c.pista = null; $('pista').hidden = true; }
+function pistas(dt) {
+  if (!c.tutorial) return;
+  relojPista -= dt;
+  if (relojPista > 0) return;
+  relojPista = 0.12;                                             // no hace falta mirarlo en cada cuadro
+  const r = c.r;
+  if (c.pista) {                                                 // la de ahora: ¿ya pasó?
+    const o = c.pista.o, frente = o.d != null ? o.d : o.d0;
+    if (frente < c.D || o.carril !== r.carril || !c.activos.includes(o)) ocultaPista();
+    return;
+  }
+  if (c.poderes.mochila > 0 || r.y > 1.5) return;                // volando o arriba de un tren no hay nada que explicar
+  // lo más cercano por delante en mi carril (una rampa no es un problema: se sube)
+  let cerca = null, dz0 = Infinity;
+  for (const o of c.activos) {
+    if (o.carril !== r.carril || !(o.tipo === 'bajo' || o.tipo === 'alto' || o.tipo === 'tren' || o.tipo === 'rampa')) continue;
+    const dz = (o.d != null ? o.d : o.d0) - c.D;
+    if (dz > 0 && dz < dz0) { dz0 = dz; cerca = o; }
+  }
+  if (!cerca || cerca.tipo === 'rampa' || c.tutorial[cerca.tipo] >= 2) return;
+  const cierre = c.V + (cerca.tipo === 'tren' && cerca.activo ? cerca.vel : 0);   // un tren que viene se acerca más rápido
+  if (dz0 / Math.max(1, cierre) > 1.6) return;                   // todavía lejos: se avisa 1,6 s antes
+  c.tutorial[cerca.tipo]++;
+  c.pista = { tipo: cerca.tipo, o: cerca };
+  const P = PISTAS[cerca.tipo], el = $('pista');
+  el.dataset.tipo = cerca.tipo;
+  $('pistaIco').innerHTML = ICONOS[P.ico];
+  $('pistaTxt').textContent = esTactil ? P.tactil : P.teclas;
+  el.hidden = false;
+}
+
 /* ===================================================================
    4. EL CICLO DE LA PARTIDA (empezar, pausa, fin, seguir)
    =================================================================== */
@@ -485,7 +536,7 @@ function empezar() {
   sonido.iniciar();
   if (!progreso.intro) { abreRelato(); return; }               // la primera vez se cuenta de qué se trata
   cierraPanel();
-  c = nuevaCarrera();
+  c = nuevaCarrera(); ocultaPista();
   mundo.reinicia();
   const e = estacionVisual(c.estacion);
   mundo.activa(e, 0);
@@ -549,6 +600,7 @@ function muestraFin() {
   estado = 'fin';
   sonido.calla();
   const k = cierraCarrera();
+  c.potVentana = 0; pintaPots(); ocultaPista();                 // por si se terminó desde la pausa en los primeros segundos
   pintaPortada();                                               // el marcador de la página (récord, monedas, multiplicador) ya cambió
   $('finTitulo').textContent = MOTIVOS[c.muerte && c.muerte.motivo] || 'Fin de la carrera';
   const nuevo = k.puntos > k.recordAntes && k.recordAntes > 0;
@@ -629,7 +681,7 @@ function cierraCarrera() {
   return c.cierre;
 }
 function aPortada() {
-  cierraCarrera();
+  cierraCarrera(); ocultaPista();
   estado = 'portada'; c = null;
   $('hud').hidden = true;
   mundo.reinicia(); mundo.activa(estacionVisual(M.ESTACIONES[0]), 0);
@@ -778,6 +830,7 @@ const ICONOS = {
   flecha: svg(`<path d="M4 16h20M17 8l8 8-8 8" fill="none" stroke="#fff" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round"/>`),
   tren: svg(`<rect x="6" y="3.5" width="20" height="23" rx="6" fill="#ffb21f" ${T}/><rect x="9" y="7.5" width="14" height="8" rx="2" fill="#5cc0ff" stroke="#142357" stroke-width="2"/><circle cx="11" cy="21" r="2" fill="#fff6c9" stroke="#142357" stroke-width="1.6"/><circle cx="21" cy="21" r="2" fill="#fff6c9" stroke="#142357" stroke-width="1.6"/><path d="M9 26.5l-2.5 3M23 26.5l2.5 3" stroke="#142357" stroke-width="2.4" stroke-linecap="round"/>`),
   salto: svg(`<path d="M16 26V8M8.5 14.5 16 7l7.5 7.5" fill="none" stroke="#2fb52f" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 28.5h20" stroke="#142357" stroke-width="2.6" stroke-linecap="round"/>`),
+  lados: svg(`<path d="M5 16h22M11 9.5 4.5 16l6.5 6.5M21 9.5l6.5 6.5-6.5 6.5" fill="none" stroke="#ff8a1f" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/>`),
   rueda: svg(`<path d="M16 5v18M8.5 16.5 16 24l7.5-7.5" fill="none" stroke="#1f7ae0" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 3.5h20" stroke="#142357" stroke-width="2.6" stroke-linecap="round"/>`),
   bandera: svg(`<path d="M8 29V4" stroke="#142357" stroke-width="2.8" stroke-linecap="round"/><path d="M8.5 5h17l-3.5 5 3.5 5h-17z" fill="#ff3d4f" ${T}/>`)
 };

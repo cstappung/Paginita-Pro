@@ -76,6 +76,24 @@ main.vl { min-width: 0; }
 .aviso { position: absolute; left: 50%; bottom: 4cqh; transform: translate(-50%, 20px); max-width: 88%; padding: 1cqh 2.2cqh; border-radius: 99px; background: rgba(10, 12, 22, .78); color: #fff; font-size: 2.4cqh; text-align: center; opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none; }
 .aviso.ver { opacity: 1; transform: translate(-50%, 0); }
 @media (prefers-reduced-motion: reduce) { .banner.ver { animation: none; } }
+/* La pista de las primeras carreras: grande, abajo (más arriba tapaba al
+   corredor), sobre el aviso chico, con la flecha moviéndose hacia donde hay
+   que deslizar (o qué tecla apretar). */
+.pista { position: absolute; left: 50%; bottom: 11cqh; translate: -50% 0; display: flex; align-items: center; gap: 1.6cqh; padding: 1.1cqh 2.6cqh 1.1cqh 1.3cqh; border-radius: 99px; white-space: nowrap; pointer-events: none;
+  background: rgba(10, 18, 50, .66); border: .4cqh solid rgba(255, 255, 255, .85); box-shadow: 0 .6cqh 1.6cqh rgba(0, 0, 0, .35);
+  font: 400 4cqh/1 "Lilita One", "Arial Black", sans-serif; color: #fff; text-shadow: 0 .3cqh 0 #142357; animation: pista-entra .25s ease-out; }
+.pista i { flex: none; width: 6.4cqh; height: 6.4cqh; padding: .7cqh; border-radius: 50%; background: #fff; box-shadow: 0 .4cqh 0 rgba(0, 0, 0, .3); }
+.pista i svg { display: block; width: 100%; height: 100%; }
+.pista[data-tipo="bajo"] i { animation: pista-arriba .7s ease-in-out infinite; }
+.pista[data-tipo="alto"] i { animation: pista-abajo .7s ease-in-out infinite; }
+.pista[data-tipo="tren"] i { animation: pista-lado .9s ease-in-out infinite; }
+.pantalla.con-pots .pista { bottom: calc(14 * var(--u, 1cqh) + 13cqh); }
+@keyframes pista-entra { from { opacity: 0; scale: .8; } }
+@keyframes pista-arriba { 50% { translate: 0 -1cqh; } }
+@keyframes pista-abajo { 50% { translate: 0 1cqh; } }
+@keyframes pista-lado { 25% { translate: -.9cqh 0; } 75% { translate: .9cqh 0; } }
+@container (max-aspect-ratio: 1/1) { .pista { font-size: 3.1cqh; gap: 1.2cqh; } .pista i { width: 5.2cqh; height: 5.2cqh; } }
+@media (prefers-reduced-motion: reduce) { .pista, .pista i { animation: none !important; } }
 
 /* --- marcador: estética juguete (letras gordas con borde, como un juego de celular) --- */
 .pantalla[data-estilo="juguete"] { --borde: #1b2030; }

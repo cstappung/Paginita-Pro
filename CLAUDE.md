@@ -3343,6 +3343,11 @@ Things that matter:
   is tapped, and leaving the shop (`saleTienda`) puts back what it really
   wears. Two class names were already taken by the HUD (`.moneda`, `.mult`):
   the pills are `.oro` and `.base`.
+- **The first two runs teach the moves** (`pistas` in `juego.js`): when a
+  barrier or a train comes down your lane, a big hint says what to do 1.6 s
+  ahead (where to swipe on a phone, which key on a PC), at most twice per
+  kind and run, and goes once the obstacle is behind you or you changed
+  lane. Nothing slows down, unlike Subway Surfers' tutorial.
 - **Mobile**: swipes (26 px) and a double tap for the skateboard; a
   portrait screen gets a 3:4 stage and the camera moves back
   (`ajusteRetrato`). Controllers go through `mando.js`.
