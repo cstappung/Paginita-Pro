@@ -4,9 +4,11 @@
  * Una miniatura es la misma pieza para un juego de un jugador y para uno
  * multijugador; lo que la distingue a simple vista es la **insignia de
  * modo** de la portada (una persona y «1 jugador», o dos personas y
- * «2–10 jugadores», cada una en su color), no un diseño distinto. Los
- * datos (qué es nuevo, qué está bloqueado) los decide `salon-datos.js`;
- * aquí solo se pinta y se toca.
+ * «2–10 jugadores», cada una en su color), no un diseño distinto. Debajo
+ * de esa insignia va la etiqueta **«Celular»** en los juegos que se pueden
+ * jugar con el dedo en un teléfono (`MOVIL`). Los datos (qué es nuevo, qué
+ * está bloqueado, qué va en el celular) los decide `salon-datos.js`; aquí
+ * solo se pinta y se toca.
  *
  * Cómo se toca, y por qué así:
  *
@@ -41,6 +43,10 @@ const esc = t => String(t == null ? "" : t).replace(/[&<>"']/g, c => ({ "&": "&a
 export const ICONO_SOLO = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="4.8" r="3" fill="currentColor"/><path d="M2.4 14.6c.6-3.3 2.8-5.2 5.6-5.2s5 1.9 5.6 5.2z" fill="currentColor"/></svg>';
 export const ICONO_MULTI = '<svg viewBox="0 0 20 16" aria-hidden="true"><circle cx="13.6" cy="4.4" r="2.5" fill="currentColor" opacity=".7"/><path d="M11 9.6c3.4-1 7.1.6 7.6 4.9h-5.2z" fill="currentColor" opacity=".7"/><circle cx="7" cy="4.8" r="3" fill="currentColor"/><path d="M1.4 14.6c.6-3.3 2.8-5.2 5.6-5.2s5 1.9 5.6 5.2z" fill="currentColor"/></svg>';
 const ICONO_BOTS = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="4.5" width="11" height="9" rx="2.5" fill="currentColor"/><circle cx="6" cy="9" r="1.3" fill="#fff"/><circle cx="10" cy="9" r="1.3" fill="#fff"/><path d="M8 4.5V2" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="1.6" r="1.1" fill="currentColor"/></svg>';
+/* La etiqueta «Celular»: un teléfono dibujado, por la misma razón que los
+   iconos de modo (📱 cambia de forma y color en cada sistema). */
+export const ICONO_MOVIL = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="4.2" y="1.4" width="7.6" height="13.2" rx="1.9" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M6.8 3.4h2.4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><circle cx="8" cy="12.1" r=".95" fill="currentColor"/></svg>';
+const ICONO_PC = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="1.6" y="2.6" width="12.8" height="8.4" rx="1.3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M5.5 13.6h5M8 11v2.6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
 export const CANDADO = '<svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7.5" rx="1.8" fill="currentColor"/><path d="M5.2 7V5.2a2.8 2.8 0 0 1 5.6 0V7" fill="none" stroke="currentColor" stroke-width="1.7"/></svg>';
 
 /* Lo que dice la insignia, corto en la portada y largo para el lector de
@@ -76,14 +82,15 @@ export function crearSalon(ctx) {
       ? `<span>${esc(e.genero)}</span>${f.salas ? `<span class="jg-mn-vivo"><i aria-hidden="true"></i>${f.salas} ${f.salas === 1 ? "sala" : "salas"}</span>` : `<span>${e.grupo ? "En grupo" : "Duelo"}</span>`}`
       : `<span>${esc(e.genero)}</span><span>${e.modo === "bots" ? "Sin ranking" : e.diario ? "📅 Reto diario" : "🏆 Ranking"}</span>`;
     const clases = ["jg-mn", f.nuevo ? "nuevo" : "", bloq ? "bloq" : "", f.top ? "top" : "", actual && actual.id === e.id ? "sel" : ""].filter(Boolean).join(" ");
-    const etiqueta = `${e.nombre}. ${ins.largo}.${bloq ? " Requiere cuenta." : ""}${f.nuevo ? " Nuevo." : ""} Ver detalles`;
+    const etiqueta = `${e.nombre}. ${ins.largo}.${e.movil ? " Funciona en el celular." : ""}${bloq ? " Requiere cuenta." : ""}${f.nuevo ? " Nuevo." : ""} Ver detalles`;
     return `
-      <article class="${clases}" data-id="${esc(e.id)}" data-modo="${e.modo}" data-grupo="${e.modo === "multi" ? (e.grupo ? "grupo" : "duelo") : ""}" style="--c:${esc(e.color)}">
+      <article class="${clases}" data-id="${esc(e.id)}" data-modo="${e.modo}" data-movil="${e.movil ? 1 : 0}" data-grupo="${e.modo === "multi" ? (e.grupo ? "grupo" : "duelo") : ""}" style="--c:${esc(e.color)}">
         <button class="jg-mn-abre" type="button" aria-haspopup="dialog" aria-expanded="${!!(actual && actual.id === e.id)}" aria-label="${esc(etiqueta)}">
           ${arte(e, !bloq && e.modo === "multi" ? "Ver opciones y abrir sala →" : "")}
           <span class="jg-mn-txt"><b class="jg-mn-nombre">${esc(e.nombre)}</b><span class="jg-mn-meta">${meta}</span></span>
         </button>
         <span class="jg-mn-modo m-${e.modo}" aria-hidden="true">${ins.ico}${esc(ins.corto)}</span>
+        ${e.movil ? `<span class="jg-mn-movil" aria-hidden="true" title="Funciona en el celular">${ICONO_MOVIL}Celular</span>` : ""}
         ${f.nuevo ? '<span class="jg-mn-etq" aria-hidden="true">Nuevo</span>' : f.top ? '<span class="jg-mn-etq top" aria-hidden="true">★<span> Más jugado</span></span>' : ""}
         ${bloq ? `<span class="jg-mn-candado" aria-hidden="true">${CANDADO}<b>Requiere cuenta</b></span>` : ""}
         ${e.modo !== "multi" ? `<a class="jg-mn-ya" href="${esc(e.ruta || e.url)}" aria-label="Jugar ya a ${esc(e.nombre)}" title="Jugar ya"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.2v9.6c0 .5.6.8 1 .5l7.2-4.8a.6.6 0 0 0 0-1L6 2.7c-.4-.3-1 0-1 .5z" fill="currentColor"/></svg></a>` : ""}
@@ -238,7 +245,11 @@ export function crearSalon(ctx) {
     const chips = `<span class="jg-mn-modo m-${e.modo}">${ins.ico}${esc(ins.largo)}</span>` +
       (e.genero ? `<span class="jg-hoja-chip">${esc(e.genero)}</span>` : "") +
       (ctx.esNuevo(e.id) ? '<span class="jg-hoja-chip nuevo">Nuevo</span>' : "") +
-      (e.diario ? '<span class="jg-hoja-chip">📅 Reto diario</span>' : "");
+      (e.diario ? '<span class="jg-hoja-chip">📅 Reto diario</span>' : "") +
+      /* En la ficha se dice también lo contrario: quien la abre desde un
+         teléfono tiene que saber antes de entrar que ahí no se puede jugar. */
+      (e.movil ? `<span class="jg-hoja-chip movil">${ICONO_MOVIL}Funciona en el celular</span>`
+        : e.pide ? `<span class="jg-hoja-chip pc">${ICONO_PC}Solo en computador: se juega con ${esc(e.pide)}</span>` : "");
     const p = e.modo === "multi" ? practicaDe(e.id) : null;
     let medio = "", pie = "";
     const reglas = `<button class="btn2" type="button" data-f="reglas" title="Cómo se juega">📖 Reglas</button>`;

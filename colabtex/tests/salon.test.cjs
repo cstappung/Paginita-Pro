@@ -7,7 +7,7 @@ const fs=require('node:fs'),vm=require('node:vm');
 const sin=f=>fs.readFileSync(f,'utf8').replace(/^import [\s\S]*?;$/mg,'').replace(/\bexport\s+/g,'');
 const ctx={crypto:require('node:crypto').webcrypto};vm.createContext(ctx);
 vm.runInContext(sin('src/juegos/motor.js')+'\n;globalThis.__J=JUEGOS;',ctx);
-vm.runInContext(sin('src/juegos/salon-datos.js')+'\n;globalThis.__S={SOLOS,GENERO,practicaDe,diasDesde,nuevos,cupoTexto,entradasSalon,bloqueado,modoSalon,esClaveInvitado,MOTIVO_CUENTA,COLOR_SOLO};',ctx);
+vm.runInContext(sin('src/juegos/salon-datos.js')+'\n;globalThis.__S={SOLOS,GENERO,practicaDe,diasDesde,nuevos,cupoTexto,entradasSalon,bloqueado,modoSalon,esClaveInvitado,MOTIVO_CUENTA,COLOR_SOLO,MOVIL,enMovil,pideEnVez};',ctx);
 const S=ctx.__S,J=ctx.__J;
 const main=fs.readFileSync('src/juegos-main.js','utf8');
 const reglas=fs.readFileSync('src/juegos/reglas.js','utf8');
@@ -81,4 +81,23 @@ test('al empezar otra visita se borra solo lo del invitado',()=>{
 test('el modo guardado vuelve a «todos» si no es uno de los tres',()=>{
  assert.equal(S.modoSalon('solo'),'solo');assert.equal(S.modoSalon('multi'),'multi');
  assert.equal(S.modoSalon('x'),'todos');assert.equal(S.modoSalon(null),'todos');
+});
+
+test('cada juego dice si va en el celular, y los que no dicen qué piden',()=>{
+ const {multi,solos}=S.entradasSalon(J);
+ /* Un juego nuevo tiene que declararse en MOVIL: sin eso no recibiría la
+    etiqueta aunque funcionara, o la recibiría sin que nadie lo probara. */
+ for(const e of [...multi,...solos]){
+  const v=S.MOVIL[e.id];
+  assert.ok(v===true||(typeof v==='string'&&v.length>0),e.id+': falta decidir si va en el celular (MOVIL en salon-datos.js)');
+  assert.equal(e.movil,v===true,e.id);assert.equal(e.pide,v===true?'':v,e.id);
+ }
+ /* Y nada sobra: una clave que no es un juego del salón es un error de tipeo. */
+ const ids=new Set([...multi,...solos].map(e=>e.id));
+ for(const k of Object.keys(S.MOVIL))assert.ok(ids.has(k),'MOVIL nombra un juego que no está en el salón: '+k);
+ /* Los que se juegan con teclado (o teclado y ratón) no llevan la etiqueta. */
+ for(const k of ['yemas','bots-yemas','boxhead','bots-boxhead','sortem'])assert.equal(S.enMovil(k),false,k);
+ assert.equal(S.pideEnVez('yemas'),'teclado y ratón');assert.equal(S.pideEnVez('sortem'),'teclado');
+ for(const k of ['uno','ajedrez','tetris','minas','snake','tetrisclub','fanal','bots-worms'])assert.equal(S.enMovil(k),true,k);
+ assert.equal(S.enMovil('no-existe'),false);assert.equal(S.pideEnVez('no-existe'),'');
 });

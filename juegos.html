@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610050215"></script>
+<script src="i18n.js?v=202610050356"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Laboratorio</title>
@@ -3509,6 +3509,13 @@ html[data-tema=oscuro] .jg-drop-quien:hover>b{color:#fff}
 .jg-mn-modo.m-bots{background:#ffe7a8}
 .jg-mn-modo.m-multi{background:var(--m-multi-bg);color:var(--m-multi-tx)}
 .jg-mn>.jg-mn-modo{position:absolute;top:8px;left:8px;z-index:1;pointer-events:none;box-shadow:0 2px 8px #0005}
+/* «Celular»: los juegos que se juegan con el dedo en un teléfono (`MOVIL`
+   en salon-datos.js). Va debajo de la insignia de modo, en blanco y celeste:
+   un color que no usa ninguna otra marca de la tarjeta (ámbar es un jugador,
+   violeta multijugador, verde nuevo, oro más jugado). */
+.jg-mn-movil{display:inline-flex;align-items:center;gap:3px;padding:2px 8px 2px 5px;border-radius:100px;background:#fff;color:#075985;font:700 10px/1.3 'IBM Plex Sans',sans-serif;white-space:nowrap}
+.jg-mn-movil svg{width:12px;height:12px;flex:none;color:#0284c7}
+.jg-mn>.jg-mn-movil{position:absolute;top:33px;left:8px;z-index:1;pointer-events:none;box-shadow:0 2px 8px #0005}
 /* Nuevo y Más jugado: arriba a la derecha. */
 .jg-mn-etq{position:absolute;top:8px;right:8px;z-index:1;pointer-events:none;padding:3px 8px;border-radius:100px;font:800 9.5px/1.3 'IBM Plex Sans',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#fff;background:#16a34a;box-shadow:0 2px 8px #0005;overflow:hidden}
 .jg-mn-etq:after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 30%,#fff8 50%,transparent 70%);transform:translateX(-120%);animation:jgEtqBrillo 3.2s ease-in-out infinite}
@@ -3566,6 +3573,10 @@ html.jg-hoja-abierta .rp-fab{display:none}
 .jg-hoja-chips{display:flex;flex-wrap:wrap;gap:6px}
 .jg-hoja-chip{display:inline-flex;align-items:center;padding:3px 10px;border-radius:100px;background:#f2eef9;color:#5c566c;font:600 11px/1.4 'IBM Plex Sans',sans-serif}
 .jg-hoja-chip.nuevo{background:#dcfce7;color:#166534}
+.jg-hoja-chip.movil,.jg-hoja-chip.pc{gap:4px}
+.jg-hoja-chip.movil{background:#e0f2fe;color:#075985}
+.jg-hoja-chip.pc{background:#fef3c7;color:#854d0e}
+.jg-hoja-chip svg{width:13px;height:13px;flex:none}
 .jg-hoja h2{margin:0;font-size:24px;letter-spacing:-.6px;line-height:1.15;color:var(--jg-ink)}
 .jg-hoja-lema{margin:-4px 0 0;font-size:13.5px;line-height:1.55;color:#5f5a70}
 .jg-hoja-salas{display:flex;align-items:center;gap:10px;margin:0;padding:10px 12px;border-radius:14px;background:#ecfdf3;border:1px solid #bbf7d0;color:#14532d;font-size:12.5px;line-height:1.45}
@@ -3624,6 +3635,8 @@ a.jg-hoja-ya{color:#fff!important}
 /* ---- Novedades dentro del salón ---- */
 .jg-nov-meta{flex-wrap:wrap}
 .jg-nov-meta .jg-mn-modo{margin-right:auto}
+.jg-nov-meta .jg-mn-modo:has(+.jg-mn-movil){margin-right:0}
+.jg-nov-meta .jg-mn-movil{margin-right:auto;background:#e0f2fe}
 .jg-nov-candado svg,.jg-nov-pie .jg-nov-candado svg{width:14px;height:14px;vertical-align:-2px}
 .jg-nov-pie .btn,.jg-nov-pie .btn2{display:inline-flex;align-items:center;justify-content:center;gap:5px;text-decoration:none!important}
 .jg-nov-pie .btn2.jg-nov-candado{flex:0 0 auto}
@@ -3742,6 +3755,9 @@ html[data-tema=oscuro] .jg-hoja{background:var(--os-sup);border-color:var(--os-b
 html[data-tema=oscuro] .jg-hoja-pie{background:var(--os-sup);border-color:var(--os-borde)}
 html[data-tema=oscuro] .jg-hoja-chip{background:var(--os-sup3);color:var(--os-tx2)}
 html[data-tema=oscuro] .jg-hoja-chip.nuevo{background:#14351f;color:#86efac}
+html[data-tema=oscuro] .jg-hoja-chip.movil,html[data-tema=oscuro] .jg-nov-meta .jg-mn-movil{background:#0c2d42;color:#bae6fd}
+html[data-tema=oscuro] .jg-nov-meta .jg-mn-movil svg{color:#7dd3fc}
+html[data-tema=oscuro] .jg-hoja-chip.pc{background:#3a2a0c;color:#fde68a}
 html[data-tema=oscuro] .jg-hoja-lema,html[data-tema=oscuro] .jg-hoja-cuenta p,html[data-tema=oscuro] .jg-puerta p{color:var(--os-tx2)}
 html[data-tema=oscuro] .jg-hoja-salas{background:#10291b;border-color:#1c4a30;color:#bbf7d0}
 html[data-tema=oscuro] .jg-hoja-salas.vacia{background:var(--os-sup2);border-color:var(--os-borde);color:var(--os-tx3)}
@@ -3797,6 +3813,6 @@ html[data-tema=oscuro] .jg-lado-cuenta>ul{color:var(--os-tx)}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610050215"></script>
+<script src="juegos-app.js?v=202610050356"></script>
 </body>
 </html>
