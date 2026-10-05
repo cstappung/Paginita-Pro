@@ -198,11 +198,17 @@ test('la misma semilla da la misma pista', () => {
   assert.deepEqual(a, b);
 });
 
-test('velocidad: de 13 a casi 30 m/s, siempre subiendo', () => {
-  assert.equal(M.velocidad(0), 13);
-  assert.ok(M.velocidad(120) > 21 && M.velocidad(120) < 23.5);
-  assert.ok(M.velocidad(1e6) <= 30 && M.velocidad(1e6) > 29.9);
-  for (let t = 1; t < 900; t += 7) assert.ok(M.velocidad(t) > M.velocidad(t - 1));
+test('velocidad: de 15 a casi 34 m/s, siempre subiendo, y una sola curva para todos', () => {
+  assert.equal(M.velocidad(0), 15);
+  assert.ok(M.velocidad(60) > 21.5 && M.velocidad(60) < 22.5, 'al minuto, ~22 m/s');
+  assert.ok(M.velocidad(120) > 26 && M.velocidad(120) < 27, 'a los 2 min, ~26,5 m/s');
+  assert.ok(M.velocidad(1e6) <= 34 && M.velocidad(1e6) > 33.9);
+  for (let t = 1; t < 900; t += 7) assert.ok(M.velocidad(t) > M.velocidad(t - 1), 'sube de a poco, sin escalones hacia atrás');
+  // los metros (que recalcula el antitrampas) son la integral de esa misma velocidad
+  let D = 0; for (let t = 0; t < 300; t += 0.001) D += M.velocidad(t + 0.0005) * 0.001;
+  assert.ok(Math.abs(D - M.metrosEntre(0, 300)) < 0.5, 'metrosEntre es la integral de velocidad');
+  // y la velocidad según los metros (la del generador) se le parece: menos de 1 m/s de diferencia
+  for (let t = 0; t <= 900; t += 15) assert.ok(Math.abs(M.velocidadEn(M.metrosEntre(0, t)) - M.velocidad(t)) < 1.1, 'velocidadEn a los ' + t + ' s');
 });
 
 test('puntos y multiplicador: lo que dice el manual', () => {
@@ -229,7 +235,8 @@ test('estaciones: los umbrales del manual y las vueltas', () => {
 
 test('poderes y tienda: duraciones y precios', () => {
   assert.equal(M.duracionPoder('iman', 0), 10); assert.equal(M.duracionPoder('iman', 2), 15);
-  assert.equal(M.duracionPoder('mochila', 5), 20.5); assert.equal(M.duracionPoder('doble', 9), 24.5, 'el nivel no pasa de 5');
+  assert.equal(M.duracionPoder('mochila', 0), 5); assert.equal(M.duracionPoder('mochila', 5), 10, 'la mochila es corta: 1 s por mejora');
+  assert.equal(M.duracionPoder('doble', 9), 24.5, 'el nivel no pasa de 5');
   assert.equal(M.precioMejora(0), 250); assert.equal(M.precioMejora(4), 5000); assert.equal(M.precioMejora(5), null);
   assert.deepEqual([0, 1, 2].map(M.costoSeguir), [500, 1000, 2000]);
   const az = M.rng(3); let pat = 0, mon = 0;

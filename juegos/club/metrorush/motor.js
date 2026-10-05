@@ -133,12 +133,27 @@
     return null;
   }
 
-  /** Velocidad de la carrera (m/s) a los `t` segundos: parte en 13 y se acerca
-      a 30 sin llegar nunca, como una curva de carga. A los 2 min va a ~22,
-      a los 5 min a ~28. Así el comienzo se aprende y el final se sufre. */
+  /** La curva de velocidad de la carrera, en un solo lugar: la usan el
+      juego (`velocidad`), el generador (`velocidadEn`) y el antitrampas
+      (`metrosEntre`, que recalcula los metros de cada carrera). Parte en
+      V0 y se acerca a VMAX sin llegar nunca, como una curva de carga; TAU
+      dice qué tan rápido. Se subió de 13→30 m/s con TAU 150 a 15→34 con
+      TAU 130, porque el juego se sentía lento: al minuto va a 22 m/s (antes
+      18,6) y a los 5 min a 32 (antes 27,7). */
+  const VELOCIDAD = { V0: 15, VMAX: 34, TAU: 130 };
+
+  /** Velocidad de la carrera (m/s) a los `t` segundos. Ejemplo: a los 0 s,
+      15; a los 60 s, 22; a los 120 s, 26,5. */
   function velocidad(t) {
-    const V0 = 13, VMAX = 30, TAU = 150;                     // inicio, techo y qué tan rápido se acerca
+    const { V0, VMAX, TAU } = VELOCIDAD;                    // inicio, techo y qué tan rápido se acerca
     return VMAX - (VMAX - V0) * Math.exp(-Math.max(0, t) / TAU);
+  }
+
+  /** Los metros que se corren entre los tiempos de juego a y b: la integral
+      de `velocidad`. Ejemplo: de 0 a 10 s, unos 157 m. */
+  function metrosEntre(a, b) {
+    const { V0, VMAX, TAU } = VELOCIDAD;
+    return VMAX * (b - a) + (VMAX - V0) * TAU * (Math.exp(-Math.max(0, b) / TAU) - Math.exp(-Math.max(0, a) / TAU));
   }
 
   /* ---------- Puntos y multiplicador ---------- */
@@ -214,24 +229,29 @@
   /** Los cuatro poderes con tiempo, su duración base (s) y su nombre. */
   const PODERES = {
     iman: { nombre: "Imán", base: 10, icono: "🧲" },
-    mochila: { nombre: "Mochila cohete", base: 8, icono: "🚀" },
+    mochila: { nombre: "Mochila cohete", base: 5, paso: 1, icono: "🚀" },   // corta y frenética, como en Subway Surfers
     zapatillas: { nombre: "Zapatillas saltarinas", base: 10, icono: "👟" },
     doble: { nombre: "2×", base: 12, icono: "✖2" }
   };
-  const SEG_POR_NIVEL = 2.5;                         // cada mejora alarga el poder 2,5 s
+  const SEG_POR_NIVEL = 2.5;                         // cada mejora alarga el poder 2,5 s (la mochila, `paso`: 1 s)
   const MAX_MEJORA = 5;                              // cinco mejoras por poder
   const PRECIOS_MEJORA = [250, 600, 1200, 2500, 5000];   // lo que cuesta pasar al nivel 1, 2, 3, 4, 5
   const PRECIO_PATINETA = 300;                       // una patineta, en monedas del juego
   const DURACION_PATINETA = 30;                      // segundos que dura una patineta
-  /** Duración (s) de un poder con `nivel` mejoras. Ejemplo: imán nivel 2 → 15 s. */
-  const duracionPoder = (clase, nivel) => (PODERES[clase] ? PODERES[clase].base : 0) + SEG_POR_NIVEL * limita(nivel | 0, 0, MAX_MEJORA);
+  /** Duración (s) de un poder con `nivel` mejoras. Ejemplo: imán nivel 2 →
+      15 s; mochila nivel 2 → 7 s (de 5 a 10 s con las cinco mejoras). */
+  const duracionPoder = (clase, nivel) => {
+    const p = PODERES[clase];                                       // el poder (o nada, si no existe)
+    if (!p) return 0;
+    return p.base + (p.paso != null ? p.paso : SEG_POR_NIVEL) * limita(nivel | 0, 0, MAX_MEJORA);
+  };
   /** Cuánto cuesta la próxima mejora si vas en `nivel` (null si ya está al máximo). */
   const precioMejora = nivel => (nivel >= MAX_MEJORA ? null : PRECIOS_MEJORA[Math.max(0, nivel | 0)]);
   /* Los potenciadores, como los de Subway Surfers: se compran en la tienda,
      se guardan y se usan al empezar una carrera (aparecen dos botones los
      primeros segundos). Se gastan al usarlos. */
   const POTENCIADORES = {
-    despegue: { nombre: "Despegue", precio: 1500, seg: 10, texto: "Empiezas la carrera volando con la mochila cohete, 10 s" },
+    despegue: { nombre: "Despegue", precio: 1500, seg: 7, texto: "Empiezas la carrera volando con la mochila cohete, 7 s" },
     puntos: { nombre: "Potenciador +5", precio: 2500, extra: 5, texto: "+5 al multiplicador durante toda una carrera" }
   };
   /** Saltar una misión cuesta más mientras más alto el multiplicador. Ejemplo: en ×1, 550; en ×10, 1900. */
@@ -412,11 +432,16 @@
        {tipo:"estrella", carril, d, y}
        {tipo:"boleto", n, carril, d, y}
        {tipo:"tunel", d0, largo, estacion} */
-  const VEL_TREN = 9;   // m/s a la que vienen los trenes en marcha (además de lo que corres tú)
-  /* Un tren en marcha espera quieto (y fuera de la vista) hasta que el corredor
-     está a APARECE metros del punto de cruce; ahí arranca. Si arrancara desde
-     que se genera, nacería a 300 m y reservaría su carril demasiado tiempo. */
-  const APARECE = 120;
+  const VEL_TREN = 11;  // m/s a la que vienen los trenes en marcha (además de lo que corres tú)
+  /* Un tren en marcha espera quieto hasta que el corredor está a APARECE
+     metros del punto de cruce; ahí arranca. Tiene que esperar FUERA de la
+     vista (se dibuja hasta 195 m por delante): con 120 m, a toda velocidad
+     esperaba a 156 m, se veía quieto y parecía un tren estacionado más, así
+     que nadie notaba que venían trenes de frente. Con 170 m espera a 295 m
+     al empezar (15 m/s) y a 225 m a toda velocidad (34 m/s). Si arrancara
+     desde que se genera, nacería a más de 300 m y reservaría su carril
+     demasiado tiempo. */
+  const APARECE = 170;
   /** Un tren que viene de frente y se cruza contigo en el metro `dArribo`,
       sabiendo que corres a `V` m/s: nace VEL_TREN·(APARECE/V) metros más allá. */
   function trenEnMarcha(carril, dArribo, V) {
@@ -431,13 +456,15 @@
       usaba la velocidad del cuadro en que se generaba el bloque, y eso movía
       un tren, el carril que dejaba libre y todo lo que venía después. Va
       redondeada a medio m/s para que ningún navegador la calcule distinta.
-      Se parece a la de verdad: a 960 m (1 min) da 17,5 m/s (la real, 18,6);
-      a 2 900 m (2,5 min), 23 (23,7). Un tren que llega 1 m/s más lento de lo
+      Se parece a la de verdad: a 1 127 m (1 min) da 21 m/s (la real, 22);
+      a 3 409 m (2,5 min), 28,5 (28). Un tren que llega 1 m/s más lento de lo
       calculado se cruza ~2 m después de su fila: no se nota. */
-  const velocidadEn = d => Math.round(2 * (13 + 17 * (1 - Math.exp(-Math.max(0, d) / 3200)))) / 2;
+  const K_METROS = 2825;                                    // ajustada a VELOCIDAD: el error máximo es 0,84 m/s
+  const velocidadEn = d => Math.round(2 * (VELOCIDAD.V0 + (VELOCIDAD.VMAX - VELOCIDAD.V0) * (1 - Math.exp(-Math.max(0, d) / K_METROS)))) / 2;
 
-  /** La dificultad entre 0 y 1 según los metros: llega al máximo a los ~9 km. */
-  const dificultad = d => limita((d - 300) / 9000, 0, 1);
+  /** La dificultad entre 0 y 1 según los metros: llega al máximo a los
+      ~7,7 km (antes a los ~9,3: el juego se sentía fácil). */
+  const dificultad = d => limita((d - 250) / 7500, 0, 1);
 
   function crearGenerador(semilla) {
     const azar = rng(semilla >>> 0 || 1);        // el azar de esta pista
@@ -486,7 +513,7 @@
 
     /** Un bloque "fila": obstáculos en los carriles que no son el camino. */
     function bloqueFila(dif, ctx) {
-      const esp = lerp(32, 19, dif) + azar() * 5;              // distancia hasta la próxima fila
+      const esp = lerp(30, 18, dif) + azar() * 5;              // distancia hasta la próxima fila
       const dr = dSig;                                          // la fila va en este metro
       const sig = siguienteCamino(dr + esp, lerp(0.35, 0.6, dif));   // el camino de la fila siguiente
       let bloqueados = 0;                                       // cuántos carriles quedaron cerrados
@@ -504,7 +531,7 @@
           continue;
         }
         const r = azar();                                       // un carril cerrado de verdad
-        if (r < lerp(0.08, 0.38, dif) && ctx && ctx.V > 0) {    // un tren que viene de frente
+        if (r < lerp(0.16, 0.4, dif) && ctx && ctx.V > 0) {     // un tren que viene de frente
           const t = emite(trenEnMarcha(c, dr, velocidadEn(dr))); // se cruza contigo justo en la fila
           libre[c] = t.d0 + LARGO_VAGON + 6;                    // su carril queda reservado mientras pasa
           bloqueados++;
@@ -545,7 +572,7 @@
       for (let o = 0; o < 3; o++) {                             // los otros carriles
         if (o === c || libre[o] > dr) continue;
         const r = azar();
-        if (r < lerp(0.1, 0.35, dif) && ctx && ctx.V > 0) {    // un tren que viene, al lado del convoy
+        if (r < lerp(0.16, 0.38, dif) && ctx && ctx.V > 0) {   // un tren que viene, al lado del convoy
           const t = emite(trenEnMarcha(o, dr + 10, velocidadEn(dr + 10))); libre[o] = t.d0 + LARGO_VAGON + 6;
         } else if (r < 0.7) {
           const m = 1 + Math.floor(azar() * 3);
@@ -554,7 +581,7 @@
         }
       }
       mantener = 1;                                             // al bajar del convoy sigues en el mismo carril
-      dSig = fin + lerp(28, 20, dif);
+      dSig = fin + lerp(26, 18, dif);
     }
 
     /** Un respiro: sin obstáculos, una cinta de monedas que zigzaguea entre carriles. */
@@ -597,7 +624,7 @@
           if (dSig < 140) { bloqueFila(0, ctx); continue; }     // el comienzo, suave
           const r = azar();
           if (r < lerp(0.08, 0.2, dif) && libre[camino] <= dSig) bloqueConvoy(dif, ctx);
-          else if (r < lerp(0.08, 0.2, dif) + 0.1) bloqueRespiro();
+          else if (r < lerp(0.08, 0.2, dif) + 0.07) bloqueRespiro();
           else bloqueFila(dif, ctx);
         }
         return salida;
@@ -625,7 +652,7 @@
   /* ---------- Lo que se exporta ---------- */
   return {
     rng, lerp, limita,
-    CARRILES, LARGO_VAGON, ALTO_TECHO, LARGO_RAMPA, FISICA, impulso, velocidad, velocidadEn, VEL_TREN, APARECE, dificultad,
+    CARRILES, LARGO_VAGON, ALTO_TECHO, LARGO_RAMPA, FISICA, impulso, VELOCIDAD, velocidad, metrosEntre, velocidadEn, VEL_TREN, APARECE, dificultad,
     MEDIO_LARGO, MARGEN_TECHO, MARGEN_RAMPA, alturaRampa, soporte, caja,
     PUNTOS_POR_METRO, MAX_BASE, MAX_ESTRELLAS, multiplicador, puntosPorTramo,
     ESTACIONES, estacionDe, siguienteUmbral, VUELTA_DESDE, VUELTA_CADA, INTRO, BOLETOS,

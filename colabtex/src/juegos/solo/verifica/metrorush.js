@@ -36,10 +36,10 @@ export function verifica(dato, prueba, ctx) {
 
 /* Lo imposible, para filas ya guardadas sin prueba. No son umbrales de
    «sospechoso»: son lo que el juego no deja hacer. Lo más rápido que se
-   puede correr es la velocidad del juego (de 13 a 30 m/s, la integral que
+   puede correr es la velocidad del juego (de 15 a 34 m/s, la integral que
    da `metrosEntre`), y el multiplicador más alto es (30 + 29 + 5) × 2 = 128,
-   o sea 1 280 puntos por metro. Ejemplo: en 60 s se corren a lo más 1 024 m,
-   así que más de 1 310 000 puntos en un minuto no se pueden hacer. */
+   o sea 1 280 puntos por metro. Ejemplo: en 60 s se corren a lo más 1 127 m,
+   así que más de 1 443 000 puntos en un minuto no se pueden hacer. */
 const PUNTOS_POR_METRO_MAX = 10 * 128;
 
 export function sospecha(categoria, fila) {

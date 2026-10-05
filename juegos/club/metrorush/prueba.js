@@ -40,7 +40,11 @@
 })(typeof self !== "undefined" ? self : this, function (M) {
   "use strict";
 
-  const VERSION = 1;
+  /* La versión de la prueba. Sube cuando cambia algo que la pista o los
+     metros dependen de él (la curva de velocidad, el generador): una prueba
+     vieja ya no se puede rehacer con el motor nuevo. 2 = velocidad 15→34 m/s,
+     más trenes de frente y más dificultad. */
+  const VERSION = 2;
   const PASO_MUESTRA = 2;         // segundos de carrera entre dos muestras
   const MAX_EVENTOS = 60000;      // una carrera de una hora deja ~2 000: esto es un tope de seguridad
   const MAX_METROS = 1000000;     // el tope de la tabla de distancia
@@ -108,11 +112,10 @@
      --------------------------------------------------------------- */
 
   /* Los metros que se corren entre los tiempos de juego a y b: la integral
-     de M.velocidad (30 − 17·e^(−t/150)). Ejemplo: de 0 a 10 s, 135,6 m. */
-  function metrosEntre(a, b) {
-    const VMAX = 30, DV = 17, TAU = 150;
-    return VMAX * (b - a) + DV * TAU * (Math.exp(-Math.max(0, b) / TAU) - Math.exp(-Math.max(0, a) / TAU));
-  }
+     de la velocidad. Vive en el motor junto a la curva (M.VELOCIDAD), así el
+     juego y el verificador no pueden usar curvas distintas. Ejemplo: de 0 a
+     10 s, 157 m. */
+  const metrosEntre = M.metrosEntre;
 
   /* Rehace la carrera. Devuelve {motivo} si no cuadra, o
      {puntos, metros, tiempo} (como los manda el juego). */

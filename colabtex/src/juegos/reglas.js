@@ -907,12 +907,12 @@ const REGLAS = {
       ])],
       ["Poderes", lista([
         "<b>Imán</b> (10 s): atrae las monedas de los tres carriles.",
-        "<b>Mochila cohete</b> (8 s): vuelas por encima de todo, con una fila de monedas en el aire. Al aterrizar tienes un instante de protección.",
+        "<b>Mochila cohete</b> (5 s): vuelas por encima de todo, con una fila de monedas en el aire. Al aterrizar tienes un instante de protección.",
         "<b>Zapatillas saltarinas</b> (10 s): saltas el doble de alto, hasta los techos de los trenes.",
         "<b>2×</b> (12 s): duplica los puntos.",
         "<b>Caja misteriosa</b>: trae monedas o una patineta.",
         "<b>Patineta</b> (H, dos toques rápidos o X en el mando): dura 30 s y, si chocas, se rompe ella en vez de terminar la carrera.",
-        "En la <b>tienda</b> cada poder tiene 5 mejoras, que lo alargan 2,5 s por nivel, y se compran patinetas."
+        "En la <b>tienda</b> cada poder tiene 5 mejoras, que lo alargan 2,5 s por nivel (la mochila, 1 s: llega a 10 s), y se compran patinetas."
       ])],
       ["Misiones", lista([
         "Siempre hay un <b>set de tres misiones</b> (en la portada, el botón Misiones o la tarjeta amarilla del multiplicador). Completar las tres sube en 1 el multiplicador base, hasta ×30, y paga monedas: 250 más 50 por cada nivel del multiplicador.",
@@ -921,7 +921,7 @@ const REGLAS = {
       ])],
       ["Potenciadores", lista([
         "Se compran en la tienda y se guardan. Al empezar una carrera aparecen unos segundos dos botones (o las teclas 1 y 2) para usar los que tengas.",
-        "<b>Despegue</b>: empiezas volando con la mochila cohete, 10 s y sin chocar.",
+        "<b>Despegue</b>: empiezas volando con la mochila cohete, 7 s y sin chocar.",
         "<b>Potenciador +5</b>: suma 5 al multiplicador durante toda la carrera.",
         "Empiezas con un Despegue de regalo."
       ])],
