@@ -1,15 +1,75 @@
-/* Verificador antitrampas de fanal (ver docs/antitrampas.md).
+/* Verificador antitrampas de FANAL (docs/antitrampas/fanal.md).
 
-   Aún sin implementar: acepta todo lo que ya pasó por resultadoClub.
-   Cuando el juego emita su prueba, PRUEBA sube a 1 y verifica() la
-   rehace con el motor del juego. */
-export const PRUEBA = 0;
+   FANAL es un Space Invaders en tiempo real con la música llevando el
+   compás: no se rehace cuadro a cuadro. La prueba es el registro de cada
+   jornada (tiros, lo que tocó cada bala y con qué tiro, golpes, poderes,
+   pulsos de la música, reloj de juego y reloj real, entradas sintéticas),
+   encadenado con un hash. `FanalPrueba.rehace` —el mismo archivo que usa
+   el juego para anotar, así no divergen— recalcula con el motor los puntos
+   exactos de cada jornada y comprueba que pudo jugarse así; aquí solo se
+   compara con lo declarado. */
+import FP from '../../../../../juegos/club/fanal/prueba.js';
+import FM from '../../../../../juegos/club/fanal/motor.js';
 
-/* Un resultado recién jugado y la prueba que mandó el juego. Devuelve
-   null si vale, o el motivo (una frase corta en castellano) si no. Puede
-   devolver una promesa. */
-export function verifica(dato, prueba) { return null; }
+export const PRUEBA = 1;
 
-/* Una fila ya guardada en soloRanks ({nombre, puntos, tiempo, partida}),
-   sin prueba: null si es verosímil, o el motivo si ningún humano la hace. */
-export function sospecha(categoria, fila) { return null; }
+const TOPE = 1000000;   // el de resultadoClub para los puntos
+
+/* `ctx.uid`, si la página lo pasa: la prueba lleva la cuenta en la que se
+   jugó, y la de otra persona (copiada de soloPruebas, que se lee con
+   sesión) no vale. Sin ctx no se puede comprobar (ver la doc). */
+export function verifica(dato, prueba, ctx) {
+  if (!prueba || typeof prueba !== 'object') return 'La partida llegó sin prueba.';
+  const cat = dato && dato.categoria;
+  if (ctx && ctx.uid && prueba.u && prueba.u !== ctx.uid) return 'La prueba es de otra cuenta.';
+  const r = FP.rehace(prueba);
+  if (r.motivo) return 'La partida no cuadra: ' + r.motivo + '.';
+  if (cat === 'club-fanal-travesia' && prueba.m !== 't') return 'La prueba es de una travesía sin fin, no de la historia.';
+  if (cat === 'club-fanal-sinfin' && prueba.m !== 's') return 'La prueba es de la historia, no de la travesía sin fin.';
+  if (cat === 'club-fanal-jornadas') {
+    if (dato.puntos !== r.completadas) return 'Las jornadas declaradas (' + dato.puntos + ') no son las de la partida (' + r.completadas + ').';
+  } else if (cat === 'club-fanal-travesia' || cat === 'club-fanal-sinfin') {
+    if (dato.puntos !== Math.min(TOPE, r.puntos)) return 'Los puntos declarados (' + dato.puntos + ') no son los de la partida (' + r.puntos + ').';
+  } else return 'Categoría desconocida.';
+  // El tiempo declarado es el de juego de esta sesión: la suma del de cada jornada.
+  if (Math.abs(dato.tiempo - Math.max(1, r.tiempo)) > 2) return 'El tiempo declarado no es el de la partida.';
+  return null;
+}
+
+/* Lo humano, para filas ya guardadas sin prueba. Referencias (datos reales
+   de la tabla): una travesía honesta de trece jornadas tarda 500–800 s de
+   juego y hace 64 000–124 000 puntos, es decir 40–60 s por jornada y unos
+   100–250 puntos por segundo. Los umbrales de aquí son varias veces más
+   generosos: solo marcan lo que ninguna persona hace. */
+const S_POR_JORNADA = 8;        // s de juego por jornada como mínimo (las honestas: 40–60)
+const PPS_SINFIN = 1000;        // puntos por segundo en el sin fin (honesto: 100–300)
+const PPS_TRAVESIA = 2000;      // en la travesía, holgado: un punto de control trae puntos de antes sin su tiempo
+const PUNTOS_TRAVESIA = 300000; // más del doble de la mejor travesía honesta vista
+
+export function sospecha(categoria, fila) {
+  const p = fila && fila.puntos, t = (fila && fila.tiempo || 0) / 1000;
+  if (!Number.isFinite(p) || !Number.isFinite(t) || t <= 0) return 'fila sin puntos o sin tiempo';
+  if (categoria === 'club-fanal-jornadas') {
+    if (p > FM.JORNADAS_HISTORIA) {
+      // Del sin fin: empieza siempre en la 14 y nunca desde un punto de control.
+      const jugadas = p - FM.JORNADAS_HISTORIA;
+      if (t < jugadas * S_POR_JORNADA) return jugadas + ' jornadas del sin fin en ' + t.toFixed(1) + ' s';
+    } else {
+      // De la historia: pudo seguir desde el punto de control del acto.
+      const desde = Math.max(...Object.values(FM.INICIO_ACTO).filter(j => j <= p));
+      const min = (p - desde + 1) * S_POR_JORNADA + (p === FM.JORNADAS_HISTORIA ? 60 : 0);
+      if (t < min) return 'jornada ' + p + ' en ' + t.toFixed(1) + ' s';
+    }
+    return null;
+  }
+  if (categoria === 'club-fanal-sinfin') {
+    if (p / t > PPS_SINFIN) return Math.round(p / t) + ' puntos por segundo en el sin fin';
+    return null;
+  }
+  if (categoria === 'club-fanal-travesia') {
+    if (p > PUNTOS_TRAVESIA) return p + ' puntos en una travesía';
+    if (p / t > PPS_TRAVESIA && p > 20000) return Math.round(p / t) + ' puntos por segundo en una travesía';
+    return null;
+  }
+  return null;
+}
