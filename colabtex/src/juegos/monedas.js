@@ -105,10 +105,14 @@ export const valorLogro = (juego, id) => VALOR_NIVEL[nivelDe(juego, id)] || 0;
    que sale de la marca misma donde la marca es la dificultad. */
 export const RECORD = { minas: 60, snake: 20, tetrisclub: 50, sortem: 50, bbtan: 50, sopa: 30, electro: 30, frontera: 40, sudoku: 40, fanal: 40, atasco: 40 };
 /* BBTAN: cada ronda n paga ⌊n/4⌋, acumulado hasta la ronda del récord
-   (1 a 3 no pagan, 4 y 5 pagan 1 cada una: llegar a la 5 da 2). */
+   (1 a 3 no pagan, 4 y 5 pagan 1 cada una: llegar a la 5 da 2). Lo que
+   paga cada ronda deja de crecer en la 450 (112 por ronda desde ahí) y
+   pasada la 600 el récord ya no paga más. */
+export const BBTAN_SATURA = 450, BBTAN_TOPE = 600;
 export function monedasBbtan(ronda) {
-  const R = Math.max(0, Math.floor(Math.min(+ronda || 0, 1000))), q = Math.floor(R / 4), r = R % 4;
-  return 2 * q * (q - 1) + q * (r + 1);
+  const R = Math.max(0, Math.floor(Math.min(+ronda || 0, BBTAN_TOPE)));
+  const S = Math.min(R, BBTAN_SATURA), q = Math.floor(S / 4), r = S % 4;
+  return 2 * q * (q - 1) + q * (r + 1) + (R - S) * Math.floor(BBTAN_SATURA / 4);
 }
 /* sortEm: los bloques de la modalidad, más 2 por cada segundo bajo un
    ritmo de 3 s por bloque (30 s para el 1–10, 60 s para el 1–20). */
