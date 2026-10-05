@@ -71,7 +71,7 @@ main.vl { min-width: 0; }
 .banner { position: absolute; left: 50%; top: 30%; transform: translate(-50%, -50%) scale(.9); text-align: center; color: #fff; opacity: 0; pointer-events: none; display: grid; gap: calc(.8cqh); width: 90%; transition: opacity .3s, transform .3s; }
 .banner.ver { opacity: 1; transform: translate(-50%, -50%) scale(1); animation: banner 3s forwards; }
 @keyframes banner { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.7); } 12% { opacity: 1; transform: translate(-50%, -50%) scale(1.06); } 20% { transform: translate(-50%, -50%) scale(1); } 85% { opacity: 1; } 100% { opacity: 0; } }
-.banner strong { font-size: 7.5cqh; line-height: 1; }
+.banner strong { font-size: 7.5cqh; line-height: 1.05; }
 .banner span { font-size: 3cqh; opacity: .9; }
 .aviso { position: absolute; left: 50%; bottom: 4cqh; transform: translate(-50%, 20px); max-width: 88%; padding: 1cqh 2.2cqh; border-radius: 99px; background: rgba(10, 12, 22, .78); color: #fff; font-size: 2.4cqh; text-align: center; opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none; }
 .aviso.ver { opacity: 1; transform: translate(-50%, 0); }
@@ -101,7 +101,7 @@ main.vl { min-width: 0; }
 .pantalla[data-estilo="pixel"] .hud .valor { font-size: calc(4.6 * var(--u)); }
 .pantalla[data-estilo="pixel"] .hud .chico, .pantalla[data-estilo="pixel"] .estacion { font-size: calc(2.2 * var(--u)); line-height: 1.5; }
 .pantalla[data-estilo="pixel"] :is(.valor, .chico, .estacion > span:first-child, .banner strong, .banner span) { text-shadow: .4cqh .4cqh 0 #2a1c18; }
-.pantalla[data-estilo="pixel"] .banner strong { font-size: 5cqh; }
+.pantalla[data-estilo="pixel"] .banner strong { font-size: 5cqh; line-height: 1.4; }   /* la letra pixel no trae aire entre líneas: con 1 las dos líneas se tocaban */
 .pantalla[data-estilo="pixel"] .mult { font-size: calc(2.6 * var(--u)); padding: 1cqh; background: #e2463a; box-shadow: 0 -.6cqh 0 #2a1c18, 0 .6cqh 0 #2a1c18, -.6cqh 0 0 #2a1c18, .6cqh 0 0 #2a1c18; }
 .pantalla[data-estilo="pixel"] .moneda { width: calc(3.4 * var(--u)); height: calc(4.2 * var(--u)); background: #ffd23f; box-shadow: inset -.8cqh 0 0 #e09a1a, inset .8cqh 0 0 #fff1a0, 0 -.6cqh 0 #2a1c18, 0 .6cqh 0 #2a1c18, -.6cqh 0 0 #2a1c18, .6cqh 0 0 #2a1c18; }
 .pantalla[data-estilo="pixel"] .pausa { background: #2a2232; color: #fff1d4; box-shadow: 0 -.6cqh 0 #fff1d4, 0 .6cqh 0 #fff1d4, -.6cqh 0 0 #fff1d4, .6cqh 0 0 #fff1d4; border: 0; }

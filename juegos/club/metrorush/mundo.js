@@ -1078,8 +1078,15 @@ class Kit {
       tira(CAJA.clone().scale(0.42, 0.12, LARGO), this.neon ? 'luz' : 'plano', this.neon ? new THREE.Color(c.bordillo).multiplyScalar(0.45).getHex() : c.bordillo, [xm, 1.21, ZC]);
       tira(uvMundo(new THREE.BoxGeometry(2.6, 0.14, LARGO), 3), this.juguete ? 'tex:acera' : 'plano', c.acera, [lado * 5.17, 0.07, ZC], 3, 'v');
     }
-    // cables de la catenaria (no en pixel: se verían como ruido)
-    if (!this.pixel) for (const x of CARRILES) {
+    /* Cables de la catenaria (no en pixel: se verían como ruido). Van sobre
+       los espacios ENTRE las vías, no sobre el centro de cada una: arriba de
+       un tren la cámara sube por encima de los cables, y el que iba justo
+       sobre tu carril cruzaba al corredor de arriba abajo, como una franja
+       negra que lo tapaba. En neón son líneas de un píxel y siguen arriba
+       de cada vía (no tapan nada). */
+    const entreVias = CARRILES[1] - CARRILES[0];                              // 2,2 m de un carril al otro
+    const xCables = this.neon ? CARRILES : [-1.5 * entreVias, -0.5 * entreVias, 0.5 * entreVias, 1.5 * entreVias];
+    if (!this.pixel) for (const x of xCables) {
       if (this.neon) {
         const lg = new LineSegmentsGeometry(); lg.setPositions([x, 5.4, 30, x, 5.4, -260]);
         const lm = new LineMaterial({ color: 0xff7ae0, linewidth: 1.1, worldUnits: false }); lm.resolution.copy(this.mundo.resolucion);
