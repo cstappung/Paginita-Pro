@@ -2,6 +2,7 @@ import { crearSolo } from "./juegos/solo/club.js";
 import { esRachaClub, rachaClub } from "./juegos/solo/club-datos.js";
 import { VERIFICADORES, juegoDeCategoria, textoPrueba } from "./juegos/solo/verifica.js";
 import { crearFrontera } from "./juegos/frontera.js";
+import { esTrampa, castiga, revisaCastigo, castigoActivo, configuraCastigo, hastaDeCuenta } from "./juegos/castigo.js";
 "use strict";
 /* ============================================================
    Juegos — la página
@@ -246,7 +247,7 @@ function ordenPopular(claves) {
   return claves.slice().sort((a, b) => (n[b] || 0) - (n[a] || 0) || pos[a] - pos[b]);
 }
 
-let offSalas = null, offMias = null, offPartida = null, offReloj = null, offEnCurso = null;
+let offSalas = null, offMias = null, offPartida = null, offReloj = null, offEnCurso = null, offCastigo = null;
 let offChat = null, chatMsgs = [], chatFirma = "";
 let jugadasVistas = -1;   // cuántas jugadas tenía el registro la última vez
 let ultimoCambio = 0;     // cuándo creció el registro por última vez (reloj local)
@@ -1153,6 +1154,22 @@ function avisa(e, juego) {
 /* ---------- pintado: el armazón ---------- */
 function render() {
   if (!state.user && !state.invitado) { if (individual) { individual.destruir(); individual = null; } return; }
+  /* Retenido por el antitrampas (castigo.js): no se monta nada debajo de
+     la capa. Un juego del club seguía sonando bajo el pantallazo, y al
+     recargar en `#solo/<juego>` se volvía a montar entero. Al terminar,
+     la capa avisa y esto vuelve a montar lo que diga la ruta. */
+  if (castigoActivo()) {
+    if (vistaPintada !== "castigo") {
+      salon.cierra(false);
+      desmontaVista();
+      desmontaJuego();
+      $("pantalla").style.display = "none";
+      vistaPintada = "castigo";
+    }
+    ambientar(null);
+    return;
+  }
+  $("pantalla").style.display = "";
   const clave = state.vista === "perfil" ? "perfil:" + state.perfilUid : state.vista;
   /* La barra de pestañas va abajo en el móvil solo en las pantallas de
      menú; en una partida o un juego del club se va (tienen su «volver»). */
@@ -1160,18 +1177,23 @@ function render() {
   if (clave !== vistaPintada) {
     /* La ficha cuelga de <body>: fuera del salón no puede quedar flotando. */
     if (state.vista !== "vestibulo") salon.cierra(false);
-    if (individual) { individual.destruir(); individual = null; }
-    if (vistaPintada === "ranks" && ranks) { ranks.destruir(); ranks = null; }
-    if (vistaPintada === "logros" && logrosVista) { logrosVista.destruir(); logrosVista = null; }
-    if (vistaPintada === "monedas" && monedasVista) { monedasVista.destruir(); monedasVista = null; }
-    if (prodropVista) { prodropVista.destruir(); prodropVista = null; }
-    if (paginaPerfil) { paginaPerfil.destruir(); paginaPerfil = null; }
+    desmontaVista();
     armazon();
     vistaPintada = clave;
   }
   if (state.vista === "vestibulo") pintaVestibulo();
   else if (state.vista === "partida" && state.user) pintaPartida();
   pintaTabs();
+}
+
+/* Lo que cada vista dejó montado (un juego del club, PRODROP, las tablas…). */
+function desmontaVista() {
+  if (individual) { individual.destruir(); individual = null; }
+  if (ranks) { ranks.destruir(); ranks = null; }
+  if (logrosVista) { logrosVista.destruir(); logrosVista = null; }
+  if (monedasVista) { monedasVista.destruir(); monedasVista = null; }
+  if (prodropVista) { prodropVista.destruir(); prodropVista = null; }
+  if (paginaPerfil) { paginaPerfil.destruir(); paginaPerfil = null; }
 }
 
 function pintaTabs() {
@@ -1254,7 +1276,16 @@ async function guardaClub(categoria, uid, dato, prueba) {
   }
   return guardaConPodio(categoria, uid, dato);
 }
-const sospechaClub = s => state.user ? fb.reportaSospecha(state.user.uid, s) : Promise.resolve();
+/* Una partida que el verificador rechazó: el aviso para los
+   administradores y, si es trampa de verdad (castigo.js: `esTrampa`, solo
+   lo que se acaba de jugar), el pantallazo y la retención. Un invitado
+   nunca llega aquí: no se verifica lo que no se guarda. */
+const sospechaClub = s => {
+  if (!state.user) return Promise.resolve();
+  const uid = state.user.uid;
+  if (esTrampa(s)) castiga(s, { uid, escribe: () => fb.ponCastigo(uid) });
+  return fb.reportaSospecha(uid, s);
+};
 
 function armazon() {
   const h = $("pantalla");
@@ -2033,6 +2064,7 @@ const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, 
 
 function pintaFin(p, est) {
   const caja = $("jgFin");
+  if (!caja) return;   // la sala no está montada (la tapa el castigo)
   const f = datosFin(p, est);
   const vacia = () => { if (caja.innerHTML) { caja.innerHTML = ""; caja.dataset.firma = ""; } };
   if (!f || finCerrado === state.pid) { vacia(); return; }
@@ -2449,6 +2481,11 @@ function wire() {
 
 (function boot() {
   wire();
+  /* El castigo del antitrampas se mira antes que la sesión: el registro
+     local basta para tapar Juegos desde el primer momento al recargar. */
+  configuraCastigo({ ahora: fb.ahora, entrar: () => entrarConGoogle(),
+    alCambiar: () => { vistaPintada = ""; render(); } });
+  revisaCastigo();
   createReportWidget({
     app: "juegos", ver: VER, urlInformes: "informes.html",
     getUser: () => state.user,
@@ -2467,8 +2504,9 @@ function wire() {
       state.invitado = true;
       state.salas = []; state.mias = []; state.enCurso = []; state.tablas = {};
       soltarPartida();
-      for (const f of [offSalas, offMias, offReloj, offEnCurso]) { if (f) { try { f(); } catch (e) {} } }
-      offSalas = offMias = offReloj = offEnCurso = null;
+      for (const f of [offSalas, offMias, offReloj, offEnCurso, offCastigo]) { if (f) { try { f(); } catch (e) {} } }
+      offSalas = offMias = offReloj = offEnCurso = offCastigo = null;
+      revisaCastigo({ uid: null, cuenta: 0 });
       if (offMonedas) { offMonedas(); offMonedas = null; datosMonedas = null; }
       limpiaInvitado();
       mostrar(); pintaUsuario();
@@ -2490,11 +2528,17 @@ function wire() {
       color: colorForUid(user.uid)
     };
     state.user = Object.assign({}, state.base);
+    /* El castigo de esta cuenta, en vivo (otra pestaña u otro aparato
+       puede ponerlo), y medido con el reloj del servidor: cuando llega la
+       corrección se vuelve a mirar, así adelantar el reloj no lo acorta. */
+    if (offCastigo) { try { offCastigo(); } catch (e) {} }
+    revisaCastigo({ uid: user.uid, cuenta: 0 });
+    offCastigo = fb.watchCastigo(user.uid, v => revisaCastigo({ cuenta: hastaDeCuenta(v) }));
     perfilDe(user.uid);          // abre la escucha; al llegar repinta
     aplicaPropio();
     if (!offMonedas) offMonedas = datosPerfil(d => { datosMonedas = d; pintaMonedas(); });
     mostrar();
-    if (!offReloj) offReloj = fb.seguirReloj();
+    if (!offReloj) offReloj = fb.seguirReloj(() => revisaCastigo());
     engancharVestibulo();
     vistaPintada = "";
     const r = leerRuta();

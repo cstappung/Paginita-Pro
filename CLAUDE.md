@@ -4497,6 +4497,24 @@ client or a bot can still produce a valid proof; only a server (Cloud
 Functions) closes that. Each game's specifics are in
 `docs/antitrampas/<juego>.md`.
 
+**A rejected game is also punished** (`juegos/castigo.js`, assets in
+`juegos/castigo/`, `docs/antitrampas.md` §6): `sospechaClub` calls
+`castiga` when `esTrampa(s)` — a fake Windows blue screen for
+`PANTALLAZO_MS` (10 s), GTA's «wasted», then a ten-minute **retention**
+overlay over all of Juegos. Only a game **just played** counts (`vivo`,
+set by `solo/club.js` for «en vivo» and by `frontera.js` for the win just
+earned): never a `localStorage` pending re-verified on load (it may come
+from an older engine), a verifier that threw, or a proof too big. While
+`castigoActivo()`, `render()` mounts nothing and destroys what was mounted
+(a club game kept playing under the overlay); when it ends the overlay
+calls back and the route is mounted again, no reload. The retention lives
+in `users/<uid>/castigo = {at}` (server time, already owner-only, **no rules
+change**; watched live, re-checked when `.info/serverTimeOffset` arrives so
+moving the clock forward does not shorten it) and in `localStorage`
+`jg.castigo = {h, u}`, which covers the moment before auth and guests but
+not **another account** on the same browser. Both are the player's own, so
+a console can delete them: the punishment deters, the rejection protects.
+
 ## Every game can be muted and turned down (a rule, not a nicety)
 
 **Every game must offer both a mute and a volume control that are visible

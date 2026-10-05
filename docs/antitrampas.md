@@ -176,3 +176,62 @@ probar que el diario de hoy se resolvió de verdad.
 3. Revisar a mano y, en la consola: borrar la fila
    (`soloRanks/<cat>/<uid>`) y, si es reincidente, vetar
    (`vetados/<uid>` = `{at: <ahora>, m: "motivo"}`).
+
+## 6. El castigo: pantallazo azul y diez minutos fuera
+
+Rechazar la marca deja fuera de la tabla al que hace trampa, pero no le
+cuesta nada intentarlo otra vez. Por eso, además del aviso en `sospechas`,
+quien manda una partida trucada se lleva un castigo
+(`colabtex/src/juegos/castigo.js`, archivos en `juegos/castigo/`):
+
+1. **Pantallazo azul.** Una pantalla azul de Windows 10 de mentira a pantalla
+   completa (`bsod.png`) con su zumbido (`bsod.mp3`), durante
+   `PANTALLAZO_MS` (10 s). El teclado no responde y el juego del club que
+   estaba abierto se desmonta (deja de sonar).
+2. **«WASTED».** Suena el de GTA (`wasted.mp3`) y la pantalla pasa a negro
+   con el letrero.
+3. **Retención.** `RETENCION_MS` (10 min) con una capa que tapa todo
+   Juegos y la cuenta atrás. Mientras dura, `render()` en `juegos-main.js`
+   no monta nada debajo (`castigoActivo`). Al terminar, la capa se quita y
+   la página vuelve a montar lo que diga la ruta, sin recargar.
+
+**Qué castiga** (`esTrampa`). Solo una partida **recién jugada** que el
+verificador rechazó (`vivo`, que pasan `solo/club.js` para lo que llega
+«en vivo» y `frontera.js` para la victoria que se acaba de ganar). No
+castiga:
+
+- un pendiente de `localStorage` que se vuelve a verificar al cargar, ni la
+  marca o el libro de victorias de la Frontera que se re-verifican al
+  entrar: pudieron jugarse con otra versión del motor;
+- un verificador que falló («No se pudo comprobar…»);
+- una prueba que no cabe («demasiado grande»): una partida larguísima no
+  es trampa.
+
+Una partida que llega **sin prueba** sí castiga: es la firma de
+`Club.result` desde la consola, y desde que el iframe se carga con
+`?v=club-31` ninguna versión actual del juego la manda así.
+
+**Dónde vive la retención**, y por qué en dos sitios:
+
+- `users/<uid>/castigo` = `{at}` con la hora **del servidor**. Para una
+  cuenta es la verdad: termina en `at + RETENCION_MS` medido con
+  `fb.ahora()` (el reloj corregido con `.info/serverTimeOffset`), así que
+  adelantar el reloj del aparato no la acorta: cuando llega la corrección
+  (`seguirReloj(alCambiar)`) se vuelve a mirar. Se escucha en vivo
+  (`watchCastigo`), así que llega a las demás pestañas y aparatos de la
+  cuenta. `users/<uid>` ya es solo del dueño: **no hace falta publicar
+  reglas nuevas**.
+- `localStorage` `jg.castigo` = `{h, u}`. Tapa desde el primer momento al
+  recargar, antes de que se sepa quién es; vale para un invitado (salir de
+  la cuenta no lo esquiva) y cubre una escritura en la cuenta que falló.
+  Lleva el uid castigado: en un computador compartido, **otra cuenta no
+  hereda el castigo**, y al invitado la capa le ofrece «¿No eres tú? Entra
+  con tu cuenta». No se borra al parecer vencido (el reloj del aparato
+  puede mentir); simplemente deja de valer.
+
+**El límite honesto.** Los dos registros son del propio jugador: quien sabe
+abrir la consola puede borrarlos. Pero tiene que darse cuenta, y su marca
+igualmente no subió: el castigo es la parte que disuade, el rechazo es la
+que protege la tabla. `tests/castigo.test.cjs` cubre qué cuenta como
+trampa, de quién es la retención, el recorrido entero con el reloj en la
+mano y que esté conectado donde se rechaza una partida.

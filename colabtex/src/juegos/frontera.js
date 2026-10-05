@@ -27,7 +27,8 @@
  *   watch(categoria, cb)           → las filas de esa tabla
  *   partida = {leer(), guardar(d, at)}  → `users/<uid>/club/frontera`
  *   alResultado([{d, previa}])     → días, partidas del club y logros
- *   reportaSospecha({c, m, p, t, d}) → una marca que la verificación rechazó
+ *   reportaSospecha({c, m, p, t, d, vivo}) → una marca que la verificación
+ *                                    rechazó (`vivo`: de la victoria recién ganada)
  *
  * Con `usuario.invitado` (el modo invitado del salón) se juega igual,
  * pero nada sale del navegador: ni la clasificación ni la racha en la
@@ -164,8 +165,11 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, r
      sus combates) y solo entonces va a la tabla. Devuelve
      `{estado: "ok" | "rechazo" | "pendiente", committed}`. «pendiente» es
      lo que no se pudo ni comprobar ni escribir ahora (sin red, sin el
-     motor, reglas sin publicar): se reintenta, y no acusa a nadie. */
-  async function verificaYGuarda(cat, dato, prueba) {
+     motor, reglas sin publicar): se reintenta, y no acusa a nadie. `vivo`
+     dice que la marca sale de la victoria que se acaba de ganar: solo un
+     rechazo así castiga (castigo.js); lo pendiente que se re-verifica al
+     entrar y el libro de victorias pudieron jugarse con otra versión. */
+  async function verificaYGuarda(cat, dato, prueba, vivo = false) {
     const motivo = await verificaClub("frontera", Object.assign({ categoria: cat }, dato), prueba, { uid });
     if (motivo) {
       if (/^No se pudo comprobar/.test(motivo)) {
@@ -175,7 +179,7 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, r
         return { estado: "pendiente" };
       }
       avisoFr = "Tu marca no se subió a la clasificación: " + motivo;
-      if (reportaSospecha) Promise.resolve().then(() => reportaSospecha({ c: cat, m: motivo, p: dato.puntos, t: dato.tiempo, d: dato.partida })).catch(() => {});
+      if (reportaSospecha) Promise.resolve().then(() => reportaSospecha({ c: cat, m: motivo, p: dato.puntos, t: dato.tiempo, d: dato.partida, vivo })).catch(() => {});
       repinta();
       return { estado: "rechazo" };
     }
@@ -194,7 +198,7 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, r
      hasta que la base lo acepta. Antes se mandaba una sola vez y, si
      fallaba (reglas sin publicar, sin red), el récord ya figuraba en
      `mejor` y no volvía a subir nunca: el menú lo mostraba y la tabla no. */
-  async function sube(cat, dato, prueba) {
+  async function sube(cat, dato, prueba, vivo = false) {
     if (invitado) return { estado: "pendiente" };
     if (JSON.stringify(prueba).length > PRUEBA_MAX) {
       avisoFr = "Esta racha es tan larga que su prueba ya no cabe: el récord queda aquí, pero no sube a la clasificación.";
@@ -204,7 +208,7 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, r
     const x = { d: dato, p: prueba };
     datos.pend[cat] = x;
     persiste();
-    const r = await verificaYGuarda(cat, dato, prueba);
+    const r = await verificaYGuarda(cat, dato, prueba, vivo);
     if (r.estado !== "pendiente" && datos.pend[cat] === x) { delete datos.pend[cat]; persiste(); }
     return r;
   }
@@ -643,7 +647,7 @@ export function crearFrontera({ usuario, guardar, watch, partida, alResultado, r
          solo salen de lo que pasó la comprobación. */
       (async () => {
         if (prueba) {
-          const s = await sube(dRacha.categoria, { puntos: n, tiempo: dRacha.tiempo, partida: dRacha.partida }, prueba);
+          const s = await sube(dRacha.categoria, { puntos: n, tiempo: dRacha.tiempo, partida: dRacha.partida }, prueba, true);
           if (s.estado === "ok") lista.push({ d: dRacha, previa: previoMejor ? { puntos: previoMejor } : null });
         }
         lista.push(...await subeVictorias());

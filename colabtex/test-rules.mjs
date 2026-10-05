@@ -125,7 +125,13 @@ await denied("un campo inventado no cuela", () =>
 await loginAs(A);
 ok("A lee el perfil de B", (await get(ref(db, `users/${userB.uid}/perfil/nick`))).val() === "Beto");
 await denied("A no lee el registro entero de B", () => get(ref(db, `users/${userB.uid}`)));
+/* El castigo del antitrampas (juegos/castigo.js) cuelga del registro
+   privado: lo escribe y lo lee su dueño, y nadie más. */
+await allowed("A apunta su castigo del antitrampas", () => set(ref(db, `users/${userA.uid}/castigo`), { at: Date.now() }));
+ok("y lo vuelve a leer al cargar", (await get(ref(db, `users/${userA.uid}/castigo/at`))).val() > 0);
 await loginAs(B);
+await denied("B no lee el castigo de A", () => get(ref(db, `users/${userA.uid}/castigo`)));
+await denied("ni se lo borra", () => set(ref(db, `users/${userA.uid}/castigo`), null));
 
 console.log("— Sincronización Yjs completa entre A y B (con reglas) —");
 const docB = new Y.Doc();

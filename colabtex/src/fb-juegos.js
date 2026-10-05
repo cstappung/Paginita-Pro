@@ -85,8 +85,11 @@ const saneaRanks = v => {
    cuenta hacia atrás hasta una hora concreta. `.info/serverTimeOffset`
    es la diferencia con el reloj del servidor, que sí es uno solo. */
 let offset = 0;
-export function seguirReloj() {
-  return onValue(ref(db, ".info/serverTimeOffset"), s => { offset = s.val() || 0; });
+export function seguirReloj(alCambiar) {
+  return onValue(ref(db, ".info/serverTimeOffset"), s => {
+    offset = s.val() || 0;
+    if (alCambiar) { try { alCambiar(offset); } catch (e) { console.warn("[juegos] reloj", e); } }
+  });
 }
 export const ahora = () => Date.now() + offset;
 
@@ -582,6 +585,13 @@ export const reportaSospecha = (uid, s) =>
     p: Number.isFinite(s.p) ? s.p : 0, t: Number.isFinite(s.t) ? s.t : 0,
     d: String(s.d || "").slice(0, 20), at: serverTimestamp()
   });
+/* El castigo del antitrampas (juegos/castigo.js): la hora *del servidor*
+   en que empezó. Vive bajo `users/<uid>`, que ya es solo del dueño, así
+   que no necesita reglas nuevas; se escucha para que llegue en vivo a las
+   demás pestañas y aparatos de la misma cuenta. */
+export const ponCastigo = uid => set(ref(db, `users/${uid}/castigo`), { at: serverTimestamp() });
+export const watchCastigo = (uid, cb) =>
+  onValue(ref(db, `users/${uid}/castigo`), s => cb(s.val()), () => cb(null));
 export function guardarSolo(categoria, uid, dato) {
   return runTransaction(ref(db, `soloRanks/${categoria}/${uid}`), previo => {
     if (previo && (previo.puntos > dato.puntos || previo.puntos === dato.puntos && previo.tiempo <= dato.tiempo)) return;

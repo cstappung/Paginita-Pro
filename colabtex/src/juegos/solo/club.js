@@ -41,7 +41,9 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
   function persistir(){try{localStorage.setItem(clave,JSON.stringify(pendientes));}catch{}}
   function sospecha(dato,motivo,donde){
     console.warn('[club] partida rechazada',juego,dato.categoria,motivo);
-    if(reportaSospecha&&!invitado)Promise.resolve().then(()=>reportaSospecha({c:dato.categoria,m:motivo,p:dato.puntos,t:dato.tiempo,d:donde})).catch(()=>{});
+    /* `vivo`: la partida se acaba de jugar. Solo eso castiga (castigo.js);
+       un pendiente de localStorage pudo quedar de otra versión del juego. */
+    if(reportaSospecha&&!invitado)Promise.resolve().then(()=>reportaSospecha({c:dato.categoria,m:motivo,p:dato.puntos,t:dato.tiempo,d:donde,vivo:donde==='en vivo'})).catch(()=>{});
   }
   function enviar(dato){if(!muerto)frame.contentWindow?.postMessage({canal:'club-parent',...dato},location.origin);}
   function estado(texto,key=categoria){enviar({tipo:'estado',categoria:key,texto});}
