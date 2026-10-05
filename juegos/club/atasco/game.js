@@ -19,6 +19,13 @@
    - A la clasificación va el total de estrellas, y solo cuando sube:
      cada resultado cuenta como una partida del club y paga monedas, así
      que repetir un nivel ya ganado no manda nada.
+   - Antitrampas: cada movida se anota (vehículo, destino, instante) y la
+     partida que ganó cada nivel se guarda con el progreso (`prog.p`). A la
+     clasificación solo van las estrellas que esas partidas respaldan, y la
+     prueba viaja con el resultado para que la página la vuelva a jugar
+     (motor.juegaPrueba). Las estrellas de antes de esta versión, sin
+     partida, se siguen viendo y abren pisos aquí, pero no cuentan en la
+     tabla hasta volver a ganar ese nivel (docs/antitrampas/atasco.md).
    - Los vehículos se colocan con `transform: translate(%)`. El porcentaje
      de translate es del tamaño del propio vehículo, así que un auto de dos
      casillas avanza una casilla con 50 %: el tablero puede cambiar de
@@ -43,15 +50,30 @@
   const primeroDe = j => PISOS.slice(0, j).reduce((s, p) => s + p.niveles.length, 0); // índice del primer nivel de un piso
 
   let prog = M.limpiaProgreso(lee("atasco.progreso", null), TOTAL);    // lo ganado hasta ahora
+  /* Cuánto vale la prueba de un nivel: [estrellas, ms], o null si no se
+     puede volver a jugar. Con esto se elige qué intento guardar. */
+  const leidos = [];
+  const nivelLeido = i => leidos[i] || (leidos[i] = M.lee(NIVELES[i].texto));
+  const califica = (i, t) => {
+    if (!NIVELES[i]) return null;
+    const r = M.juegaPrueba(nivelLeido(i), NIVELES[i].optimo, t);
+    return r.error ? null : [r.estrellas, r.ms];
+  };
+  /* Lo que la clasificación puede contar. Vuelve a jugar todas las
+     pruebas (unos milisegundos), así que se recuerda mientras `prog.p` sea
+     el mismo objeto: cada cambio del progreso arma uno nuevo. */
+  let resumenDe = null, resumen = null;
+  const respaldadas = () => (resumenDe === prog.p ? resumen : (resumenDe = prog.p, resumen = M.resumenPruebas(prog.p, PISOS)));
   let pisoVisto = Math.min(PISOS.length - 1, Math.max(0, lee("atasco.piso", 0) | 0)); // la pestaña abierta
   let ultimaSubida = "";                                               // lo último mandado a la cuenta
 
   /* ---------- Estado de la partida ---------- */
-  let J = null;           // el nivel en juego: {i, nivel, pos, movs, hist, ganado, acum, desde}
+  let J = null;           // el nivel en juego: {i, nivel, pos, movs, hist, jugadas, ganado, acum, desde, tocado}
   let elems = [];         // un elemento por vehículo, en el orden del motor
   let sel = 0;            // vehículo elegido con el teclado
   let tomado = false;     // ¿el vehículo elegido está agarrado (teclado/mando)?
   let tomadoDesde = 0;    // dónde estaba al agarrarlo
+  let tomadoGesto = null; // para la prueba: cuándo se tomó, cuántas flechas, si fue de verdad
   let arrastre = null;    // el arrastre con el dedo o el ratón en curso
   let reloj = 0;          // intervalo que repinta el tiempo
   let porTeclado = false; // ¿se está jugando con teclado o mando? (con el dedo no se pinta la selección)
@@ -210,8 +232,12 @@
   const textoEstrellas = n => "★".repeat(n) + "☆".repeat(3 - n);
 
   function pintaTotal() {
-    const t = M.totales(prog);
-    $("totalEstrellas").textContent = `★ ${t.estrellas} / ${MAX_ESTRELLAS}`;
+    const t = M.totales(prog), r = respaldadas().estrellas, b = $("totalEstrellas");
+    b.textContent = `★ ${t.estrellas} / ${MAX_ESTRELLAS}`;
+    // Estrellas de antes de las pruebas: se ven, pero la tabla aún no las cuenta.
+    b.title = r < t.estrellas
+      ? `Estrellas juntadas en todos los niveles. En la clasificación cuentan ${r}: los niveles ganados con una versión anterior del juego cuentan al volver a ganarlos.`
+      : "Estrellas juntadas en todos los niveles";
   }
 
   function pintaPisos() {
@@ -270,7 +296,8 @@
     if (i < 0 || i >= TOTAL || !M.nivelAbierto(prog, PISOS, i)) { sonido.efecto("no"); return; }
     const n = NIVELES[i];
     const nivel = M.lee(n.texto);
-    J = { i, nivel, pos: nivel.pos.slice(), movs: 0, hist: [], ganado: false, acum: 0, desde: 0 };
+    J = { i, nivel, pos: nivel.pos.slice(), movs: 0, hist: [], jugadas: [], ganado: false, acum: 0, desde: 0, tocado: false,
+          abiertoEn: performance.now(), reaccion: 0 };
     sel = 0; tomado = false; arrastre = null;
     if (pisoVisto !== n.piso) { pisoVisto = n.piso; guarda("atasco.piso", n.piso); }
     $("vistaPisos").hidden = true;
@@ -356,13 +383,24 @@
     pintaTiempo();
   }
 
-  /* ---------- El reloj del nivel: empieza con la primera movida ---------- */
-  const msJugados = () => (J ? J.acum + (J.desde ? performance.now() - J.desde : 0) : 0);
+  /* ---------- El reloj del nivel: empieza con la primera movida ----------
+     Las movidas se fechan con el instante de su evento (`e.timeStamp`, el
+     mismo reloj que performance.now), no con el de cuando se atienden: si
+     el teléfono se traba, dos sueltas en cola se atenderían juntas y la
+     prueba diría que fueron a la vez. */
+  const msJugados = ahora => (J ? J.acum + (J.desde ? (ahora || performance.now()) - J.desde : 0) : 0);
+  const instanteDe = e => (e && e.timeStamp > 0 && e.timeStamp <= performance.now() + 1000 ? e.timeStamp : performance.now());
+  /* ¿Lo hizo una mano? Un evento despachado por un guion (dispatchEvent)
+     llega con isTrusted falso. El mando (juegos/audio/mando.js) también
+     despacha teclas sintéticas, marcadas `__mando`: esas valen mientras
+     haya un mando conectado de verdad. */
+  const hayMando = () => { try { return [...(navigator.getGamepads ? navigator.getGamepads() : [])].some(g => g && g.connected); } catch (_) { return false; } };
+  const deVerdad = e => !!e && (e.isTrusted || (!!e.__mando && hayMando()));
   const formato = ms => { const s = Math.floor(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`; };
   function pintaTiempo() { if (J) $("nTiempo").textContent = formato(msJugados()); }
-  function arrancaReloj() {
+  function arrancaReloj(ahora) {
     if (!J || J.desde || J.ganado) return;
-    J.desde = performance.now();
+    J.desde = Math.min(ahora || performance.now(), performance.now());
     clearInterval(reloj); reloj = setInterval(pintaTiempo, 250);
   }
   function pausaReloj() { if (J && J.desde) { J.acum += performance.now() - J.desde; J.desde = 0; } }
@@ -370,12 +408,17 @@
   function paraReloj() { clearInterval(reloj); reloj = 0; }
 
   /* ---------- Una movida ---------- */
-  function mueve(i, d) {
+  function mueve(i, d, ahora, gesto) {
     if (!J || J.ganado || !M.puede(J.nivel, J.pos, i, d)) return false;
     J.hist.push(J.pos.slice());                                        // para deshacer
     J.pos = M.aplica(J.pos, i, d);
     J.movs++;
-    arrancaReloj();
+    arrancaReloj(ahora);
+    // La prueba: vehículo, dónde quedó y en qué instante del reloj del nivel (nunca hacia atrás).
+    // Y cómo fue el gesto (duración, pasos, puntero/teclado/mando, si fue de verdad): ver motor.codificaPrueba.
+    const previo = J.jugadas.length ? J.jugadas[J.jugadas.length - 1][2] : 0;
+    if (!J.jugadas.length) J.reaccion = Math.max(0, Math.round((ahora || performance.now()) - J.abiertoEn)); // desde que se abrió el nivel
+    J.jugadas.push([i, J.pos[i], Math.max(previo, Math.round(msJugados(ahora))), gesto]);
     colocaUno(i);
     sonido.efecto("desliza", Math.abs(d));
     vibra(8);
@@ -389,6 +432,7 @@
     tomado = false;
     J.pos = J.hist.pop();
     J.movs--;
+    J.jugadas.pop();                                                   // lo deshecho no está en la partida
     colocaTodos();
     sonido.efecto("deshace");
     pintaMarcador();
@@ -397,7 +441,7 @@
   function reinicia() {
     if (!J || J.ganado || !J.movs) return;
     tomado = false;
-    J.pos = J.nivel.pos.slice(); J.movs = 0; J.hist = []; J.acum = 0; J.desde = 0;
+    J.pos = J.nivel.pos.slice(); J.movs = 0; J.hist = []; J.jugadas = []; J.acum = 0; J.desde = 0;
     colocaTodos();
     sonido.efecto("deshace");
     pintaMarcador();
@@ -411,7 +455,8 @@
     const v = J.nivel.vehiculos[i];
     const [atras, adelante] = M.alcance(J.nivel, J.pos, i);            // el hueco no cambia mientras se arrastra
     const cs = $("lote").getBoundingClientRect().width / 6;            // una casilla en píxeles
-    arrastre = { i, v, x0: e.clientX, y0: e.clientY, atras, adelante, cs, px: 0, choco: false, id: e.pointerId };
+    arrastre = { i, v, x0: e.clientX, y0: e.clientY, atras, adelante, cs, px: 0, choco: false, id: e.pointerId,
+                 t0: instanteDe(e), pasos: 0, fiable: deVerdad(e) };                // para la prueba: cuánto duró y cuántos pasos tuvo
     sel = i; tomado = false;
     elems[i].classList.add("arrastra");
     try { elems[i].setPointerCapture(e.pointerId); } catch (_) { /* nada */ }
@@ -423,6 +468,8 @@
   window.addEventListener("pointermove", e => {
     const a = arrastre;
     if (!a || e.pointerId !== a.id) return;
+    a.pasos++;
+    if (!deVerdad(e)) a.fiable = false;
     const bruto = a.v.h ? e.clientX - a.x0 : e.clientY - a.y0;        // solo cuenta el eje de su carril
     const min = -a.atras * a.cs, max = a.adelante * a.cs;
     a.px = Math.max(min, Math.min(max, bruto));
@@ -436,7 +483,8 @@
     arrastre = null;
     elems[a.i].classList.remove("arrastra");
     const d = Math.round(a.px / a.cs);                                // la casilla más cercana
-    if (!d || !mueve(a.i, d)) colocaUno(a.i);                          // no se movió: vuelve a su sitio
+    const t = instanteDe(e), gesto = { d: t - a.t0, n: a.pasos, k: ".", f: a.fiable && deVerdad(e) };
+    if (!d || !mueve(a.i, d, t, gesto)) colocaUno(a.i);                // no se movió: vuelve a su sitio
   };
   window.addEventListener("pointerup", sueltaArrastre);
   window.addEventListener("pointercancel", sueltaArrastre);
@@ -483,8 +531,8 @@
   }
   /* Q y E (LB y RB en un mando) recorren los vehículos uno por uno: con
      las flechas se llega rápido, con esto se llega seguro a cualquiera. */
-  function eligeSiguiente(paso) {
-    if (tomado) soltarTeclado();
+  function eligeSiguiente(paso, e) {
+    if (tomado) soltarTeclado(e);
     sel = (sel + paso + elems.length) % elems.length;
     sonido.efecto("toma");
     avisa(D.nombre(J.nivel.vehiculos[sel]));
@@ -495,7 +543,7 @@
     if (!porTeclado) { porTeclado = true; pintaSeleccion(); }        // desde ahora se ve qué está elegido
     if ((e.key === "q" || e.key === "e" || e.key === "Q" || e.key === "E") && !e.ctrlKey && !e.metaKey && !e.altKey) {
       e.preventDefault();
-      eligeSiguiente(e.key.toLowerCase() === "e" ? 1 : -1);
+      eligeSiguiente(e.key.toLowerCase() === "e" ? 1 : -1, e);
       return;
     }
     const dir = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
@@ -508,6 +556,9 @@
       if (!M.puede(J.nivel, J.pos, sel, d)) { sonido.efecto("choca"); return; }
       // Mientras está tomado se mueve casilla a casilla sin contar; la movida se cuenta al soltar.
       J.pos = M.aplica(J.pos, sel, d);
+      tomadoGesto.n++;
+      if (!deVerdad(e)) tomadoGesto.f = false;
+      if (e.__mando) tomadoGesto.k = "!";
       colocaUno(sel);
       sonido.efecto("desliza", 1);
       return;
@@ -516,21 +567,25 @@
       e.preventDefault();
       if (!tomado) {                                                   // agarrar
         tomado = true; tomadoDesde = J.pos[sel];
+        tomadoGesto = { t0: instanteDe(e), n: 0, k: e.__mando ? "!" : ":", f: deVerdad(e) };
         sonido.efecto("toma");
         avisa(`${D.nombre(J.nivel.vehiculos[sel])} tomado. Flechas para moverlo, Espacio para soltar.`);
         if (sel === 0) { const [a, b] = M.alcance(J.nivel, J.pos, 0); if (!a && !b) sonido.efecto("bocina"); }
-      } else soltarTeclado();
+      } else soltarTeclado(e);
       pintaSeleccion();
     }
   });
   /* Soltar lo agarrado con el teclado: vuelve al punto de partida y hace
      la movida de una vez, así cuenta igual que un arrastre. */
-  function soltarTeclado() {
+  function soltarTeclado(e) {
     if (!tomado) return;
     tomado = false;
     const d = J.pos[sel] - tomadoDesde;
     J.pos[sel] = tomadoDesde;
-    if (!d || !mueve(sel, d)) colocaUno(sel);
+    // Al perder el foco no hay tecla: cuenta lo que tuvo el gesto hasta ahí.
+    const t = e && e.type === "keydown" ? instanteDe(e) : performance.now(), g = tomadoGesto || { t0: t, n: 0, k: ":", f: true };
+    if (e && e.type === "keydown") { if (!deVerdad(e)) g.f = false; if (e.__mando) g.k = "!"; }
+    if (!d || !mueve(sel, d, t, { d: t - g.t0, n: g.n, k: g.k, f: g.f })) colocaUno(sel);
     pintaSeleccion();
   }
   $("lote").addEventListener("focus", pintaSeleccion);
@@ -547,9 +602,9 @@
       if (k === "enter" && e.target === $("lote")) { e.preventDefault(); $("final").querySelector(".primario")?.click(); }
       return;
     }
-    if (k === "z" && !e.altKey) { e.preventDefault(); if (tomado) soltarTeclado(); deshace(); }   // Z o Ctrl+Z
+    if (k === "z" && !e.altKey) { e.preventDefault(); if (tomado) soltarTeclado(e); deshace(); }   // Z o Ctrl+Z
     else if (k === "r" && !e.ctrlKey && !e.metaKey) { e.preventDefault(); reinicia(); }
-    else if (k === "escape") { if (tomado) { soltarTeclado(); } else muestraPisos(); }
+    else if (k === "escape") { if (tomado) { soltarTeclado(e); } else muestraPisos(); }
   });
 
   /* Tras un botón el foco vuelve al estacionamiento: así las flechas siguen
@@ -565,16 +620,24 @@
   function gana() {
     J.ganado = true;
     pausaReloj(); paraReloj();
-    const ms = Math.max(1, Math.round(J.acum));
+    // El tiempo del nivel es el instante de la última movida: así cuadra al ms con la prueba.
+    const ms = Math.max(1, J.jugadas.length ? J.jugadas[J.jugadas.length - 1][2] : Math.round(J.acum));
     const n = NIVELES[J.i];
-    const antesTotales = M.totales(prog);
+    const antes = respaldadas().estrellas;
     const pisosAntes = PISOS.map((_, j) => M.pisoAbierto(prog, PISOS, j));
     const r = M.anota(prog, J.i, J.movs, ms, n.optimo);
     prog = r.prog;
+    // La partida que lo ganó, si es el mejor intento de este nivel. Una
+    // partida movida desde la consola (__atasco.mueve) no deja prueba.
+    const prueba = J.tocado ? "" : M.codificaPrueba(J.nivel, J.jugadas, J.reaccion);
+    if (prueba) prog = M.anotaPrueba(prog, J.i, prueba, califica);
     guarda("atasco.progreso", prog);
     subeNube();
-    const desp = M.totales(prog);
-    if (desp.estrellas > antesTotales.estrellas) mandaResultado();     // solo si subió el total
+    // Una partida que no parece de una persona (eventos sintéticos, ritmo de
+    // guion) no suma, pero se manda igual con su prueba: la página la
+    // rechaza y deja el aviso para los administradores.
+    const sinMano = !!prueba && prog.p[J.i] === prueba && !!respaldadas().bots[J.i];
+    if (respaldadas().estrellas > antes || sinMano) mandaResultado(sinMano ? J.i : -1); // solo si subió el total que cuenta
     const abrio = PISOS.findIndex((_, j) => !pisosAntes[j] && M.pisoAbierto(prog, PISOS, j));
     pintaTotal();                                                      // el ★ de la cabecera ya cuenta este nivel
     pintaMarcador();
@@ -623,11 +686,18 @@
   /* ====================================================================
      LA CUENTA — clasificación y progreso en la nube
      ==================================================================== */
-  function mandaResultado() {
+  /* Manda el total respaldado y, como prueba, la partida de cada nivel
+     que cuenta: la página las vuelve a jugar antes de guardar nada. */
+  function mandaResultado(conBot = -1) {
     if (!Club) return;
-    const t = M.totales(prog);
-    if (t.estrellas < 1) return;
-    Club.result({ categoria: CATEGORIA, puntos: t.estrellas, tiempo: Math.min(604800000, Math.max(1, Math.round(t.tiempo))) });
+    const r = respaldadas();
+    const n = {};
+    let puntos = r.estrellas, tiempo = r.tiempo;
+    for (const k of Object.keys(r.contados)) n[k] = prog.p[k];
+    const b = r.bots[conBot];
+    if (b) { n[conBot] = prog.p[conBot]; puntos += b[0]; tiempo = Math.min(604800000, tiempo + b[2]); } // lo que diría haber ganado
+    if (puntos < 1) return;
+    Club.result({ categoria: CATEGORIA, puntos, tiempo }, { v: M.PRUEBA_VERSION, n });
   }
   function subeNube(forzar) {
     if (!Club || !Club.guardarPartida) return;
@@ -641,7 +711,7 @@
   if (Club && Club.pedirPartida) Club.pedirPartida(dato => {
     let nube = null;
     try { nube = dato && typeof dato.d === "string" ? JSON.parse(dato.d) : null; } catch (e) { nube = null; }
-    const junta = M.mezclaProgreso(prog, nube, TOTAL);
+    const junta = M.mezclaProgreso(prog, nube, TOTAL, califica);
     const cambioAqui = JSON.stringify(junta) !== JSON.stringify(prog);
     const faltaAlla = JSON.stringify(junta) !== JSON.stringify(M.limpiaProgreso(nube, TOTAL));
     prog = junta;
@@ -655,7 +725,7 @@
   window.addEventListener("club-record", e => {
     if (sincronizado || !e.detail || e.detail.categoria !== CATEGORIA) return;
     sincronizado = true;
-    if (M.totales(prog).estrellas > (e.detail.puntos || 0)) mandaResultado();
+    if (respaldadas().estrellas > (e.detail.puntos || 0)) mandaResultado();
   });
 
   /* ---------- Mando de consola (juegos/audio/mando.js) ----------
@@ -709,7 +779,7 @@
   window.__atasco = {
     estado: () => J && { nivel: J.i, pos: J.pos.slice(), movs: J.movs, ganado: J.ganado },
     abre: i => abreNivel(i),
-    mueve: (i, d) => mueve(i, d),
+    mueve: (i, d) => { if (J) J.tocado = true; return mueve(i, d); },   // sirve para probar, pero ese nivel no deja prueba
     resuelve: () => J && M.resuelve(J.nivel, J.pos),
     progreso: () => JSON.parse(JSON.stringify(prog)),
     pisos: () => muestraPisos()
