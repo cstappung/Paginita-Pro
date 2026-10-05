@@ -477,3 +477,21 @@ Activar el sonido || Unmute || Attiva audio
 Volumen del juego || Game volume || Volume del gioco
 Efectos || Effects || Effetti
 Volumen de los efectos || Effects volume || Volume degli effetti
+# Atasco (juegos/club/atasco/): marcador, botones, pisos y pantalla final.
+Saca el auto rojo del estacionamiento || Get the red car out of the car park || Porta fuori l'auto rossa dal parcheggio
+NIVEL || LEVEL || LIVELLO
+MOVIDAS || MOVES || MOSSE
+MÍNIMO || MINIMUM || MINIMO
+TIEMPO || TIME || TEMPO
+ESTRELLAS || STARS || STELLE
+Niveles || Levels || Livelli
+Deshacer || Undo || Annulla
+Reiniciar || Restart || Ricomincia
+Repetir || Retry || Riprova
+Siguiente ▶ || Next ▶ || Avanti ▶
+¡Afuera! || You're out! || Fuori!
+¡Bien manejado! || Nicely driven! || Ben guidato!
+¡Perfecto! || Perfect! || Perfetto!
+La calle || The street || La strada
+Subterráneo {} || Basement {} || Interrato {}
+La bóveda || The vault || Il caveau

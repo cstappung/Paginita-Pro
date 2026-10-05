@@ -323,6 +323,7 @@ export const CANCIONES = [
   { id: "snake", nombre: "Serpiente funk", grupo: "De los juegos", desc: "Snake · bajo con octavas", chip: "snake", juegos: ["snake"] },
   { id: "bbtan", nombre: "Rebote", grupo: "De los juegos", desc: "BBTAN · arcade saltarín", chip: "bbtan", juegos: ["bbtan"] },
   { id: "sudoku", nombre: "Sudoku Arcade", grupo: "De los juegos", desc: "Sudoku · arcade de cuadrícula en Mi mayor", chip: "sudoku", juegos: ["sudoku"] },
+  { id: "atasco", nombre: "Hora punta", grupo: "De los juegos", desc: "Atasco · funk de bocinas en Si bemol", chip: "atasco", juegos: ["atasco"] },
   { id: "worms-menu", nombre: "Taller", grupo: "De los juegos", desc: "Circuit Breakers · menú", chip: "worms-menu" },
   { id: "worms-combate", nombre: "Al ataque", grupo: "De los juegos", desc: "Circuit Breakers · combate", chip: "worms-combate" },
   { id: "midnight", nombre: "Midnight Pulse", grupo: "De los juegos", desc: "Escondite · grabación", url: "juegos/audio/escondite-midnight-pulse.mp3", vol: 1, juegos: ["escondite"] },

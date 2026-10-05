@@ -189,7 +189,7 @@ test('las categorías de FANAL pasan por el club, por Discord y por las reglas',
  // Las reglas de Firebase conocen las tres tablas y el juego del club.
  const reglas=fs.readFileSync(path.join(__dirname,'../../firebase/database.rules.json'),'utf8');
  assert.match(reglas,/club-fanal-\(travesia\|sinfin\|jornadas\)/);
- assert.match(reglas,/sudoku\|fanal\)\$\/\)/);
+ assert.match(reglas,/sudoku\|fanal(\|[a-z]+)*\)\$\/\)/);  // fanal en la lista de clubJugadas (puede haber juegos después)
  assert.match(reglas,/'club-fanal-travesia' \|\| \$categoria === 'club-fanal-sinfin' \|\| [^?]*\? 1000000/);
  // El juego carga sus piezas con versión, y la página tiene i18n.
  const html=fs.readFileSync(path.join(D,'index.html'),'utf8');

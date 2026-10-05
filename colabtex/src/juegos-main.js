@@ -91,7 +91,7 @@ const FABRICAS = {
 const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞", pokemon: "◓", boxhead: "▣" };
 /* Los clubes de un jugador, con sus claves de la clasificación y los
    mismos signos que llevan en su tarjeta del vestíbulo. */
-const ICONO_TODOS = { ...ICONO, general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", frontera: "🏰", sudoku: "🔢", fanal: "🪔", yzombis: "🧟" };
+const ICONO_TODOS = { ...ICONO, general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", frontera: "🏰", sudoku: "🔢", fanal: "🪔", atasco: "🚗", yzombis: "🧟" };
 
 /* Lo que puede elegir quien abre la sala, por juego. Vive aquí y no en
    `motor.js` porque son controles y no reglas: el motor ya recorta lo
@@ -238,7 +238,7 @@ function leePopular() {
 }
 /* Los de un jugador, con su clave de popularidad. Cuentan como juegos en
    la marquesina: el «18» fijo de antes se quedó atrás con cada club. */
-const CLUBES = ["club-minas", "club-snake", "club-tetris", "club-sortem", "club-bbtan", "club-sopa", "club-electro", "club-frontera", "club-sudoku", "club-fanal"];
+const CLUBES = ["club-minas", "club-snake", "club-tetris", "club-sortem", "club-bbtan", "club-sopa", "club-electro", "club-frontera", "club-sudoku", "club-fanal", "club-atasco"];
 function ordenPopular(claves) {
   const n = state.popular, pos = Object.fromEntries(claves.map((k, i) => [k, i]));
   return claves.slice().sort((a, b) => (n[b] || 0) - (n[a] || 0) || pos[a] - pos[b]);
@@ -828,7 +828,7 @@ function celebra(juego, id) {
    barra de direcciones. */
 function leerRuta() {
   const h = (location.hash || "").replace(/^#/, "");
-  if (/^solo\/(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
+  if (/^solo\/(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
   if (h === "ranks") return { vista: "ranks", pid: "" };
   if (h === "logros") return { vista: "logros", pid: "" };
   if (h === "monedas") return { vista: "monedas", pid: "" };
@@ -1287,7 +1287,7 @@ function armazon() {
     h.innerHTML = "";
     logrosVista = crearLogros({ uid: state.user.uid, watchLogros: fb.watchLogros, perfil: perfilDe, icono: ICONO_TODOS,
       orden: () => ordenPopular([...Object.keys(JUEGOS), ...CLUBES])
-        .map(k => ({ "club-minas": "minas", "club-snake": "snake", "club-tetris": "tetrisclub", "club-sortem": "sortem", "club-bbtan": "bbtan", "club-sopa": "sopa", "club-electro": "electro", "club-frontera": "frontera", "club-sudoku": "sudoku", "club-fanal": "fanal" })[k] || k) });
+        .map(k => ({ "club-minas": "minas", "club-snake": "snake", "club-tetris": "tetrisclub", "club-sortem": "sortem", "club-bbtan": "bbtan", "club-sopa": "sopa", "club-electro": "electro", "club-frontera": "frontera", "club-sudoku": "sudoku", "club-fanal": "fanal", "club-atasco": "atasco" })[k] || k) });
     logrosVista.montar(h);
     return;
   }
@@ -1490,6 +1490,9 @@ const porOmision = k => Object.fromEntries((OPCIONES[k] || []).map(o => [o.clave
    Yemas), así que la lista se escribe aquí en vez de salir de las fechas
    `alta` de JUEGOS. El primero lleva «★ Lo último». */
 const NOVEDADES = [
+  { id: "atasco", color: "#e8322f", alta: "2026-10-05", titulo: "Atasco",
+    lema: "Estás encerrado en el auto rojo. Desliza autos, camiones y buses por su carril hasta abrirte camino a la salida. Con el mínimo de movidas, tres estrellas.",
+    sub: "Un jugador · 240 niveles en seis pisos", ruta: "#solo/atasco", boton: "Arrancar", reglas: ["atasco"], modo: "solo" },
   { id: "boxhead", color: "#c8892f", alta: "2026-10-05", titulo: "Boxhead",
     lema: "Zombis y diablos vistos desde arriba. Cada baja sube el multiplicador y con él llegan la Uzi, la escopeta, los barriles, las cargas y el cohete. Cooperativo o versus, con los que entren a la sala.",
     sub: "1–8 jugadores · cinco mapas", sala: { k: "boxhead", ops: { variante: "coop" } }, reglas: ["boxhead", "coop"],
@@ -1508,6 +1511,8 @@ const NOVEDADES = [
     ruta: "#cartas", boton: "Abrir sobres", cuenta: true }
 ];
 function arteNovedad(n) {
+  // Atasco: un estacionamiento visto desde arriba, el auto rojo y la barrera de salida.
+  if (n.id === "atasco") return `<div class="jg-nov-arte-at"><i></i><i></i><i></i><i></i><em></em><s></s><b>ATASCO</b></div>`;
   // FANAL: un farol que alumbra la noche y unas polillas que bajan hacia él.
   if (n.id === "fanal") return `<div class="jg-nov-arte-fn"><i></i><i></i><i></i><i></i><i></i><em></em><b>FANAL</b></div>`;
   if (n.id === "boxhead") return `<div class="jg-nov-arte-zb">${arteJuego("boxhead")}</div>`;

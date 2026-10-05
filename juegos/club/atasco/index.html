@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+<script src="../../../i18n.js?v=202610050316"></script>
+<script src="../../audio/mando.js?v=mando-2"></script>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Atasco — saca el auto rojo</title>
+  <meta name="description" content="Puzzle de estacionamiento: desliza autos, camiones y buses hasta abrirle camino al auto rojo. 240 niveles en seis pisos, con 1, 2 o 3 estrellas.">
+  <!-- Icono de la pestaña: el auto rojo visto desde arriba, en SVG para no depender de un archivo. -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%23464b55'/%3E%3Crect x='3' y='9' width='26' height='14' rx='5' fill='%23e8322f' stroke='%231d2330' stroke-width='2'/%3E%3Crect x='18' y='11' width='4' height='10' rx='1.5' fill='%239fd6ff'/%3E%3Crect x='9' y='12' width='8' height='8' rx='2' fill='%23b71f1d'/%3E%3C/svg%3E">
+  <!-- Una sola tipografía de cartel, gruesa y redonda, para títulos, marcador y números de estacionamiento. -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&display=swap">
+  <!-- Lo común del Club (volver, ranking lateral, modo integrado). Va ANTES del estilo propio para que este gane. -->
+  <link rel="stylesheet" href="../conexion.css?v=club-2">
+  <script src="../../audio/volumen.js?v=vol-1"></script>
+  <!-- conexion.js club-10: aprendió a escribir las estrellas de Atasco en el ranking lateral. -->
+  <script src="../conexion.js?v=club-10"></script>
+  <link rel="stylesheet" href="estilo.css?v=atasco-2">
+</head>
+<body>
+  <div class="shell">
+    <div class="layout">
+      <main>
+        <!-- Cabecera: no es .shell>header ni .intro, porque conexion.css las oculta dentro de Juegos. -->
+        <div class="cab">
+          <h1 class="logo"><span class="logo-p" aria-hidden="true">P</span><span class="logo-t">ATASCO</span></h1>
+          <p class="lema">Saca el auto rojo del estacionamiento</p>
+          <span id="totalEstrellas" class="total" title="Estrellas juntadas en todos los niveles" translate="no">★ 0 / 720</span>
+        </div>
+
+        <!-- ===== Vista 1: el edificio (los pisos y sus niveles) ===== -->
+        <section id="vistaPisos" aria-label="Elegir nivel">
+          <div id="pisos" class="pisos" role="tablist" aria-label="Pisos del estacionamiento"></div>
+          <p id="pisoDesc" class="piso-desc"></p>
+          <div id="niveles" class="niveles" role="list" translate="no"></div>
+          <p class="nota">Cada piso se abre con la mitad de las estrellas del anterior. ★★★ con el mínimo de movimientos, ★★ con un poco más, ★ sacando el auto como sea.</p>
+        </section>
+
+        <!-- ===== Vista 2: el estacionamiento ===== -->
+        <section id="vistaJuego" aria-label="Nivel en juego" hidden>
+          <!-- Marcador. conexion.js mueve aquí #sound-button dentro de Juegos y añade el volumen. -->
+          <div class="scorebar" role="group" aria-label="Marcador">
+            <div class="dato"><small>NIVEL</small><strong id="nNivel" translate="no">1</strong></div>
+            <div class="dato"><small>MOVIDAS</small><strong id="nMovs" translate="no">0</strong></div>
+            <div class="dato"><small>MÍNIMO</small><strong id="nMin" translate="no">0</strong></div>
+            <div class="dato"><small>TIEMPO</small><strong id="nTiempo" translate="no">0:00</strong></div>
+            <div class="dato metas" aria-label="Estrellas que da cada cantidad de movidas"><small>ESTRELLAS</small><strong id="nMetas" translate="no">★★★ ≤ 0</strong></div>
+            <button type="button" id="sound-button" aria-pressed="true" aria-label="Desactivar música y efectos" title="Música y efectos">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor"/>
+                <path class="ondas" d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/>
+                <path class="cruz" d="m16 9 6 6m0-6-6 6"/>
+              </svg>
+            </button>
+          </div>
+
+          <!-- El estacionamiento: cordón, asfalto con sus líneas y la barrera de salida a la derecha.
+               translate="no": i18n.js no debe tocar las letras de los vehículos. -->
+          <div id="marco" class="marco">
+            <div class="cordon">
+              <div id="lote" class="lote" tabindex="0" role="application" aria-roledescription="estacionamiento"
+                   aria-label="Estacionamiento de 6 por 6. Flechas o Q y E para elegir un vehículo, Espacio para tomarlo, flechas para moverlo y Espacio para soltarlo." translate="no">
+                <div class="lineas" aria-hidden="true"></div>
+                <div id="vehiculos" class="vehiculos"></div>
+              </div>
+              <!-- La salida: hueco en el cordón con barrera y cartel. -->
+              <div class="salida" aria-hidden="true">
+                <div class="cartel"><span>SALIDA</span><b>➜</b></div>
+                <div id="barrera" class="barrera"><i class="poste"></i><i class="brazo"></i></div>
+              </div>
+            </div>
+            <div id="final" class="final" role="dialog" aria-modal="false" aria-labelledby="finalTitulo" hidden></div>
+          </div>
+
+          <!-- Herramientas. -->
+          <div class="acciones">
+            <button type="button" id="btnNiveles" class="accion" title="Volver a los pisos (Esc)">▦ Niveles</button>
+            <button type="button" id="btnDeshacer" class="accion" title="Deshacer la última movida (Z)">↶ Deshacer <kbd>Z</kbd></button>
+            <button type="button" id="btnReiniciar" class="accion" title="Empezar el nivel de nuevo (R)">↺ Reiniciar <kbd>R</kbd></button>
+          </div>
+          <p class="nota" id="nota"></p>
+        </section>
+
+        <!-- Avisos para lectores de pantalla. -->
+        <div id="aviso" class="sr-only" role="status" aria-live="polite"></div>
+      </main>
+      <!-- Aquí conexion.js pone la clasificación dentro de Juegos. -->
+      <aside></aside>
+    </div>
+  </div>
+  <!-- El chip de sonido y el cancionero compartidos de la sala, el motor puro, los niveles y la pantalla. -->
+  <script src="../../audio/chip.js?v=atasco-1"></script>
+  <script src="../../audio/temas.js?v=atasco-1"></script>
+  <script src="motor.js?v=atasco-2"></script>
+  <script src="niveles.js?v=atasco-1"></script>
+  <script src="dibujo.js?v=atasco-1"></script>
+  <script src="game.js?v=atasco-2"></script>
+</body>
+</html>

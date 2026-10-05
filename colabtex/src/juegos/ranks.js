@@ -32,7 +32,7 @@ const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
 /* Los tres metales, en el orden del puesto. */
 const METAL = ["oro", "plata", "bronce"];
 const TITULO = ["Campeón", "Subcampeón", "Tercer puesto"];
-const EXTRA = { yzombis: { nombre: "Yemas zombis", color: "#7bd34a", sala: true }, minas: { nombre: "Mina Club", color: "#eeb765" }, snake: { nombre: "Snake Club", color: "#4be9bc" }, tetrisclub: { nombre: "Tetris Club", color: "#b04ee8" }, sortem: { nombre: "sortEm", color: "#ff006e" }, bbtan: { nombre: "BBTAN", color: "#c4f568" }, sopa: { nombre: "Sopa de letras", color: "#5b8cff" }, electro: { nombre: "Electrodle", color: "#f5a524" }, frontera: { nombre: "Frontera Batalla", color: "#e0743a" }, sudoku: { nombre: "Sudoku Arcade", color: "#ff2fb4" }, fanal: { nombre: "FANAL", color: "#d9a85b" } };
+const EXTRA = { yzombis: { nombre: "Yemas zombis", color: "#7bd34a", sala: true }, minas: { nombre: "Mina Club", color: "#eeb765" }, snake: { nombre: "Snake Club", color: "#4be9bc" }, tetrisclub: { nombre: "Tetris Club", color: "#b04ee8" }, sortem: { nombre: "sortEm", color: "#ff006e" }, bbtan: { nombre: "BBTAN", color: "#c4f568" }, sopa: { nombre: "Sopa de letras", color: "#5b8cff" }, electro: { nombre: "Electrodle", color: "#f5a524" }, frontera: { nombre: "Frontera Batalla", color: "#e0743a" }, sudoku: { nombre: "Sudoku Arcade", color: "#ff2fb4" }, fanal: { nombre: "FANAL", color: "#d9a85b" }, atasco: { nombre: "Atasco", color: "#e8322f" } };
 
 /* Las categorías de los juegos individuales, como botones y no como un
    desplegable: son pocas, se leen de un vistazo y cambiar de una a otra
@@ -76,6 +76,9 @@ const SOLO = {
      jornadas (la historia termina en la 13, el sin fin sigue). */
   fanal: { filas: [{ k: "m", t: "Tabla", ops: [["travesia", "Travesía"], ["sinfin", "Sin fin"], ["jornadas", "Jornada más lejana"]] }],
     cat: s => `club-fanal-${s.m}` },
+  /* Atasco: una sola tabla, las estrellas de todos los niveles. */
+  atasco: { filas: [{ k: "n", t: "Tabla", ops: [["estrellas", "Estrellas"]] }],
+    cat: s => `club-atasco-${s.n}` },
   snake: { filas: [
       { k: "m", t: "Modo", ops: [["classic", "Clásico"], ["arcade", "Arcade"], ["portals", "Portales"], ["reloj", "Contrarreloj"], ["espejo", "Espejo"], ["laberinto", "Laberinto"]] },
       { k: "t", t: "Mapa", ops: [["chico", "Chico"], ["mediano", "Mediano"], ["grande", "Grande"], ["gigante", "Gigante"]] }],
@@ -345,6 +348,8 @@ export function crearRanks(ctx) {
     /* BBTAN se mide en rondas alcanzadas, no en puntos. */
     if (solo && (categoriaSolo.startsWith("club-bbtan-") || categoriaSolo.startsWith("yemas-zombis-")))
       return { valor: f => f.puntos || 0, txt: v => `ronda ${v}`, unidad: "", menor: false };
+    if (solo && categoriaSolo === "club-atasco-estrellas")
+      return { valor: f => f.puntos || 0, txt: v => `${v} ★`, unidad: "", menor: false };
     if (solo && categoriaSolo === "club-fanal-jornadas")
       return { valor: f => f.puntos || 0, txt: v => `jornada ${v}`, unidad: "", menor: false };
     if (solo && categoriaSolo.startsWith("club-frontera-"))

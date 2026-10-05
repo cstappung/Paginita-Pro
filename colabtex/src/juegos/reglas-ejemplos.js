@@ -1,4 +1,4 @@
-import {cart, dados, tablero, orbes, reversi, cajas, paisaje, tiro, orbita, serpiente, tetris, isla, ajedrez, fanal, boxhead} from './reglas-ilustraciones.js';
+import {cart, dados, tablero, orbes, reversi, cajas, paisaje, tiro, orbita, serpiente, tetris, isla, ajedrez, fanal, boxhead, atasco} from './reglas-ilustraciones.js';
 const p=(titulo,texto,imagen)=>({titulo,texto,imagen});
 const e=(id,titulo,...pasos)=>({id,titulo,pasos});
 const fichas=(titulo,...cs)=>cart([titulo,cs]);
@@ -189,6 +189,16 @@ export const EJEMPLOS={
  e('poderes','Poderes, cartas y llamas',
   p('Lo que sueltan las polillas','A veces una polilla apagada suelta un frasco. Pabilo doble: dos tiros por disparo. Lente: los tiros atraviesan todo. Campana: aguanta un golpe. Aceite: una llama más. Destello: apaga la fila más baja.',fichas('Los poderes',['Pabilo','oro','DOS TIROS'],['Lente','azul','ATRAVIESA'],['Campana','blanco','UN GOLPE'],['Aceite','verde','+1 LLAMA'])),
   p('La Mensajera y sus cartas','Una polilla grande y pálida cruza por arriba de vez en cuando con una carta. Si la alcanzas, la carta queda en tu Bitácora para siempre y se lee al final de la jornada. Hay trece, y cada acto deja leer las suyas.',fichas('Una carta recuperada',['✉','oro','CARTA'],['+300','verde','PUNTOS'],['VI','violeta','DE XIII'])))],
+ atasco:[e('salida','Sacar el auto rojo en el mínimo',
+  p('Mira qué lo encierra','El auto rojo solo se mueve de lado, por la fila de la salida. Aquí lo tapan un auto azul y un camión verde. Para bajar el camión, primero hay que correr el furgón naranja.',atasco(0)),
+  p('Abre el camino','Cada vehículo se arrastra por su carril, hacia adelante o hacia atrás, sin girar. El furgón va a la izquierda, el camión baja y el auto sube: tres movidas.',atasco(1)),
+  p('Sácalo','Con la fila libre, el auto rojo avanza hasta la barrera. Cuatro movidas es el mínimo de este estacionamiento, así que da las tres estrellas.',atasco(2))),
+ e('estrellas','Cuántas estrellas da cada nivel',
+  p('Las cuentas del marcador','Cada nivel dice su mínimo. Con ese mínimo, tres estrellas; con un tercio más (y al menos dos movidas de margen), dos; sacando el auto como sea, una.',fichas('Un nivel de mínimo 4',['4','oro','★★★'],['5–6','verde','★★'],['7 o más','gris','★'])),
+  p('Arrastrar lejos cuenta una','Una movida es soltar un vehículo en otra casilla, aunque haya avanzado tres. Deshacer devuelve esa movida y la descuenta; Reiniciar vuelve al principio con cero movidas.',fichas('Qué cuenta',['3 casillas','verde','1 MOVIDA'],['↶','azul','−1 MOVIDA'],['↺','oro','DESDE 0']))),
+ e('pisos','Seis pisos que se abren con estrellas',
+  p('Cada piso pide la mitad','Los 240 niveles están en seis pisos de 40. Un piso se abre cuando el anterior junta la mitad de sus estrellas: 60 de 120.',fichas('Abrir el Subterráneo 1',['La calle','verde','60 / 120 ★'],['Subt. 1','oro','ABIERTO'],['Subt. 2','gris','CERRADO'])),
+  p('Dentro de un piso, en orden','Cada nivel se abre al sacar el auto en el anterior, con las estrellas que sean. Volver a un nivel para mejorarlo no cuesta nada y suma a la clasificación.',fichas('Tu avance',['12','oro','★★★'],['13','verde','★'],['14','azul','SIGUIENTE'])))],
  frontera:[e('racha','Una racha de siete en siete',
   p('Elige instalación y nivel','Torre, Palacio o Fábrica, en Nivel 50 o Abierto. Cada combinación guarda su propia racha, así que puedes llevar varias a la vez.',fichas('Tu elección',['Torre','azul','INSTALACIÓN'],['50','verde','NIVEL'],['3','oro','POKÉMON'])),
   p('Gana siete seguidos','Cada serie son siete combates. Al séptimo del 21, 42 o 35 y 70 en la Torre te espera un As de la Frontera, y vencerlo da su símbolo.',fichas('Serie 3',['15–20','verde','GANADOS'],['21','rojo','AS'],['🥈','oro','SÍMBOLO'])),
