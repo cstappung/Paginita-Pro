@@ -80,3 +80,9 @@ test('FANAL: nombre, modalidades y marcas',()=>{
  assert.match(marcaSolo('club-fanal-travesia',{puntos:45210,tiempo:1}),/^🪔 45.210 pts$/);
  assert.ok(mensajePodio({categoria:'club-fanal-travesia',uid:'a',nombre:'Ana',puesto:1,filas:[{uid:'a',nombre:'Ana',puntos:900,tiempo:9000}],enlace:'https://x/juegos.html#solo/fanal'}));
 });
+test('Atasco: nombre, tabla y marca en estrellas',()=>{
+ assert.equal(categoriaLegible('club-atasco-estrellas').club.nombre,'Atasco');
+ assert.equal(categoriaLegible('club-atasco-estrellas').modalidad,'estrellas');
+ assert.equal(marcaSolo('club-atasco-estrellas',{puntos:312,tiempo:1}),'🚗 312 ★');
+ assert.ok(mensajePodio({categoria:'club-atasco-estrellas',uid:'a',nombre:'Ana',puesto:1,filas:[{uid:'a',nombre:'Ana',puntos:300,tiempo:9000}],enlace:'https://x/juegos.html#solo/atasco'}));
+});

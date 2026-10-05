@@ -17,6 +17,8 @@
  *   bbtan      Do mayor, 142 — arcade saltarín: bajo que rebota en octavas.
  *   sudoku     Mi mayor, 134 — arcade de cuadrícula: la melodía va en grupos
  *              de tres notas, como las cajas de 3×3; el clímax sube un tono.
+ *   atasco     Si bemol mayor, 124 con swing — funk de hora punta con un
+ *              motivo de bocina («pi, pi») y palmas en el 2 y el 4.
  *   worms-menu / worms-combate  Mi mayor tranquilo y Si menor de batalla.
  *
  * Y los que no son de ningún juego, para el reproductor de la cabecera:
@@ -288,6 +290,62 @@
     },
     // Intro, el motivo dos veces, el respiro, el motivo, el clímax y, de
     // vuelta, el respiro y el clímax un tono más arriba.
+    orden: "I A A B A C A B C+2"
+  };
+
+  /* Atasco: Si bemol mayor a 124 con swing, tonalidad que no usa ningún
+     otro tema del cancionero. Melodía original. Es un funk de hora punta:
+     el motivo es una bocina —dos notas cortas iguales y un silencio, «pi,
+     pi»— que abre cada frase de A y vuelve tres veces seguidas al final del
+     clímax, como un auto que ya se cansó de esperar. El bajo salta a la
+     octava a contratiempo, como un motor en ralentí, y las palmas caen en
+     el 2 y el 4. B baja al ii-V (Do menor, Fa7) para que la frase respire
+     mientras se piensa la jugada, y C trepa por Mi bemol y Fa hasta el Si
+     bemol agudo, que es el auto rojo saliendo. La segunda vuelta de C sube
+     un tono (C+2). La intro son dos bocinazos sobre el bajo solo. */
+  T.atasco = {
+    bpm: 124, swing: .12,
+    // Pulso 25 % con eco corto: la «trompeta» del funk.
+    lead: { onda: "p25", vol: .14, vib: .006, sus: .55, eco: { t: .12, fb: .22, mezcla: .2 } },
+    // Triángulo que salta fundamental-octava: el ralentí del motor.
+    bajo: { onda: "tri", vol: .22 },
+    // Arpegio fino arriba: las luces intermitentes del estacionamiento.
+    arp: { onda: "p12", vol: .045, oct: 5, paso: .035 },
+    bat: { vol: .3 },
+    secciones: {
+      // Intro: «pi, pi» en Re y en Do, y una nota larga, sobre el bajo.
+      I: sec("Bb F7",
+        "D6 . D6 . .*12 " +
+        "C6 . C6 . .*4 F5*8",
+        "R . O R . R O . F . O . R . O .", "k...c...k.k.c..h", 4),
+      // A: la bocina abre la frase y la melodía sube por el acorde.
+      A: sec("Bb Gm7 Eb F7",
+        "D5 . D5 . F5*2 Bb5*2 A5 . Bb5 . D6*4 " +
+        "C6*2 Bb5*2 G5*4 F5*2 G5*2 Bb5*4 " +
+        "Eb5 . G5 . Bb5*2 Eb6*2 D6*2 C6*2 Bb5*4 " +
+        "A5*2 C6*2 Eb6*2 D6*2 C6*4 A5 . F5 .",
+        "R . O R . R O . F . O . R . O .", "k.h.c.hkk.h.c.hh", 4),
+      // B: el ii-V-I, frases largas para pensar.
+      B: sec("Cm7 F7 Bbmaj7 Gm7",
+        "G5*3 Eb5 C5*2 Eb5*2 G5*4 Bb5*4 " +
+        "A5*3 F5 C5*2 F5*2 A5*2 C6*2 Eb6*4 " +
+        "D6*6 C6*2 A5*4 F5*4 " +
+        "G5*2 Bb5*2 D6*2 F6*2 D6*4 . . C6*2",
+        "R . R O . R F . R . R O . R F .", "k.hcs.h.k.hcs.h.", 2),
+      // C: el clímax de ocho compases; termina con tres bocinazos y el Si bemol agudo.
+      C: sec("Eb F Dm7 Gm7 Cm7 F7 Bb Bb",
+        "Bb5 . Bb5 . Eb6*2 G6*2 F6*2 Eb6*2 Bb5*4 " +
+        "C6 . C6 . F6*2 A6*2 G6*2 F6*2 C6*4 " +
+        "D6*2 F6*2 A6*4 G6*2 F6*2 D6*4 " +
+        "Bb5*2 D6*2 G6*4 F6*2 D6*2 Bb5*4 " +
+        "Eb6*2 D6*2 C6*2 Bb5*2 G5*4 C6*4 " +
+        "A5*2 C6*2 F6*2 Eb6*2 D6*2 C6*2 A5*4 " +
+        "D6 . D6 . F6 . D6 . Bb6*8 " +
+        "Bb6*4 F6*2 D6*2 Bb5*4 .*4",
+        "R . O R . R O . F . O . R . O .", "kchks.hkkchks.hx", 2)
+    },
+    // Intro, la idea dos veces, el respiro, la idea, el clímax y, de vuelta,
+    // el respiro y el clímax un tono más arriba.
     orden: "I A A B A C A B C+2"
   };
 

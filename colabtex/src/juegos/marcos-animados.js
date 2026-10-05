@@ -187,6 +187,29 @@ function fanal() {
     en(61, 180, farol);                                                  // el farol, abajo
 }
 
+/* Atasco: una pista de asfalto alrededor de la foto con su línea
+   discontinua que corre, el auto rojo dando la vuelta, un semáforo arriba
+   que pasa de rojo a amarillo a verde y el cartel azul de «P» abajo. */
+function atasco() {
+  // El auto rojo visto desde arriba (14×8): carrocería, parabrisas, techo y franjas.
+  const auto = rect(14, 8, 2.6, "#e8322f", `stroke="#1d2330" stroke-width="1"`) +
+    `<rect x="2" y="-3" width="2" height="6" rx=".6" fill="#9fd6ff"/><rect x="-3.5" y="-2.6" width="5.2" height="5.2" rx="1" fill="#b71f1d"/>` +
+    `<path d="M-6.5-.9H6.5M-6.5 .9H6.5" stroke="#fff" stroke-width=".6" opacity=".85"/>`;
+  // El semáforo: caja oscura y tres luces que se encienden por turnos.
+  const luz = (y, c, ret) => an("t", 2.4, `<circle cy="${y}" r="2.1" fill="${c}"/>`, ret);
+  const semaforo = rect(7, 19, 2, "#1d2330", `stroke="#f5b700" stroke-width=".9"`) +
+    `<circle cy="-5.6" r="2.1" fill="#3a2020"/><circle r="2.1" fill="#3a3420"/><circle cy="5.6" r="2.1" fill="#1e3a26"/>` +
+    luz(-5.6, "#ff4d4d", 0) + luz(0, "#ffd84d", -1.6) + luz(5.6, "#4dff8a", -.8);
+  // El cartel de estacionamiento.
+  const cartel = rect(12, 12, 2.4, "#2f6fde", `stroke="#fff" stroke-width="1.2"`) + tx("P", 9, "#fff");
+  return aro(60, "#474c56", 18) +                                       // la pista de asfalto
+    aro(51.5, "#f5b700", 1.4) + aro(68.5, "#f5b700", 1.4) +             // los bordes amarillos del cordón
+    `<g class="fl" style="--d:1.6s">${aro(60, "#ffffffcc", 1.2, `stroke-dasharray="4 5"`)}</g>` + // la línea del carril que corre
+    gira(5, en(60, 0, auto, 90)) +                                       // el auto rojo da la vuelta
+    en(61, 0, semaforo) + en(61, 180, cartel) +                          // el semáforo arriba y la «P» abajo
+    chispas([[66, 70, 2, 1.6, 0], [66, 290, 2, 1.9, -.7]], "#fff3b0");  // dos destellos de faros
+}
+
 function frontera() {
   const sim = [
     `<path d="M0-2.8L.8-.8L2.8-.8L1.2.5L1.8 2.6L0 1.3L-1.8 2.6L-1.2.5L-2.8-.8L-.8-.8Z"/>`,
@@ -465,7 +488,7 @@ const DIBUJOS = {
   telectro: electro, tfrontera: frontera, tpokemon: pokemon, tescondite: escondite, tcartas: cartas,
   tcuadritos: cuadritos, treversi: reversi, torbita: orbita, tcadena: cadena, tflip: flip, tcacho: cacho,
   tuno: uno, tcatan: catan, tpresidente: presidente, tspicy: spicy, tworms: worms, tyemas: yemas,
-  tzombis: zombis, tclue: clue, tajedrez: ajedrez, tmonedas: monedas, tprodrop: prodrop, tsudoku: sudoku, tfanal: fanal, tboxhead: boxhead,
+  tzombis: zombis, tclue: clue, tajedrez: ajedrez, tmonedas: monedas, tprodrop: prodrop, tsudoku: sudoku, tfanal: fanal, tboxhead: boxhead, tatasco: atasco,
   cometa, vortice, sakura, plasma, mariposas
 };
 

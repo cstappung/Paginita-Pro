@@ -67,6 +67,10 @@ export const SOLOS = [
     ruta: "#solo/fanal", reglas: "fanal", popular: "club-fanal", ranking: true,
     lema: "Llevas la última luz a través de la noche, hacia el Alba. Dispara al pulso de la música.",
     modos: ["Travesía", "Sin fin"] },
+  { id: "atasco", tipo: "club", nombre: "Atasco", genero: "Puzzle", icono: "🚗", alta: "2026-10-05",
+    ruta: "#solo/atasco", reglas: "atasco", popular: "club-atasco", ranking: true,
+    lema: "Desliza autos, camiones y buses hasta abrirle paso al auto rojo. 240 niveles en seis pisos.",
+    modos: ["240 niveles", "1, 2 o 3 estrellas"] },
   { id: "frontera", tipo: "club", nombre: "Frontera Batalla", genero: "Pokémon", icono: "🏰", alta: "2026-10-02",
     ruta: "#solo/frontera", reglas: "frontera", popular: "club-frontera", ranking: true,
     lema: "Torre, Palacio y Fábrica de Esmeralda: rachas de siete combates contra entrenadores cada vez más duros.",
@@ -152,7 +156,7 @@ export function entradasSalon(juegos, orden = Object.keys(juegos)) {
 /* El acento de cada juego del club, el mismo de su portada. */
 export const COLOR_SOLO = {
   minas: "#f6bc64", snake: "#58f5c0", tetrisclub: "#2fd3e8", sortem: "#00f5ff", bbtan: "#c4f568",
-  sopa: "#ffb070", electro: "#fbbf24", sudoku: "#ff2fb4", fanal: "#d9a85b", frontera: "#fb923c"
+  sopa: "#ffb070", electro: "#fbbf24", sudoku: "#ff2fb4", fanal: "#d9a85b", atasco: "#e8322f", frontera: "#fb923c"
 };
 
 /* Si se puede jugar en un celular: con el dedo y en una pantalla de 390 px.
@@ -176,7 +180,7 @@ export const MOVIL = {
   boxhead: "teclado",         // se mueve y dispara solo con el teclado
   // Un jugador (`SOLOS`)
   minas: true, snake: true, tetrisclub: true, bbtan: true, sopa: true,
-  electro: true, sudoku: true, fanal: true, frontera: true,
+  electro: true, sudoku: true, fanal: true, atasco: true, frontera: true,
   "bots-worms": true, "bots-clue": true,
   sortem: "teclado",          // flechas y espacio, sin controles en pantalla
   "bots-yemas": "teclado y ratón",

@@ -7,7 +7,7 @@ vm.runInContext(sin('src/juegos/motor.js')+'\n'+sin('src/juegos/logros.js')+'\n;
 const {LOGROS,detecta,deFila,deMarca,reparto,reducir,JUEGOS}=context.__L;
 
 test('diez logros por juego, con ids válidos y únicos',()=>{
- const juegos=[...Object.keys(JUEGOS),'minas','snake','tetrisclub','sortem','bbtan','sopa','electro','frontera','sudoku','fanal'];
+ const juegos=[...Object.keys(JUEGOS),'minas','snake','tetrisclub','sortem','bbtan','sopa','electro','frontera','sudoku','fanal','atasco'];
  for(const j of juegos){
   assert.ok(LOGROS[j],j);assert.equal(LOGROS[j].length,10,j);
   const ids=LOGROS[j].map(x=>x.id);assert.equal(new Set(ids).size,10,j);
@@ -65,4 +65,10 @@ test('FANAL: la travesía por jornadas y los puntos de cada modo',()=>{
  assert.deepEqual([...deMarca('fanal',{categoria:'club-fanal-sinfin',puntos:120000,tiempo:1})],['s100k']);
  // Los puntos del sin fin no dan logros de la travesía, ni al revés.
  assert.deepEqual([...deMarca('fanal',{categoria:'club-fanal-sinfin',puntos:61000,tiempo:1})],[]);
+});
+test('Atasco: los logros salen de las estrellas juntadas',()=>{
+ assert.deepEqual([...deMarca('atasco',{categoria:'club-atasco-estrellas',puntos:1,tiempo:1})],['e1']);
+ assert.deepEqual([...deMarca('atasco',{categoria:'club-atasco-estrellas',puntos:65,tiempo:1})],['e1','e30','e60']);
+ assert.deepEqual([...deMarca('atasco',{categoria:'club-atasco-estrellas',puntos:720,tiempo:1})].length,10);
+ assert.deepEqual([...deMarca('atasco',{categoria:'club-fanal-travesia',puntos:720,tiempo:1})],[]);
 });

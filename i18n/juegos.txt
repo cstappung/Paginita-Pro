@@ -482,3 +482,21 @@ Celular || Mobile || Cellulare
 Funciona en el celular || Works on mobile || Funziona sul cellulare
 Solo en computador: se juega con teclado || Computer only: needs a keyboard || Solo su computer: serve la tastiera
 Solo en computador: se juega con teclado y ratón || Computer only: needs a keyboard and mouse || Solo su computer: servono tastiera e mouse
+# Atasco (juegos/club/atasco/): marcador, botones, pisos y pantalla final.
+Saca el auto rojo del estacionamiento || Get the red car out of the car park || Porta fuori l'auto rossa dal parcheggio
+NIVEL || LEVEL || LIVELLO
+MOVIDAS || MOVES || MOSSE
+MÍNIMO || MINIMUM || MINIMO
+TIEMPO || TIME || TEMPO
+ESTRELLAS || STARS || STELLE
+Niveles || Levels || Livelli
+Deshacer || Undo || Annulla
+Reiniciar || Restart || Ricomincia
+Repetir || Retry || Riprova
+Siguiente ▶ || Next ▶ || Avanti ▶
+¡Afuera! || You're out! || Fuori!
+¡Bien manejado! || Nicely driven! || Ben guidato!
+¡Perfecto! || Perfect! || Perfetto!
+La calle || The street || La strada
+Subterráneo {} || Basement {} || Interrato {}
+La bóveda || The vault || Il caveau

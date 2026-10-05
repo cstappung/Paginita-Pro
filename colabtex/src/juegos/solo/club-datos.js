@@ -20,6 +20,9 @@ export function categoriaClub(juego, categoria) {
     // lejana a la que se llegó (jornadas completadas).
     : juego === 'fanal'
     ? /^club-fanal-(travesia|sinfin|jornadas)$/.test(categoria)
+    // Atasco: una sola tabla, las estrellas juntadas en todos los niveles.
+    : juego === 'atasco'
+    ? categoria === 'club-atasco-estrellas'
     : juego === 'tetris'
     ? /^club-tetris-(maraton|sprint|ultra)$/.test(categoria)
     : /^club-snake-(classic|arcade|portals|reloj|espejo|laberinto)-(chico|mediano|grande|gigante)$/.test(categoria));
@@ -49,6 +52,9 @@ export function resultadoClub(juego, dato) {
      como el arcade del sudoku; las jornadas, con el tope común de 100 000. */
   if (juego === 'fanal' && dato.categoria !== 'club-fanal-jornadas' && dato.puntos > 1000000) return null;
   if (dato.categoria === 'club-fanal-jornadas' && dato.puntos > 100000) return null;
+  /* Atasco: tres estrellas por nivel; 3000 deja sitio para más pisos
+     sin aceptar números absurdos (hoy son 240 niveles, 720 estrellas). */
+  if (juego === 'atasco' && dato.puntos > 3000) return null;
   /* Frontera: la racha y las victorias son combates; 100 000 es el tope
      de la regla. */
   if (juego === 'frontera' && dato.puntos > 100000) return null;
