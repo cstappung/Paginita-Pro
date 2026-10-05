@@ -92,7 +92,7 @@ async function main() {
         if (p) {
           let prueba = null;
           try { prueba = p.d ? JSON.parse(p.d) : null; } catch { motivos.push('prueba ilegible'); }
-          const m = await verificaClub(juego, { categoria, puntos: fila.puntos, tiempo: fila.tiempo, partida: fila.partida }, prueba, { uid });
+          const m = await verificaClub(juego, { categoria, puntos: fila.puntos, tiempo: fila.tiempo, partida: fila.partida }, prueba, { uid, ahora: Number.isFinite(p.at) ? p.at : undefined });
           if (m) motivos.push('la prueba no cuadra: ' + m);
         } else if (VERIFICADORES[juego].PRUEBA > 0) {
           motivos.push('sin prueba (anterior a la verificación, o escrita a mano)');

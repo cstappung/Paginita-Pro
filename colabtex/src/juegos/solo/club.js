@@ -15,7 +15,8 @@ import {verificaClub} from './verifica.js';
    (verifica.js, docs/antitrampas.md) con la prueba que mandó el juego. Si
    no cuadra, no se guarda, no paga y no da logros: el juego se entera
    (`rechazo`) y queda un aviso en `sospechas` (`reportaSospecha`). Lo que
-   había pendiente en localStorage se vuelve a verificar al cargarlo,
+   había pendiente en localStorage se vuelve a verificar al cargarlo
+   (con la hora en que se jugó, `h`: un diario de ayer sigue valiendo),
    porque ese almacén también se puede editar a mano. `guardar` recibe la
    prueba como cuarto argumento, para escribirla junto al récord. */
 export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partida,reportaSospecha}) {
@@ -28,9 +29,9 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
   const cargados=invitado?Promise.resolve():(async()=>{
     let valor={};try{valor=JSON.parse(localStorage.getItem(clave)||'{}')||{};}catch{}
     for (const [k,v] of Object.entries(valor)) { const dato=resultadoClub(juego,v);if(!dato||k!==dato.categoria)continue;
-      const motivo=await verificaClub(juego,dato,v.prueba,{uid:cuenta});
+      const motivo=await verificaClub(juego,dato,v.prueba,{uid:cuenta,ahora:Number.isFinite(v.h)&&v.h<=Date.now()&&Date.now()-v.h<3*864e5?v.h:undefined});
       if(motivo){sospecha(dato,motivo,'pendiente');continue;}
-      if(mejorClub(dato,pendientes[k]))pendientes[k]={...dato,prueba:v.prueba};
+      if(mejorClub(dato,pendientes[k]))pendientes[k]={...dato,prueba:v.prueba,h:v.h};
     }
     persistir();
   })();
@@ -48,7 +49,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
       if(muerto)break;revisados[key]=dato.partida;
       estado('Sincronizando tu récord…',key);
       try{
-        const {prueba,...fila}=dato;
+        const {prueba,h,...fila}=dato;
         await guardar(key,usuario.uid,{...fila,nombre:usuario.name.slice(0,80)},prueba);
         if(pendientes[key]?.partida===dato.partida){delete pendientes[key];persistir();}
         estado('Récord sincronizado con tu cuenta.',key);
@@ -107,7 +108,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
           return;
         }
         if(alResultado){try{alResultado(dato,propios[dato.categoria]||pendientes[dato.categoria]||null);}catch(err){/* un logro no debe romper la partida */}}
-        if(mejorClub(dato,pendientes[dato.categoria])){pendientes[dato.categoria]={...dato,prueba};persistir();}
+        if(mejorClub(dato,pendientes[dato.categoria])){pendientes[dato.categoria]={...dato,prueba,h:Date.now()};persistir();}
         sincronizar();
       });
     }
@@ -125,7 +126,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
     temaObserver.observe(document.documentElement,{attributes:true,attributeFilter:['data-tema']});
     frame.allow='fullscreen';frame.setAttribute('allowfullscreen','');
     window.addEventListener('message',mensaje);
-    frame.src='juegos/club/'+juego+'/index.html?v=club-27&embed=1&cuenta='+encodeURIComponent(cuenta)+(invitado?'&invitado=1':'');
+    frame.src='juegos/club/'+juego+'/index.html?v=club-28&embed=1&cuenta='+encodeURIComponent(cuenta)+(invitado?'&invitado=1':'');
     host.appendChild(frame);
   }
   function destruir(){muerto=true;temaObserver?.disconnect();if(off)off();window.removeEventListener('message',mensaje);for(const [el,valor]of ocultos)el.style.display=valor;frame?.remove();host.innerHTML='';ambientar('');}

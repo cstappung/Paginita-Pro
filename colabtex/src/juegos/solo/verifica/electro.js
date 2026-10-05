@@ -183,9 +183,9 @@ function inhumano(dias) {
 }
 
 /* El tercer argumento es el `ctx` de verificaClub ({uid}); las pruebas
-   pasan en su lugar una Date (o {ahora}) para fijar el día. Sin ella
+   pasan en su lugar una Date (o {ahora}, Date o ms) para fijar el día. Sin ella
    manda el reloj. */
-const ahoraDe = ctx => ctx instanceof Date ? ctx : ctx && ctx.ahora instanceof Date ? ctx.ahora : null;
+const ahoraDe = ctx => ctx instanceof Date ? ctx : ctx && ctx.ahora instanceof Date ? ctx.ahora : ctx && Number.isFinite(ctx.ahora) ? new Date(ctx.ahora) : null;
 export function verifica(dato, prueba, ctx) {
   const r = rehaz(prueba, ahoraDe(ctx));
   if (typeof r === 'string') return r;
