@@ -22,6 +22,7 @@ export const CONTROLES = {
   "fanal": {"movil":true,"pc":true,"pide":"","por":"escucha toques"},
   "flip7": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
   "frontera": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
+  "metrorush": {"movil":true,"pc":true,"pide":"","por":"escucha toques"},
   "minas": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
   "orbita": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
   "pokemon": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},

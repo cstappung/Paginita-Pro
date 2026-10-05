@@ -1,0 +1,499 @@
+/* Metro Rush — el estilo de la página.
+
+   La página se parece a las demás del Club (cabecera, marcador, la pantalla
+   del juego y la clasificación al lado), pero la pantalla es siempre oscura y
+   su marcador cambia con la estética de la estación: letras gordas con borde
+   (juguete), letras de cabina que brillan (neón) o letra pixel con marcos
+   escalonados (retro). El atributo data-estilo de #pantalla lo decide.
+
+   Los tamaños del marcador van en unidades del contenedor (cqh, cqw): la
+   pantalla es un contenedor de tamaño, así el marcador se ve igual de grande
+   en un monitor y en un celular, en proporción. */
+
+:root { --tinta: #1d2333; --suave: #66708a; --linea: #e3e1ea; --fondo: #f4f3f7; --acento: #ff6a3d; --azul: #2c7be0; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--fondo); color: var(--tinta); font: 15px/1.5 "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; }
+.shell { max-width: 1240px; margin: 0 auto; padding: 18px 16px 40px; }
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 285px; gap: 24px; align-items: start; }
+@media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+main.vl { min-width: 0; }
+.cab { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 10px; }
+.marca { margin: 0; font: 400 34px/1 "Lilita One", "Arial Black", sans-serif; color: var(--acento); letter-spacing: .5px; text-shadow: 0 3px 0 #1d2333; }
+.lema { margin: 0; color: var(--suave); }
+
+/* ---------- el marcador de la página ---------- */
+.scorebar { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; background: #fff; border: 1px solid var(--linea); border-radius: 16px 16px 0 0; padding: 10px 14px; }
+.scorebar .dato { display: grid; line-height: 1.1; }
+.scorebar small { font-size: 10.5px; letter-spacing: .08em; color: var(--suave); font-weight: 600; }
+.scorebar strong { font: 400 20px/1.1 "Lilita One", "Arial Black", sans-serif; }
+.scorebar .botones { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.icono { width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--linea); background: #f7f6fa; font-size: 17px; cursor: pointer; color: var(--tinta); }
+.icono:hover { border-color: var(--acento); }
+.icono.apagado { opacity: .45; text-decoration: line-through; }
+:focus-visible { outline: 3px solid var(--acento); outline-offset: 2px; }
+
+/* ---------- la pantalla del juego ---------- */
+/* `hidden` tiene que ganar siempre: las capas, el HUD y el botón «seguir»
+   llevan display propio (grid/flex) y sin esto se quedaban todos visibles. */
+[hidden] { display: none !important; }
+.pantalla { position: relative; width: 100%; aspect-ratio: 16 / 10; max-height: 82vh; background: #0b0d14; border-radius: 0 0 16px 16px; overflow: hidden; container-type: size; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+@media (max-width: 700px) and (orientation: portrait) { .pantalla { aspect-ratio: 3 / 4; max-height: 78svh; } }
+#lienzo { position: absolute; inset: 0; width: 100%; height: 100%; display: block; outline: none; }
+.pantalla[data-estilo="pixel"] #lienzo { image-rendering: pixelated; }
+.pie { margin: 8px 2px 0; color: var(--suave); font-size: 13px; text-align: center; }
+
+/* ---------- el marcador sobre la carrera ---------- */
+.hud { position: absolute; inset: 0; pointer-events: none; --u: 1cqh; }
+@container (max-aspect-ratio: 1/1) { .hud { --u: 0.8cqh; } }
+.hud-izq { position: absolute; left: calc(2.4 * var(--u)); top: calc(2.4 * var(--u)); display: grid; gap: calc(.8 * var(--u)); justify-items: start; }
+.hud-der { position: absolute; right: calc(2.4 * var(--u)); top: calc(2.4 * var(--u)); display: flex; gap: calc(1.4 * var(--u)); align-items: center; }
+.hud .fila { display: flex; align-items: center; gap: calc(1.2 * var(--u)); }
+.hud .valor { font-size: calc(6.6 * var(--u)); line-height: 1; }
+.hud .chico { font-size: calc(3.3 * var(--u)); line-height: 1; }
+.hud .mult { font-size: calc(3.6 * var(--u)); }
+.hud .pausa { pointer-events: auto; width: calc(6.6 * var(--u)); height: calc(6.6 * var(--u)); display: grid; place-items: center; cursor: pointer; padding: 0; }
+.hud .pausa b { display: flex; gap: calc(1 * var(--u)); }
+.hud .pausa b::before, .hud .pausa b::after { content: ""; width: calc(1 * var(--u)); height: calc(2.8 * var(--u)); background: currentColor; border-radius: 2px; }
+.hud .moneda { width: calc(4.6 * var(--u)); height: calc(4.6 * var(--u)); }
+.estacion { display: grid; gap: calc(.5 * var(--u)); font-size: calc(2.3 * var(--u)); }
+.estacion .barra { width: calc(26 * var(--u)); height: calc(1.1 * var(--u)); border-radius: 99px; background: rgba(0, 0, 0, .35); overflow: hidden; --k: 0; }
+.estacion .barra i { display: block; height: 100%; width: calc(var(--k) * 100%); background: linear-gradient(90deg, #ffd23f, #ff6a3d); border-radius: inherit; }
+.poderes { position: absolute; left: calc(2.4 * var(--u)); bottom: calc(10 * var(--u)); margin: 0; padding: 0; list-style: none; display: grid; gap: calc(1 * var(--u)); }
+.poderes li { display: flex; align-items: center; gap: calc(1 * var(--u)); }
+.poderes li b { width: calc(5 * var(--u)); height: calc(5 * var(--u)); display: grid; place-items: center; border-radius: 50%; font-size: calc(2.6 * var(--u)); background: #fff; box-shadow: 0 calc(.4 * var(--u)) 0 rgba(0, 0, 0, .4); }
+.poderes li b svg { display: block; width: 72%; height: 72%; }
+.poderes li span { width: calc(18 * var(--u)); height: calc(1.6 * var(--u)); border-radius: 99px; background: rgba(0, 0, 0, .45); overflow: hidden; }
+.poderes li span i { display: block; height: 100%; width: calc(var(--k) * 100%); background: #ff6a3d; }
+.poderes .p-iman span i { background: #ff5a5a; } .poderes .p-mochila span i { background: #ffb02e; } .poderes .p-zapatillas span i { background: #3ad16a; } .poderes .p-doble span i { background: #5fb0ff; } .poderes .p-patineta span i { background: #b37bff; }
+.patinetas { position: absolute; right: calc(2.4 * var(--u)); bottom: calc(10 * var(--u)); display: flex; gap: calc(.8 * var(--u)); align-items: center; font-size: calc(3 * var(--u)); color: #fff; text-shadow: 0 2px 0 #000; }
+
+/* El letrero grande (estación nueva, récord, boleto) y el aviso corto. */
+.banner { position: absolute; left: 50%; top: 30%; transform: translate(-50%, -50%) scale(.9); text-align: center; color: #fff; opacity: 0; pointer-events: none; display: grid; gap: calc(.8cqh); width: 90%; transition: opacity .3s, transform .3s; }
+.banner.ver { opacity: 1; transform: translate(-50%, -50%) scale(1); animation: banner 3s forwards; }
+@keyframes banner { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.7); } 12% { opacity: 1; transform: translate(-50%, -50%) scale(1.06); } 20% { transform: translate(-50%, -50%) scale(1); } 85% { opacity: 1; } 100% { opacity: 0; } }
+.banner strong { font-size: 7.5cqh; line-height: 1.05; }
+.banner span { font-size: 3cqh; opacity: .9; }
+.aviso { position: absolute; left: 50%; bottom: 4cqh; transform: translate(-50%, 20px); max-width: 88%; padding: 1cqh 2.2cqh; border-radius: 99px; background: rgba(10, 12, 22, .78); color: #fff; font-size: 2.4cqh; text-align: center; opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none; }
+.aviso.ver { opacity: 1; transform: translate(-50%, 0); }
+@media (prefers-reduced-motion: reduce) { .banner.ver { animation: none; } }
+/* La pista de las primeras carreras: grande, abajo (más arriba tapaba al
+   corredor), sobre el aviso chico, con la flecha moviéndose hacia donde hay
+   que deslizar (o qué tecla apretar). */
+.pista { position: absolute; left: 50%; bottom: 11cqh; translate: -50% 0; display: flex; align-items: center; gap: 1.6cqh; padding: 1.1cqh 2.6cqh 1.1cqh 1.3cqh; border-radius: 99px; white-space: nowrap; pointer-events: none;
+  background: rgba(10, 18, 50, .66); border: .4cqh solid rgba(255, 255, 255, .85); box-shadow: 0 .6cqh 1.6cqh rgba(0, 0, 0, .35);
+  font: 400 4cqh/1 "Lilita One", "Arial Black", sans-serif; color: #fff; text-shadow: 0 .3cqh 0 #142357; animation: pista-entra .25s ease-out; }
+.pista i { flex: none; width: 6.4cqh; height: 6.4cqh; padding: .7cqh; border-radius: 50%; background: #fff; box-shadow: 0 .4cqh 0 rgba(0, 0, 0, .3); }
+.pista i svg { display: block; width: 100%; height: 100%; }
+.pista[data-tipo="bajo"] i { animation: pista-arriba .7s ease-in-out infinite; }
+.pista[data-tipo="alto"] i { animation: pista-abajo .7s ease-in-out infinite; }
+.pista[data-tipo="tren"] i { animation: pista-lado .9s ease-in-out infinite; }
+.pantalla.con-pots .pista { bottom: calc(14 * var(--u, 1cqh) + 13cqh); }
+@keyframes pista-entra { from { opacity: 0; scale: .8; } }
+@keyframes pista-arriba { 50% { translate: 0 -1cqh; } }
+@keyframes pista-abajo { 50% { translate: 0 1cqh; } }
+@keyframes pista-lado { 25% { translate: -.9cqh 0; } 75% { translate: .9cqh 0; } }
+@container (max-aspect-ratio: 1/1) { .pista { font-size: 3.1cqh; gap: 1.2cqh; } .pista i { width: 5.2cqh; height: 5.2cqh; } }
+@media (prefers-reduced-motion: reduce) { .pista, .pista i { animation: none !important; } }
+
+/* --- marcador: estética juguete (letras gordas con borde, como un juego de celular) --- */
+.pantalla[data-estilo="juguete"] { --borde: #1b2030; }
+.pantalla[data-estilo="juguete"] .hud, .pantalla[data-estilo="juguete"] .banner { font-family: "Lilita One", "Arial Black", sans-serif; color: #fff; }
+.pantalla[data-estilo="juguete"] :is(.valor, .chico, .estacion > span:first-child, .banner strong, .banner span) {
+  text-shadow: 0 .45cqh 0 var(--borde), .28cqh .28cqh 0 var(--borde), -.28cqh .28cqh 0 var(--borde), .28cqh -.28cqh 0 var(--borde), -.28cqh -.28cqh 0 var(--borde), 0 -.28cqh 0 var(--borde), .28cqh 0 0 var(--borde), -.28cqh 0 0 var(--borde); }
+.pantalla[data-estilo="juguete"] .mult { background: #ffc62a; color: #1b2030; padding: .3cqh 1.2cqh .4cqh; border: .45cqh solid #1b2030; border-radius: 1.4cqh; transform: rotate(-7deg); box-shadow: 0 .5cqh 0 #1b2030; }
+.pantalla[data-estilo="juguete"] .moneda { border-radius: 50%; background: radial-gradient(circle at 38% 34%, #fff2a8 0 14%, #ffd23a 15% 58%, #f0a400 59%); border: .45cqh solid #1b2030; box-shadow: inset 0 0 0 .45cqh #ffdf6b, 0 .45cqh 0 #1b2030; }
+.pantalla[data-estilo="juguete"] .pausa { background: rgba(27, 32, 48, .55); border: .45cqh solid #fff; border-radius: 1.8cqh; color: #fff; }
+
+/* --- marcador: estética neón (letras de cabina que brillan) --- */
+.pantalla[data-estilo="neon"] .hud, .pantalla[data-estilo="neon"] .banner { font-family: Orbitron, "Arial", sans-serif; font-weight: 700; color: #e9fbff; }
+.pantalla[data-estilo="neon"] :is(.valor, .banner strong) { letter-spacing: .3cqh; text-shadow: 0 0 .6cqh #22e5ff, 0 0 1.8cqh #22e5ff; }
+.pantalla[data-estilo="neon"] :is(.chico, .estacion > span:first-child, .banner span) { color: #ffe9fb; text-shadow: 0 0 .6cqh #ff2bd6, 0 0 1.6cqh #ff2bd6; }
+.pantalla[data-estilo="neon"] .mult { color: #ffe9fb; padding: .5cqh 1.2cqh; border: .3cqh solid #ff2bd6; border-radius: .6cqh; text-shadow: 0 0 .8cqh #ff2bd6; box-shadow: 0 0 1.4cqh #ff2bd6, inset 0 0 1.2cqh rgba(255, 43, 214, .5); }
+.pantalla[data-estilo="neon"] .moneda { border-radius: 50%; border: .4cqh solid #ffe14d; box-shadow: 0 0 1.2cqh #ffe14d, inset 0 0 0 .7cqh #0a0620, inset 0 0 0 1.1cqh #ffe14d; }
+.pantalla[data-estilo="neon"] .pausa { border: .3cqh solid #22e5ff; border-radius: .8cqh; color: #e9fbff; background: rgba(10, 6, 32, .55); box-shadow: 0 0 1.4cqh #22e5ff; }
+.pantalla[data-estilo="neon"] .poderes li b { background: rgba(10, 6, 32, .7); box-shadow: 0 0 1cqh #22e5ff; }
+.pantalla[data-estilo="neon"] .estacion .barra i { background: linear-gradient(90deg, #22e5ff, #ff2bd6); box-shadow: 0 0 1cqh #ff2bd6; }
+
+/* --- marcador: estética pixel (letra de 8 bits y marcos escalonados) --- */
+.pantalla[data-estilo="pixel"] .hud, .pantalla[data-estilo="pixel"] .banner { font-family: "Press Start 2P", monospace; color: #fff1d4; }
+.pantalla[data-estilo="pixel"] .hud .valor { font-size: calc(4.6 * var(--u)); }
+.pantalla[data-estilo="pixel"] .hud .chico, .pantalla[data-estilo="pixel"] .estacion { font-size: calc(2.2 * var(--u)); line-height: 1.5; }
+.pantalla[data-estilo="pixel"] :is(.valor, .chico, .estacion > span:first-child, .banner strong, .banner span) { text-shadow: .4cqh .4cqh 0 #2a1c18; }
+.pantalla[data-estilo="pixel"] .banner strong { font-size: 5cqh; line-height: 1.4; }   /* la letra pixel no trae aire entre líneas: con 1 las dos líneas se tocaban */
+.pantalla[data-estilo="pixel"] .mult { font-size: calc(2.6 * var(--u)); padding: 1cqh; background: #e2463a; box-shadow: 0 -.6cqh 0 #2a1c18, 0 .6cqh 0 #2a1c18, -.6cqh 0 0 #2a1c18, .6cqh 0 0 #2a1c18; }
+.pantalla[data-estilo="pixel"] .moneda { width: calc(3.4 * var(--u)); height: calc(4.2 * var(--u)); background: #ffd23f; box-shadow: inset -.8cqh 0 0 #e09a1a, inset .8cqh 0 0 #fff1a0, 0 -.6cqh 0 #2a1c18, 0 .6cqh 0 #2a1c18, -.6cqh 0 0 #2a1c18, .6cqh 0 0 #2a1c18; }
+.pantalla[data-estilo="pixel"] .pausa { background: #2a2232; color: #fff1d4; box-shadow: 0 -.6cqh 0 #fff1d4, 0 .6cqh 0 #fff1d4, -.6cqh 0 0 #fff1d4, .6cqh 0 0 #fff1d4; border: 0; }
+.pantalla[data-estilo="pixel"] .estacion .barra { border-radius: 0; } .pantalla[data-estilo="pixel"] .estacion .barra i { border-radius: 0; background: #2fb59a; }
+
+/* ---------- los menús, al estilo Subway Surfers ----------
+   Todo el menú comparte un mismo idioma visual, sacado del inicio de Subway
+   Surfers: letras gruesas y redondeadas (Lilita One) con un contorno azul
+   marino grueso, y botones «de plástico»: un degradado de color fuerte, un
+   brillo arriba (inset) y un canto más oscuro abajo (la sombra sin
+   desenfoque) que se hunde al apretar. Los tamaños van en --m, que es 1 % del
+   alto de la pantalla del juego o el 0,9 % del ancho, lo que sea menor: así el
+   menú se ve igual de grande, en proporción, en un monitor y en un celular
+   vertical. */
+.pantalla {
+  --ss-t: #142357;                                              /* la tinta: contornos y cantos */
+  --ss-borde: 0 .085em 0 var(--ss-t), .05em .05em 0 var(--ss-t), -.05em .05em 0 var(--ss-t), .05em -.05em 0 var(--ss-t),
+              -.05em -.05em 0 var(--ss-t), .07em 0 0 var(--ss-t), -.07em 0 0 var(--ss-t), 0 -.07em 0 var(--ss-t);
+  --ss-letra: "Lilita One", "Arial Black", system-ui, sans-serif;
+}
+/* --mt es --m con un piso, para lo que se toca con el dedo o se lee chico (en un celular vertical --m baja a ~3 px). */
+.capa { --m: min(1cqh, .9cqw); --mt: max(var(--m), 4.6px); position: absolute; inset: 0; display: grid; place-items: center; padding: 3cqh 3cqw; background: rgba(8, 20, 60, .5); backdrop-filter: blur(2px); overflow: auto; }
+
+/* El logo: dos líneas de grafiti inclinadas. La capa de abajo es el mismo
+   texto con un trazo azul marino muy grueso (el contorno y la sombra); encima
+   va otra copia (::after) con el relleno amarillo-naranja. Con el contorno
+   en un ::before de z-index negativo no funciona: el fondo recortado al texto
+   se pinta antes y quedaba tapado. */
+.logo { position: relative; display: grid; justify-items: start; transform: rotate(-5deg); transform-origin: 0 100%; font-family: var(--ss-letra); line-height: .86; letter-spacing: .02em; user-select: none; }
+.logo span { position: relative; display: block; color: var(--ss-t); -webkit-text-stroke: .2em var(--ss-t); text-shadow: 0 .13em 0 var(--ss-t), 0 .2em .14em rgba(0, 0, 0, .45); }
+.logo span::after { content: attr(data-t); position: absolute; left: 0; top: 0; -webkit-text-stroke: .025em #b4500a; text-shadow: none; color: transparent;
+  background: linear-gradient(180deg, #fffbe2 0%, #ffe44f 42%, #ffb21f 70%, #ff7a1a 100%); -webkit-background-clip: text; background-clip: text; }
+.logo .l1 { font-size: calc(7.4 * var(--m)); }
+.logo .l2 { font-size: calc(11.6 * var(--m)); margin-left: calc(2.6 * var(--m)); }
+.logo em { justify-self: end; margin: calc(.8 * var(--m)) calc(-1 * var(--m)) 0 0; transform: rotate(4deg); font: normal 400 calc(2.6 * var(--m))/1 var(--ss-letra); color: #fff; text-shadow: var(--ss-borde);
+  background: linear-gradient(#ff5a64, #e8283c); border: calc(.45 * var(--m)) solid var(--ss-t); border-radius: calc(1.2 * var(--m)); padding: calc(.6 * var(--m)) calc(1.4 * var(--m)) calc(.7 * var(--m)); box-shadow: 0 calc(.5 * var(--m)) 0 var(--ss-t); }
+
+/* Los contadores: una píldora azul oscura con el ícono saliéndose por la izquierda. */
+.pildora { position: relative; display: inline-flex; align-items: center; height: calc(5.4 * var(--mt)); padding: 0 calc(1.8 * var(--mt)) 0 calc(5.6 * var(--mt)); margin-left: calc(1 * var(--mt));
+  background: linear-gradient(#24439a, #172c6e); border: calc(.45 * var(--mt)) solid #0b1640; border-radius: 999px; color: #fff;
+  font: 400 calc(3.2 * var(--mt))/1 var(--ss-letra); text-shadow: var(--ss-borde); box-shadow: inset 0 calc(.5 * var(--mt)) 0 rgba(255, 255, 255, .16), 0 calc(.5 * var(--mt)) 0 rgba(0, 0, 0, .28); }
+.pildora i { position: absolute; left: calc(-1.1 * var(--mt)); top: 50%; width: calc(6.8 * var(--mt)); height: calc(6.8 * var(--mt)); transform: translateY(-50%); filter: drop-shadow(0 calc(.3 * var(--mt)) 0 rgba(0, 0, 0, .3)); }
+.pildora i svg, .redondo i svg, .p-barra i svg, .t-ico svg, .t-precio svg, .t-pestanas i svg, .t-traje em svg, .t-puesto svg, .t-secreto svg { display: block; width: 100%; height: 100%; }
+.pildora.oro b { color: #ffe86b; }
+
+/* Los botones redondos amarillos (opciones, ayuda, volver, flechas). */
+.redondo, .flecha { flex: none; width: calc(6.4 * var(--mt)); height: calc(6.4 * var(--mt)); padding: calc(1.1 * var(--mt)); border-radius: 50%; cursor: pointer;
+  background: radial-gradient(circle at 35% 28%, #fff7b8, #ffd23f 46%, #f2a500); border: calc(.45 * var(--mt)) solid var(--ss-t);
+  box-shadow: inset 0 calc(-.5 * var(--mt)) 0 rgba(160, 90, 0, .35), 0 calc(.6 * var(--mt)) 0 #9a6400, 0 calc(1 * var(--mt)) calc(.8 * var(--mt)) rgba(0, 0, 0, .3); }
+.redondo i, .flecha i { display: block; width: 100%; height: 100%; }
+.redondo:active, .flecha:active { transform: translateY(calc(.5 * var(--mt))); box-shadow: 0 calc(.1 * var(--mt)) 0 #9a6400; }
+.flecha.der i { transform: scaleX(-1); }
+
+/* ---- la portada (v2: más cerca del inicio de Subway Surfers) ----
+   Las letras blancas llevan un trazo azul oscuro limpio por fuera
+   (paint-order: el trazo se pinta antes que el relleno, así no se come la
+   letra) y un canto abajo; los botones son de «plástico»: degradado, borde
+   blanco grueso, brillo arriba y canto oscuro abajo, como los de Subway. */
+.pantalla { --ss-trazo: #0b1a44; }
+.capa.portada { display: block; padding: 0; overflow: hidden; cursor: pointer; backdrop-filter: none;
+  background: linear-gradient(180deg, rgba(8, 20, 60, .55) 0, rgba(8, 20, 60, 0) 24%, rgba(8, 20, 60, 0) 56%, rgba(8, 20, 60, .45) 78%, rgba(8, 20, 60, .7) 100%); }
+.p-arriba { --mt: max(calc(var(--m) * 1.2), 5px); position: absolute; left: calc(2.4 * var(--m)); right: calc(2.4 * var(--m)); top: calc(2.2 * var(--m)); display: grid; grid-template-columns: 1fr auto 1fr; align-items: start; gap: calc(2 * var(--m)); pointer-events: none; }
+.p-arriba > * { pointer-events: auto; }
+.p-perfil { display: grid; gap: calc(1.3 * var(--mt)); justify-items: start; cursor: default; }
+/* el récord: una tarjeta oscura con borde blanco y el trofeo */
+.p-record { display: inline-flex; align-items: center; gap: calc(1 * var(--mt)); padding: calc(.6 * var(--mt)) calc(2 * var(--mt)) calc(.6 * var(--mt)) calc(.8 * var(--mt));
+  background: rgba(8, 20, 60, .62); border: calc(.35 * var(--mt)) solid rgba(255, 255, 255, .9); border-radius: calc(2 * var(--mt)); color: #fff; }
+.p-record i { width: calc(5 * var(--mt)); height: calc(5 * var(--mt)); }
+.p-record i svg, .contador i svg, .jugar i svg, .p-barra i svg, .m-ico svg, .m-ok svg, .m-saltar svg, .p-mult i svg, .m-mult i svg, .pots i svg, .patinetas i svg { display: block; width: 100%; height: 100%; }
+.p-record small, .p-mult-txt small { display: block; font: 800 calc(1.6 * var(--mt))/1.1 "IBM Plex Sans", sans-serif; letter-spacing: .08em; text-transform: uppercase; }
+.p-record small { color: #bfe2ff; }
+.p-record b { font: 400 calc(3.4 * var(--mt))/1 var(--ss-letra); -webkit-text-stroke: .14em var(--ss-trazo); paint-order: stroke fill; text-shadow: 0 .08em 0 var(--ss-trazo); }
+/* el multiplicador: la pieza de progreso más importante, en amarillo; tocarla abre las misiones */
+.p-mult { display: flex; align-items: center; gap: calc(1.2 * var(--mt)); padding: calc(.6 * var(--mt)) calc(2 * var(--mt)) calc(.6 * var(--mt)) calc(.6 * var(--mt)); cursor: pointer;
+  background: linear-gradient(#fff07a, #ffbe2a); border: calc(.4 * var(--mt)) solid #fff; border-radius: calc(2 * var(--mt));
+  box-shadow: inset 0 calc(.5 * var(--mt)) 0 rgba(255, 255, 255, .55), 0 calc(.55 * var(--mt)) 0 #a86f00, 0 calc(1 * var(--mt)) calc(1 * var(--mt)) rgba(0, 0, 0, .3); }
+.p-mult-n { min-width: calc(7.4 * var(--mt)); height: calc(6.2 * var(--mt)); display: grid; place-items: center; padding: 0 calc(.9 * var(--mt)); border-radius: calc(1.4 * var(--mt));
+  background: linear-gradient(#ff7a4a, #e8401f); border: calc(.3 * var(--mt)) solid #fff; font: 400 calc(3.8 * var(--mt))/1 var(--ss-letra); color: #fff; -webkit-text-stroke: .14em #6e1600; paint-order: stroke fill; text-shadow: 0 .08em 0 #6e1600; }
+.p-mult-txt { display: grid; gap: calc(.45 * var(--mt)); text-align: left; }
+.p-mult-txt small { color: #6b3f00; }
+.p-mult-barra { display: block; width: calc(16 * var(--mt)); height: calc(1.7 * var(--mt)); border-radius: 99px; background: rgba(107, 63, 0, .25); overflow: hidden; border: calc(.2 * var(--mt)) solid rgba(107, 63, 0, .45); }
+.p-mult-barra i { display: block; height: 100%; width: calc(var(--k, 0) * 100%); background: linear-gradient(#a6f264, #33a512); border-radius: 99px; transition: width .4s; }
+.p-mult-txt em { font: normal 400 calc(2.1 * var(--mt))/1 var(--ss-letra); color: #6b3f00; }
+/* el logo chico, al centro */
+.logo.chico { justify-self: center; transform: rotate(-4deg); transform-origin: 50% 50%; justify-items: center; cursor: default; }
+.logo.chico .l1 { font-size: calc(4.4 * var(--m)); }
+.logo.chico .l2 { font-size: calc(6.8 * var(--m)); margin-left: 0; }
+.p-der { justify-self: end; display: flex; align-items: center; gap: calc(1.3 * var(--mt)); }
+/* las monedas: una píldora oscura con la moneda saliéndose y un «+» verde que lleva a la tienda */
+.contador { position: relative; display: inline-flex; align-items: center; height: calc(5.6 * var(--mt)); padding: 0 calc(.6 * var(--mt)) 0 calc(5.6 * var(--mt)); margin-left: calc(1.2 * var(--mt)); cursor: default;
+  background: rgba(8, 20, 60, .62); border: calc(.35 * var(--mt)) solid rgba(255, 255, 255, .9); border-radius: 999px; color: #fff; }
+.contador i { position: absolute; left: calc(-1.2 * var(--mt)); top: 50%; width: calc(6.6 * var(--mt)); height: calc(6.6 * var(--mt)); transform: translateY(-50%); filter: drop-shadow(0 calc(.3 * var(--mt)) 0 rgba(0, 0, 0, .3)); }
+.contador b { margin-right: calc(1.1 * var(--mt)); font: 400 calc(3.2 * var(--mt))/1 var(--ss-letra); color: #ffe86b; -webkit-text-stroke: .14em var(--ss-trazo); paint-order: stroke fill; }
+.contador .mas { width: calc(4.2 * var(--mt)); height: calc(4.2 * var(--mt)); padding: 0; display: grid; place-items: center; cursor: pointer; border-radius: calc(1.2 * var(--mt));
+  border: calc(.3 * var(--mt)) solid #fff; background: linear-gradient(#8ff04a, #33a512); color: #fff; font: 400 calc(3.4 * var(--mt))/1 var(--ss-letra); -webkit-text-stroke: .12em #0e5a10; paint-order: stroke fill; box-shadow: 0 calc(.35 * var(--mt)) 0 #1d6b07; }
+.redondo.azul { background: radial-gradient(circle at 35% 28%, #b5e8ff, #3ea9ff 46%, #1767d6); border: calc(.4 * var(--mt)) solid #fff;
+  box-shadow: inset 0 calc(-.4 * var(--mt)) 0 rgba(8, 40, 120, .35), 0 calc(.55 * var(--mt)) 0 #0b3d91, 0 calc(1 * var(--mt)) calc(.8 * var(--mt)) rgba(0, 0, 0, .3); }
+/* el botón grande de jugar: verde, redondo, con borde blanco, latiendo */
+.jugar { position: absolute; left: 50%; bottom: calc(19.5 * var(--m)); translate: -50% 0; display: inline-flex; align-items: center; gap: calc(1.1 * var(--mt)); cursor: pointer;
+  padding: calc(1.3 * var(--mt)) calc(5 * var(--mt)) calc(1.4 * var(--mt)) calc(3.2 * var(--mt)); font: 400 calc(5.4 * var(--mt))/1 var(--ss-letra); color: #fff; letter-spacing: .02em;
+  -webkit-text-stroke: .13em #0e5a10; paint-order: stroke fill; text-shadow: 0 .08em 0 #0e5a10;
+  background: linear-gradient(#9bf55a 0%, #46c81a 52%, #2c9e0c 100%); border: calc(.55 * var(--mt)) solid #fff; border-radius: 999px;
+  box-shadow: inset 0 calc(.6 * var(--mt)) 0 rgba(255, 255, 255, .5), 0 calc(.8 * var(--mt)) 0 #1d6b07, 0 calc(1.6 * var(--mt)) calc(1.6 * var(--mt)) rgba(0, 0, 0, .35);
+  animation: mr-late 1.4s ease-in-out infinite; }
+.jugar i { width: calc(4.8 * var(--mt)); height: calc(4.8 * var(--mt)); }
+.jugar:active { translate: -50% calc(.6 * var(--mt)); box-shadow: inset 0 calc(.6 * var(--mt)) 0 rgba(255, 255, 255, .5), 0 calc(.2 * var(--mt)) 0 #1d6b07; }
+@keyframes mr-late { 50% { scale: 1.06; } }
+@media (prefers-reduced-motion: reduce) { .jugar { animation: none; } }
+.tocar-txt { position: absolute; left: 0; right: 0; bottom: calc(15.4 * var(--m)); margin: 0; text-align: center; pointer-events: none; font: 800 calc(2 * var(--mt)) "IBM Plex Sans", sans-serif; color: rgba(255, 255, 255, .92); text-shadow: 0 1px 3px rgba(0, 0, 0, .7); }
+/* la barra de abajo, de lado a lado, con los botones asomando por arriba */
+.p-barra { --mt: max(calc(var(--m) * 1.15), 4.6px); position: absolute; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding: calc(.8 * var(--m)) calc(4 * var(--m)) calc(1.3 * var(--m)); cursor: default;
+  background: linear-gradient(180deg, rgba(22, 56, 138, .95), rgba(9, 26, 72, .98)); border-top: calc(.4 * var(--mt)) solid #63bcff; box-shadow: 0 calc(-.8 * var(--m)) calc(2 * var(--m)) rgba(0, 0, 0, .25); }
+.p-barra button { position: relative; display: grid; justify-items: center; gap: calc(.5 * var(--mt)); padding: 0; border: 0; background: none; cursor: pointer; color: #fff; font: 400 max(calc(2.8 * var(--m)), 11px)/1 var(--ss-letra); }
+.p-barra .tile { display: grid; place-items: center; width: calc(10.4 * var(--mt)); height: calc(9 * var(--mt)); margin-top: calc(-4.8 * var(--mt)); border-radius: calc(2.2 * var(--mt));
+  background: linear-gradient(180deg, #55c8ff, #1a72e0); border: calc(.45 * var(--mt)) solid #fff;
+  box-shadow: inset 0 calc(.6 * var(--mt)) 0 rgba(255, 255, 255, .35), 0 calc(.6 * var(--mt)) 0 #0b3d91, 0 calc(1.2 * var(--mt)) calc(1 * var(--mt)) rgba(0, 0, 0, .35); transition: transform .12s; }
+.p-barra .tile i { display: block; width: 68%; height: 68%; filter: drop-shadow(0 calc(.3 * var(--mt)) 0 rgba(0, 0, 0, .25)); }
+.p-barra button:hover .tile { transform: translateY(calc(-.5 * var(--mt))); }
+.p-barra button:active .tile { transform: translateY(calc(.4 * var(--mt))); }
+.p-barra .nom { -webkit-text-stroke: .14em var(--ss-trazo); paint-order: stroke fill; text-shadow: 0 .08em 0 var(--ss-trazo); }
+.globo { position: absolute; top: calc(-5.4 * var(--mt)); left: calc(50% + 2.8 * var(--mt)); min-width: calc(4.4 * var(--mt)); height: calc(4.4 * var(--mt)); padding: 0 calc(.8 * var(--mt)); display: grid; place-items: center;
+  border-radius: 999px; background: linear-gradient(#ff5a64, #e8283c); border: calc(.35 * var(--mt)) solid #fff; font: normal 400 calc(2.2 * var(--mt))/1 var(--ss-letra); color: #fff; box-shadow: 0 calc(.3 * var(--mt)) 0 rgba(0, 0, 0, .3); }
+/* Cargando: el logo solo, sobre azul. */
+.capa.carga { background: radial-gradient(circle at 50% 40%, #3a9bff, #123a8c 75%); align-content: center; gap: calc(4 * var(--m)); }
+.capa.carga .logo { transform-origin: 50% 50%; justify-items: center; }
+.capa.carga .logo .l2 { margin-left: 0; }
+.carga-texto { margin: 0; font: 400 calc(3 * var(--m)) var(--ss-letra); color: #fff; -webkit-text-stroke: .14em var(--ss-trazo); paint-order: stroke fill; }
+@container (orientation: portrait) {
+  .p-arriba { grid-template-columns: 1fr auto; }
+  .p-arriba .logo.chico { display: none; }
+  .p-der { flex-direction: column; align-items: flex-end; }
+  .jugar { bottom: calc(23 * var(--m)); font-size: calc(6 * var(--mt)); }
+  .tocar-txt { bottom: calc(18.6 * var(--m)); }
+  .p-barra { padding-left: calc(1.4 * var(--m)); padding-right: calc(1.4 * var(--m)); }
+}
+
+/* ---- las misiones ---- */
+.misiones .caja { width: min(600px, 100%); padding-bottom: 0; }
+.misiones .menu { position: sticky; bottom: 0; margin: 10px -22px 0; padding: 12px 16px 16px; background: linear-gradient(rgba(31, 111, 224, 0), #1f6fe0 26%); }
+@media (max-width: 700px) { .misiones .caja { padding-bottom: 0; } .misiones .menu { margin-left: -14px; margin-right: -14px; } }
+.m-cab { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.m-cab h2 { margin: 0; }
+.m-set { font: 400 15px var(--ss-letra); color: #fff; background: rgba(9, 30, 90, .4); border: 2px solid rgba(255, 255, 255, .7); border-radius: 999px; padding: 4px 12px; }
+.m-mult { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 14px 0 6px; }
+.m-mult span { min-width: 76px; padding: 8px 14px; text-align: center; border-radius: 16px; border: 3px solid #fff; font: 400 34px/1 var(--ss-letra); color: #fff; -webkit-text-stroke: .14em #6e1600; paint-order: stroke fill; text-shadow: 0 .08em 0 #6e1600; }
+.m-mult .m-de { background: linear-gradient(#ff7a4a, #e8401f); }
+.m-mult .m-a { background: linear-gradient(#fff07a, #ffbe2a); color: #fff; box-shadow: 0 0 0 4px rgba(255, 230, 100, .35); }
+.m-mult i { width: 34px; height: 34px; }
+.m-premio { text-align: center; font-weight: 700; color: #eaf4ff; }
+.m-premio svg { width: 20px; height: 20px; vertical-align: -4px; margin: 0 2px 0 4px; }
+.m-premio b { font: 400 17px var(--ss-letra); color: #ffe86b; }
+.m-lista { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 10px; }
+.m-fila { display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 16px; background: #fff; color: var(--ss-t); border: 3px solid var(--ss-t); box-shadow: 0 4px 0 rgba(10, 22, 66, .45); }
+.m-fila.ok { background: #e6ffd9; }
+.m-ico { width: 48px; height: 48px; padding: 7px; border-radius: 12px; background: #e3ecfb; border: 2px solid var(--ss-t); }
+.m-txt b { display: block; font: 700 14px/1.25 "IBM Plex Sans", sans-serif; }
+.m-txt small { font: 800 12px "IBM Plex Sans", sans-serif; color: #50608c; }
+.m-barra { display: block; height: 10px; margin: 6px 0 3px; border-radius: 99px; background: #d5ddec; border: 2px solid var(--ss-t); overflow: hidden; }
+.m-barra i { display: block; height: 100%; width: calc(var(--k) * 100%); background: linear-gradient(#a6f264, #3fb51c); }
+.m-ok { width: 40px; height: 40px; padding: 6px; border-radius: 50%; background: #36aa14; border: 3px solid var(--ss-t); }
+.m-saltar { display: grid; justify-items: center; gap: 2px; padding: 6px 12px 7px; cursor: pointer; border-radius: 12px; border: 3px solid var(--ss-t); color: #fff;
+  font: 400 15px/1 var(--ss-letra); -webkit-text-stroke: .12em var(--ss-trazo); paint-order: stroke fill; background: linear-gradient(#5cc0ff, #2a86ea); box-shadow: inset 0 3px 0 rgba(255, 255, 255, .35), 0 4px 0 #0f4a99; }
+.m-saltar span { display: inline-flex; align-items: center; gap: 3px; font-size: 13px; }
+.m-saltar span svg { width: 16px; height: 16px; }
+.m-saltar:disabled { cursor: default; filter: grayscale(.8); opacity: .65; }
+.m-saltar:active:not(:disabled) { transform: translateY(3px); box-shadow: 0 1px 0 #0f4a99; }
+
+/* ---- los potenciadores al empezar la carrera ---- */
+.pots { position: absolute; left: 50%; bottom: calc(14 * var(--u)); translate: -50% 0; display: flex; gap: calc(1.4 * var(--u)); pointer-events: auto; animation: mr-sube .35s ease-out; }
+.pots button { display: grid; grid-template-columns: auto auto; grid-template-rows: auto auto; align-items: center; column-gap: calc(1 * var(--u)); padding: calc(.8 * var(--u)) calc(1.8 * var(--u)) calc(.8 * var(--u)) calc(.9 * var(--u)); position: relative; cursor: pointer;
+  border-radius: calc(1.8 * var(--u)); border: calc(.4 * var(--u)) solid #fff; background: linear-gradient(#fff07a, #ffbe2a); box-shadow: 0 calc(.5 * var(--u)) 0 #a86f00, 0 calc(1 * var(--u)) calc(1 * var(--u)) rgba(0, 0, 0, .35); color: #6b3f00; font: 400 calc(2.4 * var(--u))/1 var(--ss-letra); }
+.pots i { grid-row: 1 / 3; width: calc(5.2 * var(--u)); height: calc(5.2 * var(--u)); }
+.pots b { font: 400 calc(2 * var(--u))/1 var(--ss-letra); }
+.pots kbd { position: absolute; top: calc(-1.2 * var(--u)); right: calc(-1.2 * var(--u)); width: calc(3.2 * var(--u)); height: calc(3.2 * var(--u)); display: grid; place-items: center; border-radius: 50%; background: var(--ss-trazo); color: #fff; font: 700 calc(1.8 * var(--u)) "IBM Plex Sans", sans-serif; border: 2px solid #fff; }
+@media (pointer: coarse) { .pots kbd { display: none; } }
+@keyframes mr-sube { from { opacity: 0; translate: -50% 40%; } }
+.patinetas i { display: inline-block; width: calc(3.4 * var(--u)); height: calc(3.4 * var(--u)); vertical-align: middle; }
+
+/* ---- los paneles (pausa, fin, retos, libreta, opciones, ayuda, relato) ---- */
+.caja { width: min(560px, 100%); max-height: 100%; overflow: auto; color: #fff; padding: 20px 22px 18px;
+  background: linear-gradient(180deg, #3a9bff 0%, #1f6fe0 100%); border: 4px solid var(--ss-t); border-radius: 22px;
+  box-shadow: inset 0 4px 0 rgba(255, 255, 255, .35), inset 0 -6px 0 rgba(0, 0, 0, .14), 0 8px 0 rgba(10, 22, 66, .5), 0 24px 50px rgba(0, 0, 0, .4); }
+.caja h2 { margin: 0 0 12px; font: 400 30px/1.1 var(--ss-letra); letter-spacing: .4px; text-shadow: var(--ss-borde); }
+.caja h2 small { font: 700 13px "IBM Plex Sans", sans-serif; color: #e2f0ff; margin-left: 6px; text-shadow: none; }
+.caja h3 { margin: 16px 0 8px; font: 400 16px var(--ss-letra); letter-spacing: .04em; text-transform: uppercase; color: #ffe86b; text-shadow: var(--ss-borde); }
+.caja p { margin: 0 0 10px; }
+.menu { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-top: 18px; }
+.opcion { font: 400 17px/1.1 var(--ss-letra); letter-spacing: .02em; padding: 10px 18px 11px; border-radius: 14px; border: 3px solid var(--ss-t); cursor: pointer; color: #fff; text-shadow: var(--ss-borde);
+  background: linear-gradient(#5cc0ff, #2a86ea); box-shadow: inset 0 3px 0 rgba(255, 255, 255, .35), 0 5px 0 #0f4a99; }
+.opcion:hover:not(:disabled) { filter: brightness(1.07); }
+.opcion:active:not(:disabled) { transform: translateY(3px); box-shadow: inset 0 3px 0 rgba(255, 255, 255, .35), 0 2px 0 #0f4a99; }
+.opcion:disabled { filter: grayscale(.7); opacity: .6; cursor: default; }
+.opcion.principal { font-size: 21px; padding: 11px 26px 12px; background: linear-gradient(#86ea3f, #36aa14); box-shadow: inset 0 3px 0 rgba(255, 255, 255, .4), 0 5px 0 #1d6b07; }
+.opcion.especial { background: linear-gradient(#ffe36b, #ffb21f); box-shadow: inset 0 3px 0 rgba(255, 255, 255, .45), 0 5px 0 #a86f00; }
+.detalle { color: #eaf4ff; font-weight: 600; }
+.nota { color: #d7eaff; font-size: 13px; }
+
+/* El resumen de la carrera (los botones quedan pegados al pie del panel:
+   con las misiones el panel puede ser más alto que la pantalla, y «Otra
+   carrera» es justo lo que se quiere tocar). */
+.fin .caja { padding-bottom: 0; }
+.fin .menu { position: sticky; bottom: 0; margin: 12px -22px 0; padding: 14px 16px 16px; background: linear-gradient(rgba(31, 111, 224, 0), #1f6fe0 26%); }
+.fin h2 { text-align: center; }
+.opcion i { display: inline-block; width: 1em; height: 1em; margin-right: .35em; vertical-align: -.14em; }
+.ayuda li i { display: inline-block; width: 1.3em; height: 1.3em; vertical-align: -.32em; }
+.ayuda li i svg, .opcion i svg, .f-datos i svg, .f-set svg, .s-cuerpo i svg, .s-tienes i svg { display: block; width: 100%; height: 100%; }
+/* los puntos, grandes y dorados, con el cintillo de récord */
+.f-puntos { position: relative; display: grid; justify-items: center; gap: 2px; padding: 10px 12px 12px; border-radius: 18px; background: rgba(9, 30, 90, .35); border: 3px solid rgba(20, 35, 87, .55); }
+.f-puntos small { font: 400 14px var(--ss-letra); letter-spacing: .1em; text-transform: uppercase; color: #d7eaff; }
+.f-puntos strong { font: 400 54px/1 var(--ss-letra); color: #ffe44f; -webkit-text-stroke: .1em var(--ss-t); paint-order: stroke fill; text-shadow: 0 .07em 0 var(--ss-t); }
+.f-puntos strong.pum { animation: f-pum .5s ease-out; }
+@keyframes f-pum { 40% { scale: 1.16; } }
+.f-record { position: absolute; top: -12px; right: -8px; rotate: 6deg; padding: 4px 12px 5px; border-radius: 10px; background: linear-gradient(#ff5a64, #e8283c); border: 3px solid var(--ss-t);
+  font: 400 15px/1 var(--ss-letra); color: #fff; text-shadow: var(--ss-borde); box-shadow: 0 4px 0 var(--ss-t); animation: f-cinta .5s .9s both cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes f-cinta { from { scale: 0; } }
+.f-mejor { font: 700 13px "IBM Plex Sans", sans-serif; color: #d7eaff; }
+/* cuatro fichas blancas: monedas, distancia, multiplicador y estación */
+.f-datos { list-style: none; margin: 12px 0 0; padding: 0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.f-datos li { display: grid; justify-items: center; align-content: start; gap: 3px; padding: 8px 6px 7px; border-radius: 14px; background: #fff; color: var(--ss-t); border: 3px solid var(--ss-t); box-shadow: 0 4px 0 rgba(10, 22, 66, .45); text-align: center; min-width: 0; }
+.f-datos i { width: 28px; height: 28px; }
+.f-datos b { font: 400 19px/1.05 var(--ss-letra); overflow-wrap: anywhere; }
+.f-datos .largo b { font-size: 15px; }
+.f-datos small { font: 700 10.5px/1.2 "IBM Plex Sans", sans-serif; color: #50608c; text-transform: uppercase; letter-spacing: .05em; }
+/* en un celular: tres fichas (la estación ya está en el marcador), título y puntos más chicos */
+@media (max-width: 520px) {
+  .fin h2 { font-size: 24px; margin-bottom: 8px; }
+  .f-puntos { padding: 6px 10px 8px; }
+  .f-puntos strong { font-size: 40px; }
+  .f-datos { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
+  .f-datos .largo { display: none; }
+  .f-datos li { padding: 6px 4px; }
+  .f-datos i { width: 22px; height: 22px; }
+  .f-datos b { font-size: 16px; }
+  .f-datos small { font-size: 9px; letter-spacing: .02em; }
+}
+/* el set completo: un cartel amarillo */
+.f-set { margin: 12px 0 0; padding: 8px 12px; border-radius: 14px; text-align: center; background: linear-gradient(#fff07a, #ffbe2a); border: 3px solid var(--ss-t); box-shadow: 0 4px 0 rgba(10, 22, 66, .45);
+  color: var(--ss-t); font: 400 17px/1.3 var(--ss-letra); animation: f-cinta .45s 1s both cubic-bezier(.3, 1.6, .5, 1); }
+.f-set svg { display: inline-block; width: 18px; height: 18px; vertical-align: -3px; margin: 0 2px 0 4px; }
+/* la carrera que no va a la clasificación (de prueba o sin comprobar) */
+.f-fuera { margin: 10px 0 0; padding: 7px 12px; border-radius: 12px; background: rgba(9, 30, 90, .45); border: 2px dashed rgba(255, 255, 255, .6); color: #eaf4ff; font: 700 13px/1.35 "IBM Plex Sans", sans-serif; text-align: center; }
+/* las misiones del resumen, en chico */
+.f-misiones { gap: 8px; }
+.f-misiones .m-fila { grid-template-columns: 38px minmax(0, 1fr) auto; gap: 10px; padding: 7px 10px; }
+.f-misiones .m-ico { width: 38px; height: 38px; padding: 5px; }
+.f-misiones .m-txt b { font-size: 13px; }
+.f-misiones .m-ok { width: 32px; height: 32px; padding: 5px; }
+
+/* ---- «¿Seguir corriendo?» después de chocar ----
+   Un botón redondo verde con el precio, dentro de un anillo amarillo que se
+   vacía en 5 s (el trazo del círculo se acorta con stroke-dashoffset, que
+   juego.js mueve en cada cuadro). Se ve el choque detrás, apenas oscurecido. */
+/* va arriba: abajo, al centro, queda el corredor tendido (la cámara del choque lo pone ahí) */
+.capa.salvar { align-items: start; padding-top: 4cqh; background: linear-gradient(rgba(8, 20, 60, .55), rgba(8, 20, 60, .15) 70%); backdrop-filter: none; }
+.s-caja { display: grid; justify-items: center; gap: calc(1.8 * var(--mt)); text-align: center; }
+.s-titulo { margin: 0; font: 400 calc(6.4 * var(--mt))/1 var(--ss-letra); color: #fff; -webkit-text-stroke: .16em var(--ss-t); paint-order: stroke fill; text-shadow: 0 .09em 0 var(--ss-t), 0 .2em .2em rgba(0, 0, 0, .4); }
+.s-boton { position: relative; width: calc(24 * var(--mt)); height: calc(24 * var(--mt)); padding: 0; border: 0; border-radius: 50%; background: none; cursor: pointer; animation: mr-late 1.4s ease-in-out infinite; }
+.s-anillo { position: absolute; inset: 0; width: 100%; height: 100%; rotate: -90deg; overflow: visible; }
+.s-anillo circle { fill: none; stroke-width: 9; }
+.s-fondo { stroke: rgba(9, 30, 90, .7); }
+.s-tiempo { stroke: #ffe44f; stroke-linecap: round; stroke-dasharray: 100; filter: drop-shadow(0 0 3px rgba(255, 228, 79, .8)); }
+.s-cuerpo { position: absolute; inset: 13%; display: grid; place-items: center; align-content: center; gap: calc(.6 * var(--mt)); border-radius: 50%;
+  background: radial-gradient(circle at 35% 28%, #b8f77a, #4cc21f 55%, #2f9a10); border: calc(.6 * var(--mt)) solid var(--ss-t);
+  box-shadow: inset 0 calc(.9 * var(--mt)) 0 rgba(255, 255, 255, .4), inset 0 calc(-.9 * var(--mt)) 0 rgba(0, 0, 0, .15), 0 calc(.8 * var(--mt)) 0 #1d6b07; }
+.s-cuerpo i { width: calc(7.4 * var(--mt)); height: calc(7.4 * var(--mt)); filter: drop-shadow(0 calc(.3 * var(--mt)) 0 rgba(0, 0, 0, .3)); }
+.s-cuerpo b { font: 400 calc(5.6 * var(--mt))/1 var(--ss-letra); color: #fff; -webkit-text-stroke: .14em var(--ss-t); paint-order: stroke fill; text-shadow: 0 .08em 0 var(--ss-t); }
+.s-boton:active .s-cuerpo { translate: 0 calc(.6 * var(--mt)); box-shadow: inset 0 calc(.9 * var(--mt)) 0 rgba(255, 255, 255, .4), 0 calc(.2 * var(--mt)) 0 #1d6b07; }
+.s-tienes { display: inline-flex; align-items: center; gap: calc(.6 * var(--mt)); margin: 0; font: 400 calc(3 * var(--mt))/1 var(--ss-letra); color: #fff; -webkit-text-stroke: .14em var(--ss-t); paint-order: stroke fill; }
+.s-tienes i { width: calc(3.6 * var(--mt)); height: calc(3.6 * var(--mt)); }
+.s-no { font: 400 calc(3.2 * var(--mt))/1 var(--ss-letra); color: #fff; text-shadow: var(--ss-borde); padding: calc(1.2 * var(--mt)) calc(3.4 * var(--mt)); border-radius: 999px; cursor: pointer;
+  background: rgba(9, 30, 90, .6); border: calc(.45 * var(--mt)) solid #fff; }
+.s-no:hover { background: rgba(9, 30, 90, .8); }
+@media (prefers-reduced-motion: reduce) { .s-boton, .f-record, .f-set, .f-puntos strong.pum { animation: none; } }
+
+/* ---- la tienda ---- */
+.capa.tienda { --m: max(min(1cqh, .9cqw), 4.4px); display: block; padding: 0; overflow: hidden; backdrop-filter: none;
+  background: repeating-linear-gradient(135deg, rgba(255, 255, 255, .05) 0 calc(2 * var(--m)), transparent calc(2 * var(--m)) calc(4 * var(--m))), linear-gradient(180deg, #3aa0ff, #1c5fd2); }
+/* en «personajes» el fondo se abre para que se vea el corredor probándose la ropa */
+.capa.tienda[data-pestana="personajes"] { background: linear-gradient(180deg, rgba(10, 30, 90, .55) 0, rgba(10, 30, 90, 0) 22%), linear-gradient(90deg, rgba(10, 30, 90, 0) 0 40%, rgba(10, 30, 90, .4) 100%); }
+.capa.tienda[data-pestana="mejoras"] .t-personajes, .capa.tienda[data-pestana="personajes"] .t-mejoras { display: none; }
+.t-cab { position: absolute; left: calc(2.4 * var(--m)); right: calc(2.4 * var(--m)); top: calc(2 * var(--m)); display: flex; align-items: center; gap: calc(2 * var(--m)); }
+.t-titulo { flex: 1; margin: 0; text-align: center; font: 400 calc(6 * var(--m))/1 var(--ss-letra); color: #fff; letter-spacing: .03em; text-shadow: var(--ss-borde), 0 .16em .14em rgba(0, 0, 0, .35); }
+.t-pestanas { position: absolute; left: 0; right: 0; top: calc(10.6 * var(--m)); display: flex; justify-content: center; gap: calc(1.4 * var(--m)); }
+.t-pestanas button { display: inline-flex; align-items: center; gap: calc(.8 * var(--m)); padding: calc(.9 * var(--m)) calc(2.8 * var(--m)) calc(1 * var(--m)) calc(1.8 * var(--m)); cursor: pointer;
+  font: 400 calc(3 * var(--m))/1 var(--ss-letra); color: #fff; text-shadow: var(--ss-borde); border: calc(.45 * var(--m)) solid var(--ss-t); border-radius: calc(2 * var(--m));
+  background: linear-gradient(#2c66bf, #1a4593); box-shadow: inset 0 calc(.5 * var(--m)) 0 rgba(255, 255, 255, .2), 0 calc(.6 * var(--m)) 0 #0d2a63; }
+.t-pestanas button[aria-selected="true"] { background: linear-gradient(#ffe36b, #ffb21f); box-shadow: inset 0 calc(.5 * var(--m)) 0 rgba(255, 255, 255, .45), 0 calc(.6 * var(--m)) 0 #a86f00; }
+.t-pestanas i { display: block; width: calc(3.8 * var(--m)); height: calc(3.8 * var(--m)); }
+.t-mejoras { position: absolute; left: 0; right: 0; top: calc(18.4 * var(--m)); bottom: 0; overflow: auto; padding: 0 calc(3 * var(--m)) calc(3 * var(--m)); }
+.t-nota { margin: 0 0 calc(1.6 * var(--m)); text-align: center; color: #eaf4ff; font: 700 calc(2.3 * var(--m)) "IBM Plex Sans", sans-serif; }
+.t-lista { list-style: none; margin: 0 auto; padding: 0; max-width: calc(130 * var(--m)); display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(58 * var(--m)), 1fr)); gap: calc(1.8 * var(--m)); }
+.t-tarjeta { display: grid; grid-template-columns: calc(11 * var(--m)) minmax(0, 1fr) auto; align-items: center; gap: calc(1.6 * var(--m)); padding: calc(1.4 * var(--m)) calc(1.6 * var(--m));
+  background: #fff; color: var(--ss-t); border: calc(.5 * var(--m)) solid var(--ss-t); border-radius: calc(2.4 * var(--m)); box-shadow: inset 0 calc(-.6 * var(--m)) 0 #dce6f6, 0 calc(.7 * var(--m)) 0 rgba(13, 42, 99, .65); }
+.t-ico { width: calc(11 * var(--m)); height: calc(11 * var(--m)); padding: calc(1.4 * var(--m)); border-radius: calc(2 * var(--m)); background: var(--tinte); border: calc(.4 * var(--m)) solid var(--ss-t); }
+.t-info { min-width: 0; }
+.t-info strong { display: block; font: 400 calc(3.4 * var(--m))/1.1 var(--ss-letra); letter-spacing: .02em; }
+.t-info small { display: block; margin-top: calc(.3 * var(--m)); font: 800 calc(2.2 * var(--m)) "IBM Plex Sans", sans-serif; color: #50608c; }
+.t-niveles { display: flex; gap: calc(.6 * var(--m)); margin-top: calc(.9 * var(--m)); }
+.t-niveles i { width: calc(4.4 * var(--m)); height: calc(2.2 * var(--m)); border-radius: calc(.7 * var(--m)); background: #d5ddec; border: calc(.3 * var(--m)) solid var(--ss-t); }
+.t-niveles i.si { background: linear-gradient(#a6f264, #3fb51c); }
+.t-cuenta { display: block; margin-top: calc(.7 * var(--m)); font: 800 calc(2.3 * var(--m)) "IBM Plex Sans", sans-serif; }
+.t-cuenta b { font: 400 calc(2.9 * var(--m)) var(--ss-letra); }
+/* El botón de precio: verde, con la moneda; gris cuando no alcanza. */
+.t-precio, .t-boton { display: inline-flex; align-items: center; gap: calc(.6 * var(--m)); padding: calc(.8 * var(--m)) calc(1.8 * var(--m)) calc(.9 * var(--m)) calc(1.1 * var(--m)); cursor: pointer;
+  font: 400 calc(3.2 * var(--m))/1 var(--ss-letra); color: #fff; text-shadow: var(--ss-borde); border: calc(.45 * var(--m)) solid var(--ss-t); border-radius: calc(1.8 * var(--m));
+  background: linear-gradient(#86ea3f, #36aa14); box-shadow: inset 0 calc(.5 * var(--m)) 0 rgba(255, 255, 255, .4), 0 calc(.6 * var(--m)) 0 #1d6b07; }
+.t-precio svg { width: calc(4 * var(--m)); height: calc(4 * var(--m)); flex: none; }
+.t-precio:active:not(:disabled), .t-boton:active { transform: translateY(calc(.5 * var(--m))); box-shadow: 0 calc(.1 * var(--m)) 0 #1d6b07; }
+.t-precio:disabled { cursor: default; background: linear-gradient(#bcc7db, #8e9cb9); box-shadow: inset 0 calc(.5 * var(--m)) 0 rgba(255, 255, 255, .3), 0 calc(.6 * var(--m)) 0 #5d6b88; }
+.t-precio.grande, .t-boton { font-size: calc(4.2 * var(--m)); padding: calc(1.1 * var(--m)) calc(3 * var(--m)) calc(1.2 * var(--m)) calc(1.8 * var(--m)); }
+.t-precio.grande svg { width: calc(5.2 * var(--m)); height: calc(5.2 * var(--m)); }
+.t-boton { padding-left: calc(3 * var(--m)); }
+.t-max { font: 400 calc(3.2 * var(--m))/1 var(--ss-letra); color: #fff; text-shadow: var(--ss-borde); padding: calc(.8 * var(--m)) calc(1.8 * var(--m)); border: calc(.45 * var(--m)) solid var(--ss-t); border-radius: calc(1.8 * var(--m));
+  background: linear-gradient(#ffe36b, #ffb21f); box-shadow: 0 calc(.6 * var(--m)) 0 #a86f00; }
+/* Personajes: la ficha y la ropa en un panel a la derecha (abajo, en vertical). */
+.t-personajes { position: absolute; right: calc(2.6 * var(--m)); top: calc(18.4 * var(--m)); max-height: calc(100% - 21 * var(--m)); width: min(54%, calc(80 * var(--m))); display: flex; flex-direction: column; gap: calc(1.6 * var(--m)); padding: calc(2 * var(--m));
+  background: linear-gradient(180deg, #3a9bff, #1f6fe0); border: calc(.5 * var(--m)) solid var(--ss-t); border-radius: calc(3 * var(--m));
+  box-shadow: inset 0 calc(.6 * var(--m)) 0 rgba(255, 255, 255, .3), 0 calc(.8 * var(--m)) 0 rgba(10, 22, 66, .55); overflow: auto; }
+.t-ficha { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: calc(1.4 * var(--m)); }
+.t-ficha .flecha { width: calc(5.6 * var(--m)); height: calc(5.6 * var(--m)); }
+.t-nombre { text-align: center; }
+.t-nombre strong { display: block; font: 400 calc(4.6 * var(--m))/1.05 var(--ss-letra); color: #fff; text-shadow: var(--ss-borde); }
+.t-nombre small { display: block; margin-top: calc(.4 * var(--m)); font: 800 calc(2.3 * var(--m)) "IBM Plex Sans", sans-serif; color: #e2f0ff; }
+.t-accion { display: flex; justify-content: center; align-items: center; min-height: calc(8 * var(--m)); }
+.t-puesto { display: inline-flex; align-items: center; gap: calc(1 * var(--m)); font: 400 calc(3.8 * var(--m))/1 var(--ss-letra); color: #fff; text-shadow: var(--ss-borde); }
+.t-puesto svg { width: calc(5 * var(--m)); height: calc(5 * var(--m)); padding: calc(.7 * var(--m)); border-radius: 50%; background: #36aa14; border: calc(.4 * var(--m)) solid var(--ss-t); }
+.t-secreto { display: flex; align-items: center; gap: calc(1.2 * var(--m)); margin: 0; padding: calc(1 * var(--m)) calc(1.6 * var(--m)); border-radius: calc(1.6 * var(--m)); background: rgba(9, 30, 90, .35); font: 700 calc(2.4 * var(--m)) "IBM Plex Sans", sans-serif; }
+.t-secreto svg { width: calc(4.6 * var(--m)); height: calc(4.6 * var(--m)); flex: none; }
+.t-ropa { list-style: none; margin: 0; padding: calc(1 * var(--m)) 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(calc(15 * var(--m)), 1fr)); gap: calc(1.4 * var(--m)); }
+.t-traje { position: relative; width: 100%; display: grid; justify-items: center; gap: calc(.7 * var(--m)); padding: calc(1.1 * var(--m)) calc(.6 * var(--m)); cursor: pointer;
+  background: #fff; color: var(--ss-t); border: calc(.45 * var(--m)) solid var(--ss-t); border-radius: calc(2 * var(--m)); box-shadow: 0 calc(.5 * var(--m)) 0 rgba(13, 42, 99, .6); font: 400 calc(2.3 * var(--m))/1.05 var(--ss-letra); }
+.t-traje.sel { background: #fff6c9; box-shadow: 0 0 0 calc(.6 * var(--m)) #ffd23f, 0 calc(.5 * var(--m)) 0 rgba(13, 42, 99, .6); }
+.t-traje .t-n { text-align: center; }
+/* La muestra: una cabecita dibujada con los colores del aspecto (gorra, cara, sudadera y mochila). */
+.t-muestra { position: relative; width: calc(9 * var(--m)); height: calc(9 * var(--m)); border-radius: 50%; border: calc(.4 * var(--m)) solid var(--ss-t); overflow: hidden;
+  background: radial-gradient(circle at 50% 44%, #f1c19c 0 19%, transparent 20%), linear-gradient(180deg, var(--b) 0 31%, transparent 31%), linear-gradient(180deg, transparent 64%, var(--a) 64%), #cfe3ff; }
+.t-muestra i { position: absolute; right: 10%; bottom: 8%; width: 24%; height: 26%; border-radius: calc(.6 * var(--m)); background: var(--d); border: calc(.3 * var(--m)) solid var(--ss-t); }
+.t-traje.secreto .t-muestra { filter: grayscale(1) brightness(.55); }
+.t-traje em { position: absolute; top: calc(-1.3 * var(--m)); right: calc(-1.3 * var(--m)); width: calc(4.8 * var(--m)); height: calc(4.8 * var(--m)); padding: calc(.7 * var(--m)); border-radius: 50%; border: calc(.4 * var(--m)) solid var(--ss-t); }
+.t-traje em.ok { background: #36aa14; }
+.t-traje em.cerrado { background: #fff; padding: calc(.5 * var(--m)); }
+@container (orientation: portrait) {
+  .t-personajes { left: calc(2 * var(--m)); right: calc(2 * var(--m)); width: auto; top: auto; height: 54%; bottom: calc(2 * var(--m)); }
+  .capa.tienda[data-pestana="personajes"] { background: linear-gradient(180deg, rgba(10, 30, 90, .55) 0, rgba(10, 30, 90, 0) 22%); }
+  .t-lista { grid-template-columns: 1fr; }
+}
+
+/* La libreta (los boletos de la historia). */
+.libreta .intro { color: #fff3c4; font-style: italic; font-weight: 600; }
+.boletos { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 10px; }
+.boletos li { padding: 10px 12px; border-radius: 12px; background: linear-gradient(135deg, #ffe36b, #ffb21f); color: var(--ss-t); border: 3px solid var(--ss-t); box-shadow: 0 4px 0 rgba(10, 22, 66, .45); }
+.boletos li strong { font: 400 16px var(--ss-letra); }
+.boletos li p { margin: 4px 0 0; color: #3b2a05; font-weight: 600; }
+.boletos li.falta { background: rgba(9, 30, 90, .32); color: #fff; border-color: rgba(20, 35, 87, .6); box-shadow: none; }
+.boletos li.falta p { color: #c9dcf7; }
+
+/* Opciones. */
+.fila { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 9px 0; border-bottom: 2px solid rgba(20, 35, 87, .35); font-weight: 700; }
+.fila select, .fila input[type="range"] { max-width: 58%; }
+.fila select { background: #12306f; color: #fff; border: 2px solid var(--ss-t); border-radius: 10px; padding: 6px 8px; font-weight: 600; }
+.fila input[type="range"], .fila input[type="checkbox"] { accent-color: #ffd23f; }
+.ayuda ul { padding-left: 18px; display: grid; gap: 8px; margin: 0; }
+
+/* ---------- dentro de Juegos (iframe) ---------- */
+.club-integrado .cab { display: none; }
+.club-integrado .shell { padding: 0; }
+.club-integrado .scorebar { background: #fff; }
+.club-integrado[data-tema=oscuro] .scorebar { background: #222638; color: #e5e9f2; border-color: #34354b; }
+.club-integrado[data-tema=oscuro] .icono { background: #2a2f45; color: #e5e9f2; border-color: #3a3f58; }
+.club-integrado[data-tema=oscuro] .pie { color: #9aa8b9; }
+@media (max-width: 700px) {
+  .scorebar { gap: 12px; padding: 8px 10px; }
+  .scorebar strong { font-size: 17px; }
+  .caja { padding: 16px 14px 14px; border-radius: 16px; }
+  .fin .caja { padding-bottom: 0; } .fin .menu { margin-left: -14px; margin-right: -14px; }
+  .opcion.principal { font-size: 19px; }
+}
