@@ -37,7 +37,7 @@ import { esTrampa, castiga, revisaCastigo, castigoActivo, configuraCastigo, hast
       contar dos veces la misma partida, así que recargar la página con
       la partida terminada no infla el marcador.
    ============================================================ */
-import { watchAuth, loginGoogle, logout } from "./firebase.js";
+import { watchAuth, loginGoogle, logout, AVISO_RECAPTCHA } from "./firebase.js";
 import * as fb from "./fb-juegos.js";
 import { escapeHtml, timeAgo, colorForUid } from "./util.js";
 import { AJ_RITMOS, JUEGOS, reducir, jugadasDe, acumula, cupoDe, minimoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, YM_MAPAS, mapaYemas, varianteYemas, ganoEn, ordenaRanks, BX_VARIANTES, BX_METAS, BX_MAPAS, salaInactiva, ultimaActividad, INACTIVA_MS } from "./juegos/motor.js";
@@ -537,6 +537,7 @@ function puertaHtml(m) {
       <a class="btn2" href="#">Volver al salón</a>
     </div>
     <p class="jg-puerta-nota">Sin cuenta puedes jugar, como invitado, a Snake, Buscaminas, Tetris y sortEm.</p>
+    <p class="jg-puerta-nota jg-recaptcha">${AVISO_RECAPTCHA}</p>
   </section>`;
 }
 
@@ -1575,7 +1576,7 @@ function armazon() {
         ${inv ? '<button class="btn jg-modos-entrar" type="button" data-login><span class="mo-l">Iniciar sesión</span><span class="mo-c">Acceder</span></button>' : ""}
       </nav>
       <div class="jg-sal-avisos">
-        ${inv ? `<p class="jg-invitado-aviso" role="note"><span class="jg-invitado-ico" aria-hidden="true">${ICONO_SOLO}</span><span><b>Estás como invitado.</b> Juegas a Snake, Buscaminas, Tetris y sortEm, pero nada se guarda ni cuenta para rankings, logros ni monedas. El resto necesita cuenta.</span><button type="button" data-login>Iniciar sesión</button></p>` : ""}
+        ${inv ? `<p class="jg-invitado-aviso" role="note"><span class="jg-invitado-ico" aria-hidden="true">${ICONO_SOLO}</span><span><b>Estás como invitado.</b> Juegas a Snake, Buscaminas, Tetris y sortEm, pero nada se guarda ni cuenta para rankings, logros ni monedas. El resto necesita cuenta.</span><button type="button" data-login>Iniciar sesión</button></p><p class="jg-recaptcha">${AVISO_RECAPTCHA}</p>` : ""}
         <div id="vesAviso"></div>
       </div>
       ${novedadesHtml()}
