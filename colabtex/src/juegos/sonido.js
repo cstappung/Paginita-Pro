@@ -83,6 +83,12 @@ function fx() {
   if (!busFx) { busFx = a.createGain(); busFx.gain.value = volEfectos * GANANCIA_FX; busFx.connect(a.destination); }
   return a;
 }
+/* Para un juego con su propio motor de efectos (Tetris, `fx.js`): el
+   contexto y el bus de efectos, para que el deslizador «Efectos» y el 🔊
+   lo gobiernen igual. null si los efectos están callados. */
+export function salidaFx() {
+  try { const a = fx(); return a ? { ctx: a, destino: busFx } : null; } catch (e) { return null; }
+}
 const P = (a, t, f, dur, o = {}) => Chip.voz(a, busFx, Object.assign({ t, f, dur, vol: 0.1, onda: "p25", sus: 0.8 }, o));
 const N = (a, t, dur, o = {}) => Chip.ruido(a, busFx, Object.assign({ t, dur, vol: 0.12 }, o));
 const H = Chip.hz;

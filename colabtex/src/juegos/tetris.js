@@ -15,13 +15,16 @@
    evitarlo sin un servidor, que es justo lo que este sitio no tiene.
    ============================================================ */
 import TM from "../../../juegos/club/tetris/motor.js";
+import TFX from "../../../juegos/club/tetris/fx.js";
 import { blancoTetris } from "./motor.js";
-import { suena } from "./sonido.js";
+import { salidaFx } from "./sonido.js";
 import * as fb from "../fb-juegos.js";
 
 const CELDA = 26;
 const VIVO_MS = 250;
 const SUBE_CADA = 30000;
+const MISIL_MS = 520;
+const quieto = () => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } };
 
 const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
@@ -32,6 +35,15 @@ export function crearTetris(ctx) {
   let vivos = {}, desVivo = null, visto = -1;
   const firmas = {};
   const W = TM.W, HV = TM.H - TM.OCULTAS;
+  /* Efectos y sonido de fx.js. El sonido sale por el bus de efectos de la
+     página (`salidaFx`), así que el 🔊 y el deslizador lo gobiernan. */
+  let fx = TFX.crearEfectos({ TM, celda: CELDA }), sonM = null, latidoT = 0;
+  const son = (k, ...a) => {
+    const o = salidaFx();
+    if (!o) return;
+    if (!sonM || sonM.ctx !== o.ctx) sonM = TFX.crearSonido(o.ctx, o.destino);
+    if (sonM[k]) sonM[k](...a);
+  };
 
   const jugador = u => (est && est.jugadores.find(x => x.uid === u)) || null;
   const nombre = u => u === uid ? "tú" : ((jugador(u) || {}).nombre || "alguien");
@@ -48,7 +60,7 @@ export function crearTetris(ctx) {
     if (!s || !juego() || s.fin) return;
     if (a === "pausa") return;
     const ok = TM.accion(s, a);
-    if (ok && (a === "izq" || a === "der")) suena("clic");
+    if (ok && (a === "izq" || a === "der")) son("mueve", s.p && s.p.x);
   });
   let configurando = false;
   const teclaAbajo = e => {
@@ -75,7 +87,7 @@ export function crearTetris(ctx) {
       <div class="jg-tablero jg-tt-sala">
         <div class="jg-tt-yo">
           <div class="jg-tt-lado"><small>Guardada</small><canvas id="ttGuarda" width="96" height="72"></canvas><div id="ttDatos" class="jg-tt-datos"></div></div>
-          <div class="jg-tt-pozo"><div id="ttBasura" class="jg-tt-basura"></div><canvas id="ttPozo" width="${W * CELDA}" height="${HV * CELDA}"></canvas><div id="ttAviso" class="jg-tt-aviso"></div></div>
+          <div class="jg-tt-pozo"><div id="ttBasura" class="jg-tt-basura"></div><canvas id="ttPozo" width="${W * CELDA}" height="${HV * CELDA}"></canvas><div id="ttAviso" class="jg-tt-aviso"></div><div id="ttAlerta" class="jg-tt-alerta"></div></div>
           <div class="jg-tt-lado"><small>Siguientes</small><canvas id="ttCola" width="96" height="300"></canvas></div>
         </div>
         <div id="ttRivales" class="jg-tt-rivales"></div>
@@ -101,7 +113,7 @@ export function crearTetris(ctx) {
          se desliza fuera dejaba la pieza bajando o corriendo sola. */
       if (a === "blando" || a === "izq" || a === "der") {
         if (a === "blando") mando.blando = true;
-        else { mando.lado = a === "izq" ? -1 : 1; mando.t = 0; mando.repite = false; if (TM.accion(s, a)) suena("clic"); }
+        else { mando.lado = a === "izq" ? -1 : 1; mando.t = 0; mando.repite = false; if (TM.accion(s, a)) son("mueve", s.p && s.p.x); }
         /* iOS: si una pulsación larga abría el menú, el pointerup no llegaba
            nunca; touchend y blur sueltan igual. */
         const EVS = ["pointerup", "pointercancel", "touchend", "touchcancel", "blur"];
@@ -129,6 +141,7 @@ export function crearTetris(ctx) {
   function arranca() {
     if (s || !est || est.fase === "espera") return;
     s = TM.crear({ semilla: est.semilla || 1, subeCada: SUBE_CADA });
+    fx = TFX.crearEfectos({ TM, celda: CELDA });
     aplicada = 0;
   }
 
@@ -139,9 +152,10 @@ export function crearTetris(ctx) {
     const dt = Math.min(100, ahora - t0);
     t0 = ahora;
     if (!s || !est) return;
+    fx.paso(dt);
     if (juego() && !s.fin) {
       const deben = est.basura[uid] || 0;
-      if (deben > aplicada) { TM.recibe(s, deben - aplicada); aplicada = deben; }
+      if (deben > aplicada) { const n = deben - aplicada; TM.recibe(s, n); aplicada = deben; if (s.tiempo > 500) { fx.amenaza(n); son("alarma", n); } }
       mando.paso(dt);
       s.blando = mando.blando;
       TM.avanza(s, dt);
@@ -150,11 +164,12 @@ export function crearTetris(ctx) {
         const n = Math.min(12, s.salida);
         s.salida = 0;
         const a = blancoTetris(est, uid);
-        if (a) jugar({ t: "ataque", uid, a, n }).catch(() => {});
+        if (a) { jugar({ t: "ataque", uid, a, n }).catch(() => {}); son("envia", n); misil(uid, a, n); }
       }
+      latido(dt);
       if (s.fin && !caidaEnviada) {
         caidaEnviada = true;
-        suena("derrota");
+        son("fin");
         jugar({ t: "cae", uid, l: s.lineas, p: s.puntos }).catch(() => { caidaEnviada = false; });
       }
       if (ahora - vivoT > VIVO_MS) {
@@ -166,18 +181,83 @@ export function crearTetris(ctx) {
   }
 
   function eventos() {
-    const ev = s.eventos.splice(0);
-    let fuerte = "";
-    for (const e of ev) {
-      if (e.e === "fija") {
-        if (e.n >= 4 || e.ts) fuerte = "estalla";
-        else if (e.n > 0 && fuerte !== "estalla") fuerte = "golpe";
-        else if (!fuerte) fuerte = "ficha";
-        if (e.n > 0 || e.ts) aviso(e);
-      } else if (e.e === "basura" && !fuerte) fuerte = "martillo";
-      else if (e.e === "nivel") suena("turno");
+    let seco = false;
+    for (const e of s.eventos.splice(0)) {
+      fx.evento(e);
+      if (e.e === "gira") son("gira", s.p && s.p.t, s.p && s.p.x);
+      else if (e.e === "guarda") son("guarda");
+      else if (e.e === "seco") { seco = true; son("seco", e.a - e.de, e.celdas[0][0]); }
+      else if (e.e === "basura") { son("impacto", e.n); alerta(raiz && raiz.querySelector(".jg-tt-pozo"), "atacado"); }
+      else if (e.e === "nivel") son("nivel");
+      else if (e.e === "fija") {
+        if (e.n || e.ts) { son("linea", e.n, e.combo, e.ts, e.pc, e.b2b); aviso(e); }
+        else if (!seco) son("fija", Math.min(1, TFX.altura(s) / 20), e.bloq && e.bloq[0] && e.bloq[0][0]);
+      }
     }
-    if (fuerte) suena(fuerte);
+  }
+  /* Con la pila a cinco filas del techo late un corazón, y más deprisa si
+     además viene basura en camino. */
+  function latido(dt) {
+    const a = TFX.altura(s), pend = TM.pendiente(s);
+    if (a < 15 && !(a >= 11 && pend >= 3)) { latidoT = 0; return; }
+    latidoT -= dt;
+    if (latidoT <= 0) {
+      const k = Math.min(1, Math.max(0, (a - 12) / 8) + pend * 0.06);
+      son("latido", k); latidoT = 900 - k * 420;
+    }
+  }
+  /* Una clase que se reinicia, para que la animación vuelva a empezar. */
+  const reinicios = new WeakMap();
+  function alerta(el, cls, ms = 600) {
+    if (!el) return;
+    el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls);
+    clearTimeout(reinicios.get(el));
+    reinicios.set(el, setTimeout(() => el.classList.remove(cls), ms));
+  }
+  /* El ataque se ve viajar: un proyectil del color de quien lo manda, del
+     pozo que limpia al que lo recibe. Va por el DOM (WAAPI, el compositor
+     lo mueve) y se borra al llegar. */
+  const elDe = u => {
+    if (!raiz) return null;
+    if (u === uid && jugador(uid) && !ctx.mirando) return raiz.querySelector("#ttPozo");
+    return raiz.querySelector(`.jg-tt-rival[data-u="${CSS.escape(u)}"] canvas`);
+  };
+  const colorDe = u => { const c = (jugador(u) || {}).color; return /^#[0-9a-f]{6}$/i.test(c || "") ? c : "#ff4a3a"; };
+  function misil(de, a, n) {
+    const o = elDe(de), d = elDe(a);
+    if (!o || !d || quieto() || document.hidden) return;
+    const r0 = o.getBoundingClientRect(), r1 = d.getBoundingClientRect();
+    if (!r0.width || !r1.width) return;
+    const x0 = r0.left + r0.width / 2, y0 = r0.top + r0.height * 0.35, x1 = r1.left + r1.width / 2, y1 = r1.top + r1.height * 0.5;
+    const mx = (x0 + x1) / 2, my = Math.min(y0, y1) - 60 - Math.min(120, Math.abs(x1 - x0) * 0.25);
+    const tam = Math.min(2.2, 1 + n * 0.12);
+    for (let i = 0; i < 3; i++) {
+      const b = document.createElement("i");
+      b.className = "jg-tt-misil";
+      b.style.setProperty("--c", colorDe(de));
+      document.body.appendChild(b);
+      const k = tam * (1 - i * 0.28);
+      const an = b.animate([
+        { transform: `translate(${x0}px,${y0}px) scale(${k * 0.4})`, opacity: 0 },
+        { transform: `translate(${mx}px,${my}px) scale(${k})`, opacity: 1 - i * 0.3, offset: 0.5 },
+        { transform: `translate(${x1}px,${y1}px) scale(${k * 1.3})`, opacity: 1 - i * 0.3 }
+      ], { duration: MISIL_MS, delay: i * 45, easing: "cubic-bezier(.45,0,.75,.6)", fill: "both" });
+      an.onfinish = an.oncancel = () => b.remove();
+    }
+    setTimeout(() => {
+      if (muerto) return;
+      if (a === uid) alerta(raiz && raiz.querySelector(".jg-tt-pozo"), "atacado");
+      else alerta(d.closest(".jg-tt-rival"), "golpe", 450);
+    }, MISIL_MS + 60);
+  }
+  let alertaT = 0;
+  function avisaAtaque(de, n) {
+    const el = raiz && raiz.querySelector("#ttAlerta");
+    if (!el) return;
+    el.innerHTML = `<span style="--c:${colorDe(de)}">⚠ <b translate="no">${esc(Nombre(de))}</b> te manda ${n}</span>`;
+    el.classList.remove("ve"); void el.offsetWidth; el.classList.add("ve");
+    clearTimeout(alertaT);
+    alertaT = setTimeout(() => el.classList.remove("ve"), 1700);
   }
   let avisoT = 0;
   function aviso(e) {
@@ -192,6 +272,7 @@ export function crearTetris(ctx) {
     const el = raiz && raiz.querySelector("#ttAviso");
     if (!el) return;
     el.textContent = partes.join(" · ");
+    el.dataset.k = e.pc ? "pc" : e.n >= 4 ? "tetris" : e.ts ? "ts" : "combo";
     el.classList.remove("ve"); void el.offsetWidth; el.classList.add("ve");
     clearTimeout(avisoT);
     avisoT = setTimeout(() => el.classList.remove("ve"), 1400);
@@ -200,15 +281,16 @@ export function crearTetris(ctx) {
   function dibuja() {
     const cv = raiz.querySelector("#ttPozo");
     const c = cv.getContext("2d");
-    TM.pintaPozo(c, s, { celda: CELDA });
+    const pend = TM.pendiente ? TM.pendiente(s) : 0;
+    fx.pinta(c, s, { pendiente: s.fin ? 0 : pend });
+    fx.sacude(cv);
     const g = raiz.querySelector("#ttGuarda").getContext("2d");
     g.clearRect(0, 0, 96, 72);
-    TM.pintaPieza(g, s.guardada, 48, 36, 18, s.puedeGuardar ? 1 : 0.35);
+    TFX.pintaPieza(g, TM, s.guardada, 48, 36, 18, s.puedeGuardar ? 1 : 0.35);
     const q = raiz.querySelector("#ttCola").getContext("2d");
     q.clearRect(0, 0, 96, 300);
-    s.cola.slice(0, 5).forEach((t, i) => TM.pintaPieza(q, t, 48, 30 + i * 60, i ? 14 : 18));
-    const pend = TM.pendiente ? TM.pendiente(s) : 0;
-    pon("ttBasura", `<i style="height:${Math.min(100, pend * 100 / HV)}%"></i>`);
+    s.cola.slice(0, 5).forEach((t, i) => TFX.pintaPieza(q, TM, t, 48, 30 + i * 60, i ? 14 : 18));
+    pon("ttBasura", `<i class="${pend >= 4 ? "carga peligro" : pend ? "carga" : ""}" style="height:${Math.min(100, pend * 100 / HV)}%"></i>`);
     pon("ttDatos", `<p><small>Líneas</small><b>${s.lineas}</b></p><p><small>Puntos</small><b>${s.puntos}</b></p><p><small>Nivel</small><b>${s.nivel}</b></p>`);
   }
 
@@ -261,7 +343,11 @@ export function crearTetris(ctx) {
     raiz.classList.toggle("mirando", !juego());
     const n = est.hist.length ? est.hist[est.hist.length - 1].i : -1;
     if (visto >= 0 && n > visto) {
-      for (const e of est.hist) if (e.i > visto && e.e === "ataque" && e.a === uid) suena("golpe");
+      for (const e of est.hist) {
+        if (e.i <= visto || e.e !== "ataque") continue;
+        if (e.a === uid && e.uid !== uid) { avisaAtaque(e.uid, e.n); misil(e.uid, uid, e.n); }
+        else if (e.uid !== uid) misil(e.uid, e.a, e.n);
+      }
     }
     visto = n;
     pintaHist();
@@ -280,7 +366,7 @@ export function crearTetris(ctx) {
   function destruir() {
     muerto = true;
     cancelAnimationFrame(raf);
-    clearTimeout(avisoT);
+    clearTimeout(avisoT); clearTimeout(alertaT);
     document.removeEventListener("keydown", teclaAbajo);
     document.removeEventListener("keyup", teclaArriba);
     if (window.Mando && cfgMando) window.Mando.libera(cfgMando);

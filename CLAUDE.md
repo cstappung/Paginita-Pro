@@ -2838,6 +2838,27 @@ the solo version on the same engine: Maratón, Sprint (40 lines; the
 result is `puntos: 40` plus the time, so the ranking orders it by time) and
 Ultra (two minutes). Its categories are `club-tetris-*` in `soloRanks`.
 
+**Tetris' look and sound live in `juegos/club/tetris/fx.js`** (UMD
+`TetrisFX`, shared by the Club and the room), and **none of it decides
+anything**: the motor has already locked, cleared and raised garbage, and the
+Club's proof is replayed without this file. The motor only adds data to its
+events for it (`fija` carries `bloq`, `filas` and their `colores`, `seco` is
+the hard drop, `basura` its `hueco`); adding fields to an event is safe,
+changing state is not. It is cheap on purpose: one sprite per colour and
+size, the background cached per level, no `shadowBlur`, capped particles,
+and the shake written to the canvas's `transform` only when it changes.
+Cleared rows flash and shatter, and the rows above **fall after the flash**
+(`desp`); garbage pushes the stack up from below; a red band at the bottom of
+the pit shows garbage on its way (`pendiente`); the piece slides to where it
+is, so at high speed it is seen falling, with a trail. In the room an attack
+also flies as a projectile in the attacker's colour from pit to pit (WAAPI
+over `<body>`), and the victim gets a «⚠ X te manda N» banner, an alarm, then
+a metal impact when the rows rise. The sound is **not** the site's chip: the
+pit is an instrument (each column a note of A minor pentatonic, panned where
+the piece is; each clear the next chord of Am–F–C–G, FM bells through an echo).
+In the room it goes through `salidaFx()` from `sonido.js` (the page's effects
+bus), in the Club through its own `fx` gain.
+
 **sortEm (`juegos/club/sortem/`) is a Solo Club game too**, on the same
 `conexion.js` protocol as Mina Club: no ranking of its own, only
 `Club.result({categoria: "club-sortem-N", puntos: N, tiempo})` for N = 10
