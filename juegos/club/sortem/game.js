@@ -154,14 +154,13 @@ class GameStateManager {
 class GameState {
   constructor(scene) {
     this.scene = scene;
-    this.blocks = [];
+    this.m = null;          // the pure engine's state (motor.js): blocks, cursor, grab
     this.textObjects = [];
-    this.selectedIdx = 0;
-    this.isGrabbed = false;
     this.gameWon = false;
-    this.startTime = null; // Will be set on first input
+    this.startTime = null; // Will be set on first input (Date.now, only for the on-screen timer)
     this.finalTime = null; // Single source of truth for final time
     this.blockPositions = [];
+    this.registro = null;  // the proof of this game (see empieza/anota/prueba)
 
     // Combo system
     this.lastMergeTime = null;
@@ -169,32 +168,144 @@ class GameState {
     this.maxCombo = 0;
   }
 
+  // The board lives in the engine; these keep the drawing code readable.
+  get blocks() { return this.m ? this.m.bloques : []; }
+  get selectedIdx() { return this.m ? this.m.sel : 0; }
+  get isGrabbed() { return !!(this.m && this.m.agarrado); }
+
   generateNumbers() {
-    let numbers;
-    let valid = false;
-    let attempts = 0;
-
-    while (!valid && attempts < 1000) {
-      attempts++;
-      numbers = Array.from({ length: N }, (_, i) => i + 1);
-
-      for (let i = numbers.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [numbers[i], numbers[j]] = [numbers[j], numbers[i]];
-      }
-
-      valid = true;
-      for (let i = 0; i < numbers.length - 1; i++) {
-        if (Math.abs(numbers[i] - numbers[i + 1]) === 1) {
-          valid = false;
-          break;
-        }
-      }
-    }
-
-    this.blocks = numbers.map(n => [n]);
+    // A fresh seed per deal: the proof carries it and the verifier deals
+    // the same board (motor.js), so the shuffle can no longer be Math.random.
+    this.m = SortemMotor.nuevo(N, nuevaSemilla());
+    this.registro = null;
     this.createTextObjects();
     this.calculatePositions();
+  }
+
+  // ---------- Proof of the game (anti-cheat, docs/antitrampas/sortem.md) ----------
+  // Every key press that reaches the board is written down with its instant
+  // (taken from the key event itself, so neither the frame rate nor a
+  // throttled tab changes it) and how it was produced: autorepeat or a real
+  // press, a real keyboard (isTrusted), a gamepad through mando.js, or a
+  // script. The verifier replays it with the same engine.
+  empieza(ev) {
+    this.startTime = Date.now();
+    this.registro = { t0: instante(ev), d0: Date.now(), ult: 0, w: 0, a: '', t: [], f: '', k: [], abiertas: {}, soltadas: {} };
+  }
+
+  anota(accion, ev, cuando) {
+    const r = this.registro;
+    if (!r) return;
+    const t = Math.max(r.ult, Math.round(cuando - r.t0));
+    r.t.push(t - r.ult);
+    r.ult = t;
+    const repite = !!(ev && ev.repeat);
+    r.a += repite ? accion.toLowerCase() : accion;
+    r.f += ev && ev.isTrusted ? '.' : ev && ev.__mando && hayMando() ? 'm' : 'u';
+    // How long the key was held, filled in on keyup. The starting key is
+    // usually released before its own action is applied (210 ms later), so
+    // a keyup already seen for that very press is used at once.
+    let dura = -1;
+    const codigo = ev && ev.code;
+    if (codigo && !repite) {
+      const suelta = r.soltadas[codigo];
+      if (suelta != null && suelta >= ev.timeStamp) dura = Math.round(suelta - ev.timeStamp);
+      else r.abiertas[codigo] = { i: r.k.length, ts: ev.timeStamp };
+      delete r.soltadas[codigo];
+    }
+    r.k.push(dura);
+  }
+
+  soltada(ev) {
+    const r = this.registro;
+    if (!r || !ev.code) return;
+    const abierta = r.abiertas[ev.code];
+    if (abierta) {
+      if (ev.timeStamp >= abierta.ts) r.k[abierta.i] = Math.round(ev.timeStamp - abierta.ts);
+      delete r.abiertas[ev.code];
+    } else r.soltadas[ev.code] = ev.timeStamp;
+  }
+
+  // The time that counts: the instant of the winning drop, unless the wall
+  // clock saw clearly more time go by (a computer that slept mid-game, or a
+  // performance.now slowed down from the console): then that one.
+  cierra() {
+    const r = this.registro;
+    r.w = Date.now() - r.d0;
+    return SortemMotor.tiempoDe(r.ult, r.w);
+  }
+
+  prueba() {
+    const r = this.registro;
+    return { v: 1, n: this.m.n, s: this.m.semilla, d: r.d0, w: r.w, a: r.a, t: r.t, f: r.f, k: r.k };
+  }
+
+  // One key press on the board, through the engine; the rest is show.
+  juega(accion) {
+    const r = SortemMotor.aplica(this.m, accion);
+    if (!r || !r.cambio) return r;
+    if (r.tipo === 'sel') this.scene.cameras.main.shake(80, 0.002);
+    else if (r.tipo === 'agarra') this.grab();
+    else if (r.tipo === 'mueve') this.moved(r.de, this.selectedIdx);
+    else if (r.tipo === 'suelta') this.dropped(r.de, r.fusiones, r.gano);
+    return r;
+  }
+
+  grab() {
+    this.scene.cameras.main.shake(100, 0.003);
+    this.createCoolParticles(this.selectedIdx, 0xff006e, 'grab');
+    playExplosion(this.scene, 0.6);
+    this.scene.tweens.add({
+      targets: this.textObjects[this.selectedIdx],
+      scale: 1.15,
+      duration: 120,
+      ease: 'Back.easeOut'
+    });
+  }
+
+  dropped(de, mergeSize, gano) {
+    this.scene.cameras.main.shake(120, 0.004);
+    playExplosion(this.scene, 0.8);
+
+    this.scene.tweens.add({
+      targets: this.textObjects[de],
+      scale: 1.0,
+      duration: 120,
+      ease: 'Back.easeIn'
+    });
+
+    // The engine already merged: redraw the blocks as they are now.
+    this.createTextObjects();
+    this.calculatePositions();
+
+    if (mergeSize > 0) {
+      // MERGE HAPPENED!
+      // Check for combo (merge within 1 second)
+      const now = Date.now();
+      if (this.lastMergeTime && (now - this.lastMergeTime) < 1000) {
+        this.comboCount++;
+        this.maxCombo = Math.max(this.maxCombo, this.comboCount);
+        // Play escalating combo sound
+        playComboSound(this.scene, this.comboCount);
+      } else {
+        this.comboCount = 1; // Reset combo
+      }
+      this.lastMergeTime = now;
+
+      // BIG SHAKE with combo multiplier!
+      const comboMultiplier = Math.min(this.comboCount * 0.5, 2); // Cap at 2x
+      this.scene.cameras.main.shake(300 * mergeSize * comboMultiplier, 0.008 * mergeSize);
+      this.createCoolParticles(this.selectedIdx, 0x10b981, 'merge', mergeSize);
+
+      // Create wave effect from merge position
+      this.createMergeWave(this.selectedIdx);
+    }
+
+    if (gano) {
+      this.gameWon = true;
+      // Capture final time immediately when win is detected
+      this.finalTime = this.cierra() / 1000;
+    }
   }
 
   calculatePositions() {
@@ -232,171 +343,22 @@ class GameState {
     });
   }
 
-  selectPrevious() {
-    if (this.selectedIdx > 0) {
-      this.selectedIdx--;
-      this.scene.cameras.main.shake(80, 0.002);
-      return true;
-    }
-    return false;
-  }
-
-  selectNext() {
-    if (this.selectedIdx < this.blocks.length - 1) {
-      this.selectedIdx++;
-      this.scene.cameras.main.shake(80, 0.002);
-      return true;
-    }
-    return false;
-  }
-
-  grab() {
-    this.isGrabbed = true;
-    this.scene.cameras.main.shake(100, 0.003);
-    this.createCoolParticles(this.selectedIdx, 0xff006e, 'grab');
-    playExplosion(this.scene, 0.6);
-    this.scene.tweens.add({
-      targets: this.textObjects[this.selectedIdx],
-      scale: 1.15,
-      duration: 120,
-      ease: 'Back.easeOut'
-    });
-  }
-
-  drop() {
-    this.isGrabbed = false;
-    this.scene.cameras.main.shake(120, 0.004);
-    playExplosion(this.scene, 0.8);
-
-    this.scene.tweens.add({
-      targets: this.textObjects[this.selectedIdx],
-      scale: 1.0,
-      duration: 120,
-      ease: 'Back.easeIn'
-    });
-
-    const oldLength = this.blocks.length;
-    this.checkMerges(this.selectedIdx);
-
-    if (oldLength > this.blocks.length) {
-      // MERGE HAPPENED!
-      const mergeSize = oldLength - this.blocks.length;
-
-      // Check for combo (merge within 1 second)
-      const now = Date.now();
-      if (this.lastMergeTime && (now - this.lastMergeTime) < 1000) {
-        this.comboCount++;
-        this.maxCombo = Math.max(this.maxCombo, this.comboCount);
-        // Play escalating combo sound
-        playComboSound(this.scene, this.comboCount);
-      } else {
-        this.comboCount = 1; // Reset combo
-      }
-      this.lastMergeTime = now;
-
-      // BIG SHAKE with combo multiplier!
-      const comboMultiplier = Math.min(this.comboCount * 0.5, 2); // Cap at 2x
-      this.scene.cameras.main.shake(300 * mergeSize * comboMultiplier, 0.008 * mergeSize);
-      this.createCoolParticles(this.selectedIdx, 0x10b981, 'merge', mergeSize);
-
-      // Create wave effect from merge position
-      this.createMergeWave(this.selectedIdx);
-    }
-
-    return this.checkWin();
-  }
-
-  checkMerges(droppedIdx) {
-    let changed = true;
-    while (changed) {
-      changed = false;
-
-      if (droppedIdx > 0) {
-        const current = this.blocks[droppedIdx - 1];
-        const next = this.blocks[droppedIdx];
-
-        if (current[current.length - 1] + 1 === next[0]) {
-          this.blocks[droppedIdx - 1] = [...current, ...next];
-          this.blocks.splice(droppedIdx, 1);
-          droppedIdx--;
-          if (this.selectedIdx >= droppedIdx) {
-            this.selectedIdx--;
-          }
-          changed = true;
-          continue;
-        }
-      }
-
-      if (droppedIdx < this.blocks.length - 1) {
-        const current = this.blocks[droppedIdx];
-        const next = this.blocks[droppedIdx + 1];
-
-        if (current[current.length - 1] + 1 === next[0]) {
-          this.blocks[droppedIdx] = [...current, ...next];
-          this.blocks.splice(droppedIdx + 1, 1);
-          if (this.selectedIdx > droppedIdx) {
-            this.selectedIdx--;
-          }
-          changed = true;
-          continue;
-        }
-      }
-    }
-
-    this.createTextObjects();
-    this.calculatePositions();
-  }
-
-  moveLeft() {
-    if (!this.isGrabbed || this.selectedIdx === 0) return false;
-
-    const temp = this.blocks[this.selectedIdx];
-    this.blocks[this.selectedIdx] = this.blocks[this.selectedIdx - 1];
-    this.blocks[this.selectedIdx - 1] = temp;
-
-    const tempText = this.textObjects[this.selectedIdx];
-    this.textObjects[this.selectedIdx] = this.textObjects[this.selectedIdx - 1];
-    this.textObjects[this.selectedIdx - 1] = tempText;
-
-    this.selectedIdx--;
+  // The engine swapped block `de` with its neighbour, which is now `a`.
+  moved(de, a) {
+    const tempText = this.textObjects[de];
+    this.textObjects[de] = this.textObjects[a];
+    this.textObjects[a] = tempText;
     this.calculatePositions();
 
     // SHAKE ON MOVE!
     this.scene.cameras.main.shake(150, 0.004);
-    this.createCoolParticles(this.selectedIdx, 0xfbbf24, 'move');
+    this.createCoolParticles(a, 0xfbbf24, 'move');
     playHit(this.scene, 0.5);
 
     // MEGA QUICK DIRECTIONAL ANIMATION!
-    this.createDirectionalStreak('left', this.selectedIdx);
-    this.animateBlockSlide('left', this.selectedIdx);
-
-    return true;
-  }
-
-  moveRight() {
-    if (!this.isGrabbed || this.selectedIdx === this.blocks.length - 1) return false;
-
-    const temp = this.blocks[this.selectedIdx];
-    this.blocks[this.selectedIdx] = this.blocks[this.selectedIdx + 1];
-    this.blocks[this.selectedIdx + 1] = temp;
-
-    const tempText = this.textObjects[this.selectedIdx];
-    this.textObjects[this.selectedIdx] = this.textObjects[this.selectedIdx + 1];
-    this.textObjects[this.selectedIdx + 1] = tempText;
-
-    this.selectedIdx++;
-    this.calculatePositions();
-
-    // SHAKE ON MOVE!
-    this.scene.cameras.main.shake(150, 0.004);
-    this.createCoolParticles(this.selectedIdx, 0xfbbf24, 'move');
-    playHit(this.scene, 0.5);
-
-    // MEGA QUICK DIRECTIONAL ANIMATION!
-    this.createDirectionalStreak('right', this.selectedIdx);
-    this.animateBlockSlide('right', this.selectedIdx);
-
-    return true;
+    const direction = a < de ? 'left' : 'right';
+    this.createDirectionalStreak(direction, a);
+    this.animateBlockSlide(direction, a);
   }
 
   createCoolParticles(idx, color, type, intensity = 1) {
@@ -578,19 +540,6 @@ class GameState {
     });
   }
 
-  checkWin() {
-    const allNumbers = this.blocks.flat();
-    for (let i = 1; i < allNumbers.length; i++) {
-      if (allNumbers[i] < allNumbers[i - 1]) {
-        return false;
-      }
-    }
-    this.gameWon = true;
-    // Capture final time immediately when win is detected
-    this.finalTime = this.getElapsedTime();
-    return true;
-  }
-
   draw(graphics) {
     graphics.clear();
 
@@ -694,6 +643,42 @@ function isHigh(ms) {
 }
 
 // ==========================================
+// PROOF OF THE GAME (anti-cheat)
+// ==========================================
+// Club.result goes out with the proof (GameState.prueba) and the page
+// replays it before saving anything; a result it refuses comes back as
+// `club-rechazo`, and the game over screen says so instead of «NEW RECORD».
+let recordPrevio = null;  // the record before this game claimed it
+let rechazo = null;       // why the page did not save the last game
+let escena = null;
+let finMostrado = false;  // the game over screen is up (redraw it on a rejection)
+function nuevaSemilla() {
+  try { return crypto.getRandomValues(new Uint32Array(1))[0]; }
+  catch (e) { return Math.floor(Math.random() * 4294967296) >>> 0; }
+}
+// mando.js turns a gamepad into synthetic key events (isTrusted false):
+// those are legitimate only while a gamepad really is connected.
+function hayMando() {
+  try { return Array.from(navigator.getGamepads ? navigator.getGamepads() : []).some(p => p && p.connected); }
+  catch (e) { return false; }
+}
+// The instant of a key press: the event's own timestamp (performance.now
+// timebase), not when Phaser gets round to its queue on the next frame.
+function instante(ev) {
+  const ahora = performance.now();
+  const ts = ev && ev.timeStamp;
+  return typeof ts === 'number' && ts > ahora - 60000 && ts <= ahora + 1 ? ts : ahora;
+}
+window.addEventListener('keyup', e => { if (gameState) gameState.soltada(e); }, true);
+window.addEventListener('club-rechazo', e => {
+  if (!e.detail || e.detail.categoria !== 'club-sortem-' + N) return;
+  rechazo = e.detail.motivo || 'not saved';
+  if (ultimoRecord) recordNube = recordPrevio;
+  ultimoRecord = false;
+  if (escena && finMostrado) showGameOverScreen(escena);
+});
+
+// ==========================================
 // GLOBAL VARIABLES
 // ==========================================
 let phaseManager;
@@ -765,6 +750,9 @@ function parseDrumPattern(patternStr) {
 // ==========================================
 function create() {
   const scene = this;
+  escena = scene;
+  rechazo = null;
+  finMostrado = false;
   // The canvas is 1000 wide but the layout was drawn for 800 centred on x=400:
   // the camera shows x = -100..900 so everything stays centred.
   scene.cameras.main.setScroll(-100, 0);
@@ -828,7 +816,7 @@ function create() {
   scene.input.keyboard.on('keydown', (event) => {
     // Normalize keyboard input to arcade codes for easier handling
     const key = KEYBOARD_TO_ARCADE[event.key] || event.key;
-    handleKeyInput(scene, key);
+    handleKeyInput(scene, key, event);
   });
 }
 
@@ -994,8 +982,9 @@ function isStartButton(key) {
 // ==========================================
 // INPUT HANDLER
 // ==========================================
-function handleKeyInput(scene, key) {
-  // key is now an arcade button code (P1U, P1A, etc.) or original key if not mapped
+function handleKeyInput(scene, key, ev) {
+  // key is now an arcade button code (P1U, P1A, etc.) or original key if not mapped.
+  // ev is the native KeyboardEvent: its instant and origin go into the proof.
 
   // Global reset button - works in any phase except transitioning
   if (isStartButton(key) && phaseManager.currentPhase !== GamePhase.TRANSITIONING) {
@@ -1013,10 +1002,10 @@ function handleKeyInput(scene, key) {
   // Handle input based on current phase
   switch (phase) {
     case GamePhase.START_SCREEN:
-      handleStartScreenInput(scene, key);
+      handleStartScreenInput(scene, key, ev);
       break;
     case GamePhase.PLAYING:
-      handlePlayingInput(scene, key);
+      handlePlayingInput(scene, key, ev, instante(ev));
       break;
     case GamePhase.GAME_OVER:
       handleGameOverInput(scene, key);
@@ -1024,7 +1013,7 @@ function handleKeyInput(scene, key) {
   }
 }
 
-function handleStartScreenInput(scene, key) {
+function handleStartScreenInput(scene, key, ev) {
   if (isUpInput(key) || isDownInput(key)) {
     cambiaModo(scene, isUpInput(key) ? 1 : -1);
     return;
@@ -1053,7 +1042,7 @@ function handleStartScreenInput(scene, key) {
 
     // Show timer and start game
     timerText.setVisible(true);
-    gameState.startTime = Date.now();
+    gameState.empieza(ev);
 
     phaseManager.setPhase(GamePhase.PLAYING);
 
@@ -1064,35 +1053,27 @@ function handleStartScreenInput(scene, key) {
       startDrumLoop(scene, 'playing');
     }, transitionDuration);
 
-    // Process the actual input for the game
+    // Process the actual input for the game (at the moment it is applied:
+    // the board takes no input during the 200 ms transition)
+    const gs = gameState;
     setTimeout(() => {
-      handlePlayingInput(scene, key);
+      if (gameState === gs) handlePlayingInput(scene, key, ev, performance.now());
     }, phaseManager.blockDuration + 10);
   }
 }
 
-function handlePlayingInput(scene, key) {
-  if (!gameState.isGrabbed) {
-    if (isLeftInput(key) && gameState.selectPrevious()) {
-      // Movement handled
-    } else if (isRightInput(key) && gameState.selectNext()) {
-      // Movement handled
-    } else if (isActionButton(key)) {
-      gameState.grab();
-      playTone(scene, 660, 0.08);
-    }
-  } else {
-    if (isLeftInput(key) && gameState.moveLeft()) {
-      // Movement handled
-    } else if (isRightInput(key) && gameState.moveRight()) {
-      // Movement handled
-    } else if (isActionButton(key)) {
-      const won = gameState.drop();
-      playTone(scene, 880, 0.12);
-      if (won) {
-        phaseManager.setPhase(GamePhase.WIN_ANIMATION);
-        winGame(scene);
-      }
+function handlePlayingInput(scene, key, ev, cuando) {
+  const accion = isLeftInput(key) ? 'L' : isRightInput(key) ? 'R' : isActionButton(key) ? 'A' : null;
+  if (!accion || gameState.gameWon) return;
+  gameState.anota(accion, ev, cuando);
+  const r = gameState.juega(accion);
+  if (!r) return;
+  if (r.tipo === 'agarra') playTone(scene, 660, 0.08);
+  else if (r.tipo === 'suelta') {
+    playTone(scene, 880, 0.12);
+    if (r.gano) {
+      phaseManager.setPhase(GamePhase.WIN_ANIMATION);
+      winGame(scene);
     }
   }
 }
@@ -1433,9 +1414,12 @@ function winGame(scene) {
   // Report to the Club ranking and compare with the cloud record
   const ms = Math.max(1, Math.round(gameState.finalTime * 1000));
   const isHighScore = isHigh(ms);
+  const recordAntes = recordNube;
   ultimoRecord = isHighScore;
   if (isHighScore) recordNube = ms;
-  if (window.Club) Club.result({ categoria: 'club-sortem-' + N, puntos: N, tiempo: ms });
+  recordPrevio = recordAntes;
+  rechazo = null;
+  if (window.Club) Club.result({ categoria: 'club-sortem-' + N, puntos: N, tiempo: ms }, gameState.prueba());
 
   // INSTANT BIG WIN!
   if (isHighScore) {
@@ -1583,6 +1567,7 @@ function winGame(scene) {
 // GAME OVER SCREEN
 // ==========================================
 function showGameOverScreen(scene) {
+  finMostrado = true;
   // Clear any existing game over objects
   clearGameOverObjects();
 
@@ -1680,14 +1665,19 @@ function showGameOverScreen(scene) {
     scene.add.text(400, 255, N + ' NUMBERS', {
       fontSize: '22px', fontFamily: 'Courier New, monospace', color: '#c8a9e8', fontStyle: 'bold'
     }).setOrigin(0.5),
-    scene.add.text(400, 315, ultimoRecord ? 'NEW RECORD!' : 'YOUR BEST', {
+    scene.add.text(400, 315, rechazo ? 'NOT SAVED' : ultimoRecord ? 'NEW RECORD!' : 'YOUR BEST', {
       fontSize: Math.round(22 * lbScale) + 'px', fontFamily: 'Courier New, monospace',
-      color: ultimoRecord ? '#ff006e' : '#ffffff', fontStyle: 'bold'
+      color: rechazo || ultimoRecord ? '#ff006e' : '#ffffff', fontStyle: 'bold'
     }).setOrigin(0.5),
-    scene.add.text(400, 375, recordNube != null ? (recordNube / 1000).toFixed(2) + 's' : '—', {
+    scene.add.text(400, 375, rechazo ? '' : recordNube != null ? (recordNube / 1000).toFixed(2) + 's' : '—', {
       fontSize: Math.round(26 * lbScale) + 'px', fontFamily: 'Courier New, monospace', color: '#fbbf24', fontStyle: 'bold'
     }).setOrigin(0.5)
   ];
+  // Why the page refused this game (club-rechazo), small, inside the frame.
+  if (rechazo) lbObjs.push(scene.add.text(400, 405, rechazo, {
+    fontSize: '13px', fontFamily: 'Courier New, monospace', color: '#ff9fc6',
+    align: 'center', wordWrap: { width: 300 }
+  }).setOrigin(0.5, 1));
   gameOverObjects = gameOverObjects.concat(lbObjs);
 
   // Cool divider line
