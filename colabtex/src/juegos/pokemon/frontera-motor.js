@@ -403,6 +403,10 @@ export function validaFrontera(sets) {
       if (it.megaStone || it.zMove) err.push(`${it.name} no sirve aquí (sin Mega ni movimientos Z).`);
     }
     if (!s.moves || !s.moves.length) err.push(`${sp.name} no tiene movimientos.`);
+    /* El formato libre del simulador admite hasta 24; el juego, cuatro.
+       Un set con más solo sale de un texto escrito a mano, y en la
+       Frontera daría un Pokémon con más opciones que cualquier rival. */
+    else if (s.moves.length > 4) err.push(`${sp.name} tiene más de cuatro movimientos.`);
   }
   return err;
 }
@@ -645,10 +649,307 @@ export function nuevaPelea(o) {
   };
 }
 
+/* ---------- la prueba de una marca (antitrampas) ----------
+   Una marca de la Frontera no se cree: se rehace (ver
+   docs/antitrampas/frontera.md). Como todo sale de la semilla, una
+   victoria se describe con lo que el jugador puso de su parte —el
+   equipo y sus elecciones— y cualquiera la vuelve a jugar aquí con el
+   mismo resultado. Este bloque arma esas pruebas (lo usa la pantalla) y
+   las comprueba (lo usa el verificador del club, en un Worker con su
+   propia copia de este motor): uno solo para los dos, así nunca dicen
+   cosas distintas.
+
+   - **Racha** (`club-frontera-<inst>-<nivel>`): la semilla, el equipo
+     del que se partió (el empaquetado de Showdown en la Torre y el
+     Palacio; los tres índices del alquiler en la Fábrica) y, por cada
+     combate ganado, `[o, elecciones, cambio, toques]`. Se rehacen todos
+     y todos tienen que ganarse.
+   - **Victorias** (`club-frontera-victorias`, acumulado de todas las
+     rachas): no cabe la historia entera, así que la prueba trae solo
+     las victorias que aún no estaban en la tabla, sobre la fila que la
+     pantalla leyó de la base (`b` puntos y `h`, la última victoria
+     contada). Cada victoria lleva su **ordinal** `o`, que entra en la
+     semilla del combate: una victoria vieja no se puede volver a contar
+     (su ordinal no pasa de `h`), y ponerle otro ordinal es otro combate,
+     que hay que volver a ganar.
+   - **Toques**: por cada elección, cuánto tardó desde la anterior (o
+     desde que se abrió el combate) y si el clic fue de una persona
+     (`isTrusted`), de un mando (los clics sintéticos de mando.js con un
+     mando conectado) o de un script. Una partida rehecha que se gana
+     no basta: un bot que simula los combates también las gana. */
+export const PRUEBA_FRONTERA = 1;
+export const MIN_COMBATE_MS = 1000;   // `cierraPelea` nunca cuenta menos por combate
+export const TOPE_LIBRO = 300;        // victorias por prueba (rehacer cada una cuesta)
+const TOPE_TIEMPO = 604800000;        // el tope de `tiempo` en las reglas
+const SEMILLA_RE = /^[0-9a-f]{12}$/;
+const CLAVE_RE = /^(torre|palacio|fabrica)-(50|abierto)$/;
+
+/* La semilla de Showdown y de la IA del combate n. Los combates de
+   antes de la prueba no tenían ordinal (o = 0). */
+export const semillaPelea = (semilla, n, o) => (o ? `${semilla}|${n}|${o}` : `${semilla}|${n}`);
+
+/* Las elecciones, compactas: «move 3» → "3", «switch 2» → "b". Lo que
+   no encaje (no debería haber nada más en la Frontera) va tal cual. */
+const CAMBIOS = "abcdef";
+export function codificaElecciones(lista) {
+  let t = "";
+  for (const c of lista || []) {
+    const m = /^move ([1-9])$/.exec(c), s = /^switch ([1-6])$/.exec(c);
+    if (m) t += m[1];
+    else if (s) t += CAMBIOS[+s[1] - 1];
+    else return (lista || []).map(String);
+  }
+  return t;
+}
+export function decodificaElecciones(c) {
+  if (Array.isArray(c)) return c.length <= 4000 && c.every(x => typeof x === "string" && x.length <= 40) ? c.slice() : null;
+  if (typeof c !== "string" || c.length > 4000) return null;
+  const out = [];
+  for (const ch of c) {
+    if (ch >= "1" && ch <= "9") { out.push("move " + ch); continue; }
+    const i = CAMBIOS.indexOf(ch);
+    if (i < 0) return null;
+    out.push("switch " + (i + 1));
+  }
+  return out;
+}
+
+/* Un toque: el intervalo en centésimas, en base 36, con "!" delante si
+   el clic no fue de una persona y "m" si fue del mando. Los toques de un
+   combate van unidos por puntos: "1k.m2f.3a". */
+export function toque(ms, origen) {
+  const cs = Math.max(0, Math.min(1679615, Math.round((+ms || 0) / 10)));
+  return (origen === "script" ? "!" : origen === "mando" ? "m" : "") + cs.toString(36);
+}
+export function leeToques(z) {
+  if (z === "") return [];
+  if (typeof z !== "string" || z.length > 30000) return null;
+  const out = [];
+  for (const t of z.split(".")) {
+    const m = /^([!m]?)([0-9a-z]{1,4})$/.exec(t);
+    if (!m) return null;
+    out.push({ ms: parseInt(m[2], 36) * 10, script: m[1] === "!", mando: m[1] === "m" });
+  }
+  return out;
+}
+
+/* ¿Juega una persona? Sobre todos los toques de la prueba. Lo que se
+   mide incluye la animación del turno: tras cada elección el combate
+   se anima con el menú escondido («…»), así que entre dos elecciones
+   de una persona pasan, como poco, el turno animado o el clic de
+   «saltar» más el de la elección. Con la pestaña oculta no hay
+   animación, pero tampoco nadie que haga clic. Los umbrales son muy
+   holgados a propósito: rechazar a alguien honrado es peor que dejar
+   pasar un bot lento.
+   - Un clic de script (`isTrusted` falso sin mando conectado) rechaza:
+     ni el ratón, ni el dedo, ni Intro sobre el botón lo dan.
+   - Menos de 100 ms desde la elección anterior es imposible (el tiempo
+     de reacción visual simple ronda los 200 ms, y aquí hay que leer el
+     menú); se toleran unos pocos —el 5 %, mínimo dos— por si el reloj
+     del aparato salta.
+   - Con 15 elecciones o más, una mediana por debajo de 350 ms es un
+     ritmo que nadie sostiene eligiendo entre cuatro movimientos y
+     cambios (elegir entre 4–6 opciones ya cuesta medio segundo largo
+     según Hick-Hyman, sin contar la animación).
+   - Con 20 o más, un ritmo de metrónomo (coeficiente de variación por
+     debajo de 0,08) solo cuenta si además va rápido (mediana < 3 s):
+     las animaciones de cada turno duran distinto, y una persona no repite
+     su intervalo al 8 %. */
+export const RITMO = { minToqueMs: 100, toleranciaRapidos: 0.05, minRapidos: 2, nMediana: 15, minMedianaMs: 350, nMetronomo: 20, maxCV: 0.08, metronomoBajoMs: 3000 };
+export function ritmoHumano(toques) {
+  if (!toques.length) return null;
+  if (toques.some(t => t.script)) return "Hubo elecciones hechas por un script, no por un clic (ni por un mando conectado).";
+  const ms = toques.map(t => t.ms);
+  const rapidos = ms.filter(x => x < RITMO.minToqueMs).length;
+  if (rapidos > Math.max(RITMO.minRapidos, Math.floor(ms.length * RITMO.toleranciaRapidos)))
+    return `${rapidos} elecciones llegaron a menos de ${RITMO.minToqueMs} ms de la anterior: ninguna persona lee el menú tan rápido.`;
+  const orden = ms.slice().sort((a, b) => a - b), mediana = orden[Math.floor(orden.length / 2)];
+  if (ms.length >= RITMO.nMediana && mediana < RITMO.minMedianaMs) return `Elecciones cada ${mediana} ms de mediana: es el ritmo de un programa.`;
+  if (ms.length >= RITMO.nMetronomo && mediana < RITMO.metronomoBajoMs) {
+    const media = ms.reduce((a, b) => a + b, 0) / ms.length;
+    const cv = media > 0 ? Math.sqrt(ms.reduce((a, b) => a + (b - media) ** 2, 0) / ms.length) / media : 0;
+    if (cv < RITMO.maxCV) return `Elecciones a ritmo de metrónomo (variación ${(cv * 100).toFixed(1)} %): las de una persona varían mucho más.`;
+  }
+  return null;
+}
+
+/* ¿Gana el jugador el combate n con este equipo y estas elecciones?
+   Es el mismo combate que monta la pantalla: el nombre del jugador no
+   cuenta (solo decide quién figura como ganador). */
+export function ganaPelea({ inst, nivel, semilla, n, o, equipo, elecciones }) {
+  const R = rivalDe(inst, n, semilla);
+  const P = nuevaPelea({
+    semilla: semillaPelea(semilla, n, o), sets: [equipo, equipoRival(inst, nivel, n, semilla).sets],
+    nombres: ["Tú", R.nombre], lados: ["tú", "cpu"], iq: iqDe(n), palacio: inst === "palacio", elecciones
+  });
+  return P.est().ganador === "tú";
+}
+
+/* Un equipo de la prueba (empaquetado) tal como se juega: tres, legal
+   para la Frontera y al nivel de la instalación, diga lo que diga. */
+function equipoDe(texto, nivelModo) {
+  if (typeof texto !== "string" || !texto || texto.length > 6000) return null;
+  let sets = null;
+  try { sets = Teams.unpack(texto); } catch (e) { return null; }
+  if (!Array.isArray(sets) || sets.length !== 3 || validaFrontera(sets).length) return null;
+  return aNivel(sets, nivelModo);
+}
+/* Los tres de alquiler elegidos al empezar la racha de la Fábrica. */
+function equipoFabrica(semilla, nivelModo, t) {
+  if (typeof t !== "string" || !/^[0-5]{3}$/.test(t) || new Set(t).size !== 3) return null;
+  const seis = alquiler(1, semilla, nivelModo);
+  const eq = aNivel([...t].map(i => seis[+i]), nivelModo);
+  return validaFrontera(eq).length ? null : eq;
+}
+
+/* Las elecciones y los toques de un combate, que tienen que ir a la par.
+   Sin toques (`null`) solo vale un combate empezado antes de la prueba
+   (o = 0), que no los anotaba. */
+function eleccionesDe(c, z, o) {
+  const elecciones = decodificaElecciones(c);
+  if (!elecciones) return null;
+  if (z == null) return o === 0 ? { elecciones, toques: [] } : null;
+  const toques = leeToques(z);
+  if (!toques || toques.length !== elecciones.length) return null;
+  return { elecciones, toques };
+}
+
+/* La prueba de la racha en curso `r` (la de la pantalla, con su `h`). */
+export function pruebaRacha(r) {
+  const p = { v: PRUEBA_FRONTERA, k: `${r.inst}-${r.nivel}`, s: r.semilla };
+  if (r.inst === "fabrica") p.t = r.t; else p.e = Teams.pack(r.equipo);
+  p.b = r.h.map(x => x.slice());
+  return p;
+}
+
+/* El libro de victorias por subir → la prueba. `libro` son entradas
+   `[clave, semilla, n, o, equipo empaquetado, elecciones, toques]`; se
+   quedan las de ordinal mayor que `h`, una por ordinal y por combate, en
+   orden, y tantas como quepan. `descartar` son las que ya no podrán
+   contar. */
+export function pruebaVictorias(b, h, libro, maxTexto = 190000) {
+  const vistos = new Set(), ords = new Set(), validas = [], descartar = [];
+  for (const x of libro || []) {
+    const ok = Array.isArray(x) && x.length === 7 && Number.isSafeInteger(x[3]) && x[3] > h && !ords.has(x[3]) && !vistos.has(`${x[0]}|${x[1]}|${x[2]}`);
+    if (!ok) { descartar.push(x); continue; }
+    ords.add(x[3]); vistos.add(`${x[0]}|${x[1]}|${x[2]}`);
+    validas.push(x);
+  }
+  validas.sort((a, z) => a[3] - z[3]);
+  const q = [], qi = new Map(), l = [];
+  let largo = 80, max = 0;
+  for (const [k, s, n, o, eq, c, z] of validas) {
+    if (l.length >= TOPE_LIBRO) break;
+    const nuevo = !qi.has(eq);
+    const fila = [k, s, n, o, nuevo ? q.length : qi.get(eq), c, z];
+    const tam = JSON.stringify(fila).length + 1 + (nuevo ? JSON.stringify(eq).length + 1 : 0);
+    if (largo + tam > maxTexto) break;
+    if (nuevo) { qi.set(eq, q.length); q.push(eq); }
+    l.push(fila); largo += tam; max = o;
+  }
+  return { prueba: { v: PRUEBA_FRONTERA, b, h, q, l }, puntos: b + l.length, partida: `fv-${max}`, usadas: l.length, descartar };
+}
+
+/* ¿Vale esta marca? null si sí; el motivo, si no. `desde`: los combates
+   de la racha antes de ese índice ya se rehicieron (el verificador lo
+   recuerda entre récords de la misma racha) y no se vuelven a jugar. */
+export function compruebaPrueba(dato, prueba, desde = 0) {
+  if (!dato || typeof dato !== "object") return "El resultado no se puede leer.";
+  if (!prueba || typeof prueba !== "object" || prueba.v !== PRUEBA_FRONTERA) return "La prueba no es de esta versión de la Frontera.";
+  if (!Number.isSafeInteger(dato.tiempo) || dato.tiempo < 1 || dato.tiempo > TOPE_TIEMPO) return "El tiempo de la partida no es válido.";
+  if (!Number.isSafeInteger(dato.puntos) || dato.puntos < 1) return "La marca no es válida.";
+  if (dato.categoria === "club-frontera-victorias") return compruebaVictorias(dato, prueba);
+  const m = /^club-frontera-((torre|palacio|fabrica)-(50|abierto))$/.exec(String(dato.categoria || ""));
+  if (!m) return "La categoría no es de la Frontera.";
+  return compruebaRacha(dato, prueba, m[2], m[3], Math.max(0, Math.floor(+desde || 0)));
+}
+
+function compruebaRacha(dato, p, inst, nivel, desde) {
+  if (p.k !== `${inst}-${nivel}`) return "La prueba es de otra instalación o de otro nivel.";
+  if (typeof p.s !== "string" || !SEMILLA_RE.test(p.s)) return "La semilla de la racha no es válida.";
+  const b = p.b;
+  if (!Array.isArray(b) || !b.length) return "La prueba no trae los combates de la racha.";
+  const n = b.length;
+  if (dato.puntos !== n) return `La racha dice ${dato.puntos} combates y la prueba trae ${n}.`;
+  if (dato.partida !== `${p.s}-${n}`) return "La prueba es de otra partida.";
+  /* Cada combate suma al menos un segundo (`cierraPelea`): lo que dure
+     menos no salió de la pantalla. */
+  if (dato.tiempo < MIN_COMBATE_MS * n) return `${n} combates en ${(dato.tiempo / 1000).toFixed(1)} s: ni un segundo por combate.`;
+  let equipo = inst === "fabrica" ? equipoFabrica(p.s, nivel, p.t) : equipoDe(p.e, nivel);
+  if (!equipo) return "El equipo de la racha no cumple las reglas de la Frontera.";
+  /* Primero lo barato: que se lea, los cambios y el ritmo de toda la
+     racha; después, los combates. */
+  const pasos = [], toques = [];
+  for (let j = 0; j < n; j++) {
+    const x = b[j];
+    if (!Array.isArray(x) || x.length !== 4) return `El combate ${j + 1} de la prueba no se puede leer.`;
+    const [o, c, sw, z] = x;
+    if (!Number.isSafeInteger(o) || o < 0) return `El combate ${j + 1} de la prueba no se puede leer.`;
+    /* Sin ordinal (y sin toques) solo puede ir el primero: es el combate
+       que una racha de antes tenía a medias cuando llegó la prueba. */
+    if (o === 0 && j > 0) return `El combate ${j + 1} de la prueba no tiene ordinal.`;
+    if (sw !== "") {
+      // El cambio de la Fábrica: uno de los tuyos por uno del rival que acabas de vencer.
+      if (inst !== "fabrica" || j === 0 || typeof sw !== "string" || !/^[0-2][0-2]$/.test(sw)) return `El cambio antes del combate ${j + 1} no es posible.`;
+      const suyos = aNivel(equipoRival(inst, nivel, j, p.s).sets, nivel);
+      const nuevo = equipo.slice();
+      nuevo[+sw[0]] = suyos[+sw[1]];
+      if (!nuevo[+sw[0]] || validaFrontera(nuevo).length) return `El cambio antes del combate ${j + 1} no es posible.`;
+      equipo = nuevo;
+    }
+    const e = eleccionesDe(c, z, o);
+    if (!e) return `Las elecciones del combate ${j + 1} no se pueden leer.`;
+    toques.push(...e.toques);
+    pasos.push({ n: j + 1, o, equipo, elecciones: e.elecciones });
+  }
+  const ritmo = ritmoHumano(toques);
+  if (ritmo) return ritmo;
+  for (const x of pasos) {
+    if (x.n <= desde) continue;
+    if (!ganaPelea({ inst, nivel, semilla: p.s, n: x.n, o: x.o, equipo: x.equipo, elecciones: x.elecciones })) return `El combate ${x.n} no se gana con las elecciones de la prueba.`;
+  }
+  return null;
+}
+
+function compruebaVictorias(dato, p) {
+  const { b, h, q, l } = p;
+  if (!Number.isSafeInteger(b) || b < 0 || !Number.isSafeInteger(h) || h < 0) return "La base de la prueba no es válida.";
+  if (!Array.isArray(q) || !Array.isArray(l) || !l.length || l.length > TOPE_LIBRO) return "La prueba no trae victorias.";
+  if (dato.puntos !== b + l.length) return `El total dice ${dato.puntos} y la prueba suma ${b} + ${l.length}.`;
+  const ords = new Set(), vistos = new Set(), pasos = [], toques = [], equipos = new Map();
+  let max = 0;
+  for (const x of l) {
+    if (!Array.isArray(x) || x.length !== 7) return "Una victoria de la prueba no se puede leer.";
+    const [k, s, n, o, qi, c, z] = x;
+    if (typeof k !== "string" || !CLAVE_RE.test(k) || typeof s !== "string" || !SEMILLA_RE.test(s) || !Number.isSafeInteger(n) || n < 1 || n > 100000 ||
+      !Number.isSafeInteger(qi) || qi < 0 || qi >= q.length) return "Una victoria de la prueba no se puede leer.";
+    if (!Number.isSafeInteger(o) || o <= h) return "La prueba vuelve a contar una victoria que ya estaba en la tabla.";
+    if (ords.has(o) || vistos.has(`${k}|${s}|${n}`)) return "La prueba cuenta dos veces la misma victoria.";
+    ords.add(o); vistos.add(`${k}|${s}|${n}`);
+    max = Math.max(max, o);
+    const [inst, nivel] = k.split("-");
+    const clave = qi + "|" + nivel;
+    if (!equipos.has(clave)) equipos.set(clave, equipoDe(q[qi], nivel));
+    const equipo = equipos.get(clave);
+    if (!equipo) return "Un equipo de la prueba no cumple las reglas de la Frontera.";
+    const e = eleccionesDe(c, z, o);
+    if (!e) return "Las elecciones de una victoria no se pueden leer.";
+    toques.push(...e.toques);
+    pasos.push({ inst, nivel, semilla: s, n, o, equipo, elecciones: e.elecciones });
+  }
+  if (dato.partida !== `fv-${max}`) return "La prueba es de otra partida.";
+  const ritmo = ritmoHumano(toques);
+  if (ritmo) return ritmo;
+  for (const x of pasos) if (!ganaPelea(x)) return `La victoria n.º ${x.o} no se gana con las elecciones de la prueba.`;
+  return null;
+}
+
 export const FRONTERA = {
   INSTALACIONES, NIVELES, POR_SERIE, FORMATO, PALACIO,
   hash32, rng, nivelDe, serieDe, esUltimo, dificultad, iqDe, ivDe, franjaDe, monedasCombate,
   rivalDe, generaEquipo, equipoRival, alquiler, validaFrontera, aNivel, prohibida,
-  decideIA, decidePalacio, claseMov, nuevaPelea
+  decideIA, decidePalacio, claseMov, nuevaPelea,
+  PRUEBA_FRONTERA, MIN_COMBATE_MS, TOPE_LIBRO, RITMO, semillaPelea, codificaElecciones, decodificaElecciones,
+  toque, leeToques, ritmoHumano, ganaPelea, pruebaRacha, pruebaVictorias, compruebaPrueba
 };
 export default FRONTERA;
