@@ -143,11 +143,11 @@ export function entradasSalon(juegos, orden = Object.keys(juegos)) {
     return {
       id: k, modo: "multi", nombre: j.nombre, lema: j.lema, color: j.color, alta: j.alta,
       genero: GENERO[k] || "", cupo: cupoTexto(j), grupo: j.cupo > 2, reglas: k,
-      practica: practicaDe(k) ? practicaDe(k).id : ""
+      practica: practicaDe(k) ? practicaDe(k).id : "", movil: enMovil(k), pide: pideEnVez(k)
     };
   });
   const solos = SOLOS.map(s => Object.assign({}, s, {
-    modo: s.tipo === "bots" ? "bots" : "solo",
+    modo: s.tipo === "bots" ? "bots" : "solo", movil: enMovil(s.id), pide: pideEnVez(s.id),
     color: s.juego && juegos[s.juego] ? juegos[s.juego].color : COLOR_SOLO[s.id] || "#f6bc64"
   }));
   return { solos, multi };
@@ -158,6 +158,38 @@ export const COLOR_SOLO = {
   minas: "#f6bc64", snake: "#58f5c0", tetrisclub: "#2fd3e8", sortem: "#00f5ff", bbtan: "#c4f568",
   sopa: "#ffb070", electro: "#fbbf24", sudoku: "#ff2fb4", fanal: "#d9a85b", atasco: "#e8322f", frontera: "#fb923c"
 };
+
+/* Si se puede jugar en un celular: con el dedo y en una pantalla de 390 px.
+   Se decidió jugando cada uno en un teléfono emulado (táctil, 390 × 844),
+   no mirando el tamaño de su pantalla: un juego que cabe pero solo se mueve
+   con flechas no se puede jugar. `true` es que sí (tiene botones táctiles,
+   como Tetris, Snake o FANAL, o se juega tocando, como las cartas y los
+   tableros); un texto es que no, y dice qué hace falta en su lugar.
+
+   Todos los juegos del salón tienen que estar aquí, multijugador y de un
+   jugador: `tests/salon.test.cjs` falla si alguno falta. Así un juego nuevo
+   no recibe la etiqueta 📱 sin que alguien lo haya probado en un teléfono,
+   ni la pierde en silencio. */
+export const MOVIL = {
+  // Multijugador (las salas de `JUEGOS`)
+  orbita: true, escondite: true, cartas: true, cuadritos: true, worms: true,
+  reversi: true, cadena: true, flip7: true, cacho: true, uno: true,
+  catan: true, presidente: true, spicy: true, tetris: true, clue: true,
+  ajedrez: true, pokemon: true,
+  yemas: "teclado y ratón",   // disparos en primera persona: captura el cursor y se mueve con WASD
+  boxhead: "teclado",         // se mueve y dispara solo con el teclado
+  // Un jugador (`SOLOS`)
+  minas: true, snake: true, tetrisclub: true, bbtan: true, sopa: true,
+  electro: true, sudoku: true, fanal: true, atasco: true, frontera: true,
+  "bots-worms": true, "bots-clue": true,
+  sortem: "teclado",          // flechas y espacio, sin controles en pantalla
+  "bots-yemas": "teclado y ratón",
+  "bots-boxhead": "teclado"
+};
+/* Si va en el celular, y si no, qué pide en su lugar («teclado»). Una
+   clave que no está en la tabla no se promete: ni etiqueta ni aviso. */
+export const enMovil = id => MOVIL[id] === true;
+export const pideEnVez = id => typeof MOVIL[id] === "string" ? MOVIL[id] : "";
 
 /* Si el invitado puede abrirla. Un multijugador necesita cuenta siempre;
    lo de un jugador nunca: corre en el navegador y, sin cuenta, solo deja

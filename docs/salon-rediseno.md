@@ -129,6 +129,28 @@ los juegos de un jugador tienen el botón redondo ▶.
 | **Nueva** | etiqueta verde «NUEVO» con un brillo que pasa cada tanto | los 4 juegos que llegaron últimos, si llegaron hace menos de 14 días |
 | **Más jugado** | etiqueta dorada «★ Más jugado» (solo ★ en tarjetas angostas) | el multijugador con más partidas |
 | **Bloqueada para invitados** | portada en gris oscuro, candado y «Requiere cuenta» | invitado + juego multijugador |
+| **Celular** | etiqueta blanca con un teléfono celeste, bajo la insignia de modo | el juego se puede jugar con el dedo en un teléfono |
+
+### La etiqueta «Celular»
+
+Dice qué juegos funcionan en un teléfono. Se decidió **jugando cada uno en
+un celular emulado** (táctil, 390 × 844), no mirando si su pantalla cabe:
+sortEm, por ejemplo, cabe entero, pero solo se mueve con las flechas.
+
+- **Sí (28)**: los que tienen botones táctiles (Tetris, Snake, FANAL,
+  Circuit Breakers…) y los que se juegan tocando (cartas, tableros, Pokémon,
+  Clue, Mina Club, la Sopa…).
+- **No (5)**: Yemas y su práctica (teclado y ratón, con el cursor
+  capturado), Boxhead y su práctica (teclado) y sortEm (teclado). Su ficha lo
+  avisa: «Solo en computador: se juega con teclado».
+
+La lista vive en `MOVIL` (`salon-datos.js`), y la prueba del salón falla si
+un juego nuevo no está en ella: nadie recibe la etiqueta sin que se haya
+probado en un teléfono.
+
+| La etiqueta en las miniaturas | Ficha de un juego que no va en el celular |
+|---|---|
+| ![Etiqueta Celular bajo la insignia de modo](salon/movil-etiqueta-celular.png) | ![Aviso «Solo en computador» en la ficha de Yemas](salon/movil-ficha-solo-computador.png) |
 
 ![Rejilla multijugador con sesión en el celular](salon/movil-multijugador.png)
 

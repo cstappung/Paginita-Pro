@@ -1668,6 +1668,17 @@ mode only hides the section that does not apply (`data-modo` on
   two people and «2–10 jugadores» in violet — colour never on its own. The
   card and its cover are size containers: `75cqw` is the cover's height
   (where the ▶ sits) and container queries scale the fixed-px art.
+- **The «Celular» tag** sits under the mode badge (white and sky blue, a
+  colour no other mark uses) on the games that can be played with a finger
+  on a phone, and the ficha says the same — or, for the rest, «Solo en
+  computador: se juega con teclado (y ratón)». It comes from `MOVIL` in
+  `salon-datos.js`, decided by **playing each game on an emulated phone**
+  (touch, 390 × 844), not by whether its screen fits: sortEm, Boxhead and
+  Yemas (and their practices) fit but only move with the keyboard.
+  `tests/salon.test.cjs` fails if a game of the lobby is missing from
+  `MOVIL`, so a new game has to be tried on a phone before it gets (or
+  goes without) the tag. Novedades read the same table through their
+  `juego` field.
 - **Card states**: *nuevo* (green tag; `nuevos()` = the four most recent
   `alta`s of the last 14 days, so the tag cannot spread to half the shop),
   *más jugado* (gold, a star only on narrow cards), *seleccionada* (`.sel`,

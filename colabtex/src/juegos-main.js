@@ -74,8 +74,8 @@ import { suena, silenciar, silenciado, ambientar, ajustarMusica, activarAudio } 
 import { montaReproductor } from "./juegos/reproductor.js";
 import { createReportWidget } from "./report-widget.js";
 import { anunciaSala, anunciaPodio, puestoSolo, conRecord, ordenSolo } from "./juegos/discord.js";
-import { crearSalon, ICONO_SOLO, ICONO_MULTI, CANDADO } from "./juegos/salon.js";
-import { SOLOS, entradasSalon, nuevos, modoSalon, esClaveInvitado, UID_INVITADO, MOTIVO_CUENTA } from "./juegos/salon-datos.js";
+import { crearSalon, ICONO_SOLO, ICONO_MULTI, ICONO_MOVIL, CANDADO } from "./juegos/salon.js";
+import { SOLOS, entradasSalon, nuevos, modoSalon, esClaveInvitado, UID_INVITADO, MOTIVO_CUENTA, enMovil } from "./juegos/salon-datos.js";
 
 const $ = id => document.getElementById(id);
 const VER = (document.currentScript && document.currentScript.src.split("?v=")[1]) || "";
@@ -1495,14 +1495,14 @@ const NOVEDADES = [
     sub: "Un jugador · 240 niveles en seis pisos", ruta: "#solo/atasco", boton: "Arrancar", reglas: ["atasco"], modo: "solo" },
   { id: "boxhead", color: "#c8892f", alta: "2026-10-05", titulo: "Boxhead",
     lema: "Zombis y diablos vistos desde arriba. Cada baja sube el multiplicador y con él llegan la Uzi, la escopeta, los barriles, las cargas y el cohete. Cooperativo o versus, con los que entren a la sala.",
-    sub: "1–8 jugadores · cinco mapas", sala: { k: "boxhead", ops: { variante: "coop" } }, reglas: ["boxhead", "coop"],
+    sub: "1–8 jugadores · cinco mapas", sala: { k: "boxhead", ops: { variante: "coop" } }, reglas: ["boxhead", "coop"], juego: "boxhead",
     modo: "multi", jugadores: "1–8 jugadores", cuenta: true, practica: "juegos/boxhead/index.html" },
   { id: "fanal", color: "#d9a85b", alta: "2026-10-04", titulo: "FANAL",
     lema: "Llevas la última luz a través de la noche, hacia el Alba. Las polillas bajan en formación hacia ella. Dispara al pulso de la música… y averigua qué estás apagando.",
-    sub: "Un jugador · trece jornadas, tres jefes y una travesía sin fin", ruta: "#solo/fanal", boton: "Encender", reglas: ["fanal"], modo: "solo" },
+    sub: "Un jugador · trece jornadas, tres jefes y una travesía sin fin", ruta: "#solo/fanal", boton: "Encender", reglas: ["fanal"], modo: "solo", juego: "fanal" },
   { id: "zombis", color: "#4f8a2b", alta: "2026-10-01", titulo: "Yemas · modo Zombis",
     lema: "Todos juntos contra oleadas de huevos podridos, en cinco mapas clásicos: bebidas, la caja misteriosa, armas en la pared y Pack-a-Punch. Se puede jugar solo.",
-    sub: "1–8 jugadores · cooperativo", sala: { k: "yemas", ops: { variante: "zombis" } }, reglas: ["yemas", "zombis"],
+    sub: "1–8 jugadores · cooperativo", sala: { k: "yemas", ops: { variante: "zombis" } }, reglas: ["yemas", "zombis"], juego: "yemas",
     modo: "multi", jugadores: "1–8 jugadores", cuenta: true, practica: "juegos/yemas/index.html" },
   { id: "prodrop", color: "#9b4dff", alta: "2026-10-02", titulo: "PRODROP · sobres y mercado",
     lema: "Sobres de cinco cartas de los profes, uno gratis cada 6 horas. Gradúalas, exhíbelas en tu perfil, véndelas en el mercado o cámbialas con otros.",
@@ -1538,7 +1538,9 @@ function novedadesHtml() {
         </header>
         <div class="jg-nov-lista">${NOVEDADES.map((n, i) => {
           const cuenta = inv && n.cuenta;
-          const insignia = n.modo ? `<span class="jg-mn-modo m-${n.modo}">${n.modo === "solo" ? ICONO_SOLO + "1 jugador" : ICONO_MULTI + escapeHtml(n.jugadores)}</span>` : "";
+          const insignia = (n.modo ? `<span class="jg-mn-modo m-${n.modo}">${n.modo === "solo" ? ICONO_SOLO + "1 jugador" : ICONO_MULTI + escapeHtml(n.jugadores)}</span>` : "") +
+            /* La misma etiqueta que la miniatura, sacada de la misma tabla (`MOVIL`). */
+            (n.juego && enMovil(n.juego) ? `<span class="jg-mn-movil" title="Funciona en el celular">${ICONO_MOVIL}Celular</span>` : "");
           const accion = cuenta
             ? (n.practica ? `<a class="btn" href="${n.practica}">Probar solo <span aria-hidden="true">→</span></a><button class="btn2 jg-nov-candado" type="button" data-login title="La sala en línea necesita cuenta">${CANDADO} Sala</button>`
               : `<button class="btn" type="button" data-login><span class="jg-nov-candado">${CANDADO}</span> Iniciar sesión</button>`)
