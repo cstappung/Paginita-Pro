@@ -692,11 +692,21 @@ function autoCalidad(dtReal) {
    =================================================================== */
 const hudCache = {};
 const ponTexto = (id, txt) => { if (hudCache[id] !== txt) { hudCache[id] = txt; $(id).textContent = txt; } };
+/* Un saltito (crece y vuelve) cuando cambia un número del marcador: el
+   multiplicador al tomar una estrella, la moneda con cada moneda. Va con
+   la propiedad `scale` (no `transform`), para no pisar la inclinación que
+   la estética juguete le da a la placa del multiplicador. */
+const quieto = matchMedia('(prefers-reduced-motion: reduce)');
+let ultSaltoMoneda = 0;
+function salta(el, k, ms) { if (el && el.animate && !quieto.matches) el.animate([{ scale: 1 }, { scale: k }, { scale: 1 }], { duration: ms, easing: 'ease-out' }); }
 function pintaHud(dt) {
   ponTexto('hudPuntos', fmt(c.puntos));
-  ponTexto('hudMult', '×' + multiplicador());
+  const mult = '×' + multiplicador(), mon = fmt(c.monedas);
+  if (hudCache.hudMult && hudCache.hudMult !== mult) salta($('hudMult'), 1.45, 380);
+  if (hudCache.hudMonedas && hudCache.hudMonedas !== mon && performance.now() - ultSaltoMoneda > 90) { ultSaltoMoneda = performance.now(); salta(document.querySelector('.hud .moneda'), 1.28, 200); }
+  ponTexto('hudMult', mult);
   ponTexto('hudMetros', fmt(c.D) + ' m');
-  ponTexto('hudMonedas', fmt(c.monedas));
+  ponTexto('hudMonedas', mon);
   ponTexto('hudPatinetas', String(progreso.patinetas));
   // la barra hacia la próxima estación
   const e = c.estacion, sig = M.siguienteUmbral(c.puntos), desde = e.desde || 0;
