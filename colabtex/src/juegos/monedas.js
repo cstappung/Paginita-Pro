@@ -51,6 +51,7 @@
 import { LOGROS, SOLO_PREFIJO, deFila, deMarca } from "./logros.js";
 import PM from "../../../juegos/prodrop/motor.js";
 import { TIENDA, PRECIO_TIENDA } from "./tienda.js";
+import { CORTES } from "./cortes.js";
 
 /* ---------- tarifas ---------- */
 /* Jugar es lo que se puede repetir, y se paga: una partida corta a dos
@@ -107,10 +108,14 @@ export const valorLogro = (juego, id) => VALOR_NIVEL[nivelDe(juego, id)] || 0;
    que sale de la marca misma donde la marca es la dificultad. */
 export const RECORD = { minas: 60, snake: 20, tetrisclub: 50, sortem: 50, bbtan: 50, sopa: 30, electro: 30, frontera: 40, sudoku: 40, fanal: 40, atasco: 40, metrorush: 40 };
 /* BBTAN: cada ronda n paga ⌊n/4⌋, acumulado hasta la ronda del récord
-   (1 a 3 no pagan, 4 y 5 pagan 1 cada una: llegar a la 5 da 2). */
+   (1 a 3 no pagan, 4 y 5 pagan 1 cada una: llegar a la 5 da 2). Lo que
+   paga cada ronda deja de crecer en la 450 (112 por ronda desde ahí) y
+   pasada la 600 el récord ya no paga más. */
+export const BBTAN_SATURA = 450, BBTAN_TOPE = 600;
 export function monedasBbtan(ronda) {
-  const R = Math.max(0, Math.floor(Math.min(+ronda || 0, 1000))), q = Math.floor(R / 4), r = R % 4;
-  return 2 * q * (q - 1) + q * (r + 1);
+  const R = Math.max(0, Math.floor(Math.min(+ronda || 0, BBTAN_TOPE)));
+  const S = Math.min(R, BBTAN_SATURA), q = Math.floor(S / 4), r = S % 4;
+  return 2 * q * (q - 1) + q * (r + 1) + (R - S) * Math.floor(BBTAN_SATURA / 4);
 }
 /* sortEm: los bloques de la modalidad, más 2 por cada segundo bajo un
    ritmo de 3 s por bloque (30 s para el 1–10, 60 s para el 1–20). */
@@ -320,12 +325,27 @@ export function economia(datos) {
   const usuarios = {}, dueno = {}, graduada = {}, enVenta = {}, sobres = {}, ofertas = {}, cambios = {};
   const ganado = {};
   const U = u => usuarios[u] || (usuarios[u] = { gastadas: 0, cobradas: 0, parada: false, falta: 0, gratis: -Infinity, sobres: {}, tienda: {} });
-  const saldo = u => { if (!(u in ganado)) ganado[u] = ganadoDe(u, d).total; const x = U(u); return ganado[u] + x.cobradas - x.gastadas; };
-  /* Cobra `p` a `u`. Si no puede, la cuenta queda parada. */
+  /* Un corte (cortes.js) congela lo que la cuenta ganó hasta `hasta` en
+     `tope`: lo que gastó antes se mide contra eso y, si no alcanzaba, se
+     anula sin parar la cuenta. Lo que gane después ya no tapa nada viejo.
+     Antes de `desde` (si lo hay) todo lo comprado vale igual: lo que no
+     alcanzaba se perdona y el saldo queda en cero, no en negativo. */
+  const cortes = d.cortes || CORTES;
+  let ahora = 0;
+  const enCorte = u => { const k = cortes[u]; return k && ahora <= k.hasta ? k : null; };
+  const saldo = u => {
+    if (!(u in ganado)) ganado[u] = ganadoDe(u, d).total;
+    const x = U(u), k = enCorte(u);
+    return (k ? Math.min(ganado[u], k.tope) : ganado[u]) + x.cobradas - x.gastadas;
+  };
+  /* Cobra `p` a `u`. Si no puede, la cuenta queda parada (dentro de un
+     corte, solo no vale). */
   const paga = (u, p) => {
     const x = U(u);
     if (x.parada) { x.falta += p; return false; }
-    if (saldo(u) < p) { x.parada = true; x.falta += p - Math.max(0, saldo(u)); return false; }
+    const k = enCorte(u);
+    if (k && ahora < (k.desde || 0)) { x.gastadas += Math.min(p, Math.max(0, saldo(u))); return true; }
+    if (saldo(u) < p) { if (k) return false; x.parada = true; x.falta += p - Math.max(0, saldo(u)); return false; }
     x.gastadas += p; return true;
   };
   /* Lo que es una copia: {id, g, w}, de su sobre o de su re-roll. */
@@ -336,6 +356,7 @@ export function economia(datos) {
     return PM.sobre(q.o, q.k, so.at).cartas[q.i];
   };
   for (const e of ev) {
+    ahora = e.at;
     if (e.t === "s") {
       const x = U(e.u);
       if (e.p === 0) {

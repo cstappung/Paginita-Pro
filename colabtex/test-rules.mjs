@@ -2,7 +2,7 @@
    (Auth + Database emulados; FIREBASE_EMU=1). */
 import { auth, db } from "./src/firebase.js";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "firebase/auth";
-import { ref, get, set, push, remove } from "firebase/database";
+import { ref, get, set, push, remove, query, orderByChild, equalTo } from "firebase/database";
 import * as Y from "yjs";
 import * as fb from "./src/fb-api.js";
 import * as rep from "./src/fb-reports.js";
@@ -444,6 +444,15 @@ console.log("— Yemas: la malla del directo (vivo/<pid>/rtc) —");
   await denied("el mirón no escribe huevos", () => set(ref(db, `vivo/${k}/y/${ub.uid}`), { x: 1 }));
   await denied("ni borra los de la sala", () => remove(ref(db, `vivo/${k}/y`)));
   await allowed("el mirón lee vivo (vacío: no hay respaldo que descargar)", () => get(ref(db, `vivo/${k}/y/${ua.uid}`)));
+  /* Nada de bajar colecciones enteras (consumo.js): solo la consulta del
+     vestíbulo, y cada sala, chat o pizarra por su pid. */
+  await allowed("el vestíbulo consulta las salas que esperan", () => get(query(ref(db, "partidas"), orderByChild("estado"), equalTo("esperando"))));
+  await denied("pero no baja todas las partidas", () => get(ref(db, "partidas")));
+  await denied("ni otra consulta sobre partidas", () => get(query(ref(db, "partidas"), orderByChild("estado"), equalTo("jugando"))));
+  await allowed("una sala sí, por su pid", () => get(ref(db, `partidas/${k}`)));
+  await denied("ni vivo entero", () => get(ref(db, "vivo")));
+  await denied("ni todo el chat", () => get(ref(db, "chat")));
+  await denied("ni todas las pruebas del club", () => get(ref(db, "soloPruebas")));
   await allowed("y se va de la malla", () => remove(ref(db, `vivo/${k}/rtc/en/${ub.uid}`)));
   await loginAs(A);
   await allowed("el jugador lee y borra su buzón", () => remove(ref(db, `vivo/${k}/rtc/b/${ua.uid}`)));
@@ -451,6 +460,43 @@ console.log("— Yemas: la malla del directo (vivo/<pid>/rtc) —");
   await denied("con fin no se escribe el huevo", () => set(ref(db, `vivo/${k}/y/${ua.uid}`), { x: 2 }));
   await allowed("con fin se borran los huevos", () => remove(ref(db, `vivo/${k}/y`)));
   await allowed("y la malla", () => remove(ref(db, `vivo/${k}/rtc`)));
+}
+
+console.log("— Salón: chat general y repeticiones del día —");
+{
+  const fj = await import("./src/fb-juegos.js");
+  const { entradaRep } = await import("./src/juegos/rieles-datos.js");
+  const { diaChile } = await import("./src/juegos/monedas.js");
+  const { serverTimestamp, update } = await import("firebase/database");
+  const ua = await loginAs(A);
+  await allowed("A escribe en el chat general", () => fj.mandaChatGeneral({ uid: ua.uid, nombre: "Ana" }, "hola salón", 200));
+  await denied("A no escribe otro antes de 20 s", () => fj.mandaChatGeneral({ uid: ua.uid, nombre: "Ana" }, "otra vez", 200));
+  await denied("ni un mensaje sin su «último» (saltándose la espera)", () => set(ref(db, "chatGeneral/abcdefghij"), { uid: ua.uid, n: "Ana", t: "x", at: serverTimestamp() }));
+  await denied("ni firmado por otro", () => update(ref(db), { "chatGeneral/abcdefghik": { uid: "otro", n: "X", t: "x", at: serverTimestamp() }, [`chatGeneralUlt/${ua.uid}`]: { at: serverTimestamp(), k: "abcdefghik" } }));
+  await allowed("A lee el chat general", () => get(ref(db, "chatGeneral")));
+  await allowed("A lee su último mensaje", () => fj.leerUltimoChatGeneral(ua.uid));
+  const ub = await loginAs(B);
+  await denied("B no lee el «último» de A", () => get(ref(db, `chatGeneralUlt/${ua.uid}`)));
+  await allowed("B escribe (su espera es suya)", () => fj.mandaChatGeneral({ uid: ub.uid, nombre: "Beto" }, "hola Ana", 200));
+  await denied("un mensaje de más de 200 caracteres", async () => { await new Promise(r => setTimeout(r, 20500)); await fj.mandaChatGeneral({ uid: ub.uid, nombre: "Beto" }, "x".repeat(201), 300); });
+  await allowed("a los 20 s B vuelve a escribir", () => fj.mandaChatGeneral({ uid: ub.uid, nombre: "Beto" }, "ya pasaron 20 s", 200));
+  const unoDeA = Object.entries((await get(ref(db, "chatGeneral"))).val() || {}).find(([, m]) => m.uid === ua.uid)[0];
+  await denied("B no borra un mensaje reciente de A", () => remove(ref(db, `chatGeneral/${unoDeA}`)));
+  await allowed("barrer lo de hace más de un día no borra nada reciente", () => fj.barreChatGeneral(Date.now() - 86400000 - 60000, 10));
+
+  const hoy = diaChile(Date.now());
+  const dato = { puntos: 1, tiempo: 42000 };
+  const e = entradaRep("club-minas-medium", hoy, dato, 1, '{"v":1}', "Beto");
+  await allowed("B guarda su mejor partida del día", () => fj.guardarRepeticion("club-minas-medium", ub.uid, e));
+  await denied("no una peor del mismo día", () => fj.guardarRepeticion("club-minas-medium", ub.uid, entradaRep("club-minas-medium", hoy, { puntos: 1, tiempo: 50000 }, 1, '{"v":1}', "Beto")));
+  await allowed("sí una mejor", () => fj.guardarRepeticion("club-minas-medium", ub.uid, entradaRep("club-minas-medium", hoy, { puntos: 1, tiempo: 30000 }, 1, '{"v":1}', "Beto")));
+  await denied("no con la clave de orden inventada", () => fj.guardarRepeticion("club-minas-medium", ub.uid, Object.assign({}, entradaRep("club-minas-medium", hoy, { puntos: 1, tiempo: 20000 }, 1, '{"v":1}', "Beto"), { o: hoy * 1e10 + 999999999 })));
+  await denied("no de mañana", () => fj.guardarRepeticion("club-minas-medium", ub.uid, entradaRep("club-minas-medium", hoy + 2, dato, 1, '{"v":1}', "Beto")));
+  await denied("no de otra categoría", () => fj.guardarRepeticion("club-minas-hard", ub.uid, Object.assign({}, e)));
+  await denied("no a nombre de otro", () => fj.guardarRepeticion("club-minas-medium", ua.uid, e));
+  await allowed("una de Tetris por puntos", () => fj.guardarRepeticion("club-tetris-maraton", ub.uid, entradaRep("club-tetris-maraton", hoy, { puntos: 12345, tiempo: 99000 }, 1, '{"v":1}', "Beto")));
+  await loginAs(A);
+  await allowed("A lee las mejores del día", () => new Promise((res, rej) => { const off = fj.watchRepeticiones("club-minas-medium", (f, err) => { off(); err ? rej(err) : res(f); }); }));
 }
 
 await signOut(auth);

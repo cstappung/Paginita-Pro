@@ -3,7 +3,7 @@
    Sprint (40 líneas contra el reloj) y Ultra (dos minutos). */
 (() => {
   'use strict';
-  const TM = window.TetrisMotor;
+  const TM = window.TetrisMotor, FX = window.TetrisFX;
   const $ = id => document.getElementById(id);
   const CLAVE = window.Club?.storageKey('tetris-club-v1') || 'tetris-club-v1';
   const SPRINT = TM.SPRINT, ULTRA_MS = TM.ULTRA_MS;
@@ -34,6 +34,10 @@
   const origen = (e, tactil) => e.__mando ? (hayMando() ? 'M' : 'X') : !e.isTrusted ? 'X' : tactil ? 'T' : '';
   const pozo = $('pozo'), cx = pozo.getContext('2d');
   const cxG = $('guarda').getContext('2d'), cxC = $('cola').getContext('2d');
+  /* Los efectos (fx.js) se rehacen en cada partida: no hay nada que
+     arrastrar de la anterior. */
+  const nuevosEfectos = () => FX.crearEfectos({ TM, celda: pozo.width / TM.W });
+  let fx = nuevosEfectos();
 
   const reloj = ms => { const t = Math.max(0, ms) / 1000; return `${Math.floor(t / 60)}:${(t % 60).toFixed(modo === 'sprint' ? 2 : 0).padStart(modo === 'sprint' ? 5 : 2, '0')}`; };
   const cat = () => `club-tetris-${modo}`;
@@ -58,7 +62,7 @@
         const c = new A(), m = c.createGain(), mu = c.createGain(), fx = c.createGain();
         m.gain.value = .6; mu.gain.value = .45; fx.gain.value = .75;
         mu.connect(m); fx.connect(m); m.connect(c.destination);
-        audio = { ctx: c, fx, rep: new window.Chip.Reproductor(c, mu, window.Temas.temas.neon) };
+        audio = { ctx: c, fx, rep: new window.Chip.Reproductor(c, mu, window.Temas.temas.neon), son: FX.crearSonido(c, fx) };
       }
       if (audio?.ctx.state === 'suspended') audio.ctx.resume().catch(() => {});
     } catch (_) { audio = null; }
@@ -76,27 +80,21 @@
     r.tempo = 1 + Math.min(.12, (s.nivel - 1) * .01) + (alto > 14 ? .06 : 0);
     try { r.tick(.2); } catch (_) { /* el sonido nunca bloquea */ }
   }
-  function efecto(k, n = 0) {
-    if (!sonido || !audio) return;
-    try {
-      const C = window.Chip, c = audio.ctx, d = audio.fx, t = c.currentTime + .005, H = C.hz;
-      const P = (m, dur, o = {}) => C.voz(c, d, Object.assign({ t, f: H(m), dur, vol: .09, onda: 'p25', sus: .8 }, o));
-      const run = (ns, st, o = {}) => ns.forEach((m, i) => P(m, st * .95, Object.assign({ t: t + i * st }, o)));
-      if (k === 'mueve') P(84, .02, { onda: 'p12', vol: .03 });
-      else if (k === 'gira') P(79, .035, { onda: 'p12', vol: .05 });
-      else if (k === 'fija') C.ruido(c, d, { t, dur: .06, vol: .1, corto: true, tono: .8 });
-      else if (k === 'guarda') P(67, .08, { onda: 'tri', vol: .14, f1: H(74) });
-      else if (k === 'linea') run([72, 76, 79, 84].slice(0, n).concat(n >= 4 ? [88, 91] : []), .045, { vol: .08 });
-      else if (k === 'nivel') run([60, 67, 72, 79, 84], .06, { onda: 'p50', vol: .08 });
-      else if (k === 'fin') run([67, 63, 60, 55, 48], .12, { onda: 'tri', vol: .16, sus: 1 });
-      else if (k === 'inicio') run([60, 64, 67, 72], .06, { onda: 'p12', vol: .08 });
-      else if (k === 'record') run([72, 76, 79, 84, 88, 91, 96], .07, { vol: .09 });
-    } catch (_) { /* nada */ }
+  /* Los efectos suenan con el motor de fx.js (el pozo como instrumento),
+     no con el chip: ver la cabecera de fx.js. */
+  function efecto(k, ...a) {
+    if (!sonido || !audio || !audio.son[k]) return;
+    audio.son[k](...a);
   }
-  function altura() {
-    if (!s) return 0;
-    for (let y = 0; y < TM.H; y++) for (let x = 0; x < TM.W; x++) if (s.pozo[y * TM.W + x]) return TM.H - y;
-    return 0;
+  const altura = () => s ? FX.altura(s) : 0;
+  /* El latido: con la pila a cinco filas del techo, un corazón que se
+     acelera cuanto más cerca está. */
+  let latidoT = 0;
+  function latido(dt) {
+    const a = altura();
+    if (estado !== 'jugando' || a < 15) { latidoT = 0; return; }
+    latidoT -= dt;
+    if (latidoT <= 0) { const k = (a - 14) / 6; efecto('latido', k); latidoT = 900 - k * 380; }
   }
 
   /* ---------- partida ---------- */
@@ -104,8 +102,9 @@
     iniciaAudio();
     let sal = (Math.random() * 2 ** 32) >>> 0;
     try { sal = crypto.getRandomValues(new Uint32Array(1))[0]; } catch (_) { /* con Math.random basta */ }
-    g = TM.grabadora({ cuenta: CUENTA, sal, modo, alJugar: a => { if (a === 'izq' || a === 'der') efecto('mueve'); } });
+    g = TM.grabadora({ cuenta: CUENTA, sal, modo, alJugar: a => { if ((a === 'izq' || a === 'der') && s && s.p) efecto('mueve', s.p.x); } });
     s = g.s;
+    fx = nuevosEfectos();
     estado = 'jugando'; fresco = true; ultimo = 0; resto = 0; pared = 0; paredAntes = 0;
     pulsos = TM.registroTeclas(performance.now());
     mando.suelta();
@@ -238,7 +237,7 @@
   }
 
   /* ---------- dibujo ---------- */
-  const avisa = t => { const a = $('aviso'); a.textContent = t; a.classList.remove('ve'); void a.offsetWidth; a.classList.add('ve'); };
+  const avisa = (t, k) => { const a = $('aviso'); a.textContent = t; a.dataset.k = k || ''; a.classList.remove('ve'); void a.offsetWidth; a.classList.add('ve'); };
   let datosFirma = '';
   function pintaDatos() {
     const t = !s ? 0 : modo === 'ultra' ? ULTRA_MS - s.tiempo : s.tiempo;
@@ -253,25 +252,29 @@
     $('record').textContent = mejor(records[modo]);
   }
   function pinta() {
-    const c = pozo.width / TM.W;
-    if (s) TM.pintaPozo(cx, s, { celda: c });
+    if (s) fx.pinta(cx, s);
     else { cx.fillStyle = '#0b0f1a'; cx.fillRect(0, 0, pozo.width, pozo.height); }
+    fx.sacude(pozo);
     cxG.clearRect(0, 0, 100, 70);
-    if (s?.guardada) TM.pintaPieza(cxG, s.guardada, 50, 35, 18, s.puedeGuardar ? 1 : .35);
+    if (s?.guardada) FX.pintaPieza(cxG, TM, s.guardada, 50, 35, 18, s.puedeGuardar ? 1 : .35);
     cxC.clearRect(0, 0, 100, 320);
-    if (s) s.cola.slice(0, 5).forEach((t, i) => TM.pintaPieza(cxC, t, 50, 34 + i * 62, i ? 15 : 18));
+    if (s) s.cola.slice(0, 5).forEach((t, i) => FX.pintaPieza(cxC, TM, t, 50, 34 + i * 62, i ? 15 : 18));
   }
 
   function eventos() {
+    let seco = false;
     for (const ev of s.eventos.splice(0)) {
-      if (ev.e === 'gira') efecto('gira');
+      fx.evento(ev);
+      if (ev.e === 'gira') efecto('gira', s.p?.t, s.p?.x);
       else if (ev.e === 'guarda') efecto('guarda');
-      else if (ev.e === 'nivel') { efecto('nivel'); avisa(`Nivel ${ev.n}`); }
+      else if (ev.e === 'seco') { seco = true; efecto('seco', ev.a - ev.de, ev.celdas[0][0]); }
+      else if (ev.e === 'nivel') { efecto('nivel'); avisa(`Nivel ${ev.n}`, 'nivel'); }
       else if (ev.e === 'fija') {
-        if (ev.n) efecto('linea', ev.n); else efecto('fija');
+        if (ev.n || ev.ts) efecto('linea', ev.n, ev.combo, ev.ts, ev.pc, ev.b2b);
+        else if (!seco) efecto('fija', Math.min(1, altura() / 20), ev.bloq?.[0]?.[0]);
         const txt = [ev.pc ? '¡Pozo limpio!' : '', ev.ts ? `T-spin${ev.n ? ' ' + ['', 'simple', 'doble', 'triple'][ev.n] : ''}` : '',
           ev.n === 4 ? '¡TETRIS!' : '', ev.b2b && (ev.n === 4 || ev.ts) ? 'B2B' : '', ev.combo > 0 ? `Combo ×${ev.combo}` : ''].filter(Boolean).join(' · ');
-        if (txt) avisa(txt);
+        if (txt) avisa(txt, ev.pc ? 'pc' : ev.n === 4 ? 'tetris' : ev.ts ? 'ts' : 'combo');
       }
     }
     s.salida = 0;
@@ -295,6 +298,8 @@
         if (fin) { if (modo === 'ultra' && fin.gano) s.tiempo = ULTRA_MS; termina(fin.gano); }
       }
     }
+    if (estado !== 'pausa') fx.paso(dt);
+    latido(dt);
     musica();
     pinta(); pintaDatos();
   }

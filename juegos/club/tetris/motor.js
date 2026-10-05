@@ -144,6 +144,8 @@
   function caer(s) {
     if (s.fin) return;
     const q = fantasma(s);
+    /* Solo para el dibujo (la estela de la caída): no cambia la partida. */
+    s.eventos.push({ e: "seco", t: q.t, de: s.p.y, a: q.y, celdas: celdas(q) });
     s.puntos += 2 * (q.y - s.p.y);
     s.p = q;
     fija(s);
@@ -170,6 +172,7 @@
   }
   function fija(s) {
     const ts = esTspin(s);
+    const tipo = s.p.t, bloq = celdas(s.p);
     let arriba = true;
     for (const [x, y] of celdas(s.p)) { if (y >= 0) s.pozo[y * W + x] = s.p.t; if (y >= OCULTAS) arriba = false; }
     s.piezas++;
@@ -177,6 +180,9 @@
     const llenas = [];
     for (let y = 0; y < H; y++) { let ok = true; for (let x = 0; x < W; x++) if (!s.pozo[y * W + x]) { ok = false; break; } if (ok) llenas.push(y); }
     const n = llenas.length;
+    /* Lo que había en las filas que se van: los efectos las rompen en
+       pedazos de su color. Como `bloq` y `tipo`, es solo para el dibujo. */
+    const colores = n ? llenas.map(y => s.pozo.slice(y * W, y * W + W)) : null;
     for (const y of llenas) { s.pozo.splice(y * W, W); s.pozo.unshift(...new Array(W).fill("")); }
     const nivel = s.nivel;
     let pts = 0, atq = 0;
@@ -204,7 +210,7 @@
       if (!s.entrante[0]) s.entrante.shift();
     }
     if (atq > 0) s.salida += atq;
-    s.eventos.push({ e: "fija", n, ts, pc: limpio, pts, atq, combo: s.combo, b2b: s.b2b && n > 0 });
+    s.eventos.push({ e: "fija", n, ts, pc: limpio, pts, atq, combo: s.combo, b2b: s.b2b && n > 0, t: tipo, bloq, filas: llenas, colores });
     if (!n && s.entrante.length) sube(s);
     s.puedeGuardar = true;
     if (arriba) { s.fin = true; s.eventos.push({ e: "fin" }); return; }
@@ -223,7 +229,7 @@
         const fila = new Array(W).fill("G"); fila[hueco] = "";
         s.pozo.push(...fila);
       }
-      s.eventos.push({ e: "basura", n: k });
+      s.eventos.push({ e: "basura", n: k, hueco });
     }
     if (s.p && !cabe(s, s.p)) {
       while (s.p.y > -2 && !cabe(s, s.p)) s.p.y--;

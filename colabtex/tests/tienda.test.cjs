@@ -9,7 +9,7 @@ const sin=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8').replace(/^impor
 const carga=(fs_,exp)=>{const c={__PM:PM};vm.createContext(c);vm.runInContext('const PM=__PM;'+fs_.map(f=>sin('src/juegos/'+f+'.js')).join('\n')+';globalThis.__T={'+exp+'}',c);return c.__T;};
 /* Cada módulo es suyo en el bundle; concatenados, chocan nombres internos
    (`juegoDeCategoria`, `snake`), así que van en contextos separados. */
-const T=Object.assign(carga(['motor','logros','tienda','monedas'],'TIENDA,PRECIO_TIENDA,economia,monedasDe'),
+const T=Object.assign(carga(['motor','logros','tienda','cortes','monedas'],'TIENDA,PRECIO_TIENDA,economia,monedasDe'),
  carga(['motor','logros','tienda','perfil-tarjeta'],'MARCOS,FONDOS,estadisticas,requisito,marcoVisible,fondoVisible,campeones,topDeCategoria,SOLO_PREFIJO,JUEGOS'),
  carga(['marcos-animados'],'MARCOS_ANIMADOS,adorno,tieneAdorno'));
 
@@ -90,4 +90,36 @@ test('cada marco animado tiene su dibujo',()=>{
   assert.ok(!/undefined|NaN/.test(s),m.id);
  }
  for(const id of T.MARCOS_ANIMADOS)assert.ok(T.MARCOS.some(m=>m.id===id&&m.anim),'dibujo sin marco: '+id);
+});
+
+test('un corte anula lo que no se pudo pagar sin parar la cuenta, y lo ganado después es suyo',()=>{
+ const tres={a:{cometa:{at:1,p:5000},olas:{at:2,p:5000},holo:{at:3,p:5000}}};
+ const g=T.monedasDe('a',conTienda(tres)).total;
+ assert.ok(T.economia(conTienda(tres)).usuarios.a.parada,'sin corte la tercera la para');
+ const corte={a:{hasta:5,tope:g}};
+ let d=Object.assign(conTienda(tres),{cortes:corte}),e=T.economia(d).usuarios.a;
+ assert.ok(!e.parada,'con corte no queda parada');assert.ok(!e.tienda.holo,'la que no cabía no vale');
+ assert.equal(T.monedasDe('a',d).saldo,g-10000);
+ /* Gana mucho más después: la tercera sigue anulada (se midió contra el
+    tope), y una compra posterior al corte se paga con lo nuevo. */
+ const masRico={solo:{'club-bbtan-rondas':{a:{nombre:'Ana',puntos:900,tiempo:1}}}};
+ const cuatro=Object.assign({},tres.a,{fuegos:{at:10,p:5000}});
+ d=Object.assign(conTienda({a:cuatro},masRico),{cortes:corte});e=T.economia(d).usuarios.a;
+ assert.ok(!e.tienda.holo,'lo ganado después no revive lo anulado');assert.ok(e.tienda.fuegos);assert.ok(!e.parada);
+ assert.equal(T.monedasDe('a',d).saldo,T.monedasDe('a',d).total-15000);
+ /* Si después se borran más récords y gana menos que el tope, se mide contra eso. */
+ d=Object.assign(conTienda(tres,{solo:{'club-bbtan-rondas':{a:{nombre:'Ana',puntos:200,tiempo:1}}}}),{cortes:corte});
+ const g2=T.monedasDe('a',d).total;assert.ok(g2<g);
+ e=T.economia(d).usuarios.a;assert.ok(!e.parada);
+ assert.equal(Object.keys(e.tienda).length,Math.min(3,Math.floor(g2/5000)),'con menos ganado cabe menos');
+ assert.ok(T.monedasDe('a',d).saldo>=0);
+});
+
+test('con «desde», lo comprado antes vale entero y el saldo queda en cero, no negativo',()=>{
+ const tres={a:{cometa:{at:1,p:5000},olas:{at:2,p:5000},holo:{at:3,p:5000},fuegos:{at:6,p:5000}}};
+ const g=T.monedasDe('a',conTienda(tres)).total;
+ const d=Object.assign(conTienda(tres),{cortes:{a:{desde:4,hasta:8,tope:g}}}),e=T.economia(d).usuarios.a;
+ assert.ok(e.tienda.cometa&&e.tienda.olas&&e.tienda.holo,'antes de «desde» todo vale');
+ assert.ok(!e.tienda.fuegos,'entre «desde» y «hasta» lo que no alcanza se anula');assert.ok(!e.parada);
+ assert.equal(T.monedasDe('a',d).saldo,0,'lo que no alcanzaba se perdona: el saldo queda en cero');
 });

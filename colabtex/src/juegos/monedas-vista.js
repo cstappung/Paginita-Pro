@@ -103,7 +103,7 @@ export function crearMonedas({ uid, datos, perfil, colorDe }) {
           <h3>Récords del club</h3>
           <p>Una vez por cada modalidad en la que tengas marca (mejorarla no vuelve a pagar):</p>
           <ul class="jg-mo-pesos">${Object.entries(RECORD).map(([j, v]) => `<li><span>${NOMBRES_CLUB[j] || j}</span><b>${v} ${MONEDA}</b></li>`).join("")}</ul>
-          <p>Además, BBTAN paga ⌊n/4⌋ por cada ronda n hasta tu récord (llegar a la 5 da 2, a la 50 da 300, a la 100 da 1.225), sortEm paga los bloques de la modalidad más 2 por cada segundo bajo 3 s por bloque, la Sopa diaria y Electrodle 10 por cada día de tu mejor racha, y Electrodle 1 más por cada 50 puntos.</p>
+          <p>Además, BBTAN paga ⌊n/4⌋ por cada ronda n hasta tu récord (llegar a la 5 da 2, a la 50 da 300, a la 100 da 1.225; desde la 450 cada ronda paga 112 y pasada la 600 ya no suma), sortEm paga los bloques de la modalidad más 2 por cada segundo bajo 3 s por bloque, la Sopa diaria y Electrodle 10 por cada día de tu mejor racha, y Electrodle 1 más por cada 50 puntos.</p>
           <h3>Partidas del club</h3>
           <p>Cada partida de un juego individual que termina con resultado paga según lo que dura, hasta ${TOPE_CLUB_DIA} partidas al día por juego (BBTAN, ${TOPE_BBTAN_DIA}: lo suyo lo paga el récord):</p>
           <ul class="jg-mo-pesos">${Object.entries(PAGO_CLUB).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([j, v]) => `<li><span>${NOMBRES_CLUB[j] || j}</span><b>${v} ${MONEDA}</b></li>`).join("")}</ul>

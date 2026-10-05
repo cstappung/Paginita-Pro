@@ -210,7 +210,7 @@ castiga:
 
 Una partida que llega **sin prueba** sí castiga: es la firma de
 `Club.result` desde la consola, y desde que el iframe se carga con
-`?v=club-32` (Metro Rush, el último en estrenar su prueba) ninguna versión actual del juego la manda así.
+`?v=club-33` (Metro Rush, el último en estrenar su prueba) ninguna versión actual del juego la manda así.
 
 **Dónde vive la retención**, y por qué en dos sitios:
 
@@ -236,3 +236,38 @@ igualmente no subió: el castigo es la parte que disuade, el rechazo es la
 que protege la tabla. `tests/castigo.test.cjs` cubre qué cuenta como
 trampa, de quién es la retención, el recorrido entero con el reloj en la
 mano y que esté conectado donde se rechaza una partida.
+
+## Cuentas paradas: los cortes
+
+Borrar récords falsos baja lo ganado hacia atrás. El recorrido de
+`economia()` (juegos/monedas.js) encuentra entonces compras de PRODROP o de
+la tienda que nunca se pudieron pagar y **para** la cuenta: esa compra y todo
+lo que compró después no vale, no puede vender ni intercambiar, y todo lo que
+gane desde ahí se va a tapar el hueco, porque lo ganado no tiene fecha y se
+mide entero contra el pasado.
+
+Un **corte** (`colabtex/src/juegos/cortes.js`) lo arregla sin deuda:
+`<uid>: {hasta, tope}`. Hasta `hasta`, la cuenta gasta contra `tope` (lo que
+ganaba al limpiarla, o menos si después se borra algo más) y una compra que
+no alcanzaba **se anula sin parar la cuenta**: el sobre no existe, la
+graduación no se hizo, la compra en el mercado se cae y la carta se queda
+con quien vendía. Desde `hasta`, lo que gana es suyo y se mide normal. Es lo
+mismo que anular una a una, en orden, las compras impagas (se comprobó con
+los datos reales: 2 073 compras anuladas dan el mismo estado que dos cortes).
+
+Va en el código, no en Firebase: no cuesta descargas ni reglas. Después de
+una limpieza:
+
+```
+cd colabtex
+node scripts/cortes.cjs ../auditoria/export.json            # mira qué pasaría
+node scripts/cortes.cjs ../auditoria/export.json --escribe  # lo agrega a cortes.js
+npm run build
+```
+
+`--hasta AAAA-MM-DD` (o `AAAA-MM-DDTHH:MM`, hora de Chile) fija el final del corte (por omisión, el fin de mañana).
+`--desde AAAA-MM-DDTHH:MM` perdona lo comprado antes de esa hora: vale entero
+aunque no alcanzara, el saldo queda en cero, y solo se anula lo de después.
+Tiene que caer **después** de la última compra impaga de la cuenta; desde
+ahí lo que gane se mide normal. Si siguió comprando sin fondos después, el
+script lo dice (la cuenta seguiría parada) y hay que correr el corte.

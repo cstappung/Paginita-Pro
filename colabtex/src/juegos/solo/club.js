@@ -18,7 +18,9 @@ import {verificaClub} from './verifica.js';
    había pendiente en localStorage se vuelve a verificar al cargarlo
    (con la hora en que se jugó, `h`: un diario de ayer sigue valiendo),
    porque ese almacén también se puede editar a mano. `guardar` recibe la
-   prueba como cuarto argumento, para escribirla junto al récord. */
+   prueba como cuarto argumento, para escribirla junto al récord, y
+   `alResultado` como tercero, para la mejor partida del día del salón
+   (rieles.js), que se guarda aunque no sea récord. */
 export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partida,reportaSospecha}) {
   let host,frame,off,temaObserver,categoria='',muerto=false,pendientes={},guardando=false,propios={};
   const invitado=!usuario,cuenta=invitado?'invitado':usuario.uid;
@@ -112,7 +114,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
           enviar({tipo:'rechazo',categoria:dato.categoria,partida:dato.partida,motivo});
           return;
         }
-        if(alResultado){try{alResultado(dato,propios[dato.categoria]||pendientes[dato.categoria]||null);}catch(err){/* un logro no debe romper la partida */}}
+        if(alResultado){try{alResultado(dato,propios[dato.categoria]||pendientes[dato.categoria]||null,prueba);}catch(err){/* un logro no debe romper la partida */}}
         if(mejorClub(dato,pendientes[dato.categoria])){pendientes[dato.categoria]={...dato,prueba,h:Date.now()};persistir();}
         sincronizar();
       });
@@ -131,7 +133,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
     temaObserver.observe(document.documentElement,{attributes:true,attributeFilter:['data-tema']});
     frame.allow='fullscreen';frame.setAttribute('allowfullscreen','');
     window.addEventListener('message',mensaje);
-    frame.src='juegos/club/'+juego+'/index.html?v=club-32&embed=1&cuenta='+encodeURIComponent(cuenta)+(invitado?'&invitado=1':'');
+    frame.src='juegos/club/'+juego+'/index.html?v=club-33&embed=1&cuenta='+encodeURIComponent(cuenta)+(invitado?'&invitado=1':'');
     host.appendChild(frame);
   }
   function destruir(){muerto=true;temaObserver?.disconnect();if(off)off();window.removeEventListener('message',mensaje);for(const [el,valor]of ocultos)el.style.display=valor;frame?.remove();host.innerHTML='';ambientar('');}
