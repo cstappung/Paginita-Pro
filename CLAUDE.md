@@ -1730,14 +1730,20 @@ say what a guest gets instead. On a phone it is a carousel of whole cards.
 longer called.
 
 **Without a session the lobby opens in guest mode** (`state.invitado`), with
-no login wall: everything single-player is playable (the ten club games and
-the bot practice of Circuit Breakers, Yemas and Clue, which are `SOLOS` in
-`salon-datos.js`), and nothing is saved — no ranking, logros, coins or cloud
+no login wall, but **only four games are playable**: Snake, Mina Club,
+Tetris Club and sortEm (`LIBRES_INVITADO` in `salon-datos.js`, the owner's
+choice). Everything else — the other club games, Frontera, the bot
+practices and every room — wears the padlock (`bloqueado`), and a typed
+`#solo/<x>` route that is not free (`rutaLibre`) gets the `MOTIVO_CUENTA.solo`
+gate in `armazon`. Nothing is saved — no ranking, logros, coins or cloud
 save. It needs **no rules change**: the guest never touches the database.
+The honest limit: the bot practices are static pages (`juegos/yemas/index.html`
+and siblings), so the lobby no longer links them for a guest but whoever
+types their URL still plays them; they never write anything.
 
 - Multiplayer cards are shown locked, not hidden (they are the reason for an
-  account). Their ficha explains why, offers «Iniciar sesión y jugar», the
-  bot practice if there is one, and «Seguir como invitado». Every
+  account). Their ficha explains why, offers «Iniciar sesión y jugar» and
+  «Seguir como invitado» (no bot practice: those need an account too). Every
   `[data-login]` goes through `entrarConGoogle(juego)`, which remembers the
   game and **reopens its ficha unlocked** once the account arrives. A shared
   `#p/<pid>` shows a gate (`puertaHtml`, texts in `MOTIVO_CUENTA`), and after
@@ -1748,9 +1754,9 @@ save. It needs **no rules change**: the guest never touches the database.
 - `crearSolo({usuario: null})` is the club's guest mode: it watches and writes
   nothing, answers `partida-pedir` with null and loads the frame with
   `cuenta=invitado&invitado=1`, which `conexion.js` (`?v=club-8`) reads to
-  replace the ranking panel with the notice. The Frontera gets the
-  `INVITADO` user (`usuario.invitado`): no ranking, no cloud run, and
-  `pokemon/equipos.js` keeps uid `invitado`'s teams in `localStorage` only.
+  replace the ranking panel with the notice. The Frontera still knows the
+  `INVITADO` user (`usuario.invitado`: no ranking, no cloud run, teams in
+  `localStorage` only), though a guest no longer reaches it.
 - What a guest leaves in `localStorage` (`*.cuenta.invitado`,
   `frontera.invitado`, `pk.equipos.invitado`: `esClaveInvitado`) is wiped
   once per tab session (`limpiaInvitado`, flag in `sessionStorage`), so a

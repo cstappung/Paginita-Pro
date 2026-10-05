@@ -19,11 +19,12 @@
  *   que llegaron últimos, si llegaron hace menos de dos semanas. Con un
  *   juego nuevo cada pocos días, «todo lo de este mes» habría puesto la
  *   etiqueta a media tienda, y una etiqueta que lo marca todo no marca nada.
- * - **El invitado ve todo y juega lo que no necesita cuenta** (`bloqueado`).
- *   Un multijugador escribe en la base de datos (salas, jugadas, ranking),
- *   y la base solo deja escribir a quien inició sesión; uno de un jugador
- *   corre entero en el navegador. Esconder los multijugador al invitado
- *   le escondería también la razón para crearse una cuenta.
+ * - **El invitado ve todo y juega solo cuatro juegos** (`bloqueado`,
+ *   `LIBRES_INVITADO`): Snake, Mina Club, Tetris Club y sortEm. El resto
+ *   (los multijugador, los demás del club y las prácticas contra bots) pide
+ *   cuenta, por decisión de la dueña del sitio. Lo bloqueado se muestra
+ *   con candado en vez de esconderse: esconderlo le escondería al invitado
+ *   también la razón para crearse una cuenta.
  */
 import { CONTROLES } from "./controles-datos.js";
 
@@ -191,10 +192,16 @@ export function juegoDeNovedad(n) {
   return s ? s.id : "";
 }
 
-/* Si el invitado puede abrirla. Un multijugador necesita cuenta siempre;
-   lo de un jugador nunca: corre en el navegador y, sin cuenta, solo deja
-   de guardar el récord. */
-export const bloqueado = (entrada, invitado) => !!invitado && entrada.modo === "multi";
+/* Lo único que un invitado puede jugar: cuatro juegos del club, por id
+   del salón. Lo demás (multijugador, el resto del club y las prácticas
+   contra bots) pide iniciar sesión. */
+export const LIBRES_INVITADO = ["snake", "minas", "tetrisclub", "sortem"];
+export const libreParaInvitado = id => LIBRES_INVITADO.includes(id);
+/* Lo mismo para una ruta `#solo/<juego>` (la del Tetris es `tetris`). */
+export const rutaLibre = juego => libreParaInvitado(juego === "tetris" ? "tetrisclub" : juego);
+
+/* Si el invitado puede abrirla. */
+export const bloqueado = (entrada, invitado) => !!invitado && !(entrada.modo === "solo" && libreParaInvitado(entrada.id));
 
 /* El modo de juego que elige la barra del salón. `todos` muestra las dos
    secciones; los otros dos esconden la que sobra (las novedades se
@@ -216,6 +223,7 @@ export const esClaveInvitado = k => typeof k === "string" && (
 /* Las vistas que un invitado no puede ver y por qué: el texto del
    aviso que las sustituye. Todas leen o escriben en la base de datos. */
 export const MOTIVO_CUENTA = {
+  solo: { t: "Este juego necesita una cuenta", d: "Sin iniciar sesión puedes jugar a Snake, Buscaminas, Tetris y sortEm. Inicia sesión con Google y se abren todos los demás, con tus récords, logros y monedas guardados." },
   partida: { t: "Te invitaron a una partida", d: "Las partidas en línea son entre cuentas: así cada jugada queda firmada por quien la hizo. Inicia sesión y entras directo a esta sala." },
   ranks: { t: "La clasificación es para quien tiene cuenta", d: "Cada fila es una persona con sus victorias, y como invitado tus partidas no se guardan. Inicia sesión y empieza a sumar." },
   logros: { t: "Los logros se ganan con cuenta", d: "Se guardan en tu perfil y se ven en tu página pública. Como invitado juegas igual, pero no quedan registrados." },
