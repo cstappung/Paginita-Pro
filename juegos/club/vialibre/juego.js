@@ -471,7 +471,7 @@ function retosEnVivo(dt) {
   const lista = M.retosDeNivel(progreso.retos.nivel);
   for (const i of cumplidos) {
     if (c.avisados.has(i) || progreso.retos.avance[i] >= lista[i].meta) continue;
-    c.avisados.add(i); sonido.reto(); aviso('Reto cumplido: ' + lista[i].texto);
+    c.avisados.add(i); sonido.reto(); aviso('Misión cumplida: ' + lista[i].texto);
   }
 }
 

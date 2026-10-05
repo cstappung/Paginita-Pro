@@ -324,7 +324,18 @@ main.vl { min-width: 0; }
 .f-datos b { font: 400 19px/1.05 var(--ss-letra); overflow-wrap: anywhere; }
 .f-datos .largo b { font-size: 15px; }
 .f-datos small { font: 700 10.5px/1.2 "IBM Plex Sans", sans-serif; color: #50608c; text-transform: uppercase; letter-spacing: .05em; }
-@media (max-width: 520px) { .f-datos { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+/* en un celular: tres fichas (la estación ya está en el marcador), título y puntos más chicos */
+@media (max-width: 520px) {
+  .fin h2 { font-size: 24px; margin-bottom: 8px; }
+  .f-puntos { padding: 6px 10px 8px; }
+  .f-puntos strong { font-size: 40px; }
+  .f-datos { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
+  .f-datos .largo { display: none; }
+  .f-datos li { padding: 6px 4px; }
+  .f-datos i { width: 22px; height: 22px; }
+  .f-datos b { font-size: 16px; }
+  .f-datos small { font-size: 9px; letter-spacing: .02em; }
+}
 /* el set completo: un cartel amarillo */
 .f-set { margin: 12px 0 0; padding: 8px 12px; border-radius: 14px; text-align: center; background: linear-gradient(#fff07a, #ffbe2a); border: 3px solid var(--ss-t); box-shadow: 0 4px 0 rgba(10, 22, 66, .45);
   color: var(--ss-t); font: 400 17px/1.3 var(--ss-letra); animation: f-cinta .45s 1s both cubic-bezier(.3, 1.6, .5, 1); }
@@ -462,6 +473,5 @@ main.vl { min-width: 0; }
   .scorebar strong { font-size: 17px; }
   .caja { padding: 16px 14px 14px; border-radius: 16px; }
   .fin .caja { padding-bottom: 0; } .fin .menu { margin-left: -14px; margin-right: -14px; }
-  .f-puntos strong { font-size: 44px; }
   .opcion.principal { font-size: 19px; }
 }
