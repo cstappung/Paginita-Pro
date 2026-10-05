@@ -696,6 +696,10 @@
       }
       return { previo, siguiente };
     }
+    /* Los pulsos programados después del número `n` (para la prueba de la
+       partida, ver prueba.js: un tiro afinado tiene que caer cerca de uno
+       de estos, y por eso se anotan todos). */
+    const pulsosDesde = n => pulsos.filter(p => p.n > n).map(p => ({ t: p.t, n: p.n }));
     /* Los pulsos ya ocurridos desde la última vez (para el dibujo). */
     let ultimoEntregado = -1;
     function consumePulsos(tj) {
@@ -847,7 +851,7 @@
     }
 
     return {
-      iniciar, listo, avanza, nivel, estado, ponEtapa, pulsoCercano, consumePulsos, fase, compasActual,
+      iniciar, listo, avanza, nivel, estado, ponEtapa, pulsoCercano, pulsosDesde, consumePulsos, fase, compasActual,
       herida, enmudece, silenciar, volumenes, pausa, sfx,
       get latencia() { return ctx ? (ctx.outputLatency || ctx.baseLatency || 0.02) : 0; },
       get silenciado() { return silenciado; },
