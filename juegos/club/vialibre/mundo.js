@@ -347,6 +347,22 @@ function uvMundo(geo, tile = 1, dy = 0) {
    3. PALETAS: los colores y la luz de cada estación
    =================================================================== */
 
+/* LEGIBILIDAD. Lo que hay que esquivar o tomar (trenes, barreras, rampas,
+   monedas, poderes, estrella, boleto) tiene que leerse de un vistazo a
+   30 m/s, en cualquier estación y en cualquier calidad. La regla: el
+   decorado puede ser tan oscuro o tan parejo como pida el estilo, pero un
+   objeto del juego tiene que distinguirse de él en luminosidad o en tono.
+   Cada paleta lo ajusta con `legible`:
+   - brillo:   luz propia de los objetos del juego (0 = ninguna). Es lo que
+               los saca de la oscuridad en Neón y Fantasma sin agregar luces.
+   - niebla:   potencia del factor de niebla en esos objetos (1 = como la
+               ciudad); con más de 1 se ven desde más lejos que el decorado.
+   - decorado: cuánto se atenúan los postes y faroles de luz (solo neón);
+               eran lo más brillante de la pantalla y competían con los
+               obstáculos.
+   Las variantes heredan el `legible` de su base, así que una estación
+   nueva de noche (hecha con variante(BASE_NEON, …)) ya nace legible. */
+
 const BASE_JUGUETE = {
   estilo: 'juguete',
   cielo: { arriba: 0x3d8ff0, horizonte: 0xcfe9ff, sol: 0xfff3d0 }, niebla: [55, 175],
@@ -363,7 +379,9 @@ const BASE_JUGUETE = {
   },
   carteles: ['CAFÉ', 'PAN', 'FARMACIA', 'LIBROS', 'HELADOS', 'FRUTAS', 'MÚSICA'],
   grafitis: [['¡CORRE!', 0xff5a8a, 0xffd23f], ['VÍA LIBRE', 0x3fd0ff, 0x7a5cff], ['LAB', 0x8aff6a, 0x19b37a], ['ZOOM', 0xffa23a, 0xff3d6e]],
-  extras: { nubes: true }
+  extras: { nubes: true },
+  // de día casi todo se lee bien; solo la niebla clara se comía los trenes lejanos (en Invierno, sobre todo)
+  legible: { brillo: 0, niebla: 1.6 }
 };
 const BASE_PIXEL = {
   estilo: 'pixel',
@@ -377,17 +395,26 @@ const BASE_PIXEL = {
     marco: 0x3b2a40, vidrioEd: 0xffcf7a, cornisa: 0x4a3550, vitrina: 0x5a3f36,
     toldos: [[0xe2463a, 0xfff1d4], [0x2fb59a, 0xfff1d4], [0xffd23f, 0x5a3b2c]],
     arboles: [0x3f7a4a, 0x4f8c4f, 0x2f6a40], tronco: 0x5a3b2c, poste: 0x3b2a40, farol: 0xffe3a0, catenaria: 0x3b2a40,
-    barrera: 0xe2463a, barrera2: 0xfff1d4, ambar: 0xffb020, rampa: 0x8a8090, oro: 0xffd23f, iman: 0xe2463a, cromo: 0xfff1d4, nube: 0xffd9c2, basurero: 0x3f7a4a
+    // la rampa era gris violeta (0x8a8090) y en la penumbra del atardecer se confundía con el balasto: acero claro
+    barrera: 0xe2463a, barrera2: 0xfff1d4, ambar: 0xffb020, rampa: 0xdfe4ea, oro: 0xffd23f, iman: 0xe2463a, cromo: 0xfff1d4, nube: 0xffd9c2, basurero: 0x3f7a4a
   },
   carteles: ['CAFÉ', 'PAN', 'ARCADE', 'LIBROS', 'DISCOS', 'FRUTAS'],
   grafitis: [['¡CORRE!', 0xffd23f, 0xe2463a], ['LAB', 0x2fb59a, 0x4f8c4f]],
-  extras: { nubes: true, disco: true }
+  extras: { nubes: true, disco: true },
+  // la luz del atardecer es cálida y pareja: un poco de brillo propio separa los objetos del fondo anaranjado
+  legible: { brillo: 0.06, niebla: 1.6 }
 };
 const BASE_NEON = {
   estilo: 'neon',
   cielo: { arriba: 0x04021a, horizonte: 0x3a0a48, sol: 0xff4fa0 }, niebla: [35, 165], nieblaColor: 0x16062a,
-  sol: null, hemi: [0x6a4ab0, 0x0a0618, 0.2], env: 0.1, exposicion: 0.72,
-  post: { bloom: [0.5, 0.3, 0.85], vineta: 0.6, sat: 1.1, aberracion: 0.0009, lineas: 0.03 },
+  /* La única luz era un cielo violeta a 0,2: los trenes, la rampa y el
+     cuerpo de los poderes se perdían como manchas negras sobre el piso negro
+     y solo sus aristas los delataban. El cielo sube a 0,5 (da volumen a lo
+     que no es luz: el techo de un tren se ve más claro que su costado), la
+     exposición un poco, y la viñeta baja de 0,6 a 0,4, que oscurecía justo
+     los carriles de los lados. */
+  sol: null, hemi: [0x7a5ac8, 0x0a0618, 0.5], env: 0.1, exposicion: 0.78,
+  post: { bloom: [0.5, 0.3, 0.85], vineta: 0.4, sat: 1.1, aberracion: 0.0009, lineas: 0.03 },
   c: {
     grava: 0x0b0720, tierra: 0x07041a, traviesa: 0x3a1a70, riel: 0x22e5ff, muro: 0x2a1a50, acera: 0x120a2a, bordillo: 0x22e5ff,
     trenes: [0xff2bd6, 0x22e5ff, 0xffe14d], acentos: [0x22e5ff, 0xff2bd6, 0xff2bd6], bajo: 0x1a1030, vidrio: 0x5ad8e8, techoTren: 0x6a35c9,
@@ -395,11 +422,17 @@ const BASE_NEON = {
     marco: 0x2a1a50, vidrioEd: 0xffffff, cornisa: 0xb01f96, vitrina: 0x4a1a40,
     toldos: [[0xff2bd6, 0x22e5ff]], ventanas: [0x22e5ff, 0xff2bd6, 0xffe14d, 0x7b5cff, 0x1a0f30, 0x1a0f30],
     arboles: [0xff2bd6], tronco: 0xff2bd6, poste: 0x2a1a50, farol: 0xff7ae0, catenaria: 0xff2bd6, rejilla: 0xb01f96,
-    barrera: 0xff3d6e, barrera2: 0xffe14d, ambar: 0xffb020, rampa: 0x22e5ff, oro: 0xffe14d, iman: 0xff3d6e, cromo: 0xffffff, nube: 0xffffff, basurero: 0x22e5ff
+    barrera: 0xff3d6e, barrera2: 0xffe14d, ambar: 0xffb020, rampa: 0x22e5ff, oro: 0xffe14d, iman: 0xff3d6e, cromo: 0xffffff, nube: 0xffffff, basurero: 0x22e5ff,
+    rampaBorde: 0xffffff,          // las aristas de la rampa, blancas: cian sobre la rejilla cian no dibujaban la cuña
+    tubo: 0xff2bd6                 // los postes de luz de los faroles (instanciados)
   },
   carteles: ['BAR', '24H', 'ARCADE', 'RAMEN', 'KARAOKE', 'DISCO'],
   grafitis: [['NEÓN', 0xff2bd6, 0x22e5ff], ['VÍA LIBRE', 0x22e5ff, 0x7b5cff]],
-  extras: { synth: ['#ffe46b', '#ff6a9a', '#ff2bd6'], estrellas: true }
+  extras: { synth: ['#ffe46b', '#ff6a9a', '#ff2bd6'], estrellas: true },
+  /* El cuerpo de los objetos del juego brilla a un 32 % de su color (un tren
+     magenta se ve magenta, no negro con borde), la niebla les llega más
+     tarde (potencia 2) y los postes de luz bajan a la mitad. */
+  legible: { brillo: 0.32, niebla: 2, decorado: 0.5 }
 };
 /** Copia una paleta base y cambia lo que se indique (también dentro de `c`). */
 function variante(base, cambios) {
@@ -414,10 +447,21 @@ export const PALETAS = {
   ocaso: BASE_PIXEL,
   neon: BASE_NEON,
   /* Estación Fantasma: el neón se vuelve verde espectral, con niebla verde y un tren fantasma en el cielo. */
+  /* Los trenes eran verde menta y cian, los mismos tonos de la ciudad, los
+     rieles y los bordillos: todo era del mismo verde y un tren no se
+     separaba de nada. Ahora son trenes fantasma de verdad: cuerpo pálido
+     (menta casi blanca, hielo, lila), ventanas apagadas (oscuras, como un
+     tren vacío) y franjas rosa, ámbar y lila, tonos que no hay en la
+     ciudad. La rampa va en ámbar por lo mismo. El cielo de la luz ambiente
+     pasa de violeta a verde, como el resto de la estación. */
   fantasma: variante(BASE_NEON, {
     cielo: { arriba: 0x020a0c, horizonte: 0x0e3a32, sol: 0x7dffcf }, nieblaColor: 0x062019,
-    c: { trenes: [0x7dffcf, 0xb6fff0, 0x3dd6ff], acentos: [0x7dffcf, 0x3dd6ff, 0x7dffcf], riel: 0x7dffcf, bordillo: 0x7dffcf, vidrio: 0x9fffe6,
+    hemi: [0x6ab8a8, 0x061210, 0.5],
+    c: { trenes: [0xe6fff4, 0xd4ecff, 0xeadcff], acentos: [0xff8ad8, 0xffc56b, 0xb08cff], techoTren: 0xc6ddd6, vidrio: 0x14352e,
+      riel: 0x7dffcf, bordillo: 0x7dffcf, rampa: 0xffc56b, tubo: 0x2bd6a0,
       edificios: [0x2bd6a0, 0x3dd6ff, 0x7dffcf], ventanas: [0x7dffcf, 0x3dd6ff, 0xb6fff0, 0x0a1e1a, 0x0a1e1a, 0x0a1e1a], cornisa: 0x2bd6a0, catenaria: 0x3dd6ff, farol: 0x9fffe6, rejilla: 0x1a7a60, traviesa: 0x10403a, vitrina: 0x0f3a30 },
+    // los cuerpos pálidos ya son claros: con menos brillo propio no se queman a blanco
+    legible: { brillo: 0.24, niebla: 2, decorado: 0.5 },
     carteles: ['ADIÓS', 'ÚLTIMO TREN', 'BOLETERÍA', 'ANDÉN 0'],
     grafitis: [['1 000 000', 0x7dffcf, 0x3dd6ff], ['HOLA', 0xb6fff0, 0x2bd6a0]],
     extras: { synth: ['#d6fff2', '#7dffcf', '#1f8a6a'], estrellas: true, espectros: true, trenFantasma: true }
@@ -426,8 +470,13 @@ export const PALETAS = {
   invierno: variante(BASE_JUGUETE, {
     cielo: { arriba: 0x8aa4c0, horizonte: 0xe6edf3, sol: 0xffffff }, niebla: [40, 150],
     sol: [0xeaf2ff, 2.0, [-16, 26, 14]], hemi: [0xeef4ff, 0xa0a8b8, 0.75],
+    /* Sobre la nieve lo blanco desaparece: las barreras rojas y blancas
+       quedaban como rayas rojas sueltas en el aire, sus patas blancas no se
+       veían y la rampa (rejilla blanca) era invisible. Las rayas pasan a
+       rojo y azul marino, las patas a marino y la rampa a naranja. */
     c: { grava: 0xe8edf2, tierra: 0xf2f5f8, acera: 0xf0f3f6, bordillo: 0xd6dde6, muro: 0xeef1f4, arboles: [0x2e6b4a, 0x3a7d58, 0x24583c],
-      edificios: [0xc9d6e3, 0xe8c9b5, 0xb8c9b0, 0xd9c2e0, 0xf2e6d8], ladrillo: 0x9c5a4a, cornisa: 0xffffff, techoTren: 0xffffff },
+      edificios: [0xc9d6e3, 0xe8c9b5, 0xb8c9b0, 0xd9c2e0, 0xf2e6d8], ladrillo: 0x9c5a4a, cornisa: 0xffffff, techoTren: 0xffffff,
+      barrera: 0xe8463b, barrera2: 0x1f2c4a, pata: 0x1f2c4a, rampa: 0xff8a2a },
     carteles: ['CHOCOLATE', 'SOPAIPILLAS', 'BUFANDAS', 'CAFÉ'],
     extras: { nubes: true, nieve: true }
   }),
@@ -444,7 +493,13 @@ export const PALETAS = {
   oxido: variante(BASE_PIXEL, {
     cielo: { arriba: 0x6a3a2a, horizonte: 0xffb070, sol: 0xfff0c0 }, niebla: [26, 140],
     sol: [0xffb878, 2.8, [-16, 13, -46]], hemi: [0xffc8a0, 0x5a3020, 1.1],
-    c: { grava: 0xc08a5a, tierra: 0xb07a4a, acera: 0xc89a6a, muro: 0xa0623a, riel: 0x8a5a3a, edificios: [0x8a4a2a, 0xa05a30, 0x7a3a22, 0xb87040], arboles: [0x6a7a3a, 0x7a8a4a], trenes: [0x8a4a2a, 0xb87040, 0x5a6a7a] },
+    /* Todo era óxido: trenes café y naranja sobre balasto naranja, con
+       niebla naranja; el tren naranja desaparecía a 60 m. Los trenes pasan
+       a pátina (el verde azulado del cobre oxidado, el opuesto del naranja),
+       hueso y azul desteñido, y las barreras a negro con amarillo de
+       peligro, que se lee sobre cualquier tono cálido. */
+    c: { grava: 0xc08a5a, tierra: 0xb07a4a, acera: 0xc89a6a, muro: 0xa0623a, riel: 0x8a5a3a, edificios: [0x8a4a2a, 0xa05a30, 0x7a3a22, 0xb87040], arboles: [0x6a7a3a, 0x7a8a4a],
+      trenes: [0x2f8f8a, 0xe8dcc0, 0x3f5f8f], barrera: 0x2a2420, barrera2: 0xffd23f },
     carteles: ['AGUA', 'TALLER', 'POSADA', 'ÚLTIMA BOMBA'],
     extras: { nubes: false, disco: true, polvo: true }
   })
@@ -464,6 +519,30 @@ function gradToon() {
 }
 let _texBrillo = null;
 const texBrillo = () => (_texBrillo ||= aTextura(TEX.brillo(), { repetir: false }));
+
+/** Hace que un material se lea mejor, tocando su shader:
+    - `brillo`: le suma luz propia en su mismo color (el color del vértice y
+      de la textura como luz emitida). Así un tren se ve como una masa de
+      color aunque la estación esté a oscuras, en cualquier calidad (no
+      depende del bloom) y sin agregar ni una luz a la escena.
+    - `niebla`: la niebla le llega más tarde. El factor de niebla (0 cerca,
+      1 al fondo) se eleva a esta potencia: con 2, un tren a 78 m en calidad
+      baja queda a un 38 % de niebla en vez de un 61 %. Al final de la vista
+      el factor sigue siendo 1, así que los objetos siguen apareciendo desde
+      la niebla sin saltar a la vista de golpe.
+    Los programas se distinguen por los dos números (customProgramCacheKey):
+    si no, Three reusaría el shader de otro material con otros valores. */
+function realza(m, brillo, niebla) {
+  if (!brillo && niebla === 1) return;
+  const b = brillo.toFixed(3), n = niebla.toFixed(2);
+  m.onBeforeCompile = sh => {
+    if (brillo) sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>',
+      `#include <emissivemap_fragment>\n\ttotalEmissiveRadiance += diffuseColor.rgb * ${b};`);
+    if (niebla !== 1) sh.fragmentShader = sh.fragmentShader.replace('#include <fog_fragment>',
+      THREE.ShaderChunk.fog_fragment.replace('fogColor, fogFactor', `fogColor, pow( fogFactor, ${n} )`));
+  };
+  m.customProgramCacheKey = () => `vialibre-realce-${b}-${n}`;
+}
 
 /** Lleva las coordenadas v de una geometría a la franja `i` de `n` de un atlas
     apilado de arriba abajo (con un margen, para que el filtrado no traiga el
@@ -507,32 +586,36 @@ class Kit {
   /* ---- materiales ----
      Las claves dicen qué clase de material es y, después de ":", su textura:
      plano (mate), pintura (brillante), metal, vidrio, luz (sin sombreado,
-     brilla), tex:x (con textura), texmetal:x, texluz:x (textura que brilla). */
+     brilla), tex:x (con textura), texmetal:x, texluz:x (textura que brilla).
+     Un "!" al final ('pintura!', 'tex:rayasRB!') marca una pieza de un
+     OBJETO DEL JUEGO: tren, barrera, rampa, poder, estrella o boleto. Es lo
+     que hay que ver de un vistazo a 30 m/s, así que no se dibuja igual que
+     la ciudad (ver `legible` en las paletas y `realza` aquí abajo). */
   mat(clave) {
     if (this.mats.has(clave)) return this.mats.get(clave);
-    const [tipo, tx] = clave.split(':');
+    const juego = clave.endsWith('!');
+    const [tipo, tx] = (juego ? clave.slice(0, -1) : clave).split(':');
     const map = tx ? this.tex(tx) : null;
+    const basico = tipo === 'luz' || tipo === 'texluz';
     let m;
-    if (tipo === 'luz' || tipo === 'texluz') m = new THREE.MeshBasicMaterial({ vertexColors: true, map, transparent: tipo === 'texluz' && !!tx && tx.startsWith('graf'), alphaTest: tx && tx.startsWith('graf') ? 0.02 : 0 });
+    if (basico) m = new THREE.MeshBasicMaterial({ vertexColors: true, map, transparent: tipo === 'texluz' && !!tx && tx.startsWith('graf'), alphaTest: tx && tx.startsWith('graf') ? 0.02 : 0 });
     else if (this.pixel) m = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: gradToon(), map, transparent: !!tx && tx.startsWith('graf'), alphaTest: tx && tx.startsWith('graf') ? 0.05 : 0 });
     else {
       const P = { plano: [.8, 0], pintura: [.34, .35], metal: [.28, .9], vidrio: [.06, .65], tex: [.9, 0], texmetal: [.5, .55] }[tipo] || [.8, 0];
       m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: P[0], metalness: P[1], map, envMapIntensity: this.pal.env,
         transparent: !!tx && tx.startsWith('graf'), alphaTest: tx && tx.startsWith('graf') ? 0.03 : 0 });
-      if (this.neon && tipo !== 'personaje') m.color.setScalar(0.14);         // en neón todo lo que no brilla es casi negro…
+      // en neón la ciudad que no brilla es casi negra (así resaltan sus luces); los objetos del juego y las personas, no
+      if (this.neon && tipo !== 'personaje' && !juego) m.color.setScalar(0.14);
     }
-    /* …menos las personas: el corredor, el inspector y el perro. En neón la
-       única luz es un cielo violeta muy tenue (0,2), y con eso un personaje
-       de colores normales salía negro sobre el piso negro. Se les suma un
-       brillo propio en sus mismos colores (el color del vértice como luz
-       emitida), que se ve en cualquier calidad, con o sin bloom. */
-    if (tipo === 'personaje' && this.neon) {
-      m.onBeforeCompile = sh => {
-        sh.fragmentShader = sh.fragmentShader.replace('#include <emissivemap_fragment>',
-          '#include <emissivemap_fragment>\n\ttotalEmissiveRadiance += diffuseColor.rgb * 0.42;');
-      };
-      m.customProgramCacheKey = () => 'vialibre-personaje-neon';
-    }
+    /* Las personas en neón (el corredor, el inspector y el perro): la única
+       luz es un cielo violeta tenue, y con eso un personaje de colores
+       normales salía negro sobre el piso negro. Se les suma un brillo propio
+       en sus mismos colores (el color del vértice como luz emitida), que se
+       ve en cualquier calidad, con o sin bloom. A los objetos del juego les
+       pasa lo mismo, con la fuerza que diga la paleta. */
+    const L = this.pal.legible || {};
+    const brillo = basico ? 0 : tipo === 'personaje' && this.neon ? 0.42 : juego ? (L.brillo || 0) : 0;
+    realza(m, brillo, juego ? (L.niebla || 1) : 1);
     if (m.transparent) { m.depthWrite = false; m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -2; }
     this.mats.set(clave, m);
     return m;
@@ -661,58 +744,73 @@ class Kit {
 
   /* ---- modelos ---- */
 
-  /** Un vagón de metro. El perfil (paredes rectas, techo redondeado) se extruye a lo largo. */
+  /** Un vagón de metro. El perfil (paredes rectas, techo redondeado) se extruye a lo largo.
+      Todas sus piezas llevan "!" (objeto del juego, ver `mat`): con poca luz
+      el cuerpo brilla en su color en vez de quedar negro. */
   tren(i) {
     const c = this.c, a = new Arma(this), col = c.trenes[i % 3], ac = c.acentos[i % 3], L = L_VAGON - 0.3;
-    a.pon(geoTren(L), 'pintura', col, [0, 0, 0], null, 1, col);
-    a.pon(CAJA, 'plano', c.bajo, [0, 0.36, 0], null, [1.75, 0.34, L - 0.6]);
+    const vid = this.vid + '!';
+    /* En neón el contorno brillante ya no puede ser del color del cuerpo:
+       con el cuerpo encendido en ese mismo color, el borde se perdía en él.
+       Va casi blanco (el color del tren aclarado), que es lo que dibuja la
+       silueta del vagón contra la ciudad oscura. */
+    const borde = new THREE.Color(col).lerp(new THREE.Color(0xffffff), 0.6).getHex();
+    a.pon(geoTren(L), 'pintura!', col, [0, 0, 0], null, 1, borde);
+    a.pon(CAJA, 'plano!', c.bajo, [0, 0.36, 0], null, [1.75, 0.34, L - 0.6]);
     for (const zb of [-3.7, 3.7]) {
-      a.pon(CAJA, 'plano', c.bajo, [0, 0.32, zb], null, [1.5, 0.22, 2]);
-      for (const s of [-1, 1]) for (const zr of [-0.62, 0.62]) a.pon(CILINDRO, 'metal', 0x2a2d33, [s * 0.6, 0.3, zb + zr], [0, 0, Math.PI / 2], [0.5, 0.12, 0.5]);
+      a.pon(CAJA, 'plano!', c.bajo, [0, 0.32, zb], null, [1.5, 0.22, 2]);
+      for (const s of [-1, 1]) for (const zr of [-0.62, 0.62]) a.pon(CILINDRO, 'metal!', 0x2a2d33, [s * 0.6, 0.3, zb + zr], [0, 0, Math.PI / 2], [0.5, 0.12, 0.5]);
     }
     const puerta = new THREE.Color(col).multiplyScalar(0.8).getHex();
     for (const s of [-1, 1]) {
-      a.pon(CAJA, this.vid, c.vidrio, [s * 1.02, 2.2, 0], null, [0.03, 0.85, L - 1.4]);                // la franja de ventanas
-      for (let k = -3; k <= 3; k++) a.pon(CAJA, 'pintura', col, [s * 1.035, 2.2, k * 1.45], null, [0.04, 0.86, 0.15]);   // pilares
+      a.pon(CAJA, vid, c.vidrio, [s * 1.02, 2.2, 0], null, [0.03, 0.85, L - 1.4]);                    // la franja de ventanas
+      for (let k = -3; k <= 3; k++) a.pon(CAJA, 'pintura!', col, [s * 1.035, 2.2, k * 1.45], null, [0.04, 0.86, 0.15]);   // pilares
       for (const zp of [-2.6, 2.6]) {
-        a.pon(CAJA, 'pintura', puerta, [s * 1.03, 1.62, zp], null, [0.03, 2.3, 1.35]);                 // puertas
-        for (const dz of [-0.33, 0.33]) a.pon(CAJA, this.vid, c.vidrio, [s * 1.045, 2.15, zp + dz], null, [0.035, 0.9, 0.5]);
-        a.pon(CAJA, 'plano', 0x22262c, [s * 1.05, 1.62, zp], null, [0.04, 2.3, 0.025]);
+        a.pon(CAJA, 'pintura!', puerta, [s * 1.03, 1.62, zp], null, [0.03, 2.3, 1.35]);                // puertas
+        for (const dz of [-0.33, 0.33]) a.pon(CAJA, vid, c.vidrio, [s * 1.045, 2.15, zp + dz], null, [0.035, 0.9, 0.5]);
+        a.pon(CAJA, 'plano!', 0x22262c, [s * 1.05, 1.62, zp], null, [0.04, 2.3, 0.025]);
       }
-      a.pon(CAJA, this.neon ? 'luz' : 'plano', ac, [s * 1.03, 1.45, 0], null, [0.03, 0.16, L]);        // franja de color
-      a.pon(new THREE.PlaneGeometry(4.2, 1.2), this.neon ? `texluz:graf|${(i + (s > 0 ? 1 : 0)) % 9}` : `tex:graf|${(i + (s > 0 ? 1 : 0)) % 9}`, 0xffffff, [s * 1.045, 0.92, -0.2], [0, s * Math.PI / 2, 0]);
+      a.pon(CAJA, this.neon ? 'luz!' : 'plano!', ac, [s * 1.03, 1.45, 0], null, [0.03, 0.16, L]);    // franja de color
+      a.pon(new THREE.PlaneGeometry(4.2, 1.2), (this.neon ? 'texluz:graf|' : 'tex:graf|') + ((i + (s > 0 ? 1 : 0)) % 9) + '!', 0xffffff, [s * 1.045, 0.92, -0.2], [0, s * Math.PI / 2, 0]);
     }
     const zf = L / 2 + 0.16;                                                                          // el frente
-    a.pon(redonda(1.55, 0.95, 0.08, 0.06), this.vid, c.vidrio, [0, 2.3, zf]);
-    a.pon(new THREE.PlaneGeometry(1.15, 0.24), 'texluz:destino', 0xffffff, [0, 2.95, zf + 0.012]);
+    a.pon(redonda(1.55, 0.95, 0.08, 0.06), vid, c.vidrio, [0, 2.3, zf]);
+    a.pon(new THREE.PlaneGeometry(1.15, 0.24), 'texluz:destino!', 0xffffff, [0, 2.95, zf + 0.012]);
     for (const s of [-1, 1]) {
-      a.pon(CILINDRO, 'luz', 0xfff4d6, [s * 0.62, 0.98, zf + 0.01], [Math.PI / 2, 0, 0], [0.26, 0.06, 0.26]);
-      a.pon(redonda(0.18, 0.1, 0.04, 0.02), 'luz', 0xff3030, [s * 0.62, 0.72, zf + 0.01]);
+      a.pon(CILINDRO, 'luz!', 0xfff4d6, [s * 0.62, 0.98, zf + 0.01], [Math.PI / 2, 0, 0], [0.26, 0.06, 0.26]);
+      a.pon(redonda(0.18, 0.1, 0.04, 0.02), 'luz!', 0xff3030, [s * 0.62, 0.72, zf + 0.01]);
     }
-    a.pon(redonda(1.85, 0.3, 0.26, 0.1), 'plano', c.bajo, [0, 0.5, zf]);
-    for (const za of [-2.8, 2.8]) a.pon(redonda(1.0, 0.26, 1.7, 0.1), 'plano', c.techoTren, [0, 3.32, za]);
+    a.pon(redonda(1.85, 0.3, 0.26, 0.1), 'plano!', c.bajo, [0, 0.5, zf]);
+    // los equipos del techo, del mismo material que el cuerpo: desde la cámara (atrás y arriba) el techo es lo que más se ve de un tren
+    for (const za of [-2.8, 2.8]) a.pon(redonda(1.0, 0.26, 1.7, 0.1), 'pintura!', c.techoTren, [0, 3.32, za]);
     const g = a.hecho();
     if (this.neon) for (const s of [-1, 1]) g.add(sprite(0xffffff, 1.8, [s * 0.62, 0.98, zf + 0.15]));
     return g;
   }
-  /** La rampa: una cuña de rejilla con bordes de cinta de peligro. Su origen es el pie (z=0) y sube hacia −z. */
+  /** La rampa: una cuña de rejilla con bordes de cinta de peligro. Su origen es el pie (z=0) y sube hacia −z.
+      En neón era 'plano' (casi negra) y solo la delataban sus aristas cian:
+      delante de un tren oscuro no se veía dónde empezaba la subida. Ahora es
+      la misma rejilla de las otras estaciones, en el color de rampa de la
+      paleta y con brillo propio, y sus aristas van en otro color (`rampaBorde`)
+      para que no se fundan con la rejilla. */
   rampa() {
-    const largo = MOTOR.LARGO_RAMPA, alto = TECHO, a = new Arma(this);
+    const largo = MOTOR.LARGO_RAMPA, alto = TECHO, a = new Arma(this), c = this.c;
     const s = new THREE.Shape(); s.moveTo(0, 0); s.lineTo(largo, 0); s.lineTo(largo, alto); s.closePath();
     const geo = new THREE.ExtrudeGeometry(s, { depth: 1.8, bevelEnabled: false });
     geo.rotateY(Math.PI / 2); geo.translate(-0.9, 0, 0);
-    a.pon(geo, this.neon ? 'plano' : 'texmetal:rejilla', this.neon ? this.c.rejilla : this.c.rampa, [0, 0, 0], null, 1, 0x22e5ff);
+    a.pon(geo, 'texmetal:rejilla!', c.rampa, [0, 0, 0], null, 1, c.rampaBorde || 0x22e5ff);
     const ang = Math.atan2(alto, largo), lg = Math.hypot(largo, alto);
-    for (const sx of [-0.84, 0.84]) a.pon(CAJA, this.neon ? 'texluz:chevron' : 'tex:chevron', 0xffffff, [sx, alto / 2 + 0.04, -largo / 2], [ang, 0, 0], [0.14, 0.05, lg]);
+    for (const sx of [-0.84, 0.84]) a.pon(CAJA, this.neon ? 'texluz:chevron!' : 'tex:chevron!', 0xffffff, [sx, alto / 2 + 0.04, -largo / 2], [ang, 0, 0], [0.14, 0.05, lg]);
     return a.hecho();
   }
   /** La barrera baja (se salta): un caballete a la altura de la cintura. */
   barreraBaja() {
     const c = this.c, a = new Arma(this);
-    a.pon(CAJA, this.neon ? 'texluz:rayasRB' : 'tex:rayasRB', 0xffffff, [0, 0.72, 0], null, [1.9, 0.3, 0.08], c.barrera);
-    for (const s of [-1, 1]) for (const k of [-1, 1]) a.pon(CAJA, 'plano', 0xe8e8e8, [s * 0.82, 0.42, k * 0.13], [k * 0.28, 0, 0], [0.07, 0.86, 0.07]);
-    a.pon(CILINDRO_CHICO, 'plano', 0x222222, [-0.6, 0.91, 0], null, [0.13, 0.08, 0.13]);
-    a.pon(ESFERA, 'luz', c.ambar, [-0.6, 0.98, 0], null, 0.14);
+    a.pon(CAJA, this.neon ? 'texluz:rayasRB!' : 'tex:rayasRB!', 0xffffff, [0, 0.72, 0], null, [1.9, 0.3, 0.08], c.barrera);
+    // las patas, del color de la paleta (en Invierno, blancas sobre la nieve no se veían)
+    for (const s of [-1, 1]) for (const k of [-1, 1]) a.pon(CAJA, 'plano!', c.pata || 0xe8e8e8, [s * 0.82, 0.42, k * 0.13], [k * 0.28, 0, 0], [0.07, 0.86, 0.07]);
+    a.pon(CILINDRO_CHICO, 'plano!', 0x222222, [-0.6, 0.91, 0], null, [0.13, 0.08, 0.13]);
+    a.pon(ESFERA, 'luz!', c.ambar, [-0.6, 0.98, 0], null, 0.14);
     const g = a.hecho();
     if (this.neon) g.add(sprite(c.ambar, 1.2, [-0.6, 0.98, 0.05]));
     return g;
@@ -720,39 +818,41 @@ class Kit {
   /** La barrera alta (se pasa rodando): un letrero de la cintura a la cabeza, con una flecha hacia abajo. */
   barreraAlta() {
     const c = this.c, a = new Arma(this);
-    for (const s of [-1, 1]) a.pon(CILINDRO, this.neon ? 'texluz:rayasNA' : 'tex:rayasNA', 0xffffff, [s * 0.9, 1.125, 0], null, [0.14, 2.25, 0.14], 0xffe14d);
-    a.pon(redonda(1.95, 0.9, 0.1, 0.04), this.neon ? 'texluz:rayasRB8' : 'tex:rayasRB8', 0xffffff, [0, 1.32, 0], null, 1, c.barrera);
-    a.pon(new THREE.CircleGeometry(0.34, 32), this.neon ? 'texluz:flecha' : 'tex:flecha', 0xffffff, [0, 1.32, 0.056]);
-    for (const s of [-1, 1]) a.pon(ESFERA, 'luz', c.ambar, [s * 0.9, 2.32, 0], null, 0.18);
+    for (const s of [-1, 1]) a.pon(CILINDRO, this.neon ? 'texluz:rayasNA!' : 'tex:rayasNA!', 0xffffff, [s * 0.9, 1.125, 0], null, [0.14, 2.25, 0.14], 0xffe14d);
+    a.pon(redonda(1.95, 0.9, 0.1, 0.04), this.neon ? 'texluz:rayasRB8!' : 'tex:rayasRB8!', 0xffffff, [0, 1.32, 0], null, 1, c.barrera);
+    a.pon(new THREE.CircleGeometry(0.34, 32), this.neon ? 'texluz:flecha!' : 'tex:flecha!', 0xffffff, [0, 1.32, 0.056]);
+    for (const s of [-1, 1]) a.pon(ESFERA, 'luz!', c.ambar, [s * 0.9, 2.32, 0], null, 0.18);
     const g = a.hecho();
     if (this.neon) for (const s of [-1, 1]) g.add(sprite(c.ambar, 1.4, [s * 0.9, 2.32, 0.05]));
     return g;
   }
-  /** Los poderes que flotan: cada uno con su forma y un aro de luz debajo. */
+  /** Los poderes que flotan: cada uno con su forma y un aro de luz debajo.
+      Como objetos del juego ("!"): en neón su cuerpo ya no queda casi negro
+      dentro del halo, se ve el imán rojo, la mochila, las zapatillas. */
   poder(clase) {
     const c = this.c, a = new Arma(this), g0 = new THREE.Group();
     const anillo = { iman: 0xff5a5a, mochila: 0xffb02e, zapatillas: 0x6aff8a, doble: 0x5fb0ff, caja: 0xffd23f }[clase];
     if (clase === 'iman') {
-      a.pon(new THREE.TorusGeometry(0.32, 0.12, 12, 24, Math.PI), 'pintura', c.iman, [0, 0.1, 0]);
-      for (const s of [-1, 1]) { a.pon(CILINDRO, 'pintura', c.iman, [s * 0.32, -0.05, 0], null, [0.24, 0.3, 0.24]); a.pon(CILINDRO, 'metal', c.cromo, [s * 0.32, -0.3, 0], null, [0.25, 0.2, 0.25]); }
+      a.pon(new THREE.TorusGeometry(0.32, 0.12, 12, 24, Math.PI), 'pintura!', c.iman, [0, 0.1, 0]);
+      for (const s of [-1, 1]) { a.pon(CILINDRO, 'pintura!', c.iman, [s * 0.32, -0.05, 0], null, [0.24, 0.3, 0.24]); a.pon(CILINDRO, 'metal!', c.cromo, [s * 0.32, -0.3, 0], null, [0.25, 0.2, 0.25]); }
     } else if (clase === 'mochila') {
-      for (const s of [-1, 1]) { a.pon(CILINDRO, 'pintura', 0xe8463b, [s * 0.16, 0, 0], null, [0.24, 0.6, 0.24]); a.pon(new THREE.ConeGeometry(0.12, 0.2, 14), 'pintura', 0xffd23f, [s * 0.16, 0.4, 0]); a.pon(new THREE.ConeGeometry(0.1, 0.18, 12), 'luz', 0xffa424, [s * 0.16, -0.38, 0], [Math.PI, 0, 0]); }
-      a.pon(redonda(0.5, 0.36, 0.12, 0.04), 'plano', 0x2a2d33, [0, 0.05, -0.14]);
+      for (const s of [-1, 1]) { a.pon(CILINDRO, 'pintura!', 0xe8463b, [s * 0.16, 0, 0], null, [0.24, 0.6, 0.24]); a.pon(new THREE.ConeGeometry(0.12, 0.2, 14), 'pintura!', 0xffd23f, [s * 0.16, 0.4, 0]); a.pon(new THREE.ConeGeometry(0.1, 0.18, 12), 'luz!', 0xffa424, [s * 0.16, -0.38, 0], [Math.PI, 0, 0]); }
+      a.pon(redonda(0.5, 0.36, 0.12, 0.04), 'plano!', 0x2a2d33, [0, 0.05, -0.14]);
     } else if (clase === 'zapatillas') {
-      a.pon(redonda(0.34, 0.24, 0.6, 0.1), 'pintura', 0x3ad16a, [0, 0, 0]);
-      a.pon(redonda(0.36, 0.08, 0.64, 0.03), 'plano', 0xffffff, [0, -0.14, 0]);
-      for (const s of [-1, 1]) a.pon(CAJA, 'plano', 0xffffff, [s * 0.24, 0.12, 0.12], [0.3, 0, s * 0.6], [0.04, 0.3, 0.4]);
+      a.pon(redonda(0.34, 0.24, 0.6, 0.1), 'pintura!', 0x3ad16a, [0, 0, 0]);
+      a.pon(redonda(0.36, 0.08, 0.64, 0.03), 'plano!', 0xffffff, [0, -0.14, 0]);
+      for (const s of [-1, 1]) a.pon(CAJA, 'plano!', 0xffffff, [s * 0.24, 0.12, 0.12], [0.3, 0, s * 0.6], [0.04, 0.3, 0.4]);
     } else if (clase === 'doble') {
-      a.pon(CILINDRO, 'pintura', 0x1d4fd6, [0, 0, 0], [Math.PI / 2, 0, 0], [0.8, 0.12, 0.8]);
-      for (const s of [-1, 1]) a.pon(new THREE.CircleGeometry(0.36, 32), 'texluz:doble', 0xffffff, [0, 0, s * 0.065], [0, s > 0 ? 0 : Math.PI, 0]);
-      a.pon(new THREE.TorusGeometry(0.4, 0.04, 8, 32), 'metal', c.oro, [0, 0, 0]);
+      a.pon(CILINDRO, 'pintura!', 0x1d4fd6, [0, 0, 0], [Math.PI / 2, 0, 0], [0.8, 0.12, 0.8]);
+      for (const s of [-1, 1]) a.pon(new THREE.CircleGeometry(0.36, 32), 'texluz:doble!', 0xffffff, [0, 0, s * 0.065], [0, s > 0 ? 0 : Math.PI, 0]);
+      a.pon(new THREE.TorusGeometry(0.4, 0.04, 8, 32), 'metal!', c.oro, [0, 0, 0]);
     } else {
-      a.pon(CAJA, this.neon ? 'texluz:caja' : 'tex:caja', 0xffffff, [0, 0, 0], null, 0.62);
+      a.pon(CAJA, this.neon ? 'texluz:caja!' : 'tex:caja!', 0xffffff, [0, 0, 0], null, 0.62);
     }
     const cuerpo = a.hecho(false);
     cuerpo.name = 'cuerpo';
     g0.add(cuerpo);
-    const aro = new THREE.Mesh(new THREE.TorusGeometry(0.62, 0.025, 8, 40), this.mat('luz'));
+    const aro = new THREE.Mesh(new THREE.TorusGeometry(0.62, 0.025, 8, 40), this.mat('luz!'));
     aro.geometry = prepara(aro.geometry, anillo); aro.rotation.x = Math.PI / 2; aro.position.y = -0.9;
     g0.add(aro);
     if (this.neon) g0.add(sprite(anillo, 2.4, [0, 0, 0], 0.7));
@@ -765,7 +865,7 @@ class Kit {
     s.closePath();
     const geo = new THREE.ExtrudeGeometry(s, { depth: 0.14, bevelEnabled: true, bevelSize: 0.03, bevelThickness: 0.03, bevelSegments: 2 });
     geo.translate(0, 0, -0.07);
-    a.pon(geo, this.neon ? 'luz' : 'metal', this.c.oro);
+    a.pon(geo, this.neon ? 'luz!' : 'metal!', this.c.oro);
     const g = new THREE.Group(), cuerpo = a.hecho(false); cuerpo.name = 'cuerpo'; g.add(cuerpo);
     if (this.neon) g.add(sprite(this.c.oro, 2, [0, 0, 0], 0.8));
     return g;
@@ -773,9 +873,9 @@ class Kit {
   /** El boleto dorado (un trozo de la historia). */
   boleto() {
     const a = new Arma(this);
-    a.pon(CAJA, 'texluz:boleto', 0xffffff, [0, 0, 0], null, [0.9, 0.45, 0.03]);
+    a.pon(CAJA, 'texluz:boleto!', 0xffffff, [0, 0, 0], null, [0.9, 0.45, 0.03]);
     const g = new THREE.Group(), cuerpo = a.hecho(false); cuerpo.name = 'cuerpo'; g.add(cuerpo);
-    const aro = new THREE.Mesh(new THREE.TorusGeometry(0.7, 0.03, 8, 40), this.mat('luz'));
+    const aro = new THREE.Mesh(new THREE.TorusGeometry(0.7, 0.03, 8, 40), this.mat('luz!'));
     aro.geometry = prepara(aro.geometry, 0xffe066); aro.rotation.x = Math.PI / 2; aro.position.y = -0.9; g.add(aro);
     if (this.neon) g.add(sprite(0xffe066, 3, [0, 0, 0], 0.9));
     return g;
@@ -864,11 +964,15 @@ class Kit {
     g.userData.largo = 1.3 * e;
     return g;
   }
+  /** Un color de luz del decorado, atenuado según la paleta (`legible.decorado`).
+      Los postes de luz de neón, a todo color, eran lo más brillante de la
+      pantalla y los ojos se iban a ellos en vez de a los obstáculos. */
+  tenue(col) { return new THREE.Color(col).multiplyScalar(this.pal.legible?.decorado ?? 1).getHex(); }
   /** Un farol de la vereda, con el brazo hacia la vía. */
   farol(lado, enSerie = false) {
     const c = this.c, a = new Arma(this);
     // instanciado en neón: el poste es un tubo de luz (las líneas de borde y el halo no se pueden instanciar)
-    if (enSerie && this.neon) a.pon(CILINDRO_CHICO, 'luz', 0xff2bd6, [0, 2.3, 0], null, [0.1, 4.6, 0.1]);
+    if (enSerie && this.neon) a.pon(CILINDRO_CHICO, 'luz', this.tenue(c.tubo || 0xff2bd6), [0, 2.3, 0], null, [0.1, 4.6, 0.1]);
     else a.pon(CILINDRO_CHICO, 'metal', c.poste, [0, 2.3, 0], null, [0.14, 4.6, 0.14], 0xff2bd6);
     a.pon(CAJA, 'metal', c.poste, [-lado * 0.42, 4.6, 0], null, [0.9, 0.08, 0.1]);
     a.pon(redonda(0.5, 0.16, 0.3, 0.06), 'plano', c.poste, [-lado * 0.82, 4.52, 0]);
@@ -880,8 +984,9 @@ class Kit {
   /** Un poste de catenaria, con su brazo sobre la vía. */
   poste(lado, enSerie = false) {
     const c = this.c, a = new Arma(this), mat = enSerie && this.neon ? 'luz' : 'metal';
-    a.pon(CAJA, mat, c.catenaria, [0, 3.15, 0], null, [0.2, 6.3, 0.2], enSerie ? null : c.catenaria);
-    a.pon(CAJA, mat, c.catenaria, [-lado * 1.72, 5.95, 0], null, [3.45, 0.12, 0.12], enSerie ? null : c.catenaria);
+    const col = enSerie && this.neon ? this.tenue(c.catenaria) : c.catenaria;     // en neón es un tubo de luz: atenuado, como los faroles
+    a.pon(CAJA, mat, col, [0, 3.15, 0], null, [0.2, 6.3, 0.2], enSerie ? null : c.catenaria);
+    a.pon(CAJA, mat, col, [-lado * 1.72, 5.95, 0], null, [3.45, 0.12, 0.12], enSerie ? null : c.catenaria);
     return a.hecho();
   }
   /** Un grafiti pintado en el muro de la vía. */
@@ -1013,6 +1118,7 @@ class Kit {
     const mat = this.neon ? new THREE.MeshBasicMaterial({ color: this.c.oro })
       : this.pixel ? new THREE.MeshToonMaterial({ color: this.c.oro, gradientMap: gradToon() })
         : new THREE.MeshStandardMaterial({ color: this.c.oro, roughness: 0.22, metalness: 1, emissive: 0x3a2500, envMapIntensity: 1.2 });
+    realza(mat, 0, this.pal.legible?.niebla || 1);                             // las monedas también son del juego: la niebla les llega más tarde
     const im = new THREE.InstancedMesh(geo, mat, 400);
     im.count = 0; im.castShadow = true; im.frustumCulled = false;
     return im;
@@ -1537,7 +1643,11 @@ export function crearMundo(canvas) {
       const n = ex.nieve ? 900 : ex.polvo ? 500 : 220, pos = new Float32Array(n * 3), az = azarDe(5);
       for (let i = 0; i < n; i++) { pos[i * 3] = (az() - .5) * 40; pos[i * 3 + 1] = az() * 16; pos[i * 3 + 2] = -az() * 120 + 10; }
       const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-      particulas = new THREE.Points(g, new THREE.PointsMaterial({ color: ex.nieve ? 0xffffff : ex.polvo ? 0xe8b080 : 0x9fffe6, size: ex.nieve ? 0.12 : ex.polvo ? 0.08 : 0.35, transparent: true, opacity: ex.espectros ? 0.5 : 0.85, depthWrite: false, blending: ex.espectros ? THREE.AdditiveBlending : THREE.NormalBlending }));
+      /* Con la textura de brillo cada partícula es una mancha redonda y
+         suave. Sin textura un punto es un cuadrado, y uno que pasaba junto a
+         la cámara se agrandaba hasta tapar un carril: en Fantasma (0,35 m,
+         aditivo) era un cuadrado pálido de 120 px encima de la vía. */
+      particulas = new THREE.Points(g, new THREE.PointsMaterial({ color: ex.nieve ? 0xffffff : ex.polvo ? 0xe8b080 : 0x9fffe6, size: ex.nieve ? 0.16 : ex.polvo ? 0.1 : 0.45, map: texBrillo(), transparent: true, opacity: ex.espectros ? 0.5 : 0.85, depthWrite: false, blending: ex.espectros ? THREE.AdditiveBlending : THREE.NormalBlending }));
       particulas.userData = { tipo: ex.nieve ? 'nieve' : ex.polvo ? 'polvo' : 'espectros' }; particulas.frustumCulled = false;
       escena.add(particulas);
     }
@@ -1650,12 +1760,14 @@ export function crearMundo(canvas) {
     // partículas del ambiente
     if (particulas) {
       const a = particulas.geometry.attributes.position, tipo = particulas.userData.tipo, vz = (e.v || 15) * dt;
+      // vuelven al fondo antes de llegar a la cámara (está en z = 8,6): pegadas a ella tapaban la vía; los espectros, aún antes (son grandes)
+      const tope = tipo === 'espectros' ? -2 : 4;
       for (let i = 0; i < a.count; i++) {
         let x = a.getX(i), y = a.getY(i), z = a.getZ(i) + vz;
         if (tipo === 'nieve') { y -= dt * 2.2; x += Math.sin(e.t + i) * dt * 0.6; }
         else if (tipo === 'polvo') { x += dt * 3; y += Math.sin(e.t * 2 + i) * dt * 0.3; }
         else { y += Math.sin(e.t * 0.7 + i) * dt * 0.5; }
-        if (z > 12) z -= 130;
+        if (z > tope) z -= 130;
         if (y < 0) y += 16; if (x > 20) x -= 40;
         a.setXYZ(i, x, y, z);
       }
