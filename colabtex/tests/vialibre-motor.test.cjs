@@ -230,10 +230,10 @@ test('saltar misiones, premio por set y potenciadores', () => {
   assert.equal(M.multiplicador({ base: 5, estrellas: 3, extra: 5, doble: true }), 26);
   assert.equal(M.multiplicador({ base: 1, extra: 99 }), 11);
   // los potenciadores se guardan, se limpian y se mezclan como algo gastable (manda el más reciente)
-  assert.deepEqual(M.progresoNuevo().potenciadores, { arranque: 1, puntos: 0 });
-  assert.deepEqual(M.limpiaProgreso({ potenciadores: { arranque: '3', puntos: -2, raro: 5 } }).potenciadores, { arranque: 3, puntos: 0 });
-  const viejo = Object.assign(M.progresoNuevo(), { at: 1, potenciadores: { arranque: 9, puntos: 9 } });
-  const nuevo = Object.assign(M.progresoNuevo(), { at: 2, potenciadores: { arranque: 0, puntos: 1 } });
-  assert.deepEqual(M.mezclaProgreso(viejo, nuevo).potenciadores, { arranque: 0, puntos: 1 });
+  assert.deepEqual(M.progresoNuevo().potenciadores, { despegue: 1, puntos: 0 });
+  assert.deepEqual(M.limpiaProgreso({ potenciadores: { despegue: '3', puntos: -2, raro: 5 } }).potenciadores, { despegue: 3, puntos: 0 });
+  const viejo = Object.assign(M.progresoNuevo(), { at: 1, potenciadores: { despegue: 9, puntos: 9 } });
+  const nuevo = Object.assign(M.progresoNuevo(), { at: 2, potenciadores: { despegue: 0, puntos: 1 } });
+  assert.deepEqual(M.mezclaProgreso(viejo, nuevo).potenciadores, { despegue: 0, puntos: 1 });
   for (const k of Object.keys(M.POTENCIADORES)) assert.ok(M.POTENCIADORES[k].precio > 0 && M.POTENCIADORES[k].nombre);
 });

@@ -3269,7 +3269,7 @@ Things that matter:
   set on the spot). Skipping is refused during a paused run: the run in
   progress would then be applied to the next set's missions. The yellow
   multiplier card on the title screen shows the set's progress and opens the
-  missions. **Boosters** (`POTENCIADORES`: *Arranque*, start flying with the
+  missions. **Boosters** (`POTENCIADORES`: *Despegue*, start flying with the
   jetpack for 10 s; *Potenciador +5*, +5 to the multiplier for the run) are
   bought in the shop, kept in `progreso.potenciadores`, and offered by two
   HUD buttons (keys 1 and 2) during the first 6 s of a run.

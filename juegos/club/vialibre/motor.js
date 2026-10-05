@@ -164,7 +164,7 @@
      se guardan y se usan al empezar una carrera (aparecen dos botones los
      primeros segundos). Se gastan al usarlos. */
   const POTENCIADORES = {
-    arranque: { nombre: "Arranque", precio: 1500, seg: 10, texto: "Empiezas la carrera volando con la mochila cohete, 10 s" },
+    despegue: { nombre: "Despegue", precio: 1500, seg: 10, texto: "Empiezas la carrera volando con la mochila cohete, 10 s" },
     puntos: { nombre: "Potenciador +5", precio: 2500, extra: 5, texto: "+5 al multiplicador durante toda una carrera" }
   };
   /** Saltar una misión cuesta más mientras más alto el multiplicador. Ejemplo: en ×1, 550; en ×10, 1900. */
@@ -276,7 +276,7 @@
       v: 1, at: 0,                                           // versión y cuándo se guardó (ms)
       monedas: 0, patinetas: 1,                              // una patineta de regalo para probarla
       mejoras: { iman: 0, mochila: 0, zapatillas: 0, doble: 0 },
-      potenciadores: { arranque: 1, puntos: 0 },             // un arranque de regalo para probarlo
+      potenciadores: { despegue: 1, puntos: 0 },             // un despegue de regalo para probarlo
       retos: { nivel: 1, avance: [0, 0, 0] },
       boletos: [],                                           // números de boleto encontrados
       aspectos: ["clasico"], aspecto: "clasico",             // los desbloqueados y el que lleva puesto

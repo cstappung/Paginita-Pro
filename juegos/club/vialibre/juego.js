@@ -343,7 +343,7 @@ function recoge(dt) {
 }
 const multiplicador = () => M.multiplicador({ base: progreso.retos.nivel, estrellas: c.estrellas, doble: c.poderes.doble > 0, extra: c.extra });
 
-/* ---- potenciadores (Arranque y Potenciador +5) ----
+/* ---- potenciadores (Despegue y Potenciador +5) ----
    Los primeros segundos de la carrera aparecen dos botones (o las teclas 1
    y 2) con los que tengas. Usarlos los gasta. */
 function pintaPots() {
@@ -351,16 +351,16 @@ function pintaPots() {
   el.hidden = !hay;
   if (!hay) return;
   el.innerHTML = Object.entries(M.POTENCIADORES).map(([k, P], i) => progreso.potenciadores[k] > 0 && !c.potUsado[k]
-    ? `<button type="button" data-pot="${k}" aria-label="${P.nombre} (tecla ${i + 1})"><i>${ICONOS[k === 'arranque' ? 'cohete' : 'mas5']}</i><span>${P.nombre}</span><b translate="no">×${progreso.potenciadores[k]}</b><kbd>${i + 1}</kbd></button>` : '').join('');
+    ? `<button type="button" data-pot="${k}" aria-label="${P.nombre} (tecla ${i + 1})"><i>${ICONOS[k === 'despegue' ? 'cohete' : 'mas5']}</i><span>${P.nombre}</span><b translate="no">×${progreso.potenciadores[k]}</b><kbd>${i + 1}</kbd></button>` : '').join('');
 }
 function usaPotenciador(k) {
   if (!c || estado !== 'jugando' || c.potVentana <= 0 || c.potUsado[k] || !(progreso.potenciadores[k] > 0)) return;
   progreso.potenciadores[k]--; c.potUsado[k] = true; guardar();
-  if (k === 'arranque') {                                       // empezar volando con la mochila, sin chocar con nada
-    const seg = M.POTENCIADORES.arranque.seg;
+  if (k === 'despegue') {                                       // empezar volando con la mochila, sin chocar con nada
+    const seg = M.POTENCIADORES.despegue.seg;
     c.poderes.mochila = seg; c.invulnerable = Math.max(c.invulnerable, seg + 1.5);
     c.activos.push(...c.gen.monedasCielo(c.D + 12, c.D + 12 + c.V * seg, c.r.carril));
-    sonido.mochila(true); sonido.poder(); aviso('¡Arranque! A volar');
+    sonido.mochila(true); sonido.poder(); aviso('¡Despegue! A volar');
   } else {                                                      // +5 al multiplicador durante toda la carrera
     c.extra = M.POTENCIADORES.puntos.extra; sonido.multiplicador(); aviso(`Potenciador: multiplicador ×${multiplicador()}`);
   }
@@ -820,7 +820,7 @@ function pintaTienda() {
   tarjetas.push(`<li class="t-tarjeta" style="--tinte:#ecdfff"><span class="t-ico">${ICONOS.patineta}</span>
       <div class="t-info"><strong>Patineta</strong><small>Te salva de un choque (30 s)</small><span class="t-cuenta">Tienes <b translate="no">${progreso.patinetas}</b></span></div>
       <button type="button" class="t-precio" data-comprar="patineta" ${progreso.monedas < M.PRECIO_PATINETA ? 'disabled' : ''} aria-label="Comprar una patineta por ${M.PRECIO_PATINETA} monedas">${ICONOS.moneda}<b translate="no">${M.PRECIO_PATINETA}</b></button></li>`);
-  for (const [k, P] of Object.entries(M.POTENCIADORES)) tarjetas.push(`<li class="t-tarjeta" style="--tinte:${k === 'arranque' ? '#dff1ff' : '#fff1c4'}"><span class="t-ico">${ICONOS[k === 'arranque' ? 'cohete' : 'mas5']}</span>
+  for (const [k, P] of Object.entries(M.POTENCIADORES)) tarjetas.push(`<li class="t-tarjeta" style="--tinte:${k === 'despegue' ? '#dff1ff' : '#fff1c4'}"><span class="t-ico">${ICONOS[k === 'despegue' ? 'cohete' : 'mas5']}</span>
       <div class="t-info"><strong>${P.nombre}</strong><small>${P.texto}</small><span class="t-cuenta">Tienes <b translate="no">${progreso.potenciadores[k]}</b></span></div>
       <button type="button" class="t-precio" data-comprar="pot:${k}" ${progreso.monedas < P.precio ? 'disabled' : ''} aria-label="Comprar ${P.nombre} por ${fmt(P.precio)} monedas">${ICONOS.moneda}<b translate="no">${fmt(P.precio)}</b></button></li>`);
   $('tiendaPoderes').innerHTML = tarjetas.join('');

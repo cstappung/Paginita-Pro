@@ -919,9 +919,9 @@ const REGLAS = {
       ])],
       ["Potenciadores", lista([
         "Se compran en la tienda y se guardan. Al empezar una carrera aparecen unos segundos dos botones (o las teclas 1 y 2) para usar los que tengas.",
-        "<b>Arranque</b>: empiezas volando con la mochila cohete, 10 s y sin chocar.",
+        "<b>Despegue</b>: empiezas volando con la mochila cohete, 10 s y sin chocar.",
         "<b>Potenciador +5</b>: suma 5 al multiplicador durante toda la carrera.",
-        "Empiezas con un Arranque de regalo."
+        "Empiezas con un Despegue de regalo."
       ])],
       ["Estaciones", lista([
         "El paisaje cambia con los puntos de la carrera, siempre pasando por un túnel: <b>Barrio Estación</b> (desde 0, la ciudad de día), <b>Ocaso</b> (50 000, retro pixelado al atardecer), <b>Línea Neón</b> (200 000, noche synthwave), <b>Estación Fantasma</b> (1 000 000), <b>Invierno</b> (2 500 000), <b>Óxido</b> (5 000 000) y <b>Fin de la Línea</b> (10 000 000). Después vuelven a girar.",
