@@ -15,6 +15,6 @@
    Lo calcula `colabtex/scripts/cortes.cjs` sobre una exportación de la
    base. Va en el código, no en Firebase: no cuesta descargas ni reglas. */
 export const CORTES = {
-  "qxNDBkP2D8dToGCHIJhfoA8k2hl2": { hasta: 1791428399999, tope: 7879 }, // 2026-10-07
-  "aKFYNzP6IgO0O0lOaoD9V2f49oJ3": { hasta: 1791428399999, tope: 6346 }, // 2026-10-07
+  "qxNDBkP2D8dToGCHIJhfoA8k2hl2": { hasta: 1791190800000, tope: 7879 }, // 2026-10-05 06:00 Chile
+  "aKFYNzP6IgO0O0lOaoD9V2f49oJ3": { hasta: 1791190800000, tope: 6346 }, // 2026-10-05 06:00 Chile
 };

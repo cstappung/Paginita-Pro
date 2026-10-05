@@ -2,12 +2,12 @@
 /* Propone los cortes de las cuentas paradas (juegos/cortes.js,
    docs/antitrampas.md) y cuenta qué pierde cada una.
 
-   Uso:  node scripts/cortes.cjs export.json [--hasta AAAA-MM-DD] [--escribe]
+   Uso:  node scripts/cortes.cjs export.json [--hasta AAAA-MM-DD[THH:MM]] [--escribe]
 
    `export.json` es la exportación de la raíz de la base (o de los nodos que
    lee la economía). Para cada cuenta parada, `tope` es lo que gana hoy y
-   `hasta` el final del día dado en Chile (por omisión, mañana): cubre lo que
-   compre hasta que se publique el cambio. Con --escribe lo agrega a
+   `hasta` el final del día dado en Chile, o la hora dada (por omisión,
+   el final de mañana). Tiene que quedar después de la última compra impaga. Con --escribe lo agrega a
    cortes.js (sin tocar los cortes que ya estaban). La exportación no se
    sube al repo. */
 'use strict';
@@ -28,7 +28,7 @@ const nombre = u => (((raiz.users || {})[u] || {}).perfil || {}).nick || '';
 
 // Fin del día (Chile, UTC−3) de la fecha pedida; por omisión, mañana.
 const dia = args.includes('--hasta') ? args[args.indexOf('--hasta') + 1] : new Date(Date.now() + 864e5 - 3 * 36e5).toISOString().slice(0, 10);
-const hasta = Date.parse(dia + 'T23:59:59.999-03:00');
+const hasta = Date.parse(dia.includes('T') ? dia + ':00-03:00' : dia + 'T23:59:59.999-03:00');
 if (!Number.isFinite(hasta)) { console.error('Fecha inválida:', dia); process.exit(2); }
 
 const ya = datos();

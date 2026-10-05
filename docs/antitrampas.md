@@ -263,6 +263,7 @@ node scripts/cortes.cjs ../auditoria/export.json --escribe  # lo agrega a cortes
 npm run build
 ```
 
-`--hasta AAAA-MM-DD` fija el final del corte (por omisión, mañana en Chile).
-Tiene que caer **después** de publicar el cambio: lo que la cuenta compre
-antes de que llegue la versión nueva también queda cubierto.
+`--hasta AAAA-MM-DD` (o `AAAA-MM-DDTHH:MM`, hora de Chile) fija el final del corte (por omisión, el fin de mañana).
+Tiene que caer **después** de la última compra impaga de la cuenta; desde
+ahí lo que gane se mide normal. Si siguió comprando sin fondos después, el
+script lo dice (la cuenta seguiría parada) y hay que correr el corte.
