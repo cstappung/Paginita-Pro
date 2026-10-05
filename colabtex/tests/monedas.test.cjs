@@ -141,3 +141,14 @@ test('Atasco: récord, 4 monedas por estrella y partidas del club',()=>{
  assert.equal(M.monedasDe('a',d).partes.records,M.RECORD.atasco+600);
  assert.equal(M.nivelDe('atasco','e1'),1);assert.equal(M.nivelDe('atasco','e720'),4);
 });
+test('Metro Rush: récord, mejor carrera, distancia y partidas del club',()=>{
+ assert.ok(M.JUEGOS_CLUB.includes('metrorush'));assert.equal(M.PAGO_CLUB.metrorush,20);assert.equal(M.RECORD.metrorush,40);
+ const d={solo:{'club-metrorush-carrera':{a:{puntos:1000000,tiempo:1}},'club-metrorush-distancia':{a:{puntos:10000,tiempo:1}}}};
+ // dos modalidades con marca (40 cada una), 1 por cada 25 000 puntos (un millón = 40) y 1 por cada 500 m (10 km = 20)
+ assert.equal(M.monedasDe('a',d).partes.records,2*M.RECORD.metrorush+40+20);
+ // Los topes: la carrera paga hasta 5 millones (200) y la distancia hasta 50 km (100).
+ const t={solo:{'club-metrorush-carrera':{a:{puntos:900000000,tiempo:1}},'club-metrorush-distancia':{a:{puntos:999999,tiempo:1}}}};
+ assert.equal(M.monedasDe('a',t).partes.records,2*M.RECORD.metrorush+200+100);
+ assert.equal(M.nivelDe('metrorush','c50k'),1);assert.equal(M.nivelDe('metrorush','c10m'),4);
+ assert.equal(M.nivelDe('metrorush','d1k'),1);assert.equal(M.nivelDe('metrorush','d42k'),4);
+});

@@ -121,3 +121,72 @@ export const atasco=etapa=>{
  cuerpo+=txt(272,90,textos[0],22,etapa===2?C.oro:C.blanco)+txt(272,122,textos[1],17)+txt(272,150,textos[2],17,etapa===2?C.oro:C.verde);
  return svg(nombre,cuerpo);
 };
+/* Metro Rush: el corredor visto de costado (salta la barrera baja, rueda
+   bajo la alta, sube por la rampa y corre por los techos) y, de espaldas,
+   las tres vías con un tren que viene de frente. `etapa`: 0 barrera baja,
+   1 barrera alta, 2 tren de frente, 3 la rampa, 4 los techos con monedas. */
+const VL={suelo:'#2b2730',riel:'#c9ccd4',durmiente:'#7a5236',tren:'#ff6a3d',trenOsc:'#b8441f',vidrio:'#1f2a3a',piel:'#f1c27d',polera:'#3b82f6',gorra:'#ff6a3d'};
+// El suelo de costado: balasto, un riel y los durmientes debajo.
+const sueloV=()=>`<rect x="0" y="200" width="480" height="50" fill="${VL.suelo}"/>`+Array.from({length:17},(_,i)=>`<rect x="${6+i*29}" y="201" width="16" height="7" fill="${VL.durmiente}"/>`).join('')+line(0,199,480,199,VL.riel,4);
+// El corredor de costado, con los pies en `fy`, mirando a la derecha.
+const corredorV=(x,fy)=>{
+ const l=(a,b,c,d,col,w)=>line(x+a,fy+b,x+c,fy+d,col,w);
+ return l(0,-32,10,-16,C.gris,6)+l(10,-16,4,0,C.gris,6)+l(0,-32,-6,-17,C.gris,6)+l(-6,-17,-17,-8,C.gris,6)+   // piernas
+  l(0,-58,10,-46,VL.piel,5)+l(10,-46,18,-56,VL.piel,5)+l(0,-58,-10,-48,VL.piel,5)+l(-10,-48,-14,-38,VL.piel,5)+ // brazos
+  l(0,-60,0,-32,VL.polera,11)+circle(x+1,fy-70,10,VL.piel)+`<path d="M${x-10} ${fy-72}q11-14 22-1h7v4h-29z" fill="${VL.gorra}"/>`;    // polera, cabeza y gorra
+};
+// Hecho un ovillo para rodar, con las rayas de velocidad detrás.
+const ovilloV=(x,fy)=>circle(x,fy-18,18,VL.polera,'#88caff')+circle(x+7,fy-24,7,VL.piel)+`<path d="M${x-1} ${fy-27}q8-9 16 0z" fill="${VL.gorra}"/>`+
+ [0,1,2].map(i=>line(x-28-i*6,fy-30+i*12,x-44-i*6,fy-30+i*12,C.gris,3)).join('');
+// Un vagón de costado: cuerpo naranja, franja, ventanas y ruedas sobre el riel.
+const vagonV=(x,w,frente=false)=>rect(x,118,w,74,VL.tren,VL.trenOsc,6)+`<rect x="${x}" y="168" width="${w}" height="8" fill="${VL.trenOsc}"/>`+
+ Array.from({length:Math.floor((w-20)/34)},(_,i)=>`<rect x="${x+14+i*34}" y="132" width="24" height="22" rx="3" fill="${VL.vidrio}"/>`).join('')+
+ circle(x+22,194,8,'#3a3f4a','#9aa3b3')+circle(x+w-22,194,8,'#3a3f4a','#9aa3b3')+(frente?circle(x+w-6,180,4,'#fff6c2'):'');
+const monedaV=(x,y,r=8)=>circle(x,y,r,'#ffc83d','#b07a10')+`<rect x="${x-1.5}" y="${y-r/2}" width="3" height="${r}" fill="#d99a1c"/>`;
+export const metrorush=etapa=>{
+ const nombre=['La barrera baja, a rayas y a la altura de la cintura, se salta','La barrera alta, con una flecha hacia abajo, se pasa rodando','Un tren que viene de frente por tu carril: cambia de carril para esquivarlo','Un tren detenido con rampa: corre por ella y subes al techo','Por los techos de los trenes, con una fila de monedas encima'][etapa];
+ // El cielo de tarde: una banda cálida sobre el azul del manual.
+ let cuerpo=`<rect x="0" y="0" width="480" height="250" rx="14" fill="#1d2440"/><rect x="0" y="120" width="480" height="80" fill="#3a2a4a" opacity=".55"/>`;
+ if(etapa===0){
+  // Barrera baja: dos patas y una tabla a rayas rojas y blancas a la altura de la cintura.
+  cuerpo+=sueloV()+rect(282,150,8,50,'#6b7280','none',2)+rect(352,150,8,50,'#6b7280','none',2)+rect(274,150,94,20,C.blanco,'#ff9c9c',3);
+  for(let i=0;i<5;i++)cuerpo+=`<path d="M${278+i*19} 168l10-16h8l-10 16z" fill="#e5484d"/>`;
+  // El salto: el arco punteado y el corredor en lo más alto, justo encima de la tabla.
+  cuerpo+=`<path d="M160 200Q318 44 476 200" fill="none" stroke="${C.oro}" stroke-width="3" stroke-dasharray="7 8"/>`+corredorV(318,122);
+  cuerpo+=txt(24,34,'Barrera baja: salta',17,C.blanco)+txt(24,58,'↑, W, Espacio o desliza hacia arriba',14,C.gris);
+ }else if(etapa===1){
+  // Barrera alta: patas largas, tabla arriba con una flecha hacia abajo; por debajo se pasa rodando.
+  cuerpo+=sueloV()+rect(282,96,8,104,'#6b7280','none',2)+rect(352,96,8,104,'#6b7280','none',2)+rect(274,96,94,40,'#facc15','#a16207',4);
+  cuerpo+=`<path d="M321 102v18m-9-8l9 10l9-10" stroke="#17243b" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+  cuerpo+=`<path d="M120 186H460" stroke="${C.verde}" stroke-width="3" stroke-dasharray="7 8"/>`+ovilloV(318,200)+corredorV(110,200);
+  cuerpo+=txt(24,34,'Barrera alta: rueda por debajo',17,C.blanco)+txt(24,58,'↓, S o desliza hacia abajo',14,C.gris);
+ }else if(etapa===2){
+  // De espaldas: tres carriles que se juntan en el horizonte, con sus durmientes y sus rieles.
+  const borde=(y,k)=>{const t=(y-70)/180;return 210-170*t+(60+340*t)*k;};
+  cuerpo+=`<path d="M40 250L210 70H270L440 250Z" fill="${VL.suelo}"/>`;
+  for(const y of [92,108,128,152,180,212,246])cuerpo+=line(borde(y,0),y,borde(y,1),y,VL.durmiente,y/40);
+  for(let c=0;c<3;c++)for(const f of [.22,.78])cuerpo+=line(borde(70,(c+f)/3),70,borde(250,(c+f)/3),250,VL.riel,2.5);
+  // El tren de frente en el carril del medio, con los dos focos encendidos.
+  cuerpo+=rect(206,84,68,66,VL.tren,VL.trenOsc,8)+`<rect x="214" y="92" width="52" height="24" rx="4" fill="${VL.vidrio}"/>`;
+  cuerpo+=circle(218,138,9,'#fff6c255')+circle(262,138,9,'#fff6c255')+circle(218,138,5,'#fff6c2')+circle(262,138,5,'#fff6c2');
+  // El corredor de espaldas y la flecha que lo lleva al carril de la izquierda.
+  cuerpo+=line(240,212,240,184,VL.polera,14)+line(235,214,233,226,C.gris,5)+line(245,214,247,226,C.gris,5)+circle(240,172,10,VL.piel)+`<path d="M230 168q10-12 20 0z" fill="${VL.gorra}"/>`;
+  cuerpo+=`<path d="M228 192Q180 192 156 174" fill="none" stroke="${C.verde}" stroke-width="4" stroke-linecap="round"/><path d="M150 168l14 0l-6 12z" fill="${C.verde}"/>`;
+  cuerpo+=txt(24,34,'Tren de frente: cambia de carril',17,C.blanco)+txt(24,58,'← → o desliza a un lado',14,C.gris);
+  // El aviso va sobre una placa para que los rieles no lo crucen.
+  cuerpo+=`<rect x="238" y="220" width="228" height="24" rx="6" fill="#142139" opacity=".9"/>`+txt(456,237,'Chocar de frente termina la carrera',13,C.rojo,'end');
+ }else if(etapa===3){
+  // Un tren detenido con su rampa: el corredor sube por ella al techo.
+  cuerpo+=sueloV()+vagonV(240,220)+`<path d="M150 199L240 118V199Z" fill="#facc15" stroke="#a16207" stroke-width="3"/>`;
+  for(let i=0;i<4;i++)cuerpo+=line(166+i*20,190-i*18,176+i*20,199,'#a16207',3);
+  cuerpo+=`<path d="M90 196H150L240 116H300" fill="none" stroke="${C.oro}" stroke-width="3" stroke-dasharray="7 8"/>`+corredorV(196,158);
+  cuerpo+=txt(24,34,'Tren detenido con rampa: sube',17,C.blanco)+txt(24,58,'o esquívalo por otro carril',14,C.gris);
+ }else{
+  // Dos vagones en fila y el corredor arriba, con una fila de monedas sobre los techos.
+  cuerpo+=sueloV()+vagonV(30,200)+vagonV(244,206);
+  for(let i=0;i<8;i++)cuerpo+=monedaV(150+i*36,92);
+  // Los textos van a la derecha: a la izquierda está el corredor sobre el primer techo.
+  cuerpo+=corredorV(110,118)+txt(456,34,'Por los techos',17,C.blanco,'end')+txt(456,58,'monedas arriba, trenes abajo',14,C.gris,'end');
+ }
+ return svg(nombre,cuerpo);
+};

@@ -71,7 +71,7 @@ Six apps plus a small shared **Informes** page:
   **Boxhead** (top-down zombie survival or versus, one to eight, in an
   iframe), plus
   **Frontera Batalla**, Emerald's Battle Frontier played solo with the same
-  teams, plus a **Clasificación** tab and a 📖 **Reglas**
+  teams, and **Metro Rush**, a 3D endless runner in three styles, plus a **Clasificación** tab and a 📖 **Reglas**
   manual for every game, solo ones included, coins, and **PRODROP**, a card-pack
   opener paid with them. Without a session it opens in **guest mode**: every
   single-player game is playable and nothing is saved. See "Juegos" below.
@@ -1722,8 +1722,8 @@ mode only hides the section that does not apply (`data-modo` on
   `.jg-mn` and the sheet `.jg-hoja`; check before naming a new piece.
 
 *Novedades* is still a hand-written list (`NOVEDADES` in `juegos-main.js`),
-because what is new is not always a room game (today FANAL, Yemas' zombie
-mode and PRODROP, each with its own cover in `arteNovedad`); each entry may
+because what is new is not always a room game (today Metro Rush, FANAL and
+PRODROP, each with its own cover in `arteNovedad`); each entry may
 carry `modo` (the same badge as the thumbnails), and `cuenta`/`practica`
 say what a guest gets instead. On a phone it is a carousel of whole cards.
 `novedades()` in `motor.js` is the older date-driven version and is no
@@ -3339,6 +3339,174 @@ to the progress (`prog.p`), the move list of each level's best attempt, and
 `verifica/atasco.js` replays them with the same engine. **Regenerating
 `niveles.js` invalidates every stored proof**: a level whose layout changes
 no longer replays, so its stars stop counting until it is won again.
+
+**Metro Rush (`juegos/club/metrorush/`) is a Solo Club endless runner in
+3D**, in the vein of Subway Surfers: three lanes, trains, low and high
+barriers, ramps up onto the roofs, coins, power-ups, a multiplier and an
+inspector with his dog who catch you after two stumbles. Plain files, no
+build (`?v=metrorush-N` on its scripts, its stylesheet and the
+`modulepreload`s, `club-N` in `solo/club.js` for the iframe). Three.js r160
+comes from jsDelivr through an import map, the same URL Yemas uses, so the
+browser cache shares it. Five files: `motor.js` (UMD `MetroRushMotor`, pure:
+the track generator, physics constants, scoring, stations, story, shop,
+missions and the progress merge, tested by `tests/metrorush-motor.test.cjs`),
+`mundo.js` (the 3D world, an ES module), `audio.js` (music and synthesised
+effects), `juego.js` (the loop, input, HUD and menus) and `estilo.css`.
+Things that matter:
+
+- **The track is generated so it can always be run.** `crearGenerador(seed)`
+  walks a "camino", a lane that moves at most one lane per row, and never
+  blocks it; every obstacle reserves its lane up to where it ends
+  (`libre[c]`), so two things never overlap. Blocks are a row, a convoy (a
+  ramp plus two to four cars with coins on the roofs), a breather (zigzag
+  coins) and the tunnel. Moving trains only start moving `APARECE` (120 m)
+  before they arrive, which is what keeps their reservations short. The test
+  runs a simulated player over 12 seeds × 12 km and checks it never meets
+  an unavoidable obstacle.
+- **The score decides the scenery.** `ESTACIONES`: Barrio Estación (0,
+  toy-like), Ocaso (50 k, pixel), Línea Neón (200 k, neon), Estación
+  Fantasma (1 M), Invierno (2.5 M), Óxido (5 M) and Fin de la Línea
+  (10 M); from 12 M the first three come back every 2 M as «vuelta N». A
+  station changes **inside a tunnel** (150 m, coins only), where nothing
+  outside is visible: `juego.js` swaps the kit, the music and the HUD skin
+  at `d0 + 40`. The track is already generated ~230 m ahead, so the tunnel
+  is requested *before* the threshold, when the metres left at the current
+  multiplier fit in what is generated (`estaciones()`); requested at the
+  threshold it showed up 15 s late. The options can lock one style
+  (`estacionVisual`).
+- **The numbers are tuned for the «million points»**: 10 points per metre
+  times the multiplier. The base multiplier goes ×1 → ×30 by completing
+  missions (three per level, `retosDeNivel(nivel)`, seeded); each star picked
+  up adds +1 for the run (up to +29) and the 2× power-up doubles the lot.
+  Speed goes from 13 to 30 m/s (`velocidad`, τ 150 s). A newcomer makes
+  ~25 k in two minutes, a great run reaches 1 M in 6–7 minutes, and a
+  veteran at ×30 in about three.
+- **Progress is Subway Surfers' own loop.** Missions come in sets of three
+  (`retosDeNivel`); a completed set raises the base multiplier by one (up to
+  ×30) and pays `premioSet(n)` coins, and a mission can be **skipped** for
+  `costoSaltar(n)` coins (`saltaReto`; skipping the last one completes the
+  set on the spot). Skipping is refused during a paused run: the run in
+  progress would then be applied to the next set's missions. The yellow
+  multiplier card on the title screen shows the set's progress and opens the
+  missions. **Boosters** (`POTENCIADORES`: *Despegue*, start flying with the
+  jetpack for 10 s; *Potenciador +5*, +5 to the multiplier for the run) are
+  bought in the shop, kept in `progreso.potenciadores`, and offered by two
+  HUD buttons (keys 1 and 2) during the first 6 s of a run.
+- **Power-ups**: magnet 10 s, jetpack 8 s (coins in the sky at 8.5 m),
+  super sneakers 10 s (jumps 4.1 m), 2× 12 s, each +2.5 s per shop level
+  (five levels); mystery box (coins, a skateboard or a jackpot); skateboard
+  (300 coins, 30 s, survives one crash); continue after a crash for
+  500 × 2^k coins, offered for 5 s by a round «¿Seguir corriendo?»
+  button before the summary (`abreSalvar`), as in Subway Surfers. The
+  run is closed when the summary shows (`cierraCarrera` returns what it
+  paints), so a completed set and its prize appear there. A frontal hit ends the run, a side hit is a stumble, and
+  a second stumble within 8 s gets you caught.
+- **Lore and secrets**: seven golden tickets, one per station, tell the
+  story of the last night of Line 3 (`BOLETOS`, read in the Libreta);
+  collecting all seven unlocks the Inspector outfit, the Konami code the
+  golden one, and a ghost train crosses the sky in Estación Fantasma.
+- **The world is built to run on a phone, and the cost is draw calls.**
+  Every prop is merged per material with vertex colours (`Arma`), pooled
+  (`kit.saca`/`guarda`), and coins and sleepers are `InstancedMesh`es;
+  scrolling is texture offsets. Measuring with `desglose()` found ~470
+  visible meshes in `baja`, and four changes took it to ~170:
+  buildings come in **blocks** of two or three (`edificio` → `unEdificio`,
+  one awning colour per block, shop signs in **one atlas** texture through
+  `franja`), so a block costs what one building did; trees, lamps and
+  catenary posts are **instanced** (`Serie`, written every frame like the
+  coins; in neon, where edge lines and halo sprites cannot be instanced,
+  the instanced pole is a glowing tube instead, `farol(lado, true)`);
+  the 49 cloud puffs are one mesh; and the pixel style in `baja` skips its
+  pass (which draws the scene twice, once for the edges) and renders at
+  pixel resolution instead (`proporcion`). **A station's kit is freed** when
+  the next one takes over (`liberaKits` → `Kit.libera`, keeping the active
+  one and the one being preloaded): each used to stay on the GPU, four by
+  Óxido. The runner rebuilt for each kit or outfit frees its geometry too
+  (`suelta3D`).
+  Each station palette builds its own kit, prepared a few steps per frame
+  ahead of time (`precarga`, 4 ms budget) and compiled inside the tunnel, so
+  the switch does not stutter. Quality `alta`/`media`/`baja` sets pixel
+  ratio, shadows, ambient occlusion (toy style only), bloom and the neon
+  mirror floor; `baja` also shortens the view to 125 m with the fog closer
+  (`vista`), which is what saves draw calls. In «auto» it steps down by
+  itself when frames average over 28 ms.
+- **What you play against must read before the scenery** (`legible` in each
+  palette, `realza()` in `mundo.js`). Trains, barriers, ramps, power-ups,
+  stars and tickets use material keys ending in `!` (`'pintura!'`); those
+  get light of their own in their own colour and a delayed fog, so they
+  stand out from the city and are seen from further away, without adding a
+  single light or draw call. Neón used to darken them with the city (black
+  trains with an outline, a black hole for a ramp) and Estación Fantasma
+  painted its trains the same green as the buildings: now Fantasma's trains
+  are pale (mint, ice, lilac) with dark windows, and Óxido's are patina
+  rather than an orange the fog swallowed. A new prop that you must dodge
+  or pick up needs the `!`.
+- **Music is one chip theme per station** (`metrorush-*` in `temas.js`, all
+  original), its tempo rising with speed (×0.92 → ×1.15). Effects are
+  synthesised in `audio.js`, everything goes through `destination`, so
+  `volumen.js` governs it; coins climb a semitone per coin in a streak.
+- **The menus are dressed like Subway Surfers' home screen**: the logo top
+  left (two layers of the same text: a thick navy stroke underneath and a
+  gradient fill in an `::after` on top; with the outline in a negative
+  z-index `::before` the background clipped to the text painted first and was
+  covered), counters top right, «¡Toca para correr!» (any empty spot of the
+  title screen starts too) and a bottom bar of four chunky buttons with
+  badges. Everything is sized in `--m` (1 % of the stage's height or 0.9 % of
+  its width, whichever is smaller); `--mt` floors it at 4.6 px for what a
+  finger touches, and the shop floors its own `--m`, or a vertical phone got
+  7 px text. Icons are drawn SVG (`ICONOS` in `juego.js`, filled into
+  `[data-icono]`), never emoji. **On the menus the camera moves in front of
+  the runner**, who turns round and waves (`e.menu` → pose `menu`), so the
+  runner has a face it never shows while running; in the shop's
+  *Personajes* tab the camera shifts it aside and it tries on whatever outfit
+  is tapped, and leaving the shop (`saleTienda`) puts back what it really
+  wears. Two class names were already taken by the HUD (`.moneda`, `.mult`):
+  the pills are `.oro` and `.base`.
+- **The first two runs teach the moves** (`pistas` in `juego.js`): when a
+  barrier or a train comes down your lane, a big hint says what to do 1.6 s
+  ahead (where to swipe on a phone, which key on a PC), at most twice per
+  kind and run, and goes once the obstacle is behind you or you changed
+  lane. Nothing slows down, unlike Subway Surfers' tutorial.
+- **Mobile**: swipes (26 px) and a double tap for the skateboard; a
+  portrait screen gets a 3:4 stage and the camera moves back
+  (`ajusteRetrato`). Controllers go through `mando.js`.
+- **Anti-cheat: every run carries a proof** (`prueba.js`, UMD
+  `MetroRushPrueba`, shared by the game and `solo/verifica/metrorush.js`;
+  `docs/antitrampas/metrorush.md`). It is not a frame-by-frame replay: it
+  holds the track seed, the base multiplier and 2× level at the start, the
+  requests the game made to the generator (tunnel, ticket, jetpack coin
+  ribbon) with the exact `dSig` they were made at, the events that change
+  the score (star and 2× pickups with the object's id, 2× end, +5, crash,
+  continue) and a distance/clock sample every 2 s. `rehace` regenerates the
+  track, checks each pickup exists where it was taken, the metres against
+  the speed integral (`metrosEntre`), game time against real time, and
+  recomputes the exact score (10 × multiplier × metres, segment by
+  segment). That needed **the track to depend only on the seed**: oncoming
+  trains used the speed of the frame that generated their block, which
+  moved the free lanes and everything after; now `velocidadEn(d)` derives
+  it from distance. A run touched with the gameplay hooks of
+  `__metrorush` (`puntos`, `pulsa`, `poder`, `inmortal`, `logica`,
+  `avanza`) or with synthetic key events is played but not sent, and the
+  game self-checks with `rehace` before sending, so a bug of its own never
+  reaches the club as a «trampa» (which would trigger the castigo). A crash
+  ends the frame (no pickups or power timers after it in that frame), and a
+  run closed from the pause gets its crash event, for the same reason.
+- **Categories**: `club-metrorush-carrera` (points of the run, sent at the end
+  of every run, capped at 1e9) and `club-metrorush-distancia` (metres, only
+  when it improves). Progress (coins, upgrades, outfits, tickets, mission
+  level, records) is one blob in `users/<uid>/club/metrorush` merged with
+  `mezclaProgreso`. Logros, coins, the `tmetrorush` champion frame, the
+  Discord podium and the manual are wired like FANAL's; the `soloRanks` and
+  `clubJugadas` regexes were widened, so the rules must be re-published.
+- `window.__metrorush` (`estado()`, `puntos(n)`, `inmortal()`, `poder(k)`,
+  `avanza(seg)`, `calidad(n)`, `logica(n)`…) drives a run from a script;
+  `avanza` steps the game without drawing, which is how every station was
+  visited in Chromium (any hook that changes the run makes it a test run
+  that is not sent; `estado`, `prueba`, `calidad` and `desglose` only read),
+  and `estado().info` reports draw calls, triangles,
+  geometries and textures. Those counts are for the **whole frame**:
+  `renderer.info.autoReset` is off and `dibuja()` resets it once, because
+  with post-processing every pass reset it and the reading was always 1.
 
 **Frontera Batalla (`#solo/frontera`) is Emerald's Battle Frontier as a
 Solo Club game**, played locally on the same `@pkmn/sim` bundle as the

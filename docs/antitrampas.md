@@ -106,7 +106,8 @@ paso: el verificador es un módulo puro que corre igual en Node.
   export function sospecha(categoria, fila) {}// null | 'motivo'  (fila guardada, sin prueba)
   ```
 
-  Los once ya están llenos y todos declaran `PRUEBA = 1`: exigen la prueba.
+  Los doce ya están llenos y todos declaran `PRUEBA = 1`: exigen la prueba
+  (Metro Rush llegó el último, ver `docs/antitrampas/metrorush.md`).
 - `solo/club.js`: verifica antes de guardar, de pagar (`alResultado`) y de
   dar logros; re-verifica lo pendiente; avisa con `reportaSospecha`.
 - `juegos-main.js` (`guardaClub`): escribe la prueba y después la fila;
@@ -153,6 +154,7 @@ que se espera de cada uno:
 | BBTAN | `club-bbtan-rondas` | semilla + ángulo de cada tiro (física determinista) | alta |
 | FANAL | `club-fanal-*` | tiempo real: verosimilitud y reloj, más que repetición | alta |
 | Frontera | `club-frontera-*` | semilla + elecciones (el simulador ya es determinista) | alta |
+| Metro Rush | `club-metrorush-*` | tiempo real: la pista de la semilla, los objetos que suben el multiplicador, los metros contra la velocidad y el reloj | alta |
 
 Las **rachas** (Sopa, Sudoku, Electrodle) son un caso aparte: el número
 sale de un blob que el propio usuario escribe (`users/<uid>/club/<juego>`).
@@ -208,7 +210,7 @@ castiga:
 
 Una partida que llega **sin prueba** sí castiga: es la firma de
 `Club.result` desde la consola, y desde que el iframe se carga con
-`?v=club-31` ninguna versión actual del juego la manda así.
+`?v=club-34` (Metro Rush, el último en estrenar su prueba) ninguna versión actual del juego la manda así.
 
 **Dónde vive la retención**, y por qué en dos sitios:
 

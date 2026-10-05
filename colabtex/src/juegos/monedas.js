@@ -93,7 +93,10 @@ export const NIVEL = {
   fanal: "1233341334",
   /* Atasco, en el orden de LOGROS.atasco: e1 e30 e60 e120 e180 e270
      e360 e480 e600 e720. */
-  atasco: "1122333444"
+  atasco: "1122333444",
+  /* Metro Rush, en el orden de LOGROS.metrorush: c50k c250k c1m c3m c10m ·
+     d1k d5k d10k d21k d42k. */
+  metrorush: "1233412334"
 };
 export function nivelDe(juego, id) {
   const l = LOGROS[juego] || [], i = l.findIndex(x => x.id === id);
@@ -103,7 +106,7 @@ export const valorLogro = (juego, id) => VALOR_NIVEL[nivelDe(juego, id)] || 0;
 
 /* Récords del club: lo que paga tener marca en una modalidad, y el extra
    que sale de la marca misma donde la marca es la dificultad. */
-export const RECORD = { minas: 60, snake: 20, tetrisclub: 50, sortem: 50, bbtan: 50, sopa: 30, electro: 30, frontera: 40, sudoku: 40, fanal: 40, atasco: 40 };
+export const RECORD = { minas: 60, snake: 20, tetrisclub: 50, sortem: 50, bbtan: 50, sopa: 30, electro: 30, frontera: 40, sudoku: 40, fanal: 40, atasco: 40, metrorush: 40 };
 /* BBTAN: cada ronda n paga ⌊n/4⌋, acumulado hasta la ronda del récord
    (1 a 3 no pagan, 4 y 5 pagan 1 cada una: llegar a la 5 da 2). Lo que
    paga cada ronda deja de crecer en la 450 (112 por ronda desde ahí) y
@@ -151,6 +154,11 @@ function extraRecord(cat, f) {
   if (cat === "club-fanal-travesia" || cat === "club-fanal-sinfin") return Math.floor(Math.min(f.puntos || 0, 200000) / 1000);
   /* Atasco: 4 monedas por estrella juntada (720 estrellas son 2880). */
   if (cat === "club-atasco-estrellas") return 4 * Math.min(f.puntos || 0, 3000);
+  /* Metro Rush: la mejor carrera paga 1 moneda por cada 25 000 puntos
+     (1 000 000 son 40, con tope en 200: en el juego se llega a millones) y
+     la distancia, 1 por cada 500 m (10 km son 20, tope en 100). */
+  if (cat === "club-metrorush-carrera") return Math.floor(Math.min(f.puntos || 0, 5000000) / 25000);
+  if (cat === "club-metrorush-distancia") return Math.floor(Math.min(f.puntos || 0, 50000) / 500);
   /* Un día perfecto de Electrodle son 700 puntos: 14 monedas. */
   if (cat === "club-electro-puntos") return Math.floor(Math.min(f.puntos || 0, 100000) / 50);
   return 0;
@@ -187,10 +195,10 @@ export function registraDia(prev, dia) {
    sortEm es un minuto, una Sopa libre o un Tetris maratón son varios.
    BBTAN se queda donde estaba (8, y 10 al día): su récord ya paga cada
    ronda y es lo que no se puede repetir. Las mismas cuentas que la regla: */
-export const PAGO_CLUB = { minas: 20, snake: 15, tetrisclub: 25, sortem: 15, bbtan: 8, sopa: 25, electro: 20, frontera: 20, sudoku: 20, fanal: 20, atasco: 15 };
+export const PAGO_CLUB = { minas: 20, snake: 15, tetrisclub: 25, sortem: 15, bbtan: 8, sopa: 25, electro: 20, frontera: 20, sudoku: 20, fanal: 20, atasco: 15, metrorush: 20 };
 export const TOPE_CLUB_DIA = 15, TOPE_BBTAN_DIA = 10;
 export const topeClub = juego => (juego === "bbtan" ? TOPE_BBTAN_DIA : TOPE_CLUB_DIA);
-export const JUEGOS_CLUB = ["minas", "snake", "tetrisclub", "sortem", "bbtan", "sopa", "electro", "frontera", "sudoku", "fanal", "atasco"];
+export const JUEGOS_CLUB = ["minas", "snake", "tetrisclub", "sortem", "bbtan", "sopa", "electro", "frontera", "sudoku", "fanal", "atasco", "metrorush"];
 export function registraJugadaClub(prev, dia, juego) {
   if (!prev || !Number.isInteger(prev.dia)) return { dia, hoy: 1, total: 1 };
   if (dia < prev.dia) return null;
