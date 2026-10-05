@@ -10,7 +10,11 @@
      - la fila no tiene prueba y su juego ya la exige;
      - la `partida` no tiene la forma que le pone el juego (un UUID en el
        club): la fila se escribió a mano, saltándose la página;
-     - la marca es inverosímil para un humano (`sospecha()` de cada juego).
+     - la marca es inverosímil para un humano (`sospecha()` de cada juego);
+     - la marca es anómala frente al resto de la tabla: mucho más rápida
+       que la mediana de los demás, o con un ritmo (puntos por segundo)
+       varias veces el de ellos. Es una señal más débil —alguien puede ser
+       muy bueno— y por eso va aparte, como «anómala».
 
    Uso:  node scripts/auditar-club.cjs export.json [--json] [--categoria club-minas-easy]
 
@@ -24,6 +28,30 @@ function cargaVerificadores() {
   const mod = { exports: {} };
   new Function('module', 'exports', 'require', code)(mod, mod.exports, require);
   return mod.exports;
+}
+
+/* Tablas donde compite el tiempo (menos es mejor); en el resto, los puntos. */
+const POR_TIEMPO = /^club-(minas-|sortem-|sopa-(facil|medio|dificil)-|sudoku-(facil|medio|dificil|experto)$|tetris-sprint$)/;
+const mediana = v => { const a = v.slice().sort((x, y) => x - y), m = a.length >> 1; return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2; };
+/* Cuánto se aparta una fila de las demás de su tabla. Con menos de tres
+   filas más no hay con qué comparar. Umbrales anchos a propósito: lo que
+   marca es «mirar esto», no «es trampa». */
+function anomalia(categoria, uid, filas) {
+  const yo = filas[uid], otros = Object.entries(filas).filter(([u]) => u !== uid).map(([, f]) => f);
+  if (yo.tiempo < 1000 && POR_TIEMPO.test(categoria)) return `terminada en ${yo.tiempo} ms`;
+  if (otros.length < 3) return null;
+  if (POR_TIEMPO.test(categoria)) {
+    /* Además de la mediana, el mejor de los demás (sin contar marcas de
+       menos de un segundo): tres personas buenas juntas son un grupo, no
+       una anomalía. */
+    const m = mediana(otros.map(f => f.tiempo)), mejor = Math.min(...otros.map(f => f.tiempo).filter(t => t >= 1000));
+    return yo.tiempo * 2.5 < m && yo.tiempo * 1.6 < mejor ? `${(m / yo.tiempo).toFixed(1)}× más rápida que la mediana de los demás (${(m / 1000).toFixed(1)} s; el mejor de ellos, ${(mejor / 1000).toFixed(1)} s)` : null;
+  }
+  if (/-racha$/.test(categoria)) return null;
+  const ritmo = f => f.puntos / Math.max(1, f.tiempo), mr = mediana(otros.map(ritmo));
+  const max = Math.max(...otros.map(f => f.puntos));
+  if (ritmo(yo) > 4 * mr && yo.puntos > 1.6 * max) return `ritmo ${(ritmo(yo) / mr).toFixed(1)}× el de la mediana de los demás`;
+  return yo.puntos > 2.5 * max ? `${(yo.puntos / max).toFixed(1)}× la mejor marca de los demás` : null;
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -57,6 +85,8 @@ async function main() {
       if (rara) motivos.push(rara);
       const s = sospechaFila(categoria, fila);
       if (s) motivos.push('inverosímil: ' + s);
+      const a = anomalia(categoria, uid, filas);
+      if (a) motivos.push('anómala: ' + a);
       if (juego) {
         const p = ((pruebas[categoria] || {})[uid] || {})[fila.partida];
         if (p) {
@@ -78,7 +108,8 @@ async function main() {
   const total = Object.values(ranks).reduce((n, f) => n + Object.keys(f || {}).length, 0);
   console.log(`${hallazgos.length} filas sospechosas de ${total}, en ${Object.keys(porUid).length} cuentas.\n`);
   for (const [uid, c] of Object.entries(porUid).sort((a, b) => b[1].filas.length - a[1].filas.length)) {
-    console.log(`■ ${c.nombre || '?'} (${uid})${vetados[uid] ? ' — ya vetada' : ''}: ${c.filas.length} filas`);
+    const nombres = [...new Set(Object.values(ranks).map(f => (f || {})[uid]).filter(Boolean).map(f => f.nombre))];
+    console.log(`■ ${nombres.join(' / ') || '?'} (${uid})${vetados[uid] ? ' — ya vetada' : ''}: ${c.filas.length} filas`);
     for (const h of c.filas) console.log(`   ${h.categoria}: ${h.puntos} pts, ${(h.tiempo / 1000).toFixed(2)} s — ${h.motivos.join('; ')}`);
   }
 }
