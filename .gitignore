@@ -18,3 +18,7 @@ colabtex/.rules-run.mjs
 firebase-debug.log
 database-debug.log
 ui-debug.log
+
+# exportaciones de la base para auditar trampas (traen nombres y uids)
+auditoria/
+*.export.json

@@ -332,6 +332,17 @@ console.log("— Monedas: partidas del club y podios —");
     ok("en Mina Club pagan quince al día", m.hoy === 15);
     await denied("la decimosexta ya no", () => minas({ dia: hoy, hoy: 16, total: m.total + 1 }));
   }
+  // antitrampas: una fila del club necesita su prueba (docs/antitrampas.md)
+  const prueba = (c, k, x) => set(ref(db, `soloPruebas/${c}/${ua.uid}/${k}`), Object.assign({ v: 1, d: "{}", at: serverTimestamp() }, x));
+  await denied("una fila sin prueba no entra", () => set(ref(db, `soloRanks/club-bbtan-rondas/${ua.uid}`), { nombre: "A", puntos: 5, tiempo: 1000, partida: "sinPrueba1" }));
+  await denied("la prueba no inventa la hora", () => prueba("club-bbtan-rondas", "partidaA1", { at: Date.now() - 9000 }));
+  await denied("ni pasa del tamaño", () => prueba("club-bbtan-rondas", "partidaA1", { d: "x".repeat(200001) }));
+  await denied("ni es de una categoría inventada", () => prueba("club-inventada-x", "partidaA1", {}));
+  await allowed("A guarda la prueba de su partida", () => prueba("club-bbtan-rondas", "partidaA1", {}));
+  await denied("y no la reescribe", () => prueba("club-bbtan-rondas", "partidaA1", { d: "[]" }));
+  await allowed("A sospechosa se apunta a sí misma", () => set(push(ref(db, `sospechas/${ua.uid}`)), { c: "club-bbtan-rondas", m: "prueba", at: serverTimestamp() }));
+  await denied("pero no lee la lista de sospechas", () => get(ref(db, "sospechas")));
+  await denied("ni se veta ni se desveta sola", () => set(ref(db, `vetados/${ua.uid}`), { at: serverTimestamp() }));
   // podios: solo justo después del récord que nombra
   await set(ref(db, `soloRanks/club-bbtan-rondas/${ua.uid}`), { nombre: "A", puntos: 7, tiempo: 1000, partida: "partidaA1" }).catch(() => {});
   const fila = (await get(ref(db, `soloRanks/club-bbtan-rondas/${ua.uid}`))).val() || {};

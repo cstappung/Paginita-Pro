@@ -4399,6 +4399,28 @@ everything fails with `PERMISSION_DENIED`, and the lobby says so in plain
 language instead of looking broken (`avisoReglas()` in `juegos-main.js`, and
 the same in `ranks.js`).
 
+## Antitrampas del Solo Club (`docs/antitrampas.md`)
+
+**A club record is not believed, it is checked.** `Club.result(dato,
+prueba)` sends a *proof* (seed, moves with their instant…) and
+`solo/club.js` runs it through `verificaClub` (`solo/verifica.js`, one
+module per game in `solo/verifica/<juego>.js`: `PRUEBA`, `verifica`,
+`sospecha`) **before** anything is saved, paid or turned into a logro. A
+rejected result is not saved, the frame gets `club-rechazo`, and a
+`sospechas/<uid>` entry is written for the admins. A verifier that throws
+rejects. What waits in `localStorage` (`jg.club.pendientes.*`) is verified
+again on load, because that store can be edited by hand. `guardaClub` in
+`juegos-main.js` writes the proof (`soloPruebas/<cat>/<uid>/<partida>`)
+before the row, and only when the row improves; the rules refuse a
+`soloRanks` row without its proof, so every record can be audited later
+with `colabtex/scripts/auditar-club.cjs` over a console export (never
+commit an export: the repo is public). Admins delete rows and set
+`vetados/<uid>`; a vetted account cannot write records, club plays or
+podiums, and `watchSolo`/`leerSolo` hide it. The honest limit: a rewritten
+client or a bot can still produce a valid proof; only a server (Cloud
+Functions) closes that. Each game's specifics are in
+`docs/antitrampas/<juego>.md`.
+
 ## Every game can be muted and turned down (a rule, not a nicety)
 
 **Every game must offer both a mute and a volume control that are visible
