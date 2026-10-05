@@ -888,13 +888,13 @@ const REGLAS = {
   vialibre: {
     lema: "Vía Libre: corre por las vías, esquiva los trenes y llega lo más lejos que puedas antes de que el inspector te atrape.",
     secciones: [
-      ["Cómo se juega", "Corres solo, siempre hacia adelante, por tres carriles de vía. Cambia de carril con ← → (o A y D), salta con ↑, W o Espacio y rueda por el suelo con ↓ o S; si ruedas en el aire, bajas de golpe. En una pantalla táctil, desliza el dedo a la izquierda, a la derecha, arriba o abajo. Por el camino hay monedas, estrellas, poderes y retos. La carrera termina cuando chocas de frente o cuando el inspector te atrapa."],
+      ["Cómo se juega", "Corres solo, siempre hacia adelante, por tres carriles de vía. Cambia de carril con ← → (o A y D), salta con ↑, W o Espacio y rueda por el suelo con ↓ o S; si ruedas en el aire, bajas de golpe. En una pantalla táctil, desliza el dedo a la izquierda, a la derecha, arriba o abajo. Por el camino hay monedas, estrellas y poderes, y siempre tienes tres misiones. La carrera termina cuando chocas de frente o cuando el inspector te atrapa."],
       ["Obstáculos", lista([
         "La <b>barrera baja</b>, a rayas y a la altura de la cintura, se salta.",
         "La <b>barrera alta</b>, con una flecha hacia abajo, se pasa rodando.",
         "Un <b>tren detenido</b> se esquiva cambiando de carril, o se sube por su rampa para correr por los techos.",
         "Un <b>tren que viene de frente</b> se esquiva.",
-        "Chocar de frente con cualquiera de ellos termina la carrera.",
+        "Chocar de frente con cualquiera de ellos termina la carrera, salvo que pagues para <b>seguir corriendo</b>: tras el choque aparece 5 s un botón con el precio (500 monedas la primera vez, el doble cada vez en la misma carrera). Si lo dejas pasar, ves el resumen.",
         "Rozar un costado al cambiar de carril es un <b>tropiezo</b>: el inspector Don Ramón y su perro Tornillo te alcanzan un rato. Dos tropiezos seguidos (en menos de 8 s) y te atrapan."
       ])],
       ["Puntos y multiplicador", lista([

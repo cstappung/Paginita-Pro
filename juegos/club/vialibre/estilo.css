@@ -306,7 +306,8 @@ main.vl { min-width: 0; }
 .fin .menu { position: sticky; bottom: 0; margin: 12px -22px 0; padding: 14px 16px 16px; background: linear-gradient(rgba(31, 111, 224, 0), #1f6fe0 26%); }
 .fin h2 { text-align: center; }
 .opcion i { display: inline-block; width: 1em; height: 1em; margin-right: .35em; vertical-align: -.14em; }
-.opcion i svg, .f-datos i svg, .f-set svg, .s-cuerpo i svg, .s-tienes i svg { display: block; width: 100%; height: 100%; }
+.ayuda li i { display: inline-block; width: 1.3em; height: 1.3em; vertical-align: -.32em; }
+.ayuda li i svg, .opcion i svg, .f-datos i svg, .f-set svg, .s-cuerpo i svg, .s-tienes i svg { display: block; width: 100%; height: 100%; }
 /* los puntos, grandes y dorados, con el cintillo de récord */
 .f-puntos { position: relative; display: grid; justify-items: center; gap: 2px; padding: 10px 12px 12px; border-radius: 18px; background: rgba(9, 30, 90, .35); border: 3px solid rgba(20, 35, 87, .55); }
 .f-puntos small { font: 400 14px var(--ss-letra); letter-spacing: .1em; text-transform: uppercase; color: #d7eaff; }

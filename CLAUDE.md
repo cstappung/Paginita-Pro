@@ -3277,7 +3277,10 @@ Things that matter:
   super sneakers 10 s (jumps 4.1 m), 2× 12 s, each +2.5 s per shop level
   (five levels); mystery box (coins, a skateboard or a jackpot); skateboard
   (300 coins, 30 s, survives one crash); continue after a crash for
-  500 × 2^k coins. A frontal hit ends the run, a side hit is a stumble, and
+  500 × 2^k coins, offered for 5 s by a round «¿Seguir corriendo?»
+  button before the summary (`abreSalvar`), as in Subway Surfers. The
+  run is closed when the summary shows (`cierraCarrera` returns what it
+  paints), so a completed set and its prize appear there. A frontal hit ends the run, a side hit is a stumble, and
   a second stumble within 8 s gets you caught.
 - **Lore and secrets**: seven golden tickets, one per station, tell the
   story of the last night of Line 3 (`BOLETOS`, read in the Libreta);
