@@ -357,6 +357,18 @@
     return { tipo: "tren", carril, d0, largo: LARGO_VAGON, vel: VEL_TREN, dArribo };
   }
 
+  /** La velocidad con que el corredor llega al metro `d` (sin contar choques),
+      para poner los trenes que vienen de frente. Sale de la distancia y no
+      de cuándo se genera la pista: así la pista depende solo de la semilla
+      (el antitrampas la vuelve a generar igual, objeto por objeto). Antes se
+      usaba la velocidad del cuadro en que se generaba el bloque, y eso movía
+      un tren, el carril que dejaba libre y todo lo que venía después. Va
+      redondeada a medio m/s para que ningún navegador la calcule distinta.
+      Se parece a la de verdad: a 960 m (1 min) da 17,5 m/s (la real, 18,6);
+      a 2 900 m (2,5 min), 23 (23,7). Un tren que llega 1 m/s más lento de lo
+      calculado se cruza ~2 m después de su fila: no se nota. */
+  const velocidadEn = d => Math.round(2 * (13 + 17 * (1 - Math.exp(-Math.max(0, d) / 3200)))) / 2;
+
   /** La dificultad entre 0 y 1 según los metros: llega al máximo a los ~9 km. */
   const dificultad = d => limita((d - 300) / 9000, 0, 1);
 
@@ -426,7 +438,7 @@
         }
         const r = azar();                                       // un carril cerrado de verdad
         if (r < lerp(0.08, 0.38, dif) && ctx && ctx.V > 0) {    // un tren que viene de frente
-          const t = emite(trenEnMarcha(c, dr, ctx.V));           // se cruza contigo justo en la fila
+          const t = emite(trenEnMarcha(c, dr, velocidadEn(dr))); // se cruza contigo justo en la fila
           libre[c] = t.d0 + LARGO_VAGON + 6;                    // su carril queda reservado mientras pasa
           bloqueados++;
         } else if (r < lerp(0.55, 0.8, dif)) {                  // trenes detenidos, uno o dos vagones
@@ -467,7 +479,7 @@
         if (o === c || libre[o] > dr) continue;
         const r = azar();
         if (r < lerp(0.1, 0.35, dif) && ctx && ctx.V > 0) {    // un tren que viene, al lado del convoy
-          const t = emite(trenEnMarcha(o, dr + 10, ctx.V)); libre[o] = t.d0 + LARGO_VAGON + 6;
+          const t = emite(trenEnMarcha(o, dr + 10, velocidadEn(dr + 10))); libre[o] = t.d0 + LARGO_VAGON + 6;
         } else if (r < 0.7) {
           const m = 1 + Math.floor(azar() * 3);
           for (let k = 0; k < m; k++) emite({ tipo: "tren", carril: o, d0: dr + 6 + k * (LARGO_VAGON + 0.4), largo: LARGO_VAGON, vel: 0 });
@@ -506,9 +518,10 @@
     }
 
     return {
-      /** Genera bloques hasta pasar el metro `dLimite`. `ctx` = {V}: a qué
-          velocidad va el corredor (para que los trenes en marcha lleguen a tiempo).
-          Devuelve los objetos nuevos. */
+      /** Genera bloques hasta pasar el metro `dLimite`. `ctx` = {V}: sin él
+          (o con V 0) no hay trenes que vengan de frente, para las pruebas; la
+          velocidad con que se ponen sale de la distancia (velocidadEn), no de
+          ctx.V, para que la pista sea siempre la misma. Devuelve los objetos nuevos. */
       generarHasta(dLimite, ctx) {
         salida = [];
         while (dSig < dLimite) {
@@ -545,7 +558,7 @@
   /* ---------- Lo que se exporta ---------- */
   return {
     rng, lerp, limita,
-    CARRILES, LARGO_VAGON, ALTO_TECHO, LARGO_RAMPA, FISICA, impulso, velocidad, VEL_TREN, APARECE, dificultad,
+    CARRILES, LARGO_VAGON, ALTO_TECHO, LARGO_RAMPA, FISICA, impulso, velocidad, velocidadEn, VEL_TREN, APARECE, dificultad,
     PUNTOS_POR_METRO, MAX_BASE, MAX_ESTRELLAS, multiplicador, puntosPorTramo,
     ESTACIONES, estacionDe, siguienteUmbral, VUELTA_DESDE, VUELTA_CADA, INTRO, BOLETOS,
     PODERES, SEG_POR_NIVEL, MAX_MEJORA, PRECIOS_MEJORA, PRECIO_PATINETA, DURACION_PATINETA, duracionPoder, precioMejora, costoSeguir,

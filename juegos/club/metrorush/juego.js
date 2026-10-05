@@ -24,10 +24,11 @@
    - Se perdona el salto un poco antes de tocar el suelo y un poco después
      de dejarlo (búfer y "tiempo de coyote"): sin eso el salto se siente
      "comido" a toda velocidad. */
-import { crearMundo, PALETAS } from './mundo.js?v=metrorush-1';
-import { Sonido } from './audio.js?v=metrorush-1';
+import { crearMundo, PALETAS } from './mundo.js?v=metrorush-2';
+import { Sonido } from './audio.js?v=metrorush-2';
 
 const M = window.MetroRushMotor;                               // el motor (motor.js)
+const MP = window.MetroRushPrueba;                            // la prueba de la carrera, para el antitrampas (prueba.js)
 const Club = window.Club || null;                             // la conexión con la sección Juegos (puede faltar)
 const F = M.FISICA;                                           // las constantes de la física
 const $ = id => document.getElementById(id);                  // atajo para buscar en la página
@@ -88,6 +89,9 @@ let panel = null;             // el panel abierto (tienda, retos, libreta, opcio
 function nuevaCarrera() {
   const semilla = (Math.random() * 2 ** 31) >>> 0;
   return {
+    // la prueba de la carrera (docs/antitrampas/metrorush.md): con qué se empezó, y después cada evento que cambia el puntaje
+    prueba: MP ? MP.nueva({ s: semilla, b: progreso.retos.nivel, md: progreso.mejoras.doble, u: cuentaUrl }) : null,
+    r0: performance.now(), sigMuestra: MP ? MP.PASO_MUESTRA : Infinity, sinteticas: 0, tocada: tocada,
     gen: M.crearGenerador(semilla),                  // la pista de esta carrera
     activos: [],                                     // los objetos de la pista que existen ahora
     D: 0, t: 0, V: M.velocidad(0),                   // metros, segundos y velocidad
@@ -106,6 +110,27 @@ function nuevaCarrera() {
   };
 }
 
+/* ---- la prueba de la carrera (antitrampas, docs/antitrampas/metrorush.md) ----
+   Se anota lo que cambia el puntaje (estrellas, el 2×, el +5, los choques),
+   los pedidos al generador de la pista y una muestra cada 2 s; con eso el
+   club rehace los puntos exactos antes de guardar un récord. Una carrera en
+   la que se usó __metrorush para cambiar algo (puntos, poderes, inmortal,
+   adelantar el tiempo, apretar teclas) se juega igual, pero no se manda a la
+   clasificación: es una partida de prueba. */
+const cuentaUrl = new URLSearchParams(location.search).get('cuenta') || 'local';
+let tocada = false;           // ¿se usó __metrorush en esta página? Desde entonces ninguna carrera cuenta
+/** Un evento de la prueba, con el tiempo de juego, los metros y el reloj real de ahora. `D` cambia los metros anotados (al chocar se anotan los de antes del rebote). */
+function anota(cod, x, D) { if (c && c.prueba) MP.evento(c.prueba, cod, c.t, D != null ? D : c.D, performance.now() - c.r0, x); }
+/** Un pedido al generador de la pista, con el punto de la pista en que se hizo. */
+function anotaPedido(tipo, ...datos) { if (c && c.prueba) MP.pedido(c.prueba, tipo, c.gen.estado().dSig, ...datos); }
+/** Una entrada que no hizo una persona (un script que despacha teclas o toques). Las del mando valen si de verdad hay un mando conectado. */
+function cuentaEntrada(e) {
+  if (!c || !e || e.isTrusted) return;
+  let mando = false;
+  try { mando = !!e.__mando && Array.from((navigator.getGamepads && navigator.getGamepads()) || []).some(g => g && g.connected); } catch (err) { mando = false; }
+  if (!mando) c.sinteticas++;
+}
+
 /* ---- lo que pide el jugador ---- */
 const pedidos = [];           // 'izq' | 'der' | 'arriba' | 'abajo' | 'patineta'
 const TECLA = { ArrowLeft: 'izq', KeyA: 'izq', ArrowRight: 'der', KeyD: 'der', ArrowUp: 'arriba', KeyW: 'arriba', Space: 'arriba', ArrowDown: 'abajo', KeyS: 'abajo', KeyH: 'patineta', ShiftRight: 'patineta' };
@@ -120,12 +145,13 @@ document.addEventListener('keydown', e => {
   // «¿Seguir corriendo?»: Intro paga y sigue, Escape (o P) lo deja pasar. Espacio y las flechas no hacen
   // nada a propósito: quien venía saltando con la barra no debe pagar sin querer.
   if (estado === 'salvar') { if (e.code === 'Enter') { e.preventDefault(); seguirTrasChoque(); } else if (e.code === 'Escape' || e.code === 'KeyP') { e.preventDefault(); muestraFin(); } return; }
-  if ((e.code === 'Digit1' || e.code === 'Digit2') && estado === 'jugando') { usaPotenciador(Object.keys(M.POTENCIADORES)[e.code === 'Digit1' ? 0 : 1]); return; }
+  if ((e.code === 'Digit1' || e.code === 'Digit2') && estado === 'jugando') { cuentaEntrada(e); usaPotenciador(Object.keys(M.POTENCIADORES)[e.code === 'Digit1' ? 0 : 1]); return; }
   if (e.code === 'KeyP' || e.code === 'Escape') { if (estado === 'jugando') pausar(); else if (estado === 'pausa' && !panel) seguirJugando(); else if (panel) cierraPanel(); e.preventDefault(); return; }
   if ((e.code === 'Enter' || e.code === 'Space') && estado === 'portada' && !panel) { e.preventDefault(); empezar(); return; }
   const a = TECLA[e.code];
   if (!a || estado !== 'jugando') return;
   e.preventDefault();
+  cuentaEntrada(e);
   if (e.repeat) return;                                       // mantener apretado no repite el movimiento
   pedidos.push(a);
 });
@@ -136,6 +162,7 @@ lienzo.addEventListener('pointerdown', ev => {
   sonido.iniciar();
   if (estado !== 'jugando') return;
   ev.preventDefault();
+  cuentaEntrada(ev);
   toque = { x: ev.clientX, y: ev.clientY, usado: false, id: ev.pointerId };
   try { lienzo.setPointerCapture(ev.pointerId); } catch (e) {}
 });
@@ -278,6 +305,7 @@ function choca(o) {
   muere(o.tipo === 'tren' && o.vel > 0 ? 'tren' : o.tipo);
 }
 function muere(motivo) {
+  anota('m');                                                   // antes del rebote: ahí paran los puntos
   estado = 'muerte';
   c.muerte = { t: 0, motivo };
   /* Un choque de frente para en seco, y medio metro hacia atrás (el rebote):
@@ -308,6 +336,7 @@ function activaPoder(clase) {
   sonido.poder();
   if (clase === 'mochila') {                                   // la mochila cohete: monedas en el aire y a volar
     c.cuenta.mochilas++;
+    anotaPedido('C', c.D + 12, c.D + 12 + c.V * dur, c.r.carril);
     c.activos.push(...c.gen.monedasCielo(c.D + 12, c.D + 12 + c.V * dur, c.r.carril));
     sonido.mochila(true);
   }
@@ -337,8 +366,9 @@ function recoge(dt) {
     // ¡recogido!
     c.activos.splice(i, 1); mundo.suelta(o);
     if (o.tipo === 'moneda') { c.monedas++; c.cuenta.monedas++; sonido.moneda(); if (c.monedas % 5 === 0) mundo.chispa(r.x, r.y + 1, 0); }
-    else if (o.tipo === 'poder') { activaPoder(o.clase); mundo.chispa(r.x, r.y + 1.2, 0, 0xffffff); }
+    else if (o.tipo === 'poder') { if (o.clase === 'doble') anota('d', o.id); activaPoder(o.clase); mundo.chispa(r.x, r.y + 1.2, 0, 0xffffff); }
     else if (o.tipo === 'estrella') {
+      anota('e', o.id);
       c.estrellas = Math.min(M.MAX_ESTRELLAS, c.estrellas + 1); c.cuenta.estrellas++;
       sonido.estrella(); aviso(`Estrella: multiplicador ×${multiplicador()}`); mundo.chispa(r.x, r.y + 1.2, 0, 0xffe066);
     } else if (o.tipo === 'boleto') {
@@ -368,9 +398,11 @@ function usaPotenciador(k) {
   if (k === 'despegue') {                                       // empezar volando con la mochila, sin chocar con nada
     const seg = M.POTENCIADORES.despegue.seg;
     c.poderes.mochila = seg; c.invulnerable = Math.max(c.invulnerable, seg + 1.5);
+    anotaPedido('C', c.D + 12, c.D + 12 + c.V * seg, c.r.carril);
     c.activos.push(...c.gen.monedasCielo(c.D + 12, c.D + 12 + c.V * seg, c.r.carril));
     sonido.mochila(true); sonido.poder(); aviso('¡Despegue! A volar');
   } else {                                                      // +5 al multiplicador durante toda la carrera
+    anota('p');
     c.extra = M.POTENCIADORES.puntos.extra; sonido.multiplicador(); aviso(`Potenciador: multiplicador ×${multiplicador()}`);
   }
   pintaPots();
@@ -409,20 +441,27 @@ function actualiza(dt) {
   if (!muriendo) {
     fisica(dt);
     choques();
+  }
+  /* Si chocó en este mismo cuadro, ya no recoge nada ni se le gastan los
+     poderes: la prueba de la carrera dice que los puntos paran en el choque,
+     y una estrella anotada justo después se leería como recogida estando caído. */
+  if (!muriendo && estado === 'jugando') {
     recoge(dt);
     // los poderes se gastan
     for (const k of Object.keys(c.poderes)) if (c.poderes[k] > 0) {
       c.poderes[k] = Math.max(0, c.poderes[k] - dt);
       if (c.poderes[k] === 0 && k === 'mochila') { sonido.mochila(false); c.invulnerable = Math.max(c.invulnerable, 2); }
+      if (c.poderes[k] === 0 && k === 'doble') anota('x');      // el multiplicador vuelve a la mitad
     }
     if (c.invulnerable > 0) c.invulnerable -= dt;
     if (c.tropiezo > 0) { c.tropiezo -= dt; if (c.tropiezo <= 0) c.perseguidorObj = 0; }
     if (c.introPersecucion > 0) { c.introPersecucion -= dt; if (c.introPersecucion <= 0 && c.tropiezo <= 0) c.perseguidorObj = 0; }
     estaciones();
+    if (c.t >= c.sigMuestra) { anota('w'); c.sigMuestra = c.t + MP.PASO_MUESTRA; }   // una muestra de metros y reloj cada 2 s
     retosEnVivo(dt);
     pistas(dt);
     if (c.potVentana > 0) { c.potVentana -= dt; if (c.potVentana <= 0) pintaPots(); }
-  } else {
+  } else if (muriendo) {
     const r = c.r;                                               // chocó en el aire: cae hasta el suelo (o el techo) antes de quedar tendido
     if (r.y > r.suelo) { r.vy -= F.gravedad * dt; r.y = Math.max(r.suelo, r.y + r.vy * dt); }
     c.muerte.t += Math.max(dt, dtRealUltimo);                     // en un aparato lento la pausa tras el choque no se alarga
@@ -447,6 +486,7 @@ function estaciones() {
   const e = M.estacionDe(faltan < 220 ? sig : c.puntos);         // a donde se va: la que viene si llega pronto
   if (!c.cambio && e.clave !== c.estacion.clave) {
     c.cambio = { estacion: e, tunel: null, hecho: false };
+    anotaPedido('T', c.D + 40, e.id);
     c.gen.pedirTunel(c.D + 40, e.id);
     mundo.precarga(estacionVisual(e));
     mundo.letreroTunel(e.nombre);
@@ -463,7 +503,7 @@ function estaciones() {
       c.estacion = cb.estacion;
       sonido.tocaTema(cb.estacion.musica);
       pantalla.dataset.estilo = estacionVisual(cb.estacion).estilo;
-      if (cb.estacion.boleto && !progreso.boletos.includes(cb.estacion.boleto)) c.gen.pedirBoleto(cb.estacion.boleto, o.d0 + o.largo + 260);
+      if (cb.estacion.boleto && !progreso.boletos.includes(cb.estacion.boleto)) { anotaPedido('B', cb.estacion.boleto, o.d0 + o.largo + 260); c.gen.pedirBoleto(cb.estacion.boleto, o.d0 + o.largo + 260); }
     }
     if (cb.hecho && c.D >= o.d0 + o.largo - 6) { banner(cb.estacion.nombre, cb.estacion.lema); c.cambio = null; }
   }
@@ -542,7 +582,7 @@ function empezar() {
   mundo.activa(e, 0);
   pantalla.dataset.estilo = e.estilo;
   for (const o of c.gen.generarHasta(230, { V: c.V })) c.activos.push(o);
-  if (!progreso.boletos.includes(1)) c.gen.pedirBoleto(1, 420);
+  if (!progreso.boletos.includes(1)) { anotaPedido('B', 1, 420); c.gen.pedirBoleto(1, 420); }
   estado = 'jugando';
   muestraCapa(null);
   $('hud').hidden = false;
@@ -614,6 +654,7 @@ function muestraFin() {
   $('finSet').hidden = !k.subio;
   if (k.subio) $('finSet').innerHTML = `¡Set completo! Multiplicador <b translate="no">×${progreso.retos.nivel}</b> y ${ICONOS.moneda}<b translate="no">+${fmt(k.premio)}</b>`;
   filasRetos($('finRetos'), k.nivelRetos, k.avanceRetos);
+  $('finFuera').hidden = !k.fuera; $('finFuera').textContent = k.fuera || '';
   muestraCapa('capaFin');
   // los puntos suben contando, con un tic suave (como el «score» de Subway Surfers)
   const el = $('finPuntos'), yo = ++cuentaFin, t0 = performance.now(), dur = k.puntos > 0 ? 900 : 0;
@@ -636,6 +677,7 @@ function seguirTrasChoque() {
   const deCarrera = Math.min(c.monedas, costo);                  // primero se paga con las monedas de esta carrera…
   c.monedas -= deCarrera; progreso.monedas -= costo - deCarrera; // …y el resto con las guardadas
   c.seguirVeces++; guardar();
+  anota('s');
   // se despeja la vía alrededor y hay unos segundos de protección
   // (se mira dónde termina cada cosa, no solo dónde empieza: un convoy largo que empezó atrás seguiría debajo de ti)
   for (let i = c.activos.length - 1; i >= 0; i--) {
@@ -672,13 +714,36 @@ function cierraCarrera() {
   progreso.monedas += premio;
   guardar();
   if (res.subio) sonido.multiplicador();
-  // a la clasificación: la carrera siempre (cuenta como partida del club); la distancia, solo si es récord
-  if (Club && Club.result && puntos >= 1) {
-    Club.result({ categoria: 'club-metrorush-carrera', puntos: Math.min(1e9, puntos), tiempo: ms });
-    if (recordDist && metros >= 1) Club.result({ categoria: 'club-metrorush-distancia', puntos: Math.min(1e6, metros), tiempo: ms });
+  // la prueba: el fin de la carrera, y el juego se revisa a sí mismo con lo mismo que usará el club
+  const prueba = cierraPrueba(puntos, metros, ms);
+  // a la clasificación (con su prueba): la carrera siempre (cuenta como partida del club); la distancia, solo si es récord
+  if (Club && Club.result && puntos >= 1 && prueba) {
+    Club.result({ categoria: 'club-metrorush-carrera', puntos: Math.min(1e9, puntos), tiempo: ms }, prueba);
+    if (recordDist && metros >= 1) Club.result({ categoria: 'club-metrorush-distancia', puntos: Math.min(1e6, metros), tiempo: ms }, prueba);
   }
-  c.cierre = { puntos, metros, monedas: c.monedas, mult, recordAntes, subio: res.subio, premio, nivelRetos: nivelAntes, avanceRetos };
+  c.cierre = { puntos, metros, monedas: c.monedas, mult, recordAntes, subio: res.subio, premio, nivelRetos: nivelAntes, avanceRetos, fuera: c.fuera };
   return c.cierre;
+}
+/** Cierra la prueba y decide si la carrera va a la clasificación. Devuelve
+    la prueba, o null si no va: una carrera tocada con __metrorush o con
+    entradas que no hizo una persona, o una prueba que no cuadra (eso sería un
+    error de este juego: se avisa en la consola en vez de mandar algo que el
+    club rechazaría como trampa). */
+function cierraPrueba(puntos, metros, ms) {
+  if (!c.prueba) return null;
+  if (!c.muerte) anota('m');                                    // se cerró en plena carrera (la pestaña, desde la pausa): ahí paran los puntos
+  anota('f');
+  const prueba = MP.cierra(JSON.parse(JSON.stringify(c.prueba)), { sn: c.sinteticas });
+  c.pruebaFinal = prueba;
+  if (c.tocada || tocada) { c.fuera = 'Partida de prueba (se usó __metrorush): no entra en la clasificación.'; return null; }
+  if (c.sinteticas > 0) { c.fuera = 'Esta carrera tuvo teclas que no apretó una persona: no entra en la clasificación.'; return null; }
+  const r = MP.rehace(prueba);
+  if (r.motivo || Math.abs(r.puntos - puntos) > 2 || r.metros !== metros || Math.abs(r.tiempo - ms) > 100) {
+    console.warn('Metro Rush: la prueba no cuadra con la carrera', r, { puntos, metros, ms });
+    c.fuera = 'Esta carrera no se pudo comprobar, así que no entra en la clasificación.';
+    return null;
+  }
+  return prueba;
 }
 function aPortada() {
   cierraCarrera(); ocultaPista();
@@ -983,7 +1048,7 @@ document.addEventListener('click', e => {
   if (b.dataset.aspecto) { const a = M.ASPECTOS[b.dataset.aspecto]; if (a && a.precio != null && progreso.monedas >= a.precio) { progreso.monedas -= a.precio; progreso.aspectos.push(b.dataset.aspecto); progreso.aspecto = b.dataset.aspecto; mundo.aspecto(a); aspectoMostrado = b.dataset.aspecto; sonido.poder(); guardar(); pintaTienda(); pintaPortada(); } return; }
   if (b.dataset.poner) { progreso.aspecto = b.dataset.poner; mundo.aspecto(M.ASPECTOS[b.dataset.poner]); aspectoMostrado = b.dataset.poner; sonido.reto(); guardar(); pintaTienda(); return; }
   if (b.dataset.saltar != null) { saltarMision(Number(b.dataset.saltar)); return; }
-  if (b.dataset.pot) { usaPotenciador(b.dataset.pot); return; }
+  if (b.dataset.pot) { cuentaEntrada(e); usaPotenciador(b.dataset.pot); return; }
   if (b.dataset.pestana && b.getAttribute('role') === 'tab') { tiendaPestana = b.dataset.pestana; sonido.carril(); pintaTienda(); return; }
   if (b.dataset.ver) { tiendaVer = b.dataset.ver; sonido.carril(); pintaTienda(); return; }
   if (b.dataset.flecha) {                                       // las flechas pasan de un aspecto al siguiente
@@ -994,7 +1059,7 @@ document.addEventListener('click', e => {
   if (!accion) return;
   ({
     jugar: empezar, otra: otraCarrera, portada: aPortada, seguir: seguirJugando, seguirChoque: seguirTrasChoque,
-    abandonar: () => { if (estado !== 'pausa') return; c.muerte = { t: 2, motivo: 'abandono' }; muestraFin(); },
+    abandonar: () => { if (estado !== 'pausa') return; anota('m'); c.muerte = { t: 2, motivo: 'abandono' }; muestraFin(); },
     noSalvar: () => { if (estado === 'salvar') muestraFin(); },
     tienda: () => abreTienda('mejoras'), personajes: () => abreTienda('personajes'), retos: abreRetos, libreta: abreLibreta, opciones: abreOpciones, ayuda: () => abrePanel('capaAyuda'),
     volver: cierraPanel, relatoListo: () => { progreso.intro = true; guardar(); panel = null; empezar(); }
@@ -1081,20 +1146,26 @@ window.addEventListener('club-record', e => {                    // el récord d
   if (d.categoria === 'club-metrorush-distancia' && d.puntos > progreso.records.distancia) { progreso.records.distancia = d.puntos; pintaPortada(); }
 });
 // Para probar desde la consola o desde un script: estado, saltar a puntos, etc.
+/* Los que cambian la carrera (puntos, teclas, poderes, inmortal, adelantar
+   el tiempo) la vuelven una partida de prueba: se juega igual, pero ya no va
+   a la clasificación (ver «la prueba de la carrera»). */
+const toca = () => { tocada = true; if (c) c.tocada = true; };
 window.__metrorush = {
   estado: () => ({ estado, puntos: c && c.puntos, D: c && c.D, V: c && c.V, estacion: c && c.estacion.nombre, info: mundo && mundo.info() }),
-  puntos: n => { if (c) c.puntos = n; },
-  pulsa: a => pedidos.push(a),
-  poder: k => c && activaPoder(k),
-  inmortal: (s = 9999) => { if (c) c.invulnerable = s; },
+  puntos: n => { toca(); if (c) c.puntos = n; },
+  pulsa: a => { toca(); pedidos.push(a); },
+  poder: k => { toca(); return c && activaPoder(k); },
+  inmortal: (s = 9999) => { toca(); if (c) c.invulnerable = s; },
+  /** La prueba de la carrera (la de la última, cerrada, si ya terminó). Solo la lee: no toca nada. */
+  prueba: () => c ? JSON.parse(JSON.stringify(c.pruebaFinal || c.prueba)) : null,
   empezar, progreso: () => progreso,
   /** Fija la calidad gráfica (sin la automática), para medir cada una. */
   calidad: n => { opciones.calidad = n; mundo.calidad(n); },
   desglose: () => mundo.desglose(),
   mundo: () => mundo,
   /** Cuánto tarda la lógica de un cuadro (física, choques, generación), en ms, promediando `n` pasos. */
-  logica: (n = 600) => { if (estado !== 'jugando') return null; const t0 = performance.now(); let k = 0; for (; k < n && estado === 'jugando'; k++) actualiza(1 / 60); return (performance.now() - t0) / Math.max(1, k); },
+  logica: (n = 600) => { if (estado !== 'jugando') return null; toca(); const t0 = performance.now(); let k = 0; for (; k < n && estado === 'jugando'; k++) actualiza(1 / 60); return (performance.now() - t0) / Math.max(1, k); },
   /** Adelanta `seg` segundos de juego sin dibujar (para probar túneles y estaciones desde un script). */
-  avanza: (seg = 5) => { for (let i = 0; i < seg * 60 && estado === 'jugando'; i++) { actualiza(1 / 60); tiempoTotal += 1 / 60; } }
+  avanza: (seg = 5) => { toca(); for (let i = 0; i < seg * 60 && estado === 'jugando'; i++) { actualiza(1 / 60); tiempoTotal += 1 / 60; } }
 };
 arranca();

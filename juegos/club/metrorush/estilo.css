@@ -359,6 +359,8 @@ main.vl { min-width: 0; }
 .f-set { margin: 12px 0 0; padding: 8px 12px; border-radius: 14px; text-align: center; background: linear-gradient(#fff07a, #ffbe2a); border: 3px solid var(--ss-t); box-shadow: 0 4px 0 rgba(10, 22, 66, .45);
   color: var(--ss-t); font: 400 17px/1.3 var(--ss-letra); animation: f-cinta .45s 1s both cubic-bezier(.3, 1.6, .5, 1); }
 .f-set svg { display: inline-block; width: 18px; height: 18px; vertical-align: -3px; margin: 0 2px 0 4px; }
+/* la carrera que no va a la clasificación (de prueba o sin comprobar) */
+.f-fuera { margin: 10px 0 0; padding: 7px 12px; border-radius: 12px; background: rgba(9, 30, 90, .45); border: 2px dashed rgba(255, 255, 255, .6); color: #eaf4ff; font: 700 13px/1.35 "IBM Plex Sans", sans-serif; text-align: center; }
 /* las misiones del resumen, en chico */
 .f-misiones { gap: 8px; }
 .f-misiones .m-fila { grid-template-columns: 38px minmax(0, 1fr) auto; gap: 10px; padding: 7px 10px; }

@@ -3379,6 +3379,27 @@ Things that matter:
 - **Mobile**: swipes (26 px) and a double tap for the skateboard; a
   portrait screen gets a 3:4 stage and the camera moves back
   (`ajusteRetrato`). Controllers go through `mando.js`.
+- **Anti-cheat: every run carries a proof** (`prueba.js`, UMD
+  `MetroRushPrueba`, shared by the game and `solo/verifica/metrorush.js`;
+  `docs/antitrampas/metrorush.md`). It is not a frame-by-frame replay: it
+  holds the track seed, the base multiplier and 2× level at the start, the
+  requests the game made to the generator (tunnel, ticket, jetpack coin
+  ribbon) with the exact `dSig` they were made at, the events that change
+  the score (star and 2× pickups with the object's id, 2× end, +5, crash,
+  continue) and a distance/clock sample every 2 s. `rehace` regenerates the
+  track, checks each pickup exists where it was taken, the metres against
+  the speed integral (`metrosEntre`), game time against real time, and
+  recomputes the exact score (10 × multiplier × metres, segment by
+  segment). That needed **the track to depend only on the seed**: oncoming
+  trains used the speed of the frame that generated their block, which
+  moved the free lanes and everything after; now `velocidadEn(d)` derives
+  it from distance. A run touched with the gameplay hooks of
+  `__metrorush` (`puntos`, `pulsa`, `poder`, `inmortal`, `logica`,
+  `avanza`) or with synthetic key events is played but not sent, and the
+  game self-checks with `rehace` before sending, so a bug of its own never
+  reaches the club as a «trampa» (which would trigger the castigo). A crash
+  ends the frame (no pickups or power timers after it in that frame), and a
+  run closed from the pause gets its crash event, for the same reason.
 - **Categories**: `club-metrorush-carrera` (points of the run, sent at the end
   of every run, capped at 1e9) and `club-metrorush-distancia` (metres, only
   when it improves). Progress (coins, upgrades, outfits, tickets, mission
@@ -3389,7 +3410,9 @@ Things that matter:
 - `window.__metrorush` (`estado()`, `puntos(n)`, `inmortal()`, `poder(k)`,
   `avanza(seg)`, `calidad(n)`, `logica(n)`…) drives a run from a script;
   `avanza` steps the game without drawing, which is how every station was
-  visited in Chromium, and `estado().info` reports draw calls, triangles,
+  visited in Chromium (any hook that changes the run makes it a test run
+  that is not sent; `estado`, `prueba`, `calidad` and `desglose` only read),
+  and `estado().info` reports draw calls, triangles,
   geometries and textures. Those counts are for the **whole frame**:
   `renderer.info.autoReset` is off and `dibuja()` resets it once, because
   with post-processing every pass reset it and the reading was always 1.
