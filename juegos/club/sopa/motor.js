@@ -198,10 +198,58 @@
     return { ult: base.ult, racha: base.racha, mejor: Math.max(a.mejor, b.mejor, base.racha) };
   }
 
+  /* ---------- la prueba de la partida (docs/antitrampas/sopa.md) ----------
+     Lo que hace falta para rehacerla: de qué sopa se trata (la fecha de la
+     diaria, o la semilla, el tema, la dificultad y el tamaño de la libre) y
+     cada selección que encontró una palabra, como `[inicio, fin, Δt, dur,
+     mov, f]` en un arreglo plano: las celdas de los dos extremos, los ms de
+     reloj de juego desde la anterior, y la forma del gesto (para distinguir
+     una mano de un script): cuánto duró el arrastre (pointerdown →
+     pointerup, ms), cuántos pointermove hubo en medio, y banderas `f` (1 =
+     algún evento sintético sin mando, 2 = mando conectado, 4 = con la
+     pestaña oculta). Las selecciones que no dieron nada no van: no cambian
+     la partida. La pantalla la arma y el verificador del club la
+     rehace con estas mismas funciones, así que las dos nunca divergen. */
+  const PRUEBA_V = 1;
+  const PASO = 6;                                         // números por palabra en `j`
+  const FECHA = /^\d{4}-\d{2}-\d{2}$/;
+  function sopaDePrueba(p) {
+    if (p.m === "d") return typeof p.f === "string" && FECHA.test(p.f) ? sopaDiaria(p.f) : null;
+    if (p.m === "l") {
+      const ok = Number.isSafeInteger(p.s) && p.s >= 0 && p.s <= 0xFFFFFFFF && TAMANOS[p.n] && DIRECCIONES[p.d] && TEMAS.some(t => t.id === p.t);
+      return ok ? generar({ tema: p.t, tam: p.n, dif: p.d, rng: mulberry32(p.s) }) : null;
+    }
+    return null;
+  }
+  /* Rehace la partida: {sopa, encontradas, tiempos, orden, gestos}, con el
+     instante (ms de reloj de juego) en que se encontró cada palabra, cuál
+     fue y la forma de su gesto ({dur, mov, f}), o {error}. */
+  function rehace(p) {
+    if (!p || typeof p !== "object" || p.v !== PRUEBA_V) return { error: "La prueba no es de esta versión de la sopa." };
+    const sopa = sopaDePrueba(p);
+    if (!sopa) return { error: "La prueba no dice de qué sopa se trata." };
+    const j = p.j, tam = sopa.tam, n = tam * tam;
+    if (!Array.isArray(j) || j.length % PASO || j.length > PASO * sopa.palabras.length) return { error: "Las jugadas de la prueba no se pueden leer." };
+    const enc = new Set(), tiempos = [], orden = [], gestos = [];
+    let t = 0;
+    for (let k = 0; k < j.length; k += PASO) {
+      const [a, b, dt, dur, mov, f] = j.slice(k, k + PASO);
+      if (![a, b].every(x => Number.isInteger(x) && x >= 0 && x < n) || ![dt, dur, mov].every(x => Number.isSafeInteger(x) && x >= 0) ||
+        !Number.isInteger(f) || f < 0 || f > 7) return { error: "Las jugadas de la prueba no se pueden leer." };
+      gestos.push({ dur, mov, f });
+      t += dt;
+      const i = palabraEn(sopa, linea(tam, a % tam, (a / tam) | 0, b % tam, (b / tam) | 0), enc);
+      if (i < 0) return { error: "Una de las jugadas no marca ninguna palabra de esa sopa." };
+      enc.add(i); tiempos.push(t); orden.push(i);
+    }
+    return { sopa, encontradas: enc.size, tiempos, orden, gestos };
+  }
+
   return {
     TEMAS, TAMANOS, DIRECCIONES, DIFICULTADES, DIARIA, INTENTOS,
     mulberry32, hash, diaChile, diaAnterior, numeroDia, temaDelDia,
     generar, sopaDiaria, linea, palabraEn,
-    rachaVacia, limpiaRacha, rachaVisible, registraDiaria, mezclaRacha
+    rachaVacia, limpiaRacha, rachaVisible, registraDiaria, mezclaRacha,
+    PRUEBA_V, PASO, sopaDePrueba, rehace
   };
 });
