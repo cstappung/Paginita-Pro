@@ -71,7 +71,7 @@ Six apps plus a small shared **Informes** page:
   **Boxhead** (top-down zombie survival or versus, one to eight, in an
   iframe), plus
   **Frontera Batalla**, Emerald's Battle Frontier played solo with the same
-  teams, plus a **Clasificación** tab and a 📖 **Reglas**
+  teams, and **Vía Libre**, a 3D endless runner in three styles, plus a **Clasificación** tab and a 📖 **Reglas**
   manual for every game, solo ones included, coins, and **PRODROP**, a card-pack
   opener paid with them. Without a session it opens in **guest mode**: every
   single-player game is playable and nothing is saved. See "Juegos" below.
@@ -1722,8 +1722,8 @@ mode only hides the section that does not apply (`data-modo` on
   `.jg-mn` and the sheet `.jg-hoja`; check before naming a new piece.
 
 *Novedades* is still a hand-written list (`NOVEDADES` in `juegos-main.js`),
-because what is new is not always a room game (today FANAL, Yemas' zombie
-mode and PRODROP, each with its own cover in `arteNovedad`); each entry may
+because what is new is not always a room game (today Vía Libre, FANAL and
+PRODROP, each with its own cover in `arteNovedad`); each entry may
 carry `modo` (the same badge as the thumbnails), and `cuenta`/`practica`
 say what a guest gets instead. On a phone it is a carousel of whole cards.
 `novedades()` in `motor.js` is the older date-driven version and is no
@@ -3220,6 +3220,85 @@ progress), `niveles.js` (generated), `dibujo.js` (the vehicles as SVG) and
   Vehicles are sticker-style SVG (thick dark outline); the red car carries
   white racing stripes. Its music is `T.atasco` in the songbook (B-flat
   major, 124 bpm with swing, a car-horn motif), also in the header player.
+
+**Vía Libre (`juegos/club/vialibre/`) is a Solo Club endless runner in
+3D**, in the vein of Subway Surfers: three lanes, trains, low and high
+barriers, ramps up onto the roofs, coins, power-ups, a multiplier and an
+inspector with his dog who catch you after two stumbles. Plain files, no
+build (`?v=vialibre-N` on its scripts, its stylesheet and the
+`modulepreload`s, `club-N` in `solo/club.js` for the iframe). Three.js r160
+comes from jsDelivr through an import map, the same URL Yemas uses, so the
+browser cache shares it. Five files: `motor.js` (UMD `ViaLibreMotor`, pure:
+the track generator, physics constants, scoring, stations, story, shop,
+missions and the progress merge, tested by `tests/vialibre-motor.test.cjs`),
+`mundo.js` (the 3D world, an ES module), `audio.js` (music and synthesised
+effects), `juego.js` (the loop, input, HUD and menus) and `estilo.css`.
+Things that matter:
+
+- **The track is generated so it can always be run.** `crearGenerador(seed)`
+  walks a "camino", a lane that moves at most one lane per row, and never
+  blocks it; every obstacle reserves its lane up to where it ends
+  (`libre[c]`), so two things never overlap. Blocks are a row, a convoy (a
+  ramp plus two to four cars with coins on the roofs), a breather (zigzag
+  coins) and the tunnel. Moving trains only start moving `APARECE` (120 m)
+  before they arrive, which is what keeps their reservations short. The test
+  runs a simulated player over 12 seeds × 12 km and checks it never meets
+  an unavoidable obstacle.
+- **The score decides the scenery.** `ESTACIONES`: Barrio Estación (0,
+  toy-like), Ocaso (50 k, pixel), Línea Neón (200 k, neon), Estación
+  Fantasma (1 M), Invierno (2.5 M), Óxido (5 M) and Fin de la Línea
+  (10 M); from 12 M the first three come back every 2 M as «vuelta N». A
+  station changes **inside a tunnel** (150 m, coins only), where nothing
+  outside is visible: `juego.js` swaps the kit, the music and the HUD skin
+  at `d0 + 40`. The track is already generated ~230 m ahead, so the tunnel
+  is requested *before* the threshold, when the metres left at the current
+  multiplier fit in what is generated (`estaciones()`); requested at the
+  threshold it showed up 15 s late. The options can lock one style
+  (`estacionVisual`).
+- **The numbers are tuned for the «million points»**: 10 points per metre
+  times the multiplier. The base multiplier goes ×1 → ×30 by completing
+  missions (three per level, `retosDeNivel(nivel)`, seeded); each star picked
+  up adds +1 for the run (up to +29) and the 2× power-up doubles the lot.
+  Speed goes from 13 to 30 m/s (`velocidad`, τ 150 s). A newcomer makes
+  ~25 k in two minutes, a great run reaches 1 M in 6–7 minutes, and a
+  veteran at ×30 in about three.
+- **Power-ups**: magnet 10 s, jetpack 8 s (coins in the sky at 8.5 m),
+  super sneakers 10 s (jumps 4.1 m), 2× 12 s, each +2.5 s per shop level
+  (five levels); mystery box (coins, a skateboard or a jackpot); skateboard
+  (300 coins, 30 s, survives one crash); continue after a crash for
+  500 × 2^k coins. A frontal hit ends the run, a side hit is a stumble, and
+  a second stumble within 8 s gets you caught.
+- **Lore and secrets**: seven golden tickets, one per station, tell the
+  story of the last night of Line 3 (`BOLETOS`, read in the Libreta);
+  collecting all seven unlocks the Inspector outfit, the Konami code the
+  golden one, and a ghost train crosses the sky in Estación Fantasma.
+- **The world is built to run on a phone.** Every prop is merged per
+  material with vertex colours (`Arma`), pooled (`kit.saca`/`guarda`), and
+  coins and sleepers are `InstancedMesh`es; scrolling is texture offsets.
+  Each station palette builds its own kit, prepared a few steps per frame
+  ahead of time (`precarga`, 4 ms budget) and compiled inside the tunnel, so
+  the switch does not stutter. Quality `alta`/`media`/`baja` sets pixel
+  ratio, shadows, ambient occlusion (toy style only), bloom and the neon
+  mirror floor; `baja` also shortens the view to 125 m with the fog closer
+  (`vista`), which is what saves draw calls. In «auto» it steps down by
+  itself when frames average over 28 ms.
+- **Music is one chip theme per station** (`vialibre-*` in `temas.js`, all
+  original), its tempo rising with speed (×0.92 → ×1.15). Effects are
+  synthesised in `audio.js`, everything goes through `destination`, so
+  `volumen.js` governs it; coins climb a semitone per coin in a streak.
+- **Mobile**: swipes (26 px) and a double tap for the skateboard; a
+  portrait screen gets a 3:4 stage and the camera moves back
+  (`ajusteRetrato`). Controllers go through `mando.js`.
+- **Categories**: `club-vialibre-carrera` (points of the run, sent at the end
+  of every run, capped at 1e9) and `club-vialibre-distancia` (metres, only
+  when it improves). Progress (coins, upgrades, outfits, tickets, mission
+  level, records) is one blob in `users/<uid>/club/vialibre` merged with
+  `mezclaProgreso`. Logros, coins, the `tvialibre` champion frame, the
+  Discord podium and the manual are wired like FANAL's; the `soloRanks` and
+  `clubJugadas` regexes were widened, so the rules must be re-published.
+- `window.__vialibre` (`estado()`, `puntos(n)`, `inmortal()`, `poder(k)`,
+  `avanza(seg)`…) drives a run from a script; `avanza` steps the game
+  without drawing, which is how every station was visited in Chromium.
 
 **Frontera Batalla (`#solo/frontera`) is Emerald's Battle Frontier as a
 Solo Club game**, played locally on the same `@pkmn/sim` bundle as the

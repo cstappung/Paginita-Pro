@@ -1,0 +1,197 @@
+/* Vía Libre — el estilo de la página.
+
+   La página se parece a las demás del Club (cabecera, marcador, la pantalla
+   del juego y la clasificación al lado), pero la pantalla es siempre oscura y
+   su marcador cambia con la estética de la estación: letras gordas con borde
+   (juguete), letras de cabina que brillan (neón) o letra pixel con marcos
+   escalonados (retro). El atributo data-estilo de #pantalla lo decide.
+
+   Los tamaños del marcador van en unidades del contenedor (cqh, cqw): la
+   pantalla es un contenedor de tamaño, así el marcador se ve igual de grande
+   en un monitor y en un celular, en proporción. */
+
+:root { --tinta: #1d2333; --suave: #66708a; --linea: #e3e1ea; --fondo: #f4f3f7; --acento: #ff6a3d; --azul: #2c7be0; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--fondo); color: var(--tinta); font: 15px/1.5 "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; }
+.shell { max-width: 1240px; margin: 0 auto; padding: 18px 16px 40px; }
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 285px; gap: 24px; align-items: start; }
+@media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+main.vl { min-width: 0; }
+.cab { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 10px; }
+.marca { margin: 0; font: 400 34px/1 "Lilita One", "Arial Black", sans-serif; color: var(--acento); letter-spacing: .5px; text-shadow: 0 3px 0 #1d2333; }
+.lema { margin: 0; color: var(--suave); }
+
+/* ---------- el marcador de la página ---------- */
+.scorebar { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; background: #fff; border: 1px solid var(--linea); border-radius: 16px 16px 0 0; padding: 10px 14px; }
+.scorebar .dato { display: grid; line-height: 1.1; }
+.scorebar small { font-size: 10.5px; letter-spacing: .08em; color: var(--suave); font-weight: 600; }
+.scorebar strong { font: 400 20px/1.1 "Lilita One", "Arial Black", sans-serif; }
+.scorebar .botones { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+.icono { width: 38px; height: 38px; border-radius: 10px; border: 1px solid var(--linea); background: #f7f6fa; font-size: 17px; cursor: pointer; color: var(--tinta); }
+.icono:hover { border-color: var(--acento); }
+.icono.apagado { opacity: .45; text-decoration: line-through; }
+:focus-visible { outline: 3px solid var(--acento); outline-offset: 2px; }
+
+/* ---------- la pantalla del juego ---------- */
+/* `hidden` tiene que ganar siempre: las capas, el HUD y el botón «seguir»
+   llevan display propio (grid/flex) y sin esto se quedaban todos visibles. */
+[hidden] { display: none !important; }
+.pantalla { position: relative; width: 100%; aspect-ratio: 16 / 10; max-height: 82vh; background: #0b0d14; border-radius: 0 0 16px 16px; overflow: hidden; container-type: size; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+@media (max-width: 700px) and (orientation: portrait) { .pantalla { aspect-ratio: 3 / 4; max-height: 78svh; } }
+#lienzo { position: absolute; inset: 0; width: 100%; height: 100%; display: block; outline: none; }
+.pantalla[data-estilo="pixel"] #lienzo { image-rendering: pixelated; }
+.pie { margin: 8px 2px 0; color: var(--suave); font-size: 13px; text-align: center; }
+
+/* ---------- el marcador sobre la carrera ---------- */
+.hud { position: absolute; inset: 0; pointer-events: none; --u: 1cqh; }
+@container (max-aspect-ratio: 1/1) { .hud { --u: 0.8cqh; } }
+.hud-izq { position: absolute; left: calc(2.4 * var(--u)); top: calc(2.4 * var(--u)); display: grid; gap: calc(.8 * var(--u)); justify-items: start; }
+.hud-der { position: absolute; right: calc(2.4 * var(--u)); top: calc(2.4 * var(--u)); display: flex; gap: calc(1.4 * var(--u)); align-items: center; }
+.hud .fila { display: flex; align-items: center; gap: calc(1.2 * var(--u)); }
+.hud .valor { font-size: calc(6.6 * var(--u)); line-height: 1; }
+.hud .chico { font-size: calc(3.3 * var(--u)); line-height: 1; }
+.hud .mult { font-size: calc(3.6 * var(--u)); }
+.hud .pausa { pointer-events: auto; width: calc(6.6 * var(--u)); height: calc(6.6 * var(--u)); display: grid; place-items: center; cursor: pointer; padding: 0; }
+.hud .pausa b { display: flex; gap: calc(1 * var(--u)); }
+.hud .pausa b::before, .hud .pausa b::after { content: ""; width: calc(1 * var(--u)); height: calc(2.8 * var(--u)); background: currentColor; border-radius: 2px; }
+.hud .moneda { width: calc(4.6 * var(--u)); height: calc(4.6 * var(--u)); }
+.estacion { display: grid; gap: calc(.5 * var(--u)); font-size: calc(2.3 * var(--u)); }
+.estacion .barra { width: calc(26 * var(--u)); height: calc(1.1 * var(--u)); border-radius: 99px; background: rgba(0, 0, 0, .35); overflow: hidden; --k: 0; }
+.estacion .barra i { display: block; height: 100%; width: calc(var(--k) * 100%); background: linear-gradient(90deg, #ffd23f, #ff6a3d); border-radius: inherit; }
+.poderes { position: absolute; left: calc(2.4 * var(--u)); bottom: calc(10 * var(--u)); margin: 0; padding: 0; list-style: none; display: grid; gap: calc(1 * var(--u)); }
+.poderes li { display: flex; align-items: center; gap: calc(1 * var(--u)); }
+.poderes li b { width: calc(5 * var(--u)); height: calc(5 * var(--u)); display: grid; place-items: center; border-radius: 50%; font-size: calc(2.6 * var(--u)); background: #fff; box-shadow: 0 calc(.4 * var(--u)) 0 rgba(0, 0, 0, .4); }
+.poderes li span { width: calc(18 * var(--u)); height: calc(1.6 * var(--u)); border-radius: 99px; background: rgba(0, 0, 0, .45); overflow: hidden; }
+.poderes li span i { display: block; height: 100%; width: calc(var(--k) * 100%); background: #ff6a3d; }
+.poderes .p-iman span i { background: #ff5a5a; } .poderes .p-mochila span i { background: #ffb02e; } .poderes .p-zapatillas span i { background: #3ad16a; } .poderes .p-doble span i { background: #5fb0ff; } .poderes .p-patineta span i { background: #b37bff; }
+.patinetas { position: absolute; right: calc(2.4 * var(--u)); bottom: calc(10 * var(--u)); display: flex; gap: calc(.8 * var(--u)); align-items: center; font-size: calc(3 * var(--u)); color: #fff; text-shadow: 0 2px 0 #000; }
+
+/* El letrero grande (estación nueva, récord, boleto) y el aviso corto. */
+.banner { position: absolute; left: 50%; top: 30%; transform: translate(-50%, -50%) scale(.9); text-align: center; color: #fff; opacity: 0; pointer-events: none; display: grid; gap: calc(.8cqh); width: 90%; transition: opacity .3s, transform .3s; }
+.banner.ver { opacity: 1; transform: translate(-50%, -50%) scale(1); animation: banner 3s forwards; }
+@keyframes banner { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.7); } 12% { opacity: 1; transform: translate(-50%, -50%) scale(1.06); } 20% { transform: translate(-50%, -50%) scale(1); } 85% { opacity: 1; } 100% { opacity: 0; } }
+.banner strong { font-size: 7.5cqh; line-height: 1; }
+.banner span { font-size: 3cqh; opacity: .9; }
+.aviso { position: absolute; left: 50%; bottom: 4cqh; transform: translate(-50%, 20px); max-width: 88%; padding: 1cqh 2.2cqh; border-radius: 99px; background: rgba(10, 12, 22, .78); color: #fff; font-size: 2.4cqh; text-align: center; opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none; }
+.aviso.ver { opacity: 1; transform: translate(-50%, 0); }
+@media (prefers-reduced-motion: reduce) { .banner.ver { animation: none; } }
+
+/* --- marcador: estética juguete (letras gordas con borde, como un juego de celular) --- */
+.pantalla[data-estilo="juguete"] { --borde: #1b2030; }
+.pantalla[data-estilo="juguete"] .hud, .pantalla[data-estilo="juguete"] .banner { font-family: "Lilita One", "Arial Black", sans-serif; color: #fff; }
+.pantalla[data-estilo="juguete"] :is(.valor, .chico, .estacion > span:first-child, .banner strong, .banner span) {
+  text-shadow: 0 .45cqh 0 var(--borde), .28cqh .28cqh 0 var(--borde), -.28cqh .28cqh 0 var(--borde), .28cqh -.28cqh 0 var(--borde), -.28cqh -.28cqh 0 var(--borde), 0 -.28cqh 0 var(--borde), .28cqh 0 0 var(--borde), -.28cqh 0 0 var(--borde); }
+.pantalla[data-estilo="juguete"] .mult { background: #ffc62a; color: #1b2030; padding: .3cqh 1.2cqh .4cqh; border: .45cqh solid #1b2030; border-radius: 1.4cqh; transform: rotate(-7deg); box-shadow: 0 .5cqh 0 #1b2030; }
+.pantalla[data-estilo="juguete"] .moneda { border-radius: 50%; background: radial-gradient(circle at 38% 34%, #fff2a8 0 14%, #ffd23a 15% 58%, #f0a400 59%); border: .45cqh solid #1b2030; box-shadow: inset 0 0 0 .45cqh #ffdf6b, 0 .45cqh 0 #1b2030; }
+.pantalla[data-estilo="juguete"] .pausa { background: rgba(27, 32, 48, .55); border: .45cqh solid #fff; border-radius: 1.8cqh; color: #fff; }
+
+/* --- marcador: estética neón (letras de cabina que brillan) --- */
+.pantalla[data-estilo="neon"] .hud, .pantalla[data-estilo="neon"] .banner { font-family: Orbitron, "Arial", sans-serif; font-weight: 700; color: #e9fbff; }
+.pantalla[data-estilo="neon"] :is(.valor, .banner strong) { letter-spacing: .3cqh; text-shadow: 0 0 .6cqh #22e5ff, 0 0 1.8cqh #22e5ff; }
+.pantalla[data-estilo="neon"] :is(.chico, .estacion > span:first-child, .banner span) { color: #ffe9fb; text-shadow: 0 0 .6cqh #ff2bd6, 0 0 1.6cqh #ff2bd6; }
+.pantalla[data-estilo="neon"] .mult { color: #ffe9fb; padding: .5cqh 1.2cqh; border: .3cqh solid #ff2bd6; border-radius: .6cqh; text-shadow: 0 0 .8cqh #ff2bd6; box-shadow: 0 0 1.4cqh #ff2bd6, inset 0 0 1.2cqh rgba(255, 43, 214, .5); }
+.pantalla[data-estilo="neon"] .moneda { border-radius: 50%; border: .4cqh solid #ffe14d; box-shadow: 0 0 1.2cqh #ffe14d, inset 0 0 0 .7cqh #0a0620, inset 0 0 0 1.1cqh #ffe14d; }
+.pantalla[data-estilo="neon"] .pausa { border: .3cqh solid #22e5ff; border-radius: .8cqh; color: #e9fbff; background: rgba(10, 6, 32, .55); box-shadow: 0 0 1.4cqh #22e5ff; }
+.pantalla[data-estilo="neon"] .poderes li b { background: rgba(10, 6, 32, .7); box-shadow: 0 0 1cqh #22e5ff; }
+.pantalla[data-estilo="neon"] .estacion .barra i { background: linear-gradient(90deg, #22e5ff, #ff2bd6); box-shadow: 0 0 1cqh #ff2bd6; }
+
+/* --- marcador: estética pixel (letra de 8 bits y marcos escalonados) --- */
+.pantalla[data-estilo="pixel"] .hud, .pantalla[data-estilo="pixel"] .banner { font-family: "Press Start 2P", monospace; color: #fff1d4; }
+.pantalla[data-estilo="pixel"] .hud .valor { font-size: calc(4.6 * var(--u)); }
+.pantalla[data-estilo="pixel"] .hud .chico, .pantalla[data-estilo="pixel"] .estacion { font-size: calc(2.2 * var(--u)); line-height: 1.5; }
+.pantalla[data-estilo="pixel"] :is(.valor, .chico, .estacion > span:first-child, .banner strong, .banner span) { text-shadow: .4cqh .4cqh 0 #2a1c18; }
+.pantalla[data-estilo="pixel"] .banner strong { font-size: 5cqh; }
+.pantalla[data-estilo="pixel"] .mult { font-size: calc(2.6 * var(--u)); padding: 1cqh; background: #e2463a; box-shadow: 0 -.6cqh 0 #2a1c18, 0 .6cqh 0 #2a1c18, -.6cqh 0 0 #2a1c18, .6cqh 0 0 #2a1c18; }
+.pantalla[data-estilo="pixel"] .moneda { width: calc(3.4 * var(--u)); height: calc(4.2 * var(--u)); background: #ffd23f; box-shadow: inset -.8cqh 0 0 #e09a1a, inset .8cqh 0 0 #fff1a0, 0 -.6cqh 0 #2a1c18, 0 .6cqh 0 #2a1c18, -.6cqh 0 0 #2a1c18, .6cqh 0 0 #2a1c18; }
+.pantalla[data-estilo="pixel"] .pausa { background: #2a2232; color: #fff1d4; box-shadow: 0 -.6cqh 0 #fff1d4, 0 .6cqh 0 #fff1d4, -.6cqh 0 0 #fff1d4, .6cqh 0 0 #fff1d4; border: 0; }
+.pantalla[data-estilo="pixel"] .estacion .barra { border-radius: 0; } .pantalla[data-estilo="pixel"] .estacion .barra i { border-radius: 0; background: #2fb59a; }
+
+/* ---------- los paneles (portada, pausa, fin, tienda…) ---------- */
+.capa { position: absolute; inset: 0; display: grid; place-items: center; padding: 3cqh 3cqw; background: rgba(8, 10, 20, .45); backdrop-filter: blur(3px); overflow: auto; }
+.capa.portada { background: linear-gradient(180deg, rgba(8, 10, 20, .05), rgba(8, 10, 20, .55)); backdrop-filter: none; }
+.caja { width: min(560px, 100%); max-height: 100%; overflow: auto; background: rgba(18, 21, 36, .92); color: #f2f4fa; border: 1px solid rgba(255, 255, 255, .14); border-radius: 18px; padding: 22px 22px 18px; box-shadow: 0 20px 60px rgba(0, 0, 0, .45); }
+.capa.portada { place-items: stretch; padding: 3cqh 3cqw 2.5cqh; }
+/* La portada: arriba el título y el menú, abajo los récords y los retos en
+   fila (así el corredor queda a la vista en el medio). */
+.capa.portada .caja { width: 100%; max-height: none; display: flex; flex-direction: column; justify-content: space-between; align-items: center; background: transparent; border: 0; box-shadow: none; text-align: center; padding: 0; overflow: visible; }
+.capa.portada .pie-portada { width: min(860px, 100%); }
+.caja h2 { margin: 0 0 10px; font: 400 26px/1.1 "Lilita One", "Arial Black", sans-serif; letter-spacing: .3px; }
+.caja h2 small { font: 500 13px "IBM Plex Sans", sans-serif; color: #aab3c8; margin-left: 6px; }
+.caja h3 { margin: 16px 0 8px; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: #aab3c8; }
+.caja p { margin: 0 0 10px; }
+.caja .titulo { margin: 0; font: 400 clamp(46px, 13cqh, 120px)/0.95 "Lilita One", "Arial Black", sans-serif; color: #fff; letter-spacing: 1px;
+  text-shadow: 0 .8cqh 0 #1b2030, .45cqh .45cqh 0 #1b2030, -.45cqh .45cqh 0 #1b2030, .45cqh -.45cqh 0 #1b2030, -.45cqh -.45cqh 0 #1b2030, 0 1.6cqh 2cqh rgba(0, 0, 0, .4); }
+.pre { margin: 0 0 6px; font: 700 13px Orbitron, sans-serif; letter-spacing: .25em; color: #ffd23f; text-shadow: 0 2px 0 #1b2030; }
+.menu { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 16px; }
+.opcion { font: 600 15px "IBM Plex Sans", sans-serif; padding: 10px 16px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, .25); background: rgba(255, 255, 255, .08); color: #fff; cursor: pointer; }
+.opcion:hover:not(:disabled) { border-color: #ffd23f; background: rgba(255, 255, 255, .14); }
+.opcion:disabled { opacity: .45; cursor: default; }
+.opcion.principal { background: #ff6a3d; border-color: #ff6a3d; color: #fff; font-family: "Lilita One", "Arial Black", sans-serif; font-weight: 400; font-size: 20px; padding: 10px 26px; box-shadow: 0 4px 0 #b8401f; }
+.opcion.especial { background: #ffc62a; border-color: #ffc62a; color: #1b2030; font-weight: 700; box-shadow: 0 4px 0 #b88a10; }
+.records { margin-top: 14px !important; color: #fff; text-shadow: 0 2px 0 #1b2030; font-size: 14px; }
+.records b { color: #ffd23f; }
+.detalle { color: #c9d0e0; }
+.nota { color: #aab3c8; font-size: 13px; }
+
+/* Los retos con su barra de avance. */
+.retos { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 8px; text-align: left; }
+.retos li { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: center; padding: 8px 10px; border-radius: 10px; background: rgba(255, 255, 255, .06); }
+.retos li i { grid-column: 1 / -1; height: 6px; border-radius: 99px; background: linear-gradient(90deg, #ffd23f calc(var(--k) * 100%), rgba(255, 255, 255, .12) 0); }
+.retos li small { color: #aab3c8; font-size: 12px; }
+.retos li.ok { background: rgba(58, 209, 106, .16); }
+.retos.mini { width: 100%; margin: 8px auto 0; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.retos.mini li { background: rgba(10, 12, 22, .66); color: #fff; font-size: 12px; line-height: 1.25; padding: 6px 8px; align-content: start; }
+.retos.mini li small { font-size: 11px; }
+@container (max-width: 520px) {
+  /* en un celular los retos de la portada tapaban al corredor: siguen en el botón «Retos» */
+  .retos.mini { display: none; }
+  .menu { gap: 7px; } .opcion { padding: 8px 12px; font-size: 14px; }
+}
+
+/* Las estadísticas del fin. */
+.estadisticas { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 6px 0 0; }
+.estadisticas div { background: rgba(255, 255, 255, .06); border-radius: 10px; padding: 8px 10px; }
+.estadisticas dt { font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: #aab3c8; }
+.estadisticas dd { margin: 2px 0 0; font: 400 20px "Lilita One", "Arial Black", sans-serif; }
+@media (max-width: 520px) { .estadisticas { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* La tienda. */
+.saldo { float: right; font: 400 20px "Lilita One", sans-serif; color: #ffd23f; }
+.articulos { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.articulos li { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 12px; background: rgba(255, 255, 255, .06); }
+.articulos li > b { font-size: 26px; text-align: center; }
+.articulos strong { display: block; }
+.articulos small { color: #aab3c8; }
+.articulos .niveles { display: flex; gap: 4px; margin-top: 4px; }
+.articulos .niveles i { width: 18px; height: 6px; border-radius: 3px; background: rgba(255, 255, 255, .15); }
+.articulos .niveles i.si { background: #ffd23f; }
+.articulos .muestra { width: 40px; height: 40px; border-radius: 10px; background: conic-gradient(var(--a) 0 50%, var(--b) 0 75%, var(--c) 0); border: 2px solid rgba(255, 255, 255, .3); }
+.articulos .secreto { max-width: 200px; text-align: right; }
+
+/* La libreta (los boletos de la historia). */
+.libreta .intro { color: #ffe9b0; font-style: italic; }
+.boletos { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 10px; }
+.boletos li { padding: 10px 12px; border-radius: 12px; background: linear-gradient(135deg, rgba(255, 201, 58, .22), rgba(224, 154, 16, .12)); border: 1px dashed rgba(255, 210, 63, .6); }
+.boletos li p { margin: 4px 0 0; color: #f2ead8; }
+.boletos li.falta { background: rgba(255, 255, 255, .04); border-color: rgba(255, 255, 255, .15); }
+.boletos li.falta p { color: #8a93a8; }
+
+/* Opciones. */
+.fila { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 8px 0; border-bottom: 1px solid rgba(255, 255, 255, .08); }
+.fila select, .fila input[type="range"] { max-width: 58%; }
+.fila select { background: #1d2236; color: #fff; border: 1px solid rgba(255, 255, 255, .2); border-radius: 8px; padding: 6px 8px; }
+.ayuda ul { padding-left: 18px; display: grid; gap: 8px; margin: 0; }
+
+/* ---------- dentro de Juegos (iframe) ---------- */
+.club-integrado .cab { display: none; }
+.club-integrado .shell { padding: 0; }
+.club-integrado .scorebar { background: #fff; }
+.club-integrado[data-tema=oscuro] .scorebar { background: #222638; color: #e5e9f2; border-color: #34354b; }
+.club-integrado[data-tema=oscuro] .icono { background: #2a2f45; color: #e5e9f2; border-color: #3a3f58; }
+.club-integrado[data-tema=oscuro] .pie { color: #9aa8b9; }
+@media (max-width: 700px) {
+  .scorebar { gap: 12px; padding: 8px 10px; }
+  .scorebar strong { font-size: 17px; }
+  .caja { padding: 16px 14px 14px; border-radius: 14px; }
+  .opcion.principal { font-size: 18px; }
+}

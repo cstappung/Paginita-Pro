@@ -176,6 +176,15 @@ y están en el repositorio público, como cualquier archivo del sitio.
 > publicar las reglas se juega igual, pero las estrellas no entran en la
 > clasificación (se mandan solas después de publicarlas) y no pagan monedas.
 
+> **Vía Libre (octubre de 2026):** `club-vialibre-carrera` (los puntos de la
+> mejor carrera, con tope de 1 000 000 000, porque en el juego se llega a
+> millones) y `club-vialibre-distancia` (los metros de la carrera más larga,
+> con tope de 1 000 000) son categorías nuevas de `soloRanks`, y `vialibre`
+> un juego nuevo de `clubJugadas`. Hay que volver a publicar las reglas:
+> hasta entonces se juega igual, pero los récords se quedan en el
+> dispositivo (se sincronizan solos después de publicarlas) y las carreras
+> no pagan monedas.
+
 Tu base de datos está ahora en **modo de prueba** (abierta a cualquiera).
 Antes de publicar el sitio:
 

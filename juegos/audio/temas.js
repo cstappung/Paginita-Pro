@@ -20,6 +20,10 @@
  *   atasco     Si bemol mayor, 124 con swing — funk de hora punta con un
  *              motivo de bocina («pi, pi») y palmas en el 2 y el 4.
  *   worms-menu / worms-combate  Mi mayor tranquilo y Si menor de batalla.
+ *   vialibre-*  uno por estación de Vía Libre: barrio (Sol mayor, 124),
+ *              ocaso (Si menor, 132), neon (Do menor, 138), fantasma (Mi
+ *              frigio, 126), invierno (La mayor, 136), oxido (Si bemol
+ *              menor, 150) y fin (Fa mayor, 128).
  *
  * Y los que no son de ningún juego, para el reproductor de la cabecera:
  *
@@ -864,6 +868,167 @@
         "R - - - - - - - - - - - F - - -", "h.......h...h...", 2)
     },
     orden: "A B A B"
+  };
+
+  /* ---------- Vía Libre: un tema por estación ----------
+     El corredor cambia de estación según los puntos, y la música cambia con
+     él: al salir de cada túnel suena otro sitio. Todos son melodías propias.
+     El juego (juegos/club/vialibre/audio.js) acelera el tempo con la
+     velocidad de la carrera, de ×0,92 a ×1,15, así que se escriben un pelo
+     por debajo del pulso que se quiere oír a media carrera. */
+
+  /* Barrio Estación: Sol mayor a 124 con un poco de swing. La melodía va
+     saltando por el acorde como quien salta de vagón en vagón, y el bajo
+     pisa fundamental, quinta y octava: calle, mañana y ganas de correr. */
+  T["vialibre-barrio"] = {
+    bpm: 124, swing: .1,
+    lead: { onda: "p25", vol: .14, vib: .008, sus: .6, eco: { t: .12, fb: .2, mezcla: .18 } },
+    bajo: { onda: "tri", vol: .22 }, arp: { onda: "p12", vol: .045, oct: 5, paso: .03 }, bat: { vol: .32 },
+    secciones: {
+      I: sec("G D", "", "R . F . O . F R . R F . O . F .", "k..hs.hkk.h.s.hh", 2),
+      A: sec("G Em C D",
+        "D5*2 G5*2 B5*2 G5 A5 B5*4 D6*2 B5*2  E5*2 G5*2 B5*3 A5 G5*4 E5*4  " +
+        "C5*2 E5*2 G5*2 E5 G5 C6*4 B5*2 A5*2  A5*2 F#5*2 D5*2 F#5 A5 D6*6 .*2",
+        "R . F . O . F R . R F . O . F .", "k..hs.hkk.h.s.hh", 2),
+      B: sec("C D Em,D G",
+        "E6*3 D6 C6*2 G5*2 E5*4 G5*2 C6*2  D6*3 C6 A5*2 F#5*2 D5*4 F#5*2 A5*2  " +
+        "B5*2 G5*2 E5*4 F#5*2 A5*2 D6*4  B5*2 A5*2 G5*2 D5*2 G5*8",
+        "R . R F . R O . R . R F . R O .", "k.hks.hkk.hks.hx", 2)
+    },
+    orden: "I A A B A B A"
+  };
+
+  /* Ocaso: Si menor a 132, pulso cuadrado de consola de 8 bits (el estilo
+     pixelado de esa estación). La tarde se va: la melodía cae al final de
+     cada frase y en B sube hasta el Fa# mayor, como el último rayo de sol. */
+  T["vialibre-ocaso"] = {
+    bpm: 132,
+    lead: { onda: "p50", vol: .13, vib: .006, sus: .65, eco: { t: .14, fb: .25, mezcla: .2 } },
+    bajo: { onda: "tri", vol: .21 }, arp: { onda: "p25", vol: .045, oct: 4, paso: .035 }, bat: { vol: .3 },
+    secciones: {
+      I: sec("Bm A", "", "R . R . F . R . O . R . F . R .", "k.h.s.h.k.h.s.hh", 2),
+      A: sec("Bm G D A",
+        "F#5*2 B5*2 D6*2 C#6 B5 C#6*4 A5*2 F#5*2  G5*2 B5*2 D6*3 C#6 B5*4 G5*4  " +
+        "F#5*2 A5*2 D6*2 E6 F#6 E6*4 D6*2 A5*2  C#6*2 B5*2 A5*2 E5 F#5 E5*6 .*2",
+        "R . R . F . R . O . R . F . R .", "k.h.s.hkk.h.s.hh", 2),
+      B: sec("Em G Bm,A F#",
+        "G5*3 F#5 E5*2 B4*2 E5*4 G5*2 B5*2  D6*3 B5 G5*2 D5*2 G5*4 B5*2 D6*2  " +
+        "F#6*2 D6*2 B5*4 E6*2 C#6*2 A5*4  A#5*4 C#6*4 F#6*8",
+        "R . R R F . R . O . R R F . O .", "k.hks.hkk.hks.hx", 2)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* Línea Neón: Do menor a 138, sierra desafinada y filtrada, bajo de
+     octavas en semicorcheas y un bombeo suave: synthwave con prisa, de
+     noche, con la vía encendida. */
+  T["vialibre-neon"] = {
+    bpm: 138, bombeo: .3,
+    lead: { onda: "saw", vol: .1, vib: .006, desafina: 10, filtro: 2600, eco: { fb: .38, mezcla: .3 } },
+    bajo: { onda: "saw", vol: .12, filtro: 560, q: 3 },
+    arp: { onda: "saw", vol: .045, oct: 4, paso: .07, desafina: 8, filtro: 1500, sus: .5 },
+    bat: { vol: .34 },
+    secciones: {
+      I: sec("Cm Ab", "", "R O R O R O R O R O R O R O R O", "k...k...k...k..h", 4),
+      A: sec("Cm Ab Eb Bb",
+        "G5*2 C6*2 Eb6*2 D6 C6 D6*4 Bb5*2 G5*2  Ab5*2 C6*2 Eb6*3 D6 C6*4 Ab5*4  " +
+        "G5*2 Bb5*2 Eb6*2 F6 G6 F6*4 Eb6*2 Bb5*2  D6*2 C6*2 Bb5*2 F5 G5 F5*6 .*2",
+        "R O R O R O R O R O R O R O R O", "k.h.s.hkk.h.s.hh", 4),
+      B: sec("Fm Ab Cm,Bb G",
+        "Ab5*3 G5 F5*2 C5*2 F5*4 Ab5*2 C6*2  Eb6*3 C6 Ab5*2 Eb5*2 Ab5*4 C6*2 Eb6*2  " +
+        "G6*2 Eb6*2 C6*4 F6*2 D6*2 Bb5*4  B5*4 D6*4 G6*8",
+        "R O R O R O R O R O R O R O R O", "k.hks.hkk.hks.hx", 4)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* Estación Fantasma (el millón de puntos): Mi frigio a 126. El acorde de
+     Fa sobre el Mi es lo que da escalofrío; el pulso fino tiembla con mucho
+     vibrato y deja un eco largo, como si alguien más corriera detrás. */
+  T["vialibre-fantasma"] = {
+    bpm: 126,
+    lead: { onda: "p12", vol: .13, vib: .02, sus: .7, eco: { fb: .5, mezcla: .42 } },
+    bajo: { onda: "tri", vol: .22 }, arp: { onda: "sine", vol: .06, oct: 4, paso: .09, sus: .5 }, bat: { vol: .3 },
+    secciones: {
+      I: sec("Em F", "", "R - - - . . R - F - - - O - F -", "t...h...T...h...", 4),
+      A: sec("Em F Am B7",
+        "E5*2 G5*2 B5*4 C6*2 B5*2 G5*4  F5*2 A5*2 C6*4 B5*2 A5*2 F5*4  " +
+        "E5*2 A5*2 C6*2 E6*2 D#6*4 C6*4  B5*2 A5*2 F#5*2 D#5*2 B4*8",
+        "R - . R F - . F O - . O F - R -", "k..ht.h.k.h.T.hh", 4),
+      B: sec("Am Em F B7",
+        "C6*4 B5*2 A5*2 E6*8  G6*4 F#6*2 E6*2 B5*8  " +
+        "A5*4 C6*2 F6*2 E6*4 C6*4  D#6*4 F#6*4 B5*8",
+        "R - . R F - . F O - . O F - R -", "k.ht.thkk.htT.hx", 4)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* Invierno: La mayor a 136, de cascabeles. El charles no para (los
+     cascabeles del trineo) y el arpegio va una octava arriba como una caja
+     de música; la melodía es la más alegre del juego. */
+  T["vialibre-invierno"] = {
+    bpm: 136,
+    lead: { onda: "p50", vol: .13, vib: .01, sus: .6, eco: { t: .11, fb: .22, mezcla: .2 } },
+    bajo: { onda: "tri", vol: .21 }, arp: { onda: "p12", vol: .045, oct: 5, paso: .04 }, bat: { vol: .3 },
+    secciones: {
+      I: sec("A E", "", "R . F . O . F . R . F . O . F .", "k.hhshhhk.hhshhh", 4),
+      A: sec("A F#m D E",
+        "E5*2 A5*2 C#6*2 B5 A5 B5*4 C#6*2 A5*2  F#5*2 A5*2 C#6*3 B5 A5*4 F#5*4  " +
+        "D5*2 F#5*2 A5*2 B5 C#6 D6*4 C#6*2 B5*2  B5*2 C#6*2 B5*2 A5 G#5 E5*6 .*2",
+        "R . F . O . F . R . F . O . F .", "k.hhshhhk.hhshhh", 4),
+      B: sec("D E C#m,F#m Bm,E",
+        "F#6*3 E6 D6*2 A5*2 F#5*4 A5*2 D6*2  E6*3 D6 B5*2 G#5*2 E5*4 G#5*2 B5*2  " +
+        "C#6*2 E6*2 G#6*4 F#6*2 C#6*2 A5*4  B5*2 D6*2 F#6*4 E6*4 G#5*4",
+        "R . R F . R O . R . R F . R O .", "k.hhshhkk.hhshhx", 4)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* Óxido (más allá del mapa): Si bemol menor a 150. Bajo de sierra
+     cerrado, caja seca y una melodía de cuadrado ancho que golpea como
+     chapa: la estación más dura, donde ya no queda ciudad. */
+  T["vialibre-oxido"] = {
+    bpm: 150,
+    lead: { onda: "p50", vol: .12, vib: .003, sus: .5, eco: { t: .1, fb: .18, mezcla: .15 } },
+    bajo: { onda: "saw", vol: .12, filtro: 650, q: 4 },
+    arp: { onda: "p25", vol: .04, oct: 4, paso: .025 }, bat: { vol: .38 },
+    secciones: {
+      I: sec("Bbm Bbm", "", "R R O R R . R O . R R O R . F O", "k.k.s...k.kks.s.", 2),
+      A: sec("Bbm Gb Ab F",
+        "Bb4*2 Db5*2 F5*2 Bb5*2 Ab5*2 F5*2 Db5*4  Bb4*2 Db5*2 Gb5*4 F5*2 Db5*2 Bb4*4  " +
+        "C5*2 Eb5*2 Ab5*2 C6*2 Bb5*2 Ab5*2 Eb5*4  F5*2 E5*2 F5*2 A5*2 C6*4 A5*4",
+        "R R O R R . R O . R R O R . F O", "k.k.s.hkk.kks.hs", 2),
+      B: sec("Ebm Bbm Gb F",
+        "Gb5*3 F5 Eb5*2 Bb4*2 Eb5*4 Gb5*2 Bb5*2  Db6*3 C6 Bb5*2 F5*2 Bb5*4 Db6*2 F6*2  " +
+        "Eb6*2 Db6*2 Bb5*4 Gb5*4 Db6*4  C6*4 A5*4 F5*8",
+        "R R O R R . R O . R R O R . F O", "x.k.s.hkk.kks.ss", 2)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* Fin de la Línea (diez millones): Fa mayor a 128, el himno. Sierra
+     ancha y desafinada, la melodía que sube por el acorde y un final (C)
+     que trepa hasta el Do más agudo del juego: llegaste al alba. */
+  T["vialibre-fin"] = {
+    bpm: 128,
+    lead: { onda: "saw", vol: .1, vib: .007, desafina: 12, filtro: 3000, eco: { fb: .32, mezcla: .26 } },
+    bajo: { onda: "tri", vol: .22 },
+    arp: { onda: "p12", vol: .045, oct: 5, paso: .035 }, bat: { vol: .34 },
+    secciones: {
+      I: sec("F C", "", "R . F . O . F . R . F R O . F .", "k...s...k.k.s..x", 2),
+      A: sec("F C Dm Bb",
+        "C5*2 F5*2 A5*2 G5 F5 G5*4 A5*2 C6*2  C6*3 Bb5 A5*2 G5*2 E5*4 G5*4  " +
+        "D5*2 F5*2 A5*2 Bb5 C6 D6*4 C6*2 A5*2  Bb5*2 A5*2 G5*2 D5 E5 F5*6 .*2",
+        "R . F . O . F . R . F R O . F .", "k.h.s.hkk.h.s.hh", 2),
+      B: sec("Bb C Am Dm",
+        "D6*3 C6 Bb5*2 F5*2 D5*4 F5*2 Bb5*2  E6*3 D6 C6*2 G5*2 E5*4 G5*2 C6*2  " +
+        "C6*2 E6*2 A6*4 G6*2 E6*2 C6*4  D6*4 F6*4 A6*8",
+        "R . R F . R O . R . R F . R O .", "k.hks.hkk.hks.hx", 2),
+      C: sec("Bb C F F",
+        "F6*4 D6*4 Bb5*4 D6*4  E6*4 G6*4 C7*8  A6*8 G6*4 F6*4  F6*8 C6*4 .*4",
+        "R . O . F . O . R . O . F . O .", "k.hks.hkk.hks.hx", 2)
+    },
+    orden: "I A A B A B C"
   };
 
   const Temas = { temas: T, linea, arpegio, raiz };

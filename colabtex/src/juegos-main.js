@@ -91,7 +91,7 @@ const FABRICAS = {
 const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞", pokemon: "◓", boxhead: "▣" };
 /* Los clubes de un jugador, con sus claves de la clasificación y los
    mismos signos que llevan en su tarjeta del vestíbulo. */
-const ICONO_TODOS = { ...ICONO, general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", frontera: "🏰", sudoku: "🔢", fanal: "🪔", atasco: "🚗", yzombis: "🧟" };
+const ICONO_TODOS = { ...ICONO, general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", frontera: "🏰", sudoku: "🔢", fanal: "🪔", atasco: "🚗", vialibre: "🚇", yzombis: "🧟" };
 
 /* Lo que puede elegir quien abre la sala, por juego. Vive aquí y no en
    `motor.js` porque son controles y no reglas: el motor ya recorta lo
@@ -238,7 +238,7 @@ function leePopular() {
 }
 /* Los de un jugador, con su clave de popularidad. Cuentan como juegos en
    la marquesina: el «18» fijo de antes se quedó atrás con cada club. */
-const CLUBES = ["club-minas", "club-snake", "club-tetris", "club-sortem", "club-bbtan", "club-sopa", "club-electro", "club-frontera", "club-sudoku", "club-fanal", "club-atasco"];
+const CLUBES = ["club-minas", "club-snake", "club-tetris", "club-sortem", "club-bbtan", "club-sopa", "club-electro", "club-frontera", "club-sudoku", "club-fanal", "club-atasco", "club-vialibre"];
 function ordenPopular(claves) {
   const n = state.popular, pos = Object.fromEntries(claves.map((k, i) => [k, i]));
   return claves.slice().sort((a, b) => (n[b] || 0) - (n[a] || 0) || pos[a] - pos[b]);
@@ -828,7 +828,7 @@ function celebra(juego, id) {
    barra de direcciones. */
 function leerRuta() {
   const h = (location.hash || "").replace(/^#/, "");
-  if (/^solo\/(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
+  if (/^solo\/(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|vialibre)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
   if (h === "ranks") return { vista: "ranks", pid: "" };
   if (h === "logros") return { vista: "logros", pid: "" };
   if (h === "monedas") return { vista: "monedas", pid: "" };
@@ -1287,7 +1287,7 @@ function armazon() {
     h.innerHTML = "";
     logrosVista = crearLogros({ uid: state.user.uid, watchLogros: fb.watchLogros, perfil: perfilDe, icono: ICONO_TODOS,
       orden: () => ordenPopular([...Object.keys(JUEGOS), ...CLUBES])
-        .map(k => ({ "club-minas": "minas", "club-snake": "snake", "club-tetris": "tetrisclub", "club-sortem": "sortem", "club-bbtan": "bbtan", "club-sopa": "sopa", "club-electro": "electro", "club-frontera": "frontera", "club-sudoku": "sudoku", "club-fanal": "fanal", "club-atasco": "atasco" })[k] || k) });
+        .map(k => ({ "club-minas": "minas", "club-snake": "snake", "club-tetris": "tetrisclub", "club-sortem": "sortem", "club-bbtan": "bbtan", "club-sopa": "sopa", "club-electro": "electro", "club-frontera": "frontera", "club-sudoku": "sudoku", "club-fanal": "fanal", "club-atasco": "atasco", "club-vialibre": "vialibre" })[k] || k) });
     logrosVista.montar(h);
     return;
   }
@@ -1490,6 +1490,9 @@ const porOmision = k => Object.fromEntries((OPCIONES[k] || []).map(o => [o.clave
    Yemas), así que la lista se escribe aquí en vez de salir de las fechas
    `alta` de JUEGOS. El primero lleva «★ Lo último». */
 const NOVEDADES = [
+  { id: "vialibre", color: "#ff6a3d", alta: "2026-10-05", titulo: "VÍA LIBRE",
+    lema: "Corre por las vías esquivando trenes: salta las barreras bajas, rueda bajo las altas y sube por las rampas a correr sobre los techos. Junta monedas, cumple retos y no dejes que el inspector te atrape.",
+    sub: "Un jugador · esquiva trenes, junta monedas y llega a la Estación Fantasma", ruta: "#solo/vialibre", boton: "Correr", reglas: ["vialibre"], modo: "solo" },
   { id: "atasco", color: "#e8322f", alta: "2026-10-05", titulo: "Atasco",
     lema: "Estás encerrado en el auto rojo. Desliza autos, camiones y buses por su carril hasta abrirte camino a la salida. Con el mínimo de movidas, tres estrellas.",
     sub: "Un jugador · 240 niveles en seis pisos", ruta: "#solo/atasco", boton: "Arrancar", reglas: ["atasco"], modo: "solo" },
@@ -1500,10 +1503,6 @@ const NOVEDADES = [
   { id: "fanal", color: "#d9a85b", alta: "2026-10-04", titulo: "FANAL",
     lema: "Llevas la última luz a través de la noche, hacia el Alba. Las polillas bajan en formación hacia ella. Dispara al pulso de la música… y averigua qué estás apagando.",
     sub: "Un jugador · trece jornadas, tres jefes y una travesía sin fin", ruta: "#solo/fanal", boton: "Encender", reglas: ["fanal"], modo: "solo" },
-  { id: "zombis", color: "#4f8a2b", alta: "2026-10-01", titulo: "Yemas · modo Zombis",
-    lema: "Todos juntos contra oleadas de huevos podridos, en cinco mapas clásicos: bebidas, la caja misteriosa, armas en la pared y Pack-a-Punch. Se puede jugar solo.",
-    sub: "1–8 jugadores · cooperativo", sala: { k: "yemas", ops: { variante: "zombis" } }, reglas: ["yemas", "zombis"],
-    modo: "multi", jugadores: "1–8 jugadores", cuenta: true, practica: "juegos/yemas/index.html" },
   { id: "prodrop", color: "#9b4dff", alta: "2026-10-02", titulo: "PRODROP · sobres y mercado",
     lema: "Sobres de cinco cartas de los profes, uno gratis cada 6 horas. Gradúalas, exhíbelas en tu perfil, véndelas en el mercado o cámbialas con otros.",
     sub: () => { const a = fb.ahora(), p = MOTOR.precioSobre(a);
@@ -1513,6 +1512,8 @@ const NOVEDADES = [
 function arteNovedad(n) {
   // Atasco: un estacionamiento visto desde arriba, el auto rojo y la barrera de salida.
   if (n.id === "atasco") return `<div class="jg-nov-arte-at"><i></i><i></i><i></i><i></i><em></em><s></s><b>ATASCO</b></div>`;
+  // Vía Libre: tres vías que se juntan en el horizonte, un tren de frente con los focos encendidos y unas monedas.
+  if (n.id === "vialibre") return `<div class="jg-nov-arte-vl"><i></i><i></i><i></i><em></em><b>VÍA LIBRE</b></div>`;
   // FANAL: un farol que alumbra la noche y unas polillas que bajan hacia él.
   if (n.id === "fanal") return `<div class="jg-nov-arte-fn"><i></i><i></i><i></i><i></i><i></i><em></em><b>FANAL</b></div>`;
   if (n.id === "boxhead") return `<div class="jg-nov-arte-zb">${arteJuego("boxhead")}</div>`;

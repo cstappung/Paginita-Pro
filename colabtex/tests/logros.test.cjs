@@ -7,7 +7,7 @@ vm.runInContext(sin('src/juegos/motor.js')+'\n'+sin('src/juegos/logros.js')+'\n;
 const {LOGROS,detecta,deFila,deMarca,reparto,reducir,JUEGOS}=context.__L;
 
 test('diez logros por juego, con ids válidos y únicos',()=>{
- const juegos=[...Object.keys(JUEGOS),'minas','snake','tetrisclub','sortem','bbtan','sopa','electro','frontera','sudoku','fanal','atasco'];
+ const juegos=[...Object.keys(JUEGOS),'minas','snake','tetrisclub','sortem','bbtan','sopa','electro','frontera','sudoku','fanal','atasco','vialibre'];
  for(const j of juegos){
   assert.ok(LOGROS[j],j);assert.equal(LOGROS[j].length,10,j);
   const ids=LOGROS[j].map(x=>x.id);assert.equal(new Set(ids).size,10,j);
@@ -71,4 +71,15 @@ test('Atasco: los logros salen de las estrellas juntadas',()=>{
  assert.deepEqual([...deMarca('atasco',{categoria:'club-atasco-estrellas',puntos:65,tiempo:1})],['e1','e30','e60']);
  assert.deepEqual([...deMarca('atasco',{categoria:'club-atasco-estrellas',puntos:720,tiempo:1})].length,10);
  assert.deepEqual([...deMarca('atasco',{categoria:'club-fanal-travesia',puntos:720,tiempo:1})],[]);
+});
+test('Vía Libre: puntos de la mejor carrera y metros de la más larga',()=>{
+ // Los de puntos: 50 000, 250 000, un millón (la Estación Fantasma), tres y diez millones.
+ assert.deepEqual([...deMarca('vialibre',{categoria:'club-vialibre-carrera',puntos:300000,tiempo:1})],['c50k','c250k']);
+ assert.deepEqual([...deMarca('vialibre',{categoria:'club-vialibre-carrera',puntos:10000000,tiempo:1})],['c50k','c250k','c1m','c3m','c10m']);
+ // Los de distancia: 1, 5, 10, 21 y 42 km.
+ assert.deepEqual([...deMarca('vialibre',{categoria:'club-vialibre-distancia',puntos:21000,tiempo:1})],['d1k','d5k','d10k','d21k']);
+ assert.deepEqual([...deMarca('vialibre',{categoria:'club-vialibre-distancia',puntos:42195,tiempo:1})],['d1k','d5k','d10k','d21k','d42k']);
+ // Los metros no dan logros de puntos, ni los puntos de distancia.
+ assert.deepEqual([...deMarca('vialibre',{categoria:'club-vialibre-distancia',puntos:3000000,tiempo:1})],['d1k','d5k','d10k','d21k','d42k']);
+ assert.deepEqual([...deMarca('vialibre',{categoria:'club-vialibre-carrera',puntos:999,tiempo:1})],[]);
 });

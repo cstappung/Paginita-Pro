@@ -1,4 +1,4 @@
-import {cart, dados, tablero, orbes, reversi, cajas, paisaje, tiro, orbita, serpiente, tetris, isla, ajedrez, fanal, boxhead, atasco} from './reglas-ilustraciones.js';
+import {cart, dados, tablero, orbes, reversi, cajas, paisaje, tiro, orbita, serpiente, tetris, isla, ajedrez, fanal, boxhead, atasco, vialibre} from './reglas-ilustraciones.js';
 const p=(titulo,texto,imagen)=>({titulo,texto,imagen});
 const e=(id,titulo,...pasos)=>({id,titulo,pasos});
 const fichas=(titulo,...cs)=>cart([titulo,cs]);
@@ -199,6 +199,18 @@ export const EJEMPLOS={
  e('pisos','Seis pisos que se abren con estrellas',
   p('Cada piso pide la mitad','Los 240 niveles están en seis pisos de 40. Un piso se abre cuando el anterior junta la mitad de sus estrellas: 60 de 120.',fichas('Abrir el Subterráneo 1',['La calle','verde','60 / 120 ★'],['Subt. 1','oro','ABIERTO'],['Subt. 2','gris','CERRADO'])),
   p('Dentro de un piso, en orden','Cada nivel se abre al sacar el auto en el anterior, con las estrellas que sean. Volver a un nivel para mejorarlo no cuesta nada y suma a la clasificación.',fichas('Tu avance',['12','oro','★★★'],['13','verde','★'],['14','azul','SIGUIENTE'])))],
+ /* Vía Libre: lo mismo que dice su manual en reglas.js (obstáculos,
+    rampa, poderes y multiplicador), con sus dibujos de vialibre(). */
+ vialibre:[e('obstaculos','Saltar, rodar o esquivar',
+  p('La barrera baja','La barrera baja es a rayas y llega a la altura de la cintura. Sáltala con ↑, W o Espacio, o deslizando el dedo hacia arriba.',vialibre(0)),
+  p('La barrera alta','La barrera alta lleva una flecha hacia abajo: pásala rodando con ↓ o S, o deslizando hacia abajo. Si estabas en el aire, rodar te baja de golpe.',vialibre(1)),
+  p('El tren de frente','Un tren que viene por tu carril se esquiva cambiando de carril con ← → o deslizando a un lado. Chocar de frente termina la carrera; rozar un costado es un tropiezo y el inspector se acerca.',vialibre(2))),
+ e('rampa','Subir por la rampa',
+  p('La rampa del tren detenido','Un tren detenido se puede esquivar por otro carril o subir corriendo por su rampa. Desde arriba se corre por los techos de los trenes.',vialibre(3)),
+  p('Por los techos','Arriba se corre de techo en techo y se recogen las monedas que haya. Con las zapatillas saltarinas saltas el doble de alto y llegas a los techos sin buscar la rampa.',vialibre(4))),
+ e('poderes','Poderes y multiplicador',
+  p('Los poderes','Imán: atrae las monedas de los tres carriles. Mochila cohete: vuelas por encima de todo. Zapatillas: saltas el doble de alto. 2×: duplica los puntos. La patineta, si chocas, se rompe ella en vez de terminar la carrera.',fichas('Cuánto dura cada uno',['10 s','rojo','IMÁN'],['8 s','azul','COHETE'],['10 s','verde','ZAPATILLAS'],['12 s','oro','2×'],['30 s','violeta','PATINETA'])),
+  p('El multiplicador','Cada metro vale 10 puntos × el multiplicador: el base de tus retos (cumplir los tres sube 1, hasta ×30) más una por cada estrella de la carrera (hasta +29). Con el 2× activo se duplica. Las monedas no dan puntos: son para la tienda.',cart(['Multiplicador',[['×4','violeta','RETOS'],['+3','oro','ESTRELLAS'],['×7','verde','TOTAL']]],['10 metros',[['700','azul','PUNTOS'],['1400','rojo','CON 2×']]])))],
  frontera:[e('racha','Una racha de siete en siete',
   p('Elige instalación y nivel','Torre, Palacio o Fábrica, en Nivel 50 o Abierto. Cada combinación guarda su propia racha, así que puedes llevar varias a la vez.',fichas('Tu elección',['Torre','azul','INSTALACIÓN'],['50','verde','NIVEL'],['3','oro','POKÉMON'])),
   p('Gana siete seguidos','Cada serie son siete combates. Al séptimo del 21, 42 o 35 y 70 en la Torre te espera un As de la Frontera, y vencerlo da su símbolo.',fichas('Serie 3',['15–20','verde','GANADOS'],['21','rojo','AS'],['🥈','oro','SÍMBOLO'])),

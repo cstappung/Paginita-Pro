@@ -210,6 +210,43 @@ function atasco() {
     chispas([[66, 70, 2, 1.6, 0], [66, 290, 2, 1.9, -.7]], "#fff3b0");  // dos destellos de faros
 }
 
+/* Vía Libre: un anillo de vía (balasto, durmientes de madera y dos rieles
+   de acero) por el que da vueltas un trencito naranja, visto desde arriba,
+   con los focos encendidos, persiguiendo una moneda dorada que gira; un
+   brillo corre por el riel y salta un destello suelto. */
+function vialibre() {
+  // Los durmientes: tablas atravesadas bajo los dos rieles (el eje y del
+  // dibujo es el radio, así que una tabla alta queda de través).
+  const durmientes = cada(24, (i, a) => en(60, a, rect(3.2, 16, .6, "#8a5e3c", `stroke="#4a3020" stroke-width=".5"`), a));
+  // Un foco que late; la posición va en un <g transform> aparte porque lo
+  // animado no puede llevar su propio transform.
+  const foco = y => `<g transform="translate(9.6 ${y})">${an("l", .8, `<circle r="1.4" fill="#fff6c2"/>`)}</g>`;
+  // La locomotora: cuerpo naranja, techo claro con rejillas, el parabrisas
+  // adelante (+x, que es el sentido en que gira), los dos focos y su haz.
+  const loco = rect(20, 11, 2.6, "#ff6a3d", `stroke="#8a2a10" stroke-width=".8"`) +
+    `<rect x="-8" y="-3" width="12" height="6" rx="1.2" fill="#ffb08f"/>` +
+    `<path d="M-5.5-3V3M-2-3V3" stroke="#c94a24" stroke-width=".6"/>` +
+    `<rect x="5.2" y="-4" width="3" height="8" rx="1" fill="#1f2a3a"/>` +
+    foco(-3.4) + foco(3.4) +
+    an("hx", 1, `<path d="M10.4-3.4L17-6.4V-.8ZM10.4 3.4L17 .8V6.4Z" fill="#fff6c2" opacity=".4"/>`);
+  // El vagón de atrás, un poco más corto, con su enganche.
+  const vagon = rect(17, 10, 2, "#e85a30", `stroke="#8a2a10" stroke-width=".8"`) +
+    `<rect x="-6.5" y="-2.6" width="13" height="5.2" rx="1" fill="#ffd0bd"/>` +
+    `<path d="M-2.2-2.6V2.6M2.2-2.6V2.6" stroke="#e85a30" stroke-width=".6"/>` +
+    `<path d="M8.5 0H11" stroke="#4a3020" stroke-width="1.4"/>`;
+  // La moneda: dorada, con su canto claro y una raya, girando sobre sí.
+  const moneda = an("v", 1.2, `<circle r="4.6" fill="#ffc83d" stroke="#b07a10" stroke-width="1"/>` +
+    `<circle r="2.9" fill="none" stroke="#fff1b8" stroke-width=".7"/><rect x="-.8" y="-2.2" width="1.6" height="4.4" fill="#d99a1c"/>`);
+  return aro(60, "#2a2622", 19) +                                         // el balasto, gris oscuro
+    durmientes +                                                          // los durmientes de madera
+    aro(55, "#b8bec8", 1.8) + aro(65, "#b8bec8", 1.8) +                   // los dos rieles de acero
+    aro(55, "#ffffff", .5, `opacity=".5"`) + aro(65, "#ffffff", .5, `opacity=".5"`) + // su filo brillante
+    `<g class="fl" style="--d:1.6s">${aro(65, "#ffffff", 1, `stroke-dasharray="2 10" stroke-linecap="round" opacity=".8"`)}</g>` + // un brillo que corre por el riel
+    aro(50.5, "#3a2a20", 1.2) + aro(69.5, "#ff6a3d", 1.3) +               // borde de adentro oscuro, el de afuera naranja
+    gira(9, en(60, 0, loco, 0) + en(60, -20, vagon, -20) + en(60, 30, moneda)) + // el tren persigue a la moneda
+    chispas([[66, 150, 2.6, 1.5, 0], [64, 255, 2, 1.9, -.7]], "#fff4d6"); // los destellos
+}
+
 function frontera() {
   const sim = [
     `<path d="M0-2.8L.8-.8L2.8-.8L1.2.5L1.8 2.6L0 1.3L-1.8 2.6L-1.2.5L-2.8-.8L-.8-.8Z"/>`,
@@ -489,6 +526,7 @@ const DIBUJOS = {
   tcuadritos: cuadritos, treversi: reversi, torbita: orbita, tcadena: cadena, tflip: flip, tcacho: cacho,
   tuno: uno, tcatan: catan, tpresidente: presidente, tspicy: spicy, tworms: worms, tyemas: yemas,
   tzombis: zombis, tclue: clue, tajedrez: ajedrez, tmonedas: monedas, tprodrop: prodrop, tsudoku: sudoku, tfanal: fanal, tboxhead: boxhead, tatasco: atasco,
+  tvialibre: vialibre,
   cometa, vortice, sakura, plasma, mariposas
 };
 

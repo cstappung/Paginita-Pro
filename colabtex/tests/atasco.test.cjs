@@ -214,7 +214,7 @@ test('las estrellas pasan por el club, por las reglas y por la página',()=>{
  assert.ok(r(1));assert.ok(r(720));assert.equal(r(3001),null);
  const reglas=fs.readFileSync(path.join(__dirname,'../../firebase/database.rules.json'),'utf8');
  assert.match(reglas,/\|club-atasco-estrellas\|/);
- assert.match(reglas,/fanal\|atasco\)\$\/\)/);
+ assert.match(reglas,/fanal\|atasco(\|[a-z]+)*\)\$\/\)/);  // atasco en clubJugadas (puede haber juegos después)
  const html=fs.readFileSync(path.join(D,'index.html'),'utf8');
  for(const f of ['motor','niveles','dibujo','game'])assert.match(html,new RegExp(f+'\\.js\\?v=atasco-\\d+'));
  assert.match(html,/estilo\.css\?v=atasco-\d+/);

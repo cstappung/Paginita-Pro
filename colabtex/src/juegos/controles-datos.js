@@ -35,6 +35,7 @@ export const CONTROLES = {
   "tetris": {"movil":true,"pc":true,"pide":"","por":"escucha toques"},
   "tetrisclub": {"movil":true,"pc":true,"pide":"","por":"escucha toques"},
   "uno": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
+  "vialibre": {"movil":true,"pc":true,"pide":"","por":"escucha toques"},
   "worms": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
   "yemas": {"movil":false,"pc":true,"pide":"teclado y ratón","por":"ratón de mira sin toque"}
 };

@@ -882,6 +882,50 @@ const REGLAS = {
       ["Clasificación", "La tabla de Atasco cuenta las <b>estrellas</b> juntadas en todos los niveles; a igualdad, gana quien sumó menos tiempo en sus mejores intentos. Solo se manda cuando el total sube, así que repetir un nivel ya ganado no cuesta nada. Tus estrellas se guardan en este navegador y, con tu sesión, también en tu cuenta."]
     ]
   },
+  /* Vía Libre (juegos/club/vialibre/): lo que dice aquí tiene que
+     coincidir con su motor.js (puntos, multiplicador, poderes, estaciones,
+     tropiezos) y su juego.js (teclas, gestos y mando). */
+  vialibre: {
+    lema: "Vía Libre: corre por las vías, esquiva los trenes y llega lo más lejos que puedas antes de que el inspector te atrape.",
+    secciones: [
+      ["Cómo se juega", "Corres solo, siempre hacia adelante, por tres carriles de vía. Cambia de carril con ← → (o A y D), salta con ↑, W o Espacio y rueda por el suelo con ↓ o S; si ruedas en el aire, bajas de golpe. En una pantalla táctil, desliza el dedo a la izquierda, a la derecha, arriba o abajo. Por el camino hay monedas, estrellas, poderes y retos. La carrera termina cuando chocas de frente o cuando el inspector te atrapa."],
+      ["Obstáculos", lista([
+        "La <b>barrera baja</b>, a rayas y a la altura de la cintura, se salta.",
+        "La <b>barrera alta</b>, con una flecha hacia abajo, se pasa rodando.",
+        "Un <b>tren detenido</b> se esquiva cambiando de carril, o se sube por su rampa para correr por los techos.",
+        "Un <b>tren que viene de frente</b> se esquiva.",
+        "Chocar de frente con cualquiera de ellos termina la carrera.",
+        "Rozar un costado al cambiar de carril es un <b>tropiezo</b>: el inspector Don Ramón y su perro Tornillo te alcanzan un rato. Dos tropiezos seguidos (en menos de 8 s) y te atrapan."
+      ])],
+      ["Puntos y multiplicador", lista([
+        "Cada metro vale 10 puntos × el <b>multiplicador</b>.",
+        "El multiplicador es el base de tus retos (de ×1 a ×30) más las <b>estrellas</b> que juntas en la carrera: +1 cada una, hasta +29.",
+        "El poder <b>2×</b> lo duplica mientras dura.",
+        "Las <b>monedas</b> no dan puntos: se gastan en la tienda."
+      ])],
+      ["Poderes", lista([
+        "<b>Imán</b> (10 s): atrae las monedas de los tres carriles.",
+        "<b>Mochila cohete</b> (8 s): vuelas por encima de todo, con una fila de monedas en el aire. Al aterrizar tienes un instante de protección.",
+        "<b>Zapatillas saltarinas</b> (10 s): saltas el doble de alto, hasta los techos de los trenes.",
+        "<b>2×</b> (12 s): duplica los puntos.",
+        "<b>Caja misteriosa</b>: trae monedas o una patineta.",
+        "<b>Patineta</b> (H, dos toques rápidos o X en el mando): dura 30 s y, si chocas, se rompe ella en vez de terminar la carrera.",
+        "En la <b>tienda</b> cada poder tiene 5 mejoras, que lo alargan 2,5 s por nivel, y se compran patinetas."
+      ])],
+      ["Retos", "Siempre hay tres retos a la vista. Cumplir los tres sube en 1 el multiplicador base, hasta ×30."],
+      ["Estaciones", lista([
+        "El paisaje cambia con los puntos de la carrera, siempre pasando por un túnel: <b>Barrio Estación</b> (desde 0, la ciudad de día), <b>Ocaso</b> (50 000, retro pixelado al atardecer), <b>Línea Neón</b> (200 000, noche synthwave), <b>Estación Fantasma</b> (1 000 000), <b>Invierno</b> (2 500 000), <b>Óxido</b> (5 000 000) y <b>Fin de la Línea</b> (10 000 000). Después vuelven a girar.",
+        "En cada estación hay un <b>boleto dorado</b> con un trozo de la historia. Los que encuentres se leen en la <b>Libreta</b>.",
+        "En Opciones puedes fijar un estilo (juguete, neón o pixelado) en vez de que cambie con las estaciones, y bajar la calidad gráfica si el teléfono va lento."
+      ])],
+      ["Controles", lista([
+        "Teclado: ← → o A D cambian de carril; ↑, W o Espacio saltan; ↓ o S ruedan (en el aire, bajan de golpe); H usa una patineta; P pausa; M apaga el sonido.",
+        "Pantalla táctil: desliza el dedo a la izquierda, a la derecha, arriba o abajo; dos toques rápidos usan una patineta.",
+        "Mando: cruceta o stick para moverte, A salta, B rueda, X usa una patineta y Start pausa."
+      ])],
+      ["Clasificación", "Hay dos tablas: <b>Mejor carrera</b>, por los puntos de tu mejor carrera, y <b>Distancia</b>, por los metros de tu carrera más larga. Cada carrera terminada cuenta como una partida del club. Subir al podio se anuncia en Discord."]
+    ]
+  },
   frontera: {
     lema: "Frontera Batalla: la de Pokémon Esmeralda. Rachas de combates individuales 3 contra 3, cada vez más difíciles.",
     secciones: [
@@ -920,7 +964,7 @@ const REGLAS = {
   }
 };
 
-const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco" };
+const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", vialibre: "Vía Libre" };
 
 export const tieneReglas = juego => Object.prototype.hasOwnProperty.call(REGLAS, juego);
 
