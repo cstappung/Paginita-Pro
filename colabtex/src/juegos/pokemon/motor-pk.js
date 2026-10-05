@@ -61,6 +61,12 @@ import { TeamGenerators } from "@pkmn/randoms";
 import FRONTERA from "./frontera-motor.js";
 export { FORMATOS, FORMATO_POR, formatoDe, genDe };
 
+/* La regla «PotD» de Showdown (va en todos los Random Battle) lee
+   `global.Config` al empezar la pelea. En Node existe `global`; en el
+   navegador no, y la sala se quedaba en «Cargando el simulador… global
+   is not defined». Los tests corren en Node y no lo veían. */
+if (typeof globalThis !== "undefined" && typeof globalThis.global === "undefined") globalThis.global = globalThis;
+
 /* Lo que decide quien no tiene nada que decidir. */
 export const NADA = "-";
 
