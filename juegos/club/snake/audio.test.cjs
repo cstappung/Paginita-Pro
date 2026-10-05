@@ -26,13 +26,13 @@ function game(speed = 'normal') {
     addEventListener: noop, Club: { storageKey: k => k, category: noop, result: noop }, AudioContext,
     matchMedia: () => ({ matches: true }), localStorage: { getItem: k => storage.get(k), setItem: (k, v) => storage.set(k, v) },
     ResizeObserver: class { observe() {} }, requestAnimationFrame: noop, devicePixelRatio: 1, setTimeout: noop, clearTimeout: noop,
-    Math, Float32Array, WeakMap, Set, Object, Array
+    Math, Float32Array, WeakMap, Set, Object, Array, location: { search: '' }, URLSearchParams
   };
   sb.window = sb; sb.globalThis = sb;
   vm.createContext(sb);
-  for (const f of ['audio/chip.js', 'audio/temas.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '../..', f), 'utf8'), sb, { filename: f });
+  for (const f of ['audio/chip.js', 'audio/temas.js', 'club/snake/motor.js']) vm.runInContext(fs.readFileSync(path.join(__dirname, '../..', f), 'utf8'), sb, { filename: f });
   const src = fs.readFileSync(__dirname + '/game.js', 'utf8').replace(/\}\)\(\);\s*$/, `
-    globalThis.engine = { start, pause, finish, tickMusic, sfx, get audio() { return audio; }, set eaten(v) { eaten = v; }, get state() { return state; } };
+    globalThis.engine = { start, pause, finish, tickMusic, sfx, get audio() { return audio; }, set eaten(v) { m.eaten = v; }, get state() { return state; } };
   })();`);
   vm.runInContext(src, sb);
   const g = sb.engine;

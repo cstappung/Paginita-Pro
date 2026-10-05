@@ -13,7 +13,8 @@ function game() {
   const storage = new Map();
   const sandbox = {
     document: { getElementById: id => { if (!elements.has(id)) elements.set(id, element()); return elements.get(id); }, querySelectorAll: () => [], documentElement: element(), addEventListener: noop },
-    window: { addEventListener: noop, Club: {storageKey:k=>k,category:noop,result:d=>sent.push(d)} }, matchMedia: () => ({ matches: true }),
+    window: { addEventListener: noop, SnakeMotor: require('./motor.js'), Club: {storageKey:k=>k,category:noop,result:(d,prueba)=>sent.push(Object.assign({},d,{prueba}))} }, matchMedia: () => ({ matches: true }),
+    location: { search: '' }, URLSearchParams,
     localStorage: { getItem: k => storage.get(k), setItem: (k, v) => storage.set(k, v) },
     ResizeObserver: class { observe() {} }, requestAnimationFrame: noop, devicePixelRatio: 1, setTimeout: noop, clearTimeout: noop,
   };
@@ -23,15 +24,11 @@ function game() {
       start, step, pause, enqueue, frame, freeCell, interval, syncSettings,
       setMode(value) { mode = value; start(); },
       patch(value) {
-        if (value.snake) { snake = value.snake; previous = snake.map(copy); }
-        if (value.direction) direction = DIRS[value.direction];
-        if ('fruit' in value) fruit = value.fruit;
-        if ('bonus' in value) bonus = value.bonus;
-        if ('activePower' in value) activePower = value.activePower;
-        if ('obstacles' in value) obstacles = value.obstacles;
-        if ('pickup' in value) pickup = value.pickup;
+        if (value.snake) { m.snake = value.snake; previous = m.snake.map(copy); }
+        if (value.direction) m.direction = DIRS[value.direction];
+        for (const k of ['fruit', 'bonus', 'activePower', 'obstacles', 'pickup']) if (k in value) m[k] = value[k];
       },
-      get() { return { state, score, eaten, snake, direction, queue, fruit, bonus, pickup, obstacles, portals, activePower, records, gameTime }; }
+      get() { return { state, score: m.score, eaten: m.eaten, snake: m.snake, direction: m.direction, queue: m.queue, fruit: m.fruit, bonus: m.bonus, pickup: m.pickup, obstacles: m.obstacles, portals: m.portals, activePower: m.activePower, records, gameTime: m.gameTime }; }
     };
   })();`);
   vm.runInContext(source, sandbox);
@@ -102,8 +99,9 @@ test('Arcade generates powers, golden fruit and obstacles at their milestones', 
 });
 test('pause freezes simulated time and powers; resume continues', () => {
   const g = game(); g.start(); g.patch({ activePower:{type:'slow',expires:10} }); g.pause();
-  g.frame(1000); g.frame(1050); assert.equal(g.get().gameTime, 0); assert.equal(g.get().activePower.type, 'slow');
-  g.pause(); g.frame(1100); assert.ok(g.get().gameTime > 0);
+  g.frame(1000); g.frame(1050); g.frame(1500); assert.equal(g.get().gameTime, 0); assert.equal(g.get().activePower.type, 'slow');
+  // El reloj de juego avanza de a tic (motor.js): hacen falta unos fotogramas.
+  g.pause(); for (let t = 1550; t <= 2000; t += 50) g.frame(t); assert.ok(g.get().gameTime > 0);
 });
 test('filling the board completes the game instead of looping on fruit spawning', () => {
   const g = game(); g.start(); const body = [{x:0,y:0}];
