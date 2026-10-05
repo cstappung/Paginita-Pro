@@ -29,7 +29,10 @@ const copia=x=>JSON.parse(JSON.stringify(x));
 /* ---------- El robot ----------
    `muertes`: tiempos de juego en que choca (después de cada uno, menos el
    último, sigue corriendo). `mochilaEn`: tiempo en que toma una mochila
-   cohete (pide la cinta de monedas). `pot`: usa el +5 a los `pot` s. */
+   cohete (pide la cinta de monedas). `pot`: usa el +5 a los `pot` s.
+   `atrapado`: el último choque es el inspector que te atrapa, y entonces
+   (como en juego.js) el corredor no se para en seco: resbala frenando con
+   M.FRENADA hasta quedar quieto. */
 function robot(o={}){
  const op=Object.assign({semilla:12345,base:3,md:2,u:'uid-robot',muertes:[70,140],mochilaEn:25,pot:2,tunelEn:1500,pausa:4,semillaDt:7},o);
  let az=op.semillaDt>>>0;const azar=()=>((az=(az*1664525+1013904223)>>>0)/4294967296);
@@ -56,8 +59,10 @@ function robot(o={}){
   // choque va antes de recoger, y en el cuadro del choque no se recoge nada
   // ni se gasta el 2×.
   if(muerte<op.muertes.length&&st.t>=op.muertes[muerte]){
-   anota('m');st.vivo=false;st.D=Math.max(0,st.D-0.35);muerte++;
-   for(let k=0;k<60;k++){const d2=0.016;st.t+=d2;st.r+=d2*1000;}   // la caída
+   const ultima=muerte===op.muertes.length-1,resbala=op.atrapado&&ultima;
+   anota('m');st.vivo=false;if(!resbala)st.D=Math.max(0,st.D-0.35);muerte++;
+   let v=resbala?st.V:0;                                            // atrapado: sigue de largo frenando
+   for(let k=0;k<60||v>0;k++){const d2=0.016;v=Math.max(0,v-M.FRENADA*d2);st.D+=v*d2;st.t+=d2;st.r+=d2*1000;}   // la caída
    st.r+=op.pausa*1000;                                             // «¿Seguir corriendo?» (el reloj de juego no corre)
    if(muerte<op.muertes.length){anota('s');st.vivo=true;continue;}
    anota('f');break;
@@ -99,6 +104,17 @@ test('Metro Rush: la carrera de un robot pasa, y el verificador da sus mismos pu
  const larga=robot({muertes:[300,600],tunelEn:3000});
  assert.equal(MV.verifica(dato(larga),larga.prueba,ctx),null);
  assert.ok(JSON.stringify(larga.prueba).length<V.PRUEBA_MAX/4,'la prueba de 10 min ocupa '+JSON.stringify(larga.prueba).length);
+});
+
+test('Metro Rush: a 50 m/s, que te atrape el inspector (resbalando ~21 m) también pasa',()=>{
+ // a los 400 s ya va a 50 m/s: frenando con M.FRENADA resbala 50²/(2·60) = 20,8 m después del choque
+ assert.equal(M.velocidad(400),50);
+ const r=robot({muertes:[400],atrapado:true,mochilaEn:0,tunelEn:0,pot:0,semilla:99,semillaDt:99});
+ const m=r.prueba.e.find(e=>e[0]==='m'),f=r.prueba.e[r.prueba.e.length-1];
+ assert.ok(f[2]-m[2]>20&&f[2]-m[2]<21.5,'resbaló '+(f[2]-m[2]).toFixed(1)+' m');
+ assert.equal(MP.rehace(r.prueba).motivo,undefined);
+ assert.equal(MV.verifica(dato(r),r.prueba,ctx),null);
+ assert.equal(MV.verifica(dato(r,'club-metrorush-distancia'),r.prueba,ctx),null);
 });
 
 test('Metro Rush: tres choques con el 2× puesto (y seguir corriendo) también pasan',()=>{

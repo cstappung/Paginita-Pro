@@ -395,7 +395,7 @@ function usaPotenciador(k) {
 function actualiza(dt) {
   c.t += dt;
   const muriendo = estado === 'muerte';
-  c.V = muriendo ? Math.max(0, c.V - 60 * dt) : M.velocidad(c.t);
+  c.V = muriendo ? Math.max(0, c.V - M.FRENADA * dt) : M.velocidad(c.t);   // al caer frena (lo que tolera el antitrampas)
   const dD = c.V * dt;
   c.Dantes = c.D;                                               // dónde iba en el cuadro anterior (para seguir la rampa)
   c.D += dD;

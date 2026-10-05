@@ -3398,11 +3398,19 @@ Things that matter:
   times the multiplier. The base multiplier goes ×1 → ×30 by completing
   missions (three per level, `retosDeNivel(nivel)`, seeded); each star picked
   up adds +1 for the run (up to +29) and the 2× power-up doubles the lot.
-  Speed goes from 15 to 34 m/s (`velocidad`, τ 130 s; it was 13→30 with τ
-  150 and felt slow). The curve lives once, in `M.VELOCIDAD`: `velocidad`,
-  the anti-cheat's `metrosEntre` and the generator's `velocidadEn` all come
-  from it, so changing the speed is one edit (plus the proof's `VERSION`,
-  because old proofs no longer replay). A newcomer makes
+  Speed is a **linear ramp with a cap**: 15 m/s, +0.1 m/s every second, 50
+  m/s from 350 s on (~11.4 km; it was 13→30 approaching a ceiling and felt
+  slow). A ceiling-approaching curve could only reach 50 by being 31 m/s at
+  the first minute; the ramp keeps the start (21 m/s at 1 min) and makes 50
+  the prize of a long run, after the obstacle density peaks (~7.7 km). The
+  curve lives once, in `M.VELOCIDAD`: `velocidad`, the anti-cheat's
+  `metrosEntre` (exact: d = V0·t + a·t²/2) and the generator's `velocidadEn`
+  (exact too: v² = V0² + 2·a·d) all come from it, so changing the speed is
+  one edit, plus the proof's `VERSION` because old proofs no longer replay.
+  Two things scale with it: rows never come closer than `FILA_MIN_S` (0.55
+  s) apart, which only matters above ~33 m/s, and the skid the anti-cheat
+  allows when the inspector catches you is VMAX²/(2·`FRENADA`) + 2 m (a
+  fixed 12 m rejected honest runs caught at 50 m/s). A newcomer makes
   ~25 k in two minutes, a great run reaches 1 M in 6–7 minutes, and a
   veteran at ×30 in about three.
 - **Progress is Subway Surfers' own loop.** Missions come in sets of three

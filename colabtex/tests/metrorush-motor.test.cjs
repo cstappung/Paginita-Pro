@@ -198,17 +198,25 @@ test('la misma semilla da la misma pista', () => {
   assert.deepEqual(a, b);
 });
 
-test('velocidad: de 15 a casi 34 m/s, siempre subiendo, y una sola curva para todos', () => {
+test('velocidad: de 15 a 50 m/s, subiendo pareja hasta los 350 s, y una sola curva para todos', () => {
   assert.equal(M.velocidad(0), 15);
-  assert.ok(M.velocidad(60) > 21.5 && M.velocidad(60) < 22.5, 'al minuto, ~22 m/s');
-  assert.ok(M.velocidad(120) > 26 && M.velocidad(120) < 27, 'a los 2 min, ~26,5 m/s');
-  assert.ok(M.velocidad(1e6) <= 34 && M.velocidad(1e6) > 33.9);
-  for (let t = 1; t < 900; t += 7) assert.ok(M.velocidad(t) > M.velocidad(t - 1), 'sube de a poco, sin escalones hacia atrás');
+  assert.equal(M.velocidad(60), 21, 'al minuto, 21 m/s');
+  assert.equal(M.velocidad(120), 27, 'a los 2 min, 27 m/s');
+  assert.equal(M.T_TOPE, 350, 'llega a 50 m/s a los 5 min 50 s');
+  assert.equal(Math.round(M.metrosEntre(0, M.T_TOPE)), 11375, '…a los 11,4 km');
+  assert.equal(M.velocidad(1e6), 50, 'y no pasa de 50');
+  for (let t = 1; t < M.T_TOPE; t += 7) assert.ok(M.velocidad(t) > M.velocidad(t - 1), 'sube de a poco, sin escalones hacia atrás');
+  for (let t = M.T_TOPE; t < 900; t += 7) assert.equal(M.velocidad(t), 50, 'arriba del tope se queda');
   // los metros (que recalcula el antitrampas) son la integral de esa misma velocidad
   let D = 0; for (let t = 0; t < 300; t += 0.001) D += M.velocidad(t + 0.0005) * 0.001;
   assert.ok(Math.abs(D - M.metrosEntre(0, 300)) < 0.5, 'metrosEntre es la integral de velocidad');
   // y la velocidad según los metros (la del generador) se le parece: menos de 1 m/s de diferencia
-  for (let t = 0; t <= 900; t += 15) assert.ok(Math.abs(M.velocidadEn(M.metrosEntre(0, t)) - M.velocidad(t)) < 1.1, 'velocidadEn a los ' + t + ' s');
+  for (let t = 0; t <= 900; t += 15) assert.ok(Math.abs(M.velocidadEn(M.metrosEntre(0, t)) - M.velocidad(t)) <= 0.25 + 1e-9, 'velocidadEn a los ' + t + ' s (solo el redondeo)');
+  // a toda velocidad las filas no llegan más seguido que cada FILA_MIN_S
+  // (se miden las barreras: van justo en su fila; los vagones de un mismo tren van a 11,7 m y no son filas)
+  const p = pista(4242, 16000).filter(o => o.tipo === 'bajo' || o.tipo === 'alto');
+  const filas = [...new Set(p.map(o => Math.round(o.d)))].filter(d => d > 12500).sort((a, b) => a - b);
+  for (let i = 1; i < filas.length; i++) assert.ok(filas[i] - filas[i - 1] >= 50 * M.FILA_MIN_S - 1 || filas[i] - filas[i - 1] < 2, 'a 50 m/s, filas a ' + (filas[i] - filas[i - 1]) + ' m');
 });
 
 test('puntos y multiplicador: lo que dice el manual', () => {

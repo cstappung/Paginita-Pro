@@ -136,25 +136,42 @@
   /** La curva de velocidad de la carrera, en un solo lugar: la usan el
       juego (`velocidad`), el generador (`velocidadEn`) y el antitrampas
       (`metrosEntre`, que recalcula los metros de cada carrera). Parte en
-      V0 y se acerca a VMAX sin llegar nunca, como una curva de carga; TAU
-      dice qué tan rápido. Se subió de 13→30 m/s con TAU 150 a 15→34 con
-      TAU 130, porque el juego se sentía lento: al minuto va a 22 m/s (antes
-      18,6) y a los 5 min a 32 (antes 27,7). */
-  const VELOCIDAD = { V0: 15, VMAX: 34, TAU: 130 };
+      V0 y sube ACEL m/s cada segundo hasta VMAX, y ahí se queda.
+
+      Por qué una rampa y no una curva que se acerca a un techo: con un
+      techo de 50 m/s, esa curva tenía que ser muy rápida al principio para
+      llegar alguna vez (31 m/s al minuto). La rampa deja el comienzo como
+      estaba (21 m/s al minuto, 27 a los dos) y sigue subiendo: llega a
+      50 m/s a los 350 s (5 min 50 s), a los 11,4 km. Es el premio de una
+      buena carrera: la densidad de obstáculos ya llegó a su máximo a los
+      ~7,7 km, y desde los 11,4 km la carrera es aguante a toda velocidad.
+      Con aceleración constante los metros tienen fórmula exacta en el
+      tiempo (d = V0·t + ACEL·t²/2) y en la distancia (v² = V0² + 2·ACEL·d). */
+  const VELOCIDAD = { V0: 15, VMAX: 50, ACEL: 0.1 };      // m/s al empezar, m/s de tope y m/s² de aceleración
+  const T_TOPE = (VELOCIDAD.VMAX - VELOCIDAD.V0) / VELOCIDAD.ACEL;   // a los 350 s llega al tope
 
   /** Velocidad de la carrera (m/s) a los `t` segundos. Ejemplo: a los 0 s,
-      15; a los 60 s, 22; a los 120 s, 26,5. */
+      15; a los 60 s, 21; a los 120 s, 27; desde los 350 s, 50. */
   function velocidad(t) {
-    const { V0, VMAX, TAU } = VELOCIDAD;                    // inicio, techo y qué tan rápido se acerca
-    return VMAX - (VMAX - V0) * Math.exp(-Math.max(0, t) / TAU);
+    const { V0, VMAX, ACEL } = VELOCIDAD;
+    return Math.min(VMAX, V0 + ACEL * Math.max(0, t));      // sube parejo y se queda en el tope
   }
 
-  /** Los metros que se corren entre los tiempos de juego a y b: la integral
-      de `velocidad`. Ejemplo: de 0 a 10 s, unos 157 m. */
-  function metrosEntre(a, b) {
-    const { V0, VMAX, TAU } = VELOCIDAD;
-    return VMAX * (b - a) + (VMAX - V0) * TAU * (Math.exp(-Math.max(0, b) / TAU) - Math.exp(-Math.max(0, a) / TAU));
+  /** Los metros corridos desde el comienzo hasta el segundo `t`: la integral
+      de `velocidad`. Hasta el tope, V0·t + ACEL·t²/2; después, a VMAX. */
+  function metrosHasta(t) {
+    const { V0, VMAX, ACEL } = VELOCIDAD;
+    const tt = Math.max(0, t), subiendo = Math.min(tt, T_TOPE);         // el tramo en que todavía acelera
+    return V0 * subiendo + ACEL * subiendo * subiendo / 2 + VMAX * (tt - subiendo);
   }
+
+  /** Los metros que se corren entre los tiempos de juego a y b. Ejemplo: de
+      0 a 10 s, 155 m; de 0 a 60 s, 1 080 m. */
+  const metrosEntre = (a, b) => metrosHasta(b) - metrosHasta(a);
+
+  /** Cómo frena el corredor cuando el inspector lo atrapa (m/s²): a 50 m/s
+      resbala 50² / (2·60) = 20,8 m. El antitrampas tolera eso, no más. */
+  const FRENADA = 60;
 
   /* ---------- Puntos y multiplicador ---------- */
 
@@ -456,11 +473,22 @@
       usaba la velocidad del cuadro en que se generaba el bloque, y eso movía
       un tren, el carril que dejaba libre y todo lo que venía después. Va
       redondeada a medio m/s para que ningún navegador la calcule distinta.
-      Se parece a la de verdad: a 1 127 m (1 min) da 21 m/s (la real, 22);
-      a 3 409 m (2,5 min), 28,5 (28). Un tren que llega 1 m/s más lento de lo
-      calculado se cruza ~2 m después de su fila: no se nota. */
-  const K_METROS = 2825;                                    // ajustada a VELOCIDAD: el error máximo es 0,84 m/s
-  const velocidadEn = d => Math.round(2 * (VELOCIDAD.V0 + (VELOCIDAD.VMAX - VELOCIDAD.V0) * (1 - Math.exp(-Math.max(0, d) / K_METROS)))) / 2;
+      Con la aceleración pareja es la de verdad (solo el redondeo la
+      separa): a 1 080 m (1 min) da 21 m/s, y desde los 11,4 km, 50. Un tren
+      que llega 1 m/s más lento de lo calculado se cruza ~2 m después de su
+      fila: no se nota. */
+  const velocidadEn = d => {
+    const { V0, VMAX, ACEL } = VELOCIDAD;
+    const v = Math.sqrt(V0 * V0 + 2 * ACEL * Math.max(0, d));   // con aceleración pareja: v² = V0² + 2·a·d
+    return Math.round(2 * Math.min(VMAX, v)) / 2;               // con su tope, y redondeada a medio m/s
+  };
+
+  /* El tiempo mínimo entre dos filas de obstáculos. A 50 m/s, filas a 18 m
+     llegaban cada 0,36 s: menos de lo que tarda una persona en reaccionar y
+     cambiar de carril (el cambio solo ya son 0,17 s). Con 0,55 s el espacio
+     crece con la velocidad, pero solo por encima de ~33 m/s; más abajo
+     manda la distancia de siempre. Ejemplo: a 50 m/s, 27,5 m entre filas. */
+  const FILA_MIN_S = 0.55;
 
   /** La dificultad entre 0 y 1 según los metros: llega al máximo a los
       ~7,7 km (antes a los ~9,3: el juego se sentía fácil). */
@@ -513,7 +541,7 @@
 
     /** Un bloque "fila": obstáculos en los carriles que no son el camino. */
     function bloqueFila(dif, ctx) {
-      const esp = lerp(30, 18, dif) + azar() * 5;              // distancia hasta la próxima fila
+      const esp = Math.max(lerp(30, 18, dif), velocidadEn(dSig) * FILA_MIN_S) + azar() * 5;   // distancia hasta la próxima fila (dSig es donde va esta fila)
       const dr = dSig;                                          // la fila va en este metro
       const sig = siguienteCamino(dr + esp, lerp(0.35, 0.6, dif));   // el camino de la fila siguiente
       let bloqueados = 0;                                       // cuántos carriles quedaron cerrados
@@ -581,7 +609,7 @@
         }
       }
       mantener = 1;                                             // al bajar del convoy sigues en el mismo carril
-      dSig = fin + lerp(26, 18, dif);
+      dSig = fin + Math.max(lerp(26, 18, dif), velocidadEn(fin) * FILA_MIN_S);
     }
 
     /** Un respiro: sin obstáculos, una cinta de monedas que zigzaguea entre carriles. */
@@ -652,7 +680,7 @@
   /* ---------- Lo que se exporta ---------- */
   return {
     rng, lerp, limita,
-    CARRILES, LARGO_VAGON, ALTO_TECHO, LARGO_RAMPA, FISICA, impulso, VELOCIDAD, velocidad, metrosEntre, velocidadEn, VEL_TREN, APARECE, dificultad,
+    CARRILES, LARGO_VAGON, ALTO_TECHO, LARGO_RAMPA, FISICA, impulso, VELOCIDAD, T_TOPE, velocidad, metrosEntre, FRENADA, velocidadEn, FILA_MIN_S, VEL_TREN, APARECE, dificultad,
     MEDIO_LARGO, MARGEN_TECHO, MARGEN_RAMPA, alturaRampa, soporte, caja,
     PUNTOS_POR_METRO, MAX_BASE, MAX_ESTRELLAS, multiplicador, puntosPorTramo,
     ESTACIONES, estacionDe, siguienteUmbral, VUELTA_DESDE, VUELTA_CADA, INTRO, BOLETOS,
