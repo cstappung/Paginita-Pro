@@ -81,7 +81,7 @@ function estacionVisual(e) {
 /* ===================================================================
    3. LA CARRERA
    =================================================================== */
-let estado = 'cargando';      // cargando | portada | jugando | pausa | muerte | fin
+let estado = 'cargando';      // cargando | portada | jugando | pausa | muerte | salvar («¿seguir corriendo?») | fin
 let c = null;                 // los datos de la carrera en curso (ver nuevaCarrera)
 let panel = null;             // el panel abierto (tienda, retos, libreta, opciones, ayuda, relato)
 
@@ -115,6 +115,9 @@ document.addEventListener('keydown', e => {
   // el código secreto de siempre, en la portada: desbloquea el aspecto dorado
   if (estado === 'portada' && !panel) { konami = e.code === KONAMI[konami] ? konami + 1 : (e.code === KONAMI[0] ? 1 : 0); if (konami === KONAMI.length) { konami = 0; desbloquea('dorado', '¡Código secreto! Aspecto Dorado desbloqueado'); } }
   if (e.code === 'KeyM') { alternaSonido(); return; }
+  // «¿Seguir corriendo?»: Intro paga y sigue, Escape (o P) lo deja pasar. Espacio y las flechas no hacen
+  // nada a propósito: quien venía saltando con la barra no debe pagar sin querer.
+  if (estado === 'salvar') { if (e.code === 'Enter') { e.preventDefault(); seguirTrasChoque(); } else if (e.code === 'Escape' || e.code === 'KeyP') { e.preventDefault(); muestraFin(); } return; }
   if ((e.code === 'Digit1' || e.code === 'Digit2') && estado === 'jugando') { usaPotenciador(Object.keys(M.POTENCIADORES)[e.code === 'Digit1' ? 0 : 1]); return; }
   if (e.code === 'KeyP' || e.code === 'Escape') { if (estado === 'jugando') pausar(); else if (estado === 'pausa' && !panel) seguirJugando(); else if (panel) cierraPanel(); e.preventDefault(); return; }
   if ((e.code === 'Enter' || e.code === 'Space') && estado === 'portada' && !panel) { e.preventDefault(); empezar(); return; }
@@ -281,6 +284,7 @@ function muere(motivo) {
      no hubo choque, así que ahí sí se frena de a poco. */
   if (motivo !== 'atrapado') { c.V = 0; c.D = Math.max(0, c.D - 0.35); }
   c.perseguidorObj = 1;
+  c.potVentana = 0; pintaPots();                                // los botones de potenciadores se van (y no vuelven al seguir)
   sonido.choque(); sonido.mochila(false);
   if (opciones.sacudida) mundo.sacude(0.8);
 }
@@ -414,7 +418,8 @@ function actualiza(dt) {
     if (c.potVentana > 0) { c.potVentana -= dt; if (c.potVentana <= 0) pintaPots(); }
   } else {
     c.muerte.t += Math.max(dt, dtRealUltimo);                     // en un aparato lento la pausa tras el choque no se alarga
-    if (c.muerte.t > 1.4 && estado === 'muerte') muestraFin();
+    if (estado === 'muerte' && c.muerte.t > 0.9 && puedeSalvar()) abreSalvar();
+    else if (estado === 'muerte' && c.muerte.t > 1.4) muestraFin();
   }
   c.perseguidor += (c.perseguidorObj - c.perseguidor) * Math.min(1, dt * 2.2);
 }
@@ -508,23 +513,68 @@ function seguirJugando() {
   if (c.poderes.mochila > 0) sonido.mochila(true);
   prevT = performance.now();
 }
+/* ---- después del choque: «¿Seguir corriendo?» ----
+   Como en Subway Surfers: antes del resumen aparece un botón redondo con el
+   precio y un anillo que se vacía en 5 segundos. Tocarlo paga y sigue la
+   misma carrera; si el anillo se acaba (o tocas «No, gracias») va al resumen.
+   Solo aparece si alcanzan las monedas (las de esta carrera más las
+   guardadas) y nunca tras «Terminar la carrera». */
+const SALVAR_SEG = 5;
+function puedeSalvar() { return c && c.muerte && c.muerte.motivo !== 'abandono' && progreso.monedas + c.monedas >= M.costoSeguir(c.seguirVeces); }
+function abreSalvar() {
+  estado = 'salvar'; c.salvarT = SALVAR_SEG; c.salvarTic = SALVAR_SEG;
+  sonido.calla();
+  $('salvarCosto').textContent = fmt(M.costoSeguir(c.seguirVeces));
+  $('salvarTienes').textContent = fmt(progreso.monedas + c.monedas);
+  $('salvarAnillo').style.strokeDashoffset = '0';
+  muestraCapa('capaSalvar');
+}
+/** La cuenta regresiva (en tiempo real: con la pestaña escondida no corre, porque no hay cuadros). */
+function pasoSalvar(dt) {
+  c.salvarT -= dt;
+  $('salvarAnillo').style.strokeDashoffset = (100 * (1 - Math.max(0, c.salvarT) / SALVAR_SEG)).toFixed(2);
+  if (c.salvarT < c.salvarTic - 1 && c.salvarT > 0) { c.salvarTic = Math.ceil(c.salvarT); sonido.tic(c.salvarTic <= 1); }   // un tic por segundo
+  if (c.salvarT <= 0) muestraFin();
+}
+const MOTIVOS = { atrapado: 'Don Ramón te atrapó', tren: 'Te atropelló un tren', bajo: 'Chocaste con una barrera', alto: 'Te diste con un letrero', rampa: 'Chocaste con una rampa', abandono: 'Carrera terminada' };
+let cuentaFin = 0;                                              // para cortar la animación de los puntos si se sale antes
+/** El resumen. La carrera se cierra aquí mismo (monedas, récords, misiones,
+    clasificación): después ya no se puede seguir, así que no hay nada que esperar. */
 function muestraFin() {
+  if (!c || estado === 'fin') return;
   estado = 'fin';
   sonido.calla();
-  const motivos = { atrapado: 'Don Ramón te atrapó', tren: 'Te atropelló un tren', bajo: 'Chocaste con una barrera', alto: 'Te diste con un letrero', rampa: 'Chocaste con una rampa' };
-  $('finTitulo').textContent = c.puntos > progreso.records.puntos && progreso.records.puntos > 0 ? '¡Nuevo récord!' : motivos[c.muerte.motivo] || 'Fin de la carrera';
+  const k = cierraCarrera();
+  pintaPortada();                                               // el marcador de la página (récord, monedas, multiplicador) ya cambió
+  $('finTitulo').textContent = MOTIVOS[c.muerte && c.muerte.motivo] || 'Fin de la carrera';
+  const nuevo = k.puntos > k.recordAntes && k.recordAntes > 0;
+  $('finRecord').hidden = !nuevo;
+  $('finMejor').textContent = nuevo ? `Antes: ${fmt(k.recordAntes)}` : `Récord: ${fmt(Math.max(k.recordAntes, k.puntos))}`;
   $('finStats').innerHTML = [
-    ['Puntos', fmt(c.puntos)], ['Distancia', fmt(c.D) + ' m'], ['Monedas', fmt(c.monedas)],
-    ['Multiplicador', '×' + multiplicador()], ['Estación', c.estacion.nombre], ['Récord', fmt(Math.max(progreso.records.puntos, c.puntos))]
-  ].map(([a, b]) => `<div><dt>${a}</dt><dd translate="no">${b}</dd></div>`).join('');
-  const costo = M.costoSeguir(c.seguirVeces), btn = $('btnSeguir');
-  btn.hidden = progreso.monedas + c.monedas < costo;
-  btn.textContent = `Seguir corriendo (${fmt(costo)} monedas)`;
-  pintaRetos($('finRetos'), true);
+    ['moneda', '+' + fmt(k.monedas), 'monedas'], ['bandera', fmt(k.metros) + ' m', 'distancia'],
+    ['estrella', '×' + k.mult, 'multiplicador'], ['tren', c.estacion.nombre, 'estación', 'largo']
+  ].map(([ico, v, nom, cls]) => `<li${cls ? ` class="${cls}"` : ''}><i>${ICONOS[ico]}</i><b translate="no">${v}</b><small>${nom}</small></li>`).join('');
+  // las misiones: si el set se completó, se muestran las del set terminado (las tres cumplidas) y el premio
+  $('finSet').hidden = !k.subio;
+  if (k.subio) $('finSet').innerHTML = `¡Set completo! Multiplicador <b translate="no">×${progreso.retos.nivel}</b> y ${ICONOS.moneda}<b translate="no">+${fmt(k.premio)}</b>`;
+  filasRetos($('finRetos'), k.nivelRetos, k.avanceRetos);
   muestraCapa('capaFin');
+  // los puntos suben contando, con un tic suave (como el «score» de Subway Surfers)
+  const el = $('finPuntos'), yo = ++cuentaFin, t0 = performance.now(), dur = k.puntos > 0 ? 900 : 0;
+  let ultTic = 0;
+  el.classList.remove('pum');
+  const sube = ahora => {
+    if (yo !== cuentaFin) return;
+    const u = dur ? Math.min(1, Math.max(0, (ahora - t0) / dur)) : 1, e = 1 - Math.pow(1 - u, 3);
+    el.textContent = fmt(k.puntos * e);
+    if (ahora - ultTic > 70 && u < 1) { ultTic = ahora; sonido.sube(e); }
+    if (u < 1) requestAnimationFrame(sube); else if (nuevo || k.subio) { el.classList.add('pum'); sonido.record(); }
+  };
+  requestAnimationFrame(sube);
 }
 /** Sigue la misma carrera después de chocar, pagando monedas. */
 function seguirTrasChoque() {
+  if (!c || estado !== 'salvar') return;                         // solo desde «¿Seguir corriendo?» (después del resumen ya no)
   const costo = M.costoSeguir(c.seguirVeces);
   if (c.monedas + progreso.monedas < costo) return;              // no alcanza (el botón ni se muestra, pero por si acaso)
   const deCarrera = Math.min(c.monedas, costo);                  // primero se paga con las monedas de esta carrera…
@@ -542,11 +592,15 @@ function seguirTrasChoque() {
   sonido.seguir(); sonido.tocaTema(c.estacion.musica);
   prevT = performance.now();
 }
-/** Cierra la carrera: suma monedas, récords y retos, guarda y avisa a la clasificación. */
+/** Cierra la carrera: suma monedas, récords y misiones, guarda y avisa a la
+    clasificación. Devuelve lo que muestra el resumen (y lo mismo si se llama
+    otra vez: cerrar dos veces no suma dos veces). */
 function cierraCarrera() {
-  if (!c || c.finalizada) return;
+  if (!c) return null;
+  if (c.finalizada) return c.cierre;
   c.finalizada = true;
   const puntos = Math.floor(c.puntos), metros = Math.floor(c.D), ms = Math.max(1, Math.round(c.t * 1000));   // las reglas piden enteros y un tiempo de al menos 1 ms
+  const recordAntes = progreso.records.puntos, mult = multiplicador();   // antes de que suba el multiplicador base
   progreso.monedas += c.monedas;
   progreso.totales.carreras++; progreso.totales.metros += metros; progreso.totales.monedas += c.monedas;
   const recordDist = metros > progreso.records.distancia;
@@ -555,16 +609,20 @@ function cierraCarrera() {
   progreso.records.monedas = Math.max(progreso.records.monedas, c.monedas);
   const nivelAntes = progreso.retos.nivel;
   const res = M.avanzaRetos(progreso.retos, c.cuenta, true);
+  // lo que se muestra: el set de esta carrera (si se completó, sus tres metas cumplidas)
+  const avanceRetos = res.subio ? M.retosDeNivel(nivelAntes).map(r => r.meta) : res.retos.avance;
   progreso.retos = res.retos;
   const premio = res.subio ? M.premioSet(nivelAntes) : 0;         // completar el set también paga
   progreso.monedas += premio;
   guardar();
-  if (res.subio) { sonido.multiplicador(); aviso(`¡Set completo! Multiplicador ×${progreso.retos.nivel} y +${fmt(premio)} monedas`); }
+  if (res.subio) sonido.multiplicador();
   // a la clasificación: la carrera siempre (cuenta como partida del club); la distancia, solo si es récord
   if (Club && Club.result && puntos >= 1) {
     Club.result({ categoria: 'club-vialibre-carrera', puntos: Math.min(1e9, puntos), tiempo: ms });
     if (recordDist && metros >= 1) Club.result({ categoria: 'club-vialibre-distancia', puntos: Math.min(1e6, metros), tiempo: ms });
   }
+  c.cierre = { puntos, metros, monedas: c.monedas, mult, recordAntes, subio: res.subio, premio, nivelRetos: nivelAntes, avanceRetos };
+  return c.cierre;
 }
 function aPortada() {
   cierraCarrera();
@@ -579,7 +637,7 @@ function otraCarrera() { cierraCarrera(); empezar(); }
 document.addEventListener('visibilitychange', () => {
   if (document.hidden) { if (estado === 'jugando') pausar(); if (estado === 'fin') cierraCarrera(); }
 });
-window.addEventListener('pagehide', () => { if (estado === 'fin' || estado === 'pausa') cierraCarrera(); });
+window.addEventListener('pagehide', () => { if (estado === 'pausa' || estado === 'salvar') cierraCarrera(); });
 
 /* ===================================================================
    5. EL BUCLE DE CADA CUADRO
@@ -594,13 +652,15 @@ function cuadro(ahora) {
   tiempoTotal += dt;
   if (!mundo) return;
   if (estado === 'jugando' || estado === 'muerte') actualiza(dt);
+  else if (estado === 'salvar') pasoSalvar(dtReal);
   // lo que el mundo necesita para dibujar este cuadro
   const r = c ? c.r : null;
   // en la portada y en la tienda la cámara se pone delante del corredor, que mira y saluda
   const menu = panel === 'capaTienda' ? 'tienda' : estado === 'portada' ? 'portada' : null;
   const pose = menu ? { modo: 'menu', t: tiempoTotal }
     : !c ? { modo: 'quieto', fase: tiempoTotal * 3 }
-    : estado === 'muerte' || (estado === 'fin' && c.muerte) ? { modo: 'caer', t: c.muerte ? c.muerte.t : 1 }
+    : c.muerte && c.muerte.motivo === 'abandono' ? { modo: 'quieto', fase: tiempoTotal * 3 }      // «Terminar la carrera»: se queda de pie
+    : estado === 'muerte' || estado === 'salvar' || (estado === 'fin' && c.muerte) ? { modo: 'caer', t: c.muerte ? c.muerte.t : 1 }
       : r.tropezarT >= 0 ? { modo: 'tropezar', t: r.tropezarT, fase: r.fase, ladeo: r.ladeo }
         : c.poderes.mochila > 0 ? { modo: 'volar', fase: r.fase }
           : r.rodar > 0 ? { modo: 'rodar', t: F.tiempoRodar - r.rodar }
@@ -748,13 +808,12 @@ $('capaPortada').addEventListener('click', e => {
   if (estado !== 'portada' || panel || e.target.closest('button, .contador, .p-record, .logo')) return;
   empezar();
 });
-/** Los tres retos con su barra de avance (en la portada, en el panel y en el fin). */
-function pintaRetos(el, conCarrera) {
-  const lista = M.retosDeNivel(progreso.retos.nivel);
-  const vivo = conCarrera && c ? M.avanzaRetos(progreso.retos, c.cuenta, false).retos.avance : progreso.retos.avance;
-  el.innerHTML = lista.map((r, i) => {
-    const v = Math.min(r.meta, vivo[i]), ok = v >= r.meta;
-    return `<li class="${ok ? 'ok' : ''}"><span>${ok ? '✔ ' : ''}${r.texto}</span><i style="--k:${(v / r.meta).toFixed(3)}"></i><small translate="no">${fmt(v)} / ${fmt(r.meta)}</small></li>`;
+/** Las misiones de un set con su barra, en chico y sin «Saltar» (para el resumen). */
+function filasRetos(el, nivel, avance) {
+  el.innerHTML = M.retosDeNivel(nivel).map((r, i) => {
+    const v = Math.min(r.meta, avance[i] || 0), ok = v >= r.meta;
+    return `<li class="m-fila${ok ? ' ok' : ''}"><span class="m-ico">${ICONOS[ICONO_RETO[r.tipo]] || ICONOS.estrella}</span>
+      <div class="m-txt"><b>${r.texto}</b><span class="m-barra"><i style="--k:${(v / r.meta).toFixed(3)}"></i></span><small translate="no">${fmt(v)} / ${fmt(r.meta)}</small></div>${ok ? `<em class="m-ok">${ICONOS.check}</em>` : ''}</li>`;
   }).join('');
 }
 function abreRetos() { pintaMisiones(); abrePanel('capaRetos'); }
@@ -868,7 +927,8 @@ document.addEventListener('click', e => {
   if (!accion) return;
   ({
     jugar: empezar, otra: otraCarrera, portada: aPortada, seguir: seguirJugando, seguirChoque: seguirTrasChoque,
-    abandonar: () => { muere('abandono'); c.muerte.t = 2; muestraFin(); },
+    abandonar: () => { if (estado !== 'pausa') return; c.muerte = { t: 2, motivo: 'abandono' }; muestraFin(); },
+    noSalvar: () => { if (estado === 'salvar') muestraFin(); },
     tienda: () => abreTienda('mejoras'), personajes: () => abreTienda('personajes'), retos: abreRetos, libreta: abreLibreta, opciones: abreOpciones, ayuda: () => abrePanel('capaAyuda'),
     volver: cierraPanel, relatoListo: () => { progreso.intro = true; guardar(); panel = null; empezar(); }
   })[accion]?.();

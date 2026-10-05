@@ -160,6 +160,10 @@ export class Sonido {
   patineta() { this.nota(220, 0.35, 0.08, 'saw', { f1: 880 }); this.soplo(0.3, 0.05, 1.6); }
   rompePatineta() { this.soplo(0.25, 0.14, 1.4, { corto: true }); this.nota(300, 0.2, 0.1, 'tri', { f1: 80 }); }
   seguir() { this.multiplicador(); }
+  /** El tic de la cuenta regresiva de «¿Seguir corriendo?» (el último segundo, más agudo). */
+  tic(ultimo) { this.nota(ultimo ? 1568 : 1046, 0.06, 0.07, 'p50'); }
+  /** Un tic suave mientras suben los puntos del resumen (sube de tono con la cuenta, k de 0 a 1). */
+  sube(k) { this.nota(660 + 660 * k, 0.03, 0.03, 'p25'); }
   record() { this.boleto(); }
   /** Entrar al túnel: un retumbo grave que se va apagando. */
   tunel() {

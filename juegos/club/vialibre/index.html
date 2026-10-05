@@ -134,15 +134,37 @@
       </div>
     </section>
 
+    <!-- Tras chocar, como en Subway Surfers: «¿Seguir corriendo?», con un
+         anillo que se vacía en 5 s. Solo aparece si alcanzan las monedas. -->
+    <section class="capa salvar" id="capaSalvar" hidden>
+      <div class="s-caja">
+        <h2 class="s-titulo">¿Seguir corriendo?</h2>
+        <button type="button" class="s-boton" data-accion="seguirChoque" aria-label="Seguir corriendo pagando monedas">
+          <svg class="s-anillo" viewBox="0 0 100 100" aria-hidden="true"><circle class="s-fondo" cx="50" cy="50" r="45"/><circle class="s-tiempo" id="salvarAnillo" cx="50" cy="50" r="45" pathLength="100"/></svg>
+          <span class="s-cuerpo"><i data-icono="moneda"></i><b id="salvarCosto" translate="no">500</b></span>
+        </button>
+        <p class="s-tienes">Tienes <i data-icono="moneda"></i><b id="salvarTienes" translate="no">0</b></p>
+        <button type="button" class="s-no" data-accion="noSalvar">No, gracias</button>
+      </div>
+    </section>
+
+    <!-- El resumen de la carrera: los puntos grandes (suben contando), el
+         récord, cuatro fichas y cómo van las misiones. -->
     <section class="capa panel fin" id="capaFin" hidden>
       <div class="caja">
         <h2 id="finTitulo">Fin de la carrera</h2>
-        <dl class="estadisticas" id="finStats"></dl>
-        <h3>Retos</h3>
-        <ol class="retos" id="finRetos"></ol>
+        <div class="f-puntos">
+          <small>Puntos</small>
+          <strong id="finPuntos" translate="no">0</strong>
+          <span class="f-record" id="finRecord" hidden>¡Nuevo récord!</span>
+          <span class="f-mejor" id="finMejor" translate="no"></span>
+        </div>
+        <ul class="f-datos" id="finStats"></ul>
+        <p class="f-set" id="finSet" hidden></p>
+        <h3>Misiones</h3>
+        <ol class="m-lista f-misiones" id="finRetos"></ol>
         <div class="menu">
-          <button type="button" class="opcion especial" data-accion="seguirChoque" id="btnSeguir" hidden>Seguir corriendo</button>
-          <button type="button" class="opcion principal" data-accion="otra">Otra carrera</button>
+          <button type="button" class="opcion principal" data-accion="otra"><i data-icono="play"></i>Otra carrera</button>
           <button type="button" class="opcion" data-accion="tienda">Tienda</button>
           <button type="button" class="opcion" data-accion="portada">Portada</button>
         </div>
