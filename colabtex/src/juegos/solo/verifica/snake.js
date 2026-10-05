@@ -60,11 +60,14 @@ const categoriaDe = c => {
 };
 const entero = x => Number.isSafeInteger(x);
 
-export function verifica(dato, prueba) {
+/* `ctx.uid` (verificaClub): la prueba tiene que ser de esa cuenta, o una
+   prueba copiada de `soloPruebas` valdría para otro. */
+export function verifica(dato, prueba, ctx) {
   const cat = categoriaDe(dato && dato.categoria);
   if (!cat) return 'Categoría de Snake Club desconocida.';
   if (!prueba || typeof prueba !== 'object' || prueba.v !== 1) return 'Prueba de Snake Club con un formato desconocido.';
   if (prueba.m !== cat.modo || prueba.t !== cat.tam) return 'La prueba es de otro modo o tamaño.';
+  if (ctx && ctx.uid && prueba.u !== ctx.uid) return 'La prueba es de una partida de otra cuenta.';
   if (!Object.prototype.hasOwnProperty.call(Motor.SPEED_MULT, prueba.r)) return 'La velocidad de la prueba no es válida.';
   if (!entero(prueba.s) || prueba.s < 0 || prueba.s > 0xFFFFFFFF) return 'La semilla de la prueba no es válida.';
   if (!entero(prueba.n) || prueba.n < 1 || prueba.n > MAX_TICS) return 'La duración de la prueba no es válida.';

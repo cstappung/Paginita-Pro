@@ -65,12 +65,15 @@ const RATIO_MIN = .6, RATIO_INTERVALO = 300, RATIO_MUESTRAS = 8;
 const nivelDe = c => { const m = /^club-minas-(easy|medium|hard)$/.exec(String(c || '')); return m ? m[1] : null; };
 const entero = x => Number.isSafeInteger(x);
 
-export function verifica(dato, prueba) {
+/* `ctx.uid` (verificaClub): la prueba tiene que ser de esa cuenta, o una
+   prueba copiada de `soloPruebas` valdría para otro. */
+export function verifica(dato, prueba, ctx) {
   const nivel = nivelDe(dato && dato.categoria);
   if (!nivel) return 'Categoría de Mina Club desconocida.';
   if (dato.puntos !== 1) return 'En Mina Club los puntos valen 1.';
   if (!prueba || typeof prueba !== 'object' || prueba.v !== 1) return 'Prueba de Mina Club con un formato desconocido.';
   if (prueba.n !== nivel) return 'La prueba es de otra dificultad.';
+  if (ctx && ctx.uid && prueba.u !== ctx.uid) return 'La prueba es de una partida de otra cuenta.';
   if (!entero(prueba.s) || prueba.s < 0 || prueba.s > 0xFFFFFFFF) return 'La semilla de la prueba no es válida.';
   if (prueba.u !== undefined && (typeof prueba.u !== 'string' || prueba.u.length > 128)) return 'La cuenta de la prueba no es válida.';
   const e = prueba.e;
