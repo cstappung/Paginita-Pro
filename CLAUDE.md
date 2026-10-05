@@ -3311,6 +3311,17 @@ Things that matter:
   mirror floor; `baja` also shortens the view to 125 m with the fog closer
   (`vista`), which is what saves draw calls. In «auto» it steps down by
   itself when frames average over 28 ms.
+- **What you play against must read before the scenery** (`legible` in each
+  palette, `realza()` in `mundo.js`). Trains, barriers, ramps, power-ups,
+  stars and tickets use material keys ending in `!` (`'pintura!'`); those
+  get light of their own in their own colour and a delayed fog, so they
+  stand out from the city and are seen from further away, without adding a
+  single light or draw call. Neón used to darken them with the city (black
+  trains with an outline, a black hole for a ramp) and Estación Fantasma
+  painted its trains the same green as the buildings: now Fantasma's trains
+  are pale (mint, ice, lilac) with dark windows, and Óxido's are patina
+  rather than an orange the fog swallowed. A new prop that you must dodge
+  or pick up needs the `!`.
 - **Music is one chip theme per station** (`vialibre-*` in `temas.js`, all
   original), its tempo rising with speed (×0.92 → ×1.15). Effects are
   synthesised in `audio.js`, everything goes through `destination`, so

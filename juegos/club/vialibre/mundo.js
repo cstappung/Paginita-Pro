@@ -1318,8 +1318,12 @@ function posa(r, p) {
     bd.codo.rotation.x = 0.35 + 0.25 * sube;
   } else if (p.modo === 'caer') {
     const k = Math.min(1, (p.t || 0) / 0.5);
-    r.cuerpo.rotation.x = 0.3 + 1.2 * k;                                       // cae de espaldas, hacia la cámara
-    r.cuerpo.position.y = -0.55 * k;
+    /* Cae de espaldas, hacia la cámara, y queda tendido SOBRE el suelo. El
+       giro es en torno a los pies, así que tendido la espalda queda a la
+       altura del suelo: hay que subirlo un poco (antes se bajaba, y quedaba
+       medio enterrado entre los durmientes, con solo la gorra a la vista). */
+    r.cuerpo.rotation.x = 0.3 + 1.15 * k;
+    r.cuerpo.position.y = 0.17 * k;
     bi.hombro.rotation.x = -2.2 * k; bd.hombro.rotation.x = -2.2 * k; bi.hombro.rotation.z = -1 * k; bd.hombro.rotation.z = 1 * k;
     pi.cadera.rotation.x = -0.9 * k; pd.cadera.rotation.x = -0.4 * k; pi.rodilla.rotation.x = -0.3; pd.rodilla.rotation.x = -0.6;
   }
@@ -1781,6 +1785,14 @@ export function crearMundo(canvas) {
         : (vertical ? [0, 1.2, 2.7, 0.95] : [0, 1.25, 4.45, 0.95]);
       camPos.lerp(_v.set(e.x + px, py, pz), k);
       camMira.lerp(_v.set(e.x + px, my, 0), k);
+    } else if (e.pose && e.pose.modo === 'caer') {
+      /* Tras un choque la cámara se acerca y baja la mirada hacia el
+         corredor tendido. Desde la de correr (que mira 18 m adelante) el
+         cuerpo, que cae hacia la cámara, quedaba justo en el borde de abajo
+         de la pantalla. Se mueve con el mismo suavizado, en medio segundo. */
+      const yS = (e.y || 0) * 0.75;                               // sobre un techo, la cámara sube con él
+      camPos.lerp(_v.set(e.x * 0.6, 3.4 + yS + ajusteRetrato.y * 0.6, 6.2 + ajusteRetrato.z * 0.6), k);
+      camMira.lerp(_v.set(e.x * 0.5, 0.3 + yS, -2.5), k);           // el corredor queda en el tercio de abajo (arriba va «¿Seguir corriendo?»)
     } else {
       camPos.lerp(_v.set(e.x * 0.45, 4.7 + yC + ajusteRetrato.y, 8.6 + ajusteRetrato.z), k);
       camMira.lerp(_v.set(e.x * 0.3, 0.4 + yC * 1.05, -9), k);

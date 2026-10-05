@@ -283,6 +283,7 @@ function muere(motivo) {
      DETRÁS de la barrera con la que chocó, tapado por ella. Si te atrapan
      no hubo choque, así que ahí sí se frena de a poco. */
   if (motivo !== 'atrapado') { c.V = 0; c.D = Math.max(0, c.D - 0.35); }
+  c.r.vy = Math.min(0, c.r.vy); c.r.rodar = 0;                   // si chocó saltando, cae (no sigue subiendo)
   c.perseguidorObj = 1;
   c.potVentana = 0; pintaPots();                                // los botones de potenciadores se van (y no vuelven al seguir)
   sonido.choque(); sonido.mochila(false);
@@ -417,6 +418,8 @@ function actualiza(dt) {
     retosEnVivo(dt);
     if (c.potVentana > 0) { c.potVentana -= dt; if (c.potVentana <= 0) pintaPots(); }
   } else {
+    const r = c.r;                                               // chocó en el aire: cae hasta el suelo (o el techo) antes de quedar tendido
+    if (r.y > r.suelo) { r.vy -= F.gravedad * dt; r.y = Math.max(r.suelo, r.y + r.vy * dt); }
     c.muerte.t += Math.max(dt, dtRealUltimo);                     // en un aparato lento la pausa tras el choque no se alarga
     if (estado === 'muerte' && c.muerte.t > 0.9 && puedeSalvar()) abreSalvar();
     else if (estado === 'muerte' && c.muerte.t > 1.4) muestraFin();
@@ -527,6 +530,7 @@ function abreSalvar() {
   $('salvarCosto').textContent = fmt(M.costoSeguir(c.seguirVeces));
   $('salvarTienes').textContent = fmt(progreso.monedas + c.monedas);
   $('salvarAnillo').style.strokeDashoffset = '0';
+  $('hud').hidden = true;                                        // el marcador estorba al cartel (vuelve si sigue la carrera)
   muestraCapa('capaSalvar');
 }
 /** La cuenta regresiva (en tiempo real: con la pestaña escondida no corre, porque no hay cuadros). */
@@ -588,7 +592,7 @@ function seguirTrasChoque() {
   }
   c.r.y = c.r.suelo = 0; c.r.vy = 0; c.r.enAire = false; c.r.rodar = 0;
   c.invulnerable = 3; c.tropiezo = 0; c.perseguidorObj = 0; c.muerte = null;
-  estado = 'jugando'; muestraCapa(null);
+  estado = 'jugando'; muestraCapa(null); $('hud').hidden = false;
   sonido.seguir(); sonido.tocaTema(c.estacion.musica);
   prevT = performance.now();
 }
