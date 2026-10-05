@@ -34,7 +34,7 @@ import { crearFrontera } from "./juegos/frontera.js";
 import { watchAuth, loginGoogle, logout } from "./firebase.js";
 import * as fb from "./fb-juegos.js";
 import { escapeHtml, timeAgo, colorForUid } from "./util.js";
-import { AJ_RITMOS, JUEGOS, reducir, jugadasDe, acumula, cupoDe, minimoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, YM_MAPAS, mapaYemas, varianteYemas, ganoEn, ordenaRanks, salaInactiva, ultimaActividad, INACTIVA_MS } from "./juegos/motor.js";
+import { AJ_RITMOS, JUEGOS, reducir, jugadasDe, acumula, cupoDe, minimoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, YM_MAPAS, mapaYemas, varianteYemas, ganoEn, ordenaRanks, BX_VARIANTES, BX_METAS, BX_MAPAS, salaInactiva, ultimaActividad, INACTIVA_MS } from "./juegos/motor.js";
 import { crearEscondite } from "./juegos/escondite.js";
 import { crearCartas } from "./juegos/cartas.js";
 import { crearCuadritos } from "./juegos/cuadritos.js";
@@ -54,6 +54,7 @@ import { crearPresidente } from "./juegos/presidente.js";
 import { crearSpicy } from "./juegos/spicy.js";
 import { crearTetris } from "./juegos/tetris.js";
 import { crearYemas } from "./juegos/yemas.js";
+import { crearBoxhead } from "./juegos/boxhead.js";
 import { crearClue } from "./juegos/clue.js";
 import { abreReglas, tieneReglas } from "./juegos/reglas.js";
 import { crearRanks } from "./juegos/ranks.js";
@@ -84,10 +85,10 @@ const FABRICAS = {
   cuadritos: crearCuadritos, reversi: crearReversi, worms: crearWorms,
   cadena: crearCadena, flip7: crearFlip7, cacho: crearCacho, uno: crearUno, catan: crearCatan,
   presidente: crearPresidente, spicy: crearSpicy, tetris: crearTetris, yemas: crearYemas, clue: crearClue,
-  ajedrez: crearAjedrez, pokemon: crearPokemon
+  ajedrez: crearAjedrez, pokemon: crearPokemon, boxhead: crearBoxhead
 };
 
-const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞", pokemon: "◓" };
+const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞", pokemon: "◓", boxhead: "▣" };
 /* Los clubes de un jugador, con sus claves de la clasificación y los
    mismos signos que llevan en su tarjeta del vestíbulo. */
 const ICONO_TODOS = { ...ICONO, general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", frontera: "🏰", sudoku: "🔢", fanal: "🪔", atasco: "🚗", yzombis: "🧟" };
@@ -187,6 +188,19 @@ const OPCIONES = {
       valores: Object.keys(YM_MAPAS).map(v => ({ v, t: YM_MAPAS[v] })) }
   ],
   clue: [{ clave: "cupo", etiqueta: "Detectives", por: 4, valores: cupos("clue") }],
+  /* Boxhead: el cupo es cuántos caben; la partida arranca con los que
+     hayan entrado (en cooperativo, incluso uno solo), y cuántos son
+     decide cuántos enemigos salen por nivel. */
+  boxhead: [
+    { clave: "cupo", etiqueta: "Jugadores", por: 4, valores: cupos("boxhead") },
+    { clave: "variante", etiqueta: "Modo", por: "coop",
+      valores: Object.keys(BX_VARIANTES).map(v => ({ v, t: BX_VARIANTES[v] })) },
+    { clave: "mapa", etiqueta: "Mapa", por: "patio",
+      valores: Object.keys(BX_MAPAS).map(v => ({ v, t: BX_MAPAS[v] })) },
+    /* La meta solo cuenta en versus: bajas para ganar. */
+    { clave: "meta", etiqueta: "Bajas para ganar (versus)", por: BX_METAS[1],
+      valores: BX_METAS.map(n => ({ v: n, t: n + " bajas" })) }
+  ],
   /* El formato decide qué equipos valen (el validador de Showdown); se
      guarda como `formato` y no como `modo`, que las reglas restringen. */
   pokemon: [{ clave: "formato", etiqueta: "Formato", por: PK_FORMATO_POR,
@@ -196,7 +210,8 @@ const OPCIONES = {
 /* La pestaña del manual que abre cada sala: la de su variante. */
 const modoReglas = (juego, o) => juego === "cacho" ? (Number(o.sicil) || 0)
   : juego === "catan" ? (o.exp === "mar" ? "mar" : "base")
-  : juego === "yemas" ? (o.variante || "todos") : o.modo;
+  : juego === "yemas" ? (o.variante || "todos")
+  : juego === "boxhead" ? (o.variante || "coop") : o.modo;
 
 const state = {
   user: null,           // el perfil ya aplicado: lo que se pinta
@@ -1478,6 +1493,10 @@ const NOVEDADES = [
   { id: "atasco", color: "#e8322f", alta: "2026-10-05", titulo: "Atasco",
     lema: "Estás encerrado en el auto rojo. Desliza autos, camiones y buses por su carril hasta abrirte camino a la salida. Con el mínimo de movidas, tres estrellas.",
     sub: "Un jugador · 240 niveles en seis pisos", ruta: "#solo/atasco", boton: "Arrancar", reglas: ["atasco"], modo: "solo" },
+  { id: "boxhead", color: "#c8892f", alta: "2026-10-05", titulo: "Boxhead",
+    lema: "Zombis y diablos vistos desde arriba. Cada baja sube el multiplicador y con él llegan la Uzi, la escopeta, los barriles, las cargas y el cohete. Cooperativo o versus, con los que entren a la sala.",
+    sub: "1–8 jugadores · cinco mapas", sala: { k: "boxhead", ops: { variante: "coop" } }, reglas: ["boxhead", "coop"],
+    modo: "multi", jugadores: "1–8 jugadores", cuenta: true, practica: "juegos/boxhead/index.html" },
   { id: "fanal", color: "#d9a85b", alta: "2026-10-04", titulo: "FANAL",
     lema: "Llevas la última luz a través de la noche, hacia el Alba. Las polillas bajan en formación hacia ella. Dispara al pulso de la música… y averigua qué estás apagando.",
     sub: "Un jugador · trece jornadas, tres jefes y una travesía sin fin", ruta: "#solo/fanal", boton: "Encender", reglas: ["fanal"], modo: "solo" },
@@ -1496,6 +1515,7 @@ function arteNovedad(n) {
   if (n.id === "atasco") return `<div class="jg-nov-arte-at"><i></i><i></i><i></i><i></i><em></em><s></s><b>ATASCO</b></div>`;
   // FANAL: un farol que alumbra la noche y unas polillas que bajan hacia él.
   if (n.id === "fanal") return `<div class="jg-nov-arte-fn"><i></i><i></i><i></i><i></i><i></i><em></em><b>FANAL</b></div>`;
+  if (n.id === "boxhead") return `<div class="jg-nov-arte-zb">${arteJuego("boxhead")}</div>`;
   if (n.id === "zombis") return `<div class="jg-nov-arte-zb">${arteJuego("yemas")}<b>ZOMBIS</b></div>`;
   if (n.id === "prodrop") {
     const cs = ["javier-pereda-torres-gta", "claudia-prieto-shiny", "david-watts-casino"];
@@ -1969,7 +1989,7 @@ const FANFARRIA = { gano: "victoria", perdi: "derrota", empate: "empate", mirand
    En cartas es el choque entero (`CHOQUE`, 2,6 s): la ronda que gana
    el trío se enseña igual que las demás. Worms no pone fanfarria — el
    marco tiene su propio audio y su propio final. */
-const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300, presidente: 1200, spicy: 1200, tetris: 1500, yemas: 1500, clue: 1800, ajedrez: 1300, pokemon: 1500 };
+const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300, presidente: 1200, spicy: 1200, tetris: 1500, yemas: 1500, clue: 1800, ajedrez: 1300, pokemon: 1500, boxhead: 1500 };
 
 function pintaFin(p, est) {
   const caja = $("jgFin");
@@ -2466,6 +2486,7 @@ function arteJuego(k) {
   if (k === "spicy") return '<div class="jg-art-sp"><b>🌶</b>' + [["7", "#e2412b", "🌶"], ["3", "#5dac3a", "🍃"], ["9", "#6b4a2b", "⚫"]].map(([n, c, e]) => '<i style="--t:' + c + '"><span>' + n + '</span><s>' + e + '</s></i>').join("") + '<em>SPICY</em></div>';
   if (k === "tetris") return '<div class="jg-art-tt">' + ["....ll", "t..zll", "ttzzoo", "itsjoo", "issjjj"].map(f => [...f].map(c => '<i class="' + (c === "." ? "" : "p-" + c) + '"></i>').join("")).join("") + '<em>TETRIS</em></div>';
   if (k === "yemas") return '<div class="jg-art-ym"><i></i><i></i><i></i><b></b><em>YEMAS</em></div>';
+  if (k === "boxhead") return '<div class="jg-art-bx"><i></i><i></i><i></i><b></b><s></s><em>BOXHEAD</em></div>';
   if (k === "clue") return '<div class="jg-art-cl"><i></i><i></i><i></i><b>✉</b><s>🔍</s><em>CLUE</em></div>';
   if (k === "pokemon") return '<div class="jg-art-pk"><i></i><b></b><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/6.gif" alt=""><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/back/9.gif" alt=""><em>POKÉMON</em></div>';
   if (k === "ajedrez") return '<div class="jg-art-aj">' + ["r", "Q", "n", "K", "p"].map(x => '<svg viewBox="0 0 100 100" aria-hidden="true">' + piezaSvg(x) + '</svg>').join("") + '</div>';

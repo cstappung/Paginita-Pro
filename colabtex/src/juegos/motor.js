@@ -177,6 +177,14 @@ export const JUEGOS = {
     minimo: 2,
     cupo: 2,
     alta: "2026-10-02"
+  },
+  boxhead: {
+    nombre: "Boxhead",
+    lema: "Zombis y demonios desde arriba: sube el multiplicador, gana armas y aguanta nivel tras nivel con los que entren",
+    color: "#c8892f",
+    minimo: 1,
+    cupo: 8,
+    alta: "2026-10-05"
   }
 };
 
@@ -196,6 +204,7 @@ export function novedades(n = 3) {
 export function minimoDe(p) {
   const j = JUEGOS[p && p.juego] || {};
   if (p && p.juego === "yemas" && varianteYemas(p) !== "zombis") return 2;
+  if (p && p.juego === "boxhead" && varianteBoxhead(p) === "versus") return 2;
   return j.minimo || 2;
 }
 
@@ -958,6 +967,7 @@ export function reducir(p) {
   if (p.juego === "clue") return { ...base, ...redClue(p, js, listos) };
   if (p.juego === "ajedrez") return { ...base, ...redAjedrez(p, js) };
   if (p.juego === "pokemon") return { ...base, ...redPokemon(p, js, listos) };
+  if (p.juego === "boxhead") return { ...base, ...redBoxhead(p, js, listos) };
   return base;
 }
 
@@ -1035,6 +1045,9 @@ export function progreso(est, juego) {
     const lider = est.puntosEq ? Math.max(0, ...Object.values(est.puntosEq)) : Math.max(0, ...Object.values(est.bajas));
     return c(lider / (est.meta || YM_META));
   }
+  /* En Boxhead cooperativo, cuántos están caídos; en versus, la meta. */
+  if (juego === "boxhead" && est.variante === "coop") return c((est.caidos || []).length / Math.max(1, (est.jugadores || []).length));
+  if (juego === "boxhead" && est.bajas) return c(Math.max(0, ...Object.values(est.bajas)) / (est.meta || BX_METAS[1]));
   /* En el ajedrez, el material que ya salió del tablero: con las damas
      cambiadas y media docena de piezas fuera es un final. */
   if (juego === "ajedrez" && est.material) return c(1 - (est.material.w + est.material.b) / 78);
@@ -6685,5 +6698,110 @@ function ajRepasa(bandos, jug, ritmo = null) {
     ofrecio, medio: pos.medio,
     reloj: reloj ? { w: reloj.w, b: reloj.b, desde, corre: !fin && corre() ? pos.color : "", base: ritmo.base, inc: ritmo.inc } : null,
     ganador, motivo
+  };
+}
+
+/* ---------- Boxhead ----------
+   El juego corre en un iframe (`juegos/boxhead/`) y los enemigos los mueve
+   el marco de quien dirige, como los zombis de Yemas. Al registro va solo
+   lo que decide la partida:
+
+   - **Cooperativo** (`coop`, de 1 a 8): `{t:"nivel", n}` lo escribe quien
+     dirige al limpiar un nivel y vale solo si es el siguiente; aceptarlo
+     levanta a los caídos. `{t:"muere", pts, k, n}` deja caído a quien lo
+     escribe con sus puntos (solo suben). Cuando todos los que siguen en la
+     sala están caídos se acaba, y gana quien más puntos hizo (`""` si
+     nadie hizo ninguno o empatan arriba).
+   - **Versus** (`versus`, de 2 a 8): `{t:"muere", por}` suma una muerte a
+     quien la escribe y una baja a `por` si es otro jugador que sigue en la
+     sala. El primero en llegar a la meta gana; si queda uno solo, gana por
+     abandono. Matarse uno mismo (un barril propio) no le da baja a nadie.
+
+   Nadie puede escribir una baja para sí mismo; el límite honesto es que un
+   cliente modificado podría negarse a morir. */
+export const BX_VARIANTES = { coop: "Cooperativo", versus: "Versus" };
+export const BX_METAS = [5, 10, 20];
+export const BX_MAPAS = { patio: "Patio", sotano: "Sótano", cruce: "Cruce", fortaleza: "Fortaleza", laberinto: "Laberinto" };
+/* Ids de arma de juegos/boxhead/js/datos.js (0–7) más el mordisco (8) y
+   el fuego de un diablo (9). Nunca se renumeran. */
+export const BX_ARMAS = 8;
+const tiene = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+export const varianteBoxhead = p => tiene(BX_VARIANTES, p && p.variante) ? p.variante : "coop";
+export const mapaBoxhead = p => tiene(BX_MAPAS, p && p.mapa) ? p.mapa : "patio";
+export function metaBoxhead(p) {
+  const m = Math.floor(Number(p && p.meta));
+  return BX_METAS.includes(m) ? m : BX_METAS[1];
+}
+
+export function redBoxhead(p, js = jugadoresDe(p), listos = true) {
+  const ids = new Set(js.map(j => j.uid));
+  const variante = varianteBoxhead(p), meta = metaBoxhead(p), mapa = mapaBoxhead(p);
+  const coop = variante === "coop";
+  const entero = (x, max) => Number.isInteger(x) && x >= 0 && x <= max ? x : 0;
+  const bajas = {}, muertes = {}, pts = {}, kills = {}, fuera = {}, caidos = {};
+  for (const u of ids) { bajas[u] = 0; muertes[u] = 0; pts[u] = 0; kills[u] = 0; }
+  const hist = [];
+  let nivel = 1, ganador = null, motivo = "";
+  const finCoop = () => {
+    const activos = js.filter(x => !fuera[x.uid]);
+    if (activos.length && !activos.every(x => caidos[x.uid])) return;
+    let mejor = "", max = 0, empate = false;
+    for (const x of activos.length ? activos : js) {
+      if (pts[x.uid] > max) { max = pts[x.uid]; mejor = x.uid; empate = false; }
+      else if (max > 0 && pts[x.uid] === max) empate = true;
+    }
+    ganador = empate ? "" : mejor;
+    motivo = "caidos";
+  };
+  for (const j of jugadasDe(p)) {
+    if (ganador !== null) break;
+    if (j.t === "abandona") {
+      if (ids.has(j.uid) && !fuera[j.uid]) {
+        fuera[j.uid] = true;
+        hist.push({ e: "sale", uid: j.uid });
+        if (coop && listos) finCoop();
+      }
+      continue;
+    }
+    if (!listos || !ids.has(j.uid) || fuera[j.uid]) continue;
+    const u = j.uid;
+    if (coop) {
+      if (j.t === "nivel") {
+        if (j.n !== nivel + 1) continue;
+        nivel = j.n;
+        for (const k of Object.keys(caidos)) delete caidos[k];
+        hist.push({ e: "nivel", n: nivel });
+        continue;
+      }
+      if (j.t !== "muere" || caidos[u]) continue;
+      muertes[u]++;
+      caidos[u] = true;
+      pts[u] = Math.max(pts[u], entero(j.pts, 1e9));
+      kills[u] = Math.max(kills[u], entero(j.k, 1e7));
+      hist.push({ e: "baja", uid: "", v: u, a: entero(j.a, BX_ARMAS + 1) });
+      finCoop();
+      continue;
+    }
+    if (j.t !== "muere") continue;
+    muertes[u]++;
+    const k = j.por;
+    const vale = typeof k === "string" && ids.has(k) && k !== u && !fuera[k];
+    hist.push({ e: "baja", uid: vale ? k : "", v: u, a: entero(j.a, BX_ARMAS + 1) });
+    if (!vale) continue;
+    bajas[k]++;
+    if (bajas[k] >= meta) { ganador = k; motivo = "meta"; }
+  }
+  const activos = js.filter(j => !fuera[j.uid]);
+  if (ganador === null && listos && !coop && activos.length <= 1) {
+    ganador = activos.length ? activos[0].uid : "";
+    motivo = "abandono";
+  }
+  if (ganador === null && listos && coop && !activos.length) finCoop();
+  return {
+    fase: !listos ? "espera" : ganador !== null ? "fin" : "jugando", turno: "",
+    variante, meta, mapa, nivel,
+    caidos: Object.keys(caidos).filter(u => !fuera[u]),
+    puntos: coop ? pts : bajas, kills, bajas, muertes, fuera,
+    hist: hist.slice(-40), ganador: ganador === null ? null : ganador, motivo
   };
 }

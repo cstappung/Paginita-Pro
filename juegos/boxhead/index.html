@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<script src="../../i18n.js?v=202610050304"></script>
+<script src="../audio/mando.js?v=mando-2"></script>
+<script src="../audio/volumen.js?v=vol-1"></script>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Boxhead</title>
+<style>
+:root{--fondo:#16130f;--panel:rgba(20,17,13,.86);--borde:#5b4a35;--txt:#f3ead8;--tenue:#b9a98c;--oro:#f2c14e;--rojo:#d94b3d}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--fondo);color:var(--txt);font:14px/1.35 "Trebuchet MS",system-ui,sans-serif;overflow:hidden;user-select:none;-webkit-user-select:none}
+#lienzo{position:fixed;inset:0;width:100%;height:100%;display:block;image-rendering:pixelated}
+.panel{background:var(--panel);border:2px solid var(--borde);border-radius:6px;box-shadow:0 3px 0 rgba(0,0,0,.45)}
+button{font:inherit;cursor:pointer}
+.btn{background:linear-gradient(#e2b44a,#b9852a);color:#2a1a06;border:2px solid #6e4d14;border-radius:5px;padding:8px 18px;font-weight:800;letter-spacing:.03em;text-transform:uppercase;box-shadow:0 3px 0 #4a3209}
+.btn:hover{filter:brightness(1.08)}.btn:active{transform:translateY(2px);box-shadow:0 1px 0 #4a3209}
+.btn2{background:#2c251c;color:var(--txt);border:2px solid var(--borde);border-radius:5px;padding:6px 12px}
+.btn2.sel{border-color:var(--oro);color:var(--oro)}
+/* ---- HUD ---- */
+#hud{position:fixed;inset:0;pointer-events:none}
+#hud[hidden]{display:none}
+#vida{position:absolute;left:10px;top:10px;width:230px;padding:8px 10px}
+.barra{height:12px;background:#3b0f0b;border:1px solid #000;border-radius:3px;overflow:hidden}
+.barra>i{display:block;height:100%;background:linear-gradient(#6fe06a,#2f9a2a);transition:width .15s}
+#combo{margin-top:6px;display:flex;align-items:center;gap:8px}
+#combo .barra{flex:1;height:8px;background:#2a2112}
+#combo .barra>i{background:linear-gradient(#ffd96b,#e39b1d);transition:none}
+#mul{font-weight:900;color:var(--oro);min-width:44px;text-align:right;font-size:18px;text-shadow:0 2px 0 #000}
+#pts{margin-top:4px;display:flex;justify-content:space-between;color:var(--tenue)}
+#pts b{color:var(--txt)}
+#armas{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);display:flex;gap:4px;padding:5px}
+.slot{width:62px;height:46px;border:2px solid #3d3227;border-radius:4px;background:#221c15;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10px;color:var(--tenue);position:relative}
+.slot.sel{border-color:var(--oro);background:#3a2e1c;color:var(--txt)}
+.slot.no{opacity:.35}
+.slot canvas{width:34px;height:20px}
+.slot b{position:absolute;left:3px;top:1px;font-size:9px;color:#8a7a62}
+.slot span{font-weight:700}
+#nivel{position:absolute;left:50%;top:10px;transform:translateX(-50%);padding:5px 14px;text-align:center;white-space:nowrap}
+#nivel b{color:var(--oro);font-size:16px}
+#tabla{position:absolute;right:10px;top:54px;min-width:170px;padding:6px 8px;font-size:12px}
+#tabla div{display:flex;justify-content:space-between;gap:10px;align-items:center}
+#tabla i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px}
+#tabla .caido{opacity:.45;text-decoration:line-through}
+#vol{position:absolute;right:10px;top:10px;pointer-events:auto;padding:4px 8px}
+#banner{position:absolute;left:50%;top:26%;transform:translateX(-50%);font-size:30px;font-weight:900;color:var(--oro);text-shadow:0 3px 0 #000,0 0 18px rgba(0,0,0,.6);white-space:nowrap;opacity:0;transition:opacity .3s}
+#banner.ver{opacity:1}
+#premio{position:absolute;left:50%;top:36%;transform:translateX(-50%);font-size:18px;font-weight:800;color:#fff;text-shadow:0 2px 0 #000;white-space:nowrap;opacity:0;transition:opacity .3s}
+#premio.ver{opacity:1}
+#aviso{position:absolute;left:50%;bottom:66px;transform:translateX(-50%);color:#fff;text-shadow:0 2px 0 #000;font-weight:700;white-space:nowrap}
+#ayuda{position:absolute;left:10px;bottom:10px;font-size:11px;color:var(--tenue);max-width:260px;padding:5px 8px}
+#rojo{position:fixed;inset:0;pointer-events:none;box-shadow:inset 0 0 120px rgba(200,0,0,.0);transition:box-shadow .2s}
+/* ---- menú ---- */
+.capa{position:fixed;inset:0;display:grid;place-items:center;background:rgba(10,8,6,.72);z-index:5;padding:16px;overflow:auto}
+.capa[hidden]{display:none}
+.caja{max-width:620px;width:100%;padding:18px 20px;text-align:center}
+.logo{font-size:48px;font-weight:900;letter-spacing:.06em;color:var(--oro);text-shadow:0 4px 0 #6e4d14,0 8px 0 rgba(0,0,0,.4);margin:0 0 4px}
+.sub{color:var(--tenue);margin:0 0 14px}
+.fila{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:8px 0 14px}
+.skin{width:64px;padding:4px 2px;background:#221c15;border:2px solid #3d3227;border-radius:5px;color:var(--tenue);font-size:11px}
+.skin canvas{width:40px;height:52px;display:block;margin:0 auto 2px}
+.skin.sel{border-color:var(--oro);color:var(--txt);background:#3a2e1c}
+h3{margin:6px 0 2px;font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--tenue)}
+.menu-ayuda{font-size:12px;color:var(--tenue);margin-top:12px}
+kbd{background:#2c251c;border:1px solid var(--borde);border-radius:3px;padding:0 4px;font:inherit;font-size:11px}
+#cuenta{color:var(--tenue);font-size:12px;margin-top:8px}
+@media (max-width:640px){
+  #vida{width:170px;padding:5px 7px}#tabla{display:none}.slot{width:40px;height:36px}.slot canvas{width:24px;height:14px}.slot span{font-size:9px}
+  #ayuda{display:none}.logo{font-size:34px}#banner{font-size:22px}
+}
+</style>
+</head>
+<body>
+<canvas id="lienzo"></canvas>
+<div id="rojo"></div>
+
+<div id="hud" hidden>
+  <div id="vida" class="panel">
+    <div class="barra"><i id="vidaBarra" style="width:100%"></i></div>
+    <div id="combo"><div class="barra"><i id="comboBarra" style="width:0"></i></div><span id="mul">×1</span></div>
+    <div id="pts"><span>Puntos <b id="ptsN">0</b></span><span>Bajas <b id="kN">0</b></span></div>
+  </div>
+  <div id="nivel" class="panel"></div>
+  <div id="vol" class="panel" data-volumen></div>
+  <div id="tabla" class="panel" translate="no"></div>
+  <div id="banner"></div>
+  <div id="premio"></div>
+  <div id="aviso"></div>
+  <div id="armas" class="panel"></div>
+  <p id="ayuda" class="panel"><kbd>WASD</kbd>/<kbd>flechas</kbd> moverte · <kbd>Espacio</kbd> disparar · <kbd>Q</kbd>/<kbd>E</kbd> o <kbd>1</kbd>–<kbd>8</kbd> arma · <kbd>X</kbd> detonar cargas · <kbd>Esc</kbd> pausa</p>
+</div>
+
+<div id="menu" class="capa">
+  <div class="caja panel">
+    <h1 class="logo">BOXHEAD</h1>
+    <p class="sub" id="menuSub">Zombis, demonios y un multiplicador que no para de subir.</p>
+    <div id="menuMapas"><h3>Mapa</h3><div class="fila" id="mapas"></div></div>
+    <h3>Personaje</h3>
+    <div class="fila" id="skins"></div>
+    <button class="btn" id="jugar">¡A jugar!</button>
+    <p id="cuenta"></p>
+    <p class="menu-ayuda" id="menuAyuda"><kbd>WASD</kbd>/<kbd>flechas</kbd> moverte · <kbd>Espacio</kbd> disparar · <kbd>Q</kbd>/<kbd>E</kbd> cambiar arma · <kbd>X</kbd> detonar cargas.<br>Cada baja sube el multiplicador; las armas nuevas se ganan con él.</p>
+  </div>
+</div>
+
+<div id="pausa" class="capa" hidden>
+  <div class="caja panel">
+    <h2 class="logo" style="font-size:34px">PAUSA</h2>
+    <p class="sub" id="pausaSub">En línea la partida sigue: los zombis no esperan.</p>
+    <button class="btn" id="seguir">Seguir</button>
+  </div>
+</div>
+
+<div id="fin" class="capa" hidden>
+  <div class="caja panel">
+    <h2 class="logo" style="font-size:34px">FIN</h2>
+    <p class="sub" id="finTxt"></p>
+    <button class="btn" id="otra">Jugar otra vez</button>
+  </div>
+</div>
+
+<script src="js/datos.js?v=boxhead-1"></script>
+<script src="js/juego.js?v=boxhead-1"></script>
+</body>
+</html>

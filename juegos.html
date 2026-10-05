@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610050257"></script>
+<script src="i18n.js?v=202610050304"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Laboratorio</title>
@@ -1470,6 +1470,17 @@ try { var t = localStorage.getItem("jg.tema");
 .jg-art-ym i:nth-child(3){left:122px;background:#ff9ec7;transform:rotate(8deg)}
 .jg-art-ym b{position:absolute;left:50%;bottom:2px;width:132px;height:16px;margin-left:-66px;border-radius:50%;background:#ffc21a;box-shadow:0 0 0 5px #fff8}
 .jg-art-ym em{position:absolute;left:50%;bottom:-30px;transform:translateX(-50%);font:900 18px 'IBM Plex Mono',monospace;font-style:normal;letter-spacing:3px;color:#fff;text-shadow:2px 2px 0 #b36b00}
+.jg-art-bx{position:relative;width:170px;height:104px}
+.jg-art-bx i{position:absolute;bottom:14px;width:34px;height:58px}
+.jg-art-bx i::before{content:"";position:absolute;left:3px;top:0;width:28px;height:26px;background:#f1d4ad;border:2px solid #3a2a18;border-radius:3px;box-shadow:inset -5px -5px 0 #0000001f}
+.jg-art-bx i::after{content:"";position:absolute;left:6px;top:26px;width:22px;height:30px;border:2px solid #3a2a18;border-radius:2px;background:var(--r,#4f7a3a)}
+.jg-art-bx i:nth-child(1){left:14px;--r:#4f7a3a}
+.jg-art-bx i:nth-child(2){left:68px;bottom:22px;--r:#3c5f9c}
+.jg-art-bx i:nth-child(3){left:122px;--r:#8a2f2a;filter:hue-rotate(70deg) saturate(.5) brightness(.85)}
+.jg-art-bx i:nth-child(3)::before{background:#9bb07a}
+.jg-art-bx b{position:absolute;left:50%;bottom:4px;width:150px;height:12px;margin-left:-75px;background:repeating-linear-gradient(90deg,#6b5233 0 18px,#5a4429 18px 20px);border:2px solid #2a1d0f}
+.jg-art-bx s{position:absolute;left:104px;bottom:16px;width:14px;height:18px;border-radius:3px;background:#c0392b;border:2px solid #3a1410;box-shadow:inset 0 4px 0 #0003,inset 0 -4px 0 #0003}
+.jg-art-bx em{position:absolute;left:50%;bottom:-30px;transform:translateX(-50%);font:900 18px 'IBM Plex Mono',monospace;font-style:normal;letter-spacing:3px;color:#f2c14e;text-shadow:2px 2px 0 #6e4d14}
 .jg-yemas-aviso{margin:0 0 10px;padding:10px 14px;border-radius:12px;background:#ffb3001f;border:1px solid #ffb30055;font:13px 'IBM Plex Mono',monospace}.jg-yemas-aviso[hidden]{display:none}
 .jg-yemas-marco{display:block;width:100%;height:calc(100vh - 120px);min-height:520px;border:0;border-radius:18px;background:#a9dcff}
 .jg-portada-clue{background:radial-gradient(ellipse at 50% 40%,#5a1422,#1c0a10 70%)}
@@ -2943,10 +2954,12 @@ html[data-tema=oscuro] .jg-tira{border-color:var(--os-borde)}
 .jg-nov-c .jg-nov-arte>*{zoom:1}
 .jg-nov-arte-zb>.jg-art-ym{zoom:.8}
 .jg-nov-arte-zb .jg-art-ym em{display:none}
+.jg-nov-arte-zb>.jg-art-bx{zoom:.8}
+.jg-nov-arte-zb .jg-art-bx em{display:none}
 .jg-nov-arte .jg-nov-arte-bb{place-items:stretch}
 .jg-nov-pie a.btn{display:flex;align-items:center;justify-content:center;gap:6px;flex:1;text-decoration:none}
 @media(max-width:700px){.jg-tira header small{flex-basis:100%;order:3}.jg-tira{padding:12px}}
-@media(max-width:700px){.jg-nov-arte-zb>.jg-art-ym{zoom:.5}}
+@media(max-width:700px){.jg-nov-arte-zb>.jg-art-ym,.jg-nov-arte-zb>.jg-art-bx{zoom:.5}}
 .jg-nov-arte-zb,.jg-nov-arte-pd,.jg-nov-arte-bb{position:absolute;inset:0;display:grid;place-items:center}
 .jg-nov-arte-zb{background:radial-gradient(ellipse at 50% 110%,#7fbf3a 0,#2f4d14 45%,#0f1a08 100%)}
 /* FANAL en Novedades: un farol abajo y cinco polillas que bajan hacia su luz. */
@@ -3799,6 +3812,6 @@ html[data-tema=oscuro] .jg-lado-cuenta>ul{color:var(--os-tx)}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610050257"></script>
+<script src="juegos-app.js?v=202610050304"></script>
 </body>
 </html>

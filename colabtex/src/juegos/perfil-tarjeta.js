@@ -66,7 +66,7 @@ export const MARCOS = [
     ["tcatan", "catan", "Hexágonos"], ["tpresidente", "presidente", "Banda presidencial"], ["tspicy", "spicy", "Picante"],
     ["tworms", "worms", "Artillería"], ["tyemas", "yemas", "Huevos en guerra"], ["tzombis", "zombis", "Horda"],
     ["tclue", "clue", "Pistas"], ["tajedrez", "ajedrez", "Caballo de oro"], ["tmonedas", "monedas", "Tesoro"],
-    ["tprodrop", "prodrop", "Coleccionista"], ["tsudoku", "sudoku", "Cuadrícula arcade"], ["tfanal", "fanal", "Última luz"], ["tatasco", "atasco", "Luz verde"]
+    ["tprodrop", "prodrop", "Coleccionista"], ["tsudoku", "sudoku", "Cuadrícula arcade"], ["tfanal", "fanal", "Última luz"], ["tboxhead", "boxhead", "Cabeza cuadrada"], ["tatasco", "atasco", "Luz verde"]
   ].map(([id, top, n]) => ({ id, n, anim: true, req: { top } }))
 ];
 

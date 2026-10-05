@@ -410,6 +410,52 @@ const REGLAS = {
       ["Sin trampas", "Cada uno roba de un mazo propio que solo su navegador conoce, y cada carta jugada queda sellada con un hash: nadie puede cambiarla después ni ver la mano de otro. Al final todos revelan su semilla y la mesa comprueba cada carta; a quien mintió se le marca en rojo."]
     ]
   },
+  boxhead: {
+    lema: "Acción vista desde arriba: zombis, diablos y un multiplicador que no para de subir. De 1 a 8 jugadores.",
+    secciones: [
+      ["Controles", lista([
+        "<b>WASD</b> o flechas para moverte; el personaje mira hacia donde camina (ocho direcciones) y dispara hacia ahí.",
+        "<b>Espacio</b> dispara (mantenlo apretado), <b>Q</b>/<b>E</b> o <b>1</b>–<b>8</b> cambian de arma, <b>X</b> detona todas tus cargas puestas y <b>Esc</b> pausa.",
+        "El aspecto se elige en el menú del juego antes de empezar: Bambo, Jon, Soldado, Médico, Ninja, Policía, Payaso o Robot."
+      ])],
+      ["El multiplicador", lista([
+        "Cada baja sube el <b>multiplicador</b> en uno y llena la barra de combo. La barra se vacía sola, y más rápido cuanto más alto vas; si llega a cero, vuelves a ×1.",
+        "Los puntos de cada baja son 10 por un zombi y 20 por un diablo, <b>por el multiplicador</b>: encadenar bajas es lo que da puntos de verdad.",
+        "Las armas y mejoras se ganan por el multiplicador más alto alcanzado, y no se pierden aunque el combo se corte."
+      ])],
+      ["Las armas", lista([
+        "<b>Pistola</b> (desde el comienzo, munición infinita), <b>Uzi</b> (×5), <b>Escopeta</b> (×10), <b>Barriles</b> (×15), <b>Granadas</b> (×20), <b>Muro falso</b> (×25), <b>Cohetes</b> (×30) y <b>Cargas</b> (×40).",
+        "Los <b>barriles</b> se dejan en el suelo y revientan cuando les disparas; los <b>muros falsos</b> tapan el paso a los enemigos hasta que los rompen; las <b>cargas</b> se ponen y se detonan todas juntas con <b>X</b>.",
+        "Entre arma y arma llegan mejoras: pistola rápida (×8), más munición de Uzi (×12), escopeta más ancha (×18), y así hasta cargas más grandes (×60)."
+      ])],
+      ["Enemigos y cajas", lista([
+        "Los <b>zombis</b> caminan hacia ti y muerden. Los <b>diablos</b> aparecen desde el nivel 3: aguantan más, son más rápidos y escupen bolas de fuego.",
+        "Cada nivel trae más enemigos, con más vida y más rápidos. También salen más cuantos más jugadores haya en la sala.",
+        "Los enemigos sueltan <b>cajas</b>: unas curan 50 de vida y otras rellenan la munición de un arma que tengas."
+      ])],
+      ["Mapas", "Cinco, elegidos al abrir la sala: Patio, Sótano, Cruce, Fortaleza y Laberinto. Los enemigos entran por los bordes y nunca aparecen pegados a un jugador."],
+      ["Sin servidor", "El movimiento va de navegador a navegador. Los enemigos los mueve un jugador, el que dirige, y si se va los toma el siguiente. Al registro de la sala solo van las muertes y los niveles superados: cada uno anota su propia muerte, así que un navegador modificado podría no morirse. Es el mismo límite honesto del resto de los juegos."],
+      ["Para practicar", "El juego suelto (<code>juegos/boxhead/</code>) se juega solo, en supervivencia, en cualquiera de los cinco mapas."]
+    ],
+    modos: {
+      coop: { nombre: "Supervivencia", secciones: [
+        ["En equipo", lista([
+          "Todos contra las oleadas. Un nivel termina cuando no queda ningún enemigo, y entonces empieza el siguiente.",
+          "Las explosiones propias y las de tus compañeros te hacen un tercio del daño: ojo con los barriles.",
+          "Quien cae espera a que el resto limpie el nivel y vuelve al empezar el siguiente.",
+          "La partida termina cuando caen todos a la vez. Gana quien hizo más puntos."
+        ])]
+      ]},
+      versus: { nombre: "Versus", secciones: [
+        ["Todos contra todos", lista([
+          "Se empieza con <b>todas las armas</b>. Hay enemigos igual, menos y con más diablos, para que el mapa no se quede quieto.",
+          "Tus balas y explosiones hieren a los demás jugadores; tus propias explosiones te hacen la mitad.",
+          "Al morir vuelves a los tres segundos, con la munición repuesta.",
+          "Gana el primero en llegar a la meta de bajas que eligió la sala (5, 10 o 20). Matarte a ti mismo cuenta como muerte y no da baja. Se necesitan al menos dos jugadores."
+        ])]
+      ]}
+    }
+  },
   tetris: {
     lema: "Tetris a la vez: de 2 a 8 pozos, gana el último en pie.",
     secciones: [
