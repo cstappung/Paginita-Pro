@@ -2108,6 +2108,61 @@ stored. Both new nodes, `chat` and `enCurso`, need the rules re-published
 (`firebase/CONFIGURAR-FIREBASE.md`). Until then games play normally, but the
 chat sends nothing and the lobby shows no games in progress.
 
+**The lobby has two side rails on a wide PC** (`juegos/rieles.js`, the DOM;
+`juegos/rieles-datos.js`, pure; `juegos/repeticion.js`, the replays). On the
+left, the best game *of the day* of four club tables, replayed on a loop with
+who played it: Tetris Maratón, Snake classic mediano, sortEm 20 and the
+buscaminas medio (`REPES`). On the right, the general chat. They hang off
+`<body>` and show only in the menu views (`VISTAS_RIEL` in `juegos-main.js`
+sets `html.jg-rieles` through `rieles.pon()`, on every `render()`) and from
+1400 px (`ANCHO`, which must match the `@media` in juegos.html). There the
+`main` narrows to leave them room (`--riel`), rather than the rails covering
+it, and the ⚑ moves left of the chat. Narrower, the replays are gone and the
+chat is a 💬 button with an unread badge that opens a panel, a bottom sheet
+on a phone. Things to keep:
+
+- **A replay is the anti-cheat proof, not a video.** Every club result
+  already carries what it takes to rebuild it, and the four engines are
+  deterministic, so `repeticion.js` replays the proof step by step with the
+  same engine, copying each verifier's loop (`crearRepro`: `dur`, `en(ms)`,
+  `pinta(ctx, w, h)`, `marcador()`). Going backwards rebuilds from the start.
+  A game longer than two minutes plays faster (`velocidadRep`, up to ×4).
+- **Each scene is drawn like its game**, not as a generic grid: Tetris'
+  well with its Guardada/Siguientes boxes and numbers, Snake's lime stroke
+  body (interpolated between ticks) under its light score bar, sortEm's
+  neon 800-wide scene cropped to the «Time:» and the blocks, and Mina
+  Club's garden with its flags/time bar. The colours and shapes are copied
+  from each game's `game.js`/`style.css`, so a reskin of a game has to be
+  mirrored there. There is no card box: each entry is only a title row
+  (game · player) and the scene, transparent around it, and the rail
+  splits its height by each scene's `aspecto`.
+  `tests/rieles.test.cjs` plays robot games of each and checks the replay
+  reaches the engine's own final score.
+- **`repeticiones/<cat>/<uid>`** = `{dia, o, p, t, n, v, d, at}`: each
+  account's best game of the day. `apuntaRepeticion` in `juegos-main.js`
+  writes it from `alResultado` (which now also gets the proof, third
+  argument in `solo/club.js`) even when it is not a record, only when it
+  beats the stored one, one write at a time. `o = dia·1e10 + score`, where
+  score is the points, or `1e9 − tiempo` for the time tables. The rule
+  recomputes it, so «the three highest `o`» (`watchRepeticiones`) are the
+  best of the latest day with games, without downloading every proof.
+- **What is replayed is verified first**, with the same `verificaClub` and
+  the owner's uid; a hand-written row that does not check out is skipped for
+  the next one. With nothing stored (or before the rules are published) the
+  card replays the all-time record of the club table, whose proof is already
+  in `soloPruebas`.
+- **The 20 s between chat messages is the rule's, not the page's.**
+  `chatGeneral/<id>` and `chatGeneralUlt/<uid>` = `{at, k}` go in one
+  `update`, and each rule checks the other (the `gratis` pattern), with
+  `now >= previous at + 20000`. The page counts down on the button and shows
+  only the last 15 minutes. It re-subscribes every 10 min so the query
+  window does not grow with the session. Messages older than a day can be
+  deleted by anyone signed in, and the lobby sweeps a few on opening.
+- Guests see a login gate in both rails (no rule change for them). Names in
+  both rails get `translate="no"` and the live profile through `mezcla`.
+
+The three nodes need the rules re-published (`firebase/CONFIGURAR-FIREBASE.md`).
+
 **A `PERMISSION_DENIED` now says what to do about it.** The rules in the repo
 are not the rules in force: they are published by hand in the console and
 pushing to Pages does not deploy them, so the live copy lags behind every new

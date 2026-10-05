@@ -76,6 +76,8 @@ import { fotoSana, colorSano } from "./juegos/sano.js";
 import { suena, silenciar, silenciado, ambientar, ajustarMusica, activarAudio } from "./juegos/sonido.js";
 import { montaReproductor } from "./juegos/reproductor.js";
 import { createReportWidget } from "./report-widget.js";
+import { crearRieles } from "./juegos/rieles.js";
+import { repDe, entradaRep, mejoraRep } from "./juegos/rieles-datos.js";
 import { anunciaSala, anunciaPodio, puestoSolo, conRecord, ordenSolo } from "./juegos/discord.js";
 import { crearSalon, ICONO_SOLO, ICONO_MULTI, CANDADO, plataformas } from "./juegos/salon.js";
 import { SOLOS, entradasSalon, nuevos, modoSalon, esClaveInvitado, UID_INVITADO, MOTIVO_CUENTA, enMovil, enPc, juegoDeNovedad } from "./juegos/salon-datos.js";
@@ -1153,12 +1155,13 @@ function avisa(e, juego) {
 
 /* ---------- pintado: el armazón ---------- */
 function render() {
-  if (!state.user && !state.invitado) { if (individual) { individual.destruir(); individual = null; } return; }
+  if (!state.user && !state.invitado) { if (individual) { individual.destruir(); individual = null; } if (rieles) rieles.pon(false); return; }
   /* Retenido por el antitrampas (castigo.js): no se monta nada debajo de
      la capa. Un juego del club seguía sonando bajo el pantallazo, y al
      recargar en `#solo/<juego>` se volvía a montar entero. Al terminar,
      la capa avisa y esto vuelve a montar lo que diga la ruta. */
   if (castigoActivo()) {
+    if (rieles) rieles.pon(false);
     if (vistaPintada !== "castigo") {
       salon.cierra(false);
       desmontaVista();
@@ -1184,6 +1187,35 @@ function render() {
   if (state.vista === "vestibulo") pintaVestibulo();
   else if (state.vista === "partida" && state.user) pintaPartida();
   pintaTabs();
+  /* Los rieles (repeticiones y chat general) solo en las vistas de menú:
+     en una partida, un juego del club o los sobres, la pantalla es del juego. */
+  if (rieles) rieles.pon(VISTAS_RIEL.has(state.vista) && !(state.invitado && MOTIVO_CUENTA[state.vista]));
+}
+const VISTAS_RIEL = new Set(["vestibulo", "ranks", "logros", "monedas", "perfil"]);
+let rieles = null;
+
+/* La mejor partida del día de cada cuenta en los cuatro juegos del riel
+   (rieles-datos.js), con su prueba ya verificada para que el salón la
+   repita. Se escribe aunque no sea récord —es la de hoy—, solo si mejora
+   la que ya había, y de a una por vez (dos resultados seguidos leerían la
+   misma «previa»). Si las reglas aún no conocen el nodo, no pasa nada. */
+const repPropias = new Map();
+let repCola = Promise.resolve();
+function apuntaRepeticion(dato, prueba) {
+  const u = state.user;
+  if (!u || !dato || !repDe(dato.categoria)) return;
+  const juego = juegoDeCategoria(dato.categoria);
+  const e = entradaRep(dato.categoria, diaMonedas(fb.ahora()), dato, VERIFICADORES[juego] ? VERIFICADORES[juego].PRUEBA : 0, textoPrueba(prueba) || "", u.name);
+  if (!e) return;
+  const clave = u.uid + ":" + dato.categoria;
+  repCola = repCola.then(async () => {
+    let previa = repPropias.get(clave);
+    if (previa === undefined) previa = await fb.leerRepeticion(dato.categoria, u.uid).catch(() => null);
+    repPropias.set(clave, previa || null);
+    if (!mejoraRep(e, previa)) return;
+    await fb.guardarRepeticion(dato.categoria, u.uid, e);
+    repPropias.set(clave, e);
+  }).catch(err => console.warn("[juegos] no se pudo guardar la repetición", err));
 }
 
 /* Lo que cada vista dejó montado (un juego del club, PRODROP, las tablas…). */
@@ -1324,7 +1356,7 @@ function armazon() {
       partida: u ? { leer: () => fb.leerPartidaClub(u.uid, juego), guardar: (d, at) => fb.guardarPartidaClub(u.uid, juego, d, at) } : null,
       /* Un logro individual sale de la marca: se celebra el que esta
          partida da y la mejor marca guardada no daba ya. */
-      alResultado: u ? (d, previa) => { marcaJugadaClub(clave); const antes = new Set(previa ? deMarca(clave, Object.assign({ categoria: d.categoria }, previa)) : []);
+      alResultado: u ? (d, previa, prueba) => { marcaJugadaClub(clave); apuntaRepeticion(d, prueba); const antes = new Set(previa ? deMarca(clave, Object.assign({ categoria: d.categoria }, previa)) : []);
         for (const id of deMarca(clave, d)) if (!antes.has(id)) celebra(clave, id); } : undefined });
     individual.montar(h);
     /* La barra de arriba sale del mismo catálogo que el salón, así que un
@@ -2486,6 +2518,10 @@ function wire() {
   configuraCastigo({ ahora: fb.ahora, entrar: () => entrarConGoogle(),
     alCambiar: () => { vistaPintada = ""; render(); } });
   revisaCastigo();
+  rieles = crearRieles({
+    fb, usuario: () => state.user ? { uid: state.user.uid, name: state.user.name } : null,
+    perfil: perfilDe, marco: marcoDeUid, colorDe: colorForUid, dia: () => diaMonedas(fb.ahora())
+  });
   createReportWidget({
     app: "juegos", ver: VER, urlInformes: "informes.html",
     getUser: () => state.user,

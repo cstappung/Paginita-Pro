@@ -505,3 +505,46 @@ Subterráneo {} || Basement {} || Interrato {}
 La bóveda || The vault || Il caveau
 El antitrampas rechazó tu partida. Quedas retenido: no puedes usar Juegos hasta que termine la cuenta atrás. || The anti-cheat rejected your game. You are held: you can't use Games until the countdown ends. || L'anti-cheat ha rifiutato la tua partita. Sei trattenuto: non puoi usare Giochi finché non finisce il conto alla rovescia.
 ¿No eres tú? Entra con tu cuenta || Not you? Sign in with your account || Non sei tu? Accedi con il tuo account
+# Los rieles del salón: mejores partidas del día y chat general (rieles.js)
+Mejores partidas || Best games || Migliori partite
+del día · en bucle || of the day · on loop || del giorno · in loop
+Mejor de hoy || Today's best || Migliore di oggi
+Mejor de ayer || Yesterday's best || Migliore di ieri
+Última mejor partida || Latest best game || Ultima miglior partita
+Récord histórico || All-time record || Record storico
+Buscando la mejor partida… || Looking for the best game… || Cerco la miglior partita…
+Nadie ha jugado todavía. ¡Estrena la tabla! || Nobody has played yet. Be the first! || Nessuno ha ancora giocato. Inaugura la classifica!
+Las repeticiones esperan que se publiquen las reglas de Firebase. || Replays are waiting for the Firebase rules to be published. || Le repliche aspettano che si pubblichino le regole di Firebase.
+Jugar ahora → || Play now → || Gioca ora →
+Pausar la repetición || Pause the replay || Metti in pausa la replica
+Seguir la repetición || Resume the replay || Riprendi la replica
+Maratón || Marathon || Maratona
+Clásico · mediano || Classic · medium || Classico · medio
+20 números || 20 numbers || 20 numeri
+La aventura · medio || The adventure · medium || L'avventura · medio
+{} línea · nivel {} || {} line · level {} || {} riga · livello {}
+{} líneas · nivel {} || {} lines · level {} || {} righe · livello {}
+{} fruta · largo {} || {} fruit · length {} || {} frutto · lunghezza {}
+{} frutas · largo {} || {} fruits · length {} || {} frutti · lunghezza {}
+{} bloque || {} block || {} blocco
+{} bloques || {} blocks || {} blocchi
+{} % despejado · {} 🚩 || {} % cleared · {} 🚩 || {} % scoperto · {} 🚩
+Las mejores partidas del día de Tetris, Snake, sortEm y Buscaminas, repetidas jugada por jugada. || The best games of the day in Tetris, Snake, sortEm and Minesweeper, replayed move by move. || Le migliori partite del giorno di Tetris, Snake, sortEm e Campo minato, ripetute mossa per mossa.
+Inicia sesión para verlas. || Sign in to watch them. || Accedi per guardarle.
+Chat general || General chat || Chat generale
+últimos 15 min || last 15 min || ultimi 15 min
+Escribe a todo el salón… || Write to the whole lobby… || Scrivi a tutta la sala…
+Mensaje para el chat general || Message for the general chat || Messaggio per la chat generale
+Abrir el chat general || Open the general chat || Apri la chat generale
+Abrir el chat general ({} sin leer) || Open the general chat ({} unread) || Apri la chat generale ({} non letti)
+Cerrar el chat || Close the chat || Chiudi la chat
+Inicia sesión para leer y escribir en el chat general. || Sign in to read and write in the general chat. || Accedi per leggere e scrivere nella chat generale.
+Nadie ha escrito en los últimos 15 minutos. ¡Saluda! || Nobody has written in the last 15 minutes. Say hi! || Nessuno ha scritto negli ultimi 15 minuti. Saluta!
+Se puede escribir un mensaje cada 20 segundos || You can send one message every 20 seconds || Si può scrivere un messaggio ogni 20 secondi
+Espera unos segundos: se puede escribir un mensaje cada 20 s. || Wait a few seconds: one message every 20 s. || Aspetta qualche secondo: un messaggio ogni 20 s.
+No se pudo enviar: el chat general espera que se publiquen las reglas de Firebase. || Could not send: the general chat is waiting for the Firebase rules to be published. || Invio non riuscito: la chat generale aspetta che si pubblichino le regole di Firebase.
+No se pudo enviar. Revisa la conexión e inténtalo otra vez. || Could not send. Check your connection and try again. || Invio non riuscito. Controlla la connessione e riprova.
+El chat general espera que se publiquen las reglas de Firebase. || The general chat is waiting for the Firebase rules to be published. || La chat generale aspetta che si pubblichino le regole di Firebase.
+No se pudo leer el chat. || Could not read the chat. || Impossibile leggere la chat.
+hace un rato || a while ago || poco fa
+ahora || now || ora
