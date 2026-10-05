@@ -29,6 +29,9 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
   const cargados=invitado?Promise.resolve():(async()=>{
     let valor={};try{valor=JSON.parse(localStorage.getItem(clave)||'{}')||{};}catch{}
     for (const [k,v] of Object.entries(valor)) { const dato=resultadoClub(juego,v);if(!dato||k!==dato.categoria)continue;
+      /* Un pendiente de antes de la verificación (sin prueba) se descarta en
+         silencio: no es trampa, es una versión vieja. */
+      if(v.prueba===undefined||v.prueba===null)continue;
       const motivo=await verificaClub(juego,dato,v.prueba,{uid:cuenta,ahora:Number.isFinite(v.h)&&v.h<=Date.now()&&Date.now()-v.h<3*864e5?v.h:undefined});
       if(motivo){sospecha(dato,motivo,'pendiente');continue;}
       if(mejorClub(dato,pendientes[k]))pendientes[k]={...dato,prueba:v.prueba,h:v.h};
@@ -126,7 +129,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
     temaObserver.observe(document.documentElement,{attributes:true,attributeFilter:['data-tema']});
     frame.allow='fullscreen';frame.setAttribute('allowfullscreen','');
     window.addEventListener('message',mensaje);
-    frame.src='juegos/club/'+juego+'/index.html?v=club-30&embed=1&cuenta='+encodeURIComponent(cuenta)+(invitado?'&invitado=1':'');
+    frame.src='juegos/club/'+juego+'/index.html?v=club-31&embed=1&cuenta='+encodeURIComponent(cuenta)+(invitado?'&invitado=1':'');
     host.appendChild(frame);
   }
   function destruir(){muerto=true;temaObserver?.disconnect();if(off)off();window.removeEventListener('message',mensaje);for(const [el,valor]of ocultos)el.style.display=valor;frame?.remove();host.innerHTML='';ambientar('');}

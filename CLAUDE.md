@@ -3215,6 +3215,12 @@ progress), `niveles.js` (generated), `dibujo.js` (the vehicles as SVG) and
   white racing stripes. Its music is `T.atasco` in the songbook (B-flat
   major, 124 bpm with swing, a car-horn motif), also in the header player.
 
+**Atasco's anti-cheat proof** (`docs/antitrampas/atasco.md`) stores, next
+to the progress (`prog.p`), the move list of each level's best attempt, and
+`verifica/atasco.js` replays them with the same engine. **Regenerating
+`niveles.js` invalidates every stored proof**: a level whose layout changes
+no longer replays, so its stars stop counting until it is won again.
+
 **Frontera Batalla (`#solo/frontera`) is Emerald's Battle Frontier as a
 Solo Club game**, played locally on the same `@pkmn/sim` bundle as the
 Pokémon rooms (`PokeMotor.frontera`, from `pokemon/frontera-motor.js`; the
