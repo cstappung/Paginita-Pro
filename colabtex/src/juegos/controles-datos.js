@@ -1,0 +1,40 @@
+/* Generado por colabtex/scripts/build-controles.js a partir del código de
+   cada juego: no editar a mano (para corregir uno, `@controles:` en su
+   código). `movil`: se juega con el dedo; `pc`: con teclado o ratón;
+   `pide`: qué hace falta si no va en el celular; `por`: la señal que decidió. */
+export const CONTROLES = {
+  "ajedrez": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
+  "atasco": {"movil":true,"pc":true,"pide":"","por":"escucha toques"},
+  "bbtan": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
+  "bots-boxhead": {"movil":false,"pc":true,"pide":"teclado","por":"flechas o WASD sin toque ni puntero"},
+  "bots-clue": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
+  "bots-worms": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
+  "bots-yemas": {"movil":false,"pc":true,"pide":"teclado y ratón","por":"ratón de mira sin toque"},
+  "boxhead": {"movil":false,"pc":true,"pide":"teclado","por":"flechas o WASD sin toque ni puntero"},
+  "cacho": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
+  "cadena": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
+  "cartas": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
+  "catan": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
+  "clue": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
+  "cuadritos": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
+  "electro": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
+  "escondite": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
+  "fanal": {"movil":true,"pc":true,"pide":"","por":"escucha toques"},
+  "flip7": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
+  "frontera": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
+  "minas": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
+  "orbita": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
+  "pokemon": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
+  "presidente": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
+  "reversi": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
+  "snake": {"movil":true,"pc":true,"pide":"","por":"escucha toques"},
+  "sopa": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
+  "sortem": {"movil":false,"pc":true,"pide":"teclado","por":"@controles: teclado"},
+  "spicy": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
+  "sudoku": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
+  "tetris": {"movil":true,"pc":true,"pide":"","por":"escucha toques"},
+  "tetrisclub": {"movil":true,"pc":true,"pide":"","por":"escucha toques"},
+  "uno": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
+  "worms": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
+  "yemas": {"movil":false,"pc":true,"pide":"teclado y ratón","por":"ratón de mira sin toque"}
+};

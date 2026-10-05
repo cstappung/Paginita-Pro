@@ -74,6 +74,16 @@
 
   #viewLogin{flex:1;display:none;place-items:center}
   .login-card{width:400px;max-width:92vw;background:#fff;border:1px solid #e2e8ec;border-radius:12px;padding:30px;text-align:center}
+  /* En un teléfono la cabecera en una sola fila medía 532 px y ensanchaba
+     la página entera: las secciones bajan a una segunda fila, con su propio
+     scroll lateral, como en Juegos. */
+  @media(max-width:600px){
+    .head{height:auto;flex-wrap:wrap;gap:8px 12px;padding:10px 14px}
+    .head-nav{order:3;flex:1 0 100%;margin:0;overflow-x:auto;white-space:nowrap;scrollbar-width:none}
+    .head-nav::-webkit-scrollbar{display:none}
+    .logo b,#userName{display:none}
+    main{padding:20px 16px 48px}
+  }
 </style>
 </head>
 <body>

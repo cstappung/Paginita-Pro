@@ -1339,3 +1339,15 @@ body[data-phase="elige"] .top-line { opacity: 0; }
 .vol-top { display: flex; align-items: center; }
 .vol-top .vj-ctl { color: #fff; }
 @media (max-width: 640px) { .vol-top .vj-ctl input { width: 56px; } .vol-top .vj-ctl output { display: none; } }
+/* En un teléfono la barra de arriba medía 400 px en pantallas de 320 a 390,
+   y lo último (el ♪ y medio deslizador) quedaba fuera. El ♪ propio sobra al
+   lado del 🔊 del volumen, que también silencia; el deslizador se achica, y
+   a 320 la colección dice solo cuántas tienes. */
+@media (max-width: 430px) {
+  #soundBtn { display: none; }
+  .top-actions { gap: 4px; }
+  .top .chip { padding: 7px 8px; font-size: 12.5px; }
+  .vol-top .vj-ctl { padding: 3px 6px 3px 2px; gap: 4px; }
+  .vol-top .vj-ctl input { width: 44px; }
+}
+@media (max-width: 360px) { .col-tot { display: none; } }

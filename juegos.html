@@ -772,6 +772,11 @@ try { var t = localStorage.getItem("jg.tema");
   body{background:#f5f4fa;color:var(--jg-ink)}
   .head{height:auto;min-height:64px;padding:12px 28px;flex-wrap:wrap;background:#171522;gap:12px;border-bottom:1px solid #ffffff12}
   .logo-mark{background:#ab8bff;color:#171522;border-radius:9px}.head-nav a{color:#b8b2c8}.head-right{gap:8px}.btn-ghost{color:#cbc4de}
+  /* El idioma va suelto en la cabecera, no dentro de .head-right: en un
+     teléfono baja a la fila de las secciones, y así la fila de los botones
+     cabe en 320 px sin empujar «Salir» fuera de la pantalla. */
+  .head>.jg-idioma{display:flex;margin-left:auto}
+  .head>.jg-idioma~.head-right{margin-left:0}
   /* El reproductor: botón con ecualizador en la cabecera y panel con el repertorio.
      El panel es oscuro en los dos temas, como la cabecera de la que sale. */
   .jg-rep-btn{display:inline-flex;align-items:center;gap:7px;max-width:210px;padding:6px 11px;border-radius:100px;background:#ffffff0d;border:1px solid #ffffff14;color:#e4ddf6}
@@ -2333,7 +2338,7 @@ html[data-tema=oscuro] .jg-rkc-barra{background:#ffffff14}
 .jg-of-podio:hover{background:color-mix(in srgb,var(--c) 15%,#f7f6fb)}
 .jg-of-podio-t{display:flex;justify-content:space-between;font-size:10.5px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--jg-muted);margin-bottom:6px}
 .jg-of-podio-t b{letter-spacing:0;text-transform:none;color:var(--c);filter:brightness(.8)}
-.jg-of-podio ol{list-style:none;margin:0;padding:0;display:grid;gap:3px}
+.jg-of-podio ol{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:minmax(0,1fr);gap:3px}
 .jg-of-podio li{display:flex;align-items:center;gap:8px;font-size:13px;padding:2px 4px;border-radius:7px}
 .jg-of-podio li.yo{background:color-mix(in srgb,var(--c) 22%,transparent);font-weight:700}
 .jg-of-podio li>i{font-style:normal;width:20px;height:20px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:800;color:#fff;background:#b8b3c7;flex:0 0 auto}
@@ -2355,6 +2360,14 @@ html[data-tema=oscuro] .jg-of-podio-t b{filter:brightness(1.3)}
   .head-nav{flex-wrap:nowrap;white-space:nowrap;scrollbar-width:none;gap:18px}
   .head-nav::-webkit-scrollbar{display:none}
   .head-right{width:auto;margin-left:auto;flex-wrap:nowrap}
+  /* Dos filas: logo y botones arriba; secciones (con su propio scroll) e
+     idioma abajo. Con todo en la fila de arriba, a 360 px «Salir» quedaba
+     fuera de la pantalla y la página entera se ensanchaba a 389 px. «Perfil»
+     sobra aquí: la foto abre la misma tarjeta, con «Ver perfil». */
+  .head-nav{order:3;flex:1 0 60%;width:auto;min-width:0}
+  .head>.jg-idioma{order:4;margin-left:0}
+  .head>.jg-idioma~.head-right{margin-left:auto}
+  #btnPerfil{display:none}
   .logo b{display:none}
   .jg-rep-nom,.jg-rep-flecha{display:none}
   .head-right .btn-ghost{padding-left:7px;padding-right:7px}
@@ -2365,6 +2378,23 @@ html[data-tema=oscuro] .jg-of-podio-t b{filter:brightness(1.3)}
   .jg-lg-chip{white-space:nowrap}
   .jg-tabla{font-size:12px}
   .jg-tabla th,.jg-tabla td{padding-left:8px;padding-right:8px;white-space:nowrap}
+  /* Nueve columnas no caben: los puntos, que son la última, quedaban detrás
+     de un scroll lateral que nadie hace. Aquí van puesto, jugador y puntos;
+     jugadas y ganadas bajan a una línea debajo del nombre (`jg-jug-sub`), lo
+     demás (`jg-opc` en ranks.js) se esconde, y un nombre largo se corta con
+     «…» en vez de empujar la tabla. */
+  .jg-tabla .jg-opc{display:none}
+  .jg-jug>span{display:block;max-width:calc(100vw - 200px);overflow:hidden;text-overflow:ellipsis}
+  .jg-tabla .jg-jug-sub{display:block;font-weight:400;font-size:11px;color:var(--jg-muted)}
+}
+.jg-jug-sub{display:none}
+/* Con el dedo, los botones de la cabecera y el ✕ de «Tus partidas» medían
+   24 px de alto: se tocaba el de al lado. 36 es lo que cabe sin que la fila
+   de 320 px deje de entrar en una línea. */
+@media(pointer:coarse){
+  .head-right .btn-ghost{min-height:36px;min-width:36px;display:inline-flex;align-items:center;justify-content:center}
+  .head .i18n-sel{min-height:32px}
+  .mini.del{min-width:34px;min-height:34px}
 }
 html[data-tema=oscuro] .jg-ym-eq.rojo.mio{color:#ff9a8c}
 html[data-tema=oscuro] .jg-ym-eq.azul.mio{color:#8cc2ff}
@@ -3475,6 +3505,9 @@ html[data-tema=oscuro] .jg-drop-quien:hover>b{color:#fff}
 .jg-sal-rapida{flex-shrink:0;max-width:46%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .jg-sal-rapida small{font-weight:500;opacity:.75;margin-left:4px}
 .jg-sal-rapida[hidden]{display:none}
+/* En un teléfono chico el botón de «Unirme a…» se comía el título: baja a
+   su propia fila, a todo lo ancho, donde además llega mejor el pulgar. */
+@media(max-width:420px){.jg-sal-tit{flex-wrap:wrap}.jg-sal-rapida{flex:1 1 100%;max-width:none}}
 .jg-sal-ver{flex-shrink:0;border:0;background:none;font:700 12.5px 'IBM Plex Sans',sans-serif;color:var(--jg-purple);cursor:pointer;padding:10px 4px}
 .jg-desliza{display:none}
 .jg-sal[data-modo=solo] .jg-sal-ver{display:none}
@@ -3524,6 +3557,21 @@ html[data-tema=oscuro] .jg-drop-quien:hover>b{color:#fff}
 .jg-mn-modo.m-bots{background:#ffe7a8}
 .jg-mn-modo.m-multi{background:var(--m-multi-bg);color:var(--m-multi-tx)}
 .jg-mn>.jg-mn-modo{position:absolute;top:8px;left:8px;z-index:1;pointer-events:none;box-shadow:0 2px 8px #0005}
+/* Dónde se juega (`plataformas` en salon.js, datos de `CONTROLES`): una
+   píldora blanca debajo de la insignia de modo con «Celular» en celeste y
+   «PC» en pizarra, o solo «PC». Celeste porque ninguna otra marca de la
+   tarjeta lo usa (ámbar es un jugador, violeta multijugador, verde nuevo,
+   oro más jugado). Los svg llevan tamaño explícito: sin él se dibujan a
+   todo lo ancho de la tarjeta. */
+.jg-mn-plat{display:inline-flex;align-items:stretch;border-radius:100px;background:#fff;font:700 10px/1.3 'IBM Plex Sans',sans-serif;white-space:nowrap;overflow:hidden}
+.jg-mn-plat i{display:inline-flex;align-items:center;gap:3px;padding:2px 7px 2px 5px;font-style:normal}
+.jg-mn-plat i+i{border-left:1px solid #e2e8f0}
+.jg-mn-plat i.cel{color:#075985}
+.jg-mn-plat i.pc{color:#334155}
+.jg-mn-plat svg{width:12px;height:12px;flex:none}
+.jg-mn-plat i.cel svg{color:#0284c7}
+.jg-mn-plat i.pc svg{color:#64748b}
+.jg-mn>.jg-mn-plat{position:absolute;top:33px;left:8px;z-index:1;pointer-events:none;box-shadow:0 2px 8px #0005;max-width:calc(100% - 16px)}
 /* Nuevo y Más jugado: arriba a la derecha. */
 .jg-mn-etq{position:absolute;top:8px;right:8px;z-index:1;pointer-events:none;padding:3px 8px;border-radius:100px;font:800 9.5px/1.3 'IBM Plex Sans',sans-serif;letter-spacing:.08em;text-transform:uppercase;color:#fff;background:#16a34a;box-shadow:0 2px 8px #0005;overflow:hidden}
 .jg-mn-etq:after{content:"";position:absolute;inset:0;background:linear-gradient(100deg,transparent 30%,#fff8 50%,transparent 70%);transform:translateX(-120%);animation:jgEtqBrillo 3.2s ease-in-out infinite}
@@ -3531,6 +3579,9 @@ html[data-tema=oscuro] .jg-drop-quien:hover>b{color:#fff}
 .jg-mn-etq.top:after{display:none}
 /* En una tarjeta angosta la estrella sola: el texto pisaba la insignia de modo. */
 @container (max-width:250px){.jg-mn-etq.top>span{display:none}}
+/* Y en una de teléfono chico (dos columnas a 320 px) «2–10 jugadores» no
+   cabía junto a la estrella: queda el icono de dos personas y «2–10». */
+@container (max-width:165px){.jg-mn-pal{display:none}}
 @keyframes jgEtqBrillo{0%,55%{transform:translateX(-120%)}80%,100%{transform:translateX(120%)}}
 .jg-mn.nuevo{border-color:color-mix(in srgb,#16a34a 35%,#e5e0ee)}
 /* ▶ Jugar ya: sobre el borde entre portada y texto, a la derecha. 75cqw es
@@ -3577,10 +3628,18 @@ html.jg-hoja-abierta .rp-fab{display:none}
 .jg-hoja-x:hover{background:#000c}
 .jg-hoja-arte{flex:0 0 auto;aspect-ratio:16/7;border-radius:0;touch-action:none}
 .jg-hoja-arte.jg-mn-sp{padding:16px 18px 18px}
-.jg-hoja-cuerpo{flex:1 1 auto;overflow:auto;overscroll-behavior:contain;padding:14px 18px 18px;display:grid;gap:12px;align-content:start;min-height:0}
+/* `minmax(0,1fr)` y no la columna implícita: esa mide lo que pida el hijo
+   más ancho sin partirse (un nombre largo en el podio, la opción más larga
+   de un select), y a 320 px empujaba la ficha entera 16 px fuera de la
+   pantalla, con el texto y el botón «Unirme» cortados. */
+.jg-hoja-cuerpo{flex:1 1 auto;overflow:auto;overscroll-behavior:contain;padding:14px 18px 18px;display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-content:start;min-height:0}
 .jg-hoja-chips{display:flex;flex-wrap:wrap;gap:6px}
 .jg-hoja-chip{display:inline-flex;align-items:center;padding:3px 10px;border-radius:100px;background:#f2eef9;color:#5c566c;font:600 11px/1.4 'IBM Plex Sans',sans-serif}
 .jg-hoja-chip.nuevo{background:#dcfce7;color:#166534}
+.jg-hoja-chip.movil,.jg-hoja-chip.pc{gap:4px}
+.jg-hoja-chip.movil{background:#e0f2fe;color:#075985}
+.jg-hoja-chip.pc{background:#fef3c7;color:#854d0e}
+.jg-hoja-chip svg{width:13px;height:13px;flex:none}
 .jg-hoja h2{margin:0;font-size:24px;letter-spacing:-.6px;line-height:1.15;color:var(--jg-ink)}
 .jg-hoja-lema{margin:-4px 0 0;font-size:13.5px;line-height:1.55;color:#5f5a70}
 .jg-hoja-salas{display:flex;align-items:center;gap:10px;margin:0;padding:10px 12px;border-radius:14px;background:#ecfdf3;border:1px solid #bbf7d0;color:#14532d;font-size:12.5px;line-height:1.45}
@@ -3599,7 +3658,9 @@ html.jg-hoja-abierta .rp-fab{display:none}
 .jg-hoja-nota{margin:0;font-size:12px;line-height:1.55;color:var(--jg-muted)}
 .jg-hoja-nota a{color:var(--jg-purple);font-weight:600}
 .jg-enlace-btn{border:0;background:none;padding:0;font:700 12px 'IBM Plex Sans',sans-serif;color:var(--jg-purple);cursor:pointer;text-decoration:underline}
-.jg-hoja-pie{flex:0 0 auto;display:flex;gap:8px;padding:12px 16px calc(12px + env(safe-area-inset-bottom));border-top:1px solid #efebf5;background:#fff}
+/* Con tres botones (Pokémon suma «Equipos») no caben en 320 px: el
+   principal baja a su propia fila, a todo lo ancho, en vez de salirse. */
+.jg-hoja-pie{flex:0 0 auto;display:flex;flex-wrap:wrap;gap:8px;padding:12px 16px calc(12px + env(safe-area-inset-bottom));border-top:1px solid #efebf5;background:#fff}
 .jg-hoja-pie .btn,.jg-hoja-pie .btn2{height:48px;display:inline-flex;align-items:center;justify-content:center;gap:6px;text-decoration:none!important;white-space:nowrap}
 .jg-hoja-ya{flex:1;font-size:14px!important}
 a.jg-hoja-ya{color:#fff!important}
@@ -3639,6 +3700,8 @@ a.jg-hoja-ya{color:#fff!important}
 /* ---- Novedades dentro del salón ---- */
 .jg-nov-meta{flex-wrap:wrap}
 .jg-nov-meta .jg-mn-modo{margin-right:auto}
+.jg-nov-meta .jg-mn-modo:has(+.jg-mn-plat){margin-right:0}
+.jg-nov-meta .jg-mn-plat{margin-right:auto;background:#f1f5f9;box-shadow:inset 0 0 0 1px #e2e8f0}
 .jg-nov-candado svg,.jg-nov-pie .jg-nov-candado svg{width:14px;height:14px;vertical-align:-2px}
 .jg-nov-pie .btn,.jg-nov-pie .btn2{display:inline-flex;align-items:center;justify-content:center;gap:5px;text-decoration:none!important}
 .jg-nov-pie .btn2.jg-nov-candado{flex:0 0 auto}
@@ -3704,6 +3767,13 @@ a.jg-hoja-ya{color:#fff!important}
   .jg-hoja-asa{display:none}
   .jg-hoja-arte{aspect-ratio:2/1;touch-action:auto}
 }
+/* Un teléfono acostado pasa de 720 px de ancho pero tiene 390 de alto: con
+   la portada 2:1 y los botones, al cuerpo de la ficha (salas, opciones) le
+   quedaban unos 30 px. Ahí la ficha usa toda la altura y la portada se achica. */
+@media(min-width:721px) and (max-height:560px){
+  .jg-hoja{top:8px;bottom:8px}
+  .jg-hoja-arte{aspect-ratio:auto;height:96px}
+}
 @media(min-width:901px){
   /* La columna de salas a la derecha, pegajosa junto a las dos secciones
      de juegos; las novedades y la intro ocupan todo el ancho. */
@@ -3757,6 +3827,14 @@ html[data-tema=oscuro] .jg-hoja{background:var(--os-sup);border-color:var(--os-b
 html[data-tema=oscuro] .jg-hoja-pie{background:var(--os-sup);border-color:var(--os-borde)}
 html[data-tema=oscuro] .jg-hoja-chip{background:var(--os-sup3);color:var(--os-tx2)}
 html[data-tema=oscuro] .jg-hoja-chip.nuevo{background:#14351f;color:#86efac}
+html[data-tema=oscuro] .jg-hoja-chip.movil{background:#0c2d42;color:#bae6fd}
+html[data-tema=oscuro] .jg-nov-meta .jg-mn-plat{background:#141b2b;box-shadow:inset 0 0 0 1px #ffffff1a}
+html[data-tema=oscuro] .jg-nov-meta .jg-mn-plat i+i{border-left-color:#ffffff1a}
+html[data-tema=oscuro] .jg-nov-meta .jg-mn-plat i.cel{color:#bae6fd}
+html[data-tema=oscuro] .jg-nov-meta .jg-mn-plat i.cel svg{color:#7dd3fc}
+html[data-tema=oscuro] .jg-nov-meta .jg-mn-plat i.pc{color:#cbd5e1}
+html[data-tema=oscuro] .jg-nov-meta .jg-mn-plat i.pc svg{color:#94a3b8}
+html[data-tema=oscuro] .jg-hoja-chip.pc{background:#3a2a0c;color:#fde68a}
 html[data-tema=oscuro] .jg-hoja-lema,html[data-tema=oscuro] .jg-hoja-cuenta p,html[data-tema=oscuro] .jg-puerta p{color:var(--os-tx2)}
 html[data-tema=oscuro] .jg-hoja-salas{background:#10291b;border-color:#1c4a30;color:#bbf7d0}
 html[data-tema=oscuro] .jg-hoja-salas.vacia{background:var(--os-sup2);border-color:var(--os-borde);color:var(--os-tx3)}
@@ -3784,8 +3862,8 @@ html[data-tema=oscuro] .jg-lado-cuenta>ul{color:var(--os-tx)}
       <a href="juegos.html" style="color:#fff;font-weight:600">Juegos</a>
       <a href="informes.html">Informes</a>
     </nav>
+    <span class="jg-idioma" data-i18n-selector></span>
     <div class="head-right">
-      <span data-i18n-selector></span>
       <button class="btn-ghost jg-rep-btn" id="btnMusica">Música</button>
       <button class="btn-ghost" id="btnSonido" title="Sonido" aria-pressed="true">🔊</button>
       <button class="btn-ghost" id="btnTema" title="Modo oscuro" aria-pressed="false">☾</button>

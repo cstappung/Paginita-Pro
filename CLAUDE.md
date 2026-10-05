@@ -1668,17 +1668,31 @@ mode only hides the section that does not apply (`data-modo` on
   two people and «2–10 jugadores» in violet — colour never on its own. The
   card and its cover are size containers: `75cqw` is the cover's height
   (where the ▶ sits) and container queries scale the fixed-px art.
-- **The «Celular» tag** sits under the mode badge (white and sky blue, a
-  colour no other mark uses) on the games that can be played with a finger
-  on a phone, and the ficha says the same — or, for the rest, «Solo en
-  computador: se juega con teclado (y ratón)». It comes from `MOVIL` in
-  `salon-datos.js`, decided by **playing each game on an emulated phone**
-  (touch, 390 × 844), not by whether its screen fits: sortEm, Boxhead and
-  Yemas (and their practices) fit but only move with the keyboard.
-  `tests/salon.test.cjs` fails if a game of the lobby is missing from
-  `MOVIL`, so a new game has to be tried on a phone before it gets (or
-  goes without) the tag. Novedades read the same table through their
-  `juego` field.
+- **The «Celular · PC» tags** sit in one white pill under the mode badge
+  (`plataformas` in `salon.js`): «Celular» in sky blue (a colour no other
+  mark uses) for games played with a finger, «PC» in slate for games played
+  with keyboard or mouse, i.e. every game today. The ficha says it as a
+  sentence — «Se juega en el celular y en el PC», or «Solo en PC: se juega
+  con teclado (y ratón)». **Nobody maintains a list**: the table is
+  `src/juegos/controles-datos.js`, **generated** by
+  `colabtex/scripts/build-controles.js` at the start of every
+  `npm run build` (committed like the bundles), which **reads each game's
+  own code** for what it listens to — touch (`touchstart`, `pointer:coarse`),
+  pointer/click, movement keys (arrows/WASD) and mouse look
+  (`requestPointerLock`). Mouse look without touch, or movement keys with
+  no touch and no pointer, means not on a phone. Which code is a game's
+  comes from the lobby tables themselves (the `src/juegos/<id>.js` module
+  plus the iframe folder it opens, `juegos/club/<x>/`, or a bots practice's
+  `url` folder), never the shared files (`mando.js` synthesises arrow keys
+  for every game). When the reading is wrong, the game says so in its own
+  code with a `@controles: tactil raton teclado` comment, which wins —
+  sortEm does, because its one `pointerdown` only picks the mode on the
+  title screen. `tests/controles.test.cjs` checks the rule, that the
+  reading matches the 34 games tried on an emulated phone (touch,
+  390 × 844), and that the generated file is up to date with the code (if
+  not: `npm run build`). Novedades read the same table through
+  `juegoDeNovedad` (its `juego`, the room it opens or its `#solo/<x>`
+  route), so a new one gets its tags too.
 - **Card states**: *nuevo* (green tag; `nuevos()` = the four most recent
   `alta`s of the last 14 days, so the tag cannot spread to half the shop),
   *más jugado* (gold, a star only on narrow cards), *seleccionada* (`.sel`,
@@ -1746,6 +1760,20 @@ save. It needs **no rules change**: the guest never touches the database.
 set by `render()`): icon plus a short label (`.tab-c`, «Ranking»), fixed above
 the safe area, with the ⚑ report button lifted above it. In a room or a club
 game they are hidden — those screens have their own «volver».
+
+**On a phone the header is two rows** (≤ 600 px): logo and buttons on top,
+the site sections (scrolling sideways) and the 🌐 language selector below.
+The selector is therefore a loose child of `.head` (`.jg-idioma`), not inside
+`.head-right`: with everything on one row, «Salir» fell off the screen at
+360 px and the whole page widened to 389 px. «Perfil» is hidden there (the
+avatar opens the same card, with «Ver perfil»), and on touch screens the
+header buttons are at least 36 px. Two other phone rules of the same kind:
+the ranking table keeps puesto, jugador and puntos and moves jugadas and
+ganadas under the name (`jg-jug-sub`, the rest is `jg-opc`), because with
+nine columns the points sat behind a sideways scroll; and `.jg-hoja-cuerpo`
+is `minmax(0,1fr)`, because the implicit grid column took the min-content of
+its widest child (a long podium name, the longest `<option>`) and pushed
+the ficha out of a 320 px screen.
 
 `juegos.html` carries the whole `.jg-*` stylesheet — unlike CSV·Scope this is a
 plain page, not a generated `.dc.html` with nowhere to put it, so the skin
