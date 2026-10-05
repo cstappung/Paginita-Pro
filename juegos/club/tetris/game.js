@@ -6,7 +6,10 @@
   const TM = window.TetrisMotor;
   const $ = id => document.getElementById(id);
   const CLAVE = window.Club?.storageKey('tetris-club-v1') || 'tetris-club-v1';
-  const SPRINT = 40, ULTRA_MS = 120000;
+  const SPRINT = TM.SPRINT, ULTRA_MS = TM.ULTRA_MS;
+  /* La cuenta entra en la semilla de cada partida (TM.semillaDe): la
+     prueba de un récord no le sirve a otra persona. */
+  const CUENTA = new URLSearchParams(location.search).get('cuenta') || 'local';
   const NOMBRE = { maraton: 'Maratón', sprint: 'Sprint', ultra: 'Ultra' };
 
   let guardado = {};
@@ -16,7 +19,19 @@
   const records = guardado.records || {};
   const guarda = () => { try { localStorage.setItem(CLAVE, JSON.stringify({ modo, sonido, records })); } catch (_) { /* nada */ } };
 
-  let s = null, estado = 'menu', ultimo = 0;
+  /* `g` graba la partida (TM.grabadora); `resto` es el tiempo real que
+     aún no llega a un paso entero; `pared` mide, con el reloj del
+     sistema, cuánto se jugó de verdad (va en la prueba: un reloj del
+     juego frenado a mano se nota contra él). */
+  let s = null, g = null, estado = 'menu', ultimo = 0, resto = 0, pared = 0, paredAntes = 0;
+  /* Las pulsaciones de la partida (TM.registroTeclas), para la capa
+     anti-bot: instante, cuánto se mantuvo y de dónde vino cada una. */
+  let pulsos = null;
+  const hayMando = () => { try { return [...(navigator.getGamepads?.() || [])].some(p => p && p.connected); } catch (_) { return false; } };
+  /* De dónde viene un evento: el teclado o el dedo de verdad (isTrusted),
+     el mando (mando.js despacha teclas sintéticas marcadas `__mando`, y
+     valen si hay un mando conectado) o nadie (un script). */
+  const origen = (e, tactil) => e.__mando ? (hayMando() ? 'M' : 'X') : !e.isTrusted ? 'X' : tactil ? 'T' : '';
   const pozo = $('pozo'), cx = pozo.getContext('2d');
   const cxG = $('guarda').getContext('2d'), cxC = $('cola').getContext('2d');
 
@@ -87,8 +102,12 @@
   /* ---------- partida ---------- */
   function empieza() {
     iniciaAudio();
-    s = TM.crear({ semilla: (Math.random() * 2 ** 32) >>> 0, nivel: 1 });
-    estado = 'jugando'; fresco = true; ultimo = 0;
+    let sal = (Math.random() * 2 ** 32) >>> 0;
+    try { sal = crypto.getRandomValues(new Uint32Array(1))[0]; } catch (_) { /* con Math.random basta */ }
+    g = TM.grabadora({ cuenta: CUENTA, sal, modo, alJugar: a => { if (a === 'izq' || a === 'der') efecto('mueve'); } });
+    s = g.s;
+    estado = 'jugando'; fresco = true; ultimo = 0; resto = 0; pared = 0; paredAntes = 0;
+    pulsos = TM.registroTeclas(performance.now());
     mando.suelta();
     $('capa').hidden = true;
     bloqueaModos(true);
@@ -102,8 +121,9 @@
     const r = { puntos: s.puntos, tiempo: Math.max(1, Math.round(s.tiempo)) };
     const vale = modo === 'sprint' ? gano : r.puntos >= 1;
     const nuevo = vale && mejora(r);
-    if (nuevo) { records[modo] = r; guarda(); }
-    if (vale) window.Club?.result({ categoria: cat(), puntos: modo === 'sprint' ? SPRINT : r.puntos, tiempo: r.tiempo });
+    if (nuevo) { antesDelRecord = { modo, cat: cat(), r: records[modo] }; records[modo] = r; guarda(); }
+    if (vale) window.Club?.result({ categoria: cat(), puntos: modo === 'sprint' ? SPRINT : r.puntos, tiempo: r.tiempo },
+      g.prueba({ w: Math.round(pared), k: pulsos.texto() }));
     efecto(nuevo ? 'record' : 'fin');
     capa(
       modo === 'sprint' ? (gano ? '¡40 líneas!' : 'Se llenó') : modo === 'ultra' && gano ? '¡Tiempo!' : 'Se acabó',
@@ -112,20 +132,32 @@
       'Otra vez');
     pintaDatos();
   }
+  /* Si la página no acepta la partida, el récord local tampoco cuenta. */
+  let antesDelRecord = null;
+  window.addEventListener('club-rechazo', e => {
+    const d = e.detail; if (!d) return;
+    if (antesDelRecord && d.categoria === antesDelRecord.cat) {
+      if (antesDelRecord.r) records[antesDelRecord.modo] = antesDelRecord.r; else delete records[antesDelRecord.modo];
+      antesDelRecord = null; guarda(); pintaDatos();
+    }
+    if (estado === 'fin' && d.categoria === cat()) $('capaP').textContent = 'No se guardó: ' + (d.motivo || 'la partida no cuadra.');
+  });
   function capa(t, p, b) {
     $('capaT').innerHTML = `${t}<span>.</span>`.replace(/([.!])<span>\.<\/span>$/, '$1');
     $('capaP').textContent = p; $('jugar').textContent = b; $('capa').hidden = false;
   }
   function pausa() {
-    if (estado === 'jugando') { estado = 'pausa'; mando.suelta(); capa('Pausa', `${NOMBRE[modo]} · nivel ${s.nivel}`, 'Seguir'); }
-    else if (estado === 'pausa') { estado = 'jugando'; ultimo = 0; $('capa').hidden = true; pozo.focus(); }
+    if (estado === 'jugando') { estado = 'pausa'; mando.suelta(); g.vacia(); capa('Pausa', `${NOMBRE[modo]} · nivel ${s.nivel}`, 'Seguir'); }
+    else if (estado === 'pausa') { estado = 'jugando'; ultimo = 0; paredAntes = 0; $('capa').hidden = true; pozo.focus(); }
   }
   function bloqueaModos(b) { document.querySelectorAll('[data-modo]').forEach(x => { x.disabled = b; }); }
 
   function acciones(a) {
     if (a === 'pausa') return pausa();
     if (estado !== 'jugando') return;
-    if (TM.accion(s, a) && (a === 'izq' || a === 'der')) efecto('mueve');
+    /* No se aplica aquí: se deja para el comienzo del próximo paso, que
+       es como la rehace el verificador. */
+    g.pide(a);
   }
   const mando = TM.crearMando(acciones);
   let configurando = false;
@@ -147,9 +179,11 @@
       e.preventDefault(); return estado === 'pausa' ? pausa() : empieza();
     }
     if (estado === 'pausa' && e.code !== 'KeyP' && e.code !== 'Escape') return;
+    const a = mando.accionDe(e.code);
+    if (estado === 'jugando' && a && a !== 'pausa' && !e.repeat) pulsos.baja(e.code, e.timeStamp, origen(e));
     mando.baja(e);
   });
-  document.addEventListener('keyup', e => mando.sube(e));
+  document.addEventListener('keyup', e => { if (pulsos) pulsos.sube(e.code, e.timeStamp); mando.sube(e); });
   window.addEventListener('blur', () => { mando.suelta(); if (estado === 'jugando') pausa(); });
   document.addEventListener('visibilitychange', () => { if (document.hidden && estado === 'jugando') pausa(); });
 
@@ -158,11 +192,15 @@
   document.querySelectorAll('.tt-tactil [data-a]').forEach(b => {
     const a = b.dataset.a;
     let rep = null;
-    const suelta = () => { clearInterval(rep); clearTimeout(rep); rep = null; if (a === 'blando') mando.blando = false; };
+    const suelta = e => {
+      clearInterval(rep); clearTimeout(rep); rep = null; if (a === 'blando') mando.blando = false;
+      if (pulsos) pulsos.sube('tactil-' + a, e && e.timeStamp || performance.now());
+    };
     b.addEventListener('pointerdown', e => {
       e.preventDefault(); iniciaAudio();
       try { b.setPointerCapture(e.pointerId); } catch (_) {}
       if (estado !== 'jugando') return;
+      pulsos.baja('tactil-' + a, e.timeStamp, origen(e, true));
       if (a === 'blando') { mando.blando = true; return; }
       acciones(a);
       if (a === 'izq' || a === 'der') rep = setTimeout(() => { rep = setInterval(() => acciones(a), 50); }, 170);
@@ -243,13 +281,19 @@
     requestAnimationFrame(bucle);
     const dt = ultimo ? Math.min(100, t - ultimo) : 0; ultimo = t;
     if (estado === 'jugando') {
-      mando.paso(dt);
-      s.blando = mando.blando;
-      TM.avanza(s, dt);
-      eventos();
-      if (s.fin) termina(false);
-      else if (modo === 'sprint' && s.lineas >= SPRINT) termina(true);
-      else if (modo === 'ultra' && s.tiempo >= ULTRA_MS) { s.tiempo = ULTRA_MS; termina(true); }
+      const ahora = Date.now();
+      if (paredAntes) pared += Math.min(1000, Math.max(0, ahora - paredAntes));
+      paredAntes = ahora;
+      /* Pasos fijos de TM.PASO ms, los que quepan en este cuadro: lo que
+         rehace el verificador es exactamente esta sucesión. */
+      resto += dt;
+      while (resto >= TM.PASO && estado === 'jugando') {
+        resto -= TM.PASO;
+        mando.paso(TM.PASO);
+        const fin = g.paso(mando.blando);
+        eventos();
+        if (fin) { if (modo === 'ultra' && fin.gano) s.tiempo = ULTRA_MS; termina(fin.gano); }
+      }
     }
     musica();
     pinta(); pintaDatos();
