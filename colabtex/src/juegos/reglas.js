@@ -415,23 +415,25 @@ const REGLAS = {
     secciones: [
       ["Controles", lista([
         "<b>WASD</b> o flechas para moverte; el personaje mira hacia donde camina (ocho direcciones) y dispara hacia ahí.",
-        "<b>Espacio</b> dispara (mantenlo apretado), <b>Q</b>/<b>E</b> o <b>1</b>–<b>8</b> cambian de arma, <b>X</b> detona todas tus cargas puestas y <b>Esc</b> pausa.",
+        "<b>Espacio</b> dispara (mantenlo apretado), <b>Q</b>/<b>E</b> o <b>1</b>–<b>8</b> cambian de arma, <b>X</b> detona todas tus cargas puestas y <b>Esc</b> pausa. En línea la pausa detiene la partida para todos (enemigos incluidos) hasta que quien la pidió siga, como mucho dos minutos.",
         "El aspecto se elige en el menú del juego antes de empezar: Bambo, Jon, Soldado, Médico, Ninja, Policía, Payaso o Robot."
       ])],
       ["El multiplicador", lista([
-        "Cada baja sube el <b>multiplicador</b> en uno y llena la barra de combo. La barra se vacía sola, y más rápido cuanto más alto vas; si llega a cero, vuelves a ×1.",
+        "Cada baja sube el <b>multiplicador</b> en uno y llena la barra de combo. La barra (el semicírculo sobre tus puntos, arriba al centro) se vacía sola, y más rápido cuanto más alto vas; cuando llega a cero el multiplicador <b>baja de a uno</b>, con una barra más corta cada vez, hasta volver a ×1.",
         "Los puntos de cada baja son 10 por un zombi y 20 por un diablo, <b>por el multiplicador</b>: encadenar bajas es lo que da puntos de verdad.",
         "Las armas y mejoras se ganan por el multiplicador más alto alcanzado, y no se pierden aunque el combo se corte."
       ])],
       ["Las armas", lista([
         "<b>Pistola</b> (desde el comienzo, munición infinita), <b>Uzi</b> (×5), <b>Escopeta</b> (×10), <b>Barriles</b> (×15), <b>Granadas</b> (×20), <b>Muro falso</b> (×25), <b>Cohetes</b> (×30) y <b>Cargas</b> (×40).",
         "Los <b>barriles</b> se dejan en el suelo y revientan cuando les disparas; los <b>muros falsos</b> tapan el paso a los enemigos hasta que los rompen; las <b>cargas</b> se ponen y se detonan todas juntas con <b>X</b>.",
-        "Entre arma y arma llegan mejoras: pistola rápida (×8), más munición de Uzi (×12), escopeta más ancha (×18), y así hasta cargas más grandes (×60)."
+        "En <b>cada</b> multiplicador nuevo que no trae arma llega una <b>mejora</b>, rotando entre las armas que ya tienes: más daño, más cadencia, más alcance, más balas, perdigones y apertura en la escopeta, más radio en barriles, granadas, cohetes y cargas, más vida en el muro falso. Cada mejora tiene un tope, así que ninguna arma se vuelve absurda."
       ])],
       ["Enemigos y cajas", lista([
         "Los <b>zombis</b> caminan hacia ti y muerden. Los <b>diablos</b> aparecen desde el nivel 3: aguantan más, son más rápidos y escupen bolas de fuego.",
         "Cada nivel trae más enemigos, con más vida y más rápidos. También salen más cuantos más jugadores haya en la sala.",
-        "Los enemigos sueltan <b>cajas</b>: unas curan 50 de vida y otras rellenan la munición de un arma que tengas."
+        "Los enemigos sueltan <b>cajas</b>: unas curan 50 de vida y otras rellenan la munición de un arma que tengas.",
+        "Cada golpe <b>empuja</b> al enemigo hacia atrás y lo deja medio segundo aturdido antes de volver a perseguirte. Hay <b>fuego amigo</b> entre ellos: las bolas de fuego de los diablos queman a los zombis (y a otros diablos) que se crucen.",
+        "Tu vida, el arma en la mano y sus balas van justo encima de tu personaje, como en el original."
       ])],
       ["Mapas", "Cinco, elegidos al abrir la sala: Patio, Sótano, Cruce, Fortaleza y Laberinto. Los enemigos entran por los bordes y nunca aparecen pegados a un jugador."],
       ["Sin servidor", "El movimiento va de navegador a navegador. Los enemigos los mueve un jugador, el que dirige, y si se va los toma el siguiente. Al registro de la sala solo van las muertes y los niveles superados: cada uno anota su propia muerte, así que un navegador modificado podría no morirse. Es el mismo límite honesto del resto de los juegos."],
