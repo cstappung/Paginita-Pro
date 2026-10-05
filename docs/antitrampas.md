@@ -106,8 +106,7 @@ paso: el verificador es un módulo puro que corre igual en Node.
   export function sospecha(categoria, fila) {}// null | 'motivo'  (fila guardada, sin prueba)
   ```
 
-  Hoy los once son esqueletos que aceptan todo: el trabajo por juego es
-  llenarlos.
+  Los once ya están llenos y todos declaran `PRUEBA = 1`: exigen la prueba.
 - `solo/club.js`: verifica antes de guardar, de pagar (`alResultado`) y de
   dar logros; re-verifica lo pendiente; avisa con `reportaSospecha`.
 - `juegos-main.js` (`guardaClub`): escribe la prueba y después la fila;
