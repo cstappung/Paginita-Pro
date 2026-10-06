@@ -346,6 +346,30 @@ const TEX = {
     x.fillStyle = g; x.fillRect(0, 0, 64, 64);
     return c;
   },
+  /** Las luces de un tren que viene de frente, en una sola textura (así todo
+      su brillo es UNA llamada al GPU). Mitad izquierda: un halo redondo para
+      cada foco. Mitad derecha: un haz que es fuerte arriba (junto al tren) y
+      se apaga hacia abajo, con los bordes suaves: es el charco de luz que el
+      tren tira sobre la vía delante de él. */
+  faro() {
+    const [c, x] = lienzo(256, 128);
+    const g = x.createRadialGradient(64, 64, 0, 64, 64, 63);                  // el halo: blanco al centro, transparente en el borde
+    g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.16, 'rgba(255,255,255,0.8)');
+    g.addColorStop(0.42, 'rgba(255,255,255,0.22)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = g; x.fillRect(0, 0, 128, 128);
+    const img = x.createImageData(128, 128);                                  // el haz, píxel por píxel
+    for (let j = 0; j < 128; j++) {
+      const largo = Math.pow(1 - j / 127, 1.7);                               // fila 0 (arriba) = junto al tren: fuerte; abajo: nada
+      for (let i = 0; i < 128; i++) {
+        const u = (i - 63.5) / 64, ancho = Math.exp(-u * u * 4.5) * (1 - u * u); // de lado: una campana que llega a cero en el borde
+        const k = (j * 128 + i) * 4;
+        img.data[k] = img.data[k + 1] = img.data[k + 2] = 255;
+        img.data[k + 3] = Math.round(255 * largo * Math.max(0, ancho));
+      }
+    }
+    x.putImageData(img, 128, 0);
+    return c;
+  },
   /** El letrero de la entrada del túnel: «PRÓXIMA ESTACIÓN · …». */
   tunel(nombre) {
     const [c, x] = lienzo(1024, 192);
@@ -686,6 +710,7 @@ class Kit {
       case 'doble': t = aTextura(TEX.doble(), { repetir: false, pixel: px }); break;
       case 'caja': t = aTextura(TEX.caja(), { repetir: false, pixel: px }); break;
       case 'boleto': t = aTextura(TEX.boleto(), { repetir: false, pixel: px }); break;
+      case 'faro': t = aTextura(TEX.faro(), { repetir: false }); break;         // las luces de los trenes que vienen (suaves también en pixel)
       case 'toldo': { const [c1, c2] = c.toldos[+arg[0] % c.toldos.length]; t = aTextura(TEX.toldo(c1, c2, this.neon ? 0.45 : 1), { pixel: px }); break; }
       case 'cartel': t = aTextura(this.lienzoCartel(arg[0]), { repetir: false, pixel: px }); break;
       case 'carteles': {                                                       // todos los letreros de la paleta en una textura, uno debajo del otro
@@ -757,6 +782,7 @@ class Kit {
     const pasos = [];
     const pre = (tipo, fab, n) => { for (let i = 0; i < n; i++) pasos.push(() => { const o = fab(); o.visible = false; o.userData.tipoReserva = tipo; this.almacen.add(o); if (!this.reserva.has(tipo)) this.reserva.set(tipo, []); this.reserva.get(tipo).push(o); }); };
     for (let i = 0; i < 3; i++) pre('tren' + i, () => this.tren(i), 3);
+    for (let i = 0; i < 3; i++) pre('trenM' + i, () => this.tren(i, true), 1);   // los que vienen de frente (con los focos encendidos)
     pre('rampa', () => this.rampa(), 3); pre('bajo', () => this.barreraBaja(), 5); pre('alto', () => this.barreraAlta(), 5);
     for (const lado of [-1, 1]) {
       pre('edificio' + lado, () => this.edificio(lado), 7); pre('graf' + lado, () => this.grafiti(lado), 3);
@@ -781,8 +807,20 @@ class Kit {
 
   /** Un vagón de metro. El perfil (paredes rectas, techo redondeado) se extruye a lo largo.
       Todas sus piezas llevan "!" (objeto del juego, ver `mat`): con poca luz
-      el cuerpo brilla en su color en vez de quedar negro. */
-  tren(i) {
+      el cuerpo brilla en su color en vez de quedar negro.
+
+      `marcha` = un tren que VIENE DE FRENTE. Antes era el mismo modelo que
+      uno detenido y, como se mira desde atrás y arriba, nadie notaba que
+      venía hacia ti hasta tenerlo encima. Ahora se distinguen como en la
+      vida real, donde adelante van luces blancas y atrás rojas:
+      - detenido: focos apagados (vidrio oscuro) y las luces rojas de cola;
+      - en marcha: focos blancos grandes, una franja de luz bajo el
+        parabrisas, sin rojo, y además un brillo (`faro`): un halo en cada
+        foco y un charco de luz en la vía delante de él, que se ve desde
+        lejos, atraviesa la niebla y crece en tus pies cuando se acerca.
+      El brillo es una sola malla con una sola textura (TEX.faro): una
+      llamada al GPU más por tren en marcha, nada en los detenidos. */
+  tren(i, marcha = false) {
     const c = this.c, a = new Arma(this), col = c.trenes[i % 3], ac = c.acentos[i % 3], L = L_VAGON - 0.3;
     const vid = this.vid + '!';
     /* En neón el contorno brillante ya no puede ser del color del cuerpo:
@@ -812,14 +850,31 @@ class Kit {
     a.pon(redonda(1.55, 0.95, 0.08, 0.06), vid, c.vidrio, [0, 2.3, zf]);
     a.pon(new THREE.PlaneGeometry(1.15, 0.24), 'texluz:destino!', 0xffffff, [0, 2.95, zf + 0.012]);
     for (const s of [-1, 1]) {
-      a.pon(CILINDRO, 'luz!', 0xfff4d6, [s * 0.62, 0.98, zf + 0.01], [Math.PI / 2, 0, 0], [0.26, 0.06, 0.26]);
-      a.pon(redonda(0.18, 0.1, 0.04, 0.02), 'luz!', 0xff3030, [s * 0.62, 0.72, zf + 0.01]);
+      if (marcha) a.pon(CILINDRO, 'luz!', 0xffffff, [s * 0.62, 0.98, zf + 0.02], [Math.PI / 2, 0, 0], [0.36, 0.07, 0.36]);   // foco encendido, más grande
+      else {
+        a.pon(CILINDRO, 'plano!', 0x3a3f49, [s * 0.62, 0.98, zf + 0.01], [Math.PI / 2, 0, 0], [0.26, 0.06, 0.26]);       // foco apagado
+        a.pon(redonda(0.18, 0.1, 0.04, 0.02), 'luz!', 0xff3030, [s * 0.62, 0.72, zf + 0.01]);                           // la luz roja de cola
+      }
     }
+    if (marcha) a.pon(CAJA, 'luz!', 0xfff6dc, [0, 1.72, zf + 0.03], null, [1.3, 0.08, 0.03]);   // la franja de luz bajo el parabrisas
     a.pon(redonda(1.85, 0.3, 0.26, 0.1), 'plano!', c.bajo, [0, 0.5, zf]);
     // los equipos del techo, del mismo material que el cuerpo: desde la cámara (atrás y arriba) el techo es lo que más se ve de un tren
     for (const za of [-2.8, 2.8]) a.pon(redonda(1.0, 0.26, 1.7, 0.1), 'pintura!', c.techoTren, [0, 3.32, za]);
     const g = a.hecho();
-    if (this.neon) for (const s of [-1, 1]) g.add(sprite(0xffffff, 1.8, [s * 0.62, 0.98, zf + 0.15]));
+    if (marcha) {
+      /* El brillo de los focos. Cada tren en marcha tiene su propio material
+         (comparten el programa del GPU), porque su opacidad cambia sola:
+         aparece de a poco desde el fondo y late si viene por tu carril (ver
+         `paso`). Sin niebla, a propósito: las luces atraviesan la niebla
+         antes que el tren, que es justo lo que avisa de lejos. */
+      // blanco frío de noche, cálido de día y al atardecer; de día más fuerte (una luz que se suma a un fondo claro se nota menos)
+      const luz = new THREE.Color(this.neon ? 0xdcefff : this.pixel ? 0xffe6b0 : 0xfff0c8).multiplyScalar(this.neon ? 0.85 : this.pixel ? 1.15 : 1.6);
+      const mat = new THREE.MeshBasicMaterial({ map: this.tex('faro'), color: luz, vertexColors: true, transparent: true, opacity: 0,
+        blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.DoubleSide });
+      const faro = new THREE.Mesh(this._geoFaro ||= geoFaro(zf), mat);
+      faro.castShadow = faro.receiveShadow = false; faro.renderOrder = 2;
+      g.add(faro); g.userData.faro = faro;
+    }
     return g;
   }
   /** La rampa: una cuña de rejilla con bordes de cinta de peligro. Su origen es el pie (z=0) y sube hacia −z.
@@ -1186,6 +1241,36 @@ function geoTren(L) {
   cacheTren.set(L, g);
   return g;
 }
+/** La geometría del brillo de un tren que viene (ver `Kit.tren`), con su
+    frente en z = `zf` mirando hacia +z (hacia el corredor). Son cuadros
+    planos que usan las dos mitades de TEX.faro:
+    - un halo en cada foco y un resplandor grande y tenue entre los dos (lo
+      que se ve de lejos, cuando el tren todavía es un punto);
+    - el charco de luz sobre la vía: de 3,1 m de ancho y 14 m hacia
+      adelante, fuerte junto al tren, apagándose lejos de él.
+    El color de cada vértice es su intensidad (con mezcla aditiva, negro no
+    suma nada). Ejemplo: el charco va a 0,65 y los halos a 1. */
+function geoFaro(zf) {
+  const pos = [], uv = [], col = [];
+  /** Un cuadro con esquinas a, b, c, d (en orden), su rango de uv y su intensidad k. */
+  const cuadro = (a, b, c, d, u0, u1, v0, v1, k) => {
+    const P = [a, b, c, d], U = [[u0, v0], [u1, v0], [u1, v1], [u0, v1]];
+    for (const i of [0, 1, 2, 0, 2, 3]) { pos.push(...P[i]); uv.push(...U[i]); col.push(k, k, k); }
+  };
+  const HALO = [0.004, 0.496], HAZ = [0.504, 0.996];                         // las dos mitades de la textura (con un margen entre ellas)
+  const halo = (x, y, z, r, k) => cuadro([x - r, y - r, z], [x + r, y - r, z], [x + r, y + r, z], [x - r, y + r, z], HALO[0], HALO[1], 0, 1, k);
+  for (const s of [-1, 1]) halo(s * 0.62, 0.98, zf + 0.25, 1.05, 1);          // un halo por foco
+  halo(0, 1.25, zf + 0.3, 2.4, 0.3);                                         // el resplandor de los dos juntos
+  // el charco: v = 1 junto al tren (lo fuerte del haz) y v = 0 a 14 m (se apaga); va justo sobre los rieles
+  const y = 0.32, z0 = zf - 0.3, z1 = zf + 14;
+  cuadro([-1.55, y, z1], [1.55, y, z1], [1.55, y, z0], [-1.55, y, z0], HAZ[0], HAZ[1], 0, 1, 0.65);
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.computeBoundingSphere();
+  return g;
+}
 /** Una mancha de luz (sprite) para el neón. */
 function sprite(col, escala, pos, opacidad = 1) {
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: texBrillo(), color: col, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: opacidad }));
@@ -1234,7 +1319,20 @@ function armaCorredor(kit, asp) {
   // la mochila cohete (aparece con el poder) y sus llamas
   const cohete = new THREE.Group(); cohete.position.set(0, 0.32, 0.3); cohete.visible = false; torso.add(cohete);
   parte(cohete, a => { for (const s of [-1, 1]) { a.pon(CILINDRO, 'pintura', 0xe8463b, [s * 0.13, 0, 0.04], null, [0.17, 0.46, 0.17]); a.pon(new THREE.ConeGeometry(0.085, 0.14, 12), 'pintura', 0xffd23f, [s * 0.13, 0.3, 0.04]); } });
-  const llamas = parte(cohete, a => { for (const s of [-1, 1]) a.pon(new THREE.ConeGeometry(0.08, 0.5, 10), 'luz', 0xffa424, [s * 0.13, -0.5, 0.04], [Math.PI, 0, 0]); });
+  /* Las llamas cuelgan de la boca de las toberas (el origen de la pieza está
+     ahí, a −0,25): así, cuando `paso` las estira para que tiemblen, crecen
+     hacia abajo sin separarse del cohete. Van de blanco amarillo en la boca
+     a rojo anaranjado en la punta, pintado en el color de cada vértice: la
+     misma malla, ninguna llamada más al GPU. */
+  const llamas = parte(cohete, a => { for (const s of [-1, 1]) a.pon(new THREE.ConeGeometry(0.08, 0.5, 10), 'luz', 0xffa424, [s * 0.13, -0.25, 0.04], [Math.PI, 0, 0]); }, [0, -0.25, 0]);
+  {
+    const geo = llamas.children[0].geometry, py = geo.attributes.position, cv = geo.attributes.color;
+    const boca = new THREE.Color(0xfff2b8), punta = new THREE.Color(0xff4a14), col = new THREE.Color();
+    for (let i = 0; i < py.count; i++) {
+      col.copy(boca).lerp(punta, THREE.MathUtils.clamp(-py.getY(i) / 0.5, 0, 1));   // y = 0 en la boca, −0,5 en la punta
+      cv.setXYZ(i, col.r, col.g, col.b);
+    }
+  }
   const cab = art(torso, [0, 0.8, 0]); cab.rotation.x = 0.12;
   parte(cab, a => {
     a.pon(ESFERA, 'personaje', piel, [0, 0, 0], null, [0.4, 0.42, 0.4]);
@@ -1495,6 +1593,135 @@ export function crearMundo(canvas) {
   let particulas = null, trenFantasma = null, tiempoFantasma = 0;
   const camPos = new THREE.Vector3(0, 4.7, 8.6), camMira = new THREE.Vector3(0, 0.4, -9);
 
+  /* ---- la sensación de velocidad (solo para el ojo) ----
+     Nada de esto mueve al corredor: la velocidad de verdad, los metros y los
+     puntos los decide juego.js, y el antitrampas los recalcula con la curva
+     del motor. Aquí solo se cambia CÓMO se ve:
+     - el lente se abre con la velocidad (hasta +11° a 50 m/s) y la cámara
+       se acerca y baja un poco: el costado del mundo pasa más rápido;
+     - un balanceo apenas visible con cada paso, y la cámara se ladea un
+       poco al cambiar de carril;
+     - líneas de viento (una sola malla de instancias: una llamada al GPU)
+       que aparecen pasados los ~24 m/s;
+     - la mochila cohete: un golpe de lente al despegar (un resorte que sale
+       y vuelve), las líneas a toda fuerza, temblor de cámara, las llamas
+       que crecen y un resplandor detrás del corredor; al aterrizar, un
+       golpe hacia abajo.
+     La rapidez se mide como k = (V − V0) / (VMAX − V0) con la curva del
+     motor (MOTOR.VELOCIDAD), nunca con números escritos aquí: si la curva
+     cambia, esto la sigue. Ejemplo: a 15 m/s k = 0; a 32,5 m/s k = 0,5.
+     `mov` lo fija el juego: `sacudir` es la opción «Sacudir la pantalla» y
+     `quieto` el ajuste del sistema «reducir movimiento»; sin sacudir no hay
+     temblor, balanceo ni ladeo, y quieto además quita las líneas y achica
+     el golpe de lente. */
+  const VEL = MOTOR.VELOCIDAD;                                                // {V0, VMAX}: la misma curva del juego y del antitrampas
+  const SENS = {
+    FOV_VEL: 11,        // grados que se abre el lente a toda velocidad (k = 1)
+    FOV_VUELO: 5,       // grados más mientras se vuela con la mochila
+    FOV_PATADA: 18,     // grados por unidad del resorte del despegue (el pico queda en ~+10°)
+    ACERCA: 0.9,        // metros que la cámara se acerca a toda velocidad…
+    BAJA: 0.4,          // …y que baja
+    PASO: 0.035,        // el balanceo de cada zancada a toda velocidad (m)
+    LADEO: 0.09         // cuánto del ladeo del corredor toma la cámara
+  };
+  const mov = { sacudir: true, quieto: false };
+  const sens = {
+    kv: 0,              // k suavizado (el lente no salta de golpe)
+    p: 0, pv: 0,        // el resorte del golpe de lente (posición y velocidad)
+    cy: 0, cyv: 0,      // el resorte del golpe de cámara al aterrizar (m)
+    vuelo: 0,           // 0 a 1: cuánto se nota la mochila (sube y baja suave)
+    volaba: false,      // ¿volaba en el cuadro anterior? (para notar el despegue y el aterrizaje)
+    cae: false,         // se acabó la mochila y todavía no toca el suelo
+    Dantes: null,       // el metro del cuadro anterior: lo que se avanzó mueve las líneas
+    lineas: 0,          // la fuerza de las líneas de viento (su opacidad)
+    giro: 0,            // el ladeo de la cámara (radianes)
+    extra: 0            // los grados que se le suman al lente ahora
+  };
+  let fovBase = 40;                                                          // el lente sin nada (lo fija `tamano` según la forma de la pantalla)
+  const azarL = azarDe(0x11E7A5);                                            // azar propio de las líneas y las llamas (no gasta el Math.random del juego)
+
+  /* Las líneas de viento: rayas finas y largas a lo largo de la vía, por los
+     costados y por arriba (nunca sobre los carriles ni sobre el corredor,
+     donde están los obstáculos), que pasan más rápido que el mundo. Cada raya
+     son dos planos cruzados (se ve desde cualquier ángulo), con la punta de
+     adelante brillante y la cola que se apaga: el color de cada vértice es
+     su brillo, y con mezcla aditiva el negro no suma nada. */
+  const N_LINEAS = 40;
+  const lineas = (() => {
+    const pos = [], col = [], Z = [-0.5, 0.3, 0.5], B = [0, 1, 0];           // a lo largo: cola apagada, lo más brillante cerca de la punta, punta suave
+    for (const vertical of [false, true]) for (let s = 0; s < 2; s++) {
+      const A = vertical ? [0, -0.5] : [-0.5, 0], C = vertical ? [0, 0.5] : [0.5, 0];   // los dos bordes largos del plano
+      const P = [[...A, Z[s]], [...C, Z[s]], [...C, Z[s + 1]], [...A, Z[s + 1]]], K = [B[s], B[s], B[s + 1], B[s + 1]];
+      for (const i of [0, 1, 2, 0, 2, 3]) { pos.push(...P[i]); col.push(K[i], K[i], K[i]); }
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    const m = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.DoubleSide });
+    const im = new THREE.InstancedMesh(g, m, N_LINEAS);
+    im.frustumCulled = false; im.visible = false; im.count = 0; im.renderOrder = 3; im.name = 'lineas';
+    return im;
+  })();
+  escena.add(lineas);
+  const rayas = Array.from({ length: N_LINEAS }, () => ({ x: 0, y: -50, z: 0, l: 1, v: 1, w: 0.05 }));
+  let rayasListas = false;
+  const _der = new THREE.Vector3(), _arr = new THREE.Vector3(), _fre = new THREE.Vector3(), _r = new THREE.Vector3();
+  /** Pone una raya en un lugar nuevo, DENTRO de lo que ve la cámara, entre
+      12 y 45 m por delante (`cerca`: desde 3 m, al aparecer) y lejos del
+      centro de la pantalla. Como la raya queda quieta de lado y solo avanza
+      en z, al acercarse se abre hacia el borde de la pantalla: es el efecto
+      de «salto al hiperespacio». Nunca sobre los carriles ni el corredor
+      (abajo al centro), donde se leen los obstáculos.
+      Ejemplo: sx = 0,8 y sy = 0,5 es arriba a la derecha. */
+  function naceRaya(R, cerca, ex, ey) {
+    _der.set(1, 0, 0).applyQuaternion(camara.quaternion);                    // los ejes de la cámara: derecha, arriba y adelante
+    _arr.set(0, 1, 0).applyQuaternion(camara.quaternion);
+    _fre.set(0, 0, -1).applyQuaternion(camara.quaternion);
+    const tv = Math.tan(THREE.MathUtils.degToRad(camara.fov / 2)), th = tv * camara.aspect;
+    for (let k = 0; k < 10; k++) {
+      const d = cerca ? 3 + azarL() * 42 : 12 + azarL() * 33;               // a cuántos metros por delante
+      // dónde en la pantalla (−1 a 1): tres de cada cuatro por los costados (sobre las fachadas se notan más que sobre el cielo claro)
+      const costado = azarL() < 0.75, lado = azarL() < 0.5 ? -1 : 1;
+      const sx = costado ? lado * (0.45 + azarL() * 0.55) : azarL() * 2 - 1, sy = costado ? azarL() * 2 - 1 : 0.5 + azarL() * 0.5;
+      _r.copy(camPos).addScaledVector(_fre, d).addScaledVector(_der, sx * d * th).addScaledVector(_arr, sy * d * tv);
+      if (_r.y < 0.4) continue;                                              // bajo el suelo, no
+      if (Math.abs(_r.x - ex) < 2.7 && _r.y < ey + 3.6) continue;            // sobre la vía y el corredor, no
+      R.x = _r.x; R.y = _r.y; R.z = _r.z;
+      break;
+    }
+    R.l = 0.6 + azarL() * 0.8;                                               // largo propio de cada una
+    R.v = 1.3 + azarL() * 0.9;                                               // pasan entre 1,3 y 2,2 veces más rápido que el mundo
+    R.w = 0.09 + azarL() * 0.08;                                             // grosor (m): a 30 m, unos 2 px; al pasar junto a la cámara, más
+  }
+  /** Mueve y dibuja las líneas de viento. Su fuerza: nada hasta ~24 m/s
+      (k = 0,25), 0,6 a 50 m/s, y casi toda con la mochila. Avanzan con lo
+      que avanzó el mundo (`dD`), no con el reloj: en la pausa se quedan
+      quietas (y se apagan) aunque los cuadros sigan. Ejemplo: a 50 m/s, en
+      un cuadro de 1/60 s el mundo avanza 0,83 m y cada raya entre 1,1 y 1,8. */
+  function pintaRayas(e, dD, corre, dt) {
+    const porVelocidad = THREE.MathUtils.clamp((sens.kv - 0.25) / 0.75, 0, 1) * 0.6;
+    const meta = mov.quieto || !corre ? 0 : Math.min(1, Math.max(porVelocidad, sens.vuelo * 0.95) + Math.max(0, sens.p) * 0.3);
+    sens.lineas += (meta - sens.lineas) * (1 - Math.exp(-6 * dt));
+    if (sens.lineas < 0.01) { lineas.visible = false; return; }             // apagadas no cuestan nada
+    const ex = e.x || 0, ey = (e.y || 0) + SUELO;
+    if (!rayasListas) { for (const R of rayas) naceRaya(R, true, ex, ey); rayasListas = true; }
+    lineas.visible = true;
+    lineas.material.opacity = sens.lineas;
+    const largo = 2 + 9 * sens.kv + 7 * sens.vuelo;                          // más largas a más velocidad (m)
+    const n = Math.round(N_LINEAS * (0.45 + 0.55 * sens.lineas));            // y más mientras más fuerza
+    for (let i = 0; i < N_LINEAS; i++) {
+      const R = rayas[i];
+      R.z += Math.max(0, dD) * R.v;                                          // vienen hacia la cámara
+      if (R.z - largo * R.l * 0.5 > camPos.z + 0.5) naceRaya(R, false, ex, ey);   // ya pasó la cámara: vuelve al fondo
+      if (i < n) lineas.setMatrixAt(i, _m.compose(_p.set(R.x, R.y, R.z), _q.identity(), _s.set(R.w, R.w, largo * R.l)));
+    }
+    lineas.count = n; lineas.instanceMatrix.needsUpdate = true;
+  }
+  /* El resplandor de la mochila cohete: una mancha de luz detrás del
+     corredor, solo mientras vuela (una llamada al GPU, solo entonces). */
+  const brasa = sprite(0xffa040, 1.2, [0, -50, 0], 0.9);
+  brasa.material.fog = false; brasa.visible = false; brasa.renderOrder = 3; escena.add(brasa);
+
   /* ---- la ciudad de los costados ---- */
   const paisaje = [];                                                         // {obj, d, largo, tipo}
   const frente = { e: { [-1]: 0, [1]: 0 }, farol: 0, poste: 0, arbol: { [-1]: 0, [1]: 0 }, graf: { [-1]: 0, [1]: 0 } };
@@ -1573,7 +1800,10 @@ export function crearMundo(canvas) {
     // el túnel se anota una sola vez (o.vis marcado): antes se volvía a pedir en cada cuadro y sinPaisaje crecía sin parar
     if (o.tipo === 'tunel') { if (tunelObj !== o) { tunelObj = o; sinPaisaje.push([o.d0, o.d0 + o.largo]); } o.vis = { tunel: true }; return; }
     let obj;
-    if (o.tipo === 'tren') { const i = (o.id || 0) % 3; obj = kit.saca('tren' + i, () => kit.tren(i)); obj.position.x = CARRILES[o.carril]; }
+    if (o.tipo === 'tren') {                                                  // uno que viene de frente (vel > 0) sale de otra reserva: la de los focos encendidos
+      const i = (o.id || 0) % 3, marcha = o.vel > 0;
+      obj = kit.saca((marcha ? 'trenM' : 'tren') + i, () => kit.tren(i, marcha)); obj.position.x = CARRILES[o.carril]; obj.rotation.z = 0;
+    }
     else if (o.tipo === 'rampa') { obj = kit.saca('rampa', () => kit.rampa()); obj.position.x = CARRILES[o.carril]; obj.position.y = SUELO; }
     else if (o.tipo === 'bajo') { obj = kit.saca('bajo', () => kit.barreraBaja()); obj.position.set(CARRILES[o.carril], SUELO, 0); }
     else if (o.tipo === 'alto') { obj = kit.saca('alto', () => kit.barreraAlta()); obj.position.set(CARRILES[o.carril], SUELO, 0); }
@@ -1773,6 +2003,8 @@ export function crearMundo(canvas) {
       particulas.userData = { tipo: ex.nieve ? 'nieve' : ex.polvo ? 'polvo' : 'espectros' }; particulas.frustumCulled = false;
       escena.add(particulas);
     }
+    // las líneas de viento toman el tono de la estética: cian de noche, crema al atardecer, blancas de día
+    lineas.material.color.set(kit.neon ? 0xa8f2ff : kit.pixel ? 0xfff0d8 : 0xffffff);
     if (trenFantasma) { escena.remove(trenFantasma); trenFantasma = null; }
     if (ex.trenFantasma) {
       trenFantasma = new THREE.Mesh(geoTren(L_VAGON * 3), new THREE.MeshBasicMaterial({ color: 0x7dffcf, transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
@@ -1799,8 +2031,20 @@ export function crearMundo(canvas) {
     // objetos del juego
     for (const o of dinamicos) {
       const obj = o.vis.obj;
-      if (o.tipo === 'tren') obj.position.z = -(o.d0 + o.largo / 2 - D);
-      else if (o.tipo === 'rampa') obj.position.z = -(o.d0 - D);
+      if (o.tipo === 'tren') {
+        obj.position.z = -(o.d0 + o.largo / 2 - D);
+        const faro = obj.userData.faro;
+        if (faro) {
+          /* Las luces de un tren que viene: aparecen de a poco en el último
+             30 % de lo que se dibuja (si no, saltarían a la vista de golpe en
+             el borde), y si viene por tu carril laten un poco. Además el
+             vagón se mece apenas: un tren detenido no se mueve. */
+          const dist = o.d0 - D, mio = Math.abs(CARRILES[o.carril] - e.x) < 1.1 && dist > -2;
+          const aparece = THREE.MathUtils.clamp((vista - dist) / (vista * 0.3), 0, 1);
+          faro.material.opacity = aparece * (mio ? 0.85 + 0.15 * Math.sin(e.t * 16) : 0.8);   // late 2,5 veces por segundo (menos de 3: no encandila)
+          obj.rotation.z = o.activo ? Math.sin(e.t * 7.3 + (o.id || 0)) * 0.01 : 0;
+        }
+      } else if (o.tipo === 'rampa') obj.position.z = -(o.d0 - D);
       else if (o.tipo === 'bajo' || o.tipo === 'alto') obj.position.z = -(o.d - D);
       else {                                                                  // poderes, estrellas y boletos: giran y flotan
         obj.position.set(o.x != null ? o.x : CARRILES[o.carril], (o.y || 1.2) + SUELO + Math.sin(e.t * 3 + o.id) * 0.12, -(o.d - D));
@@ -1824,6 +2068,28 @@ export function crearMundo(canvas) {
       tunel.position.z = z0;
       if (z0 - tunelObj.largo > DETRAS + 20) tunelObj = null;
     } else tunel.visible = false;
+    // la sensación de velocidad: cuánto se avanzó, qué tan rápido va y si despegó o aterrizó
+    const dD = sens.Dantes == null ? 0 : D - sens.Dantes;                     // metros desde el cuadro anterior
+    if (dD < -1) { sens.volaba = sens.cae = false; sens.vuelo = 0; sens.p = sens.pv = sens.cy = sens.cyv = 0; }   // una carrera nueva (D volvió a cero): de cero
+    sens.Dantes = D;
+    const avanza = dD > 1e-4 && !e.menu;                                     // ¿el mundo se mueve? (en pausa, en el menú y tras chocar, no)
+    const corre = avanza && !(e.pose && e.pose.modo === 'caer');
+    const kv = corre ? THREE.MathUtils.clamp(((e.v || 0) - VEL.V0) / (VEL.VMAX - VEL.V0), 0, 1) : 0;   // 0 a V0, 1 a VMAX
+    sens.kv += (kv - sens.kv) * (1 - Math.exp(-2.5 * dt));                  // en ~0,4 s: el lente no salta
+    const vuela = corre && !!(e.poderes && e.poderes.mochila);
+    if (avanza && vuela !== sens.volaba) {                                   // despegó, o se le acabó la mochila, en este cuadro
+      if (vuela) { sens.pv += mov.quieto ? 4 : 9; sens.cae = false; }        // despegue: el lente se abre de golpe y vuelve
+      else { sens.pv -= 1.5; sens.cae = true; }                              // se apagó: el lente se cierra un poco y empieza la caída
+      sens.volaba = vuela;
+    }
+    if (sens.cae && corre && (e.y || 0) - (e.suelo || 0) < 0.05) {          // tocó el suelo (o un techo) después de volar: el golpe
+      sens.cae = false; sens.pv -= 2.5; sens.cyv -= 4.5;
+      if (mov.sacudir && !mov.quieto) sacudida = Math.max(sacudida, 0.3);
+    }
+    // dos resortes con amortiguación: salen con el golpe y vuelven solos a cero, con un rebote chico
+    sens.pv += (-60 * sens.p - 9 * sens.pv) * dt; sens.p += sens.pv * dt;
+    sens.cyv += (-70 * sens.cy - 10 * sens.cyv) * dt; sens.cy += sens.cyv * dt;
+    sens.vuelo += ((vuela ? 1 : 0) - sens.vuelo) * (1 - Math.exp(-4 * dt));
     // el corredor
     if (corredor) {
       const r = corredor, P = e.poderes || {};
@@ -1834,6 +2100,16 @@ export function crearMundo(canvas) {
       posa(r, e.pose || { modo: 'correr', fase: 0 });
       r.cohete.visible = !!P.mochila;
       r.llamas.scale.y = 0.7 + Math.random() * 0.6;
+      brasa.visible = !!P.mochila && !e.menu;
+      if (P.mochila && avanza) {
+        /* Volando, las llamas tiemblan fuerte (cambian de largo y de grosor en
+           cada cuadro) y el golpe del despegue las estira; el resplandor va
+           en la boca de las toberas y late con ellas. */
+        const golpe = Math.max(0, sens.p), largo = 0.8 + azarL() * 1.0 + golpe * 1.4;
+        r.llamas.scale.set(0.8 + azarL() * 0.4, largo, 0.8 + azarL() * 0.4);
+        brasa.scale.setScalar(0.8 + largo * 0.45 + golpe * 1.2);
+      }
+      if (brasa.visible) { r.llamas.updateWorldMatrix(true, false); r.llamas.localToWorld(brasa.position.set(0, -0.3, 0.06)); }   // a un tercio de las llamas (ya estiradas por su escala)
       r.tabla.visible = !!P.patineta;
       r.aura.visible = !!P.iman; r.aura.rotation.z = e.t * 3;
       for (const pp of r.piernas) pp.brilloZap.visible = !!P.zapatillas;
@@ -1880,12 +2156,33 @@ export function crearMundo(canvas) {
       camPos.lerp(_v.set(e.x * 0.6, 3.4 + yS + ajusteRetrato.y * 0.6, 6.2 + ajusteRetrato.z * 0.6), k);
       camMira.lerp(_v.set(e.x * 0.5, 0.3 + yS, -2.5), k);           // el corredor queda en el tercio de abajo (arriba va «¿Seguir corriendo?»)
     } else {
-      camPos.lerp(_v.set(e.x * 0.45, 4.7 + yC + ajusteRetrato.y, 8.6 + ajusteRetrato.z), k);
+      // corriendo: a más velocidad la cámara se acerca y baja un poco (con el lente más abierto, el costado pasa más rápido)
+      camPos.lerp(_v.set(e.x * 0.45, 4.7 + yC + ajusteRetrato.y - SENS.BAJA * sens.kv, 8.6 + ajusteRetrato.z - SENS.ACERCA * sens.kv), k);
       camMira.lerp(_v.set(e.x * 0.3, 0.4 + yC * 1.05, -9), k);
     }
     camara.position.copy(camPos);
+    camara.position.y += sens.cy;                                             // el golpe del aterrizaje de la mochila
     if (sacudida > 0) { camara.position.x += (Math.random() - .5) * sacudida; camara.position.y += (Math.random() - .5) * sacudida; sacudida = Math.max(0, sacudida - dt * 2.5); }
+    const mueve = mov.sacudir && !mov.quieto;                                 // ¿se permite mover la cámara por gusto?
+    if (mueve && corre) {
+      // el paso: la cámara baja y sube apenas con cada zancada, más a más velocidad
+      if (e.pose && e.pose.modo === 'correr') camara.position.y += SENS.PASO * sens.kv * (Math.abs(Math.cos(e.pose.fase || 0)) * 2 - 1);
+      // la mochila: un temblor fino y continuo (sumas de senos: parejo aunque los cuadros duren distinto)
+      if (sens.vuelo > 0.01) {
+        const a = 0.045 * sens.vuelo;
+        camara.position.x += a * (Math.sin(e.t * 31) + 0.5 * Math.sin(e.t * 53 + 2));
+        camara.position.y += a * (Math.sin(e.t * 37 + 1) + 0.5 * Math.sin(e.t * 61));
+      }
+    }
     camara.lookAt(camMira);
+    // la cámara se ladea un poco hacia donde se mueve el corredor al cambiar de carril
+    sens.giro += ((mueve && corre ? ((e.pose && e.pose.ladeo) || 0) * SENS.LADEO : 0) - sens.giro) * (1 - Math.exp(-8 * dt));
+    if (Math.abs(sens.giro) > 1e-4) camara.rotateZ(sens.giro);
+    // el lente: se abre con la velocidad y con la mochila, más el golpe del despegue (con tope, por si se juntan)
+    const curva = 1 - Math.pow(1 - sens.kv, 1.5);                            // sube rápido al principio y se aplana arriba: a 32 m/s ya va en +7°
+    sens.extra = Math.min(24, SENS.FOV_VEL * curva + SENS.FOV_VUELO * sens.vuelo + SENS.FOV_PATADA * sens.p);
+    if (Math.abs(camara.fov - (fovBase + sens.extra)) > 0.01) { camara.fov = fovBase + sens.extra; camara.updateProjectionMatrix(); }
+    pintaRayas(e, dD, corre, dt);
     kit.cielo.position.copy(camara.position);
     // partículas del ambiente
     if (particulas) {
@@ -1934,7 +2231,8 @@ export function crearMundo(canvas) {
     renderer.setSize(ancho, alto, false);
     const asp = ancho / alto;
     // el ángulo de visión se ajusta para que siempre quepan los tres carriles (en un celular vertical, más abierto)
-    camara.fov = THREE.MathUtils.clamp(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(33)) / asp) * 180 / Math.PI, 40, 74);
+    fovBase = THREE.MathUtils.clamp(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(33)) / asp) * 180 / Math.PI, 40, 74);
+    camara.fov = fovBase + sens.extra;                                         // más lo que la velocidad le está sumando ahora (ver `paso`)
     ajusteRetrato.y = asp < 1 ? 1.2 * (1 - asp) : 0; ajusteRetrato.z = asp < 1 ? 2.2 * (1 - asp) : 0;
     camara.aspect = asp; camara.updateProjectionMatrix();
     mundo.resolucion.set(ancho * renderer.getPixelRatio(), alto * renderer.getPixelRatio());
@@ -1963,6 +2261,9 @@ export function crearMundo(canvas) {
     aspecto(asp) { aspecto = asp; if (kit && corredor) { escena.remove(corredor.raiz, corredor.sombra); suelta3D(corredor.raiz, corredor.sombra); corredor = armaCorredor(kit, aspecto); escena.add(corredor.raiz, corredor.sombra); aplicaSombras(); } },
     /** Sacude la cámara (un choque). */
     sacude(f) { sacudida = Math.max(sacudida, f); },
+    /** Qué movimientos de cámara se permiten (ver «la sensación de velocidad»):
+        `sacudir` = la opción del juego; `quieto` = el sistema pide reducir el movimiento. */
+    movimiento(o) { Object.assign(mov, o); },
     /** Un brillito donde se tomó una moneda o un poder. */
     chispa(x, y, z, col) {
       const m = new THREE.Mesh(geoChispa, matChispa(col || 0xfff3a0));
@@ -1982,6 +2283,7 @@ export function crearMundo(canvas) {
       escena.traverse(o => {
         if (!o.isMesh || !visible(o)) return;
         let t = 'otro'; for (let x = o; x; x = x.parent) if (x.userData && x.userData.tipoReserva) { t = x.userData.tipoReserva; break; }
+        if (o === lineas) t = 'lineas';
         if (t === 'otro' && kit) { if (o === kit.monedas) t = 'monedas'; else for (let x = o; x; x = x.parent) { if (x === kit.via) { t = 'via'; break; } if (x === kit.cielo) { t = 'cielo'; break; } if (corredor && x === corredor.raiz) { t = 'corredor'; break; } } }
         n[t] = (n[t] || 0) + 1;
       });

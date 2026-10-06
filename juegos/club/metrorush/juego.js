@@ -225,19 +225,23 @@ function fisica(dt) {
       if (c.poderes.zapatillas > 0) sonido.saltoAlto(); else sonido.salto();
     }
   }
-  // 3) de lado: el corredor va hacia el centro de su carril
-  const xObj = M.CARRILES[r.carril], vl = 2.2 / F.cambioCarril;
+  // 3) de lado: el corredor va hacia el centro de su carril. Volando con la
+  //    mochila cambia de carril 1,7 veces más rápido (más frenético, y así se
+  //    alcanzan las monedas del cielo): es solo de lado, así que no cambia ni
+  //    los metros ni los puntos, y volando no hay choques.
+  const xObj = M.CARRILES[r.carril], vl = 2.2 / F.cambioCarril * (c.poderes.mochila > 0 ? 1.7 : 1);
   r.xPrev = r.x;
   r.x += Math.max(-vl * dt, Math.min(vl * dt, xObj - r.x));
   r.ladeo += ((xObj - r.x) * -0.18 - r.ladeo) * Math.min(1, dt * 10);   // se inclina hacia donde va
   // 4) arriba y abajo: gravedad, suelo, rampas y techos (o la mochila cohete)
   const sop = soporte(r.x, c.D, r.y);
   if (c.poderes.mochila > 0) {
-    r.y += (F.alturaMochila - r.y) * (1 - Math.exp(-3.5 * dt)); r.vy = 0; r.enAire = true;
+    // sube de golpe: el 95 % de la altura en medio segundo (antes, en casi uno). Solo cambia la altura, no los metros
+    r.y += (F.alturaMochila - r.y) * (1 - Math.exp(-6 * dt)); r.vy = 0; r.enAire = true;
   } else {
     r.vy -= F.gravedad * dt; r.y += r.vy * dt;
     if (r.y <= sop.h) {                                        // toca el suelo (o el techo, o la rampa)
-      if (r.enAire && r.vy < -1) { sonido.aterriza(); if (r.rodarPend) { r.rodar = F.tiempoRodar; c.cuenta.rodadas++; sonido.rodar(); } }
+      if (r.enAire && r.vy < -1) { sonido.aterriza(-r.vy); if (r.rodarPend) { r.rodar = F.tiempoRodar; c.cuenta.rodadas++; sonido.rodar(); } }
       r.y = sop.h; r.vy = 0; r.enAire = false; r.rodarPend = false; r.ultSuelo = c.t;
     } else if (!r.enAire && r.y > sop.h + 0.05) r.enAire = true;   // se acabó el tren: cae
   }
@@ -321,7 +325,7 @@ function activaPoder(clase) {
     c.cuenta.mochilas++;
     anotaPedido('C', c.D + 12, c.D + 12 + c.V * dur, c.r.carril);
     c.activos.push(...c.gen.monedasCielo(c.D + 12, c.D + 12 + c.V * dur, c.r.carril));
-    sonido.mochila(true);
+    sonido.mochila(true); sonido.despega();
   }
   aviso(M.PODERES[clase].nombre + '!');
 }
@@ -383,7 +387,7 @@ function usaPotenciador(k) {
     c.poderes.mochila = seg; c.invulnerable = Math.max(c.invulnerable, seg + 1.5);
     anotaPedido('C', c.D + 12, c.D + 12 + c.V * seg, c.r.carril);
     c.activos.push(...c.gen.monedasCielo(c.D + 12, c.D + 12 + c.V * seg, c.r.carril));
-    sonido.mochila(true); sonido.poder(); aviso('¡Despegue! A volar');
+    sonido.mochila(true); sonido.despega(); sonido.poder(); aviso('¡Despegue! A volar');
   } else {                                                      // +5 al multiplicador durante toda la carrera
     anota('p');
     c.extra = M.POTENCIADORES.puntos.extra; sonido.multiplicador(); aviso(`Potenciador: multiplicador ×${multiplicador()}`);
@@ -415,6 +419,7 @@ function actualiza(dt) {
     if (o.tipo === 'tren' && o.vel > 0) {
       if (!o.activo && c.D >= o.dArribo - M.APARECE) o.activo = true;
       if (o.activo && !muriendo) o.d0 -= o.vel * dt;            // al morir todo se queda quieto (el tren no te pasa por encima)
+      if (o.activo && !muriendo) avisaTren(o);                  // la bocina, si viene hacia ti
       if (o.d0 + o.largo < c.D - 1 && !c.esquivados.has(o.id) && !muriendo) { c.esquivados.add(o.id); c.cuenta.esquivar++; }
     }
     const fin = o.d != null ? o.d : o.d0 + (o.largo || 0);
@@ -434,7 +439,7 @@ function actualiza(dt) {
     // los poderes se gastan
     for (const k of Object.keys(c.poderes)) if (c.poderes[k] > 0) {
       c.poderes[k] = Math.max(0, c.poderes[k] - dt);
-      if (c.poderes[k] === 0 && k === 'mochila') { sonido.mochila(false); c.invulnerable = Math.max(c.invulnerable, 2); }
+      if (c.poderes[k] === 0 && k === 'mochila') { sonido.mochila(false); sonido.cortaMochila(); c.invulnerable = Math.max(c.invulnerable, 2); }
       if (c.poderes[k] === 0 && k === 'doble') anota('x');      // el multiplicador vuelve a la mitad
     }
     if (c.invulnerable > 0) c.invulnerable -= dt;
@@ -453,6 +458,35 @@ function actualiza(dt) {
     else if (estado === 'muerte' && c.muerte.t > 1.4) muestraFin();
   }
   c.perseguidor += (c.perseguidorObj - c.perseguidor) * Math.min(1, dt * 2.2);
+}
+
+/* ---- los trenes que vienen de frente se anuncian ----
+   Solo sonido y vibración: no cambia nada del juego. Un tren en marcha que
+   viene por TU carril toca la bocina cuando le faltan 2,4 s para cruzarse
+   contigo (un bocinazo largo) y, si sigues ahí cuando falta 1 s, dos toques
+   cortos y urgentes; si te metes en su carril ya tarde, van directo los dos
+   toques. Uno del carril de al lado toca corto y bajito, como mucho uno cada
+   3 s (si no, con varios trenes sería un concierto). La bocina suena del lado
+   en que viene, y en un celular además vibra (si «Sacudir la pantalla» está
+   encendido). Ejemplo: a 30 m/s con el tren a 11 m/s se acercan a 41 m/s:
+   el bocinazo suena con el tren a ~98 m. */
+function avisaTren(o) {
+  const r = c.r, dz = o.d0 - c.D;                                // metros hasta su frente
+  if (estado !== 'jugando' || dz <= 0 || dz > mundo.vista || c.poderes.mochila > 0) return;   // ya pasó, aún no se ve, o vuelas por encima
+  const seg = dz / (c.V + o.vel);                                // segundos para cruzarse
+  const lejos = Math.abs(o.carril - r.carril);                   // 0: mi carril; 1: el de al lado; 2: el del otro extremo
+  const pan = Math.max(-1, Math.min(1, (M.CARRILES[o.carril] - r.x) / 3));   // de qué lado suena
+  if (lejos === 0) {
+    if (!o.bocina && seg < 2.4) { o.bocina = seg < 1 ? 2 : 1; sonido.bocina(o.bocina, pan); vibra(o.bocina === 2 ? 140 : [90, 60, 90]); }
+    else if (o.bocina === 1 && seg < 1) { o.bocina = 2; sonido.bocina(2, pan); vibra(140); }
+  } else if (lejos === 1 && !o.bocina && !o.bocinaLejos && seg < 2 && c.t - (c.bocinaLejos ?? -9) > 3) {   // c.bocinaLejos: cuándo tocó la última «de al lado»
+    o.bocinaLejos = true; c.bocinaLejos = c.t; sonido.bocina(0, pan);
+  }
+}
+/** Una vibración corta en el celular (Android; el iPhone no deja), solo si «Sacudir la pantalla» está encendido. */
+function vibra(patron) {
+  if (!esTactil || !opciones.sacudida || !navigator.vibrate) return;
+  try { navigator.vibrate(patron); } catch (e) { /* sin permiso: no pasa nada */ }
 }
 
 /* ---- estaciones y túneles ---- */
@@ -780,7 +814,7 @@ function cuadro(ahora) {
     perseguidor: c && !menu ? c.perseguidor : 0, menu
   });
   mundo.dibuja();
-  sonido.tick(c && estado === 'jugando' ? c.V : 13);
+  sonido.tick(c && estado === 'jugando' ? c.V : M.VELOCIDAD.V0);
   if (c && (estado === 'jugando' || estado === 'muerte')) pintaHud(dt);
   autoCalidad(dtReal);
 }
@@ -805,6 +839,12 @@ const ponTexto = (id, txt) => { if (hudCache[id] !== txt) { hudCache[id] = txt; 
    la propiedad `scale` (no `transform`), para no pisar la inclinación que
    la estética juguete le da a la placa del multiplicador. */
 const quieto = matchMedia('(prefers-reduced-motion: reduce)');
+/** Le dice al mundo qué movimientos de cámara se permiten (ver «la sensación
+    de velocidad» en mundo.js): la opción «Sacudir la pantalla» (sin ella no
+    hay temblor, balanceo ni ladeo) y el ajuste del sistema «reducir
+    movimiento» (además, sin líneas de viento). */
+function aplicaMovimiento() { if (mundo) mundo.movimiento({ sacudir: !!opciones.sacudida, quieto: quieto.matches }); }
+if (quieto.addEventListener) quieto.addEventListener('change', aplicaMovimiento);
 let ultSaltoMoneda = 0;
 function salta(el, k, ms) { if (el && el.animate && !quieto.matches) el.animate([{ scale: 1 }, { scale: k }, { scale: 1 }], { duration: ms, easing: 'ease-out' }); }
 function pintaHud(dt) {
@@ -1094,6 +1134,7 @@ for (const [id, k] of [['optCalidad', 'calidad'], ['optEstilo', 'estilo'], ['opt
     guardaOpciones();
     if (k === 'calidad') mundo.calidad(opciones.calidad === 'auto' ? calidadInicial() : opciones.calidad);
     if (k === 'musica' || k === 'efectos') sonido.volumenes(opciones.musica / 100, opciones.efectos / 100);
+    if (k === 'sacudida') aplicaMovimiento();
     if (k === 'estilo' && (estado === 'portada')) aPortada();
   });
 }
@@ -1126,6 +1167,7 @@ async function arranca() {
     return;
   }
   mundo.calidad(calidadInicial());
+  aplicaMovimiento();
   const ajusta = () => { const r = pantalla.getBoundingClientRect(); mundo.tamano(r.width, r.height); };
   new ResizeObserver(ajusta).observe(pantalla); ajusta();
   mundo.aspecto(M.ASPECTOS[progreso.aspecto] || M.ASPECTOS.clasico); aspectoMostrado = progreso.aspecto;

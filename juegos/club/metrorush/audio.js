@@ -21,6 +21,8 @@
      bajar uno sin el otro, y el botón ♪ / la tecla M silencian los dos. */
 const Chip = window.Chip;                      // el motor chiptune (juegos/audio/chip.js)
 const Temas = window.Temas;                    // el cancionero (juegos/audio/temas.js)
+// la curva de velocidad del motor (motor.js se carga antes como script): de aquí sale el tempo, sin números escritos a mano
+const VEL = (window.MetroRushMotor && window.MetroRushMotor.VELOCIDAD) || { V0: 15, VMAX: 50 };
 
 export class Sonido {
   constructor() {
@@ -85,8 +87,9 @@ export class Sonido {
   /** Llamar en cada cuadro: agenda las notas que vienen y ajusta el tempo a la velocidad. */
   tick(velocidad, capas) {
     if (!this.ctx || !this.rep) return;
-    // de 13 m/s (×0,92) a 30 m/s (×1,15): el apuro se oye
-    this.rep.tempo = 0.92 + 0.23 * Math.max(0, Math.min(1, ((velocidad || 13) - 13) / 17));
+    // de V0 (×0,92) a VMAX (×1,15), con la curva del motor: el apuro se oye. Ejemplo: a 32,5 m/s, ×1,035
+    const k = ((velocidad || VEL.V0) - VEL.V0) / (VEL.VMAX - VEL.V0);
+    this.rep.tempo = 0.92 + 0.23 * Math.max(0, Math.min(1, k));
     if (capas) Object.assign(this.rep.capas, capas);
     this.rep.tick(0.25);
   }
@@ -116,7 +119,13 @@ export class Sonido {
   }
   salto() { this.nota(320, 0.16, 0.08, 'p12', { f1: 760 }); this.soplo(0.12, 0.05, 2.2); }
   saltoAlto() { this.nota(260, 0.3, 0.09, 'p12', { f1: 1200 }); this.soplo(0.2, 0.06, 2.6); }
-  aterriza() { this.soplo(0.06, 0.05, 0.6); }
+  /** Tocar el suelo. `v` = la velocidad de caída (m/s): desde 14 (bajar de
+      la mochila, o rodar en el aire) suma un golpe grave, más fuerte mientras
+      más rápido cae. Un salto normal cae a ~10 m/s y suena como siempre. */
+  aterriza(v = 0) {
+    this.soplo(0.06, 0.05, 0.6);
+    if (v > 14) { const k = Math.min(1, (v - 14) / 12); this.nota(120, 0.22, 0.08 + 0.1 * k, 'tri', { f1: 42 }); this.soplo(0.14, 0.04 + 0.05 * k, 0.5); }
+  }
   rodar() { this.soplo(0.28, 0.07, 0.8, { tono1: 0.35 }); }
   carril() { this.soplo(0.07, 0.035, 2.8, { tono1: 1.6 }); }
   /** El choque: un golpe grave, un estallido de ruido y un chirrido metálico. */
@@ -171,19 +180,133 @@ export class Sonido {
     this.soplo(1.6, 0.09, 0.3, { tono1: 0.15 });
     this.nota(55, 1.4, 0.08, 'tri', { f1: 40 });
   }
-  /** La mochila cohete suena mientras dura (un soplido continuo). */
+  /** Un búfer de ruido blanco de 2 s, hecho una vez y reusado (la mochila,
+      los soplidos y el aire de la bocina). Lo hace un generador propio para
+      no gastar el Math.random del juego. */
+  ruidoBlanco() {
+    if (this._ruido) return this._ruido;
+    const n = Math.floor(this.ctx.sampleRate * 2), b = this.ctx.createBuffer(1, n, this.ctx.sampleRate), a = b.getChannelData(0);
+    let s = 0x9E3779B9;
+    for (let i = 0; i < n; i++) { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; a[i] = s / 2147483648 - 1; }   // de −1 a 1
+    return (this._ruido = b);
+  }
+  /** Guarda unos nodos entre las voces vivas (para que callaEfectos los pueda
+      parar) y los suelta solos cuando la fuente termina. */
+  vive(fuente, nodos) {
+    const v = { fuente, nodos };
+    this.voces.add(v);
+    fuente.onended = () => { this.voces.delete(v); for (const n of nodos) { try { n.disconnect(); } catch (e) {} } };
+  }
+  /** Un soplido de viento: ruido por un filtro de banda que barre de f0 a f1
+      Hz en `dur` segundos. Ejemplo: de 300 a 2600 Hz es un «¡fuuum!» que sube. */
+  barrido(dur, vol, f0, f1) {
+    if (!this.ctx) return;
+    const ctx = this.ctx, t = this.t;
+    const s = ctx.createBufferSource(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+    s.buffer = this.ruidoBlanco();
+    f.type = 'bandpass'; f.Q.value = 1.3;
+    f.frequency.setValueAtTime(f0, t); f.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + dur * 0.3); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(f); f.connect(g); g.connect(this.efectos);
+    s.start(t); s.stop(t + dur + 0.02);
+    this.vive(s, [s, f, g]);
+  }
+  /** El despegue de la mochila: un soplido que sube y un golpe grave. */
+  despega() {
+    if (!this.ctx) return;
+    this.barrido(0.42, 0.16, 280, 2800);
+    this.nota(96, 0.38, 0.2, 'sine', { f1: 36, sus: 0.75 });
+    this.soplo(0.25, 0.07, 1.4, { tono1: 2.6 });
+  }
+  /** Se acaba la mochila: un soplido que baja y el motor que tose dos veces
+      (el golpe del suelo lo pone `aterriza`, cuando de verdad toca el suelo). */
+  cortaMochila() {
+    if (!this.ctx) return;
+    this.barrido(0.36, 0.1, 2200, 240);
+    this.nota(70, 0.1, 0.07, 'saw', { f1: 40 });
+    Chip.voz(this.ctx, this.efectos, { t: this.t + 0.13, f: 62, f1: 36, dur: 0.12, vol: 0.06, onda: 'saw' }, this.voces);
+  }
+  /** La mochila cohete ruge mientras dura. Son tres capas que suenan solas,
+      sin que el juego tenga que tocar nada en cada cuadro:
+      - el rugido: ruido por un filtro de banda cuyo centro tiembla 11 veces
+        por segundo (el aleteo de la llama);
+      - el retumbo: el mismo ruido por un filtro de graves;
+      - el motor: una onda de sierra grave que se mece.
+      Todo pasa por una ganancia propia (para encenderla de golpe y apagarla
+      suave) y de ahí a los efectos, así que el volumen de la sala la manda. */
   mochila(encendida) {
     if (!this.ctx) return;
     if (encendida && !this.motor) {
-      const r = Chip.ruido(this.ctx, this.efectos, { t: this.t, dur: 60, vol: 0.05, tono: 0.5 }, this.voces);
-      this.motor = r;
+      const ctx = this.ctx, t = this.t;
+      const master = ctx.createGain();
+      master.gain.setValueAtTime(0.0001, t); master.gain.exponentialRampToValueAtTime(1, t + 0.07);   // se enciende de golpe
+      master.connect(this.efectos);
+      const ruido = ctx.createBufferSource(); ruido.buffer = this.ruidoBlanco(); ruido.loop = true;
+      const banda = ctx.createBiquadFilter(); banda.type = 'bandpass'; banda.frequency.value = 850; banda.Q.value = 0.9;
+      const gB = ctx.createGain(); gB.gain.value = 0.11;
+      const aleteo = ctx.createOscillator(); aleteo.frequency.value = 11;
+      const gA = ctx.createGain(); gA.gain.value = 260;                      // ±260 Hz alrededor de los 850
+      aleteo.connect(gA); gA.connect(banda.frequency);
+      ruido.connect(banda); banda.connect(gB); gB.connect(master);
+      const grave = ctx.createBiquadFilter(); grave.type = 'lowpass'; grave.frequency.value = 160;
+      const gG = ctx.createGain(); gG.gain.value = 0.22;
+      ruido.connect(grave); grave.connect(gG); gG.connect(master);
+      const sierra = ctx.createOscillator(); sierra.type = 'sawtooth'; sierra.frequency.value = 52;
+      const meceo = ctx.createOscillator(); meceo.frequency.value = 6.5;
+      const gM = ctx.createGain(); gM.gain.value = 4;                        // ±4 Hz: el motor que vibra
+      meceo.connect(gM); gM.connect(sierra.frequency);
+      const pasa = ctx.createBiquadFilter(); pasa.type = 'lowpass'; pasa.frequency.value = 420;
+      const gS = ctx.createGain(); gS.gain.value = 0.05;
+      sierra.connect(pasa); pasa.connect(gS); gS.connect(master);
+      const fuentes = [ruido, aleteo, sierra, meceo];
+      for (const f of fuentes) f.start(t);
+      this.motor = { master, fuentes, nodos: [banda, gB, gA, grave, gG, gM, pasa, gS, master] };
     } else if (!encendida && this.motor) {
-      try { this.motor.stop(this.t + 0.05); } catch (e) {}
+      const m = this.motor, t = this.t, g = m.master.gain;
+      g.cancelScheduledValues(t); g.setValueAtTime(Math.max(0.0001, g.value), t); g.exponentialRampToValueAtTime(0.0001, t + 0.15);   // se apaga en 0,15 s
+      for (const f of m.fuentes) { try { f.stop(t + 0.2); } catch (e) {} }
+      m.fuentes[0].onended = () => { for (const n of [...m.fuentes, ...m.nodos]) { try { n.disconnect(); } catch (e) {} } };
       this.motor = null;
     }
   }
+  /** La bocina de un tren que viene de frente: tres sierras en La menor (suena
+      a advertencia), que entran un poco bajas y afinan en 70 ms, como el aire
+      de una bocina de verdad, por un filtro que les quita lo chillón.
+      fuerza 1: un bocinazo largo (viene por tu carril);
+      fuerza 2: dos toques cortos y urgentes (ya casi llega);
+      fuerza 0: uno corto y bajito (viene por el carril de al lado).
+      `pan`: de −1 (a tu izquierda) a 1 (a tu derecha). */
+  bocina(fuerza, pan = 0) {
+    if (!this.ctx) return;
+    const ctx = this.ctx, t0 = this.t;
+    const golpes = fuerza === 2 ? [[0, 0.16], [0.24, 0.2]] : [[0, fuerza === 1 ? 0.8 : 0.42]];   // [cuándo, cuánto dura]
+    const vol = fuerza === 0 ? 0.035 : fuerza === 2 ? 0.1 : 0.085;
+    const lado = ctx.createStereoPanner ? ctx.createStereoPanner() : ctx.createGain();
+    if (lado.pan) lado.pan.value = Math.max(-1, Math.min(1, pan));
+    const filtro = ctx.createBiquadFilter(); filtro.type = 'lowpass'; filtro.frequency.value = fuerza === 0 ? 1100 : 2000; filtro.Q.value = 1.5;
+    filtro.connect(lado); lado.connect(this.efectos);
+    const comunes = [filtro, lado];
+    golpes.forEach(([d, dur], gi) => {
+      const t = t0 + d, g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + 0.035);
+      g.gain.setValueAtTime(vol, t + dur); g.gain.linearRampToValueAtTime(0.0001, t + dur + 0.12);
+      g.connect(filtro);
+      [220, 262, 330].forEach((f, i) => {
+        const o = ctx.createOscillator(); o.type = 'sawtooth';
+        o.frequency.setValueAtTime(f * 0.96, t); o.frequency.exponentialRampToValueAtTime(f, t + 0.07);
+        o.detune.value = (i - 1) * 6;                                        // un poquito desafinadas entre sí: más ancha
+        o.connect(g); o.start(t); o.stop(t + dur + 0.14);
+        // la última nota del último golpe suelta también lo común (el filtro y el paneo)
+        const ultima = gi === golpes.length - 1 && i === 2;
+        this.vive(o, ultima ? [o, g, ...comunes] : i === 2 ? [o, g] : [o]);
+      });
+    });
+    // el aire: un soplo corto al empezar cada bocinazo
+    if (fuerza !== 0) Chip.ruido(ctx, filtro, { t: t0, dur: 0.12, vol: vol * 0.5, tono: 1.8 }, this.voces);
+  }
   /** Calla todos los efectos que estén sonando. */
   callaEfectos() {
+    if (this.motor) this.mochila(false);
     for (const v of this.voces) { try { v.fuente.stop(0); } catch (e) {} }
     this.voces.clear(); this.motor = null;
   }
