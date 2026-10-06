@@ -2057,7 +2057,10 @@ export function crearMundo(canvas) {
       if (n >= 400) break;
       const z = -(o.d - D);
       if (z < -vista || z > DETRAS) continue;
-      _m.compose(_p.set(o.x != null ? o.x : CARRILES[o.carril], o.y + SUELO, z), _q.setFromEuler(_e.set(0, e.t * 3 + o.d * 0.15, 0)), _s.set(1, 1, 1));
+      _p.set(o.x != null ? o.x : CARRILES[o.carril], o.y + SUELO, z);
+      // una moneda que pasa pegada a la cámara (las del cielo, volando con el lente abierto) se achica: si no, tapa media pantalla
+      const dc = _p.distanceTo(camPos), esc = dc < 4 ? Math.max(0.05, dc / 4) : 1;
+      _m.compose(_p, _q.setFromEuler(_e.set(0, e.t * 3 + o.d * 0.15, 0)), _s.set(esc, esc, esc));
       im.setMatrixAt(n++, _m);
     }
     im.count = n; im.instanceMatrix.needsUpdate = true;
@@ -2156,8 +2159,12 @@ export function crearMundo(canvas) {
       camPos.lerp(_v.set(e.x * 0.6, 3.4 + yS + ajusteRetrato.y * 0.6, 6.2 + ajusteRetrato.z * 0.6), k);
       camMira.lerp(_v.set(e.x * 0.5, 0.3 + yS, -2.5), k);           // el corredor queda en el tercio de abajo (arriba va «¿Seguir corriendo?»)
     } else {
-      // corriendo: a más velocidad la cámara se acerca y baja un poco (con el lente más abierto, el costado pasa más rápido)
-      camPos.lerp(_v.set(e.x * 0.45, 4.7 + yC + ajusteRetrato.y - SENS.BAJA * sens.kv, 8.6 + ajusteRetrato.z - SENS.ACERCA * sens.kv), k);
+      /* Corriendo: a más velocidad la cámara se acerca y baja un poco (con el
+         lente más abierto, el costado pasa más rápido). Volando no: con el
+         lente tan abierto, las monedas del cielo que pasan bajo la cámara
+         se veían enormes en el borde de abajo. */
+      const acerca = sens.kv * (1 - sens.vuelo);
+      camPos.lerp(_v.set(e.x * 0.45, 4.7 + yC + ajusteRetrato.y - SENS.BAJA * acerca, 8.6 + ajusteRetrato.z - SENS.ACERCA * acerca), k);
       camMira.lerp(_v.set(e.x * 0.3, 0.4 + yC * 1.05, -9), k);
     }
     camara.position.copy(camPos);
