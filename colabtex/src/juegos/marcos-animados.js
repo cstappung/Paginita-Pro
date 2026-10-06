@@ -210,6 +210,29 @@ function atasco() {
     chispas([[66, 70, 2, 1.6, 0], [66, 290, 2, 1.9, -.7]], "#fff3b0");  // dos destellos de faros
 }
 
+/* ALETEO: un anillo de cielo que se oscurece de día a noche, dos tubos
+   verdes con su boca, y el pajarito amarillo que da la vuelta aleteando;
+   una luna roja abajo y dos plumas que caen. */
+function aleteo() {
+  const pajaro = `<ellipse rx="6.5" ry="5.2" fill="#ffd23f" stroke="#3a2a0a" stroke-width=".9"/>` +
+    `<ellipse cx="1" cy="1.8" rx="3.6" ry="2.3" fill="#fff4c2"/>` +
+    an("wg", .35, `<ellipse cx="-2.4" cy="-.4" rx="3.2" ry="2.1" fill="#ffae12" stroke="#3a2a0a" stroke-width=".6"/>`) +
+    `<circle cx="2.6" cy="-2" r="1.9" fill="#fff"/><circle cx="3.2" cy="-2" r=".9" fill="#111"/>` +
+    `<path d="M5.4 -.4L9.6 .6L5.4 1.8Z" fill="#ff7a1a" stroke="#3a2a0a" stroke-width=".5"/>`;
+  const tubo = rect(10, 18, 1, "#6fd04b", `stroke="#24451a" stroke-width="1"`) +
+    `<rect x="-6.5" y="-9" width="13" height="4.5" rx="1" fill="#86e05c" stroke="#24451a" stroke-width="1"/>` +
+    `<rect x="-3" y="-4" width="2" height="12" fill="#c2f58a" opacity=".7"/>`;
+  const pluma = `<path d="M0-3C2-1 2 1 0 3C-2 1-2-1 0-3Z" fill="#fff4c2" stroke="#9e7a2a" stroke-width=".4"/>`;
+  return trazo(60, 270, 90, "#3fb6f5", 16) + trazo(60, 90, 270, "#1b244f", 16) +
+    aro(51.5, "#24451a", 1.2) + aro(68.5, "#24451a", 1.2) +
+    en(60, 0, an("l", 2.6, `<circle r="4.5" fill="#ffe46b"/>`)) +
+    en(60, 180, an("l", 1.9, `<circle r="4.3" fill="#ff2b2b"/><circle cx="1.6" cy="-1" r="3.4" fill="#4c0a13"/>`)) +
+    en(60, 60, tubo, 0) + en(60, 240, tubo, 180) +
+    en(66, 125, an("dr", 2.8, pluma)) + en(64, 300, an("dr", 3.4, pluma, -1.2)) +
+    gira(6, en(60, 0, an("f", .7, pajaro), 90)) +
+    chispas([[66, 30, 2, 1.7, 0], [67, 210, 1.8, 2.1, -.8]], "#ffffff");
+}
+
 /* Metro Rush: un anillo de vía (balasto, durmientes de madera y dos rieles
    de acero) por el que da vueltas un trencito naranja, visto desde arriba,
    con los focos encendidos, persiguiendo una moneda dorada que gira; un
@@ -535,7 +558,7 @@ const DIBUJOS = {
   telectro: electro, tfrontera: frontera, tpokemon: pokemon, tescondite: escondite, tcartas: cartas,
   tcuadritos: cuadritos, treversi: reversi, tgato: gato, torbita: orbita, tcadena: cadena, tflip: flip, tcacho: cacho,
   tuno: uno, tcatan: catan, tpresidente: presidente, tspicy: spicy, tworms: worms, tyemas: yemas,
-  tzombis: zombis, tclue: clue, tajedrez: ajedrez, tmonedas: monedas, tprodrop: prodrop, tsudoku: sudoku, tfanal: fanal, tboxhead: boxhead, tatasco: atasco,
+  tzombis: zombis, tclue: clue, tajedrez: ajedrez, tmonedas: monedas, tprodrop: prodrop, tsudoku: sudoku, tfanal: fanal, tboxhead: boxhead, tatasco: atasco, taleteo: aleteo,
   tmetrorush: metrorush,
   cometa, vortice, sakura, plasma, mariposas
 };

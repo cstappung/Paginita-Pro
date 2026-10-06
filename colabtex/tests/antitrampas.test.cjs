@@ -2,7 +2,7 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),esbuild=r
 const carga=(entry,extra='')=>{const mod={exports:{}};new Function('module','exports','require',esbuild.buildSync({entryPoints:[entry],bundle:true,format:'cjs',platform:'node',write:false}).outputFiles[0].text+extra)(mod,mod.exports,require);return mod.exports;};
 const V=carga('src/juegos/solo/verifica.js');
 test('Antitrampas: cada juego del club tiene su verificador con la forma acordada',()=>{
- for(const j of ['minas','snake','tetris','sortem','bbtan','sopa','sudoku','electro','fanal','atasco','frontera','metrorush']){
+ for(const j of ['minas','snake','tetris','sortem','bbtan','sopa','sudoku','electro','fanal','atasco','frontera','metrorush','aleteo']){
   const v=V.VERIFICADORES[j];assert.ok(v,j);assert.equal(typeof v.verifica,'function',j);assert.equal(typeof v.sospecha,'function',j);assert.ok(Number.isSafeInteger(v.PRUEBA)&&v.PRUEBA>=0,j);
  }
  assert.equal(V.juegoDeCategoria('club-tetris-sprint'),'tetris');assert.equal(V.juegoDeCategoria('club-frontera-torre-50'),'frontera');

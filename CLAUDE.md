@@ -3275,6 +3275,24 @@ Things that matter:
   the game from a script, which is how the story and the bosses were
   played through in Chromium.
 
+**ALETEO (`juegos/club/aleteo/`) is a Solo Club Flappy Bird whose sky
+goes dark**, in the vein of BBTAN's descent. Plain files, no build
+(`?v=aleteo-N`): `motor.js` (UMD `AleteoMotor`, pure: fixed 1/60 s ticks,
+mulberry32 per pipe seeded with the account, the proof codec and `rehace`),
+`lore.js` (UMD `AleteoLore`), `musica.js` (live WebAudio) and `juego.js`
+(the canvas). **The darkness never touches the game**: `corrupcion(puntos)`
+climbs 0 → 5 with no steps (thresholds 15/35/60/90/130, 15-pipe fades),
+and every colour (`paleta`), thought, crash line, label (ALETEO→ENCIERRO,
+letter by letter) and music sky reads it, while pipe 200 is as wide as
+pipe 20. The story: a bird flying back to the nest through morning,
+afternoon, dusk, night, the cage (the pipes were bars) and the void
+(«Nunca saliste»). One table, `club-aleteo-vuelo` (pipes, time = game
+time), with a proof `{v, s, u, f, n, r}` that `solo/verifica/aleteo.js`
+replays (`docs/antitrampas/aleteo.md`); logros, coins, the `taleteo` frame,
+the Discord podium and the manual are wired like Atasco's. The `soloRanks`
+and `clubJugadas` regexes were widened, so the rules must be re-published.
+`tests/aleteo.test.cjs` covers motor, lore and verifier.
+
 **Atasco (`juegos/club/atasco/`) is a Solo Club game too**, a sliding
 parking puzzle in the vein of Parking Panic / Rush Hour: you are stuck in the
 red car and slide the others along their lanes until the exit row is clear.
