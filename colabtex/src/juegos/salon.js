@@ -110,7 +110,7 @@ export function crearSalon(ctx) {
         ${plataformas(e)}
         ${f.nuevo ? '<span class="jg-mn-etq" aria-hidden="true">Nuevo</span>' : f.top ? '<span class="jg-mn-etq top" aria-hidden="true">★<span> Más jugado</span></span>' : ""}
         ${bloq ? `<span class="jg-mn-candado" aria-hidden="true">${CANDADO}<b>Requiere cuenta</b></span>` : ""}
-        ${e.modo !== "multi" ? `<a class="jg-mn-ya" href="${esc(e.ruta || e.url)}" aria-label="Jugar ya a ${esc(e.nombre)}" title="Jugar ya"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.2v9.6c0 .5.6.8 1 .5l7.2-4.8a.6.6 0 0 0 0-1L6 2.7c-.4-.3-1 0-1 .5z" fill="currentColor"/></svg></a>` : ""}
+        ${e.modo !== "multi" && !bloq ? `<a class="jg-mn-ya" href="${esc(e.ruta || e.url)}" aria-label="Jugar ya a ${esc(e.nombre)}" title="Jugar ya"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.2v9.6c0 .5.6.8 1 .5l7.2-4.8a.6.6 0 0 0 0-1L6 2.7c-.4-.3-1 0-1 .5z" fill="currentColor"/></svg></a>` : ""}
       </article>`;
   }
 
@@ -275,9 +275,10 @@ export function crearSalon(ctx) {
          y dos salidas que no lo dejan con las manos vacías. */
       medio = `<div class="jg-hoja-cuenta">
         <span class="jg-hoja-candado" aria-hidden="true">${CANDADO}</span>
-        <h3>Este juego es multijugador y necesita una cuenta</h3>
-        <p>Con tu cuenta de Google abres salas, invitas a tus amigos con un enlace y sumas puntos en la clasificación, logros y monedas. Es gratis y tarda un clic.</p>
-        ${p ? `<a class="jg-hoja-alt" href="${esc(p.url)}">${ICONO_BOTS} Mientras tanto, practícalo solo contra bots →</a>` : ""}
+        <h3>${e.modo === "multi" ? "Este juego es multijugador y necesita una cuenta" : "Este juego necesita una cuenta"}</h3>
+        <p>${e.modo === "multi"
+          ? "Con tu cuenta de Google abres salas, invitas a tus amigos con un enlace y sumas puntos en la clasificación, logros y monedas. Es gratis y tarda un clic."
+          : "Sin iniciar sesión puedes jugar a Snake, Buscaminas, Tetris y sortEm. Con tu cuenta de Google se abre este y todos los demás, y tus récords, logros y monedas quedan guardados. Es gratis y tarda un clic."}</p>
         <button class="jg-hoja-alt" type="button" data-f="cierra">Seguir como invitado</button>
       </div>`;
       pie = `${reglas}<button class="btn jg-hoja-ya" type="button" data-f="login">Iniciar sesión y jugar</button>`;

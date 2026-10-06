@@ -29,12 +29,22 @@ export const app = initializeApp(firebaseConfig);
    getStorage para que sus primeras peticiones ya lleven el sello. En
    localhost pide un token de depuración (sale en la consola la primera vez
    y se registra en la consola de Firebase); sin él, con App Check
-   «aplicado», la vista previa local se quedaría sin base. */
-const APP_CHECK_SITE_KEY = "";
+   «aplicado», la vista previa local se quedaría sin base.
+
+   La clave de sitio es pública por diseño (va en la página); la secreta
+   vive solo en la consola de Firebase. El sello flotante de reCAPTCHA se
+   esconde porque tapaba el botón ⚑ y la barra de pestañas del celular;
+   Google lo permite si el aviso `AVISO_RECAPTCHA` se ve en el camino del
+   usuario, y por eso va bajo cada botón de iniciar sesión. */
+const APP_CHECK_SITE_KEY = "6LedGuEtAAAAAJil2UaHh3j8gCLGf0YP8O1Mo_Bc";
+export const AVISO_RECAPTCHA = 'Este sitio está protegido por reCAPTCHA y se aplican la <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Política de privacidad</a> y las <a href="https://policies.google.com/terms" target="_blank" rel="noopener">Condiciones del servicio</a> de Google.';
 if (APP_CHECK_SITE_KEY && typeof window !== "undefined" && typeof document !== "undefined") {
   try {
     if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) self.FIREBASE_APPCHECK_DEBUG_TOKEN = true;
     initializeAppCheck(app, { provider: new ReCaptchaV3Provider(APP_CHECK_SITE_KEY), isTokenAutoRefreshEnabled: true });
+    const estilo = document.createElement("style");
+    estilo.textContent = ".grecaptcha-badge{visibility:hidden!important}";
+    document.head.appendChild(estilo);
   } catch (e) { console.warn("App Check no arrancó:", e); }
 }
 export const auth = getAuth(app);
