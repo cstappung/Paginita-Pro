@@ -965,9 +965,9 @@ const REGLAS = {
         "<b>Mochila cohete</b> (5 s): vuelas por encima de todo, con una fila de monedas en el aire. Al aterrizar tienes un instante de protección.",
         "<b>Zapatillas saltarinas</b> (10 s): saltas el doble de alto, hasta los techos de los trenes.",
         "<b>2×</b> (12 s): duplica los puntos.",
-        "<b>Caja misteriosa</b>: trae monedas o una patineta.",
+        "<b>Caja misteriosa</b>: trae monedas, una patineta o el <b>pogo saltarín</b>, que te lanza por encima de los trenes y te deja caer despacio (en el aire puedes cambiar de carril; rodar lo suelta).",
         "<b>Patineta</b> (H, dos toques rápidos o X en el mando): dura 30 s y, si chocas, se rompe ella en vez de terminar la carrera.",
-        "En la <b>tienda</b> cada poder tiene 5 mejoras, que lo alargan 2,5 s por nivel (la mochila, 1 s: llega a 10 s), y se compran patinetas."
+        "En la <b>tienda</b> cada poder tiene 5 mejoras, que lo alargan 2,5 s por nivel (la mochila, 1 s: llega a 10 s), y se compran patinetas y la <b>súper caja misteriosa</b> (monedas, tres patinetas o un potenciador)."
       ])],
       ["Misiones", lista([
         "Siempre hay un <b>set de tres misiones</b> (en la portada, el botón Misiones o la tarjeta amarilla del multiplicador). Completar las tres sube en 1 el multiplicador base, hasta ×30, y paga monedas: 250 más 50 por cada nivel del multiplicador.",

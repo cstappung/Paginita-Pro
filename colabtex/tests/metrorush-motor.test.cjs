@@ -171,6 +171,35 @@ test('subir de la rampa al vagón nunca te choca, a ningún ritmo de cuadros ni 
   }
 });
 
+test('zigzag rápido de techo en techo: ningún vagón te choca ni te caes', () => {
+  /* El fallo: el techo te sostenía solo hasta 1,05 m del centro de su carril
+     y los carriles están a 2,2 m; a mitad de un cambio de carril entre dos
+     vagones ninguno te sostenía, caías un poco y los dos te chocaban. Aquí,
+     sobre tres trenes en fila, se cambia de carril cada vez que se llega al
+     centro del otro (al ritmo real del juego: un carril en 0,17 s). */
+  const F = M.FISICA, objs = [0, 1, 2].map(c => ({ tipo: 'tren', carril: c, d0: 40, largo: M.LARGO_VAGON * 3, vel: 0 }));
+  for (const fps of [20, 30, 60, 144]) for (const V of [15, 30, 50]) {
+    const dt = 1 / fps, vl = 2.2 / F.cambioCarril;
+    let D = 42, Dantes = D, y = M.ALTO_TECHO, vy = 0, x = M.CARRILES[0], carril = 0, dir = 1, menor = y;
+    while (D < 40 + M.LARGO_VAGON * 3 - 2) {
+      Dantes = D; D += V * dt;
+      const obj = M.CARRILES[carril], xPrev = x;
+      x += Math.max(-vl * dt, Math.min(vl * dt, obj - x));
+      if (x === obj) { if (carril + dir > 2 || carril + dir < 0) dir = -dir; carril += dir; }   // llegó: al de al lado, y vuelta
+      const sop = M.soporte(objs, x, D, y, Dantes);
+      vy -= F.gravedad * dt; y += vy * dt; if (y <= sop.h) { y = sop.h; vy = 0; }
+      menor = Math.min(menor, y);
+      for (const o of objs) {
+        const k = M.caja(o, D), lim = k.w + F.medioAncho;
+        if (D + M.MEDIO_LARGO < k.z0 || D - M.MEDIO_LARGO > k.z1 || Math.abs(x - M.CARRILES[o.carril]) >= lim) continue;
+        assert.ok(y + 0.02 >= k.y1, `${fps} fps a ${V} m/s: choca con el carril ${o.carril} en x=${x.toFixed(2)} (y=${y.toFixed(2)}, antes x=${xPrev.toFixed(2)})`);
+      }
+    }
+    assert.equal(menor, M.ALTO_TECHO, `${fps} fps a ${V} m/s: nunca baja del techo`);
+  }
+  assert.ok(M.ANCHO_TECHO >= 1.1, 'a mitad de camino entre dos carriles un techo todavía te sostiene');
+});
+
 test('los choques siguen ahí: de frente contra un vagón, de lado contra la rampa, y bajar por atrás no choca', () => {
   const tren = { tipo: 'tren', carril: 1, d0: 40, largo: M.LARGO_VAGON, vel: 0 };
   for (const fps of [30, 60, 144]) {
@@ -256,9 +285,16 @@ test('poderes y tienda: duraciones y precios', () => {
   assert.deepEqual([M.ASPECTOS.nocturno.precio, M.ASPECTOS.grafitero.precio], [15000, 30000]);
   assert.deepEqual([M.costoSaltar(1), M.costoSaltar(10)], [2750, 9500], 'saltar una misión, ×5');
   assert.deepEqual([0, 1, 2].map(M.costoSeguir), [500, 1000, 2000]);
-  const az = M.rng(3); let pat = 0, mon = 0;
-  for (let i = 0; i < 4000; i++) { const r = M.cajaMisteriosa(az); if (r.patineta) pat++; if (r.monedas) mon++; }
-  assert.ok(pat > 800 && pat < 1200, 'un cuarto de las cajas son patinetas'); assert.ok(mon > 2700);
+  const az = M.rng(3); let pat = 0, mon = 0, pogo = 0;
+  for (let i = 0; i < 4000; i++) { const r = M.cajaMisteriosa(az); if (r.patineta) pat++; if (r.monedas) mon++; if (r.pogo) pogo++; }
+  assert.ok(pat > 650 && pat < 950, 'un quinto de las cajas son patinetas'); assert.ok(pogo > 650 && pogo < 950, 'y otro quinto, el pogo');
+  assert.ok(mon > 2200);
+  // la súper caja: siempre algo, y en monedas sueltas da menos que lo que cuesta (no fabrica monedas)
+  const az2 = M.rng(9); let suelto = 0;
+  for (let i = 0; i < 20000; i++) { const r = M.cajaSuper(az2); assert.ok(r.monedas || r.patinetas || r.potenciador); suelto += r.monedas || 0; }
+  assert.ok(suelto / 20000 < M.PRECIO_SUPERCAJA, 'en promedio devuelve menos monedas de las que cuesta');
+  // el pogo sube por encima de los techos de los trenes (3,35 m)
+  assert.ok(M.FISICA.alturaPogo > 3.6 && M.FISICA.gravedadPogo < 1);
 });
 
 test('retos: tres por nivel, iguales en dos aparatos, y cumplirlos sube el multiplicador', () => {
@@ -300,6 +336,20 @@ test('progreso: limpiar lo que viene de afuera y mezclar dos aparatos', () => {
   assert.deepEqual(m.retos, { nivel: 4, avance: [5, 0, 0] }, 'el nivel de retos nunca baja');
   assert.deepEqual(m.records, { puntos: 70000, distancia: 900, monedas: 99 });
   assert.deepEqual(M.mezclaProgreso(cel, pc), m, 'da lo mismo el orden');
+});
+
+test('progreso: otro navegador que empezó de cero no borra las monedas', () => {
+  // el PC jugó mucho; el navegador nuevo nunca leyó la cuenta, jugó 2 carreras y guardó DESPUÉS
+  const pc = Object.assign(M.progresoNuevo(), { at: 100, monedas: 52000, aspectos: ['clasico', 'nocturno'], aspecto: 'nocturno', mejoras: { iman: 4, mochila: 2, zapatillas: 1, doble: 3 }, totales: { carreras: 40, metros: 90000, monedas: 70000 } });
+  const nuevo = Object.assign(M.progresoNuevo(), { at: 500, monedas: 300, totales: { carreras: 2, metros: 1500, monedas: 300 } });
+  const m = M.mezclaProgreso(nuevo, pc);
+  assert.equal(m.monedas, 52000, 'el saldo grande vuelve');
+  assert.equal(m.aspecto, 'nocturno');
+  assert.deepEqual(m.mejoras, pc.mejoras);
+  assert.deepEqual(M.mezclaProgreso(pc, nuevo), m, 'da lo mismo el orden');
+  // pero si el nuevo SÍ siguió desde el viejo (totales ≥) y gastó, manda su saldo
+  const sigue = Object.assign(M.progresoNuevo(), { at: 600, monedas: 2000, totales: { carreras: 41, metros: 91000, monedas: 70500 } });
+  assert.equal(M.mezclaProgreso(pc, sigue).monedas, 2000);
 });
 
 test('saltar misiones, premio por set y potenciadores', () => {

@@ -33,6 +33,8 @@ test('Castigo: solo castiga la trampa recién jugada',()=>{
   assert.equal(C.esTrampa({c:'club-frontera-torre-50',m:'El combate no se gana así.',d:'fr-1'}),false,'la Frontera re-verificando al entrar');
   assert.equal(C.esTrampa({m:'No se pudo comprobar la partida: x is undefined',vivo:true}),false,'el verificador falló');
   assert.equal(C.esTrampa({m:'La prueba de la partida es demasiado grande.',vivo:true}),false,'una partida larguísima');
+  assert.equal(C.esTrampa({c:'club-metrorush-carrera',m:'la prueba es de otra versión del juego',vivo:true}),false,'un juego viejo en caché no es trampa');
+  assert.equal(C.esTrampa({c:'club-atasco-estrellas',m:'La prueba es de otra versión de Atasco (recarga la página).',vivo:true}),false);
   assert.equal(C.esTrampa(null),false);
 });
 

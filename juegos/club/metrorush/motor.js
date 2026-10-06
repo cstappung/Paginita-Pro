@@ -58,6 +58,8 @@
     caidaRapida: 24,       // m/s hacia abajo si ruedas en el aire (el "golpe al suelo")
     cambioCarril: 0.17,    // segundos que tarda en pasar de un carril al de al lado
     alturaMochila: 8.5,    // la mochila cohete vuela a esta altura
+    alturaPogo: 7,         // el pogo saltarín sube hasta aquí (más arriba que los techos, 3,35)…
+    gravedadPogo: 0.4,     // …y cae con el 40 % de la gravedad: ~2,3 s en el aire, como el de Subway Surfers
     altoDePie: 1.7,        // lo que ocupa el corredor de pie…
     altoRodando: 0.8,      // …y rodando (pasa bajo la barrera alta, que empieza a 1,0)
     medioAncho: 0.35,      // medio ancho del corredor para los choques
@@ -83,7 +85,15 @@
      cuenta desde D = 24,7 y el techo sostiene desde D = 24,6. */
   const MEDIO_LARGO = 0.3;               // cuánto ocupa el corredor hacia adelante (y hacia atrás) de D
   const MARGEN_TECHO = 0.4;              // desde cuánto antes (y hasta cuánto después) sostiene el techo de un vagón
-  const MARGEN_RAMPA = 0.4;              // lo mismo para la rampa: su caja también choca hasta 0,3 m después de su final
+  const MARGEN_RAMPA = 0.4;
+  /* Lo mismo de costado: un techo (o una rampa) te sostiene mientras su caja
+     te pueda chocar, o sea hasta su medio ancho más el del corredor (0,98 +
+     0,35 = 1,33 m del centro de su carril). Sostenía solo hasta 1,05 m, y los
+     carriles están a 2,2: a mitad de un cambio de carril entre dos vagones
+     quedabas a 1,1 m de cada uno, ninguno te sostenía, empezabas a caer y los
+     dos te chocaban. Por eso un zigzag rápido de techo en techo mataba. */
+  const ANCHO_TECHO = 0.98 + FISICA.medioAncho;
+  const ANCHO_RAMPA = 0.95 + FISICA.medioAncho;              // lo mismo para la rampa: su caja también choca hasta 0,3 m después de su final
 
   /** La altura de la rampa `o` en la distancia D (0 al pie, ALTO_TECHO arriba). */
   const alturaRampa = (o, D) => ALTO_TECHO * limita((D - o.d0) / o.largo, 0, 1);
@@ -101,7 +111,7 @@
       const fin = o.d0 + o.largo;
       // ni la pisas ni la acabas de pasar en este cuadro (un cuadro largo puede saltar su final entero)
       if (D < o.d0 - MARGEN_RAMPA || Dantes > fin + MARGEN_RAMPA) continue;
-      if (Math.abs(x - CARRILES[o.carril]) > 1.05) continue;                      // no está en mi carril
+      if (Math.abs(x - CARRILES[o.carril]) >= ANCHO_RAMPA) continue;               // no está en mi carril
       const hs = alturaRampa(o, D);                                               // pasado el final, queda en ALTO_TECHO
       // la sigues si ibas sobre ella: tu altura alcanza la de la rampa donde estabas en el cuadro anterior
       const antes = Math.min(hs, alturaRampa(o, Dantes));
@@ -115,7 +125,7 @@
     for (const o of objs) {
       if (o.tipo !== 'tren') continue;
       if (D < o.d0 - MARGEN_TECHO || D > o.d0 + o.largo + MARGEN_TECHO) continue;
-      if (Math.abs(x - CARRILES[o.carril]) > 1.05) continue;
+      if (Math.abs(x - CARRILES[o.carril]) >= ANCHO_TECHO) continue;
       if (yEf >= ALTO_TECHO - 0.5 && ALTO_TECHO >= h) { h = ALTO_TECHO; tren = o; }
     }
     return { h, tren };
@@ -299,12 +309,30 @@
     inspector: { nombre: "Inspector", precio: null, secreto: "Encuentra los siete boletos dorados.", sudadera: 0x1f3a5f, gorra: 0x1f3a5f, jeans: 0x14213d, mochila: 0x8a5a35, mochila2: 0xfca311, suela: 0x111111 }
   };
 
-  /** La caja misteriosa: casi siempre monedas, a veces una patineta y, muy rara vez, el premio gordo. */
+  /** La caja misteriosa: casi siempre monedas, a veces una patineta o un
+      pogo saltarín y, muy rara vez, el premio gordo. El pogo sale solo de
+      aquí (no lo pone el generador de pista), así la pista sigue dependiendo
+      solo de la semilla y las pruebas del antitrampas no cambian. */
   function cajaMisteriosa(azar) {
     const x = azar();                                                // un número al azar
     if (x < 0.05) return { monedas: 1000, gordo: true };             // 5 %: premio gordo
-    if (x < 0.30) return { patineta: 1 };                            // 25 %: una patineta
-    return { monedas: 100 + Math.floor(azar() * 9) * 50 };           // 70 %: de 100 a 500 monedas
+    if (x < 0.25) return { patineta: 1 };                            // 20 %: una patineta
+    if (x < 0.45) return { pogo: true };                             // 20 %: el pogo saltarín, de una
+    return { monedas: 100 + Math.floor(azar() * 9) * 50 };           // 55 %: de 100 a 500 monedas
+  }
+  /* La súper caja misteriosa, como la de Subway Surfers: se compra en la
+     tienda y se abre en el menú. Siempre da algo bueno; lo que da en monedas
+     sueltas vale en promedio ~3 500, menos que su precio, así que no sirve
+     para fabricar monedas: lo que la hace valer son los potenciadores y las
+     patinetas. */
+  const PRECIO_SUPERCAJA = 9000;
+  function cajaSuper(azar) {
+    const x = azar();
+    if (x < 0.05) return { monedas: 50000, gordo: true };                 // 5 %: el premio gordo de verdad
+    if (x < 0.15) return { potenciador: "puntos" };                       // 10 %: un Potenciador +5
+    if (x < 0.35) return { potenciador: "despegue" };                     // 20 %: un Despegue
+    if (x < 0.60) return { patinetas: 3 };                                // 25 %: tres patinetas
+    return { monedas: 2500 + Math.floor(azar() * 16) * 500 };             // 40 %: de 2 500 a 10 000 monedas
   }
 
   /* ---------- Retos ----------
@@ -437,6 +465,22 @@
     for (const k of Object.keys(m.records)) m.records[k] = Math.max(A.records[k], B.records[k]);
     for (const k of Object.keys(m.totales)) m.totales[k] = Math.max(A.totales[k], B.totales[k]);
     m.intro = A.intro || B.intro;
+    /* ¿El más reciente empezó de cero sin ver al otro? Los totales (carreras,
+       metros, monedas juntadas) solo crecen, así que una copia que siguió
+       jugando desde la otra los tiene todos iguales o mayores. Si el más
+       viejo los tiene todos ≥ y alguno mayor, el nuevo es un comienzo aparte
+       (otro navegador que nunca leyó la cuenta) y su saldo no puede pisar el
+       del viejo: se queda con lo mayor de cada cosa gastable.
+       Ejemplo: PC con 52.000 monedas y 40 carreras; navegador nuevo con 300
+       monedas y 2 carreras, guardado después → quedan 52.000, no 300. */
+    const tk = Object.keys(m.totales);
+    const empezoDeCero = tk.every(k => viejo.totales[k] >= nuevo.totales[k]) && tk.some(k => viejo.totales[k] > nuevo.totales[k]);
+    if (empezoDeCero) {
+      m.monedas = Math.max(A.monedas, B.monedas);                   // el saldo grande no se pierde
+      m.patinetas = Math.max(A.patinetas, B.patinetas);
+      for (const k of Object.keys(m.potenciadores)) m.potenciadores[k] = Math.max(A.potenciadores[k], B.potenciadores[k]);
+      if (viejo.aspecto !== "clasico") m.aspecto = viejo.aspecto;   // el traje que llevaba de verdad
+    }
     return m;
   }
 
@@ -693,12 +737,12 @@
   return {
     rng, lerp, limita,
     CARRILES, LARGO_VAGON, ALTO_TECHO, LARGO_RAMPA, FISICA, impulso, VELOCIDAD, T_TOPE, velocidad, metrosEntre, FRENADA, velocidadEn, FILA_MIN_S, VEL_TREN, APARECE, dificultad,
-    MEDIO_LARGO, MARGEN_TECHO, MARGEN_RAMPA, alturaRampa, soporte, caja,
+    MEDIO_LARGO, MARGEN_TECHO, MARGEN_RAMPA, ANCHO_TECHO, alturaRampa, soporte, caja,
     PUNTOS_POR_METRO, MAX_BASE, MAX_ESTRELLAS, multiplicador, puntosPorTramo,
     ESTACIONES, estacionDe, siguienteUmbral, VUELTA_DESDE, VUELTA_CADA, INTRO, BOLETOS,
     PODERES, SEG_POR_NIVEL, MAX_MEJORA, PRECIOS_MEJORA, PRECIO_PATINETA, DURACION_PATINETA, duracionPoder, precioMejora, costoSeguir,
     POTENCIADORES, costoSaltar, premioSet, saltaReto,
-    ASPECTOS, cajaMisteriosa,
+    ASPECTOS, cajaMisteriosa, cajaSuper, PRECIO_SUPERCAJA,
     RETOS, retosDeNivel, avanzaRetos,
     progresoNuevo, limpiaProgreso, mezclaProgreso,
     crearGenerador

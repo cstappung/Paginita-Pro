@@ -24,8 +24,8 @@
    - Se perdona el salto un poco antes de tocar el suelo y un poco después
      de dejarlo (búfer y "tiempo de coyote"): sin eso el salto se siente
      "comido" a toda velocidad. */
-import { crearMundo, PALETAS } from './mundo.js?v=metrorush-2';
-import { Sonido } from './audio.js?v=metrorush-2';
+import { crearMundo, PALETAS } from './mundo.js?v=metrorush-5';
+import { Sonido } from './audio.js?v=metrorush-5';
 
 const M = window.MetroRushMotor;                               // el motor (motor.js)
 const MP = window.MetroRushPrueba;                            // la prueba de la carrera, para el antitrampas (prueba.js)
@@ -43,18 +43,48 @@ const lee = (k, def) => { try { const t = localStorage.getItem(k); return t ? JS
 const escribe = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* sin almacenamiento: se juega igual */ } };
 let progreso = M.limpiaProgreso(lee(CLAVE, null));            // lo que se gana y se compra (va a la cuenta)
 const opciones = Object.assign({ calidad: 'auto', estilo: 'auto', musica: 80, efectos: 90, sacudida: true, mudo: false }, lee(CLAVE_OPC, {}));
+/* La cuenta guarda `{d, at}` en users/<uid>/club/metrorush, y eso mismo es
+   lo que llega al pedirla: un OBJETO con el progreso como texto en `d`.
+   Antes se hacía JSON.parse(dato) del objeto entero, que siempre fallaba y
+   se ignoraba en silencio: la copia de la cuenta nunca se leía, y en otro
+   navegador se empezaba de cero (y lo primero que se guardaba pisaba la
+   nube). Ahora no se sube nada hasta haber leído la cuenta. */
+let nubeLeida = !(Club && Club.pedirPartida);                // fuera de Juegos no hay cuenta que esperar
+let subirLuego = false;                                       // se guardó antes de leer la cuenta: subir al leerla
 /** Guarda el progreso aquí y (si `subir`) en la cuenta. */
 function guardar(subir = true) {
   progreso.at = Date.now();
   escribe(CLAVE, progreso);
-  if (subir && Club && Club.guardarPartida) Club.guardarPartida(JSON.stringify(progreso));
+  if (!subir || !Club || !Club.guardarPartida) return;
+  if (!nubeLeida) { subirLuego = true; return; }              // primero se lee la cuenta, o la copia vacía de aquí la pisaría
+  Club.guardarPartida(JSON.stringify(progreso));
 }
 const guardaOpciones = () => escribe(CLAVE_OPC, opciones);
+/** Saca el progreso de lo que respondió la cuenta: `{d: "texto"}` o, por si acaso, el texto solo. */
+function progresoDeNube(dato) {
+  const texto = dato && typeof dato === 'object' ? dato.d : dato;   // la forma que guarda la cuenta, o texto suelto
+  if (typeof texto !== 'string' || !texto) return null;            // la cuenta no tiene nada
+  try { return JSON.parse(texto); } catch (e) { return null; }     // un dato raro se ignora
+}
 // lo de la nube se mezcla con lo de aquí (gana lo más nuevo en monedas; lo mayor en mejoras, boletos y récords)
-if (Club && Club.pedirPartida) Club.pedirPartida(dato => {
-  if (!dato) return;
-  try { progreso = M.mezclaProgreso(progreso, JSON.parse(dato)); guardar(false); pintaPortada(); } catch (e) { /* un dato raro se ignora */ }
-});
+let intentosNube = 0;
+function leeNube() {
+  Club.pedirPartida(dato => {
+    const nube = progresoDeNube(dato);
+    // nada (cuenta nueva o lectura fallida): se pregunta una vez más antes de dar la cuenta por vacía
+    if (!nube && intentosNube++ < 1) { setTimeout(leeNube, 4000); return; }
+    const antes = JSON.stringify(progreso);
+    if (nube) progreso = M.mezclaProgreso(progreso, nube);
+    nubeLeida = true;
+    // si aquí había algo que la cuenta no tenía (o se guardó mientras se esperaba), se sube
+    const distinto = !nube || JSON.stringify(progreso) !== JSON.stringify(M.limpiaProgreso(nube));
+    if (subirLuego || distinto) guardar(true);
+    else if (JSON.stringify(progreso) !== antes) guardar(false);
+    subirLuego = false;
+    pintaPortada();
+  });
+}
+if (Club && Club.pedirPartida) leeNube();
 
 /* ===================================================================
    2. PIEZAS: pantalla, mundo y sonido
@@ -99,6 +129,7 @@ function nuevaCarrera() {
     r: { carril: 1, carrilPrev: 1, x: 0, xPrev: 0, y: 0, vy: 0, suelo: 0, enAire: false, rodar: 0, rodarPend: false, fase: 0,
       ultSuelo: 0, saltoBufer: -1, tropezarT: -1, ladeo: 0 },
     poderes: { iman: 0, mochila: 0, zapatillas: 0, doble: 0, patineta: 0 },   // segundos que les quedan
+    pogo: false,                                              // ¿va en el pogo saltarín? (sale de la caja misteriosa)
     invulnerable: 0, tropiezo: 0, perseguidor: 1, perseguidorObj: 1, introPersecucion: 2.5,
     cuenta: { monedas: 0, saltos: 0, rodadas: 0, distancia: 0, puntos: 0, poderes: 0, techos: 0, estrellas: 0, esquivar: 0, patinetas: 0, mochilas: 0 },
     techos: new Set(), esquivados: new Set(), avisados: new Set(),
@@ -206,10 +237,11 @@ function fisica(dt) {
       const n = Math.max(0, Math.min(2, r.carril + (p === 'izq' ? -1 : 1)));
       if (n !== r.carril) { r.carrilPrev = r.carril; r.carril = n; sonido.carril(); }
     } else if (p === 'arriba') {
-      if (c.poderes.mochila > 0) continue;                    // volando no se salta
+      if (c.poderes.mochila > 0 || c.pogo) continue;          // volando (mochila o pogo) no se salta
       r.saltoBufer = 0.16;                                     // se recuerda un instante, por si aún no toca el suelo
     } else if (p === 'abajo') {
       if (c.poderes.mochila > 0) continue;
+      if (c.pogo) c.pogo = false;                              // rodar en el pogo lo suelta: cae de golpe como siempre
       if (r.enAire) { r.vy = -F.caidaRapida; r.rodarPend = true; r.saltoBufer = -1; }   // en el aire: baja de golpe y rueda al caer
       else { r.rodar = F.tiempoRodar; c.cuenta.rodadas++; sonido.rodar(); }
     } else if (p === 'patineta') usaPatineta();
@@ -239,8 +271,9 @@ function fisica(dt) {
     // sube de golpe: el 95 % de la altura en medio segundo (antes, en casi uno). Solo cambia la altura, no los metros
     r.y += (F.alturaMochila - r.y) * (1 - Math.exp(-6 * dt)); r.vy = 0; r.enAire = true;
   } else {
-    r.vy -= F.gravedad * dt; r.y += r.vy * dt;
+    r.vy -= F.gravedad * (c.pogo ? F.gravedadPogo : 1) * dt; r.y += r.vy * dt;   // en el pogo cae despacio (flota)
     if (r.y <= sop.h) {                                        // toca el suelo (o el techo, o la rampa)
+      if (c.pogo && r.vy < 0) { c.pogo = false; c.invulnerable = Math.max(c.invulnerable, 0.35); }   // se acabó el pogo: un respiro al aterrizar
       if (r.enAire && r.vy < -1) { sonido.aterriza(-r.vy); if (r.rodarPend) { r.rodar = F.tiempoRodar; c.cuenta.rodadas++; sonido.rodar(); } }
       r.y = sop.h; r.vy = 0; r.enAire = false; r.rodarPend = false; r.ultSuelo = c.t;
     } else if (!r.enAire && r.y > sop.h + 0.05) r.enAire = true;   // se acabó el tren: cae
@@ -259,6 +292,7 @@ const caja = o => M.caja(o, c.D);
 function choques() {
   const r = c.r;
   if (c.poderes.mochila > 0 || r.y > 6) return;                // volando, por encima de todo
+  if (c.pogo && r.y > 3.6) return;                             // en el pogo, por encima de los techos (3,35): nada te alcanza
   const yb = r.y + 0.02, yt = r.y + (r.rodar > 0 ? F.altoRodando : F.altoDePie);
   for (const o of c.activos) {
     const k = caja(o);
@@ -301,6 +335,7 @@ function muere(motivo) {
      no hubo choque, así que ahí sí se frena de a poco. */
   if (motivo !== 'atrapado') { c.V = 0; c.D = Math.max(0, c.D - 0.35); }
   c.r.vy = Math.min(0, c.r.vy); c.r.rodar = 0;                   // si chocó saltando, cae (no sigue subiendo)
+  c.pogo = false;                                               // y el pogo se pierde
   c.perseguidorObj = 1;
   c.potVentana = 0; pintaPots();                                // los botones de potenciadores se van (y no vuelven al seguir)
   ocultaPista();
@@ -314,6 +349,7 @@ function activaPoder(clase) {
     const premio = M.cajaMisteriosa(Math.random);
     sonido.caja();
     if (premio.patineta) { progreso.patinetas++; aviso('Caja misteriosa: ¡una patineta!'); }
+    else if (premio.pogo) { if (!lanzaPogo()) { c.monedas += 300; aviso('Caja misteriosa: +300 monedas'); } }   // volando con la mochila no hay pogo: monedas
     else { c.monedas += premio.monedas; aviso(premio.gordo ? `¡PREMIO GORDO! +${premio.monedas} monedas` : `Caja misteriosa: +${premio.monedas} monedas`); }
     return;
   }
@@ -328,6 +364,24 @@ function activaPoder(clase) {
     sonido.mochila(true); sonido.despega();
   }
   aviso(M.PODERES[clase].nombre + '!');
+}
+/* El pogo saltarín (de la caja misteriosa, como en Subway Surfers): un
+   brinco enorme, por encima de los techos, que cae despacio (40 % de la
+   gravedad). Arriba de los trenes nada te choca; desde el suelo hasta los
+   techos se tarda ~0,25 s, y ese tramo lo cubre un instante de invulnerable.
+   Se puede cambiar de carril en el aire, y rodar lo suelta. Solo cambia la
+   altura: los metros y los puntos siguen igual, y por eso la prueba del
+   antitrampas no necesita saber de él. Devuelve false si no se pudo. */
+function lanzaPogo() {
+  const r = c.r;
+  if (c.poderes.mochila > 0) return false;                     // volando con la mochila no se puede
+  c.pogo = true;
+  r.vy = Math.sqrt(2 * F.gravedad * F.gravedadPogo * Math.max(0.5, F.alturaPogo - r.y));   // hasta 7 m, desde donde esté
+  r.enAire = true; r.rodar = 0; r.saltoBufer = -1; r.ultSuelo = -1; r.rodarPend = false;
+  c.invulnerable = Math.max(c.invulnerable, 0.45);             // la subida hasta los techos
+  c.cuenta.saltos++;
+  sonido.pogo(); aviso('¡Pogo saltarín!');
+  return true;
 }
 function usaPatineta() {
   if (c.poderes.patineta > 0) return;
@@ -804,13 +858,14 @@ function cuadro(ahora) {
     : estado === 'muerte' || estado === 'salvar' || (estado === 'fin' && c.muerte) ? { modo: 'caer', t: c.muerte ? c.muerte.t : 1 }
       : r.tropezarT >= 0 ? { modo: 'tropezar', t: r.tropezarT, fase: r.fase, ladeo: r.ladeo }
         : c.poderes.mochila > 0 ? { modo: 'volar', fase: r.fase }
+          : c.pogo ? { modo: 'pogo', vy: r.vy, ladeo: r.ladeo, t: tiempoTotal }   // de pie en el pogo, agarrado al manubrio
           : c.poderes.patineta > 0 ? { modo: 'patinar', fase: r.fase, ladeo: r.ladeo, vy: r.vy, aire: r.enAire, t: tiempoTotal, agacha }   // de lado sobre la tabla (rodar = agacharse, saltar = un ollie)
           : r.rodar > 0 ? { modo: 'rodar', t: F.tiempoRodar - r.rodar }
             : r.enAire ? { modo: 'saltar', vy: r.vy, ladeo: r.ladeo }
               : { modo: 'correr', fase: r.fase, ladeo: r.ladeo };
   mundo.paso({
     D: c ? c.D : 0, x: r ? r.x : 0, y: r ? r.y : 0, suelo: r ? r.suelo : 0, v: c ? c.V : 0, dt, t: tiempoTotal, pose,
-    poderes: c ? { iman: c.poderes.iman > 0, mochila: c.poderes.mochila > 0, zapatillas: c.poderes.zapatillas > 0, patineta: c.poderes.patineta > 0 } : {},
+    poderes: c ? { iman: c.poderes.iman > 0, mochila: c.poderes.mochila > 0, zapatillas: c.poderes.zapatillas > 0, patineta: c.poderes.patineta > 0, pogo: !!c.pogo } : {},
     perseguidor: c && !menu ? c.perseguidor : 0, menu
   });
   mundo.dibuja();
@@ -924,6 +979,7 @@ const ICONOS = {
   salto: svg(`<path d="M16 26V8M8.5 14.5 16 7l7.5 7.5" fill="none" stroke="#2fb52f" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 28.5h20" stroke="#142357" stroke-width="2.6" stroke-linecap="round"/>`),
   lados: svg(`<path d="M5 16h22M11 9.5 4.5 16l6.5 6.5M21 9.5l6.5 6.5-6.5 6.5" fill="none" stroke="#ff8a1f" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/>`),
   rueda: svg(`<path d="M16 5v18M8.5 16.5 16 24l7.5-7.5" fill="none" stroke="#1f7ae0" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 3.5h20" stroke="#142357" stroke-width="2.6" stroke-linecap="round"/>`),
+  supercaja: svg(`<path d="M4 12h24v16H4z" fill="#8b5cf6" ${T}/><path d="M2.5 7.5h27v5h-27z" fill="#b28cff" ${T}/><path d="M14 7.5h4V28h-4z" fill="#ffd23f" stroke="#142357" stroke-width="1.6"/><path d="M16 7c-3-5-8-4-6-1s6 1 6 1 4-.8 6-1 -3-4-6 1z" fill="#ffd23f" ${T}/><path d="M23 15.5l1 2 2 .5-1.5 1.5.4 2.2-1.9-1-1.9 1 .4-2.2L20 18l2-.5z" fill="#fff"/>`),
   bandera: svg(`<path d="M8 29V4" stroke="#142357" stroke-width="2.8" stroke-linecap="round"/><path d="M8.5 5h17l-3.5 5 3.5 5h-17z" fill="#ff3d4f" ${T}/>`)
 };
 /* El ícono de cada clase de misión. */
@@ -1037,6 +1093,17 @@ function saleTienda() {                                        // vuelve a la ro
   if (aspectoMostrado && aspectoMostrado !== progreso.aspecto) mundo.aspecto(M.ASPECTOS[progreso.aspecto] || M.ASPECTOS.clasico);
   aspectoMostrado = progreso.aspecto;
 }
+let superTexto = '';           // lo que dio la última súper caja (se ve en su tarjeta)
+/** Abre una súper caja: cobra, sortea el premio y lo entrega. */
+function abreSuperCaja() {
+  if (progreso.monedas < M.PRECIO_SUPERCAJA) return;
+  progreso.monedas -= M.PRECIO_SUPERCAJA;
+  const p = M.cajaSuper(Math.random);
+  if (p.monedas) { progreso.monedas += p.monedas; superTexto = (p.gordo ? '¡PREMIO GORDO! ' : 'Te tocaron ') + fmt(p.monedas) + ' monedas'; }
+  else if (p.patinetas) { progreso.patinetas += p.patinetas; superTexto = `Te tocaron ${p.patinetas} patinetas`; }
+  else if (p.potenciador) { progreso.potenciadores[p.potenciador]++; superTexto = `Te tocó un ${M.POTENCIADORES[p.potenciador].nombre}`; }
+  sonido.caja(); setTimeout(() => sonido.boleto(), 160);
+}
 function pintaTienda() {
   const cap = $('capaTienda');
   cap.dataset.pestana = tiendaPestana;
@@ -1054,6 +1121,10 @@ function pintaTienda() {
   tarjetas.push(`<li class="t-tarjeta" style="--tinte:#ecdfff"><span class="t-ico">${ICONOS.patineta}</span>
       <div class="t-info"><strong>Patineta</strong><small>Te salva de un choque (30 s)</small><span class="t-cuenta">Tienes <b translate="no">${progreso.patinetas}</b></span></div>
       <button type="button" class="t-precio" data-comprar="patineta" ${progreso.monedas < M.PRECIO_PATINETA ? 'disabled' : ''} aria-label="Comprar una patineta por ${M.PRECIO_PATINETA} monedas">${ICONOS.moneda}<b translate="no">${M.PRECIO_PATINETA}</b></button></li>`);
+  // la súper caja misteriosa: se abre en el acto, y lo que dio queda escrito en su tarjeta
+  tarjetas.push(`<li class="t-tarjeta" style="--tinte:#efe4ff"><span class="t-ico">${ICONOS.supercaja}</span>
+      <div class="t-info"><strong>Súper caja misteriosa</strong><small>${superTexto || 'Siempre trae algo bueno: monedas, patinetas o potenciadores'}</small></div>
+      <button type="button" class="t-precio" data-comprar="supercaja" ${progreso.monedas < M.PRECIO_SUPERCAJA ? 'disabled' : ''} aria-label="Abrir una súper caja por ${fmt(M.PRECIO_SUPERCAJA)} monedas">${ICONOS.moneda}<b translate="no">${fmt(M.PRECIO_SUPERCAJA)}</b></button></li>`);
   for (const [k, P] of Object.entries(M.POTENCIADORES)) tarjetas.push(`<li class="t-tarjeta" style="--tinte:${k === 'despegue' ? '#dff1ff' : '#fff1c4'}"><span class="t-ico">${ICONOS[k === 'despegue' ? 'cohete' : 'mas5']}</span>
       <div class="t-info"><strong>${P.nombre}</strong><small>${P.texto}</small><span class="t-cuenta">Tienes <b translate="no">${progreso.potenciadores[k]}</b></span></div>
       <button type="button" class="t-precio" data-comprar="pot:${k}" ${progreso.monedas < P.precio ? 'disabled' : ''} aria-label="Comprar ${P.nombre} por ${fmt(P.precio)} monedas">${ICONOS.moneda}<b translate="no">${fmt(P.precio)}</b></button></li>`);
@@ -1083,7 +1154,8 @@ document.addEventListener('click', e => {
   sonido.iniciar();
   if (b.dataset.comprar) {
     const k = b.dataset.comprar;
-    if (k === 'patineta') { if (progreso.monedas >= M.PRECIO_PATINETA) { progreso.monedas -= M.PRECIO_PATINETA; progreso.patinetas++; sonido.poder(); } }
+    if (k === 'supercaja') abreSuperCaja();
+    else if (k === 'patineta') { if (progreso.monedas >= M.PRECIO_PATINETA) { progreso.monedas -= M.PRECIO_PATINETA; progreso.patinetas++; sonido.poder(); } }
     else if (k.startsWith('pot:')) { const id = k.slice(4), P = M.POTENCIADORES[id]; if (P && progreso.monedas >= P.precio) { progreso.monedas -= P.precio; progreso.potenciadores[id]++; sonido.poder(); } }
     else { const p = M.precioMejora(progreso.mejoras[k]); if (p != null && progreso.monedas >= p) { progreso.monedas -= p; progreso.mejoras[k]++; sonido.poder(); } }
     guardar(); pintaTienda(); pintaPortada(); return;
