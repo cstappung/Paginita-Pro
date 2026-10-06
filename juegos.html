@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610060111"></script>
+<script src="i18n.js?v=202610060116"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Laboratorio</title>
@@ -15,7 +15,7 @@ try { var t = localStorage.getItem("jg.tema");
 } catch (e) {}
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Lilita+One&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Lilita+One&family=Caveat:wght@500;700&display=swap" rel="stylesheet">
 <style>
   /* ============================================================
      Juegos — la hoja de estilo de las seis piezas
@@ -886,6 +886,35 @@ try { var t = localStorage.getItem("jg.tema");
   .jg-cab{padding:18px 0}.jg-quien-chip{padding:6px 12px}.jg-invita{border-radius:15px;margin-bottom:18px;padding:20px;border-color:#e4dfeb}
   .jg-barra{padding:17px 20px;border-radius:18px 18px 0 0;background:#fff;border-color:#e4dfeb;gap:16px}.jg-fase{font-weight:600;font-size:13px}.jg-m b{font-size:21px}.jg-pie{border-radius:0 0 18px 18px;padding:16px 20px;border-color:#e4dfeb}
   .jg-tablero{padding:30px;background:radial-gradient(ellipse at center,#fff,#eeedf6);border-color:#e4dfeb}.jg-svg{max-width:500px}.jg-cuad .jg-svg{padding:16px;border-radius:16px;background:#fff;box-shadow:0 8px 35px #29204013}.jg-svg .jg-punto{fill:#758199}.jg-caja{opacity:.25}.jg-caja-l{opacity:.7}.jg-raya{filter:drop-shadow(0 2px 1px #0002)}
+  /* ---------- Gato: tiza sobre pizarra ---------- */
+  .jg-portada-gato{background:radial-gradient(ellipse at 40% 35%,#355a47,#18291f)}
+  .jg-art-gt{position:relative;width:62%;aspect-ratio:1;padding:10px;border-radius:10px;background:radial-gradient(ellipse at 35% 30%,#2f5242,#1a3127);border:7px solid #7a5232;box-shadow:inset 0 0 18px #0008,10px 12px 24px #0007;transform:rotate(-5deg)}
+  .jg-art-gt svg{width:100%;height:100%;display:block;fill:none;stroke:#eef2e6;stroke-width:4.5;stroke-linecap:round;opacity:.93}
+  .jg-art-gt .x{stroke:#f3f6ee}.jg-art-gt .o{stroke:#9ed8f0}.jg-art-gt .r{stroke:#f6dc74;stroke-width:5;opacity:.85}
+  .jg-art-gt em{position:absolute;right:-6px;bottom:-14px;font:700 26px Caveat,cursive;font-style:normal;color:#f6dc74;transform:rotate(-6deg);text-shadow:0 2px 4px #0008}
+  .jg-gato .jg-tablero{place-items:center}
+  .jg-gt-marco{width:min(100%,640px);padding:14px;border-radius:14px;background:linear-gradient(135deg,#9a6a3f,#6b4424 55%,#8a5c35);box-shadow:0 18px 30px #0005,inset 0 2px 0 #c99a6a,inset 0 -3px 0 #4a2d16;position:relative}
+  .jg-gt-marco:after{content:'';position:absolute;left:12%;right:12%;bottom:4px;height:6px;border-radius:3px;background:linear-gradient(90deg,#eee 0 9%,transparent 9% 16%,#f6dc74 16% 21%,transparent 21%);opacity:.8}
+  .jg-gt-svg{display:block;width:100%;height:auto;border-radius:6px;box-shadow:inset 0 0 30px #000a}
+  .jg-gt-pizarra{fill:#22392f}
+  .jg-gt-t{fill:none;stroke:#eef2e6;stroke-linecap:round;stroke-linejoin:round;opacity:.92}
+  .jg-gt-reja{opacity:.85}.jg-gt-reja2{opacity:.55}
+  .jg-gt-x{stroke:#f4f6ef}.jg-gt-o{stroke:#9ed8f0}
+  .jg-gt-raya{stroke:#f6dc74;opacity:.95}
+  .jg-gt-aqui{stroke:#f6dc74;stroke-dasharray:14 12;opacity:.75;animation:jgGtLate 1.6s ease-in-out infinite}
+  .jg-gt-suyo{stroke:#ff9c9c;opacity:.45;animation:none}
+  .jg-gt-cerrado{opacity:.35}
+  .jg-gt-nueva{stroke-dasharray:1;stroke-dashoffset:1;animation:jgGtTraza .38s ease-out forwards}
+  .jg-gt-nueva.jg-gt-2{animation-delay:.3s}
+  .jg-gt-libre{fill:transparent;cursor:pointer}
+  .jg-gt-libre:hover{fill:#ffffff12}
+  .jg-gt-fase{font:700 1.35em Caveat,cursive;letter-spacing:.02em}
+  .jg-gt-m{font-family:Caveat,cursive;font-size:1.15em}
+  .jg-gt-letra{font:700 1.4em Caveat,cursive;margin-right:2px}
+  .jg-gt-turno{box-shadow:0 0 0 2px #f6dc74}
+  @keyframes jgGtTraza{to{stroke-dashoffset:0}}
+  @keyframes jgGtLate{50%{opacity:.35}}
+  @media (prefers-reduced-motion:reduce){.jg-gt-nueva{animation:none;stroke-dashoffset:0}.jg-gt-aqui{animation:none}}
   .jg-rev-svg{max-width:480px;border:9px solid #214536;border-radius:20px;box-shadow:0 18px 28px #17372830,0 2px 0 2px #183529}.jg-rev-fondo{fill:url(#rv-fieltro)}.jg-rev-f{filter:drop-shadow(2px 4px 2px #0005)}.jg-rev-cas{stroke:#153e3555}.jg-rev-pista,.jg-rev-n{opacity:.8}
   .jg-cr .jg-tablero{background:radial-gradient(ellipse at center,#23142e,#0d0916 75%);border-color:#2a1f38;padding:26px 14px}
   /* ---- Flip 7 ---- */
@@ -4115,6 +4144,6 @@ html[data-tema=oscuro] .jg-cg-n{box-shadow:0 0 0 2px var(--os-fondo)}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610060111"></script>
+<script src="juegos-app.js?v=202610060116"></script>
 </body>
 </html>
