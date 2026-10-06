@@ -105,7 +105,7 @@ export const SOLOS = [
    elegir más que el nombre solo. */
 export const GENERO = {
   orbita: "Física", escondite: "Búsqueda", cartas: "Cartas", cuadritos: "Tablero",
-  worms: "Artillería", reversi: "Tablero", cadena: "Estrategia", flip7: "Cartas",
+  worms: "Artillería", reversi: "Tablero", gato: "Tablero", cadena: "Estrategia", flip7: "Cartas",
   cacho: "Dados", uno: "Cartas", catan: "Tablero", presidente: "Cartas",
   spicy: "Faroleo", tetris: "Reflejos", yemas: "Acción", clue: "Deducción",
   ajedrez: "Tablero", pokemon: "Combate", boxhead: "Acción"

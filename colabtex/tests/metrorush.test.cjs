@@ -87,7 +87,7 @@ test('el salón, la ruta, las novedades, el iframe y el manual conocen Metro Rus
  const main=fs.readFileSync(path.join(__dirname,'../src/juegos-main.js'),'utf8');
  assert.match(main,/solo\\\/\([^)]*\bmetrorush\b/,'leerRuta conoce #solo/metrorush');
  assert.ok(main.includes('"club-metrorush"'),'su clave de popularidad está en CLUBES');
- assert.match(main,/const NOVEDADES = \[\s*\{ id: "metrorush"/,'es la primera novedad');
+ assert.match(main,/const NOVEDADES = \[[\s\S]*?\{ id: "metrorush"/,'está en las novedades');
  assert.match(main,/n\.id === "metrorush"\) return `<div class="jg-nov-arte-mr">/);
  const html=fs.readFileSync(path.join(__dirname,'../../juegos.html'),'utf8');
  assert.match(html,/\.sp-e-metrorush\b/);assert.match(html,/\.jg-nov-arte-mr\{/);

@@ -185,6 +185,14 @@ export const JUEGOS = {
     minimo: 1,
     cupo: 8,
     alta: "2026-10-05"
+  },
+  gato: {
+    nombre: "Gato",
+    lema: "Tres en raya en tiza, o el Super Gato: nueve gatos dentro de uno",
+    color: "#2f6b4f",
+    minimo: 2,
+    cupo: 2,
+    alta: "2026-10-06"
   }
 };
 
@@ -968,6 +976,7 @@ export function reducir(p) {
   if (p.juego === "ajedrez") return { ...base, ...redAjedrez(p, js) };
   if (p.juego === "pokemon") return { ...base, ...redPokemon(p, js, listos) };
   if (p.juego === "boxhead") return { ...base, ...redBoxhead(p, js, listos) };
+  if (p.juego === "gato") return { ...base, ...redGato(p, js) };
   return base;
 }
 
@@ -1051,6 +1060,8 @@ export function progreso(est, juego) {
   /* En el ajedrez, el material que ya salió del tablero: con las damas
      cambiadas y media docena de piezas fuera es un final. */
   if (juego === "ajedrez" && est.material) return c(1 - (est.material.w + est.material.b) / 78);
+  /* En el gato, las casillas (o los gatos pequeños) ya decididos. */
+  if (juego === "gato" && est.tab) return c(est.movs / (est.variante === "super" ? 81 : 9));
   if (juego === "cartas" && est.ganadas) return c(Math.max(0, ...Object.values(est.ganadas).map(g => g.length)) / 5);
   return 0;
 }
@@ -6803,5 +6814,86 @@ export function redBoxhead(p, js = jugadoresDe(p), listos = true) {
     caidos: Object.keys(caidos).filter(u => !fuera[u]),
     puntos: coop ? pts : bajas, kills, bajas, muertes, fuera,
     hist: hist.slice(-40), ganador: ganador === null ? null : ganador, motivo
+  };
+}
+
+
+/* ---------- gato (tres en raya) y super gato ----------
+   Una jugada es `{t:"p", uid, i}`: en el clásico `i` es la casilla
+   (0–8, por filas); en el super, `i = g*9 + c`, el gato pequeño `g` y su
+   casilla `c`. La casilla `c` en la que se juega manda al rival al gato
+   pequeño `c`; si ese ya está decidido (ganado o lleno), puede jugar en
+   cualquiera libre. Ganar un gato pequeño lo marca con la ficha de quien
+   lo ganó, y tres marcados en raya ganan la partida. Un gato pequeño
+   lleno sin ganador no cuenta para nadie. Abre la X, que es el primer
+   asiento; en la revancha se alterna por la paridad de la semilla. */
+export const GT_VARIANTES = { clasico: "Clásico (3×3)", super: "Super Gato (9×9)" };
+export const GT_LINEAS = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
+export const varianteGato = p => (p && p.variante === "super") ? "super" : "clasico";
+
+/* Quién gana un tablero de nueve (array de "", "x", "o"; "-" es un gato
+   pequeño empatado): "x", "o", "-" si está lleno sin raya, "" si sigue. */
+export function gtGanador(t) {
+  for (const [a, b, c] of GT_LINEAS)
+    if ((t[a] === "x" || t[a] === "o") && t[a] === t[b] && t[a] === t[c]) return t[a];
+  return t.every(v => v) ? "-" : "";
+}
+export function gtLinea(t) {
+  for (const l of GT_LINEAS) { const [a, b, c] = l; if ((t[a] === "x" || t[a] === "o") && t[a] === t[b] && t[a] === t[c]) return l; }
+  return null;
+}
+
+function redGato(p, js) {
+  const variante = varianteGato(p);
+  const sup = variante === "super";
+  const n = sup ? 81 : 9;
+  const a = js[0] ? js[0].uid : "", b = js[1] ? js[1].uid : "";
+  const listos = !!(a && b);
+  // La X abre; quién lleva la X lo decide la semilla, para que la
+  // revancha no deje siempre al mismo empezando.
+  const inv = (Number(p.semilla) || 0) % 2 === 1;
+  const equis = inv ? b : a, circulos = inv ? a : b;
+  const fichaDe = u => (u === equis ? "x" : u === circulos ? "o" : "");
+  const tab = Array(n).fill("");
+  const grande = Array(9).fill("");        // en el super: quién ganó cada gato pequeño
+  let turno = equis, forzado = -1, ganador = null, motivo = "", movs = 0, ultima = -1;
+  const pequeno = g => tab.slice(g * 9, g * 9 + 9);
+
+  for (const j of jugadasDe(p)) {
+    if (j.t === "abandona") {
+      if (ganador === null && listos) { const o = j.uid === a ? b : j.uid === b ? a : ""; if (o) { ganador = o; motivo = "abandono"; } }
+      continue;
+    }
+    if (j.t !== "p" || ganador !== null || !listos || j.uid !== turno) continue;
+    const i = Math.floor(Number(j.i));
+    if (!(i >= 0 && i < n) || tab[i]) continue;
+    if (sup) {
+      const g = Math.floor(i / 9);
+      if (grande[g]) continue;
+      if (forzado >= 0 && g !== forzado) continue;
+    }
+    tab[i] = fichaDe(j.uid);
+    movs++; ultima = i;
+    if (sup) {
+      const g = Math.floor(i / 9);
+      grande[g] = gtGanador(pequeno(g));
+      const c = i % 9;
+      forzado = grande[c] ? -1 : c;
+      const w = gtGanador(grande);
+      if (w === "x" || w === "o") { ganador = w === "x" ? equis : circulos; motivo = "raya"; }
+      else if (w === "-") { ganador = ""; motivo = "empate"; }
+    } else {
+      const w = gtGanador(tab);
+      if (w === "x" || w === "o") { ganador = w === "x" ? equis : circulos; motivo = "raya"; }
+      else if (w === "-") { ganador = ""; motivo = "empate"; }
+    }
+    turno = j.uid === a ? b : a;
+  }
+  if (ganador !== null) { turno = ""; forzado = -1; }
+  const linea = sup ? gtLinea(grande) : gtLinea(tab);
+  return {
+    fase: !listos ? "espera" : (ganador !== null ? "fin" : "jugando"),
+    variante, tab, grande, turno, forzado, equis, circulos, movs, ultima,
+    linea: ganador ? linea : null, ganador, motivo
   };
 }

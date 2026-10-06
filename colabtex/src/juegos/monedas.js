@@ -62,7 +62,7 @@ export const TARIFA = { partida: 20, victoria: 40, empate: 20 };
 /* Cuánto pesa una partida de cada juego: lo que dura y lo que cuesta
    ganarla. 1 es una partida corta a dos. */
 export const PESO = {
-  escondite: 1, cartas: 1, cuadritos: 1, cadena: 1, tetris: 1, reversi: 1.2, orbita: 1.2,
+  escondite: 1, gato: 1, cartas: 1, cuadritos: 1, cadena: 1, tetris: 1, reversi: 1.2, orbita: 1.2,
   yemas: 1.3, spicy: 1.4, flip7: 1.5, cacho: 1.5, uno: 1.5, ajedrez: 1.6,
   boxhead: 1.3, worms: 1.8, presidente: 1.8, pokemon: 1.8, clue: 2.5, catan: 3
 };
@@ -76,7 +76,7 @@ export const NOMBRE_NIVEL = ["", "Fácil", "Medio", "Difícil", "Legendario"];
 const F = "1322";
 export const NIVEL = {
   orbita: F + "212233", escondite: F + "322311", cartas: F + "222132",
-  cuadritos: F + "123233", reversi: F + "331324", ajedrez: F + "132233",
+  cuadritos: F + "123233", reversi: F + "331324", gato: F + "132331", ajedrez: F + "132233",
   pokemon: F + "112323",
   cadena: F + "132232", worms: F + "132323", flip7: F + "221232",
   cacho: F + "212132", uno: F + "121223", catan: F + "122213",
