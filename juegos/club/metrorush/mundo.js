@@ -1276,13 +1276,23 @@ function armaCorredor(kit, asp) {
 }
 
 /** Pone la pose del corredor según lo que está haciendo.
-    p = {modo: 'correr'|'saltar'|'rodar'|'volar'|'tropezar'|'caer'|'quieto'|'menu', fase, t, vy, ladeo} */
+    p = {modo: 'correr'|'saltar'|'rodar'|'patinar'|'volar'|'tropezar'|'caer'|'quieto'|'menu', fase, t, vy, ladeo, agacha, aire} */
 function posa(r, p) {
   const s = Math.sin(p.fase || 0), c = Math.cos(p.fase || 0);
   const [pi, pd] = r.piernas, [bi, bd] = r.brazos;
+  /* Primero todo vuelve a su lugar de siempre. Cada pose cambia solo lo
+     suyo, y lo que una pose movió (la bolita de la rodada, la postura de
+     lado en la patineta) no puede quedarse pegado en la siguiente. */
   r.cuerpo.rotation.set(-0.14, 0.08 * s, (p.ladeo || 0));
-  r.cuerpo.position.y = 0;
-  r.pelvis.position.y = 0.78;
+  r.cuerpo.position.set(0, 0, 0);                                              // los pies en el origen
+  r.cuerpo.scale.setScalar(1);                                                 // de su tamaño (la rodada lo achica un poco)
+  r.pelvis.position.set(0, 0.78, 0);                                           // la cadera a su altura de pie
+  r.pelvis.rotation.set(0, 0, 0);                                              // mirando hacia adelante (en la patineta se pone de lado)
+  r.torso.rotation.set(0, 0, 0);                                               // el tronco derecho
+  r.cab.rotation.set(0.12, 0, 0);                                              // la cabeza apenas inclinada, como se armó
+  r.tabla.position.set(0, 0, 0);                                               // la patineta en su sitio…
+  r.tabla.rotation.set(0, 0, 0);                                               // …y plana
+  pi.tobillo.rotation.x = pd.tobillo.rotation.x = 0;                           // los pies planos (la bolita y la patineta los doblan)
   bi.hombro.rotation.z = -0.15; bd.hombro.rotation.z = 0.15;
   pi.cadera.rotation.z = pd.cadera.rotation.z = 0;                             // la pose del menú las abre un poco: se cierran antes de cualquier otra
   if (p.modo === 'correr' || p.modo === 'quieto') {
@@ -1300,12 +1310,64 @@ function posa(r, p) {
     bi.hombro.rotation.x = -0.4; bd.hombro.rotation.x = 0.4; bi.hombro.rotation.z = -1.4; bd.hombro.rotation.z = 1.4;
     bi.codo.rotation.x = 0.4; bd.codo.rotation.x = 0.4;
   } else if (p.modo === 'rodar') {
+    /* Hecho una bolita que da una vuelta entera hacia adelante. Antes giraba
+       el cuerpo entero en torno a los pies (el origen de `cuerpo` está en el
+       suelo): a media vuelta quedaba de cabeza BAJO la vía y desaparecía, y
+       con el tronco derecho la "bolita" medía un metro de largo. Ahora se
+       encoge (tronco doblado sobre las rodillas, cabeza metida, brazos
+       abrazando las piernas) y gira en torno al centro de la bolita, que se
+       pone en el origen de `cuerpo` y se levanta a la altura de su radio:
+       así ninguna parte baja del suelo (lo más bajo, −0,02 m) y lo más alto
+       queda en ~1,08 m (la barrera alta empieza a 1,0 m), en todos los
+       ángulos. Medido en Chromium con la caja de lo que se ve: la mochila
+       cohete y sus llamas cuelgan escondidas del torso y no cuentan. */
     const giro = (p.t || 0) * Math.PI * 2 / 0.62;                              // una vuelta completa en lo que dura la rodada
-    r.pelvis.position.y = 0.42;
-    r.cuerpo.rotation.x = -giro;
-    r.cuerpo.position.y = 0.05;
-    for (const pp of [pi, pd]) { pp.cadera.rotation.x = 1.9; pp.rodilla.rotation.x = -2.3; pp.tobillo.rotation.x = 0.4; }
-    for (const b of [bi, bd]) { b.hombro.rotation.x = 1.6; b.codo.rotation.x = 1.6; }
+    r.torso.rotation.x = -2.0;                                                 // el tronco se dobla hacia adelante, sobre los muslos
+    r.cab.rotation.x = -0.5;                                                   // el mentón al pecho
+    for (const pp of [pi, pd]) { pp.cadera.rotation.x = 0.99; pp.rodilla.rotation.x = -2.7; pp.tobillo.rotation.x = 0.6; }   // las rodillas al pecho y los talones atrás
+    for (const b of [bi, bd]) { b.hombro.rotation.x = 0.2; b.codo.rotation.x = 1.55; }   // los brazos bajan por delante…
+    bi.hombro.rotation.z = 0.3; bd.hombro.rotation.z = -0.3;                   // …y se cierran sobre las canillas: las abrazan
+    r.pelvis.position.set(0, 0.141, 0.399);                                    // corre el cuerpo para que el centro de la bolita quede en el origen
+    r.cuerpo.scale.setScalar(0.78);                                            // más chico mientras rueda: la cabeza es grande y la bolita no cabe bajo la barrera
+    r.cuerpo.position.y = 0.56;                                                // el centro, a la altura del radio: la bolita toca el suelo y no lo cruza
+    r.cuerpo.rotation.x = -giro;                                               // y gira en torno a ese centro
+  } else if (p.modo === 'patinar') {
+    /* En la patineta (una tabla que flota, como el hoverboard de Subway
+       Surfers): de lado, rodillas dobladas y brazos abiertos para el
+       equilibrio. Se inclina al cambiar de carril (y la tabla con él), en
+       el salto hace un ollie (encoge las piernas y la tabla levanta la
+       punta al subir y se nivela al bajar, según `vy`: no según el tiempo
+       en el aire, que al caerse de un techo empieza con vy = 0) y al rodar
+       se agacha sobre la tabla en vez de hacerse bolita.
+       `agacha` va de 0 a 1 y `aire` dice si está en el aire. */
+    const t = p.t || 0, ag = p.agacha || 0, vy = p.vy || 0, ladeo = p.ladeo || 0;
+    const ABRE = 0.3;                                                          // cuánto se separan los pies a lo largo de la tabla
+    const encoge = p.aire ? 0.6 + 0.4 * (1 - Math.min(1, Math.abs(vy) / 10)) : 0;   // en el aire recoge las rodillas (más en lo más alto)
+    const cadera = 0.45 + 1.0 * ag, rodilla = -0.9 - 1.45 * ag;               // de pie con las rodillas dobladas → agachado
+    const caderaE = cadera + 0.55 * encoge, rodillaE = rodilla - 1.0 * encoge; // y recogidas en el salto
+    // el alto de la pierna, de la cadera a la suela, con el pie plano
+    const altoPierna = (h, k) => 0.4 * Math.cos(ABRE) * Math.cos(h) + 0.4 * (Math.cos(ABRE) * Math.cos(k) * Math.cos(h) - Math.sin(k) * Math.sin(h)) + 0.1;
+    const flota = Math.sin(t * 3.2) * 0.02;                                    // la tabla sube y baja apenas, y él con ella
+    const levanta = altoPierna(cadera, rodilla) - altoPierna(caderaE, rodillaE);   // lo que suben los pies al encogerse: la tabla sube con ellos
+    // la tabla
+    r.tabla.position.y = flota + levanta;
+    r.tabla.rotation.x = !p.aire ? 0                                           // en el suelo, plana
+      : vy > 0 ? 0.45 * Math.min(1, vy / 10)                                   // subiendo: la punta arriba (y se nivela al llegar arriba)
+        : -0.15 * Math.sin(Math.min(1, -vy / 10) * Math.PI);                   // bajando: un poco de punta y plana otra vez al tocar el suelo
+    r.tabla.rotation.z = ladeo * 1.5;                                          // se ladea con él al cambiar de carril
+    // el cuerpo: de lado sobre la tabla, ladeado igual que ella (los dos giran en torno al mismo punto, así los pies no se despegan)
+    r.cuerpo.rotation.set(0, 0, ladeo * 1.5);
+    r.cuerpo.position.y = flota;
+    r.pelvis.rotation.y = -1.05;                                               // la cadera de lado: el pie izquierdo adelante
+    r.pelvis.position.y = 0.15 + altoPierna(cadera, rodilla);                  // a la altura justa para que las suelas pisen la tabla (su cara de arriba está a 0,15)
+    pi.cadera.rotation.set(caderaE, 0, -ABRE); pd.cadera.rotation.set(caderaE, 0, ABRE);   // las piernas abiertas, una hacia la punta y otra hacia la cola
+    for (const pp of [pi, pd]) { pp.rodilla.rotation.x = rodillaE; pp.tobillo.rotation.x = -(caderaE + rodillaE); }   // rodillas dobladas, pies planos
+    r.torso.rotation.set(-0.2 - 0.75 * ag, 0.35, 0);                           // el tronco un poco adelante y los hombros abiertos hacia donde va
+    r.cab.rotation.set(0.12 + 0.4 * ag, 0.6, 0);                               // la cabeza mira hacia adelante, por la vía (agachado, la levanta)
+    const vaiven = Math.sin(t * 2.3) * 0.15;                                   // los brazos se mecen como un balancín
+    bi.hombro.rotation.set(0.2 + 0.6 * ag, 0, -1.25 + 0.9 * ag + vaiven - 0.2 * encoge);   // el brazo de adelante, abierto hacia la punta
+    bd.hombro.rotation.set(-0.1 + 0.9 * ag, 0, 1.1 - 0.75 * ag + vaiven + 0.2 * encoge);   // el de atrás, hacia la cola (agachado, los dos bajan a la tabla)
+    bi.codo.rotation.x = 0.35 + 0.25 * ag; bd.codo.rotation.x = 0.5 + 0.1 * ag;
   } else if (p.modo === 'volar') {
     pi.cadera.rotation.x = 0.2; pd.cadera.rotation.x = -0.1; pi.rodilla.rotation.x = -0.4; pd.rodilla.rotation.x = -0.6;
     bi.hombro.rotation.x = 0.3 + 0.1 * s; bd.hombro.rotation.x = 0.3 - 0.1 * s; bi.hombro.rotation.z = -0.6; bd.hombro.rotation.z = 0.6;

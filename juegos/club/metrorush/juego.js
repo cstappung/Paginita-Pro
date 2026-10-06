@@ -761,12 +761,16 @@ function cuadro(ahora) {
   const r = c ? c.r : null;
   // en la portada y en la tienda la cámara se pone delante del corredor, que mira y saluda
   const menu = panel === 'capaTienda' ? 'tienda' : estado === 'portada' ? 'portada' : null;
+  // en la patineta, rodar es agacharse: de 0 a 1 en una décima, se queda, y vuelve en las últimas 0,12 s (suave, sin saltos)
+  const agacha0 = r && r.rodar > 0 ? Math.max(0, Math.min(1, (F.tiempoRodar - r.rodar) / 0.1, r.rodar / 0.12)) : 0;
+  const agacha = agacha0 * agacha0 * (3 - 2 * agacha0);
   const pose = menu ? { modo: 'menu', t: tiempoTotal }
     : !c ? { modo: 'quieto', fase: tiempoTotal * 3 }
     : c.muerte && c.muerte.motivo === 'abandono' ? { modo: 'quieto', fase: tiempoTotal * 3 }      // «Terminar la carrera»: se queda de pie
     : estado === 'muerte' || estado === 'salvar' || (estado === 'fin' && c.muerte) ? { modo: 'caer', t: c.muerte ? c.muerte.t : 1 }
       : r.tropezarT >= 0 ? { modo: 'tropezar', t: r.tropezarT, fase: r.fase, ladeo: r.ladeo }
         : c.poderes.mochila > 0 ? { modo: 'volar', fase: r.fase }
+          : c.poderes.patineta > 0 ? { modo: 'patinar', fase: r.fase, ladeo: r.ladeo, vy: r.vy, aire: r.enAire, t: tiempoTotal, agacha }   // de lado sobre la tabla (rodar = agacharse, saltar = un ollie)
           : r.rodar > 0 ? { modo: 'rodar', t: F.tiempoRodar - r.rodar }
             : r.enAire ? { modo: 'saltar', vy: r.vy, ladeo: r.ladeo }
               : { modo: 'correr', fase: r.fase, ladeo: r.ladeo };
@@ -971,7 +975,23 @@ let tiendaVer = null;                                          // el aspecto que
 let aspectoMostrado = null;                                    // el que lleva el corredor en pantalla
 function abreTienda(pestana = 'mejoras') {
   tiendaPestana = pestana; tiendaVer = progreso.aspecto;
+  if (estado === 'fin') despejaChoque();                       // desde el resumen: primero se saca la carrera perdida del escenario
   pintaTienda(); abrePanel('capaTienda');
+}
+/* La tienda abierta desde el resumen se veía sobre el lugar del choque:
+   el corredor quedaba en su carril (y a veces en el aire, fuera de la
+   cámara del probador), con el tren o la barrera del choque pegados a la
+   espalda, las monedas flotando, el aro del imán todavía girando y el
+   marcador de la carrera encima de la tienda. Desde la portada no pasa,
+   porque ahí no hay carrera y la vía está vacía. La carrera ya está cerrada
+   (el resumen la cerró), así que se saca del escenario igual que al ir a la
+   portada, y el resumen sigue ahí al volver. */
+function despejaChoque() {
+  if (!c) return;                                              // ya se despejó (o no hubo carrera)
+  cierraCarrera();                                             // ya estaba cerrada: cerrarla otra vez no suma nada
+  c = null;                                                    // sin carrera, el corredor va al medio de la vía, en el suelo y sin poderes
+  $('hud').hidden = true;                                      // el marcador de la carrera ya no tiene nada que contar
+  mundo.reinicia();                                            // fuera trenes, barreras, monedas y poderes: la vía queda vacía, como en la portada
 }
 function saleTienda() {                                        // vuelve a la ropa que de verdad lleva puesta
   if (aspectoMostrado && aspectoMostrado !== progreso.aspecto) mundo.aspecto(M.ASPECTOS[progreso.aspecto] || M.ASPECTOS.clasico);
