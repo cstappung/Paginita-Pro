@@ -86,6 +86,15 @@ const SALA = {
     { id: "multitud", n: "Entre la multitud", d: "Gana con 5 jugadores o más.", i: "👥", x: c => c.gano && c.n >= 5 },
     { id: "justo", n: "Por una caja", d: "Gana por un solo punto.", i: "🤏", x: c => c.gano && margen(c.est.puntos || {}, c) === 1 }
   ],
+  /* Gato: todo sale del tablero final; `grande` es el del super. */
+  gato: [
+    { id: "raya", n: "Tres en raya", d: "Gana un gato clásico.", i: "✖️", m: "Clásico", x: c => c.gano && c.est.variante === "clasico" && c.est.motivo === "raya" },
+    { id: "rapido", n: "A la tercera", d: "Gana un gato clásico en tu tercera ficha.", i: "⚡", m: "Clásico", x: c => c.gano && c.est.variante === "clasico" && c.est.motivo === "raya" && c.est.movs <= 6 },
+    { id: "super", n: "Super Gato", d: "Gana una partida de Super Gato.", i: "#️⃣", m: "Super Gato", x: c => c.gano && c.est.variante === "super" && c.est.motivo === "raya" },
+    { id: "pequeno", n: "Primer gatito", d: "Gana un gato pequeño en el Super Gato.", i: "🐱", m: "Super Gato", x: c => c.est.variante === "super" && (c.est.grande || []).includes(c.est.equis === c.me ? "x" : "o") },
+    { id: "cinco", n: "Dueño de la pizarra", d: "Ten cinco gatos pequeños a la vez.", i: "🧽", m: "Super Gato", x: c => { const f = c.est.equis === c.me ? "x" : "o"; return c.est.variante === "super" && (c.est.grande || []).filter(v => v === f).length >= 5; } },
+    { id: "tablas", n: "Gato encerrado", d: "Termina una partida en empate.", i: "🤝", x: c => c.est.fase === "fin" && c.est.motivo === "empate" }
+  ],
   reversi: [
     { id: "cincuenta", n: "Marea negra", d: "Gana con 50 fichas o más.", i: "🌊", x: c => c.gano && ((c.est.cuenta || {})[c.me] || 0) >= 50 },
     { id: "esquinas", n: "Las cuatro esquinas", d: "Ten las cuatro esquinas a la vez.", i: "🏰", x: c => { const L = (c.est.lado || 8) - 1, t = c.est.tab || {}; return ["0_0", `0_${L}`, `${L}_0`, `${L}_${L}`].every(q => t[q] === c.me); } },

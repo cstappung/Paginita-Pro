@@ -118,6 +118,40 @@ const REGLAS = {
       ["El final", "Cuando ninguno de los dos puede jugar, gana quien tenga más fichas en el tablero."]
     ]
   },
+  gato: {
+    lema: "Tres en raya escrito con tiza, o nueve gatos dentro de uno.",
+    secciones: [
+      ["Quién empieza", "Uno juega con <b>X</b> y el otro con <b>O</b>; la X abre la partida. Quién lleva cada letra lo decide la sala al azar."]
+    ],
+    modos: {
+      clasico: {
+        nombre: "Clásico",
+        secciones: [
+          ["Tu turno", "Escribe tu letra en una casilla libre del tablero de 3×3."],
+          ["Ganar", lista([
+            "Gana quien consigue <b>tres en raya</b>: una fila, una columna o una diagonal.",
+            "Si se llenan las nueve casillas sin raya, es <b>empate</b> (gato encerrado)."
+          ])]
+        ]
+      },
+      super: {
+        nombre: "Super Gato",
+        secciones: [
+          ["El tablero", "Es un gato grande cuyas nueve casillas son, cada una, un gato pequeño de 3×3."],
+          ["Dónde juegas", lista([
+            "La casilla del gato pequeño en que juegas <b>manda al rival</b> al gato pequeño que ocupa esa misma posición en el grande. Si juegas en la esquina de arriba a la derecha, el otro tiene que jugar en el gato de arriba a la derecha.",
+            "El gato donde te toca jugar se marca en <b>amarillo</b>.",
+            "Si te mandan a un gato que ya está ganado o lleno, puedes jugar en <b>cualquier</b> gato que siga abierto."
+          ])],
+          ["Ganar", lista([
+            "Quien hace tres en raya en un gato pequeño se lo queda: se tacha y se escribe su letra en grande.",
+            "Gana la partida quien hace <b>tres en raya de gatos pequeños</b> en el gato grande.",
+            "Un gato pequeño lleno sin raya no es de nadie. Si ya no queda donde jugar sin raya grande, es empate."
+          ])]
+        ]
+      }
+    }
+  },
   ajedrez: {
     lema: "El ajedrez de siempre, para dos.",
     secciones: [

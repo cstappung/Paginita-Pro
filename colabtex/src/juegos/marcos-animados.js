@@ -421,6 +421,16 @@ function yemas() {
 
 /* Boxhead: cabezas cuadradas en el anillo, un barril que tiembla y
    casquillos que caen. */
+function gato() {
+  // Una pizarra en anillo con equis y círculos de tiza que se dibujan y se borran.
+  const tiza = "#f1efe6";
+  const x = `<path d="M-4.5-4.5L4.5 4.5M4.5-4.5L-4.5 4.5" stroke="${tiza}" stroke-width="1.6" stroke-linecap="round" fill="none" pathLength="100" stroke-dasharray="100 100"/>`;
+  const o = `<circle r="4.6" stroke="#ffe08a" stroke-width="1.6" fill="none" pathLength="100" stroke-dasharray="100 100"/>`;
+  const marcas = cada(8, (i, a) => en(60, a + 22.5, an("dw", 4, i % 2 ? o : x, n1(-i * .5))));
+  const rejas = cada(8, (i, a) => en(60, a, `<path d="M0-8V8" stroke="${tiza}" stroke-width=".9" opacity=".55" stroke-linecap="round"/>`, a));
+  return aro(60, "#2b4a3a", 20) + aro(50.5, "#7a4e2a", 2.4) + aro(69.5, "#7a4e2a", 2.4) + rejas + marcas;
+}
+
 function boxhead() {
   const cabeza = (c, i) => an("hop", 1.4, `<rect x="-5" y="-5" width="10" height="10" rx="1" fill="${c}" stroke="#3b2a12" stroke-width=".8"/><rect x="-3" y="-1.6" width="1.6" height="1.6" fill="#111"/><rect x="1.4" y="-1.6" width="1.6" height="1.6" fill="#111"/><rect x="-2" y="2" width="4" height=".9" fill="#3b2a12"/>`, n1(-i * .25));
   const barril = an("z", .5, `<rect x="-4" y="-6" width="8" height="12" rx="1.6" fill="#b91c1c" stroke="#450a0a" stroke-width=".8"/><path d="M-4-2H4M-4 2H4" stroke="#450a0a" stroke-width=".7"/>`);
@@ -523,7 +533,7 @@ function mariposas() {
 const DIBUJOS = {
   tsnake: snake, tminas: minas, ttetris: tetris, tsortem: sortem, tbbtan: bbtan, tsopa: sopa,
   telectro: electro, tfrontera: frontera, tpokemon: pokemon, tescondite: escondite, tcartas: cartas,
-  tcuadritos: cuadritos, treversi: reversi, torbita: orbita, tcadena: cadena, tflip: flip, tcacho: cacho,
+  tcuadritos: cuadritos, treversi: reversi, tgato: gato, torbita: orbita, tcadena: cadena, tflip: flip, tcacho: cacho,
   tuno: uno, tcatan: catan, tpresidente: presidente, tspicy: spicy, tworms: worms, tyemas: yemas,
   tzombis: zombis, tclue: clue, tajedrez: ajedrez, tmonedas: monedas, tprodrop: prodrop, tsudoku: sudoku, tfanal: fanal, tboxhead: boxhead, tatasco: atasco,
   tmetrorush: metrorush,

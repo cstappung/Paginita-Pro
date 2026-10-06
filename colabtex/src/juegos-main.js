@@ -40,12 +40,13 @@ import { esTrampa, castiga, revisaCastigo, castigoActivo, configuraCastigo, hast
 import { watchAuth, loginGoogle, logout, AVISO_RECAPTCHA } from "./firebase.js";
 import * as fb from "./fb-juegos.js";
 import { escapeHtml, timeAgo, colorForUid } from "./util.js";
-import { AJ_RITMOS, JUEGOS, reducir, jugadasDe, acumula, cupoDe, minimoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, YM_MAPAS, mapaYemas, varianteYemas, ganoEn, ordenaRanks, BX_VARIANTES, BX_METAS, BX_MAPAS, salaInactiva, ultimaActividad, INACTIVA_MS } from "./juegos/motor.js";
+import { AJ_RITMOS, JUEGOS, reducir, jugadasDe, acumula, cupoDe, minimoDe, TAMANOS, etiquetaTamano, meToca, progreso, CR_MALLAS, mayoriaExpulsion, MODOS_F7, MODOS_UNO, CT_EXPANSIONES, YM_VARIANTES, YM_LARGOS, YM_MAPAS, mapaYemas, varianteYemas, ganoEn, ordenaRanks, BX_VARIANTES, BX_METAS, BX_MAPAS, GT_VARIANTES, salaInactiva, ultimaActividad, INACTIVA_MS } from "./juegos/motor.js";
 import { crearEscondite } from "./juegos/escondite.js";
 import { crearCartas } from "./juegos/cartas.js";
 import { crearCuadritos } from "./juegos/cuadritos.js";
 import { crearOrbita } from "./juegos/orbita.js";
 import { crearReversi } from "./juegos/reversi.js";
+import { crearGato } from "./juegos/gato.js";
 import { crearAjedrez, piezaSvg } from "./juegos/ajedrez.js";
 import { crearPokemon } from "./juegos/pokemon.js";
 import { FORMATOS as PK_FORMATOS, FORMATO_POR as PK_FORMATO_POR } from "./juegos/pokemon/formatos.js";
@@ -93,10 +94,10 @@ const FABRICAS = {
   cuadritos: crearCuadritos, reversi: crearReversi, worms: crearWorms,
   cadena: crearCadena, flip7: crearFlip7, cacho: crearCacho, uno: crearUno, catan: crearCatan,
   presidente: crearPresidente, spicy: crearSpicy, tetris: crearTetris, yemas: crearYemas, clue: crearClue,
-  ajedrez: crearAjedrez, pokemon: crearPokemon, boxhead: crearBoxhead
+  ajedrez: crearAjedrez, pokemon: crearPokemon, boxhead: crearBoxhead, gato: crearGato
 };
 
-const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞", pokemon: "◓", boxhead: "▣" };
+const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞", pokemon: "◓", boxhead: "▣", gato: "#" };
 /* Los clubes de un jugador, con sus claves de la clasificación y los
    mismos signos que llevan en su tarjeta del vestíbulo. */
 const ICONO_TODOS = { ...ICONO, general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", frontera: "🏰", sudoku: "🔢", fanal: "🪔", atasco: "🚗", metrorush: "🚇", yzombis: "🧟" };
@@ -195,6 +196,9 @@ const OPCIONES = {
     { clave: "mapa", etiqueta: "Mapa (zombis)", por: "nacht",
       valores: Object.keys(YM_MAPAS).map(v => ({ v, t: YM_MAPAS[v] })) }
   ],
+  /* Gato: la variante, no `modo` (las reglas lo restringen). */
+  gato: [{ clave: "variante", etiqueta: "Modo", por: "clasico",
+    valores: Object.keys(GT_VARIANTES).map(v => ({ v, t: GT_VARIANTES[v] })) }],
   clue: [{ clave: "cupo", etiqueta: "Detectives", por: 4, valores: cupos("clue") }],
   /* Boxhead: el cupo es cuántos caben; la partida arranca con los que
      hayan entrado (en cooperativo, incluso uno solo), y cuántos son
@@ -219,7 +223,8 @@ const OPCIONES = {
 const modoReglas = (juego, o) => juego === "cacho" ? (Number(o.sicil) || 0)
   : juego === "catan" ? (o.exp === "mar" ? "mar" : "base")
   : juego === "yemas" ? (o.variante || "todos")
-  : juego === "boxhead" ? (o.variante || "coop") : o.modo;
+  : juego === "boxhead" ? (o.variante || "coop")
+  : juego === "gato" ? (o.variante === "super" ? "super" : "clasico") : o.modo;
 
 const state = {
   user: null,           // el perfil ya aplicado: lo que se pinta
@@ -1655,6 +1660,10 @@ const porOmision = k => Object.fromEntries((OPCIONES[k] || []).map(o => [o.clave
    Yemas), así que la lista se escribe aquí en vez de salir de las fechas
    `alta` de JUEGOS. El primero lleva «★ Lo último». */
 const NOVEDADES = [
+  { id: "gato", color: "#2f6b4f", alta: "2026-10-06", titulo: "Gato y Super Gato",
+    lema: "El tres en raya de siempre, en tiza sobre la pizarra. O el Super Gato: nueve gatos dentro de uno, y la casilla donde juegas decide en qué gato juega el otro.",
+    sub: "Duelo · dos modalidades", sala: { k: "gato", ops: { variante: "super" } }, reglas: ["gato", "super"],
+    modo: "multi", jugadores: "2 jugadores", cuenta: true },
   { id: "metrorush", color: "#ff6a3d", alta: "2026-10-05", titulo: "METRO RUSH",
     lema: "Corre por las vías esquivando trenes: salta las barreras bajas, rueda bajo las altas y sube por las rampas a correr sobre los techos. Junta monedas, cumple retos y no dejes que el inspector te atrape.",
     sub: "Un jugador · esquiva trenes, junta monedas y llega a la Estación Fantasma", ruta: "#solo/metrorush", boton: "Correr", reglas: ["metrorush"], modo: "solo" },
@@ -1681,6 +1690,7 @@ function arteNovedad(n) {
   if (n.id === "metrorush") return `<div class="jg-nov-arte-mr"><i></i><i></i><i></i><em></em><b>METRO RUSH</b></div>`;
   // FANAL: un farol que alumbra la noche y unas polillas que bajan hacia él.
   if (n.id === "fanal") return `<div class="jg-nov-arte-fn"><i></i><i></i><i></i><i></i><i></i><em></em><b>FANAL</b></div>`;
+  if (n.id === "gato") return `<div class="jg-nov-arte-zb">${arteJuego("gato")}</div>`;
   if (n.id === "boxhead") return `<div class="jg-nov-arte-zb">${arteJuego("boxhead")}</div>`;
   if (n.id === "zombis") return `<div class="jg-nov-arte-zb">${arteJuego("yemas")}<b>ZOMBIS</b></div>`;
   if (n.id === "prodrop") {
@@ -2163,7 +2173,7 @@ const FANFARRIA = { gano: "victoria", perdi: "derrota", empate: "empate", mirand
    En cartas es el choque entero (`CHOQUE`, 2,6 s): la ronda que gana
    el trío se enseña igual que las demás. Worms no pone fanfarria — el
    marco tiene su propio audio y su propio final. */
-const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300, presidente: 1200, spicy: 1200, tetris: 1500, yemas: 1500, clue: 1800, ajedrez: 1300, pokemon: 1500, boxhead: 1500 };
+const PAUSA_FIN = { cuadritos: 1400, reversi: 1500, orbita: 1300, cartas: 2800, escondite: 1700, worms: 2500, cadena: 800, flip7: 1000, cacho: 900, uno: 1000, catan: 1300, presidente: 1200, spicy: 1200, tetris: 1500, yemas: 1500, clue: 1800, ajedrez: 1300, pokemon: 1500, boxhead: 1500, gato: 1200 };
 
 function pintaFin(p, est) {
   const caja = $("jgFin");
@@ -2687,6 +2697,7 @@ function arteJuego(k) {
   if (k === "spicy") return '<div class="jg-art-sp"><b>🌶</b>' + [["7", "#e2412b", "🌶"], ["3", "#5dac3a", "🍃"], ["9", "#6b4a2b", "⚫"]].map(([n, c, e]) => '<i style="--t:' + c + '"><span>' + n + '</span><s>' + e + '</s></i>').join("") + '<em>SPICY</em></div>';
   if (k === "tetris") return '<div class="jg-art-tt">' + ["....ll", "t..zll", "ttzzoo", "itsjoo", "issjjj"].map(f => [...f].map(c => '<i class="' + (c === "." ? "" : "p-" + c) + '"></i>').join("")).join("") + '<em>TETRIS</em></div>';
   if (k === "yemas") return '<div class="jg-art-ym"><i></i><i></i><i></i><b></b><em>YEMAS</em></div>';
+  if (k === "gato") return '<div class="jg-art-gt"><svg viewBox="0 0 120 120" aria-hidden="true"><path d="M42 12 Q40 60 43 108 M79 11 Q81 62 78 109 M12 41 Q60 39 108 42 M11 79 Q62 81 109 78"/><path class="x" d="M18 18 L35 34 M35 17 L18 35 M86 86 L103 103 M103 85 L86 103"/><circle class="o" cx="61" cy="60" r="11"/><circle class="o" cx="96" cy="25" r="10"/><path class="r" d="M14 14 Q60 61 106 106"/></svg><em>GATO</em></div>';
   if (k === "boxhead") return '<div class="jg-art-bx"><i></i><i></i><i></i><b></b><s></s><em>BOXHEAD</em></div>';
   if (k === "clue") return '<div class="jg-art-cl"><i></i><i></i><i></i><b>✉</b><s>🔍</s><em>CLUE</em></div>';
   if (k === "pokemon") return '<div class="jg-art-pk"><i></i><b></b><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/6.gif" alt=""><img src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-v/black-white/animated/back/9.gif" alt=""><em>POKÉMON</em></div>';

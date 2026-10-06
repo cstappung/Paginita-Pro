@@ -34,6 +34,9 @@ export const EJEMPLOS={
   p('Sugiere desde la sala','Entraste al laboratorio. Sugieres un sospechoso y un arma en esa sala: aquí, la sospechosa Roja con el capacitor en el laboratorio.',fichas('Tu sugerencia',['Roja','rojo','QUIÉN'],['Cap.','azul','CON QUÉ'],['Lab.','verde','DÓNDE'])),
   p('El primero que tenga te enseña una','Los demás responden en orden. El segundo jugador tiene el capacitor y te lo enseña solo a ti; el resto solo ve que te enseñó algo.',fichas('Lo que ves tú',['?','gris','ROJA'],['Cap.','oro','ENSEÑADA'],['?','gris','LAB.'])),
   p('Tacha en la libreta y acusa al final','El capacitor no está en el sobre: táchalo. Cuando solo te quede un quién, un con qué y un dónde, acusa. Si fallas quedas fuera, pero sigues enseñando cartas.',fichas('Tu libreta',['Cap.','gris','TACHADA'],['Roja','violeta','POSIBLE'],['Lab.','violeta','POSIBLE'])))],
+ gato:[e('raya','Hacer tres en raya',
+  p('Dos en línea','Juegas con X y ya tienes dos en la fila de arriba. La O todavía no ha tapado la tercera casilla de esa fila.',tablero('Gato: dos X en la fila de arriba',3,3,['X','X','','','O','','O','',''],{0:'azul',1:'azul'})),
+  p('La tercera cierra la raya','Escribes X en la esquina libre y completas la fila. Sirve igual una columna o una diagonal: tres iguales seguidas ganan.',tablero('Gato: tres X en la fila de arriba',3,3,['X','X','X','','O','','O','',''],{0:'verde',1:'verde',2:'verde'})))],
  reversi:[e('encerrar','Encerrar y convertir fichas',
   p('Busca una línea sin huecos','Juegas con las fichas negras. Tienes dos blancas rivales junto a una negra propia. Necesitas cerrar esa fila por el otro extremo.',reversi(0)),
   p('Coloca la ficha que cierra','La nueva negra encierra las dos blancas entre fichas tuyas. Lo mismo funciona en vertical y diagonal.',reversi(1)),
@@ -250,6 +253,18 @@ const VENGANZA=[e('cero','El cero y el siete gafe',
  p('El trece es una excepción','En Vengeance puedes tener dos 13 sin pasarte. Esa excepción no convierte cualquier número repetido en válido.',fichas('Pareja permitida',['13','oro'],['13','oro'])),
  p('Los otros números siguen repitiéndose','Dos ochos todavía te hacen pasarte si no tienes protección. Super mantiene la excepción del 13, pero añade una familia 14 diferente.',fichas('Repetición peligrosa',['8','azul'],['8','rojo'])))];
 export const VARIANTES={
+ gato:{
+  clasico:[e('tapar','Tapar la raya del rival',
+   p('El rival amenaza','La O tiene dos en la diagonal. Si no escribes en la esquina que falta, en su próximo turno hace tres en raya.',tablero('Gato: O amenaza la diagonal',3,3,['O','X','','','O','','','','X'],{0:'rojo',4:'rojo'})),
+   p('Escribe donde iba a ganar','Tu X en esa casilla corta la diagonal. Si se llenan las nueve sin raya, la partida acaba en empate.',tablero('Gato: X tapa la diagonal',3,3,['O','X','','','O','','','','X'],{8:'verde'})))],
+  super:[e('mandar','Tu casilla manda al rival',
+   p('Juegas en una esquina','Dentro del gato pequeño del centro escribes X en la casilla de arriba a la derecha. Esa posición dice a qué gato grande irá el rival.',tablero('Gato pequeño central: X arriba a la derecha',3,3,['','','X','','O','','','',''],{2:'azul'})),
+   p('El rival juega en ese gato','La O tiene que jugar en el gato pequeño de arriba a la derecha del tablero grande, que se marca en amarillo.',tablero('Tablero grande: gato de arriba a la derecha marcado',3,3,['','','➜','','#','','','',''],{2:'oro'})),
+   p('Gato cerrado, elección libre','Si te mandan a un gato que ya ganó alguien o que está lleno, puedes jugar en cualquier gato pequeño que siga abierto.',tablero('Tablero grande con gatos ganados',3,3,['X','','O','','','','','X',''],{0:'azul',2:'rojo',7:'azul'}))),
+   e('grande','Ganar el gato grande',
+   p('Cada gato pequeño es una casilla','Quien hace tres en raya en un gato pequeño se lo queda. En el tablero grande cuenta como su letra.',tablero('Tablero grande: dos gatos de X en la columna izquierda',3,3,['X','','O','X','O','','','',''],{0:'azul',3:'azul'})),
+   p('Tres gatos en raya','Gana la partida quien junta tres gatos pequeños en raya: fila, columna o diagonal del tablero grande.',tablero('Tablero grande: tres gatos de X en columna',3,3,['X','','O','X','O','','X','',''],{0:'verde',3:'verde',6:'verde'})))]
+ },
  yemas:{
   zombis:[e('zombis','Rondas, puntos y tiendas',
    p('Cada golpe suma puntos','Pegarle a un zombi da 10 puntos y freírlo 60; a la cabeza son 100 y con la sartén 130. Los puntos sirven para comprar armas.',fichas('Puntos por zombi',['10','blanco','GOLPE'],['60','verde','FRITO'],['100','oro','CABEZA'])),

@@ -61,7 +61,7 @@ export const MARCOS = [
     ["tsortem", "sortem", "Bloques en orden"], ["tbbtan", "bbtan", "Bola retro"], ["tsopa", "sopa", "Sopa de letras"],
     ["telectro", "electro", "Circuito"], ["tfrontera", "frontera", "Símbolos de la Frontera"], ["tpokemon", "pokemon", "Poké Ball"],
     ["tescondite", "escondite", "Escondidos"], ["tcartas", "cartas", "Tres elementos"], ["tcuadritos", "cuadritos", "Puntos y cajas"],
-    ["treversi", "reversi", "Fichas que giran"], ["torbita", "orbita", "Órbitas"], ["tcadena", "cadena", "Reacción en cadena"],
+    ["treversi", "reversi", "Fichas que giran"], ["tgato", "gato", "Tiza"], ["torbita", "orbita", "Órbitas"], ["tcadena", "cadena", "Reacción en cadena"],
     ["tflip", "flip7", "Siete cartas"], ["tcacho", "cacho", "Cubilete"], ["tuno", "uno", "Sentido de juego"],
     ["tcatan", "catan", "Hexágonos"], ["tpresidente", "presidente", "Banda presidencial"], ["tspicy", "spicy", "Picante"],
     ["tworms", "worms", "Artillería"], ["tyemas", "yemas", "Huevos en guerra"], ["tzombis", "zombis", "Horda"],
