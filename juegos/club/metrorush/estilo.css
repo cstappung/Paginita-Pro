@@ -14,7 +14,14 @@
 * { box-sizing: border-box; }
 body { margin: 0; background: var(--fondo); color: var(--tinta); font: 15px/1.5 "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif; }
 .shell { max-width: 1240px; margin: 0 auto; padding: 18px 16px 40px; }
+/* En pantallas grandes (Full HD, 2K, 4K) el juego crece con la pantalla en vez
+   de quedarse en ~900 px de ancho. El alto lo sigue limitando .pantalla (82 %
+   de la ventana). Sin `vh` aquí: dentro de Juegos el iframe toma su alto del
+   contenido, y un ancho que dependiera del alto se realimentaría. */
+@media (min-width: 1400px) { .shell { max-width: 1480px; } }
 .layout { display: grid; grid-template-columns: minmax(0, 1fr) 285px; gap: 24px; align-items: start; }
+/* fuera de Juegos la columna lateral queda vacía: el juego usa todo el ancho */
+.layout:has(> aside:empty) { grid-template-columns: minmax(0, 1fr); }
 @media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr); } }
 main.vl { min-width: 0; }
 .cab { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 10px; }
@@ -496,4 +503,12 @@ main.vl { min-width: 0; }
   .caja { padding: 16px 14px 14px; border-radius: 16px; }
   .fin .caja { padding-bottom: 0; } .fin .menu { margin-left: -14px; margin-right: -14px; }
   .opcion.principal { font-size: 19px; }
+}
+
+/* Celular acostado (pantalla baja): el título y el lema se comían un tercio del
+   alto y el juego quedaba cortado abajo. Se esconden y la pantalla del juego
+   usa todo el alto menos el marcador. */
+@media (orientation: landscape) and (max-height: 520px) {
+  .cab { display: none; }
+  .pantalla { max-height: calc(100svh - 64px); }
 }

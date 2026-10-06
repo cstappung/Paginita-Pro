@@ -3474,6 +3474,13 @@ Things that matter:
   run is closed when the summary shows (`cierraCarrera` returns what it
   paints), so a completed set and its prize appear there. A frontal hit ends the run, a side hit is a stumble, and
   a second stumble within 8 s gets you caught.
+- **A stale game in cache is not cheating.** PR #135 raised the proof to
+  VERSION 2 without bumping the iframe's `?v=club-N`, so browsers kept the
+  old `index.html` (old engine, VERSION 1 proofs) while the page verified
+  with the new one, and honest players got the castigo. `esTrampa` now
+  skips any «otra versión» rejection (it is still rejected, not punished),
+  and **any change to a club game's proof must bump `club-N` in
+  `solo/club.js`**.
 - **The pogo stick only comes out of the mystery box** (`lanzaPogo`,
   `c.pogo`), never from the track generator, so the track still depends on
   the seed alone and proofs did not change. It launches to `alturaPogo`
@@ -3512,8 +3519,11 @@ Things that matter:
   ahead of time (`precarga`, 4 ms budget) and compiled inside the tunnel, so
   the switch does not stutter. Quality `alta`/`media`/`baja` sets pixel
   ratio (`dpr` 3 / 2.5 / 2, never more than the device's: at 1.5 / 1 / 0.8 a
-  3× phone drew a third of its resolution and the game looked blurred),
-  shadows, ambient occlusion (toy style only), bloom and the neon
+  3× phone drew a third of its resolution and the game looked blurred;
+  anti-aliasing is MSAA on the composer's target, 4 samples, only below 2×,
+  never FXAA, which blurred the whole frame; no chromatic aberration; line
+  widths are in CSS pixels, `mundo.resolucion` = CSS size, or a 2.2 px neon
+  edge was 0.7 px on a 3× phone), shadows, ambient occlusion (toy style only), bloom and the neon
   mirror floor; `baja` also shortens the view to 125 m with the fog closer
   (`vista`), which is what saves draw calls. In «auto» it steps down by
   itself when frames average over 28 ms. **Every geometry must carry

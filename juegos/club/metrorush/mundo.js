@@ -1605,7 +1605,10 @@ function armaTunel() {
 
 /** Crea el mundo sobre un canvas. Devuelve lo que la pantalla necesita para dibujar. */
 export function crearMundo(canvas) {
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
+  /* El suavizado del propio lienzo solo sirve cuando se dibuja directo (calidad
+     baja, sin post-proceso) en una pantalla de 1×: ahí, sin él, los bordes
+     salían en escalera. Con 2× o más no hace falta (ver armaComposer). */
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: (window.devicePixelRatio || 1) < 2, powerPreference: 'high-performance' });
   renderer.info.autoReset = false;                                            // se reinicia a mano en dibuja(): con post-proceso, cada pasada la borraba
   renderer.shadowMap.enabled = true;
   const escena = new THREE.Scene();
@@ -1911,8 +1914,16 @@ export function crearMundo(canvas) {
        lienzo se dibuja a la resolución de los píxeles (pixelRatio < 1, ver
        proporcion) y el navegador lo agranda sin suavizar. */
     if (calidad === 'baja') return;
-    const c = new EffectComposer(renderer);
-    c.setPixelRatio(renderer.getPixelRatio()); c.setSize(ancho, alto);
+    /* El suavizado de bordes es MSAA (el lienzo intermedio con 4 muestras por
+       píxel), no FXAA: FXAA difumina la imagen ENTERA después de dibujarla
+       (texturas, letreros, bordes finos) y era parte de lo «borroso». Con
+       2× de densidad o más no hace falta ninguno: el escalón de un borde ya
+       es más chico que lo que el ojo separa, y nos ahorramos el costo. */
+    const pr = renderer.getPixelRatio();
+    const muestras = pr < 2 && renderer.capabilities.isWebGL2 ? 4 : 0;
+    const rt = new THREE.WebGLRenderTarget(Math.round(ancho * pr), Math.round(alto * pr), { type: THREE.HalfFloatType, samples: muestras });
+    const c = new EffectComposer(renderer, rt);
+    c.setPixelRatio(pr); c.setSize(ancho, alto);
     if (kit.pixel) {
       // el tamaño del píxel se elige para que la imagen tenga ~270 filas de alto, en cualquier pantalla
       const px = Math.max(2, Math.round(alto * renderer.getPixelRatio() / 270));
@@ -1928,11 +1939,12 @@ export function crearMundo(canvas) {
     }
     if (A.bloom && pal.post.bloom) c.addPass(new UnrealBloomPass(new THREE.Vector2(ancho / 2, alto / 2), ...pal.post.bloom));
     c.addPass(new OutputPass());
-    if (A.fxaa && !kit.pixel) { const f = new ShaderPass(FXAAShader); f.uniforms.resolution.value.set(1 / (ancho * renderer.getPixelRatio()), 1 / (alto * renderer.getPixelRatio())); c.addPass(f); }
+    // FXAA solo si no hay MSAA (WebGL1) y la densidad es baja: es el último recurso, porque difumina
+    if (A.fxaa && !kit.pixel && !muestras && pr < 2) { const f = new ShaderPass(FXAAShader); f.uniforms.resolution.value.set(1 / (ancho * pr), 1 / (alto * pr)); c.addPass(f); }
     if (pal.post.vineta) {
       const v = new ShaderPass(ACABADO);
       v.uniforms.vig.value = pal.post.vineta; v.uniforms.sat.value = pal.post.sat || 1;
-      v.uniforms.aber.value = calidad === 'alta' ? (pal.post.aberracion || 0) : 0;
+      v.uniforms.aber.value = 0;                                             // sin aberración cromática: separaba los colores en los bordes y restaba nitidez
       v.uniforms.scan.value = pal.post.lineas || 0; v.uniforms.alto.value = alto * renderer.getPixelRatio();
       c.addPass(v);
     }
@@ -2297,7 +2309,11 @@ export function crearMundo(canvas) {
     camara.fov = fovBase + sens.extra;                                         // más lo que la velocidad le está sumando ahora (ver `paso`)
     ajusteRetrato.y = asp < 1 ? 1.2 * (1 - asp) : 0; ajusteRetrato.z = asp < 1 ? 2.2 * (1 - asp) : 0;
     camara.aspect = asp; camara.updateProjectionMatrix();
-    mundo.resolucion.set(ancho * renderer.getPixelRatio(), alto * renderer.getPixelRatio());
+    /* Las líneas (los bordes del neón, la rejilla, los cables) miden su grosor
+       en píxeles de esta resolución. Antes era la del lienzo (CSS × densidad),
+       y en un celular de 3× un borde de 2,2 px quedaba de 0,7 px: casi
+       invisible. En píxeles CSS el grosor es el mismo en cualquier pantalla. */
+    mundo.resolucion.set(ancho, alto);
     for (const k of kits.values()) for (const lm of k.lineasMat.values()) lm.resolution.copy(mundo.resolucion);
     ponEspejo();
     armaComposer();

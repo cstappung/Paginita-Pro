@@ -57,6 +57,12 @@ export function esTrampa(s) {
   const m = String(s.m || "");
   if (/^No se pudo comprobar/.test(m)) return false;
   if (/demasiado grande/.test(m)) return false;
+  /* Una prueba de otra versión es caché, no trampa: el iframe trae el juego
+     viejo (su index.html quedó guardado) y la página ya verifica con el nuevo.
+     Pasó con Metro Rush: la prueba subió a la versión 2 sin que cambiara el
+     ?v= del iframe, y gente que jugó normal se llevó el castigo. Se rechaza
+     igual (no entra a la tabla), pero no se castiga. */
+  if (/otra versi[oó]n/i.test(m)) return false;
   return true;
 }
 
