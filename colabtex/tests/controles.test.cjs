@@ -35,7 +35,7 @@ test('@controles en el código del juego manda sobre la lectura',()=>{
    `@controles:` en su código y se añade a esta lista. */
 const PROBADOS={
  movil:['orbita','escondite','cartas','cuadritos','worms','reversi','cadena','flip7','cacho','uno','catan','presidente','spicy','tetris','clue','ajedrez','pokemon',
-  'minas','snake','tetrisclub','bbtan','sopa','electro','sudoku','fanal','atasco','frontera','bots-worms','bots-clue'],
+  'minas','snake','tetrisclub','bbtan','sopa','electro','sudoku','fanal','atasco','aleteo','frontera','bots-worms','bots-clue'],
  teclado:['boxhead','bots-boxhead','sortem'],
  tecladoYRaton:['yemas','bots-yemas']
 };

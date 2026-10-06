@@ -102,7 +102,7 @@ const FABRICAS = {
 const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞", pokemon: "◓", boxhead: "▣", gato: "#" };
 /* Los clubes de un jugador, con sus claves de la clasificación y los
    mismos signos que llevan en su tarjeta del vestíbulo. */
-const ICONO_TODOS = { ...ICONO, general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", frontera: "🏰", sudoku: "🔢", fanal: "🪔", atasco: "🚗", metrorush: "🚇", yzombis: "🧟" };
+const ICONO_TODOS = { ...ICONO, general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", frontera: "🏰", sudoku: "🔢", fanal: "🪔", atasco: "🚗", aleteo: "🐦", metrorush: "🚇", yzombis: "🧟" };
 
 /* Lo que puede elegir quien abre la sala, por juego. Vive aquí y no en
    `motor.js` porque son controles y no reglas: el motor ya recorta lo
@@ -254,7 +254,7 @@ function leePopular() {
 }
 /* Los de un jugador, con su clave de popularidad. Cuentan como juegos en
    la marquesina: el «18» fijo de antes se quedó atrás con cada club. */
-const CLUBES = ["club-minas", "club-snake", "club-tetris", "club-sortem", "club-bbtan", "club-sopa", "club-electro", "club-frontera", "club-sudoku", "club-fanal", "club-atasco", "club-metrorush"];
+const CLUBES = ["club-minas", "club-snake", "club-tetris", "club-sortem", "club-bbtan", "club-sopa", "club-electro", "club-frontera", "club-sudoku", "club-fanal", "club-atasco", "club-aleteo", "club-metrorush"];
 function ordenPopular(claves) {
   const n = state.popular, pos = Object.fromEntries(claves.map((k, i) => [k, i]));
   return claves.slice().sort((a, b) => (n[b] || 0) - (n[a] || 0) || pos[a] - pos[b]);
@@ -848,7 +848,7 @@ function celebra(juego, id) {
    barra de direcciones. */
 function leerRuta() {
   const h = (location.hash || "").replace(/^#/, "");
-  if (/^solo\/(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|metrorush)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
+  if (/^solo\/(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|metrorush)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
   if (h === "ranks") return { vista: "ranks", pid: "" };
   if (h === "logros") return { vista: "logros", pid: "" };
   if (h === "monedas") return { vista: "monedas", pid: "" };
@@ -1471,7 +1471,7 @@ function armazon() {
     h.innerHTML = "";
     logrosVista = crearLogros({ uid: state.user.uid, watchLogros: fb.watchLogros, perfil: perfilDe, icono: ICONO_TODOS,
       orden: () => ordenPopular([...Object.keys(JUEGOS), ...CLUBES])
-        .map(k => ({ "club-minas": "minas", "club-snake": "snake", "club-tetris": "tetrisclub", "club-sortem": "sortem", "club-bbtan": "bbtan", "club-sopa": "sopa", "club-electro": "electro", "club-frontera": "frontera", "club-sudoku": "sudoku", "club-fanal": "fanal", "club-atasco": "atasco", "club-metrorush": "metrorush" })[k] || k) });
+        .map(k => ({ "club-minas": "minas", "club-snake": "snake", "club-tetris": "tetrisclub", "club-sortem": "sortem", "club-bbtan": "bbtan", "club-sopa": "sopa", "club-electro": "electro", "club-frontera": "frontera", "club-sudoku": "sudoku", "club-fanal": "fanal", "club-atasco": "atasco", "club-aleteo": "aleteo", "club-metrorush": "metrorush" })[k] || k) });
     logrosVista.montar(h);
     return;
   }
@@ -1691,6 +1691,9 @@ const NOVEDADES = [
     lema: "El tres en raya de siempre, en tiza sobre la pizarra. O el Super Gato: nueve gatos dentro de uno, y la casilla donde juegas decide en qué gato juega el otro.",
     sub: "Duelo · dos modalidades", sala: { k: "gato", ops: { variante: "super" } }, reglas: ["gato", "super"],
     modo: "multi", jugadores: "2 jugadores", cuenta: true },
+  { id: "aleteo", color: "#3fb6f5", alta: "2026-10-06", titulo: "ALETEO",
+    lema: "Un pajarito vuelve al nido por entre los tubos. Toca para aletear. Cuanto más lejos llega, más tarde se hace… y lo que hay al final del cielo no es un nido.",
+    sub: "Un jugador · seis cielos y una sola tabla", ruta: "#solo/aleteo", boton: "Volar", reglas: ["aleteo"], modo: "solo" },
   { id: "metrorush", color: "#ff6a3d", alta: "2026-10-05", titulo: "METRO RUSH",
     lema: "Corre por las vías esquivando trenes: salta las barreras bajas, rueda bajo las altas y sube por las rampas a correr sobre los techos. Junta monedas, cumple retos y no dejes que el inspector te atrape.",
     sub: "Un jugador · esquiva trenes, junta monedas y llega a la Estación Fantasma", ruta: "#solo/metrorush", boton: "Correr", reglas: ["metrorush"], modo: "solo" },
@@ -1711,6 +1714,8 @@ const NOVEDADES = [
     ruta: "#cartas", boton: "Abrir sobres", cuenta: true }
 ];
 function arteNovedad(n) {
+  // ALETEO: el cielo que se oscurece de izquierda a derecha, tubos y el pájaro.
+  if (n.id === "aleteo") return `<div class="jg-nov-arte-al"><i></i><i></i><i></i><i></i><em></em><b>ALETEO</b></div>`;
   // Atasco: un estacionamiento visto desde arriba, el auto rojo y la barrera de salida.
   if (n.id === "atasco") return `<div class="jg-nov-arte-at"><i></i><i></i><i></i><i></i><em></em><s></s><b>ATASCO</b></div>`;
   // Metro Rush: tres vías que se juntan en el horizonte, un tren de frente con los focos encendidos y unas monedas.

@@ -187,6 +187,13 @@ y están en el repositorio público, como cualquier archivo del sitio.
 > publicar las reglas se juega igual, pero las estrellas no entran en la
 > clasificación (se mandan solas después de publicarlas) y no pagan monedas.
 
+> **ALETEO (octubre de 2026):** `club-aleteo-vuelo` (los tubos del mejor
+> vuelo, con tope de 100 000) es una categoría nueva de `soloRanks`, y
+> `aleteo` un juego nuevo de `clubJugadas`. El progreso va en
+> `users/<uid>/club/aleteo`, que ya era de su dueño. Hasta volver a publicar
+> las reglas se juega igual, pero los vuelos no entran en la clasificación y
+> no pagan monedas.
+
 > **Metro Rush (octubre de 2026):** `club-metrorush-carrera` (los puntos de la
 > mejor carrera, con tope de 1 000 000 000, porque en el juego se llega a
 > millones) y `club-metrorush-distancia` (los metros de la carrera más larga,

@@ -140,12 +140,13 @@ const CLUBS = {
   sudoku: { nombre: "Sudoku Arcade", juego: "Sudoku Arcade", icono: "🔢", ruta: "sudoku" },
   fanal: { nombre: "FANAL", juego: "FANAL", icono: "🪔", ruta: "fanal" },
   atasco: { nombre: "Atasco", juego: "Atasco", icono: "🚗", ruta: "atasco" },
+  aleteo: { nombre: "ALETEO", juego: "ALETEO", icono: "🐦", ruta: "aleteo" },
   metrorush: { nombre: "Metro Rush", juego: "Metro Rush", icono: "🚇", ruta: "metrorush" }
 };
 
 /* "club-snake-arcade-grande" → {club, modalidad: "Arcade · tablero grande"} */
 export function categoriaLegible(cat) {
-  const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|metrorush)-(.+)$/.exec(String(cat || ""));
+  const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|metrorush)-(.+)$/.exec(String(cat || ""));
   if (!m) return null;
   return { club: CLUBS[m[1]], modalidad: m[2].split("-").map(k => MODALIDADES[k] || k).join(" · ") };
 }
@@ -171,6 +172,8 @@ export function marcaSolo(cat, f) {
   if (/^club-fanal-/.test(cat)) return `🪔 ${Number(f.puntos).toLocaleString("es-CL")} pts`;
   // Atasco: las estrellas juntadas en todos los niveles.
   if (cat === "club-atasco-estrellas") return `🚗 ${f.puntos} ★`;
+  // ALETEO: los tubos pasados en el mejor vuelo.
+  if (cat === "club-aleteo-vuelo") return `🐦 ${f.puntos} ${f.puntos === 1 ? "tubo" : "tubos"}`;
   // Metro Rush: la distancia se dice en metros; la mejor carrera, en puntos.
   if (cat === "club-metrorush-distancia") return `🚇 ${Number(f.puntos).toLocaleString("es-CL")} m`;
   if (cat === "club-metrorush-carrera") return `🚇 ${Number(f.puntos).toLocaleString("es-CL")} pts`;

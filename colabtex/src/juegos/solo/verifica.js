@@ -27,10 +27,11 @@ import * as sudoku from './verifica/sudoku.js';
 import * as electro from './verifica/electro.js';
 import * as fanal from './verifica/fanal.js';
 import * as atasco from './verifica/atasco.js';
+import * as aleteo from './verifica/aleteo.js';
 import * as frontera from './verifica/frontera.js';
 import * as metrorush from './verifica/metrorush.js';
 
-export const VERIFICADORES = {minas, snake, tetris, sortem, bbtan, sopa, sudoku, electro, fanal, atasco, frontera, metrorush};
+export const VERIFICADORES = {minas, snake, tetris, sortem, bbtan, sopa, sudoku, electro, fanal, atasco, aleteo, frontera, metrorush};
 
 /* Lo que ocupa una prueba como texto, como mucho. La regla de
    `soloPruebas` pide lo mismo. */

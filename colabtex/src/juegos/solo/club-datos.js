@@ -23,6 +23,9 @@ export function categoriaClub(juego, categoria) {
     // Atasco: una sola tabla, las estrellas juntadas en todos los niveles.
     : juego === 'atasco'
     ? categoria === 'club-atasco-estrellas'
+    // ALETEO: una sola tabla, los tubos pasados en el mejor vuelo.
+    : juego === 'aleteo'
+    ? categoria === 'club-aleteo-vuelo'
     // Metro Rush: la mejor carrera (puntos) y la carrera más larga (metros).
     : juego === 'metrorush'
     ? /^club-metrorush-(carrera|distancia)$/.test(categoria)
@@ -58,6 +61,8 @@ export function resultadoClub(juego, dato) {
   /* Atasco: tres estrellas por nivel; 3000 deja sitio para más pisos
      sin aceptar números absurdos (hoy son 240 niveles, 720 estrellas). */
   if (juego === 'atasco' && dato.puntos > 3000) return null;
+  /* ALETEO: tubos de un vuelo, con el tope de su verificador. */
+  if (juego === 'aleteo' && dato.puntos > 100000) return null;
   /* Metro Rush: una carrera pasa del millón de puntos sin esfuerzo, así que
      su tope es el de la regla (1 000 000 000); la distancia son metros,
      hasta 1 000 000 (mil kilómetros en una carrera). */

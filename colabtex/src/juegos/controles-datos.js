@@ -4,6 +4,7 @@
    `pide`: qué hace falta si no va en el celular; `por`: la señal que decidió. */
 export const CONTROLES = {
   "ajedrez": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
+  "aleteo": {"movil":true,"pc":true,"pide":"","por":"escucha toques"},
   "atasco": {"movil":true,"pc":true,"pide":"","por":"escucha toques"},
   "bbtan": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
   "bots-boxhead": {"movil":false,"pc":true,"pide":"teclado","por":"flechas o WASD sin toque ni puntero"},
