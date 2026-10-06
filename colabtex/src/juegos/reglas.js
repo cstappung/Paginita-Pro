@@ -926,7 +926,7 @@ const REGLAS = {
         "Empiezas con un Despegue de regalo."
       ])],
       ["Estaciones", lista([
-        "El paisaje cambia con los puntos de la carrera, siempre pasando por un túnel: <b>Barrio Estación</b> (desde 0, la ciudad de día), <b>Ocaso</b> (50 000, retro pixelado al atardecer), <b>Línea Neón</b> (200 000, noche synthwave), <b>Estación Fantasma</b> (1 000 000), <b>Invierno</b> (2 500 000), <b>Óxido</b> (5 000 000) y <b>Fin de la Línea</b> (10 000 000). Después vuelven a girar.",
+        "El paisaje cambia con la distancia recorrida, siempre pasando por un túnel: <b>Barrio Estación</b> (desde el comienzo, la ciudad de día), <b>Ocaso</b> (a los 1 500 m, retro pixelado al atardecer), <b>Línea Neón</b> (3 500 m, noche synthwave), <b>Estación Fantasma</b> (6 000 m), <b>Invierno</b> (9 000 m), <b>Óxido</b> (12 500 m) y <b>Fin de la Línea</b> (17 000 m). Después vuelven a girar cada 4 km.",
         "En cada estación hay un <b>boleto dorado</b> con un trozo de la historia. Los que encuentres se leen en la <b>Libreta</b>.",
         "En Opciones puedes fijar un estilo (juguete, neón o pixelado) en vez de que cambie con las estaciones, y bajar la calidad gráfica si el teléfono va lento."
       ])],

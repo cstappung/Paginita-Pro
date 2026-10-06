@@ -457,17 +457,16 @@ function actualiza(dt) {
 
 /* ---- estaciones y túneles ---- */
 function estaciones() {
-  /* El túnel se pide ANTES de llegar al umbral. La pista ya está generada
-     unos 230 m por delante (lo que se ve), así que un túnel pedido justo al
-     cruzar el umbral recién aparecería 15 segundos después. Por eso se
-     calcula cuántos metros faltan para el umbral al multiplicador de ahora:
-     si es menos de lo que ya está generado, el túnel se pide ya y cae más o
-     menos donde vas a estar cuando ganes esos puntos. Ejemplo: vas en 49 000
-     con ×5, faltan 1000 puntos = 20 m; el túnel cae a ~240 m y la estación
-     nueva empieza al salir de él. */
-  const sig = M.siguienteUmbral(c.puntos);
-  const faltan = (sig - c.puntos) / (M.PUNTOS_POR_METRO * multiplicador());
-  const e = M.estacionDe(faltan < 220 ? sig : c.puntos);         // a donde se va: la que viene si llega pronto
+  /* Las estaciones cambian con la DISTANCIA (M.ESTACIONES, en metros), no
+     con los puntos. El túnel se pide ANTES de llegar al umbral: la pista ya
+     está generada unos 230 m por delante (lo que se ve), así que un túnel
+     pedido justo al cruzar el umbral recién aparecería 230 m después. Si
+     faltan menos de 220 m, se pide ya y cae justo en el umbral, porque es
+     ahí donde termina lo generado. Ejemplo: vas en el metro 1 300 y Ocaso
+     empieza en el 1 500; el túnel cae a ~1 530 y Ocaso empieza al salir. */
+  const sig = M.siguienteUmbral(c.D);                            // el metro en que empieza la estación siguiente
+  const faltan = sig - c.D;                                      // cuántos metros faltan para llegar
+  const e = M.estacionDe(faltan < 220 ? sig : c.D);              // a donde se va: la que viene si llega pronto
   if (!c.cambio && e.clave !== c.estacion.clave) {
     c.cambio = { estacion: e, tunel: null, hecho: false };
     anotaPedido('T', c.D + 40, e.id);
@@ -476,7 +475,7 @@ function estaciones() {
     mundo.letreroTunel(e.nombre);
   }
   // precarga el kit de la estación siguiente cuando falta poco (para que el túnel no se trabe)
-  if (c.puntos > sig * 0.7) mundo.precarga(estacionVisual(M.estacionDe(sig)));
+  if (faltan < 900) mundo.precarga(estacionVisual(M.estacionDe(sig)));
   const cb = c.cambio;
   if (cb && cb.tunel) {
     const o = cb.tunel;
@@ -814,8 +813,8 @@ function pintaHud(dt) {
   ponTexto('hudMonedas', mon);
   ponTexto('hudPatinetas', String(progreso.patinetas));
   // la barra hacia la próxima estación
-  const e = c.estacion, sig = M.siguienteUmbral(c.puntos), desde = e.desde || 0;
-  const k = Math.max(0, Math.min(1, (c.puntos - (e.vuelta > 1 ? sig - M.VUELTA_CADA : desde)) / Math.max(1, sig - (e.vuelta > 1 ? sig - M.VUELTA_CADA : desde))));
+  const e = c.estacion, sig = M.siguienteUmbral(c.D), desde = e.desde || 0;   // en metros, como las estaciones
+  const k = Math.max(0, Math.min(1, (c.D - (e.vuelta > 1 ? sig - M.VUELTA_CADA : desde)) / Math.max(1, sig - (e.vuelta > 1 ? sig - M.VUELTA_CADA : desde))));
   ponTexto('hudEstacion', e.nombre);
   $('hudEstBarra').style.setProperty('--k', k.toFixed(3));
   // los poderes activos, con su barra de tiempo
@@ -1054,7 +1053,7 @@ function abreLibreta() {
   $('listaBoletos').innerHTML = M.ESTACIONES.map(e => {
     const b = M.BOLETOS[e.boleto], tiene = progreso.boletos.includes(e.boleto);
     return tiene ? `<li><strong>${b.titulo}</strong><p>${b.texto}</p></li>`
-      : `<li class="falta"><strong>Boleto n.º ${e.boleto} · ${e.desde ? `desde ${fmt(e.desde)} puntos` : 'Barrio Estación'}</strong><p>Todavía no lo encuentras. Está en la estación ${e.nombre}.</p></li>`;
+      : `<li class="falta"><strong>Boleto n.º ${e.boleto} · ${e.desde ? `desde los ${fmt(e.desde)} m` : 'Barrio Estación'}</strong><p>Todavía no lo encuentras. Está en la estación ${e.nombre}.</p></li>`;
   }).join('');
   $('libretaCuenta').textContent = `${progreso.boletos.length} de 7 boletos`;
   abrePanel('capaLibreta');

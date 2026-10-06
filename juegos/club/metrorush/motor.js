@@ -189,39 +189,46 @@
   /** Puntos que da avanzar `metros` con ese multiplicador. */
   const puntosPorTramo = (metros, mult) => metros * PUNTOS_POR_METRO * mult;
 
-  /* ---------- Estaciones (cambian con los puntos) ----------
+  /* ---------- Estaciones (cambian con la distancia) ----------
      Cada estación tiene su estilo de dibujo (juguete, pixel o neón), su
      paleta de colores, su música y un boleto dorado con un trozo de la
-     historia. Se entra a cada una por un túnel. Después de la última, las
-     tres primeras vuelven a girar cada 2 millones ("vuelta 2", "vuelta 3"…). */
+     historia. Se entra a cada una por un túnel. `desde` son METROS de la
+     carrera: antes eran puntos, y como los puntos van × el multiplicador,
+     quien tenía ×30 pasaba por todas las estaciones treinta veces más
+     rápido que quien empezaba. Por distancia, todos las ven en el mismo
+     punto de la vía. Con la velocidad de la carrera (ver VELOCIDAD) se
+     llega a Ocaso hacia 1 min 15 s, a Línea Neón a 2 min 40 s, a Estación
+     Fantasma a 4 min, a Invierno a 5 min 10 s, a Óxido a 6 min 10 s (ya a
+     50 m/s) y al Fin de la Línea a 7 min 40 s. Después de la última, las
+     tres primeras vuelven a girar cada 4 km ("vuelta 2", "vuelta 3"…). */
   const ESTACIONES = [
     { id: "barrio", nombre: "Barrio Estación", desde: 0, estilo: "juguete", paleta: "barrio", musica: "metrorush-barrio", lema: "Donde empieza la Línea 3", boleto: 1 },
-    { id: "ocaso", nombre: "Ocaso", desde: 50000, estilo: "pixel", paleta: "ocaso", musica: "metrorush-ocaso", lema: "El sol se pone en píxeles", boleto: 2 },
-    { id: "neon", nombre: "Línea Neón", desde: 200000, estilo: "neon", paleta: "neon", musica: "metrorush-neon", lema: "De noche la vía se enciende sola", boleto: 3 },
-    { id: "fantasma", nombre: "Estación Fantasma", desde: 1000000, estilo: "neon", paleta: "fantasma", musica: "metrorush-fantasma", lema: "Nadie había corrido tanto", boleto: 4 },
-    { id: "invierno", nombre: "Invierno", desde: 2500000, estilo: "juguete", paleta: "invierno", musica: "metrorush-invierno", lema: "Nieva sobre los rieles", boleto: 5 },
-    { id: "oxido", nombre: "Óxido", desde: 5000000, estilo: "pixel", paleta: "oxido", musica: "metrorush-oxido", lema: "Más allá del mapa", boleto: 6 },
-    { id: "fin", nombre: "Fin de la Línea", desde: 10000000, estilo: "juguete", paleta: "alba", musica: "metrorush-fin", lema: "Aquí se acaban las vías… ¿o no?", boleto: 7 }
+    { id: "ocaso", nombre: "Ocaso", desde: 1500, estilo: "pixel", paleta: "ocaso", musica: "metrorush-ocaso", lema: "El sol se pone en píxeles", boleto: 2 },
+    { id: "neon", nombre: "Línea Neón", desde: 3500, estilo: "neon", paleta: "neon", musica: "metrorush-neon", lema: "De noche la vía se enciende sola", boleto: 3 },
+    { id: "fantasma", nombre: "Estación Fantasma", desde: 6000, estilo: "neon", paleta: "fantasma", musica: "metrorush-fantasma", lema: "Nadie había corrido tanto", boleto: 4 },
+    { id: "invierno", nombre: "Invierno", desde: 9000, estilo: "juguete", paleta: "invierno", musica: "metrorush-invierno", lema: "Nieva sobre los rieles", boleto: 5 },
+    { id: "oxido", nombre: "Óxido", desde: 12500, estilo: "pixel", paleta: "oxido", musica: "metrorush-oxido", lema: "Más allá del mapa", boleto: 6 },
+    { id: "fin", nombre: "Fin de la Línea", desde: 17000, estilo: "juguete", paleta: "alba", musica: "metrorush-fin", lema: "Aquí se acaban las vías… ¿o no?", boleto: 7 }
   ];
-  const VUELTA_DESDE = 12000000, VUELTA_CADA = 2000000;   // desde 12 M, una estación de las tres primeras cada 2 M
+  const VUELTA_DESDE = 21000, VUELTA_CADA = 4000;   // desde los 21 km, una estación de las tres primeras cada 4 km
 
-  /** La estación que corresponde a `puntos`. Devuelve una copia con `clave`
-      (distinta en cada vuelta, para saber cuándo hay que cambiar). */
-  function estacionDe(puntos) {
-    const p = Math.max(0, puntos || 0);
+  /** La estación que corresponde a los `metros` corridos. Devuelve una copia
+      con `clave` (distinta en cada vuelta, para saber cuándo hay que cambiar). */
+  function estacionDe(metros) {
+    const p = Math.max(0, metros || 0);
     if (p < VUELTA_DESDE) {
       let e = ESTACIONES[0];
       for (const x of ESTACIONES) if (p >= x.desde) e = x;  // la última cuyo umbral ya pasaste
       return Object.assign({}, e, { clave: e.id, vuelta: 1 });
     }
-    const k = Math.floor((p - VUELTA_DESDE) / VUELTA_CADA);  // cuántos giros van desde los 12 M
+    const k = Math.floor((p - VUELTA_DESDE) / VUELTA_CADA);  // cuántos giros van desde los 21 km
     const base = ESTACIONES[k % 3];                          // barrio, ocaso, neón, barrio…
     const vuelta = 2 + Math.floor(k / 3);                    // la vuelta en que vas
     return Object.assign({}, base, { nombre: `${base.nombre} · vuelta ${vuelta}`, clave: `${base.id}-${k}`, vuelta, boleto: null });
   }
-  /** Los puntos a los que empieza la estación siguiente (para la barra del HUD). */
-  function siguienteUmbral(puntos) {
-    const p = Math.max(0, puntos || 0);
+  /** Los metros a los que empieza la estación siguiente (para la barra del HUD). */
+  function siguienteUmbral(metros) {
+    const p = Math.max(0, metros || 0);
     for (const x of ESTACIONES) if (x.desde > p) return x.desde;
     if (p < VUELTA_DESDE) return VUELTA_DESDE;
     return VUELTA_DESDE + (Math.floor((p - VUELTA_DESDE) / VUELTA_CADA) + 1) * VUELTA_CADA;
@@ -235,7 +242,7 @@
     { titulo: "Boleto n.º 1 · Barrio Estación", texto: "La Línea 3 cierra mañana. Dicen que el último tren no para en ninguna estación. Dicen muchas cosas." },
     { titulo: "Boleto n.º 2 · Ocaso", texto: "Don Ramón lleva cuarenta años de inspector y nunca ha atrapado a nadie. Tornillo tampoco. Pero no se rinden: es su última noche también." },
     { titulo: "Boleto n.º 3 · Línea Neón", texto: "De noche la vía se enciende sola. Nadie paga la luz. Nadie pregunta. Los letreros dicen tu nombre si corres lo bastante rápido." },
-    { titulo: "Boleto n.º 4 · Estación Fantasma", texto: "Un millón. Aquí bajan los que corrieron demasiado y se quedaron a vivir en la vía. Saluda: te están aplaudiendo, aunque no los veas." },
+    { titulo: "Boleto n.º 4 · Estación Fantasma", texto: "Seis kilómetros. Aquí bajan los que corrieron demasiado y se quedaron a vivir en la vía. Saluda: te están aplaudiendo, aunque no los veas." },
     { titulo: "Boleto n.º 5 · Invierno", texto: "Nieva sobre los rieles. En el andén hay un termo de café con una nota: «Para el que corre. —R.». Don Ramón sabe que no lo vas a tomar. Lo deja igual." },
     { titulo: "Boleto n.º 6 · Óxido", texto: "La línea sigue más allá del mapa. Los rieles están tibios y oxidados, como si alguien los hubiera usado anoche. Alguien que corría como tú." },
     { titulo: "Boleto n.º 7 · Fin de la Línea", texto: "Amanece. Se acabaron las vías… y aun así tus pies siguen encontrando dónde pisar. La Línea 3 no cierra mientras alguien la corra. Gracias por correrla." }
@@ -252,8 +259,11 @@
   };
   const SEG_POR_NIVEL = 2.5;                         // cada mejora alarga el poder 2,5 s (la mochila, `paso`: 1 s)
   const MAX_MEJORA = 5;                              // cinco mejoras por poder
-  const PRECIOS_MEJORA = [250, 600, 1200, 2500, 5000];   // lo que cuesta pasar al nivel 1, 2, 3, 4, 5
-  const PRECIO_PATINETA = 300;                       // una patineta, en monedas del juego
+  /* Los precios de la tienda subieron ×10 (las mejoras eran de 250 a 5 000 y
+     la patineta 300): con lo que se junta en unas pocas carreras se compraba
+     todo, y una tienda que se vacía en una tarde deja de ser una meta. */
+  const PRECIOS_MEJORA = [2500, 6000, 12000, 25000, 50000];   // lo que cuesta pasar al nivel 1, 2, 3, 4, 5
+  const PRECIO_PATINETA = 3000;                      // una patineta, en monedas del juego
   const DURACION_PATINETA = 30;                      // segundos que dura una patineta
   /** Duración (s) de un poder con `nivel` mejoras. Ejemplo: imán nivel 2 →
       15 s; mochila nivel 2 → 7 s (de 5 a 10 s con las cinco mejoras). */
@@ -268,11 +278,13 @@
      se guardan y se usan al empezar una carrera (aparecen dos botones los
      primeros segundos). Se gastan al usarlos. */
   const POTENCIADORES = {
-    despegue: { nombre: "Despegue", precio: 1500, seg: 7, texto: "Empiezas la carrera volando con la mochila cohete, 7 s" },
-    puntos: { nombre: "Potenciador +5", precio: 2500, extra: 5, texto: "+5 al multiplicador durante toda una carrera" }
+    despegue: { nombre: "Despegue", precio: 15000, seg: 7, texto: "Empiezas la carrera volando con la mochila cohete, 7 s" },
+    puntos: { nombre: "Potenciador +5", precio: 25000, extra: 5, texto: "+5 al multiplicador durante toda una carrera" }
   };
-  /** Saltar una misión cuesta más mientras más alto el multiplicador. Ejemplo: en ×1, 550; en ×10, 1900. */
-  const costoSaltar = nivel => 400 + 150 * limita(nivel | 0, 1, MAX_BASE);
+  /** Saltar una misión cuesta más mientras más alto el multiplicador. Ejemplo:
+      en ×1, 2 750; en ×10, 9 500 (subió ×5: saltarse las misiones salía más
+      barato que cumplirlas). */
+  const costoSaltar = nivel => 2000 + 750 * limita(nivel | 0, 1, MAX_BASE);
   /** Lo que paga completar un set de tres misiones (además de subir el multiplicador). Ejemplo: el set de ×4 paga 450. */
   const premioSet = nivel => 250 + 50 * limita(nivel | 0, 1, MAX_BASE);
   /** Seguir después de chocar: 500, 1000, 2000… monedas (se duplica en cada carrera). */
@@ -281,8 +293,8 @@
   /* Los aspectos del corredor: colores de la ropa. Dos son secretos. */
   const ASPECTOS = {
     clasico: { nombre: "Clásico", precio: 0, sudadera: 0xff5a3c, gorra: 0x2a6df4, jeans: 0x3b5ba8, mochila: 0x1fb5a0, mochila2: 0xffd23f, suela: 0xe8463b },
-    nocturno: { nombre: "Nocturno", precio: 1500, sudadera: 0x2b2d42, gorra: 0x8d99ae, jeans: 0x1d1e2c, mochila: 0xef233c, mochila2: 0xedf2f4, suela: 0xef233c },
-    grafitero: { nombre: "Grafitero", precio: 3000, sudadera: 0x7b2ff7, gorra: 0x00f5d4, jeans: 0x22223b, mochila: 0xfee440, mochila2: 0xf15bb5, suela: 0x00f5d4 },
+    nocturno: { nombre: "Nocturno", precio: 15000, sudadera: 0x2b2d42, gorra: 0x8d99ae, jeans: 0x1d1e2c, mochila: 0xef233c, mochila2: 0xedf2f4, suela: 0xef233c },
+    grafitero: { nombre: "Grafitero", precio: 30000, sudadera: 0x7b2ff7, gorra: 0x00f5d4, jeans: 0x22223b, mochila: 0xfee440, mochila2: 0xf15bb5, suela: 0x00f5d4 },
     dorado: { nombre: "Dorado", precio: null, secreto: "Teclea el código de siempre en la portada (↑ ↑ ↓ ↓ ← → ← → B A).", sudadera: 0xd4a017, gorra: 0xffe066, jeans: 0x8a6d1a, mochila: 0xffd23f, mochila2: 0xfff3b0, suela: 0xffe066 },
     inspector: { nombre: "Inspector", precio: null, secreto: "Encuentra los siete boletos dorados.", sudadera: 0x1f3a5f, gorra: 0x1f3a5f, jeans: 0x14213d, mochila: 0x8a5a35, mochila2: 0xfca311, suela: 0x111111 }
   };

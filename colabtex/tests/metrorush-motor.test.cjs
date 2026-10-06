@@ -227,16 +227,21 @@ test('puntos y multiplicador: lo que dice el manual', () => {
   assert.equal(M.puntosPorTramo(100, 3), 3000);
 });
 
-test('estaciones: los umbrales del manual y las vueltas', () => {
-  const nombres = [[0, 'Barrio Estación'], [49999, 'Barrio Estación'], [50000, 'Ocaso'], [200000, 'Línea Neón'], [1e6, 'Estación Fantasma'],
-    [2.5e6, 'Invierno'], [5e6, 'Óxido'], [1e7, 'Fin de la Línea'], [11999999, 'Fin de la Línea']];
+test('estaciones: los umbrales del manual (en metros) y las vueltas', () => {
+  const nombres = [[0, 'Barrio Estación'], [1499, 'Barrio Estación'], [1500, 'Ocaso'], [3500, 'Línea Neón'], [6000, 'Estación Fantasma'],
+    [9000, 'Invierno'], [12500, 'Óxido'], [17000, 'Fin de la Línea'], [20999, 'Fin de la Línea']];
   for (const [p, n] of nombres) assert.equal(M.estacionDe(p).nombre, n, String(p));
   assert.deepEqual(M.ESTACIONES.map(e => e.estilo), ['juguete', 'pixel', 'neon', 'neon', 'juguete', 'pixel', 'juguete']);
-  const v = M.estacionDe(12e6);
+  const v = M.estacionDe(21000);
   assert.equal(v.id, 'barrio'); assert.equal(v.vuelta, 2); assert.equal(v.boleto, null);
-  assert.equal(M.estacionDe(14e6).id, 'ocaso'); assert.equal(M.estacionDe(16e6).id, 'neon'); assert.equal(M.estacionDe(18e6).vuelta, 3);
-  assert.notEqual(M.estacionDe(12e6).clave, M.estacionDe(18e6).clave, 'cada vuelta es un cambio');
-  assert.equal(M.siguienteUmbral(0), 50000); assert.equal(M.siguienteUmbral(1e7), 12e6); assert.equal(M.siguienteUmbral(12.5e6), 14e6);
+  assert.equal(M.estacionDe(25000).id, 'ocaso'); assert.equal(M.estacionDe(29000).id, 'neon'); assert.equal(M.estacionDe(33000).vuelta, 3);
+  assert.notEqual(M.estacionDe(21000).clave, M.estacionDe(33000).clave, 'cada vuelta es un cambio');
+  assert.equal(M.siguienteUmbral(0), 1500); assert.equal(M.siguienteUmbral(17000), 21000); assert.equal(M.siguienteUmbral(22000), 25000);
+  // con la velocidad de la carrera, las estaciones van repartidas: ninguna llega antes del minuto ni dos en menos de 50 s
+  const tDe = m => { let t = 0; while (M.metrosEntre(0, t) < m) t += 0.25; return t; };
+  const tiempos = M.ESTACIONES.slice(1).map(e => tDe(e.desde));
+  assert.ok(tiempos[0] > 60, 'Ocaso llega a los ' + tiempos[0] + ' s');
+  for (let i = 1; i < tiempos.length; i++) assert.ok(tiempos[i] - tiempos[i - 1] > 50, M.ESTACIONES[i + 1].id + ' llega ' + (tiempos[i] - tiempos[i - 1]) + ' s después de la anterior');
   // un boleto por estación, con su texto
   for (const e of M.ESTACIONES) assert.ok(M.BOLETOS[e.boleto] && M.BOLETOS[e.boleto].texto.length > 40, e.id);
 });
@@ -245,7 +250,11 @@ test('poderes y tienda: duraciones y precios', () => {
   assert.equal(M.duracionPoder('iman', 0), 10); assert.equal(M.duracionPoder('iman', 2), 15);
   assert.equal(M.duracionPoder('mochila', 0), 5); assert.equal(M.duracionPoder('mochila', 5), 10, 'la mochila es corta: 1 s por mejora');
   assert.equal(M.duracionPoder('doble', 9), 24.5, 'el nivel no pasa de 5');
-  assert.equal(M.precioMejora(0), 250); assert.equal(M.precioMejora(4), 5000); assert.equal(M.precioMejora(5), null);
+  assert.equal(M.precioMejora(0), 2500); assert.equal(M.precioMejora(4), 50000); assert.equal(M.precioMejora(5), null);   // la tienda, ×10
+  assert.equal(M.PRECIO_PATINETA, 3000);
+  assert.deepEqual([M.POTENCIADORES.despegue.precio, M.POTENCIADORES.puntos.precio], [15000, 25000]);
+  assert.deepEqual([M.ASPECTOS.nocturno.precio, M.ASPECTOS.grafitero.precio], [15000, 30000]);
+  assert.deepEqual([M.costoSaltar(1), M.costoSaltar(10)], [2750, 9500], 'saltar una misión, ×5');
   assert.deepEqual([0, 1, 2].map(M.costoSeguir), [500, 1000, 2000]);
   const az = M.rng(3); let pat = 0, mon = 0;
   for (let i = 0; i < 4000; i++) { const r = M.cajaMisteriosa(az); if (r.patineta) pat++; if (r.monedas) mon++; }

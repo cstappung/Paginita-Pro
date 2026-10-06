@@ -3383,17 +3383,20 @@ Things that matter:
   track. `tests/metrorush-motor.test.cjs` climbs it at 20–144 fps and every
   speed, and checks that a car's front, a low jump into it and a side entry
   under a ramp still crash.
-- **The score decides the scenery.** `ESTACIONES`: Barrio Estación (0,
-  toy-like), Ocaso (50 k, pixel), Línea Neón (200 k, neon), Estación
-  Fantasma (1 M), Invierno (2.5 M), Óxido (5 M) and Fin de la Línea
-  (10 M); from 12 M the first three come back every 2 M as «vuelta N». A
-  station changes **inside a tunnel** (150 m, coins only), where nothing
-  outside is visible: `juego.js` swaps the kit, the music and the HUD skin
-  at `d0 + 40`. The track is already generated ~230 m ahead, so the tunnel
-  is requested *before* the threshold, when the metres left at the current
-  multiplier fit in what is generated (`estaciones()`); requested at the
-  threshold it showed up 15 s late. The options can lock one style
-  (`estacionVisual`).
+- **The distance decides the scenery** (it used to be the score, so a
+  player at ×30 went through every station thirty times faster than a
+  newcomer). `ESTACIONES[].desde` is in metres: Barrio Estación (0,
+  toy-like), Ocaso (1 500 m, pixel), Línea Neón (3 500, neon), Estación
+  Fantasma (6 000), Invierno (9 000), Óxido (12 500) and Fin de la Línea
+  (17 000); from 21 km the first three come back every 4 km as «vuelta N».
+  With the speed ramp that is ~1:15, 2:40, 4:00, 5:10, 6:10 and 7:40 of
+  running, and the test checks none comes before the first minute or less
+  than 50 s after the previous one. A station changes **inside a tunnel**
+  (150 m, coins only), where nothing outside is visible: `juego.js` swaps
+  the kit, the music and the HUD skin at `d0 + 40`. The track is already
+  generated ~230 m ahead, so the tunnel is requested *before* the
+  threshold, as soon as fewer than 220 m are left (`estaciones()`), and it
+  lands right on it. The options can lock one style (`estacionVisual`).
 - **The numbers are tuned for the «million points»**: 10 points per metre
   times the multiplier. The base multiplier goes ×1 → ×30 by completing
   missions (three per level, `retosDeNivel(nivel)`, seeded); each star picked
@@ -3428,7 +3431,7 @@ Things that matter:
   short and frantic, +1 s per level, up to 10), super sneakers 10 s (jumps
   4.1 m), 2× 12 s, the others +2.5 s per shop level (five levels; a power's
   own `paso` overrides it); mystery box (coins, a skateboard or a jackpot); skateboard
-  (300 coins, 30 s, survives one crash); continue after a crash for
+  (3 000 coins, 30 s, survives one crash); continue after a crash for
   500 × 2^k coins, offered for 5 s by a round «¿Seguir corriendo?»
   button before the summary (`abreSalvar`), as in Subway Surfers. The
   run is closed when the summary shows (`cierraCarrera` returns what it
