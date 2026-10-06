@@ -149,3 +149,32 @@ test('Castigo: está conectado donde se rechaza una partida',()=>{
   assert.match(fr,/dRacha\.partida \}, prueba, true\)/,'la Frontera: solo la victoria recién ganada');
   for(const f of ['bsod.png','bsod.mp3','wasted.mp3'])assert.ok(fs.existsSync(path.join(__dirname,'../../juegos/castigo',f)),f);
 });
+
+test('Castigo: la suspensión de un administrador usa la misma capa y se levanta en vivo',()=>{
+  mock.timers.enable({apis:['setTimeout','setInterval']});
+  try{
+    const E=entorno(),C=carga();let t=1e12,cambios=0;
+    C.configuraCastigo({ahora:()=>t,alCambiar:()=>cambios++});
+    const DIA=24*60*MIN;
+    assert.equal(C.revisaCastigo({uid:'ana',cuenta:0,suspension:null}),false);
+    assert.equal(C.revisaCastigo({suspension:{hasta:t+2*DIA+3*60*MIN,m:'Récords falsos'}}),true);
+    assert.equal(E.capa().classList.contains('retenido'),true,'directo al WASTED, sin pantallazo');
+    assert.match(E.capa().innerHTML,/WASTED/);
+    assert.match(E.capa().innerHTML,/administrador suspendió/);
+    assert.match(E.capa().innerHTML,/Récords falsos/);
+    assert.equal(E.capa().querySelector('.jg-cs-r').textContent,'2d 03:00:00','los días se cuentan');
+    assert.deepEqual(E.sonidos,['juegos/castigo/wasted.mp3'],'suena el «wasted» al llegar');
+    C.revisaCastigo({});
+    assert.equal(E.sonidos.length,1,'no vuelve a sonar al repintar');
+    assert.equal(C.revisaCastigo({uid:null}),false,'sin sesión no se aplica (un invitado no guarda nada)');
+    assert.equal(C.revisaCastigo({uid:'ana'}),true);
+    assert.equal(C.revisaCastigo({suspension:null}),false,'el administrador la levanta: la capa se va sola');
+    assert.equal(E.capa(),null);
+    assert.ok(cambios>=2);
+    /* La que ya pasó no tapa nada. */
+    assert.equal(C.revisaCastigo({suspension:{hasta:t-1,m:''}}),false);
+    assert.equal(C.hastaDeSuspension({hasta:t+5},t),t+5);
+    assert.equal(C.hastaDeSuspension({hasta:'x'},t),0);
+    assert.equal(C.restante(1000+3600000,1000),'01:00:00');
+  }finally{mock.timers.reset();}
+});

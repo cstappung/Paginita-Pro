@@ -5,6 +5,8 @@ import { crearSolo } from "./juegos/solo/club.js";
 import { esRachaClub, rachaClub } from "./juegos/solo/club-datos.js";
 import { VERIFICADORES, juegoDeCategoria, textoPrueba } from "./juegos/solo/verifica.js";
 import { crearFrontera } from "./juegos/frontera.js";
+import { crearAdmin } from "./juegos/admin.js";
+import { merecesRevision } from "./juegos/admin-datos.js";
 import { esTrampa, castiga, revisaCastigo, castigoActivo, configuraCastigo, hastaDeCuenta } from "./juegos/castigo.js";
 "use strict";
 /* ============================================================
@@ -229,6 +231,7 @@ const modoReglas = (juego, o) => juego === "cacho" ? (Number(o.sicil) || 0)
 const state = {
   user: null,           // el perfil ya aplicado: lo que se pinta
   invitado: false,      // sin sesión: se ve el salón y se juega a lo de un jugador
+  admin: false,         // `admins/<uid>`: ve el escudo 🛡️ y el panel #admin (null mientras se comprueba)
   base: null,           // lo que dice Google, sin tocar
   vista: "vestibulo",     // vestibulo | partida | ranks
   pid: "",
@@ -257,7 +260,7 @@ function ordenPopular(claves) {
   return claves.slice().sort((a, b) => (n[b] || 0) - (n[a] || 0) || pos[a] - pos[b]);
 }
 
-let offSalas = null, offMias = null, offPartida = null, offReloj = null, offEnCurso = null, offCastigo = null;
+let offSalas = null, offMias = null, offPartida = null, offReloj = null, offEnCurso = null, offCastigo = null, offSuspension = null;
 let offChat = null, chatMsgs = [], chatFirma = "";
 let jugadasVistas = -1;   // cuántas jugadas tenía el registro la última vez
 let ultimoCambio = 0;     // cuándo creció el registro por última vez (reloj local)
@@ -271,6 +274,7 @@ let logrosVista = null;
 let paginaPerfil = null;
 let monedasVista = null;
 let prodropVista = null;
+let adminVista = null;
 let individual = null;
 let proximo = 0;          // el número de jugada que toca escribir
 const enVuelo = new Set(); // jugadas de esta pestaña aún sin confirmar (ver `terminar`)
@@ -486,6 +490,8 @@ function mostrar() {
   $("viewMain").style.display = dentro || state.invitado ? "" : "none";
   for (const id of ["userName", "userAvatar", "btnPerfil", "btnLogout", "userMonedas"]) $(id).style.display = dentro ? "" : "none";
   $("btnEntrar").style.display = state.invitado ? "" : "none";
+  /* El escudo del panel solo lo ve quien está en `admins/<uid>`. */
+  $("btnAdmin").style.display = dentro && state.admin ? "" : "none";
   document.documentElement.classList.toggle("jg-invitado", state.invitado);
 }
 
@@ -847,6 +853,7 @@ function leerRuta() {
   if (h === "logros") return { vista: "logros", pid: "" };
   if (h === "monedas") return { vista: "monedas", pid: "" };
   if (h === "cartas") return { vista: "cartas", pid: "" };
+  if (h === "admin") return { vista: "admin", pid: "" };
   const pf = h.match(/^perfil\/([-\w]+)$/);
   if (pf) return { vista: "perfil", pid: "", uid: pf[1] };
   const m = h.match(/^p\/([-\w]+)$/);
@@ -1234,6 +1241,7 @@ function desmontaVista() {
   if (logrosVista) { logrosVista.destruir(); logrosVista = null; }
   if (monedasVista) { monedasVista.destruir(); monedasVista = null; }
   if (prodropVista) { prodropVista.destruir(); prodropVista = null; }
+  if (adminVista) { adminVista.destruir(); adminVista = null; }
   if (paginaPerfil) { paginaPerfil.destruir(); paginaPerfil = null; }
 }
 
@@ -1264,6 +1272,12 @@ async function guardaConPodio(categoria, uid, dato, anunciar = true) {
   if (!antes || !res || !res.committed) return res;
   const filas = conRecord(antes, uid, dato);
   const puesto = puestoSolo(filas, uid), previo = puestoSolo(antes, uid);
+  /* Un récord que sube al podio de una tabla del club queda en la cola de
+     los administradores (admin.js), que pueden ver su repetición y decidir
+     si se queda. Una fila chica; la prueba ya está guardada aparte. */
+  if (merecesRevision(categoria, puesto, previo) && dato.partida)
+    fb.apuntaRevision(categoria, uid, { p: dato.partida, pts: dato.puntos, t: dato.tiempo, l: puesto, n: dato.nombre })
+      .catch(e => console.warn("[juegos] no se pudo apuntar la revisión", e));
   if (puesto >= 1 && puesto <= 3 && (!previo || puesto < previo)) {
     const sitio = antes.slice().sort(ordenSolo)[puesto - 1];
     const u = state.user || {};
@@ -1466,6 +1480,19 @@ function armazon() {
     prodropVista = crearProdrop({ usuario: state.user, datos: datosPerfil, perfil: perfilDe, fb, volver: () => ir(""),
       quien: u => quien(u, perfilDe(u), null, { nombre: nombreEnDatos(u, datosP || {}) }, colorForUid) });
     prodropVista.montar(h);
+    return;
+  }
+  if (state.vista === "admin") {
+    /* El panel de administración (admin.js). Las reglas vuelven a
+       comprobar cada escritura; esto solo evita enseñarlo a quien no es. */
+    if (!state.user || !state.admin) {
+      h.innerHTML = `<section class="jg-adm"><p class="jg-nada">${state.user && state.admin === null ? "Comprobando permisos…" : "Esta página es solo para administradores."}</p></section>`;
+      return;
+    }
+    h.innerHTML = "";
+    adminVista = crearAdmin({ uid: state.user.uid, fb, datos: datosPerfil, ahora: fb.ahora,
+      nombre: u => (datosP && nombreEnDatos(u, datosP)) || "" });
+    adminVista.montar(h);
     return;
   }
   if (state.vista === "monedas") {
@@ -2577,6 +2604,7 @@ function wire() {
   });
   $("btnLogout").onclick = () => logout();
   $("btnPerfil").onclick = () => { if (state.user) ir("#perfil/" + state.user.uid); };
+  $("btnAdmin").onclick = () => ir("#admin");
   document.addEventListener("click", alTocarPerfil);
   pintaSonido();
   montaReproductor($("btnMusica"));
@@ -2623,9 +2651,10 @@ function wire() {
       state.invitado = true;
       state.salas = []; state.mias = []; state.enCurso = []; state.tablas = {};
       soltarPartida();
-      for (const f of [offSalas, offMias, offReloj, offEnCurso, offCastigo]) { if (f) { try { f(); } catch (e) {} } }
-      offSalas = offMias = offReloj = offEnCurso = offCastigo = null;
-      revisaCastigo({ uid: null, cuenta: 0 });
+      for (const f of [offSalas, offMias, offReloj, offEnCurso, offCastigo, offSuspension]) { if (f) { try { f(); } catch (e) {} } }
+      offSalas = offMias = offReloj = offEnCurso = offCastigo = offSuspension = null;
+      state.admin = false;
+      revisaCastigo({ uid: null, cuenta: 0, suspension: null });
       if (offConsumo) { try { offConsumo(); } catch (e) {} offConsumo = null; }
       medidor.ponCuenta(null); apuntadoConsumo = 0;
       if (offMonedas) { offMonedas(); offMonedas = null; datosMonedas = null; }
@@ -2655,6 +2684,19 @@ function wire() {
     if (offCastigo) { try { offCastigo(); } catch (e) {} }
     revisaCastigo({ uid: user.uid, cuenta: 0 });
     offCastigo = fb.watchCastigo(user.uid, v => revisaCastigo({ cuenta: hastaDeCuenta(v) }));
+    /* La suspensión que puso un administrador (admin.js): la misma capa
+       de «WASTED», con el tiempo que él eligió. Un nodo chico, casi
+       siempre vacío. */
+    if (offSuspension) { try { offSuspension(); } catch (e) {} }
+    revisaCastigo({ suspension: null });
+    offSuspension = fb.watchSuspension(user.uid, v => revisaCastigo({ suspension: v }));
+    /* ¿Es administrador? Una lectura por sesión. */
+    state.admin = null;
+    fb.esAdminJuegos(user.uid).then(a => {
+      if (!state.user || state.user.uid !== user.uid) return;
+      state.admin = a; mostrar();
+      if (state.vista === "admin") { vistaPintada = ""; render(); }
+    });
     /* Lo que la cuenta bajó hoy en sus otros aparatos y pestañas: el tope
        es por jugador, no por navegador. */
     if (offConsumo) { try { offConsumo(); } catch (e) {} }

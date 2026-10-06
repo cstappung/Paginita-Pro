@@ -2,7 +2,7 @@
    (Auth + Database emulados; FIREBASE_EMU=1). */
 import { auth, db } from "./src/firebase.js";
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut } from "firebase/auth";
-import { ref, get, set, push, remove, query, orderByChild, equalTo } from "firebase/database";
+import { ref, get, set, push, remove, update, query, orderByChild, equalTo } from "firebase/database";
 import * as Y from "yjs";
 import * as fb from "./src/fb-api.js";
 import * as rep from "./src/fb-reports.js";
@@ -497,6 +497,63 @@ console.log("— Salón: chat general y repeticiones del día —");
   await allowed("una de Tetris por puntos", () => fj.guardarRepeticion("club-tetris-maraton", ub.uid, entradaRep("club-tetris-maraton", hoy, { puntos: 12345, tiempo: 99000 }, 1, '{"v":1}', "Beto")));
   await loginAs(A);
   await allowed("A lee las mejores del día", () => new Promise((res, rej) => { const off = fj.watchRepeticiones("club-minas-medium", (f, err) => { off(); err ? rej(err) : res(f); }); }));
+}
+
+console.log("— Administración: revisiones, auditoría, ajustes y suspensiones —");
+{
+  const { serverTimestamp } = await import("firebase/database");
+  const ua = await loginAs(A), ub = await loginAs(B);
+  /* Un administrador se pone a mano, como en la consola: con el token de
+     dueño del emulador, que se salta las reglas. */
+  const comoDueno = (ruta, v) => fetch(`http://127.0.0.1:9000/${ruta}.json?ns=mi-pagina-pro-default-rtdb`,
+    { method: v === null ? "DELETE" : "PUT", headers: { Authorization: "Bearer owner" }, body: v === null ? undefined : JSON.stringify(v) });
+  await comoDueno(`admins/${ua.uid}`, true);
+  // B juega y sube al podio: deja su revisión
+  await set(ref(db, `soloPruebas/club-bbtan-rondas/${ub.uid}/partidaB9`), { v: 1, d: "{}", at: serverTimestamp() }).catch(() => {});
+  await remove(ref(db, `soloRanks/club-bbtan-rondas/${ub.uid}`)).catch(() => {});
+  await allowed("B guarda su récord", () => set(ref(db, `soloRanks/club-bbtan-rondas/${ub.uid}`), { nombre: "B", puntos: 900, tiempo: 1000, partida: "partidaB9" }));
+  const rev = (u, x) => set(ref(db, `revisiones/club-bbtan-rondas/${u}`), Object.assign({ p: "partidaB9", pts: 900, t: 1000, l: 1, n: "B", at: serverTimestamp() }, x));
+  await denied("una revisión no nombra otra partida", () => rev(ub.uid, { p: "otraPartida" }));
+  await denied("ni la escribe otro", () => rev(ua.uid, {}));
+  await allowed("B apunta su récord para revisar", () => rev(ub.uid, {}));
+  await denied("B no lee la cola", () => get(ref(db, "revisiones")));
+  await denied("B no se pone ajustes", () => set(push(ref(db, `ajustesMonedas/${ub.uid}`)), { n: 1000, m: "x", por: ub.uid, at: serverTimestamp() }));
+  await denied("B no se suspende ni se levanta nada", () => set(ref(db, `suspensiones/${ua.uid}`), { hasta: Date.now() + 60000, m: "x", por: ub.uid, at: serverTimestamp() }));
+  await denied("B no escribe auditados", () => set(ref(db, `auditados/club-bbtan-rondas/${ub.uid}`), { p: "partidaB9", ok: true, at: serverTimestamp() }));
+  await denied("B no borra su revisión", () => remove(ref(db, `revisiones/club-bbtan-rondas/${ub.uid}`)));
+  await allowed("B lee los ajustes (cuentan en el saldo de todos)", () => get(ref(db, "ajustesMonedas")));
+  await loginAs(A);
+  await allowed("el admin lee la cola", () => get(ref(db, "revisiones")));
+  await allowed("el admin apunta lo auditado", () => set(ref(db, `auditados/club-bbtan-rondas/${ub.uid}`), { p: "partidaB9", ok: true, h: true, m: "revisada a mano", at: serverTimestamp() }));
+  await allowed("el admin lee lo auditado", () => get(ref(db, "auditados")));
+  const ajuste = x => set(push(ref(db, `ajustesMonedas/${ub.uid}`)), Object.assign({ n: 500, m: "premio", por: ua.uid, at: serverTimestamp() }, x));
+  await denied("un ajuste no es decimal", () => ajuste({ n: 1.5 }));
+  await denied("ni cero", () => ajuste({ n: 0 }));
+  await denied("ni pasa de diez millones", () => ajuste({ n: 10000001 }));
+  await denied("ni se firma a nombre de otro", () => ajuste({ por: ub.uid }));
+  await denied("ni va sin motivo", () => ajuste({ m: "" }));
+  const aj = push(ref(db, `ajustesMonedas/${ub.uid}`));
+  await allowed("el admin suma monedas", () => set(aj, { n: 500, m: "premio", por: ua.uid, at: serverTimestamp() }));
+  await allowed("y resta", () => ajuste({ n: -200 }));
+  await denied("un ajuste no se reescribe", () => set(aj, { n: 5000, m: "premio", por: ua.uid, at: serverTimestamp() }));
+  await denied("ni se borra", () => remove(aj));
+  const susp = x => set(ref(db, `suspensiones/${ub.uid}`), Object.assign({ hasta: Date.now() + 3600000, m: "récords falsos", por: ua.uid, at: serverTimestamp() }, x));
+  await denied("una suspensión no termina en el pasado", () => susp({ hasta: Date.now() - 1000 }));
+  await denied("ni dura más de un año", () => susp({ hasta: Date.now() + 400 * 86400000 }));
+  await denied("ni se suspende a sí mismo", () => set(ref(db, `suspensiones/${ua.uid}`), { hasta: Date.now() + 3600000, m: "x", por: ua.uid, at: serverTimestamp() }));
+  await allowed("el admin suspende a B una hora", () => susp({}));
+  await loginAs(B);
+  await allowed("B ve su suspensión", () => get(ref(db, `suspensiones/${ub.uid}`)));
+  await denied("pero no la de nadie más", () => get(ref(db, "suspensiones")));
+  await denied("B suspendido no escribe récords", () => set(ref(db, `soloRanks/club-bbtan-rondas/${ub.uid}`), { nombre: "B", puntos: 950, tiempo: 1000, partida: "partidaB9" }));
+  await denied("ni cobra partidas del club", () => set(ref(db, `clubJugadas/${ub.uid}/minas`), { dia: 1, hoy: 1, total: 1, at: serverTimestamp() }));
+  await loginAs(A);
+  await allowed("el admin levanta la suspensión", () => remove(ref(db, `suspensiones/${ub.uid}`)));
+  await allowed("el admin elimina el récord entero de una vez", () => update(ref(db), {
+    [`soloRanks/club-bbtan-rondas/${ub.uid}`]: null, [`soloPruebas/club-bbtan-rondas/${ub.uid}/partidaB9`]: null,
+    [`revisiones/club-bbtan-rondas/${ub.uid}`]: null, [`auditados/club-bbtan-rondas/${ub.uid}`]: null }));
+  await comoDueno(`admins/${ua.uid}`, null);
+  await denied("sin ser admin ya no suma monedas", () => ajuste({}));
 }
 
 await signOut(auth);
