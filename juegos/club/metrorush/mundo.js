@@ -1888,6 +1888,14 @@ export function crearMundo(canvas) {
     media: { dpr: 2.5, sombras: 1024, ao: false, bloom: true, fxaa: true, espejo: false, pixel: 4 },
     baja: { dpr: 2, sombras: 0, ao: false, bloom: false, fxaa: false, espejo: false, pixel: 0 }
   };
+  const SIN_NAN = {
+    uniforms: { tDiffuse: { value: null } },
+    vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: `uniform sampler2D tDiffuse; varying vec2 vUv;
+      void main(){ vec4 c = texture2D(tDiffuse, vUv);
+        if (any(isnan(c)) || any(isinf(c))) c = vec4(0.0, 0.0, 0.0, 1.0);
+        gl_FragColor = c; }`
+  };
   const ACABADO = {                                                            // viñeta, saturación, aberración y líneas de barrido
     uniforms: { tDiffuse: { value: null }, vig: { value: 0.3 }, sat: { value: 1 }, aber: { value: 0 }, scan: { value: 0 }, alto: { value: 720 } },
     vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
@@ -1925,18 +1933,38 @@ export function crearMundo(canvas) {
     const c = new EffectComposer(renderer, rt);
     c.setPixelRatio(pr); c.setSize(ancho, alto);
     if (kit.pixel) {
-      // el tamaño del píxel se elige para que la imagen tenga ~270 filas de alto, en cualquier pantalla
-      const px = Math.max(2, Math.round(alto * renderer.getPixelRatio() / 270));
+      // el tamaño del píxel se elige para que la imagen tenga ~FILAS_PIXEL filas de alto, en cualquier pantalla
+      const px = Math.max(2, Math.round(alto * renderer.getPixelRatio() / FILAS_PIXEL));
       c.addPass(new RenderPixelatedPass(px, escena, camara, { normalEdgeStrength: calidad === 'baja' ? 0.0001 : 0.45, depthEdgeStrength: calidad === 'baja' ? 0.0001 : 0.55 }));
     } else c.addPass(new RenderPass(escena, camara));
     if (A.ao && kit.juguete) {
       try {
         const ao = new GTAOPass(escena, camara, ancho, alto);
+        /* La oclusión redibuja TODA la escena con un material de normales, y de
+           fábrica solo esconde puntos y líneas. Lo que no tiene normales (los
+           sprites como el brillo de la mochila cohete, las líneas gruesas del
+           neón, las partículas) da NaN en ese pase, y el bloom esparce cada
+           NaN en un cuadrado negro: eso es lo que se veía sobre la mochila.
+           Aquí se esconde, solo durante el pase de normales, todo lo que no
+           tenga normales, así no depende de acordarse objeto por objeto. */
+        ao.overrideVisibility = function () {
+          const cache = this._visibilityCache;
+          this.scene.traverse(o => {
+            cache.set(o, o.visible);
+            const g = o.geometry;
+            const sinNormales = g && g.isBufferGeometry && !g.attributes.normal;
+            if (o.isPoints || o.isLine || o.isSprite || o.isLineSegments2 || o.isLine2 || sinNormales) o.visible = false;
+          });
+        };
         ao.updateGtaoMaterial({ radius: 0.8, distanceExponent: 1.4, thickness: 2, scale: 1.3, samples: 12, distanceFallOff: 1 });
         ao.updatePdMaterial({ lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 5, rings: 2, samples: 12 });
         c.addPass(ao);
       } catch (e) { console.warn('Metro Rush: sin oclusión ambiental', e); }
     }
+    /* Red de seguridad antes del bloom: un píxel NaN o infinito (de cualquier
+       shader) el bloom lo agranda hasta un cuadrado negro. Aquí se cambia por
+       negro y se queda en un píxel. isnan/isinf solo existen en WebGL2. */
+    if (A.bloom && pal.post.bloom && renderer.capabilities.isWebGL2) c.addPass(new ShaderPass(SIN_NAN));
     if (A.bloom && pal.post.bloom) c.addPass(new UnrealBloomPass(new THREE.Vector2(ancho / 2, alto / 2), ...pal.post.bloom));
     c.addPass(new OutputPass());
     // FXAA solo si no hay MSAA (WebGL1) y la densidad es baja: es el último recurso, porque difumina
@@ -2292,11 +2320,21 @@ export function crearMundo(canvas) {
   const matChispa = col => { if (!matsChispa.has(col)) matsChispa.set(col, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending })); return matsChispa.get(col); };
 
   /* ---- tamaño de la pantalla ---- */
+  /* Cuántas filas tiene la imagen en el estilo pixelado. Eran 270 y se veía
+     tosco: los píxeles medían 2 a 4 píxeles de pantalla y no se leía nada a lo
+     lejos. Con 420 sigue siendo pixel art (bordes en escalera, colores planos)
+     pero bastante más nítido. */
+  const FILAS_PIXEL = 420;
   /** Cuántos píxeles del lienzo por píxel de la pantalla. En baja con estilo
-      pixelado, ~270 filas en total (el mismo tamaño de píxel que la pasada). */
+      pixelado, el lienzo mismo tiene ~FILAS_PIXEL filas y el navegador lo
+      agranda sin suavizar. En media y alta, el estilo pixelado dibuja al menos
+      a 2×: su pasada necesita píxeles de 2 o más, y en una pantalla de 1× eso
+      daba 300 filas como mucho. A 2× caben las 420, y no cuesta casi nada,
+      porque la pasada dibuja la escena a la resolución de sus píxeles. */
   function proporcion() {
-    if (calidad === 'baja' && kit && kit.pixel) return 1 / Math.max(2, Math.round(alto / 270));
-    return Math.min(window.devicePixelRatio || 1, AJUSTES[calidad].dpr);
+    if (calidad === 'baja' && kit && kit.pixel) return Math.min(1, FILAS_PIXEL / Math.max(1, alto));
+    const normal = Math.min(window.devicePixelRatio || 1, AJUSTES[calidad].dpr);
+    return kit && kit.pixel ? Math.max(2, normal) : normal;
   }
   const ajusteRetrato = { y: 0, z: 0 };
   function tamano(w, h) {

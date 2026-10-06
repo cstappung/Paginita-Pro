@@ -3530,7 +3530,17 @@ Things that matter:
   normals**: SAO (high quality, toy style) redraws every mesh with a normals
   material, a geometry without them gives NaN, and bloom spreads that NaN
   into black blocks (that is what the oncoming trains' headlights did).
-  Points get constant up normals (`normalesFijas`).
+  Points get constant up normals (`normalesFijas`). Two nets catch the rest:
+  the GTAO pass's `overrideVisibility` is replaced so its normals pass hides
+  sprites, `LineSegments2`/`Line2` and **anything whose geometry has no
+  `normal` attribute** (stock GTAO only hides points and lines, and the
+  jetpack's glow sprite drew a black square on the backpack), and a
+  `SIN_NAN` pass right before bloom (WebGL2 only, `isnan`/`isinf`) turns a
+  stray NaN into one black pixel instead of a square. The **pixel style** is
+  `FILAS_PIXEL` (420) rows tall, not 270, which read as coarse; with the
+  post-processing pass it renders at least at 2× so a 1× screen still fits
+  420 rows (the pass needs pixels of 2 or more), and in `baja` the canvas
+  itself is ~420 rows, upscaled without smoothing.
 - **What you play against must read before the scenery** (`legible` in each
   palette, `realza()` in `mundo.js`). Trains, barriers, ramps, power-ups,
   stars and tickets use material keys ending in `!` (`'pintura!'`); those
