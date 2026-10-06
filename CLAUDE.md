@@ -3371,6 +3371,13 @@ Things that matter:
   away at top speed, inside the 195 m that is drawn, looked parked, and
   nobody noticed that trains came head-on. The test runs a simulated player
   over 12 seeds × 12 km and checks it never meets an unavoidable obstacle.
+- **Speed is also felt, never faked**: the FOV widens and the camera
+  closes in with `k = (V − V0)/(VMAX − V0)` from `M.VELOCIDAD` (never a
+  hardcoded range), with speed lines; the jetpack adds a FOV kick, harder
+  flames, light shake and a roar in `audio.js`, and while flying the camera
+  does not close in (sky coins next to it are shrunk). Oncoming trains wear
+  headlights and blow a horn. None of it touches distance or score, which
+  the anti-cheat recomputes; the music tempo follows the same `k`.
 - **The catenary is high on purpose** (`ALTO_CABLE` 7.8 m, `ALTO_BRAZO`
   8.3, `ALTO_POSTE` 8.6 in `mundo.js`): standing on a roof the head is at
   5.05 m and a jump from there reaches 6.55, and the roof camera sits at 7.2
