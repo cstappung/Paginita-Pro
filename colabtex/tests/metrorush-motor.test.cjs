@@ -285,9 +285,16 @@ test('poderes y tienda: duraciones y precios', () => {
   assert.deepEqual([M.ASPECTOS.nocturno.precio, M.ASPECTOS.grafitero.precio], [15000, 30000]);
   assert.deepEqual([M.costoSaltar(1), M.costoSaltar(10)], [2750, 9500], 'saltar una misión, ×5');
   assert.deepEqual([0, 1, 2].map(M.costoSeguir), [500, 1000, 2000]);
-  const az = M.rng(3); let pat = 0, mon = 0;
-  for (let i = 0; i < 4000; i++) { const r = M.cajaMisteriosa(az); if (r.patineta) pat++; if (r.monedas) mon++; }
-  assert.ok(pat > 800 && pat < 1200, 'un cuarto de las cajas son patinetas'); assert.ok(mon > 2700);
+  const az = M.rng(3); let pat = 0, mon = 0, pogo = 0;
+  for (let i = 0; i < 4000; i++) { const r = M.cajaMisteriosa(az); if (r.patineta) pat++; if (r.monedas) mon++; if (r.pogo) pogo++; }
+  assert.ok(pat > 650 && pat < 950, 'un quinto de las cajas son patinetas'); assert.ok(pogo > 650 && pogo < 950, 'y otro quinto, el pogo');
+  assert.ok(mon > 2200);
+  // la súper caja: siempre algo, y en monedas sueltas da menos que lo que cuesta (no fabrica monedas)
+  const az2 = M.rng(9); let suelto = 0;
+  for (let i = 0; i < 20000; i++) { const r = M.cajaSuper(az2); assert.ok(r.monedas || r.patinetas || r.potenciador); suelto += r.monedas || 0; }
+  assert.ok(suelto / 20000 < M.PRECIO_SUPERCAJA, 'en promedio devuelve menos monedas de las que cuesta');
+  // el pogo sube por encima de los techos de los trenes (3,35 m)
+  assert.ok(M.FISICA.alturaPogo > 3.6 && M.FISICA.gravedadPogo < 1);
 });
 
 test('retos: tres por nivel, iguales en dos aparatos, y cumplirlos sube el multiplicador', () => {
@@ -329,6 +336,20 @@ test('progreso: limpiar lo que viene de afuera y mezclar dos aparatos', () => {
   assert.deepEqual(m.retos, { nivel: 4, avance: [5, 0, 0] }, 'el nivel de retos nunca baja');
   assert.deepEqual(m.records, { puntos: 70000, distancia: 900, monedas: 99 });
   assert.deepEqual(M.mezclaProgreso(cel, pc), m, 'da lo mismo el orden');
+});
+
+test('progreso: otro navegador que empezó de cero no borra las monedas', () => {
+  // el PC jugó mucho; el navegador nuevo nunca leyó la cuenta, jugó 2 carreras y guardó DESPUÉS
+  const pc = Object.assign(M.progresoNuevo(), { at: 100, monedas: 52000, aspectos: ['clasico', 'nocturno'], aspecto: 'nocturno', mejoras: { iman: 4, mochila: 2, zapatillas: 1, doble: 3 }, totales: { carreras: 40, metros: 90000, monedas: 70000 } });
+  const nuevo = Object.assign(M.progresoNuevo(), { at: 500, monedas: 300, totales: { carreras: 2, metros: 1500, monedas: 300 } });
+  const m = M.mezclaProgreso(nuevo, pc);
+  assert.equal(m.monedas, 52000, 'el saldo grande vuelve');
+  assert.equal(m.aspecto, 'nocturno');
+  assert.deepEqual(m.mejoras, pc.mejoras);
+  assert.deepEqual(M.mezclaProgreso(pc, nuevo), m, 'da lo mismo el orden');
+  // pero si el nuevo SÍ siguió desde el viejo (totales ≥) y gastó, manda su saldo
+  const sigue = Object.assign(M.progresoNuevo(), { at: 600, monedas: 2000, totales: { carreras: 41, metros: 91000, monedas: 70500 } });
+  assert.equal(M.mezclaProgreso(pc, sigue).monedas, 2000);
 });
 
 test('saltar misiones, premio por set y potenciadores', () => {

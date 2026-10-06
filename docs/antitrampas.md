@@ -210,7 +210,7 @@ castiga:
 
 Una partida que llega **sin prueba** sí castiga: es la firma de
 `Club.result` desde la consola, y desde que el iframe se carga con
-`?v=club-36` (Metro Rush, el último en estrenar su prueba) ninguna versión actual del juego la manda así.
+`?v=club-37` (Metro Rush, el último en estrenar su prueba) ninguna versión actual del juego la manda así.
 
 **Dónde vive la retención**, y por qué en dos sitios:
 

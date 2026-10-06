@@ -58,6 +58,8 @@
     caidaRapida: 24,       // m/s hacia abajo si ruedas en el aire (el "golpe al suelo")
     cambioCarril: 0.17,    // segundos que tarda en pasar de un carril al de al lado
     alturaMochila: 8.5,    // la mochila cohete vuela a esta altura
+    alturaPogo: 7,         // el pogo saltarín sube hasta aquí (más arriba que los techos, 3,35)…
+    gravedadPogo: 0.4,     // …y cae con el 40 % de la gravedad: ~2,3 s en el aire, como el de Subway Surfers
     altoDePie: 1.7,        // lo que ocupa el corredor de pie…
     altoRodando: 0.8,      // …y rodando (pasa bajo la barrera alta, que empieza a 1,0)
     medioAncho: 0.35,      // medio ancho del corredor para los choques
@@ -307,12 +309,30 @@
     inspector: { nombre: "Inspector", precio: null, secreto: "Encuentra los siete boletos dorados.", sudadera: 0x1f3a5f, gorra: 0x1f3a5f, jeans: 0x14213d, mochila: 0x8a5a35, mochila2: 0xfca311, suela: 0x111111 }
   };
 
-  /** La caja misteriosa: casi siempre monedas, a veces una patineta y, muy rara vez, el premio gordo. */
+  /** La caja misteriosa: casi siempre monedas, a veces una patineta o un
+      pogo saltarín y, muy rara vez, el premio gordo. El pogo sale solo de
+      aquí (no lo pone el generador de pista), así la pista sigue dependiendo
+      solo de la semilla y las pruebas del antitrampas no cambian. */
   function cajaMisteriosa(azar) {
     const x = azar();                                                // un número al azar
     if (x < 0.05) return { monedas: 1000, gordo: true };             // 5 %: premio gordo
-    if (x < 0.30) return { patineta: 1 };                            // 25 %: una patineta
-    return { monedas: 100 + Math.floor(azar() * 9) * 50 };           // 70 %: de 100 a 500 monedas
+    if (x < 0.25) return { patineta: 1 };                            // 20 %: una patineta
+    if (x < 0.45) return { pogo: true };                             // 20 %: el pogo saltarín, de una
+    return { monedas: 100 + Math.floor(azar() * 9) * 50 };           // 55 %: de 100 a 500 monedas
+  }
+  /* La súper caja misteriosa, como la de Subway Surfers: se compra en la
+     tienda y se abre en el menú. Siempre da algo bueno; lo que da en monedas
+     sueltas vale en promedio ~3 500, menos que su precio, así que no sirve
+     para fabricar monedas: lo que la hace valer son los potenciadores y las
+     patinetas. */
+  const PRECIO_SUPERCAJA = 9000;
+  function cajaSuper(azar) {
+    const x = azar();
+    if (x < 0.05) return { monedas: 50000, gordo: true };                 // 5 %: el premio gordo de verdad
+    if (x < 0.15) return { potenciador: "puntos" };                       // 10 %: un Potenciador +5
+    if (x < 0.35) return { potenciador: "despegue" };                     // 20 %: un Despegue
+    if (x < 0.60) return { patinetas: 3 };                                // 25 %: tres patinetas
+    return { monedas: 2500 + Math.floor(azar() * 16) * 500 };             // 40 %: de 2 500 a 10 000 monedas
   }
 
   /* ---------- Retos ----------
@@ -445,6 +465,22 @@
     for (const k of Object.keys(m.records)) m.records[k] = Math.max(A.records[k], B.records[k]);
     for (const k of Object.keys(m.totales)) m.totales[k] = Math.max(A.totales[k], B.totales[k]);
     m.intro = A.intro || B.intro;
+    /* ¿El más reciente empezó de cero sin ver al otro? Los totales (carreras,
+       metros, monedas juntadas) solo crecen, así que una copia que siguió
+       jugando desde la otra los tiene todos iguales o mayores. Si el más
+       viejo los tiene todos ≥ y alguno mayor, el nuevo es un comienzo aparte
+       (otro navegador que nunca leyó la cuenta) y su saldo no puede pisar el
+       del viejo: se queda con lo mayor de cada cosa gastable.
+       Ejemplo: PC con 52.000 monedas y 40 carreras; navegador nuevo con 300
+       monedas y 2 carreras, guardado después → quedan 52.000, no 300. */
+    const tk = Object.keys(m.totales);
+    const empezoDeCero = tk.every(k => viejo.totales[k] >= nuevo.totales[k]) && tk.some(k => viejo.totales[k] > nuevo.totales[k]);
+    if (empezoDeCero) {
+      m.monedas = Math.max(A.monedas, B.monedas);                   // el saldo grande no se pierde
+      m.patinetas = Math.max(A.patinetas, B.patinetas);
+      for (const k of Object.keys(m.potenciadores)) m.potenciadores[k] = Math.max(A.potenciadores[k], B.potenciadores[k]);
+      if (viejo.aspecto !== "clasico") m.aspecto = viejo.aspecto;   // el traje que llevaba de verdad
+    }
     return m;
   }
 
@@ -706,7 +742,7 @@
     ESTACIONES, estacionDe, siguienteUmbral, VUELTA_DESDE, VUELTA_CADA, INTRO, BOLETOS,
     PODERES, SEG_POR_NIVEL, MAX_MEJORA, PRECIOS_MEJORA, PRECIO_PATINETA, DURACION_PATINETA, duracionPoder, precioMejora, costoSeguir,
     POTENCIADORES, costoSaltar, premioSet, saltaReto,
-    ASPECTOS, cajaMisteriosa,
+    ASPECTOS, cajaMisteriosa, cajaSuper, PRECIO_SUPERCAJA,
     RETOS, retosDeNivel, avanzaRetos,
     progresoNuevo, limpiaProgreso, mezclaProgreso,
     crearGenerador

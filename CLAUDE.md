@@ -3395,7 +3395,12 @@ Things that matter:
   and this one (`c.Dantes`), because a 50 ms frame at full speed is 1.5 m of
   track. `tests/metrorush-motor.test.cjs` climbs it at 20–144 fps and every
   speed, and checks that a car's front, a low jump into it and a side entry
-  under a ramp still crash.
+  under a ramp still crash. The same rule holds **sideways**: a roof holds
+  you while you are within `ANCHO_TECHO` (0.98 m + the runner's half width)
+  of its lane centre, i.e. exactly as far as its car can hit you. It used to
+  hold only within 1.05 m while the car hit up to 1.33 m, so zigzagging from
+  roof to roof dropped the runner off the edge mid-change and it died
+  against the very car it had just left.
 - **The distance decides the scenery** (it used to be the score, so a
   player at ×30 went through every station thirty times faster than a
   newcomer). `ESTACIONES[].desde` is in metres: Barrio Estación (0,
@@ -3443,13 +3448,26 @@ Things that matter:
 - **Power-ups**: magnet 10 s, jetpack 5 s (coins in the sky at 8.5 m;
   short and frantic, +1 s per level, up to 10), super sneakers 10 s (jumps
   4.1 m), 2× 12 s, the others +2.5 s per shop level (five levels; a power's
-  own `paso` overrides it); mystery box (coins, a skateboard or a jackpot); skateboard
+  own `paso` overrides it); mystery box (coins, a skateboard, the **pogo
+  stick** or a jackpot); skateboard
   (3 000 coins, 30 s, survives one crash); continue after a crash for
   500 × 2^k coins, offered for 5 s by a round «¿Seguir corriendo?»
   button before the summary (`abreSalvar`), as in Subway Surfers. The
   run is closed when the summary shows (`cierraCarrera` returns what it
   paints), so a completed set and its prize appear there. A frontal hit ends the run, a side hit is a stumble, and
   a second stumble within 8 s gets you caught.
+- **The pogo stick only comes out of the mystery box** (`lanzaPogo`,
+  `c.pogo`), never from the track generator, so the track still depends on
+  the seed alone and proofs did not change. It launches to `alturaPogo`
+  (7 m) and falls at `gravedadPogo` (40 %) of gravity, ~2.3 s airborne;
+  above 3.6 m (over the roofs) nothing hits you, the climb to there is
+  covered by 0.45 s of invulnerability, rolling drops it, and landing ends
+  it. It only changes height, so distance and score are untouched. The
+  model hangs off the runner (`pogo`, `resorte`, pose `'pogo'`) and lifts
+  it 0.55 m so the rubber foot touches the ground. The **super mystery box**
+  is bought in the shop (`PRECIO_SUPERCAJA` 9 000, `cajaSuper`) and opened
+  on the spot; its loose coins average ~3 500, less than its price, so it
+  cannot mint coins.
 - **Lore and secrets**: seven golden tickets, one per station, tell the
   story of the last night of Line 3 (`BOLETOS`, read in the Libreta);
   collecting all seven unlocks the Inspector outfit, the Konami code the
@@ -3475,10 +3493,16 @@ Things that matter:
   Each station palette builds its own kit, prepared a few steps per frame
   ahead of time (`precarga`, 4 ms budget) and compiled inside the tunnel, so
   the switch does not stutter. Quality `alta`/`media`/`baja` sets pixel
-  ratio, shadows, ambient occlusion (toy style only), bloom and the neon
+  ratio (`dpr` 3 / 2.5 / 2, never more than the device's: at 1.5 / 1 / 0.8 a
+  3× phone drew a third of its resolution and the game looked blurred),
+  shadows, ambient occlusion (toy style only), bloom and the neon
   mirror floor; `baja` also shortens the view to 125 m with the fog closer
   (`vista`), which is what saves draw calls. In «auto» it steps down by
-  itself when frames average over 28 ms.
+  itself when frames average over 28 ms. **Every geometry must carry
+  normals**: SAO (high quality, toy style) redraws every mesh with a normals
+  material, a geometry without them gives NaN, and bloom spreads that NaN
+  into black blocks (that is what the oncoming trains' headlights did).
+  Points get constant up normals (`normalesFijas`).
 - **What you play against must read before the scenery** (`legible` in each
   palette, `realza()` in `mundo.js`). Trains, barriers, ramps, power-ups,
   stars and tickets use material keys ending in `!` (`'pintura!'`); those
@@ -3544,7 +3568,17 @@ Things that matter:
   of every run, capped at 1e9) and `club-metrorush-distancia` (metres, only
   when it improves). Progress (coins, upgrades, outfits, tickets, mission
   level, records) is one blob in `users/<uid>/club/metrorush` merged with
-  `mezclaProgreso`. Logros, coins, the `tmetrorush` champion frame, the
+  `mezclaProgreso`. **That node is `{d, at}` and the reply is that object**,
+  not the string: the game used to `JSON.parse` the whole object, which
+  always threw and was swallowed, so the cloud copy was never read and a
+  second browser started from zero (then overwrote the cloud). Now
+  `progresoDeNube` reads `d`, nothing is uploaded until the cloud has been
+  read (`nubeLeida`, a save before that waits in `subirLuego`), and an
+  empty reply is asked once more before trusting it. `mezclaProgreso` also
+  spots a copy that **started from scratch** (the older one has every
+  lifetime `totales` ≥ and one >): its newer timestamp no longer wins the
+  coins, skateboards and boosters, the max of each does, which recovers a
+  balance an earlier overwrite had wiped from the cloud. Logros, coins, the `tmetrorush` champion frame, the
   Discord podium and the manual are wired like FANAL's; the `soloRanks` and
   `clubJugadas` regexes were widened, so the rules must be re-published.
 - `window.__metrorush` (`estado()`, `puntos(n)`, `inmortal()`, `poder(k)`,

@@ -1376,6 +1376,21 @@ function armaCorredor(kit, asp) {
   // la patineta (aparece con el poder) y el aro del imán
   const tabla = new THREE.Group(); tabla.visible = false; raiz.add(tabla);
   parte(tabla, a => { a.pon(redonda(0.62, 0.06, 1.5, 0.03), 'pintura', 0x7b2ff7, [0, 0.12, 0]); a.pon(redonda(0.58, 0.02, 1.4, 0.01), 'luz', 0x00f5d4, [0, 0.085, 0]); });
+  /* El pogo saltarín (sale de la caja misteriosa): un palo delante del
+     corredor, con manubrio a la altura del pecho, dos pedales bajo los pies
+     y un resorte con su goma abajo. El palo baja 0,55 m bajo los pies, así
+     que mientras se usa el corredor va 0,55 m más arriba (ver `paso`). */
+  const pogo = new THREE.Group(); pogo.visible = false; raiz.add(pogo);
+  parte(pogo, a => {
+    a.pon(CILINDRO_CHICO, 'pintura', 0xff3b8d, [0, 0.33, -0.24], null, [0.07, 1.1, 0.07]);              // el palo, de -0,22 a 0,88
+    a.pon(CILINDRO_CHICO, 'pintura', 0x2b2d42, [0, 1.06, -0.24], [0, 0, Math.PI / 2], [0.06, 0.62, 0.06]);   // el manubrio
+    for (const sx of [-1, 1]) a.pon(CILINDRO_CHICO, 'personaje', 0x111111, [sx * 0.27, 1.06, -0.24], [0, 0, Math.PI / 2], [0.075, 0.12, 0.075]);   // los puños de goma
+    for (const sx of [-1, 1]) a.pon(CAJA, 'pintura', 0xffd23f, [sx * 0.14, -0.01, -0.14], null, [0.16, 0.035, 0.24]);    // los pedales, bajo cada pie
+    a.pon(CAJA, 'pintura', 0x2b2d42, [0, -0.01, -0.24], null, [0.12, 0.06, 0.08]);                     // donde se unen al palo
+    a.pon(CILINDRO_CHICO, 'personaje', 0x111111, [0, -0.53, -0.24], null, [0.1, 0.05, 0.1]);             // la goma de abajo
+  });
+  const resorte = new THREE.Group(); resorte.position.set(0, -0.5, -0.24); pogo.add(resorte);   // se estira y se encoge desde la goma
+  parte(resorte, a => { for (let i = 0; i < 5; i++) a.pon(new THREE.TorusGeometry(0.055, 0.012, 5, 14), 'luz', 0x00f5d4, [0, 0.05 + i * 0.07, 0], [Math.PI / 2, 0, 0]); });
   const aura = new THREE.Mesh(new THREE.TorusGeometry(0.85, 0.03, 6, 40), kit.mat('luz'));
   aura.geometry = prepara(aura.geometry, 0xff5a5a); aura.rotation.x = Math.PI / 2; aura.position.y = 1.0; aura.visible = false; raiz.add(aura);
   // la sombra redonda bajo los pies (en calidad baja, que no tiene sombras de verdad)
@@ -1383,11 +1398,11 @@ function armaCorredor(kit, asp) {
   sombra.material.userData.propio = true;                                      // es solo de este corredor: se suelta con él
   sombra.rotation.x = -Math.PI / 2; sombra.position.y = 0.01;
   raiz.scale.setScalar(0.95);
-  return { raiz, cuerpo, pelvis, torso, cab, piernas, brazos, cohete, llamas, tabla, aura, sombra };
+  return { raiz, cuerpo, pelvis, torso, cab, piernas, brazos, cohete, llamas, tabla, pogo, resorte, aura, sombra };
 }
 
 /** Pone la pose del corredor según lo que está haciendo.
-    p = {modo: 'correr'|'saltar'|'rodar'|'patinar'|'volar'|'tropezar'|'caer'|'quieto'|'menu', fase, t, vy, ladeo, agacha, aire} */
+    p = {modo: 'correr'|'saltar'|'rodar'|'patinar'|'volar'|'pogo'|'tropezar'|'caer'|'quieto'|'menu', fase, t, vy, ladeo, agacha, aire} */
 function posa(r, p) {
   const s = Math.sin(p.fase || 0), c = Math.cos(p.fase || 0);
   const [pi, pd] = r.piernas, [bi, bd] = r.brazos;
@@ -1403,6 +1418,7 @@ function posa(r, p) {
   r.cab.rotation.set(0.12, 0, 0);                                              // la cabeza apenas inclinada, como se armó
   r.tabla.position.set(0, 0, 0);                                               // la patineta en su sitio…
   r.tabla.rotation.set(0, 0, 0);                                               // …y plana
+  if (r.pogo) { r.pogo.rotation.set(0, 0, 0); r.resorte.scale.set(1, 1, 1); }  // el pogo derecho y el resorte suelto
   pi.tobillo.rotation.x = pd.tobillo.rotation.x = 0;                           // los pies planos (la bolita y la patineta los doblan)
   bi.hombro.rotation.z = -0.15; bd.hombro.rotation.z = 0.15;
   pi.cadera.rotation.z = pd.cadera.rotation.z = 0;                             // la pose del menú las abre un poco: se cierran antes de cualquier otra
@@ -1484,6 +1500,19 @@ function posa(r, p) {
     bi.hombro.rotation.x = 0.3 + 0.1 * s; bd.hombro.rotation.x = 0.3 - 0.1 * s; bi.hombro.rotation.z = -0.6; bd.hombro.rotation.z = 0.6;
     bi.codo.rotation.x = 0.3; bd.codo.rotation.x = 0.3;
     r.cuerpo.rotation.x = -0.35;
+  } else if (p.modo === 'pogo') {
+    /* De pie en los pedales, agarrado al manubrio con las dos manos y las
+       rodillas un poco dobladas. El resorte se encoge mientras más rápido
+       sube o baja (en la cima, quieto en el aire, está suelto), y todo se
+       ladea al cambiar de carril. */
+    const vy = p.vy || 0, k = Math.min(1, Math.abs(vy) / 14);
+    r.cuerpo.rotation.set(-0.06, 0, (p.ladeo || 0) * 1.4);
+    for (const pp of [pi, pd]) { pp.cadera.rotation.x = 0.35; pp.rodilla.rotation.x = -0.6; pp.tobillo.rotation.x = 0.25; }
+    r.pelvis.position.y = 0.72;                                                // baja un poco: las rodillas dobladas
+    for (const b of [bi, bd]) { b.hombro.rotation.x = -0.95; b.codo.rotation.x = 0.55; }   // los brazos al manubrio
+    bi.hombro.rotation.z = 0.12; bd.hombro.rotation.z = -0.12;
+    r.pogo.rotation.z = (p.ladeo || 0) * 1.4;
+    r.resorte.scale.y = 1 - 0.45 * k;
   } else if (p.modo === 'tropezar') {
     const k = Math.sin(Math.min(1, (p.t || 0) / 0.4) * Math.PI);
     r.cuerpo.rotation.x = -0.14 - 0.5 * k; r.cuerpo.rotation.z = (p.ladeo || 0) + 0.3 * k;
@@ -1844,14 +1873,17 @@ export function crearMundo(canvas) {
      los del aparato). Estaban en 1,5 / 1,0 / 0,8, y un celular (pantalla de
      3×, calidad media por defecto) dibujaba a un tercio de su resolución y el
      navegador lo estiraba: el juego se veía borroso. Ahora ni la baja queda
-     por debajo de 1,5 (a esa densidad un celular ya se ve nítido) y la alta usa
-     la de la pantalla entera; si el aparato no da abasto, «auto» baja de nivel.
+     por debajo de 2 (medido en un celular de 3×: con 1,5 todavía se notaba
+     blando, sin FXAA que lo disimule), la media va a 2,5 y la alta usa la de
+     la pantalla entera. El lienzo de un celular es chico (el escenario 3:4,
+     ~360×480 CSS), así que 2× son ~0,7 megapíxeles: lo aguanta. Si el aparato
+     no da abasto, «auto» baja de nivel.
      El estilo pixelado en baja sigue siendo a propósito de píxeles grandes,
      pero nítidos (se agranda sin suavizar). */
   const AJUSTES = {
     alta: { dpr: 3, sombras: 2048, ao: true, bloom: true, fxaa: true, espejo: true, pixel: 4 },
-    media: { dpr: 2, sombras: 1024, ao: false, bloom: true, fxaa: true, espejo: false, pixel: 4 },
-    baja: { dpr: 1.5, sombras: 0, ao: false, bloom: false, fxaa: false, espejo: false, pixel: 0 }
+    media: { dpr: 2.5, sombras: 1024, ao: false, bloom: true, fxaa: true, espejo: false, pixel: 4 },
+    baja: { dpr: 2, sombras: 0, ao: false, bloom: false, fxaa: false, espejo: false, pixel: 0 }
   };
   const ACABADO = {                                                            // viñeta, saturación, aberración y líneas de barrido
     uniforms: { tDiffuse: { value: null }, vig: { value: 0.3 }, sat: { value: 1 }, aber: { value: 0 }, scan: { value: 0 }, alto: { value: 720 } },
@@ -2118,7 +2150,7 @@ export function crearMundo(canvas) {
     // el corredor
     if (corredor) {
       const r = corredor, P = e.poderes || {};
-      r.raiz.position.set(e.x, e.y + SUELO + (P.patineta ? 0.12 : 0), 0);
+      r.raiz.position.set(e.x, e.y + SUELO + (P.pogo && !e.menu ? 0.55 : P.patineta ? 0.12 : 0), 0);   // en el pogo, la goma toca donde iban los pies
       // en el menú se da vuelta y mira a la cámara (en la tienda gira despacio, como en un probador)
       const giro = !e.menu ? 0 : Math.PI + (e.menu === 'tienda' ? Math.sin(e.t * 0.55) * 0.5 : Math.sin(e.t * 0.4) * 0.12);
       r.raiz.rotation.y += (giro - r.raiz.rotation.y) * (1 - Math.exp(-7 * (e.dt || 0.016)));
@@ -2135,7 +2167,8 @@ export function crearMundo(canvas) {
         brasa.scale.setScalar(0.8 + largo * 0.45 + golpe * 1.2);
       }
       if (brasa.visible) { r.llamas.updateWorldMatrix(true, false); r.llamas.localToWorld(brasa.position.set(0, -0.3, 0.06)); }   // a un tercio de las llamas (ya estiradas por su escala)
-      r.tabla.visible = !!P.patineta;
+      r.tabla.visible = !!P.patineta && !P.pogo;
+      r.pogo.visible = !!P.pogo && !e.menu;
       r.aura.visible = !!P.iman; r.aura.rotation.z = e.t * 3;
       for (const pp of r.piernas) pp.brilloZap.visible = !!P.zapatillas;
       r.sombra.position.set(e.x, (e.suelo || 0) + SUELO + 0.01, 0);

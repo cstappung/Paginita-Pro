@@ -166,6 +166,12 @@ export class Sonido {
     Chip.voz(this.ctx, this.efectos, { t: t + 0.62, f: 523, f1: 1047, dur: 0.6, vol: 0.05, onda: 'saw' }, this.voces);
   }
   caja() { this.soplo(0.08, 0.08, 1.8); this.nota(659, 0.1, 0.06, 'p25'); setTimeout(() => this.moneda(), 90); }
+  /** El pogo: un «boing» de resorte (sube y vuelve a subir, como un muelle) y un soplo hacia arriba. */
+  pogo() {
+    this.nota(140, 0.12, 0.1, 'tri', { f1: 520 });
+    setTimeout(() => this.nota(220, 0.32, 0.09, 'p25', { f1: 1400 }), 70);
+    this.soplo(0.35, 0.05, 2.4, { tono1: 3.2 });
+  }
   patineta() { this.nota(220, 0.35, 0.08, 'saw', { f1: 880 }); this.soplo(0.3, 0.05, 1.6); }
   rompePatineta() { this.soplo(0.25, 0.14, 1.4, { corto: true }); this.nota(300, 0.2, 0.1, 'tri', { f1: 80 }); }
   seguir() { this.multiplicador(); }
