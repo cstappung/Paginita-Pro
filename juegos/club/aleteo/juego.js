@@ -107,6 +107,14 @@
     if (e.target === lienzo || e.target.closest('button')) return;
     if (estado === 'listo' || estado === 'jugando') { e.preventDefault(); pulsa(!deVerdad(e) ? 'x' : e.pointerType === 'touch' ? 't' : 'r', e); }
   });
+  // Un toque no debe seleccionar nada ni abrir el menú de la pulsación larga: en el celular
+  // eso pintaba el escenario entero de azul a cada aleteo. Los botones conservan su toque, y
+  // fuera del vuelo (en el cartel final) el dedo puede volver a desplazar la página.
+  const escenario = $('escenario');
+  escenario.addEventListener('touchstart', e => {
+    if (estado !== 'fin' && !e.target.closest('button')) e.preventDefault();
+  }, { passive: false });
+  for (const t of ['selectstart', 'contextmenu', 'dragstart']) escenario.addEventListener(t, e => e.preventDefault());
   addEventListener('keydown', e => {
     const k = e.code;
     if (k === 'KeyP' || k === 'Escape') { if (estado === 'jugando') { e.preventDefault(); pausado ? sigue() : pausa(); } return; }
