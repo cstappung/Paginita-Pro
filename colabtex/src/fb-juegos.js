@@ -334,9 +334,9 @@ export const otorgarLogro = (juego, uid, id) => set(ref(db, `logros/${juego}/${u
 /* También escucha `diario`, la racha de días jugando: con las cuatro
    lecturas se calcula el saldo de monedas de cualquiera (juegos/monedas.js).
    Antes de publicar las reglas `diario` falla sola y el resto sigue. */
-const NODOS_MONEDAS = 9;
+const NODOS_MONEDAS = 10;
 export function watchLogros(cb) {
-  const d = { ranks: {}, solo: {}, logros: {}, diario: {}, cartas: {}, mercado: {}, clubJugadas: {}, podios: {}, tienda: {} }, err = {}, llegados = new Set();
+  const d = { ranks: {}, solo: {}, logros: {}, diario: {}, cartas: {}, mercado: {}, clubJugadas: {}, podios: {}, tienda: {}, ajustes: {} }, err = {}, llegados = new Set();
   /* `completo`: ya llegaron todas al menos una vez. Antes de eso el
      saldo sale de una suma a medias. */
   const oye = (nodo, k) => onValue(ref(db, nodo), s => {
@@ -344,7 +344,7 @@ export function watchLogros(cb) {
     d.completo = llegados.size === NODOS_MONEDAS; cb(d, err);
   }, e => { err[k] = e; llegados.add(k); d.completo = llegados.size === NODOS_MONEDAS; cb(d, err); });
   const offs = [oye(R, "ranks"), oye("soloRanks", "solo"), oye("logros", "logros"), oye("diario", "diario"), oye("cartas", "cartas"), oye("mercado", "mercado"),
-    oye("clubJugadas", "clubJugadas"), oye("podios", "podios"), oye("tienda", "tienda")];
+    oye("clubJugadas", "clubJugadas"), oye("podios", "podios"), oye("tienda", "tienda"), oye("ajustesMonedas", "ajustes")];
   return () => offs.forEach(f => f());
 }
 
@@ -802,3 +802,82 @@ export function watchEnCurso(cb) {
     cb(Object.entries(v).map(([id, x]) => Object.assign({ id }, x)), null);
   }, err => cb([], err));
 }
+
+/* ---------- la administración (juegos/admin.js) ----------
+   Quién es administrador lo dice `admins/<uid>` = true, que solo se
+   escribe a mano en la consola y que solo su dueño puede leer. Todo lo
+   de abajo lo vuelven a comprobar las reglas: el panel es la cara, no la
+   llave. Pensado para bajar lo mínimo:
+   - un jugador normal solo escucha `suspensiones/<su uid>` (casi siempre
+     vacío) y `ajustesMonedas` (unos pocos ajustes, dentro del saldo);
+   - el panel escucha tres nodos chicos (`revisiones`, `suspensiones`,
+     `vetados`) y lee `auditados` una vez al abrir la auditoría;
+   - una prueba (hasta 200 kB) solo se baja por su clave, al abrir un
+     récord o al verificar una fila que nadie auditó todavía. */
+export const esAdminJuegos = uid =>
+  uid ? get(ref(db, `admins/${uid}`)).then(s => s.val() === true, () => false) : Promise.resolve(false);
+
+/* La suspensión de esta cuenta, en vivo: la pone o la levanta un
+   administrador y llega al momento a todas sus pestañas. */
+export const watchSuspension = (uid, cb) =>
+  onValue(ref(db, `suspensiones/${uid}`), s => cb(s.val()), () => cb(null));
+
+/* Un récord del club que subió al podio, para que lo revise un
+   administrador. La regla pide que la fila de `soloRanks` sea esta misma
+   partida. Una por tabla y cuenta: un récord nuevo reemplaza al anterior
+   pendiente. */
+export const apuntaRevision = (categoria, uid, r) =>
+  set(ref(db, `revisiones/${categoria}/${uid}`), {
+    p: String(r.p), pts: r.pts, t: r.t, l: r.l, n: String(r.n || "").slice(0, 80), at: serverTimestamp()
+  });
+
+/* Lo que mira el panel, en vivo: tres nodos chicos. */
+export function watchAdmin(cb) {
+  const d = { revisiones: {}, suspensiones: {}, vetados: {} }, err = {};
+  const oye = (nodo, k) => onValue(ref(db, nodo), s => { d[k] = s.val() || {}; err[k] = null; cb(d, err); },
+    e => { err[k] = e; cb(d, err); });
+  const offs = [oye("revisiones", "revisiones"), oye("suspensiones", "suspensiones"), oye("vetados", "vetados")];
+  return () => offs.forEach(f => f());
+}
+/* Lo ya auditado (`auditados/<cat>/<uid>` = {p, ok, m, at}): una lectura
+   al abrir la auditoría, no una escucha. */
+export const leerAuditados = () => get(ref(db, "auditados")).then(s => s.val() || {});
+export const apuntaAuditado = (categoria, uid, a) =>
+  set(ref(db, `auditados/${categoria}/${uid}`), Object.assign({ p: String(a.p), ok: !!a.ok, m: String(a.m || "").slice(0, 300), at: serverTimestamp() }, a.h ? { h: true } : {}));
+
+/* Conservar un récord revisado: sale de la cola y queda auditado como
+   bueno, para que la auditoría no vuelva a bajar su prueba. */
+export const conservaRecord = (categoria, uid, partida) => update(ref(db), {
+  [`revisiones/${categoria}/${uid}`]: null,
+  [`auditados/${categoria}/${uid}`]: { p: String(partida), ok: true, h: true, m: "revisada a mano", at: serverTimestamp() }
+});
+/* Eliminar un récord: la fila, su prueba, su revisión, su auditoría y la
+   repetición del riel, en una sola escritura (todo o nada). El cobro del
+   podio no se borra —es del jugador y nadie lo puede tocar— pero deja de
+   pagar solo: `podioValido` pide que la fila siga en la tabla. */
+export function borraRecord(categoria, uid, partida, conRepeticion) {
+  const u = {
+    [`soloRanks/${categoria}/${uid}`]: null,
+    [`revisiones/${categoria}/${uid}`]: null,
+    [`auditados/${categoria}/${uid}`]: null
+  };
+  if (partida && /^[-a-zA-Z0-9]{1,80}$/.test(partida)) u[`soloPruebas/${categoria}/${uid}/${partida}`] = null;
+  if (conRepeticion) u[`repeticiones/${categoria}/${uid}`] = null;
+  return update(ref(db), u);
+}
+/* Descartar una revisión que ya no corresponde (la fila cambió o se
+   borró): solo sale de la cola. */
+export const descartaRevision = (categoria, uid) => remove(ref(db, `revisiones/${categoria}/${uid}`));
+
+/* Sumar o restar monedas: un ajuste nuevo, que no se borra nunca (para
+   deshacerlo se pone otro al revés). La regla pide `por` = quien escribe. */
+export const ajustaMonedas = (uid, n, m, por) =>
+  set(push(ref(db, `ajustesMonedas/${uid}`)), { n, m: String(m || "").slice(0, 200), por, at: serverTimestamp() });
+
+/* Suspender hasta una hora (del servidor) y levantar la suspensión. */
+export const suspende = (uid, hasta, m, por) =>
+  set(ref(db, `suspensiones/${uid}`), { hasta: Math.round(hasta), m: String(m || "").slice(0, 300), por, at: serverTimestamp() });
+export const levantaSuspension = uid => remove(ref(db, `suspensiones/${uid}`));
+/* El veto de siempre (`vetados/<uid>`): para siempre, hasta que se quite. */
+export const veta = (uid, m) => set(ref(db, `vetados/${uid}`), { at: serverTimestamp(), m: String(m || "").slice(0, 300) });
+export const quitaVeto = uid => remove(ref(db, `vetados/${uid}`));

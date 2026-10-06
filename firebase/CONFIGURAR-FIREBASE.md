@@ -45,9 +45,11 @@ siquiera haciendo privado el repositorio. Lo que protege los datos son las
 2. **Nombrarte administrador** (opcional, solo para Informes). Tu uid sale en
    **Authentication → Users**, columna *User UID*. En **Realtime Database →
    Datos**, crea en la raíz `admins/<tu uid>` = `true` (booleano, no texto).
-   Con eso ves ✕ y ✓ en **Informes**. Nadie puede escribir ese nodo desde la
-   web; solo tú, en la consola. Sin él todo funciona igual, pero nadie puede
-   borrar errores del informe.
+   Con eso ves ✕ y ✓ en **Informes** y el escudo 🛡️ de **Juegos**, que abre
+   el panel de administración (`juegos.html#admin`: récords por revisar con su
+   repetición, auditoría, monedas y suspensiones). Nadie puede escribir ese
+   nodo desde la web; solo tú, en la consola. Sin él todo funciona igual, pero
+   nadie puede borrar errores del informe ni administrar Juegos.
 3. **Restringir la API key por dominio.** [Google Cloud → APIs y servicios →
    Credenciales](https://console.cloud.google.com/apis/credentials?project=mi-pagina-pro)
    → la clave *Browser key (auto created by Firebase)* → **Restricciones de
@@ -438,6 +440,30 @@ Hasta publicar, los récords se siguen guardando con las reglas viejas,
 pero sin prueba que auditar. Para vetar a alguien, en la consola:
 `vetados/<uid>` = `{"at": <ms de ahora>, "m": "motivo"}`, y borrar sus filas
 de `soloRanks`.
+
+### ⚠ El panel de administración de Juegos pide publicar otra vez
+
+Cuatro nodos nuevos, todos para el panel `juegos.html#admin`
+(`colabtex/src/juegos/admin.js`), que solo ve quien está en `admins/<uid>`:
+
+- `revisiones/<cat>/<uid>`: el récord del club que acaba de subir al podio
+  (1.º a 3.º). Lo escribe el jugador, y la regla pide que sea su fila de
+  verdad; solo lo leen y lo borran los administradores.
+- `auditados/<cat>/<uid>` = `{p, ok, m, h?}`: el veredicto de la prueba de
+  esa partida, para que ningún administrador la vuelva a bajar. Solo
+  administradores.
+- `ajustesMonedas/<uid>/<id>` = `{n, m, por, at}`: monedas sumadas o
+  restadas a mano. Lo lee cualquiera con sesión (entra en el saldo de todos);
+  lo escribe solo un administrador, una vez, y no se borra (para deshacerlo
+  se pone otro al revés).
+- `suspensiones/<uid>` = `{hasta, m, por, at}`: la suspensión con la
+  pantalla de «WASTED». La lee su dueño (y los administradores); la escriben
+  y la levantan solo los administradores, hasta un año.
+
+Además, una cuenta **suspendida** ya no puede escribir récords,
+partidas del club, podios, rachas, repeticiones ni el chat general (la misma
+condición que `vetados`, con la hora de fin). Hasta publicar, el panel avisa
+de que faltan las reglas y los jugadores no notan nada.
 
 ### ⚠ Los rieles del salón (chat general y mejores partidas) piden publicar otra vez
 
