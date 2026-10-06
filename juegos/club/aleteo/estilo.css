@@ -17,6 +17,8 @@ html[data-cielo=ocaso],html[data-cielo=noche],html[data-cielo=jaula],html[data-c
 [hidden]{display:none!important}
 *{box-sizing:border-box}
 html,body{margin:0}
+/* El velo azul que Android/iOS pintan sobre lo que se toca cubría el escenario entero a cada aleteo. */
+html{-webkit-tap-highlight-color:transparent}
 body{background:var(--fondo);color:var(--tinta);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;transition:background-color 1.2s,color 1.2s}
 .shell{max-width:1000px;margin:0 auto;padding:16px}
 .layout{display:grid;grid-template-columns:minmax(0,1fr) 285px;gap:24px;align-items:start}
@@ -68,8 +70,9 @@ html[data-cielo=jaula] .logo-ave::after,html[data-cielo="vacío"] .logo-ave::aft
 /* --- El escenario --- */
 .escenario{position:relative;width:max(var(--ancho-juego),var(--ancho-juego-min));max-width:100%;aspect-ratio:360/640;margin:0 auto;border-radius:18px;overflow:hidden;
   border:4px solid var(--borde);box-shadow:0 6px 0 color-mix(in srgb,var(--borde) 70%,transparent),0 18px 40px #0003;background:#000;
-  touch-action:manipulation;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;transition:border-color 1.2s}
-#lienzo{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:pointer;outline:none}
+  touch-action:manipulation;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;transition:border-color 1.2s}
+#lienzo{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:pointer;outline:none;-webkit-tap-highlight-color:transparent;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+#lienzo:focus{outline:none}
 #lienzo:focus-visible{outline:none;box-shadow:inset 0 0 0 3px var(--acento)}
 .piensa{position:absolute;left:8%;right:8%;top:17%;margin:0;text-align:center;font:italic 700 clamp(11px,3.4cqw,15px)/1.3 system-ui,sans-serif;
   color:#fff;text-shadow:0 1px 0 #000a,0 0 8px #0008;opacity:0;pointer-events:none}
