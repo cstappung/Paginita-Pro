@@ -28,7 +28,7 @@ cuadro. Pero **los puntos no salen de la física**: salen de los metros y
 del multiplicador.
 
 - Los metros los da la velocidad, que solo depende del tiempo de juego:
-  `30 − 17·e^(−t/150)` m/s (`M.velocidad`). Entre dos instantes se corre su
+  `15 + 0,1·t` m/s con tope en 50 (`M.velocidad`, con la curva en `M.VELOCIDAD`). Entre dos instantes se corre su
   integral (`metrosEntre`).
 - El multiplicador solo cambia con las estrellas (+1 cada una, hasta +29),
   el 2× (× 2 lo que dura) y el Potenciador +5, sobre el base con que se
@@ -50,7 +50,7 @@ más rápido de lo calculado: no se nota.
 ### Formato (`prueba.js`, el mismo archivo para el juego y el verificador)
 
 ```js
-{ v: 1, s: <semilla>, b: <base>, md: <nivel del 2×>, u: <cuenta>, sn: <entradas sintéticas>,
+{ v: 2, s: <semilla>, b: <base>, md: <nivel del 2×>, u: <cuenta>, sn: <entradas sintéticas>,
   i: [                                // los pedidos al generador, con su punto de la pista (dSig)
     ["B", dSig, n, desde],            //   un boleto dorado
     ["T", dSig, desde, estacion],     //   un túnel (cambio de estación)
@@ -87,7 +87,7 @@ los puntos se suman con esos metros. Una carrera de 10 minutos ocupa ~11 kB
      con el 2× puesto, porque el cuadro del choque no lo gasta);
    - el +5 se usa una vez, en los primeros 6,5 s;
    - entre un choque y «seguir corriendo» no hay puntos, y los metros solo
-     resbalan lo que da la caída (12 m como mucho).
+     resbalan lo que da la caída (de 50 m/s a 0, 20,8 m, más 2 de holgura).
 4. **Lo declarado**: los puntos (±2 por redondeo), los metros (±1) y el
    tiempo (±0,1 s); y que la prueba sea de esa cuenta.
 
@@ -110,7 +110,7 @@ como trampa.
 No son umbrales de «raro»: son lo que el juego no deja hacer.
 
 - Distancia: más metros que la integral de la velocidad en ese tiempo
-  (+15 m). En un minuto se corren unos 1 024 m.
+  (+15 m). En un minuto se corren 1 080 m.
 - Carrera: más de 1 280 puntos por metro posible (el multiplicador máximo es
   (30 + 29 + 5) × 2 = 128).
 

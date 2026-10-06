@@ -40,7 +40,11 @@
 })(typeof self !== "undefined" ? self : this, function (M) {
   "use strict";
 
-  const VERSION = 1;
+  /* La versión de la prueba. Sube cuando cambia algo que la pista o los
+     metros dependen de él (la curva de velocidad, el generador): una prueba
+     vieja ya no se puede rehacer con el motor nuevo. 2 = velocidad de 15 a
+     50 m/s, más trenes de frente y más dificultad. */
+  const VERSION = 2;
   const PASO_MUESTRA = 2;         // segundos de carrera entre dos muestras
   const MAX_EVENTOS = 60000;      // una carrera de una hora deja ~2 000: esto es un tope de seguridad
   const MAX_METROS = 1000000;     // el tope de la tabla de distancia
@@ -57,7 +61,9 @@
   const TOL_RECOGE = 1.3;
   const TOL_DOBLE = 0.15;
   const TOL_DOBLE_CHOQUE = 0.06;  // el cuadro del choque no gasta el 2×: cada choque con el 2× puesto lo alarga hasta un cuadro
-  const DERIVA_MUERTE = 12;       // metros que puede seguir resbalando el corredor al caer (de 30 m/s a 0)
+  // metros que puede seguir resbalando el corredor al caer: de la velocidad tope a 0 con la frenada del
+  // juego (50 m/s → 20,8 m), más 2 m de holgura. Con un 12 fijo, caer atrapado a 50 m/s se rechazaba.
+  const DERIVA_MUERTE = M.VELOCIDAD.VMAX * M.VELOCIDAD.VMAX / (2 * M.FRENADA) + 2;
 
   const r4 = x => Math.round(x * 1e4) / 1e4;   // tiempos y relojes: a la décima de milésima basta
 
@@ -108,11 +114,10 @@
      --------------------------------------------------------------- */
 
   /* Los metros que se corren entre los tiempos de juego a y b: la integral
-     de M.velocidad (30 − 17·e^(−t/150)). Ejemplo: de 0 a 10 s, 135,6 m. */
-  function metrosEntre(a, b) {
-    const VMAX = 30, DV = 17, TAU = 150;
-    return VMAX * (b - a) + DV * TAU * (Math.exp(-Math.max(0, b) / TAU) - Math.exp(-Math.max(0, a) / TAU));
-  }
+     de la velocidad. Vive en el motor junto a la curva (M.VELOCIDAD), así el
+     juego y el verificador no pueden usar curvas distintas. Ejemplo: de 0 a
+     10 s, 155 m. */
+  const metrosEntre = M.metrosEntre;
 
   /* Rehace la carrera. Devuelve {motivo} si no cuadra, o
      {puntos, metros, tiempo} (como los manda el juego). */

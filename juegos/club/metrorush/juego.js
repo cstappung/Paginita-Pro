@@ -192,21 +192,10 @@ if (window.Mando) window.Mando.configura({
 
 /* ---- la física ---- */
 
-/** Qué hay bajo los pies del corredor en (x, D) estando a la altura y:
-    el suelo (0), una rampa (sube de 0 al techo) o el techo de un tren. */
-function soporte(x, D, y) {
-  let h = 0, tren = null;
-  for (const o of c.activos) {
-    if (o.tipo !== 'tren' && o.tipo !== 'rampa') continue;
-    if (D < o.d0 - 0.2 || D > o.d0 + o.largo + 0.2) continue;   // no está a mi altura en la pista
-    if (Math.abs(x - M.CARRILES[o.carril]) > 1.05) continue;    // no está en mi carril
-    if (o.tipo === 'rampa') {
-      const hs = M.ALTO_TECHO * Math.max(0, Math.min(1, (D - o.d0) / o.largo));
-      if (y >= hs - 0.7 && hs > h) h = hs;
-    } else if (y >= M.ALTO_TECHO - 0.5 && M.ALTO_TECHO >= h) { h = M.ALTO_TECHO; tren = o; }
-  }
-  return { h, tren };
-}
+/** Qué hay bajo los pies del corredor: el suelo (0), una rampa o el techo
+    de un tren. Lo decide `M.soporte` (motor.js), que se prueba en Node; aquí
+    solo se le pasan la pista y la D del cuadro anterior. */
+const soporte = (x, D, y) => M.soporte(c.activos, x, D, y, c.Dantes);
 /** Mueve al corredor un paso de `dt` segundos. */
 function fisica(dt) {
   const r = c.r;
@@ -236,19 +225,23 @@ function fisica(dt) {
       if (c.poderes.zapatillas > 0) sonido.saltoAlto(); else sonido.salto();
     }
   }
-  // 3) de lado: el corredor va hacia el centro de su carril
-  const xObj = M.CARRILES[r.carril], vl = 2.2 / F.cambioCarril;
+  // 3) de lado: el corredor va hacia el centro de su carril. Volando con la
+  //    mochila cambia de carril 1,7 veces más rápido (más frenético, y así se
+  //    alcanzan las monedas del cielo): es solo de lado, así que no cambia ni
+  //    los metros ni los puntos, y volando no hay choques.
+  const xObj = M.CARRILES[r.carril], vl = 2.2 / F.cambioCarril * (c.poderes.mochila > 0 ? 1.7 : 1);
   r.xPrev = r.x;
   r.x += Math.max(-vl * dt, Math.min(vl * dt, xObj - r.x));
   r.ladeo += ((xObj - r.x) * -0.18 - r.ladeo) * Math.min(1, dt * 10);   // se inclina hacia donde va
   // 4) arriba y abajo: gravedad, suelo, rampas y techos (o la mochila cohete)
   const sop = soporte(r.x, c.D, r.y);
   if (c.poderes.mochila > 0) {
-    r.y += (F.alturaMochila - r.y) * (1 - Math.exp(-3.5 * dt)); r.vy = 0; r.enAire = true;
+    // sube de golpe: el 95 % de la altura en medio segundo (antes, en casi uno). Solo cambia la altura, no los metros
+    r.y += (F.alturaMochila - r.y) * (1 - Math.exp(-6 * dt)); r.vy = 0; r.enAire = true;
   } else {
     r.vy -= F.gravedad * dt; r.y += r.vy * dt;
     if (r.y <= sop.h) {                                        // toca el suelo (o el techo, o la rampa)
-      if (r.enAire && r.vy < -1) { sonido.aterriza(); if (r.rodarPend) { r.rodar = F.tiempoRodar; c.cuenta.rodadas++; sonido.rodar(); } }
+      if (r.enAire && r.vy < -1) { sonido.aterriza(-r.vy); if (r.rodarPend) { r.rodar = F.tiempoRodar; c.cuenta.rodadas++; sonido.rodar(); } }
       r.y = sop.h; r.vy = 0; r.enAire = false; r.rodarPend = false; r.ultSuelo = c.t;
     } else if (!r.enAire && r.y > sop.h + 0.05) r.enAire = true;   // se acabó el tren: cae
   }
@@ -261,14 +254,8 @@ function fisica(dt) {
 
 /* ---- choques ---- */
 
-/** El alto que ocupa cada obstáculo [abajo, arriba] y su medio ancho. */
-function caja(o) {
-  if (o.tipo === 'tren') return { z0: o.d0, z1: o.d0 + o.largo, y0: 0, y1: M.ALTO_TECHO, w: 0.98 };
-  if (o.tipo === 'bajo') return { z0: o.d - 0.12, z1: o.d + 0.12, y0: 0, y1: 0.95, w: 0.95 };
-  if (o.tipo === 'alto') return { z0: o.d - 0.12, z1: o.d + 0.12, y0: 1.0, y1: 2.35, w: 0.95 };
-  if (o.tipo === 'rampa') { const hs = M.ALTO_TECHO * Math.max(0, Math.min(1, (c.D - o.d0) / o.largo)); return { z0: o.d0, z1: o.d0 + o.largo, y0: 0, y1: hs - 0.6, w: 0.95 }; }
-  return null;
-}
+/** El alto que ocupa cada obstáculo [abajo, arriba] y su medio ancho (motor.js). */
+const caja = o => M.caja(o, c.D);
 function choques() {
   const r = c.r;
   if (c.poderes.mochila > 0 || r.y > 6) return;                // volando, por encima de todo
@@ -276,7 +263,7 @@ function choques() {
   for (const o of c.activos) {
     const k = caja(o);
     if (!k || k.y1 <= k.y0) continue;
-    if (c.D + 0.3 < k.z0 || c.D - 0.3 > k.z1) continue;          // no está a mi altura en la pista
+    if (c.D + M.MEDIO_LARGO < k.z0 || c.D - M.MEDIO_LARGO > k.z1) continue;   // no está a mi altura en la pista
     const X = M.CARRILES[o.carril], lim = k.w + F.medioAncho;
     if (Math.abs(r.x - X) >= lim) continue;                     // no está en mi carril
     if (yb >= k.y1 || yt <= k.y0) continue;                     // lo paso por arriba o por abajo
@@ -338,7 +325,7 @@ function activaPoder(clase) {
     c.cuenta.mochilas++;
     anotaPedido('C', c.D + 12, c.D + 12 + c.V * dur, c.r.carril);
     c.activos.push(...c.gen.monedasCielo(c.D + 12, c.D + 12 + c.V * dur, c.r.carril));
-    sonido.mochila(true);
+    sonido.mochila(true); sonido.despega();
   }
   aviso(M.PODERES[clase].nombre + '!');
 }
@@ -400,7 +387,7 @@ function usaPotenciador(k) {
     c.poderes.mochila = seg; c.invulnerable = Math.max(c.invulnerable, seg + 1.5);
     anotaPedido('C', c.D + 12, c.D + 12 + c.V * seg, c.r.carril);
     c.activos.push(...c.gen.monedasCielo(c.D + 12, c.D + 12 + c.V * seg, c.r.carril));
-    sonido.mochila(true); sonido.poder(); aviso('¡Despegue! A volar');
+    sonido.mochila(true); sonido.despega(); sonido.poder(); aviso('¡Despegue! A volar');
   } else {                                                      // +5 al multiplicador durante toda la carrera
     anota('p');
     c.extra = M.POTENCIADORES.puntos.extra; sonido.multiplicador(); aviso(`Potenciador: multiplicador ×${multiplicador()}`);
@@ -412,8 +399,9 @@ function usaPotenciador(k) {
 function actualiza(dt) {
   c.t += dt;
   const muriendo = estado === 'muerte';
-  c.V = muriendo ? Math.max(0, c.V - 60 * dt) : M.velocidad(c.t);
+  c.V = muriendo ? Math.max(0, c.V - M.FRENADA * dt) : M.velocidad(c.t);   // al caer frena (lo que tolera el antitrampas)
   const dD = c.V * dt;
+  c.Dantes = c.D;                                               // dónde iba en el cuadro anterior (para seguir la rampa)
   c.D += dD;
   if (!muriendo) {
     // los puntos: 10 por metro × el multiplicador
@@ -431,6 +419,7 @@ function actualiza(dt) {
     if (o.tipo === 'tren' && o.vel > 0) {
       if (!o.activo && c.D >= o.dArribo - M.APARECE) o.activo = true;
       if (o.activo && !muriendo) o.d0 -= o.vel * dt;            // al morir todo se queda quieto (el tren no te pasa por encima)
+      if (o.activo && !muriendo) avisaTren(o);                  // la bocina, si viene hacia ti
       if (o.d0 + o.largo < c.D - 1 && !c.esquivados.has(o.id) && !muriendo) { c.esquivados.add(o.id); c.cuenta.esquivar++; }
     }
     const fin = o.d != null ? o.d : o.d0 + (o.largo || 0);
@@ -450,7 +439,7 @@ function actualiza(dt) {
     // los poderes se gastan
     for (const k of Object.keys(c.poderes)) if (c.poderes[k] > 0) {
       c.poderes[k] = Math.max(0, c.poderes[k] - dt);
-      if (c.poderes[k] === 0 && k === 'mochila') { sonido.mochila(false); c.invulnerable = Math.max(c.invulnerable, 2); }
+      if (c.poderes[k] === 0 && k === 'mochila') { sonido.mochila(false); sonido.cortaMochila(); c.invulnerable = Math.max(c.invulnerable, 2); }
       if (c.poderes[k] === 0 && k === 'doble') anota('x');      // el multiplicador vuelve a la mitad
     }
     if (c.invulnerable > 0) c.invulnerable -= dt;
@@ -471,19 +460,47 @@ function actualiza(dt) {
   c.perseguidor += (c.perseguidorObj - c.perseguidor) * Math.min(1, dt * 2.2);
 }
 
+/* ---- los trenes que vienen de frente se anuncian ----
+   Solo sonido y vibración: no cambia nada del juego. Un tren en marcha que
+   viene por TU carril toca la bocina cuando le faltan 2,4 s para cruzarse
+   contigo (un bocinazo largo) y, si sigues ahí cuando falta 1 s, dos toques
+   cortos y urgentes; si te metes en su carril ya tarde, van directo los dos
+   toques. Uno del carril de al lado toca corto y bajito, como mucho uno cada
+   3 s (si no, con varios trenes sería un concierto). La bocina suena del lado
+   en que viene, y en un celular además vibra (si «Sacudir la pantalla» está
+   encendido). Ejemplo: a 30 m/s con el tren a 11 m/s se acercan a 41 m/s:
+   el bocinazo suena con el tren a ~98 m. */
+function avisaTren(o) {
+  const r = c.r, dz = o.d0 - c.D;                                // metros hasta su frente
+  if (estado !== 'jugando' || dz <= 0 || dz > mundo.vista || c.poderes.mochila > 0) return;   // ya pasó, aún no se ve, o vuelas por encima
+  const seg = dz / (c.V + o.vel);                                // segundos para cruzarse
+  const lejos = Math.abs(o.carril - r.carril);                   // 0: mi carril; 1: el de al lado; 2: el del otro extremo
+  const pan = Math.max(-1, Math.min(1, (M.CARRILES[o.carril] - r.x) / 3));   // de qué lado suena
+  if (lejos === 0) {
+    if (!o.bocina && seg < 2.4) { o.bocina = seg < 1 ? 2 : 1; sonido.bocina(o.bocina, pan); vibra(o.bocina === 2 ? 140 : [90, 60, 90]); }
+    else if (o.bocina === 1 && seg < 1) { o.bocina = 2; sonido.bocina(2, pan); vibra(140); }
+  } else if (lejos === 1 && !o.bocina && !o.bocinaLejos && seg < 2 && c.t - (c.bocinaLejos ?? -9) > 3) {   // c.bocinaLejos: cuándo tocó la última «de al lado»
+    o.bocinaLejos = true; c.bocinaLejos = c.t; sonido.bocina(0, pan);
+  }
+}
+/** Una vibración corta en el celular (Android; el iPhone no deja), solo si «Sacudir la pantalla» está encendido. */
+function vibra(patron) {
+  if (!esTactil || !opciones.sacudida || !navigator.vibrate) return;
+  try { navigator.vibrate(patron); } catch (e) { /* sin permiso: no pasa nada */ }
+}
+
 /* ---- estaciones y túneles ---- */
 function estaciones() {
-  /* El túnel se pide ANTES de llegar al umbral. La pista ya está generada
-     unos 230 m por delante (lo que se ve), así que un túnel pedido justo al
-     cruzar el umbral recién aparecería 15 segundos después. Por eso se
-     calcula cuántos metros faltan para el umbral al multiplicador de ahora:
-     si es menos de lo que ya está generado, el túnel se pide ya y cae más o
-     menos donde vas a estar cuando ganes esos puntos. Ejemplo: vas en 49 000
-     con ×5, faltan 1000 puntos = 20 m; el túnel cae a ~240 m y la estación
-     nueva empieza al salir de él. */
-  const sig = M.siguienteUmbral(c.puntos);
-  const faltan = (sig - c.puntos) / (M.PUNTOS_POR_METRO * multiplicador());
-  const e = M.estacionDe(faltan < 220 ? sig : c.puntos);         // a donde se va: la que viene si llega pronto
+  /* Las estaciones cambian con la DISTANCIA (M.ESTACIONES, en metros), no
+     con los puntos. El túnel se pide ANTES de llegar al umbral: la pista ya
+     está generada unos 230 m por delante (lo que se ve), así que un túnel
+     pedido justo al cruzar el umbral recién aparecería 230 m después. Si
+     faltan menos de 220 m, se pide ya y cae justo en el umbral, porque es
+     ahí donde termina lo generado. Ejemplo: vas en el metro 1 300 y Ocaso
+     empieza en el 1 500; el túnel cae a ~1 530 y Ocaso empieza al salir. */
+  const sig = M.siguienteUmbral(c.D);                            // el metro en que empieza la estación siguiente
+  const faltan = sig - c.D;                                      // cuántos metros faltan para llegar
+  const e = M.estacionDe(faltan < 220 ? sig : c.D);              // a donde se va: la que viene si llega pronto
   if (!c.cambio && e.clave !== c.estacion.clave) {
     c.cambio = { estacion: e, tunel: null, hecho: false };
     anotaPedido('T', c.D + 40, e.id);
@@ -492,7 +509,7 @@ function estaciones() {
     mundo.letreroTunel(e.nombre);
   }
   // precarga el kit de la estación siguiente cuando falta poco (para que el túnel no se trabe)
-  if (c.puntos > sig * 0.7) mundo.precarga(estacionVisual(M.estacionDe(sig)));
+  if (faltan < 900) mundo.precarga(estacionVisual(M.estacionDe(sig)));
   const cb = c.cambio;
   if (cb && cb.tunel) {
     const o = cb.tunel;
@@ -778,12 +795,16 @@ function cuadro(ahora) {
   const r = c ? c.r : null;
   // en la portada y en la tienda la cámara se pone delante del corredor, que mira y saluda
   const menu = panel === 'capaTienda' ? 'tienda' : estado === 'portada' ? 'portada' : null;
+  // en la patineta, rodar es agacharse: de 0 a 1 en una décima, se queda, y vuelve en las últimas 0,12 s (suave, sin saltos)
+  const agacha0 = r && r.rodar > 0 ? Math.max(0, Math.min(1, (F.tiempoRodar - r.rodar) / 0.1, r.rodar / 0.12)) : 0;
+  const agacha = agacha0 * agacha0 * (3 - 2 * agacha0);
   const pose = menu ? { modo: 'menu', t: tiempoTotal }
     : !c ? { modo: 'quieto', fase: tiempoTotal * 3 }
     : c.muerte && c.muerte.motivo === 'abandono' ? { modo: 'quieto', fase: tiempoTotal * 3 }      // «Terminar la carrera»: se queda de pie
     : estado === 'muerte' || estado === 'salvar' || (estado === 'fin' && c.muerte) ? { modo: 'caer', t: c.muerte ? c.muerte.t : 1 }
       : r.tropezarT >= 0 ? { modo: 'tropezar', t: r.tropezarT, fase: r.fase, ladeo: r.ladeo }
         : c.poderes.mochila > 0 ? { modo: 'volar', fase: r.fase }
+          : c.poderes.patineta > 0 ? { modo: 'patinar', fase: r.fase, ladeo: r.ladeo, vy: r.vy, aire: r.enAire, t: tiempoTotal, agacha }   // de lado sobre la tabla (rodar = agacharse, saltar = un ollie)
           : r.rodar > 0 ? { modo: 'rodar', t: F.tiempoRodar - r.rodar }
             : r.enAire ? { modo: 'saltar', vy: r.vy, ladeo: r.ladeo }
               : { modo: 'correr', fase: r.fase, ladeo: r.ladeo };
@@ -793,7 +814,7 @@ function cuadro(ahora) {
     perseguidor: c && !menu ? c.perseguidor : 0, menu
   });
   mundo.dibuja();
-  sonido.tick(c && estado === 'jugando' ? c.V : 13);
+  sonido.tick(c && estado === 'jugando' ? c.V : M.VELOCIDAD.V0);
   if (c && (estado === 'jugando' || estado === 'muerte')) pintaHud(dt);
   autoCalidad(dtReal);
 }
@@ -818,6 +839,12 @@ const ponTexto = (id, txt) => { if (hudCache[id] !== txt) { hudCache[id] = txt; 
    la propiedad `scale` (no `transform`), para no pisar la inclinación que
    la estética juguete le da a la placa del multiplicador. */
 const quieto = matchMedia('(prefers-reduced-motion: reduce)');
+/** Le dice al mundo qué movimientos de cámara se permiten (ver «la sensación
+    de velocidad» en mundo.js): la opción «Sacudir la pantalla» (sin ella no
+    hay temblor, balanceo ni ladeo) y el ajuste del sistema «reducir
+    movimiento» (además, sin líneas de viento). */
+function aplicaMovimiento() { if (mundo) mundo.movimiento({ sacudir: !!opciones.sacudida, quieto: quieto.matches }); }
+if (quieto.addEventListener) quieto.addEventListener('change', aplicaMovimiento);
 let ultSaltoMoneda = 0;
 function salta(el, k, ms) { if (el && el.animate && !quieto.matches) el.animate([{ scale: 1 }, { scale: k }, { scale: 1 }], { duration: ms, easing: 'ease-out' }); }
 function pintaHud(dt) {
@@ -830,8 +857,8 @@ function pintaHud(dt) {
   ponTexto('hudMonedas', mon);
   ponTexto('hudPatinetas', String(progreso.patinetas));
   // la barra hacia la próxima estación
-  const e = c.estacion, sig = M.siguienteUmbral(c.puntos), desde = e.desde || 0;
-  const k = Math.max(0, Math.min(1, (c.puntos - (e.vuelta > 1 ? sig - M.VUELTA_CADA : desde)) / Math.max(1, sig - (e.vuelta > 1 ? sig - M.VUELTA_CADA : desde))));
+  const e = c.estacion, sig = M.siguienteUmbral(c.D), desde = e.desde || 0;   // en metros, como las estaciones
+  const k = Math.max(0, Math.min(1, (c.D - (e.vuelta > 1 ? sig - M.VUELTA_CADA : desde)) / Math.max(1, sig - (e.vuelta > 1 ? sig - M.VUELTA_CADA : desde))));
   ponTexto('hudEstacion', e.nombre);
   $('hudEstBarra').style.setProperty('--k', k.toFixed(3));
   // los poderes activos, con su barra de tiempo
@@ -988,7 +1015,23 @@ let tiendaVer = null;                                          // el aspecto que
 let aspectoMostrado = null;                                    // el que lleva el corredor en pantalla
 function abreTienda(pestana = 'mejoras') {
   tiendaPestana = pestana; tiendaVer = progreso.aspecto;
+  if (estado === 'fin') despejaChoque();                       // desde el resumen: primero se saca la carrera perdida del escenario
   pintaTienda(); abrePanel('capaTienda');
+}
+/* La tienda abierta desde el resumen se veía sobre el lugar del choque:
+   el corredor quedaba en su carril (y a veces en el aire, fuera de la
+   cámara del probador), con el tren o la barrera del choque pegados a la
+   espalda, las monedas flotando, el aro del imán todavía girando y el
+   marcador de la carrera encima de la tienda. Desde la portada no pasa,
+   porque ahí no hay carrera y la vía está vacía. La carrera ya está cerrada
+   (el resumen la cerró), así que se saca del escenario igual que al ir a la
+   portada, y el resumen sigue ahí al volver. */
+function despejaChoque() {
+  if (!c) return;                                              // ya se despejó (o no hubo carrera)
+  cierraCarrera();                                             // ya estaba cerrada: cerrarla otra vez no suma nada
+  c = null;                                                    // sin carrera, el corredor va al medio de la vía, en el suelo y sin poderes
+  $('hud').hidden = true;                                      // el marcador de la carrera ya no tiene nada que contar
+  mundo.reinicia();                                            // fuera trenes, barreras, monedas y poderes: la vía queda vacía, como en la portada
 }
 function saleTienda() {                                        // vuelve a la ropa que de verdad lleva puesta
   if (aspectoMostrado && aspectoMostrado !== progreso.aspecto) mundo.aspecto(M.ASPECTOS[progreso.aspecto] || M.ASPECTOS.clasico);
@@ -1070,7 +1113,7 @@ function abreLibreta() {
   $('listaBoletos').innerHTML = M.ESTACIONES.map(e => {
     const b = M.BOLETOS[e.boleto], tiene = progreso.boletos.includes(e.boleto);
     return tiene ? `<li><strong>${b.titulo}</strong><p>${b.texto}</p></li>`
-      : `<li class="falta"><strong>Boleto n.º ${e.boleto} · ${e.desde ? `desde ${fmt(e.desde)} puntos` : 'Barrio Estación'}</strong><p>Todavía no lo encuentras. Está en la estación ${e.nombre}.</p></li>`;
+      : `<li class="falta"><strong>Boleto n.º ${e.boleto} · ${e.desde ? `desde los ${fmt(e.desde)} m` : 'Barrio Estación'}</strong><p>Todavía no lo encuentras. Está en la estación ${e.nombre}.</p></li>`;
   }).join('');
   $('libretaCuenta').textContent = `${progreso.boletos.length} de 7 boletos`;
   abrePanel('capaLibreta');
@@ -1091,6 +1134,7 @@ for (const [id, k] of [['optCalidad', 'calidad'], ['optEstilo', 'estilo'], ['opt
     guardaOpciones();
     if (k === 'calidad') mundo.calidad(opciones.calidad === 'auto' ? calidadInicial() : opciones.calidad);
     if (k === 'musica' || k === 'efectos') sonido.volumenes(opciones.musica / 100, opciones.efectos / 100);
+    if (k === 'sacudida') aplicaMovimiento();
     if (k === 'estilo' && (estado === 'portada')) aPortada();
   });
 }
@@ -1123,6 +1167,7 @@ async function arranca() {
     return;
   }
   mundo.calidad(calidadInicial());
+  aplicaMovimiento();
   const ajusta = () => { const r = pantalla.getBoundingClientRect(); mundo.tamano(r.width, r.height); };
   new ResizeObserver(ajusta).observe(pantalla); ajusta();
   mundo.aspecto(M.ASPECTOS[progreso.aspecto] || M.ASPECTOS.clasico); aspectoMostrado = progreso.aspecto;
