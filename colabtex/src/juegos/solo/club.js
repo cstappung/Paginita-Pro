@@ -123,9 +123,9 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
   function montar(el){
     host=el;ambientar(null);host.innerHTML='';
     for(const id of ['btnMusica','volMusica','btnSonido']){const el=document.getElementById(id);if(el){ocultos.push([el,el.style.display]);el.style.display='none';}}
-    frame=document.createElement('iframe');frame.title=juego==='minas'?'Mina Club — Buscaminas':juego==='tetris'?'Tetris Club':juego==='sortem'?'sortEm':juego==='bbtan'?'BBTAN':juego==='sopa'?'Sopa de letras':juego==='electro'?'Electrodle':juego==='sudoku'?'Sudoku Arcade':juego==='fanal'?'FANAL':juego==='atasco'?'Atasco':juego==='metrorush'?'Metro Rush':'Snake Club';
+    frame=document.createElement('iframe');frame.title=juego==='minas'?'Mina Club — Buscaminas':juego==='tetris'?'Tetris Club':juego==='sortem'?'sortEm':juego==='bbtan'?'BBTAN':juego==='sopa'?'Sopa de letras':juego==='electro'?'Electrodle':juego==='sudoku'?'Sudoku Arcade':juego==='fanal'?'FANAL':juego==='atasco'?'Atasco':juego==='aleteo'?'ALETEO':juego==='metrorush'?'Metro Rush':'Snake Club';
     frame.className='jg-solo-frame';
-    frame.style.height=juego==='tetris'?'880px':juego==='sortem'||juego==='bbtan'||juego==='electro'||juego==='sudoku'||juego==='fanal'||juego==='atasco'||juego==='metrorush'?'900px':'760px';
+    frame.style.height=juego==='tetris'?'880px':juego==='sortem'||juego==='bbtan'||juego==='electro'||juego==='sudoku'||juego==='fanal'||juego==='atasco'||juego==='aleteo'||juego==='metrorush'?'900px':'760px';
     const tema=()=>enviar({tipo:'tema',oscuro:document.documentElement.dataset.tema==='oscuro'});
     frame.addEventListener('load',tema);
     if(juego==='sortem')frame.addEventListener('load',()=>frame.focus());

@@ -376,6 +376,20 @@ const SOLO = {
     { id: "e600", n: "Sin un bocinazo", d: "Junta 600 estrellas.", i: "📯", m: "Estrellas", s: d => cat(/-estrellas$/)(d) && d.puntos >= 600 },
     { id: "e720", n: "La bóveda abierta", d: "Junta las 720 estrellas: los 240 niveles con el mínimo de movidas.", i: "🏆", m: "Estrellas", s: d => cat(/-estrellas$/)(d) && d.puntos >= 720 }
   ],
+  /* ALETEO. Todos salen de club-aleteo-vuelo (puntos = tubos pasados en
+     el mejor vuelo); los umbrales de los cielos son los de lore.js. */
+  aleteo: [
+    { id: "t1", n: "Primer tubo", d: "Pasa tu primer tubo.", i: "🐣", m: "Vuelo", s: d => cat(/-vuelo$/)(d) && d.puntos >= 1 },
+    { id: "t10", n: "Bronce", d: "Pasa 10 tubos en un vuelo.", i: "🥉", m: "Vuelo", s: d => cat(/-vuelo$/)(d) && d.puntos >= 10 },
+    { id: "t15", n: "La bandada se adelantó", d: "Llega a la tarde (15 tubos).", i: "🌇", m: "Cielos", s: d => cat(/-vuelo$/)(d) && d.puntos >= 15 },
+    { id: "t25", n: "Plata", d: "Pasa 25 tubos en un vuelo.", i: "🥈", m: "Vuelo", s: d => cat(/-vuelo$/)(d) && d.puntos >= 25 },
+    { id: "t35", n: "Pájaros en los cables", d: "Llega al ocaso (35 tubos).", i: "🌆", m: "Cielos", s: d => cat(/-vuelo$/)(d) && d.puntos >= 35 },
+    { id: "t50", n: "Oro", d: "Pasa 50 tubos en un vuelo.", i: "🥇", m: "Vuelo", s: d => cat(/-vuelo$/)(d) && d.puntos >= 50 },
+    { id: "t60", n: "La luna no parpadea", d: "Llega a la noche (60 tubos).", i: "🌕", m: "Cielos", s: d => cat(/-vuelo$/)(d) && d.puntos >= 60 },
+    { id: "t90", n: "Siempre fueron barrotes", d: "Llega a la jaula (90 tubos).", i: "⛓️", m: "Cielos", s: d => cat(/-vuelo$/)(d) && d.puntos >= 90 },
+    { id: "t100", n: "Platino", d: "Pasa 100 tubos en un vuelo.", i: "💠", m: "Vuelo", s: d => cat(/-vuelo$/)(d) && d.puntos >= 100 },
+    { id: "t130", n: "Bienvenido de vuelta", d: "Llega al vacío (130 tubos).", i: "🕳️", m: "Cielos", s: d => cat(/-vuelo$/)(d) && d.puntos >= 130 }
+  ],
   /* Metro Rush. Los de puntos salen de club-metrorush-carrera (puntos de la
      mejor carrera: 1 000 000 es donde empieza la Estación Fantasma y
      10 000 000 el Fin de la Línea); los de distancia, de
@@ -400,7 +414,7 @@ export const LOGROS = Object.fromEntries([
   ...Object.entries(SOLO)
 ]);
 /* Qué categorías de `soloRanks` alimentan cada juego individual. */
-export const SOLO_PREFIJO = { minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-", electro: "club-electro-", frontera: "club-frontera-", sudoku: "club-sudoku-", fanal: "club-fanal-", atasco: "club-atasco-", metrorush: "club-metrorush-" };
+export const SOLO_PREFIJO = { minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-", electro: "club-electro-", frontera: "club-frontera-", sudoku: "club-sudoku-", fanal: "club-fanal-", atasco: "club-atasco-", aleteo: "club-aleteo-", metrorush: "club-metrorush-" };
 
 /* Los logros de partida que `uid` tiene ya en esta, según lo que se ve. */
 export function detecta(p, est, uid) {

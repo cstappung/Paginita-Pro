@@ -149,6 +149,7 @@ que se espera de cada uno:
 | Sopa de letras | `club-sopa-*` (tiempo, racha) | tablero de la semilla + selecciones; la racha | baja |
 | Sudoku Arcade | `club-sudoku-*` | tablero de la semilla + dígitos; el arcade se recalcula | baja |
 | Atasco | `club-atasco-estrellas` | los movimientos de cada nivel (motor y solver ya puros) | baja |
+| ALETEO | `club-aleteo-vuelo` | semilla + tick de cada aleteo (física determinista a 1/60 s) | baja |
 | Electrodle | `club-electro-*` | los intentos de cada modo; el blanco sale de la fecha | media |
 | sortEm | `club-sortem-*` (tiempo) | el reparto + cada movimiento | media |
 | BBTAN | `club-bbtan-rondas` | semilla + ángulo de cada tiro (física determinista) | alta |

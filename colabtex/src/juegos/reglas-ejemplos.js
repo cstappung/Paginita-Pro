@@ -1,4 +1,4 @@
-import {cart, dados, tablero, orbes, reversi, cajas, paisaje, tiro, orbita, serpiente, tetris, isla, ajedrez, fanal, boxhead, atasco, metrorush} from './reglas-ilustraciones.js';
+import {cart, dados, tablero, orbes, reversi, cajas, paisaje, tiro, orbita, serpiente, tetris, isla, ajedrez, fanal, boxhead, atasco, metrorush, aleteo} from './reglas-ilustraciones.js';
 const p=(titulo,texto,imagen)=>({titulo,texto,imagen});
 const e=(id,titulo,...pasos)=>({id,titulo,pasos});
 const fichas=(titulo,...cs)=>cart([titulo,cs]);
@@ -192,6 +192,13 @@ export const EJEMPLOS={
  e('poderes','Poderes, cartas y llamas',
   p('Lo que sueltan las polillas','A veces una polilla apagada suelta un frasco. Pabilo doble: dos tiros por disparo. Lente: los tiros atraviesan todo. Campana: aguanta un golpe. Aceite: una llama más. Destello: apaga la fila más baja.',fichas('Los poderes',['Pabilo','oro','DOS TIROS'],['Lente','azul','ATRAVIESA'],['Campana','blanco','UN GOLPE'],['Aceite','verde','+1 LLAMA'])),
   p('La Mensajera y sus cartas','Una polilla grande y pálida cruza por arriba de vez en cuando con una carta. Si la alcanzas, la carta queda en tu Bitácora para siempre y se lee al final de la jornada. Hay trece, y cada acto deja leer las suyas.',fichas('Una carta recuperada',['✉','oro','CARTA'],['+300','verde','PUNTOS'],['VI','violeta','DE XIII'])))],
+ aleteo:[e('volar','Pasar un par de tubos',
+  p('Aletea para subir','Cada aleteo le da al pájaro un impulso hacia arriba. Aquí está bajo el hueco, así que un aleteo a tiempo lo pone a la altura justa para entrar.',aleteo(0)),
+  p('Deja que caiga','Entre aleteo y aleteo la gravedad lo baja. Dentro del hueco conviene no aletear de más: el tubo de arriba está tan cerca como el de abajo.',aleteo(1)),
+  p('Un tubo, un punto','Al dejar atrás el par de tubos el marcador sube uno. Tocar un tubo o el suelo termina el vuelo; el techo solo lo frena.',aleteo(2))),
+ e('medallas','Medallas y clasificación',
+  p('Una medalla por vuelo','Al chocar recibes la medalla de lo lejos que llegaste. Las cuentas son siempre las mismas, porque la velocidad no cambia nunca.',fichas('Medallas',['10','oro','BRONCE'],['25','gris','PLATA'],['50','oro','ORO'],['100','violeta','PLATINO'])),
+  p('La tabla Vuelo','Ordena por tubos pasados y, a igualdad, gana el vuelo más corto. Cada vuelo se rehace con su semilla y sus aleteos antes de guardarse.',fichas('Dos vuelos de 40',['40','verde','EN 52 s'],['40','azul','EN 53 s'],['1.º','oro','EL DE 52 s'])))],
  atasco:[e('salida','Sacar el auto rojo en el mínimo',
   p('Mira qué lo encierra','El auto rojo solo se mueve de lado, por la fila de la salida. Aquí lo tapan un auto azul y un camión verde. Para bajar el camión, primero hay que correr el furgón naranja.',atasco(0)),
   p('Abre el camino','Cada vehículo se arrastra por su carril, hacia adelante o hacia atrás, sin girar. El furgón va a la izquierda, el camión baja y el auto sube: tres movidas.',atasco(1)),

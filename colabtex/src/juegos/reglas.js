@@ -918,6 +918,27 @@ const REGLAS = {
       ["Clasificación", "La tabla de Atasco cuenta las <b>estrellas</b> juntadas en todos los niveles; a igualdad, gana quien sumó menos tiempo en sus mejores intentos. Solo se manda cuando el total sube, así que repetir un nivel ya ganado no cuesta nada. Tus estrellas se guardan en este navegador y, con tu sesión, también en tu cuenta."]
     ]
   },
+  /* ALETEO (juegos/club/aleteo/): lo que dice aquí tiene que coincidir con
+     motor.js (tubos, medallas) y juego.js (controles). El lore no se cuenta:
+     se descubre volando. */
+  aleteo: {
+    lema: "ALETEO: un pajarito vuelve al nido pasando entre tubos. Cada aleteo lo sube; si no aleteas, cae.",
+    secciones: [
+      ["Cómo se juega", "El pájaro avanza solo. Tú solo decides cuándo <b>aletear</b>: cada aleteo le da un impulso hacia arriba y, entre uno y otro, la gravedad lo baja. Pasa por el hueco de cada par de tubos sin tocarlos. Tocar un tubo o el suelo termina el vuelo; el techo no mata, solo frena."],
+      ["Puntos y medallas", lista([
+        "Cada par de tubos que pasas vale <b>1 punto</b>.",
+        "Al chocar ganas una medalla según lo lejos que llegaste: <b>bronce</b> desde 10, <b>plata</b> desde 25, <b>oro</b> desde 50 y <b>platino</b> desde 100.",
+        "El hueco entre los tubos se va cerrando de a poco durante los primeros tubos y después se queda igual. La velocidad no cambia nunca."
+      ])],
+      ["Mientras más lejos…", "…más tarde se hace. El cielo cambia con lo que avanzas, y no siempre para bien. Lo demás lo descubres volando."],
+      ["Controles", lista([
+        "Clic, toque, Espacio, ↑, W o Intro: aletear. El primer aleteo empieza el vuelo.",
+        "P o Esc: pausa. El vuelo también se pausa solo si cambias de pestaña.",
+        "Mando: A, B o RB aletean y Start pausa."
+      ])],
+      ["Clasificación", "La tabla <b>Vuelo</b> ordena por tubos pasados; a igualdad, gana el vuelo más corto. Cada vuelo se rehace con su semilla y sus aleteos antes de guardarse, así que solo cuenta lo que de verdad se voló. Subir al podio se anuncia en Discord."]
+    ]
+  },
   /* Metro Rush (juegos/club/metrorush/): lo que dice aquí tiene que
      coincidir con su motor.js (puntos, multiplicador, poderes, estaciones,
      tropiezos) y su juego.js (teclas, gestos y mando). */
@@ -1010,7 +1031,7 @@ const REGLAS = {
   }
 };
 
-const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", metrorush: "Metro Rush" };
+const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", metrorush: "Metro Rush" };
 
 export const tieneReglas = juego => Object.prototype.hasOwnProperty.call(REGLAS, juego);
 

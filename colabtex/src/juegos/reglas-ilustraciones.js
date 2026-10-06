@@ -121,6 +121,27 @@ export const atasco=etapa=>{
  cuerpo+=txt(272,90,textos[0],22,etapa===2?C.oro:C.blanco)+txt(272,122,textos[1],17)+txt(272,150,textos[2],17,etapa===2?C.oro:C.verde);
  return svg(nombre,cuerpo);
 };
+/* ALETEO: el pájaro entre tubos, de costado. Etapa 0, aletea y sube;
+   1, deja de aletear y cae por el hueco; 2, pasa el tubo y suma el punto.
+   El cielo es el de la mañana: el manual no cuenta lo que viene después. */
+export const aleteo=etapa=>{
+ const nombre=['Un aleteo sube al pájaro hacia el hueco entre los tubos','Sin aletear, la gravedad lo baja por el hueco','Pasado el par de tubos, el marcador suma un punto'][etapa];
+ let cuerpo=`<rect x="14" y="14" width="452" height="196" rx="10" fill="#3fb6f5"/><rect x="14" y="120" width="452" height="90" fill="#c4efff" opacity=".55"/>`;
+ cuerpo+=circle(410,52,22,'#ffe46b')+circle(90,60,14,'#ffffff')+circle(108,56,18,'#ffffff')+circle(126,62,12,'#ffffff');
+ const tubo=(x,y,h)=>rect(x,y,52,h,'#6fd04b','#24451a',4)+`<rect x="${x+8}" y="${y+4}" width="9" height="${Math.max(0,h-8)}" fill="#c2f58a" opacity=".7"/>`;
+ const tx=etapa===2?120:250,hueco=[96,150];
+ cuerpo+=tubo(tx,14,hueco[0]-14)+rect(tx-6,hueco[0]-20,64,20,'#6fd04b','#24451a',4)+tubo(tx,hueco[1],196-(hueco[1]-14))+rect(tx-6,hueco[1],64,20,'#6fd04b','#24451a',4);
+ cuerpo+=`<rect x="14" y="196" width="452" height="14" fill="#86cf3c"/><rect x="14" y="206" width="452" height="30" rx="0" fill="#ead79a"/>`;
+ const [bx,by]=[[150,150],[262,112],[250,122]][etapa];
+ const rot=[-25,25,5][etapa];
+ cuerpo+=`<g transform="translate(${bx} ${by}) rotate(${rot})"><ellipse rx="17" ry="13" fill="#ffd23f" stroke="#1a1a1a" stroke-width="2"/><ellipse cx="3" cy="5" rx="9" ry="6" fill="#fff4c2"/><ellipse cx="-6" cy="${etapa===0?-6:3}" rx="9" ry="5" fill="#ffae12" stroke="#1a1a1a" stroke-width="1.5"/><circle cx="7" cy="-4" r="4" fill="#ffffff" stroke="#1a1a1a" stroke-width="1.5"/><circle cx="8" cy="-4" r="1.8" fill="#1a1a1a"/><path d="M14 0 L24 3 L14 7 Z" fill="#ff7a1a" stroke="#1a1a1a" stroke-width="1.5"/></g>`;
+ if(etapa===0)cuerpo+=line(bx-30,by+40,bx-4,by+14,C.blanco,3)+txt(bx-60,by+64,'¡aleteo!',16,'#ffffff');
+ if(etapa===1)cuerpo+=line(bx-40,by-28,bx-8,by-6,'#ffffffaa',3)+txt(330,190,'cae solo',16,'#173052');
+ const pts=etapa===2?1:0;
+ cuerpo+=txt(240,48,String(pts),40,'#ffffff','middle');
+ if(etapa===2)cuerpo+=txt(330,110,'+1 tubo',22,C.oro)+txt(330,138,'El hueco no',15,'#173052')+txt(330,158,'cambia de ancho',15,'#173052')+txt(330,178,'desde aquí.',15,'#173052');
+ return svg(nombre,cuerpo);
+};
 /* Metro Rush: el corredor visto de costado (salta la barrera baja, rueda
    bajo la alta, sube por la rampa y corre por los techos) y, de espaldas,
    las tres vías con un tren que viene de frente. `etapa`: 0 barrera baja,
