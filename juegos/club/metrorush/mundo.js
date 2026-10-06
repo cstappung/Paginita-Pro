@@ -1650,11 +1650,19 @@ export function crearMundo(canvas) {
     k.preparando = true;
     pasosPendientes.push(...k.pasosDePreparacion());
   }
-  /** La niebla de la paleta, acortada si la vista se acortó (calidad baja). */
+  /* La niebla, un poco más suave que la de cada paleta: empieza un 40 % más
+     lejos y termina un 15 % más lejos (se veía la ciudad lavada demasiado
+     cerca). El final sigue topado en el borde de lo que se dibuja (vista − 6),
+     para que lo que aparece salga de la niebla y no salte a la vista de golpe.
+     Ejemplo, Barrio con la vista entera: de 55–175 m pasa a 77–189 m. */
+  const SUAVE_NIEBLA = { cerca: 1.4, lejos: 1.15 };
+  /** La niebla de la paleta, suavizada y acortada si la vista se acortó (calidad baja). */
   function ajustaNiebla() {
     if (!escena.fog || !kit) return;
-    const [cerca, lejos] = kit.pal.niebla, f = vista / VISTA;
-    escena.fog.near = cerca * f; escena.fog.far = Math.min(lejos, vista - 6);
+    const [cerca, lejos] = kit.pal.niebla, f = vista / VISTA;                  // f < 1 cuando la calidad baja acorta la vista
+    const fin = Math.min(lejos * SUAVE_NIEBLA.lejos, vista - 6);                // dónde ya no se ve nada (nunca más allá de lo dibujado)
+    escena.fog.far = fin;
+    escena.fog.near = Math.min(cerca * SUAVE_NIEBLA.cerca * f, fin - 40);        // dónde empieza, siempre 40 m antes del final
   }
   /** Activa la estación: cambia kit, luces, cielo, niebla, post-proceso. `desde` = metro desde el que se rehace la ciudad. */
   function activa(estacion, desde) {
