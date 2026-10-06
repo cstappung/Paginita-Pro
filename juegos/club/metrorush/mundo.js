@@ -1206,7 +1206,7 @@ class Kit {
     if (pal.extras.estrellas) {
       const est = [];
       for (let i = 0; i < 380; i++) est.push((az() - .5) * 360, 8 + az() * 110, -175);
-      const ge = new THREE.BufferGeometry(); ge.setAttribute('position', new THREE.Float32BufferAttribute(est, 3));
+      const ge = new THREE.BufferGeometry(); ge.setAttribute('position', new THREE.Float32BufferAttribute(est, 3)); normalesFijas(ge);
       g.add(new THREE.Points(ge, new THREE.PointsMaterial({ color: 0xffffff, size: 2, sizeAttenuation: false, fog: false, transparent: true, opacity: 0.8 })));
     }
     for (const m of g.children) m.frustumCulled = false;
@@ -1268,8 +1268,21 @@ function geoFaro(zf) {
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  /* Normales aunque el material no las use: la oclusión ambiental (SAO, en
+     calidad alta) vuelve a dibujar cada malla con un material de normales, y
+     sin ellas salían valores inválidos que el bloom esparcía en cuadros negros
+     sobre el tren que venía. */
+  g.computeVertexNormals();
   g.computeBoundingSphere();
   return g;
+}
+/** Una normal fija (hacia arriba) en cada punto de una nube de partículas: la
+    oclusión ambiental (SAO, calidad alta) dibuja todo con un material de
+    normales, y sin ellas salían valores inválidos (cuadros negros en el bloom). */
+function normalesFijas(g) {
+  const n = g.getAttribute('position').count, a = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) a[i * 3 + 1] = 1;
+  g.setAttribute('normal', new THREE.BufferAttribute(a, 3));
 }
 /** Una mancha de luz (sprite) para el neón. */
 function sprite(col, escala, pos, opacidad = 1) {
@@ -1657,6 +1670,7 @@ export function crearMundo(canvas) {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    g.computeVertexNormals();                                                  // para la oclusión ambiental (ver geoFaro)
     const m = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.DoubleSide });
     const im = new THREE.InstancedMesh(g, m, N_LINEAS);
     im.frustumCulled = false; im.visible = false; im.count = 0; im.renderOrder = 3; im.name = 'lineas';
@@ -1826,10 +1840,18 @@ export function crearMundo(canvas) {
   }
 
   /* ---- calidad y post-proceso ---- */
+  /* `dpr`: cuántos píxeles del lienzo por píxel CSS, como tope (nunca más que
+     los del aparato). Estaban en 1,5 / 1,0 / 0,8, y un celular (pantalla de
+     3×, calidad media por defecto) dibujaba a un tercio de su resolución y el
+     navegador lo estiraba: el juego se veía borroso. Ahora ni la baja queda
+     por debajo de 1,5 (a esa densidad un celular ya se ve nítido) y la alta usa
+     la de la pantalla entera; si el aparato no da abasto, «auto» baja de nivel.
+     El estilo pixelado en baja sigue siendo a propósito de píxeles grandes,
+     pero nítidos (se agranda sin suavizar). */
   const AJUSTES = {
-    alta: { dpr: 1.5, sombras: 2048, ao: true, bloom: true, fxaa: true, espejo: true, pixel: 4 },
-    media: { dpr: 1.0, sombras: 1024, ao: false, bloom: true, fxaa: true, espejo: false, pixel: 4 },
-    baja: { dpr: 0.8, sombras: 0, ao: false, bloom: false, fxaa: false, espejo: false, pixel: 0 }
+    alta: { dpr: 3, sombras: 2048, ao: true, bloom: true, fxaa: true, espejo: true, pixel: 4 },
+    media: { dpr: 2, sombras: 1024, ao: false, bloom: true, fxaa: true, espejo: false, pixel: 4 },
+    baja: { dpr: 1.5, sombras: 0, ao: false, bloom: false, fxaa: false, espejo: false, pixel: 0 }
   };
   const ACABADO = {                                                            // viñeta, saturación, aberración y líneas de barrido
     uniforms: { tDiffuse: { value: null }, vig: { value: 0.3 }, sat: { value: 1 }, aber: { value: 0 }, scan: { value: 0 }, alto: { value: 720 } },
@@ -1994,7 +2016,7 @@ export function crearMundo(canvas) {
     if (ex.nieve || ex.polvo || ex.espectros) {
       const n = ex.nieve ? 900 : ex.polvo ? 500 : 220, pos = new Float32Array(n * 3), az = azarDe(5);
       for (let i = 0; i < n; i++) { pos[i * 3] = (az() - .5) * 40; pos[i * 3 + 1] = az() * 16; pos[i * 3 + 2] = -az() * 120 + 10; }
-      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(pos, 3)); normalesFijas(g);
       /* Con la textura de brillo cada partícula es una mancha redonda y
          suave. Sin textura un punto es un cuadrado, y uno que pasaba junto a
          la cámara se agrandaba hasta tapar un carril: en Fantasma (0,35 m,

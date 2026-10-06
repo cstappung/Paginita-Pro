@@ -83,7 +83,15 @@
      cuenta desde D = 24,7 y el techo sostiene desde D = 24,6. */
   const MEDIO_LARGO = 0.3;               // cuánto ocupa el corredor hacia adelante (y hacia atrás) de D
   const MARGEN_TECHO = 0.4;              // desde cuánto antes (y hasta cuánto después) sostiene el techo de un vagón
-  const MARGEN_RAMPA = 0.4;              // lo mismo para la rampa: su caja también choca hasta 0,3 m después de su final
+  const MARGEN_RAMPA = 0.4;
+  /* Lo mismo de costado: un techo (o una rampa) te sostiene mientras su caja
+     te pueda chocar, o sea hasta su medio ancho más el del corredor (0,98 +
+     0,35 = 1,33 m del centro de su carril). Sostenía solo hasta 1,05 m, y los
+     carriles están a 2,2: a mitad de un cambio de carril entre dos vagones
+     quedabas a 1,1 m de cada uno, ninguno te sostenía, empezabas a caer y los
+     dos te chocaban. Por eso un zigzag rápido de techo en techo mataba. */
+  const ANCHO_TECHO = 0.98 + FISICA.medioAncho;
+  const ANCHO_RAMPA = 0.95 + FISICA.medioAncho;              // lo mismo para la rampa: su caja también choca hasta 0,3 m después de su final
 
   /** La altura de la rampa `o` en la distancia D (0 al pie, ALTO_TECHO arriba). */
   const alturaRampa = (o, D) => ALTO_TECHO * limita((D - o.d0) / o.largo, 0, 1);
@@ -101,7 +109,7 @@
       const fin = o.d0 + o.largo;
       // ni la pisas ni la acabas de pasar en este cuadro (un cuadro largo puede saltar su final entero)
       if (D < o.d0 - MARGEN_RAMPA || Dantes > fin + MARGEN_RAMPA) continue;
-      if (Math.abs(x - CARRILES[o.carril]) > 1.05) continue;                      // no está en mi carril
+      if (Math.abs(x - CARRILES[o.carril]) >= ANCHO_RAMPA) continue;               // no está en mi carril
       const hs = alturaRampa(o, D);                                               // pasado el final, queda en ALTO_TECHO
       // la sigues si ibas sobre ella: tu altura alcanza la de la rampa donde estabas en el cuadro anterior
       const antes = Math.min(hs, alturaRampa(o, Dantes));
@@ -115,7 +123,7 @@
     for (const o of objs) {
       if (o.tipo !== 'tren') continue;
       if (D < o.d0 - MARGEN_TECHO || D > o.d0 + o.largo + MARGEN_TECHO) continue;
-      if (Math.abs(x - CARRILES[o.carril]) > 1.05) continue;
+      if (Math.abs(x - CARRILES[o.carril]) >= ANCHO_TECHO) continue;
       if (yEf >= ALTO_TECHO - 0.5 && ALTO_TECHO >= h) { h = ALTO_TECHO; tren = o; }
     }
     return { h, tren };
@@ -693,7 +701,7 @@
   return {
     rng, lerp, limita,
     CARRILES, LARGO_VAGON, ALTO_TECHO, LARGO_RAMPA, FISICA, impulso, VELOCIDAD, T_TOPE, velocidad, metrosEntre, FRENADA, velocidadEn, FILA_MIN_S, VEL_TREN, APARECE, dificultad,
-    MEDIO_LARGO, MARGEN_TECHO, MARGEN_RAMPA, alturaRampa, soporte, caja,
+    MEDIO_LARGO, MARGEN_TECHO, MARGEN_RAMPA, ANCHO_TECHO, alturaRampa, soporte, caja,
     PUNTOS_POR_METRO, MAX_BASE, MAX_ESTRELLAS, multiplicador, puntosPorTramo,
     ESTACIONES, estacionDe, siguienteUmbral, VUELTA_DESDE, VUELTA_CADA, INTRO, BOLETOS,
     PODERES, SEG_POR_NIVEL, MAX_MEJORA, PRECIOS_MEJORA, PRECIO_PATINETA, DURACION_PATINETA, duracionPoder, precioMejora, costoSeguir,
