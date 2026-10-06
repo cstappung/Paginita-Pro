@@ -18,49 +18,30 @@
 
    Uso:  node scripts/auditar-club.cjs export.json [--json] [--todo] [--categoria club-minas-easy]
 
+   Lo mismo se puede hacer sin exportar nada desde el panel de
+   administración de Juegos (juegos.html#admin → Auditoría), que además
+   recuerda lo ya auditado y deja eliminar la fila con un clic.
+
    La exportación trae nombres y uids: no se sube al repositorio (es
    público). Se deja fuera del árbol o en una carpeta ignorada. */
 'use strict';
 const fs = require('fs'), path = require('path'), esbuild = require('esbuild');
 
+/* Los verificadores y las señales de la auditoría, en un solo paquete.
+   Las señales viven en src/juegos/admin-datos.js: son las mismas que usa
+   el panel de administración de Juegos (#admin), así los dos nunca
+   discrepan. */
 function cargaVerificadores() {
-  const code = esbuild.buildSync({ entryPoints: [path.join(__dirname, '../src/juegos/solo/verifica.js')], bundle: true, format: 'cjs', platform: 'node', write: false }).outputFiles[0].text;
+  const code = esbuild.buildSync({
+    stdin: {
+      contents: "export * from './juegos/solo/verifica.js'; export { senalesFila, hallazgo } from './juegos/admin-datos.js';",
+      resolveDir: path.join(__dirname, '../src'), loader: 'js'
+    },
+    bundle: true, format: 'cjs', platform: 'node', write: false
+  }).outputFiles[0].text;
   const mod = { exports: {} };
   new Function('module', 'exports', 'require', code)(mod, mod.exports, require);
   return mod.exports;
-}
-
-/* Tablas donde compite el tiempo (menos es mejor); en el resto, los puntos. */
-const POR_TIEMPO = /^club-(minas-|sortem-|sopa-(facil|medio|dificil)-|sudoku-(facil|medio|dificil|experto)$|tetris-sprint$)/;
-const mediana = v => { const a = v.slice().sort((x, y) => x - y), m = a.length >> 1; return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2; };
-/* Cuánto se aparta una fila de las demás de su tabla. Con menos de tres
-   filas más no hay con qué comparar. Umbrales anchos a propósito: lo que
-   marca es «mirar esto», no «es trampa». */
-function anomalia(categoria, uid, filas) {
-  const yo = filas[uid], otros = Object.entries(filas).filter(([u]) => u !== uid).map(([, f]) => f);
-  if (yo.tiempo < 1000 && POR_TIEMPO.test(categoria)) return `terminada en ${yo.tiempo} ms`;
-  if (otros.length < 3) return null;
-  if (POR_TIEMPO.test(categoria)) {
-    /* Además de la mediana, el mejor de los demás (sin contar marcas de
-       menos de un segundo): tres personas buenas juntas son un grupo, no
-       una anomalía. */
-    const m = mediana(otros.map(f => f.tiempo)), mejor = Math.min(...otros.map(f => f.tiempo).filter(t => t >= 1000));
-    return yo.tiempo * 2.5 < m && yo.tiempo * 1.6 < mejor ? `${(m / yo.tiempo).toFixed(1)}× más rápida que la mediana de los demás (${(m / 1000).toFixed(1)} s; el mejor de ellos, ${(mejor / 1000).toFixed(1)} s)` : null;
-  }
-  if (/-racha$/.test(categoria)) return null;
-  const ritmo = f => f.puntos / Math.max(1, f.tiempo), mr = mediana(otros.map(ritmo));
-  const max = Math.max(...otros.map(f => f.puntos));
-  if (ritmo(yo) > 4 * mr && yo.puntos > 1.6 * max) return `ritmo ${(ritmo(yo) / mr).toFixed(1)}× el de la mediana de los demás`;
-  return yo.puntos > 2.5 * max ? `${(yo.puntos / max).toFixed(1)}× la mejor marca de los demás` : null;
-}
-
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-/* La forma de `partida` que escribe cada camino legítimo. */
-function partidaRara(categoria, partida) {
-  if (typeof partida !== 'string') return 'sin partida';
-  if (categoria.startsWith('yemas-zombis-')) return /^[-_A-Za-z0-9]{6,40}$/.test(partida) ? null : 'partida con forma rara';
-  if (categoria.startsWith('club-frontera-')) return /^(frv?-|[-_A-Za-z0-9]+-\d+v?$)/.test(partida) ? null : 'partida con forma rara para la Frontera';
-  return UUID.test(partida) ? null : 'partida que no es un UUID: escrita fuera del juego';
 }
 
 async function main() {
@@ -73,20 +54,15 @@ async function main() {
   const ranks = raiz.soloRanks || (Object.keys(raiz).some(k => /^club-|^yemas-zombis-/.test(k)) ? raiz : {});
   const pruebas = raiz.soloPruebas || {};
   const vetados = raiz.vetados || {};
-  const { VERIFICADORES, juegoDeCategoria, verificaClub, sospechaFila } = cargaVerificadores();
+  const { VERIFICADORES, juegoDeCategoria, verificaClub, sospechaFila, senalesFila, hallazgo } = cargaVerificadores();
 
   const hallazgos = [];
   for (const [categoria, filas] of Object.entries(ranks)) {
     if (filtro && categoria !== filtro) continue;
     const juego = juegoDeCategoria(categoria);
     for (const [uid, fila] of Object.entries(filas || {})) {
-      const motivos = [];
-      const rara = partidaRara(categoria, fila.partida);
-      if (rara) motivos.push(rara);
-      const s = sospechaFila(categoria, fila);
-      if (s) motivos.push('inverosímil: ' + s);
-      const a = anomalia(categoria, uid, filas);
-      if (a) motivos.push('anómala: ' + a);
+      if (!fila) continue;
+      const motivos = senalesFila(categoria, uid, filas, sospechaFila);
       if (juego) {
         const p = ((pruebas[categoria] || {})[uid] || {})[fila.partida];
         if (p) {
@@ -98,7 +74,7 @@ async function main() {
           motivos.push('sin prueba (anterior a la verificación, o escrita a mano)');
         }
       }
-      if (motivos.length) hallazgos.push({ categoria, uid, nombre: fila.nombre, puntos: fila.puntos, tiempo: fila.tiempo, partida: fila.partida, vetado: !!vetados[uid], motivos });
+      if (motivos.length) hallazgos.push(hallazgo(categoria, uid, fila, motivos, vetados));
     }
   }
 

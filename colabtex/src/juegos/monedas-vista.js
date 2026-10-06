@@ -23,7 +23,8 @@ const PARTES = [
   ["club", "🕹️", "Partidas del club", `de 15 a 25 por partida, hasta ${TOPE_CLUB_DIA} al día por juego`],
   ["podios", "👑", "Podios", "500 · 250 · 100 por quitarle el puesto a alguien"],
   ["logros", "🎖️", "Logros", "15 · 40 · 100 · 250 según dificultad"],
-  ["dias", "🔥", "Recompensa diaria", `${pagoDia(1)} el primer día, +${PAGO_DIA} por día seguido hasta ${pagoDia(TOPE_DIA)}`]
+  ["dias", "🔥", "Recompensa diaria", `${pagoDia(1)} el primer día, +${PAGO_DIA} por día seguido hasta ${pagoDia(TOPE_DIA)}`],
+  ["ajustes", "🛡️", "Ajustes", "lo que un administrador sumó o restó a mano"]
 ];
 
 function fila(f, i, uid, perfil, colorDe, chico, datos) {
@@ -86,7 +87,7 @@ export function crearMonedas({ uid, datos, perfil, colorDe }) {
           ${yo.parada ? `<p class="jg-mo-gasto">Una compra quedó sin fondos y no vale: hasta que ganes ${formatoMonedas(yo.falta)} monedas más, nada de lo que compres después cuenta.</p>` : ""}</div>
         <div class="jg-mo-racha-c">${rachaHtml(d, hoy)}</div>
       </header>
-      <div class="jg-mo-partes">${PARTES.map(([k, i, t, s]) =>
+      <div class="jg-mo-partes">${PARTES.filter(([k]) => k !== "ajustes" || yo.partes.ajustes).map(([k, i, t, s]) =>
         `<div><span>${i}</span><b>${formatoMonedas(yo.partes[k])}</b><small>${t}</small><em>${s}</em></div>`).join("")}</div>
       <div class="jg-mo-cols">
         <section class="jg-mo-caja"><h2>Top de monedas</h2>

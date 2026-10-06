@@ -35,6 +35,15 @@
    del motor); tampoco un verificador que falló («No se pudo comprobar…»)
    ni una prueba que no cabe (una partida larguísima no es trampa). Los
    archivos viven en `juegos/castigo/`.
+
+   **La suspensión de un administrador usa la misma capa** (admin.js):
+   `suspensiones/<uid>` = {hasta, m, por, at}, que solo escribe quien está
+   en `admins`. La duración la elige el administrador, así que no pasa por
+   `RETENCION_MS` ni por localStorage: la manda la cuenta, en vivo, y
+   cuando la levantan (borran el nodo) la capa se va sola. Se ve el mismo
+   «WASTED», con el motivo y lo que falta, y suena el «wasted» al llegar.
+   Las reglas, además, no dejan a una cuenta suspendida escribir récords,
+   partidas del club ni podios mientras dure.
    ============================================================ */
 
 export const PANTALLAZO_MS = 10000;
@@ -51,13 +60,21 @@ export function esTrampa(s) {
   return true;
 }
 
-/* «mm:ss» de lo que falta; "" si ya no falta nada. */
+/* «mm:ss» de lo que falta; "" si ya no falta nada. Pasada la hora (una
+   suspensión puede durar días) agrega las horas y los días. */
 export function restante(hasta, ahora) {
   const ms = Number(hasta) - ahora;
   if (!(ms > 0)) return "";
   const s = Math.ceil(ms / 1000);
-  return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+  const mmss = String(Math.floor(s % 3600 / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+  if (s < 3600) return String(Math.floor(s / 60)).padStart(2, "0") + ":" + String(s % 60).padStart(2, "0");
+  const d = Math.floor(s / 86400), h = String(Math.floor(s % 86400 / 3600)).padStart(2, "0");
+  return (d ? d + "d " : "") + h + ":" + mmss;
 }
+
+/* Hasta cuándo dura una suspensión de administrador; 0 si no hay o ya
+   pasó. */
+export const hastaDeSuspension = (v, ahora) => v && Number.isFinite(v.hasta) && v.hasta > ahora ? v.hasta : 0;
 
 /* El registro local tal como está guardado ({h, u}); null si no hay. */
 export function leeRegistro(texto) {
@@ -101,6 +118,10 @@ export function configuraCastigo(o = {}) {
 
 let capa = null, reloj1 = null, zumbido = null, cambio = null, hasta = 0, enPantallazo = false;
 let quien, pintadoPara, enCuenta = 0, ocultos = [];
+/* La suspensión de la cuenta ({hasta, m}) y si es ella la que manda ahora
+   (dura más que la retención del antitrampas). `sonoSusp`: la última
+   suspensión por la que ya sonó el «wasted». */
+let susp = null, porSusp = false, sonoSusp = 0;
 
 /* ¿Hay castigo en pantalla (pantallazo o retención)? */
 export const castigoActivo = () => !!capa;
@@ -180,18 +201,27 @@ function tic() {
 function pintaRetencion() {
   const c = montaCapa();
   c.classList.add("retenido");
-  pintadoPara = quien;
-  /* La explicación se deja traducir (i18n.js); el «WASTED» y la cuenta
-     atrás no. */
+  pintadoPara = firmaCapa();
+  /* La explicación se deja traducir (i18n.js); el «WASTED», la cuenta
+     atrás y el motivo que escribió el administrador no. */
+  const msg = porSusp
+    ? `<div class="jg-cs-m">Un administrador suspendió tu cuenta. No puedes usar Juegos hasta que termine la cuenta atrás.</div>` +
+      (susp && susp.m ? `<div class="jg-cs-m" translate="no">«${escapa(susp.m)}»</div>` : "")
+    : `<div class="jg-cs-m">El antitrampas rechazó tu partida. Quedas retenido: no puedes usar Juegos hasta que termine la cuenta atrás.</div>`;
   c.innerHTML = ESTILO + `<div>
     <div class="jg-cs-t" translate="no">WASTED</div>
-    <div class="jg-cs-m">El antitrampas rechazó tu partida. Quedas retenido: no puedes usar Juegos hasta que termine la cuenta atrás.</div>
+    ${msg}
     <div class="jg-cs-r" translate="no"></div>
     ${quien === null && entrar ? '<button class="jg-cs-e" type="button">¿No eres tú? Entra con tu cuenta</button>' : ""}</div>`;
   const b = c.querySelector(".jg-cs-e");
   if (b) b.onclick = () => entrar();
   tic();
 }
+
+const escapa = t => String(t).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+/* Lo que decide cómo se pinta la capa: quién mira (el botón de entrar) y
+   si es una suspensión (el texto y el motivo). */
+const firmaCapa = () => String(quien) + "|" + (porSusp && susp ? susp.hasta + ":" + (susp.m || "") : "");
 
 function retiene() {
   enPantallazo = false;
@@ -206,7 +236,7 @@ function retiene() {
    (`alCambiar`); no hace falta recargar. */
 function libera() {
   clearInterval(reloj1); clearTimeout(cambio); reloj1 = cambio = null;
-  enPantallazo = false; hasta = 0;
+  enPantallazo = false; hasta = 0; porSusp = false;
   if (zumbido) { zumbido.pause(); zumbido = null; }
   window.removeEventListener("keydown", bloqueaTeclas, true);
   window.removeEventListener("keyup", bloqueaTeclas, true);
@@ -244,11 +274,21 @@ export function castiga(s, { uid, escribe } = {}) {
 export function revisaCastigo(o = {}) {
   if ("uid" in o) quien = o.uid;
   if ("cuenta" in o) enCuenta = Number(o.cuenta) || 0;
-  const h = vigente(leeLocal(), quien, enCuenta, reloj());
+  if ("suspension" in o) susp = o.suspension && Number.isFinite(o.suspension.hasta) ? { hasta: o.suspension.hasta, m: String(o.suspension.m || "") } : null;
+  const ahora = reloj();
+  /* La suspensión es de una cuenta: sin sesión no se aplica. */
+  const hs = quien ? hastaDeSuspension(susp, ahora) : 0;
+  const hc = vigente(leeLocal(), quien, enCuenta, ahora);
+  const h = Math.max(hs, hc);
+  porSusp = !!hs && hs >= hc;
   if (h) {
     hasta = enPantallazo ? Math.max(hasta, h) : h;
-    if (!capa) { retiene(); avisa(); }
-    else if (!enPantallazo && pintadoPara !== quien) pintaRetencion();   // el botón depende de quién mira
+    /* El «wasted» suena una vez por suspensión en esta pestaña: no
+       cada vez que llega la corrección del reloj o se repinta. */
+    const nueva = porSusp && susp.hasta !== sonoSusp;
+    if (porSusp) sonoSusp = susp.hasta;
+    if (!capa) { retiene(); avisa(); if (nueva) sonar("wasted.mp3", false); }
+    else if (!enPantallazo && pintadoPara !== firmaCapa()) { pintaRetencion(); if (nueva) sonar("wasted.mp3", false); }   // el texto depende de quién mira y por qué
     return true;
   }
   /* El pantallazo de un castigo recién puesto no lo corta una lectura

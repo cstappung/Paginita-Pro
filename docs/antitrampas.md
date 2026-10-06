@@ -168,6 +168,18 @@ probar que el diario de hoy se resolvió de verdad.
 
 ## 5. Qué hacer con los que ya están en las tablas
 
+**Lo corto: el panel de administración** (`juegos.html#admin`, pestaña
+*Auditoría*). Hace lo mismo que el script de abajo contra la base viva, sin
+exportar nada: las señales sin bajar ninguna prueba (la tabla ya está en
+memoria), y después, con un botón, verifica solo las pruebas que nadie
+auditó todavía (el veredicto queda en `auditados`). Cada fila se elimina o
+se marca como buena con un clic. Los récords que suben al podio llegan
+además a la pestaña *Récords*, con su repetición en Tetris, Snake, sortEm
+y el buscaminas. Las señales viven en `src/juegos/admin-datos.js` y el
+script las usa también, así que los dos nunca discrepan.
+
+Lo de siempre, por consola:
+
 1. Exportar `soloRanks` (y `soloPruebas`, `sospechas`, `vetados`) desde la
    consola, a un archivo fuera del repositorio o en `auditoria/` (ignorada).
 2. `cd colabtex && node scripts/auditar-club.cjs ../auditoria/export.json`.
