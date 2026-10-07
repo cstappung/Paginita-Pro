@@ -34,6 +34,7 @@
  * refresca, abiertaPara}`; `ctx` trae lo que vive en `juegos-main.js`
  * (el arte de las portadas, las salas abiertas, crear y entrar, el login).
  */
+import { portadaSolo } from "./portadas-solo.js";
 import { bloqueado, practicaDe } from "./salon-datos.js";
 
 const esc = t => String(t == null ? "" : t).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -82,13 +83,16 @@ export function crearSalon(ctx) {
   /* ---------- la miniatura ---------- */
 
   /* El arte de la portada: los multijugador y las prácticas usan el de su
-     juego (`arteJuego` en juegos-main.js); los del club, su fondo de
-     siempre (`.sp-e-<id>`) con el nombre escrito con su tipografía. */
+     juego (`arteJuego` en juegos-main.js); los del club, su escena en SVG
+     con el nombre escrito encima en su tipografía. */
   function arte(e, pista = "") {
     const p = pista ? `<span class="jg-mn-pista">${esc(pista)}</span>` : "";
     if (e.modo === "multi") return `<span class="jg-mn-arte jg-portada jg-portada-${e.id}" aria-hidden="true">${ctx.arteMulti(e.id)}${p}</span>`;
     if (e.modo === "bots") return `<span class="jg-mn-arte jg-portada jg-portada-${e.juego}" aria-hidden="true">${ctx.arteMulti(e.juego)}${p}</span>`;
-    return `<span class="jg-mn-arte jg-mn-sp sp-e-${e.id}" aria-hidden="true"><strong>${esc(e.nombre)} <span>${esc(e.icono)}</span></strong>${p}</span>`;
+    /* Los del club llevan su escena ilustrada (portadas-solo.js) debajo
+       del nombre; el fondo `.sp-e-<id>` queda solo para el que no tenga. */
+    const svg = portadaSolo(e.id);
+    return `<span class="jg-mn-arte jg-mn-sp sp-e-${e.id}${svg ? " con-svg" : ""}" aria-hidden="true">${svg}<strong>${esc(e.nombre)} <span>${esc(e.icono)}</span></strong>${p}</span>`;
   }
 
   /* `f` son las marcas de este momento: nuevo, más jugado, salas que
