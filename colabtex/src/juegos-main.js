@@ -102,7 +102,7 @@ const FABRICAS = {
 const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞", pokemon: "◓", boxhead: "▣", gato: "#" };
 /* Los clubes de un jugador, con sus claves de la clasificación y los
    mismos signos que llevan en su tarjeta del vestíbulo. */
-const ICONO_TODOS = { ...ICONO, general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", frontera: "🏰", sudoku: "🔢", fanal: "🪔", atasco: "🚗", aleteo: "🐦", metrorush: "🚇", yzombis: "🧟" };
+const ICONO_TODOS = { ...ICONO, general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", frontera: "🏰", sudoku: "🔢", fanal: "🪔", atasco: "🚗", aleteo: "🐦", dosmil: "🟨", metrorush: "🚇", yzombis: "🧟" };
 
 /* Lo que puede elegir quien abre la sala, por juego. Vive aquí y no en
    `motor.js` porque son controles y no reglas: el motor ya recorta lo
@@ -254,7 +254,7 @@ function leePopular() {
 }
 /* Los de un jugador, con su clave de popularidad. Cuentan como juegos en
    la marquesina: el «18» fijo de antes se quedó atrás con cada club. */
-const CLUBES = ["club-minas", "club-snake", "club-tetris", "club-sortem", "club-bbtan", "club-sopa", "club-electro", "club-frontera", "club-sudoku", "club-fanal", "club-atasco", "club-aleteo", "club-metrorush"];
+const CLUBES = ["club-minas", "club-snake", "club-tetris", "club-sortem", "club-bbtan", "club-sopa", "club-electro", "club-frontera", "club-sudoku", "club-fanal", "club-atasco", "club-aleteo", "club-dosmil", "club-metrorush"];
 function ordenPopular(claves) {
   const n = state.popular, pos = Object.fromEntries(claves.map((k, i) => [k, i]));
   return claves.slice().sort((a, b) => (n[b] || 0) - (n[a] || 0) || pos[a] - pos[b]);
@@ -850,7 +850,7 @@ function celebra(juego, id) {
    barra de direcciones. */
 function leerRuta() {
   const h = (location.hash || "").replace(/^#/, "");
-  if (/^solo\/(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|metrorush)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
+  if (/^solo\/(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|dosmil|metrorush)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
   if (h === "ranks") return { vista: "ranks", pid: "" };
   if (h === "logros") return { vista: "logros", pid: "" };
   if (h === "monedas") return { vista: "monedas", pid: "" };
@@ -1473,7 +1473,7 @@ function armazon() {
     h.innerHTML = "";
     logrosVista = crearLogros({ uid: state.user.uid, watchLogros: fb.watchLogros, perfil: perfilDe, icono: ICONO_TODOS,
       orden: () => ordenPopular([...Object.keys(JUEGOS), ...CLUBES])
-        .map(k => ({ "club-minas": "minas", "club-snake": "snake", "club-tetris": "tetrisclub", "club-sortem": "sortem", "club-bbtan": "bbtan", "club-sopa": "sopa", "club-electro": "electro", "club-frontera": "frontera", "club-sudoku": "sudoku", "club-fanal": "fanal", "club-atasco": "atasco", "club-aleteo": "aleteo", "club-metrorush": "metrorush" })[k] || k) });
+        .map(k => ({ "club-minas": "minas", "club-snake": "snake", "club-tetris": "tetrisclub", "club-sortem": "sortem", "club-bbtan": "bbtan", "club-sopa": "sopa", "club-electro": "electro", "club-frontera": "frontera", "club-sudoku": "sudoku", "club-fanal": "fanal", "club-atasco": "atasco", "club-aleteo": "aleteo", "club-dosmil": "dosmil", "club-metrorush": "metrorush" })[k] || k) });
     logrosVista.montar(h);
     return;
   }
@@ -1703,6 +1703,9 @@ const NOVEDADES = [
     lema: "El tres en raya de siempre, en tiza sobre la pizarra. O el Super Gato: nueve gatos dentro de uno, y la casilla donde juegas decide en qué gato juega el otro.",
     sub: "Duelo · dos modalidades", sala: { k: "gato", ops: { variante: "super" } }, reglas: ["gato", "super"],
     modo: "multi", jugadores: "2 jugadores", cuenta: true },
+  { id: "dosmil", color: "#edc22e", alta: "2026-10-07", titulo: "2048",
+    lema: "Desliza las fichas hacia un lado: las iguales que chocan se juntan en una del doble. Cada jugada trae una ficha nueva. Llega al 2048… y sigue.",
+    sub: "Un jugador · junta fichas hasta el 2048", ruta: "#solo/dosmil", boton: "Jugar", reglas: ["dosmil"], modo: "solo" },
   { id: "aleteo", color: "#3fb6f5", alta: "2026-10-06", titulo: "ALETEO",
     lema: "Un pajarito vuelve al nido por entre los tubos. Toca para aletear. Cuanto más lejos llega, más tarde se hace… y lo que hay al final del cielo no es un nido.",
     sub: "Un jugador · seis cielos y una sola tabla", ruta: "#solo/aleteo", boton: "Volar", reglas: ["aleteo"], modo: "solo" },
@@ -1732,6 +1735,11 @@ const NOVEDADES = [
     ruta: "#cartas", boton: "Abrir sobres", cuenta: true }
 ];
 function arteNovedad(n) {
+  // 2048: el tablero de 4×4 con sus fichas y la del 2048 que late.
+  if (n.id === "dosmil") {
+    const f = [2, 0, 4, 8, 0, 16, 2, 0, 32, 64, 0, 4, 128, 256, 512, 2048];
+    return `<div class="jg-nov-arte-dm"><div>${f.map(v => `<i class="v${v}">${v || ""}</i>`).join("")}</div><b>2048</b></div>`;
+  }
   // ALETEO: el cielo que se oscurece de izquierda a derecha, tubos y el pájaro.
   if (n.id === "aleteo") return `<div class="jg-nov-arte-al"><i></i><i></i><i></i><i></i><s></s><em></em><b>ALETEO</b></div>`;
   // Sudoku Arcade: el tablero de neón con unas cifras, la casilla que late, las vidas y el combo.

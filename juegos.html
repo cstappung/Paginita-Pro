@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610071625"></script>
+<script src="i18n.js?v=202610071848"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Laboratorio</title>
@@ -1755,6 +1755,7 @@ html:has(.jg-reglas-capa) .rp-fab{display:none}
 .sp-e-sudoku strong span{color:#22e6ff;text-shadow:0 0 10px #22e6ffaa}
 .sp-e-sudoku>b{color:#7cf3ff}
 /* FANAL: la noche, unas pocas estrellas y la luz de un farol abajo, a la derecha. */
+.sp-e-dosmil{background:radial-gradient(circle at 85% 20%,#edc22e55,transparent 55%),linear-gradient(135deg,#3a3026,#1a1510 72%)}.sp-e-dosmil strong{color:#f9f6f2;text-shadow:0 2px 0 #776e65}.sp-e-dosmil strong span{color:#edc22e}
 .sp-e-fanal{background:radial-gradient(circle at 84% 96%,#ffcf6b70 0,#ff9a3c26 16%,transparent 40%),radial-gradient(1.5px 1.5px at 18% 26%,#ffe8c2 98%,transparent),radial-gradient(1px 1px at 58% 16%,#ffe8c2 98%,transparent),radial-gradient(1.5px 1.5px at 76% 40%,#ffc98a 98%,transparent),radial-gradient(1px 1px at 34% 60%,#ffe8c2 98%,transparent),radial-gradient(1px 1px at 90% 12%,#ffe8c2 98%,transparent),linear-gradient(160deg,#1c1332,#0b0a1c 70%)}
 .sp-e-fanal strong{font-family:"Jacquarda Bastarda 9",Georgia,serif;font-style:normal;letter-spacing:.06em;color:#d9a85b;text-shadow:0 0 14px #ff9a3c66}
 .sp-e-fanal strong span{color:#ffcf6b}
@@ -3215,6 +3216,14 @@ html[data-tema=oscuro] .jg-tira{border-color:var(--os-borde)}
    derecha (sol, nubes, atardecer, luna y estrellas), lomas que se apagan,
    dos pares de tubos con su boca, la estela punteada del vuelo y el
    pajarito aleteando. Los tubos de la noche ya se ven como barrotes. */
+.jg-nov-arte-dm{position:absolute;inset:0;overflow:hidden;display:grid;place-items:center;background:radial-gradient(circle at 75% 20%,#edc22e44,transparent 55%),linear-gradient(135deg,#faf8ef,#efe4cf)}
+.jg-nov-arte-dm>div{display:grid;grid-template-columns:repeat(4,28px);gap:5px;padding:6px;border-radius:8px;background:#bbada0;transform:translateY(-10px)}
+.jg-nov-arte-dm i{display:grid;place-items:center;height:28px;border-radius:4px;background:#cdc1b4;font:800 11px/1 system-ui,sans-serif;font-style:normal;color:#776e65}
+.jg-nov-arte-dm i.v2{background:#eee4da}.jg-nov-arte-dm i.v4{background:#ede0c8}.jg-nov-arte-dm i.v8{background:#f2b179;color:#fff}.jg-nov-arte-dm i.v16{background:#f59563;color:#fff}.jg-nov-arte-dm i.v32{background:#f67c5f;color:#fff}.jg-nov-arte-dm i.v64{background:#f65e3b;color:#fff}.jg-nov-arte-dm i.v128{background:#edcf72;color:#fff}.jg-nov-arte-dm i.v256{background:#edcc61;color:#fff}.jg-nov-arte-dm i.v512{background:#edc850;color:#fff}
+.jg-nov-arte-dm i.v2048{background:#edc22e;color:#fff;font-size:9px;box-shadow:0 0 12px #edc22eaa;animation:jg-dm-late 1.2s ease-in-out infinite}
+.jg-nov-arte-dm>b{position:absolute;bottom:6px;left:0;right:0;text-align:center;font:900 26px/1 system-ui,sans-serif;color:#776e65;letter-spacing:.04em}
+@keyframes jg-dm-late{50%{transform:scale(1.12)}}
+@media (prefers-reduced-motion:reduce){.jg-nov-arte-dm i.v2048{animation:none}}
 .jg-nov-arte-al{position:absolute;inset:0;overflow:hidden;isolation:isolate;background:
   radial-gradient(circle at 13% 26%,#fffbe0 0 4.5%,#ffe58a99 5.5%,#ffd25a33 11%,transparent 17%),
   radial-gradient(circle at 80% 22%,#fff8e6 0 4%,#fff8e622 5%,transparent 9%),
@@ -4333,6 +4342,6 @@ html[data-tema=oscuro] .jg-adm-tabs .btn2.on{background:#ab8bff;color:#171522;bo
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610071625"></script>
+<script src="juegos-app.js?v=202610071848"></script>
 </body>
 </html>

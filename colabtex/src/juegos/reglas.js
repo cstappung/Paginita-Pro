@@ -939,6 +939,27 @@ const REGLAS = {
       ["Clasificación", "La tabla <b>Vuelo</b> ordena por tubos pasados; a igualdad, gana el vuelo más corto. Cada vuelo se rehace con su semilla y sus aleteos antes de guardarse, así que solo cuenta lo que de verdad se voló. Subir al podio se anuncia en Discord."]
     ]
   },
+  /* 2048 (juegos/club/dosmil/): lo que dice aquí tiene que coincidir con
+     motor.js (fusiones, fichas nuevas) y juego.js (controles). */
+  dosmil: {
+    lema: "2048: desliza las fichas del tablero, junta dos iguales y llega a la ficha 2048.",
+    secciones: [
+      ["Cómo se juega", "Cada jugada empuja <b>todas</b> las fichas hacia un lado (arriba, abajo, izquierda o derecha) hasta que chocan con el borde o con otra ficha. Dos fichas con el mismo número que chocan se <b>juntan</b> en una sola con la suma. Después de cada jugada aparece una ficha nueva en una casilla vacía: un 2, o a veces un 4."],
+      ["Reglas finas", lista([
+        "Cada ficha se junta una sola vez por jugada: una fila 2 2 2 2 empujada a la izquierda queda 4 4, no 8.",
+        "Una jugada que no mueve nada no cuenta y no hace aparecer ficha.",
+        "Llegar al <b>2048</b> no termina la partida: puedes seguir hacia el 4096 y más allá.",
+        "La partida termina cuando el tablero está lleno y no hay dos fichas iguales vecinas."
+      ])],
+      ["Puntos", "Cada vez que dos fichas se juntan sumas el valor de la ficha nueva: juntar dos 8 da 16 puntos."],
+      ["Controles", lista([
+        "Flechas o WASD, o desliza el dedo sobre el tablero.",
+        "P o Esc: pausa. La partida también se pausa sola si cambias de pestaña.",
+        "Mando: la cruceta o el stick mueven y Start pausa."
+      ])],
+      ["Clasificación", "Dos tablas: <b>Puntos</b> (el puntaje de la partida; a igualdad, la más corta) y <b>Ficha</b> (la ficha más alta; a igualdad, quien llegó antes a ella). Cada partida se rehace con su semilla y sus jugadas antes de guardarse, así que solo cuenta lo que de verdad se jugó."]
+    ]
+  },
   /* Metro Rush (juegos/club/metrorush/): lo que dice aquí tiene que
      coincidir con su motor.js (puntos, multiplicador, poderes, estaciones,
      tropiezos) y su juego.js (teclas, gestos y mando). */
@@ -1031,7 +1052,7 @@ const REGLAS = {
   }
 };
 
-const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", metrorush: "Metro Rush" };
+const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", metrorush: "Metro Rush" };
 
 export const tieneReglas = juego => Object.prototype.hasOwnProperty.call(REGLAS, juego);
 

@@ -233,6 +233,16 @@ function aleteo() {
     chispas([[66, 30, 2, 1.7, 0], [67, 210, 1.8, 2.1, -.8]], "#ffffff");
 }
 
+/* 2048: un anillo de fichas del tablero, del 2 al 2048 en sus colores,
+   que da la vuelta despacio, con la ficha dorada latiendo arriba. */
+function dosmil() {
+  const cols = ["#eee4da", "#ede0c8", "#f2b179", "#f59563", "#f67c5f", "#f65e3b", "#edcf72", "#edcc61", "#edc850", "#edc53f", "#edc22e", "#b784d6"];
+  const fichas = cada(12, (i, a) => en(60, a, rect(13, 13, 2, cols[i], `stroke="#8f7a66" stroke-width=".8"`), a));
+  return gira(24, fichas) +
+    en(60, 0, an("l", 1.6, `<rect x="-9" y="-9" width="18" height="18" rx="3" fill="#edc22e" stroke="#c9a21a" stroke-width="1.2"/><text y="2.6" text-anchor="middle" font-family="Arial,sans-serif" font-weight="900" font-size="6.5" fill="#fff">2048</text>`)) +
+    chispas([[66, 40, 2, 1.7, 0], [66, 220, 1.8, 2.1, -.8]], "#fff3b0");
+}
+
 /* Metro Rush: un anillo de vía (balasto, durmientes de madera y dos rieles
    de acero) por el que da vueltas un trencito naranja, visto desde arriba,
    con los focos encendidos, persiguiendo una moneda dorada que gira; un
@@ -558,7 +568,7 @@ const DIBUJOS = {
   telectro: electro, tfrontera: frontera, tpokemon: pokemon, tescondite: escondite, tcartas: cartas,
   tcuadritos: cuadritos, treversi: reversi, tgato: gato, torbita: orbita, tcadena: cadena, tflip: flip, tcacho: cacho,
   tuno: uno, tcatan: catan, tpresidente: presidente, tspicy: spicy, tworms: worms, tyemas: yemas,
-  tzombis: zombis, tclue: clue, tajedrez: ajedrez, tmonedas: monedas, tprodrop: prodrop, tsudoku: sudoku, tfanal: fanal, tboxhead: boxhead, tatasco: atasco, taleteo: aleteo,
+  tzombis: zombis, tclue: clue, tajedrez: ajedrez, tmonedas: monedas, tprodrop: prodrop, tsudoku: sudoku, tfanal: fanal, tboxhead: boxhead, tatasco: atasco, taleteo: aleteo, tdosmil: dosmil,
   tmetrorush: metrorush,
   cometa, vortice, sakura, plasma, mariposas
 };

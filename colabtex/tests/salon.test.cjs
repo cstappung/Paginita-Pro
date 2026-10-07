@@ -76,7 +76,7 @@ test('el invitado solo juega Snake, Buscaminas, Tetris y sortEm',()=>{
  assert.ok(solos.some(s=>s.modo==='bots'&&S.bloqueado(s,true)),'las prácticas contra bots piden cuenta');
  // Las rutas #solo/<x>: el Tetris del club va por «tetris».
  for(const r of ['snake','minas','tetris','sortem'])assert.ok(S.rutaLibre(r),r);
- for(const r of ['bbtan','sopa','electro','sudoku','fanal','atasco','aleteo','frontera','tetrisclub-no'])assert.ok(!S.rutaLibre(r),r);
+ for(const r of ['bbtan','sopa','electro','sudoku','fanal','atasco','aleteo','dosmil','frontera','tetrisclub-no'])assert.ok(!S.rutaLibre(r),r);
  for(const k of ['solo','partida','ranks','logros','monedas','cartas','perfil'])assert.ok(S.MOTIVO_CUENTA[k].t&&S.MOTIVO_CUENTA[k].d,k);
 });
 

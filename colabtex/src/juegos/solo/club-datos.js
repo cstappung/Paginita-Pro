@@ -26,6 +26,9 @@ export function categoriaClub(juego, categoria) {
     // ALETEO: una sola tabla, los tubos pasados en el mejor vuelo.
     : juego === 'aleteo'
     ? categoria === 'club-aleteo-vuelo'
+    // 2048: el mejor puntaje y la ficha más alta.
+    : juego === 'dosmil'
+    ? /^club-dosmil-(puntos|ficha)$/.test(categoria)
     // Metro Rush: la mejor carrera (puntos) y la carrera más larga (metros).
     : juego === 'metrorush'
     ? /^club-metrorush-(carrera|distancia)$/.test(categoria)
@@ -63,6 +66,9 @@ export function resultadoClub(juego, dato) {
   if (juego === 'atasco' && dato.puntos > 3000) return null;
   /* ALETEO: tubos de un vuelo, con el tope de su verificador. */
   if (juego === 'aleteo' && dato.puntos > 100000) return null;
+  /* 2048: el puntaje, hasta 4 000 000; la ficha, una potencia de 2 hasta 262 144. */
+  if (dato.categoria === 'club-dosmil-puntos' && dato.puntos > 4000000) return null;
+  if (dato.categoria === 'club-dosmil-ficha' && (dato.puntos > 262144 || (dato.puntos & (dato.puntos - 1)) !== 0)) return null;
   /* Metro Rush: una carrera pasa del millón de puntos sin esfuerzo, así que
      su tope es el de la regla (1 000 000 000); la distancia son metros,
      hasta 1 000 000 (mil kilómetros en una carrera). */
