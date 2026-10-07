@@ -10,19 +10,22 @@ const M=require(path.join(D,'motor.js')),L=require(path.join(D,'lore.js'));
 const CAT='club-aleteo-vuelo';
 
 /* Un bot que aletea cuando cae por debajo del centro del próximo hueco,
-   hasta `max` tubos; después se deja caer. */
-function vuela(semilla,u,max=60){
- const E=M.nueva(semilla,u),aleteos=[];
+   hasta `max` tubos; después se deja caer. Con `pulso` (px) el umbral
+   tiembla en cada aleteo como el de una mano; con 0 aletea siempre a la
+   misma altura, que es lo que delata a un programa. */
+function vuela(semilla,u,max=60,pulso=44){
+ const E=M.nueva(semilla,u),aleteos=[],r=M.rng(semilla*7+1);
+ let umbral=-34;
  while(!E.muerto&&E.t<200000){
   const tb=E.tubos.find(t=>t.x+M.TW>M.PX-M.R);
   let a=E.t===0;
-  if(!a&&E.puntos<max&&tb&&E.vy>=0&&E.y>tb.c+tb.g/2-34)a=true;
+  if(!a&&E.puntos<max&&tb&&E.vy>=0&&E.y>tb.c+tb.g/2+umbral){a=true;umbral=-44-pulso/2+r()*pulso;}
   if(a)aleteos.push([E.t,E.t%3?'r':'k']);
   M.paso(E,a);
  }
  return {E,aleteos};
 }
-const prueba=(semilla,u,max)=>{const {E,aleteos}=vuela(semilla,u,max);return {E,p:{v:1,s:semilla,u,f:M.codifica(aleteos),n:E.t,r:M.msDe(E.t)+50}};};
+const prueba=(semilla,u,max,pulso)=>{const {E,aleteos}=vuela(semilla,u,max,pulso);return {E,p:{v:1,s:semilla,u,f:M.codifica(aleteos),n:E.t,r:M.msDe(E.t)+50}};};
 const dato=(E,u)=>({categoria:CAT,uid:u,puntos:E.puntos,tiempo:M.msDe(E.t)});
 
 test('el motor es determinista y la cuenta cambia el cielo',()=>{
@@ -74,6 +77,18 @@ test('el verificador acepta el vuelo honesto y rechaza las trampas',async()=>{
  await mal(dato(E,'ana'),{...p,v:2});
 });
 
+test('rechaza al bot que aletea siempre a la misma altura',async()=>{
+ for(const s of [5,6,7]){
+  const {E,p}=prueba(s,'bot',60,0);
+  assert.ok(E.puntos>=20);
+  assert.match(await V.verificaClub('aleteo',dato(E,'bot'),p),/misma altura/);
+ }
+ for(const s of [5,6,7]){
+  const {E,p}=prueba(s,'ana',60);
+  assert.equal(await V.verificaClub('aleteo',dato(E,'ana'),p),null);
+ }
+});
+
 test('sospecha de tiempos imposibles',()=>{
  assert.equal(VA.sospecha(CAT,{puntos:10,tiempo:M.msDe(M.ticksMinimos(10))+500}),null);
  assert.notEqual(VA.sospecha(CAT,{puntos:10,tiempo:1000}),null);
@@ -85,4 +100,21 @@ test('las versiones y las reglas',()=>{
  assert.match(html,/\?v=aleteo-\d+/);
  const reglas=fs.readFileSync(path.join(__dirname,'../../firebase/database.rules.json'),'utf8');
  assert.match(reglas,/aleteo-vuelo/);
+});
+
+test('rechaza un vuelo con el reloj del juego ralentizado',async()=>{
+ const {E,p}=prueba(99,'ana');
+ const t=M.msDe(E.t);
+ assert.ok(t>20000);
+ // Los dos relojes de acuerdo (con un poco de ruido): pasa.
+ assert.equal(await V.verificaClub('aleteo',dato(E,'ana'),{...p,a:t+40,w:t+180}),null);
+ // performance.now a medio ritmo: el sistema vio el doble de tiempo.
+ assert.match(await V.verificaClub('aleteo',dato(E,'ana'),{...p,a:t+40,w:2*t}),/velocidad del juego/);
+ // Solo uno de los dos: la prueba está rota.
+ assert.notEqual(await V.verificaClub('aleteo',dato(E,'ana'),{...p,a:t}),null);
+ // Vuelos cortos no se juzgan por el reloj.
+ const P=carga('src/juegos/solo/verifica/patrones.js');
+ assert.equal(P.dosRelojes(5000,9000),null);
+ assert.equal(P.dosRelojes(undefined,undefined),null);
+ assert.notEqual(P.dosRelojes(60000,40000),null);
 });

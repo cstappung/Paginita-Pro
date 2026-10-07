@@ -35,6 +35,7 @@
       n: tics jugados, g: giros con su origen (motor.leeGiros), w: ms de pared jugando,
       p: pausas, u?: uid} */
 import Motor from '../../../../../juegos/club/snake/motor.js';
+import { rachas } from './patrones.js';
 
 export const PRUEBA = 1;
 
@@ -80,6 +81,18 @@ export function verifica(dato, prueba, ctx) {
   const sinteticos = giros.filter(x => x.marcas.includes('X')).length;
   const juego = Motor.crear({ mode: cat.modo, size: cat.tam, speed: prueba.r, semilla: prueba.s });
   let j = 0, comida = -1, cortas = 0, reflejos = 0, ticsConGiro = 0;
+  /* Cada fruta: ¿se llegó por el camino más corto posible, sin un solo tic
+     de más? (`null` corta la racha: portales, nivel o espejo cambian el
+     tablero y la cuenta de antes ya no vale). */
+  const envuelve = cat.modo === 'portals' || cat.modo === 'laberinto';
+  const dist = (a, b) => {
+    let dx = Math.abs(a.x - b.x), dy = Math.abs(a.y - b.y);
+    if (envuelve) { dx = Math.min(dx, juego.COLS - dx); dy = Math.min(dy, juego.ROWS - dy); }
+    return dx + dy;
+  };
+  const aFruta = () => juego.fruit ? dist(juego.snake[0], juego.fruit) : -1;
+  const camino = [];
+  let f0 = juego.ticks, d0 = aFruta();
   for (;;) {
     if (j < giros.length && giros[j].tic === juego.ticks) {
       ticsConGiro++;
@@ -94,6 +107,11 @@ export function verifica(dato, prueba, ctx) {
     juego.tick();
     // Una fruta comida con el tic siguiente a menos de 100 ms.
     if (juego.state === 'playing' && juego.ev.some(x => x.k === 'come') && juego.interval() <= VENTANA_CORTA) { comida = juego.ticks; cortas++; }
+    if (juego.ev.some(x => x.k === 'come')) {
+      if (d0 > 0) camino.push(juego.ticks - f0 === d0);
+      f0 = juego.ticks; d0 = aFruta();
+    }
+    if (juego.ev.some(x => x.k === 'portales' || x.k === 'nivel' || x.k === 'espejo')) camino.push(null);
     juego.ev.length = 0;
   }
   if (j < giros.length) return 'Hay giros después del final de la partida.';
@@ -106,6 +124,21 @@ export function verifica(dato, prueba, ctx) {
   const azar = ticsConGiro / juego.ticks, fraccion = cortas ? reflejos / cortas : 0;
   if (cortas >= FRUTAS_MIN && fraccion >= REFLEJO_FRACCION && fraccion >= REFLEJO_VECES * azar && fraccion >= azar + REFLEJO_MARGEN)
     return `Giró hacia la fruta nueva antes de poder verla en ${reflejos} de ${cortas} frutas: reflejos de bot.`;
+  return camino_(camino);
+}
+
+/* El camino. Un bot va a cada fruta por el camino más corto, sin un tic de
+   más: esperar al último instante de la ventana y girar justo ahí, fruta
+   tras fruta. Una persona también llega derecho a veces, pero no doce
+   frutas seguidas ni ocho de cada diez. Calibrado con las partidas de la
+   tabla: las personas no pasan de 5 seguidas ni del 38 %; un bot que va
+   derecho a la fruta hace rachas de 14 a 23 y el 88–100 %. */
+const RACHA_CAMINO = 12, FRACCION_CAMINO = .8, FRUTAS_CAMINO = 20;
+function camino_(camino) {
+  const { larga } = rachas(camino, x => x === true);
+  if (larga >= RACHA_CAMINO) return `${larga} frutas seguidas por el camino más corto, sin un solo paso de más: así juega un programa.`;
+  const n = camino.filter(x => x !== null).length, ok = camino.filter(x => x === true).length;
+  if (n >= FRUTAS_CAMINO && ok / n >= FRACCION_CAMINO) return `${ok} de ${n} frutas por el camino más corto: así juega un programa.`;
   return null;
 }
 

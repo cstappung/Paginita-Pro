@@ -132,3 +132,11 @@ propio juego:
 2. Añadir `tests/antitrampas-snake.test.cjs` a `test:juegos`.
 3. Subir el `?v=` del marco en `solo/club.js` (el juego ahora carga
    `motor.js` antes de `game.js`; los dos llevan `?v=snake-prueba-1`).
+
+## La mano (camino más corto)
+
+Por cada fruta se compara lo que tardó con la distancia de Manhattan (con
+vuelta en portales y laberinto): llegar sin un tic de más es ir por el
+camino más corto. Rechaza 12 frutas seguidas así, o el 80 % de 20 o más.
+Las personas de la tabla no pasan de 5 seguidas ni del 38 %. Portales,
+cambio de nivel y espejo cortan la racha.

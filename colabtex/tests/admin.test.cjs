@@ -31,10 +31,13 @@ test('auditoría: señales sin bajar ninguna prueba',()=>{
 
 test('auditoría: solo se bajan las pruebas que nadie auditó con esa partida',()=>{
   const solo={'club-minas-easy':{a:{partida:'p1'},b:{partida:'p2'},c:{partida:'p3'}},'yemas-zombis-kino':{a:{partida:'zz'}}};
-  const aud={'club-minas-easy':{a:{p:'p1',ok:true},b:{p:'viejo',ok:false,m:'x'}}};
+  const aud={'club-minas-easy':{a:{p:'p1',ok:true,vv:A.AUDITORIA_V},b:{p:'viejo',ok:false,m:'x'}}};
   const juegoDe=c=>c.startsWith('club-minas-')?'minas':null;
   const pend=A.pruebasPendientes(solo,aud,juegoDe).map(x=>x.uid).sort();
   assert.deepEqual(pend,['b','c'],'a ya está; b cambió de partida; c nunca; zombis no tiene prueba');
+  // Auditada con verificadores de antes: vuelve a la cola, salvo si se revisó a mano.
+  const viejo={'club-minas-easy':{a:{p:'p1',ok:true},b:{p:'p2',ok:true,vv:A.AUDITORIA_V-1},c:{p:'p3',ok:true,h:true}}};
+  assert.deepEqual(A.pruebasPendientes(solo,viejo,juegoDe).map(x=>x.uid).sort(),['a','b']);
   const malos=A.auditadosMalos({'club-minas-easy':{b:{partida:'p2'},c:{partida:'p3',nombre:'C'}}},{'club-minas-easy':{b:{p:'viejo',ok:false,m:'x'},c:{p:'p3',ok:false,m:'no cuadra'}}});
   assert.equal(malos.length,1);assert.equal(malos[0].uid,'c');assert.match(malos[0].motivos[0],/no cuadra/);
   const j=A.juntaHallazgos([{categoria:'k',uid:'u',motivos:['anómala: x']}],[{categoria:'k',uid:'u',motivos:['la prueba no cuadra: y']},{categoria:'k',uid:'v',motivos:['anómala: z']}]);

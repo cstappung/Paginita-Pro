@@ -32,11 +32,13 @@ function resuelve(s,paso,{errores=false,pistas=0,semilla=1,exacto=false,forma=nu
 /* Un robot del arcade que se equivoca `errores` veces. Los puntos los
    cuenta como la pantalla (game.js): combo, unidades cerradas y, al
    ganar, el bono de tiempo y el de las vidas. */
-function arcade(semilla,paso,errores=0,{exacto=false,forma=null}={}){
+function arcade(semilla,paso,errores=0,{exacto=false,forma=null,enOrden=false}={}){
  const s=M.generar({dificultad:'medio',rng:M.mulberry32(semilla)}),tab=s.pistas.slice(),rng=M.mulberry32(semilla+1);
  const j=[];let t=0,combo=0,vidas=3,puntos=0,k=0,e=0;forma=forma||mano(rng);
  const d=k=>Math.round(exacto?paso(k):paso(k)*(0.7+rng()*0.6));
- for(let i=0;i<81;i++){
+ const celdas=[...Array(81).keys()];
+ if(!enOrden)for(let q=80;q>0;q--){const w=Math.floor(rng()*(q+1));[celdas[q],celdas[w]]=[celdas[w],celdas[q]];}
+ for(const i of celdas){
   if(tab[i])continue;
   if(e<errores){e++;const dt=d(k);t+=dt;j.push(i,s.solucion[i]%9+1,dt,...forma(k));vidas--;combo=0;k++;if(vidas<=0)return {j,t:t+450,puntos,gana:false,s};}
   const dt=d(k);t+=dt;j.push(i,s.solucion[i],dt,...forma(k));k++;tab[i]=s.solucion[i];combo++;
@@ -177,4 +179,38 @@ test('Sudoku: sospecha() de filas guardadas sin prueba',()=>{
  assert.equal(S.sospecha('club-sudoku-arcade',{puntos:30266,tiempo:584000}),null);
  assert.equal(S.sospecha('club-sudoku-experto',{puntos:1,tiempo:400000}),null);
  assert.equal(S.PRUEBA,1);
+});
+
+test('Sudoku: escribir la solución en orden de lectura delata a un programa',async()=>{
+ // Un bot con forma y ritmo de persona que escribe la solución celda por
+ // celda, de izquierda a derecha (el de las tablas que hizo un fácil así).
+ for(const [d,semilla] of [['facil',101],['experto',102]]){
+  const o={v:1,m:'c',s:semilla,d},s=M.sudokuDePrueba(o),rng=M.mulberry32(semilla),j=[];let t=0;
+  s.pistas.forEach((v,i)=>{if(v)return;const dt=Math.round(4000*(0.5+rng()));t+=dt;j.push(i,s.solucion[i],dt,90+Math.round(rng()*600),0);});
+  assert.match(String(await V.verificaClub('sudoku',{categoria:'club-sudoku-'+d,puntos:1,tiempo:t,partida:'x'},{...o,j})),/orden de lectura/,d);
+ }
+ // El arcade igual, con ritmo humano.
+ const a=arcade(88,()=>4000,0,{enOrden:true});
+ assert.match(String(await V.verificaClub('sudoku',{categoria:'club-sudoku-arcade',puntos:a.puntos,tiempo:a.t,partida:'x'},{v:1,m:'a',s:88,j:a.j})),/orden de lectura/);
+ // Casi en orden, con dos celdas invertidas cada ocho: ninguna racha llega a 20,
+ // pero la fracción delata con 30 celdas o más.
+ const o={v:1,m:'c',s:103,d:'medio'},s=M.sudokuDePrueba(o),vac=s.pistas.map((v,i)=>v?-1:i).filter(i=>i>=0);
+ for(let q=0;q+1<vac.length;q+=8)[vac[q],vac[q+1]]=[vac[q+1],vac[q]];
+ const rng=M.mulberry32(7),j=[];let t=0;
+ for(const i of vac){const dt=Math.round(4000*(0.5+rng()));t+=dt;j.push(i,s.solucion[i],dt,90+Math.round(rng()*600),0);}
+ const r=S.ordenLectura(s,j);
+ assert.ok(r.racha<20&&r.fraccion>=0.75,JSON.stringify(r));
+ assert.match(String(await V.verificaClub('sudoku',{categoria:'club-sudoku-medio',puntos:1,tiempo:t,partida:'x'},{...o,j})),/orden de lectura/);
+ // Un orden barajado (el de las partidas honestas de arriba) ronda el 50 %.
+ const h=resuelve(s,()=>4000,{semilla:3}),rh=S.ordenLectura(s,h.j);
+ assert.ok(rh.racha<8&&rh.fraccion<0.65,JSON.stringify(rh));
+});
+
+test('Sudoku: el reloj del juego ralentizado se nota contra el del sistema',async()=>{
+ const r=arcade(1,()=>5000,0);
+ const dato={categoria:'club-sudoku-arcade',puntos:r.puntos,tiempo:r.t,partida:'x'};
+ const p={v:1,m:'a',s:1,j:r.j};
+ assert.equal(await V.verificaClub('sudoku',dato,{...p,a:r.t,w:r.t+300}),null);
+ assert.match(String(await V.verificaClub('sudoku',dato,{...p,a:r.t,w:r.t*3})),/velocidad del juego/);
+ assert.match(String(await V.verificaClub('sudoku',dato,{...p,w:r.t})),/relojes/);
 });

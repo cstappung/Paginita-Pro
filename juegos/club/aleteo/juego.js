@@ -61,7 +61,7 @@
   /* ---------- Estado ---------- */
   let estado = 'listo';            // listo · jugando · muerte · fin
   let pausado = false;
-  let E = null, aleteos = [], pendiente = null, fiable = true, tocado = false, t0 = 0, nMuerte = 0;
+  let E = null, aleteos = [], pendiente = null, fiable = true, tocado = false, t0 = 0, w0 = 0, pP = 0, pW = 0, pP0 = 0, pW0 = 0, nMuerte = 0;
   let prevY = M.Y0, acc = 0, ultimo = performance.now(), reloj = 0;
   let mundo = 0;                   // desplazamiento del suelo y del decorado, en px lógicos
   let cVista = 0, cMax = 0;
@@ -135,12 +135,12 @@
     const s = new Uint32Array(1); crypto.getRandomValues(s);
     E = M.nueva(s[0], CUENTA);
     aleteos = []; pendiente = origen; fiable = origen !== 'x'; tocado = false;
-    t0 = performance.now(); acc = M.TICK; prevY = E.y; cMax = 0;
+    t0 = performance.now(); w0 = Date.now(); pP = pW = 0; acc = M.TICK; prevY = E.y; cMax = 0;
     estado = 'jugando'; $('listo').hidden = true;
     ave.enSuelo = false;
   }
-  function pausa() { if (estado !== 'jugando' || pausado) return; pausado = true; $('pausa').hidden = false; $('btnSeguir').focus({ preventScroll: true }); }
-  function sigue() { if (!pausado) return; pausado = false; $('pausa').hidden = true; ultimo = performance.now(); acc = 0; lienzo.focus({ preventScroll: true }); }
+  function pausa() { if (estado !== 'jugando' || pausado) return; pausado = true; pP0 = performance.now(); pW0 = Date.now(); $('pausa').hidden = false; $('btnSeguir').focus({ preventScroll: true }); }
+  function sigue() { if (!pausado) return; pausado = false; pP += performance.now() - pP0; pW += Date.now() - pW0; $('pausa').hidden = true; ultimo = performance.now(); acc = 0; lienzo.focus({ preventScroll: true }); }
   function otraVez() {
     estado = 'listo'; E = null; $('fin').hidden = true; $('listo').hidden = false;
     ave.y = M.Y0; ave.vy = 0; ave.rot = 0; ave.enSuelo = false; popPuntos = 0;
@@ -174,7 +174,10 @@
 
   function reporta() {
     if (!Club || !E || E.puntos < 1 || !fiable || tocado) return;
-    const prueba = { v: 1, s: E.semilla, u: E.u, f: M.codifica(aleteos), n: nMuerte, r: Math.round(performance.now() - t0) };
+    const prueba = { v: 1, s: E.semilla, u: E.u, f: M.codifica(aleteos), n: nMuerte, r: Math.round(performance.now() - t0),
+      // Lo jugado sin pausas en los dos relojes: un reloj trucado en uno solo
+      // (para que el juego vaya más lento) los separa.
+      a: Math.round(performance.now() - t0 - pP), w: Date.now() - w0 - pW };
     Club.result({ categoria: CATEGORIA, puntos: E.puntos, tiempo: M.msDe(nMuerte) }, prueba);
   }
 

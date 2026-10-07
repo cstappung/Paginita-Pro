@@ -263,7 +263,8 @@ export function crearRanks(ctx) {
         : "Todavía no ha terminado ninguna partida de este juego. Sé el primero."}</td></tr>`;
       return;
     }
-    if (solo) {t.innerHTML = `<thead><tr><th>#</th><th>Jugador</th><th>Récord</th><th>Tiempo</th></tr></thead><tbody>${orden.map((f,i)=>`<tr class="${f.uid===uid?'jg-yo':''}${i<3?' jg-rk-top':''}"><td class="jg-th-n">${puesto(i)}</td><td class="jg-jug" data-perfil="${esc(f.uid)}" data-nombre="${esc(f.nombre)}">${foto(f, 26)}<span>${esc(f.nombre)}</span></td><td>${categoriaSolo.startsWith('club-minas-')?'Completado':categoriaSolo==='club-tetris-sprint'?'40 líneas':categoriaSolo.startsWith('club-sortem-')?f.puntos+' números':categoriaSolo.startsWith('club-bbtan-')||categoriaSolo.startsWith('yemas-zombis-')?'Ronda '+f.puntos:categoriaSolo.startsWith('club-frontera-')?f.puntos+(f.puntos===1?' victoria':' victorias'):/-racha$/.test(categoriaSolo)?f.puntos+(f.puntos===1?' día':' días'):f.puntos}</td><td>${(f.tiempo/1000).toFixed(2)} s</td></tr>`).join('')}</tbody>`;return;}
+    const adm = solo && ctx.esAdmin && ctx.esAdmin() && ctx.borraRecord;
+    if (solo) {t.innerHTML = `<thead><tr><th>#</th><th>Jugador</th><th>Récord</th><th>Tiempo</th>${adm?'<th class="jg-rk-adm" title="Solo administradores">🛡️</th>':''}</tr></thead><tbody>${orden.map((f,i)=>`<tr class="${f.uid===uid?'jg-yo':''}${i<3?' jg-rk-top':''}"><td class="jg-th-n">${puesto(i)}</td><td class="jg-jug" data-perfil="${esc(f.uid)}" data-nombre="${esc(f.nombre)}">${foto(f, 26)}<span>${esc(f.nombre)}</span></td><td>${categoriaSolo.startsWith('club-minas-')?'Completado':categoriaSolo==='club-tetris-sprint'?'40 líneas':categoriaSolo.startsWith('club-sortem-')?f.puntos+' números':categoriaSolo.startsWith('club-bbtan-')||categoriaSolo.startsWith('yemas-zombis-')?'Ronda '+f.puntos:categoriaSolo.startsWith('club-frontera-')?f.puntos+(f.puntos===1?' victoria':' victorias'):/-racha$/.test(categoriaSolo)?f.puntos+(f.puntos===1?' día':' días'):f.puntos}</td><td>${(f.tiempo/1000).toFixed(2)} s</td>${adm?`<td class="jg-rk-adm"><button type="button" class="btn2 jg-rk-borra" title="Eliminar este récord (administración)" data-borra="${esc(f.uid)}" data-partida="${esc(f.partida||'')}" data-nombre="${esc(f.nombre||'')}">🗑</button></td>`:''}</tr>`).join('')}</tbody>`;return;}
     t.innerHTML = `
       <thead><tr>
         <th class="jg-th-n">#</th><th>Jugador</th>
@@ -496,6 +497,19 @@ export function crearRanks(ctx) {
   }
 
   function alClic(ev) {
+    const del = ev.target.closest("[data-borra]");
+    if (del && esSolo(juego) && ctx.esAdmin && ctx.esAdmin() && ctx.borraRecord) {
+      ev.stopPropagation();
+      const u = del.getAttribute("data-borra"), p = del.getAttribute("data-partida") || "", c = categoriaSolo;
+      const n = del.getAttribute("data-nombre") || u;
+      if (!c || !confirm(`¿Eliminar el récord de ${n} en ${c}?\n\nSe borran la fila, su prueba, su revisión y su repetición. No se puede deshacer.`)) return;
+      del.disabled = true;
+      Promise.resolve(ctx.borraRecord(c, u, p)).catch(e => {
+        del.disabled = false;
+        alert("No se pudo eliminar: " + (e && e.message || e));
+      });
+      return;
+    }
     const c = ev.target.closest("[data-cat-k]");
     if (c && esSolo(juego)) {
       const e = elige(juego), k = c.getAttribute("data-cat-k"), v = c.getAttribute("data-cat-v");

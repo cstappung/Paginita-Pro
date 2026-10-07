@@ -167,6 +167,48 @@ de Chile (la regla lo comprueba; un día saltado vuelve a 1), y la fila de
 desde ahí al estrenarlo. El verificador de cada juego solo tiene que
 probar que el diario de hoy se resolvió de verdad.
 
+## 4 bis. Cómo se jugó: la capa de las entradas
+
+Rehacer la prueba atrapa los datos inventados, pero no a un programa que
+juega de verdad con jugadas válidas. A ese se lo reconoce por la forma de
+sus entradas: hace lo mismo, igual de bien y en el mismo instante, muchas
+veces **seguidas**. Las herramientas comunes viven en
+`src/juegos/solo/verifica/patrones.js` (`minDesviacion`, `rachas`,
+`grano`) y miran siempre tramos seguidos, nunca medias: una partida larga y
+buena de una persona tiene su media, pero no veinte gestos idénticos en
+fila. Cada umbral está calibrado con las partidas reales de la base
+(el detalle, en el `.md` de cada juego):
+
+- **Tetris**: rachas de teclas apretadas en el mismo milisegundo (el bot
+  que era top 1 del sprint, Piavote, manda la pieza entera de golpe; su
+  prueba mínima está en `tests/fixtures/tetris-sprint-bot.json`).
+- **Snake**: frutas seguidas alcanzadas por el camino más corto, sin un
+  solo tic de más.
+- **Sudoku**: celdas resueltas en orden de lectura (izquierda a derecha,
+  arriba abajo): así escribe la solución quien ya la tiene.
+- **ALETEO**: aleteos seguidos a la misma altura respecto del hueco.
+
+**La velocidad del juego** (`dosRelojes`): las extensiones que
+«ralentizan el juego» truquean `performance.now()`. Las pruebas nuevas de
+Sudoku y ALETEO cuentan lo jugado con ese reloj (`a`) y con `Date.now()`
+(`w`); si difieren más de un 5 % (pasados 20 s) se rechaza. Una prueba sin
+ninguno de los dos es de antes y no se mira; con uno solo, está rota. El
+límite: trucar los dos relojes a la vez no se ve desde el navegador.
+
+**Re-auditoría automática.** `AUDITORIA_V` (en `admin-datos.js`) es la
+versión de los verificadores; cada veredicto en `auditados/<cat>/<uid>`
+guarda la suya en `vv`, y `pruebasPendientes` vuelve a poner en cola toda
+fila auditada con una versión anterior (salvo las marcadas a mano, `h`).
+Al abrir *Auditoría*, el panel verifica lo pendiente por sí solo una vez
+por visita. **Al endurecer un verificador, sube `AUDITORIA_V`** y todas las
+tablas pasan otra vez por él. `vv` necesita las reglas re-publicadas; hasta
+entonces se escribe sin él y la cola se repite en cada visita.
+
+**Borrar desde la Clasificación.** Un administrador ve un 🗑 en cada fila
+de las tablas del club (`ranks.js`, con `esAdmin`/`borraRecord` en su
+`ctx`); borra con el mismo `fb.borraRecord` del panel (fila, prueba,
+revisión, auditoría y repetición).
+
 ## 5. Qué hacer con los que ya están en las tablas
 
 **Lo corto: el panel de administración** (`juegos.html#admin`, pestaña

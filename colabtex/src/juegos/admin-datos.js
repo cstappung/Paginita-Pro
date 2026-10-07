@@ -103,9 +103,16 @@ export const hallazgo = (categoria, uid, fila, motivos, vetados = {}) => ({
   partida: fila.partida, vetado: !!(vetados && vetados[uid]), motivos
 });
 
+/* La versión de la auditoría. Se sube cuando los verificadores aprenden a
+   ver algo nuevo (la forma de jugar: octubre de 2026, v2): lo auditado
+   con otra versión vuelve a la cola, salvo lo que un administrador
+   revisó a mano (`h`), que ya tiene su veredicto. */
+export const AUDITORIA_V = 2;
+
 /* Las filas cuya prueba hay que bajar y verificar: las de un juego con
    verificador (`juegoDe(cat)` no nulo) que nadie auditó todavía con esa
-   misma partida. Lo auditado es `auditados[cat][uid] = {p, ok, m}`. */
+   misma partida y esta versión. Lo auditado es
+   `auditados[cat][uid] = {p, ok, m, vv, h}`. */
 export function pruebasPendientes(solo, auditados, juegoDe) {
   const out = [];
   for (const [categoria, filas] of Object.entries(solo || {})) {
@@ -114,7 +121,7 @@ export function pruebasPendientes(solo, auditados, juegoDe) {
     for (const [uid, fila] of Object.entries(filas || {})) {
       if (!fila || typeof fila.partida !== "string") continue;
       const a = ((auditados || {})[categoria] || {})[uid];
-      if (a && a.p === fila.partida) continue;                                   // ya auditada esta misma partida
+      if (a && a.p === fila.partida && (a.h || a.vv === AUDITORIA_V)) continue;   // ya auditada esta misma partida
       out.push({ categoria, uid, juego, fila });
     }
   }

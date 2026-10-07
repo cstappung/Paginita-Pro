@@ -297,3 +297,21 @@ test('Tetris anti-bot: las pulsaciones tienen que estar y poder leerse',async()=
     piensa cada pieza también. */
  await ok(sprintRapido);await ok(lento);
 });
+
+/* Un caso real: el top 1 del Sprint que destapó la capa de «teclas a la
+   vez». La partida es válida (el motor la rehace con sus 40 líneas, y el
+   ritmo general no es de metrónomo), pero el 84 % de las pulsaciones llega
+   en el mismo milisegundo que la anterior: el programa manda de golpe
+   toda la secuencia de cada pieza. Solo se guarda esa prueba. */
+test('una partida real de bot (teclas en ráfagas de 0 ms) se rechaza',()=>{
+ const {dato,prueba}=require('./fixtures/tetris-sprint-bot.json');
+ const m=VT.verifica(dato,prueba,{uid:prueba.u});
+ assert.match(String(m),/mismo instante/);
+});
+test('un reloj grueso (múltiplos de 100 ms) no cuenta como teclas a la vez',()=>{
+ const {dato,prueba}=require('./fixtures/tetris-sprint-bot.json');
+ const pul=TM.leeTeclasPrueba(prueba.k).map(p=>({...p,d:Math.round(p.d/100)*100}));
+ const k=pul.map(p=>p.d.toString(36)+(p.h!==null?'.'+p.h.toString(36):'')+p.o).join(',');
+ const m=VT.verifica(dato,{...prueba,k},{uid:prueba.u});
+ assert.ok(!/mismo instante/.test(String(m)),String(m));
+});

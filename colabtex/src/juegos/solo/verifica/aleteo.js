@@ -19,6 +19,7 @@
    saca una prueba válida. Flappy Bird es justamente el juego que un bot
    juega bien. */
 import M from '../../../../../juegos/club/aleteo/motor.js';
+import { minDesviacion, dosRelojes } from './patrones.js';
 
 export const PRUEBA = 1;
 
@@ -40,12 +41,49 @@ export function verifica(dato, prueba, ctx) {
   if (Number(dato.tiempo) !== M.msDe(n)) return 'El tiempo declarado no es el del vuelo.';
   const r = Number(prueba.r);
   if (!Number.isFinite(r) || r < M.msDe(n) * 0.9) return 'El vuelo duró menos en el reloj que en el juego.';
+  // Desde aleteo-3: lo jugado sin pausas en los dos relojes.
+  const reloj = dosRelojes(prueba.a, prueba.w);
+  if (reloj) return reloj;
   const aleteos = M.decodifica(prueba.f);
   if (!aleteos) return 'Los aleteos de la prueba no se pueden leer.';
   if (aleteos.some(a => a[1] === 'x')) return 'El vuelo trae aleteos que no hizo una mano (eventos sintéticos).';
   const res = M.rehace(prueba.s, prueba.u, aleteos, n);
   if (res.error) return res.error;
   if (res.puntos !== puntos) return `El vuelo rehecho pasa ${res.puntos} tubos, no ${puntos}.`;
+  return mano(prueba.s, prueba.u, aleteos, n);
+}
+
+/* La mano. Un bot aletea cuando el pájaro cruza una altura fija respecto
+   del hueco que viene, y eso deja una huella que ninguna mano deja: la
+   distancia entre el pájaro y el centro del hueco en cada aleteo casi no
+   varía. Se mide de dos formas, sobre la peor ventana del vuelo (la más
+   pareja):
+   - en `ALETEOS_V` aleteos seguidos (sin contar el primero, que arranca);
+   - en el último aleteo antes de cada tubo, `TUBOS_V` tubos seguidos.
+   Calibrado con los vuelos de la tabla: las personas no bajan de 12 px en
+   la primera ni de 8 en la segunda; los bots, de 5 y de 3,3. */
+const ALETEOS_V = 20, ALETEOS_SD = 6, TUBOS_V = 15, TUBOS_SD = 4;
+
+function mano(s, u, aleteos, n) {
+  const E = M.nueva(s, u), dy = [], porTubo = new Map();
+  let i = 0;
+  while (!E.muerto && E.t < n) {
+    let a = false;
+    while (i < aleteos.length && aleteos[i][0] === E.t) { a = true; i++; }
+    if (a) {
+      const tb = E.tubos.find(t => t.x + M.TW + M.R > M.PX);
+      if (tb) {
+        const d = E.y - tb.c;
+        if (E.t > 0) dy.push(d);
+        if (tb.x > M.PX + M.R) porTubo.set(tb.k, d);
+      }
+    }
+    M.paso(E, a);
+  }
+  if (minDesviacion(dy, ALETEOS_V) < ALETEOS_SD)
+    return `${ALETEOS_V} aleteos seguidos a la misma altura del hueco: así aletea un programa, no una mano.`;
+  if (minDesviacion([...porTubo.values()], TUBOS_V) < TUBOS_SD)
+    return `${TUBOS_V} tubos seguidos cruzados aleteando a la misma altura: así aletea un programa, no una mano.`;
   return null;
 }
 

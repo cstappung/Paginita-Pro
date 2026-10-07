@@ -1505,7 +1505,12 @@ function armazon() {
     h.innerHTML = "";
     ranks = crearRanks({ uid: state.user.uid, watchRanks: fb.watchRanks, watchSolo: fb.watchSolo, watchTodos: fb.watchRanksTodos,
       perfil: perfilDe, colorDe: colorForUid, icono: Object.assign({ prodrop: "🃏" }, ICONO_TODOS), orden: () => ordenPopular(Object.keys(JUEGOS)),
-      datos: datosPerfil, quien: u => quien(u, perfilDe(u), null, { nombre: datosP ? nombreEnDatos(u, datosP) : "" }, colorForUid) });
+      datos: datosPerfil, quien: u => quien(u, perfilDe(u), null, { nombre: datosP ? nombreEnDatos(u, datosP) : "" }, colorForUid),
+      /* Un administrador borra desde la propia tabla el récord que le
+         parece sospechoso, sin pasar por la cola del panel. La regla
+         vuelve a mirar que lo sea. */
+      esAdmin: () => !!state.admin,
+      borraRecord: (c, u, p) => fb.borraRecord(c, u, p, !!repDe(c)) });
     ranks.montar(h);
     return;
   }
@@ -2701,6 +2706,7 @@ function wire() {
       if (!state.user || state.user.uid !== user.uid) return;
       state.admin = a; mostrar();
       if (state.vista === "admin") { vistaPintada = ""; render(); }
+      if (a && ranks && ranks.refresca) ranks.refresca();
     });
     /* Lo que la cuenta bajó hoy en sus otros aparatos y pestañas: el tope
        es por jugador, no por navegador. */
