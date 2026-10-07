@@ -1716,18 +1716,33 @@ const NOVEDADES = [
     lema: "Zombis y diablos vistos desde arriba. Cada baja sube el multiplicador y con él llegan la Uzi, la escopeta, los barriles, las cargas y el cohete. Cooperativo o versus, con los que entren a la sala.",
     sub: "1–8 jugadores · cinco mapas", sala: { k: "boxhead", ops: { variante: "coop" } }, reglas: ["boxhead", "coop"],
     modo: "multi", jugadores: "1–8 jugadores", cuenta: true },
+  { id: "componentes", color: "#2fbf71", alta: "2026-10-04", titulo: "PRODROP · colección Componentes",
+    lema: "La segunda colección de cartas: 25 componentes electrónicos en 11 temas, del realista y el esquemático al pixel art, el dieciochero y el arcano. Las legendarias salen quemadas… o con nieve de Navidad.",
+    sub: "275 cartas nuevas · elige el sobre de Componentes al abrir", ruta: "#cartas", boton: "Abrir un sobre", cuenta: true },
+  { id: "sudoku", color: "#ff2fb4", alta: "2026-10-04", titulo: "Sudoku Arcade",
+    lema: "El sudoku del día con su racha, el clásico en cuatro dificultades y el arcade: tres vidas, combos de hasta ×4 y premio por cerrar filas, columnas y cajas.",
+    sub: "Un jugador · diario, clásico y arcade", ruta: "#solo/sudoku", boton: "Jugar", reglas: ["sudoku"], modo: "solo" },
   { id: "fanal", color: "#d9a85b", alta: "2026-10-04", titulo: "FANAL",
     lema: "Llevas la última luz a través de la noche, hacia el Alba. Las polillas bajan en formación hacia ella. Dispara al pulso de la música… y averigua qué estás apagando.",
     sub: "Un jugador · trece jornadas, tres jefes y una travesía sin fin", ruta: "#solo/fanal", boton: "Encender", reglas: ["fanal"], modo: "solo" },
   { id: "prodrop", color: "#9b4dff", alta: "2026-10-02", titulo: "PRODROP · sobres y mercado",
-    lema: "Sobres de cinco cartas de los profes, uno gratis cada 6 horas. Gradúalas, exhíbelas en tu perfil, véndelas en el mercado o cámbialas con otros.",
+    lema: "Sobres de cinco cartas, de los profes o de componentes, y uno gratis cada 6 horas. Gradúalas, exhíbelas en tu perfil, véndelas en el mercado, cámbialas con otros o junta diez para un re-roll.",
     sub: () => { const a = fb.ahora(), p = MOTOR.precioSobre(a);
       return a < MOTOR.PRECIO.promoHasta ? `Sobre a ${p} monedas hasta el 4 de octubre (después, ${MOTOR.PRECIO.normal})` : `Sobre a ${p} monedas · graduar, ${MOTOR.PRECIO.gradua}`; },
     ruta: "#cartas", boton: "Abrir sobres", cuenta: true }
 ];
 function arteNovedad(n) {
   // ALETEO: el cielo que se oscurece de izquierda a derecha, tubos y el pájaro.
-  if (n.id === "aleteo") return `<div class="jg-nov-arte-al"><i></i><i></i><i></i><i></i><em></em><b>ALETEO</b></div>`;
+  if (n.id === "aleteo") return `<div class="jg-nov-arte-al"><i></i><i></i><i></i><i></i><s></s><em></em><b>ALETEO</b></div>`;
+  // Sudoku Arcade: el tablero de neón con unas cifras, la casilla que late, las vidas y el combo.
+  if (n.id === "sudoku") {
+    const cifras = [[0, 0, 5, 1], [2, 0, 3], [4, 1, 7, 1], [7, 1, 1], [1, 3, 8], [3, 2, 6, 1], [6, 3, 2], [8, 4, 9, 1], [5, 5, 4], [2, 6, 1, 1], [7, 6, 5], [0, 8, 6], [4, 7, 3, 1], [6, 8, 7], [8, 7, 8]];
+    return `<div class="jg-nov-arte-sd"><div>${cifras.map(([x, y, v, p]) => `<i${p ? ' class="p"' : ""} style="--x:${x};--y:${y}">${v}</i>`).join("")}<em></em></div><u>♥♥♥</u><s>×4</s><b>SUDOKU <span>ARCADE</span></b></div>`;
+  }
+  if (n.id === "componentes") {
+    const cs = ["arcano/esp32", "navidad/timer-555", "quemado/mosfet-potencia"];
+    return `<div class="jg-nov-arte-pd cmp">${cs.map(c => `<img src="juegos/prodrop/cards/componentes/${c}.webp" alt="" loading="lazy">`).join("")}<i>NUEVA COLECCIÓN</i><b>COMPO<span>NENTES</span></b></div>`;
+  }
   // Atasco: un estacionamiento visto desde arriba, el auto rojo y la barrera de salida.
   if (n.id === "atasco") return `<div class="jg-nov-arte-at"><i></i><i></i><i></i><i></i><em></em><s></s><b>ATASCO</b></div>`;
   // Metro Rush: tres vías que se juntan en el horizonte, un tren de frente con los focos encendidos y unas monedas.

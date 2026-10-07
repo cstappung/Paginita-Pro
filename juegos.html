@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610071412"></script>
+<script src="i18n.js?v=202610071427"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Laboratorio</title>
@@ -3017,7 +3017,7 @@ html[data-tema=oscuro] .jg-aj-punto-t{border-color:#ffffff66}
   .jg-ban-c{grid-template-columns:minmax(0,1fr);grid-template-rows:165px auto;min-height:0;
     background:radial-gradient(ellipse 120% 60% at 50% 0,color-mix(in srgb,var(--c) 50%,transparent),transparent 75%),#120c22}
   .jg-ban-c:before{inset:0 0 auto;width:auto;height:4px}
-  .jg-ban-arte.jg-portada{grid-column:1;grid-row:1;-webkit-mask-image:linear-gradient(180deg,#000 70%,transparent);mask-image:linear-gradient(180deg,#000 70%,transparent)}
+  .jg-ban-arte.jg-portada{grid-column:1;grid-row:1;-webkit-mask-image:linear-gradient(180deg,#000 88%,transparent);mask-image:linear-gradient(180deg,#000 88%,transparent)}
   .jg-ban .jg-ban-arte>*{--k:1}
   .jg-ban-cuerpo{grid-column:1;grid-row:2;gap:6px;padding:4px 16px 44px}
   .jg-ban-cuerpo h2{font-size:22px}
@@ -3196,7 +3196,6 @@ html[data-tema=oscuro] .jg-tira{border-color:var(--os-borde)}
 .jg-nov-arte .jg-nov-arte-bb{place-items:stretch}
 .jg-nov-pie a.btn{display:flex;align-items:center;justify-content:center;gap:6px;flex:1;text-decoration:none}
 @media(max-width:700px){.jg-tira header small{flex-basis:100%;order:3}.jg-tira{padding:12px}}
-@media(max-width:700px){.jg-nov-arte-zb>.jg-art-ym,.jg-nov-arte-zb>.jg-art-bx{zoom:.5}}
 .jg-nov-arte-zb,.jg-nov-arte-pd,.jg-nov-arte-bb{position:absolute;inset:0;display:grid;place-items:center}
 .jg-nov-arte-zb{background:radial-gradient(ellipse at 50% 110%,#7fbf3a 0,#2f4d14 45%,#0f1a08 100%)}
 /* Metro Rush en Novedades: tres vías que se juntan en el horizonte, el
@@ -3211,21 +3210,64 @@ html[data-tema=oscuro] .jg-tira{border-color:var(--os-borde)}
 @keyframes jg-mr-moneda{50%{scale:.15 1}}
 .jg-nov-arte-mr>b{position:absolute;bottom:6px;left:0;right:0;text-align:center;font:italic 900 22px/1 Impact,"Arial Black",system-ui,sans-serif;letter-spacing:.06em;color:#fff3e0;text-shadow:0 2px 0 #b8441f,0 0 12px #ff6a3d99}
 @media (prefers-reduced-motion:reduce){.jg-nov-arte-mr i{animation:none}}
-@media(max-width:700px){.jg-nov-arte-mr>b{font-size:14px}}
 /* FANAL en Novedades: un farol abajo y cinco polillas que bajan hacia su luz. */
-/* ALETEO: el cielo se oscurece de izquierda a derecha (mañana, atardecer,
-   noche), dos pares de tubos y el pajarito que aletea entre ellos. */
-.jg-nov-arte-al{position:absolute;inset:0;overflow:hidden;background:radial-gradient(circle at 12% 22%,#fff7c2 0 5%,#ffe58a55 6%,transparent 13%),linear-gradient(90deg,#8fd8ff 0,#bfe6ff 18%,#ffc078 42%,#c4527a 62%,#3a1f5c 80%,#0b0718)}
-.jg-nov-arte-al i{position:absolute;width:30px;border:2px solid #17320f;background:linear-gradient(90deg,#3f9c34,#8be35f 38%,#4fae3f 70%,#2f7a27)}
-.jg-nov-arte-al i:nth-child(odd){top:-2px;border-radius:0 0 5px 5px;box-shadow:inset 0 -9px 0 #2f7a27}
-.jg-nov-arte-al i:nth-child(even){bottom:-2px;border-radius:5px 5px 0 0;box-shadow:inset 0 9px 0 #2f7a27}
-.jg-nov-arte-al i:nth-child(1){left:36%;height:46px}.jg-nov-arte-al i:nth-child(2){left:36%;height:58px}
-.jg-nov-arte-al i:nth-child(3){left:70%;height:66px;filter:brightness(.5) saturate(.7)}.jg-nov-arte-al i:nth-child(4){left:70%;height:40px;filter:brightness(.5) saturate(.7)}
-.jg-nov-arte-al em{position:absolute;left:22%;top:44%;width:24px;height:19px;border-radius:50%;border:2px solid #3b2a05;background:radial-gradient(circle at 70% 34%,#111 0 9%,#fff 10% 22%,transparent 23%),radial-gradient(circle at 34% 64%,#fff2b0 0 22%,transparent 23%),#ffd23a;animation:jg-al-vuela 1.6s ease-in-out infinite}
-.jg-nov-arte-al em:after{content:"";position:absolute;right:-8px;top:8px;border:5px solid transparent;border-left:9px solid #ff7a1a;border-right:0}
-.jg-nov-arte-al>b{position:absolute;bottom:7px;left:0;right:0;text-align:center;font:900 24px/1 "Lilita One","Arial Rounded MT Bold",system-ui,sans-serif;letter-spacing:.12em;color:#fff;text-shadow:0 2px 0 #1a3b66,0 0 14px #3fb6f599}
-@keyframes jg-al-vuela{0%,100%{transform:translateY(0) rotate(-8deg)}50%{transform:translateY(-12px) rotate(10deg)}}
-@media (prefers-reduced-motion:reduce){.jg-nov-arte-al em{animation:none}}
+/* ALETEO: un solo cielo que va de la mañana a la noche de izquierda a
+   derecha (sol, nubes, atardecer, luna y estrellas), lomas que se apagan,
+   dos pares de tubos con su boca, la estela punteada del vuelo y el
+   pajarito aleteando. Los tubos de la noche ya se ven como barrotes. */
+.jg-nov-arte-al{position:absolute;inset:0;overflow:hidden;isolation:isolate;background:
+  radial-gradient(circle at 13% 26%,#fffbe0 0 4.5%,#ffe58a99 5.5%,#ffd25a33 11%,transparent 17%),
+  radial-gradient(circle at 80% 22%,#fff8e6 0 4%,#fff8e622 5%,transparent 9%),
+  radial-gradient(circle at 82.5% 19%,#2a1640 0 4%,transparent 4.5%),
+  radial-gradient(1px 1px at 72% 12%,#fff 99%,transparent),radial-gradient(1px 1px at 79% 34%,#fff 99%,transparent),radial-gradient(1.5px 1.5px at 84% 46%,#fff 99%,transparent),
+  radial-gradient(1px 1px at 95% 40%,#fff 99%,transparent),radial-gradient(1px 1px at 77% 22%,#ffffffaa 99%,transparent),radial-gradient(1.5px 1.5px at 97% 9%,#fff 99%,transparent),
+  linear-gradient(90deg,#6ccbff 0,#a9e1ff 20%,#ffd59a 38%,#ff8f6b 50%,#c4527a 60%,#5b2d78 72%,#1f1240 86%,#0b0718)}
+/* Las nubes de la mañana y las lomas, que pasan del verde a la noche. */
+.jg-nov-arte-al:before{content:"";position:absolute;inset:0;z-index:-1;background:
+  radial-gradient(ellipse 22px 9px at 24% 20%,#fff 95%,transparent),radial-gradient(ellipse 14px 8px at 29% 16%,#fff 95%,transparent),radial-gradient(ellipse 12px 6px at 20% 22%,#fff 95%,transparent),
+  radial-gradient(ellipse 18px 7px at 47% 34%,#ffe7d6dd 95%,transparent),radial-gradient(ellipse 10px 6px at 50% 31%,#ffe7d6dd 95%,transparent)}
+.jg-nov-arte-al:after{content:"";position:absolute;left:0;right:0;bottom:0;height:30%;z-index:-1;
+  background:linear-gradient(90deg,#57b947,#3f8f3a 30%,#7a4a4f 52%,#3b1f4f 70%,#120a22);
+  -webkit-mask:radial-gradient(60px 34px at 6% 100%,#000 98%,#0000),radial-gradient(80px 30px at 30% 100%,#000 98%,#0000),radial-gradient(70px 36px at 58% 100%,#000 98%,#0000),radial-gradient(90px 28px at 86% 100%,#000 98%,#0000),linear-gradient(#0000 70%,#000 70%);
+  mask:radial-gradient(60px 34px at 6% 100%,#000 98%,#0000),radial-gradient(80px 30px at 30% 100%,#000 98%,#0000),radial-gradient(70px 36px at 58% 100%,#000 98%,#0000),radial-gradient(90px 28px at 86% 100%,#000 98%,#0000),linear-gradient(#0000 70%,#000 70%)}
+.jg-nov-arte-al i{position:absolute;width:30px;border:2px solid #17320f;border-width:0 2px;background:linear-gradient(90deg,#3c9732,#9ff06b 30%,#61c24c 55%,#2c7224)}
+.jg-nov-arte-al i:after{content:"";position:absolute;left:-6px;right:-6px;height:13px;border:2px solid #17320f;border-radius:3px;background:linear-gradient(90deg,#3c9732,#b6f78a 30%,#61c24c 55%,#2c7224)}
+.jg-nov-arte-al i:nth-child(odd){top:0}.jg-nov-arte-al i:nth-child(odd):after{bottom:-2px}
+.jg-nov-arte-al i:nth-child(even){bottom:0}.jg-nov-arte-al i:nth-child(even):after{top:-2px}
+.jg-nov-arte-al i:nth-child(1){left:40%;height:44px}.jg-nov-arte-al i:nth-child(2){left:40%;height:62px}
+.jg-nov-arte-al i:nth-child(3){left:70%;height:58px;filter:brightness(.42) saturate(.5) hue-rotate(40deg)}.jg-nov-arte-al i:nth-child(4){left:70%;height:48px;filter:brightness(.42) saturate(.5) hue-rotate(40deg)}
+/* La estela: puntitos que dibujan el último aleteo. */
+.jg-nov-arte-al s{position:absolute;left:5%;top:44%;width:23%;height:24%;border:2px dotted #ffffffcc;border-color:#ffffffcc transparent transparent;border-radius:50% 50% 0 0/100% 100% 0 0;transform:rotate(-6deg);opacity:.85}
+.jg-nov-arte-al em{position:absolute;left:27%;top:38%;width:26px;height:20px;border-radius:52% 48% 46% 54%/56% 56% 44% 44%;border:2px solid #4a3000;background:radial-gradient(circle at 72% 32%,#111 0 8%,#fff 9% 24%,transparent 25%),radial-gradient(ellipse at 40% 78%,#fff3b8 0 26%,transparent 27%),linear-gradient(#ffe25a,#ffb81f);box-shadow:0 3px 8px #0004;animation:jg-al-vuela 1.4s ease-in-out infinite}
+.jg-nov-arte-al em:before{content:"";position:absolute;left:1px;top:7px;width:12px;height:8px;border:2px solid #4a3000;border-radius:50%;background:#fff6d6;transform-origin:80% 30%;animation:jg-al-ala .28s ease-in-out infinite alternate}
+.jg-nov-arte-al em:after{content:"";position:absolute;right:-9px;top:9px;width:11px;height:6px;border:2px solid #4a3000;border-radius:2px 7px 7px 2px;background:#ff7a1a}
+.jg-nov-arte-al>b{position:absolute;bottom:6px;left:0;right:0;text-align:center;font:400 28px/1 "Lilita One","Arial Rounded MT Bold",system-ui,sans-serif;letter-spacing:.14em;color:#fff7d6;-webkit-text-stroke:2px #2a1640;paint-order:stroke fill;text-shadow:0 3px 0 #2a1640,0 0 16px #ffb36b88}
+@keyframes jg-al-vuela{0%,100%{transform:translateY(2px) rotate(-10deg)}50%{transform:translateY(-12px) rotate(8deg)}}
+@keyframes jg-al-ala{from{transform:rotate(-28deg)}to{transform:rotate(26deg)}}
+@media (prefers-reduced-motion:reduce){.jg-nov-arte-al em,.jg-nov-arte-al em:before{animation:none}}
+
+/* Sudoku Arcade: el tablero de neón un poco tumbado, unas cifras, la casilla
+   que se está por llenar latiendo, las tres vidas y el combo. */
+.jg-nov-arte-sd{position:absolute;inset:0;overflow:hidden;perspective:420px;background:radial-gradient(circle at 85% 18%,#ff2fb455,transparent 45%),radial-gradient(circle at 10% 100%,#22e6ff33,transparent 50%),repeating-linear-gradient(90deg,#ff2fb422 0 1px,#0000 1px 30px),repeating-linear-gradient(0deg,#ff2fb422 0 1px,#0000 1px 30px),linear-gradient(135deg,#1f0626,#0a0f24 75%)}
+.jg-nov-arte-sd>div{position:absolute;left:50%;top:8px;width:117px;height:117px;margin-left:-58px;transform:rotateX(22deg);transform-origin:50% 100%;border:2px solid #ff2fb4;border-radius:4px;box-shadow:0 0 14px #ff2fb488,inset 0 0 18px #ff2fb433;
+  background:repeating-linear-gradient(90deg,#0000 0 37px,#ff2fb4 37px 39px),repeating-linear-gradient(0deg,#0000 0 37px,#ff2fb4 37px 39px),repeating-linear-gradient(90deg,#0000 0 12px,#22e6ff44 12px 13px),repeating-linear-gradient(0deg,#0000 0 12px,#22e6ff44 12px 13px),#0d0b24e6}
+.jg-nov-arte-sd>div i{position:absolute;left:calc(var(--x)*13px);top:calc(var(--y)*13px);width:13px;height:13px;display:grid;place-items:center;font:700 9px/1 "IBM Plex Mono",monospace;font-style:normal;color:#7cf3ff;text-shadow:0 0 5px #22e6ff}
+.jg-nov-arte-sd>div i.p{color:#ffe3f4;text-shadow:0 0 5px #ff2fb4}
+.jg-nov-arte-sd>div em{position:absolute;left:52px;top:52px;width:13px;height:13px;border-radius:2px;background:#ffe14a;box-shadow:0 0 10px 2px #ffe14a;animation:jg-sd-late 1.1s ease-in-out infinite}
+.jg-nov-arte-sd>s{position:absolute;right:21%;top:22%;text-decoration:none;font:900 italic 20px/1 system-ui,sans-serif;color:#ffe14a;text-shadow:0 0 10px #ffb21a,2px 2px #5a1a00;transform:rotate(8deg);animation:jg-sd-combo 1.8s ease-in-out infinite}
+.jg-nov-arte-sd>u{position:absolute;left:21%;top:24%;text-decoration:none;font:16px/1 system-ui,sans-serif;color:#ff4f8b;letter-spacing:2px;text-shadow:0 0 8px #ff2fb4}
+.jg-nov-arte-sd>b{position:absolute;bottom:7px;left:0;right:0;text-align:center;font:900 22px/1 system-ui,sans-serif;letter-spacing:.06em;color:#ffe3f4;text-shadow:0 0 10px #ff2fb4aa,2px 2px #3a0a2c}
+.jg-nov-arte-sd>b span{color:#22e6ff;text-shadow:0 0 10px #22e6ffaa,2px 2px #062a33}
+@keyframes jg-sd-late{0%,100%{opacity:.35}50%{opacity:1}}
+@keyframes jg-sd-combo{0%,100%{transform:rotate(8deg) scale(1)}50%{transform:rotate(4deg) scale(1.15)}}
+@media (prefers-reduced-motion:reduce){.jg-nov-arte-sd>div em,.jg-nov-arte-sd>s{animation:none}}
+
+/* La colección de Componentes: tres cartas sobre una placa de circuito,
+   con pistas de cobre y la leyenda nueva. */
+.jg-nov-arte-pd.cmp{background:radial-gradient(ellipse at 50% 55%,#1d7a52aa,transparent 70%),repeating-linear-gradient(90deg,#0000 0 46px,#c8893c55 46px 48px,#0000 48px 94px),repeating-linear-gradient(0deg,#0000 0 30px,#c8893c44 30px 32px),radial-gradient(circle at 20% 30%,#e0a45a 0 3px,transparent 4px),radial-gradient(circle at 82% 70%,#e0a45a 0 3px,transparent 4px),linear-gradient(160deg,#0f3d2a,#06170f 80%)}
+.jg-nov-arte-pd.cmp img:nth-child(2){border-color:#7dff8f;box-shadow:0 0 22px #7dff8f88}
+.jg-nov-arte-pd.cmp>b span{background-image:linear-gradient(90deg,#7dff8f,#ffcc3d)}
+.jg-nov-arte-pd.cmp>i{position:absolute;top:5px;right:64px;z-index:2;font:800 9px/1 system-ui,sans-serif;font-style:normal;letter-spacing:.08em;color:#06170f;background:#7dff8f;padding:4px 7px;border-radius:99px;box-shadow:0 0 10px #7dff8f99}
 .jg-nov-arte-fn{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 104%,#ffcf6b99 0,#ff9a3c40 20%,transparent 52%),linear-gradient(#0b0a1c,#24163a 80%)}
 .jg-nov-arte-fn i{position:absolute;width:18px;height:12px;background:#b8a088;clip-path:polygon(50% 100%,44% 62%,14% 78%,0 18%,38% 36%,46% 0,54% 0,62% 36%,100% 18%,86% 78%,56% 62%);animation:jg-fn-alas .5s steps(2) infinite}
 .jg-nov-arte-fn i:nth-child(1){left:18%;top:18%}.jg-nov-arte-fn i:nth-child(2){left:62%;top:12%;background:#c47a3c;animation-delay:-.2s}
@@ -3259,7 +3301,6 @@ html[data-tema=oscuro] .jg-tira{border-color:var(--os-borde)}
 .jg-nov-arte-bb i:nth-child(2n){background:#c4f568}.jg-nov-arte-bb i:nth-child(3n){background:#5cc8ff}
 .jg-nov-arte-bb em{position:absolute;bottom:34px;left:50%;width:10px;height:10px;margin-left:-5px;border-radius:50%;background:#fff;box-shadow:0 0 10px #fff}
 .jg-nov-arte-bb>b{position:absolute;bottom:8px;left:0;right:0;text-align:center;font:400 16px/1 "Press Start 2P",ui-monospace,monospace;color:#c4f568;text-shadow:2px 2px #1d2b06}
-@media(max-width:700px){.jg-nov-arte-pd img{width:46px;top:12px}.jg-nov-arte-pd img:nth-child(2){width:52px}.jg-nov-arte-pd img:nth-child(1){transform:translateX(-30px) rotate(-12deg)}.jg-nov-arte-pd img:nth-child(3){transform:translateX(30px) rotate(12deg)}.jg-nov-arte-pd>b{font-size:14px}.jg-nov-arte-bb{grid-template-columns:repeat(3,22px);grid-auto-rows:16px}.jg-nov-arte-zb>b{font-size:14px}.jg-nov-arte-bb>b{font-size:10px}}
 .jg-drop-quien{display:flex;align-items:center;gap:5px;min-width:0;cursor:pointer;font-size:11px;color:var(--jg-muted)}
 .jg-drop-quien>b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .jg-drop-quien:hover>b{color:var(--jg-ink);text-decoration:underline}
@@ -4258,6 +4299,6 @@ html[data-tema=oscuro] .jg-adm-tabs .btn2.on{background:#ab8bff;color:#171522;bo
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610071412"></script>
+<script src="juegos-app.js?v=202610071427"></script>
 </body>
 </html>
