@@ -390,6 +390,20 @@ const SOLO = {
     { id: "t100", n: "Platino", d: "Pasa 100 tubos en un vuelo.", i: "💠", m: "Vuelo", s: d => cat(/-vuelo$/)(d) && d.puntos >= 100 },
     { id: "t130", n: "Bienvenido de vuelta", d: "Llega al vacío (130 tubos).", i: "🕳️", m: "Cielos", s: d => cat(/-vuelo$/)(d) && d.puntos >= 130 }
   ],
+  /* 2048. Los de ficha salen de club-dosmil-ficha (puntos = la ficha más
+     alta) y los de puntos de club-dosmil-puntos (el puntaje de la partida). */
+  dosmil: [
+    { id: "f256", n: "Primeros pasos", d: "Llega a la ficha 256.", i: "🟧", m: "Ficha", s: d => cat(/-ficha$/)(d) && d.puntos >= 256 },
+    { id: "f512", n: "Medio camino", d: "Llega a la ficha 512.", i: "🟠", m: "Ficha", s: d => cat(/-ficha$/)(d) && d.puntos >= 512 },
+    { id: "f1024", n: "Casi", d: "Llega a la ficha 1024.", i: "🔶", m: "Ficha", s: d => cat(/-ficha$/)(d) && d.puntos >= 1024 },
+    { id: "f2048", n: "¡2048!", d: "Llega a la ficha 2048.", i: "🟨", m: "Ficha", s: d => cat(/-ficha$/)(d) && d.puntos >= 2048 },
+    { id: "f4096", n: "Más allá", d: "Llega a la ficha 4096.", i: "🟪", m: "Ficha", s: d => cat(/-ficha$/)(d) && d.puntos >= 4096 },
+    { id: "f8192", n: "La ficha azul", d: "Llega a la ficha 8192.", i: "🟦", m: "Ficha", s: d => cat(/-ficha$/)(d) && d.puntos >= 8192 },
+    { id: "p5k", n: "Calentando", d: "Haz 5 000 puntos en una partida.", i: "🔢", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 5000 },
+    { id: "p20k", n: "Buena mano", d: "Haz 20 000 puntos en una partida.", i: "🧮", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 20000 },
+    { id: "p50k", n: "Constructor", d: "Haz 50 000 puntos en una partida.", i: "🏗️", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 50000 },
+    { id: "p100k", n: "Arquitecto", d: "Haz 100 000 puntos en una partida.", i: "🏛️", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 100000 }
+  ],
   /* Metro Rush. Los de puntos salen de club-metrorush-carrera (puntos de la
      mejor carrera: 1 000 000 es donde empieza la Estación Fantasma y
      10 000 000 el Fin de la Línea); los de distancia, de
@@ -414,7 +428,7 @@ export const LOGROS = Object.fromEntries([
   ...Object.entries(SOLO)
 ]);
 /* Qué categorías de `soloRanks` alimentan cada juego individual. */
-export const SOLO_PREFIJO = { minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-", electro: "club-electro-", frontera: "club-frontera-", sudoku: "club-sudoku-", fanal: "club-fanal-", atasco: "club-atasco-", aleteo: "club-aleteo-", metrorush: "club-metrorush-" };
+export const SOLO_PREFIJO = { minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-", electro: "club-electro-", frontera: "club-frontera-", sudoku: "club-sudoku-", fanal: "club-fanal-", atasco: "club-atasco-", aleteo: "club-aleteo-", dosmil: "club-dosmil-", metrorush: "club-metrorush-" };
 
 /* Los logros de partida que `uid` tiene ya en esta, según lo que se ve. */
 export function detecta(p, est, uid) {

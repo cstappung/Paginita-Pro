@@ -150,6 +150,7 @@ que se espera de cada uno:
 | Sudoku Arcade | `club-sudoku-*` | tablero de la semilla + dígitos; el arcade se recalcula | baja |
 | Atasco | `club-atasco-estrellas` | los movimientos de cada nivel (motor y solver ya puros) | baja |
 | ALETEO | `club-aleteo-vuelo` | semilla + tick de cada aleteo (física determinista a 1/60 s) | baja |
+| 2048 | `club-dosmil-puntos`, `club-dosmil-ficha` | semilla + dirección y Δms de cada jugada | baja |
 | Electrodle | `club-electro-*` | los intentos de cada modo; el blanco sale de la fecha | media |
 | sortEm | `club-sortem-*` (tiempo) | el reparto + cada movimiento | media |
 | BBTAN | `club-bbtan-rondas` | semilla + ángulo de cada tiro (física determinista) | alta |
@@ -187,6 +188,8 @@ fila. Cada umbral está calibrado con las partidas reales de la base
 - **Sudoku**: celdas resueltas en orden de lectura (izquierda a derecha,
   arriba abajo): así escribe la solución quien ya la tiene.
 - **ALETEO**: aleteos seguidos a la misma altura respecto del hueco.
+- **2048**: 30 jugadas seguidas a menos de 40 ms, o 100 seguidas en menos
+  de 5 s; además `dosRelojes`.
 
 **La velocidad del juego** (`dosRelojes`): las extensiones que
 «ralentizan el juego» truquean `performance.now()`. Las pruebas nuevas de

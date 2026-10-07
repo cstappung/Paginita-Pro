@@ -212,6 +212,21 @@ const ARTE = {
     <path d="M14 1 L26 4 L14 8 Z" fill="#ff7a1a" stroke="#4a3000" stroke-width="1.5"/></g></g>`;
   },
 
+  dosmil: u => {
+    const C = { 2: ["#eee4da", "#776e65"], 4: ["#ede0c8", "#776e65"], 8: ["#f2b179", "#fff"], 16: ["#f59563", "#fff"], 32: ["#f67c5f", "#fff"], 64: ["#f65e3b", "#fff"], 128: ["#edcf72", "#fff"], 256: ["#edcc61", "#fff"], 512: ["#edc850", "#fff"], 1024: ["#edc53f", "#fff"], 2048: ["#edc22e", "#fff"] };
+    const t = [[2, 0, 4, 8], [0, 16, 32, 0], [64, 128, 0, 256], [512, 0, 1024, 2048]];
+    let fichas = "";
+    t.forEach((fila, y) => fila.forEach((v, x) => {
+      const px = 92 + x * 56, py = 38 + y * 56;
+      fichas += `<rect x="${px}" y="${py}" width="48" height="48" rx="5" fill="${v ? C[v][0] : "#cdc1b4"}"/>`;
+      if (v) fichas += `<text x="${px + 24}" y="${py + 31}" text-anchor="middle" font-family="Arial,sans-serif" font-weight="900" font-size="${v >= 1000 ? 14 : v >= 100 ? 17 : 22}" fill="${C[v][1]}">${v}</text>`;
+    }));
+    return `<defs><radialGradient id="g${u}" cx=".5" cy=".4" r=".8"><stop offset="0" stop-color="#fff6d8"/><stop offset="1" stop-color="#e9d9b8"/></radialGradient></defs>
+    <rect width="400" height="300" fill="url(#g${u})"/>
+    <rect x="84" y="30" width="232" height="232" rx="10" fill="#bbada0"/>${fichas}
+    <rect class="a-late" x="260" y="206" width="48" height="48" rx="5" fill="none" stroke="#fff3b0" stroke-width="3"/>`;
+  },
+
   frontera: u => {
     const ventanas = Array.from({ length: 6 }, (_, k) => `<rect x="${304 + (k % 2) * 16}" y="${80 + Math.floor(k / 2) * 34}" width="8" height="14" rx="3" fill="#ffd27a"/>`).join("");
     return `<defs><linearGradient id="g${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a1250"/><stop offset=".55" stop-color="#c2410c"/><stop offset=".85" stop-color="#fb923c"/></linearGradient></defs>

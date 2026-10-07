@@ -1,0 +1,141 @@
+/* ================================================================
+   2048 — la piel.
+   La paleta es la del original (crema, beis y naranjas que se encienden
+   hacia el oro del 2048), y el tablero es DOM, no lienzo: cada ficha es
+   un elemento colocado con --x/--y que se desliza con una transición,
+   así la animación la hace el navegador y el texto se lee y se traduce
+   (los números llevan translate="no").
+   ================================================================ */
+:root{
+  --fondo:#faf8ef;--tinta:#776e65;--panel:#bbada0;--celda:#cdc1b4;--acento:#f67c5f;--borde:#8f7a66;
+  --cartel:"Lilita One","Arial Rounded MT Bold",system-ui,sans-serif;
+  --alto-pantalla:100vh;
+  color-scheme:light;
+}
+[hidden]{display:none!important}
+*{box-sizing:border-box}
+html,body{margin:0}
+html{-webkit-tap-highlight-color:transparent}
+body{background:var(--fondo);color:var(--tinta);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.shell{max-width:1000px;margin:0 auto;padding:16px}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 285px;gap:24px;align-items:start}
+.layout>aside:empty{display:none}
+@media (max-width:850px){.layout{grid-template-columns:minmax(0,1fr)}}
+.club-integrado body{background:transparent}
+:focus-visible{outline:3px solid var(--acento);outline-offset:2px}
+button{font:inherit;color:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+
+/* El panel de ranking del Club, con la piel del juego. */
+.club-ranking,.club-integrado .club-ranking,html.club-integrado[data-tema] .club-ranking{background:#fff;color:var(--tinta);
+  border:3px solid var(--borde);border-radius:16px;box-shadow:0 5px 0 color-mix(in srgb,var(--borde) 60%,transparent)}
+.club-ranking h2{font:400 18px/1.2 var(--cartel)!important;color:var(--tinta)}
+.club-ranking ol,.club-ranking p{color:color-mix(in srgb,var(--tinta) 80%,transparent)}
+.club-ranking button{background:var(--fondo);color:var(--tinta);border:2px solid var(--borde);border-radius:10px}
+.club-volver{color:color-mix(in srgb,var(--tinta) 80%,transparent)}
+
+/* --- El tamaño del juego: cuadrado, que quepa a lo alto --- */
+:root{--ancho-juego:min(100%,460px,calc(var(--alto-pantalla) - 230px))}
+.club-integrado{--ancho-juego:min(100%,480px,calc(var(--alto-pantalla) - 250px))}
+:root{--ancho-juego-min:250px}
+
+/* --- Cabecera --- */
+.cab{display:flex;align-items:center;gap:6px 14px;flex-wrap:wrap;margin:0 auto 10px;width:max(var(--ancho-juego),var(--ancho-juego-min));max-width:100%}
+.logo{margin:0;font:400 clamp(34px,8vw,52px)/1 var(--cartel);color:#fff;background:#edc22e;padding:6px 12px 8px;border-radius:12px;
+  box-shadow:0 4px 0 #c9a21a,0 0 18px #edc22e66;letter-spacing:.02em}
+.lema{margin:0;opacity:.85;font-weight:700;flex:1 1 180px}
+
+/* --- Marcador --- */
+.scorebar,.club-integrado .scorebar,html.club-integrado[data-tema] .scorebar{display:flex;align-items:center;justify-content:space-between;gap:6px 10px;flex-wrap:wrap;
+  width:max(var(--ancho-juego),var(--ancho-juego-min));max-width:100%;margin:0 auto 10px;padding:8px 10px;background:var(--panel);color:#fff;
+  border:none;border-radius:12px;box-shadow:0 4px 0 color-mix(in srgb,var(--borde) 70%,transparent)}
+.dato{position:relative;display:grid;gap:2px;min-width:0;justify-items:center;background:#a39383;border-radius:8px;padding:5px 10px}
+.dato small{font:800 10px/1 system-ui,sans-serif;color:#eee4da;letter-spacing:.08em;white-space:nowrap}
+.dato strong{font:400 20px/1 var(--cartel);font-variant-numeric:tabular-nums;white-space:nowrap;color:#fff}
+.pop-suma{position:absolute;left:50%;top:0;font:400 18px/1 var(--cartel);color:#776e65;pointer-events:none;opacity:0;white-space:nowrap}
+.pop-suma.sube{animation:popSuma .6s ease-out forwards}
+@keyframes popSuma{0%{transform:translate(-50%,6px);opacity:1}100%{transform:translate(-50%,-28px);opacity:0}}
+.mini{font:400 15px/1 var(--cartel);padding:9px 12px;border-radius:9px;border:none;background:var(--borde);color:#f9f6f2;cursor:pointer;min-height:38px}
+@media (hover:hover){.mini:hover{filter:brightness(1.1)}}
+#sound-button{display:grid;place-items:center;width:38px;height:38px;padding:0;border-radius:9px;border:none;background:var(--borde);color:#f9f6f2;cursor:pointer}
+#sound-button svg{width:22px;height:22px}
+#sound-button[aria-pressed=false] .ondas{display:none}
+#sound-button[aria-pressed=true] .cruz{display:none}
+@media (pointer:coarse){.mini,#sound-button{min-height:44px;min-width:44px}}
+
+/* --- El escenario: el tablero y sus capas --- */
+.escenario{position:relative;width:max(var(--ancho-juego),var(--ancho-juego-min));max-width:100%;aspect-ratio:1;margin:0 auto;border-radius:12px;overflow:hidden;
+  background:var(--panel);outline:none;container-type:inline-size;
+  touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+.escenario:focus-visible{box-shadow:0 0 0 3px var(--acento)}
+.tablero{position:absolute;inset:0}
+/* Las dieciséis casillas vacías, que juego.js pone debajo de las fichas. */
+.celda{position:absolute;left:0;top:0;width:21.25cqw;height:21.25cqw;border-radius:1.4cqw;background:var(--celda);
+  transform:translate(calc(3cqw + var(--x) * 24.25cqw),calc(3cqw + var(--y) * 24.25cqw))}
+.ficha{position:absolute;left:0;top:0;width:21.25cqw;height:21.25cqw;
+  transform:translate(calc(3cqw + var(--x) * 24.25cqw),calc(3cqw + var(--y) * 24.25cqw));
+  transition:transform .11s ease-in-out;z-index:1}
+.ficha b{position:absolute;inset:0;display:grid;place-items:center;border-radius:1.4cqw;font:400 9.5cqw/1 var(--cartel);
+  background:var(--f,#3c3a32);color:var(--c,#f9f6f2);box-shadow:var(--s,none);font-variant-numeric:tabular-nums}
+.ficha[data-d="3"] b{font-size:8cqw}
+.ficha[data-d="4"] b{font-size:6.6cqw}
+.ficha[data-d="5"] b{font-size:5.4cqw}
+.ficha[data-d="6"] b{font-size:4.6cqw}
+.ficha.nueva b{animation:aparece .2s .1s ease both}
+.ficha.fusion{z-index:2}
+.ficha.fusion b{animation:junta .2s .1s ease both}
+@keyframes aparece{0%{transform:scale(0);opacity:0}100%{transform:none;opacity:1}}
+@keyframes junta{0%{transform:scale(0)}50%{transform:scale(1.2)}100%{transform:none}}
+.ficha[data-e="1"]{--f:#eee4da;--c:#776e65}
+.ficha[data-e="2"]{--f:#ede0c8;--c:#776e65}
+.ficha[data-e="3"]{--f:#f2b179}
+.ficha[data-e="4"]{--f:#f59563}
+.ficha[data-e="5"]{--f:#f67c5f}
+.ficha[data-e="6"]{--f:#f65e3b}
+.ficha[data-e="7"]{--f:#edcf72;--s:0 0 3cqw #f3d77455,inset 0 0 0 1px #ffffff24}
+.ficha[data-e="8"]{--f:#edcc61;--s:0 0 3.5cqw #f3d77466,inset 0 0 0 1px #ffffff30}
+.ficha[data-e="9"]{--f:#edc850;--s:0 0 4cqw #f3d7747a,inset 0 0 0 1px #ffffff3a}
+.ficha[data-e="10"]{--f:#edc53f;--s:0 0 4.5cqw #f3d7748f,inset 0 0 0 1px #ffffff44}
+.ficha[data-e="11"]{--f:#edc22e;--s:0 0 5cqw #f3d774a8,inset 0 0 0 1px #ffffff50}
+.ficha[data-e="12"]{--f:#b784d6}
+.ficha[data-e="13"]{--f:#9b5fc2}
+.ficha[data-e="14"]{--f:#7a3fae}
+.ficha[data-e="15"]{--f:#3c6fd1}
+.ficha[data-e="16"]{--f:#2450a8}
+.ficha[data-e="17"]{--f:#1d2f63}
+
+/* Las capas sobre el tablero. */
+.capa{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:6%;text-align:center;
+  background:#eee4daba;animation:entra .4s ease both}
+@keyframes entra{0%{opacity:0}100%{opacity:1}}
+.tit{margin:0;font:400 clamp(30px,11cqw,54px)/1 var(--cartel);color:var(--tinta)}
+.tarjeta{display:grid;gap:4px 12px;grid-template-columns:auto auto;align-items:baseline;background:#fff;color:var(--tinta);border-radius:12px;padding:12px 18px;box-shadow:0 4px 0 #0002}
+.tarjeta small{font:800 10px/1 system-ui,sans-serif;letter-spacing:.08em;opacity:.75;text-align:left}
+.tarjeta strong{font:400 26px/1 var(--cartel);font-variant-numeric:tabular-nums;text-align:right}
+.tarjeta .nuevo{grid-column:1/-1}
+#pausa .tarjeta{grid-template-columns:auto;justify-items:center;gap:12px}
+.frase{margin:0;max-width:320px;font:700 14px/1.35 system-ui,sans-serif;color:var(--tinta)}
+.boton{font:400 clamp(17px,5.4cqw,22px)/1 var(--cartel);padding:12px 22px;border-radius:12px;border:none;cursor:pointer;
+  background:var(--borde);color:#f9f6f2;box-shadow:0 4px 0 #5e4f42;min-height:46px}
+.boton:active{transform:translateY(3px);box-shadow:0 1px 0 #5e4f42}
+@media (hover:hover){.boton:hover{filter:brightness(1.1)}}
+.gano{background:#edc22ec8}
+.gano .tit{color:#fff;text-shadow:0 4px 0 #c9a21a}
+.gano .frase{color:#fff}
+.nuevo{font:400 13px/1 var(--cartel);font-style:normal;color:#fff;background:#e8322f;padding:4px 8px;border-radius:6px;justify-self:center;animation:latido .8s ease-in-out infinite}
+@keyframes latido{50%{transform:scale(1.06)}}
+
+.nota{width:max(var(--ancho-juego),var(--ancho-juego-min));max-width:100%;margin:12px auto 0;font-size:13px;opacity:.85;text-align:center}
+kbd{font:700 12px/1 ui-monospace,monospace;padding:2px 5px;border-radius:5px;border:1px solid #0003;background:#fff8}
+
+/* Pantalla apaisada y baja: el tablero a la izquierda, lo demás al lado. */
+html.apaisado main{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-areas:"esc cab" "esc mar" "esc nota";gap:0 16px;align-items:start}
+html.apaisado .escenario{grid-area:esc;width:calc(var(--alto-pantalla) - 40px);min-width:200px}
+html.apaisado .cab{grid-area:cab;width:auto}
+html.apaisado .scorebar{grid-area:mar;width:auto}
+html.apaisado .nota{grid-area:nota;width:auto}
+
+@media (prefers-reduced-motion:reduce){
+  .ficha{transition:none}
+  .ficha.nueva b,.ficha.fusion b,.nuevo,.pop-suma.sube,.capa{animation:none}
+  .pop-suma.sube{opacity:0}
+}

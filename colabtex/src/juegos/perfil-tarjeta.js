@@ -66,7 +66,7 @@ export const MARCOS = [
     ["tcatan", "catan", "Hexágonos"], ["tpresidente", "presidente", "Banda presidencial"], ["tspicy", "spicy", "Picante"],
     ["tworms", "worms", "Artillería"], ["tyemas", "yemas", "Huevos en guerra"], ["tzombis", "zombis", "Horda"],
     ["tclue", "clue", "Pistas"], ["tajedrez", "ajedrez", "Caballo de oro"], ["tmonedas", "monedas", "Tesoro"],
-    ["tprodrop", "prodrop", "Coleccionista"], ["tsudoku", "sudoku", "Cuadrícula arcade"], ["tfanal", "fanal", "Última luz"], ["tboxhead", "boxhead", "Cabeza cuadrada"], ["tatasco", "atasco", "Luz verde"], ["taleteo", "aleteo", "Ala negra"],
+    ["tprodrop", "prodrop", "Coleccionista"], ["tsudoku", "sudoku", "Cuadrícula arcade"], ["tfanal", "fanal", "Última luz"], ["tboxhead", "boxhead", "Cabeza cuadrada"], ["tatasco", "atasco", "Luz verde"], ["taleteo", "aleteo", "Ala negra"], ["tdosmil", "dosmil", "Ficha dorada"],
     ["tmetrorush", "metrorush", "Maquinista"]
   ].map(([id, top, n]) => ({ id, n, anim: true, req: { top } }))
 ];
@@ -95,7 +95,7 @@ export const FONDOS = [
   { id: "holo", n: "Holográfico", oscuro: false, anim: true, req: { tienda: true }, css: () => "linear-gradient(115deg, #ffc6f0, #fff1b8, #b9f3ff, #c8ffd9, #e2c8ff)" }
 ];
 
-const NOMBRES_EXTRA = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", metrorush: "Metro Rush" };
+const NOMBRES_EXTRA = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", metrorush: "Metro Rush" };
 export const nombreJuego = j => (JUEGOS[j] && JUEGOS[j].nombre) || NOMBRES_EXTRA[j] || j;
 
 /* Las partes de una categoría del club, para decirla en palabras. */
@@ -140,6 +140,8 @@ export function valorMarca(c, f) {
   if (c === "club-fanal-jornadas") return `jornada ${f.puntos || 0}`;
   if (c === "club-atasco-estrellas") return `${f.puntos || 0} ★`;
   if (c === "club-aleteo-vuelo") return `${f.puntos || 0} ${f.puntos === 1 ? "tubo" : "tubos"}`;
+  if (c === "club-dosmil-puntos") return `${f.puntos || 0} puntos`;
+  if (c === "club-dosmil-ficha") return `ficha ${f.puntos || 0}`;
   // Metro Rush: la distancia es en metros (la mejor carrera sigue en puntos).
   if (c === "club-metrorush-distancia") return `${(f.puntos || 0).toLocaleString("es-CL")} m`;
   if (c === "club-sopa-racha" || c === "club-electro-racha" || c === "club-sudoku-racha") return `${f.puntos || 0} ${f.puntos === 1 ? "día" : "días"}`;

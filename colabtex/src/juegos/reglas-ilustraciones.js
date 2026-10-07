@@ -142,6 +142,22 @@ export const aleteo=etapa=>{
  if(etapa===2)cuerpo+=txt(330,110,'+1 tubo',22,C.oro)+txt(330,138,'El hueco no',15,'#173052')+txt(330,158,'cambia de ancho',15,'#173052')+txt(330,178,'desde aquí.',15,'#173052');
  return svg(nombre,cuerpo);
 };
+/* 2048: un tablero de 4×4. Etapa 0, dos 8 en la misma fila; 1, deslizado a
+   la izquierda quedan en un 16; 2, aparece un 2 nuevo en una casilla vacía. */
+const DM={2:'#eee4da',4:'#ede0c8',8:'#f2b179',16:'#f59563',32:'#f67c5f',64:'#f65e3b'};
+export const dosmil=etapa=>{
+ const nombre=['Dos fichas de 8 en la misma fila','Deslizado a la izquierda, los dos 8 se juntan en un 16','Tras la jugada aparece una ficha nueva de 2'][etapa];
+ const tabs=[[[0,8,0,8],[2,0,0,0],[0,4,0,0],[0,0,0,2]],[[16,0,0,0],[2,0,0,0],[4,0,0,0],[2,0,0,0]],[[16,0,0,0],[2,0,0,0],[4,0,0,2],[2,0,0,0]]][etapa];
+ let cuerpo=`<rect x="14" y="14" width="452" height="196" rx="10" fill="#faf8ef"/><rect x="40" y="22" width="180" height="180" rx="8" fill="#bbada0"/>`;
+ tabs.forEach((fila,r)=>fila.forEach((v,c)=>{const x=48+c*43,y=30+r*43;
+  const nueva=(etapa===1&&r===0&&c===0)||(etapa===2&&r===2&&c===3);
+  cuerpo+=`<rect x="${x}" y="${y}" width="37" height="37" rx="4" fill="${v?DM[v]:'#cdc1b4'}"${nueva?' stroke="#edc22e" stroke-width="3"':''}/>`;
+  if(v)cuerpo+=txt(x+18.5,y+25,String(v),v>8?16:18,v>=8?'#ffffff':'#776e65','middle');}));
+ if(etapa===0)cuerpo+=txt(250,70,'Dos 8 en fila,',20,'#776e65')+txt(250,98,'sin nada entre medio.',16,'#776e65')+txt(250,150,'← desliza',22,C.oro);
+ if(etapa===1)cuerpo+=txt(250,70,'8 + 8 = 16',22,'#f59563')+txt(250,100,'+16 puntos',18,C.verde)+txt(250,140,'Todo corrió',16,'#776e65')+txt(250,160,'hasta el borde.',16,'#776e65');
+ if(etapa===2)cuerpo+=txt(250,70,'Ficha nueva',22,'#776e65')+txt(250,100,'casi siempre un 2,',16,'#776e65')+txt(250,122,'a veces un 4.',16,'#776e65');
+ return svg(nombre,cuerpo);
+};
 /* Metro Rush: el corredor visto de costado (salta la barrera baja, rueda
    bajo la alta, sube por la rampa y corre por los techos) y, de espaldas,
    las tres vías con un tren que viene de frente. `etapa`: 0 barrera baja,

@@ -1,4 +1,4 @@
-import {cart, dados, tablero, orbes, reversi, cajas, paisaje, tiro, orbita, serpiente, tetris, isla, ajedrez, fanal, boxhead, atasco, metrorush, aleteo} from './reglas-ilustraciones.js';
+import {cart, dados, tablero, orbes, reversi, cajas, paisaje, tiro, orbita, serpiente, tetris, isla, ajedrez, fanal, boxhead, atasco, metrorush, aleteo, dosmil} from './reglas-ilustraciones.js';
 const p=(titulo,texto,imagen)=>({titulo,texto,imagen});
 const e=(id,titulo,...pasos)=>({id,titulo,pasos});
 const fichas=(titulo,...cs)=>cart([titulo,cs]);
@@ -192,6 +192,13 @@ export const EJEMPLOS={
  e('poderes','Poderes, cartas y llamas',
   p('Lo que sueltan las polillas','A veces una polilla apagada suelta un frasco. Pabilo doble: dos tiros por disparo. Lente: los tiros atraviesan todo. Campana: aguanta un golpe. Aceite: una llama más. Destello: apaga la fila más baja.',fichas('Los poderes',['Pabilo','oro','DOS TIROS'],['Lente','azul','ATRAVIESA'],['Campana','blanco','UN GOLPE'],['Aceite','verde','+1 LLAMA'])),
   p('La Mensajera y sus cartas','Una polilla grande y pálida cruza por arriba de vez en cuando con una carta. Si la alcanzas, la carta queda en tu Bitácora para siempre y se lee al final de la jornada. Hay trece, y cada acto deja leer las suyas.',fichas('Una carta recuperada',['✉','oro','CARTA'],['+300','verde','PUNTOS'],['VI','violeta','DE XIII'])))],
+ dosmil:[e('juntar','Juntar dos fichas iguales',
+  p('Mira las parejas','Aquí hay dos 8 en la misma fila. Las fichas solo se juntan si quedan una al lado de la otra en la dirección en que deslizas, sin nada entre medio.',dosmil(0)),
+  p('Desliza','Al deslizar a la izquierda, todas las fichas corren hasta el borde. Los dos 8 chocan y quedan en un 16, y el 16 suma 16 puntos. Una ficha recién juntada no se vuelve a juntar en la misma jugada.',dosmil(1)),
+  p('Llega una ficha nueva','Después de cada jugada que mueve algo aparece una ficha nueva en una casilla vacía: casi siempre un 2, a veces un 4. Si el tablero se llena y nada se puede juntar, la partida termina.',dosmil(2))),
+ e('tablas','Puntos y clasificación',
+  p('Dos tablas','La tabla Puntos guarda la suma de todas las juntadas de la partida. La tabla Ficha guarda la ficha más alta a la que llegaste, y a igualdad gana quien llegó antes.',fichas('Una partida',['2048','oro','FICHA'],['20 312','verde','PUNTOS'],['4:12','azul','TIEMPO'])),
+  p('Se puede seguir','Llegar al 2048 no termina la partida: puedes seguir hacia el 4096 y más allá. Cada partida se rehace jugada por jugada con su semilla antes de guardarse.',fichas('Más allá',['2048','oro','LOGRADO'],['4096','rojo','SIGUIENTE'],['8192','violeta','LEYENDA'])))],
  aleteo:[e('volar','Pasar un par de tubos',
   p('Aletea para subir','Cada aleteo le da al pájaro un impulso hacia arriba. Aquí está bajo el hueco, así que un aleteo a tiempo lo pone a la altura justa para entrar.',aleteo(0)),
   p('Deja que caiga','Entre aleteo y aleteo la gravedad lo baja. Dentro del hueco conviene no aletear de más: el tubo de arriba está tan cerca como el de abajo.',aleteo(1)),

@@ -78,6 +78,10 @@ export const SOLOS = [
     ruta: "#solo/aleteo", reglas: "aleteo", popular: "club-aleteo", ranking: true,
     lema: "Toca para aletear entre los tubos y vuelve al nido. Seis cielos, cada uno más oscuro que el anterior.",
     modos: ["Un toque, un aleteo", "Seis cielos"] },
+  { id: "dosmil", tipo: "club", nombre: "2048", genero: "Puzle", icono: "🟨", alta: "2026-10-07",
+    ruta: "#solo/dosmil", reglas: "dosmil", popular: "club-dosmil", ranking: true,
+    lema: "Desliza las fichas, junta dos iguales y llega al 2048. Y después, más allá.",
+    modos: ["Tabla de puntos", "Tabla de ficha"] },
   { id: "metrorush", tipo: "club", nombre: "Metro Rush", genero: "Runner", icono: "🚇", alta: "2026-10-05",
     ruta: "#solo/metrorush", reglas: "metrorush", popular: "club-metrorush", ranking: true,
     lema: "Corre por las vías esquivando trenes, junta monedas y llega a la Estación Fantasma. Siete estaciones y un inspector que no se cansa.",
@@ -167,7 +171,7 @@ export function entradasSalon(juegos, orden = Object.keys(juegos)) {
 /* El acento de cada juego del club, el mismo de su portada. */
 export const COLOR_SOLO = {
   minas: "#f6bc64", snake: "#58f5c0", tetrisclub: "#2fd3e8", sortem: "#00f5ff", bbtan: "#c4f568",
-  sopa: "#ffb070", electro: "#fbbf24", sudoku: "#ff2fb4", fanal: "#d9a85b", atasco: "#e8322f", aleteo: "#3fb6f5", metrorush: "#ff6a3d", frontera: "#fb923c"
+  sopa: "#ffb070", electro: "#fbbf24", sudoku: "#ff2fb4", fanal: "#d9a85b", atasco: "#e8322f", aleteo: "#3fb6f5", dosmil: "#edc22e", metrorush: "#ff6a3d", frontera: "#fb923c"
 };
 
 /* Dónde se juega cada entrada: en el celular (con el dedo), en el PC

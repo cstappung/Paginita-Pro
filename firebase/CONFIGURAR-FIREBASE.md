@@ -194,6 +194,14 @@ y están en el repositorio público, como cualquier archivo del sitio.
 > las reglas se juega igual, pero los vuelos no entran en la clasificación y
 > no pagan monedas.
 
+> **2048 (octubre de 2026):** `club-dosmil-puntos` (el puntaje de la
+> partida, con tope de 4 000 000) y `club-dosmil-ficha` (la ficha más alta,
+> una potencia de 2 hasta 262 144) son categorías nuevas de `soloRanks`, y
+> `dosmil` un juego nuevo de `clubJugadas`. La partida a medias va en
+> `users/<uid>/club/dosmil`, que ya era de su dueño. Hasta volver a publicar
+> las reglas se juega igual, pero las partidas no entran en la clasificación
+> y no pagan monedas.
+
 > **Metro Rush (octubre de 2026):** `club-metrorush-carrera` (los puntos de la
 > mejor carrera, con tope de 1 000 000 000, porque en el juego se llega a
 > millones) y `club-metrorush-distancia` (los metros de la carrera más larga,
