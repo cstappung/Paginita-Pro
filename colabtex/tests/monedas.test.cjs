@@ -5,7 +5,7 @@ const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const sin=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8').replace(/^import [\s\S]*?;$/mg,'').replace(/\bexport\s+/g,'');
 const ctx={};vm.createContext(ctx);
 vm.runInContext(sin('src/juegos/motor.js')+'\n'+sin('src/juegos/logros.js')+'\n'+sin('src/juegos/tienda.js')+'\n'+sin('src/juegos/cortes.js')+'\n'+sin('src/juegos/monedas.js')+
- ';globalThis.__M={JUEGOS,LOGROS,NIVEL,PESO,VALOR_NIVEL,TARIFA,RECORD,monedasDe,topMonedas,registraDia,rachaHoy,pagoDia,diaChile,valorLogro,nivelDe,monedasBbtan,monedasSortem,registraJugadaClub,PAGO_CLUB,TOPE_CLUB_DIA,TOPE_BBTAN_DIA,topeClub,JUEGOS_CLUB,PODIO,podioValido}',ctx);
+ ';globalThis.__M={JUEGOS,LOGROS,NIVEL,PESO,VALOR_NIVEL,TARIFA,RECORD,monedasDe,topMonedas,registraDia,rachaHoy,pagoDia,diaChile,valorLogro,nivelDe,monedasBbtan,monedasSortem,registraJugadaClub,PAGO_CLUB,TOPE_CLUB_DIA,TOPE_BBTAN_DIA,topeClub,JUEGOS_CLUB,PODIO,podioValido,ultimosPodios}',ctx);
 const M=ctx.__M;
 
 test('cada logro tiene su nivel, y cada juego de sala su peso',()=>{
@@ -151,4 +151,19 @@ test('Metro Rush: récord, mejor carrera, distancia y partidas del club',()=>{
  assert.equal(M.monedasDe('a',t).partes.records,2*M.RECORD.metrorush+200+100);
  assert.equal(M.nivelDe('metrorush','c50k'),1);assert.equal(M.nivelDe('metrorush','c10m'),4);
  assert.equal(M.nivelDe('metrorush','d1k'),1);assert.equal(M.nivelDe('metrorush','d42k'),4);
+});
+
+test('los últimos tops: podios válidos, del más reciente al más antiguo',()=>{
+ const solo={'club-tetris-maraton':{a:{nombre:'A',puntos:900,tiempo:1,partida:'pA1234'},b:{nombre:'B',puntos:500,tiempo:1,partida:'pB1234'}},
+  'club-snake-classic-mediano':{a:{nombre:'A',puntos:40,tiempo:1,partida:'otra99'},c:{nombre:'C',puntos:30,tiempo:1,partida:'pC1234'}}};
+ const podios={
+  a:{pA1234:{c:'club-tetris-maraton',p:1,q:'b',at:300},viejo1:{c:'club-snake-classic-mediano',p:1,q:'c',at:100}},
+  b:{pB1234:{c:'club-tetris-maraton',p:2,q:'zz',at:400}},          // la víctima ya no está en la tabla: no vale
+  c:{pC1234:{c:'club-snake-classic-mediano',p:2,q:'c',at:500}}};   // contra sí mismo: no vale
+ const l=M.ultimosPodios({solo,podios});
+ assert.equal(JSON.stringify(l.map(x=>[x.uid,x.partida])),JSON.stringify([['a','pA1234'],['a','viejo1']]));
+ assert.equal(l[0].fila.puntos,900,'la fila sigue siendo esa partida: lleva la marca');
+ assert.equal(l[1].fila,null,'la marca ya se mejoró: no se sabe la de entonces');
+ assert.equal(M.ultimosPodios({solo,podios},1).length,1);
+ assert.equal(M.ultimosPodios({}).length,0);
 });

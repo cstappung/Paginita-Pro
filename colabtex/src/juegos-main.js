@@ -70,14 +70,14 @@ import { crearRanks } from "./juegos/ranks.js";
 import { LOGROS, detecta, deFila, deMarca } from "./juegos/logros.js";
 import { crearLogros } from "./juegos/logros-vista.js";
 import { monedasDe, formatoMonedas, valorLogro, registraDia, diaChile as diaMonedas, pagoDia, rachaHoy,
-  registraJugadaClub, PAGO_CLUB, topeClub, PODIO, topMonedas, economia } from "./juegos/monedas.js";
+  registraJugadaClub, PAGO_CLUB, topeClub, PODIO, topMonedas, economia, ultimosPodios } from "./juegos/monedas.js";
 import { PRECIO_TIENDA } from "./juegos/tienda.js";
 import { crearMonedas, topHtml, MONEDA } from "./juegos/monedas-vista.js";
 import { crearProdrop } from "./juegos/prodrop.js";
 import { mejoresDrops, miniCarta, cifras as cifrasCartas, MOTOR, rankingColeccion } from "./juegos/prodrop-cartas.js";
 import { mezcla, abrePerfil } from "./juegos/perfil.js";
 import { abreMini, cierraMini, miniAbierta, crearPaginaPerfil, avatarMarco, quien } from "./juegos/perfil-vista.js";
-import { estadisticas, nombreCategoria, marcoVisible } from "./juegos/perfil-tarjeta.js";
+import { estadisticas, nombreCategoria, marcoVisible, valorMarca } from "./juegos/perfil-tarjeta.js";
 import { fotoSana, colorSano } from "./juegos/sano.js";
 import { suena, silenciar, silenciado, ambientar, ajustarMusica, activarAudio } from "./juegos/sonido.js";
 import { montaReproductor } from "./juegos/reproductor.js";
@@ -711,6 +711,8 @@ function pintaMonedas() {
   if (caja && u && d) caja.innerHTML = topHtml(d, u.uid, perfilDe, colorForUid);
   const drops = $("vesDrops");
   if (drops && u && d && d.completo) drops.innerHTML = dropsHtml(d);
+  const tops = $("vesTops");
+  if (tops && u && d && d.completo) tops.innerHTML = topsLista(d);
 }
 /* El nombre que alguien dejó en sus filas, si no tiene perfil. */
 function nombreEnDatos(uid, d) {
@@ -1583,22 +1585,26 @@ function armazon() {
     return;
   }
   /* El salón, de arriba abajo y pensado primero para el móvil:
-       1. el saludo y la barra de modo (Todos · 1 jugador · Multijugador),
+       1. las novedades, un banner que pasa solo y que ningún modo esconde;
+       2. el saludo y la barra de modo (Todos · 1 jugador · Multijugador),
           que se queda pegada arriba al hacer scroll;
-       2. el aviso del invitado, si lo es;
-       3. las novedades, el escaparate, que ningún modo esconde;
+       3. el aviso del invitado, si lo es;
        4. «Para jugar solo», un carrusel justo a la entrada: antes estaban
           al final del catálogo y nadie los veía;
        5. las salas (abiertas, tuyas, en juego), en su columna;
        6. «Multijugador», con su insignia de grupo y sus filtros;
-       7. la tira de drops de PRODROP.
-     En pantalla ancha la columna de salas va a la derecha y pegajosa,
-     junto a las dos secciones de juegos; en el móvil cae entre el carrusel
-     de un jugador y el catálogo multijugador, donde se busca una sala. */
+       7. los últimos tops del club y la tira de drops de PRODROP.
+     En pantalla ancha la columna de salas va a la derecha y pegajosa, y
+     baja hasta el final del salón: si acababa en «Multijugador», al hacer
+     scroll se quedaba pegada encima de los tops y de los drops, porque
+     Chrome no la sujeta a su área de la rejilla sino a la rejilla entera.
+     En el móvil cae entre el carrusel de un jugador y el catálogo
+     multijugador, donde se busca una sala. */
   const inv = state.invitado;
   const nombre = u ? String(u.name || "").split(" ")[0] : "";
   h.innerHTML = `
     <div class="jg-sal" id="vesSalon" data-modo="${modoVes}">
+      ${novedadesHtml()}
       <header class="jg-sal-intro">
         <span class="jg-eyebrow">LABORATORIO · SALÓN DE JUEGOS</span>
         <h1>¿A qué jugamos${nombre ? `, <span translate="no">${escapeHtml(nombre)}</span>` : ""}?</h1>
@@ -1616,7 +1622,6 @@ function armazon() {
         ${inv ? `<p class="jg-invitado-aviso" role="note"><span class="jg-invitado-ico" aria-hidden="true">${ICONO_SOLO}</span><span><b>Estás como invitado.</b> Juegas a Snake, Buscaminas, Tetris y sortEm, pero nada se guarda ni cuenta para rankings, logros ni monedas. El resto necesita cuenta.</span><button type="button" data-login>Iniciar sesión</button></p><p class="jg-recaptcha">${AVISO_RECAPTCHA}</p>` : ""}
         <div id="vesAviso"></div>
       </div>
-      ${novedadesHtml()}
       <section class="jg-sal-sec jg-sal-solo" aria-labelledby="vesSoloT">
         <header class="jg-sal-tit">
           <span class="jg-sal-ico m-solo" aria-hidden="true">${ICONO_SOLO}</span>
@@ -1661,6 +1666,7 @@ function armazon() {
         </div>
         <div class="jg-rejilla" id="vesElige"></div>
       </section>
+      ${inv ? "" : topsHtml()}
       ${inv ? "" : tiraHtml()}
     </div>`;
   vesFirma = "";
@@ -1674,6 +1680,7 @@ function armazon() {
     b.onclick = () => { const c = $("vesSolos"); c.scrollBy({ left: Number(b.dataset.desliza) * c.clientWidth * 0.9, behavior: "smooth" }); };
   }
   enganchaNovedades(h);
+  enganchaBanner(h);
   salon.enganchar($("vesSalon"));
 }
 
@@ -1741,36 +1748,34 @@ function arteNovedad(n) {
    `plataformas`; vacío si la novedad no lleva a un juego (PRODROP). */
 const plataformaDe = id => id ? { movil: enMovil(id), pc: enPc(id) } : {};
 
-/* Las novedades llevan la misma insignia de modo que las miniaturas. El
+/* Las novedades son un banner: una diapositiva a la vez, a todo el ancho
+   y antes del saludo, que pasa sola a la siguiente (entra por la derecha)
+   cada `BAN_MS`. Llevan la misma insignia de modo que las miniaturas. El
    invitado ve las mismas; las que necesitan cuenta (una sala, la tienda)
-   lo dicen y ofrecen lo que sí puede hacer: la práctica, si la hay. */
+   lo dicen y ofrecen lo que sí puede hacer: la práctica, si la hay.
+   Tras la última va una copia de la primera (`inert`): el paso de la
+   última a la primera sigue hacia la derecha y, al terminar, la pista
+   salta sin transición a la primera de verdad (`enganchaBanner`). */
 function novedadesHtml() {
-  const inv = state.invitado;
-  return `
-      <section class="jg-nov" aria-labelledby="vesNovT">
-        <header class="jg-nov-cab">
-          <span class="jg-eyebrow">RECIÉN LLEGADO</span>
-          <h2 id="vesNovT">Novedades</h2>
-          <p>Lo último que llegó al salón.</p>
-        </header>
-        <div class="jg-nov-lista">${NOVEDADES.map((n, i) => {
-          /* Como invitado solo se abren los cuatro juegos libres; lo demás
-             (también las prácticas contra bots) pide iniciar sesión. */
-          const cuenta = inv && (n.cuenta || !(n.ruta && n.ruta.startsWith("#solo/") && rutaLibre(n.ruta.slice(6))));
-          const insignia = (n.modo ? `<span class="jg-mn-modo m-${n.modo}">${n.modo === "solo" ? ICONO_SOLO + "1 jugador" : ICONO_MULTI + escapeHtml(n.jugadores)}</span>` : "") +
-            /* Las mismas etiquetas que la miniatura, de la misma tabla (`CONTROLES`),
-               para el juego al que lleva la novedad. */
-            plataformas(plataformaDe(juegoDeNovedad(n)));
-          const accion = cuenta
-            ? `<button class="btn" type="button" data-login><span class="jg-nov-candado">${CANDADO}</span> Iniciar sesión</button>`
-            : n.sala ? `<button class="btn" data-nov-crear="${n.id}">Abrir sala <span aria-hidden="true">→</span></button>`
-            : `<a class="btn" href="${n.ruta}">${escapeHtml(n.boton)} <span aria-hidden="true">→</span></a>`;
-          return `
-          <article class="jg-nov-c${cuenta ? " bloq" : ""}" style="--c:${n.color}">
-            <div class="jg-portada jg-nov-arte" aria-hidden="true">${arteNovedad(n)}</div>
-            <div class="jg-nov-cuerpo">
-              <div class="jg-nov-meta"><span class="jg-nov-sello">${i === 0 ? "★ Lo último" : "Nuevo"}</span>${insignia}<span>${escapeHtml(fechaAlta(n.alta))}</span></div>
-              <h3>${escapeHtml(n.titulo)}</h3>
+  const inv = state.invitado, N = NOVEDADES.length;
+  const diapo = (n, i, copia) => {
+    /* Como invitado solo se abren los cuatro juegos libres; lo demás
+       (también las prácticas contra bots) pide iniciar sesión. */
+    const cuenta = inv && (n.cuenta || !(n.ruta && n.ruta.startsWith("#solo/") && rutaLibre(n.ruta.slice(6))));
+    const insignia = (n.modo ? `<span class="jg-mn-modo m-${n.modo}">${n.modo === "solo" ? ICONO_SOLO + "1 jugador" : ICONO_MULTI + escapeHtml(n.jugadores)}</span>` : "") +
+      /* Las mismas etiquetas que la miniatura, de la misma tabla (`CONTROLES`),
+         para el juego al que lleva la novedad. */
+      plataformas(plataformaDe(juegoDeNovedad(n)));
+    const accion = cuenta
+      ? `<button class="btn" type="button" data-login><span class="jg-nov-candado">${CANDADO}</span> Iniciar sesión</button>`
+      : n.sala ? `<button class="btn" data-nov-crear="${n.id}">Abrir sala <span aria-hidden="true">→</span></button>`
+      : `<a class="btn" href="${n.ruta}">${escapeHtml(n.boton)} <span aria-hidden="true">→</span></a>`;
+    return `
+          <article class="jg-ban-c${cuenta ? " bloq" : ""}" style="--c:${n.color}" ${copia ? 'aria-hidden="true" inert' : `role="group" aria-roledescription="diapositiva" aria-label="${i + 1} de ${N}: ${escapeHtml(n.titulo)}"`}>
+            <div class="jg-portada jg-nov-arte jg-ban-arte" aria-hidden="true">${arteNovedad(n)}</div>
+            <div class="jg-ban-cuerpo">
+              <div class="jg-ban-meta"><span class="jg-nov-sello">${i === 0 ? "★ Lo último" : "Nuevo"}</span>${insignia}<span class="jg-ban-fecha">${escapeHtml(fechaAlta(n.alta))}</span></div>
+              <h2>${escapeHtml(n.titulo)}</h2>
               <p>${escapeHtml(n.lema)}</p>
               <small>${escapeHtml(typeof n.sub === "function" ? n.sub() : n.sub)}${cuenta ? " · requiere cuenta" : ""}</small>
               <div class="jg-nov-pie">
@@ -1779,7 +1784,18 @@ function novedadesHtml() {
               </div>
             </div>
           </article>`;
-        }).join("")}</div>
+  };
+  return `
+      <section class="jg-ban" id="vesBanner" aria-roledescription="carrusel" aria-label="Novedades del salón">
+        <div class="jg-ban-vista">
+          <div class="jg-ban-pista" aria-live="off">${NOVEDADES.map((n, i) => diapo(n, i, false)).join("")}${N > 1 ? diapo(NOVEDADES[0], 0, true) : ""}</div>
+        </div>${N > 1 ? `
+        <button class="jg-ban-flecha ant" type="button" data-ban="-1" aria-label="Novedad anterior">‹</button>
+        <button class="jg-ban-flecha sig" type="button" data-ban="1" aria-label="Novedad siguiente">›</button>
+        <div class="jg-ban-pie">
+          <div class="jg-ban-puntos" role="group" aria-label="Elegir novedad">${NOVEDADES.map((n, i) => `<button type="button" data-ban-ir="${i}" aria-label="${escapeHtml(n.titulo)}"><i></i></button>`).join("")}</div>
+          <button class="jg-ban-pausa" type="button" data-ban-pausa aria-label="Pausar las novedades" title="Pausar">❚❚</button>
+        </div>` : ""}
       </section>`;
 }
 /* La tira de los últimos drops de PRODROP: va al final, después de los
@@ -1801,6 +1817,125 @@ function enganchaNovedades(h) {
     const n = de(b.getAttribute("data-nov-reglas")), [k, modo] = n.reglas;
     b.onclick = () => abreReglas(k, modo ? { modo, nombre: JUEGOS[k] ? JUEGOS[k].nombre : n.titulo } : undefined);
   }
+}
+
+/* El banner de novedades pasa solo cada `BAN_MS`. El tiempo se cuenta a
+   mano (un tic cada 100 ms que solo suma mientras nadie lo mira de cerca),
+   porque se detiene por cinco motivos a la vez: el ratón encima, el foco
+   dentro, la pestaña oculta, el botón de pausa y quien pidió menos
+   movimiento (que empieza en pausa). El punto activo se llena con lo que
+   falta para pasar. Con el dedo se arrastra; un arrastre no es un clic. */
+const BAN_MS = 7000;
+let banTic = 0;
+function enganchaBanner(h) {
+  clearInterval(banTic);
+  const raiz = h.querySelector("#vesBanner"), N = NOVEDADES.length;
+  if (!raiz || N < 2) return;
+  const pista = raiz.querySelector(".jg-ban-pista"), vista = raiz.querySelector(".jg-ban-vista");
+  const puntos = [...raiz.querySelectorAll("[data-ban-ir]")], pausa = raiz.querySelector("[data-ban-pausa]");
+  const quieto = (() => { try { return matchMedia("(prefers-reduced-motion: reduce)").matches; } catch (e) { return false; } })();
+  let i = 0, t = 0, encima = false, foco = false, pausado = quieto, arrastre = null;
+  const pon = (k, anima, dx = 0) => {
+    pista.classList.toggle("sin-trans", !anima || quieto);
+    pista.style.transform = `translateX(calc(${-k * 100}% + ${dx}px))`;
+  };
+  const pinta = () => {
+    const j = i % N;
+    puntos.forEach((b, k) => { b.classList.toggle("on", k === j); b.setAttribute("aria-current", String(k === j)); });
+    const lleno = raiz.querySelector(".jg-ban-puntos .on i");
+    for (const b of puntos) b.firstChild.style.transform = "";
+    if (lleno) lleno.style.transform = `scaleX(${Math.min(1, t / BAN_MS)})`;
+    raiz.classList.toggle("pausa", pausado);
+    pausa.textContent = pausado ? "▶" : "❚❚";
+    pausa.setAttribute("aria-label", pausado ? "Reanudar las novedades" : "Pausar las novedades");
+    pausa.title = pausado ? "Reanudar" : "Pausar";
+  };
+  const ve = k => {
+    t = 0;
+    /* Parada en la copia (a medio pasar): se cuenta desde la primera. */
+    if (i >= N) { k -= N; i = 0; pon(0, false); void pista.offsetWidth; }
+    /* De la primera hacia atrás: se salta a la copia y se anima desde ahí. */
+    if (k < 0) { pon(N, false); void pista.offsetWidth; k = N - 1; }
+    i = Math.min(k, N);
+    pon(i, true);
+    if (quieto && i >= N) { i = 0; pon(0, false); }   // sin transición no llega `transitionend`
+    pinta();
+  };
+  /* Al llegar a la copia de la primera, se vuelve a la de verdad sin que
+     se note: son idénticas. */
+  pista.addEventListener("transitionend", e => {
+    if (e.target === pista && i >= N) { i = 0; pon(0, false); pinta(); }
+  });
+  raiz.querySelectorAll("[data-ban]").forEach(b => b.onclick = () => ve(i + Number(b.dataset.ban)));
+  puntos.forEach(b => b.onclick = () => ve(Number(b.dataset.banIr)));
+  pausa.onclick = () => { pausado = !pausado; pinta(); };
+  raiz.addEventListener("pointerenter", e => { if (e.pointerType === "mouse") encima = true; });
+  raiz.addEventListener("pointerleave", e => { if (e.pointerType === "mouse") encima = false; });
+  raiz.addEventListener("focusin", () => { foco = true; });
+  raiz.addEventListener("focusout", e => { if (!raiz.contains(e.relatedTarget)) foco = false; });
+  raiz.addEventListener("keydown", e => {
+    if (e.key === "ArrowRight" || e.key === "ArrowLeft") { e.preventDefault(); ve(i + (e.key === "ArrowRight" ? 1 : -1)); }
+  });
+  vista.addEventListener("pointerdown", e => {
+    if (e.pointerType === "mouse") return;
+    arrastre = { x: e.clientX, y: e.clientY, dx: 0, movio: false };
+  });
+  vista.addEventListener("pointermove", e => {
+    if (!arrastre) return;
+    arrastre.dx = e.clientX - arrastre.x;
+    if (!arrastre.movio && Math.abs(arrastre.dx) > 8 && Math.abs(arrastre.dx) > Math.abs(e.clientY - arrastre.y)) arrastre.movio = true;
+    if (arrastre.movio) { t = 0; pon(i, false, arrastre.dx); }
+  });
+  const suelta = () => {
+    if (!arrastre) return;
+    const a = arrastre; arrastre = null;
+    if (!a.movio) return;
+    const ancho = vista.clientWidth || 1;
+    if (Math.abs(a.dx) > Math.min(60, ancho * 0.18)) ve(i + (a.dx < 0 ? 1 : -1)); else pon(i, true);
+    vista.dataset.arrastro = "1";
+    setTimeout(() => { delete vista.dataset.arrastro; }, 0);
+  };
+  vista.addEventListener("pointerup", suelta);
+  vista.addEventListener("pointercancel", suelta);
+  vista.addEventListener("click", e => { if (vista.dataset.arrastro) { e.preventDefault(); e.stopPropagation(); } }, true);
+  pon(0, false);
+  pinta();
+  banTic = setInterval(() => {
+    if (!document.body.contains(raiz)) { clearInterval(banTic); return; }
+    if (pausado || encima || foco || arrastre || document.hidden || salon.abiertaPara()) return;
+    t += 100;
+    if (t >= BAN_MS) ve(i + 1); else pinta();
+  }, 100);
+}
+
+/* ---------- últimos tops ----------
+   Quién subió hace poco al podio de una tabla del club quitándole el
+   puesto a otra persona (`ultimosPodios`, de `podios`, que es lo único con
+   fecha). Una lista corta: es noticia, no una clasificación. */
+const NOMBRE_PUESTO = ["", "1.º", "2.º", "3.º"], MEDALLA = ["", "🥇", "🥈", "🥉"];
+const topsHtml = () => `
+      <section class="jg-tops" aria-labelledby="vesTopsT">
+        <header><h2 id="vesTopsT">🏆 Últimos tops</h2><small>quién se subió al podio del club, del más reciente al más antiguo</small><a href="#ranks">Clasificación →</a></header>
+        <ol id="vesTops" class="jg-tops-lista"><li class="jg-nada">Buscando récords…</li></ol>
+      </section>`;
+function topsLista(d) {
+  const l = ultimosPodios(d, 8);
+  if (!l.length) return `<li class="jg-nada">Nadie le ha quitado todavía un puesto del podio a nadie. ¿Serás el primero? <a href="#ranks">Mira las tablas →</a></li>`;
+  const nom = (uid, c) => {
+    const f = d.solo && d.solo[c] && d.solo[c][uid];
+    return quien(uid, perfilDe(uid), null, { nombre: (f && f.nombre) || nombreEnDatos(uid, d) }, colorForUid);
+  };
+  return l.map(x => {
+    const q = nom(x.uid, x.c), o = nom(x.q, x.c);
+    const tabla = x.c.startsWith("yemas-zombis-") ? `Yemas zombis · ${YM_MAPAS[x.c.slice(13)] || x.c.slice(13)}` : nombreCategoria(x.c);
+    const marca = x.fila ? valorMarca(x.c, x.fila) : "";
+    return `<li class="jg-top p${x.p}">
+          <span class="jg-top-med" aria-label="Puesto ${x.p}">${MEDALLA[x.p]}</span>
+          <span class="jg-top-quien" data-perfil="${escapeHtml(x.uid)}" data-nombre="${escapeHtml(q.nombre)}">${avatarMarco(q.foto, q.nombre, q.color, marcoDeUid(x.uid), 30, x.uid)}</span>
+          <span class="jg-top-txt"><b translate="no" data-perfil="${escapeHtml(x.uid)}">${escapeHtml(q.nombre)}</b> le quitó el ${NOMBRE_PUESTO[x.p]} puesto a <b translate="no" data-perfil="${escapeHtml(x.q)}">${escapeHtml(o.nombre)}</b>
+            <small>${escapeHtml(tabla)}${marca ? ` · ${escapeHtml(marca)}` : ""} · ${haceCuanto(x.at)}</small></span>
+        </li>`;
+  }).join("");
 }
 
 /* Los filtros de los multijugador (todos, duelos, en grupo) solo
@@ -1831,7 +1966,7 @@ function ponModo(m) {
      ella y no a media página de lo que había antes. */
   const barra = document.querySelector(".jg-modos");
   if (barra && barra.getBoundingClientRect().top <= 1) {
-    const sec = document.querySelector(modoVes === "multi" ? ".jg-sal-multi" : ".jg-nov");
+    const sec = document.querySelector(modoVes === "multi" ? ".jg-sal-multi" : ".jg-sal-solo");
     if (sec) window.scrollTo({ top: window.scrollY + sec.getBoundingClientRect().top - barra.offsetHeight - 8 });
   }
 }

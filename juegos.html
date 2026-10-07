@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610070534"></script>
+<script src="i18n.js?v=202610071412"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Laboratorio</title>
@@ -2961,47 +2961,115 @@ html[data-tema=oscuro] .jg-aj-bando{border-color:var(--os-borde2);color:var(--os
 html[data-tema=oscuro] .jg-aj-punto-t{border-color:#ffffff66}
 
 /* ============================================================
-   Novedades: los tres últimos juegos, lo primero del vestíbulo
+   Novedades: un banner que pasa solo, lo primero del vestíbulo
    ============================================================ */
-/* Ocupa todo el ancho del salón, encima de los juegos: va antes que
-   nada porque es lo que cambia de una visita a otra. */
-.jg-nov{grid-area:nov;margin-bottom:28px}
-.jg-nov-cab{display:flex;align-items:baseline;gap:6px 14px;flex-wrap:wrap;margin-bottom:14px}
-.jg-nov-cab .jg-eyebrow{flex-basis:100%;color:var(--jg-purple)}
-html[data-tema=oscuro] .jg-nov-cab .jg-eyebrow{color:#c4b1ff}
-.jg-nov-cab h2{margin:0;font-size:26px;letter-spacing:-.5px;color:var(--jg-ink)}
-.jg-nov-cab p{margin:0;font-size:13px;color:var(--jg-muted)}
-.jg-nov-lista{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
-.jg-nov-c{position:relative;display:flex;flex-direction:column;overflow:hidden;border:1px solid #e5e0ee;border-radius:18px;background:#fff;box-shadow:0 1px 2px #2a1e440a;transition:transform .22s cubic-bezier(.2,.8,.3,1),box-shadow .22s}
-.jg-nov-c:hover{transform:translateY(-4px);box-shadow:0 16px 34px #39226d16}
-.jg-nov-c:before{content:"";position:absolute;inset:0 0 auto;height:4px;background:var(--c);z-index:1}
-.jg-nov-c .jg-portada{height:150px;border-radius:0;flex-shrink:0}
-.jg-nov-c .jg-portada>*{zoom:.82}
-.jg-nov-cuerpo{display:flex;flex-direction:column;gap:6px;padding:14px 16px 16px;flex:1}
-.jg-nov-meta{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11.5px;color:var(--jg-muted)}
-.jg-nov-sello{font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:99px;color:#fff;background:var(--c)}
-.jg-nov-cuerpo h3{margin:2px 0 0;font-size:19px;letter-spacing:-.3px;color:var(--jg-ink)}
-.jg-nov-cuerpo p{margin:0;font-size:12.5px;line-height:1.5;color:#5f5a70;flex:1}
-.jg-nov-cuerpo small{font-size:11.5px;color:var(--jg-muted)}
+/* Una diapositiva a la vez, a todo el ancho y antes del saludo: es lo que
+   cambia de una visita a otra. La pista lleva todas en fila y se corre
+   con un `translateX`; cada diapositiva es oscura en los dos temas, con el
+   color de su juego (`--c`) entrando desde la derecha, donde va el arte. */
+.jg-ban{grid-area:nov;position:relative;min-width:0;margin:0 0 22px;border-radius:22px;overflow:hidden;background:#120c22;box-shadow:0 14px 40px #2a1e4426;isolation:isolate}
+.jg-ban-vista{overflow:hidden;touch-action:pan-y}
+.jg-ban-pista{display:flex;transition:transform .65s cubic-bezier(.65,0,.25,1);will-change:transform}
+.jg-ban-pista.sin-trans{transition:none}
+.jg-ban-c{flex:0 0 100%;min-width:0;position:relative;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);min-height:290px;color:#fff;
+  background:radial-gradient(ellipse 70% 120% at 100% 50%,color-mix(in srgb,var(--c) 55%,transparent),transparent 70%),linear-gradient(100deg,#120c22 0 38%,color-mix(in srgb,var(--c) 30%,#120c22))}
+.jg-ban-c:before{content:"";position:absolute;inset:0 auto 0 0;width:5px;background:var(--c);z-index:2}
+.jg-ban-arte.jg-portada{grid-column:2;grid-row:1;height:auto;border-radius:0;background:none;-webkit-mask-image:linear-gradient(90deg,transparent,#000 22%);mask-image:linear-gradient(90deg,transparent,#000 22%)}
+/* El arte de cada novedad está hecho para la tarjeta de antes (unos
+   380×165): se dibuja a ese tamaño y se escala entero, porque con `zoom`
+   las piezas en px de algunos (ALETEO) se salían del cuadro. */
+.jg-ban .jg-ban-arte>*{position:absolute;inset:auto;left:50%;top:50%;width:380px;height:165px;zoom:1;transform:translate(-50%,-50%) scale(var(--k,2.15))}
+.jg-ban-cuerpo{grid-column:1;grid-row:1;position:relative;z-index:1;display:flex;flex-direction:column;justify-content:center;gap:8px;padding:30px 20px 52px 38px}
+.jg-ban-meta{display:flex;align-items:center;flex-wrap:wrap;gap:7px;font-size:12px;color:#c9bde8}
+.jg-ban-meta .jg-mn-plat{box-shadow:0 1px 4px #0004}
+.jg-ban-fecha{margin-left:2px}
+.jg-ban-cuerpo h2{margin:2px 0 0;font-size:clamp(26px,3.2vw,40px);line-height:1.05;letter-spacing:-.8px;color:#fff;text-shadow:0 2px 18px #0006}
+.jg-ban-cuerpo p{margin:0;max-width:52ch;font-size:14px;line-height:1.55;color:#e4dcf6;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.jg-ban-cuerpo small{font-size:12px;color:#a99fcb}
+.jg-ban-cuerpo .jg-nov-pie{max-width:380px;margin-top:6px}
+.jg-ban-cuerpo .jg-nov-pie .btn{background:var(--c);border-color:transparent;color:#fff;text-shadow:0 1px 2px #0006;box-shadow:0 6px 18px color-mix(in srgb,var(--c) 45%,transparent)}
+.jg-ban-cuerpo .jg-nov-pie .btn:hover{filter:brightness(1.1)}
+.jg-ban-cuerpo .jg-nov-pie .btn2{background:#ffffff1a;border-color:#ffffff33;color:#fff}
+.jg-ban-c.bloq .jg-ban-arte{filter:grayscale(.35) brightness(.85)}
+.jg-nov-sello{font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:99px;color:#fff;background:var(--c);box-shadow:0 1px 4px #0004}
 .jg-nov-pie{display:flex;gap:8px;margin-top:8px}
 .jg-nov-pie .btn{flex:1}
-@media(max-width:1080px){.jg-nov-c .jg-portada{height:126px}.jg-nov-c .jg-portada>*{zoom:.68}}
-@media(max-width:900px){
+/* Flechas a los lados y, abajo a la izquierda, los puntos: el activo es
+   una píldora que se llena con el tiempo que falta para pasar. */
+.jg-ban-flecha{position:absolute;top:50%;z-index:3;width:40px;height:40px;margin-top:-20px;border-radius:50%;border:1px solid #ffffff38;background:#120c2299;color:#fff;font-size:22px;line-height:1;cursor:pointer;display:grid;place-items:center;opacity:0;transition:opacity .2s,background .2s;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.jg-ban-flecha.ant{left:12px}.jg-ban-flecha.sig{right:12px}
+.jg-ban:hover .jg-ban-flecha,.jg-ban-flecha:focus-visible{opacity:1}
+.jg-ban-flecha:hover{background:#120c22dd}
+.jg-ban-pie{position:absolute;left:38px;bottom:16px;z-index:3;display:flex;align-items:center;gap:10px}
+.jg-ban-puntos{display:flex;align-items:center;gap:6px}
+.jg-ban-puntos button{position:relative;width:9px;height:9px;padding:0;border:0;border-radius:99px;background:#ffffff55;cursor:pointer;overflow:hidden;transition:width .3s,background .3s}
+.jg-ban-puntos button:hover{background:#ffffff99}
+.jg-ban-puntos button.on{width:34px;background:#ffffff40}
+.jg-ban-puntos i{position:absolute;inset:0;background:#fff;border-radius:inherit;transform:scaleX(0);transform-origin:left;transition:transform .1s linear}
+.jg-ban-puntos button:not(.on) i{transition:none}
+.jg-ban.pausa .jg-ban-puntos .on i{transform:scaleX(1)!important}
+.jg-ban-pausa{width:26px;height:26px;padding:0;border:1px solid #ffffff38;border-radius:50%;background:#ffffff14;color:#fff;font-size:9px;letter-spacing:-1px;cursor:pointer}
+.jg-ban-pausa:hover{background:#ffffff2e}
+@media(hover:none){.jg-ban-flecha{display:none}}
 
-  .jg-nov-lista{grid-template-columns:1fr;gap:12px}
-  .jg-nov-c{flex-direction:row}
-  .jg-nov-c:hover{transform:none}
-  .jg-nov-c:before{inset:0 auto 0 0;width:4px;height:auto}
-  .jg-nov-c .jg-portada{width:118px;height:auto;min-height:100%}
-  .jg-nov-c .jg-portada>*{zoom:.5}
-  .jg-nov-cuerpo{padding:12px 14px}
-  .jg-nov-cuerpo p{font-size:12px}
+@media(max-width:720px){
+  .jg-ban{margin:0 -4px 18px;border-radius:18px}
+  .jg-ban-c{grid-template-columns:minmax(0,1fr);grid-template-rows:165px auto;min-height:0;
+    background:radial-gradient(ellipse 120% 60% at 50% 0,color-mix(in srgb,var(--c) 50%,transparent),transparent 75%),#120c22}
+  .jg-ban-c:before{inset:0 0 auto;width:auto;height:4px}
+  .jg-ban-arte.jg-portada{grid-column:1;grid-row:1;-webkit-mask-image:linear-gradient(180deg,#000 70%,transparent);mask-image:linear-gradient(180deg,#000 70%,transparent)}
+  .jg-ban .jg-ban-arte>*{--k:1}
+  .jg-ban-cuerpo{grid-column:1;grid-row:2;gap:6px;padding:4px 16px 44px}
+  .jg-ban-cuerpo h2{font-size:22px}
+  .jg-ban-cuerpo p{font-size:12.5px}
+  .jg-ban-cuerpo .jg-nov-pie{max-width:none}
+  .jg-ban-cuerpo .jg-nov-pie .btn,.jg-ban-cuerpo .jg-nov-pie .btn2{height:44px}
+  .jg-ban-pie{left:16px;bottom:14px}
+  .jg-ban-flecha{top:82px;width:34px;height:34px;margin-top:-17px;font-size:19px}
+  .jg-ban-flecha.ant{left:8px}.jg-ban-flecha.sig{right:8px}
 }
-@media (prefers-reduced-motion:reduce){.jg-nov-c,.jg-nov-c:hover{transition:none;transform:none}}
-html[data-tema=oscuro] .jg-nov-c{background:var(--os-sup);border-color:var(--os-borde);box-shadow:none}
-html[data-tema=oscuro] .jg-nov-c:hover{box-shadow:0 16px 34px #0008}
-html[data-tema=oscuro] .jg-nov-cuerpo p{color:var(--os-tx2)}
-html[data-tema=oscuro] .jg-nov-cab h2,html[data-tema=oscuro] .jg-nov-cuerpo h3{color:var(--os-tx)}
+@media(prefers-reduced-motion:reduce){.jg-ban-pista,.jg-ban-puntos button,.jg-ban-puntos i{transition:none}}
+html[data-tema=oscuro] .jg-ban{box-shadow:0 0 0 1px var(--os-borde),0 14px 40px #0008}
+
+/* ---- Últimos tops: quién se subió al podio del club ---- */
+.jg-tops{grid-area:tops;min-width:0;margin:0 0 22px;padding:14px 16px 10px;border:1px solid #e4dfeb;border-radius:18px;background:#fff}
+.jg-tops header{display:flex;align-items:baseline;gap:4px 12px;flex-wrap:wrap;margin-bottom:8px}
+.jg-tops h2{margin:0;font-size:17px;letter-spacing:-.2px;color:var(--jg-ink)}
+.jg-tops header small{flex:1;font-size:12px;color:var(--jg-muted)}
+.jg-tops header a{font-size:12.5px;font-weight:700;color:var(--jg-purple);text-decoration:none}
+.jg-tops header a:hover{text-decoration:underline}
+.jg-tops-lista{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:6px 14px}
+.jg-tops-lista>.jg-nada{grid-column:1/-1;margin:4px 0 6px;font-size:13px;color:var(--jg-muted)}
+.jg-tops-lista>.jg-nada a{color:var(--jg-purple)}
+/* El marco dice el puesto: oro con un aura que respira para el 1.º,
+   plata y cobre lisos para el 2.º y el 3.º. */
+.jg-top{position:relative;display:flex;align-items:center;gap:10px;min-width:0;padding:7px 8px;border-radius:12px;background:#f7f5fb;border:2px solid transparent}
+.jg-top.p1{border-color:#e2b23a;background:linear-gradient(90deg,#fff4cf,#fffaf0);box-shadow:0 0 0 1px #fff3c4 inset,0 0 10px 1px #f5c54299;animation:jg-top-aura 2.4s ease-in-out infinite}
+.jg-top.p1:after{content:"";position:absolute;inset:-5px;border-radius:16px;pointer-events:none;background:conic-gradient(from var(--jg-ang,0deg),#ffd86b00 0 70%,#ffe9a0 82%,#ffd86b00 94%);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);padding:3px;animation:jg-top-gira 3.2s linear infinite;opacity:.9}
+.jg-top.p1 .jg-top-quien{border-radius:50%;box-shadow:0 0 0 2px #e2b23a,0 0 10px 2px #f5c542aa}
+.jg-top.p2{border-color:#b9c0cb;background:linear-gradient(90deg,#eef1f5,#f7f8fa)}
+.jg-top.p2 .jg-top-quien{border-radius:50%;box-shadow:0 0 0 2px #b9c0cb}
+.jg-top.p3{border-color:#c07a45;background:linear-gradient(90deg,#f8e6d8,#fbf4ee)}
+.jg-top.p3 .jg-top-quien{border-radius:50%;box-shadow:0 0 0 2px #c07a45}
+@property --jg-ang{syntax:"<angle>";inherits:false;initial-value:0deg}
+@keyframes jg-top-gira{to{--jg-ang:360deg}}
+@keyframes jg-top-aura{0%,100%{box-shadow:0 0 0 1px #fff3c4 inset,0 0 8px 0 #f5c54288}50%{box-shadow:0 0 0 1px #fff3c4 inset,0 0 18px 4px #f5c542cc}}
+@media(prefers-reduced-motion:reduce){.jg-top.p1,.jg-top.p1:after{animation:none}}
+.jg-top-med{font-size:20px;line-height:1;flex:none}
+.jg-top-quien{flex:none;cursor:pointer;display:inline-flex}
+.jg-top-txt{min-width:0;font-size:12.5px;line-height:1.35;color:#4b4560}
+.jg-top-txt b{color:var(--jg-ink);cursor:pointer}
+.jg-top-txt b:hover{text-decoration:underline}
+.jg-top-txt small{display:block;font-size:11.5px;color:var(--jg-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media(max-width:720px){.jg-tops header small{flex-basis:100%;order:3}.jg-tops{padding:12px}}
+html[data-tema=oscuro] .jg-tops{background:var(--os-sup);border-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-tops h2,html[data-tema=oscuro] .jg-top-txt b{color:var(--os-tx)}
+html[data-tema=oscuro] .jg-tops header a,html[data-tema=oscuro] .jg-tops-lista>.jg-nada a{color:#c4b1ff}
+html[data-tema=oscuro] .jg-top{background:var(--os-sup2)}
+html[data-tema=oscuro] .jg-top.p1{background:linear-gradient(90deg,#3a2f0f,var(--os-sup2))}
+html[data-tema=oscuro] .jg-top.p2{background:linear-gradient(90deg,#2b3038,var(--os-sup2))}
+html[data-tema=oscuro] .jg-top.p3{background:linear-gradient(90deg,#3a2517,var(--os-sup2))}
+html[data-tema=oscuro] .jg-top-txt{color:var(--os-tx2)}
 
 /* ---- Monedas: saldo en la cabecera, top en el vestíbulo, pestaña #monedas ---- */
 .jg-saldo{color:#f5c542!important;font-weight:700;font-variant-numeric:tabular-nums}
@@ -3121,7 +3189,6 @@ html[data-tema=oscuro] .jg-mo-ver{color:#c4b1ff}
 .jg-tira .jg-nada{margin:4px 0;color:#c9bde8;font-size:13px}.jg-tira .jg-nada a{color:#ffcc3d}
 html[data-tema=oscuro] .jg-tira{border-color:var(--os-borde)}
 .jg-nov-arte{position:relative;overflow:hidden}
-.jg-nov-c .jg-nov-arte>*{zoom:1}
 .jg-nov-arte-zb>.jg-art-ym{zoom:.8}
 .jg-nov-arte-zb .jg-art-ym em{display:none}
 .jg-nov-arte-zb>.jg-art-bx{zoom:.8}
@@ -3146,6 +3213,19 @@ html[data-tema=oscuro] .jg-tira{border-color:var(--os-borde)}
 @media (prefers-reduced-motion:reduce){.jg-nov-arte-mr i{animation:none}}
 @media(max-width:700px){.jg-nov-arte-mr>b{font-size:14px}}
 /* FANAL en Novedades: un farol abajo y cinco polillas que bajan hacia su luz. */
+/* ALETEO: el cielo se oscurece de izquierda a derecha (mañana, atardecer,
+   noche), dos pares de tubos y el pajarito que aletea entre ellos. */
+.jg-nov-arte-al{position:absolute;inset:0;overflow:hidden;background:radial-gradient(circle at 12% 22%,#fff7c2 0 5%,#ffe58a55 6%,transparent 13%),linear-gradient(90deg,#8fd8ff 0,#bfe6ff 18%,#ffc078 42%,#c4527a 62%,#3a1f5c 80%,#0b0718)}
+.jg-nov-arte-al i{position:absolute;width:30px;border:2px solid #17320f;background:linear-gradient(90deg,#3f9c34,#8be35f 38%,#4fae3f 70%,#2f7a27)}
+.jg-nov-arte-al i:nth-child(odd){top:-2px;border-radius:0 0 5px 5px;box-shadow:inset 0 -9px 0 #2f7a27}
+.jg-nov-arte-al i:nth-child(even){bottom:-2px;border-radius:5px 5px 0 0;box-shadow:inset 0 9px 0 #2f7a27}
+.jg-nov-arte-al i:nth-child(1){left:36%;height:46px}.jg-nov-arte-al i:nth-child(2){left:36%;height:58px}
+.jg-nov-arte-al i:nth-child(3){left:70%;height:66px;filter:brightness(.5) saturate(.7)}.jg-nov-arte-al i:nth-child(4){left:70%;height:40px;filter:brightness(.5) saturate(.7)}
+.jg-nov-arte-al em{position:absolute;left:22%;top:44%;width:24px;height:19px;border-radius:50%;border:2px solid #3b2a05;background:radial-gradient(circle at 70% 34%,#111 0 9%,#fff 10% 22%,transparent 23%),radial-gradient(circle at 34% 64%,#fff2b0 0 22%,transparent 23%),#ffd23a;animation:jg-al-vuela 1.6s ease-in-out infinite}
+.jg-nov-arte-al em:after{content:"";position:absolute;right:-8px;top:8px;border:5px solid transparent;border-left:9px solid #ff7a1a;border-right:0}
+.jg-nov-arte-al>b{position:absolute;bottom:7px;left:0;right:0;text-align:center;font:900 24px/1 "Lilita One","Arial Rounded MT Bold",system-ui,sans-serif;letter-spacing:.12em;color:#fff;text-shadow:0 2px 0 #1a3b66,0 0 14px #3fb6f599}
+@keyframes jg-al-vuela{0%,100%{transform:translateY(0) rotate(-8deg)}50%{transform:translateY(-12px) rotate(10deg)}}
+@media (prefers-reduced-motion:reduce){.jg-nov-arte-al em{animation:none}}
 .jg-nov-arte-fn{position:absolute;inset:0;background:radial-gradient(ellipse at 50% 104%,#ffcf6b99 0,#ff9a3c40 20%,transparent 52%),linear-gradient(#0b0a1c,#24163a 80%)}
 .jg-nov-arte-fn i{position:absolute;width:18px;height:12px;background:#b8a088;clip-path:polygon(50% 100%,44% 62%,14% 78%,0 18%,38% 36%,46% 0,54% 0,62% 36%,100% 18%,86% 78%,56% 62%);animation:jg-fn-alas .5s steps(2) infinite}
 .jg-nov-arte-fn i:nth-child(1){left:18%;top:18%}.jg-nov-arte-fn i:nth-child(2){left:62%;top:12%;background:#c47a3c;animation-delay:-.2s}
@@ -3607,13 +3687,14 @@ html[data-tema=oscuro] .jg-drop-quien:hover>b{color:#fff}
 :root{--m-solo:#e59a00;--m-solo-bg:#ffcf5c;--m-solo-tx:#3d2a00;--m-multi:#7042df;--m-multi-bg:#7042df;--m-multi-tx:#fff}
 
 /* ---- La rejilla del salón: una columna en el móvil ---- */
-.jg-sal{display:grid;grid-template-columns:minmax(0,1fr);grid-template-areas:"intro" "modos" "avisos" "nov" "solo" "lado" "multi" "tira";align-items:start}
+.jg-sal{display:grid;grid-template-columns:minmax(0,1fr);grid-template-areas:"nov" "intro" "modos" "avisos" "solo" "lado" "multi" "tops" "tira";align-items:start}
 .jg-sal-intro{grid-area:intro;margin-bottom:10px}
 .jg-sal-intro h1{font-size:26px;letter-spacing:-.8px;margin:8px 0 4px;line-height:1.1;color:var(--jg-ink)}
 .jg-sal-intro p{margin:0;font-size:13px;color:var(--jg-muted);line-height:1.5}
 .jg-sal-intro .jg-eyebrow{color:var(--jg-purple)}
 .jg-sal-avisos{grid-area:avisos;min-width:0}
-.jg-sal .jg-nov{grid-area:nov;min-width:0}
+.jg-sal .jg-ban{grid-area:nov}
+.jg-sal .jg-tops{grid-area:tops}
 .jg-sal-solo{grid-area:solo}.jg-sal-multi{grid-area:multi}
 .jg-sal .jg-ves-lado{grid-area:lado}
 .jg-sal .jg-tira{grid-area:tira;margin:8px 0 0}
@@ -3851,10 +3932,6 @@ a.jg-hoja-ya{color:#fff!important}
 .jg-lado-cuenta>.btn{display:flex;align-items:center;justify-content:center;margin:0 18px;width:calc(100% - 36px)}
 
 /* ---- Novedades dentro del salón ---- */
-.jg-nov-meta{flex-wrap:wrap}
-.jg-nov-meta .jg-mn-modo{margin-right:auto}
-.jg-nov-meta .jg-mn-modo:has(+.jg-mn-plat){margin-right:0}
-.jg-nov-meta .jg-mn-plat{margin-right:auto;background:#f1f5f9;box-shadow:inset 0 0 0 1px #e2e8f0}
 .jg-nov-candado svg,.jg-nov-pie .jg-nov-candado svg{width:14px;height:14px;vertical-align:-2px}
 .jg-nov-pie .btn,.jg-nov-pie .btn2{display:inline-flex;align-items:center;justify-content:center;gap:5px;text-decoration:none!important}
 .jg-nov-pie .btn2.jg-nov-candado{flex:0 0 auto}
@@ -3930,26 +4007,17 @@ a.jg-hoja-ya{color:#fff!important}
 @media(min-width:901px){
   /* La columna de salas a la derecha, pegajosa junto a las dos secciones
      de juegos; las novedades y la intro ocupan todo el ancho. */
-  .jg-sal{grid-template-columns:minmax(0,1fr) 320px;column-gap:28px;grid-template-areas:"intro intro" "modos modos" "avisos avisos" "nov nov" "solo lado" "multi lado" "tira tira"}
-  .jg-sal[data-modo=solo]{grid-template-areas:"intro intro" "modos modos" "avisos avisos" "nov nov" "solo solo" "tira tira"}
-  .jg-sal[data-modo=multi]{grid-template-areas:"intro intro" "modos modos" "avisos avisos" "nov nov" "multi lado" "tira tira"}
+  /* La columna baja hasta el final (tops y tira incluidos). Chrome sujeta
+     un `sticky` a la rejilla entera, no a su área: cuando acababa en
+     «Multijugador», al bajar se quedaba pegada encima de los drops. */
+  .jg-sal{grid-template-columns:minmax(0,1fr) 320px;column-gap:28px;grid-template-areas:"nov nov" "intro intro" "modos modos" "avisos avisos" "solo lado" "multi lado" "tops lado" "tira lado";grid-template-rows:auto auto auto auto auto auto auto 1fr}
+  .jg-sal[data-modo=solo]{grid-template-areas:"nov nov" "intro intro" "modos modos" "avisos avisos" "solo solo" "tops tops" "tira tira";grid-template-rows:none}
+  .jg-sal[data-modo=multi]{grid-template-areas:"nov nov" "intro intro" "modos modos" "avisos avisos" "multi lado" "tops lado" "tira lado";grid-template-rows:auto auto auto auto auto auto 1fr}
   .jg-sal .jg-ves-lado{top:76px;max-height:calc(100vh - 96px)}
   .jg-modos-sel{flex:0 1 560px}
   .jg-modos{justify-content:space-between}
 }
-/* En el móvil las novedades son un carrusel de tarjetas enteras, no una
-   pila de tres filas que empujaba los juegos una pantalla abajo. */
 @media(max-width:720px){
-  .jg-sal .jg-nov{margin-bottom:22px}
-  .jg-sal .jg-nov-cab h2{font-size:20px}
-  .jg-sal .jg-nov-lista{display:flex;gap:10px;overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x mandatory;margin:0 -16px;padding:2px 16px 10px;scroll-padding:0 16px;scrollbar-width:none}
-  .jg-sal .jg-nov-lista::-webkit-scrollbar{display:none}
-  .jg-sal .jg-nov-c{flex:0 0 84%;flex-direction:column;scroll-snap-align:start}
-  .jg-sal .jg-nov-c:before{inset:0 0 auto;width:auto;height:4px}
-  .jg-sal .jg-nov-c .jg-portada{width:auto;height:118px;min-height:0}
-  .jg-sal .jg-nov-cuerpo{padding:12px 14px 14px}
-  .jg-sal .jg-nov-cuerpo p{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
-  .jg-sal .jg-nov-pie .btn,.jg-sal .jg-nov-pie .btn2{height:46px}
   .jg-sal .jg-ves-lado{margin-bottom:22px}
   .jg-hoja-pie .btn,.jg-hoja-pie .btn2{height:50px}
 }
@@ -3981,12 +4049,6 @@ html[data-tema=oscuro] .jg-hoja-pie{background:var(--os-sup);border-color:var(--
 html[data-tema=oscuro] .jg-hoja-chip{background:var(--os-sup3);color:var(--os-tx2)}
 html[data-tema=oscuro] .jg-hoja-chip.nuevo{background:#14351f;color:#86efac}
 html[data-tema=oscuro] .jg-hoja-chip.movil{background:#0c2d42;color:#bae6fd}
-html[data-tema=oscuro] .jg-nov-meta .jg-mn-plat{background:#141b2b;box-shadow:inset 0 0 0 1px #ffffff1a}
-html[data-tema=oscuro] .jg-nov-meta .jg-mn-plat i+i{border-left-color:#ffffff1a}
-html[data-tema=oscuro] .jg-nov-meta .jg-mn-plat i.cel{color:#bae6fd}
-html[data-tema=oscuro] .jg-nov-meta .jg-mn-plat i.cel svg{color:#7dd3fc}
-html[data-tema=oscuro] .jg-nov-meta .jg-mn-plat i.pc{color:#cbd5e1}
-html[data-tema=oscuro] .jg-nov-meta .jg-mn-plat i.pc svg{color:#94a3b8}
 html[data-tema=oscuro] .jg-hoja-chip.pc{background:#3a2a0c;color:#fde68a}
 html[data-tema=oscuro] .jg-hoja-lema,html[data-tema=oscuro] .jg-hoja-cuenta p,html[data-tema=oscuro] .jg-puerta p{color:var(--os-tx2)}
 html[data-tema=oscuro] .jg-hoja-salas{background:#10291b;border-color:#1c4a30;color:#bbf7d0}
@@ -4196,6 +4258,6 @@ html[data-tema=oscuro] .jg-adm-tabs .btn2.on{background:#ab8bff;color:#171522;bo
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610070534"></script>
+<script src="juegos-app.js?v=202610071412"></script>
 </body>
 </html>

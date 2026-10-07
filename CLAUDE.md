@@ -1649,15 +1649,36 @@ before dying; `cadena.js`'s marcador does the same once the replay is over.
 **The lobby is the *salón*** (`juegos/salon-datos.js`, pure, and
 `juegos/salon.js`, the DOM; the proposal behind it, with screenshots, is
 [docs/salon-rediseno.md](docs/salon-rediseno.md)). Mobile first, top to
-bottom: a greeting, the **mode bar** (Todos · 1 jugador · Multijugador,
-sticky, remembered in `jg.modoSalon`), the guest notice, *Novedades*, **«Para
-jugar solo» as a carousel right at the entrance** (it used to be a block at
-the very end that nobody reached), the rooms column, the **multiplayer**
-grid with its Todos/Duelos/En grupo filter, and the PRODROP drops strip.
-`.jg-sal` places them by grid areas; from 901 px the rooms column
-(`aside.jg-ves-lado`, sticky) sits to the right of the two game sections. A
-mode only hides the section that does not apply (`data-modo` on
-`.jg-sal`); *Novedades* is never hidden.
+bottom: the *Novedades* **banner**, a greeting, the **mode bar** (Todos ·
+1 jugador · Multijugador, sticky, remembered in `jg.modoSalon`), the guest
+notice, **«Para jugar solo» as a carousel right at the entrance** (it used
+to be a block at the very end that nobody reached), the rooms column, the
+**multiplayer** grid with its Todos/Duelos/En grupo filter, *Últimos tops*
+and the PRODROP drops strip. `.jg-sal` places them by grid areas; from
+901 px the rooms column (`aside.jg-ves-lado`, sticky) sits to the right and
+**spans every row down to the drops strip**: Chrome bounds a sticky grid
+item by the whole grid, not by its area, so when the column ended at
+«Multijugador» it stayed stuck on top of the strip below. A mode only hides
+the section that does not apply (`data-modo` on `.jg-sal`); *Novedades* is
+never hidden.
+
+- **The banner** (`novedadesHtml` + `enganchaBanner` in `juegos-main.js`,
+  `.jg-ban` in juegos.html) shows one slide at a time and advances by
+  itself every `BAN_MS` (7 s), the next one entering from the right. After
+  the last slide goes an `inert` copy of the first, so the loop keeps going
+  right and then snaps back without a transition. The clock is a 100 ms tick
+  that only counts while nobody is looking closely: mouse over, focus
+  inside, hidden tab, the ⏸ button, an open ficha and reduced motion all
+  hold it; the active dot fills with the time left. Swipe on touch; a drag
+  is never a click. Each slide's art (`arteNovedad`) is drawn at the old
+  card's size (380×165) and scaled whole with `transform` — `zoom` pushed
+  px-placed pieces out of the box.
+- **Últimos tops** (`topsLista`, from `ultimosPodios` in `monedas.js`) are
+  the latest `podios` claims — the only club record with a date, since a
+  `soloRanks` row has none — still valid by `podioValido`, newest first,
+  with the mark only while the row is still that same game. The frame says
+  the place: gold with a breathing aura for 1.º, plain silver and copper for
+  2.º and 3.º.
 
 - **One thumbnail for both modes** (`.jg-mn`, `tarjeta()`): a 4:3 cover
   (`arteJuego` for room games and their bot practice, the `.sp-e-<id>`
@@ -1725,7 +1746,7 @@ mode only hides the section that does not apply (`data-modo` on
 because what is new is not always a room game (today Metro Rush, FANAL and
 PRODROP, each with its own cover in `arteNovedad`); each entry may
 carry `modo` (the same badge as the thumbnails), and `cuenta`/`practica`
-say what a guest gets instead. On a phone it is a carousel of whole cards.
+say what a guest gets instead. On a phone the banner puts the art on top.
 `novedades()` in `motor.js` is the older date-driven version and is no
 longer called.
 
