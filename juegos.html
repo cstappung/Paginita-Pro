@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610071427"></script>
+<script src="i18n.js?v=202610071625"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Laboratorio</title>
@@ -3741,7 +3741,10 @@ html[data-tema=oscuro] .jg-drop-quien:hover>b{color:#fff}
 .jg-sal .jg-tira{grid-area:tira;margin:8px 0 0}
 .jg-sal-sec{min-width:0;margin-bottom:26px}
 /* Un modo esconde la sección que sobra; las novedades no se van nunca. */
-.jg-sal[data-modo=solo] .jg-sal-multi,.jg-sal[data-modo=solo] .jg-ves-lado,.jg-sal[data-modo=multi] .jg-sal-solo{display:none}
+/* La columna de salas (salas abiertas, top monedas, tus partidas) se queda
+   también en «1 jugador»: el top de monedas y la recompensa diaria son de
+   todos los modos. */
+.jg-sal[data-modo=solo] .jg-sal-multi,.jg-sal[data-modo=multi] .jg-sal-solo{display:none}
 
 /* ---- La barra de modo ---- */
 .jg-modos{grid-area:modos;position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:8px;margin:0 -16px 14px;padding:8px 16px;background:color-mix(in srgb,#f5f4fa 90%,transparent);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
@@ -3817,6 +3820,37 @@ html[data-tema=oscuro] .jg-drop-quien:hover>b{color:#fff}
 .jg-mn-sp>strong{zoom:1;position:static}
 :where(.jg-mn-sp) strong{display:block;max-width:78%;font-size:clamp(15px,11.5cqi,30px);line-height:1;font-weight:900;font-style:italic;letter-spacing:-.04em;text-transform:uppercase;color:#fff;text-shadow:0 2px 14px #0009;overflow-wrap:anywhere}
 .jg-mn-sp strong>span{position:absolute;right:8%;top:18%;font-size:clamp(34px,30cqi,80px);font-style:normal;line-height:1;opacity:.32;transform:rotate(-12deg);color:#f6bc64;text-shadow:0 0 30px currentColor}
+/* La escena ilustrada (portadas-solo.js) va debajo del nombre y ocupa toda
+   la portada; el emoji transparente de antes sobra con ella. Se anima solo
+   al pasar el ratón o con el foco, y siempre en la ficha. Cada pieza que
+   se mueve gira o late sobre su propio centro (`fill-box`), y ninguna lleva
+   `transform` en el SVG: la animación lo reemplazaría. */
+.jg-mn-arte>.jg-sp-svg{position:absolute;inset:0;width:100%;height:100%;zoom:1;display:block}
+.jg-mn-sp.con-svg>strong{position:relative;z-index:1;text-shadow:0 2px 3px #000a,0 2px 16px #000c}
+.jg-mn-sp.con-svg strong>span{display:none}
+.jg-sp-svg [class^="a-"]{transform-box:fill-box;transform-origin:center}
+.jg-sp-svg .a-ala{transform-origin:center bottom}
+.jg-sp-svg .a-barrera{transform-origin:center top}
+.jg-mn:is(:hover,:focus-within) .jg-sp-svg .a-late,.jg-hoja-arte .jg-sp-svg .a-late{animation:jgSpLate 1.4s ease-in-out infinite}
+.jg-mn:is(:hover,:focus-within) .jg-sp-svg :is(.a-mueve,.a-vuela),.jg-hoja-arte .jg-sp-svg :is(.a-mueve,.a-vuela){animation:jgSpFlota 1.6s ease-in-out infinite}
+.jg-mn:is(:hover,:focus-within) .jg-sp-svg .a-ala,.jg-hoja-arte .jg-sp-svg .a-ala{animation:jgSpAla .22s ease-in-out infinite alternate}
+.jg-mn:is(:hover,:focus-within) .jg-sp-svg .a-gira,.jg-hoja-arte .jg-sp-svg .a-gira{animation:jgSpGira 2.4s ease-in-out infinite}
+.jg-mn:is(:hover,:focus-within) .jg-sp-svg .a-cae,.jg-hoja-arte .jg-sp-svg .a-cae{animation:jgSpCae 1.8s steps(6) infinite}
+.jg-mn:is(:hover,:focus-within) .jg-sp-svg .a-flamea,.jg-hoja-arte .jg-sp-svg .a-flamea{animation:jgSpFlamea .8s ease-in-out infinite alternate}
+.jg-mn:is(:hover,:focus-within) .jg-sp-svg .a-chispa,.jg-hoja-arte .jg-sp-svg .a-chispa{animation:jgSpChispa 1.2s steps(2) infinite}
+.jg-mn:is(:hover,:focus-within) .jg-sp-svg .a-sale,.jg-hoja-arte .jg-sp-svg .a-sale{animation:jgSpSale 2.6s cubic-bezier(.5,0,.4,1) infinite}
+.jg-mn:is(:hover,:focus-within) .jg-sp-svg .a-barrera,.jg-hoja-arte .jg-sp-svg .a-barrera{animation:jgSpBarrera 2.6s ease-in-out infinite}
+.jg-mn:is(:hover,:focus-within) .jg-sp-svg .a-lengua,.jg-hoja-arte .jg-sp-svg .a-lengua{animation:jgSpLate .5s steps(2) infinite}
+@keyframes jgSpLate{0%,100%{opacity:.45}50%{opacity:1}}
+@keyframes jgSpFlota{0%,100%{transform:translateY(3px)}50%{transform:translateY(-6px)}}
+@keyframes jgSpAla{from{transform:scaleY(1)}to{transform:scaleY(.35)}}
+@keyframes jgSpGira{0%,100%{transform:scaleX(1)}50%{transform:scaleX(.25)}}
+@keyframes jgSpCae{from{transform:translateY(-40px)}to{transform:translateY(40px)}}
+@keyframes jgSpFlamea{from{transform:skewY(-6deg)}to{transform:skewY(6deg)}}
+@keyframes jgSpChispa{0%,100%{opacity:1}50%{opacity:.6}}
+@keyframes jgSpSale{0%,25%{transform:translateX(0)}60%,100%{transform:translateX(150px);opacity:0}}
+@keyframes jgSpBarrera{0%,20%{transform:rotate(0)}40%,80%{transform:rotate(-80deg)}100%{transform:rotate(0)}}
+@media(prefers-reduced-motion:reduce){.jg-sp-svg [class^="a-"]{animation:none!important}}
 .jg-mn-txt{display:grid;gap:3px;padding:9px 12px 12px;min-width:0}
 .jg-mn-nombre{font-size:14.5px;font-weight:650;letter-spacing:-.2px;line-height:1.25;color:var(--jg-ink);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .jg-mn-meta{display:flex;flex-wrap:wrap;align-items:center;font-size:11.5px;color:var(--jg-muted);line-height:1.4}
@@ -4052,7 +4086,7 @@ a.jg-hoja-ya{color:#fff!important}
      un `sticky` a la rejilla entera, no a su área: cuando acababa en
      «Multijugador», al bajar se quedaba pegada encima de los drops. */
   .jg-sal{grid-template-columns:minmax(0,1fr) 320px;column-gap:28px;grid-template-areas:"nov nov" "intro intro" "modos modos" "avisos avisos" "solo lado" "multi lado" "tops lado" "tira lado";grid-template-rows:auto auto auto auto auto auto auto 1fr}
-  .jg-sal[data-modo=solo]{grid-template-areas:"nov nov" "intro intro" "modos modos" "avisos avisos" "solo solo" "tops tops" "tira tira";grid-template-rows:none}
+  .jg-sal[data-modo=solo]{grid-template-areas:"nov nov" "intro intro" "modos modos" "avisos avisos" "solo lado" "tops lado" "tira lado";grid-template-rows:auto auto auto auto auto auto 1fr}
   .jg-sal[data-modo=multi]{grid-template-areas:"nov nov" "intro intro" "modos modos" "avisos avisos" "multi lado" "tops lado" "tira lado";grid-template-rows:auto auto auto auto auto auto 1fr}
   .jg-sal .jg-ves-lado{top:76px;max-height:calc(100vh - 96px)}
   .jg-modos-sel{flex:0 1 560px}
@@ -4299,6 +4333,6 @@ html[data-tema=oscuro] .jg-adm-tabs .btn2.on{background:#ab8bff;color:#171522;bo
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610071427"></script>
+<script src="juegos-app.js?v=202610071625"></script>
 </body>
 </html>

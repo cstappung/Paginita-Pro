@@ -1659,8 +1659,8 @@ and the PRODROP drops strip. `.jg-sal` places them by grid areas; from
 **spans every row down to the drops strip**: Chrome bounds a sticky grid
 item by the whole grid, not by its area, so when the column ended at
 «Multijugador» it stayed stuck on top of the strip below. A mode only hides
-the section that does not apply (`data-modo` on `.jg-sal`); *Novedades* is
-never hidden.
+the section that does not apply (`data-modo` on `.jg-sal`); *Novedades* and
+the rooms column (open rooms, top coins, your games) are never hidden.
 
 - **The banner** (`novedadesHtml` + `enganchaBanner` in `juegos-main.js`,
   `.jg-ban` in juegos.html) shows one slide at a time and advances by
@@ -1681,8 +1681,10 @@ never hidden.
   2.º and 3.º.
 
 - **One thumbnail for both modes** (`.jg-mn`, `tarjeta()`): a 4:3 cover
-  (`arteJuego` for room games and their bot practice, the `.sp-e-<id>`
-  backgrounds for the club), the name, and one meta line (genre, then
+  (`arteJuego` for room games and their bot practice; for the club an
+  illustrated SVG scene from `juegos/portadas-solo.js`, `viewBox` 400×300
+  with `slice`, over the old `.sp-e-<id>` background, which stays only as
+  the fallback), the name, and one meta line (genre, then
   open rooms / «Duelo» / «En grupo» for multiplayer, «🏆 Ranking» / «📅 Reto
   diario» / «Sin ranking» for solo). What tells the modes apart at a glance
   is the **mode badge** on the cover: one person and «1 jugador» in amber, or
@@ -1714,6 +1716,14 @@ never hidden.
   not: `npm run build`). Novedades read the same table through
   `juegoDeNovedad` (its `juego`, the room it opens or its `#solo/<x>`
   route), so a new one gets its tags too.
+- **The club covers keep clear of what the card puts on top**: badges top
+  left, the name bottom left, ▶ bottom right; the motif goes top right and
+  centre, and the bottom is darkened for the name. Gradient ids carry a
+  counter (the same game is in the carousel and in the ficha, and a
+  repeated `url(#id)` points at the first one, which may be hidden). The
+  pieces with an `a-*` class animate only on hover/focus and in the ficha,
+  and never carry an SVG `transform` themselves (the animation would
+  replace it): a positioned piece is wrapped in a `<g>` that carries it.
 - **Card states**: *nuevo* (green tag; `nuevos()` = the four most recent
   `alta`s of the last 14 days, so the tag cannot spread to half the shop),
   *más jugado* (gold, a star only on narrow cards), *seleccionada* (`.sel`,
