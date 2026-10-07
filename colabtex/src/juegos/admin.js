@@ -25,7 +25,7 @@
    comprobar que quien escribe está en `admins`.
    ============================================================ */
 import {
-  auditaSenales, auditadosMalos, pruebasPendientes, juntaHallazgos, listaRevisiones,
+  auditaSenales, auditadosMalos, pruebasPendientes, AUDITORIA_V, juntaHallazgos, listaRevisiones,
   duracionMs, formatoDuracion, duracionTexto, listaSuspensiones, ajusteValido, sumaAjustes, listaAjustes, AJUSTE_MAX
 } from "./admin-datos.js";
 import { verificaClub, juegoDeCategoria, sospechaFila, VERIFICADORES } from "./solo/verifica.js";
@@ -50,7 +50,7 @@ export function crearAdmin(ctx) {
   let host = null, muerto = false;
   let pestaña = "records";
   let datos = null, adm = { revisiones: {}, suspensiones: {}, vetados: {} }, errAdm = {};
-  let auditados = null, cargandoAud = false, verificando = null;   // verificando: {hechas, total, bytes}
+  let auditados = null, cargandoAud = false, verificando = null, autoVerificado = false;   // verificando: {hechas, total, bytes}
   let verSinPrueba = false;
   let cuenta = "";                       // la cuenta elegida en Monedas / Suspensiones
   let detalle = null;                    // {categoria, uid, partida, nombre, puntos, tiempo, lugar, origen}
@@ -168,7 +168,7 @@ export function crearAdmin(ctx) {
           const motivo = juego ? await verificaClub(juego, dato, prueba, { uid, ahora: Number.isFinite(pr.at) ? pr.at : undefined }) : null;
           x = { prueba, at: pr.at, bytes: (pr.d || "").length, motivo, repro: !!(prueba && crearRepro(juego, prueba)) };
           /* El veredicto queda para la auditoría: no se vuelve a bajar. */
-          fb.apuntaAuditado(categoria, uid, { p: partida, ok: !motivo, m: motivo || "" }).then(() => { if (auditados) ((auditados[categoria] = auditados[categoria] || {})[uid] = { p: partida, ok: !motivo, m: motivo || "" }); }, () => {});
+          fb.apuntaAuditado(categoria, uid, { p: partida, ok: !motivo, m: motivo || "", vv: AUDITORIA_V }).then(() => { if (auditados) ((auditados[categoria] = auditados[categoria] || {})[uid] = { p: partida, ok: !motivo, m: motivo || "", vv: AUDITORIA_V }); }, () => {});
         }
       } catch (e) { x = { error: "No se pudo bajar la prueba: " + (e && e.message || e) }; }
       pruebas.set(k, x);
@@ -257,6 +257,10 @@ export function crearAdmin(ctx) {
       return `<p class="jg-nada">Leyendo lo ya auditado…</p>`;
     }
     const pend = pruebasPendientes(datos.solo, auditados, juegoDeCategoria);
+    /* Lo pendiente se audita solo, una vez por visita: al subir
+       AUDITORIA_V todos los récords vuelven a pasar por los verificadores
+       sin que nadie tenga que acordarse de pulsar. */
+    if (pend.length && !verificando && !autoVerificado) { autoVerificado = true; setTimeout(() => { if (!muerto && !verificando) verificaPendientes(); }, 0); }
     const l = hallazgos();
     const total = Object.values(datos.solo || {}).reduce((n, f) => n + Object.keys(f || {}).length, 0);
     return `<div class="jg-adm-caja">
@@ -299,8 +303,8 @@ export function crearAdmin(ctx) {
             const motivo = ilegible ? "prueba ilegible" : await verificaClub(juego, { categoria, puntos: fila.puntos, tiempo: fila.tiempo, partida: fila.partida }, prueba, { uid, ahora: Number.isFinite(pr.at) ? pr.at : undefined });
             if (motivo) { ok = false; m = motivo; }
           }
-          await fb.apuntaAuditado(categoria, uid, { p: fila.partida, ok, m });
-          ((auditados[categoria] = auditados[categoria] || {})[uid] = { p: fila.partida, ok, m });
+          await fb.apuntaAuditado(categoria, uid, { p: fila.partida, ok, m, vv: AUDITORIA_V });
+          ((auditados[categoria] = auditados[categoria] || {})[uid] = { p: fila.partida, ok, m, vv: AUDITORIA_V });
         } catch (e) { console.warn("[admin] no se pudo auditar", categoria, uid, e); }
         verificando.hechas++;
         if (verificando.hechas % 3 === 0) pinta();

@@ -4878,6 +4878,22 @@ client or a bot can still produce a valid proof; only a server (Cloud
 Functions) closes that. Each game's specifics are in
 `docs/antitrampas/<juego>.md`.
 
+**Records are also judged by how they were played**
+(`solo/verifica/patrones.js`, `docs/antitrampas.md` §4 bis). A proof that
+replays still rejects when the inputs show a program: runs of keys in the
+same millisecond (Tetris), fruits reached by the shortest path with no
+spare tick (Snake), cells solved in reading order (Sudoku), flaps at the
+same height above the gap (ALETEO). They look at **consecutive** windows,
+never averages, and each threshold is calibrated against the real tables.
+Speed hacks are caught by `dosRelojes`: new Sudoku and ALETEO proofs count
+the time played with `performance.now` (`a`) and `Date.now` (`w`), and
+more than 5 % apart (past 20 s) rejects. **Raise `AUDITORIA_V`
+(`admin-datos.js`) whenever a verifier gets stricter**: verdicts in
+`auditados` carry it as `vv`, older ones are re-queued, and the Auditoría
+tab verifies the queue by itself once per visit. Admins also get a 🗑 on
+every club row of the Clasificación (`ranks.js`, `esAdmin`/`borraRecord`
+in its ctx, the same `fb.borraRecord`). `vv` needs the rules re-published.
+
 **Deleting fake records can leave an account *parada*** (its earnings drop
 retroactively, an old purchase becomes unfunded and every later coin goes to
 cover it). `juegos/cortes.js` fixes that without debt: `<uid>: {hasta,

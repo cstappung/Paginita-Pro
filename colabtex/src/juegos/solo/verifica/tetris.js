@@ -10,6 +10,7 @@
    falso positivo (rechazarle el récord a alguien honesto) es peor que
    dejar pasar una trampa rara. */
 import TM from '../../../../../juegos/club/tetris/motor.js';
+import { rachas, grano } from './patrones.js';
 
 export const PRUEBA = 1;
 
@@ -68,6 +69,17 @@ const PARED_RAZON = 0.3, PARED_MARGEN_MS = 15000;
      teclas, del mando o de los botones táctiles. */
 const CV_MIN = 0.12, CV_INTERVALOS = 40, CV_METRONOMO = 0.03, CV_METRONOMO_N = 60, PAUSA_MS = 3000;
 const MANTIENE_MIN = 10, MANTIENE_N = 30, REACCION_MIN = 100;
+/* Teclas apretadas «a la vez». Dos dedos pueden caer en el mismo
+   milisegundo de vez en cuando, pero tres pulsaciones seguidas a ≤ 2 ms
+   unas de otras no las hace una mano: es un programa que manda de golpe
+   toda la secuencia de la pieza (mover, mover, girar, soltar). En las
+   partidas reales de la base no hay ni una racha así (el 0 % de los
+   intervalos es 0 ms); en el top 1 que lo destapó, el 84 %. Rechaza con
+   `JUNTAS_RACHAS` rachas de 3, o con más de `JUNTAS_FRAC` de intervalos
+   en 0 ms. No cuenta si el navegador mide con un reloj grueso (todos los
+   intervalos múltiplos de 8 ms o más), ni los del mando o los botones
+   táctiles, que sí pueden llegar juntos en un mismo cuadro. */
+const JUNTAS_MS = 2, JUNTAS_SEGUIDAS = 3, JUNTAS_RACHAS = 10, JUNTAS_FRAC = 0.3, JUNTAS_N = 100, GRANO_GRUESO = 8;
 
 function antibot(r, k) {
   const pul = TM.leeTeclasPrueba(k === undefined ? null : k);
@@ -82,6 +94,14 @@ function antibot(r, k) {
     const cv = m > 0 ? Math.sqrt(iv.reduce((a, b) => a + (b - m) ** 2, 0) / iv.length) / m : 0;
     if (cv < CV_METRONOMO && iv.length >= CV_METRONOMO_N) return 'Las teclas se pulsaron a ritmo de metrónomo, como un programa.';
     if (cv < CV_MIN) señales.push('ritmo de metrónomo');
+  }
+  const tecl = [];
+  for (let i = 1; i < pul.length; i++) if (!pul[i].o && !pul[i - 1].o) tecl.push(pul[i].d);
+  if (grano(tecl) < GRANO_GRUESO) {
+    const juntas = rachas(tecl, d => d <= JUNTAS_MS, JUNTAS_SEGUIDAS).rachas;
+    const ceros = tecl.filter(d => d === 0).length;
+    if (juntas >= JUNTAS_RACHAS || (tecl.length >= JUNTAS_N && ceros > JUNTAS_FRAC * tecl.length))
+      return `${juntas} veces se apretaron ${JUNTAS_SEGUIDAS} o más teclas seguidas en el mismo instante: las manda un programa.`;
   }
   const h = pul.map(p => p.h).filter(x => x !== null).sort((a, b) => a - b);
   if (h.length >= MANTIENE_N && h[h.length >> 1] < MANTIENE_MIN) señales.push('teclas sin mantener');

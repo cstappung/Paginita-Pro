@@ -99,7 +99,7 @@ test('Snake antitrampas: la prueba que arma game.js pasa el verificador',async()
   for(const [modo,tam,vel] of [['classic','grande','normal'],['espejo','chico','fast'],['portals','mediano','chill'],['reloj','chico','normal']]){
     const {api,motor,enviados}=juegoReal(modo,tam,vel);api.start();
     for(let k=0;k<100000&&!enviados.length;k++){
-      const m=motor(),quiero=robot(m,12);
+      const m=motor(),quiero=robot(m,8);
       if(quiero&&!Motor.same(Motor.DIRS[quiero],m.direction))api.enqueue(m.mirrored?ESPEJO[quiero]:quiero);
       if(k===40){api.pause();api.enqueue('up');api.pause();}
       api.step();
@@ -143,6 +143,13 @@ test('Snake antitrampas: cada vía de trampa se rechaza',async()=>{
   for(const [modo,vel,semilla] of [['classic','fast',50],['arcade','fast',50],['reloj','fast',52],['espejo','fast',50]]){
     const bot=juega(modo,'grande',vel,semilla,{frutas:60,reaccion:null});
     assert.match(await vale(bot),/reflejos de bot/,modo);
+  }
+  /* Un bot paciente: a ritmo lento no hay ventana corta que delate sus
+     reflejos, pero llega a cada fruta por el camino más corto, sin un paso
+     de más, fruta tras fruta. */
+  for(const [modo,semilla] of [['classic',60],['reloj',61],['espejo',62],['arcade',63]]){
+    const bot=juega(modo,'grande','chill',semilla,{frutas:40,reaccion:null});
+    assert.match(await vale(bot),/camino más corto/,modo);
   }
   // El zen no tiene tabla.
   assert.match(await vale({dato:{...base.dato,categoria:'club-snake-zen-grande'},prueba:{...base.prueba,m:'zen'}}),/desconocida/);

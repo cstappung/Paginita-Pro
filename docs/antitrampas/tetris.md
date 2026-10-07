@@ -188,3 +188,13 @@ cadena (y un pozo limpio cada cien piezas), con la mitad más de margen
    el resultado sin prueba y se rechaza con «recarga la página».
 3. `motor.js` lo empaqueta también `juegos-app.js` (la sala): hay que
    compilar (`npm run build`) al integrar. Crece ~6 KB.
+
+## La mano (rachas de teclas a la vez)
+
+`verifica/tetris.js` mira los intervalos entre pulsaciones de teclado
+seguidas (no las del mando ni los botones táctiles). Tres o más a ≤ 2 ms
+unas de otras es una pieza mandada de golpe: rechaza con 10 rachas así, o
+con más del 30 % de intervalos en 0 ms (sobre 100 o más). No se juzga si el
+reloj del navegador es grueso (`grano` ≥ 8 ms, Firefox con
+resistFingerprinting). En la base, ninguna partida humana tiene una sola
+racha; el top 1 del sprint (Piavote) tiene el 84 % de intervalos en 0 ms.

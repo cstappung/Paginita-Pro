@@ -91,6 +91,10 @@
   let notasOn = false;                                // modo lápiz encendido
   let historial = [];                                 // pila para deshacer: cada entrada es [[i, valor, notas], ...]
   let ms = 0, corriendo = false, marca = performance.now(); // reloj del juego
+  /* Lo jugado en esta visita contado con los dos relojes (performance.now y
+     Date.now): una extensión que ralentiza el juego truca uno solo y los
+     separa. Van en la prueba (`a`, `w`); docs/antitrampas/sudoku.md. */
+  let relA = 0, relW = 0, marcaW = Date.now();
   let terminada = false;                              // la partida ya acabó (ganada, perdida o ya hecha hoy)
   let vidas = VIDAS, combo = 0, mejorCombo = 0, puntos = 0; // marcador del Arcade
   let pistasUsadas = 0;                               // cuántas pistas se pidieron (Clásico)
@@ -122,9 +126,9 @@
 
   /** Lleva el reloj hasta este instante (el intervalo solo lo hace cada 250 ms). */
   function actualiza() {
-    const ahora = performance.now();
-    if (corriendo && juego && !document.hidden) ms += ahora - marca;
-    marca = ahora;
+    const ahora = performance.now(), ahoraW = Date.now();
+    if (corriendo && juego && !document.hidden) { ms += ahora - marca; relA += ahora - marca; relW += ahoraW - marcaW; }
+    marca = ahora; marcaW = ahoraW;
   }
   /** Anota en la prueba lo que cambió en el tablero desde la última vez. */
   function apunta(esPista) {
@@ -149,6 +153,7 @@
     const p = { v: M.PRUEBA_V, m: { diario: "d", clasico: "c", arcade: "a" }[juego.modo], j: jugadas };
     if (juego.modo === "diario") p.f = juego.fecha; else p.s = juego.semilla;
     if (juego.modo === "clasico") p.d = juego.dif;
+    actualiza(); p.a = Math.round(relA); p.w = Math.round(relW);
     return p;
   }
 
@@ -643,7 +648,7 @@
     historial = []; fallo = null; notasOn = false;
     vidas = VIDAS; combo = 0; mejorCombo = 0; puntos = 0;
     terminada = !!(estado && estado.hecha);
-    corriendo = !terminada; marca = performance.now();
+    corriendo = !terminada; marca = performance.now(); marcaW = Date.now(); relA = relW = 0;
     vaciasAlEmpezar = p.pistas.filter(v => !v).length || 1;
     sel = tab.findIndex(v => !v); if (sel < 0) sel = 40; // empieza en la primera celda vacía
     $("final").hidden = true;
@@ -681,7 +686,10 @@
     if (hecha) estado = { tab: p.solucion, hecha: true, ms: prog && prog.fecha === p.fecha ? prog.ms : 0 };
     else if (prog && prog.fecha === p.fecha) {
       const t = deTexto(prog.tab);
-      if (encaja(t, p.pistas)) estado = { tab: t, notas: notasValidas(prog.notas), ms: prog.ms, j: prog.j };
+      /* Si se dejó para ir a otro modo (`fuera`), el reloj siguió corriendo
+         mientras tanto: pasar al Arcade no puede ser una pausa del diario. */
+      const fuera = Number.isFinite(prog.fuera) ? Math.min(Math.max(0, Date.now() - prog.fuera), 864e5) : 0;
+      if (encaja(t, p.pistas)) estado = { tab: t, notas: notasValidas(prog.notas), ms: (+prog.ms || 0) + fuera, j: prog.j };
     }
     empieza(p, estado);
     pintaInfo();
@@ -715,10 +723,11 @@
   }
 
   /** Guarda la partida a medias (Diario y Clásico; el Arcade se juega de una vez). */
-  function guardaProgreso() {
+  function guardaProgreso(fuera) {
     if (!juego || terminada) return;
+    actualiza();
     const j = sinPrueba ? [] : jugadas;               // sin prueba no tiene sentido guardar jugadas
-    if (juego.modo === "diario") guarda("sudoku.diario", { fecha: juego.fecha, tab: aTexto(tab), notas, ms: Math.round(ms), j });
+    if (juego.modo === "diario") guarda("sudoku.diario", Object.assign({ fecha: juego.fecha, tab: aTexto(tab), notas, ms: Math.round(ms), j }, fuera ? { fuera: Date.now() } : {}));
     else if (juego.modo === "clasico") guarda("sudoku.clasico", { dif: juego.dif, pistas: aTexto(juego.pistas), sol: aTexto(juego.solucion), tab: aTexto(tab), notas, ms: Math.round(ms), ayudas: [...ayudas], s: juego.semilla, j });
   }
 
@@ -861,7 +870,16 @@
 
   /* ---------- Modos ---------- */
   function ponModo(m) {
-    if (juego && !terminada) guardaProgreso();       // lo que estaba a medias queda guardado
+    /* Cambiar de modo no pausa nada. El Clásico a medias se abandona (al
+       volver hay uno nuevo: si no, ir al Arcade y volver era un botón de
+       pausa con el tablero memorizado), y el diario, que es uno por día, se
+       guarda con la hora en que se dejó y el reloj cuenta ese rato. */
+    if (juego && !terminada) {
+      if (juego.modo === "clasico" && m !== "clasico") borra("sudoku.clasico");
+      else if (juego.modo === "diario" && m !== "diario") guardaProgreso(true);
+      else guardaProgreso();
+    }
+    generacion++;                                     // y una generación en curso del modo anterior se descarta
     modo = m; guarda("sudoku.modo", m);
     for (const b of document.querySelectorAll("[data-modo]")) {
       const si = b.dataset.modo === m;
@@ -915,7 +933,7 @@
   setInterval(() => { actualiza(); if (corriendo && juego) $("reloj").textContent = reloj(ms); }, 250);
   setInterval(guardaProgreso, 5000);                  // guardado periódico por si se cierra de golpe
   document.addEventListener("visibilitychange", () => {
-    marca = performance.now();
+    marca = performance.now(); marcaW = Date.now();
     if (document.hidden) {                            // al irse: guardar, subir el diario y callar la música
       guardaProgreso();
       if (modo === "diario") subeNube(false);

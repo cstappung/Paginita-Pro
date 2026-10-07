@@ -28,6 +28,7 @@
    con eventos de verdad, de a una celda, con pausas irregulares de
    persona, no se distingue: ese es el límite honesto. */
 import SM from '../../../../../juegos/club/sudoku/motor.js';
+import { rachas, dosRelojes } from './patrones.js';
 
 export const PRUEBA = 1;
 
@@ -78,7 +79,32 @@ const rachaMaxima = fecha => SM.numeroDia(fecha) - SM.numeroDia(LANZAMIENTO) + 1
 const MAX_ARCADE = 4 * (SM.PUNTOS.acierto * 64 + SM.PUNTOS.unidad * 27 + SM.PUNTOS.triple * 9) +
   SM.REFERENCIA.medio * SM.PUNTOS.porSegundo + SM.VIDAS_ARCADE * SM.PUNTOS.vida;
 
-function ritmoHumano(r, dif, tiempo) {
+/* El orden de lectura. Una persona resuelve por donde ve una deducción:
+   salta de una caja a otra, sigue un número por el tablero, vuelve atrás.
+   Un programa que ya tiene la solución la escribe celda por celda, de
+   izquierda a derecha y de arriba abajo. Se mira el orden en que cada
+   celda recibe su valor correcto: la racha más larga de índices
+   crecientes y la fracción de pasos que avanzan. Calibrado con las tablas:
+   las personas no pasan de 6 seguidas ni del 56 %; el bot del experto en
+   90 s escribe 43 seguidas (100 %). Un orden aleatorio da un 50 %, y 20
+   seguidas al azar tienen una probabilidad de 1/20! ≈ 4·10⁻¹⁹. */
+const ORDEN_RACHA = 20, ORDEN_FRACCION = 0.75, ORDEN_CELDAS = 30;
+
+export function ordenLectura(sudoku, j) {
+  const orden = [];
+  for (let k = 0; k + 1 < j.length; k += 5) {
+    const i = j[k], v = j[k + 1];
+    if (v >= 1 && v <= 9 && v === sudoku.solucion[i]) orden.push(i);
+  }
+  const pasos = orden.slice(1).map((x, k) => x > orden[k]);
+  return {
+    celdas: orden.length,
+    racha: orden.length ? rachas(pasos, x => x).larga + 1 : 0,
+    fraccion: pasos.length ? pasos.filter(Boolean).length / pasos.length : 0,
+  };
+}
+
+function ritmoHumano(r, dif, tiempo, j) {
   const acc = r.acciones;
   if (acc.some(a => a.f & F_SINTETICO)) return 'Hay jugadas hechas con eventos sintéticos (un script, no el teclado ni el ratón).';
   if (acc.filter(a => a.f & F_OCULTA).length >= 2) return 'Hay jugadas hechas con la pestaña oculta: eso no lo hace una persona.';
@@ -97,6 +123,9 @@ function ritmoHumano(r, dif, tiempo) {
   const pegadas = acc.length >= GAP_JUGADAS ? acc.filter(a => a.g < GAP_MS).length / acc.length : 0;
   if (pegadas >= GAP_FIJO) return 'Casi todas las jugadas eligen la celda y escriben a la vez: eso es un script.';
   if ((variacion < CV_DEBIL ? 1 : 0) + (pegadas >= GAP_DEBIL ? 1 : 0) >= 2) return 'Ritmo de metrónomo y celda y número a la vez: parece un script.';
+  const o = ordenLectura(r.sudoku, j);
+  if (o.racha >= ORDEN_RACHA) return `${o.racha} celdas seguidas resueltas en orden de lectura, de izquierda a derecha: así escribe la solución un programa.`;
+  if (o.celdas >= ORDEN_CELDAS && o.fraccion >= ORDEN_FRACCION) return `El ${Math.round(o.fraccion * 100)} % de las celdas se resolvió avanzando en orden de lectura: ninguna deducción sigue ese orden.`;
   return null;
 }
 
@@ -114,6 +143,8 @@ export function verifica(dato, prueba, ctx) {
     if (prueba.f !== hoy && prueba.f !== SM.diaAnterior(hoy)) return 'La prueba no es el sudoku diario de hoy.';
     if (dato.puntos > rachaMaxima(prueba.f)) return `Una racha de ${dato.puntos} días no cabe: el sudoku existe desde el ${LANZAMIENTO}.`;
   }
+  const reloj = dosRelojes(prueba.a, prueba.w);  // desde sudoku-4
+  if (reloj) return reloj;
   const r = SM.rehace(prueba);
   if (r.error) return r.error;
   if (dato.tiempo < r.fin) return 'El tiempo declarado es menor que el de las jugadas.';
@@ -122,7 +153,7 @@ export function verifica(dato, prueba, ctx) {
     const puntos = SM.puntosFinalArcade(r.puntos, r.gana, r.vidas, dato.tiempo);
     if (puntos !== dato.puntos) return `Los puntos no cuadran: la partida da ${puntos}, no ${dato.puntos}.`;
   } else if (!r.resuelto) return 'La prueba no deja el sudoku resuelto.';
-  return ritmoHumano(r, modo === 'c' ? cat : 'medio', dato.tiempo);
+  return ritmoHumano(r, modo === 'c' ? cat : 'medio', dato.tiempo, prueba.j);
 }
 
 /* Para revisar a mano lo ya guardado sin prueba, el doble de los pisos:

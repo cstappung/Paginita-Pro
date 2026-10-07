@@ -150,3 +150,15 @@ de bot de las tablas (experto 90 s, arcade 30 266 en 105 s) caen ahí.
    semilla (`generar`, hasta ~0,5 s en experto). Pasa una vez por
    resultado y otra al re-verificar lo pendiente; no hace falta nada, pero
    que se sepa.
+
+## La mano (orden de lectura) y la velocidad
+
+Se mira el orden en que cada celda recibe su valor correcto. Rechaza 20
+celdas seguidas en orden de lectura, o el 75 % de 30 o más avanzando. Las
+personas de la tabla no pasan de 6 seguidas ni del 56 %; un orden aleatorio
+da un 50 %. Desde `sudoku-4` la prueba trae `a`/`w` (los dos relojes,
+`dosRelojes`).
+
+Arreglado en `sudoku-4`: cambiar de clásico a arcade (o al diario) y volver
+dejaba el tablero anterior con el reloj en pausa; ahora cada cambio de modo
+empieza una partida nueva de ese modo.

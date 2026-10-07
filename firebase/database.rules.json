@@ -586,6 +586,7 @@
           "p": { ".validate": "newData.isString() && newData.val().length <= 80" },
           "ok": { ".validate": "newData.isBoolean()" },
           "h": { ".validate": "newData.isBoolean()" },
+          "vv": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 1000" },
           "m": { ".validate": "newData.isString() && newData.val().length <= 300" },
           "at": { ".validate": "newData.isNumber()" },
           "$otro": { ".validate": false }

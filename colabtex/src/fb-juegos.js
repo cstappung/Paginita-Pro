@@ -842,8 +842,15 @@ export function watchAdmin(cb) {
 /* Lo ya auditado (`auditados/<cat>/<uid>` = {p, ok, m, at}): una lectura
    al abrir la auditoría, no una escucha. */
 export const leerAuditados = () => get(ref(db, "auditados")).then(s => s.val() || {});
-export const apuntaAuditado = (categoria, uid, a) =>
-  set(ref(db, `auditados/${categoria}/${uid}`), Object.assign({ p: String(a.p), ok: !!a.ok, m: String(a.m || "").slice(0, 300), at: serverTimestamp() }, a.h ? { h: true } : {}));
+/* `vv` es la versión de los verificadores con que se juzgó (admin-datos:
+   AUDITORIA_V): al subirla, todo lo auditado antes vuelve a la cola. Con
+   las reglas sin publicar `vv` no entra y se reintenta sin él. */
+export const apuntaAuditado = (categoria, uid, a) => {
+  const r = ref(db, `auditados/${categoria}/${uid}`);
+  const base = Object.assign({ p: String(a.p), ok: !!a.ok, m: String(a.m || "").slice(0, 300), at: serverTimestamp() }, a.h ? { h: true } : {});
+  if (!Number.isSafeInteger(a.vv)) return set(r, base);
+  return set(r, Object.assign({ vv: a.vv }, base)).catch(() => set(r, base));
+};
 
 /* Conservar un récord revisado: sale de la cola y queda auditado como
    bueno, para que la auditoría no vuelva a bajar su prueba. */

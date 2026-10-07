@@ -33,3 +33,11 @@ Flappy Bird es justo el juego que un bot juega perfecto: el de
 `tests/aleteo.test.cjs` vuela para siempre con una regla de una línea. Un
 bot que mande eventos de verdad saca una prueba válida. Lo que la prueba sí
 cierra es inventar el puntaje, acelerar el reloj y copiar vuelos ajenos.
+
+## La mano (misma altura) y la velocidad
+
+En cada aleteo se mide la distancia del pájaro al centro del hueco que
+viene. Rechaza si 20 aleteos seguidos tienen una desviación menor de 6 px,
+o si el último aleteo antes de 15 tubos seguidos la tiene menor de 4 px.
+Las personas no bajan de 12 y 8 px; los bots, de 5 y 3,3. Desde `aleteo-3`
+la prueba trae `a`/`w` (`dosRelojes`).
