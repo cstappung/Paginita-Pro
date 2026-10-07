@@ -222,6 +222,23 @@ export function podioValido(uid, x, solo) {
     solo && solo[x.c] && solo[x.c][uid] && solo[x.c][x.q]);
 }
 
+/* Los últimos podios tomados, del más reciente al más antiguo, para la
+   sección «Últimos tops» del salón. Salen de `podios` porque es lo único
+   con fecha: una fila de `soloRanks` no dice cuándo se hizo. Solo los que
+   todavía valen (`podioValido`: las dos filas siguen en la tabla), y con
+   la marca (`fila`) solo si la fila sigue siendo esa misma partida; si la
+   persona ya la mejoró, la marca de entonces no se sabe. */
+export function ultimosPodios(d, n = 8) {
+  const solo = (d && d.solo) || {}, out = [];
+  for (const [uid, l] of Object.entries((d && d.podios) || {}))
+    for (const [partida, x] of Object.entries(l || {})) {
+      if (!podioValido(uid, x, solo) || !Number.isFinite(x.at)) continue;
+      const f = solo[x.c][uid];
+      out.push({ uid, partida, c: x.c, p: x.p, q: x.q, at: x.at, fila: f.partida === partida ? f : null });
+    }
+  return out.sort((a, b) => b.at - a.at || String(a.partida).localeCompare(String(b.partida))).slice(0, n);
+}
+
 /* La racha que se ve hoy: si ayer no jugaste, ya no hay. */
 export const rachaHoy = (d, hoy) => (d && (d.dia === hoy || d.dia === hoy - 1) ? d.racha : 0);
 
