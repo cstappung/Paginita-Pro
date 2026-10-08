@@ -3262,17 +3262,52 @@ and synthesised effects. Things that matter:
 retold as a lonely voyage: you carry the last light (a lantern on a boat)
 through the night towards «el Alba», and the invaders are moths drawn to
 it. Plain files, no build (`?v=fanal-N` on its five scripts and its
-stylesheet): `relato.js` (every text: the per-jornada log, the 13 letters
-the Mensajera carries, the revelation, the ending, the endless «ecos»),
+stylesheet): `relato.js` (every text: the per-jornada log, the 19 letters
+the Mensajera carries, the revelation, both endings, the endless «ecos»,
+the taller and the augurios),
 `motor.js` (pure: jornadas, difficulty, points, the pulse judgement, the
 progress merge), `sprites.js` (pixel art), `musica.js` (a procedural
 music engine) and `juego.js` (the screen). The first four are UMD and run
 in Node, so `tests/fanal.test.cjs` covers them without a browser. The
-story is 13 jornadas in four acts (enjambre, niebla, oscuro, alba): nine
-waves and four encounters (la Nodriza, el Faro Ciego, la Esfinge, el
-Alba); finishing it unlocks the endless mode, which cycles the first three
-acts in blocks of three waves and their returning boss (`jornada(n)`).
-Things that matter:
+story is 25 jornadas in seven acts: the first part (enjambre, niebla,
+oscuro, alba; jornadas 1–13, la Nodriza, el Faro Ciego, la Esfinge, el
+Alba) and, **without leaving the run**, «la otra orilla» (los cascos, la
+seda, la hoguera; 14–25, el Casco, la Crisálida, la Hoguera). Internally
+those are acts 6, 7 and 8 (5 is the endless; `ROMANO_ACTO` shows them as
+V, VI, VII). After the Hoguera the same run turns endless (26+), cycling
+the six fighting acts in blocks of three waves and their boss
+(`jornada(n)`); the «sin fin» mode on the title screen starts there
+directly, with the story's 25 brasas, and opens once the Hoguera is seen
+(`prog.hoguera`). Things that matter:
+
+- **Brasas, the taller and evolutions** (`MEJORAS`, `compra`, `armas`,
+  `nave` in `motor.js`). Each completed jornada gives one brasa; between
+  jornadas the taller opens (`capaTaller`, keys 1–9) and each brasa buys a
+  level (three per upgrade, four upgrades per branch: the flame —
+  cadence, damage, pierce, spread — and the boat — oars, tempered glass,
+  oil, long light) or relights one flame. Every three levels in a branch
+  it evolves (Chispa → Brasa → Antorcha → Faro → Estrella; Barca → Fanal
+  de bronce → Luciérnaga → Doble vidrio → Faro errante), with a new sprite
+  and a power. **`armas()` is the single source** of cooldown, bullet
+  pattern, damage and pierce: the screen shoots with it and the proof
+  bounds with it. What is bought goes into the next jornada's record as
+  `u` (one letter per brasa) and the verifier re-buys it with the same
+  `M.compra`; a checkpoint restores upgrades from its proof.
+- **Augurios: every jornada is a bit harder, and it says why.** The night
+  learns one thing per jornada from a fixed wheel of eight (fire rate,
+  scale speed, march, aim, dives, boss fury, more scales, armour), stacking
+  each lap (`nivelAugurio`, `aplicaAugurios`, with caps). They depend only
+  on the jornada number, so a table position is equally hard for everyone,
+  and the transit names the new one. Boss life also grows with the jornada.
+- **The other shore has its own mechanics, none of them in the proof**:
+  drifting wrecks (`cascos`), silk threads that slow the oars (`hilos`,
+  `F.enredo`), embers dropped by dying moths (`ascuas`). The Casco marks
+  its anchor column, pulls you in, and its falling debris become new small
+  wrecks; the Crisálida drops marked threads and hatches into an imago at
+  a third of its life; the Hoguera holds eight lanterns prisoner (shooting
+  one frees it and it rows with you, taking scales) and halves every hit
+  while five or more remain — the proof counts boss damage generously, so
+  that rule needed no proof change.
 
 - **The counter «✦ luces» is the twist made visible.** It starts at 430,
   and each background star *is* one of those lights: killing a moth puts
@@ -3321,9 +3356,12 @@ Things that matter:
   wall, which shots cannot break.
 - **Categories**: `club-fanal-travesia` and `club-fanal-sinfin` (points,
   capped at 1 000 000) and `club-fanal-jornadas` (the furthest jornada
-  completed: 13 is the end of the story). `jornadas` is only sent when it
+  completed: 13 is the Alba, 25 the Hoguera). `jornadas` is only sent when it
   improves, because every result counts as a club play and pays coins.
-  Ten logros (`deMarca`), coins (10 per jornada, 1 per 1000 points), the
+  Ten logros (`deMarca`), coins (the jornadas record pays like BBTAN's
+  rounds, `monedasFanal`: jornada n pays 5n + 5 up to 250 from the 49th,
+  nothing past the 160th — 520 for the Alba, 1750 for the Hoguera; and 1
+  per 1000 points up to the cap), the
   `tfanal` champion frame, the Discord podium and the manual are wired
   like Sudoku Arcade's. Read letters, the ending seen, the act checkpoint
   and local records travel as one blob in `users/<uid>/club/fanal`
@@ -3332,9 +3370,11 @@ Things that matter:
   re-published.
 - The log and the revelation are written as whole lines and revealed with
   CSS, never letter by letter: `i18n.js` would translate every fragment.
-  `window.__fanal` (`salta(n)`, `sigue()`, `estado()`, `mundo()`…) drives
-  the game from a script, which is how the story and the bosses were
-  played through in Chromium.
+  `window.__fanal` (`salta(n)`, `sigue()`, `estado()`, `mundo()`,
+  `brasas(n)`, `taller()`, `prueba()`…) drives the game from a script,
+  which is how the story and the bosses were played through in Chromium.
+  The proof is version 2 since the second part (`docs/antitrampas/fanal.md`);
+  any change to it must bump `club-N` in `solo/club.js`.
 
 **ALETEO (`juegos/club/aleteo/`) is a Solo Club Flappy Bird whose sky
 goes dark**, in the vein of BBTAN's descent. Plain files, no build

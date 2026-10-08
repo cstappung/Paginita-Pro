@@ -2,7 +2,7 @@
 <html lang="es" data-acto="1">
 <head>
 <meta charset="utf-8">
-<script src="../../../i18n.js?v=202610080411"></script>
+<script src="../../../i18n.js?v=202610080532"></script>
 <script src="../../audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#0b0a1c">
@@ -16,22 +16,22 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jacquarda+Bastarda+9&family=Pixelify+Sans:wght@400;600&display=swap">
 <!-- Lo común del Club (volver, ranking lateral, modo integrado) va antes del estilo propio, para que este gane. -->
 <link rel="stylesheet" href="../conexion.css?v=club-2">
-<link rel="stylesheet" href="estilo.css?v=fanal-2">
+<link rel="stylesheet" href="estilo.css?v=fanal-3">
 <script src="../../audio/volumen.js?v=vol-1"></script>
 <script src="../conexion.js?v=club-11"></script>
-<script src="relato.js?v=fanal-1" defer></script>
-<script src="motor.js?v=fanal-2" defer></script>
-<script src="prueba.js?v=fanal-1" defer></script>
-<script src="sprites.js?v=fanal-1" defer></script>
-<script src="musica.js?v=fanal-2" defer></script>
-<script src="juego.js?v=fanal-4" defer></script>
+<script src="relato.js?v=fanal-2" defer></script>
+<script src="motor.js?v=fanal-3" defer></script>
+<script src="prueba.js?v=fanal-2" defer></script>
+<script src="sprites.js?v=fanal-2" defer></script>
+<script src="musica.js?v=fanal-3" defer></script>
+<script src="juego.js?v=fanal-5" defer></script>
 </head>
 <body>
 <div class="shell"><div class="layout">
 <main class="fanal" aria-label="FANAL">
   <header class="cab">
     <h1 class="marca">Fanal</h1>
-    <p class="lema">una travesía hacia el alba</p>
+    <p class="lema">una travesía hacia el alba, y más allá</p>
   </header>
 
   <!-- El marcador. conexion.js mete aquí el botón de sonido cuando el juego está dentro de Juegos. -->
@@ -54,7 +54,7 @@
     <!-- El HUD de arriba: dónde estás, cuántas luces quedan, cuánto falta. -->
     <div class="hud-sup" id="hudSup" hidden>
       <span id="hudJornada">JORNADA 1 · EL ENJAMBRE</span>
-      <span class="der"><span id="hudLuces" title="Luces en el cielo">✦ 430</span><span id="hudAlba">AL ALBA · 13 JORNADAS</span></span>
+      <span class="der"><span id="hudBrasas" title="Brasas para el taller"></span><span id="hudLuces" title="Luces en el cielo">✦ 430</span><span id="hudAlba">AL ALBA · 13 JORNADAS</span></span>
     </div>
     <div class="jefe-barra" id="jefeBarra" hidden><b id="jefeNombre">LA NODRIZA</b><i><span id="jefeVida"></span></i></div>
     <div class="aviso" id="aviso" role="status" aria-live="polite"></div>
@@ -93,6 +93,22 @@
     <section class="capa tarjeta-jefe" id="capaJefe" hidden>
       <p class="epiteto" id="jefeEpiteto"></p>
       <h2 class="jefe-titulo" id="jefeTitulo"></h2>
+    </section>
+
+    <!-- El taller: entre jornadas, las brasas se gastan en la llama (el arma) o en el fanal. -->
+    <section class="capa panel taller" id="capaTaller" hidden aria-label="Taller">
+      <div class="caja" tabindex="-1">
+        <h2>Taller</h2>
+        <p class="brasas">Tienes <b id="tallerBrasas">0 brasas</b>. Cada una sube un nivel; cada tres en una rama, evoluciona. (Teclas 1–9.)</p>
+        <div class="ramas">
+          <div id="tallerArma"></div>
+          <div id="tallerNave"></div>
+        </div>
+        <div class="pie-taller">
+          <button type="button" class="mejora" id="tallerLlama" data-codigo="l"><span class="nom">Encender una llama</span><span class="pips">🔥</span><span class="desc">Recupera una llama perdida, por dos brasas.</span></button>
+          <button type="button" class="opcion principal" data-accion="taller-seguir" id="tallerSeguir">Remar</button>
+        </div>
+      </div>
     </section>
 
     <section class="capa panel" id="capaPausa" hidden>
@@ -142,7 +158,9 @@
           <li>Los <b>cascos hundidos</b> te cubren, pero se rompen.</li>
           <li><b>Dispara al pulso</b> de la música: el tiro sale <b>afinado</b> (dorado), hace el doble de daño y atraviesa. Cada cuatro polillas apagadas así sube la <b>Resonancia</b>, el multiplicador de puntos, hasta ×8. La llama y el metrónomo de abajo laten con el pulso. Un golpe la devuelve a ×1.</li>
           <li>La <b>Mensajera</b> cruza arriba de vez en cuando. Si la alcanzas, suelta una carta.</li>
-          <li><b>Poderes</b>: pabilo doble (dos tiros), lente (los tiros atraviesan todo), campana (aguanta un golpe), aceite (una llama) y destello (apaga la fila más baja).</li>
+          <li><b>Poderes</b>: pabilo doble (un tiro más), lente (los tiros atraviesan todo), campana (aguanta un golpe), aceite (una llama) y destello (apaga la fila más baja).</li>
+          <li><b>Brasas y taller</b>: cada jornada completada da una brasa. Entre jornadas se gastan en <b>la llama</b> (cadencia, daño, atravesar, tiros por disparo) o en <b>el fanal</b> (remos, campana, llamas, luz). Cada tres en una rama, el arma o el fanal <b>evoluciona</b>.</li>
+          <li><b>Augurios</b>: cada jornada la noche aprende algo y se vuelve un poco más dura. El tránsito te dice qué.</li>
           <li>P pausa · M sonido.</li>
         </ul>
         <div class="menu"><button type="button" class="opcion principal" data-accion="volver">Volver</button></div>

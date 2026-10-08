@@ -865,34 +865,52 @@ const REGLAS = {
      motor.js (jornadas, puntos, Resonancia, llamas) y juego.js (teclas,
      poderes, jefes). No cuenta los giros de la historia: eso es del juego. */
   fanal: {
-    lema: "FANAL: llevas la última luz a través de la noche, hacia el Alba. Las polillas bajan en formación hacia ella.",
+    lema: "FANAL: llevas la última luz a través de la noche, hacia el Alba y más allá. Las polillas bajan en formación hacia ella.",
     secciones: [
       ["Cómo se juega", "Rema de un lado a otro con ← → (o A y D) y dispara con Espacio; mantenerlo apretado dispara solo. En una pantalla táctil, arrastra el dedo para remar y toca para disparar. Las polillas bajan en formación, marchando al compás de la música y cada vez más rápido cuanto menos quedan. Si una escama te toca, si una polilla en picada llega a tu llama o si la formación alcanza la línea del fanal, pierdes una llama. Sin llamas, el fanal se apaga. Los cascos hundidos que flotan sobre ti te cubren, pero se rompen con cada golpe (también con los tuyos)."],
       ["Al pulso", lista([
-        "La música marca pulsos en compases irregulares (7, 5, 11, 9 o 13 corcheas). La llama late con cada pulso y el metrónomo de abajo enciende el que suena.",
-        "Un disparo justo en un pulso sale <b>afinado</b>: dorado, con el doble de daño, y atraviesa a la primera polilla.",
+        "La música marca pulsos en compases irregulares (7, 5, 11, 9, 10, 15, 8 o 13 corcheas). La llama late con cada pulso y el metrónomo de abajo enciende el que suena.",
+        "Un disparo justo en un pulso sale <b>afinado</b>: dorado, con más daño, y atraviesa a la primera polilla.",
         "Cada cuatro polillas apagadas con tiros afinados sube la <b>Resonancia</b>, el multiplicador de puntos, hasta ×8. Un disparo fuera del pulso pierde lo que llevabas hacia la próxima; un golpe la devuelve a ×1.",
         "Moverte también suena: el disparo es más agudo cuanto más a la derecha estás."
       ])],
       ["La travesía", lista([
-        "Son trece jornadas en cuatro actos: <b>El enjambre</b>, <b>La niebla</b>, <b>Lo oscuro</b> y <b>El alba</b>. Cada acto tiene su cielo, sus polillas, su escala y su compás.",
-        "Al final de cada acto hay un encuentro grande: <b>la Nodriza</b>, <b>el Faro Ciego</b> y <b>la Esfinge</b>. El último encuentro no se gana como los otros: lee la bitácora.",
-        "Entre jornadas se lee la bitácora de quien lleva el fanal y las cartas que hayas recuperado. Al empezar cada acto se guarda un punto de control: si el fanal se apaga, puedes volver a encender desde ahí.",
-        "Al terminar la travesía se abre la <b>travesía sin fin</b>: las jornadas siguen, cada una más dura, y los jefes vuelven."
+        "La primera parte son trece jornadas en cuatro actos: <b>El enjambre</b>, <b>La niebla</b>, <b>Lo oscuro</b> y <b>El alba</b>. Cada acto tiene su cielo, sus polillas, su escala y su compás.",
+        "Al final de cada acto hay un encuentro grande: <b>la Nodriza</b>, <b>el Faro Ciego</b> y <b>la Esfinge</b>. El encuentro con el Alba no se gana como los otros: lee la bitácora.",
+        "Después del Alba la travesía no termina: sigue a <b>la otra orilla</b>, tres actos más (<b>Los cascos</b>, <b>La seda</b>, <b>La hoguera</b>) con sus jefes, y después de la Hoguera se vuelve <b>sin fin</b>: las jornadas siguen, recorren todos los actos y los jefes vuelven más fuertes.",
+        "Entre jornadas se lee la bitácora de quien lleva el fanal y las cartas que hayas recuperado. Al empezar cada acto (y al llegar al sin fin) se guarda un punto de control: si el fanal se apaga, puedes volver a encender desde ahí, con tus mejoras.",
+        "Quien apagó la Hoguera puede empezar directo en la <b>travesía sin fin</b> desde la portada, con las 25 brasas de la historia para gastar."
       ])],
+      ["Brasas, taller y evoluciones", lista([
+        "Cada jornada completada da una <b>brasa</b>. Entre jornadas se abre el <b>taller</b>: cada brasa sube un nivel de una mejora (tres niveles cada una). También puedes guardarlas, o gastar dos en volver a encender una llama perdida.",
+        "<b>La llama</b> (el arma): <b>Mecha corta</b> (disparas más seguido y con más tiros en el aire), <b>Llama viva</b> (más daño), <b>Punta de vidrio</b> (los tiros atraviesan más) y <b>Pabilo trenzado</b> (dos, tres y cuatro tiros por disparo, en abanico).",
+        "<b>El fanal</b> (la barca): <b>Remos largos</b> (más rápido), <b>Vidrio templado</b> (empiezas cada jornada con la campana puesta, y después se rehace sola), <b>Reserva de aceite</b> (una llama más de tope por nivel) y <b>Luz larga</b> (más luz; los poderes vienen hacia ti, caen más y duran más).",
+        "Cada tres niveles en una rama, <b>evoluciona</b>. La llama: Chispa → <b>Brasa</b> (los afinados atraviesan una más) → <b>Antorcha</b> (los afinados sueltan dos chispas a los costados) → <b>Faro</b> (los afinados lo atraviesan todo) → <b>Estrella</b> (todos tus tiros hacen un punto más de daño). El fanal: Barca → <b>Fanal de bronce</b> (una llama más de tope) → <b>Luciérnaga</b> (una te acompaña y se lleva las escamas que toca) → <b>Doble vidrio</b> (la campana vuelve sola) → <b>Faro errante</b> (dos luciérnagas y un pulso cada cuarenta y cinco segundos que barre las escamas cercanas).",
+        "Cada tecla del 1 al 8 compra la mejora en el orden en que se ve; el 9 enciende una llama (dos brasas)."
+      ])],
+      ["Augurios", "Cada jornada la noche aprende algo y se vuelve un poco más dura, siempre en el mismo orden: disparan más seguido, las escamas caen más rápido, la formación marcha más rápido, te apuntan mejor, se lanzan más en picada, los jefes atacan más seguido, caben más escamas en el aire y las polillas aguantan un golpe más. Después la rueda vuelve a empezar, encima de lo anterior. El tránsito dice cuál llegó. Los jefes, además, tienen más vida cuanto más lejos estás."],
       ["Los jefes", lista([
         "<b>La Nodriza</b> levanta las alas antes de soltar un abanico de escamas, pone larvas que caen hacia tu luz y, con un aleteo, empuja el fanal hacia un costado.",
         "<b>El Faro Ciego</b> anuncia su haz con dos líneas punteadas: el sector entre ellas se ilumina. Sal de él o quédate bajo un casco. Un enjambre lo rodea y se lleva los tiros.",
-        "<b>La Esfinge</b> se esconde en lo oscuro. Enciende sus marcas antes de atacar: dos puntos señalan la columna de su picada; una marca arriba, el único hueco de un muro de polvo que no se rompe a tiros. A veces oscurece tu luz."
+        "<b>La Esfinge</b> se esconde en lo oscuro. Enciende sus marcas antes de atacar: dos puntos señalan la columna de su picada; una marca arriba, el único hueco de un muro de polvo que no se rompe a tiros. A veces oscurece tu luz.",
+        "<b>El Casco</b> marca una columna con puntos y suelta su ancla por ella; te arrastra hacia él con la resaca; tira pecios que, si no te tocan, se quedan abajo como cascos chicos (más escudo); y al final suelta burbujas que revientan en un anillo.",
+        "<b>La Crisálida</b> marca dónde van a caer sus hilos de seda: tocarlos no quita llamas, pero enreda los remos. Suelta crías que caen hacia tu luz y gira escamas. Al final se abre, y lo que sale es más rápido.",
+        "<b>La Hoguera</b> tiene ocho fanales presos ardiendo a su alrededor: si les disparas se sueltan y reman contigo, llevándose escamas. Mientras le queden cinco presos, el fuego se come la mitad de cada golpe. Marca columnas de fuego antes de encenderlas (un casco encima te protege), lanza brasas y te atrae hacia ella."
+      ])],
+      ["Los actos de la otra orilla", lista([
+        "<b>Los cascos</b>: seis cascos hundidos que derivan de lado a lado. Te cubren, pero no se quedan quietos.",
+        "<b>La seda</b>: las polillas cuelgan hilos hasta abajo. Pasar por uno enreda los remos y vas más lento un momento.",
+        "<b>La hoguera</b>: cada polilla que apagas puede soltar un ascua que cae. Hay más luz que nunca."
       ])],
       ["Poderes y cartas", lista([
-        "<b>Pabilo doble</b> (12 s): dos tiros por disparo. <b>Lente</b> (8 s): los tiros atraviesan todo. <b>Campana</b>: aguanta un golpe. <b>Aceite</b>: una llama más (hasta cinco). <b>Destello</b>: apaga la fila más baja y se lleva las escamas.",
-        "La <b>Mensajera</b> cruza arriba de vez en cuando. Si la alcanzas suelta una carta, que queda en la Bitácora para siempre (hay trece), y paga entre 100 y 500 puntos.",
+        "<b>Pabilo doble</b> (12 s): un tiro más por disparo. <b>Lente</b> (8 s): los tiros atraviesan todo. <b>Campana</b>: aguanta un golpe. <b>Aceite</b>: una llama más (hasta tu tope). <b>Destello</b>: apaga la fila más baja y se lleva las escamas.",
+        "La <b>Mensajera</b> cruza arriba de vez en cuando. Si la alcanzas suelta una carta, que queda en la Bitácora para siempre (hay diecinueve en la historia; en el sin fin trae ecos), y paga entre 100 y 500 puntos.",
         "Ganas una llama extra a los 30 000, 80 000 y 150 000 puntos, y luego cada 100 000."
       ])],
-      ["Puntos y clasificación", "Cada polilla vale según su tipo y su acto, multiplicado por la Resonancia, y la mitad más si el tiro fue afinado. Cada jornada suma un bonus por no recibir daño y por puntería, y cada jefe, el suyo. En la Clasificación compiten los puntos de la travesía, los del sin fin y la jornada más lejana a la que llegaste. Subir al podio se anuncia en Discord."],
+      ["Puntos y clasificación", "Cada polilla vale según su tipo y su acto, multiplicado por la Resonancia, y la mitad más si el tiro fue afinado. Cada jornada suma un bonus por no recibir daño y por puntería, y cada jefe, el suyo. En la Clasificación compiten los puntos de la travesía, los del sin fin y la jornada más lejana a la que llegaste. El récord de jornadas paga monedas por cada jornada, cada una más que la anterior (llegar a la Hoguera son 1750). Subir al podio se anuncia en Discord."],
       ["Controles", lista([
         "← → o A D: remar. Espacio, Z, ↑ o W: disparar.",
+        "En el taller: 1–8 las mejoras, 9 una llama.",
         "P o Esc: pausa. M: sonido.",
         "En Opciones: líneas de barrido, aberración en los golpes, menos destellos, sacudida de pantalla y volumen de música y efectos."
       ])]
