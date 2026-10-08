@@ -51,7 +51,7 @@
   function nuevoYo() {
     const ammo = D.ARMAS.map(a => (a.id === 0 ? Infinity : 0));
     return { x: 0, y: 0, d: 2, v: false, hp: 100, w: 0, pts: 0, mul: 1, maxMul: 1, combo: 0, comboMax: 1, k: 0, ammo,
-      tiene: new Set([0]), mejoras: new Set(), cd: 0, mov: false, muerto: false, nivelMuerte: 0, respawn: 0, inv: 0, fin: 0 };
+      tiene: new Set([0]), mejoras: new Set(), arm: 0, pot: 0, cd: 0, mov: false, muerto: false, nivelMuerte: 0, respawn: 0, inv: 0, fin: 0 };
   }
 
   // El mundo: lo que simula el director y lo que los demás reflejan.
@@ -75,6 +75,8 @@
 
   // ---------- entrada ----------
   const teclas = new Set();
+  const TECLA_TIENDA = {};
+  for (const t of D.TIENDA) TECLA_TIENDA['Key' + t.tecla] = t.id;
   addEventListener('keydown', e => {
     if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
     if (e.repeat && e.code !== 'Space') { teclas.add(e.code); return; }
@@ -86,6 +88,7 @@
     else if (e.code === 'KeyE') cicla(1);
     else if (e.code === 'KeyX') detona();
     else if (/^Digit[1-8]$/.test(e.code)) eligeArma(+e.code.slice(5) - 1);
+    else { const t = TECLA_TIENDA[e.code]; if (t) compra(t); }
   });
   addEventListener('keyup', e => teclas.delete(e.code));
   addEventListener('blur', () => teclas.clear());
@@ -93,14 +96,14 @@
   if (window.Mando) Mando.configura({
     stick: { izq: 'KeyA', der: 'KeyD', arriba: 'KeyW', abajo: 'KeyS' },
     botones: {
-      a: 'Space', rt: 'Space', lb: 'KeyQ', rb: 'KeyE', x: 'KeyX', y: 'KeyE',
+      a: 'Space', rt: 'Space', lb: 'KeyQ', rb: 'KeyE', x: 'KeyX', y: 'KeyB',
       izq: 'KeyA', der: 'KeyD', arriba: 'KeyW', abajo: 'KeyS',
       start: () => { if (jugando && !terminado) ponPausa(!pausado); },
     },
     menu: () => !jugando || pausado || terminado,
     inicio: '#jugar',
     zonas: [{ sel: '#ayuda' }, { sel: '#menuAyuda' }],
-    pistas: [['stickL', 'moverte'], ['a rt', 'disparar'], ['lb rb', 'cambiar arma'], ['x', 'detonar cargas'], ['start', 'pausa']],
+    pistas: [['stickL', 'moverte'], ['a rt', 'disparar'], ['lb rb', 'cambiar arma'], ['x', 'detonar cargas'], ['y', 'comprar munición en la tienda'], ['start', 'pausa']],
   });
 
   // ---------- el mapa ----------
@@ -112,20 +115,32 @@
     return null;
   }
   // ¿Choca un cuerpo de radio r en (x, y)? Devuelve true, el objeto o null.
-  function choca(x, y, r) {
+  function choca(x, y, r, ign) {
     const x0 = Math.floor((x - r) / TS), x1 = Math.floor((x + r) / TS), y0 = Math.floor((y - r) / TS), y1 = Math.floor((y + r) / TS);
     for (let ty = y0; ty <= y1; ty++) for (let tx = x0; tx <= x1; tx++) if (celda(tx, ty) !== 0) return true;
     for (const o of O.values()) {
+      if (ign && ign.has(o)) continue;
       const b = cajaObj(o);
       if (b && x + r > b[0] && x - r < b[2] && y + r > b[1] && y - r < b[3]) return o;
     }
     return null;
   }
   // Mueve por ejes; devuelve el objeto contra el que chocó, si fue uno.
+  // Lo que ya se pisa al empezar no frena: un muro puesto encima (por otro
+  // jugador, o por el retardo de la red) dejaba al cuerpo clavado en él.
+  function encima(c, r) {
+    let s = null;
+    for (const o of O.values()) {
+      const b = cajaObj(o);
+      if (b && c.x + r > b[0] && c.x - r < b[2] && c.y + r > b[1] && c.y - r < b[3]) (s || (s = new Set())).add(o);
+    }
+    return s;
+  }
   function mover(c, dx, dy, r) {
     let bloq = null;
-    if (dx) { const h = choca(c.x + dx, c.y, r); if (!h) c.x += dx; else if (h !== true) bloq = h; }
-    if (dy) { const h = choca(c.x, c.y + dy, r); if (!h) c.y += dy; else if (h !== true) bloq = h; }
+    const ign = encima(c, r);
+    if (dx) { const h = choca(c.x + dx, c.y, r, ign); if (!h) c.x += dx; else if (h !== true) bloq = h; }
+    if (dy) { const h = choca(c.x, c.y + dy, r, ign); if (!h) c.y += dy; else if (h !== true) bloq = h; }
     return bloq;
   }
   function despejado(x1, y1, x2, y2) {
@@ -203,16 +218,17 @@
 
   function dispara() {
     if (yo.cd > 0 || !yo.v || yo.muerto) return;
-    const a = armaYo();
+    const a = Object.assign({}, armaYo());
     if (!(yo.ammo[yo.w] > 0)) { eligeArma(0); return; }
     yo.cd = a.cad;
+    if (a.d) a.d = Math.round(a.d * D.factorPotencia(yo.pot));
     const ang = Math.atan2(DIRS[yo.d][1], DIRS[yo.d][0]);
     if (a.tipo === 'bala') {
-      rayo(yo.x, yo.y, ang + (Math.random() - 0.5) * 2 * (a.desv || 0.012), a.alc, a.d, a.id);
+      rayo(yo.x, yo.y, ang + (Math.random() - 0.5) * 2 * (a.desv || 0.012), a.alc, a.d, a.id, a.pen || 0);
       gasta(); son(a.id === 1 ? 'uzi' : 'pistola');
     } else if (a.tipo === 'perdigon') {
       for (let i = 0; i < a.perdigones; i++)
-        rayo(yo.x, yo.y, ang + (i / (a.perdigones - 1) - 0.5) * a.abre + azar(-0.03, 0.03), a.alc * azar(0.85, 1), a.d, a.id);
+        rayo(yo.x, yo.y, ang + (i / (a.perdigones - 1) - 0.5) * a.abre + azar(-0.03, 0.03), a.alc * azar(0.85, 1), a.d, a.id, a.pen || 0);
       gasta(); son('escopeta');
     } else if (a.tipo === 'granada' || a.tipo === 'cohete') {
       const id = nid();
@@ -229,9 +245,12 @@
     if (yo.ammo[yo.w] <= 0) { yo.ammo[yo.w] = 0; setTimeout(() => { if (!(yo.ammo[yo.w] > 0)) eligeArma(0); }, 120); }
   }
 
-  // Bala instantánea: avanza de 4 en 4 px hasta lo primero que toque.
-  function rayo(x, y, ang, alc, d, w) {
+  // Bala instantánea: avanza de 4 en 4 px hasta lo primero que toque. Con
+  // `pen` (mejora de penetración) atraviesa ese número de enemigos más,
+  // perdiendo un 30 % de daño en cada uno; muros y barriles la paran siempre.
+  function rayo(x, y, ang, alc, d, w, pen) {
     const cs = Math.cos(ang), sn = Math.sin(ang);
+    const heridos = new Set();
     let l = 6;
     for (; l < alc; l += 4) {
       const px = x + cs * l, py = y + sn * l;
@@ -246,7 +265,12 @@
       }
       if (pega) break;
       for (const e of E.values()) {
-        if ((px - e.x) ** 2 + (py - e.y) ** 2 < (D.ENEMIGOS[e.k].radio + 6) ** 2) { golpeaEnemigo(e, d, w, x, y); pega = true; break; }
+        if (heridos.has(e)) continue;
+        if ((px - e.x) ** 2 + (py - e.y) ** 2 < (D.ENEMIGOS[e.k].radio + 6) ** 2) {
+          golpeaEnemigo(e, d, w, x, y); heridos.add(e); d *= 0.7;
+          if (heridos.size > (pen || 0)) pega = true;
+          break;
+        }
       }
       if (pega) break;
       if (versus()) {
@@ -308,7 +332,8 @@
       const tx = Math.floor((yo.x + dx * TS * 0.9) / TS), ty = Math.floor((yo.y + dy * TS * 0.9) / TS);
       if (celda(tx, ty) !== 0) return false;
       x = tx * TS + TS / 2; y = ty * TS + TS / 2;
-      if (dist(x, y, yo.x, yo.y) < 14) return false;
+      // Nunca encima de alguien: el muro lo dejaría encerrado dentro.
+      if (Math.abs(x - yo.x) < TS / 2 + 10 && Math.abs(y - yo.y) < TS / 2 + 10) return false;
       for (const o of O.values()) if (o.k !== 'carga' && Math.abs(o.x - x) < TS && Math.abs(o.y - y) < TS) return false;
       for (const r of R.values()) if (r.v && Math.abs(r.x - x) < TS / 2 + 8 && Math.abs(r.y - y) < TS / 2 + 8) return false;
     } else {
@@ -358,6 +383,8 @@
   function recibe(d, w, por) {
     if (!yo.v || yo.muerto || terminado || d <= 0) return;
     if (yo.inv > 0 && por !== cfg.yo) return;
+    // La armadura se come una parte del golpe hasta gastarse.
+    if (yo.arm > 0) { const ab = Math.min(yo.arm, d * D.ARMADURA.absorbe); yo.arm -= ab; d -= ab; }
     yo.hp -= d;
     if (inmortal) yo.hp = Math.max(1, yo.hp);
     rojo = Math.min(1, rojo + d / 40);
@@ -446,7 +473,7 @@
     let cands = M.spawnsE.filter(s => obj.every(o => dist(s.x, s.y, o.x, o.y) > TS * 5));
     if (!cands.length) cands = M.spawnsE;
     const s = cands[(Math.random() * cands.length) | 0];
-    const k = Math.random() < D.parteDiablos(versus() ? n + 2 : n) ? 1 : 0;
+    const k = D.tipoEnemigo(versus() ? n + 2 : n, Math.random());
     const max = D.vidaEnemigo(k, n);
     const e = { id: nid(), k, x: s.x + azar(-4, 4), y: s.y + azar(-4, 4), hp: max, max, d: 0, atk: 0, cd: 0.5, cdF: azar(1, 3), flash: 0 };
     e.tx = e.x; e.ty = e.y;
@@ -466,16 +493,19 @@
       if (Number.isFinite(sx) && Number.isFinite(sy) && (sx !== e.x || sy !== e.y)) { ax = e.x - sx; ay = e.y - sy; }
       else { ax = -DIRS[e.d || 0][0]; ay = -DIRS[e.d || 0][1]; }
       const l = Math.hypot(ax, ay) || 1;
-      e.aturd = ATURDE; e.kvx = ax / l * EMPUJE; e.kvy = ay / l * EMPUJE;
+      const em = EMPUJE * (D.ENEMIGOS[e.k].masa ?? 1);
+      e.aturd = ATURDE * Math.min(1, D.ENEMIGOS[e.k].masa ?? 1) + 0.1; e.kvx = ax / l * em; e.kvy = ay / l * em;
       return;
     }
     E.delete(id);
     const m = [nid(), quien || '', e.k, Math.round(e.x), Math.round(e.y)];
     dir.m.push(m); if (dir.m.length > 20) dir.m.shift();
     procesaMuerte(m);
+    const C = D.ENEMIGOS[e.k];
+    if (C.explota) dir.cola.push({ t: 0.05, x: e.x, y: e.y, r: C.radioExplota, d: C.explota, w: 3, u: quien || '' });
     const r = Math.random();
-    if (B.size < 12 && r < 0.17) {
-      const b = { id: nid(), k: r < 0.12 ? 0 : 1, x: Math.round(e.x), y: Math.round(e.y) };
+    if (B.size < 12 && r < 0.2) {
+      const b = { id: nid(), k: r < 0.11 ? 0 : r < 0.16 ? 1 : 2, x: Math.round(e.x), y: Math.round(e.y) };
       B.set(b.id, b);
     }
   }
@@ -531,6 +561,7 @@
           if (obj.length) {
             dir.n = meta; dir.q = Math.round(D.totalNivel(meta) * (1 + 0.25 * (np - 1)));
             dir.t = 0; dir.ritmo = 1.5;
+            reponBarriles();
           }
         } else if (dir.q === 0 && E.size === 0 && obj.length) {
           dir.t += dt;
@@ -540,7 +571,9 @@
           }
         }
       } else {
+        const n0 = dir.n;
         dir.t += dt; dir.n = 1 + Math.floor(dir.t / 60); dir.q = 1;
+        if (dir.n !== n0) reponBarriles();
       }
       dir.ritmo -= dt;
       const cupo = Math.round(D.maxVivos(dir.n, np) * (versus() ? 0.5 : 1));
@@ -588,12 +621,15 @@
       if (dd > C.radio + 10) bloq = mover(e, dx * vel * dt + sx * 0.3, dy * vel * dt + sy * 0.3, C.radio - 1);
       else mover(e, sx * 0.3, sy * 0.3, C.radio - 1);
       e.d = D.dirDe(dx, dy);
-      const golpe = C.golpe * (1 + 0.03 * (dir.n - 1));
+      const golpe = D.golpeNivel(e.k, dir.n);
+      // El explosivo no muerde: se revienta al llegar.
+      if (C.explota && dd < C.radio + 16) { danaEnemigo(e.id, 1e9, '', 3, e.x, e.y); continue; }
+      if (C.explota && bloq) { danaEnemigo(e.id, 1e9, '', 3, e.x, e.y); continue; }
       if (dd < C.radio + 14 && e.cd <= 0) { golpea(t.uid, golpe, 8, ''); e.cd = 0.8; e.atk = 0.25; }
       else if (bloq && e.cd <= 0) { e.cd = 0.8; e.atk = 0.25; danaObjeto(bloq.id, golpe * 1.5, ''); }
       if (C.fuego && e.cdF <= 0 && dd < C.alcFuego && despejado(e.x, e.y, t.x, t.y)) {
         const a = Math.atan2(t.y - e.y, t.x - e.x);
-        F.push({ id: nid(), x: e.x, y: e.y, vx: Math.cos(a) * 170, vy: Math.sin(a) * 170, t: 3, d: C.fuego, de: e.id });
+        F.push({ id: nid(), x: e.x, y: e.y, vx: Math.cos(a) * 170, vy: Math.sin(a) * 170, t: 3, d: C.fuego, de: e.id, k: e.k });
         e.cdF = C.cadFuego * azar(0.8, 1.2); e.atk = 0.3;
         son('fuego');
       }
@@ -602,7 +638,7 @@
     for (const f of F) {
       f.x += f.vx * dt; f.y += f.vy * dt; f.t -= dt;
       if (f.t <= 0 || choca(f.x, f.y, 3)) { f.fin = true; humo(f.x, f.y); continue; }
-      const dmg = f.d * (1 + 0.03 * (dir.n - 1));
+      const dmg = f.d * (1 + 0.02 * (dir.n - 1));
       for (const o of obj) if (dist(f.x, f.y, o.x, o.y) < 12) { golpea(o.uid, dmg, 9, ''); f.fin = true; humo(f.x, f.y); break; }
       if (f.fin) continue;
       // Fuego amigo: la bola no distingue, quema al enemigo que se cruce.
@@ -619,7 +655,7 @@
     return {
       n: dir.n, q: dir.q, t: Math.round(dir.t * 10) / 10,
       e: [...E.values()].map(e => [e.id, e.k, Math.round(e.x), Math.round(e.y), Math.max(1, Math.round(100 * e.hp / e.max)), e.d, e.atk > 0 ? 1 : 0, e.aturd > 0 ? 1 : 0]),
-      f: F.map(f => [f.id, Math.round(f.x), Math.round(f.y), Math.round(f.vx), Math.round(f.vy)]),
+      f: F.map(f => [f.id, Math.round(f.x), Math.round(f.y), Math.round(f.vx), Math.round(f.vy), f.k || 1]),
       o: [...O.values()].map(o => [o.id, OBJ.indexOf(o.k), o.x, o.y, Math.max(1, Math.round(100 * Math.min(o.hp, o.max) / o.max)), o.u || '', o.r || 0, o.max >= 1e9 ? 0 : o.max, o.d || 0]),
       b: [...B.values()].map(b => [b.id, b.k, b.x, b.y]),
       m: dir.m, x: dir.x,
@@ -633,7 +669,7 @@
     const vistos = new Set();
     for (const a of zb.e || []) {
       if (!Array.isArray(a)) continue;
-      const [id, k0, x, y, pc, d, atk, aturd] = a, k = k0 ? 1 : 0;
+      const [id, k0, x, y, pc, d, atk, aturd] = a, k = D.ENEMIGOS[k0 | 0] ? k0 | 0 : 0;
       vistos.add(id);
       ultimoId = Math.max(ultimoId, id);
       const max = D.vidaEnemigo(k, Math.max(1, dir.n));
@@ -644,7 +680,7 @@
       if (adoptar) { e.x = x; e.y = y; }
     }
     for (const id of [...E.keys()]) if (!vistos.has(id)) E.delete(id);
-    F = (zb.f || []).filter(Array.isArray).map(([id, x, y, vx, vy]) => ({ id, x, y, vx, vy, t: 3, d: D.ENEMIGOS[1].fuego }));
+    F = (zb.f || []).filter(Array.isArray).map(([id, x, y, vx, vy, k]) => ({ id, x, y, vx, vy, t: 3, k: k || 1, d: (D.ENEMIGOS[k || 1] || D.ENEMIGOS[1]).fuego || 14 }));
     const vo = new Set();
     for (const a of zb.o || []) {
       if (!Array.isArray(a)) continue;
@@ -675,12 +711,25 @@
     if (adoptar) { dir.x = []; dir.cola = []; flujoT = 0; }
   }
 
+  const MANCHA = ['rgba(110,20,12,.6)', 'rgba(90,10,30,.6)', 'rgba(120,30,10,.55)', 'rgba(70,14,14,.7)', 'rgba(40,30,20,.65)', 'rgba(60,110,20,.55)'];
+  /* Los barriles del mapa vuelven al empezar cada nivel, donde no haya ya
+     uno: el escenario se puede volar una y otra vez. */
+  function reponBarriles() {
+    for (const b of M.barriles || []) {
+      let hay = false;
+      for (const o of O.values()) if (dist(o.x, o.y, b.x, b.y) < 6) { hay = true; break; }
+      if (hay) continue;
+      const id = nid();
+      O.set(id, { id, k: 'barril', x: b.x, y: b.y, hp: VIDA_OBJ.barril, max: VIDA_OBJ.barril, u: '', r: 84, d: 120 });
+    }
+  }
+
   function procesaMuerte(m) {
     if (vistosM.has(m[0])) return;
     vistosM.add(m[0]);
     if (vistosM.size > 400) vistosM.delete(vistosM.values().next().value);
     sangre(m[3], m[4], 10, m[2]);
-    manchas.push({ x: m[3] + azar(-3, 3), y: m[4] + azar(-3, 3), r: azar(8, 13), c: m[2] ? 'rgba(90,10,30,.6)' : 'rgba(110,20,12,.6)' });
+    manchas.push({ x: m[3] + azar(-3, 3), y: m[4] + azar(-3, 3), r: azar(8, 13), c: MANCHA[m[2]] || MANCHA[0] });
     if (manchas.length > 200) manchas.shift();
     son('baja');
     if (cfg && m[1] === cfg.yo) miBaja(m[2]);
@@ -724,7 +773,7 @@
       if (!s || typeof s !== 'object' || u === cfg.yo) continue;
       let r = R.get(u);
       if (!r) { r = { x: +s.x || 0, y: +s.y || 0 }; R.set(u, r); }
-      r.tx = +s.x || 0; r.ty = +s.y || 0; r.d = (s.d | 0) & 7; r.v = !!s.v; r.hp = +s.hp || 0; r.w = s.w | 0;
+      r.tx = +s.x || 0; r.ty = +s.y || 0; r.d = (s.d | 0) & 7; r.v = !!s.v; r.hp = +s.hp || 0; r.arm = +s.arm || 0; r.w = s.w | 0;
       r.pts = s.pts | 0; r.k = s.k | 0; r.mul = s.mul | 0; r.sk = s.sk; r.mv = !!s.mv; r.h = !!s.h;
       if (s.pz) { if (!r.pz) r.pzDesde = Date.now(); r.pz = true; } else r.pz = false;
       if (dist(r.x, r.y, r.tx, r.ty) > TS * 4) { r.x = r.tx; r.y = r.ty; }
@@ -827,7 +876,7 @@
   // Mi estado, unas doce veces por segundo.
   function miEstado() {
     const e = {
-      x: Math.round(yo.x), y: Math.round(yo.y), d: yo.d, v: yo.v && !yo.muerto ? 1 : 0, hp: Math.max(0, Math.round(yo.hp)),
+      x: Math.round(yo.x), y: Math.round(yo.y), d: yo.d, v: yo.v && !yo.muerto ? 1 : 0, hp: Math.max(0, Math.round(yo.hp)), arm: Math.round(yo.arm || 0),
       w: yo.w, pts: yo.pts | 0, mul: yo.mul, k: yo.k, sk: skinId, mv: yo.mov ? 1 : 0,
     };
     if (pausado && !cfg.mirando) e.pz = 1;
@@ -933,11 +982,36 @@
   function abreCaja(k) {
     son('recoge');
     if (k === 1) { yo.hp = Math.min(100, yo.hp + 50); premio('+50 vida'); return; }
+    if (k === 2) { yo.arm = Math.min(D.ARMADURA.max, (yo.arm || 0) + D.ARMADURA.caja); premio('+' + D.ARMADURA.caja + ' armadura'); return; }
     const l = [...yo.tiene].filter(i => i !== 0 && yo.ammo[i] < D.arma(i, yo.mejoras).max);
     if (!l.length) { yo.pts += 50; premio('+50 puntos'); return; }
     const i = l[(Math.random() * l.length) | 0], a = D.arma(i, yo.mejoras);
     yo.ammo[i] = Math.min(a.max, yo.ammo[i] + a.caja);
     premio('+' + a.caja + ' ' + a.nombre);
+  }
+
+  // La tienda: hay que estar al lado de un puesto ($) y tener los puntos.
+  function tiendaCerca() {
+    if (!yo.v || yo.muerto) return null;
+    for (const t of M.tiendas || []) if (dist(t.x, t.y, yo.x, yo.y) < D.ALCANCE_TIENDA) return t;
+    return null;
+  }
+  function compra(id) {
+    if (!tiendaCerca()) return;
+    const t = D.TIENDA.find(x => x.id === id);
+    if (!t) return;
+    if (id === 'potencia' && (yo.pot || 0) >= t.max) { son('clic'); premio('Potencia al máximo'); return; }
+    if (id === 'armadura' && (yo.arm || 0) >= D.ARMADURA.max) { son('clic'); premio('Armadura completa'); return; }
+    if (id === 'botiquin' && yo.hp >= 100) { son('clic'); premio('Vida completa'); return; }
+    const precio = D.precioTienda(id, yo.pot || 0);
+    if (yo.pts < precio) { son('clic'); premio('Faltan ' + (precio - yo.pts) + ' puntos'); return; }
+    yo.pts -= precio;
+    if (id === 'balas') { for (const i of yo.tiene) if (i !== 0) yo.ammo[i] = D.arma(i, yo.mejoras).max; }
+    else if (id === 'armadura') yo.arm = Math.min(D.ARMADURA.max, (yo.arm || 0) + 50);
+    else if (id === 'botiquin') yo.hp = Math.min(100, yo.hp + 50);
+    else if (id === 'potencia') yo.pot = (yo.pot || 0) + 1;
+    son('compra');
+    premio(t.nombre + ' −' + precio);
   }
 
   function finPractica() {
@@ -1022,13 +1096,23 @@
       case 'recoge': tono(660, 990, 0.1, 0.18); tono(990, 1320, 0.1, 0.14, 'square', 0.08); break;
       case 'fuego': ruido(0.25, 900, 0.15 * v); break;
       case 'premio': [523, 659, 784, 1046].forEach((f, i) => tono(f, f, 0.12, 0.14, 'square', i * 0.08)); break;
+      case 'compra': [880, 1320].forEach((f, i) => tono(f, f, 0.08, 0.14, 'square', i * 0.06)); ruido(0.05, 5000, 0.1); break;
+      case 'acido': ruido(0.18, 1800, 0.12 * v); tono(500, 260, 0.15, 0.06 * v, 'sine'); break;
       case 'nivel': [392, 523, 659].forEach((f, i) => tono(f, f * 1.01, 0.18, 0.16, 'triangle', i * 0.12)); break;
     }
   }
 
   // ---------- dibujo ----------
   const SKIN_Z = [{ piel: '#93a77b', camisa: '#5e6b4c', pantalon: '#3d4a38', pelo: '#3a4730', extra: 'zombi' },
-    { piel: '#c43a2a', camisa: '#6d150e', pantalon: '#3d0b07', pelo: '#2a0503', extra: 'cuernos' }];
+    { piel: '#c43a2a', camisa: '#6d150e', pantalon: '#3d0b07', pelo: '#2a0503', extra: 'cuernos' },
+    { piel: '#b0b98a', camisa: '#8a5a2b', pantalon: '#4b3a26', pelo: '#3a4730', extra: 'zombi' },
+    { piel: '#7f8c6a', camisa: '#3b3f4a', pantalon: '#26282e', pelo: '#2a2f22', extra: 'zombi' },
+    { piel: '#a39a6a', camisa: '#c25a12', pantalon: '#4a3a1c', pelo: '#3a3020', extra: 'zombi' },
+    { piel: '#6fbf4a', camisa: '#2f6b2a', pantalon: '#1f3d1c', pelo: '#204a1a', extra: 'zombi' }];
+  // Tamaño y color de ojos por tipo de enemigo (índice = k de ENEMIGOS).
+  const TALLA_Z = [1, 1, 0.85, 1.35, 1, 1];
+  const OJOS_Z = ['#d7ff7a', '#ffd23a', '#ffffff', '#ff4a3a', '#ffb347', '#eaff3a'];
+  const VIDA_Z = ['#a6e05a', '#ff6a3a', '#e8e8e8', '#c0392b', '#ffb347', '#7ee04a'];
 
   function personaje(c, x, y, d, s, t, mov, op) {
     op = op || {};
@@ -1154,7 +1238,8 @@
     for (const b of B.values()) {
       const by = b.y + Math.sin(T * 4 + b.id % 7) * 1.5;
       cx.fillStyle = 'rgba(0,0,0,.25)'; cx.beginPath(); cx.ellipse(b.x, b.y + 3, 8, 3, 0, 0, 7); cx.fill();
-      if (b.k === 1) { cx.fillStyle = '#f4f4f4'; cx.fillRect(b.x - 7, by - 10, 14, 12); cx.fillStyle = '#d22'; cx.fillRect(b.x - 1.5, by - 8, 3, 8); cx.fillRect(b.x - 4.5, by - 5.5, 9, 3); }
+      if (b.k === 2) { cx.fillStyle = '#2d6fb8'; cx.fillRect(b.x - 7, by - 10, 14, 12); cx.fillStyle = '#9fd0ff'; cx.beginPath(); cx.moveTo(b.x - 4, by - 8); cx.lineTo(b.x + 4, by - 8); cx.lineTo(b.x + 3, by - 3); cx.lineTo(b.x, by); cx.lineTo(b.x - 3, by - 3); cx.closePath(); cx.fill(); }
+      else if (b.k === 1) { cx.fillStyle = '#f4f4f4'; cx.fillRect(b.x - 7, by - 10, 14, 12); cx.fillStyle = '#d22'; cx.fillRect(b.x - 1.5, by - 8, 3, 8); cx.fillRect(b.x - 4.5, by - 5.5, 9, 3); }
       else { cx.fillStyle = '#6b7a2c'; cx.fillRect(b.x - 8, by - 10, 16, 12); cx.fillStyle = '#c9d47a'; cx.fillRect(b.x - 8, by - 6, 16, 3); cx.fillStyle = '#2e3510'; cx.fillRect(b.x - 8, by - 10, 16, 1); }
     }
     for (const o of O.values()) if (o.k === 'carga') dibujaObjeto(cx, o);
@@ -1164,16 +1249,27 @@
       const c = M.celdas[y * M.ancho + x];
       if (c) lista.push({ y: y * TS + TS, f: () => bloque(cx, x * TS, y * TS, c === 1 ? 20 : 12, c === 1 ? M.muro : CAJA) });
     }
+    for (const t of M.tiendas || []) lista.push({ y: t.y, f: () => puesto(t) });
     for (const o of O.values()) if (o.k !== 'carga') lista.push({ y: o.k === 'muro' ? o.y + TS / 2 : o.y, f: () => dibujaObjeto(cx, o) });
     for (const e of E.values()) lista.push({ y: e.y, f: () => {
-      personaje(cx, e.x, e.y, e.d || 0, SKIN_Z[e.k], T + e.id % 10, true, { zombi: true, sinArma: true, ojos: e.k ? '#ffd23a' : '#d7ff7a', flash: e.flash > 0, tumbo: e.tb || 0 });
-      if (e.hp < e.max) { cx.fillStyle = '#300'; cx.fillRect(e.x - 9, e.y - 44, 18, 2.5); cx.fillStyle = e.k ? '#ff6a3a' : '#a6e05a'; cx.fillRect(e.x - 9, e.y - 44, 18 * clamp(e.hp / e.max, 0, 1), 2.5); }
+      const ta = TALLA_Z[e.k] || 1;
+      if (ta !== 1) { cx.save(); cx.translate(e.x, e.y); cx.scale(ta, ta); cx.translate(-e.x, -e.y); }
+      personaje(cx, e.x, e.y, e.d || 0, SKIN_Z[e.k] || SKIN_Z[0], T * (e.k === 2 ? 1.6 : 1) + e.id % 10, true, { zombi: true, sinArma: true, ojos: OJOS_Z[e.k] || OJOS_Z[0], flash: e.flash > 0, tumbo: e.tb || 0 });
+      if (e.k === 4) {
+        // El explosivo lleva la panza encendida: late más rápido cuanto más cerca.
+        const pul = 0.5 + 0.5 * Math.sin(T * 10 + e.id);
+        cx.fillStyle = 'rgba(255,' + Math.round(120 + 100 * pul) + ',40,' + (0.55 + 0.4 * pul).toFixed(2) + ')';
+        cx.beginPath(); cx.arc(e.x, e.y - 14, 4.5 + pul * 1.5, 0, 7); cx.fill();
+      }
+      if (ta !== 1) cx.restore();
+      const hy = e.y - 44 * ta;
+      if (e.hp < e.max) { cx.fillStyle = '#300'; cx.fillRect(e.x - 9, hy, 18, 2.5); cx.fillStyle = VIDA_Z[e.k] || VIDA_Z[0]; cx.fillRect(e.x - 9, hy, 18 * clamp(e.hp / e.max, 0, 1), 2.5); }
     } });
     for (const [u, r] of R) {
       if (!r.v) { lista.push({ y: r.y, f: () => tumba(r.x, r.y) }); continue; }
       lista.push({ y: r.y, f: () => {
         personaje(cx, r.x, r.y, r.d || 0, D.skin(r.sk), T + ordenDe(u), r.mv, { anillo: colorDe(u), largo: largoArma(r.w) });
-        barraVida(r.x, r.y, r.hp);
+        barraVida(r.x, r.y, r.hp, r.arm);
         cx.font = 'bold 7px Trebuchet MS, sans-serif'; cx.textAlign = 'center';
         cx.fillStyle = '#000'; cx.fillText(nombreDe(u), r.x + 0.5, r.y - 48.5); cx.fillStyle = colorDe(u); cx.fillText(nombreDe(u), r.x, r.y - 49);
       } });
@@ -1185,7 +1281,7 @@
       } });
       // Como en el original: vida, arma y balas justo encima de la cabeza.
       if (yo.v && !yo.muerto) lista.push({ y: 1e9, f: () => {
-        barraVida(yo.x, yo.y, yo.hp);
+        barraVida(yo.x, yo.y, yo.hp, yo.arm);
         const a = D.ARMAS[yo.w], bal = yo.w === 0 ? '∞' : String(yo.ammo[yo.w] | 0);
         cx.font = 'bold 7px Trebuchet MS, sans-serif'; cx.textAlign = 'center';
         const t = a.nombre + '  ' + bal;
@@ -1209,7 +1305,8 @@
     }
     for (const f of F) {
       const g = cx.createRadialGradient(f.x, f.y - 14, 1, f.x, f.y - 14, 8);
-      g.addColorStop(0, '#fff3b0'); g.addColorStop(0.4, '#ff8a1f'); g.addColorStop(1, 'rgba(255,60,0,0)');
+      if (f.k === 5) { g.addColorStop(0, '#f4ffb0'); g.addColorStop(0.4, '#7ee04a'); g.addColorStop(1, 'rgba(60,200,0,0)'); }
+      else { g.addColorStop(0, '#fff3b0'); g.addColorStop(0.4, '#ff8a1f'); g.addColorStop(1, 'rgba(255,60,0,0)'); }
       cx.fillStyle = g; cx.beginPath(); cx.arc(f.x, f.y - 14, 8, 0, 7); cx.fill();
     }
     cx.lineCap = 'round';
@@ -1228,11 +1325,28 @@
     }
     $('rojo').style.boxShadow = 'inset 0 0 ' + Math.round(80 + 80 * rojo) + 'px rgba(200,0,0,' + (rojo * 0.7 + (yo.v && yo.hp < 30 ? 0.25 + 0.15 * Math.sin(T * 6) : 0)).toFixed(2) + ')';
   }
-  function barraVida(x, y, hp) {
+  function barraVida(x, y, hp, arm) {
     const f = clamp(hp / 100, 0, 1);
     cx.fillStyle = '#000'; cx.fillRect(x - 13, y - 46, 26, 4.5);
     cx.fillStyle = '#4a0f0b'; cx.fillRect(x - 12.5, y - 45.5, 25, 3.5);
     cx.fillStyle = f < 0.3 ? '#ff4a3a' : '#5fd85a'; cx.fillRect(x - 12.5, y - 45.5, 25 * f, 3.5);
+    if (arm > 0) {
+      const a = clamp(arm / D.ARMADURA.max, 0, 1);
+      cx.fillStyle = '#000'; cx.fillRect(x - 13, y - 42, 26, 2.5);
+      cx.fillStyle = '#4fa8ff'; cx.fillRect(x - 12.5, y - 41.5, 25 * a, 1.5);
+    }
+  }
+  // Un puesto de la tienda: mostrador con un letrero «$» que brilla.
+  function puesto(t) {
+    const x = t.x, y = t.y, cerca = yo.v && !yo.muerto && dist(x, y, yo.x, yo.y) < D.ALCANCE_TIENDA;
+    cx.fillStyle = 'rgba(0,0,0,.3)'; cx.beginPath(); cx.ellipse(x, y + 4, 13, 4, 0, 0, 7); cx.fill();
+    cx.fillStyle = '#5a3d1e'; cx.fillRect(x - 11, y - 12, 22, 15);
+    cx.fillStyle = '#8b6234'; cx.fillRect(x - 12, y - 14, 24, 4);
+    cx.fillStyle = '#3b2814'; cx.fillRect(x - 11, y - 6, 22, 1);
+    const b = 0.6 + 0.4 * Math.sin(T * 4);
+    cx.fillStyle = cerca ? '#ffe36a' : 'rgba(255,214,90,' + b.toFixed(2) + ')';
+    cx.font = 'bold 12px Trebuchet MS, sans-serif'; cx.textAlign = 'center';
+    cx.fillText('$', x, y - 18 + Math.sin(T * 3) * 1.5);
   }
   const largoArma = w => [8, 10, 12, 7, 7, 7, 13, 7][w] || 8;
   function tumba(x, y) {
@@ -1273,7 +1387,12 @@
     pintaArmas(false);
     if (cfg.mirando) $('aviso').textContent = 'Estás mirando';
     else if (yo.muerto && ONLINE) $('aviso').textContent = versus() ? 'Vuelves en ' + Math.max(0, Math.ceil(yo.respawn)) + '…' : 'Caíste: vuelves cuando tu equipo limpie el nivel';
-    else $('aviso').textContent = '';
+    else {
+      const tc = tiendaCerca();
+      $('aviso').textContent = tc ? D.TIENDA.map(t => t.tecla + ' ' + t.nombre.toLowerCase() + ' ' + (t.id === 'potencia' && (yo.pot || 0) >= t.max ? 'máx.' : D.precioTienda(t.id, yo.pot || 0))).join(' · ') : '';
+    }
+    $('armN').textContent = Math.round(yo.arm || 0);
+    $('potN').textContent = (yo.pot || 0) ? ' · Potencia +' + (yo.pot * 10) + ' %' : '';
     // tabla
     const filas = activos().map(j => {
       const u = j.uid, mio = u === cfg.yo, r = R.get(u);

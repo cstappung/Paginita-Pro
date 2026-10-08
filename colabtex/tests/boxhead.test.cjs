@@ -113,3 +113,71 @@ test('boxhead: el combo baja de a uno con barras más cortas',()=>{
   assert.ok(D.bajadaCombo(m)<=D.duracionCombo(m));
  }
 });
+
+test('boxhead: la mezcla de enemigos suma 1 y cada tipo entra en su nivel',()=>{
+ for(let n=1;n<=60;n++){
+  const p=D.mezclaNivel(n);
+  assert.ok(Math.abs(p.reduce((a,b)=>a+b,0)-1)<1e-9,'suma 1 en '+n);
+  assert.ok(p[0]>=0.2-1e-9,'zombis comunes ≥ 20 % en '+n);
+  for(const e of D.ENEMIGOS)if(e.id&&n<e.desde)assert.equal(p[e.id],0,e.nombre+' antes de tiempo');
+  for(const e of D.ENEMIGOS)if(e.id&&n>=e.desde)assert.ok(p[e.id]>0,e.nombre+' falta en '+n);
+  assert.equal(D.tipoEnemigo(n,0),p[0]>0?0:D.tipoEnemigo(n,0));
+  assert.ok(D.tipoEnemigo(n,0.999999)>=0&&D.tipoEnemigo(n,0.999999)<D.ENEMIGOS.length);
+ }
+});
+
+test('boxhead: la dificultad sube de forma pausada y sin saltos',()=>{
+ let prev=null;
+ for(let n=1;n<=40;n++){
+  const c={total:D.totalNivel(n),ritmo:D.ritmoNivel(n),vida:D.vidaEnemigo(0,n),vel:D.velEnemigo(0,n),golpe:D.golpeNivel(0,n),max:D.maxVivos(n,1)};
+  if(prev){
+   assert.ok(c.total>=prev.total&&c.total-prev.total<=4,'total recto en '+n);
+   assert.ok(c.ritmo<=prev.ritmo&&prev.ritmo-c.ritmo<=0.031,'ritmo recto en '+n);
+   assert.ok(c.vida>=prev.vida&&c.vida/prev.vida<=1.1,'vida suave en '+n);
+   assert.ok(c.vel>=prev.vel&&c.vel-prev.vel<=1,'velocidad suave en '+n);
+   assert.ok(c.golpe>=prev.golpe&&c.golpe-prev.golpe<=1,'golpe suave en '+n);
+   assert.ok(c.max>=prev.max&&c.max-prev.max<=1,'vivos a la vez suave en '+n);
+  }
+  prev=c;
+ }
+});
+
+test('boxhead: tienda, potencia y armadura',()=>{
+ for(const t of D.TIENDA){assert.ok(t.precio>0&&/^[A-Z]$/.test(t.tecla),t.id);}
+ assert.equal(new Set(D.TIENDA.map(t=>t.tecla)).size,D.TIENDA.length,'teclas distintas');
+ assert.equal(D.precioTienda('balas',0),250);
+ assert.equal(D.precioTienda('potencia',0),800);
+ assert.equal(D.precioTienda('potencia',2),2400);
+ assert.equal(D.precioTienda('potencia',5),Infinity);
+ assert.equal(D.precioTienda('nada',0),Infinity);
+ assert.equal(D.factorPotencia(0),1);
+ assert.ok(Math.abs(D.factorPotencia(5)-1.5)<1e-9);
+ assert.ok(Math.abs(D.factorPotencia(9)-1.5)<1e-9,'potencia con tope');
+ assert.ok(D.ARMADURA.absorbe>0&&D.ARMADURA.absorbe<1&&D.ARMADURA.max>0);
+});
+
+test('boxhead: la penetración se gana con mejoras y tiene tope',()=>{
+ const todas=new Set(D.MEJORAS.map(m=>m.id));
+ const conPen=D.ARMAS.filter(a=>(D.PASOS[a.id]||[]).some(p=>p[0]==='pen'));
+ assert.ok(conPen.length>=2,'al menos dos armas atraviesan');
+ for(const a of conPen){
+  const f=D.arma(a.id,todas);
+  assert.ok((f.pen||0)>(a.pen||0),a.nombre+' gana penetración');
+  assert.ok((f.pen||0)<=6,a.nombre+' penetración con tope');
+ }
+});
+
+test('boxhead: cada mapa tiene tienda y barriles a los que se llega',()=>{
+ for(const id of D.ORDEN_MAPAS){
+  const m=D.cargaMapa(id),ts=D.TS;
+  assert.ok(m.tiendas.length>=1,id+': sin tienda');
+  assert.ok(m.barriles.length>=1,id+': sin barriles');
+  const libre=(x,y)=>x>=0&&y>=0&&x<m.ancho&&y<m.alto&&m.celdas[y*m.ancho+x]===0;
+  const ini=m.spawnsP[0],sx=Math.floor(ini.x/ts),sy=Math.floor(ini.y/ts);
+  const visto=new Set([sx+','+sy]),cola=[[sx,sy]];
+  while(cola.length){const [x,y]=cola.shift();for(const [dx,dy] of [[1,0],[-1,0],[0,1],[0,-1]]){const nx=x+dx,ny=y+dy,k=nx+','+ny;if(!visto.has(k)&&libre(nx,ny)){visto.add(k);cola.push([nx,ny]);}}}
+  const llega=(px,py)=>{const tx=Math.floor(px/ts),ty=Math.floor(py/ts);return visto.has(tx+','+ty)||[[1,0],[-1,0],[0,1],[0,-1]].some(([dx,dy])=>visto.has((tx+dx)+','+(ty+dy)));};
+  for(const t of m.tiendas)assert.ok(llega(t.x,t.y),id+': tienda aislada');
+  for(const b of m.barriles)assert.ok(llega(b.x,b.y),id+': barril aislado');
+ }
+});

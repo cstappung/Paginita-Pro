@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="../../i18n.js?v=202610071848"></script>
+<script src="../../i18n.js?v=202610080322"></script>
 <script src="../audio/mando.js?v=mando-2"></script>
 <script src="../audio/volumen.js?v=vol-1"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -88,14 +88,14 @@ kbd{background:#2c251c;border:1px solid var(--borde);border-radius:3px;padding:0
     <span id="mul">×1</span>
     <b id="ptsN">0</b>
   </div>
-  <div id="info" class="panel"><span id="nivel"></span> · Bajas <b id="kN">0</b></div>
+  <div id="info" class="panel"><span id="nivel"></span> · Bajas <b id="kN">0</b> · Armadura <b id="armN">0</b><span id="potN"></span></div>
   <div id="vol" class="panel" data-volumen></div>
   <div id="tabla" class="panel" translate="no"></div>
   <div id="banner"></div>
   <div id="premio"></div>
   <div id="aviso"></div>
   <div id="armas" class="panel"></div>
-  <p id="ayuda" class="panel"><kbd>WASD</kbd>/<kbd>flechas</kbd> moverte · <kbd>Espacio</kbd> disparar · <kbd>Q</kbd>/<kbd>E</kbd> o <kbd>1</kbd>–<kbd>8</kbd> arma · <kbd>X</kbd> detonar cargas · <kbd>Esc</kbd> pausa</p>
+  <p id="ayuda" class="panel"><kbd>WASD</kbd>/<kbd>flechas</kbd> moverte · <kbd>Espacio</kbd> disparar · <kbd>Q</kbd>/<kbd>E</kbd> o <kbd>1</kbd>–<kbd>8</kbd> arma · <kbd>X</kbd> detonar cargas · en la tienda <kbd>$</kbd>: <kbd>B</kbd> munición, <kbd>R</kbd> armadura, <kbd>H</kbd> botiquín, <kbd>G</kbd> potencia · <kbd>Esc</kbd> pausa</p>
 </div>
 
 <div id="menu" class="capa">
@@ -107,7 +107,7 @@ kbd{background:#2c251c;border:1px solid var(--borde);border-radius:3px;padding:0
     <div class="fila" id="skins"></div>
     <button class="btn" id="jugar">¡A jugar!</button>
     <p id="cuenta"></p>
-    <p class="menu-ayuda" id="menuAyuda"><kbd>WASD</kbd>/<kbd>flechas</kbd> moverte · <kbd>Espacio</kbd> disparar · <kbd>Q</kbd>/<kbd>E</kbd> cambiar arma · <kbd>X</kbd> detonar cargas.<br>Cada baja sube el multiplicador; las armas nuevas se ganan con él.</p>
+    <p class="menu-ayuda" id="menuAyuda"><kbd>WASD</kbd>/<kbd>flechas</kbd> moverte · <kbd>Espacio</kbd> disparar · <kbd>Q</kbd>/<kbd>E</kbd> cambiar arma · <kbd>X</kbd> detonar cargas.<br>Junto a un puesto <kbd>$</kbd> compras con tus puntos: <kbd>B</kbd> munición, <kbd>R</kbd> armadura, <kbd>H</kbd> botiquín, <kbd>G</kbd> potencia.<br>Cada baja sube el multiplicador; las armas nuevas se ganan con él.</p>
   </div>
 </div>
 
@@ -127,7 +127,7 @@ kbd{background:#2c251c;border:1px solid var(--borde);border-radius:3px;padding:0
   </div>
 </div>
 
-<script src="js/datos.js?v=boxhead-2"></script>
-<script src="js/juego.js?v=boxhead-2"></script>
+<script src="js/datos.js?v=boxhead-3"></script>
+<script src="js/juego.js?v=boxhead-3"></script>
 </body>
 </html>

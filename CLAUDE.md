@@ -4300,6 +4300,24 @@ standing directs the enemies, as in Yemas' zombies. Things to keep:
   the combo as a semicircle (`#marca`, an SVG arc with `pathLength`), and
   health, weapon and ammo drawn on the canvas over the player
   (`barraVida`). Muros/barrels travel with their upgraded `vida`/`d`.
+- **Six enemy kinds** (`ENEMIGOS`, k 0–5: zombi, diablo, corredor, bruto,
+  explosivo, escupidor), each entering at its `desde` level and growing its
+  share by `parte` per level up to `tope` (`mezclaNivel`, zombies always
+  ≥ 20 %). The explosivo detonates on contact or death (a queued explosion
+  that hurts players and enemies); the escupidor's acid is a fireball whose
+  `zb.f` entry carries the kind (`[id,x,y,vx,vy,k]`). **Difficulty is
+  linear on purpose** (`totalNivel`, `vidaEnemigo`, `velEnemigo`,
+  `golpeNivel`, `ritmoNivel`, `maxVivos`): it used to jump from easy to a
+  wall around level 8–12, and the test pins every step as small.
+- **Armour and the shop are each player's own**, never in the log: `$`
+  cells in the map are supply booths where B/R/H/G buy ammo, armour (absorbs
+  60 % of a hit, `ARMADURA`), a medkit and `potencia` (+10 % damage, five
+  levels, `factorPotencia`) with points. A blue box drop gives armour. `pen`
+  upgrades let pistol, uzi and shotgun pellets go through one more enemy each.
+  `b` cells are map barrels that come back each level (`reponBarriles`).
+- **A muro placed on yourself no longer traps you**: `pon` refuses one that
+  overlaps the player, and `choca` ignores an object the body already
+  overlaps, so walking out of it is always possible.
 - Room options: `variante` (coop/versus), `mapa` (`BX_MAPAS`, must match
   `ORDEN_MAPAS`) and `meta` — not `modo`. `'boxhead'` was added to the
   rules' `juego` and `logros` whitelists, so they must be re-published.

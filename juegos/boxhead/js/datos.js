@@ -42,9 +42,9 @@
      solo tiene que aplicarlas en orden. Se generan una vez, al cargar:
      todos los navegadores sacan la misma lista. */
   const PASOS = {
-    0: [['d', 1.15, 'más daño'], ['cad', 0.88, 'disparo más rápido'], ['alc', 1.1, 'más alcance']],
-    1: [['d', 1.12, 'más daño'], ['cad', 0.9, 'más cadencia'], ['desv', 0.8, 'más precisión'], ['max', 1.25, 'más munición']],
-    2: [['d', 1.12, 'más daño'], ['perdigones', 1, 'más perdigones'], ['cad', 0.88, 'recarga más rápida'], ['abre', 1.12, 'más dispersión'], ['alc', 1.1, 'más alcance']],
+    0: [['d', 1.15, 'más daño'], ['cad', 0.88, 'disparo más rápido'], ['pen', 1, 'atraviesa un enemigo más'], ['alc', 1.1, 'más alcance']],
+    1: [['d', 1.12, 'más daño'], ['cad', 0.9, 'más cadencia'], ['pen', 1, 'atraviesa un enemigo más'], ['desv', 0.8, 'más precisión'], ['max', 1.25, 'más munición']],
+    2: [['d', 1.12, 'más daño'], ['perdigones', 1, 'más perdigones'], ['pen', 1, 'perdigones perforantes'], ['cad', 0.88, 'recarga más rápida'], ['abre', 1.12, 'más dispersión'], ['alc', 1.1, 'más alcance']],
     3: [['r', 1.12, 'explosión mayor'], ['d', 1.15, 'más daño'], ['max', 1.3, 'más munición']],
     4: [['r', 1.1, 'explosión mayor'], ['d', 1.15, 'más daño'], ['cad', 0.88, 'lanzamiento más rápido'], ['max', 1.3, 'más munición']],
     5: [['vida', 1.3, 'muros más resistentes'], ['max', 1.3, 'más munición']],
@@ -60,6 +60,7 @@
       case 'alc': return 640;
       case 'desv': return 0.012;
       case 'perdigones': return 16;
+      case 'pen': return a.id === 2 ? 2 : 4;
       case 'abre': return 1.1;
       case 'r': return 200;
       case 'vel': return 900;
@@ -86,9 +87,9 @@
         for (let j = 0; j < lista.length && !hecho; j++) {
           const [k, f, txt] = lista[(ciclo[id] + j) % lista.length];
           const lim = tope(a, k), antes = a[k];
-          let v = k === 'perdigones' ? antes + 1 : antes * f;
+          let v = k === 'perdigones' || k === 'pen' ? (antes || 0) + 1 : antes * f;
           v = baja(k) ? Math.max(v, lim) : Math.min(v, lim);
-          if (k === 'perdigones' || k === 'max' || k === 'vida' || k === 'd' || k === 'alc' || k === 'vel' || k === 'r') v = Math.round(v);
+          if (k === 'perdigones' || k === 'pen' || k === 'max' || k === 'vida' || k === 'd' || k === 'alc' || k === 'vel' || k === 'r') v = Math.round(v);
           else v = Math.round(v * 1000) / 1000;
           if (v === antes) continue;
           ciclo[id] = (ciclo[id] + j + 1) % lista.length;
@@ -103,7 +104,7 @@
     return out;
   }
   const MEJORAS = generaMejoras();
-  const CAMPOS = ['d', 'cad', 'alc', 'desv', 'perdigones', 'abre', 'r', 'vel', 'max', 'caja', 'vida'];
+  const CAMPOS = ['d', 'cad', 'alc', 'desv', 'perdigones', 'pen', 'abre', 'r', 'vel', 'max', 'caja', 'vida'];
 
   /* Un arma con las mejoras que ya se tienen aplicadas. */
   function arma(id, mejoras) {
@@ -135,21 +136,68 @@
   const duracionCombo = mul => Math.max(1.6, 4 - mul * 0.04);
   /* Al vaciarse, el multiplicador baja uno y la barra vuelve a la mitad. */
   const bajadaCombo = mul => duracionCombo(mul) * 0.5;
-  const PUNTOS = [10, 20];   // zombi, diablo (× multiplicador)
+  /* Puntos por baja (× multiplicador), por tipo de enemigo. */
+  const PUNTOS = [10, 20, 15, 40, 25, 25];
 
-  /* ---------- enemigos ---------- */
+  /* ---------- enemigos ----------
+     `desde`: primer nivel en que aparece · `parte`/`tope`: cuánto crece su
+     parte del nivel por nivel y hasta dónde · `velMax`: su techo de
+     velocidad · `masa`: cuánto le mueve un impacto (1 = como un zombi). */
   const ENEMIGOS = [
-    { id: 0, nombre: 'Zombi', vida: 40, vel: 46, golpe: 9, radio: 11 },
-    { id: 1, nombre: 'Diablo', vida: 110, vel: 58, golpe: 12, radio: 12, fuego: 14, cadFuego: 2.6, alcFuego: 320 }
+    { id: 0, nombre: 'Zombi', vida: 40, vel: 46, velMax: 74, golpe: 9, radio: 11, desde: 1, parte: 0, tope: 0, masa: 1 },
+    { id: 1, nombre: 'Diablo', vida: 110, vel: 58, velMax: 84, golpe: 12, radio: 12, fuego: 14, cadFuego: 2.6, alcFuego: 320, desde: 3, parte: 0.05, tope: 0.3, masa: 0.8 },
+    { id: 2, nombre: 'Corredor', vida: 24, vel: 86, velMax: 112, golpe: 6, radio: 10, desde: 4, parte: 0.04, tope: 0.22, masa: 1.3 },
+    { id: 3, nombre: 'Bruto', vida: 260, vel: 34, velMax: 52, golpe: 22, radio: 15, desde: 7, parte: 0.025, tope: 0.12, masa: 0.2 },
+    { id: 4, nombre: 'Explosivo', vida: 30, vel: 54, velMax: 76, golpe: 0, radio: 11, explota: 46, radioExplota: 66, desde: 5, parte: 0.03, tope: 0.14, masa: 1 },
+    { id: 5, nombre: 'Escupidor', vida: 70, vel: 40, velMax: 60, golpe: 7, radio: 11, fuego: 10, cadFuego: 2.2, alcFuego: 260, acido: true, desde: 9, parte: 0.03, tope: 0.14, masa: 0.9 }
   ];
-  const vidaEnemigo = (k, n) => Math.round(ENEMIGOS[k].vida * (1 + 0.1 * (n - 1)));
-  const velEnemigo = (k, n) => Math.min(ENEMIGOS[k].vel + 1.6 * (n - 1), k ? 88 : 80);
-  /* Cuántos trae el nivel n y qué parte son diablos (desde el 3). */
-  const totalNivel = n => Math.min(14 + 6 * (n - 1), 160);
-  const parteDiablos = n => n < 3 ? 0 : Math.min(0.45, 0.08 * (n - 2));
+  /* La dificultad sube recta y despacio: cada nivel un poco más de vida,
+     velocidad, golpe, cantidad y ritmo. Antes subía el doble de rápido en
+     cantidad y ritmo a la vez, y del nivel 8 al 12 pasaba de fácil a muro. */
+  const vidaEnemigo = (k, n) => Math.round(ENEMIGOS[k].vida * (1 + 0.08 * (n - 1)));
+  const velEnemigo = (k, n) => Math.min(ENEMIGOS[k].vel + 1 * (n - 1), ENEMIGOS[k].velMax);
+  const golpeNivel = (k, n) => Math.round(ENEMIGOS[k].golpe * (1 + 0.02 * (n - 1)));
+  const totalNivel = n => Math.min(16 + 4 * (n - 1), 120);
+  /* Qué parte del nivel es de cada tipo: cada uno entra en su `desde` y
+     crece de a poco; los zombis comunes son siempre al menos el 20 %. */
+  function mezclaNivel(n) {
+    const p = ENEMIGOS.map(e => (e.id && n >= e.desde ? Math.min(e.tope, e.parte * (n - e.desde + 1)) : 0));
+    const suma = p.reduce((a, b) => a + b, 0);
+    if (suma > 0.8) for (let i = 1; i < p.length; i++) p[i] *= 0.8 / suma;
+    p[0] = 1 - p.reduce((a, b) => a + b, 0);
+    return p;
+  }
+  /* El tipo de un enemigo nuevo del nivel n, con r en [0, 1). */
+  function tipoEnemigo(n, r) {
+    const p = mezclaNivel(n);
+    let acc = 0;
+    for (let k = 0; k < p.length; k++) { acc += p[k]; if (r < acc) return k; }
+    return 0;
+  }
+  const parteDiablos = n => mezclaNivel(n)[1];
   /* Cuántos caben a la vez, para que el nivel 20 no sea una alfombra. */
-  const maxVivos = (n, jug) => Math.min(14 + 3 * jug + 2 * n, 60);
-  const ritmoNivel = n => Math.max(0.22, 1.1 - 0.06 * (n - 1));
+  const maxVivos = (n, jug) => Math.min(14 + 3 * jug + n, 48);
+  const ritmoNivel = n => Math.max(0.35, 1.0 - 0.03 * (n - 1));
+
+  /* ---------- tienda y armadura ----------
+     Se compra con los puntos, de pie junto a una estación de suministros
+     (`$` en el mapa). `potencia` sube el daño de todas las armas un 10 %
+     por nivel; cada nivel cuesta más. */
+  const ARMADURA = { max: 100, absorbe: 0.6, caja: 35 };
+  const TIENDA = [
+    { id: 'balas', nombre: 'Munición', tecla: 'B', precio: 250, txt: 'rellena todas tus armas' },
+    { id: 'armadura', nombre: 'Armadura', tecla: 'R', precio: 400, txt: '+50 de armadura' },
+    { id: 'botiquin', nombre: 'Botiquín', tecla: 'H', precio: 300, txt: '+50 de vida' },
+    { id: 'potencia', nombre: 'Potencia', tecla: 'G', precio: 800, txt: '+10 % de daño', max: 5 }
+  ];
+  const precioTienda = (id, nivel) => {
+    const t = TIENDA.find(x => x.id === id);
+    if (!t) return Infinity;
+    if (id === 'potencia') return (nivel || 0) >= t.max ? Infinity : t.precio * ((nivel || 0) + 1);
+    return t.precio;
+  };
+  const factorPotencia = nivel => 1 + 0.1 * Math.max(0, Math.min(5, nivel || 0));
+  const ALCANCE_TIENDA = 40;
 
   /* ---------- aspectos ---------- */
   const SKINS = [
@@ -166,7 +214,9 @@
 
   /* ---------- mapas ----------
      `#` muro, `.` suelo, `c` caja fija (también sólida, más baja), `S` por
-     donde entran los enemigos, `P` donde aparecen los jugadores. Las filas
+     donde entran los enemigos, `P` donde aparecen los jugadores, `b` un
+     barril explosivo que vuelve a estar al empezar cada nivel y `$` una
+     estación de suministros (la tienda). Las filas
      se rellenan con muro hasta la más larga y el borde siempre es muro. */
   const MAPAS = {
     patio: {
@@ -174,24 +224,24 @@
       filas: [
         '################################',
         '#S............SS..............S#',
-        '#..............................#',
+        '#......$.......................#',
         '#...####..............####.....#',
         '#...#.........cc.........#.....#',
         '#...#....................#.....#',
-        '#..............................#',
+        '#..............b...............#',
         '#.........#####..#####.........#',
         '#.........#..........#.........#',
         '#..cc.....#..........#.....cc..#',
-        'S.........#...P..P...#.........S',
-        'S.........#...P..P...#.........S',
+        'S.....b...#...P..P...#.........S',
+        'S.........#...P..P...#...b.....S',
         '#..cc.....#..........#.....cc..#',
         '#.........#..........#.........#',
         '#.........#####..#####.........#',
-        '#..............................#',
+        '#...............b..............#',
         '#...#....................#.....#',
         '#...#.........cc.........#.....#',
         '#...####..............####.....#',
-        '#..............................#',
+        '#.......................$......#',
         '#S............SS..............S#',
         '################################'
       ]
@@ -200,22 +250,22 @@
       nombre: 'Sótano', suelo: ['#8d8478', '#847b70'], muro: ['#7a5a43', '#5c4332', '#4a3528'],
       filas: [
         '##################################',
-        '#S.......#...........#..........S#',
+        '#S.......#.....$.....#..........S#',
         '#........#...........#...........#',
         '#........#....c.c....#...........#',
-        '#..............................cc#',
+        '#....b.........................cc#',
         '#........#...........#...........#',
         '####.#####...........#####.#######',
         '#........#....#.#....#...........#',
         '#..cc....#...........#.....cc....#',
-        'S...........P.....P..............S',
+        'S...........P...b.P..............S',
         'S...........P.....P..............S',
         '#..cc....#...........#.....cc....#',
         '#........#....#.#....#...........#',
         '####.#####...........#####.#######',
         '#........#...........#...........#',
-        '#cc..............................#',
-        '#........#....c.c....#...........#',
+        '#cc.........................b....#',
+        '#........#....c.c....#.....$.....#',
         '#........#...........#...........#',
         '#S.......#...........#..........S#',
         '##################################'
@@ -225,20 +275,20 @@
       nombre: 'Cruce', suelo: ['#7d7d7d', '#737373'], muro: ['#a35a43', '#7d4231', '#653426'],
       filas: [
         '##############SS##############',
-        '#.........#........#.........#',
+        '#....$....#........#.........#',
         '#..####...#........#...####..#',
         '#..####...#...cc...#...####..#',
         '#..####......................#',
-        '#.........#........#.........#',
+        '#.........#...b....#.........#',
         '####..#####........#####..####',
-        'S............P..P............S',
+        'S.....b......P..P............S',
         'S............P..P............S',
         '####..#####........#####..####',
-        '#.........#........#.........#',
+        '#.........#....b...#.........#',
         '#..####......................#',
         '#..####...#...cc...#...####..#',
         '#..####...#........#...####..#',
-        '#.........#........#.........#',
+        '#.........#........#....$....#',
         '##############SS##############'
       ]
     },
@@ -247,22 +297,22 @@
       filas: [
         '####################################',
         '#S................................S#',
-        '#..................................#',
+        '#.................b................#',
         '#....############....##########....#',
-        '#....#..........#....#........#....#',
+        '#....#.....$....#....#........#....#',
         '#....#..cc..........P....cc...#....#',
         '#....#..........#....#........#....#',
         '#....####..######....####..####....#',
-        '#..................................#',
+        '#.b................................#',
         'S.................PP...............S',
         'S.................PP...............S',
-        '#..................................#',
+        '#................................b.#',
         '#....####..######....####..####....#',
         '#....#..........#....#........#....#',
         '#....#..cc..........P....cc...#....#',
-        '#....#..........#....#........#....#',
+        '#....#..........#....#...$....#....#',
         '#....############....##########....#',
-        '#..................................#',
+        '#................b.................#',
         '#S................................S#',
         '####################################'
       ]
@@ -271,22 +321,22 @@
       nombre: 'Laberinto', suelo: ['#9fb0bf', '#94a5b4'], muro: ['#5d6d7e', '#465464', '#37424f'],
       filas: [
         '################################',
-        '#S.....#.........#............S#',
+        '#S.$...#.........#............S#',
         '#......#...###...#....####.....#',
         '#..##......#.........#.........#',
-        '#..#.......#....cc...#....##...#',
+        '#..#.......#.b..cc...#....##...#',
         '#..#...#####.........#.....#...#',
         '#......#.......####........#...#',
         '###..###..P.P..#.......#####...#',
         'S.........P.P..#...............S',
         '#....cc........#.......cc......#',
         '#........####......####........#',
-        '#..............#...............#',
+        '#.......b......#...............#',
         'S......#####...#....P.P...#....S',
-        '#..........#...#....P.P...#....#',
+        '#..........#...#..b.P.P...#....#',
         '#...##.....#..........#####....#',
         '#....#.........cc..............#',
-        '#S...#.....####........#......S#',
+        '#S...#.....####........#....$.S#',
         '################################'
       ]
     }
@@ -298,7 +348,7 @@
   function cargaMapa(id) {
     const M = MAPAS[mapaValido(id)];
     const ancho = Math.max(...M.filas.map(f => f.length)), alto = M.filas.length;
-    const celdas = [], spawnsE = [], spawnsP = [];
+    const celdas = [], spawnsE = [], spawnsP = [], barriles = [], tiendas = [];
     for (let y = 0; y < alto; y++) {
       const fila = M.filas[y].padEnd(ancho, '#');
       for (let x = 0; x < ancho; x++) {
@@ -306,11 +356,13 @@
         const borde = x === 0 || y === 0 || x === ancho - 1 || y === alto - 1;
         if (c === 'S') spawnsE.push({ x: x * TS + TS / 2, y: y * TS + TS / 2, tx: x, ty: y });
         if (c === 'P') spawnsP.push({ x: x * TS + TS / 2, y: y * TS + TS / 2 });
+        if (c === 'b') barriles.push({ x: x * TS + TS / 2, y: y * TS + TS / 2 });
+        if (c === '$') tiendas.push({ x: x * TS + TS / 2, y: y * TS + TS / 2, tx: x, ty: y });
         if (borde && c !== 'S') c = '#';
         celdas.push(c === '#' ? 1 : c === 'c' ? 2 : 0);
       }
     }
-    return { id: mapaValido(id), nombre: M.nombre, suelo: M.suelo, muro: M.muro, ancho, alto, celdas, spawnsE, spawnsP };
+    return { id: mapaValido(id), nombre: M.nombre, suelo: M.suelo, muro: M.muro, ancho, alto, celdas, spawnsE, spawnsP, barriles, tiendas };
   }
 
   /* Las 8 direcciones, como en el original: 0 = este y en sentido horario. */
@@ -320,7 +372,8 @@
 
   return {
     TS, ARMAS, MEJORAS, PASOS, arma, nivelArma, premios, duracionCombo, bajadaCombo, PUNTOS, ENEMIGOS, vidaEnemigo, velEnemigo,
-    totalNivel, parteDiablos, maxVivos, ritmoNivel, SKINS, skin, MAPAS, ORDEN_MAPAS, mapaValido,
+    golpeNivel, totalNivel, mezclaNivel, tipoEnemigo, parteDiablos, maxVivos, ritmoNivel,
+    ARMADURA, TIENDA, precioTienda, factorPotencia, ALCANCE_TIENDA, SKINS, skin, MAPAS, ORDEN_MAPAS, mapaValido,
     cargaMapa, DIRS, dirDe
   };
 });
