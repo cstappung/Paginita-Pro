@@ -111,3 +111,34 @@ kbd{display:inline-block;min-width:20px;padding:1px 5px;border:1px solid var(--b
 .tt-aviso[data-k=tetris].ve,.tt-aviso[data-k=pc].ve{animation:avisoGrande 1.5s cubic-bezier(.2,.9,.3,1.2)}
 @keyframes avisoGrande{0%{opacity:0;transform:scale(2.2);filter:blur(4px)}12%{opacity:1;transform:scale(.92);filter:none}22%{transform:scale(1.06)}32%{transform:scale(1)}80%{opacity:1}100%{opacity:0;transform:translateY(-34px) scale(1.05)}}
 @media (prefers-reduced-motion:reduce){.tt-aviso.ve,.tt-aviso[data-k].ve{animation:aviso 1.4s linear}}
+
+/* Modo celular (CLAUDE.md, «Modo celular»): mientras se juega en un teléfono en
+   vertical, `club-inm` (conexion.js) deja solo el pozo, sus cajas, una barra
+   de datos encima y la franja de botones abajo. El pozo sigue siendo 300×600
+   lógicos: solo cambia la escala a la que se pinta. */
+.tt-hud{display:none}
+html.club-inm,html.club-inm body{height:100%;overflow:hidden;overscroll-behavior:none;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+html.club-inm{--lado:58px;--franja:clamp(58px,11dvh,96px);--hueco:6px}
+html.club-inm .tt-cab,html.club-inm .tt-modos,html.club-inm .tt-pie,html.club-inm .tt-rank,html.club-inm .club-volver,html.club-inm .club-ranking,html.club-inm .tt-datos,html.club-inm .club-vol-flota{display:none!important}
+html.club-inm .shell{max-width:none;height:100dvh;box-sizing:border-box;margin:0;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+html.club-inm .tt-escena{height:100%;box-sizing:border-box;padding:4px 0 0;border:0;border-radius:0;box-shadow:none}
+html.club-inm .tt-layout,html.club-inm .tt-layout:has(.tt-rank:not(:empty)){display:block;height:100%}
+html.club-inm .tt-centro{height:100%;display:flex;flex-direction:column}
+html.club-inm .tt-juego{flex:1;min-height:0;gap:var(--hueco);align-items:flex-start}
+html.club-inm .tt-lado{width:var(--lado);gap:6px}
+html.club-inm .tt-caja{padding:5px 3px;border-radius:10px}
+html.club-inm .tt-caja small{font-size:8px;letter-spacing:.06em}
+html.club-inm .tt-caja canvas{width:100%;height:auto}
+html.club-inm .tt-pozo{padding:4px}
+html.club-inm .tt-pozo canvas{width:auto;height:min(calc(100dvh - var(--franja) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 20px),calc((100vw - 2*var(--lado) - 2*var(--hueco) - env(safe-area-inset-left) - env(safe-area-inset-right) - 8px)*2))}
+html.club-inm .tt-capa{inset:4px}
+html.club-inm .tt-hud{display:flex;position:absolute;top:4px;left:4px;right:4px;z-index:2;align-items:center;gap:6px;padding:3px 4px 3px 7px;background:#070b15b3;border-radius:9px 9px 0 0;font:600 11px/1.1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--tinta);pointer-events:none}
+html.club-inm .tt-hud span{display:flex;flex-direction:column;min-width:0}
+html.club-inm .tt-hud small{font-size:7px;letter-spacing:.08em;text-transform:uppercase;color:var(--apagado)}
+html.club-inm .tt-hud b{font-weight:700;white-space:nowrap}
+html.club-inm #hudPausa{margin-left:auto;pointer-events:auto;min-width:30px;min-height:28px;border-radius:8px;border:1px solid var(--borde);background:var(--caja);color:var(--tinta);font-size:11px;touch-action:manipulation}
+html.club-inm .tt-hud .tt-hud-vol{pointer-events:auto;flex-direction:row}
+html.club-inm .tt-hud .vj-ctl{padding:0;border:0;background:none}html.club-inm .tt-hud .vj-ctl :is(input,output){display:none}
+html.club-inm .tt-tactil{display:flex;flex-wrap:nowrap;height:var(--franja);box-sizing:border-box;margin:0;padding:6px 6px 4px;gap:5px}
+html.club-inm .tt-tactil button{flex:1;min-width:0;min-height:48px;height:100%;font-size:24px;color:var(--tinta)}
+html.club-inm .tt-tactil [data-a=contragira]{display:none}

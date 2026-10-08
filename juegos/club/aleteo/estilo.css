@@ -147,3 +147,24 @@ html.apaisado .nota{grid-area:nota;width:auto}
 @media (prefers-reduced-motion:reduce){
   .logo-ave,.listo-tit,.mano i,.nuevo,.medalla.brilla::after{animation:none}
 }
+
+/* --- Modo celular (CLAUDE.md): mientras se vuela, el juego ocupa la pantalla.
+   conexion.js pone html.club-inm solo en táctiles de 600 px o menos; el marcador
+   pasa a ser una franja translúcida encima del cielo y no hay botonera: tocar
+   en cualquier parte aletea. El mundo lógico (360×640) no cambia. --- */
+.pausa-m{display:none}
+html.club-inm,html.club-inm body{height:100%;overflow:hidden;overscroll-behavior:none;touch-action:none;user-select:none;-webkit-user-select:none;background:#000}
+html.club-inm .shell{max-width:none;height:100dvh;box-sizing:border-box;margin:0;position:relative;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);display:grid;place-items:center}
+html.club-inm .layout,html.club-inm main{display:contents}
+html.club-inm .cab,html.club-inm .nota,html.club-inm .layout>aside,html.club-inm .club-volver,html.club-inm .club-ranking,html.club-inm .club-vol-flota{display:none!important}
+html.club-inm .escenario{--w:min(100vw - env(safe-area-inset-left) - env(safe-area-inset-right),(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * .5625);
+  width:var(--w);min-width:0;max-width:none;margin:0;border:0;border-radius:0;box-shadow:none;grid-area:1/1}
+html.club-inm .scorebar,html.club-inm.club-integrado .scorebar,html.club-inm.club-integrado[data-tema] .scorebar{grid-area:1/1;align-self:start;z-index:5;position:relative;
+  width:min(100vw - env(safe-area-inset-left) - env(safe-area-inset-right),(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * .5625);max-width:none;box-sizing:border-box;
+  margin:0;padding:4px 8px;flex-wrap:nowrap;gap:8px;background:#0a1020a6;color:#fff;border:0;border-radius:0;box-shadow:none;backdrop-filter:blur(2px)}
+html.club-inm .dato small{font-size:8px}
+html.club-inm .dato strong{font-size:14px}
+html.club-inm .pausa-m{display:grid;place-items:center;margin-left:auto;width:34px;height:34px;padding:0;border-radius:9px;border:2px solid #fff6;background:#0006;color:#fff;font:800 13px/1 system-ui,sans-serif;cursor:pointer}
+html.club-inm #sound-button{width:34px;height:34px;background:#0006;color:#fff;border-color:#fff6}
+html.club-inm .scorebar .vj-ctl input,html.club-inm .scorebar .vj-ctl output{display:none}

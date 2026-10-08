@@ -50,6 +50,16 @@ export function crearTetris(ctx) {
   const nombre = u => u === uid ? "tú" : ((jugador(u) || {}).nombre || "alguien");
   const Nombre = u => { const t = nombre(u); return t.charAt(0).toUpperCase() + t.slice(1); };
   const juego = () => !ctx.mirando && !!jugador(uid) && est && est.fase === "jugando" && !est.fuera[uid];
+  /* Modo celular: mientras se juega, la sala ocupa toda la pantalla, con los
+     datos en una barra fina arriba, los pozos rivales en una columna estrecha
+     a la derecha y la franja de botones abajo (juegos.html, html.jg-tt-inm).
+     Solo en un teléfono en vertical; en el PC nada cambia. */
+  const celular = () => {
+    try { return matchMedia("(pointer:coarse)").matches && Math.min(innerWidth, innerHeight) <= 600 && innerHeight > innerWidth; }
+    catch { return false; }
+  };
+  const inmersivo = v => document.documentElement.classList.toggle("jg-tt-inm", !!v);
+  const alGirar = () => inmersivo(!muerto && juego() && celular());
   const pon = (id, html) => {
     if (firmas[id] === html) return;
     firmas[id] = html;
@@ -113,6 +123,7 @@ export function crearTetris(ctx) {
       </div>
       <div id="ttHist" class="jg-tt-hist"></div>`;
     host.appendChild(raiz);
+    window.addEventListener("resize", alGirar);
     const pintaTeclas = () => { raiz.querySelector("#ttTeclasTxt").textContent = TM.textoTeclas(); };
     pintaTeclas(); ponMando();
     raiz.querySelector("#ttTeclas").addEventListener("click", () => {
@@ -383,6 +394,7 @@ export function crearTetris(ctx) {
     else f = "Quedan " + est.vivos.length + " en pie";
     pon("ttFase", esc(f));
     raiz.classList.toggle("mirando", !juego());
+    alGirar();
     const n = est.hist.length ? est.hist[est.hist.length - 1].i : -1;
     if (visto >= 0 && n > visto) {
       for (const e of est.hist) {
@@ -407,6 +419,8 @@ export function crearTetris(ctx) {
 
   function destruir() {
     muerto = true;
+    window.removeEventListener("resize", alGirar);
+    inmersivo(false);
     cancelAnimationFrame(raf);
     clearTimeout(avisoT); clearTimeout(alertaT); clearInterval(fondoT);
     document.removeEventListener("keydown", teclaAbajo);

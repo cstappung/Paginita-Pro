@@ -5170,6 +5170,28 @@ the controls come from:
   Clue, Sopa and Electrodle make no sound. Atasco has its own 🔊 in the
   scoreboard and loads `volumen.js`, like Sudoku Arcade.
 
+## Modo celular (pantalla completa mientras se juega)
+
+Tetris Club, the Tetris room, ALETEO and FANAL go **immersive on a phone in
+portrait** (`pointer:coarse`, the smaller side ≤ 600 px, taller than wide);
+desktop and landscape are untouched. In a Club game, `Club.inmersivo(on)` in
+`conexion.js` decides it (`Club.celular()` measures `window.top`, since the
+iframe only measures what the page gave it), toggles `html.club-inm` in the
+frame and tells the parent, where `solo/club.js` toggles `html.jg-club-inm`
+(the iframe fills the window, the site chrome hides; `destruir` removes it).
+A rotation re-evaluates it. Each game turns it on at «Jugar» and off on pause
+and game over, so the menu, the ranking and the footer come back with them;
+FANAL syncs it every frame from its own state. The Tetris room is painted by
+the page itself, so `tetris.js` toggles `html.jg-tt-inm` (only while
+`juego()`, i.e. playing and not out). The layout in all of them: a thin data
+bar on top, the game filling the rest without distortion (`100dvh`,
+safe-area insets, no scroll/zoom/selection), and a control strip of at most
+~15 % of the height with buttons ≥ 48 px — Tetris `◀ ▼ ▶ ⟳ ⤓ ⇄` (⟲ hidden),
+rival wells in a narrow right column in the room; ALETEO flaps on a tap
+anywhere; FANAL ◀ ▶ left and ✦ right. Only the screen changes: the controls
+send the same actions as the keyboard, so proofs, `mando.js` and the
+generated `controles-datos.js` are unaffected.
+
 ## Mandos (`juegos/audio/mando.js`)
 
 PS4/PS5, Xbox and Switch Pro controllers work everywhere in Juegos. Each

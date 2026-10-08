@@ -243,3 +243,28 @@ html.sin-lineas .lineas{display:none}
 @media (max-width:480px){.taller .ramas{grid-template-columns:1fr}.mejora{padding:5px 7px}}
 @media (prefers-reduced-motion:reduce){.taller.evoluciona .caja{animation:none}}
 .taller .caja:focus{outline:none}
+
+/* --- Modo celular (CLAUDE.md): mientras dura la travesía, el juego ocupa la
+   pantalla. conexion.js pone html.club-inm solo en táctiles de 600 px o menos.
+   El marcador queda como una franja fina arriba, el lienzo llena lo que sobra
+   sin deformarse (3:4) y la botonera es una franja de a lo más 16 % del alto:
+   ◀ ▶ a la izquierda, ✦ a la derecha. Fuera del juego (taller, relato,
+   revelación) la botonera se oculta (html.sin-franja) y las capas se usan con
+   el dedo. --- */
+html.club-inm,html.club-inm body{height:100%;overflow:hidden;overscroll-behavior:none;touch-action:none;user-select:none;-webkit-user-select:none;background:#000}
+html.club-inm{--franja:clamp(56px,15dvh,96px);--marcador:44px;--sa-t:env(safe-area-inset-top);--sa-b:env(safe-area-inset-bottom);--sa-l:env(safe-area-inset-left);--sa-r:env(safe-area-inset-right)}
+html.club-inm.sin-franja{--franja:0px}
+html.club-inm .shell{max-width:none;height:100dvh;box-sizing:border-box;margin:0;padding:var(--sa-t) var(--sa-r) var(--sa-b) var(--sa-l);display:flex;flex-direction:column;align-items:center;overflow:hidden}
+html.club-inm .layout,html.club-inm main.fanal{display:flex;flex-direction:column;align-items:center;width:100%;flex:1;min-height:0;gap:0}
+html.club-inm .cab,html.club-inm .pie,html.club-inm .layout>aside,html.club-inm .club-volver,html.club-inm .club-ranking,html.club-inm .club-vol-flota{display:none!important}
+html.club-inm .scorebar,html.club-inm.club-integrado .scorebar,html.club-inm.club-integrado[data-tema] .scorebar{flex:none;box-sizing:border-box;width:100%;height:var(--marcador);margin:0;padding:3px 8px;gap:9px;flex-wrap:nowrap;background:#000c;border:0;border-bottom:1px solid var(--linea);box-shadow:none}
+html.club-inm .scorebar::after{display:none}
+html.club-inm .dato small{font-size:8px;letter-spacing:.08em}
+html.club-inm .dato strong{font-size:14px}
+html.club-inm .scorebar .vj-ctl{padding:0;border:0;background:none}
+html.club-inm .scorebar .vj-ctl input,html.club-inm .scorebar .vj-ctl output{display:none}
+html.club-inm .pantalla{flex:none;box-sizing:border-box;width:min(100vw - var(--sa-l) - var(--sa-r),(100dvh - var(--sa-t) - var(--sa-b) - var(--marcador) - var(--franja)) * .75);border:0;box-shadow:none;margin:auto 0}
+html.club-inm .tactil{display:flex;flex:none;box-sizing:border-box;width:100%;height:var(--franja);margin:0;padding:6px 8px;gap:8px;align-items:stretch}
+html.club-inm .tactil button{flex:0 0 auto;width:max(64px,22vw);min-height:48px;height:auto;font-size:26px}
+html.club-inm .tactil button.fuego{margin-left:auto;width:max(80px,30vw)}
+html.club-inm.sin-franja .tactil{display:none}

@@ -111,10 +111,12 @@
     $('capa').hidden = true;
     bloqueaModos(true);
     efecto('inicio');
+    inmersivo(true);
     pozo.focus();
   }
   function termina(gano) {
     estado = 'fin';
+    inmersivo(false);
     bloqueaModos(false);
     mando.suelta();
     const r = { puntos: s.puntos, tiempo: Math.max(1, Math.round(s.tiempo)) };
@@ -146,9 +148,13 @@
     $('capaP').textContent = p; $('jugar').textContent = b; $('capa').hidden = false;
   }
   function pausa() {
-    if (estado === 'jugando') { estado = 'pausa'; mando.suelta(); g.vacia(); capa('Pausa', `${NOMBRE[modo]} · nivel ${s.nivel}`, 'Seguir'); }
-    else if (estado === 'pausa') { estado = 'jugando'; ultimo = 0; paredAntes = 0; $('capa').hidden = true; pozo.focus(); }
+    if (estado === 'jugando') { estado = 'pausa'; mando.suelta(); g.vacia(); inmersivo(false); capa('Pausa', `${NOMBRE[modo]} · nivel ${s.nivel}`, 'Seguir'); }
+    else if (estado === 'pausa') { estado = 'jugando'; ultimo = 0; paredAntes = 0; $('capa').hidden = true; inmersivo(true); pozo.focus(); }
   }
+  /* Modo celular (CLAUDE.md): mientras se juega, el pozo ocupa la pantalla
+     con los datos encima y los botones abajo; en pausa y al terminar vuelve
+     el menú. En PC Club.celular() es falso y no cambia nada. */
+  function inmersivo(v) { window.Club?.inmersivo?.(v); }
   function bloqueaModos(b) { document.querySelectorAll('[data-modo]').forEach(x => { x.disabled = b; }); }
 
   function acciones(a) {
@@ -220,6 +226,7 @@
   document.addEventListener('visibilitychange', () => { if (document.hidden) sueltaTodo(); });
 
   $('jugar').addEventListener('click', () => estado === 'pausa' ? pausa() : empieza());
+  $('hudPausa').addEventListener('click', () => pausa());
   $('sonido').addEventListener('click', () => {
     sonido = !sonido; guarda(); $('sonido').textContent = sonido ? '🔊' : '🔈';
     if (sonido) iniciaAudio(); else if (audio) { audio.rep.detener(); sonando = false; }
@@ -231,7 +238,7 @@
   function ponModo() {
     document.querySelectorAll('[data-modo]').forEach(x => x.classList.toggle('activo', x.dataset.modo === modo));
     window.Club?.category(cat());
-    s = null; estado = 'menu';
+    s = null; estado = 'menu'; inmersivo(false);
     capa(NOMBRE[modo], modo === 'sprint' ? 'Cuarenta líneas, lo más rápido que puedas.' : modo === 'ultra' ? 'Dos minutos: todos los puntos que quepan.' : 'Completa filas. Que no llegue arriba.', 'Jugar');
     pintaDatos(); pinta();
   }
@@ -250,6 +257,11 @@
     $('etqT').textContent = modo === 'ultra' ? 'Queda' : 'Tiempo';
     $('datoT').textContent = reloj(s ? t : modo === 'ultra' ? ULTRA_MS : 0);
     $('record').textContent = mejor(records[modo]);
+    $('hudA').textContent = $('datoA').textContent;
+    $('hudL').textContent = $('datoL').textContent;
+    $('hudN').textContent = $('datoN').textContent;
+    $('hudT').textContent = $('datoT').textContent;
+    $('hudR').textContent = $('record').textContent;
   }
   function pinta() {
     if (s) fx.pinta(cx, s);

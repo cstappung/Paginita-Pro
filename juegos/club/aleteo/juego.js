@@ -125,6 +125,14 @@
     e.preventDefault();
     pulsa(!deVerdad(e) ? 'x' : e.__mando ? 'm' : 'k', e);
   });
+  /* Modo celular (CLAUDE.md): mientras se vuela, el juego ocupa la pantalla
+     y cualquier toque fuera del escenario también aletea. */
+  const inmersivo = v => { if (Club && Club.inmersivo) Club.inmersivo(v); };
+  document.addEventListener('pointerdown', e => {
+    if (!document.documentElement.classList.contains('club-inm') || escenario.contains(e.target) || e.target.closest('button,input,a')) return;
+    if (estado === 'jugando') { e.preventDefault(); pulsa(!deVerdad(e) ? 'x' : e.pointerType === 'touch' ? 't' : 'r', e); }
+  });
+  $('btnPausaM').addEventListener('click', () => { if (estado === 'jugando') pausado ? sigue() : pausa(); });
   $('btnOtra').addEventListener('click', () => { despierta(); otraVez(); });
   $('btnSeguir').addEventListener('click', () => { despierta(); sigue(); });
   document.addEventListener('visibilitychange', () => { if (document.hidden && estado === 'jugando') pausa(); });
@@ -136,11 +144,11 @@
     E = M.nueva(s[0], CUENTA);
     aleteos = []; pendiente = origen; fiable = origen !== 'x'; tocado = false;
     t0 = performance.now(); w0 = Date.now(); pP = pW = 0; acc = M.TICK; prevY = E.y; cMax = 0;
-    estado = 'jugando'; $('listo').hidden = true;
+    estado = 'jugando'; $('listo').hidden = true; inmersivo(true);
     ave.enSuelo = false;
   }
-  function pausa() { if (estado !== 'jugando' || pausado) return; pausado = true; pP0 = performance.now(); pW0 = Date.now(); $('pausa').hidden = false; $('btnSeguir').focus({ preventScroll: true }); }
-  function sigue() { if (!pausado) return; pausado = false; pP += performance.now() - pP0; pW += Date.now() - pW0; $('pausa').hidden = true; ultimo = performance.now(); acc = 0; lienzo.focus({ preventScroll: true }); }
+  function pausa() { if (estado !== 'jugando' || pausado) return; pausado = true; inmersivo(false); pP0 = performance.now(); pW0 = Date.now(); $('pausa').hidden = false; $('btnSeguir').focus({ preventScroll: true }); }
+  function sigue() { if (!pausado) return; pausado = false; if (estado === 'jugando') inmersivo(true); pP += performance.now() - pP0; pW += Date.now() - pW0; $('pausa').hidden = true; ultimo = performance.now(); acc = 0; lienzo.focus({ preventScroll: true }); }
   function otraVez() {
     estado = 'listo'; E = null; $('fin').hidden = true; $('listo').hidden = false;
     ave.y = M.Y0; ave.vy = 0; ave.rot = 0; ave.enSuelo = false; popPuntos = 0;
@@ -199,7 +207,7 @@
     cuentaFin = { p, med, nuevo, listo: false };
   }
   function muestraFin() {
-    estado = 'fin'; finDesde = performance.now();
+    estado = 'fin'; finDesde = performance.now(); inmersivo(false);
     $('fin').hidden = false;
     const { p, med, nuevo } = cuentaFin;
     const dur = Math.min(900, 120 + p * 22), desde = performance.now();
