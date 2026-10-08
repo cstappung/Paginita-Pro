@@ -14,6 +14,13 @@ daño, golpes de un jefe, ritmo por polilla) salen de `M.armas` con esas
 mejoras. Una prueba de la versión 1 se rechaza como «de otra versión del
 juego» (caché, no trampa: no castiga), y el iframe subió a `club-42`.
 
+**Versión 3** (octubre de 2026): las brasas solo se ganan venciendo a un
+jefe, y el sin fin empieza con una por jefe de la historia (7). Una prueba
+de la versión 2 compraba con la brasa de cada jornada, así que ya no
+cuadra: se rechaza como de otra versión (no castiga), y el iframe subió a
+`club-44`. Un punto de control guardado con la 2 se sigue jugando, pero
+no cuenta.
+
 ## Vías encontradas
 
 1. `Club.result` desde la consola con un número cualquiera.
@@ -70,8 +77,8 @@ prueba (de antes de esto) se juega igual, pero no se manda.
 
 - Cadena de hash, orden de jornadas desde la 1 (o la 26 en el sin fin), lo
   heredado termina al empezar un acto (también el del sin fin, la 26).
-- El taller: cada compra con brasas que había (una por jornada completada;
-  el sin fin empieza con 25), sin pasar del nivel 3, la llama solo si cabe.
+- El taller: cada compra con brasas que había (una por jefe vencido;
+  el sin fin empieza con 7), sin pasar del nivel 3, la llama solo si cabe.
 - Puntos y llamas exactos por jornada: Resonancia, bonus, llamas extra,
   Mensajera con semilla. Lo declarado = lo recalculado; tiempo declarado =
   suma de `g`; modo = categoría; cuenta = `u` (si la página pasa `ctx.uid`).
@@ -117,11 +124,12 @@ resellada y con puntos ajustados: tiros convertidos en afinados), jornadas
 quitadas, `salta`, `dano`, `acerca`, `limpia`, tiros a 5 cs, cámara rápida,
 entradas sintéticas, la partida real de la tabla (39 jornadas en 56 s) y un
 bot que dispara cada 0,17 s sin fallar. El robot compra en el taller (y en
-el sin fin gasta sus 25 brasas). Además, una partida jugada en Chromium
+el sin fin gasta sus 7 brasas). Además, una partida jugada en Chromium
 por el juego de verdad (un bot que lee el mundo con `__fanal`, con el reloj
 real simulado y sin eventos de entrada; la marca `x` se le quita para la
-prueba) pasa, con sus compras y evoluciones, y editada no; y la partida
-real de la versión 1 se rechaza como de otra versión. A mano en
+prueba) con la versión 2 se rechaza ahora como de otra versión, igual que
+la de la versión 1; lo que se comprobaba sobre ella (afinados convertidos,
+una compra sin brasas, puntos inflados) se comprueba sobre el robot. A mano en
 Chromium: continuar desde un punto de control pasa; teclas despachadas por
 script (`dispatchEvent`) se rechazan; usar `__fanal` no manda nada.
 

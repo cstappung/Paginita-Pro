@@ -3369,7 +3369,7 @@ directly, with the story's 25 brasas, and opens once the Hoguera is seen
   `window.__fanal` (`salta(n)`, `sigue()`, `estado()`, `mundo()`,
   `brasas(n)`, `taller()`, `prueba()`…) drives the game from a script,
   which is how the story and the bosses were played through in Chromium.
-  The proof is version 2 since the second part (`docs/antitrampas/fanal.md`);
+  The proof is version 3 since brasas come only from bosses (`docs/antitrampas/fanal.md`);
   any change to it must bump `club-N` in `solo/club.js`.
 
 **ALETEO (`juegos/club/aleteo/`) is a Solo Club Flappy Bird whose sky

@@ -36,8 +36,10 @@
   "use strict";
 
   /* La 2 trae las mejoras (el campo `u` de cada jornada) y la segunda parte
-     de la travesía: una prueba de la 1 se jugó con otras reglas. */
-  const VERSION = 2;
+     de la travesía: una prueba de la 1 se jugó con otras reglas. La 3 da
+     las brasas solo por jefe vencido: una de la 2 compraba con las de
+     cada jornada, y se rechaza como de otra versión (caché, no trampa). */
+  const VERSION = 3;
 
   /* El alfabeto de los eventos. Cada evento es una letra seguida de las
      centésimas que pasaron desde el anterior (en decimal, nada si fue en el

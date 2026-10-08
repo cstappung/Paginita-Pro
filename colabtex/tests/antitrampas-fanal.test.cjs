@@ -100,7 +100,7 @@ function robot(o={}){
   }
   const fin=muerto?'m':'c';
   if(fin==='c'&&j.tipo!=='lumbre'&&j.jefe!=='alba')suma(M.bonusJornada({acto:j.acto,sinDanio:golpes===0,disparos:disp,aciertos:acier}).total);
-  if(fin==='c'){completadas=n;st.taller.brasas++;}
+  if(fin==='c'){completadas=n;if(j.tipo==='jefe')st.taller.brasas++;}
   for(const p of pul)if(p<=t+0.15)FP.pulso(reg,p);
   const dur=t-t0;G+=dur*0.97;R+=dur*1000*1.04+3000;
   FP.cierra(prueba,reg,fin,t,R,G,st.pts,st.llamas,{b:0,d:0});
@@ -119,7 +119,7 @@ function resella(prueba){let prev=M.hashTexto('fanal|'+prueba.id+'|'+prueba.m);f
 function reajusta(prueba){for(let i=0;i<40;i++){resella(prueba);const r=FP.rehace(prueba),m=r.motivo&&/dice (-?\d+), dan (-?\d+)/.exec(r.motivo);if(!m)return prueba;const x=prueba.J.find(x=>x.s===+m[1]);x.s=+m[2];}return prueba;}
 
 test('FANAL: el verificador está activo y una partida sin prueba no entra',async()=>{
- assert.equal(FV.PRUEBA,2);
+ assert.equal(FV.PRUEBA,3);
  assert.match(await V.verificaClub('fanal',{categoria:'club-fanal-travesia',puntos:90000,tiempo:600000,partida:'x'},null),/sin prueba/);
 });
 
@@ -296,21 +296,24 @@ const REAL={"datos":[{"categoria":"club-fanal-travesia","puntos":103076,"tiempo"
 /* La partida real de la versión 1 (antes del taller): ya no cuadra con
    estas reglas, y se rechaza como de otra versión (caché, no trampa). */
 const REAL_V1='{"datos":[{"categoria":"club-fanal-travesia","puntos":9268,"tiempo":183803},{"categoria":"club-fanal-jornadas","puntos":2,"tiempo":183803}],"prueba":{"v":1,"m":"t","id":"1ow5v311ncy9620mf6","u":"uidprueba","k":0,"J":[{"n":1,"t":5233,"r":6831,"g":52279,"e":"z32T22S31S35S50T24S31A129A15S10C136S10S55A15S27T23S19A223T5T97S20T116S24S43B22B25T26S19S31A29A25S18B137T16A15T25A134B035B05T10S20T31A057SA17T26B134T26B112C15S23S65C112T10B067B03S18S60S32M088T3T35T29S68T55S57T63S55T25S52T50S51S57B112T8T104S18T90S28S108T19C071S24T21T102S35T20T25T90T28C072T5A050A05S28S52A13T17T25A125A17S21T47T77T31S84S31A117T15C135S12B116B040TT37C132B026T25S24S23T62S48T65S28T45B055SB15S25S74S23T25T20T90S22S35B25C23T15T110T40T25C138A05A07T13S17T112S35T108T28B125B15S7","p":"1e,1s,1o,14,14,1o,14,14,1n,14,13,1n,12,13,1n,13,13,1m,12,13,1l,11,11,1j,10,10,1h,10,z,1g,x,y,1f,x,y,1d,w,x,1d,x,x,1d,x,x,1d,x,w,1e,w,x,1d,x,x,1d,x,x,1c,x,w,1d,w,w,1d,w,x,1c,x,w,1c,w,w,1c,w,w,1c,w,w,1c,w,w,1b,v,u,1a,u,u,19,u,u,18,u,u,19,u,t,18,s,t,17,s,s,15,s,s,16,r,s,16,s,r,16,r,s,14,r,s,14,r,s,14,r,r,14,r,q,14,r,q,14,q,p,13,p,q,12,q,p,13,p,q,12,p,p,12","f":"c","s":2010,"v":3,"b":0,"d":0,"h":"vkno3dz7i9"},{"n":2,"t":7121,"r":8924,"g":71179,"e":"z32T30S25S28S47S55T27T31A129B15S15T55T45S21A060T22S22S30S56A14T25B138S17T75S23S33S74T41B125S9B130C110S8T65C18S17C153T22T32S30T25S56S55B17T17T36C215S7C075S21T39S25S23A132T11S29A128T45C13T25A054B06S2S22B143T8B114T10S18T35B123T24T30C138C15S22S35A118S15T27T35T75S28B128B15T7T78T34S70T50C115S6p52B03T12S37S23T82S30T18C217B123T23S52C117S10S31C130T27T43g42S43S29T26B129C15T6A17B15T17B126C15T5A19B15B16C14T6S20A045T19T23T20T95S28S25T100T32B050T53T32S72T28S72S60T48T63T42T27T51T32T33S74T56T57T58T32T30S82T25S76T32T97T30T98T27T33T90T28C129g61T2S25S90S33T32S23T42S62T43C057TC056T9T63T57B045C06S27T17T105S16S32T28T82T18S17T93S32S80T27S95T23S35C050T13T75","p":"w,2p,14,14,1o,14,14,1o,13,14,1o,13,14,1n,14,13,1n,13,13,1n,13,13,1m,13,12,1m,11,12,1l,11,12,1k,12,11,1k,11,10,1j,11,11,1i,10,10,1h,z,z,1f,z,y,1f,x,y,1d,x,x,1e,w,x,1d,w,x,1c,w,x,1c,w,w,1b,w,v,1b,w,v,1b,v,v,1a,u,u,1a,u,u,1a,u,u,18,t,r,15,r,r,14,r,r,15,r,r,14,r,r,14,r,r,14,q,r,14,r,q,14,r,q,14,r,r,14,q,r,14,q,r,14,r,q,14,r,r,13,r,r,14,q,r,14,r,q,14,r,q,14,r,r,14,q,r,14,r,q,14,r,q,14,r,q,14,q,q,14,q,r,13,r,q,13,r,q,14,q,q,13,q,q,12,q,q,12,q,p,12,p,p,12,p,q,12,p,p,12,p,q,11,q,p,12,p,p,12,q,p,12,p,p,12,p,p","f":"c","s":4888,"v":1,"b":0,"d":0,"h":"1uqyjjy4ka0"},{"n":3,"t":6296,"r":7913,"g":60345,"e":"z32S28S22S27T26A130T12A118T74S31B067S18T34S21C220S12T20A135T23A14S60C18C17S11S22S38A120T9A123SB145C15ST17C211S15A132B13T7A053T5B110S7B063T5S27B140C13T5B112S8T85T25S24S30S21C155S7S60T48T39S35S41C129S3S85T18A135S10S25S37A112S19S87S23S87S38S55T47T33M27T35B120C15T27B16C114S20T41B120S19B055T5T18T97T45T68C12S55C16C15S15T75S52T78S32S30B125A017SS26S45T55A040A05S10S25S50T39T30S23A122B13T3C137S13C110T55S39S70T53S77S40T73S28T75S25T24S85T26T30S32T83S25T77S25T83S22S98T32S77T31A037B03T14S20B043T28S25T84S21S97T25T93S17T115T30B15S83S35T54S33S77S36C110T10S40T20A14S21T102g32","p":"k,1s,1g,1o,14,14,1o,14,14,1n,14,14,1n,13,13,1m,13,13,1l,12,11,1k,10,10,1j,10,z,1h,z,z,1h,z,10,1g,z,z,1g,z,z,1g,y,z,1f,z,y,1f,y,y,1f,y,y,1f,y,y,1f,y,y,1d,x,x,1d,w,x,1c,x,w,1c,w,w,1c,v,w,1b,w,v,1b,w,v,1b,v,v,1a,v,u,1a,u,v,19,u,u,18,u,t,18,t,u,18,t,t,18,u,t,18,t,u,18,t,t,18,u,t,18,t,t,18,u,t,18,t,u,18,t,t,18,u,t,18,t,u,17,t,t,16,t,s,17,t,s,17,t,s,17,t,s,17,t,s,17,s,s,17,s,s,17,s,t,16,s,s,16,s,s,16,r,s,3p,2h","f":"m","s":9268,"v":0,"b":0,"d":0,"h":"x3ysq6vg2l"}]}}';
-test('FANAL: una partida real (Chromium, el juego de verdad) pasa, y editada no',async()=>{
+test('FANAL: las partidas reales de versiones anteriores se rechazan como de otra versión, y la del robot editada no pasa',async()=>{
+ // La partida real de Chromium es de la versión 2 (una brasa por jornada):
+ // con las brasas solo por jefe ya no cuadra, y se rechaza sin castigo.
  const {datos,prueba}=REAL;
- for(const d of datos)assert.equal(await verifica({...d,partida:'p'},prueba,{uid:'local'}),null,d.categoria);
- const r=FP.rehace(prueba);
- assert.equal(r.puntos,datos[0].puntos);assert.equal(r.completadas,12);assert.equal(r.muerto,true);
- assert.ok(M.evolucion(r.mej,'arma')>=2&&M.evolucion(r.mej,'nave')>=2,'evolucionó el arma y el fanal');
- // Todos los tiros sin afinar convertidos en afinados: lejos del pulso que sonó.
- const b=copia(prueba);for(const x of b.J)x.e=x.e.replace(/S/g,'T');reajusta(b);
- assert.match(String(FP.rehace(b).motivo),/afinado lejos de todo pulso/);
- // Mejoras que no se pagaron: una compra de más antes de la primera jornada.
- const c=copia(prueba);c.J[0].u='c';resella(c);
- assert.match(String(FP.rehace(c).motivo),/compra imposible/);
- // Un récord inflado con la prueba real.
- assert.match(await verifica({...datos[0],puntos:datos[0].puntos*3,partida:'p'},prueba),/puntos declarados/);
- // La de la versión 1.
+ for(const d of datos)assert.match(await verifica({...d,partida:'p'},prueba,{uid:'local'}),/otra versión/,d.categoria);
  const v1=JSON.parse(REAL_V1);
  assert.match(await verifica({...v1.datos[0],partida:'p'},v1.prueba,{uid:'uidprueba'}),/otra versión/);
+ // Lo que se comprobaba sobre ella, sobre una travesía del robot que compra.
+ const r=conTiempo(robot({semilla:8,compras:'cbfvcb'}));
+ assert.equal(await verifica(r.dato,r.prueba,{uid:'uid-robot'}),null);
+ const rh=FP.rehace(r.prueba);
+ assert.ok(M.LISTA_MEJORAS.some(k=>rh.mej[k]>0),'compró en el taller');
+ // Todos los tiros sin afinar convertidos en afinados: lejos del pulso que sonó.
+ const b=copia(r.prueba);for(const x of b.J)x.e=x.e.replace(/S/g,'T');reajusta(b);
+ assert.match(String(FP.rehace(b).motivo),/afinado lejos de todo pulso/);
+ // Mejoras que no se pagaron: una compra antes de vencer al primer jefe.
+ const c=copia(r.prueba);c.J[1].u='c';resella(c);
+ assert.match(String(FP.rehace(c).motivo),/compra imposible/);
+ // Un récord inflado.
+ assert.match(await verifica({...r.dato,puntos:r.dato.puntos*3},r.prueba),/puntos declarados/);
 });
