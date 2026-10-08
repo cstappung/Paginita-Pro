@@ -12,7 +12,7 @@
 import FP from '../../../../../juegos/club/fanal/prueba.js';
 import FM from '../../../../../juegos/club/fanal/motor.js';
 
-export const PRUEBA = 2;
+export const PRUEBA = 3;
 
 const TOPE = 1000000;   // el de resultadoClub para los puntos
 
