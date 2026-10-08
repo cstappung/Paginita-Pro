@@ -471,6 +471,13 @@ const REGLAS = {
         "Cada golpe <b>empuja</b> al enemigo hacia atrás y lo deja medio segundo aturdido antes de volver a perseguirte. Hay <b>fuego amigo</b> entre ellos: las bolas de fuego de los diablos queman a los zombis (y a otros diablos) que se crucen.",
         "Tu vida, el arma en la mano y sus balas van justo encima de tu personaje, como en el original."
       ])],
+      ["Jefes", lista([
+        "Cada nivel que termina en <b>5</b> (5, 15, 25…) trae un <b>mini jefe</b> que llega <b>junto con</b> la oleada normal. Cada nivel que termina en <b>0</b> (10, 20, 30…) trae un <b>jefe grande</b> que llega <b>solo</b>: los únicos enemigos son los que él mismo invoca.",
+        "Minis: <b>El Carnicero</b> se agacha, brilla y embiste en línea recta; <b>El Nigromante</b> levanta zombis del suelo; <b>La Bruja</b> lanza anillos de fuego (dos seguidos cuando está herida); <b>La Larva Madre</b> pare corredores y revienta en más al morir; <b>El Espectro</b> se desvanece y reaparece a tu lado.",
+        "Grandes: <b>El Coloso</b> pisa el suelo y lanza una onda (marca el círculo antes, sal de él); <b>La Reina de la Colmena</b> pare enjambres de corredores y explosivos; <b>El Archidiablo</b> gira soltando una espiral de fuego; <b>La Hidra</b> escupe ácido en cinco direcciones y le brotan escupidores al perder vida; <b>El Titán</b> lanza rocas que estallan donde caen (la sombra avisa) y, herido, se enfurece.",
+        "Su barra de vida va arriba de la pantalla. La vida crece con el nivel y con la gente en la sala. Matar un mini da 300 puntos y un grande 1000, por el multiplicador.",
+        "Cuando ya salieron los cinco de cada clase, <b>vuelven a rotar</b> en el mismo orden, cada vuelta más duros."
+      ])],
       ["Tienda", lista([
         "Cada mapa tiene <b>estaciones de suministros</b>. De pie junto a una, el aviso de abajo muestra los precios y se compra con los puntos: <b>B</b> munición para todas tus armas (250), <b>R</b> +50 de armadura (400), <b>H</b> +50 de vida (300) y <b>G</b> potencia, +10 % de daño en todas las armas, hasta cinco veces (800, 1600, 2400…).",
         "Gastar puntos baja tu marcador: es el precio de llegar más lejos."

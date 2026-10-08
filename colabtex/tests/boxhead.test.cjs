@@ -181,3 +181,30 @@ test('boxhead: cada mapa tiene tienda y barriles a los que se llega',()=>{
   for(const b of m.barriles)assert.ok(llega(b.x,b.y),id+': barril aislado');
  }
 });
+
+test('boxhead: jefes en los niveles 5/15/25… (mini) y 10/20/30… (grande), rotando',()=>{
+ assert.equal(D.jefeDeNivel(3),-1);assert.equal(D.jefeDeNivel(12),-1);
+ assert.equal(D.jefeDeNivel(5),6);assert.equal(D.jefeDeNivel(15),7);assert.equal(D.jefeDeNivel(45),10);assert.equal(D.jefeDeNivel(55),6);
+ assert.equal(D.jefeDeNivel(10),11);assert.equal(D.jefeDeNivel(50),15);assert.equal(D.jefeDeNivel(60),11);
+ assert.ok(D.MINIS.length>=5&&D.GRANDES.length>=5,'al menos cinco de cada');
+ const habs=new Set();
+ for(const k of [...D.MINIS,...D.GRANDES]){
+  const C=D.ENEMIGOS[k];
+  assert.ok(D.esJefe(k),C.nombre+' es jefe');
+  for(const c of ['hab','cd','rg','talla','txt'])assert.ok(C[c],C.nombre+' sin '+c);
+  habs.add(C.hab);
+  assert.ok(D.vidaJefe(k,30,1)>D.vidaJefe(k,5,1),'la vida crece con el nivel');
+  assert.ok(D.vidaJefe(k,5,4)>D.vidaJefe(k,5,1),'y con los jugadores');
+ }
+ assert.equal(habs.size,D.MINIS.length+D.GRANDES.length,'cada jefe con su habilidad');
+ for(const k of D.MINIS)assert.equal(D.ENEMIGOS[k].jefe,'mini');
+ for(const k of D.GRANDES)assert.equal(D.ENEMIGOS[k].jefe,'grande');
+});
+
+test('boxhead: la mezcla normal nunca saca un jefe',()=>{
+ for(let n=1;n<=80;n++){
+  const p=D.mezclaNivel(n);
+  for(let k=0;k<p.length;k++)if(D.esJefe(k))assert.equal(p[k],0);
+  for(let i=0;i<50;i++)assert.ok(!D.esJefe(D.tipoEnemigo(n,i/50)));
+ }
+});

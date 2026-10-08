@@ -4300,6 +4300,18 @@ standing directs the enemies, as in Yemas' zombies. Things to keep:
   the combo as a semicircle (`#marca`, an SVG arc with `pathLength`), and
   health, weapon and ammo drawn on the canvas over the player
   (`barraVida`). Muros/barrels travel with their upgraded `vida`/`d`.
+- **Bosses** (`ENEMIGOS` 6–15, `MINIS`/`GRANDES`, `jefeDeNivel` in
+  `datos.js`): a level ending in 5 adds a mini boss to the normal wave, a
+  level ending in 0 brings a big boss **alone** (the director zeroes the
+  queue, `dir.q = 0`); only what its ability summons comes with it. Five of
+  each, rotating once all have appeared. They have `desde: Infinity`, so
+  `mezclaNivel` never picks them. Each has one `hab` with cooldown `cd`,
+  run by the director as a small state machine (`est`: 0 idle, 1 marking a
+  shockwave, 2 charging, 3 executing, 4 faded, 5 furious) that rides `zb`
+  so every screen draws the warning. `radio` is for walls (so they fit the
+  corridors), `rg` for bullets and bites, `talla` for the drawing; their
+  life is `vidaJefe` (level and players). Their bar is `#jefeBar`. Nothing
+  new goes in the log, so no rules change.
 - **Six enemy kinds** (`ENEMIGOS`, k 0–5: zombi, diablo, corredor, bruto,
   explosivo, escupidor), each entering at its `desde` level and growing its
   share by `parte` per level up to `tope` (`mezclaNivel`, zombies always
