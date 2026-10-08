@@ -508,18 +508,10 @@ El antitrampas rechazó tu partida. Quedas retenido: no puedes usar Juegos hasta
 # Los rieles del salón: mejores partidas del día y chat general (rieles.js)
 Mejores partidas || Best games || Migliori partite
 del día · en bucle || of the day · on loop || del giorno · in loop
-del día · cambian cada día || of the day · new every day || del giorno · cambiano ogni giorno
 Mejores partidas del día || Best games of the day || Migliori partite del giorno
-Hoy en el carrusel || Today in the carousel || Oggi nel carosello
-Repetición || Replay || Replica
-Partida anterior || Previous game || Partita precedente
-Partida siguiente || Next game || Partita successiva
-Sin partidas || No games yet || Nessuna partita
 Jugar a {} || Play {} || Gioca a {}
-Tubos pasados || Pipes passed || Tubi superati
 Rondas || Rounds || Round
 ronda {} || round {} || round {}
-{} tubos || {} pipes || {} tubi
 Las mejores partidas del día de los juegos del club que más se juegan, repetidas jugada por jugada. Cada día, otra alineación. || The best games of the day in the club's most played games, replayed move by move. A new lineup every day. || Le migliori partite del giorno dei giochi del club più giocati, ripetute mossa per mossa. Ogni giorno una formazione diversa.
 Mejor de hoy || Today's best || Migliore di oggi
 Mejor de ayer || Yesterday's best || Migliore di ieri
@@ -535,6 +527,36 @@ Maratón || Marathon || Maratona
 Clásico · mediano || Classic · medium || Classico · medio
 20 números || 20 numbers || 20 numeri
 La aventura · medio || The adventure · medium || L'avventura · medio
+Clásico · chico || Classic · small || Classico · piccolo
+Clásico · grande || Classic · large || Classico · grande
+Clásico · gigante || Classic · giant || Classico · gigante
+Arcade · chico || Arcade · small || Arcade · piccolo
+Arcade · mediano || Arcade · medium || Arcade · medio
+Arcade · grande || Arcade · large || Arcade · grande
+Arcade · gigante || Arcade · giant || Arcade · gigante
+Portales · chico || Portals · small || Portali · piccolo
+Portales · mediano || Portals · medium || Portali · medio
+Portales · grande || Portals · large || Portali · grande
+Portales · gigante || Portals · giant || Portali · gigante
+Contrarreloj · chico || Time attack · small || Contro il tempo · piccolo
+Contrarreloj · mediano || Time attack · medium || Contro il tempo · medio
+Contrarreloj · grande || Time attack · large || Contro il tempo · grande
+Contrarreloj · gigante || Time attack · giant || Contro il tempo · gigante
+Espejo · chico || Mirror · small || Specchio · piccolo
+Espejo · mediano || Mirror · medium || Specchio · medio
+Espejo · grande || Mirror · large || Specchio · grande
+Espejo · gigante || Mirror · giant || Specchio · gigante
+Laberinto · chico || Maze · small || Labirinto · piccolo
+Laberinto · mediano || Maze · medium || Labirinto · medio
+Laberinto · grande || Maze · large || Labirinto · grande
+Laberinto · gigante || Maze · giant || Labirinto · gigante
+Sprint · 40 líneas || Sprint · 40 lines || Sprint · 40 righe
+Ultra · 2 minutos || Ultra · 2 minutes || Ultra · 2 minuti
+10 números || 10 numbers || 10 numeri
+Un paseo · fácil || A stroll · easy || Una passeggiata · facile
+Sin miedo · difícil || Fearless · hard || Senza paura · difficile
+Ficha más alta || Highest tile || Tessera più alta
+ficha {} || tile {} || tessera {}
 {} línea · nivel {} || {} line · level {} || {} riga · livello {}
 {} líneas · nivel {} || {} lines · level {} || {} righe · livello {}
 {} fruta · largo {} || {} fruit · length {} || {} frutto · lunghezza {}

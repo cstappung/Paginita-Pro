@@ -300,7 +300,8 @@ export function watchRanks(juego, cb) {
 /* Cuánto se juega cada cosa, para ordenar el catálogo: la suma de
    `jugadas` de todas las filas de `ranks/<juego>` (una partida de cuatro
    cuenta cuatro — es tiempo de gente jugando, que es lo que se mide) y,
-   de los individuales, cuántos récords hay en `soloRanks`. Una lectura
+   de los individuales, cuántos récords hay en `soloRanks` (por juego, y
+   también por tabla: el riel elige con eso qué modo repetir). Una lectura
    al entrar; las filas son pequeñas y no hace falta escucharlas. */
 export async function leerPopularidad() {
   const [r, s] = await Promise.all([get(ref(db, R)), get(ref(db, "soloRanks")).catch(() => null)]);
@@ -309,7 +310,10 @@ export async function leerPopularidad() {
     n[juego] = Object.values(filas || {}).reduce((t, f) => t + (+(f && f.jugadas) || 0), 0);
   for (const [cat, filas] of Object.entries((s && s.val()) || {})) {
     const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|dosmil|metrorush)-/.exec(cat);
-    if (m) n["club-" + m[1]] = (n["club-" + m[1]] || 0) + Object.keys(filas || {}).length;
+    if (m) {
+      n["club-" + m[1]] = (n["club-" + m[1]] || 0) + Object.keys(filas || {}).length;
+      n[cat] = Object.keys(filas || {}).length;
+    }
   }
   /* Las filas ya están aquí, así que van también: con ellas el
      vestíbulo pinta el podio del juego destacado sin otra lectura. */
@@ -616,7 +620,7 @@ export function guardarSolo(categoria, uid, dato) {
 
 /* ---------- los rieles del salón (juegos/rieles.js) ----------
    `repeticiones/<categoría>/<uid>`: la mejor partida del día de cada
-   cuenta en los juegos del carrusel (`REPES`), con su prueba antitrampas para
+   cuenta en los juegos del riel (`REPES`), con su prueba antitrampas para
    rehacerla (rieles-datos.js). La consulta trae solo las tres con la
    clave de orden más alta, que son las mejores del último día con
    partidas: nunca la categoría entera, que traería cada prueba. */

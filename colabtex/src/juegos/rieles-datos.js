@@ -1,6 +1,6 @@
-/* Los rieles del salón (solo en PC): a la izquierda, un carrusel con las
-   mejores partidas del día de los juegos del club que más se juegan (una
-   alineación distinta cada día); a la derecha, el chat general. Esto es lo puro —qué se guarda, cómo se ordena, cuánto se
+/* Los rieles del salón (solo en PC): a la izquierda, las mejores partidas
+   del día de cuatro de los juegos del club que más se juegan (otros cuatro
+   cada día), repetidas en bucle; a la derecha, el chat general. Esto es lo puro —qué se guarda, cómo se ordena, cuánto se
    espera— para que se pueda comprobar en Node sin navegador ni Firebase
    (tests/rieles.test.cjs). El DOM vive en rieles.js y las repeticiones en
    repeticion.js.
@@ -19,35 +19,48 @@
    devuelve los mejores de hoy y, si hoy nadie jugó, los del último día con
    partidas. */
 
-/* Los juegos que pueden salir en el carrusel: los del club que se rehacen
-   jugada a jugada con su motor (repeticion.js), una tabla de cada uno.
-   FANAL y Metro Rush no están porque su prueba no se rehace cuadro a
-   cuadro, y los diarios (sopa, sudoku, Electrodle) tampoco: verlos
-   resolver es mirar una grilla quieta. `menor`: compite el tiempo (el
-   buscaminas y sortEm tienen los puntos fijos); `unidad`, cómo se dice su
-   marca. `popular` es la clave con que el salón cuenta cuánto se juega
-   cada uno (`leerPopularidad`). */
+/* Las tablas que pueden salir en el riel: todos los modos de los juegos
+   del club que se rehacen jugada a jugada con su motor (repeticion.js).
+   ALETEO y BBTAN también se pueden rehacer, pero se dejaron fuera a
+   propósito; FANAL y Metro Rush no se rehacen cuadro a cuadro, y los
+   diarios (sopa, sudoku, Electrodle) son una grilla casi quieta.
+   `menor`: compite el tiempo (el buscaminas, sortEm y el sprint de
+   Tetris tienen los puntos fijos); `unidad`, cómo se dice su marca.
+   `popular` es la clave con que el salón cuenta cuánto se juega cada
+   juego (`leerPopularidad`). */
+const tabla = (juego, titulo, cat, modo, ruta, extra) => Object.assign({ cat, juego, titulo, modo, ruta, menor: false, popular: "club-" + juego }, extra);
+const SN_MODOS = { classic: "Clásico", arcade: "Arcade", portals: "Portales", reloj: "Contrarreloj", espejo: "Espejo", laberinto: "Laberinto" };
+const SN_TAMANOS = { chico: "chico", mediano: "mediano", grande: "grande", gigante: "gigante" };
 export const REPES = [
-  { cat: "club-tetris-maraton", juego: "tetris", titulo: "Tetris", modo: "Maratón", ruta: "#solo/tetris", menor: false },
-  { cat: "club-snake-classic-mediano", juego: "snake", titulo: "Snake", modo: "Clásico · mediano", ruta: "#solo/snake", menor: false },
-  { cat: "club-sortem-20", juego: "sortem", titulo: "sortEm", modo: "20 números", ruta: "#solo/sortem", menor: true },
-  { cat: "club-minas-medium", juego: "minas", titulo: "Buscaminas", modo: "La aventura · medio", ruta: "#solo/minas", menor: true },
-  { cat: "club-dosmil-puntos", juego: "dosmil", titulo: "2048", modo: "Puntos", ruta: "#solo/dosmil", menor: false },
-  { cat: "club-aleteo-vuelo", juego: "aleteo", titulo: "ALETEO", modo: "Tubos pasados", ruta: "#solo/aleteo", menor: false, unidad: "tubos" },
-  { cat: "club-bbtan-rondas", juego: "bbtan", titulo: "BBTAN", modo: "Rondas", ruta: "#solo/bbtan", menor: false, unidad: "ronda" }
-].map(r => Object.assign(r, { popular: "club-" + r.juego }));
+  tabla("tetris", "Tetris", "club-tetris-maraton", "Maratón", "#solo/tetris"),
+  tabla("tetris", "Tetris", "club-tetris-sprint", "Sprint · 40 líneas", "#solo/tetris", { menor: true }),
+  tabla("tetris", "Tetris", "club-tetris-ultra", "Ultra · 2 minutos", "#solo/tetris"),
+  ...Object.entries(SN_MODOS).flatMap(([m, nm]) => Object.entries(SN_TAMANOS).map(([t, nt]) =>
+    tabla("snake", "Snake", `club-snake-${m}-${t}`, `${nm} · ${nt}`, "#solo/snake"))),
+  tabla("sortem", "sortEm", "club-sortem-10", "10 números", "#solo/sortem", { menor: true }),
+  tabla("sortem", "sortEm", "club-sortem-20", "20 números", "#solo/sortem", { menor: true }),
+  tabla("minas", "Buscaminas", "club-minas-easy", "Un paseo · fácil", "#solo/minas", { menor: true }),
+  tabla("minas", "Buscaminas", "club-minas-medium", "La aventura · medio", "#solo/minas", { menor: true }),
+  tabla("minas", "Buscaminas", "club-minas-hard", "Sin miedo · difícil", "#solo/minas", { menor: true }),
+  tabla("dosmil", "2048", "club-dosmil-puntos", "Puntos", "#solo/dosmil"),
+  tabla("dosmil", "2048", "club-dosmil-ficha", "Ficha más alta", "#solo/dosmil", { unidad: "ficha" })
+];
+/* Los juegos, una vez cada uno, en el orden de `REPES`. */
+export const JUEGOS_REP = [...new Set(REPES.map(r => r.juego))];
 export const repDe = cat => REPES.find(r => r.cat === cat) || null;
 
 /* ---------- la alineación del día ----------
-   Cada día salen `POR_DIA` de esos juegos, en el orden en que pasan.
-   Primero se ordenan por cuánto se juegan (`popular`, lo que el salón ya
-   lee para ordenar el catálogo; empate: el orden de `REPES`), y después se
-   sortean sin reponer con el día como semilla y un peso que baja con el
-   puesto: el más jugado pesa `REPES.length`, el último 1. Así lo que más
-   se juega sale casi todos los días, lo demás va rotando, y todos los que
-   abren el salón el mismo día ven la misma alineación (la popularidad
-   cambia despacio y llega de la misma lectura para todos). */
-export const POR_DIA = 5;
+   Cada día salen `POR_DIA` juegos distintos, cada uno con uno de sus
+   modos, en el orden en que se apilan. Los juegos se ordenan por cuánto se
+   juegan (`popular`, lo que el salón ya lee para ordenar el catálogo;
+   empate: el orden de `REPES`) y se sortean sin reponer con el día como
+   semilla y un peso que baja con el puesto: el más jugado pesa tanto como
+   juegos hay, el último 1. Después, el modo de cada uno se sortea con la
+   misma semilla entre sus tablas que tienen récords (peso: la raíz de
+   cuántos, así los modos chicos también salen); sin ese dato, entre todas.
+   Así lo más jugado sale casi todos los días, los modos van rotando, y
+   todos los que abren el salón el mismo día ven la misma alineación. */
+export const POR_DIA = 4;
 function azar(semilla) {
   let a = semilla >>> 0;
   return () => {
@@ -57,17 +70,24 @@ function azar(semilla) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
+function sortea(r, items, peso) {
+  const total = items.reduce((s, x) => s + peso(x), 0);
+  if (!(total > 0)) return Math.floor(r() * items.length);
+  let tiro = r() * total, j = 0;
+  while (j < items.length - 1 && (tiro -= peso(items[j])) >= 0) j++;
+  return j;
+}
+const cuenta = (popular, k) => +((popular || {})[k]) || 0;
 export function masJugados(popular) {
-  const n = r => +((popular || {})[r.popular]) || 0;
-  return REPES.map((r, i) => ({ r, i })).sort((a, b) => n(b.r) - n(a.r) || a.i - b.i).map(x => x.r);
+  return JUEGOS_REP.map((j, i) => ({ j, i })).sort((a, b) => cuenta(popular, "club-" + b.j) - cuenta(popular, "club-" + a.j) || a.i - b.i).map(x => x.j);
 }
 export function alineacionDelDia(dia, popular, cuantos = POR_DIA) {
-  const orden = masJugados(popular), azarDia = azar(Math.imul((dia | 0) + 1, 0x9E3779B1) ^ 0x5EED);
-  const quedan = orden.map((r, i) => ({ r, peso: orden.length - i })), out = [];
+  const orden = masJugados(popular), r = azar(Math.imul((dia | 0) + 1, 0x9E3779B1) ^ 0x5EED);
+  const quedan = orden.map((j, i) => ({ j, peso: orden.length - i })), out = [];
   while (out.length < cuantos && quedan.length) {
-    let tiro = azarDia() * quedan.reduce((s, x) => s + x.peso, 0), j = 0;
-    while (j < quedan.length - 1 && (tiro -= quedan[j].peso) >= 0) j++;
-    out.push(quedan.splice(j, 1)[0].r);
+    const { j } = quedan.splice(sortea(r, quedan, x => x.peso), 1)[0];
+    const modos = REPES.filter(t => t.juego === j);
+    out.push(modos[sortea(r, modos, t => Math.sqrt(cuenta(popular, t.cat)))]);
   }
   return out;
 }
@@ -117,14 +137,8 @@ export function etiquetaDia(dia, hoy) {
 /* La repetición va siempre a la velocidad a la que se jugó, aunque la
    partida dure media hora: acelerada (lo hacía hasta ×4 con las de más de
    dos minutos), una Maratón de Tetris dejaba de parecerse a jugarla. */
-/* Lo que se queda quieto el tablero final antes de pasar a la siguiente. */
+/* Lo que se queda quieto el tablero final antes de volver a empezar. */
 export const PAUSA_FINAL_MS = 2600;
-/* En el carrusel cada partida pasa una vez y deja el sitio a la siguiente.
-   Una partida larga no se acelera: se ve su último tramo, `TRAMO_MS`, que
-   es donde se decide la marca (el final de la Maratón, los últimos tubos).
-   Una tabla sin partidas se salta después de `VACIA_MS`. */
-export const TRAMO_MS = 90000, VACIA_MS = 6000;
-export const desdeRep = dur => Math.max(0, dur - TRAMO_MS);
 
 /* «4:07», «38,2 s»: el tiempo de una partida, como en el club. */
 export function formatoTiempo(ms) {
@@ -139,6 +153,7 @@ export const formatoPuntos = n => Number.isFinite(n) ? Math.round(n).toLocaleStr
 export function formatoMarca(rep, p, t) {
   if (rep.menor) return formatoTiempo(t);
   if (rep.unidad === "ronda") return "ronda " + formatoPuntos(p);
+  if (rep.unidad === "ficha") return "ficha " + formatoPuntos(p);
   return formatoPuntos(p) + " " + (rep.unidad || "pts");
 }
 

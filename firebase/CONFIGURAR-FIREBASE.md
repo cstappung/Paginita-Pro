@@ -201,6 +201,13 @@ y están en el repositorio público, como cualquier archivo del sitio.
 > `users/<uid>/club/dosmil`, que ya era de su dueño. Hasta volver a publicar
 > las reglas se juega igual, pero las partidas no entran en la clasificación
 > y no pagan monedas.
+>
+> **Corrección (8 de octubre de 2026):** el `.validate` de `puntos` en
+> `soloRanks` dejaba al 2048 en el tope general de 100 000, así que un
+> puntaje mayor (o la ficha 131 072 / 262 144) se rechazaba con
+> `PERMISSION_DENIED` y el récord no se guardaba. Ahora `club-dosmil-puntos`
+> llega a 4 000 000 y `club-dosmil-ficha` a 1 000 000. Hay que volver a
+> publicar las reglas.
 
 > **Metro Rush (octubre de 2026):** `club-metrorush-carrera` (los puntos de la
 > mejor carrera, con tope de 1 000 000 000, porque en el juego se llega a
@@ -495,17 +502,18 @@ Tres nodos nuevos, para lo que se ve a los lados del salón en un PC ancho
   desde el anterior**: la espera la pone la base, no la página. Solo lo lee
   su dueño.
 - `repeticiones/<categoría>/<uid>` — la mejor partida del día de cada cuenta
-  en los juegos del carrusel: Tetris Maratón, Snake clásico mediano, sortEm
-  de 20, el buscaminas medio, 2048 por puntos, ALETEO y BBTAN, con su prueba
-  antitrampas para que el salón la repita. Solo esas siete categorías, solo
+  en los juegos que rotan en el riel, en todos sus modos: Tetris (maratón,
+  sprint, ultra), Snake (los seis modos en los cuatro tamaños), sortEm (10 y
+  20), el buscaminas (fácil, medio, difícil) y 2048 (puntos y ficha), con su
+  prueba antitrampas para que el salón la repita. Solo esas categorías, solo
   el día de hoy (en Chile), y solo si mejora la que ya había; `o` (la clave
   por la que se ordena) la recalcula la regla.
 
 Sin publicar, el chat dice que espera las reglas y el riel de la izquierda
 repite el récord histórico de cada tabla (que ya está en `soloPruebas`).
-**2048, ALETEO y BBTAN se sumaron después**: con las reglas de antes, el
-carrusel ya los muestra con su récord histórico, pero la mejor partida *del
-día* de esos tres solo se guarda después de volver a publicar. El
+**Los modos nuevos se sumaron después**: con las reglas de antes, el riel
+ya los muestra con su récord histórico, pero la mejor partida *del día* de
+esos modos solo se guarda después de volver a publicar. El
 arreglo es el de siempre: pegar `firebase/database.rules.json` entero y
 **Publicar**.
 
