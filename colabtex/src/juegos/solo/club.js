@@ -89,6 +89,8 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
     const d=e.data;
     if(d.tipo==='alto'&&Number.isFinite(d.alto)){if(juego==='sortem')return;frame.style.height=Math.min(4000,Math.max(320,d.alto))+'px';return;}
     if(d.tipo==='volver'){volver();return;}
+    // Modo celular: mientras se juega, el iframe ocupa toda la ventana (como sortEm).
+    if(d.tipo==='inmersivo'){document.documentElement.classList.toggle('jg-club-inm',!!d.v);return;}
     if(d.tipo==='reintentar'){sincronizar();return;}
     /* La partida a medias vive en la cuenta: el juego la pide al abrir y la
        manda al empezar cada ronda. Si no hay cuenta o falla, sigue la local. */
@@ -133,9 +135,9 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
     temaObserver.observe(document.documentElement,{attributes:true,attributeFilter:['data-tema']});
     frame.allow='fullscreen';frame.setAttribute('allowfullscreen','');
     window.addEventListener('message',mensaje);
-    frame.src='juegos/club/'+juego+'/index.html?v=club-44&embed=1&cuenta='+encodeURIComponent(cuenta)+(invitado?'&invitado=1':'');
+    frame.src='juegos/club/'+juego+'/index.html?v=club-45&embed=1&cuenta='+encodeURIComponent(cuenta)+(invitado?'&invitado=1':'');
     host.appendChild(frame);
   }
-  function destruir(){muerto=true;temaObserver?.disconnect();if(off)off();window.removeEventListener('message',mensaje);for(const [el,valor]of ocultos)el.style.display=valor;frame?.remove();host.innerHTML='';ambientar('');}
+  function destruir(){muerto=true;document.documentElement.classList.remove('jg-club-inm');temaObserver?.disconnect();if(off)off();window.removeEventListener('message',mensaje);for(const [el,valor]of ocultos)el.style.display=valor;frame?.remove();host.innerHTML='';ambientar('');}
   return {montar,destruir};
 }

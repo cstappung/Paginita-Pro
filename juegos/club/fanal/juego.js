@@ -2732,7 +2732,18 @@
     paso(dt);
   }
   /* Un paso del juego: música, pulsos, mundo y dibujo. */
+  /* Modo celular (CLAUDE.md): la travesía ocupa toda la pantalla mientras
+     dura; la pausa, el final y la portada devuelven el menú. La franja de
+     botones solo se ve mientras se rema (taller y relato se tocan sin ella). */
+  const EN_TRAVESIA = new Set(["juego", "relato", "taller", "revelacion", "final", "muriendo"]);
+  let inmVisto = null;
+  function sincronizaInmersivo() {
+    const v = EN_TRAVESIA.has(estado) && !panel;
+    if (v !== inmVisto) { inmVisto = v; if (Club && Club.inmersivo) Club.inmersivo(v); }
+    html.classList.toggle("sin-franja", estado !== "juego");
+  }
   function paso(dt) {
+    sincronizaInmersivo();
     if (estado !== "pausa") {
       tMusica += dt;
       musica.avanza(tMusica, dt);

@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610080838"></script>
+<script src="i18n.js?v=202610081622"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Laboratorio</title>
@@ -1641,6 +1641,36 @@ try { var t = localStorage.getItem("jg.tema");
   .jg-aj .jg-aj-col{max-width:calc(100vh - 30px);margin:0 auto}
   .jg-orb-lienzo{max-width:calc((100vh - 40px) * 1.6);margin:0 auto}
 }
+/* Modo celular de la sala de Tetris (tetris.js pone html.jg-tt-inm solo en un
+   teléfono en vertical y mientras uno juega): la sala tapa toda la pantalla.
+   Arriba una barra fina con la fase y los datos; en medio el pozo, con la
+   guardada y las siguientes en una columna estrecha a la izquierda y los
+   pozos rivales en otra a la derecha; abajo la franja de botones. `yo` y los
+   lados son `display:contents` para que sus piezas caigan en la rejilla. */
+html.jg-tt-inm,html.jg-tt-inm body{overflow:hidden;height:100%;overscroll-behavior:none}
+html.jg-tt-inm .head,html.jg-tt-inm .bar,html.jg-tt-inm .rp-fab,html.jg-tt-inm .jg-cg-fab,html.jg-tt-inm .jg-riel,html.jg-tt-inm .jg-partida-layout>.jg-chat{display:none!important}
+html.jg-tt-inm .jg-tt{--col:clamp(44px,13vw,60px);--riv:clamp(52px,16vw,72px);--barra:30px;--franja:clamp(60px,15dvh,96px);--sa-t:env(safe-area-inset-top);--sa-b:env(safe-area-inset-bottom);--sa-l:env(safe-area-inset-left);--sa-r:env(safe-area-inset-right);
+  position:fixed;inset:0;z-index:40;height:100dvh;margin:0;border-radius:0;padding:var(--sa-t) var(--sa-r) var(--sa-b) var(--sa-l);overflow:hidden;
+  display:grid;gap:4px;grid-template-columns:var(--col) minmax(0,1fr) var(--riv);grid-template-rows:var(--barra) auto minmax(0,1fr) var(--franja);
+  grid-template-areas:"barra barra barra" "guarda pozo riv" "cola pozo riv" "tac tac tac";
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:none}
+html.jg-tt-inm .jg-tt .jg-tablero.jg-tt-sala,html.jg-tt-inm .jg-tt-yo,html.jg-tt-inm .jg-tt-lado{display:contents}
+html.jg-tt-inm .jg-tt-lado small,html.jg-tt-inm .jg-tt-hist,html.jg-tt-inm .jg-tt-ayuda,html.jg-tt-inm .jg-tt-tactil [data-a=contragira]{display:none}
+:root html.jg-tt-inm .jg-tt .jg-barra{grid-area:barra;margin:0;padding:0 10px;min-height:0;height:var(--barra);align-items:center;flex-wrap:nowrap;font-size:12px;background:#111829cc;border-radius:0;white-space:nowrap;overflow:hidden}
+html.jg-tt-inm #ttDatos{grid-area:barra;justify-self:end;align-self:center;z-index:1;display:flex;flex-direction:row;gap:8px;width:auto;padding-right:10px}
+html.jg-tt-inm #ttDatos p{flex-direction:row;align-items:baseline;gap:3px;padding:0;background:none}
+html.jg-tt-inm #ttDatos small{font-size:9px;color:#8fa0bb}html.jg-tt-inm #ttDatos b{font-size:13px}
+html.jg-tt-inm #ttGuarda{grid-area:guarda;width:100%;height:auto;margin:4px 0 0 4px}
+html.jg-tt-inm #ttCola{grid-area:cola;width:100%;height:auto;margin-left:4px;align-self:start}
+html.jg-tt-inm .jg-tt-pozo{grid-area:pozo;justify-self:center;align-self:center;min-width:0}
+html.jg-tt-inm .jg-tt-pozo canvas{max-width:none;max-height:none;height:auto;width:min(calc(100vw - var(--sa-l) - var(--sa-r) - var(--col) - var(--riv) - 32px),calc((100dvh - var(--sa-t) - var(--sa-b) - var(--barra) - var(--franja) - 16px) / 2))}
+html.jg-tt-inm .jg-tt-rivales{grid-column:3;grid-row:2/4;flex-direction:column;flex-wrap:nowrap;justify-content:flex-start;gap:6px;margin:0;padding:4px 4px 0 0;max-width:none;overflow-y:auto;scrollbar-width:none}
+html.jg-tt-inm .jg-tt-rival{font-size:9px;gap:1px;max-width:100%}
+html.jg-tt-inm .jg-tt-rival .nom{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+html.jg-tt-inm .jg-tt-rival .dat{font-size:8px}
+html.jg-tt-inm .jg-tt-rival canvas{width:100%;height:auto}
+html.jg-tt-inm .jg-tt-tactil{grid-area:tac;display:flex!important;flex-wrap:nowrap;gap:6px;margin:0;padding:4px 6px 6px;align-items:stretch;height:var(--franja)}
+html.jg-tt-inm .jg-tt-tactil button{flex:1 1 0;min-width:0;min-height:48px;font-size:24px}
 /* Tetris: lo que hace sentir el ataque (fx.js pinta dentro del pozo; esto es lo de fuera). */
 .jg-tt-pozo canvas{will-change:transform}
 .jg-tt-pozo.atacado canvas{animation:jgTtAtacado .6s ease-out}
@@ -2283,6 +2313,13 @@ html.jg-sortem,html.jg-sortem body{overflow:hidden;height:100%}
 html.jg-sortem .head,html.jg-sortem .bar,html.jg-sortem .rp-fab,html.jg-sortem .jg-solo-barra{display:none!important}
 html.jg-sortem #pantalla{position:fixed;inset:0;z-index:1;margin:0;max-width:none;padding:0;background:#10051f}
 html.jg-sortem .jg-solo-frame{height:100%!important}
+/* Modo celular de los juegos del Club (Tetris, ALETEO, FANAL): mientras se
+   juega, el iframe ocupa la ventana entera; la pausa y el fin lo devuelven
+   (club.js recibe `inmersivo` del juego). */
+html.jg-club-inm,html.jg-club-inm body{overflow:hidden;height:100%;overscroll-behavior:none}
+html.jg-club-inm .head,html.jg-club-inm .bar,html.jg-club-inm .rp-fab,html.jg-club-inm .jg-solo-barra,html.jg-club-inm .jg-cg-fab,html.jg-club-inm .jg-riel{display:none!important}
+html.jg-club-inm #pantalla{position:fixed;inset:0;z-index:30;margin:0;max-width:none;padding:0;background:#000}
+html.jg-club-inm .jg-solo-frame{height:100%!important;width:100%;border:0;border-radius:0;display:block}
 /* PRODROP: el abridor ocupa la ventana, como sortEm (su barra trae «← Juegos» y el saldo). */
 html.jg-prodrop,html.jg-prodrop body{overflow:hidden;height:100%}
 html.jg-prodrop .head,html.jg-prodrop .bar,html.jg-prodrop .rp-fab{display:none!important}
@@ -4376,6 +4413,6 @@ html[data-tema=oscuro] .jg-adm-tabs .btn2.on{background:#ab8bff;color:#171522;bo
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610080838"></script>
+<script src="juegos-app.js?v=202610081622"></script>
 </body>
 </html>

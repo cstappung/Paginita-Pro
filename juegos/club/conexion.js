@@ -7,7 +7,7 @@
   // se lee ni se escribe; el panel lo dice y no ofrece «reintentar».
   const invitado=new URLSearchParams(location.search).get('invitado')==='1';
   const AVISO_INVITADO='Modo invitado: esta partida no se guarda ni entra en la clasificación. Inicia sesión en Juegos para competir.';
-  let categoria='',lista,estado,propio,alPartida=null;
+  let categoria='',lista,estado,propio,alPartida=null,quiere=false;
   const enviar=d=>{if(embebido)parent.postMessage({canal:'club-child',...d},location.origin);};
   /* `result(dato, prueba)`: la prueba es lo que el verificador de cada juego
      necesita para rehacer la partida (docs/antitrampas.md). Si la página
@@ -18,8 +18,17 @@
     result(dato,prueba){const {prueba:p0,...resto}=dato||{};enviar({tipo:'resultado',...resto,partida:crypto.randomUUID(),prueba:prueba===undefined?p0:prueba});},
     // La partida a medias, en la cuenta (solo dentro de Juegos).
     guardarPartida(texto){enviar({tipo:'partida-guardar',d:texto||null,at:Date.now()});},
-    pedirPartida(cb){if(!embebido){cb(null);return;}alPartida=cb;enviar({tipo:'partida-pedir'});}
+    pedirPartida(cb){if(!embebido){cb(null);return;}alPartida=cb;enviar({tipo:'partida-pedir'});},
+    /* Pantalla completa en celular mientras se juega (CLAUDE.md, «Modo
+       celular»): solo en pantallas táctiles de 600 px o menos, medidas en la
+       ventana de arriba, porque el iframe mide lo que la página le dio. */
+    celular(){const m=w=>matchMedia('(pointer:coarse)').matches&&Math.min(w.innerWidth,w.innerHeight)<=600&&w.innerHeight>w.innerWidth;try{return m(window.top);}catch(e){return m(window);}},
+    inmersivo(on){quiere=!!on;const v=quiere&&window.Club.celular();
+      for(const el of document.querySelectorAll('.i18n-flota'))el.style.visibility=v?'hidden':'';
+      if(document.documentElement.classList.contains('club-inm')===v)return v;document.documentElement.classList.toggle('club-inm',v);enviar({tipo:'inmersivo',v});return v;}
   });
+  /* Girar el teléfono a horizontal sale del modo; volver a vertical lo recupera. */
+  addEventListener('resize',()=>{if(quiere)window.Club.inmersivo(true);});
   document.addEventListener('DOMContentLoaded',()=>{
     const shell=document.querySelector('.site-shell,.shell');
     const volver=document.createElement('a');volver.textContent='← Volver a Juegos';volver.href='../../../juegos.html';volver.className='club-volver';
