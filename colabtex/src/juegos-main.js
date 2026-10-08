@@ -1725,9 +1725,9 @@ const NOVEDADES = [
   { id: "sudoku", color: "#ff2fb4", alta: "2026-10-04", titulo: "Sudoku Arcade",
     lema: "El sudoku del día con su racha, el clásico en cuatro dificultades y el arcade: tres vidas, combos de hasta ×4 y premio por cerrar filas, columnas y cajas.",
     sub: "Un jugador · diario, clásico y arcade", ruta: "#solo/sudoku", boton: "Jugar", reglas: ["sudoku"], modo: "solo" },
-  { id: "fanal", color: "#d9a85b", alta: "2026-10-04", titulo: "FANAL",
-    lema: "Llevas la última luz a través de la noche, hacia el Alba. Las polillas bajan en formación hacia ella. Dispara al pulso de la música… y averigua qué estás apagando.",
-    sub: "Un jugador · trece jornadas, tres jefes y una travesía sin fin", ruta: "#solo/fanal", boton: "Encender", reglas: ["fanal"], modo: "solo" },
+  { id: "fanal", color: "#d9a85b", alta: "2026-10-08", titulo: "FANAL · la otra orilla",
+    lema: "Llevas la última luz a través de la noche, hacia el Alba… y más allá: la otra orilla, los cascos, la seda y la Hoguera. Cada jornada da una brasa para mejorar el arma o el fanal, y cada tres, evolucionan. Dispara al pulso de la música… y averigua qué estás apagando.",
+    sub: "Un jugador · veinticinco jornadas, siete jefes, taller de mejoras y una travesía sin fin", ruta: "#solo/fanal", boton: "Encender", reglas: ["fanal"], modo: "solo" },
   { id: "prodrop", color: "#9b4dff", alta: "2026-10-02", titulo: "PRODROP · sobres y mercado",
     lema: "Sobres de cinco cartas, de los profes o de componentes, y uno gratis cada 6 horas. Gradúalas, exhíbelas en tu perfil, véndelas en el mercado, cámbialas con otros o junta diez para un re-roll.",
     sub: () => { const a = fb.ahora(), p = MOTOR.precioSobre(a);

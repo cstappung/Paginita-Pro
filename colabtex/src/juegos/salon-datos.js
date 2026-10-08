@@ -68,7 +68,7 @@ export const SOLOS = [
     modos: ["Diario", "Clásico", "Arcade"] },
   { id: "fanal", tipo: "club", nombre: "FANAL", genero: "Arcade", icono: "🪔", alta: "2026-10-04",
     ruta: "#solo/fanal", reglas: "fanal", popular: "club-fanal", ranking: true,
-    lema: "Llevas la última luz a través de la noche, hacia el Alba. Dispara al pulso de la música.",
+    lema: "Llevas la última luz a través de la noche, hacia el Alba y más allá. Mejora el arma y el fanal con las brasas de cada jornada.",
     modos: ["Travesía", "Sin fin"] },
   { id: "atasco", tipo: "club", nombre: "Atasco", genero: "Puzzle", icono: "🚗", alta: "2026-10-05",
     ruta: "#solo/atasco", reglas: "atasco", popular: "club-atasco", ranking: true,

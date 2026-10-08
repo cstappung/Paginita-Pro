@@ -5,7 +5,7 @@ const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path');
 const sin=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8').replace(/^import [\s\S]*?;$/mg,'').replace(/\bexport\s+/g,'');
 const ctx={};vm.createContext(ctx);
 vm.runInContext(sin('src/juegos/motor.js')+'\n'+sin('src/juegos/logros.js')+'\n'+sin('src/juegos/tienda.js')+'\n'+sin('src/juegos/cortes.js')+'\n'+sin('src/juegos/monedas.js')+
- ';globalThis.__M={JUEGOS,LOGROS,NIVEL,PESO,VALOR_NIVEL,TARIFA,RECORD,monedasDe,topMonedas,registraDia,rachaHoy,pagoDia,diaChile,valorLogro,nivelDe,monedasBbtan,monedasSortem,registraJugadaClub,PAGO_CLUB,TOPE_CLUB_DIA,TOPE_BBTAN_DIA,topeClub,JUEGOS_CLUB,PODIO,podioValido,ultimosPodios}',ctx);
+ ';globalThis.__M={JUEGOS,LOGROS,NIVEL,PESO,VALOR_NIVEL,TARIFA,RECORD,monedasDe,topMonedas,registraDia,rachaHoy,pagoDia,diaChile,valorLogro,nivelDe,monedasBbtan,monedasFanal,monedasSortem,registraJugadaClub,PAGO_CLUB,TOPE_CLUB_DIA,TOPE_BBTAN_DIA,topeClub,JUEGOS_CLUB,PODIO,podioValido,ultimosPodios}',ctx);
 const M=ctx.__M;
 
 test('cada logro tiene su nivel, y cada juego de sala su peso',()=>{
@@ -130,8 +130,10 @@ test('Sudoku Arcade: récord, racha, arcade y partidas del club',()=>{
 test('FANAL: récord, jornadas, puntos y partidas del club',()=>{
  assert.ok(M.JUEGOS_CLUB.includes('fanal'));assert.ok(M.PAGO_CLUB.fanal>0);
  const d={solo:{'club-fanal-travesia':{a:{puntos:45000,tiempo:1}},'club-fanal-jornadas':{a:{puntos:13,tiempo:1}}}};
- // dos modalidades con marca (40 cada una), 10 por jornada completada y 1 por cada 1000 puntos
- assert.equal(M.monedasDe('a',d).partes.records,2*M.RECORD.fanal+130+45);
+  // dos modalidades con marca (40 cada una), las jornadas como BBTAN (13 son 520) y 1 por cada 1000 puntos
+ assert.equal(M.monedasDe('a',d).partes.records,2*M.RECORD.fanal+520+45);
+ assert.equal(M.monedasFanal(25),1750);assert.equal(M.monedasFanal(100),19120);assert.equal(M.monedasFanal(500),M.monedasFanal(160));
+ for(let j=1;j<=60;j++)assert.ok(M.monedasFanal(j)>=10*j&&M.monedasFanal(j)>M.monedasFanal(j-1),'nunca menos que antes: '+j);
  assert.equal(M.nivelDe('fanal','alba'),3);assert.equal(M.nivelDe('fanal','s250k'),4);
 });
 test('Atasco: récord, 4 monedas por estrella y partidas del club',()=>{

@@ -105,6 +105,51 @@
       naufragio: { m: "#1e2836", n: "#121a24", k: "#2e3c50", h: "#5a7aa8", g: "#8fb0e0" },
       acento: "#8fb0e0"
       // las polillas del sin fin se tiñen a partir del acto que recorren (ver paletaPolilla)
+    },
+    /* La otra orilla. V · los cascos: agua negra, cobre verdoso y óxido. */
+    6: {
+      nombre: "cascos",
+      cielo: ["#060c10", "#0c1a1e", "#16282a"],
+      estrella: ["#cfe6e0", "#a8c8c0", "#8aa8a4"],
+      nube: ["#1c3236", "#2e4a4c"],                      // agua quieta
+      particula: "#7aa8a0",                              // burbujas que suben
+      sombra: "#04080a",
+      escama: ["#d0f0e8", "#5ab8a8"],
+      naufragio: { m: "#3a3028", n: "#241c16", k: "#5a4a3a", h: "#8a6a3a", g: "#c89a52" },
+      a: { a: "#6a5a4a", b: "#8a6a4a", B: "#5a4232", e: "#c8a070", f: "#a88a62", c: "#3a2a20", d: "#7a5a40" },   // carcoma
+      b: { a: "#6a7a76", b: "#a8b8b0", B: "#6a7a74", e: "#d8e4dc", f: "#c8d6ce", c: "#4a5652", d: "#8a9a94" },   // polilla de vela
+      c: { a: "#3a6a62", b: "#4a8a7a", B: "#2a5a50", e: "#a8e0c8", f: "#78c0a8", c: "#24403a", d: "#5a9a88" },   // polilla ancla
+      acento: "#5ab8a8"
+    },
+    /* VI · la seda: lila y hueso, capullos y colas largas. */
+    7: {
+      nombre: "seda",
+      cielo: ["#14101c", "#241a2e", "#3a2a40"],
+      estrella: ["#fff0f6", "#f0d8e8", "#d8c0d8"],
+      nube: ["#4a3850", "#7a6080"],
+      particula: "#f0e0f0",                              // hebras sueltas
+      sombra: "#0e0a14",
+      escama: ["#fff4fa", "#e0a8d0"],
+      naufragio: { m: "#5a4a58", n: "#3a2e3a", k: "#7a6a78", h: "#d8c8d8", g: "#f0e4f0" },
+      a: { a: "#c8b8b0", b: "#f2ece2", B: "#d0c6b8", e: "#fffaf2", f: "#ffffff", c: "#b8a898", d: "#e8dccc" },   // polilla de la seda
+      b: { a: "#c87aa0", b: "#f0a8c8", B: "#c07898", e: "#ffe0ee", f: "#ffd0e4", c: "#8a4a68", d: "#d890b0" },   // luna rosa
+      c: { a: "#8a6a50", b: "#9a6aa8", B: "#6a4a7a", e: "#fff0d8", f: "#d8a8e0", c: "#5a3a48", d: "#b08a70" },   // atlas
+      acento: "#e0a8d0"
+    },
+    /* VII · la hoguera: brasa, ceniza y oro. Por primera vez sobra luz. */
+    8: {
+      nombre: "hoguera",
+      cielo: ["#140604", "#2a0c06", "#4a1a08"],
+      estrella: ["#ffd8a0", "#ffb070", "#ff8a50"],
+      nube: ["#3a1206", "#6a2a0a"],
+      particula: "#ffb060",                              // chispas que suben
+      sombra: "#0e0402",
+      escama: ["#fff0b0", "#ff6a20"],
+      naufragio: { m: "#3a2418", n: "#24140c", k: "#5a3a22", h: "#ff8a3a", g: "#ffd070" },
+      a: { a: "#ffb060", b: "#ff8a2a", B: "#c8501a", e: "#fff0a0", f: "#ffd070", c: "#6a2a10", d: "#ff6a20" },   // chispa
+      b: { a: "#6a5a50", b: "#3a3030", B: "#241c1c", e: "#ff9a40", f: "#ff6a20", c: "#2a2020", d: "#5a4a40" },   // ceniza encendida
+      c: { a: "#ffd070", b: "#e84a1a", B: "#a02a10", e: "#ffe080", f: "#ffb040", c: "#5a1a0a", d: "#ff8a2a" },   // fénix menor
+      acento: "#ff8a3a"
     }
   };
 
@@ -359,6 +404,214 @@
   POLILLAS[4].b = POLILLAS[3].b;   // sombras: la forma rota de lo oscuro
   POLILLAS[4].c = POLILLAS[4].a;   // por si una oleada del alba pidiera la c
 
+  /* La otra orilla. Acto V · los cascos. */
+  POLILLAS[6] = {
+    // a · carcoma: rechoncha, de alas cortas, la que agujerea los cascos.
+    a: [[
+      "..a.....a..",
+      "...a...a...",
+      "..bbcdcbb..",
+      ".bebcdcbeb.",
+      "bbbBcdcBbbb",
+      "bBbbcccbbBb",
+      ".bBb.c.bBb.",
+      "..b.....b..",
+      "..........."
+    ], [
+      "..a.....a..",
+      "...a...a...",
+      "...bcdcb...",
+      "..bbcdcbb..",
+      ".bebcdcbeb.",
+      ".bBbcccbBb.",
+      "..bb.c.bb..",
+      "...b...b...",
+      "..........."
+    ]],
+    // b · polilla de vela: alas rotas como una vela vieja.
+    b: [[
+      ".a.......a.",
+      "..a.....a..",
+      "f.bbcdcbb.f",
+      "fbbbcdcbbbf",
+      "b.ebcdcbe.b",
+      "bbbBcdcBbbb",
+      "b.bBcccBb.b",
+      "..b..c..b..",
+      ".b.......b."
+    ], [
+      ".a.......a.",
+      "..a.....a..",
+      "...bcdcb...",
+      "..fbcdcbf..",
+      ".fbecdcebf.",
+      ".bbBcdcBbb.",
+      ".b.BcccB.b.",
+      "..b..c..b..",
+      "..........."
+    ]],
+    // c · polilla ancla: las alas de atrás caen como los brazos de un ancla.
+    c: [[
+      "....a.a....",
+      ".....d.....",
+      "....cdc....",
+      "bb.bcdcb.bb",
+      "bbbbcdcbbbb",
+      ".beBcdcBeb.",
+      "..bBcdcBb..",
+      ".ff.ccc.ff.",
+      "f.........f"
+    ], [
+      "....a.a....",
+      ".....d.....",
+      "....cdc....",
+      "...bcdcb...",
+      ".bbbcdcbbb.",
+      "bbeBcdcBebb",
+      "b.bBcdcBb.b",
+      "..f.ccc.f..",
+      ".f.......f."
+    ]]
+  };
+  /* Acto VI · la seda. */
+  POLILLAS[7] = {
+    // a · polilla de la seda: blanca, peluda, de alas chicas.
+    a: [[
+      "..a.....a..",
+      "..aa...aa..",
+      "...bcccb...",
+      ".bbbcdcbbb.",
+      "bbebcdcbebb",
+      "bbbbcdcbbbb",
+      ".bBbcccbBb.",
+      "..bb.c.bb..",
+      "..........."
+    ], [
+      "..a.....a..",
+      "..aa...aa..",
+      "...bcccb...",
+      "..bbcdcbb..",
+      ".bebcdcbeb.",
+      ".bbbcdcbbb.",
+      "..bBcccBb..",
+      "...b.c.b...",
+      "..........."
+    ]],
+    // b · luna rosa: dos colas largas.
+    b: [[
+      "..a.....a..",
+      "...a...a...",
+      "ffbbcdcbbff",
+      "fbebcdcbebf",
+      ".bbbcdcbbb.",
+      "..bBcdcBb..",
+      "..fbcccbf..",
+      "..f..c..f..",
+      ".f.......f."
+    ], [
+      "..a.....a..",
+      "...a...a...",
+      "..fbcdcbf..",
+      ".fbecdcebf.",
+      "..bbcdcbb..",
+      "..bBcdcBb..",
+      "...bcccb...",
+      "...f.c.f...",
+      "..f.....f.."
+    ]],
+    // c · atlas: alas enormes con ventanas claras.
+    c: [[
+      "...a...a...",
+      "....a.a....",
+      "bbbbcdcbbbb",
+      "bebbcdcbbeb",
+      "bbebcdcbebb",
+      "fbbBcdcBbbf",
+      ".fbBcccBbf.",
+      "..ff.c.ff..",
+      "..........."
+    ], [
+      "...a...a...",
+      "....a.a....",
+      "..bbcdcbb..",
+      ".bebcdcbeb.",
+      ".bbecdcebb.",
+      ".fbBcdcBbf.",
+      "..fBcccBf..",
+      "...f.c.f...",
+      "..........."
+    ]]
+  };
+  /* Acto VII · la hoguera. */
+  POLILLAS[8] = {
+    // a · chispa: chica, con alas como lenguas de fuego.
+    a: [[
+      "...a...a...",
+      "....a.a....",
+      "...bcdcb...",
+      "..bbcdcbb..",
+      ".bebcdcbeb.",
+      ".bbBcdcBbb.",
+      "..fBcccBf..",
+      "..f..c..f..",
+      ".f.......f."
+    ], [
+      "...a...a...",
+      "....a.a....",
+      "....cdc....",
+      "...bcdcb...",
+      "..bbcdcbb..",
+      ".bebcdcbeb.",
+      ".fbBcccBbf.",
+      "f..f.c.f..f",
+      "..........."
+    ]],
+    // b · ceniza encendida: alas negras con el borde ardiendo.
+    b: [[
+      ".a.......a.",
+      "..a.....a..",
+      ".fbbcdcbbf.",
+      "fbbbcdcbbbf",
+      "fbebcdcbebf",
+      "fbbBcdcBbbf",
+      ".fbBcccBbf.",
+      "..ff.c.ff..",
+      "..........."
+    ], [
+      ".a.......a.",
+      "..a.....a..",
+      "...fcdcf...",
+      "..fbcdcbf..",
+      ".fbecdcebf.",
+      ".fbBcdcBbf.",
+      "..fBcccBf..",
+      "...f.c.f...",
+      "..........."
+    ]],
+    // c · fénix menor: alas como llamas que suben.
+    c: [[
+      "....a.a....",
+      ".....d.....",
+      "b..bcdcb..b",
+      "bb.bcdcb.bb",
+      "bbbbcdcbbbb",
+      ".bebcdcbeb.",
+      "..fBcdcBf..",
+      ".f.fcccf.f.",
+      "f..f.c.f..f"
+    ], [
+      "....a.a....",
+      ".....d.....",
+      "...bcdcb...",
+      "..bbcdcbb..",
+      ".bbbcdcbbb.",
+      "bbebcdcbebb",
+      "b.fBcdcBf.b",
+      "..f.ccc.f..",
+      ".f..f.f..f."
+    ]]
+  };
+
   /* Una polilla chica (7×5) para las larvas de la Nodriza y las que cubren
      el Faro Ciego. */
   const MINI = [[
@@ -420,6 +673,67 @@
   ];
   /* Dónde va la llama dentro del vidrio (columna central, filas 3 y 4). */
   const LLAMA = { x: 7, y: 4 };
+  /* El fanal evoluciona (ver motor.js: nave y evolucion). Cada forma tiene
+     el mismo tamaño y la llama en el mismo sitio, para que nada se mueva
+     al cambiar: I bronce, II con su luciérnaga, III doble vidrio, IV faro
+     errante, con su corona. */
+  const FANAL_EVO = [
+    FANAL,
+    FANAL,
+    [
+      ".......h.......",
+      "......hgh......",
+      ".....hgggh.....",
+      "....hg...gh....",
+      "....hg...gh....",
+      ".....hhhhh.....",
+      "hjjjjjjjjjjjjjh",
+      "jjojjhjjjhjjojj",
+      ".jjjjjjjjjjjjj.",
+      "..kkkkkkkkkkk.."
+    ],
+    [
+      "......hhh......",
+      ".....hgggh.....",
+      "....hg...gh....",
+      "....g.....g....",
+      "....g.....g....",
+      "....hhhhhhh....",
+      "hjjjjjjjjjjjjjh",
+      "jjojjhjjjhjjojj",
+      ".jjjjjjjjjjjjj.",
+      "..kkkkkkkkkkk.."
+    ],
+    [
+      "...h...h...h...",
+      "....h.hhh.h....",
+      ".....hgggh.....",
+      "....hg...gh....",
+      "....g.....g....",
+      "....hhhhhhh....",
+      "hjjjjjjjjjjjjjh",
+      "jjojjhjjjhjjojj",
+      ".jjjjjjjjjjjjj.",
+      "..kkkkkkkkkkk.."
+    ]
+  ];
+  const PALETAS_FANAL = [
+    PALETA_FANAL,
+    { j: "#7a5434", k: "#4a3222", h: "#e8b868", g: "#fff0c0", l: "#2e2018", o: "#c8903e" },
+    { j: "#7a5434", k: "#4a3222", h: "#e8b868", g: "#fff0c0", l: "#2e2018", o: "#c8903e" },
+    { j: "#7a5a3a", k: "#4a3424", h: "#f0c878", g: "#dff4ff", l: "#2e2018", o: "#d8a050" },
+    { j: "#8a6a44", k: "#5a4228", h: "#fff0c8", g: "#ffffff", l: "#2e2018", o: "#ffd27a" }
+  ];
+  /* Un fanal chico (7×7) para los que arden presos en la Hoguera. */
+  const FANALITO = [
+    "...h...",
+    "..hgh..",
+    ".hg.gh.",
+    ".g...g.",
+    ".hhhhh.",
+    "jjjjjjj",
+    ".kkkkk."
+  ];
 
   /* Los cascos hundidos que sirven de escudo: una barca dada vuelta. Su
      forma es el arco del búnker del original, con la quilla arriba. Cada
@@ -445,7 +759,11 @@
     1: [[5, 0, "k"], [5, 1, "k"], [6, 1, "k"], [4, 2, "k"], [17, 1, "h"], [18, 1, "h"]],
     2: [[10, 0, "h"], [11, 0, "g"], [12, 0, "g"], [13, 0, "h"], [9, 1, "h"], [14, 1, "h"], [6, 3, "h"], [16, 4, "h"], [3, 6, "h"]],
     3: [[11, 0, "h"], [12, 0, "h"], [10, 1, "g"], [13, 1, "g"], [10, 2, "g"], [13, 2, "g"], [11, 1, "g"], [12, 1, "g"]],
-    4: [], 5: [[11, 0, "h"], [12, 0, "h"], [10, 1, "g"], [13, 1, "g"]]
+    4: [], 5: [[11, 0, "h"], [12, 0, "h"], [10, 1, "g"], [13, 1, "g"]],
+    // V: percebes de cobre; VI: hebras de seda pegadas; VII: brasas en la quilla.
+    6: [[3, 5, "g"], [7, 3, "g"], [15, 2, "h"], [19, 4, "g"], [11, 1, "h"], [21, 7, "h"]],
+    7: [[6, 0, "g"], [6, 1, "h"], [17, 0, "g"], [17, 1, "h"], [17, 2, "g"], [11, 1, "g"]],
+    8: [[9, 0, "h"], [14, 0, "g"], [10, 1, "g"], [5, 3, "h"], [18, 3, "h"], [12, 2, "h"]]
   };
 
   /* Los iconos de los poderes, en un frasco de vidrio (r). */
@@ -697,6 +1015,100 @@
      relativo a su esquina, con las alas abiertas del todo. */
   const MARCAS_ESFINGE = [[39 - 16, 15], [39 + 16, 15], [39 - 25, 9], [39 + 25, 9], [39 - 9, 21], [39 + 9, 21]];
 
+  /* El Casco: un fanal enorme hundido, con la quilla arriba (está dado
+     vuelta) y su farol colgando abajo, todavía encendido. Cobre verde de
+     tanto tiempo bajo el agua. La llama se pinta viva. */
+  const COLORES_CASCO = { m: "#3a3028", n: "#241c16", k: "#5a4a3a", h: "#8a6a3a", g: "#c89a52", v: "#2e5a52", V: "#5a9a88", o: "#120c08", G: "#2a3a38" };
+  function casco(k, col) {
+    const W = 52, H = 40, cx = 26, c = lienzo(W, H), x = c.getContext("2d");
+    if (!x) return c;
+    col = col || COLORES_CASCO;
+    // El casco: una barca dada vuelta, con la quilla arriba.
+    poligono(x, [[3, 6], [49, 6], [44, 21], [8, 21]], col.m);
+    trazo(x, [[5, 5], [47, 5]], col.k, 2);
+    for (let i = 0; i < 4; i++) trazo(x, [[6 + i, 9 + i * 3], [46 - i, 9 + i * 3]], col.n, 1);   // tablones
+    // Cobre verde y agujeros.
+    for (const [vx, vy, r] of [[12, 10, 3], [34, 13, 2.5], [22, 17, 2], [41, 9, 2]]) elipse(x, vx, vy, r, r * 0.7, col.v);
+    for (const [vx, vy] of [[18, 12], [30, 9], [38, 17]]) elipse(x, vx, vy, 1.4, 1.2, col.o);
+    elipse(x, 13, 10, 1.4, 1, col.V); elipse(x, 35, 13, 1.2, 0.9, col.V);
+    // El mástil roto, colgando hacia abajo, y el farol al lado.
+    trazo(x, [[cx - 9, 21], [cx - 11 - k, 33]], col.k, 1.6);
+    // El farol: soporte, vidrio y remate apuntando al fanal.
+    trazo(x, [[cx, 21], [cx, 24]], col.h, 1.4);
+    poligono(x, [[cx - 6, 24], [cx + 6, 24], [cx + 6, 26], [cx - 6, 26]], col.g);
+    poligono(x, [[cx - 5, 26], [cx + 5, 26], [cx + 5, 34], [cx - 5, 34]], col.G);
+    for (const mx of [cx - 5, cx, cx + 5]) trazo(x, [[mx, 26], [mx, 34]], col.h, 1);
+    poligono(x, [[cx - 6, 34], [cx + 6, 34], [cx + 3, 37], [cx - 3, 37]], col.g);
+    elipse(x, cx, 38, 1.4, 1.2, col.h);
+    return cuantiza(c, Object.values(col));
+  }
+
+  /* La Crisálida: un capullo enorme colgado de un hilo; en su última
+     fase se abre y sale la imago, una polilla atlas pálida. */
+  const COLORES_CRISALIDA = { s: "#f2ece2", S: "#c8bcb0", b: "#a8949e", B: "#6a5a68", p: "#f0a8c8", P: "#9a5a80", c: "#5a3a48", e: "#fff8ec", a: "#d8c0a8" };
+  function crisalida(k, col) {
+    const W = 34, H = 48, cx = 17, c = lienzo(W, H), x = c.getContext("2d");
+    if (!x) return c;
+    col = col || COLORES_CRISALIDA;
+    // El hilo de arriba.
+    trazo(x, [[cx, 0], [cx, 6]], col.S, 1);
+    // El capullo, con su latido (k lo infla un poco).
+    elipse(x, cx, 25, 12 + k, 19, col.S);
+    elipse(x, cx, 25, 10.5 + k, 17.5, col.s);
+    // Las vueltas de seda.
+    for (let i = 0; i < 6; i++) { const y = 12 + i * 5; trazo(x, [[cx - 10 - k, y + 2], [cx, y], [cx + 10 + k, y + 2]], col.S, 1); }
+    // Por dentro, la forma de lo que va a nacer.
+    elipse(x, cx, 27, 4, 9, col.b);
+    elipse(x, cx, 20, 2.4, 3, col.B);
+    elipse(x, cx - 5, 28, 1.6, 4, col.p); elipse(x, cx + 5, 28, 1.6, 4, col.p);
+    return cuantiza(c, Object.values(col));
+  }
+  function imago(k, col) {
+    const W = 64, H = 40, cx = 32, c = lienzo(W, H), x = c.getContext("2d");
+    if (!x) return c;
+    col = col || COLORES_CRISALIDA;
+    // Alas grandes, con las ventanas claras del atlas.
+    espejo(cx, (s, m) => {
+      poligono(x, [m([3, 10]), m([29 * k, 3]), m([31 * k, 14]), m([24 * k, 30]), m([6, 26])], col.P);
+      poligono(x, [m([3, 11]), m([28 * k, 4.5]), m([29.5 * k, 14]), m([23 * k, 28.5]), m([6, 25])], col.p);
+      elipse(x, m([17 * k, 13])[0], 13, 3 * k + 1, 2.4, col.e);
+      elipse(x, m([16 * k, 23])[0], 23, 2.4 * k + 0.8, 2, col.e);
+      trazo(x, [m([5, 17]), m([30 * k, 9])], col.P, 0.8);
+      trazo(x, [m([7, 24]), m([26 * k, 26])], col.s, 0.9);   // los restos del capullo, pegados
+    });
+    // Cuerpo y cabeza.
+    elipse(x, cx, 15, 3.4, 10, col.c);
+    elipse(x, cx, 28, 3, 2.6, col.c);
+    espejo(cx, (s, m) => trazo(x, [m([1.5, 30]), m([6, 36])], col.a, 1));
+    return cuantiza(c, Object.values(col));
+  }
+
+  /* La Hoguera: un montón de fanales apilados que arden juntos. Lo que
+     arde (las llamas) se pinta vivo; aquí van los marcos y el carbón. */
+  const COLORES_HOGUERA = { h: "#8a5a2a", H: "#5a3418", g: "#ffd070", G: "#c8902a", o: "#2a140a", r: "#c84a1a", k: "#3a2010" };
+  function hoguera(k, col) {
+    const W = 60, H = 44, cx = 30, c = lienzo(W, H), x = c.getContext("2d");
+    if (!x) return c;
+    col = col || COLORES_HOGUERA;
+    // El carbón de abajo… que en la pantalla queda arriba: la Hoguera
+    // está colgada del cielo y arde hacia el fanal.
+    elipse(x, cx, 6, 26, 6, col.o);
+    elipse(x, cx, 7, 22, 4, col.k);
+    // Los fanales apilados, en pirámide (de tres, dos y uno).
+    const marco = (fx, fy) => {
+      poligono(x, [[fx - 5, fy], [fx + 5, fy], [fx + 5, fy + 10], [fx - 5, fy + 10]], col.H);
+      poligono(x, [[fx - 4, fy + 1], [fx + 4, fy + 1], [fx + 4, fy + 9], [fx - 4, fy + 9]], col.r);
+      trazo(x, [[fx, fy + 1], [fx, fy + 9]], col.h, 1);
+      poligono(x, [[fx - 5, fy + 10], [fx + 5, fy + 10], [fx + 2, fy + 12], [fx - 2, fy + 12]], col.G);
+    };
+    for (const fx of [cx - 12, cx, cx + 12]) marco(fx, 8);
+    for (const fx of [cx - 6, cx + 6]) marco(fx, 19);
+    marco(cx, 30);
+    // Brasas entre los marcos.
+    for (const [bx, by] of [[cx - 18, 12], [cx + 18, 12], [cx - 12, 22], [cx + 12, 22], [cx - 6, 33], [cx + 6, 33]]) elipse(x, bx, by, 1.6 + k * 0.4, 1.2, col.g);
+    return cuantiza(c, Object.values(col));
+  }
+
   /* ================================================================
      El banco: todo pintado una vez
      ================================================================ */
@@ -727,11 +1139,28 @@
           return blanco ? silueta(c) : c;
         });
       },
-      fanal(alba, blanco) {
-        return toma("f" + (alba ? "a" : "") + (blanco ? "w" : ""), () => {
-          const c = pintaTexto(FANAL, alba ? PALETA_ALBA : PALETA_FANAL, !!alba); // el Alba viene volteada: es tu reflejo
+      fanal(alba, blanco, evo) {
+        const t = alba ? 0 : Math.max(0, Math.min(4, evo || 0));
+        return toma("f" + (alba ? "a" : "") + (blanco ? "w" : "") + t, () => {
+          const c = pintaTexto(FANAL_EVO[t], alba ? PALETA_ALBA : PALETAS_FANAL[t], !!alba); // el Alba viene volteada: es tu reflejo
           return blanco ? silueta(c) : c;
         });
+      },
+      /* Los fanales presos en la Hoguera (y los que suelta). */
+      fanalito(blanco) {
+        return toma("fi" + (blanco ? "w" : ""), () => { const c = pintaTexto(FANALITO, PALETAS_FANAL[1], false); return blanco ? silueta(c) : c; });
+      },
+      casco(cuadro, blanco) {
+        return toma("jc" + (cuadro & 1) + (blanco ? "w" : ""), () => { const c = casco(cuadro & 1 ? 1.5 : 0); return blanco ? silueta(c) : c; });
+      },
+      crisalida(cuadro, blanco) {
+        return toma("jq" + (cuadro % 3) + (blanco ? "w" : ""), () => { const c = crisalida([0, 0.8, 1.4][cuadro % 3]); return blanco ? silueta(c) : c; });
+      },
+      imago(cuadro, blanco) {
+        return toma("ji" + (cuadro % 3) + (blanco ? "w" : ""), () => { const c = imago([1, 0.86, 0.72][cuadro % 3]); return blanco ? silueta(c) : c; });
+      },
+      hoguera(cuadro, blanco) {
+        return toma("jh" + (cuadro % 3) + (blanco ? "w" : ""), () => { const c = hoguera(cuadro % 3); return blanco ? silueta(c) : c; });
       },
       nodriza(cuadro, blanco) {
         return toma("jn" + cuadro + (blanco ? "w" : ""), () => { const c = nodriza([1, 0.86, 0.72][cuadro % 3]); return blanco ? silueta(c) : c; });
@@ -776,6 +1205,7 @@
   return {
     PALETAS, PALETA_FANAL, PALETA_ALBA, POLILLAS, MINI, MENSAJERA, FANAL, LLAMA, NAUFRAGIO, DECORACION,
     PODERES, CARTA, DIGITOS, MARCAS_ESFINGE, COLORES_NODRIZA, COLORES_FARO, COLORES_ESFINGE,
+    FANAL_EVO, PALETAS_FANAL, FANALITO, COLORES_CASCO, COLORES_CRISALIDA, COLORES_HOGUERA,
     rgb, hex, mezcla, paletaPolilla, lienzo, pintaTexto, silueta, cuantiza, crearBanco, naufragio
   };
 });

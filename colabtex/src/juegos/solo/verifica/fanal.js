@@ -4,14 +4,15 @@
    compás: no se rehace cuadro a cuadro. La prueba es el registro de cada
    jornada (tiros, lo que tocó cada bala y con qué tiro, golpes, poderes,
    pulsos de la música, reloj de juego y reloj real, entradas sintéticas),
-   encadenado con un hash. `FanalPrueba.rehace` —el mismo archivo que usa
+   encadenado con un hash, más las mejoras compradas en el taller antes de
+   cada jornada. `FanalPrueba.rehace` —el mismo archivo que usa
    el juego para anotar, así no divergen— recalcula con el motor los puntos
    exactos de cada jornada y comprueba que pudo jugarse así; aquí solo se
    compara con lo declarado. */
 import FP from '../../../../../juegos/club/fanal/prueba.js';
 import FM from '../../../../../juegos/club/fanal/motor.js';
 
-export const PRUEBA = 1;
+export const PRUEBA = 2;
 
 const TOPE = 1000000;   // el de resultadoClub para los puntos
 
@@ -37,29 +38,25 @@ export function verifica(dato, prueba, ctx) {
 }
 
 /* Lo humano, para filas ya guardadas sin prueba. Referencias (datos reales
-   de la tabla): una travesía honesta de trece jornadas tarda 500–800 s de
-   juego y hace 64 000–124 000 puntos, es decir 40–60 s por jornada y unos
-   100–250 puntos por segundo. Los umbrales de aquí son varias veces más
-   generosos: solo marcan lo que ninguna persona hace. */
-const S_POR_JORNADA = 8;        // s de juego por jornada como mínimo (las honestas: 40–60)
-const PPS_SINFIN = 1000;        // puntos por segundo en el sin fin (honesto: 100–300)
-const PPS_TRAVESIA = 2000;      // en la travesía, holgado: un punto de control trae puntos de antes sin su tiempo
-const PUNTOS_TRAVESIA = 300000; // más del doble de la mejor travesía honesta vista
+   de la tabla, de antes de la segunda parte): la travesía honesta hasta el
+   Alba tardaba 500–800 s de juego e hacía 64 000–124 000 puntos, es decir
+   40–60 s por jornada y unos 100–250 puntos por segundo. Con las mejoras
+   el arma crece, pero los augurios también: los umbrales de aquí son
+   varias veces más generosos y solo marcan lo que ninguna persona hace.
+   La travesía ya no tiene techo de puntos (sigue sin fin): se mira el ritmo. */
+const S_POR_JORNADA = 8;        // s de juego por jornada como mínimo (las honestas: 30–60)
+const PPS_SINFIN = 5000;        // puntos por segundo en el sin fin (con el arma llena, un bot de Chromium hizo 3400)
+const PPS_TRAVESIA = 2500;      // en la travesía, holgado: un punto de control trae puntos de antes sin su tiempo
 
 export function sospecha(categoria, fila) {
   const p = fila && fila.puntos, t = (fila && fila.tiempo || 0) / 1000;
   if (!Number.isFinite(p) || !Number.isFinite(t) || t <= 0) return 'fila sin puntos o sin tiempo';
   if (categoria === 'club-fanal-jornadas') {
-    if (p > FM.JORNADAS_HISTORIA) {
-      // Del sin fin: empieza siempre en la 14 y nunca desde un punto de control.
-      const jugadas = p - FM.JORNADAS_HISTORIA;
-      if (t < jugadas * S_POR_JORNADA) return jugadas + ' jornadas del sin fin en ' + t.toFixed(1) + ' s';
-    } else {
-      // De la historia: pudo seguir desde el punto de control del acto.
-      const desde = Math.max(...Object.values(FM.INICIO_ACTO).filter(j => j <= p));
-      const min = (p - desde + 1) * S_POR_JORNADA + (p === FM.JORNADAS_HISTORIA ? 60 : 0);
-      if (t < min) return 'jornada ' + p + ' en ' + t.toFixed(1) + ' s';
-    }
+    // Pudo seguir desde el punto de control del acto (el sin fin también
+    // tiene el suyo, y su modo empieza ahí).
+    const desde = Math.max(...Object.values(FM.INICIO_ACTO).filter(j => j <= p));
+    const min = (p - desde + 1) * S_POR_JORNADA + (p >= FM.JORNADA_ALBA && desde <= FM.JORNADA_ALBA ? 60 : 0);
+    if (t < min) return p > FM.JORNADAS_HISTORIA ? (p - desde + 1) + ' jornadas del sin fin en ' + t.toFixed(1) + ' s' : 'jornada ' + p + ' en ' + t.toFixed(1) + ' s';
     return null;
   }
   if (categoria === 'club-fanal-sinfin') {
@@ -67,7 +64,6 @@ export function sospecha(categoria, fila) {
     return null;
   }
   if (categoria === 'club-fanal-travesia') {
-    if (p > PUNTOS_TRAVESIA) return p + ' puntos en una travesía';
     if (p / t > PPS_TRAVESIA && p > 20000) return Math.round(p / t) + ' puntos por segundo en una travesía';
     return null;
   }
