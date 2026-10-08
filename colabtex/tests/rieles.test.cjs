@@ -11,6 +11,9 @@ const TM=require('../../juegos/club/tetris/motor.js');
 const Snake=require('../../juegos/club/snake/motor.js');
 const Sortem=require('../../juegos/club/sortem/motor.js');
 const Mina=require('../../juegos/club/minas/engine.js');
+const Dosmil=require('../../juegos/club/dosmil/motor.js');
+const Aleteo=require('../../juegos/club/aleteo/motor.js');
+const Bbtan=require('../../juegos/club/bbtan/motor.js');
 const lcg=s=>()=>(s=(Math.imul(1664525,s)+1013904223)>>>0)/4294967296;
 
 /* ---------- robots que juegan y dejan su prueba ---------- */
@@ -63,6 +66,34 @@ function minas(semilla){
   return {prueba:{v:1,n:'medium',s:semilla,u:'uid1',e},tiempo:pt};
 }
 
+function dosmil(semilla){
+  const E=Dosmil.nueva(semilla,'uid1'),j=[],r=lcg(semilla);
+  while(Dosmil.puedeMover(E)&&j.length<3000){
+    for(const d of [2,3,1,0]){const C={...E,t:E.t.slice()};if(Dosmil.mueve(C,d)){Dosmil.mueve(E,d);j.push([d,'k',Math.round(150+r()*250)]);break;}}
+  }
+  const ms=j.reduce((a,x)=>a+x[2],0);
+  return {prueba:{v:1,s:semilla,u:'uid1',f:Dosmil.codifica(j),a:ms+20,w:ms+120,fin:!Dosmil.puedeMover(E)},puntos:E.puntos,ms};
+}
+function aleteo(semilla,max=25){
+  const E=Aleteo.nueva(semilla,'uid1'),al=[],r=lcg(semilla);let umbral=-34;
+  while(!E.muerto&&E.t<200000){
+    const tb=E.tubos.find(t=>t.x+Aleteo.TW>Aleteo.PX-Aleteo.R);let a=E.t===0;
+    if(!a&&E.puntos<max&&tb&&E.vy>=0&&E.y>tb.c+tb.g/2+umbral){a=true;umbral=-66+r()*44;}
+    if(a)al.push([E.t,'k']);Aleteo.paso(E,a);
+  }
+  return {prueba:{v:1,s:semilla,u:'uid1',f:Aleteo.codifica(al),n:E.t,r:Aleteo.msDe(E.t)+50},puntos:E.puntos};
+}
+function bbtan(semilla,rondas=25){
+  const E=Bbtan.nueva(semilla,'uid1'),r=lcg(semilla);let t=900;
+  while(E.state==='aim'&&E.round<=rondas){
+    const ang=Bbtan.ANG_MIN+300+Math.floor(r()*(Bbtan.ANG_MAX-Bbtan.ANG_MIN-600));
+    const tiro=E.round%7===3?[ang,Math.round(t),40]:[ang,Math.round(t)];
+    const ticks=Bbtan.juegaTiro(E,tiro);assert.equal(typeof ticks,'number',String(ticks));
+    t+=ticks*1000/240+400+(E.round%5?700:9000);
+  }
+  return {prueba:Bbtan.prueba(E),ronda:E.round,estado:E.state};
+}
+
 /* Lleva un reproductor al final, a la mitad y otra vez al final: hacia
    atrás tiene que rehacer desde cero y llegar al mismo sitio. */
 function recorre(r){
@@ -109,17 +140,50 @@ test('Buscaminas: la repetición gana el tablero en la última jugada',()=>{
     r.en(r.dur-1);assert.equal(r.fin,false);
   }
 });
+test('2048: la repetición suma los puntos del robot en su última jugada',()=>{
+  for(const s of [4,808,31337]){
+    const {prueba,puntos,ms}=dosmil(s),r=crearRepro('dosmil',prueba);
+    assert.equal(r.dur,ms);
+    const {fin,medio}=recorre(r);
+    assert.equal(fin.puntos,puntos);assert.equal(r.fin,true);assert.ok(medio.puntos<puntos);
+    assert.equal(Dosmil.rehace(prueba.s,prueba.u,Dosmil.decodifica(prueba.f)).puntos,puntos);
+  }
+});
+test('ALETEO: la repetición choca en el tick de la prueba con los tubos del robot',()=>{
+  for(const s of [9,123,2026]){
+    const {prueba,puntos}=aleteo(s),r=crearRepro('aleteo',prueba);
+    assert.equal(r.dur,Aleteo.msDe(prueba.n));
+    const {fin}=recorre(r);
+    assert.equal(fin.puntos,puntos);assert.equal(r.fin,true);
+    r.en(r.dur-40);assert.equal(r.fin,false,'antes del final sigue volando');
+  }
+});
+test('BBTAN: la repetición llega a la ronda del robot, también saltando hacia atrás',()=>{
+  for(const s of [17,4321]){
+    const {prueba,ronda}=bbtan(s),r=crearRepro('bbtan',prueba);
+    const {fin,medio}=recorre(r);
+    assert.equal(fin.puntos,ronda);assert.equal(r.fin,true);assert.ok(medio.puntos<ronda);
+    // Las esperas largas se acortan: la repetición dura menos que la partida.
+    assert.ok(r.dur<Bbtan.decodifica(prueba.t).pop()[1]+60000);
+    r.en(r.dur-1);assert.equal(r.fin,false);
+  }
+});
 test('Una prueba ilegible no da reproductor (y no lanza)',()=>{
   assert.equal(crearRepro('tetris',{v:1,e:'%%%',n:5,u:'x',a:1}),null);
   assert.equal(crearRepro('snake',{g:'zz',t:'nada'}),null);
   assert.equal(crearRepro('sortem',{a:'XYZ',t:[1,2,3],n:20}),null);
   assert.equal(crearRepro('minas',{e:[1,2],n:'medium'}),null);
   assert.equal(crearRepro('bbtan',{}),null);
+  assert.equal(crearRepro('bbtan',{v:1,s:1,u:'x',t:'!!'}),null);
+  assert.equal(crearRepro('dosmil',{v:1,s:1,u:'x',f:'k9zzzzz'}),null);
+  assert.equal(crearRepro('aleteo',{v:1,s:1,u:'x',f:'k0',n:-3}),null);
+  assert.equal(crearRepro('frontera',{v:1}),null);
   assert.equal(crearRepro('minas',null),null);
 });
 test('Pintar no lanza con un contexto 2D de mentira',()=>{
   const ctx=new Proxy({},{get:(o,k)=>k in o?o[k]:(()=>({addColorStop(){},width:10})),set:(o,k,v)=>(o[k]=v,true)});
-  for(const r of [crearRepro('tetris',tetris(3)),crearRepro('snake',snake(1).prueba),crearRepro('sortem',sortem(5).prueba),crearRepro('minas',minas(2).prueba)])
+  for(const r of [crearRepro('tetris',tetris(3)),crearRepro('snake',snake(1).prueba),crearRepro('sortem',sortem(5).prueba),crearRepro('minas',minas(2).prueba),
+    crearRepro('dosmil',dosmil(4).prueba),crearRepro('aleteo',aleteo(9).prueba),crearRepro('bbtan',bbtan(17,8).prueba)])
     {assert.ok(r.aspecto>0.3&&r.aspecto<2,'aspecto de la escena');for(const ms of [0,r.dur/3,r.dur])for(const [w,h] of [[300,150],[180,120],[40,30]]){r.en(ms);r.pinta(ctx,w,h,ms/1000);}}
 });
 
@@ -144,6 +208,34 @@ test('La clave de orden: el día manda, después los puntos o el tiempo',()=>{
   assert.equal(D.etiquetaDia(hoy-1,hoy),'Mejor de ayer');
   assert.equal(D.etiquetaDia(hoy-9,hoy),'Última mejor partida');
 });
+test('La alineación del día: la misma para todos, distinta cada día, y lo más jugado sale más',()=>{
+  const pop={'club-bbtan':90,'club-tetris':80,'club-dosmil':70,'club-aleteo':60,'club-snake':50,'club-minas':40,'club-sortem':30};
+  assert.deepEqual(D.masJugados(pop).map(r=>r.juego),['bbtan','tetris','dosmil','aleteo','snake','minas','sortem']);
+  assert.deepEqual(D.masJugados({}).map(r=>r.cat),D.REPES.map(r=>r.cat),'sin popularidad, el orden de REPES');
+  const veces={},firmas=new Set();
+  for(let d=20000;d<20400;d++){
+    const a=D.alineacionDelDia(d,pop);
+    assert.equal(a.length,D.POR_DIA);
+    assert.equal(new Set(a.map(r=>r.cat)).size,D.POR_DIA,'sin repetidos');
+    assert.deepEqual(D.alineacionDelDia(d,JSON.parse(JSON.stringify(pop))).map(r=>r.cat),a.map(r=>r.cat),'determinista');
+    firmas.add(a.map(r=>r.cat).join());
+    for(const r of a)veces[r.juego]=(veces[r.juego]||0)+1;
+  }
+  assert.ok(firmas.size>40,'cambia de un día a otro');
+  assert.ok(veces.bbtan>veces.minas&&veces.minas>veces.sortem,'el peso baja con el puesto');
+  assert.ok(veces.sortem>40,'el menos jugado también sale algunos días');
+  assert.equal(D.alineacionDelDia(20000,null,99).length,D.REPES.length);
+  for(const r of D.REPES)assert.ok(crearRepro(r.juego,{})===null&&typeof r.ruta==='string'&&r.popular==='club-'+r.juego,r.cat);
+});
+test('La marca de cada tabla y el tramo de una partida larga',()=>{
+  const de=cat=>D.repDe(cat);
+  assert.equal(D.formatoMarca(de('club-tetris-maraton'),12340,1),'12.340 pts');
+  assert.equal(D.formatoMarca(de('club-minas-medium'),1,247000),'4:07');
+  assert.equal(D.formatoMarca(de('club-bbtan-rondas'),41,1),'ronda 41');
+  assert.equal(D.formatoMarca(de('club-aleteo-vuelo'),30,1),'30 tubos');
+  assert.equal(D.desdeRep(20000),0);
+  assert.equal(D.desdeRep(D.TRAMO_MS+5000),5000,'una partida larga muestra su último tramo');
+});
 test('El tiempo de una partida, como en el club; la repetición no se acelera',()=>{
   assert.equal(D.velocidadRep,undefined,'cada partida se repite a la velocidad a la que se jugó');
   assert.equal(D.formatoTiempo(38240),'38,2 s');
@@ -160,7 +252,7 @@ test('Chat general: la ventana de 15 min, la espera de 20 s y lo no leído',()=>
   assert.equal(D.limpiaChat('x'.repeat(300)).length,D.CHAT_LARGO);
   assert.equal(D.sinLeer(msgs,ahora-15*60000,'a'),1,'solo lo de otros y lo posterior a lo visto');
 });
-test('Las reglas conocen los tres nodos y las cuatro categorías',()=>{
+test('Las reglas conocen los tres nodos y las categorías del carrusel',()=>{
   const reglas=JSON.parse(fs.readFileSync('../firebase/database.rules.json','utf8')).rules;
   for(const n of ['chatGeneral','chatGeneralUlt','repeticiones'])assert.ok(reglas[n],n);
   const val=reglas.repeticiones.$categoria.$uid['.validate'];

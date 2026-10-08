@@ -616,7 +616,7 @@ export function guardarSolo(categoria, uid, dato) {
 
 /* ---------- los rieles del salón (juegos/rieles.js) ----------
    `repeticiones/<categoría>/<uid>`: la mejor partida del día de cada
-   cuenta en los cuatro juegos del riel, con su prueba antitrampas para
+   cuenta en los juegos del carrusel (`REPES`), con su prueba antitrampas para
    rehacerla (rieles-datos.js). La consulta trae solo las tres con la
    clave de orden más alta, que son las mejores del último día con
    partidas: nunca la categoría entera, que traería cada prueba. */

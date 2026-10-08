@@ -2799,7 +2799,7 @@ function wire() {
   revisaCastigo();
   rieles = crearRieles({
     fb, usuario: () => state.user ? { uid: state.user.uid, name: state.user.name } : null,
-    perfil: perfilDe, marco: marcoDeUid, colorDe: colorForUid, dia: () => diaMonedas(fb.ahora())
+    perfil: perfilDe, marco: marcoDeUid, colorDe: colorForUid, dia: () => diaMonedas(fb.ahora()), popular: () => state.popular
   });
   createReportWidget({
     app: "juegos", ver: VER, urlInformes: "informes.html",
