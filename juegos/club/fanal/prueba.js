@@ -530,7 +530,7 @@
         if (!lumbre && !alba) suma(M.bonusJornada({ acto: j.acto, sinDanio: c.golpes === 0, disparos: c.disparos, aciertos: c.aciertos }).total);
         completadas = Math.max(completadas, x.n);
         if (x.n >= M.JORNADA_ALBA) completa = true;
-        taller.brasas++;                                                // cada jornada completada, una brasa
+        if (jefe) taller.brasas++;                                      // solo vencer a un jefe da una brasa
       }
       if (Math.round(est.puntos) !== x.s) return mal("los puntos de la " + donde + " no salen de sus eventos (dice " + x.s + ", dan " + Math.round(est.puntos) + ")");
       if (est.llamas !== x.v) return mal("las llamas de la " + donde + " no salen de sus eventos");

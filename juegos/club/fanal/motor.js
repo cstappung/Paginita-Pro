@@ -9,7 +9,7 @@
    - Los AUGURIOS: cada jornada que pasas, la noche aprende algo (un poco
      más de fuego, escamas más rápidas, polillas que aguantan un golpe
      más…). Son fijos por número de jornada, iguales para todos.
-   - Las MEJORAS: cada jornada completada da una brasa, y cada brasa sube un
+   - Las MEJORAS: cada jefe vencido da una brasa, y cada brasa sube un
      nivel de una mejora del arma o del fanal. Cada tres niveles en una rama
      el arma o el fanal EVOLUCIONA. `armas()` y `nave()` traducen los
      niveles a números de juego, y los usan la pantalla y el verificador.
@@ -283,8 +283,8 @@
   /* Las evoluciones: a los 3, 6, 9 y 12 niveles de una rama. */
   const EVOLUCION = [3, 6, 9, 12];
   /* Las brasas con que empieza la travesía sin fin: las que habría juntado
-     quien llegó hasta ahí remando. */
-  const BRASAS_SINFIN = JORNADAS_HISTORIA;
+     quien llegó hasta ahí remando (una por jefe). */
+  const BRASAS_SINFIN = JORNADAS.filter(j => j.tipo === "jefe").length;
 
   function mejorasVacias() { const m = {}; for (const k of LISTA_MEJORAS) m[k] = 0; return m; }
   /* Unos niveles cualesquiera, limpios: solo las ocho mejoras, enteros entre 0 y su tope. */

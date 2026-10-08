@@ -137,10 +137,12 @@ html.sin-lineas .lineas{display:none}
 .opcion small{display:block;font-size:11px;color:var(--tenue)}
 
 /* La portada: el título en bastarda, sobre el cielo que se mueve. */
-.portada{background:linear-gradient(#0000 40%,#000a)}
-.portada-txt{width:min(100%,330px);display:grid;justify-items:center}
+.portada{background:linear-gradient(#0000 40%,#000a);container-type:inline-size;overflow:hidden}
+/* El título se mide contra la portada (cqi), no contra la ventana: con 19vw
+   en un PC salía más ancho que la caja y empujaba el menú fuera de ella. */
+.portada-txt{width:min(100%,400px);display:grid;grid-template-columns:minmax(0,1fr);justify-items:center}
 .portada .pre{margin:0;color:var(--tenue);letter-spacing:.24em;font-size:11px;text-transform:uppercase}
-.titulo{margin:0 0 14px;font:400 clamp(64px,19vw,104px)/1 var(--gotica);color:var(--acento);text-shadow:0 0 24px #ff9a3c55,0 3px 0 #000;letter-spacing:.04em;animation:respira 4s ease-in-out infinite}
+.titulo{margin:0 0 14px;font:400 clamp(48px,18cqi,88px)/1 var(--gotica);color:var(--acento);text-shadow:0 0 24px #ff9a3c55,0 3px 0 #000;letter-spacing:.04em;white-space:nowrap;animation:respira 4s ease-in-out infinite}
 @keyframes respira{50%{text-shadow:0 0 34px #ff9a3c88,0 3px 0 #000}}
 .portada .menu{width:100%}
 .portada .opcion{background:#140f26cc;text-align:center}
