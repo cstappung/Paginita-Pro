@@ -1,6 +1,6 @@
-/* Los rieles del salón (solo en PC): a la izquierda, un carrusel con las
-   mejores partidas del día de los juegos del club que más se juegan (una
-   alineación distinta cada día); a la derecha, el chat general. Esto es lo puro —qué se guarda, cómo se ordena, cuánto se
+/* Los rieles del salón (solo en PC): a la izquierda, las mejores partidas
+   del día de cuatro de los juegos del club que más se juegan (otros cuatro
+   cada día), repetidas en bucle; a la derecha, el chat general. Esto es lo puro —qué se guarda, cómo se ordena, cuánto se
    espera— para que se pueda comprobar en Node sin navegador ni Firebase
    (tests/rieles.test.cjs). El DOM vive en rieles.js y las repeticiones en
    repeticion.js.
@@ -19,7 +19,7 @@
    devuelve los mejores de hoy y, si hoy nadie jugó, los del último día con
    partidas. */
 
-/* Los juegos que pueden salir en el carrusel: los del club que se rehacen
+/* Los juegos que pueden salir en el riel: los del club que se rehacen
    jugada a jugada con su motor (repeticion.js), una tabla de cada uno.
    FANAL y Metro Rush no están porque su prueba no se rehace cuadro a
    cuadro, y los diarios (sopa, sudoku, Electrodle) tampoco: verlos
@@ -39,7 +39,7 @@ export const REPES = [
 export const repDe = cat => REPES.find(r => r.cat === cat) || null;
 
 /* ---------- la alineación del día ----------
-   Cada día salen `POR_DIA` de esos juegos, en el orden en que pasan.
+   Cada día salen `POR_DIA` de esos juegos, en el orden en que se apilan.
    Primero se ordenan por cuánto se juegan (`popular`, lo que el salón ya
    lee para ordenar el catálogo; empate: el orden de `REPES`), y después se
    sortean sin reponer con el día como semilla y un peso que baja con el
@@ -47,7 +47,7 @@ export const repDe = cat => REPES.find(r => r.cat === cat) || null;
    se juega sale casi todos los días, lo demás va rotando, y todos los que
    abren el salón el mismo día ven la misma alineación (la popularidad
    cambia despacio y llega de la misma lectura para todos). */
-export const POR_DIA = 5;
+export const POR_DIA = 4;
 function azar(semilla) {
   let a = semilla >>> 0;
   return () => {
@@ -117,14 +117,8 @@ export function etiquetaDia(dia, hoy) {
 /* La repetición va siempre a la velocidad a la que se jugó, aunque la
    partida dure media hora: acelerada (lo hacía hasta ×4 con las de más de
    dos minutos), una Maratón de Tetris dejaba de parecerse a jugarla. */
-/* Lo que se queda quieto el tablero final antes de pasar a la siguiente. */
+/* Lo que se queda quieto el tablero final antes de volver a empezar. */
 export const PAUSA_FINAL_MS = 2600;
-/* En el carrusel cada partida pasa una vez y deja el sitio a la siguiente.
-   Una partida larga no se acelera: se ve su último tramo, `TRAMO_MS`, que
-   es donde se decide la marca (el final de la Maratón, los últimos tubos).
-   Una tabla sin partidas se salta después de `VACIA_MS`. */
-export const TRAMO_MS = 90000, VACIA_MS = 6000;
-export const desdeRep = dur => Math.max(0, dur - TRAMO_MS);
 
 /* «4:07», «38,2 s»: el tiempo de una partida, como en el club. */
 export function formatoTiempo(ms) {

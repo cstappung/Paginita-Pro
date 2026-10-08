@@ -495,7 +495,7 @@ Tres nodos nuevos, para lo que se ve a los lados del salón en un PC ancho
   desde el anterior**: la espera la pone la base, no la página. Solo lo lee
   su dueño.
 - `repeticiones/<categoría>/<uid>` — la mejor partida del día de cada cuenta
-  en los juegos del carrusel: Tetris Maratón, Snake clásico mediano, sortEm
+  en los juegos que rotan en el riel: Tetris Maratón, Snake clásico mediano, sortEm
   de 20, el buscaminas medio, 2048 por puntos, ALETEO y BBTAN, con su prueba
   antitrampas para que el salón la repita. Solo esas siete categorías, solo
   el día de hoy (en Chile), y solo si mejora la que ya había; `o` (la clave
@@ -504,7 +504,7 @@ Tres nodos nuevos, para lo que se ve a los lados del salón en un PC ancho
 Sin publicar, el chat dice que espera las reglas y el riel de la izquierda
 repite el récord histórico de cada tabla (que ya está en `soloPruebas`).
 **2048, ALETEO y BBTAN se sumaron después**: con las reglas de antes, el
-carrusel ya los muestra con su récord histórico, pero la mejor partida *del
+riel ya los muestra con su récord histórico, pero la mejor partida *del
 día* de esos tres solo se guarda después de volver a publicar. El
 arreglo es el de siempre: pegar `firebase/database.rules.json` entero y
 **Publicar**.

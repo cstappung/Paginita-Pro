@@ -227,14 +227,12 @@ test('La alineación del día: la misma para todos, distinta cada día, y lo má
   assert.equal(D.alineacionDelDia(20000,null,99).length,D.REPES.length);
   for(const r of D.REPES)assert.ok(crearRepro(r.juego,{})===null&&typeof r.ruta==='string'&&r.popular==='club-'+r.juego,r.cat);
 });
-test('La marca de cada tabla y el tramo de una partida larga',()=>{
+test('La marca de cada tabla',()=>{
   const de=cat=>D.repDe(cat);
   assert.equal(D.formatoMarca(de('club-tetris-maraton'),12340,1),'12.340 pts');
   assert.equal(D.formatoMarca(de('club-minas-medium'),1,247000),'4:07');
   assert.equal(D.formatoMarca(de('club-bbtan-rondas'),41,1),'ronda 41');
   assert.equal(D.formatoMarca(de('club-aleteo-vuelo'),30,1),'30 tubos');
-  assert.equal(D.desdeRep(20000),0);
-  assert.equal(D.desdeRep(D.TRAMO_MS+5000),5000,'una partida larga muestra su último tramo');
 });
 test('El tiempo de una partida, como en el club; la repetición no se acelera',()=>{
   assert.equal(D.velocidadRep,undefined,'cada partida se repite a la velocidad a la que se jugó');
@@ -252,7 +250,7 @@ test('Chat general: la ventana de 15 min, la espera de 20 s y lo no leído',()=>
   assert.equal(D.limpiaChat('x'.repeat(300)).length,D.CHAT_LARGO);
   assert.equal(D.sinLeer(msgs,ahora-15*60000,'a'),1,'solo lo de otros y lo posterior a lo visto');
 });
-test('Las reglas conocen los tres nodos y las categorías del carrusel',()=>{
+test('Las reglas conocen los tres nodos y las categorías del riel',()=>{
   const reglas=JSON.parse(fs.readFileSync('../firebase/database.rules.json','utf8')).rules;
   for(const n of ['chatGeneral','chatGeneralUlt','repeticiones'])assert.ok(reglas[n],n);
   const val=reglas.repeticiones.$categoria.$uid['.validate'];

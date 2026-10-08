@@ -2147,8 +2147,9 @@ chat sends nothing and the lobby shows no games in progress.
 
 **The lobby has two side rails on a wide PC** (`juegos/rieles.js`, the DOM;
 `juegos/rieles-datos.js`, pure; `juegos/repeticion.js`, the replays). On the
-left, a **carousel** of the best game *of the day* of the club's most played
-games, with who played it. On the right, the general chat. They hang off
+left, the best game *of the day* of four of the club's most played games
+(a different four each day), stacked and replayed on a loop with who
+played it. On the right, the general chat. They hang off
 `<body>` and show only in the menu views (`VISTAS_RIEL` in `juegos-main.js`
 sets `html.jg-rieles` through `rieles.pon()`, on every `render()`) and from
 1400 px (`ANCHO`, which must match the `@media` in juegos.html). There the
@@ -2162,22 +2163,13 @@ on a phone. Things to keep:
   buscaminas medio, 2048 puntos, ALETEO and BBTAN rondas. FANAL and Metro
   Rush are out (their proof is not frame by frame) and so are the daily
   puzzles (watching a grid fill up is not a highlight). Each day
-  `alineacionDelDia(dia, popular)` picks `POR_DIA` (5) of them: sorted by
+  `alineacionDelDia(dia, popular)` picks `POR_DIA` (4) of them: sorted by
   `state.popular` (the same counts that order the catalogue, passed in as
   `ctx.popular`), then drawn without replacement with the day as the seed
   and a weight that falls with the rank. The most played show up almost
   every day, the rest rotate, and everyone sees the same lineup that day.
   `pon()` re-checks it on every render, so the day or a popularity read
   that reorders it rebuilds the watchers.
-- **One game at a time.** The stage plays the current game once and moves
-  to the next; a game longer than `TRAMO_MS` (90 s) shows only its last
-  stretch (`desdeRep`), never sped up. Under it, the lineup with each
-  game's best player and mark (`formatoMarca`: points, time, «38 tubos»,
-  «ronda 41»), clickable, with the active row's progress. Hover or focus
-  inside holds the carousel (the game loops instead), a table with no game
-  is skipped after `VACIA_MS`, and with reduced motion nothing advances
-  and the stage rests on the final board. Only the visible game is
-  painted, but all five tables are watched so the list is filled in.
 - **A replay is the anti-cheat proof, not a video.** Every club result
   already carries what it takes to rebuild it, and the four engines are
   deterministic, so `repeticion.js` replays the proof step by step with the
@@ -2203,7 +2195,8 @@ on a phone. Things to keep:
   thinking before each shot is cut to `BB_APUNTA_MAX` (1.5 s), or a long
   game would be mostly a still board. It keeps a board snapshot before every
   shot, so seeking (the last-stretch start, going back) never re-simulates
-  hundreds of rounds of physics on the lobby's thread.
+  hundreds of rounds of physics on the lobby's thread. The rail splits its
+  height by each scene's `aspecto`, with no card box around them.
 - **`repeticiones/<cat>/<uid>`** = `{dia, o, p, t, n, v, d, at}`: each
   account's best game of the day. `apuntaRepeticion` in `juegos-main.js`
   writes it from `alResultado` (which now also gets the proof, third
@@ -2214,7 +2207,7 @@ on a phone. Things to keep:
   best of the latest day with games, without downloading every proof. The
   rule whitelists the `REPES` categories (a test checks they match), so a
   new game in the pool needs the rules re-published; until then its daily
-  write fails quietly and the carousel shows its all-time record.
+  write fails quietly and the rail shows its all-time record.
 - **What is replayed is verified first**, with the same `verificaClub` and
   the owner's uid; a hand-written row that does not check out is skipped for
   the next one. With nothing stored (or before the rules are published) the

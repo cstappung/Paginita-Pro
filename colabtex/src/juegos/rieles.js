@@ -1,9 +1,10 @@
-/* Los rieles del salón: en un PC ancho, a la izquierda un carrusel con
-   las mejores partidas del día de los juegos del club que más se juegan,
-   con quien las jugó; a la derecha el chat general. En una pantalla más
-   angosta (y en el celular) las repeticiones no salen y el chat es un
-   botón 💬 que abre un panel (una hoja desde abajo en el celular). Lo
-   puro está en rieles-datos.js y las repeticiones en repeticion.js.
+/* Los rieles del salón: en un PC ancho, a la izquierda las mejores
+   partidas del día de cuatro juegos del club, en bucle, con quien las
+   jugó (cuáles cuatro cambia cada día: `alineacionDelDia`, los más
+   jugados casi siempre y el resto rotando); a la derecha el chat general. En una pantalla más angosta (y en
+   el celular) las repeticiones no salen y el chat es un botón 💬 que
+   abre un panel (una hoja desde abajo en el celular). Lo puro está en
+   rieles-datos.js y las repeticiones en repeticion.js.
 
    Cuelgan de <body> y se muestran por CSS: `html.jg-rieles` (lo pone
    `pon(true)` en las vistas de menú) más el ancho (`@media` en
@@ -11,38 +12,30 @@
    partida, un juego del club, los sobres— no hay riel ni escucha: el
    juego es de la pantalla entera.
 
-   **El carrusel.** Cada día sale una alineación de `POR_DIA` juegos
-   (`alineacionDelDia`: los más jugados casi siempre, el resto rotando).
-   Arriba se ve una partida a la vez, grande, y pasa sola a la siguiente
-   cuando termina (una partida larga muestra su último tramo, `TRAMO_MS`);
-   debajo, la alineación de hoy con quién tiene la mejor partida de cada
-   juego, para saltar a cualquiera. Con el ratón encima o el foco dentro,
-   la partida vuelve a empezar en vez de pasar; con «reducir movimiento»
-   no pasa sola y se queda en el tablero final.
-
    **Lo que se reproduce se comprueba antes.** Cada prueba pasa por el
    mismo verificador antitrampas que la aceptó al guardarla
    (`verificaClub`, con el uid de su dueño): una fila escrita a mano en la
    base, con una prueba que no cuadra, no llega a la pantalla del salón y
    se prueba con la siguiente. Si hoy (ni nunca) se guardó ninguna, el
-   carrusel repite el récord histórico de la tabla del club, cuya prueba
-   ya vive en `soloPruebas`. */
+   riel repite el récord histórico de la tabla del club, cuya prueba ya
+   vive en `soloPruebas`. */
 import { escapeHtml } from "../util.js";
 import { avatarMarco } from "./perfil-vista.js";
 import { mezcla } from "./perfil.js";
 import { verificaClub } from "./solo/verifica.js";
 import { crearRepro } from "./repeticion.js";
-import { COLOR_SOLO } from "./salon-datos.js";
 import {
-  alineacionDelDia, etiquetaDia, PAUSA_FINAL_MS, VACIA_MS, desdeRep, formatoMarca,
+  alineacionDelDia, etiquetaDia, PAUSA_FINAL_MS, formatoMarca,
   CHAT_VENTANA_MS, CHAT_LARGO, CHAT_MAX, CHAT_VIEJO_MS, chatVisibles, esperaChat, limpiaChat, sinLeer
 } from "./rieles-datos.js";
 
+/* Alto / ancho de cada escena (repeticion.js: `aspecto`), para repartir el
+   riel antes de que llegue la partida. */
+const ASPECTO = { tetris: 1.01, snake: 0.89, sortem: 0.65, minas: 0.95, dosmil: 1.22, aleteo: 1.78, bbtan: 1.38 };
 /* El corte de «PC ancho». Debe coincidir con el `@media` de juegos.html. */
 export const ANCHO = "(min-width: 1400px)";
 const CUADRO_MS = 33, PIE_MS = 400, RELEE_CHAT_MS = 10 * 60 * 1000, REPINTA_CHAT_MS = 15000;
 const CLAVE_VISTO = "jg.chatG.visto";
-const colorDeJuego = j => COLOR_SOLO[j === "tetris" ? "tetrisclub" : j] || "#8b5cf6";
 
 const leeVisto = () => { try { return Number(localStorage.getItem(CLAVE_VISTO)) || 0; } catch (e) { return 0; } };
 const ponVisto = v => { try { localStorage.setItem(CLAVE_VISTO, String(v)); } catch (e) { /* opcional */ } };
@@ -60,24 +53,9 @@ export function crearRieles(ctx) {
   const izq = document.createElement("aside");
   izq.className = "jg-riel jg-riel-izq";
   izq.setAttribute("aria-label", "Mejores partidas del día");
-  izq.innerHTML = `<header class="jg-riel-cab"><span class="jg-vivo" aria-hidden="true"></span><h2>Mejores partidas</h2><small>del día · cambian cada día</small></header>
-    <div class="jg-rp-car">
-      <article class="jg-rp cargando" aria-roledescription="carrusel" aria-label="Repetición">
-        <div class="jg-rp-cab"><a href="#" class="jg-rp-juego"><b></b><span></span></a><span class="jg-rp-quien"></span></div>
-        <div class="jg-rp-lienzo" title="Pausar o seguir"><canvas aria-hidden="true"></canvas>
-          <button class="jg-rp-pausa" type="button" aria-label="Seguir la repetición">▶</button>
-          <p class="jg-rp-msg"></p></div>
-        <div class="jg-rp-pie"><span class="jg-rp-origen"></span>
-          <span class="jg-rp-ctl"><button type="button" data-paso="-1" aria-label="Partida anterior">‹</button><button type="button" class="jg-rp-pp" aria-label="Pausar la repetición">❚❚</button><button type="button" data-paso="1" aria-label="Partida siguiente">›</button></span></div>
-        <div class="jg-rp-barra" aria-hidden="true"><i></i></div>
-      </article>
-      <p class="jg-rp-hoy">Hoy en el carrusel</p>
-      <ol class="jg-rp-linea"></ol>
-    </div>`;
-  const esc = izq.querySelector(".jg-rp"), canvas = esc.querySelector("canvas"), caja = esc.querySelector(".jg-rp-lienzo");
-  const escJuego = esc.querySelector(".jg-rp-juego"), escQuien = esc.querySelector(".jg-rp-quien"), escMsg = esc.querySelector(".jg-rp-msg");
-  const escOrigen = esc.querySelector(".jg-rp-origen"), escBarra = esc.querySelector(".jg-rp-barra i"), ppBtn = esc.querySelector(".jg-rp-pp");
-  const linea = izq.querySelector(".jg-rp-linea");
+  izq.innerHTML = `<header class="jg-riel-cab"><span class="jg-vivo" aria-hidden="true"></span><h2>Mejores partidas</h2><small>del día · en bucle</small></header>
+    <div class="jg-rp-lista"></div>`;
+  const lista = izq.querySelector(".jg-rp-lista");
 
   const chat = document.createElement("aside");
   chat.className = "jg-riel jg-riel-der jg-cg";
@@ -106,40 +84,51 @@ export function crearRieles(ctx) {
 
   document.body.append(izq, chat, fondo, fab);
 
-  /* ---------- la alineación del día ----------
-     Una «tarjeta» por juego de hoy: su escucha de `repeticiones`, la
-     partida elegida y ya comprobada, y su fila en la lista. Cambia sola
-     al cambiar el día (o si la popularidad que llegó reordena la lista). */
-  let tarjetas = [], firmaLinea = "", actual = 0;
-  const comprobadas = new Map();
-  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
-  /* Lo que se está viendo arriba: desde qué instante y cuándo empezó
-     (`t0`), la pausa, y desde cuándo espera una tabla sin partida. */
-  const vista = { t: null, firma: "", t0: 0, desde: 0, pausado: false, enPausa: 0, espera: 0, w: 0, h: 0, dpr: 0, pieFirma: "" };
-  let retenido = false;
-
+  /* ---------- las repeticiones ----------
+     Los cuatro juegos de hoy. La lista se rehace sola al cambiar el día
+     (o si la popularidad que llegó reordena la alineación). */
+  let tarjetas = [], firmaLinea = "";
   function armaLinea() {
     const reps = alineacionDelDia(ctx.dia(), ctx.popular ? ctx.popular() : null);
     const firma = reps.map(r => r.cat).join(",");
     if (firma === firmaLinea) return false;
-    const antes = tarjetas[actual] && tarjetas[actual].rep.cat;
     for (const t of tarjetas) { if (t.off) t.off(); t.gen++; }
     firmaLinea = firma;
-    linea.innerHTML = "";
-    tarjetas = reps.map((rep, i) => {
-      const li = document.createElement("li");
-      li.innerHTML = `<button type="button" style="--c:${colorDeJuego(rep.juego)}"><i class="jg-rp-punto" aria-hidden="true"></i><b>${escapeHtml(rep.titulo)}</b><span class="jg-rp-l-quien"></span><span class="jg-rp-l-marca"></span><i class="jg-rp-l-barra" aria-hidden="true"></i></button>`;
-      const btn = li.querySelector("button");
-      btn.onclick = () => ve(i, true);
-      linea.appendChild(li);
-      return { rep, li, btn, quienEl: li.querySelector(".jg-rp-l-quien"), marcaEl: li.querySelector(".jg-rp-l-marca"),
-        off: null, gen: 0, repro: null, entrada: null, origen: "", estado: "cargando", error: null, filaFirma: "" };
-    });
-    const sigue = tarjetas.findIndex(t => t.rep.cat === antes);
-    actual = sigue >= 0 ? sigue : 0;
-    vista.t = null;
-    for (const t of tarjetas) pintaFila(t);
+    lista.innerHTML = "";
+    tarjetas = reps.map(tarjeta);
     return true;
+  }
+  function tarjeta(rep) {
+    const el = document.createElement("article");
+    el.className = "jg-rp cargando";
+    el.dataset.cat = rep.cat;
+    el.style.flexGrow = String(ASPECTO[rep.juego] || 1);
+    el.innerHTML = `<div class="jg-rp-cab"><a href="${rep.ruta}" title="Jugar a ${escapeHtml(rep.titulo)}"><b>${escapeHtml(rep.titulo)}</b><span>${escapeHtml(rep.modo)}</span></a><span class="jg-rp-quien"></span></div>
+      <div class="jg-rp-lienzo" title="Pausar o seguir"><canvas aria-hidden="true"></canvas>
+        <button class="jg-rp-pausa" type="button" aria-label="Seguir la repetición">▶</button>
+        <p class="jg-rp-msg">Buscando la mejor partida…</p></div>`;
+    lista.appendChild(el);
+    const t = {
+      rep, el, canvas: el.querySelector("canvas"), msg: el.querySelector(".jg-rp-msg"), quien: el.querySelector(".jg-rp-quien"),
+      pausaBtn: el.querySelector(".jg-rp-pausa"), origen: "",
+      off: null, gen: 0, repro: null, entrada: null, v: 1, t0: 0, pausado: false, enPausa: 0, pieFirma: "", w: 0, h: 0
+    };
+    t.pausaBtn.onclick = () => pausa(t, !t.pausado);
+    el.querySelector(".jg-rp-lienzo").addEventListener("click", ev => { if (ev.target === t.canvas) pausa(t, !t.pausado); });
+    return t;
+  }
+  /* Lo comprobado no se vuelve a comprobar: la misma fila llega en cada
+     cambio de la consulta. */
+  const comprobadas = new Map();
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+  function pausa(t, si) {
+    if (!t.repro || t.pausado === si) return;
+    const ahora = performance.now();
+    if (si) t.enPausa = ahora; else t.t0 += ahora - t.enPausa;
+    t.pausado = si;
+    t.el.classList.toggle("pausada", si);
+    pintaTarjeta(t, ahora, true);
   }
 
   async function valida(rep, fila) {
@@ -160,9 +149,7 @@ export function crearRieles(ctx) {
   /* El récord de siempre, cuando nadie guardó todavía una partida del día
      (o antes de publicar las reglas de `repeticiones`). */
   async function historico(rep) {
-    const filas = (await fb.leerSolo(rep.cat)).sort((a, b) => rep.menor
-      ? a.tiempo - b.tiempo || a.uid.localeCompare(b.uid)
-      : b.puntos - a.puntos || a.tiempo - b.tiempo || a.uid.localeCompare(b.uid));
+    const filas = (await fb.leerSolo(rep.cat)).sort((a, b) => b.puntos - a.puntos || a.tiempo - b.tiempo || a.uid.localeCompare(b.uid));
     for (const f of filas.slice(0, 3)) {
       if (!f.partida) continue;
       const pr = await fb.leerPruebaSolo(rep.cat, f.uid, f.partida).catch(() => null);
@@ -188,161 +175,85 @@ export function crearRieles(ctx) {
       if (gen !== t.gen) return;
     }
     if (!elegida) {
-      t.repro = null; t.entrada = null; t.estado = "vacia"; t.error = error || null;
-      pintaFila(t);
-      if (t === tarjetas[actual]) muestra();
+      t.repro = null; t.entrada = null;
+      t.el.classList.remove("cargando");
+      t.el.classList.add("vacia");
+      t.msg.innerHTML = (error && esPermiso(error) ? "Las repeticiones esperan que se publiquen las reglas de Firebase." : "Nadie ha jugado todavía. ¡Estrena la tabla!") +
+        `<a class="jg-rp-jugar" href="${t.rep.ruta}">Jugar ahora →</a>`;
+      t.quien.innerHTML = "";
+      t.pieFirma = "";
+      limpiaLienzo(t);
       return;
     }
     const { fila, prueba } = elegida;
     const firma = `${fila.uid}:${fila.p}:${fila.t}:${fila.o || ""}`;
-    t.estado = "lista";
+    t.el.classList.remove("cargando", "vacia");
+    t.msg.textContent = "";
     t.origen = origen === "record" ? "Récord histórico" : etiquetaDia(fila.dia, ctx.dia());
-    if (!(t.entrada && t.entrada.firma === firma && t.repro)) {
-      t.repro = crearRepro(t.rep.juego, prueba);
-      t.entrada = { uid: fila.uid, n: fila.n, p: fila.p, t: fila.t, firma };
+    if (t.entrada && t.entrada.firma === firma && t.repro) return;
+    t.repro = crearRepro(t.rep.juego, prueba);
+    t.entrada = { uid: fila.uid, n: fila.n, p: fila.p, t: fila.t, firma };
+    t.el.style.flexGrow = String(t.repro.aspecto);
+    t.t0 = performance.now();
+    t.pieFirma = "";
+    /* Con «reducir movimiento» la tarjeta se queda quieta en el tablero
+       final; ▶ la pone en marcha. */
+    if (reduce.matches || t.pausado) {
+      t.enPausa = t.t0; t.t0 -= t.repro.dur; t.pausado = true;
+      t.el.classList.add("pausada");
     }
-    pintaFila(t);
-    if (t === tarjetas[actual]) muestra();
+    pintaTarjeta(t, performance.now(), true);
   }
 
-  /* ---------- lo que se ve arriba ---------- */
-  const nombreDe = e => mezcla({ nombre: e.n || "Jugador" }, ctx.perfil(e.uid)).nombre || "Jugador";
-  const marcaDe = t => formatoMarca(t.rep, t.entrada.p, t.entrada.t);
-
-  /* Pone arriba la partida de la tarjeta `actual`. Si es la misma que ya
-     estaba (llegó otra vez la misma fila), no la reinicia. */
-  function muestra() {
-    const t = tarjetas[actual];
-    if (!t) return;
-    const firma = t.rep.cat + "|" + (t.entrada ? t.entrada.firma : t.estado);
-    if (vista.t === t && vista.firma === firma) return;
-    const otroJuego = vista.t !== t;
-    vista.t = t; vista.firma = firma; vista.pieFirma = ""; vista.espera = performance.now();
-    esc.style.setProperty("--c", colorDeJuego(t.rep.juego));
-    escJuego.href = t.rep.ruta;
-    escJuego.title = `Jugar a ${t.rep.titulo}`;
-    escJuego.querySelector("b").textContent = t.rep.titulo;
-    escJuego.querySelector("span").textContent = t.rep.modo;
-    for (const x of tarjetas) {
-      x.btn.classList.toggle("activa", x === t);
-      if (x === t) x.btn.setAttribute("aria-current", "true"); else x.btn.removeAttribute("aria-current");
-      x.btn.style.setProperty("--p", "0");
-    }
-    esc.classList.toggle("cargando", t.estado === "cargando");
-    esc.classList.toggle("vacia", t.estado === "vacia");
-    if (otroJuego) { esc.classList.remove("entra"); void esc.offsetWidth; esc.classList.add("entra"); }
-    if (!t.repro) {
-      escQuien.innerHTML = ""; escOrigen.textContent = "";
-      escMsg.innerHTML = t.estado === "cargando" ? "Buscando la mejor partida…"
-        : (t.error && esPermiso(t.error) ? "Las repeticiones esperan que se publiquen las reglas de Firebase." : "Nadie ha jugado todavía. ¡Estrena la tabla!") +
-          `<a class="jg-rp-jugar" href="${t.rep.ruta}">Jugar ahora →</a>`;
-      limpiaLienzo();
-      vista.pausado = false;
-      ponPausa(false);
-      return;
-    }
-    escMsg.textContent = "";
-    vista.desde = desdeRep(t.repro.dur);
-    vista.t0 = performance.now() - vista.desde;
-    vista.pausado = false;
-    // Con «reducir movimiento» se queda quieta en el tablero final; ▶ la pone en marcha.
-    if (reduce.matches) { vista.t0 -= t.repro.dur - vista.desde; ponPausa(true); }
-    else ponPausa(false);
-    pintaEscena(performance.now(), true);
+  function limpiaLienzo(t) {
+    const g = t.canvas.getContext("2d");
+    if (g) g.clearRect(0, 0, t.canvas.width, t.canvas.height);
   }
 
-  function ponPausa(si) {
-    const ahora = performance.now();
-    if (si !== vista.pausado) {
-      if (si) vista.enPausa = ahora; else vista.t0 += ahora - vista.enPausa;
-    }
-    vista.pausado = si;
-    esc.classList.toggle("pausada", si && !!(vista.t && vista.t.repro));
-    ppBtn.textContent = si ? "▶" : "❚❚";
-    ppBtn.setAttribute("aria-label", si ? "Seguir la repetición" : "Pausar la repetición");
+  /* El instante de la partida que toca ahora: el bucle es la partida,
+     a su velocidad real, más una pausa con el tablero final. */
+  function instante(t, ahora) {
+    const reloj = (t.pausado ? t.enPausa : ahora) - t.t0;
+    const vuelta = t.repro.dur + PAUSA_FINAL_MS;
+    if (reloj >= vuelta) { t.t0 += Math.floor(reloj / vuelta) * vuelta; return instante(t, ahora); }
+    return Math.min(t.repro.dur, reloj);
   }
 
-  function ve(i, aMano) {
-    if (!tarjetas.length) return;
-    actual = (i + tarjetas.length) % tarjetas.length;
-    vista.t = null;
-    muestra();
-    if (aMano) arranca();
-  }
-
-  function limpiaLienzo() {
-    const g = canvas.getContext("2d");
-    if (g) g.clearRect(0, 0, canvas.width, canvas.height);
-  }
-
-  /* El instante de la partida que toca ahora: la partida (o su último
-     tramo), a su velocidad real, más una pausa con el tablero final.
-     Devuelve null cuando ya terminó la vuelta y toca pasar a la siguiente. */
-  function instante(ahora) {
-    const r = vista.t.repro, reloj = (vista.pausado ? vista.enPausa : ahora) - vista.t0;
-    if (reloj >= r.dur + PAUSA_FINAL_MS) {
-      if (!retenido && !reduce.matches && tarjetas.length > 1) return null;
-      vista.t0 = ahora - vista.desde;
-      return vista.desde;
-    }
-    return Math.min(r.dur, reloj);
-  }
-
-  function pintaEscena(ahora, pie) {
-    const t = vista.t;
-    if (!t || !t.repro) return;
+  function pintaTarjeta(t, ahora, pie) {
+    if (!t.repro) return;
+    const caja = t.canvas.parentElement;
     const w = caja.clientWidth, h = caja.clientHeight;
     if (!w || !h) return;
-    const ms = instante(ahora);
-    if (ms === null) { ve(actual + 1, false); return; }
     const dpr = Math.min(2, window.devicePixelRatio || 1);
-    if (vista.w !== w || vista.h !== h || vista.dpr !== dpr) {
-      vista.w = w; vista.h = h; vista.dpr = dpr;
-      canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
-      canvas.style.width = w + "px"; canvas.style.height = h + "px";
+    if (t.w !== w || t.h !== h || t.dpr !== dpr) {
+      t.w = w; t.h = h; t.dpr = dpr;
+      t.canvas.width = Math.round(w * dpr); t.canvas.height = Math.round(h * dpr);
+      t.canvas.style.width = w + "px"; t.canvas.style.height = h + "px";
     }
+    const ms = instante(t, ahora);
     t.repro.en(ms);
-    const g = canvas.getContext("2d");
+    const g = t.canvas.getContext("2d");
     g.setTransform(1, 0, 0, 1, 0, 0);
-    g.clearRect(0, 0, canvas.width, canvas.height);
+    g.clearRect(0, 0, t.canvas.width, t.canvas.height);
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     // Lo que en el juego se mueve solo (la cuadrícula de sortEm, la fruta
-    // que late, el ala) sigue moviéndose con la repetición en pausa.
+    // que late) sigue moviéndose con la repetición en pausa.
     t.repro.pinta(g, w, h, ahora / 1000);
-    const p = Math.max(0, Math.min(1, (ms - vista.desde) / Math.max(1, t.repro.dur - vista.desde)));
-    escBarra.style.transform = `scaleX(${p})`;
-    t.btn.style.setProperty("--p", p.toFixed(3));
-    if (pie) pintaPie();
+    if (pie) pintaPie(t);
   }
 
-  /* Arriba de la escena, quién la jugó; debajo, de dónde viene (hoy, ayer,
-     récord) y su marca final. */
-  function pintaPie() {
-    const t = vista.t, e = t && t.entrada;
-    if (!e) return;
-    const p = mezcla({ nombre: e.n || "Jugador" }, ctx.perfil(e.uid));
-    const nombre = p.nombre || "Jugador", final = marcaDe(t);
-    const firma = [nombre, p.foto, p.color, ctx.marco(e.uid), final, t.origen].join("|");
-    if (firma === vista.pieFirma) return;
-    vista.pieFirma = firma;
-    escQuien.title = `${t.origen}: ${nombre} · ${final}`;
-    escQuien.innerHTML = `${avatarMarco(p.foto, nombre, p.color || ctx.colorDe(e.uid), ctx.marco(e.uid), 18, e.uid)}<b translate="no" data-perfil="${escapeHtml(e.uid)}" data-nombre="${escapeHtml(nombre)}">${escapeHtml(nombre)}</b>`;
-    escOrigen.innerHTML = `<span>${escapeHtml(t.origen)}</span> · <b>${escapeHtml(final)}</b>`;
-  }
-
-  /* La fila de cada juego en la lista de hoy: quién y su marca. */
-  function pintaFila(t) {
+  /* Arriba de la escena, quién la jugó y su marca final; el «hoy, ayer,
+     récord» va en el título, para no cargar la línea. */
+  function pintaPie(t) {
     const e = t.entrada;
-    const quienTxt = e ? nombreDe(e) : t.estado === "vacia" ? "Sin partidas" : "…";
-    const marca = e ? marcaDe(t) : "";
-    const firma = quienTxt + "|" + marca + "|" + t.estado;
-    if (firma === t.filaFirma) return;
-    t.filaFirma = firma;
-    t.quienEl.setAttribute("translate", e ? "no" : "yes");
-    t.quienEl.textContent = quienTxt;
-    t.quienEl.classList.toggle("nadie", !e);
-    t.marcaEl.textContent = marca;
-    t.btn.setAttribute("aria-label", `${t.rep.titulo}: ${e ? `${quienTxt}, ${marca}` : quienTxt}`);
+    const p = mezcla({ nombre: e.n || "Jugador" }, ctx.perfil(e.uid));
+    const nombre = p.nombre || "Jugador";
+    const final = formatoMarca(t.rep, e.p, e.t);
+    const firma = [nombre, p.foto, p.color, ctx.marco(e.uid), final, t.origen].join("|");
+    if (firma === t.pieFirma) return;
+    t.pieFirma = firma;
+    t.quien.title = `${t.origen}: ${nombre} · ${final}`;
+    t.quien.innerHTML = `${avatarMarco(p.foto, nombre, p.color || ctx.colorDe(e.uid), ctx.marco(e.uid), 18, e.uid)}<b translate="no" data-perfil="${escapeHtml(e.uid)}" data-nombre="${escapeHtml(nombre)}">${escapeHtml(nombre)}</b>`;
   }
 
   function cuadro(ahora) {
@@ -353,12 +264,7 @@ export function crearRieles(ctx) {
     ultimoCuadro = ahora;
     const pie = ahora - ultimoPie > PIE_MS;
     if (pie) ultimoPie = ahora;
-    const t = vista.t;
-    if (!t) { muestra(); return; }
-    if (t.repro) pintaEscena(ahora, pie);
-    // Una tabla sin partida (o que tarda en llegar) no se queda en pantalla.
-    else if (!retenido && !reduce.matches && tarjetas.length > 1 && ahora - vista.espera > (t.estado === "vacia" ? VACIA_MS : 2 * VACIA_MS)) ve(actual + 1, false);
-    if (pie) for (const x of tarjetas) if (x.entrada) pintaFila(x);
+    for (const t of tarjetas) if (t.repro) pintaTarjeta(t, ahora, pie);
   }
   const arranca = () => { if (!raf && activo && ancho.matches && !document.hidden) raf = requestAnimationFrame(cuadro); };
 
@@ -366,28 +272,15 @@ export function crearRieles(ctx) {
     armaLinea();
     for (const t of tarjetas) {
       if (t.off) continue;
+      t.el.classList.add("cargando");
       t.off = fb.watchRepeticiones(t.rep.cat, (filas, error) => { elige(t, filas, error); });
     }
-    muestra();
     arranca();
   }
   function suelta() {
     for (const t of tarjetas) { if (t.off) { t.off(); t.off = null; } t.gen++; }
     if (raf) { cancelAnimationFrame(raf); raf = 0; }
   }
-
-  /* Pausar: el botón, o un clic en la escena. Las flechas y la lista saltan. */
-  ppBtn.onclick = () => { if (vista.t && vista.t.repro) ponPausa(!vista.pausado); };
-  esc.querySelector(".jg-rp-pausa").onclick = () => ponPausa(false);
-  caja.addEventListener("click", ev => { if (ev.target === canvas && vista.t && vista.t.repro) ponPausa(!vista.pausado); });
-  for (const b of esc.querySelectorAll("[data-paso]")) b.onclick = () => ve(actual + Number(b.dataset.paso), true);
-  /* Mirando de cerca (ratón encima o foco dentro) la partida no se va. */
-  const carrusel = izq.querySelector(".jg-rp-car");
-  const retiene = () => { retenido = carrusel.matches(":hover") || carrusel.contains(document.activeElement); };
-  carrusel.addEventListener("pointerenter", () => { retenido = true; });
-  carrusel.addEventListener("pointerleave", () => setTimeout(retiene, 0));
-  carrusel.addEventListener("focusin", () => { retenido = true; });
-  carrusel.addEventListener("focusout", () => setTimeout(retiene, 0));
 
   /* ---------- el chat general ---------- */
   let offChat = null, chatMsgs = [], chatFirma = "", relee = 0, repinta = 0, ultimoMio = null, abierto = false, barrido = false, cuenta = 0, enviando = false;
@@ -530,13 +423,13 @@ export function crearRieles(ctx) {
   const alAncho = () => {
     if (ancho.matches && abierto) abre(false);
     if (activo && ancho.matches && ctx.usuario()) engancha(); else suelta();
-    vista.w = 0;
+    for (const t of tarjetas) t.w = 0;
     chatFirma = "";
     pintaChat();
     arranca();
   };
   ancho.addEventListener("change", alAncho);
-  const alVer = () => { if (!document.hidden) { vista.w = 0; arranca(); } };
+  const alVer = () => { if (!document.hidden) { for (const t of tarjetas) t.w = 0; arranca(); } };
   document.addEventListener("visibilitychange", alVer);
   /* La cabecera del sitio no es fija: mientras se ve, los rieles empiezan
      debajo de ella, y al bajar suben hasta el borde (`--jg-scroll`). */
@@ -567,11 +460,7 @@ export function crearRieles(ctx) {
     if (activo) ponScroll();
     if (!activo && abierto) abre(false);
     if (cambio) {
-      if (uid !== quien) {
-        sueltaChat(); suelta(); comprobadas.clear(); ultimoMio = null;
-        for (const t of tarjetas) { t.repro = null; t.entrada = null; t.estado = "cargando"; t.filaFirma = ""; pintaFila(t); }
-        vista.t = null;
-      }
+      if (uid !== quien) { sueltaChat(); suelta(); comprobadas.clear(); ultimoMio = null; for (const t of tarjetas) { t.repro = null; t.entrada = null; t.pausado = false; t.el.classList.remove("pausada"); } }
       quien = uid;
       pintaPuertaIzq(!u);
       if (activo && u) { enganchaChat(); if (ancho.matches) engancha(); }
@@ -583,9 +472,7 @@ export function crearRieles(ctx) {
       // Otro día (o la popularidad que llegó reordena la alineación).
       if (u && ancho.matches && armaLinea()) engancha();
       // Un perfil que llegó (apodo, foto, marco): los pies y el chat lo recogen.
-      vista.pieFirma = "";
-      pintaPie();
-      for (const t of tarjetas) { t.filaFirma = ""; pintaFila(t); }
+      for (const t of tarjetas) if (t.repro) pintaPie(t);
       pintaChat();
     }
     arranca();
