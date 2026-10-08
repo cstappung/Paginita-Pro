@@ -201,6 +201,13 @@ y están en el repositorio público, como cualquier archivo del sitio.
 > `users/<uid>/club/dosmil`, que ya era de su dueño. Hasta volver a publicar
 > las reglas se juega igual, pero las partidas no entran en la clasificación
 > y no pagan monedas.
+>
+> **Corrección (8 de octubre de 2026):** el `.validate` de `puntos` en
+> `soloRanks` dejaba al 2048 en el tope general de 100 000, así que un
+> puntaje mayor (o la ficha 131 072 / 262 144) se rechazaba con
+> `PERMISSION_DENIED` y el récord no se guardaba. Ahora `club-dosmil-puntos`
+> llega a 4 000 000 y `club-dosmil-ficha` a 1 000 000. Hay que volver a
+> publicar las reglas.
 
 > **Metro Rush (octubre de 2026):** `club-metrorush-carrera` (los puntos de la
 > mejor carrera, con tope de 1 000 000 000, porque en el juego se llega a
