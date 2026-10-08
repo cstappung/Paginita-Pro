@@ -192,9 +192,14 @@
     arranca();
     const r = M.mueve(E, dir);
     if (!r) return;
+    /* Cada jugada guarda ms ENTEROS: performance.now trae decimales, y un
+       tiempo con decimales no pasa `resultadoClub` (Number.isSafeInteger),
+       que tiraba el récord sin avisar. `ultimaA` avanza lo mismo que se
+       redondeó, para que la suma no se aleje del reloj. */
     const ahora = reloj().a;
-    jugadas.push([dir, origen, Math.min(M.DELTA_MAX, ahora - ultimaA)]);
-    ultimaA = ahora;
+    const dt = Math.min(M.DELTA_MAX, Math.max(0, Math.round(ahora - ultimaA)));
+    jugadas.push([dir, origen, dt]);
+    ultimaA = dt < M.DELTA_MAX ? ultimaA + dt : ahora;
     if (origen === 'x') fiable = false;
     enSesion++; desdeSubida++;
     anima(r);
@@ -216,7 +221,8 @@
   // Cierra la partida: guarda el progreso y manda lo que corresponde.
   function cierra(fin) {
     para();
-    const res = M.rehace(E.semilla, E.u, jugadas);
+    // Lo mismo que leerá el verificador: las jugadas tal como viajan en la prueba.
+    const res = M.rehace(E.semilla, E.u, M.decodifica(M.codifica(jugadas)) || jugadas);
     if (res.error) return { res: null, mejoraPuntos: false, mejoraFicha: false };
     const antes = { mejor: prog.mejor, ficha: prog.ficha, fichaT: prog.fichaT };
     const mejoraFicha = res.ficha > antes.ficha || (res.ficha === antes.ficha && res.ficha > 0 && (!antes.fichaT || res.tFicha < antes.fichaT));

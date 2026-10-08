@@ -124,3 +124,15 @@ test('las versiones y las reglas',()=>{
  assert.match(reglas,/'club-dosmil-puntos' \? 4000000/);
  assert.match(reglas,/'club-dosmil-ficha' \|\| [^?]*\? 1000000 /);
 });
+
+test('el juego guarda ms enteros: un tiempo con decimales no entra en la clasificación',()=>{
+ /* performance.now trae decimales; si la jugada los guardaba, res.ms salía
+    con decimales y resultadoClub (Number.isSafeInteger) tiraba el récord
+    sin avisar, en las dos tablas. */
+ const js=fs.readFileSync(path.join(D,'juego.js'),'utf8');
+ assert.match(js,/Math\.round\(ahora - ultimaA\)/);
+ assert.match(js,/M\.decodifica\(M\.codifica\(jugadas\)\)/);
+ const {resultadoClub}=carga('src/juegos/solo/club-datos.js');
+ assert.equal(resultadoClub('dosmil',{categoria:CP,puntos:1200,tiempo:61234.7,partida:'abc'}),null);
+ assert.ok(resultadoClub('dosmil',{categoria:CP,puntos:1200,tiempo:61235,partida:'abc'}));
+});

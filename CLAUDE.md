@@ -3365,6 +3365,9 @@ replays it (`docs/antitrampas/dosmil.md`), rejecting bursts no hand can
 play. Logros, coins, the `tdosmil` frame, the Discord podium and the manual
 are wired like ALETEO's; the `soloRanks`, `soloPruebas` and `clubJugadas`
 regexes were widened, so the rules must be re-published.
+Each move stores **whole** ms (`Math.round` in `juega`): `performance.now`
+has decimals, and a fractional `tiempo` fails `resultadoClub`
+(`Number.isSafeInteger`), which dropped every record silently.
 `tests/dosmil.test.cjs` covers motor and verifier.
 
 **Atasco (`juegos/club/atasco/`) is a Solo Club game too**, a sliding
