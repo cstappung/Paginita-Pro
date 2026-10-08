@@ -450,26 +450,32 @@ const REGLAS = {
       ["Controles", lista([
         "<b>WASD</b> o flechas para moverte; el personaje mira hacia donde camina (ocho direcciones) y dispara hacia ahí.",
         "<b>Espacio</b> dispara (mantenlo apretado), <b>Q</b>/<b>E</b> o <b>1</b>–<b>8</b> cambian de arma, <b>X</b> detona todas tus cargas puestas y <b>Esc</b> pausa. En línea la pausa detiene la partida para todos (enemigos incluidos) hasta que quien la pidió siga, como mucho dos minutos.",
+        "Junto a una <b>estación de suministros</b> (el puesto con el <b>$</b>) se compra con tus puntos: <b>B</b> munición, <b>R</b> armadura, <b>H</b> botiquín y <b>G</b> potencia.",
         "El aspecto se elige en el menú del juego antes de empezar: Bambo, Jon, Soldado, Médico, Ninja, Policía, Payaso o Robot."
       ])],
       ["El multiplicador", lista([
         "Cada baja sube el <b>multiplicador</b> en uno y llena la barra de combo. La barra (el semicírculo sobre tus puntos, arriba al centro) se vacía sola, y más rápido cuanto más alto vas; cuando llega a cero el multiplicador <b>baja de a uno</b>, con una barra más corta cada vez, hasta volver a ×1.",
-        "Los puntos de cada baja son 10 por un zombi y 20 por un diablo, <b>por el multiplicador</b>: encadenar bajas es lo que da puntos de verdad.",
+        "Los puntos de cada baja son 10 por un zombi, 15 por un corredor, 20 por un diablo, 25 por un explosivo o un escupidor y 40 por un bruto, <b>por el multiplicador</b>: encadenar bajas es lo que da puntos de verdad.",
         "Las armas y mejoras se ganan por el multiplicador más alto alcanzado, y no se pierden aunque el combo se corte."
       ])],
       ["Las armas", lista([
         "<b>Pistola</b> (desde el comienzo, munición infinita), <b>Uzi</b> (×5), <b>Escopeta</b> (×10), <b>Barriles</b> (×15), <b>Granadas</b> (×20), <b>Muro falso</b> (×25), <b>Cohetes</b> (×30) y <b>Cargas</b> (×40).",
         "Los <b>barriles</b> se dejan en el suelo y revientan cuando les disparas; los <b>muros falsos</b> tapan el paso a los enemigos hasta que los rompen; las <b>cargas</b> se ponen y se detonan todas juntas con <b>X</b>.",
-        "En <b>cada</b> multiplicador nuevo que no trae arma llega una <b>mejora</b>, rotando entre las armas que ya tienes: más daño, más cadencia, más alcance, más balas, perdigones y apertura en la escopeta, más radio en barriles, granadas, cohetes y cargas, más vida en el muro falso. Cada mejora tiene un tope, así que ninguna arma se vuelve absurda."
+        "En <b>cada</b> multiplicador nuevo que no trae arma llega una <b>mejora</b>, rotando entre las armas que ya tienes: más daño, más cadencia, más alcance, más balas, perdigones y apertura en la escopeta, más radio en barriles, granadas, cohetes y cargas, más vida en el muro falso, y <b>penetración</b> en pistola, uzi y escopeta: cada nivel hace que la bala atraviese un enemigo más. Cada mejora tiene un tope, así que ninguna arma se vuelve absurda."
       ])],
       ["Enemigos y cajas", lista([
-        "Los <b>zombis</b> caminan hacia ti y muerden. Los <b>diablos</b> aparecen desde el nivel 3: aguantan más, son más rápidos y escupen bolas de fuego.",
-        "Cada nivel trae más enemigos, con más vida y más rápidos. También salen más cuantos más jugadores haya en la sala.",
-        "Los enemigos sueltan <b>cajas</b>: unas curan 50 de vida y otras rellenan la munición de un arma que tengas.",
+        "Los <b>zombis</b> caminan hacia ti y muerden. Los <b>diablos</b> aparecen desde el nivel 3: aguantan más y escupen bolas de fuego. Los <b>corredores</b> (nivel 4) son flacos y muy rápidos. Los <b>explosivos</b> (nivel 5) brillan en la barriga y revientan al tocarte o al morir, dañando a todo lo que esté cerca, enemigos incluidos. Los <b>brutos</b> (nivel 7) son lentos, enormes, casi no se dejan empujar y pegan fuerte. Los <b>escupidores</b> (nivel 9) lanzan ácido verde desde lejos.",
+        "La dificultad sube <b>de a poco y en línea recta</b>: cada nivel trae unos pocos enemigos más, un poco más de vida, de velocidad y de golpe, y cada tipo nuevo empieza siendo una parte pequeña de la oleada y crece despacio. También salen más cuantos más jugadores haya en la sala.",
+        "Los enemigos sueltan <b>cajas</b>: unas curan 50 de vida, otras rellenan la munición de un arma que tengas y las azules dan 35 de <b>armadura</b>.",
+        "La <b>armadura</b> (hasta 100, la barra azul bajo la de vida) absorbe el 60 % de cada golpe mientras dure.",
         "Cada golpe <b>empuja</b> al enemigo hacia atrás y lo deja medio segundo aturdido antes de volver a perseguirte. Hay <b>fuego amigo</b> entre ellos: las bolas de fuego de los diablos queman a los zombis (y a otros diablos) que se crucen.",
         "Tu vida, el arma en la mano y sus balas van justo encima de tu personaje, como en el original."
       ])],
-      ["Mapas", "Cinco, elegidos al abrir la sala: Patio, Sótano, Cruce, Fortaleza y Laberinto. Los enemigos entran por los bordes y nunca aparecen pegados a un jugador."],
+      ["Tienda", lista([
+        "Cada mapa tiene <b>estaciones de suministros</b>. De pie junto a una, el aviso de abajo muestra los precios y se compra con los puntos: <b>B</b> munición para todas tus armas (250), <b>R</b> +50 de armadura (400), <b>H</b> +50 de vida (300) y <b>G</b> potencia, +10 % de daño en todas las armas, hasta cinco veces (800, 1600, 2400…).",
+        "Gastar puntos baja tu marcador: es el precio de llegar más lejos."
+      ])],
+      ["Mapas", "Cinco, elegidos al abrir la sala: Patio, Sótano, Cruce, Fortaleza y Laberinto. Los enemigos entran por los bordes y nunca aparecen pegados a un jugador. Cada mapa trae <b>barriles</b> propios que revientan al dispararles y vuelven a aparecer al empezar cada nivel."],
       ["Sin servidor", "El movimiento va de navegador a navegador. Los enemigos los mueve un jugador, el que dirige, y si se va los toma el siguiente. Al registro de la sala solo van las muertes y los niveles superados: cada uno anota su propia muerte, así que un navegador modificado podría no morirse. Es el mismo límite honesto del resto de los juegos."],
       ["Para practicar", "El juego suelto (<code>juegos/boxhead/</code>) se juega solo, en supervivencia, en cualquiera de los cinco mapas."]
     ],
