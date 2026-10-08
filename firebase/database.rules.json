@@ -490,7 +490,7 @@
             ".validate": "newData.isString() && newData.val().length <= 80"
           },
           "puntos": {
-            ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= ($categoria.beginsWith('club-snake-') || $categoria.beginsWith('club-tetris-') || $categoria === 'club-metrorush-carrera' ? 1000000000 : $categoria === 'club-metrorush-distancia' || $categoria === 'club-fanal-travesia' || $categoria === 'club-fanal-sinfin' || $categoria === 'club-sudoku-arcade' || $categoria === 'club-electro-puntos' ? 1000000 : 100000) && (!$categoria.beginsWith('club-minas-') || newData.val() === 1) && (!$categoria.matches(/^club-sudoku-(facil|medio|dificil|experto)$/) || newData.val() === 1) && newData.val() % 1 === 0"
+            ".validate": "newData.isNumber() && newData.val() > 0 && newData.val() <= ($categoria.beginsWith('club-snake-') || $categoria.beginsWith('club-tetris-') || $categoria === 'club-metrorush-carrera' ? 1000000000 : $categoria === 'club-dosmil-puntos' ? 4000000 : $categoria === 'club-dosmil-ficha' || $categoria === 'club-metrorush-distancia' || $categoria === 'club-fanal-travesia' || $categoria === 'club-fanal-sinfin' || $categoria === 'club-sudoku-arcade' || $categoria === 'club-electro-puntos' ? 1000000 : 100000) && (!$categoria.beginsWith('club-minas-') || newData.val() === 1) && (!$categoria.matches(/^club-sudoku-(facil|medio|dificil|experto)$/) || newData.val() === 1) && newData.val() % 1 === 0"
           },
           "tiempo": {
             ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 604800000 && newData.val() % 1 === 0"

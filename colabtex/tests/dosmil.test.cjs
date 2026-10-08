@@ -118,4 +118,9 @@ test('las versiones y las reglas',()=>{
  const reglas=fs.readFileSync(path.join(__dirname,'../../firebase/database.rules.json'),'utf8');
  assert.match(reglas,/dosmil-\(puntos\|ficha\)/);
  assert.match(reglas,/\|dosmil/);
+ /* El tope de `puntos` en soloRanks tiene que dejar pasar lo que el
+    verificador acepta: 4 000 000 puntos y la ficha 262 144. Con el tope
+    general de 100 000 las partidas buenas se rechazaban al guardarse. */
+ assert.match(reglas,/'club-dosmil-puntos' \? 4000000/);
+ assert.match(reglas,/'club-dosmil-ficha' \|\| [^?]*\? 1000000 /);
 });
