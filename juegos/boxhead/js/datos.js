@@ -137,7 +137,7 @@
   /* Al vaciarse, el multiplicador baja uno y la barra vuelve a la mitad. */
   const bajadaCombo = mul => duracionCombo(mul) * 0.5;
   /* Puntos por baja (× multiplicador), por tipo de enemigo. */
-  const PUNTOS = [10, 20, 15, 40, 25, 25];
+  const PUNTOS = [10, 20, 15, 40, 25, 25, 300, 300, 300, 300, 300, 1000, 1000, 1000, 1000, 1000];
 
   /* ---------- enemigos ----------
      `desde`: primer nivel en que aparece · `parte`/`tope`: cuánto crece su
@@ -149,8 +149,48 @@
     { id: 2, nombre: 'Corredor', vida: 24, vel: 86, velMax: 112, golpe: 6, radio: 10, desde: 4, parte: 0.04, tope: 0.22, masa: 1.3 },
     { id: 3, nombre: 'Bruto', vida: 260, vel: 34, velMax: 52, golpe: 22, radio: 15, desde: 7, parte: 0.025, tope: 0.12, masa: 0.2 },
     { id: 4, nombre: 'Explosivo', vida: 30, vel: 54, velMax: 76, golpe: 0, radio: 11, explota: 46, radioExplota: 66, desde: 5, parte: 0.03, tope: 0.14, masa: 1 },
-    { id: 5, nombre: 'Escupidor', vida: 70, vel: 40, velMax: 60, golpe: 7, radio: 11, fuego: 10, cadFuego: 2.2, alcFuego: 260, acido: true, desde: 9, parte: 0.03, tope: 0.14, masa: 0.9 }
+    { id: 5, nombre: 'Escupidor', vida: 70, vel: 40, velMax: 60, golpe: 7, radio: 11, fuego: 10, cadFuego: 2.2, alcFuego: 260, acido: true, desde: 9, parte: 0.03, tope: 0.14, masa: 0.9 },
+    /* Jefes. Nunca salen de la mezcla (`desde: Infinity`): los pone el
+       director al empezar un nivel que termina en 5 (mini) o en 0 (grande).
+       `radio` es el de chocar con los muros, como los demás, para que
+       quepan por los pasillos; `rg` es el de recibir balas y morder, y
+       `talla` la escala del dibujo. `hab` dice qué hace y `cd` cada cuánto. */
+    { id: 6, nombre: 'El Carnicero', jefe: 'mini', hab: 'embiste', cd: 4.5, vida: 900, vel: 50, velMax: 70, golpe: 20, radio: 13, rg: 20, talla: 1.6, desde: Infinity, parte: 0, tope: 0, masa: 0.1,
+      txt: 'se agacha, brilla y embiste en línea recta' },
+    { id: 7, nombre: 'El Nigromante', jefe: 'mini', hab: 'invoca', cd: 6.5, vida: 700, vel: 38, velMax: 56, golpe: 12, radio: 12, rg: 18, talla: 1.45, fuego: 12, cadFuego: 3, alcFuego: 300, desde: Infinity, parte: 0, tope: 0, masa: 0.1,
+      txt: 'levanta zombis del suelo a su alrededor' },
+    { id: 8, nombre: 'La Bruja', jefe: 'mini', hab: 'anillo', cd: 4, vida: 750, vel: 44, velMax: 62, golpe: 12, radio: 12, rg: 18, talla: 1.45, fuego: 14, desde: Infinity, parte: 0, tope: 0, masa: 0.1,
+      txt: 'lanza anillos de fuego; dos seguidos cuando está herida' },
+    { id: 9, nombre: 'La Larva Madre', jefe: 'mini', hab: 'cria', cd: 5, vida: 1000, vel: 30, velMax: 44, golpe: 16, radio: 14, rg: 22, talla: 1.7, desde: Infinity, parte: 0, tope: 0, masa: 0.1,
+      txt: 'pare corredores, y al morir revienta en más' },
+    { id: 10, nombre: 'El Espectro', jefe: 'mini', hab: 'salta', cd: 5, vida: 650, vel: 60, velMax: 80, golpe: 14, radio: 11, rg: 17, talla: 1.4, desde: Infinity, parte: 0, tope: 0, masa: 0.1,
+      txt: 'se desvanece y reaparece a tu lado' },
+    { id: 11, nombre: 'El Coloso', jefe: 'grande', hab: 'pisoton', cd: 5, vida: 3200, vel: 36, velMax: 52, golpe: 30, radio: 14, rg: 28, talla: 2.2, onda: 110, dOnda: 45, desde: Infinity, parte: 0, tope: 0, masa: 0.05,
+      txt: 'pisa el suelo y lanza una onda; marca el círculo antes' },
+    { id: 12, nombre: 'La Reina de la Colmena', jefe: 'grande', hab: 'enjambre', cd: 6, vida: 2800, vel: 32, velMax: 46, golpe: 22, radio: 14, rg: 26, talla: 2, fuego: 12, cadFuego: 2.5, alcFuego: 340, desde: Infinity, parte: 0, tope: 0, masa: 0.05,
+      txt: 'pare enjambres de corredores y explosivos' },
+    { id: 13, nombre: 'El Archidiablo', jefe: 'grande', hab: 'espiral', cd: 6, vida: 3000, vel: 42, velMax: 58, golpe: 24, radio: 14, rg: 26, talla: 2.1, fuego: 16, cadFuego: 1.6, alcFuego: 420, desde: Infinity, parte: 0, tope: 0, masa: 0.05,
+      txt: 'gira soltando una espiral de fuego y dispara en abanico' },
+    { id: 14, nombre: 'La Hidra', jefe: 'grande', hab: 'hidra', cd: 3.5, vida: 3400, vel: 30, velMax: 44, golpe: 22, radio: 14, rg: 28, talla: 2.2, fuego: 12, acido: true, desde: Infinity, parte: 0, tope: 0, masa: 0.05,
+      txt: 'escupe ácido en cinco direcciones; al perder vida le brotan escupidores' },
+    { id: 15, nombre: 'El Titán', jefe: 'grande', hab: 'roca', cd: 3, vida: 4000, vel: 34, velMax: 50, golpe: 34, radio: 14, rg: 30, talla: 2.4, onda: 70, dOnda: 40, desde: Infinity, parte: 0, tope: 0, masa: 0.05,
+      txt: 'lanza rocas que estallan donde caen; herido, se enfurece' }
   ];
+  /* Los jefes rotan en este orden: 5, 15, 25, 35, 45 los minis y 10, 20,
+     30, 40, 50 los grandes; después vuelve a empezar. */
+  const MINIS = [6, 7, 8, 9, 10];
+  const GRANDES = [11, 12, 13, 14, 15];
+  function jefeDeNivel(n) {
+    n = Math.floor(n);
+    if (!(n > 0)) return -1;
+    if (n % 10 === 5) return MINIS[((n - 5) / 10) % MINIS.length];
+    if (n % 10 === 0) return GRANDES[(n / 10 - 1) % GRANDES.length];
+    return -1;
+  }
+  const esJefe = k => !!(ENEMIGOS[k] && ENEMIGOS[k].jefe);
+  /* Vida del jefe: crece con el nivel (cada vuelta de la rotación pega más)
+     y con la gente en la sala, porque lo reparten entre todos. */
+  const vidaJefe = (k, n, np) => Math.round(ENEMIGOS[k].vida * (1 + 0.06 * (n - 1)) * (1 + 0.6 * (Math.max(1, np) - 1)));
   /* La dificultad sube recta y despacio: cada nivel un poco más de vida,
      velocidad, golpe, cantidad y ritmo. Antes subía el doble de rápido en
      cantidad y ritmo a la vez, y del nivel 8 al 12 pasaba de fácil a muro. */
@@ -371,7 +411,7 @@
   const dirDe = (dx, dy) => (Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) + 8) % 8;
 
   return {
-    TS, ARMAS, MEJORAS, PASOS, arma, nivelArma, premios, duracionCombo, bajadaCombo, PUNTOS, ENEMIGOS, vidaEnemigo, velEnemigo,
+    TS, ARMAS, MEJORAS, PASOS, arma, nivelArma, premios, duracionCombo, bajadaCombo, PUNTOS, ENEMIGOS, MINIS, GRANDES, jefeDeNivel, esJefe, vidaJefe, vidaEnemigo, velEnemigo,
     golpeNivel, totalNivel, mezclaNivel, tipoEnemigo, parteDiablos, maxVivos, ritmoNivel,
     ARMADURA, TIENDA, precioTienda, factorPotencia, ALCANCE_TIENDA, SKINS, skin, MAPAS, ORDEN_MAPAS, mapaValido,
     cargaMapa, DIRS, dirDe
