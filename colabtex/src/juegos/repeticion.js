@@ -129,6 +129,9 @@ function reproTetris(p) {
    desliza (se interpola con la posición del tic anterior). Arriba, la
    barra clara de los puntos. */
 const LIMA = ["#c1f45a", "#77b83e"];
+/* El número y el nombre de cada modo (snake/game.js: MODES) y los poderes del arcade. */
+const SN_MODO = { classic: "01 / CLÁSICO", arcade: "02 / ARCADE", portals: "03 / PORTALES", reloj: "04 / CONTRARRELOJ", espejo: "05 / ESPEJO", laberinto: "06 / LABERINTO", zen: "07 / ZEN" };
+const SN_PODER = { shield: ["◇", "#80dbef"], slow: ["◷", "#b6a0fa"], double: ["×2", "#f5cd72"] };
 function reproSnake(p) {
   const giros = Snake.leeGiros(p.g);
   if (!giros || !Snake.SIZES[p.t] || !Snake.SPEED_MULT[p.r]) throw new Error("prueba ilegible");
@@ -201,7 +204,7 @@ function reproSnake(p) {
     const chico = `700 ${Math.max(6, Math.round(c * 0.5))}px "IBM Plex Sans", sans-serif`;
     texto(ctx, "PUNTOS", x0 + c * 0.9, y0 + barra * 0.34, chico, "#747c6b", "left", "middle");
     texto(ctx, String(m.score).padStart(3, "0"), x0 + c * 0.9, y0 + barra * 0.72, `500 ${Math.max(9, Math.round(c * 1.15))}px "IBM Plex Sans", sans-serif`, "#1f2a1c", "left", "middle");
-    const estado = m.state === "playing" ? "EN JUEGO" : "FIN";
+    const estado = m.state !== "playing" ? "FIN" : p.m === "reloj" ? `${Math.ceil(Math.max(0, m.timeLeft))} S` : m.mirrored ? "ESPEJO" : "EN JUEGO";
     texto(ctx, estado, x0 + bw - c * 0.9, y0 + barra / 2, chico, "#2a3326", "right", "middle");
     circulo(ctx, x0 + bw - c * 1.5 - ctx.measureText(estado).width, y0 + barra / 2, Math.max(1.5, c * 0.13), m.state === "playing" ? "#7ca73e" : "#cf7459");
     // El tablero.
@@ -215,10 +218,24 @@ function reproSnake(p) {
     }
     const vi = ctx.createRadialGradient(bw / 2, bh / 2, bw * 0.1, bw / 2, bh / 2, bw * 0.65);
     vi.addColorStop(0, "#00000000"); vi.addColorStop(1, "#07160c45"); ctx.fillStyle = vi; ctx.fillRect(0, 0, bw, bh);
-    if (c >= 9) texto(ctx, "01 / CLÁSICO · " + p.t.toUpperCase(), c * 0.9, c * 0.9, `500 ${Math.max(6, Math.round(c * 0.42))}px "IBM Plex Sans", sans-serif`, "#7d917e", "left", "middle");
+    if (c >= 9) texto(ctx, (SN_MODO[p.m] || "01 / CLÁSICO") + " · " + p.t.toUpperCase(), c * 0.9, c * 0.9, `500 ${Math.max(6, Math.round(c * 0.42))}px "IBM Plex Sans", sans-serif`, "#7d917e", "left", "middle");
     for (const o of m.obstacles) {
       relleno(ctx, (o.x + 0.13) * c, (o.y + 0.13) * c, c * 0.74, c * 0.74, c * 0.16, "#63745a");
       relleno(ctx, (o.x + 0.24) * c, (o.y + 0.24) * c, c * 0.52, c * 0.11, c * 0.04, "#829375");
+    }
+    // Los portales (anillos que giran) y el poder del arcade, como en el juego.
+    (m.portals || []).forEach((q, i) => {
+      const color = i ? "#80d7c4" : "#b1a1f4";
+      ctx.save(); ctx.translate((q.x + 0.5) * c, (q.y + 0.5) * c); ctx.rotate(reloj * (i ? 1 : -1));
+      ctx.shadowColor = color; ctx.shadowBlur = c * 0.55; ctx.strokeStyle = color; ctx.lineWidth = Math.max(1, c * 0.08);
+      ctx.beginPath(); ctx.ellipse(0, 0, c * 0.43, c * 0.35, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    });
+    if (m.pickup && SN_PODER[m.pickup.type]) {
+      const [icono, color] = SN_PODER[m.pickup.type], x = (m.pickup.x + 0.5) * c, y = (m.pickup.y + 0.5) * c;
+      ctx.save(); ctx.translate(x, y); ctx.rotate(Math.PI / 4); ctx.shadowColor = color; ctx.shadowBlur = c * 0.4;
+      relleno(ctx, -c * 0.31, -c * 0.31, c * 0.62, c * 0.62, c * 0.12, color); ctx.restore();
+      if (c >= 7) texto(ctx, icono, x, y + 1, `bold ${Math.round(c * 0.4)}px Arial`, "#1e3028", "center", "middle");
     }
     if (m.fruit) fruta(ctx, m.fruit, c, reloj, false);
     if (m.bonus) fruta(ctx, m.bonus, c, reloj, true);

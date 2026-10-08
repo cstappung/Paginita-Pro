@@ -31,7 +31,7 @@ import {
 
 /* Alto / ancho de cada escena (repeticion.js: `aspecto`), para repartir el
    riel antes de que llegue la partida. */
-const ASPECTO = { tetris: 1.01, snake: 0.89, sortem: 0.65, minas: 0.95, dosmil: 1.22, aleteo: 1.78, bbtan: 1.38 };
+const ASPECTO = { tetris: 1.01, snake: 0.89, sortem: 0.65, minas: 0.95, dosmil: 1.22 };
 /* El corte de «PC ancho». Debe coincidir con el `@media` de juegos.html. */
 export const ANCHO = "(min-width: 1400px)";
 const CUADRO_MS = 33, PIE_MS = 400, RELEE_CHAT_MS = 10 * 60 * 1000, REPINTA_CHAT_MS = 15000;
