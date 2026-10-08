@@ -165,7 +165,7 @@
     "La Hoguera se volvió a encender. Siempre hay fanales cansados.",
     "Las que nacieron mirándote ya tienen crías. También te miran.",
     "Los cascos se hunden despacio. Tú no te detengas.",
-    "Cada brasa que juntas es una jornada que no te apagaste.",
+    "Cada brasa que juntas es un jefe que no pudo apagarte.",
     "Ahora vuelas más rápido que nosotras. Igual te alcanzamos en los sueños.",
     "No hay otra orilla. Hay muchas, y todas son esta."
   ];
@@ -249,7 +249,7 @@
   };
   const AUGURIO_PRE = "La noche aprende:";
 
-  /* El taller: lo que se compra con las brasas (una por jornada). Cada
+  /* El taller: lo que se compra con las brasas (una por jefe vencido). Cada
      mejora tiene tres niveles; `d` dice lo que hace cada uno. */
   const RAMAS = { arma: "LA LLAMA", nave: "EL FANAL" };
   const MEJORAS = {

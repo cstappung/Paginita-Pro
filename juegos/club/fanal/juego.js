@@ -18,7 +18,7 @@
      revelación (al apagar el Faro Ciego), el cruce con el Alba y el final
      de la Hoguera. Después del Alba la travesía no termina: sigue a la
      otra orilla, y después de la Hoguera, sin fin.
-   - Entre jornada y jornada abre el TALLER: cada jornada completada da una
+   - Entre jornada y jornada abre el TALLER: cada jefe vencido da una
      brasa, y cada brasa sube una mejora del arma o del fanal (motor.js:
      MEJORAS, armas, nave). Cada tres en una rama, el arma o el fanal
      evoluciona y se ve distinto. Cada jornada trae además un augurio: la
@@ -1430,7 +1430,7 @@
     const conBonus = P.j.tipo !== "lumbre" && P.j.jefe !== "alba";
     if (conBonus) suma(b.total);
     P.completadas = Math.max(P.completadas, P.jornada);
-    P.brasas++;                                                        // cada jornada completada, una brasa para el taller
+    if (P.j.tipo === "jefe") P.brasas++;                               // solo vencer a un jefe da una brasa para el taller
     if (P.j.tipo === "lumbre") P.piedadJ = P.apagadasLumbre === 0;
     regCierra("c");
     // Las cartas leídas en la jornada quedan en la bitácora para siempre.
