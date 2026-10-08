@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610080817"></script>
+<script src="i18n.js?v=202610080823"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Laboratorio</title>
@@ -4152,8 +4152,8 @@ html[data-tema=oscuro] .jg-lado-cuenta>ul{color:var(--os-tx)}
 
 /* ---- Los rieles del salón (juegos/rieles.js) ----
    En un PC ancho (≥ 1400 px, el mismo corte que `ANCHO` en rieles.js) y
-   solo en las vistas de menú (`html.jg-rieles`): a la izquierda las
-   mejores partidas del día en bucle, a la derecha el chat general. El
+   solo en las vistas de menú (`html.jg-rieles`): a la izquierda el
+   carrusel de las mejores partidas del día, a la derecha el chat general. El
    contenido se estrecha para dejarles sitio en vez de quedar debajo. Más
    angosto, las repeticiones no salen y el chat es un botón 💬 que abre un
    panel (en el celular, una hoja desde abajo). Los tableros de las
@@ -4165,11 +4165,13 @@ html[data-tema=oscuro] .jg-lado-cuenta>ul{color:var(--os-tx)}
 .jg-riel-cab small{font:500 10px 'IBM Plex Mono',monospace;letter-spacing:.4px;color:var(--jg-muted,#6b6679);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .jg-riel-puerta{display:grid;gap:10px;justify-items:start;padding:16px;font-size:12.5px;line-height:1.5;color:var(--jg-muted,#6b6679);background:#fff;border:1px solid #e4dfeb;border-radius:16px}
 .jg-riel-puerta p{margin:0}
-.jg-riel-izq.invitado .jg-rp-lista{display:none}
-.jg-rp-lista{flex:1;min-height:0;display:flex;flex-direction:column;gap:14px;overflow:auto;overscroll-behavior:contain;scrollbar-width:none}
-.jg-rp-lista::-webkit-scrollbar{display:none}
-/* Sin caja: arriba el juego y quién lo jugó, debajo la escena tal cual. */
-.jg-rp{flex:1 1 0;min-height:118px;display:flex;flex-direction:column;gap:5px}
+.jg-riel-izq.invitado .jg-rp-car{display:none}
+/* El carrusel: arriba una partida grande (el juego y quién, la escena, de
+   dónde viene y su marca, las flechas y la barra de lo que lleva), debajo
+   la alineación de hoy. El color de cada juego (`--c`) es el de su
+   portada en el salón. */
+.jg-rp-car{flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;padding:10px;background:#fff;border:1px solid #e4dfeb;border-radius:16px}
+.jg-rp{flex:1 1 0;min-height:170px;display:flex;flex-direction:column;gap:6px}
 .jg-rp-cab{display:flex;align-items:center;gap:8px;padding:0 2px;min-width:0;flex-shrink:0}
 .jg-rp-cab>a{display:flex;align-items:baseline;gap:6px;color:inherit;min-width:0;overflow:hidden}
 .jg-rp-cab>a:hover{text-decoration:none}.jg-rp-cab>a:hover b{color:var(--jg-purple,#6d3fd4)}
@@ -4179,6 +4181,8 @@ html[data-tema=oscuro] .jg-lado-cuenta>ul{color:var(--os-tx)}
 .jg-rp-quien .jg-av{flex-shrink:0}
 .jg-rp-quien b{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
 .jg-rp-lienzo{position:relative;flex:1;min-height:0;cursor:pointer}
+.jg-rp.entra .jg-rp-lienzo{animation:jgRpEntra .35s ease-out}
+@keyframes jgRpEntra{from{opacity:0;transform:translateX(16px)}}
 .jg-rp-lienzo canvas{position:absolute;inset:0;display:block}
 .jg-rp-msg{position:absolute;inset:0;margin:0;display:grid;place-content:center;gap:8px;padding:12px;text-align:center;font-size:12px;line-height:1.45;color:var(--jg-muted,#6b6679);border:1px dashed #d8d2e4;border-radius:12px}
 .jg-rp-msg:empty{display:none}
@@ -4187,6 +4191,28 @@ html[data-tema=oscuro] .jg-lado-cuenta>ul{color:var(--os-tx)}
 .jg-rp-pausa{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:44px;height:44px;border:0;border-radius:50%;background:#000a;color:#fff;font-size:16px;cursor:pointer;display:none}
 .jg-rp.pausada .jg-rp-pausa{display:block}
 .jg-rp-jugar{font-size:12px;font-weight:600}
+.jg-rp-pie{display:flex;align-items:center;gap:8px;min-width:0;flex-shrink:0;padding:0 2px}
+.jg-rp-origen{flex:1;min-width:0;font-size:11.5px;color:var(--jg-muted,#6b6679);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jg-rp-origen b{font-weight:600;color:var(--jg-ink,#1d1830)}
+.jg-rp-ctl{display:flex;gap:3px;flex-shrink:0}
+.jg-rp-ctl button{width:28px;height:28px;display:grid;place-items:center;padding:0;border:0;border-radius:8px;background:#f1eef7;color:#3d3650;font-size:15px;line-height:1;cursor:pointer}
+.jg-rp-ctl button:hover{background:#e6e0f2}
+.jg-rp-ctl .jg-rp-pp{font-size:9px;letter-spacing:-1px}
+.jg-rp.cargando .jg-rp-pp,.jg-rp.vacia .jg-rp-pp{visibility:hidden}
+.jg-rp-barra{height:3px;border-radius:3px;background:#efebf5;overflow:hidden;flex-shrink:0}
+.jg-rp-barra i{display:block;height:100%;background:var(--c,#6d3fd4);transform-origin:left;transform:scaleX(0)}
+.jg-rp-hoy{margin:2px 2px 0;font:600 10px 'IBM Plex Mono',monospace;letter-spacing:.6px;text-transform:uppercase;color:var(--jg-muted,#6b6679);flex-shrink:0}
+.jg-rp-linea{list-style:none;margin:0;padding:0;display:grid;gap:2px;flex-shrink:0}
+.jg-rp-linea button{position:relative;width:100%;display:grid;grid-template-columns:8px auto minmax(0,1fr) auto;align-items:center;gap:8px;padding:7px 8px;border:0;border-radius:10px;background:transparent;font:inherit;font-size:12px;color:inherit;text-align:left;cursor:pointer;overflow:hidden}
+.jg-rp-linea button:hover{background:#f6f3fb}
+.jg-rp-linea button.activa{background:color-mix(in srgb,var(--c) 16%,#fff)}
+.jg-rp-punto{width:8px;height:8px;border-radius:50%;background:var(--c);box-shadow:0 0 0 1px #0000001a}
+.jg-rp-linea b{font-size:12.5px;white-space:nowrap}
+.jg-rp-l-quien{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--jg-muted,#6b6679)}
+.jg-rp-l-quien.nadie{font-style:italic}
+.jg-rp-l-marca{font:600 11px 'IBM Plex Mono',monospace;color:#3d3650;white-space:nowrap}
+.jg-rp-l-barra{position:absolute;left:0;bottom:0;width:100%;height:2px;background:var(--c);transform-origin:left;transform:scaleX(var(--p,0));opacity:0}
+.jg-rp-linea button.activa .jg-rp-l-barra{opacity:1}
 
 .jg-cg{flex-direction:column;background:#fff;border:1px solid #e4dfeb;border-radius:16px;overflow:hidden}
 .jg-cg>.jg-riel-cab{padding:12px 14px;border-bottom:1px solid #efebf5}
@@ -4238,11 +4264,19 @@ html[data-tema=oscuro] .jg-lado-cuenta>ul{color:var(--os-tx)}
   .jg-cg-form .inp{font-size:16px}
 }
 @keyframes jgCgSube{from{transform:translateY(40px);opacity:.4}}
-@media (prefers-reduced-motion:reduce){.jg-rp.cargando .jg-rp-msg,html.jg-rieles.jg-cg-abierto .jg-cg{animation:none}}
+@media (prefers-reduced-motion:reduce){.jg-rp.cargando .jg-rp-msg,.jg-rp.entra .jg-rp-lienzo,html.jg-rieles.jg-cg-abierto .jg-cg{animation:none}}
 
 html[data-tema=oscuro] .jg-cg,html[data-tema=oscuro] .jg-riel-puerta{background:var(--os-sup);border-color:var(--os-borde)}
 html[data-tema=oscuro] .jg-riel-cab small,html[data-tema=oscuro] .jg-rp-cab>a span,html[data-tema=oscuro] .jg-rp-msg,html[data-tema=oscuro] .jg-riel-puerta,html[data-tema=oscuro] .jg-cg-msg time,html[data-tema=oscuro] .jg-cg-cierra{color:var(--os-tx3)}
 html[data-tema=oscuro] .jg-rp-msg{border-color:var(--os-borde2)}
+html[data-tema=oscuro] .jg-rp-car{background:var(--os-sup);border-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-rp-origen,html[data-tema=oscuro] .jg-rp-hoy,html[data-tema=oscuro] .jg-rp-l-quien{color:var(--os-tx3)}
+html[data-tema=oscuro] .jg-rp-ctl button{background:var(--os-sup2);color:var(--os-tx)}
+html[data-tema=oscuro] .jg-rp-ctl button:hover{background:var(--os-sup3)}
+html[data-tema=oscuro] .jg-rp-barra{background:var(--os-sup2)}
+html[data-tema=oscuro] .jg-rp-linea button:hover{background:var(--os-sup2)}
+html[data-tema=oscuro] .jg-rp-linea button.activa{background:color-mix(in srgb,var(--c) 18%,var(--os-sup))}
+html[data-tema=oscuro] .jg-rp-l-marca,html[data-tema=oscuro] .jg-rp-origen b{color:var(--os-tx)}
 html[data-tema=oscuro] .jg-rp-cab>a:hover b{color:#c9b6ff}
 html[data-tema=oscuro] .jg-cg>.jg-riel-cab,html[data-tema=oscuro] .jg-cg-form{border-color:var(--os-borde)}
 html[data-tema=oscuro] .jg-cg-msg{color:var(--os-tx2)}
@@ -4342,6 +4376,6 @@ html[data-tema=oscuro] .jg-adm-tabs .btn2.on{background:#ab8bff;color:#171522;bo
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610080817"></script>
+<script src="juegos-app.js?v=202610080823"></script>
 </body>
 </html>

@@ -2147,9 +2147,9 @@ chat sends nothing and the lobby shows no games in progress.
 
 **The lobby has two side rails on a wide PC** (`juegos/rieles.js`, the DOM;
 `juegos/rieles-datos.js`, pure; `juegos/repeticion.js`, the replays). On the
-left, the best game *of the day* of four club tables, replayed on a loop with
-who played it: Tetris Maratón, Snake classic mediano, sortEm 20 and the
-buscaminas medio (`REPES`). On the right, the general chat. They hang off
+left, the best game *of the day* of four of the club's most played games,
+each in one of its modes (a different lineup each day), stacked and
+replayed on a loop with who played it. On the right, the general chat. They hang off
 `<body>` and show only in the menu views (`VISTAS_RIEL` in `juegos-main.js`
 sets `html.jg-rieles` through `rieles.pon()`, on every `render()`) and from
 1400 px (`ANCHO`, which must match the `@media` in juegos.html). There the
@@ -2158,6 +2158,20 @@ it, and the ⚑ moves left of the chat. Narrower, the replays are gone and the
 chat is a 💬 button with an unread badge that opens a panel, a bottom sheet
 on a phone. Things to keep:
 
+- **The pool and the daily lineup.** `REPES` lists every mode of the five
+  games the rail rotates: Tetris (maratón, sprint, ultra), Snake (6 modes ×
+  4 sizes), sortEm (10, 20), buscaminas (easy, medium, hard) and 2048
+  (puntos, ficha), 34 tables. ALETEO and BBTAN have replays in
+  `repeticion.js` but are left out of the rail on purpose (the owner's
+  choice); FANAL and Metro Rush cannot be replayed frame by frame, and the
+  daily puzzles are a still grid. Each day `alineacionDelDia(dia, popular)`
+  picks `POR_DIA` (4) distinct games, sorted by `state.popular` and drawn
+  without replacement with the day as the seed and a weight that falls with
+  the rank, and then one mode of each, drawn with the same seed among its
+  tables that have records (weight: the square root of how many; uniform
+  when there is no data). `leerPopularidad` counts the `soloRanks` rows per
+  table too (`n[categoria]`) for this. Everyone sees the same lineup that
+  day; `pon()` re-checks it on every render.
 - **A replay is the anti-cheat proof, not a video.** Every club result
   already carries what it takes to rebuild it, and the four engines are
   deterministic, so `repeticion.js` replays the proof step by step with the
@@ -2169,14 +2183,22 @@ on a phone. Things to keep:
 - **Each scene is drawn like its game**, not as a generic grid: Tetris'
   well with its Guardada/Siguientes boxes and numbers, Snake's lime stroke
   body (interpolated between ticks) under its light score bar, sortEm's
-  neon 800-wide scene cropped to the «Time:» and the blocks, and Mina
-  Club's garden with its flags/time bar. The colours and shapes are copied
-  from each game's `game.js`/`style.css`, so a reskin of a game has to be
-  mirrored there. There is no card box: each entry is only a title row
-  (game · player) and the scene, transparent around it, and the rail
-  splits its height by each scene's `aspecto`.
+  neon 800-wide scene cropped to the «Time:» and the blocks, Mina Club's
+  garden with its flags/time bar, 2048's sand board with the moves sliding
+  (`movs` from the engine), ALETEO's sky in `AleteoLore.paleta` of the
+  pipes passed (it darkens like the game) and BBTAN's dotted board with
+  pixel-framed blocks. The colours and shapes are copied from each game's
+  `game.js`/`style.css`, so a reskin of a game has to be mirrored there.
   `tests/rieles.test.cjs` plays robot games of each and checks the replay
-  reaches the engine's own final score.
+  reaches the engine's own final score, also after seeking backwards.
+- **BBTAN is the one replay that is not fully real time.** The physics
+  plays at the game's own pace (`shotPace` integrated: ×1 for 5 s, then up
+  to ×4; squeezed into the real gap when the player fast-forwarded), but the
+  thinking before each shot is cut to `BB_APUNTA_MAX` (1.5 s), or a long
+  game would be mostly a still board. It keeps a board snapshot before every
+  shot, so seeking (the last-stretch start, going back) never re-simulates
+  hundreds of rounds of physics on the lobby's thread. The rail splits its
+  height by each scene's `aspecto`, with no card box around them.
 - **`repeticiones/<cat>/<uid>`** = `{dia, o, p, t, n, v, d, at}`: each
   account's best game of the day. `apuntaRepeticion` in `juegos-main.js`
   writes it from `alResultado` (which now also gets the proof, third
@@ -2184,7 +2206,11 @@ on a phone. Things to keep:
   beats the stored one, one write at a time. `o = dia·1e10 + score`, where
   score is the points, or `1e9 − tiempo` for the time tables. The rule
   recomputes it, so «the three highest `o`» (`watchRepeticiones`) are the
-  best of the latest day with games, without downloading every proof.
+  best of the latest day with games, without downloading every proof. The
+  rule whitelists the `REPES` categories and lists the time tables for
+  `o` (a test checks both match `REPES`), so a
+  new game in the pool needs the rules re-published; until then its daily
+  write fails quietly and the rail shows its all-time record.
 - **What is replayed is verified first**, with the same `verificaClub` and
   the owner's uid; a hand-written row that does not check out is skipped for
   the next one. With nothing stored (or before the rules are published) the
@@ -3232,17 +3258,52 @@ and synthesised effects. Things that matter:
 retold as a lonely voyage: you carry the last light (a lantern on a boat)
 through the night towards «el Alba», and the invaders are moths drawn to
 it. Plain files, no build (`?v=fanal-N` on its five scripts and its
-stylesheet): `relato.js` (every text: the per-jornada log, the 13 letters
-the Mensajera carries, the revelation, the ending, the endless «ecos»),
+stylesheet): `relato.js` (every text: the per-jornada log, the 19 letters
+the Mensajera carries, the revelation, both endings, the endless «ecos»,
+the taller and the augurios),
 `motor.js` (pure: jornadas, difficulty, points, the pulse judgement, the
 progress merge), `sprites.js` (pixel art), `musica.js` (a procedural
 music engine) and `juego.js` (the screen). The first four are UMD and run
 in Node, so `tests/fanal.test.cjs` covers them without a browser. The
-story is 13 jornadas in four acts (enjambre, niebla, oscuro, alba): nine
-waves and four encounters (la Nodriza, el Faro Ciego, la Esfinge, el
-Alba); finishing it unlocks the endless mode, which cycles the first three
-acts in blocks of three waves and their returning boss (`jornada(n)`).
-Things that matter:
+story is 25 jornadas in seven acts: the first part (enjambre, niebla,
+oscuro, alba; jornadas 1–13, la Nodriza, el Faro Ciego, la Esfinge, el
+Alba) and, **without leaving the run**, «la otra orilla» (los cascos, la
+seda, la hoguera; 14–25, el Casco, la Crisálida, la Hoguera). Internally
+those are acts 6, 7 and 8 (5 is the endless; `ROMANO_ACTO` shows them as
+V, VI, VII). After the Hoguera the same run turns endless (26+), cycling
+the six fighting acts in blocks of three waves and their boss
+(`jornada(n)`); the «sin fin» mode on the title screen starts there
+directly, with the story's 25 brasas, and opens once the Hoguera is seen
+(`prog.hoguera`). Things that matter:
+
+- **Brasas, the taller and evolutions** (`MEJORAS`, `compra`, `armas`,
+  `nave` in `motor.js`). Each completed jornada gives one brasa; between
+  jornadas the taller opens (`capaTaller`, keys 1–9) and each brasa buys a
+  level (three per upgrade, four upgrades per branch: the flame —
+  cadence, damage, pierce, spread — and the boat — oars, tempered glass,
+  oil, long light) or relights one flame. Every three levels in a branch
+  it evolves (Chispa → Brasa → Antorcha → Faro → Estrella; Barca → Fanal
+  de bronce → Luciérnaga → Doble vidrio → Faro errante), with a new sprite
+  and a power. **`armas()` is the single source** of cooldown, bullet
+  pattern, damage and pierce: the screen shoots with it and the proof
+  bounds with it. What is bought goes into the next jornada's record as
+  `u` (one letter per brasa) and the verifier re-buys it with the same
+  `M.compra`; a checkpoint restores upgrades from its proof.
+- **Augurios: every jornada is a bit harder, and it says why.** The night
+  learns one thing per jornada from a fixed wheel of eight (fire rate,
+  scale speed, march, aim, dives, boss fury, more scales, armour), stacking
+  each lap (`nivelAugurio`, `aplicaAugurios`, with caps). They depend only
+  on the jornada number, so a table position is equally hard for everyone,
+  and the transit names the new one. Boss life also grows with the jornada.
+- **The other shore has its own mechanics, none of them in the proof**:
+  drifting wrecks (`cascos`), silk threads that slow the oars (`hilos`,
+  `F.enredo`), embers dropped by dying moths (`ascuas`). The Casco marks
+  its anchor column, pulls you in, and its falling debris become new small
+  wrecks; the Crisálida drops marked threads and hatches into an imago at
+  a third of its life; the Hoguera holds eight lanterns prisoner (shooting
+  one frees it and it rows with you, taking scales) and halves every hit
+  while five or more remain — the proof counts boss damage generously, so
+  that rule needed no proof change.
 
 - **The counter «✦ luces» is the twist made visible.** It starts at 430,
   and each background star *is* one of those lights: killing a moth puts
@@ -3291,9 +3352,12 @@ Things that matter:
   wall, which shots cannot break.
 - **Categories**: `club-fanal-travesia` and `club-fanal-sinfin` (points,
   capped at 1 000 000) and `club-fanal-jornadas` (the furthest jornada
-  completed: 13 is the end of the story). `jornadas` is only sent when it
+  completed: 13 is the Alba, 25 the Hoguera). `jornadas` is only sent when it
   improves, because every result counts as a club play and pays coins.
-  Ten logros (`deMarca`), coins (10 per jornada, 1 per 1000 points), the
+  Ten logros (`deMarca`), coins (the jornadas record pays like BBTAN's
+  rounds, `monedasFanal`: jornada n pays 5n + 5 up to 250 from the 49th,
+  nothing past the 160th — 520 for the Alba, 1750 for the Hoguera; and 1
+  per 1000 points up to the cap), the
   `tfanal` champion frame, the Discord podium and the manual are wired
   like Sudoku Arcade's. Read letters, the ending seen, the act checkpoint
   and local records travel as one blob in `users/<uid>/club/fanal`
@@ -3302,9 +3366,11 @@ Things that matter:
   re-published.
 - The log and the revelation are written as whole lines and revealed with
   CSS, never letter by letter: `i18n.js` would translate every fragment.
-  `window.__fanal` (`salta(n)`, `sigue()`, `estado()`, `mundo()`…) drives
-  the game from a script, which is how the story and the bosses were
-  played through in Chromium.
+  `window.__fanal` (`salta(n)`, `sigue()`, `estado()`, `mundo()`,
+  `brasas(n)`, `taller()`, `prueba()`…) drives the game from a script,
+  which is how the story and the bosses were played through in Chromium.
+  The proof is version 2 since the second part (`docs/antitrampas/fanal.md`);
+  any change to it must bump `club-N` in `solo/club.js`.
 
 **ALETEO (`juegos/club/aleteo/`) is a Solo Club Flappy Bird whose sky
 goes dark**, in the vein of BBTAN's descent. Plain files, no build
@@ -3339,6 +3405,9 @@ replays it (`docs/antitrampas/dosmil.md`), rejecting bursts no hand can
 play. Logros, coins, the `tdosmil` frame, the Discord podium and the manual
 are wired like ALETEO's; the `soloRanks`, `soloPruebas` and `clubJugadas`
 regexes were widened, so the rules must be re-published.
+Each move stores **whole** ms (`Math.round` in `juega`): `performance.now`
+has decimals, and a fractional `tiempo` fails `resultadoClub`
+(`Number.isSafeInteger`), which dropped every record silently.
 `tests/dosmil.test.cjs` covers motor and verifier.
 
 **Atasco (`juegos/club/atasco/`) is a Solo Club game too**, a sliding

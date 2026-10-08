@@ -1,7 +1,18 @@
 # Antitrampas de FANAL
 
 Categorías: `club-fanal-travesia` y `club-fanal-sinfin` (puntos) y
-`club-fanal-jornadas` (la jornada más lejana completada; 13 es el final).
+`club-fanal-jornadas` (la jornada más lejana completada; 13 es el Alba, 25
+la Hoguera, y desde ahí la travesía sigue sin fin).
+
+**Versión 2 de la prueba** (octubre de 2026): la travesía se alargó a una
+segunda parte y después sin fin, cada jornada da una brasa que se gasta en
+mejoras del arma y del fanal (`motor.js`: `MEJORAS`, `compra`, `armas`,
+`nave`), y los augurios endurecen cada jornada. Cada registro lleva las
+compras del taller (`u`) y el verificador las vuelve a hacer con la misma
+`M.compra`; los límites mecánicos (espera entre tiros, cosas por tiro,
+daño, golpes de un jefe, ritmo por polilla) salen de `M.armas` con esas
+mejoras. Una prueba de la versión 1 se rechaza como «de otra versión del
+juego» (caché, no trampa: no castiga), y el iframe subió a `club-42`.
 
 ## Vías encontradas
 
@@ -32,12 +43,15 @@ eventos, así que se anota cada jornada y se recalcula con el motor.
 
 ### Formato
 
-`{v:1, m:"t"|"s", id, u, k, J:[registro…], x?}`. `id`: semilla de la
+`{v:2, m:"t"|"s", id, u, k, J:[registro…], x?}`. `id`: semilla de la
 partida (de ella sale el valor de cada Mensajera, `M.valorMensajera`).
 `u`: la cuenta. `k`: jornadas heredadas de un punto de control. Cada
 registro: `{n, t (cs de juego), r (cs reales), g (ms en juego), e
-(eventos), p (pulsos), f ("c"|"m"|"a"|"f"), s (puntos), v (llamas), b
-(entradas sintéticas), d (entradas del mando), h (hash encadenado)}`.
+(eventos), p (pulsos), f ("c"|"m"|"a"), s (puntos), v (llamas), b
+(entradas sintéticas), d (entradas del mando), u (compras del taller antes
+de la jornada: una letra por brasa, `cfpbrvoi` las mejoras y `l` una
+llama), h (hash encadenado)}`. El cruce con el Alba es el evento `f` de la
+jornada 13, que se cierra `c`: la travesía sigue.
 
 `e` es una letra por evento y las centésimas desde el anterior; los que
 vienen de una bala llevan además cuántos tiros atrás salió (base 36):
@@ -54,31 +68,40 @@ prueba (de antes de esto) se juega igual, pero no se manda.
 
 ## Qué verifica (`rehace` + `verifica/fanal.js`)
 
-- Cadena de hash, orden de jornadas desde la 1 (o la 14 en el sin fin), lo
-  heredado termina al empezar un acto.
+- Cadena de hash, orden de jornadas desde la 1 (o la 26 en el sin fin), lo
+  heredado termina al empezar un acto (también el del sin fin, la 26).
+- El taller: cada compra con brasas que había (una por jornada completada;
+  el sin fin empieza con 25), sin pasar del nivel 3, la llama solo si cabe.
 - Puntos y llamas exactos por jornada: Resonancia, bonus, llamas extra,
   Mensajera con semilla. Lo declarado = lo recalculado; tiempo declarado =
   suma de `g`; modo = categoría; cuenta = `u` (si la página pasa `ctx.uid`).
-- Mecánica: cada formación completa con sus polillas exactas, las de dos
-  vidas necesitan un roce, el jefe necesita su vida en daño, el Alba tarda
-  ≥ 59 s, 24 lumbres, ninguna polilla antes de 1 s ni jefe antes de 2,5 s,
-  muerte ⇔ llamas en 0, cada acierto con un tiro anterior (≤ 3 s de vuelo,
-  tope de cosas por bala salvo con la lente), tiros a ≥ 0,14 s (el fanal
-  espera 0,16), cada tiro afinado a ≤ 125 ms de un pulso anotado.
+- Mecánica: cada formación completa con sus polillas exactas, las que
+  aguantan más golpes necesitan el daño de sus roces (`N`) antes del tiro
+  que las apaga, el jefe necesita su vida en daño, el Alba tarda ≥ 59 s, 24
+  lumbres, ninguna polilla antes de 1 s ni jefe antes de 2,5 s, muerte ⇔
+  llamas en 0, cada acierto con un tiro anterior (≤ 3 s de vuelo, tope de
+  cosas por tiro según el patrón y lo que atraviesa el arma, salvo con la
+  lente o el rayo del Faro), tiros a la espera del arma menos 2 cs (0,16 s
+  sin mejoras, 0,095 s con la mecha corta entera), cada tiro afinado a ≤
+  125 ms de un pulso anotado.
 - Reloj: juego ≤ real × 1,1 + 2 s por jornada (cámara rápida).
 - Bots: `b > 0` (eventos con `isTrusted` falso sin mando conectado)
   rechaza; las del mando (`__mando` con un gamepad conectado) valen. Ritmo
-  humano: oleada ≥ 3 s + 0,25 s por polilla a balazos (mitad con pabilo,
-  nada con lente), jefe ≥ 8 s, media ≥ 20 s por jornada con 4 o más,
-  travesía entera ≥ 300 s. Márgenes de 2–4× sobre lo honesto.
+  humano: oleada ≥ 3 s + 0,25 s por polilla a balazos + 0,15 s por roce,
+  divididos por lo que toca un tiro (sin mejoras, uno sin afinar; con
+  mejoras, el que más toca: un abanico afinado que atraviesa una columna
+  apilada apaga varias de un golpe; nada con lente), jefe ≥ 4 s y nunca antes de 2,5 s + sus golpes a la espera del
+  arma, media ≥ 7 s por jornada con 4 o más, la primera parte entera ≥
+  300 s. Márgenes de 2–4× sobre lo honesto.
 - `__fanal`: cualquier uso (también leer `mundo()`/`teclas`) marca la
   página; ninguna partida de ahí en adelante se manda, el panel final lo
   dice, y un punto de control guardado así lleva `x:1` y la prueba lo
   rechaza. Los ganchos siguen funcionando para probar.
 
-`sospecha()`: sin fin > 1000 pts/s; jornadas del sin fin a < 8 s cada una;
-jornada 13 en < 60 s + 8 s/jornada; travesía > 300 000 puntos o > 2000
-pts/s. Marca las dos filas reales de arriba y deja las honestas.
+`sospecha()`: sin fin > 5000 pts/s; jornadas a < 8 s cada una desde el
+último punto de control (más el minuto del Alba si lo cruza); travesía >
+2500 pts/s. Ya no hay techo de puntos en la travesía: no termina. Marca las
+dos filas reales de arriba y deja las honestas.
 
 El ritmo de disparo **no** se juzga por regularidad: mantener Espacio
 dispara cada 0,3 s exactos, y eso es lo normal.
@@ -93,10 +116,20 @@ inflados, tiempo recortado, otra categoría/cuenta, prueba editada (también
 resellada y con puntos ajustados: tiros convertidos en afinados), jornadas
 quitadas, `salta`, `dano`, `acerca`, `limpia`, tiros a 5 cs, cámara rápida,
 entradas sintéticas, la partida real de la tabla (39 jornadas en 56 s) y un
-bot que dispara cada 0,17 s sin fallar. Además, una partida real jugada en
-Chromium con teclas de verdad (3 jornadas) pasa, y editada no. A mano en
+bot que dispara cada 0,17 s sin fallar. El robot compra en el taller (y en
+el sin fin gasta sus 25 brasas). Además, una partida jugada en Chromium
+por el juego de verdad (un bot que lee el mundo con `__fanal`, con el reloj
+real simulado y sin eventos de entrada; la marca `x` se le quita para la
+prueba) pasa, con sus compras y evoluciones, y editada no; y la partida
+real de la versión 1 se rechaza como de otra versión. A mano en
 Chromium: continuar desde un punto de control pasa; teclas despachadas por
 script (`dispatchEvent`) se rechazan; usar `__fanal` no manda nada.
+
+Un error del juego que esta prueba encontró (lo vio el bot de Chromium):
+si una oleada terminaba antes de que pasara su Mensajera, la que quedaba
+pendiente cruzaba durante el jefe siguiente, y alcanzarla dejaba una `M`
+en una jornada de jefe, que el verificador rechaza. Ahora un jefe empieza
+con `mensajerasRest = 0`.
 
 ## Límite honesto
 
@@ -119,6 +152,6 @@ script (`dispatchEvent`) se rechazan; usar `__fanal` no manda nada.
 
 ## Pendiente
 
-- Probar en Chromium una travesía completa real (el bot ciego no pasa de
-  la jornada 3); los jefes y el Alba están cubiertos solo por el robot.
+- Probar con una persona la segunda parte entera y el sin fin: los jefes
+  nuevos están cubiertos por el robot y por el bot de Chromium.
 - Calibrar los mínimos de ritmo con pruebas reales cuando haya datos.

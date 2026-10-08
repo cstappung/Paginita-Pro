@@ -9,7 +9,8 @@
      del reloj de juego, desde que empezó la jornada.
    - Al cerrar la jornada el registro se encadena con un hash al anterior y
      se guarda con los puntos y las llamas que el juego tiene en ese
-     momento.
+     momento, y con las mejoras que se compraron en el taller antes de
+     empezarla (el campo `u`: una letra por brasa gastada).
    - `rehace(prueba)` repite la partida a partir de esos eventos con el
      motor (motor.js): recalcula los puntos con la Resonancia, el bonus de
      cada jornada, las llamas extra; y comprueba que cada jornada pudo
@@ -34,7 +35,9 @@
 })(typeof self !== "undefined" ? self : this, function (M) {
   "use strict";
 
-  const VERSION = 1;
+  /* La 2 trae las mejoras (el campo `u` de cada jornada) y la segunda parte
+     de la travesía: una prueba de la 1 se jugó con otras reglas. */
+  const VERSION = 2;
 
   /* El alfabeto de los eventos. Cada evento es una letra seguida de las
      centésimas que pasaron desde el anterior (en decimal, nada si fue en el
@@ -72,10 +75,11 @@
   }
   /* Abre el registro de la jornada `n`. `t` es el reloj de juego (el de la
      música, en segundos), `r` el reloj real (performance.now, en ms), `g`
-     el tiempo de juego acumulado de la partida (en segundos) y `lat` la
-     latencia del audio en ms. */
-  function abre(n, t, r, g, lat) {
-    const reg = { n, t0: t, r0: r, g0: Math.round(g * 1000), ev: [], ult: 0, disp: 0, pul: [], pn: -1, lat: null, latT: -1e9, msj: 0 };
+     el tiempo de juego acumulado de la partida (en segundos), `lat` la
+     latencia del audio en ms y `u` las mejoras compradas en el taller justo
+     antes (sus códigos, ver motor.js: MEJORAS y CODIGO_LLAMA). */
+  function abre(n, t, r, g, lat, u) {
+    const reg = { n, t0: t, r0: r, g0: Math.round(g * 1000), ev: [], ult: 0, disp: 0, pul: [], pn: -1, lat: null, latT: -1e9, msj: 0, u: String(u || "") };
     latencia(reg, t, lat, true);
     return reg;
   }
@@ -113,7 +117,8 @@
     reg.pul.push(Math.max(prev, abs));
   }
   /* Cierra la jornada y la encadena a la prueba. `fin`: "c" completada,
-     "m" el fanal se apagó, "a" abandonada, "f" el cruce con el Alba. `s` y
+     "m" el fanal se apagó, "a" abandonada (el cruce con el Alba ya no cierra
+     la partida: la jornada 13 termina "c" y la travesía sigue). `s` y
      `v` son los puntos y las llamas que el juego tiene ahora; `ent`, las
      entradas de la jornada: {b: sintéticas (isTrusted falso y sin mando
      conectado), d: del mando}. */
@@ -122,14 +127,14 @@
     for (const x of reg.pul) { p += (p ? "," : "") + (x - prev).toString(36); prev = x; }
     const rec = {
       n: reg.n, t: centesimas(reg, t), r: Math.max(0, Math.round((r - reg.r0) / 10)), g: Math.round(g * 1000) - reg.g0,
-      e: reg.ev.join(""), p, f: fin, s: Math.round(s), v,
+      e: reg.ev.join(""), p, f: fin, s: Math.round(s), v, u: reg.u,
       b: Math.max(0, (ent && ent.b) | 0), d: Math.max(0, (ent && ent.d) | 0)
     };
     rec.h = hashRegistro(ultimoHash(prueba), rec);
     prueba.J.push(rec);
     return rec;
   }
-  const hashRegistro = (prev, x) => M.hashTexto(prev + "|" + [x.n, x.t, x.r, x.g, x.e, x.p == null ? "" : x.p, x.f, x.s, x.v, x.b, x.d].join("|"));
+  const hashRegistro = (prev, x) => M.hashTexto(prev + "|" + [x.n, x.t, x.r, x.g, x.e, x.p == null ? "" : x.p, x.f, x.s, x.v, x.b, x.d, x.u == null ? "" : x.u].join("|"));
   const ultimoHash = prueba => (prueba.J.length ? prueba.J[prueba.J.length - 1].h : M.hashTexto("fanal|" + prueba.id + "|" + prueba.m));
 
   /* Si la prueba no cabe en lo que se guarda (200 000 caracteres), se le
@@ -153,7 +158,7 @@
   /* Los márgenes, todos generosos: un falso positivo (rechazar a quien
      jugó de verdad) es peor que dejar pasar una trampa rara. */
   const LIM = {
-    enfriar: 14,          // cs entre dos tiros: el juego espera 0,16 s (F.cool); 2 cs de redondeo
+    enfriar: 2,           // cs de redondeo sobre la espera entre dos tiros (0,16 s sin mejoras: ver M.armas)
     vuelo: 300,           // cs que una bala puede tardar en tocar algo: 1 s de pantalla, más la cámara lenta
     ventana: M.VENTANA_PULSO * 1000 + 30, // ms: la ventana del pulso, más redondeos y la latencia anotada
     entrada: 100,         // cs: ninguna polilla se puede tocar antes de 1,1 s (la entrada más corta)
@@ -177,16 +182,18 @@
        a un bot que dispara cada 0,17 s y no falla nunca (unas 4,5 polillas
        por segundo, 260 s la travesía entera). */
     porPolilla: 25,       // cs por polilla apagada a balazos en una oleada completa (4 por segundo)…
+    porRoce: 15,          // …y por cada roce a una que aguanta más (los augurios endurecen la formación:
+                          // sin esto, un bot que no falla pasaba por apagar cada una en dos tiros)…
     oleadaBase: 300,      // …más 3 s (la entrada de la formación y el cierre). Con el pabilo
                           // (dos balas por tiro) cuenta la mitad; con la lente, que atraviesa
                           // columnas enteras, solo la base.
-    jefeMin: 800,         // cs: un jefe con 76 golpes o más no cae en menos de 8 s
+    jefeMin: 400,         // cs: ningún jefe cae en menos de 4 s, ni antes de lo que permiten sus golpes y el arma
     lumbreMin: 500,       // cs: veinticuatro lumbres, aunque se apaguen a tiros
     travesiaMin: 30000,   // cs de juego de una travesía entera desde la jornada 1 (5 min; la honesta, 8–13)
     /* Y en promedio: con cuatro jornadas completas o más (sin contar el
-       Alba, que ya tiene su minuto), no menos de 20 s cada una. Las
-       honestas promedian 40–60 s. */
-    mediaMin: 2000,
+       Alba, que ya tiene su minuto), no menos de 7 s cada una. Las
+       honestas promedian 30–60 s sin mejoras y 10–25 s con el arma llena. */
+    mediaMin: 700,        // (con el arma llena una oleada cae en 7–10 s: un bot de Chromium promedió 11,5)
     mediaDesde: 4
   };
 
@@ -248,29 +255,33 @@
   function rehace(prueba) {
     const mal = motivo => ({ motivo });
     if (!prueba || typeof prueba !== "object") return mal("sin prueba");
-    if (prueba.v !== VERSION) return mal("versión de prueba desconocida");
+    if (prueba.v !== VERSION) return mal("prueba de otra versión del juego");
     if (prueba.x) return mal("partida tocada desde la consola (__fanal): no entra en la clasificación");
     if (prueba.m !== "t" && prueba.m !== "s") return mal("modo desconocido");
     if (typeof prueba.id !== "string" || !/^[A-Za-z0-9_-]{6,40}$/.test(prueba.id)) return mal("semilla ilegible");
     const J = prueba.J;
     if (!Array.isArray(J) || J.length > 3000) return mal("jornadas ilegibles");
-    if (!entero(prueba.k, 0, J.length) || (prueba.m === "s" && prueba.k)) return mal("herencia ilegible");
+    if (!entero(prueba.k, 0, J.length)) return mal("herencia ilegible");
     const base = prueba.m === "s" ? M.JORNADAS_HISTORIA + 1 : 1;
     if (prueba.k) {
       // Lo heredado es lo jugado hasta un punto de control: termina justo
       // antes del comienzo de un acto.
       const sig = J[prueba.k - 1] && J[prueba.k - 1].n + 1;
       if (!Object.values(M.INICIO_ACTO).includes(sig) || sig <= 1) return mal("el punto de control no cae al empezar un acto");
+      if (prueba.m === "s") return mal("el sin fin no sigue de un punto de control");
     }
     // Jornadas sin pulsos: solo si la prueba es enorme (ver ajusta) y solo las primeras.
     const totalEventos = J.reduce((s, x) => s + (x && typeof x.e === "string" ? x.e.length : 0), 0);
 
     const est = { puntos: 0, llamas: M.LLAMAS_INICIO, notas: 0, muerto: false };
+    // El taller: las mejoras y las brasas que quedan (el sin fin empieza con
+    // las de toda la historia). Se compran con M.compra, lo mismo que el juego.
+    const taller = { mej: M.mejorasVacias(), brasas: prueba.m === "s" ? M.BRASAS_SINFIN : 0, llamas: 0 };
     const suma = n => {
       const antes = est.puntos;
       est.puntos += n;
       const extra = M.llamasGanadas(antes, est.puntos);
-      if (extra) est.llamas = Math.min(M.LLAMAS_MAX, est.llamas + extra);
+      if (extra) est.llamas = Math.min(M.llamasMax(taller.mej), est.llamas + extra);
     };
     const mult = () => M.resonancia(est.notas);
     let hashPrev = M.hashTexto("fanal|" + prueba.id + "|" + prueba.m), completadas = 0, completa = false, tiempo = 0, sinPulsosAun = true;
@@ -280,16 +291,24 @@
       const x = J[i], donde = "jornada " + (x && x.n);
       if (!x || typeof x !== "object") return mal("jornada ilegible");
       if (x.n !== base + i) return mal("las jornadas no siguen en orden desde la " + base + " (" + donde + ")");
-      if (!entero(x.t, 0, 1e9) || !entero(x.r, 0, 1e10) || !entero(x.g, 0, 1e10) || !Number.isSafeInteger(x.s) || !entero(x.v, 0, M.LLAMAS_MAX)) return mal("números ilegibles en la " + donde);
-      if (!["c", "m", "a", "f"].includes(x.f)) return mal("fin ilegible en la " + donde);
+      if (!entero(x.t, 0, 1e9) || !entero(x.r, 0, 1e10) || !entero(x.g, 0, 1e10) || !Number.isSafeInteger(x.s) || !entero(x.v, 0, M.LLAMAS_TOPE)) return mal("números ilegibles en la " + donde);
+      if (!["c", "m", "a"].includes(x.f)) return mal("fin ilegible en la " + donde);
+      if (typeof x.u !== "string" || !/^[a-z]{0,80}$/.test(x.u)) return mal("compras ilegibles en la " + donde);
       if (hashRegistro(hashPrev, x) !== x.h) return mal("la cadena de la prueba no cuadra en la " + donde);
       hashPrev = x.h;
       const ultima = i === J.length - 1;
       if (!ultima && x.f !== "c") return mal("una jornada que no terminó no puede tener otra detrás (" + donde + ")");
       if (i < prueba.k && x.f !== "c") return mal("lo heredado del punto de control tiene que estar completo");
       const j = M.jornada(x.n), alba = j.jefe === "alba";
-      if (x.f === "f" && !(prueba.m === "t" && alba)) return mal("cruce con el Alba fuera de su jornada");
-      if (alba && x.f === "c") return mal("el Alba no se completa sino cruzándola");
+      // Lo que se compró en el taller antes de esta jornada, en orden.
+      taller.llamas = est.llamas;
+      for (const cod of x.u) {
+        const no = M.compra(taller, cod);
+        if (no) return mal("una compra imposible en el taller antes de la " + donde + " (" + no + ")");
+      }
+      est.llamas = taller.llamas;
+      const arm = M.armas(taller.mej), topeLlamas = M.llamasMax(taller.mej);
+      const enfriar = Math.round(arm.cool * 100) - LIM.enfriar;
 
       // El reloj: el de juego no corre más que el real, y el tiempo en juego
       // no supera el de la jornada.
@@ -327,12 +346,16 @@
       const cupo = { a: 0, b: 0, c: 0 };
       if (oleada) for (const p of form.lista) cupo[p.tipo]++;
       const vida = t => (j.vida && j.vida[t]) || 1;
-      const conVida2 = oleada && ["a", "b", "c"].some(t => cupo[t] && vida(t) >= 2);
+      // El daño de un tiro: el más alto y el más bajo que pudo hacer una de
+      // sus balas (las chispas de la Antorcha pegan como un tiro sin afinar).
+      const danoMax = af => (af ? arm.danoA : arm.danoN);
+      const danoMin = af => (af ? (arm.chispas ? arm.danoN : arm.danoA) : arm.danoN);
+      const vidaMax = oleada ? Math.max(0, ...["a", "b", "c"].filter(t => cupo[t]).map(vida)) : 0;
       const acto = j.acto, vuelta = j.vuelta || 0;
       poderesRecientes.push({ p: false, l: false });
       const ultimas = poderesRecientes.slice(-3);
       const tiros = [];
-      const c = { kills: { a: 0, b: 0, c: 0 }, aBala: 0, planas2: 0, N: 0, disparos: 0, aciertos: 0, golpes: 0, msj: 0, Q: 0, q: 0, Z: 0, dano: 0, jefeMuere: -1, cruce: -1, ultimaKill: -1 };
+      const c = { kills: { a: 0, b: 0, c: 0 }, aBala: 0, falta: 0, danoN: 0, N: 0, disparos: 0, aciertos: 0, golpes: 0, msj: 0, Q: 0, q: 0, Z: 0, dano: 0, jefeMuere: -1, cruce: -1, ultimaKill: -1 };
       let lat = 0, latT = null, latPrev = null, zPend = null, hubo = false, previo = null, ultimoTiro = null, fin = false;
       const tipoMal = l => mal("«" + l + "» no puede pasar en la " + donde);
 
@@ -368,7 +391,7 @@
         switch (l) {
           case "S": case "T": {
             if (est.muerto) return mal("un tiro con el fanal apagado en la " + donde);
-            if (ultimoTiro !== null && e.abs - ultimoTiro < LIM.enfriar) return mal("dos tiros a " + (e.abs - ultimoTiro) + " cs en la " + donde + " (el fanal espera 16)");
+            if (ultimoTiro !== null && e.abs - ultimoTiro < enfriar) return mal("dos tiros a " + (e.abs - ultimoTiro) + " cs en la " + donde + " (el fanal espera " + Math.round(arm.cool * 100) + ")");
             ultimoTiro = e.abs;
             c.disparos++;
             if (l === "T") {
@@ -383,13 +406,13 @@
             if (e.abs < LIM.entrada) return mal("una polilla apagada antes de llegar a la formación en la " + donde);
             c.kills[t]++; c.aBala++; c.ultimaKill = e.abs;
             if (af) est.notas++;
-            else if (vida(t) >= 2) c.planas2++;
+            c.falta += Math.max(0, vida(t) - danoMax(af));             // lo que tuvieron que quitarle los roces de antes
             suma(M.puntosPolilla(acto, t, mult(), af, vuelta));
             break;
           }
           case "N":
-            if (!conVida2 || af) return tipoMal(l);
-            c.N++;
+            if (!(vidaMax > danoMin(af))) return tipoMal(l);
+            c.N++; c.danoN += danoMax(af);
             break;
           case "G": case "H": case "I": case "J": case "K": case "L": {
             if (!oleada || est.muerto) return tipoMal(l);
@@ -402,7 +425,7 @@
             break;
           }
           case "O":
-            if (jefe !== "nodriza") return tipoMal(l);
+            if (jefe !== "nodriza" && jefe !== "crisalida") return tipoMal(l);
             if (af) est.notas++;
             suma(10 * mult());
             break;
@@ -416,7 +439,7 @@
             suma(25 * mult());
             break;
           case "V":
-            if (jefe !== "faro") return tipoMal(l);
+            if (jefe !== "faro" && jefe !== "hoguera") return tipoMal(l);
             if (af) est.notas++;
             suma(15 * mult());
             break;
@@ -424,7 +447,7 @@
             if (!jefe || alba || c.jefeMuere >= 0) return tipoMal(l);
             if (e.abs < LIM.jefeEntra) return mal("un golpe al jefe mientras se presentaba en la " + donde);
             if (af) est.notas++;
-            c.dano += af ? 2 : 1;
+            c.dano += danoMax(af);
             suma(5 * mult());
             break;
           case "Z":
@@ -449,7 +472,7 @@
           case "f":
             if (!alba || est.muerto || c.cruce >= 0) return tipoMal(l);
             if (e.abs < LIM.alba) return mal("el Alba llegó en " + (e.abs / 100).toFixed(1) + " s (tarda un minuto)");
-            c.cruce = e.abs; fin = true;
+            c.cruce = e.abs; fin = true;                                // después del cruce ya no pasa nada en esta jornada
             suma(M.PUNTOS_JEFE.alba + (c.Z === 0 ? 5000 : 0));
             break;
           case "q":
@@ -460,21 +483,25 @@
             if (!(oleada || lumbre) || est.muerto) return tipoMal(l);
             if (l === "p") ultimas[ultimas.length - 1].p = true;
             if (l === "l") ultimas[ultimas.length - 1].l = true;
-            if (l === "a") est.llamas = Math.min(M.LLAMAS_MAX, est.llamas + 1);
+            if (l === "a") est.llamas = Math.min(topeLlamas, est.llamas + 1);
         }
         previo = e;
       }
 
-      // Lo que una bala puede tocar: una sin afinar, una cosa; una afinada
-      // atraviesa una y toca otra, más la Mensajera de paso. El pabilo
-      // dobla las balas; con la lente atraviesan todo y no se cuenta.
+      // Lo que un tiro puede tocar: cada bala, una cosa más las que atraviesa
+      // (y, si atraviesa, la Mensajera de paso). El patrón del arma dice
+      // cuántas balas salen, el pabilo suma una y la Antorcha dos chispas a
+      // los tiros afinados. Con la lente, o afinado con el Faro, atraviesa
+      // todo y no se cuenta.
       const pabilo = ultimas.some(u => u.p), lente = ultimas.some(u => u.l);
-      if (!lente) for (const t of tiros) if (t.usos > (pabilo ? 2 : 1) * (t.af ? 3 : 1)) return mal("una bala tocó " + t.usos + " cosas en la " + donde);
+      const balasTiro = af => arm.patron.length + (pabilo ? 1 : 0) + (af && arm.chispas ? 2 : 0);
+      const toques = af => { const p = af ? arm.perfA : arm.perfN; return 1 + p + (p > 0 ? 1 : 0); };
+      if (!lente) for (const t of tiros) if (!(t.af && arm.rayo) && t.usos > balasTiro(t.af) * toques(t.af)) return mal("una bala tocó " + t.usos + " cosas en la " + donde);
       for (const t of ["a", "b", "c"]) if (c.kills[t] > cupo[t]) return mal("más polillas " + t + " que las de la formación en la " + donde);
-      if (c.planas2 > c.N) return mal("polillas de dos vidas apagadas de un solo tiro sin afinar en la " + donde);
+      if (c.falta > c.danoN) return mal("polillas que aguantan más de un golpe apagadas sin los golpes de antes en la " + donde);
       if (c.Q + c.q > 24) return mal("más de 24 lumbres en la " + donde);
       if ((x.f === "m") !== est.muerto) return mal(est.muerto ? "el fanal se apagó pero la jornada no terminó ahí (" + donde + ")" : "la " + donde + " dice que el fanal se apagó y no");
-      if ((x.f === "f") !== (c.cruce >= 0)) return mal("el cruce con el Alba no cuadra en la " + donde);
+      if (alba && x.f === "c" && c.cruce < 0) return mal("el Alba no se completa sino cruzándola");
       if (x.f === "c") {
         if (oleada) {
           for (const t of ["a", "b", "c"]) if (c.kills[t] !== cupo[t]) return mal("la " + donde + " terminó sin apagar toda la formación");
@@ -482,16 +509,29 @@
           if (c.ultimaKill < entra) return mal("la formación de la " + donde + " cayó antes de terminar de entrar");
           if (x.t < c.ultimaKill + LIM.trasOleada) return mal("la " + donde + " se cerró antes de tiempo");
         }
-        if (jefe && c.jefeMuere < 0) return mal("la " + donde + " terminó con el jefe vivo");
-        if (jefe && x.t < c.jefeMuere + LIM.trasJefe) return mal("la " + donde + " se cerró antes de tiempo");
-        // El ritmo humano (ver LIM).
-        const minimo = oleada ? LIM.oleadaBase + (lente ? 0 : (pabilo ? LIM.porPolilla / 2 : LIM.porPolilla) * c.aBala) : jefe ? LIM.jefeMin : LIM.lumbreMin;
+        if (jefe && !alba && c.jefeMuere < 0) return mal("la " + donde + " terminó con el jefe vivo");
+        if (jefe && !alba && x.t < c.jefeMuere + LIM.trasJefe) return mal("la " + donde + " se cerró antes de tiempo");
+        // El ritmo humano (ver LIM). Un arma más grande apaga más por tiro:
+        // la cuenta por polilla se divide por lo que puede tocar un tiro sin
+        // afinar. El jefe, además, no cae antes de lo que permiten sus golpes.
+        // Sin mejoras cuenta lo que toca un tiro sin afinar (lo de siempre);
+        // con mejoras, lo más que toca cualquier tiro: un abanico afinado que
+        // atraviesa una columna apilada apaga varias de un golpe, y una
+        // persona con el arma crecida lo hace de verdad (un bot de Chromium
+        // jugando el juego real lo mostró: 48 polillas en 3,5 s).
+        const sinMejoras = M.LISTA_MEJORAS.every(k => !taller.mej[k]);
+        const potencia = sinMejoras ? balasTiro(false) * (1 + arm.perfN) : Math.max(balasTiro(false) * (1 + arm.perfN), balasTiro(true) * (1 + (arm.rayo ? 4 : arm.perfA)));
+        const vidaJ = jefe && !alba ? M.vidaJefe(j) : 0;
+        const golpesJ = Math.ceil(vidaJ / Math.max(1, balasTiro(true) * arm.danoA));
+        const minimo = oleada ? LIM.oleadaBase + (lente ? 0 : (Math.max(3, LIM.porPolilla / potencia) * c.aBala + Math.max(2, LIM.porRoce / potencia) * c.N))
+          : jefe ? (alba ? 0 : Math.max(LIM.jefeMin, LIM.jefeEntra + golpesJ * enfriar)) : LIM.lumbreMin;
         if (x.t < minimo) return mal("la " + donde + " duró " + (x.t / 100).toFixed(1) + " s: ninguna persona la termina en menos de " + (minimo / 100).toFixed(0) + " s");
         if (lumbre && c.Q + c.q !== 24) return mal("la " + donde + " terminó con lumbres en el aire");
-        if (!lumbre) suma(M.bonusJornada({ acto: j.acto, sinDanio: c.golpes === 0, disparos: c.disparos, aciertos: c.aciertos }).total);
+        if (!lumbre && !alba) suma(M.bonusJornada({ acto: j.acto, sinDanio: c.golpes === 0, disparos: c.disparos, aciertos: c.aciertos }).total);
         completadas = Math.max(completadas, x.n);
+        if (x.n >= M.JORNADA_ALBA) completa = true;
+        if (jefe) taller.brasas++;                                      // solo vencer a un jefe da una brasa
       }
-      if (x.f === "f") { completadas = M.JORNADAS_HISTORIA; completa = true; }
       if (Math.round(est.puntos) !== x.s) return mal("los puntos de la " + donde + " no salen de sus eventos (dice " + x.s + ", dan " + Math.round(est.puntos) + ")");
       if (est.llamas !== x.v) return mal("las llamas de la " + donde + " no salen de sus eventos");
     }
@@ -500,13 +540,13 @@
       const media = hechas.reduce((s, x) => s + x.t, 0) / hechas.length;
       if (media < LIM.mediaMin) return mal(hechas.length + " jornadas a " + (media / 100).toFixed(1) + " s cada una: ninguna persona juega a ese ritmo");
     }
-    // Una travesía entera jugada de una vez (sin punto de control) no baja
-    // de cuatro minutos de juego.
-    if (completa && !prueba.k) {
-      const total = J.reduce((s, x) => s + x.t, 0);
+    // La primera parte entera (hasta el Alba) jugada de una vez, sin punto
+    // de control, no baja de cinco minutos de juego.
+    if (completa && !prueba.k && prueba.m === "t") {
+      const total = J.filter(x => x.n <= M.JORNADA_ALBA).reduce((s, x) => s + x.t, 0);
       if (total < LIM.travesiaMin) return mal("una travesía entera en " + (total / 100).toFixed(0) + " s (la más rápida posible pasa de " + LIM.travesiaMin / 100 + ")");
     }
-    return { puntos: Math.round(est.puntos), completadas, completa, tiempo, muerto: est.muerto, jornadas: J.length };
+    return { puntos: Math.round(est.puntos), completadas, completa, tiempo, muerto: est.muerto, jornadas: J.length, llamas: est.llamas, mej: taller.mej, brasas: taller.brasas };
   }
 
   return { VERSION, LIM, PRUEBA_MAX, nueva, abre, evento, disparo, latencia, pulso, cierra, ajusta, rehace, leeEventos, leePulsos };

@@ -123,6 +123,17 @@ export function monedasBbtan(ronda) {
   const S = Math.min(R, BBTAN_SATURA), q = Math.floor(S / 4), r = S % 4;
   return 2 * q * (q - 1) + q * (r + 1) + (R - S) * Math.floor(BBTAN_SATURA / 4);
 }
+/* FANAL, como BBTAN: el récord de jornadas paga cada jornada hasta él, y
+   cada una más que la anterior: la n paga 5n + 5 (la 1 paga 10, la 13 —el
+   Alba— 70) hasta 250 por jornada desde la 49, y pasada la 160 el récord ya
+   no paga más. Llegar al Alba son 520; a la Hoguera (25), 1750; a la 50,
+   6620; a la 100, 19 120. Nunca paga menos que lo de antes (10 por jornada). */
+export const FANAL_SATURA = 49, FANAL_TOPE = 160;
+export function monedasFanal(jornadas) {
+  const J = Math.max(0, Math.floor(Math.min(+jornadas || 0, FANAL_TOPE)));
+  const S = Math.min(J, FANAL_SATURA);
+  return 5 * S * (S + 1) / 2 + 5 * S + (J - S) * (5 * FANAL_SATURA + 5);
+}
 /* sortEm: los bloques de la modalidad, más 2 por cada segundo bajo un
    ritmo de 3 s por bloque (30 s para el 1–10, 60 s para el 1–20). */
 export function monedasSortem(n, ms) {
@@ -154,10 +165,11 @@ function extraRecord(cat, f) {
   /* Sudoku Arcade: el récord del arcade paga 1 moneda por cada 1000
      puntos (con tope, para que una marca absurda no compre la tienda). */
   if (cat === "club-sudoku-arcade") return Math.floor(Math.min(f.puntos || 0, 200000) / 1000);
-  /* FANAL: cada jornada completada paga 10 (hasta la 60) y los puntos de
-     la travesía o del sin fin, 1 por cada 1000, con el mismo tope. */
-  if (cat === "club-fanal-jornadas") return 10 * Math.min(f.puntos || 0, 60);
-  if (cat === "club-fanal-travesia" || cat === "club-fanal-sinfin") return Math.floor(Math.min(f.puntos || 0, 200000) / 1000);
+  /* FANAL: el récord de jornadas paga como BBTAN (monedasFanal) y los
+     puntos de la travesía o del sin fin, 1 por cada 1000, hasta el tope
+     del ranking (1 000 000 son 1000). */
+  if (cat === "club-fanal-jornadas") return monedasFanal(f.puntos);
+  if (cat === "club-fanal-travesia" || cat === "club-fanal-sinfin") return Math.floor(Math.min(f.puntos || 0, 1000000) / 1000);
   /* Atasco: 4 monedas por estrella juntada (720 estrellas son 2880). */
   if (cat === "club-atasco-estrellas") return 4 * Math.min(f.puntos || 0, 3000);
   /* ALETEO: 2 monedas por tubo del mejor vuelo (100 tubos son 200), con

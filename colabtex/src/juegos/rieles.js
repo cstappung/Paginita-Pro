@@ -1,6 +1,7 @@
 /* Los rieles del salón: en un PC ancho, a la izquierda las mejores
    partidas del día de cuatro juegos del club, en bucle, con quien las
-   jugó; a la derecha el chat general. En una pantalla más angosta (y en
+   jugó (cuáles cuatro cambia cada día: `alineacionDelDia`, los más
+   jugados casi siempre y el resto rotando); a la derecha el chat general. En una pantalla más angosta (y en
    el celular) las repeticiones no salen y el chat es un botón 💬 que
    abre un panel (una hoja desde abajo en el celular). Lo puro está en
    rieles-datos.js y las repeticiones en repeticion.js.
@@ -24,13 +25,13 @@ import { mezcla } from "./perfil.js";
 import { verificaClub } from "./solo/verifica.js";
 import { crearRepro } from "./repeticion.js";
 import {
-  REPES, etiquetaDia, PAUSA_FINAL_MS, formatoTiempo, formatoPuntos,
+  alineacionDelDia, etiquetaDia, PAUSA_FINAL_MS, formatoMarca,
   CHAT_VENTANA_MS, CHAT_LARGO, CHAT_MAX, CHAT_VIEJO_MS, chatVisibles, esperaChat, limpiaChat, sinLeer
 } from "./rieles-datos.js";
 
 /* Alto / ancho de cada escena (repeticion.js: `aspecto`), para repartir el
    riel antes de que llegue la partida. */
-const ASPECTO = { tetris: 1.01, snake: 0.89, sortem: 0.65, minas: 0.95 };
+const ASPECTO = { tetris: 1.01, snake: 0.89, sortem: 0.65, minas: 0.95, dosmil: 1.22 };
 /* El corte de «PC ancho». Debe coincidir con el `@media` de juegos.html. */
 export const ANCHO = "(min-width: 1400px)";
 const CUADRO_MS = 33, PIE_MS = 400, RELEE_CHAT_MS = 10 * 60 * 1000, REPINTA_CHAT_MS = 15000;
@@ -41,7 +42,8 @@ const ponVisto = v => { try { localStorage.setItem(CLAVE_VISTO, String(v)); } ca
 const esPermiso = e => /permission/i.test(String(e && (e.code || e.message) || e));
 
 /* ctx = {fb, usuario() → {uid, name}|null, perfil(uid), marco(uid),
-   colorDe(uid), dia() → día de Chile de hoy} */
+   colorDe(uid), dia() → día de Chile de hoy, popular() → juego → cuánto
+   se juega} */
 export function crearRieles(ctx) {
   const { fb } = ctx;
   const ancho = window.matchMedia(ANCHO);
@@ -82,8 +84,21 @@ export function crearRieles(ctx) {
 
   document.body.append(izq, chat, fondo, fab);
 
-  /* ---------- las repeticiones ---------- */
-  const tarjetas = REPES.map(rep => {
+  /* ---------- las repeticiones ----------
+     Los cuatro juegos de hoy. La lista se rehace sola al cambiar el día
+     (o si la popularidad que llegó reordena la alineación). */
+  let tarjetas = [], firmaLinea = "";
+  function armaLinea() {
+    const reps = alineacionDelDia(ctx.dia(), ctx.popular ? ctx.popular() : null);
+    const firma = reps.map(r => r.cat).join(",");
+    if (firma === firmaLinea) return false;
+    for (const t of tarjetas) { if (t.off) t.off(); t.gen++; }
+    firmaLinea = firma;
+    lista.innerHTML = "";
+    tarjetas = reps.map(tarjeta);
+    return true;
+  }
+  function tarjeta(rep) {
     const el = document.createElement("article");
     el.className = "jg-rp cargando";
     el.dataset.cat = rep.cat;
@@ -101,7 +116,7 @@ export function crearRieles(ctx) {
     t.pausaBtn.onclick = () => pausa(t, !t.pausado);
     el.querySelector(".jg-rp-lienzo").addEventListener("click", ev => { if (ev.target === t.canvas) pausa(t, !t.pausado); });
     return t;
-  });
+  }
   /* Lo comprobado no se vuelve a comprobar: la misma fila llega en cada
      cambio de la consulta. */
   const comprobadas = new Map();
@@ -233,11 +248,11 @@ export function crearRieles(ctx) {
     const e = t.entrada;
     const p = mezcla({ nombre: e.n || "Jugador" }, ctx.perfil(e.uid));
     const nombre = p.nombre || "Jugador";
-    const final = t.rep.menor ? formatoTiempo(e.t) : formatoPuntos(e.p);
+    const final = formatoMarca(t.rep, e.p, e.t);
     const firma = [nombre, p.foto, p.color, ctx.marco(e.uid), final, t.origen].join("|");
     if (firma === t.pieFirma) return;
     t.pieFirma = firma;
-    t.quien.title = `${t.origen}: ${nombre} · ${final}${t.rep.menor ? "" : " pts"}`;
+    t.quien.title = `${t.origen}: ${nombre} · ${final}`;
     t.quien.innerHTML = `${avatarMarco(p.foto, nombre, p.color || ctx.colorDe(e.uid), ctx.marco(e.uid), 18, e.uid)}<b translate="no" data-perfil="${escapeHtml(e.uid)}" data-nombre="${escapeHtml(nombre)}">${escapeHtml(nombre)}</b>`;
   }
 
@@ -254,6 +269,7 @@ export function crearRieles(ctx) {
   const arranca = () => { if (!raf && activo && ancho.matches && !document.hidden) raf = requestAnimationFrame(cuadro); };
 
   function engancha() {
+    armaLinea();
     for (const t of tarjetas) {
       if (t.off) continue;
       t.el.classList.add("cargando");
@@ -428,7 +444,7 @@ export function crearRieles(ctx) {
     if (invitado && !puerta) {
       puerta = document.createElement("div");
       puerta.className = "jg-riel-puerta";
-      puerta.innerHTML = `<p>Las mejores partidas del día de Tetris, Snake, sortEm y Buscaminas, repetidas jugada por jugada.</p><p>Inicia sesión para verlas.</p><button class="btn" type="button" data-login>Iniciar sesión</button>`;
+      puerta.innerHTML = `<p>Las mejores partidas del día de los juegos del club que más se juegan, repetidas jugada por jugada. Cada día, otra alineación.</p><p>Inicia sesión para verlas.</p><button class="btn" type="button" data-login>Iniciar sesión</button>`;
       izq.appendChild(puerta);
     } else if (!invitado && puerta) puerta.remove();
   }
@@ -453,6 +469,8 @@ export function crearRieles(ctx) {
       pintaChat();
       espera();
     } else if (activo) {
+      // Otro día (o la popularidad que llegó reordena la alineación).
+      if (u && ancho.matches && armaLinea()) engancha();
       // Un perfil que llegó (apodo, foto, marco): los pies y el chat lo recogen.
       for (const t of tarjetas) if (t.repro) pintaPie(t);
       pintaChat();

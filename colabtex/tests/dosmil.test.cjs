@@ -118,4 +118,21 @@ test('las versiones y las reglas',()=>{
  const reglas=fs.readFileSync(path.join(__dirname,'../../firebase/database.rules.json'),'utf8');
  assert.match(reglas,/dosmil-\(puntos\|ficha\)/);
  assert.match(reglas,/\|dosmil/);
+ /* El tope de `puntos` en soloRanks tiene que dejar pasar lo que el
+    verificador acepta: 4 000 000 puntos y la ficha 262 144. Con el tope
+    general de 100 000 las partidas buenas se rechazaban al guardarse. */
+ assert.match(reglas,/'club-dosmil-puntos' \? 4000000/);
+ assert.match(reglas,/'club-dosmil-ficha' \|\| [^?]*\? 1000000 /);
+});
+
+test('el juego guarda ms enteros: un tiempo con decimales no entra en la clasificación',()=>{
+ /* performance.now trae decimales; si la jugada los guardaba, res.ms salía
+    con decimales y resultadoClub (Number.isSafeInteger) tiraba el récord
+    sin avisar, en las dos tablas. */
+ const js=fs.readFileSync(path.join(D,'juego.js'),'utf8');
+ assert.match(js,/Math\.round\(ahora - ultimaA\)/);
+ assert.match(js,/M\.decodifica\(M\.codifica\(jugadas\)\)/);
+ const {resultadoClub}=carga('src/juegos/solo/club-datos.js');
+ assert.equal(resultadoClub('dosmil',{categoria:CP,puntos:1200,tiempo:61234.7,partida:'abc'}),null);
+ assert.ok(resultadoClub('dosmil',{categoria:CP,puntos:1200,tiempo:61235,partida:'abc'}));
 });

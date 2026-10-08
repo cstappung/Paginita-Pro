@@ -14,8 +14,15 @@
      juego los usa para la marcha de la formación (el «latido»), para que la
      llama lata y para juzgar si un disparo salió afinado.
    - El relato se cuenta entre jornadas (la bitácora), en las cartas que
-     suelta la Mensajera y en dos secuencias que no se pueden saltar: la
-     revelación (al apagar el Faro Ciego) y el cruce con el Alba.
+     suelta la Mensajera y en tres secuencias que no se pueden saltar: la
+     revelación (al apagar el Faro Ciego), el cruce con el Alba y el final
+     de la Hoguera. Después del Alba la travesía no termina: sigue a la
+     otra orilla, y después de la Hoguera, sin fin.
+   - Entre jornada y jornada abre el TALLER: cada jefe vencido da una
+     brasa, y cada brasa sube una mejora del arma o del fanal (motor.js:
+     MEJORAS, armas, nave). Cada tres en una rama, el arma o el fanal
+     evoluciona y se ve distinto. Cada jornada trae además un augurio: la
+     noche aprende algo y se pone un poco más difícil.
    - Lo que dura de una partida a otra (cartas leídas, final visto, punto de
      control, récords) se guarda en el navegador y, dentro de Juegos, en la
      cuenta (Club.guardarPartida). Los puntajes van a la clasificación con
@@ -152,6 +159,9 @@
     if (acto === 3) f.nubes = texturaNubes(p.nube, 0.18, 0.6, 37);
     if (acto === 4) f.nubes = texturaNubes(p.nube, 0.38, 0.5, 41);
     if (acto === 5) f.nubes = texturaNubes(p.nube, 0.26, 0.5, 53);
+    if (acto === 6) f.nubes = texturaNubes(p.nube, 0.5, 0.45, 61);
+    if (acto === 7) f.nubes = texturaNubes(p.nube, 0.55, 0.4, 67);
+    if (acto === 8) f.nubes = texturaNubes(p.nube, 0.4, 0.55, 71);
     return (fondos[acto] = f);
   }
 
@@ -198,6 +208,10 @@
   let form = null, polillas = [], balas = [], escamas = [], poderes = [], particulas = [], flotantes = [], destellos = [];
   let naufragios = [], msj = null, jefe = null, lumbres = [], sombras = [], larvas = [];
   let cenizas = [];             // nubes de polvo de ala que bajan (jornada 10)
+  let hilos = [];               // los hilos de seda que cuelgan las polillas (acto VI)
+  let anclas = [];              // el ancla del Casco
+  let columnas = [];            // las columnas de fuego de la Hoguera
+  let luciernagas = [];         // las que te siguen (evolución del fanal) y los fanales liberados
   /* En la portada, unas pocas polillas revolotean alrededor de la llama:
      lo primero que se ve ya es lo que el juego va a contar. */
   const adorno = Array.from({ length: 7 }, (_, i) => ({ a: (i / 7) * Math.PI * 2, r: 22 + i * 9, w: (i % 2 ? 1 : -1) * (0.5 + i * 0.06), f: i * 1.7, tipo: ["a", "b", "c"][i % 3] }));
@@ -237,7 +251,8 @@
   const latMs = () => Math.round((musica.latencia || 0) * 1000);
   function regAbre(n) {
     if (!P || !P.prueba) return;
-    P.reg = FP.abre(n, tMusica, performance.now(), P.tiempo, latMs());
+    P.reg = FP.abre(n, tMusica, performance.now(), P.tiempo, latMs(), P.uSig);
+    P.uSig = "";
     anotaPulsos();
   }
   // Los pulsos que la música programó desde la última vez.
@@ -275,25 +290,51 @@
       acogidas: 0, apagadasLumbre: 0, albaGolpes: 0, tiempo: 0, reintentos: 0,
       stats: { disparos: 0, aciertos: 0, afinados: 0, apagadas: 0, mejorRes: 1, danios: 0, cartas: 0 },
       terminando: 0, fuentes: {},
-      prueba: null, reg: null, msjK: 0, tocada: false, legado: false, sinteticas: 0, mando: 0, sintAntes: 0, mandoAntes: 0
+      prueba: null, reg: null, msjK: 0, tocada: false, legado: false, sinteticas: 0, mando: 0, sintAntes: 0, mandoAntes: 0,
+      // El taller: niveles de cada mejora, brasas sin gastar y lo comprado
+      // para la próxima jornada (va a la prueba, ver regAbre).
+      mej: M.mejorasVacias(), brasas: modo === "sinfin" ? M.BRASAS_SINFIN : 0, uSig: "", gastadas: 0
     };
   }
   function nuevoFanal() {
-    return { x: W / 2, vx: 0, invul: 0, campana: 0, pabilo: 0, lente: 0, cool: 0, remo: 0, apagado: 0, viento: 0, radioExtra: 0, aro: 0 };
+    return { x: W / 2, vx: 0, invul: 0, campana: 0, campanaT: 0, pabilo: 0, lente: 0, cool: 0, remo: 0, apagado: 0, viento: 0, radioExtra: 0, aro: 0, enredo: 0, pulsoT: 0 };
   }
-  const actoVisual = j => (j ? j.acto : 1);                          // 1..4 historia, 5 sin fin
+  /* El arma y el fanal de ahora (con las mejoras compradas). */
+  const arma = () => M.armas(P ? P.mej : null);
+  const naveF = () => M.nave(P ? P.mej : null);
+  const topeLlamas = () => M.llamasMax(P ? P.mej : null);
+  /* ¿Esta jornada es todavía de la historia (con su relato y sus giros)? */
+  const enHistoria = () => P && P.modo === "travesia" && P.jornada <= M.JORNADAS_HISTORIA;
+  const actoVisual = j => (j ? j.acto : 1);                          // 1..4 y 6..8 historia, 5 sin fin
   const formaDe = j => (j && j.acto === 5 ? j.actoBase : j ? j.acto : 1); // de qué acto son las polillas
   const multiplicador = () => M.resonancia(P ? P.notas : 0);
 
   /* ================================================================
      Cascos hundidos (los escudos)
      ================================================================ */
-  function creaNaufragios(acto) {
-    return [48, 96, 144, 192].map(cx => ({ x: cx - 12, y: M.Y_NAUFRAGIOS - 6, w: 24, h: 12, pix: S.naufragio(acto), cv: S.lienzo(24, 12), sucio: true }));
+  function creaNaufragios(acto, n) {
+    // En los cascos (acto V) son seis y derivan: escudos que se mueven.
+    const pos = n === 6 ? [10, 50, 90, 130, 170, 210] : [48, 96, 144, 192];
+    return pos.map((cx, i) => ({ x: cx - 12, y: M.Y_NAUFRAGIOS - 6, w: 24, h: 12, pix: S.naufragio(acto), cv: S.lienzo(24, 12), sucio: true, vx: n === 6 ? (i % 2 ? -1 : 1) * azar(4, 8) : 0 }));
+  }
+  /* Un casco chico (lo que deja un pecio del Casco al caer). */
+  function cascoChico(x) {
+    const pix = S.naufragio(6).slice(4).map(f => f.slice(6, 18));
+    return { x: Math.round(x - 6), y: M.Y_NAUFRAGIOS + 0, w: 12, h: pix.length, pix, cv: S.lienzo(12, pix.length), sucio: true, vx: 0 };
+  }
+  /* Los cascos que derivan dan la vuelta por los costados. */
+  function derivaNaufragios(dt) {
+    for (const n of naufragios) {
+      if (!n.vx) continue;
+      n.fx = (n.fx == null ? n.x : n.fx) + n.vx * dt;
+      if (n.fx > W + 2) n.fx = -n.w - 2; else if (n.fx < -n.w - 2) n.fx = W + 2;
+      n.x = Math.round(n.fx);
+    }
   }
   function pintaNaufragio(n) {
     const c = n.cv.getContext("2d");
-    c.clearRect(0, 0, 24, 12);
+    if (!c) return;
+    c.clearRect(0, 0, n.w, n.h);
     n.pix.forEach((fila, y) => fila.forEach((col, x) => { if (col) { c.fillStyle = col; c.fillRect(x, y, 1, 1); } }));
     n.sucio = false;
   }
@@ -420,7 +461,7 @@
     P.fuegoAcum += j.fuego * dt;
     while (P.fuegoAcum >= 1) {
       P.fuegoAcum -= 1;
-      if (escamas.filter(e => !e.jefe).length < j.balas) disparaFormacion();
+      if (escamas.filter(e => !e.jefe && !e.ascua).length < j.balas) disparaFormacion();
     }
     // Picadas: polillas que dejan la fila y bajan hacia la luz.
     P.picadaAcum += (j.picada || 0) * dt;
@@ -428,6 +469,30 @@
       P.picadaAcum -= 1;
       const c = polillas.filter(p => p.viva && p.estado === "fila" && (p.tipo !== "a" || j.acto >= 2));
       if (c.length) { const p = c[Math.floor(Math.random() * c.length)]; p.estado = "picada"; p.t = 0; p.vx = 0; p.vy = -40; p.disparo = j.acto >= 2; }
+    }
+    // La seda: de vez en cuando una polilla de la fila cuelga un hilo hasta
+    // abajo. Tocarlo no quita llamas: enreda los remos un momento.
+    if (j.hilos) {
+      P.hiloAcum = (P.hiloAcum || 0) + j.hilos * dt;
+      while (P.hiloAcum >= 1) {
+        P.hiloAcum -= 1;
+        const c = polillas.filter(p => p.viva && p.estado === "fila" && !hilos.some(h => h.p === p));
+        if (c.length && hilos.length < 4) hilos.push({ p: c[Math.floor(Math.random() * c.length)], t: 0, dur: azar(3.2, 4.6), largo: 0 });
+      }
+    }
+  }
+  /* Los hilos de seda: bajan desde su polilla, cuelgan un rato y se van. */
+  function actualizaHilos(dt) {
+    for (let i = hilos.length - 1; i >= 0; i--) {
+      const h = hilos[i];
+      h.t += dt;
+      if (h.p) { if (!h.p.viva || h.p.estado !== "fila") { hilos.splice(i, 1); continue; } h.x = h.p.x + h.p.w / 2; h.y0 = h.p.y + h.p.h; }
+      h.largo = Math.min(H - h.y0, h.largo + 260 * dt);
+      if (h.t > h.dur) { hilos.splice(i, 1); continue; }
+      if (estado === "juego" && h.y0 + h.largo > M.Y_FANAL - 6 && Math.abs(h.x - F.x) < 3.5 && !F.apagado) {
+        if (F.enredo <= 0) { chispas(F.x, M.Y_FANAL - 8, 6, ["#f2ece2", "#ffffff"], 20, 0.5, "polvo"); musica.sfx.roce(F.x); }
+        F.enredo = 1.1;
+      }
     }
   }
   /* Una polilla en picada: sube un poco, se deja caer hacia la llama con un
@@ -448,8 +513,10 @@
     if (estado === "juego" && Math.abs(p.x + p.w / 2 - F.x) < 8 && Math.abs(p.y + p.h / 2 - (M.Y_FANAL - 3)) < 7) { mata(p, null, "quema"); golpeFanal("picada"); return; }
     if (p.y > H + 12) { p.estado = "vuelve"; p.t = 0; p.ox = hueco(p).x; p.oy = -16; p.x = p.ox; p.y = p.oy; }
   }
+  /* Una escama. El augurio «veloz» la acelera (motor.js: aplicaAugurios). */
   function nuevaEscama(x, y, vx, vy, extra) {
-    return Object.assign({ x, y, vx, vy, t: 0, estilo: actoVisual(P.j) }, extra || {});
+    const v = (P && P.j && P.j.velEscama) || 1;
+    return Object.assign({ x, y, vx: vx * v, vy: vy * v, t: 0, estilo: actoVisual(P.j) }, extra || {});
   }
   function disparaFormacion() {
     // Por columna, la polilla más baja; a veces la que está sobre el fanal.
@@ -459,7 +526,7 @@
     if (!cand.length) return;
     let p = cand[Math.floor(Math.random() * cand.length)];
     if (Math.random() < P.j.apunta) p = cand.reduce((a, b) => (Math.abs(b.x + b.w / 2 - F.x) < Math.abs(a.x + a.w / 2 - F.x) ? b : a));
-    const vel = { 1: 70, 2: 78, 3: 86, 4: 80, 5: 90 }[actoVisual(P.j)] * (P.j.acto === 5 ? 1 + (M.dificultad(P.jornada) - 1) * 0.25 : 1);
+    const vel = ({ 1: 70, 2: 78, 3: 86, 4: 80, 5: 90, 6: 84, 7: 88, 8: 94 }[actoVisual(P.j)] || 86) * (P.j.acto === 5 ? 1 + (M.dificultad(P.jornada) - 1) * 0.25 : 1);
     const vx = P.j.acto >= 2 && Math.random() < P.j.apunta ? clamp((F.x - p.x) * 0.18, -16, 16) : 0;
     escamas.push(nuevaEscama(p.x + p.w / 2, p.y + p.h - 1, vx, vel));
   }
@@ -490,7 +557,7 @@
     musica.sfx.muerte(msj.x, 7, true);
     apagaEstrella();
     let leida = false;
-    if (P.modo === "travesia") {
+    if (enHistoria()) {
       const i = R.fragmentoSiguiente(new Set([...prog.frag, ...P.fragJ]), P.acto);
       if (i >= 0) { P.fragJ.push(i); leida = true; avisa("✉ Carta " + R.romano(i + 1) + " recuperada"); }
     } else {
@@ -508,8 +575,8 @@
      ================================================================ */
   const PODERES = ["pabilo", "lente", "campana", "aceite", "destello"];
   function soltarPoder(x, y, seguro) {
-    if (!seguro && (poderes.length || Math.random() > 0.045)) return;
-    const pesos = { pabilo: 30, lente: 20, campana: 25, aceite: P.llamas < M.LLAMAS_MAX ? 12 : 0, destello: 15 };
+    if (!seguro && (poderes.length || Math.random() > 0.045 * naveF().probPoder)) return;
+    const pesos = { pabilo: 30, lente: 20, campana: 25, aceite: P.llamas < topeLlamas() ? 12 : 0, destello: 15 };
     let r = Math.random() * Object.values(pesos).reduce((a, b) => a + b, 0), tipo = "pabilo";
     for (const k of PODERES) { r -= pesos[k]; if (r <= 0) { tipo = k; break; } }
     poderes.push({ x, y, tipo, t: 0 });
@@ -520,13 +587,15 @@
     anillo(F.x, M.Y_FANAL - 2, "#ffd27a", 18);
     const nombres = { pabilo: "Pabilo doble", lente: "Lente", campana: "Campana de vidrio", aceite: "Aceite: una llama", destello: "Destello" };
     avisa(nombres[p.tipo]);
-    if (p.tipo === "pabilo") F.pabilo = 12;
-    if (p.tipo === "lente") F.lente = 8;
+    const dur = naveF().durPoder;
+    if (p.tipo === "pabilo") F.pabilo = 12 * dur;
+    if (p.tipo === "lente") F.lente = 8 * dur;
     if (p.tipo === "campana") F.campana = 1;
-    if (p.tipo === "aceite") { P.llamas = Math.min(M.LLAMAS_MAX, P.llamas + 1); pintaLlamas(); }
+    if (p.tipo === "aceite") { P.llamas = Math.min(topeLlamas(), P.llamas + 1); pintaLlamas(); }
     if (p.tipo === "destello") {
       relampago("#fff6d8", 0.5); sacude(0.25);
       escamas = escamas.filter(e => e.muro);                           // se lleva todas las escamas (no los muros)
+      hilos = [];
       const bajas = polillas.filter(q => q.viva && q.estado !== "entrando");
       const maxY = Math.max(-1, ...bajas.map(q => q.y));
       for (const q of bajas) if (q.y >= maxY - 3) mata(q, null, "destello"); // la fila más baja
@@ -541,7 +610,7 @@
     const antes = P.puntos;
     P.puntos += n;
     const extra = M.llamasGanadas(antes, P.puntos);
-    if (extra) { P.llamas = Math.min(M.LLAMAS_MAX, P.llamas + extra); pintaLlamas(); avisa("Una llama más"); musica.sfx.poder(); }
+    if (extra) { P.llamas = Math.min(topeLlamas(), P.llamas + extra); pintaLlamas(); avisa("Una llama más"); musica.sfx.poder(); }
     if (x != null) flota(x, y, n, grande ? "#fff6d8" : "#ffd27a");
   }
   function subeNota(afinado) {
@@ -574,6 +643,10 @@
     P.stats.apagadas++;
     // En la ceniza, el polvo de las alas queda en el aire y baja despacio.
     if (P.j.ceniza && Math.random() < 0.5) cenizas.push({ x: p.x + p.w / 2, y: p.y + p.h / 2, vy: azar(14, 22), r: azar(7, 10), t: 0 });
+    // En la hoguera, una polilla apagada puede soltar un ascua que cae.
+    if (P.j.ascuas && Math.random() < P.j.ascuas) escamas.push(nuevaEscama(p.x + p.w / 2, p.y + p.h, azar(-25, 25), azar(-30, 10), { ascua: true, g: 70, estilo: 8 }));
+    // En la seda, su hilo se corta.
+    hilos = hilos.filter(h => h.p !== p);
     apagaEstrella();
     soltarPoder(p.x + p.w / 2, p.y + p.h / 2, false);
   }
@@ -581,7 +654,7 @@
   function golpeFanal(fuente) {
     if (F.invul > 0 || F.apagado || estado !== "juego") return;
     if (F.campana > 0) {                                               // la campana de vidrio aguanta uno
-      F.campana = 0; F.invul = 0.9;
+      F.campana = 0; F.invul = 0.9; F.campanaT = naveF().regenera;   // con vidrio templado, vuelve sola
       chispas(F.x, M.Y_FANAL - 4, 18, ["#e8dcc4", "#ffffff"], 70, 0.6);
       musica.sfx.roce(F.x); sacude(0.2); avisa("La campana se rompió");
       return;
@@ -604,17 +677,24 @@
      ================================================================ */
   function disparar() {
     if (estado !== "juego" || F.apagado || F.cool > 0) return;
-    const propias = balas.length, max = F.pabilo > 0 ? 4 : 2;
+    const A = arma();
+    // El patrón del arma (motor.js: armas); el pabilo suma una bala.
+    let patron = A.patron.slice();
+    if (F.pabilo > 0) patron = patron.length === 1 ? [{ dx: -3, vx: 0 }, { dx: 3, vx: 0 }] : patron.concat([{ dx: 0, vx: 0 }]);
+    const propias = balas.filter(b => !b.chispa).length, max = A.tope * patron.length;
     if (propias >= max) return;
     // ¿Cayó en un pulso? Se compara con lo que se OYE (el audio sale con
     // algo de retraso por la tarjeta de sonido).
     const t = tMusica - musica.latencia, pc = musica.pulsoCercano(t);
     const afinado = M.juzgaPulso(t, pc.previo, pc.siguiente).afinado;
-    const vel = F.lente > 0 ? -380 : -300;
+    const vel = F.lente > 0 ? -380 : afinado && A.rayo ? -360 : -300;
     const k = P.reg ? FP.disparo(P.reg, afinado, tMusica, latMs()) : 0;   // la bala recuerda su tiro (para la prueba)
-    const nueva = dx => balas.push({ x: F.x + dx, y: M.Y_FANAL - 9, vy: vel, afinado, perfora: F.lente > 0 ? 99 : afinado ? 1 : 0, dano: afinado ? 2 : 1, tocados: new Set(), k });
-    if (F.pabilo > 0) { nueva(-3); nueva(3); } else nueva(0);
-    F.cool = 0.16;
+    const perfora = F.lente > 0 || (afinado && A.rayo) ? 99 : afinado ? A.perfA : A.perfN;
+    const nueva = (dx, vx, extra) => balas.push(Object.assign({ x: F.x + dx, y: M.Y_FANAL - 9, vx: vx || 0, vy: vel, afinado, perfora, dano: afinado ? A.danoA : A.danoN, tocados: new Set(), k, evo: A.evolucion, rayo: afinado && A.rayo }, extra || {}));
+    for (const p of patron) nueva(p.dx, p.vx);
+    // La Antorcha: los tiros afinados sueltan dos chispas a los costados.
+    if (afinado && A.chispas) for (const s of [-1, 1]) nueva(s * 2, s * 110, { chispa: true, perfora: 0, dano: A.danoN, rayo: false });
+    F.cool = A.cool;
     P.stats.disparos++; P.disparosJ++;
     if (afinado) { P.stats.afinados++; anillo(F.x, M.Y_FANAL - 9, "#ffd27a", 10); fx.metro = 1; }
     else P.notas = Math.floor(P.notas / 4) * 4;                        // fuera del pulso se pierde lo que iba de la nota
@@ -625,8 +705,8 @@
   function actualizaBalas(dt) {
     for (let i = balas.length - 1; i >= 0; i--) {
       const b = balas[i];
-      b.y += b.vy * dt;
-      let fuera = b.y < -6;
+      b.y += b.vy * dt; b.x += (b.vx || 0) * dt;
+      let fuera = b.y < -6 || b.x < -6 || b.x > W + 6;
       // Contra las escamas: se anulan (los muros de la Esfinge no se rompen).
       for (let k = escamas.length - 1; k >= 0 && !fuera; k--) {
         const e = escamas[k];
@@ -689,14 +769,29 @@
     for (let i = escamas.length - 1; i >= 0; i--) {
       const e = escamas[i];
       e.t += dt;
-      e.x += (e.vx + (e.estilo === 1 && !e.muro ? Math.sin(e.t * 18) * 14 : e.estilo === 2 ? Math.sin(e.t * 4) * 6 : 0)) * dt;
+      if (e.g) e.vy = Math.min(e.vy + e.g * dt, 140);                 // las ascuas y los pecios caen
+      e.x += (e.vx + (e.estilo === 1 && !e.muro ? Math.sin(e.t * 18) * 14 : e.estilo === 2 || e.burbuja ? Math.sin(e.t * 4) * 6 : 0)) * dt;
       e.y += e.vy * dt;
       let fuera = e.y > H + 4 || e.x < -6 || e.x > W + 6 || e.y < -40;
+      // La burbuja del Casco revienta en un anillo de escamas.
+      if (!fuera && e.burbuja && e.y > e.revienta) {
+        for (let k = 0; k < 7; k++) { const a = (k / 7) * Math.PI * 2; escamas.push(nuevaEscama(e.x, e.y, Math.cos(a) * 46, Math.sin(a) * 46 + 30, { jefe: true, estilo: 6 })); }
+        chispas(e.x, e.y, 8, ["#d0f0e8", "#5ab8a8"], 40, 0.4); musica.sfx.roce(e.x);
+        escamas.splice(i, 1); continue;
+      }
+      // El pecio del Casco que llega abajo se queda: un casco chico más.
+      if (!fuera && e.pecio && e.y >= M.Y_NAUFRAGIOS - 4) {
+        if (naufragios.length < 9) naufragios.push(cascoChico(e.x));
+        chispas(e.x, e.y, 8, ["#5a4a3a", "#8a6a3a"], 30, 0.5, "polvo"); musica.sfx.escudo();
+        escamas.splice(i, 1); continue;
+      }
+      // Las luciérnagas (y los fanales liberados) se llevan las escamas que tocan.
+      if (!fuera && !e.muro) for (const l of luciernagas) if (l.cd <= 0 && Math.abs(e.x - l.x) < 4 && Math.abs(e.y - l.y) < 4) { l.cd = l.libre ? 4 : 6; fuera = true; chispas(e.x, e.y, 5, ["#fff6d8", "#ffd27a"], 30, 0.3); break; }
       if (!fuera) {
         const hit = naufragioEn(e.x, e.y + 2);
         if (hit) { erosiona(hit.n, hit.lx, hit.ly, e.muro ? 3 : 2); fuera = true; }
       }
-      if (!fuera && estado === "juego" && Math.abs(e.x - F.x) < 6.5 && e.y > M.Y_FANAL - 8 && e.y < M.Y_FANAL + 5) { golpeFanal(e.devuelta ? "devuelta" : e.muro ? "muro" : "escama"); fuera = true; }
+      if (!fuera && estado === "juego" && Math.abs(e.x - F.x) < (e.pecio ? 8 : 6.5) && e.y > M.Y_FANAL - 8 && e.y < M.Y_FANAL + 5) { golpeFanal(e.devuelta ? "devuelta" : e.muro ? "muro" : e.ascua ? "ascua" : e.pecio ? "pecio" : "escama"); fuera = true; }
       if (fuera) escamas.splice(i, 1);
     }
   }
@@ -707,26 +802,64 @@
   function actualizaFanal(dt) {
     F.invul = Math.max(0, F.invul - dt); F.cool = Math.max(0, F.cool - dt);
     F.pabilo = Math.max(0, F.pabilo - dt); F.lente = Math.max(0, F.lente - dt);
-    F.aro = Math.max(0, F.aro - dt);
+    F.aro = Math.max(0, F.aro - dt); F.enredo = Math.max(0, F.enredo - dt);
     if (F.apagado) { F.apagado += dt; return; }
-    const puede = estado === "juego" || estado === "relato" || estado === "revelacion";
+    const N = naveF();
+    // El vidrio templado: la campana rota vuelve sola al rato.
+    if (estado === "juego" && F.campana <= 0 && F.campanaT > 0) {
+      F.campanaT -= dt;
+      if (F.campanaT <= 0) { F.campana = 1; anillo(F.x, M.Y_FANAL - 3, "#e8dcc4", 14); musica.sfx.ui(5); }
+    }
+    // El faro errante: cada tanto, un pulso que barre las escamas cercanas.
+    if (estado === "juego" && N.pulso) {
+      F.pulsoT += dt;
+      if (F.pulsoT >= N.pulso) {
+        F.pulsoT = 0;
+        escamas = escamas.filter(e => e.muro || Math.hypot(e.x - F.x, e.y - M.Y_FANAL) > 70);
+        anillo(F.x, M.Y_FANAL - 4, "#fff6d8", 70); destella(F.x, M.Y_FANAL - 6, 60, 0.8, 0.4); musica.sfx.empuje();
+      }
+    }
+    actualizaLuciernagas(dt, N);
+    const puede = estado === "juego" || estado === "relato" || estado === "revelacion" || estado === "taller";
     let dir = 0;
     if (puede) {
       if (teclas.izq) dir -= 1;
       if (teclas.der) dir += 1;
       if (toque != null && Math.abs(toque - F.x) > 2) dir = Math.sign(toque - F.x) * Math.min(1, Math.abs(toque - F.x) / 14);
     }
-    const objetivo = dir * 104;
-    F.vx += clamp(objetivo - F.vx, -1100 * dt, 1100 * dt);             // aceleración con algo de inercia: es una barca
+    const objetivo = dir * N.vel * (F.enredo > 0 ? 0.45 : 1);          // los hilos de seda enredan los remos
+    F.vx += clamp(objetivo - F.vx, -1100 * (N.vel / 104) * dt, 1100 * (N.vel / 104) * dt); // aceleración con algo de inercia: es una barca
     F.vx += F.viento * dt;                                              // el aleteo de la Nodriza empuja
     F.x = clamp(F.x + F.vx * dt, 10, W - 10);
     if (F.x <= 10 || F.x >= W - 10) F.vx = 0;
-    F.remo += Math.abs(F.vx) * dt * 0.12 + (estado === "relato" ? dt * 2.4 : 0);
-    // Disparo automático mientras se mantiene apretado.
+    F.remo += Math.abs(F.vx) * dt * 0.12 + (estado === "relato" || estado === "taller" ? dt * 2.4 : 0);
+    // Disparo automático mientras se mantiene apretado (más seguido con la mecha corta).
     if (estado === "juego" && (teclas.fuego || toque != null)) {
       autoT -= dt;
-      if (autoT <= 0) { disparar(); autoT = 0.3; }
+      if (autoT <= 0) { disparar(); autoT = arma().auto; }
     } else autoT = 0;
+    // La luz larga atrae los poderes.
+    if (N.iman && estado === "juego") for (const p of poderes) {
+      const dx = F.x - p.x, dy = M.Y_FANAL - 3 - p.y, d = Math.hypot(dx, dy);
+      if (d < N.iman && d > 1) { p.x += (dx / d) * 70 * dt; p.y += (dy / d) * 50 * dt; }
+    }
+  }
+  /* Las luciérnagas: las que te siguen (evolución del fanal) dan vueltas a
+     la llama y se llevan las escamas que tocan; después de una se cansan
+     un momento. Los fanales que se liberan de la Hoguera hacen lo mismo
+     mientras dura ese encuentro. */
+  function actualizaLuciernagas(dt, N) {
+    const propias = luciernagas.filter(l => !l.libre).length;
+    while (propias < N.luciernagas && luciernagas.filter(l => !l.libre).length < N.luciernagas) luciernagas.push({ a: Math.random() * 6.28, x: F.x, y: M.Y_FANAL - 10, cd: 0, f: Math.random() * 6 });
+    const n = luciernagas.length;
+    luciernagas.forEach((l, i) => {
+      l.cd = Math.max(0, l.cd - dt);
+      l.a += dt * (l.libre ? 1.6 : 2.4);
+      const r = l.libre ? 24 : 15, ang = l.a + (i / Math.max(1, n)) * Math.PI * 2;
+      const tx = F.x + Math.cos(ang) * r, ty = M.Y_FANAL - 12 + Math.sin(ang) * r * 0.45;
+      const k = 1 - Math.exp(-dt * (l.libre ? 3 : 8));
+      l.x += (tx - l.x) * k; l.y += (ty - l.y) * k;
+    });
   }
 
   /* El radio de la luz de la llama ahora: el del acto, con las llamas que
@@ -736,7 +869,7 @@
     const vidas = P ? Math.pow(Math.max(1, P.llamas) / 3, 0.22) : 1;
     const tiembla = 1 + Math.sin(tMusica * 13) * 0.025 + Math.sin(tMusica * 7.3) * 0.03;
     const apagando = F && F.apagado ? Math.max(0, 1 - F.apagado / 1.4) : 1;
-    return (base + (F ? F.radioExtra : 0)) * vidas * tiembla * (1 + pulsoLuz * 0.07) * fx.eclipse * apagando;
+    return (base + (F ? F.radioExtra : 0)) * vidas * tiembla * (1 + pulsoLuz * 0.07) * fx.eclipse * apagando * naveF().luz;
   }
 
   /* ================================================================
@@ -747,7 +880,9 @@
     jefe = { tipo, vida: M.vidaJefe(j), max: M.vidaJefe(j), x: W / 2, y: -50, t: 0, cd: 2.6, ataque: null, flash: 0, entrando: 2.6, fuerza: j.fuerza || 1, cuadro: 0, muerto: 0, alfa: 1 };
     if (tipo === "faro") { jefe.orbita = Array.from({ length: 14 }, (_, i) => ({ a: (i / 14) * Math.PI * 2, r: 28 + (i % 2) * 5, viva: true, f: Math.random() * 6 })); jefe.respawn = 0; }
     if (tipo === "esfinge") { jefe.casaY = 82; jefe.visible = 0.4; }
+    if (tipo === "hoguera") { jefe.orbita = Array.from({ length: 8 }, (_, i) => ({ a: (i / 8) * Math.PI * 2, r: 36, viva: true, f: Math.random() * 6 })); jefe.libres = 0; }
     if (tipo === "alba") { jefe.dist = M.DISTANCIA_ALBA; jefe.vida = 1; jefe.max = 1; jefe.entrando = 0; jefe.y = 20; jefe.x = W - F.x; jefe.tSombra = 4; }
+    jefe.furia = j.furia || 1;                                         // el augurio de los grandes
     const info = R.JEFES[tipo];
     if (tipo !== "alba") {
       $("jefeEpiteto").textContent = info.epiteto; $("jefeTitulo").textContent = info.nombre;
@@ -763,13 +898,20 @@
   function golpeaJefe(b) {
     if (!jefe || jefe.muerto || b.tocados.has(jefe)) return false;
     const t = jefe.tipo;
-    if (t === "faro") {
+    if (t === "faro" || t === "hoguera") {
+      // El enjambre que cubre al Faro, o los fanales presos en la Hoguera.
       for (const o of jefe.orbita) if (o.viva) {
         const ox = jefe.x + Math.cos(o.a) * o.r, oy = jefe.y + Math.sin(o.a) * o.r * 0.7;
         if (Math.abs(b.x - ox) < 4.5 && Math.abs(b.y - oy) < 4) {
           o.viva = false; P.aciertosJ++; P.stats.aciertos++; anota("V", b); subeNota(b.afinado);
           suma(15 * multiplicador(), ox, oy); musica.sfx.muerte(ox, ++P.cadena, false);
-          chispas(ox, oy, 8, ["#a9d6a2", "#e6f2d8"], 35, 0.5, "polvo");
+          if (t === "faro") chispas(ox, oy, 8, ["#a9d6a2", "#e6f2d8"], 35, 0.5, "polvo");
+          else {
+            // Un fanal liberado: se suelta del fuego y viene a remar contigo.
+            jefe.libres++; chispas(ox, oy, 12, ["#fff0c0", "#ffd070"], 40, 0.6);
+            luciernagas.push({ a: Math.random() * 6.28, x: ox, y: oy, cd: 0, f: Math.random() * 6, libre: true });
+            avisa(jefe.libres === 8 ? "Los soltaste a todos" : "Un fanal se soltó");
+          }
           return true;
         }
       }
@@ -786,10 +928,13 @@
       }
       return false;
     }
-    const caja = { nodriza: [20, 14, 0], faro: [11, 11, 2], esfinge: [14, 13, 0] }[t];
+    const caja = { nodriza: [20, 14, 0], faro: [11, 11, 2], esfinge: [14, 13, 0], casco: [22, 12, -2], crisalida: jefe.imago ? [22, 12, 0] : [11, 18, 2], hoguera: [20, 14, 2] }[t];
     if (jefe.entrando > 0 || (t === "esfinge" && jefe.oculta)) return false;
     if (Math.abs(b.x - jefe.x) < caja[0] && Math.abs(b.y - (jefe.y + caja[2])) < caja[1]) {
-      jefe.vida -= b.dano; jefe.flash = 0.07; b.tocados.add(jefe);
+      // La Hoguera se defiende con los fanales que tiene presos: mientras
+      // queden cinco o más, el fuego se come la mitad de cada golpe.
+      const escudo = t === "hoguera" && jefe.orbita.filter(o => o.viva).length >= 5 ? 0.5 : 1;
+      jefe.vida -= b.dano * escudo; jefe.flash = 0.07; b.tocados.add(jefe);
       P.aciertosJ++; P.stats.aciertos++; anota("X", b); subeNota(b.afinado);
       suma(5 * multiplicador(), null, null);
       musica.sfx.jefeGolpe(); chispas(b.x, b.y, 4, ["#ffffff", "#ffd27a"], 30, 0.3);
@@ -804,12 +949,17 @@
   function actualizaJefe(dt) {
     if (!jefe) return;
     jefe.t += dt; jefe.flash = Math.max(0, jefe.flash - dt);
-    if (jefe.muerto) { jefe.muerto += dt; return; }
+    if (jefe.muerto) {
+      jefe.muerto += dt;
+      // Los fanales que seguían presos en la Hoguera se sueltan y se van, cada uno por su lado.
+      if (jefe.tipo === "hoguera") for (const o of jefe.orbita) { o.r += 34 * dt; o.a += dt * 0.3; }
+      return;
+    }
     // Con el fanal apagado, el jefe se queda quieto: ya no hay a quién atacar.
     if (estado === "muriendo" || estado === "fin") { jefe.ataque = null; jefe.haz = null; jefe.pista = null; F.viento = 0; return; }
     if (jefe.entrando > 0) {                                           // entra despacio mientras se presenta
       jefe.entrando -= dt;
-      const casa = jefe.tipo === "faro" ? 64 : jefe.tipo === "esfinge" ? jefe.casaY : 74;
+      const casa = { faro: 64, esfinge: jefe.casaY, casco: 66, crisalida: 78, hoguera: 62 }[jefe.tipo] || 74;
       jefe.y = lerp(jefe.y, casa, 1 - Math.exp(-dt * 2.2));
       return;
     }
@@ -817,11 +967,14 @@
     else if (jefe.tipo === "faro") faro(dt);
     else if (jefe.tipo === "esfinge") esfinge(dt);
     else if (jefe.tipo === "alba") alba(dt);
+    else if (jefe.tipo === "casco") casco(dt);
+    else if (jefe.tipo === "crisalida") crisalida(dt);
+    else if (jefe.tipo === "hoguera") hoguera(dt);
   }
   /* El planificador de ataques: elige uno, lo anuncia y lo deja correr. */
   function planifica(dt, elegir, enfriar) {
     if (jefe.ataque) return;
-    jefe.cd -= dt * (jefe.fuerza > 1 ? Math.min(1.6, jefe.fuerza) : 1);
+    jefe.cd -= dt * (jefe.fuerza > 1 ? Math.min(1.6, jefe.fuerza) : 1) * (jefe.furia || 1);
     if (jefe.cd > 0) return;
     jefe.ataque = { nombre: elegir(), t: 0, hecho: 0 };
     jefe.cd = enfriar[faseJefe()];
@@ -1014,6 +1167,156 @@
     }
     if (jefe.dist <= 0 && estado === "juego") cruce();
   }
+  /* El Casco: un fanal hundido que todavía arde. Tira el ancla (marca la
+     columna antes), te arrastra hacia él con la resaca, suelta pecios que
+     al caer se vuelven cascos chicos (escudos nuevos) y, al final, burbujas
+     que revientan en un anillo de escamas. */
+  function casco(dt) {
+    const f = faseJefe();
+    jefe.x = W / 2 + Math.sin(jefe.t * 0.35) * 60;
+    jefe.y = 66 + Math.sin(jefe.t * 0.8) * 3;
+    jefe.cuadro = Math.floor(jefe.t * 2) & 1;
+    planifica(dt, () => {
+      const op = ["ancla", "resaca", "pecios", "ancla"].concat(f >= 1 ? ["burbujas"] : []).concat(f === 2 ? ["burbujas", "ancla"] : []);
+      return op[Math.floor(Math.random() * op.length)];
+    }, [2.0, 1.6, 1.3]);
+    const a = jefe.ataque;
+    F.viento = 0;
+    if (!a) return;
+    a.t += dt;
+    if (a.nombre === "ancla") {
+      if (a.x == null) { a.x = clamp(F.x + azar(-6, 6), 12, W - 12); a.n = [1, 1, 2][f]; a.i = 0; }
+      jefe.marcaX = a.x;
+      if (a.t > 0.85 && !a.suelta) { a.suelta = 1; anclas.push({ x: a.x, y: jefe.y + 16, vy: 0, sube: 0, t: 0 }); musica.sfx.ancla(); sacude(0.15); }
+      if (a.suelta && !anclas.length) {
+        if (++a.i < a.n) { a.x = clamp(F.x + azar(-10, 10), 12, W - 12); a.t = 0.2; a.suelta = 0; }
+        else { jefe.marcaX = null; jefe.ataque = null; }
+      }
+    } else if (a.nombre === "resaca") {
+      if (a.t > 0.6 && a.t < 2.3) {
+        F.viento = clamp(jefe.x - F.x, -1, 1) * (110 + f * 30);
+        if (Math.random() < 0.5) particulas.push({ x: azar(0, W), y: azar(190, 300), vx: Math.sign(jefe.x - F.x || 1) * azar(80, 140), vy: 0, vida: 0.9, max: 0.9, col: "#7aa8a0", tipo: "viento" });
+        a.acum = (a.acum || 0) + dt;
+        if (a.acum > 0.55) { a.acum = 0; abanico(jefe.x, jefe.y + 18, 3, 0.35, 74); }
+      }
+      if (a.t > 2.4) jefe.ataque = null;
+    } else if (a.nombre === "pecios") {
+      if (a.t > 0.5 && !a.hecho) {
+        a.hecho = 1; musica.sfx.aleteo();
+        for (let i = 0; i < 2 + f; i++) escamas.push(nuevaEscama(jefe.x + azar(-14, 14), jefe.y + 10, azar(-45, 45), azar(-60, -25), { pecio: true, g: 80, jefe: true }));
+      }
+      if (a.t > 0.9) jefe.ataque = null;
+    } else if (a.nombre === "burbujas") {
+      if (a.t > 0.5 && !a.hecho) {
+        a.hecho = 1;
+        for (let i = 0; i < 2 + f; i++) escamas.push(nuevaEscama(jefe.x + (i - 1) * 22, jefe.y + 16, (i - 1) * 10, 38, { burbuja: true, revienta: azar(170, 215), jefe: true, estilo: 6 }));
+      }
+      if (a.t > 0.9) jefe.ataque = null;
+    }
+  }
+  /* El ancla: cae recta, rompe lo que pisa y vuelve a subir despacio. */
+  function actualizaAnclas(dt) {
+    for (let i = anclas.length - 1; i >= 0; i--) {
+      const n = anclas[i];
+      n.t += dt;
+      if (!n.sube) {
+        n.vy = Math.min(n.vy + 520 * dt, 300); n.y += n.vy * dt;
+        const hit = naufragioEn(n.x, n.y + 6);
+        if (hit) erosiona(hit.n, hit.lx, hit.ly, 4);
+        if (estado === "juego" && Math.abs(n.x - F.x) < 8 && n.y + 6 > M.Y_FANAL - 8 && n.y < M.Y_FANAL + 4) golpeFanal("ancla");
+        if (n.y > H - 10) { n.sube = 1; sacude(0.2); chispas(n.x, H - 4, 10, ["#7aa8a0", "#d0f0e8"], 50, 0.6); }
+      } else {
+        n.y -= 110 * dt;
+        if (!jefe || n.y < (jefe ? jefe.y + 16 : 0)) anclas.splice(i, 1);
+      }
+    }
+  }
+
+  /* La Crisálida: cuelga de un hilo y late. Baja hilos de seda (enredan),
+     suelta crías que caen hacia la luz y lanza un giro de escamas. Al
+     final se abre: sale la imago, más rápida, que sacude polvo de las alas. */
+  function crisalida(dt) {
+    const f = faseJefe();
+    if (f === 2 && !jefe.imago) {
+      jefe.imago = true; relampago("#fff0f8", 0.4); sacude(0.3); musica.sfx.cruce(); avisa("Se abrió el capullo");
+      chispas(jefe.x, jefe.y, 40, ["#f2ece2", "#f0a8c8"], 70, 1.2, "polvo");
+    }
+    const vel = jefe.imago ? 0.7 : 0.45, amp = jefe.imago ? 80 : 46;
+    jefe.x = W / 2 + Math.sin(jefe.t * vel) * amp;
+    jefe.y = 78 + Math.sin(jefe.t * (jefe.imago ? 2.4 : 1.1)) * (jefe.imago ? 6 : 2);
+    jefe.cuadro = Math.floor(jefe.t * (jefe.imago ? 9 : 2.5)) % 3;
+    planifica(dt, () => {
+      const op = jefe.imago ? ["polvo", "giro", "eclosion", "hilos", "polvo"] : ["hilos", "eclosion", "giro", "hilos"];
+      return op[Math.floor(Math.random() * op.length)];
+    }, [2.1, 1.7, 1.2]);
+    const a = jefe.ataque;
+    if (!a) return;
+    a.t += dt;
+    if (a.nombre === "hilos") {
+      if (!a.xs) { const n = [3, 4, 5][f]; a.xs = Array.from({ length: n }, (_, i) => clamp((i === 0 ? F.x : azar(14, W - 14)) + azar(-4, 4), 10, W - 10)); jefe.marcasHilo = a.xs; }
+      if (a.t > 0.8 && !a.hecho) { a.hecho = 1; jefe.marcasHilo = null; for (const x of a.xs) hilos.push({ x, y0: 0, t: 0, dur: 3.2, largo: 0, gotea: 0 }); musica.sfx.barrido(0.6); }
+      if (a.t > 1.1) jefe.ataque = null;
+    } else if (a.nombre === "eclosion") {
+      if (a.t > 0.5 && !a.hecho) {
+        a.hecho = 1;
+        for (let i = 0; i < 3 + f; i++) larvas.push({ x: jefe.x + azar(-8, 8), y: jefe.y + 8, vx: azar(-60, 60), vy: azar(-30, -5), t: 0, vida: 1, f: Math.random() * 6, acto: 7 });
+      }
+      if (a.t > 0.8) jefe.ataque = null;
+    } else if (a.nombre === "giro") {
+      if (a.t > 0.4) { a.acum = (a.acum || 0) + dt; while (a.acum > 0.1) { a.acum -= 0.1; const ang = a.t * 4.2; escamas.push(nuevaEscama(jefe.x, jefe.y + 10, Math.sin(ang) * 58, 34 + Math.abs(Math.cos(ang)) * 38, { jefe: true, estilo: 7 })); } }
+      if (a.t > 1.9) jefe.ataque = null;
+    } else if (a.nombre === "polvo") {
+      if (a.t > 0.45 && !a.hecho) { a.hecho = 1; abanico(jefe.x, jefe.y + 12, 11, 1.05, 78, { estilo: 7 }); musica.sfx.aleteo(); }
+      if (a.t > 0.75) jefe.ataque = null;
+    }
+  }
+
+  /* La Hoguera: cuelga del cielo hecha de fanales que arden juntos. Ocho
+     arden presos a su alrededor: tirarles los suelta (y vienen contigo),
+     y mientras queden cinco el fuego se come la mitad de cada golpe. Ataca
+     con columnas de fuego (marcadas antes), una fuente de brasas y su
+     abrazo, que te tira hacia ella. */
+  function hoguera(dt) {
+    const f = faseJefe();
+    jefe.x = W / 2 + Math.sin(jefe.t * 0.25) * 30;
+    jefe.y = 62 + Math.sin(jefe.t * 1.3) * 2;
+    jefe.cuadro = Math.floor(jefe.t * 8) % 3;
+    for (const o of jefe.orbita) o.a += dt * (0.6 + f * 0.25);
+    planifica(dt, () => {
+      const op = ["llamarada", "brasas", "abrazo", "llamarada"].concat(f === 2 ? ["brasas", "llamarada"] : []);
+      return op[Math.floor(Math.random() * op.length)];
+    }, [2.0, 1.6, 1.25]);
+    const a = jefe.ataque;
+    F.viento = 0;
+    if (!a) return;
+    a.t += dt;
+    if (a.nombre === "llamarada") {
+      if (!a.xs) {
+        const n = [2, 3, 3][f];
+        a.xs = [clamp(F.x + azar(-6, 6), 10, W - 10)];
+        while (a.xs.length < n) { const x = azar(14, W - 14); if (a.xs.every(y => Math.abs(y - x) > 30)) a.xs.push(x); }
+        a.dur = [1.1, 1.2, 1.4][f];
+      }
+      if (a.t < 0.95) columnas = a.xs.map(x => ({ x, aviso: true }));
+      else if (a.t < 0.95 + a.dur) {
+        if (!a.sono) { a.sono = 1; musica.sfx.llamarada(a.dur); sacude(0.12); }
+        columnas = a.xs.map(x => ({ x, aviso: false }));
+        // Un casco encima te da sombra.
+        for (const c of columnas) if (estado === "juego" && Math.abs(c.x - F.x) < 7 && !naufragioEn(F.x, M.Y_NAUFRAGIOS + 2)) golpeFanal("llamarada");
+      } else { columnas = []; jefe.ataque = null; }
+    } else if (a.nombre === "brasas") {
+      if (a.t > 0.5) { a.acum = (a.acum || 0) + dt; while (a.acum > 0.12) { a.acum -= 0.12; escamas.push(nuevaEscama(jefe.x + azar(-10, 10), jefe.y + 14, azar(-75, 75), azar(-90, -40), { ascua: true, g: 75, jefe: true, estilo: 8 })); } }
+      if (a.t > 0.5 + [1, 1.3, 1.6][f]) jefe.ataque = null;
+    } else if (a.nombre === "abrazo") {
+      if (a.t > 0.5 && a.t < 2.4) {
+        F.viento = clamp(jefe.x - F.x, -1, 1) * (100 + f * 30);
+        a.acum = (a.acum || 0) + dt;
+        if (a.acum > 0.7) { a.acum = 0; abanico(jefe.x, jefe.y + 16, 6 + f, 1.2, 62, { estilo: 8 }); }
+      }
+      if (a.t > 2.5) jefe.ataque = null;
+    }
+  }
+
   /* Las nubes de ceniza: si alcanzan el fanal, la llama se ahoga un
      momento (la luz se achica), sin quitar ninguna llama. */
   function actualizaCenizas(dt) {
@@ -1044,6 +1347,7 @@
     jefe.muerto = 0.001; jefe.vida = 0;
     escamas = escamas.filter(e => !e.jefe);
     larvas.forEach(l => (l.vida = 0));
+    hilos = [];
     fx.eclipseObj = 1; F.viento = 0;
     anota("j");
     suma(M.PUNTOS_JEFE[jefe.tipo] * (P.j.vuelta ? 1 + 0.25 * P.j.vuelta : 1), jefe.x, jefe.y, true);
@@ -1054,8 +1358,10 @@
     $("jefeBarra").hidden = true;
     musica.estado({ jefe: null });
     apagaEstrella();
-    if (jefe.tipo === "faro" && P.modo === "travesia") programa(revelacion, 1.4);
-    else if (jefe.tipo === "esfinge" && P.modo === "travesia") { apagaTodas(); programa(terminaJornada, 3.6); }
+    anclas = []; columnas = []; jefe.marcaX = null; jefe.marcasHilo = null;
+    if (jefe.tipo === "faro" && enHistoria()) programa(revelacion, 1.4);
+    else if (jefe.tipo === "esfinge" && enHistoria()) { apagaTodas(); programa(terminaJornada, 3.6); }
+    else if (jefe.tipo === "hoguera" && enHistoria()) programa(finalHoguera, 2.6);
     else programa(terminaJornada, 2.2);
   }
   /* Al morir la Esfinge se apagan las estrellas que quedan: en el cielo no
@@ -1091,6 +1397,7 @@
      ================================================================ */
   function limpiaEntidades() {
     polillas = []; balas = []; escamas = []; poderes = []; larvas = []; lumbres = []; sombras = []; cenizas = []; msj = null; jefe = null;
+    hilos = []; anclas = []; columnas = []; luciernagas = luciernagas.filter(l => !l.libre);
     $("jefeBarra").hidden = true; fx.eclipseObj = 1; F.viento = 0;
   }
   function iniciaJornada(n) {
@@ -1099,10 +1406,15 @@
     P.sinDanio = true; P.disparosJ = 0; P.aciertosJ = 0; P.fragJ = []; P.ecoJ = []; P.ecoMostrar = null; P.terminando = 0;
     P.fuegoAcum = 0; P.picadaAcum = 0; P.msjK = 0;
     limpiaEntidades();
-    naufragios = j.tipo === "lumbre" || j.jefe === "alba" ? [] : creaNaufragios(actoVisual(j));
+    naufragios = j.tipo === "lumbre" || j.jefe === "alba" ? [] : creaNaufragios(actoVisual(j), j.cascos || (j.jefe === "casco" ? 6 : 0));
+    // Lo que trae el fanal desde el taller.
+    const N = naveF();
+    if (N.campana) F.campana = 1;
+    F.campanaT = 0; F.enredo = 0; F.pulsoT = 0;
+    P.hiloAcum = 0;
     if (j.tipo === "oleada") { empiezaOleada(j); P.mensajerasRest = j.mensajeras; P.tMensajera = azar(9, 17); }
     else if (j.tipo === "lumbre") { empiezaLumbres(); P.mensajerasRest = j.mensajeras; P.tMensajera = azar(5, 9); }
-    else empiezaJefe(j);
+    else { empiezaJefe(j); P.mensajerasRest = 0; }                    // la Mensajera de la oleada anterior no cruza el jefe
     if (j.tipo === "lumbre") programa(() => musica.estado({ modo: "transito" }), 0.05); // nadie dispara: la música tampoco
     estado = "juego";
     musica.estado({ modo: "juego", jefe: j.tipo === "jefe" ? j.jefe : null, vida: 1, tension: 0, peligro: 0, latido: 1, cerca: 0 });
@@ -1115,13 +1427,15 @@
   function terminaJornada() {
     if (!P || estado === "fin" || estado === "muriendo") return;
     const b = M.bonusJornada({ acto: P.j.acto, sinDanio: P.sinDanio, disparos: P.disparosJ, aciertos: P.aciertosJ });
-    if (P.j.tipo !== "lumbre") suma(b.total);
+    const conBonus = P.j.tipo !== "lumbre" && P.j.jefe !== "alba";
+    if (conBonus) suma(b.total);
     P.completadas = Math.max(P.completadas, P.jornada);
+    if (P.j.tipo === "jefe") P.brasas++;                               // solo vencer a un jefe da una brasa para el taller
     if (P.j.tipo === "lumbre") P.piedadJ = P.apagadasLumbre === 0;
     regCierra("c");
     // Las cartas leídas en la jornada quedan en la bitácora para siempre.
     if (P.fragJ.length || P.ecoJ.length) { prog.frag = [...new Set([...prog.frag, ...P.fragJ])].sort((a, c) => a - c); prog.ecos = [...new Set([...prog.ecos, ...P.ecoJ])].sort((a, c) => a - c); guardaProgreso(); }
-    transito(P.jornada + 1, P.j.tipo === "lumbre" ? null : b);
+    transito(P.jornada + 1, conBonus ? b : null);
   }
 
   /* El tránsito: se rema hacia la próxima jornada. Se lee la bitácora, las
@@ -1137,37 +1451,126 @@
       document.documentElement.dataset.acto = actoSig;
       musica.enmudece(1.4);
       programa(() => { musica.ponEtapa(etapaMusical(jSig), true); if (estado === "relato") musica.estado({ modo: "transito", jefe: null }); }, 1.5);
-      if (actoSig === 5 || P.modo === "sinfin") cielo.estrellas = cielo.estrellas.concat(creaEstrellas(30, nSig)).slice(-200);
+      if (actoSig >= 5) cielo.estrellas = cielo.estrellas.concat(creaEstrellas(30, nSig)).slice(-260);
     } else {
-      if (P.modo === "sinfin") musica.ponEtapa(etapaMusical(jSig));
+      if (jSig.acto === 5) musica.ponEtapa(etapaMusical(jSig));
       musica.estado({ modo: "transito", jefe: null });
     }
     // El punto de control: al empezar un acto de la historia.
     if (P.modo === "travesia" && Object.values(M.INICIO_ACTO).includes(nSig) && nSig > 1) {
-      prog.punto = { j: nSig, puntos: P.puntos, llamas: P.llamas, luces: P.luces, at: Date.now() };
+      prog.punto = { j: nSig, puntos: P.puntos, llamas: P.llamas, luces: P.luces, mej: Object.assign({}, P.mej), br: P.brasas, at: Date.now() };
       // Con la prueba de lo jugado: sin ella, seguir desde aquí no cuenta.
       if (P.prueba && !P.legado) prog.punto.pr = Object.assign({ v: P.prueba.v, m: "t", id: P.prueba.id, J: P.prueba.J.slice() }, P.tocada ? { x: 1 } : {});
       guardaProgreso();
     }
     const lineas = [];
     if (cambia) {
-      const a = jSig.acto === 5 ? R.ACTO_SINFIN : R.ACTOS[jSig.acto - 1];
-      ponActo(jSig.acto === 5 ? "" : "ACTO " + ["I", "II", "III", "IV"][jSig.acto - 1], a.nombre, a.lema);
+      const a = R.actoInfo(jSig.acto);
+      const num = jSig.acto === 5 ? "" : (nSig === M.JORNADA_ALBA + 1 ? R.PARTE_DOS.num + " · " : "") + "ACTO " + M.ROMANO_ACTO[jSig.acto];
+      ponActo(num, a.nombre, a.lema);
     } else ponActo("", "", "");
-    const caido = P.jornada && P.j && P.j.tipo === "jefe" && R.JEFES[P.j.jefe] ? R.JEFES[P.j.jefe].cae : "";
+    const caido = P.jornada && P.j && P.j.tipo === "jefe" && R.JEFES[P.j.jefe] && P.jornada <= M.JORNADAS_HISTORIA ? R.JEFES[P.j.jefe].cae : "";
     if (caido && P.modo === "travesia") lineas.push({ t: caido });
     lineas.push({ t: R.bitacora(nSig), cls: "bitacora" });
     if (jSig.jefe === "alba") lineas.push({ t: R.AVISO_ALBA, cls: "grande" });
-    const cartas = P.modo === "travesia" ? P.fragJ.map(i => ({ n: R.romano(i + 1), t: R.FRAGMENTOS[i].texto })) : P.ecoMostrar != null ? [{ n: "~", t: R.ECOS[P.ecoMostrar] }] : [];
+    if (jSig.jefe === "hoguera" && nSig <= M.JORNADAS_HISTORIA) lineas.push({ t: R.AVISO_HOGUERA, cls: "grande" });
+    // El augurio: lo que la noche aprendió para esta jornada.
+    const aug = M.augurioDe(nSig);
+    if (aug) lineas.push({ t: R.AUGURIO_PRE + " " + R.AUGURIOS[aug].toLowerCase(), cls: "augurio" });
+    const cartas = P.fragJ.length ? P.fragJ.map(i => ({ n: R.romano(i + 1), t: R.FRAGMENTOS[i].texto })) : P.ecoMostrar != null ? [{ n: "~", t: R.ECOS[P.ecoMostrar] }] : [];
     $("capaRelato").classList.add("transito");                         // se ve el cielo pasar mientras se lee
-    muestraRelato(lineas, cartas, bonus && bonus.total ? `${bonus.sinDanio ? "SIN DAÑO +" + bonus.sinDanio + " · " : ""}PUNTERÍA +${bonus.precision}` : "", cambia ? 1.4 : 0.4);
-    relatoSigue = () => iniciaJornada(nSig);
-    relatoAuto = 9 + cartas.length * 4 + (cambia ? 3 : 0);
+    const brasa = P.brasas > 0 ? `🔥 ${P.brasas} ${P.brasas === 1 ? "BRASA" : "BRASAS"} PARA EL TALLER` : "";
+    const textoBonus = [bonus && bonus.total ? `${bonus.sinDanio ? "SIN DAÑO +" + bonus.sinDanio + " · " : ""}PUNTERÍA +${bonus.precision}` : "", brasa].filter(Boolean).join(" · ");
+    muestraRelato(lineas, cartas, textoBonus, cambia ? 1.4 : 0.3, 1.2);
+    // Después del relato, el taller (si hay brasas); después, a remar.
+    relatoSigue = () => (P.brasas > 0 ? abreTaller(() => iniciaJornada(nSig)) : iniciaJornada(nSig));
+    relatoAuto = 6 + cartas.length * 4 + (cambia ? 3 : 0);
     pintaHud(true);
   }
   function etapaMusical(j) {
     if (j.acto === 5) return { sinfin: Math.floor((j.n - M.JORNADAS_HISTORIA - 1) / 4) };
     return j.acto;
+  }
+
+  /* ================================================================
+     El taller: las brasas se gastan en mejoras (motor.js: compra)
+     ================================================================
+     Se abre en el tránsito, entre el relato y la jornada siguiente. Lo que
+     se compra queda en P.uSig y entra en la prueba al abrir la jornada
+     (regAbre): el verificador lo vuelve a comprar con la misma función. */
+  let tallerSigue = null;
+  function abreTaller(despues) {
+    estado = "taller"; tallerSigue = despues;
+    pintaTaller();
+    muestra("capaTaller");
+    // El foco va a la caja y no a un botón: quien venía con Espacio apretado
+    // desde el relato no compra nada sin querer.
+    $("capaTaller").querySelector(".caja").focus({ preventScroll: true });
+  }
+  function cierraTaller() {
+    if (estado !== "taller") return;
+    oculta("capaTaller");
+    const f = tallerSigue; tallerSigue = null;
+    estado = "relato";
+    if (f) f();
+  }
+  function compraTaller(codigo) {
+    if (estado !== "taller" || !P) return;
+    const est = { mej: P.mej, brasas: P.brasas, llamas: P.llamas };
+    const evoA = M.evolucion(P.mej, "arma"), evoN = M.evolucion(P.mej, "nave");
+    const no = M.compra(est, codigo);
+    if (no) { avisa(no.charAt(0).toUpperCase() + no.slice(1)); musica.sfx.ui(0); return; }
+    P.brasas = est.brasas; P.llamas = est.llamas; P.uSig += codigo; P.gastadas++;
+    pintaLlamas();
+    const k = M.POR_CODIGO[codigo];
+    musica.sfx.brasa(k ? P.mej[k] : 1);
+    anillo(F.x, M.Y_FANAL - 4, "#ffb060", 16); chispas(F.x, M.Y_FANAL - 8, 10, ["#ffd27a", "#ff9a3c"], 40, 0.6);
+    // ¿Evolucionó algo?
+    for (const [rama, antes] of [["arma", evoA], ["nave", evoN]]) {
+      const ahora = M.evolucion(P.mej, rama);
+      if (ahora > antes) {
+        const e = R.EVOLUCIONES[rama][ahora];
+        avisa("✦ " + (rama === "arma" ? "La llama" : "El fanal") + " evoluciona: " + e.nombre);
+        musica.sfx.evolucion(); relampago("#fff0c8", 0.45); sacude(0.2);
+        chispas(F.x, M.Y_FANAL - 6, 40, ["#fff6d8", "#ffd27a", "#ff9a3c"], 90, 1.2);
+        $("capaTaller").classList.remove("evoluciona"); void $("capaTaller").offsetWidth; $("capaTaller").classList.add("evoluciona");
+      }
+    }
+    pintaTaller();
+  }
+  /* Pinta el taller: las dos ramas con su evolución, las cuatro mejoras de
+     cada una con sus niveles y lo que hará el próximo, y la llama. */
+  function pintaTaller() {
+    if (!P) return;
+    $("tallerBrasas").textContent = P.brasas === 1 ? "1 brasa" : P.brasas + " brasas";
+    for (const rama of ["arma", "nave"]) {
+      const caja = $(rama === "arma" ? "tallerArma" : "tallerNave");
+      caja.replaceChildren();
+      const evo = M.evolucion(P.mej, rama), pts = M.puntosRama(P.mej, rama), sig = M.EVOLUCION[evo];
+      const h = document.createElement("h3");
+      h.textContent = R.RAMAS[rama];
+      const ev = document.createElement("p"); ev.className = "evo";
+      const nom = document.createElement("b"); nom.textContent = R.EVOLUCIONES[rama][evo].nombre;
+      ev.append(nom, document.createTextNode(sig ? ` · evoluciona en ${sig - pts}` : " · forma final"));
+      ev.title = R.EVOLUCIONES[rama][evo].d;
+      caja.append(h, ev);
+      for (const k of M.LISTA_MEJORAS) {
+        if (M.MEJORAS[k].rama !== rama) continue;
+        const nivel = P.mej[k], max = M.MEJORAS[k].max, info = R.MEJORAS[k];
+        const b = document.createElement("button");
+        b.type = "button"; b.className = "mejora"; b.dataset.codigo = M.MEJORAS[k].codigo;
+        b.disabled = nivel >= max || P.brasas < 1;
+        const n = document.createElement("span"); n.className = "nom"; n.textContent = info.nombre;
+        const pips = document.createElement("span"); pips.className = "pips"; pips.textContent = "●".repeat(nivel) + "○".repeat(max - nivel);
+        const d = document.createElement("span"); d.className = "desc"; d.textContent = nivel >= max ? "Al máximo." : info.d[nivel];
+        b.append(n, pips, d);
+        caja.appendChild(b);
+      }
+    }
+    const l = $("tallerLlama");
+    l.disabled = P.brasas < M.COSTO_LLAMA || P.llamas >= topeLlamas();
+    l.querySelector(".desc").textContent = P.llamas >= topeLlamas() ? "Las llamas están llenas (" + P.llamas + ")." : R.LLAMA_TALLER.d + " (" + P.llamas + " de " + topeLlamas() + ")";
+    $("tallerSeguir").textContent = P.brasas > 0 ? "Guardar las brasas y remar" : "Remar";
   }
   function ponActo(num, nombre, lema) { $("relActo").textContent = num; $("relNombre").textContent = nombre; $("relLema").textContent = lema; $("relActo").hidden = !num; $("relNombre").hidden = !nombre; $("relLema").hidden = !lema; }
   /* Muestra el relato: las líneas (con su clase), las cartas y el bonus.
@@ -1234,7 +1637,6 @@
     musica.sfx.cruce();
     musica.estado({ modo: "final", jefe: null });
     cielo.lleno = 0.001;                                               // empieza la visión
-    P.completadas = M.JORNADAS_HISTORIA;
     const piedad = P.piedadJ;
     const lineas = R.FINAL.map(t => ({ t }));
     if (piedad) lineas.push({ t: R.FINAL_PIEDAD });
@@ -1248,11 +1650,54 @@
     anota("f");
     suma(M.PUNTOS_JEFE.alba + (P.albaGolpes === 0 ? 5000 : 0));
     prog.alba = true; if (piedad) prog.piedad = true;
-    prog.punto = { j: 0, at: Date.now() };                             // la historia terminó: se borra el punto de control
     guardaProgreso();
-    enviaResultados(true);
-    relatoSigue = () => { $("capaRelato").classList.remove("suave"); muestraFin(true); };
+    // La travesía no termina aquí: después de la orden, la otra orilla.
+    relatoSigue = () => {
+      $("capaRelato").classList.remove("suave");
+      P.finalViendo = false; cielo.lleno = 0;
+      // El cielo no estaba vacío: las alas que se vieron vuelven a ser estrellas.
+      P.luces = 600; cielo.estrellas = creaEstrellas(260, 14);
+      estado = "juego"; jefe = null;
+      terminaJornada();
+    };
     estado = "relato"; P.finalViendo = true;
+  }
+
+  /* El final de la segunda parte, al apagar la Hoguera: los fanales que
+     ardían en ella se sueltan y cada uno toma su rumbo. Después, sin fin. */
+  function finalHoguera() {
+    if (!P || estado !== "juego") return;
+    estado = "final";
+    const libres = jefe ? jefe.libres : 0;
+    escamas = []; balas = []; larvas = [];
+    musica.enmudece(2.4);
+    programa(() => musica.estado({ modo: "final", jefe: null }), 2);
+    relampago("#ffe0b0", 0.6);
+    // Los fanales sueltos (y los que todavía ardían) se van cada uno por su lado.
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2;
+      chispas(W / 2 + Math.cos(a) * 30, 62 + Math.sin(a) * 18, 4, ["#ffd070", "#fff0c0"], 50, 2.2);
+    }
+    luciernagas = luciernagas.filter(l => !l.libre);
+    const lineas = R.FINAL_HOGUERA.map(t => ({ t }));
+    if (libres >= 8) lineas.push({ t: R.FINAL_HOGUERA_LIBRES });
+    lineas.push({ t: R.FINAL_HOGUERA_CIERRE }, { t: R.FINAL_HOGUERA_ORDEN, cls: "grande" });
+    ponActo("", "", "");
+    $("capaRelato").classList.add("suave");
+    muestraRelato(lineas, [], "", 1.6, 2.2);
+    R.FINAL_HOGUERA.forEach((_, i) => programa(() => musica.sfx.nota(MU.MOTIVOS.fanal[i % 7][0], 4, 0.08), 1.6 + i * 2.2));
+    relatoListo = 1.6 + lineas.length * 2.2 + 1;
+    relatoAuto = 0;
+    prog.hoguera = true; guardaProgreso();
+    relatoSigue = () => {
+      $("capaRelato").classList.remove("suave");
+      // Las luces que se soltaron quedan en el cielo.
+      P.luces += 80 + libres * 10;
+      cielo.estrellas = cielo.estrellas.concat(creaEstrellas(80, 25)).slice(-300);
+      estado = "juego"; jefe = null;
+      terminaJornada();
+    };
+    estado = "relato";
   }
 
   /* El fanal se apaga. */
@@ -1262,13 +1707,13 @@
     musica.sfx.apagado();
     musica.estado({ modo: "apagado", jefe: null });
     chispas(F.x, M.Y_FANAL - 6, 40, ["#3a2a1e", "#6a5a4a", "#9a8a7a"], 30, 2.2, "humo");
-    programa(() => { enviaResultados(false); muestraFin(false); }, 2.6);
+    programa(() => { enviaResultados(); muestraFin(); }, 2.6);
   }
   /* Manda los puntajes a la clasificación del Club. */
-  function enviaResultados(completa) {
+  function enviaResultados() {
     if (!P || P.enviado) return;
     P.enviado = true;
-    regCierra(completa ? "f" : F.apagado ? "m" : "a");
+    regCierra(F.apagado ? "m" : "a");
     const prueba = P.prueba ? FP.ajusta(JSON.parse(JSON.stringify(P.prueba))) : null;
     const cuenta = !!prueba && !P.tocada && !P.legado;                // ¿entra en la clasificación?
     if (prueba && cuenta) {
@@ -1280,7 +1725,7 @@
     const tiempo = Math.max(1, Math.round(P.tiempo * 1000));
     const cat = P.modo === "sinfin" ? "club-fanal-sinfin" : "club-fanal-travesia";
     const puntos = Math.round(P.puntos);
-    const jornadas = P.modo === "sinfin" ? P.completadas : (completa ? M.JORNADAS_HISTORIA : P.completadas);
+    const jornadas = P.completadas;
     const m = prog.mejor;
     if (Club && cuenta) {
       if (puntos >= 1) Club.result({ categoria: cat, puntos: Math.min(1000000, puntos), tiempo }, prueba);
@@ -1310,6 +1755,7 @@
     if (modo === "travesia" && desde && desde.j > 1) {               // desde el punto de control
       P.puntos = desde.puntos || 0; P.llamas = Math.max(1, desde.llamas || 3); P.luces = desde.luces || 200; P.reintentos = 1;
       P.completadas = desde.j - 1;
+      P.mej = M.limpiaMejoras(desde.mej); P.brasas = Math.max(0, desde.br | 0);
       // Lo jugado hasta el punto de control viaja con él: la prueba sigue
       // desde ahí. Sin eso (un punto de una versión anterior, o tocado a
       // mano) la travesía se juega igual, pero no cuenta.
@@ -1318,12 +1764,15 @@
       if (ultima && !pr.x && ultima.n === desde.j - 1) {
         const prueba = { v: FP.VERSION, m: "t", id: pr.id, u: cuentaUrl, k: pr.J.length, J: pr.J.slice() };
         const r = FP.rehace(prueba);
-        if (!r.motivo) { P.prueba = prueba; P.puntos = r.puntos; P.llamas = Math.max(1, ultima.v); sigue = true; }
+        // Las mejoras y las brasas salen de la prueba misma (lo que se compró en cada taller).
+        if (!r.motivo) { P.prueba = prueba; P.puntos = r.puntos; P.llamas = Math.max(1, ultima.v); P.mej = r.mej; P.brasas = r.brasas; sigue = true; }
       }
       if (!sigue) { P.legado = true; if (pr && pr.x) P.tocada = true; }
     }
     const primera = modo === "sinfin" ? M.JORNADAS_HISTORIA + 1 : desde && desde.j > 1 ? desde.j : 1;
+    if (modo === "sinfin") P.luces = 600;
     cielo.estrellas = creaEstrellas(Math.min(P.luces, 430), modo === "sinfin" ? 99 : 7);
+    luciernagas = [];
     creaMotas();
     if (Club) Club.category(modo === "sinfin" ? "club-fanal-sinfin" : "club-fanal-travesia");
     oculta("capaPortada"); oculta("capaFin");
@@ -1382,7 +1831,8 @@
   }
   function aPortada() {
     estado = "portada"; P = null; F = nuevoFanal(); agenda = []; limpiaEntidades();
-    for (const id of ["capaFin", "capaPausa", "capaRelato", "capaBitacora", "capaAyuda", "capaOpciones", "capaJefe"]) oculta(id);
+    for (const id of ["capaFin", "capaPausa", "capaRelato", "capaBitacora", "capaAyuda", "capaOpciones", "capaJefe", "capaTaller"]) oculta(id);
+    luciernagas = []; hilos = []; anclas = []; columnas = [];
     $("hudSup").hidden = true;
     html.classList.remove("ultima-llama");
     cielo.desde = cielo.hacia = 1; cielo.mezcla = 1; html.dataset.acto = 1;
@@ -1395,13 +1845,18 @@
   function pintaPortada() {
     const p = prog.punto, c = $("btnContinuar");
     c.hidden = !(p && p.j > 1);
-    if (!c.hidden) c.textContent = `Continuar · Acto ${["", "I", "II", "III", "IV"][Object.entries(M.INICIO_ACTO).find(([, j]) => j === p.j)?.[0] || 1]}`;
+    if (!c.hidden) c.textContent = "Continuar · " + nombrePunto(p.j);
     const s = $("btnSinFin");
-    s.disabled = !prog.alba;
-    s.textContent = prog.alba ? "Travesía sin fin" : "Travesía sin fin · se abre en el alba";
+    s.disabled = !prog.hoguera;
+    s.textContent = prog.hoguera ? "Travesía sin fin" : "Travesía sin fin · se abre al apagar la Hoguera";
     $("btnBitacora").textContent = `Bitácora · ${prog.frag.length}/${R.FRAGMENTOS.length}`;
     const m = prog.mejor;
     $("records").textContent = m.travesia || m.jornada ? `Récord ${m.travesia.toLocaleString("es-CL")} · jornada ${m.jornada}${m.sinfin ? " · sin fin " + m.sinfin.toLocaleString("es-CL") : ""}` : "";
+  }
+  /* Cómo se llama un punto de control: el acto en que cae. */
+  function nombrePunto(n) {
+    const a = M.jornada(n).acto;
+    return a === 5 ? "Sin fin" : "Acto " + M.ROMANO_ACTO[a];
   }
   function pintaBitacora() {
     const l = $("listaCartas"); l.replaceChildren();
@@ -1412,35 +1867,37 @@
       else { li.className = "perdida"; li.append(n, document.createTextNode("— carta perdida —")); }
       l.appendChild(li);
     });
-    const ve = prog.alba && prog.ecos.length > 0;
+    const ve = prog.ecos.length > 0;
     $("ecosTitulo").hidden = !ve; $("listaEcos").hidden = !ve;
     const le = $("listaEcos"); le.replaceChildren();
     if (ve) prog.ecos.forEach(i => { const li = document.createElement("li"); li.textContent = R.ECOS[i]; le.appendChild(li); });
   }
-  function muestraFin(completa) {
+  function muestraFin() {
     estado = "fin";
-    oculta("capaRelato");
+    oculta("capaRelato"); oculta("capaTaller");
     const s = P.stats, prec = s.disparos ? Math.round((s.aciertos / s.disparos) * 100) : 0, af = s.disparos ? Math.round((s.afinados / s.disparos) * 100) : 0;
-    $("finTitulo").textContent = completa ? "La travesía" : "El fanal se apagó";
-    $("finLinea").textContent = completa ? "Cruzaste el alba. La noche sigue, y ahora sabes lo que hay en ella." : R.APAGADO[Math.floor(Math.random() * R.APAGADO.length)];
+    $("finTitulo").textContent = "El fanal se apagó";
+    $("finLinea").textContent = R.APAGADO[Math.floor(Math.random() * R.APAGADO.length)];
     if (P.tocada || P.legado) $("finLinea").textContent += P.tocada
       ? " (Partida de prueba: se usó __fanal, no entra en la clasificación.)"
       : " (Siguió desde un punto de control de una versión anterior, sin prueba: no entra en la clasificación.)";
     const min = Math.floor(P.tiempo / 60), seg = Math.floor(P.tiempo % 60);
     const filas = [
       ["Puntos", Math.round(P.puntos).toLocaleString("es-CL"), P.nuevoRecord],
-      ["Jornada", completa && P.modo === "travesia" ? "13 · el alba" : String(P.jornada), P.nuevaJornada],
+      ["Jornada", String(P.jornada) + (P.completadas >= M.JORNADAS_HISTORIA ? " · sin fin" : P.completadas >= M.JORNADA_ALBA ? " · la otra orilla" : ""), P.nuevaJornada],
       ["Polillas apagadas", s.apagadas], ["Precisión", prec + " %"], ["Tiros afinados", af + " %"],
       ["Mejor resonancia", "×" + s.mejorRes], ["Cartas recuperadas", s.cartas], ["Llamas perdidas", s.danios],
+      ["La llama", R.EVOLUCIONES.arma[M.evolucion(P.mej, "arma")].nombre], ["El fanal", R.EVOLUCIONES.nave[M.evolucion(P.mej, "nave")].nombre],
+      ["Brasas gastadas", P.gastadas + (P.brasas ? " (" + P.brasas + " sin gastar)" : "")],
       ["Tiempo de travesía", `${min}:${String(seg).padStart(2, "0")}`]
     ];
-    if (completa && P.modo === "travesia") filas.push(["Lumbres acogidas", P.acogidas + " de 24"]);
+    if (P.modo === "travesia" && P.completadas >= 12) filas.push(["Lumbres acogidas", P.acogidas + " de 24"]);
     const dl = $("finStats"); dl.replaceChildren();
     for (const [k, v, nuevo] of filas) { const dt = document.createElement("dt"); dt.textContent = k; const dd = document.createElement("dd"); dd.textContent = v; if (nuevo) dd.className = "nuevo"; dl.append(dt, dd); }
     const p = prog.punto;
-    $("btnReencender").hidden = completa || P.modo !== "travesia" || !(p && p.j > 1);
+    $("btnReencender").hidden = P.modo !== "travesia" || !(p && p.j > 1);
     if (!$("btnReencender").hidden) $("btnReencender").textContent = `Volver a encender · desde la jornada ${p.j}`;
-    $("btnFinSinFin").hidden = !prog.alba;
+    $("btnFinSinFin").hidden = !prog.hoguera;
     $("btnFinNueva").textContent = P.modo === "sinfin" ? "Otra travesía sin fin" : "Empezar de nuevo";
     $("btnFinNueva").dataset.accion = P.modo === "sinfin" ? "sinfin" : "nueva";
     if (P.modo === "sinfin") $("btnFinSinFin").hidden = true;
@@ -1459,16 +1916,18 @@
     if (a === "nueva") empieza("travesia", null);
     else if (a === "continuar") empieza("travesia", prog.punto);
     else if (a === "reencender") empieza("travesia", prog.punto);
-    else if (a === "sinfin") { if (prog.alba) empieza("sinfin", null); }
+    else if (a === "sinfin") { if (prog.hoguera) empieza("sinfin", null); }
+    else if (a === "taller-seguir") cierraTaller();
     else if (a === "bitacora") abrePanel("capaBitacora");
     else if (a === "ayuda") abrePanel("capaAyuda");
     else if (a === "opciones") abrePanel("capaOpciones");
     else if (a === "volver") cierraPanel();
     else if (a === "seguir") sigue();
-    else if (a === "abandonar") { if (P) { enviaResultados(false); } aPortada(); }
+    else if (a === "abandonar") { if (P) { enviaResultados(); } aPortada(); }
     else if (a === "portada") aPortada();
   });
   $("capaRelato").addEventListener("pointerdown", () => sigueRelato());
+  $("capaTaller").addEventListener("click", e => { const b = e.target.closest("[data-codigo]"); if (b && !b.disabled) compraTaller(b.dataset.codigo); });
   $("btnPausa").addEventListener("click", () => (estado === "pausa" ? sigue() : pausa()));
 
   /* ---------- Opciones y sonido ---------- */
@@ -1507,6 +1966,12 @@
       return;
     }
     if (e.code === "KeyM") { alternaSonido(); return; }
+    // En el taller: 1–8 compran las mejoras (en el orden en que se ven), 9 enciende una llama.
+    if (estado === "taller") {
+      const d = /^(Digit|Numpad)([1-9])$/.exec(e.code);
+      if (d) { e.preventDefault(); const i = +d[2] - 1; compraTaller(i < 8 ? M.MEJORAS[M.LISTA_MEJORAS[i]].codigo : M.CODIGO_LLAMA); }
+      return;                                                         // el resto del teclado es de los botones
+    }
     if (estado === "relato" && (t === "fuego" || e.code === "Enter")) { e.preventDefault(); if (!e.repeat) sigueRelato(); return; }
     if (t) {
       if (estado === "portada" || estado === "fin" || panel) return;  // en los menús, el teclado es de los botones
@@ -1521,7 +1986,7 @@
      y los paneles manda el cursor. */
   if (window.Mando) window.Mando.configura({
     botones: { a: "Space", rt: "Space", start: "KeyP", y: "KeyM" },
-    menu: () => estado === "portada" || estado === "fin" || estado === "final" || estado === "pausa" || !!panel,
+    menu: () => estado === "portada" || estado === "fin" || estado === "final" || estado === "pausa" || estado === "taller" || !!panel,
     pistas: [["dpad stickL", "remar"], ["a rt", "disparar al pulso"], ["start", "pausa"], ["y", "sonido"]],
     zonas: [{ sel: ".pie" }]
   });
@@ -1580,13 +2045,14 @@
     ponTexto("hudRes", "×" + multiplicador());
     if (!P) return;
     const j = P.j || M.jornada(Math.max(1, P.jornada));
-    const nombre = j.acto === 5 ? "SIN FIN" : R.ACTOS[j.acto - 1].nombre;
+    const nombre = j.acto === 5 ? "SIN FIN" : R.actoInfo(j.acto).nombre;
     ponTexto("hudJornada", `JORNADA ${Math.max(1, P.jornada)} · ${nombre}`);
     ponTexto("hudLuces", "✦ " + Math.max(0, P.luces));
+    ponTexto("hudBrasas", P.brasas > 0 ? "🔥 " + P.brasas : "");
     let alba;
-    if (P.modo === "sinfin") alba = "SIGUIENTE LUZ · " + R.SIGUIENTE_LUZ;
+    if (P.modo === "sinfin" || P.jornada > M.JORNADA_ALBA) alba = "SIGUIENTE LUZ · " + R.SIGUIENTE_LUZ;
     else if (jefe && jefe.tipo === "alba") alba = cielo.lleno > 0 ? "EL ALBA · CRUZADA" : "AL ALBA · " + Math.ceil(jefe.dist) + (Math.ceil(jefe.dist) === 1 ? " BRAZA" : " BRAZAS");
-    else { const q = M.JORNADAS_HISTORIA - Math.max(1, P.jornada) + 1; alba = "AL ALBA · " + q + (q === 1 ? " JORNADA" : " JORNADAS"); }
+    else { const q = M.JORNADA_ALBA - Math.max(1, P.jornada) + 1; alba = "AL ALBA · " + q + (q === 1 ? " JORNADA" : " JORNADAS"); }
     ponTexto("hudAlba", alba);
   }
   function pintaLlamas() {
@@ -1627,6 +2093,9 @@
     actualizaLarvas(dtj);
     actualizaSombras(dtj);
     actualizaCenizas(dtj);
+    actualizaHilos(dtj);
+    actualizaAnclas(dtj);
+    if (estado === "juego") derivaNaufragios(dtj);
     actualizaBalas(dtj);
     actualizaEscamas(dtj);
     // Poderes que caen.
@@ -1692,7 +2161,7 @@
     cielo.estrellas = cielo.estrellas.filter(e => e.viva || e.muere > 0);
     for (const m of cielo.motas) {
       const acto = cielo.hacia;
-      m.y += (acto === 4 ? -10 : acto === 3 ? 9 : 6) * m.z * dt + cielo.vel * m.z * 0.5 * dt;
+      m.y += (acto === 4 || acto === 6 || acto === 8 ? -10 : acto === 3 ? 9 : 6) * m.z * dt + cielo.vel * m.z * 0.5 * dt;
       m.x += Math.sin(tMusica * 0.6 + m.f) * 4 * dt;
       if (m.y > H + 2) { m.y = -2; m.x = Math.random() * W; }
       if (m.y < -2) { m.y = H + 2; m.x = Math.random() * W; }
@@ -1758,7 +2227,7 @@
     const acto = cielo.hacia, p = S.PALETAS[acto] || S.PALETAS[1];
     ex.fillStyle = p.particula;
     for (const m of cielo.motas) {
-      ex.globalAlpha = acto === 4 ? 0.7 : acto === 3 ? 0.5 : 0.35;
+      ex.globalAlpha = acto === 4 || acto === 8 ? 0.7 : acto === 3 ? 0.5 : 0.35;
       ex.fillRect(Math.floor(m.x), Math.floor(m.y), m.z > 1.2 ? 2 : 1, 1);
     }
     ex.globalAlpha = 1;
@@ -1837,6 +2306,50 @@
       if (m > 0 && !jefe.muerto) for (const [mx, my] of S.MARCAS_ESFINGE) brillo(jefe.x - 39 + mx, jefe.y - 22 + my, 7, "#e8dcc8", m * 0.9);
       if (jefe.ataque && jefe.ataque.nombre === "picada" && jefe.ataque.etapa === "marca") { lx.fillStyle = "#c7a6ff"; lx.globalAlpha = 0.18; lx.fillRect(Math.floor(jefe.x) - 1, 40, 2, H); lx.globalAlpha = 1; }
       if (jefe.pista != null) { brillo(jefe.pista, 34, 10, "#e8dcc8", 0.9); ex.fillStyle = "#e8dcc8"; ex.fillRect(jefe.pista - 3, 30, 7, 1); ex.fillRect(jefe.pista - 2, 31, 5, 1); ex.fillRect(jefe.pista - 1, 32, 3, 1); }
+    } else if (t === "casco") {
+      const img = banco.casco(jefe.cuadro, blanco);
+      ex.globalAlpha = jefe.muerto ? Math.max(0, 1 - jefe.muerto / 1.6) : 1;
+      const x0 = Math.floor(jefe.x - img.width / 2), y0 = Math.floor(jefe.y - img.height / 2 + (jefe.muerto ? jefe.muerto * 30 : 0));
+      ex.drawImage(img, x0, y0);
+      ex.globalAlpha = 1;
+      // Su llama, colgando dentro del farol: todavía arde.
+      if (!jefe.muerto || jefe.muerto < 1) { const fx0 = x0 + 26, fy0 = y0 + 30; ex.fillStyle = "#ff9a3c"; ex.fillRect(fx0 - 1, fy0 - 1, 3, 3); ex.fillStyle = "#fff0b0"; ex.fillRect(fx0, fy0 + (Math.sin(tMusica * 15) > 0 ? 1 : 0), 1, 2); }
+      if (jefe.marcaX != null && !jefe.muerto) { lx.fillStyle = "#7aa8a0"; for (let y = 50; y < H; y += 6) { lx.globalAlpha = 0.5; lx.fillRect(Math.floor(jefe.marcaX), y, 1, 2); } lx.globalAlpha = 1; }
+    } else if (t === "crisalida") {
+      const img = jefe.imago ? banco.imago(jefe.cuadro, blanco) : banco.crisalida(jefe.cuadro, blanco);
+      ex.globalAlpha = jefe.muerto ? Math.max(0, 1 - jefe.muerto / 1.4) : 1;
+      if (!jefe.imago) { ex.fillStyle = "#c8bcb0"; ex.fillRect(Math.floor(jefe.x), 0, 1, Math.max(0, Math.floor(jefe.y - img.height / 2))); }   // el hilo del que cuelga
+      ex.drawImage(img, Math.floor(jefe.x - img.width / 2), Math.floor(jefe.y - img.height / 2));
+      ex.globalAlpha = 1;
+      if (jefe.marcasHilo) { lx.fillStyle = "#f2ece2"; for (const x of jefe.marcasHilo) for (let y = 40; y < H; y += 8) { lx.globalAlpha = 0.45; lx.fillRect(Math.floor(x), y, 1, 3); } lx.globalAlpha = 1; }
+    } else if (t === "hoguera") {
+      const img = banco.hoguera(jefe.cuadro, blanco);
+      ex.globalAlpha = jefe.muerto ? Math.max(0, 1 - jefe.muerto / 2) : 1;
+      const x0 = Math.floor(jefe.x - img.width / 2), y0 = Math.floor(jefe.y - img.height / 2);
+      ex.drawImage(img, x0, y0);
+      // Las llamas, vivas: lenguas que bajan hacia el fanal (la Hoguera arde hacia ti).
+      const fuerza = jefe.muerto ? Math.max(0, 1 - jefe.muerto / 1.5) : 1;
+      for (let i = 0; i < 14; i++) {
+        const fx0 = x0 + 6 + i * 3.6, largo = (6 + 5 * Math.abs(Math.sin(tMusica * 6 + i * 1.7))) * fuerza;
+        ex.fillStyle = "#ff6a20"; ex.fillRect(Math.floor(fx0), y0 + 36, 2, Math.floor(largo));
+        ex.fillStyle = "#ffd070"; ex.fillRect(Math.floor(fx0), y0 + 36, 1, Math.floor(largo * 0.6));
+      }
+      ex.globalAlpha = 1;
+      for (const o of jefe.orbita || []) if (o.viva) {
+        const ox = jefe.x + Math.cos(o.a) * o.r, oy = jefe.y + Math.sin(o.a) * o.r * 0.7;
+        if (jefe.muerto) ex.globalAlpha = Math.max(0, 1 - jefe.muerto / 6);
+        ex.drawImage(banco.fanalito(), Math.floor(ox - 3), Math.floor(oy - 3));
+        ex.fillStyle = jefe.muerto ? "#ffd070" : "#ff6a20"; ex.fillRect(Math.floor(ox) - 1, Math.floor(oy) - 5 - (Math.sin(tMusica * 12 + o.f) > 0 ? 1 : 0), 3, 2);  // arde (al soltarse, su propia llama)
+        ex.globalAlpha = 1;
+      }
+      // Las columnas de fuego: primero la marca, después el fuego.
+      for (const c of columnas) {
+        if (c.aviso) { lx.fillStyle = "#ff8a3a"; for (let y = 50; y < H; y += 6) { lx.globalAlpha = 0.55; lx.fillRect(Math.floor(c.x) - 7, y, 1, 2); lx.fillRect(Math.floor(c.x) + 7, y, 1, 2); } lx.globalAlpha = 1; }
+        else {
+          for (let y = 70; y < H; y += 2) { ex.fillStyle = (y + Math.floor(tMusica * 60)) % 6 < 3 ? "#ff6a20" : "#ffb040"; ex.fillRect(Math.floor(c.x - 5 + Math.sin(y * 0.2 + tMusica * 20) * 1.5), y, 11, 2); }
+          ex.fillStyle = "#fff0b0"; ex.fillRect(Math.floor(c.x) - 1, 70, 3, H - 70);
+        }
+      }
     } else if (t === "alba") {
       const esc = escalaAlba(), img = banco.fanal(true);
       const w = img.width * esc, h = img.height * esc;
@@ -1892,7 +2405,7 @@
         const y0 = y + 2, x0 = x + s * 7, pal = Math.round(r * (lado === s ? 2 : 1));
         ex.fillRect(x0 + s * 1, y0, 1, 1); ex.fillRect(x0 + s * 2, y0 + 1 + pal, 1, 1); ex.fillRect(x0 + s * 3, y0 + 2 + pal, 2, 1);
       }
-      ex.drawImage(banco.fanal(false, F.invul > 1.9), x - 7, y - 5);
+      ex.drawImage(banco.fanal(false, F.invul > 1.9, P ? M.evolucion(P.mej, "nave") : 0), x - 7, y - 5);
       // La llama: tres colores que tiemblan dentro del vidrio.
       if (!F.apagado || F.apagado < 1.4) {
         const alto = F.apagado ? Math.max(0, 3 - Math.floor(F.apagado * 2.5)) : 2 + (Math.sin(tMusica * 17) > 0.2 ? 1 : 0) + (pulsoLuz > 0.6 ? 1 : 0);
@@ -1905,6 +2418,7 @@
         }
       }
       if (F.campana > 0) { ex.strokeStyle = "rgba(232,220,196,.65)"; ex.lineWidth = 1; ex.beginPath(); ex.arc(x + 0.5, y - 2, 10, Math.PI, 0); ex.stroke(); }
+      if (F.enredo > 0) { ex.fillStyle = "rgba(242,236,226,.8)"; ex.fillRect(x - 8, y + 1, 1, 3); ex.fillRect(x + 8, y + 1, 1, 3); ex.fillRect(x - 6, y + 3, 13, 1); }   // seda en los remos
     }
   }
   function dibujaEscamas() {
@@ -1913,6 +2427,9 @@
       const pal = S.PALETAS[e.estilo] || S.PALETAS[1];
       if (e.devuelta) { ex.fillStyle = "#fff6d8"; ex.fillRect(x - 1, y - 1, 3, 3); ex.fillStyle = "#ffd27a"; ex.fillRect(x, y - 3, 1, 2); continue; }
       if (e.muro) { ex.fillStyle = pal.escama[1]; ex.fillRect(x - 2, y - 1, 5, 3); ex.fillStyle = pal.escama[0]; ex.fillRect(x - 1, y, 3, 1); continue; }
+      if (e.pecio) { ex.fillStyle = "#5a4a3a"; ex.fillRect(x - 3, y - 1, 7, 3); ex.fillStyle = "#8a6a3a"; ex.fillRect(x - 2, y - 2, 5, 1); continue; }
+      if (e.burbuja) { ex.fillStyle = "#d0f0e8"; ex.fillRect(x - 2, y - 3, 5, 1); ex.fillRect(x - 2, y + 3, 5, 1); ex.fillRect(x - 3, y - 2, 1, 5); ex.fillRect(x + 3, y - 2, 1, 5); ex.fillRect(x - 1, y - 1, 1, 1); continue; }
+      if (e.ascua) { ex.fillStyle = "#ff6a20"; ex.fillRect(x - 1, y - 1, 3, 3); ex.fillStyle = "#fff0b0"; ex.fillRect(x, y, 1, 1); continue; }
       ex.fillStyle = pal.escama[0];
       if (e.estilo === 1) { ex.fillRect(x, y - 2, 1, 1); ex.fillRect(x + ((Math.floor(e.t * 18) & 1) ? 1 : -1), y - 1, 1, 1); ex.fillRect(x, y, 1, 1); ex.fillRect(x + ((Math.floor(e.t * 18) & 1) ? -1 : 1), y + 1, 1, 1); }
       else if (e.estilo === 2) { ex.fillRect(x, y - 2, 1, 2); ex.fillRect(x - 1, y, 3, 2); }
@@ -1922,6 +2439,9 @@
   function dibujaBalas() {
     for (const b of balas) {
       const x = Math.floor(b.x), y = Math.floor(b.y);
+      if (b.chispa) { ex.fillStyle = "#ffb040"; ex.fillRect(x, y, 1, 3); ex.fillStyle = "#fff6d8"; ex.fillRect(x, y, 1, 1); continue; }
+      if (b.rayo) { ex.fillStyle = "#e8f6ff"; ex.fillRect(x - 1, y - 2, 3, 12); ex.fillStyle = "#ffffff"; ex.fillRect(x, y - 4, 1, 16); continue; }   // el Faro: el tiro afinado es un rayo
+      if (b.evo >= 4) { ex.fillStyle = "#fff6d8"; ex.fillRect(x - 1, y + 1, 3, 1); ex.fillRect(x, y - 1, 1, 5); }   // la Estrella: cada tiro, una cruz de luz
       if (b.afinado) { ex.fillStyle = "#ffd27a"; ex.fillRect(x - 1, y, 3, 4); ex.fillStyle = "#fff6d8"; ex.fillRect(x, y - 1, 1, 6); ex.fillStyle = "#ff9a3c"; ex.fillRect(x, y + 5, 1, 3); }
       else { ex.fillStyle = F && F.lente > 0 ? "#bfe8ff" : "#ffe6a8"; ex.fillRect(x, y, 1, 5); ex.fillStyle = "#fff6d8"; ex.fillRect(x, y, 1, 2); }
     }
@@ -1941,7 +2461,28 @@
     ex.globalAlpha = 1;
   }
   function dibujaMenores() {
-    for (const l of larvas) if (l.vida > 0) ex.drawImage(banco.mini(1, Math.floor(l.t * 10) & 1), Math.floor(l.x - 3), Math.floor(l.y - 2));
+    for (const l of larvas) if (l.vida > 0) ex.drawImage(banco.mini(l.acto || 1, Math.floor(l.t * 10) & 1), Math.floor(l.x - 3), Math.floor(l.y - 2));
+    // Los hilos de seda: una línea pálida que tiembla un poco.
+    for (const h of hilos) {
+      const a = Math.min(1, h.t * 3, (h.dur - h.t) * 2);
+      ex.globalAlpha = 0.55 * a; ex.fillStyle = "#f2ece2";
+      for (let y = Math.floor(h.y0); y < h.y0 + h.largo; y += 2) ex.fillRect(Math.floor(h.x + Math.sin(y * 0.08 + h.t * 3) * 0.8), y, 1, 2);
+      ex.globalAlpha = 1;
+    }
+    // El ancla del Casco: la cadena y el ancla.
+    for (const n of anclas) {
+      if (jefe) { ex.fillStyle = "#5a4a3a"; for (let y = Math.floor(jefe.y + 16); y < n.y - 4; y += 3) ex.fillRect(Math.floor(n.x), y, 1, 2); }
+      const x = Math.floor(n.x), y = Math.floor(n.y);
+      ex.fillStyle = "#8a6a3a"; ex.fillRect(x, y - 6, 1, 10); ex.fillRect(x - 3, y - 4, 7, 1);
+      ex.fillStyle = "#c89a52"; ex.fillRect(x - 5, y + 3, 11, 1); ex.fillRect(x - 6, y + 1, 2, 2); ex.fillRect(x + 5, y + 1, 2, 2); ex.fillRect(x - 1, y - 8, 3, 2);
+    }
+    // Las luciérnagas (y los fanales que se soltaron de la Hoguera).
+    for (const l of luciernagas) {
+      ex.globalAlpha = l.cd > 0 ? 0.45 : 1;
+      if (l.libre) { const img = banco.fanalito(); ex.drawImage(img, Math.floor(l.x - 3), Math.floor(l.y - 3)); }
+      else { ex.fillStyle = "#fff6d8"; ex.fillRect(Math.floor(l.x), Math.floor(l.y), 1, 1); ex.fillStyle = "#ffd27a"; ex.fillRect(Math.floor(l.x) - 1, Math.floor(l.y) + 1, 3, 1); }
+      ex.globalAlpha = 1;
+    }
     for (const l of lumbres) if (l.viva) {
       // Las que rodean la llama en la revelación son las del faro (de la
       // niebla); las del alba brillan solas.
@@ -2033,6 +2574,8 @@
     // En lo oscuro las polillas brillan apenas, como estrellas lejanas (y es
     // que eso son, aunque todavía no se sepa).
     if (P && P.j && (actoVisual(P.j) === 3 || (actoVisual(P.j) === 5 && P.j.actoBase === 3))) for (const p of polillas) if (p.viva) out.push({ x: p.x + p.w / 2, y: p.y + p.h / 2, r: 8, i: 0.32 });
+    // En la hoguera las polillas arden un poco, y las ascuas alumbran.
+    if (P && P.j && (formaDe(P.j) === 8)) for (const p of polillas) if (p.viva) out.push({ x: p.x + p.w / 2, y: p.y + p.h / 2, r: 7, i: 0.3 });
     for (const l of lumbres) if (l.viva && !l.quieta) out.push({ x: l.x, y: l.y, r: 15, i: 0.85 });
     if (msj) out.push({ x: msj.x, y: msj.y + 5, r: 14, i: 0.8 });
     if (jefe && !jefe.muerto) {
@@ -2041,7 +2584,12 @@
       if (jefe.tipo === "esfinge") out.push({ x: jefe.x, y: jefe.y, r: 22, i: 0.18 * jefe.alfa });   // un contorno: nunca del todo invisible
       if (jefe.tipo === "alba") out.push({ x: jefe.x, y: jefe.y, r: 30 + (1 - jefe.dist / M.DISTANCIA_ALBA) * 80, i: 1 });
       if (jefe.tipo === "nodriza") out.push({ x: jefe.x, y: jefe.y, r: 26, i: 0.35 });
+      if (jefe.tipo === "casco") out.push({ x: jefe.x, y: jefe.y + 12, r: 30, i: 0.8 });
+      if (jefe.tipo === "crisalida") out.push({ x: jefe.x, y: jefe.y, r: 30, i: 0.5 });
+      if (jefe.tipo === "hoguera") out.push({ x: jefe.x, y: jefe.y + 4, r: 70, i: 1 });
     }
+    for (const c of columnas) if (!c.aviso) out.push({ x: c.x, y: 200, r: 40, i: 0.9 });
+    for (const l of luciernagas) out.push({ x: l.x, y: l.y, r: l.libre ? 14 : 10, i: 0.7 });
     return out;
   }
 
@@ -2116,7 +2664,9 @@
       brillo(F.x, M.Y_FANAL - 6, 18 + pulsoLuz * 4, P && P.llamas === 1 ? "#a8c8ff" : "#ffcf6b", 0.8);
       brillo(F.x, M.Y_FANAL - 6, r * 0.7, acto === 2 ? "#b8d0c4" : acto === 3 ? "#6a55a0" : "#ff9a3c", acto === 2 ? 0.22 : 0.12);
     }
-    for (const b of balas) brillo(b.x, b.y + 2, b.afinado ? 10 : 6, b.afinado ? "#ffd27a" : "#ffe6a8", 0.7);
+    for (const b of balas) brillo(b.x, b.y + 2, b.rayo ? 14 : b.afinado ? 10 : 6, b.rayo ? "#e8f6ff" : b.afinado ? "#ffd27a" : "#ffe6a8", 0.7);
+    for (const l of luciernagas) brillo(l.x, l.y, l.libre ? 10 : 7, l.libre ? "#ffd070" : "#fff0b0", l.cd > 0 ? 0.25 : 0.7);
+    for (const c of columnas) if (!c.aviso) brillo(c.x, 200, 60, "#ff6a20", 0.35);
     for (const e of escamas) brillo(e.x, e.y, e.muro ? 6 : 5, (S.PALETAS[e.estilo] || S.PALETAS[1]).escama[1], 0.55);
     for (const d of destellos) brillo(d.x, d.y, d.r * 0.6, "#fff0c8", 0.8 * (1 - d.t / d.dur));
     for (const l of lumbres) if (l.viva && !l.quieta) brillo(l.x, l.y, 7, "#fff2c8", 0.35);
@@ -2125,6 +2675,9 @@
     if (jefe && !jefe.muerto) {
       if (jefe.tipo === "faro") brillo(jefe.x, jefe.y + 1, 16, "#e6f6dc", 0.9);
       if (jefe.tipo === "alba") brillo(jefe.x, jefe.y, 24 + (1 - jefe.dist / M.DISTANCIA_ALBA) * 60, "#fff2d8", 0.7);
+      if (jefe.tipo === "casco") brillo(jefe.x, jefe.y + 12, 16, "#ffb060", 0.8);
+      if (jefe.tipo === "hoguera") brillo(jefe.x, jefe.y + 6, 50, "#ff8a3a", 0.6);
+      if (jefe.tipo === "crisalida") brillo(jefe.x, jefe.y, 18, "#f0d8e8", 0.35);
     }
     if (cielo.lleno > 0) brillo(W / 2, H / 2, 260, "#fff6e0", 0.25 * clamp(cielo.lleno / 2, 0, 1) * (1 - clamp((cielo.lleno - 14) / 6, 0, 1)));
     dibujaParticulas();
@@ -2225,8 +2778,11 @@
     salta(n, modo) { empieza(modo || (n > M.JORNADAS_HISTORIA ? "sinfin" : "travesia"), { j: n, puntos: 0, llamas: 3, luces: 200 }); },
     sigue: () => { relatoListo = 0; sigueRelato(); },
     paso: dt => paso(dt || 1 / 60),
-    estado: () => ({ estado, jornada: P && P.jornada, puntos: P && P.puntos, llamas: P && P.llamas, luces: P && P.luces, restan: form && form.restan, jefe: jefe && { tipo: jefe.tipo, vida: jefe.vida, dist: jefe.dist }, notas: P && P.notas }),
-    desbloquea() { prog.alba = true; guardaProgreso(false); pintaPortada(); },
+    estado: () => ({ estado, brasas: P && P.brasas, jornada: P && P.jornada, puntos: P && P.puntos, llamas: P && P.llamas, luces: P && P.luces, restan: form && form.restan, jefe: jefe && { tipo: jefe.tipo, vida: jefe.vida, dist: jefe.dist }, notas: P && P.notas }),
+    desbloquea() { prog.alba = true; prog.hoguera = true; guardaProgreso(false); pintaPortada(); },
+    brasas: n => { if (P) { P.brasas += n == null ? 10 : n; pintaHud(true); } },
+    prueba: () => (P && P.prueba ? JSON.parse(JSON.stringify(P.prueba)) : null),
+    taller: () => (P ? { mej: Object.assign({}, P.mej), brasas: P.brasas, arma: arma(), nave: naveF() } : null),
     dano: v => { if (jefe) { jefe.vida -= v || 999; pintaVidaJefe(); if (jefe.vida <= 0 && !jefe.muerto) muereJefe(); } },
     limpia: () => { for (const p of polillas) if (p.viva) mata(p, null); for (const l of lumbres) l.viva = false; },
     acerca: () => { if (jefe && jefe.tipo === "alba") jefe.dist = 2; },

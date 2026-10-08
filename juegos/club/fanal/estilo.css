@@ -34,6 +34,10 @@
 :root[data-acto="4"]{--fondo:#24162e;--panel:#2e1d38;--panel2:#3b2746;--linea:#7a5a72;--tinta:#fff2e0;--tenue:#e0b8b0;--acento:#ffd27a;--acento2:#fff6d8;--brillo:0 0 22px #ffd27a66;--vineta:.35}
 /* --- El sin fin: plata azul, sin estridencias --- */
 :root[data-acto="5"]{--fondo:#04070e;--panel:#0a111e;--panel2:#111b2c;--linea:#22324c;--tinta:#dce6f8;--tenue:#7a8eb0;--acento:#8fb0e0;--acento2:#e0ecff;--brillo:0 0 12px #8fb0e044;--vineta:.6}
+/* La otra orilla: V los cascos (cobre verde), VI la seda (lila), VII la hoguera (brasa). */
+:root[data-acto="6"]{--fondo:#060c10;--panel:#0c1a1c;--panel2:#132628;--linea:#2e4a4c;--tinta:#dcece8;--tenue:#7a9a94;--acento:#5ab8a8;--acento2:#d0f0e8;--brillo:0 0 14px #5ab8a844;--vineta:.6}
+:root[data-acto="7"]{--fondo:#14101c;--panel:#1e1828;--panel2:#2a2236;--linea:#4a3850;--tinta:#fff0f6;--tenue:#b8a0b8;--acento:#e0a8d0;--acento2:#fff4fa;--brillo:0 0 16px #e0a8d044;--vineta:.45}
+:root[data-acto="8"]{--fondo:#140604;--panel:#200c06;--panel2:#2e140a;--linea:#6a2a0a;--tinta:#fff0dc;--tenue:#d89070;--acento:#ff8a3a;--acento2:#fff0b0;--brillo:0 0 18px #ff8a3a66;--vineta:.4}
 
 /* --- Base --- */
 [hidden]{display:none!important}
@@ -133,10 +137,12 @@ html.sin-lineas .lineas{display:none}
 .opcion small{display:block;font-size:11px;color:var(--tenue)}
 
 /* La portada: el título en bastarda, sobre el cielo que se mueve. */
-.portada{background:linear-gradient(#0000 40%,#000a)}
-.portada-txt{width:min(100%,330px);display:grid;justify-items:center}
+.portada{background:linear-gradient(#0000 40%,#000a);container-type:inline-size;overflow:hidden}
+/* El título se mide contra la portada (cqi), no contra la ventana: con 19vw
+   en un PC salía más ancho que la caja y empujaba el menú fuera de ella. */
+.portada-txt{width:min(100%,400px);display:grid;grid-template-columns:minmax(0,1fr);justify-items:center}
 .portada .pre{margin:0;color:var(--tenue);letter-spacing:.24em;font-size:11px;text-transform:uppercase}
-.titulo{margin:0 0 14px;font:400 clamp(64px,19vw,104px)/1 var(--gotica);color:var(--acento);text-shadow:0 0 24px #ff9a3c55,0 3px 0 #000;letter-spacing:.04em;animation:respira 4s ease-in-out infinite}
+.titulo{margin:0 0 14px;font:400 clamp(48px,18cqi,88px)/1 var(--gotica);color:var(--acento);text-shadow:0 0 24px #ff9a3c55,0 3px 0 #000;letter-spacing:.04em;white-space:nowrap;animation:respira 4s ease-in-out infinite}
 @keyframes respira{50%{text-shadow:0 0 34px #ff9a3c88,0 3px 0 #000}}
 .portada .menu{width:100%}
 .portada .opcion{background:#140f26cc;text-align:center}
@@ -213,3 +219,27 @@ html.sin-lineas .lineas{display:none}
   .scorebar{gap:10px;padding:7px 9px}
   .dato strong{font-size:15px}
 }
+
+/* --- El taller: las brasas se gastan entre jornadas --- */
+.taller{background:#000b}
+.taller .caja{width:min(100%,520px)}
+.taller .brasas{margin:0 0 10px;color:var(--acento2);font-size:13px;letter-spacing:.08em}
+.taller .brasas b{color:var(--acento)}
+.taller .ramas{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.taller h3{margin:0 0 2px;font-size:20px}
+.taller .evo{margin:0 0 6px;font-size:11px;color:var(--tenue);letter-spacing:.06em}
+.taller .evo b{color:var(--acento2);font-weight:600}
+.mejora{display:grid;grid-template-columns:1fr auto;gap:1px 6px;width:100%;margin:0 0 5px;padding:6px 8px;background:var(--panel2);border:1px solid var(--linea);color:var(--tinta);text-align:left;cursor:pointer;font:inherit;font-size:12px}
+.mejora:hover:not([disabled]),.mejora:focus-visible{border-color:var(--acento);background:var(--linea)}
+.mejora[disabled]{opacity:.5;cursor:default}
+.mejora .nom{font-weight:600;color:var(--acento)}
+.mejora .pips{color:var(--acento2);letter-spacing:.1em}
+.mejora .desc{grid-column:1/-1;font-size:11px;color:var(--tenue)}
+.taller .pie-taller{display:grid;gap:6px;margin-top:8px}
+.taller.evoluciona .caja{animation:evoluciona .9s ease-out}
+@keyframes evoluciona{0%{box-shadow:0 0 0 0 var(--acento),6px 6px 0 #0007}40%{box-shadow:0 0 40px 8px var(--acento),6px 6px 0 #0007}100%{box-shadow:0 0 0 0 transparent,6px 6px 0 #0007}}
+.lineas-relato p.augurio{font-size:12px;color:var(--acento);letter-spacing:.06em;font-style:italic}
+#hudBrasas:empty{display:none}
+@media (max-width:480px){.taller .ramas{grid-template-columns:1fr}.mejora{padding:5px 7px}}
+@media (prefers-reduced-motion:reduce){.taller.evoluciona .caja{animation:none}}
+.taller .caja:focus{outline:none}

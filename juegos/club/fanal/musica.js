@@ -2,8 +2,9 @@
 
    Qué hace, en general:
    - Cada acto tiene su ESCALA (pélog, frigia dominante, menor húngara,
-     lidia aumentada; sléndro en el sin fin), su MÉTRICA irregular (7/8,
-     5/4, 11/8, 9/8, 13/8) y su timbre. Las escalas se guardan en cents y
+     lidia aumentada; en la otra orilla hirajoshi, enigmática y bizantina;
+     sléndro en el sin fin), su MÉTRICA irregular (7/8, 5/4, 11/8, 9/8,
+     10/8, 15/8, 3+3+2, 13/8) y su timbre. Las escalas se guardan en cents y
      no en semitonos: el pélog y el sléndro no caben en un piano, y las
      escalas «de piano» llevan además una desafinación microtonal leve
      por nota, como un instrumento de verdad.
@@ -55,7 +56,12 @@
     frigiaDom: { nombre: "frigia dominante", cents: [0, 100, 400, 500, 700, 800, 1000], grados: [0, 1, 2, 3, 4, 5, 6], tempera: true },
     hungara: { nombre: "menor húngara", cents: [0, 200, 300, 600, 700, 800, 1100], grados: [0, 1, 2, 3, 4, 5, 6], tempera: true },
     tonos: { nombre: "tonos enteros", cents: [0, 200, 400, 600, 800, 1000], grados: [0, 1, 2, 3, 4, 5], tempera: true },
-    lidiaAum: { nombre: "lidia aumentada", cents: [0, 200, 400, 600, 800, 900, 1100], grados: [0, 1, 2, 3, 4, 5, 6], tempera: true }
+    lidiaAum: { nombre: "lidia aumentada", cents: [0, 200, 400, 600, 800, 900, 1100], grados: [0, 1, 2, 3, 4, 5, 6], tempera: true },
+    // La otra orilla: lo hundido (pentatónica japonesa, con sus dos semitonos),
+    // la seda (la escala enigmática de Verdi) y la hoguera (bizantina).
+    hirajoshi: { nombre: "hirajoshi", cents: [0, 200, 300, 700, 800], grados: [0, 1, 2, 3, 4], tempera: true },
+    enigmatica: { nombre: "enigmática", cents: [0, 100, 400, 600, 800, 1000, 1100], grados: [0, 1, 2, 3, 4, 5, 6], tempera: true },
+    bizantina: { nombre: "bizantina", cents: [0, 100, 400, 500, 700, 800, 1100], grados: [0, 1, 2, 3, 4, 5, 6], tempera: true }
   };
 
   /* Las métricas, como grupos de corcheas: cada grupo empieza en un PULSO
@@ -68,6 +74,9 @@
     "11/8": { grupos: [3, 3, 3, 2] },
     "9/8": { grupos: [2, 2, 2, 3] },
     "13/8": { grupos: [3, 2, 3, 2, 3] },
+    "10/8": { grupos: [3, 3, 2, 2] },
+    "15/8": { grupos: [2, 3, 2, 3, 2, 3] },
+    "3+3+2": { grupos: [3, 3, 2] },
     "7/4": { grupos: [2, 2, 2, 2, 2, 2, 2], acentos: [0, 2, 4] }
   };
 
@@ -117,7 +126,10 @@
     2: { escala: "frigiaDom", raiz: 164.81, metrica: "5/4", epm: 264, poli: 3, ratio: 2.76, reverb: 3.6, ombak: 2.5 },
     3: { escala: "hungara", raiz: 110.0, metrica: "11/8", epm: 288, poli: 4, ratio: 3.5, reverb: 5.0, ombak: 1.6 },
     4: { escala: "lidiaAum", raiz: 130.81, metrica: "9/8", epm: 240, poli: 4, ratio: 2.0, reverb: 3.2, ombak: 1.2 },
-    5: { escala: "slendro", raiz: 98.0, metrica: "13/8", epm: 300, poli: 4, ratio: 1.4, reverb: 3.8, ombak: 5 }
+    5: { escala: "slendro", raiz: 98.0, metrica: "13/8", epm: 300, poli: 4, ratio: 1.4, reverb: 3.8, ombak: 5 },
+    6: { escala: "hirajoshi", raiz: 116.54, metrica: "10/8", epm: 288, poli: 3, ratio: 1.8, reverb: 4.6, ombak: 3 },
+    7: { escala: "enigmatica", raiz: 155.56, metrica: "15/8", epm: 336, poli: 4, ratio: 2.4, reverb: 3.0, ombak: 2 },
+    8: { escala: "bizantina", raiz: 138.59, metrica: "3+3+2", epm: 312, poli: 3, ratio: 3.0, reverb: 2.4, ombak: 4 }
   };
   /* El sin fin rota de escala y compás cada jornada, para que la travesía
      que no termina tampoco suene siempre igual. */
@@ -126,7 +138,10 @@
     { escala: "pelog", raiz: 110.0, metrica: "7/8", ratio: 1.4 },
     { escala: "hungara", raiz: 123.47, metrica: "11/8", ratio: 3.5 },
     { escala: "frigiaDom", raiz: 92.5, metrica: "5/4", ratio: 2.76 },
-    { escala: "tonos", raiz: 103.83, metrica: "9/8", ratio: 2.0 }
+    { escala: "tonos", raiz: 103.83, metrica: "9/8", ratio: 2.0 },
+    { escala: "hirajoshi", raiz: 116.54, metrica: "10/8", ratio: 1.8 },
+    { escala: "enigmatica", raiz: 130.81, metrica: "15/8", ratio: 2.4 },
+    { escala: "bizantina", raiz: 110.0, metrica: "3+3+2", ratio: 3.0 }
   ];
   function etapaSinFin(n) {
     const r = ROTACION_SINFIN[((n % ROTACION_SINFIN.length) + ROTACION_SINFIN.length) % ROTACION_SINFIN.length];
@@ -143,7 +158,13 @@
     // El Faro (dos de 5/4): un suspiro frigio, el semitono que no se resuelve.
     faro: [[0, 4], [1, 2], [2, 4], [1, 2], [0, 4], [-1, 2], [0, 2]],
     // La Esfinge (dos de 11/8): sube por la cuarta aumentada húngara.
-    esfinge: [[0, 3], [3, 3], [4, 2], [3, 1], [5, 3], [4, 3], [6, 2], [7, 5]]
+    esfinge: [[0, 3], [3, 3], [4, 2], [3, 1], [5, 3], [4, 3], [6, 2], [7, 5]],
+    // El Casco (dos de 10/8): una campana hundida que baja y no termina de volver.
+    casco: [[0, 3], [2, 3], [1, 2], [0, 2], [-1, 3], [0, 3], [2, 2], [1, 2]],
+    // La Crisálida (dos de 15/8): una canción de cuna que sube despacio.
+    crisalida: [[0, 2], [1, 3], [2, 2], [4, 3], [3, 2], [2, 3], [4, 2], [5, 3], [4, 2], [2, 3], [1, 2], [0, 3]],
+    // La Hoguera (dos de 3+3+2): una danza alrededor del fuego.
+    hoguera: [[0, 3], [1, 3], [2, 2], [4, 3], [3, 3], [1, 2]]
   };
 
   /* Cuántas corcheas dura un motivo. */
@@ -183,6 +204,11 @@
     if (jefe === "nodriza") return fase === 0 ? m : fase === 1 ? transpone(m, 1) : fragmenta(transpone(m, 2), 3);
     if (jefe === "faro") return fase === 0 ? m : fase === 1 ? m : tartamudea(m);
     if (jefe === "esfinge") return fase === 0 ? m : fase === 1 ? retrograda(m) : transpone(aumenta(m, 2), -7);
+    // El Casco se hunde un poco más en cada fase; la Crisálida tartamudea y
+    // al final se da vuelta (nace); la Hoguera sube y se rompe en chispas.
+    if (jefe === "casco") return fase === 0 ? m : fase === 1 ? transpone(m, -2) : retrograda(transpone(m, -4));
+    if (jefe === "crisalida") return fase === 0 ? m : fase === 1 ? fragmenta(m, 4) : invierte(m, 2);
+    if (jefe === "hoguera") return fase === 0 ? m : fase === 1 ? transpone(m, 2) : fragmenta(transpone(m, 4), 2);
     return m;
   }
 
@@ -611,6 +637,15 @@
       } else if (j === "alba") {                                        // vidrio: FM armónica, pura
         campana(t, f, dur * 3, 0.22 * vol, { ratio: 2, indice: 1.1, ombak: 0.8, envio: 0.7 });
         if (est.cerca > 0.4) campana(t, frecuencia(R * 2, E, -grado), dur * 3, 0.1 * vol * est.cerca, { ratio: 2, indice: 1.1, ombak: 0.8, pan: -0.3 }); // tu tema, al derecho, se le suma
+      } else if (j === "casco") {                                       // una campana bajo el agua: grave, opaca y larga
+        campana(t, f / 2, dur * 3, 0.3 * vol, { ratio: 1.8, indice: 1.4, ombak: 2.5, envio: 0.8 });
+        pulso(t, f / 4, dur, 0.1 * vol, { ancho: 0.45, corte: 500, ataque: 0.05, sostiene: 0.9 });
+      } else if (j === "crisalida") {                                   // vidrio que respira: FM suave con vibrato
+        campana(t, f, dur * 2, 0.22 * vol, { ratio: 2.76, indice: 0.7, ombak: 1.5, envio: 0.6 });
+        if (faseDeVida(est.vida) === 2) campana(t, f * 2, dur, 0.08 * vol, { ratio: 3.5, indice: 1.2 }); // la imago chilla
+      } else if (j === "hoguera") {                                     // bronce brillante y una chispa encima
+        pulso(t, f, dur, 0.18 * vol, { ancho: 0.25, corte: 2400, q: 1.2, vibrato: 6, ataque: 0.01, sostiene: 0.6, envio: 0.3 });
+        campana(t, f * 2, dur * 1.5, 0.1 * vol, { ratio: 3, indice: 2.2, ombak: 4 });
       } else {                                                          // melodía de etapa: una voz de pulso filtrada con vibrato
         const fil = etapa.escala === "lidiaAum" ? null : 1500;
         if (!fil) campana(t, f, dur * 2.5, 0.2 * vol, { ratio: 1, indice: 0.9, ombak: 0.6 });
@@ -835,6 +870,19 @@
           for (let i = 0; i < n * 2; i++) campana(t + i * 0.04, frecuencia(etapa.raiz, etapa.escala, i), 7, 0.06, { destino: efectos, ratio: 2, indice: 0.8, ombak: 1, envio: 0.9, pan: (i % 2 ? 1 : -1) * 0.5 });
         });
       },
+      /* Una evolución del arma o del fanal: la escala entera hacia arriba. */
+      evolucion() {
+        efecto(t => {
+          const n = ESCALAS[etapa.escala].cents.length;
+          for (let i = 0; i <= n; i++) campana(t + i * 0.06, frecuencia(etapa.raiz * 2, etapa.escala, i), 1.4, 0.1, { destino: efectos, ratio: 2, indice: 1.4, envio: 0.6, pan: (i % 2 ? 1 : -1) * 0.4 });
+          golpeGrave(t, 110, 55, 0.6, 0.18, efectos);
+        });
+      },
+      /* Una brasa que se gasta en el taller. */
+      brasa(nivel) { efecto(t => { campana(t, frecuencia(etapa.raiz * 2, etapa.escala, 2 + (nivel || 0) * 2), 0.8, 0.09, { destino: efectos, ratio: 3, indice: 1.6, envio: 0.4 }); soplo(t, 0.12, 0.06, 3200, 1.4, "bandpass", efectos, 0.5); }); },
+      /* El ancla del Casco, el fuego de la Hoguera. */
+      ancla() { efecto(t => { golpeGrave(t, 70, 32, 0.9, 0.32, efectos); soplo(t, 0.5, 0.1, 500, 1, "lowpass", efectos, 0.3); }); },
+      llamarada(dur) { efecto(t => soplo(t, dur || 1, 0.12, 700, 1.2, "bandpass", efectos, 3)); },
       /* Un toque de interfaz, afinado como todo lo demás. */
       ui(grado) { efecto(t => campana(t, frecuencia(etapa.raiz * 4, etapa.escala, grado || 0), 0.35, 0.05, { destino: efectos, ratio: 2, indice: 1, envio: 0.2 })); },
       /* Una campana suelta de la escala (para las revelaciones). */

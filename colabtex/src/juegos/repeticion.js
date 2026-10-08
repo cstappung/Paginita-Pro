@@ -27,6 +27,10 @@ import TM from "../../../juegos/club/tetris/motor.js";
 import Snake from "../../../juegos/club/snake/motor.js";
 import Sortem from "../../../juegos/club/sortem/motor.js";
 import Mina from "../../../juegos/club/minas/engine.js";
+import Dosmil from "../../../juegos/club/dosmil/motor.js";
+import Aleteo from "../../../juegos/club/aleteo/motor.js";
+import AleteoLore from "../../../juegos/club/aleteo/lore.js";
+import Bbtan from "../../../juegos/club/bbtan/motor.js";
 
 const redondo = (ctx, x, y, w, h, r) => {
   ctx.beginPath();
@@ -125,6 +129,9 @@ function reproTetris(p) {
    desliza (se interpola con la posición del tic anterior). Arriba, la
    barra clara de los puntos. */
 const LIMA = ["#c1f45a", "#77b83e"];
+/* El número y el nombre de cada modo (snake/game.js: MODES) y los poderes del arcade. */
+const SN_MODO = { classic: "01 / CLÁSICO", arcade: "02 / ARCADE", portals: "03 / PORTALES", reloj: "04 / CONTRARRELOJ", espejo: "05 / ESPEJO", laberinto: "06 / LABERINTO", zen: "07 / ZEN" };
+const SN_PODER = { shield: ["◇", "#80dbef"], slow: ["◷", "#b6a0fa"], double: ["×2", "#f5cd72"] };
 function reproSnake(p) {
   const giros = Snake.leeGiros(p.g);
   if (!giros || !Snake.SIZES[p.t] || !Snake.SPEED_MULT[p.r]) throw new Error("prueba ilegible");
@@ -197,7 +204,7 @@ function reproSnake(p) {
     const chico = `700 ${Math.max(6, Math.round(c * 0.5))}px "IBM Plex Sans", sans-serif`;
     texto(ctx, "PUNTOS", x0 + c * 0.9, y0 + barra * 0.34, chico, "#747c6b", "left", "middle");
     texto(ctx, String(m.score).padStart(3, "0"), x0 + c * 0.9, y0 + barra * 0.72, `500 ${Math.max(9, Math.round(c * 1.15))}px "IBM Plex Sans", sans-serif`, "#1f2a1c", "left", "middle");
-    const estado = m.state === "playing" ? "EN JUEGO" : "FIN";
+    const estado = m.state !== "playing" ? "FIN" : p.m === "reloj" ? `${Math.ceil(Math.max(0, m.timeLeft))} S` : m.mirrored ? "ESPEJO" : "EN JUEGO";
     texto(ctx, estado, x0 + bw - c * 0.9, y0 + barra / 2, chico, "#2a3326", "right", "middle");
     circulo(ctx, x0 + bw - c * 1.5 - ctx.measureText(estado).width, y0 + barra / 2, Math.max(1.5, c * 0.13), m.state === "playing" ? "#7ca73e" : "#cf7459");
     // El tablero.
@@ -211,10 +218,24 @@ function reproSnake(p) {
     }
     const vi = ctx.createRadialGradient(bw / 2, bh / 2, bw * 0.1, bw / 2, bh / 2, bw * 0.65);
     vi.addColorStop(0, "#00000000"); vi.addColorStop(1, "#07160c45"); ctx.fillStyle = vi; ctx.fillRect(0, 0, bw, bh);
-    if (c >= 9) texto(ctx, "01 / CLÁSICO · " + p.t.toUpperCase(), c * 0.9, c * 0.9, `500 ${Math.max(6, Math.round(c * 0.42))}px "IBM Plex Sans", sans-serif`, "#7d917e", "left", "middle");
+    if (c >= 9) texto(ctx, (SN_MODO[p.m] || "01 / CLÁSICO") + " · " + p.t.toUpperCase(), c * 0.9, c * 0.9, `500 ${Math.max(6, Math.round(c * 0.42))}px "IBM Plex Sans", sans-serif`, "#7d917e", "left", "middle");
     for (const o of m.obstacles) {
       relleno(ctx, (o.x + 0.13) * c, (o.y + 0.13) * c, c * 0.74, c * 0.74, c * 0.16, "#63745a");
       relleno(ctx, (o.x + 0.24) * c, (o.y + 0.24) * c, c * 0.52, c * 0.11, c * 0.04, "#829375");
+    }
+    // Los portales (anillos que giran) y el poder del arcade, como en el juego.
+    (m.portals || []).forEach((q, i) => {
+      const color = i ? "#80d7c4" : "#b1a1f4";
+      ctx.save(); ctx.translate((q.x + 0.5) * c, (q.y + 0.5) * c); ctx.rotate(reloj * (i ? 1 : -1));
+      ctx.shadowColor = color; ctx.shadowBlur = c * 0.55; ctx.strokeStyle = color; ctx.lineWidth = Math.max(1, c * 0.08);
+      ctx.beginPath(); ctx.ellipse(0, 0, c * 0.43, c * 0.35, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.restore();
+    });
+    if (m.pickup && SN_PODER[m.pickup.type]) {
+      const [icono, color] = SN_PODER[m.pickup.type], x = (m.pickup.x + 0.5) * c, y = (m.pickup.y + 0.5) * c;
+      ctx.save(); ctx.translate(x, y); ctx.rotate(Math.PI / 4); ctx.shadowColor = color; ctx.shadowBlur = c * 0.4;
+      relleno(ctx, -c * 0.31, -c * 0.31, c * 0.62, c * 0.62, c * 0.12, color); ctx.restore();
+      if (c >= 7) texto(ctx, icono, x, y + 1, `bold ${Math.round(c * 0.4)}px Arial`, "#1e3028", "center", "middle");
     }
     if (m.fruit) fruta(ctx, m.fruit, c, reloj, false);
     if (m.bonus) fruta(ctx, m.bonus, c, reloj, true);
@@ -429,7 +450,353 @@ function reproMinas(p) {
   };
 }
 
-const FABRICAS = { tetris: reproTetris, snake: reproSnake, sortem: reproSortem, minas: reproMinas };
+/* ---------- 2048 (puntos) ----------
+   Cada jugada en su instante (la suma de los Δms de la prueba), como
+   `DosmilMotor.rehace`. Se dibuja como dosmil/estilo.css: el panel arena
+   con sus casillas, las fichas en sus colores (de la 128 a la 2048 con su
+   brillo dorado) y, arriba, la barra de puntos y ficha más alta. Cada
+   jugada se ve deslizarse (los `movs` del motor) y la ficha nueva y las
+   fusiones crecen un poco al llegar. En unidades del tablero: 100 de lado,
+   casillas de 21,25 cada 24,25 desde 3, como el `cqw` del juego. */
+const DM_FICHA = ["#cdc1b4", "#eee4da", "#ede0c8", "#f2b179", "#f59563", "#f67c5f", "#f65e3b", "#edcf72", "#edcc61", "#edc850",
+  "#edc53f", "#edc22e", "#b784d6", "#9b5fc2", "#7a3fae", "#3c6fd1", "#2450a8", "#1d2f63"];
+const DM = { panel: "#bbada0", dato: "#a39383", rotulo: "#eee4da", oscuro: "#776e65", claro: "#f9f6f2", cartel: '"Lilita One", "Arial Rounded MT Bold", system-ui, sans-serif' };
+const DM_DESLIZ = 110, DM_CRECE = 170, DM_BARRA = 18, DM_HUECO = 4;
+function reproDosmil(p) {
+  const jugadas = Dosmil.decodifica(p.f);
+  if (!jugadas || !jugadas.length || typeof p.u !== "string" || !Number.isSafeInteger(p.s)) throw new Error("prueba ilegible");
+  const instantes = [];
+  let total = 0;
+  for (const j of jugadas) { total += j[2]; instantes.push(total); }
+  let E, k, ultima, ahora = 0;
+  const reset = () => { E = Dosmil.nueva(p.s, p.u); k = 0; ultima = null; };
+  reset();
+  function en(ms) {
+    if (k > 0 && instantes[k - 1] > ms) reset();
+    while (k < jugadas.length && instantes[k] <= ms) {
+      const r = Dosmil.mueve(E, jugadas[k][0]);
+      if (!r) throw new Error("jugada que no mueve");
+      ultima = { r, at: instantes[k] };
+      k++;
+    }
+    ahora = ms;
+  }
+  const casilla = i => ({ x: 3 + (i % 4) * 24.25, y: 3 + Math.floor(i / 4) * 24.25 });
+  function ficha(ctx, u, x0, y0, x, y, e, escala) {
+    const t = 21.25 * escala, cx = x0 + (x + 10.625) * u, cy = y0 + (y + 10.625) * u;
+    ctx.save();
+    if (e >= 7 && e <= 11) { ctx.shadowColor = "#f3d77488"; ctx.shadowBlur = (2 + (e - 7) * 0.6) * u; }
+    relleno(ctx, cx - t * u / 2, cy - t * u / 2, t * u, t * u, 1.4 * u, DM_FICHA[Math.min(e, DM_FICHA.length - 1)]);
+    ctx.restore();
+    const v = String(2 ** e), tam = (v.length <= 2 ? 9.5 : v.length === 3 ? 8 : v.length === 4 ? 6.4 : 5) * escala;
+    texto(ctx, v, cx, cy + 0.4 * u, `400 ${Math.max(5, tam * u)}px ${DM.cartel}`, e <= 2 ? DM.oscuro : DM.claro, "center", "middle");
+  }
+  function pinta(ctx, w, h) {
+    const alto = 100 + DM_BARRA + DM_HUECO, u = Math.min(w / 100, h / alto);
+    const x0 = (w - 100 * u) / 2, y0 = (h - alto * u) / 2, yb = y0 + (DM_BARRA + DM_HUECO) * u;
+    // La barra: puntos y ficha más alta, en las cajitas del marcador.
+    relleno(ctx, x0, y0, 100 * u, DM_BARRA * u, 3 * u, DM.panel);
+    [["PUNTOS", E.puntos.toLocaleString("es-CL")], ["FICHA", String(Dosmil.valor(E.max))]].forEach(([n, v], j) => {
+      const bx = x0 + (2 + j * 49) * u;
+      relleno(ctx, bx, y0 + 2 * u, 47 * u, (DM_BARRA - 4) * u, 2 * u, DM.dato);
+      if (u >= 1.6) texto(ctx, n, bx + 23.5 * u, y0 + 6 * u, `800 ${3.2 * u}px system-ui, sans-serif`, DM.rotulo, "center", "middle");
+      texto(ctx, v, bx + 23.5 * u, y0 + (u >= 1.6 ? 11.6 : 9) * u, `400 ${Math.max(7, 6.4 * u)}px ${DM.cartel}`, "#fff", "center", "middle");
+    });
+    // El tablero y sus casillas vacías.
+    relleno(ctx, x0, yb, 100 * u, 100 * u, 3 * u, DM.panel);
+    for (let i = 0; i < 16; i++) { const c = casilla(i); relleno(ctx, x0 + c.x * u, yb + c.y * u, 21.25 * u, 21.25 * u, 1.4 * u, DM_FICHA[0]); }
+    const dt = ultima ? ahora - ultima.at : Infinity;
+    if (dt < DM_DESLIZ) {
+      // A medio deslizar: cada ficha va de su casilla de antes a la de ahora.
+      const f = dt / DM_DESLIZ, a = 1 - (1 - f) * (1 - f);
+      for (const [desde, hasta, e] of ultima.r.movs) {
+        const c0 = casilla(desde), c1 = casilla(hasta);
+        ficha(ctx, u, x0, yb, c0.x + (c1.x - c0.x) * a, c0.y + (c1.y - c0.y) * a, e, 1);
+      }
+      return;
+    }
+    const crece = dt - DM_DESLIZ < DM_CRECE ? (dt - DM_DESLIZ) / DM_CRECE : 1;
+    for (let i = 0; i < 16; i++) {
+      const e = E.t[i];
+      if (!e) continue;
+      let escala = 1;
+      if (crece < 1 && ultima) {
+        if (ultima.r.nueva && ultima.r.nueva.i === i) escala = 0.3 + 0.7 * crece;
+        else if (ultima.r.fusiones.includes(i)) escala = 1 + 0.12 * Math.sin(crece * Math.PI);
+      }
+      const c = casilla(i);
+      ficha(ctx, u, x0, yb, c.x, c.y, e, escala);
+    }
+  }
+  return {
+    dur: total, aspecto: (100 + DM_BARRA + DM_HUECO) / 100, en, pinta,
+    get fin() { return k === jugadas.length; },
+    marcador: () => ({ puntos: E.puntos, tiempo: Math.min(ahora, total), extra: `ficha ${Dosmil.valor(E.max)} · ${E.jugadas} jugadas` })
+  };
+}
+
+/* ---------- ALETEO ----------
+   Un tick cada 1/60 s y, antes de cada uno, el aleteo que cayó en él: el
+   bucle de `AleteoMotor.rehace`. Entre tick y tick, el pájaro y los tubos
+   se deslizan (la fracción del tick siguiente). Se dibuja como
+   aleteo/juego.js, simplificado: el cielo, las nubes, los tubos con su
+   labio, el suelo rayado, el pájaro con su ala en tres posiciones y el
+   número grande arriba; los colores salen de `AleteoLore.paleta` con los
+   tubos pasados, así que el cielo se va oscureciendo como en el juego. */
+const AL_NUBES = [{ x: 30, y: 120, s: 1 }, { x: 210, y: 70, s: 0.8 }, { x: 330, y: 170, s: 1.15 }, { x: 470, y: 105, s: 0.9 }];
+function reproAleteo(p) {
+  const aleteos = Aleteo.decodifica(p.f), n = p.n;
+  if (!aleteos || !aleteos.length || aleteos[0][0] !== 0 || !Number.isSafeInteger(n) || n < 1 || n > 2e6 || typeof p.u !== "string") throw new Error("prueba ilegible");
+  const dur = Aleteo.msDe(n);
+  let E, i, antesY, frac = 0;
+  const reset = () => { E = Aleteo.nueva(p.s, p.u); i = 0; antesY = E.y; };
+  reset();
+  function en(ms) {
+    const meta = ms >= dur ? n : Math.min(n, Math.floor(ms * 0.06));
+    if (meta < E.t) reset();
+    while (E.t < meta && !E.muerto) {
+      let a = false;
+      while (i < aleteos.length && aleteos[i][0] === E.t) { a = true; i++; }
+      antesY = E.y;
+      Aleteo.paso(E, a);
+    }
+    frac = E.muerto ? 1 : Math.min(1, Math.max(0, ms * 0.06 - E.t + 1));
+  }
+  const { W, H, SUELO, TW, PX, VEL } = Aleteo;
+  function tubo(ctx, pal, x, tb) {
+    if (x > W + 10 || x + TW < -10) return;
+    const arriba = tb.c - tb.g / 2, abajo = tb.c + tb.g / 2;
+    for (const [y0, y1, labio] of [[-20, arriba, arriba], [abajo, SUELO, abajo]]) {
+      const g = ctx.createLinearGradient(x, 0, x + TW, 0);
+      g.addColorStop(0, pal.tuboSombra); g.addColorStop(0.22, pal.tubo); g.addColorStop(0.38, pal.tuboLuz); g.addColorStop(0.55, pal.tubo); g.addColorStop(1, pal.tuboSombra);
+      ctx.fillStyle = g; ctx.fillRect(x + 3, y0, TW - 6, y1 - y0);
+      ctx.strokeStyle = pal.borde; ctx.lineWidth = 3; ctx.strokeRect(x + 3, y0, TW - 6, y1 - y0);
+      const ly = labio === arriba ? labio - 26 : labio;
+      ctx.fillStyle = g; ctx.fillRect(x - 4, ly, TW + 8, 26); ctx.strokeRect(x - 4, ly, TW + 8, 26);
+    }
+  }
+  function pajaro(ctx, pal, y, rot, fase) {
+    ctx.save(); ctx.translate(PX, y); ctx.rotate(rot);
+    ctx.lineWidth = 2.2; ctx.strokeStyle = pal.borde === "#000000" ? "#3a3a3a" : "#1b130b";
+    const elipse = (x, y, rx, ry, r, color) => { ctx.fillStyle = color; ctx.beginPath(); ctx.ellipse(x, y, rx, ry, r, 0, Math.PI * 2); ctx.fill(); };
+    ctx.fillStyle = pal.ala; ctx.beginPath(); ctx.moveTo(-13, -2); ctx.lineTo(-22, -7); ctx.lineTo(-21, 4); ctx.closePath(); ctx.fill(); ctx.stroke();
+    elipse(0, 0, 15, 12, 0, pal.pajaro); ctx.stroke();
+    elipse(3, 5, 9, 5.5, 0.1, pal.vientre);
+    elipse(-4, [-7, 0, 6][fase], 8, 5, [-0.6, 0, 0.55][fase], pal.ala); ctx.stroke();
+    ctx.fillStyle = "#ffffff"; ctx.beginPath(); ctx.arc(7, -5, 5.4, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    circulo(ctx, 8.6, -5, 2.4, pal.ojo);
+    ctx.fillStyle = pal.pico;
+    ctx.beginPath(); ctx.moveTo(10, -1); ctx.lineTo(21, 1); ctx.lineTo(10, 3.5); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(10, 3.5); ctx.lineTo(18, 5); ctx.lineTo(10, 7); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+  function pinta(ctx, w, h, reloj) {
+    const k = Math.min(w / W, h / H), t = E.t - 1 + frac;
+    const prox = Aleteo.proximo(E), avance = prox ? Math.max(0, Math.min(0.99, 1 - (prox.x + TW / 2 - PX) / Aleteo.SEP)) : 0;
+    const pal = AleteoLore.paleta(AleteoLore.corrupcion(E.puntos + avance));
+    ctx.save();
+    ctx.translate((w - W * k) / 2, (h - H * k) / 2); ctx.scale(k, k);
+    redondo(ctx, 0, 0, W, H, 14); ctx.clip();
+    const g = ctx.createLinearGradient(0, 0, 0, SUELO);
+    g.addColorStop(0, pal.cieloA); g.addColorStop(1, pal.cieloB);
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, SUELO);
+    const s = VEL * Math.max(0, t), vuelta = W + 260;
+    ctx.fillStyle = pal.nube; ctx.globalAlpha = 0.85;
+    for (const nb of AL_NUBES) {
+      const x = ((nb.x - s * 0.12) % vuelta + vuelta) % vuelta - 130, y = nb.y, q = nb.s;
+      ctx.beginPath();
+      ctx.arc(x, y, 18 * q, 0, 6.29); ctx.arc(x + 22 * q, y - 10 * q, 22 * q, 0, 6.29);
+      ctx.arc(x + 48 * q, y - 2 * q, 17 * q, 0, 6.29); ctx.arc(x + 26 * q, y + 6 * q, 18 * q, 0, 6.29);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    for (const tb of E.tubos) tubo(ctx, pal, Aleteo.X0 + tb.k * Aleteo.SEP - VEL * t, tb);
+    // El suelo, rayado y corriendo con el mundo.
+    ctx.fillStyle = pal.suelo; ctx.fillRect(0, SUELO, W, H - SUELO);
+    ctx.fillStyle = pal.sueloTop; ctx.fillRect(0, SUELO, W, 16);
+    ctx.save(); ctx.beginPath(); ctx.rect(0, SUELO, W, 16); ctx.clip();
+    ctx.fillStyle = "rgba(0,0,0,.14)";
+    for (let x = -24 - s % 24; x < W + 24; x += 24) { ctx.beginPath(); ctx.moveTo(x, SUELO + 16); ctx.lineTo(x + 12, SUELO); ctx.lineTo(x + 24, SUELO); ctx.lineTo(x + 12, SUELO + 16); ctx.fill(); }
+    ctx.restore();
+    ctx.fillStyle = pal.borde; ctx.fillRect(0, SUELO - 2, W, 3); ctx.fillRect(0, SUELO + 16, W, 2);
+    // El pájaro: cabecea según su velocidad, como en el juego.
+    const y = E.muerto ? E.y : antesY + (E.y - antesY) * frac, vy = E.vy;
+    const rot = E.muerto ? 1.2 : vy < 0 ? -0.42 : Math.max(-0.42, Math.min(1.45, -0.42 + (vy - 1) * 0.2));
+    const fase = E.muerto ? 1 : Math.floor(((reloj || 0) * (vy < 0 ? 26 : 12)) % 3);
+    pajaro(ctx, pal, y, rot, fase);
+    // Los tubos pasados, grandes y con borde, arriba al centro.
+    ctx.font = '400 54px "Lilita One", system-ui, sans-serif'; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.lineJoin = "round"; ctx.lineWidth = 9; ctx.strokeStyle = "#1b2a3d";
+    ctx.strokeText(String(E.puntos), W / 2, 74); ctx.fillStyle = "#ffffff"; ctx.fillText(String(E.puntos), W / 2, 74);
+    ctx.restore();
+  }
+  return {
+    dur, aspecto: H / W, en, pinta,
+    get fin() { return E.muerto; },
+    marcador: () => ({ puntos: E.puntos, tiempo: Aleteo.msDe(E.t), extra: `${E.aleteos} aleteo${E.aleteos === 1 ? "" : "s"}` })
+  };
+}
+
+/* ---------- BBTAN (rondas) ----------
+   Cada tiro con el mismo motor que `verifica/bbtan.js` (`juegaTiro` paso
+   por paso: lanzar, los ticks, recoger a mano si lo hizo, bajar). Tres
+   tiempos por ronda:
+   - **apuntar**: la línea de puntos hacia el ángulo que eligió. Es lo
+     único que no va a la velocidad real: lo que pensó cada tiro (hasta
+     minutos) se acorta a `BB_APUNTA_MAX`, o una partida de cien rondas
+     sería casi toda un tablero quieto;
+   - **el tiro**, a la velocidad sola del juego (`shotPace`: ×1 los
+     primeros 5 s y después sube hasta ×4). Si entre ese tiro y el
+     siguiente pasó menos (apuró con el botón de velocidad), se reparte
+     parejo en el tiempo que de verdad duró;
+   - **la bajada** del tablero, `BB_BAJA` ms.
+   Para ir hacia atrás (y saltar al final) se guarda una foto del tablero
+   antes de cada tiro: rehacer cuatrocientas rondas de física en cada
+   vuelta del bucle trabaría el salón. Se dibuja como bbtan/game.js en su
+   cielo de siempre: el fondo de puntos, los bloques con su marco de
+   píxeles, su vida y su barra, los bonos en sus colores y las bolas. */
+const BB = { lima: "#c4f568", morado: "#b7a1f7", naranja: "#ffa675", cian: "#77d9d2", fondo: "#141719", puntos: "#2a2e2f", suelo: "#4b5142", bola: "#f6ffe9", texto: "#a9b699" };
+const BB_APUNTA_MAX = 1500, BB_APUNTA_MIN = 350, BB_BAJA = 400;
+const bbColor = b => b.reinforced || b.max >= 24 ? BB.naranja : b.max >= 14 ? BB.morado : b.max >= 8 ? BB.cian : BB.lima;
+const bbItem = p => p.kind === "ball" ? BB.lima : p.kind === "laser-h" ? BB.morado : p.kind === "laser-v" ? BB.cian : BB.naranja;
+/* Los ticks que corrieron `s` segundos después de lanzar, a la velocidad
+   sola del juego (la integral de `shotPace`), y su inversa. */
+const bbTicksEn = s => 60 * (s <= 5 ? s : s <= 14.375 ? 5 + (s - 5) + 0.16 * (s - 5) ** 2 : 28.4375 + 4 * (s - 14.375));
+function bbSegundos(k) {
+  const x = k / 60;
+  if (x <= 5) return x;
+  if (x <= 28.4375) return 5 + (-1 + Math.sqrt(1 + 0.64 * (x - 5))) / 0.32;
+  return 14.375 + (x - 28.4375) / 4;
+}
+function reproBbtan(p) {
+  const tiros = p && typeof p.u === "string" && Number.isInteger(p.s) ? Bbtan.decodifica(p.t) : null;
+  if (!tiros || !tiros.length) throw new Error("prueba ilegible");
+  const foto = E => ({ round: E.round, count: E.count, score: E.score, launchX: E.launchX, idSeq: E.idSeq,
+    blocks: E.blocks.map(b => Object.assign({}, b)), pickups: E.pickups.map(q => ({ x: q.x, y: q.y, kind: q.kind, alive: q.alive })) });
+  const revela = f => {
+    const E = Bbtan.nueva(p.s, p.u);
+    Object.assign(E, { round: f.round, count: f.count, score: f.score, launchX: f.launchX, idSeq: f.idSeq,
+      blocks: f.blocks.map(b => Object.assign({}, b)), pickups: f.pickups.map(q => Object.assign({}, q)) });
+    E._celdas = null;
+    return E;
+  };
+  // Primera pasada: la foto antes de cada tiro, cuántos ticks duró y el horario de la repetición.
+  const plan = [];
+  let E = Bbtan.nueva(p.s, p.u), reloj = 0;
+  for (let i = 0; i < tiros.length; i++) {
+    const f = foto(E), ticks = Bbtan.juegaTiro(E, tiros[i]);
+    if (typeof ticks !== "number") throw new Error(ticks);
+    const natural = bbSegundos(ticks) * 1000;
+    const hueco = i + 1 < tiros.length ? tiros[i + 1][1] - tiros[i][1] - BB_BAJA : Infinity;
+    const fisica = hueco > 0 && natural > hueco ? hueco : natural;
+    const pensado = i ? tiros[i][1] - tiros[i - 1][1] - plan[i - 1].fisica - BB_BAJA : tiros[0][1];
+    const apunta = Math.max(BB_APUNTA_MIN, Math.min(BB_APUNTA_MAX, pensado));
+    plan.push({ f, tiro: tiros[i], ticks, fisica, natural: fisica === natural, apunta, inicio: reloj });
+    reloj += apunta + fisica + BB_BAJA;
+  }
+  const dur = reloj;
+  let ci = -1, ultimoMs = -1, fase = "apunta", baja = 0, ahora = 0, fantasma = null, tirado = false;
+  E = null;
+  function avanza(pl, k) {
+    const t = pl.tiro;
+    while (E.state === "shoot") {
+      if (t.length > 2 && E.ticks >= t[2]) { Bbtan.recoge(E, true); break; }
+      if (E.ticks >= k) break;
+      Bbtan.tick(E);
+    }
+  }
+  function en(ms) {
+    ms = Math.max(0, Math.min(dur, ms));
+    let i = plan.length - 1;
+    while (i > 0 && plan[i].inicio > ms) i--;
+    if (i !== ci || ms < ultimoMs) { E = revela(plan[i].f); ci = i; fantasma = null; tirado = false; }
+    ultimoMs = ahora = ms;
+    const pl = plan[i], e = ms - pl.inicio;
+    if (e < pl.apunta) { fase = "apunta"; baja = 0; return; }
+    if (!tirado) { Bbtan.dispara(E, pl.tiro[0], pl.tiro[1], null, ""); tirado = true; }
+    const ef = e - pl.apunta;
+    if (ef < pl.fisica) {
+      fase = "tiro";
+      avanza(pl, Math.min(pl.ticks, Math.floor(pl.natural ? bbTicksEn(ef / 1000) : ef / pl.fisica * pl.ticks)));
+      return;
+    }
+    avanza(pl, pl.ticks);
+    fase = "baja";
+    baja = ms >= dur ? 1 : Math.min(1, (ef - pl.fisica) / BB_BAJA);
+    if (baja >= 1 && i === plan.length - 1) { if (E.state === "descend") Bbtan.baja(E); fase = "fin"; }
+  }
+  const { W, FLOOR, R } = Bbtan, ALTO = 580;
+  function pixelBall(ctx, x, y, r) { x = Math.round(x); y = Math.round(y); ctx.fillRect(x - r + 2, y - r, r * 2 - 4, r * 2); ctx.fillRect(x - r, y - r + 2, r * 2, r * 2 - 4); }
+  function marco(ctx, x, y, w, h, color) {
+    x = Math.round(x); y = Math.round(y); ctx.fillStyle = color;
+    ctx.fillRect(x + 4, y + 1, w - 8, 2); ctx.fillRect(x + 4, y + h - 3, w - 8, 2); ctx.fillRect(x + 1, y + 4, 2, h - 8); ctx.fillRect(x + w - 3, y + 4, 2, h - 8);
+    ctx.fillRect(x + 2, y + 2, 2, 2); ctx.fillRect(x + w - 4, y + 2, 2, 2); ctx.fillRect(x + 2, y + h - 4, 2, 2); ctx.fillRect(x + w - 4, y + h - 4, 2, 2);
+  }
+  // La línea de puntos del tiro que viene, como `drawAim` del juego.
+  function mira() {
+    if (fantasma) return fantasma;
+    const pl = plan[ci], [dx, dy] = Bbtan.direccion(pl.tiro[0]);
+    const g = { x: E.launchX, y: FLOOR - 1, vx: dx * Bbtan.VEL, vy: dy * Bbtan.VEL }, pts = [];
+    let golpes = 0;
+    for (let k = 0; k < 145; k++) {
+      const llego = Bbtan.stepBall(E, g, 0.008, () => golpes++, null);
+      if (k % 3 === 0) pts.push({ x: g.x, y: g.y });
+      if (llego || golpes >= 2) break;
+    }
+    return (fantasma = pts);
+  }
+  function pinta(ctx, w, h) {
+    const k = Math.min(w / W, h / ALTO);
+    ctx.save();
+    ctx.translate((w - W * k) / 2, (h - ALTO * k) / 2); ctx.scale(k, k);
+    relleno(ctx, 0, 0, W, ALTO, 14, BB.fondo);
+    ctx.fillStyle = BB.puntos;
+    for (let y = 14; y < FLOOR; y += 19) for (let x = 15; x < W; x += 19) ctx.fillRect(x, y, 1.5, 1.5);
+    ctx.strokeStyle = BB.suelo; ctx.lineWidth = 1.5; ctx.setLineDash([5, 6]);
+    ctx.beginPath(); ctx.moveTo(12, FLOOR + 7); ctx.lineTo(W - 12, FLOOR + 7); ctx.stroke(); ctx.setLineDash([]);
+    const dy = fase === "baja" ? Bbtan.ROW * (1 - (1 - baja) * (1 - baja)) : 0;
+    if (fase === "apunta") {
+      const pts = mira(), vis = Math.min(1, (ahora - plan[ci].inicio) / 300);
+      ctx.fillStyle = BB.lima;
+      pts.forEach((q, j) => { ctx.globalAlpha = ((1 - j / pts.length) * 0.5 + 0.08) * vis; ctx.fillRect(Math.round(q.x) - 1.5, Math.round(q.y) - 1.5, 4, 4); });
+      ctx.globalAlpha = 1;
+    }
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    for (const b of E.blocks) {
+      if (b.hp <= 0) continue;
+      const color = bbColor(b), y = b.y + dy;
+      ctx.fillStyle = color + "22"; ctx.fillRect(b.x + 3, y + 3, b.w - 6, b.h - 6);
+      marco(ctx, b.x, y, b.w, b.h, color);
+      ctx.fillStyle = color + "55"; ctx.fillRect(b.x + 5, y + b.h - 8, Math.round((b.w - 10) * (b.hp / b.max)), 2);
+      ctx.font = `700 ${b.hp > 99 ? 17 : 21}px ui-monospace, "IBM Plex Mono", monospace`;
+      ctx.fillStyle = color; ctx.fillText(String(b.hp), b.x + b.w / 2, y + b.h / 2);
+    }
+    for (const q of E.pickups) {
+      if (!q.alive) continue;
+      const color = bbItem(q), y = q.y + dy;
+      ctx.lineWidth = 1.5; ctx.fillStyle = color + "18"; ctx.beginPath(); ctx.arc(q.x, y, 11, 0, Math.PI * 2); ctx.fill(); ctx.strokeStyle = color; ctx.stroke();
+      ctx.fillStyle = color; ctx.font = `700 ${q.kind === "ball" ? 16 : 17}px ui-monospace, monospace`;
+      ctx.fillText(q.kind === "ball" ? "+" : q.kind === "laser-h" ? "↔" : q.kind === "laser-v" ? "↕" : "⁂", q.x, y + 1);
+    }
+    ctx.fillStyle = BB.bola;
+    for (const b of E.balls) pixelBall(ctx, b.x, b.y, R);
+    // El lanzador: donde salen las bolas (y adonde volverá la primera).
+    if (E.state === "aim" || (E.state === "shoot" && E.queue > 0)) { ctx.fillStyle = BB.lima; pixelBall(ctx, E.launchX, FLOOR - R, R + 1); }
+    if (E.nextX !== null && E.state !== "aim") { ctx.fillStyle = BB.lima; pixelBall(ctx, E.nextX, FLOOR - R, R + 1); }
+    // Arriba: la ronda y las bolas, como el marcador del juego.
+    ctx.font = '700 22px ui-monospace, "IBM Plex Mono", monospace'; ctx.textBaseline = "middle";
+    ctx.textAlign = "left"; ctx.fillStyle = BB.lima; ctx.fillText(`RONDA ${E.round}`, 16, 30);
+    ctx.textAlign = "right"; ctx.fillStyle = BB.texto; ctx.fillText(`×${E.count}`, W - 16, 30);
+    ctx.restore();
+  }
+  return {
+    dur, aspecto: ALTO / W, en, pinta,
+    get fin() { return fase === "fin"; },
+    marcador: () => ({ puntos: E ? E.round : 1, tiempo: ahora, extra: E ? `${E.count} bola${E.count === 1 ? "" : "s"} · ${E.score.toLocaleString("es-CL")} pts` : "" })
+  };
+}
+
+const FABRICAS = { tetris: reproTetris, snake: reproSnake, sortem: reproSortem, minas: reproMinas, dosmil: reproDosmil, aleteo: reproAleteo, bbtan: reproBbtan };
 
 /* null si la prueba no se puede reproducir (y entonces no se muestra). */
 export function crearRepro(juego, prueba) {

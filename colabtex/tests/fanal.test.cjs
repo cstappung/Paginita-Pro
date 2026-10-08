@@ -16,15 +16,17 @@ const R=require(path.join(D,'relato.js'));
 const MU=require(path.join(D,'musica.js'));
 const S=require(path.join(D,'sprites.js'));
 
-test('la travesía: trece jornadas, al menos ocho oleadas y tres jefes, cuatro actos en orden',()=>{
- assert.equal(M.JORNADAS_HISTORIA,13);
+test('la travesía: veinticinco jornadas en siete actos, siete jefes, y el Alba en la 13',()=>{
+ assert.equal(M.JORNADAS_HISTORIA,25);assert.equal(M.JORNADA_ALBA,13);
  const oleadas=M.JORNADAS.filter(j=>j.tipo==='oleada'||j.tipo==='lumbre');
  const jefes=M.JORNADAS.filter(j=>j.tipo==='jefe');
- assert.ok(oleadas.length>=8,String(oleadas.length));
- assert.deepEqual(jefes.map(j=>j.jefe),['nodriza','faro','esfinge','alba']);
+ assert.ok(oleadas.length>=17,String(oleadas.length));
+ assert.deepEqual(jefes.map(j=>j.jefe),['nodriza','faro','esfinge','alba','casco','crisalida','hoguera']);
+ assert.equal(M.jornada(13).jefe,'alba');
  // Los actos no retroceden y cada uno cierra con su jefe.
  M.JORNADAS.forEach((j,i)=>{assert.equal(j.n,i+1);if(i)assert.ok(j.acto>=M.JORNADAS[i-1].acto);});
- for(const a of [1,2,3])assert.equal(M.JORNADAS.filter(j=>j.acto===a).pop().tipo,'jefe');
+ for(const a of [1,2,3,6,7,8])assert.equal(M.JORNADAS.filter(j=>j.acto===a).pop().tipo,'jefe');
+ for(const j of M.JORNADAS)assert.ok(M.ROMANO_ACTO[j.acto],'acto '+j.acto+' con número');
  // El punto de control cae al empezar cada acto.
  for(const [a,n] of Object.entries(M.INICIO_ACTO))assert.equal(M.jornada(n).acto,+a);
 });
@@ -32,14 +34,63 @@ test('la travesía: trece jornadas, al menos ocho oleadas y tres jefes, cuatro a
 test('la curva: la historia sube de jornada en jornada y el sin fin sube y se detiene',()=>{
  const ol=M.JORNADAS.filter(j=>j.tipo==='oleada');
  for(let i=1;i<ol.length;i++)assert.ok(ol[i].fuego>=ol[i-1].fuego-0.2,'fuego jornada '+ol[i].n);
- assert.equal(M.dificultad(5),1);
- assert.ok(M.dificultad(20)>M.dificultad(15));
+ assert.equal(M.dificultad(5),1);assert.equal(M.dificultad(25),1);
+ assert.ok(M.dificultad(40)>M.dificultad(30));
  assert.equal(M.dificultad(500),2.4);
- // El sin fin recorre los tres actos en bloques de cuatro, con su jefe al cierre.
- assert.deepEqual([14,15,16,17].map(n=>M.jornada(n).tipo),['oleada','oleada','oleada','jefe']);
- assert.equal(M.jornada(17).jefe,'nodriza');assert.equal(M.jornada(21).jefe,'faro');assert.equal(M.jornada(25).jefe,'esfinge');
- assert.ok(M.vidaJefe(M.jornada(29))>M.vidaJefe(M.jornada(17)),'el jefe vuelve más fuerte');
- for(let n=14;n<200;n++){const j=M.jornada(n);if(j.tipo!=='oleada')continue;assert.ok(j.balas<=8&&j.cols<=11&&j.filas.length<=6,String(n));}
+ // El sin fin recorre los seis actos de pelea en bloques de cuatro, con su jefe al cierre.
+ assert.deepEqual([26,27,28,29].map(n=>M.jornada(n).tipo),['oleada','oleada','oleada','jefe']);
+ assert.deepEqual([29,33,37,41,45,49].map(n=>M.jornada(n).jefe),['nodriza','faro','esfinge','casco','crisalida','hoguera']);
+ assert.ok([26,30,34,38,42,46].every(n=>M.jornada(n).acto===5));
+ assert.ok(M.vidaJefe(M.jornada(53))>M.vidaJefe(M.jornada(29)),'el jefe vuelve más fuerte');
+ assert.ok(M.vidaJefe(M.jornada(25))>M.vidaJefe(M.jornada(4)),'los jefes crecen con la jornada');
+ for(let n=1;n<300;n++){const j=M.jornada(n);if(j.tipo!=='oleada')continue;
+  assert.ok(j.balas<=12&&j.cols<=11&&j.filas.length<=6&&j.fuego<=4&&j.apunta<=0.75&&j.picada<=0.6,String(n));
+  for(const v of Object.values(j.vida||{}))assert.ok(v>=1&&v<=(n>M.JORNADAS_HISTORIA?8:4),'vida en la '+n);}
+ assert.ok(M.jornada(62).vida.a>M.jornada(30).vida.a,'el sin fin se endurece');
+});
+
+test('los augurios: uno por jornada, fijos, y cada jornada un poco más dura que la anterior',()=>{
+ assert.equal(M.augurioDe(1),null);
+ assert.equal(M.augurioDe(2),'rafaga');assert.equal(M.augurioDe(10),'rafaga');assert.equal(M.augurioDe(9),'coraza');
+ assert.equal(M.nivelAugurio(2,'rafaga'),1);assert.equal(M.nivelAugurio(9,'rafaga'),1);assert.equal(M.nivelAugurio(10,'rafaga'),2);
+ assert.equal(M.nivelAugurio(8,'coraza'),0);assert.equal(M.nivelAugurio(9,'coraza'),1);
+ for(const a of M.AUGURIOS)assert.ok(R.AUGURIOS[a],'texto del augurio '+a);
+ // Lo mismo dos veces es lo mismo: no depende de la partida.
+ assert.deepEqual(M.jornada(37),M.jornada(37));
+ // La jornada 1 queda como estaba; la 10 dispara más que en la tabla.
+ assert.equal(M.jornada(1).fuego,M.JORNADAS[0].fuego);
+ assert.ok(M.jornada(10).fuego>M.JORNADAS[9].fuego);
+ // La coraza endurece primero a las grandes.
+ assert.equal(M.jornada(9).vida.c,(M.JORNADAS[8].vida.c||1)+1);
+ // Los jefes atacan más seguido y las escamas caen más rápido con las jornadas.
+ assert.ok(M.jornada(30).furia>M.jornada(8).furia&&M.jornada(30).velEscama>M.jornada(3).velEscama);
+});
+
+test('el taller: una brasa por nivel, tres niveles, evoluciones cada tres y el arma que sale de eso',()=>{
+ const est={mej:M.mejorasVacias(),brasas:4,llamas:3};
+ assert.equal(M.compra(est,'c'),null);assert.equal(M.compra(est,'c'),null);assert.equal(M.compra(est,'c'),null);
+ assert.match(M.compra(est,'c'),/máximo/);
+ assert.match(M.compra(est,'z'),/desconocida/);
+ assert.equal(M.compra(est,'o'),null);assert.equal(est.brasas,0);
+ assert.match(M.compra(est,'b'),/sin brasas/);
+ assert.equal(M.evolucion(est.mej,'arma'),1);assert.equal(M.evolucion(est.mej,'nave'),0);
+ assert.equal(M.llamasMax(est.mej),6);
+ // Encender una llama: solo si cabe.
+ const ll={mej:M.mejorasVacias(),brasas:3,llamas:5};
+ assert.match(M.compra(ll,'l'),/llenas/);ll.llamas=2;assert.equal(M.compra(ll,'l'),null);assert.equal(ll.llamas,3);assert.equal(ll.brasas,1);assert.match(M.compra(ll,'l'),/faltan/);
+ // El arma sin nada es la de siempre; llena, todo crece.
+ const a0=M.armas(M.mejorasVacias()),a4=M.armas({cadencia:3,fuerza:3,perfora:3,abanico:3});
+ assert.deepEqual([a0.cool,a0.danoN,a0.danoA,a0.perfN,a0.perfA,a0.patron.length,a0.tope],[0.16,1,2,0,1,1,2]);
+ assert.equal(a4.evolucion,4);assert.ok(a4.chispas&&a4.rayo);
+ assert.ok(a4.cool<a0.cool&&a4.danoA>a0.danoA&&a4.patron.length===4&&a4.perfN===2);
+ const n4=M.nave({remo:3,vidrio:3,aceite:3,iman:3});
+ assert.equal(n4.evolucion,4);assert.equal(n4.luciernagas,2);assert.ok(n4.campana&&n4.regenera>0&&n4.pulso>0);
+ assert.equal(M.llamasMax({aceite:3,remo:3,vidrio:3,iman:3}),M.LLAMAS_TOPE);
+ // Cada código es de una sola mejora, y los textos existen.
+ assert.equal(new Set(M.LISTA_MEJORAS.map(k=>M.MEJORAS[k].codigo)).size,8);
+ assert.ok(!M.POR_CODIGO[M.CODIGO_LLAMA]);
+ for(const k of M.LISTA_MEJORAS){assert.ok(R.MEJORAS[k]&&R.MEJORAS[k].d.length===M.MEJORAS[k].max,k);}
+ for(const r of ['arma','nave'])assert.equal(R.EVOLUCIONES[r].length,M.EVOLUCION.length+1);
 });
 
 test('la formación cabe en la pantalla y deja espacio para marchar',()=>{
@@ -56,16 +107,18 @@ test('puntos, Resonancia, bonus y llamas extra',()=>{
  assert.equal(M.resonancia(0),1);assert.equal(M.resonancia(3),1);assert.equal(M.resonancia(4),2);assert.equal(M.resonancia(99),8);
  assert.equal(M.puntosPolilla(1,'c',1,false,0),30);
  assert.equal(M.puntosPolilla(1,'c',2,true,0),90);            // 30 × 2 × 1,5
- assert.equal(M.puntosPolilla(5,'a',1,false,2),30);           // 25 × 1,2 en la segunda vuelta
+ assert.equal(M.puntosPolilla(5,'a',1,false,2),48);           // 40 × 1,2 en la segunda vuelta
+ for(const a of [6,7,8])assert.ok(M.PUNTOS[a].c>M.PUNTOS[3].c,'la otra orilla paga más: '+a);
+ for(const j of ['casco','crisalida','hoguera'])assert.ok(M.PUNTOS_JEFE[j]>0&&M.VIDA_JEFE[j]>0,j);
  const b=M.bonusJornada({acto:2,sinDanio:true,disparos:10,aciertos:5});
  assert.deepEqual(b,{sinDanio:1000,precision:500,total:1500});
  assert.equal(M.bonusJornada({acto:1,sinDanio:false,disparos:0,aciertos:0}).total,0);
  assert.equal(M.llamasGanadas(29000,31000),1);
  assert.equal(M.llamasGanadas(0,160000),3);
  assert.equal(M.llamasGanadas(150000,260000),1);              // solo 250 000: 150 000 ya estaba
- // Una travesía perfecta queda lejos del tope del ranking.
- const pol=M.JORNADAS.reduce((t,j)=>t+M.polillasDe(j),0);
- assert.ok(pol*M.puntosPolilla(3,'c',8,true,0)+Object.values(M.PUNTOS_JEFE).reduce((a,c)=>a+c,0)<1000000);
+ // La primera parte perfecta queda lejos del tope del ranking.
+ const pol=M.JORNADAS.slice(0,13).reduce((t,j)=>t+M.polillasDe(j),0);
+ assert.ok(pol*M.puntosPolilla(3,'c',8,true,0)+8000<1000000);
 });
 
 test('el juicio del pulso: dentro de la ventana es afinado, fuera no, y el más cercano manda',()=>{
@@ -88,24 +141,32 @@ test('el progreso se mezcla: se suman cartas, el final no se olvida y gana el pu
  assert.equal(M.mezclaProgreso(a,{punto:{j:9,puntos:1,llamas:3,at:30}}).punto.j,9);
  assert.deepEqual(M.mezclaProgreso('basura',null).frag,[]);
  const r=M.mulberry32(7),r2=M.mulberry32(7);assert.equal(r(),r2());
+ // El punto de control lleva las mejoras y las brasas (limpias), y la Hoguera vista no se olvida.
+ const p=M.mezclaProgreso({hoguera:true,punto:{j:14,puntos:5,llamas:7,at:3,mej:{aceite:2,remo:9,trampa:3},br:4}},{hoguera:false});
+ assert.equal(p.hoguera,true);assert.equal(p.punto.mej.aceite,2);assert.equal(p.punto.mej.remo,3);assert.equal(p.punto.mej.trampa,undefined);
+ assert.equal(p.punto.br,4);assert.equal(p.punto.llamas,7);
 });
 
 test('el relato: textos completos, en orden, y las cartas no se adelantan',()=>{
  assert.equal(R.BITACORA.length,M.JORNADAS_HISTORIA);
  R.BITACORA.forEach((t,i)=>assert.ok(t.startsWith('Jornada '+(i+1)+'.'),t));
- assert.equal(R.FRAGMENTOS.length,13);
+ assert.equal(R.FRAGMENTOS.length,19);
  for(let i=1;i<R.FRAGMENTOS.length;i++)assert.ok(R.FRAGMENTOS[i].acto>=R.FRAGMENTOS[i-1].acto);
  assert.equal(R.fragmentoSiguiente([],1),0);
  assert.equal(R.fragmentoSiguiente([0,1,2,3],1),-1,'el acto I solo deja leer las suyas');
  assert.equal(R.fragmentoSiguiente([0,1,2,3],2),4);
  assert.equal(R.fragmentoSiguiente([...Array(13).keys()],4),-1);
  // Cada acto tiene Mensajeras suficientes para todas sus cartas.
- for(const a of [1,2,3,4]){const cartas=R.FRAGMENTOS.filter(f=>f.acto===a).length,cruces=M.JORNADAS.filter(j=>j.acto===a).reduce((t,j)=>t+(j.mensajeras||0),0);assert.ok(cruces>=cartas,'acto '+a+': '+cruces+' cruces para '+cartas+' cartas');}
+ assert.equal(R.fragmentoSiguiente([...Array(13).keys()],6),13,'la otra orilla sigue en la XIV');
+ assert.equal(R.fragmentoSiguiente([],5),-1,'el sin fin no trae cartas');
+ for(const a of [1,2,3,4,6,7,8]){const cartas=R.FRAGMENTOS.filter(f=>f.acto===a).length,cruces=M.JORNADAS.filter(j=>j.acto===a).reduce((t,j)=>t+(j.mensajeras||0),0);assert.ok(cruces>=cartas,'acto '+a+': '+cruces+' cruces para '+cartas+' cartas');}
  assert.ok(R.ECOS.length>=10);assert.ok(R.ecoSiguiente([0,1],0)===2);
  assert.match(R.bitacora(14),/^Jornada 14\. /);assert.match(R.bitacora(140),/^Jornada 140\. /);
  assert.equal(R.romano(13),'XIII');assert.equal(R.romano(4),'IV');
  assert.ok(R.REVELACION.length>=4&&R.FINAL.length>=4);
- for(const j of ['nodriza','faro','esfinge','alba'])assert.ok(R.JEFES[j].nombre&&R.JEFES[j].epiteto,j);
+ for(const j of ['nodriza','faro','esfinge','alba','casco','crisalida','hoguera'])assert.ok(R.JEFES[j].nombre&&R.JEFES[j].epiteto,j);
+ for(const a of [1,2,3,4,5,6,7,8])assert.ok(R.actoInfo(a).nombre&&R.actoInfo(a).lema,'acto '+a);
+ assert.ok(R.FINAL_HOGUERA.length>=4&&R.FINAL_HOGUERA_ORDEN&&R.AVISO_HOGUERA);
  // Todo el texto en español, sin restos de plantilla.
  const todo=JSON.stringify(R);assert.doesNotMatch(todo,/undefined|\bTODO\b|lorem ipsum/);
 });
@@ -129,6 +190,16 @@ test('la música: cada acto con su escala y su métrica irregular, y los efectos
  assert.ok(Math.abs(MU.frecuencia(110,'hungara',-7)-55)<1e-9);
  // El sin fin rota de escala y compás.
  assert.notEqual(MU.etapaSinFin(0).escala,MU.etapaSinFin(1).escala);
+});
+
+test('la otra orilla suena distinta: escalas y compases propios e irregulares',()=>{
+ const orilla=[6,7,8].map(a=>MU.ETAPAS[a]);
+ assert.equal(new Set([1,2,3,4,6,7,8].map(a=>MU.ETAPAS[a].escala)).size,7,'una escala por acto');
+ for(const e of orilla){const m=MU.mapaCompas(e.metrica);assert.ok(MU.METRICAS[e.metrica],e.metrica);assert.ok(m.grupos.some(g=>g!==m.grupos[0]),'grupos desiguales en '+e.metrica);}
+ for(const [j,met] of [['casco','10/8'],['crisalida','15/8'],['hoguera','3+3+2']]){
+  assert.equal(MU.largoMotivo(MU.leitmotiv(j,0)),MU.mapaCompas(met).largo*2,j);
+  assert.notDeepEqual(MU.leitmotiv(j,0),MU.leitmotiv(j,2),j+' cambia en la última fase');
+ }
 });
 
 test('los leitmotivs duran dos compases de su acto y cambian con la vida del jefe',()=>{
@@ -162,7 +233,7 @@ test('las capas: el latido siempre en juego, el colchón solo con peligro, silen
 
 test('los dibujos: filas del mismo largo, papeles conocidos y una paleta por acto',()=>{
  const forma=(nombre,filas)=>{const w=filas[0].length;filas.forEach((f,i)=>assert.equal(f.length,w,nombre+' fila '+i));};
- for(const a of [1,2,3,4])for(const t of ['a','b','c']){
+ for(const a of [1,2,3,4,6,7,8])for(const t of ['a','b','c']){
   const p=S.POLILLAS[a][t];assert.equal(p.length,2,a+t);
   p.forEach((cuadro,i)=>{forma('polilla '+a+t+i,cuadro);assert.match(cuadro.join(''),/^[.abBcdef]+$/);});
   for(const papel of 'abBcdef')assert.match(S.paletaPolilla(a,t)[papel],/^#[0-9a-f]{6}$/,a+t+papel);
@@ -171,8 +242,10 @@ test('los dibujos: filas del mismo largo, papeles conocidos y una paleta por act
  S.MINI.forEach((c,i)=>forma('mini'+i,c));S.MENSAJERA.forEach((c,i)=>forma('mensajera'+i,c));
  forma('fanal',S.FANAL);forma('naufragio',S.NAUFRAGIO);
  for(const [k,v] of Object.entries(S.PODERES))forma(k,v);
- for(const a of [1,2,3,5]){const n=S.naufragio(a);assert.equal(n.length,S.NAUFRAGIO.length);assert.ok(n.flat().filter(Boolean).length>150);}
- assert.equal(new Set([1,2,3,4,5].map(a=>S.PALETAS[a].cielo[0])).size,5,'cinco cielos distintos');
+ S.FANAL_EVO.forEach((f,i)=>{forma('fanal evo '+i,f);assert.equal(f.length,S.FANAL.length);assert.equal(f[0].length,S.FANAL[0].length);});
+ assert.equal(S.FANAL_EVO.length,S.PALETAS_FANAL.length);forma('fanalito',S.FANALITO);
+ for(const a of [1,2,3,5,6,7,8]){const n=S.naufragio(a);assert.equal(n.length,S.NAUFRAGIO.length);assert.ok(n.flat().filter(Boolean).length>150);}
+ assert.equal(new Set([1,2,3,4,5,6,7,8].map(a=>S.PALETAS[a].cielo[0])).size,8,'ocho cielos distintos');
  assert.equal(S.mezcla('#000000','#ffffff',0.5),'#808080');
 });
 
