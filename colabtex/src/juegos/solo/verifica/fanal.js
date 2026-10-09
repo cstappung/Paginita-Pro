@@ -12,7 +12,7 @@
 import FP from '../../../../../juegos/club/fanal/prueba.js';
 import FM from '../../../../../juegos/club/fanal/motor.js';
 
-export const PRUEBA = 3;
+export const PRUEBA = 4;
 
 const TOPE = 1000000;   // el de resultadoClub para los puntos
 
@@ -25,14 +25,17 @@ export function verifica(dato, prueba, ctx) {
   if (ctx && ctx.uid && prueba.u && prueba.u !== ctx.uid) return 'La prueba es de otra cuenta.';
   const r = FP.rehace(prueba);
   if (r.motivo) return 'La partida no cuadra: ' + r.motivo + '.';
-  if (cat === 'club-fanal-travesia' && prueba.m !== 't') return 'La prueba es de una travesía sin fin, no de la historia.';
-  if (cat === 'club-fanal-sinfin' && prueba.m !== 's') return 'La prueba es de la historia, no de la travesía sin fin.';
+  // Desde la versión 4 hay un solo modo: la travesía, siempre desde la
+  // jornada 1, que después del Sol sigue sin fin. La tabla «sin fin» quedó
+  // con las marcas de antes y ya no recibe ninguna.
+  if (prueba.m !== 't' || prueba.k !== 0) return 'La prueba no empieza en la jornada 1.';
   if (cat === 'club-fanal-jornadas') {
     if (dato.puntos !== r.completadas) return 'Las jornadas declaradas (' + dato.puntos + ') no son las de la partida (' + r.completadas + ').';
-  } else if (cat === 'club-fanal-travesia' || cat === 'club-fanal-sinfin') {
+  } else if (cat === 'club-fanal-travesia') {
     if (dato.puntos !== Math.min(TOPE, r.puntos)) return 'Los puntos declarados (' + dato.puntos + ') no son los de la partida (' + r.puntos + ').';
   } else return 'Categoría desconocida.';
-  // El tiempo declarado es el de juego de esta sesión: la suma del de cada jornada.
+  // El tiempo declarado es el de juego: la suma del de cada jornada (una
+  // travesía retomada lleva en su prueba todas las anteriores).
   if (Math.abs(dato.tiempo - Math.max(1, r.tiempo)) > 2) return 'El tiempo declarado no es el de la partida.';
   return null;
 }
@@ -43,17 +46,17 @@ export function verifica(dato, prueba, ctx) {
    40–60 s por jornada y unos 100–250 puntos por segundo. Con las mejoras
    el arma crece, pero los augurios también: los umbrales de aquí son
    varias veces más generosos y solo marcan lo que ninguna persona hace.
-   La travesía ya no tiene techo de puntos (sigue sin fin): se mira el ritmo. */
+   La travesía no tiene techo de puntos (sigue sin fin): se mira el ritmo. */
 const S_POR_JORNADA = 8;        // s de juego por jornada como mínimo (las honestas: 30–60)
 const PPS_SINFIN = 5000;        // puntos por segundo en el sin fin (con el arma llena, un bot de Chromium hizo 3400)
-const PPS_TRAVESIA = 2500;      // en la travesía, holgado: un punto de control trae puntos de antes sin su tiempo
+const PPS_TRAVESIA = 5000;      // en la travesía (pasado el Sol, con el arma llena, un bot de Chromium hizo 3400)
 
 export function sospecha(categoria, fila) {
   const p = fila && fila.puntos, t = (fila && fila.tiempo || 0) / 1000;
   if (!Number.isFinite(p) || !Number.isFinite(t) || t <= 0) return 'fila sin puntos o sin tiempo';
   if (categoria === 'club-fanal-jornadas') {
-    // Pudo seguir desde el punto de control del acto (el sin fin también
-    // tiene el suyo, y su modo empieza ahí).
+    // Las filas de antes de la versión 4 pudieron seguir desde el punto de
+    // control de un acto (o del sin fin); se les da ese margen.
     const desde = Math.max(...Object.values(FM.INICIO_ACTO).filter(j => j <= p));
     const min = (p - desde + 1) * S_POR_JORNADA + (p >= FM.JORNADA_ALBA && desde <= FM.JORNADA_ALBA ? 60 : 0);
     if (t < min) return p > FM.JORNADAS_HISTORIA ? (p - desde + 1) + ' jornadas del sin fin en ' + t.toFixed(1) + ' s' : 'jornada ' + p + ' en ' + t.toFixed(1) + ' s';

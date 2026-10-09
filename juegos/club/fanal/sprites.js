@@ -150,6 +150,54 @@
       b: { a: "#6a5a50", b: "#3a3030", B: "#241c1c", e: "#ff9a40", f: "#ff6a20", c: "#2a2020", d: "#5a4a40" },   // ceniza encendida
       c: { a: "#ffd070", b: "#e84a1a", B: "#a02a10", e: "#ffe080", f: "#ffb040", c: "#5a1a0a", d: "#ff8a2a" },   // fénix menor
       acento: "#ff8a3a"
+    },
+    /* Lo alto. VIII · la marea: de noche otra vez, plata y tinta azul,
+       con la luna encima del agua. */
+    9: {
+      nombre: "marea",
+      cielo: ["#060a18", "#0e1830", "#1a2a48"],
+      estrella: ["#eef4ff", "#c8d8f0", "#a8b8d8"],
+      nube: ["#22304e", "#3a4a6e"],                      // el reflejo en el agua
+      particula: "#a8c8f0",                              // espuma que sube
+      sombra: "#04060e",
+      escama: ["#eef4ff", "#8ab0e8"],
+      naufragio: { m: "#2a3448", n: "#1a2232", k: "#3e4a62", h: "#8a9ab8", g: "#c8d6ee" },
+      a: { a: "#9aa4b8", b: "#d0d8e6", B: "#a0aabc", e: "#ffffff", f: "#eef2f8", c: "#6a7488", d: "#c0c8d8" },   // polilla de plata
+      b: { a: "#a8c890", b: "#c8e6b0", B: "#8ab890", e: "#f0fae0", f: "#e0f4d0", c: "#6a8a6a", d: "#b0d8a8" },   // polilla luna (la verde)
+      c: { a: "#5a6a9a", b: "#3a4a7a", B: "#24305a", e: "#c8d6f0", f: "#8a9ad0", c: "#1e2848", d: "#4a5a8a" },   // de tinta
+      acento: "#c8d8f0"
+    },
+    /* IX · el firmamento: negro, oro de estrella y violeta. */
+    10: {
+      nombre: "firmamento",
+      cielo: ["#020208", "#06061a", "#0e0a2a"],
+      estrella: ["#fff8e0", "#d8c8ff", "#a8b8ff"],
+      nube: ["#120a2e", "#22164a"],                      // la vía láctea, apenas
+      particula: "#d8c8ff",                              // polvo de estrellas
+      sombra: "#010104",
+      escama: ["#fff8e0", "#b08aff"],
+      naufragio: { m: "#1a1630", n: "#0e0c1e", k: "#2a2448", h: "#6a5aa8", g: "#d8c8ff" },
+      a: { a: "#c8a860", b: "#ffe6a0", B: "#d8b060", e: "#fffaf0", f: "#fff2c8", c: "#7a5a2a", d: "#ffd27a" },   // polilla de oro
+      b: { a: "#6a5aa8", b: "#4a3a8a", B: "#2e2460", e: "#d8c8ff", f: "#9a86e0", c: "#1e1640", d: "#5a4a98" },   // violeta
+      c: { a: "#3a4a8a", b: "#22306a", B: "#141c48", e: "#a8c0ff", f: "#6a80d0", c: "#0e1430", d: "#3a4a9a" },   // azul de medianoche
+      acento: "#d8c8ff"
+    },
+    /* X · el cenit: mediodía. Cielo claro, y las polillas oscuras contra
+       él (aquí lo que se ve es la sombra). Las escamas, rojas: en un cielo
+       blanco, una escama blanca no se vería. */
+    11: {
+      nombre: "cenit",
+      cielo: ["#8ac8f0", "#c8e6f8", "#fff4dc"],
+      estrella: ["#ffffff", "#fff8e0", "#fff0c0"],
+      nube: ["#ffffff", "#e8f4fc"],
+      particula: "#fff8d0",                              // destellos en el aire
+      sombra: "#2a3a4a",
+      escama: ["#e8401a", "#a02a10"],
+      naufragio: { m: "#a88858", n: "#806038", k: "#c8a878", h: "#fff0c8", g: "#ffffff" },
+      a: { a: "#8a4a2a", b: "#c8682a", B: "#8a4018", e: "#ffe0a0", f: "#ffb050", c: "#4a1a0a", d: "#e8823a" },   // chispa de mediodía
+      b: { a: "#7a2a4a", b: "#b8405a", B: "#7a1a38", e: "#ffc0b0", f: "#ff8a98", c: "#3a0a1a", d: "#d85070" },   // grana
+      c: { a: "#1a3a7a", b: "#2a5aa8", B: "#1a3a78", e: "#c0e0ff", f: "#7aaae8", c: "#0a1a40", d: "#3a6ac8" },   // azul cobalto
+      acento: "#ff9a3c"
     }
   };
 
@@ -611,6 +659,13 @@
       ".f..f.f..f."
     ]]
   };
+
+  /* Lo alto no inventa formas nuevas: la marea trae las de la seda (la
+     polilla luna es de ahí), el firmamento las de lo oscuro y el cenit las
+     de la hoguera. Cambian los colores, que es lo que se ve de lejos. */
+  POLILLAS[9] = POLILLAS[7];
+  POLILLAS[10] = POLILLAS[3];
+  POLILLAS[11] = POLILLAS[8];
 
   /* Una polilla chica (7×5) para las larvas de la Nodriza y las que cubren
      el Faro Ciego. */
@@ -1109,6 +1164,90 @@
     return cuantiza(c, Object.values(col));
   }
 
+  /* La Luna: un disco de nácar en creciente (la parte en sombra tiene un
+     ojo abierto) con alas de velo detrás, que se abren con `k`. */
+  const COLORES_LUNA = { l: "#e8eef6", L: "#b8c4d6", s: "#7a88a0", S: "#3e4a62", o: "#1a2236", a: "#9ab0d8", A: "#5a6e98", e: "#fff8e8" };
+  function luna(k, col) {
+    const W = 64, H = 50, cx = 32, cy = 24, c = lienzo(W, H), x = c.getContext("2d");
+    if (!x) return c;
+    col = col || COLORES_LUNA;
+    // Las alas de velo, detrás del disco.
+    espejo(cx, s => {
+      elipse(x, cx + s * (15 + 6 * k), cy - 2, 9 + 9 * k, 11, col.A, s * 0.55);
+      elipse(x, cx + s * (14 + 6 * k), cy - 1, 6 + 7 * k, 8, col.a, s * 0.55);
+      elipse(x, cx + s * (12 + 3 * k), cy + 13, 5 + 3 * k, 6, col.A, -s * 0.4);
+    });
+    // El disco y su borde.
+    elipse(x, cx, cy, 17, 17, col.L);
+    elipse(x, cx, cy, 15.5, 15.5, col.l);
+    // La sombra: un creciente (recortado dentro del disco).
+    x.save(); x.beginPath(); x.ellipse(cx, cy, 15.5, 15.5, 0, 0, Math.PI * 2); x.clip();
+    elipse(x, cx + 10, cy - 3, 14, 15, col.S);
+    elipse(x, cx + 12, cy - 4, 11, 12, col.o);
+    x.restore();
+    // Cráteres en la parte iluminada.
+    elipse(x, cx - 8, cy - 6, 2.6, 2.1, col.L);
+    elipse(x, cx - 4, cy + 7, 3, 2.3, col.L);
+    elipse(x, cx - 11, cy + 3, 1.7, 1.4, col.s);
+    elipse(x, cx - 2, cy - 11, 1.4, 1.1, col.s);
+    // El ojo dormido del lado claro y el abierto del lado oscuro.
+    trazo(x, [[cx - 10, cy - 1], [cx - 7, cy + 1], [cx - 4, cy - 1]], col.S, 1);
+    elipse(x, cx + 6, cy - 2, 2, 1.5, col.e);
+    return cuantiza(c, Object.values(col));
+  }
+
+  /* Una de las Siete Hermanas: una estrella de cuatro puntas con su núcleo.
+     Las veladas (que no reciben daño) se pintan apagadas. */
+  const COLORES_HERMANA = { w: "#fffaf0", y: "#ffe6a0", o: "#ffb84a", v: "#b08ae0", V: "#5a4a98" };
+  const COLORES_VELADA = { w: "#8a80a8", y: "#5a5078", o: "#3a3058", v: "#2e2448", V: "#1a1430" };
+  function hermana(k, col) {
+    const W = 15, H = 15, cx = 7.5, c = lienzo(W, H), x = c.getContext("2d");
+    if (!x) return c;
+    col = col || COLORES_HERMANA;
+    const L = 6.8 - k, l = 1.6;
+    poligono(x, [[cx, cx - L - 0.5], [cx + l, cx - l], [cx + L + 0.5, cx], [cx + l, cx + l], [cx, cx + L + 0.5], [cx - l, cx + l], [cx - L - 0.5, cx], [cx - l, cx - l]], col.v);
+    poligono(x, [[cx, cx - L + 1], [cx + 1, cx - 1], [cx + L - 1, cx], [cx + 1, cx + 1], [cx, cx + L - 1], [cx - 1, cx + 1], [cx - L + 1, cx], [cx - 1, cx - 1]], col.y);
+    elipse(x, cx, cx, 2.6, 2.6, col.o);
+    elipse(x, cx, cx, 1.6, 1.6, col.w);
+    return cuantiza(c, Object.values(col));
+  }
+
+  /* El Sol: un disco de fuego con cara, y una corona de lenguas cortas que
+     cambia con `k` (los rayos largos se pintan vivos en el juego). */
+  const COLORES_SOL = { r: "#c84a1a", o: "#ff9a3c", y: "#ffd070", g: "#fff0b0", w: "#fffaf0", e: "#7a2a10" };
+  function sol(k, col) {
+    const W = 64, H = 64, cx = 32, cy = 32, c = lienzo(W, H), x = c.getContext("2d");
+    if (!x) return c;
+    col = col || COLORES_SOL;
+    // La corona: doce lenguas, alternando largas y cortas.
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2 + (k % 2) * 0.13, largo = (i % 2 ? 26 : 29) + k * 1.2, ab = 0.16;
+      poligono(x, [[cx + Math.cos(a - ab) * 19, cy + Math.sin(a - ab) * 19], [cx + Math.cos(a) * largo, cy + Math.sin(a) * largo], [cx + Math.cos(a + ab) * 19, cy + Math.sin(a + ab) * 19]], i % 2 ? col.r : col.o);
+    }
+    // El disco en anillos.
+    elipse(x, cx, cy, 21, 21, col.r);
+    elipse(x, cx, cy, 19.5, 19.5, col.o);
+    elipse(x, cx, cy, 16, 16, col.y);
+    elipse(x, cx - 2, cy - 2, 11, 11, col.g);
+    elipse(x, cx - 4, cy - 4, 5, 5, col.w);
+    // La cara: dos ojos entornados y una boca que no sonríe.
+    trazo(x, [[cx - 10, cy - 3], [cx - 7, cy - 5], [cx - 4, cy - 3]], col.e, 1.4);
+    trazo(x, [[cx + 4, cy - 3], [cx + 7, cy - 5], [cx + 10, cy - 3]], col.e, 1.4);
+    trazo(x, [[cx - 6, cy + 8], [cx, cy + 6 + k * 0.6], [cx + 6, cy + 8]], col.e, 1.4);
+    return cuantiza(c, Object.values(col));
+  }
+
+  /* Un lienzo teñido: el color se mezcla encima sin tocar lo transparente
+     (las fases 2 y 3 de los jefes, de carmesí). */
+  function tine(c, color, a) {
+    const s = lienzo(c.width, c.height), x = s.getContext("2d");
+    if (!x) return s;
+    x.drawImage(c, 0, 0);
+    x.globalCompositeOperation = "source-atop";
+    x.globalAlpha = a; x.fillStyle = color; x.fillRect(0, 0, s.width, s.height);
+    return s;
+  }
+
   /* ================================================================
      El banco: todo pintado una vez
      ================================================================ */
@@ -1165,6 +1304,20 @@
       nodriza(cuadro, blanco) {
         return toma("jn" + cuadro + (blanco ? "w" : ""), () => { const c = nodriza([1, 0.86, 0.72][cuadro % 3]); return blanco ? silueta(c) : c; });
       },
+      luna(cuadro, blanco) {
+        return toma("jl" + (cuadro % 3) + (blanco ? "w" : ""), () => { const c = luna([1, 0.85, 0.7][cuadro % 3]); return blanco ? silueta(c) : c; });
+      },
+      hermana(cuadro, velada, blanco) {
+        return toma("jk" + (cuadro & 1) + (velada ? "v" : "") + (blanco ? "w" : ""), () => { const c = hermana(cuadro & 1 ? 1.4 : 0, velada ? COLORES_VELADA : null); return blanco ? silueta(c) : c; });
+      },
+      sol(cuadro, blanco) {
+        return toma("js" + (cuadro % 3) + (blanco ? "w" : ""), () => { const c = sol(cuadro % 3); return blanco ? silueta(c) : c; });
+      },
+      /* Cualquier lienzo del banco, teñido (las fases 2 y 3). La clave es
+         la del original más el tinte. */
+      tinte(img, clave, color, a) {
+        return toma("t" + clave + color + a, () => tine(img, color, a));
+      },
       faro(blanco) {
         return toma("jf" + (blanco ? "w" : ""), () => { const c = faro(1); return blanco ? silueta(c) : c; });
       },
@@ -1205,7 +1358,7 @@
   return {
     PALETAS, PALETA_FANAL, PALETA_ALBA, POLILLAS, MINI, MENSAJERA, FANAL, LLAMA, NAUFRAGIO, DECORACION,
     PODERES, CARTA, DIGITOS, MARCAS_ESFINGE, COLORES_NODRIZA, COLORES_FARO, COLORES_ESFINGE,
-    FANAL_EVO, PALETAS_FANAL, FANALITO, COLORES_CASCO, COLORES_CRISALIDA, COLORES_HOGUERA,
+    FANAL_EVO, PALETAS_FANAL, FANALITO, COLORES_CASCO, COLORES_CRISALIDA, COLORES_HOGUERA, COLORES_LUNA, COLORES_HERMANA, COLORES_SOL,
     rgb, hex, mezcla, paletaPolilla, lienzo, pintaTexto, silueta, cuantiza, crearBanco, naufragio
   };
 });
