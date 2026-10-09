@@ -25,7 +25,7 @@
     input[type="checkbox"] { accent-color: var(--accent); }
     input[type="range"] { accent-color: var(--accent); }
   </style>
-  <script src="scope-engine.js?v=202610081622"></script>
+  <script src="scope-engine.js?v=202610090114"></script>
 </helmet>
 
 <div class="osc" data-screen-label="CSV Oscilloscope">
@@ -182,7 +182,7 @@
               <div class="cell">
                 <div class="k">THD</div>
                 <div id="thdBig" class="v">—</div>
-                <div class="s">vs. fundamental</div>
+                <div id="thdSub" class="s">vs. fundamental</div>
               </div>
               <div class="cell">
                 <div class="k">TDD</div>
@@ -418,8 +418,27 @@
             <label class="lab w" title="Maximum demand load current (rated current of the converter), rms">I<sub>L</sub> (rms)</label>
             <input id="ilIn" class="in grow mono" type="text" defaultValue="" placeholder="e.g. 100 or 4.5">
           </div>
+          <div class="row">
+            <label class="lab w" title="Draws the IEEE 519 limit behind the harmonic bars. Current limits depend on the short-circuit ratio I_SC/I_L at the point of common coupling; voltage limits on the bus voltage.">Limits</label>
+            <select id="ieeeSel" class="in grow">
+              <option value="off">Off</option>
+              <optgroup label="Current · I_SC/I_L (Table 2)">
+                <option value="i20">I_SC/I_L &lt; 20</option>
+                <option value="i50">20 – 50</option>
+                <option value="i100">50 – 100</option>
+                <option value="i1000">100 – 1000</option>
+                <option value="iinf">&gt; 1000</option>
+              </optgroup>
+              <optgroup label="Voltage · bus (Table 1)">
+                <option value="v1k">V ≤ 1 kV</option>
+                <option value="v69k">1 – 69 kV</option>
+                <option value="v161k">69 – 161 kV</option>
+                <option value="vhi">&gt; 161 kV</option>
+              </optgroup>
+            </select>
+          </div>
           <button id="btnIeee" class="btn wide" title="Sets the harmonic count to 50, the order used by IEEE 519">Preset IEEE 519 · n ≤ 50</button>
-          <div class="hint">TDD refers the harmonic content to the rated demand current I<sub>L</sub> instead of the fundamental, so a lightly loaded converter no longer looks distorted. Leave I<sub>L</sub> empty to show THD only.</div>
+          <div class="hint">TDD refers the harmonic content to the rated demand current I<sub>L</sub> instead of the fundamental, so a lightly loaded converter no longer looks distorted. Leave I<sub>L</sub> empty to show THD only. With <b>Limits</b> on, the standard is drawn behind the harmonic bars (in % of I<sub>L</sub>, or of the measured I<sub>1</sub> when I<sub>L</sub> is empty) and orders over it turn red.</div>
         </section>
 
         <section class="grp">
