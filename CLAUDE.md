@@ -3533,11 +3533,21 @@ Things that matter:
   does not close in (sky coins next to it are shrunk). Oncoming trains wear
   headlights and blow a horn. None of it touches distance or score, which
   the anti-cheat recomputes; the music tempo follows the same `k`.
-- **The catenary is high on purpose** (`ALTO_CABLE` 7.8 m, `ALTO_BRAZO`
-  8.3, `ALTO_POSTE` 8.6 in `mundo.js`): standing on a roof the head is at
-  5.05 m and a jump from there reaches 6.55, and the roof camera sits at 7.2
-  (7.9 in portrait). At 5.4 m the runner went through the wires as soon as
-  it climbed a car. The arm stays just under the jetpack's 8.5 m.
+- **The catenary is high on purpose** (`ALTO_CABLE` 11.2 m, `ALTO_BRAZO`
+  11.7, `ALTO_POSTE` 12.0 in `mundo.js`): the top of the head is 1.8 m over
+  the feet, so a sneakers jump from a roof reaches ~9.7 m, the jetpack's
+  head ~10.4 and the pogo's ~10.8 (it rides 0.55 m higher). At 7.8 m all
+  three went through the wires once the jump became Subway Surfers' 2.1 m.
+  `tests/metrorush-salto.test.cjs` reads those constants out of `mundo.js`
+  and checks the clearances; the tunnel portals carry a concrete pediment
+  up to 12.4 m so the wires still disappear into them.
+- **The jump is Subway Surfers'** (`FISICA`: gravity 26, `alturaSalto` 2.1
+  m, ~0.8 s in the air; sneakers 4.4): the high barrier (1.0–2.35 m) still
+  has to be rolled under, a normal jump still cannot reach a roof (ramps),
+  and the camera height (`yC` in `paso`) is one continuous formula, the
+  largest of «0.75 of the floor + 0.4 of the jump», «never more than 2 m
+  below the runner» (plus a lead while the pogo rises) and, with the
+  jetpack, «1.2 m below»: the old three-piece one jerked at y = 1 mid-jump.
 - **What the runner stands on and what hits it is pure** (`M.soporte`,
   `M.caja`, in `motor.js`; `juego.js` only calls them). The rule: a roof
   holds you over the whole stretch in which its car can hit you, so
@@ -3602,7 +3612,7 @@ Things that matter:
   HUD buttons (keys 1 and 2) during the first 6 s of a run.
 - **Power-ups**: magnet 10 s, jetpack 5 s (coins in the sky at 8.5 m;
   short and frantic, +1 s per level, up to 10), super sneakers 10 s (jumps
-  4.1 m), 2× 12 s, the others +2.5 s per shop level (five levels; a power's
+  4.4 m), 2× 12 s, the others +2.5 s per shop level (five levels; a power's
   own `paso` overrides it); mystery box (coins, a skateboard, the **pogo
   stick** or a jackpot); skateboard
   (3 000 coins, 30 s, survives one crash); continue after a crash for
@@ -3620,16 +3630,46 @@ Things that matter:
   `solo/club.js`**.
 - **The pogo stick only comes out of the mystery box** (`lanzaPogo`,
   `c.pogo`), never from the track generator, so the track still depends on
-  the seed alone and proofs did not change. It launches to `alturaPogo`
-  (7 m) and falls at `gravedadPogo` (40 %) of gravity, ~2.3 s airborne;
-  above 3.6 m (over the roofs) nothing hits you, the climb to there is
-  covered by 0.45 s of invulnerability, rolling drops it, and landing ends
-  it. It only changes height, so distance and score are untouched. The
-  model hangs off the runner (`pogo`, `resorte`, pose `'pogo'`) and lifts
-  it 0.55 m so the rubber foot touches the ground. The **super mystery box**
+  the seed alone and proofs did not change. Its flight is `M.vueloPogo(y)`:
+  up to `alturaPogo` (8.3 m, at least `subidaPogo` 3 m from a roof),
+  falling at `gravedadPogo` (40 %) of gravity, ~2.5 s airborne. Nothing
+  hits you on the way up or above 3.6 m (over the roofs); the last stretch
+  down collides as usual, so you steer away or land on a roof (being
+  invincible to the ground would let it land *inside* a train). It is not
+  launched if a tunnel falls within the flight (its ceiling is 6.6 m: the
+  box gives coins instead). While it flies, `M.monedasPogo` lays an arc of
+  15 coins per lane where the flight is over the roofs: pure arithmetic,
+  no RNG, not from the generator and worth no points, so the prueba does
+  not need to know (`metrorush-salto.test.cjs` checks the track of a seed
+  is unchanged). The model hangs off the runner (`pogo`, `resorte`, pose
+  `'pogo'`) and lifts it 0.55 m so the rubber foot touches the ground; the
+  pose squashes the spring on launch and does a full turn at the apex,
+  driven by `vy` (not the clock) so it lands on the apex from a roof too. The **super mystery box**
   is bought in the shop (`PRECIO_SUPERCAJA` 9 000, `cajaSuper`) and opened
   on the spot; its loose coins average ~3 500, less than its price, so it
   cannot mint coins.
+- **The chase is loud and visible, and none of it is game state**
+  (`persecucion`/`c.pers` in `juego.js`, `pasoPersecucion` in `mundo.js`,
+  `ladrido`/`alto`/`silbato`/`atrapado` in `audio.js`). The first stumble
+  makes Don Ramón shout «¡Alto!» (formant-synthesised voice plus a police
+  whistle), raise a gold badge with a comic bubble over his head, and the
+  dog barks every second or so while the 8 s window lasts, with a red
+  pulsing border (`.mr-peligro`). Both run on the runner's own floor (on
+  the roofs too: below, a train hid them, bubble and all) and come closer
+  and faster after a stumble. On the catch the dog leaps in an arc onto the
+  fallen runner's chest (`ATERRIZA_PERRO`, 0.45 s, the same constant in
+  both files, with a camera shake there) and the inspector bows beside him
+  with «¡TE PILLÉ!». The bubbles are planes with a canvas texture (normals
+  for SAO), built once and not freed with the kits. `__metrorush.tropieza()`
+  and `__metrorush.pogo()` trigger both from a script (test runs).
+- **The female runners** (`paloma`, `trini`, `luz`, `maite` in
+  `ASPECTOS`) carry `rasgos` (hair colour, `peinado` coleta / trenzas /
+  larga / monos, `tocado` cintillo / boina, `falda`, `lentes`, `aros`):
+  `armaRasgos` in `mundo.js` replaces the cap with hair and adds the
+  silhouette, `mueveRasgos` (called at the end of `posa`) swings ponytail,
+  braids, long hair and skirt. Hanging hair rotates *negative* x to go
+  backwards (the face looks to −z). Their shop thumbnail is an SVG
+  (`muestraRasgos` in `juego.js`), since what tells them apart is the hair.
 - **Lore and secrets**: seven golden tickets, one per station, tell the
   story of the last night of Line 3 (`BOLETOS`, read in the Libreta);
   collecting all seven unlocks the Inspector outfit, the Konami code the
