@@ -24,8 +24,8 @@
    - Se perdona el salto un poco antes de tocar el suelo y un poco después
      de dejarlo (búfer y "tiempo de coyote"): sin eso el salto se siente
      "comido" a toda velocidad. */
-import { crearMundo, PALETAS } from './mundo.js?v=metrorush-6';
-import { Sonido } from './audio.js?v=metrorush-6';
+import { crearMundo, PALETAS } from './mundo.js?v=metrorush-7';
+import { Sonido } from './audio.js?v=metrorush-7';
 
 const M = window.MetroRushMotor;                               // el motor (motor.js)
 const MP = window.MetroRushPrueba;                            // la prueba de la carrera, para el antitrampas (prueba.js)
