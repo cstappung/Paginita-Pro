@@ -1028,6 +1028,17 @@ const REGLAS = {
         "Chocar de frente con cualquiera de ellos termina la carrera, salvo que pagues para <b>seguir corriendo</b>: tras el choque aparece 5 s un botón con el precio (500 monedas la primera vez, el doble cada vez en la misma carrera). Si lo dejas pasar, ves el resumen.",
         "Rozar un costado al cambiar de carril es un <b>tropiezo</b>: el inspector Don Ramón y su perro Tornillo te alcanzan un rato. Dos tropiezos seguidos (en menos de 8 s) y te atrapan."
       ])],
+      ["Modos", lista([
+        "En la portada eliges el modo antes de correr (se recuerda en ese aparato). Cada modo tiene su propia tabla en la Clasificación.",
+        "<b>Clásico</b>: el juego de siempre, con poderes, cajas, patineta, potenciadores y «seguir corriendo».",
+        "<b>Sin ayudas</b>: no salen poderes ni cajas misteriosas, no hay patineta ni potenciadores, y chocar termina la carrera sin segunda oportunidad. Las monedas y las estrellas siguen.",
+        "<b>Sin monedas</b>: las monedas están en la pista, pero brillan en rojo y <b>tocar una termina la carrera</b>, como chocar de frente. Tampoco hay poderes ni ayudas. Las monedas nunca tapan el único camino: siempre hay por dónde pasar.",
+        "<b>Fantasma</b>: las reglas de Sin ayudas, y corres contra el fantasma de la mejor carrera de su tabla, en su misma pista.",
+        "<b>City</b>: la carrera por la ciudad, con todos los poderes y ayudas.",
+        "<b>City sin ayudas</b>: la ciudad con las reglas de Sin ayudas.",
+        "<b>City fantasma</b>: la ciudad sin ayudas, contra el fantasma de la mejor carrera de su tabla.",
+        "Las misiones, la tienda y el multiplicador base son los mismos en todos los modos."
+      ])],
       ["Puntos y multiplicador", lista([
         "Cada metro vale 10 puntos × el <b>multiplicador</b>.",
         "El multiplicador es el base de tus misiones (de ×1 a ×30) más las <b>estrellas</b> que juntas en la carrera: +1 cada una, hasta +29, más el <b>Potenciador +5</b> si usaste uno.",
@@ -1062,9 +1073,10 @@ const REGLAS = {
       ["Controles", lista([
         "Teclado: ← → o A D cambian de carril; ↑, W o Espacio saltan; ↓ o S ruedan (en el aire, bajan de golpe); H usa una patineta; P pausa; M apaga el sonido.",
         "Pantalla táctil: desliza el dedo a la izquierda, a la derecha, arriba o abajo; dos toques rápidos usan una patineta.",
-        "Mando: cruceta o stick para moverte, A salta, B rueda, X usa una patineta y Start pausa."
+        "Mando: cruceta o stick para moverte, A salta, B rueda, X usa una patineta y Start pausa.",
+        "Pantalla completa: el botón ⛶ de la portada o de la pausa, o la tecla F. En un teléfono vertical, la carrera además ocupa toda la pantalla mientras corres."
       ])],
-      ["Clasificación", "Hay dos tablas: <b>Mejor carrera</b>, por los puntos de tu mejor carrera, y <b>Distancia</b>, por los metros de tu carrera más larga. Cada carrera terminada cuenta como una partida del club. Subir al podio se anuncia en Discord."]
+      ["Clasificación", "Cada modo tiene su tabla por los puntos de tu mejor carrera: <b>Clásico</b>, <b>Sin ayudas</b>, <b>Sin monedas</b>, <b>Fantasma</b>, <b>City</b>, <b>City sin ayudas</b> y <b>City fantasma</b>. Además está <b>Distancia</b>, por los metros de tu carrera más larga en el modo clásico. Al terminar, el resumen dice a qué tabla fue la carrera. Cada carrera terminada cuenta como una partida del club. Subir al podio se anuncia en Discord."]
     ]
   },
   frontera: {

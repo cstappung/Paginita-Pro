@@ -181,7 +181,7 @@ function extraRecord(cat, f) {
   /* Metro Rush: la mejor carrera paga 1 moneda por cada 25 000 puntos
      (1 000 000 son 40, con tope en 200: en el juego se llega a millones) y
      la distancia, 1 por cada 500 m (10 km son 20, tope en 100). */
-  if (cat === "club-metrorush-carrera") return Math.floor(Math.min(f.puntos || 0, 5000000) / 25000);
+  if (/^club-metrorush-(carrera|puro|sinmonedas|fantasma|city|citypuro|cityfantasma)$/.test(cat)) return Math.floor(Math.min(f.puntos || 0, 5000000) / 25000);   // la mejor carrera de cada modo paga igual
   if (cat === "club-metrorush-distancia") return Math.floor(Math.min(f.puntos || 0, 50000) / 500);
   /* Un día perfecto de Electrodle son 700 puntos: 14 monedas. */
   if (cat === "club-electro-puntos") return Math.floor(Math.min(f.puntos || 0, 100000) / 50);

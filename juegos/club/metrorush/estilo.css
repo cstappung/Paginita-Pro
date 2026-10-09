@@ -512,3 +512,74 @@ main.vl { min-width: 0; }
   .cab { display: none; }
   .pantalla { max-height: calc(100svh - 64px); }
 }
+
+/* ---------- los modos de juego (M.MODOS) ----------
+   En la portada, encima del botón de jugar: una fila de tarjetas de
+   «plástico», una por modo, con su ícono dibujado y su nombre corto, y
+   abajo la regla del modo elegido en una línea. La elegida va en amarillo
+   (como la tarjeta del multiplicador); las demás, azul oscuro translúcido
+   con borde blanco, como los contadores. Todo en --mt (con piso, porque se
+   toca con el dedo). En vertical la fila se parte en dos renglones. */
+.p-modos { --mt: max(calc(var(--m) * 1.05), 4.6px); position: absolute; left: calc(2 * var(--m)); right: calc(2 * var(--m)); bottom: calc(30 * var(--m)); display: grid; justify-items: center; gap: calc(1 * var(--mt)); cursor: default; pointer-events: none; }
+.p-modos > * { pointer-events: auto; }   /* la caja de la fila no tapa al botón de jugar: solo las tarjetas y la línea toman toques */
+.p-modos-fila { display: flex; flex-wrap: wrap; justify-content: center; gap: calc(1.1 * var(--mt)); }
+.p-modo { display: inline-flex; align-items: center; gap: calc(.8 * var(--mt)); height: calc(6.4 * var(--mt)); padding: 0 calc(1.8 * var(--mt)) 0 calc(.7 * var(--mt)); cursor: pointer;
+  background: rgba(8, 20, 60, .7); border: calc(.38 * var(--mt)) solid rgba(255, 255, 255, .9); border-radius: 999px; color: #fff;
+  font: 400 calc(2.5 * var(--mt))/1 var(--ss-letra); -webkit-text-stroke: .13em var(--ss-trazo); paint-order: stroke fill;
+  box-shadow: inset 0 calc(.4 * var(--mt)) 0 rgba(255, 255, 255, .14), 0 calc(.5 * var(--mt)) 0 rgba(0, 0, 0, .35); transition: transform .12s; }
+.p-modo i { flex: none; width: calc(4.8 * var(--mt)); height: calc(4.8 * var(--mt)); filter: drop-shadow(0 calc(.25 * var(--mt)) 0 rgba(0, 0, 0, .3)); }
+.p-modo i svg { display: block; width: 100%; height: 100%; }
+.p-modo:hover { transform: translateY(calc(-.35 * var(--mt))); }
+.p-modo:active { transform: translateY(calc(.35 * var(--mt))); }
+.p-modo.sel { background: linear-gradient(#fff07a, #ffbe2a); border-color: #fff; color: #fff; -webkit-text-stroke-color: #6e3a00;
+  box-shadow: inset 0 calc(.5 * var(--mt)) 0 rgba(255, 255, 255, .55), 0 calc(.55 * var(--mt)) 0 #a86f00, 0 0 0 calc(.5 * var(--mt)) rgba(255, 230, 100, .35); }
+.p-modo.sel[data-modo="sinmonedas"] { background: linear-gradient(#ff8a7a, #e8283c); -webkit-text-stroke-color: #5a0000; box-shadow: inset 0 calc(.5 * var(--mt)) 0 rgba(255, 255, 255, .4), 0 calc(.55 * var(--mt)) 0 #7a0010, 0 0 0 calc(.5 * var(--mt)) rgba(255, 80, 80, .35); }
+.p-modo-desc { margin: 0; max-width: min(100%, calc(110 * var(--mt))); padding: calc(.5 * var(--mt)) calc(1.6 * var(--mt)); border-radius: 999px; background: rgba(8, 20, 60, .55);
+  font: 700 calc(2.1 * var(--mt))/1.25 "IBM Plex Sans", sans-serif; color: #fff; text-align: center; text-shadow: 0 1px 2px rgba(0, 0, 0, .6); }
+@container (orientation: portrait) {
+  .p-modos { bottom: calc(23 * var(--m) + 12.5 * max(var(--m), 4.6px)); }   /* encima del botón de jugar, que en vertical es más grande (su alto va en --mt con piso) */
+  .p-modos-fila { max-width: calc(64 * var(--mt)); }
+  .p-modo { height: calc(5.6 * var(--mt)); font-size: calc(2.2 * var(--mt)); padding-right: calc(1.3 * var(--mt)); }
+  .p-modo i { width: calc(4.2 * var(--mt)); height: calc(4.2 * var(--mt)); }
+}
+@media (prefers-reduced-motion: reduce) { .p-modo { transition: none; } }
+
+/* La insignia del modo en el marcador de la carrera: chica, bajo la barra de
+   la estación. En «Sin monedas» va en rojo, para que no se olvide. */
+.hud-modo { display: inline-flex; align-items: center; gap: calc(.6 * var(--u)); padding: calc(.35 * var(--u)) calc(1.2 * var(--u)) calc(.35 * var(--u)) calc(.4 * var(--u));
+  border-radius: 999px; background: rgba(8, 20, 60, .62); border: calc(.25 * var(--u)) solid rgba(255, 255, 255, .85); font: 400 calc(2 * var(--u))/1 "Lilita One", "Arial Black", sans-serif; color: #fff; text-shadow: none; }
+.hud-modo:empty { display: none; }
+.hud-modo svg { display: block; width: calc(3 * var(--u)); height: calc(3 * var(--u)); }
+.hud-modo[data-modo="sinmonedas"] { background: rgba(160, 10, 20, .75); }
+.pantalla[data-estilo="pixel"] .hud-modo { font-family: "Press Start 2P", monospace; font-size: calc(1.4 * var(--u)); border-radius: 0; }
+.pantalla[data-estilo="neon"] .hud-modo { font-family: Orbitron, Arial, sans-serif; font-size: calc(1.6 * var(--u)); box-shadow: 0 0 1cqh #22e5ff; }
+
+/* En el resumen: a qué tabla fue la carrera. */
+.f-tabla { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 10px 0 0; padding: 6px 12px; border-radius: 999px; background: rgba(9, 30, 90, .45); border: 2px solid rgba(255, 255, 255, .7); font: 700 14px/1.3 "IBM Plex Sans", sans-serif; color: #eaf4ff; }
+.f-tabla svg { flex: none; width: 24px; height: 24px; }
+.f-tabla b { font: 400 16px var(--ss-letra); color: #ffe86b; }
+.f-tabla[data-modo="sinmonedas"] b { color: #ffb3a8; }
+.opcion.con-ico i svg { display: block; width: 100%; height: 100%; }
+
+/* ---------- pantalla completa (⛶ o F) y modo celular ----------
+   html.mr-pc la pone juego.js con la pantalla completa del navegador;
+   html.club-inm, conexion.js mientras se corre en un teléfono vertical
+   (CLAUDE.md, «Modo celular»). En los dos queda el marcador de la página
+   como una franja fina arriba —con el sonido y el volumen del Club, que
+   tienen que verse donde se juega— y la pantalla del juego ocupa todo lo
+   demás, sin proporción fija (el mundo se ajusta solo con el
+   ResizeObserver de juego.js). Lo demás (título, pie, clasificación,
+   «volver») se esconde. */
+html.mr-pc, html.club-inm, html.mr-pc body, html.club-inm body { height: 100%; overflow: hidden; overscroll-behavior: none; background: #0b0d14; }
+html.club-inm { touch-action: none; user-select: none; -webkit-user-select: none; }
+html.mr-pc .shell, html.club-inm .shell { max-width: none; height: 100dvh; margin: 0; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); display: flex; flex-direction: column; overflow: hidden; }
+html.mr-pc .layout, html.club-inm .layout { display: flex; flex-direction: column; align-items: stretch; flex: 1; min-height: 0; gap: 0; }
+html.mr-pc main.vl, html.club-inm main.vl { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+html.mr-pc :is(.cab, .pie, .layout > aside, .club-volver, .club-ranking), html.club-inm :is(.cab, .pie, .layout > aside, .club-volver, .club-ranking) { display: none !important; }
+html.mr-pc .scorebar, html.club-inm .scorebar, html.mr-pc.club-integrado .scorebar, html.club-inm.club-integrado .scorebar, html.mr-pc.club-integrado[data-tema] .scorebar, html.club-inm.club-integrado[data-tema] .scorebar {
+  flex: none; flex-wrap: nowrap; gap: 12px; padding: 3px 10px; border: 0; border-radius: 0; background: #0b0d14; color: #e8ecf4; }
+html.mr-pc .scorebar small, html.club-inm .scorebar small { font-size: 8.5px; color: #8f9bb8; }
+html.mr-pc .scorebar strong, html.club-inm .scorebar strong { font-size: 15px; }
+html.mr-pc .scorebar .icono, html.club-inm .scorebar .icono { width: 32px; height: 32px; background: #1a1f30; color: #fff; border-color: #ffffff40; }
+html.club-inm .scorebar .vj-ctl input, html.club-inm .scorebar .vj-ctl output { display: none; }
+html.mr-pc .pantalla, html.club-inm .pantalla { flex: 1; min-height: 0; width: 100%; aspect-ratio: auto; max-height: none; border-radius: 0; }

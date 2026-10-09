@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="../../../i18n.js?v=202610090240"></script>
+<script src="../../../i18n.js?v=202610090611"></script>
 <script src="../../audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#14182b">
@@ -16,13 +16,13 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Orbitron:wght@700&family=Press+Start+2P&display=swap">
 <!-- Lo común del Club (volver, ranking lateral, modo integrado) va antes del estilo propio, para que este gane. -->
 <link rel="stylesheet" href="../conexion.css?v=club-2">
-<link rel="stylesheet" href="estilo.css?v=metrorush-6">
+<link rel="stylesheet" href="estilo.css?v=metrorush-7">
 <script src="../../audio/volumen.js?v=vol-1"></script>
-<script src="../conexion.js?v=club-11"></script>
-<script src="../../audio/chip.js?v=metrorush-6"></script>
-<script src="../../audio/temas.js?v=metrorush-6"></script>
-<script src="motor.js?v=metrorush-6"></script>
-<script src="prueba.js?v=metrorush-6"></script>
+<script src="../conexion.js?v=club-12"></script>
+<script src="../../audio/chip.js?v=metrorush-7"></script>
+<script src="../../audio/temas.js?v=metrorush-7"></script>
+<script src="motor.js?v=metrorush-7"></script>
+<script src="prueba.js?v=metrorush-7"></script>
 <!-- Three.js (el mismo de Yemas: la misma dirección, así el navegador ya lo tiene guardado). -->
 <script type="importmap">
 { "imports": {
@@ -30,9 +30,9 @@
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
 } }
 </script>
-<link rel="modulepreload" href="mundo.js?v=metrorush-6">
-<link rel="modulepreload" href="audio.js?v=metrorush-6">
-<script type="module" src="juego.js?v=metrorush-6"></script>
+<link rel="modulepreload" href="mundo.js?v=metrorush-7">
+<link rel="modulepreload" href="audio.js?v=metrorush-7">
+<script type="module" src="juego.js?v=metrorush-7"></script>
 </head>
 <body>
 <div class="shell"><div class="layout">
@@ -62,6 +62,8 @@
         <div class="fila"><span class="valor" id="hudPuntos" translate="no">0</span><span class="mult" id="hudMult" translate="no">×1</span></div>
         <span class="chico" id="hudMetros" translate="no">0 m</span>
         <div class="estacion"><span id="hudEstacion">Barrio Estación</span><span class="barra" id="hudEstBarra"><i></i></span></div>
+        <!-- La insignia del modo de juego (Clásico, Sin ayudas, Sin monedas, City, City sin ayudas). -->
+        <span class="hud-modo" id="hudModo" translate="no"></span>
       </div>
       <div class="hud-der">
         <div class="fila"><span class="moneda" aria-hidden="true"></span><span class="valor" id="hudMonedas" translate="no">0</span></div>
@@ -102,7 +104,14 @@
           <span class="contador" title="Tus monedas"><i data-icono="moneda"></i><b id="portadaMonedas" translate="no">0</b><button type="button" class="mas" data-accion="tienda" aria-label="Ir a la tienda">+</button></span>
           <button type="button" class="redondo azul" data-accion="opciones" aria-label="Opciones" title="Opciones"><i data-icono="engranaje"></i></button>
           <button type="button" class="redondo azul" data-accion="ayuda" aria-label="Cómo se juega" title="Cómo se juega"><i data-icono="ayuda"></i></button>
+          <!-- Pantalla completa (también la tecla F). Se esconde donde el navegador no la tiene (iPhone). -->
+          <button type="button" class="redondo azul pc" data-accion="pantallaCompleta" aria-label="Pantalla completa (F)" aria-pressed="false" title="Pantalla completa (F)"><i data-icono="pantalla"></i></button>
         </div>
+      </div>
+      <!-- El modo de juego: una tarjeta por modo (las arma juego.js desde M.MODOS) y su regla en una línea. -->
+      <div class="p-modos" id="portadaModos">
+        <div class="p-modos-fila" id="modosLista" role="radiogroup" aria-label="Modo de juego"></div>
+        <p class="p-modo-desc" id="modoDesc"></p>
       </div>
       <button type="button" class="jugar" data-accion="jugar"><i data-icono="play"></i><span>¡Jugar!</span></button>
       <p class="tocar-txt">o toca la pantalla</p>
@@ -132,6 +141,7 @@
           <button type="button" class="opcion" data-accion="retos">Misiones</button>
           <button type="button" class="opcion" data-accion="opciones">Opciones</button>
           <button type="button" class="opcion" data-accion="ayuda">Cómo se juega</button>
+          <button type="button" class="opcion con-ico" data-accion="pantallaCompleta" aria-pressed="false"><i data-icono="pantalla"></i><span class="nom-pc">Pantalla completa</span></button>
           <button type="button" class="opcion" data-accion="abandonar">Terminar la carrera</button>
         </div>
       </div>
@@ -163,6 +173,8 @@
           <span class="f-mejor" id="finMejor" translate="no"></span>
         </div>
         <ul class="f-datos" id="finStats"></ul>
+        <!-- A qué tabla de la clasificación fue la carrera (la de su modo). -->
+        <p class="f-tabla" id="finTabla"></p>
         <p class="f-set" id="finSet" hidden></p>
         <p class="f-fuera" id="finFuera" role="note" hidden></p>
         <h3>Misiones</h3>
@@ -251,13 +263,15 @@
           <li>Chocar de frente termina la carrera, salvo que pagues monedas para <b>seguir corriendo</b> (cada vez cuesta el doble). Rozar un costado es un <b>tropiezo</b>: Don Ramón y su perro Tornillo te alcanzan. Dos tropiezos seguidos y te atrapan.</li>
           <li><b>Puntos</b>: 10 por metro × el multiplicador. Las <b>misiones</b> van de a tres: completar el set sube el multiplicador base (hasta ×30) y paga monedas. Cada <b>estrella</b> suma +1 en la carrera.</li>
           <li><b>Poderes</b>: <i data-icono="iman"></i> imán, <i data-icono="mochila"></i> mochila cohete, <i data-icono="zapatilla"></i> zapatillas saltarinas, <i data-icono="doble"></i> puntos dobles y la caja misteriosa. La <i data-icono="patineta"></i> <b>patineta</b> te salva de un choque. En la tienda se mejoran y se compran los potenciadores <i data-icono="cohete"></i> Despegue y <i data-icono="mas5"></i> +5, que se usan al empezar (teclas 1 y 2).</li>
+          <li><b>Modos</b> (se eligen en la portada): <b>Clásico</b>; <b>Sin ayudas</b>, sin poderes, cajas, patineta, potenciadores ni segunda oportunidad; <b>Sin monedas</b>, donde las monedas (rojas) terminan la carrera si las tocas; <b>Fantasma</b>, sin ayudas y contra el fantasma de la mejor carrera; <b>City</b>, <b>City sin ayudas</b> y <b>City fantasma</b>. Cada uno tiene su tabla.</li>
+          <li><b>F</b> o el botón ⛶: pantalla completa.</li>
           <li>Con la distancia cambias de <b>estación</b> (y de estética) pasando por un túnel. En cada una hay un <b>boleto dorado</b> con un trozo de la historia.</li>
         </ul>
         <div class="menu"><button type="button" class="opcion principal" data-accion="volver">Volver</button></div>
       </div>
     </section>
   </div>
-  <p class="pie">← → carril · ↑ saltar · ↓ rodar · H patineta · P pausa · M sonido</p>
+  <p class="pie">← → carril · ↑ saltar · ↓ rodar · H patineta · P pausa · M sonido · F pantalla completa</p>
 </main>
 <aside></aside>
 </div></div>

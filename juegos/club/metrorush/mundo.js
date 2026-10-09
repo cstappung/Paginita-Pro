@@ -1228,6 +1228,16 @@ class Kit {
   }
 }
 
+/** Tiñe (o devuelve a su oro) el material de las monedas: en el modo «Sin
+    monedas» tocarlas mata, así que tienen que leerse como peligro de un
+    vistazo, rojas y con brillo propio (el neón no tiene `emissive`: con el
+    color basta, porque su material ya es plano y brillante). */
+function tiñeMonedas(mat, rojas) {
+  if (mat.userData.oro == null) { mat.userData.oro = mat.color.getHex(); mat.userData.emis = mat.emissive ? mat.emissive.getHex() : null; }
+  mat.color.setHex(rojas ? 0xff2b2b : mat.userData.oro);
+  if (mat.emissive) mat.emissive.setHex(rojas ? 0x8a0000 : mat.userData.emis);
+}
+
 /** El perfil de un vagón extruido a lo largo (se cachea por largo). */
 const cacheTren = new Map();
 function geoTren(L) {
@@ -1635,6 +1645,7 @@ export function crearMundo(canvas) {
   let corredor = null, perse = null, aspecto = MOTOR.ASPECTOS.clasico;
   let sacudida = 0;
   const chispas = [];                                                         // brillitos al tomar monedas
+  let monedasRojas = false;                                                   // ¿las monedas son un peligro? (modo «Sin monedas»)
   let particulas = null, trenFantasma = null, tiempoFantasma = 0;
   const camPos = new THREE.Vector3(0, 4.7, 8.6), camMira = new THREE.Vector3(0, 0.4, -9);
 
@@ -2147,13 +2158,15 @@ export function crearMundo(canvas) {
     }
     // monedas: una InstancedMesh
     const im = kit.monedas; let n = 0;
+    if (im.userData.peligro !== monedasRojas) { tiñeMonedas(im.material, monedasRojas); im.userData.peligro = monedasRojas; }   // cada kit tiene su material: se tiñe al usarlo
+    const late = monedasRojas && !mov.quieto ? 1 + 0.14 * Math.sin(e.t * 9) : 1;   // en «Sin monedas» laten, como una alarma
     for (const o of monedas) {
       if (n >= 400) break;
       const z = -(o.d - D);
       if (z < -vista || z > DETRAS) continue;
       _p.set(o.x != null ? o.x : CARRILES[o.carril], o.y + SUELO, z);
       // una moneda que pasa pegada a la cámara (las del cielo, volando con el lente abierto) se achica: si no, tapa media pantalla
-      const dc = _p.distanceTo(camPos), esc = dc < 4 ? Math.max(0.05, dc / 4) : 1;
+      const dc = _p.distanceTo(camPos), esc = (dc < 4 ? Math.max(0.05, dc / 4) : 1) * late;
       _m.compose(_p, _q.setFromEuler(_e.set(0, e.t * 3 + o.d * 0.15, 0)), _s.set(esc, esc, esc));
       im.setMatrixAt(n++, _m);
     }
@@ -2380,6 +2393,8 @@ export function crearMundo(canvas) {
     /** Qué movimientos de cámara se permiten (ver «la sensación de velocidad»):
         `sacudir` = la opción del juego; `quieto` = el sistema pide reducir el movimiento. */
     movimiento(o) { Object.assign(mov, o); },
+    /** Pinta las monedas de rojo (y latiendo) si `si`: el modo «Sin monedas». */
+    monedasPeligro(si) { monedasRojas = !!si; },
     /** Un brillito donde se tomó una moneda o un poder. */
     chispa(x, y, z, col) {
       const m = new THREE.Mesh(geoChispa, matChispa(col || 0xfff3a0));

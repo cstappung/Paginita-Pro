@@ -24,8 +24,8 @@
    - Se perdona el salto un poco antes de tocar el suelo y un poco después
      de dejarlo (búfer y "tiempo de coyote"): sin eso el salto se siente
      "comido" a toda velocidad. */
-import { crearMundo, PALETAS } from './mundo.js?v=metrorush-6';
-import { Sonido } from './audio.js?v=metrorush-6';
+import { crearMundo, PALETAS } from './mundo.js?v=metrorush-7';
+import { Sonido } from './audio.js?v=metrorush-7';
 
 const M = window.MetroRushMotor;                               // el motor (motor.js)
 const MP = window.MetroRushPrueba;                            // la prueba de la carrera, para el antitrampas (prueba.js)
@@ -42,7 +42,12 @@ const CLAVE_OPC = 'metrorush.opciones';
 const lee = (k, def) => { try { const t = localStorage.getItem(k); return t ? JSON.parse(t) : def; } catch (e) { return def; } };
 const escribe = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* sin almacenamiento: se juega igual */ } };
 let progreso = M.limpiaProgreso(lee(CLAVE, null));            // lo que se gana y se compra (va a la cuenta)
-const opciones = Object.assign({ calidad: 'auto', estilo: 'auto', musica: 80, efectos: 90, sacudida: true, mudo: false }, lee(CLAVE_OPC, {}));
+const opciones = Object.assign({ calidad: 'auto', estilo: 'auto', musica: 80, efectos: 90, sacudida: true, mudo: false, modo: 'clasico' }, lee(CLAVE_OPC, {}));
+/* El modo de juego elegido en la portada (M.MODOS: clásico, sin ayudas, sin
+   monedas, City, City sin ayudas). Se recuerda en este aparato, con las
+   opciones; una clave que ya no existe vuelve al clásico. */
+if (!M.modoDe(opciones.modo) || !opciones.modo) opciones.modo = 'clasico';
+let modoSel = M.modoDe(opciones.modo);                         // el modo con que empieza la próxima carrera
 /* La cuenta guarda `{d, at}` en users/<uid>/club/metrorush, y eso mismo es
    lo que llega al pedirla: un OBJETO con el progreso como texto en `d`.
    Antes se hacía JSON.parse(dato) del objeto entero, que siempre fallaba y
@@ -116,15 +121,23 @@ let estado = 'cargando';      // cargando | portada | jugando | pausa | muerte |
 let c = null;                 // los datos de la carrera en curso (ver nuevaCarrera)
 let panel = null;             // el panel abierto (tienda, retos, libreta, opciones, ayuda, relato)
 
+/* La semilla de la próxima carrera. Normalmente al azar; el modo Fantasma
+   la fija (semillaSiguiente) para correr la MISMA pista que el récord que se
+   persigue: el antitrampas acepta cualquier semilla, porque la pista sale de
+   ella y la prueba la lleva en `s`. Se usa una vez y vuelve al azar. */
+let semillaSiguiente = null;
 function nuevaCarrera() {
-  const semilla = (Math.random() * 2 ** 31) >>> 0;
+  const semilla = semillaSiguiente != null ? semillaSiguiente >>> 0 : (Math.random() * 2 ** 31) >>> 0;
+  semillaSiguiente = null;
+  const modo = modoSel, curva = M.velocidadDe(modo);            // el modo de esta carrera y su curva de velocidad (la clásica, en el clásico)
   return {
+    modo, curva, mundoJ: M.mundoDe(modo),            // las reglas, la velocidad y el mundo (estaciones, historia) de esta carrera
     // la prueba de la carrera (docs/antitrampas/metrorush.md): con qué se empezó, y después cada evento que cambia el puntaje
-    prueba: MP ? MP.nueva({ s: semilla, b: progreso.retos.nivel, md: progreso.mejoras.doble, u: cuentaUrl }) : null,
+    prueba: MP ? MP.nueva({ s: semilla, b: progreso.retos.nivel, md: progreso.mejoras.doble, u: cuentaUrl, m: modo.id }) : null,
     r0: performance.now(), sigMuestra: MP ? MP.PASO_MUESTRA : Infinity, sinteticas: 0, tocada: tocada,
-    gen: M.crearGenerador(semilla),                  // la pista de esta carrera
+    gen: M.crearGenerador(semilla, { modo: modo.id }), // la pista de esta carrera (la del modo)
     activos: [],                                     // los objetos de la pista que existen ahora
-    D: 0, t: 0, V: M.velocidad(0),                   // metros, segundos y velocidad
+    D: 0, t: 0, V: curva.velocidad(0),               // metros, segundos y velocidad
     puntos: 0, monedas: 0, estrellas: 0,
     r: { carril: 1, carrilPrev: 1, x: 0, xPrev: 0, y: 0, vy: 0, suelo: 0, enAire: false, rodar: 0, rodarPend: false, fase: 0,
       ultSuelo: 0, saltoBufer: -1, tropezarT: -1, ladeo: 0 },
@@ -133,11 +146,13 @@ function nuevaCarrera() {
     invulnerable: 0, tropiezo: 0, perseguidor: 1, perseguidorObj: 1, introPersecucion: 2.5,
     cuenta: { monedas: 0, saltos: 0, rodadas: 0, distancia: 0, puntos: 0, poderes: 0, techos: 0, estrellas: 0, esquivar: 0, patinetas: 0, mochilas: 0 },
     techos: new Set(), esquivados: new Set(), avisados: new Set(),
-    estacion: M.estacionDe(0), cambio: null, banner: 2.5,
+    estacion: M.estacionDe(0, modo), cambio: null, banner: 2.5,
     seguirVeces: 0, muerte: null, recordAvisado: false, finalizada: false, quieto: 0,
     extra: 0, potVentana: 6, potUsado: {},          // el potenciador de puntos (+5), y cuánto quedan los botones de potenciadores
     tutorial: progreso.totales.carreras < 2 ? { bajo: 0, alto: 0, tren: 0 } : null,   // las pistas de las dos primeras carreras
-    pista: null                                      // la pista que se está mostrando ({tipo, o})
+    pista: null,                                     // la pista que se está mostrando ({tipo, o})
+    semilla,                                         // la semilla de esta pista (la del récord, en el modo Fantasma)
+    rastro: null                                     // el rastro de esta carrera para que otro la vea como fantasma (texto; va a la prueba como `g`)
   };
 }
 
@@ -173,6 +188,7 @@ document.addEventListener('keydown', e => {
   // el código secreto de siempre, en la portada: desbloquea el aspecto dorado
   if (estado === 'portada' && !panel) { konami = e.code === KONAMI[konami] ? konami + 1 : (e.code === KONAMI[0] ? 1 : 0); if (konami === KONAMI.length) { konami = 0; desbloquea('dorado', '¡Código secreto! Aspecto Dorado desbloqueado'); } }
   if (e.code === 'KeyM') { alternaSonido(); return; }
+  if (e.code === 'KeyF' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) { alternaPantallaCompleta(); return; }   // F: pantalla completa (no en un campo de texto: eso ya se filtró arriba)
   // «¿Seguir corriendo?»: Intro paga y sigue, Escape (o P) lo deja pasar. Espacio y las flechas no hacen
   // nada a propósito: quien venía saltando con la barra no debe pagar sin querer.
   if (estado === 'salvar') { if (e.code === 'Enter') { e.preventDefault(); seguirTrasChoque(); } else if (e.code === 'Escape' || e.code === 'KeyP') { e.preventDefault(); muestraFin(); } return; }
@@ -318,7 +334,7 @@ function tropieza(X) {
   aviso('¡Cuidado! Don Ramón te pisa los talones');
 }
 function choca(o) {
-  if (c.poderes.patineta > 0) {                                 // la patineta se rompe y te salva
+  if (c.poderes.patineta > 0) {                                 // (en los modos sin patineta nunca hay una puesta)                                 // la patineta se rompe y te salva
     c.poderes.patineta = 0; c.invulnerable = 2; sonido.rompePatineta(); if (opciones.sacudida) mundo.sacude(0.4);
     aviso('¡La patineta te salvó!');
     return;
@@ -345,6 +361,7 @@ function muere(motivo) {
 
 /* ---- poderes ---- */
 function activaPoder(clase) {
+  if (!c.modo.items) return;                                   // los modos sin ayudas no tienen poderes (ni siquiera desde la consola)
   if (clase === 'caja') {
     const premio = M.cajaMisteriosa(Math.random);
     sonido.caja();
@@ -384,6 +401,7 @@ function lanzaPogo() {
   return true;
 }
 function usaPatineta() {
+  if (!c.modo.patineta) { aviso(`En «${c.modo.nombre}» no hay patineta`); return; }   // los modos sin ayudas
   if (c.poderes.patineta > 0) return;
   if (progreso.patinetas <= 0) { aviso('No te quedan patinetas (se compran en la tienda)'); return; }
   progreso.patinetas--; c.poderes.patineta = M.DURACION_PATINETA; c.cuenta.patinetas++;
@@ -404,6 +422,17 @@ function recoge(dt) {
     }
     if (Math.abs(o.d - c.D) > 1.0 || Math.abs((o.x != null ? o.x : ox) - r.x) > 0.95) continue;
     if (o.y < r.y - 0.4 || o.y > r.y + 2.2) continue;
+    /* En «Sin monedas» una moneda es un obstáculo: tocarla termina la
+       carrera, como un choque de frente (la prueba lo anota como choque).
+       La caja es un poco más chica que la de recoger (0,7 m hacia adelante
+       y 0,6 m de lado en vez de 1 y 0,95): es un castigo y se cobra solo si
+       de verdad la tocaste. Lo demás (estrellas, boletos) se recoge igual. */
+    if (o.tipo === 'moneda' && c.modo.monedasMatan) {
+      if (Math.abs(o.d - c.D) > 0.7 || Math.abs((o.x != null ? o.x : ox) - r.x) > 0.6 || c.invulnerable > 0) continue;
+      mundo.chispa(r.x, r.y + 1, 0, 0xff3b3b);
+      muere('moneda');
+      return;                                                   // con el choque no se recoge nada más en este cuadro
+    }
     // ¡recogido!
     c.activos.splice(i, 1); mundo.suelta(o);
     if (o.tipo === 'moneda') { c.monedas++; c.cuenta.monedas++; sonido.moneda(); if (c.monedas % 5 === 0) mundo.chispa(r.x, r.y + 1, 0); }
@@ -426,7 +455,7 @@ const multiplicador = () => M.multiplicador({ base: progreso.retos.nivel, estrel
    Los primeros segundos de la carrera aparecen dos botones (o las teclas 1
    y 2) con los que tengas. Usarlos los gasta. */
 function pintaPots() {
-  const el = $('hudPots'), hay = c && c.potVentana > 0 && Object.keys(M.POTENCIADORES).some(k => progreso.potenciadores[k] > 0 && !c.potUsado[k]);
+  const el = $('hudPots'), hay = c && c.modo.potenciadores && c.potVentana > 0 && Object.keys(M.POTENCIADORES).some(k => progreso.potenciadores[k] > 0 && !c.potUsado[k]);
   el.hidden = !hay;
   pantalla.classList.toggle('con-pots', hay);                     // la pista de las primeras carreras sube para no taparlos
   if (!hay) return;
@@ -434,7 +463,7 @@ function pintaPots() {
     ? `<button type="button" data-pot="${k}" aria-label="${P.nombre} (tecla ${i + 1})"><i>${ICONOS[k === 'despegue' ? 'cohete' : 'mas5']}</i><span>${P.nombre}</span><b translate="no">×${progreso.potenciadores[k]}</b><kbd>${i + 1}</kbd></button>` : '').join('');
 }
 function usaPotenciador(k) {
-  if (!c || estado !== 'jugando' || c.potVentana <= 0 || c.potUsado[k] || !(progreso.potenciadores[k] > 0)) return;
+  if (!c || !c.modo.potenciadores || estado !== 'jugando' || c.potVentana <= 0 || c.potUsado[k] || !(progreso.potenciadores[k] > 0)) return;
   progreso.potenciadores[k]--; c.potUsado[k] = true; guardar();
   if (k === 'despegue') {                                       // empezar volando con la mochila, sin chocar con nada
     const seg = M.POTENCIADORES.despegue.seg;
@@ -453,7 +482,7 @@ function usaPotenciador(k) {
 function actualiza(dt) {
   c.t += dt;
   const muriendo = estado === 'muerte';
-  c.V = muriendo ? Math.max(0, c.V - M.FRENADA * dt) : M.velocidad(c.t);   // al caer frena (lo que tolera el antitrampas)
+  c.V = muriendo ? Math.max(0, c.V - M.FRENADA * dt) : c.curva.velocidad(c.t);   // al caer frena (lo que tolera el antitrampas); la curva es la del modo
   const dD = c.V * dt;
   c.Dantes = c.D;                                               // dónde iba en el cuadro anterior (para seguir la rampa)
   c.D += dD;
@@ -462,7 +491,8 @@ function actualiza(dt) {
     const antes = c.puntos;
     c.puntos += M.puntosPorTramo(dD, multiplicador());
     c.cuenta.puntos = Math.floor(c.puntos); c.cuenta.distancia = Math.floor(c.D);
-    if (!c.recordAvisado && progreso.records.puntos > 0 && antes <= progreso.records.puntos && c.puntos > progreso.records.puntos) {
+    const rec = M.recordDe(progreso, c.modo);                   // el récord de este modo
+    if (!c.recordAvisado && rec > 0 && antes <= rec && c.puntos > rec) {
       c.recordAvisado = true; banner('¡Nuevo récord!', fmt(c.puntos) + ' puntos'); sonido.record();
     }
   }
@@ -488,8 +518,9 @@ function actualiza(dt) {
   /* Si chocó en este mismo cuadro, ya no recoge nada ni se le gastan los
      poderes: la prueba de la carrera dice que los puntos paran en el choque,
      y una estrella anotada justo después se leería como recogida estando caído. */
+  if (!muriendo && estado === 'jugando') recoge(dt);
+  // en «Sin monedas» recoger puede ser un choque: entonces, como con los demás choques, el cuadro termina ahí
   if (!muriendo && estado === 'jugando') {
-    recoge(dt);
     // los poderes se gastan
     for (const k of Object.keys(c.poderes)) if (c.poderes[k] > 0) {
       c.poderes[k] = Math.max(0, c.poderes[k] - dt);
@@ -552,9 +583,9 @@ function estaciones() {
      faltan menos de 220 m, se pide ya y cae justo en el umbral, porque es
      ahí donde termina lo generado. Ejemplo: vas en el metro 1 300 y Ocaso
      empieza en el 1 500; el túnel cae a ~1 530 y Ocaso empieza al salir. */
-  const sig = M.siguienteUmbral(c.D);                            // el metro en que empieza la estación siguiente
+  const sig = M.siguienteUmbral(c.D, c.modo);                    // el metro en que empieza la estación siguiente (Infinity si el mundo no tiene otra)
   const faltan = sig - c.D;                                      // cuántos metros faltan para llegar
-  const e = M.estacionDe(faltan < 220 ? sig : c.D);              // a donde se va: la que viene si llega pronto
+  const e = M.estacionDe(faltan < 220 ? sig : c.D, c.modo);      // a donde se va: la que viene si llega pronto
   if (!c.cambio && e.clave !== c.estacion.clave) {
     c.cambio = { estacion: e, tunel: null, hecho: false };
     anotaPedido('T', c.D + 40, e.id);
@@ -563,7 +594,7 @@ function estaciones() {
     mundo.letreroTunel(e.nombre);
   }
   // precarga el kit de la estación siguiente cuando falta poco (para que el túnel no se trabe)
-  if (faltan < 900) mundo.precarga(estacionVisual(M.estacionDe(sig)));
+  if (faltan < 900) mundo.precarga(estacionVisual(M.estacionDe(sig, c.modo)));
   const cb = c.cambio;
   if (cb && cb.tunel) {
     const o = cb.tunel;
@@ -574,7 +605,7 @@ function estaciones() {
       c.estacion = cb.estacion;
       sonido.tocaTema(cb.estacion.musica);
       pantalla.dataset.estilo = estacionVisual(cb.estacion).estilo;
-      if (cb.estacion.boleto && !progreso.boletos.includes(cb.estacion.boleto)) { anotaPedido('B', cb.estacion.boleto, o.d0 + o.largo + 260); c.gen.pedirBoleto(cb.estacion.boleto, o.d0 + o.largo + 260); }
+      if (cb.estacion.boleto && c.modo.mundo === 'metro' && !progreso.boletos.includes(cb.estacion.boleto)) { anotaPedido('B', cb.estacion.boleto, o.d0 + o.largo + 260); c.gen.pedirBoleto(cb.estacion.boleto, o.d0 + o.largo + 260); }
     }
     if (cb.hecho && c.D >= o.d0 + o.largo - 6) { banner(cb.estacion.nombre, cb.estacion.lema); c.cambio = null; }
   }
@@ -653,14 +684,18 @@ function empezar() {
   mundo.activa(e, 0);
   pantalla.dataset.estilo = e.estilo;
   for (const o of c.gen.generarHasta(230, { V: c.V })) c.activos.push(o);
-  if (!progreso.boletos.includes(1)) { anotaPedido('B', 1, 420); c.gen.pedirBoleto(1, 420); }
+  // el boleto de la primera estación (solo en la Línea 3: los boletos guardados son de ese mundo)
+  if (c.estacion.boleto && c.modo.mundo === 'metro' && !progreso.boletos.includes(c.estacion.boleto)) { anotaPedido('B', c.estacion.boleto, 420); c.gen.pedirBoleto(c.estacion.boleto, 420); }
   estado = 'jugando';
   muestraCapa(null);
   $('hud').hidden = false;
+  pintaModoHud();                                               // la insignia del modo y lo que el modo no tiene (patinetas)
+  mundo.monedasPeligro(!!c.modo.monedasMatan);                  // en «Sin monedas» las monedas se ven rojas: son un peligro
+  if (Club && Club.inmersivo) Club.inmersivo(true);             // en un teléfono vertical, la carrera ocupa toda la pantalla
   sonido.tocaTema(c.estacion.musica);
   banner(c.estacion.nombre, c.estacion.lema);
   if (esTactil && progreso.totales.carreras < 3) aviso('Desliza el dedo: ← → carril · ↑ saltar · ↓ rodar');
-  if (Club) Club.category('club-metrorush-carrera');
+  if (Club) Club.category(c.modo.categoria);                    // la clasificación del costado: la tabla de este modo
   pintaPots();
   lienzo.focus({ preventScroll: true });
   midiendo = { t: 0, n: 0, suma: 0 };
@@ -668,6 +703,7 @@ function empezar() {
 function pausar() {
   if (estado !== 'jugando') return;
   estado = 'pausa'; sonido.calla(); sonido.mochila(false);
+  if (Club && Club.inmersivo) Club.inmersivo(false);            // en pausa vuelven el marcador de la página y el volumen
   $('pausaDetalle').textContent = `${fmt(c.puntos)} puntos · ${fmt(c.D)} m · ${c.monedas} monedas`;
   muestraCapa('capaPausa');
 }
@@ -675,6 +711,7 @@ function seguirJugando() {
   if (estado !== 'pausa') return;
   cierraPanel(); muestraCapa(null);
   estado = 'jugando'; sonido.tocaTema(c.estacion.musica);
+  if (Club && Club.inmersivo) Club.inmersivo(true);
   if (c.poderes.mochila > 0) sonido.mochila(true);
   prevT = performance.now();
 }
@@ -685,7 +722,7 @@ function seguirJugando() {
    Solo aparece si alcanzan las monedas (las de esta carrera más las
    guardadas) y nunca tras «Terminar la carrera». */
 const SALVAR_SEG = 5;
-function puedeSalvar() { return c && c.muerte && c.muerte.motivo !== 'abandono' && progreso.monedas + c.monedas >= M.costoSeguir(c.seguirVeces); }
+function puedeSalvar() { return c && c.modo.revivir && c.muerte && c.muerte.motivo !== 'abandono' && progreso.monedas + c.monedas >= M.costoSeguir(c.seguirVeces); }
 function abreSalvar() {
   estado = 'salvar'; c.salvarT = SALVAR_SEG; c.salvarTic = SALVAR_SEG;
   sonido.calla();
@@ -702,7 +739,7 @@ function pasoSalvar(dt) {
   if (c.salvarT < c.salvarTic - 1 && c.salvarT > 0) { c.salvarTic = Math.ceil(c.salvarT); sonido.tic(c.salvarTic <= 1); }   // un tic por segundo
   if (c.salvarT <= 0) muestraFin();
 }
-const MOTIVOS = { atrapado: 'Don Ramón te atrapó', tren: 'Te atropelló un tren', bajo: 'Chocaste con una barrera', alto: 'Te diste con un letrero', rampa: 'Chocaste con una rampa', abandono: 'Carrera terminada' };
+const MOTIVOS = { atrapado: 'Don Ramón te atrapó', tren: 'Te atropelló un tren', bajo: 'Chocaste con una barrera', alto: 'Te diste con un letrero', rampa: 'Chocaste con una rampa', moneda: 'Tocaste una moneda', abandono: 'Carrera terminada' };
 let cuentaFin = 0;                                              // para cortar la animación de los puntos si se sale antes
 /** El resumen. La carrera se cierra aquí mismo (monedas, récords, misiones,
     clasificación): después ya no se puede seguir, así que no hay nada que esperar. */
@@ -710,6 +747,7 @@ function muestraFin() {
   if (!c || estado === 'fin') return;
   estado = 'fin';
   sonido.calla();
+  if (Club && Club.inmersivo) Club.inmersivo(false);            // el resumen se ve con la página entera (clasificación, volumen)
   const k = cierraCarrera();
   c.potVentana = 0; pintaPots(); ocultaPista();                 // por si se terminó desde la pausa en los primeros segundos
   pintaPortada();                                               // el marcador de la página (récord, monedas, multiplicador) ya cambió
@@ -726,6 +764,9 @@ function muestraFin() {
   if (k.subio) $('finSet').innerHTML = `¡Set completo! Multiplicador <b translate="no">×${progreso.retos.nivel}</b> y ${ICONOS.moneda}<b translate="no">+${fmt(k.premio)}</b>`;
   filasRetos($('finRetos'), k.nivelRetos, k.avanceRetos);
   $('finFuera').hidden = !k.fuera; $('finFuera').textContent = k.fuera || '';
+  // a qué tabla fue la carrera (o a cuál habría ido): la del modo, y la distancia si fue récord en el clásico
+  $('finTabla').innerHTML = `${ICONOS[ICONO_MODO[k.modo.id]] || ''}<span>${k.enviada ? 'Va a la tabla' : 'Tabla del modo'} «<b>${k.modo.nombre}</b>»${k.enviada && k.distancia ? ' y a «<b>Distancia</b>»' : ''}</span>`;
+  $('finTabla').dataset.modo = k.modo.id;
   muestraCapa('capaFin');
   // los puntos suben contando, con un tic suave (como el «score» de Subway Surfers)
   const el = $('finPuntos'), yo = ++cuentaFin, t0 = performance.now(), dur = k.puntos > 0 ? 900 : 0;
@@ -769,12 +810,13 @@ function cierraCarrera() {
   if (c.finalizada) return c.cierre;
   c.finalizada = true;
   const puntos = Math.floor(c.puntos), metros = Math.floor(c.D), ms = Math.max(1, Math.round(c.t * 1000));   // las reglas piden enteros y un tiempo de al menos 1 ms
-  const recordAntes = progreso.records.puntos, mult = multiplicador();   // antes de que suba el multiplicador base
+  const mult = multiplicador();                                  // antes de que suba el multiplicador base
+  const recordAntes = M.anotaRecord(progreso, c.modo, puntos);   // el récord de ESTE modo (el del clásico es records.puntos)
   progreso.monedas += c.monedas;
   progreso.totales.carreras++; progreso.totales.metros += metros; progreso.totales.monedas += c.monedas;
-  const recordDist = metros > progreso.records.distancia;
-  progreso.records.puntos = Math.max(progreso.records.puntos, puntos);
-  progreso.records.distancia = Math.max(progreso.records.distancia, metros);
+  // la distancia es una tabla del clásico: solo ahí cuenta como récord
+  const recordDist = c.modo.distancia && metros > progreso.records.distancia;
+  if (c.modo.distancia) progreso.records.distancia = Math.max(progreso.records.distancia, metros);
   progreso.records.monedas = Math.max(progreso.records.monedas, c.monedas);
   const nivelAntes = progreso.retos.nivel;
   const res = M.avanzaRetos(progreso.retos, c.cuenta, true);
@@ -787,12 +829,15 @@ function cierraCarrera() {
   if (res.subio) sonido.multiplicador();
   // la prueba: el fin de la carrera, y el juego se revisa a sí mismo con lo mismo que usará el club
   const prueba = cierraPrueba(puntos, metros, ms);
-  // a la clasificación (con su prueba): la carrera siempre (cuenta como partida del club); la distancia, solo si es récord
-  if (Club && Club.result && puntos >= 1 && prueba) {
-    Club.result({ categoria: 'club-metrorush-carrera', puntos: Math.min(1e9, puntos), tiempo: ms }, prueba);
+  // a la clasificación (con su prueba): la carrera siempre, a la tabla de su modo (cuenta como partida del club);
+  // la distancia, solo en el clásico y si es récord
+  const enviada = !!(Club && Club.result && puntos >= 1 && prueba);
+  if (enviada) {
+    Club.result({ categoria: c.modo.categoria, puntos: Math.min(1e9, puntos), tiempo: ms }, prueba);
     if (recordDist && metros >= 1) Club.result({ categoria: 'club-metrorush-distancia', puntos: Math.min(1e6, metros), tiempo: ms }, prueba);
   }
-  c.cierre = { puntos, metros, monedas: c.monedas, mult, recordAntes, subio: res.subio, premio, nivelRetos: nivelAntes, avanceRetos, fuera: c.fuera };
+  c.cierre = { puntos, metros, monedas: c.monedas, mult, recordAntes, subio: res.subio, premio, nivelRetos: nivelAntes, avanceRetos, fuera: c.fuera,
+    modo: c.modo, enviada, distancia: enviada && recordDist && metros >= 1 };
   return c.cierre;
 }
 /** Cierra la prueba y decide si la carrera va a la clasificación. Devuelve
@@ -805,6 +850,7 @@ function cierraPrueba(puntos, metros, ms) {
   if (!c.muerte) anota('m');                                    // se cerró en plena carrera (la pestaña, desde la pausa): ahí paran los puntos
   anota('f');
   const prueba = MP.cierra(JSON.parse(JSON.stringify(c.prueba)), { sn: c.sinteticas });
+  if (typeof c.rastro === 'string' && MP.ponFantasma) MP.ponFantasma(prueba, c.rastro);   // el rastro del fantasma (no cuenta para los puntos)
   c.pruebaFinal = prueba;
   if (c.tocada || tocada) { c.fuera = 'Partida de prueba (se usó __metrorush): no entra en la clasificación.'; return null; }
   if (c.sinteticas > 0) { c.fuera = 'Esta carrera tuvo teclas que no apretó una persona: no entra en la clasificación.'; return null; }
@@ -820,10 +866,51 @@ function aPortada() {
   cierraCarrera(); ocultaPista();
   estado = 'portada'; c = null;
   $('hud').hidden = true;
-  mundo.reinicia(); mundo.activa(estacionVisual(M.ESTACIONES[0]), 0);
-  pantalla.dataset.estilo = estacionVisual(M.ESTACIONES[0]).estilo;
-  sonido.tocaTema('metrorush-barrio');
+  if (Club && Club.inmersivo) Club.inmersivo(false);
+  escenaPortada();
   pintaPortada(); muestraCapa('capaPortada');
+}
+/** El escenario de la portada: la primera estación del mundo del modo
+    elegido, con los trenes de una pista cualquiera a la vista, y su música. */
+function escenaPortada() {
+  const e = estacionVisual(M.estacionDe(0, modoSel));
+  mundo.reinicia(); mundo.activa(e, 0);
+  mundo.monedasPeligro(!!modoSel.monedasMatan);
+  pantalla.dataset.estilo = e.estilo;
+  const vitrina = M.crearGenerador(2026, { modo: modoSel.id });  // en la portada se ve la vía con los primeros trenes de una pista cualquiera
+  for (const o of vitrina.generarHasta(200, { V: 13 })) if (o.tipo !== 'moneda' && o.d0 > 30) mundo.nuevo(o);
+  sonido.tocaTema(e.musica || 'metrorush-barrio');
+}
+/* ---- el modo de juego (M.MODOS) ----
+   Se elige en la portada con una fila de tarjetas; cada una dice su regla
+   en una línea. Lo elegido se guarda en las opciones de este aparato, la
+   clasificación del costado pasa a la tabla de ese modo y, si el modo es de
+   otro mundo (City), el escenario de la portada cambia. */
+function eligeModo(id) {
+  const m = M.modoDe(id);
+  if (!m || estado !== 'portada') return;
+  const otroMundo = m.mundo !== modoSel.mundo;
+  modoSel = m; opciones.modo = m.id; guardaOpciones();
+  if (Club) Club.category(m.categoria);
+  if (otroMundo) escenaPortada(); else mundo.monedasPeligro(!!m.monedasMatan);
+  sonido.carril();
+  pintaPortada();
+}
+/** La fila de modos de la portada y la línea que explica el elegido. */
+function pintaModos() {
+  $('modosLista').innerHTML = M.ORDEN_MODOS.map(k => {
+    const m = M.MODOS[k], sel = m === modoSel;
+    return `<button type="button" class="p-modo${sel ? ' sel' : ''}" role="radio" aria-checked="${sel}" data-modo="${k}" title="${m.desc}"><i>${ICONOS[ICONO_MODO[k]]}</i><span>${m.corto}</span></button>`;
+  }).join('');
+  $('modoDesc').textContent = modoSel.desc;
+  $('capaPortada').dataset.modo = modoSel.id;
+}
+/** La insignia del modo en el marcador de la carrera, y lo que ese modo no tiene. */
+function pintaModoHud() {
+  const el = $('hudModo');
+  el.innerHTML = `${ICONOS[ICONO_MODO[c.modo.id]]}<span>${c.modo.corto}</span>`;
+  el.dataset.modo = c.modo.id;
+  document.querySelector('.hud .patinetas').hidden = !c.modo.patineta;   // sin patineta no hay contador de patinetas
 }
 function otraCarrera() { cierraCarrera(); empezar(); }
 document.addEventListener('visibilitychange', () => {
@@ -912,9 +999,11 @@ function pintaHud(dt) {
   ponTexto('hudMonedas', mon);
   ponTexto('hudPatinetas', String(progreso.patinetas));
   // la barra hacia la próxima estación
-  const e = c.estacion, sig = M.siguienteUmbral(c.D), desde = e.desde || 0;   // en metros, como las estaciones
-  const k = Math.max(0, Math.min(1, (c.D - (e.vuelta > 1 ? sig - M.VUELTA_CADA : desde)) / Math.max(1, sig - (e.vuelta > 1 ? sig - M.VUELTA_CADA : desde))));
+  const e = c.estacion, sig = M.siguienteUmbral(c.D, c.modo), desde = e.desde || 0;   // en metros, como las estaciones
+  const cada = c.mundoJ.vuelta ? c.mundoJ.vuelta.cada : 0;       // lo que dura una vuelta en este mundo
+  const k = Math.max(0, Math.min(1, (c.D - (e.vuelta > 1 ? sig - cada : desde)) / Math.max(1, sig - (e.vuelta > 1 ? sig - cada : desde))));
   ponTexto('hudEstacion', e.nombre);
+  $('hudEstBarra').hidden = !Number.isFinite(sig);               // un mundo sin más estaciones no tiene barra hacia la siguiente
   $('hudEstBarra').style.setProperty('--k', k.toFixed(3));
   // los poderes activos, con su barra de tiempo
   const lista = [];
@@ -980,8 +1069,21 @@ const ICONOS = {
   lados: svg(`<path d="M5 16h22M11 9.5 4.5 16l6.5 6.5M21 9.5l6.5 6.5-6.5 6.5" fill="none" stroke="#ff8a1f" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/>`),
   rueda: svg(`<path d="M16 5v18M8.5 16.5 16 24l7.5-7.5" fill="none" stroke="#1f7ae0" stroke-width="4.6" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 3.5h20" stroke="#142357" stroke-width="2.6" stroke-linecap="round"/>`),
   supercaja: svg(`<path d="M4 12h24v16H4z" fill="#8b5cf6" ${T}/><path d="M2.5 7.5h27v5h-27z" fill="#b28cff" ${T}/><path d="M14 7.5h4V28h-4z" fill="#ffd23f" stroke="#142357" stroke-width="1.6"/><path d="M16 7c-3-5-8-4-6-1s6 1 6 1 4-.8 6-1 -3-4-6 1z" fill="#ffd23f" ${T}/><path d="M23 15.5l1 2 2 .5-1.5 1.5.4 2.2-1.9-1-1.9 1 .4-2.2L20 18l2-.5z" fill="#fff"/>`),
-  bandera: svg(`<path d="M8 29V4" stroke="#142357" stroke-width="2.8" stroke-linecap="round"/><path d="M8.5 5h17l-3.5 5 3.5 5h-17z" fill="#ff3d4f" ${T}/>`)
+  bandera: svg(`<path d="M8 29V4" stroke="#142357" stroke-width="2.8" stroke-linecap="round"/><path d="M8.5 5h17l-3.5 5 3.5 5h-17z" fill="#ff3d4f" ${T}/>`),
+  // los modos: sin ayudas (el rayo de los poderes, tachado), sin monedas (una moneda roja con calavera), la ciudad y la ciudad tachada
+  sinAyudas: svg(`<circle cx="16" cy="16" r="13" fill="#eaf1fb" ${T}/><path d="M18 6.5 10.5 17h5l-1.5 8.5 7.5-11h-5z" fill="#ffd23f" stroke="#142357" stroke-width="2" stroke-linejoin="round"/><path d="M7 25 25 7" stroke="#e8283c" stroke-width="3.6" stroke-linecap="round"/>`),
+  peligro: svg(`<circle cx="16" cy="16" r="13" fill="#ff4a3d" stroke="#6e0a00" stroke-width="2.5"/><circle cx="16" cy="16" r="8.8" fill="none" stroke="#ffb3a8" stroke-width="1.8"/><path d="M11 14.5a5 5 0 0 1 10 0c0 1.8-.8 2.8-1.8 3.5v2.2h-6.4V18c-1-.7-1.8-1.7-1.8-3.5z" fill="#fff" stroke="#6e0a00" stroke-width="1.6" stroke-linejoin="round"/><circle cx="13.9" cy="14.6" r="1.3" fill="#6e0a00"/><circle cx="18.1" cy="14.6" r="1.3" fill="#6e0a00"/><path d="M14.4 22.6h3.2" stroke="#6e0a00" stroke-width="1.6" stroke-linecap="round"/>`),
+  ciudad: svg(`<path d="M3 28V14h6V8h7v6h3V4h8v24z" fill="#5cc0ff" ${T}/><path d="M6 18h2M6 22h2M12 12h2M12 16h2M12 20h2M22 8h2M22 12h2M22 16h2M22 20h2" stroke="#fff6c9" stroke-width="2" stroke-linecap="round"/><path d="M1.5 28.5h29" stroke="#142357" stroke-width="2.6" stroke-linecap="round"/>`),
+  // el fantasma: una sábana con ojos, y la ciudad con su fantasma
+  fantasma: svg(`<path d="M6 28V14a10 10 0 0 1 20 0v14l-3.3-2.6-3.4 2.6-3.3-2.6-3.3 2.6-3.4-2.6z" fill="#eef3ff" ${T}/><ellipse cx="12.5" cy="14" rx="2" ry="2.8" fill="#142357"/><ellipse cx="19.5" cy="14" rx="2" ry="2.8" fill="#142357"/>`),
+  ciudadFantasma: svg(`<path d="M3 28V14h6V8h7v6h3V4h8v24z" fill="#9fd9ff" ${T}/><path d="M1.5 28.5h29" stroke="#142357" stroke-width="2.6" stroke-linecap="round"/><path d="M12 29V21a6 6 0 0 1 12 0v8l-2-1.6-2 1.6-2-1.6-2 1.6-2-1.6z" fill="#eef3ff" stroke="#142357" stroke-width="2" stroke-linejoin="round"/><circle cx="16" cy="21.5" r="1.2" fill="#142357"/><circle cx="20" cy="21.5" r="1.2" fill="#142357"/>`),
+  ciudadPura: svg(`<path d="M3 28V14h6V8h7v6h3V4h8v24z" fill="#9fd9ff" ${T}/><path d="M6 18h2M12 12h2M12 16h2M22 8h2M22 12h2" stroke="#fff6c9" stroke-width="2" stroke-linecap="round"/><path d="M1.5 28.5h29" stroke="#142357" stroke-width="2.6" stroke-linecap="round"/><path d="M6 26 26 6" stroke="#e8283c" stroke-width="3.6" stroke-linecap="round"/>`),
+  // pantalla completa: cuatro esquinas hacia afuera (entrar) o hacia adentro (salir)
+  pantalla: svg(`<path d="M5 12V5h7M20 5h7v7M27 20v7h-7M12 27H5v-7" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>`),
+  pantallaSale: svg(`<path d="M12 5v7H5M27 12h-7V5M20 27v-7h7M5 20h7v7" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>`)
 };
+/* El ícono de cada modo de juego (M.MODOS). */
+const ICONO_MODO = { clasico: 'tren', puro: 'sinAyudas', sinmonedas: 'peligro', fantasma: 'fantasma', city: 'ciudad', citypuro: 'ciudadPura', cityfantasma: 'ciudadFantasma' };
 /* El ícono de cada clase de misión. */
 const ICONO_RETO = { monedas: 'moneda', monedasTotal: 'moneda', saltos: 'salto', rodadas: 'rueda', distancia: 'bandera', puntos: 'estrella',
   poderes: 'rayo', techos: 'tren', estrellas: 'estrella', esquivar: 'tren', patinetas: 'patineta', mochilas: 'mochila' };
@@ -1002,7 +1104,8 @@ function cierraPanel() {
   muestraCapa(estado === 'pausa' ? 'capaPausa' : estado === 'fin' ? 'capaFin' : estado === 'portada' ? 'capaPortada' : null);
 }
 function pintaPortada() {
-  ponTexto('portadaRecord', fmt(progreso.records.puntos));
+  ponTexto('portadaRecord', fmt(M.recordDe(progreso, modoSel)));   // el récord del modo elegido
+  pintaModos();
   ponTexto('portadaMult', '×' + progreso.retos.nivel);
   ponTexto('portadaMonedas', fmt(progreso.monedas));
   // los globitos de la barra: cuántos retos van cumplidos y cuántos boletos tienes
@@ -1013,14 +1116,14 @@ function pintaPortada() {
   // el globito «!» de Misiones: hay algo que hacer ahí (una misión se puede saltar con lo que tienes, o el set está a una misión)
   $('portadaRetosG').hidden = !(progreso.retos.nivel < M.MAX_BASE && (hechos === 2 || progreso.monedas >= M.costoSaltar(progreso.retos.nivel)));
   ponTexto('portadaBoletos', `${progreso.boletos.length}/7`);
-  ponTexto('barRecord', fmt(progreso.records.puntos));
+  ponTexto('barRecord', fmt(M.recordDe(progreso, modoSel)));
   ponTexto('barMonedas', fmt(progreso.monedas));
   ponTexto('barMult', '×' + progreso.retos.nivel);
 }
 /* Tocar cualquier parte vacía de la portada empieza a correr, como «toca
    para jugar»: solo los botones y los contadores no cuentan. */
 $('capaPortada').addEventListener('click', e => {
-  if (estado !== 'portada' || panel || e.target.closest('button, .contador, .p-record, .logo')) return;
+  if (estado !== 'portada' || panel || e.target.closest('button, .contador, .p-record, .logo, .p-modos')) return;   // la fila de modos tampoco empieza
   empezar();
 });
 /** Las misiones de un set con su barra, en chico y sin «Saltar» (para el resumen). */
@@ -1163,6 +1266,7 @@ document.addEventListener('click', e => {
   if (b.dataset.aspecto) { const a = M.ASPECTOS[b.dataset.aspecto]; if (a && a.precio != null && progreso.monedas >= a.precio) { progreso.monedas -= a.precio; progreso.aspectos.push(b.dataset.aspecto); progreso.aspecto = b.dataset.aspecto; mundo.aspecto(a); aspectoMostrado = b.dataset.aspecto; sonido.poder(); guardar(); pintaTienda(); pintaPortada(); } return; }
   if (b.dataset.poner) { progreso.aspecto = b.dataset.poner; mundo.aspecto(M.ASPECTOS[b.dataset.poner]); aspectoMostrado = b.dataset.poner; sonido.reto(); guardar(); pintaTienda(); return; }
   if (b.dataset.saltar != null) { saltarMision(Number(b.dataset.saltar)); return; }
+  if (b.dataset.modo) { eligeModo(b.dataset.modo); return; }   // una tarjeta de modo, en la portada
   if (b.dataset.pot) { cuentaEntrada(e); usaPotenciador(b.dataset.pot); return; }
   if (b.dataset.pestana && b.getAttribute('role') === 'tab') { tiendaPestana = b.dataset.pestana; sonido.carril(); pintaTienda(); return; }
   if (b.dataset.ver) { tiendaVer = b.dataset.ver; sonido.carril(); pintaTienda(); return; }
@@ -1177,9 +1281,15 @@ document.addEventListener('click', e => {
     abandonar: () => { if (estado !== 'pausa') return; anota('m'); c.muerte = { t: 2, motivo: 'abandono' }; muestraFin(); },
     noSalvar: () => { if (estado === 'salvar') muestraFin(); },
     tienda: () => abreTienda('mejoras'), personajes: () => abreTienda('personajes'), retos: abreRetos, libreta: abreLibreta, opciones: abreOpciones, ayuda: () => abrePanel('capaAyuda'),
-    volver: cierraPanel, relatoListo: () => { progreso.intro = true; guardar(); panel = null; empezar(); }
+    volver: cierraPanel, relatoListo: () => { progreso.intro = true; guardar(); panel = null; empezar(); },
+    pantallaCompleta: alternaPantallaCompleta
   })[accion]?.();
 });
+/* La Libreta y el relato cuentan la historia de la Línea 3 (el mundo
+   «metro»). Un mundo con historia propia (City) la tiene en
+   M.historiaDe(modo) → {intro, boletos, estaciones}: es el gancho para
+   mostrarla cuando ese mundo tenga boletos (y su propio lugar en el
+   progreso para guardarlos; los de `progreso.boletos` son de la Línea 3). */
 function abreLibreta() {
   $('libretaIntro').textContent = M.INTRO;
   $('listaBoletos').innerHTML = M.ESTACIONES.map(e => {
@@ -1223,10 +1333,46 @@ function desbloquea(aspecto, texto) {
   progreso.aspectos.push(aspecto); guardar(); sonido.boleto(); aviso(texto);
 }
 
+/* ---- pantalla completa (PC y teléfono) ----
+   El botón ⛶ de la portada y de la pausa, o la tecla F, piden pantalla
+   completa para TODA la página del juego (el iframe de Juegos ya trae
+   allow="fullscreen"); el estilo (html.mr-pc) deja solo el marcador fino de
+   arriba —con el sonido y el volumen, que tienen que verse siempre— y la
+   pantalla del juego ocupando el resto. Safari viejo usa los nombres webkit.
+   En el iPhone no hay pantalla completa de elementos: ahí el botón no se
+   muestra y basta el modo inmersivo de conexion.js (Club.inmersivo), que se
+   prende al correr. El ícono y el texto siguen al estado real
+   (fullscreenchange), también si se sale con Escape. */
+const enPantallaCompleta = () => !!(document.fullscreenElement || document.webkitFullscreenElement);
+const hayPantallaCompleta = !!(document.fullscreenEnabled || document.webkitFullscreenEnabled);
+function alternaPantallaCompleta() {
+  if (!hayPantallaCompleta) return;
+  try {
+    if (enPantallaCompleta()) { const f = document.exitFullscreen || document.webkitExitFullscreen; const r = f && f.call(document); if (r && r.catch) r.catch(() => {}); }
+    else { const el = document.documentElement, f = el.requestFullscreen || el.webkitRequestFullscreen; const r = f && f.call(el); if (r && r.catch) r.catch(() => {}); }
+  } catch (e) { /* el navegador no dejó (sin un gesto, o en un iframe sin permiso): se sigue en ventana */ }
+}
+function pintaPantallaCompleta() {
+  const si = enPantallaCompleta();
+  document.documentElement.classList.toggle('mr-pc', si);        // el estilo de pantalla completa (estilo.css)
+  for (const b of document.querySelectorAll('[data-accion="pantallaCompleta"]')) {
+    b.hidden = !hayPantallaCompleta;
+    b.setAttribute('aria-pressed', String(si));
+    const t = si ? 'Salir de pantalla completa (F)' : 'Pantalla completa (F)';
+    b.title = t; b.setAttribute('aria-label', t);
+    const i = b.querySelector('i'); if (i) i.innerHTML = ICONOS[si ? 'pantallaSale' : 'pantalla'];
+    const n = b.querySelector('.nom-pc'); if (n) n.textContent = si ? 'Salir de pantalla completa' : 'Pantalla completa';
+  }
+  if (mundo) requestAnimationFrame(() => { const r = pantalla.getBoundingClientRect(); mundo.tamano(r.width, r.height); });   // el lienzo toma el tamaño nuevo ya
+}
+document.addEventListener('fullscreenchange', pintaPantallaCompleta);
+document.addEventListener('webkitfullscreenchange', pintaPantallaCompleta);
+
 /* ===================================================================
    8. ARRANQUE
    =================================================================== */
 ponIconos();
+pintaPantallaCompleta();
 async function arranca() {
   // las fuentes del marcador y de los letreros (con un tope: si no llegan, se usa la de respaldo)
   const fuentes = Promise.all(['100px "Lilita One"', '700 60px Orbitron', '20px "Press Start 2P"'].map(f => document.fonts.load(f).catch(() => null)));
@@ -1243,24 +1389,19 @@ async function arranca() {
   const ajusta = () => { const r = pantalla.getBoundingClientRect(); mundo.tamano(r.width, r.height); };
   new ResizeObserver(ajusta).observe(pantalla); ajusta();
   mundo.aspecto(M.ASPECTOS[progreso.aspecto] || M.ASPECTOS.clasico); aspectoMostrado = progreso.aspecto;
-  const inicio = estacionVisual(M.ESTACIONES[0]);
-  mundo.activa(inicio, 0);
-  pantalla.dataset.estilo = inicio.estilo;
-  // en la portada se ve la vía con los primeros trenes de una pista cualquiera
-  const vitrina = M.crearGenerador(2026);
-  for (const o of vitrina.generarHasta(200, { V: 13 })) if (o.tipo !== 'moneda' && o.d0 > 30) mundo.nuevo(o);
+  escenaPortada();                                              // la primera estación del modo elegido, con trenes a la vista
   estado = 'portada';
   pintaPortada(); muestraCapa('capaPortada');
-  if (Club) Club.category('club-metrorush-carrera');
-  sonido.tocaTema('metrorush-barrio');
+  if (Club) Club.category(modoSel.categoria);                   // la clasificación del costado: la del modo elegido
   requestAnimationFrame(t => { prevT = t; cuadro(t); });
   // se precarga el kit de la segunda estación cuando el navegador esté libre
   setTimeout(() => mundo.precarga(estacionVisual(M.ESTACIONES[1])), 4000);
 }
 window.addEventListener('club-record', e => {                    // el récord de la nube, por si es mayor que el de aquí
   const d = e.detail; if (!d) return;
-  if (d.categoria === 'club-metrorush-carrera' && d.puntos > progreso.records.puntos) { progreso.records.puntos = d.puntos; pintaPortada(); }
-  if (d.categoria === 'club-metrorush-distancia' && d.puntos > progreso.records.distancia) { progreso.records.distancia = d.puntos; pintaPortada(); }
+  if (d.categoria === 'club-metrorush-distancia') { if (d.puntos > progreso.records.distancia) { progreso.records.distancia = d.puntos; pintaPortada(); } return; }
+  const m = M.modoDeCategoria(d.categoria);                     // la mejor carrera de algún modo
+  if (m && d.puntos > M.recordDe(progreso, m)) { M.anotaRecord(progreso, m, d.puntos); pintaPortada(); }
 });
 // Para probar desde la consola o desde un script: estado, saltar a puntos, etc.
 /* Los que cambian la carrera (puntos, teclas, poderes, inmortal, adelantar
@@ -1268,7 +1409,17 @@ window.addEventListener('club-record', e => {                    // el récord d
    a la clasificación (ver «la prueba de la carrera»). */
 const toca = () => { tocada = true; if (c) c.tocada = true; };
 window.__metrorush = {
-  estado: () => ({ estado, puntos: c && c.puntos, D: c && c.D, V: c && c.V, estacion: c && c.estacion.nombre, info: mundo && mundo.info() }),
+  estado: () => ({ estado, puntos: c && c.puntos, D: c && c.D, V: c && c.V, estacion: c && c.estacion.nombre, info: mundo && mundo.info(),
+    modo: c ? c.modo.id : modoSel.id, motivo: c && c.muerte ? c.muerte.motivo : null, carril: c && c.r.carril, y: c && c.r.y,
+    tabla: c && c.cierre ? { modo: c.cierre.modo.id, enviada: c.cierre.enviada, fuera: c.cierre.fuera || null } : null }),
+  /** La semilla de la próxima carrera (la del récord, en el modo Fantasma). No vuelve «de prueba» a nada:
+      el antitrampas acepta cualquier semilla. Gancho para el fantasma. */
+  semillaSiguiente: n => { semillaSiguiente = Number.isInteger(n) && n >= 0 ? n : null; return semillaSiguiente; },
+  /** Elige el modo de juego en la portada, como tocar su tarjeta (no vuelve «de prueba» a nada). */
+  modo: id => { eligeModo(id); return modoSel.id; },
+  /** Los objetos de la pista por delante (copias, solo para mirar): [{tipo, clase, carril, d, y}]. */
+  objetos: (hasta = 60) => c ? c.activos.filter(o => (o.d != null ? o.d : o.d0) - c.D < hasta && (o.d != null ? o.d : o.d0 + (o.largo || 0)) > c.D - 1)
+    .map(o => ({ tipo: o.tipo, clase: o.clase, carril: o.carril, d: o.d != null ? o.d : o.d0, y: o.y, largo: o.largo, vel: o.vel })) : [],
   puntos: n => { toca(); if (c) c.puntos = n; },
   pulsa: a => { toca(); pedidos.push(a); },
   poder: k => { toca(); return c && activaPoder(k); },

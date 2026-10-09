@@ -3765,6 +3765,73 @@ Things that matter:
   geometries and textures. Those counts are for the **whole frame**:
   `renderer.info.autoReset` is off and `dibuja()` resets it once, because
   with post-processing every pass reset it and the reading was always 1.
+  `modo(id)` picks the mode like a tap on its card and `objetos(m)` lists
+  what is ahead (both read-only: neither makes the run a test run).
+- **Modes are data** (`MODOS`/`ORDEN_MODOS` in `motor.js`), picked on the
+  title screen (a row of cards above «¡Jugar!», remembered in
+  `metrorush.opciones.modo`), shown as a badge in the HUD, and each has its
+  own table:
+
+  | id | name | table | items · boosters · skate · continue | coins kill | world |
+  |---|---|---|---|---|---|
+  | `clasico` | Clásico | `club-metrorush-carrera` (+ `-distancia`) | yes | no | metro |
+  | `puro` | Sin ayudas | `club-metrorush-puro` | no | no | metro |
+  | `sinmonedas` | Sin monedas | `club-metrorush-sinmonedas` | no | **yes** | metro |
+  | `fantasma` | Fantasma | `club-metrorush-fantasma` | no | no | metro |
+  | `city` | City | `club-metrorush-city` | yes | no | city |
+  | `citypuro` | City sin ayudas | `club-metrorush-citypuro` | no | no | city |
+  | `cityfantasma` | City fantasma | `club-metrorush-cityfantasma` | no | no | city |
+
+  The two **Fantasma** modes (`fantasma: true`) race the ghost of the #1 of
+  their own table. Only the hooks exist so far: the next run's seed can be
+  fixed (`semillaSiguiente` in `juego.js`, also `__metrorush.semillaSiguiente(n)`,
+  used once) so the track is the record holder's (any seed verifies), and
+  the proof has an optional `g` (ghost trace text, `c.rastro` →
+  `MP.ponFantasma`) that `rehace` ignores for scoring but caps at
+  `MAX_FANTASMA` (60 000 chars); the whole proof is capped at `PRUEBA_MAX`
+  (200 000 chars of JSON) in `solo/verifica.js`.
+
+  `crearGenerador(seed, {modo})`: without a mode (or with `clasico`) the
+  track is **byte-identical to before modes** (`metrorush-modos.test.cjs`
+  pins five seeds' hashes taken from the old engine). Without `items` no
+  power-ups or boxes are emitted (stars and tickets stay). With
+  `monedasMatan` coins become obstacles, so they never go on the safe path
+  (no arc over a low barrier, no roof rows, no rows under a high barrier):
+  they close lanes that were already closed (half the barrier slots of a
+  closed lane become a coin row), and respiro/tunnel ribbons run off the
+  path; a simulated player that treats each coin as a wall always finds a
+  way. In the game a coin touched within 0.7 m × 0.6 m is `muere('moneda')`
+  and the coins are tinted red and pulse (`mundo.monedasPeligro`). The
+  proof gains `m` (absent for classic, so classic proofs did not change and
+  `VERSION` stays 2); `rehace` regenerates with that mode and its speed
+  curve and rejects a 2× (`d`), the jetpack ribbon (`C`), the +5 (`p`) or a
+  continue (`s`) in modes without them, a ticket the world lacks, and an
+  unknown `m`. The verifier rejects a result whose table is not its proof's
+  mode, and distance from any mode but classic. **Worlds** (`MUNDOS`):
+  `metro` (Línea 3) and `city`, today a scaffold with one station
+  (`ESTACIONES_CITY`, palette `alba`, no loops, no tickets) so City plays end
+  to end. The hooks for filling it, all read by game, generator and proof:
+  `ESTACIONES_CITY` / `MUNDOS.city.vuelta`, `INTRO_CITY`/`BOLETOS_CITY`
+  (`historiaDe(modo)`), `MUNDOS.city.velocidad` (`velocidadDe(modo)` →
+  `{velocidad, metrosEntre, velocidadEn, VELOCIDAD}`; changing it voids
+  stored City proofs), `MUNDOS.city.generador.bloque(api, dif)` (a block of
+  its own; `api` has the RNG, `emite`, the classic blocks and the live
+  `dSig`/`camino`/`libre`), `registraTipo(tipo, {caja})` for new collidable
+  objects (mundo.js `nuevo` must also learn to draw them) and
+  `MUNDOS.city.personajes`. Per-mode local records live in
+  `progreso.recordsModo` (`recordDe`/`anotaRecord`; classic stays in
+  `records.puntos`). The six new tables pay like `-carrera` (1 coin per
+  25 000 points, plus `RECORD` each), are in `club-datos.js`, `ranks.js`
+  (a «Modo» row), Discord and the profile; the `soloRanks`/`soloPruebas`
+  regexes and the 1e9 cap were widened, so **the rules must be
+  re-published**. Logros still read only the classic tables. Proof changes
+  bumped `club-47` and `metrorush-7`.
+- **Fullscreen**: ⛶ on the title screen and in the pause panel, or `F`,
+  calls `requestFullscreen` on the document (webkit fallback; the button
+  hides where the API is missing, i.e. iPhone). `html.mr-pc` (and
+  `html.club-inm`, set by `Club.inmersivo(true)` at run start on a portrait
+  phone and cleared on pause and at the summary) keeps only a thin scorebar
+  (mute and volume must stay visible) and lets `.pantalla` fill the rest.
 
 **Frontera Batalla (`#solo/frontera`) is Emerald's Battle Frontier as a
 Solo Club game**, played locally on the same `@pkmn/sim` bundle as the

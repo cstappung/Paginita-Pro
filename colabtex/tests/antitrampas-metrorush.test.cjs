@@ -201,7 +201,8 @@ test('Metro Rush: el juego anota la prueba y la manda con el resultado',()=>{
  const fs=require('node:fs'),js=fs.readFileSync(path.join(DIR,'juego.js'),'utf8'),html=fs.readFileSync(path.join(DIR,'index.html'),'utf8');
  assert.match(html,/prueba\.js\?v=/,'la página carga prueba.js');
  assert.match(html,/conexion\.js\?v=club-(1[1-9]|[2-9]\d)/,'con la conexión que manda la prueba');
- assert.match(js,/Club\.result\(\{ categoria: 'club-metrorush-carrera'.*\}, prueba\)/);
+ // la mejor carrera va a la tabla de su modo (la del clásico es club-metrorush-carrera); la distancia, solo del clásico
+ assert.match(js,/Club\.result\(\{ categoria: c\.modo\.categoria.*\}, prueba\)/);
  assert.match(js,/Club\.result\(\{ categoria: 'club-metrorush-distancia'.*\}, prueba\)/);
  for(const cod of ["'e'","'d'","'x'","'p'","'m'","'s'","'w'","'f'"])assert.ok(js.includes('anota('+cod),'anota '+cod);
  for(const tipo of ["'T'","'B'","'C'"])assert.ok(js.includes('anotaPedido('+tipo),'pide '+tipo);

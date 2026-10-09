@@ -109,7 +109,8 @@ const PARTES = {
   experto: "Experto",  // la dificultad más alta del clásico de Sudoku Arcade
   travesia: "Travesía", sinfin: "Sin fin", jornadas: "Jornada más lejana",  // FANAL
   estrellas: "Estrellas",  // Atasco
-  carrera: "Mejor carrera", distancia: "Distancia"  // Metro Rush
+  carrera: "Mejor carrera", distancia: "Distancia",  // Metro Rush (el clásico)
+  puro: "Sin ayudas", sinmonedas: "Sin monedas", fantasma: "Fantasma", city: "City", citypuro: "City sin ayudas", cityfantasma: "City fantasma"  // Metro Rush (los otros modos)
 };
 export const juegoDeCategoria = c => Object.keys(SOLO_PREFIJO).find(k => String(c).startsWith(SOLO_PREFIJO[k])) || "";
 export function nombreCategoria(c) {

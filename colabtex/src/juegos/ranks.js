@@ -83,9 +83,9 @@ const SOLO = {
     cat: s => `club-aleteo-${s.n}` },
   dosmil: { filas: [{ k: "n", t: "Tabla", ops: [["puntos", "Puntos"], ["ficha", "Ficha"]] }],
     cat: s => `club-dosmil-${s.n}` },
-  /* Metro Rush: la mejor carrera por puntos y la carrera más larga en
-     metros. Dos tablas, una fila. */
-  metrorush: { filas: [{ k: "m", t: "Tabla", ops: [["carrera", "Mejor carrera"], ["distancia", "Distancia"]] }],
+  /* Metro Rush: una fila «Modo» con la mejor carrera de cada modo (carrera
+     es el clásico) y la carrera más larga en metros (solo del clásico). */
+  metrorush: { filas: [{ k: "m", t: "Modo", ops: [["carrera", "Clásico"], ["distancia", "Distancia"], ["puro", "Sin ayudas"], ["sinmonedas", "Sin monedas"], ["fantasma", "Fantasma"], ["city", "City"], ["citypuro", "City sin ayudas"], ["cityfantasma", "City fantasma"]] }],
     cat: s => `club-metrorush-${s.m}` },
   snake: { filas: [
       { k: "m", t: "Modo", ops: [["classic", "Clásico"], ["arcade", "Arcade"], ["portals", "Portales"], ["reloj", "Contrarreloj"], ["espejo", "Espejo"], ["laberinto", "Laberinto"]] },

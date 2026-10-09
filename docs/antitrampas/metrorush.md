@@ -96,6 +96,37 @@ prueba no cuadrara (sería un error del juego) no la manda, lo dice en el
 resumen y avisa en la consola, en vez de mandar algo que el club castigaría
 como trampa.
 
+### Los modos (`m`)
+
+Cada modo de juego (`MODOS` en `motor.js`) tiene su tabla:
+`club-metrorush-carrera` (clásico), `-puro` (Sin ayudas), `-sinmonedas`,
+`-fantasma`, `-city`, `-citypuro` y `-cityfantasma`; la distancia es solo del clásico. La prueba lleva el
+modo en `m`, salvo el clásico, que no lo anota: su prueba es la misma de
+antes de los modos y `VERSION` sigue en 2. `rehace`:
+
+- regenera la pista con ese modo (`crearGenerador(s, {modo})`) y mide los
+  metros con su curva (`velocidadDe(modo)`);
+- rechaza un `m` que no existe, y lo que el modo no permite: un 2× (`d`)
+  o la cinta de la mochila (`C`) sin poderes, el +5 (`p`) sin
+  potenciadores, «seguir corriendo» (`s`) sin segunda oportunidad, un
+  boleto (`B`) que ese mundo no tiene.
+
+El verificador además exige que la tabla sea la del modo de la prueba (una
+carrera del clásico, con sus poderes, no entra en «Sin ayudas») y que la
+distancia venga del clásico. `sospecha` usa el multiplicador máximo de cada
+modo: sin poderes ni potenciadores es 30 + 29 = 59 (590 puntos por metro).
+
+Los modos Fantasma corren la pista del récord que persiguen: la semilla se
+puede elegir y el verificador acepta cualquiera (la pista sale de ella). La
+prueba puede traer `g`, el rastro del fantasma (carril y altura en texto):
+`rehace` no lo usa para los puntos, solo exige que sea texto de a lo más
+`MAX_FANTASMA` = 60 000 caracteres; la prueba entera sigue con el tope del
+club de 200 000 (`PRUEBA_MAX`).
+
+En «Sin monedas» tocar una moneda es un choque (`m`). Que el choque fue
+contra una moneda no se prueba —no se prueba el carril—, pero un choque
+solo resta puntos: no hay trampa ahí.
+
 ### Lo que hace el juego con una carrera que no vale
 
 - Si se usó un gancho de `__metrorush` que cambia la carrera, o hubo teclas

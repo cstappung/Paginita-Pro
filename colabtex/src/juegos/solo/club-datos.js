@@ -29,9 +29,10 @@ export function categoriaClub(juego, categoria) {
     // 2048: el mejor puntaje y la ficha más alta.
     : juego === 'dosmil'
     ? /^club-dosmil-(puntos|ficha)$/.test(categoria)
-    // Metro Rush: la mejor carrera (puntos) y la carrera más larga (metros).
+    // Metro Rush: la mejor carrera de cada modo (carrera es el clásico; puro,
+    // sinmonedas, fantasma, city, citypuro y cityfantasma, los otros) y la carrera más larga (metros, solo clásico).
     : juego === 'metrorush'
-    ? /^club-metrorush-(carrera|distancia)$/.test(categoria)
+    ? /^club-metrorush-(carrera|distancia|puro|sinmonedas|fantasma|city|citypuro|cityfantasma)$/.test(categoria)
     : juego === 'tetris'
     ? /^club-tetris-(maraton|sprint|ultra)$/.test(categoria)
     : /^club-snake-(classic|arcade|portals|reloj|espejo|laberinto)-(chico|mediano|grande|gigante)$/.test(categoria));
@@ -72,7 +73,7 @@ export function resultadoClub(juego, dato) {
   /* Metro Rush: una carrera pasa del millón de puntos sin esfuerzo, así que
      su tope es el de la regla (1 000 000 000); la distancia son metros,
      hasta 1 000 000 (mil kilómetros en una carrera). */
-  if (dato.categoria === 'club-metrorush-carrera' && dato.puntos > 1000000000) return null;
+  if (/^club-metrorush-(carrera|puro|sinmonedas|fantasma|city|citypuro|cityfantasma)$/.test(dato.categoria) && dato.puntos > 1000000000) return null;   // los puntos de cualquier modo
   if (dato.categoria === 'club-metrorush-distancia' && dato.puntos > 1000000) return null;
   /* Frontera: la racha y las victorias son combates; 100 000 es el tope
      de la regla. */
