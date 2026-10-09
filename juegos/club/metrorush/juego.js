@@ -24,10 +24,10 @@
    - Se perdona el salto un poco antes de tocar el suelo y un poco después
      de dejarlo (búfer y "tiempo de coyote"): sin eso el salto se siente
      "comido" a toda velocidad. */
-import { crearMundo, PALETAS } from './mundo.js?v=metrorush-7';
-import { Sonido } from './audio.js?v=metrorush-7';
-import './mundo-city.js?v=metrorush-7';                        // CITY: el dibujo de City (se engancha a mundo.js por GANCHOS)
-import { crearCiudad } from './ciudad.js?v=metrorush-7';       // CITY: lo que la carrera hace distinto en City
+import { crearMundo, PALETAS } from './mundo.js?v=metrorush-8';
+import { Sonido } from './audio.js?v=metrorush-8';
+import './mundo-city.js?v=metrorush-8';                        // CITY: el dibujo de City (se engancha a mundo.js por GANCHOS)
+import { crearCiudad } from './ciudad.js?v=metrorush-8';       // CITY: lo que la carrera hace distinto en City
 
 const M = window.MetroRushMotor;                               // el motor (motor.js)
 const MP = window.MetroRushPrueba;                            // la prueba de la carrera, para el antitrampas (prueba.js)
@@ -616,7 +616,9 @@ function actualiza(dt) {
     const fin = o.d != null ? o.d : o.d0 + (o.largo || 0);
     if (fin < c.D - 15) { mundo.suelta(o); c.activos.splice(i, 1); continue; }
     if (!o.vis && (o.d != null ? o.d : o.d0) - c.D < mundo.vista) mundo.nuevo(o);
-    if (o.tipo === 'tunel' && c.cambio && !c.cambio.tunel) c.cambio.tunel = o;
+    // el cambio de estación se engancha al túnel QUE VA A ESA estación (un túnel
+    // del fantasma hacia otra, grabado con otros umbrales, no debe adelantarlo)
+    if (o.tipo === 'tunel' && c.cambio && !c.cambio.tunel && (o.estacion == null || o.estacion === c.cambio.estacion.id)) c.cambio.tunel = o;
   }
   if (!muriendo) {
     fisica(dt);
@@ -791,7 +793,12 @@ function pideFantasma(modo, forzar) {
 /** Llegó (o no) el fantasma: se repinta la portada, y si se tocó «¡Jugar!» esperándolo, se empieza. */
 function alLlegarFantasma() {
   pintaFantasmaPortada();
-  if (esperandoFantasma) { esperandoFantasma = false; if (estado === 'portada' || estado === 'fin') { if (estado === 'fin') cierraCarrera(); empezar(); } }
+  if (!esperandoFantasma) return;
+  esperandoFantasma = false;
+  // solo se arranca si nada cambió mientras tanto: sigue en un modo fantasma,
+  // en la portada o el resumen, y sin un panel abierto (la tienda, la Libreta…)
+  if (!modoSel.fantasma || panel) return;
+  if (estado === 'portada' || estado === 'fin') { if (estado === 'fin') cierraCarrera(); empezar(); }
 }
 /** ¿Hay que esperar al fantasma antes de empezar? Solo si viene en camino
     (como mucho ESPERA_FANTASMA: después se corre solo). */
@@ -1352,6 +1359,7 @@ function eligeModo(id) {
   if (!m || estado !== 'portada') return;
   const otroMundo = m.mundo !== modoSel.mundo;
   modoSel = m; opciones.modo = m.id; guardaOpciones();
+  esperandoFantasma = false;                                    // otro modo: ya no se espera al fantasma del anterior
   if (Club) Club.category(m.categoria);
   if (otroMundo) { escenaPortada(); vistePuesto(); } else mundo.monedasPeligro(!!m.monedasMatan);   // CITY: al cambiar de mundo, su ropa de ese mundo
   sonido.carril();
@@ -1565,7 +1573,7 @@ function ponIconos(raiz = document) {
 function muestraCapa(id) {
   for (const el of document.querySelectorAll('.capa')) el.hidden = el.id !== id;
 }
-function abrePanel(id) { if (panel === 'capaTienda' && id !== 'capaTienda') saleTienda(); panel = id; for (const el of document.querySelectorAll('.capa')) el.hidden = el.id !== id; }
+function abrePanel(id) { esperandoFantasma = false; if (panel === 'capaTienda' && id !== 'capaTienda') saleTienda(); panel = id; for (const el of document.querySelectorAll('.capa')) el.hidden = el.id !== id; }
 function cierraPanel() {
   if (!panel) return;
   if (panel === 'capaTienda') saleTienda();

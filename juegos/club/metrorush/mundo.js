@@ -50,7 +50,7 @@ import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 // los escenarios nuevos y la historia que se ve en la vía (afiches, utilería, horizonte, sucesos): ver escenarios.js
-import * as ESC from './escenarios.js?v=metrorush-7';
+import * as ESC from './escenarios.js?v=metrorush-8';
 
 const MOTOR = window.MetroRushMotor;                // el motor (motor.js), cargado antes como script
 const CARRILES = MOTOR.CARRILES;                   // x de cada carril

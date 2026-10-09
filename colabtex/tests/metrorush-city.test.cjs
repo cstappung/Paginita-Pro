@@ -521,5 +521,5 @@ test('el juego engancha City en pocos lugares, y todo lo que choca o se recoge s
   assert.match(mundo, /export const GANCHOS/); assert.match(mundo, /GANCHOS\.objeto \? GANCHOS\.objeto\(kit, o\)/);
   // se cargan antes (el motor con City, y los módulos del dibujo y de la carrera)
   assert.ok(html.indexOf('city.js?v=') < html.indexOf('motor.js?v='), 'city.js antes de motor.js');
-  assert.match(juego, /import '\.\/mundo-city\.js\?v=metrorush-7'/); assert.match(juego, /from '\.\/ciudad\.js\?v=metrorush-7'/);
+  assert.match(juego, /import '\.\/mundo-city\.js\?v=metrorush-\d+'/); assert.match(juego, /from '\.\/ciudad\.js\?v=metrorush-\d+'/);
 });

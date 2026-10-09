@@ -117,9 +117,13 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
       const responde=r=>enviar({tipo:'fantasma',categoria:cat,...r});
       if(invitado){responde({dato:null,motivo:'invitado'});return;}
       if(!fantasma||!categoriaClub(juego,cat)){responde({dato:null,motivo:'sin-fantasma'});return;}
-      const tabla=tablas[cat]?Promise.resolve(tablas[cat])
-        :cat===categoria?new Promise(f=>{(esperanTabla[cat]=esperanTabla[cat]||[]).push(f);setTimeout(()=>f(null),6000);}).then(t=>t||fantasma.leerTabla(cat))
-        :fantasma.leerTabla(cat);
+      // la copia en memoria solo vale si es la de la categoría que se escucha
+      // en vivo (las otras se quedan viejas: se leen de nuevo, una vez)
+      const espera=()=>new Promise(f=>{
+        const lista=esperanTabla[cat]=esperanTabla[cat]||[];lista.push(f);
+        setTimeout(()=>{const i=lista.indexOf(f);if(i>=0)lista.splice(i,1);f(null);},6000);   // sin respuesta: se suelta (y se borra de la lista)
+      }).then(t=>t||fantasma.leerTabla(cat));
+      const tabla=cat===categoria?(tablas[cat]?Promise.resolve(tablas[cat]):espera()):fantasma.leerTabla(cat);
       tabla.then(async filas=>{
         const orden=(filas||[]).slice().sort((a,b)=>b.puntos-a.puntos||a.tiempo-b.tiempo||a.uid.localeCompare(b.uid));
         const top=orden[0];
@@ -169,7 +173,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
     temaObserver.observe(document.documentElement,{attributes:true,attributeFilter:['data-tema']});
     frame.allow='fullscreen';frame.setAttribute('allowfullscreen','');
     window.addEventListener('message',mensaje);
-    frame.src='juegos/club/'+juego+'/index.html?v=club-47&embed=1&cuenta='+encodeURIComponent(cuenta)+(invitado?'&invitado=1':'');
+    frame.src='juegos/club/'+juego+'/index.html?v=club-48&embed=1&cuenta='+encodeURIComponent(cuenta)+(invitado?'&invitado=1':'');
     host.appendChild(frame);
   }
   function destruir(){muerto=true;document.documentElement.classList.remove('jg-club-inm');temaObserver?.disconnect();if(off)off();window.removeEventListener('message',mensaje);for(const [el,valor]of ocultos)el.style.display=valor;frame?.remove();host.innerHTML='';ambientar('');}
