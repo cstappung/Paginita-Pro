@@ -1,4 +1,4 @@
-import {cart, dados, tablero, orbes, reversi, cajas, paisaje, tiro, orbita, serpiente, tetris, isla, ajedrez, fanal, boxhead, atasco, metrorush, aleteo, dosmil} from './reglas-ilustraciones.js';
+import {cart, dados, tablero, orbes, reversi, cajas, paisaje, tiro, orbita, serpiente, tetris, isla, ajedrez, fanal, boxhead, atasco, metrorush, aleteo, dosmil, tulones} from './reglas-ilustraciones.js';
 const p=(titulo,texto,imagen)=>({titulo,texto,imagen});
 const e=(id,titulo,...pasos)=>({id,titulo,pasos});
 const fichas=(titulo,...cs)=>cart([titulo,cs]);
@@ -206,6 +206,10 @@ export const EJEMPLOS={
  e('medallas','Medallas y clasificación',
   p('Una medalla por vuelo','Al chocar recibes la medalla de lo lejos que llegaste. Las cuentas son siempre las mismas, porque la velocidad no cambia nunca.',fichas('Medallas',['10','oro','BRONCE'],['25','gris','PLATA'],['50','oro','ORO'],['100','violeta','PLATINO'])),
   p('La tabla Vuelo','Ordena por tubos pasados y, a igualdad, gana el vuelo más corto. Cada vuelo se rehace con su semilla y sus aleteos antes de guardarse.',fichas('Dos vuelos de 40',['40','verde','EN 52 s'],['40','azul','EN 53 s'],['1.º','oro','EL DE 52 s'])))],
+ tulones:[e('trepar','Trepar por la cabra',
+  p('Sale tu tulón','En tu turno aparece tu tulón al pie de la torre, en calzoncillos y calcetines como todos. Tienes el tiempo del turno para subir lo más alto que puedas.',tulones(0)),
+  p('Agarra y empuja','Mantén A para llevar el brazo izquierdo hasta el lomo de la cabra: al tocarla, la mano se agarra. Con la mano agarrada, mover el ratón hacia abajo empuja el cuerpo hacia arriba.',tulones(1)),
+  p('Congélate y deja torre','Cuando se acaba el tiempo, o al apretar Espacio, tu tulón se congela donde quedó. El siguiente jugador trepa por encima de él, y así la torre crece turno a turno.',tulones(2)))],
  atasco:[e('salida','Sacar el auto rojo en el mínimo',
   p('Mira qué lo encierra','El auto rojo solo se mueve de lado, por la fila de la salida. Aquí lo tapan un auto azul y un camión verde. Para bajar el camión, primero hay que correr el furgón naranja.',atasco(0)),
   p('Abre el camino','Cada vehículo se arrastra por su carril, hacia adelante o hacia atrás, sin girar. El furgón va a la izquierda, el camión baja y el auto sube: tres movidas.',atasco(1)),

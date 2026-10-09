@@ -227,6 +227,31 @@ const ARTE = {
     <rect class="a-late" x="260" y="206" width="48" height="48" rx="5" fill="none" stroke="#fff3b0" stroke-width="3"/>`;
   },
 
+  /* Tulones: la cabra al fondo y la torre de amigos congelados en
+     calzoncillos, con el de arriba trepando. */
+  tulones: u => {
+    const tipo = (x, y, r, piel, pelo, polera) => `<g transform="translate(${x} ${y}) rotate(${r})">
+      <rect x="-9" y="-2" width="18" height="30" rx="7" fill="${piel}" stroke="#2a1d18" stroke-width="2"/>
+      <path d="M-10 18 H10 V27 Q0 33 -10 27Z" fill="#f7f7f2" stroke="#2a1d18" stroke-width="2"/>
+      <rect x="-9" y="-2" width="18" height="12" rx="5" fill="${polera}" stroke="#2a1d18" stroke-width="2"/>
+      <path d="M-8 27 L-12 52 M8 27 L12 52" stroke="${piel}" stroke-width="7" stroke-linecap="round"/>
+      <path d="M-9 4 L-24 20 M9 4 L24 -10" stroke="${piel}" stroke-width="6" stroke-linecap="round"/>
+      <circle cx="0" cy="-14" r="12" fill="${piel}" stroke="#2a1d18" stroke-width="2"/>
+      <path d="M-12 -18 Q0 -32 12 -18 Q6 -24 -12 -18Z" fill="${pelo}"/>
+      <circle cx="-4" cy="-14" r="1.8" fill="#2a1d18"/><circle cx="4" cy="-14" r="1.8" fill="#2a1d18"/>
+      <path d="M-4 -7 Q0 -4 4 -7" stroke="#2a1d18" stroke-width="1.6" fill="none"/></g>`;
+    return `<defs><linearGradient id="g${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#7fd0ff"/><stop offset=".75" stop-color="#d8f1ff"/></linearGradient></defs>
+    <rect width="400" height="300" fill="url(#g${u})"/>
+    <circle cx="340" cy="54" r="26" fill="#fff6c2"/>
+    <path d="M0 250 Q120 236 220 246 T400 240 V300 H0Z" fill="#6cbf4a"/>
+    <g transform="translate(150 218)"><ellipse cx="0" cy="0" rx="44" ry="20" fill="#f1ece2" stroke="#2a1d18" stroke-width="3"/>
+      <path d="M-30 14 V38 M-12 16 V38 M14 16 V38 M30 14 V38" stroke="#2a1d18" stroke-width="5" stroke-linecap="round"/>
+      <circle cx="44" cy="-14" r="13" fill="#f1ece2" stroke="#2a1d18" stroke-width="3"/><path d="M40 -26 Q34 -40 26 -38 M50 -26 Q56 -40 64 -36" stroke="#8b6b45" stroke-width="4" fill="none"/>
+      <circle cx="48" cy="-16" r="2" fill="#2a1d18"/></g>
+    ${tipo(214, 160, 70, "#f2c29b", "#3b2a1a", "#e8322f")}${tipo(246, 112, -20, "#8d5a3b", "#111", "#2f7de1")}
+    <g class="a-mueve">${tipo(262, 50, 12, "#ffd9b8", "#e0a020", "#2fb36b")}</g>`;
+  },
+
   frontera: u => {
     const ventanas = Array.from({ length: 6 }, (_, k) => `<rect x="${304 + (k % 2) * 16}" y="${80 + Math.floor(k / 2) * 34}" width="8" height="14" rx="3" fill="#ffd27a"/>`).join("");
     return `<defs><linearGradient id="g${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a1250"/><stop offset=".55" stop-color="#c2410c"/><stop offset=".85" stop-color="#fb923c"/></linearGradient></defs>

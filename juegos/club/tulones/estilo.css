@@ -1,0 +1,154 @@
+/* ================================================================
+   Tulones — la piel.
+   Cielo, pasto y una cabra: lo de colores lo pinta juego.js en el
+   lienzo; aquí van el marco, el marcador, las capas, el editor de
+   aspecto y los botones táctiles. Escenario apaisado (16:10), porque
+   la torre crece hacia arriba pero se trepa de lado a lado.
+   ================================================================ */
+:root{
+  --fondo:#dff1fb;--tinta:#1f3a4d;--panel:#2f7fb8;--celda:#5aa0d0;--acento:#f2a524;--borde:#1f5f8f;
+  --cartel:"Lilita One","Arial Rounded MT Bold",system-ui,sans-serif;
+  --alto-pantalla:100vh;
+  color-scheme:light;
+}
+[hidden]{display:none!important}
+*{box-sizing:border-box}
+html,body{margin:0}
+html{-webkit-tap-highlight-color:transparent}
+body{background:var(--fondo);color:var(--tinta);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.shell{max-width:1000px;margin:0 auto;padding:16px}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 285px;gap:24px;align-items:start}
+.layout>aside:empty{display:none}
+@media (max-width:850px){.layout{grid-template-columns:minmax(0,1fr)}}
+.club-integrado body{background:transparent}
+:focus-visible{outline:3px solid var(--acento);outline-offset:2px}
+button,select,input{font:inherit;color:inherit;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+
+/* Sin ranking: el panel del Club no tiene nada que mostrar. */
+.club-ranking,.club-integrado .club-ranking,html.club-integrado[data-tema] .club-ranking{display:none!important}
+.club-volver{color:color-mix(in srgb,var(--tinta) 80%,transparent)}
+
+/* --- El tamaño del juego: apaisado, que quepa a lo alto --- */
+:root{--ancho-juego:min(100%,760px,calc((var(--alto-pantalla) - 230px) * 1.6))}
+.club-integrado{--ancho-juego:min(100%,780px,calc((var(--alto-pantalla) - 250px) * 1.6))}
+:root{--ancho-juego-min:300px}
+
+/* --- Cabecera --- */
+.cab{display:flex;align-items:center;gap:6px 14px;flex-wrap:wrap;margin:0 auto 10px;width:max(var(--ancho-juego),var(--ancho-juego-min));max-width:100%}
+.logo{margin:0;font:400 clamp(34px,8vw,52px)/1 var(--cartel);color:#fff;background:#e2483d;padding:6px 14px 8px;border-radius:12px;
+  box-shadow:0 4px 0 #a52a22,0 0 18px #e2483d55;letter-spacing:.02em}
+.lema{margin:0;opacity:.85;font-weight:700;flex:1 1 180px}
+
+/* --- Marcador --- */
+.scorebar,.club-integrado .scorebar,html.club-integrado[data-tema] .scorebar{display:flex;align-items:center;justify-content:space-between;gap:6px 10px;flex-wrap:wrap;
+  width:max(var(--ancho-juego),var(--ancho-juego-min));max-width:100%;margin:0 auto 10px;padding:8px 10px;background:var(--panel);color:#fff;
+  border:none;border-radius:12px;box-shadow:0 4px 0 var(--borde)}
+.dato{display:grid;gap:2px;min-width:0;justify-items:center;background:#ffffff22;border-radius:8px;padding:5px 10px}
+.dato small{font:800 10px/1 system-ui,sans-serif;color:#d6ecfa;letter-spacing:.08em;white-space:nowrap}
+.dato strong{font:400 20px/1 var(--cartel);font-variant-numeric:tabular-nums;white-space:nowrap;color:#fff;max-width:9em;overflow:hidden;text-overflow:ellipsis}
+.dato strong.apura{color:#ffd34d;animation:latido .5s ease-in-out infinite}
+.mini{font:400 15px/1 var(--cartel);padding:9px 12px;border-radius:9px;border:none;background:var(--borde);color:#fff;cursor:pointer;min-height:38px}
+@media (hover:hover){.mini:hover{filter:brightness(1.12)}}
+#sound-button{display:grid;place-items:center;width:38px;height:38px;padding:0;border-radius:9px;border:none;background:var(--borde);color:#fff;cursor:pointer}
+#sound-button svg{width:22px;height:22px}
+#sound-button[aria-pressed=false] .ondas{display:none}
+#sound-button[aria-pressed=true] .cruz{display:none}
+@media (pointer:coarse){.mini,#sound-button{min-height:44px;min-width:44px}}
+
+/* --- El escenario --- */
+.escenario{position:relative;width:max(var(--ancho-juego),var(--ancho-juego-min));max-width:100%;aspect-ratio:16/10;margin:0 auto;border-radius:12px;overflow:hidden;
+  background:#8fd0f4;outline:none;container-type:inline-size;cursor:crosshair;
+  touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none;-webkit-tap-highlight-color:transparent}
+.escenario:focus-visible{box-shadow:0 0 0 3px var(--acento)}
+#lienzo{position:absolute;inset:0;width:100%;height:100%;display:block}
+
+/* Botones táctiles: abajo, brazos a la izquierda, piernas a la derecha. */
+.tactil{position:absolute;left:0;right:0;bottom:0;z-index:3;display:flex;align-items:flex-end;justify-content:space-between;gap:8px;
+  padding:8px max(8px,env(safe-area-inset-left)) max(8px,env(safe-area-inset-bottom));pointer-events:none}
+.tactil .lado{display:flex;gap:8px;pointer-events:auto}
+.miembro,.congela{position:relative;display:grid;place-items:center;width:clamp(48px,11cqw,64px);height:clamp(48px,11cqw,64px);border-radius:50%;
+  border:3px solid #fff;background:#1f5f8fcc;color:#fff;font-size:clamp(20px,5cqw,28px);line-height:1;cursor:pointer;box-shadow:0 3px 0 #0004;
+  touch-action:none;-webkit-user-select:none;user-select:none}
+.miembro small{position:absolute;right:2px;bottom:0;font:800 10px/1 system-ui,sans-serif;opacity:.8}
+.miembro.activo{background:#f2a524;transform:scale(1.08)}
+.miembro.agarra{background:#43a35a}
+.congela{pointer-events:auto;background:#7fd3ffcc;width:clamp(44px,9cqw,54px);height:clamp(44px,9cqw,54px)}
+
+/* Las capas sobre el escenario. */
+.capa{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:4%;text-align:center;
+  background:#dff1fbd8;animation:entra .4s ease both;overflow:auto}
+@keyframes entra{0%{opacity:0}100%{opacity:1}}
+.tit{margin:0;font:400 clamp(28px,7cqw,50px)/1 var(--cartel);color:#e2483d;text-shadow:0 3px 0 #fff}
+.panel{display:grid;gap:8px;justify-items:center;width:min(100%,520px);margin:auto}
+.tarjeta{display:grid;gap:12px;justify-items:center;background:#fff;color:var(--tinta);border-radius:12px;padding:16px 22px;box-shadow:0 4px 0 #0002}
+.frase{margin:0;max-width:420px;font:700 14px/1.35 system-ui,sans-serif;color:var(--tinta)}
+.boton{font:400 clamp(17px,3.6cqw,22px)/1 var(--cartel);padding:12px 22px;border-radius:12px;border:none;cursor:pointer;
+  background:#e2483d;color:#fff;box-shadow:0 4px 0 #a52a22;min-height:46px}
+.boton:active{transform:translateY(3px);box-shadow:0 1px 0 #a52a22}
+@media (hover:hover){.boton:hover{filter:brightness(1.1)}}
+.fila-btn{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.nuevo{font:400 13px/1 var(--cartel);font-style:normal;color:#fff;background:#e8322f;padding:4px 8px;border-radius:6px;animation:latido .8s ease-in-out infinite;display:inline-block}
+@keyframes latido{50%{transform:scale(1.06)}}
+
+/* El menú: la lista de jugadores. */
+.jugadores{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;width:100%}
+.jug{position:relative;display:grid;justify-items:center;gap:2px;background:#fff;border-radius:12px;padding:6px 6px 8px;box-shadow:0 3px 0 #0002}
+.jug canvas{width:64px;height:80px}
+.jug b{font:400 15px/1.1 var(--cartel);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.jug .acc{display:flex;gap:4px}
+.jug .acc button{border:none;border-radius:8px;background:#e6f2fa;padding:4px 8px;cursor:pointer;min-height:30px}
+.jug .acc button:hover{background:#cfe6f6}
+.opciones{display:flex;gap:10px 16px;flex-wrap:wrap;justify-content:center;font-weight:700}
+.opciones select{margin-left:4px;padding:5px 8px;border-radius:8px;border:2px solid var(--borde);background:#fff}
+.record{margin:0;font-size:13px;opacity:.85}
+
+/* Turno y fin. */
+.turno canvas{width:120px;height:150px}
+.podio{margin:0;padding:0;list-style:none;display:grid;gap:6px;width:min(100%,380px)}
+.podio li{display:grid;grid-template-columns:auto 44px 1fr auto;align-items:center;gap:8px;background:#fff;border-radius:10px;padding:4px 10px;box-shadow:0 3px 0 #0002;text-align:left}
+.podio li:first-child{background:#fff4cf}
+.podio .pos{font:400 18px/1 var(--cartel);color:#e2483d}
+.podio canvas{width:44px;height:55px}
+.podio .nom{font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.podio .alt{font:400 18px/1 var(--cartel);font-variant-numeric:tabular-nums}
+
+.nota{width:max(var(--ancho-juego),var(--ancho-juego-min));max-width:100%;margin:12px auto 0;font-size:13px;opacity:.85;text-align:center}
+kbd{font:700 12px/1 ui-monospace,monospace;padding:2px 5px;border-radius:5px;border:1px solid #0003;background:#fff8}
+
+/* --- El editor de aspecto --- */
+.editor{border:none;border-radius:16px;padding:0;max-width:min(96vw,720px);width:100%;background:#fff;color:var(--tinta);box-shadow:0 10px 40px #0005}
+.editor::backdrop{background:#0b2a3f99}
+.ed-cuerpo{display:grid;gap:12px;padding:16px;margin:0}
+.ed-tit{margin:0;font:400 26px/1 var(--cartel);color:#e2483d}
+.ed-grid{display:grid;grid-template-columns:230px minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:560px){.ed-grid{grid-template-columns:minmax(0,1fr)}}
+.ed-vista{display:grid;gap:8px;justify-items:center;background:linear-gradient(#bfe6fb,#e9f7ff 70%,#9fd27a 70%);border-radius:12px;padding:8px}
+.ed-vista canvas{width:220px;height:300px;max-width:100%;height:auto;aspect-ratio:220/300}
+.ed-nombre{display:grid;gap:2px;font-weight:700;width:100%}
+.ed-nombre input{padding:6px 8px;border-radius:8px;border:2px solid var(--borde);font-weight:700}
+.ed-presets{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.ed-presets button{border:2px solid var(--borde);background:#e6f2fa;border-radius:999px;padding:4px 10px;cursor:pointer;font-weight:700;font-size:13px}
+.ed-presets button:hover{background:#cfe6f6}
+.ed-campo{display:grid;grid-template-columns:110px minmax(0,1fr);align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #0001}
+.ed-campo>span{font-weight:800;font-size:13px}
+.muestras{display:flex;gap:5px;flex-wrap:wrap}
+.muestras button{width:28px;height:28px;border-radius:50%;border:2px solid #0003;cursor:pointer;padding:0}
+.muestras button[aria-pressed=true]{outline:3px solid var(--acento);outline-offset:1px}
+.ciclo{display:flex;align-items:center;gap:6px}
+.ciclo button{width:32px;height:32px;border:none;border-radius:8px;background:var(--borde);color:#fff;cursor:pointer;font-weight:900}
+.ciclo b{flex:1;text-align:center;font-weight:700;text-transform:capitalize}
+
+/* --- Modo celular: el escenario a toda la pantalla mientras se juega --- */
+html.club-inm,html.club-inm body{height:100%;overflow:hidden;background:#000;overscroll-behavior:none}
+html.club-inm .shell{max-width:none;padding:0;height:100dvh}
+html.club-inm .layout,html.club-inm main{display:contents}
+html.club-inm .cab,html.club-inm .nota,html.club-inm aside,html.club-inm .club-volver,html.club-inm .club-ranking,html.club-inm .club-vol-flota{display:none!important}
+html.club-inm .escenario{position:fixed;inset:0;width:auto;height:auto;aspect-ratio:auto;border-radius:0;margin:0}
+html.club-inm .scorebar{position:fixed;left:0;right:0;top:0;z-index:6;width:auto;margin:0;border-radius:0;padding:4px max(6px,env(safe-area-inset-left));
+  padding-top:max(4px,env(safe-area-inset-top));background:#2f7fb8cc;box-shadow:none}
+html.club-inm .dato{padding:2px 6px}
+html.club-inm .dato strong{font-size:15px}
+
+@media (prefers-reduced-motion:reduce){
+  .nuevo,.capa,.dato strong.apura{animation:none}
+}

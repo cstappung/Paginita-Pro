@@ -121,6 +121,41 @@ export const atasco=etapa=>{
  cuerpo+=txt(272,90,textos[0],22,etapa===2?C.oro:C.blanco)+txt(272,122,textos[1],17)+txt(272,150,textos[2],17,etapa===2?C.oro:C.verde);
  return svg(nombre,cuerpo);
 };
+/* Tulones: un tulón en calzoncillos trepando. Etapa 0, sale al pie de la
+   cabra; 1, una mano agarrada a la cabra y el ratón abajo lo sube;
+   2, se congela y el siguiente trepa por encima. */
+const tulon=(x,y,piel,pelo,calzon,brazos,piernas,frio)=>{
+ const tinta='#1a1a1a',p=frio?'#bfe6ff':piel;
+ let g=`<g transform="translate(${x} ${y})">`;
+ for(const [a,b,c,d] of piernas)g+=`<path d="M${a} ${b} L${c} ${d}" stroke="${tinta}" stroke-width="11" stroke-linecap="round"/><path d="M${a} ${b} L${c} ${d}" stroke="${p}" stroke-width="7" stroke-linecap="round"/>`+circle(c,d,5,'#ffffff');
+ g+=`<rect x="-12" y="-40" width="24" height="38" rx="10" fill="${p}" stroke="${tinta}" stroke-width="2"/>`;
+ g+=`<path d="M-12 -12 H12 V2 Q6 8 0 4 Q-6 8 -12 2 Z" fill="${calzon}" stroke="${tinta}" stroke-width="2"/><ellipse cx="0" cy="0" rx="4" ry="3" fill="${calzon}" stroke="${tinta}" stroke-width="1.2"/>`;
+ for(const [a,b,c,d] of brazos)g+=`<path d="M${a} ${b} L${c} ${d}" stroke="${tinta}" stroke-width="9" stroke-linecap="round"/><path d="M${a} ${b} L${c} ${d}" stroke="${p}" stroke-width="5.5" stroke-linecap="round"/>`+circle(c,d,4.5,p,tinta);
+ g+=`<circle cx="0" cy="-54" r="13" fill="${p}" stroke="${tinta}" stroke-width="2"/><path d="M-13 -56 Q-12 -70 0 -69 Q12 -70 13 -56 Q6 -62 0 -60 Q-6 -62 -13 -56 Z" fill="${pelo}"/>`;
+ g+=`<circle cx="-4" cy="-54" r="1.8" fill="${tinta}"/><circle cx="5" cy="-54" r="1.8" fill="${tinta}"/><path d="M-4 -47 Q1 -44 6 -47" stroke="${tinta}" stroke-width="1.6" fill="none"/>`;
+ return g+'</g>';
+};
+const cabra=(x,y)=>`<g transform="translate(${x} ${y})"><ellipse cx="0" cy="-42" rx="46" ry="24" fill="#f4efe4" stroke="#1a1a1a" stroke-width="2"/>`+[-32,-14,14,32].map(a=>`<path d="M${a} -24 L${a} 0" stroke="#1a1a1a" stroke-width="6" stroke-linecap="round"/>`).join('')+`<ellipse cx="50" cy="-66" rx="14" ry="11" fill="#f4efe4" stroke="#1a1a1a" stroke-width="2"/><path d="M46 -76 Q40 -92 30 -90 M54 -76 Q56 -92 46 -94" stroke="#8a7a62" stroke-width="3" fill="none"/><circle cx="54" cy="-68" r="1.8" fill="#1a1a1a"/><path d="M56 -56 L54 -46" stroke="#e7dccb" stroke-width="4"/></g>`;
+export const tulones=etapa=>{
+ const nombre=['Al empezar el turno, el tulón aparece al pie de la cabra','La mano agarrada a la cabra y el ratón hacia abajo suben al tulón','El tulón se congela y el siguiente trepa por encima de él'][etapa];
+ let cuerpo=`<rect x="14" y="14" width="452" height="222" rx="10" fill="#8fd3ff"/>`+circle(420,48,20,'#ffe46b')+`<rect x="14" y="200" width="452" height="36" fill="#6fbf4a"/>`;
+ cuerpo+=cabra(150,200);
+ if(etapa===0){
+  cuerpo+=tulon(290,186,'#f1c9a5','#5b3a22','#ffffff',[[-10,-36,-22,-14],[10,-36,22,-14]],[[-6,0,-8,14],[6,0,8,14]]);
+  cuerpo+=txt(332,90,'Tu turno:',20,'#17243b')+txt(332,116,'45 s para',16,'#17243b')+txt(332,138,'trepar',16,'#17243b');
+ }else if(etapa===1){
+  cuerpo+=tulon(232,150,'#f1c9a5','#5b3a22','#ffffff',[[-10,-36,-34,-30],[10,-36,26,-18]],[[-6,0,-10,30],[6,0,12,26]]);
+  cuerpo+=circle(198,120,9,'none',C.oro);
+  cuerpo+=line(330,70,330,120,'#17243b',3)+`<path d="M322 112 L330 124 L338 112" stroke="#17243b" stroke-width="3" fill="none"/>`;
+  cuerpo+=txt(350,90,'A: agarra',16,'#17243b')+txt(350,112,'ratón abajo:',16,'#17243b')+txt(350,134,'¡sube!',18,'#17243b');
+ }else{
+  cuerpo+=tulon(176,136,'#f1c9a5','#5b3a22','#ffffff',[[-10,-36,-26,-50],[10,-36,24,-48]],[[-6,0,-14,24],[6,0,14,26]],true);
+  cuerpo+=tulon(200,78,'#8d5a3b','#1a1a1a','#e8322f',[[-10,-36,-30,-28],[10,-36,26,-52]],[[-6,0,-18,22],[6,0,6,40]]);
+  cuerpo+=txt(176,96,'❄',18,'#17243b','middle');
+  cuerpo+=txt(300,90,'Congelado:',18,'#17243b')+txt(300,114,'ahora es torre',16,'#17243b')+txt(300,138,'Torre: 2,4 m',16,'#17243b');
+ }
+ return svg(nombre,cuerpo);
+};
 /* ALETEO: el pájaro entre tubos, de costado. Etapa 0, aletea y sube;
    1, deja de aletear y cae por el hueco; 2, pasa el tubo y suma el punto.
    El cielo es el de la mañana: el manual no cuenta lo que viene después. */

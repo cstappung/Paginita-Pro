@@ -949,6 +949,28 @@ const REGLAS = {
       ["Clasificación", "La tabla de Atasco cuenta las <b>estrellas</b> juntadas en todos los niveles; a igualdad, gana quien sumó menos tiempo en sus mejores intentos. Solo se manda cuando el total sube, así que repetir un nivel ya ganado no cuesta nada. Tus estrellas se guardan en este navegador y, con tu sesión, también en tu cuenta."]
     ]
   },
+  /* Tulones (juegos/club/tulones/): lo que dice aquí tiene que coincidir con
+     motor.js (miembros, congelar) y juego.js (turnos, controles). */
+  tulones: {
+    lema: "Tulones: cada turno sale un tulón nuevo que trepa por la cabra y por los que ya se congelaron. Gana quien deja su tulón más alto.",
+    secciones: [
+      ["Cómo se juega", "Es para jugar por turnos en un mismo equipo, de 1 a 8 personas. En tu turno aparece tu tulón al pie de la torre y tienes el tiempo elegido (de 30 a 90 s) para trepar. Cuando se acaba, o cuando lo decides, tu tulón se <b>congela</b> donde está y pasa a ser parte de la torre: el siguiente puede pisarlo, colgarse de él y seguir subiendo."],
+      ["Brazos y piernas", lista([
+        "Cada brazo y cada pierna se mueve por separado: <b>A</b> el brazo izquierdo, <b>S</b> el derecho, <b>K</b> la pierna izquierda y <b>L</b> la derecha.",
+        "Mientras mantienes una tecla, ese miembro sigue al ratón. Los que no sostienes cuelgan con el peso del cuerpo.",
+        "Si la mano o el pie toca la cabra, el suelo o un tulón congelado, <b>se agarra</b>. Al soltar la tecla, se suelta.",
+        "Con algo agarrado, llevar el ratón hacia abajo empuja el cuerpo hacia arriba: así se trepa."
+      ])],
+      ["La torre", "La altura de cada tulón se mide desde el suelo hasta su punto más alto. Al terminar las rondas elegidas (3, 5, 10 o sin fin) gana quien consiguió la mayor altura, y la torre completa se compara con tu récord, que se guarda en este navegador. Si un tulón sale del escenario, se pierde y el turno pasa."],
+      ["Personajes", "Antes de jugar, cada jugador elige su tulón: nombre, color de piel, físico, peinado y color del pelo, barba, calzoncillos y su color, calcetines y sombrero, o uno de los personajes ya armados. Todos andan en calzoncillos y calcetines, como en el original."],
+      ["Controles", lista([
+        "Teclado y ratón: A, S, K o L para sostener un miembro, y el ratón (o las flechas) para llevarlo. Espacio congela antes de tiempo. P o Esc, pausa.",
+        "En el celular: los cuatro botones de los lados sostienen cada miembro, arrastrar el dedo por el escenario lo lleva y ❄ congela.",
+        "Con mando: LB y RB los brazos, LT y RT las piernas, el stick izquierdo lleva, A congela y Start pausa."
+      ])],
+      ["Sin clasificación", "Tulones es para reírse con amigos en la misma pantalla: no tiene tabla en la Clasificación ni paga monedas."]
+    ]
+  },
   /* ALETEO (juegos/club/aleteo/): lo que dice aquí tiene que coincidir con
      motor.js (tubos, medallas) y juego.js (controles). El lore no se cuenta:
      se descubre volando. */
@@ -1083,7 +1105,7 @@ const REGLAS = {
   }
 };
 
-const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", metrorush: "Metro Rush" };
+const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", metrorush: "Metro Rush", tulones: "Tulones" };
 
 export const tieneReglas = juego => Object.prototype.hasOwnProperty.call(REGLAS, juego);
 
