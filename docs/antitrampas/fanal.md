@@ -1,8 +1,23 @@
 # Antitrampas de FANAL
 
-Categorías: `club-fanal-travesia` y `club-fanal-sinfin` (puntos) y
-`club-fanal-jornadas` (la jornada más lejana completada; 13 es el Alba, 25
-la Hoguera, y desde ahí la travesía sigue sin fin).
+Categorías: `club-fanal-travesia` (puntos) y `club-fanal-jornadas` (la
+jornada más lejana completada; 8 es el Alba, 14 la Hoguera, 20 el Sol, y
+desde ahí la travesía sigue sin fin). `club-fanal-sinfin` queda con las
+marcas de antes de la versión 4 y no recibe ninguna nueva.
+
+**Versión 4** (octubre de 2026): un solo modo. La historia son veinte
+jornadas (una oleada y un jefe por acto) hasta el Sol, y después sigue sin
+fin con los jefes en fase 2 y 3 (en la fase 3, sus espinas son eventos
+`V`; el Sol suelta larvas, `O`). Ya no hay puntos de control: toda prueba
+empieza en la jornada 1 (`m:"t"`, `k:0`, o se rechaza). Retomar una
+travesía guardada (la página se cerró, o «Salir» en la pausa) sigue la
+**misma** prueba: el punto guarda la prueba hasta la jornada que empezaba,
+y el juego la rehace con `rehace` para recuperar puntos, llamas, mejoras,
+brasas y notas. Una llama perdida en la jornada a medias viaja como
+`perdidas` y se vuelve a anotar (`g`) al retomarla, así que salir no
+devuelve llamas. El tiempo declarado es el de toda la travesía. Las
+pruebas de la 3 se rechazan como de otra versión (no castiga), y el iframe
+subió a `club-47`.
 
 **Versión 2 de la prueba** (octubre de 2026): la travesía se alargó a una
 segunda parte y después sin fin, cada jornada da una brasa que se gasta en
@@ -50,15 +65,15 @@ eventos, así que se anota cada jornada y se recalcula con el motor.
 
 ### Formato
 
-`{v:2, m:"t"|"s", id, u, k, J:[registro…], x?}`. `id`: semilla de la
+`{v:4, m:"t", id, u, k:0, J:[registro…], x?}`. `id`: semilla de la
 partida (de ella sale el valor de cada Mensajera, `M.valorMensajera`).
-`u`: la cuenta. `k`: jornadas heredadas de un punto de control. Cada
+`u`: la cuenta. `k`: 0 (era lo heredado de un punto de control). Cada
 registro: `{n, t (cs de juego), r (cs reales), g (ms en juego), e
 (eventos), p (pulsos), f ("c"|"m"|"a"), s (puntos), v (llamas), b
 (entradas sintéticas), d (entradas del mando), u (compras del taller antes
 de la jornada: una letra por brasa, `cfpbrvoi` las mejoras y `l` una
 llama), h (hash encadenado)}`. El cruce con el Alba es el evento `f` de la
-jornada 13, que se cierra `c`: la travesía sigue.
+jornada 8, que se cierra `c`: la travesía sigue.
 
 `e` es una letra por evento y las centésimas desde el anterior; los que
 vienen de una bala llevan además cuántos tiros atrás salió (base 36):
@@ -69,16 +84,15 @@ llama perdida, `j` jefe muere, `f` cruce, `q` lumbre acogida, `plcad`
 poderes, `z` latencia del audio. `p`: los pulsos de la música (deltas en
 base 36). Una travesía entera ocupa 10–16 kB.
 
-El punto de control guarda la prueba hasta ahí (`punto.pr`, la conserva
-`mezclaProgreso`); al continuar, la prueba sigue desde ahí. Un punto sin
-prueba (de antes de esto) se juega igual, pero no se manda.
+La travesía guardada lleva la prueba hasta ahí (`punto.pr`, la conserva
+`mezclaProgreso`, junto con `punto.ver`); al retomarla, la prueba sigue
+desde ahí. Un punto de otra versión se descarta al cargar.
 
 ## Qué verifica (`rehace` + `verifica/fanal.js`)
 
-- Cadena de hash, orden de jornadas desde la 1 (o la 26 en el sin fin), lo
-  heredado termina al empezar un acto (también el del sin fin, la 26).
-- El taller: cada compra con brasas que había (una por jefe vencido;
-  el sin fin empieza con 7), sin pasar del nivel 3, la llama solo si cabe.
+- Cadena de hash, orden de jornadas desde la 1, `k` = 0.
+- El taller: cada compra con brasas que había (una por jefe vencido), sin
+  pasar del nivel 3, la llama solo si cabe.
 - Puntos y llamas exactos por jornada: Resonancia, bonus, llamas extra,
   Mensajera con semilla. Lo declarado = lo recalculado; tiempo declarado =
   suma de `g`; modo = categoría; cuenta = `u` (si la página pasa `ctx.uid`).

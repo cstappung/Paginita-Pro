@@ -9,8 +9,8 @@
    golpes, toma poderes, mata jefes, cruza el Alba) y lleva los puntos por
    su cuenta, con una implementación aparte del recuento (si el juego y el
    verificador se equivocaran igual, aquí no coincidiría). Sus partidas
-   —lentas, rápidas pero humanas, con muerte, desde un punto de control, en
-   el sin fin— pasan; y cada vía de trampa se rechaza: resultado inventado,
+   —lentas, rápidas pero humanas, con muerte, retomadas después de cerrar la
+   página, más allá del Sol— pasan; y cada vía de trampa se rechaza: resultado inventado,
    puntos inflados, tiempo recortado, prueba de otra partida o de otra
    cuenta, prueba editada, __fanal.salta / dano / acerca / limpia, tiros más
    rápidos que el fanal, cámara rápida, entradas sintéticas, y el bot que se
@@ -32,17 +32,17 @@ function rng(s){return M.mulberry32(s);}
 function pulsosDesde(t0,hasta){const out=[];let p=t0,i=0;while(p<hasta){out.push(p);p+=[0.4,0.4,0.6][i++%3];}return out;}
 
 function robot(o={}){
- const op=Object.assign({modo:'t',desde:1,hasta:13,porKill:0.7,afinados:0.5,golpes:0.3,muereEn:0,semilla:1,lat:40,id:'robotfanal01',u:'uid-robot',heredada:null,prisa:1,vuelo:null,compras:''},o);
- const r=rng(op.semilla),prueba=op.heredada?Object.assign(copia(op.heredada),{u:op.u,k:op.heredada.J.length}):FP.nueva(op.modo==='s'?'sinfin':'travesia',op.id,op.u);
+ const op=Object.assign({desde:1,hasta:8,porKill:0.7,afinados:0.5,golpes:0.3,muereEn:0,semilla:1,lat:40,id:'robotfanal01',u:'uid-robot',heredada:null,prisa:1,vuelo:null,compras:''},o);
+ // Retomar una travesía guardada sigue la misma prueba (k sigue en 0).
+ const r=rng(op.semilla),prueba=op.heredada?Object.assign(copia(op.heredada),{u:op.u,k:0}):FP.nueva(op.id,op.u);
  // El recuento propio (no usa prueba.js: lo hace aparte, para contrastar).
  // El taller sí usa M.compra y M.armas: son las reglas del juego, no del verificador.
- const st={pts:0,llamas:3,notas:0,taller:{mej:M.mejorasVacias(),brasas:op.modo==='s'?M.BRASAS_SINFIN:0,llamas:3}};
- if(op.heredada){const h=op.heredada.J[op.heredada.J.length-1];st.pts=h.s;st.llamas=h.v;const rh=FP.rehace(Object.assign(copia(op.heredada),{k:0}));st.taller.mej=rh.mej;st.taller.brasas=rh.brasas;}
+ const st={pts:0,llamas:3,notas:0,taller:{mej:M.mejorasVacias(),brasas:0,llamas:3}};
+ if(op.heredada){const rh=FP.rehace(copia(op.heredada));st.pts=rh.puntos;st.llamas=rh.llamas;st.notas=rh.notas;st.taller.mej=rh.mej;st.taller.brasas=rh.brasas;}
  const suma=n=>{const a=st.pts;st.pts+=n;st.llamas=Math.min(M.llamasMax(st.taller.mej),st.llamas+M.llamasGanadas(a,st.pts));};
  const res=()=>M.resonancia(st.notas);
  let T=100,R=500000,G=0,muerto=false,completadas=op.heredada?op.heredada.J[op.heredada.J.length-1].n:0,iCompra=0;
- const base=op.modo==='s'?M.JORNADAS_HISTORIA+1:1;
- for(let n=Math.max(base,op.desde);n<=op.hasta&&!muerto;n++){
+ for(let n=Math.max(op.heredada?op.heredada.J.length+1:1,op.desde);n<=op.hasta&&!muerto;n++){
   // El taller: compra en el orden de `compras` mientras haya brasas.
   let u='';st.taller.llamas=st.llamas;
   while(iCompra<op.compras.length&&st.taller.brasas>0){const c=op.compras[iCompra];if(M.compra(st.taller,c)===null)u+=c;iCompra++;}
@@ -92,8 +92,8 @@ function robot(o={}){
    espera(25);                                                        // el final se lee entero; la travesía sigue
   }else{
    espera(3+r());const vida=M.vidaJefe(j);let dano=0;
-   if(j.jefe==='faro'||j.jefe==='hoguera')for(let k=0;k<4;k++){pega('V',tiro(true));suma(15*res());}
-   if(j.jefe==='nodriza'||j.jefe==='crisalida')for(let k=0;k<3;k++){pega('O',tiro(false));suma(10*res());}
+   if(j.jefe==='faro'||j.jefe==='hoguera'||(j.fase||1)>=3)for(let k=0;k<4;k++){pega('V',tiro(true));suma(15*res());}
+   if(j.jefe==='nodriza'||j.jefe==='crisalida'||j.jefe==='sol')for(let k=0;k<3;k++){pega('O',tiro(false));suma(10*res());}
    while(dano<vida){espera(op.porKill*0.4*r());const af=r()<op.afinados;pega('X',tiro(af));dano+=af?A.danoA:A.danoN;suma(5*res());}
    FP.evento(reg,'j',t);suma(M.PUNTOS_JEFE[j.jefe]*(vuelta?1+0.25*vuelta:1));
    espera(2.3);
@@ -106,11 +106,11 @@ function robot(o={}){
   FP.cierra(prueba,reg,fin,t,R,G,st.pts,st.llamas,{b:0,d:0});
   T=t+9;                                                              // el tránsito entre jornadas
  }
- const cat=op.modo==='s'?'club-fanal-sinfin':'club-fanal-travesia',tiempo=tiempoSesion(prueba);
+ const cat='club-fanal-travesia',tiempo=tiempoSesion(prueba);
  return {prueba,dato:{categoria:cat,puntos:Math.min(1e6,Math.round(st.pts)),tiempo,partida:'p'},jornadas:{categoria:'club-fanal-jornadas',puntos:completadas,tiempo,partida:'p'},st};
 }
 /* El tiempo de juego de la sesión, como lo declara el juego. */
-const tiempoSesion=pr=>Math.max(1,pr.J.slice(pr.k).reduce((s,x)=>s+x.g,0));
+const tiempoSesion=pr=>Math.max(1,pr.J.reduce((s,x)=>s+x.g,0));
 const verifica=(dato,prueba,ctx)=>V.verificaClub('fanal',dato,prueba).then(m=>m||FV.verifica(dato,prueba,ctx));
 const conTiempo=(r)=>{r.dato.tiempo=tiempoSesion(r.prueba);r.jornadas.tiempo=tiempoSesion(r.prueba);return r;};
 /* Lo que haría quien edita su prueba y la vuelve a sellar: recalcula la cadena. */
@@ -119,7 +119,7 @@ function resella(prueba){let prev=M.hashTexto('fanal|'+prueba.id+'|'+prueba.m);f
 function reajusta(prueba){for(let i=0;i<40;i++){resella(prueba);const r=FP.rehace(prueba),m=r.motivo&&/dice (-?\d+), dan (-?\d+)/.exec(r.motivo);if(!m)return prueba;const x=prueba.J.find(x=>x.s===+m[1]);x.s=+m[2];}return prueba;}
 
 test('FANAL: el verificador está activo y una partida sin prueba no entra',async()=>{
- assert.equal(FV.PRUEBA,3);
+ assert.equal(FV.PRUEBA,4);
  assert.match(await V.verificaClub('fanal',{categoria:'club-fanal-travesia',puntos:90000,tiempo:600000,partida:'x'},null),/sin prueba/);
 });
 
@@ -132,42 +132,43 @@ test('FANAL: travesías honestas del robot pasan (lenta, normal y rápida pero h
   assert.equal(rh.completa,true);
   assert.equal(await verifica(r.dato,r.prueba,{uid:'uid-robot'}),null,'puntos '+porKill);
   assert.equal(await verifica(r.jornadas,r.prueba),null,'jornadas '+porKill);
-  assert.equal(r.jornadas.puntos,13);
+  assert.equal(r.jornadas.puntos,8);
   assert.ok(JSON.stringify(r.prueba).length<60000,'compacta: '+JSON.stringify(r.prueba).length);
   // Del orden de lo que hace un humano: 500–800 s y 64 000–124 000 puntos en la tabla real.
   const s=r.prueba.J.reduce((a,x)=>a+x.t,0)/100;
-  assert.ok(s>240,'duración '+s);
+  assert.ok(s>180,'duración '+s);
  }
 });
 
-test('FANAL: con muerte, abandono a medias, sin fin y desde un punto de control',async()=>{
- const m=conTiempo(robot({muereEn:6,semilla:4}));
+test('FANAL: con muerte, más allá del Sol y retomada después de cerrar la página',async()=>{
+ const m=conTiempo(robot({muereEn:5,semilla:4}));
  assert.equal(m.prueba.J.at(-1).f,'m');
  assert.equal(await verifica(m.dato,m.prueba),null);
  assert.equal(await verifica(m.jornadas,m.prueba),null);
- assert.equal(m.jornadas.puntos,5);
- const s=conTiempo(robot({modo:'s',hasta:34,semilla:5,muereEn:34,compras:'cbfcbvfpbocr'}));
+ assert.equal(m.jornadas.puntos,4);
+ // Hasta el Sol y una vuelta de fase 2 (los jefes vuelven), muriendo en la 25.
+ const s=conTiempo(robot({hasta:25,semilla:5,muereEn:25,compras:'cbfcbvfpbocr'}));
  assert.equal(await verifica(s.dato,s.prueba),null);
- assert.equal(s.jornadas.puntos,33);
- // Desde el punto de control del acto II (jornada 5): lo heredado viaja con él.
+ assert.equal(s.jornadas.puntos,24);
+ // Retomada: se guardó al empezar la 5 y se sigue con la misma prueba.
  const a=robot({hasta:4,semilla:6});
- const punto={v:FP.VERSION,m:'t',id:a.prueba.id,J:a.prueba.J};
- const b=robot({heredada:punto,desde:5,hasta:13,semilla:7});
- b.dato.tiempo=tiempoSesion(b.prueba);b.jornadas.tiempo=b.dato.tiempo;
- assert.equal(b.prueba.k,4);
+ const b=conTiempo(robot({heredada:a.prueba,hasta:8,semilla:7}));
+ assert.equal(b.prueba.k,0);assert.equal(b.prueba.J.length,8);
  assert.equal(await verifica(b.dato,b.prueba),null);
  assert.equal(await verifica(b.jornadas,b.prueba),null);
- // El progreso guardado conserva la prueba del punto de control.
- const prog=M.mezclaProgreso({punto:{j:5,puntos:a.prueba.J.at(-1).s,llamas:3,at:5,pr:punto}},null);
+ // El progreso guardado conserva la prueba de la travesía a medias.
+ const prog=M.mezclaProgreso({punto:{j:5,puntos:a.prueba.J.at(-1).s,llamas:3,at:5,pr:a.prueba}},null);
  assert.equal(prog.punto.pr.J.length,4);
+ // Una prueba vieja que empezaba en un punto de control ya no entra.
+ assert.match(String(FP.rehace({...copia(a.prueba),k:2}).motivo),/punto de control/);
 });
 
 test('FANAL: resultado inventado, puntos inflados, tiempo recortado, otra categoría u otra cuenta',async()=>{
  const r=conTiempo(robot({semilla:8}));
  assert.match(await verifica({...r.dato,puntos:r.dato.puntos+1000},r.prueba),/puntos declarados/);
  assert.match(await verifica({...r.dato,tiempo:Math.round(r.dato.tiempo/2)},r.prueba),/tiempo declarado/);
- assert.match(await verifica({...r.dato,categoria:'club-fanal-sinfin'},r.prueba),/historia, no de la travesía sin fin/);
- assert.match(await verifica({...r.jornadas,puntos:14},r.prueba),/jornadas declaradas/);
+ assert.match(await verifica({...r.dato,categoria:'club-fanal-sinfin'},r.prueba),/Categoría desconocida/);
+ assert.match(await verifica({...r.jornadas,puntos:9},r.prueba),/jornadas declaradas/);
  assert.match(await verifica(r.dato,r.prueba,{uid:'otra-cuenta'}),/otra cuenta/);
  // Una prueba de una partida corta para un resultado grande.
  const corta=conTiempo(robot({hasta:2,semilla:9}));
@@ -198,16 +199,16 @@ test('FANAL: la prueba editada a mano no pasa, aunque se vuelva a sellar',async(
 });
 
 test('FANAL: lo que dejan los ganchos __fanal (salta, dano, acerca, limpia) se rechaza',async()=>{
- // salta(12): la prueba empieza en la 12, sin las once de antes.
+ // salta(6): la prueba empieza en la 6, sin las cinco de antes.
  const r=robot({semilla:11});
- const s=copia(r.prueba);s.J=s.J.slice(11);reajusta(s);
+ const s=copia(r.prueba);s.J=s.J.slice(5);reajusta(s);
  assert.match(String(FP.rehace(s).motivo),/orden/);
  // dano(): el jefe muere sin los golpes que aguanta.
- const d=copia(r.prueba),nod=d.J[3];
+ const d=copia(r.prueba),nod=d.J[1];
  nod.e=nod.e.replace(/X[0-9a-z]\d*/g,'');reajusta(d);
- assert.match(String(FP.rehace(d).motivo),/jefe murió con 0|dos tiros a/);
+ assert.match(String(FP.rehace(d).motivo),/jefe murió con 0|dos tiros a|lejos de todo pulso/);
  // acerca(): el Alba llega en diez segundos.
- const a=copia(r.prueba),alba=a.J[12];
+ const a=copia(r.prueba),alba=a.J[7];
  alba.e=alba.e.replace(/f\d+$/,'f10');alba.t=Math.min(alba.t,2000);alba.g=Math.min(alba.g,alba.t*10);reajusta(a);
  assert.match(String(FP.rehace(a).motivo),/Alba llegó|bala que tardó|después del cierre/);
  // limpia(): polillas apagadas sin bala ni destello.
@@ -247,12 +248,12 @@ function comprime(prueba,f){
  }
  return reajusta(p);
 }
-test('FANAL: el bot de la tabla (26 jornadas del sin fin en 56 s) y la travesía exprés se rechazan',async()=>{
- // Lo que se vio en la tabla: jornadas = 39 y 130 543 puntos del sin fin, con 55,98 s.
- const hon=robot({modo:'s',hasta:39,semilla:13,golpes:0});
+test('FANAL: el bot de la tabla (jornadas en 56 s) y la travesía exprés se rechazan',async()=>{
+ // Lo que se vio en la tabla: 39 jornadas con 55,98 s.
+ const hon=robot({hasta:39,semilla:13,golpes:0});
  const seg=hon.prueba.J.reduce((a,x)=>a+x.t,0)/100;
  const bot=comprime(hon.prueba,seg/56);
- const dato={categoria:'club-fanal-sinfin',puntos:FP.rehace(bot).puntos||hon.dato.puntos,tiempo:55980,partida:'p'};
+ const dato={categoria:'club-fanal-travesia',puntos:FP.rehace(bot).puntos||hon.dato.puntos,tiempo:55980,partida:'p'};
  assert.ok(Math.abs(bot.J.reduce((a,x)=>a+x.t,0)/100-56)<3);
  const motivo=await verifica(dato,bot);
  assert.ok(motivo,'tiene que rechazarse');
@@ -260,22 +261,22 @@ test('FANAL: el bot de la tabla (26 jornadas del sin fin en 56 s) y la travesía
  // Un bot que juega de verdad, pero como una máquina: dispara cada 0,17 s
  // sin esperar a nada y no falla nunca. La mecánica lo deja (cada tiro es
  // legal), el ritmo humano no.
- for(const [modo,hasta] of [['t',13],['s',39]]){
-  const b=robot({modo,hasta,porKill:0,afinados:0,prisa:0,vuelo:0.05,golpes:0,sinRodeo:true,poderes:false,semilla:14});
+ for(const hasta of [8,30]){
+  const b=robot({hasta,porKill:0,afinados:0,prisa:0,vuelo:0.05,golpes:0,sinRodeo:true,poderes:false,semilla:14});
   const m=FP.rehace(b.prueba).motivo;
-  assert.match(String(m),/ninguna persona|travesía entera|cada una/,modo+': '+m+' en '+(b.prueba.J.reduce((a,x)=>a+x.t,0)/100)+' s');
+  assert.match(String(m),/ninguna persona|travesía entera|cada una/,hasta+': '+m+' en '+(b.prueba.J.reduce((a,x)=>a+x.t,0)/100)+' s');
  }
- // Una travesía honesta apretada a la mitad del tiempo honesto más corto (250 s).
+ // Una travesía honesta apretada por debajo del mínimo (150 s hasta el Alba).
  const h=robot({semilla:15,porKill:0.5,golpes:0}),sh=h.prueba.J.reduce((a,x)=>a+x.t,0)/100;
  assert.ok(FP.rehace(h.prueba).motivo===undefined);
- assert.ok(FP.rehace(comprime(h.prueba,sh/200)).motivo,'una travesía de 200 s');
+ assert.ok(FP.rehace(comprime(h.prueba,sh/150)).motivo,'una travesía de 150 s');
 });
 
 test('FANAL: sospecha() marca las filas imposibles de la tabla y deja las humanas',()=>{
  assert.match(FV.sospecha('club-fanal-sinfin',{puntos:330543,tiempo:55980}),/por segundo/);
  assert.match(FV.sospecha('club-fanal-jornadas',{puntos:39,tiempo:55980}),/jornadas del sin fin/);
- assert.match(FV.sospecha('club-fanal-jornadas',{puntos:13,tiempo:20000}),/jornada 13/);
- assert.match(FV.sospecha('club-fanal-travesia',{puntos:999999,tiempo:200000}),/por segundo en una travesía/);
+ assert.match(FV.sospecha('club-fanal-jornadas',{puntos:8,tiempo:20000}),/jornada 8/);
+ assert.match(FV.sospecha('club-fanal-travesia',{puntos:999999,tiempo:150000}),/por segundo en una travesía/);
  for(const [c,p,t] of [['club-fanal-travesia',124000,500000],['club-fanal-travesia',64000,800000],['club-fanal-jornadas',13,500000],['club-fanal-jornadas',13,95000],['club-fanal-sinfin',60000,900000],['club-fanal-jornadas',30,700000],['club-fanal-travesia',900000,1800000],['club-fanal-jornadas',60,2400000]])
   assert.equal(FV.sospecha(c,{puntos:p,tiempo:t}),null,c+' '+p);
  // Desde el punto de control del acto IV: 90 000 puntos heredados en 100 s de sesión.

@@ -61,7 +61,13 @@
     // la seda (la escala enigmática de Verdi) y la hoguera (bizantina).
     hirajoshi: { nombre: "hirajoshi", cents: [0, 200, 300, 700, 800], grados: [0, 1, 2, 3, 4], tempera: true },
     enigmatica: { nombre: "enigmática", cents: [0, 100, 400, 600, 800, 1000, 1100], grados: [0, 1, 2, 3, 4, 5, 6], tempera: true },
-    bizantina: { nombre: "bizantina", cents: [0, 100, 400, 500, 700, 800, 1100], grados: [0, 1, 2, 3, 4, 5, 6], tempera: true }
+    bizantina: { nombre: "bizantina", cents: [0, 100, 400, 500, 700, 800, 1100], grados: [0, 1, 2, 3, 4, 5, 6], tempera: true },
+    // Lo alto: la marea (dórica, la luna que sube y baja), el firmamento
+    // (prometeo, abierta y sin tónica clara) y el cenit (mixolidia: el
+    // mediodía, mayor y sin sombra).
+    dorica: { nombre: "dórica", cents: [0, 200, 300, 500, 700, 900, 1000], grados: [0, 1, 2, 3, 4, 5, 6], tempera: true },
+    prometeo: { nombre: "prometeo", cents: [0, 200, 400, 600, 900, 1000], grados: [0, 1, 2, 3, 4, 5], tempera: true },
+    mixolidia: { nombre: "mixolidia", cents: [0, 200, 400, 500, 700, 900, 1000], grados: [0, 1, 2, 3, 4, 5, 6], tempera: true }
   };
 
   /* Las métricas, como grupos de corcheas: cada grupo empieza en un PULSO
@@ -77,7 +83,10 @@
     "10/8": { grupos: [3, 3, 2, 2] },
     "15/8": { grupos: [2, 3, 2, 3, 2, 3] },
     "3+3+2": { grupos: [3, 3, 2] },
-    "7/4": { grupos: [2, 2, 2, 2, 2, 2, 2], acentos: [0, 2, 4] }
+    "7/4": { grupos: [2, 2, 2, 2, 2, 2, 2], acentos: [0, 2, 4] },
+    "5/8": { grupos: [3, 2] },
+    "14/8": { grupos: [3, 3, 2, 3, 3], acentos: [0, 2, 3] },
+    "17/8": { grupos: [3, 2, 2, 3, 2, 3, 2] }
   };
 
   /* El mapa de un compás: cuántas corcheas tiene, en cuáles empieza un
@@ -129,7 +138,10 @@
     5: { escala: "slendro", raiz: 98.0, metrica: "13/8", epm: 300, poli: 4, ratio: 1.4, reverb: 3.8, ombak: 5 },
     6: { escala: "hirajoshi", raiz: 116.54, metrica: "10/8", epm: 288, poli: 3, ratio: 1.8, reverb: 4.6, ombak: 3 },
     7: { escala: "enigmatica", raiz: 155.56, metrica: "15/8", epm: 336, poli: 4, ratio: 2.4, reverb: 3.0, ombak: 2 },
-    8: { escala: "bizantina", raiz: 138.59, metrica: "3+3+2", epm: 312, poli: 3, ratio: 3.0, reverb: 2.4, ombak: 4 }
+    8: { escala: "bizantina", raiz: 138.59, metrica: "3+3+2", epm: 312, poli: 3, ratio: 3.0, reverb: 2.4, ombak: 4 },
+    9: { escala: "dorica", raiz: 123.47, metrica: "5/8", epm: 276, poli: 4, ratio: 2.0, reverb: 4.2, ombak: 2.2 },
+    10: { escala: "prometeo", raiz: 174.61, metrica: "14/8", epm: 318, poli: 5, ratio: 3.2, reverb: 5.4, ombak: 1.4 },
+    11: { escala: "mixolidia", raiz: 146.83, metrica: "17/8", epm: 336, poli: 3, ratio: 1.0, reverb: 2.2, ombak: 5.5 }
   };
   /* El sin fin rota de escala y compás cada jornada, para que la travesía
      que no termina tampoco suene siempre igual. */
@@ -141,7 +153,10 @@
     { escala: "tonos", raiz: 103.83, metrica: "9/8", ratio: 2.0 },
     { escala: "hirajoshi", raiz: 116.54, metrica: "10/8", ratio: 1.8 },
     { escala: "enigmatica", raiz: 130.81, metrica: "15/8", ratio: 2.4 },
-    { escala: "bizantina", raiz: 110.0, metrica: "3+3+2", ratio: 3.0 }
+    { escala: "bizantina", raiz: 110.0, metrica: "3+3+2", ratio: 3.0 },
+    { escala: "dorica", raiz: 98.0, metrica: "5/8", ratio: 2.0 },
+    { escala: "prometeo", raiz: 130.81, metrica: "14/8", ratio: 3.2 },
+    { escala: "mixolidia", raiz: 110.0, metrica: "17/8", ratio: 1.0 }
   ];
   function etapaSinFin(n) {
     const r = ROTACION_SINFIN[((n % ROTACION_SINFIN.length) + ROTACION_SINFIN.length) % ROTACION_SINFIN.length];
@@ -164,7 +179,13 @@
     // La Crisálida (dos de 15/8): una canción de cuna que sube despacio.
     crisalida: [[0, 2], [1, 3], [2, 2], [4, 3], [3, 2], [2, 3], [4, 2], [5, 3], [4, 2], [2, 3], [1, 2], [0, 3]],
     // La Hoguera (dos de 3+3+2): una danza alrededor del fuego.
-    hoguera: [[0, 3], [1, 3], [2, 2], [4, 3], [3, 3], [1, 2]]
+    hoguera: [[0, 3], [1, 3], [2, 2], [4, 3], [3, 3], [1, 2]],
+    // La Luna (dos de 5/8): una nana que sube como la marea y vuelve a bajar.
+    luna: [[0, 2], [2, 1], [4, 2], [2, 2], [0, 3]],
+    // Las Siete Hermanas (dos de 14/8): siete notas, una por estrella, y su eco.
+    constelacion: [[0, 4], [1, 3], [2, 4], [3, 3], [4, 4], [5, 3], [6, 4], [4, 3]],
+    // El Sol (dos de 17/8): un himno que no baja nunca de la tónica.
+    sol: [[0, 4], [4, 3], [7, 3], [6, 2], [4, 3], [5, 2], [7, 4], [9, 3], [7, 3], [4, 4], [7, 3]]
   };
 
   /* Cuántas corcheas dura un motivo. */
@@ -209,6 +230,11 @@
     if (jefe === "casco") return fase === 0 ? m : fase === 1 ? transpone(m, -2) : retrograda(transpone(m, -4));
     if (jefe === "crisalida") return fase === 0 ? m : fase === 1 ? fragmenta(m, 4) : invierte(m, 2);
     if (jefe === "hoguera") return fase === 0 ? m : fase === 1 ? transpone(m, 2) : fragmenta(transpone(m, 4), 2);
+    // La Luna mengua (se da vuelta); las Hermanas se apagan de a una (la
+    // frase se acorta); el Sol arde más alto y al final se repite, cegado.
+    if (jefe === "luna") return fase === 0 ? m : fase === 1 ? invierte(m, 2) : retrograda(transpone(m, -3));
+    if (jefe === "constelacion") return fase === 0 ? m : fase === 1 ? fragmenta(m, 5) : fragmenta(transpone(m, 2), 3);
+    if (jefe === "sol") return fase === 0 ? m : fase === 1 ? transpone(m, 2) : fragmenta(transpone(m, 5), 4);
     return m;
   }
 
@@ -646,6 +672,16 @@
       } else if (j === "hoguera") {                                     // bronce brillante y una chispa encima
         pulso(t, f, dur, 0.18 * vol, { ancho: 0.25, corte: 2400, q: 1.2, vibrato: 6, ataque: 0.01, sostiene: 0.6, envio: 0.3 });
         campana(t, f * 2, dur * 1.5, 0.1 * vol, { ratio: 3, indice: 2.2, ombak: 4 });
+      } else if (j === "luna") {                                        // vidrio frío y un seno muy quieto debajo
+        campana(t, f, dur * 3, 0.22 * vol, { ratio: 2, indice: 0.8, ombak: 1, envio: 0.8, pan: -0.15 });
+        pulso(t, f / 2, dur, 0.07 * vol, { ancho: 0.5, corte: 700, ataque: 0.08, sostiene: 0.9 });
+      } else if (j === "constelacion") {                                // siete campanitas que se contestan de lado a lado
+        campana(t, f * 2, dur * 2, 0.16 * vol, { ratio: 3.2, indice: 1.8, ombak: 0.6, envio: 0.8, pan: i % 2 ? 0.6 : -0.6 });
+        if (faseDeVida(est.vida) >= 1) campana(t + 0.09, f * 3, dur, 0.05 * vol, { ratio: 3.2, indice: 1.2, pan: i % 2 ? -0.6 : 0.6 });
+      } else if (j === "sol") {                                         // metal a pleno: bronce, quinta y un pulso que no deja respirar
+        campana(t, f, dur * 2, 0.24 * vol, { ratio: 1, indice: 3.2, ombak: 6, envio: 0.4 });
+        pulso(t, f * 1.5, dur, 0.1 * vol, { ancho: 0.2, corte: 2600, q: 1.3, vibrato: 8, ataque: 0.01, sostiene: 0.7 });
+        if (faseDeVida(est.vida) === 2) golpeGrave(t, f / 4, f / 4.4, dur, 0.14 * vol);
       } else {                                                          // melodía de etapa: una voz de pulso filtrada con vibrato
         const fil = etapa.escala === "lidiaAum" ? null : 1500;
         if (!fil) campana(t, f, dur * 2.5, 0.2 * vol, { ratio: 1, indice: 0.9, ombak: 0.6 });

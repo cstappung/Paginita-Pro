@@ -74,7 +74,7 @@ const SOLO = {
     cat: s => `club-sudoku-${s.m}` },
   /* FANAL: la travesía y el sin fin por puntos; la jornada más lejana por
      jornadas (la historia termina en la 13, el sin fin sigue). */
-  fanal: { filas: [{ k: "m", t: "Tabla", ops: [["travesia", "Travesía"], ["sinfin", "Sin fin"], ["jornadas", "Jornada más lejana"]] }],
+  fanal: { filas: [{ k: "m", t: "Tabla", ops: [["travesia", "Travesía"], ["jornadas", "Jornada más lejana"], ["sinfin", "Sin fin (hasta oct. 2026)"]] }],
     cat: s => `club-fanal-${s.m}` },
   /* Atasco: una sola tabla, las estrellas de todos los niveles. */
   atasco: { filas: [{ k: "n", t: "Tabla", ops: [["estrellas", "Estrellas"]] }],
