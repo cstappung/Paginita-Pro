@@ -163,12 +163,15 @@ function robot(objs, modo, metros, { fps = 60, curva = M.velocidadDe(modo), P = 
       if (DEPIE.has(o.tipo) && dz > 0 && dz < V * 0.2 + 0.4 && !(o.tipo === 'baranda' && r.y >= 0.9)) {
         if (!r.enAire) salta(); else if (r.vy <= 0 && r.y < 0.9) r.bufer = 0.16;   // cayendo y bajo: lo pide (como el búfer de juego.js)
       }
-      /* Cayendo de un techo hacia algo que hay que saltar: baja de golpe
-         (rodar en el aire, como haría una persona) para tocar el suelo a
-         tiempo de saltar. Si viene muy encima, cayendo sin más lo pisa; y si
+      /* Cayendo (de un techo, o de un salto largo: 0,8 s en el aire) hacia
+         algo que hay que saltar: baja de golpe (rodar en el aire, como haría
+         una persona) para tocar el suelo a tiempo de saltar. Si viene muy encima, cayendo sin más lo pisa; y si
          cayendo sin más ya le pasa por encima (una lona lo lanzó alto), no. */
       const tz = (dz + 1.2) / V, yLlega = r.y + r.vy * tz - F.gravedad * tz * tz / 2;   // la altura con que dejaría atrás la cosa cayendo sin más
-      if (DEPIE.has(o.tipo) && r.enAire && r.y > 2 && r.vy < 3 && dz > V * 0.2 && dz < V * 0.55 && !r.rodarPend && yLlega < 1.2
+      // (ya pasó lo que saltaba: nada debajo ni justo delante, o caería encima)
+      const debajo = activos.some(q => q !== o && q.carril === r.carril && !q.roto && q.tipo !== 'tren' && q.tipo !== 'lona'
+        && (q.d != null ? Math.abs(q.d - D - V * 0.04) < 1 + V * 0.06 : q.d0 < D + V * 0.1 && q.d0 + q.largo > D - 1));
+      if (DEPIE.has(o.tipo) && r.enAire && r.y > 0.9 && r.vy < 3 && dz > V * 0.2 && dz < V * 0.6 && !r.rodarPend && yLlega < 1.2 && !debajo
         && !activos.some(t => t.tipo === 'tren' && t.carril === r.carril && t.d0 + t.largo > D - 0.5 && t.d0 < frente(o))) {
         r.vy = -F.caidaRapida; r.rodarPend = true;
       }
@@ -247,8 +250,9 @@ test('los cinco distritos: en metros, con su música, su paleta, su escenografí
   const v = M.estacionDe(13500, 'city'); assert.match(v.nombre, /vuelta 2/); assert.ok(!v.boleto);
   assert.equal(M.estacionDe(16500, 'citypuro').distrito, 'muelles');
   assert.equal(M.siguienteUmbral(9500, 'city'), 13000);
-  // la postal de un mundo no es de otro: los boletos de la Línea 3 siguen siendo siete
-  assert.equal(M.BOLETOS.length, 8);
+  // la postal de un mundo no es de otro: City lleva sus cinco postales y la Línea 3 sus boletos, en otra lista
+  assert.equal(M.historiaDe('city').boletos, C.POSTALES); assert.notEqual(M.BOLETOS, C.POSTALES);
+  assert.ok(M.BOLETOS.length > C.POSTALES.length, 'los boletos de la Línea 3 no se mezclan con las postales');
 });
 
 test('la velocidad de City: su propia curva, la misma para el juego, el generador y el antitrampas', () => {
@@ -283,8 +287,8 @@ test('los personajes de City: chicas y chicos, con una ventaja chica que no toca
   }
   assert.ok(ids.some(k => P[k].apariencia.falda), 'hay faldas'); assert.ok(ids.some(k => !P[k].apariencia.falda), 'y pantalones');
   assert.deepEqual(C.ventajaDe('clasico'), {}); assert.deepEqual(C.ventajaDe(null), {});
-  // el salto de Nico no pasa de 1,7 m (un dron arranca en 1,15: se sigue rodando, no saltando)
-  assert.ok(F.alturaSalto * P.nico.ventaja.salto < C.DRON.y1 - 0.02);
+  // el salto de Nico (2,27 m) no pasa por encima de un dron (2,45) ni llega a pisarlo (eso solo desde un techo o una lona)
+  assert.ok(F.alturaSalto * P.nico.ventaja.salto < C.DRON.y1 - C.PISA_DRON - 0.01);
 });
 
 test('progreso: las postales y los personajes de City se guardan aparte y se suman entre aparatos', () => {
@@ -396,7 +400,7 @@ test('el cajón: de frente choca, se salta a tiempo, y cayendo encima se rompe',
     if (CHOCA(fps)) assert.equal(tramo([caj], { fps, V, desde: 20 }).choque, 'cajon', `${fps}/${V}: de frente choca`);
     const salta = tramo([caj], { fps, V, desde: 20, accion: (D, r) => { if (!r.enAire && 39.4 - D < V * 0.2 && D < 39.4) { r.vy = M.impulso(F.alturaSalto); r.enAire = true; } } });
     assert.equal(salta.choque, null, `${fps}/${V}: saltándolo pasa`);
-    const cae = tramo([caj], { fps, V, desde: 40 - V * 0.3, y0: 2.4 });    // cayendo de un techo (o de una lona) justo encima: a 0,8 m en su centro
+    const cae = tramo([caj], { fps, V, desde: 40 - V * Math.sqrt(2 * 1.6 / F.gravedad), y0: 2.4 });    // cayendo de 2,4 m (un techo, una lona) justo encima: a 0,8 m en su centro
     assert.equal(cae.choque, null, `${fps}/${V}: cayendo encima no choca`); if (CHOCA(fps)) assert.equal(cae.pisado, 1, `${fps}/${V}: lo pisa`);
   }
   // la regla del pisotón: bajando y con los pies (en el cuadro anterior) casi a la altura de arriba
@@ -414,16 +418,21 @@ test('el dron: de pie choca, un salto normal también, rodando pasa, y desde arr
     const salta = tramo([dron], { fps, V, desde: 20, accion: (D, r) => { if (!r.enAire && 39.4 - D < V * 0.2 && D < 39.4) { r.vy = M.impulso(F.alturaSalto); r.enAire = true; } } });
     if (CHOCA(fps)) assert.equal(salta.choque, 'dron', `${fps}/${V}: un salto normal no lo pasa`);
   }
-  assert.equal(C.pisa({ tipo: 'dron' }, 1.7, -2), true); assert.equal(C.pisa({ tipo: 'dron' }, 1.4, -2), false);
+  assert.equal(C.pisa({ tipo: 'dron' }, 2.4, -2), true, 'cayendo de un techo lo pisa');
+  assert.equal(C.pisa({ tipo: 'dron' }, F.alturaSalto, -0.1), false, 'con un salto normal, ni en lo más alto');
 });
 
 test('la baranda: de frente choca; saltando se sube, se desliza todo el riel y se baja sin chocar', () => {
   const b = { tipo: 'baranda', carril: 1, d0: 40, largo: 24, alto: C.BARANDA.alto };
+  const v0 = M.impulso(F.alturaSalto), tCae = (v0 + Math.sqrt(v0 * v0 - 2 * F.gravedad * C.BARANDA.alto)) / F.gravedad;   // del salto al riel
   for (const fps of RITMOS) for (const V of VELS) {
+    // la más corta que arma el generador a esa velocidad
+    const largo = Math.ceil(V * 0.75) + 10, b = { tipo: 'baranda', carril: 1, d0: 40, largo, alto: C.BARANDA.alto };
+    const comido = V * tCae - (V * 0.2 + 0.4);                    // lo que el salto se come del comienzo del riel
     assert.equal(tramo([b], { fps, V, desde: 25 }).choque, 'baranda', `${fps}/${V}: de frente choca`);   // (es larga: choca a cualquier ritmo)
-    const sube = tramo([b], { fps, V, desde: 25, hasta: 80, accion: (D, r) => { if (!r.enAire && r.y < 0.5 && 39.7 - D < V * 0.2 + 0.4 && D < 39.7) { r.vy = M.impulso(F.alturaSalto); r.enAire = true; } } });
+    const sube = tramo([b], { fps, V, desde: 25, hasta: 40 + largo + 30, accion: (D, r) => { if (!r.enAire && r.y < 0.5 && 39.7 - D < V * 0.2 + 0.4 && D < 39.7) { r.vy = M.impulso(F.alturaSalto); r.enAire = true; } } });
     assert.equal(sube.choque, null, `${fps}/${V}: saltando se sube`);
-    assert.ok(sube.riel > 24 - V * 0.25 - 2, `${fps}/${V}: se desliza (${sube.riel.toFixed(1)} m)`);   // casi todo el riel (el salto se come el comienzo)
+    assert.ok(sube.riel > largo - comido - 2 && sube.riel >= 8, `${fps}/${V}: se desliza (${sube.riel.toFixed(1)} m de ${largo})`);   // todo el riel menos lo que se come el salto
     assert.equal(sube.y, 0, `${fps}/${V}: al final se baja`);
   }
   // sostiene solo en su carril y a lo largo del riel
@@ -434,16 +443,16 @@ test('la baranda: de frente choca; saltando se sube, se desliza todo el riel y s
 });
 
 test('la lona: te lanza por encima de los vagones, a toda velocidad y ritmo de cuadros, sin chocar', () => {
-  for (const fps of RITMOS) for (const V of VELS) for (const n of [2, 3]) {
-    // como la arma el generador: el tren empieza a max(5, V·0,26 + 1,5) m de la lona
-    const d0 = 40 + Math.max(5, V * 0.26 + 1.5), objs = [{ tipo: 'lona', carril: 1, d: 40 }];
+  for (const fps of RITMOS) for (const V of VELS) for (const n of [C.vagonesLona(V), Math.min(4, C.vagonesLona(V) + 1)]) {
+    // como la arma el generador: el tren empieza a huecoLona(V) m de la lona, con vagonesLona(V) vagones (o uno más)
+    const d0 = 40 + C.huecoLona(V), objs = [{ tipo: 'lona', carril: 1, d: 40 }];
     for (let i = 0; i < n; i++) objs.push({ tipo: 'tren', carril: 1, d0: d0 + i * (M.LARGO_VAGON + 0.4), largo: M.LARGO_VAGON, vel: 0 });
     const fin = d0 + n * (M.LARGO_VAGON + 0.4);
     const r = tramo(objs, { fps, V, desde: 30, hasta: fin + 30 });
     assert.equal(r.choque, null, `${fps}/${V}/${n} vagones: no choca`);
     assert.ok(r.lanzado, `${fps}/${V}: la lona lanza`);
     assert.ok(r.maxY > (fps >= 60 ? 5 : 4.5) && r.maxY < 5.4, `${fps}/${V}: hasta ~5,2 m (${r.maxY.toFixed(2)})`);   // a 20 cuadros/s el paso de Euler sube un poco menos
-    if (V <= 32) { const s = tramo(objs, { fps, V, desde: 30, hasta: fin - 3 }); assert.equal(s.y, M.ALTO_TECHO, `${fps}/${V}/${n}: aterriza en el techo`); }
+    const s = tramo(objs, { fps, V, desde: 30, hasta: fin - 3 }); assert.equal(s.y, M.ALTO_TECHO, `${fps}/${V}/${n}: aterriza en el techo (a cualquier velocidad)`);
   }
   // con Sol (×1,15) sube más, y nunca pasa de los 6 m sobre los que ya nada choca
   assert.ok(C.impulsoLona(1.15) > C.impulsoLona(1)); assert.ok(C.LONA.altura * 1.15 < 6.05);

@@ -23,9 +23,10 @@
      · CAJONES: pilas de cajas de 1 m en un carril. Se saltan, o se PISAN:
        caer encima (mejor con «rodar en el aire», el pisotón) las rompe y
        sueltan monedas. De frente, chocan como una barrera baja.
-     · DRONES: flotan a la altura de la cabeza (1,15 a 1,95 m). Se pasan
-       rodando, o se pisan desde arriba (desde un techo o una lona).
-     · BARANDAS: un riel de 1 m de alto y de 16 a 30 m de largo. Saltando
+     · DRONES: un dron con un cartel colgando a la altura de la cabeza
+       (todo junto ocupa de 1,15 a 2,45 m: más que un salto normal, 2,1 m).
+       Se pasan rodando, o se pisan desde arriba (desde un techo o una lona).
+     · BARANDAS: un riel de 1 m de alto, más largo a más velocidad (22 a 56 m). Saltando
        se cae encima y se desliza (grind): suelta monedas mientras dura. De
        frente, al nivel del suelo, chocan.
      · LONAS (y respiraderos de vapor en Bajo Vías): no chocan; pisarlas te
@@ -115,7 +116,7 @@
   const PERSONAJES = {
     lia: { id: "lia", nombre: "Lía", precio: 6000, ventaja: { iman: 3 }, texto: "Imán: dura 3 s más",
       apariencia: { piel: 0xc98e62, pelo: 0x24150e, peinado: "coleta", falda: null, sudadera: 0x2fb5a8, gorra: 0xffd23f, jeans: 0x283a5c, mochila: 0xff5a8a, mochila2: 0xffffff, suela: 0xff5a8a } },
-    nico: { id: "nico", nombre: "Nico", precio: 9000, ventaja: { salto: 1.12 }, texto: "Resortes: salta un 12 % más alto",
+    nico: { id: "nico", nombre: "Nico", precio: 9000, ventaja: { salto: 1.08 }, texto: "Resortes: salta un 8 % más alto",
       apariencia: { piel: 0xf1c19c, pelo: 0xc9772e, peinado: "corto", falda: null, sudadera: 0xffb020, gorra: 0x2d6cdf, jeans: 0x3a3f58, mochila: 0x2d6cdf, mochila2: 0xffd23f, suela: 0x2d6cdf } },
     ambar: { id: "ambar", nombre: "Ámbar", precio: 12000, ventaja: { pisoton: 2 }, texto: "Pisotón de oro: el doble de monedas al romper cajones y drones",
       apariencia: { piel: 0x8d5a3b, pelo: 0x140c08, peinado: "trenzas", falda: 0x7b2ff7, sudadera: 0xffd23f, gorra: 0x7b2ff7, jeans: 0x1d1e2c, mochila: 0x00c2a8, mochila2: 0xff5a8a, suela: 0xffffff } },
@@ -131,7 +132,11 @@
      Las medidas que comparten el juego (choques, pisar, deslizarse) y
      mundo.js (el dibujo). Todo en metros sobre la vía. */
   const CAJON = { alto: 1.0, largo: 1.2, w: 0.9 };            // la pila de cajas: un poco más alta que la barrera baja (0,95), se salta igual
-  const DRON = { y0: 1.15, y1: 1.95, largo: 0.9, w: 0.8 };     // el dron: rodando (0,8 m) pasas por debajo
+  /* El dron y su cartel: rodando (0,8 m) se pasa por debajo; arriba llega a
+     2,45 m, más que el salto normal (2,1 m) y que el de Nico (2,27 m), así
+     que saltando se choca igual que con la barrera alta (que llega a 2,35). */
+  const DRON = { y0: 1.15, y1: 2.45, largo: 0.9, w: 0.8 };
+  const PISA_DRON = 0.15;                                      // el dron solo se pisa cayendo de más alto que cualquier salto (2,3 m)
   const BARANDA = { alto: 1.0, w: 0.45 };                      // el riel: se desliza encima, a 1 m
   const LONA = { altura: 5.2, largo: 1.8, w: 0.9 };            // la lona: te lanza a 5,2 m (el techo de un tren está a 3,35)
   const PISA = 0.35;                                           // margen para contar una caída como «encima» (el cuadro anterior)
@@ -165,8 +170,8 @@
       a 0,3 m (saltó tarde y se lo comió de frente) → choca. */
   function pisa(o, yAntes, vy) {
     if (!o || o.roto || (o.tipo !== "cajon" && o.tipo !== "dron") || vy > 0) return false;
-    const arriba = o.tipo === "cajon" ? CAJON.alto : DRON.y1;           // el borde de arriba
-    return yAntes >= arriba - PISA;
+    if (o.tipo === "cajon") return yAntes >= CAJON.alto - PISA;          // el cajón: casi a su altura basta
+    return yAntes >= DRON.y1 - PISA_DRON;                               // el dron: solo desde un techo o una lona, nunca con un salto (su tope son 2,27 m)
   }
   /** ¿El corredor (en x, D, a altura y) está pisando la lona `o`? Solo
       desde el suelo (no desde un techo ni volando). */
@@ -175,6 +180,21 @@
   }
   /** La velocidad hacia arriba que da la lona (con la ventaja de Sol, si la tiene). */
   const impulsoLona = (k = 1) => impulso(LONA.altura * k);
+  /* El vuelo de la lona, en metros de pista: desde que te lanza hasta que
+     vuelves a caer a la altura de un techo (3,35 m). Sube a 5,2 m y baja,
+     así que a 26 m/s² de gravedad son ~1 s: 16 m a 16 m/s, 47 m a 46. */
+  function vueloLona(V) {
+    const g = FISICA.gravedad, v0 = impulsoLona(1);                        // la gravedad del juego y el impulso de la lona
+    return V * (v0 + Math.sqrt(v0 * v0 - 2 * g * ALTO_TECHO)) / g;           // subida y bajada hasta el techo, por la velocidad
+  }
+  /* Dónde empieza el primer vagón detrás de una lona: lo bastante lejos
+     para que el salto ya vaya por encima de su techo (3,55 m con margen,
+     a los ~0,28 s de subir) al llegar a él: 5,7 m a 16 m/s, 13,5 m a 46. */
+  const huecoLona = V => Math.max(5, V * 0.26 + 1.5);
+  /* Cuántos vagones van detrás: los justos para que el vuelo caiga sobre
+     los techos con 6 m de techo por delante (de 2 a 4), así a toda
+     velocidad no se pasa de largo y aterriza en el suelo detrás. */
+  const vagonesLona = V => limita(Math.ceil((vueloLona(V) + 6 - huecoLona(V)) / (LARGO_VAGON + 0.4)), 2, 4);
 
   /* ---------- El bloque de pista de City ----------
      Se llama en cada vuelta del generador (ver crearGenerador en motor.js),
@@ -247,13 +267,17 @@
     drones(api, dif, ctx, st) {
       return fila(api, dif, ctx, st, "dron");
     },
-    /** Una BARANDA en el camino: 16 a 30 m de riel con monedas encima. Se
+    /** Una BARANDA en el camino: 22 a 56 m de riel con monedas encima. Se
         salta y se desliza; o se cambia de carril (uno de los otros dos
         queda libre). Al final, a veces, una estrella secreta en el aire. */
     baranda(api, dif, ctx, st) {
       const dr = api.dSig, c = api.camino;
       if (api.libre[c] > dr) return false;                       // el camino está ocupado: mejor un bloque de siempre
-      const largo = 16 + Math.floor(api.azar() * 15);
+      /* El largo crece con la velocidad: un salto (0,8 s en el aire) cae sobre
+         el riel ~0,75·V m después de su comienzo, y siempre tienen que quedar
+         de 10 a 21 m de riel por delante para deslizarse (de 22 a 33 m a
+         16 m/s, de 45 a 56 m a 46). */
+      const largo = Math.ceil(api.velocidadEn(dr) * 0.75) + 10 + Math.floor(api.azar() * 12);
       api.emite({ tipo: "baranda", carril: c, d0: dr, largo, alto: BARANDA.alto });
       if (!api.peligro) api.filaMonedas(c, dr + 2, largo - 3, BARANDA.alto + 0.9, 2);   // monedas a lo largo del riel
       const otros = [0, 1, 2].filter(k => k !== c && api.libre[k] <= dr);
@@ -261,7 +285,7 @@
         const k = otros[Math.floor(api.azar() * 2)];
         trenes(api, k, dr + 2, 1 + (largo > 22 ? 1 : 0));
       }
-      secreta(api, st, c, dr + largo + 3, BARANDA.alto + 2.3);    // saltando al final del riel se alcanza
+      secreta(api, st, c, dr + largo + 3, BARANDA.alto + 2.0);    // saltando al final del riel se alcanza (el salto llega a 2,1 m sobre el riel)
       api.libre[c] = dr + largo + 2;                             // nadie más se mete en el riel
       api.mantener = 1;                                          // al bajar sigues en el mismo carril
       api.dSig = dr + largo + espacio(api, dif, dr + largo);
@@ -276,23 +300,18 @@
     lonas(api, dif, ctx, st, est) {
       const dr = api.dSig, c = api.camino;
       /* La lona va en un carril que quedó libre hace rato: si ahí terminaba
-         un convoy, quien baja de su techo (3,35 m, ~0,45 s en el aire) tiene
+         un convoy, quien baja de su techo (3,35 m, ~0,5 s en el aire) tiene
          que tocar el suelo antes de llegar a ella, o pasa volando por encima
          sin rebotar y se estrella contra los vagones que la siguen. */
-      const aire = api.velocidadEn(dr) * 0.5;
+      const aire = api.velocidadEn(dr) * 0.55;
       const op = [0, 1, 2].filter(k => k !== c && api.libre[k] <= dr - aire);
       if (!op.length || api.libre[c] > dr) return false;
       const L = op[Math.floor(api.azar() * op.length)];          // el carril de la lona
       const vapor = est.distrito === "bajo";
       api.emite({ tipo: "lona", carril: L, d: dr, variante: vapor ? "vapor" : "lona" });
-      const n = 2 + (api.azar() < dif ? 1 : 0);
-      /* Dónde empieza el tren: lo bastante lejos para que el salto ya vaya
-         por encima de su techo al llegar a él. Subiendo a 5,2 m se pasa los
-         3,55 m (techo y un margen) a los 0,24 s; a 46 m/s eso son 11 m, así
-         que el hueco crece con la velocidad de ahí: 5,7 m a 16 m/s, 13,5 m
-         a 46. Se cae encima hasta 0,86 s después del salto (14 m a 16 m/s,
-         40 m a 46): con dos o tres vagones casi siempre aterrizas arriba. */
-      const d0 = dr + Math.max(5, api.velocidadEn(dr) * 0.26 + 1.5);
+      const Vl = api.velocidadEn(dr);                            // la velocidad al llegar a la lona
+      const n = Math.min(4, vagonesLona(Vl) + (api.azar() < dif ? 1 : 0));   // los vagones justos para caer arriba (uno más, a veces, si es difícil)
+      const d0 = dr + huecoLona(Vl);                             // el primer vagón, a la distancia en que el vuelo ya lo pasa por arriba
       const fin = trenes(api, L, d0, n);
       if (!api.peligro) {
         for (let i = 1; i <= 4; i++) api.emite({ tipo: "moneda", carril: L, d: dr + i * 1.6, y: 1.2 + i * 0.9 });   // la subida
@@ -356,6 +375,6 @@
   Object.assign(W, { estaciones: DISTRITOS, vuelta: VUELTA, intro: INTRO, boletos: POSTALES, velocidad: VELOCIDAD_CITY,
     generador, personajes: PERSONAJES, tema: "city-sur" });
   M.ESTACIONES_CITY = DISTRITOS; M.INTRO_CITY = INTRO; M.BOLETOS_CITY = POSTALES;
-  M.CITY = { DISTRITOS, VUELTA, VELOCIDAD: VELOCIDAD_CITY, INTRO, POSTALES, PERSONAJES, ventajaDe, CAJON, DRON, BARANDA, LONA, PISA, pisa, enLona, impulsoLona, PESOS };
+  M.CITY = { DISTRITOS, VUELTA, VELOCIDAD: VELOCIDAD_CITY, INTRO, POSTALES, PERSONAJES, ventajaDe, CAJON, DRON, BARANDA, LONA, PISA, PISA_DRON, pisa, enLona, impulsoLona, vueloLona, huecoLona, vagonesLona, PESOS };
   return M;
 });

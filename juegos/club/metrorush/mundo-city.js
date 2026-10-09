@@ -391,7 +391,8 @@ Object.assign(Kit.prototype, {
      Todos llevan «!» (objetos del juego). Su origen y cómo los coloca
      `userData.colocar(o, D, t)` (lo llama mundo.js en cada cuadro):
        · cajón: centro de la base, en o.d;
-       · dron: centro del cuerpo, flotando a 1,55 m (entre 1,15 y 1,95);
+       · dron: centro del cuerpo, flotando a 2,15 m; su cartel cuelga hasta
+         1,2 m (todo junto, lo que su caja de choque: de 1,15 a 2,45);
        · baranda: la punta de adelante (o.d0), y se estira hasta o.largo;
        · lona / vapor: el centro, en o.d. */
 
@@ -408,20 +409,26 @@ Object.assign(Kit.prototype, {
     return g;
   },
   /** Un dron de vigilancia: cuerpo redondeado, cuatro brazos con su anillo
-      de hélice, un ojo rojo hacia el corredor y una franja de peligro. */
+      de hélice, un ojo rojo hacia el corredor y una franja de peligro. Lleva
+      colgando un cartel a rayas a la altura de la cabeza: así se ve que
+      ocupa de 1,15 a 2,45 m, que se pasa por debajo rodando y que saltando
+      no (el salto llega a 2,1 m: el dron solo, arriba, parecería saltable). */
   dronCity() {
     const a = new Arma(this), col = this.neon ? 0x22e5ff : 0x3a4a5a;
     a.pon(redonda(0.95, 0.34, 0.75, 0.12), 'pintura!', col, [0, 0, 0], null, 1, 0xffffff);
     a.pon(CAJA, this.neon ? 'texluz:rayasNA!' : 'tex:rayasNA!', 0xffffff, [0, 0, 0.38], null, [0.9, 0.1, 0.02]);
     a.pon(ESFERA, 'luz!', 0xff3030, [0, -0.05, 0.37], null, [0.2, 0.2, 0.1]);   // el ojo
     a.pon(CILINDRO_CHICO, 'plano!', 0x1d1f26, [0, -0.25, 0], null, [0.18, 0.2, 0.18]);   // la cámara de abajo
+    for (const sx of [-1, 1]) a.pon(CILINDRO_CHICO, 'plano!', 0x1d1f26, [sx * 0.36, -0.31, 0.05], null, [0.025, 0.28, 0.025]);   // los dos cables del cartel
+    a.pon(CAJA, 'plano!', 0x1d1f26, [0, -0.7, 0.03], null, [0.98, 0.56, 0.04]);   // el marco del cartel (de 1,17 a 1,73 m sobre el suelo)
+    a.pon(CAJA, this.neon ? 'texluz:rayasNA!' : 'tex:rayasNA!', 0xffffff, [0, -0.7, 0.06], null, [0.9, 0.48, 0.02]);   // su cara a rayas, hacia el corredor
     for (const [sx, sz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
       a.pon(CAJA, 'plano!', 0x2a2d33, [sx * 0.5, 0.12, sz * 0.32], [0, sx * sz * 0.6, 0], [0.5, 0.06, 0.08]);   // el brazo
       a.pon(new THREE.TorusGeometry(0.22, 0.025, 6, 18), 'luz!', this.neon ? 0xff2bd6 : 0xdfe6ee, [sx * 0.72, 0.2, sz * 0.46], [Math.PI / 2, 0, 0]);   // la hélice girando (un anillo)
     }
     const g = a.hecho();
     if (this.neon) g.add(sprite(0xff3030, 1.1, [0, -0.05, 0.42], 0.8));
-    g.userData.colocar = (o, D, t) => g.position.set(CARRILES[o.carril], SUELO + 1.55 + Math.sin(t * 4 + (o.id || 0)) * 0.035, -(o.d - D));   // flota apenas (solo el dibujo)
+    g.userData.colocar = (o, D, t) => g.position.set(CARRILES[o.carril], SUELO + 2.15 + Math.sin(t * 4 + (o.id || 0)) * 0.035, -(o.d - D));   // flota apenas (solo el dibujo)
     return g;
   },
   /** Una baranda de 20 m (se estira al largo de cada una): un bordillo de
@@ -591,7 +598,7 @@ function creaEfectos({ escena }) {
     /** Los trozos de un objeto pisado `o` (cajón: madera; dron: gris y cian), donde está ahora (z = 0, el corredor). */
     rompe(o) {
       const col = o.tipo === 'dron' ? [0x3a4a5a, 0x22e5ff, 0xff3030] : [0xc8873a, 0xa86a2a, 0x3a2a1a];
-      const y0 = o.tipo === 'dron' ? 1.55 : 0.6;
+      const y0 = o.tipo === 'dron' ? 1.8 : 0.6;
       for (let k = 0; k < 12; k++) {
         if (trozos.length >= MAX) trozos.shift();
         trozos.push({ p: new THREE.Vector3(CARRILES[o.carril] + (Math.random() - 0.5) * 0.8, y0 + SUELO, (Math.random() - 0.5) * 0.6),
