@@ -971,6 +971,20 @@
     else if (jefe.tipo === "crisalida") crisalida(dt);
     else if (jefe.tipo === "hoguera") hoguera(dt);
   }
+  /* El vaivén de un jefe de lado a lado. Antes cada jefe escribía
+     jefe.x = W/2 + sin(jefe.t·k)·amp, con el reloj del jefe, que ya corría
+     mientras entraba: al terminar la entrada (o al volver de una picada, o
+     al abrirse el capullo) la x saltaba de golpe hasta 70 px, y el jefe se
+     «teletransportaba» a un costado. Ahora el vaivén tiene su propio reloj
+     (`td`, que solo corre aquí y empieza en el centro, donde entra el
+     jefe) y el jefe va hacia ese punto con velocidad tope: si el objetivo
+     salta, lo alcanza deslizándose. */
+  function vaivenX(dt, k, amp, v) {
+    jefe.td = (jefe.td || 0) + dt;
+    const obj = W / 2 + Math.sin(jefe.td * k) * amp, tope = (v || 90) * dt;
+    jefe.x += clamp(obj - jefe.x, -tope, tope);
+  }
+  const objetivoX = (k, amp) => W / 2 + Math.sin((jefe.td || 0) * k) * amp;
   /* El planificador de ataques: elige uno, lo anuncia y lo deja correr. */
   function planifica(dt, elegir, enfriar) {
     if (jefe.ataque) return;
@@ -991,7 +1005,7 @@
   /* La Nodriza: abanicos de escamas, larvas y el viento de sus alas. */
   function nodriza(dt) {
     const f = faseJefe();
-    if (!jefe.ataque || jefe.ataque.nombre !== "aleteo") jefe.x = W / 2 + Math.sin(jefe.t * 0.45) * 66;
+    if (!jefe.ataque || jefe.ataque.nombre !== "aleteo") vaivenX(dt, 0.45, 66);
     jefe.y = 74 + Math.sin(jefe.t * 1.3) * 3;
     jefe.cuadro = Math.floor(jefe.t * (6 + f * 3)) % 3;
     planifica(dt, () => {
@@ -1044,7 +1058,7 @@
      destellos y un enjambre que lo protege. */
   function faro(dt) {
     const f = faseJefe();
-    jefe.x = W / 2 + Math.sin(jefe.t * 0.3) * 20;
+    vaivenX(dt, 0.3, 20);
     jefe.y = 64 + Math.sin(jefe.t * 0.9) * 2;
     for (const o of jefe.orbita) o.a += dt * (0.8 + f * 0.2);
     jefe.respawn += dt;
@@ -1096,7 +1110,7 @@
      (un muro con un solo hueco) y eclipsa la luz. */
   function esfinge(dt) {
     const f = faseJefe(), a = jefe.ataque;
-    if (!a || (a.nombre !== "picada")) { jefe.x = W / 2 + Math.sin(jefe.t * 0.33) * 72; jefe.y = lerp(jefe.y, jefe.casaY + Math.sin(jefe.t * 0.8) * 3, 1 - Math.exp(-dt * 3)); }
+    if (!a || (a.nombre !== "picada")) { vaivenX(dt, 0.33, 72); jefe.y = lerp(jefe.y, jefe.casaY + Math.sin(jefe.t * 0.8) * 3, 1 - Math.exp(-dt * 3)); }
     jefe.cuadro = Math.floor(jefe.t * 5) % 3;
     jefe.marcas = Math.max(0, (jefe.marcas || 0) - dt * 1.5);
     planifica(dt, () => {
@@ -1115,7 +1129,7 @@
         if (estado === "juego" && Math.abs(jefe.x - F.x) < 16 && Math.abs(jefe.y - (M.Y_FANAL - 4)) < 12) golpeFanal("picada");
         const hit = naufragioEn(jefe.x, jefe.y + 10);
         if (hit) erosiona(hit.n, hit.lx, hit.ly, 4);
-        if (jefe.y > H + 40) { a.i++; jefe.y = -40; if (a.i < a.n) { a.etapa = "huye"; a.tt = 0.35; } else { a.etapa = "vuelve"; a.tt = 0; jefe.x = W / 2; } }
+        if (jefe.y > H + 40) { a.i++; jefe.y = -40; if (a.i < a.n) { a.etapa = "huye"; a.tt = 0.35; } else { a.etapa = "vuelve"; a.tt = 0; jefe.x = objetivoX(0.33, 72); } }
       } else if (a.etapa === "vuelve") { jefe.y = lerp(-40, jefe.casaY, suave(Math.min(1, a.tt / 0.9))); if (a.tt > 0.9) jefe.ataque = null; }
     } else if (a.nombre === "acertijo") {
       if (!a.huecos) { a.huecos = [entero(2, 30)]; if (f >= 1) a.huecos.push(entero(2, 30)); a.k = 0; }
@@ -1173,7 +1187,7 @@
      que revientan en un anillo de escamas. */
   function casco(dt) {
     const f = faseJefe();
-    jefe.x = W / 2 + Math.sin(jefe.t * 0.35) * 60;
+    vaivenX(dt, 0.35, 60);
     jefe.y = 66 + Math.sin(jefe.t * 0.8) * 3;
     jefe.cuadro = Math.floor(jefe.t * 2) & 1;
     planifica(dt, () => {
@@ -1242,7 +1256,7 @@
       chispas(jefe.x, jefe.y, 40, ["#f2ece2", "#f0a8c8"], 70, 1.2, "polvo");
     }
     const vel = jefe.imago ? 0.7 : 0.45, amp = jefe.imago ? 80 : 46;
-    jefe.x = W / 2 + Math.sin(jefe.t * vel) * amp;
+    vaivenX(dt, vel, amp);
     jefe.y = 78 + Math.sin(jefe.t * (jefe.imago ? 2.4 : 1.1)) * (jefe.imago ? 6 : 2);
     jefe.cuadro = Math.floor(jefe.t * (jefe.imago ? 9 : 2.5)) % 3;
     planifica(dt, () => {
@@ -1278,7 +1292,7 @@
      abrazo, que te tira hacia ella. */
   function hoguera(dt) {
     const f = faseJefe();
-    jefe.x = W / 2 + Math.sin(jefe.t * 0.25) * 30;
+    vaivenX(dt, 0.25, 30);
     jefe.y = 62 + Math.sin(jefe.t * 1.3) * 2;
     jefe.cuadro = Math.floor(jefe.t * 8) % 3;
     for (const o of jefe.orbita) o.a += dt * (0.6 + f * 0.25);
@@ -1750,7 +1764,7 @@
     P = nuevaPartida(modo); F = nuevoFanal(); agenda = [];
     particulas = []; flotantes = []; destellos = [];
     html.classList.remove("ultima-llama");
-    P.prueba = FP.nueva(modo, nuevoId(), cuentaUrl);
+    P.prueba = FP.nueva(nuevoId(), cuentaUrl);
     P.tocada = tocada;
     if (modo === "travesia" && desde && desde.j > 1) {               // desde el punto de control
       P.puntos = desde.puntos || 0; P.llamas = Math.max(1, desde.llamas || 3); P.luces = desde.luces || 200; P.reintentos = 1;

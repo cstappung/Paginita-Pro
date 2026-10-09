@@ -38,8 +38,11 @@
   /* La 2 trae las mejoras (el campo `u` de cada jornada) y la segunda parte
      de la travesía: una prueba de la 1 se jugó con otras reglas. La 3 da
      las brasas solo por jefe vencido: una de la 2 compraba con las de
-     cada jornada, y se rechaza como de otra versión (caché, no trampa). */
-  const VERSION = 3;
+     cada jornada, y se rechaza como de otra versión (caché, no trampa).
+     La 4 es la travesía de veinte jornadas (una oleada por jefe, la Luna,
+     las Siete Hermanas y el Sol) con un solo modo: siempre desde la
+     jornada 1, sin puntos de control ni sin fin aparte. */
+  const VERSION = 4;
 
   /* El alfabeto de los eventos. Cada evento es una letra seguida de las
      centésimas que pasaron desde el anterior (en decimal, nada si fue en el
@@ -53,8 +56,11 @@
        N        bala que toca una polilla de dos vidas sin apagarla
        G H I    polilla apagada por el destello (tipo a, b, c)
        J K L    polilla en picada que se quema en la llama (tipo a, b, c)
-       O        larva de la Nodriza          Q  lumbre apagada (jornada 12)
-       R        sombra (el Alba)              V  polilla que orbita al Faro
+       O        larva de la Nodriza o de la Crisálida, llamarada del Sol
+       Q        lumbre apagada (las del Alba)
+       R        sombra (el Alba)
+       V        polilla que orbita al Faro o a la Hoguera, espina de un
+                jefe en su fase 3
        X        golpe al jefe                 Z  tiro que empuja al Alba
        M        la Mensajera alcanzada
        g        el fanal pierde una llama     j  el jefe muere
@@ -69,11 +75,11 @@
      Lo que anota el juego
      --------------------------------------------------------------- */
 
-  /* Una prueba nueva. `m`: "t" travesía, "s" sin fin; `id`: la semilla de
-     la partida (la eligen el juego o quien juega: da igual, igual hay que
-     jugarla); `u`: la cuenta. */
-  function nueva(modo, id, u) {
-    return { v: VERSION, m: modo === "sinfin" || modo === "s" ? "s" : "t", id: String(id), u: String(u || ""), k: 0, J: [] };
+  /* Una prueba nueva. `id`: la semilla de la partida (la eligen el juego
+     o quien juega: da igual, igual hay que jugarla); `u`: la cuenta. `m`
+     queda en "t" (la travesía): es el único modo, y forma parte del hash. */
+  function nueva(id, u) {
+    return { v: VERSION, m: "t", id: String(id), u: String(u || ""), k: 0, J: [] };
   }
   /* Abre el registro de la jornada `n`. `t` es el reloj de juego (el de la
      música, en segundos), `r` el reloj real (performance.now, en ms), `g`
@@ -120,7 +126,7 @@
   }
   /* Cierra la jornada y la encadena a la prueba. `fin`: "c" completada,
      "m" el fanal se apagó, "a" abandonada (el cruce con el Alba ya no cierra
-     la partida: la jornada 13 termina "c" y la travesía sigue). `s` y
+     la partida: su jornada termina "c" y la travesía sigue). `s` y
      `v` son los puntos y las llamas que el juego tiene ahora; `ent`, las
      entradas de la jornada: {b: sintéticas (isTrusted falso y sin mando
      conectado), d: del mando}. */
@@ -176,8 +182,8 @@
     pulsosJuntos: 3,      // intervalos de menos de 0,2 s permitidos por jornada (cambios de etapa)
     sinPulsos: 100000,    // caracteres de eventos a partir de los cuales se aceptan jornadas viejas sin pulsos
     /* Ritmo humano. Lo de arriba es lo que la mecánica permite; esto es lo
-       que una persona puede. Una travesía honesta de trece jornadas tarda
-       entre 500 y 800 s de juego (40–60 s por jornada, una polilla por
+       que una persona puede. Una travesía honesta hasta el Alba (ocho
+       jornadas) tarda entre 300 y 500 s de juego (40–60 s por jornada, una polilla por
        segundo); los mínimos de aquí son de dos a cuatro veces más cortos,
        para que ni la mejor partida imaginable roce el límite, y dejan fuera
        lo que se vio en la tabla (26 jornadas del sin fin en 56 s) y también
@@ -191,7 +197,7 @@
                           // columnas enteras, solo la base.
     jefeMin: 400,         // cs: ningún jefe cae en menos de 4 s, ni antes de lo que permiten sus golpes y el arma
     lumbreMin: 500,       // cs: veinticuatro lumbres, aunque se apaguen a tiros
-    travesiaMin: 30000,   // cs de juego de una travesía entera desde la jornada 1 (5 min; la honesta, 8–13)
+    travesiaMin: 18000,   // cs de juego hasta el Alba, la jornada 8 (3 min; la honesta, 5–8)
     /* Y en promedio: con cuatro jornadas completas o más (sin contar el
        Alba, que ya tiene su minuto), no menos de 7 s cada una. Las
        honestas promedian 30–60 s sin mejoras y 10–25 s con el arma llena. */
@@ -251,34 +257,28 @@
   const entero = (x, min, max) => Number.isSafeInteger(x) && x >= min && x <= max;
 
   /* Rehace una prueba. Devuelve {puntos, completadas, completa, tiempo,
-     muerto, jornadas} si cuadra, o {motivo} si no. `tiempo` es el de juego
-     de esta sesión (las jornadas heredadas de un punto de control no
-     cuentan: se jugaron antes). */
+     muerto, jornadas, llamas, mej, brasas, notas} si cuadra, o {motivo} si
+     no. Lo último es el estado con que sigue la travesía: el juego lo usa
+     para retomar una partida guardada a medias sin creerle al guardado. */
   function rehace(prueba) {
     const mal = motivo => ({ motivo });
     if (!prueba || typeof prueba !== "object") return mal("sin prueba");
     if (prueba.v !== VERSION) return mal("prueba de otra versión del juego");
     if (prueba.x) return mal("partida tocada desde la consola (__fanal): no entra en la clasificación");
-    if (prueba.m !== "t" && prueba.m !== "s") return mal("modo desconocido");
+    if (prueba.m !== "t") return mal("modo desconocido");
     if (typeof prueba.id !== "string" || !/^[A-Za-z0-9_-]{6,40}$/.test(prueba.id)) return mal("semilla ilegible");
     const J = prueba.J;
     if (!Array.isArray(J) || J.length > 3000) return mal("jornadas ilegibles");
-    if (!entero(prueba.k, 0, J.length)) return mal("herencia ilegible");
-    const base = prueba.m === "s" ? M.JORNADAS_HISTORIA + 1 : 1;
-    if (prueba.k) {
-      // Lo heredado es lo jugado hasta un punto de control: termina justo
-      // antes del comienzo de un acto.
-      const sig = J[prueba.k - 1] && J[prueba.k - 1].n + 1;
-      if (!Object.values(M.INICIO_ACTO).includes(sig) || sig <= 1) return mal("el punto de control no cae al empezar un acto");
-      if (prueba.m === "s") return mal("el sin fin no sigue de un punto de control");
-    }
+    // Ya no hay puntos de control: toda travesía empieza en la jornada 1.
+    if (prueba.k !== 0) return mal("la travesía no sigue de un punto de control");
+    const base = 1;
     // Jornadas sin pulsos: solo si la prueba es enorme (ver ajusta) y solo las primeras.
     const totalEventos = J.reduce((s, x) => s + (x && typeof x.e === "string" ? x.e.length : 0), 0);
 
     const est = { puntos: 0, llamas: M.LLAMAS_INICIO, notas: 0, muerto: false };
-    // El taller: las mejoras y las brasas que quedan (el sin fin empieza con
-    // las de toda la historia). Se compran con M.compra, lo mismo que el juego.
-    const taller = { mej: M.mejorasVacias(), brasas: prueba.m === "s" ? M.BRASAS_SINFIN : 0, llamas: 0 };
+    // El taller: las mejoras y las brasas que quedan. Se compran con
+    // M.compra, lo mismo que el juego.
+    const taller = { mej: M.mejorasVacias(), brasas: 0, llamas: 0 };
     const suma = n => {
       const antes = est.puntos;
       est.puntos += n;
@@ -300,7 +300,6 @@
       hashPrev = x.h;
       const ultima = i === J.length - 1;
       if (!ultima && x.f !== "c") return mal("una jornada que no terminó no puede tener otra detrás (" + donde + ")");
-      if (i < prueba.k && x.f !== "c") return mal("lo heredado del punto de control tiene que estar completo");
       const j = M.jornada(x.n), alba = j.jefe === "alba";
       // Lo que se compró en el taller antes de esta jornada, en orden.
       taller.llamas = est.llamas;
@@ -316,10 +315,7 @@
       // no supera el de la jornada.
       if (x.t > x.r * LIM.realHolgura + LIM.realExtra) return mal("el reloj de juego corrió más rápido que el real en la " + donde);
       if (x.g > x.t * 10 + 50) return mal("más tiempo en juego que tiempo de jornada en la " + donde);
-      if (i >= prueba.k) tiempo += x.g;
-      // Al seguir desde un punto de control la partida es nueva: la
-      // Resonancia vuelve a ×1 (las llamas y los puntos siguen).
-      if (i === prueba.k && i > 0) est.notas = 0;
+      tiempo += x.g;
       // Las entradas: un script que despacha teclas o toques da isTrusted
       // falso. Las del mando (mando.js) también, pero esas el juego las
       // cuenta aparte, y solo si había un mando conectado.
@@ -353,7 +349,7 @@
       const danoMax = af => (af ? arm.danoA : arm.danoN);
       const danoMin = af => (af ? (arm.chispas ? arm.danoN : arm.danoA) : arm.danoN);
       const vidaMax = oleada ? Math.max(0, ...["a", "b", "c"].filter(t => cupo[t]).map(vida)) : 0;
-      const acto = j.acto, vuelta = j.vuelta || 0;
+      const acto = j.acto, vuelta = j.vuelta || 0, fase = j.fase || 1;
       poderesRecientes.push({ p: false, l: false });
       const ultimas = poderesRecientes.slice(-3);
       const tiros = [];
@@ -427,7 +423,7 @@
             break;
           }
           case "O":
-            if (jefe !== "nodriza" && jefe !== "crisalida") return tipoMal(l);
+            if (jefe !== "nodriza" && jefe !== "crisalida" && jefe !== "sol") return tipoMal(l);
             if (af) est.notas++;
             suma(10 * mult());
             break;
@@ -441,7 +437,8 @@
             suma(25 * mult());
             break;
           case "V":
-            if (jefe !== "faro" && jefe !== "hoguera") return tipoMal(l);
+            // Las espinas de la fase 3 las tiene cualquier jefe menos el Alba.
+            if (jefe !== "faro" && jefe !== "hoguera" && !(jefe && !alba && fase >= 3)) return tipoMal(l);
             if (af) est.notas++;
             suma(15 * mult());
             break;
@@ -542,13 +539,12 @@
       const media = hechas.reduce((s, x) => s + x.t, 0) / hechas.length;
       if (media < LIM.mediaMin) return mal(hechas.length + " jornadas a " + (media / 100).toFixed(1) + " s cada una: ninguna persona juega a ese ritmo");
     }
-    // La primera parte entera (hasta el Alba) jugada de una vez, sin punto
-    // de control, no baja de cinco minutos de juego.
-    if (completa && !prueba.k && prueba.m === "t") {
+    // La primera parte entera (hasta el Alba) no baja de tres minutos de juego.
+    if (completa) {
       const total = J.filter(x => x.n <= M.JORNADA_ALBA).reduce((s, x) => s + x.t, 0);
       if (total < LIM.travesiaMin) return mal("una travesía entera en " + (total / 100).toFixed(0) + " s (la más rápida posible pasa de " + LIM.travesiaMin / 100 + ")");
     }
-    return { puntos: Math.round(est.puntos), completadas, completa, tiempo, muerto: est.muerto, jornadas: J.length, llamas: est.llamas, mej: taller.mej, brasas: taller.brasas };
+    return { puntos: Math.round(est.puntos), completadas, completa, tiempo, muerto: est.muerto, jornadas: J.length, llamas: est.llamas, mej: taller.mej, brasas: taller.brasas, notas: est.notas };
   }
 
   return { VERSION, LIM, PRUEBA_MAX, nueva, abre, evento, disparo, latencia, pulso, cierra, ajusta, rehace, leeEventos, leePulsos };

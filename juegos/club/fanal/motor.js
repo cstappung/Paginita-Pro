@@ -1,11 +1,13 @@
 /* FANAL — el motor, puro: jornadas, dificultad, puntos, ritmo y progreso.
 
    Qué hace, en general:
-   - Describe la travesía como una lista de JORNADAS: veinticinco en la
-     historia (trece hasta el Alba y doce más en la otra orilla, con siete
-     encuentros grandes) y una función que fabrica las del sin fin a partir
-     de la 26, cada vez un poco más duras. La travesía no se acaba: después
-     de la Hoguera sigue sola hacia el sin fin.
+   - Describe la travesía como una lista de JORNADAS: veinte en la
+     historia, cada una una oleada de polillas seguida de su jefe (ocho
+     hasta el Alba, seis en la otra orilla y seis en lo alto, que termina
+     en el Sol), y una función que fabrica las del sin fin a partir de la
+     21: los mismos jefes en su fase 2 (la primera vuelta) y 3 (todas las
+     que siguen), con una oleada entre cada dos. La travesía es una sola y
+     no se acaba: después del Sol sigue sola hacia el sin fin.
    - Los AUGURIOS: cada jornada que pasas, la noche aprende algo (un poco
      más de fuego, escamas más rápidas, polillas que aguantan un golpe
      más…). Son fijos por número de jornada, iguales para todos.
@@ -53,11 +55,14 @@
     5: { oscuro: 0.62, radio: 74 },
     6: { oscuro: 0.55, radio: 78 },   // los cascos: agua negra, la luz rebota en el metal
     7: { oscuro: 0.36, radio: 84 },   // la seda: blanca, devuelve la luz
-    8: { oscuro: 0.22, radio: 96 }    // la hoguera: por primera vez, sobra luz
+    8: { oscuro: 0.22, radio: 96 },   // la hoguera: por primera vez, sobra luz
+    9: { oscuro: 0.5, radio: 82 },    // la marea: de noche otra vez, con luna
+    10: { oscuro: 0.72, radio: 76 },  // el firmamento: negro y estrellas
+    11: { oscuro: 0.08, radio: 104 }  // el cenit: mediodía, casi no hay sombra
   };
   /* El número romano con que se presenta cada acto: el sin fin (5) no
      tiene número; los de la otra orilla (6, 7 y 8) son el V, el VI y el VII. */
-  const ROMANO_ACTO = { 1: "I", 2: "II", 3: "III", 4: "IV", 6: "V", 7: "VI", 8: "VII" };
+  const ROMANO_ACTO = { 1: "I", 2: "II", 3: "III", 4: "IV", 6: "V", 7: "VI", 8: "VII", 9: "VIII", 10: "IX", 11: "X" };
 
   /* Puntos por tipo de polilla y acto. Las filas de arriba (tipo c) valen
      más, como en el original, porque son las últimas en bajar. En el acto 4
@@ -70,19 +75,22 @@
     5: { a: 40, b: 60, c: 90 },
     6: { a: 30, b: 45, c: 70 },
     7: { a: 35, b: 55, c: 80 },
-    8: { a: 40, b: 60, c: 90 }
+    8: { a: 40, b: 60, c: 90 },
+    9: { a: 45, b: 65, c: 95 },
+    10: { a: 50, b: 70, c: 100 },
+    11: { a: 55, b: 80, c: 110 }
   };
   /* Lo que paga la Mensajera: uno de estos, al azar, como el platillo del
      original, que nunca valía lo mismo dos veces seguidas. */
   const PUNTOS_MENSAJERA = [100, 150, 200, 300, 500];
   /* Lo que paga cada encuentro grande al terminar. */
-  const PUNTOS_JEFE = { nodriza: 2000, faro: 3500, esfinge: 5000, alba: 8000, casco: 6000, crisalida: 8000, hoguera: 12000 };
+  const PUNTOS_JEFE = { nodriza: 2000, faro: 3500, esfinge: 5000, alba: 8000, casco: 6000, crisalida: 8000, hoguera: 12000, luna: 14000, constelacion: 16000, sol: 20000 };
   /* Llamas extra: en estos puntajes y luego cada 100 000. */
   const LLAMAS_EXTRA = [30000, 80000, 150000];
   const LLAMAS_INICIO = 3, LLAMAS_MAX = 5;   // el máximo sin mejoras (ver llamasMax)
 
   /* La vida de los jefes, en golpes normales (un tiro afinado quita dos). */
-  const VIDA_JEFE = { nodriza: 76, faro: 84, esfinge: 104, casco: 110, crisalida: 120, hoguera: 150 };
+  const VIDA_JEFE = { nodriza: 76, faro: 84, esfinge: 104, casco: 110, crisalida: 120, hoguera: 150, luna: 160, constelacion: 175, sol: 200 };
   /* El encuentro con el Alba no se gana con vida sino con distancia: parte
      en DISTANCIA_ALBA brazas, se acerca CIERRE_ALBA por segundo y cada tiro
      que la toca la aleja EMPUJE_ALBA (y vuelve hacia ti). */
@@ -93,7 +101,9 @@
      «normal»; menos castiga a quien juega con un teclado lento. */
   const VENTANA_PULSO = 0.095;
 
-  /* Las trece jornadas de la historia. Cada oleada dice:
+  /* Las veinte jornadas de la historia: una oleada y su jefe, acto por
+     acto (el acto IV, el del Alba, tiene las lumbres en vez de oleada).
+     Cada oleada dice:
      - filas: el tipo de polilla de cada fila, de arriba abajo (a, b o c);
      - cols: cuántas columnas tiene la formación;
      - paso: cuántos píxeles avanza de lado en cada pulso de la música;
@@ -104,45 +114,54 @@
      - deriva: cuánto se mecen (en píxeles) entre un paso y otro;
      - vida: golpes que aguanta cada tipo (por omisión, uno);
      - mensajeras: cuántas veces cruza la Mensajera;
-     - niebla, ceniza, lumbre: lo particular de cada acto. */
+     - niebla, ceniza, cascos, hilos, ascuas, marea, fugaces: lo particular
+       de cada acto.
+     `nivel` es lo que pesa la jornada para los augurios y la vida del jefe:
+     el número que tenía en la travesía de veinticinco, cuando había tres
+     oleadas por acto. Con una sola, contar por `n` dejaba a cada jefe con
+     la mitad de la noche encima que antes; contar por `nivel` deja la curva
+     donde estaba aunque la travesía sea más corta.
+     Cada oleada es la última (la más dura) de su acto en aquella travesía,
+     un poco más dura todavía; la del acto I es la de siempre, para
+     aprender. */
   const JORNADAS = [
-    { n: 1, acto: 1, tipo: "oleada", filas: ["c", "b", "b", "a", "a"], cols: 9, paso: 2, fuego: 0.45, balas: 2, apunta: 0, picada: 0, deriva: 1, mensajeras: 1 },
-    { n: 2, acto: 1, tipo: "oleada", filas: ["c", "c", "b", "b", "a"], cols: 10, paso: 2, fuego: 0.65, balas: 3, apunta: 0.1, picada: 0.03, deriva: 1, mensajeras: 1 },
-    { n: 3, acto: 1, tipo: "oleada", filas: ["c", "c", "b", "b", "a", "a"], cols: 10, paso: 2.4, fuego: 0.85, balas: 3, apunta: 0.2, picada: 0.06, deriva: 1.5, mensajeras: 2 },
-    { n: 4, acto: 1, tipo: "jefe", jefe: "nodriza" },
-    { n: 5, acto: 2, tipo: "oleada", filas: ["c", "b", "b", "a", "a"], cols: 9, paso: 2.2, fuego: 0.8, balas: 3, apunta: 0.2, picada: 0.05, deriva: 4, niebla: 0.45, mensajeras: 1 },
-    { n: 6, acto: 2, tipo: "oleada", filas: ["c", "c", "b", "b", "a"], cols: 10, paso: 2.4, fuego: 0.95, balas: 4, apunta: 0.25, picada: 0.08, deriva: 4, niebla: 0.6, vida: { c: 2 }, mensajeras: 1 },
-    { n: 7, acto: 2, tipo: "oleada", filas: ["c", "c", "b", "b", "a", "a"], cols: 10, paso: 2.6, fuego: 1.05, balas: 4, apunta: 0.3, picada: 0.13, deriva: 5, niebla: 0.75, vida: { c: 2 }, mensajeras: 2 },
-    { n: 8, acto: 2, tipo: "jefe", jefe: "faro" },
-    { n: 9, acto: 3, tipo: "oleada", filas: ["c", "b", "b", "a", "a"], cols: 9, paso: 2.6, fuego: 1.0, balas: 4, apunta: 0.3, picada: 0.1, deriva: 3, vida: { c: 2 }, mensajeras: 1 },
-    { n: 10, acto: 3, tipo: "oleada", filas: ["c", "c", "b", "b", "a", "a"], cols: 10, paso: 2.8, fuego: 1.2, balas: 5, apunta: 0.35, picada: 0.14, deriva: 3, ceniza: true, vida: { c: 2, b: 2 }, mensajeras: 2 },
-    { n: 11, acto: 3, tipo: "jefe", jefe: "esfinge" },
-    { n: 12, acto: 4, tipo: "lumbre", filas: ["a", "a", "a"], cols: 8, paso: 0, fuego: 0, balas: 0, apunta: 0, picada: 0, deriva: 6, mensajeras: 2 }, // las dos cartas del alba
-    { n: 13, acto: 4, tipo: "jefe", jefe: "alba" },
+    { n: 1, nivel: 1, acto: 1, tipo: "oleada", filas: ["c", "b", "b", "a", "a"], cols: 9, paso: 2, fuego: 0.45, balas: 2, apunta: 0, picada: 0, deriva: 1, mensajeras: 1 },
+    { n: 2, nivel: 4, acto: 1, tipo: "jefe", jefe: "nodriza" },
+    { n: 3, nivel: 8, acto: 2, tipo: "oleada", filas: ["c", "c", "b", "b", "a", "a"], cols: 10, paso: 2.6, fuego: 1.15, balas: 4, apunta: 0.32, picada: 0.14, deriva: 5, niebla: 0.75, vida: { c: 2 }, mensajeras: 2 },
+    { n: 4, nivel: 8, acto: 2, tipo: "jefe", jefe: "faro" },
+    { n: 5, nivel: 11, acto: 3, tipo: "oleada", filas: ["c", "c", "b", "b", "a", "a"], cols: 10, paso: 2.8, fuego: 1.3, balas: 5, apunta: 0.37, picada: 0.15, deriva: 3, ceniza: true, vida: { c: 2, b: 2 }, mensajeras: 2 },
+    { n: 6, nivel: 11, acto: 3, tipo: "jefe", jefe: "esfinge" },
+    { n: 7, nivel: 12, acto: 4, tipo: "lumbre", filas: ["a", "a", "a"], cols: 8, paso: 0, fuego: 0, balas: 0, apunta: 0, picada: 0, deriva: 6, mensajeras: 2 }, // las dos cartas del alba
+    { n: 8, nivel: 13, acto: 4, tipo: "jefe", jefe: "alba" },
     /* La otra orilla. V · los cascos: los fanales hundidos derivan (son
        escudos que se mueven) y las polillas anidan en ellos. */
-    { n: 14, acto: 6, tipo: "oleada", filas: ["c", "b", "b", "a", "a"], cols: 9, paso: 2.6, fuego: 1.1, balas: 4, apunta: 0.3, picada: 0.08, deriva: 2, cascos: 6, vida: { c: 2 }, mensajeras: 1 },
-    { n: 15, acto: 6, tipo: "oleada", filas: ["c", "c", "b", "b", "a"], cols: 10, paso: 2.7, fuego: 1.2, balas: 5, apunta: 0.32, picada: 0.1, deriva: 2, cascos: 6, vida: { c: 2, b: 2 }, mensajeras: 1 },
-    { n: 16, acto: 6, tipo: "oleada", filas: ["c", "c", "b", "b", "a", "a"], cols: 10, paso: 2.8, fuego: 1.3, balas: 5, apunta: 0.35, picada: 0.12, deriva: 2.5, cascos: 6, vida: { c: 2, b: 2 }, mensajeras: 1 },
-    { n: 17, acto: 6, tipo: "jefe", jefe: "casco" },
+    { n: 9, nivel: 17, acto: 6, tipo: "oleada", filas: ["c", "c", "b", "b", "a", "a"], cols: 10, paso: 2.8, fuego: 1.4, balas: 5, apunta: 0.37, picada: 0.13, deriva: 2.5, cascos: 6, vida: { c: 2, b: 2 }, mensajeras: 2 },
+    { n: 10, nivel: 17, acto: 6, tipo: "jefe", jefe: "casco" },
     /* VI · la seda: las polillas cuelgan hilos que enredan los remos. */
-    { n: 18, acto: 7, tipo: "oleada", filas: ["c", "b", "b", "a", "a"], cols: 9, paso: 2.7, fuego: 1.15, balas: 5, apunta: 0.3, picada: 0.1, deriva: 5, hilos: 0.25, vida: { c: 2 }, mensajeras: 1 },
-    { n: 19, acto: 7, tipo: "oleada", filas: ["c", "c", "b", "b", "a"], cols: 10, paso: 2.8, fuego: 1.25, balas: 5, apunta: 0.33, picada: 0.12, deriva: 5, hilos: 0.35, vida: { c: 2, b: 2 }, mensajeras: 1 },
-    { n: 20, acto: 7, tipo: "oleada", filas: ["c", "c", "b", "b", "a", "a"], cols: 10, paso: 2.9, fuego: 1.35, balas: 6, apunta: 0.36, picada: 0.14, deriva: 5, hilos: 0.45, vida: { c: 3, b: 2 }, mensajeras: 1 },
-    { n: 21, acto: 7, tipo: "jefe", jefe: "crisalida" },
+    { n: 11, nivel: 21, acto: 7, tipo: "oleada", filas: ["c", "c", "b", "b", "a", "a"], cols: 10, paso: 2.9, fuego: 1.45, balas: 6, apunta: 0.38, picada: 0.15, deriva: 5, hilos: 0.45, vida: { c: 3, b: 2 }, mensajeras: 2 },
+    { n: 12, nivel: 21, acto: 7, tipo: "jefe", jefe: "crisalida" },
     /* VII · la hoguera: cada polilla apagada puede soltar un ascua que cae. */
-    { n: 22, acto: 8, tipo: "oleada", filas: ["c", "c", "b", "b", "a"], cols: 10, paso: 2.9, fuego: 1.3, balas: 6, apunta: 0.35, picada: 0.12, deriva: 3, ascuas: 0.25, vida: { c: 2, b: 2 }, mensajeras: 1 },
-    { n: 23, acto: 8, tipo: "oleada", filas: ["c", "c", "b", "b", "a", "a"], cols: 10, paso: 3, fuego: 1.4, balas: 6, apunta: 0.38, picada: 0.14, deriva: 3, ascuas: 0.35, vida: { c: 3, b: 2 }, mensajeras: 1 },
-    { n: 24, acto: 8, tipo: "oleada", filas: ["c", "c", "b", "b", "a", "a"], cols: 11, paso: 3.1, fuego: 1.5, balas: 6, apunta: 0.4, picada: 0.16, deriva: 3, ascuas: 0.45, vida: { c: 3, b: 2, a: 2 }, mensajeras: 1 },
-    { n: 25, acto: 8, tipo: "jefe", jefe: "hoguera" }
+    { n: 13, nivel: 25, acto: 8, tipo: "oleada", filas: ["c", "c", "b", "b", "a", "a"], cols: 11, paso: 3.1, fuego: 1.6, balas: 6, apunta: 0.41, picada: 0.17, deriva: 3, ascuas: 0.45, vida: { c: 3, b: 2, a: 2 }, mensajeras: 2 },
+    { n: 14, nivel: 25, acto: 8, tipo: "jefe", jefe: "hoguera" },
+    /* Lo alto. VIII · la marea: la formación sube y baja con la luna
+       (`marea`, en píxeles de amplitud). */
+    { n: 15, nivel: 28, acto: 9, tipo: "oleada", filas: ["c", "c", "b", "b", "a", "a"], cols: 10, paso: 3, fuego: 1.6, balas: 6, apunta: 0.4, picada: 0.16, deriva: 4, marea: 12, vida: { c: 3, b: 2, a: 2 }, mensajeras: 2 },
+    { n: 16, nivel: 28, acto: 9, tipo: "jefe", jefe: "luna" },
+    /* IX · el firmamento: caen estrellas fugaces en diagonal (`fugaces`,
+       por segundo). */
+    { n: 17, nivel: 31, acto: 10, tipo: "oleada", filas: ["c", "c", "b", "b", "a", "a"], cols: 11, paso: 3.1, fuego: 1.65, balas: 6, apunta: 0.42, picada: 0.17, deriva: 3, fugaces: 0.35, vida: { c: 3, b: 2, a: 2 }, mensajeras: 2 },
+    { n: 18, nivel: 31, acto: 10, tipo: "jefe", jefe: "constelacion" },
+    /* X · el cenit: un poco de todo lo de antes, a pleno sol. */
+    { n: 19, nivel: 34, acto: 11, tipo: "oleada", filas: ["c", "c", "b", "b", "a", "a"], cols: 11, paso: 3.2, fuego: 1.7, balas: 7, apunta: 0.44, picada: 0.18, deriva: 3, ascuas: 0.3, marea: 6, fugaces: 0.2, vida: { c: 3, b: 3, a: 2 }, mensajeras: 2 },
+    { n: 20, nivel: 34, acto: 11, tipo: "jefe", jefe: "sol" }
   ];
-  const JORNADA_ALBA = 13;                    // el cruce con el Alba: el final de la primera parte
-  const JORNADAS_HISTORIA = JORNADAS.length;   // 25: la Hoguera cierra la historia; después, el sin fin
+  const JORNADA_ALBA = 8;                     // el cruce con el Alba: el final de la primera parte
+  const JORNADA_HOGUERA = 14;                 // la Hoguera: el final de la segunda
+  const JORNADAS_HISTORIA = JORNADAS.length;   // 20: el Sol cierra la historia; después, el sin fin
 
-  /* El primer número de jornada de cada acto: ahí se guarda el punto de
-     control, y desde ahí se reintenta. El 5 es el sin fin: también se
-     guarda al llegar a él. */
-  const INICIO_ACTO = { 1: 1, 2: 5, 3: 9, 4: 12, 6: 14, 7: 18, 8: 22, 5: 26 };
+  /* El primer número de jornada de cada acto (el 5 es el sin fin): ahí
+     cambian la piel, el cielo y la música. */
+  const INICIO_ACTO = { 1: 1, 2: 3, 3: 5, 4: 7, 6: 9, 7: 11, 8: 13, 9: 15, 10: 17, 11: 19, 5: 21 };
 
   /* Los augurios: lo que la noche aprende en cada jornada que pasas. La
      jornada n trae los n − 1 primeros de esta rueda (dando vueltas, cada
@@ -162,8 +181,9 @@
   /* Aplica los augurios a una jornada ya armada. Los topes son donde la
      pantalla deja de ser justa. */
   function aplicaAugurios(j) {
-    const s = k => nivelAugurio(j.n, k);
-    j.presion = Math.max(0, j.n - 1);
+    const nv = j.nivel || j.n;
+    const s = k => nivelAugurio(nv, k);
+    j.presion = Math.max(0, nv - 1);
     j.velEscama = +Math.min(1.8, Math.pow(1.05, s("veloz"))).toFixed(4);   // lo usa la pantalla
     j.furia = +Math.min(2, Math.pow(1.07, s("furia"))).toFixed(4);          // los jefes atacan más seguido
     if (j.tipo !== "oleada") return j;
@@ -186,39 +206,49 @@
     return j;
   }
 
-  /* Qué tan dura es una jornada del modo sin fin: sube un 5 % por jornada
-     después de la Hoguera y se detiene en ×2,4, que con los augurios encima
-     ya es una pantalla llena de escamas. */
+  /* Qué tan dura es una jornada del sin fin: sube un 6 % por jornada
+     después del Sol y se detiene en ×2,4, que con los augurios encima ya
+     es una pantalla llena de escamas. */
   function dificultad(n) {
     if (n <= JORNADAS_HISTORIA) return 1;                                       // la historia ya trae su curva
-    return Math.min(2.4, 1 + 0.05 * (n - JORNADAS_HISTORIA));
+    return Math.min(2.4, 1 + 0.06 * (n - JORNADAS_HISTORIA));
   }
 
-  /* El sin fin recorre los seis actos de pelea en bloques de cuatro (tres
-     oleadas y el jefe del acto, que vuelve más fuerte). */
-  const CICLO_SINFIN = [1, 2, 3, 6, 7, 8];
-  const JEFE_DE_ACTO = { 1: "nodriza", 2: "faro", 3: "esfinge", 6: "casco", 7: "crisalida", 8: "hoguera" };
-  const ULTIMA_OLEADA = { 1: 3, 2: 7, 3: 10, 6: 16, 7: 20, 8: 24 };   // la que el sin fin copia y endurece
+  /* El sin fin recorre los nueve actos de pelea en bloques de dos: una
+     oleada y el jefe del acto, que vuelve en otra fase. La primera vuelta
+     entera es la fase 2; de ahí en adelante, la 3 (y cada vuelta más
+     fuerte por la dificultad). */
+  const CICLO_SINFIN = [1, 2, 3, 6, 7, 8, 9, 10, 11];
+  const JEFE_DE_ACTO = { 1: "nodriza", 2: "faro", 3: "esfinge", 6: "casco", 7: "crisalida", 8: "hoguera", 9: "luna", 10: "constelacion", 11: "sol" };
+  /* La oleada que el sin fin copia y endurece en cada acto. La del acto I
+     no es la de la historia (esa es para aprender) sino una más dura. */
+  const OLEADA_DE_ACTO = { 2: 3, 3: 5, 6: 9, 7: 11, 8: 13, 9: 15, 10: 17, 11: 19 };
+  const OLEADA_I_SINFIN = { acto: 1, tipo: "oleada", filas: ["c", "c", "b", "b", "a", "a"], cols: 10, paso: 2.4, fuego: 0.95, balas: 3, apunta: 0.22, picada: 0.07, deriva: 1.5, mensajeras: 1 };
+  const oleadaBase = acto => (acto === 1 ? OLEADA_I_SINFIN : JORNADAS[OLEADA_DE_ACTO[acto] - 1]);
+  /* La fase de los jefes de una vuelta del sin fin (en la historia, 1). */
+  const faseDeVuelta = vuelta => (vuelta >= 1 ? 3 : 2);
 
   /* Una jornada cualquiera, con sus augurios: las de la historia de la
      tabla y las del sin fin fabricadas. */
   function jornada(n) {
-    if (n >= 1 && n <= JORNADAS_HISTORIA) return aplicaAugurios(Object.assign({}, JORNADAS[n - 1])); // copia, para no tocar la tabla
-    const k = Math.max(0, n - JORNADAS_HISTORIA - 1);   // 0 en la jornada 26
-    const bloque = Math.floor(k / 4);             // cada bloque es un acto con su jefe
-    const pos = k % 4;                            // 0,1,2 oleadas · 3 jefe
+    if (n >= 1 && n <= JORNADAS_HISTORIA) return aplicaAugurios(Object.assign({ fase: 1 }, JORNADAS[n - 1])); // copia, para no tocar la tabla
+    const k = Math.max(0, n - JORNADAS_HISTORIA - 1);   // 0 en la jornada 21
+    const bloque = Math.floor(k / 2);             // cada bloque es un acto con su jefe
+    const pos = k % 2;                            // 0 oleada · 1 jefe
     const actoBase = CICLO_SINFIN[bloque % CICLO_SINFIN.length];
-    const vuelta = Math.floor(bloque / CICLO_SINFIN.length); // cuántas veces se recorrieron los seis
+    const vuelta = Math.floor(bloque / CICLO_SINFIN.length); // cuántas veces se recorrieron los nueve
+    const fase = faseDeVuelta(vuelta);
     const m = dificultad(n);                      // multiplicador de esta jornada
-    if (pos === 3) return aplicaAugurios({ n, acto: 5, actoBase, tipo: "jefe", jefe: JEFE_DE_ACTO[actoBase], fuerza: m, vuelta });
-    // Las oleadas copian la última oleada del acto base y la endurecen.
-    const base = JORNADAS[ULTIMA_OLEADA[actoBase] - 1];
-    // La tercera oleada de cada bloque suma una fila de las chicas si cabe.
-    const filas = pos === 2 && base.filas.length < 6 ? base.filas.concat(["a"]) : base.filas.slice();
+    const nivel = 34 + (n - JORNADAS_HISTORIA);  // los augurios siguen sumando uno por jornada
+    if (pos === 1) return aplicaAugurios({ n, nivel, acto: 5, actoBase, tipo: "jefe", jefe: JEFE_DE_ACTO[actoBase], fuerza: m, vuelta, fase });
+    // La oleada copia la del acto base y la endurece; desde la segunda
+    // vuelta suma una fila de las chicas si cabe, y una columna.
+    const base = oleadaBase(actoBase);
+    const filas = vuelta >= 1 && base.filas.length < 6 ? base.filas.concat(["a"]) : base.filas.slice();
     return endurece(aplicaAugurios({
-      n, acto: 5, actoBase, tipo: "oleada", vuelta,
+      n, nivel, acto: 5, actoBase, tipo: "oleada", vuelta, fase,
       filas,
-      cols: Math.min(11, base.cols + (pos === 2 ? 1 : 0)),             // la tercera, más ancha
+      cols: Math.min(11, base.cols + (vuelta >= 1 ? 1 : 0)),
       paso: +(base.paso * (1 + (m - 1) * 0.35)).toFixed(2),            // marcha algo más rápida
       fuego: +(base.fuego * m).toFixed(2),                             // más escamas por segundo…
       balas: Math.min(8, base.balas + Math.floor((m - 1) * 3)),        // …y más a la vez
@@ -227,7 +257,7 @@
       deriva: base.deriva,
       niebla: actoBase === 2 ? base.niebla : 0,
       ceniza: actoBase === 3,
-      cascos: base.cascos || 0, hilos: base.hilos || 0, ascuas: base.ascuas || 0,
+      cascos: base.cascos || 0, hilos: base.hilos || 0, ascuas: base.ascuas || 0, marea: base.marea || 0, fugaces: base.fugaces || 0,
       vida: Object.assign({}, base.vida || {}, m > 1.6 ? { a: Math.max(2, (base.vida && base.vida.a) || 1) } : {}), // muy adentro, hasta las chicas aguantan dos
       mensajeras: 1
     }), Math.floor(k / 6));
@@ -249,13 +279,14 @@
     return { oscuro: Math.min(0.92, b.oscuro + 0.1), radio: b.radio - 4 };
   }
 
-  /* La vida de un jefe en una jornada: crece con la jornada (el arma
-     también crece, con las mejoras) hasta el cuádruple, y en el sin fin con
-     la fuerza. */
+  /* La vida de un jefe en una jornada: crece con el nivel de la jornada
+     (el arma también crece, con las mejoras) hasta el cuádruple, en el sin
+     fin con la fuerza, y en las fases 2 y 3 un poco más. */
+  const VIDA_FASE = { 1: 1, 2: 1.15, 3: 1.3 };
   function vidaJefe(j) {
     const base = VIDA_JEFE[j.jefe] || 0;
-    const porJornada = Math.min(4, 1 + 0.05 * Math.max(0, (j.n || 4) - 4));
-    return Math.round(base * porJornada * (j.fuerza ? 0.7 + 0.3 * j.fuerza : 1));
+    const porJornada = Math.min(4, 1 + 0.05 * Math.max(0, (j.nivel || j.n || 4) - 4));
+    return Math.round(base * porJornada * (j.fuerza ? 0.7 + 0.3 * j.fuerza : 1) * (VIDA_FASE[j.fase] || 1));
   }
 
   /* ---------------------------------------------------------------
@@ -282,9 +313,6 @@
   const CODIGO_LLAMA = "l", COSTO_LLAMA = 2;
   /* Las evoluciones: a los 3, 6, 9 y 12 niveles de una rama. */
   const EVOLUCION = [3, 6, 9, 12];
-  /* Las brasas con que empieza la travesía sin fin: las que habría juntado
-     quien llegó hasta ahí remando (una por jefe). */
-  const BRASAS_SINFIN = JORNADAS.filter(j => j.tipo === "jefe").length;
 
   function mejorasVacias() { const m = {}; for (const k of LISTA_MEJORAS) m[k] = 0; return m; }
   /* Unos niveles cualesquiera, limpios: solo las ocho mejoras, enteros entre 0 y su tope. */
@@ -409,7 +437,7 @@
   }
 
   /* El bonus de una jornada: por no recibir daño y por puntería. */
-  const BONUS_ACTO = { 1: 1, 2: 2, 3: 3, 4: 4, 5: 6, 6: 5, 7: 5, 8: 6 };
+  const BONUS_ACTO = { 1: 1, 2: 2, 3: 3, 4: 4, 5: 7, 6: 5, 7: 5, 8: 6, 9: 6, 10: 7, 11: 7 };
   function bonusJornada({ acto, sinDanio, disparos, aciertos }) {
     const a = BONUS_ACTO[acto] || 4;                            // la otra orilla y el sin fin pagan más
     const precision = disparos > 0 ? Math.min(1, aciertos / disparos) : 0;
@@ -445,13 +473,19 @@
   }
 
   /* El progreso que se guarda, vacío. `frag` y `ecos` son índices leídos;
-     `alba`, si se vio el final; `piedad`, si alguna vez se cruzó la jornada
-     12 sin apagar ninguna lumbre; `punto`, el punto de control de la
-     historia (con `at` para saber cuál es el más nuevo, y `j: 0` cuando se
-     borró); `mejor`, los récords locales; `hoguera`, si se vio el final de
-     la segunda parte (abre la travesía sin fin desde la portada). */
+     `alba`, `hoguera` y `sol`, qué finales se vieron; `piedad`, si alguna
+     vez se cruzó la jornada de las lumbres sin apagar ninguna; `punto`, la
+     travesía a medias (con `at` para saber cuál es la más nueva, y `j: 0`
+     cuando se terminó); `mejor`, los récords locales.
+     `punto` no es un punto de control: no hay dónde reintentar. Es la
+     partida que quedó abierta cuando alguien cerró la página, y se borra
+     en cuanto la travesía acaba (apagándose o terminándola). Se reescribe
+     al empezar cada jornada y cada vez que se pierde una llama
+     (`perdidas`: las de la jornada en curso), para que salir y volver no
+     devuelva lo que se perdió. `sinfin` en `mejor` queda de cuando había
+     dos modos, para no tirar el récord de nadie. */
   function progresoVacio() {
-    return { v: 1, frag: [], ecos: [], alba: false, hoguera: false, piedad: false, punto: { j: 0, at: 0 }, mejor: { travesia: 0, sinfin: 0, jornada: 0 } };
+    return { v: 1, frag: [], ecos: [], alba: false, hoguera: false, sol: false, piedad: false, punto: { j: 0, at: 0 }, mejor: { travesia: 0, sinfin: 0, jornada: 0 } };
   }
 
   /* Junta dos progresos (el del navegador y el de la cuenta): lo leído se
@@ -465,6 +499,7 @@
     r.ecos = [...new Set([...indices(x.ecos, 64), ...indices(y.ecos, 64)])].sort((p, q) => p - q);
     r.alba = !!(x.alba || y.alba);
     r.hoguera = !!(x.hoguera || y.hoguera);
+    r.sol = !!(x.sol || y.sol);
     r.piedad = !!(x.piedad || y.piedad);
     const pa = limpio(x.punto), pb = limpio(y.punto);
     const pt = (+pb.at || 0) > (+pa.at || 0) ? pb : pa;           // el más nuevo, incluido un borrado
@@ -477,6 +512,13 @@
     if (r.punto.j > 0 && pt.mej) r.punto.mej = limpiaMejoras(pt.mej);
     if (r.punto.j > 0 && Number.isFinite(+pt.br)) r.punto.br = Math.max(0, Math.min(999, Math.floor(+pt.br)));
     if (r.punto.j > 0) r.punto.llamas = Math.min(llamasMax(r.punto.mej), r.punto.llamas);
+    // Las llamas perdidas en la jornada a medias, y la racha de notas
+    // afinadas con que se empezó (la Resonancia no se reinicia entre
+    // jornadas).
+    if (r.punto.j > 0) r.punto.perdidas = Math.max(0, Math.min(LLAMAS_TOPE, Math.floor(+pt.perdidas || 0)));
+    if (r.punto.j > 0) r.punto.notas = Math.max(0, Math.min(1e6, Math.floor(+pt.notas || 0)));
+    // Lo comprado en el taller para la jornada a medias (va a su prueba).
+    if (r.punto.j > 0 && typeof pt.u === "string" && /^[a-z]{0,80}$/.test(pt.u)) r.punto.u = pt.u;
     // La prueba de lo jugado hasta el punto de control (ver prueba.js): sin
     // ella, seguir desde aquí no entra en la clasificación. Se guarda tal
     // cual (el verificador la rehace entera) si tiene la forma y cabe.
@@ -491,10 +533,12 @@
     return r;
   }
 
-  /* Lo más que ocupa la prueba guardada con el punto de control: el
+  /* Lo más que ocupa la prueba guardada con la travesía a medias: el
      progreso entero viaja a la cuenta en un blob de menos de 200 000
-     caracteres, y once jornadas reales ocupan unas decenas de miles. */
-  const PRUEBA_PUNTO_MAX = 150000;
+     caracteres, y veinte jornadas reales ocupan unas decenas de miles. Muy
+     adentro del sin fin puede no caber: entonces la partida se sigue igual,
+     pero ya no entra en la clasificación. */
+  const PRUEBA_PUNTO_MAX = 180000;
 
   /* Un hash de texto de 53 bits (cyrb53), en base 36. No es una firma: lo
      que hace es encadenar las jornadas de la prueba (cada una lleva el
@@ -539,12 +583,12 @@
     ANCHO, ALTO, Y_FANAL, Y_NAUFRAGIOS, Y_LIMITE, Y_FORMACION,
     ACTOS, PUNTOS, PUNTOS_MENSAJERA, PUNTOS_JEFE, LLAMAS_EXTRA, LLAMAS_INICIO, LLAMAS_MAX,
     VIDA_JEFE, DISTANCIA_ALBA, CIERRE_ALBA, EMPUJE_ALBA, VENTANA_PULSO,
-    JORNADAS, JORNADAS_HISTORIA, INICIO_ACTO,
+    JORNADAS, JORNADAS_HISTORIA, INICIO_ACTO, JORNADA_HOGUERA, OLEADA_DE_ACTO, faseDeVuelta, VIDA_FASE,
     dificultad, jornada, actoDe, vidaJefe, formacion, polillasDe,
     resonancia, puntosPolilla, bonusJornada, llamasGanadas, juzgaPulso, latido,
     progresoVacio, mezclaProgreso, mulberry32, hashTexto, valorMensajera, PRUEBA_PUNTO_MAX,
     ROMANO_ACTO, JORNADA_ALBA, AUGURIOS, nivelAugurio, augurioDe, aplicaAugurios, CICLO_SINFIN, JEFE_DE_ACTO,
-    MEJORAS, LISTA_MEJORAS, POR_CODIGO, CODIGO_LLAMA, COSTO_LLAMA, EVOLUCION, BRASAS_SINFIN, PATRONES, BONUS_ACTO,
+    MEJORAS, LISTA_MEJORAS, POR_CODIGO, CODIGO_LLAMA, COSTO_LLAMA, EVOLUCION, PATRONES, BONUS_ACTO,
     LLAMAS_TOPE, mejorasVacias, limpiaMejoras, puntosRama, evolucion, llamasMax, armas, nave, compra
   };
 });
