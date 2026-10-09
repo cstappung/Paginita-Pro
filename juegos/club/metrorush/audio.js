@@ -25,7 +25,7 @@
 const Chip = window.Chip;                      // el motor chiptune (juegos/audio/chip.js)
 const Temas = window.Temas;                    // el cancionero (juegos/audio/temas.js)
 // la curva de velocidad del motor (motor.js se carga antes como script): de aquí sale el tempo, sin números escritos a mano
-const VEL = (window.MetroRushMotor && window.MetroRushMotor.VELOCIDAD) || { V0: 15, VMAX: 50 };
+let VEL = (window.MetroRushMotor && window.MetroRushMotor.VELOCIDAD) || { V0: 15, VMAX: 50 };   // CITY: `curva` la cambia (City tiene su propia curva)
 
 /* Las listas de cada sitio, por su id: las diez estaciones de motor.js
    (ESTACIONES[].id) y los cinco barrios de Subway City. El primer tema de
@@ -206,6 +206,12 @@ export class Sonido {
       this.rep.tick(0.25);                                     // y se agenda desde el corte en este mismo cuadro
     }
   }
+
+  /* CITY: la curva de velocidad de la carrera ({V0, VMAX}, la de
+     M.velocidadDe(modo)). El tempo va de ×0,92 en V0 a ×1,15 en VMAX de
+     ESA curva: City corre de 16 a 46 m/s, y con la clásica (15 a 50) su
+     tope sonaría a ×1,08 y nunca llegaría al apuro. */
+  curva(V) { if (V && V.VMAX > V.V0) VEL = V; }
 
   /* ---------- efectos ---------- */
 

@@ -517,6 +517,11 @@ main.vl { min-width: 0; }
 .t-traje em { position: absolute; top: calc(-1.3 * var(--m)); right: calc(-1.3 * var(--m)); width: calc(4.8 * var(--m)); height: calc(4.8 * var(--m)); padding: calc(.7 * var(--m)); border-radius: 50%; border: calc(.4 * var(--m)) solid var(--ss-t); }
 .t-traje em.ok { background: #36aa14; }
 .t-traje em.cerrado { background: #fff; padding: calc(.5 * var(--m)); }
+/* CITY: la insignia «City» de los personajes que solo se juegan en City
+   (arriba a la izquierda, para no tapar el visto bueno ni el candado). */
+.t-traje em.t-city { left: calc(-1.1 * var(--m)); right: auto; top: calc(-1.1 * var(--m)); width: auto; height: auto; padding: calc(.25 * var(--m)) calc(.9 * var(--m));
+  border-radius: calc(1.2 * var(--m)); border-width: calc(.3 * var(--m)); background: linear-gradient(180deg, #ff7ad9, #7b2ff7); color: #fff;
+  font-style: normal; font-size: calc(1.9 * var(--mt, var(--m))); line-height: 1.2; letter-spacing: .04em; transform: rotate(-8deg); }
 @container (orientation: portrait) {
   .t-personajes { left: calc(2 * var(--m)); right: calc(2 * var(--m)); width: auto; top: auto; height: 54%; bottom: calc(2 * var(--m)); }
   .capa.tienda[data-pestana="personajes"] { background: linear-gradient(180deg, rgba(10, 30, 90, .55) 0, rgba(10, 30, 90, 0) 22%); }
