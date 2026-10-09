@@ -50,16 +50,32 @@
   const LARGO_RAMPA = 5;                 // la rampa sube del suelo al techo en 5 m
 
   /* La física del corredor. Las alturas están en metros sobre la vía. */
+  /* EL SALTO, COMO EN SUBWAY SURFERS (ronda 2)
+     Antes el salto subía 1,5 m con gravedad 34 y duraba 0,59 s: se sentía
+     bajo y apurado al lado del de Subway Surfers. Ahora sube 2,1 m y dura
+     0,80 s en el suelo: el tiempo en el aire es 2·√(2h/g), así que con
+     h = 2,1 y g = 26 da 2·√(4,2/26) = 0,804 s. Lo que NO cambia, a propósito:
+       · la barrera alta (empieza a 1,0 m y termina a 2,35) sigue sin poder
+         saltarse: 2,1 < 2,35, así que hay que rodar como siempre;
+       · la barrera baja (0,95) se pasa con más margen: el corredor va por
+         encima de ella 0,59 s (antes 0,36 s), el salto perdona más;
+       · un salto normal no llega a un techo (2,1 < 3,35 − 0,5): para subir
+         a los trenes siguen haciendo falta la rampa o las zapatillas;
+       · desde un techo sube a 3,35 + 2,1 = 5,45 m: la cabeza queda a ~7,4 m,
+         bajo los cables de la catenaria (ver ALTO_CABLE en mundo.js).
+     Ni los metros ni los puntos dependen de la altura del salto, así que la
+     prueba del antitrampas no cambia (no sube su VERSION). */
   const FISICA = {
-    gravedad: 34,          // m/s²: más fuerte que la real para que el salto se sienta ágil
-    alturaSalto: 1.5,      // un salto normal pasa la barrera baja (que mide 0,95)
-    alturaZapatillas: 4.1, // con zapatillas saltarinas se llega a los techos (3,35)
+    gravedad: 26,          // m/s²: más fuerte que la real (9,8) para que el salto se sienta ágil, pero menos que antes (34): flota más
+    alturaSalto: 2.1,      // un salto normal: 2,1 m y 0,80 s en el aire (pasa la barrera baja, que mide 0,95; no la alta, que llega a 2,35)
+    alturaZapatillas: 4.4, // con zapatillas saltarinas se llega holgado a los techos (3,35): 1,16 s en el aire
     tiempoRodar: 0.62,     // segundos que dura una rodada
-    caidaRapida: 24,       // m/s hacia abajo si ruedas en el aire (el "golpe al suelo")
+    caidaRapida: 24,       // m/s hacia abajo si ruedas en el aire (el "golpe al suelo": de 2,1 m baja en menos de 0,1 s)
     cambioCarril: 0.17,    // segundos que tarda en pasar de un carril al de al lado
     alturaMochila: 8.5,    // la mochila cohete vuela a esta altura
-    alturaPogo: 7,         // el pogo saltarín sube hasta aquí (más arriba que los techos, 3,35)…
-    gravedadPogo: 0.4,     // …y cae con el 40 % de la gravedad: ~2,3 s en el aire, como el de Subway Surfers
+    alturaPogo: 8.3,       // el pogo saltarín sube hasta aquí (muy por encima de los techos, 3,35)…
+    subidaPogo: 3,         // …y nunca sube menos que esto, aunque se lance desde un techo
+    gravedadPogo: 0.4,     // …y cae con el 40 % de la gravedad: ~2,5 s en el aire desde el suelo, como el de Subway Surfers
     altoDePie: 1.7,        // lo que ocupa el corredor de pie…
     altoRodando: 0.8,      // …y rodando (pasa bajo la barrera alta, que empieza a 1,0)
     medioAncho: 0.35,      // medio ancho del corredor para los choques
@@ -448,6 +464,21 @@
     clasico: { nombre: "Clásico", precio: 0, sudadera: 0xff5a3c, gorra: 0x2a6df4, jeans: 0x3b5ba8, mochila: 0x1fb5a0, mochila2: 0xffd23f, suela: 0xe8463b },
     nocturno: { nombre: "Nocturno", precio: 15000, sudadera: 0x2b2d42, gorra: 0x8d99ae, jeans: 0x1d1e2c, mochila: 0xef233c, mochila2: 0xedf2f4, suela: 0xef233c },
     grafitero: { nombre: "Grafitero", precio: 30000, sudadera: 0x7b2ff7, gorra: 0x00f5d4, jeans: 0x22223b, mochila: 0xfee440, mochila2: 0xf15bb5, suela: 0x00f5d4 },
+    /* --- Las corredoras (ronda 2) ---
+       Cuatro personajes nuevos con silueta propia: `rasgos` (peinado,
+       tocado, falda, lentes, aros; mundo.js, «Los rasgos») cambia el
+       muñeco, no solo los colores. Sin gorra: `gorra` es el color del
+       tocado y de los elásticos. `jeans` pinta las piernas (calzas o
+       medias). Precios entre los de siempre y un poco más arriba, para
+       que haya algo nuevo que juntar en cada tramo. */
+    paloma: { nombre: "Paloma", precio: 20000, sudadera: 0x16c2b0, gorra: 0xff4f9a, jeans: 0x1d1e2c, mochila: 0xff4f9a, mochila2: 0xfff3b0, suela: 0xff4f9a,
+      rasgos: { pelo: 0x4a2a18, peinado: "coleta", tocado: "cintillo" } },                       // cola de caballo alta, cintillo y calzas: la deportista
+    trini: { nombre: "Trini", precio: 25000, sudadera: 0xe8463b, gorra: 0x2b2d42, jeans: 0x2b2d42, mochila: 0xffd23f, mochila2: 0x2b2d42, suela: 0x2b2d42,
+      rasgos: { pelo: 0xc8742c, peinado: "trenzas", tocado: "boina", falda: 0xe8463b } },     // dos trenzas, boina y vestido rojo
+    luz: { nombre: "Luz", precio: 35000, sudadera: 0xf5f1e6, gorra: 0x7b5cd6, jeans: 0x3a3f55, mochila: 0x7b5cd6, mochila2: 0xf5f1e6, suela: 0x7b5cd6,
+      rasgos: { pelo: 0x1d1a22, peinado: "larga", lentes: true, falda: 0x5b3fa8 } },          // melena larga, lentes redondos y falda morada
+    maite: { nombre: "Maite", precio: 45000, sudadera: 0xffb703, gorra: 0x3a86ff, jeans: 0x3a86ff, mochila: 0x3a86ff, mochila2: 0xffb703, suela: 0xffffff,
+      rasgos: { pelo: 0x2a1610, peinado: "monos", aros: true, falda: 0x3a86ff } },            // dos moños, aros dorados y falda azul
     dorado: { nombre: "Dorado", precio: null, secreto: "Teclea el código de siempre en la portada (↑ ↑ ↓ ↓ ← → ← → B A).", sudadera: 0xd4a017, gorra: 0xffe066, jeans: 0x8a6d1a, mochila: 0xffd23f, mochila2: 0xfff3b0, suela: 0xffe066 },
     inspector: { nombre: "Inspector", precio: null, secreto: "Encuentra los siete boletos dorados.", sudadera: 0x1f3a5f, gorra: 0x1f3a5f, jeans: 0x14213d, mochila: 0x8a5a35, mochila2: 0xfca311, suela: 0x111111 }
   };
@@ -946,6 +977,56 @@
     };
   }
 
+  /* ---------- El vuelo del pogo saltarín (ronda 2) ----------
+     El pogo de Subway Surfers es UN lanzamiento enorme (invencible al subir y sobre los techos), que cae
+     despacio, con un arco de monedas en los tres carriles mientras vuela.
+     Aquí está la cuenta, pura, para que el juego y los tests usen la misma:
+       · sube hasta alturaPogo (8,3 m) desde donde esté, pero nunca menos de
+         subidaPogo (3 m): desde un techo (3,35) también es un gran salto;
+       · cae con gravedadPogo × gravedad (10,4 m/s²): desde el suelo pasa
+         ~2,5 s en el aire.
+     Las monedas del arco NO salen del generador de la pista: no gastan su
+     azar (la pista depende solo de la semilla y de los pedidos que anota la
+     prueba), y las monedas no dan puntos, así que la prueba del antitrampas
+     no necesita saber de ellas. Por eso tampoco tienen nada al azar: dónde
+     van se calcula solo con la trayectoria. */
+  /** La trayectoria del pogo lanzado desde la altura y0: {v0, gp, cima,
+      alto(t), duracion}. `alto(t)` es la altura a los t segundos y
+      `duracion`, cuánto tarda en volver al suelo (y = 0). Ejemplo: desde el
+      suelo, v0 ≈ 13,1 m/s, cima 8,3 m y duracion ≈ 2,53 s. */
+  function vueloPogo(y0) {
+    const y = Math.max(0, y0 || 0);                                        // desde dónde se lanza (el suelo o un techo)
+    const sube = Math.max(FISICA.subidaPogo, FISICA.alturaPogo - y);        // cuánto sube: hasta 8,3 m, y al menos 3 m
+    const gp = FISICA.gravedad * FISICA.gravedadPogo;                       // la gravedad del pogo (flota)
+    const v0 = Math.sqrt(2 * gp * sube);                                    // la velocidad para llegar justo a la cima: v = √(2·g·h)
+    const alto = t => y + v0 * t - gp * t * t / 2;                          // la parábola de siempre
+    const duracion = (v0 + Math.sqrt(v0 * v0 + 2 * gp * y)) / gp;           // cuándo alto(t) = 0 (de vuelta en el suelo)
+    return { v0, gp, cima: y + sube, alto, duracion };
+  }
+  /* Las monedas van solo en el tramo del vuelo que pasa por encima de los
+     techos (PISO_MONEDA_POGO): así ninguna queda metida dentro de un vagón,
+     y si el corredor aterriza sobre un techo no deja monedas debajo. */
+  const PISO_MONEDA_POGO = ALTO_TECHO + 0.25;                              // 3,6 m: el arco empieza y termina sobre los techos
+  const N_MONEDAS_POGO = 15;                                               // quince por carril, como en Subway Surfers (45 en total)
+  /** El arco de monedas del pogo lanzado en el metro D, a V m/s, desde la
+      altura y0: 15 por carril en los tres carriles, cada una donde va a
+      pasar el corredor (a la altura de su pecho) en ese momento del vuelo.
+      Devuelve objetos {tipo:"moneda", carril, d, y, pogo:true} sin id (el
+      juego les pone uno). Ejemplo: desde el suelo a 20 m/s, de ~6 a ~44 m
+      por delante. */
+  function monedasPogo(D, V, y0) {
+    const v = vueloPogo(y0), sale = [];
+    const disc = v.v0 * v.v0 - 2 * v.gp * (PISO_MONEDA_POGO - Math.max(0, y0 || 0));   // ¿llega a pasar sobre los techos? (siempre: la cima es ≥ 3,35 + 3)
+    if (disc <= 0) return sale;
+    const t0 = Math.max(0, (v.v0 - Math.sqrt(disc)) / v.gp);                // cuándo sube por encima de los techos (0 si ya estaba)
+    const t1 = (v.v0 + Math.sqrt(disc)) / v.gp;                             // cuándo vuelve a bajar a esa altura
+    for (let i = 0; i < N_MONEDAS_POGO; i++) {
+      const t = t0 + (t1 - t0) * (i + 0.5) / N_MONEDAS_POGO;                // repartidas parejo en ese tramo
+      for (let carril = 0; carril < 3; carril++) sale.push({ tipo: "moneda", carril, d: D + V * t, y: v.alto(t) + 1.0, pogo: true });
+    }
+    return sale;
+  }
+
   /* ---------- Lo que se exporta ---------- */
   return {
     rng, lerp, limita,
@@ -961,6 +1042,7 @@
     ASPECTOS, cajaMisteriosa, cajaSuper, PRECIO_SUPERCAJA,
     RETOS, retosDeNivel, avanzaRetos,
     progresoNuevo, limpiaProgreso, mezclaProgreso,
-    crearGenerador
+    crearGenerador,
+    vueloPogo, monedasPogo, PISO_MONEDA_POGO, N_MONEDAS_POGO
   };
 });

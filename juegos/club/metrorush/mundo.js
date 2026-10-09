@@ -57,12 +57,22 @@ const TECHO = MOTOR.ALTO_TECHO;                    // altura del techo de un tre
 /* La catenaria va alta, por encima de lo que pasa en los techos: de pie
    sobre un vagón la cabeza llega a 5,05 m y un salto desde ahí a 6,55, y la
    cámara de los techos va a 7,2 (7,9 con el celular en vertical). Con los
-   cables a 5,4 el corredor los atravesaba en cuanto subía a un vagón. Por
-   arriba, la mochila cohete vuela a 8,5: el brazo del poste queda justo
-   debajo de sus pies. */
-const ALTO_CABLE = 7.8;                            // los cables de la catenaria
-const ALTO_BRAZO = 8.3;                            // el brazo del poste que los sostiene
-const ALTO_POSTE = 8.6;                            // el poste entero
+   cables a 5,4 el corredor los atravesaba en cuanto subía a un vagón. (Las
+   alturas de hoy, con el salto nuevo, en el bloque de abajo.) */
+/* --- La catenaria, más alta para el salto nuevo (ronda 2) ---
+   Lo más alto del corredor es la coronilla: 1,8 m sobre sus pies (la cabeza
+   tiene el centro a 1,68 y 0,21 de radio, y el muñeco va a escala 0,95), y
+   los pies van 0,14 sobre el piso (la vía). Con el salto de Subway Surfers
+   (2,1 m; 4,4 con zapatillas) saltar desde un techo con zapatillas la lleva
+   a 3,35 + 4,4 + 0,14 + 1,8 ≈ 9,7 m; la mochila vuela a 8,5 (cabeza a
+   10,4) y el pogo sube a 8,3 con el corredor 0,55 más arriba (cabeza a
+   10,8). Con los cables a 7,8 todos los atravesaban; ahora van a 11,2, el
+   brazo justo encima y el poste un poco más arriba. Los tests
+   (metrorush-salto) leen estos números de aquí y lo comprueban. */
+const ALTO_CABLE = 11.2;                           // los cables de la catenaria (eran 7,8)
+const ALTO_BRAZO = 11.7;                           // el brazo del poste que los sostiene (era 8,3)
+const ALTO_POSTE = 12.0;                           // el poste entero (era 8,6)
+const ATERRIZA_PERRO = 0.45;                       // a los cuántos segundos de la atrapada cae el perro encima (lo mismo usa juego.js)
 const VISTA = 195;                                 // hasta cuántos metros por delante se dibujan las cosas
 const DETRAS = 16;                                 // cuántos metros por detrás siguen existiendo
 const SUELO = 0.14;                                // la vía (el balasto) está 14 cm sobre el piso: ahí pisa el corredor
@@ -1363,10 +1373,112 @@ function sprite(col, escala, pos, opacidad = 1) {
    5. EL CORREDOR, EL INSPECTOR Y SU PERRO
    =================================================================== */
 
+/* --- Los rasgos de las corredoras (ronda 2) ---
+   Los aspectos de siempre son el mismo muñeco con otra ropa. Las corredoras
+   nuevas (Paloma, Trini, Luz y Maite, en `MOTOR.ASPECTOS`) traen además
+   `rasgos`, que cambian la silueta, que es lo que se reconoce de espaldas
+   corriendo, que es como se las ve casi siempre:
+   - pelo: el color (las cejas lo siguen);
+   - peinado: 'coleta' (cola de caballo alta), 'trenzas' (dos, a los lados),
+     'larga' (melena hasta la mitad de la espalda) o 'monos' (dos moños);
+   - tocado: 'cintillo' o 'boina', en el color `gorra` del aspecto (sin
+     tocado, `gorra` no se usa: no llevan gorra, llevan el pelo);
+   - falda: un color, o nada: una falda acampanada colgada de la cadera
+     (con el color de la sudadera es un vestido);
+   - lentes y aros: redondos y dorados.
+   Todo es de piezas fundidas como el resto del corredor (una llamada al GPU
+   por material). El pelo que cuelga (coleta, trenzas, melena) y la falda
+   cuelgan de articulaciones propias que `mueveRasgos` mece al correr, se
+   levantan al caer de un salto y se quedan quietas en el aire del pogo. */
+/** Agrega los rasgos de `asp.rasgos` a un corredor a medio armar. Devuelve sus articulaciones. */
+function armaRasgos(asp, pelo, piel, cab, pelvis, parte, art) {
+  const R = asp.rasgos, pelo2 = new THREE.Color(pelo).multiplyScalar(0.78).getHex();   // un tono más oscuro, para las mechas
+  const cuelgan = [];                                                         // las articulaciones que se mecen
+  // el pelo de arriba (donde iba la gorra) y el flequillo
+  parte(cab, a => {
+    a.pon(new THREE.SphereGeometry(0.214, 22, 12, 0, Math.PI * 2, 0, Math.PI * 0.36), 'personaje', pelo, [0, 0.022, 0]);   // la coronilla (deja libres cejas y ojos)
+    a.pon(ESFERA, 'personaje', pelo, [-0.05, 0.13, -0.15], [0, 0, 0.35], [0.26, 0.08, 0.1]);   // el flequillo, de lado
+    for (const s of [-1, 1]) {
+      a.pon(CAJA, 'personaje', 0x1d1a2a, [s * 0.105, 0.05, -0.172], [0, 0, s * 0.6], [0.035, 0.012, 0.012]);   // las pestañas, en la esquina de afuera de cada ojo
+    }
+    if (R.tocado === 'cintillo') a.pon(new THREE.TorusGeometry(0.218, 0.022, 6, 22, Math.PI), 'personaje', asp.gorra, [0, 0.04, 0.02], [-0.35, 0, 0]);   // de oreja a oreja por arriba
+    if (R.tocado === 'boina') {
+      a.pon(ESFERA, 'personaje', asp.gorra, [0.02, 0.19, 0.03], [0, 0, 0.22], [0.5, 0.13, 0.48]);   // la boina, chata y caída hacia un lado
+      a.pon(ESFERA, 'personaje', asp.gorra, [0.03, 0.26, 0.03], null, 0.04);                        // el piquito de arriba
+    }
+    if (R.lentes) {
+      for (const s of [-1, 1]) a.pon(new THREE.TorusGeometry(0.052, 0.009, 6, 16), 'personaje', 0x2b2d42, [s * 0.068, 0.02, -0.2]);   // los dos marcos redondos
+      a.pon(CAJA, 'personaje', 0x2b2d42, [0, 0.026, -0.205], null, [0.04, 0.01, 0.01]);             // el puente
+    }
+    if (R.aros) for (const s of [-1, 1]) a.pon(new THREE.TorusGeometry(0.04, 0.008, 6, 14), 'personaje', 0xffc63a, [s * 0.205, -0.1, 0.01], [0, Math.PI / 2, 0]);   // aros dorados
+    if (R.peinado === 'monos') for (const s of [-1, 1]) {
+      a.pon(ESFERA, 'personaje', pelo, [s * 0.14, 0.17, 0.05], null, 0.19);                         // los dos moños
+      a.pon(new THREE.TorusGeometry(0.06, 0.016, 6, 14), 'personaje', asp.gorra, [s * 0.12, 0.12, 0.04], [0.9, 0, -s * 0.6]);   // el elástico de cada uno
+    }
+  });
+  // lo que cuelga y se mece
+  if (R.peinado === 'coleta') {
+    const coleta = art(cab, [0, 0.17, 0.16]);                                 // nace arriba y atrás de la cabeza
+    parte(coleta, a => {
+      a.pon(new THREE.TorusGeometry(0.045, 0.018, 6, 14), 'personaje', asp.gorra, [0, 0, 0.01], [0.5, 0, 0]);   // el elástico
+      a.pon(new THREE.CapsuleGeometry(0.06, 0.24, 4, 10), 'personaje', pelo, [0, -0.17, 0.04]);    // la cola…
+      a.pon(ESFERA, 'personaje', pelo2, [0, -0.33, 0.05], null, [0.09, 0.12, 0.09]);               // …y su punta
+    });
+    cuelgan.push({ g: coleta, x0: 0.75, amp: 1 });                            // cae hacia atrás, y se mece mucho
+  }
+  if (R.peinado === 'trenzas') for (const s of [-1, 1]) {
+    const trenza = art(cab, [s * 0.16, -0.04, 0.09]);                          // detrás de cada oreja
+    parte(trenza, a => {
+      for (let i = 0; i < 4; i++) a.pon(ESFERA, 'personaje', i % 2 ? pelo2 : pelo, [0, -0.05 - i * 0.075, 0], null, [0.085, 0.1, 0.085]);   // los nudos de la trenza
+      a.pon(ESFERA, 'personaje', asp.gorra, [0, -0.35, 0], null, 0.05);                              // el lazo de la punta
+    });
+    cuelgan.push({ g: trenza, x0: 0.25, amp: 0.6, lado: s });
+  }
+  if (R.peinado === 'larga') {
+    const melena = art(cab, [0, 0.02, 0.1]);                                  // cuelga de la nuca
+    parte(melena, a => {
+      a.pon(redonda(0.44, 0.46, 0.12, 0.05), 'personaje', pelo, [0, -0.2, 0.04]);   // la melena, hasta la mitad de la espalda
+      a.pon(redonda(0.36, 0.08, 0.1, 0.04), 'personaje', pelo2, [0, -0.43, 0.05]);   // las puntas, más oscuras
+    });
+    cuelgan.push({ g: melena, x0: 0.12, amp: 0.35 });                         // pesada: se mece poco
+  }
+  let falda = null;
+  if (R.falda != null) {
+    falda = art(pelvis, [0, 0.06, 0]);                                         // cuelga de la cintura
+    parte(falda, a => {
+      a.pon(new THREE.CylinderGeometry(0.18, 0.31, 0.34, 18), 'personaje', R.falda, [0, -0.15, 0]);   // acampanada
+      a.pon(new THREE.CylinderGeometry(0.315, 0.315, 0.035, 18), 'personaje', new THREE.Color(R.falda).multiplyScalar(0.75).getHex(), [0, -0.31, 0]);   // el ruedo, más oscuro
+    });
+  }
+  return { cuelgan, falda };
+}
+/** Mece el pelo y la falda según la pose `p` (la llama `posa` al final). */
+function mueveRasgos(r, p) {
+  const { cuelgan, falda } = r.rasgos;
+  const f = p.fase || 0, t = p.t || 0, vy = p.vy || 0;
+  // cuánto se levanta el pelo: cayendo (vy < 0) flota hacia arriba, subiendo se pega
+  const flota = p.modo === 'saltar' || p.modo === 'patinar' ? THREE.MathUtils.clamp(-vy / 10, -0.4, 1) : 0;
+  for (const c of cuelgan) {
+    let x = c.x0, z = 0;                                                       // x: hacia atrás; z: de lado
+    if (p.modo === 'correr') { x += 0.22 * c.amp * Math.sin(f * 2); z = 0.25 * c.amp * Math.sin(f); }   // rebota dos veces por zancada y se va de lado a lado
+    else if (p.modo === 'menu' || p.modo === 'quieto') z = 0.08 * c.amp * Math.sin(t * 1.6 + f);       // apenas se mece
+    else if (p.modo === 'volar') x += 0.9 * c.amp;                            // con la mochila el viento lo tira para atrás
+    else if (p.modo === 'rodar') x += 0.6 * c.amp;                            // hecha bolita, el pelo pegado
+    x += 1.1 * c.amp * flota;                                                  // al caer, el pelo sube
+    if (c.lado) z += c.lado * 0.12;                                            // las trenzas, un poco abiertas
+    c.g.rotation.set(-x, 0, z);                                                // negativo: atrás es +z (la cara mira a −z)
+  }
+  if (falda) {
+    // la falda se abre con las piernas al correr, y flota un poco al caer
+    falda.rotation.set(p.modo === 'correr' ? 0.08 * Math.sin(f * 2) : 0, 0, p.modo === 'correr' ? 0.06 * Math.sin(f) : 0);
+    falda.scale.set(1 + 0.12 * Math.max(0, flota), 1, 1 + 0.12 * Math.max(0, flota));   // al caer se infla
+  }
+}
+
 /** Arma el corredor articulado con los colores de su aspecto.
     Devuelve las articulaciones para poder posarlo en cada cuadro. */
 function armaCorredor(kit, asp) {
-  const piel = 0xf1c19c, pelo = 0x3b2a20;
+  const piel = 0xf1c19c, pelo = (asp.rasgos && asp.rasgos.pelo) || 0x3b2a20;   // las corredoras traen su color de pelo (ver «Los rasgos»)
   const raiz = new THREE.Group(), cuerpo = new THREE.Group(); raiz.add(cuerpo);
   const parte = (padre, construir, pos = [0, 0, 0]) => {                   // una pieza rígida (fundida) colgada de una articulación
     const a = new Arma(kit); construir(a); const m = a.hecho(); m.position.set(pos[0], pos[1], pos[2]); padre.add(m); return m;
@@ -1430,10 +1542,13 @@ function armaCorredor(kit, asp) {
     }
     a.pon(ESFERA, 'personaje', new THREE.Color(piel).multiplyScalar(0.88).getHex(), [0, -0.03, -0.196], null, [0.04, 0.034, 0.03]);   // la nariz
     a.pon(new THREE.TorusGeometry(0.046, 0.011, 6, 14, Math.PI), 'personaje', 0x8a2a1e, [0, -0.072, -0.176], [0.25, 0, Math.PI]);    // la sonrisa
-    a.pon(new THREE.SphereGeometry(0.218, 22, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), 'personaje', asp.gorra, [0, 0.03, 0]);
-    a.pon(new THREE.CylinderGeometry(0.17, 0.17, 0.025, 20, 1, false, -Math.PI / 2, Math.PI), 'personaje', asp.gorra, [0, 0.04, 0.13], [-0.14, 0, 0]);
-    a.pon(ESFERA, 'personaje', asp.gorra, [0, 0.25, 0], null, 0.05);
+    if (!asp.rasgos) {                                                         // la gorra (las corredoras van sin gorra: ver «Los rasgos»)
+      a.pon(new THREE.SphereGeometry(0.218, 22, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), 'personaje', asp.gorra, [0, 0.03, 0]);
+      a.pon(new THREE.CylinderGeometry(0.17, 0.17, 0.025, 20, 1, false, -Math.PI / 2, Math.PI), 'personaje', asp.gorra, [0, 0.04, 0.13], [-0.14, 0, 0]);
+      a.pon(ESFERA, 'personaje', asp.gorra, [0, 0.25, 0], null, 0.05);
+    }
   });
+  const rasgos = asp.rasgos ? armaRasgos(asp, pelo, piel, cab, pelvis, parte, art) : null;   // peinado, falda, lentes… (ver «Los rasgos»)
   const brazos = [-1, 1].map(s => {
     const hombro = art(torso, [s * 0.27, 0.5, 0]);
     parte(hombro, a => a.pon(new THREE.CapsuleGeometry(0.068, 0.2, 4, 10), 'personaje', asp.sudadera, [0, -0.15, 0]));
@@ -1466,7 +1581,7 @@ function armaCorredor(kit, asp) {
   sombra.material.userData.propio = true;                                      // es solo de este corredor: se suelta con él
   sombra.rotation.x = -Math.PI / 2; sombra.position.y = 0.01;
   raiz.scale.setScalar(0.95);
-  return { raiz, cuerpo, pelvis, torso, cab, piernas, brazos, cohete, llamas, tabla, pogo, resorte, aura, sombra };
+  return { raiz, cuerpo, pelvis, torso, cab, piernas, brazos, cohete, llamas, tabla, pogo, resorte, aura, sombra, rasgos };
 }
 
 /** Pone la pose del corredor según lo que está haciendo.
@@ -1581,6 +1696,32 @@ function posa(r, p) {
     bi.hombro.rotation.z = 0.12; bd.hombro.rotation.z = -0.12;
     r.pogo.rotation.z = (p.ladeo || 0) * 1.4;
     r.resorte.scale.y = 1 - 0.45 * k;
+    /* --- El pogo de la ronda 2: impulso, vuelta en la cima y caída ---
+       Como en Subway Surfers, el salto del pogo es un espectáculo:
+       - al despegar (los primeros 0,22 s, `t` = segundos en el pogo) el
+         resorte se aplasta y se suelta, y él se agacha y se estira con él;
+       - subiendo, el resorte va estirado (ya se soltó);
+       - en la cima, mientras la velocidad vertical cruza de +4 a −4 m/s, da
+         una vuelta entera sobre sí mismo con el pogo (sale de `vy`, no del
+         reloj: el pogo lanzado desde un techo sube menos y la vuelta igual
+         cae en la cima), y encoge las piernas como en un truco;
+       - bajando, se prepara para el golpe: rodillas dobladas, resorte suelto. */
+    const t = p.t || 0;                                                        // segundos desde que saltó con el pogo
+    const IMPULSO = 0.22;                                                      // lo que dura el impulso
+    if (t < IMPULSO) {
+      const u = t / IMPULSO;                                                   // 0 → 1 durante el impulso
+      const aplasta = Math.sin(u * Math.PI);                                   // se aplasta y vuelve: sube y baja una vez
+      r.resorte.scale.y = 1 - 0.55 * aplasta + 0.25 * u;                       // la goma contra el suelo, y después se estira
+      r.pelvis.position.y = 0.72 - 0.12 * aplasta;                             // él se agacha con el resorte…
+      for (const pp of [pi, pd]) { pp.cadera.rotation.x = 0.35 + 0.5 * aplasta; pp.rodilla.rotation.x = -0.6 - 0.8 * aplasta; }   // …doblando las rodillas
+    } else if (vy > 0) r.resorte.scale.y = 1 + 0.25 * k;                      // subiendo: el resorte suelto y estirado
+    const vuelta = THREE.MathUtils.smoothstep((4 - vy) / 8, 0, 1);             // 0 antes de la cima, 1 después (sin saltos)
+    if (t >= IMPULSO && vuelta > 0 && vuelta < 1) {
+      const truco = Math.sin(vuelta * Math.PI);                                // más encogido a mitad de la vuelta
+      for (const pp of [pi, pd]) { pp.cadera.rotation.x = 0.35 + 0.9 * truco; pp.rodilla.rotation.x = -0.6 - 1.3 * truco; }   // las rodillas al pecho
+    }
+    r.cuerpo.rotation.y = vuelta * Math.PI * 2;                                // la vuelta entera (2π = de espaldas otra vez)
+    r.pogo.rotation.y = vuelta * Math.PI * 2;                                  // el pogo gira con él: lo lleva de las manos
   } else if (p.modo === 'tropezar') {
     const k = Math.sin(Math.min(1, (p.t || 0) / 0.4) * Math.PI);
     r.cuerpo.rotation.x = -0.14 - 0.5 * k; r.cuerpo.rotation.z = (p.ladeo || 0) + 0.3 * k;
@@ -1613,6 +1754,7 @@ function posa(r, p) {
     bi.hombro.rotation.x = -2.2 * k; bd.hombro.rotation.x = -2.2 * k; bi.hombro.rotation.z = -1 * k; bd.hombro.rotation.z = 1 * k;
     pi.cadera.rotation.x = -0.9 * k; pd.cadera.rotation.x = -0.4 * k; pi.rodilla.rotation.x = -0.3; pd.rodilla.rotation.x = -0.6;
   }
+  if (r.rasgos) mueveRasgos(r, p);                                            // el pelo y la falda siguen al cuerpo (ver «Los rasgos»)
 }
 
 /** El inspector Don Ramón (uniforme y gorra con visera) y su perro Tornillo. */
@@ -1640,7 +1782,17 @@ function armaPerseguidor(kit) {
   }
   const cola = new THREE.Group(); cola.position.set(0, 0.6, 0.36);
   const ac = new Arma(kit); ac.pon(CAJA, 'personaje', cafe, [0, 0.12, 0.05], [0.6, 0, 0], [0.05, 0.28, 0.05]); cola.add(ac.hecho()); perro.add(cola);
-  return { r, perro, patas, cola };
+  /* --- La placa del inspector (ronda 2) ---
+     Una placa dorada de seis puntas en la mano derecha, que solo se ve
+     cuando grita «¡Alto!» o cuando te atrapa (`paso` la prende y levanta
+     el brazo). Es un prisma de seis lados (se ve igual de los dos lados) con
+     una estrella de luz al centro, colgada del codo a la altura de la mano. */
+  const placa = new THREE.Group(); placa.position.set(0, -0.36, -0.05); placa.visible = false;   // en la mano (la mano está a −0,31 del codo)
+  const ap = new Arma(kit);
+  ap.pon(new THREE.CylinderGeometry(0.11, 0.11, 0.03, 6), 'pintura!', 0xffc63a, [0, 0, 0], [Math.PI / 2, 0, 0]);   // el escudo: seis lados, de canto hacia los costados
+  ap.pon(new THREE.CylinderGeometry(0.05, 0.05, 0.045, 5), 'luz!', 0xfff3b0, [0, 0, 0], [Math.PI / 2, 0, 0]);      // el centro que brilla
+  placa.add(ap.hecho()); r.brazos[1].codo.add(placa);
+  return { r, perro, patas, cola, placa };
 }
 
 /** El túnel entre estaciones: un tubo oscuro con tiras de luz y un letrero en la entrada. */
@@ -1658,6 +1810,13 @@ function armaTunel() {
   for (const zz of [0, -largo]) {                                              // los dos portales
     const p = new THREE.Mesh(CAJA, borde); p.scale.set(9.4, 1.6, 1); p.position.set(0, 7.4, zz); g.add(p);
     for (const s of [-1, 1]) { const q = new THREE.Mesh(CAJA, borde); q.scale.set(0.9, 7.4, 1); q.position.set(s * 4.35, 3.7, zz); g.add(q); }
+    /* --- El frontón del portal (ronda 2) ---
+       Los cables de la catenaria subieron a 11,2 m (ver ALTO_CABLE): antes
+       entraban en el portal y desaparecían, ahora pasarían por encima del
+       túnel. Un frontón de hormigón sobre cada portal, hasta 12,4 m, los
+       recibe como antes y tapa lo que sigue detrás. */
+    const f = new THREE.Mesh(CAJA, hormigon); f.scale.set(9.4, 4.2, 1.6); f.position.set(0, 10.3, zz - 0.3); g.add(f);   // de 8,2 a 12,4 m, un poco más grueso que el portal
+    const corn = new THREE.Mesh(CAJA, borde); corn.scale.set(9.8, 0.35, 1.9); corn.position.set(0, 12.55, zz - 0.3); g.add(corn);   // la cornisa de arriba
   }
   const cartelMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
   const cartel = new THREE.Mesh(new THREE.PlaneGeometry(6.4, 1.2), cartelMat); cartel.position.set(0, 7.45, 0.52); g.add(cartel);
@@ -1702,6 +1861,122 @@ export function crearMundo(canvas) {
   let ancho = 1280, alto = 720;
   let corredor = null, perse = null, aspecto = MOTOR.ASPECTOS.clasico;
   let sacudida = 0;
+
+  /* --- La persecución con más impacto (ronda 2) ---
+     Dibuja al inspector Don Ramón y a su perro Tornillo detrás del corredor
+     con lo que manda juego.js en `e.persecucion` ({amenaza, grito, ladra,
+     atrapa}; ver «La persecución» allá). Es solo imagen:
+     - después del primer tropiezo (amenaza) vienen más cerca, el inspector
+       corre inclinado y más rápido, y el perro se adelanta;
+     - con el grito, el inspector levanta la placa dorada y aparece un globo
+       «¡ALTO!» sobre su cabeza (crece de golpe y se desvanece);
+     - el perro, cuando ladra, levanta el hocico y da un saltito;
+     - al atraparte: el perro salta en arco y cae encima del corredor tendido
+       (mirando a la cámara, moviendo la cola), y el inspector se pone a su
+       lado, inclinado, con la placa en alto y el globo «¡TE PILLÉ!».
+     Los globos son planos con una textura de lienzo (con normales: el SAO
+     de la calidad alta redibuja todo lo que es malla), sin niebla y por
+     encima de todo; se arman la primera vez que hacen falta y no se sueltan
+     con los kits (son del mundo, no de una estación). */
+  const persigue = { am: 0, fase: 0, y: 0, perro0: null, inspector0: null, globos: {} };   // lo que dura de un cuadro al otro (y: el piso por el que corren)
+  /** Un globo de historieta con `texto`, armado una vez (plano de 1,9 × 0,95 m). */
+  function globo(texto) {
+    if (persigue.globos[texto]) return persigue.globos[texto];
+    const lz = document.createElement('canvas'); lz.width = 512; lz.height = 256;   // la textura
+    const g = lz.getContext('2d');
+    g.fillStyle = '#ffffff'; g.strokeStyle = '#141420'; g.lineWidth = 12;      // el globo blanco con borde de tinta
+    g.beginPath(); g.ellipse(256, 112, 236, 96, 0, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.beginPath(); g.moveTo(200, 196); g.lineTo(150, 250); g.lineTo(262, 202); g.closePath(); g.fill(); g.stroke();   // la colita hacia abajo
+    g.beginPath(); g.ellipse(256, 112, 230, 90, 0, 0, Math.PI * 2); g.fill();    // tapa la raya donde la colita se une al globo
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = `900 ${texto.length > 7 ? 92 : 118}px "Lilita One", Impact, "Arial Black", sans-serif`;   // los largos, más chicos
+    g.lineWidth = 10; g.strokeStyle = '#141420'; g.strokeText(texto, 256, 118);   // el contorno de las letras…
+    g.fillStyle = '#e8263b'; g.fillText(texto, 256, 118);                     // …y las letras rojas
+    const tex = new THREE.CanvasTexture(lz); tex.colorSpace = THREE.SRGBColorSpace;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(1.9, 0.95),
+      new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false, fog: false, toneMapped: false }));
+    m.renderOrder = 999; m.frustumCulled = false; m.visible = false;         // siempre encima, y no se esconde por estar al borde
+    escena.add(m);
+    return (persigue.globos[texto] = m);
+  }
+  /** Muestra (o esconde) un globo sobre la cabeza del inspector: crece de golpe y se desvanece al final. */
+  function ponGlobo(texto, ver, x, y, z, edad, resta) {
+    const m = ver || persigue.globos[texto] ? globo(texto) : null;            // no lo arma si nunca se mostró
+    if (!m) return;
+    m.visible = !!ver;
+    if (!ver) return;
+    const crece = Math.min(1, edad / 0.14), rebote = 1 + 0.25 * Math.sin(crece * Math.PI);   // de 0 al tamaño, pasándose un poco
+    m.scale.setScalar(Math.max(0.01, crece * rebote));
+    m.material.opacity = resta == null ? 1 : Math.min(1, resta / 0.25);       // se desvanece el último cuarto de segundo
+    m.position.set(x, y + 0.05 * Math.sin(edad * 9), z);                      // flota apenas
+    m.quaternion.copy(camara.quaternion);                                     // de frente a la cámara
+  }
+  /** Un cuadro de la persecución (ver el comentario de arriba). */
+  function pasoPersecucion(e, dt) {
+    const PE = e.persecucion || {}, k = e.perseguidor || 0;
+    const atrapa = PE.atrapa != null && PE.atrapa >= 0 ? PE.atrapa : -1;      // segundos desde la atrapada (−1: no)
+    const vis = k > 0.01 || atrapa >= 0;
+    perse.r.raiz.visible = perse.perro.visible = vis;
+    const insp = perse.r, perro = perse.perro, [, bd] = insp.brazos;          // bd: el brazo de la placa
+    if (!vis) { persigue.perro0 = persigue.inspector0 = null; ponGlobo('¡ALTO!', false); ponGlobo('¡TE PILLÉ!', false); return; }
+    persigue.am += ((PE.amenaza ? 1 : 0) - persigue.am) * (1 - Math.exp(-3 * dt));   // se acercan (y se van) en ~0,3 s
+    /* Corren por el mismo piso que el corredor: si él va por los techos, ellos
+       también (como el guardia de Subway Surfers, que se sube a los trenes).
+       Abajo, en la vía, un tren entre ellos y la cámara los tapaba enteros,
+       con globo y todo. Suben y bajan suavizado, en ~0,2 s. */
+    persigue.y += ((e.suelo || 0) - persigue.y) * (1 - Math.exp(-6 * dt));
+    const am = persigue.am, piso = SUELO + persigue.y;
+    if (atrapa < 0) {
+      // la carrera: detrás, más cerca y más rápido con la amenaza
+      persigue.perro0 = persigue.inspector0 = null;
+      persigue.fase += dt * (11 + 4 * am);                                    // las zancadas (acumuladas: cambiar el ritmo no salta)
+      const z = 2.2 - 0.8 * am + (1 - k) * 9;                                 // a 2,2 m, o a 1,4 con la amenaza
+      insp.raiz.position.set(e.x * 0.85 + 0.6, piso, z);
+      insp.raiz.rotation.y = 0;
+      posa(insp, { modo: 'correr', fase: persigue.fase });
+      insp.cuerpo.rotation.x -= 0.22 * am;                                    // inclinado hacia adelante: va con todo
+      const grita = (PE.grito || 0) > 0;
+      if (grita) { bd.hombro.rotation.set(2.7, 0, 0.25); bd.codo.rotation.x = 0.15; }   // el brazo arriba, mostrando la placa
+      perse.placa.visible = grita;
+      ponGlobo('¡ALTO!', grita, insp.raiz.position.x, piso + 2.55, z, 1.6 - (PE.grito || 0), PE.grito);
+      ponGlobo('¡TE PILLÉ!', false);
+      // el perro: adelante del inspector (más con la amenaza), saltando al ladrar
+      const ladra = Math.max(0, PE.ladra || 0), hop = ladra > 0 ? Math.sin(Math.min(1, 1 - ladra / 0.35) * Math.PI) : 0;
+      perro.position.set(e.x * 0.85 - 0.7, piso + 0.18 * hop, z - 0.9 - 0.6 * am);
+      perro.rotation.set(0.35 * hop, 0, 0);                                    // el hocico arriba cuando ladra
+      perse.patas.forEach((p, i) => { p.rotation.x = Math.sin(persigue.fase * 1.6 + (i % 2 ? Math.PI : 0) + (i > 1 ? 1 : 0)) * 0.8; });
+      perse.cola.rotation.z = Math.sin(e.t * 20) * 0.6;
+      return;
+    }
+    // la atrapada: dónde estaban al empezar (de ahí parten el salto y la caminata)
+    if (!persigue.perro0) persigue.perro0 = perro.position.clone();
+    if (!persigue.inspector0) persigue.inspector0 = insp.raiz.position.clone();
+    const sueloR = (e.suelo || 0) + SUELO;                                    // donde está tendido el corredor (la vía o un techo)
+    // el perro: un salto en arco hasta el pecho del corredor (que cayó de espaldas hacia la cámara)
+    const u = THREE.MathUtils.clamp((atrapa - 0.08) / (ATERRIZA_PERRO - 0.08), 0, 1);   // 0 → 1 durante el salto
+    const destino = _v.set(e.x + 0.05, sueloR + 0.3, 0.95);                   // sobre el pecho
+    perro.position.lerpVectors(persigue.perro0, destino, u);
+    perro.position.y += 1.3 * Math.sin(u * Math.PI);                          // el arco
+    perro.rotation.set(0.5 * (1 - 2 * u) * Math.sin(u * Math.PI), Math.PI * THREE.MathUtils.smoothstep(u, 0, 1), 0);   // se da vuelta en el aire y cae mirando a la cámara
+    if (u >= 1) {                                                             // ya encima: ladra moviendo la cabeza y la cola
+      const ladra = Math.max(0, PE.ladra || 0);
+      perro.position.y += 0.04 * Math.abs(Math.sin(atrapa * 7));              // respira agitado
+      perro.rotation.x = 0.3 * Math.sin(Math.min(1, 1 - ladra / 0.6) * Math.PI) * (ladra > 0 ? 1 : 0);
+      perse.patas.forEach(p => { p.rotation.x = 0.35; });                     // las patas firmes sobre el pecho
+      perse.cola.rotation.z = Math.sin(e.t * 28) * 0.8;                       // la cola, feliz
+    } else perse.patas.forEach((p, i) => { p.rotation.x = (i < 2 ? -1 : 1) * 0.9 * Math.sin(u * Math.PI); });   // estirado en el salto
+    // el inspector: camina hasta el costado del corredor, se inclina y muestra la placa
+    const w = THREE.MathUtils.smoothstep(atrapa / 0.5, 0, 1);
+    insp.raiz.position.lerpVectors(persigue.inspector0, _v.set(e.x + 1.05, sueloR, 0.35), w);   // al costado de la cadera (más cerca de la cámara quedaba fuera de cuadro)
+    insp.raiz.rotation.y = (Math.PI / 2) * w;                                 // se gira hacia el corredor tendido
+    posa(insp, { modo: w < 1 ? 'correr' : 'quieto', fase: e.t * 9, t: atrapa });
+    insp.torso.rotation.x = -0.6 * w;                                         // se agacha de la cintura sobre él (las piernas quedan derechas)
+    insp.cab.rotation.x = 0.12 + 0.3 * w;                                     // y lo mira
+    bd.hombro.rotation.set(2.3, 0, 0.2); bd.codo.rotation.x = 0.3;            // la placa en alto
+    perse.placa.visible = true;
+    ponGlobo('¡ALTO!', false);
+    ponGlobo('¡TE PILLÉ!', atrapa > 0.25, insp.raiz.position.x, insp.raiz.position.y + 2.4, insp.raiz.position.z, atrapa - 0.25, null);
+  }
   const chispas = [];                                                         // brillitos al tomar monedas
   let monedasRojas = false;                                                   // ¿las monedas son un peligro? (modo «Sin monedas»)
   let particulas = null, trenFantasma = null, tiempoFantasma = 0;
@@ -2255,6 +2530,16 @@ export function crearMundo(canvas) {
       else { sens.pv -= 1.5; sens.cae = true; }                              // se apagó: el lente se cierra un poco y empieza la caída
       sens.volaba = vuela;
     }
+    /* --- El pogo también se siente (ronda 2) ---
+       Al saltar con el pogo el lente se abre de golpe (menos que con la
+       mochila) y al aterrizar la cámara cae un poco, como un golpe seco.
+       Solo mira el borde: el cuadro en que empieza y el que termina. */
+    const enPogo = corre && !!(e.poderes && e.poderes.pogo);                 // ¿va en el pogo este cuadro?
+    if (avanza && enPogo !== !!sens.pogoAntes) {                              // empezó o terminó en este cuadro
+      if (enPogo) sens.pv += mov.quieto ? 3 : 7;                              // el resorte se suelta: patada al lente
+      else { sens.cyv -= 3.5; if (mov.sacudir && !mov.quieto) sacudida = Math.max(sacudida, 0.22); }   // la goma toca el techo o la vía
+      sens.pogoAntes = enPogo;                                                // recuerda para el próximo cuadro
+    }
     if (sens.cae && corre && (e.y || 0) - (e.suelo || 0) < 0.05) {          // tocó el suelo (o un techo) después de volar: el golpe
       sens.cae = false; sens.pv -= 2.5; sens.cyv -= 4.5;
       if (mov.sacudir && !mov.quieto) sacudida = Math.max(sacudida, 0.3);
@@ -2291,23 +2576,29 @@ export function crearMundo(canvas) {
       r.sombra.scale.setScalar(Math.max(0.4, 1 - (e.y - (e.suelo || 0)) * 0.15));
     }
     // el inspector y el perro (vienen detrás cuando tropiezas)
-    if (perse) {
-      const k = e.perseguidor || 0, vis = k > 0.01;
-      perse.r.raiz.visible = perse.perro.visible = vis;
-      if (vis) {
-        const z = 2.2 + (1 - k) * 9;
-        perse.r.raiz.position.set(e.x * 0.85 + 0.6, SUELO, z);
-        posa(perse.r, { modo: 'correr', fase: e.t * 11 });
-        perse.perro.position.set(e.x * 0.85 - 0.7, SUELO, z - 0.9);
-        perse.patas.forEach((p, i) => { p.rotation.x = Math.sin(e.t * 18 + (i % 2 ? Math.PI : 0) + (i > 1 ? 1 : 0)) * 0.8; });
-        perse.cola.rotation.z = Math.sin(e.t * 20) * 0.6;
-      }
-    }
+    if (perse) pasoPersecucion(e, dt);
     // la cámara: detrás y arriba, sigue al corredor con suavidad
     // en el suelo la cámara casi no sube con el salto (se ve el salto); en
     // los techos sube un poco menos que él (se ve la vía de abajo); volando
     // con la mochila lo sigue metro a metro, o el corredor se sale por arriba
-    const yC = e.y > 4.8 ? 3.6 + (e.y - 4.8) : e.y > 1 ? e.y * 0.75 : e.y * 0.4;
+    /* --- La altura de la cámara, continua (ronda 2) ---
+       Antes eran tres tramos con un salto en y = 1: con el salto nuevo de
+       2,1 m la cámara pegaba un tirón a mitad de cada salto. Ahora es el
+       mayor de tres pisos, y todos crecen sin saltos:
+       - lo de siempre: 0,75 de la altura del piso que pisa (en un techo, 2,51
+         como antes) más 0,4 de lo que salta sobre él (casi no se mueve: se ve
+         el salto);
+       - nunca más de 2 m por debajo del corredor, para que un salto con
+         zapatillas o el pogo no se salgan por arriba de la pantalla; en el
+         pogo, que sube a 13 m/s, se adelanta además lo que va a subir en el
+         suavizado de la cámara (0,17 s), o la cámara llegaba tarde;
+       - con la mochila, 1,2 m por debajo, como antes (a 8,5 m da 7,3). */
+    const sueloC = e.suelo || 0, yR = e.y || 0;                                 // el piso que pisa y la altura del corredor
+    const vyPogo = e.pose && e.pose.modo === 'pogo' ? Math.max(0, e.pose.vy || 0) : 0;   // cuánto sube el pogo (m/s)
+    const yC = Math.max(
+      0.75 * sueloC + 0.4 * (yR - sueloC),                                    // pegada al piso, casi quieta en el salto
+      yR - 2.0 + vyPogo * 0.17,                                               // no lo deja salirse por arriba
+      e.poderes && e.poderes.mochila ? yR - 1.2 : -Infinity);                 // volando con la mochila, como antes
     const k = 1 - Math.exp(-6 * dt);
     if (e.menu) {
       /* La cámara del menú, delante del corredor y a la altura del pecho.

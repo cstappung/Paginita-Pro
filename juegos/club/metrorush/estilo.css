@@ -608,3 +608,24 @@ html.mr-pc .scorebar strong, html.club-inm .scorebar strong { font-size: 15px; }
 html.mr-pc .scorebar .icono, html.club-inm .scorebar .icono { width: 32px; height: 32px; background: #1a1f30; color: #fff; border-color: #ffffff40; }
 html.club-inm .scorebar .vj-ctl input, html.club-inm .scorebar .vj-ctl output { display: none; }
 html.mr-pc .pantalla, html.club-inm .pantalla { flex: 1; min-height: 0; width: 100%; aspect-ratio: auto; max-height: none; border-radius: 0; }
+
+/* --- La persecución: el borde rojo de peligro (ronda 2) ---
+   Mientras Don Ramón te pisa los talones (los 8 s después de un tropiezo)
+   los bordes de la pantalla laten en rojo, como el aviso de peligro de
+   Subway Surfers. Es un div sobre el lienzo y debajo del HUD (juego.js lo
+   pone una vez, `pintaPeligro`); no atrapa toques. Con «reducir movimiento»
+   no late: se queda fijo y tenue. */
+.mr-peligro { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .3s;
+  box-shadow: inset 0 0 7cqh 2cqh rgba(230, 30, 40, .55);          /* el borde rojo, hacia adentro */
+  background: radial-gradient(ellipse at center, transparent 58%, rgba(200, 0, 20, .22) 100%); }   /* y las esquinas un poco teñidas */
+.mr-peligro.ver { opacity: 1; animation: mr-late 0.62s ease-in-out infinite alternate; }   /* late, como un corazón apurado */
+@keyframes mr-late { from { opacity: .45; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .mr-peligro.ver { animation: none; opacity: .7; } }
+
+/* --- La muestra de las corredoras (ronda 2) ---
+   Las corredoras se muestran con un SVG (su peinado, ver `muestraRasgos` en
+   juego.js) en vez del dibujo de CSS con gorra: el círculo y el borde son
+   los mismos, el fondo lo pinta el SVG. */
+.t-muestra.con-rasgos { background: #cfe3ff; }
+.t-muestra.con-rasgos svg { display: block; width: 100%; height: 100%; }
+.t-traje.secreto .t-muestra.con-rasgos { filter: grayscale(1) brightness(.55); }

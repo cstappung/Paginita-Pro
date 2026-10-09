@@ -419,6 +419,105 @@ export class Sonido {
     // el aire: un soplo corto al empezar cada bocinazo
     if (fuerza !== 0) Chip.ruido(ctx, filtro, { t: t0, dur: 0.12, vol: vol * 0.5, tono: 1.8 }, this.voces);
   }
+  /* ---------- La persecución: el perro, el grito y el silbato (ronda 2) ----------
+     Don Ramón y Tornillo se hacen oír. Todo es sintetizado, como el resto de
+     los efectos (nada que bajar, nada que esperar):
+     - `ladrido`: un «¡guau!» con un diente de sierra que sube y cae de tono
+       por un filtro de banda (la boca del perro) y un soplo de aire;
+     - `alto`: el grito «¡Alto!» de un inspector, hecho con síntesis de
+       formantes (una voz de sierra pasada por tres filtros que se mueven de
+       la «a» a la «l», un corte para la «t» y la «o»), seguido de dos
+       pitazos de silbato de policía (dos tonos agudos con un trino de 30 Hz);
+     - `atrapado`: el golpe de que te atrapen: un golpe sordo, un pitazo
+       largo y el perro que ladra dos veces encima tuyo.
+     Todo pasa por `this.efectos`, así el volumen de efectos y el mudo lo
+     gobiernan, y por `vive`, así `callaEfectos` lo puede cortar. */
+
+  /** Un ladrido. `fuerza` 1 = uno normal; 2 o más = doble y más fuerte (más cerca). */
+  ladrido(fuerza = 1) {
+    if (!this.ctx) return;
+    const ctx = this.ctx, vol = 0.07 + 0.03 * Math.min(2, fuerza);           // más fuerte mientras más cerca
+    const veces = fuerza >= 2 ? 2 : 1;                                       // «¡guau, guau!» cuando está encima
+    for (let i = 0; i < veces; i++) {
+      const t = this.t + i * 0.2, tono = 1 + (i ? -0.08 : 0) + (Math.random() - 0.5) * 0.1;   // el segundo un poco más grave; cada uno distinto
+      const o = ctx.createOscillator(), f = ctx.createBiquadFilter(), g = ctx.createGain();
+      o.type = 'sawtooth';                                                   // la garganta: rica en armónicos
+      o.frequency.setValueAtTime(330 * tono, t);                             // arranca medio
+      o.frequency.exponentialRampToValueAtTime(620 * tono, t + 0.03);        // sube de golpe (la «gu»)
+      o.frequency.exponentialRampToValueAtTime(240 * tono, t + 0.16);        // y cae (el «au»)
+      f.type = 'bandpass'; f.Q.value = 2.2;                                  // la boca: una sola resonancia
+      f.frequency.setValueAtTime(1300, t); f.frequency.exponentialRampToValueAtTime(700, t + 0.16);   // se cierra al final
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol, t + 0.012);          // ataque seco
+      g.gain.exponentialRampToValueAtTime(vol * 0.5, t + 0.07); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.19);   // y se apaga rápido
+      o.connect(f); f.connect(g); g.connect(this.efectos);
+      o.start(t); o.stop(t + 0.21);
+      this.vive(o, [o, f, g]);
+      Chip.ruido(ctx, this.efectos, { t, dur: 0.07, vol: vol * 0.45, tono: 1.6 }, this.voces);   // el aire que sale con el ladrido
+    }
+  }
+  /** El grito «¡Alto!» del inspector y dos pitazos de silbato. */
+  alto() {
+    if (!this.ctx) return;
+    const ctx = this.ctx, t = this.t, VOL = 0.16;
+    // la voz: una sierra grave (un hombre gritando) que sube en la «a» y baja en la «o»
+    const o = ctx.createOscillator(); o.type = 'sawtooth';
+    o.frequency.setValueAtTime(150, t); o.frequency.linearRampToValueAtTime(205, t + 0.12);   // «¡Aaa…» sube con el esfuerzo
+    o.frequency.linearRampToValueAtTime(185, t + 0.24); o.frequency.linearRampToValueAtTime(175, t + 0.33);   // «…l-t…»
+    o.frequency.linearRampToValueAtTime(130, t + 0.62);                      // «…to!» cae al final
+    const vib = ctx.createOscillator(), vibG = ctx.createGain();             // un temblor de voz (5,5 Hz): que no suene a máquina
+    vib.frequency.value = 5.5; vibG.gain.value = 4; vib.connect(vibG); vibG.connect(o.frequency);
+    // la boca: tres formantes en paralelo, cada uno un filtro de banda que se mueve de vocal en vocal
+    const boca = ctx.createGain(); boca.gain.value = 1; boca.connect(this.efectos);
+    const env = ctx.createGain(); o.connect(env);                            // la envolvente de la voz (se corta para la «t»)
+    // [F, amplitud] por momento: «a» (0–0,18 s), «l» (0,18–0,24), «t» (silencio, 0,24–0,3), «o» (0,3–0,62)
+    const formantes = [
+      { q: 6, a: [[0, 780], [0.18, 760], [0.22, 380], [0.3, 520], [0.62, 480]], g: 1 },     // F1: abierta en la «a», cerrada en la «l»
+      { q: 8, a: [[0, 1250], [0.18, 1200], [0.22, 1050], [0.3, 880], [0.62, 820]], g: 0.6 },  // F2: baja de la «a» a la «o»
+      { q: 10, a: [[0, 2600], [0.62, 2500]], g: 0.25 }                                       // F3: el brillo del grito
+    ];
+    const nodos = [o, vib, vibG, env, boca];
+    for (const fo of formantes) {
+      const f = ctx.createBiquadFilter(), g = ctx.createGain();
+      f.type = 'bandpass'; f.Q.value = fo.q; g.gain.value = fo.g;
+      fo.a.forEach(([d, hz], i) => i === 0 ? f.frequency.setValueAtTime(hz, t + d) : f.frequency.linearRampToValueAtTime(hz, t + d));
+      env.connect(f); f.connect(g); g.connect(boca); nodos.push(f, g);
+    }
+    env.gain.setValueAtTime(0.0001, t); env.gain.exponentialRampToValueAtTime(VOL, t + 0.03);   // el grito arranca fuerte
+    env.gain.setValueAtTime(VOL, t + 0.2); env.gain.linearRampToValueAtTime(VOL * 0.6, t + 0.235);   // la «l», un poco más suave
+    env.gain.linearRampToValueAtTime(0.0001, t + 0.25);                       // la lengua cierra: silencio de la «t»
+    env.gain.setValueAtTime(0.0001, t + 0.3); env.gain.linearRampToValueAtTime(VOL, t + 0.33);   // se abre en la «o»
+    env.gain.setValueAtTime(VOL, t + 0.5); env.gain.exponentialRampToValueAtTime(0.0001, t + 0.66);   // y se apaga
+    o.start(t); vib.start(t); o.stop(t + 0.68); vib.stop(t + 0.68);
+    this.vive(o, nodos);
+    Chip.ruido(ctx, this.efectos, { t: t + 0.285, dur: 0.035, vol: 0.06, tono: 3.4, corto: true }, this.voces);   // el chasquido de la «t»
+    // el silbato: dos pitazos cortos, después del grito
+    this.silbato(t + 0.72, 0.16); this.silbato(t + 0.95, 0.32);
+  }
+  /** Un pitazo de silbato de policía que empieza en `t0` y dura `dur` s: dos tonos agudos con un trino rápido (la bolita del silbato). */
+  silbato(t0, dur) {
+    if (!this.ctx) return;
+    const ctx = this.ctx, g = ctx.createGain(), trino = ctx.createOscillator(), trinoG = ctx.createGain();
+    trino.frequency.value = 30; trinoG.gain.value = 140;                     // la bolita: 30 vueltas por segundo, ±140 Hz
+    trino.connect(trinoG);
+    g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.045, t0 + 0.015);   // entra de golpe…
+    g.gain.setValueAtTime(0.045, t0 + dur); g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur + 0.04);   // …y se corta
+    g.connect(this.efectos);
+    const nodos = [trino, trinoG, g];
+    [2850, 3150].forEach(f => {                                              // dos cámaras del silbato, un poco desafinadas: el «batido»
+      const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = f;
+      trinoG.connect(o.frequency); o.connect(g); o.start(t0); o.stop(t0 + dur + 0.06); nodos.push(o);
+    });
+    trino.start(t0); trino.stop(t0 + dur + 0.06);
+    this.vive(trino, nodos);
+  }
+  /** Te atraparon: un golpe sordo, un pitazo largo y el perro encima, ladrando. */
+  atrapado() {
+    if (!this.ctx) return;
+    this.nota(95, 0.35, 0.16, 'tri', { f1: 40, sus: 0.7 });                  // el golpe: la mano en el hombro (o el suelo)
+    this.silbato(this.t + 0.05, 0.75);                                       // el pitazo largo de «¡te pillé!»
+    setTimeout(() => this.ladrido(2), 380);                                  // el perro cae encima y ladra dos veces
+  }
+
   /** Calla todos los efectos que estén sonando. */
   callaEfectos() {
     if (this.motor) this.mochila(false);

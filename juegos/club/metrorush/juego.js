@@ -297,6 +297,7 @@ function fisica(dt) {
   r.suelo = sop.h;
   if (sop.tren && !c.techos.has(sop.tren.id)) { c.techos.add(sop.tren.id); c.cuenta.techos++; }
   if (r.rodar > 0) r.rodar -= dt;
+  if (c.pogo) c.pogoT = (c.pogoT || 0) + dt;                    // cuánto lleva en el pogo (la pose lo usa para el resorte y la pirueta)
   if (r.tropezarT >= 0) { r.tropezarT += dt; if (r.tropezarT > 0.45) r.tropezarT = -1; }
   r.fase += dt * (8 + c.V * 0.32);                            // la zancada se acelera con la velocidad
 }
@@ -308,7 +309,12 @@ const caja = o => M.caja(o, c.D);
 function choques() {
   const r = c.r;
   if (c.poderes.mochila > 0 || r.y > 6) return;                // volando, por encima de todo
-  if (c.pogo && r.y > 3.6) return;                             // en el pogo, por encima de los techos (3,35): nada te alcanza
+  /* En el pogo: invencible toda la subida y todo lo que vuela por encima de
+     los techos (3,35 m). En el último tramo de la bajada vuelven los choques,
+     como antes: así lo que haya abajo se esquiva cambiando de carril, o se
+     cae sobre el techo. Si fuera invencible hasta tocar el suelo, podría
+     aterrizar DENTRO de un tren y morir de frente al terminarse el pogo. */
+  if (c.pogo && (r.vy > 0 || r.y > 3.6)) return;
   const yb = r.y + 0.02, yt = r.y + (r.rodar > 0 ? F.altoRodando : F.altoDePie);
   for (const o of c.activos) {
     const k = caja(o);
@@ -331,7 +337,8 @@ function tropieza(X) {
   r.tropezarT = 0;
   if (c.tropiezo > 0) { muere('atrapado'); return; }            // segundo tropiezo seguido: te atrapan
   c.tropiezo = F.ventanaTropiezo; c.perseguidorObj = 1;
-  aviso('¡Cuidado! Don Ramón te pisa los talones');
+  aviso('¡Alto! Don Ramón te pisa los talones');
+  gritaAlto();                                                  // el grito, la placa y el perro (ver «La persecución»)
 }
 function choca(o) {
   if (c.poderes.patineta > 0) {                                 // (en los modos sin patineta nunca hay una puesta)                                 // la patineta se rompe y te salva
@@ -359,6 +366,71 @@ function muere(motivo) {
   if (opciones.sacudida) mundo.sacude(0.8);
 }
 
+/* ---- La persecución, con más impacto (ronda 2) ----
+   Todo esto es imagen y sonido: no cambia ni un metro ni un punto, así que
+   el antitrampas no se entera. Lleva un estado aparte, `c.pers`:
+   - grito: segundos que le quedan al «¡Alto!» del inspector (con la placa
+     en alto y el globo de texto en el mundo);
+   - ladra: segundos que le quedan al ladrido que suena (el perro levanta la
+     cabeza y da un saltito);
+   - sigLadra: cuánto falta para el próximo ladrido mientras te persiguen;
+   - atrapo: segundos desde que te atraparon (−1 si no): con eso `mundo`
+     anima al perro saltándote encima y al inspector inclinándose.
+   Se llama desde `cuadro` en todos los estados, para que la escena de la
+   atrapada siga en «¿Seguir corriendo?» y en el resumen. */
+const ATERRIZA_PERRO = 0.45;                                    // a los cuántos segundos de atraparte cae el perro encima (lo mismo usa mundo.js)
+/** El estado de la persecución de esta carrera (se arma la primera vez). */
+function estadoPers() {
+  return c.pers || (c.pers = { grito: 0, ladra: 0, sigLadra: 0.5, atrapo: -1 });
+}
+/** El primer tropiezo: el inspector grita «¡Alto!» con la placa en alto, pita y el perro ladra. */
+function gritaAlto() {
+  const P = estadoPers();
+  P.grito = 1.6; P.ladra = 0.35; P.sigLadra = 1.1;               // el globo dura 1,6 s; el primer ladrido ya mismo
+  c.perseguidor = Math.max(c.perseguidor, 0.95);                // aparecen de golpe detrás (si no, llegaban cuando el grito ya había pasado)
+  sonido.alto(); sonido.ladrido(1);
+  vibra([40, 60, 40]);                                          // dos golpecitos en el bolsillo (si «Sacudir» está encendido)
+}
+/** Un paso de la persecución: ladridos mientras te siguen, la atrapada y el borde rojo de peligro. */
+function persecucion(dt) {
+  if (!c) { pintaPeligro(false); return; }
+  const P = estadoPers();
+  P.grito = Math.max(0, P.grito - dt); P.ladra = Math.max(0, P.ladra - dt);   // se apagan solos
+  const atrapado = !!(c.muerte && c.muerte.motivo === 'atrapado');            // te atraparon (sigue en «seguir», en el resumen…)
+  if (!atrapado) P.atrapo = -1;                                               // al seguir corriendo, la escena se deshace
+  else {
+    const antes = P.atrapo;
+    if (antes < 0) { P.atrapo = 0; sonido.atrapado(); }                       // el instante de la atrapada
+    else P.atrapo += dt;
+    if (antes < ATERRIZA_PERRO && P.atrapo >= ATERRIZA_PERRO) {               // el perro cae encima: el golpe se siente
+      P.ladra = 0.6;
+      if (opciones.sacudida) mundo.sacude(0.7);
+    }
+  }
+  // mientras dura el tropiezo el perro ladra cada tanto (más seguido al final, cuando está por soltarte)
+  const persigue = estado === 'jugando' && c.tropiezo > 0;
+  if (persigue) {
+    P.sigLadra -= dt;
+    if (P.sigLadra <= 0) { sonido.ladrido(c.tropiezo < 2.5 ? 1 : 2); P.ladra = 0.35; P.sigLadra = 0.9 + Math.random() * 0.9; }
+  }
+  pintaPeligro(persigue);
+}
+/** El borde rojo de peligro que late mientras el inspector te pisa los talones (un div sobre el lienzo, puesto una vez). */
+function pintaPeligro(ver) {
+  let el = $('mrPeligro');
+  if (!el && ver) {                                                          // se crea la primera vez que hace falta
+    el = document.createElement('div'); el.id = 'mrPeligro'; el.className = 'mr-peligro'; el.setAttribute('aria-hidden', 'true');
+    $('lienzo').insertAdjacentElement('afterend', el);                       // justo sobre el juego, debajo del HUD
+  }
+  if (el) el.classList.toggle('ver', !!ver);
+}
+/** Lo que `mundo` necesita para dibujar la persecución en este cuadro. */
+function datosPersecucion() {
+  if (!c) return null;
+  const P = estadoPers();
+  return { amenaza: estado === 'jugando' && c.tropiezo > 0 ? 1 : 0, grito: P.grito, ladra: P.ladra, atrapa: P.atrapo };
+}
+
 /* ---- poderes ---- */
 function activaPoder(clase) {
   if (!c.modo.items) return;                                   // los modos sin ayudas no tienen poderes (ni siquiera desde la consola)
@@ -382,21 +454,35 @@ function activaPoder(clase) {
   }
   aviso(M.PODERES[clase].nombre + '!');
 }
-/* El pogo saltarín (de la caja misteriosa, como en Subway Surfers): un
-   brinco enorme, por encima de los techos, que cae despacio (40 % de la
-   gravedad). Arriba de los trenes nada te choca; desde el suelo hasta los
-   techos se tarda ~0,25 s, y ese tramo lo cubre un instante de invulnerable.
-   Se puede cambiar de carril en el aire, y rodar lo suelta. Solo cambia la
-   altura: los metros y los puntos siguen igual, y por eso la prueba del
-   antitrampas no necesita saber de él. Devuelve false si no se pudo. */
+/* El pogo saltarín (de la caja misteriosa, como en Subway Surfers), ronda 2.
+   UN lanzamiento enorme: sube hasta 8,3 m (al menos 3 m, aunque se lance
+   desde un techo) y cae despacio (40 % de la gravedad), ~2,5 s en el aire.
+   Es invencible toda la subida y mientras va por encima de los techos (ver
+   `choques`), y se puede cambiar de carril en el aire; rodar lo suelta. Aterriza donde caiga:
+   en el suelo o sobre el techo de un tren (M.soporte lo sostiene).
+   Mientras vuela aparece un arco de monedas en los tres carriles (15 por
+   carril, M.monedasPogo). Esas monedas NO salen del generador de la pista,
+   no gastan su azar y no dan puntos: la pista sigue dependiendo solo de la
+   semilla y de los pedidos anotados, y la prueba del antitrampas no necesita
+   saber del pogo (solo cambia la altura, nunca los metros ni los puntos).
+   No se lanza si en lo que dura el vuelo viene un túnel (su techo está a
+   6,6 m y el pogo lo atravesaría): entonces la caja da monedas.
+   Devuelve false si no se pudo. */
+let idPogo = 0;                                                // ids negativos para las monedas del arco (los de la pista son positivos)
 function lanzaPogo() {
   const r = c.r;
   if (c.poderes.mochila > 0) return false;                     // volando con la mochila no se puede
-  c.pogo = true;
-  r.vy = Math.sqrt(2 * F.gravedad * F.gravedadPogo * Math.max(0.5, F.alturaPogo - r.y));   // hasta 7 m, desde donde esté
+  const vuelo = M.vueloPogo(r.y);                              // la trayectoria (la misma cuenta que usan los tests)
+  const alcance = c.D + c.V * vuelo.duracion + 15;             // hasta dónde llega volando (y un poco más)
+  if (c.activos.some(o => o.tipo === 'tunel' && o.d0 < alcance && o.d0 + o.largo > c.D - 2)) return false;   // un túnel en el camino: mejor monedas
+  c.pogo = true; c.pogoT = 0;                                  // va en el pogo, y desde cuándo (para la animación)
+  r.vy = vuelo.v0;                                             // el impulso: justo para llegar a la cima
   r.enAire = true; r.rodar = 0; r.saltoBufer = -1; r.ultSuelo = -1; r.rodarPend = false;
-  c.invulnerable = Math.max(c.invulnerable, 0.45);             // la subida hasta los techos
+  c.invulnerable = Math.max(c.invulnerable, 0.45);             // el instante del despegue (después, `choques` no mira nada mientras suba o vaya sobre los techos)
   c.cuenta.saltos++;
+  if (!c.modo.monedasMatan) {                                  // (en «Sin monedas» no hay cajas, pero por si acaso: ahí matarían)
+    for (const m of M.monedasPogo(c.D, c.V, r.y)) { m.id = --idPogo; c.activos.push(m); }   // el arco de monedas en los tres carriles
+  }
   sonido.pogo(); aviso('¡Pogo saltarín!');
   return true;
 }
@@ -932,6 +1018,8 @@ function cuadro(ahora) {
   if (!mundo) return;
   if (estado === 'jugando' || estado === 'muerte') actualiza(dt);
   else if (estado === 'salvar') pasoSalvar(dtReal);
+  if (c) persecucion(estado === 'pausa' ? 0 : dt);               // ladridos, la atrapada y el borde rojo (en pausa, quieto)
+  else pintaPeligro(false);
   // lo que el mundo necesita para dibujar este cuadro
   const r = c ? c.r : null;
   // en la portada y en la tienda la cámara se pone delante del corredor, que mira y saluda
@@ -945,7 +1033,7 @@ function cuadro(ahora) {
     : estado === 'muerte' || estado === 'salvar' || (estado === 'fin' && c.muerte) ? { modo: 'caer', t: c.muerte ? c.muerte.t : 1 }
       : r.tropezarT >= 0 ? { modo: 'tropezar', t: r.tropezarT, fase: r.fase, ladeo: r.ladeo }
         : c.poderes.mochila > 0 ? { modo: 'volar', fase: r.fase }
-          : c.pogo ? { modo: 'pogo', vy: r.vy, ladeo: r.ladeo, t: tiempoTotal }   // de pie en el pogo, agarrado al manubrio
+          : c.pogo ? { modo: 'pogo', vy: r.vy, ladeo: r.ladeo, t: c.pogoT || 0 }   // de pie en el pogo, agarrado al manubrio (t: desde que se lanzó)
           : c.poderes.patineta > 0 ? { modo: 'patinar', fase: r.fase, ladeo: r.ladeo, vy: r.vy, aire: r.enAire, t: tiempoTotal, agacha }   // de lado sobre la tabla (rodar = agacharse, saltar = un ollie)
           : r.rodar > 0 ? { modo: 'rodar', t: F.tiempoRodar - r.rodar }
             : r.enAire ? { modo: 'saltar', vy: r.vy, ladeo: r.ladeo }
@@ -953,7 +1041,8 @@ function cuadro(ahora) {
   mundo.paso({
     D: c ? c.D : 0, x: r ? r.x : 0, y: r ? r.y : 0, suelo: r ? r.suelo : 0, v: c ? c.V : 0, dt, t: tiempoTotal, pose,
     poderes: c ? { iman: c.poderes.iman > 0, mochila: c.poderes.mochila > 0, zapatillas: c.poderes.zapatillas > 0, patineta: c.poderes.patineta > 0, pogo: !!c.pogo } : {},
-    perseguidor: c && !menu ? c.perseguidor : 0, menu
+    perseguidor: c && !menu ? c.perseguidor : 0, menu,
+    persecucion: c && !menu ? datosPersecucion() : null          // el grito, el ladrido y la atrapada (ver «La persecución»)
   });
   mundo.dibuja();
   sonido.tick(c && estado === 'jugando' ? c.V : M.VELOCIDAD.V0);
@@ -1170,6 +1259,35 @@ function saltarMision(i) {
    «personajes» (los aspectos). En personajes el corredor se prueba la ropa
    que tocas aunque no sea tuya; al salir de la tienda vuelve a lo puesto. */
 let tiendaPestana = 'mejoras';                                 // la pestaña abierta
+/* --- La muestra de las corredoras (ronda 2) ---
+   Los aspectos de siempre se muestran con una cabecita de CSS (gorra, cara,
+   sudadera). Las corredoras no llevan gorra: lo que las distingue es el
+   peinado, así que su muestra es un SVG chico que dibuja la cara con su
+   pelo (coleta, trenzas, melena o moños), su tocado (cintillo o boina), y
+   los lentes o aros si los tiene, con los mismos colores que el modelo 3D
+   (`a.rasgos` en motor.js). Todo con colores del aspecto: nada que el
+   jugador escriba, nada que escapar. */
+function muestraRasgos(a) {
+  const R = a.rasgos, hex = n => '#' + n.toString(16).padStart(6, '0');
+  const pelo = hex(R.pelo), toc = hex(a.gorra), ropa = hex(a.sudadera), tinta = '#0d2a63';   // los colores (tinta: el borde de la tienda)
+  const detras = R.peinado === 'larga' ? `<path d="M27 44 Q26 82 34 86 L66 86 Q74 82 73 44 Z" fill="${pelo}"/>`   // la melena, detrás de la cara
+    : R.peinado === 'coleta' ? `<path d="M64 28 Q88 26 84 58 Q80 48 70 40 Z" fill="${pelo}"/><circle cx="66" cy="30" r="4" fill="${toc}"/>`   // la cola, hacia un lado
+      : R.peinado === 'trenzas' ? [-1, 1].map(s => `<g fill="${pelo}">${[0, 1, 2].map(i => `<circle cx="${50 + s * 22}" cy="${54 + i * 9}" r="5.5"/>`).join('')}<circle cx="${50 + s * 22}" cy="${80}" r="3" fill="${toc}"/></g>`).join('')
+        : R.peinado === 'monos' ? `<circle cx="32" cy="27" r="9" fill="${pelo}"/><circle cx="68" cy="27" r="9" fill="${pelo}"/>` : '';
+  const tocado = R.tocado === 'cintillo' ? `<path d="M30 42 Q50 16 70 42" fill="none" stroke="${toc}" stroke-width="4" stroke-linecap="round"/>`
+    : R.tocado === 'boina' ? `<ellipse cx="53" cy="27" rx="23" ry="8" fill="${toc}" transform="rotate(-10 53 27)"/><circle cx="54" cy="18" r="2.5" fill="${toc}"/>` : '';
+  const lentes = R.lentes ? `<g fill="none" stroke="#2b2d42" stroke-width="1.8"><circle cx="43" cy="47" r="5.5"/><circle cx="57" cy="47" r="5.5"/><path d="M48.5 47 L51.5 47"/></g>` : '';
+  const aros = R.aros ? `<g fill="none" stroke="#ffc63a" stroke-width="1.8"><circle cx="30" cy="55" r="3.2"/><circle cx="70" cy="55" r="3.2"/></g>` : '';
+  return `<svg viewBox="0 0 100 100" aria-hidden="true">
+    <rect width="100" height="100" fill="#cfe3ff"/>${detras}
+    <ellipse cx="50" cy="100" rx="38" ry="24" fill="${ropa}"/><rect x="45" y="62" width="10" height="10" fill="#f1c19c"/>
+    <circle cx="50" cy="48" r="19" fill="#f1c19c"/>
+    <path d="M31 47 Q30 26 50 27 Q70 26 69 47 Q66 37 58 34 Q48 40 34 40 Z" fill="${pelo}"/>
+    <circle cx="43.5" cy="48" r="2.2" fill="#1d1a2a"/><circle cx="56.5" cy="48" r="2.2" fill="#1d1a2a"/>
+    <path d="M39 45.5 L41 44.5 M61 45.5 L59 44.5" stroke="#1d1a2a" stroke-width="1.2"/>
+    <path d="M45 56 Q50 60 55 56" fill="none" stroke="#8a2a1e" stroke-width="1.6" stroke-linecap="round"/>
+    ${tocado}${lentes}${aros}<rect x="70" y="80" width="13" height="13" rx="3" fill="${hex(a.mochila)}" stroke="${tinta}" stroke-width="1.5"/></svg>`;
+}
 let tiendaVer = null;                                          // el aspecto que se está probando
 let aspectoMostrado = null;                                    // el que lleva el corredor en pantalla
 function abreTienda(pestana = 'mejoras') {
@@ -1239,7 +1357,8 @@ function pintaTienda() {
     const hex = n => '#' + n.toString(16).padStart(6, '0');
     const marca = puesto ? `<em class="ok">${ICONOS.check}</em>` : secreto ? `<em class="cerrado">${ICONOS.candado}</em>` : '';
     return `<li><button type="button" class="t-traje${k === tiendaVer ? ' sel' : ''}${secreto ? ' secreto' : ''}" data-ver="${k}" aria-pressed="${k === tiendaVer}">
-      <span class="t-muestra" style="--a:${hex(a.sudadera)};--b:${hex(a.gorra)};--c:${hex(a.jeans)};--d:${hex(a.mochila)}"><i></i></span><span class="t-n">${a.nombre}</span>${marca}</button></li>`;
+      ${a.rasgos ? `<span class="t-muestra con-rasgos">${muestraRasgos(a)}</span>`   /* las corredoras: su cabecita con peinado (ver «La muestra de las corredoras») */
+        : `<span class="t-muestra" style="--a:${hex(a.sudadera)};--b:${hex(a.gorra)};--c:${hex(a.jeans)};--d:${hex(a.mochila)}"><i></i></span>`}<span class="t-n">${a.nombre}</span>${marca}</button></li>`;
   }).join('');
   const a = M.ASPECTOS[tiendaVer], tiene = progreso.aspectos.includes(tiendaVer), puesto = progreso.aspecto === tiendaVer;
   $('tiendaNombre').textContent = a.nombre;
@@ -1435,7 +1554,8 @@ const toca = () => { tocada = true; if (c) c.tocada = true; };
 window.__metrorush = {
   estado: () => ({ estado, puntos: c && c.puntos, D: c && c.D, V: c && c.V, estacion: c && c.estacion.nombre, info: mundo && mundo.info(),
     modo: c ? c.modo.id : modoSel.id, motivo: c && c.muerte ? c.muerte.motivo : null, carril: c && c.r.carril, y: c && c.r.y,
-    tabla: c && c.cierre ? { modo: c.cierre.modo.id, enviada: c.cierre.enviada, fuera: c.cierre.fuera || null } : null }),
+    tabla: c && c.cierre ? { modo: c.cierre.modo.id, enviada: c.cierre.enviada, fuera: c.cierre.fuera || null } : null,
+    pogo: !!(c && c.pogo), tropiezo: c ? c.tropiezo : 0, suelo: c && c.r.suelo, pers: c && c.pers ? Object.assign({}, c.pers) : null }),   // (ronda 2: el pogo y la persecución)
   /** La semilla de la próxima carrera (la del récord, en el modo Fantasma). No vuelve «de prueba» a nada:
       el antitrampas acepta cualquier semilla. Gancho para el fantasma. */
   semillaSiguiente: n => { semillaSiguiente = Number.isInteger(n) && n >= 0 ? n : null; return semillaSiguiente; },
@@ -1448,6 +1568,12 @@ window.__metrorush = {
   pulsa: a => { toca(); pedidos.push(a); },
   poder: k => { toca(); return c && activaPoder(k); },
   inmortal: (s = 9999) => { toca(); if (c) c.invulnerable = s; },
+  /* Ganchos de la ronda 2 (los dos vuelven «de prueba» la carrera, como los demás que cambian algo):
+     `pogo()` lanza el pogo saltarín ya mismo (como si saliera de la caja) y
+     `tropieza()` hace tropezar al corredor como contra un costado (el
+     segundo seguido lo atrapa), para mirar la persecución sin buscar un tren. */
+  pogo: () => { toca(); return !!(c && estado === 'jugando' && c.modo.items && lanzaPogo()); },
+  tropieza: () => { toca(); if (c && estado === 'jugando') tropieza(c.r.x + 1); return estado; },
   /** La prueba de la carrera (la de la última, cerrada, si ya terminó). Solo la lee: no toca nada. */
   prueba: () => c ? JSON.parse(JSON.stringify(c.pruebaFinal || c.prueba)) : null,
   empezar, progreso: () => progreso,
