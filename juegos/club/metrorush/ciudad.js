@@ -14,7 +14,11 @@
      · los PERSONAJES de City, cada uno con su ventaja chica, que se compran
        y se ponen en la tienda solo con un modo de City elegido;
      · las POSTALES (los boletos de City), guardadas aparte de los boletos de
-       la Línea 3, y su Libreta.
+       la Línea 3, y su Libreta;
+     · lo que trae Subway Surfers City (ver city.js): la ENERGÍA de la tabla
+       (celdas y la batería; llena, la tabla se enciende gratis), las MONEDAS
+       ×2, el rebote del chicle, el dron que te lanza, las REJILLAS que abre
+       el pisotón y las BURBUJAS de baja gravedad con su doble salto.
 
    POR QUÉ ASÍ
    - Un módulo propio y unas pocas líneas «CITY:» en juego.js: así el resto
@@ -56,7 +60,12 @@ export function crearCiudad({ M, sonido, aviso }) {
     },
     grind() { sonido.soplo(0.06, 0.025, 3.4, { corto: true }); },   // el roce del metal (un chispazo cortito, varias veces por segundo)
     chicle() { sonido.nota(523, 0.12, 0.07, 'p25', { f1: 880 }); },   // tomar el chicle
-    revienta() { sonido.soplo(0.09, 0.12, 2.8, { corto: true }); sonido.nota(900, 0.08, 0.07, 'p12', { f1: 200 }); }   // ¡plop!
+    revienta() { sonido.soplo(0.09, 0.12, 2.8, { corto: true }); sonido.nota(900, 0.08, 0.07, 'p12', { f1: 200 }); },   // ¡plop!
+    energia(n) { sonido.nota(660 + n * 55, 0.07, 0.05, 'p25', { f1: 990 + n * 55 }); },   // una celda: un «tic» que sube con la carga
+    llena() { for (const [k, f] of [[0, 523], [1, 659], [2, 784], [3, 1047]]) setTimeout(() => sonido.nota(f, 0.12, 0.06, 'p25'), k * 60); },   // tabla cargada: un arpegio
+    rebote() { sonido.nota(260, 0.22, 0.09, 'tri', { f1: 620 }); },   // ¡boing! de la burbuja
+    rejilla() { sonido.nota(180, 0.18, 0.09, 'p12', { f1: 90 }); sonido.soplo(0.2, 0.12, 1.2, { corto: true }); },   // la rejilla que cede
+    doble() { sonido.nota(880, 0.14, 0.06, 'p25', { f1: 1320 }); }   // el poder de monedas ×2
   };
 
   /** Lo que dice el resumen según con qué chocaste (se suma a MOTIVOS de juego.js). */
@@ -81,15 +90,63 @@ export function crearCiudad({ M, sonido, aviso }) {
         chicle: 0,                                               // segundos que le quedan a la burbuja
         yAntes: 0,                                               // la altura de los pies al empezar el cuadro (para pisar)
         grind: 0, grindSon: 0,                                   // metros deslizados desde la última moneda, y el reloj del roce
-        pisadas: 0, lonas: 0                                     // cuántos cajones/drones rompió y cuántas lonas usó
+        pisadas: 0, lonas: 0,                                    // cuántos cajones/drones rompió y cuántas lonas usó
+        energia: 0,                                              // celdas de energía de la tabla (llena con CITY.ENERGIA_LLENA)
+        monedas2: 0,                                             // segundos que le quedan a «monedas ×2»
+        reboto: false, doble: false,                             // ya rebotó con el chicle / ya usó el doble salto (en este salto)
+        enBurbuja: false,                                        // está dentro de un tramo de burbujas (baja gravedad)
+        enAireAntes: false, golpeAntes: false                    // al empezar el cuadro: ¿en el aire? ¿bajando de golpe? (para la rejilla)
       } : null;
     },
-    /** Cuánto más alto salta (Nico: ×1,12). Solo cambia la altura. */
-    salto: c => (c.ciudad && c.ciudad.ventaja.salto) || 1,
+    /** Cuánto más alto salta (Nico: ×1,08; con chicle, un 15 % más, como en City). Solo cambia la altura. */
+    salto: c => ((c.ciudad && c.ciudad.ventaja.salto) || 1) * (c.ciudad && c.ciudad.chicle > 0 ? CITY.CHICLE.salto : 1),
+    /** La gravedad de este cuadro: dentro de las burbujas, el 55 % (los saltos flotan). */
+    gravedad: c => (c.ciudad && c.ciudad.enBurbuja ? CITY.BURBUJAS.gravedad : 1),
+    /** ¿Puede saltar en el aire? Solo dentro de las burbujas, una vez por salto (el doble salto). */
+    saltoAire(c) {
+      const C = c.ciudad;
+      if (!C || !C.enBurbuja || C.doble) return false;
+      C.doble = true; son.rebote();
+      return true;
+    },
+    /** «Rodar» en el aire con el chicle: rebota hacia arriba en vez de bajar
+        de golpe (una vez por salto). Devuelve true si rebotó. */
+    rebota(c) {
+      const C = c.ciudad, r = c.r;
+      if (!C || C.chicle <= 0 || !r.enAire || C.reboto) return false;
+      C.reboto = true; r.vy = M.impulso(CITY.CHICLE.rebote); r.rodarPend = false; r.saltoBufer = -1;
+      son.rebote();
+      return true;
+    },
+    /** Cuánto vale una moneda ahora: 2 con «monedas ×2». */
+    valorMoneda: c => (c.ciudad && c.ciudad.monedas2 > 0 ? 2 : 1),
+    /** Una celda de energía tomada. Al llenarse avisa que la tabla está lista. */
+    energia(c) {
+      const C = c.ciudad;
+      if (!C) return;
+      if (C.energia >= CITY.ENERGIA_LLENA) { c.monedas += 5; return; }   // ya llena: cada celda de más son 5 monedas
+      const vale = (C.ventaja && C.ventaja.energia) || 1;                // Dante: cada celda vale por dos
+      C.energia = Math.min(CITY.ENERGIA_LLENA, C.energia + vale);         // suma, sin pasarse de la barra
+      if (C.energia >= CITY.ENERGIA_LLENA) { son.llena(); aviso('¡Tabla cargada! H o dos toques para encenderla'); }
+      else son.energia(C.energia);
+    },
+    /** ¿La energía está llena? (la tabla se enciende gratis) */
+    tablaLista: c => !!(c.ciudad && c.ciudad.energia >= CITY.ENERGIA_LLENA),
+    /** Gasta la energía y devuelve lo que dura la tabla encendida. */
+    usaTabla(c) { c.ciudad.energia = 0; return CITY.TABLA_SEG; },
+    /** Lo que muestra el marcador de City: la energía y lo que le queda a «monedas ×2». */
+    hud: c => (c.ciudad ? { energia: c.ciudad.energia, llena: CITY.ENERGIA_LLENA, monedas2: c.ciudad.monedas2 } : null),
     /** Segundos de más que dura un poder (Lía: +3 s de imán). */
     extraPoder: (c, clase) => (c.ciudad && clase === 'iman' && c.ciudad.ventaja.iman) || 0,
     /** Al empezar la física del cuadro: dónde estaban los pies. */
-    antes(c) { if (c.ciudad) c.ciudad.yAntes = c.r.y; },
+    antes(c) {
+      const C = c.ciudad;
+      if (!C) return;
+      C.yAntes = c.r.y; C.enAireAntes = c.r.enAire; C.golpeAntes = c.r.rodarPend;
+      // ¿dentro de un tramo de burbujas? (ocupa los tres carriles)
+      C.enBurbuja = false;
+      for (const o of c.activos) if (o.tipo === 'burbujas' && c.D >= o.d0 && c.D <= o.d0 + o.largo) { C.enBurbuja = true; break; }
+    },
 
     /** Después de mover al corredor (fisica en juego.js): las lonas, el
         deslizarse por la baranda y lo que le queda a la burbuja. `sop` es lo
@@ -114,7 +171,7 @@ export function crearCiudad({ M, sonido, aviso }) {
         C.grind += c.V * dt;
         while (C.grind >= 2) {                                   // una moneda cada 2 m (Bruno: dos)
           C.grind -= 2;
-          const n = C.ventaja.grind || 1;
+          const n = (C.ventaja.grind || 1) * (C.monedas2 > 0 ? 2 : 1);   // Bruno: dos; con monedas ×2, el doble
           c.monedas += n; c.cuenta.monedas += n;
         }
         C.grindSon -= dt;
@@ -123,7 +180,22 @@ export function crearCiudad({ M, sonido, aviso }) {
           if (mundo) mundo.chispa(r.x, r.y + 0.05, 0, 0xffd27a);
         }
       } else C.grind = 0;
-      // 3) la burbuja de chicle se gasta
+      // 3) en el suelo se recuperan el rebote del chicle y el doble salto
+      if (!r.enAire) { C.reboto = false; C.doble = false; }
+      // 4) la rejilla: caerle encima de golpe (el pisotón) la abre y suelta su escondite de monedas
+      if (C.enAireAntes && C.golpeAntes && !r.enAire && r.y < 0.3) for (const o of c.activos) {
+        if (o.tipo !== 'rejilla' || o.abierta || Math.abs(o.d - c.D) > CITY.REJILLA.largo / 2 + 0.6 || Math.abs(r.x - M.CARRILES[o.carril]) > CITY.REJILLA.w) continue;
+        o.abierta = true; o.abiertaT = t;
+        const n = CITY.REJILLA.monedas * (C.ventaja.pisoton || 1) * (C.monedas2 > 0 ? 2 : 1);
+        c.monedas += n; c.cuenta.monedas += n; C.pisadas++;
+        son.rejilla();
+        if (mundo) { mundo.chispa(r.x, r.y + 0.4, 0, 0xffe066); if (mundo.city && mundo.city.geiser) mundo.city.geiser(o); }
+        aviso(`¡Escondite bajo la rejilla! +${n} monedas`);
+        break;
+      }
+      // 5) monedas ×2 se gasta
+      if (C.monedas2 > 0) C.monedas2 = Math.max(0, C.monedas2 - dt);
+      // 6) la burbuja de chicle se gasta
       if (C.chicle > 0) {
         C.chicle = Math.max(0, C.chicle - dt);
         if (C.chicle === 0 && mundo && mundo.city) mundo.city.chicle(false);
@@ -147,10 +219,12 @@ export function crearCiudad({ M, sonido, aviso }) {
       const golpe = r.rodarPend ? 2 : 1;                          // venía cayendo de golpe (rodó en el aire)
       const n = (o.tipo === 'dron' ? 8 : 5) * golpe * (C.ventaja.pisoton || 1);
       c.monedas += n; c.cuenta.monedas += n; C.pisadas++;
-      r.vy = M.impulso(1.1); r.enAire = true; r.rodarPend = false;   // el rebote
+      // el rebote: el dron, como en City, te lanza alto (a ~5,3 m: de techo en techo); el cajón, un saltito
+      r.vy = M.impulso(o.tipo === 'dron' ? CITY.DRON_IMPULSO : 1.1); r.enAire = true; r.rodarPend = false;
       son.pisa(o.tipo === 'dron');
+      if (o.tipo === 'dron') son.lona();
       if (mundo) mundo.chispa(r.x, r.y + 0.3, 0, 0xffe066);
-      aviso(`¡Pisotón! +${n} monedas`);
+      aviso(o.tipo === 'dron' ? `¡Dron impulsor! +${n} monedas` : `¡Pisotón! +${n} monedas`);
       return true;
     },
     /** Un choque de frente con la burbuja puesta: revienta y te salva (como
@@ -165,13 +239,24 @@ export function crearCiudad({ M, sonido, aviso }) {
       return true;
     },
     /** Al caer (muere en juego.js): la burbuja se va. */
-    cae(c, mundo) { if (c.ciudad) { c.ciudad.chicle = 0; if (mundo && mundo.city) mundo.city.chicle(false); } },
-    /** Un poder recogido: si es el chicle, lo maneja City (y devuelve true). */
+    cae(c, mundo) { if (c.ciudad) { c.ciudad.chicle = 0; c.ciudad.monedas2 = 0; if (mundo && mundo.city) mundo.city.chicle(false); } },
+    /** Un poder recogido: si es de City (chicle, batería, monedas ×2), lo maneja City (y devuelve true). */
     poder(c, clase, mundo) {
-      if (!c.ciudad || clase !== 'chicle') return false;
+      if (!c.ciudad) return false;
+      if (clase === 'bateria') {                                 // la batería: la energía de la tabla, llena de una
+        c.ciudad.energia = CITY.ENERGIA_LLENA; c.cuenta.poderes++;
+        son.llena(); aviso('¡Batería! Tabla cargada: H o dos toques');
+        return true;
+      }
+      if (clase === 'monedas2') {                                // cada moneda cuenta doble (no los puntos)
+        c.ciudad.monedas2 = CITY.MONEDAS2_SEG; c.cuenta.poderes++;
+        son.doble(); aviso(`¡Monedas ×2 por ${CITY.MONEDAS2_SEG} s!`);
+        return true;
+      }
+      if (clase !== 'chicle') return false;
       c.ciudad.chicle = 20; c.cuenta.poderes++;                  // dura 20 s o hasta que revienta
       if (mundo && mundo.city) mundo.city.chicle(true);
-      son.chicle(); aviso('¡Chicle! Una burbuja te salva de un choque');
+      son.chicle(); aviso('¡Chicle! Te salva de un choque, saltas más y rebotas en el aire');
       return true;
     },
 

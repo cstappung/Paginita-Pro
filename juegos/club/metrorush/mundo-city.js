@@ -9,8 +9,11 @@
        y el mar de Los Muelles, las torres de vidrio y las palmeras del
        Bulevar Aurora, el pasto, los lagos y los patos del Parque de los
        Lagos y el muro de la zanja de Bajo Vías;
-     · los objetos nuevos de la pista: cajones, drones, barandas, lonas,
-       respiraderos de vapor, el chicle y la estrella secreta;
+     · los objetos nuevos de la pista: cajones (que en Los Muelles caen
+       colgados de una grúa), drones, barandas, lonas, respiraderos de
+       vapor, el chicle y la estrella secreta; y lo de Subway Surfers City:
+       las celdas de energía de la tabla, la batería, las monedas ×2, las
+       rejillas del pisotón y el tramo de burbujas de baja gravedad;
      · los rasgos de los personajes de City (peinado y falda), en el bloque
        «CITY: rasgos de los personajes»;
      · los efectos: la burbuja del chicle y los trozos de lo que se pisa.
@@ -38,7 +41,7 @@
    (ver `legible` y `realza` en mundo.js) y se lee de lejos en todos los
    estilos. La escenografía no lleva «!». */
 import * as THREE from 'three';
-import { PALETAS, GANCHOS, piezas } from './mundo.js?v=metrorush-8';
+import { PALETAS, GANCHOS, piezas } from './mundo.js?v=metrorush-9';
 
 const MOTOR = window.MetroRushMotor;                    // el motor (con City instalado por city.js)
 const CITY = MOTOR && MOTOR.CITY;                       // las medidas y los datos de City (city.js)
@@ -163,6 +166,13 @@ function techo(a, clave, col, x, y0, z, ancho, alto, largo) {
 }
 /** Un color al azar de una lista, con el azar del kit. */
 const deLista = (az, lista) => lista[Math.floor(az() * lista.length)];
+/** Un rayo (la forma del ícono de energía) de alto `h`, centrado en 0, para ShapeGeometry. */
+function rayo(h) {
+  const k = h / 26, sh = new THREE.Shape();
+  [[2.5, 13], [-9, -2], [-1.5, -2], [-3.5, -13], [8, 2], [0.5, 2]].forEach(([x, y], i) => (i ? sh.lineTo(x * k, y * k) : sh.moveTo(x * k, y * k)));
+  sh.closePath();
+  return sh;
+}
 
 Object.assign(Kit.prototype, {
   /** La cuadra de City del costado `lado`: la que pida el distrito. */
@@ -405,7 +415,25 @@ Object.assign(Kit.prototype, {
     for (const s of [-1, 1]) for (const yf of [0.12, 0.52]) a.pon(CAJA, 'plano!', 0x3a2a1a, [s * 0.45, yf, 0.56], null, [0.88, 0.06, 0.02]);   // los flejes, del lado que se ve
     a.pon(CAJA, this.neon ? 'texluz:rayasNA!' : 'tex:rayasNA!', 0xffffff, [0.12, 0.81, 0.53], null, [0.6, 0.12, 0.02]);   // la etiqueta de «frágil»
     const g = a.hecho();
-    g.userData.colocar = (o, D) => g.position.set(CARRILES[o.carril], SUELO, -(o.d - D));
+    /* El contenedor que cae (Los Muelles, `o.cae`): cuelga de un cable y
+       baja mientras te acercas (CITY.alturaCae); su sombra en el suelo
+       crece y se oscurece, así se sabe en qué carril va a caer. El cable y
+       la sombra son dos piezas aparte (no van en el Arma) para poder
+       mostrarlas solo mientras cae; un cajón quieto no las muestra. */
+    const cable = new THREE.Mesh(CAJA, new THREE.MeshBasicMaterial({ color: 0x1d1f26 }));
+    cable.scale.set(0.05, 14, 0.05); cable.visible = false; g.add(cable);
+    const sombra = new THREE.Mesh(new THREE.CircleGeometry(0.75, 20), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.4, depthWrite: false }));
+    sombra.rotation.x = -Math.PI / 2; sombra.visible = false; sombra.userData.sinAO = true; g.add(sombra);
+    g.userData.colocar = (o, D) => {
+      const h = o.cae ? CITY.alturaCae(o.d - D) : 0;             // la altura del contenedor sobre su lugar en el suelo
+      g.position.set(CARRILES[o.carril], SUELO + h, -(o.d - D));
+      cable.visible = sombra.visible = h > 0.01;
+      if (h > 0.01) {
+        cable.position.y = 1.0 + 7;                                // desde la tapa hacia arriba
+        sombra.position.y = -h + 0.03;                             // en el suelo, bajo el contenedor
+        const k = 1 - h / 9; sombra.scale.setScalar(0.6 + k * 0.6); sombra.material.opacity = 0.15 + 0.4 * k;
+      }
+    };
     return g;
   },
   /** Un dron de vigilancia: cuerpo redondeado, cuatro brazos con su anillo
@@ -516,6 +544,113 @@ Object.assign(Kit.prototype, {
     if (this.neon) g0.add(sprite(0xff6ec7, 2.4, [0, 0, 0], 0.7));
     return g0;
   },
+  /** Los poderes de City: el chicle, la batería y las monedas ×2 (null si es otro). */
+  poderCity(clase) {
+    if (clase === 'chicle' && this.chicle) return this.chicle();
+    if (clase === 'bateria') return this.bateria();
+    if (clase === 'monedas2') return this.monedas2();
+    return null;
+  },
+  /** La batería (llena la energía de la tabla): una pila amarilla con su
+      polo, una franja negra y el rayo, con el aro de luz de los poderes. */
+  bateria() {
+    const a = new Arma(this), g0 = new THREE.Group();
+    a.pon(CILINDRO, 'pintura!', 0xffd23f, [0, 0.1, 0], null, [0.5, 0.62, 0.5], 0xffffff);   // el cuerpo
+    a.pon(CILINDRO, 'pintura!', 0x22262e, [0, -0.32, 0], null, [0.5, 0.22, 0.5]);           // el fondo negro
+    a.pon(CILINDRO_CHICO, 'metal!', 0xdfe4ea, [0, 0.5, 0], null, [0.18, 0.14, 0.18]);      // el polo
+    a.pon(new THREE.ShapeGeometry(rayo(0.32)), 'luz!', 0x22c6ff, [0, 0.08, 0.255]);       // el rayo, hacia el corredor
+    const cuerpo = a.hecho(false); cuerpo.name = 'cuerpo'; g0.add(cuerpo);
+    const b = new Arma(this);
+    b.pon(new THREE.TorusGeometry(0.62, 0.025, 8, 40), 'luz!', 0x22c6ff, [0, -0.9, 0], [Math.PI / 2, 0, 0]);
+    g0.add(b.hecho(false));
+    if (this.neon) g0.add(sprite(0x22c6ff, 2.4, [0, 0, 0], 0.7));
+    return g0;
+  },
+  /** Monedas ×2: dos monedas de oro una delante de la otra y un aro verde. */
+  monedas2() {
+    const a = new Arma(this), g0 = new THREE.Group();
+    for (const [x, y, z] of [[-0.16, 0.12, -0.08], [0.16, -0.1, 0.08]]) a.pon(CILINDRO, 'metal!', 0xffc81e, [x, y, z], [Math.PI / 2, 0, 0], [0.62, 0.12, 0.62], 0xffffff);
+    a.pon(new THREE.TorusGeometry(0.2, 0.035, 6, 18), 'luz!', 0xfff3a6, [0.16, -0.1, 0.15]);   // el borde brillante de la de adelante
+    const cuerpo = a.hecho(false); cuerpo.name = 'cuerpo'; g0.add(cuerpo);
+    const b = new Arma(this);
+    b.pon(new THREE.TorusGeometry(0.62, 0.025, 8, 40), 'luz!', 0x6aff8a, [0, -0.9, 0], [Math.PI / 2, 0, 0]);
+    g0.add(b.hecho(false));
+    if (this.neon) g0.add(sprite(0x6aff8a, 2.4, [0, 0, 0], 0.7));
+    return g0;
+  },
+  /** Una celda de energía de la tabla: un cilindro cian de luz con tapas
+      oscuras, que gira y flota. Es más chica que un poder y más grande que
+      una moneda: se lee como «otra cosa que se junta». */
+  celdaEnergia() {
+    const a = new Arma(this);
+    a.pon(CILINDRO, 'luz!', 0x5ff6ff, [0, 0, 0], null, [0.32, 0.46, 0.32]);
+    for (const s of [-1, 1]) a.pon(CILINDRO, 'pintura!', 0x1d2a3a, [0, s * 0.27, 0], null, [0.36, 0.1, 0.36], 0x5ff6ff);
+    a.pon(new THREE.ShapeGeometry(rayo(0.18)), 'luz!', 0xffffff, [0, 0, 0.17]);
+    const g = a.hecho();
+    g.add(sprite(0x22c6ff, 1.1, [0, 0, 0], this.neon ? 0.8 : 0.45));
+    g.userData.colocar = (o, D, t) => {
+      g.position.set(CARRILES[o.carril], SUELO + o.y + Math.sin(t * 3 + (o.id || 0)) * 0.08, -(o.d - D));
+      g.rotation.y = t * 2.6;
+    };
+    return g;
+  },
+  /** La rejilla del pisotón: una tapa de rejilla con su marco de peligro.
+      Tiembla cuando te acercas (hay algo abajo); abierta, la tapa queda
+      levantada sobre su bisagra y se ve el hueco oscuro. */
+  rejillaCity() {
+    const g = new THREE.Group();
+    const marco = new Arma(this);
+    for (const s of [-1, 1]) {
+      marco.pon(uvMundo(new THREE.BoxGeometry(1.9, 0.08, 0.12), 0.5), this.neon ? 'texluz:rayasNA!' : 'tex:rayasNA!', 0xffffff, [0, 0.04, s * 0.92], null, 1);
+      marco.pon(uvMundo(new THREE.BoxGeometry(0.12, 0.08, 1.9), 0.5), this.neon ? 'texluz:rayasNA!' : 'tex:rayasNA!', 0xffffff, [s * 0.92, 0.04, 0], null, 1);
+    }
+    marco.pon(CAJA, 'plano!', 0x07080b, [0, 0.01, 0], null, [1.72, 0.02, 1.72]);   // el hueco oscuro (se ve al abrirla)
+    g.add(marco.hecho());
+    const tapaA = new Arma(this);
+    tapaA.pon(CAJA, this.neon ? 'texluz:rejillaNeon!' : 'tex:rejilla!', this.neon ? 0xffb020 : 0xdfe4ea, [0, 0, -0.86], null, [1.72, 0.06, 1.72]);   // la tapa, colgada de su bisagra (la de atrás)
+    const tapa = tapaA.hecho(); tapa.position.set(0, 0.07, 0.86); g.add(tapa);
+    g.userData.colocar = (o, D, t) => {
+      g.position.set(CARRILES[o.carril], SUELO, -(o.d - D));
+      if (o.abierta) {                                              // abierta: la tapa sube sobre la bisagra (en 0,2 s) y se queda
+        const k = Math.min(1, (t - (o.abiertaT || t)) / 0.2);
+        tapa.rotation.x = -1.9 * k; tapa.position.y = 0.07;
+      } else {                                                      // cerrada: tiembla cuando la tienes cerca (a menos de 30 m)
+        const cerca = o.d - D < 30 && o.d - D > -2;
+        tapa.rotation.x = 0; tapa.position.y = 0.07 + (cerca ? Math.abs(Math.sin(t * 38 + (o.id || 0))) * 0.05 : 0);
+      }
+    };
+    return g;
+  },
+  /** El tramo de burbujas (baja gravedad, Parque de los Lagos): un arco de
+      entrada con su cartel redondo y burbujas grandes que flotan sobre los
+      tres carriles a lo largo del tramo. Las burbujas son una sola malla
+      instanciada (una llamada al GPU); son translúcidas, así que la
+      oclusión ambiental no las dibuja (`sinAO`). */
+  burbujasCity() {
+    const g = new THREE.Group();
+    const arco = new Arma(this), col = this.neon ? 0xff2bd6 : 0x6ad1ff;
+    for (const s of [-1, 1]) arco.pon(CILINDRO, 'pintura!', col, [s * 3.6, 3, 0], null, [0.22, 6, 0.22], 0xffffff);   // los postes, fuera de la vía
+    arco.pon(new THREE.TorusGeometry(3.6, 0.13, 8, 40, Math.PI), 'pintura!', col, [0, 6, 0], null, 1, 0xffffff);   // el arco
+    arco.pon(new THREE.CircleGeometry(0.75, 24), 'luz!', 0xffffff, [0, 9.6, 0.02]);                            // el cartel: una burbuja
+    arco.pon(new THREE.TorusGeometry(0.75, 0.08, 8, 30), 'luz!', col, [0, 9.6, 0.03]);
+    g.add(arco.hecho());
+    const N = 18, geo = new THREE.SphereGeometry(1, 18, 12);
+    const mat = new THREE.MeshStandardMaterial({ color: 0xbfefff, emissive: this.neon ? 0x6a2bff : 0x3fb0ff, emissiveIntensity: this.neon ? 0.6 : 0.25,
+      roughness: 0.1, metalness: 0, transparent: true, opacity: 0.28, depthWrite: false });
+    const im = new THREE.InstancedMesh(geo, mat, N); im.frustumCulled = false; im.userData.sinAO = true; im.renderOrder = 3; g.add(im);
+    const az = (k => () => ((k = (k * 1664525 + 1013904223) >>> 0) / 4294967296))(77);   // siempre las mismas burbujas
+    const B = Array.from({ length: N }, () => ({ f: az(), x: (az() - 0.5) * 7, y: 1.6 + az() * 5.5, r: 0.35 + az() * 0.7, w: az() * 6 }));
+    const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3();
+    g.userData.colocar = (o, D, t) => {
+      g.position.set(0, SUELO, -(o.d0 - D));
+      B.forEach((b, k) => {                                       // a lo largo del tramo, subiendo y bajando despacio
+        p.set(b.x + Math.sin(t * 0.7 + b.w) * 0.3, b.y + Math.sin(t * 1.1 + b.w) * 0.4, -b.f * o.largo);
+        im.setMatrixAt(k, m4.compose(p, q, sc.setScalar(b.r * (1 + Math.sin(t * 2 + b.w) * 0.05))));
+      });
+      im.instanceMatrix.needsUpdate = true;
+    };
+    return g;
+  },
   /** Las reservas de City, preparadas de a poco con la ciudad (solo en los kits de City). */
   pasosCity(pre) {
     if (!this.pal.distrito || !CITY) return;
@@ -523,6 +658,9 @@ Object.assign(Kit.prototype, {
     pre('baranda', () => this.barandaCity(), 2); pre('lona', () => this.lonaCity(), 2);
     if (this.pal.distrito === 'bajo') pre('vapor', () => this.vaporCity(), 2);
     pre('estrellaS', () => this.estrellaSecreta(), 1); pre('poder-chicle', () => this.chicle(), 1);
+    pre('energia', () => this.celdaEnergia(), 4); pre('rejilla', () => this.rejillaCity(), 1);
+    pre('poder-bateria', () => this.bateria(), 1); pre('poder-monedas2', () => this.monedas2(), 1);
+    if (this.pal.distrito === 'parque') pre('burbujas', () => this.burbujasCity(), 1);
   }
 });
 
@@ -536,6 +674,9 @@ function objetoCity(kit, o) {
   else if (o.tipo === 'dron') obj = kit.saca('dron', () => kit.dronCity());
   else if (o.tipo === 'baranda') obj = kit.saca('baranda', () => kit.barandaCity());
   else if (o.tipo === 'lona') obj = o.variante === 'vapor' ? kit.saca('vapor', () => kit.vaporCity()) : kit.saca('lona', () => kit.lonaCity());
+  else if (o.tipo === 'energia') obj = kit.saca('energia', () => kit.celdaEnergia());
+  else if (o.tipo === 'rejilla') obj = kit.saca('rejilla', () => kit.rejillaCity());
+  else if (o.tipo === 'burbujas') obj = kit.saca('burbujas', () => kit.burbujasCity());
   else if (o.tipo === 'estrella' && o.secreta) { obj = kit.saca('estrellaS', () => kit.estrellaSecreta()); obj.position.x = CARRILES[o.carril]; }
   return obj;
 }
@@ -604,6 +745,15 @@ function creaEfectos({ escena }) {
         trozos.push({ p: new THREE.Vector3(CARRILES[o.carril] + (Math.random() - 0.5) * 0.8, y0 + SUELO, (Math.random() - 0.5) * 0.6),
           v: new THREE.Vector3((Math.random() - 0.5) * 6, 3 + Math.random() * 4, -2 - Math.random() * 4), r: Math.random() * 6, w: (Math.random() - 0.5) * 14,
           t: 0, e: 0.12 + Math.random() * 0.14, c: col[k % col.length] });
+      }
+    },
+    /** El escondite de una rejilla abierta: un chorro de monedas que salta del hueco (solo dibujo). */
+    geiser(o) {
+      for (let k = 0; k < 16; k++) {
+        if (trozos.length >= MAX) trozos.shift();
+        trozos.push({ p: new THREE.Vector3(CARRILES[o.carril] + (Math.random() - 0.5) * 0.6, SUELO + 0.1, (Math.random() - 0.5) * 0.4),
+          v: new THREE.Vector3((Math.random() - 0.5) * 3, 7 + Math.random() * 4, -1 - Math.random() * 2), r: Math.random() * 6, w: (Math.random() - 0.5) * 18,
+          t: 0, e: 0.16 + Math.random() * 0.06, c: k % 3 ? 0xffc81e : 0xfff3a6 });
       }
     },
     /** Cada cuadro: la burbuja sigue al corredor y los trozos vuelan con el mundo. */

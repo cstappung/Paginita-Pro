@@ -51,7 +51,17 @@ main.vl { min-width: 0; }
 
 /* ---------- el marcador sobre la carrera ---------- */
 .hud { position: absolute; inset: 0; pointer-events: none; --u: 1cqh; }
-@container (max-aspect-ratio: 1/1) { .hud { --u: 0.8cqh; } }
+/* Vertical (celular): la unidad mira también el ancho, y las monedas bajan
+   debajo de la pausa. En una fila, un puntaje de 7 cifras se montaba sobre
+   las monedas (390 px de ancho no alcanzan para las dos cosas lado a lado);
+   en columna el puntaje solo comparte la fila con la pausa. */
+@container (max-aspect-ratio: 1/1) {
+  .hud { --u: min(0.8cqh, 1.45cqw); }
+  .hud-der, .pantalla[data-estilo="pixel"] .hud-der { flex-direction: column-reverse; align-items: flex-end; }
+  /* Orbitron es mucho más ancha que las otras letras: en vertical un puntaje de 9 cifras
+     llegaba hasta la pausa, así que en neón se achica y se aprieta el espaciado. */
+  .pantalla[data-estilo="neon"] .hud .valor { font-size: calc(4.5 * var(--u)); letter-spacing: .1cqh; }
+}
 .hud-izq { position: absolute; left: calc(2.4 * var(--u)); top: calc(2.4 * var(--u)); display: grid; gap: calc(.8 * var(--u)); justify-items: start; }
 .hud-der { position: absolute; right: calc(2.4 * var(--u)); top: calc(2.4 * var(--u)); display: flex; gap: calc(1.4 * var(--u)); align-items: center; }
 .hud .fila { display: flex; align-items: center; gap: calc(1.2 * var(--u)); }
@@ -73,6 +83,18 @@ main.vl { min-width: 0; }
 .poderes li span i { display: block; height: 100%; width: calc(var(--k) * 100%); background: #ff6a3d; }
 .poderes .p-iman span i { background: #ff5a5a; } .poderes .p-mochila span i { background: #ffb02e; } .poderes .p-zapatillas span i { background: #3ad16a; } .poderes .p-doble span i { background: #5fb0ff; } .poderes .p-patineta span i { background: #b37bff; }
 .patinetas { position: absolute; right: calc(2.4 * var(--u)); bottom: calc(10 * var(--u)); display: flex; gap: calc(.8 * var(--u)); align-items: center; font-size: calc(3 * var(--u)); color: #fff; text-shadow: 0 2px 0 #000; }
+/* CITY: la energía de la tabla (una barra cian que se llena con las celdas) y el reloj de «monedas ×2», encima de las patinetas. */
+.hud-city { position: absolute; right: calc(2.4 * var(--u)); bottom: calc(15 * var(--u)); display: grid; justify-items: end; gap: calc(.8 * var(--u)); font-size: calc(2.6 * var(--u)); color: #fff; text-shadow: 0 2px 0 #000; pointer-events: none; }
+.hud-city[hidden], .hud-city [hidden] { display: none; }
+.hud-city .energia, .hud-city .mon2 { display: flex; align-items: center; gap: calc(.7 * var(--u)); }
+.hud-city .energia > i, .hud-city .mon2 > i { width: calc(3 * var(--u)); height: calc(3 * var(--u)); display: inline-block; }
+.hud-city i svg { display: block; width: 100%; height: 100%; }
+.hud-city .barra { width: calc(14 * var(--u)); height: calc(1.6 * var(--u)); border-radius: 99px; background: rgba(0, 0, 0, .45); overflow: hidden; box-shadow: 0 0 0 calc(.25 * var(--u)) rgba(255, 255, 255, .5); }
+.hud-city .barra i { display: block; height: 100%; width: calc(var(--k, 0) * 100%); background: linear-gradient(90deg, #22c6ff, #5ff6ff); transition: width .2s; }
+.hud-city.lista .energia { animation: mrEnergia .7s ease-in-out infinite alternate; transform-origin: right center; }   /* late hacia la izquierda: crecer desde el centro lo sacaba por el borde */
+.hud-city.lista .barra i { background: linear-gradient(90deg, #ffd23f, #fff36a); }
+@keyframes mrEnergia { from { transform: scale(1); } to { transform: scale(1.12); } }
+@media (prefers-reduced-motion: reduce) { .hud-city.lista .energia { animation: none; } }
 
 /* El letrero grande (estación nueva, récord, boleto) y el aviso corto. */
 .banner { position: absolute; left: 50%; top: 30%; transform: translate(-50%, -50%) scale(.9); text-align: center; color: #fff; opacity: 0; pointer-events: none; display: grid; gap: calc(.8cqh); width: 90%; transition: opacity .3s, transform .3s; }
@@ -179,6 +201,7 @@ main.vl { min-width: 0; }
 .pantalla[data-estilo="pixel"] .hud .pausa b { gap: calc(3 * var(--pp)); }
 .pantalla[data-estilo="pixel"] .hud .pausa b::before, .pantalla[data-estilo="pixel"] .hud .pausa b::after { width: calc(3 * var(--pp)); height: calc(10 * var(--pp)); border-radius: 0; }
 .pantalla[data-estilo="pixel"] .patinetas { font-size: var(--pf-chico); right: var(--pm); }
+.pantalla[data-estilo="pixel"] .hud-city { font-size: var(--pf-chico); right: var(--pm); }
 .pantalla[data-estilo="pixel"] .estacion .barra { height: calc(2 * var(--pp)); border-radius: 0; } .pantalla[data-estilo="pixel"] .estacion .barra i { border-radius: 0; background: #2fb59a; }
 
 /* ---------- los menús, al estilo Subway Surfers ----------
@@ -254,6 +277,8 @@ main.vl { min-width: 0; }
   box-shadow: inset 0 calc(.5 * var(--mt)) 0 rgba(255, 255, 255, .55), 0 calc(.55 * var(--mt)) 0 #a86f00, 0 calc(1 * var(--mt)) calc(1 * var(--mt)) rgba(0, 0, 0, .3); }
 .p-mult-n { min-width: calc(7.4 * var(--mt)); height: calc(6.2 * var(--mt)); display: grid; place-items: center; padding: 0 calc(.9 * var(--mt)); border-radius: calc(1.4 * var(--mt));
   background: linear-gradient(#ff7a4a, #e8401f); border: calc(.3 * var(--mt)) solid #fff; font: 400 calc(3.8 * var(--mt))/1 var(--ss-letra); color: #fff; -webkit-text-stroke: .14em #6e1600; paint-order: stroke fill; text-shadow: 0 .08em 0 #6e1600; }
+/* Sin ayudas: el multiplicador es ×10 fijo para todos; la placa va en azul para que se note que no es el de las misiones */
+.p-mult.fijo .p-mult-n { background: linear-gradient(#4ad8ff, #1f7fe8); -webkit-text-stroke-color: #0b2f6e; text-shadow: 0 .08em 0 #0b2f6e; }
 .p-mult-txt { display: grid; gap: calc(.45 * var(--mt)); text-align: left; }
 .p-mult-txt small { color: #6b3f00; }
 .p-mult-barra { display: block; width: calc(16 * var(--mt)); height: calc(1.7 * var(--mt)); border-radius: 99px; background: rgba(107, 63, 0, .25); overflow: hidden; border: calc(.2 * var(--mt)) solid rgba(107, 63, 0, .45); }

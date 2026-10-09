@@ -36,9 +36,31 @@
      · ESTRELLAS SECRETAS: estrellas normales (+1 al multiplicador, la prueba
        las anota como cualquier estrella) puestas donde solo se llega por la
        ruta difícil: arriba del salto de una lona, al final de una baranda.
+   Y lo que trae Subway Surfers City (2026) sobre el original:
+     · ENERGÍA DE TABLA: celdas de energía en la pista (más escasas que las
+       monedas). Con ENERGIA_LLENA juntas, la tabla se enciende gratis con
+       H o dos toques y dura TABLA_SEG. Solo en los modos con patineta.
+     · BATERÍA: un poder que llena la energía de una.
+     · MONEDAS ×2: un poder que cuenta doble cada moneda (no los puntos).
+     · CHICLE, como en City: además de salvarte, salta un 15 % más, y
+       «rodar» en el aire rebota en vez de bajar de golpe (una vez por salto).
+     · DRON IMPULSOR: pisar un dron (desde un techo o una lona) te lanza
+       alto, como en City, donde los drones te suben a los andamios.
+     · REJILLAS: rejillas en el suelo que tiemblan. Caerles encima de golpe
+       (el pisotón: rodar en el aire) las abre: abajo hay un escondite de
+       monedas, como los pasajes secretos del pisotón de City.
+     · CONTENEDORES QUE CAEN (Los Muelles): los cajones de los muelles caen
+       desde las grúas mientras te acercas, con su sombra marcando el carril.
+       Caen siempre antes de que llegues (a 12 m ya están en el suelo), así
+       que se esquivan igual que un cajón quieto.
+     · BURBUJAS (Parque de los Lagos): un tramo de baja gravedad, como las
+       burbujas de DeLorean Park: los saltos flotan y en el aire se puede
+       saltar una vez más (el doble salto).
    Nada de esto cambia cómo se calculan los puntos: siguen siendo 10 por
    metro × el multiplicador, y el multiplicador solo cambia con estrellas,
    el 2× y el +5. Por eso la prueba (prueba.js) no necesitó eventos nuevos.
+   (Los «speed pads» de City no están a propósito: la velocidad sale de los
+   metros recorridos y el antitrampas la recalcula; un acelerón la rompería.)
 
    UMD: `window.MetroRushCity` en la página (una función), `module.exports`
    en Node. La función recibe el motor ya armado y le instala City. */
@@ -123,9 +145,14 @@
     bruno: { id: "bruno", nombre: "Bruno", precio: 15000, ventaja: { grind: 2 }, texto: "Rielero: el doble de monedas deslizándose por las barandas",
       apariencia: { piel: 0xe0ac84, pelo: 0x3b2a20, peinado: "rapado", falda: null, sudadera: 0x3a4a3a, gorra: 0xe8463b, jeans: 0x1f2a44, mochila: 0xe8463b, mochila2: 0xf2f2f2, suela: 0xe8463b } },
     sol: { id: "sol", nombre: "Sol", precio: 20000, ventaja: { lona: 1.15 }, texto: "Acróbata: las lonas y el vapor la lanzan un 15 % más alto",
-      apariencia: { piel: 0xf6d2b8, pelo: 0xe8c25a, peinado: "melena", falda: 0xff7a3d, sudadera: 0xff7a3d, gorra: 0x23304a, jeans: 0x23304a, mochila: 0x6ad1ff, mochila2: 0xffe14d, suela: 0x23304a } }
+      apariencia: { piel: 0xf6d2b8, pelo: 0xe8c25a, peinado: "melena", falda: 0xff7a3d, sudadera: 0xff7a3d, gorra: 0x23304a, jeans: 0x23304a, mochila: 0x6ad1ff, mochila2: 0xffe14d, suela: 0x23304a } },
+    /* Dante llegó para que haya tres chicas y tres chicos. Su ventaja es la
+       de la tabla eléctrica: cada celda de energía le vale por dos, así que
+       la enciende con la mitad. No toca puntos ni metros, como las demás. */
+    dante: { id: "dante", nombre: "Dante", precio: 24000, ventaja: { energia: 2 }, texto: "Electricista: cada celda de energía vale por dos",
+      apariencia: { piel: 0x6b4128, pelo: 0x0f0a07, peinado: "corto", falda: null, sudadera: 0x23304a, gorra: 0x6ad1ff, jeans: 0x8a8f9c, mochila: 0xffe14d, mochila2: 0x23304a, suela: 0x6ad1ff } }
   };
-  /** La ventaja del personaje `id` (o {} si no es de City): {iman, salto, pisoton, grind, lona}. */
+  /** La ventaja del personaje `id` (o {} si no es de City): {iman, salto, pisoton, grind, lona, energia}. */
   const ventajaDe = id => (id && PERSONAJES[id] ? PERSONAJES[id].ventaja : {}) || {};
 
   /* ---------- Los objetos nuevos de la pista ----------
@@ -162,6 +189,30 @@
     }
   });
   M.registraTipo("lona", { caja: () => null });                // la lona no choca: se pisa
+  // lo de Subway Surfers City: nada de esto choca (se toma, se pisa o se atraviesa)
+  M.registraTipo("energia", { caja: () => null });             // la celda de energía de la tabla
+  M.registraTipo("rejilla", { caja: () => null });             // la rejilla del pisotón
+  M.registraTipo("burbujas", { caja: () => null });            // el tramo de baja gravedad
+
+  /* Las medidas de lo nuevo de City (las usan ciudad.js y mundo-city.js). */
+  const ENERGIA_LLENA = 10;                                    // celdas para encender la tabla (como en City)
+  const TABLA_SEG = 15;                                        // lo que dura la tabla encendida con energía
+  const MONEDAS2_SEG = 15;                                     // lo que dura el poder «monedas ×2»
+  const CHICLE = { salto: 1.15, rebote: 2.6 };                 // con chicle: salta un 15 % más; el rebote sube 2,6 m
+  const DRON_IMPULSO = 3.0;                                    // pisar un dron te lanza 3 m sobre donde estabas (~5,3 m del suelo)
+  const REJILLA = { largo: 1.8, w: 0.9, monedas: 15 };         // la rejilla y lo que suelta su escondite (el doble con Ámbar)
+  const BURBUJAS = { gravedad: 0.55 };                         // dentro del tramo, la gravedad es el 55 %: un salto sube 3,8 m
+  /* El contenedor que cae: dónde está según cuánto falta para llegar a él.
+     A más de 34 m todavía cuelga a 9 m; de 34 a 12 m baja (acelerando,
+     como algo que cae); a menos de 12 m ya está en el suelo. Solo es el
+     dibujo: choca igual que un cajón quieto, y para cuando lo tienes al
+     alcance (1 m) hace rato que tocó el suelo. Ejemplo: a 23 m va a 2,25 m. */
+  function alturaCae(dist) {
+    if (dist <= 12) return 0;
+    if (dist >= 34) return 9;
+    const f = (dist - 12) / 22;                                // 0 en el suelo, 1 arriba
+    return 9 * f * f;
+  }
 
   /** ¿Una caída del corredor rompe el objeto `o` (un cajón o un dron)? Sí
       si va bajando (vy ≤ 0) y en el cuadro anterior sus pies estaban
@@ -221,9 +272,17 @@
   };
   const generador = {
     bloque(api, dif, ctx) {
-      const st = api._city || (api._city = { sig: 150, chicle: 700, secreta: 600 });
+      const st = api._city || (api._city = { sig: 150, chicle: 700, secreta: 600, bateria: 900, monedas2: 1200, rejilla: 300, burbujas: 0 });
       if (api.dSig < st.sig) return false;                        // todavía no toca: un bloque de siempre
       const dr = api.dSig, est = M.estacionDe(dr, api.modo);      // el distrito donde cae el bloque
+      /* En el parque, cada 400 a 700 m, un tramo de burbujas (baja gravedad)
+         sobre los tres carriles, encima de lo que venga. No choca ni cierra
+         nada: el camino sigue siendo el mismo, solo se salta más alto. */
+      if (est.distrito === "parque" && dr >= st.burbujas) {
+        const largo = 70 + Math.floor(hashD(dr, 1) * 40);
+        api.emite({ tipo: "burbujas", carril: 1, d0: dr, largo });
+        st.burbujas = dr + largo + 400 + hashD(dr, 2) * 300;
+      }
       const pesos = PESOS[est.distrito] || PESOS.sur;
       const tipo = api.elige(pesos);
       const hecho = BLOQUES[tipo](api, dif, ctx, st, est);
@@ -236,7 +295,37 @@
       si no, los regalos de siempre (poder, estrella, caja, boleto). */
   function regalo(api, st, c, d, y) {
     if (api.conPoderes && d >= st.chicle) { api.emite({ tipo: "poder", clase: "chicle", carril: c, d, y: y || 1.2 }); st.chicle = d + 650 + api.azar() * 500; return; }
+    // la batería (llena la energía de la tabla: solo donde hay tabla) y las monedas ×2, los dos poderes de City
+    if (api.conPoderes && api.modo.patineta && d >= st.bateria) { api.emite({ tipo: "poder", clase: "bateria", carril: c, d, y: y || 1.2 }); st.bateria = d + 900 + hashD(d, 4) * 600; return; }
+    if (api.conPoderes && d >= st.monedas2) { api.emite({ tipo: "poder", clase: "monedas2", carril: c, d, y: y || 1.2 }); st.monedas2 = d + 800 + hashD(d, 5) * 600; return; }
     api.regalos(c, d, y);
+  }
+  /** Las celdas de energía de un bloque: dos o tres en fila, 3 m entre sí,
+      desde (c, d0) hacia adelante, a la altura y. Cada bloque las pone
+      donde sabe que no hay nada (detrás de la fila, encima del riel, sobre
+      los techos). Solo con patineta (sin tabla no hay qué cargar). No
+      consumen azar: no cambian el resto de la pista. */
+  function energia(api, c, d0, y) {
+    if (!api.conPoderes || !api.modo.patineta) return;
+    const n = 2 + (Math.floor(d0) % 2);                          // dos o tres, según el metro (sin azar)
+    for (let i = 0; i < n; i++) api.emite({ tipo: "energia", carril: c, d: d0 + i * 3, y });
+  }
+  /** Un número de 0 a 1 que sale del metro `d` (y de `k`), sin tocar el
+      azar de la pista: lo nuevo de City (rejillas, burbujas) no cambia en
+      nada dónde caen los trenes y las barreras, así una pista de antes
+      sigue siendo la misma con estas cosas encima. Ejemplo: hashD(812.4, 3)
+      da siempre el mismo número, en Node y en cualquier navegador. */
+  function hashD(d, k) {
+    let h = (Math.floor(d * 16) ^ (k * 0x9e3779b1)) >>> 0;     // el metro en dieciseisavos y la sal
+    h = Math.imul(h ^ (h >>> 16), 0x85ebca6b) >>> 0;           // la mezcla de murmur3 (solo enteros: igual en todas partes)
+    h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35) >>> 0;
+    return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+  }
+  /** Una rejilla del pisotón en el carril c, en d, si ya toca otra (una cada 250 a 450 m). */
+  function rejilla(api, st, c, d) {
+    if (d < st.rejilla) return;
+    api.emite({ tipo: "rejilla", carril: c, d });
+    st.rejilla = d + 250 + hashD(d, 3) * 200;
   }
   /** Una estrella secreta en (c, d, y), si ya toca otra (una cada 500 a 800 m). */
   function secreta(api, st, c, d, y) {
@@ -259,13 +348,13 @@
     /** Una fila de CAJONES: en el camino una pila que se salta o se pisa
         (con un arco de monedas encima, que enseña dónde saltar); los otros
         carriles, cerrados con trenes, drones o más cajones. */
-    cajones(api, dif, ctx, st) {
-      return fila(api, dif, ctx, st, "cajon");
+    cajones(api, dif, ctx, st, est) {
+      return fila(api, dif, ctx, st, "cajon", est);
     },
     /** Una fila de DRONES: en el camino un dron que se pasa rodando (con una
         fila de monedas bajita debajo, que enseña a rodar). */
-    drones(api, dif, ctx, st) {
-      return fila(api, dif, ctx, st, "dron");
+    drones(api, dif, ctx, st, est) {
+      return fila(api, dif, ctx, st, "dron", est);
     },
     /** Una BARANDA en el camino: 22 a 56 m de riel con monedas encima. Se
         salta y se desliza; o se cambia de carril (uno de los otros dos
@@ -285,6 +374,7 @@
         const k = otros[Math.floor(api.azar() * 2)];
         trenes(api, k, dr + 2, 1 + (largo > 22 ? 1 : 0));
       }
+      energia(api, c, dr + Math.floor(largo / 2), BARANDA.alto + 1.9);   // las celdas, arriba del riel: hay que saltar deslizándose
       secreta(api, st, c, dr + largo + 3, BARANDA.alto + 2.0);    // saltando al final del riel se alcanza (el salto llega a 2,1 m sobre el riel)
       api.libre[c] = dr + largo + 2;                             // nadie más se mete en el riel
       api.mantener = 1;                                          // al bajar sigues en el mismo carril
@@ -319,6 +409,7 @@
         api.filaMonedas(c, dr - 2, Math.min(14, fin - dr - 4));                                   // y el camino
       }
       secreta(api, st, L, d0 + LARGO_VAGON * 0.6, ALTO_TECHO + 1.6);   // encima del primer vagón
+      if (n >= 2) energia(api, L, d0 + LARGO_VAGON + 3, ALTO_TECHO + 1.9);   // las celdas, sobre el segundo vagón (la ruta difícil paga)
       const tercero = [0, 1, 2].find(k => k !== c && k !== L && api.libre[k] <= dr);
       if (tercero != null && api.azar() < 0.5) api.emite({ tipo: api.azar() < 0.5 ? "cajon" : "dron", carril: tercero, d: dr + 8 });
       api.dSig = Math.max(dr + espacio(api, dif, dr), d0 + 10);
@@ -331,15 +422,17 @@
       de la fila siguiente (por donde pasará el camino) a lo más con otro
       obstáculo pasable, y el que queda cerrado de verdad con un tren, un
       tren que viene, o un obstáculo de City. Nunca una fila vacía. */
-  function fila(api, dif, ctx, st, obst) {
+  function fila(api, dif, ctx, st, obst, est) {
     const dr = api.dSig, esp = espacio(api, dif, dr);
     if (api.libre[api.camino] > dr) return false;                // el camino está reservado: un bloque de siempre
+    const cae = !!est && est.distrito === "muelles";             // en Los Muelles los cajones caen desde las grúas
+    rejilla(api, st, api.camino, dr - esp * 0.45);               // a veces una rejilla del pisotón en el camino, antes de la fila
     const sig = api.siguienteCamino(dr + esp, lerp(0.35, 0.6, dif));
     let cerrados = 0;
     for (let c = 0; c < 3; c++) {
       if (api.libre[c] > dr) { cerrados++; continue; }
       if (c === api.camino) {
-        api.emite({ tipo: obst, carril: c, d: dr });
+        api.emite({ tipo: obst, carril: c, d: dr, cae: cae && obst === "cajon" });
         if (!api.peligro) {
           if (obst === "cajon") api.arcoMonedas(c, dr);           // el arco: salta (o pisa) aquí
           else api.filaMonedas(c, dr - 3, 6, 0.5, 1.5);           // bajita: rueda aquí
@@ -347,7 +440,7 @@
         continue;
       }
       if (c === sig) {                                           // por donde seguirá el camino: a lo más algo pasable
-        if (api.azar() < 0.35) api.emite({ tipo: api.azar() < 0.5 ? "cajon" : "dron", carril: c, d: dr });
+        if (api.azar() < 0.35) { const t = api.azar() < 0.5 ? "cajon" : "dron"; api.emite({ tipo: t, carril: c, d: dr, cae: cae && t === "cajon" }); }
         continue;
       }
       const r = api.azar();                                      // el carril cerrado de verdad
@@ -355,13 +448,17 @@
         const t = api.emite(api.trenEnMarcha(c, dr, api.velocidadEn(dr)));
         api.libre[c] = t.d0 + LARGO_VAGON + 6;
       } else if (r < lerp(0.6, 0.8, dif)) trenes(api, c, dr, api.azar() < lerp(0.3, 0.6, dif) ? 2 : 1);
-      else api.emite({ tipo: api.azar() < 0.5 ? "cajon" : "dron", carril: c, d: dr });
+      else { const t = api.azar() < 0.5 ? "cajon" : "dron"; api.emite({ tipo: t, carril: c, d: dr, cae: cae && t === "cajon" }); }
       cerrados++;
     }
     if (!cerrados) {                                             // nunca una fila vacía
       const c = [0, 1, 2].find(x => x !== api.camino && x !== sig && api.libre[x] <= dr);
       if (c != null) trenes(api, c, dr, 1);
     }
+    /* Las celdas, en el carril de la fila justo después del obstáculo (de
+       dr + 6 a dr + 12): ese carril queda vacío hasta la fila siguiente,
+       que está a 18 m o más. */
+    energia(api, api.camino, dr + 6, 1.0);
     regalo(api, st, api.camino, dr + esp * 0.5);
     api.camino = sig;
     api.dSig = dr + esp;
@@ -375,6 +472,7 @@
   Object.assign(W, { estaciones: DISTRITOS, vuelta: VUELTA, intro: INTRO, boletos: POSTALES, velocidad: VELOCIDAD_CITY,
     generador, personajes: PERSONAJES, tema: "city-sur" });
   M.ESTACIONES_CITY = DISTRITOS; M.INTRO_CITY = INTRO; M.BOLETOS_CITY = POSTALES;
-  M.CITY = { DISTRITOS, VUELTA, VELOCIDAD: VELOCIDAD_CITY, INTRO, POSTALES, PERSONAJES, ventajaDe, CAJON, DRON, BARANDA, LONA, PISA, PISA_DRON, pisa, enLona, impulsoLona, vueloLona, huecoLona, vagonesLona, PESOS };
+  M.CITY = { DISTRITOS, VUELTA, VELOCIDAD: VELOCIDAD_CITY, INTRO, POSTALES, PERSONAJES, ventajaDe, CAJON, DRON, BARANDA, LONA, PISA, PISA_DRON, pisa, enLona, impulsoLona, vueloLona, huecoLona, vagonesLona, PESOS,
+    ENERGIA_LLENA, TABLA_SEG, MONEDAS2_SEG, CHICLE, DRON_IMPULSO, REJILLA, BURBUJAS, alturaCae };
   return M;
 });

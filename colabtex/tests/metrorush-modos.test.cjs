@@ -157,7 +157,7 @@ function robot(modo,o={}){
  const st={t:0,D:0,V:curva.velocidad(0),puntos:0,estrellas:0,doble:0,extra:0,vivo:true,r:0},objetos=new Map(),tomados=new Set();
  const anota=(cod,x)=>MP.evento(prueba,cod,st.t,st.D,st.r,x),pedido=(tipo,...d)=>MP.pedido(prueba,tipo,gen.estado().dSig,...d);
  const agrega=l=>{for(const ob of l)objetos.set(ob.id,ob);},durDoble=M.duracionPoder('doble',op.md);
- const mult=()=>M.multiplicador({base:op.base,estrellas:st.estrellas,doble:st.doble>0,extra:st.extra});
+ const mult=()=>M.multiplicador({base:op.base,estrellas:st.estrellas,doble:st.doble>0,extra:st.extra,fijo:MO.multFijo});
  agrega(gen.generarHasta(230,{V:st.V}));
  const est=M.estacionDe(0,modo);if(est.boleto){pedido('B',est.boleto,420);gen.pedirBoleto(est.boleto,420);}
  let sig=MP.PASO_MUESTRA,muerte=0,mochila=false,usoPot=false;
@@ -284,4 +284,26 @@ test('el juego: elige el modo, lo manda a su tabla, pantalla completa, y las ver
  assert.match(js,/Club\.inmersivo\(true\)/);assert.match(js,/Club\.inmersivo\(false\)/);
  assert.match(html,/id="modosLista"/);assert.match(html,/id="hudModo"/);assert.match(html,/id="finTabla"/);
  assert.equal((html.match(/data-accion="pantallaCompleta"/g)||[]).length,2,'⛶ en la portada y en la pausa');
+});
+
+test('Sin ayudas y City sin ayudas: ×10 fijo para todos, sin importar nivel ni estrellas',()=>{
+ // solo esos dos modos lo fijan; el fantasma y los demás siguen con el de las misiones
+ assert.equal(M.MODOS.puro.multFijo,10);assert.equal(M.MODOS.citypuro.multFijo,10);
+ for(const k of ['clasico','sinmonedas','fantasma','city','cityfantasma'])assert.ok(!M.MODOS[k].multFijo,k);
+ assert.equal(M.multiplicador({base:25,estrellas:7,fijo:10}),10);
+ assert.equal(M.multiplicador({base:25,estrellas:7}),32);
+ for(const k of ['puro','citypuro']){
+  // la misma carrera con nivel 1 y con nivel 25 da los mismos puntos, y son 100 por metro
+  const a=robot(k,{base:1}),b=robot(k,{base:25});
+  assert.ok(a.estrellas>=1,k+': recogió estrellas');
+  assert.equal(a.puntos,b.puntos,k);
+  const ra=MP.rehace(a.prueba),rb=MP.rehace(b.prueba);
+  assert.equal(ra.motivo,undefined);assert.equal(rb.motivo,undefined);
+  assert.equal(ra.puntos,rb.puntos,k);
+  assert.ok(Math.abs(ra.puntos-ra.metros*100)<=100,k+': '+ra.puntos+' para '+ra.metros+' m');
+  // el tope del verificador para filas sin prueba es 100 por metro
+  assert.match(MV.sospecha(M.MODOS[k].categoria,{puntos:2e5,tiempo:60000}),/multiplicador máximo/);
+ }
+ // en el fantasma el nivel sí cuenta
+ const f1=robot('fantasma',{base:1}),f9=robot('fantasma',{base:9});assert.ok(f9.puntos>f1.puntos*2);
 });

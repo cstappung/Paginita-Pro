@@ -24,10 +24,10 @@
    - Se perdona el salto un poco antes de tocar el suelo y un poco después
      de dejarlo (búfer y "tiempo de coyote"): sin eso el salto se siente
      "comido" a toda velocidad. */
-import { crearMundo, PALETAS } from './mundo.js?v=metrorush-8';
-import { Sonido } from './audio.js?v=metrorush-8';
-import './mundo-city.js?v=metrorush-8';                        // CITY: el dibujo de City (se engancha a mundo.js por GANCHOS)
-import { crearCiudad } from './ciudad.js?v=metrorush-8';       // CITY: lo que la carrera hace distinto en City
+import { crearMundo, PALETAS } from './mundo.js?v=metrorush-9';
+import { Sonido } from './audio.js?v=metrorush-9';
+import './mundo-city.js?v=metrorush-9';                        // CITY: el dibujo de City (se engancha a mundo.js por GANCHOS)
+import { crearCiudad } from './ciudad.js?v=metrorush-9';       // CITY: lo que la carrera hace distinto en City
 
 const M = window.MetroRushMotor;                               // el motor (motor.js)
 const MP = window.MetroRushPrueba;                            // la prueba de la carrera, para el antitrampas (prueba.js)
@@ -269,6 +269,7 @@ function fisica(dt) {
     } else if (p === 'abajo') {
       if (c.poderes.mochila > 0) continue;
       if (c.pogo) c.pogo = false;                              // rodar en el pogo lo suelta: cae de golpe como siempre
+      if (r.enAire && c.ciudad && ciudad.rebota(c)) continue;  // CITY: con chicle, rodar en el aire rebota hacia arriba
       if (r.enAire) { r.vy = -F.caidaRapida; r.rodarPend = true; r.saltoBufer = -1; }   // en el aire: baja de golpe y rueda al caer
       else { r.rodar = F.tiempoRodar; c.cuenta.rodadas++; sonido.rodar(); }
     } else if (p === 'patineta') usaPatineta();
@@ -277,7 +278,8 @@ function fisica(dt) {
   if (r.saltoBufer > 0) {
     r.saltoBufer -= dt;
     const enSuelo = !r.enAire || c.t - r.ultSuelo < 0.09;
-    if (enSuelo && c.poderes.mochila <= 0) {
+    const enAire = !enSuelo && c.poderes.mochila <= 0 && !c.pogo && ciudad.saltoAire(c);   // CITY: en las burbujas, un salto más en el aire
+    if ((enSuelo || enAire) && c.poderes.mochila <= 0) {
       const alto = (c.poderes.zapatillas > 0 ? F.alturaZapatillas : F.alturaSalto) * ciudad.salto(c);   // CITY: Nico salta un poco más (solo altura)
       r.vy = M.impulso(alto); r.enAire = true; r.rodar = 0; r.saltoBufer = -1; r.ultSuelo = -1;
       c.cuenta.saltos++;
@@ -298,7 +300,7 @@ function fisica(dt) {
     // sube de golpe: el 95 % de la altura en medio segundo (antes, en casi uno). Solo cambia la altura, no los metros
     r.y += (F.alturaMochila - r.y) * (1 - Math.exp(-6 * dt)); r.vy = 0; r.enAire = true;
   } else {
-    r.vy -= F.gravedad * (c.pogo ? F.gravedadPogo : 1) * dt; r.y += r.vy * dt;   // en el pogo cae despacio (flota)
+    r.vy -= F.gravedad * (c.pogo ? F.gravedadPogo : 1) * ciudad.gravedad(c) * dt; r.y += r.vy * dt;   // en el pogo cae despacio (flota); CITY: en las burbujas también
     if (r.y <= sop.h) {                                        // toca el suelo (o el techo, o la rampa)
       if (c.pogo && r.vy < 0) { c.pogo = false; c.invulnerable = Math.max(c.invulnerable, 0.35); }   // se acabó el pogo: un respiro al aterrizar
       if (r.enAire && r.vy < -1) { sonido.aterriza(-r.vy); if (r.rodarPend) { r.rodar = F.tiempoRodar; c.cuenta.rodadas++; sonido.rodar(); } }
@@ -505,9 +507,33 @@ function lanzaPogo() {
 function usaPatineta() {
   if (!c.modo.patineta) { aviso(`En «${c.modo.nombre}» no hay patineta`); return; }   // los modos sin ayudas
   if (c.poderes.patineta > 0) return;
+  if (ciudad.tablaLista(c)) {                                   // CITY: con la energía llena, la tabla se enciende gratis (no gasta las compradas)
+    c.poderes.patineta = ciudad.usaTabla(c); c.patTotal = c.poderes.patineta; c.cuenta.patinetas++;
+    sonido.patineta(); aviso('¡Tabla encendida con energía! Te salva de un choque');
+    return;
+  }
   if (progreso.patinetas <= 0) { aviso('No te quedan patinetas (se compran en la tienda)'); return; }
-  progreso.patinetas--; c.poderes.patineta = M.DURACION_PATINETA; c.cuenta.patinetas++;
+  progreso.patinetas--; c.poderes.patineta = c.patTotal = M.DURACION_PATINETA; c.cuenta.patinetas++;
   sonido.patineta(); aviso('¡Patineta! Te salva de un choque');
+}
+
+/** CITY: la barra de energía de la tabla (solo con patineta en el modo) y
+    el reloj de «monedas ×2». Se escribe solo cuando cambia (como el resto
+    del marcador). Ejemplo: «⚡ 7/10»; llena, «⚡ ¡Lista! H». */
+function pintaHudCity() {
+  const el = $('hudCity'), h = ciudad.hud(c);
+  const ver = !!h && (c.modo.patineta || h.monedas2 > 0);
+  if (el.hidden === ver) el.hidden = !ver;
+  if (!ver) return;
+  const lista = h.energia >= h.llena, txt = (c.modo.patineta ? (lista ? '¡Lista! H' : `${h.energia}/${h.llena}`) : '') + '|' + (h.monedas2 > 0 ? Math.ceil(h.monedas2) : '');
+  if (hudCache.city === txt) return;
+  hudCache.city = txt;
+  el.classList.toggle('lista', lista);
+  $('hudEnergia').hidden = !c.modo.patineta;
+  $('hudEnergia').style.setProperty('--k', (h.energia / h.llena).toFixed(2));
+  ponTexto('hudEnergiaTxt', lista ? '¡Lista!' : `${h.energia}/${h.llena}`);   // corto: el cómo (H o dos toques) ya lo dijo el aviso al llenarse
+  $('hudMon2').hidden = !(h.monedas2 > 0);
+  ponTexto('hudMon2Txt', `×2 ${Math.ceil(h.monedas2)} s`);
 }
 
 /* ---- monedas, poderes y regalos que se recogen ---- */
@@ -515,7 +541,7 @@ function recoge(dt) {
   const r = c.r, imanta = c.poderes.iman > 0, k = 1 - Math.exp(-14 * dt);
   for (let i = c.activos.length - 1; i >= 0; i--) {
     const o = c.activos[i];
-    if (o.tipo !== 'moneda' && o.tipo !== 'poder' && o.tipo !== 'estrella' && o.tipo !== 'boleto') continue;
+    if (o.tipo !== 'moneda' && o.tipo !== 'poder' && o.tipo !== 'estrella' && o.tipo !== 'boleto' && o.tipo !== 'energia') continue;   // CITY: la energía de la tabla
     const dz = o.d - c.D;
     if (dz > 20 || dz < -2) continue;
     const ox = o.x != null ? o.x : M.CARRILES[o.carril];
@@ -537,12 +563,16 @@ function recoge(dt) {
     }
     // ¡recogido!
     c.activos.splice(i, 1); mundo.suelta(o);
-    if (o.tipo === 'moneda') { c.monedas++; c.cuenta.monedas++; sonido.moneda(); if (c.monedas % 5 === 0) mundo.chispa(r.x, r.y + 1, 0); }
+    if (o.tipo === 'moneda') { const n = ciudad.valorMoneda(c); c.monedas += n; c.cuenta.monedas += n; sonido.moneda(); if (c.monedas % 5 === 0) mundo.chispa(r.x, r.y + 1, 0); }   // CITY: con monedas ×2, valen dos
+    else if (o.tipo === 'energia') { ciudad.energia(c); mundo.chispa(r.x, r.y + 1, 0, 0x5ff6ff); }   // CITY: una celda de energía de la tabla
     else if (o.tipo === 'poder') { if (o.clase === 'doble') anota('d', o.id); activaPoder(o.clase); mundo.chispa(r.x, r.y + 1.2, 0, 0xffffff); }
     else if (o.tipo === 'estrella') {
       anota('e', o.id);
       c.estrellas = Math.min(M.MAX_ESTRELLAS, c.estrellas + 1); c.cuenta.estrellas++;
-      sonido.estrella(); aviso(`Estrella: multiplicador ×${multiplicador()}`); mundo.chispa(r.x, r.y + 1.2, 0, 0xffe066);
+      // con el multiplicador fijo (Sin ayudas) la estrella no lo sube: paga monedas y cuenta para las misiones
+      if (c.modo.multFijo) { c.monedas += ESTRELLA_MONEDAS; sonido.estrella(); aviso(`Estrella: +${ESTRELLA_MONEDAS} monedas (multiplicador fijo ×${c.modo.multFijo})`); }
+      else { sonido.estrella(); aviso(`Estrella: multiplicador ×${multiplicador()}`); }
+      mundo.chispa(r.x, r.y + 1.2, 0, 0xffe066);
     } else if (o.tipo === 'boleto' && c.ciudad) {                // CITY: una postal (se guarda aparte de los boletos de la Línea 3)
       sonido.boleto(); banner(ciudad.postal(progreso, o.n), 'Léela en la Libreta');
       guardar();
@@ -556,7 +586,9 @@ function recoge(dt) {
     }
   }
 }
-const multiplicador = () => M.multiplicador({ base: progreso.retos.nivel, estrellas: c.estrellas, doble: c.poderes.doble > 0, extra: c.extra });
+const ESTRELLA_MONEDAS = 50;                                   // lo que paga una estrella donde no puede subir el multiplicador
+// el multiplicador de la carrera; en Sin ayudas (`multFijo`) es ×10 fijo para todos, sin importar nivel ni estrellas
+const multiplicador = () => M.multiplicador({ base: progreso.retos.nivel, estrellas: c.estrellas, doble: c.poderes.doble > 0, extra: c.extra, fijo: c.modo.multFijo });
 
 /* ---- potenciadores (Despegue y Potenciador +5) ----
    Los primeros segundos de la carrera aparecen dos botones (o las teclas 1
@@ -1474,6 +1506,7 @@ function pintaHud(dt) {
   ponTexto('hudMetros', fmt(c.D) + ' m');
   ponTexto('hudMonedas', mon);
   ponTexto('hudPatinetas', String(progreso.patinetas));
+  pintaHudCity();                                                // CITY: la energía de la tabla y las monedas ×2
   if (c.fan) pintaFantasmaHud();                                 // la ventaja contra el fantasma
   // la barra hacia la próxima estación
   const e = c.estacion, sig = M.siguienteUmbral(c.D, c.modo), desde = e.desde || 0;   // en metros, como las estaciones
@@ -1485,12 +1518,12 @@ function pintaHud(dt) {
   // los poderes activos, con su barra de tiempo
   const lista = [];
   for (const [kk, v] of Object.entries(c.poderes)) if (v > 0) {
-    const total = kk === 'patineta' ? M.DURACION_PATINETA : M.duracionPoder(kk, progreso.mejoras[kk]);
+    const total = kk === 'patineta' ? (c.patTotal || M.DURACION_PATINETA) : M.duracionPoder(kk, progreso.mejoras[kk]);
     lista.push(`<li class="p-${kk}"><b>${ICONOS[kk === 'patineta' ? 'patineta' : ICONO_PODER[kk]]}</b><span><i style="--k:${Math.min(1, v / total).toFixed(3)}"></i></span></li>`);
   }
   const html = lista.join('');
   if (hudCache.poderes !== html.replace(/--k:[\d.]+/g, '')) { hudCache.poderes = html.replace(/--k:[\d.]+/g, ''); $('hudPoderes').innerHTML = html; }
-  else { let i = 0; for (const [kk, v] of Object.entries(c.poderes)) if (v > 0) { const el = $('hudPoderes').children[i++]; if (el) { const total = kk === 'patineta' ? M.DURACION_PATINETA : M.duracionPoder(kk, progreso.mejoras[kk]); el.querySelector('i').style.setProperty('--k', Math.min(1, v / total).toFixed(3)); } } }
+  else { let i = 0; for (const [kk, v] of Object.entries(c.poderes)) if (v > 0) { const el = $('hudPoderes').children[i++]; if (el) { const total = kk === 'patineta' ? (c.patTotal || M.DURACION_PATINETA) : M.duracionPoder(kk, progreso.mejoras[kk]); el.querySelector('i').style.setProperty('--k', Math.min(1, v / total).toFixed(3)); } } }
   // el letrero grande se apaga solo
   if (c.banner > 0) { c.banner -= dt; if (c.banner <= 0) $('banner').classList.remove('ver'); }
 }
@@ -1583,7 +1616,10 @@ function cierraPanel() {
 function pintaPortada() {
   ponTexto('portadaRecord', fmt(M.recordDe(progreso, modoSel)));   // el récord del modo elegido
   pintaModos();
-  ponTexto('portadaMult', '×' + progreso.retos.nivel);
+  // en un modo de multiplicador fijo (Sin ayudas) la placa dice ×10: es lo que vale la próxima carrera
+  const fijo = modoSel.multFijo;
+  ponTexto('portadaMult', '×' + (fijo || progreso.retos.nivel));
+  $('portadaMult').closest('.p-mult').classList.toggle('fijo', !!fijo);
   ponTexto('portadaMonedas', fmt(progreso.monedas));
   // los globitos de la barra: cuántos retos van cumplidos y cuántos boletos tienes
   const lista = M.retosDeNivel(progreso.retos.nivel);
@@ -1595,7 +1631,7 @@ function pintaPortada() {
   ponTexto('portadaBoletos', ciudad.cuentaPostales(modoSel, progreso) || `${boletosTenidos()}/${boletosLinea().length}`);   // CITY: las postales
   ponTexto('barRecord', fmt(M.recordDe(progreso, modoSel)));
   ponTexto('barMonedas', fmt(progreso.monedas));
-  ponTexto('barMult', '×' + progreso.retos.nivel);
+  ponTexto('barMult', '×' + (fijo || progreso.retos.nivel));
 }
 /* Tocar cualquier parte vacía de la portada empieza a correr, como «toca
    para jugar»: solo los botones y los contadores no cuentan. */
@@ -1651,30 +1687,40 @@ let tiendaPestana = 'mejoras';                                 // la pestaña ab
    Los aspectos de siempre se muestran con una cabecita de CSS (gorra, cara,
    sudadera). Las corredoras no llevan gorra: lo que las distingue es el
    peinado, así que su muestra es un SVG chico que dibuja la cara con su
-   pelo (coleta, trenzas, melena o moños), su tocado (cintillo o boina), y
+   pelo (coleta, trenzas, melena, moños o afro), su tono de piel, su tocado (cintillo o boina), y
    los lentes o aros si los tiene, con los mismos colores que el modelo 3D
    (`a.rasgos` en motor.js). Todo con colores del aspecto: nada que el
    jugador escriba, nada que escapar. */
 function muestraRasgos(a) {
   const R = a.rasgos, hex = n => '#' + n.toString(16).padStart(6, '0');
-  const pelo = hex(R.pelo), toc = hex(a.gorra), ropa = hex(a.sudadera), tinta = '#0d2a63';   // los colores (tinta: el borde de la tienda)
+  const piel = hex(R.piel ?? 0xf1c19c), pelo = hex(R.pelo), toc = hex(a.gorra), ropa = hex(a.sudadera), tinta = '#0d2a63';   // los colores (tinta: el borde de la tienda)
   const detras = R.peinado === 'larga' ? `<path d="M27 44 Q26 82 34 86 L66 86 Q74 82 73 44 Z" fill="${pelo}"/>`   // la melena, detrás de la cara
     : R.peinado === 'coleta' ? `<path d="M64 28 Q88 26 84 58 Q80 48 70 40 Z" fill="${pelo}"/><circle cx="66" cy="30" r="4" fill="${toc}"/>`   // la cola, hacia un lado
       : R.peinado === 'trenzas' ? [-1, 1].map(s => `<g fill="${pelo}">${[0, 1, 2].map(i => `<circle cx="${50 + s * 22}" cy="${54 + i * 9}" r="5.5"/>`).join('')}<circle cx="${50 + s * 22}" cy="${80}" r="3" fill="${toc}"/></g>`).join('')
-        : R.peinado === 'monos' ? `<circle cx="32" cy="27" r="9" fill="${pelo}"/><circle cx="68" cy="27" r="9" fill="${pelo}"/>` : '';
+        : R.peinado === 'monos' ? `<circle cx="32" cy="27" r="9" fill="${pelo}"/><circle cx="68" cy="27" r="9" fill="${pelo}"/>`
+          : R.peinado === 'afro' ? `<circle cx="50" cy="40" r="29" fill="${pelo}"/>` : '';   // la nube del afro, detrás de la cara
   const tocado = R.tocado === 'cintillo' ? `<path d="M30 42 Q50 16 70 42" fill="none" stroke="${toc}" stroke-width="4" stroke-linecap="round"/>`
-    : R.tocado === 'boina' ? `<ellipse cx="53" cy="27" rx="23" ry="8" fill="${toc}" transform="rotate(-10 53 27)"/><circle cx="54" cy="18" r="2.5" fill="${toc}"/>` : '';
+    : R.tocado === 'boina' ? `<ellipse cx="53" cy="27" rx="23" ry="8" fill="${toc}" transform="rotate(-10 53 27)"/><circle cx="54" cy="18" r="2.5" fill="${toc}"/>`
+      : R.tocado === 'gorra' ? `<path d="M30 42 Q30 24 50 24 Q70 24 70 42 Z" fill="${toc}"/><path d="M30 41 L16 44 Q22 38 32 37 Z" fill="${toc}"/>` : '';   // la gorra de City, con la visera hacia un lado
   const lentes = R.lentes ? `<g fill="none" stroke="#2b2d42" stroke-width="1.8"><circle cx="43" cy="47" r="5.5"/><circle cx="57" cy="47" r="5.5"/><path d="M48.5 47 L51.5 47"/></g>` : '';
   const aros = R.aros ? `<g fill="none" stroke="#ffc63a" stroke-width="1.8"><circle cx="30" cy="55" r="3.2"/><circle cx="70" cy="55" r="3.2"/></g>` : '';
   return `<svg viewBox="0 0 100 100" aria-hidden="true">
     <rect width="100" height="100" fill="#cfe3ff"/>${detras}
-    <ellipse cx="50" cy="100" rx="38" ry="24" fill="${ropa}"/><rect x="45" y="62" width="10" height="10" fill="#f1c19c"/>
-    <circle cx="50" cy="48" r="19" fill="#f1c19c"/>
+    <ellipse cx="50" cy="100" rx="38" ry="24" fill="${ropa}"/><rect x="45" y="62" width="10" height="10" fill="${piel}"/>
+    <circle cx="50" cy="48" r="19" fill="${piel}"/>
     <path d="M31 47 Q30 26 50 27 Q70 26 69 47 Q66 37 58 34 Q48 40 34 40 Z" fill="${pelo}"/>
     <circle cx="43.5" cy="48" r="2.2" fill="#1d1a2a"/><circle cx="56.5" cy="48" r="2.2" fill="#1d1a2a"/>
-    <path d="M39 45.5 L41 44.5 M61 45.5 L59 44.5" stroke="#1d1a2a" stroke-width="1.2"/>
+    ${R.chico ? '' : '<path d="M39 45.5 L41 44.5 M61 45.5 L59 44.5" stroke="#1d1a2a" stroke-width="1.2"/>'}
     <path d="M45 56 Q50 60 55 56" fill="none" stroke="#8a2a1e" stroke-width="1.6" stroke-linecap="round"/>
     ${tocado}${lentes}${aros}<rect x="70" y="80" width="13" height="13" rx="3" fill="${hex(a.mochila)}" stroke="${tinta}" stroke-width="1.5"/></svg>`;
+}
+/** Los personajes de City traen `piel`, `pelo` y `peinado` sueltos en su
+    apariencia (y otros nombres de peinado): se traducen a `rasgos` para que
+    `muestraRasgos` los dibuje con su cara de verdad. Ejemplo: Dante, de pelo
+    corto, sale con su piel morena y su gorra celeste. */
+function conRasgosCity(a) {
+  const peinado = { melena: 'larga', coleta: 'coleta', trenzas: 'trenzas' }[a.peinado] || '';   // corto y rapado: solo el pelo de arriba
+  return Object.assign({}, a, { rasgos: { pelo: a.pelo, piel: a.piel, peinado, tocado: peinado ? '' : 'gorra', chico: !peinado } });   // sin pelo largo, gorra (como en 3D) y sin pestañas
 }
 let tiendaVer = null;                                          // el aspecto que se está probando
 let aspectoMostrado = null;                                    // el que lleva el corredor en pantalla
@@ -1752,7 +1798,7 @@ function pintaTienda() {
     const hex = n => '#' + n.toString(16).padStart(6, '0');
     const marca = puesto ? `<em class="ok">${ICONOS.check}</em>` : secreto ? `<em class="cerrado">${ICONOS.candado}</em>` : '';
     return `<li><button type="button" class="t-traje${k === tiendaVer ? ' sel' : ''}${secreto ? ' secreto' : ''}" data-ver="${k}" aria-pressed="${k === tiendaVer}">
-      ${a.rasgos ? `<span class="t-muestra con-rasgos">${muestraRasgos(a)}</span>`   /* las corredoras: su cabecita con peinado (ver «La muestra de las corredoras») */
+      ${a.rasgos || a.city ? `<span class="t-muestra con-rasgos">${muestraRasgos(a.rasgos ? a : conRasgosCity(a))}</span>`   /* las corredoras y los de City: su cabecita con peinado y piel (ver «La muestra de las corredoras») */
         : `<span class="t-muestra" style="--a:${hex(a.sudadera)};--b:${hex(a.gorra)};--c:${hex(a.jeans)};--d:${hex(a.mochila)}"><i></i></span>`}<span class="t-n">${a.nombre}</span>${marca}${a.city ? '<em class="t-city">City</em>' : ''}</button></li>`;
   }).join('');
   const a = ciudad.aspecto(tiendaVer), tiene = ciudad.tiene(progreso, tiendaVer), puesto = puestoAhora === tiendaVer;
@@ -1903,7 +1949,7 @@ pintaPantallaCompleta();
    píxeles enteros del aparato. Solo lo usa el estilo pixel (estilo.css). */
 function medidasPixel(r) {
   const dpr = window.devicePixelRatio || 1;                                  // píxeles del aparato por píxel CSS
-  const u = (r.width <= r.height ? 0.8 : 1) * r.height / 100;                // la unidad del marcador (--u en estilo.css)
+  const u = (r.width <= r.height ? Math.min(0.8 * r.height, 1.45 * r.width) : r.height) / 100;   // la unidad del marcador (--u en estilo.css; en vertical mira también el ancho)
   const ocho = v => Math.max(1, Math.round(v * dpr / 8)) * 8 / dpr;          // al múltiplo de 8 píxeles del aparato más cercano (en px CSS)
   const entero = v => Math.max(1, Math.round(v * dpr)) / dpr;                // a píxeles enteros del aparato
   const chico = ocho(2.2 * u), pp = chico / 8;                               // la letra chica y un píxel suyo
@@ -1967,7 +2013,7 @@ window.__metrorush = {
   modo: id => { eligeModo(id); return modoSel.id; },
   /** Los objetos de la pista por delante (copias, solo para mirar): [{tipo, clase, carril, d, y}]. */
   objetos: (hasta = 60) => c ? c.activos.filter(o => (o.d != null ? o.d : o.d0) - c.D < hasta && (o.d != null ? o.d : o.d0 + (o.largo || 0)) > c.D - 1)
-    .map(o => ({ tipo: o.tipo, clase: o.clase, carril: o.carril, d: o.d != null ? o.d : o.d0, y: o.y, largo: o.largo, vel: o.vel })) : [],
+    .map(o => ({ tipo: o.tipo, clase: o.clase, carril: o.carril, d: o.d != null ? o.d : o.d0, y: o.y, largo: o.largo, vel: o.vel, cae: o.cae || undefined })) : [],
   puntos: n => { toca(); if (c) c.puntos = n; },
   pulsa: a => { toca(); pedidos.push(a); },
   poder: k => { toca(); return c && activaPoder(k); },

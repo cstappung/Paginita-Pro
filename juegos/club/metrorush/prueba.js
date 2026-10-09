@@ -229,7 +229,7 @@
         // los puntos del tramo, con el multiplicador que había
         if (cod !== "w") {
           if (D < Dpuntos - 1e-9) return mal("los metros van hacia atrás");
-          puntos += M.puntosPorTramo(D - Dpuntos, M.multiplicador({ base: p.b, estrellas, doble, extra }));
+          puntos += M.puntosPorTramo(D - Dpuntos, M.multiplicador({ base: p.b, estrellas, doble, extra, fijo: modo.multFijo }));
           Dpuntos = D;
         }
       }

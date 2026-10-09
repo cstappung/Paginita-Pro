@@ -248,8 +248,13 @@
 
   /** El multiplicador total: base de los retos + estrellas de la carrera +
       el potenciador (si se usó uno al empezar), y ×2 si el poder 2× está
-      activo. Ejemplo: base 5, 3 estrellas, potenciador +5 y 2× → 26. */
-  function multiplicador({ base = 1, estrellas = 0, doble = false, extra = 0 } = {}) {
+      activo. Ejemplo: base 5, 3 estrellas, potenciador +5 y 2× → 26.
+      `fijo`: el multiplicador de un modo que lo fija (MODOS[...].multFijo);
+      con él no cuentan ni la base, ni las estrellas, ni nada. Ejemplo: en
+      Sin ayudas, base 25 y 4 estrellas → 10, igual que un jugador nuevo. */
+  function multiplicador({ base = 1, estrellas = 0, doble = false, extra = 0, fijo = 0 } = {}) {
+    // un modo con multiplicador fijo (Sin ayudas: ×10 para todos) no mira nada más
+    if (fijo > 0) return fijo;
     const m = limita(base, 1, MAX_BASE) + limita(estrellas, 0, MAX_ESTRELLAS) + limita(extra | 0, 0, 10);
     return m * (doble ? 2 : 1);
   }
@@ -423,19 +428,19 @@
   const MODOS = {
     clasico: { id: "clasico", nombre: "Clásico", corto: "Clásico", desc: "El de siempre: poderes, patineta, potenciadores y seguir corriendo.",
       categoria: "club-metrorush-carrera", items: true, potenciadores: true, patineta: true, revivir: true, monedasMatan: false, mundo: "metro", distancia: true },
-    puro: { id: "puro", nombre: "Sin ayudas", corto: "Sin ayudas", desc: "Sin poderes, cajas, patineta ni potenciadores, y sin segunda oportunidad. Solo monedas y estrellas.",
-      categoria: "club-metrorush-puro", items: false, potenciadores: false, patineta: false, revivir: false, monedasMatan: false, mundo: "metro" },
+    puro: { id: "puro", nombre: "Sin ayudas", corto: "Sin ayudas", desc: "Todos corren a ×10 fijo, sin poderes, cajas, patineta ni potenciadores, y sin segunda oportunidad.",
+      categoria: "club-metrorush-puro", items: false, potenciadores: false, patineta: false, revivir: false, monedasMatan: false, mundo: "metro", multFijo: 10 },
     sinmonedas: { id: "sinmonedas", nombre: "Sin monedas", corto: "Sin monedas", desc: "Las monedas queman: tocar una termina la carrera. Sin poderes ni ayudas.",
       categoria: "club-metrorush-sinmonedas", items: false, potenciadores: false, patineta: false, revivir: false, monedasMatan: true, mundo: "metro" },
     city: { id: "city", nombre: "City", corto: "City", desc: "La ciudad, con todos los poderes y ayudas.",
       categoria: "club-metrorush-city", items: true, potenciadores: true, patineta: true, revivir: true, monedasMatan: false, mundo: "city" },
-    citypuro: { id: "citypuro", nombre: "City sin ayudas", corto: "City puro", desc: "La ciudad sin poderes, cajas, patineta ni potenciadores, y sin segunda oportunidad.",
-      categoria: "club-metrorush-citypuro", items: false, potenciadores: false, patineta: false, revivir: false, monedasMatan: false, mundo: "city" },
+    citypuro: { id: "citypuro", nombre: "City sin ayudas", corto: "City puro", desc: "La ciudad a ×10 fijo para todos, sin poderes, cajas, patineta ni potenciadores, y sin segunda oportunidad.",
+      categoria: "club-metrorush-citypuro", items: false, potenciadores: false, patineta: false, revivir: false, monedasMatan: false, mundo: "city", multFijo: 10 },
     /* Los dos «Fantasma»: las reglas de Sin ayudas, y además se corre contra
        el fantasma de la mejor carrera de su propia tabla. El fantasma (traerlo,
        dibujarlo, anotarlo) lo hace otro trabajo; aquí quedan los ganchos: la
        semilla elegible al empezar y el campo `g` de la prueba. */
-    fantasma: { id: "fantasma", nombre: "Fantasma", corto: "Fantasma", desc: "Sin ayudas, contra el fantasma de la mejor carrera de esta tabla, en su misma pista.",
+    fantasma: { id: "fantasma", nombre: "Fantasma", corto: "Fantasma", desc: "Sin poderes ni ayudas, contra el fantasma de la mejor carrera de esta tabla, en su misma pista.",
       categoria: "club-metrorush-fantasma", items: false, potenciadores: false, patineta: false, revivir: false, monedasMatan: false, mundo: "metro", fantasma: true },
     cityfantasma: { id: "cityfantasma", nombre: "City fantasma", corto: "City fantasma", desc: "La ciudad sin ayudas, contra el fantasma de la mejor carrera de esta tabla.",
       categoria: "club-metrorush-cityfantasma", items: false, potenciadores: false, patineta: false, revivir: false, monedasMatan: false, mundo: "city", fantasma: true }
@@ -524,7 +529,7 @@
     nocturno: { nombre: "Nocturno", precio: 15000, sudadera: 0x2b2d42, gorra: 0x8d99ae, jeans: 0x1d1e2c, mochila: 0xef233c, mochila2: 0xedf2f4, suela: 0xef233c },
     grafitero: { nombre: "Grafitero", precio: 30000, sudadera: 0x7b2ff7, gorra: 0x00f5d4, jeans: 0x22223b, mochila: 0xfee440, mochila2: 0xf15bb5, suela: 0x00f5d4 },
     /* --- Las corredoras (ronda 2) ---
-       Cuatro personajes nuevos con silueta propia: `rasgos` (peinado,
+       Cinco personajes con silueta propia (Kiara llegó después): `rasgos` (peinado,
        tocado, falda, lentes, aros; mundo.js, «Los rasgos») cambia el
        muñeco, no solo los colores. Sin gorra: `gorra` es el color del
        tocado y de los elásticos. `jeans` pinta las piernas (calzas o
@@ -538,6 +543,12 @@
       rasgos: { pelo: 0x1d1a22, peinado: "larga", lentes: true, falda: 0x5b3fa8 } },          // melena larga, lentes redondos y falda morada
     maite: { nombre: "Maite", precio: 45000, sudadera: 0xffb703, gorra: 0x3a86ff, jeans: 0x3a86ff, mochila: 0x3a86ff, mochila2: 0xffb703, suela: 0xffffff,
       rasgos: { pelo: 0x2a1610, peinado: "monos", aros: true, falda: 0x3a86ff } },            // dos moños, aros dorados y falda azul
+    /* --- Kiara (ronda 3): la quinta corredora, para que haya cinco chicas y
+       cinco chicos. Su silueta es el afro, una nube de pelo redonda que se
+       reconoce de espaldas a cualquier distancia; `piel` le da un tono de
+       piel propio (las demás usan el de siempre). Sin falda: calzas negras. */
+    kiara: { nombre: "Kiara", precio: 55000, sudadera: 0x2ec27e, gorra: 0xff7a3d, jeans: 0x1d1e2c, mochila: 0xff7a3d, mochila2: 0x2ec27e, suela: 0xffffff,
+      rasgos: { pelo: 0x1a100b, piel: 0x8d5a3b, peinado: "afro", tocado: "cintillo", aros: true } },   // afro con cintillo naranja y aros
     dorado: { nombre: "Dorado", precio: null, secreto: "Teclea el código de siempre en la portada (↑ ↑ ↓ ↓ ← → ← → B A).", sudadera: 0xd4a017, gorra: 0xffe066, jeans: 0x8a6d1a, mochila: 0xffd23f, mochila2: 0xfff3b0, suela: 0xffe066 },
     inspector: { nombre: "Inspector", precio: null, secreto: "Encuentra todos los boletos dorados de la Línea 3.", sudadera: 0x1f3a5f, gorra: 0x1f3a5f, jeans: 0x14213d, mochila: 0x8a5a35, mochila2: 0xfca311, suela: 0x111111 }
   };

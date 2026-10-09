@@ -3701,9 +3701,11 @@ Things that matter:
   with «¡TE PILLÉ!». The bubbles are planes with a canvas texture (normals
   for SAO), built once and not freed with the kits. `__metrorush.tropieza()`
   and `__metrorush.pogo()` trigger both from a script (test runs).
-- **The female runners** (`paloma`, `trini`, `luz`, `maite` in
-  `ASPECTOS`) carry `rasgos` (hair colour, `peinado` coleta / trenzas /
-  larga / monos, `tocado` cintillo / boina, `falda`, `lentes`, `aros`):
+- **The female runners** (`paloma`, `trini`, `luz`, `maite`, `kiara` in
+  `ASPECTOS`; five against five male, counting the two secret ones, and
+  `metrorush-salto.test.cjs` keeps it even) carry `rasgos` (hair colour,
+  optional `piel`, `peinado` coleta / trenzas / larga / monos / afro,
+  `tocado` cintillo / boina, `falda`, `lentes`, `aros`):
   `armaRasgos` in `mundo.js` replaces the cap with hair and adds the
   silhouette, `mueveRasgos` (called at the end of `posa`) swings ponytail,
   braids, long hair and skirt. Hanging hair rotates *negative* x to go
@@ -3986,6 +3988,34 @@ Things that matter:
   regexes and the 1e9 cap were widened, so **the rules must be
   re-published**. Logros still read only the classic tables. Proof changes
   bumped `club-47` and `metrorush-7`.
+
+  **Sin ayudas and City sin ayudas run at a fixed ×10 for everyone**
+  (`multFijo: 10` in `MODOS`; `M.multiplicador({…, fijo})` returns it and
+  ignores base, stars, 2× and +5). The point is a table where only distance
+  decides: base ×30 veterans and newcomers score the same per metre. The
+  game, `rehace` and the verifier's per-metre cap (`10 × multFijo`) all read
+  `multFijo`, so changing it voids those tables' proofs (it bumped `club-49`
+  and `metrorush-9`). A star there pays 50 coins instead.
+
+  **City** is its own world now (`city.js`: districts, generator,
+  characters and constants; `ciudad.js`: its physics in the run;
+  `mundo-city.js`: its drawing; `tests/metrorush-city.test.cjs`). Five
+  districts by distance (Barrio Sur, Los Muelles, Bulevar Aurora, Parque de
+  los Lagos, Bajo Vías), postales instead of tickets, its own speed curve,
+  and six characters in `PERSONAJES` (three girls, three boys), each with
+  one small `ventaja` that never touches metres or the multiplier. On top of
+  cajones, drones, barandas and lonas it carries Subway Surfers City's newer
+  pieces: energy cells (`energia`, ten light the free electric board for
+  `TABLA_SEG`; only in modes with a skateboard), the `bateria` and
+  `monedas2` powers, the chicle's bounce («roll» in the air goes up, once
+  per jump), drones that launch you when stepped on, floor grates
+  (`rejilla`) opened by a ground-pound, containers that drop from the cranes
+  in Los Muelles (`cae`, `alturaCae`: always on the ground 12 m before you)
+  and low-gravity `burbujas` stretches in the park with one extra jump.
+  **None of the new pieces draws from `api.azar`**: they are placed with
+  `hashD(d, k)`, so adding one never moves the rest of a seed's track (the
+  robot test that runs every seed found that the hard way). Speed pads are
+  left out on purpose: the anti-cheat recomputes speed from distance.
 - **Fullscreen**: ⛶ on the title screen and in the pause panel, or `F`,
   calls `requestFullscreen` on the document (webkit fallback; the button
   hides where the API is missing, i.e. iPhone). `html.mr-pc` (and

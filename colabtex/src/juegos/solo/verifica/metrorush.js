@@ -66,7 +66,8 @@ export function sospecha(categoria, fila) {
     return null;
   }
   // la mejor carrera de cualquier modo: sin poderes ni potenciadores el multiplicador llega menos alto
-  const tope = modo.items || modo.potenciadores ? PUNTOS_POR_METRO_MAX : PUNTOS_POR_METRO_SIN;
+  // y en Sin ayudas (`multFijo`) es fijo: ×10 → 100 puntos por metro, ni uno más
+  const tope = modo.multFijo ? 10 * modo.multFijo : modo.items || modo.potenciadores ? PUNTOS_POR_METRO_MAX : PUNTOS_POR_METRO_SIN;
   if (p > maxMetros * tope) return p + ' puntos en ' + t.toFixed(1) + ' s (más de lo que da el multiplicador máximo)';
   return null;
 }

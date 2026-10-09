@@ -281,10 +281,13 @@ test('los personajes de City: chicas y chicos, con una ventaja chica que no toca
     for (const k of ['sudadera', 'gorra', 'jeans', 'mochila', 'mochila2', 'suela', 'piel', 'pelo']) assert.equal(typeof p.apariencia[k], 'number', id + '.' + k);
     // una sola ventaja, de las que no cambian ni los metros ni el multiplicador
     const v = Object.keys(p.ventaja); assert.equal(v.length, 1, id);
-    assert.ok(['iman', 'salto', 'pisoton', 'grind', 'lona'].includes(v[0]), id);
+    assert.ok(['iman', 'salto', 'pisoton', 'grind', 'lona', 'energia'].includes(v[0]), id);
     assert.ok(p.ventaja[v[0]] > 0 && p.ventaja[v[0]] <= 3, id + ': chica');
     assert.equal(C.ventajaDe(id), p.ventaja);
   }
+  // tres chicas y tres chicos (Dante llegó para emparejar)
+  const chicas = ['lia', 'ambar', 'sol'], chicos = ['nico', 'bruno', 'dante'];
+  assert.deepEqual([...ids].sort(), [...chicas, ...chicos].sort());
   assert.ok(ids.some(k => P[k].apariencia.falda), 'hay faldas'); assert.ok(ids.some(k => !P[k].apariencia.falda), 'y pantalones');
   assert.deepEqual(C.ventajaDe('clasico'), {}); assert.deepEqual(C.ventajaDe(null), {});
   // el salto de Nico (2,27 m) no pasa por encima de un dron (2,45) ni llega a pisarlo (eso solo desde un techo o una lona)
@@ -323,6 +326,49 @@ test('la pista de City tiene lo suyo; «City sin ayudas» ni un poder ni un chic
   const h = l => crypto.createHash('sha256').update(JSON.stringify(l)).digest('hex');
   assert.equal(h(pista(77, 4000, 'city').objs), h(pista(77, 4000, 'city').objs));
   assert.notEqual(h(pista(77, 4000, 'city').objs), h(pista(77, 4000, 'citypuro').objs));
+});
+
+test('lo de Subway Surfers City: energía de la tabla, rejillas, contenedores que caen, burbujas y los poderes nuevos', () => {
+  const city = pista(2026, 10500, 'city').objs, puro = pista(2026, 10500, 'citypuro').objs;
+  const de = (l, t) => l.filter(o => o.tipo === t);
+  // las celdas de energía cargan la tabla: solo donde hay patineta (en «sin ayudas» no hay qué cargar)
+  assert.ok(de(city, 'energia').length > 30, 'city: celdas de energía');
+  assert.equal(de(puro, 'energia').length, 0, 'citypuro: ni una celda');
+  // los poderes nuevos (batería y monedas ×2) solo con poderes
+  for (const k of ['bateria', 'monedas2']) {
+    assert.ok(city.some(o => o.tipo === 'poder' && o.clase === k), 'city: ' + k);
+    assert.ok(!puro.some(o => o.tipo === 'poder' && o.clase === k), 'citypuro: sin ' + k);
+  }
+  // rejillas en los dos modos (no son una ayuda: se ganan con un pisotón), espaciadas
+  for (const l of [city, puro]) {
+    const r = de(l, 'rejilla').map(o => o.d);
+    assert.ok(r.length > 10, 'rejillas');
+    for (let i = 1; i < r.length; i++) assert.ok(r[i] - r[i - 1] >= 250 - 1e-9, 'una cada 250 m o más');
+  }
+  // el parque trae tramos de burbujas, que ocupan los tres carriles; los otros distritos no
+  const burb = de(city, 'burbujas');
+  assert.ok(burb.length >= 1, 'hay burbujas');
+  for (const b of burb) {
+    assert.equal(M.estacionDe(b.d0, 'city').distrito, 'parque', 'solo en el parque');
+    assert.ok(b.largo >= 70 && b.largo <= 110, 'largo del tramo');
+  }
+  // los contenedores que caen solo son cajones, y solo en los muelles
+  const caen = city.filter(o => o.cae);
+  assert.ok(caen.length > 0, 'hay contenedores que caen');
+  for (const o of caen) { assert.equal(o.tipo, 'cajon'); assert.equal(M.estacionDe(o.d, 'city').distrito, 'muelles'); }
+  // nada de lo nuevo choca
+  for (const t of ['energia', 'rejilla', 'burbujas']) { assert.ok(M.TIPOS[t], t); assert.equal(M.caja({ tipo: t, d: 10, carril: 0 }, 10), null, t + ' no choca'); }
+  // la altura del contenedor: arriba lejos, en el suelo antes de llegar, y bajando sin saltos
+  assert.equal(C.alturaCae(40), 9); assert.equal(C.alturaCae(12), 0); assert.equal(C.alturaCae(0), 0);
+  let prev = C.alturaCae(34);
+  for (let d = 33.5; d >= 12; d -= 0.5) { const h = C.alturaCae(d); assert.ok(h <= prev + 1e-12, 'baja de a poco'); prev = h; }
+  // los números que el jugador siente
+  assert.equal(C.ENERGIA_LLENA, 10); assert.ok(C.TABLA_SEG > 0 && C.MONEDAS2_SEG > 0);
+  assert.ok(C.BURBUJAS.gravedad > 0 && C.BURBUJAS.gravedad < 1, 'en las burbujas se flota');
+  assert.ok(C.CHICLE.salto > 1, 'el chicle salta más');
+  // Dante: cada celda vale por dos (en ciudad.js, sin pasarse de la barra)
+  assert.match(lee('ciudad.js'), /C\.ventaja\.energia/);
+  assert.match(lee('ciudad.js'), /Math\.min\(CITY\.ENERGIA_LLENA/);
 });
 
 test('la pista clásica no cambió con City (sus huellas)', () => {
@@ -476,7 +522,7 @@ function carrera(modo, semilla, segundos) {
   while (t < segundos) {
     const dt = 1 / 60; t += dt; rr += dt * 1000;
     const V = curva.velocidad(t), dD = V * dt; D += dD;
-    puntos += M.puntosPorTramo(dD, M.multiplicador({ base: 3, estrellas, doble: false, extra: 0 }));
+    puntos += M.puntosPorTramo(dD, M.multiplicador({ base: 3, estrellas, doble: false, extra: 0, fijo: M.modoDe(modo).multFijo }));
     agrega(g.generarHasta(D + 230, { V: Math.max(13, V) }));
     const um = M.siguienteUmbral(D, modo), e = M.estacionDe(um - D < 220 ? um : D, modo);
     if (!cambio && e.clave !== actual.clave) { cambio = e; pedido('T', D + 40, e.id); g.pedirTunel(D + 40, e.id); }

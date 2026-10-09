@@ -122,13 +122,16 @@ test('las corredoras: precio, rasgos y un peinado distinto cada una', () => {
   const peinados = new Set();
   for (const [id, a] of nuevas) {
     assert.ok(Number.isInteger(a.precio) && a.precio >= 15000 && a.precio <= 60000, `${id}: precio ${a.precio}`);
-    assert.ok(['coleta', 'trenzas', 'larga', 'monos'].includes(a.rasgos.peinado), `${id}: peinado`);
+    assert.ok(['coleta', 'trenzas', 'larga', 'monos', 'afro'].includes(a.rasgos.peinado), `${id}: peinado`);
     assert.ok(Number.isInteger(a.rasgos.pelo), `${id}: color de pelo`);
     for (const k of ['sudadera', 'gorra', 'jeans', 'mochila', 'mochila2', 'suela']) assert.ok(Number.isInteger(a[k]), `${id}.${k}`);
     peinados.add(a.rasgos.peinado);
   }
   assert.equal(peinados.size, nuevas.length, 'cada una se reconoce de espaldas por el peinado');
   assert.ok(nuevas.some(([, a]) => a.rasgos.falda != null), 'alguna con falda o vestido');
+  // tantas corredoras como corredores (los secretos cuentan: también se juegan)
+  const todos = Object.values(M.ASPECTOS);
+  assert.equal(todos.filter(a => a.rasgos).length, todos.filter(a => !a.rasgos).length, 'cinco y cinco');
   // se pueden comprar y quedan guardadas como cualquier aspecto
   const p = M.limpiaProgreso({ aspectos: nuevas.map(([id]) => id), aspecto: nuevas[0][0] });
   assert.equal(p.aspecto, nuevas[0][0]);

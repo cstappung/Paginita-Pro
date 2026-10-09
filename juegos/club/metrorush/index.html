@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="../../../i18n.js?v=202610091240"></script>
+<script src="../../../i18n.js?v=202610091335"></script>
 <script src="../../audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#14182b">
@@ -16,18 +16,18 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Orbitron:wght@700&family=Press+Start+2P&display=swap">
 <!-- Lo común del Club (volver, ranking lateral, modo integrado) va antes del estilo propio, para que este gane. -->
 <link rel="stylesheet" href="../conexion.css?v=club-2">
-<link rel="stylesheet" href="estilo.css?v=metrorush-8">
+<link rel="stylesheet" href="estilo.css?v=metrorush-9">
 <script src="../../audio/volumen.js?v=vol-1"></script>
 <script src="../conexion.js?v=club-13"></script>
-<script src="../../audio/chip.js?v=metrorush-8"></script>
-<script src="../../audio/temas.js?v=metrorush-8"></script>
-<script src="city.js?v=metrorush-8"></script>   <!-- CITY: el mundo City; antes que el motor, que lo instala al armarse -->
-<script src="motor.js?v=metrorush-8"></script>
+<script src="../../audio/chip.js?v=metrorush-9"></script>
+<script src="../../audio/temas.js?v=metrorush-9"></script>
+<script src="city.js?v=metrorush-9"></script>   <!-- CITY: el mundo City; antes que el motor, que lo instala al armarse -->
+<script src="motor.js?v=metrorush-9"></script>
 <!-- El fantasma (modos «Fantasma»): el rastro de una carrera y cómo se vuelve a ver. Antes que prueba.js, que lo usa. -->
-<script src="fantasma.js?v=metrorush-8"></script>
-<script src="prueba.js?v=metrorush-8"></script>
+<script src="fantasma.js?v=metrorush-9"></script>
+<script src="prueba.js?v=metrorush-9"></script>
 <!-- la historia que se ve y se oye en carrera: afiches, altavoz, grafitis (solo datos; escenarios.js la dibuja) -->
-<script src="historia.js?v=metrorush-8"></script>
+<script src="historia.js?v=metrorush-9"></script>
 <!-- Three.js (el mismo de Yemas: la misma dirección, así el navegador ya lo tiene guardado). -->
 <script type="importmap">
 { "imports": {
@@ -35,12 +35,12 @@
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
 } }
 </script>
-<link rel="modulepreload" href="mundo.js?v=metrorush-8">
-<link rel="modulepreload" href="escenarios.js?v=metrorush-8">
-<link rel="modulepreload" href="audio.js?v=metrorush-8">
-<link rel="modulepreload" href="mundo-city.js?v=metrorush-8">   <!-- CITY: el dibujo de City -->
-<link rel="modulepreload" href="ciudad.js?v=metrorush-8">       <!-- CITY: City en la carrera -->
-<script type="module" src="juego.js?v=metrorush-8"></script>
+<link rel="modulepreload" href="mundo.js?v=metrorush-9">
+<link rel="modulepreload" href="escenarios.js?v=metrorush-9">
+<link rel="modulepreload" href="audio.js?v=metrorush-9">
+<link rel="modulepreload" href="mundo-city.js?v=metrorush-9">   <!-- CITY: el dibujo de City -->
+<link rel="modulepreload" href="ciudad.js?v=metrorush-9">       <!-- CITY: City en la carrera -->
+<script type="module" src="juego.js?v=metrorush-9"></script>
 </head>
 <body>
 <div class="shell"><div class="layout">
@@ -81,6 +81,11 @@
       </div>
       <ul class="poderes" id="hudPoderes" aria-label="Poderes activos"></ul>
       <div class="patinetas" title="Patinetas: H o dos toques"><i data-icono="patineta"></i><b id="hudPatinetas" translate="no">0</b></div>
+      <!-- CITY: la energía de la tabla (al llenarse, H o dos toques la encienden gratis) y el reloj de «monedas ×2». -->
+      <div class="hud-city" id="hudCity" hidden>
+        <div class="energia" id="hudEnergia" title="Energía de la tabla: llena, H o dos toques"><i data-icono="rayo"></i><span class="barra"><i></i></span><b id="hudEnergiaTxt" translate="no">0/10</b></div>
+        <div class="mon2" id="hudMon2" hidden><i data-icono="moneda"></i><b id="hudMon2Txt" translate="no">×2</b></div>
+      </div>
       <!-- Los potenciadores: aparecen los primeros segundos de la carrera, si tienes alguno (teclas 1 y 2). -->
       <div class="pots" id="hudPots" hidden></div>
     </div>
@@ -279,7 +284,7 @@
           <li>Chocar de frente termina la carrera, salvo que pagues monedas para <b>seguir corriendo</b> (cada vez cuesta el doble). Rozar un costado es un <b>tropiezo</b>: Don Ramón y su perro Tornillo te alcanzan. Dos tropiezos seguidos y te atrapan.</li>
           <li><b>Puntos</b>: 10 por metro × el multiplicador. Las <b>misiones</b> van de a tres: completar el set sube el multiplicador base (hasta ×30) y paga monedas. Cada <b>estrella</b> suma +1 en la carrera.</li>
           <li><b>Poderes</b>: <i data-icono="iman"></i> imán, <i data-icono="mochila"></i> mochila cohete, <i data-icono="zapatilla"></i> zapatillas saltarinas, <i data-icono="doble"></i> puntos dobles y la caja misteriosa. La <i data-icono="patineta"></i> <b>patineta</b> te salva de un choque. En la tienda se mejoran y se compran los potenciadores <i data-icono="cohete"></i> Despegue y <i data-icono="mas5"></i> +5, que se usan al empezar (teclas 1 y 2).</li>
-          <li><b>Modos</b> (se eligen en la portada): <b>Clásico</b>; <b>Sin ayudas</b>, sin poderes, cajas, patineta, potenciadores ni segunda oportunidad; <b>Sin monedas</b>, donde las monedas (rojas) terminan la carrera si las tocas; <b>Fantasma</b>, sin ayudas y contra el fantasma de la mejor carrera de la tabla (un corredor azul que repite su carrera en su misma pista; arriba a la izquierda ves cuántos puntos le llevas); <b>City</b>, <b>City sin ayudas</b> y <b>City fantasma</b>. Cada uno tiene su tabla.</li>
+          <li><b>Modos</b> (se eligen en la portada): <b>Clásico</b>; <b>Sin ayudas</b>, todos a ×10 fijo, sin poderes, cajas, patineta, potenciadores ni segunda oportunidad; <b>Sin monedas</b>, donde las monedas (rojas) terminan la carrera si las tocas; <b>Fantasma</b>, sin ayudas y contra el fantasma de la mejor carrera de la tabla (un corredor azul que repite su carrera en su misma pista; arriba a la izquierda ves cuántos puntos le llevas); <b>City</b>, <b>City sin ayudas</b> y <b>City fantasma</b>. Cada uno tiene su tabla.</li>
           <li><b>F</b> o el botón ⛶: pantalla completa.</li>
           <li>Con la distancia cambias de <b>estación</b> (y de estética) pasando por un túnel. En cada una hay un <b>boleto dorado</b> con un trozo de la historia.</li>
         </ul>

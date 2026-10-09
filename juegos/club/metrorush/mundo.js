@@ -50,7 +50,7 @@ import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 // los escenarios nuevos y la historia que se ve en la vía (afiches, utilería, horizonte, sucesos): ver escenarios.js
-import * as ESC from './escenarios.js?v=metrorush-8';
+import * as ESC from './escenarios.js?v=metrorush-9';
 
 const MOTOR = window.MetroRushMotor;                // el motor (motor.js), cargado antes como script
 const CARRILES = MOTOR.CARRILES;                   // x de cada carril
@@ -1001,7 +1001,7 @@ class Kit {
       Como objetos del juego ("!"): en neón su cuerpo ya no queda casi negro
       dentro del halo, se ve el imán rojo, la mochila, las zapatillas. */
   poder(clase) {
-    if (clase === 'chicle' && this.chicle) return this.chicle();              // CITY: el chicle (mundo-city.js)
+    if (this.poderCity) { const g = this.poderCity(clase); if (g) return g; }   // CITY: el chicle, la batería y las monedas ×2 (mundo-city.js)
     const c = this.c, a = new Arma(this), g0 = new THREE.Group();
     const anillo = { iman: 0xff5a5a, mochila: 0xffb02e, zapatillas: 0x6aff8a, doble: 0x5fb0ff, caja: 0xffd23f }[clase];
     if (clase === 'iman') {
@@ -1418,12 +1418,14 @@ const AYUDA = { Arma, CAJA, CILINDRO, CILINDRO_CHICO, ESFERA, prepara, funde, ma
 
 /* --- Los rasgos de las corredoras (ronda 2) ---
    Los aspectos de siempre son el mismo muñeco con otra ropa. Las corredoras
-   nuevas (Paloma, Trini, Luz y Maite, en `MOTOR.ASPECTOS`) traen además
+   nuevas (Paloma, Trini, Luz, Maite y Kiara, en `MOTOR.ASPECTOS`) traen además
    `rasgos`, que cambian la silueta, que es lo que se reconoce de espaldas
    corriendo, que es como se las ve casi siempre:
    - pelo: el color (las cejas lo siguen);
    - peinado: 'coleta' (cola de caballo alta), 'trenzas' (dos, a los lados),
-     'larga' (melena hasta la mitad de la espalda) o 'monos' (dos moños);
+     'larga' (melena hasta la mitad de la espalda), 'monos' (dos moños) o
+     'afro' (una nube redonda alrededor de la cabeza: no cuelga ni se mece);
+   - piel: un tono de piel propio (opcional; sin él, el de siempre);
    - tocado: 'cintillo' o 'boina', en el color `gorra` del aspecto (sin
      tocado, `gorra` no se usa: no llevan gorra, llevan el pelo);
    - falda: un color, o nada: una falda acampanada colgada de la cadera
@@ -1454,6 +1456,10 @@ function armaRasgos(asp, pelo, piel, cab, pelvis, parte, art) {
       a.pon(CAJA, 'personaje', 0x2b2d42, [0, 0.026, -0.205], null, [0.04, 0.01, 0.01]);             // el puente
     }
     if (R.aros) for (const s of [-1, 1]) a.pon(new THREE.TorusGeometry(0.04, 0.008, 6, 14), 'personaje', 0xffc63a, [s * 0.205, -0.1, 0.01], [0, Math.PI / 2, 0]);   // aros dorados
+    if (R.peinado === 'afro') {
+      a.pon(ESFERA, 'personaje', pelo, [0, 0.11, 0.13], null, [0.66, 0.58, 0.5]);                    // la nube: más ancha que la cabeza y corrida hacia atrás (la cara, en −z, queda libre)
+      for (const [x, y, z] of [[-0.2, 0.2, 0.14], [0.2, 0.2, 0.14], [0, 0.28, 0.14], [0, 0.12, 0.3]]) a.pon(ESFERA, 'personaje', pelo2, [x, y, z], null, 0.22);   // bultos más oscuros: le dan textura sin texturas
+    }
     if (R.peinado === 'monos') for (const s of [-1, 1]) {
       a.pon(ESFERA, 'personaje', pelo, [s * 0.14, 0.17, 0.05], null, 0.19);                         // los dos moños
       a.pon(new THREE.TorusGeometry(0.06, 0.016, 6, 14), 'personaje', asp.gorra, [s * 0.12, 0.12, 0.04], [0.9, 0, -s * 0.6]);   // el elástico de cada uno
@@ -1521,7 +1527,7 @@ function mueveRasgos(r, p) {
 /** Arma el corredor articulado con los colores de su aspecto.
     Devuelve las articulaciones para poder posarlo en cada cuadro. */
 function armaCorredor(kit, asp) {
-  const piel = asp.piel ?? 0xf1c19c, pelo = asp.pelo ?? ((asp.rasgos && asp.rasgos.pelo) || 0x3b2a20);   // CITY trae su piel y su pelo; las corredoras, su color de pelo (ver «Los rasgos»)
+  const piel = asp.piel ?? (asp.rasgos && asp.rasgos.piel) ?? 0xf1c19c, pelo = asp.pelo ?? ((asp.rasgos && asp.rasgos.pelo) || 0x3b2a20);   // CITY trae su piel y su pelo; las corredoras, su color de pelo (ver «Los rasgos»)
   const raiz = new THREE.Group(), cuerpo = new THREE.Group(); raiz.add(cuerpo);
   const parte = (padre, construir, pos = [0, 0, 0]) => {                   // una pieza rígida (fundida) colgada de una articulación
     const a = new Arma(kit); construir(a); const m = a.hecho(); m.position.set(pos[0], pos[1], pos[2]); padre.add(m); return m;
