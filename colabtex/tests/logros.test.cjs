@@ -9,13 +9,15 @@ const {LOGROS,detecta,deFila,deMarca,reparto,reducir,JUEGOS}=context.__L;
 test('diez logros por juego, con ids válidos y únicos',()=>{
  const juegos=[...Object.keys(JUEGOS),'minas','snake','tetrisclub','sortem','bbtan','sopa','electro','frontera','sudoku','fanal','atasco','metrorush','aleteo','dosmil'];
  for(const j of juegos){
-  assert.ok(LOGROS[j],j);assert.equal(LOGROS[j].length,10,j);
-  const ids=LOGROS[j].map(x=>x.id);assert.equal(new Set(ids).size,10,j);
+  const n=j==='metrorush'?11:10;   // Metro Rush suma «Cazafantasmas», el único individual que se escribe en vivo
+  assert.ok(LOGROS[j],j);assert.equal(LOGROS[j].length,n,j);
+  const ids=LOGROS[j].map(x=>x.id);assert.equal(new Set(ids).size,n,j);
   for(const x of LOGROS[j]){assert.match(x.id,/^[a-z0-9]{1,20}$/,j+'/'+x.id);assert.ok(x.n&&x.d&&x.i,j+'/'+x.id);}
  }
  const reglas=JSON.parse(fs.readFileSync('../firebase/database.rules.json','utf8'));
  const re=new RegExp(reglas.rules.logros.$juego['.validate'].match(/matches\(\/(.*)\/\)/)[1]);
  for(const j of Object.keys(JUEGOS))assert.ok(re.test(j),'regla sin '+j);
+ assert.ok(re.test('metrorush'),'regla sin metrorush (Cazafantasmas se escribe)');
 });
 test('los de la fila salen de ganadas, racha y jugadas',()=>{
  assert.deepEqual([...deFila(null)],[]);
@@ -82,4 +84,10 @@ test('Metro Rush: puntos de la mejor carrera y metros de la más larga',()=>{
  // Los metros no dan logros de puntos, ni los puntos de distancia.
  assert.deepEqual([...deMarca('metrorush',{categoria:'club-metrorush-distancia',puntos:3000000,tiempo:1})],['d1k','d5k','d10k','d21k','d42k']);
  assert.deepEqual([...deMarca('metrorush',{categoria:'club-metrorush-carrera',puntos:999,tiempo:1})],[]);
+ // La distancia de City da los mismos logros de distancia.
+ assert.deepEqual([...deMarca('metrorush',{categoria:'club-metrorush-citydistancia',puntos:5000,tiempo:1})],['d1k','d5k']);
+ // «Cazafantasmas» no sale de ninguna marca: lo escribe la página en vivo, y reparto lo cuenta desde logros/.
+ assert.ok(LOGROS.metrorush.some(x=>x.id==='fan'));
+ assert.ok(!deMarca('metrorush',{categoria:'club-metrorush-distancia',puntos:999999,tiempo:1}).includes('fan'));
+ const r=reparto({},{},{metrorush:{u1:{fan:1}}});assert.ok(r.tiene.metrorush.fan.has('u1'));
 });

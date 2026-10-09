@@ -33,6 +33,9 @@
        celular»): solo en pantallas táctiles de 600 px o menos, medidas en la
        ventana de arriba, porque el iframe mide lo que la página le dio. */
     celular(){const m=w=>matchMedia('(pointer:coarse)').matches&&Math.min(w.innerWidth,w.innerHeight)<=600&&w.innerHeight>w.innerWidth;try{return m(window.top);}catch(e){return m(window);}},
+    /* `logro(id)`: un logro que el juego detecta en vivo (Metro Rush,
+       «Cazafantasmas»). La página lo anota en la cuenta; el juego no toca Firebase. */
+    logro(id){if(embebido&&!invitado&&typeof id==='string')enviar({tipo:'logro',id});},
     inmersivo(on){quiere=!!on;const v=quiere&&window.Club.celular();
       for(const el of document.querySelectorAll('.i18n-flota'))el.style.visibility=v?'hidden':'';
       if(document.documentElement.classList.contains('club-inm')===v)return v;document.documentElement.classList.toggle('club-inm',v);enviar({tipo:'inmersivo',v});return v;}
@@ -60,14 +63,16 @@
     const d=e.data;
     if(d.tipo==='tema'){document.documentElement.dataset.tema=d.oscuro?'oscuro':'claro';return;}
     if(d.tipo==='partida'){const f=alPartida;alPartida=null;if(f)f(d.error?null:d.dato||null);return;}
-    if(d.tipo==='fantasma'){const l=alFantasma.get(d.categoria)||[];alFantasma.delete(d.categoria);for(const f of l)f(d.error?null:d.dato||null,d.error?'error':d.motivo||(d.dato?'':'vacia'));return;}
+    if(d.tipo==='fantasma'){const l=alFantasma.get(d.categoria)||[];alFantasma.delete(d.categoria);for(const f of l)f(d.error?null:d.dato||null,d.error?'error':d.motivo||(d.dato?'':'vacia'));
+      // nadie lo pidió: la página lo manda porque cambió el n.º 1 de la tabla (alguien batió el récord)
+      if(!l.length&&!d.error)window.dispatchEvent(new CustomEvent('club-fantasma',{detail:{categoria:d.categoria,dato:d.dato||null,motivo:d.motivo||(d.dato?'':'vacia')}}));return;}
     if(d.tipo==='rechazo'){window.dispatchEvent(new CustomEvent('club-rechazo',{detail:{categoria:d.categoria,partida:d.partida,motivo:d.motivo}}));if(d.categoria===categoria&&estado)estado.textContent='Esta partida no se guardó: '+d.motivo;return;}
     if(d.categoria!==categoria)return;
     if(d.tipo==='estado'&&estado){estado.textContent=d.texto;return;}
     if(d.tipo!=='ranking'||!lista)return;
     lista.replaceChildren();const racha=/^club-(sopa|electro|sudoku)-racha$/.test(categoria),minas=!racha&&(categoria.startsWith('club-minas-')||categoria.startsWith('club-sortem-')||categoria.startsWith('club-sopa-')||/^club-sudoku-(facil|medio|dificil|experto)$/.test(categoria)||categoria==='club-tetris-sprint');
-    const estrellas=categoria==='club-atasco-estrellas';
-    const marca=f=>minas?(f.tiempo/1000).toFixed(2)+' s':racha?f.puntos+(f.puntos===1?' día':' días'):estrellas?f.puntos+' ★':f.puntos+' puntos';
+    const estrellas=categoria==='club-atasco-estrellas',metros=/^club-metrorush-(city)?distancia$/.test(categoria);
+    const marca=f=>minas?(f.tiempo/1000).toFixed(2)+' s':racha?f.puntos+(f.puntos===1?' día':' días'):estrellas?f.puntos+' ★':metros?f.puntos+' m':f.puntos+' puntos';
     for(const f of d.filas||[]){const li=document.createElement('li');li.textContent=(f.nombre||'Jugador')+(f.yo?' (tú)':'')+' · '+marca(f);lista.appendChild(li);}
     estado.textContent=d.error?'No se pudo cargar el ranking en línea. Tu récord local se conserva.':d.filas?.length?'Cada modalidad tiene su propia clasificación.':'Todavía no hay récords. ¡Estrena esta clasificación!';
     propio.textContent=d.propio?'Tu récord en la nube: '+marca(d.propio):'';

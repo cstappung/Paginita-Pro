@@ -120,19 +120,21 @@ function plan(objs, hasta, curva) {
   const K = d => Math.ceil(curva.velocidadEn(d) * 0.17) + 1;
   const bien = [0, 1, 2].map(() => new Uint8Array(N));
   for (let c = 0; c < 3; c++) bien[c][N - 1] = libre[c][N - 1];
-  const cambia = (c, o, d) => {
+  // `cabe`: el cambio en sí cabe (su carril sigue libre lo que tarda en salir, el otro se puede entrar); `cambia`: y además llega a un carril bien
+  const cabe = (c, o, d) => {
     const V = curva.velocidadEn(d), k = K(d), sale = Math.ceil(V * 0.11) + 1, llega = Math.max(0, Math.floor(V * 0.06) - 1);
     if (d + k >= N) return false;
     for (let x = 0; x <= sale; x++) if (!libre[c][d + x]) return false;
     for (let x = llega; x <= k; x++) if (!entra[o][d + x]) return false;
-    return !!bien[o][d + k];
+    return true;
   };
+  const cambia = (c, o, d) => cabe(c, o, d) && !!bien[o][d + K(d)];
   // de atrás hacia adelante: un carril está bien en d si está libre y sigue bien en d+1, o si desde ahí se puede cambiar a uno que esté bien
   for (let d = N - 2; d >= 0; d--) for (let c = 0; c < 3; c++) {
     if (!libre[c][d]) continue;
     if (bien[c][d + 1] || [c - 1, c + 1].some(o => o >= 0 && o <= 2 && cambia(c, o, d))) bien[c][d] = 1;
   }
-  return { libre, entra, bien, cambia, K };
+  return { libre, entra, bien, cambia, cabe, K };
 }
 
 const DEPIE = new Set(['bajo', 'cajon', 'baranda']), RUEDA = new Set(['alto', 'dron', 'conducto']);
@@ -141,6 +143,23 @@ function robot(objs, modo, metros, { fps = 60, curva = M.velocidadDe(modo), P = 
   const cosas = objs.filter(o => ['tren', 'rampa', 'bajo', 'alto', 'cajon', 'dron', 'baranda', 'lona', 'cobertizo', 'viga', 'conducto', 'seto', 'burbujas'].includes(o.tipo)).map(o => Object.assign({}, o))
     .sort((a, b) => (a.vel > 0 ? a.dArribo - 260 : (a.d ?? a.d0)) - (b.vel > 0 ? b.dArribo - 260 : (b.d ?? b.d0)));
   const pl = P || plan(objs, metros + 300, curva), dt = 1 / fps;
+  /* El plan, cuadro a cuadro. El plan por metros dice dónde se PUEDE
+     cambiar de carril, pero a 20 cuadros/s y 58 m/s un cuadro son 2,9 m: si
+     la única salida es un metro justo, el robot salta de largo por encima de
+     ella (se vio: cambiar recién a los 14 039 m, ni antes ni después). Como
+     la velocidad sale de la curva, dónde cae cada cuadro se sabe de antemano
+     (`Ds`), y `bienF[c][n]` dice si desde el cuadro n en el carril c hay
+     salida contando solo los metros en que de verdad habrá un cuadro. */
+  const Ds = [0];
+  for (let tt = 0, DD = 0; DD < metros + 5;) { const V = curva.velocidad(tt); tt += dt; DD += V * dt; Ds.push(DD); }   // igual que el bucle de abajo
+  const nF = Ds.length, bienF = [0, 1, 2].map(() => new Uint8Array(nF + 1).fill(1));
+  const cuadroDe = d => { let a = 0, b = nF - 1; while (a < b) { const m = (a + b) >> 1; if (Ds[m] >= d) b = m; else a = m + 1; } return a; };   // el primer cuadro en o pasado d
+  const saleA = (c, n) => { const d = Math.floor(Ds[n]); return [c - 1, c + 1].find(o => o >= 0 && o <= 2 && pl.cabe(c, o, d) && bienF[o][cuadroDe(d + pl.K(d))]); };
+  for (let n = nF - 1; n >= 0; n--) for (let c = 0; c < 3; c++) {
+    const d = Math.floor(Ds[n]);
+    bienF[c][n] = pl.libre[c][d] && (bienF[c][n + 1] || saleA(c, n) != null) ? 1 : 0;
+  }
+  let nC = 0;                                                   // el cuadro en que va
   const r = { x: X[1], xPrev: X[1], carril: 1, carrilPrev: 1, y: 0, vy: 0, enAire: false, rodar: 0, rodarPend: false, bufer: -1 };
   let D = 0, Dantes = 0, t = 0, i = 0, tropiezo = -99, pisadas = 0, lonas = 0, grind = 0, setos = 0, conductos = 0, doble = false;
   const activos = [];
@@ -158,11 +177,10 @@ function robot(objs, modo, metros, { fps = 60, curva = M.velocidadDe(modo), P = 
     }
     // 1) por dónde: el plan de carriles
     const dI = Math.floor(D);
-    // (se mira un cuadro más allá: a 20 cuadros/s un cuadro son más de 2 m, y el metro justo para cambiarse podría quedar entre dos)
-    const mira = Math.ceil(V * dt) + 1;
-    let quedarse = true; for (let x = 1; x <= mira; x++) if (!pl.bien[r.carril][dI + x]) quedarse = false;
+    nC++;                                                       // (D ya es Ds[nC])
+    const quedarse = !!bienF[r.carril][nC + 1];                 // el próximo cuadro en este carril todavía tiene salida
     if (Math.abs(r.x - X[r.carril]) < 1e-6 && !quedarse) {
-      const o = [r.carril - 1, r.carril + 1].find(o => o >= 0 && o <= 2 && pl.cambia(r.carril, o, dI));
+      const o = saleA(r.carril, nC);
       if (o != null) { r.carrilPrev = r.carril; r.carril = o; }
     }
     // 2) qué hacer con lo que viene por su carril (o por el que se está cambiando)
@@ -235,19 +253,31 @@ function robot(objs, modo, metros, { fps = 60, curva = M.velocidadDe(modo), P = 
     } else if (!r.enAire && r.y > sop.h + 0.05) r.enAire = true;
     if (sop.tren) cuenta.techos++;
     // lo de City después de mover (ciudad.fisica): la lona y el riel
-    if (r.y < 0.35) for (const o of activos) if (C.enLona(o, r.x, D, r.y)) { o.usada = true; r.vy = C.impulsoLona(1); r.enAire = true; r.rodar = 0; lonas++; break; }
+    // igual que ciudad.js: la comprobación barre el tramo del cuadro (Dantes→D) y el vapor sopla en toda su columna
+    for (const o of activos) if (C.enLona(o, r.x, D, r.y, Dantes, r.vy)) {
+      o.usada = true;                                             // una vez cada una
+      r.vy = o.variante === 'vapor' ? M.impulso(Math.max(0.6, C.LONA.altura - r.y)) : C.impulsoLona(1);
+      r.enAire = true; r.rodar = 0; lonas++; break;
+    }
     if (sop.apoyo && sop.apoyo.tipo === 'baranda' && !r.enAire) grind += V * dt;
     if (r.rodar > 0) r.rodar -= dt;
     // 4) los choques (choques en juego.js, con el pisotón de City)
     if (r.y <= 6) {
-      const yb = r.y + 0.02, yt = r.y + (r.rodar > 0 ? F.altoRodando : F.altoDePie);
+      const altoR = r.rodar > 0 ? F.altoRodando : F.altoDePie, dD = D - Dantes;
       for (const o of activos) {
         const k = M.caja(o, D);
         if (!k || k.y1 <= k.y0) continue;
-        if (D + M.MEDIO_LARGO < k.z0 || D - M.MEDIO_LARGO > k.z1) continue;
+        let xs = r.x, ys = r.y;
+        if (D + M.MEDIO_LARGO < k.z0 || D - M.MEDIO_LARGO > k.z1) {
+          // el barrido de juego.js: una pieza más corta que el cuadro se mira en el instante en que se la cruzó
+          const ancho = k.z1 - k.z0 + 2 * M.MEDIO_LARGO;
+          if (ancho >= dD || Dantes - M.MEDIO_LARGO > k.z1 || D + M.MEDIO_LARGO < k.z0) continue;
+          const s0 = Math.max(0, (k.z0 - M.MEDIO_LARGO - Dantes) / dD), s1 = Math.min(1, (k.z1 + M.MEDIO_LARGO - Dantes) / dD), sm = (s0 + s1) / 2;
+          xs = r.xPrev + (r.x - r.xPrev) * sm; ys = yAntes + (r.y - yAntes) * sm;
+        }
         const Xo = X[o.carril], lim = k.w + F.medioAncho;
-        if (Math.abs(r.x - Xo) >= lim) continue;
-        if (yb >= k.y1 || yt <= k.y0) continue;
+        if (Math.abs(xs - Xo) >= lim) continue;
+        if (ys + 0.02 >= k.y1 || ys + altoR <= k.y0) continue;
         if (C.pisa(o, yAntes, r.vy)) { o.roto = true; pisadas++; r.vy = M.impulso(1.1); r.enAire = true; continue; }
         const deCostado = Math.abs(r.xPrev - Xo) >= lim - 0.02;
         if (!deCostado) return { choque: { tipo: o.tipo, carril: o.carril, d: +(o.d ?? o.d0).toFixed(1), D: +D.toFixed(1), y: +r.y.toFixed(2), x: +r.x.toFixed(2), V: +V.toFixed(1), rodar: r.rodar > 0 }, D, pisadas, lonas, grind, cuenta };
@@ -292,8 +322,11 @@ test('los cinco distritos: en metros, con su música, su paleta, su escenografí
 test('la velocidad de City: su propia curva, la misma para el juego, el generador y el antitrampas', () => {
   const V = M.velocidadDe('city'), Vp = M.velocidadDe('citypuro'), Vf = M.velocidadDe('cityfantasma'), Vc = M.velocidadDe('clasico');
   assert.equal(V, Vp); assert.equal(V, Vf); assert.notEqual(V, Vc);
-  assert.equal(V.VELOCIDAD, C.VELOCIDAD); assert.deepEqual(C.VELOCIDAD, { V0: 16, VMAX: 46, ACEL: 0.11 });
-  assert.equal(V.velocidad(0), 16); assert.equal(V.velocidad(1e4), 46);
+  assert.equal(V.VELOCIDAD, C.VELOCIDAD); assert.deepEqual(C.VELOCIDAD, { V0: 16, VMAX: 60, ACEL: 0.11 });
+  assert.equal(V.velocidad(0), 16); assert.equal(V.velocidad(1e4), 60);
+  // la curva de la versión 2 (tope 46) queda para rehacer las pruebas de antes, y hasta su tope es la misma
+  const V2 = M.velocidadDe('city', 2); assert.equal(V2.velocidad(1e4), 46);
+  for (let t = 0; t < 270; t += 5) assert.equal(V2.velocidad(t), V.velocidad(t));
   assert.ok(Math.abs(V.velocidadEn(V.metrosEntre(0, 100)) - V.velocidad(100)) < 1e-6, 'velocidadEn y metrosEntre son la misma curva');
   // el juego le pasa la curva de la carrera al mundo (la cámara) y al sonido (el tempo)
   const juego = lee('juego.js'), ciudad = lee('ciudad.js'), mundo = lee('mundo.js'), audio = lee('audio.js');
@@ -404,6 +437,7 @@ test('lo de Subway Surfers City: energía de la tabla, rejillas, contenedores qu
   assert.equal(C.ENERGIA_LLENA, 10); assert.ok(C.TABLA_SEG > 0 && C.MONEDAS2_SEG > 0);
   assert.ok(C.BURBUJAS.gravedad > 0 && C.BURBUJAS.gravedad < 1, 'en las burbujas se flota');
   assert.ok(C.CHICLE.salto > 1, 'el chicle salta más');
+  assert.equal(C.CHICLE.seg, 15); assert.ok(C.CHICLE.rebote > M.ALTO_TECHO && C.CHICLE.tope > M.ALTO_TECHO + 2, 'el rebote del chicle pasa el frente de un vagón');
   // Dante: cada celda vale por dos (en ciudad.js, sin pasarse de la barra)
   assert.match(lee('ciudad.js'), /C\.ventaja\.energia/);
   assert.match(lee('ciudad.js'), /Math\.min\(CITY\.ENERGIA_LLENA/);
@@ -412,17 +446,20 @@ test('lo de Subway Surfers City: energía de la tabla, rejillas, contenedores qu
 test('la pista clásica no cambió con City (sus huellas)', () => {
   // las mismas de metrorush-modos.test.cjs: el recorrido de 15 km con un túnel, la mochila y un boleto
   function clasica(semilla) {
-    const g = M.crearGenerador(semilla), objs = []; let D = 0, t = 0;
+    // la pista de la versión 2 (la que rehacen las pruebas guardadas)
+    const g = M.crearGenerador(semilla, { version: 2 }), objs = [], curva = M.velocidadDe(undefined, 2); let D = 0, t = 0;
     while (D < 15000) {
-      const V = M.velocidad(t); D += V * 0.05; t += 0.05; objs.push(...g.generarHasta(D + 230, { V }));
+      const V = curva.velocidad(t); D += V * 0.05; t += 0.05; objs.push(...g.generarHasta(D + 230, { V }));
       if (Math.abs(D - 1300) < 1 && !g._t) { g._t = 1; g.pedirTunel(D + 40, 'ocaso'); }
       if (Math.abs(D - 2000) < 1 && !g._c) { g._c = 1; objs.push(...g.monedasCielo(D + 12, D + 100, 1)); g.pedirBoleto(2, D + 300); }
     }
-    return crypto.createHash('sha256').update(JSON.stringify(objs)).digest('hex').slice(0, 16) + ':' + objs.length;
+    // como en metrorush-modos: de las monedas, solo su id y su carril (lo que lee la prueba del antitrampas)
+    const lee = objs.map(o => o.tipo === 'moneda' ? { id: o.id, c: o.carril } : o);
+    return crypto.createHash('sha256').update(JSON.stringify(lee)).digest('hex').slice(0, 16) + ':' + objs.length;
   }
-  assert.equal(clasica(1), '99eab28c0344da60:4746');
-  assert.equal(clasica(2026), 'd1d2c227952fd138:4747');
-  assert.equal(clasica(424242), '8c171d3acd37d3c2:4681');
+  assert.equal(clasica(1), '83dec4198ead80ca:4746');
+  assert.equal(clasica(2026), '043d71412da4f3b6:4747');
+  assert.equal(clasica(424242), 'ad1c7261c748d071:4681');
 });
 
 test('el generador de City nunca deja una carrera imposible (robot con la física del juego, 8 semillas × 2 modos × 11 km)', () => {
@@ -432,7 +469,7 @@ test('el generador de City nunca deja una carrera imposible (robot con la físic
     const { objs, curva } = pista(semilla, metros + 400, modo);
     const P = plan(objs, metros + 300, curva);
     assert.ok(P.bien[1][0], `${modo} ${semilla}: el plan de carriles llega al final`);
-    const fps = [30, 60, 144][k % 3];
+    const fps = [20, 30, 60, 144][k % 4];
     const r = robot(objs, modo, metros, { fps, curva, P });
     assert.equal(r.choque, null, `${modo} ${semilla} a ${fps} cuadros/s: ${JSON.stringify(r.choque)}`);
     resumen.push(r);
@@ -461,7 +498,10 @@ function tramo(objs, { fps = 60, V = 20, desde = 0, hasta = 60, y0 = 0, vy0 = 0,
     const yAntes = r.y, sop = M.soporte(os, r.x, D, r.y, Dantes);
     r.vy -= F.gravedad * grav(D) * dt; r.y += r.vy * dt;
     if (r.y <= sop.h) { r.y = sop.h; r.vy = 0; r.enAire = false; } else if (!r.enAire && r.y > sop.h + 0.05) r.enAire = true;
-    if (r.y < 0.35) for (const o of os) if (C.enLona(o, r.x, D, r.y)) { o.usada = true; lanzado = true; r.vy = C.impulsoLona(1); r.enAire = true; }
+    for (const o of os) if (C.enLona(o, r.x, D, r.y, Dantes, r.vy)) {   // barrido, como en ciudad.js
+      o.usada = true; lanzado = true; r.enAire = true;
+      r.vy = o.variante === 'vapor' ? M.impulso(Math.max(0.6, C.LONA.altura - r.y)) : C.impulsoLona(1);
+    }
     if (sop.apoyo && sop.apoyo.tipo === 'baranda' && !r.enAire) { riel += V * dt; minRiel = Math.min(minRiel, r.y); }
     if (r.rodar > 0) r.rodar -= dt;
     maxY = Math.max(maxY, r.y);
@@ -759,7 +799,7 @@ test('la prueba de City se rehace: estrellas secretas, túneles, postales y la c
 test('el juego engancha City en pocos lugares, y todo lo que choca o se recoge se ve', () => {
   const juego = lee('juego.js'), ciudad = lee('ciudad.js'), mundo = lee('mundo.js'), dibujo = lee('mundo-city.js'), html = lee('index.html');
   // el chicle no entra en la lista de poderes (el marcador le pediría su duración a la tienda)
-  assert.match(ciudad, /c\.ciudad\.chicle = 20/); assert.doesNotMatch(ciudad, /c\.poderes\.chicle/);
+  assert.match(ciudad, /c\.ciudad\.chicle = CITY\.CHICLE\.seg/); assert.doesNotMatch(ciudad, /c\.poderes\.chicle/);
   // los ganchos de juego.js (pocos, marcados CITY)
   for (const re of [/ciudad\.pisa\(c, o, mundo\)/, /ciudad\.salva\(c, mundo\)/, /ciudad\.poder\(c, clase, mundo\)/, /ciudad\.fisica\(c, sop, dt, mundo, tiempoTotal\)/,
     /ciudad\.faltaPostal\(c, progreso, cb\.estacion\.boleto\)/, /ciudad\.libreta\(modoSel, progreso, \$, fmt\)/, /ciudad\.idsTienda\(modoSel\)/, /Object\.assign\(MOTIVOS, ciudad\.MOTIVOS\)/])
@@ -775,4 +815,126 @@ test('el juego engancha City en pocos lugares, y todo lo que choca o se recoge s
   // se cargan antes (el motor con City, y los módulos del dibujo y de la carrera)
   assert.ok(html.indexOf('city.js?v=') < html.indexOf('motor.js?v='), 'city.js antes de motor.js');
   assert.match(juego, /import '\.\/mundo-city\.js\?v=metrorush-\d+'/); assert.match(juego, /from '\.\/ciudad\.js\?v=metrorush-\d+'/);
+});
+
+/* ---------- El chicle, cuadro a cuadro ----------
+   Como el Bubble Gum de City: rodar en el aire es un PISOTÓN (baja de golpe,
+   abre rejillas, pisa cajones y drones) y al caer la burbuja rebota alto;
+   volando atrae monedas. Antes ese rodar subía 2,6 m en el aire (un doble
+   salto, que no era lo de City). Se corre ciudad.js de verdad con la física
+   de juego.js copiada en corto (como el robot). */
+function correChicle({ fps, V, objs = [], seg = 2, chicle = true, init, pulsa }) {
+  const fuente = lee('ciudad.js').replace('export function crearCiudad', 'function crearCiudad');
+  const crearCiudad = new Function(fuente + '\nreturn crearCiudad;')();
+  const boings = [], mundo = { chispa() {}, suelta() {}, city: { chicle() {}, rompe() {}, geiser() {}, boing(x, y) { boings.push(y); } } };
+  const ciudad = crearCiudad({ M, sonido: { nota() {}, soplo() {} }, aviso() {} });
+  const c = { r: { carril: 1, x: 0, xPrev: 0, y: 0, vy: 0, enAire: false, rodar: 0, rodarPend: false, saltoBufer: -1, ultSuelo: 0 },
+    poderes: { iman: 0, mochila: 0, zapatillas: 0, doble: 0, patineta: 0 }, activos: objs, D: 0, Dantes: 0, t: 0, V, monedas: 0,
+    cuenta: { monedas: 0, saltos: 0, rodadas: 0, poderes: 0 }, invulnerable: 0, modo: M.MODOS.city };
+  ciudad.inicia(c, { personajeCity: null, personajesCity: [] }, mundo);
+  if (chicle) ciudad.poder(c, 'chicle', mundo);
+  if (init) init(c);
+  const dt = 1 / fps, r = c.r, log = [];
+  let muerto = null;
+  for (let k = 0; k < seg * fps && !muerto; k++) {
+    c.t += dt; c.Dantes = c.D; c.yAntes = r.y; c.D += V * dt;
+    const p = pulsa(c);                                          // lo que pide el jugador viendo el cuadro anterior (se aplica después de antes, como en juego.js)
+    ciudad.antes(c);
+    if (p === 'arriba') r.saltoBufer = 0.16;
+    else if (p === 'abajo' && r.enAire && !ciudad.rebota(c)) { r.vy = -F.caidaRapida; r.rodarPend = true; r.saltoBufer = -1; }
+    if (r.saltoBufer > 0) {
+      r.saltoBufer -= dt;
+      if (!r.enAire || c.t - r.ultSuelo < 0.09) { r.vy = M.impulso(F.alturaSalto * ciudad.salto(c)); r.enAire = true; r.saltoBufer = -1; r.ultSuelo = -1; }
+    }
+    r.xPrev = r.x;
+    const sop = M.soporte(c.activos, r.x, c.D, r.y, c.Dantes);
+    r.vy -= F.gravedad * ciudad.gravedad(c) * dt; r.y += r.vy * dt;
+    if (r.y <= sop.h) { if (r.enAire && r.vy < -1 && r.rodarPend) r.rodar = F.tiempoRodar; r.y = sop.h; r.vy = 0; r.enAire = false; r.rodarPend = false; r.ultSuelo = c.t; }
+    else if (!r.enAire && r.y > sop.h + 0.05) r.enAire = true;
+    ciudad.fisica(c, sop, dt, mundo, c.t);
+    if (r.rodar > 0) r.rodar -= dt;
+    const alto = r.rodar > 0 ? F.altoRodando : F.altoDePie;     // los choques (el barrido entre cuadros, como en juego.js)
+    for (const o of c.activos) {
+      const q = M.caja(o, c.D); if (!q || q.y1 <= q.y0) continue;
+      let ys = r.y; const dD = c.D - c.Dantes;
+      if (c.D + M.MEDIO_LARGO < q.z0 || c.D - M.MEDIO_LARGO > q.z1) {
+        if (q.z1 - q.z0 + 2 * M.MEDIO_LARGO >= dD || c.Dantes - M.MEDIO_LARGO > q.z1 || c.D + M.MEDIO_LARGO < q.z0) continue;
+        const s0 = Math.max(0, (q.z0 - M.MEDIO_LARGO - c.Dantes) / dD), s1 = Math.min(1, (q.z1 + M.MEDIO_LARGO - c.Dantes) / dD);
+        ys = c.yAntes + (r.y - c.yAntes) * (s0 + s1) / 2;
+      }
+      if (Math.abs(r.x - X[o.carril]) >= q.w + F.medioAncho || ys + 0.02 >= q.y1 || ys + alto <= q.y0) continue;
+      if (ciudad.pisa(c, o, mundo) || c.invulnerable > 0) continue;
+      muerto = o; break;
+    }
+    log.push({ y: r.y, enAire: r.enAire, iman: ciudad.imanChicle(c) });
+  }
+  return { c, log, muerto, boings };
+}
+/** Salta y, en lo alto, rueda (el pisotón). `luego(c)` sigue después de caer. */
+const saltaYPisa = luego => { let f = 0; return c => { if (f === 0) { f = 1; return 'arriba'; } if (f === 1 && c.r.enAire && c.r.vy <= 0) { f = 2; return 'abajo'; } if (f === 2 && !c.r.enAire) { f = 3; if (luego) luego(c); } return null; }; };
+
+test('el chicle: rodar en el aire es un pisotón y al caer la burbuja rebota alto (a todo ritmo de cuadros)', () => {
+  const ideal = C.CHICLE.rebote;
+  for (const fps of [20, 30, 60, 144]) {
+    // 1) el rebote: sube lo de CHICLE.rebote (lo que el semi-implícito de juego.js da a ese ritmo, como el salto) y nunca antes de caer
+    const { log, boings } = correChicle({ fps, V: 30, seg: 3, pulsa: saltaYPisa() });
+    const cae = log.findIndex((e, k) => k && !e.enAire && log[k - 1].enAire);
+    assert.ok(cae > 0, fps + ': cae del pisotón');
+    assert.ok(log.slice(0, cae).every(e => e.y < F.alturaSalto * C.CHICLE.salto + 0.01), fps + ': el pisotón no sube en el aire (no es un doble salto)');
+    const sube = Math.max(...log.slice(cae).map(e => e.y));
+    // (el Euler semi-implícito pierde v0·dt/2 de altura, como en cualquier salto: a 20 fps 3,27 m, a 144 fps 3,55)
+    assert.ok(sube > ideal - M.impulso(ideal) / fps / 2 - 0.05 && sube <= ideal + 0.01, `${fps} fps: rebota ${sube.toFixed(2)} m (ideal ${ideal})`);
+    assert.ok(sube > M.ALTO_TECHO - 0.5, fps + ': el rebote alcanza un techo de vagón');
+    assert.equal(boings.length, 1, fps + ': un ¡boing! en el dibujo');
+    // volando atrae monedas; en el suelo, no
+    assert.ok(log.some(e => e.enAire && e.iman) && !log.some(e => !e.enAire && e.iman), fps + ': el imán del chicle, solo en el aire');
+    // 2) sin chicle, rodar en el aire es el de siempre: cae y no rebota
+    const s = correChicle({ fps, V: 30, seg: 2, chicle: false, pulsa: saltaYPisa() });
+    const i = s.log.findIndex((e, k) => k && !e.enAire && s.log[k - 1].enAire);
+    assert.equal(Math.max(...s.log.slice(i).map(e => e.y)), 0, fps + ': sin chicle no rebota');
+    for (const V of [16, 30, 46, 60]) {
+      // 3) del suelo al techo: un vagón que aparece delante justo al rebotar se sube sin chocar
+      const tren = { tipo: 'tren', carril: 1, d0: 1e9, largo: 30, vel: 0, id: 1 };
+      const t = correChicle({ fps, V, objs: [tren], seg: 3, pulsa: saltaYPisa(c => { tren.d0 = c.D + V * 0.45; }) });
+      assert.equal(t.muerto, null, `${fps} fps, ${V} m/s: no choca con el vagón`);
+      assert.ok(t.log.some(e => !e.enAire && e.y === M.ALTO_TECHO), `${fps} fps, ${V} m/s: cae sobre el techo`);
+      // 4) la rejilla: el pisotón con chicle la abre aunque rebote (cae sobre ella, o unos metros antes)
+      for (const antes of [0, 5]) {
+        const rej = { tipo: 'rejilla', carril: 1, d: 1e9 };
+        correChicle({ fps, V, objs: [rej], seg: 2, pulsa: saltaYPisa(c => { rej.d = c.D + antes; }) });
+        assert.ok(rej.abierta, `${fps} fps, ${V} m/s: abre la rejilla ${antes} m delante`);
+      }
+      // 5) el pisotón sobre un dron (bajando de un techo) lo pisa y la burbuja rebota hasta el tope; sin chicle, el dron lanza lo suyo
+      let pisado = 0;
+      for (let k = 0; k <= 10; k++) {
+        const ventana = [true, false].map(chicle => {
+          const dron = { tipo: 'dron', carril: 1, d: V * (0.02 + k * 0.006) };
+          let f = 0;
+          const d = correChicle({ fps, V, objs: [dron], seg: 1.5, chicle, init: c => { c.r.y = M.ALTO_TECHO; c.r.enAire = true; }, pulsa: () => (f++ === 0 ? 'abajo' : null) });
+          return { roto: !!dron.roto && !d.muerto, sube: Math.max(...d.log.map(e => e.y)), monedas: d.c.monedas };
+        });
+        assert.equal(ventana[0].roto, ventana[1].roto, `${fps} fps, ${V} m/s: el chicle pisa el dron igual que el pisotón de siempre`);
+        if (ventana[0].roto) { pisado++; assert.equal(ventana[0].monedas, 16, 'pisotón: el doble'); assert.ok(ventana[0].sube > ventana[1].sube && ventana[0].sube <= C.CHICLE.tope + 0.01, 'rebota más, sin pasar el tope'); }
+      }
+      assert.ok(pisado >= 4, `${fps} fps, ${V} m/s: hay ventana para pisar el dron (${pisado})`);
+    }
+  }
+  // 6) un cajón delante del pisotón: se pisa (el rebote va un cuadro después, cuando los pies ya bajaron). Donde el
+  //    pisotón de siempre lo pisa, con chicle no se choca nunca (salta más alto: a veces lo pasa por arriba o lo pisa más lejos)
+  for (const fps of [20, 30, 60, 144]) for (const V of [16, 30, 46, 60]) {
+    let pisa = 0;
+    for (let k = 0; k <= 12; k++) {
+      const [conChicle, normal] = [true, false].map(chicle => {
+        const caj = { tipo: 'cajon', carril: 1, d: 1e9 }; let f = 0;
+        const r = correChicle({ fps, V, objs: [caj], seg: 2, chicle, pulsa: c => {
+          if (f === 0) { f = 1; return 'arriba'; }
+          if (f === 1 && c.r.enAire && c.r.vy <= 0) { f = 2; caj.d = c.D + V * (0.03 + 0.01 * k); return 'abajo'; }
+          return null; } });
+        return r.muerto ? 'choca' : caj.roto ? 'pisa' : 'pasa';
+      });
+      if (conChicle === 'pisa') pisa++;
+      if (normal === 'pisa') assert.notEqual(conChicle, 'choca', `${fps} fps, ${V} m/s, ${k}: el chicle no choca donde el pisotón de siempre pisa`);
+    }
+    assert.ok(pisa >= 2, `${fps} fps, ${V} m/s: hay ventana para pisar el cajón con chicle (${pisa})`);
+  }
 });

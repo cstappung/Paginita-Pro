@@ -190,8 +190,20 @@
       buena carrera: la densidad de obstáculos ya llegó a su máximo a los
       ~7,7 km, y desde los 11,4 km la carrera es aguante a toda velocidad.
       Con aceleración constante los metros tienen fórmula exacta en el
-      tiempo (d = V0·t + ACEL·t²/2) y en la distancia (v² = V0² + 2·ACEL·d). */
-  const VELOCIDAD = { V0: 15, VMAX: 50, ACEL: 0.1 };      // m/s al empezar, m/s de tope y m/s² de aceleración
+      tiempo (d = V0·t + ACEL·t²/2) y en la distancia (v² = V0² + 2·ACEL·d).
+
+      EL TOPE SUBIÓ A 60 m/s (versión 3 de la prueba). El comienzo no cambió
+      nada (la misma rampa), así que hasta los 11,4 km la pista es idéntica;
+      desde ahí sigue acelerando hasta 60 m/s a los 450 s (7 min 30 s), a
+      los 16,9 km. Las carreras guardadas con la versión 2 (tope 50) se
+      siguen rehaciendo con su curva: velocidadDe(modo, 2) da la vieja, y la
+      pista de una prueba v2 se genera con ella (crearGenerador {version}).
+      Por eso un fantasma de antes del cambio todavía se puede correr: la
+      carrera contra él usa su misma curva. */
+  const VELOCIDAD = { V0: 15, VMAX: 60, ACEL: 0.1 };      // m/s al empezar, m/s de tope y m/s² de aceleración (versión 3)
+  const VELOCIDAD_V2 = { V0: 15, VMAX: 50, ACEL: 0.1 };   // la de la versión 2 de la prueba (tope 50), para rehacer carreras viejas
+  const VERSION_PISTA = 3;
+  const ID_CIELO = 1e8;                                   // desde aquí, los ids de las monedas de la mochila (versión 3): la pista nunca llega tan lejos                                 // la versión de pista/velocidad de las carreras nuevas (= VERSION de prueba.js)
 
   /** Arma una CURVA de velocidad a partir de {V0, VMAX, ACEL}: todo lo que
       sale de ella en un solo objeto, para que el juego, el generador y el
@@ -236,8 +248,8 @@
   const metrosHasta = CURVA.metrosHasta;
   const metrosEntre = CURVA.metrosEntre;
 
-  /** Cómo frena el corredor cuando el inspector lo atrapa (m/s²): a 50 m/s
-      resbala 50² / (2·60) = 20,8 m. El antitrampas tolera eso, no más. */
+  /** Cómo frena el corredor cuando el inspector lo atrapa (m/s²): a 60 m/s
+      resbala 60² / (2·60) = 30 m. El antitrampas tolera eso, no más. */
   const FRENADA = 60;
 
   /* ---------- Puntos y multiplicador ---------- */
@@ -299,11 +311,12 @@
     { id: "cocheras", nombre: "Cocheras", desde: 8400, estilo: "pixel", paleta: "cocheras", musica: "metrorush-cocheras", lema: "Donde duermen los trenes viejos", boleto: 9 },
     { id: "invierno", nombre: "Invierno", desde: 10950, estilo: "juguete", paleta: "invierno", musica: "metrorush-invierno", lema: "Nieva sobre los rieles", boleto: 5 },
     { id: "muelle", nombre: "Muelle", desde: 13700, estilo: "neon", paleta: "muelle", musica: "metrorush-muelle", lema: "La línea que iba a llegar al mar", boleto: 10 },
-    { id: "oxido", nombre: "Óxido", desde: 16450, estilo: "pixel", paleta: "oxido", musica: "metrorush-oxido", lema: "Más allá del mapa", boleto: 6 },
+    { id: "oxido", nombre: "Óxido", desde: 16950, estilo: "pixel", paleta: "oxido", musica: "metrorush-oxido", lema: "Más allá del mapa", boleto: 6 },
     // la paleta "fin" es la del alba con la historia (afiches, grafitis): "alba" queda limpia para City, que la reusa
-    { id: "fin", nombre: "Fin de la Línea", desde: 19200, estilo: "juguete", paleta: "fin", musica: "metrorush-fin", lema: "Aquí se acaban las vías… ¿o no?", boleto: 7 }
+    { id: "fin", nombre: "Fin de la Línea", desde: 20250, estilo: "juguete", paleta: "fin", musica: "metrorush-fin", lema: "Aquí se acaban las vías… ¿o no?", boleto: 7 }
   ];
-  const VUELTA_DESDE = 23200, VUELTA_CADA = 4000;   // desde los 23,2 km (80 s después del Fin), una de las tres primeras cada 4 km
+  const VUELTA_DESDE = 24250, VUELTA_CADA = 4000;   // desde los 24,25 km (67 s después del Fin, ya a 60 m/s), una de las tres primeras cada 4 km
+  // (Óxido y el Fin se corrieron 500 m y 1 km cuando el tope pasó de 50 a 60 m/s: a esa velocidad llegaban a 48 y 46 s de la anterior)
   const VUELTA_IDS = ["barrio", "ocaso", "neon"];    // las que giran: una de cada estilo, como siempre
 
   /** La estación que corresponde a los `metros` corridos, en el mundo del
@@ -404,9 +417,9 @@
   const BOLETOS_CITY = [null];                              // los boletos de City (todavía ninguno)
   const MUNDOS = {
     metro: { id: "metro", nombre: "Línea 3", estaciones: ESTACIONES, vuelta: { desde: VUELTA_DESDE, cada: VUELTA_CADA, n: 3, ids: VUELTA_IDS },
-      intro: INTRO, boletos: BOLETOS, velocidad: VELOCIDAD, generador: null, personajes: null, tema: "metrorush-barrio" },
+      intro: INTRO, boletos: BOLETOS, velocidad: VELOCIDAD, velocidadV2: VELOCIDAD_V2, generador: null, personajes: null, tema: "metrorush-barrio" },
     city: { id: "city", nombre: "City", estaciones: ESTACIONES_CITY, vuelta: null,
-      intro: INTRO_CITY, boletos: BOLETOS_CITY, velocidad: VELOCIDAD, generador: null, personajes: null, tema: "metrorush-barrio" }
+      intro: INTRO_CITY, boletos: BOLETOS_CITY, velocidad: VELOCIDAD, velocidadV2: VELOCIDAD_V2, generador: null, personajes: null, tema: "metrorush-barrio" }
   };
 
   /* ---------- Los modos de juego ----------
@@ -418,46 +431,89 @@
        revivir        «¿Seguir corriendo?» después de un choque
        monedasMatan   tocar una moneda termina la carrera (como un choque de frente)
        mundo          la clave de MUNDOS
-       fantasma       se corre contra el fantasma del n.º 1 de su propia tabla
-                      (con su misma semilla, para que la pista sea la misma; ver
-                      `semillaSiguiente` en juego.js y el campo `g` de la prueba)
+       fantasma       se corre contra el fantasma del n.º 1 de la tabla de
+                      DISTANCIA de su mundo (con su misma semilla y sus mismas
+                      reglas, para que la pista sea la misma; ver `conReglas`,
+                      `semillaSiguiente` en juego.js y los campos `g` y `pm`
+                      de la prueba)
      El clásico es el juego de siempre: su pista y sus pruebas son las de
-     antes de que hubiera modos (una prueba sin `m` es del clásico), y es el
-     único con tabla de distancia (`distancia: true`). `corto` va en la
+     antes de que hubiera modos (una prueba sin `m` es del clásico). Las
+     tablas de distancia (una por mundo) no son de un modo: las dice
+     DISTANCIA, más abajo. `corto` va en la
      insignia del marcador; `desc`, en la portada. */
   const MODOS = {
     clasico: { id: "clasico", nombre: "Clásico", corto: "Clásico", desc: "El de siempre: poderes, patineta, potenciadores y seguir corriendo.",
-      categoria: "club-metrorush-carrera", items: true, potenciadores: true, patineta: true, revivir: true, monedasMatan: false, mundo: "metro", distancia: true },
+      categoria: "club-metrorush-carrera", items: true, potenciadores: true, patineta: true, revivir: true, monedasMatan: false, mundo: "metro" },
     puro: { id: "puro", nombre: "Sin ayudas", corto: "Sin ayudas", desc: "Todos corren a ×10 fijo, sin poderes, cajas, patineta ni potenciadores, y sin segunda oportunidad.",
       categoria: "club-metrorush-puro", items: false, potenciadores: false, patineta: false, revivir: false, monedasMatan: false, mundo: "metro", multFijo: 10 },
     sinmonedas: { id: "sinmonedas", nombre: "Sin monedas", corto: "Sin monedas", desc: "Las monedas queman: tocar una termina la carrera. Sin poderes ni ayudas.",
       categoria: "club-metrorush-sinmonedas", items: false, potenciadores: false, patineta: false, revivir: false, monedasMatan: true, mundo: "metro" },
-    city: { id: "city", nombre: "City", corto: "City", desc: "La ciudad, con todos los poderes y ayudas.",
+    city: { id: "city", nombre: "City", corto: "City", desc: "La ciudad, con todos los poderes y ayudas; la tabla se carga con energía.",
       categoria: "club-metrorush-city", items: true, potenciadores: true, patineta: true, revivir: true, monedasMatan: false, mundo: "city" },
     citypuro: { id: "citypuro", nombre: "City sin ayudas", corto: "City puro", desc: "La ciudad a ×10 fijo para todos, sin poderes, cajas, patineta ni potenciadores, y sin segunda oportunidad.",
       categoria: "club-metrorush-citypuro", items: false, potenciadores: false, patineta: false, revivir: false, monedasMatan: false, mundo: "city", multFijo: 10 },
-    /* Los dos «Fantasma»: las reglas de Sin ayudas, y además se corre contra
-       el fantasma de la mejor carrera de su propia tabla. El fantasma (traerlo,
-       dibujarlo, anotarlo) lo hace otro trabajo; aquí quedan los ganchos: la
-       semilla elegible al empezar y el campo `g` de la prueba. */
-    fantasma: { id: "fantasma", nombre: "Fantasma", corto: "Fantasma", desc: "Sin poderes ni ayudas, contra el fantasma de la mejor carrera de esta tabla, en su misma pista.",
-      categoria: "club-metrorush-fantasma", items: false, potenciadores: false, patineta: false, revivir: false, monedasMatan: false, mundo: "metro", fantasma: true },
-    cityfantasma: { id: "cityfantasma", nombre: "City fantasma", corto: "City fantasma", desc: "La ciudad sin ayudas, contra el fantasma de la mejor carrera de esta tabla.",
-      categoria: "club-metrorush-cityfantasma", items: false, potenciadores: false, patineta: false, revivir: false, monedasMatan: false, mundo: "city", fantasma: true }
+    /* Los dos «Fantasma»: se corre contra el fantasma de la carrera MÁS LARGA
+       de su mundo (la n.º 1 de la tabla de distancia), venga del modo normal,
+       de Sin ayudas o de otra carrera contra el fantasma. «Fantasma» no quiere
+       decir «sin ítems»: se corre con las MISMAS reglas que tuvo esa carrera
+       (`reglasPor`, aplicadas con `conReglas`), porque las reglas cambian la
+       pista (sin ítems no salen poderes ni cajas) y la pista tiene que ser
+       la suya. Ejemplo: si el récord es del Clásico, se corre con poderes,
+       patineta y «seguir corriendo»; si es de Sin ayudas, sin nada y a ×10.
+       La carrera va a la tabla de distancia: se compite en metros.
+       Los indicadores de abajo (items: false…) son los de una carrera de
+       antes, que no decía sus reglas: su pista era la de Sin ayudas. */
+    fantasma: { id: "fantasma", nombre: "Fantasma", corto: "Fantasma", desc: "Contra el fantasma de la carrera más larga, en su misma pista y con sus mismas reglas. Gana quien llegue más lejos.",
+      categoria: "club-metrorush-distancia", items: false, potenciadores: false, patineta: false, revivir: false, monedasMatan: false, mundo: "metro", fantasma: true,
+      reglasPor: ["clasico", "puro"], reglasDefecto: "clasico" },
+    cityfantasma: { id: "cityfantasma", nombre: "City fantasma", corto: "City fantasma", desc: "La ciudad contra el fantasma de la carrera más larga, en su misma pista y con sus mismas reglas.",
+      categoria: "club-metrorush-citydistancia", items: false, potenciadores: false, patineta: false, revivir: false, monedasMatan: false, mundo: "city", fantasma: true,
+      reglasPor: ["city", "citypuro"], reglasDefecto: "city" }
   };
   const ORDEN_MODOS = ["clasico", "puro", "sinmonedas", "fantasma", "city", "citypuro", "cityfantasma"];   // el orden en que se muestran
+  /* Las tablas de DISTANCIA, una por mundo: los metros de la carrera más
+     larga. Entran el modo normal, el sin ayudas y el fantasma de cada mundo
+     (las tres pistas se pueden volver a correr igual); «Sin monedas» no,
+     porque su pista es otra (las monedas son muros). El n.º 1 de cada una es
+     el fantasma de su mundo. */
+  const DISTANCIA = {
+    metro: { categoria: "club-metrorush-distancia", modos: ["clasico", "puro", "fantasma"] },
+    city: { categoria: "club-metrorush-citydistancia", modos: ["city", "citypuro", "cityfantasma"] }
+  };
+  /** La tabla de distancia del mundo de un modo, o null si ese modo no entra en ninguna. */
+  function distanciaDe(modo) {
+    const m = modoDe(modo); if (!m) return null;
+    const T = DISTANCIA[m.mundo];
+    return T && T.modos.includes(m.id) ? T : null;
+  }
   /** El modo de una clave. Sin clave (null, undefined o "") es el clásico,
       que es lo que dice una prueba vieja sin `m`; una clave que no existe da
       null (el antitrampas la rechaza). También acepta el objeto del modo. */
   function modoDe(id) {
-    if (id && typeof id === "object") return MODOS[id.id] === id ? id : null;
+    if (id && typeof id === "object") return MODOS[id.id] === id || (id.reglas && MODOS[id.id] && MODOS[id.id].fantasma) ? id : null;   // (o un fantasma con las reglas de su fuente: conReglas)
     if (id == null || id === "") return MODOS.clasico;
     return Object.prototype.hasOwnProperty.call(MODOS, id) ? MODOS[id] : null;
   }
-  /** El modo cuya tabla es `categoria` (null si ninguno; la distancia es del clásico). */
+  /** El modo cuya tabla es `categoria` (null si ninguno). Las de distancia
+      dan el modo normal de su mundo (el clásico o City): de ahí sale su curva
+      de velocidad; qué modos entran en ellas lo dice DISTANCIA. */
   function modoDeCategoria(categoria) {
-    if (categoria === "club-metrorush-distancia") return MODOS.clasico;
-    return ORDEN_MODOS.map(k => MODOS[k]).find(m => m.categoria === categoria) || null;
+    if (categoria === DISTANCIA.metro.categoria) return MODOS.clasico;
+    if (categoria === DISTANCIA.city.categoria) return MODOS.city;
+    return ORDEN_MODOS.map(k => MODOS[k]).find(m => m.categoria === categoria && !m.fantasma) || null;
+  }
+  /** Un modo fantasma corriendo con las reglas de `reglas` (la clave del modo
+      que corrió el fantasma; ver MODOS.fantasma). Devuelve un modo nuevo con
+      todo lo de esas reglas (ítems, patineta, ×10 fijo…) pero el nombre, la
+      tabla y el `id` del fantasma, más `reglas` con la clave. Una clave que
+      ese fantasma no admite da null. Ejemplo: conReglas("fantasma", "clasico")
+      → items: true, revivir: true, categoria de distancia, id "fantasma". */
+  function conReglas(modo, reglas) {
+    const f = typeof modo === "string" ? MODOS[modo] : modo && MODOS[modo.id];
+    if (!f || !f.fantasma || !f.reglasPor.includes(reglas)) return null;
+    const R = MODOS[reglas];
+    return Object.assign({}, R, { id: f.id, nombre: f.nombre, corto: f.corto, desc: f.desc, categoria: f.categoria, mundo: f.mundo,
+      fantasma: true, reglasPor: f.reglasPor, reglasDefecto: f.reglasDefecto, reglas });
   }
   /** El mundo de un modo (o de una clave de modo). Sin modo, la Línea 3. */
   const mundoDe = modo => MUNDOS[(modoDe(modo) || MODOS.clasico).mundo] || MUNDOS.metro;
@@ -467,9 +523,12 @@
       o la de su mundo. Se arma una vez por objeto {V0, VMAX, ACEL} y se
       guarda: la clásica es CURVA, la misma de siempre. */
   const curvas = new Map([[VELOCIDAD, CURVA]]);
-  function velocidadDe(modo) {
+  /* `version`: la versión de la prueba (2 = la curva vieja, tope 50; sin
+     versión o 3, la de ahora). Ejemplo: velocidadDe("clasico", 2).VELOCIDAD.VMAX → 50. */
+  function velocidadDe(modo, version) {
     const m = modoDe(modo) || MODOS.clasico;
-    const V = m.velocidad || mundoDe(m).velocidad || VELOCIDAD;
+    const W = mundoDe(m);
+    const V = version === 2 ? (m.velocidadV2 || W.velocidadV2 || VELOCIDAD_V2) : (m.velocidad || W.velocidad || VELOCIDAD);
     if (!curvas.has(V)) curvas.set(V, hazCurva(V));
     return curvas.get(V);
   }
@@ -661,9 +720,26 @@
   /** El récord local de la mejor carrera en `modo`: el del clásico vive en
       records.puntos (como siempre); los demás, en recordsModo. */
   const claveRecord = modo => { const m = modoDe(modo) || MODOS.clasico; return m.id === "clasico" ? null : m.id; };
-  function recordDe(prog, modo) { const k = claveRecord(modo); return k ? (prog.recordsModo && prog.recordsModo[k]) || 0 : (prog.records && prog.records.puntos) || 0; }
-  /** Anota un récord de `modo` si es mayor (modifica `prog`). Devuelve el récord que había. */
+  /** Dónde vive el récord local de distancia del mundo de `modo` (en
+      records): «distancia» la Línea 3, «distanciaCity» City. */
+  const campoDistancia = modo => { const m = modoDe(modo) || MODOS.clasico; return m.mundo === "city" ? "distanciaCity" : "distancia"; };
+  /** El récord de distancia (metros) del mundo de `modo`. */
+  function distanciaRecord(prog, modo) { return (prog.records && prog.records[campoDistancia(modo)]) || 0; }
+  /** Anota una distancia si es mayor. Devuelve la que había. */
+  function anotaDistancia(prog, modo, metros) {
+    const k = campoDistancia(modo), antes = distanciaRecord(prog, modo);
+    prog.records[k] = Math.max(antes, metros);
+    return antes;
+  }
+  // en un modo «Fantasma» lo que se compite son metros: su récord es el de distancia de su mundo
+  function recordDe(prog, modo) {
+    const m = modoDe(modo); if (m && m.fantasma) return distanciaRecord(prog, m);
+    const k = claveRecord(modo); return k ? (prog.recordsModo && prog.recordsModo[k]) || 0 : (prog.records && prog.records.puntos) || 0;
+  }
+  /** Anota un récord de `modo` si es mayor (modifica `prog`). Devuelve el récord que había.
+      En un modo «Fantasma» `puntos` son metros (va al récord de distancia). */
   function anotaRecord(prog, modo, puntos) {
+    const m = modoDe(modo); if (m && m.fantasma) return anotaDistancia(prog, m, puntos);
     const k = claveRecord(modo), antes = recordDe(prog, modo);
     if (k) prog.recordsModo[k] = Math.max(antes, puntos); else prog.records.puntos = Math.max(antes, puntos);
     return antes;
@@ -680,7 +756,7 @@
       boletos: [],                                           // números de boleto encontrados
       boletosCity: [], personajesCity: [], personajeCity: null,   // CITY: las postales de City, sus personajes comprados y el que lleva en City (null = su aspecto de siempre)
       aspectos: ["clasico"], aspecto: "clasico",             // los desbloqueados y el que lleva puesto
-      records: { puntos: 0, distancia: 0, monedas: 0 },      // las mejores marcas locales (los puntos y la distancia, del clásico)
+      records: { puntos: 0, distancia: 0, distanciaCity: 0, monedas: 0 },   // las mejores marcas locales (los puntos del clásico; la distancia de la Línea 3 y la de City)
       recordsModo: { puro: 0, sinmonedas: 0, fantasma: 0, city: 0, citypuro: 0, cityfantasma: 0 },   // la mejor carrera de cada uno de los otros modos
       totales: { carreras: 0, metros: 0, monedas: 0 },       // lo acumulado
       intro: false                                           // si ya vio la introducción
@@ -825,13 +901,17 @@
      crece con la velocidad, pero solo por encima de ~33 m/s; más abajo
      manda la distancia de siempre. Ejemplo: a 50 m/s, 27,5 m entre filas. */
   const FILA_MIN_S = 0.55;
+  /* El arco de monedas sobre la barrera baja (ver arcoMonedas): */
+  const PASO_ARCO = 0.18;                // entre moneda y moneda, esta fracción de medio salto (0,072 s)
+  const ALTO_ARCO = 0.7;                 // cada moneda va 0,7 m sobre los pies del salto ideal (la caja de recoger va de −0,4 a +2,2)
 
   /** La dificultad entre 0 y 1 según los metros: llega al máximo a los
       ~7,7 km (antes a los ~9,3: el juego se sentía fácil). */
   const dificultad = d => limita((d - 250) / 7500, 0, 1);
 
   /* EL GENERADOR Y LOS MODOS
-     `crearGenerador(semilla, {modo})`: sin modo (o con el clásico) la pista
+     `crearGenerador(semilla, {modo, version})`: `version` es la de la prueba
+     (2 = la curva vieja de tope 50; sin ella, la de ahora). Sin modo (o con el clásico) la pista
      es exactamente la de siempre, objeto por objeto: el antitrampas de las
      carreras ya guardadas depende de eso (lo fija un test con su huella).
      Lo que cambia con el modo, y solo cuando el modo lo pide:
@@ -853,7 +933,8 @@
     const modo = modoDe(opciones && opciones.modo) || MODOS.clasico;   // una clave que no existe se juega como el clásico
     const conPoderes = modo.items !== false;     // ¿salen poderes y cajas?
     const peligro = !!modo.monedasMatan;         // ¿las monedas matan? (entonces nunca van en el camino)
-    const curva = velocidadDe(modo);             // la curva de velocidad del modo
+    const version = (opciones && opciones.version) || VERSION_PISTA;   // la versión de la pista (la 2 es la vieja, la de las pruebas de antes)
+    const curva = velocidadDe(modo, version);    // la curva de velocidad del modo (y de esa versión)
     const velocidadEn = curva.velocidadEn;       // con la que se ponen los trenes de frente (la clásica, en el clásico)
     const ext = modo.generador || mundoDe(modo).generador || null;   // los bloques propios del mundo, si tiene
     const azar = rng(semilla >>> 0 || 1);        // el azar de esta pista
@@ -865,6 +946,7 @@
     let boleto = null;                           // {n, desde} si hay que poner un boleto
     let sigPoder = 320, sigEstrella = 420, sigCaja = 900;   // metros de los próximos regalos
     let nId = 0;                                 // contador para dar un id único a cada objeto
+    let nCielo = 0;                              // y el de las monedas de la mochila (versión 3: aparte, ver monedasCielo)
     let salida = [];                             // lo que devuelve el llamado en curso
 
     const emite = o => { o.id = ++nId; salida.push(o); return o; };   // agrega un objeto a la salida
@@ -878,9 +960,44 @@
     function filaMonedas(c, d, largo, y = 0.9, paso = 2.2) {
       for (let x = 0; x <= largo; x += paso) emite({ tipo: "moneda", carril: c, d: d + x, y });
     }
-    /** Un arco de 5 monedas sobre una barrera baja en d (enseña dónde saltar). */
+    /* EL ARCO DE MONEDAS SOBRE LA BARRERA BAJA, DIBUJADO CON EL SALTO DE VERDAD
+       Antes era un arco fijo de 6 m de largo y 2,1 m de alto, hecho para el
+       salto viejo (1,5 m, 0,59 s). Con el salto nuevo (2,1 m, 0,80 s) el
+       corredor vuela 12 m a 15 m/s y 40 m a 50 m/s, así que pasaba MUY por
+       encima de las monedas de las puntas: la caja de recoger exige que la
+       moneda no quede más de 0,4 m bajo los pies, y a 30 m/s los pies van a
+       más de 1,67 m (la altura de la moneda de la punta + 0,4) en los 11 m del
+       centro del salto. Resultado: saltando bien la barrera se perdían dos.
+       Ahora las monedas siguen la parábola del salto a la velocidad que lleva
+       el corredor en ese metro (velocidadEn, la misma con que se ponen los
+       trenes), con la cima justo encima de la barrera:
+         · la moneda i está en el instante t = (i − 2)·PASO_ARCO·T/2 desde la
+           cima, donde T/2 = √(2h/g) es medio salto (0,40 s): las cinco cubren
+           el 36 % central del vuelo (4,3 m de largo a 15 m/s, 14,5 m a
+           50 m/s), justo la parte que va sobre la barrera;
+         · va a ALTO_ARCO (0,7 m) sobre los pies en ese instante. Se recoge de
+           0,4 m bajo los pies a 2,2 m sobre ellos, así que el salto real puede
+           ir 1,1 m más alto o 1,5 m más bajo que el ideal y las toca igual.
+           El margen de abajo es más grande a propósito: a 20 fps el juego
+           integra el salto cuadro a cuadro y sube solo 1,84 m (no 2,1) y dura
+           0,70 s, y con 0,9 m (el medio exacto) ahí se perdía la última;
+         · con eso, saltar hasta 0,14 s antes o después de lo justo todavía
+           recoge las cinco, a 20, 30, 60 o 144 cuadros por segundo (lo mide
+           colabtex/tests/metrorush-arco.test.cjs, y de ahí salieron estos dos
+           números: un barrido de separaciones y alturas);
+         · de pie, la más baja queda a 2,53 m (se recoge hasta 2,2): sin saltar
+           no se toca ninguna, así que el arco sigue enseñando dónde saltar.
+       Son las mismas cinco monedas en el mismo orden: cambian solo su `d` y su
+       `y`, así que los ids de todo lo demás (lo que revisa la prueba del
+       antitrampas) no se mueven. */
     function arcoMonedas(c, d) {
-      for (let i = 0; i < 5; i++) { const dz = (i - 2) * 1.5; emite({ tipo: "moneda", carril: c, d: d + dz, y: 0.9 + 1.2 * (1 - (dz / 3.6) ** 2) }); }
+      const V = velocidadEn(d);                                   // la velocidad del corredor al llegar a la barrera
+      const medio = Math.sqrt(2 * FISICA.alturaSalto / FISICA.gravedad);   // medio salto, en segundos (0,40 s)
+      for (let i = 0; i < 5; i++) {
+        const t = (i - 2) * PASO_ARCO * medio;                    // segundos antes (−) o después (+) de la cima
+        const pies = FISICA.alturaSalto - FISICA.gravedad * t * t / 2;   // a qué altura van los pies en ese instante
+        emite({ tipo: "moneda", carril: c, d: d + V * t, y: pies + ALTO_ARCO });   // la moneda, a la altura del pecho
+      }
     }
     /** Pone los regalos que tocan (poder, estrella, caja, boleto) en el carril c, metro d. */
     function regalos(c, d, y = 1.2) {
@@ -1057,12 +1174,21 @@
       pedirBoleto(n, desde) { boleto = { n, desde }; },
       /** Monedas en el aire para la mochila cohete: una cinta a 8,5 m que cambia
           de carril cada tanto, de `desde` a `hasta`. */
+      /* La cinta de monedas de la mochila cohete. En la versión 3 no toca la
+         pista: usa su propio azar (de la semilla y del metro) y sus propios
+         ids (desde ID_CIELO), así que agarrar una mochila ya no cambia lo que
+         viene después. Eso es lo que deja correr la pista de un fantasma con
+         poderes: si su mochila y la tuya movieran el azar, tu pista se
+         separaría de la suya en cuanto uno de los dos volara. En la versión 2
+         (las pruebas de antes) sigue como era, para que se rehagan igual. */
       monedasCielo(desde, hasta, carril) {
         salida = [];
         let c = carril == null ? 1 : carril;
+        const v3 = version >= 3, az = v3 ? rng(((semilla >>> 0) ^ Math.imul(Math.round(desde * 8) + 1, 0x9E3779B1)) >>> 0 || 1) : azar;
         for (let d = desde, k = 0; d <= hasta; d += 2.6, k++) {
-          if (k > 0 && k % 14 === 0) c = limita(c + (azar() < 0.5 ? -1 : 1), 0, 2);
-          emite({ tipo: "moneda", carril: c, d, y: FISICA.alturaMochila + 0.6 });
+          if (k > 0 && k % 14 === 0) c = limita(c + (az() < 0.5 ? -1 : 1), 0, 2);
+          const o = { tipo: "moneda", carril: c, d, y: FISICA.alturaMochila + 0.6 };
+          if (v3) { o.id = ID_CIELO + ++nCielo; salida.push(o); } else emite(o);   // v3: ids aparte, que no corren los de la pista
         }
         return salida;
       },
@@ -1126,9 +1252,9 @@
   /* ---------- Lo que se exporta ---------- */
   return {
     rng, lerp, limita,
-    CARRILES, LARGO_VAGON, ALTO_TECHO, LARGO_RAMPA, FISICA, impulso, VELOCIDAD, T_TOPE, velocidad, metrosEntre, FRENADA, velocidadEn, FILA_MIN_S, VEL_TREN, APARECE, activaTren, dificultad,
-    hazCurva, CURVA, velocidadDe,
-    MODOS, ORDEN_MODOS, modoDe, modoDeCategoria, MUNDOS, mundoDe, historiaDe, ESTACIONES_CITY, INTRO_CITY, BOLETOS_CITY, TIPOS, registraTipo,
+    CARRILES, LARGO_VAGON, ALTO_TECHO, LARGO_RAMPA, FISICA, impulso, VELOCIDAD, T_TOPE, velocidad, metrosEntre, FRENADA, velocidadEn, FILA_MIN_S, PASO_ARCO, ALTO_ARCO, VEL_TREN, APARECE, activaTren, dificultad,
+    hazCurva, CURVA, velocidadDe, VELOCIDAD_V2, VERSION_PISTA,
+    MODOS, ORDEN_MODOS, modoDe, modoDeCategoria, DISTANCIA, distanciaDe, conReglas, campoDistancia, distanciaRecord, anotaDistancia, ID_CIELO, MUNDOS, mundoDe, historiaDe, ESTACIONES_CITY, INTRO_CITY, BOLETOS_CITY, TIPOS, registraTipo,
     recordDe, anotaRecord,
     MEDIO_LARGO, MARGEN_TECHO, MARGEN_RAMPA, ANCHO_TECHO, alturaRampa, soporte, caja,
     PUNTOS_POR_METRO, MAX_BASE, MAX_ESTRELLAS, multiplicador, puntosPorTramo,

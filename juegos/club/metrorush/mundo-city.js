@@ -44,7 +44,7 @@
    (ver `legible` y `realza` en mundo.js) y se lee de lejos en todos los
    estilos. La escenografía no lleva «!». */
 import * as THREE from 'three';
-import { PALETAS, GANCHOS, piezas } from './mundo.js?v=metrorush-11';
+import { PALETAS, GANCHOS, piezas } from './mundo.js?v=metrorush-13';
 
 const MOTOR = window.MetroRushMotor;                    // el motor (con City instalado por city.js)
 const CITY = MOTOR && MOTOR.CITY;                       // las medidas y los datos de City (city.js)
@@ -510,9 +510,16 @@ Object.assign(Kit.prototype, {
     }
     g.userData.colocar = (o, D, t) => {
       g.position.set(CARRILES[o.carril], SUELO, -(o.d - D));
+      /* El chorro: al usarlo (usadaT, lo pone ciudad.js) el respiradero
+         SOPLA durante un segundo: las bocanadas suben el doble de alto
+         (hasta los techos, que es adonde te lleva), más anchas y más
+         opacas, y después vuelve a humear tranquilo. Sin esto, subir por
+         el vapor parecía un salto que salió solo. */
+      const b = o.usadaT != null ? Math.max(0, 1 - (t - o.usadaT)) : 0;   // 1 recién usado → 0 al segundo
       nubes.forEach((s, k) => {                                     // cada bocanada sube 3 m en 0,7 s, crece y se apaga
-        const f = (t * 1.4 + k / 3) % 1;
-        s.position.set(Math.sin(k * 2.1 + t) * 0.15, 0.4 + f * 3, 0); s.scale.setScalar(0.9 + f * 2.2); s.material.opacity = 0.65 * (1 - f);
+        const f = (t * (1.4 + 2.2 * b) + k / 3) % 1;               // soplando, suben más rápido
+        s.position.set(Math.sin(k * 2.1 + t) * 0.15 * (1 - b), 0.4 + f * (3 + 3.5 * b), 0);
+        s.scale.setScalar((0.9 + f * 2.2) * (1 + 0.8 * b)); s.material.opacity = Math.min(0.95, (0.65 + 0.3 * b) * (1 - f));
       });
     };
     return g;
@@ -831,7 +838,9 @@ function vistePersonaje(p, kit, asp, pelo) {
    ===================================================================
    GANCHOS.crea los arma una vez por mundo:
      · la burbuja del chicle alrededor del corredor (una esfera rosada
-       transparente que tiembla) y su reventón al salvarte de un choque;
+       transparente que tiembla) y su reventón al salvarte de un choque; al
+       caer de un pisotón se aplasta y rebota como gelatina, y deja un aro
+       rosado que se abre en el piso (el «¡boing!») con unos trocitos;
      · los trozos de un cajón o un dron pisado: una sola InstancedMesh de 36
        cubitos (una llamada al GPU) que salen volando y caen.
    Todo es dibujo: nada de esto cambia la carrera. */
@@ -840,14 +849,33 @@ function creaEfectos({ escena }) {
     color: 0xff7ad9, emissive: 0xff3fb0, emissiveIntensity: 0.35, roughness: 0.15, metalness: 0, transparent: true, opacity: 0.26, depthWrite: false
   }));
   burbuja.visible = false; burbuja.renderOrder = 3; escena.add(burbuja);
-  let chicle = false, revienta = -1;                                // ¿hay burbuja?, y el tiempo del reventón (−1: ninguno)
+  let chicle = false, revienta = -1, aplasta = -1;                  // ¿hay burbuja?, el tiempo del reventón y el del aplastón del rebote (−1: ninguno)
+  /* El aro del ¡boing!: un toro chato en el piso (BufferGeometry de three,
+     con sus normales), sin luz propia; crece y se apaga en 0,4 s, y se queda
+     atrás con el mundo como los trozos. */
+  const aro = new THREE.Mesh(new THREE.TorusGeometry(1, 0.07, 6, 32), new THREE.MeshBasicMaterial({ color: 0xff7ad9, transparent: true, opacity: 0, depthWrite: false }));
+  aro.rotation.x = Math.PI / 2; aro.visible = false; aro.renderOrder = 3; escena.add(aro);
+  let aroT = -1;                                                    // el tiempo del aro (−1: ninguno)
   const MAX = 36, trozos = [];                                      // {p, v, r, w, t, e}
   const im = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xffffff }), MAX);
   im.count = 0; im.frustumCulled = false; escena.add(im);
   const _m = new THREE.Matrix4(), _q = new THREE.Quaternion(), _e = new THREE.Euler(), _p = new THREE.Vector3(), _s = new THREE.Vector3(), _c = new THREE.Color();
   return {
     /** Muestra u oculta la burbuja; con `pum` la revienta (se agranda y se apaga). */
-    chicle(si, pum) { if (pum && chicle) revienta = 0; chicle = !!si; },
+    chicle(si, pum) { if (pum && chicle) revienta = 0; chicle = !!si; if (!chicle) aplasta = -1; },
+    /** El ¡boing! del chicle al caer de un pisotón en (x, y): la burbuja se
+        aplasta y rebota, y en el piso se abre un aro rosado con trocitos. */
+    boing(x, y) {
+      aplasta = 0; aroT = 0;
+      aro.position.set(x, (y || 0) + SUELO + 0.05, 0); aro.visible = true;
+      for (let k = 0; k < 8; k++) {                                 // los trocitos de chicle (los mismos cubitos de los pisados)
+        if (trozos.length >= MAX) trozos.shift();
+        const a = k / 8 * Math.PI * 2;
+        trozos.push({ p: new THREE.Vector3(x + Math.cos(a) * 0.4, (y || 0) + SUELO + 0.15, Math.sin(a) * 0.4),
+          v: new THREE.Vector3(Math.cos(a) * 4, 2 + Math.random() * 2, Math.sin(a) * 4), r: Math.random() * 6, w: (Math.random() - 0.5) * 12,
+          t: 0, e: 0.1 + Math.random() * 0.06, c: k % 2 ? 0xff7ad9 : 0xffb3ec });
+      }
+    },
     /** Los trozos de un objeto pisado `o` (cajón: madera; dron: gris y cian), donde está ahora (z = 0, el corredor). */
     rompe(o) {
       const col = o.tipo === 'dron' ? [0x3a4a5a, 0x22e5ff, 0xff3030] : [0xc8873a, 0xa86a2a, 0x3a2a1a];
@@ -881,8 +909,23 @@ function creaEfectos({ escena }) {
           if (f >= 1) { revienta = -1; burbuja.material.opacity = 0.26; }
         } else {                                                    // tiembla como una pompa
           const t = e.t || 0;
-          burbuja.scale.set(1.12 + Math.sin(t * 7) * 0.04, 1.18 + Math.sin(t * 5.3) * 0.05, 1.12 + Math.cos(t * 6.1) * 0.04);
+          /* El aplastón del rebote (0,45 s): una oscilación amortiguada,
+             primero chata y ancha (el golpe), después estirada (el impulso).
+             Ejemplo: al caer, alto ×0,65 y ancho ×1,21; a los 0,15 s, alto ×1,2. */
+          let sy = 1, sx = 1;
+          if (aplasta >= 0) {
+            aplasta += dt; const f = aplasta / 0.45;
+            if (f >= 1) aplasta = -1;
+            else { const d = Math.exp(-4 * f) * Math.cos(3 * Math.PI * f) * 0.35; sy = 1 - d; sx = 1 + d * 0.6; }
+          }
+          burbuja.scale.set((1.12 + Math.sin(t * 7) * 0.04) * sx, (1.18 + Math.sin(t * 5.3) * 0.05) * sy, (1.12 + Math.cos(t * 6.1) * 0.04) * sx);
+          burbuja.position.y -= (1 - sy) * 1.18 * 0.8;              // chata, se apoya en el piso (no flota sobre los pies)
         }
+      }
+      if (aroT >= 0) {                                              // el aro del ¡boing!: se abre y se apaga en 0,4 s
+        aroT += dt; const f = aroT / 0.4;
+        if (f >= 1 || e.menu) { aroT = -1; aro.visible = false; }
+        else { aro.scale.set(0.5 + f * 1.8, 0.5 + f * 1.8, 1 + f); aro.material.opacity = 0.8 * (1 - f); aro.position.z += (e.v || 0) * dt; }
       }
       let n = 0;
       for (let i = trozos.length - 1; i >= 0; i--) {

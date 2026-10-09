@@ -1,29 +1,35 @@
 /* Metro Rush — el fantasma: el rastro de una carrera y cómo se vuelve a ver.
 
    QUÉ HACE, EN GLOBAL
-   En los modos «Fantasma» y «City fantasma» se corre contra la mejor
-   carrera de la tabla (la n.º 1), en su MISMA pista. Para eso hacen falta
-   tres cosas, y las tres viven aquí (todo puro: corre en Node y en la página):
+   En los modos «Fantasma» y «City fantasma» se corre contra la carrera más
+   larga de su mundo (la n.º 1 de la tabla de distancia, venga del modo
+   normal, de Sin ayudas o de otro fantasma), en su MISMA pista y con sus
+   mismas reglas. Para eso hacen falta tres cosas, y las tres viven aquí
+   (todo puro: corre en Node y en la página):
      1. El RASTRO: mientras se corre se anota, cada décima de segundo de
         juego, dónde está el corredor de lado (x), a qué altura (y) y qué
         hace (corre, sube, baja, rueda, tropieza). Se guarda como un texto
         corto en la prueba de la carrera (`g`, ver prueba.js), así el que
         venga después puede verlo correr.
-     2. Los PUNTOS del fantasma metro a metro: salen de los eventos de su
-        prueba (estrellas, choque) con la misma cuenta del antitrampas: 10
-        por metro × su multiplicador. Así se sabe en todo momento quién va
-        ganando.
+     2. Los METROS del fantasma segundo a segundo (`metrosEn`): salen de los
+        eventos de su prueba (las muestras cada 2 s, los choques y el seguir
+        corriendo) y de la curva de velocidad. Se compite en metros: gana
+        quien llega más lejos. (Sus puntos, `tramosPuntos`, quedan para el
+        resumen.)
      3. PREPARAR el fantasma que manda la página: se comprueba con `rehace`
         (la misma prueba que pasó el antitrampas), se saca su semilla, los
         pedidos que le hizo al generador (túneles y boletos, para que la
         pista salga idéntica) y su rastro.
 
    POR QUÉ ASÍ
-   - La velocidad solo depende del tiempo de juego, y en un modo es la misma
+   - La velocidad solo depende del tiempo de juego, y en un mundo es la misma
      para todos: a los 10 s todos van en el metro 155. Por eso el rastro NO
-     guarda los metros (los da la curva) y el fantasma corre siempre a tu
-     lado mientras los dos siguen en pie; la carrera de verdad es de PUNTOS
-     (que dependen del multiplicador de cada uno) y de quién aguanta más.
+     guarda los metros (los dan la curva y los eventos) y el fantasma corre a
+     tu lado mientras los dos siguen en pie. La carrera es de METROS: quién
+     aguanta más. Antes era de puntos, y salía el absurdo de ir «−4 994»
+     corriendo hombro con hombro (±0 m): su multiplicador era más alto, nada
+     más. Con un fantasma del modo normal, que pudo chocar y seguir corriendo,
+     se queda atrás mientras está caído y retoma después.
    - El rastro no cuenta para los puntos: el antitrampas solo mira que se
      pueda leer y que no dure más que la carrera (prueba.js). Lo que se
      dibuja con él es solo para el ojo.
@@ -230,42 +236,93 @@
     return t.p + t.k * Math.max(0, D - t.D);
   }
 
+  /** Los puntos de paso del fantasma: [{t, D, vivo}] de sus eventos (las
+      muestras cada 2 s, los choques, el seguir corriendo y el fin). `vivo`
+      dice si desde ese punto iba corriendo. */
+  function pasos(prueba) {
+    const out = [{ t: 0, D: 0, vivo: true }];
+    let vivo = true;
+    for (const ev of prueba.e || []) {
+      const [cod, t, D] = ev;
+      if (cod === "m") vivo = false; else if (cod === "s") vivo = true;
+      out.push({ t, D, vivo: cod === "f" ? false : vivo });
+    }
+    return out;
+  }
+  /** Dónde iba el fantasma a los `t` segundos de juego. Corriendo, lo que da
+      la curva desde el último punto (sin pasarse del siguiente); caído,
+      derecho de un punto al otro (resbala y se queda). Después del fin, donde
+      quedó. `curva` es la de su carrera (M.velocidadDe). Ejemplo: corrió sin
+      chocar hasta los 60 s → a los 30 s va donde la curva dice a los 30 s. */
+  function metrosEn(p, curva, t) {
+    let lo = 0, hi = p.length - 1;                       // el último punto antes de t (búsqueda binaria)
+    if (t >= p[hi].t) return p[hi].D;
+    while (lo < hi) { const m = (lo + hi + 1) >> 1; if (p[m].t <= t) lo = m; else hi = m - 1; }
+    const a = p[lo], b = p[lo + 1];
+    if (a.vivo) return Math.min(b.D, a.D + curva.metrosEntre(a.t, t));
+    const f = b.t > a.t ? (t - a.t) / (b.t - a.t) : 1;
+    return a.D + (b.D - a.D) * f;
+  }
+  /** ¿Iba corriendo a los `t` segundos? (para dibujarlo cayendo o de pie) */
+  function vivoEn(p, t) {
+    let lo = 0, hi = p.length - 1;
+    if (t >= p[hi].t) return false;
+    while (lo < hi) { const m = (lo + hi + 1) >> 1; if (p[m].t <= t) lo = m; else hi = m - 1; }
+    return p[lo].vivo;
+  }
+
   /* ---------------------------------------------------------------
      4. Preparar el fantasma que llega de la página
      --------------------------------------------------------------- */
 
   /** Arma el fantasma desde lo que mandó la página ({nombre, puntos, d, yo…}:
       `d` es la prueba como texto, tal como está en soloPruebas). `MP` es
-      prueba.js y `M` el motor; `modo` el id del modo que se va a correr.
-      Devuelve {motivo} si no sirve, o el fantasma:
+      prueba.js y `M` el motor; `modo` el id del modo fantasma que se va a
+      correr. Devuelve {motivo} si no sirve, o el fantasma:
         nombre, yo        quién es (yo: es tu propia carrera)
-        semilla, pedidos  para correr su misma pista (solo túneles y boletos)
+        semilla, pedidos  para correr su misma pista (túneles y boletos; en
+                          la versión 2 también la cinta de la mochila, que
+                          ahí movía el azar de la pista)
+        reglas, version   con qué reglas y qué versión de pista corrió (las
+                          que va a usar esta carrera: M.conReglas)
+        curva             su curva de velocidad
+        pasos             sus puntos de paso, para metrosEn
         rastro            sus muestras (null si su prueba no trae rastro)
         tramos            sus puntos metro a metro
-        tm, Dm            cuándo y en qué metro chocó
-        Df                en qué metro quedó (tras resbalar)
-        puntos, metros    lo que hizo (lo que dice la tabla) */
+        tm, Dm            cuándo y en qué metro chocó por última vez
+        tf, Df            cuándo terminó y en qué metro quedó (tras resbalar)
+        puntos, metros    lo que hizo (metros: lo que dice la tabla) */
   function prepara(dato, MP, M, modo) {
     const mal = m => ({ motivo: m });
+    const F = M.MODOS[modo];
+    if (!F || !F.fantasma) return mal("este modo no tiene fantasma");
     if (!dato || typeof dato.d !== "string" || !dato.d) return mal("su récord no trae la prueba de la carrera");
     let p;
     try { p = JSON.parse(dato.d); } catch (e) { return mal("su prueba no se puede leer"); }
     const r = MP.rehace(p);                              // la misma revisión del antitrampas
     if (r.motivo) return mal(/otra versión/.test(r.motivo) ? "su récord es de otra versión del juego" : "su prueba no cuadra (" + r.motivo + ")");
-    if (r.modo !== modo) return mal("su récord no es de este modo");
+    const T = M.DISTANCIA[F.mundo];
+    if (!T || !T.modos.includes(r.modo)) return mal("su récord no es de este mundo");
+    /* Las reglas: las suyas si son de las que este fantasma admite (el modo
+       normal o el sin ayudas); un fantasma de antes, que corrió sin nada y
+       sin decirlo, tiene la pista de Sin ayudas. */
+    const reglas = F.reglasPor.includes(r.reglas) ? r.reglas : F.reglasPor[F.reglasPor.length - 1];
     const fin = p.e[p.e.length - 1];                     // el evento «f»
-    const m = p.e.find(ev => ev[0] === "m") || fin;      // el choque (en los fantasma no se sigue corriendo: hay uno)
+    const ms = p.e.filter(ev => ev[0] === "m"), m = ms[ms.length - 1] || fin;   // el último choque (en el modo normal pudo seguir corriendo)
     const rastro = typeof p.g === "string" ? decodifica(p.g) : null;
+    const version = p.v;
     return {
       nombre: String(dato.nombre || "Jugador").slice(0, 80), yo: !!dato.yo,
-      semilla: p.s >>> 0,
-      pedidos: p.i.filter(q => q[0] === "T" || q[0] === "B"),   // sin la cinta de la mochila: en estos modos no hay
+      semilla: p.s >>> 0, reglas, version,
+      curva: M.velocidadDe(M.conReglas(modo, reglas), version),
+      pedidos: p.i.filter(q => q[0] === "T" || q[0] === "B" || (q[0] === "C" && version < 3)),
+      pasos: pasos(p),
       rastro: rastro && rastro.n ? rastro : null,
       tramos: tramosPuntos(p, M),
-      tm: m[1], Dm: m[2], Df: fin[2],
+      tm: m[1], Dm: m[2], tf: fin[1], Df: fin[2],
       puntos: r.puntos, metros: r.metros
     };
   }
 
-  return { VERSION, PASO, ALFA, ESTADOS, MAX_MUESTRAS, X0, QX, QY, crearGrabador, codifica, recorre, cuenta, duracion, decodifica, estadoEn, desdeEn, tramosPuntos, puntosEn, prepara };
+  return { VERSION, PASO, ALFA, ESTADOS, MAX_MUESTRAS, X0, QX, QY, crearGrabador, codifica, recorre, cuenta, duracion, decodifica, estadoEn, desdeEn, tramosPuntos, puntosEn, pasos, metrosEn, vivoEn, prepara };
 });

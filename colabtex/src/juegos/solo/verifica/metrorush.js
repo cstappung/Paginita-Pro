@@ -10,12 +10,15 @@
    real, y recalcula los puntos exactos; aquí solo se compara con lo
    declarado.
 
-   Los modos (MODOS en motor.js): cada uno manda sus puntos a su tabla
-   (club-metrorush-carrera el clásico, -puro, -sinmonedas, -fantasma,
-   -city, -citypuro, -cityfantasma) y la prueba dice su modo en `m` (sin `m`, clásico). Aquí se
+   Los modos (MODOS en motor.js): cada modo normal manda sus puntos a su
+   tabla (club-metrorush-carrera el clásico, -puro, -sinmonedas, -city,
+   -citypuro) y la prueba dice su modo en `m` (sin `m`, clásico). Aquí se
    comprueba que la tabla sea la del modo de la prueba: una carrera del
-   clásico, con sus poderes, no puede entrar en «Sin ayudas». La distancia
-   es solo del clásico. */
+   clásico, con sus poderes, no puede entrar en «Sin ayudas».
+   La DISTANCIA es una tabla por mundo (M.DISTANCIA): club-metrorush-distancia
+   la Línea 3 (clásico, Sin ayudas y Fantasma) y club-metrorush-citydistancia
+   City (City, City sin ayudas y City fantasma). Los modos fantasma no tienen
+   tabla de puntos: su carrera solo va, en metros, a la distancia de su mundo. */
 import MP from '../../../../../juegos/club/metrorush/prueba.js';
 
 export const PRUEBA = 1;
@@ -32,11 +35,13 @@ export function verifica(dato, prueba, ctx) {
   const cat = dato && dato.categoria;
   const modoCat = MP.modoDeCategoria(cat);                     // de qué modo es la tabla (null: ninguna)
   if (!modoCat) return 'Categoría desconocida.';
-  if (cat === 'club-metrorush-distancia' && r.modo !== 'clasico') return 'La distancia solo cuenta en el modo clásico (la prueba es del modo ' + MP.MODOS[r.modo].nombre + ').';
-  if (cat !== 'club-metrorush-distancia' && modoCat.id !== r.modo) return 'La prueba es del modo ' + MP.MODOS[r.modo].nombre + ', no de la tabla ' + modoCat.nombre + '.';
-  if (cat === 'club-metrorush-distancia') {
+  const tablaDist = Object.values(MP.DISTANCIA).find(T => T.categoria === cat);   // ¿es una tabla de distancia? (una por mundo)
+  if (tablaDist) {
+    if (!tablaDist.modos.includes(r.modo)) return 'La prueba es del modo ' + MP.MODOS[r.modo].nombre + ', que no entra en esta tabla de distancia.';
     if (Math.abs(dato.puntos - Math.min(TOPE_DISTANCIA, r.metros)) > 1) return 'Los metros declarados (' + dato.puntos + ') no son los de la carrera (' + r.metros + ').';
   } else {
+    if (MP.MODOS[r.modo].fantasma) return 'Una carrera fantasma solo va a la tabla de distancia de su mundo.';
+    if (modoCat.id !== r.modo) return 'La prueba es del modo ' + MP.MODOS[r.modo].nombre + ', no de la tabla ' + modoCat.nombre + '.';
     // Los puntos se suman tramo a tramo en el juego y aquí de una vez: puede
     // haber una diferencia de redondeo de un punto.
     if (Math.abs(dato.puntos - Math.min(TOPE_CARRERA, r.puntos)) > 2) return 'Los puntos declarados (' + dato.puntos + ') no son los de la carrera (' + r.puntos + ').';
@@ -47,7 +52,7 @@ export function verifica(dato, prueba, ctx) {
 
 /* Lo imposible, para filas ya guardadas sin prueba. No son umbrales de
    «sospechoso»: son lo que el juego no deja hacer. Lo más rápido que se
-   puede correr es la velocidad del juego (de 15 a 50 m/s, la integral que
+   puede correr es la velocidad del juego (de 15 a 60 m/s, la integral que
    da `metrosEntre`), y el multiplicador más alto es (30 + 29 + 5) × 2 = 128,
    o sea 1 280 puntos por metro. Ejemplo: en 60 s se corren a lo más 1 080 m,
    así que más de 1 402 000 puntos en un minuto no se pueden hacer. */
@@ -61,7 +66,7 @@ export function sospecha(categoria, fila) {
   const modo = MP.modoDeCategoria(categoria);                   // la curva de velocidad es la del modo de la tabla
   if (!modo) return null;
   const maxMetros = MP.velocidadDe(modo).metrosEntre(0, t) + 15;
-  if (categoria === 'club-metrorush-distancia') {
+  if (Object.values(MP.DISTANCIA).some(T => T.categoria === categoria)) {   // las de distancia (Línea 3 y City): metros
     if (p > maxMetros) return p + ' m en ' + t.toFixed(1) + ' s (más rápido que el juego)';
     return null;
   }

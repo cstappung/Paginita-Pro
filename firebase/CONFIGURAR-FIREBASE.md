@@ -218,6 +218,16 @@ y están en el repositorio público, como cualquier archivo del sitio.
 > dispositivo (se sincronizan solos después de publicarlas) y las carreras
 > no pagan monedas.
 
+> **Metro Rush, fantasma y distancia de City (9 de octubre de 2026):**
+> `club-metrorush-citydistancia` (los metros de la carrera más larga de City,
+> con tope de 1 000 000) entra en las expresiones de `soloRanks`,
+> `soloPruebas` y `clubJugadas`, y `metrorush` entra en la lista de juegos de
+> `logros` (el logro «Cazafantasmas» se escribe en vivo, al ganarle al
+> fantasma). Los modos Fantasma ya no tienen tabla de puntos propia: anotan
+> en la tabla de distancia de su mundo. Hay que volver a publicar las reglas;
+> hasta entonces el récord de distancia de City se queda en el dispositivo y
+> el logro no se guarda.
+
 Tu base de datos está ahora en **modo de prueba** (abierta a cualquiera).
 Antes de publicar el sitio:
 

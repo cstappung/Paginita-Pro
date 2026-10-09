@@ -42,8 +42,10 @@
        H o dos toques y dura TABLA_SEG. Solo en los modos con patineta.
      · BATERÍA: un poder que llena la energía de una.
      · MONEDAS ×2: un poder que cuenta doble cada moneda (no los puntos).
-     · CHICLE, como en City: además de salvarte, salta un 15 % más, y
-       «rodar» en el aire rebota en vez de bajar de golpe (una vez por salto).
+     · CHICLE, como el Bubble Gum de City (15 s): además de salvarte, salta
+       un 15 % más; «rodar» en el aire es un pisotón (baja de golpe, abre
+       rejillas y pisa cajones y drones) y al caer de él la burbuja rebota
+       3,6 m (lo que pide un techo de vagón); volando atrae las monedas.
      · DRON IMPULSOR: pisar un dron (desde un techo o una lona) te lanza
        alto, como en City, donde los drones te suben a los andamios.
      · REJILLAS: rejillas en el suelo que tiemblan. Caerles encima de golpe
@@ -119,12 +121,17 @@
      acelera un poco más (0,11 contra 0,1 m/s²), pero su tope es más bajo
      (46 contra 50): las calles están más llenas (cajones, drones, barandas)
      y a 50 m/s no se alcanza a leer una baranda antes de tenerla encima.
-     Llega al tope a los ~273 s (4 min 33 s), a los ~8,5 km.
+     Llegaba al tope a los ~273 s (4 min 33 s), a los ~8,5 km. Desde la
+     versión 3 de la prueba el tope es 60 m/s, como en la Línea 3 (se pidió
+     así): la rampa es la misma, así que hasta los 8,5 km nada cambia, y
+     sigue subiendo hasta los 400 s (~13,6 km). Las pruebas v2 se rehacen
+     con VELOCIDAD_CITY_V2 (M.velocidadDe(modo, 2)).
      La leen el juego, el generador (velocidadEn) y el antitrampas
      (metrosEntre) por M.velocidadDe(modo). Cambiarla cambia las pruebas de
      City: no hay pruebas de City guardadas de antes de esto (el modo era un
      armazón), así que no hizo falta subir VERSION en prueba.js. */
-  const VELOCIDAD_CITY = { V0: 16, VMAX: 46, ACEL: 0.11 };
+  const VELOCIDAD_CITY = { V0: 16, VMAX: 60, ACEL: 0.11 };     // versión 3 de la prueba: el tope subió a 60 (llega a los 400 s, ~13,6 km)
+  const VELOCIDAD_CITY_V2 = { V0: 16, VMAX: 46, ACEL: 0.11 };  // la de la versión 2 (tope 46), para rehacer carreras City guardadas antes
 
   /* ---------- La historia de City ----------
      La intro (se lee en la Libreta y en el relato) y cinco postales, una por
@@ -245,7 +252,14 @@
     // arriba es como el techo de un vagón: sostiene a 3,35 m si ya vas casi a esa altura
     soporte: (o, x, D, y) => (D >= o.d0 - 0.4 && D <= o.d0 + o.largo + 0.4 && Math.abs(x - CARRILES[o.carril]) < ANCHO_PISO && y >= CONDUCTO.alto - 0.5 ? CONDUCTO.alto : null)
   });
-  M.registraTipo("seto", { caja: o => ({ z0: o.d - SETO.largo / 2, z1: o.d + SETO.largo / 2, y0: 0, y1: SETO.alto, w: SETO.w }) });
+  M.registraTipo("seto", {
+    caja: o => ({ z0: o.d - SETO.largo / 2, z1: o.d + SETO.largo / 2, y0: 0, y1: SETO.alto, w: SETO.w }),
+    /* Arriba se puede pisar: un salto flotante que baja un poco antes de
+       pasarlo cae sobre el seto y sigue (antes se moría «enredado» aunque
+       los pies ya estuvieran casi arriba). Sostiene desde 0,35 m bajo su
+       borde: lo que cae en ese margen sube al borde y no choca. */
+    soporte: (o, x, D, y) => (Math.abs(D - o.d) <= SETO.largo / 2 + 0.3 && Math.abs(x - CARRILES[o.carril]) < ANCHO_PISO && y >= SETO.alto - 0.35 ? SETO.alto : null)
+  });
   M.registraTipo("viga", {
     caja: () => null,                                          // cuelga de cables: por debajo se pasa (y en su carril vienen vagones)
     soporte: (o, x, D, y) => {
@@ -260,10 +274,16 @@
   const ENERGIA_LLENA = 10;                                    // celdas para encender la tabla (como en City)
   const TABLA_SEG = 15;                                        // lo que dura la tabla encendida con energía
   const MONEDAS2_SEG = 15;                                     // lo que dura el poder «monedas ×2»
-  const CHICLE = { salto: 1.15, rebote: 2.6 };                 // con chicle: salta un 15 % más; el rebote sube 2,6 m
+  /* El chicle: dura `seg`; el salto sube `salto` veces más; caer de un
+     pisotón rebota `rebote` m sobre donde cayó (del suelo, 3,6 m: pasa el
+     frente de un vagón, 3,35, y cae en su techo), pero nunca más arriba de
+     `tope` m sobre la vía (de un techo, 2,65 m más: los pies a 6 m). */
+  const CHICLE = { seg: 15, salto: 1.15, rebote: 3.6, tope: 6 };
   const DRON_IMPULSO = 3.0;                                    // pisar un dron te lanza 3 m sobre donde estabas (~5,3 m del suelo)
   const REJILLA = { largo: 1.8, w: 0.9, monedas: 15 };         // la rejilla y lo que suelta su escondite (el doble con Ámbar)
   const BURBUJAS = { gravedad: 0.55 };                         // dentro del tramo, la gravedad es el 55 %: un salto sube 3,8 m
+  const PASO_BURBUJA = 0.12;                                   // el arco de monedas del salto flotante: entre moneda y moneda, esta fracción de medio salto (ver setos)
+  const ALTO_BURBUJA = 0.5;                                    // …y cada moneda, 0,5 m sobre los pies del salto ideal
   /* El contenedor que cae: dónde está según cuánto falta para llegar a él.
      A más de 34 m todavía cuelga a 9 m; de 34 a 12 m baja (acelerando,
      como algo que cae); a menos de 12 m ya está en el suelo. Solo es el
@@ -286,10 +306,27 @@
     if (o.tipo === "cajon") return yAntes >= CAJON.alto - PISA;          // el cajón: casi a su altura basta
     return yAntes >= DRON.y1 - PISA_DRON;                               // el dron: solo desde un techo o una lona, nunca con un salto (su tope son 2,27 m)
   }
-  /** ¿El corredor (en x, D, a altura y) está pisando la lona `o`? Solo
-      desde el suelo (no desde un techo ni volando). */
-  function enLona(o, x, D, y) {
-    return o.tipo === "lona" && !o.usada && y < 0.35 && Math.abs(o.d - D) < LONA.largo / 2 + 0.3 && Math.abs(x - CARRILES[o.carril]) < LONA.w;
+  /** ¿El corredor (en x, a altura y, que avanzó de Dantes a D en este
+      cuadro, con velocidad vertical vy) está sobre la lona `o`?
+      - La LONA de verdad: solo desde el suelo (no desde un techo ni volando).
+      - El VAPOR empuja en toda su columna (hasta 2,5 m): quien salta
+        delante de él, que es lo que hace cualquiera al verlo, también sube.
+        Antes solo lanzaba con los pies en el suelo, así que saltarlo te
+        pasaba por encima del vapor y te estrellaba contra los vagones de
+        detrás. No empuja a quien ya sube más rápido de lo que él daría.
+      - Barrido: se mira todo lo que se avanzó en el cuadro, no solo dónde
+        terminó. A 20 fps y 60 m/s un cuadro son 3 m y la lona mide 2,4: el
+        vapor se saltaba solo uno de cada cinco cuadros.
+      Ejemplo: vapor en d 100, cuadro de 98,6 a 101,6 m, pies a 1,2 m subiendo
+      a 4 m/s → empuja (antes: no, ni por altura ni por barrido). */
+  function enLona(o, x, D, y, Dantes = D, vy = 0) {
+    if (o.tipo !== "lona" || o.usada) return false;
+    const vapor = o.variante === "vapor";
+    if (y >= (vapor ? 2.5 : 0.35)) return false;                          // el vapor empuja en toda su columna; la lona, solo pisada
+    if (vapor && vy >= impulso(Math.max(0.6, LONA.altura - y))) return false;   // ya sube más que lo que él daría
+    const m = LONA.largo / 2 + 0.3;                                        // su medio largo, con un poco de margen
+    if (Math.min(D, Dantes) - m >= o.d || Math.max(D, Dantes) + m <= o.d) return false;   // no la cruzó en este cuadro
+    return Math.abs(x - CARRILES[o.carril]) < LONA.w + (vapor ? FISICA.medioAncho : 0);   // en su carril (el vapor, un poco más ancho)
   }
   /** La velocidad hacia arriba que da la lona (con la ventaja de Sol, si la tiene). */
   const impulsoLona = (k = 1) => impulso(LONA.altura * k);
@@ -305,9 +342,10 @@
      a los ~0,28 s de subir) al llegar a él: 5,7 m a 16 m/s, 13,5 m a 46. */
   const huecoLona = V => Math.max(5, V * 0.26 + 1.5);
   /* Cuántos vagones van detrás: los justos para que el vuelo caiga sobre
-     los techos con 6 m de techo por delante (de 2 a 4), así a toda
-     velocidad no se pasa de largo y aterriza en el suelo detrás. */
-  const vagonesLona = V => limita(Math.ceil((vueloLona(V) + 6 - huecoLona(V)) / (LARGO_VAGON + 0.4)), 2, 4);
+     los techos con 6 m de techo por delante (de 2 a 6: con 4 de tope, a
+     60 m/s el vuelo caía a 3 m del final), así a toda velocidad no se pasa
+     de largo y aterriza en el suelo detrás. */
+  const vagonesLona = V => limita(Math.ceil((vueloLona(V) + 6 - huecoLona(V)) / (LARGO_VAGON + 0.4)), 2, 6);
 
   /* ---------- El bloque de pista de City ----------
      Se llama en cada vuelta del generador (ver crearGenerador en motor.js),
@@ -747,9 +785,27 @@
         api.emite({ tipo: "seto", carril: k, d });
         api.libre[k] = Math.max(api.libre[k], d + 2);
       }
-      if (!api.peligro) for (let j = 0; j < 7; j++) {            // el arco del salto flotante sobre el camino (hasta ~3,7 m)
-        const dz = (j - 3) * 2.2;
-        api.emite({ tipo: "moneda", carril: c, d: d + dz, y: 1.2 + 2.5 * (1 - (dz / 7.5) ** 2) });
+      /* El arco del salto flotante sobre el muro, dibujado con ese salto de
+         verdad (como arcoMonedas en motor.js para la barrera baja). Antes era
+         un arco fijo de 13 m, pero el salto flotante dura 1,46 s: a 30 m/s
+         vuela 44 m y pasaba más de un metro por encima de las monedas de las
+         puntas. Ahora las siete siguen su parábola (gravedad × 0,55, cima a
+         3,82 m) a la velocidad de ese metro, con la cima sobre el seto, cada
+         una ALTO_BURBUJA sobre los pies y separadas PASO_BURBUJA de medio
+         salto. Son más juntas y más bajas que las de la barrera (0,18 y 0,7):
+         un salto que dura el doble se aleja más del ideal, y a 20 fps este
+         sube solo 3,53 m, así que con los números de la barrera se perdía la
+         última si se saltaba un poco antes. Así aguanta saltar 0,16 s antes o
+         después a cualquier fps (colabtex/tests/metrorush-arco.test.cjs). */
+      if (!api.peligro) {
+        const g = FISICA.gravedad * BURBUJAS.gravedad;           // la gravedad dentro de las burbujas
+        const v0 = impulso(FISICA.alturaSalto);                  // el mismo impulso del salto de siempre…
+        const cima = v0 * v0 / (2 * g), medio = v0 / g;          // …que aquí sube a 3,82 m y tarda 0,73 s en llegar arriba
+        for (let j = 0; j < 7; j++) {
+          const t = (j - 3) * PASO_BURBUJA * medio;              // segundos antes (−) o después (+) de la cima
+          const pies = cima - g * t * t / 2;                     // la altura de los pies en ese instante
+          api.emite({ tipo: "moneda", carril: c, d: d + V * t, y: pies + ALTO_BURBUJA });
+        }
       }
     }
     secreta(api, st, c, ultimo, 6.5);                             // arriba del último muro: con el doble salto (~7,6 m)
@@ -826,7 +882,7 @@
      Se llena el MUNDO city (el armazón de motor.js) y se exportan las
      piezas que usan juego.js, mundo.js y los tests en M.CITY. */
   const W = M.MUNDOS.city;
-  Object.assign(W, { estaciones: DISTRITOS, vuelta: VUELTA, intro: INTRO, boletos: POSTALES, velocidad: VELOCIDAD_CITY,
+  Object.assign(W, { estaciones: DISTRITOS, vuelta: VUELTA, intro: INTRO, boletos: POSTALES, velocidad: VELOCIDAD_CITY, velocidadV2: VELOCIDAD_CITY_V2,
     generador, personajes: PERSONAJES, tema: "city-sur" });
   M.ESTACIONES_CITY = DISTRITOS; M.INTRO_CITY = INTRO; M.BOLETOS_CITY = POSTALES;
   M.CITY = { DISTRITOS, VUELTA, VELOCIDAD: VELOCIDAD_CITY, INTRO, POSTALES, PERSONAJES, ventajaDe, CAJON, DRON, BARANDA, LONA, PISA, PISA_DRON, pisa, enLona, impulsoLona, vueloLona, huecoLona, vagonesLona, PERFIL, PROPIO,

@@ -11,8 +11,10 @@
    - la prueba de cada modo se rehace (un robot corre cuadro a cuadro como
      juego.js), lo que el modo no permite se rechaza, y una carrera no puede
      entrar en la tabla de otro modo;
-   - las cuatro tablas nuevas están en el club, las reglas, la
-     clasificación, las monedas, Discord y el perfil;
+   - las tablas nuevas (los puntos de cada modo normal y la distancia de
+     City) están en el club, las reglas, la clasificación, las monedas,
+     Discord y el perfil; los modos fantasma no tienen tabla de puntos: van
+     a la distancia de su mundo;
    - el mundo City tiene sus distritos, su vuelta y sus ganchos (lo demás
      de City está en metrorush-city.test.cjs). */
 const {test}=require('node:test'),assert=require('node:assert/strict'),esbuild=require('esbuild');
@@ -24,31 +26,46 @@ const MV=cargaEsm('src/juegos/solo/verifica/metrorush.js');
 const sin=f=>fs.readFileSync(path.join(__dirname,'..',f),'utf8').replace(/^import [\s\S]*?;$/mg,'').replace(/\bexport\s+/g,'');
 const carga=(archivos,exp)=>{const c={crypto:crypto.webcrypto,TextEncoder};vm.createContext(c);vm.runInContext(archivos.map(sin).join('\n')+';globalThis.__X={'+exp+'};',c);return c.__X;};
 const copia=x=>JSON.parse(JSON.stringify(x));
-const NUEVAS=['club-metrorush-puro','club-metrorush-sinmonedas','club-metrorush-fantasma','club-metrorush-city','club-metrorush-citypuro','club-metrorush-cityfantasma'];
+// las tablas de puntos de los modos nuevos (los fantasma no tienen: corren en la distancia de su mundo)
+const NUEVAS=['club-metrorush-puro','club-metrorush-sinmonedas','club-metrorush-city','club-metrorush-citypuro'];
+const TABLA=['club-metrorush-carrera','club-metrorush-puro','club-metrorush-sinmonedas','club-metrorush-distancia','club-metrorush-city','club-metrorush-citypuro','club-metrorush-citydistancia'];   // la de cada modo, en ORDEN_MODOS
 
 /* La pista de una semilla como la recorre el juego (generando 230 m por
    delante), con un túnel, la cinta de la mochila y un boleto pedidos en el
    camino. Devuelve sus objetos. */
-function pista(semilla,metros,opciones){
- const g=M.crearGenerador(semilla,opciones),objs=[];const curva=M.velocidadDe(opciones&&opciones.modo);let D=0,t=0;
+function pista(semilla,metros,opciones,cielo=true){
+ const g=M.crearGenerador(semilla,opciones),objs=[];const curva=M.velocidadDe(opciones&&opciones.modo,opciones&&opciones.version);let D=0,t=0;
  while(D<metros){const V=curva.velocidad(t);D+=V*0.05;t+=0.05;objs.push(...g.generarHasta(D+230,{V}));
   if(Math.abs(D-1300)<1&&!g._t){g._t=1;g.pedirTunel(D+40,'ocaso');}
-  if(Math.abs(D-2000)<1&&!g._c){g._c=1;objs.push(...g.monedasCielo(D+12,D+100,1));g.pedirBoleto(2,D+300);}
+  if(Math.abs(D-2000)<1&&!g._c){g._c=1;if(cielo)objs.push(...g.monedasCielo(D+12,D+100,1));g.pedirBoleto(2,D+300);}
  }
  return objs;
 }
 const huella=objs=>crypto.createHash('sha256').update(JSON.stringify(objs)).digest('hex').slice(0,16)+':'+objs.length;
+/* La huella de lo que lee la prueba del antitrampas: cada objeto tal cual,
+   salvo las monedas, de las que quedan solo su id y su carril. La prueba
+   (`rehace` en prueba.js) reconoce estrellas y 2× por su id y su metro, y
+   las monedas ni suman puntos ni están en ella; lo que sí no puede moverse
+   es la cantidad y el orden de lo emitido, porque de eso salen los ids. Por
+   eso el arco de monedas sobre la barrera baja pudo ajustarse al salto nuevo
+   (motor.js, arcoMonedas) sin que dejara de verificar ninguna carrera vieja. */
+const huellaPrueba=objs=>huella(objs.map(o=>o.tipo==='moneda'?{id:o.id,c:o.carril}:o));
 /* Sacadas del motor de ANTES de los modos (mismo recorrido de arriba, 15 km):
    si alguna cambia, las carreras clásicas ya guardadas dejan de verificar. */
-const HUELLAS_CLASICO={1:'99eab28c0344da60:4746',2026:'d1d2c227952fd138:4747',7919:'68007069748c7be3:4811',12345:'24e64c7c1eb67155:4855',424242:'8c171d3acd37d3c2:4681'};
+const HUELLAS_CLASICO={1:'83dec4198ead80ca:4746',2026:'043d71412da4f3b6:4747',7919:'f93538e7e2bbe287:4811',12345:'febede443f1892ae:4855',424242:'ad1c7261c748d071:4681'};
+/* La pista entera, monedas incluidas (con el arco de monedas del salto de
+   Subway Surfers): cambia solo si cambia lo que se ve, y entonces a propósito. */
+const HUELLAS_CLASICO_TODO={1:'c6de4e1d837b6d5a:4746',2026:'de855ad015febf45:4747',7919:'4905d5dc03f4a7dd:4811',12345:'b33bf7cbed9dab57:4855',424242:'3ad9490e02f3e359:4681'};
 
 test('la tabla de modos: siete, con su tabla, sus reglas y su mundo',()=>{
  assert.deepEqual(M.ORDEN_MODOS,['clasico','puro','sinmonedas','fantasma','city','citypuro','cityfantasma']);
- assert.deepEqual(M.ORDEN_MODOS.map(k=>M.MODOS[k].categoria),['club-metrorush-carrera',...NUEVAS]);
+ assert.deepEqual(M.ORDEN_MODOS.map(k=>M.MODOS[k].categoria),TABLA);
  for(const k of M.ORDEN_MODOS){const m=M.MODOS[k];
   assert.equal(m.id,k);for(const c of ['nombre','corto','desc','categoria','mundo'])assert.ok(typeof m[c]==='string'&&m[c],k+'.'+c);
   for(const c of ['items','potenciadores','patineta','revivir','monedasMatan'])assert.equal(typeof m[c],'boolean',k+'.'+c);
-  assert.ok(M.MUNDOS[m.mundo],k+': su mundo existe');assert.equal(M.modoDeCategoria(m.categoria),m);}
+  assert.ok(M.MUNDOS[m.mundo],k+': su mundo existe');
+  // la tabla de un modo normal da ese modo; la de un fantasma es la distancia, que da el modo normal de su mundo
+  assert.equal(M.modoDeCategoria(m.categoria),m.fantasma?M.MODOS[m.mundo==='city'?'city':'clasico']:m);}
  // los sin ayudas no tienen nada; «sin monedas» además mata con las monedas
  for(const k of ['puro','sinmonedas','fantasma','citypuro','cityfantasma'])for(const c of ['items','potenciadores','patineta','revivir'])assert.equal(M.MODOS[k][c],false,k+'.'+c);
  assert.equal(M.MODOS.sinmonedas.monedasMatan,true);assert.ok(['clasico','puro','fantasma','city','citypuro','cityfantasma'].every(k=>!M.MODOS[k].monedasMatan));
@@ -62,11 +79,20 @@ test('la tabla de modos: siete, con su tabla, sus reglas y su mundo',()=>{
 });
 
 test('el clásico no cambió: misma pista objeto por objeto, misma curva',()=>{
+ // las huellas son de la pista de la versión 2 (tope 50 m/s), que es la que rehacen las pruebas guardadas
  for(const [s,h] of Object.entries(HUELLAS_CLASICO)){
-  assert.equal(huella(pista(+s,15000)),h,'semilla '+s+' sin modo');
-  assert.equal(huella(pista(+s,15000,{modo:'clasico'})),h,'semilla '+s+' con modo clásico');
+  assert.equal(huellaPrueba(pista(+s,15000,{version:2})),h,'semilla '+s+' sin modo');
+  assert.equal(huellaPrueba(pista(+s,15000,{modo:'clasico',version:2})),h,'semilla '+s+' con modo clásico');
+  assert.equal(huella(pista(+s,15000,{modo:'clasico',version:2})),HUELLAS_CLASICO_TODO[s],'semilla '+s+': la pista entera, monedas incluidas');
+  // la versión 3 (tope 60 m/s) es la misma pista hasta el tope viejo (11,4 km): recién ahí empieza a ir más rápido
+  // (sin la cinta de la mochila: en v2 sale del mismo azar que la pista y la corre; en v3 tiene su propio azar)
+  const corta=objs=>huella(objs.filter(o=>(o.d??o.d0)<11300));
+  assert.equal(corta(pista(+s,15000,undefined,false)),corta(pista(+s,15000,{version:2},false)),'semilla '+s+': v3 = v2 hasta los 11,3 km');
+  // en v3 la cinta no mueve nada de la pista: es la misma con o sin ella (salvo sus propias monedas, con ids aparte)
+  const sinCielo=objs=>huella(objs.filter(o=>!(o.id>=M.ID_CIELO)));
+  assert.equal(sinCielo(pista(+s,15000)),sinCielo(pista(+s,15000,undefined,false)),'semilla '+s+': la cinta de la mochila no corre la pista');
  }
- assert.equal(M.velocidadDe('clasico'),M.CURVA);assert.equal(M.velocidadDe(),M.CURVA);
+ assert.equal(M.velocidadDe('clasico'),M.CURVA);assert.equal(M.velocidadDe(),M.CURVA);assert.notEqual(M.velocidadDe(undefined,2),M.CURVA);
  assert.equal(M.velocidad,M.CURVA.velocidad);assert.equal(M.metrosEntre(0,60),1080);assert.equal(M.velocidadEn(1080),21);
  // la prueba del clásico no lleva el modo: queda igual que antes
  const p=MP.nueva({s:5,b:2,md:1,u:'x',m:'clasico'});assert.deepEqual(Object.keys(p),['v','s','b','md','u','i','e']);
@@ -183,7 +209,7 @@ function robot(modo,o={}){
  }
  return {prueba:MP.cierra(prueba,{sn:0}),puntos:Math.floor(st.puntos),metros:Math.floor(st.D),tiempo:Math.max(1,Math.round(st.t*1000)),estrellas:st.estrellas};
 }
-const dato=(r,cat)=>({categoria:cat,puntos:cat==='club-metrorush-distancia'?r.metros:r.puntos,tiempo:r.tiempo,partida:'x'});
+const dato=(r,cat)=>({categoria:cat,puntos:/distancia$/.test(cat)?r.metros:r.puntos,tiempo:r.tiempo,partida:'x'});   // las de distancia van en metros
 const ctx={uid:'uid-robot'};
 
 test('la carrera de cada modo se rehace y el verificador da sus mismos puntos',()=>{
@@ -193,10 +219,12 @@ test('la carrera de cada modo se rehace y el verificador da sus mismos puntos',(
   assert.ok(Math.abs(re.puntos-r.puntos)<=1,k+': puntos '+re.puntos+' / '+r.puntos);assert.equal(re.metros,r.metros);
   assert.ok(r.estrellas>=1,k+': el robot recogió estrellas');
   assert.equal(MV.verifica(dato(r,M.MODOS[k].categoria),r.prueba,ctx),null,k);
-  assert.equal(MV.sospecha(M.MODOS[k].categoria,{puntos:r.puntos,tiempo:r.tiempo}),null,k+': no es sospechosa');
+  assert.equal(MV.sospecha(M.MODOS[k].categoria,{puntos:dato(r,M.MODOS[k].categoria).puntos,tiempo:r.tiempo}),null,k+': no es sospechosa');
  }
- // la del clásico sigue sin `m` y vale para la distancia
+ // la del clásico sigue sin `m` y vale para la distancia; Sin ayudas también, y City para la de City
  const r=robot('clasico');assert.equal(r.prueba.m,undefined);assert.equal(MV.verifica(dato(r,'club-metrorush-distancia'),r.prueba,ctx),null);
+ const pu=robot('puro');assert.equal(MV.verifica(dato(pu,'club-metrorush-distancia'),pu.prueba,ctx),null);
+ for(const k of ['city','citypuro']){const c=robot(k);assert.equal(MV.verifica(dato(c,'club-metrorush-citydistancia'),c.prueba,ctx),null,k);}
 });
 
 test('lo que el modo no permite se rechaza',()=>{
@@ -234,7 +262,13 @@ test('una carrera no entra en la tabla de otro modo',()=>{
  const puro=robot('puro'),cl=robot('clasico'),sm=robot('sinmonedas');
  assert.match(MV.verifica(dato(puro,'club-metrorush-carrera'),puro.prueba,ctx),/modo Sin ayudas/);
  assert.match(MV.verifica(dato(cl,'club-metrorush-puro'),cl.prueba,ctx),/modo Clásico, no de la tabla Sin ayudas/);
- assert.match(MV.verifica(dato(puro,'club-metrorush-distancia'),puro.prueba,ctx),/distancia solo cuenta en el modo clásico/);
+ // la distancia es de cada mundo: Sin monedas no entra, ni una carrera de la Línea 3 en la de City (ni al revés)
+ assert.match(MV.verifica(dato(sm,'club-metrorush-distancia'),sm.prueba,ctx),/no entra en esta tabla de distancia/);
+ assert.match(MV.verifica(dato(puro,'club-metrorush-citydistancia'),puro.prueba,ctx),/no entra en esta tabla de distancia/);
+ const ci=robot('city');assert.match(MV.verifica(dato(ci,'club-metrorush-distancia'),ci.prueba,ctx),/no entra en esta tabla de distancia/);
+ // una carrera fantasma no entra en ninguna tabla de puntos (ni en la vieja «Fantasma»)
+ const fa=robot('fantasma');assert.match(MV.verifica(dato(fa,'club-metrorush-carrera'),fa.prueba,ctx),/fantasma solo va/);
+ assert.match(MV.verifica(dato(fa,'club-metrorush-fantasma'),fa.prueba,ctx),/Categoría desconocida/);
  assert.match(MV.verifica(dato(sm,'club-metrorush-citypuro'),sm.prueba,ctx),/no de la tabla/);
  assert.match(MV.verifica(dato(puro,'club-metrorush-nada'),puro.prueba,ctx),/Categoría desconocida/);
  assert.match(MV.verifica({...dato(puro,'club-metrorush-puro'),puntos:puro.puntos*2},puro.prueba,ctx),/puntos declarados/);
@@ -243,7 +277,7 @@ test('una carrera no entra en la tabla de otro modo',()=>{
  assert.equal(MV.sospecha('club-metrorush-city',{puntos:1e6,tiempo:60000}),null);
 });
 
-test('las cuatro tablas nuevas están en el club, las reglas, la clasificación, las monedas, Discord y el perfil',()=>{
+test('las tablas nuevas están en el club, las reglas, la clasificación, las monedas, Discord y el perfil',()=>{
  const C=carga(['src/juegos/solo/club-datos.js'],'categoriaClub,resultadoClub');
  for(const c of NUEVAS){
   assert.ok(C.categoriaClub('metrorush',c),c);assert.ok(!C.categoriaClub('fanal',c));
@@ -251,22 +285,31 @@ test('las cuatro tablas nuevas están en el club, las reglas, la clasificación,
   assert.ok(r(1000000000));assert.equal(r(1000000001),null);
  }
  assert.ok(!C.categoriaClub('metrorush','club-metrorush-citypuros'));
+ // la distancia de City: metros, hasta 1 000 000; las viejas tablas fantasma ya no reciben carreras
+ assert.ok(C.categoriaClub('metrorush','club-metrorush-citydistancia'));
+ const rd=n=>C.resultadoClub('metrorush',{categoria:'club-metrorush-citydistancia',puntos:n,tiempo:65000,partida:'abc-1'});assert.ok(rd(1000000));assert.equal(rd(1000001),null);
+ for(const c of ['club-metrorush-fantasma','club-metrorush-cityfantasma'])assert.ok(!C.categoriaClub('metrorush',c),c);
  const reglas=JSON.parse(fs.readFileSync(path.join(__dirname,'../../firebase/database.rules.json'),'utf8')).rules;
  for(const nodo of [reglas.soloRanks.$categoria.$uid,reglas.soloPruebas.$categoria.$uid.$partida]){
   const re=new RegExp(nodo['.validate'].match(/matches\(\/(.+?)\/\)/)[1]);
-  for(const c of NUEVAS)assert.ok(re.test(c),c);assert.ok(!re.test('club-metrorush-turbo'));
+  for(const c of [...NUEVAS,'club-metrorush-citydistancia'])assert.ok(re.test(c),c);assert.ok(!re.test('club-metrorush-turbo'));
  }
  const regla=reglas.soloRanks.$categoria.$uid.puntos['.validate'];
  const cabe=(cat,n)=>Function('return '+regla.replace(/newData\.isNumber\(\)/g,'true').replace(/newData\.val\(\)/g,String(n)).replace(/\$categoria/g,JSON.stringify(cat)).replace(/\.beginsWith\(/g,'.startsWith(').replace(/\.matches\(/g,'.match('))();
  for(const c of NUEVAS){assert.ok(cabe(c,1000000000),c);assert.ok(!cabe(c,1000000001),c);}
+ assert.ok(cabe('club-metrorush-citydistancia',1000000));assert.ok(!cabe('club-metrorush-citydistancia',1000001));
  const ranks=fs.readFileSync(path.join(__dirname,'../src/juegos/ranks.js'),'utf8');
- for(const op of ['carrera','distancia','puro','sinmonedas','fantasma','city','citypuro','cityfantasma'])assert.match(ranks,new RegExp('metrorush: \\{ filas: \\[\\{ k: "m", t: "Modo", ops: \\[[^\\n]*\\["'+op+'", '),op);
+ for(const op of ['carrera','distancia','puro','sinmonedas','city','citydistancia','citypuro'])assert.match(ranks,new RegExp('metrorush: \\{ filas: \\[\\{ k: "m", t: "Modo", ops: \\[[^\\n]*\\["'+op+'", '),op);
  const Mo=carga(['src/juegos/motor.js','src/juegos/logros.js','src/juegos/tienda.js','src/juegos/cortes.js','src/juegos/monedas.js'],'monedasDe,RECORD');
  const solo={};for(const c of NUEVAS)solo[c]={a:{puntos:1000000,tiempo:1}};
  assert.equal(Mo.monedasDe('a',{solo}).partes.records,NUEVAS.length*(Mo.RECORD.metrorush+40),'cada tabla paga su récord y 1 por cada 25 000 puntos');
+ // la distancia de City paga como la de la Línea 3: 1 por cada 500 m (tope 100)
+ assert.equal(Mo.monedasDe('a',{solo:{'club-metrorush-citydistancia':{a:{puntos:10000,tiempo:1}}}}).partes.records,Mo.RECORD.metrorush+20);
+ assert.equal(ranks.includes('"fantasma", "Fantasma"'),false,'la tabla «Fantasma» ya no se ofrece');
  const X=carga(['src/juegos/discord.js'],'marcaSolo,categoriaLegible');
  assert.equal(X.categoriaLegible('club-metrorush-sinmonedas').modalidad,'sin monedas');assert.equal(X.categoriaLegible('club-metrorush-citypuro').modalidad,'City sin ayudas');
  assert.equal(X.marcaSolo('club-metrorush-puro',{puntos:12500,tiempo:1}),'🚇 12.500 pts');
+ assert.equal(X.marcaSolo('club-metrorush-citydistancia',{puntos:12500,tiempo:1}),'🚇 12.500 m');
  const P=carga(['src/juegos/motor.js','src/juegos/logros.js','src/juegos/tienda.js','src/juegos/perfil-tarjeta.js'],'nombreCategoria');
  assert.equal(P.nombreCategoria('club-metrorush-puro'),'Metro Rush · Sin ayudas');assert.equal(P.nombreCategoria('club-metrorush-city'),'Metro Rush · City');
 });
@@ -278,7 +321,7 @@ test('el juego: elige el modo, lo manda a su tabla, pantalla completa, y las ver
  const vs=new Set([...html.matchAll(/(?:motor|prueba|mundo|audio|juego|estilo)\.(?:js|css)\?v=(metrorush-\d+)/g),...js.matchAll(/\.js\?v=(metrorush-\d+)/g)].map(m=>m[1]));
  assert.equal(vs.size,1,'versiones distintas: '+[...vs]);assert.ok(+[...vs][0].split('-')[1]>=7);
  assert.ok(+club.match(/index\.html\?v=club-(\d+)/)[1]>=47,'club-N subió (la prueba cambió)');
- assert.match(js,/MP\.nueva\(\{[^}]*m: modo\.id/);assert.match(js,/M\.crearGenerador\(semilla, \{ modo: modo\.id \}\)/);
+ assert.match(js,/MP\.nueva\(\{[^}]*m: modo\.id, pm: modo\.reglas, v: version/);assert.match(js,/M\.crearGenerador\(semilla, \{ modo, version \}\)/);
  assert.match(js,/Club\.category\(c\.modo\.categoria\)/);assert.match(js,/c\.modo\.monedasMatan/);
  assert.match(js,/requestFullscreen/);assert.match(js,/webkitRequestFullscreen/);assert.match(js,/fullscreenchange/);assert.match(js,/KeyF/);
  assert.match(js,/Club\.inmersivo\(true\)/);assert.match(js,/Club\.inmersivo\(false\)/);
@@ -304,6 +347,7 @@ test('Sin ayudas y City sin ayudas: ×10 fijo para todos, sin importar nivel ni 
   // el tope del verificador para filas sin prueba es 100 por metro
   assert.match(MV.sospecha(M.MODOS[k].categoria,{puntos:2e5,tiempo:60000}),/multiplicador máximo/);
  }
- // en el fantasma el nivel sí cuenta
+ // en un fantasma de antes (sin `pm`) el nivel sí cuenta; con reglas de Sin ayudas (`pm: 'puro'`) es ×10 como ellas
  const f1=robot('fantasma',{base:1}),f9=robot('fantasma',{base:9});assert.ok(f9.puntos>f1.puntos*2);
+ assert.equal(M.conReglas('fantasma','puro').multFijo,10);assert.equal(M.conReglas('cityfantasma','citypuro').multFijo,10);
 });

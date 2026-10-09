@@ -3909,15 +3909,27 @@ Things that matter:
   | id | name | table | items · boosters · skate · continue | coins kill | world |
   |---|---|---|---|---|---|
   | `clasico` | Clásico | `club-metrorush-carrera` (+ `-distancia`) | yes | no | metro |
-  | `puro` | Sin ayudas | `club-metrorush-puro` | no | no | metro |
+  | `puro` | Sin ayudas | `club-metrorush-puro` (+ `-distancia`) | no | no | metro |
   | `sinmonedas` | Sin monedas | `club-metrorush-sinmonedas` | no | **yes** | metro |
-  | `fantasma` | Fantasma | `club-metrorush-fantasma` | no | no | metro |
-  | `city` | City | `club-metrorush-city` | yes | no | city |
-  | `citypuro` | City sin ayudas | `club-metrorush-citypuro` | no | no | city |
-  | `cityfantasma` | City fantasma | `club-metrorush-cityfantasma` | no | no | city |
+  | `fantasma` | Fantasma | only `club-metrorush-distancia` | the ghost's | no | metro |
+  | `city` | City | `club-metrorush-city` (+ `-citydistancia`) | yes | no | city |
+  | `citypuro` | City sin ayudas | `club-metrorush-citypuro` (+ `-citydistancia`) | no | no | city |
+  | `cityfantasma` | City fantasma | only `club-metrorush-citydistancia` | the ghost's | no | city |
+
+  **Distance is one table per world** (`DISTANCIA` in `motor.js`:
+  `club-metrorush-distancia` takes clásico, puro and fantasma;
+  `-citydistancia` takes city, citypuro and cityfantasma). A normal run
+  sends its points and, only when it beats the local distance record, its
+  metres too; a fantasma run sends only metres. Local records follow the
+  same split (`records.distancia` / `records.distanciaCity`,
+  `campoDistancia`), and in a fantasma mode `recordDe`/`anotaRecord` are
+  that distance. The old `-fantasma`/`-cityfantasma` points tables are no
+  longer written (the rules still accept them). The verifier checks that a
+  distance table only gets its world's modes and that a fantasma run goes
+  nowhere else.
 
   The two **Fantasma** modes (`fantasma: true`) race the ghost of the #1 of
-  their own table (`juegos/club/metrorush/fantasma.js`, UMD
+  their world's **distance** table, whichever mode set it (`juegos/club/metrorush/fantasma.js`, UMD
   `MetroRushFantasma`, pure; section «EL FANTASMA» in `juego.js` and
   `mundo.js`; `tests/metrorush-fantasma.test.cjs`). Things to keep:
   - **The trace** is recorded only in those modes, one sample per 0.1 s of
@@ -3944,14 +3956,28 @@ Things that matter:
     while the ghost was still running there (`pideBoleto`): boletos depend
     on each player's collection. The proof records them as its own, so it
     verifies like any run. A hook-fixed `semillaSiguiente` disables the ghost.
-  - **Speed is the same for everyone**, so while both run the ghost is at
-    your side (z 0); the race is in points (each one's multiplier) and in
-    who lasts. HUD `#hudFan` shows the lead in points and metres, a banner
-    when you overtake, and the summary who won. Names only in the portada
+  - **The run plays by the ghost's rules.** `M.conReglas(modoFantasma,
+    reglas)` builds a composite mode: the track, powers and multiplier of
+    the mode the record came from, plus «fantasma». The proof carries `pm`
+    (those rules) and `v` (track version 2 or 3, i.e. the 50/46 or the
+    60 m/s cap), so `rehace` regenerates the same track. That is also why
+    the race is **in metres**, never points: `MF.metrosEn(pasos, curva, t)`
+    and `vivoEn` place the ghost, `#hudFan` shows the lead in metres, and
+    the summary says who went further.
+  - **Beating it is a logro** («Cazafantasmas», id `fan`), written live:
+    `Club.logro('fan')` → `conexion.js` posts `{tipo:'logro'}` →
+    `solo/club.js` → `fb.otorgarLogro('metrorush', uid, 'fan')` plus the
+    toast. `metrorush` had to enter the rules' `logros` whitelist.
+  - **A new #1 replaces the ghost at once**: when row 1 of the watched table
+    changes, the page pushes an unsolicited `fantasma` message, `conexion.js`
+    dispatches `club-fantasma`, and `juego.js` prepares that ghost instead
+    of the cached one (the bug was racing the previous record right after
+    breaking it).
+  - Names only in the portada
     (`translate="no"`) and the 3D label, never in avisos/banners. The ghost
     is a translucent blue runner with no shadow, no collision and
-    `userData.sinAO` (GTAO skips it); one without a trace races on points
-    only and is not drawn.
+    `userData.sinAO` (GTAO skips it); one without a trace still races (in
+    metres) but is not drawn.
 
   `crearGenerador(seed, {modo})`: without a mode (or with `clasico`) the
   track is **byte-identical to before modes** (`metrorush-modos.test.cjs`

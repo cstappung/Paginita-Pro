@@ -179,7 +179,7 @@ export function marcaSolo(cat, f) {
   if (cat === "club-dosmil-puntos") return `🟨 ${f.puntos} puntos`;
   if (cat === "club-dosmil-ficha") return `🟨 ficha ${f.puntos}`;
   // Metro Rush: la distancia se dice en metros; la mejor carrera, en puntos.
-  if (cat === "club-metrorush-distancia") return `🚇 ${Number(f.puntos).toLocaleString("es-CL")} m`;
+  if (cat === "club-metrorush-distancia" || cat === "club-metrorush-citydistancia") return `🚇 ${Number(f.puntos).toLocaleString("es-CL")} m`;
   if (/^club-metrorush-(carrera|puro|sinmonedas|fantasma|city|citypuro|cityfantasma)$/.test(cat)) return `🚇 ${Number(f.puntos).toLocaleString("es-CL")} pts`;   // la mejor carrera de cualquier modo
   return `${Number(f.puntos).toLocaleString("es-CL")} pts`;
 }

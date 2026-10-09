@@ -1075,7 +1075,7 @@ const REGLAS = {
         "Empiezas con un Despegue de regalo."
       ])],
       ["Estaciones", lista([
-        "El paisaje cambia con la distancia recorrida, siempre pasando por un túnel: <b>Barrio Estación</b> (desde el comienzo, la ciudad de día), <b>Ocaso</b> (a los 1 200 m, retro pixelado al atardecer), <b>Mercado de Farolillos</b> (2 550 m), <b>Línea Neón</b> (4 200 m, noche synthwave), <b>Estación Fantasma</b> (6 150 m), <b>Cocheras</b> (8 400 m), <b>Invierno</b> (10 950 m), <b>Muelle</b> (13 700 m), <b>Óxido</b> (16 450 m) y <b>Fin de la Línea</b> (19 200 m). Después vuelven a girar cada 4 km.",
+        "El paisaje cambia con la distancia recorrida, siempre pasando por un túnel: <b>Barrio Estación</b> (desde el comienzo, la ciudad de día), <b>Ocaso</b> (a los 1 200 m, retro pixelado al atardecer), <b>Mercado de Farolillos</b> (2 550 m), <b>Línea Neón</b> (4 200 m, noche synthwave), <b>Estación Fantasma</b> (6 150 m), <b>Cocheras</b> (8 400 m), <b>Invierno</b> (10 950 m), <b>Muelle</b> (13 700 m), <b>Óxido</b> (16 950 m) y <b>Fin de la Línea</b> (20 250 m). Después vuelven a girar cada 4 km.",
         "En cada estación hay un <b>boleto dorado</b> con un capítulo de la historia: diez en total. Los que encuentres se leen en la <b>Libreta</b>. Mientras corres, la historia también está en los <b>afiches</b> de la vereda y en el <b>altavoz</b> del andén, que habla al entrar a cada túnel.",
         "En Opciones puedes fijar un estilo (juguete, neón o pixelado) en vez de que cambie con las estaciones, y bajar la calidad gráfica si el teléfono va lento."
       ])],
@@ -1084,7 +1084,7 @@ const REGLAS = {
         "<b>Cajones</b>: de frente chocan; se saltan, o se rompen cayéndoles encima (dan monedas). En Los Muelles caen desde las grúas mientras te acercas: su sombra marca el carril y ya están en el suelo antes de que llegues.",
         "<b>Drones</b>: se pasan rodando por debajo. Pisados desde un techo o una lona se rompen y te lanzan hacia arriba.",
         "<b>Barandas</b>: saltando te subes y te deslizas por el riel juntando monedas. <b>Lonas</b> (y el vapor de Bajo Vías): te mandan por encima de los vagones.",
-        "<b>Celdas de energía</b> (⚡): con 10 la <b>tabla eléctrica</b> se enciende gratis (H o dos toques) y dura 15 s, como una patineta. La <b>batería</b> la llena de una. Solo en City, que tiene patinetas.",
+        "<b>Celdas de energía</b> (⚡): con 10 la <b>tabla eléctrica</b> se enciende gratis (H o dos toques) y dura 15 s, como una patineta. La <b>batería</b> la llena de una, y en City la caja misteriosa también. Es la única tabla de City: las patinetas compradas en la tienda no se usan ahí (quedan guardadas para la Línea 3).",
         "<b>Rejillas</b> en el suelo que tiemblan: cáeles encima de golpe (rodar en el aire) y se abren con un chorro de monedas.",
         "En City no hay barreras ni rampas de la Línea 3: <b>cada distrito arma su propia pista</b>, con sus obstáculos, sus trenes y su pieza propia, y se corre distinto:",
         "<b>Barrio Sur · hacia arriba</b>: cajones y drones al ras, pocos trenes de frente, y cada tanto un <b>cobertizo</b>: una caseta de 2 m al pie de unos vagones sin rampa. Salta al techito y, de ahí, otra vez al techo del vagón. El camino de abajo sigue libre. Las rejillas salen seguido, para aprender el pisotón.",
@@ -1092,7 +1092,7 @@ const REGLAS = {
         "<b>Bulevar Aurora · de lado</b>: rieles por todas partes, drones y muchos trenes que vienen de frente. Los <b>rieles en zigzag</b> son dos o tres barandas que cruzan los carriles: deslizándote, cámbiate al riel siguiente sin tocar el suelo, y cada <b>transbordo</b> multiplica las monedas del riel (×2, ×3, ×4).",
         "<b>Parque de los Lagos · flotar</b>: los carriles se cierran con <b>setos</b> de 2,8 m, que un salto normal no pasa, y con lonas que rebotan a los techos. Seguido llegan las <b>burbujas</b>: ahí se flota y, en el aire, se puede saltar una vez más; es lo único que pasa por encima de los setos.",
         "<b>Bajo Vías · rodar</b>: casi todo se pasa por abajo: drones, paredes largas de vagones, trenes de frente y, muy seguido, <b>conductos</b>: un ducto colgado sobre el carril, más largo que una rodada. Rueda al entrar y vuelve a rodar en el <b>anillo naranja</b> (cada «abajo» reinicia la rodada). El vapor te sube a los techos.",
-        "<b>Chicle</b>: te salva de un choque, saltas un poco más y rodar en el aire te hace rebotar hacia arriba. <b>Monedas ×2</b> (15 s): cada moneda vale dos (no cambia los puntos).",
+        "<b>Chicle</b> (15 s): una burbuja que te salva de un choque de frente y te hace saltar un poco más. Rodar en el aire es un <b>pisotón</b>: bajas de golpe (abre rejillas y rompe cajones y drones) y al caer la burbuja <b>rebota</b> y te lanza alto, lo justo para caer sobre un vagón. En el aire, además, atrae las monedas cercanas como el imán. <b>Monedas ×2</b> (15 s): cada moneda vale dos (no cambia los puntos).",
         "Las <b>estrellas secretas</b> están escondidas en las rutas difíciles. Los <b>personajes de City</b> (Lía, Nico, Ámbar, Bruno, Sol y Dante) se compran en la tienda y cada uno trae una ventaja pequeña que no toca los puntos: más imán, más salto, más monedas al pisar o al deslizarte, más impulso en las lonas o energía que vale por dos."
       ])],
       ["Controles", lista([

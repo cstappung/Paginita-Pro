@@ -144,7 +144,7 @@ export function valorMarca(c, f) {
   if (c === "club-dosmil-puntos") return `${f.puntos || 0} puntos`;
   if (c === "club-dosmil-ficha") return `ficha ${f.puntos || 0}`;
   // Metro Rush: la distancia es en metros (la mejor carrera sigue en puntos).
-  if (c === "club-metrorush-distancia") return `${(f.puntos || 0).toLocaleString("es-CL")} m`;
+  if (c === "club-metrorush-distancia" || c === "club-metrorush-citydistancia") return `${(f.puntos || 0).toLocaleString("es-CL")} m`;
   if (c === "club-sopa-racha" || c === "club-electro-racha" || c === "club-sudoku-racha") return `${f.puntos || 0} ${f.puntos === 1 ? "día" : "días"}`;
   return `${f.puntos || 0} pts`;
 }

@@ -36,8 +36,10 @@ const copia=x=>JSON.parse(JSON.stringify(x));
 function robot(o={}){
  const op=Object.assign({semilla:12345,base:3,md:2,u:'uid-robot',muertes:[70,140],mochilaEn:25,pot:2,tunelEn:1500,pausa:4,semillaDt:7},o);
  let az=op.semillaDt>>>0;const azar=()=>((az=(az*1664525+1013904223)>>>0)/4294967296);
- const gen=M.crearGenerador(op.semilla),prueba=MP.nueva({s:op.semilla,b:op.base,md:op.md,u:op.u});
- const st={t:0,D:0,V:M.velocidad(0),puntos:0,estrellas:0,doble:0,extra:0,vivo:true,r:0};
+ const curva=M.velocidadDe(undefined,op.version),vel=t=>curva.velocidad(t);   // op.version: 2 = la curva vieja (tope 50 m/s)
+ const gen=M.crearGenerador(op.semilla,op.version?{version:op.version}:undefined),prueba=MP.nueva({s:op.semilla,b:op.base,md:op.md,u:op.u});
+ if(op.version)prueba.v=op.version;
+ const st={t:0,D:0,V:vel(0),puntos:0,estrellas:0,doble:0,extra:0,vivo:true,r:0};
  const objetos=new Map(),tomados=new Set();
  const anota=(cod,x,D)=>MP.evento(prueba,cod,st.t,D!=null?D:st.D,st.r,x);
  const pedido=(tipo,...d)=>MP.pedido(prueba,tipo,gen.estado().dSig,...d);
@@ -50,7 +52,7 @@ function robot(o={}){
   const dt=0.008+azar()*0.042;                      // cuadros de 8 a 50 ms, como un aparato que va y viene
   st.r+=dt*1000+azar()*3;                            // el reloj real: lo mismo, y un poco más (el cuadro tarda en procesarse)
   st.t+=dt;
-  st.V=st.vivo?M.velocidad(st.t):0;
+  st.V=st.vivo?vel(st.t):0;
   const dD=st.V*dt;st.D+=dD;
   if(st.vivo)st.puntos+=M.puntosPorTramo(dD,mult());
   agrega(gen.generarHasta(st.D+230,{V:Math.max(13,st.V)}));
@@ -106,15 +108,29 @@ test('Metro Rush: la carrera de un robot pasa, y el verificador da sus mismos pu
  assert.ok(JSON.stringify(larga.prueba).length<V.PRUEBA_MAX/4,'la prueba de 10 min ocupa '+JSON.stringify(larga.prueba).length);
 });
 
-test('Metro Rush: a 50 m/s, que te atrape el inspector (resbalando ~21 m) también pasa',()=>{
- // a los 400 s ya va a 50 m/s: frenando con M.FRENADA resbala 50²/(2·60) = 20,8 m después del choque
- assert.equal(M.velocidad(400),50);
- const r=robot({muertes:[400],atrapado:true,mochilaEn:0,tunelEn:0,pot:0,semilla:99,semillaDt:99});
+test('Metro Rush: a 60 m/s, que te atrape el inspector (resbalando ~30 m) también pasa',()=>{
+ // a los 500 s ya va a 60 m/s: frenando con M.FRENADA resbala 60²/(2·60) = 30 m después del choque
+ assert.equal(M.velocidad(500),60);
+ const r=robot({muertes:[500],atrapado:true,mochilaEn:0,tunelEn:0,pot:0,semilla:99,semillaDt:99});
  const m=r.prueba.e.find(e=>e[0]==='m'),f=r.prueba.e[r.prueba.e.length-1];
- assert.ok(f[2]-m[2]>20&&f[2]-m[2]<21.5,'resbaló '+(f[2]-m[2]).toFixed(1)+' m');
+ assert.ok(f[2]-m[2]>29&&f[2]-m[2]<31,'resbaló '+(f[2]-m[2]).toFixed(1)+' m');
  assert.equal(MP.rehace(r.prueba).motivo,undefined);
  assert.equal(MV.verifica(dato(r),r.prueba,ctx),null);
  assert.equal(MV.verifica(dato(r,'club-metrorush-distancia'),r.prueba,ctx),null);
+});
+
+test('Metro Rush: una carrera de la versión 2 (tope 50 m/s) se sigue aceptando con su curva de entonces',()=>{
+ // 450 s: pasa de largo el tope viejo (350 s), donde las dos curvas ya no son la misma
+ const r=robot({muertes:[450],mochilaEn:0,tunelEn:0,pot:0,semilla:77,semillaDt:77,version:2});
+ assert.equal(r.prueba.v,2);
+ assert.equal(MP.rehace(r.prueba).motivo,undefined,'la v2 se rehace con su curva');
+ assert.equal(MV.verifica(dato(r),r.prueba,ctx),null);
+ // la misma carrera haciéndose pasar por v3 no cuadra: con la curva nueva habría corrido más
+ const falsa=JSON.parse(JSON.stringify(r.prueba));falsa.v=3;
+ assert.ok(MP.rehace(falsa).motivo,'con la curva nueva los metros no cuadran');
+ // y una versión que ya no existe se rechaza
+ const v1=JSON.parse(JSON.stringify(r.prueba));v1.v=1;
+ assert.match(MP.rehace(v1).motivo,/otra versión/);
 });
 
 test('Metro Rush: tres choques con el 2× puesto (y seguir corriendo) también pasan',()=>{
@@ -201,9 +217,10 @@ test('Metro Rush: el juego anota la prueba y la manda con el resultado',()=>{
  const fs=require('node:fs'),js=fs.readFileSync(path.join(DIR,'juego.js'),'utf8'),html=fs.readFileSync(path.join(DIR,'index.html'),'utf8');
  assert.match(html,/prueba\.js\?v=/,'la página carga prueba.js');
  assert.match(html,/conexion\.js\?v=club-(1[1-9]|[2-9]\d)/,'con la conexión que manda la prueba');
- // la mejor carrera va a la tabla de su modo (la del clásico es club-metrorush-carrera); la distancia, solo del clásico
+ // la mejor carrera va a la tabla de su modo (la del clásico es club-metrorush-carrera); la distancia, a la de su mundo
  assert.match(js,/Club\.result\(\{ categoria: c\.modo\.categoria.*\}, prueba\)/);
- assert.match(js,/Club\.result\(\{ categoria: 'club-metrorush-distancia'.*\}, prueba\)/);
+ assert.match(js,/Club\.result\(\{ categoria: tablaDist\.categoria.*\}, prueba\)/);
+ assert.match(js,/const tablaDist = M\.distanciaDe\(c\.modo\)/);
  for(const cod of ["'e'","'d'","'x'","'p'","'m'","'s'","'w'","'f'"])assert.ok(js.includes('anota('+cod),'anota '+cod);
  for(const tipo of ["'T'","'B'","'C'"])assert.ok(js.includes('anotaPedido('+tipo),'pide '+tipo);
  // los ganchos que cambian la carrera la vuelven de prueba

@@ -100,7 +100,11 @@ como trampa.
 
 Cada modo de juego (`MODOS` en `motor.js`) tiene su tabla:
 `club-metrorush-carrera` (clásico), `-puro` (Sin ayudas), `-sinmonedas`,
-`-fantasma`, `-city`, `-citypuro` y `-cityfantasma`; la distancia es solo del clásico. La prueba lleva el
+`-city` y `-citypuro`. La distancia tiene una tabla por mundo (`DISTANCIA`
+en `motor.js`): `club-metrorush-distancia` recibe el clásico, Sin ayudas y
+Fantasma; `club-metrorush-citydistancia`, City, City sin ayudas y City
+fantasma. Los dos modos Fantasma no tienen tabla de puntos: anotan solo en
+la de distancia de su mundo. La prueba lleva el
 modo en `m`, salvo el clásico, que no lo anota: su prueba es la misma de
 antes de los modos y `VERSION` sigue en 2. `rehace`:
 
@@ -112,12 +116,22 @@ antes de los modos y `VERSION` sigue en 2. `rehace`:
   boleto (`B`) que ese mundo no tiene.
 
 El verificador además exige que la tabla sea la del modo de la prueba (una
-carrera del clásico, con sus poderes, no entra en «Sin ayudas») y que la
-distancia venga del clásico. `sospecha` usa el multiplicador máximo de cada
+carrera del clásico, con sus poderes, no entra en «Sin ayudas»), que una
+tabla de distancia reciba solo los modos de su mundo, y que una carrera
+fantasma vaya únicamente a la tabla de distancia (con `puntos` = metros). `sospecha` usa el multiplicador máximo de cada
 modo: sin poderes ni potenciadores es 30 + 29 = 59 (590 puntos por metro).
 
-Los modos Fantasma corren la pista del récord que persiguen: la semilla se
-puede elegir y el verificador acepta cualquiera (la pista sale de ella). La
+Los modos Fantasma corren la pista del récord que persiguen: el n.º 1 de
+la tabla de distancia de su mundo, venga del modo que venga (normal, sin
+ayudas o fantasma). Por eso la carrera fantasma corre **con las reglas del
+fantasma**: `M.conReglas(modoFantasma, reglas)` arma un modo compuesto (las
+reglas de pista, poderes y multiplicador del modo de quien puso el récord,
+más «fantasma»), y la prueba lo dice en `pm` (el modo cuyas reglas usó) y en
+`v` (la versión de pista: la 2, con tope de 50/46 m/s, o la 3, con 60). Así
+la pista es idéntica a la del récord y `rehace` la regenera con esas mismas
+reglas. La semilla se puede elegir y el verificador acepta cualquiera (la
+pista sale de ella). La carrera se compara en metros (`metrosEn`), no en
+puntos: con reglas de otro modo los puntos no serían comparables. La
 prueba puede traer `g`, el rastro del fantasma (carril y altura en texto):
 `rehace` no lo usa para los puntos, solo exige que sea texto de a lo más
 `MAX_FANTASMA` = 60 000 caracteres; la prueba entera sigue con el tope del

@@ -185,6 +185,17 @@ main.vl { min-width: 0; }
 .pantalla[data-estilo="pixel"] :is(.valor, .chico, .estacion > span:first-child, .mult, .patinetas b, .banner strong, .banner span) { --o: .125em; --c: #2a1c18;
   text-shadow: var(--o) 0 0 var(--c), calc(-1 * var(--o)) 0 0 var(--c), 0 var(--o) 0 var(--c), 0 calc(-1 * var(--o)) 0 var(--c),
     var(--o) var(--o) 0 var(--c), calc(-1 * var(--o)) var(--o) 0 var(--c), var(--o) calc(-1 * var(--o)) 0 var(--c), calc(-1 * var(--o)) calc(-1 * var(--o)) 0 var(--c), 0 calc(2 * var(--o)) 0 var(--c); }
+/* Las mayúsculas con tilde (juego.js, ponConTildes): la fuente pixel dibuja
+   «Ó» igual que «ó», así que en el estilo pixel va la O sin tilde y encima
+   una tilde de dos píxeles de letra (0,125 em cada uno) con el mismo borde
+   que el texto (las cuatro sombras encadenadas engordan el contorno un
+   píxel, también en diagonal). En juguete y neón, la letra tal cual. */
+.mr-tilde::after { content: attr(data-l); }
+.pantalla[data-estilo="pixel"] .mr-tilde { position: relative; }
+.pantalla[data-estilo="pixel"] .mr-tilde::after { content: attr(data-b); }
+.pantalla[data-estilo="pixel"] .mr-tilde::before { content: ""; position: absolute; left: .375em; top: -.25em; width: .125em; height: .125em;
+  background: currentColor; box-shadow: .125em -.125em 0 currentColor;
+  filter: drop-shadow(.125em 0 0 var(--c, #2a1c18)) drop-shadow(-.125em 0 0 var(--c, #2a1c18)) drop-shadow(0 .125em 0 var(--c, #2a1c18)) drop-shadow(0 -.125em 0 var(--c, #2a1c18)); }
 /* El letrero grande, sin escalar ni centrar con traslaciones (remuestrean la
    letra): de lado a lado, centrado por el texto, y aparece por escalones. */
 .pantalla[data-estilo="pixel"] .banner { left: 0; right: 0; width: auto; top: 22%; transform: none; padding: 0 calc(4 * var(--pp)); gap: calc(3 * var(--pp)); }

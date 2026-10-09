@@ -24,10 +24,10 @@
    - Se perdona el salto un poco antes de tocar el suelo y un poco después
      de dejarlo (búfer y "tiempo de coyote"): sin eso el salto se siente
      "comido" a toda velocidad. */
-import { crearMundo, PALETAS } from './mundo.js?v=metrorush-11';
-import { Sonido } from './audio.js?v=metrorush-11';
-import './mundo-city.js?v=metrorush-11';                        // CITY: el dibujo de City (se engancha a mundo.js por GANCHOS)
-import { crearCiudad } from './ciudad.js?v=metrorush-11';       // CITY: lo que la carrera hace distinto en City
+import { crearMundo, PALETAS } from './mundo.js?v=metrorush-13';
+import { Sonido } from './audio.js?v=metrorush-13';
+import './mundo-city.js?v=metrorush-13';                        // CITY: el dibujo de City (se engancha a mundo.js por GANCHOS)
+import { crearCiudad } from './ciudad.js?v=metrorush-13';       // CITY: lo que la carrera hace distinto en City
 
 const M = window.MetroRushMotor;                               // el motor (motor.js)
 const MP = window.MetroRushPrueba;                            // la prueba de la carrera, para el antitrampas (prueba.js)
@@ -136,13 +136,21 @@ function nuevaCarrera() {
   const fanG = semillaSiguiente == null ? fantasmaListo(modoSel) : null;
   const semilla = semillaSiguiente != null ? semillaSiguiente >>> 0 : fanG ? fanG.semilla : (Math.random() * 2 ** 31) >>> 0;
   semillaSiguiente = null;
-  const modo = modoSel, curva = M.velocidadDe(modo);            // el modo de esta carrera y su curva de velocidad (la clásica, en el clásico)
+  /* En un modo fantasma se corre con las REGLAS del fantasma (su pista es la
+     de esas reglas: con o sin poderes y cajas) y con su versión de pista;
+     sin fantasma, con las del modo normal de su mundo (reglasDefecto).
+     Ejemplo: el récord de distancia es del Clásico → poderes, patineta y
+     seguir corriendo; es de Sin ayudas → nada, a ×10. */
+  const modo = modoSel.fantasma ? M.conReglas(modoSel, fanG ? fanG.reglas : modoSel.reglasDefecto) : modoSel;
+  const version = fanG ? fanG.version : MP ? MP.VERSION : undefined;   // la versión de la pista (la del fantasma, que puede ser la vieja)
+  const curva = M.velocidadDe(modo, version);                   // la curva de velocidad (la clásica, en el clásico)
   return {
     modo, curva, mundoJ: M.mundoDe(modo),            // las reglas, la velocidad y el mundo (estaciones, historia) de esta carrera
     // la prueba de la carrera (docs/antitrampas/metrorush.md): con qué se empezó, y después cada evento que cambia el puntaje
-    prueba: MP ? MP.nueva({ s: semilla, b: progreso.retos.nivel, md: progreso.mejoras.doble, u: cuentaUrl, m: modo.id }) : null,
+    prueba: MP ? MP.nueva({ s: semilla, b: progreso.retos.nivel, md: progreso.mejoras.doble, u: cuentaUrl, m: modo.id, pm: modo.reglas, v: version }) : null,
     r0: performance.now(), sigMuestra: MP ? MP.PASO_MUESTRA : Infinity, sinteticas: 0, tocada: tocada,
-    gen: M.crearGenerador(semilla, { modo: modo.id }), // la pista de esta carrera (la del modo)
+    gen: M.crearGenerador(semilla, { modo, version }), // la pista de esta carrera (la del modo, o la de las reglas del fantasma)
+    version,                                         // la versión de esa pista
     activos: [],                                     // los objetos de la pista que existen ahora
     D: 0, t: 0, V: curva.velocidad(0),               // metros, segundos y velocidad
     puntos: 0, monedas: 0, estrellas: 0,
@@ -160,9 +168,10 @@ function nuevaCarrera() {
     pista: null,                                     // la pista que se está mostrando ({tipo, o})
     semilla,                                         // la semilla de esta pista (la del récord, en el modo Fantasma)
     rastro: null,                                    // el rastro de esta carrera para que otro la vea como fantasma (texto; va a la prueba como `g`)
-    // el fantasma (ver «EL FANTASMA»): contra quién se corre, y el grabador del rastro de esta carrera (solo en los modos fantasma)
+    // el fantasma (ver «EL FANTASMA»): contra quién se corre, y el grabador del rastro de esta carrera
+    // (en todo modo que entra en la tabla de distancia: cualquiera de esas carreras puede ser el próximo fantasma)
     fan: fanG ? nuevoFan(fanG) : null,
-    grab: modo.fantasma && MF ? MF.crearGrabador() : null, rastroK: 0
+    grab: M.distanciaDe(modo) && MF ? MF.crearGrabador() : null, rastroK: 0
   };
 }
 
@@ -269,7 +278,7 @@ function fisica(dt) {
     } else if (p === 'abajo') {
       if (c.poderes.mochila > 0) continue;
       if (c.pogo) c.pogo = false;                              // rodar en el pogo lo suelta: cae de golpe como siempre
-      if (r.enAire && c.ciudad && ciudad.rebota(c)) continue;  // CITY: con chicle, rodar en el aire rebota hacia arriba
+      if (r.enAire && c.ciudad && ciudad.rebota(c)) continue;  // CITY: con chicle, rodar en el aire es el pisotón que después rebota (ciudad.js)
       if (r.enAire) { r.vy = -F.caidaRapida; r.rodarPend = true; r.saltoBufer = -1; }   // en el aire: baja de golpe y rueda al caer
       else { r.rodar = F.tiempoRodar; c.cuenta.rodadas++; sonido.rodar(); }
     } else if (p === 'patineta') usaPatineta();
@@ -329,14 +338,30 @@ function choques() {
      cae sobre el techo. Si fuera invencible hasta tocar el suelo, podría
      aterrizar DENTRO de un tren y morir de frente al terminarse el pogo. */
   if (c.pogo && (r.vy > 0 || r.y > 3.6)) return;
-  const yb = r.y + 0.02, yt = r.y + (r.rodar > 0 ? F.altoRodando : F.altoDePie);
+  const alto = r.rodar > 0 ? F.altoRodando : F.altoDePie;       // cuánto mide el corredor (de pie o rodando)
+  const dA = c.Dantes != null ? c.Dantes : c.D, dD = c.D - dA;  // dónde empezó el cuadro y cuánto avanzó
   for (const o of c.activos) {
     const k = caja(o);
     if (!k || k.y1 <= k.y0) continue;
-    if (c.D + M.MEDIO_LARGO < k.z0 || c.D - M.MEDIO_LARGO > k.z1) continue;   // no está a mi altura en la pista
+    let xs = r.x, ys = r.y;                                     // dónde estaba el corredor al cruzar la pieza
+    if (c.D + M.MEDIO_LARGO < k.z0 || c.D - M.MEDIO_LARGO > k.z1) {   // no está a mi altura en la pista al final del cuadro…
+      /* …pero puede que la haya atravesado DENTRO del cuadro. Una pieza corta
+         (un cajón o un seto de 1,2 m, un dron de 0,9) mide menos que lo que
+         se avanza en un cuadro lento: a 60 m/s y 20 cuadros/s son 3 m. Mirar
+         solo dónde termina el cuadro la dejaba atrás sin tocarla, y se podía
+         pasar a través. Ejemplo: cajón en el metro 40, el cuadro va de 38,8
+         a 41,8; al final estás 1,8 m más allá y al principio 1,2 m antes. Se
+         mira entonces en el instante en que se la cruzó (la mitad del tramo
+         en que se solapan), con el carril y la altura de ese momento. */
+      const ancho = k.z1 - k.z0 + 2 * M.MEDIO_LARGO;          // cuánto de pista ocupa el choque
+      if (ancho >= dD || dA - M.MEDIO_LARGO > k.z1 || c.D + M.MEDIO_LARGO < k.z0) continue;   // ya se habría visto, o no la cruzó
+      const s0 = Math.max(0, (k.z0 - M.MEDIO_LARGO - dA) / dD), s1 = Math.min(1, (k.z1 + M.MEDIO_LARGO - dA) / dD), s = (s0 + s1) / 2;
+      xs = r.xPrev + (r.x - r.xPrev) * s;                       // el carril de ese instante
+      ys = c.yAntes != null ? c.yAntes + (r.y - c.yAntes) * s : r.y;   // y la altura
+    }
     const X = M.CARRILES[o.carril], lim = k.w + F.medioAncho;
-    if (Math.abs(r.x - X) >= lim) continue;                     // no está en mi carril
-    if (yb >= k.y1 || yt <= k.y0) continue;                     // lo paso por arriba o por abajo
+    if (Math.abs(xs - X) >= lim) continue;                      // no está en mi carril
+    if (ys + 0.02 >= k.y1 || ys + alto <= k.y0) continue;       // lo paso por arriba o por abajo
     if (c.ciudad && ciudad.pisa(c, o, mundo)) continue;         // CITY: cayendo encima de un cajón o un dron, lo rompes
     if (c.invulnerable > 0) continue;
     const deCostado = Math.abs(r.xPrev - X) >= lim - 0.02;      // recién me metí en su carril
@@ -448,13 +473,26 @@ function datosPersecucion() {
   return { amenaza: estado === 'jugando' && c.tropiezo > 0 ? 1 : 0, grito: P.grito, ladra: P.ladra, atrapa: P.atrapo };
 }
 
+/* La cinta de monedas de la mochila (o del Despegue). En la versión 3 de la
+   pista no la toca (motor.js, monedasCielo), y se anota igual en la prueba.
+   Corriendo la pista vieja (contra un fantasma de la versión 2) la cinta
+   todavía movería el azar, así que sale de un generador aparte y no se
+   anota: la pista sigue siendo la del fantasma, y las monedas no dan puntos. */
+function cintaCielo(desde, hasta, carril) {
+  if (c.version >= 3 || !MP) { anotaPedido('C', desde, hasta, carril); return c.gen.monedasCielo(desde, hasta, carril); }
+  if (!c.genCielo) c.genCielo = M.crearGenerador(c.semilla ^ 0x5eed, { modo: c.modo });   // uno por carrera: sus ids no se repiten
+  return c.genCielo.monedasCielo(desde, hasta, carril);
+}
+
 /* ---- poderes ---- */
 function activaPoder(clase) {
   if (!c.modo.items) return;                                   // los modos sin ayudas no tienen poderes (ni siquiera desde la consola)
   if (clase === 'caja') {
     const premio = M.cajaMisteriosa(Math.random);
     sonido.caja();
-    if (premio.patineta) { progreso.patinetas++; aviso('Caja misteriosa: ¡una patineta!'); }
+    // en City no se usan las patinetas de la tienda: la caja carga la tabla eléctrica (o, si ya estaba llena, monedas)
+    if (premio.patineta && c.ciudad) { if (ciudad.cargaTabla(c)) aviso('Caja misteriosa: ¡tabla cargada! H o dos toques'); else { c.monedas += 300; aviso('Caja misteriosa: +300 monedas'); } }
+    else if (premio.patineta) { progreso.patinetas++; aviso('Caja misteriosa: ¡una patineta!'); }
     else if (premio.pogo) { if (!lanzaPogo()) { c.monedas += 300; aviso('Caja misteriosa: +300 monedas'); } }   // volando con la mochila no hay pogo: monedas
     else { c.monedas += premio.monedas; aviso(premio.gordo ? `¡PREMIO GORDO! +${premio.monedas} monedas` : `Caja misteriosa: +${premio.monedas} monedas`); }
     return;
@@ -466,8 +504,7 @@ function activaPoder(clase) {
   sonido.poder();
   if (clase === 'mochila') {                                   // la mochila cohete: monedas en el aire y a volar
     c.cuenta.mochilas++;
-    anotaPedido('C', c.D + 12, c.D + 12 + c.V * dur, c.r.carril);
-    c.activos.push(...c.gen.monedasCielo(c.D + 12, c.D + 12 + c.V * dur, c.r.carril));
+    c.activos.push(...cintaCielo(c.D + 12, c.D + 12 + c.V * dur, c.r.carril));
     sonido.mochila(true); sonido.despega();
   }
   aviso(M.PODERES[clase].nombre + '!');
@@ -512,6 +549,11 @@ function usaPatineta() {
     sonido.patineta(); aviso('¡Tabla encendida con energía! Te salva de un choque');
     return;
   }
+  /* En City solo existe la tabla eléctrica: se carga con diez celdas de
+     energía (las celestes de la pista) y las patinetas compradas en la
+     tienda quedan guardadas para la Línea 3. Así City se juega como Subway
+     Surfers City, donde la tabla es de energía y no se compra. */
+  if (c.ciudad) { aviso(`Junta energía para la tabla: ${ciudad.hud(c).energia}/${ciudad.hud(c).llena}`); return; }
   if (progreso.patinetas <= 0) { aviso('No te quedan patinetas (se compran en la tienda)'); return; }
   progreso.patinetas--; c.poderes.patineta = c.patTotal = M.DURACION_PATINETA; c.cuenta.patinetas++;
   sonido.patineta(); aviso('¡Patineta! Te salva de un choque');
@@ -538,7 +580,8 @@ function pintaHudCity() {
 
 /* ---- monedas, poderes y regalos que se recogen ---- */
 function recoge(dt) {
-  const r = c.r, imanta = c.poderes.iman > 0, k = 1 - Math.exp(-14 * dt);
+  const r = c.r, imanta = c.poderes.iman > 0 || ciudad.imanChicle(c),   // CITY: con chicle, en el aire también imanta
+        k = 1 - Math.exp(-14 * dt);
   for (let i = c.activos.length - 1; i >= 0; i--) {
     const o = c.activos[i];
     if (o.tipo !== 'moneda' && o.tipo !== 'poder' && o.tipo !== 'estrella' && o.tipo !== 'boleto' && o.tipo !== 'energia') continue;   // CITY: la energía de la tabla
@@ -548,15 +591,26 @@ function recoge(dt) {
     if (o.tipo === 'moneda' && imanta && dz < 18) {             // el imán las trae volando
       o.x = ox + (r.x - ox) * k; o.y += (r.y + 1 - o.y) * k; o.d += (c.D - o.d) * k;
     }
-    if (Math.abs(o.d - c.D) > 1.0 || Math.abs((o.x != null ? o.x : ox) - r.x) > 0.95) continue;
-    if (o.y < r.y - 0.4 || o.y > r.y + 2.2) continue;
+    /* Se recoge lo que el corredor CRUZÓ en este cuadro, no solo lo que le
+       quedó cerca al final. A 50 m/s y 20 fps avanza 2,5 m por cuadro, más
+       que la caja de 2 m (±1): mirando solo dónde terminó, una moneda que
+       cayó entre dos cuadros no se tocaba nunca (y eso pasaba justo en los
+       arcos, que a esa velocidad tienen las monedas a 5 m). La altura con
+       que se compara es la que tenían los pies al pasar por esa moneda
+       (interpolada entre el principio y el final del cuadro), así que un
+       salto se mide igual a 20 fps que a 144. */
+    const dA = c.Dantes != null ? c.Dantes : c.D;               // dónde empezó el cuadro
+    if (o.d < dA - 1.0 || o.d > c.D + 1.0 || Math.abs((o.x != null ? o.x : ox) - r.x) > 0.95) continue;
+    const f = c.D > dA ? Math.min(1, Math.max(0, (o.d - dA) / (c.D - dA))) : 1;   // qué parte del cuadro llevaba al pasar por ella
+    const yP = c.yAntes != null ? c.yAntes + (r.y - c.yAntes) * f : r.y;          // la altura de los pies en ese momento
+    if (o.y < yP - 0.4 || o.y > yP + 2.2) continue;
     /* En «Sin monedas» una moneda es un obstáculo: tocarla termina la
        carrera, como un choque de frente (la prueba lo anota como choque).
        La caja es un poco más chica que la de recoger (0,7 m hacia adelante
        y 0,6 m de lado en vez de 1 y 0,95): es un castigo y se cobra solo si
        de verdad la tocaste. Lo demás (estrellas, boletos) se recoge igual. */
     if (o.tipo === 'moneda' && c.modo.monedasMatan) {
-      if (Math.abs(o.d - c.D) > 0.7 || Math.abs((o.x != null ? o.x : ox) - r.x) > 0.6 || c.invulnerable > 0) continue;
+      if (o.d < dA - 0.7 || o.d > c.D + 0.7 || Math.abs((o.x != null ? o.x : ox) - r.x) > 0.6 || c.invulnerable > 0) continue;   // también la que cruzó entre dos cuadros
       mundo.chispa(r.x, r.y + 1, 0, 0xff3b3b);
       muere('moneda');
       return;                                                   // con el choque no se recoge nada más en este cuadro
@@ -607,8 +661,7 @@ function usaPotenciador(k) {
   if (k === 'despegue') {                                       // empezar volando con la mochila, sin chocar con nada
     const seg = M.POTENCIADORES.despegue.seg;
     c.poderes.mochila = seg; c.invulnerable = Math.max(c.invulnerable, seg + 1.5);
-    anotaPedido('C', c.D + 12, c.D + 12 + c.V * seg, c.r.carril);
-    c.activos.push(...c.gen.monedasCielo(c.D + 12, c.D + 12 + c.V * seg, c.r.carril));
+    c.activos.push(...cintaCielo(c.D + 12, c.D + 12 + c.V * seg, c.r.carril));
     sonido.mochila(true); sonido.despega(); sonido.poder(); aviso('¡Despegue! A volar');
   } else {                                                      // +5 al multiplicador durante toda la carrera
     anota('p');
@@ -624,15 +677,17 @@ function actualiza(dt) {
   c.V = muriendo ? Math.max(0, c.V - M.FRENADA * dt) : c.curva.velocidad(c.t);   // al caer frena (lo que tolera el antitrampas); la curva es la del modo
   const dD = c.V * dt;
   c.Dantes = c.D;                                               // dónde iba en el cuadro anterior (para seguir la rampa)
+  c.yAntes = c.r.y;                                             // a qué altura iban los pies al empezar el cuadro (para recoger, ver recoge)
   c.D += dD;
   if (!muriendo) {
     // los puntos: 10 por metro × el multiplicador
     const antes = c.puntos;
     c.puntos += M.puntosPorTramo(dD, multiplicador());
     c.cuenta.puntos = Math.floor(c.puntos); c.cuenta.distancia = Math.floor(c.D);
-    const rec = M.recordDe(progreso, c.modo);                   // el récord de este modo
-    if (!c.recordAvisado && rec > 0 && antes <= rec && c.puntos > rec) {
-      c.recordAvisado = true; banner('¡Nuevo récord!', fmt(c.puntos) + ' puntos'); sonido.record();
+    const rec = M.recordDe(progreso, c.modo);                   // el récord de este modo (en un modo fantasma, metros)
+    const fanM = !!c.modo.fantasma, va = fanM ? c.D : c.puntos, iba = fanM ? c.D - dD : antes;   // lo que se compara: metros o puntos
+    if (!c.recordAvisado && rec > 0 && iba <= rec && va > rec) {
+      c.recordAvisado = true; banner('¡Nuevo récord!', fmt(va) + (fanM ? ' m' : ' puntos')); sonido.record();
     }
   }
   // la pista: generar por delante, mover los trenes que vienen, dibujar lo cercano y soltar lo que pasó
@@ -759,28 +814,33 @@ function estaciones() {
    3 bis. EL FANTASMA (modos «Fantasma» y «City fantasma»)
    ===================================================================
    QUÉ HACE, EN GLOBAL
-   En estos modos se corre contra la mejor carrera de la tabla (la n.º 1 de
-   todo el sitio), en su MISMA pista, y sin ítems ni revivir (eso lo dice
-   el modo, M.MODOS). Cinco piezas:
+   En estos modos se corre contra la carrera más larga del mundo (la n.º 1
+   de la tabla de distancia de todo el sitio, venga del modo normal, de Sin
+   ayudas o de otro fantasma), en su MISMA pista y con sus MISMAS reglas: si
+   él tuvo poderes y «seguir corriendo», tú también (M.conReglas). Se compite
+   en metros: gana quien llega más lejos. Cinco piezas:
      1. Pedir el fantasma a la página (Club.pedirFantasma): la fila 1.ª de la
         tabla y su prueba. Se prepara con fantasma.js, que la pasa por el
-        mismo `rehace` del antitrampas (si no cuadra, se corre solo).
+        mismo `rehace` del antitrampas (si no cuadra, se corre solo). Si
+        alguien bate el récord mientras tanto, la página manda el fantasma
+        nuevo sin que se lo pidan (evento «club-fantasma»).
      2. Correr su pista: su semilla, y los túneles y boletos que él le pidió
         al generador, en el mismo punto (generaPista, pideTunel, pideBoleto).
         La prueba de ESTA carrera los anota como propios: para el
         antitrampas es una carrera más con esa semilla, y la acepta.
      3. Grabar el rastro de esta carrera (x, altura y qué hace, cada 0,1 s),
-        para que la próxima persona la vea correr si queda n.º 1.
+        para que la próxima persona la vea correr si queda n.º 1. Se graba
+        en todos los modos que entran en la tabla de distancia.
      4. Dibujarlo: un corredor azul translúcido que sigue su rastro, sin
         sombra ni choques (mundo.js, «EL FANTASMA»).
-     5. La ventaja en vivo: puntos (que dependen del multiplicador de cada
-        uno) y metros (iguales mientras los dos corren: la velocidad es la
-        misma para todos; se separan cuando uno choca). Un letrero cuando lo
-        adelantas, y al final, quién ganó.
+     5. La ventaja en vivo, en metros (iguales mientras los dos corren: la
+        velocidad es la misma para todos; se separan cuando uno choca). Un
+        letrero cuando lo adelantas, y al final, quién ganó. Ganarle da el
+        logro «Cazafantasmas».
    Los nombres nunca van en avisos ni letreros (esos se traducen): solo en
    la portada, dentro de translate="no", y en el letrerito 3D del fantasma.
    Un fantasma sin rastro (una carrera de antes del rastro) corre igual en
-   puntos, pero no se dibuja. */
+   metros, pero no se dibuja. */
 const MF = window.MetroRushFantasma || null;                   // el rastro y la preparación del fantasma (fantasma.js)
 const ESPERA_FANTASMA = 8000;                                  // ms que se espera la respuesta de la página antes de correr solo
 const fantasmas = {};                                          // por categoría: {estado, g (el fantasma preparado), motivo, pidio, reloj}
@@ -832,6 +892,23 @@ function alLlegarFantasma() {
   if (!modoSel.fantasma || panel) return;
   if (estado === 'portada' || estado === 'fin') { if (estado === 'fin') cierraCarrera(); empezar(); }
 }
+const ORDEN_FANTASMA = Object.keys(M.MODOS).filter(k => M.MODOS[k].fantasma);   // los modos que corren contra un fantasma
+/* El n.º 1 cambió (alguien —quizá tú— batió el récord): la página manda el
+   fantasma nuevo sin que se lo pidan. Se prepara igual que uno pedido y
+   reemplaza al anterior, así la próxima carrera ya corre contra el nuevo.
+   Si llega en medio de una carrera, esa sigue contra el que tenía. */
+window.addEventListener('club-fantasma', e => {
+  const d = e.detail; if (!d || !MF) return;
+  const modo = ORDEN_FANTASMA.map(k => M.MODOS[k]).find(m => m.categoria === d.categoria);   // de qué modo fantasma es esa tabla
+  if (!modo) return;
+  const ant = fantasmas[d.categoria];
+  if (ant) clearTimeout(ant.reloj);
+  const info = { estado: 'vacia', g: null, motivo: '', pidio: performance.now(), reloj: 0 };
+  if (d.dato) { const g = MF.prepara(d.dato, MP, M, modo.id); if (g.motivo) { info.estado = 'malo'; info.motivo = g.motivo; } else { info.estado = 'listo'; info.g = g; } }
+  else if (d.motivo && d.motivo !== 'vacia') return;           // un «no hay» que no es «tabla vacía»: se queda el que había
+  fantasmas[d.categoria] = info;
+  alLlegarFantasma();
+});
 /** ¿Hay que esperar al fantasma antes de empezar? Solo si viene en camino
     (como mucho ESPERA_FANTASMA: después se corre solo). */
 function esperaAlFantasma() {
@@ -849,9 +926,10 @@ function nuevoFan(g) {
     pi: 0,                                 // cuántos de sus pedidos a la pista ya se aplicaron
     reclamados: new Set(),                 // sus pedidos que esta carrera usó en vez de pedir uno propio
     diverge: false,                        // la pista dejó de ser la suya (no debería pasar): sus pedidos ya no se aplican
-    lado: 0,                               // quién va ganando en puntos: 1 tú, −1 él, 0 parejos (con margen)
-    pg: 0, Dg: 0,                          // sus puntos y su metro ahora
-    murio: false, fase: 0, ladeo: 0        // si ya chocó, y su zancada y su inclinación (para dibujarlo)
+    lado: 0,                               // quién va ganando en metros: 1 tú, −1 él, 0 parejos (con margen)
+    Dg: 0, vivo: true, caeT: 0,            // su metro ahora, si va corriendo, y cuándo cayó por última vez
+    murio: false, superado: false,         // si ya terminó su carrera, y si ya lo pasaste después de eso
+    fase: 0, ladeo: 0                      // su zancada y su inclinación (para dibujarlo)
   };
 }
 
@@ -876,7 +954,9 @@ function generaPista(hasta, ctx) {
     for (const o of c.gen.generarHasta(q[1], ctx)) salida.push(o);   // hasta donde él lo pidió
     if (c.gen.estado().dSig !== q[1]) { f.diverge = true; console.warn('Metro Rush: la pista del fantasma se separó'); break; }
     MP.pedido(c.prueba, q[0], q[1], ...q.slice(2));             // en la prueba de esta carrera, en el mismo punto
-    if (q[0] === 'T') c.gen.pedirTunel(q[2], q[3]); else c.gen.pedirBoleto(q[2], q[3]);
+    if (q[0] === 'T') c.gen.pedirTunel(q[2], q[3]);
+    else if (q[0] === 'B') c.gen.pedirBoleto(q[2], q[3]);
+    else for (const o of c.gen.monedasCielo(q[2], q[3], q[4])) salida.push(o);   // 'C', solo de un fantasma de la versión 2: su cinta movió el azar de su pista
     f.pi++;
   }
   for (const o of c.gen.generarHasta(hasta, ctx)) salida.push(o);
@@ -914,13 +994,13 @@ function pideBoleto(n, desde) {
 
 /* ---- el paso del fantasma (lo llama actualiza en cada cuadro) ----
    1) graba el rastro de esta carrera mientras se corre; 2) calcula dónde va
-   el fantasma y cuántos puntos lleva, y avisa cuando cambia quién gana.
-   Los puntos del fantasma salen de su prueba, metro a metro (fantasma.js:
-   tramosPuntos), con los metros que da la curva de velocidad a ese tiempo:
-   son los mismos que él corrió. El margen (25 puntos, o el 0,4 %) evita que
-   los avisos vayan y vuelvan cuando van parejos. */
+   el fantasma (fantasma.js: metrosEn, con su curva y sus choques) y avisa
+   cuando cambia quién va adelante. El margen (1,5 m) evita que los avisos
+   vayan y vuelvan cuando van parejos: mientras los dos corren van hombro con
+   hombro, y eso se lee «a la par», no como una ventaja de centímetros. */
+const MARGEN_FAN = 1.5;
 function pasoFantasma(dt, muriendo) {
-  // 1) el rastro: una muestra cada 0,1 s de juego, mientras se corre (al chocar termina)
+  // 1) el rastro: una muestra cada 0,1 s de juego, mientras se corre (al chocar se para; al seguir corriendo se pone al día)
   if (c.grab && estado === 'jugando' && !muriendo) {
     const r = c.r;
     const s = r.tropezarT >= 0 ? 4 : r.rodar > 0 ? 3 : r.enAire ? (r.vy > 0 ? 1 : 2) : 0;   // tropieza, rueda, sube, baja o corre
@@ -928,62 +1008,64 @@ function pasoFantasma(dt, muriendo) {
   }
   const f = c.fan;
   if (!f) return;
-  const g = f.g, vivoG = c.t < g.tm, yoVivo = !c.muerte;
-  // 2) dónde va y cuánto lleva
-  const Dcorre = c.curva.metrosEntre(0, Math.min(c.t, g.tm));    // los metros que corrió hasta ahora (o hasta su choque)
-  f.Dg = vivoG ? Dcorre : g.Df;                                  // caído, queda donde resbaló
-  f.pg = vivoG ? MF.puntosEn(g.tramos, Dcorre) : g.puntos;       // caído, lo que dice la tabla
-  if (vivoG) f.fase += dt * (8 + c.curva.velocidad(c.t) * 0.32); // su zancada, como la tuya
-  // su choque
-  if (!vivoG && !f.murio) {
+  const g = f.g, yoVivo = !c.muerte;
+  // 2) dónde va: sus metros a este segundo de juego, y si va corriendo
+  f.Dg = MF.metrosEn(g.pasos, g.curva, c.t);
+  const vivoG = MF.vivoEn(g.pasos, c.t);
+  if (!vivoG && f.vivo) f.caeT = c.t;                            // acaba de caer (en el modo normal puede volver a correr)
+  f.vivo = vivoG;
+  if (vivoG) f.fase += dt * (8 + g.curva.velocidad(c.t) * 0.32); // su zancada, como la tuya
+  // terminó su carrera (su último choque)
+  if (c.t >= g.tf && !f.murio) {
     f.murio = true;
-    if (yoVivo) aviso(c.puntos > g.puntos ? '¡El fantasma chocó y vas ganando!' : `El fantasma chocó: pásale sus ${fmt(g.puntos)} puntos`);
+    if (yoVivo) aviso(c.D > g.Df ? '¡El fantasma chocó y vas más lejos!' : `El fantasma chocó: llega más allá de sus ${fmt(g.metros)} m`);
   }
-  // quién gana, con margen
-  const dif = c.puntos - f.pg, margen = Math.max(25, f.pg * 0.004);
-  const lado = dif > margen ? 1 : dif < -margen ? -1 : f.lado;
+  // quién va adelante, con margen
+  const dif = c.D - f.Dg;
+  const lado = dif > MARGEN_FAN ? 1 : dif < -MARGEN_FAN ? -1 : (f.murio ? f.lado : 0);
   if (lado !== f.lado && yoVivo && estado === 'jugando') {
-    if (lado === 1 && f.lado === -1) {                           // lo pasaste
-      if (vivoG) banner('¡Adelantaste al fantasma!', 'Ahora no lo dejes pasar');
-      else banner('¡Superaste al fantasma!', 'Su récord: ' + fmt(g.puntos) + ' puntos');
+    if (lado === 1 && f.murio && !f.superado) {                  // pasaste el metro donde quedó: le ganaste
+      f.superado = true;
+      banner('¡Superaste al fantasma!', 'Su récord: ' + fmt(g.metros) + ' m');
       sonido.record();
-    } else if (lado === -1 && f.lado === 1) aviso('El fantasma te pasó');
+    } else if (lado === 1 && f.lado !== 1 && !f.murio) aviso('¡Vas delante del fantasma!');
+    else if (lado === -1 && f.lado !== -1) aviso('El fantasma va delante');
   }
   f.lado = lado;
 }
 
 /** Lo que mundo.paso necesita para dibujar al fantasma este cuadro, o null.
     x e y salen de su rastro (interpolados); de lado y hacia arriba se ve
-    exactamente lo que él hizo. Mientras los dos corren va a tu altura (z 0:
-    la misma velocidad); caído, se queda atrás donde quedó; si caes tú, sigue. */
+    exactamente lo que él hizo. Hacia adelante va donde dicen sus metros:
+    a tu altura mientras los dos corren (la misma velocidad), atrás si
+    chocó, adelante si chocaste tú. */
 function dibujoFantasma() {
   const f = c && c.fan;
   if (!f || !f.g.rastro || estado === 'portada') return null;
-  const g = f.g, ra = g.rastro, t = c.t, vivoG = t < g.tm, yoVivo = !c.muerte;
-  const tt = Math.min(t, g.tm);
-  const p = MF.estadoEn(ra, tt);
+  const g = f.g, ra = g.rastro, t = c.t;
+  const p = MF.estadoEn(ra, t);                                  // pasado el rastro, la última muestra
   if (!p) return null;
   // su velocidad de lado y vertical, de las muestras alrededor (para inclinarlo y para la pose del salto)
-  const a = MF.estadoEn(ra, Math.max(0, tt - 0.05)), b = MF.estadoEn(ra, tt + 0.05);
+  const a = MF.estadoEn(ra, Math.max(0, t - 0.05)), b = MF.estadoEn(ra, t + 0.05);
   const vx = (b.x - a.x) / 0.1, vy = (b.y - a.y) / 0.1;
   f.ladeo += (Math.max(-0.45, Math.min(0.45, -vx * 0.031)) - f.ladeo) * 0.25;
-  const z = vivoG ? (yoVivo ? 0 : c.curva.metrosEntre(0, t) - c.D) : g.Df - c.D;
-  const desde = () => tt - MF.desdeEn(ra, tt);                   // cuánto lleva en este estado
-  const pose = !vivoG ? { modo: 'caer', t: t - g.tm }
+  const z = Math.abs(f.Dg - c.D) < 0.05 ? 0 : f.Dg - c.D;        // corriendo los dos, a tu lado (sin temblar por centímetros)
+  const desde = () => t - MF.desdeEn(ra, t);                     // cuánto lleva en este estado
+  const pose = !f.vivo ? { modo: 'caer', t: t - f.caeT }
     : p.s === 4 ? { modo: 'tropezar', t: desde(), fase: f.fase, ladeo: f.ladeo }
       : p.s === 3 ? { modo: 'rodar', t: desde() }
         : p.s === 1 || p.s === 2 ? { modo: 'saltar', vy: p.s === 1 ? Math.max(1, vy) : Math.min(-1, vy), ladeo: f.ladeo }
           : { modo: 'correr', fase: f.fase, ladeo: f.ladeo };
-  const alfa = vivoG ? 1 : Math.max(0.35, 1 - (t - g.tm) / 1.5);  // caído se va apagando (sin desaparecer: se ve dónde quedó)
-  return { x: p.x, y: p.y, z, pose, alfa, nombre: g.yo ? 'Tu récord' : g.nombre };
+  const alfa = f.vivo ? 1 : Math.max(0.35, 1 - (t - f.caeT) / 1.5);   // caído se va apagando (sin desaparecer: se ve dónde quedó)
+  return { x: p.x, y: f.vivo ? p.y : 0, z, pose, alfa, nombre: g.yo ? 'Tu récord' : g.nombre };
 }
 
-/** La ventaja en el marcador: puntos (+ adelante, − atrás) y metros. */
+/** La ventaja en el marcador, en metros: «a la par» mientras van juntos,
+    + adelante, − atrás; abajo, hasta dónde llegó su récord. */
 function pintaFantasmaHud() {
-  const f = c.fan, dif = Math.round(c.puntos - f.pg);
-  ponTexto('hudFanPts', (dif >= 0 ? '+' : '−') + fmt(Math.abs(dif)));
-  const dm = Math.round(c.D - f.Dg);                             // 0 mientras los dos corren
-  ponTexto('hudFanM', (dm > 0 ? '+' : dm < 0 ? '−' : '±') + fmt(Math.abs(dm)) + ' m');
+  const f = c.fan, dm = Math.round(c.D - f.Dg);
+  ponTexto('hudFanPts', f.lado === 0 && Math.abs(dm) <= MARGEN_FAN ? 'a la par' : (dm >= 0 ? '+' : '−') + fmt(Math.abs(dm)) + ' m');
+  ponTexto('hudFanM', 'récord ' + fmt(f.g.metros) + ' m');
   const el = $('hudFan'), ld = String(f.lado);
   if (el.dataset.lado !== ld) el.dataset.lado = ld;              // verde si ganas, rojo si pierdes
 }
@@ -1002,18 +1084,19 @@ function pintaFantasmaPortada() {
     const g = f.g;
     if (g.yo) pon('Corres contra tu propio récord: ');
     else { pon('Corres contra '); pon(g.nombre, true); pon(': '); }   // el nombre de una persona no se traduce
-    pon(fmt(g.puntos) + ' pts · ' + fmt(g.metros) + ' m', true);
-    if (!g.rastro) pon(' (su carrera no trae rastro: solo verás su puntaje)');
+    pon(fmt(g.metros) + ' m', true);
+    pon(' · con las reglas de «' + M.MODOS[g.reglas].nombre + '»');
+    if (!g.rastro) pon(' (su carrera no trae rastro: solo verás sus metros)');
   } else pon({
-    cargando: 'Buscando al fantasma de esta tabla…',
-    vacia: 'Nadie ha corrido esta tabla: tu carrera será el primer fantasma.',
+    cargando: 'Buscando al fantasma de la carrera más larga…',
+    vacia: 'Nadie tiene récord de distancia aún: tu carrera será el primer fantasma.',
     invitado: 'Inicia sesión en Juegos para correr contra el fantasma del récord.',
     fuera: 'Abre Metro Rush desde Juegos para correr contra el fantasma del récord.',
     malo: 'El fantasma del récord no se puede usar (' + (f && f.motivo) + '): correrás solo.',
     error: 'No se pudo traer al fantasma: esta vez correrás solo.'
   }[estadoF] || '');
 }
-/** En el resumen: cómo te fue contra el fantasma. */
+/** En el resumen: cómo te fue contra el fantasma, en metros. */
 function pintaFinFantasma(k) {
   const el = $('finFantasma');
   if (!el) return;
@@ -1022,15 +1105,15 @@ function pintaFinFantasma(k) {
   el.textContent = '';
   const pon = (txt, num) => { const n = document.createElement(num ? 'b' : 'span'); n.textContent = txt; if (num) n.setAttribute('translate', 'no'); el.appendChild(n); };
   const f = c.fan;
-  if (!f) { pon(k.puntos >= 1 ? 'Corriste sin fantasma: si es la mejor, tu carrera será el fantasma de esta tabla.' : 'Corriste sin fantasma.'); el.dataset.lado = '0'; return; }
-  const dif = k.puntos - f.g.puntos;                             // contra su carrera entera (lo que dice la tabla)
+  if (!f) { pon(k.metros >= 1 ? 'Corriste sin fantasma: si es la carrera más larga, será el próximo fantasma.' : 'Corriste sin fantasma.'); el.dataset.lado = '0'; return; }
+  const dif = k.metros - f.g.metros;                             // contra su carrera entera (lo que dice la tabla)
   el.dataset.lado = dif > 0 ? '1' : dif < 0 ? '-1' : '0';
-  if (dif > 0) { pon('¡Le ganaste al fantasma por '); pon(fmt(dif), true); pon(' puntos!'); }
-  else if (dif < 0) { pon('El fantasma te ganó por '); pon(fmt(-dif), true); pon(' puntos'); }
+  if (dif > 0) { pon('¡Le ganaste al fantasma por '); pon(fmt(dif) + ' m', true); pon('!'); }
+  else if (dif < 0) { pon('El fantasma llegó '); pon(fmt(-dif) + ' m', true); pon(' más lejos'); }
   else pon('Empate exacto con el fantasma');
-  // al rato se vuelve a preguntar quién es el n.º 1 (si ganaste, el próximo fantasma eres tú)
+  // al rato se vuelve a preguntar quién es el n.º 1 (si ganaste, el próximo fantasma eres tú; la página además lo manda sola)
   const modo = k.modo;
-  setTimeout(() => pideFantasma(modo, true), 3000);
+  setTimeout(() => pideFantasma(M.MODOS[modo.id], true), 3000);
 }
 
 /* ---- retos (se avisan apenas se cumplen) ---- */
@@ -1064,7 +1147,12 @@ const PISTAS = {
    cajones, que se saltan como la baja, y de drones, que se ruedan como la
    alta), así que sin esto sus primeras carreras no enseñaban nada. La rampa
    está para saber que no es un problema (se sube). */
-const PISTA_DE = { bajo: 'bajo', alto: 'alto', tren: 'tren', rampa: 'rampa', cajon: 'bajo', dron: 'alto' };
+const PISTA_DE = { bajo: 'bajo', alto: 'alto', tren: 'tren', rampa: 'rampa', cajon: 'bajo', dron: 'alto', seto: 'seto' };
+/* El seto del parque enseña dos cosas: dentro de las burbujas se salta
+   (el salto flota y lo pasa); fuera es un muro de 2,8 m, como un vagón, y se
+   esquiva. Ejemplo: la pared de tres setos de punta a punta solo se pasa
+   saltando, y eso es lo que dice la pista. */
+const pistaDe = o => PISTA_DE[o.tipo] === 'seto' ? (c.ciudad && c.ciudad.enBurbuja ? 'bajo' : 'tren') : PISTA_DE[o.tipo];
 let relojPista = 0;
 function ocultaPista() { if (c) c.pista = null; $('pista').hidden = true; }
 function pistas(dt) {
@@ -1086,7 +1174,7 @@ function pistas(dt) {
     const dz = (o.d != null ? o.d : o.d0) - c.D;
     if (dz > 0 && dz < dz0) { dz0 = dz; cerca = o; }
   }
-  const k = cerca && PISTA_DE[cerca.tipo];                       // la pista que toca (un cajón enseña a saltar, como la barrera baja)
+  const k = cerca && pistaDe(cerca);                       // la pista que toca (un cajón enseña a saltar, como la barrera baja)
   if (!cerca || k === 'rampa' || c.tutorial[k] >= 2) return;
   const cierre = c.V + (cerca.tipo === 'tren' && cerca.activo ? cerca.vel : 0);   // un tren que viene se acerca más rápido
   if (dz0 / Math.max(1, cierre) > 1.6) return;                   // todavía lejos: se avisa 1,6 s antes
@@ -1127,6 +1215,7 @@ function altavozDice(txt) {
   const el = $('altavoz'); el.hidden = false; el.classList.remove('ver'); void el.offsetWidth; el.classList.add('ver');
   altavozT = Math.min(7, 4.5 + txt.length * 0.03);
   sonido.dingDong();
+  sonido.anuncio(txt);                                          // y lo dice la voz grabada, al terminar el ding-dong (sin grabación, callado)
 }
 /** Esconde el anuncio (pausa, choque, portada, carrera nueva). */
 function altavozCalla() { altavozT = 0; const el = $('altavoz'); if (el) { el.classList.remove('ver'); el.hidden = true; } }
@@ -1252,9 +1341,10 @@ function muestraFin() {
   c.potVentana = 0; pintaPots(); ocultaPista();                 // por si se terminó desde la pausa en los primeros segundos
   pintaPortada();                                               // el marcador de la página (récord, monedas, multiplicador) ya cambió
   $('finTitulo').textContent = MOTIVOS[c.muerte && c.muerte.motivo] || 'Fin de la carrera';
-  const nuevo = k.puntos > k.recordAntes && k.recordAntes > 0;
+  const fanM = !!k.modo.fantasma, val = fanM ? k.metros : k.puntos, uni = fanM ? ' m' : '';   // en un modo fantasma el récord es en metros
+  const nuevo = val > k.recordAntes && k.recordAntes > 0;
   $('finRecord').hidden = !nuevo;
-  $('finMejor').textContent = nuevo ? `Antes: ${fmt(k.recordAntes)}` : `Récord: ${fmt(Math.max(k.recordAntes, k.puntos))}`;
+  $('finMejor').textContent = nuevo ? `Antes: ${fmt(k.recordAntes)}${uni}` : `Récord: ${fmt(Math.max(k.recordAntes, val))}${uni}`;
   $('finStats').innerHTML = [
     ['moneda', '+' + fmt(k.monedas), 'monedas'], ['bandera', fmt(k.metros) + ' m', 'distancia'],
     ['estrella', '×' + k.mult, 'multiplicador'], ['tren', c.estacion.nombre, 'estación', 'largo']
@@ -1265,7 +1355,10 @@ function muestraFin() {
   filasRetos($('finRetos'), k.nivelRetos, k.avanceRetos);
   $('finFuera').hidden = !k.fuera; $('finFuera').textContent = k.fuera || '';
   // a qué tabla fue la carrera (o a cuál habría ido): la del modo, y la distancia si fue récord en el clásico
-  $('finTabla').innerHTML = `${ICONOS[ICONO_MODO[k.modo.id]] || ''}<span>${k.enviada ? 'Va a la tabla' : 'Tabla del modo'} «<b>${k.modo.nombre}</b>»${k.enviada && k.distancia ? ' y a «<b>Distancia</b>»' : ''}</span>`;
+  const nomDist = (k.modo.mundo === 'city' ? 'City distancia' : 'Distancia');   // el nombre de la tabla de distancia de su mundo
+  $('finTabla').innerHTML = fanM
+    ? `${ICONOS[ICONO_MODO[k.modo.id]] || ''}<span>${k.enviada ? 'Va a la tabla' : 'Tabla'} «<b>${nomDist}</b>»</span>`
+    : `${ICONOS[ICONO_MODO[k.modo.id]] || ''}<span>${k.enviada ? 'Va a la tabla' : 'Tabla del modo'} «<b>${k.modo.nombre}</b>»${k.enviada && k.distancia ? ` y a «<b>${nomDist}</b>»` : ''}</span>`;
   $('finTabla').dataset.modo = k.modo.id;
   pintaFinFantasma(k);                                          // contra el fantasma: quién ganó (modos «Fantasma»)
   muestraCapa('capaFin');
@@ -1312,12 +1405,15 @@ function cierraCarrera() {
   c.finalizada = true;
   const puntos = Math.floor(c.puntos), metros = Math.floor(c.D), ms = Math.max(1, Math.round(c.t * 1000));   // las reglas piden enteros y un tiempo de al menos 1 ms
   const mult = multiplicador();                                  // antes de que suba el multiplicador base
-  const recordAntes = M.anotaRecord(progreso, c.modo, puntos);   // el récord de ESTE modo (el del clásico es records.puntos)
+  // la distancia: una tabla por mundo (Línea 3 o City) que reúne su modo normal, su «sin ayudas» y su fantasma
+  const tablaDist = M.distanciaDe(c.modo);
+  const distAntes = M.distanciaRecord(progreso, c.modo);         // el récord de distancia de este mundo, antes de esta carrera
+  const fanM = !!c.modo.fantasma;                                // en un modo fantasma solo se compiten metros
+  const recordAntes = M.anotaRecord(progreso, c.modo, fanM ? metros : puntos);   // el récord de ESTE modo (en un fantasma, su distancia)
   progreso.monedas += c.monedas;
   progreso.totales.carreras++; progreso.totales.metros += metros; progreso.totales.monedas += c.monedas;
-  // la distancia es una tabla del clásico: solo ahí cuenta como récord
-  const recordDist = c.modo.distancia && metros > progreso.records.distancia;
-  if (c.modo.distancia) progreso.records.distancia = Math.max(progreso.records.distancia, metros);
+  const recordDist = !!tablaDist && metros > distAntes;          // ¿mejoró la distancia de su mundo?
+  if (tablaDist) M.anotaDistancia(progreso, c.modo, metros);
   progreso.records.monedas = Math.max(progreso.records.monedas, c.monedas);
   const nivelAntes = progreso.retos.nivel;
   const res = M.avanzaRetos(progreso.retos, c.cuenta, true);
@@ -1330,15 +1426,23 @@ function cierraCarrera() {
   if (res.subio) sonido.multiplicador();
   // la prueba: el fin de la carrera, y el juego se revisa a sí mismo con lo mismo que usará el club
   const prueba = cierraPrueba(puntos, metros, ms);
-  // a la clasificación (con su prueba): la carrera siempre, a la tabla de su modo (cuenta como partida del club);
-  // la distancia, solo en el clásico y si es récord
-  const enviada = !!(Club && Club.result && puntos >= 1 && prueba);
+  // a la clasificación (con su prueba). Un modo fantasma no tiene tabla de puntos: su carrera va siempre,
+  // en metros, a la distancia de su mundo (cuenta como partida del club). Los demás van siempre a la tabla
+  // de su modo y, si mejoraron la distancia de su mundo, también a esa.
+  const enviada = !!(Club && Club.result && prueba && (fanM ? metros >= 1 : puntos >= 1));
+  let aDist = false;
   if (enviada) {
-    Club.result({ categoria: c.modo.categoria, puntos: Math.min(1e9, puntos), tiempo: ms }, prueba);
-    if (recordDist && metros >= 1) Club.result({ categoria: 'club-metrorush-distancia', puntos: Math.min(1e6, metros), tiempo: ms }, prueba);
+    if (fanM) { Club.result({ categoria: tablaDist.categoria, puntos: Math.min(1e6, metros), tiempo: ms }, prueba); }
+    else {
+      Club.result({ categoria: c.modo.categoria, puntos: Math.min(1e9, puntos), tiempo: ms }, prueba);
+      if (tablaDist && recordDist && metros >= 1) { Club.result({ categoria: tablaDist.categoria, puntos: Math.min(1e6, metros), tiempo: ms }, prueba); aDist = true; }
+    }
   }
+  // el logro «Cazafantasmas»: pasar al fantasma (su récord) en una carrera de verdad, que va a la clasificación
+  const cazado = !!(enviada && fanM && c.fan && c.fan.g && metros > c.fan.g.metros);   // (también contra tu propio récord: es el n.º 1 igual)
+  if (cazado && Club && Club.logro) Club.logro('fan');
   c.cierre = { puntos, metros, monedas: c.monedas, mult, recordAntes, subio: res.subio, premio, nivelRetos: nivelAntes, avanceRetos, fuera: c.fuera,
-    modo: c.modo, enviada, distancia: enviada && recordDist && metros >= 1 };
+    modo: c.modo, enviada, distancia: aDist, cazado };
   return c.cierre;
 }
 /** Cierra la prueba y decide si la carrera va a la clasificación. Devuelve
@@ -1419,7 +1523,7 @@ function pintaModoHud() {
   const el = $('hudModo');
   el.innerHTML = `${ICONOS[ICONO_MODO[c.modo.id]]}<span>${c.modo.corto}</span>`;
   el.dataset.modo = c.modo.id;
-  document.querySelector('.hud .patinetas').hidden = !c.modo.patineta;   // sin patineta no hay contador de patinetas
+  document.querySelector('.hud .patinetas').hidden = !c.modo.patineta || !!c.ciudad;   // sin patineta (o en City, donde solo está la tabla de energía) no hay contador de patinetas
   $('hudFan').hidden = !c.fan;                                   // contra el fantasma: la ventaja (modos «Fantasma» con fantasma)
 }
 function otraCarrera() { cierraCarrera(); empezar(); }
@@ -1490,6 +1594,34 @@ function autoCalidad(dtReal) {
    =================================================================== */
 const hudCache = {};
 const ponTexto = (id, txt) => { if (hudCache[id] !== txt) { hudCache[id] = txt; $(id).textContent = txt; } };
+/* La fuente pixel (Press Start 2P) dibuja cada mayúscula con tilde con la
+   misma figura que su minúscula: en una celda de 8×8 la tilde no le cabe
+   encima a una mayúscula, así que «Óxido» se leía «óxido». Los nombres que
+   van en esa fuente (la estación del marcador y el letrero grande) se
+   escriben con `ponConTildes`: cada mayúscula con tilde va en un
+   <span class="mr-tilde" data-l="Ó" data-b="O">. En los estilos juguete y
+   neón la hoja muestra la letra tal cual (data-l); en el pixel muestra la
+   letra sin tilde (data-b) y le dibuja encima la tilde de dos píxeles
+   (estilo.css, .mr-tilde). El texto de verdad sigue entero en
+   aria-label, para quien lee con un lector de pantalla. */
+const SIN_TILDE = { 'Á': 'A', 'É': 'E', 'Í': 'I', 'Ó': 'O', 'Ú': 'U' };
+function ponConTildes(el, txt) {
+  txt = String(txt || '');
+  if (!/[ÁÉÍÓÚ]/.test(txt)) { el.textContent = txt; el.removeAttribute('aria-label'); return; }   // lo normal: texto sin más
+  el.textContent = '';
+  for (const parte of txt.split(/([ÁÉÍÓÚ])/)) {
+    if (!parte) continue;
+    if (SIN_TILDE[parte]) {                                    // una mayúscula con tilde: su caja propia
+      const s = document.createElement('span');
+      s.className = 'mr-tilde'; s.dataset.l = parte; s.dataset.b = SIN_TILDE[parte];
+      s.setAttribute('aria-hidden', 'true');
+      el.appendChild(s);
+    } else el.appendChild(document.createTextNode(parte));      // el resto, tal cual
+  }
+  el.setAttribute('aria-label', txt);                          // el nombre entero, para el lector de pantalla
+}
+/** Como ponTexto (solo escribe si cambió), pero con las tildes de la fuente pixel. */
+const ponTextoTildes = (id, txt) => { if (hudCache[id] !== txt) { hudCache[id] = txt; ponConTildes($(id), txt); } };
 /* Un saltito (crece y vuelve) cuando cambia un número del marcador: el
    multiplicador al tomar una estrella, la moneda con cada moneda. Va con
    la propiedad `scale` (no `transform`), para no pisar la inclinación que
@@ -1518,7 +1650,7 @@ function pintaHud(dt) {
   const e = c.estacion, sig = M.siguienteUmbral(c.D, c.modo), desde = e.desde || 0;   // en metros, como las estaciones
   const cada = c.mundoJ.vuelta ? c.mundoJ.vuelta.cada : 0;       // lo que dura una vuelta en este mundo
   const k = Math.max(0, Math.min(1, (c.D - (e.vuelta > 1 ? sig - cada : desde)) / Math.max(1, sig - (e.vuelta > 1 ? sig - cada : desde))));
-  ponTexto('hudEstacion', e.nombre);
+  ponTextoTildes('hudEstacion', e.nombre);                     // con la tilde de «Óxido» bien puesta en la fuente pixel
   $('hudEstBarra').hidden = !Number.isFinite(sig);               // un mundo sin más estaciones no tiene barra hacia la siguiente
   $('hudEstBarra').style.setProperty('--k', k.toFixed(3));
   // los poderes activos, con su barra de tiempo
@@ -1542,7 +1674,7 @@ function aviso(txt) {
 }
 /** El letrero grande del centro (estación nueva, récord, boleto). */
 function banner(titulo, sub) {
-  $('bannerTitulo').textContent = titulo; $('bannerSub').textContent = sub || '';
+  ponConTildes($('bannerTitulo'), titulo); ponConTildes($('bannerSub'), sub || '');   // «Óxido» con su mayúscula también en la fuente pixel
   const b = $('banner'); b.classList.remove('ver'); void b.offsetWidth; b.classList.add('ver');
   if (c) c.banner = 3;
 }
@@ -1620,7 +1752,8 @@ function cierraPanel() {
   muestraCapa(estado === 'pausa' ? 'capaPausa' : estado === 'fin' ? 'capaFin' : estado === 'portada' ? 'capaPortada' : null);
 }
 function pintaPortada() {
-  ponTexto('portadaRecord', fmt(M.recordDe(progreso, modoSel)));   // el récord del modo elegido
+  const recTxt = fmt(M.recordDe(progreso, modoSel)) + (modoSel.fantasma ? ' m' : '');   // el récord del modo elegido (en un fantasma, su distancia)
+  ponTexto('portadaRecord', recTxt);
   pintaModos();
   // en un modo de multiplicador fijo (Sin ayudas) la placa dice ×10: es lo que vale la próxima carrera
   const fijo = modoSel.multFijo;
@@ -1635,7 +1768,7 @@ function pintaPortada() {
   // el globito «!» de Misiones: hay algo que hacer ahí (una misión se puede saltar con lo que tienes, o el set está a una misión)
   $('portadaRetosG').hidden = !(progreso.retos.nivel < M.MAX_BASE && (hechos === 2 || progreso.monedas >= M.costoSaltar(progreso.retos.nivel)));
   ponTexto('portadaBoletos', ciudad.cuentaPostales(modoSel, progreso) || `${boletosTenidos()}/${boletosLinea().length}`);   // CITY: las postales
-  ponTexto('barRecord', fmt(M.recordDe(progreso, modoSel)));
+  ponTexto('barRecord', recTxt);
   ponTexto('barMonedas', fmt(progreso.monedas));
   ponTexto('barMult', '×' + (fijo || progreso.retos.nivel));
 }
@@ -1996,7 +2129,12 @@ async function arranca() {
 }
 window.addEventListener('club-record', e => {                    // el récord de la nube, por si es mayor que el de aquí
   const d = e.detail; if (!d) return;
-  if (d.categoria === 'club-metrorush-distancia') { if (d.puntos > progreso.records.distancia) { progreso.records.distancia = d.puntos; pintaPortada(); } return; }
+  for (const w of Object.keys(M.DISTANCIA)) {                   // las de distancia (una por mundo): metros
+    if (d.categoria !== M.DISTANCIA[w].categoria) continue;
+    const m = M.MODOS[M.DISTANCIA[w].modos[0]];                  // un modo de ese mundo, para saber dónde se guarda
+    if (d.puntos > M.distanciaRecord(progreso, m)) { M.anotaDistancia(progreso, m, d.puntos); pintaPortada(); }
+    return;
+  }
   const m = M.modoDeCategoria(d.categoria);                     // la mejor carrera de algún modo
   if (m && d.puntos > M.recordDe(progreso, m)) { M.anotaRecord(progreso, m, d.puntos); pintaPortada(); }
 });
@@ -2021,7 +2159,7 @@ window.__metrorush = {
   modo: id => { eligeModo(id); return modoSel.id; },
   /** Los objetos de la pista por delante (copias, solo para mirar): [{tipo, clase, carril, d, y}]. */
   objetos: (hasta = 60) => c ? c.activos.filter(o => (o.d != null ? o.d : o.d0) - c.D < hasta && (o.d != null ? o.d : o.d0 + (o.largo || 0)) > c.D - 1)
-    .map(o => ({ tipo: o.tipo, clase: o.clase, carril: o.carril, d: o.d != null ? o.d : o.d0, y: o.y, largo: o.largo, vel: o.vel, cae: o.cae || undefined })) : [],
+    .map(o => ({ id: o.id, tipo: o.tipo, clase: o.clase, carril: o.carril, d: o.d != null ? o.d : o.d0, y: o.y, largo: o.largo, vel: o.vel, cae: o.cae || undefined })) : [],
   puntos: n => { toca(); if (c) c.puntos = n; },
   pulsa: a => { toca(); pedidos.push(a); },
   poder: k => { toca(); return c && activaPoder(k); },

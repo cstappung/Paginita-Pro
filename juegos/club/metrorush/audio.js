@@ -14,6 +14,10 @@
      túnel, boleto, reto cumplido…). La moneda sube de tono si encadenas
      varias seguidas, como una escala, porque eso es lo que da ganas de
      juntar la fila entera.
+   - La VOZ del altavoz del andén: cada anuncio de historia.js (ANUNCIOS)
+     tiene su grabación en assets/voz/<estación>-<proxima|eco>.mp3, hecha
+     una vez con colabtex/scripts/metrorush-voz.py. `anuncio(txt)` la toca
+     justo después del ding-dong, con la música agachada mientras habla.
 
    POR QUÉ ASÍ
    - El AudioContext se crea con el primer gesto (un navegador no deja antes).
@@ -21,7 +25,12 @@
      en el control de volumen y silencio de la sala: el juego no sabe nada
      del volumen general y aun así lo respeta.
    - Música y efectos tienen cada uno su ganancia, para que Opciones pueda
-     bajar uno sin el otro, y el botón ♪ / la tecla M silencian los dos. */
+     bajar uno sin el otro, y el botón ♪ / la tecla M silencian los dos.
+   - La voz es GRABADA y no del navegador (speechSynthesis no existe en
+     muchos celulares y en cada PC suena distinto), como la de BBTAN. Va por
+     los efectos: el volumen de efectos, el mudo y volumen.js la gobiernan.
+     Si el archivo no está (sin red, o sin grabar todavía) no pasa nada: el
+     anuncio se lee igual en la franja, solo que callado. */
 const Chip = window.Chip;                      // el motor chiptune (juegos/audio/chip.js)
 const Temas = window.Temas;                    // el cancionero (juegos/audio/temas.js)
 // la curva de velocidad del motor (motor.js se carga antes como script): de aquí sale el tempo, sin números escritos a mano
@@ -68,6 +77,46 @@ export function listaDe(id) {
   return { clave: id, temas: [id] };                                         // un tema suelto: se repite solo
 }
 
+/* ---------- la voz del altavoz ----------
+   Los textos están en historia.js (window.MetroRushHistoria.ANUNCIOS) y la
+   grabación de cada uno se llama como su estación y cuál de los dos es:
+   «barrio-proxima», «barrio-eco»… Se busca por el TEXTO que juego.js
+   muestra, así juego.js no tiene que saber de archivos: un texto que no
+   está en ANUNCIOS (el de las vueltas, «Otra vuelta…») no tiene voz. */
+const VOZ_TRAS_DING = 1.1;                     // segundos desde el ding-dong hasta la voz (la segunda campana suena a los 0,45 s y se apaga)
+const VOZ_TARDE = 3;                           // si la grabación llega más de 3 s después de pedirla, ya no se dice (la franja casi se fue)
+const VOZ_VOL = 0.7;                           // la voz sobre los efectos: se normalizó en el script, aquí solo se acomoda a los demás sonidos
+const VOZ_AGACHA = 0.45;                       // a cuánto baja la música mientras habla el altavoz (1 = no baja)
+const CUALES = ['proxima', 'eco'];             // los dos anuncios de cada estación, en el orden en que se oyen
+/** Los anuncios de historia.js, o null si no se cargó (en City igual existen; juego.js decide si habla). */
+const anuncios = () => (typeof window !== 'undefined' && window.MetroRushHistoria && window.MetroRushHistoria.ANUNCIOS) || null;
+/** El nombre de la grabación de un anuncio, por su texto: 'barrio-proxima', 'oxido-eco'… null si no tiene. */
+export function vozDe(txt) {
+  const A = anuncios();
+  if (!A || !txt) return null;
+  for (const id in A) for (const cual of CUALES) if (A[id] && A[id][cual] === txt) return id + '-' + cual;
+  return null;
+}
+/** La grabación que se oirá después de `nombre`: tras el «próxima» de una
+    estación viene su eco, y tras el eco el «próxima» de la siguiente (las
+    estaciones de ANUNCIOS van en el orden del recorrido). null al final. */
+export function vozSiguiente(nombre) {
+  const A = anuncios();
+  if (!A || !nombre) return null;
+  const [id, cual] = nombre.split('-'), ids = Object.keys(A), i = ids.indexOf(id);
+  if (i < 0) return null;
+  if (cual === 'proxima') return id + '-eco';                              // la misma estación, a mitad de camino
+  return i + 1 < ids.length ? ids[i + 1] + '-proxima' : null;               // el túnel de la que sigue
+}
+/** La dirección del MP3, al lado de este módulo, con su mismo `?v=`: una
+    grabación nueva llega con el próximo cambio de versión, sin caché vieja. */
+function urlVoz(nombre) {
+  const aqui = new URL(import.meta.url);                                   // audio.js?v=metrorush-N
+  const u = new URL('assets/voz/' + nombre + '.mp3', aqui);
+  u.search = aqui.search;                                                  // el mismo ?v= que el módulo
+  return u.href;
+}
+
 export class Sonido {
   constructor() {
     this.ctx = null;                           // se crea con el primer gesto
@@ -79,6 +128,10 @@ export class Sonido {
     this.racha = 0; this.ultMoneda = 0;        // para que las monedas seguidas suban de tono
     this.voces = new Set();                    // las notas vivas (para poder callarlas)
     this.motor = null;                         // el ruido continuo de la mochila cohete
+    this.vozBufs = new Map();                  // las grabaciones del altavoz: nombre → promesa del AudioBuffer (o null si no se pudo)
+    this.vozSeq = 0;                           // sube con cada anuncio y con cada «calla»: una grabación que llega tarde mira si sigue siendo la suya
+    this.vozActual = null;                     // la fuente que está hablando ahora (para cortarla en la pausa o con otro anuncio)
+    this.dingT = -9;                           // cuándo sonó el último ding-dong (la voz espera a que termine)
   }
   /** Crea el contexto de audio (llamar dentro de un gesto: tecla, toque, clic). */
   iniciar() {
@@ -87,9 +140,11 @@ export class Sonido {
     if (!AC) return;                                           // sin audio: el juego sigue igual, mudo
     this.ctx = new AC();
     this.salida = this.ctx.createGain(); this.salida.gain.value = this.mudo ? 0 : 1; this.salida.connect(this.ctx.destination);
-    this.musica = this.ctx.createGain(); this.musica.gain.value = this.volMusica; this.musica.connect(this.salida);
+    this.agacha = this.ctx.createGain(); this.agacha.gain.value = 1; this.agacha.connect(this.salida);   // la música baja aquí mientras habla el altavoz (aparte de su volumen de Opciones)
+    this.musica = this.ctx.createGain(); this.musica.gain.value = this.volMusica; this.musica.connect(this.agacha);
     this.efectos = this.ctx.createGain(); this.efectos.gain.value = this.volEfectos; this.efectos.connect(this.salida);
     if (this.temaPendiente) this.tocaTema(this.temaPendiente);
+    this.cargaVoz('barrio-eco');                               // la primera voz de una carrera: se baja ya, mientras está la portada
   }
   /** Silencia o devuelve todo el sonido del juego. */
   ponMudo(m) {
@@ -188,6 +243,7 @@ export class Sonido {
   }
   /** Calla la música (en la pausa y en el fin). */
   calla() {
+    this.callaVoz();                                           // el altavoz también se calla (pausa, «¿Seguir?», resumen)
     if (!this.rep) return;
     try { this.rep.destruir(); this.capaRep.disconnect(); } catch (e) {}
     this.rep = null; this.tema = null;                       // la lista y su posición se recuerdan: al volver sigue el mismo tema
@@ -305,6 +361,7 @@ export class Sonido {
   dingDong() {
     if (!this.ctx) return;
     const t = this.t;
+    this.dingT = t;                                            // la voz del anuncio (si tiene) espera a que pase
     for (const [f, d] of [[659, 0], [523, 0.45]]) {
       Chip.voz(this.ctx, this.efectos, { t: t + d, f, dur: 1.0, vol: 0.06, onda: 'sine', sus: 0.35 }, this.voces);        // la campana
       Chip.voz(this.ctx, this.efectos, { t: t + d, f: f * 2, dur: 0.45, vol: 0.018, onda: 'sine', sus: 0.2 }, this.voces);   // su brillo
@@ -539,8 +596,71 @@ export class Sonido {
     setTimeout(() => this.ladrido(2), 380);                                  // el perro cae encima y ladra dos veces
   }
 
+  /* ---------- La voz del altavoz ----------
+     juego.js (altavozDice) llama `anuncio(txt)` con el texto que muestra,
+     justo después del ding-dong. Aquí:
+     - se busca su grabación (vozDe); sin grabación, nada;
+     - se baja (fetch) y se decodifica una vez, y queda guardada para la
+       próxima vuelta por esa estación; de paso se baja la que se oirá
+       después (vozSiguiente), así el túnel siguiente no espera a la red;
+     - suena VOZ_TRAS_DING s después del ding-dong (o enseguida, si llegó
+       tarde), y solo si llegó a tiempo y nadie la calló entretanto;
+     - va por `this.efectos` (volumen de efectos, mudo ♪ y volumen.js) y por
+       `vive` (callaEfectos la corta);
+     - mientras habla, la música baja a VOZ_AGACHA y vuelve al terminar.
+     Ejemplo: un anuncio de 4 s pedido a los 10,0 s suena de 11,1 a 15,1 s,
+     con la música a menos de la mitad de 11,0 a ~15,5 s. */
+
+  /** Baja (una sola vez) y decodifica la grabación `nombre`. Promesa del AudioBuffer, o de null si no está o no hay red. */
+  cargaVoz(nombre) {
+    if (!this.ctx || !nombre || typeof fetch !== 'function') return Promise.resolve(null);
+    if (!this.vozBufs.has(nombre)) {
+      const p = fetch(urlVoz(nombre))
+        .then(r => (r.ok ? r.arrayBuffer() : null))                         // un 404 (sin grabar) es null, no un error
+        .then(b => b && new Promise((ok, mal) => this.ctx.decodeAudioData(b, ok, mal)))   // con callbacks: el Safari viejo no devuelve promesa
+        .catch(() => null);                                                  // sin red o archivo roto: callado, sin romper nada
+      p.then(buf => { if (!buf) this.vozBufs.delete(nombre); });             // lo que falló se puede volver a pedir en otra vuelta
+      this.vozBufs.set(nombre, p);
+    }
+    return this.vozBufs.get(nombre);
+  }
+  /** Dice el anuncio `txt` con su grabación, después del ding-dong. Sin grabación (o en mudo), no hace nada. */
+  anuncio(txt) {
+    const nombre = vozDe(txt);
+    if (!this.ctx || !nombre) return;                                        // sin audio o sin grabación: el anuncio solo se lee
+    this.callaVoz();                                                         // si hablaba otro anuncio, se corta
+    const seq = this.vozSeq, pedido = this.t;
+    const desde = pedido - this.dingT < 0.25 ? this.dingT + VOZ_TRAS_DING : pedido;   // con ding-dong recién tocado, espera que termine
+    this.cargaVoz(nombre).then(buf => {
+      if (!buf || seq !== this.vozSeq || this.mudo) return;                  // no llegó, lo callaron entretanto, o el juego está mudo
+      const ctx = this.ctx, ahora = ctx.currentTime;
+      if (ahora - pedido > VOZ_TARDE) return;                                // llegó demasiado tarde: la franja ya casi se fue
+      const t0 = Math.max(desde, ahora + 0.02), fin = t0 + buf.duration;
+      const s = ctx.createBufferSource(), g = ctx.createGain();
+      s.buffer = buf; g.gain.value = VOZ_VOL;
+      s.connect(g); g.connect(this.efectos);                                 // por los efectos: su volumen, el mudo y volumen.js
+      s.start(t0);
+      this.vive(s, [s, g]);                                                  // callaEfectos la puede cortar
+      this.vozActual = s;
+      const a = this.agacha.gain;                                            // la música se agacha mientras habla…
+      a.cancelScheduledValues(ahora); a.setValueAtTime(a.value, ahora);
+      a.setTargetAtTime(VOZ_AGACHA, Math.max(ahora, t0 - 0.15), 0.08);
+      a.setTargetAtTime(1, fin, 0.25);                                       // …y vuelve sola al terminar
+    });
+    this.cargaVoz(vozSiguiente(nombre));                                     // la que viene, ya bajada para cuando toque
+  }
+  /** Corta la voz que esté hablando (o por llegar) y devuelve la música a su volumen. */
+  callaVoz() {
+    this.vozSeq++;                                                           // una grabación que aún se está bajando ya no sonará
+    if (!this.ctx) return;
+    if (this.vozActual) { try { this.vozActual.stop(0); } catch (e) {} this.vozActual = null; }
+    const a = this.agacha.gain, ahora = this.ctx.currentTime;
+    a.cancelScheduledValues(ahora); a.setTargetAtTime(1, ahora, 0.12);       // la música vuelve enseguida
+  }
+
   /** Calla todos los efectos que estén sonando. */
   callaEfectos() {
+    this.callaVoz();                                                         // el altavoz incluido
     if (this.motor) this.mochila(false);
     for (const v of this.voces) { try { v.fuente.stop(0); } catch (e) {} }
     this.voces.clear(); this.motor = null;

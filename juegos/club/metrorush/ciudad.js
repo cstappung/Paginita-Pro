@@ -10,14 +10,17 @@
        techos de los trenes;
      · BARANDAS: subido al riel te deslizas, y cada 2 m es una moneda;
      · el CHICLE: un poder de City, una burbuja que revienta en lugar de que
-       choques (como la patineta, pero sale en la pista);
+       choques (como la patineta, pero sale en la pista). Mientras dura, el
+       salto sube más, «rodar» en el aire es un PISOTÓN (bajas de golpe) y al
+       caer de él la burbuja rebota y te lanza alto (el ciclo del Bubble Gum
+       de City); volando, el chicle atrae las monedas como el imán;
      · los PERSONAJES de City, cada uno con su ventaja chica, que se compran
        y se ponen en la tienda solo con un modo de City elegido;
      · las POSTALES (los boletos de City), guardadas aparte de los boletos de
        la Línea 3, y su Libreta;
      · lo que trae Subway Surfers City (ver city.js): la ENERGÍA de la tabla
        (celdas y la batería; llena, la tabla se enciende gratis), las MONEDAS
-       ×2, el rebote del chicle, el dron que te lanza, las REJILLAS que abre
+       ×2, el pisotón con rebote del chicle, el dron que te lanza, las REJILLAS que abre
        el pisotón y las BURBUJAS de baja gravedad con su doble salto.
 
    POR QUÉ ASÍ
@@ -54,6 +57,7 @@ export function crearCiudad({ M, sonido, aviso }) {
      golpe de ruido, audio.js): así suenan de la misma consola. */
   const son = {
     lona() { sonido.nota(196, 0.32, 0.1, 'tri', { f1: 784 }); sonido.soplo(0.1, 0.06, 1.4); },       // ¡boing!: un tono que sube
+    vapor() { sonido.soplo(0.55, 0.16, 0.9); sonido.soplo(0.25, 0.08, 3.2, { corto: true }); sonido.nota(140, 0.25, 0.05, 'tri', { f1: 420 }); },   // ¡fshhh!: un chorro largo, un silbido y un empujón grave
     pisa(dron) {                                                 // el crujido de la madera o el chispazo del dron
       if (dron) { sonido.nota(1400, 0.1, 0.06, 'p12', { f1: 300 }); sonido.soplo(0.16, 0.1, 2.4, { corto: true }); }
       else { sonido.soplo(0.14, 0.12, 0.9, { corto: true }); sonido.nota(140, 0.12, 0.08, 'tri', { f1: 70 }); }
@@ -64,11 +68,18 @@ export function crearCiudad({ M, sonido, aviso }) {
     energia(n) { sonido.nota(660 + n * 55, 0.07, 0.05, 'p25', { f1: 990 + n * 55 }); },   // una celda: un «tic» que sube con la carga
     llena() { for (const [k, f] of [[0, 523], [1, 659], [2, 784], [3, 1047]]) setTimeout(() => sonido.nota(f, 0.12, 0.06, 'p25'), k * 60); },   // tabla cargada: un arpegio
     rebote() { sonido.nota(260, 0.22, 0.09, 'tri', { f1: 620 }); },   // ¡boing! de la burbuja
+    pisoton() { sonido.soplo(0.1, 0.06, 2.4, { corto: true }); sonido.nota(520, 0.1, 0.05, 'tri', { f1: 160 }); },   // ¡fiuu!: el pisotón del chicle, un soplido que baja
     rejilla() { sonido.nota(180, 0.18, 0.09, 'p12', { f1: 90 }); sonido.soplo(0.2, 0.12, 1.2, { corto: true }); },   // la rejilla que cede
     transbordo(n) { sonido.nota(587 + n * 147, 0.1, 0.07, 'p25', { f1: 880 + n * 220 }); },   // saltar de riel a riel: más agudo con cada transbordo
     viga() { sonido.nota(110, 0.2, 0.08, 'p12', { f1: 220 }); sonido.soplo(0.08, 0.05, 2, { corto: true }); },   // agarrar la viga: un «clanc» de metal
     doble() { sonido.nota(880, 0.14, 0.06, 'p25', { f1: 1320 }); }   // el poder de monedas ×2
   };
+
+  /** La altura del rebote del chicle saliendo desde `y` (el suelo, o el
+      techo donde cayó): CITY.CHICLE.rebote sobre los pies, pero sin pasar de
+      CITY.CHICLE.tope sobre la vía. Ejemplo: del suelo, 3,6 m (más que el
+      techo de un vagón, 3,35); de un techo, 2,65 m más (hasta 6 m). */
+  const alturaRebote = y => Math.max(0.6, Math.min(CITY.CHICLE.rebote, CITY.CHICLE.tope - y));
 
   /** Lo que dice el resumen según con qué chocaste (se suma a MOTIVOS de juego.js). */
   const MOTIVOS = { cajon: 'Chocaste con unos cajones', dron: 'Te diste con un dron', baranda: 'Chocaste con una baranda',
@@ -96,14 +107,18 @@ export function crearCiudad({ M, sonido, aviso }) {
         pisadas: 0, lonas: 0,                                    // cuántos cajones/drones rompió y cuántas lonas usó
         energia: 0,                                              // celdas de energía de la tabla (llena con CITY.ENERGIA_LLENA)
         monedas2: 0,                                             // segundos que le quedan a «monedas ×2»
-        reboto: false, doble: false,                             // ya rebotó con el chicle / ya usó el doble salto (en este salto)
+        doble: false,                                            // ya usó el doble salto de las burbujas (en este salto)
+        pisoton: false,                                          // va bajando de un pisotón con chicle (al caer, rebota)
+        boing: false,                                            // acaba de caer de ese pisotón: rebota al empezar el próximo cuadro
+        rebotando: false, golpeSuelo: false,                     // va subiendo de ese rebote; y si el pisotón cayó en el suelo (no en un techo)
         enBurbuja: false,                                        // está dentro de un tramo de burbujas (baja gravedad)
+        burbujasVistas: 0, vapores: 0, golpeT: 0,                // cuántos tramos de burbujas y vapores lleva (para avisar las primeras veces), y lo que le queda al pisotón en el suelo
         enAireAntes: false, golpeAntes: false,                   // al empezar el cuadro: ¿en el aire? ¿bajando de golpe? (para la rejilla)
         riel: null, transbordos: 0,                              // el riel en que vas (zigzag) y cuántas veces saltaste de uno a otro sin tocar el suelo
         enViga: false, vigas: 0                                  // ¿vas sobre una viga de grúa?, y cuántas agarraste
       } : null;
     },
-    /** Cuánto más alto salta (Nico: ×1,08; con chicle, un 15 % más, como en City). Solo cambia la altura. */
+    /** Cuánto más alto salta (Nico: ×1,08; con chicle, CITY.CHICLE.salto más). Solo cambia la altura. */
     salto: c => ((c.ciudad && c.ciudad.ventaja.salto) || 1) * (c.ciudad && c.ciudad.chicle > 0 ? CITY.CHICLE.salto : 1),
     /** La gravedad de este cuadro: dentro de las burbujas, el 55 % (los saltos flotan). */
     gravedad: c => (c.ciudad && c.ciudad.enBurbuja ? CITY.BURBUJAS.gravedad : 1),
@@ -114,15 +129,24 @@ export function crearCiudad({ M, sonido, aviso }) {
       C.doble = true; son.rebote();
       return true;
     },
-    /** «Rodar» en el aire con el chicle: rebota hacia arriba en vez de bajar
-        de golpe (una vez por salto). Devuelve true si rebotó. */
+    /** «Rodar» en el aire con el chicle: el PISOTÓN del Bubble Gum de City.
+        Baja de golpe igual que siempre (F.caidaRapida, y `rodarPend`, así que
+        sigue siendo un pisotón: abre la rejilla y pisa cajones y drones por
+        el doble), y además queda marcado: al caer, la burbuja rebota y te
+        lanza alto (ver `fisica` y `antes`). Antes este rodar te subía 2,6 m
+        en el aire, y eso se sentía como un doble salto, no como el chicle de
+        City. Devuelve true si lo hizo (juego.js entonces no hace lo suyo). */
     rebota(c) {
       const C = c.ciudad, r = c.r;
-      if (!C || C.chicle <= 0 || !r.enAire || C.reboto) return false;
-      C.reboto = true; r.vy = M.impulso(CITY.CHICLE.rebote); r.rodarPend = false; r.saltoBufer = -1;
-      son.rebote();
+      if (!C || C.chicle <= 0 || !r.enAire) return false;
+      r.vy = -M.FISICA.caidaRapida; r.rodarPend = true; r.saltoBufer = -1;   // lo mismo que el rodar en el aire de juego.js
+      if (!C.pisoton) son.pisoton();
+      C.pisoton = true; C.rebotando = false;
       return true;
     },
+    /** ¿El chicle atrae monedas ahora? Sí mientras dure y vaya en el aire
+        (como en City: la burbuja trae las monedas que vuelan cerca). */
+    imanChicle: c => !!(c.ciudad && c.ciudad.chicle > 0 && c.r.enAire),
     /** Cuánto vale una moneda ahora: 2 con «monedas ×2». */
     valorMoneda: c => (c.ciudad && c.ciudad.monedas2 > 0 ? 2 : 1),
     /** Una celda de energía tomada. Al llenarse avisa que la tabla está lista. */
@@ -137,6 +161,14 @@ export function crearCiudad({ M, sonido, aviso }) {
     },
     /** ¿La energía está llena? (la tabla se enciende gratis) */
     tablaLista: c => !!(c.ciudad && c.ciudad.energia >= CITY.ENERGIA_LLENA),
+    /** Carga la tabla de una vez (lo que la caja misteriosa da en City en
+        lugar de una patineta de la tienda, que aquí no se usan). */
+    cargaTabla(c) {
+      const C = c.ciudad;
+      if (!C || C.energia >= CITY.ENERGIA_LLENA) return false;     // ya llena: que la caja dé otra cosa
+      C.energia = CITY.ENERGIA_LLENA; son.llena();
+      return true;
+    },
     /** Gasta la energía y devuelve lo que dura la tabla encendida. */
     usaTabla(c) { c.ciudad.energia = 0; return CITY.TABLA_SEG; },
     /** Lo que muestra el marcador de City: la energía y lo que le queda a «monedas ×2». */
@@ -149,8 +181,28 @@ export function crearCiudad({ M, sonido, aviso }) {
       if (!C) return;
       C.yAntes = c.r.y; C.enAireAntes = c.r.enAire; C.golpeAntes = c.r.rodarPend;
       // ¿dentro de un tramo de burbujas? (ocupa los tres carriles)
+      const antes = C.enBurbuja;
       C.enBurbuja = false;
       for (const o of c.activos) if (o.tipo === 'burbujas' && c.D >= o.d0 && c.D <= o.d0 + o.largo) { C.enBurbuja = true; break; }
+      /* El rebote del chicle: el cuadro pasado cayó de un pisotón, y ahora la
+         burbuja lo lanza. Va un cuadro después de caer, no en el mismo: en
+         ese cuadro los choques todavía tienen que ver los pies bajando, o el
+         cajón sobre el que cayó contaría como un choque de frente (pisar
+         pide vy ≤ 0). La altura es la misma dentro de las burbujas (el
+         impulso se mide con su gravedad), para que el tope se cumpla. */
+      const r = c.r;
+      if (C.boing) {
+        C.boing = false;
+        if (C.chicle > 0 && !r.enAire && c.poderes.mochila <= 0 && !c.pogo) {
+          r.vy = M.impulso(alturaRebote(r.y) * (C.enBurbuja ? CITY.BURBUJAS.gravedad : 1));
+          r.enAire = true; r.rodar = 0; r.rodarPend = false; r.saltoBufer = -1; r.ultSuelo = -1;   // se acabó la rodada del pisotón; sin coyote
+          C.rebotando = true;
+        }
+      }
+      /* Al entrar, lo que hay que hacer: sin esto, los muros de setos de los
+         tres carriles parecían imposibles (nada decía que ahí el salto flota).
+         Las dos primeras veces de cada carrera; después ya se sabe. */
+      if (C.enBurbuja && !antes && C.burbujasVistas++ < 2) aviso('¡Burbujas! Tus saltos flotan: salta los setos');
     },
 
     /** Después de mover al corredor (fisica en juego.js): las lonas, el
@@ -160,13 +212,19 @@ export function crearCiudad({ M, sonido, aviso }) {
       const C = c.ciudad, r = c.r;
       if (!C) return;
       // 1) la lona: pisarla (desde el suelo) te lanza a 5,2 m, por encima de los techos
-      if (r.y < 0.35 && c.poderes.mochila <= 0) for (const o of c.activos) {
-        if (!CITY.enLona(o, r.x, c.D, r.y)) continue;
-        o.usada = true; o.usadaT = t;                            // una vez cada una; usadaT hace que se hunda en el dibujo
-        r.vy = CITY.impulsoLona(C.ventaja.lona || 1); r.enAire = true;
+      //    (y el vapor: en toda su columna, aunque se le salte encima; ver CITY.enLona)
+      if (c.poderes.mochila <= 0) for (const o of c.activos) {
+        if (!CITY.enLona(o, r.x, c.D, r.y, c.Dantes, r.vy)) continue;
+        o.usada = true; o.usadaT = t;                            // una vez cada una; usadaT hace que se hunda (o sople) en el dibujo
+        const k = C.ventaja.lona || 1;                           // la ventaja de Sol: sube más
+        // la lona lanza desde el suelo; el vapor te lleva a la misma altura desde donde estés (saltando ya ibas arriba)
+        r.vy = o.variante === 'vapor' ? M.impulso(Math.max(0.6, CITY.LONA.altura * k - r.y)) : CITY.impulsoLona(k);
+        r.enAire = true;
+        if (o.variante === 'vapor' && !C.vapores++) aviso('¡El vapor te sube a los techos!');   // la primera vez en la carrera, qué pasó
         r.rodar = 0; r.saltoBufer = -1; r.ultSuelo = -1; r.rodarPend = false;
+        C.pisoton = false;                                       // la lona manda: el pisotón del chicle no rebota después
         c.cuenta.saltos++; C.lonas++;
-        son.lona();
+        if (o.variante === 'vapor') son.vapor(); else son.lona();   // el vapor suena a chorro, no a cama elástica
         if (mundo) mundo.chispa(r.x, r.y + 0.3, 0, o.variante === 'vapor' ? 0xffe0b0 : 0x6ad1ff);
         break;
       }
@@ -195,16 +253,32 @@ export function crearCiudad({ M, sonido, aviso }) {
           if (mundo) mundo.chispa(r.x, r.y + 0.05, 0, 0xffd27a);
         }
       } else C.grind = 0;
-      // 3) en el suelo se recuperan el rebote del chicle y el doble salto (y en el suelo de verdad se corta la racha de transbordos)
-      if (!r.enAire) { C.reboto = false; C.doble = false; }
+      // 3) en el suelo se recupera el doble salto (y en el suelo de verdad se corta la racha de transbordos)
+      const cayoPisoton = C.pisoton && !r.enAire;                // acaba de caer de un pisotón con chicle (en el suelo o en un techo)
+      if (!r.enAire) { C.doble = false; C.pisoton = false; C.rebotando = false; }
       if (!r.enAire && !riel) { C.riel = null; C.transbordos = 0; }
       // la viga de la grúa: al agarrarla, un «clanc» (y la primera vez, qué hacer)
       const viga = !!(sop && sop.apoyo && sop.apoyo.tipo === 'viga' && !r.enAire);
       if (viga && !C.enViga) { C.vigas++; son.viga(); if (C.vigas === 1) aviso('¡Agarraste la viga! Te deja sobre los vagones'); }
       C.enViga = viga;
       // 4) la rejilla: caerle encima de golpe (el pisotón) la abre y suelta su escondite de monedas
-      if (C.enAireAntes && C.golpeAntes && !r.enAire && r.y < 0.3) for (const o of c.activos) {
-        if (o.tipo !== 'rejilla' || o.abierta || Math.abs(o.d - c.D) > CITY.REJILLA.largo / 2 + 0.6 || Math.abs(r.x - M.CARRILES[o.carril]) > CITY.REJILLA.w) continue;
+      /* El pisotón «dura» 0,35 s en el suelo: antes solo valía el cuadro
+         exacto en que se aterrizaba, a ±1,5 m de la rejilla, y eso era una
+         ventana de 50 a 150 ms para apretar abajo en el aire (a 46 m/s,
+         63 ms): casi nunca se abría. Ahora, aterrizar de un pisotón deja
+         0,35 s en que la rejilla que se cruce (barrido entre cuadros) se
+         abre. Ejemplo: a 46 m/s, aterrizar 10 m antes de la rejilla basta. */
+      /* Con chicle, el pisotón rebota y uno ya no se queda en el suelo: los
+         0,35 s siguen corriendo mientras sube del rebote (C.rebotando), si
+         el pisotón cayó en el suelo (no en un techo). Así el chicle abre la
+         rejilla igual que el pisotón de siempre. */
+      if (!r.enAire && C.enAireAntes && (C.golpeAntes || cayoPisoton)) { C.golpeT = 0.35; C.golpeSuelo = r.y < 0.3; }   // acaba de caer de un pisotón
+      else if (r.enAire && !C.rebotando) C.golpeT = 0;                    // en el aire no cuenta (salvo el rebote del chicle)
+      else C.golpeT = Math.max(0, (C.golpeT || 0) - dt);                  // en el suelo (o rebotando) se va gastando
+      const mR = CITY.REJILLA.largo / 2 + 0.6;                            // el medio largo de la rejilla, con margen
+      if (C.golpeT > 0 && (C.rebotando ? C.golpeSuelo : r.y < 0.3)) for (const o of c.activos) {
+        if (o.tipo !== 'rejilla' || o.abierta || o.d < Math.min(c.D, c.Dantes) - mR || o.d > Math.max(c.D, c.Dantes) + mR
+            || Math.abs(r.x - M.CARRILES[o.carril]) > CITY.REJILLA.w) continue;
         o.abierta = true; o.abiertaT = t;
         const n = CITY.REJILLA.monedas * (C.ventaja.pisoton || 1) * (C.monedas2 > 0 ? 2 : 1);
         c.monedas += n; c.cuenta.monedas += n; C.pisadas++;
@@ -212,6 +286,11 @@ export function crearCiudad({ M, sonido, aviso }) {
         if (mundo) { mundo.chispa(r.x, r.y + 0.4, 0, 0xffe066); if (mundo.city && mundo.city.geiser) mundo.city.geiser(o); }
         aviso(`¡Escondite bajo la rejilla! +${n} monedas`);
         break;
+      }
+      // 4b) el pisotón con chicle cayó: la burbuja se aplasta y rebota (el impulso, al empezar el próximo cuadro: ver `antes`)
+      if (cayoPisoton && C.chicle > 0) {
+        C.boing = true; son.rebote();
+        if (mundo && mundo.city && mundo.city.boing) mundo.city.boing(r.x, r.y);
       }
       // 5) monedas ×2 se gasta
       if (C.monedas2 > 0) C.monedas2 = Math.max(0, C.monedas2 - dt);
@@ -240,7 +319,13 @@ export function crearCiudad({ M, sonido, aviso }) {
       const n = (o.tipo === 'dron' ? 8 : 5) * golpe * (C.ventaja.pisoton || 1);
       c.monedas += n; c.cuenta.monedas += n; C.pisadas++;
       // el rebote: el dron, como en City, te lanza alto (a ~5,3 m: de techo en techo); el cajón, un saltito
-      r.vy = M.impulso(o.tipo === 'dron' ? CITY.DRON_IMPULSO : 1.1); r.enAire = true; r.rodarPend = false;
+      let h = o.tipo === 'dron' ? CITY.DRON_IMPULSO : 1.1;
+      /* Con chicle y bajando de un pisotón, el cajón o el dron también hacen
+         rebotar la burbuja: sube lo del rebote (si es más que lo suyo). Ya no
+         queda un rebote pendiente para el suelo: este lo reemplaza. */
+      const conChicle = C.chicle > 0 && (C.pisoton || C.boing);
+      if (conChicle) { h = Math.max(h, alturaRebote(r.y)); C.pisoton = false; C.boing = false; C.rebotando = true; son.rebote(); if (mundo && mundo.city && mundo.city.boing) mundo.city.boing(r.x, r.y); }
+      r.vy = M.impulso(h); r.enAire = true; r.rodarPend = false;
       son.pisa(o.tipo === 'dron');
       if (o.tipo === 'dron') son.lona();
       if (mundo) mundo.chispa(r.x, r.y + 0.3, 0, 0xffe066);
@@ -252,14 +337,14 @@ export function crearCiudad({ M, sonido, aviso }) {
     salva(c, mundo) {
       const C = c.ciudad;
       if (!C || C.chicle <= 0) return false;
-      C.chicle = 0; c.invulnerable = 2;
+      C.chicle = 0; c.invulnerable = 2; C.pisoton = false; C.boing = false;
       if (mundo && mundo.city) mundo.city.chicle(false, true);   // el reventón
       son.revienta();
       aviso('¡La burbuja de chicle te salvó!');
       return true;
     },
     /** Al caer (muere en juego.js): la burbuja se va. */
-    cae(c, mundo) { if (c.ciudad) { c.ciudad.chicle = 0; c.ciudad.monedas2 = 0; if (mundo && mundo.city) mundo.city.chicle(false); } },
+    cae(c, mundo) { if (c.ciudad) { c.ciudad.chicle = 0; c.ciudad.monedas2 = 0; c.ciudad.pisoton = c.ciudad.boing = false; if (mundo && mundo.city) mundo.city.chicle(false); } },
     /** Un poder recogido: si es de City (chicle, batería, monedas ×2), lo maneja City (y devuelve true). */
     poder(c, clase, mundo) {
       if (!c.ciudad) return false;
@@ -274,9 +359,9 @@ export function crearCiudad({ M, sonido, aviso }) {
         return true;
       }
       if (clase !== 'chicle') return false;
-      c.ciudad.chicle = 20; c.cuenta.poderes++;                  // dura 20 s o hasta que revienta
+      c.ciudad.chicle = CITY.CHICLE.seg; c.cuenta.poderes++;     // dura 15 s o hasta que revienta
       if (mundo && mundo.city) mundo.city.chicle(true);
-      son.chicle(); aviso('¡Chicle! Te salva de un choque, saltas más y rebotas en el aire');
+      son.chicle(); aviso('¡Chicle! Rueda en el aire: pisotón y rebote. Te salva de un choque');
       return true;
     },
 

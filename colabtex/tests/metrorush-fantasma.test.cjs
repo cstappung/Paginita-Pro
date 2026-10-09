@@ -17,7 +17,11 @@
      repiten sus túneles y boletos en el mismo punto aunque se corra a otro
      ritmo de cuadros y con otros boletos, y la prueba de esa carrera se
      rehace;
-   - el clásico no graba rastro, y la página lee la prueba solo por clave. */
+   - el clásico no graba rastro, y la página lee la prueba solo por clave;
+   - el fantasma es la carrera MÁS LARGA de su mundo (modo normal, sin
+     ayudas o fantasma) y se corre con SUS reglas (conReglas, `pm` en la
+     prueba); la carrera se compite en metros (metrosEn) y va a la tabla de
+     distancia. */
 const {test}=require('node:test'),assert=require('node:assert/strict'),esbuild=require('esbuild');
 const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path'),crypto=require('node:crypto');
 const DIR=path.join(__dirname,'../../juegos/club/metrorush');
@@ -47,13 +51,16 @@ const nuevoFan=g=>({g,pi:0,reclamados:new Set(),diverge:false});
    estrellas recogidas, cambios de carril y saltos con su rastro, y un choque
    a los `muere` segundos. Con `contra` (un fantasma preparado) corre su pista. */
 function corre(modo,o={}){
- const P=funcionesPista(),MO=M.modoDe(modo),curva=M.velocidadDe(modo),mundo=M.mundoDe(modo);
+ // las reglas: en un modo fantasma, las del fantasma que se persigue (o las pedidas); la versión, la suya
+ const reglas=o.contra?o.contra.reglas:o.reglas,version=o.contra?o.contra.version:MP.VERSION;
+ const MO=M.MODOS[modo].fantasma&&reglas?M.conReglas(modo,reglas):M.modoDe(modo);
+ const P=funcionesPista(),curva=M.velocidadDe(MO,version),mundo=M.mundoDe(modo);
  const op=Object.assign({semilla:777,base:3,u:'uid-robot',muere:200,boletos:[],dtMin:0.008,dtMax:0.05,az:1},o);
  let az=op.az>>>0||1;const azar=()=>((az=(az*1664525+1013904223)>>>0)/4294967296);
  const semilla=o.contra?o.contra.semilla:op.semilla;
- const c={prueba:MP.nueva({s:semilla,b:op.base,md:0,u:op.u,m:modo}),gen:M.crearGenerador(semilla,{modo}),fan:o.contra?nuevoFan(o.contra):null,D:0};
+ const c={prueba:MP.nueva({s:semilla,b:op.base,md:0,u:op.u,m:modo,pm:MO.reglas,v:version}),gen:M.crearGenerador(semilla,{modo:MO,version}),version,fan:o.contra?nuevoFan(o.contra):null,D:0};
  P.poneC(c);
- const st={t:0,r:0,puntos:0,estrellas:0},objs=[],tomados=new Set(),boletos=new Set(op.boletos),grab=MO.fantasma?F.crearGrabador():null;
+ const st={t:0,r:0,puntos:0,estrellas:0},objs=[],tomados=new Set(),boletos=new Set(op.boletos),grab=M.distanciaDe(MO)?F.crearGrabador():null;
  let estacion=M.estacionDe(0,modo),cambio=null,tunel=null,rk=0,sig=MP.PASO_MUESTRA;
  const r={carril:1,x:0,y:0,vy:0,rodar:0};
  const anota=(cod,x)=>MP.evento(c.prueba,cod,st.t,c.D,st.r,x);
@@ -63,7 +70,7 @@ function corre(modo,o={}){
  for(let paso=0;paso<400000;paso++){
   const dt=op.dtMin+azar()*(op.dtMax-op.dtMin);st.t+=dt;st.r+=dt*1000+azar()*2;
   const V=curva.velocidad(st.t),dD=V*dt;c.D+=dD;
-  st.puntos+=M.puntosPorTramo(dD,M.multiplicador({base:op.base,estrellas:st.estrellas,doble:false,extra:0}));
+  st.puntos+=M.puntosPorTramo(dD,M.multiplicador({base:op.base,estrellas:st.estrellas,doble:false,extra:0,fijo:MO.multFijo}));   // (con las reglas de Sin ayudas, ×10 fijo)
   agrega(P.generaPista(c.D+230,{V:Math.max(13,V)}));
   // el choque
   if(st.t>=op.muere){anota('m');c.D=Math.max(0,c.D-0.35);for(let k=0;k<60;k++){st.t+=0.016;st.r+=16;}anota('f');break;}
@@ -86,7 +93,7 @@ function corre(modo,o={}){
  }
  const prueba=MP.cierra(c.prueba,{sn:0});
  if(grab)MP.ponFantasma(prueba,grab.texto());
- return {prueba,objs,c,puntos:Math.floor(st.puntos),metros:Math.floor(c.D),tiempo:Math.max(1,Math.round(st.t*1000)),boletosPedidos:prueba.i.filter(q=>q[0]==='B').map(q=>q[2])};
+ return {prueba,objs,c,MO,puntos:Math.floor(st.puntos),metros:Math.floor(c.D),tiempo:Math.max(1,Math.round(st.t*1000)),boletosPedidos:prueba.i.filter(q=>q[0]==='B').map(q=>q[2])};
 }
 
 test('el rastro se escribe y se lee igual (carriles justos, repeticiones juntas)',()=>{
@@ -137,7 +144,7 @@ test('con rastro la carrera se rehace igual; un rastro incoherente se rechaza',(
   const r=corre(modo,{muere:90}),re=MP.rehace(r.prueba);
   assert.equal(re.motivo,undefined,modo+': '+re.motivo);assert.ok(Math.abs(re.puntos-r.puntos)<=1);assert.equal(re.metros,r.metros);
   const sin=copia(r.prueba);delete sin.g;assert.equal(MP.rehace(sin).puntos,re.puntos,'el rastro no suma ni quita');
-  assert.equal(MV.verifica({categoria:M.MODOS[modo].categoria,puntos:r.puntos,tiempo:r.tiempo,partida:'x'},r.prueba,{uid:'uid-robot'}),null,modo);
+  assert.equal(MV.verifica({categoria:M.MODOS[modo].categoria,puntos:r.metros,tiempo:r.tiempo,partida:'x'},r.prueba,{uid:'uid-robot'}),null,modo);
   assert.ok(Math.abs(F.duracion(r.prueba.g)-90)<0.3,'el rastro termina en el choque: '+F.duracion(r.prueba.g));
  }
  const r=corre('fantasma',{muere:60});
@@ -173,7 +180,7 @@ test('prepara: el fantasma que manda la página, comprobado con rehace',()=>{
  assert.match(F.prepara({nombre:'x',d:''},MP,M,'fantasma').motivo,/no trae la prueba/);
  assert.match(F.prepara(null,MP,M,'fantasma').motivo,/no trae/);
  assert.match(F.prepara({d:'{malo'},MP,M,'fantasma').motivo,/no se puede leer/);
- assert.match(F.prepara({d:JSON.stringify(r.prueba)},MP,M,'cityfantasma').motivo,/no es de este modo/);
+ assert.match(F.prepara({d:JSON.stringify(r.prueba)},MP,M,'cityfantasma').motivo,/no es de este mundo/);
  const vieja=copia(r.prueba);vieja.v=1;assert.match(F.prepara({d:JSON.stringify(vieja)},MP,M,'fantasma').motivo,/otra versión/);
  const trucha=copia(r.prueba);trucha.e.splice(3,0,['e',2,40,2000,99999]);assert.match(F.prepara({d:JSON.stringify(trucha)},MP,M,'fantasma').motivo,/no cuadra/);
  // sin rastro corre igual (solo en puntos)
@@ -219,11 +226,13 @@ test('City fantasma también: su pista y su prueba',()=>{
  const lim=g.Dm+200;assert.deepEqual(yo.objs.filter(o=>(o.d!=null?o.d:o.d0)<lim).map(k),fg.objs.filter(o=>(o.d!=null?o.d:o.d0)<lim).map(k));
 });
 
-test('el clásico no cambia: sin rastro ni fantasma; la página lee la prueba solo por clave',()=>{
+test('el clásico no cambia (salvo el rastro); la página lee la prueba solo por clave',()=>{
  // juego.js: el grabador solo en los modos fantasma; el fantasma solo si el modo lo es
- assert.match(JS,/grab: modo\.fantasma && MF \? MF\.crearGrabador\(\) : null/);
+ assert.match(JS,/grab: M\.distanciaDe\(modo\) && MF \? MF\.crearGrabador\(\) : null/);
  assert.match(JS,/const f = modo && modo\.fantasma \? fantasmas\[modo\.categoria\] : null;/);
- const cl=corre('clasico',{muere:80});assert.equal(cl.prueba.g,undefined);assert.equal(cl.prueba.m,undefined);assert.equal(MP.rehace(cl.prueba).motivo,undefined);
+ // el clásico sigue siendo el de siempre (sin `m` ni `pm`), pero graba su rastro: entra en la distancia y puede ser el próximo fantasma
+ const cl=corre('clasico',{muere:80});assert.equal(typeof cl.prueba.g,'string');assert.equal(cl.prueba.m,undefined);assert.equal(cl.prueba.pm,undefined);assert.equal(MP.rehace(cl.prueba).motivo,undefined);
+ const sm=corre('sinmonedas',{muere:40});assert.equal(sm.prueba.g,undefined,'Sin monedas no entra en la distancia: no graba');
  // fantasma.js se carga antes que prueba.js (que lo usa para mirar el rastro)
  const html=fs.readFileSync(path.join(DIR,'index.html'),'utf8');
  assert.ok(html.indexOf('src="fantasma.js')>0&&html.indexOf('src="fantasma.js')<html.indexOf('src="prueba.js'));
@@ -236,4 +245,59 @@ test('el clásico no cambia: sin rastro ni fantasma; la página lee la prueba so
  const reglas=JSON.parse(fs.readFileSync(path.join(__dirname,'../../firebase/database.rules.json'),'utf8')).rules;
  assert.equal(reglas.soloPruebas.$categoria.$uid.$partida['.read'],'auth != null');
  assert.equal(reglas.soloPruebas['.read'],undefined);assert.equal(reglas.soloPruebas.$categoria['.read'],undefined);
+});
+
+test('el fantasma es la carrera más larga de su mundo, de cualquier modo, y se corre con sus reglas',()=>{
+ // la tabla del fantasma ES la de distancia de su mundo, y entran el modo normal, el sin ayudas y el fantasma
+ assert.equal(M.MODOS.fantasma.categoria,'club-metrorush-distancia');assert.equal(M.MODOS.cityfantasma.categoria,'club-metrorush-citydistancia');
+ assert.deepEqual([...M.DISTANCIA.metro.modos],['clasico','puro','fantasma']);assert.deepEqual([...M.DISTANCIA.city.modos],['city','citypuro','cityfantasma']);
+ assert.equal(M.distanciaDe('sinmonedas'),null,'Sin monedas no entra en la distancia');
+ // conReglas: lo de las reglas (poderes, ×10…) con el nombre y la tabla del fantasma
+ const cr=M.conReglas('fantasma','clasico');assert.equal(cr.id,'fantasma');assert.equal(cr.items,true);assert.equal(cr.revivir,true);assert.equal(cr.categoria,'club-metrorush-distancia');assert.equal(cr.reglas,'clasico');
+ assert.equal(M.conReglas('fantasma','puro').multFijo,10);assert.equal(M.conReglas('fantasma','city'),null,'reglas de otro mundo: no');
+ assert.equal(M.modoDe(cr),cr,'modoDe acepta el modo compuesto');
+ // una carrera del CLÁSICO (con poderes) sirve de fantasma: se corre con reglas «clasico»
+ const cl=corre('clasico',{muere:100,semilla:31});
+ const g=F.prepara({nombre:'Leo',d:JSON.stringify(cl.prueba)},MP,M,'fantasma');assert.equal(g.motivo,undefined,g.motivo);
+ assert.equal(g.reglas,'clasico');assert.equal(g.semilla,31);assert.equal(g.metros,cl.metros);
+ // y quien lo persigue corre con esas reglas: su prueba dice `pm`, se rehace y va a la distancia en metros
+ const yo=corre('fantasma',{contra:g,muere:130,az:12});
+ assert.equal(yo.prueba.m,'fantasma');assert.equal(yo.prueba.pm,'clasico');assert.equal(yo.MO.items,true);
+ assert.equal(yo.c.fan.diverge,false);
+ const re=MP.rehace(yo.prueba);assert.equal(re.motivo,undefined,re.motivo);assert.equal(re.reglas,'clasico');
+ assert.equal(MV.verifica({categoria:'club-metrorush-distancia',puntos:yo.metros,tiempo:yo.tiempo,partida:'x'},yo.prueba,{uid:'uid-robot'}),null);
+ // una carrera fantasma no entra en una tabla de puntos, ni en la distancia del otro mundo
+ assert.match(MV.verifica({categoria:'club-metrorush-carrera',puntos:yo.puntos,tiempo:yo.tiempo,partida:'x'},yo.prueba,{uid:'uid-robot'}),/fantasma solo va/);
+ assert.match(MV.verifica({categoria:'club-metrorush-citydistancia',puntos:yo.metros,tiempo:yo.tiempo,partida:'x'},yo.prueba,{uid:'uid-robot'}),/no entra en esta tabla/);
+ // reglas que no son de este fantasma: la prueba no vale
+ const mala=copia(yo.prueba);mala.pm='city';assert.match(MP.rehace(mala).motivo,/reglas del fantasma/);
+ const sinFan=copia(cl.prueba);sinFan.pm='clasico';assert.match(MP.rehace(sinFan).motivo,/reglas del fantasma/);
+ // una de Sin ayudas también es fantasma, con sus reglas (sin ítems, ×10)
+ const pu=corre('puro',{muere:80,semilla:8});const gp=F.prepara({d:JSON.stringify(pu.prueba)},MP,M,'fantasma');assert.equal(gp.reglas,'puro');
+ // una prueba fantasma vieja (sin pm) se corrió sin nada: su pista es la de Sin ayudas
+ const vieja=corre('fantasma',{muere:70,semilla:9});assert.equal(vieja.prueba.pm,undefined);assert.equal(F.prepara({d:JSON.stringify(vieja.prueba)},MP,M,'fantasma').reglas,'puro');
+});
+
+test('la carrera contra el fantasma va en metros: dónde está el fantasma en cada instante',()=>{
+ const cl=corre('clasico',{muere:90,semilla:44});
+ const g=F.prepara({d:JSON.stringify(cl.prueba)},MP,M,'fantasma');
+ // mientras corre, lleva los metros de la curva (los mismos que tú: la velocidad es igual para todos)
+ for(const t of [5,30,60,85])assert.ok(Math.abs(F.metrosEn(g.pasos,g.curva,t)-g.curva.metrosEntre(0,t))<2.5,'t='+t);
+ assert.equal(F.vivoEn(g.pasos,30),true);
+ // después de su último choque ya no avanza: queda en sus metros finales
+ const fin=F.metrosEn(g.pasos,g.curva,g.tf+50);assert.ok(Math.abs(fin-g.Df)<0.5,fin+' / '+g.Df);
+ assert.equal(F.vivoEn(g.pasos,g.tf+50),false);
+ // nunca retrocede (salvo el empujón del choque)
+ let ant=-1;for(let t=0;t<g.tf+5;t+=0.37){const d=F.metrosEn(g.pasos,g.curva,t);assert.ok(d>=ant-0.5,t+": "+d+" < "+ant);ant=Math.max(ant,d);}   // (al chocar resbala un poco hacia atrás: el juego lo empuja 0,35 m)
+});
+
+test('juego.js: la carrera fantasma va a la distancia de su mundo y ganarle da «Cazafantasmas»',()=>{
+ assert.match(JS,/const tablaDist = M\.distanciaDe\(c\.modo\)/);
+ assert.match(JS,/if \(fanM\) \{ Club\.result\(\{ categoria: tablaDist\.categoria, puntos: Math\.min\(1e6, metros\)/);
+ assert.match(JS,/Club\.logro\('fan'\)/);
+ assert.match(JS,/addEventListener\('club-fantasma'/,'el fantasma nuevo llega sin pedirlo');
+ const con=fs.readFileSync(path.join(__dirname,'../../juegos/club/conexion.js'),'utf8');
+ assert.match(con,/logro\(id\)/);assert.match(con,/club-fantasma/);
+ const club=fs.readFileSync(path.join(__dirname,'../src/juegos/solo/club.js'),'utf8');
+ assert.match(club,/d\.tipo==='logro'/);
 });
