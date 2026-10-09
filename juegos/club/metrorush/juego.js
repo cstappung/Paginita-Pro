@@ -24,10 +24,10 @@
    - Se perdona el salto un poco antes de tocar el suelo y un poco después
      de dejarlo (búfer y "tiempo de coyote"): sin eso el salto se siente
      "comido" a toda velocidad. */
-import { crearMundo, PALETAS } from './mundo.js?v=metrorush-9';
-import { Sonido } from './audio.js?v=metrorush-9';
-import './mundo-city.js?v=metrorush-9';                        // CITY: el dibujo de City (se engancha a mundo.js por GANCHOS)
-import { crearCiudad } from './ciudad.js?v=metrorush-9';       // CITY: lo que la carrera hace distinto en City
+import { crearMundo, PALETAS } from './mundo.js?v=metrorush-10';
+import { Sonido } from './audio.js?v=metrorush-10';
+import './mundo-city.js?v=metrorush-10';                        // CITY: el dibujo de City (se engancha a mundo.js por GANCHOS)
+import { crearCiudad } from './ciudad.js?v=metrorush-10';       // CITY: lo que la carrera hace distinto en City
 
 const M = window.MetroRushMotor;                               // el motor (motor.js)
 const MP = window.MetroRushPrueba;                            // la prueba de la carrera, para el antitrampas (prueba.js)
@@ -640,7 +640,7 @@ function actualiza(dt) {
   for (let i = c.activos.length - 1; i >= 0; i--) {
     const o = c.activos[i];
     if (o.tipo === 'tren' && o.vel > 0) {
-      if (!o.activo && c.D >= o.dArribo - M.APARECE) o.activo = true;
+      M.activaTren(o, c.D, c.V);                               // (al partir tarde, en la largada, se adelanta a donde ya iría)
       if (o.activo && !muriendo) o.d0 -= o.vel * dt;            // al morir todo se queda quieto (el tren no te pasa por encima)
       if (o.activo && !muriendo) avisaTren(o);                  // la bocina, si viene hacia ti
       if (o.d0 + o.largo < c.D - 1 && !c.esquivados.has(o.id) && !muriendo) { c.esquivados.add(o.id); c.cuenta.esquivar++; }
@@ -1866,6 +1866,8 @@ function abreLibreta() {
 }
 function abreRelato() {
   $('relatoTexto').textContent = ciudad.intro(modoSel) || M.INTRO;   // CITY: la intro de City, con un modo de City
+  // y su título: en City la historia es otra (la ciudad que heredó los vagones), no la última noche de la Línea 3
+  $('relatoTitulo').textContent = ciudad.intro(modoSel) ? 'La ciudad de los vagones' : 'La última noche de la Línea 3';
   abrePanel('capaRelato');
 }
 function abreOpciones() {

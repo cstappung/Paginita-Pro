@@ -13,7 +13,10 @@
        colgados de una grúa), drones, barandas, lonas, respiraderos de
        vapor, el chicle y la estrella secreta; y lo de Subway Surfers City:
        las celdas de energía de la tabla, la batería, las monedas ×2, las
-       rejillas del pisotón y el tramo de burbujas de baja gravedad;
+       rejillas del pisotón y el tramo de burbujas de baja gravedad; y lo
+       propio de cada distrito: el cobertizo del Barrio Sur, la viga de
+       grúa de Los Muelles, el conducto de Bajo Vías y los setos del parque
+       (los rieles en zigzag del Bulevar son barandas);
      · los rasgos de los personajes de City (peinado y falda), en el bloque
        «CITY: rasgos de los personajes»;
      · los efectos: la burbuja del chicle y los trozos de lo que se pisa.
@@ -41,7 +44,7 @@
    (ver `legible` y `realza` en mundo.js) y se lee de lejos en todos los
    estilos. La escenografía no lleva «!». */
 import * as THREE from 'three';
-import { PALETAS, GANCHOS, piezas } from './mundo.js?v=metrorush-9';
+import { PALETAS, GANCHOS, piezas } from './mundo.js?v=metrorush-10';
 
 const MOTOR = window.MetroRushMotor;                    // el motor (con City instalado por city.js)
 const CITY = MOTOR && MOTOR.CITY;                       // las medidas y los datos de City (city.js)
@@ -651,6 +654,107 @@ Object.assign(Kit.prototype, {
     };
     return g;
   },
+  /* ---------- Lo propio de cada distrito ----------
+     Cada distrito tiene un objeto que solo sale ahí y que se juega distinto
+     (ver «LO PROPIO DE CADA DISTRITO» en city.js). Sus medidas salen de
+     CITY (COBERTIZO, VIGA, CONDUCTO, SETO), las mismas que usan los choques,
+     así lo que se ve es lo que choca o sostiene. */
+
+  /** BARRIO SUR · el cobertizo: una caseta de madera de 2 m con techo de
+      calamina, al pie de los vagones. Se salta encima (el techo sostiene) y
+      de ahí al vagón. Largo variable: se arma de 10 m y se estira en z
+      (como la baranda). El frente lleva franjas de peligro (choca) y una
+      flecha arriba («aquí se sube»). */
+  cobertizoCity() {
+    const a = new Arma(this), K = CITY.COBERTIZO, L = 10;
+    const madera = this.neon ? 0x3a2a6e : (this.pixel ? 0x9a5b34 : 0xb06a3c), calamina = this.neon ? 0x22e5ff : 0xc9ced6;
+    a.pon(CAJA, this.pixel ? 'plano!' : 'pintura!', madera, [0, (K.alto - 0.16) / 2, -L / 2], null, [1.84, K.alto - 0.16, L], 0xffffff);   // el cuerpo de tablas
+    for (let z = -0.8; z > -L; z -= 1.6) a.pon(CAJA, 'plano!', this.neon ? 0x6a35c9 : 0x6e3d22, [0, (K.alto - 0.16) / 2, z], null, [1.88, K.alto - 0.2, 0.08]);   // las tablas (vetas)
+    a.pon(CAJA, this.neon ? 'luz!' : 'metal!', calamina, [0, K.alto - 0.08, -L / 2], null, [2.0, 0.16, L + 0.3]);   // el techo de calamina (donde se para)
+    for (let x = -0.8; x <= 0.81; x += 0.4) a.pon(CAJA, 'metal!', this.neon ? 0x9a6bff : 0x8f969f, [x, K.alto + 0.01, -L / 2], null, [0.05, 0.03, L + 0.3]);   // sus ondas
+    a.pon(uvMundo(new THREE.BoxGeometry(1.86, 0.22, 0.04), 0.5), this.neon ? 'texluz:rayasNA!' : 'tex:rayasNA!', 0xffffff, [0, 0.35, 0.02], null, 1);   // el frente: peligro abajo
+    a.pon(new THREE.CircleGeometry(0.32, 24), this.neon ? 'texluz:flecha!' : 'tex:flecha!', 0xffffff, [0, 1.25, 0.03], [0, 0, Math.PI]);   // y la flecha hacia arriba
+    const g = a.hecho();
+    g.userData.colocar = (o, D) => { g.position.set(CARRILES[o.carril], SUELO, -(o.d0 - D)); g.scale.z = o.largo / L; };
+    return g;
+  },
+  /** LOS MUELLES · la viga de grúa: una viga amarilla que sube en rampa de
+      1,9 a 4,2 m y sigue plana sobre los vagones, colgada de cables. Tres
+      piezas: la rampa y el tramo plano (cajas de largo 1, estiradas y
+      giradas en `colocar` según o.sube y o.largo) y los cables. La cara de
+      arriba de cada pieza va justo a `alturaViga`: ahí se para el corredor. */
+  vigaCity() {
+    const V = CITY.VIGA, alto = 0.34, g = new THREE.Group();
+    const amarillo = this.neon ? 0xffb020 : 0xffc21a;
+    const pieza = () => {
+      const a = new Arma(this);
+      a.pon(CAJA, this.pixel ? 'plano!' : 'pintura!', amarillo, [0, -alto / 2, -0.5], null, [1.5, alto, 1], 0xffffff);   // el alma de la viga (largo 1, hacia −z)
+      for (const s of [-1, 1]) a.pon(uvMundo(new THREE.BoxGeometry(0.04, 0.12, 1), 0.5), this.neon ? 'texluz:rayasNA!' : 'tex:rayasNA!', 0xffffff, [s * 0.76, -alto / 2, -0.5], null, 1);   // sus bordes de peligro
+      a.pon(CAJA, 'metal!', 0x3a3f46, [0, 0.01, -0.5], null, [0.5, 0.02, 1]);   // la huella oscura de arriba (por dónde se corre)
+      return a.hecho();
+    };
+    const rampa = pieza(), plano = pieza(); g.add(rampa, plano);
+    const c = new Arma(this);
+    for (const s of [-1, 1]) c.pon(CILINDRO_CHICO, 'metal!', 0x2a2d33, [s * 0.55, 4, 0], null, [0.05, 8, 0.05]);   // dos cables de 8 m, hacia la grúa
+    c.pon(CAJA, 'pintura!', amarillo, [0, 8, 0], null, [1.6, 0.3, 0.5], 0xffffff);                                 // el carro de la grúa, arriba
+    const cables = [c.hecho(), null]; cables[1] = cables[0].clone(); g.add(cables[0], cables[1]);
+    g.userData.colocar = (o, D) => {
+      const sube = o.sube, plana = Math.max(0.1, o.largo - sube), dy = V.y1 - V.y0;
+      g.position.set(CARRILES[o.carril], SUELO, -(o.d0 - D));
+      rampa.position.set(0, V.y0, 0); rampa.rotation.x = Math.atan2(dy, sube); rampa.scale.z = Math.hypot(sube, dy);   // de (0, 1,9) a (−sube, 4,2)
+      plano.position.set(0, V.y1, -sube); plano.scale.z = plana;
+      cables[0].position.set(0, V.y1, -sube - 1); cables[1].position.set(0, V.y1, -o.largo + 1);   // (los cables cuelgan sobre la viga plana)
+    };
+    return g;
+  },
+  /** BAJO VÍAS · el conducto: un ducto de obra colgado sobre el carril, de
+      1,0 a 3,35 m (abajo queda justo el hueco para pasar rodando). Tiene
+      franjas de peligro en la boca, una luz en el piso para guiar y el
+      ANILLO naranja que avisa dónde volver a rodar (se mueve a o.anillo). */
+  conductoCity() {
+    const K = CITY.CONDUCTO, L = 10, g = new THREE.Group(), alto = K.alto - K.y0;
+    const a = new Arma(this), gris = this.neon ? 0x2b2f4a : 0x6f7782;
+    a.pon(CAJA, this.pixel ? 'plano!' : 'metal!', gris, [0, K.y0 + alto / 2, -L / 2], null, [1.9, alto, L], 0xffffff);   // el ducto
+    for (let z = -1.2; z > -L; z -= 2.4) a.pon(CAJA, 'metal!', this.neon ? 0x6a35c9 : 0x4a525c, [0, K.y0 + alto / 2, z], null, [1.96, alto + 0.06, 0.12]);   // sus juntas
+    a.pon(uvMundo(new THREE.BoxGeometry(1.92, 0.24, 0.04), 0.5), this.neon ? 'texluz:rayasNA!' : 'tex:rayasNA!', 0xffffff, [0, K.y0 + 0.12, 0.02], null, 1);   // la boca: peligro abajo
+    a.pon(CAJA, 'luz!', this.neon ? 0x22e5ff : 0xfff3c0, [0, K.y0 - 0.02, -L / 2], null, [0.3, 0.03, L]);   // la luz del techo del hueco
+    const cuerpo = a.hecho(); g.add(cuerpo);
+    /* La boca se lee de lejos como «pasa por abajo»: sin esto, de frente el
+       ducto era un bloque oscuro (sobre todo en neón) y parecía un muro. Va
+       aparte del cuerpo para que no se estire con el largo del ducto. */
+    const m = new Arma(this), borde = this.neon ? 0x22e5ff : 0xffd23f;
+    m.pon(CAJA, 'luz!', borde, [0, K.alto + 0.04, 0.03], null, [2.0, 0.08, 0.06]);                     // el borde de arriba de la boca
+    for (const s of [-1, 1]) m.pon(CAJA, 'luz!', borde, [s * 0.98, K.y0 + alto / 2, 0.03], null, [0.08, alto + 0.08, 0.06]);   // y sus dos lados
+    m.pon(new THREE.CircleGeometry(0.42, 24), this.neon ? 'texluz:flecha!' : 'tex:flecha!', 0xffffff, [0, K.y0 + alto * 0.55, 0.07]);   // el cartel: flecha hacia abajo (rodar)
+    m.pon(CAJA, 'luz!', borde, [0, 0.015, 0.9], null, [1.4, 0.03, 0.14]);                              // una raya en el suelo, antes de la boca
+    g.add(m.hecho());
+    const b = new Arma(this);
+    b.pon(CAJA, 'luz!', 0xff8a1e, [0, K.y0 + alto / 2, 0], null, [2.05, alto + 0.14, 0.35]);   // el anillo: «rueda otra vez aquí»
+    b.pon(CAJA, 'luz!', 0xff8a1e, [0, 0.02, 0], null, [1.6, 0.03, 0.5]);                      // y su marca en el suelo
+    const anillo = b.hecho(); g.add(anillo);
+    if (this.neon || this.pixel) anillo.add(sprite(0xff8a1e, 2.2, [0, 0.6, 0], 0.45));
+    g.userData.colocar = (o, D) => {
+      g.position.set(CARRILES[o.carril], SUELO, -(o.d0 - D));
+      cuerpo.scale.z = o.largo / L;                             // el ducto se estira; el anillo no (va en su metro)
+      anillo.position.z = -((o.anillo ?? o.d0 + o.largo / 2) - o.d0);
+    };
+    return g;
+  },
+  /** PARQUE · el seto: un muro de arbusto recortado de 2,8 m, que solo se
+      pasa con el salto que flota de las burbujas. Unas flores para que no
+      sea un bloque verde, y una franja clara arriba que marca su altura. */
+  setoCity() {
+    const S = CITY.SETO, a = new Arma(this);
+    const verde = this.neon ? 0x1f8f6a : 0x2f9e44, claro = this.neon ? 0x6affc8 : 0x6ccf5a;
+    a.pon(CAJA, this.pixel ? 'plano!' : 'pintura!', verde, [0, S.alto / 2, 0], null, [1.86, S.alto, S.largo], 0xffffff);   // el arbusto
+    a.pon(CAJA, this.neon ? 'luz!' : 'pintura!', claro, [0, S.alto - 0.06, 0], null, [1.9, 0.12, S.largo + 0.04]);   // el borde de arriba, recortado
+    const az = (k => () => ((k = (k * 1664525 + 1013904223) >>> 0) / 4294967296))(31);   // siempre las mismas flores
+    for (let k = 0; k < 9; k++) a.pon(ESFERA, 'pintura!', [0xff6ec7, 0xffe14d, 0xffffff][k % 3], [(az() - 0.5) * 1.6, 0.4 + az() * (S.alto - 0.8), S.largo / 2 + 0.02], null, 0.09);   // flores en el frente
+    for (const s of [-1, 1]) a.pon(CAJA, 'plano!', 0x5a3a22, [s * 0.7, 0.12, 0], null, [0.12, 0.24, S.largo * 0.8]);   // la base de tierra
+    const g = a.hecho();
+    g.userData.colocar = (o, D) => { g.position.set(CARRILES[o.carril], SUELO, -(o.d - D)); };
+    return g;
+  },
   /** Las reservas de City, preparadas de a poco con la ciudad (solo en los kits de City). */
   pasosCity(pre) {
     if (!this.pal.distrito || !CITY) return;
@@ -660,7 +764,11 @@ Object.assign(Kit.prototype, {
     pre('estrellaS', () => this.estrellaSecreta(), 1); pre('poder-chicle', () => this.chicle(), 1);
     pre('energia', () => this.celdaEnergia(), 4); pre('rejilla', () => this.rejillaCity(), 1);
     pre('poder-bateria', () => this.bateria(), 1); pre('poder-monedas2', () => this.monedas2(), 1);
-    if (this.pal.distrito === 'parque') pre('burbujas', () => this.burbujasCity(), 1);
+    if (this.pal.distrito === 'parque') { pre('burbujas', () => this.burbujasCity(), 1); pre('seto', () => this.setoCity(), 6); }
+    // lo propio de cada distrito, solo en el suyo (en otro kit, si llega a pedirse, se arma en el momento)
+    if (this.pal.distrito === 'sur') pre('cobertizo', () => this.cobertizoCity(), 2);
+    if (this.pal.distrito === 'muelles') pre('viga', () => this.vigaCity(), 2);
+    if (this.pal.distrito === 'bajo') pre('conducto', () => this.conductoCity(), 2);
   }
 });
 
@@ -677,6 +785,10 @@ function objetoCity(kit, o) {
   else if (o.tipo === 'energia') obj = kit.saca('energia', () => kit.celdaEnergia());
   else if (o.tipo === 'rejilla') obj = kit.saca('rejilla', () => kit.rejillaCity());
   else if (o.tipo === 'burbujas') obj = kit.saca('burbujas', () => kit.burbujasCity());
+  else if (o.tipo === 'cobertizo') obj = kit.saca('cobertizo', () => kit.cobertizoCity());
+  else if (o.tipo === 'viga') obj = kit.saca('viga', () => kit.vigaCity());
+  else if (o.tipo === 'conducto') obj = kit.saca('conducto', () => kit.conductoCity());
+  else if (o.tipo === 'seto') obj = kit.saca('seto', () => kit.setoCity());
   else if (o.tipo === 'estrella' && o.secreta) { obj = kit.saca('estrellaS', () => kit.estrellaSecreta()); obj.position.x = CARRILES[o.carril]; }
   return obj;
 }

@@ -60,7 +60,7 @@ function pista(semilla, metros, modo, conPostales = false) {
       cajones y barandas; rodar bajo barreras altas y drones; nada con las
       rampas (se suben) ni con las lonas.
    Falla si choca de frente o si tropieza dos veces seguidas (lo atraparían). */
-function cerrados(objs, hasta) {
+function cerrados(objs, hasta, curva) {
   const N = Math.ceil(hasta) + 2, libre = [0, 1, 2].map(() => new Uint8Array(N).fill(1));
   const trenes = objs.filter(o => o.tipo === 'tren'), subible = new Set();
   for (const r of objs.filter(o => o.tipo === 'rampa')) {        // una rampa sube a su tren (y a los pegados a él)
@@ -93,12 +93,21 @@ function cerrados(objs, hasta) {
     if (o.tipo === 'rampa') cierra(entra, o.carril, o.d0 + 0.5, o.d0 + o.largo + 1);
     else if (o.tipo === 'baranda') cierra(entra, o.carril, o.d0 - 1, o.d0 + o.largo + 1);
     else if (['cajon', 'dron', 'bajo', 'alto'].includes(o.tipo)) cierra(entra, o.carril, o.d - 2, o.d + 1.5);
+    /* Al carril de un seto se entra con tiempo de saltar flotando (el salto
+       tiene que salir antes de 0,62 s): de lado y encima, ya no. */
+    else if (o.tipo === 'seto') cierra(entra, o.carril, o.d - curva.velocidadEn(o.d) * 0.7, o.d + 1.5);
+    /* El cobertizo y la viga son la ruta de arriba (como la lona): su carril
+       se da por cerrado hasta el final de sus vagones (esos ya los cierra el
+       bucle de los trenes); el camino nunca depende de ellos. El conducto se
+       pasa rodando: se sigue por él, pero no se entra de lado. */
+    else if (o.tipo === 'cobertizo' || o.tipo === 'viga') { cierra(libre, o.carril, o.d0 - 1, o.d0 + o.largo + 1); cierra(entra, o.carril, o.d0 - 3, o.d0 + o.largo + 1); }
+    else if (o.tipo === 'conducto') cierra(entra, o.carril, o.d0 - 2, o.d0 + o.largo + 1);
   }
   for (let c = 0; c < 3; c++) for (let d = 0; d < N; d++) if (!libre[c][d]) entra[c][d] = 0;
   return { libre, entra };
 }
 function plan(objs, hasta, curva) {
-  const { libre, entra } = cerrados(objs, hasta), N = libre[0].length;
+  const { libre, entra } = cerrados(objs, hasta, curva), N = libre[0].length;
   /* Un cambio de carril que empieza en el metro d, a la velocidad V de ahí
      (cruza 2,2 m en 0,17 s): sale del alcance de lo que hay en su carril
      (1,33 m de lado, un vagón) a los 0,103 s, y entra en el del otro a los
@@ -123,14 +132,14 @@ function plan(objs, hasta, curva) {
   return { libre, entra, bien, cambia, K };
 }
 
-const DEPIE = new Set(['bajo', 'cajon', 'baranda']), RUEDA = new Set(['alto', 'dron']);
+const DEPIE = new Set(['bajo', 'cajon', 'baranda']), RUEDA = new Set(['alto', 'dron', 'conducto']);
 const frente = o => o.d != null ? o.d - 0.6 : o.d0;             // dónde empieza (cajón, dron y barreras: su centro menos un poco)
 function robot(objs, modo, metros, { fps = 60, curva = M.velocidadDe(modo), P = null } = {}) {
-  const cosas = objs.filter(o => ['tren', 'rampa', 'bajo', 'alto', 'cajon', 'dron', 'baranda', 'lona'].includes(o.tipo)).map(o => Object.assign({}, o))
+  const cosas = objs.filter(o => ['tren', 'rampa', 'bajo', 'alto', 'cajon', 'dron', 'baranda', 'lona', 'cobertizo', 'viga', 'conducto', 'seto', 'burbujas'].includes(o.tipo)).map(o => Object.assign({}, o))
     .sort((a, b) => (a.vel > 0 ? a.dArribo - 260 : (a.d ?? a.d0)) - (b.vel > 0 ? b.dArribo - 260 : (b.d ?? b.d0)));
   const pl = P || plan(objs, metros + 300, curva), dt = 1 / fps;
   const r = { x: X[1], xPrev: X[1], carril: 1, carrilPrev: 1, y: 0, vy: 0, enAire: false, rodar: 0, rodarPend: false, bufer: -1 };
-  let D = 0, Dantes = 0, t = 0, i = 0, tropiezo = -99, pisadas = 0, lonas = 0, grind = 0;
+  let D = 0, Dantes = 0, t = 0, i = 0, tropiezo = -99, pisadas = 0, lonas = 0, grind = 0, setos = 0, conductos = 0, doble = false;
   const activos = [];
   const cuenta = { saltos: 0, rodadas: 0, techos: 0 };
   while (D < metros) {
@@ -140,7 +149,7 @@ function robot(objs, modo, metros, { fps = 60, curva = M.velocidadDe(modo), P = 
     while (i < cosas.length && (cosas[i].vel > 0 ? cosas[i].dArribo - 260 : (cosas[i].d ?? cosas[i].d0)) < D + 230) activos.push(cosas[i++]);
     for (let k = activos.length - 1; k >= 0; k--) {
       const o = activos[k];
-      if (o.tipo === 'tren' && o.vel > 0) { if (!o.activo && D >= o.dArribo - M.APARECE) o.activo = true; if (o.activo) o.d0 -= o.vel * dt; }
+      if (o.tipo === 'tren' && o.vel > 0) { M.activaTren(o, D, V); if (o.activo) o.d0 -= o.vel * dt; }
       const fin = o.d != null ? o.d : o.d0 + (o.largo || 0);
       if (fin < D - 15) activos.splice(k, 1);
     }
@@ -157,9 +166,30 @@ function robot(objs, modo, metros, { fps = 60, curva = M.velocidadDe(modo), P = 
     const salta = () => { r.vy = M.impulso(F.alturaSalto); r.enAire = true; r.rodar = 0; r.rodarPend = false; r.bufer = -1; cuenta.saltos++; };
     if (r.bufer > 0) { r.bufer -= dt; if (!r.enAire) salta(); }   // el búfer del salto (juego.js): pedido en el aire, sale al tocar el suelo
     const alto = r.y > 2.5 && !r.enAire;                          // de pie arriba de un tren: nada lo alcanza
+    // las burbujas del parque (ciudad.antes): dentro, la gravedad baja y hay un salto más en el aire
+    const enBurbuja = activos.some(o => o.tipo === 'burbujas' && D >= o.d0 && D <= o.d0 + o.largo);
+    if (!r.enAire) doble = false;
     if (!alto) for (const o of activos) {
       if (o.carril !== r.carril || o.roto) continue;
       const dz = frente(o) - D;
+      /* El seto: solo flotando. Salta cuando le faltan 0,38 a 0,62 s (el
+         salto flotante pasa de 2,8 m entre los 0,35 y los 1,11 s); si va en
+         el aire y cayendo sin más no le pasaría por encima, usa el salto de
+         más de las burbujas. */
+      if (o.tipo === 'seto') {
+        const ventana = dz > V * 0.38 + 0.6 && dz < V * 0.62;
+        if (ventana && !r.enAire) { salta(); setos++; }
+        else if (ventana && r.enAire && enBurbuja && !doble && r.vy < 0) { const tz = (dz + 1.2) / V, g = F.gravedad * C.BURBUJAS.gravedad; if (r.y + r.vy * tz - g * tz * tz / 2 < C.SETO.alto + 0.3) { r.vy = M.impulso(F.alturaSalto); doble = true; setos++; } }
+        continue;
+      }
+      // el conducto: rodar desde la entrada y volver a rodar adentro hasta salir (dz es negativo adentro)
+      if (o.tipo === 'conducto') {
+        const sale = o.d0 + o.largo - D;
+        if (dz < V * 0.25 + 0.8 && sale > -0.6 && r.rodar < (sale + 1.2) / V + dt && !r.rodarPend) {   // (+ un cuadro: a 20 cuadros/s la rodada se acababa justo en la salida)
+          if (r.enAire) { r.vy = -F.caidaRapida; r.rodarPend = true; } else { if (r.rodar <= 0) conductos++; r.rodar = F.tiempoRodar; cuenta.rodadas++; }
+        }
+        continue;
+      }
       if (DEPIE.has(o.tipo) && dz > 0 && dz < V * 0.2 + 0.4 && !(o.tipo === 'baranda' && r.y >= 0.9)) {
         if (!r.enAire) salta(); else if (r.vy <= 0 && r.y < 0.9) r.bufer = 0.16;   // cayendo y bajo: lo pide (como el búfer de juego.js)
       }
@@ -194,7 +224,7 @@ function robot(objs, modo, metros, { fps = 60, curva = M.velocidadDe(modo), P = 
     const vl = 2.2 / F.cambioCarril;
     r.xPrev = r.x; r.x += Math.max(-vl * dt, Math.min(vl * dt, X[r.carril] - r.x));
     const sop = M.soporte(activos, r.x, D, r.y, Dantes);
-    r.vy -= F.gravedad * dt; r.y += r.vy * dt;
+    r.vy -= F.gravedad * (enBurbuja ? C.BURBUJAS.gravedad : 1) * dt; r.y += r.vy * dt;
     if (r.y <= sop.h) {
       if (r.enAire && r.rodarPend) { r.rodar = F.tiempoRodar; }
       r.y = sop.h; r.vy = 0; r.enAire = false; r.rodarPend = false;
@@ -223,7 +253,7 @@ function robot(objs, modo, metros, { fps = 60, curva = M.velocidadDe(modo), P = 
       }
     }
   }
-  return { choque: null, D, pisadas, lonas, grind, cuenta, tropiezos: tropiezo > 0 };
+  return { choque: null, D, pisadas, lonas, grind, cuenta, setos, conductos, tropiezos: tropiezo > 0 };
 }
 
 /* ---------- los datos ---------- */
@@ -350,7 +380,7 @@ test('lo de Subway Surfers City: energía de la tabla, rejillas, contenedores qu
   assert.ok(burb.length >= 1, 'hay burbujas');
   for (const b of burb) {
     assert.equal(M.estacionDe(b.d0, 'city').distrito, 'parque', 'solo en el parque');
-    assert.ok(b.largo >= 70 && b.largo <= 110, 'largo del tramo');
+    if (!b.setos) assert.ok(b.largo >= 70 && b.largo <= 110, 'largo del tramo solo');
   }
   // los contenedores que caen solo son cajones, y solo en los muelles
   const caen = city.filter(o => o.cae);
@@ -403,6 +433,8 @@ test('el generador de City nunca deja una carrera imposible (robot con la físic
   assert.ok(resumen.reduce((s, r) => s + r.grind, 0) > 100, 'se deslizó por barandas');
   assert.ok(resumen.reduce((s, r) => s + r.cuenta.saltos, 0) > 200, 'saltó');
   assert.ok(resumen.reduce((s, r) => s + r.cuenta.rodadas, 0) > 100, 'rodó');
+  assert.ok(resumen.reduce((s, r) => s + r.setos, 0) > 10, 'saltó setos flotando');
+  assert.ok(resumen.reduce((s, r) => s + r.conductos, 0) > 10, 'pasó conductos rodando');
 });
 
 /* ---------- cada mecánica, cuadro a cuadro ---------- */
@@ -410,17 +442,19 @@ test('el generador de City nunca deja una carrera imposible (robot con la físic
 /** Corre en el carril 1 de `desde` a `hasta` a velocidad fija con `objs`,
     haciendo lo que diga `accion(D, r)`; devuelve el choque (o null), la
     altura final y lo que pasó. Misma física que el robot. */
-function tramo(objs, { fps = 60, V = 20, desde = 0, hasta = 60, y0 = 0, vy0 = 0, accion = () => {} }) {
-  const dt = 1 / fps, r = { x: X[1], y: y0, vy: vy0, enAire: y0 > 0, rodar: 0 }, os = objs.map(o => Object.assign({}, o));
-  let D = desde, Dantes = D, lanzado = false, pisado = 0, riel = 0, maxY = y0;
+function tramo(objs, { fps = 60, V = 20, desde = 0, hasta = 60, y0 = 0, vy0 = 0, carril = 1, grav = () => 1, accion = () => {} }) {
+  const dt = 1 / fps, r = { x: X[carril], carril, y: y0, vy: vy0, enAire: y0 > 0, rodar: 0 }, os = objs.map(o => Object.assign({}, o));
+  let D = desde, Dantes = D, lanzado = false, pisado = 0, riel = 0, maxY = y0, minRiel = Infinity;
+  const vl = 2.2 / F.cambioCarril;                                 // cambiarse de carril: 2,2 m en 0,17 s (como juego.js)
   while (D < hasta) {
     Dantes = D; D += V * dt;
     accion(D, r);
+    r.x += Math.max(-vl * dt, Math.min(vl * dt, X[r.carril] - r.x));
     const yAntes = r.y, sop = M.soporte(os, r.x, D, r.y, Dantes);
-    r.vy -= F.gravedad * dt; r.y += r.vy * dt;
+    r.vy -= F.gravedad * grav(D) * dt; r.y += r.vy * dt;
     if (r.y <= sop.h) { r.y = sop.h; r.vy = 0; r.enAire = false; } else if (!r.enAire && r.y > sop.h + 0.05) r.enAire = true;
     if (r.y < 0.35) for (const o of os) if (C.enLona(o, r.x, D, r.y)) { o.usada = true; lanzado = true; r.vy = C.impulsoLona(1); r.enAire = true; }
-    if (sop.apoyo && sop.apoyo.tipo === 'baranda' && !r.enAire) riel += V * dt;
+    if (sop.apoyo && sop.apoyo.tipo === 'baranda' && !r.enAire) { riel += V * dt; minRiel = Math.min(minRiel, r.y); }
     if (r.rodar > 0) r.rodar -= dt;
     maxY = Math.max(maxY, r.y);
     const yb = r.y + 0.02, yt = r.y + (r.rodar > 0 ? F.altoRodando : F.altoDePie);
@@ -428,10 +462,10 @@ function tramo(objs, { fps = 60, V = 20, desde = 0, hasta = 60, y0 = 0, vy0 = 0,
       const k = M.caja(o, D);
       if (!k || k.y1 <= k.y0 || D + M.MEDIO_LARGO < k.z0 || D - M.MEDIO_LARGO > k.z1 || Math.abs(r.x - X[o.carril]) >= k.w + F.medioAncho || yb >= k.y1 || yt <= k.y0) continue;
       if (C.pisa(o, yAntes, r.vy)) { o.roto = true; pisado++; r.vy = M.impulso(1.1); r.enAire = true; continue; }
-      return { choque: o.tipo, D, y: r.y, lanzado, pisado, riel, maxY };
+      return { choque: o.tipo, D, y: r.y, carril: r.carril, lanzado, pisado, riel, maxY, minRiel };
     }
   }
-  return { choque: null, D, y: r.y, lanzado, pisado, riel, maxY };
+  return { choque: null, D, y: r.y, carril: r.carril, lanzado, pisado, riel, maxY, minRiel };
 }
 const RITMOS = [20, 30, 60, 144], VELS = [16, 24, 32, 40, 46];
 /* «De frente choca» se mira desde 60 cuadros/s: a 20 un cuadro avanza
@@ -506,6 +540,121 @@ test('la lona: te lanza por encima de los vagones, a toda velocidad y ritmo de c
   assert.equal(C.enLona({ tipo: 'lona', carril: 1, d: 40 }, X[1], 40, 1.2), false, 'saltando por encima no');
 });
 
+/* ---------- lo propio de cada distrito, cuadro a cuadro ----------
+   Cada uno como lo arma el generador a esa velocidad (las mismas cuentas
+   de city.js), a 20, 30, 60 y 144 cuadros/s y de 16 a 46 m/s. */
+const salto = r => { r.vy = M.impulso(F.alturaSalto); r.enAire = true; };
+const vagones = (c, d0, n) => Array.from({ length: n }, (_, i) => ({ tipo: 'tren', carril: c, d0: d0 + i * (M.LARGO_VAGON + 0.4), largo: M.LARGO_VAGON, vel: 0 }));
+
+test('el cobertizo (Barrio Sur): de frente choca; un salto al techito y otro al vagón te dejan arriba', () => {
+  for (const fps of RITMOS) for (const V of VELS) {
+    const largo = Math.ceil(V * 0.8) + 4, cob = { tipo: 'cobertizo', carril: 1, d0: 40, largo, alto: C.COBERTIZO.alto };
+    const objs = [cob, ...vagones(1, 40 + largo, 2)], fin = 40 + largo + 2 * (M.LARGO_VAGON + 0.4);
+    if (CHOCA(fps)) assert.equal(tramo(objs, { fps, V, desde: 20 }).choque, 'cobertizo', `${fps}/${V}: de frente choca`);
+    // el primer salto, ~0,3 s antes (el salto pasa 1,55 m a los 0,2 s); el segundo, desde el techito, ~0,25 s antes del vagón
+    const accion = (D, r) => {
+      if (!r.enAire && r.y < 0.5 && 40 - D < V * 0.3 && D < 40) salta(r);
+      else if (!r.enAire && Math.abs(r.y - C.COBERTIZO.alto) < 0.05 && 40 + largo - D < V * 0.25) salta(r);
+    }, salta = salto;
+    const r = tramo(objs, { fps, V, desde: 20, hasta: fin - 3, accion });
+    assert.equal(r.choque, null, `${fps}/${V}: no choca`);
+    assert.equal(r.y, M.ALTO_TECHO, `${fps}/${V}: termina sobre el vagón`);
+    // quedarse en el techito sin el segundo salto es chocar con el vagón
+    if (CHOCA(fps)) assert.equal(tramo(objs, { fps, V, desde: 20, hasta: fin, accion: (D, r) => { if (!r.enAire && r.y < 0.5 && 40 - D < V * 0.3 && D < 40) salta(r); } }).choque, 'tren', `${fps}/${V}: sin el segundo salto, el vagón`);
+  }
+  // el techito sostiene solo desde arriba y en su carril
+  const cob = { tipo: 'cobertizo', carril: 1, d0: 40, largo: 20 };
+  assert.equal(M.soporte([cob], X[1], 50, 1.6).h, C.COBERTIZO.alto); assert.equal(M.soporte([cob], X[1], 50, 1).h, 0); assert.equal(M.soporte([cob], X[0], 50, 2.1).h, 0);
+});
+
+test('la viga de grúa (Los Muelles): se salta al comienzo, sube sola hasta 4,2 m y te suelta sobre los vagones', () => {
+  for (const fps of RITMOS) for (const V of VELS) {
+    const sube = Math.ceil(V * 0.35) + 4, largo = sube + Math.ceil(V * 1.2), w0 = 40 + sube + 2;
+    const n = Math.ceil((40 + largo + V * 0.3 + 6 - w0) / (M.LARGO_VAGON + 0.4));
+    const objs = [{ tipo: 'viga', carril: 1, d0: 40, sube, largo }, ...vagones(1, w0, n)], fin = w0 + n * (M.LARGO_VAGON + 0.4);
+    if (CHOCA(fps)) assert.equal(tramo(objs, { fps, V, desde: 20, hasta: fin }).choque, 'tren', `${fps}/${V}: sin subir, los vagones`);
+    let arriba = 0;
+    const r = tramo(objs, { fps, V, desde: 20, hasta: fin - 3, accion: (D, r) => {
+      if (!r.enAire && r.y < 0.5 && 40 - D < V * 0.35 && D < 40) salto(r);   // ~0,35 s antes (el arco de monedas lo marca)
+      if (!r.enAire && r.y > 4) arriba++;
+    } });
+    assert.equal(r.choque, null, `${fps}/${V}: no choca`);
+    assert.ok(arriba > 0, `${fps}/${V}: llegó arriba de la viga`);
+    assert.equal(r.y, M.ALTO_TECHO, `${fps}/${V}: la viga lo suelta sobre los vagones`);
+  }
+  // la altura de la viga, a lo largo
+  const v = { tipo: 'viga', carril: 1, d0: 40, sube: 10, largo: 40 };
+  assert.equal(C.alturaViga(v, 40), C.VIGA.y0); assert.equal(C.alturaViga(v, 50), C.VIGA.y1); assert.equal(C.alturaViga(v, 70), C.VIGA.y1);
+  assert.equal(M.soporte([v], X[1], 45, 0.2).h, 0, 'desde el suelo no se agarra'); assert.equal(M.soporte([v], X[0], 60, 4.2).h, 0, 'solo en su carril');
+});
+
+test('los rieles en zigzag (Bulevar Aurora): se cruzan los tres carriles sin tocar el suelo', () => {
+  for (const fps of RITMOS) for (const V of VELS) {
+    const solape = Math.ceil(V * 0.35) + 4, rieles = [];
+    let d0 = 40, fin = 40;
+    [0, 1, 2].forEach((k, i) => {
+      const largo = i === 0 ? Math.ceil(V * 0.75) + 10 : Math.ceil(V * 0.9) + 10;
+      if (i > 0) d0 = fin - solape;
+      rieles.push({ tipo: 'baranda', carril: k, d0, largo, alto: C.BARANDA.alto, zigzag: i + 1 }); fin = d0 + largo;
+    });
+    const r = tramo(rieles, { fps, V, desde: 20, hasta: fin - 2, carril: 0, accion: (D, r) => {
+      if (!r.enAire && r.y < 0.5 && 39.7 - D < V * 0.2 + 0.4 && D < 39.7) salto(r);
+      // a mitad del solape, al riel siguiente (cambiarse tarda 0,17 s; el solape dura ~0,35)
+      for (let i = 1; i < 3; i++) if (r.carril === i - 1 && r.y >= 0.9 && !r.enAire && D > rieles[i].d0 + 1) r.carril = i;
+    } });
+    assert.equal(r.choque, null, `${fps}/${V}: no choca`);
+    assert.equal(r.carril, 2, `${fps}/${V}: llegó al tercer riel`);
+    assert.ok(r.minRiel >= C.BARANDA.alto - 1e-9, `${fps}/${V}: no tocó el suelo (${r.minRiel})`);
+    assert.ok(r.riel > rieles[1].largo + rieles[2].largo - 2 * solape, `${fps}/${V}: se deslizó por los tres (${r.riel.toFixed(1)} m)`);
+  }
+});
+
+test('el conducto (Bajo Vías): una rodada no alcanza; volver a rodar en el anillo, sí', () => {
+  for (const fps of RITMOS) for (const V of VELS) {
+    const largo = Math.ceil(V * 0.85) + 2, anillo = 40 + Math.round((largo - 0.1 * V - 0.3) / 2), con = { tipo: 'conducto', carril: 1, d0: 40, largo, anillo };   // como lo arma city.js
+    if (CHOCA(fps)) assert.equal(tramo([con], { fps, V, desde: 20 }).choque, 'conducto', `${fps}/${V}: de pie choca`);
+    const una = tramo([con], { fps, V, desde: 20, hasta: 40 + largo + 5, accion: (D, r) => { if (r.rodar <= 0 && D < 40 && 40 - D < V * 0.1 + 0.6) r.rodar = F.tiempoRodar; } });
+    if (CHOCA(fps)) assert.equal(una.choque, 'conducto', `${fps}/${V}: una sola rodada no alcanza`);
+    const dos = tramo([con], { fps, V, desde: 20, hasta: 40 + largo + 5, accion: (D, r) => {
+      if (r.rodar <= 0 && D < 40 && 40 - D < V * 0.1 + 0.6) r.rodar = F.tiempoRodar;
+      else if (D >= anillo && D < anillo + V / fps + 0.01) r.rodar = F.tiempoRodar;   // en el anillo, «abajo» otra vez
+    } });
+    assert.equal(dos.choque, null, `${fps}/${V}: rodando otra vez en el anillo pasa`);
+  }
+  // por arriba se camina (sostiene a 3,35 m) y rodando bajo él no se choca
+  const con = { tipo: 'conducto', carril: 1, d0: 40, largo: 30 };
+  assert.equal(M.soporte([con], X[1], 50, 3.3).h, C.CONDUCTO.alto); assert.ok(F.altoRodando < C.CONDUCTO.y0, 'rodando cabe debajo');
+});
+
+test('los setos (Parque): de un salto normal no se pasan; con el salto que flota de las burbujas, sí', () => {
+  const g = C.BURBUJAS.gravedad;
+  for (const fps of RITMOS) for (const V of VELS) {
+    const seto = { tipo: 'seto', carril: 1, d: 60 };
+    const accion = (D, r) => { if (!r.enAire && 60 - D < V * 0.5 && D < 60) salto(r); };
+    if (CHOCA(fps)) assert.equal(tramo([seto], { fps, V, desde: 20, hasta: 80, accion }).choque, 'seto', `${fps}/${V}: sin burbujas choca`);
+    const r = tramo([seto], { fps, V, desde: 20, hasta: 60 + V * 1.3, accion, grav: () => g });
+    assert.equal(r.choque, null, `${fps}/${V}: flotando pasa`);
+    assert.ok(r.maxY > C.SETO.alto, `${fps}/${V}: le pasa por encima`);
+  }
+  assert.ok(M.impulso(F.alturaSalto) ** 2 / (2 * F.gravedad) < C.SETO.alto - 0.5, 'un salto normal ni se le acerca');
+});
+
+test('cada distrito trae lo suyo, y solo el suyo', () => {
+  const propio = { cobertizo: 'sur', viga: 'muelles', conducto: 'bajo', seto: 'parque' };
+  for (const modo of ['city', 'citypuro']) for (const semilla of [11, 2026, 90210]) {
+    const objs = pista(semilla, 10500, modo).objs, cuenta = {};
+    for (const o of objs) {
+      const d = M.estacionDe(o.d ?? o.d0, modo).distrito;
+      if (propio[o.tipo]) { assert.equal(d, propio[o.tipo], `${modo} ${semilla}: ${o.tipo} fuera de su distrito (${d})`); cuenta[o.tipo] = (cuenta[o.tipo] || 0) + 1; }
+      if (o.zigzag === 1) { assert.equal(d, 'bulevar', `${modo} ${semilla}: zigzag fuera del Bulevar`); cuenta.zigzag = (cuenta.zigzag || 0) + 1; }
+      if (o.tipo === 'burbujas') assert.ok(o.setos >= 2, `${modo} ${semilla}: burbujas sin setos`);
+    }
+    // a menudo: varias veces por distrito (Bajo Vías empieza a los 9 km: hasta 10,5 hay 1,5)
+    for (const [t, min] of [['cobertizo', 3], ['viga', 4], ['zigzag', 5], ['conducto', 3], ['seto', 12]]) assert.ok((cuenta[t] || 0) >= min, `${modo} ${semilla}: pocos ${t} (${cuenta[t] || 0})`);
+  }
+  assert.deepEqual(C.PROPIO, { sur: 'cobertizo', muelles: 'viga', bulevar: 'zigzag', bajo: 'conducto' });
+});
+
 /* ---------- el antitrampas ---------- */
 
 /* Una carrera de City como la anota juego.js: los pedidos (túneles y
@@ -562,6 +711,9 @@ test('el juego engancha City en pocos lugares, y todo lo que choca o se recoge s
     assert.match(juego, re);
   // los objetos de City se dibujan (con el «!» de lo que se esquiva o se recoge)
   for (const f of ['cajonCity', 'dronCity', 'barandaCity', 'lonaCity', 'vaporCity', 'estrellaSecreta', 'chicle']) assert.match(dibujo, new RegExp(`\\n  ${f}\\(\\) \\{`), f);
+  for (const f of ['cobertizoCity', 'vigaCity', 'conductoCity', 'setoCity']) assert.match(dibujo, new RegExp(`\\n  ${f}\\(\\) \\{`), f);
+  // todo tipo que City registra en el motor (choca o sostiene) tiene su dibujo
+  for (const t of ['cajon', 'dron', 'baranda', 'lona', 'rejilla', 'burbujas', 'cobertizo', 'viga', 'conducto', 'seto']) { assert.ok(M.TIPOS[t], t); assert.match(dibujo, new RegExp(`o\\.tipo === '${t}'`), t + ': se dibuja'); }
   const obj = dibujo.slice(dibujo.indexOf('\n  cajonCity() {'), dibujo.indexOf('\n  pasosCity(pre) {'));
   for (const m of obj.matchAll(/'((?:pintura|plano|luz|metal|personaje|tex:[\w|]+|texluz:[\w|]+))(!?)'/g)) assert.equal(m[2], '!', 'material de juego sin «!»: ' + m[1]);
   assert.match(mundo, /export const GANCHOS/); assert.match(mundo, /GANCHOS\.objeto \? GANCHOS\.objeto\(kit, o\)/);

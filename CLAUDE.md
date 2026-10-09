@@ -4016,6 +4016,40 @@ Things that matter:
   `hashD(d, k)`, so adding one never moves the rest of a seed's track (the
   robot test that runs every seed found that the hard way). Speed pads are
   left out on purpose: the anti-cheat recomputes speed from distance.
+
+  **Each district plays differently, it is not a reskin.** Each one has
+  its own piece (`PROPIO` in `city.js`) that shows up only there, on its
+  own rhythm (`st.propio`, 110–220 m after the last one ends). If it does
+  not fit, it is tried again 12 m later instead of waiting for the next
+  City block. Barrio Sur has the **cobertizo**: a 2 m shed glued to wagons
+  with no ramp, two jumps up, the upper route. Los Muelles has the
+  **viga**: a crane beam rising from 1.9 to 4.2 m that you jump onto about
+  0.35 s early. It drops you on the roofs, and `alturaViga` is its support.
+  Bulevar Aurora has the **zigzag**: two or three barandas that overlap by
+  0.35·V + 4 m across the lanes. Landing on a different rail without
+  touching the ground is a *transbordo*, and the rail's coins pay ×2, ×3,
+  ×4 (`ciudad.js`). Bajo Vías has the **conducto**: a duct from 1.0 to
+  3.35 m, longer than one roll and shorter than two. Its orange ring sits
+  halfway between where a new roll reaches the exit and where a roll
+  started at the mouth ends, and it can have a vapor vent beside it to the
+  roofs. Its mouth carries a lit frame and a down-arrow sign, not stretched
+  with the duct: head-on, in neon, a plain duct read as a solid wall. The park's **setos** (2.8 m hedges) are passable only with the
+  bubbles' floating jump. Burbujas therefore always come with their hedge
+  race (`setos()`, wall spacing 2·V + 6), never loose over ordinary rows,
+  and never cross into the next district. Before, a stray floating jump
+  carried you 60 m and dropped you on the next barrier. The common blocks
+  are a weighted draw per district (`PESOS`). Three generator rules came
+  out of a robot sweep over 80 seeds × 4 frame rates (zero crashes at 30
+  fps and up):
+  - after a wagon run, `trenes` reserves its lane for 0.4·V;
+  - a hedge lane cannot be entered without time to jump;
+  - `M.activaTren` moves forward an oncoming train placed in the first
+    170 m. It used to start late and cross 30 m past its row, on the safe
+    path.
+
+  `tests/metrorush-city.test.cjs` checks each piece frame by frame (20–144
+  fps, 16–46 m/s), and that each one appears only in its district and
+  often.
 - **Fullscreen**: ⛶ on the title screen and in the pause panel, or `F`,
   calls `requestFullscreen` on the document (webkit fallback; the button
   hides where the API is missing, i.e. iPhone). `html.mr-pc` (and

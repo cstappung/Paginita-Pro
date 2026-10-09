@@ -65,11 +65,14 @@ export function crearCiudad({ M, sonido, aviso }) {
     llena() { for (const [k, f] of [[0, 523], [1, 659], [2, 784], [3, 1047]]) setTimeout(() => sonido.nota(f, 0.12, 0.06, 'p25'), k * 60); },   // tabla cargada: un arpegio
     rebote() { sonido.nota(260, 0.22, 0.09, 'tri', { f1: 620 }); },   // ¡boing! de la burbuja
     rejilla() { sonido.nota(180, 0.18, 0.09, 'p12', { f1: 90 }); sonido.soplo(0.2, 0.12, 1.2, { corto: true }); },   // la rejilla que cede
+    transbordo(n) { sonido.nota(587 + n * 147, 0.1, 0.07, 'p25', { f1: 880 + n * 220 }); },   // saltar de riel a riel: más agudo con cada transbordo
+    viga() { sonido.nota(110, 0.2, 0.08, 'p12', { f1: 220 }); sonido.soplo(0.08, 0.05, 2, { corto: true }); },   // agarrar la viga: un «clanc» de metal
     doble() { sonido.nota(880, 0.14, 0.06, 'p25', { f1: 1320 }); }   // el poder de monedas ×2
   };
 
   /** Lo que dice el resumen según con qué chocaste (se suma a MOTIVOS de juego.js). */
-  const MOTIVOS = { cajon: 'Chocaste con unos cajones', dron: 'Te diste con un dron', baranda: 'Chocaste con una baranda' };
+  const MOTIVOS = { cajon: 'Chocaste con unos cajones', dron: 'Te diste con un dron', baranda: 'Chocaste con una baranda',
+    cobertizo: 'Chocaste con un cobertizo', conducto: 'Te diste contra un conducto', seto: 'Te enredaste en un seto' };
 
   return {
     MOTIVOS,
@@ -95,7 +98,9 @@ export function crearCiudad({ M, sonido, aviso }) {
         monedas2: 0,                                             // segundos que le quedan a «monedas ×2»
         reboto: false, doble: false,                             // ya rebotó con el chicle / ya usó el doble salto (en este salto)
         enBurbuja: false,                                        // está dentro de un tramo de burbujas (baja gravedad)
-        enAireAntes: false, golpeAntes: false                    // al empezar el cuadro: ¿en el aire? ¿bajando de golpe? (para la rejilla)
+        enAireAntes: false, golpeAntes: false,                   // al empezar el cuadro: ¿en el aire? ¿bajando de golpe? (para la rejilla)
+        riel: null, transbordos: 0,                              // el riel en que vas (zigzag) y cuántas veces saltaste de uno a otro sin tocar el suelo
+        enViga: false, vigas: 0                                  // ¿vas sobre una viga de grúa?, y cuántas agarraste
       } : null;
     },
     /** Cuánto más alto salta (Nico: ×1,08; con chicle, un 15 % más, como en City). Solo cambia la altura. */
@@ -168,10 +173,20 @@ export function crearCiudad({ M, sonido, aviso }) {
       // 2) la baranda: subido al riel (es lo que te sostiene y no vas en el aire) te deslizas
       const riel = sop && sop.apoyo && sop.apoyo.tipo === 'baranda' && !r.enAire;
       if (riel) {
+        /* Un riel distinto del anterior sin haber tocado el suelo es un
+           TRANSBORDO (los rieles en zigzag del Bulevar): cada uno suma 1 al
+           multiplicador de las monedas del riel, hasta ×4. Ejemplo: tres
+           rieles hechos enteros, el tercero paga 3 monedas cada 2 m. */
+        if (C.riel && C.riel !== sop.apoyo) {
+          C.transbordos = Math.min(3, C.transbordos + 1);
+          son.transbordo(C.transbordos);
+          aviso(`¡Transbordo! Monedas ×${C.transbordos + 1}`);
+        }
+        C.riel = sop.apoyo;
         C.grind += c.V * dt;
         while (C.grind >= 2) {                                   // una moneda cada 2 m (Bruno: dos)
           C.grind -= 2;
-          const n = (C.ventaja.grind || 1) * (C.monedas2 > 0 ? 2 : 1);   // Bruno: dos; con monedas ×2, el doble
+          const n = (C.ventaja.grind || 1) * (C.monedas2 > 0 ? 2 : 1) * (1 + C.transbordos);   // Bruno: dos; con monedas ×2, el doble; cada transbordo, uno más
           c.monedas += n; c.cuenta.monedas += n;
         }
         C.grindSon -= dt;
@@ -180,8 +195,13 @@ export function crearCiudad({ M, sonido, aviso }) {
           if (mundo) mundo.chispa(r.x, r.y + 0.05, 0, 0xffd27a);
         }
       } else C.grind = 0;
-      // 3) en el suelo se recuperan el rebote del chicle y el doble salto
+      // 3) en el suelo se recuperan el rebote del chicle y el doble salto (y en el suelo de verdad se corta la racha de transbordos)
       if (!r.enAire) { C.reboto = false; C.doble = false; }
+      if (!r.enAire && !riel) { C.riel = null; C.transbordos = 0; }
+      // la viga de la grúa: al agarrarla, un «clanc» (y la primera vez, qué hacer)
+      const viga = !!(sop && sop.apoyo && sop.apoyo.tipo === 'viga' && !r.enAire);
+      if (viga && !C.enViga) { C.vigas++; son.viga(); if (C.vigas === 1) aviso('¡Agarraste la viga! Te deja sobre los vagones'); }
+      C.enViga = viga;
       // 4) la rejilla: caerle encima de golpe (el pisotón) la abre y suelta su escondite de monedas
       if (C.enAireAntes && C.golpeAntes && !r.enAire && r.y < 0.3) for (const o of c.activos) {
         if (o.tipo !== 'rejilla' || o.abierta || Math.abs(o.d - c.D) > CITY.REJILLA.largo / 2 + 0.6 || Math.abs(r.x - M.CARRILES[o.carril]) > CITY.REJILLA.w) continue;

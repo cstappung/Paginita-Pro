@@ -1086,7 +1086,12 @@ const REGLAS = {
         "<b>Barandas</b>: saltando te subes y te deslizas por el riel juntando monedas. <b>Lonas</b> (y el vapor de Bajo Vías): te mandan por encima de los vagones.",
         "<b>Celdas de energía</b> (⚡): con 10 la <b>tabla eléctrica</b> se enciende gratis (H o dos toques) y dura 15 s, como una patineta. La <b>batería</b> la llena de una. Solo en City, que tiene patinetas.",
         "<b>Rejillas</b> en el suelo que tiemblan: cáeles encima de golpe (rodar en el aire) y se abren con un chorro de monedas.",
-        "<b>Burbujas</b> (Parque de los Lagos): un tramo donde se flota y, en el aire, se puede saltar una vez más.",
+        "Cada distrito tiene <b>lo suyo</b>, que solo sale ahí y cambia cómo se corre:",
+        "<b>Barrio Sur · cobertizos</b>: una caseta de 2 m al pie de unos vagones sin rampa. Salta al techito y, de ahí, otra vez al techo del vagón. El camino de abajo sigue libre.",
+        "<b>Los Muelles · vigas de grúa</b>: una viga amarilla que sube sola de 1,9 a 4,2 m. Salta un poco antes de que empiece (las monedas marcan el arco) y te deja caer sobre los vagones.",
+        "<b>Bulevar Aurora · rieles en zigzag</b>: dos o tres barandas que cruzan los carriles. Deslizándote, cámbiate al riel siguiente sin tocar el suelo: cada <b>transbordo</b> multiplica las monedas del riel (×2, ×3, ×4).",
+        "<b>Parque de los Lagos · setos en las burbujas</b>: en las burbujas se flota y, en el aire, se puede saltar una vez más. Ahí hay muros de setos de 2,8 m que un salto normal no pasa: solo el que flota.",
+        "<b>Bajo Vías · conductos</b>: un ducto colgado sobre el carril, más largo que una rodada. Rueda al entrar y vuelve a rodar en el <b>anillo naranja</b> (cada «abajo» reinicia la rodada). Al lado, el vapor te sube a los techos.",
         "<b>Chicle</b>: te salva de un choque, saltas un poco más y rodar en el aire te hace rebotar hacia arriba. <b>Monedas ×2</b> (15 s): cada moneda vale dos (no cambia los puntos).",
         "Las <b>estrellas secretas</b> están escondidas en las rutas difíciles. Los <b>personajes de City</b> (Lía, Nico, Ámbar, Bruno, Sol y Dante) se compran en la tienda y cada uno trae una ventaja pequeña que no toca los puntos: más imán, más salto, más monedas al pisar o al deslizarte, más impulso en las lonas o energía que vale por dos."
       ])],

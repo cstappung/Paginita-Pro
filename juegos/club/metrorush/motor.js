@@ -790,6 +790,22 @@
     return { tipo: "tren", carril, d0, largo: LARGO_VAGON, vel: VEL_TREN, dArribo };
   }
 
+  /** Echa a andar un tren que viene de frente cuando el corredor llega a
+      `dArribo − APARECE` (D es donde va, V su velocidad). Devuelve si está
+      andando. Un tren puesto en los primeros 170 m ya debía haber partido
+      antes de la largada: si se lo dejaba en su d0, andaba menos tiempo del
+      calculado y se cruzaba ~30 m después de su fila, justo en el carril que
+      el camino seguro usaba ahí. Así que, al partir tarde, se adelanta a
+      donde ya habría llegado. No toca la pista (el generador ni el
+      antitrampas lo ven): solo dónde arranca. */
+  function activaTren(o, D, V) {
+    if (o.activo) return true;
+    if (D < o.dArribo - APARECE) return false;
+    o.activo = true;
+    o.d0 = Math.min(o.d0, o.dArribo + o.vel * Math.max(0, o.dArribo - D) / Math.max(8, V || 13));
+    return true;
+  }
+
   /** La velocidad con que el corredor llega al metro `d` (sin contar choques),
       para poner los trenes que vienen de frente. Sale de la distancia y no
       de cuándo se genera la pista: así la pista depende solo de la semilla
@@ -1110,7 +1126,7 @@
   /* ---------- Lo que se exporta ---------- */
   return {
     rng, lerp, limita,
-    CARRILES, LARGO_VAGON, ALTO_TECHO, LARGO_RAMPA, FISICA, impulso, VELOCIDAD, T_TOPE, velocidad, metrosEntre, FRENADA, velocidadEn, FILA_MIN_S, VEL_TREN, APARECE, dificultad,
+    CARRILES, LARGO_VAGON, ALTO_TECHO, LARGO_RAMPA, FISICA, impulso, VELOCIDAD, T_TOPE, velocidad, metrosEntre, FRENADA, velocidadEn, FILA_MIN_S, VEL_TREN, APARECE, activaTren, dificultad,
     hazCurva, CURVA, velocidadDe,
     MODOS, ORDEN_MODOS, modoDe, modoDeCategoria, MUNDOS, mundoDe, historiaDe, ESTACIONES_CITY, INTRO_CITY, BOLETOS_CITY, TIPOS, registraTipo,
     recordDe, anotaRecord,

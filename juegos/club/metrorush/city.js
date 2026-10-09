@@ -56,6 +56,23 @@
      · BURBUJAS (Parque de los Lagos): un tramo de baja gravedad, como las
        burbujas de DeLorean Park: los saltos flotan y en el aire se puede
        saltar una vez más (el doble salto).
+   Y lo que hace que cada distrito se JUEGUE distinto (no solo que se vea
+   distinto): cada uno tiene un objeto propio que pide otro verbo.
+     · BARRIO SUR · COBERTIZOS: un techito de 2 m pegado a dos o tres
+       vagones sin rampa. Se sube con DOS saltos: al techito y, desde ahí,
+       al techo del vagón (la ruta de arriba, con sus monedas).
+     · LOS MUELLES · VIGAS DE GRÚA: una viga que cuelga de la grúa, empieza
+       a 1,9 m y sube a 4,2 m por encima de los contenedores. Se salta a
+       ella y te sube; al final te deja sobre los vagones.
+     · BULEVAR AURORA · RIELES EN ZIGZAG: dos o tres barandas que se
+       solapan cruzando los carriles. Deslizándote, te cambias al riel de
+       al lado sin tocar el suelo; cada transbordo multiplica las monedas.
+     · PARQUE DE LOS LAGOS · SETOS: setos de 2,8 m, más altos que un salto
+       normal (2,1 m), solo dentro de las burbujas, donde el salto flota
+       (3,8 m). Las burbujas dejan de ser un adorno: son la manera de pasar.
+     · BAJO VÍAS · CONDUCTOS: un ducto de 1 a 3,35 m sobre el carril, más
+       largo que una rodada. Se entra rodando y hay que VOLVER a rodar en el
+       anillo de luz antes de salir.
    Nada de esto cambia cómo se calculan los puntos: siguen siendo 10 por
    metro × el multiplicador, y el multiplicador solo cambia con estrellas,
    el 2× y el +5. Por eso la prueba (prueba.js) no necesitó eventos nuevos.
@@ -194,6 +211,51 @@
   M.registraTipo("rejilla", { caja: () => null });             // la rejilla del pisotón
   M.registraTipo("burbujas", { caja: () => null });            // el tramo de baja gravedad
 
+  /* ---------- Lo propio de cada distrito ----------
+     Las medidas que comparten el generador (abajo), el juego (choques y lo
+     que sostiene, por M.caja y M.soporte) y el dibujo (mundo-city.js). */
+  const ANCHO_PISO = 0.95 + FISICA.medioAncho;                 // hasta dónde de su carril sostiene algo de 0,95 m de medio ancho (lo mismo que choca)
+  /* El COBERTIZO (Barrio Sur): choca hasta 1,55 m y sostiene a 2 m. Un
+     salto desde el suelo pasa de 1,55 m entre los 0,20 y los 0,61 s; desde
+     el techito, un salto pasa de 2,85 m (lo que pide el techo del vagón)
+     entre los 0,09 y los 0,71 s: los dos saltos tienen ventana de sobra. */
+  const COBERTIZO = { alto: 2.0, choca: 1.55, w: 0.95 };
+  /* El CONDUCTO (Bajo Vías): de 1 m (rodando ocupas 0,8) a 3,35 m, el alto
+     de un vagón: arriba es un techo más, que se camina desde los trenes. */
+  const CONDUCTO = { y0: 1.0, alto: ALTO_TECHO, w: 0.95 };
+  /* El SETO (el parque): 2,8 m. Un salto normal llega a 2,1 m (Nico, 2,27);
+     en las burbujas, a 3,82 m, y pasa de 2,8 m entre los 0,35 y los 1,11 s
+     después de saltar: casi un segundo de ventana. */
+  const SETO = { alto: 2.8, largo: 1.2, w: 0.95 };
+  /* La VIGA de la grúa (Los Muelles): sus pies van a 1,9 m al comienzo y a
+     4,2 m pasada la subida (`o.sube` m). Se agarra desde 0,6 m por debajo:
+     un salto normal (2,1 m) la toma al comienzo. Nada de ella choca: cuelga. */
+  const VIGA = { y0: 1.9, y1: 4.2, agarra: 0.6, w: 0.95 };
+  /** La altura de la viga `o` en D (lo que pisan los pies). Ejemplo: con sube 12, a 6 m del comienzo va a 3,05 m. */
+  const alturaViga = (o, D) => VIGA.y0 + (VIGA.y1 - VIGA.y0) * limita((D - o.d0) / o.sube, 0, 1);
+
+  M.registraTipo("cobertizo", {
+    caja: o => ({ z0: o.d0, z1: o.d0 + o.largo, y0: 0, y1: COBERTIZO.choca, w: COBERTIZO.w }),
+    /* Sostiene a 2 m desde 0,02 m bajo el borde que choca (los pies van
+       0,02 m sobre su altura): así no queda franja en que ni choca ni sostiene. */
+    soporte: (o, x, D, y) => (D >= o.d0 - 0.4 && D <= o.d0 + o.largo + 0.4 && Math.abs(x - CARRILES[o.carril]) < ANCHO_PISO && y >= COBERTIZO.choca - 0.02 ? COBERTIZO.alto : null)
+  });
+  M.registraTipo("conducto", {
+    caja: o => ({ z0: o.d0, z1: o.d0 + o.largo, y0: CONDUCTO.y0, y1: CONDUCTO.alto, w: CONDUCTO.w }),
+    // arriba es como el techo de un vagón: sostiene a 3,35 m si ya vas casi a esa altura
+    soporte: (o, x, D, y) => (D >= o.d0 - 0.4 && D <= o.d0 + o.largo + 0.4 && Math.abs(x - CARRILES[o.carril]) < ANCHO_PISO && y >= CONDUCTO.alto - 0.5 ? CONDUCTO.alto : null)
+  });
+  M.registraTipo("seto", { caja: o => ({ z0: o.d - SETO.largo / 2, z1: o.d + SETO.largo / 2, y0: 0, y1: SETO.alto, w: SETO.w }) });
+  M.registraTipo("viga", {
+    caja: () => null,                                          // cuelga de cables: por debajo se pasa (y en su carril vienen vagones)
+    soporte: (o, x, D, y) => {
+      if (D < o.d0 - 0.3 || D > o.d0 + o.largo) return null;   // antes o después de la viga
+      if (Math.abs(x - CARRILES[o.carril]) >= VIGA.w) return null;   // un poco más angosta: cambiarse de carril te suelta
+      const h = alturaViga(o, D);
+      return y >= h - VIGA.agarra ? h : null;                  // a su altura, o casi: te agarras (y te sube con ella)
+    }
+  });
+
   /* Las medidas de lo nuevo de City (las usan ciudad.js y mundo-city.js). */
   const ENERGIA_LLENA = 10;                                    // celdas para encender la tabla (como en City)
   const TABLA_SEG = 15;                                        // lo que dura la tabla encendida con energía
@@ -263,30 +325,51 @@
      El estado propio (cuándo toca el próximo bloque, el próximo chicle, la
      próxima estrella secreta) vive en `api._city`: el `api` es de cada
      generador, así dos pistas nunca se pisan el estado. */
-  const PESOS = {                                              // qué bloque sale más en cada distrito
-    sur: { cajones: 3, lonas: 2, baranda: 1.5, drones: 0.6 },
-    muelles: { cajones: 3.5, lonas: 1.6, baranda: 1.2, drones: 0.6 },
-    bulevar: { baranda: 3, lonas: 1.8, cajones: 1.2, drones: 1 },
-    parque: { lonas: 3, baranda: 1.4, cajones: 1.5, drones: 0.6 },
-    bajo: { drones: 3.4, lonas: 2.4, baranda: 1.5, cajones: 1 }
+  /* Cada distrito tiene su bloque PROPIO (cobertizo, viga, zigzag,
+     conducto; el parque, los setos dentro de las burbujas), que llega con
+     su propio ritmo: a los 110 a 220 m de terminar el anterior, garantizado. Es lo que hace que un
+     distrito se juegue distinto y no sea solo otra pintura. Entre medio, un
+     sorteo de los bloques comunes, con pesos según el distrito. */
+  const PROPIO = { sur: "cobertizo", muelles: "viga", bulevar: "zigzag", bajo: "conducto" };
+  const PESOS = {                                              // los bloques comunes que salen más en cada distrito
+    sur: { cajones: 2.5, lonas: 1.2, baranda: 0.8, drones: 0.4 },
+    muelles: { cajones: 3, lonas: 0.8, baranda: 0.6, drones: 0.6 },   // (los cajones de Los Muelles caen de las grúas)
+    bulevar: { baranda: 1.5, lonas: 1, drones: 1, cajones: 0.8 },
+    parque: { lonas: 3, cajones: 1.5, baranda: 1.2, drones: 0.4 },
+    bajo: { drones: 2.5, lonas: 2.5, baranda: 0.8, cajones: 0.6 }    // (la «lona» de Bajo Vías es el respiradero de vapor)
   };
   const generador = {
     bloque(api, dif, ctx) {
-      const st = api._city || (api._city = { sig: 150, chicle: 700, secreta: 600, bateria: 900, monedas2: 1200, rejilla: 300, burbujas: 0 });
+      const st = api._city || (api._city = { sig: 150, chicle: 700, secreta: 600, bateria: 900, monedas2: 1200, rejilla: 300, burbujas: 0, propio: 220 });
+      const est0 = M.estacionDe(api.dSig, api.modo);              // en el Barrio Sur los bloques propios vienen un poco más espaciados (es el primero: se aprende)
       if (api.dSig < st.sig) return false;                        // todavía no toca: un bloque de siempre
       const dr = api.dSig, est = M.estacionDe(dr, api.modo);      // el distrito donde cae el bloque
-      /* En el parque, cada 400 a 700 m, un tramo de burbujas (baja gravedad)
-         sobre los tres carriles, encima de lo que venga. No choca ni cierra
-         nada: el camino sigue siendo el mismo, solo se salta más alto. */
+      /* En el parque, cada 180 a 330 m, un tramo de burbujas (baja gravedad)
+         con su carrera de SETOS, lo que solo se pasa flotando. Siempre con
+         sus setos: un tramo de burbujas suelto, encima de filas de siempre,
+         hacía flotar ~60 m un salto cualquiera y caer justo encima de la
+         barrera siguiente. Si los carriles todavía están ocupados se vuelve
+         a probar a los 12 m. */
       if (est.distrito === "parque" && dr >= st.burbujas) {
-        const largo = 70 + Math.floor(hashD(dr, 1) * 40);
-        api.emite({ tipo: "burbujas", carril: 1, d0: dr, largo });
-        st.burbujas = dr + largo + 400 + hashD(dr, 2) * 300;
+        if (setos(api, dif, st)) { st.sig = api.dSig; return true; }
+        st.sig = dr + 12; return false;
+      }
+      /* El bloque propio del distrito, cuando le toca. Si no cabe (el camino
+         o los carriles todavía ocupados), sigue tocándole: se vuelve a probar
+         a los 12 m. */
+      const propio = PROPIO[est.distrito];
+      if (propio && dr >= st.propio) {
+        if (BLOQUES[propio](api, dif, ctx, st, est)) {
+          st.propio = api.dSig + lerp(170, 110, dif) + hashD(dr, 15) * 50;   // el próximo (sin tocar el azar de la pista)
+          st.sig = api.dSig + lerp(50, 25, dif);                 // y un respiro de bloques de siempre antes del sorteo
+          return true;
+        }
+        st.sig = dr + 12; return false;
       }
       const pesos = PESOS[est.distrito] || PESOS.sur;
-      const tipo = api.elige(pesos);
-      const hecho = BLOQUES[tipo](api, dif, ctx, st, est);
-      st.sig = api.dSig + lerp(140, 60, dif) + api.azar() * 50;  // el próximo bloque de City
+      const hecho = BLOQUES[api.elige(pesos)](api, dif, ctx, st, est);
+      // si no cupo, se vuelve a probar pronto: si no, un distrito pasaba cuadras enteras sin nada suyo
+      st.sig = hecho ? api.dSig + (est0.distrito === "sur" ? lerp(150, 80, dif) : lerp(140, 60, dif)) + api.azar() * 50 : dr + 12;
       return hecho;
     }
   };
@@ -340,7 +423,11 @@
   function trenes(api, c, d0, n) {
     for (let k = 0; k < n; k++) api.emite({ tipo: "tren", carril: c, d0: d0 + k * (LARGO_VAGON + 0.4), largo: LARGO_VAGON, vel: 0 });
     const fin = d0 + n * (LARGO_VAGON + 0.4);
-    api.libre[c] = fin + 4;
+    /* El carril queda reservado un poco más allá del último vagón: si el
+       camino se pasa a él justo ahí, cambiarse (0,17 s) y prepararse para
+       lo que venga (rodar, saltar) pide ~0,4 s. Con 4 m fijos, a 31 m/s el
+       robot del test no alcanzaba a entrar antes de un dron. */
+    api.libre[c] = fin + Math.max(4, api.velocidadEn(fin) * 0.4);
     return fin;
   }
 
@@ -415,8 +502,185 @@
       api.dSig = Math.max(dr + espacio(api, dif, dr), d0 + 10);
       regalo(api, st, c, dr + 10);
       return true;
-    }
+    },
+    /** BARRIO SUR · un COBERTIZO al pie de dos o tres vagones sin rampa, en
+        un carril que no es el camino (la ruta de arriba). Dos saltos: al
+        techito (2 m) y de ahí al techo del vagón. El camino sigue libre. */
+    cobertizo(api, dif, ctx, st) {
+      const dr = api.dSig, c = api.camino, V = api.velocidadEn(dr);
+      // como la lona: un carril libre hace rato (quien baja de un techo toca el suelo antes de llegar)
+      const op = [0, 1, 2].filter(k => k !== c && api.libre[k] <= dr - V * 0.55);
+      if (!op.length || api.libre[c] > dr) return false;
+      const L = op[Math.floor(hashD(dr, 6) * op.length)];       // el carril del cobertizo (sin tocar el azar de la pista)
+      const largo = Math.ceil(V * 0.8) + 4;                      // ~0,8 s sobre el techito: aterrizar tarde y aun así saltar a tiempo
+      api.emite({ tipo: "cobertizo", carril: L, d0: dr, largo, alto: COBERTIZO.alto });
+      rejilla(api, st, c, dr + 4);                               // el camino, abajo: a veces una rejilla del pisotón
+      const n = 2 + (hashD(dr, 7) < dif ? 1 : 0);                // dos vagones (tres, si es difícil), pegados al techito
+      const fin = trenes(api, L, dr + largo, n);
+      if (!api.peligro) {
+        for (let i = 1; i <= 3; i++) api.emite({ tipo: "moneda", carril: L, d: dr - 6 + i * 1.6, y: 0.9 + i * 0.5 });   // la subida al techito
+        api.filaMonedas(L, dr + 2, largo - 4, COBERTIZO.alto + 0.9);                                               // el techito
+        api.filaMonedas(L, dr + largo + 2, fin - dr - largo - 4, ALTO_TECHO + 0.9);                                 // los techos
+        api.filaMonedas(c, dr - 2, Math.min(14, fin - dr - 4));                                                     // y el camino
+      }
+      secreta(api, st, L, fin - LARGO_VAGON * 0.5, ALTO_TECHO + 1.6);   // sobre el último vagón: solo por arriba
+      energia(api, L, dr + largo + 3, ALTO_TECHO + 1.9);
+      const tercero = [0, 1, 2].find(k => k !== c && k !== L && api.libre[k] <= dr);
+      if (tercero != null && hashD(dr, 8) < 0.5) api.emite({ tipo: "cajon", carril: tercero, d: dr + 8 });
+      api.dSig = Math.max(dr + espacio(api, dif, dr), dr + largo + 10);
+      regalo(api, st, c, dr + 10);
+      return true;
+    },
+    /** LOS MUELLES · una VIGA de grúa sobre un carril con vagones (no el
+        camino): se salta a ella al comienzo (1,9 m), sube a 4,2 m y te
+        deja caer sobre los techos al final. El camino sigue libre. */
+    viga(api, dif, ctx, st) {
+      const dr = api.dSig, c = api.camino, V = api.velocidadEn(dr);
+      const op = [0, 1, 2].filter(k => k !== c && api.libre[k] <= dr - V * 0.55);
+      if (!op.length || api.libre[c] > dr) return false;
+      const L = op[Math.floor(hashD(dr, 9) * op.length)];
+      const sube = Math.ceil(V * 0.35) + 4;                      // la subida: a 20 cuadros/s sube a lo más 0,33 m por cuadro (se agarra con 0,6)
+      const largo = sube + Math.ceil(V * 1.2);                   // y ~1,2 s arriba
+      api.emite({ tipo: "viga", carril: L, d0: dr, sube, largo });
+      rejilla(api, st, c, dr + 4);
+      /* Los vagones, debajo desde donde la viga ya va arriba, y hasta
+         0,3·V + 6 m pasado su final: soltarse de 4,2 m tarda 0,26 s en
+         bajar a la altura de un techo, y tiene que caer encima. */
+      const w0 = dr + sube + 2;
+      const n = Math.ceil((dr + largo + V * 0.3 + 6 - w0) / (LARGO_VAGON + 0.4));
+      const fin = trenes(api, L, w0, n);
+      if (!api.peligro) {
+        /* El arco del salto que agarra la viga: se salta ~0,35 s antes de
+           su comienzo (así se llega arriba justo cuando empieza; la viga
+           sube más rápido que un salto que llega tarde). */
+        const v0 = Math.sqrt(2 * FISICA.gravedad * FISICA.alturaSalto);
+        for (let i = 1; i <= 3; i++) { const t = 0.35 * i / 3; api.emite({ tipo: "moneda", carril: L, d: dr - V * 0.35 + V * t, y: 0.9 + v0 * t - FISICA.gravedad * t * t / 2 }); }
+        for (let d = dr + 2; d < dr + largo - 1; d += 2.5) api.emite({ tipo: "moneda", carril: L, d, y: alturaViga({ d0: dr, sube }, d) + 0.9 });   // a lo largo de la viga
+        api.filaMonedas(L, dr + largo + 4, fin - dr - largo - 6, ALTO_TECHO + 0.9);                                // los techos al soltarse
+        api.filaMonedas(c, dr - 2, Math.min(14, fin - dr - 4));
+      }
+      secreta(api, st, L, dr + largo - 4, VIGA.y1 + 2.0);        // saltando desde la viga (el salto sube 2,1 m más)
+      energia(api, L, dr + sube + 4, VIGA.y1 + 1.0);
+      const tercero = [0, 1, 2].find(k => k !== c && k !== L && api.libre[k] <= dr);
+      if (tercero != null && hashD(dr, 10) < 0.5) api.emite({ tipo: "cajon", carril: tercero, d: dr + 8, cae: true });
+      api.dSig = Math.max(dr + espacio(api, dif, dr), dr + 12);
+      regalo(api, st, c, dr + 10);
+      return true;
+    },
+    /** BULEVAR AURORA · RIELES EN ZIGZAG: dos o tres barandas que cruzan
+        los carriles, cada una empezando 0,35·V + 4 m antes de que termine la
+        anterior (~0,35 s de solape: cambiarse de carril tarda 0,17). Se
+        hacen enteras sin tocar el suelo. Cada carril lleva un solo riel (dos
+        en el mismo carril dejarían un hueco traicionero entre ellos). El
+        camino sigue siendo el carril del primero: quien no se cambia baja
+        al final de ese riel y sigue. */
+    zigzag(api, dif, ctx, st) {
+      const dr = api.dSig, c = api.camino, V = api.velocidadEn(dr);
+      const orden = c === 0 ? [0, 1, 2] : c === 2 ? [2, 1, 0] : [1, hashD(dr, 11) < 0.5 ? 0 : 2];   // de un lado al otro
+      if (orden.some(k => api.libre[k] > dr)) return false;
+      const solape = Math.ceil(V * 0.35) + 4;
+      let d0 = dr, fin = dr;
+      orden.forEach((k, i) => {
+        const largo = i === 0 ? Math.ceil(V * 0.75) + 10 : Math.ceil(V * 0.9) + 10;   // el primero, como una baranda; los otros, más largos que el doble solape
+        if (i > 0) d0 = fin - solape;
+        api.emite({ tipo: "baranda", carril: k, d0, largo, alto: BARANDA.alto, zigzag: i + 1 });
+        if (!api.peligro) api.filaMonedas(k, d0 + 2, largo - 3, BARANDA.alto + 0.9, 2);
+        if (i > 0) energia(api, k, d0 + 2, BARANDA.alto + 1.1);   // las celdas, al comienzo de cada riel nuevo: premian el transbordo
+        fin = d0 + largo;
+        api.libre[k] = fin + 2;
+      });
+      const ult = orden[orden.length - 1];
+      secreta(api, st, ult, fin + 3, BARANDA.alto + 2.0);        // al final del último riel, en el aire: solo llega quien hizo el zigzag
+      api.mantener = 1;
+      api.dSig = fin + espacio(api, dif, fin);
+      regalo(api, st, c, api.libre[c] + 4);
+      return true;
+    },
+    /** BAJO VÍAS · un CONDUCTO en el camino: se pasa rodando, y como es más
+        largo que una rodada (≈0,85 s dentro contra 0,62), hay que volver a
+        rodar adentro, en el anillo de luz. Los otros carriles, cerrados con
+        vagones (uno siempre, el otro casi siempre): por arriba de ellos se
+        puede caminar el techo del conducto. */
+    conducto(api, dif, ctx, st) {
+      const dr = api.dSig, c = api.camino, V = api.velocidadEn(dr);
+      if (api.libre[c] > dr) return false;
+      /* Más largo que una rodada (0,62 s) y más corto que dos: 0,85·V + 2 m.
+         El ANILLO va a medio camino entre dos puntos: desde dónde una rodada
+         nueva (~0,6·V m, contando lo que se come un cuadro lento) ya alcanza
+         la salida, largo + 0,3 − 0,6·V, y dónde se acaba la primera rodada
+         empezada en la boca, ~0,5·V − 0,6. Así vale a 16 m/s y a 46, a 20
+         cuadros/s y a 144. Apretar «abajo» antes también sirve: cada vez
+         reinicia la rodada. */
+      const largo = Math.ceil(V * 0.85) + 2;
+      const anillo = dr + Math.round((largo - 0.1 * V - 0.3) / 2);
+      api.emite({ tipo: "conducto", carril: c, d0: dr, largo, anillo });   // el anillo: dónde volver a rodar
+      if (!api.peligro) api.filaMonedas(c, dr + 1, largo - 2, 0.5, 1.5);   // bajitas, adentro: rueda
+      const n = Math.ceil(largo / (LARGO_VAGON + 0.4));
+      const otros = [0, 1, 2].filter(k => k !== c && api.libre[k] <= dr);
+      otros.forEach((k, i) => {
+        if (i === 0 || hashD(dr, 12) < lerp(0.4, 0.8, dif)) {
+          /* La ruta de arriba: un respiradero de vapor antes de los vagones
+             (a la distancia justa de una lona) te deja en sus techos, y de
+             ahí se ve el conducto desde arriba. Solo si ese carril está
+             libre desde antes (como toda lona). */
+          const dl = dr - 2 - huecoLona(V);
+          if (i === 0 && api.libre[k] <= dl - V * 0.55) {
+            api.emite({ tipo: "lona", carril: k, d: dl, variante: "vapor" });
+            if (!api.peligro) api.filaMonedas(k, dr + 1, n * (LARGO_VAGON + 0.4) - 4, ALTO_TECHO + 0.9);   // los techos pagan
+          }
+          trenes(api, k, dr - 2, n);
+        } else api.emite({ tipo: "dron", carril: k, d: dr + 4 });
+      });
+      api.libre[c] = dr + largo + 2;
+      api.mantener = 1;
+      /* Al salir, un poco más de aire que entre filas: quien no entró al
+         conducto (por un carril que quedó libre, el de un tren que venía)
+         puede tener que cruzar dos carriles para volver al camino. */
+      api.dSig = dr + largo + espacio(api, dif, dr + largo) + Math.ceil(V * 0.3);
+      regalo(api, st, c, dr + largo + 6);
+      return true;
+    },
   };
+
+  /** PARQUE · un tramo de burbujas con SETOS: muros de setos de 2,8 m que
+      solo se pasan con el salto que flota (en las burbujas llega a 3,82 m).
+      Dos o tres muros, separados 2·V + 6 m: un salto flotante dura ~1,5 s,
+      así que entre muro y muro se aterriza y se vuelve a saltar. El primero
+      va a 0,7·V + 4 m de la entrada (el salto se da ya dentro del tramo) y
+      el tramo sigue 1,3·V + 8 m pasado el último (se aterriza flotando). Un
+      carril que no es el camino lleva, a veces, un vagón en vez de seto.
+      Devuelve false si el camino está ocupado (se prueba de nuevo luego). */
+  function setos(api, dif, st) {
+    const dr = api.dSig, V = api.velocidadEn(dr), c = api.camino;
+    /* El camino tiene que estar libre ya; los otros carriles pueden tener
+       todavía un tren que termina (hasta 80 m más allá): la carrera empieza
+       cuando todos están libres (`base`), y entre medio solo hay burbujas. */
+    const ocupado = Math.max(api.libre[0], api.libre[1], api.libre[2]);
+    if (api.libre[c] > dr || ocupado > dr + 80) return false;
+    const base = Math.max(dr, ocupado);
+    const n = 2 + (hashD(dr, 13) < 0.4 + dif * 0.4 ? 1 : 0);
+    const primero = base + Math.ceil(V * 0.7) + 4, paso = Math.ceil(V * 2) + 6;
+    const ultimo = primero + (n - 1) * paso, largo = ultimo + Math.ceil(V * 1.3) + 8 - dr;
+    // todo dentro del parque: termina antes de que se pida el túnel al distrito siguiente (220 m antes)
+    if (dr + largo > M.siguienteUmbral(dr, api.modo) - 260) { st.burbujas = M.siguienteUmbral(dr, api.modo); return false; }   // (el próximo, en la próxima vuelta al parque)
+    api.emite({ tipo: "burbujas", carril: 1, d0: dr, largo, setos: n });
+    for (let i = 0; i < n; i++) {
+      const d = primero + i * paso;
+      for (let k = 0; k < 3; k++) {
+        if (k !== c && hashD(d, 14 + k) < 0.3) { trenes(api, k, d - 4, 1); continue; }   // un vagón: ese carril, cerrado en este muro
+        api.emite({ tipo: "seto", carril: k, d });
+        api.libre[k] = Math.max(api.libre[k], d + 2);
+      }
+      if (!api.peligro) for (let j = 0; j < 7; j++) {            // el arco del salto flotante sobre el camino (hasta ~3,7 m)
+        const dz = (j - 3) * 2.2;
+        api.emite({ tipo: "moneda", carril: c, d: d + dz, y: 1.2 + 2.5 * (1 - (dz / 7.5) ** 2) });
+      }
+    }
+    secreta(api, st, c, ultimo, 6.5);                             // arriba del último muro: con el doble salto (~7,6 m)
+    api.dSig = dr + largo;
+    st.burbujas = dr + largo + 180 + hashD(dr, 2) * 150;
+    return true;
+  }
 
   /** Una fila con `obst` (cajón o dron) en el camino. Los demás carriles: el
       de la fila siguiente (por donde pasará el camino) a lo más con otro
@@ -472,7 +736,8 @@
   Object.assign(W, { estaciones: DISTRITOS, vuelta: VUELTA, intro: INTRO, boletos: POSTALES, velocidad: VELOCIDAD_CITY,
     generador, personajes: PERSONAJES, tema: "city-sur" });
   M.ESTACIONES_CITY = DISTRITOS; M.INTRO_CITY = INTRO; M.BOLETOS_CITY = POSTALES;
-  M.CITY = { DISTRITOS, VUELTA, VELOCIDAD: VELOCIDAD_CITY, INTRO, POSTALES, PERSONAJES, ventajaDe, CAJON, DRON, BARANDA, LONA, PISA, PISA_DRON, pisa, enLona, impulsoLona, vueloLona, huecoLona, vagonesLona, PESOS,
-    ENERGIA_LLENA, TABLA_SEG, MONEDAS2_SEG, CHICLE, DRON_IMPULSO, REJILLA, BURBUJAS, alturaCae };
+  M.CITY = { DISTRITOS, VUELTA, VELOCIDAD: VELOCIDAD_CITY, INTRO, POSTALES, PERSONAJES, ventajaDe, CAJON, DRON, BARANDA, LONA, PISA, PISA_DRON, pisa, enLona, impulsoLona, vueloLona, huecoLona, vagonesLona, PESOS, PROPIO,
+    ENERGIA_LLENA, TABLA_SEG, MONEDAS2_SEG, CHICLE, DRON_IMPULSO, REJILLA, BURBUJAS, alturaCae,
+    COBERTIZO, CONDUCTO, SETO, VIGA, alturaViga };
   return M;
 });
