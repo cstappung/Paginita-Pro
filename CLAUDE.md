@@ -3645,9 +3645,10 @@ Things that matter:
   catenary posts are **instanced** (`Serie`, written every frame like the
   coins; in neon, where edge lines and halo sprites cannot be instanced,
   the instanced pole is a glowing tube instead, `farol(lado, true)`);
-  the 49 cloud puffs are one mesh; and the pixel style in `baja` skips its
-  pass (which draws the scene twice, once for the edges) and renders at
-  pixel resolution instead (`proporcion`). **A station's kit is freed** when
+  the 49 cloud puffs are one mesh; and the pixel style in `baja` keeps its
+  pass but only for silhouettes (`soloSilueta`: no second render of the
+  scene for the normals, which is what doubled its draw calls), so the
+  outlines survive at the cost of one full-screen quad. **A station's kit is freed** when
   the next one takes over (`liberaKits` → `Kit.libera`, keeping the active
   one and the one being preloaded): each used to stay on the GPU, four by
   Óxido. The runner rebuilt for each kit or outfit frees its geometry too
@@ -3673,11 +3674,24 @@ Things that matter:
   `normal` attribute** (stock GTAO only hides points and lines, and the
   jetpack's glow sprite drew a black square on the backpack), and a
   `SIN_NAN` pass right before bloom (WebGL2 only, `isnan`/`isinf`) turns a
-  stray NaN into one black pixel instead of a square. The **pixel style** is
-  `FILAS_PIXEL` (420) rows tall, not 270, which read as coarse; with the
-  post-processing pass it renders at least at 2× so a 1× screen still fits
-  420 rows (the pass needs pixels of 2 or more), and in `baja` the canvas
-  itself is ~420 rows, upscaled without smoothing.
+  stray NaN into one black pixel instead of a square. **In the pixel style
+  every art pixel is a whole number of device pixels** (`ladoPixel` = ⌊device
+  height / `FILAS_PIXEL` (400)⌋, so 400–800 rows): the canvas is sized in art
+  pixels (`setPixelRatio(1)`, rounded up so it covers the stage), its CSS size
+  is set to exactly k device pixels per canvas pixel and it is upscaled with
+  `image-rendering: pixelated`, in every quality (the `dpr` caps do not apply).
+  It used to draw at 2.5× on a 3× phone with pass pixels of 3, i.e. 3.6 screen
+  pixels per art pixel, stretched ×1.2 with smoothing: mixed 3- and 4-wide
+  columns, blurred. The pass now runs with pixels of 1 (`PasadaPixel`, which
+  also measures the silhouette edge in metres, a neighbour 15 % farther, so
+  obstacles get a one-pixel outline at any distance; three.js's 0.01 on the
+  raw depth buffer only fired within ~10 m) and the composer works at the
+  canvas size (`getDrawingBufferSize`), no MSAA. A 1× monitor gets k = 1.
+  The pixel HUD font (Press Start 2P, an 8-px grid) is only crisp at a
+  multiple of 8 device pixels: `medidasPixel` in `juego.js` snaps the sizes
+  the sheet asked for (`--pf-*`, `--pp` = one glyph pixel, `--pm`), the shadow
+  is a one-glyph-pixel outline in `em`, and the banner neither scales nor
+  centres with a translation (both resample the text).
 - **What you play against must read before the scenery** (`legible` in each
   palette, `realza()` in `mundo.js`). Trains, barriers, ramps, power-ups,
   stars and tickets use material keys ending in `!` (`'pintura!'`); those

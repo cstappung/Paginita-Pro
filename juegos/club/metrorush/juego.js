@@ -24,8 +24,8 @@
    - Se perdona el salto un poco antes de tocar el suelo y un poco después
      de dejarlo (búfer y "tiempo de coyote"): sin eso el salto se siente
      "comido" a toda velocidad. */
-import { crearMundo, PALETAS } from './mundo.js?v=metrorush-6';
-import { Sonido } from './audio.js?v=metrorush-6';
+import { crearMundo, PALETAS } from './mundo.js?v=metrorush-7';
+import { Sonido } from './audio.js?v=metrorush-7';
 
 const M = window.MetroRushMotor;                               // el motor (motor.js)
 const MP = window.MetroRushPrueba;                            // la prueba de la carrera, para el antitrampas (prueba.js)
@@ -1227,6 +1227,30 @@ function desbloquea(aspecto, texto) {
    8. ARRANQUE
    =================================================================== */
 ponIconos();
+/* La letra del marcador pixelado (Press Start 2P) está dibujada en una
+   cuadrícula de 8: solo se ve nítida si su tamaño es un múltiplo de 8
+   píxeles del APARATO (cada píxel de la letra, un cuadrado entero de
+   píxeles). En unidades del contenedor salía a 25,3 píxeles en un celular de
+   3×, cada píxel de la letra medía 3,16 y los bordes se emborronaban; la
+   sombra (.4cqh = 4,6 píxeles) además caía corrida respecto de esa
+   cuadrícula y se veía doble. Aquí se calcula el tamaño que pedía la hoja de
+   estilos y se lleva al múltiplo de 8 más cercano; la sombra y los marcos van
+   en `--pp`, un píxel de la letra chica. Lo demás (márgenes) se ajusta a
+   píxeles enteros del aparato. Solo lo usa el estilo pixel (estilo.css). */
+function medidasPixel(r) {
+  const dpr = window.devicePixelRatio || 1;                                  // píxeles del aparato por píxel CSS
+  const u = (r.width <= r.height ? 0.8 : 1) * r.height / 100;                // la unidad del marcador (--u en estilo.css)
+  const ocho = v => Math.max(1, Math.round(v * dpr / 8)) * 8 / dpr;          // al múltiplo de 8 píxeles del aparato más cercano (en px CSS)
+  const entero = v => Math.max(1, Math.round(v * dpr)) / dpr;                // a píxeles enteros del aparato
+  const chico = ocho(2.2 * u), pp = chico / 8;                               // la letra chica y un píxel suyo
+  const fija = (k, v) => pantalla.style.setProperty(k, v + 'px');
+  fija('--pp', pp);                                                          // un píxel de la letra chica: sombras y marcos
+  fija('--pf-chico', chico);                                                 // metros, nombre de la estación, multiplicador
+  fija('--pf-valor', 2 * chico);                                             // los puntos y las monedas: el doble, la misma cuadrícula
+  fija('--pf-banner', ocho(5 * r.height / 100));                             // el letrero grande (5cqh)
+  fija('--pf-banner2', ocho(3 * r.height / 100));                            // su segunda línea (3cqh)
+  fija('--pm', entero(2.4 * u));                                             // el margen del marcador, en píxeles enteros
+}
 async function arranca() {
   // las fuentes del marcador y de los letreros (con un tope: si no llegan, se usa la de respaldo)
   const fuentes = Promise.all(['100px "Lilita One"', '700 60px Orbitron', '20px "Press Start 2P"'].map(f => document.fonts.load(f).catch(() => null)));
@@ -1240,7 +1264,7 @@ async function arranca() {
   }
   mundo.calidad(calidadInicial());
   aplicaMovimiento();
-  const ajusta = () => { const r = pantalla.getBoundingClientRect(); mundo.tamano(r.width, r.height); };
+  const ajusta = () => { const r = pantalla.getBoundingClientRect(); mundo.tamano(r.width, r.height); medidasPixel(r); };
   new ResizeObserver(ajusta).observe(pantalla); ajusta();
   mundo.aspecto(M.ASPECTOS[progreso.aspecto] || M.ASPECTOS.clasico); aspectoMostrado = progreso.aspecto;
   const inicio = estacionVisual(M.ESTACIONES[0]);

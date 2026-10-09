@@ -601,6 +601,64 @@ function realza(m, brillo, niebla) {
   m.customProgramCacheKey = () => `metrorush-realce-${b}-${n}`;
 }
 
+/* La pasada del estilo pixelado, con el contorno medido en metros. La de
+   three.js oscurece el borde de una silueta cuando la profundidad del vecino
+   salta más de 0,01 en el búfer de profundidad, que no es lineal: con la
+   cámara a 0,1 m del plano cercano eso solo pasa a menos de ~10 m, así que
+   solo el corredor tenía contorno y un tren a 40 m se fundía con la vía y
+   los edificios. Aquí el salto se mide en distancia de verdad y relativo a
+   la propia (un vecino un 15 % más lejos ya es borde): el tren, la barrera
+   o la rampa que vienen quedan recortados con un píxel oscuro a cualquier
+   distancia. El suelo visto de refilón no da bordes falsos (de una fila a la
+   siguiente se aleja menos de un 10 % hasta el final de la niebla), y el
+   contorno se apaga al llegar a ella (`lejos`), para que lo que sale de la
+   bruma no aparezca con un trazo negro encima. El resto (las aristas que
+   brillan, por la normal) queda como en three.js.
+   Con `soloSilueta` (calidad baja) no se dibuja la escena una segunda vez
+   para las normales: solo el contorno, que sale de la profundidad de la
+   misma pasada. Cuesta las mismas llamadas al GPU que dibujar directo, más
+   un cuadro a la resolución del arte, y así la calidad baja de un celular
+   también recorta los obstáculos. */
+class PasadaPixel extends RenderPixelatedPass {
+  constructor(lado, escena, camara, op = {}) {
+    super(lado, escena, camara, op);
+    this.soloSilueta = !!op.soloSilueta;                                      // sin la pasada de normales
+    if (this.soloSilueta) this.normalEdgeStrength = 0;                        // (el constructor de three cambia un 0 por 0,3)
+  }
+  createPixelatedMaterial() {
+    const m = super.createPixelatedMaterial();
+    Object.assign(m.uniforms, { cerca: { value: 0.1 }, fondo: { value: 240 }, lejos: { value: 1e4 } });   // planos de la cámara y fin de la niebla
+    m.fragmentShader = m.fragmentShader
+      .replace('uniform float depthEdgeStrength;', 'uniform float depthEdgeStrength;\nuniform float cerca, fondo, lejos;\n'
+        // del valor del búfer de profundidad (perspectiva) a metros desde la cámara
+        + 'float metros(float d) { return cerca * fondo / (fondo - (fondo - cerca) * d); }')
+      .replace(/float depthEdgeIndicator\(float depth, vec3 normal\) \{[\s\S]*?return floor\(smoothstep\(0\.01, 0\.02, diff\) \* 2\.\) \/ 2\.;\s*\}/,
+        `float depthEdgeIndicator(float depth, vec3 normal) {
+          float z = metros(depth), diff = 0.0;
+          diff += clamp((metros(getDepth(1, 0)) - z) / z, 0.0, 1.0);
+          diff += clamp((metros(getDepth(-1, 0)) - z) / z, 0.0, 1.0);
+          diff += clamp((metros(getDepth(0, 1)) - z) / z, 0.0, 1.0);
+          diff += clamp((metros(getDepth(0, -1)) - z) / z, 0.0, 1.0);
+          return floor(smoothstep(0.15, 0.3, diff) * 2.) / 2. * (1.0 - smoothstep(0.65 * lejos, lejos, z));
+        }`);
+    return m;
+  }
+  render(renderer, writeBuffer) {
+    const u = this.fsQuad.material.uniforms, cam = this.camera, fog = this.scene.fog;
+    u.cerca.value = cam.near; u.fondo.value = cam.far; u.lejos.value = fog ? fog.far : 1e4;   // se leen cada cuadro: la niebla cambia con la estación y la calidad
+    if (!this.soloSilueta) { super.render(renderer, writeBuffer); return; }
+    // lo mismo que la de three.js, sin dibujar las normales (normalEdgeStrength = 0: el sombreador no las lee)
+    u.normalEdgeStrength.value = 0; u.depthEdgeStrength.value = this.depthEdgeStrength;
+    renderer.setRenderTarget(this.beautyRenderTarget);                        // la escena, una sola vez, con su profundidad
+    renderer.render(this.scene, this.camera);
+    u.tDiffuse.value = this.beautyRenderTarget.texture; u.tDepth.value = this.beautyRenderTarget.depthTexture;
+    u.tNormal.value = this.normalRenderTarget.texture;                        // vacía: está declarada en el sombreador, pero no se usa
+    renderer.setRenderTarget(this.renderToScreen ? null : writeBuffer);
+    if (!this.renderToScreen && this.clear) renderer.clear();
+    this.fsQuad.render(renderer);                                             // el contorno, a la resolución del arte
+  }
+}
+
 /** Lleva las coordenadas v de una geometría a la franja `i` de `n` de un atlas
     apilado de arriba abajo (con un margen, para que el filtrado no traiga el
     color de la franja vecina). Ejemplo: el letrero 2 de 5 usa v de 0,4 a 0,6. */
@@ -1881,8 +1939,8 @@ export function crearMundo(canvas) {
      la pantalla entera. El lienzo de un celular es chico (el escenario 3:4,
      ~360×480 CSS), así que 2× son ~0,7 megapíxeles: lo aguanta. Si el aparato
      no da abasto, «auto» baja de nivel.
-     El estilo pixelado en baja sigue siendo a propósito de píxeles grandes,
-     pero nítidos (se agranda sin suavizar). */
+     El estilo pixelado no usa este `dpr`: su lienzo mide un píxel por
+     píxel del arte y se agranda un número entero de veces (ver tamano). */
   const AJUSTES = {
     alta: { dpr: 3, sombras: 2048, ao: true, bloom: true, fxaa: true, espejo: true, pixel: 4 },
     media: { dpr: 2.5, sombras: 1024, ao: false, bloom: true, fxaa: true, espejo: false, pixel: 4 },
@@ -1917,25 +1975,30 @@ export function crearMundo(canvas) {
     const A = AJUSTES[calidad], pal = kit.pal;
     renderer.toneMapping = kit.pixel ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = pal.exposicion;
-    /* En baja se dibuja directo, sin post-proceso. El estilo pixelado tampoco
-       usa su pasada (que dibuja la escena dos veces, una para los bordes): el
-       lienzo se dibuja a la resolución de los píxeles (pixelRatio < 1, ver
-       proporcion) y el navegador lo agranda sin suavizar. */
-    if (calidad === 'baja') return;
+    /* En baja se dibuja directo, sin post-proceso. El estilo pixelado es la
+       excepción: su pasada va igual, pero sin la segunda escena para las
+       normales (soloSilueta), así cuesta lo mismo que dibujar directo y los
+       obstáculos siguen con su contorno. Su lienzo ya está a la resolución
+       del arte (ver tamano) y el navegador lo agranda sin suavizar. */
+    if (calidad === 'baja' && !kit.pixel) return;
     /* El suavizado de bordes es MSAA (el lienzo intermedio con 4 muestras por
        píxel), no FXAA: FXAA difumina la imagen ENTERA después de dibujarla
        (texturas, letreros, bordes finos) y era parte de lo «borroso». Con
        2× de densidad o más no hace falta ninguno: el escalón de un borde ya
        es más chico que lo que el ojo separa, y nos ahorramos el costo. */
     const pr = renderer.getPixelRatio();
-    const muestras = pr < 2 && renderer.capabilities.isWebGL2 ? 4 : 0;
-    const rt = new THREE.WebGLRenderTarget(Math.round(ancho * pr), Math.round(alto * pr), { type: THREE.HalfFloatType, samples: muestras });
+    const tam = renderer.getDrawingBufferSize(new THREE.Vector2());           // el lienzo de verdad, en píxeles (en pixelado, los del arte)
+    // el pixelado no lleva MSAA: sus bordes en escalera son el estilo, y su pasada dibuja en su propio lienzo
+    const muestras = !kit.pixel && pr < 2 && renderer.capabilities.isWebGL2 ? 4 : 0;
+    const rt = new THREE.WebGLRenderTarget(tam.x, tam.y, { type: THREE.HalfFloatType, samples: muestras });
     const c = new EffectComposer(renderer, rt);
-    c.setPixelRatio(pr); c.setSize(ancho, alto);
+    c.setPixelRatio(1); c.setSize(tam.x, tam.y);                               // en píxeles del lienzo: igual que antes fuera del pixelado (CSS × densidad)
     if (kit.pixel) {
-      // el tamaño del píxel se elige para que la imagen tenga ~FILAS_PIXEL filas de alto, en cualquier pantalla
-      const px = Math.max(2, Math.round(alto * renderer.getPixelRatio() / FILAS_PIXEL));
-      c.addPass(new RenderPixelatedPass(px, escena, camara, { normalEdgeStrength: calidad === 'baja' ? 0.0001 : 0.45, depthEdgeStrength: calidad === 'baja' ? 0.0001 : 0.55 }));
+      /* Píxeles de 1: el lienzo ya mide un píxel por píxel del arte (ver
+         tamano). La pasada queda solo para marcar los bordes con un píxel y
+         su imagen sale 1:1, sin el estirón de una división que no da entera
+         (con 895 / 3 la última columna medía otra cosa). */
+      c.addPass(new PasadaPixel(1, escena, camara, { normalEdgeStrength: 0.45, depthEdgeStrength: 0.55, soloSilueta: calidad === 'baja' }));
     } else c.addPass(new RenderPass(escena, camara));
     if (A.ao && kit.juguete) {
       try {
@@ -1968,12 +2031,12 @@ export function crearMundo(canvas) {
     if (A.bloom && pal.post.bloom) c.addPass(new UnrealBloomPass(new THREE.Vector2(ancho / 2, alto / 2), ...pal.post.bloom));
     c.addPass(new OutputPass());
     // FXAA solo si no hay MSAA (WebGL1) y la densidad es baja: es el último recurso, porque difumina
-    if (A.fxaa && !kit.pixel && !muestras && pr < 2) { const f = new ShaderPass(FXAAShader); f.uniforms.resolution.value.set(1 / (ancho * pr), 1 / (alto * pr)); c.addPass(f); }
+    if (A.fxaa && !kit.pixel && !muestras && pr < 2) { const f = new ShaderPass(FXAAShader); f.uniforms.resolution.value.set(1 / tam.x, 1 / tam.y); c.addPass(f); }
     if (pal.post.vineta) {
       const v = new ShaderPass(ACABADO);
       v.uniforms.vig.value = pal.post.vineta; v.uniforms.sat.value = pal.post.sat || 1;
       v.uniforms.aber.value = 0;                                             // sin aberración cromática: separaba los colores en los bordes y restaba nitidez
-      v.uniforms.scan.value = pal.post.lineas || 0; v.uniforms.alto.value = alto * renderer.getPixelRatio();
+      v.uniforms.scan.value = pal.post.lineas || 0; v.uniforms.alto.value = tam.y;
       c.addPass(v);
     }
     composer = c;
@@ -2105,7 +2168,7 @@ export function crearMundo(canvas) {
       trenFantasma.visible = false; escena.add(trenFantasma);
     }
     aplicaSombras();
-    tamano(ancho, alto);                                                       // la proporción depende del estilo (pixelado en baja) y rearma el post-proceso
+    tamano(anchoCss, altoCss);                                                 // el lienzo depende del estilo (el pixelado mide el suyo en píxeles del arte) y rearma el post-proceso
     try { renderer.compile(escena, camara); } catch (e) { /* si no se puede compilar antes, se compila al dibujar */ }
   }
 
@@ -2320,28 +2383,47 @@ export function crearMundo(canvas) {
   const matChispa = col => { if (!matsChispa.has(col)) matsChispa.set(col, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending })); return matsChispa.get(col); };
 
   /* ---- tamaño de la pantalla ---- */
-  /* Cuántas filas tiene la imagen en el estilo pixelado. Eran 270 y se veía
-     tosco: los píxeles medían 2 a 4 píxeles de pantalla y no se leía nada a lo
-     lejos. Con 420 sigue siendo pixel art (bordes en escalera, colores planos)
-     pero bastante más nítido. */
-  const FILAS_PIXEL = 420;
-  /** Cuántos píxeles del lienzo por píxel de la pantalla. En baja con estilo
-      pixelado, el lienzo mismo tiene ~FILAS_PIXEL filas y el navegador lo
-      agranda sin suavizar. En media y alta, el estilo pixelado dibuja al menos
-      a 2×: su pasada necesita píxeles de 2 o más, y en una pantalla de 1× eso
-      daba 300 filas como mucho. A 2× caben las 420, y no cuesta casi nada,
-      porque la pasada dibuja la escena a la resolución de sus píxeles. */
+  /* El estilo pixelado tiene al menos FILAS_PIXEL filas, y cada píxel del
+     arte mide un número ENTERO de píxeles del aparato (ladoPixel). Antes el
+     lienzo iba a 2,5× en un celular de 3× y la pasada pixelada usaba píxeles
+     de 3 de ese lienzo: cada píxel del arte medía 3,6 píxeles de la pantalla,
+     el navegador lo estiraba ×1,2 suavizando, y salían columnas de 3 y de 4
+     mezcladas y borrosas. Ahora el lienzo tiene exactamente un píxel por
+     píxel del arte y el navegador lo agranda ×k sin suavizar
+     (image-rendering: pixelated), así cada píxel es un cuadrado nítido de
+     k×k. Con piso (floor) en vez de redondeo, nunca quedan menos de 400
+     filas: un celular de 3× queda en ~480 filas con píxeles de 3×3, un
+     monitor de 1× dibuja a su resolución (k = 1, solo bordes y luz por
+     escalones) y uno Full HD a píxeles de 2×2. */
+  const FILAS_PIXEL = 400;
+  /** La densidad de la pantalla (píxeles del aparato por píxel CSS). */
+  const dprAparato = () => window.devicePixelRatio || 1;
+  /** Cuántos píxeles del aparato mide un píxel del arte en el estilo pixelado (siempre entero, al menos 1). */
+  function ladoPixel() { return Math.max(1, Math.floor(altoCss * dprAparato() / FILAS_PIXEL)); }
+  /** Cuántos píxeles del lienzo por píxel CSS, fuera del estilo pixelado (que fija su lienzo aparte, ver tamano). */
   function proporcion() {
-    if (calidad === 'baja' && kit && kit.pixel) return Math.min(1, FILAS_PIXEL / Math.max(1, alto));
-    const normal = Math.min(window.devicePixelRatio || 1, AJUSTES[calidad].dpr);
-    return kit && kit.pixel ? Math.max(2, normal) : normal;
+    return Math.min(dprAparato(), AJUSTES[calidad].dpr);
   }
+  let anchoCss = 1280, altoCss = 720;                                         // el tamaño CSS exacto (con decimales) de la pantalla
   const ajusteRetrato = { y: 0, z: 0 };
   function tamano(w, h) {
+    anchoCss = Math.max(1, w); altoCss = Math.max(1, h);                      // con decimales: el pixelado los necesita para cubrir justo la pantalla
     ancho = Math.max(1, w | 0); alto = Math.max(1, h | 0);
-    renderer.setPixelRatio(proporcion());
-    renderer.setSize(ancho, alto, false);
-    const asp = ancho / alto;
+    let asp = ancho / alto;
+    if (kit && kit.pixel) {
+      const dpr = dprAparato(), k = ladoPixel();                              // k: píxeles del aparato por píxel del arte
+      const aw = Math.ceil(anchoCss * dpr / k), ah = Math.ceil(altoCss * dpr / k);   // hacia arriba: el lienzo cubre la pantalla entera (lo que sobra, < k píxeles, queda fuera)
+      renderer.setPixelRatio(1);                                              // el lienzo se mide directo en píxeles del arte
+      renderer.setSize(aw, ah, false);                                        // false: el tamaño CSS se pone aquí abajo, no el que pondría three
+      canvas.style.width = (aw * k / dpr) + 'px';                             // exactamente k píxeles del aparato por píxel del lienzo…
+      canvas.style.height = (ah * k / dpr) + 'px';
+      canvas.style.imageRendering = 'pixelated';                              // …y agrandado sin suavizar: cuadrados nítidos
+      asp = aw / ah;                                                          // la cámara, con la forma del lienzo de verdad
+    } else {
+      renderer.setPixelRatio(proporcion());
+      renderer.setSize(ancho, alto, false);
+      canvas.style.width = canvas.style.height = canvas.style.imageRendering = '';   // vuelve al 100 % de la hoja de estilos
+    }
     // el ángulo de visión se ajusta para que siempre quepan los tres carriles (en un celular vertical, más abierto)
     fovBase = THREE.MathUtils.clamp(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(33)) / asp) * 180 / Math.PI, 40, 74);
     camara.fov = fovBase + sens.extra;                                         // más lo que la velocidad le está sumando ahora (ver `paso`)
@@ -2369,7 +2451,7 @@ export function crearMundo(canvas) {
     dibuja() { renderer.info.reset(); if (composer) composer.render(); else renderer.render(escena, camara); },
     tamano,
     /** Cambia la calidad: 'alta' | 'media' | 'baja'. */
-    calidad(nivel) { if (!AJUSTES[nivel] || nivel === calidad) return; calidad = nivel; vista = nivel === 'baja' ? 125 : VISTA; ajustaNiebla(); tamano(ancho, alto); aplicaSombras(); },
+    calidad(nivel) { if (!AJUSTES[nivel] || nivel === calidad) return; calidad = nivel; vista = nivel === 'baja' ? 125 : VISTA; ajustaNiebla(); tamano(anchoCss, altoCss); aplicaSombras(); },
     /** Hasta cuántos metros por delante se dibuja (el juego no crea dibujos más allá). */
     get vista() { return vista; },
     get nivelCalidad() { return calidad; },

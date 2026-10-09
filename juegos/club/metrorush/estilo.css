@@ -121,16 +121,41 @@ main.vl { min-width: 0; }
 .pantalla[data-estilo="neon"] .poderes li b { background: rgba(10, 6, 32, .7); box-shadow: 0 0 1cqh #22e5ff; }
 .pantalla[data-estilo="neon"] .estacion .barra i { background: linear-gradient(90deg, #22e5ff, #ff2bd6); box-shadow: 0 0 1cqh #ff2bd6; }
 
-/* --- marcador: estética pixel (letra de 8 bits y marcos escalonados) --- */
-.pantalla[data-estilo="pixel"] .hud, .pantalla[data-estilo="pixel"] .banner { font-family: "Press Start 2P", monospace; color: #fff1d4; }
-.pantalla[data-estilo="pixel"] .hud .valor { font-size: calc(4.6 * var(--u)); }
-.pantalla[data-estilo="pixel"] .hud .chico, .pantalla[data-estilo="pixel"] .estacion { font-size: calc(2.2 * var(--u)); line-height: 1.5; }
-.pantalla[data-estilo="pixel"] :is(.valor, .chico, .estacion > span:first-child, .banner strong, .banner span) { text-shadow: .4cqh .4cqh 0 #2a1c18; }
-.pantalla[data-estilo="pixel"] .banner strong { font-size: 5cqh; line-height: 1.4; }   /* la letra pixel no trae aire entre líneas: con 1 las dos líneas se tocaban */
-.pantalla[data-estilo="pixel"] .mult { font-size: calc(2.6 * var(--u)); padding: 1cqh; background: #e2463a; box-shadow: 0 -.6cqh 0 #2a1c18, 0 .6cqh 0 #2a1c18, -.6cqh 0 0 #2a1c18, .6cqh 0 0 #2a1c18; }
-.pantalla[data-estilo="pixel"] .moneda { width: calc(3.4 * var(--u)); height: calc(4.2 * var(--u)); background: #ffd23f; box-shadow: inset -.8cqh 0 0 #e09a1a, inset .8cqh 0 0 #fff1a0, 0 -.6cqh 0 #2a1c18, 0 .6cqh 0 #2a1c18, -.6cqh 0 0 #2a1c18, .6cqh 0 0 #2a1c18; }
-.pantalla[data-estilo="pixel"] .pausa { background: #2a2232; color: #fff1d4; box-shadow: 0 -.6cqh 0 #fff1d4, 0 .6cqh 0 #fff1d4, -.6cqh 0 0 #fff1d4, .6cqh 0 0 #fff1d4; border: 0; }
-.pantalla[data-estilo="pixel"] .estacion .barra { border-radius: 0; } .pantalla[data-estilo="pixel"] .estacion .barra i { border-radius: 0; background: #2fb59a; }
+/* --- marcador: estética pixel (letra de 8 bits y marcos escalonados) ---
+   Todo va en medidas que calcula juego.js (medidasPixel) y no en cqh: la
+   letra solo es nítida si mide un múltiplo de 8 píxeles del aparato
+   (--pf-*), y los marcos y sombras, píxeles enteros de esa letra (--pp). La
+   sombra es un contorno de un píxel de la letra (0,125 em, sea cual sea su
+   tamaño) más una caída: se lee sobre el cielo claro del atardecer y cae
+   justo en la cuadrícula, en vez de un corrimiento de 4,6 píxeles que la
+   duplicaba. Sin suavizado de letra ni transformaciones que la remuestreen. */
+.pantalla[data-estilo="pixel"] .hud, .pantalla[data-estilo="pixel"] .banner { font-family: "Press Start 2P", monospace; color: #fff1d4; -webkit-font-smoothing: none; font-smooth: never; text-rendering: optimizeSpeed; }
+.pantalla[data-estilo="pixel"] .hud-izq { left: var(--pm); top: var(--pm); gap: calc(2 * var(--pp)); }
+.pantalla[data-estilo="pixel"] .hud-der { right: var(--pm); top: var(--pm); gap: calc(3 * var(--pp)); }
+.pantalla[data-estilo="pixel"] .hud .fila { gap: calc(3 * var(--pp)); }
+.pantalla[data-estilo="pixel"] .hud .valor { font-size: var(--pf-valor); line-height: 1; }
+.pantalla[data-estilo="pixel"] .hud .chico, .pantalla[data-estilo="pixel"] .estacion { font-size: var(--pf-chico); line-height: 1.5; }
+.pantalla[data-estilo="pixel"] .estacion { gap: calc(2 * var(--pp)); }
+.pantalla[data-estilo="pixel"] :is(.valor, .chico, .estacion > span:first-child, .mult, .patinetas b, .banner strong, .banner span) { --o: .125em; --c: #2a1c18;
+  text-shadow: var(--o) 0 0 var(--c), calc(-1 * var(--o)) 0 0 var(--c), 0 var(--o) 0 var(--c), 0 calc(-1 * var(--o)) 0 var(--c),
+    var(--o) var(--o) 0 var(--c), calc(-1 * var(--o)) var(--o) 0 var(--c), var(--o) calc(-1 * var(--o)) 0 var(--c), calc(-1 * var(--o)) calc(-1 * var(--o)) 0 var(--c), 0 calc(2 * var(--o)) 0 var(--c); }
+/* El letrero grande, sin escalar ni centrar con traslaciones (remuestrean la
+   letra): de lado a lado, centrado por el texto, y aparece por escalones. */
+.pantalla[data-estilo="pixel"] .banner { left: 0; right: 0; width: auto; top: 22%; transform: none; padding: 0 calc(4 * var(--pp)); gap: calc(3 * var(--pp)); }
+.pantalla[data-estilo="pixel"] .banner.ver { transform: none; animation: banner-px 3s steps(1, end) forwards; }
+@keyframes banner-px { 0% { opacity: 0; } 4% { opacity: .5; } 8% { opacity: 1; } 85% { opacity: 1; } 92% { opacity: .5; } 100% { opacity: 0; } }
+.pantalla[data-estilo="pixel"] .banner strong { font-size: var(--pf-banner); line-height: 1.5; }   /* la letra pixel no trae aire entre líneas: con 1 las dos líneas se tocaban */
+.pantalla[data-estilo="pixel"] .banner span { font-size: var(--pf-banner2); line-height: 1.5; opacity: 1; }
+.pantalla[data-estilo="pixel"] .mult { font-size: var(--pf-chico); line-height: 1; padding: calc(2 * var(--pp)); margin: 0 calc(2 * var(--pp)); background: #e2463a; color: #fff1d4;
+  box-shadow: 0 calc(-2 * var(--pp)) 0 #2a1c18, 0 calc(2 * var(--pp)) 0 #2a1c18, calc(-2 * var(--pp)) 0 0 #2a1c18, calc(2 * var(--pp)) 0 0 #2a1c18; }
+.pantalla[data-estilo="pixel"] .moneda { width: calc(12 * var(--pp)); height: calc(16 * var(--pp)); margin: 0 calc(2 * var(--pp)); background: #ffd23f;
+  box-shadow: inset calc(-3 * var(--pp)) 0 0 #e09a1a, inset calc(3 * var(--pp)) 0 0 #fff1a0, 0 calc(-2 * var(--pp)) 0 #2a1c18, 0 calc(2 * var(--pp)) 0 #2a1c18, calc(-2 * var(--pp)) 0 0 #2a1c18, calc(2 * var(--pp)) 0 0 #2a1c18; }
+.pantalla[data-estilo="pixel"] .hud .pausa { width: calc(var(--pf-valor) + 8 * var(--pp)); height: calc(var(--pf-valor) + 8 * var(--pp)); background: #2a2232; color: #fff1d4; border: 0; border-radius: 0;
+  box-shadow: 0 calc(-2 * var(--pp)) 0 #fff1d4, 0 calc(2 * var(--pp)) 0 #fff1d4, calc(-2 * var(--pp)) 0 0 #fff1d4, calc(2 * var(--pp)) 0 0 #fff1d4; }
+.pantalla[data-estilo="pixel"] .hud .pausa b { gap: calc(3 * var(--pp)); }
+.pantalla[data-estilo="pixel"] .hud .pausa b::before, .pantalla[data-estilo="pixel"] .hud .pausa b::after { width: calc(3 * var(--pp)); height: calc(10 * var(--pp)); border-radius: 0; }
+.pantalla[data-estilo="pixel"] .patinetas { font-size: var(--pf-chico); right: var(--pm); }
+.pantalla[data-estilo="pixel"] .estacion .barra { height: calc(2 * var(--pp)); border-radius: 0; } .pantalla[data-estilo="pixel"] .estacion .barra i { border-radius: 0; background: #2fb59a; }
 
 /* ---------- los menús, al estilo Subway Surfers ----------
    Todo el menú comparte un mismo idioma visual, sacado del inicio de Subway
