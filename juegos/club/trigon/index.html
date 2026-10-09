@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-<script src="../../../i18n.js?v=202610091531"></script>
+<script src="../../../i18n.js?v=202610091623"></script>
 <script src="../../audio/mando.js?v=mando-2"></script>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Trigon — junta los triángulos</title>
@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="../conexion.css?v=club-2">
   <script src="../../audio/volumen.js?v=vol-1"></script>
   <script src="../conexion.js?v=club-11"></script>
-  <link rel="stylesheet" href="estilo.css?v=trigon-8">
+  <link rel="stylesheet" href="estilo.css?v=trigon-11">
   <link rel="stylesheet" href="temas.css?v=trigon-6">
   <script>
     /* El tema antes de pintar nada, para que no parpadee el Clásico al cargar otro. */
@@ -53,6 +53,8 @@
           <svg id="tablero" class="tablero" aria-hidden="true"></svg>
           <div id="efectos" class="efectos" aria-hidden="true"></div>
           <b id="racha" class="racha" translate="no" aria-hidden="true"></b>
+          <b id="popPoder" class="pop-poder" aria-hidden="true"></b>
+          <p id="aviso" class="aviso" role="status" hidden>No cabe ninguna pieza: ¡usa un poder!</p>
 
           <div id="fin" class="capa fin" role="dialog" aria-modal="false" aria-labelledby="finTitulo" hidden>
             <p id="finTitulo" class="tit">SIN ESPACIO</p>
@@ -70,6 +72,7 @@
           </div>
         </div>
 
+        <div id="poderes" class="poderes" role="group" aria-label="Poderes"></div>
         <div id="mano" class="mano" aria-label="Tus piezas"></div>
 
           <div id="temas" class="capa menu temas" role="dialog" aria-modal="false" aria-labelledby="temasTitulo" hidden>
@@ -106,7 +109,10 @@
               <p>Arrastra cada una de las tres piezas de la mano hasta el hexágono. No se pueden girar: llegan ya orientadas.</p>
               <p>Completa una línea de triángulos —horizontal o en cualquiera de las dos diagonales— y se borra. Cerrar varias de una vez da más puntos, y cerrar líneas en jugadas seguidas arma una <b>racha</b> que multiplica el bono.</p>
               <p>Al usar las tres piezas llega otra mano. La partida termina cuando ninguna pieza que te queda cabe en el tablero.</p>
-              <p class="chico">Teclado: <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> eligen pieza, flechas la mueven, <kbd>Enter</kbd> la suelta, <kbd>Esc</kbd> cancela.</p>
+              <p><b>Poderes</b>: cerrar líneas puede regalarte uno (más probable si cierras varias a la vez). Aparecen sobre el tablero:</p>
+              <p>🔨 <b>Martillo</b> rompe un triángulo · 🔄 <b>Girar</b> gira 60° una pieza de tu mano · 🔀 <b>Cambiar mano</b> te da tres piezas nuevas · 💣 <b>Bomba</b> rompe los triángulos alrededor de un punto · 💥 <b>Segunda oportunidad</b> (muy rara) borra la mitad de abajo cuando ya no cabe nada.</p>
+              <p>Si ninguna pieza cabe pero algún poder puede salvarte, la partida sigue y ese poder late.</p>
+              <p class="chico">Teclado: <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> eligen pieza, flechas la mueven, <kbd>Enter</kbd> la suelta, <kbd>Esc</kbd> cancela. Poderes: <kbd>H</kbd> martillo, <kbd>G</kbd> girar, <kbd>C</kbd> cambiar, <kbd>B</kbd> bomba, <kbd>V</kbd> segunda oportunidad.</p>
             </div>
           </div>
         </div>
@@ -117,7 +123,7 @@
     </div>
   </div>
   <svg id="arrastre" class="arrastre" aria-hidden="true" hidden></svg>
-  <script src="motor.js?v=trigon-4"></script>
-  <script src="juego.js?v=trigon-8"></script>
+  <script src="motor.js?v=trigon-6"></script>
+  <script src="juego.js?v=trigon-12"></script>
 </body>
 </html>

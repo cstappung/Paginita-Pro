@@ -5,8 +5,9 @@
    tiempo = los ms jugados (sin pausas) hasta la última jugada.
 
    El juego manda `{v: 1, s, u, j, a, w, fin}`: la semilla, la cuenta, cada
-   jugada como [pieza, dx, dy, origen, ms desde la anterior] y lo jugado en
-   los dos relojes. Aquí se vuelve a jugar con el MISMO motor
+   jugada como [pieza, dx, dy, origen, ms desde la anterior] (o
+   [-1, casilla, 0, origen, ms] para un martillazo, que el motor solo acepta
+   si había un martillo ganado) y lo jugado en los dos relojes. Aquí se vuelve a jugar con el MISMO motor
    (`juegos/club/trigon/motor.js`):
 
    - cada pieza tiene que caber donde se soltó en el tablero rehecho, y el

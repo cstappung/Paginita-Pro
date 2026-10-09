@@ -131,6 +131,38 @@ Cambiar el aspecto completo del juego sin tocar las reglas. Cada tema tiene
 - [x] ~~Docs: `CLAUDE.md` y `firebase/CONFIGURAR-FIREBASE.md`~~
 - [ ] Probar con sesión iniciada: jugar desde Juegos, que el puntaje entre a la clasificación y paguen las monedas
 - [ ] Publicar las reglas de Firebase (lo hace la dueña del sitio; sin eso se juega igual pero no entra a la clasificación)
-- [ ] Commit y Pull Request al repo original
+- [x] ~~Commit y push de la rama `trigon` (`df90d54`)~~
+- [ ] Pull Request al repo original (lo crea José)
 
 **Quedó fuera (opcional, para después):** marco de campeón en el perfil, repeticiones de partidas (replays) y la fila de Trigon en los carruseles de récords del salón.
+
+## Extra — Poderes ✅
+
+Se ganan al cerrar líneas (más probable cuantas más a la vez). Toda la tabla
+de probabilidades está en `motor.js` (`PODERES`), para ajustarla en un solo sitio.
+
+| Poder | Chance con 1 / 2 / 3 líneas | Máx. | Uso |
+|---|---|---|---|
+| 🔨 Martillo | 20 / 30 / 40 % (tope 50) | 3 | toca un triángulo ocupado |
+| 🔄 Girar | 15 / 20 / 25 % (tope 35) | 3 | toca una pieza de la mano (o 1-2-3) |
+| 🔀 Cambiar mano | 10 / 15 / 20 % (tope 30) | 2 | un toque |
+| 💣 Bomba | 5 / 10 / 15 % (tope 25) | 2 | toca un punto: rompe hasta 6 triángulos |
+| 💥 Segunda oportunidad | 1 / 5 / 10 % | 1 | solo si no cabe nada: borra la mitad de abajo |
+
+- [x] ~~Motor: tabla `PODERES`, `usa(E, código, a, b)`; cada uso va al registro con su código negativo y el verificador lo rehace~~
+- [x] ~~La partida solo termina si no cabe nada y ningún poder puede destrabarla (girar solo cuenta si alguna rotación cabe)~~
+- [x] ~~Pantalla: botones con contador en posición fija (no se corren al gastarse), en la esquina del tablero en escritorio y en una fila bajo el tablero en celular~~
+- [x] ~~Modos: martillo con cursor de martillo, bomba con vista previa en rojo del área, girar resaltando la mano; Esc cancela~~
+- [x] ~~Teclado: H martillo, G girar (+1-2-3), C cambiar, B bomba, V segunda oportunidad~~
+- [x] ~~«+🔨🔄…» al ganarlos, aviso y botones que laten cuando estás atascado~~
+- [x] ~~Simulación: 300 partidas sin trabarse y todas se rehacen igual. Por partida, un jugador simple gana ~1 martillo, ~0,85 girar, ~0,6 cambiar, ~0,25 bombas y ~0,05 segundas oportunidades~~
+- [x] ~~Tests: 12/12 de Trigon y 584/584 de juegos~~
+- [x] ~~Probado jugando: aprobado~~
+- [x] ~~Manual del sitio (`reglas.js`), docs, commit y push a la rama `trigon` (PR #158)~~
+- [ ] Ajustar la tabla `PODERES` si con el tiempo algo queda muy fuerte o muy débil (la segunda oportunidad casi no sale, a propósito)
+
+## Pendiente para otro PR
+
+- [ ] Marco de campeón en el perfil (`marcos-animados.js` + `perfil-tarjeta.js`)
+- [ ] Repeticiones de partidas (`repeticion.js`)
+- [ ] Fila de Trigon en los carruseles de récords del salón (`rieles-datos.js`)

@@ -3465,7 +3465,10 @@ on a triangular grid (after the iOS game). Plain files, no build
 (`?v=trigon-N`): `motor.js` (UMD `TrigonMotor`, pure: a hexagon of side 4 =
 96 triangles in axial coordinates, 24 lines in three directions, 8 piece
 shapes with every rotation and mirror, each hand of three from mulberry32
-seeded with `mezcla(base, k)` and re-dealt up to 4 times if nothing fits),
+seeded with `mezcla(base, k)` and re-dealt up to 4 times if nothing fits, and the five power-ups of its
+`PODERES` table — hammer, rotate, new hand, bomb, second chance — won at
+random when lines clear, logged as moves with negative codes and replayed
+like the rest),
 `juego.js` (the screen: SVG board, drag and drop with a magnet to the
 nearest valid spot, keyboard 1-2-3 + arrows + Enter, the start menu with
 the leaderboard read from the `ranking` message, and per-theme line-clear

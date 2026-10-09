@@ -22,6 +22,10 @@ function juega(semilla,u,lento=400,rango=600,max=100000){
    const c=M.CELDAS.find(c=>c.d===d0&&M.destino(E,p,c.x-x0,c.y-y0));
    if(c){M.coloca(E,k,c.x-x0,c.y-y0,[E.jugadas%3?'r':'t',Math.round(lento+azar()*rango)]);hecho=true;}
   }
+  // Atascado: usa el primer poder que destrabe (la segunda oportunidad, cambiar, girar, la bomba, el martillo).
+  if(!hecho){const x=['r',Math.round(lento+azar()*rango)],P=E.poderes;
+   hecho=!!((P.vida&&M.usa(E,-5,0,0,x))||(P.cambio&&M.usa(E,-3,0,0,x))||(P.girar&&[0,1,2].some(k=>E.mano[k]&&M.usa(E,-2,k,0,x)))
+    ||(P.bomba&&M.usa(E,-4,0,0,x))||(P.martillo&&M.usa(E,-1,E.t.findIndex(v=>v),0,x)));}
   if(!hecho)break;
  }
  return E;
@@ -65,6 +69,50 @@ test('cerrar una línea la borra y paga el bono con la racha',()=>{
  assert.equal(r.lineas,1);assert.equal(r.suma,1+M.bonoLineas(1));
  assert.ok(L.every(i=>E.t[i]===0));
  assert.equal(M.bonoLineas(2),60);assert.equal(M.bonoLineas(3),120);
+});
+
+test('los poderes: tabla, martillo, bomba, girar, cambiar y segunda oportunidad',()=>{
+ assert.deepEqual(M.ORDEN_PODERES,['martillo','girar','cambio','bomba','vida']);
+ const P=M.PODERES;
+ assert.equal(P.martillo.chance(1),0.2);assert.equal(P.martillo.chance(4),0.5);
+ assert.equal(P.vida.chance(1),0.01);assert.equal(P.vida.chance(2),0.05);assert.equal(P.vida.chance(5),0.1);
+ const x=['r',100];
+ // Martillo: sin martillo o sobre una casilla vacía no hay martillazo.
+ const E=M.nueva(3,'x');
+ assert.equal(M.usa(E,-1,0,0,x),null);
+ E.poderes.martillo=1;E.t[5]=2;
+ assert.equal(M.usa(E,-1,6,0,x),null);
+ assert.deepEqual(M.usa(E,-1,5,0,x),{poder:'martillo',borradas:[5],valores:[2]});
+ assert.equal(E.t[5],0);assert.equal(E.poderes.martillo,0);assert.deepEqual(E.registro.at(-1),[-1,5,0,'r',100]);
+ // Bomba: rompe lo ocupado alrededor de un punto; un punto sin nada ocupado no gasta la bomba.
+ const B=M.nueva(3,'x');B.poderes.bomba=1;
+ assert.equal(M.usa(B,-4,0,0,x),null);assert.equal(B.poderes.bomba,1);
+ for(const i of M.alrededor(0,0))B.t[i]=3;
+ assert.equal(M.usa(B,-4,0,0,x).borradas.length,6);assert.ok(M.alrededor(0,0).every(i=>!B.t[i]));
+ // Girar: seis giros vuelven a la pieza de partida.
+ const G=M.nueva(5,'x');G.poderes.girar=3;const o0=G.mano[0].o;let q=G.mano[0];for(let k=0;k<6;k++)q=M.girada(q);
+ assert.equal(q.o,o0);assert.ok(M.usa(G,-2,0,0,x));assert.equal(G.poderes.girar,2);
+ assert.equal(M.usa(G,-2,7,0,x),null,'no hay pieza 7');
+ // Cambiar mano: reparte una mano nueva.
+ const C=M.nueva(6,'x');C.poderes.cambio=1;const antes=C.k;assert.ok(M.usa(C,-3,0,0,x).reparte);assert.equal(C.k,antes+1);
+ // Segunda oportunidad: solo si no cabe nada; borra la mitad de abajo.
+ const hex=M.FORMAS.findIndex(f=>f.id==='hexagono');
+ const V=M.nueva(7,'x');V.poderes.vida=1;
+ assert.equal(M.usa(V,-5,0,0,x),null,'si algo cabe no se usa');
+ V.t.fill(1);V.mano=[{f:hex,o:0},null,null];
+ const rv=M.usa(V,-5,0,0,x);assert.equal(rv.borradas.length,48);assert.equal(V.t.filter(v=>!v).length,48);
+ // Atascado con un poder que destraba: sigue; sin poderes: termina.
+ const F=M.nueva(4,'x');F.t.fill(1);F.poderes.martillo=2;F.mano=[{f:hex,o:0},null,null];
+ assert.ok(M.usa(F,-1,0,0,x));assert.equal(F.fin,false,'queda un martillo: sigue');
+ assert.ok(M.usa(F,-1,95,0,x));assert.equal(F.fin,true,'sin poderes y sin sitio: termina');
+ // En partidas enteras se ganan poderes y la partida rehecha los cuenta igual.
+ let usados=0;
+ for(let s=1;s<=30;s++){const R0=juega(s,'u');usados+=R0.registro.filter(j=>j[0]<0).length;
+  const R=M.rehace(R0.semilla,R0.u,R0.registro);assert.equal(R.error,undefined);assert.equal(R.E.puntos,R0.puntos);
+  assert.deepEqual(R.E.poderes,R0.poderes);assert.equal(R.E.fin,true);}
+ assert.ok(usados>0,'algún poder se usó');
+ assert.ok(M.rehace(1,'u',[[-1,0,0,'r',100]]).error,'un poder sin ganar no se rehace');
+ assert.ok(M.rehace(1,'u',[[-9,0,0,'r',100]]).error,'un código que no existe no se rehace');
 });
 
 test('una mano nueva nunca es imposible si alguna pieza puede caber',()=>{

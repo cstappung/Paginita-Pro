@@ -15,6 +15,11 @@
    - **El tablero es un hexágono de lado LADO**: los triángulos con sus tres
      vértices dentro de |x| ≤ LADO, |y| ≤ LADO, |x + y| ≤ LADO. Son
      6·LADO² triángulos y 2·LADO franjas por dirección.
+   - **Los poderes** (🔨 🔄 🔀 💣 💥, tabla PODERES): cerrar líneas puede
+     regalar alguno, con más probabilidad cuantas más líneas a la vez. Su
+     azar sale del mismo chorro de la partida, y cada uso va al registro con
+     su código negativo ([código, a, b, …]), así que también se rehace. La
+     partida no termina mientras algún poder pueda destrabarla.
    - **El azar no es del navegador.** Cada tanda de tres piezas sale de su
      propio chorro mulberry32 (`mezcla(base, k)`), con la cuenta dentro de
      la base, para que la partida se pueda rehacer. */
@@ -23,6 +28,25 @@
   const LADO = 4;
   const H = Math.sqrt(3) / 2;
   const MANO = 3;
+
+  /* Los poderes: cuántos se guardan como mucho y la probabilidad de ganar
+     uno al cerrar n líneas de una vez. Para equilibrar el juego, se toca
+     solo esta tabla. El código es el que llevan en el registro.
+     - martillo: rompe un triángulo ocupado.
+     - girar: gira 60° una pieza de la mano.
+     - cambio: descarta la mano y reparte otra.
+     - bomba: rompe los triángulos alrededor de un punto de la red.
+     - vida (segunda oportunidad): solo si no cabe nada; borra la mitad de
+       abajo del tablero. Muy rara a propósito: infla los puntajes. */
+  const PODERES = {
+    martillo: { codigo: -1, max: 3, chance: n => Math.min(0.5, 0.1 + 0.1 * n) },
+    girar: { codigo: -2, max: 3, chance: n => Math.min(0.35, 0.1 + 0.05 * n) },
+    cambio: { codigo: -3, max: 2, chance: n => Math.min(0.3, 0.05 + 0.05 * n) },
+    bomba: { codigo: -4, max: 2, chance: n => Math.min(0.25, 0.05 * n) },
+    vida: { codigo: -5, max: 1, chance: n => n >= 3 ? 0.1 : n === 2 ? 0.05 : 0.01 }
+  };
+  const ORDEN_PODERES = Object.keys(PODERES);
+  const PODER_DE_CODIGO = Object.fromEntries(ORDEN_PODERES.map(k => [PODERES[k].codigo, k]));
 
   function rng(a) {
     a >>>= 0;
@@ -132,7 +156,7 @@
 
   function nueva(semilla, u) {
     const E = { semilla: semilla >>> 0, u: String(u || ''), t: new Array(CELDAS.length).fill(0), k: 0,
-      puntos: 0, lineas: 0, jugadas: 0, racha: 0, mejorRacha: 0, fin: false, mano: [], registro: [] };
+      puntos: 0, lineas: 0, jugadas: 0, racha: 0, mejorRacha: 0, poderes: Object.fromEntries(ORDEN_PODERES.map(k => [k, 0])), fin: false, mano: [], registro: [] };
     E.base = mezcla(E.semilla, hashTexto(E.u));
     reparte(E);
     return E;
@@ -176,6 +200,33 @@
   }
   const puedeJugar = E => E.mano.some(p => p && cabe(E, p));
 
+  // La misma pieza girada 60° (otra de las orientaciones de su forma).
+  function girada(p) {
+    const f = FORMAS[p.f], k = JSON.stringify(normaliza(f.orient[p.o].map(gira)));
+    return { f: p.f, o: f.orient.findIndex(o => JSON.stringify(o) === k) };
+  }
+  // ¿Alguna pieza de la mano cabe girándola una o más veces?
+  const cabeGirando = E => E.mano.some(p => {
+    for (let q = p, g = 0; q && g < 5; g++) { q = girada(q); if (cabe(E, q)) return true; }
+    return false;
+  });
+  // ¿Algún poder guardado puede destrabar una partida en la que no cabe nada?
+  const rescate = E => {
+    const P = E.poderes;
+    return P.martillo > 0 || P.bomba > 0 || P.cambio > 0 || P.vida > 0 || (P.girar > 0 && cabeGirando(E));
+  };
+  // La partida termina cuando ninguna pieza cabe y ningún poder puede hacer sitio.
+  const termino = E => !puedeJugar(E) && !rescate(E);
+
+  // Los triángulos del tablero que tocan el punto (x, y) de la red: seis en el interior, menos en el borde.
+  function alrededor(x, y) {
+    if (!Number.isInteger(x) || !Number.isInteger(y)) return [];
+    return [[x, y, 0], [x - 1, y, 0], [x, y - 1, 0], [x - 1, y, 1], [x, y - 1, 1], [x - 1, y - 1, 1]]
+      .map(([a, b, d]) => INDICE.get(clave(a, b, d))).filter(i => i !== undefined);
+  }
+  // La mitad de abajo del tablero, que borra la segunda oportunidad.
+  const MITAD = CELDAS.map((c, i) => c.y >= 0 ? i : -1).filter(i => i >= 0);
+
   // 20, 60, 120, 200… por cerrar 1, 2, 3, 4 líneas de una vez, y la racha lo multiplica.
   const bonoLineas = n => 10 * n * (n + 1);
 
@@ -199,11 +250,51 @@
     E.registro.push(extra ? [slot, dx, dy, extra[0], extra[1]] : [slot, dx, dy]);
     const suma = casillas.length + bonoLineas(n) * Math.max(1, E.racha);
     E.puntos += suma; E.lineas += n; E.jugadas++;
+    // Cada poder tira su dado del mismo chorro, siempre en el mismo orden (aunque ya esté lleno), para que la partida se rehaga igual.
+    const ganados = [];
+    if (n) {
+      const r = rng(mezcla(E.base ^ 0x4D41, E.jugadas));
+      for (const k of ORDEN_PODERES) if (r() < PODERES[k].chance(n) && E.poderes[k] < PODERES[k].max) { E.poderes[k]++; ganados.push(k); }
+    }
     E.mano[slot] = null;
     const nuevaMano = E.mano.every(m => !m);
     if (nuevaMano) reparte(E);
-    if (!puedeJugar(E)) E.fin = true;
-    return { casillas, borradas: [...borradas], lineas: n, suma, reparte: nuevaMano };
+    E.fin = termino(E);
+    return { casillas, borradas: [...borradas], lineas: n, suma, reparte: nuevaMano, ganados };
+  }
+
+  /* Usa un poder. `codigo` es el de PODERES; `a` y `b` dicen dónde: la
+     casilla (martillo), la pieza de la mano (girar) o el punto de la red
+     (bomba); 0 y 0 si no hace falta. No suma puntos ni corta la racha.
+     Devuelve null si no se puede; si se puede, {poder, borradas, valores}
+     (los triángulos rotos y su color), {poder, slot} o {poder, reparte}. */
+  function usa(E, codigo, a, b, extra) {
+    const k = PODER_DE_CODIGO[codigo];
+    if (!k || E.fin || E.poderes[k] < 1 || !Number.isInteger(a) || !Number.isInteger(b)) return null;
+    let res;
+    if (k === 'martillo') {
+      if (a < 0 || a >= CELDAS.length || !E.t[a]) return null;
+      res = { borradas: [a] };
+    } else if (k === 'bomba') {
+      const ocupadas = alrededor(a, b).filter(i => E.t[i]);
+      if (!ocupadas.length) return null;
+      res = { borradas: ocupadas };
+    } else if (k === 'vida') {
+      if (puedeJugar(E)) return null;
+      res = { borradas: MITAD.filter(i => E.t[i]) };
+    } else if (k === 'girar') {
+      if (!E.mano[a]) return null;
+      E.mano[a] = girada(E.mano[a]);
+      res = { slot: a };
+    } else {
+      reparte(E);
+      res = { reparte: true };
+    }
+    if (res.borradas) { res.valores = res.borradas.map(i => E.t[i]); for (const i of res.borradas) E.t[i] = 0; }
+    E.poderes[k]--;
+    E.registro.push(extra ? [codigo, a, b, extra[0], extra[1]] : [codigo, a, b]);
+    E.fin = termino(E);
+    return Object.assign({ poder: k }, res);
   }
 
   /* Rehace una partida desde su semilla y sus jugadas. Cada jugada es
@@ -225,13 +316,14 @@
         if (typeof j[3] !== 'string' || j[3].length !== 1 || !ORIGENES.includes(j[3]) || !Number.isSafeInteger(j[4]) || j[4] < 0) return { error: 'Una jugada de la partida está mal formada.' };
         ms += j[4];
       }
-      if (!coloca(E, j[0], j[1], j[2], j.length === 5 ? [j[3], j[4]] : null)) return { error: 'Una jugada de la partida no se puede hacer en el tablero rehecho.' };
+      const extra = j.length === 5 ? [j[3], j[4]] : null;
+      if (j[0] < 0 ? !usa(E, j[0], j[1], j[2], extra) : !coloca(E, j[0], j[1], j[2], extra)) return { error: 'Una jugada de la partida no se puede hacer en el tablero rehecho.' };
     }
     return { E, ms };
   }
 
   const api = { LADO, H, MANO, CELDAS, LINEAS, FORMAS, vertices, plano, celdasDe, nueva, destino, cubre,
-    lineasQueCierra, cabe, puedeJugar, coloca, bonoLineas, rehace };
+    lineasQueCierra, cabe, puedeJugar, coloca, bonoLineas, rehace, usa, girada, alrededor, PODERES, ORDEN_PODERES };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.TrigonMotor = api;
 })(this);

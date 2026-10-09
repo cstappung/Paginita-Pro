@@ -50,6 +50,9 @@
     vuelve: () => tono(180, 0, 0.1, 'sine', 0.06),
     borra: n => [0, 4, 7, 12, 16, 19].slice(0, n + 2).forEach((s, i) => tono(523.25 * 2 ** (s / 12), i * 0.06, 0.3, 'triangle', 0.11)),
     fin: () => [7, 4, 0, -5].forEach((s, i) => tono(392 * 2 ** (s / 12), i * 0.12, 0.35, 'sine', 0.1)),
+    martillo: () => [0, 7, 12, 19].forEach((s, i) => tono(659.25 * 2 ** (s / 12), i * 0.05, 0.25, 'square', 0.05)),
+    golpe: () => { tono(110, 0, 0.12, 'square', 0.16); tono(70, 0.02, 0.18, 'sine', 0.2); tono(1400, 0, 0.04, 'triangle', 0.06); },
+    bomba: () => { tono(80, 0, 0.4, 'sawtooth', 0.14); tono(55, 0.03, 0.5, 'sine', 0.22); [0, 3, 7].forEach((st, i) => tono(220 * 2 ** (st / 12), 0.08 + i * 0.05, 0.25, 'triangle', 0.06)); },
   };
   function pintaSonido() {
     const b = $('sound-button');
@@ -103,6 +106,7 @@
   const capaCeldas = document.createElementNS(NS, 'g'), capaEfectos = document.createElementNS(NS, 'g');
   tablero.append(capaCeldas, capaEfectos);
   const celdas = M.CELDAS.map(c => poligono(capaCeldas, c.x, c.y, c.d, 'celda'));
+  celdas.forEach((p, i) => p.setAttribute('data-i', String(i)));
 
   function pintaTablero() {
     M.CELDAS.forEach((_, i) => {
@@ -217,6 +221,7 @@
     $('nPuntos').textContent = String(E ? E.puntos : 0);
     $('nMejor').textContent = String(Math.max(prog.mejor, E ? E.puntos : 0));
     $('nLineas').textContent = String(E ? E.lineas : 0);
+    pintaPoderes();
   }
   function popSuma(n) {
     const p = $('popSuma');
@@ -252,6 +257,8 @@
     const p = E.mano[s];
     if (!p) return;
     e.preventDefault();
+    if (modo === 'girar') { usaPoder('girar', s, 0, !e.isTrusted ? 'x' : e.pointerType === 'touch' ? 't' : 'r'); return; }
+    modoPoder(null);
     suelta_teclado();
     const b = dibujaPieza(flota, p, 0.15);
     const px = tablero.getBoundingClientRect().width / VB.w;
@@ -319,6 +326,111 @@
   for (const t of ['selectstart', 'contextmenu', 'dragstart']) document.addEventListener(t, e => { if (e.target.closest && e.target.closest('.escenario,.mano')) e.preventDefault(); });
   mano.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
 
+  /* ---------- Poderes ----------
+     Lo que se gana al cerrar líneas (motor.js, PODERES) aparece como botón
+     sobre el tablero, solo si tienes alguno. Martillo, bomba y girar abren
+     un modo (el siguiente toque en el tablero o en la mano los usa);
+     cambiar mano y segunda oportunidad se usan al tocarlos. Si no cabe
+     nada y algún poder puede destrabar la partida, esos botones laten. */
+  const PODER_UI = {
+    martillo: { icono: '🔨', nombre: 'Martillo', ayuda: 'toca un triángulo ocupado para romperlo', tecla: 'KeyH', modo: true },
+    bomba: { icono: '💣', nombre: 'Bomba', ayuda: 'toca un punto del tablero: rompe los triángulos a su alrededor', tecla: 'KeyB', modo: true },
+    girar: { icono: '🔄', nombre: 'Girar', ayuda: 'toca una pieza de tu mano (o 1, 2, 3) para girarla 60°', tecla: 'KeyG', modo: true },
+    cambio: { icono: '🔀', nombre: 'Cambiar mano', ayuda: 'descarta tus piezas y recibe tres nuevas', tecla: 'KeyC' },
+    vida: { icono: '💥', nombre: 'Segunda oportunidad', ayuda: 'solo cuando no cabe nada: borra la mitad de abajo del tablero', tecla: 'KeyV' }
+  };
+  let modo = null;
+  const botonesPoder = {};
+  for (const k of M.ORDEN_PODERES) {
+    const u = PODER_UI[k], b = document.createElement('button');
+    b.type = 'button'; b.className = 'poder vacio';
+    b.title = u.nombre + ': ' + u.ayuda + ' (' + u.tecla.slice(3) + ')';
+    b.setAttribute('aria-label', u.nombre + ': ' + u.ayuda);
+    if (u.modo) b.setAttribute('aria-pressed', 'false');
+    b.innerHTML = '<span aria-hidden="true">' + u.icono + '</span><b translate="no">0</b>';
+    b.addEventListener('click', e => activa(k, !e.isTrusted ? 'x' : e.pointerType === 'touch' ? 't' : 'r'));
+    $('poderes').appendChild(b);
+    botonesPoder[k] = b;
+  }
+  function activa(k, origen) {
+    if (!E || terminada || enMenu() || !E.poderes[k]) return;
+    if (PODER_UI[k].modo) modoPoder(modo === k ? null : k);
+    else usaPoder(k, 0, 0, origen);
+  }
+  function pintaPoderes() {
+    const atascado = !!E && !terminada && !M.puedeJugar(E);
+    for (const k of M.ORDEN_PODERES) {
+      const n = E ? E.poderes[k] : 0, b = botonesPoder[k];
+      // Sin cargas el botón queda invisible pero en su sitio: si se corrieran, un segundo toque caería en otro poder.
+      b.classList.toggle('vacio', !n);
+      b.querySelector('b').textContent = String(n);
+      b.disabled = !n || terminada || (k === 'vida' && !atascado);
+      b.classList.toggle('urge', atascado && n > 0 && !b.disabled);
+      if (PODER_UI[k].modo) b.setAttribute('aria-pressed', String(modo === k));
+    }
+    $('aviso').hidden = !atascado;
+    if (modo && !(E && E.poderes[modo])) modoPoder(null);
+  }
+  function modoPoder(k) {
+    modo = k && E && E.poderes[k] > 0 && !terminada ? k : null;
+    if (modo) suelta_teclado();
+    const esc = $('escenario');
+    for (const m of ['martillo', 'bomba']) esc.classList.toggle('modo-' + m, modo === m);
+    mano.classList.toggle('modo-girar', modo === 'girar');
+    for (const c of celdas) c.classList.remove('mira');
+    for (const [j, b] of Object.entries(botonesPoder)) if (PODER_UI[j].modo) b.setAttribute('aria-pressed', String(modo === j));
+  }
+  function ganaPoderes(lista) {
+    if (!lista.length) return;
+    sonidos.martillo();
+    const p = $('popPoder');
+    p.textContent = '+' + lista.map(k => PODER_UI[k].icono).join('');
+    p.classList.remove('sube'); void p.offsetWidth; p.classList.add('sube');
+  }
+  const SONIDO_PODER = { martillo: 'golpe', bomba: 'bomba', vida: 'bomba', girar: 'toma', cambio: 'pone' };
+  function usaPoder(k, a, b, origen) {
+    arranca();
+    const ahora = reloj().a, dt = Math.max(0, Math.round(ahora - ultimaA));
+    const r = M.usa(E, M.PODERES[k].codigo, a, b, [origen || 'x', dt]);
+    if (!r) { sonidos.vuelve(); return; }
+    ultimaA += dt;
+    modoPoder(null);
+    pintaTablero();
+    if (r.borradas && r.borradas.length) estalla(r.borradas, r.valores);
+    (sonidos[SONIDO_PODER[k]] || sonidos.pone)();
+    pintaMano(!!r.reparte); pintaMarcador();
+    if (E.fin) termina(); else guardaPartida();
+  }
+  // El punto de la red más cercano al puntero, para la bomba.
+  function puntoBajo(e) {
+    const rect = tablero.getBoundingClientRect(), px = rect.width / VB.w;
+    const bx = VB.x + (e.clientX - rect.left) / px, by = VB.y + (e.clientY - rect.top) / px;
+    const fy = by / M.H, fx = bx - fy / 2;
+    let mejor = null;
+    for (let y = Math.floor(fy); y <= Math.ceil(fy); y++)
+      for (let x = Math.floor(fx); x <= Math.ceil(fx); x++) {
+        const [cx, cy] = M.plano(x, y), d = Math.hypot(cx - bx, cy - by);
+        if (!mejor || d < mejor.d) mejor = { x, y, d };
+      }
+    return mejor;
+  }
+  tablero.addEventListener('pointermove', e => {
+    if (modo !== 'bomba') return;
+    const q = puntoBajo(e), zona = new Set(M.alrededor(q.x, q.y));
+    celdas.forEach((c, i) => c.classList.toggle('mira', zona.has(i)));
+  });
+  tablero.addEventListener('pointerleave', () => { for (const c of celdas) c.classList.remove('mira'); });
+  tablero.addEventListener('pointerup', e => {
+    if (!modo || enMenu() || arr) return;
+    const origen = !e.isTrusted ? 'x' : e.pointerType === 'touch' ? 't' : 'r';
+    if (modo === 'bomba') { const q = puntoBajo(e); usaPoder('bomba', q.x, q.y, origen); return; }
+    if (modo !== 'martillo') return;
+    const p = e.target.closest && e.target.closest('polygon.celda');
+    if (!p) return;
+    const i = +p.getAttribute('data-i');
+    if (E.t[i]) usaPoder('martillo', i, 0, origen);
+  });
+
   /* ---------- Teclado ----------
      1, 2 y 3 eligen pieza y la ponen en la posición libre más cerca del
      centro; las flechas la mueven por la red (arriba y abajo alternan el
@@ -358,6 +470,10 @@
   }
   addEventListener('keydown', e => {
     if (!E || terminada || enMenu() || arr) return;
+    const poder = M.ORDEN_PODERES.find(k => PODER_UI[k].tecla === e.code);
+    if (poder) { e.preventDefault(); activa(poder, e.isTrusted ? 'k' : 'x'); return; }
+    if (e.code === 'Escape' && modo) { e.preventDefault(); modoPoder(null); return; }
+    if (modo === 'girar' && (/^Digit[1-3]$/.test(e.code) || /^Numpad[1-3]$/.test(e.code))) { e.preventDefault(); usaPoder('girar', +e.code.slice(-1) - 1, 0, e.isTrusted ? 'k' : 'x'); return; }
     if (/^Digit[1-3]$/.test(e.code) || /^Numpad[1-3]$/.test(e.code)) { e.preventDefault(); elige(+e.code.slice(-1) - 1); return; }
     if (!kb) return;
     const paso = {
@@ -444,6 +560,7 @@
       muestraRacha(r.lineas, E.racha);
     } else sonidos.pone();
     popSuma(r.suma);
+    ganaPoderes(r.ganados);
     pintaMano(r.reparte); pintaMarcador();
     if (E.fin) termina(); else guardaPartida();
   }
@@ -464,6 +581,7 @@
 
   function termina() {
     terminada = true;
+    modoPoder(null);
     para();
     reporta(true);
     const nuevo = E.puntos > prog.mejor && E.puntos > 0;
@@ -484,6 +602,7 @@
     const s = new Uint32Array(1); crypto.getRandomValues(s);
     E = M.nueva(s[0], CUENTA);
     terminada = false; kb = null;
+    modoPoder(null);
     reiniciaRelojes(null); arranca();
     $('fin').hidden = true; $('menu').hidden = true;
     pintaTablero(); pintaMano(true); pintaMarcador();
@@ -645,7 +764,8 @@
   addEventListener('resize', ajustaPantalla);
   addEventListener('pagehide', guardaPartida);
 
-  window.__trigon = { estado: () => E, motor: M };
+  // Para probar desde la consola. Cambiar el estado a mano no sirve para la clasificación: el verificador rehace la partida.
+  window.__trigon = { estado: () => E, motor: M, repinta: () => { pintaTablero(); pintaMano(); pintaMarcador(); } };
   if (!retoma()) {
     const s = new Uint32Array(1); crypto.getRandomValues(s);
     E = M.nueva(s[0], CUENTA);

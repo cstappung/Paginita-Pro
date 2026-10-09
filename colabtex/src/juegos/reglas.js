@@ -1012,12 +1012,19 @@ const REGLAS = {
         "Mientras arrastras, la sombra muestra dónde cae la pieza y las líneas que cerraría se iluminan.",
         "Una pieza que no cabe en ningún lado se ve gris.",
         "Si ninguna pieza de una mano nueva cabe, se reparte otra (hasta cuatro veces).",
-        "La partida termina cuando ninguna de las piezas que te quedan cabe en el tablero."
+        "La partida termina cuando ninguna de las piezas que te quedan cabe en el tablero y ningún poder puede hacer sitio."
       ])],
       ["Puntos", "Cada triángulo que pones suma 1. Cerrar líneas da un bono de 20, 60, 120, 200… por 1, 2, 3, 4… líneas de una vez, y si cierras líneas en jugadas seguidas armas una <b>racha</b> que multiplica ese bono (×2, ×3…)."],
+      ["Poderes", "Cerrar líneas puede regalarte un poder, con más probabilidad cuantas más líneas cierres de una vez. Aparecen como botones junto al tablero y no suman puntos ni cortan la racha:" + lista([
+        "🔨 <b>Martillo</b> (hasta 3): rompe un triángulo ocupado.",
+        "🔄 <b>Girar</b> (hasta 3): gira 60° una pieza de tu mano.",
+        "🔀 <b>Cambiar mano</b> (hasta 2): descarta tus piezas y recibe tres nuevas.",
+        "💣 <b>Bomba</b> (hasta 2): rompe los triángulos alrededor de un punto del tablero.",
+        "💥 <b>Segunda oportunidad</b> (muy rara, 1): cuando ya no cabe nada, borra la mitad de abajo del tablero."
+      ]) + "Si ninguna pieza cabe pero algún poder puede salvarte, la partida sigue y ese botón late."],
       ["Controles", lista([
         "Arrastra con el ratón o con el dedo.",
-        "Teclado: 1, 2 y 3 eligen pieza, las flechas la mueven, Enter la suelta y Esc cancela.",
+        "Teclado: 1, 2 y 3 eligen pieza, las flechas la mueven, Enter la suelta y Esc cancela. Poderes: H martillo, G girar, C cambiar, B bomba, V segunda oportunidad.",
         "🎨 cambia el tema (Clásico, Halloween, Gris, Forest y Espacio), en modo oscuro o claro, sin perder la partida.",
         "La partida a medias se guarda en este navegador y se retoma si vuelves antes de 24 horas."
       ])],
