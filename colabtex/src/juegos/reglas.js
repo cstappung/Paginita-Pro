@@ -1001,6 +1001,36 @@ const REGLAS = {
       ["Clasificación", "La tabla <b>Vuelo</b> ordena por tubos pasados; a igualdad, gana el vuelo más corto. Cada vuelo se rehace con su semilla y sus aleteos antes de guardarse, así que solo cuenta lo que de verdad se voló. Subir al podio se anuncia en Discord."]
     ]
   },
+  /* Trigon (juegos/club/trigon/): lo que dice aquí tiene que coincidir con
+     motor.js (líneas, puntos, reparto) y juego.js (controles, temas). */
+  trigon: {
+    lema: "Trigon: arrastra piezas de triángulos al tablero hexagonal y completa líneas en tres direcciones.",
+    secciones: [
+      ["Cómo se juega", "El tablero es un hexágono de 96 triángulos. Abajo (o al lado, en pantallas anchas) tienes una mano de <b>tres piezas</b>; arrastra cada una hasta el tablero. Las piezas no se giran: llegan ya orientadas. Cuando usas las tres, llega otra mano."],
+      ["Líneas", "Una línea es una franja de triángulos de borde a borde. Hay líneas en <b>tres direcciones</b>: horizontal y las dos diagonales. Cuando una se llena entera, se borra. Si una pieza llena varias a la vez, se borran todas juntas."],
+      ["Reglas finas", lista([
+        "Mientras arrastras, la sombra muestra dónde cae la pieza y las líneas que cerraría se iluminan.",
+        "Una pieza que no cabe en ningún lado se ve gris.",
+        "Si ninguna pieza de una mano nueva cabe, se reparte otra (hasta cuatro veces).",
+        "La partida termina cuando ninguna de las piezas que te quedan cabe en el tablero y ningún poder puede hacer sitio."
+      ])],
+      ["Puntos", "Cada triángulo que pones suma 1. Cerrar líneas da un bono de 20, 60, 120, 200… por 1, 2, 3, 4… líneas de una vez, y si cierras líneas en jugadas seguidas armas una <b>racha</b> que multiplica ese bono (×2, ×3…)."],
+      ["Poderes", "Cerrar líneas puede regalarte un poder, con más probabilidad cuantas más líneas cierres de una vez. Aparecen como botones junto al tablero y no suman puntos ni cortan la racha:" + lista([
+        "🔨 <b>Martillo</b> (hasta 3): rompe un triángulo ocupado.",
+        "🔄 <b>Girar</b> (hasta 3): gira 60° una pieza de tu mano.",
+        "🔀 <b>Cambiar mano</b> (hasta 2): descarta tus piezas y recibe tres nuevas.",
+        "💣 <b>Bomba</b> (hasta 2): rompe los triángulos alrededor de un punto del tablero.",
+        "💥 <b>Segunda oportunidad</b> (muy rara, 1): cuando ya no cabe nada, borra la mitad de abajo del tablero."
+      ]) + "Si ninguna pieza cabe pero algún poder puede salvarte, la partida sigue y ese botón late."],
+      ["Controles", lista([
+        "Arrastra con el ratón o con el dedo.",
+        "Teclado: 1, 2 y 3 eligen pieza, las flechas la mueven, Enter la suelta y Esc cancela. Poderes: H martillo, G girar, C cambiar, B bomba, V segunda oportunidad.",
+        "🎨 cambia el tema (Clásico, Halloween, Gris, Forest y Espacio), en modo oscuro o claro, sin perder la partida.",
+        "La partida a medias se guarda en este navegador y se retoma si vuelves antes de 24 horas."
+      ])],
+      ["Clasificación", "Una tabla de <b>Puntos</b> (a igualdad, la partida más corta). Cada partida se rehace con su semilla y sus jugadas antes de guardarse, así que solo cuenta lo que de verdad se jugó."]
+    ]
+  },
   /* 2048 (juegos/club/dosmil/): lo que dice aquí tiene que coincidir con
      motor.js (fusiones, fichas nuevas) y juego.js (controles). */
   dosmil: {
@@ -1114,7 +1144,7 @@ const REGLAS = {
   }
 };
 
-const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", metrorush: "Metro Rush", tulones: "Tulones" };
+const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", trigon: "Trigon", metrorush: "Metro Rush", tulones: "Tulones" };
 
 export const tieneReglas = juego => Object.prototype.hasOwnProperty.call(REGLAS, juego);
 
