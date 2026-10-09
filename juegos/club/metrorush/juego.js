@@ -24,10 +24,10 @@
    - Se perdona el salto un poco antes de tocar el suelo y un poco después
      de dejarlo (búfer y "tiempo de coyote"): sin eso el salto se siente
      "comido" a toda velocidad. */
-import { crearMundo, PALETAS } from './mundo.js?v=metrorush-13';
-import { Sonido } from './audio.js?v=metrorush-13';
-import './mundo-city.js?v=metrorush-13';                        // CITY: el dibujo de City (se engancha a mundo.js por GANCHOS)
-import { crearCiudad } from './ciudad.js?v=metrorush-13';       // CITY: lo que la carrera hace distinto en City
+import { crearMundo, PALETAS } from './mundo.js?v=metrorush-14';
+import { Sonido } from './audio.js?v=metrorush-14';
+import './mundo-city.js?v=metrorush-14';                        // CITY: el dibujo de City (se engancha a mundo.js por GANCHOS)
+import { crearCiudad } from './ciudad.js?v=metrorush-14';       // CITY: lo que la carrera hace distinto en City
 
 const M = window.MetroRushMotor;                               // el motor (motor.js)
 const MP = window.MetroRushPrueba;                            // la prueba de la carrera, para el antitrampas (prueba.js)
@@ -2098,8 +2098,12 @@ function medidasPixel(r) {
   fija('--pp', pp);                                                          // un píxel de la letra chica: sombras y marcos
   fija('--pf-chico', chico);                                                 // metros, nombre de la estación, multiplicador
   fija('--pf-valor', 2 * chico);                                             // los puntos y las monedas: el doble, la misma cuadrícula
-  fija('--pf-banner', ocho(5 * r.height / 100));                             // el letrero grande (5cqh)
-  fija('--pf-banner2', ocho(3 * r.height / 100));                            // su segunda línea (3cqh)
+  /* El letrero va por el alto (5cqh y 3cqh), salvo en un celular vertical: ahí
+     5cqh son 42 px y la letra pixel es cuadrada, así que «Boleto 6 de 10» no
+     cabía en una línea y el letrero tapaba media pantalla. Con el ancho de
+     tope caben unas 16 letras grandes y unas 28 chicas por línea. */
+  fija('--pf-banner', ocho(Math.min(5 * r.height / 100, 0.9 * r.width / 16)));   // el letrero grande
+  fija('--pf-banner2', ocho(Math.min(3 * r.height / 100, 0.9 * r.width / 28)));  // su segunda línea
   fija('--pm', entero(2.4 * u));                                             // el margen del marcador, en píxeles enteros
 }
 async function arranca() {

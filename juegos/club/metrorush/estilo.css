@@ -100,8 +100,8 @@ main.vl { min-width: 0; }
 .banner { position: absolute; left: 50%; top: 30%; transform: translate(-50%, -50%) scale(.9); text-align: center; color: #fff; opacity: 0; pointer-events: none; display: grid; gap: calc(.8cqh); width: 90%; transition: opacity .3s, transform .3s; }
 .banner.ver { opacity: 1; transform: translate(-50%, -50%) scale(1); animation: banner 3s forwards; }
 @keyframes banner { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.7); } 12% { opacity: 1; transform: translate(-50%, -50%) scale(1.06); } 20% { transform: translate(-50%, -50%) scale(1); } 85% { opacity: 1; } 100% { opacity: 0; } }
-.banner strong { font-size: 7.5cqh; line-height: 1.05; }
-.banner span { font-size: 3cqh; opacity: .9; }
+.banner strong { font-size: min(7.5cqh, 11cqw); line-height: 1.05; }   /* en un celular vertical manda el ancho: «Boleto 6 de 10» en una línea */
+.banner > span { font-size: min(3cqh, 4.6cqw); opacity: .9; }   /* «>»: solo la segunda línea; sin él, la «Ó» de «Óxido» (un span dentro del título) salía chica y del color del subtítulo */
 .aviso { position: absolute; left: 50%; bottom: 4cqh; transform: translate(-50%, 20px); max-width: 88%; padding: 1cqh 2.2cqh; border-radius: 99px; background: rgba(10, 12, 22, .78); color: #fff; font-size: 2.4cqh; text-align: center; opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none; }
 .aviso.ver { opacity: 1; transform: translate(-50%, 0); }
 @media (prefers-reduced-motion: reduce) { .banner.ver { animation: none; } }
@@ -151,7 +151,7 @@ main.vl { min-width: 0; }
 /* --- marcador: estética juguete (letras gordas con borde, como un juego de celular) --- */
 .pantalla[data-estilo="juguete"] { --borde: #1b2030; }
 .pantalla[data-estilo="juguete"] .hud, .pantalla[data-estilo="juguete"] .banner { font-family: "Lilita One", "Arial Black", sans-serif; color: #fff; }
-.pantalla[data-estilo="juguete"] :is(.valor, .chico, .estacion > span:first-child, .banner strong, .banner span) {
+.pantalla[data-estilo="juguete"] :is(.valor, .chico, .estacion > span:first-child, .banner strong, .banner > span) {
   text-shadow: 0 .45cqh 0 var(--borde), .28cqh .28cqh 0 var(--borde), -.28cqh .28cqh 0 var(--borde), .28cqh -.28cqh 0 var(--borde), -.28cqh -.28cqh 0 var(--borde), 0 -.28cqh 0 var(--borde), .28cqh 0 0 var(--borde), -.28cqh 0 0 var(--borde); }
 .pantalla[data-estilo="juguete"] .mult { background: #ffc62a; color: #1b2030; padding: .3cqh 1.2cqh .4cqh; border: .45cqh solid #1b2030; border-radius: 1.4cqh; transform: rotate(-7deg); box-shadow: 0 .5cqh 0 #1b2030; }
 .pantalla[data-estilo="juguete"] .moneda { border-radius: 50%; background: radial-gradient(circle at 38% 34%, #fff2a8 0 14%, #ffd23a 15% 58%, #f0a400 59%); border: .45cqh solid #1b2030; box-shadow: inset 0 0 0 .45cqh #ffdf6b, 0 .45cqh 0 #1b2030; }
@@ -160,7 +160,7 @@ main.vl { min-width: 0; }
 /* --- marcador: estética neón (letras de cabina que brillan) --- */
 .pantalla[data-estilo="neon"] .hud, .pantalla[data-estilo="neon"] .banner { font-family: Orbitron, "Arial", sans-serif; font-weight: 700; color: #e9fbff; }
 .pantalla[data-estilo="neon"] :is(.valor, .banner strong) { letter-spacing: .3cqh; text-shadow: 0 0 .6cqh #22e5ff, 0 0 1.8cqh #22e5ff; }
-.pantalla[data-estilo="neon"] :is(.chico, .estacion > span:first-child, .banner span) { color: #ffe9fb; text-shadow: 0 0 .6cqh #ff2bd6, 0 0 1.6cqh #ff2bd6; }
+.pantalla[data-estilo="neon"] :is(.chico, .estacion > span:first-child, .banner > span) { color: #ffe9fb; text-shadow: 0 0 .6cqh #ff2bd6, 0 0 1.6cqh #ff2bd6; }
 .pantalla[data-estilo="neon"] .mult { color: #ffe9fb; padding: .5cqh 1.2cqh; border: .3cqh solid #ff2bd6; border-radius: .6cqh; text-shadow: 0 0 .8cqh #ff2bd6; box-shadow: 0 0 1.4cqh #ff2bd6, inset 0 0 1.2cqh rgba(255, 43, 214, .5); }
 .pantalla[data-estilo="neon"] .moneda { border-radius: 50%; border: .4cqh solid #ffe14d; box-shadow: 0 0 1.2cqh #ffe14d, inset 0 0 0 .7cqh #0a0620, inset 0 0 0 1.1cqh #ffe14d; }
 .pantalla[data-estilo="neon"] .pausa { border: .3cqh solid #22e5ff; border-radius: .8cqh; color: #e9fbff; background: rgba(10, 6, 32, .55); box-shadow: 0 0 1.4cqh #22e5ff; }
@@ -182,7 +182,7 @@ main.vl { min-width: 0; }
 .pantalla[data-estilo="pixel"] .hud .valor { font-size: var(--pf-valor); line-height: 1; }
 .pantalla[data-estilo="pixel"] .hud .chico, .pantalla[data-estilo="pixel"] .estacion { font-size: var(--pf-chico); line-height: 1.5; }
 .pantalla[data-estilo="pixel"] .estacion { gap: calc(2 * var(--pp)); }
-.pantalla[data-estilo="pixel"] :is(.valor, .chico, .estacion > span:first-child, .mult, .patinetas b, .banner strong, .banner span) { --o: .125em; --c: #2a1c18;
+.pantalla[data-estilo="pixel"] :is(.valor, .chico, .estacion > span:first-child, .mult, .patinetas b, .banner strong, .banner > span) { --o: .125em; --c: #2a1c18;
   text-shadow: var(--o) 0 0 var(--c), calc(-1 * var(--o)) 0 0 var(--c), 0 var(--o) 0 var(--c), 0 calc(-1 * var(--o)) 0 var(--c),
     var(--o) var(--o) 0 var(--c), calc(-1 * var(--o)) var(--o) 0 var(--c), var(--o) calc(-1 * var(--o)) 0 var(--c), calc(-1 * var(--o)) calc(-1 * var(--o)) 0 var(--c), 0 calc(2 * var(--o)) 0 var(--c); }
 /* Las mayúsculas con tilde (juego.js, ponConTildes): la fuente pixel dibuja
@@ -202,7 +202,7 @@ main.vl { min-width: 0; }
 .pantalla[data-estilo="pixel"] .banner.ver { transform: none; animation: banner-px 3s steps(1, end) forwards; }
 @keyframes banner-px { 0% { opacity: 0; } 4% { opacity: .5; } 8% { opacity: 1; } 85% { opacity: 1; } 92% { opacity: .5; } 100% { opacity: 0; } }
 .pantalla[data-estilo="pixel"] .banner strong { font-size: var(--pf-banner); line-height: 1.5; }   /* la letra pixel no trae aire entre líneas: con 1 las dos líneas se tocaban */
-.pantalla[data-estilo="pixel"] .banner span { font-size: var(--pf-banner2); line-height: 1.5; opacity: 1; }
+.pantalla[data-estilo="pixel"] .banner > span { font-size: var(--pf-banner2); line-height: 1.5; opacity: 1; }
 .pantalla[data-estilo="pixel"] .mult { font-size: var(--pf-chico); line-height: 1; padding: calc(2 * var(--pp)); margin: 0 calc(2 * var(--pp)); background: #e2463a; color: #fff1d4;
   box-shadow: 0 calc(-2 * var(--pp)) 0 #2a1c18, 0 calc(2 * var(--pp)) 0 #2a1c18, calc(-2 * var(--pp)) 0 0 #2a1c18, calc(2 * var(--pp)) 0 0 #2a1c18; }
 .pantalla[data-estilo="pixel"] .moneda { width: calc(12 * var(--pp)); height: calc(16 * var(--pp)); margin: 0 calc(2 * var(--pp)); background: #ffd23f;

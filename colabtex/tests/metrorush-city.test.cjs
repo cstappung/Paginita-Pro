@@ -515,7 +515,7 @@ function tramo(objs, { fps = 60, V = 20, desde = 0, hasta = 60, y0 = 0, vy0 = 0,
   }
   return { choque: null, D, y: r.y, carril: r.carril, lanzado, pisado, riel, maxY, minRiel };
 }
-const RITMOS = [20, 30, 60, 144], VELS = [16, 24, 32, 40, 46];
+const RITMOS = [20, 30, 60, 144], VELS = [16, 24, 32, 40, 46, 53, 60];   // hasta el tope de City (60 m/s)
 /* «De frente choca» se mira desde 60 cuadros/s: a 20 un cuadro avanza
    hasta 2,3 m y un objeto corto (un dron mide 0,9 m; una barrera baja de la
    Línea 3, 0,24) puede quedar entre dos cuadros. Pasa igual en el clásico;
@@ -597,7 +597,7 @@ const vagones = (c, d0, n) => Array.from({ length: n }, (_, i) => ({ tipo: 'tren
 test('el cobertizo (Barrio Sur): de frente choca; un salto al techito y otro al vagón te dejan arriba', () => {
   for (const fps of RITMOS) for (const V of VELS) {
     const largo = Math.ceil(V * 0.8) + 4, cob = { tipo: 'cobertizo', carril: 1, d0: 40, largo, alto: C.COBERTIZO.alto };
-    const objs = [cob, ...vagones(1, 40 + largo, 2)], fin = 40 + largo + 2 * (M.LARGO_VAGON + 0.4);
+    const nv = C.vagonesCobertizo(V), objs = [cob, ...vagones(1, 40 + largo, nv)], fin = 40 + largo + nv * (M.LARGO_VAGON + 0.4);   // los vagones que pone el generador a esa velocidad
     if (CHOCA(fps)) assert.equal(tramo(objs, { fps, V, desde: 20 }).choque, 'cobertizo', `${fps}/${V}: de frente choca`);
     // el primer salto, ~0,3 s antes (el salto pasa 1,55 m a los 0,2 s); el segundo, desde el techito, ~0,25 s antes del vagón
     const accion = (D, r) => {
@@ -610,6 +610,8 @@ test('el cobertizo (Barrio Sur): de frente choca; un salto al techito y otro al 
     // quedarse en el techito sin el segundo salto es chocar con el vagón
     if (CHOCA(fps)) assert.equal(tramo(objs, { fps, V, desde: 20, hasta: fin, accion: (D, r) => { if (!r.enAire && r.y < 0.5 && 40 - D < V * 0.3 && D < 40) salta(r); } }).choque, 'tren', `${fps}/${V}: sin el segundo salto, el vagón`);
   }
+  // los vagones del cobertizo crecen solo pasado el tope viejo de City (46 m/s): las pistas de la versión 2 no cambian
+  assert.equal(C.vagonesCobertizo(46), 2); assert.equal(C.vagonesCobertizo(60), 3);
   // el techito sostiene solo desde arriba y en su carril
   const cob = { tipo: 'cobertizo', carril: 1, d0: 40, largo: 20 };
   assert.equal(M.soporte([cob], X[1], 50, 1.6).h, C.COBERTIZO.alto); assert.equal(M.soporte([cob], X[1], 50, 1).h, 0); assert.equal(M.soporte([cob], X[0], 50, 2.1).h, 0);

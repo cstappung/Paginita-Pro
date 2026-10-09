@@ -44,7 +44,7 @@
    (ver `legible` y `realza` en mundo.js) y se lee de lejos en todos los
    estilos. La escenografía no lleva «!». */
 import * as THREE from 'three';
-import { PALETAS, GANCHOS, piezas } from './mundo.js?v=metrorush-13';
+import { PALETAS, GANCHOS, piezas } from './mundo.js?v=metrorush-14';
 
 const MOTOR = window.MetroRushMotor;                    // el motor (con City instalado por city.js)
 const CITY = MOTOR && MOTOR.CITY;                       // las medidas y los datos de City (city.js)

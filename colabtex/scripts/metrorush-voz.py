@@ -26,15 +26,21 @@ POR QUÉ ASÍ
     recortada a la banda de un parlante de bocina (300 a 3400 Hz), con un
     poco de saturación del parlante, un eco corto de andén (la pared de
     enfrente, ~70 ms) y una sala de concreto (reverb de 1,1 s, poca mezcla).
-  - Mono, 22 050 Hz y 48 kbps: un anuncio de 5 s pesa ~30 kB y los veinte
-    juntos menos de 1 MB.
+  - Mono, a la frecuencia de la voz (16 000 Hz con carlfm) y 48 kbps: un
+    anuncio de 5 s pesa ~30 kB y los veinte juntos menos de 1 MB. Los 16 kHz
+    no se notan: el parlante de andén corta igual en 3400 Hz.
 
-Voz (https://huggingface.co/rhasspy/piper-voices, carpeta es/es_MX/):
-  es_MX-claude-high  (dataset apache-2.0)   · la voz de la empresa y de Marta
-Se descargan el .onnx y el .onnx.json en una carpeta y se pasa con --voces.
+Voz: es-carlfm-x-low (dataset de carlfm01, dominio público), del release
+v0.0.2 de Piper en GitHub:
+  https://github.com/rhasspy/piper/releases/download/v0.0.2/voice-es-carlfm-x-low.tar.gz
+Se descomprime en una carpeta (trae el .onnx y el .onnx.json) y se pasa con
+--voces. Se eligió esa porque se baja de GitHub; las de huggingface
+(es_MX-claude-high…) suenan mejor y sirven igual con --voz si se tienen.
+Las dos de MLS de ese mismo release (es-mls_*) no sirven con piper-tts 1.8:
+una frase de 5 s sale de 28 s, balbuceando.
 
   pip install piper-tts numpy scipy soundfile lameenc
-  python3 colabtex/scripts/metrorush-voz.py --voces /ruta/a/voces
+  python3 colabtex/scripts/metrorush-voz.py --voces /ruta/a/voces             # con es-carlfm-x-low
   python3 colabtex/scripts/metrorush-voz.py --voces /ruta --solo oxido --wav /tmp/wav
   python3 colabtex/scripts/metrorush-voz.py --voces /ruta --revisa   # transcribe y compara (faster-whisper)
 """
@@ -44,10 +50,10 @@ import numpy as np
 import soundfile as sf
 from scipy.signal import butter, sosfilt
 
-SR = 22050                                                    # la frecuencia de Piper (voces «high» y «medium»)
+SR = 16000                                                    # la frecuencia de la voz (se lee de su .onnx.json en main)
 AQUI = os.path.dirname(os.path.abspath(__file__))             # colabtex/scripts
 METRO = os.path.normpath(os.path.join(AQUI, '..', '..', 'juegos', 'club', 'metrorush'))   # la carpeta del juego
-VOZ = 'es_MX-claude-high'                                     # la voz de todos los anuncios
+VOZ = 'es-carlfm-x-low'                                       # la voz de todos los anuncios (cambia con --voz)
 LARGO = 1.12                                                  # >1 = más lento: un altavoz habla sin apuro
 CUALES = ('proxima', 'eco')                                   # los dos anuncios de cada estación (los mismos de audio.js)
 
@@ -193,13 +199,17 @@ def revisa(ruta, texto):
 
 
 def main():
-    global ARGS
+    global ARGS, VOZ, SR
     ap = argparse.ArgumentParser()
-    ap.add_argument('--voces', required=True, help='carpeta con es_MX-claude-high.onnx y su .onnx.json')
+    ap.add_argument('--voces', required=True, help='carpeta con el .onnx de la voz y su .onnx.json')
+    ap.add_argument('--voz', default=VOZ, help='nombre de la voz (sin .onnx); por defecto ' + VOZ)
     ap.add_argument('--wav', help='carpeta donde dejar también los .wav (para revisarlos)')
     ap.add_argument('--solo', help='solo la estación con este id (barrio, ocaso…)')
     ap.add_argument('--revisa', action='store_true', help='transcribe cada MP3 con faster-whisper y lo muestra junto al texto')
     ARGS = ap.parse_args()
+    VOZ = ARGS.voz                                            # la voz elegida
+    with open(os.path.join(ARGS.voces, VOZ + '.onnx.json'), encoding='utf-8') as f:
+        SR = json.load(f)['audio']['sample_rate']             # todo el proceso (filtros, eco, sala, MP3) va a la frecuencia de la voz
     salida = os.path.join(METRO, 'assets', 'voz')
     os.makedirs(salida, exist_ok=True)
     total = 0

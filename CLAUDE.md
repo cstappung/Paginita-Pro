@@ -3623,11 +3623,14 @@ Things that matter:
   times the multiplier. The base multiplier goes ×1 → ×30 by completing
   missions (three per level, `retosDeNivel(nivel)`, seeded); each star picked
   up adds +1 for the run (up to +29) and the 2× power-up doubles the lot.
-  Speed is a **linear ramp with a cap**: 15 m/s, +0.1 m/s every second, 50
-  m/s from 350 s on (~11.4 km; it was 13→30 approaching a ceiling and felt
-  slow). A ceiling-approaching curve could only reach 50 by being 31 m/s at
-  the first minute; the ramp keeps the start (21 m/s at 1 min) and makes 50
-  the prize of a long run, after the obstacle density peaks (~7.7 km). The
+  Speed is a **linear ramp with a cap**: 15 m/s, +0.1 m/s every second, 60
+  m/s from 450 s on (~16.9 km; City: 16 → 60 at +0.11). The cap was 50
+  (46 in City) until proof version 3: `VELOCIDAD_V2` and `VERSIONES = [2,
+  3]` keep version-2 proofs replaying with their old curve and track, which
+  are identical to the new ones up to the old cap, so an honest old run
+  never turns into a cheat. A ceiling-approaching curve could only reach
+  the cap by being 31 m/s at the first minute; the ramp keeps the start
+  (21 m/s at 1 min) and makes the top speed the prize of a long run. The
   curve lives once, in `M.VELOCIDAD`: `velocidad`, the anti-cheat's
   `metrosEntre` (exact: d = V0·t + a·t²/2) and the generator's `velocidadEn`
   (exact too: v² = V0² + 2·a·d) all come from it, so changing the speed is
@@ -3635,7 +3638,11 @@ Things that matter:
   Two things scale with it: rows never come closer than `FILA_MIN_S` (0.55
   s) apart, which only matters above ~33 m/s, and the skid the anti-cheat
   allows when the inspector catches you is VMAX²/(2·`FRENADA`) + 2 m (a
-  fixed 12 m rejected honest runs caught at 50 m/s). A newcomer makes
+  fixed 12 m rejected honest runs caught at top speed). The coin arc over a
+  low barrier is drawn on the jump's own parabola at that metre's speed
+  (`arcoMonedas`), and `recoge` checks what the runner crossed during the
+  frame (feet height interpolated), not only where it ended:
+  `tests/metrorush-arco.test.cjs` jumps every arc at 20–144 fps. A newcomer makes
   ~25 k in two minutes, a great run reaches 1 M in 6–7 minutes, and a
   veteran at ×30 in about three.
 - **Progress is Subway Surfers' own loop.** Missions come in sets of three
@@ -3727,12 +3734,23 @@ Things that matter:
   and take the place of graffiti slots (`decoraMuro`), so they add no draw
   calls; the same goes for the story graffiti (`LORE`). The **altavoz**
   (`#altavoz`, an amber strip at the top, `ANUNCIOS` per station) speaks
-  with a synthesised ding-dong (`sonido.dingDong()`, no speech) when the
+  with a synthesised ding-dong (`sonido.dingDong()`) followed by a
+  **recorded voice** (`assets/voz/<station>-<proxima|eco>.mp3`, ~700 kB in
+  all, played by `audio.js`'s `anuncio`, which ducks the music) when the
   tunnel to a station starts, where there is nothing to dodge, and once
   more halfway through the station (`altavoz()` in `juego.js`) only when
   no hint, banner or obstacle in your lane within 2.2 s competes with it.
   All of it is gated by `mundo.lore()`, on for the metro world only, so
-  City gets none of it. With a style locked in the options
+  City gets none of it. The voice is rendered once by
+  `colabtex/scripts/metrorush-voz.py` (Piper, voice `es-carlfm-x-low`,
+  public domain, from Piper's GitHub release because huggingface was not
+  reachable; then a platform-speaker chain: 300–3400 Hz, horn presence,
+  slight saturation, a 70 ms wall echo and a concrete room). The text in
+  `ANUNCIOS` is both what the strip shows and what was recorded: **change
+  an announcement and re-run the script** (`DICCION` turns «317» into
+  «tres diecisiete» for the voice only). `tests/metrorush-voz.test.cjs`
+  checks one MP3 per announcement and that `textos.json` still matches.
+  With a style locked in the options
   (`estacionVisual`) the posters are those of the locked palette.
 - **The three new stations are their own scenery** (`escenarios.js`:
   `paletasNuevas`, `PROPS`, `cielo`, `ambiente`): Mercado (stalls, lantern
@@ -4032,9 +4050,13 @@ Things that matter:
   one small `ventaja` that never touches metres or the multiplier. On top of
   cajones, drones, barandas and lonas it carries Subway Surfers City's newer
   pieces: energy cells (`energia`, ten light the free electric board for
-  `TABLA_SEG`; only in modes with a skateboard), the `bateria` and
-  `monedas2` powers, the chicle's bounce («roll» in the air goes up, once
-  per jump), drones that launch you when stepped on, floor grates
+  `TABLA_SEG`; only in modes with a skateboard). **City has no shop
+  skateboards**: the board is only that electric one, charged by cells or
+  the `bateria` power, so the HUD's skateboard counter is hidden there. The `bateria` and
+  `monedas2` powers, the **chicle** (like SS City's Bubble Gum: 15 s,
+  jumps 15 % higher, «roll» in the air is a ground-pound that bounces you
+  back up to 3.6 m, and it also pulls coins in while airborne,
+  `imanChicle`), drones that launch you when stepped on, floor grates
   (`rejilla`) opened by a ground-pound, containers that drop from the cranes
   in Los Muelles (`cae`, `alturaCae`: always on the ground 12 m before you)
   and low-gravity `burbujas` stretches in the park with one extra jump.
@@ -4096,11 +4118,24 @@ Things that matter:
   barrier and a drone like a high one, since City has neither barrier.
 
   `tests/metrorush-city.test.cjs` checks each piece frame by frame (20–144
-  fps, 16–46 m/s), that each one appears only in its district and often,
+  fps, 16–60 m/s), that each one appears only in its district and often,
   and the mix itself: zero classic pieces, each district's defining share
   (cobertizo ≥ 5 %, crates + beams ≥ 50 %, rails ≥ 28 %, hedges ≥ 40 %,
   drones + ducts ≥ 30 %) and an L1 distance ≥ 0.45 between any two
   districts' mixes. Change a `PERFIL` and re-measure.
+
+  **Collisions are swept, in both worlds** (`choques` in `juego.js`): a
+  piece shorter than the frame's advance (a crate, a drone, a hedge at
+  60 m/s and 20 fps is 3 m per frame) is tested at the instant it was
+  crossed, with x and y interpolated from `xPrev`/`yAntes`, so it cannot
+  be tunnelled through. `CITY.enLona(o, x, D, y, Dantes, vy)` is swept the
+  same way (the vapor blows over its whole column, the lona only from the
+  ground). The test robot mirrors both, and plans **frame by frame**
+  (`bienF`: where each frame will fall is known from the curve), because a
+  lane-change window one metre wide is skipped at 2.9 m per frame; with
+  that, 24 seeds × 2 modes × 17.5 km run clean at 20, 24, 30, 60 and 144
+  fps. Every crash the metre-level robot reported at low fps was the robot
+  missing that window, not the track.
 - **Fullscreen**: ⛶ on the title screen and in the pause panel, or `F`,
   calls `requestFullscreen` on the document (webkit fallback; the button
   hides where the API is missing, i.e. iPhone). `html.mr-pc` (and

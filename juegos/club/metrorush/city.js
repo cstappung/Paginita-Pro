@@ -346,6 +346,15 @@
      60 m/s el vuelo caía a 3 m del final), así a toda velocidad no se pasa
      de largo y aterriza en el suelo detrás. */
   const vagonesLona = V => limita(Math.ceil((vueloLona(V) + 6 - huecoLona(V)) / (LARGO_VAGON + 0.4)), 2, 6);
+  /** Cuántos vagones van pegados al COBERTIZO a la velocidad V: los que hacen
+      falta para caer arriba saltando desde el techito. Ese salto (de 2 m a
+      la cima de 4,1 y de vuelta a 3,35, el techo) dura 0,64 s y sale ~0,25 s
+      antes del primer vagón, así que aterriza ~0,39·V m adentro de la fila;
+      con 5 m de margen (cada vagón ocupa 11,7 m con su junta). Hasta 46 m/s son los dos de siempre (por eso las
+      pistas de la versión 2, con ese tope, no cambian); a 60 m/s, tres: con
+      dos, el salto pasaba por encima de toda la fila y la ruta de arriba se
+      acababa en el aire. Ejemplo: vagonesCobertizo(60) → 3. */
+  const vagonesCobertizo = V => limita(Math.ceil((V * 0.39 + 5) / (LARGO_VAGON + 0.4)), 2, 4);
 
   /* ---------- El bloque de pista de City ----------
      Se llama en cada vuelta del generador (ver crearGenerador en motor.js),
@@ -629,7 +638,7 @@
       const largo = Math.ceil(V * 0.8) + 4;                      // ~0,8 s sobre el techito: aterrizar tarde y aun así saltar a tiempo
       api.emite({ tipo: "cobertizo", carril: L, d0: dr, largo, alto: COBERTIZO.alto });
       rejilla(api, st, c, dr + 4);                               // el camino, abajo: a veces una rejilla del pisotón
-      const n = 2 + (hashD(dr, 7) < dif ? 1 : 0);                // dos vagones (tres, si es difícil), pegados al techito
+      const n = Math.max(vagonesCobertizo(V), 2 + (hashD(dr, 7) < dif ? 1 : 0));   // dos vagones (tres si es difícil, y los que pida la velocidad), pegados al techito
       const fin = bajada(api, L, trenes(api, L, dr + largo, n));
       if (!api.peligro) {
         for (let i = 1; i <= 3; i++) api.emite({ tipo: "moneda", carril: L, d: dr - 6 + i * 1.6, y: 0.9 + i * 0.5 });   // la subida al techito
@@ -885,7 +894,7 @@
   Object.assign(W, { estaciones: DISTRITOS, vuelta: VUELTA, intro: INTRO, boletos: POSTALES, velocidad: VELOCIDAD_CITY, velocidadV2: VELOCIDAD_CITY_V2,
     generador, personajes: PERSONAJES, tema: "city-sur" });
   M.ESTACIONES_CITY = DISTRITOS; M.INTRO_CITY = INTRO; M.BOLETOS_CITY = POSTALES;
-  M.CITY = { DISTRITOS, VUELTA, VELOCIDAD: VELOCIDAD_CITY, INTRO, POSTALES, PERSONAJES, ventajaDe, CAJON, DRON, BARANDA, LONA, PISA, PISA_DRON, pisa, enLona, impulsoLona, vueloLona, huecoLona, vagonesLona, PERFIL, PROPIO,
+  M.CITY = { DISTRITOS, VUELTA, VELOCIDAD: VELOCIDAD_CITY, INTRO, POSTALES, PERSONAJES, ventajaDe, CAJON, DRON, BARANDA, LONA, PISA, PISA_DRON, pisa, enLona, impulsoLona, vueloLona, huecoLona, vagonesLona, vagonesCobertizo, PERFIL, PROPIO,
     ENERGIA_LLENA, TABLA_SEG, MONEDAS2_SEG, CHICLE, DRON_IMPULSO, REJILLA, BURBUJAS, alturaCae,
     COBERTIZO, CONDUCTO, SETO, VIGA, alturaViga };
   return M;
