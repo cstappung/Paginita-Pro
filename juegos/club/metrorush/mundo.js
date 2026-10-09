@@ -848,7 +848,7 @@ class Kit {
     pasos.push(() => {                                                         // árboles, faroles y postes: instancias
       const libres = []; const serie = (g, max) => { const s = new Serie(g, max); libres.push(s); return s; };
       this.series = {
-        arbol: this.neon ? [] : [0, 1, 2].map(() => { const g = this.arbol(); g.scale.setScalar(1); return serie(g, 40); }),   // tres árboles distintos, cada uno muchas veces (en neón no hay)
+        arbol: this.neon && !this.pal.arbolesNeon ? [] : [0, 1, 2].map(() => { const g = this.arbol(); g.scale.setScalar(1); return serie(g, 40); }),   // tres árboles distintos, cada uno muchas veces (en neón no hay)
         farol: { [-1]: serie(this.farol(-1, true), 24), [1]: serie(this.farol(1, true), 24) },
         poste: { [-1]: serie(this.poste(-1, true), 14), [1]: serie(this.poste(1, true), 14) }
       };
@@ -857,6 +857,7 @@ class Kit {
     });
     for (const cl of ['iman', 'mochila', 'zapatillas', 'doble', 'caja']) pre('poder-' + cl, () => this.poder(cl), 1);
     pre('estrella', () => this.estrella(), 2); pre('boleto', () => this.boleto(), 1);
+    if (this.pasosCity) this.pasosCity(pre);                                   // CITY: las reservas de los objetos de City (mundo-city.js)
     pasos.push(() => { this.via = this.armaVia(); this.cielo = this.armaCielo(); this.monedas = this.armaMonedas(); this.via.name = 'via:' + this.clave; this.cielo.name = 'cielo:' + this.clave; this.listo = true; });
     return pasos;
   }
@@ -979,6 +980,7 @@ class Kit {
       Como objetos del juego ("!"): en neón su cuerpo ya no queda casi negro
       dentro del halo, se ve el imán rojo, la mochila, las zapatillas. */
   poder(clase) {
+    if (clase === 'chicle' && this.chicle) return this.chicle();              // CITY: el chicle (mundo-city.js)
     const c = this.c, a = new Arma(this), g0 = new THREE.Group();
     const anillo = { iman: 0xff5a5a, mochila: 0xffb02e, zapatillas: 0x6aff8a, doble: 0x5fb0ff, caja: 0xffd23f }[clase];
     if (clase === 'iman') {
@@ -1035,6 +1037,7 @@ class Kit {
       edificio suelto eran ~7 llamadas al GPU, una por material; la cuadra
       entera usa casi los mismos materiales, así que cuesta lo de uno. */
   edificio(lado) {
+    if (this.pal.distrito && this.cuadraCity) return this.cuadraCity(lado);   // CITY: los distritos tienen sus propias cuadras (mundo-city.js)
     const az = this.az, a = new Arma(this), n = az() < 0.65 ? 3 : 2;
     const toldo = Math.floor(az() * this.c.toldos.length);
     const partes = [];
@@ -1099,6 +1102,7 @@ class Kit {
   }
   /** Un árbol low-poly: tronco y tres copas facetadas. */
   arbol() {
+    if (this.pal.distrito && this.arbolCity) { const g = this.arbolCity(); if (g) return g; }   // CITY: palmeras en el bulevar (mundo-city.js)
     const c = this.c, az = this.az, a = new Arma(this);
     a.pon(new THREE.CylinderGeometry(0.11, 0.17, 1.7, 8), 'plano', c.tronco, [0, 0.85, 0]);
     for (let k = 0; k < 3; k++) {
@@ -1286,6 +1290,27 @@ class Kit {
   }
 }
 
+/* ===================================================================
+   CITY: los ganchos del mundo City (mundo-city.js)
+   ===================================================================
+   El dibujo de City (los cinco distritos, sus objetos, los rasgos de sus
+   personajes, la burbuja del chicle) vive en mundo-city.js, que importa este
+   módulo, le agrega lo suyo a PALETAS y al Kit, y llena GANCHOS. Así este
+   archivo solo lleva unas pocas líneas marcadas «CITY:» en los lugares donde
+   se pregunta por un gancho, y sin City cargado nada cambia.
+   `piezas` son las herramientas internas que mundo-city.js necesita (no hay
+   otra forma de compartirlas entre módulos que exportarlas). */
+export const GANCHOS = {
+  paleta: null,      // (clave) → una paleta que no está en PALETAS (las de City con otro estilo: 'muelles@neon'), o null
+  objeto: null,      // (kit, o) → el dibujo de un objeto de la pista de City (cajón, dron…), o null si no es suyo
+  viste: null,       // (partes del corredor, kit, apariencia, pelo) → agrega los rasgos de un personaje de City
+  crea: null         // ({escena}) → los efectos de City en la escena (la burbuja, los trozos): {paso(e, corredor), …}
+};
+export const piezas = {
+  Kit, Arma, Serie, CAJA, CILINDRO, CILINDRO_CHICO, ESFERA, redonda, prepara, funde, matriz, uvMundo, franja, sprite, texBrillo,
+  variante, BASE_JUGUETE, BASE_PIXEL, BASE_NEON, TEX, aTextura, lienzo, hexCss, azarDe, SUELO, CARRILES, TECHO, L_VAGON
+};
+
 /** Tiñe (o devuelve a su oro) el material de las monedas: en el modo «Sin
     monedas» tocarlas mata, así que tienen que leerse como peligro de un
     vistazo, rojas y con brillo propio (el neón no tiene `emissive`: con el
@@ -1366,7 +1391,7 @@ function sprite(col, escala, pos, opacidad = 1) {
 /** Arma el corredor articulado con los colores de su aspecto.
     Devuelve las articulaciones para poder posarlo en cada cuadro. */
 function armaCorredor(kit, asp) {
-  const piel = 0xf1c19c, pelo = 0x3b2a20;
+  const piel = asp.piel ?? 0xf1c19c, pelo = asp.pelo ?? 0x3b2a20;          // CITY: un personaje de City trae su piel y su pelo
   const raiz = new THREE.Group(), cuerpo = new THREE.Group(); raiz.add(cuerpo);
   const parte = (padre, construir, pos = [0, 0, 0]) => {                   // una pieza rígida (fundida) colgada de una articulación
     const a = new Arma(kit); construir(a); const m = a.hecho(); m.position.set(pos[0], pos[1], pos[2]); padre.add(m); return m;
@@ -1465,6 +1490,7 @@ function armaCorredor(kit, asp) {
   const sombra = new THREE.Mesh(new THREE.CircleGeometry(0.45, 20), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.28, depthWrite: false }));
   sombra.material.userData.propio = true;                                      // es solo de este corredor: se suelta con él
   sombra.rotation.x = -Math.PI / 2; sombra.position.y = 0.01;
+  if (GANCHOS.viste && asp.peinado) GANCHOS.viste({ cab, torso, pelvis, piernas }, kit, asp, pelo);   // CITY: peinado y falda (mundo-city.js)
   raiz.scale.setScalar(0.95);
   return { raiz, cuerpo, pelvis, torso, cab, piernas, brazos, cohete, llamas, tabla, pogo, resorte, aura, sombra };
 }
@@ -1706,6 +1732,7 @@ export function crearMundo(canvas) {
   let monedasRojas = false;                                                   // ¿las monedas son un peligro? (modo «Sin monedas»)
   let particulas = null, trenFantasma = null, tiempoFantasma = 0;
   const camPos = new THREE.Vector3(0, 4.7, 8.6), camMira = new THREE.Vector3(0, 0.4, -9);
+  const visCity = GANCHOS.crea ? GANCHOS.crea({ escena }) : null;             // CITY: los efectos de City (mundo-city.js), si está cargado
 
   /* ---- la sensación de velocidad (solo para el ojo) ----
      Nada de esto mueve al corredor: la velocidad de verdad, los metros y los
@@ -1728,7 +1755,7 @@ export function crearMundo(canvas) {
      `quieto` el ajuste del sistema «reducir movimiento»; sin sacudir no hay
      temblor, balanceo ni ladeo, y quieto además quita las líneas y achica
      el golpe de lente. */
-  const VEL = MOTOR.VELOCIDAD;                                                // {V0, VMAX}: la misma curva del juego y del antitrampas
+  let VEL = MOTOR.VELOCIDAD;                                                  // {V0, VMAX}: la misma curva del juego y del antitrampas (CITY: la cambia `curva`, City tiene la suya)
   const SENS = {
     FOV_VEL: 11,        // grados que se abre el lente a toda velocidad (k = 1)
     FOV_VUELO: 5,       // grados más mientras se vuela con la mochila
@@ -1914,6 +1941,8 @@ export function crearMundo(canvas) {
     if (o.tipo === 'moneda') { o.vis = { moneda: true }; monedas.add(o); return; }
     // el túnel se anota una sola vez (o.vis marcado): antes se volvía a pedir en cada cuadro y sinPaisaje crecía sin parar
     if (o.tipo === 'tunel') { if (tunelObj !== o) { tunelObj = o; sinPaisaje.push([o.d0, o.d0 + o.largo]); } o.vis = { tunel: true }; return; }
+    const objCity = GANCHOS.objeto ? GANCHOS.objeto(kit, o) : null;           // CITY: cajones, drones, barandas, lonas, estrellas secretas
+    if (objCity) { o.vis = { obj: objCity, kit }; dinamicos.add(o); return; }
     let obj;
     if (o.tipo === 'tren') {                                                  // uno que viene de frente (vel > 0) sale de otra reserva: la de los focos encendidos
       const i = (o.id || 0) % 3, marcha = o.vel > 0;
@@ -2078,7 +2107,7 @@ export function crearMundo(canvas) {
   function kitDe(estacion) {
     const clave = estacion.paleta;
     if (!kits.has(clave)) {
-      const k = new Kit(mundo, clave, PALETAS[clave] || PALETAS.barrio);
+      const k = new Kit(mundo, clave, PALETAS[clave] || (GANCHOS.paleta && GANCHOS.paleta(clave)) || PALETAS.barrio);   // CITY: 'muelles@neon' la arma mundo-city.js
       escena.add(k.almacen);
       kits.set(clave, k);
     }
@@ -2199,6 +2228,7 @@ export function crearMundo(canvas) {
     // objetos del juego
     for (const o of dinamicos) {
       const obj = o.vis.obj;
+      if (obj.userData.colocar) { obj.userData.colocar(o, D, e.t); continue; }   // CITY: los objetos de City se colocan (y animan) solos
       if (o.tipo === 'tren') {
         obj.position.z = -(o.d0 + o.largo / 2 - D);
         const faro = obj.userData.faro;
@@ -2290,6 +2320,7 @@ export function crearMundo(canvas) {
       r.sombra.position.set(e.x, (e.suelo || 0) + SUELO + 0.01, 0);
       r.sombra.scale.setScalar(Math.max(0.4, 1 - (e.y - (e.suelo || 0)) * 0.15));
     }
+    if (visCity) visCity.paso(e, corredor);                                  // CITY: la burbuja del chicle y los trozos de lo que se pisó
     // el inspector y el perro (vienen detrás cuando tropiezas)
     if (perse) {
       const k = e.perseguidor || 0, vis = k > 0.01;
@@ -2475,6 +2506,11 @@ export function crearMundo(canvas) {
     /** Qué movimientos de cámara se permiten (ver «la sensación de velocidad»):
         `sacudir` = la opción del juego; `quieto` = el sistema pide reducir el movimiento. */
     movimiento(o) { Object.assign(mov, o); },
+    /** CITY: la curva de velocidad con que se mide la sensación de velocidad
+        ({V0, VMAX}): la del mundo de la carrera (City tiene la suya). */
+    curva(V) { if (V && V.VMAX > V.V0) VEL = V; },
+    /** CITY: los efectos de City (null sin mundo-city.js): chicle(si), rompe(o, col). */
+    city: visCity,
     /** Pinta las monedas de rojo (y latiendo) si `si`: el modo «Sin monedas». */
     monedasPeligro(si) { monedasRojas = !!si; },
     /** Un brillito donde se tomó una moneda o un poder. */

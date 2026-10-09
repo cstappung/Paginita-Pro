@@ -26,6 +26,8 @@
      "comido" a toda velocidad. */
 import { crearMundo, PALETAS } from './mundo.js?v=metrorush-7';
 import { Sonido } from './audio.js?v=metrorush-7';
+import './mundo-city.js?v=metrorush-7';                        // CITY: el dibujo de City (se engancha a mundo.js por GANCHOS)
+import { crearCiudad } from './ciudad.js?v=metrorush-7';       // CITY: lo que la carrera hace distinto en City
 
 const M = window.MetroRushMotor;                               // el motor (motor.js)
 const MP = window.MetroRushPrueba;                            // la prueba de la carrera, para el antitrampas (prueba.js)
@@ -97,6 +99,7 @@ if (Club && Club.pedirPartida) leeNube();
 const pantalla = $('pantalla'), lienzo = $('lienzo');
 const sonido = new Sonido();
 sonido.ponMudo(opciones.mudo); sonido.volumenes(opciones.musica / 100, opciones.efectos / 100);
+const ciudad = crearCiudad({ M, sonido, aviso: t => aviso(t) });   // CITY: pisar, lonas, barandas, chicle, personajes y postales (ciudad.js)
 let mundo = null;                                             // se crea cuando cargan las fuentes
 const esTactil = matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
 
@@ -111,6 +114,8 @@ function calidadInicial() {
 const PALETA_FIJA = { juguete: 'barrio', neon: 'neon', pixel: 'ocaso' };
 function estacionVisual(e) {
   if (opciones.estilo === 'auto' || e.estilo === opciones.estilo) return e;
+  // CITY: un distrito conserva su ciudad con el estilo fijado («muelles@neon», la arma mundo-city.js)
+  if (e.distrito) return Object.assign({}, e, { estilo: opciones.estilo, paleta: e.paleta + '@' + opciones.estilo });
   return Object.assign({}, e, { estilo: opciones.estilo, paleta: PALETA_FIJA[opciones.estilo] });
 }
 
@@ -246,6 +251,7 @@ const soporte = (x, D, y) => M.soporte(c.activos, x, D, y, c.Dantes);
 /** Mueve al corredor un paso de `dt` segundos. */
 function fisica(dt) {
   const r = c.r;
+  ciudad.antes(c);                                               // CITY: dónde estaban los pies (para pisar cajones y drones)
   // 1) lo que pidió el jugador
   while (pedidos.length) {
     const p = pedidos.shift();
@@ -267,7 +273,7 @@ function fisica(dt) {
     r.saltoBufer -= dt;
     const enSuelo = !r.enAire || c.t - r.ultSuelo < 0.09;
     if (enSuelo && c.poderes.mochila <= 0) {
-      const alto = c.poderes.zapatillas > 0 ? F.alturaZapatillas : F.alturaSalto;
+      const alto = (c.poderes.zapatillas > 0 ? F.alturaZapatillas : F.alturaSalto) * ciudad.salto(c);   // CITY: Nico salta un poco más (solo altura)
       r.vy = M.impulso(alto); r.enAire = true; r.rodar = 0; r.saltoBufer = -1; r.ultSuelo = -1;
       c.cuenta.saltos++;
       if (c.poderes.zapatillas > 0) sonido.saltoAlto(); else sonido.salto();
@@ -295,6 +301,7 @@ function fisica(dt) {
     } else if (!r.enAire && r.y > sop.h + 0.05) r.enAire = true;   // se acabó el tren: cae
   }
   r.suelo = sop.h;
+  if (c.ciudad) ciudad.fisica(c, sop, dt, mundo, tiempoTotal);   // CITY: lonas, deslizarse por la baranda y la burbuja
   if (sop.tren && !c.techos.has(sop.tren.id)) { c.techos.add(sop.tren.id); c.cuenta.techos++; }
   if (r.rodar > 0) r.rodar -= dt;
   if (r.tropezarT >= 0) { r.tropezarT += dt; if (r.tropezarT > 0.45) r.tropezarT = -1; }
@@ -317,6 +324,7 @@ function choques() {
     const X = M.CARRILES[o.carril], lim = k.w + F.medioAncho;
     if (Math.abs(r.x - X) >= lim) continue;                     // no está en mi carril
     if (yb >= k.y1 || yt <= k.y0) continue;                     // lo paso por arriba o por abajo
+    if (c.ciudad && ciudad.pisa(c, o, mundo)) continue;         // CITY: cayendo encima de un cajón o un dron, lo rompes
     if (c.invulnerable > 0) continue;
     const deCostado = Math.abs(r.xPrev - X) >= lim - 0.02;      // recién me metí en su carril
     if (deCostado) tropieza(X); else choca(o);
@@ -334,6 +342,7 @@ function tropieza(X) {
   aviso('¡Cuidado! Don Ramón te pisa los talones');
 }
 function choca(o) {
+  if (c.ciudad && ciudad.salva(c, mundo)) return;               // CITY: la burbuja de chicle revienta y te salva
   if (c.poderes.patineta > 0) {                                 // (en los modos sin patineta nunca hay una puesta)                                 // la patineta se rompe y te salva
     c.poderes.patineta = 0; c.invulnerable = 2; sonido.rompePatineta(); if (opciones.sacudida) mundo.sacude(0.4);
     aviso('¡La patineta te salvó!');
@@ -352,6 +361,7 @@ function muere(motivo) {
   if (motivo !== 'atrapado') { c.V = 0; c.D = Math.max(0, c.D - 0.35); }
   c.r.vy = Math.min(0, c.r.vy); c.r.rodar = 0;                   // si chocó saltando, cae (no sigue subiendo)
   c.pogo = false;                                               // y el pogo se pierde
+  ciudad.cae(c, mundo);                                         // CITY: y la burbuja de chicle
   c.perseguidorObj = 1;
   c.potVentana = 0; pintaPots();                                // los botones de potenciadores se van (y no vuelven al seguir)
   ocultaPista();
@@ -370,7 +380,8 @@ function activaPoder(clase) {
     else { c.monedas += premio.monedas; aviso(premio.gordo ? `¡PREMIO GORDO! +${premio.monedas} monedas` : `Caja misteriosa: +${premio.monedas} monedas`); }
     return;
   }
-  const dur = M.duracionPoder(clase, progreso.mejoras[clase]);
+  if (ciudad.poder(c, clase, mundo)) return;                   // CITY: el chicle no es un poder de la lista (ver ciudad.js)
+  const dur = M.duracionPoder(clase, progreso.mejoras[clase]) + ciudad.extraPoder(c, clase);   // CITY: Lía, +3 s de imán
   c.poderes[clase] = dur;
   c.cuenta.poderes++;
   sonido.poder();
@@ -441,6 +452,9 @@ function recoge(dt) {
       anota('e', o.id);
       c.estrellas = Math.min(M.MAX_ESTRELLAS, c.estrellas + 1); c.cuenta.estrellas++;
       sonido.estrella(); aviso(`Estrella: multiplicador ×${multiplicador()}`); mundo.chispa(r.x, r.y + 1.2, 0, 0xffe066);
+    } else if (o.tipo === 'boleto' && c.ciudad) {                // CITY: una postal (se guarda aparte de los boletos de la Línea 3)
+      sonido.boleto(); banner(ciudad.postal(progreso, o.n), 'Léela en la Libreta');
+      guardar();
     } else if (o.tipo === 'boleto') {
       if (!progreso.boletos.includes(o.n)) { progreso.boletos.push(o.n); progreso.boletos.sort((a, b) => a - b); }
       sonido.boleto(); banner(M.BOLETOS[o.n].titulo, 'Léelo en la Libreta');
@@ -606,6 +620,7 @@ function estaciones() {
       sonido.tocaTema(cb.estacion.musica);
       pantalla.dataset.estilo = estacionVisual(cb.estacion).estilo;
       if (cb.estacion.boleto && c.modo.mundo === 'metro' && !progreso.boletos.includes(cb.estacion.boleto)) { anotaPedido('B', cb.estacion.boleto, o.d0 + o.largo + 260); c.gen.pedirBoleto(cb.estacion.boleto, o.d0 + o.largo + 260); }
+      if (ciudad.faltaPostal(c, progreso, cb.estacion.boleto)) { anotaPedido('B', cb.estacion.boleto, o.d0 + o.largo + 260); c.gen.pedirBoleto(cb.estacion.boleto, o.d0 + o.largo + 260); }   // CITY: la postal del distrito
     }
     if (cb.hecho && c.D >= o.d0 + o.largo - 6) { banner(cb.estacion.nombre, cb.estacion.lema); c.cambio = null; }
   }
@@ -680,12 +695,15 @@ function empezar() {
   cierraPanel();
   c = nuevaCarrera(); ocultaPista();
   mundo.reinicia();
+  ciudad.inicia(c, progreso, mundo);                            // CITY: la curva de velocidad del modo (mundo y sonido) y lo de City
+  vistePuesto();                                                // CITY: en City corre con su personaje de City
   const e = estacionVisual(c.estacion);
   mundo.activa(e, 0);
   pantalla.dataset.estilo = e.estilo;
   for (const o of c.gen.generarHasta(230, { V: c.V })) c.activos.push(o);
   // el boleto de la primera estación (solo en la Línea 3: los boletos guardados son de ese mundo)
   if (c.estacion.boleto && c.modo.mundo === 'metro' && !progreso.boletos.includes(c.estacion.boleto)) { anotaPedido('B', c.estacion.boleto, 420); c.gen.pedirBoleto(c.estacion.boleto, 420); }
+  if (ciudad.faltaPostal(c, progreso, c.estacion.boleto)) { anotaPedido('B', c.estacion.boleto, 420); c.gen.pedirBoleto(c.estacion.boleto, 420); }   // CITY: la postal de Barrio Sur
   estado = 'jugando';
   muestraCapa(null);
   $('hud').hidden = false;
@@ -740,6 +758,7 @@ function pasoSalvar(dt) {
   if (c.salvarT <= 0) muestraFin();
 }
 const MOTIVOS = { atrapado: 'Don Ramón te atrapó', tren: 'Te atropelló un tren', bajo: 'Chocaste con una barrera', alto: 'Te diste con un letrero', rampa: 'Chocaste con una rampa', moneda: 'Tocaste una moneda', abandono: 'Carrera terminada' };
+Object.assign(MOTIVOS, ciudad.MOTIVOS);                       // CITY: cajones, drones y barandas
 let cuentaFin = 0;                                              // para cortar la animación de los puntos si se sale antes
 /** El resumen. La carrera se cierra aquí mismo (monedas, récords, misiones,
     clasificación): después ya no se puede seguir, así que no hay nada que esperar. */
@@ -892,7 +911,7 @@ function eligeModo(id) {
   const otroMundo = m.mundo !== modoSel.mundo;
   modoSel = m; opciones.modo = m.id; guardaOpciones();
   if (Club) Club.category(m.categoria);
-  if (otroMundo) escenaPortada(); else mundo.monedasPeligro(!!m.monedasMatan);
+  if (otroMundo) { escenaPortada(); vistePuesto(); } else mundo.monedasPeligro(!!m.monedasMatan);   // CITY: al cambiar de mundo, su ropa de ese mundo
   sonido.carril();
   pintaPortada();
 }
@@ -956,7 +975,7 @@ function cuadro(ahora) {
     perseguidor: c && !menu ? c.perseguidor : 0, menu
   });
   mundo.dibuja();
-  sonido.tick(c && estado === 'jugando' ? c.V : M.VELOCIDAD.V0);
+  sonido.tick(c && estado === 'jugando' ? c.V : (c ? c.curva.VELOCIDAD : M.VELOCIDAD).V0);   // CITY: el reposo es el V0 de la curva de la carrera
   if (c && (estado === 'jugando' || estado === 'muerte')) pintaHud(dt);
   autoCalidad(dtReal);
 }
@@ -1009,11 +1028,11 @@ function pintaHud(dt) {
   const lista = [];
   for (const [kk, v] of Object.entries(c.poderes)) if (v > 0) {
     const total = kk === 'patineta' ? M.DURACION_PATINETA : M.duracionPoder(kk, progreso.mejoras[kk]);
-    lista.push(`<li class="p-${kk}"><b>${ICONOS[kk === 'patineta' ? 'patineta' : ICONO_PODER[kk]]}</b><span><i style="--k:${(v / total).toFixed(3)}"></i></span></li>`);
+    lista.push(`<li class="p-${kk}"><b>${ICONOS[kk === 'patineta' ? 'patineta' : ICONO_PODER[kk]]}</b><span><i style="--k:${Math.min(1, v / total).toFixed(3)}"></i></span></li>`);
   }
   const html = lista.join('');
   if (hudCache.poderes !== html.replace(/--k:[\d.]+/g, '')) { hudCache.poderes = html.replace(/--k:[\d.]+/g, ''); $('hudPoderes').innerHTML = html; }
-  else { let i = 0; for (const [kk, v] of Object.entries(c.poderes)) if (v > 0) { const el = $('hudPoderes').children[i++]; if (el) { const total = kk === 'patineta' ? M.DURACION_PATINETA : M.duracionPoder(kk, progreso.mejoras[kk]); el.querySelector('i').style.setProperty('--k', (v / total).toFixed(3)); } } }
+  else { let i = 0; for (const [kk, v] of Object.entries(c.poderes)) if (v > 0) { const el = $('hudPoderes').children[i++]; if (el) { const total = kk === 'patineta' ? M.DURACION_PATINETA : M.duracionPoder(kk, progreso.mejoras[kk]); el.querySelector('i').style.setProperty('--k', Math.min(1, v / total).toFixed(3)); } } }
   // el letrero grande se apaga solo
   if (c.banner > 0) { c.banner -= dt; if (c.banner <= 0) $('banner').classList.remove('ver'); }
 }
@@ -1115,7 +1134,7 @@ function pintaPortada() {
   $('portadaMisBarra').style.setProperty('--k', (hechos / lista.length).toFixed(3));
   // el globito «!» de Misiones: hay algo que hacer ahí (una misión se puede saltar con lo que tienes, o el set está a una misión)
   $('portadaRetosG').hidden = !(progreso.retos.nivel < M.MAX_BASE && (hechos === 2 || progreso.monedas >= M.costoSaltar(progreso.retos.nivel)));
-  ponTexto('portadaBoletos', `${progreso.boletos.length}/7`);
+  ponTexto('portadaBoletos', ciudad.cuentaPostales(modoSel, progreso) || `${progreso.boletos.length}/7`);   // CITY: las postales
   ponTexto('barRecord', fmt(M.recordDe(progreso, modoSel)));
   ponTexto('barMonedas', fmt(progreso.monedas));
   ponTexto('barMult', '×' + progreso.retos.nivel);
@@ -1173,7 +1192,7 @@ let tiendaPestana = 'mejoras';                                 // la pestaña ab
 let tiendaVer = null;                                          // el aspecto que se está probando
 let aspectoMostrado = null;                                    // el que lleva el corredor en pantalla
 function abreTienda(pestana = 'mejoras') {
-  tiendaPestana = pestana; tiendaVer = progreso.aspecto;
+  tiendaPestana = pestana; tiendaVer = ciudad.puestoDe(progreso, modoSel);   // CITY: en City, su personaje de City
   if (estado === 'fin') despejaChoque();                       // desde el resumen: primero se saca la carrera perdida del escenario
   pintaTienda(); abrePanel('capaTienda');
 }
@@ -1193,8 +1212,13 @@ function despejaChoque() {
   mundo.reinicia();                                            // fuera trenes, barreras, monedas y poderes: la vía queda vacía, como en la portada
 }
 function saleTienda() {                                        // vuelve a la ropa que de verdad lleva puesta
-  if (aspectoMostrado && aspectoMostrado !== progreso.aspecto) mundo.aspecto(M.ASPECTOS[progreso.aspecto] || M.ASPECTOS.clasico);
-  aspectoMostrado = progreso.aspecto;
+  vistePuesto();                                                // CITY: la del modo elegido (en City, su personaje de City)
+}
+/** CITY: le pone al corredor lo que lleva puesto con el modo elegido (en
+    City, su personaje de City si tiene uno puesto), si no lo lleva ya. */
+function vistePuesto() {
+  const k = ciudad.puestoDe(progreso, c ? c.modo : modoSel);
+  if (mundo && k !== aspectoMostrado) { mundo.aspecto(ciudad.aspecto(k) || M.ASPECTOS.clasico); aspectoMostrado = k; }
 }
 let superTexto = '';           // lo que dio la última súper caja (se ve en su tarjeta)
 /** Abre una súper caja: cobra, sortea el premio y lo entrega. */
@@ -1233,24 +1257,26 @@ function pintaTienda() {
       <button type="button" class="t-precio" data-comprar="pot:${k}" ${progreso.monedas < P.precio ? 'disabled' : ''} aria-label="Comprar ${P.nombre} por ${fmt(P.precio)} monedas">${ICONOS.moneda}<b translate="no">${fmt(P.precio)}</b></button></li>`);
   $('tiendaPoderes').innerHTML = tarjetas.join('');
   // los personajes: la ropa en fila, y la ficha del que se está probando
-  if (!M.ASPECTOS[tiendaVer]) tiendaVer = progreso.aspecto;
-  $('tiendaAspectos').innerHTML = Object.entries(M.ASPECTOS).map(([k, a]) => {
-    const tiene = progreso.aspectos.includes(k), puesto = progreso.aspecto === k, secreto = !tiene && a.precio == null;
+  // CITY: con un modo de City, primero sus personajes (con la insignia «City»); las claves y lo puesto los resuelve ciudad.js
+  const puestoAhora = ciudad.puestoDe(progreso, modoSel);
+  if (!ciudad.aspecto(tiendaVer) || !ciudad.idsTienda(modoSel).includes(tiendaVer)) tiendaVer = puestoAhora;
+  $('tiendaAspectos').innerHTML = ciudad.idsTienda(modoSel).map(k => [k, ciudad.aspecto(k)]).map(([k, a]) => {
+    const tiene = ciudad.tiene(progreso, k), puesto = puestoAhora === k, secreto = !tiene && a.precio == null;
     const hex = n => '#' + n.toString(16).padStart(6, '0');
     const marca = puesto ? `<em class="ok">${ICONOS.check}</em>` : secreto ? `<em class="cerrado">${ICONOS.candado}</em>` : '';
     return `<li><button type="button" class="t-traje${k === tiendaVer ? ' sel' : ''}${secreto ? ' secreto' : ''}" data-ver="${k}" aria-pressed="${k === tiendaVer}">
-      <span class="t-muestra" style="--a:${hex(a.sudadera)};--b:${hex(a.gorra)};--c:${hex(a.jeans)};--d:${hex(a.mochila)}"><i></i></span><span class="t-n">${a.nombre}</span>${marca}</button></li>`;
+      <span class="t-muestra" style="--a:${hex(a.sudadera)};--b:${hex(a.gorra)};--c:${hex(a.jeans)};--d:${hex(a.mochila)}"><i></i></span><span class="t-n">${a.nombre}</span>${marca}${a.city ? '<em class="t-city">City</em>' : ''}</button></li>`;
   }).join('');
-  const a = M.ASPECTOS[tiendaVer], tiene = progreso.aspectos.includes(tiendaVer), puesto = progreso.aspecto === tiendaVer;
+  const a = ciudad.aspecto(tiendaVer), tiene = ciudad.tiene(progreso, tiendaVer), puesto = puestoAhora === tiendaVer;
   $('tiendaNombre').textContent = a.nombre;
-  $('tiendaEstado').textContent = puesto ? 'Lo llevas puesto' : tiene ? 'Es tuyo' : a.precio != null ? 'En venta' : 'Secreto';
+  $('tiendaEstado').textContent = (puesto ? 'Lo llevas puesto' : tiene ? 'Es tuyo' : a.precio != null ? 'En venta' : 'Secreto') + (a.city ? ` · Solo en City · ${a.texto}` : '');   // CITY: su ventaja
   $('tiendaAccion').innerHTML = puesto ? `<span class="t-puesto">${ICONOS.check}<span>Puesto</span></span>`
     : tiene ? `<button type="button" class="t-boton verde" data-poner="${tiendaVer}">Ponérmelo</button>`
       : a.precio != null ? `<button type="button" class="t-precio grande" data-aspecto="${tiendaVer}" ${progreso.monedas < a.precio ? 'disabled' : ''}>${ICONOS.moneda}<b translate="no">${fmt(a.precio)}</b></button>`
         : `<p class="t-secreto">${ICONOS.candado}<span>${a.secreto}</span></p>`;
   // el corredor se lo prueba (solo en la pestaña de personajes; en mejoras lleva lo suyo)
-  const mostrar = tiendaPestana === 'personajes' ? tiendaVer : progreso.aspecto;
-  if (mundo && mostrar !== aspectoMostrado) { mundo.aspecto(M.ASPECTOS[mostrar]); aspectoMostrado = mostrar; }
+  const mostrar = tiendaPestana === 'personajes' ? tiendaVer : puestoAhora;
+  if (mundo && mostrar !== aspectoMostrado) { mundo.aspecto(ciudad.aspecto(mostrar)); aspectoMostrado = mostrar; }
 }
 document.addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
@@ -1263,6 +1289,7 @@ document.addEventListener('click', e => {
     else { const p = M.precioMejora(progreso.mejoras[k]); if (p != null && progreso.monedas >= p) { progreso.monedas -= p; progreso.mejoras[k]++; sonido.poder(); } }
     guardar(); pintaTienda(); pintaPortada(); return;
   }
+  { const k = ciudad.clic(b, progreso, modoSel); if (k) { mundo.aspecto(ciudad.aspecto(k)); aspectoMostrado = k; guardar(); pintaTienda(); pintaPortada(); return; } }   // CITY: comprar o ponerse un personaje de City
   if (b.dataset.aspecto) { const a = M.ASPECTOS[b.dataset.aspecto]; if (a && a.precio != null && progreso.monedas >= a.precio) { progreso.monedas -= a.precio; progreso.aspectos.push(b.dataset.aspecto); progreso.aspecto = b.dataset.aspecto; mundo.aspecto(a); aspectoMostrado = b.dataset.aspecto; sonido.poder(); guardar(); pintaTienda(); pintaPortada(); } return; }
   if (b.dataset.poner) { progreso.aspecto = b.dataset.poner; mundo.aspecto(M.ASPECTOS[b.dataset.poner]); aspectoMostrado = b.dataset.poner; sonido.reto(); guardar(); pintaTienda(); return; }
   if (b.dataset.saltar != null) { saltarMision(Number(b.dataset.saltar)); return; }
@@ -1271,7 +1298,7 @@ document.addEventListener('click', e => {
   if (b.dataset.pestana && b.getAttribute('role') === 'tab') { tiendaPestana = b.dataset.pestana; sonido.carril(); pintaTienda(); return; }
   if (b.dataset.ver) { tiendaVer = b.dataset.ver; sonido.carril(); pintaTienda(); return; }
   if (b.dataset.flecha) {                                       // las flechas pasan de un aspecto al siguiente
-    const ids = Object.keys(M.ASPECTOS), i = ids.indexOf(tiendaVer);
+    const ids = ciudad.idsTienda(modoSel), i = ids.indexOf(tiendaVer);   // CITY: en City, también sus personajes
     tiendaVer = ids[(i + Number(b.dataset.flecha) + ids.length) % ids.length]; sonido.carril(); pintaTienda(); return;
   }
   const accion = b.dataset.accion;
@@ -1291,6 +1318,7 @@ document.addEventListener('click', e => {
    mostrarla cuando ese mundo tenga boletos (y su propio lugar en el
    progreso para guardarlos; los de `progreso.boletos` son de la Línea 3). */
 function abreLibreta() {
+  if (ciudad.libreta(modoSel, progreso, $, fmt)) { abrePanel('capaLibreta'); return; }   // CITY: las postales de City
   $('libretaIntro').textContent = M.INTRO;
   $('listaBoletos').innerHTML = M.ESTACIONES.map(e => {
     const b = M.BOLETOS[e.boleto], tiene = progreso.boletos.includes(e.boleto);
@@ -1301,7 +1329,7 @@ function abreLibreta() {
   abrePanel('capaLibreta');
 }
 function abreRelato() {
-  $('relatoTexto').textContent = M.INTRO;
+  $('relatoTexto').textContent = ciudad.intro(modoSel) || M.INTRO;   // CITY: la intro de City, con un modo de City
   abrePanel('capaRelato');
 }
 function abreOpciones() {
@@ -1412,14 +1440,14 @@ async function arranca() {
   aplicaMovimiento();
   const ajusta = () => { const r = pantalla.getBoundingClientRect(); mundo.tamano(r.width, r.height); medidasPixel(r); };
   new ResizeObserver(ajusta).observe(pantalla); ajusta();
-  mundo.aspecto(M.ASPECTOS[progreso.aspecto] || M.ASPECTOS.clasico); aspectoMostrado = progreso.aspecto;
+  vistePuesto();                                                // CITY: lo puesto en el modo elegido (en City, su personaje)
   escenaPortada();                                              // la primera estación del modo elegido, con trenes a la vista
   estado = 'portada';
   pintaPortada(); muestraCapa('capaPortada');
   if (Club) Club.category(modoSel.categoria);                   // la clasificación del costado: la del modo elegido
   requestAnimationFrame(t => { prevT = t; cuadro(t); });
   // se precarga el kit de la segunda estación cuando el navegador esté libre
-  setTimeout(() => mundo.precarga(estacionVisual(M.ESTACIONES[1])), 4000);
+  setTimeout(() => mundo.precarga(estacionVisual(M.historiaDe(modoSel).estaciones[1] || M.ESTACIONES[1])), 4000);   // CITY: la segunda del mundo elegido
 }
 window.addEventListener('club-record', e => {                    // el récord de la nube, por si es mayor que el de aquí
   const d = e.detail; if (!d) return;

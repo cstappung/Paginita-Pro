@@ -13,7 +13,8 @@
      entrar en la tabla de otro modo;
    - las cuatro tablas nuevas están en el club, las reglas, la
      clasificación, las monedas, Discord y el perfil;
-   - el mundo City es un armazón jugable (una estación, sin vueltas). */
+   - el mundo City tiene sus distritos, su vuelta y sus ganchos (lo demás
+     de City está en metrorush-city.test.cjs). */
 const {test}=require('node:test'),assert=require('node:assert/strict'),esbuild=require('esbuild');
 const fs=require('node:fs'),vm=require('node:vm'),path=require('node:path'),crypto=require('node:crypto');
 const DIR=path.join(__dirname,'../../juegos/club/metrorush');
@@ -114,11 +115,12 @@ test('«Sin monedas»: las monedas nunca tapan el camino (jugador simulado, 8 se
  }
 });
 
-test('el mundo City es un armazón jugable: una estación, sin vueltas, su historia',()=>{
+test('el mundo City: sus distritos, su vuelta, su historia y sus ganchos',()=>{
  const e=M.estacionDe(0,'city');assert.equal(e.id,M.ESTACIONES_CITY[0].id);assert.equal(e.clave,e.id);
- assert.equal(M.estacionDe(50000,'citypuro').id,e.id,'sin vueltas, se queda en su última estación');
- assert.equal(M.siguienteUmbral(100,'city'),Infinity);
- assert.ok(M.estacionDe(0,'city').paleta,'reusa una paleta que ya existe');
+ // city.js lo llena: cinco distritos, y después de los 13 km dan la vuelta (como la Línea 3)
+ assert.equal(M.ESTACIONES_CITY.length,5);assert.equal(M.siguienteUmbral(100,'city'),M.ESTACIONES_CITY[1].desde);
+ assert.match(M.estacionDe(50000,'citypuro').nombre,/vuelta/);
+ assert.ok(M.estacionDe(0,'city').paleta,'tiene paleta');
  assert.equal(M.historiaDe('city').intro,M.INTRO_CITY);assert.equal(M.historiaDe('clasico').intro,M.INTRO);
  // el clásico y los demás modos del metro siguen con las estaciones de siempre
  assert.equal(M.estacionDe(1600,'puro').id,'ocaso');assert.equal(M.estacionDe(1600).id,'ocaso');assert.equal(M.siguienteUmbral(0,'sinmonedas'),1500);
@@ -207,8 +209,8 @@ test('lo que el modo no permite se rechaza',()=>{
  assert.match(con(p=>{p.i.push(['C',p.i.length?p.i[p.i.length-1][1]:60,100,200,1]);}),/mochila|pista/);
  // un modo que no existe, o mal escrito
  assert.match(con(p=>{p.m='turbo';}),/modo de juego no existe/);assert.match(con(p=>{p.m=3;}),/modo de juego no es válido/);
- // un boleto que el mundo no tiene (City no tiene boletos todavía)
- const c=robot('city');const pc=copia(c.prueba);pc.i.unshift(['B',60,1,420]);assert.match(MP.rehace(pc).motivo||'',/boleto/);
+ // un boleto que el mundo no tiene (City tiene cinco postales: no hay una n.º 9)
+ const c=robot('city');const pc=copia(c.prueba);pc.i.unshift(['B',60,9,420]);assert.match(MP.rehace(pc).motivo||'',/boleto/);
  // el clásico sí permite todo eso: su robot usa 2×, +5, seguir y la mochila y pasa
  const cl=robot('clasico');assert.ok(cl.prueba.e.some(e=>e[0]==='p')&&cl.prueba.e.some(e=>e[0]==='s')&&cl.prueba.i.some(q=>q[0]==='C'));
  assert.equal(MP.rehace(cl.prueba).motivo,undefined);

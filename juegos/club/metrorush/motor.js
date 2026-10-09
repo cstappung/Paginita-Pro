@@ -21,6 +21,12 @@
    tres carriles: 0 (izquierda), 1 (centro) y 2 (derecha). */
 (function (raiz, fabrica) {
   const M = fabrica();                                                    // construye el motor una sola vez
+  /* CITY: el mundo City (city.js) se instala sobre el motor recién armado,
+     aquí y no en cada lugar que lo usa: así el juego, la prueba del
+     antitrampas, el verificador del club y los tests ven el mismo City. En
+     la página city.js se carga antes que este archivo (index.html). */
+  const ciudad = typeof module === "object" && module.exports ? require("./city.js") : raiz.MetroRushCity;
+  if (typeof ciudad === "function") ciudad(M);
   if (typeof module === "object" && module.exports) module.exports = M;   // Node (los tests)
   else raiz.MetroRushMotor = M;                                           // navegador (la pantalla)
 })(typeof self !== "undefined" ? self : this, function () {
@@ -128,7 +134,18 @@
       if (Math.abs(x - CARRILES[o.carril]) >= ANCHO_TECHO) continue;
       if (yEf >= ALTO_TECHO - 0.5 && ALTO_TECHO >= h) { h = ALTO_TECHO; tren = o; }
     }
-    return { h, tren };
+    /* CITY: los tipos nuevos que sostienen (la baranda de City, registrada
+       con `soporte` en registraTipo) dicen su altura; gana la más alta. Los
+       objetos de la Línea 3 no tienen tipo registrado, así que el clásico no
+       pasa por aquí. `apoyo` es el objeto que te sostiene (para el grind). */
+    let apoyo = null;
+    for (const o of objs) {
+      const t = TIPOS[o.tipo];
+      if (!t || !t.soporte) continue;
+      const hs = t.soporte(o, x, D, yEf);
+      if (hs != null && hs > h) { h = hs; apoyo = o; tren = null; }
+    }
+    return { h, tren, apoyo };
   }
 
   /** La caja que ocupa el obstáculo `o` cuando el corredor va en D:
@@ -293,10 +310,10 @@
      de la última, su historia (intro y boletos), su curva de velocidad y,
      si quiere, sus propios bloques de pista. Hoy hay dos:
        · metro: la Línea 3 de siempre (ESTACIONES, BOLETOS, VELOCIDAD);
-       · city: la ciudad de los modos City. Por ahora es un ARMAZÓN: una
-         sola estación que reusa una paleta que ya existe ("alba", la del Fin
-         de la Línea), sin boletos y con la curva clásica, para que el modo
-         se pueda jugar de punta a punta. Otro trabajo la va a llenar.
+       · city: la ciudad de los modos City. Aquí queda un ARMAZÓN (una
+         estación, sin boletos, la curva clásica) que city.js llena al
+         instalarse: cinco distritos con vuelta, su curva, sus postales, sus
+         personajes y su propio bloque de pista (ver city.js).
 
      CÓMO SE LLENA CITY (para quien venga después)
        - Estaciones: agregar filas a ESTACIONES_CITY ({id, nombre, desde (m),
@@ -577,6 +594,7 @@
       potenciadores: { despegue: 1, puntos: 0 },             // un despegue de regalo para probarlo
       retos: { nivel: 1, avance: [0, 0, 0] },
       boletos: [],                                           // números de boleto encontrados
+      boletosCity: [], personajesCity: [], personajeCity: null,   // CITY: las postales de City, sus personajes comprados y el que lleva en City (null = su aspecto de siempre)
       aspectos: ["clasico"], aspecto: "clasico",             // los desbloqueados y el que lleva puesto
       records: { puntos: 0, distancia: 0, monedas: 0 },      // las mejores marcas locales (los puntos y la distancia, del clásico)
       recordsModo: { puro: 0, sinmonedas: 0, fantasma: 0, city: 0, citypuro: 0, cityfantasma: 0 },   // la mejor carrera de cada uno de los otros modos
@@ -603,6 +621,12 @@
     for (const k of Object.keys(p.recordsModo)) p.recordsModo[k] = entero(x.recordsModo && x.recordsModo[k], 0, 1e12);
     for (const k of Object.keys(p.totales)) p.totales[k] = entero(x.totales && x.totales[k], 0, 1e12);
     p.intro = !!x.intro;
+    /* CITY: las postales (1 a 5, las que tiene BOLETOS_CITY) y los
+       personajes de City (solo los que existen; el puesto, solo si es suyo). */
+    const nPost = (MUNDOS.city.boletos || []).length - 1, PC = MUNDOS.city.personajes || {};
+    p.boletosCity = Array.isArray(x.boletosCity) ? [...new Set(x.boletosCity.map(Number).filter(n => Number.isInteger(n) && n >= 1 && n <= nPost))].sort((a, b) => a - b) : [];
+    p.personajesCity = Array.isArray(x.personajesCity) ? [...new Set(x.personajesCity.filter(k => typeof k === "string" && Object.prototype.hasOwnProperty.call(PC, k)))] : [];
+    p.personajeCity = p.personajesCity.includes(x.personajeCity) ? x.personajeCity : null;
     return p;
   }
   /** Mezcla dos progresos (el del aparato y el de la nube).
@@ -618,6 +642,8 @@
     else if (viejo.retos.nivel === m.retos.nivel) m.retos.avance = m.retos.avance.map((v, i) => Math.max(v, viejo.retos.avance[i]));
     m.boletos = [...new Set([...A.boletos, ...B.boletos])].sort((x, y) => x - y);
     m.aspectos = [...new Set([...A.aspectos, ...B.aspectos])];
+    m.boletosCity = [...new Set([...A.boletosCity, ...B.boletosCity])].sort((x, y) => x - y);   // CITY: las postales y los personajes solo se suman
+    m.personajesCity = [...new Set([...A.personajesCity, ...B.personajesCity])];
     for (const k of Object.keys(m.records)) m.records[k] = Math.max(A.records[k], B.records[k]);
     for (const k of Object.keys(m.recordsModo)) m.recordsModo[k] = Math.max(A.recordsModo[k], B.recordsModo[k]);
     for (const k of Object.keys(m.totales)) m.totales[k] = Math.max(A.totales[k], B.totales[k]);
