@@ -1744,6 +1744,13 @@ the rooms column (open rooms, top coins, your games) are never hidden.
   pieces with an `a-*` class animate only on hover/focus and in the ficha,
   and never carry an SVG `transform` themselves (the animation would
   replace it): a positioned piece is wrapped in a `<g>` that carries it.
+  The ficha is a wider crop that shows only y ≈ 62–238 of the 400×300
+  scene, its ✕ covers x > 345, y < 115, and on a phone it writes the name
+  on one wide line (up to x ≈ 255). So a figure that has to be seen whole
+  goes between those lines. Metro Rush's cover was checked against all
+  three shapes (card, row, ficha) in light and dark, at 1280 px and on a
+  3× phone: a runner on a board, a train coming head-on and the «MR»
+  wagon, with the coins above the name rather than beside it.
 - **Card states**: *nuevo* (green tag; `nuevos()` = the four most recent
   `alta`s of the last 14 days, so the tag cannot spread to half the shop),
   *más jugado* (gold, a star only on narrow cards), *seleccionada* (`.sel`,

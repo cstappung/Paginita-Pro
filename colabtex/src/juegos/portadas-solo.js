@@ -92,7 +92,7 @@ const ARTE = {
     // El halo detrás del corredor, con rayos suaves: lo despega del fondo.
     const rayos = Array.from({ length: 10 }, (_, k) => {
       const a = k * Math.PI / 5 + .2, b = a + .14;
-      return `<path d="M300 120 L${(300 + 260 * Math.cos(a)).toFixed(1)} ${(120 + 260 * Math.sin(a)).toFixed(1)} L${(300 + 260 * Math.cos(b)).toFixed(1)} ${(120 + 260 * Math.sin(b)).toFixed(1)}Z" fill="#fffbe0"/>`;
+      return `<path d="M300 125 L${(300 + 260 * Math.cos(a)).toFixed(1)} ${(125 + 260 * Math.sin(a)).toFixed(1)} L${(300 + 260 * Math.cos(b)).toFixed(1)} ${(125 + 260 * Math.sin(b)).toFixed(1)}Z" fill="#fff"/>`;
     }).join("");
 
     // Tres vías: los rieles van al punto de fuga; los durmientes se juntan a lo lejos.
@@ -108,15 +108,15 @@ const ARTE = {
     const arr = x => 96 + 22 * (x - 54) / 146, aba = x => 252 - 134 * (x - 54) / 146;   // el borde de arriba y el de abajo del costado
     const alto = (x, t) => arr(x) + (aba(x) - arr(x)) * t;                             // un punto a la fracción t de la altura
     const ventanas = [[60, 80], [88, 104], [112, 124], [132, 142]].map(([a, b]) =>
-      `<path d="M${a} ${alto(a, .16).toFixed(1)} L${b} ${alto(b, .16).toFixed(1)} L${b} ${alto(b, .4).toFixed(1)} L${a} ${alto(a, .4).toFixed(1)}Z" fill="#1d3f74" stroke="${TINTA}" stroke-width="2"/>`).join("");
+      `<path d="M${a} ${alto(a, .16).toFixed(1)} L${b} ${alto(b, .16).toFixed(1)} L${b} ${alto(b, .4).toFixed(1)} L${a} ${alto(a, .4).toFixed(1)}Z" fill="#1e3f73" stroke="${TINTA}" stroke-width="2"/><path d="M${a + 3} ${alto(a + 3, .36).toFixed(1)} L${a + 8} ${alto(a + 8, .2).toFixed(1)}" stroke="#fff" stroke-width="2.4" opacity=".3"/>`).join("");
     const vagon = `<path d="M54 96 L150 ${arr(150).toFixed(1)} V${aba(150).toFixed(1)} L54 252Z" fill="url(#vg${u})" stroke="${TINTA}" stroke-width="3" stroke-linejoin="round"/>
       ${ventanas}
       <path d="M54 ${alto(54, .55)} L150 ${alto(150, .55).toFixed(1)}" stroke="#1f7ae0" stroke-width="7"/><path d="M54 ${alto(54, .6)} L150 ${alto(150, .6).toFixed(1)}" stroke="#ffe7a0" stroke-width="2.2"/>
-      <g transform="translate(104 152) scale(.7) translate(-90 -214)"><path d="M62 222 q8 -26 26 -24 q4 -14 18 -10 q12 4 6 18 q12 6 2 18 q-18 10 -34 6 q-18 6 -18 -8z" fill="#ff3fa4" stroke="${TINTA}" stroke-width="2.6"/>
-      <path d="M72 214 q10 -10 16 0 t16 -2 t12 -6" stroke="#9bff4a" stroke-width="5" fill="none" stroke-linecap="round"/></g>
+      <g transform="translate(80 150) skewY(-13)">${[[TINTA, 10], ["#ff3fa4", 6]].map(([c, w]) => `<path d="M2 20 V3 L10 13 L18 3 V20 M26 20 V3 h7 q7 0 7 7 q0 7 -7 7 h-7 M33 17 L40 20" stroke="${c}" stroke-width="${w}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`).join("")}
+      <path d="M3 5 l4 5 M27 4 h5" stroke="#fff" stroke-width="1.6" stroke-linecap="round" opacity=".8"/></g>
       <path d="M54 232 L150 ${alto(150, .87).toFixed(1)} V${aba(150).toFixed(1)} L54 252Z" fill="#2a1a3a" opacity=".8"/>
       <path d="M-120 96 H54 V252 H-120Z" fill="url(#vt${u})" stroke="${TINTA}" stroke-width="3"/>
-      <rect x="-20" y="118" width="56" height="44" rx="6" fill="#1d3f74" stroke="${TINTA}" stroke-width="2.5"/><path d="M-12 124 l-8 28 M2 124 l-10 34" stroke="#fff" stroke-width="3" opacity=".25"/>
+      <rect x="-20" y="118" width="56" height="44" rx="6" fill="#1e3f73" stroke="${TINTA}" stroke-width="2.5"/><path d="M-12 124 l-8 28 M2 124 l-10 34" stroke="#fff" stroke-width="3" opacity=".25"/>
       <rect x="-120" y="232" width="174" height="20" fill="#2a1a3a" opacity=".8"/>`;
 
     // El tren de frente por la vía del medio: pisa (sombra y bogies) y sus focos son lo que más brilla del fondo.
@@ -130,26 +130,28 @@ const ARTE = {
       <circle cx="170" cy="155" r="4" fill="#fffbe0" stroke="${TINTA}" stroke-width="1.8"/><circle cx="210" cy="155" r="4" fill="#fffbe0" stroke="${TINTA}" stroke-width="1.8"/>
       <g class="a-foco"><circle cx="170" cy="155" r="20" fill="url(#lz${u})"/><circle cx="210" cy="155" r="20" fill="url(#lz${u})"/></g>`;
 
-    // La tabla voladora, girada hacia la cámara (se le ve la punta), con dos estelas cian.
-    const tabla = `<g transform="translate(4 54) rotate(-22)">
-      ${[[-1, -3], [1, 6]].map(([s, dy]) => `<path d="M-44 ${dy} q-14 ${s * 3} -26 ${s * 2}" stroke="${TINTA}" stroke-width="8" stroke-linecap="round" fill="none"/><path d="M-44 ${dy} q-14 ${s * 3} -26 ${s * 2}" stroke="#7ff0ff" stroke-width="4" stroke-linecap="round" fill="none" class="a-flamea"/>`).join("")}
-      <rect x="-44" y="-9" width="88" height="18" rx="9" fill="#ff3fa4" stroke="${TINTA}" stroke-width="3"/>
-      <rect x="-40" y="2" width="80" height="5" rx="2.5" fill="#c4127a"/>
-      <path d="M-32 -3 h64" stroke="#ffd0ea" stroke-width="2.6" stroke-linecap="round"/>
-      <path d="M-14 -9 l6 18 M4 -9 l6 18" stroke="#ffe14d" stroke-width="3"/></g>`;
+    // La tabla voladora, en coordenadas de la escena (no del corredor):
+    // casi horizontal, justo bajo las dos suelas (y ≈ 222–236), con dos
+    // estelas cian que salen de la cola hacia el fondo, no hacia el suelo.
+    const tabla = `<g transform="translate(300 223) rotate(-3)">
+      ${[-4, 4].map(dy => `<path d="M-50 ${dy} h-20" stroke="${TINTA}" stroke-width="8" stroke-linecap="round"/><path d="M-50 ${dy} h-20" stroke="#7ff0ff" stroke-width="4" stroke-linecap="round" class="a-flamea"/>`).join("")}
+      <rect x="-53" y="-7" width="106" height="14" rx="7" fill="#ff3fa4" stroke="${TINTA}" stroke-width="3"/>
+      <rect x="-48" y="1.5" width="96" height="4" rx="2" fill="#c4127a"/>
+      <path d="M-40 -2.5 h80" stroke="#ffd0ea" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M-18 -7 l5 14 M2 -7 l5 14" stroke="#ffe14d" stroke-width="3"/></g>`;
     const zapa = (x, y, r) => `<g transform="translate(${x} ${y}) rotate(${r}) scale(1.12)"><path d="M-9 -4 q2 -6 9 -6 q8 0 10 6 q4 1 4 6 h-25z" fill="#fff" stroke="${TINTA}" stroke-width="2.4" stroke-linejoin="round"/><path d="M-10 2 h24" stroke="#ff4646" stroke-width="3"/><path d="M-2 -6 l3 4 M3 -7 l3 4" stroke="#ff4646" stroke-width="1.6"/></g>`;
     const guante = (x, y) => `<circle cx="${x}" cy="${y}" r="7" fill="#fff" stroke="${TINTA}" stroke-width="2.6"/><path d="M${x - 3} ${y - 2} h5" stroke="#c9c9dd" stroke-width="1.6" stroke-linecap="round"/>`;
     // El corredor, con el origen en la cadera: de frente, la cara girada un poco
     // atrás (mira quién lo sigue), una rodilla arriba, los brazos abiertos para
     // equilibrarse y la gorra al revés. La cabeza es grande a propósito.
-    const corredor = `${tabla}
+    const corredor = `
       ${trazo("M10 2 L22 24 L26 44", "#2b59c3", 12)}${zapa(28, 46, -8)}
       ${trazo("M-8 2 L-28 16 L-18 38", "#2b59c3", 12)}${zapa(-16, 42, 14)}
       <path d="M-13 -4 Q-19 -24 -17 -40 Q0 -47 17 -40 Q19 -24 13 -4Z" fill="#ff8a1f" stroke="${TINTA}" stroke-width="3" stroke-linejoin="round"/>
       <path d="M-9 -12 Q0 -8 9 -12" stroke="#c45a00" stroke-width="2.4" fill="none"/><path d="M-6 -42 Q0 -30 6 -42" stroke="#c45a00" stroke-width="2.2" fill="none"/>
       <path d="M-14 -36 q-5 10 -2 24 M14 -36 q5 10 2 24" stroke="#2b2b55" stroke-width="2.6" fill="none"/>
-      ${trazo("M-14 -36 L-30 -22 L-43 -16", "#ff8a1f", 11)}${guante(-47, -15)}
-      ${trazo("M14 -36 L34 -40 L46 -31", "#ff8a1f", 11)}${guante(50, -30)}
+      ${trazo("M-14 -36 L-27 -22 L-34 -29", "#ff8a1f", 11)}${guante(-39, -31)}
+      ${trazo("M14 -36 L30 -39 L37 -29", "#ff8a1f", 11)}${guante(41, -26)}
       <path d="M-10 -45 q10 8 20 0" stroke="#22d3ee" stroke-width="5" fill="none" stroke-linecap="round"/><circle cx="-11" cy="-45" r="4.2" fill="#22d3ee" stroke="${TINTA}" stroke-width="2"/><circle cx="11" cy="-45" r="4.2" fill="#22d3ee" stroke="${TINTA}" stroke-width="2"/>
       <circle cx="0" cy="-64" r="19" fill="#f4c08f" stroke="${TINTA}" stroke-width="3"/>
       <path d="M-19 -66 q0 -22 19 -22 q20 0 20 19 q-19 -5 -39 3z" fill="#e8322f" stroke="${TINTA}" stroke-width="2.8" stroke-linejoin="round"/>
@@ -167,9 +169,9 @@ const ARTE = {
 
     return `<defs><linearGradient id="g${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1279f0"/><stop offset=".25" stop-color="#36aef7"/><stop offset=".4" stop-color="#a8e6ff"/><stop offset=".4" stop-color="#8a8296"/><stop offset="1" stop-color="#3f364d"/></linearGradient>
     <pattern id="gr${u}" width="9" height="7" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r=".8" fill="#b7afc2"/><circle cx="6.5" cy="5" r=".8" fill="#b7afc2"/></pattern>
-    <radialGradient id="ha${u}"><stop offset="0" stop-color="#fffbe0" stop-opacity=".75"/><stop offset=".55" stop-color="#fff3b0" stop-opacity=".3"/><stop offset="1" stop-color="#fff3b0" stop-opacity="0"/></radialGradient>
-    <linearGradient id="vg${u}" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#e0a21a"/><stop offset="1" stop-color="#a8650a"/></linearGradient>
-    <linearGradient id="vt${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d99a12"/><stop offset="1" stop-color="#9a5a08"/></linearGradient>
+    <radialGradient id="ha${u}"><stop offset="0" stop-color="#fffbe0" stop-opacity=".55"/><stop offset=".55" stop-color="#fff3b0" stop-opacity=".22"/><stop offset="1" stop-color="#fff3b0" stop-opacity="0"/></radialGradient>
+    <linearGradient id="vg${u}" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#e8a50c"/><stop offset="1" stop-color="#b86a06"/></linearGradient>
+    <linearGradient id="vt${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9930a"/><stop offset="1" stop-color="#8f5205"/></linearGradient>
     <linearGradient id="vd${u}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#bff3ff"/><stop offset=".4" stop-color="#3a7bd5"/><stop offset="1" stop-color="#16306b"/></linearGradient>
     <linearGradient id="hz${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fffbe0" stop-opacity=".35"/><stop offset="1" stop-color="#fffbe0" stop-opacity="0"/></linearGradient>
     <radialGradient id="lz${u}"><stop offset="0" stop-color="#fff"/><stop offset=".3" stop-color="#fffbe0" stop-opacity=".9"/><stop offset="1" stop-color="#ffe86b" stop-opacity="0"/></radialGradient>
@@ -178,17 +180,17 @@ const ARTE = {
     <rect width="400" height="300" fill="url(#g${u})"/>
     <rect y="${FY}" width="400" height="${300 - FY}" fill="url(#gr${u})" opacity=".35"/>
     <path d="M14 46 q-12 0 -10 -10 q2 -8 12 -7 q4 -13 18 -12 q12 2 13 12 q12 -3 15 7 q2 10 -10 10z" fill="#fff" opacity=".95"/>
-    <g clip-path="url(#ci${u})" opacity=".18">${rayos}</g>
+    <g clip-path="url(#ci${u})" opacity=".2">${rayos}</g>
     ${lejos}${cerca}
     <rect y="${FY}" width="400" height="4" fill="#5c5670"/>
     ${durmientes}${rieles}
-    <circle cx="300" cy="120" r="95" fill="url(#ha${u})"/>
+    <circle cx="300" cy="125" r="90" fill="url(#ha${u})"/>
     ${tren}${vagon}
-    ${[[244, 190, 14, 0], [225, 168, 11.5, -.3], [211, 152, 9.5, -.6], [201, 141, 7.5, -.9]].map(c => moneda(...c)).join("")}
-    ${brillo(253, 179, 9)}
-    <ellipse cx="302" cy="240" rx="46" ry="7" fill="#000" opacity=".35"/>
+    ${[[247, 176, 11, 0], [237, 159, 9, -.25], [228, 145, 7, -.5]].map(c => moneda(...c)).join("")}
+    ${brillo(263, 150, 7)}
+    <ellipse cx="300" cy="232" rx="42" ry="4" fill="#000" opacity=".3"/>
     <g class="a-raya">${rayas}</g>
-    <g class="a-mueve"><g transform="translate(300 164) rotate(-4) scale(1.2)">${corredor}</g></g>`;
+    <g class="a-mueve">${tabla}<g transform="translate(298 166) rotate(-4) scale(1.05)">${corredor}</g></g>`;
   },
 
   tetrisclub: u => {
