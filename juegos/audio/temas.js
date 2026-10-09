@@ -23,7 +23,9 @@
  *   metrorush-*  uno por estación de Metro Rush: barrio (Sol mayor, 124),
  *              ocaso (Si menor, 132), neon (Do menor, 138), fantasma (Mi
  *              frigio, 126), invierno (La mayor, 136), oxido (Si bemol
- *              menor, 150) y fin (Fa mayor, 128). Y dos más por estación
+ *              menor, 150) y fin (Fa mayor, 128); y las tres estaciones
+ *              nuevas: mercado (Re mayor, 126 con swing), cocheras (Sol
+ *              menor, 140) y muelle (Mi menor, 116). Y dos más por estación
  *              (`metrorush-barrio-2`, `-3`… hasta `metrorush-fin-3`) más
  *              cinco de Subway City (`metrorush-city-sur`, `-muelles`,
  *              `-bulevar`, `-parque`, `-bajo`), porque audio.js los hace
@@ -1463,6 +1465,84 @@
         "Db6*2 C6*2 Bb5*4 F5*4 Bb5*4  Ab5*2 G5*2 F5*4 C5*4 F5*4  " +
         "F6*2 Eb6*2 Db6*4 Ab5*4 Db6*4  E6*4 G6*4 C7*4 Bb6*4",
         "R . R . . R . . R . . R R . F .", "k.h.s.h..hk.s.sx", 4)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* ---------- Metro Rush: las tres estaciones nuevas ----------
+     Mercado de Farolillos, Cocheras y Muelle (ver ESTACIONES en
+     juegos/club/metrorush/motor.js). Como las demás: melodías propias, un
+     pelo por debajo del pulso que se quiere oír a media carrera (el juego
+     acelera el tempo con la velocidad). Cada una rota con dos temas
+     prestados de su mismo humor (LISTAS en metrorush/audio.js). */
+
+  /* Mercado de Farolillos: Re mayor a 126 con swing, de feria. Palmas en
+     cada tiempo débil como en una cumbia de puesto, la melodía que sube y
+     baja por el acorde como quien se pasea entre los toldos, y una sección
+     C de notas picadas, el pregón. */
+  T["metrorush-mercado"] = {
+    bpm: 126, swing: .14,
+    lead: { onda: "p25", vol: .13, vib: .009, sus: .6, eco: { t: .12, fb: .22, mezcla: .2 } },
+    bajo: { onda: "tri", vol: .22 }, arp: { onda: "p12", vol: .045, oct: 5, paso: .03 }, bat: { vol: .32 },
+    secciones: {
+      I: sec("D A", "", "R . F . R . F . R . F . O . F .", "k.hck.hck.hck.hc", 2),
+      A: sec("D G Bm A",
+        "A5*2 F#5*2 A5*2 D6*2 C#6 D6 E6*2 D6*4  B5*2 G5*2 B5*2 D6*2 E6*3 D6 B5*4  " +
+        "F#5*2 B5*2 D6*2 B5 C#6 D6*4 F#6*4  E6*2 C#6*2 A5*2 E5 F#5 E5*6 .*2",
+        "R . F . O . F . R . F . O . F .", "k.hcs.hkk.hcs.hh", 2),
+      B: sec("G A F#m,Bm Em,A",
+        "D6*3 B5 G5*2 B5*2 D6*4 G6*4  E6*3 C#6 A5*2 C#6*2 E6*4 A6*4  " +
+        "F#6*2 E6*2 C#6*4 D6*2 C#6*2 B5*4  G5*2 B5*2 E6*4 C#6*4 A5*4",
+        "R . R F . R O . R . R F . R O .", "k.hks.hkk.hks.hx", 2),
+      C: sec("D A G A",
+        "F#6 . F#6 . A6*2 F#6*2 D6 . D6 . F#6*2 D6*2  E6 . E6 . A6*2 E6*2 C#6 . C#6 . E6*2 A5*2  " +
+        "D6 . D6 . G6*2 D6*2 B5 . B5 . D6*2 B5*2  C#6*2 E6*2 A6*4 G6*2 E6*2 C#6*2 .*2",
+        "R . F . R . F . R . F . O . F .", "k.hcs.hck.hcs.hc", 2)
+    },
+    orden: "I A A B A C B A"
+  };
+
+  /* Cocheras: Sol menor a 140, de patio de maniobras de noche. El bajo va
+     en corcheas parejas, como las ruedas sobre las juntas de la vía, y la
+     melodía de cuadrado ancho deja huecos (los trenes que duermen); en B
+     sube hasta el Re mayor, el 317 que no está en su vía. */
+  T["metrorush-cocheras"] = {
+    bpm: 140,
+    lead: { onda: "p50", vol: .12, vib: .005, sus: .55, eco: { t: .13, fb: .3, mezcla: .24 } },
+    bajo: { onda: "tri", vol: .22 }, arp: { onda: "p25", vol: .04, oct: 4, paso: .03 }, bat: { vol: .34 },
+    secciones: {
+      I: sec("Gm Gm", "", "R . R . R . R . R . R . R . F .", "k.h.k.h.k.h.k.hs", 2),
+      A: sec("Gm Eb F D",
+        "G5*4 Bb5*2 D6*2 .*2 C6*2 Bb5*4  G5*4 Bb5*2 Eb6*2 .*2 D6*2 C6*4  " +
+        "A5*4 C6*2 F6*2 .*2 Eb6*2 D6*4  F#5*2 A5*2 D6*4 C6*2 A5*2 F#5*4",
+        "R . R . R . R . R . R . O . F .", "k.hhs.hhk.hhs.hh", 2),
+      B: sec("Cm Gm Eb D",
+        "Eb6*3 D6 C6*2 G5*2 C6*4 Eb6*4  D6*3 C6 Bb5*2 G5*2 D5*4 G5*4  " +
+        "G5*2 Bb5*2 Eb6*4 F6*2 Eb6*2 D6*4  D6*4 F#6*4 A6*4 F#6*4",
+        "R R . R R . R . R R . R R . F .", "k.hks.hkk.hks.tT", 2)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* Muelle: Mi menor a 116, de puerto con lluvia. Sierra filtrada con un
+     eco largo (el agua), un arpegio agudo y rápido como gotas, el bajo que
+     se queda quieto y un pulso a medio tiempo: es la estación más lenta,
+     la de la línea que iba a llegar al mar. */
+  T["metrorush-muelle"] = {
+    bpm: 116, bombeo: .2,
+    lead: { onda: "saw", vol: .09, vib: .008, desafina: 8, filtro: 2200, eco: { fb: .45, mezcla: .36 } },
+    bajo: { onda: "saw", vol: .11, filtro: 480, q: 3 },
+    arp: { onda: "p12", vol: .045, oct: 5, paso: .06 }, bat: { vol: .3 },
+    secciones: {
+      I: sec("Em C", "", "R - - - - - - - F - - - O - - -", "k.......s.......", 2),
+      A: sec("Em C G D",
+        "B5*4 E6*2 G6*2 F#6*4 E6*2 B5*2  C6*4 E6*2 G6*2 E6*6 .*2  " +
+        "D6*4 G6*2 B6*2 A6*4 G6*2 D6*2  F#6*4 E6*2 D6*2 A5*8",
+        "R - - . R - F - R - - . O - F -", "k...h.h.s...h.hh", 2),
+      B: sec("Am Em C B",
+        "C6*2 E6*2 A6*4 G6*2 E6*2 C6*4  B5*2 E6*2 G6*4 F#6*2 E6*2 B5*4  " +
+        "E6*2 G6*2 C7*4 B6*4 G6*4  D#6*4 F#6*4 B6*8",
+        "R - - . R - F - R - - . O - F -", "k...h.hks...h.hx", 2)
     },
     orden: "I A A B A B"
   };

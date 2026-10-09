@@ -257,15 +257,16 @@ test('puntos y multiplicador: lo que dice el manual', () => {
 });
 
 test('estaciones: los umbrales del manual (en metros) y las vueltas', () => {
-  const nombres = [[0, 'Barrio Estación'], [1499, 'Barrio Estación'], [1500, 'Ocaso'], [3500, 'Línea Neón'], [6000, 'Estación Fantasma'],
-    [9000, 'Invierno'], [12500, 'Óxido'], [17000, 'Fin de la Línea'], [20999, 'Fin de la Línea']];
+  const nombres = [[0, 'Barrio Estación'], [1199, 'Barrio Estación'], [1200, 'Ocaso'], [2550, 'Mercado de Farolillos'], [4200, 'Línea Neón'],
+    [6150, 'Estación Fantasma'], [8400, 'Cocheras'], [10950, 'Invierno'], [13700, 'Muelle'], [16450, 'Óxido'],
+    [19200, 'Fin de la Línea'], [23199, 'Fin de la Línea']];
   for (const [p, n] of nombres) assert.equal(M.estacionDe(p).nombre, n, String(p));
-  assert.deepEqual(M.ESTACIONES.map(e => e.estilo), ['juguete', 'pixel', 'neon', 'neon', 'juguete', 'pixel', 'juguete']);
-  const v = M.estacionDe(21000);
+  assert.deepEqual(M.ESTACIONES.map(e => e.estilo), ['juguete', 'pixel', 'juguete', 'neon', 'neon', 'pixel', 'juguete', 'neon', 'pixel', 'juguete']);
+  const v = M.estacionDe(23200);
   assert.equal(v.id, 'barrio'); assert.equal(v.vuelta, 2); assert.equal(v.boleto, null);
-  assert.equal(M.estacionDe(25000).id, 'ocaso'); assert.equal(M.estacionDe(29000).id, 'neon'); assert.equal(M.estacionDe(33000).vuelta, 3);
-  assert.notEqual(M.estacionDe(21000).clave, M.estacionDe(33000).clave, 'cada vuelta es un cambio');
-  assert.equal(M.siguienteUmbral(0), 1500); assert.equal(M.siguienteUmbral(17000), 21000); assert.equal(M.siguienteUmbral(22000), 25000);
+  assert.equal(M.estacionDe(27200).id, 'ocaso'); assert.equal(M.estacionDe(31200).id, 'neon'); assert.equal(M.estacionDe(35200).vuelta, 3);
+  assert.notEqual(M.estacionDe(23200).clave, M.estacionDe(35200).clave, 'cada vuelta es un cambio');
+  assert.equal(M.siguienteUmbral(0), 1200); assert.equal(M.siguienteUmbral(19200), 23200); assert.equal(M.siguienteUmbral(24000), 27200);
   // con la velocidad de la carrera, las estaciones van repartidas: ninguna llega antes del minuto ni dos en menos de 50 s
   const tDe = m => { let t = 0; while (M.metrosEntre(0, t) < m) t += 0.25; return t; };
   const tiempos = M.ESTACIONES.slice(1).map(e => tDe(e.desde));
@@ -323,7 +324,7 @@ test('retos: tres por nivel, iguales en dos aparatos, y cumplirlos sube el multi
 });
 
 test('progreso: limpiar lo que viene de afuera y mezclar dos aparatos', () => {
-  const sucio = M.limpiaProgreso({ monedas: -5, mejoras: { iman: 99, x: 3 }, boletos: [3, 3, 9, 'a', 1], aspectos: ['dorado', 'pirata'], aspecto: 'pirata', retos: { nivel: 77 } });
+  const sucio = M.limpiaProgreso({ monedas: -5, mejoras: { iman: 99, x: 3 }, boletos: [3, 3, 99, 'a', 1], aspectos: ['dorado', 'pirata'], aspecto: 'pirata', retos: { nivel: 77 } });
   assert.equal(sucio.monedas, 0); assert.equal(sucio.mejoras.iman, 5); assert.equal(sucio.mejoras.x, undefined);
   assert.deepEqual(sucio.boletos, [1, 3]); assert.deepEqual(sucio.aspectos, ['clasico', 'dorado']); assert.equal(sucio.aspecto, 'clasico');
   assert.equal(sucio.retos.nivel, 30);

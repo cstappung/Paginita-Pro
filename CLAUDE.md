@@ -3558,13 +3558,15 @@ Things that matter:
   against the very car it had just left.
 - **The distance decides the scenery** (it used to be the score, so a
   player at ×30 went through every station thirty times faster than a
-  newcomer). `ESTACIONES[].desde` is in metres: Barrio Estación (0,
-  toy-like), Ocaso (1 500 m, pixel), Línea Neón (3 500, neon), Estación
-  Fantasma (6 000), Invierno (9 000), Óxido (12 500) and Fin de la Línea
-  (17 000); from 21 km the first three come back every 4 km as «vuelta N».
-  With the speed ramp that is ~1:15, 2:40, 4:00, 5:10, 6:10 and 7:40 of
-  running, and the test checks none comes before the first minute or less
-  than 50 s after the previous one. A station changes **inside a tunnel**
+  newcomer). `ESTACIONES[].desde` is in metres, ten stations: Barrio
+  Estación (0, toy-like), Ocaso (1 200, pixel), Mercado de Farolillos
+  (2 550, toy), Línea Neón (4 200, neon), Estación Fantasma (6 150),
+  Cocheras (8 400, pixel), Invierno (10 950), Muelle (13 700, neon), Óxido
+  (16 450) and Fin de la Línea (19 200); from 23.2 km barrio, ocaso and neon
+  come back every 4 km as «vuelta N» (`VUELTA_IDS`). With the speed ramp
+  that is one every ~55 s from 1:06 to 8:27, and the test checks none comes
+  before the first minute or less than 50 s after the previous one. Moving
+  thresholds does not change any track: tunnels are requests in the proof. A station changes **inside a tunnel**
   (150 m, coins only), where nothing outside is visible: `juego.js` swaps
   the kit, the music and the HUD skin at `d0 + 40`. The track is already
   generated ~230 m ahead, so the tunnel is requested *before* the
@@ -3630,10 +3632,39 @@ Things that matter:
   is bought in the shop (`PRECIO_SUPERCAJA` 9 000, `cajaSuper`) and opened
   on the spot; its loose coins average ~3 500, less than its price, so it
   cannot mint coins.
-- **Lore and secrets**: seven golden tickets, one per station, tell the
-  story of the last night of Line 3 (`BOLETOS`, read in the Libreta);
-  collecting all seven unlocks the Inspector outfit, the Konami code the
-  golden one, and a ghost train crosses the sky in Estación Fantasma.
+- **Lore and secrets**: ten golden tickets, one per station, tell the
+  story of the last night of Line 3 (`BOLETOS`, read in the Libreta).
+  **A ticket's number is its name, not its order**: 1–7 are the original
+  ones (already saved by players) and the three new stations got 8–10;
+  `capituloDe(n)` gives the route order the Libreta and the pickup banner
+  show («Boleto 3 de 10»). Collecting all of them unlocks the Inspector
+  outfit (whoever already had it keeps it), the Konami code the golden one,
+  and a ghost train crosses the sky in Estación Fantasma.
+- **The story is also told while running, without stopping anything**
+  (`historia.js`, UMD `MetroRushHistoria`, pure data; `escenarios.js`, the
+  Three side). Posters on the pavement (`AFICHES` per palette: company
+  notices, «se busca» portraits of Don Ramón, Marta and Tornillo, local ads
+  and a line map with «usted está aquí») are cells of **one atlas texture**
+  and take the place of graffiti slots (`decoraMuro`), so they add no draw
+  calls; the same goes for the story graffiti (`LORE`). The **altavoz**
+  (`#altavoz`, an amber strip at the top, `ANUNCIOS` per station) speaks
+  with a synthesised ding-dong (`sonido.dingDong()`, no speech) when the
+  tunnel to a station starts, where there is nothing to dodge, and once
+  more halfway through the station (`altavoz()` in `juego.js`) only when
+  no hint, banner or obstacle in your lane within 2.2 s competes with it.
+  All of it is gated by `mundo.lore()`, on for the metro world only, so
+  City gets none of it. With a style locked in the options
+  (`estacionVisual`) the posters are those of the locked palette.
+- **The three new stations are their own scenery** (`escenarios.js`:
+  `paletasNuevas`, `PROPS`, `cielo`, `ambiente`): Mercado (stalls, lantern
+  strings, rising farolillos), Cocheras (bidones, spare rails, signals,
+  sawtooth sheds and flood towers), Muelle (bollards, cargo, rain and far
+  lightning, cranes and a lighthouse beam). `fin` is a copy of `alba`, so
+  City's dawn stays clean. In cocheras, muelle and óxido the 317 crosses
+  the horizon as a faint lit silhouette. Their props replace the trees
+  (`arbol()` asks `ESC.prop` first) and keep the original order of random
+  draws, so the other stations did not change. Music: `metrorush-mercado`,
+  `-cocheras`, `-muelle` in `temas.js`, each heading its `LISTAS` entry.
 - **The world is built to run on a phone, and the cost is draw calls.**
   Every prop is merged per material with vertex colours (`Arma`), pooled
   (`kit.saca`/`guarda`), and coins and sleepers are `InstancedMesh`es;

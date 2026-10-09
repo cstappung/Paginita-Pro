@@ -351,6 +351,10 @@ export const CANCIONES = [
   { id: "metrorush-oxido-3", nombre: "Chatarra", grupo: "De los juegos", desc: "Metro Rush · Óxido, ritmo roto en Sol menor", chip: "metrorush-oxido-3" },
   { id: "metrorush-fin-2", nombre: "Amanecer", grupo: "De los juegos", desc: "Metro Rush · Fin de la Línea, Do mayor", chip: "metrorush-fin-2" },
   { id: "metrorush-fin-3", nombre: "Última vuelta", grupo: "De los juegos", desc: "Metro Rush · Fin de la Línea, himno con palmas", chip: "metrorush-fin-3" },
+  // las tres estaciones nuevas de la Línea 3 (Mercado, Cocheras y Muelle), con su tema propio
+  { id: "metrorush-mercado", nombre: "Mercado de Farolillos", grupo: "De los juegos", desc: "Metro Rush · feria nocturna en Re mayor con swing", chip: "metrorush-mercado" },
+  { id: "metrorush-cocheras", nombre: "Cocheras", grupo: "De los juegos", desc: "Metro Rush · trenes dormidos, Sol menor a 140", chip: "metrorush-cocheras" },
+  { id: "metrorush-muelle", nombre: "Muelle", grupo: "De los juegos", desc: "Metro Rush · lluvia y faro, Mi menor con bombeo", chip: "metrorush-muelle" },
   { id: "metrorush-city-sur", nombre: "Barrio Sur", grupo: "De los juegos", desc: "Metro Rush · Subway City, funk de hip-hop soleado", chip: "metrorush-city-sur" },
   { id: "metrorush-city-muelles", nombre: "Los Muelles", grupo: "De los juegos", desc: "Metro Rush · Subway City, groove industrial del puerto", chip: "metrorush-city-muelles" },
   { id: "metrorush-city-bulevar", nombre: "El Bulevar", grupo: "De los juegos", desc: "Metro Rush · Subway City, synthpop del centro", chip: "metrorush-city-bulevar" },

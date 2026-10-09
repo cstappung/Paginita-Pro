@@ -27,7 +27,7 @@ const Temas = window.Temas;                    // el cancionero (juegos/audio/te
 // la curva de velocidad del motor (motor.js se carga antes como script): de aquí sale el tempo, sin números escritos a mano
 const VEL = (window.MetroRushMotor && window.MetroRushMotor.VELOCIDAD) || { V0: 15, VMAX: 50 };
 
-/* Las listas de cada sitio, por su id: las siete estaciones de motor.js
+/* Las listas de cada sitio, por su id: las diez estaciones de motor.js
    (ESTACIONES[].id) y los cinco barrios de Subway City. El primer tema de
    cada estación es el de siempre (el que motor.js nombra en `musica`), y
    los otros dos son del mismo humor. Los barrios tienen un tema propio y
@@ -40,6 +40,10 @@ export const LISTAS = {
   invierno: ['metrorush-invierno', 'metrorush-invierno-2', 'metrorush-invierno-3'],
   oxido: ['metrorush-oxido', 'metrorush-oxido-2', 'metrorush-oxido-3'],
   fin: ['metrorush-fin', 'metrorush-fin-2', 'metrorush-fin-3'],
+  // las tres estaciones nuevas: su tema propio y dos prestados del mismo humor
+  mercado: ['metrorush-mercado', 'metrorush-barrio-3', 'metrorush-ocaso-2'],        // fiesta de feria: el barrio y el atardecer
+  cocheras: ['metrorush-cocheras', 'metrorush-oxido-2', 'metrorush-fantasma-3'],    // patio de maniobras de noche: lo industrial y lo vacío
+  muelle: ['metrorush-muelle', 'metrorush-neon-3', 'metrorush-fantasma-2'],         // puerto con lluvia: el neón y la estación fantasma
   'city-sur': ['metrorush-city-sur', 'metrorush-barrio-2', 'metrorush-barrio-3'],            // soleado: el barrio
   'city-muelles': ['metrorush-city-muelles', 'metrorush-oxido-3', 'metrorush-oxido-2'],      // industrial: el óxido
   'city-bulevar': ['metrorush-city-bulevar', 'metrorush-neon-2', 'metrorush-neon-3'],        // de noche: el neón
@@ -289,6 +293,17 @@ export class Sonido {
   /** Un tic suave mientras suben los puntos del resumen (sube de tono con la cuenta, k de 0 a 1). */
   sube(k) { this.nota(660 + 660 * k, 0.03, 0.03, 'p25'); }
   record() { this.boleto(); }
+  /** El «ding-dong» del altavoz del andén, antes de cada anuncio (juego.js:
+      altavozDice): dos campanas que bajan, Mi y Do, como en las estaciones.
+      Cada una lleva su octava encima, más corta y suave: el brillo del metal. */
+  dingDong() {
+    if (!this.ctx) return;
+    const t = this.t;
+    for (const [f, d] of [[659, 0], [523, 0.45]]) {
+      Chip.voz(this.ctx, this.efectos, { t: t + d, f, dur: 1.0, vol: 0.06, onda: 'sine', sus: 0.35 }, this.voces);        // la campana
+      Chip.voz(this.ctx, this.efectos, { t: t + d, f: f * 2, dur: 0.45, vol: 0.018, onda: 'sine', sus: 0.2 }, this.voces);   // su brillo
+    }
+  }
   /** Entrar al túnel: un retumbo grave que se va apagando. */
   tunel() {
     if (!this.ctx) return;

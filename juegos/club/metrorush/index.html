@@ -23,6 +23,8 @@
 <script src="../../audio/temas.js?v=metrorush-7"></script>
 <script src="motor.js?v=metrorush-7"></script>
 <script src="prueba.js?v=metrorush-7"></script>
+<!-- la historia que se ve y se oye en carrera: afiches, altavoz, grafitis (solo datos; escenarios.js la dibuja) -->
+<script src="historia.js?v=metrorush-7"></script>
 <!-- Three.js (el mismo de Yemas: la misma dirección, así el navegador ya lo tiene guardado). -->
 <script type="importmap">
 { "imports": {
@@ -31,6 +33,7 @@
 } }
 </script>
 <link rel="modulepreload" href="mundo.js?v=metrorush-7">
+<link rel="modulepreload" href="escenarios.js?v=metrorush-7">
 <link rel="modulepreload" href="audio.js?v=metrorush-7">
 <script type="module" src="juego.js?v=metrorush-7"></script>
 </head>
@@ -78,6 +81,8 @@
     <div class="aviso" id="aviso" role="status" aria-live="polite"></div>
     <!-- En las dos primeras carreras: qué hacer con lo que viene por tu carril. -->
     <div class="pista" id="pista" aria-live="polite" hidden><i id="pistaIco"></i><span id="pistaTxt"></span></div>
+    <!-- El altavoz del andén: dos anuncios por estación, en momentos tranquilos (va después del letrero grande: en vertical se aparta mientras ese se ve). -->
+    <div class="altavoz" id="altavoz" role="status" aria-live="polite" hidden><i aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 9h4l5-4v14l-5-4H3z" fill="currentColor"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></i><span id="altavozTxt"></span></div>
 
     <!-- Cargando. -->
     <section class="capa carga" id="capaCarga">
