@@ -220,7 +220,7 @@ test('Fantasma: cualquier semilla vale, y el rastro `g` no cuenta pero tiene top
  for(const k of ['fantasma','cityfantasma']){const r=robot(k,{semilla:987654321});assert.equal(MP.rehace(r.prueba).motivo,undefined,k);
   assert.equal(MV.verifica(dato(r,M.MODOS[k].categoria),r.prueba,ctx),null,k);}
  const r=robot('fantasma'),base=MP.rehace(r.prueba);
- const conG=copia(r.prueba);MP.ponFantasma(conG,'1a1b2c'.repeat(1000));const re=MP.rehace(conG);
+ const conG=copia(r.prueba);MP.ponFantasma(conG,require(path.join(DIR,'fantasma.js')).codifica(Array.from({length:600},(_,i)=>[M.CARRILES[(i>>5)%3],(i%7)*0.3,i%5])));/* un rastro de verdad (fantasma.js): 60 s, lo que duró la carrera */const re=MP.rehace(conG);
  assert.equal(re.motivo,undefined);assert.equal(re.puntos,base.puntos,'el rastro no cambia los puntos');
  const largo=copia(r.prueba);largo.g='x'.repeat(MP.MAX_FANTASMA+1);assert.match(MP.rehace(largo).motivo,/fantasma/);
  const raro=copia(r.prueba);raro.g=[1,2];assert.match(MP.rehace(raro).motivo,/fantasma/);

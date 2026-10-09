@@ -22,6 +22,8 @@
 <script src="../../audio/chip.js?v=metrorush-7"></script>
 <script src="../../audio/temas.js?v=metrorush-7"></script>
 <script src="motor.js?v=metrorush-7"></script>
+<!-- El fantasma (modos «Fantasma»): el rastro de una carrera y cómo se vuelve a ver. Antes que prueba.js, que lo usa. -->
+<script src="fantasma.js?v=metrorush-7"></script>
 <script src="prueba.js?v=metrorush-7"></script>
 <!-- Three.js (el mismo de Yemas: la misma dirección, así el navegador ya lo tiene guardado). -->
 <script type="importmap">
@@ -64,6 +66,8 @@
         <div class="estacion"><span id="hudEstacion">Barrio Estación</span><span class="barra" id="hudEstBarra"><i></i></span></div>
         <!-- La insignia del modo de juego (Clásico, Sin ayudas, Sin monedas, City, City sin ayudas). -->
         <span class="hud-modo" id="hudModo" translate="no"></span>
+        <!-- Contra el fantasma (modos «Fantasma»): cuántos puntos y metros le llevas (+) o te lleva (−). -->
+        <div class="hud-fan" id="hudFan" hidden><i data-icono="fantasma"></i><b id="hudFanPts" translate="no">+0</b><small id="hudFanM" translate="no">±0 m</small></div>
       </div>
       <div class="hud-der">
         <div class="fila"><span class="moneda" aria-hidden="true"></span><span class="valor" id="hudMonedas" translate="no">0</span></div>
@@ -112,6 +116,8 @@
       <div class="p-modos" id="portadaModos">
         <div class="p-modos-fila" id="modosLista" role="radiogroup" aria-label="Modo de juego"></div>
         <p class="p-modo-desc" id="modoDesc"></p>
+        <!-- En los modos fantasma: contra quién se corre (o por qué no hay fantasma). -->
+        <p class="p-fantasma" id="modoFantasma" aria-live="polite" hidden></p>
       </div>
       <button type="button" class="jugar" data-accion="jugar"><i data-icono="play"></i><span>¡Jugar!</span></button>
       <p class="tocar-txt">o toca la pantalla</p>
@@ -175,6 +181,8 @@
         <ul class="f-datos" id="finStats"></ul>
         <!-- A qué tabla de la clasificación fue la carrera (la de su modo). -->
         <p class="f-tabla" id="finTabla"></p>
+        <!-- En los modos fantasma: quién ganó. -->
+        <p class="f-fantasma" id="finFantasma" hidden></p>
         <p class="f-set" id="finSet" hidden></p>
         <p class="f-fuera" id="finFuera" role="note" hidden></p>
         <h3>Misiones</h3>
@@ -263,7 +271,7 @@
           <li>Chocar de frente termina la carrera, salvo que pagues monedas para <b>seguir corriendo</b> (cada vez cuesta el doble). Rozar un costado es un <b>tropiezo</b>: Don Ramón y su perro Tornillo te alcanzan. Dos tropiezos seguidos y te atrapan.</li>
           <li><b>Puntos</b>: 10 por metro × el multiplicador. Las <b>misiones</b> van de a tres: completar el set sube el multiplicador base (hasta ×30) y paga monedas. Cada <b>estrella</b> suma +1 en la carrera.</li>
           <li><b>Poderes</b>: <i data-icono="iman"></i> imán, <i data-icono="mochila"></i> mochila cohete, <i data-icono="zapatilla"></i> zapatillas saltarinas, <i data-icono="doble"></i> puntos dobles y la caja misteriosa. La <i data-icono="patineta"></i> <b>patineta</b> te salva de un choque. En la tienda se mejoran y se compran los potenciadores <i data-icono="cohete"></i> Despegue y <i data-icono="mas5"></i> +5, que se usan al empezar (teclas 1 y 2).</li>
-          <li><b>Modos</b> (se eligen en la portada): <b>Clásico</b>; <b>Sin ayudas</b>, sin poderes, cajas, patineta, potenciadores ni segunda oportunidad; <b>Sin monedas</b>, donde las monedas (rojas) terminan la carrera si las tocas; <b>Fantasma</b>, sin ayudas y contra el fantasma de la mejor carrera; <b>City</b>, <b>City sin ayudas</b> y <b>City fantasma</b>. Cada uno tiene su tabla.</li>
+          <li><b>Modos</b> (se eligen en la portada): <b>Clásico</b>; <b>Sin ayudas</b>, sin poderes, cajas, patineta, potenciadores ni segunda oportunidad; <b>Sin monedas</b>, donde las monedas (rojas) terminan la carrera si las tocas; <b>Fantasma</b>, sin ayudas y contra el fantasma de la mejor carrera de la tabla (un corredor azul que repite su carrera en su misma pista; arriba a la izquierda ves cuántos puntos le llevas); <b>City</b>, <b>City sin ayudas</b> y <b>City fantasma</b>. Cada uno tiene su tabla.</li>
           <li><b>F</b> o el botón ⛶: pantalla completa.</li>
           <li>Con la distancia cambias de <b>estación</b> (y de estética) pasando por un túnel. En cada una hay un <b>boleto dorado</b> con un trozo de la historia.</li>
         </ul>

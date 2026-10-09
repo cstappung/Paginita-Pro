@@ -127,7 +127,9 @@ let panel = null;             // el panel abierto (tienda, retos, libreta, opcio
    ella y la prueba la lleva en `s`. Se usa una vez y vuelve al azar. */
 let semillaSiguiente = null;
 function nuevaCarrera() {
-  const semilla = semillaSiguiente != null ? semillaSiguiente >>> 0 : (Math.random() * 2 ** 31) >>> 0;
+  // el fantasma (modos «Fantasma»): si hay uno listo, se corre SU pista (su semilla); la semilla fijada a mano gana y lo apaga
+  const fanG = semillaSiguiente == null ? fantasmaListo(modoSel) : null;
+  const semilla = semillaSiguiente != null ? semillaSiguiente >>> 0 : fanG ? fanG.semilla : (Math.random() * 2 ** 31) >>> 0;
   semillaSiguiente = null;
   const modo = modoSel, curva = M.velocidadDe(modo);            // el modo de esta carrera y su curva de velocidad (la clásica, en el clásico)
   return {
@@ -152,7 +154,10 @@ function nuevaCarrera() {
     tutorial: progreso.totales.carreras < 2 ? { bajo: 0, alto: 0, tren: 0 } : null,   // las pistas de las dos primeras carreras
     pista: null,                                     // la pista que se está mostrando ({tipo, o})
     semilla,                                         // la semilla de esta pista (la del récord, en el modo Fantasma)
-    rastro: null                                     // el rastro de esta carrera para que otro la vea como fantasma (texto; va a la prueba como `g`)
+    rastro: null,                                    // el rastro de esta carrera para que otro la vea como fantasma (texto; va a la prueba como `g`)
+    // el fantasma (ver «EL FANTASMA»): contra quién se corre, y el grabador del rastro de esta carrera (solo en los modos fantasma)
+    fan: fanG ? nuevoFan(fanG) : null,
+    grab: modo.fantasma && MF ? MF.crearGrabador() : null, rastroK: 0
   };
 }
 
@@ -497,7 +502,7 @@ function actualiza(dt) {
     }
   }
   // la pista: generar por delante, mover los trenes que vienen, dibujar lo cercano y soltar lo que pasó
-  for (const o of c.gen.generarHasta(c.D + 230, { V: Math.max(13, c.V) })) c.activos.push(o);
+  for (const o of generaPista(c.D + 230, { V: Math.max(13, c.V) })) c.activos.push(o);   // (generaPista: la del fantasma, si se corre contra uno)
   for (let i = c.activos.length - 1; i >= 0; i--) {
     const o = c.activos[i];
     if (o.tipo === 'tren' && o.vel > 0) {
@@ -543,6 +548,7 @@ function actualiza(dt) {
     else if (estado === 'muerte' && c.muerte.t > 1.4) muestraFin();
   }
   c.perseguidor += (c.perseguidorObj - c.perseguidor) * Math.min(1, dt * 2.2);
+  if (c.grab || c.fan) pasoFantasma(dt, muriendo);              // el rastro de esta carrera y la carrera contra el fantasma
 }
 
 /* ---- los trenes que vienen de frente se anuncian ----
@@ -588,8 +594,7 @@ function estaciones() {
   const e = M.estacionDe(faltan < 220 ? sig : c.D, c.modo);      // a donde se va: la que viene si llega pronto
   if (!c.cambio && e.clave !== c.estacion.clave) {
     c.cambio = { estacion: e, tunel: null, hecho: false };
-    anotaPedido('T', c.D + 40, e.id);
-    c.gen.pedirTunel(c.D + 40, e.id);
+    pideTunel(c.D + 40, e.id);                                   // (el del fantasma, si él ya lo pidió: ver «EL FANTASMA»)
     mundo.precarga(estacionVisual(e));
     mundo.letreroTunel(e.nombre);
   }
@@ -605,10 +610,283 @@ function estaciones() {
       c.estacion = cb.estacion;
       sonido.tocaTema(cb.estacion.musica);
       pantalla.dataset.estilo = estacionVisual(cb.estacion).estilo;
-      if (cb.estacion.boleto && c.modo.mundo === 'metro' && !progreso.boletos.includes(cb.estacion.boleto)) { anotaPedido('B', cb.estacion.boleto, o.d0 + o.largo + 260); c.gen.pedirBoleto(cb.estacion.boleto, o.d0 + o.largo + 260); }
+      if (cb.estacion.boleto && c.modo.mundo === 'metro' && !progreso.boletos.includes(cb.estacion.boleto)) pideBoleto(cb.estacion.boleto, o.d0 + o.largo + 260);
     }
     if (cb.hecho && c.D >= o.d0 + o.largo - 6) { banner(cb.estacion.nombre, cb.estacion.lema); c.cambio = null; }
   }
+}
+
+/* ===================================================================
+   3 bis. EL FANTASMA (modos «Fantasma» y «City fantasma»)
+   ===================================================================
+   QUÉ HACE, EN GLOBAL
+   En estos modos se corre contra la mejor carrera de la tabla (la n.º 1 de
+   todo el sitio), en su MISMA pista, y sin ítems ni revivir (eso lo dice
+   el modo, M.MODOS). Cinco piezas:
+     1. Pedir el fantasma a la página (Club.pedirFantasma): la fila 1.ª de la
+        tabla y su prueba. Se prepara con fantasma.js, que la pasa por el
+        mismo `rehace` del antitrampas (si no cuadra, se corre solo).
+     2. Correr su pista: su semilla, y los túneles y boletos que él le pidió
+        al generador, en el mismo punto (generaPista, pideTunel, pideBoleto).
+        La prueba de ESTA carrera los anota como propios: para el
+        antitrampas es una carrera más con esa semilla, y la acepta.
+     3. Grabar el rastro de esta carrera (x, altura y qué hace, cada 0,1 s),
+        para que la próxima persona la vea correr si queda n.º 1.
+     4. Dibujarlo: un corredor azul translúcido que sigue su rastro, sin
+        sombra ni choques (mundo.js, «EL FANTASMA»).
+     5. La ventaja en vivo: puntos (que dependen del multiplicador de cada
+        uno) y metros (iguales mientras los dos corren: la velocidad es la
+        misma para todos; se separan cuando uno choca). Un letrero cuando lo
+        adelantas, y al final, quién ganó.
+   Los nombres nunca van en avisos ni letreros (esos se traducen): solo en
+   la portada, dentro de translate="no", y en el letrerito 3D del fantasma.
+   Un fantasma sin rastro (una carrera de antes del rastro) corre igual en
+   puntos, pero no se dibuja. */
+const MF = window.MetroRushFantasma || null;                   // el rastro y la preparación del fantasma (fantasma.js)
+const ESPERA_FANTASMA = 8000;                                  // ms que se espera la respuesta de la página antes de correr solo
+const fantasmas = {};                                          // por categoría: {estado, g (el fantasma preparado), motivo, pidio, reloj}
+let esperandoFantasma = false;                                 // «¡Jugar!» se tocó mientras el fantasma venía en camino
+
+/** El fantasma listo para el modo `modo`, o null (no es un modo fantasma, o no hay). */
+function fantasmaListo(modo) {
+  const f = modo && modo.fantasma ? fantasmas[modo.categoria] : null;
+  return f && f.estado === 'listo' ? f.g : null;
+}
+/** Pide a la página el n.º 1 de la tabla del modo. Una vez cada 30 s como
+    mucho (la página guarda la tabla y la prueba, pero no hace falta
+    preguntar en cada vuelta a la portada), salvo `forzar`. La respuesta
+    llega por Club.pedirFantasma; si no llega en ESPERA_FANTASMA, se corre solo. */
+function pideFantasma(modo, forzar) {
+  if (!modo || !modo.fantasma || !MF) return;
+  const cat = modo.categoria, ant = fantasmas[cat];
+  if (ant && ant.estado === 'cargando') return;                // ya se está pidiendo
+  if (ant && !forzar && ant.estado !== 'error' && performance.now() - ant.pidio < 30000) return;   // hace poco: vale lo que hay
+  const info = { estado: 'cargando', g: null, motivo: '', pidio: performance.now(), reloj: 0 };
+  fantasmas[cat] = info;
+  /* dato: lo que mandó la página ({nombre, puntos, d…}) o null; motivo: por qué no hay */
+  const llega = (dato, motivo) => {
+    if (fantasmas[cat] !== info) return;                       // una respuesta a un pedido viejo
+    if (info.estado !== 'cargando' && !(info.tarde && (dato || motivo !== 'error'))) return;   // ya contestada (una tardía vale si dice algo más que «error»)
+    clearTimeout(info.reloj); info.tarde = false;
+    if (!dato) info.estado = ['invitado', 'fuera', 'vacia'].includes(motivo) ? motivo : 'error';
+    else {
+      const g = MF.prepara(dato, MP, M, modo.id);              // pasa por rehace: un fantasma que no cuadra no se corre
+      if (g.motivo) { info.estado = 'malo'; info.motivo = g.motivo; }
+      else { info.estado = 'listo'; info.g = g; }
+    }
+    alLlegarFantasma();
+  };
+  /* si la página no contesta a tiempo se corre solo, pero la respuesta que
+     llegue después aún vale para la carrera siguiente (un hilo ocupado
+     compilando sombreadores en un teléfono lento puede atrasarla) */
+  info.reloj = setTimeout(() => { llega(null, 'error'); info.tarde = true; }, ESPERA_FANTASMA);
+  if (Club && Club.pedirFantasma) Club.pedirFantasma(cat, llega); else llega(null, 'fuera');
+  pintaFantasmaPortada();
+}
+/** Llegó (o no) el fantasma: se repinta la portada, y si se tocó «¡Jugar!» esperándolo, se empieza. */
+function alLlegarFantasma() {
+  pintaFantasmaPortada();
+  if (esperandoFantasma) { esperandoFantasma = false; if (estado === 'portada' || estado === 'fin') { if (estado === 'fin') cierraCarrera(); empezar(); } }
+}
+/** ¿Hay que esperar al fantasma antes de empezar? Solo si viene en camino
+    (como mucho ESPERA_FANTASMA: después se corre solo). */
+function esperaAlFantasma() {
+  const f = modoSel.fantasma ? fantasmas[modoSel.categoria] : null;
+  if (!f || f.estado !== 'cargando' || semillaSiguiente != null) return false;
+  if (!esperandoFantasma) aviso('Buscando al fantasma…');
+  esperandoFantasma = true;
+  return true;
+}
+
+/** Lo que se lleva de un fantasma durante la carrera. */
+function nuevoFan(g) {
+  return {
+    g,                                     // el fantasma preparado (fantasma.js: prepara)
+    pi: 0,                                 // cuántos de sus pedidos a la pista ya se aplicaron
+    reclamados: new Set(),                 // sus pedidos que esta carrera usó en vez de pedir uno propio
+    diverge: false,                        // la pista dejó de ser la suya (no debería pasar): sus pedidos ya no se aplican
+    lado: 0,                               // quién va ganando en puntos: 1 tú, −1 él, 0 parejos (con margen)
+    pg: 0, Dg: 0,                          // sus puntos y su metro ahora
+    murio: false, fase: 0, ladeo: 0        // si ya chocó, y su zancada y su inclinación (para dibujarlo)
+  };
+}
+
+/* ---- su pista ----
+   La pista sale de la semilla y de los pedidos (túneles y boletos), cada uno
+   aplicado cuando lo generado llega a su `dSig`. Para que salga la misma que
+   la del fantasma, sus pedidos se aplican en el mismo punto: se genera hasta
+   ahí, se pide y se sigue. Esta carrera no pide los suyos mientras él los
+   tenga: un túnel a la misma estación se «reclama» (ya viene en los de él),
+   y un boleto que él no pidió (ya lo tenía) tampoco se pide mientras él
+   corría ahí, porque cambiaría la pista. Pasado su choque, todo vuelve a ser
+   como siempre. La prueba anota los pedidos tal cual: rehace los repite con
+   la misma semilla, igual que si los hubiera pedido esta carrera.
+   Ejemplo: el fantasma pidió el túnel a Ocaso en dSig 1 487; al generar hasta
+   1 520 se genera primero hasta 1 487, se pide el túnel y se sigue. */
+function generaPista(hasta, ctx) {
+  const f = c.fan;
+  if (!f || f.diverge) return c.gen.generarHasta(hasta, ctx);   // sin fantasma: como siempre
+  const salida = [];
+  while (f.pi < f.g.pedidos.length && f.g.pedidos[f.pi][1] <= hasta) {
+    const q = f.g.pedidos[f.pi];
+    for (const o of c.gen.generarHasta(q[1], ctx)) salida.push(o);   // hasta donde él lo pidió
+    if (c.gen.estado().dSig !== q[1]) { f.diverge = true; console.warn('Metro Rush: la pista del fantasma se separó'); break; }
+    MP.pedido(c.prueba, q[0], q[1], ...q.slice(2));             // en la prueba de esta carrera, en el mismo punto
+    if (q[0] === 'T') c.gen.pedirTunel(q[2], q[3]); else c.gen.pedirBoleto(q[2], q[3]);
+    f.pi++;
+  }
+  for (const o of c.gen.generarHasta(hasta, ctx)) salida.push(o);
+  return salida;
+}
+/** Busca un pedido del fantasma de ese tipo que cumpla `es` y no se haya usado; lo marca usado. */
+function reclamaPedido(tipo, es) {
+  const f = c.fan;
+  if (!f || f.diverge) return false;
+  for (let i = 0; i < f.g.pedidos.length; i++) {
+    const q = f.g.pedidos[i];
+    if (q[0] === tipo && !f.reclamados.has(i) && es(q)) { f.reclamados.add(i); return true; }
+  }
+  return false;
+}
+/** Un pedido propio con el fantasma corriendo todavía: si le quedan pedidos por aplicar, la pista ya no es la suya. */
+function pedidoPropio() { const f = c.fan; if (f && !f.diverge && f.pi < f.g.pedidos.length) f.diverge = true; }
+/** El túnel hacia la estación `id`: el del fantasma si él lo pidió, o uno propio. */
+function pideTunel(desde, id) {
+  if (reclamaPedido('T', q => q[3] === id)) return;              // ya viene en su pista
+  pedidoPropio();
+  anotaPedido('T', desde, id); c.gen.pedirTunel(desde, id);
+}
+/** El boleto `n`: el del fantasma si él lo pidió; si no, uno propio, salvo
+    mientras él corría por ahí (no lo pidió: lo tenía, y pedirlo cambiaría su pista). */
+function pideBoleto(n, desde) {
+  const f = c.fan;
+  if (f && !f.diverge) {
+    if (reclamaPedido('B', q => q[2] === n)) return;
+    if (c.D < f.g.Dm) return;                                    // él seguía corriendo aquí y no lo pidió
+  }
+  pedidoPropio();
+  anotaPedido('B', n, desde); c.gen.pedirBoleto(n, desde);
+}
+
+/* ---- el paso del fantasma (lo llama actualiza en cada cuadro) ----
+   1) graba el rastro de esta carrera mientras se corre; 2) calcula dónde va
+   el fantasma y cuántos puntos lleva, y avisa cuando cambia quién gana.
+   Los puntos del fantasma salen de su prueba, metro a metro (fantasma.js:
+   tramosPuntos), con los metros que da la curva de velocidad a ese tiempo:
+   son los mismos que él corrió. El margen (25 puntos, o el 0,4 %) evita que
+   los avisos vayan y vuelvan cuando van parejos. */
+function pasoFantasma(dt, muriendo) {
+  // 1) el rastro: una muestra cada 0,1 s de juego, mientras se corre (al chocar termina)
+  if (c.grab && estado === 'jugando' && !muriendo) {
+    const r = c.r;
+    const s = r.tropezarT >= 0 ? 4 : r.rodar > 0 ? 3 : r.enAire ? (r.vy > 0 ? 1 : 2) : 0;   // tropieza, rueda, sube, baja o corre
+    while (c.t >= c.rastroK * MF.PASO) { c.grab.muestra(r.x, r.y, s); c.rastroK++; }
+  }
+  const f = c.fan;
+  if (!f) return;
+  const g = f.g, vivoG = c.t < g.tm, yoVivo = !c.muerte;
+  // 2) dónde va y cuánto lleva
+  const Dcorre = c.curva.metrosEntre(0, Math.min(c.t, g.tm));    // los metros que corrió hasta ahora (o hasta su choque)
+  f.Dg = vivoG ? Dcorre : g.Df;                                  // caído, queda donde resbaló
+  f.pg = vivoG ? MF.puntosEn(g.tramos, Dcorre) : g.puntos;       // caído, lo que dice la tabla
+  if (vivoG) f.fase += dt * (8 + c.curva.velocidad(c.t) * 0.32); // su zancada, como la tuya
+  // su choque
+  if (!vivoG && !f.murio) {
+    f.murio = true;
+    if (yoVivo) aviso(c.puntos > g.puntos ? '¡El fantasma chocó y vas ganando!' : `El fantasma chocó: pásale sus ${fmt(g.puntos)} puntos`);
+  }
+  // quién gana, con margen
+  const dif = c.puntos - f.pg, margen = Math.max(25, f.pg * 0.004);
+  const lado = dif > margen ? 1 : dif < -margen ? -1 : f.lado;
+  if (lado !== f.lado && yoVivo && estado === 'jugando') {
+    if (lado === 1 && f.lado === -1) {                           // lo pasaste
+      if (vivoG) banner('¡Adelantaste al fantasma!', 'Ahora no lo dejes pasar');
+      else banner('¡Superaste al fantasma!', 'Su récord: ' + fmt(g.puntos) + ' puntos');
+      sonido.record();
+    } else if (lado === -1 && f.lado === 1) aviso('El fantasma te pasó');
+  }
+  f.lado = lado;
+}
+
+/** Lo que mundo.paso necesita para dibujar al fantasma este cuadro, o null.
+    x e y salen de su rastro (interpolados); de lado y hacia arriba se ve
+    exactamente lo que él hizo. Mientras los dos corren va a tu altura (z 0:
+    la misma velocidad); caído, se queda atrás donde quedó; si caes tú, sigue. */
+function dibujoFantasma() {
+  const f = c && c.fan;
+  if (!f || !f.g.rastro || estado === 'portada') return null;
+  const g = f.g, ra = g.rastro, t = c.t, vivoG = t < g.tm, yoVivo = !c.muerte;
+  const tt = Math.min(t, g.tm);
+  const p = MF.estadoEn(ra, tt);
+  if (!p) return null;
+  // su velocidad de lado y vertical, de las muestras alrededor (para inclinarlo y para la pose del salto)
+  const a = MF.estadoEn(ra, Math.max(0, tt - 0.05)), b = MF.estadoEn(ra, tt + 0.05);
+  const vx = (b.x - a.x) / 0.1, vy = (b.y - a.y) / 0.1;
+  f.ladeo += (Math.max(-0.45, Math.min(0.45, -vx * 0.031)) - f.ladeo) * 0.25;
+  const z = vivoG ? (yoVivo ? 0 : c.curva.metrosEntre(0, t) - c.D) : g.Df - c.D;
+  const desde = () => tt - MF.desdeEn(ra, tt);                   // cuánto lleva en este estado
+  const pose = !vivoG ? { modo: 'caer', t: t - g.tm }
+    : p.s === 4 ? { modo: 'tropezar', t: desde(), fase: f.fase, ladeo: f.ladeo }
+      : p.s === 3 ? { modo: 'rodar', t: desde() }
+        : p.s === 1 || p.s === 2 ? { modo: 'saltar', vy: p.s === 1 ? Math.max(1, vy) : Math.min(-1, vy), ladeo: f.ladeo }
+          : { modo: 'correr', fase: f.fase, ladeo: f.ladeo };
+  const alfa = vivoG ? 1 : Math.max(0.35, 1 - (t - g.tm) / 1.5);  // caído se va apagando (sin desaparecer: se ve dónde quedó)
+  return { x: p.x, y: p.y, z, pose, alfa, nombre: g.yo ? 'Tu récord' : g.nombre };
+}
+
+/** La ventaja en el marcador: puntos (+ adelante, − atrás) y metros. */
+function pintaFantasmaHud() {
+  const f = c.fan, dif = Math.round(c.puntos - f.pg);
+  ponTexto('hudFanPts', (dif >= 0 ? '+' : '−') + fmt(Math.abs(dif)));
+  const dm = Math.round(c.D - f.Dg);                             // 0 mientras los dos corren
+  ponTexto('hudFanM', (dm > 0 ? '+' : dm < 0 ? '−' : '±') + fmt(Math.abs(dm)) + ' m');
+  const el = $('hudFan'), ld = String(f.lado);
+  if (el.dataset.lado !== ld) el.dataset.lado = ld;              // verde si ganas, rojo si pierdes
+}
+/** En la portada, contra quién se va a correr (solo en los modos fantasma). */
+function pintaFantasmaPortada() {
+  const el = $('modoFantasma');
+  if (!el) return;
+  const f = modoSel.fantasma ? fantasmas[modoSel.categoria] : null;
+  el.hidden = !modoSel.fantasma;
+  if (!modoSel.fantasma) return;
+  const estadoF = f ? f.estado : MF ? 'cargando' : 'error';
+  el.dataset.estado = estadoF;
+  el.textContent = '';
+  const pon = (txt, sinTraducir) => { const n = document.createElement(sinTraducir ? 'b' : 'span'); n.textContent = txt; if (sinTraducir) n.setAttribute('translate', 'no'); el.appendChild(n); };
+  if (estadoF === 'listo') {
+    const g = f.g;
+    if (g.yo) pon('Corres contra tu propio récord: ');
+    else { pon('Corres contra '); pon(g.nombre, true); pon(': '); }   // el nombre de una persona no se traduce
+    pon(fmt(g.puntos) + ' pts · ' + fmt(g.metros) + ' m', true);
+    if (!g.rastro) pon(' (su carrera no trae rastro: solo verás su puntaje)');
+  } else pon({
+    cargando: 'Buscando al fantasma de esta tabla…',
+    vacia: 'Nadie ha corrido esta tabla: tu carrera será el primer fantasma.',
+    invitado: 'Inicia sesión en Juegos para correr contra el fantasma del récord.',
+    fuera: 'Abre Metro Rush desde Juegos para correr contra el fantasma del récord.',
+    malo: 'El fantasma del récord no se puede usar (' + (f && f.motivo) + '): correrás solo.',
+    error: 'No se pudo traer al fantasma: esta vez correrás solo.'
+  }[estadoF] || '');
+}
+/** En el resumen: cómo te fue contra el fantasma. */
+function pintaFinFantasma(k) {
+  const el = $('finFantasma');
+  if (!el) return;
+  el.hidden = !k.modo.fantasma;
+  if (!k.modo.fantasma) return;
+  el.textContent = '';
+  const pon = (txt, num) => { const n = document.createElement(num ? 'b' : 'span'); n.textContent = txt; if (num) n.setAttribute('translate', 'no'); el.appendChild(n); };
+  const f = c.fan;
+  if (!f) { pon(k.puntos >= 1 ? 'Corriste sin fantasma: si es la mejor, tu carrera será el fantasma de esta tabla.' : 'Corriste sin fantasma.'); el.dataset.lado = '0'; return; }
+  const dif = k.puntos - f.g.puntos;                             // contra su carrera entera (lo que dice la tabla)
+  el.dataset.lado = dif > 0 ? '1' : dif < 0 ? '-1' : '0';
+  if (dif > 0) { pon('¡Le ganaste al fantasma por '); pon(fmt(dif), true); pon(' puntos!'); }
+  else if (dif < 0) { pon('El fantasma te ganó por '); pon(fmt(-dif), true); pon(' puntos'); }
+  else pon('Empate exacto con el fantasma');
+  // al rato se vuelve a preguntar quién es el n.º 1 (si ganaste, el próximo fantasma eres tú)
+  const modo = k.modo;
+  setTimeout(() => pideFantasma(modo, true), 3000);
 }
 
 /* ---- retos (se avisan apenas se cumplen) ---- */
@@ -677,15 +955,16 @@ function pistas(dt) {
 function empezar() {
   sonido.iniciar();
   if (!progreso.intro) { abreRelato(); return; }               // la primera vez se cuenta de qué se trata
+  if (esperaAlFantasma()) return;                               // el fantasma viene en camino: se empieza apenas llegue (o a los 8 s, solo)
   cierraPanel();
   c = nuevaCarrera(); ocultaPista();
   mundo.reinicia();
   const e = estacionVisual(c.estacion);
   mundo.activa(e, 0);
   pantalla.dataset.estilo = e.estilo;
-  for (const o of c.gen.generarHasta(230, { V: c.V })) c.activos.push(o);
+  for (const o of generaPista(230, { V: c.V })) c.activos.push(o);
   // el boleto de la primera estación (solo en la Línea 3: los boletos guardados son de ese mundo)
-  if (c.estacion.boleto && c.modo.mundo === 'metro' && !progreso.boletos.includes(c.estacion.boleto)) { anotaPedido('B', c.estacion.boleto, 420); c.gen.pedirBoleto(c.estacion.boleto, 420); }
+  if (c.estacion.boleto && c.modo.mundo === 'metro' && !progreso.boletos.includes(c.estacion.boleto)) pideBoleto(c.estacion.boleto, 420);
   estado = 'jugando';
   muestraCapa(null);
   $('hud').hidden = false;
@@ -767,6 +1046,7 @@ function muestraFin() {
   // a qué tabla fue la carrera (o a cuál habría ido): la del modo, y la distancia si fue récord en el clásico
   $('finTabla').innerHTML = `${ICONOS[ICONO_MODO[k.modo.id]] || ''}<span>${k.enviada ? 'Va a la tabla' : 'Tabla del modo'} «<b>${k.modo.nombre}</b>»${k.enviada && k.distancia ? ' y a «<b>Distancia</b>»' : ''}</span>`;
   $('finTabla').dataset.modo = k.modo.id;
+  pintaFinFantasma(k);                                          // contra el fantasma: quién ganó (modos «Fantasma»)
   muestraCapa('capaFin');
   // los puntos suben contando, con un tic suave (como el «score» de Subway Surfers)
   const el = $('finPuntos'), yo = ++cuentaFin, t0 = performance.now(), dur = k.puntos > 0 ? 900 : 0;
@@ -850,11 +1130,15 @@ function cierraPrueba(puntos, metros, ms) {
   if (!c.muerte) anota('m');                                    // se cerró en plena carrera (la pestaña, desde la pausa): ahí paran los puntos
   anota('f');
   const prueba = MP.cierra(JSON.parse(JSON.stringify(c.prueba)), { sn: c.sinteticas });
+  if (c.grab) c.rastro = c.grab.texto();                         // el rastro de esta carrera (modos fantasma)
   if (typeof c.rastro === 'string' && MP.ponFantasma) MP.ponFantasma(prueba, c.rastro);   // el rastro del fantasma (no cuenta para los puntos)
   c.pruebaFinal = prueba;
   if (c.tocada || tocada) { c.fuera = 'Partida de prueba (se usó __metrorush): no entra en la clasificación.'; return null; }
   if (c.sinteticas > 0) { c.fuera = 'Esta carrera tuvo teclas que no apretó una persona: no entra en la clasificación.'; return null; }
-  const r = MP.rehace(prueba);
+  let r = MP.rehace(prueba);
+  /* Si lo que no cuadra es el rastro (un error nuestro al grabarlo), se
+     manda sin él: el récord vale igual, solo que no se podrá ver correr. */
+  if (r.motivo && prueba.g !== undefined) { const sinG = Object.assign({}, prueba); delete sinG.g; const r2 = MP.rehace(sinG); if (!r2.motivo) { console.warn('Metro Rush: el rastro no cuadra; va sin él', r.motivo); delete prueba.g; r = r2; } }
   if (r.motivo || Math.abs(r.puntos - puntos) > 2 || r.metros !== metros || Math.abs(r.tiempo - ms) > 100) {
     console.warn('Metro Rush: la prueba no cuadra con la carrera', r, { puntos, metros, ms });
     c.fuera = 'Esta carrera no se pudo comprobar, así que no entra en la clasificación.';
@@ -869,6 +1153,7 @@ function aPortada() {
   if (Club && Club.inmersivo) Club.inmersivo(false);
   escenaPortada();
   pintaPortada(); muestraCapa('capaPortada');
+  pideFantasma(modoSel);                                        // en un modo fantasma, quién es el n.º 1 (puede haber cambiado)
 }
 /** El escenario de la portada: la primera estación del mundo del modo
     elegido, con los trenes de una pista cualquiera a la vista, y su música. */
@@ -894,6 +1179,7 @@ function eligeModo(id) {
   if (Club) Club.category(m.categoria);
   if (otroMundo) escenaPortada(); else mundo.monedasPeligro(!!m.monedasMatan);
   sonido.carril();
+  pideFantasma(m);                                              // en un modo fantasma, se busca al n.º 1 de su tabla
   pintaPortada();
 }
 /** La fila de modos de la portada y la línea que explica el elegido. */
@@ -904,6 +1190,7 @@ function pintaModos() {
   }).join('');
   $('modoDesc').textContent = modoSel.desc;
   $('capaPortada').dataset.modo = modoSel.id;
+  pintaFantasmaPortada();                                       // contra quién se corre (modos «Fantasma»)
 }
 /** La insignia del modo en el marcador de la carrera, y lo que ese modo no tiene. */
 function pintaModoHud() {
@@ -911,6 +1198,7 @@ function pintaModoHud() {
   el.innerHTML = `${ICONOS[ICONO_MODO[c.modo.id]]}<span>${c.modo.corto}</span>`;
   el.dataset.modo = c.modo.id;
   document.querySelector('.hud .patinetas').hidden = !c.modo.patineta;   // sin patineta no hay contador de patinetas
+  $('hudFan').hidden = !c.fan;                                   // contra el fantasma: la ventaja (modos «Fantasma» con fantasma)
 }
 function otraCarrera() { cierraCarrera(); empezar(); }
 document.addEventListener('visibilitychange', () => {
@@ -953,7 +1241,8 @@ function cuadro(ahora) {
   mundo.paso({
     D: c ? c.D : 0, x: r ? r.x : 0, y: r ? r.y : 0, suelo: r ? r.suelo : 0, v: c ? c.V : 0, dt, t: tiempoTotal, pose,
     poderes: c ? { iman: c.poderes.iman > 0, mochila: c.poderes.mochila > 0, zapatillas: c.poderes.zapatillas > 0, patineta: c.poderes.patineta > 0, pogo: !!c.pogo } : {},
-    perseguidor: c && !menu ? c.perseguidor : 0, menu
+    perseguidor: c && !menu ? c.perseguidor : 0, menu,
+    fantasma: menu ? null : dibujoFantasma()                     // el corredor fantasma (null: no hay)
   });
   mundo.dibuja();
   sonido.tick(c && estado === 'jugando' ? c.V : M.VELOCIDAD.V0);
@@ -998,6 +1287,7 @@ function pintaHud(dt) {
   ponTexto('hudMetros', fmt(c.D) + ' m');
   ponTexto('hudMonedas', mon);
   ponTexto('hudPatinetas', String(progreso.patinetas));
+  if (c.fan) pintaFantasmaHud();                                 // la ventaja contra el fantasma
   // la barra hacia la próxima estación
   const e = c.estacion, sig = M.siguienteUmbral(c.D, c.modo), desde = e.desde || 0;   // en metros, como las estaciones
   const cada = c.mundoJ.vuelta ? c.mundoJ.vuelta.cada : 0;       // lo que dura una vuelta en este mundo
@@ -1417,6 +1707,7 @@ async function arranca() {
   estado = 'portada';
   pintaPortada(); muestraCapa('capaPortada');
   if (Club) Club.category(modoSel.categoria);                   // la clasificación del costado: la del modo elegido
+  pideFantasma(modoSel);                                        // en un modo fantasma, el n.º 1 de su tabla
   requestAnimationFrame(t => { prevT = t; cuadro(t); });
   // se precarga el kit de la segunda estación cuando el navegador esté libre
   setTimeout(() => mundo.precarga(estacionVisual(M.ESTACIONES[1])), 4000);
@@ -1439,6 +1730,10 @@ window.__metrorush = {
   /** La semilla de la próxima carrera (la del récord, en el modo Fantasma). No vuelve «de prueba» a nada:
       el antitrampas acepta cualquier semilla. Gancho para el fantasma. */
   semillaSiguiente: n => { semillaSiguiente = Number.isInteger(n) && n >= 0 ? n : null; return semillaSiguiente; },
+  /** El fantasma (solo para mirar): el de la portada (por tabla) y el de la carrera en curso. */
+  fantasma: () => ({ portada: Object.fromEntries(Object.entries(fantasmas).map(([k, v]) => [k, { estado: v.estado, motivo: v.motivo || null, nombre: v.g && v.g.nombre, puntos: v.g && v.g.puntos, rastro: !!(v.g && v.g.rastro) }])),
+    carrera: c && c.fan ? { lado: c.fan.lado, pg: c.fan.pg, Dg: c.fan.Dg, diverge: c.fan.diverge, aplicados: c.fan.pi, pedidos: c.fan.g.pedidos.length } : null,
+    rastro: c && c.grab ? c.grab.n : null }),
   /** Elige el modo de juego en la portada, como tocar su tarjeta (no vuelve «de prueba» a nada). */
   modo: id => { eligeModo(id); return modoSel.id; },
   /** Los objetos de la pista por delante (copias, solo para mirar): [{tipo, clase, carril, d, y}]. */
