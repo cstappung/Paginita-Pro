@@ -125,11 +125,11 @@
      un poco más dura todavía; la del acto I es la de siempre, para
      aprender. */
   const JORNADAS = [
-    { n: 1, nivel: 1, acto: 1, tipo: "oleada", filas: ["c", "b", "b", "a", "a"], cols: 9, paso: 2, fuego: 0.45, balas: 2, apunta: 0, picada: 0, deriva: 1, mensajeras: 1 },
+    { n: 1, nivel: 1, acto: 1, tipo: "oleada", filas: ["c", "b", "b", "a", "a"], cols: 9, paso: 2, fuego: 0.45, balas: 2, apunta: 0, picada: 0, deriva: 1, mensajeras: 4 },   // las cuatro cartas del enjambre
     { n: 2, nivel: 4, acto: 1, tipo: "jefe", jefe: "nodriza" },
-    { n: 3, nivel: 8, acto: 2, tipo: "oleada", filas: ["c", "c", "b", "b", "a", "a"], cols: 10, paso: 2.6, fuego: 1.15, balas: 4, apunta: 0.32, picada: 0.14, deriva: 5, niebla: 0.75, vida: { c: 2 }, mensajeras: 2 },
+    { n: 3, nivel: 8, acto: 2, tipo: "oleada", filas: ["c", "c", "b", "b", "a", "a"], cols: 10, paso: 2.6, fuego: 1.15, balas: 4, apunta: 0.32, picada: 0.14, deriva: 5, niebla: 0.75, vida: { c: 2 }, mensajeras: 4 },
     { n: 4, nivel: 8, acto: 2, tipo: "jefe", jefe: "faro" },
-    { n: 5, nivel: 11, acto: 3, tipo: "oleada", filas: ["c", "c", "b", "b", "a", "a"], cols: 10, paso: 2.8, fuego: 1.3, balas: 5, apunta: 0.37, picada: 0.15, deriva: 3, ceniza: true, vida: { c: 2, b: 2 }, mensajeras: 2 },
+    { n: 5, nivel: 11, acto: 3, tipo: "oleada", filas: ["c", "c", "b", "b", "a", "a"], cols: 10, paso: 2.8, fuego: 1.3, balas: 5, apunta: 0.37, picada: 0.15, deriva: 3, ceniza: true, vida: { c: 2, b: 2 }, mensajeras: 3 },
     { n: 6, nivel: 11, acto: 3, tipo: "jefe", jefe: "esfinge" },
     { n: 7, nivel: 12, acto: 4, tipo: "lumbre", filas: ["a", "a", "a"], cols: 8, paso: 0, fuego: 0, balas: 0, apunta: 0, picada: 0, deriva: 6, mensajeras: 2 }, // las dos cartas del alba
     { n: 8, nivel: 13, acto: 4, tipo: "jefe", jefe: "alba" },
@@ -519,6 +519,7 @@
     if (r.punto.j > 0) r.punto.notas = Math.max(0, Math.min(1e6, Math.floor(+pt.notas || 0)));
     // Lo comprado en el taller para la jornada a medias (va a su prueba).
     if (r.punto.j > 0 && typeof pt.u === "string" && /^[a-z]{0,80}$/.test(pt.u)) r.punto.u = pt.u;
+    if (r.punto.j > 0 && Number.isInteger(pt.ver)) r.punto.ver = pt.ver;
     // La prueba de lo jugado hasta el punto de control (ver prueba.js): sin
     // ella, seguir desde aquí no entra en la clasificación. Se guarda tal
     // cual (el verificador la rehace entera) si tiene la forma y cabe.
