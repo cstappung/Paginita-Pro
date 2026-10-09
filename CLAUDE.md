@@ -48,6 +48,7 @@ before the first edit. Read only the docs the task needs.
 | Perfiles, marcos, fondos, tienda, clasificación/ranking, logros, monedas, recompensa diaria | `docs/claude/juegos/perfiles-y-economia.md` |
 | Música, canciones, reproductor ♪, volumen, mandos/controles | `juegos/audio/CLAUDE.md` |
 | Solo Club in general, antitrampas, castigo, modo celular | `juegos/club/CLAUDE.md` |
+| Crear un juego nuevo, agregar un juego | `docs/claude/juegos/crear-un-juego.md` |
 | Panel de administración | `docs/claude/juegos/admin.md` |
 | PRODROP, sobres, cartas coleccionables, mercado | `juegos/prodrop/CLAUDE.md` |
 
@@ -95,10 +96,9 @@ Solo Club games (read `juegos/club/CLAUDE.md` too):
 
 Snake, Tulones and Gato have no doc yet; read their code.
 
-**Creating a new game?** Read `colabtex/src/juegos/CLAUDE.md`,
-`docs/claude/juegos/perfiles-y-economia.md` (logros, coins, ranking), and, for a
-club game, `juegos/club/CLAUDE.md` plus the doc of the most similar existing
-game, to copy its wiring.
+**Creating a new game?** Read `docs/claude/juegos/crear-un-juego.md` first:
+the checklist of every file and list a new room or Solo Club game must be
+added to. Then the docs it names.
 
 ### Keeping the docs small
 
@@ -155,8 +155,10 @@ npm start            # static preview server at http://localhost:8123
   `file://` the origin is `null`, so Google login is refused and the BusyTeX
   `vendor/` fetches are blocked — the site looks broken for reasons that have
   nothing to do with the code.
-- **There is no unit-test suite**: `npm test` is the npm stub and exits 1. The
-  only automated check in the repo is the security-rules test below. The pure
+- **`npm test` is the npm stub and exits 1.** The games have
+  `npm run test:juegos` (`node --test` over `colabtex/tests/*.test.cjs`; a
+  new game's test must be added to that script), and the Firebase rules have
+  the security-rules test below. For the rest there is no suite. The pure
   modules (`reports.js`, `draw/geom.js`, and the path/format arithmetic in
   `file-move.js` and `format.js`) are written to be exercisable from Node
   without a browser, so ad-hoc checks are cheap — there is just no runner.
