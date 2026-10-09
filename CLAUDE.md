@@ -325,6 +325,26 @@ base columns did not change meaning. Three things make the comparison honest:
   grouped per harmonic in each channel's colour, and the compare card lists
   f₁, the ratio to the source, Δφ₁ and THD per channel.
 
+**The IEEE 519 limits are drawn behind the harmonic bars** (*Limits* under
+*Distortion · IEEE 519*, `IEEE519`, `ieeeInfo`, `drawIeeeBackdrop`). Current
+limits are Table 2 by I_SC/I_L, voltage ones Table 1 by bus voltage. Four
+things it settles:
+
+- **The reference is I_L**, the standard's own denominator, and the measured
+  I₁ when I_L is empty (the "% of I₁" figure many papers plot), which the
+  key on the plot says. Voltages always use the measured V₁. The limit is
+  converted into whatever unit the bars show (peak, rms, % of f₁).
+- **The shaded step is the odd-order envelope**; an even order's own limit
+  (25 % of its band) is a dashed mark in its slot. Drawing it into the
+  outline made a saw that hid the bands. Above n = 50 the standard says
+  nothing, so that zone is greyed out with "(n > 50)", not left unlimited.
+- **With the limits on, the scale follows the harmonics and the limits**,
+  not the fundamental, which is cut with a break mark and its value written
+  beside it: at 100 % it flattened a 4 % limit onto the floor.
+- **An order is over only past its limit by more than 1e-4 relative**, so a
+  harmonic exactly on it (2.0000 %) is not flagged by rounding. The TDD/THD
+  the standard judges is summed up to n = 50, whatever the harmonic count.
+
 ## FiltroLab architecture
 
 One file, `filtros-engine.js`, an IIFE on `window.FiltrosApp` behind the same

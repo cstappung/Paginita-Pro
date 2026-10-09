@@ -86,6 +86,10 @@ export const SOLOS = [
     ruta: "#solo/metrorush", reglas: "metrorush", popular: "club-metrorush", ranking: true,
     lema: "Corre por las vías esquivando trenes, junta monedas y llega a la Estación Fantasma. Siete estaciones y un inspector que no se cansa.",
     modos: ["Carrera sin fin", "Siete estaciones", "Tienda y retos"] },
+  { id: "tulones", tipo: "club", nombre: "Tulones", genero: "Física", icono: "🩲", alta: "2026-10-09",
+    ruta: "#solo/tulones", reglas: "tulones", popular: "club-tulones", ranking: false,
+    lema: "Trepa sobre una cabra y sobre tus amigos congelados en calzoncillos. La torre más alta gana. De 1 a 8 en el mismo teclado.",
+    modos: ["1 a 8 jugadores", "Torre sin fin"] },
   { id: "frontera", tipo: "club", nombre: "Frontera Batalla", genero: "Pokémon", icono: "🏰", alta: "2026-10-02",
     ruta: "#solo/frontera", reglas: "frontera", popular: "club-frontera", ranking: true,
     lema: "Torre, Palacio y Fábrica de Esmeralda: rachas de siete combates contra entrenadores cada vez más duros.",
@@ -171,7 +175,7 @@ export function entradasSalon(juegos, orden = Object.keys(juegos)) {
 /* El acento de cada juego del club, el mismo de su portada. */
 export const COLOR_SOLO = {
   minas: "#f6bc64", snake: "#58f5c0", tetrisclub: "#2fd3e8", sortem: "#00f5ff", bbtan: "#c4f568",
-  sopa: "#ffb070", electro: "#fbbf24", sudoku: "#ff2fb4", fanal: "#d9a85b", atasco: "#e8322f", aleteo: "#3fb6f5", dosmil: "#edc22e", metrorush: "#ff6a3d", frontera: "#fb923c"
+  sopa: "#ffb070", electro: "#fbbf24", sudoku: "#ff2fb4", fanal: "#d9a85b", atasco: "#e8322f", aleteo: "#3fb6f5", dosmil: "#edc22e", metrorush: "#ff6a3d", tulones: "#63b8ee", frontera: "#fb923c"
 };
 
 /* Dónde se juega cada entrada: en el celular (con el dedo), en el PC

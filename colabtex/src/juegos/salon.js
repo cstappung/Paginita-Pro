@@ -101,7 +101,7 @@ export function crearSalon(ctx) {
     const bloq = bloqueado(e, f.invitado), ins = insignia(e);
     const meta = e.modo === "multi"
       ? `<span>${esc(e.genero)}</span>${f.salas ? `<span class="jg-mn-vivo"><i aria-hidden="true"></i>${f.salas} ${f.salas === 1 ? "sala" : "salas"}</span>` : `<span>${e.grupo ? "En grupo" : "Duelo"}</span>`}`
-      : `<span>${esc(e.genero)}</span><span>${e.modo === "bots" ? "Sin ranking" : e.diario ? "📅 Reto diario" : "🏆 Ranking"}</span>`;
+      : `<span>${esc(e.genero)}</span><span>${e.modo === "bots" || e.ranking === false ? "Sin ranking" : e.diario ? "📅 Reto diario" : "🏆 Ranking"}</span>`;
     const clases = ["jg-mn", f.nuevo ? "nuevo" : "", bloq ? "bloq" : "", f.top ? "top" : "", actual && actual.id === e.id ? "sel" : ""].filter(Boolean).join(" ");
     const etiqueta = `${e.nombre}. ${ins.largo}.${e.movil || e.pc ? " " + dondeSeJuega(e) + "." : ""}${bloq ? " Requiere cuenta." : ""}${f.nuevo ? " Nuevo." : ""} Ver detalles`;
     return `

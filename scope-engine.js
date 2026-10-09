@@ -419,9 +419,9 @@ self.onmessage = function(e) {
     "measureBody", "measureScopeSel", "btnExportMeas",
     "fftSource", "fftCompareList", "fftPhaseMode", "fftCmpCard", "fftCmpBody", "fftWindow", "fftScale", "fftRange", "fftMaxIn",
     "f0In", "nHarmIn", "multMode", "multKIn", "multKRow", "harmUnit",
-    "ilIn", "btnIeee", "btnCompute", "btnExportHarm", "fftSummary",
+    "ilIn", "ieeeSel", "btnIeee", "btnCompute", "btnExportHarm", "fftSummary",
     "specWrap", "specCanvas", "harmWrap", "harmCanvas", "phaseWrap", "phaseCanvas",
-    "harmTableBody", "thdBig", "tddBig", "tddSub", "harmMeta",
+    "harmTableBody", "thdBig", "thdSub", "tddBig", "tddSub", "harmMeta",
     "tbPointer", "tbZoom", "tbZoomX", "tbZoomY", "tbPan", "tbFit", "tbFitY", "tbBack", "tbFwd",
     "tbCursors", "tbLegend", "tbYMode", "tbPng", "tbCsv", "tbInfo",
     "cursorCard", "cursorHead", "cursorBody",
@@ -2518,6 +2518,81 @@ self.onmessage = function(e) {
     return v;
   }
 
+  /* ---------- IEEE 519 limits (drawn behind the harmonic bars) ----------
+     Table 2 of IEEE 519-2014/2022 (systems 120 V – 69 kV): the largest
+     individual harmonic current, in % of I_L, per band of odd orders, for
+     each short-circuit ratio I_SC/I_L at the point of common coupling. Even
+     orders are limited to 25 % of the odd limit of their band. Table 1 is the
+     voltage one: one individual limit for every order and a THD limit, by bus
+     voltage, in % of the fundamental. Both stop at the 50th order — the
+     standard says nothing above it, which is why that region is greyed out
+     rather than drawn as "no limit". */
+  const IEEE_BANDS = [2, 11, 17, 23, 35, 51];   // band b = [B[b], B[b+1])
+  const IEEE519 = {
+    i20:   { kind: "i", lim: [4.0, 2.0, 1.5, 0.6, 0.3],  tot: 5.0,  label: "I_SC/I_L < 20" },
+    i50:   { kind: "i", lim: [7.0, 3.5, 2.5, 1.0, 0.5],  tot: 8.0,  label: "I_SC/I_L 20–50" },
+    i100:  { kind: "i", lim: [10.0, 4.5, 4.0, 1.5, 0.7], tot: 12.0, label: "I_SC/I_L 50–100" },
+    i1000: { kind: "i", lim: [12.0, 5.5, 5.0, 2.0, 1.0], tot: 15.0, label: "I_SC/I_L 100–1000" },
+    iinf:  { kind: "i", lim: [15.0, 7.0, 6.0, 2.5, 1.4], tot: 20.0, label: "I_SC/I_L > 1000" },
+    v1k:   { kind: "v", ind: 5.0, tot: 8.0, label: "V ≤ 1 kV" },
+    v69k:  { kind: "v", ind: 3.0, tot: 5.0, label: "1 kV < V ≤ 69 kV" },
+    v161k: { kind: "v", ind: 1.5, tot: 2.5, label: "69 kV < V ≤ 161 kV" },
+    vhi:   { kind: "v", ind: 1.0, tot: 1.5, label: "V > 161 kV" }
+  };
+  const IEEE_KEY = "csvscope_ieee519";
+  /* Limit of order n in % of the reference, or null where the standard sets
+     none (the fundamental, and anything above the 50th). */
+  function ieeeBandPct(spec, n) {
+    if (n < 2 || n > 50) return null;
+    if (spec.kind === "v") return spec.ind;
+    let b = 0;
+    while (b < spec.lim.length - 1 && n >= IEEE_BANDS[b + 1]) b++;
+    return spec.lim[b];
+  }
+  function ieeeLimitPct(spec, n) {
+    const l = ieeeBandPct(spec, n);
+    return l === null || spec.kind === "v" || n % 2 ? l : l * 0.25;
+  }
+  /* Everything the overlay needs for the source channel, or null when off.
+     The reference is I_L for currents — the standard's own denominator — and
+     the measured fundamental when I_L is empty (the "% of I₁" reading many
+     papers plot), said so on screen. For voltages it is always the measured
+     fundamental, standing in for the nominal one. */
+  function ieeeInfo() {
+    const spec = IEEE519[R.ieeeSel.value];
+    const H = S.harm;
+    if (!spec || !H || H.error || !(H.fundRms > 0)) return null;
+    const useIL = spec.kind === "i" && H.iL > 0;
+    const ref = useIL ? H.iL : H.fundRms;
+    const u = R.harmUnit.value;
+    const toDisplay = (pct) => {
+      const rms = pct / 100 * ref;
+      return u === "pct" ? rms / H.fundRms * 100 : u === "rms" ? rms : rms * Math.SQRT2;
+    };
+    const over = new Set();
+    let sumSq = 0;
+    H.harms.forEach(hh => {
+      if (hh.n < 2 || hh.n > 50) return;
+      const rms = hh.mag / Math.SQRT2;
+      sumSq += rms * rms;
+      const lim = ieeeLimitPct(spec, hh.n);
+      // a hair of tolerance: a harmonic sitting exactly on its limit (as
+      // printed with four decimals) must not be flagged by rounding noise
+      if (lim !== null && rms / ref * 100 > lim * (1 + 1e-4)) over.add(hh.n);
+    });
+    const totPct = Math.sqrt(sumSq) / ref * 100;
+    return { spec, ref, useIL, toDisplay, over, totPct, totOk: totPct <= spec.tot * (1 + 1e-4),
+      totName: spec.kind === "i" ? (useIL ? "TDD" : "THD") : "THD",
+      refTxt: spec.kind === "i" ? (useIL ? "I_L = " + fmt(ref, H.channel.unit || "A", 3) : "I_L not set → I₁ = " + fmt(ref, H.channel.unit || "A", 3))
+        : "V₁ = " + fmt(ref, H.channel.unit || "V", 3) };
+  }
+  /* 1, 2, 2.5 or 5 × 10^k: a tick step that reads like the figure in a paper. */
+  function niceStep(raw) {
+    if (!(raw > 0)) return 1;
+    const p = Math.pow(10, Math.floor(Math.log10(raw))), m = raw / p;
+    return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * p;
+  }
+
   function displayedHarms() {
     if (!S.harm || S.harm.error) return [];
     const mode = R.multMode.value;
@@ -2820,30 +2895,71 @@ self.onmessage = function(e) {
     const g = barGeometry(c, list);
     const ser = S.series.length ? harmSeries() : [{ ch: S.harm.channel, harm: S.harm, ref: true }];
     const K = ser.length, sg = slotGeometry(g, K);
+    const ie = ieeeInfo();
     let maxV = 0;
+    /* With the limits on, the scale is set by the harmonics and the limits,
+       not by the fundamental: at 100 % of I₁ it would flatten a 4 % limit to
+       a line on the floor. The fundamental bar is then cut at the top with a
+       break mark and its value written there. */
     list.forEach(hh => ser.forEach(x => {
+      if (ie && hh.n === 1) return;
       const o = harmAt(x.harm, hh.n);
       if (o) { const v = harmDisplayMag(o, x.harm); if (v > maxV) maxV = v; }
     }));
+    let stepV = 0;
+    if (ie) {
+      list.forEach(hh => { const l = ieeeLimitPct(ie.spec, hh.n); if (l !== null) maxV = Math.max(maxV, ie.toDisplay(l)); });
+      if (maxV <= 0) maxV = 1;
+      stepV = niceStep(maxV * 1.08 / 4);
+      maxV = stepV * Math.ceil(maxV * 1.08 / stepV);
+    }
     if (maxV <= 0) maxV = 1;
+    const nTicks = ie ? Math.round(maxV / stepV) : 4;
     // y grid
     ctx.strokeStyle = t.gridMinor;
     ctx.fillStyle = t.muted;
     ctx.textAlign = "right";
-    for (let i = 0; i <= 4; i++) {
-      const y = g.padT + g.ih - (i / 4) * g.ih;
+    if (ie) ctx.setLineDash([2, 3]);
+    for (let i = 0; i <= nTicks; i++) {
+      const v = (i / nTicks) * maxV;
+      const y = g.padT + g.ih - (i / nTicks) * g.ih;
       ctx.beginPath(); ctx.moveTo(g.padL, Math.round(y) + 0.5); ctx.lineTo(w - g.padR, Math.round(y) + 0.5); ctx.stroke();
-      ctx.fillText(R.harmUnit.value === "pct" ? ((i / 4) * maxV).toFixed(0) : fmt((i / 4) * maxV, "", 1), g.padL - 4, y + 3);
+      ctx.fillText(R.harmUnit.value === "pct" ? (ie && maxV < 40 ? String(+v.toFixed(2)) : v.toFixed(0)) : fmt(v, "", 1), g.padL - 4, y + 3);
     }
+    ctx.setLineDash([]);
+    if (ie) drawIeeeBackdrop(ctx, t, g, list, ie, maxV, w);
     ctx.textAlign = "center";
     list.forEach((hh, i) => {
       const x0 = g.padL + i * g.step + (g.step - sg.slot) / 2;
       ser.forEach((x, k) => {
         const o = harmAt(x.harm, hh.n);
         if (!o) return;
-        const bh = (harmDisplayMag(o, x.harm) / maxV) * g.ih;
-        ctx.fillStyle = i === S.hoverHarm ? (K > 1 ? x.ch.color : "#e0821f") : seriesColor(x, t, "mag", hh.n);
-        ctx.fillRect(x0 + k * sg.sub, g.padT + g.ih - bh, Math.max(1, sg.sub - (K > 1 && sg.sub > 3 ? 1 : 0)), Math.max(1, bh));
+        const v = harmDisplayMag(o, x.harm);
+        const cut = v > maxV;
+        const bh = Math.min(1, v / maxV) * g.ih;
+        const bx = x0 + k * sg.sub, bw = Math.max(1, sg.sub - (K > 1 && sg.sub > 3 ? 1 : 0)), by = g.padT + g.ih - bh;
+        const bad = ie && x.ref && ie.over.has(hh.n);
+        ctx.fillStyle = i === S.hoverHarm ? (K > 1 ? x.ch.color : "#e0821f") : bad && K === 1 ? "#d23c3c" : seriesColor(x, t, "mag", hh.n);
+        ctx.fillRect(bx, by, bw, Math.max(1, bh));
+        if (bad && K > 1) {
+          ctx.strokeStyle = "#d23c3c";
+          ctx.lineWidth = 1.5;
+          ctx.strokeRect(bx - 0.75, by - 0.75, bw + 1.5, Math.max(1, bh) + 1.5);
+          ctx.lineWidth = 1;
+        }
+        if (cut) {
+          // break mark: two slanted gaps near the top, then the real value
+          ctx.strokeStyle = t.scopeBg;
+          ctx.lineWidth = 2;
+          [8, 13].forEach(d => { ctx.beginPath(); ctx.moveTo(bx - 1, by + d + 3); ctx.lineTo(bx + bw + 1, by + d - 1); ctx.stroke(); });
+          ctx.lineWidth = 1;
+          if (k === 0) {
+            ctx.fillStyle = t.text;
+            ctx.textAlign = "left";
+            ctx.fillText("↑ " + fmt(v, R.harmUnit.value === "pct" ? "%" : "", 3), bx + bw + 3, by + 9);
+            ctx.textAlign = "center";
+          }
+        }
       });
       if (i === S.hoverHarm && K > 1) {
         ctx.strokeStyle = "#e0821f";
@@ -2855,17 +2971,114 @@ self.onmessage = function(e) {
       }
     });
     ctx.textAlign = "left";
+    if (ie) drawIeeeLegend(ctx, t, w, ie);
     // hover tooltip
     if (S.hoverHarm >= 0 && list[S.hoverHarm]) {
       const hh = list[S.hoverHarm], pct = R.harmUnit.value === "pct" ? "%" : "";
+      const lim = ie ? ieeeLimitPct(ie.spec, hh.n) : null;
       const lines = K > 1
         ? [{ txt: "n=" + hh.n + "  " + fmt(hh.f, "Hz", 1) }].concat(ser.map(x => {
             const o = harmAt(x.harm, hh.n);
             return { color: x.ch.color, txt: x.ch.label + "  " + (o ? fmt(harmDisplayMag(o, x.harm), pct, 3) : "—") };
           }))
         : [{ txt: "n=" + hh.n + "  " + fmt(hh.f, "Hz", 1) + "  " + fmt(harmDisplayMag(hh), pct, 3) + "  φ " + hh.phase.toFixed(1) + "°" }];
+      if (ie) {
+        const src = harmAt(S.harm, hh.n);
+        lines.push({ txt: lim === null ? "IEEE 519: no limit for n = " + hh.n
+          : "IEEE 519: " + (src ? (src.mag / Math.SQRT2 / ie.ref * 100).toFixed(2) : "—") + " % ≤ " + +lim.toFixed(3) + " % of " + (ie.spec.kind === "v" ? "V₁" : ie.useIL ? "I_L" : "I₁")
+            + (ie.over.has(hh.n) ? "  ✗" : "  ✓") });
+      }
       drawHarmTooltip(ctx, t, w, lines);
     }
+  }
+
+  /* The limit as a stepped, shaded area behind the bars: each order's slot is
+     filled up to its band's limit and one outline runs over the tops, so the
+     band edges (10/11, 16/17, …) read as steps. That envelope is the odd-order
+     limit; an even order's own limit (25 % of it) is a short dashed mark in
+     its slot — drawing it into the outline turned the whole area into a saw
+     that hid the bands. Orders above the 50th get a grey zone of their own,
+     since the standard does not cover them. */
+  function drawIeeeBackdrop(ctx, t, g, list, ie, maxV, w) {
+    const base = g.padT + g.ih;
+    const yOf = (v) => base - Math.min(1, v / maxV) * g.ih;
+    const fill = t.dark ? "rgba(170,180,192,0.13)" : "rgba(120,130,142,0.10)";
+    const edge = t.dark ? "rgba(190,198,208,0.75)" : "rgba(120,126,134,0.85)";
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(g.padL, g.padT, g.iw, g.ih);
+    ctx.clip();
+    let run = null;
+    const flush = () => {
+      if (!run) return;
+      ctx.beginPath();
+      ctx.moveTo(run[0].x0, base);
+      run.forEach(p => { ctx.lineTo(p.x0, p.y); ctx.lineTo(p.x1, p.y); });
+      ctx.lineTo(run[run.length - 1].x1, base);
+      ctx.fillStyle = fill;
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(run[0].x0, base);
+      run.forEach(p => { ctx.lineTo(p.x0, p.y); ctx.lineTo(p.x1, p.y); });
+      ctx.lineTo(run[run.length - 1].x1, base);
+      ctx.strokeStyle = edge;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      run = null;
+    };
+    let over50 = -1;
+    const evens = [];
+    list.forEach((hh, i) => {
+      const lim = ieeeBandPct(ie.spec, hh.n);
+      if (hh.n > 50 && over50 < 0) over50 = i;
+      if (lim === null) { flush(); return; }
+      const p = { x0: g.padL + i * g.step, x1: g.padL + (i + 1) * g.step, y: Math.round(yOf(ie.toDisplay(lim))) + 0.5 };
+      (run = run || []).push(p);
+      const own = ieeeLimitPct(ie.spec, hh.n);
+      if (own !== lim) evens.push({ x0: p.x0 + g.step * 0.1, x1: p.x1 - g.step * 0.1, y: Math.round(yOf(ie.toDisplay(own))) + 0.5 });
+    });
+    flush();
+    if (evens.length) {
+      ctx.strokeStyle = edge;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([2, 2]);
+      ctx.beginPath();
+      evens.forEach(p => { ctx.moveTo(p.x0, p.y); ctx.lineTo(p.x1, p.y); });
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    if (over50 >= 0) {
+      const x = g.padL + over50 * g.step;
+      ctx.fillStyle = t.dark ? "rgba(150,160,172,0.16)" : "rgba(110,118,128,0.13)";
+      ctx.fillRect(x, g.padT, w - g.padR - x, g.ih);
+      ctx.fillStyle = t.muted;
+      ctx.font = "italic 13px 'IBM Plex Sans', serif";
+      ctx.textAlign = "center";
+      if (w - g.padR - x > 50) ctx.fillText("(n > 50)", (x + w - g.padR) / 2, g.padT + Math.max(40, g.ih * 0.35));
+      ctx.font = "10px 'IBM Plex Mono', monospace";
+    }
+    ctx.restore();
+  }
+  /* Top-right key: what is drawn, against what, and the total-distortion
+     verdict, so a screenshot of this panel stands on its own in a report. */
+  function drawIeeeLegend(ctx, t, w, ie) {
+    ctx.font = "10px 'IBM Plex Mono', monospace";
+    const txt = "IEEE 519 · " + ie.spec.label + " · " + ie.refTxt;
+    const tot = ie.totName + "(n≤50) " + ie.totPct.toFixed(2) + " % / " + ie.spec.tot.toFixed(1) + " %"
+      + (ie.over.size ? " · " + ie.over.size + " order" + (ie.over.size > 1 ? "s" : "") + " over" : "");
+    const tw = Math.max(ctx.measureText(txt).width, ctx.measureText(tot).width) + 26;
+    const x = Math.max(200, w - tw - 10);
+    ctx.fillStyle = t.legendBg;
+    ctx.fillRect(x, 3, tw, 28);
+    ctx.strokeStyle = t.dark ? "rgba(190,198,208,0.75)" : "rgba(120,126,134,0.85)";
+    ctx.strokeRect(x + 0.5, 3.5, tw - 1, 27);
+    ctx.fillStyle = t.dark ? "rgba(170,180,192,0.3)" : "rgba(120,130,142,0.22)";
+    ctx.fillRect(x + 6, 9, 12, 8);
+    ctx.strokeRect(x + 6.5, 9.5, 11, 7);
+    ctx.fillStyle = t.text;
+    ctx.fillText(txt, x + 22, 16);
+    ctx.fillStyle = ie.totOk && !ie.over.size ? (t.dark ? "#3ddc7f" : "#0f7a4a") : "#d23c3c";
+    ctx.fillText((ie.totOk && !ie.over.size ? "✓ " : "✗ ") + tot, x + 22, 27);
   }
 
   function drawPhaseBars() {
@@ -2940,6 +3153,7 @@ self.onmessage = function(e) {
 
   const IL_PROMPT = "set I<sub>L</sub> to enable";
   function setDistortionReadout(H) {
+    R.thdSub.textContent = "vs. fundamental";
     if (!H || H.error) {
       R.thdBig.textContent = "—";
       R.tddBig.textContent = "—";
@@ -2953,6 +3167,14 @@ self.onmessage = function(e) {
     } else {
       R.tddBig.textContent = "—";
       R.tddSub.innerHTML = IL_PROMPT;
+    }
+    /* The limit beside the number it applies to: TDD for a current with I_L,
+       THD otherwise (a voltage, or a current referred to its own I₁). */
+    const ie = ieeeInfo();
+    if (ie) {
+      const verdict = '<span style="color:var(' + (ie.totOk ? "--ok" : "--bad") + ')">' + (ie.totOk ? "✓" : "✗") + " limit " + ie.spec.tot.toFixed(1) + " %</span>";
+      if (ie.spec.kind === "i" && ie.useIL) R.tddSub.innerHTML += " · " + verdict;
+      else R.thdSub.innerHTML = "vs. fundamental · " + verdict;
     }
   }
 
@@ -2981,11 +3203,24 @@ self.onmessage = function(e) {
       + (H.iL && H.fundRms > H.iL * 1.02
         ? '<br><span style="color:var(--bad)">⚠ the measured fundamental (' + fmt(H.fundRms, u, 3) + " rms) exceeds I<sub>L</sub> — check that I<sub>L</sub> is the rated current in rms, not peak</span>"
         : "");
+    const ie = ieeeInfo();
+    if (ie) {
+      const over = [...ie.over];
+      R.harmMeta.innerHTML += "<br>IEEE 519 (" + ie.spec.label + ", " + ie.refTxt.replace("I_L", "I<sub>L</sub>") + "): "
+        + (over.length
+          ? '<span style="color:var(--bad)">' + over.length + " order" + (over.length > 1 ? "s" : "") + " over the limit (n = " + over.slice(0, 12).join(", ") + (over.length > 12 ? "…" : "") + ")</span>"
+          : '<span style="color:var(--ok)">every order within its limit</span>')
+        + " · " + ie.totName + " " + ie.totPct.toFixed(2) + " % " + (ie.totOk ? "≤ " : '<span style="color:var(--bad)">&gt; ') + ie.spec.tot.toFixed(1) + " %" + (ie.totOk ? "" : "</span>")
+        + (H.harms.length < 50 && !H.clipped ? '<br><span style="color:var(--bad)">⚠ only ' + H.harms.length + " harmonics analysed — the standard goes up to n = 50 (Preset IEEE 519)</span>" : "");
+    }
     const list = displayedHarms();
     const fund = H.harms[0].mag;
     list.forEach((hh, i) => {
       const tr = document.createElement("tr");
-      tr.className = "osc-tr osc-htr" + (hh.n === 1 ? " fund" : "");
+      const lim = ie ? ieeeLimitPct(ie.spec, hh.n) : null;
+      tr.className = "osc-tr osc-htr" + (hh.n === 1 ? " fund" : "") + (ie && ie.over.has(hh.n) ? " over" : "");
+      if (lim !== null) tr.title = "IEEE 519 limit: " + +lim.toFixed(3) + " % of " + (ie.spec.kind === "v" ? "V₁" : ie.useIL ? "I_L" : "I₁")
+        + " · measured " + (hh.mag / Math.SQRT2 / ie.ref * 100).toFixed(2) + " %";
       const pct = fund > 0 ? (hh.mag / fund * 100) : 0;
       // per-order distortion against I_L: the form IEEE 519 states its limits in
       const pctIL = H.iL ? (hh.mag / Math.SQRT2 / H.iL * 100) : null;
@@ -3041,6 +3276,10 @@ self.onmessage = function(e) {
       + "\n# THD_pct," + (H.thd !== null ? (H.thd * 100).toFixed(4) : "")
       + "\n# I_L_rms," + (H.iL !== null ? H.iL : "")
       + "\n# TDD_pct," + (H.tdd !== null ? (H.tdd * 100).toFixed(4) : "") + "\n";
+    const ie = ieeeInfo();
+    if (ie) csv += "# IEEE519_limits," + ie.spec.label + "\n# IEEE519_reference_rms," + ie.ref + " (" + (ie.spec.kind === "v" ? "V1 measured" : ie.useIL ? "I_L" : "I1 measured, I_L not set") + ")"
+      + "\n# IEEE519_" + ie.totName + "_pct," + ie.totPct.toFixed(4) + "\n# IEEE519_" + ie.totName + "_limit_pct," + ie.spec.tot
+      + "\n# IEEE519_orders_over_limit," + [...ie.over].join(" ") + "\n";
     /* Compared channels get three columns each. Their phase is referred to the
        source's window start, so it can be subtracted from the source's
        phase_deg directly; dphase_deg is that subtraction, already wrapped. */
@@ -3048,13 +3287,15 @@ self.onmessage = function(e) {
     const tag = (x) => x.ch.label.replace(/[^\w]+/g, "_");
     if (others.length) csv += "# compared_phase_reference,source window start\n";
     csv += "n,freq_Hz,mag_peak,mag_rms,pct_of_fundamental,pct_of_IL,phase_deg"
+      + (ie ? ",ieee519_pct_of_ref,ieee519_limit_pct,ieee519_ok" : "")
       + others.map(x => "," + tag(x) + "_mag_peak," + tag(x) + "_phase_deg," + tag(x) + "_dphase_deg").join("") + "\n";
     const fund = H.harms[0].mag;
     displayedHarms().forEach(hh => {
       csv += [hh.n, hh.f, hh.mag, hh.mag / Math.SQRT2,
         fund > 0 ? (hh.mag / fund * 100) : 0,
         H.iL ? (hh.mag / Math.SQRT2 / H.iL * 100) : "",
-        hh.phase].concat(...others.map(x => {
+        hh.phase].concat(ie ? (lim => [hh.mag / Math.SQRT2 / ie.ref * 100, lim === null ? "" : lim, lim === null ? "" : (ie.over.has(hh.n) ? 0 : 1)])(ieeeLimitPct(ie.spec, hh.n)) : [],
+        ...others.map(x => {
           const o = harmAt(x.harm, hh.n);
           return o ? [o.mag, o.phaseRef, wrap180(o.phaseRef - hh.phaseRef)] : ["", "", ""];
         })).join(",") + "\n";
@@ -4050,10 +4291,19 @@ self.onmessage = function(e) {
       R[id].addEventListener("change", scheduleAnalysis);
     });
     R.ilIn.addEventListener("keydown", e => { if (e.key === "Enter") R.ilIn.blur(); });
+    R.ieeeSel.addEventListener("change", () => {
+      try { localStorage.setItem(IEEE_KEY, R.ieeeSel.value); } catch (e) { /* private mode */ }
+      renderFFTView();
+    });
     R.btnIeee.addEventListener("click", () => {
       // IEEE 519 evaluates orders up to the 50th; TDD needs I_L, so ask for it
       // right away rather than silently reporting a dash.
       R.nHarmIn.value = "50";
+      if (R.ieeeSel.value === "off") {
+        R.ieeeSel.value = "i20";
+        try { localStorage.setItem(IEEE_KEY, "i20"); } catch (e) { /* private mode */ }
+        if (!S.harm && !S.fft) renderFFTView();
+      }
       if (S.harm || S.fft) runAnalysis();
       if (!readRatedCurrent()) { R.ilIn.focus(); R.fftSummary.textContent = "Enter the rated demand current I_L to get TDD."; }
     });
@@ -4172,6 +4422,7 @@ self.onmessage = function(e) {
     bindCanvas("xy", "xyCanvas", "xyWrap");
     R.f0In.value = String(S.opts.fundamental || 50);
     if (S.opts.ratedCurrent) R.ilIn.value = String(S.opts.ratedCurrent);
+    try { const v = localStorage.getItem(IEEE_KEY); R.ieeeSel.value = v && IEEE519[v] ? v : "off"; } catch (e) { R.ieeeSel.value = "off"; }
     S.glowOn = S.opts.traceGlow !== false;
     R.chkGlow.checked = S.glowOn;
     wire();
