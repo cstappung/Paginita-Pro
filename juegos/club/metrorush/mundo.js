@@ -49,6 +49,8 @@ import { Reflector } from 'three/addons/objects/Reflector.js';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
+// los escenarios nuevos y la historia que se ve en la vía (afiches, utilería, horizonte, sucesos): ver escenarios.js
+import * as ESC from './escenarios.js?v=metrorush-7';
 
 const MOTOR = window.MetroRushMotor;                // el motor (motor.js), cargado antes como script
 const CARRILES = MOTOR.CARRILES;                   // x de cada carril
@@ -571,6 +573,13 @@ export const PALETAS = {
     extras: { nubes: false, disco: true, polvo: true }
   })
 };
+/* ---- Las estaciones nuevas y la historia (escenarios.js) ----
+   Se suman Mercado de Farolillos, Cocheras, Muelle y «fin» (el alba con la
+   historia; el «alba» queda limpio para City), y después cada paleta de la
+   Línea 3 recibe sus grafitis, letreros y afiches. Las bases no se tocan:
+   todo son copias hechas con `variante`. */
+Object.assign(PALETAS, ESC.paletasNuevas({ variante, BASE_JUGUETE, BASE_PIXEL, BASE_NEON, PALETAS }));
+ESC.sumaHistoria(PALETAS, variante);
 
 /* ===================================================================
    4. EL KIT DE UNA ESTACIÓN (materiales, texturas, modelos y reservas)
@@ -787,7 +796,7 @@ class Kit {
         t = aTextura(cv, { repetir: false, pixel: px }); break;
       }
       case 'graf': { const g = this.pal.grafitis[+arg[0] % this.pal.grafitis.length]; t = aTextura(TEX.grafiti(az, g[0], g[1], g[2], this.neon ? 0.85 : 1), { repetir: false, pixel: px }); break; }
-      default: t = null;
+      default: t = ESC.textura(this, tipo, arg, AYUDA);                      // los afiches y los grafitis de la historia (o null)
     }
     this.texs.set(nombre, t);
     return t;
@@ -855,10 +864,12 @@ class Kit {
     for (const lado of [-1, 1]) {
       pre('edificio' + lado, () => this.edificio(lado), 7); pre('graf' + lado, () => this.grafiti(lado), 3);
     }
+    ESC.preparaKit(this, pre, AYUDA);                                         // los afiches y los grafitis de la historia (si la paleta tiene)
     pasos.push(() => {                                                         // árboles, faroles y postes: instancias
       const libres = []; const serie = (g, max) => { const s = new Serie(g, max); libres.push(s); return s; };
       this.series = {
-        arbol: this.neon ? [] : [0, 1, 2].map(() => { const g = this.arbol(); g.scale.setScalar(1); return serie(g, 40); }),   // tres árboles distintos, cada uno muchas veces (en neón no hay)
+        // en neón no hay árboles, salvo que la estación traiga su utilería (el Muelle: bitas, cajas, faroles)
+        arbol: this.neon && !this.pal.props ? [] : [0, 1, 2].map(() => { const g = this.arbol(); g.scale.setScalar(1); return serie(g, 40); }),   // tres árboles distintos, cada uno muchas veces (en neón no hay)
         farol: { [-1]: serie(this.farol(-1, true), 24), [1]: serie(this.farol(1, true), 24) },
         poste: { [-1]: serie(this.poste(-1, true), 14), [1]: serie(this.poste(1, true), 14) }
       };
@@ -1109,6 +1120,7 @@ class Kit {
   }
   /** Un árbol low-poly: tronco y tres copas facetadas. */
   arbol() {
+    const prop = ESC.prop(this, AYUDA); if (prop) return prop;               // una estación nueva pone su utilería (puestos, bidones, bitas) en vez de árboles
     const c = this.c, az = this.az, a = new Arma(this);
     a.pon(new THREE.CylinderGeometry(0.11, 0.17, 1.7, 8), 'plano', c.tronco, [0, 0.85, 0]);
     for (let k = 0; k < 3; k++) {
@@ -1277,6 +1289,7 @@ class Kit {
       const ge = new THREE.BufferGeometry(); ge.setAttribute('position', new THREE.Float32BufferAttribute(est, 3)); normalesFijas(ge);
       g.add(new THREE.Points(ge, new THREE.PointsMaterial({ color: 0xffffff, size: 2, sizeAttenuation: false, fog: false, transparent: true, opacity: 0.8 })));
     }
+    ESC.cielo(this, g, AYUDA);                                                // el horizonte de las estaciones nuevas (tejados, galpones, grúas y faro)
     for (const m of g.children) m.frustumCulled = false;
     return g;
   }
@@ -1368,6 +1381,11 @@ function sprite(col, escala, pos, opacidad = 1) {
   s.scale.setScalar(escala); s.position.set(pos[0], pos[1], pos[2]);
   return s;
 }
+
+/* Las ayudas de este archivo que usa escenarios.js (afiches, utilería,
+   horizonte, sucesos). Se le pasan en vez de copiarse allá: así una pieza
+   nueva se arma, se funde y se libera igual que las de aquí. */
+const AYUDA = { Arma, CAJA, CILINDRO, CILINDRO_CHICO, ESFERA, prepara, funde, matriz, lienzo, aTextura, TEX, sprite, normalesFijas, geoTren, azarDe, SUELO, L_VAGON };
 
 /* ===================================================================
    5. EL CORREDOR, EL INSPECTOR Y SU PERRO
@@ -1980,6 +1998,8 @@ export function crearMundo(canvas) {
   const chispas = [];                                                         // brillitos al tomar monedas
   let monedasRojas = false;                                                   // ¿las monedas son un peligro? (modo «Sin monedas»)
   let particulas = null, trenFantasma = null, tiempoFantasma = 0;
+  let lore = true;                                                            // ¿se cuenta la historia de la Línea 3? (afiches, el 317): solo en su mundo, lo dice juego.js
+  let sucesos = null;                                                         // los sucesos de la estación (escenarios.js): farolillos, lluvia, el 317…
   const camPos = new THREE.Vector3(0, 4.7, 8.6), camMira = new THREE.Vector3(0, 0.4, -9);
 
   /* ---- la sensación de velocidad (solo para el ojo) ----
@@ -2134,12 +2154,17 @@ export function crearMundo(canvas) {
         frente.arbol[lado] = d + 9 + kit.az() * 8;
         if (enTunel(d - 2, d + 2)) continue;
         const v = kit.series.arbol[Math.floor(kit.az() * 3)];
-        paisaje.push({ serie: v, x: lado * (5.45 + kit.az() * 0.3), y: SUELO, rot: kit.az() * 6.28, esc: 0.9 + kit.az() * 0.35, d, largo: 1.5, k: kit });
+        // la utilería de una estación nueva va de frente a la vía (un árbol, girado al azar); el azar se pide igual en los dos casos
+        const x = lado * (5.45 + kit.az() * 0.3), giro = kit.az(), rot = kit.pal.props ? ESC.giroProp(lado, giro) : giro * 6.28;
+        paisaje.push({ serie: v, x, y: SUELO, rot, esc: 0.9 + kit.az() * 0.35, d, largo: 1.5, k: kit });
       }
       while (frente.graf[lado] < hasta) {                                     // grafitis en el muro
         const d = frente.graf[lado];
         frente.graf[lado] = d + 12 + kit.az() * 22;
         if (enTunel(d - 3, d + 3) || kit.az() < 0.35) continue;
+        // con la historia, algunos de estos lugares son un afiche de pie en la vereda o un grafiti de la historia (escenarios.js)
+        const deco = lore ? ESC.decoraMuro(kit, lado, AYUDA) : null;
+        if (deco) { deco.obj.position.set(...deco.pos); paisaje.push({ obj: deco.obj, d, largo: deco.largo, k: kit }); continue; }
         const o = kit.saca('graf' + lado, () => kit.grafiti(lado)); o.position.set(lado * 3.56, 0.6, 0);
         paisaje.push({ obj: o, d, largo: 1.8, k: kit });
       }
@@ -2453,6 +2478,9 @@ export function crearMundo(canvas) {
       trenFantasma = new THREE.Mesh(geoTren(L_VAGON * 3), new THREE.MeshBasicMaterial({ color: 0x7dffcf, transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
       trenFantasma.visible = false; escena.add(trenFantasma);
     }
+    // los sucesos de la estación nueva (farolillos, lluvia y relámpagos, focos, el 317 a lo lejos): escenarios.js
+    if (sucesos) { sucesos.quita(); sucesos = null; }
+    sucesos = ESC.ambiente(kit, escena, AYUDA, lore);
     aplicaSombras();
     tamano(anchoCss, altoCss);                                                 // el lienzo depende del estilo (el pixelado mide el suyo en píxeles del arte) y rearma el post-proceso
     try { renderer.compile(escena, camara); } catch (e) { /* si no se puede compilar antes, se compila al dibujar */ }
@@ -2669,6 +2697,7 @@ export function crearMundo(canvas) {
       }
       a.needsUpdate = true;
     }
+    if (sucesos) sucesos.paso(e, dt, camara, mov);                           // los sucesos de la estación (escenarios.js)
     if (trenFantasma) {                                                       // el tren fantasma cruza el cielo de vez en cuando
       tiempoFantasma -= dt;
       if (tiempoFantasma <= 0 && !trenFantasma.visible) { trenFantasma.visible = true; trenFantasma.position.set(-80, 18, -90); trenFantasma.rotation.y = Math.PI / 2; tiempoFantasma = 22; }
@@ -2766,6 +2795,8 @@ export function crearMundo(canvas) {
     /** Qué movimientos de cámara se permiten (ver «la sensación de velocidad»):
         `sacudir` = la opción del juego; `quieto` = el sistema pide reducir el movimiento. */
     movimiento(o) { Object.assign(mov, o); },
+    /** ¿Se cuenta la historia de la Línea 3 en la vía (afiches, grafitis de la historia, el 317)? Solo en su mundo: juego.js lo apaga en City. Vale para lo que se ponga desde ahora. */
+    lore(si) { lore = !!si; },
     /** Pinta las monedas de rojo (y latiendo) si `si`: el modo «Sin monedas». */
     monedasPeligro(si) { monedasRojas = !!si; },
     /** Un brillito donde se tomó una moneda o un poder. */

@@ -361,7 +361,7 @@ function muere(motivo) {
   c.pogo = false;                                               // y el pogo se pierde
   c.perseguidorObj = 1;
   c.potVentana = 0; pintaPots();                                // los botones de potenciadores se van (y no vuelven al seguir)
-  ocultaPista();
+  ocultaPista(); altavozCalla();
   sonido.choque(); sonido.mochila(false);
   if (opciones.sacudida) mundo.sacude(0.8);
 }
@@ -529,8 +529,10 @@ function recoge(dt) {
       sonido.estrella(); aviso(`Estrella: multiplicador ×${multiplicador()}`); mundo.chispa(r.x, r.y + 1.2, 0, 0xffe066);
     } else if (o.tipo === 'boleto') {
       if (!progreso.boletos.includes(o.n)) { progreso.boletos.push(o.n); progreso.boletos.sort((a, b) => a - b); }
-      sonido.boleto(); banner(M.BOLETOS[o.n].titulo, 'Léelo en la Libreta');
-      if (progreso.boletos.length >= 7) desbloquea('inspector', '¡Los siete boletos! Aspecto Inspector desbloqueado');
+      // el número que se muestra es su lugar en la historia (el de la vía), no su número interno: «Boleto 3 de 10»
+      const cap = M.capituloDe(o.n);
+      sonido.boleto(); banner(`Boleto ${cap.n} de ${cap.de}`, `«${M.BOLETOS[o.n].titulo}» · Léelo en la Libreta`);
+      if (tieneTodosLosBoletos()) desbloquea('inspector', '¡Todos los boletos! Don Ramón terminó su último turno: te regala su gorra. Aspecto Inspector');
       guardar();
     }
   }
@@ -620,6 +622,7 @@ function actualiza(dt) {
     if (c.t >= c.sigMuestra) { anota('w'); c.sigMuestra = c.t + MP.PASO_MUESTRA; }   // una muestra de metros y reloj cada 2 s
     retosEnVivo(dt);
     pistas(dt);
+    altavoz(dt);                                                 // el altavoz del andén (la historia que se oye)
     if (c.potVentana > 0) { c.potVentana -= dt; if (c.potVentana <= 0) pintaPots(); }
   } else if (muriendo) {
     const r = c.r;                                               // chocó en el aire: cae hasta el suelo (o el techo) antes de quedar tendido
@@ -684,11 +687,12 @@ function estaciones() {
   const cb = c.cambio;
   if (cb && cb.tunel) {
     const o = cb.tunel;
-    if (!cb.entro && c.D >= o.d0 - 2) { cb.entro = true; sonido.tunel(); }
+    if (!cb.entro && c.D >= o.d0 - 2) { cb.entro = true; sonido.tunel(); altavozProxima(cb.estacion); }   // en el túnel no hay obstáculos: ahí habla el altavoz
     if (!cb.hecho && c.D >= o.d0 + 40) {                         // dentro del túnel (no se ve el mundo de afuera): se cambia todo
       cb.hecho = true;
       mundo.activa(estacionVisual(cb.estacion), o.d0 + o.largo + 4);
       c.estacion = cb.estacion;
+      altavozEstacion();                                         // el «eco» de esta estación, más adelante y en un momento tranquilo
       sonido.tocaTema(cb.estacion.musica);
       pantalla.dataset.estilo = estacionVisual(cb.estacion).estilo;
       if (cb.estacion.boleto && c.modo.mundo === 'metro' && !progreso.boletos.includes(cb.estacion.boleto)) { anotaPedido('B', cb.estacion.boleto, o.d0 + o.largo + 260); c.gen.pedirBoleto(cb.estacion.boleto, o.d0 + o.largo + 260); }
@@ -757,6 +761,71 @@ function pistas(dt) {
   el.hidden = false;
 }
 
+/* ---- el altavoz del andén (la historia que se oye) ----
+   La Libreta cuenta la historia con el juego en pausa; el altavoz la cuenta
+   mientras se corre, sin detener nada. Es una franja chica arriba al centro
+   (debajo del marcador, lejos del letrero grande, de los avisos y de las
+   pistas, que van abajo) con un «ding-dong» de estación antes de hablar.
+   Habla dos veces por estación (textos en historia.js):
+   - «Próxima estación…» al entrar al túnel: en el túnel no hay obstáculos,
+     así que es el único momento en que leer no compite con esquivar;
+   - el «eco», una sola vez, pasados ECO_TRAS segundos en la estación y solo
+     en un momento tranquilo: sin pista del tutorial a la vista, sin el
+     letrero grande y sin nada por tu carril en los próximos ECO_LIBRE
+     segundos. Si en ECO_ESPERA segundos no hay calma, no se dice (otra
+     visita será).
+   Solo en la Línea 3 (el mundo de esta historia), y no cambia nada del
+   juego: ni puntos, ni metros, ni la prueba. Ejemplo: a 30 m/s el túnel
+   dura 5 s; el anuncio queda 4,5 s más lo que tarde en leerse. */
+const HIST = window.MetroRushHistoria || null;                 // los textos (historia.js); sin él, el altavoz calla
+const ECO_TRAS = 20, ECO_ESPERA = 25, ECO_LIBRE = 2.2;
+let altavozT = 0;                                               // segundos que le quedan al anuncio a la vista
+/** ¿Habla el altavoz en esta carrera? Solo en la Línea 3. */
+const altavozActivo = () => !!(HIST && c && c.modo.mundo === 'metro');
+/** Muestra un anuncio, con su ding-dong. La duración crece con el largo del texto (de 4,5 a 7 s). */
+function altavozDice(txt) {
+  if (!txt) return;
+  $('altavozTxt').textContent = txt;
+  const el = $('altavoz'); el.hidden = false; el.classList.remove('ver'); void el.offsetWidth; el.classList.add('ver');
+  altavozT = Math.min(7, 4.5 + txt.length * 0.03);
+  sonido.dingDong();
+}
+/** Esconde el anuncio (pausa, choque, portada, carrera nueva). */
+function altavozCalla() { altavozT = 0; const el = $('altavoz'); if (el) { el.classList.remove('ver'); el.hidden = true; } }
+/** Al entrar al túnel de la estación `est`: «Próxima estación…». */
+function altavozProxima(est) { if (altavozActivo()) altavozDice(HIST.anuncioProxima(est)); }
+/** Al llegar a una estación: el eco queda programado (una vez por visita). */
+function altavozEstacion() { if (c) c.eco = altavozActivo() ? { t: 0, txt: HIST.anuncioEco(c.estacion) } : null; }
+/** Cada cuadro: apaga el anuncio cuando se cumple su tiempo y decide si llegó el momento del eco. */
+function altavoz(dt) {
+  if (altavozT > 0) { altavozT -= dt; if (altavozT <= 0) { $('altavoz').classList.remove('ver'); setTimeout(() => { if (altavozT <= 0) $('altavoz').hidden = true; }, 400); } }
+  const eco = c.eco;
+  if (!eco || !eco.txt) return;
+  eco.t += dt;
+  if (eco.t < ECO_TRAS) return;
+  if (eco.t > ECO_TRAS + ECO_ESPERA) { c.eco = null; return; }   // no hubo calma: se queda sin decir
+  if (altavozT > 0 || c.pista || c.banner > 0 || c.cambio) return;   // ya hay algo que leer, o viene un túnel
+  // ¿viene algo por mi carril en los próximos segundos? (lo mismo que miran las pistas del tutorial)
+  for (const o of c.activos) {
+    if (o.carril !== c.r.carril || !(o.tipo === 'bajo' || o.tipo === 'alto' || o.tipo === 'tren' || o.tipo === 'rampa')) continue;
+    const dz = (o.d != null ? o.d : o.d0) - c.D, cierre = c.V + (o.tipo === 'tren' && o.activo ? o.vel : 0);
+    if (dz > -2 && dz / Math.max(1, cierre) < ECO_LIBRE) return;
+  }
+  altavozDice(eco.txt); c.eco = null;
+}
+
+/* ---- los boletos de la Línea 3 ----
+   Son uno por estación (hoy diez). El número de un boleto es su nombre (los
+   1 a 7 de siempre y 8 a 10 de las estaciones nuevas); lo que se muestra es
+   su lugar en la vía. El aspecto Inspector se gana con TODOS: quien ya lo
+   ganó con los siete de antes lo conserva (está en sus aspectos). */
+/** Las estaciones de la Línea 3 que tienen boleto, en el orden de la vía. */
+const boletosLinea = () => M.ESTACIONES.filter(e => e.boleto);
+/** Cuántos de esos tienes. */
+const boletosTenidos = () => boletosLinea().filter(e => progreso.boletos.includes(e.boleto)).length;
+/** ¿Están todos? */
+const tieneTodosLosBoletos = () => boletosTenidos() === boletosLinea().length;
+
 /* ===================================================================
    4. EL CICLO DE LA PARTIDA (empezar, pausa, fin, seguir)
    =================================================================== */
@@ -764,10 +833,12 @@ function empezar() {
   sonido.iniciar();
   if (!progreso.intro) { abreRelato(); return; }               // la primera vez se cuenta de qué se trata
   cierraPanel();
-  c = nuevaCarrera(); ocultaPista();
+  c = nuevaCarrera(); ocultaPista(); altavozCalla();
   mundo.reinicia();
+  mundo.lore(c.modo.mundo === 'metro');                        // los afiches y el 317 cuentan la historia de la Línea 3: solo en su mundo
   const e = estacionVisual(c.estacion);
   mundo.activa(e, 0);
+  altavozEstacion();                                            // el primer «eco» (Barrio: la línea cierra mañana)
   pantalla.dataset.estilo = e.estilo;
   for (const o of c.gen.generarHasta(230, { V: c.V })) c.activos.push(o);
   // el boleto de la primera estación (solo en la Línea 3: los boletos guardados son de ese mundo)
@@ -788,7 +859,7 @@ function empezar() {
 }
 function pausar() {
   if (estado !== 'jugando') return;
-  estado = 'pausa'; sonido.calla(); sonido.mochila(false);
+  estado = 'pausa'; sonido.calla(); sonido.mochila(false); altavozCalla();
   if (Club && Club.inmersivo) Club.inmersivo(false);            // en pausa vuelven el marcador de la página y el volumen
   $('pausaDetalle').textContent = `${fmt(c.puntos)} puntos · ${fmt(c.D)} m · ${c.monedas} monedas`;
   muestraCapa('capaPausa');
@@ -949,7 +1020,7 @@ function cierraPrueba(puntos, metros, ms) {
   return prueba;
 }
 function aPortada() {
-  cierraCarrera(); ocultaPista();
+  cierraCarrera(); ocultaPista(); altavozCalla();
   estado = 'portada'; c = null;
   $('hud').hidden = true;
   if (Club && Club.inmersivo) Club.inmersivo(false);
@@ -960,7 +1031,7 @@ function aPortada() {
     elegido, con los trenes de una pista cualquiera a la vista, y su música. */
 function escenaPortada() {
   const e = estacionVisual(M.estacionDe(0, modoSel));
-  mundo.reinicia(); mundo.activa(e, 0);
+  mundo.reinicia(); mundo.lore(modoSel.mundo === 'metro'); mundo.activa(e, 0);
   mundo.monedasPeligro(!!modoSel.monedasMatan);
   pantalla.dataset.estilo = e.estilo;
   const vitrina = M.crearGenerador(2026, { modo: modoSel.id });  // en la portada se ve la vía con los primeros trenes de una pista cualquiera
@@ -1204,7 +1275,7 @@ function pintaPortada() {
   $('portadaMisBarra').style.setProperty('--k', (hechos / lista.length).toFixed(3));
   // el globito «!» de Misiones: hay algo que hacer ahí (una misión se puede saltar con lo que tienes, o el set está a una misión)
   $('portadaRetosG').hidden = !(progreso.retos.nivel < M.MAX_BASE && (hechos === 2 || progreso.monedas >= M.costoSaltar(progreso.retos.nivel)));
-  ponTexto('portadaBoletos', `${progreso.boletos.length}/7`);
+  ponTexto('portadaBoletos', `${boletosTenidos()}/${boletosLinea().length}`);
   ponTexto('barRecord', fmt(M.recordDe(progreso, modoSel)));
   ponTexto('barMonedas', fmt(progreso.monedas));
   ponTexto('barMult', '×' + progreso.retos.nivel);
@@ -1411,12 +1482,14 @@ document.addEventListener('click', e => {
    progreso para guardarlos; los de `progreso.boletos` son de la Línea 3). */
 function abreLibreta() {
   $('libretaIntro').textContent = M.INTRO;
-  $('listaBoletos').innerHTML = M.ESTACIONES.map(e => {
+  // en el orden de la vía, que es el de la historia: «Boleto 3 de 10 · Objetos perdidos»
+  const lista = boletosLinea(), N = lista.length;
+  $('listaBoletos').innerHTML = lista.map((e, i) => {
     const b = M.BOLETOS[e.boleto], tiene = progreso.boletos.includes(e.boleto);
-    return tiene ? `<li><strong>${b.titulo}</strong><p>${b.texto}</p></li>`
-      : `<li class="falta"><strong>Boleto n.º ${e.boleto} · ${e.desde ? `desde los ${fmt(e.desde)} m` : 'Barrio Estación'}</strong><p>Todavía no lo encuentras. Está en la estación ${e.nombre}.</p></li>`;
+    return tiene ? `<li><strong>Boleto ${i + 1} de ${N} · ${b.titulo}</strong><p>${b.texto}</p></li>`
+      : `<li class="falta"><strong>Boleto ${i + 1} de ${N} · ${e.desde ? `desde los ${fmt(e.desde)} m` : 'Barrio Estación'}</strong><p>Todavía no lo encuentras. Está en la estación ${e.nombre}.</p></li>`;
   }).join('');
-  $('libretaCuenta').textContent = `${progreso.boletos.length} de 7 boletos`;
+  $('libretaCuenta').textContent = `${boletosTenidos()} de ${N} boletos`;
   abrePanel('capaLibreta');
 }
 function abreRelato() {

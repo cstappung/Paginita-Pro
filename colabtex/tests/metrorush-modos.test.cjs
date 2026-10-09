@@ -121,7 +121,7 @@ test('el mundo City es un armazón jugable: una estación, sin vueltas, su histo
  assert.ok(M.estacionDe(0,'city').paleta,'reusa una paleta que ya existe');
  assert.equal(M.historiaDe('city').intro,M.INTRO_CITY);assert.equal(M.historiaDe('clasico').intro,M.INTRO);
  // el clásico y los demás modos del metro siguen con las estaciones de siempre
- assert.equal(M.estacionDe(1600,'puro').id,'ocaso');assert.equal(M.estacionDe(1600).id,'ocaso');assert.equal(M.siguienteUmbral(0,'sinmonedas'),1500);
+ assert.equal(M.estacionDe(1600,'puro').id,'ocaso');assert.equal(M.estacionDe(1600).id,'ocaso');assert.equal(M.siguienteUmbral(0,'sinmonedas'),1200);
  // los ganchos del generador: un bloque propio y un tipo de objeto nuevo
  const viejo=M.MUNDOS.city.generador;let llamado=0;
  M.MUNDOS.city.generador={bloque(api){if(api.dSig<400)return false;llamado++;api.emite({tipo:'prueba-x',carril:api.camino,d:api.dSig});api.dSig+=40;return true;}};

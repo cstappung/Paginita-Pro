@@ -1066,8 +1066,8 @@ const REGLAS = {
         "Empiezas con un Despegue de regalo."
       ])],
       ["Estaciones", lista([
-        "El paisaje cambia con la distancia recorrida, siempre pasando por un túnel: <b>Barrio Estación</b> (desde el comienzo, la ciudad de día), <b>Ocaso</b> (a los 1 500 m, retro pixelado al atardecer), <b>Línea Neón</b> (3 500 m, noche synthwave), <b>Estación Fantasma</b> (6 000 m), <b>Invierno</b> (9 000 m), <b>Óxido</b> (12 500 m) y <b>Fin de la Línea</b> (17 000 m). Después vuelven a girar cada 4 km.",
-        "En cada estación hay un <b>boleto dorado</b> con un trozo de la historia. Los que encuentres se leen en la <b>Libreta</b>.",
+        "El paisaje cambia con la distancia recorrida, siempre pasando por un túnel: <b>Barrio Estación</b> (desde el comienzo, la ciudad de día), <b>Ocaso</b> (a los 1 200 m, retro pixelado al atardecer), <b>Mercado de Farolillos</b> (2 550 m), <b>Línea Neón</b> (4 200 m, noche synthwave), <b>Estación Fantasma</b> (6 150 m), <b>Cocheras</b> (8 400 m), <b>Invierno</b> (10 950 m), <b>Muelle</b> (13 700 m), <b>Óxido</b> (16 450 m) y <b>Fin de la Línea</b> (19 200 m). Después vuelven a girar cada 4 km.",
+        "En cada estación hay un <b>boleto dorado</b> con un capítulo de la historia: diez en total. Los que encuentres se leen en la <b>Libreta</b>. Mientras corres, la historia también está en los <b>afiches</b> de la vereda y en el <b>altavoz</b> del andén, que habla al entrar a cada túnel.",
         "En Opciones puedes fijar un estilo (juguete, neón o pixelado) en vez de que cambie con las estaciones, y bajar la calidad gráfica si el teléfono va lento."
       ])],
       ["Controles", lista([

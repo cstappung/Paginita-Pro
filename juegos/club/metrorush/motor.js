@@ -246,21 +246,43 @@
      carrera: antes eran puntos, y como los puntos van × el multiplicador,
      quien tenía ×30 pasaba por todas las estaciones treinta veces más
      rápido que quien empezaba. Por distancia, todos las ven en el mismo
-     punto de la vía. Con la velocidad de la carrera (ver VELOCIDAD) se
-     llega a Ocaso hacia 1 min 15 s, a Línea Neón a 2 min 40 s, a Estación
-     Fantasma a 4 min, a Invierno a 5 min 10 s, a Óxido a 6 min 10 s (ya a
-     50 m/s) y al Fin de la Línea a 7 min 40 s. Después de la última, las
-     tres primeras vuelven a girar cada 4 km ("vuelta 2", "vuelta 3"…). */
+     punto de la vía.
+
+     SON DIEZ (eran siete: se sumaron Mercado de Farolillos, Cocheras y
+     Muelle). Con diez, los umbrales se repartieron de nuevo para que todas
+     quepan con el mismo ritmo: con la velocidad de la carrera (ver
+     VELOCIDAD) cada una llega ~55 s después de la anterior y la primera
+     pasado el minuto (Ocaso a 1 min 06 s, Mercado a 2:01, Línea Neón a
+     2:57, Estación Fantasma a 3:52, Cocheras a 4:47, Invierno a 5:42,
+     Muelle a 6:37, Óxido a 7:32 y el Fin de la Línea a 8:27). El test de
+     motor exige al menos 50 s entre una y otra. Los túneles los pide el
+     juego y quedan en la prueba, así que mover los umbrales no cambia la
+     pista de una semilla (los hashes del clásico sin pedidos siguen igual)
+     ni invalida pruebas viejas: cada una trae sus pedidos.
+
+     El número del boleto es su NOMBRE, no su orden: los 1 a 7 son los de
+     siempre (los que ya tiene guardados cada jugador) y los de las
+     estaciones nuevas son 8, 9 y 10. El orden en la historia es el de la
+     vía, y es el que muestra la Libreta («Boleto 3 de 10»).
+
+     Después de la última, giran Barrio, Ocaso y Línea Neón cada 4 km
+     ("vuelta 2", "vuelta 3"…), como antes: `vuelta.ids` las nombra para
+     que no dependan de su lugar en la lista. */
   const ESTACIONES = [
     { id: "barrio", nombre: "Barrio Estación", desde: 0, estilo: "juguete", paleta: "barrio", musica: "metrorush-barrio", lema: "Donde empieza la Línea 3", boleto: 1 },
-    { id: "ocaso", nombre: "Ocaso", desde: 1500, estilo: "pixel", paleta: "ocaso", musica: "metrorush-ocaso", lema: "El sol se pone en píxeles", boleto: 2 },
-    { id: "neon", nombre: "Línea Neón", desde: 3500, estilo: "neon", paleta: "neon", musica: "metrorush-neon", lema: "De noche la vía se enciende sola", boleto: 3 },
-    { id: "fantasma", nombre: "Estación Fantasma", desde: 6000, estilo: "neon", paleta: "fantasma", musica: "metrorush-fantasma", lema: "Nadie había corrido tanto", boleto: 4 },
-    { id: "invierno", nombre: "Invierno", desde: 9000, estilo: "juguete", paleta: "invierno", musica: "metrorush-invierno", lema: "Nieva sobre los rieles", boleto: 5 },
-    { id: "oxido", nombre: "Óxido", desde: 12500, estilo: "pixel", paleta: "oxido", musica: "metrorush-oxido", lema: "Más allá del mapa", boleto: 6 },
-    { id: "fin", nombre: "Fin de la Línea", desde: 17000, estilo: "juguete", paleta: "alba", musica: "metrorush-fin", lema: "Aquí se acaban las vías… ¿o no?", boleto: 7 }
+    { id: "ocaso", nombre: "Ocaso", desde: 1200, estilo: "pixel", paleta: "ocaso", musica: "metrorush-ocaso", lema: "El sol se pone entre los rieles", boleto: 2 },
+    { id: "mercado", nombre: "Mercado de Farolillos", desde: 2550, estilo: "juguete", paleta: "mercado", musica: "metrorush-mercado", lema: "Los puestos no cierran esta noche", boleto: 8 },
+    { id: "neon", nombre: "Línea Neón", desde: 4200, estilo: "neon", paleta: "neon", musica: "metrorush-neon", lema: "De noche la vía se enciende sola", boleto: 3 },
+    { id: "fantasma", nombre: "Estación Fantasma", desde: 6150, estilo: "neon", paleta: "fantasma", musica: "metrorush-fantasma", lema: "Aquí no para un tren desde 2006", boleto: 4 },
+    { id: "cocheras", nombre: "Cocheras", desde: 8400, estilo: "pixel", paleta: "cocheras", musica: "metrorush-cocheras", lema: "Donde duermen los trenes viejos", boleto: 9 },
+    { id: "invierno", nombre: "Invierno", desde: 10950, estilo: "juguete", paleta: "invierno", musica: "metrorush-invierno", lema: "Nieva sobre los rieles", boleto: 5 },
+    { id: "muelle", nombre: "Muelle", desde: 13700, estilo: "neon", paleta: "muelle", musica: "metrorush-muelle", lema: "La línea que iba a llegar al mar", boleto: 10 },
+    { id: "oxido", nombre: "Óxido", desde: 16450, estilo: "pixel", paleta: "oxido", musica: "metrorush-oxido", lema: "Más allá del mapa", boleto: 6 },
+    // la paleta "fin" es la del alba con la historia (afiches, grafitis): "alba" queda limpia para City, que la reusa
+    { id: "fin", nombre: "Fin de la Línea", desde: 19200, estilo: "juguete", paleta: "fin", musica: "metrorush-fin", lema: "Aquí se acaban las vías… ¿o no?", boleto: 7 }
   ];
-  const VUELTA_DESDE = 21000, VUELTA_CADA = 4000;   // desde los 21 km, una estación de las tres primeras cada 4 km
+  const VUELTA_DESDE = 23200, VUELTA_CADA = 4000;   // desde los 23,2 km (80 s después del Fin), una de las tres primeras cada 4 km
+  const VUELTA_IDS = ["barrio", "ocaso", "neon"];    // las que giran: una de cada estilo, como siempre
 
   /** La estación que corresponde a los `metros` corridos, en el mundo del
       `modo` (sin modo, la Línea 3 de siempre). Devuelve una copia con
@@ -274,8 +296,9 @@
       for (const x of lista) if (p >= x.desde) e = x;        // la última cuyo umbral ya pasaste
       return Object.assign({}, e, { clave: e.id, vuelta: 1 });
     }
-    const k = Math.floor((p - V.desde) / V.cada);            // cuántos giros van desde los 21 km
-    const base = lista[k % V.n];                             // barrio, ocaso, neón, barrio…
+    const k = Math.floor((p - V.desde) / V.cada);            // cuántos giros van desde el comienzo de las vueltas
+    // barrio, ocaso, neón, barrio… (con `ids`, por su nombre; sin ellos, las n primeras de la lista, como en City)
+    const base = V.ids ? lista.find(x => x.id === V.ids[k % V.ids.length]) || lista[0] : lista[k % V.n];
     const vuelta = 2 + Math.floor(k / V.n);                  // la vuelta en que vas
     return Object.assign({}, base, { nombre: `${base.nombre} · vuelta ${vuelta}`, clave: `${base.id}-${k}`, vuelta, boleto: null });
   }
@@ -291,18 +314,37 @@
   }
 
   /* ---------- La historia ----------
-     Siete boletos dorados, uno por estación. Se leen en la Libreta. */
-  const INTRO = "La Línea 3 cierra mañana. Esta noche, el último tren no para en ninguna estación… y tú vas a correr toda la vía antes de que apaguen las luces. Don Ramón, el inspector, y su perro Tornillo vienen detrás.";
+     Diez boletos dorados, uno por estación, que juntos cuentan la última
+     noche de la Línea 3 de principio a fin: el cierre (Barrio, Ocaso), las
+     pistas de quién maneja el último tren (Mercado, Neón, Fantasma), la
+     revelación en las Cocheras, el porqué (Invierno, Muelle, Óxido) y el
+     final al amanecer. Se leen en la Libreta en el orden de la vía. En la
+     carrera, la historia también se ve y se oye (afiches, grafitis y el
+     altavoz del andén): eso vive en historia.js, que no decide nada.
+
+     `titulo` es el nombre del capítulo; el número que se muestra («Boleto
+     3 de 10») sale del orden de ESTACIONES (ver capituloDe). Los personajes:
+     tú (sin nombre), Don Ramón Ibarra (el inspector), su perro Tornillo y
+     Marta Quiroga, la maquinista del 317, el primer tren de la línea. */
+  const INTRO = "La Línea 3 cierra mañana. Esta noche, el último tren no para en ninguna estación… y tú vas a correr toda la vía antes de que apaguen las luces. Don Ramón, el inspector, y su perro Tornillo vienen detrás. Nadie sabe quién maneja ese último tren.";
   const BOLETOS = [
-    null,  // (los boletos se cuentan desde el 1)
-    { titulo: "Boleto n.º 1 · Barrio Estación", texto: "La Línea 3 cierra mañana. Dicen que el último tren no para en ninguna estación. Dicen muchas cosas." },
-    { titulo: "Boleto n.º 2 · Ocaso", texto: "Don Ramón lleva cuarenta años de inspector y nunca ha atrapado a nadie. Tornillo tampoco. Pero no se rinden: es su última noche también." },
-    { titulo: "Boleto n.º 3 · Línea Neón", texto: "De noche la vía se enciende sola. Nadie paga la luz. Nadie pregunta. Los letreros dicen tu nombre si corres lo bastante rápido." },
-    { titulo: "Boleto n.º 4 · Estación Fantasma", texto: "Seis kilómetros. Aquí bajan los que corrieron demasiado y se quedaron a vivir en la vía. Saluda: te están aplaudiendo, aunque no los veas." },
-    { titulo: "Boleto n.º 5 · Invierno", texto: "Nieva sobre los rieles. En el andén hay un termo de café con una nota: «Para el que corre. —R.». Don Ramón sabe que no lo vas a tomar. Lo deja igual." },
-    { titulo: "Boleto n.º 6 · Óxido", texto: "La línea sigue más allá del mapa. Los rieles están tibios y oxidados, como si alguien los hubiera usado anoche. Alguien que corría como tú." },
-    { titulo: "Boleto n.º 7 · Fin de la Línea", texto: "Amanece. Se acabaron las vías… y aun así tus pies siguen encontrando dónde pisar. La Línea 3 no cierra mientras alguien la corra. Gracias por correrla." }
+    null,  // (los boletos se cuentan desde el 1; el número es su nombre, no su orden: ver ESTACIONES)
+    { titulo: "El letrero de la boletería", texto: "En la boletería hay un letrero escrito a mano: «Último servicio, 23:59. No se detiene en ninguna estación». Abajo, con otra letra: «Ni lo intenten. —M.». En el barrio nadie sabe quién es M. Don Ramón dice que él sí sabe, pero se hace el leso." },
+    { titulo: "Cero multas", texto: "Don Ramón lleva cuarenta años de inspector y nunca ha multado a nadie. Tornillo nunca ha mordido a nadie. Hoy es su último turno, y aun así te persigue. Quizás no quiere atraparte. Quizás solo no quiere quedarse quieto mientras le cierran la línea." },
+    { titulo: "Alguien enciende la vía", texto: "De noche la vía se enciende sola, letrero por letrero, un poco antes de que llegues. En la vitrina de un bar se refleja la cabina del último tren: alguien con una trenza gris va apretando interruptores, y lleva puesta una gorra de maquinista." },
+    { titulo: "Se busca: Marta Quiroga", texto: "Le dicen Estación Fantasma porque aquí no para ningún tren desde 2006. Ese año la empresa mandó a desguace el 317, el primer tren de la línea. Esa noche el 317 desapareció de las cocheras, y su maquinista, Marta Quiroga, también. Los carteles de «SE BUSCA» siguen aquí. Alguien les dibujó un bigote. Alguien más se lo borró." },
+    { titulo: "Dos termos", texto: "Nieva sobre los rieles. En el andén hay un termo con una nota: «Para la que maneja de noche. —R.». Al lado hay otro, más abollado: «Para el que inspecciona. —M.». Los dos siguen calientes. Hace veinte años que se dejan café en este andén y nunca coinciden." },
+    { titulo: "Rieles tibios", texto: "La línea sigue más allá del mapa. Los rieles están tibios: el 317 acaba de pasar. Durante veinte años Marta manejó de noche por las vías que nadie usa, para que no se oxidaran del todo. Esta noche es la última vez, y por primera vez en veinte años va a frenar." },
+    { titulo: "Válido", texto: "Amanece. El 317 espera en el último andén, con la puerta abierta. Marta baja con su gorra de vuelta y dos cafés. Don Ramón llega sin aire; ella le pasa uno: «Te lo debía desde 1986». Y él, por fin, atrapa a alguien: a ti. Te pica el boleto. «Válido», dice, «para todos los viajes que queden». Tornillo mueve la cola." },
+    { titulo: "Objetos perdidos", texto: "En el mercado, el puesto de objetos perdidos vende lo que nadie reclamó en cuarenta años: paraguas, un acordeón, una dentadura. Lo único que no está a la venta es una gorra de maquinista con un nombre bordado: M. QUIROGA. «Esa la vienen a buscar», dice la señora. «Esta noche.»" },
+    { titulo: "La pizarra de 1986", texto: "En las cocheras duermen los trenes viejos, cada uno en su vía. La 7 está vacía. En la pizarra del turno sigue escrito con tiza, de 1986: «Viaje inaugural, 317. Maquinista: M. Quiroga. Inspector en práctica: R. Ibarra, 19 años». Tornillo olfatea la vía vacía y mueve la cola." },
+    { titulo: "Hasta el mar", texto: "La Línea 3 iba a llegar al mar. Lo dicen los planos de 1986 que se mojan en la caseta del muelle: la vía seguía derecho hasta el agua. Nunca la terminaron. Pero estos rieles brillan bajo la lluvia, sin una mancha de óxido, como si alguien los limpiara cada noche." }
   ];
+  /** El lugar de un boleto en la historia (1 = el primero de la vía) y cuántos hay en el mundo. Ejemplo: el boleto 8 (Mercado) es el capítulo 3 de 10. */
+  function capituloDe(n, modo) {
+    const lista = mundoDe(modo).estaciones.filter(e => e.boleto);
+    return { n: lista.findIndex(e => e.boleto === n) + 1, de: lista.length };
+  }
 
   /* ---------- Los mundos (dónde se corre) ----------
      Un MUNDO es el lugar de la carrera: sus estaciones, cómo giran después
@@ -339,7 +381,7 @@
   const INTRO_CITY = "La Línea 3 llegó a la ciudad. Aquí las vías cruzan las calles, y Don Ramón conoce cada esquina… o eso cree.";
   const BOLETOS_CITY = [null];                              // los boletos de City (todavía ninguno)
   const MUNDOS = {
-    metro: { id: "metro", nombre: "Línea 3", estaciones: ESTACIONES, vuelta: { desde: VUELTA_DESDE, cada: VUELTA_CADA, n: 3 },
+    metro: { id: "metro", nombre: "Línea 3", estaciones: ESTACIONES, vuelta: { desde: VUELTA_DESDE, cada: VUELTA_CADA, n: 3, ids: VUELTA_IDS },
       intro: INTRO, boletos: BOLETOS, velocidad: VELOCIDAD, generador: null, personajes: null, tema: "metrorush-barrio" },
     city: { id: "city", nombre: "City", estaciones: ESTACIONES_CITY, vuelta: null,
       intro: INTRO_CITY, boletos: BOLETOS_CITY, velocidad: VELOCIDAD, generador: null, personajes: null, tema: "metrorush-barrio" }
@@ -480,7 +522,7 @@
     maite: { nombre: "Maite", precio: 45000, sudadera: 0xffb703, gorra: 0x3a86ff, jeans: 0x3a86ff, mochila: 0x3a86ff, mochila2: 0xffb703, suela: 0xffffff,
       rasgos: { pelo: 0x2a1610, peinado: "monos", aros: true, falda: 0x3a86ff } },            // dos moños, aros dorados y falda azul
     dorado: { nombre: "Dorado", precio: null, secreto: "Teclea el código de siempre en la portada (↑ ↑ ↓ ↓ ← → ← → B A).", sudadera: 0xd4a017, gorra: 0xffe066, jeans: 0x8a6d1a, mochila: 0xffd23f, mochila2: 0xfff3b0, suela: 0xffe066 },
-    inspector: { nombre: "Inspector", precio: null, secreto: "Encuentra los siete boletos dorados.", sudadera: 0x1f3a5f, gorra: 0x1f3a5f, jeans: 0x14213d, mochila: 0x8a5a35, mochila2: 0xfca311, suela: 0x111111 }
+    inspector: { nombre: "Inspector", precio: null, secreto: "Encuentra todos los boletos dorados de la Línea 3.", sudadera: 0x1f3a5f, gorra: 0x1f3a5f, jeans: 0x14213d, mochila: 0x8a5a35, mochila2: 0xfca311, suela: 0x111111 }
   };
 
   /** La caja misteriosa: casi siempre monedas, a veces una patineta o un
@@ -627,7 +669,8 @@
     if (x.potenciadores && typeof x.potenciadores === "object") for (const k of Object.keys(p.potenciadores)) p.potenciadores[k] = entero(x.potenciadores[k], 0, 999);
     for (const k of Object.keys(p.mejoras)) p.mejoras[k] = entero(x.mejoras && x.mejoras[k], 0, MAX_MEJORA);
     if (x.retos) p.retos = { nivel: entero(x.retos.nivel, 1, MAX_BASE), avance: [0, 1, 2].map(i => entero(x.retos.avance && x.retos.avance[i], 0, 1e9)) };
-    p.boletos = Array.isArray(x.boletos) ? [...new Set(x.boletos.map(Number).filter(n => Number.isInteger(n) && n >= 1 && n <= 7))].sort((a, b) => a - b) : [];   // solo boletos que existen (1 a 7)
+    // solo boletos que existen en la Línea 3 (hoy 1 a 10; los 1 a 7 guardados antes siguen valiendo, con su mismo número)
+    p.boletos = Array.isArray(x.boletos) ? [...new Set(x.boletos.map(Number).filter(n => Number.isInteger(n) && n >= 1 && n < BOLETOS.length && BOLETOS[n]))].sort((a, b) => a - b) : [];
     p.aspectos = Array.isArray(x.aspectos) ? [...new Set(["clasico", ...x.aspectos.filter(a => ASPECTOS[a])])] : ["clasico"];
     p.aspecto = ASPECTOS[x.aspecto] && p.aspectos.includes(x.aspecto) ? x.aspecto : "clasico";
     for (const k of Object.keys(p.records)) p.records[k] = entero(x.records && x.records[k], 0, 1e12);
@@ -1036,7 +1079,7 @@
     recordDe, anotaRecord,
     MEDIO_LARGO, MARGEN_TECHO, MARGEN_RAMPA, ANCHO_TECHO, alturaRampa, soporte, caja,
     PUNTOS_POR_METRO, MAX_BASE, MAX_ESTRELLAS, multiplicador, puntosPorTramo,
-    ESTACIONES, estacionDe, siguienteUmbral, VUELTA_DESDE, VUELTA_CADA, INTRO, BOLETOS,
+    ESTACIONES, estacionDe, siguienteUmbral, VUELTA_DESDE, VUELTA_CADA, VUELTA_IDS, INTRO, BOLETOS, capituloDe,
     PODERES, SEG_POR_NIVEL, MAX_MEJORA, PRECIOS_MEJORA, PRECIO_PATINETA, DURACION_PATINETA, duracionPoder, precioMejora, costoSeguir,
     POTENCIADORES, costoSaltar, premioSet, saltaReto,
     ASPECTOS, cajaMisteriosa, cajaSuper, PRECIO_SUPERCAJA,
