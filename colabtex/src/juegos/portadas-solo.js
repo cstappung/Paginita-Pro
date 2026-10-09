@@ -98,8 +98,10 @@ const ARTE = {
     // Tres vías: los rieles van al punto de fuga; los durmientes se juntan a lo lejos.
     const VIAS = [-115, 155, 425];                               // el centro de cada vía, abajo
     const rieles = VIAS.flatMap(c => [c - 55, c + 55]).map(x0 => `<path d="M${x0} 300 L${FX} ${FY}" stroke="#2c2840" stroke-width="4.5"/><path d="M${x0 - 1.5} 300 L${FX} ${FY}" stroke="#dfe6f4" stroke-width="1.8"/>`).join("");
+    // Al animarse, una ola de brillo recorre los durmientes desde el horizonte
+    // hacia quien mira (el lejano, k = 0, se adelanta más): la vía "corre".
     const durmientes = VIAS.map(c => [123, 128, 135, 145, 158, 176, 201, 236, 286].map((y, k) =>
-      `<path d="M${enX(c - 68, y).toFixed(1)} ${y} H${enX(c + 68, y).toFixed(1)}" stroke="#4a3020" stroke-width="${1 + k * 1.4}"/>`).join("")).join("");
+      `<path class="a-durmiente" style="animation-delay:${(k * .12 - 1.1).toFixed(2)}s" d="M${enX(c - 68, y).toFixed(1)} ${y} H${enX(c + 68, y).toFixed(1)}" stroke="#4a3020" stroke-width="${1 + k * 1.4}"/>`).join("")).join("");
 
     // El vagón de la izquierda, alejándose por su vía. Su costado fuga al
     // punto de fuga y termina en x = 150, sin tocar al tren; no se le ve el
@@ -120,7 +122,7 @@ const ARTE = {
       <rect x="-120" y="232" width="174" height="20" fill="#2a1a3a" opacity=".8"/>`;
 
     // El tren de frente por la vía del medio: pisa (sombra y bogies) y sus focos son lo que más brilla del fondo.
-    const tren = `<path d="M171 168 L150 200 H218 L201 168Z" fill="url(#hz${u})"/>
+    const tren = `<g class="a-tiembla"><path d="M171 168 L150 200 H218 L201 168Z" fill="url(#hz${u})"/>
       <ellipse cx="190" cy="169" rx="36" ry="4" fill="#000" opacity=".45"/>
       <path d="M160 164 V120 q0 -10 10 -10 h40 q10 0 10 10 V164Z" fill="#ff4646" stroke="${TINTA}" stroke-width="2.6"/>
       <rect x="165" y="118" width="50" height="22" rx="3" fill="url(#vd${u})" stroke="${TINTA}" stroke-width="2"/><path d="M172 118 l-5 20 M182 118 l-6 22" stroke="#fff" stroke-width="2" opacity=".35"/>
@@ -128,13 +130,13 @@ const ARTE = {
       <rect x="162" y="164" width="56" height="6" fill="#22202e"/><rect x="157" y="160" width="66" height="5" rx="2" fill="#3a3f52" stroke="${TINTA}" stroke-width="2"/>
       <rect x="181" y="112" width="18" height="5" rx="1" fill="${TINTA}"/><text x="190" y="116.3" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace" font-weight="800" font-size="4.2" fill="#ffd23f">L3</text>
       <circle cx="170" cy="155" r="4" fill="#fffbe0" stroke="${TINTA}" stroke-width="1.8"/><circle cx="210" cy="155" r="4" fill="#fffbe0" stroke="${TINTA}" stroke-width="1.8"/>
-      <g class="a-foco"><circle cx="170" cy="155" r="20" fill="url(#lz${u})"/><circle cx="210" cy="155" r="20" fill="url(#lz${u})"/></g>`;
+      <g class="a-foco"><circle cx="170" cy="155" r="20" fill="url(#lz${u})"/><circle cx="210" cy="155" r="20" fill="url(#lz${u})"/></g></g>`;
 
     // La tabla voladora, en coordenadas de la escena (no del corredor):
     // casi horizontal, justo bajo las dos suelas (y ≈ 222–236), con dos
     // estelas cian que salen de la cola hacia el fondo, no hacia el suelo.
     const tabla = `<g transform="translate(300 223) rotate(-3)">
-      ${[-4, 4].map(dy => `<path d="M-50 ${dy} h-20" stroke="${TINTA}" stroke-width="8" stroke-linecap="round"/><path d="M-50 ${dy} h-20" stroke="#7ff0ff" stroke-width="4" stroke-linecap="round" class="a-flamea"/>`).join("")}
+      ${[-4, 4].map(dy => `<path d="M-50 ${dy} h-20" stroke="${TINTA}" stroke-width="8" stroke-linecap="round"/><path d="M-50 ${dy} h-20" stroke="#7ff0ff" stroke-width="4" stroke-linecap="round" class="a-estela" style="animation-delay:${dy > 0 ? -.15 : 0}s"/>`).join("")}
       <rect x="-53" y="-7" width="106" height="14" rx="7" fill="#ff3fa4" stroke="${TINTA}" stroke-width="3"/>
       <rect x="-48" y="1.5" width="96" height="4" rx="2" fill="#c4127a"/>
       <path d="M-40 -2.5 h80" stroke="#ffd0ea" stroke-width="2.4" stroke-linecap="round"/>
@@ -164,8 +166,10 @@ const ARTE = {
 
     // Las rayas de velocidad: radiales desde el punto de fuga, solo en la
     // periferia (el borde derecho y la franja alta), sin cruzar al corredor.
+    // Cada una lleva su propio desfase (3/14 de vuelta), así al animarse pasan
+    // en chorro continuo en vez de parpadear todas a la vez.
     const rayas = [[.06, 175, 235], [.2, 180, 240], [.34, 175, 235], [.48, 185, 240], [-.06, 160, 215], [-.2, 150, 205], [-.34, 140, 190]]
-      .map(([a, r0, r1]) => `<path d="M${(FX + r0 * Math.cos(a)).toFixed(1)} ${(FY + r0 * Math.sin(a)).toFixed(1)} L${(FX + r1 * Math.cos(a)).toFixed(1)} ${(FY + r1 * Math.sin(a)).toFixed(1)}" stroke="#fff" stroke-width="2.6" stroke-linecap="round" opacity=".55"/>`).join("");
+      .map(([a, r0, r1], k) => `<path class="a-raya" style="animation-delay:${(-k * 3 / 14 % .5).toFixed(2)}s" d="M${(FX + r0 * Math.cos(a)).toFixed(1)} ${(FY + r0 * Math.sin(a)).toFixed(1)} L${(FX + r1 * Math.cos(a)).toFixed(1)} ${(FY + r1 * Math.sin(a)).toFixed(1)}" stroke="#fff" stroke-width="2.6" stroke-linecap="round" opacity=".55"/>`).join("");
 
     return `<defs><linearGradient id="g${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1279f0"/><stop offset=".25" stop-color="#36aef7"/><stop offset=".4" stop-color="#a8e6ff"/><stop offset=".4" stop-color="#8a8296"/><stop offset="1" stop-color="#3f364d"/></linearGradient>
     <pattern id="gr${u}" width="9" height="7" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r=".8" fill="#b7afc2"/><circle cx="6.5" cy="5" r=".8" fill="#b7afc2"/></pattern>
@@ -187,10 +191,10 @@ const ARTE = {
     <circle cx="300" cy="125" r="90" fill="url(#ha${u})"/>
     ${tren}${vagon}
     ${[[247, 176, 11, 0], [237, 159, 9, -.25], [228, 145, 7, -.5]].map(c => moneda(...c)).join("")}
-    ${brillo(263, 150, 7)}
-    <ellipse cx="300" cy="232" rx="42" ry="4" fill="#000" opacity=".3"/>
-    <g class="a-raya">${rayas}</g>
-    <g class="a-mueve">${tabla}<g transform="translate(298 166) rotate(-4) scale(1.05)">${corredor}</g></g>`;
+    <g class="a-late">${brillo(263, 150, 7)}</g>
+    <ellipse cx="300" cy="232" rx="42" ry="4" fill="#000" opacity=".3" class="a-sombra"/>
+    ${rayas}
+    <g class="a-surfea">${tabla}<g transform="translate(298 166) rotate(-4) scale(1.05)">${corredor}</g></g>`;
   },
 
   tetrisclub: u => {
