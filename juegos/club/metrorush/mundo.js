@@ -1813,6 +1813,47 @@ function armaPerseguidor(kit) {
   return { r, perro, patas, cola, placa };
 }
 
+/* ===================================================================
+   5 bis. EL FANTASMA (modos «Fantasma» y «City fantasma»)
+   ===================================================================
+   El corredor de la mejor carrera de la tabla, que corre a tu lado: es el
+   mismo muñeco articulado (armaCorredor, así posa igual), pero de un azul
+   translúcido de un solo material propio, sin sombra (ni la de verdad ni la
+   redonda de calidad baja) y sin escribir profundidad, para que nunca tape
+   ni se coma lo que tiene detrás. Lleva un letrerito con el nombre de quien
+   lo corrió (en un lienzo: no pasa por la traducción ni por el HTML). No
+   choca con nada: solo se dibuja (lo mueve juego.js con su rastro).
+   La oclusión ambiental no lo ve (`sinAO`): redibujaría su cuerpo opaco en
+   el pase de normales y le pondría un halo oscuro a algo que es de aire. */
+function armaFantasma(kit, nombre) {
+  const r = armaCorredor(kit, MOTOR.ASPECTOS.clasico);                       // el mismo cuerpo de siempre…
+  const mat = new THREE.MeshLambertMaterial({ color: 0x9fd0ff, emissive: 0x2f6bff, emissiveIntensity: 0.55, vertexColors: true,
+    transparent: true, opacity: 0.45, depthWrite: false });                  // …teñido de azul, translúcido y con luz propia (se ve en la noche del neón)
+  mat.userData.propio = true;                                                // es solo de este fantasma: se suelta con él
+  r.raiz.traverse(o => {
+    if (o.isLine || o.isLineSegments2 || o.isLine2) { o.visible = false; return; }   // los bordes de neón quedarían opacos sobre un cuerpo de aire
+    if (!o.isMesh) return;
+    o.material = mat;                                                        // todas las piezas con el mismo material: una sola opacidad que bajar
+    o.castShadow = o.receiveShadow = false;                                  // sin sombra
+    o.renderOrder = 3;                                                       // después de lo opaco
+    o.userData.sinAO = true;                                                 // la oclusión ambiental no lo dibuja
+  });
+  for (const x of [r.cohete, r.tabla, r.pogo, r.aura]) x.visible = false;    // en estos modos no hay poderes
+  for (const pp of r.piernas) pp.brilloZap.visible = false;
+  // el letrero con el nombre, sobre la cabeza
+  const [cv, g] = lienzo(512, 96);
+  g.font = 'bold 54px "Lilita One", Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  const txt = String(nombre || 'Fantasma').slice(0, 24);
+  const ancho = Math.min(500, g.measureText(txt).width + 70);
+  g.fillStyle = 'rgba(16, 40, 110, 0.72)'; g.beginPath(); g.roundRect((512 - ancho) / 2, 8, ancho, 80, 40); g.fill();
+  g.fillStyle = '#e8f3ff'; g.fillText(txt, 256, 50);
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+  const cartel = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 0.85 }));
+  cartel.scale.set(2.4, 0.45, 1); cartel.position.set(0, 2.45, 0); cartel.renderOrder = 4;
+  r.raiz.add(cartel);
+  return { r, mat, cartel, kit, nombre };
+}
+
 /** El túnel entre estaciones: un tubo oscuro con tiras de luz y un letrero en la entrada. */
 function armaTunel() {
   const g = new THREE.Group(), largo = 150;
@@ -1878,6 +1919,7 @@ export function crearMundo(canvas) {
   const pasosPendientes = [];                                                 // trabajo de preparación repartido en cuadros
   let ancho = 1280, alto = 720;
   let corredor = null, perse = null, aspecto = MOTOR.ASPECTOS.clasico;
+  let fan = null;                                                             // el fantasma (armaFantasma), si se corre contra uno
   let sacudida = 0;
 
   /* --- La persecución con más impacto (ronda 2) ---
@@ -2327,7 +2369,7 @@ export function crearMundo(canvas) {
             cache.set(o, o.visible);
             const g = o.geometry;
             const sinNormales = g && g.isBufferGeometry && !g.attributes.normal;
-            if (o.isPoints || o.isLine || o.isSprite || o.isLineSegments2 || o.isLine2 || sinNormales) o.visible = false;
+            if (o.isPoints || o.isLine || o.isSprite || o.isLineSegments2 || o.isLine2 || sinNormales || o.userData.sinAO) o.visible = false;   // sinAO: el fantasma (es translúcido)
           });
         };
         ao.updateGtaoMaterial({ radius: 0.8, distanceExponent: 1.4, thickness: 2, scale: 1.3, samples: 12, distanceFallOff: 1 });
@@ -2605,6 +2647,21 @@ export function crearMundo(canvas) {
     }
     // el inspector y el perro (vienen detrás cuando tropiezas)
     if (perse) pasoPersecucion(e, dt);
+    /* El fantasma: e.fantasma = {x, y, z (metros por delante de ti; negativo,
+       detrás), pose, alfa (0 a 1), nombre} o null. Se arma con el kit de la
+       estación (sus geometrías salen del kit) y se rearma si el kit o el
+       nombre cambian. */
+    const ef = e.fantasma;
+    if (fan && (!ef || fan.kit !== kit || fan.nombre !== ef.nombre)) { escena.remove(fan.r.raiz); suelta3D(fan.r.raiz, fan.r.sombra); fan.cartel.material.map.dispose(); fan.cartel.material.dispose(); fan = null; }
+    if (ef && !fan) { fan = armaFantasma(kit, ef.nombre); escena.add(fan.r.raiz); }
+    if (fan) {
+      const a = THREE.MathUtils.clamp(ef.alfa == null ? 1 : ef.alfa, 0, 1);
+      fan.r.raiz.visible = a > 0.01 && -ef.z < DETRAS && ef.z < vista;          // fuera de lo que se dibuja, no se dibuja
+      fan.mat.opacity = 0.45 * a; fan.cartel.material.opacity = 0.85 * a;
+      fan.r.raiz.position.set(ef.x, ef.y + SUELO, -ef.z);
+      posa(fan.r, ef.pose || { modo: 'correr', fase: 0 });
+      fan.cartel.visible = !(ef.pose && ef.pose.modo === 'caer');             // caído, sin letrero
+    }
     // la cámara: detrás y arriba, sigue al corredor con suavidad
     // en el suelo la cámara casi no sube con el salto (se ve el salto); en
     // los techos sube un poco menos que él (se ve la vía de abajo); volando

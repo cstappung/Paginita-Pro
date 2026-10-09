@@ -3878,13 +3878,41 @@ Things that matter:
   | `cityfantasma` | City fantasma | `club-metrorush-cityfantasma` | no | no | city |
 
   The two **Fantasma** modes (`fantasma: true`) race the ghost of the #1 of
-  their own table. Only the hooks exist so far: the next run's seed can be
-  fixed (`semillaSiguiente` in `juego.js`, also `__metrorush.semillaSiguiente(n)`,
-  used once) so the track is the record holder's (any seed verifies), and
-  the proof has an optional `g` (ghost trace text, `c.rastro` →
-  `MP.ponFantasma`) that `rehace` ignores for scoring but caps at
-  `MAX_FANTASMA` (60 000 chars); the whole proof is capped at `PRUEBA_MAX`
-  (200 000 chars of JSON) in `solo/verifica.js`.
+  their own table (`juegos/club/metrorush/fantasma.js`, UMD
+  `MetroRushFantasma`, pure; section «EL FANTASMA» in `juego.js` and
+  `mundo.js`; `tests/metrorush-fantasma.test.cjs`). Things to keep:
+  - **The trace** is recorded only in those modes, one sample per 0.1 s of
+    game time: lane `x` (0.1 m), height `y` (0.15 m) and state (runs, up,
+    down, rolls, stumbles), three letters each from a 64-letter alphabet,
+    repeats merged (`.`, `~c`), version `1` first. It goes in the proof as
+    `g` (`MP.ponFantasma`, capped at `MAX_FANTASMA` 60 000 chars; the whole
+    proof at `PRUEBA_MAX`, 200 000, in `solo/verifica.js`). **It never
+    scores**: `rehace` only rejects one it cannot read or that lasts longer
+    than the run + 2 s, and if the game's own trace fails that,
+    `cierraPrueba` sends the run without it. Proof `VERSION` did not change.
+  - **Fetching**: `Club.pedirFantasma(cat, cb)` (`conexion.js`) →
+    `fantasma-pedir` in `solo/club.js`, which takes row 1 of the table it
+    is already watching (club order) and reads its proof **by key**
+    (`soloPruebas/<cat>/<uid>/<partida>`), cached per visit for the
+    download cap. Guests get `motivo: 'invitado'`, an empty table `vacia`
+    (the portada says your run will be the first ghost). The frame runs it
+    through `rehace` again (`F.prepara`); one that fails is not raced.
+    «¡Jugar!» waits up to `ESPERA_FANTASMA` (8 s) for one on its way; past
+    that the run starts alone, but a late answer still counts for the next.
+  - **Same track**: the run uses the ghost's seed and replays its `T`/`B`
+    requests at the same `dSig` (`generaPista`), claims them instead of
+    making its own (`pideTunel`), and makes no boleto request of its own
+    while the ghost was still running there (`pideBoleto`): boletos depend
+    on each player's collection. The proof records them as its own, so it
+    verifies like any run. A hook-fixed `semillaSiguiente` disables the ghost.
+  - **Speed is the same for everyone**, so while both run the ghost is at
+    your side (z 0); the race is in points (each one's multiplier) and in
+    who lasts. HUD `#hudFan` shows the lead in points and metres, a banner
+    when you overtake, and the summary who won. Names only in the portada
+    (`translate="no"`) and the 3D label, never in avisos/banners. The ghost
+    is a translucent blue runner with no shadow, no collision and
+    `userData.sinAO` (GTAO skips it); one without a trace races on points
+    only and is not drawn.
 
   `crearGenerador(seed, {modo})`: without a mode (or with `clasico`) the
   track is **byte-identical to before modes** (`metrorush-modos.test.cjs`

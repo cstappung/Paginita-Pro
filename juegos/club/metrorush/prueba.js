@@ -44,9 +44,10 @@
    UMD: `MetroRushPrueba` en la página, `module.exports` en Node y en el
    verificador del club (colabtex/src/juegos/solo/verifica/metrorush.js). */
 (function (raiz, fabrica) {
-  if (typeof module === "object" && module.exports) module.exports = fabrica(require("./motor.js"));
-  else raiz.MetroRushPrueba = fabrica(raiz.MetroRushMotor);
-})(typeof self !== "undefined" ? self : this, function (M) {
+  /* F = fantasma.js (el formato del rastro `g`); si la página no lo cargó, el rastro solo se mide por su largo. */
+  if (typeof module === "object" && module.exports) module.exports = fabrica(require("./motor.js"), require("./fantasma.js"));
+  else raiz.MetroRushPrueba = fabrica(raiz.MetroRushMotor, raiz.MetroRushFantasma);
+})(typeof self !== "undefined" ? self : this, function (M, F) {
   "use strict";
 
   /* La versión de la prueba. Sube cuando cambia algo que la pista o los
@@ -57,13 +58,16 @@
   const PASO_MUESTRA = 2;         // segundos de carrera entre dos muestras
   const MAX_EVENTOS = 60000;      // una carrera de una hora deja ~2 000: esto es un tope de seguridad
   const MAX_METROS = 1000000;     // el tope de la tabla de distancia
-  /* El rastro del fantasma (`g`, opcional): un texto compacto con muestras
-     de carril y altura que anota quien corre, para que otro lo vea correr
-     después. No cuenta para los puntos (rehace no lo lee) y solo se le pone
-     un tope de tamaño. La prueba entera tiene además el tope del club,
-     PRUEBA_MAX = 200 000 caracteres de JSON (colabtex/src/juegos/solo/verifica.js,
-     en verificaClub). Ejemplo: 60 000 caracteres son ~30 min a 30 muestras
-     por segundo de 1 carácter… o 10 min a 3 caracteres. */
+  /* El rastro del fantasma (`g`, opcional): un texto compacto con una
+     muestra de carril, altura y estado cada 0,1 s de juego (el formato está
+     en fantasma.js). Solo lo anotan los modos «Fantasma», para que el que
+     venga después vea correr al n.º 1. No cuenta para los puntos: rehace solo
+     mira que se pueda leer y que no dure más que la carrera. La prueba entera
+     tiene además el tope del club, PRUEBA_MAX = 200 000 caracteres de JSON
+     (colabtex/src/juegos/solo/verifica.js, en verificaClub). Ejemplo: el peor
+     caso son 3 letras por muestra, 30 por segundo: 60 000 letras son 33 min
+     cambiando de carril sin parar; corriendo de verdad (con muestras
+     repetidas que se juntan) alcanza para horas. */
   const MAX_FANTASMA = 60000;
 
   /* Tolerancias (en el lado de no castigar a nadie honesto):
@@ -169,6 +173,17 @@
     if (!fin || fin[0] !== "f") return mal("la prueba no termina en el fin de la carrera");
     const Dfin = fin[2];
     if (!Number.isFinite(Dfin) || Dfin < 0 || Dfin > MAX_METROS) return mal("los metros finales no son válidos");
+    /* El rastro del fantasma, solo lo burdo (docs/antitrampas/metrorush.md):
+       que se pueda leer (fantasma.js) y que no dure más que la carrera, con
+       2 s de holgura (se anota una muestra cada 0,1 s mientras se corre, y
+       termina al chocar). No suma ni quita puntos: solo evita guardar un
+       rastro que no es de esta carrera. Ejemplo: una carrera que termina a
+       los 60 s no puede traer un rastro de 200 s. */
+    if (typeof p.g === "string" && F) {
+      const dur = F.duracion(p.g);                         // segundos que cubre el rastro (−1: no es un rastro)
+      if (dur < 0) return mal("el rastro del fantasma no se puede leer");
+      if (dur > fin[1] + 2) return mal("el rastro del fantasma dura más que la carrera");
+    }
 
     // 1) La pista: la misma semilla y los mismos pedidos, en el mismo punto.
     //    Solo hacen falta las estrellas y los 2× (lo que cambia el puntaje).

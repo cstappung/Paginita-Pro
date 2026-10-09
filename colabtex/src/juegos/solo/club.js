@@ -21,8 +21,14 @@ import {verificaClub} from './verifica.js';
    prueba como cuarto argumento, para escribirla junto al récord, y
    `alResultado` como tercero, para la mejor partida del día del salón
    (rieles.js), que se guarda aunque no sea récord. */
-export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partida,reportaSospecha}) {
+export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partida,reportaSospecha,fantasma}) {
   let host,frame,off,temaObserver,categoria='',muerto=false,pendientes={},guardando=false,propios={};
+  /* El fantasma (Metro Rush, modos «Fantasma»): la tabla ordenada que ya
+     trae la escucha de cada categoría (`tablas`), quienes esperan a que
+     llegue (`esperanTabla`) y las pruebas ya bajadas, por partida
+     (`pruebasFantasma`): una prueba pesa hasta 200 kB, y el tope de
+     descarga diario (consumo.js) no da para bajarla en cada carrera. */
+  const tablas={},esperanTabla={},pruebasFantasma=new Map();
   const invitado=!usuario,cuenta=invitado?'invitado':usuario.uid;
   const clave='jg.club.pendientes.'+cuenta+'.'+juego;
   const ocultos=[];
@@ -80,6 +86,7 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
       if(muerto||categoria!==key)return;
       const orden=(filas||[]).sort((a,b)=>b.puntos-a.puntos||a.tiempo-b.tiempo||a.uid.localeCompare(b.uid));
       propios[key]=orden.find(f=>f.uid===usuario.uid)||null;
+      tablas[key]=orden;for(const f of esperanTabla[key]||[])f(orden);delete esperanTabla[key];   // el fantasma que esperaba esta tabla
       enviar({tipo:'ranking',categoria:key,filas:orden.slice(0,10).map(f=>({nombre:f.nombre,puntos:f.puntos,tiempo:f.tiempo,yo:f.uid===usuario.uid})),propio:orden.find(f=>f.uid===usuario.uid)||null,error:!!error});
     });
     sincronizar();
@@ -97,6 +104,33 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
     if(d.tipo==='partida-pedir'){
       if(!partida){enviar({tipo:'partida',dato:null});return;}
       partida.leer().then(dato=>enviar({tipo:'partida',dato:dato||null}),()=>enviar({tipo:'partida',error:true}));return;
+    }
+    /* El fantasma: la fila 1.ª de la tabla (en el orden del club: más
+       puntos, menos tiempo, uid) y su prueba, leída POR CLAVE (las reglas
+       no dejan leer soloPruebas entera). La tabla sale de la escucha que el
+       juego ya abrió para esa categoría (no se baja dos veces); si el juego
+       pide otra, se lee una vez. La prueba se guarda por partida: el mismo
+       récord no se vuelve a bajar en la visita. Al invitado no se le lee
+       nada (sin sesión la base no deja). */
+    if(d.tipo==='fantasma-pedir'){
+      const cat=String(d.categoria||'');
+      const responde=r=>enviar({tipo:'fantasma',categoria:cat,...r});
+      if(invitado){responde({dato:null,motivo:'invitado'});return;}
+      if(!fantasma||!categoriaClub(juego,cat)){responde({dato:null,motivo:'sin-fantasma'});return;}
+      const tabla=tablas[cat]?Promise.resolve(tablas[cat])
+        :cat===categoria?new Promise(f=>{(esperanTabla[cat]=esperanTabla[cat]||[]).push(f);setTimeout(()=>f(null),6000);}).then(t=>t||fantasma.leerTabla(cat))
+        :fantasma.leerTabla(cat);
+      tabla.then(async filas=>{
+        const orden=(filas||[]).slice().sort((a,b)=>b.puntos-a.puntos||a.tiempo-b.tiempo||a.uid.localeCompare(b.uid));
+        const top=orden[0];
+        if(!top){responde({dato:null,motivo:'vacia'});return;}
+        const base={nombre:String(top.nombre||'Jugador').slice(0,80),puntos:top.puntos,tiempo:top.tiempo,yo:top.uid===usuario.uid,partida:top.partida};
+        if(typeof top.partida!=='string'||!/^[-a-zA-Z0-9]{1,80}$/.test(top.partida)){responde({dato:{...base,d:''}});return;}
+        const clave=cat+'/'+top.uid+'/'+top.partida;
+        if(!pruebasFantasma.has(clave))pruebasFantasma.set(clave,fantasma.leerPrueba(cat,top.uid,top.partida).then(v=>v&&typeof v.d==='string'?v.d:'').catch(e=>{pruebasFantasma.delete(clave);throw e;}));
+        responde({dato:{...base,d:await pruebasFantasma.get(clave)}});
+      }).catch(()=>responde({error:true}));
+      return;
     }
     if(d.tipo==='partida-guardar'){if(partida)partida.guardar(typeof d.d==='string'&&d.d.length<200000?d.d:null,d.at).catch(()=>{});return;}
     if(d.tipo==='categoria'){

@@ -123,6 +123,43 @@ prueba puede traer `g`, el rastro del fantasma (carril y altura en texto):
 `MAX_FANTASMA` = 60 000 caracteres; la prueba entera sigue con el tope del
 club de 200 000 (`PRUEBA_MAX`).
 
+#### El rastro del fantasma (`g`) y por qué no es una vía de trampa
+
+El rastro lo graba `juego.js` solo en los modos fantasma (`fantasma.js`):
+una muestra cada 0,1 s de juego con el carril (`x`, al décimo de metro), la
+altura (`y`, a los 15 cm) y qué hacía el corredor (corre, sube, baja,
+rueda, tropieza), tres letras por muestra y las repetidas juntas («.», «~c»).
+Empieza con la versión («1»). Una carrera de 10 minutos ocupa de 2 a 18 kB.
+
+**El rastro no da ni quita puntos, y nunca decide un récord.** Es solo lo
+que ve quien corre después: el puntaje del fantasma sale de sus eventos
+(estrellas, choque) con la misma cuenta que `rehace`, y su pista de su
+semilla y sus pedidos. Por eso `rehace` solo revisa lo burdo, que no es de
+esta carrera:
+
+- que se pueda leer (`F.duracion(g) ≥ 0`: la versión, letras del alfabeto,
+  un estado de 0 a 4, ninguna repetición antes de la primera muestra; una
+  ficha cortada al final, por el recorte a `MAX_FANTASMA`, se acepta);
+- que no dure más que la carrera, con 2 s de holgura (`duración ≤ t(f) + 2`).
+
+Nada más: un rastro que «atraviesa» un tren o salta donde no hay nada no se
+rechaza, porque no hay nada que ganar con eso (no suma puntos, y el que
+corre contra él solo pierde si lo imita). Si el propio juego graba un rastro
+que no pasa esas dos reglas (un error nuestro), `cierraPrueba` lo saca y
+manda la carrera sin él: el récord vale igual, solo que no se podrá ver
+correr.
+
+Correr contra el fantasma no cambia nada para el verificador: la carrera
+usa la semilla del fantasma y aplica sus túneles y boletos (`T`, `B`) en el
+mismo `dSig` en que él los pidió, para que la pista sea idéntica; la prueba
+los anota como propios y `rehace` los repite como cualquier otro pedido. El
+fantasma llega de la página (`solo/club.js`, mensaje `fantasma-pedir`): la
+fila 1.ª de la tabla y su prueba, leída **por clave**
+(`soloPruebas/<cat>/<uid>/<partida>`, la regla ya lo permitía) y guardada
+por visita, y el juego la vuelve a pasar por `rehace` antes de correr contra
+ella; si no cuadra (otra versión, otro modo), se corre solo. `VERSION` no
+cambió: `g` es opcional y las pruebas sin él se leen igual.
+
 En «Sin monedas» tocar una moneda es un choque (`m`). Que el choque fue
 contra una moneda no se prueba —no se prueba el carril—, pero un choque
 solo resta puntos: no hay trampa ahí.
@@ -158,6 +195,16 @@ otra cuenta, una estrella que no está, recogida lejos o dos veces, el 2×
 estirado, un base imposible o más alto que el de verdad, el +5 tarde, las
 entradas sintéticas, otra semilla, un pedido corrido, la cámara rápida, los
 metros de más y el tiempo recortado.
+
+`colabtex/tests/metrorush-fantasma.test.cjs`: el rastro de ida y vuelta (los
+carriles justos, las repeticiones de más de 65), el tope (10 minutos del
+peor caso bajo `MAX_FANTASMA`, uno recortado se sigue leyendo), la
+interpolación, una carrera con rastro que se rehace con los mismos puntos
+que sin él, el rastro ilegible o más largo que la carrera rechazado, los
+puntos del fantasma metro a metro iguales a `rehace`, `prepara`, y que un
+perseguidor con otro ritmo de cuadros y otros boletos corre la MISMA pista
+que el fantasma (con `generaPista`, `pideTunel` y `pideBoleto` sacadas tal
+cual de `juego.js`) y su prueba se rehace.
 
 Además se jugaron carreras en Chromium: una corta con teclas de verdad y un
 choque natural, otra con un choque, «seguir corriendo» pagando y otro
