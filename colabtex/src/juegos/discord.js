@@ -142,12 +142,13 @@ const CLUBS = {
   atasco: { nombre: "Atasco", juego: "Atasco", icono: "🚗", ruta: "atasco" },
   aleteo: { nombre: "ALETEO", juego: "ALETEO", icono: "🐦", ruta: "aleteo" },
   dosmil: { nombre: "2048", juego: "2048", icono: "🟨", ruta: "dosmil" },
+  trigon: { nombre: "Trigon", juego: "Trigon", icono: "🔺", ruta: "trigon" },
   metrorush: { nombre: "Metro Rush", juego: "Metro Rush", icono: "🚇", ruta: "metrorush" }
 };
 
 /* "club-snake-arcade-grande" → {club, modalidad: "Arcade · tablero grande"} */
 export function categoriaLegible(cat) {
-  const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|dosmil|metrorush)-(.+)$/.exec(String(cat || ""));
+  const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|metrorush)-(.+)$/.exec(String(cat || ""));
   if (!m) return null;
   return { club: CLUBS[m[1]], modalidad: m[2].split("-").map(k => MODALIDADES[k] || k).join(" · ") };
 }
@@ -177,6 +178,7 @@ export function marcaSolo(cat, f) {
   if (cat === "club-aleteo-vuelo") return `🐦 ${f.puntos} ${f.puntos === 1 ? "tubo" : "tubos"}`;
   if (cat === "club-dosmil-puntos") return `🟨 ${f.puntos} puntos`;
   if (cat === "club-dosmil-ficha") return `🟨 ficha ${f.puntos}`;
+  if (cat === "club-trigon-puntos") return `🔺 ${Number(f.puntos).toLocaleString("es-CL")} puntos`;
   // Metro Rush: la distancia se dice en metros; la mejor carrera, en puntos.
   if (cat === "club-metrorush-distancia") return `🚇 ${Number(f.puntos).toLocaleString("es-CL")} m`;
   if (cat === "club-metrorush-carrera") return `🚇 ${Number(f.puntos).toLocaleString("es-CL")} pts`;

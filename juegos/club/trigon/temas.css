@@ -1,0 +1,141 @@
+/* ================================================================
+   Trigon — los temas.
+   Cada tema es un juego de variables sobre [data-skin], y su modo claro
+   otro sobre [data-skin][data-modo="claro"]; el oscuro es el de siempre.
+   Van en el atributo y no solo en <html> para que la tarjeta de cada tema
+   en el selector, que lleva sus propios data-skin y data-modo, se pinte
+   con sus colores sin pintar la página entera.
+
+   --p1…--p8 son los colores de las ocho formas de pieza (motor.js,
+   FORMAS, en ese orden). --deco es la imagen de fondo de la página:
+   degradados y, en algunos temas, un SVG en línea.
+   ================================================================ */
+
+/* ---------- Clásico: morado noche y piezas pastel ---------- */
+:root,[data-skin="clasico"]{
+  color-scheme:dark;
+  --fondo:#2a2230;--fondo2:#3b2f3f;--panel:#4a3d50;--celda:#54465b;--celda-cierra:#7a6683;
+  --borde:#6b5a73;--sobre-borde:#fff;--tinta:#f4ecf7;--tinta-suave:#cdbfd4;
+  --acento:#f6d23c;--sobre-acento:#2a2230;--acento-sombra:#c9a21a;
+  --velo:#2a2230d8;--velo-fuerte:#2a2230f2;--hueco:#ffffff0d;--hueco-fuerte:#ffffff1a;--racha:#fff;
+  --p1:#f6d23c;--p2:#5ccf7a;--p3:#9b7fe6;--p4:#4fc6e0;--p5:#ef5b5b;--p6:#f39c3d;--p7:#5b8def;--p8:#e97bc8;
+  --deco:radial-gradient(120% 80% at 50% 0%,#4b3a55 0%,transparent 60%);
+}
+[data-skin="clasico"][data-modo="claro"]{
+  color-scheme:light;
+  --fondo:#f4eff7;--fondo2:#e6deec;--panel:#fff;--celda:#d4c9dc;--celda-cierra:#bba9c7;
+  --borde:#8d7a99;--sobre-borde:#fff;--tinta:#2a2230;--tinta-suave:#6e5f78;
+  --acento:#f6c90e;--sobre-acento:#2a2230;--acento-sombra:#c9a000;
+  --velo:#f4eff7dd;--velo-fuerte:#f4eff7f4;--hueco:#2a22300d;--hueco-fuerte:#2a22301a;--racha:#fff;
+  --p1:#e8b800;--p2:#2fb35a;--p3:#7c5bd6;--p4:#1ea8c9;--p5:#e23f3f;--p6:#ec8417;--p7:#3a6fe0;--p8:#d856b0;
+  --deco:radial-gradient(120% 80% at 50% 0%,#fff 0%,transparent 60%);
+}
+
+/* ---------- Halloween: noche, luna naranja y murciélagos ---------- */
+[data-skin="halloween"]{
+  color-scheme:dark;
+  --fondo:#140a19;--fondo2:#24122c;--panel:#2f1838;--celda:#3e2148;--celda-cierra:#6a3a52;
+  --borde:#5c2f68;--sobre-borde:#ffe9d6;--tinta:#ffeedd;--tinta-suave:#d9b8a6;
+  --acento:#ff7a1a;--sobre-acento:#1a0b05;--acento-sombra:#b84a00;
+  --velo:#140a19d8;--velo-fuerte:#140a19f2;--hueco:#ff7a1a10;--hueco-fuerte:#ff7a1a22;--racha:#ffd9b0;
+  --p1:#ff7a1a;--p2:#a3e635;--p3:#9b5de5;--p4:#2ee6a8;--p5:#ff3d2e;--p6:#ffcf3f;--p7:#c77dff;--p8:#f15bb5;
+  --deco:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='520' height='260' viewBox='0 0 520 260'%3E%3Cg fill='%23000' fill-opacity='.55'%3E%3Cpath d='M60 60q10-14 22-6q4-8 9 0q5-8 9 0q12-8 22 6q-10-3-15 5q-5-4-16 3q-11-7-16-3q-5-8-15-5z'/%3E%3Cpath transform='translate(330 30) scale(.7)' d='M60 60q10-14 22-6q4-8 9 0q5-8 9 0q12-8 22 6q-10-3-15 5q-5-4-16 3q-11-7-16-3q-5-8-15-5z'/%3E%3Cpath transform='translate(200 140) scale(.5)' d='M60 60q10-14 22-6q4-8 9 0q5-8 9 0q12-8 22 6q-10-3-15 5q-5-4-16 3q-11-7-16-3q-5-8-15-5z'/%3E%3C/g%3E%3C/svg%3E"),
+    radial-gradient(circle at 85% 12%,#ffb15c 0 5%,#ff7a1a55 6%,transparent 22%),
+    radial-gradient(120% 70% at 50% 0%,#3b1640 0%,transparent 65%);
+}
+[data-skin="halloween"][data-modo="claro"]{
+  color-scheme:light;
+  --fondo:#fff2e4;--fondo2:#ffe1c4;--panel:#fff;--celda:#f2c9a2;--celda-cierra:#e8a874;
+  --borde:#7a3e8a;--sobre-borde:#fff;--tinta:#3b1d0e;--tinta-suave:#8a5a3e;
+  --acento:#ff6a00;--sobre-acento:#fff;--acento-sombra:#b84a00;
+  --velo:#fff2e4dd;--velo-fuerte:#fff2e4f4;--hueco:#7a3e8a12;--hueco-fuerte:#7a3e8a22;--racha:#fff;
+  --p1:#ff6a00;--p2:#65a30d;--p3:#7c3aed;--p4:#0d9f74;--p5:#dc2626;--p6:#e0a100;--p7:#a855f7;--p8:#db2777;
+  --deco:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='520' height='260' viewBox='0 0 520 260'%3E%3Cg fill='%237a3e8a' fill-opacity='.18'%3E%3Cpath d='M60 60q10-14 22-6q4-8 9 0q5-8 9 0q12-8 22 6q-10-3-15 5q-5-4-16 3q-11-7-16-3q-5-8-15-5z'/%3E%3Cpath transform='translate(330 30) scale(.7)' d='M60 60q10-14 22-6q4-8 9 0q5-8 9 0q12-8 22 6q-10-3-15 5q-5-4-16 3q-11-7-16-3q-5-8-15-5z'/%3E%3C/g%3E%3C/svg%3E"),
+    radial-gradient(circle at 85% 12%,#ffb15c 0 5%,#ff7a1a33 6%,transparent 22%);
+}
+
+/* ---------- Gris: todo en escala de grises ---------- */
+[data-skin="gris"]{
+  color-scheme:dark;
+  --fondo:#121212;--fondo2:#1e1e1e;--panel:#262626;--celda:#333;--celda-cierra:#555;
+  --borde:#4a4a4a;--sobre-borde:#f2f2f2;--tinta:#f2f2f2;--tinta-suave:#a8a8a8;
+  --acento:#e8e8e8;--sobre-acento:#121212;--acento-sombra:#8a8a8a;
+  --velo:#121212d8;--velo-fuerte:#121212f2;--hueco:#ffffff0a;--hueco-fuerte:#ffffff18;--racha:#fff;
+  --p1:#fafafa;--p2:#bdbdbd;--p3:#8f8f8f;--p4:#dcdcdc;--p5:#a3a3a3;--p6:#ececec;--p7:#c9c9c9;--p8:#7a7a7a;
+  --deco:linear-gradient(180deg,#1c1c1c 0%,transparent 50%);
+}
+[data-skin="gris"][data-modo="claro"]{
+  color-scheme:light;
+  --fondo:#f2f2f2;--fondo2:#e0e0e0;--panel:#fff;--celda:#cdcdcd;--celda-cierra:#b0b0b0;
+  --borde:#5c5c5c;--sobre-borde:#fff;--tinta:#1a1a1a;--tinta-suave:#666;
+  --acento:#262626;--sobre-acento:#fff;--acento-sombra:#000;
+  --velo:#f2f2f2dd;--velo-fuerte:#f2f2f2f4;--hueco:#0000000a;--hueco-fuerte:#00000016;--racha:#fff;
+  --p1:#1f1f1f;--p2:#5e5e5e;--p3:#8a8a8a;--p4:#3d3d3d;--p5:#707070;--p6:#2e2e2e;--p7:#4d4d4d;--p8:#9a9a9a;
+  --deco:linear-gradient(180deg,#fff 0%,transparent 50%);
+}
+
+/* ---------- Forest: bosque de noche en calipso y celeste ---------- */
+[data-skin="forest"]{
+  color-scheme:dark;
+  --fondo:#04232a;--fondo2:#083640;--panel:#0b4550;--celda:#11535e;--celda-cierra:#1f7c86;
+  --borde:#17707c;--sobre-borde:#e6fdff;--tinta:#e6fdff;--tinta-suave:#9ed3da;
+  --acento:#3ee6d6;--sobre-acento:#032127;--acento-sombra:#139c90;
+  --velo:#04232ad8;--velo-fuerte:#04232af2;--hueco:#3ee6d60f;--hueco-fuerte:#3ee6d622;--racha:#e6fdff;
+  --p1:#3ee6d6;--p2:#7ad7ff;--p3:#00a6d6;--p4:#90f1ac;--p5:#48cae4;--p6:#c4fff5;--p7:#5eead4;--p8:#8ab6ff;
+  --deco:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='120' viewBox='0 0 240 120'%3E%3Cg fill='%2302161b'%3E%3Cpath d='M30 120 30 104 8 104 26 82 14 82 30 58 22 58 40 30 58 58 50 58 66 82 54 82 72 104 50 104 50 120z'/%3E%3Cpath d='M120 120 120 108 102 108 116 90 106 90 120 70 113 70 128 46 143 70 136 70 150 90 140 90 154 108 136 108 136 120z'/%3E%3Cpath d='M196 120 196 106 178 106 193 86 183 86 198 64 191 64 207 38 223 64 216 64 231 86 221 86 236 106 218 106 218 120z'/%3E%3C/g%3E%3C/svg%3E"),
+    radial-gradient(circle at 15% 10%,#c4fff5 0 2.5%,#3ee6d633 3.5%,transparent 16%),
+    radial-gradient(120% 70% at 50% 0%,#0c4a55 0%,transparent 65%);
+}
+[data-skin="forest"][data-modo="claro"]{
+  color-scheme:light;
+  --fondo:#e7fbfd;--fondo2:#c8f0f4;--panel:#fff;--celda:#a5dde4;--celda-cierra:#79c6cf;
+  --borde:#0e7480;--sobre-borde:#fff;--tinta:#053038;--tinta-suave:#3f7a83;
+  --acento:#0abfb0;--sobre-acento:#fff;--acento-sombra:#077d73;
+  --velo:#e7fbfddd;--velo-fuerte:#e7fbfdf4;--hueco:#0e74800f;--hueco-fuerte:#0e74801f;--racha:#fff;
+  --p1:#0aa89b;--p2:#0284c7;--p3:#0369a1;--p4:#16a34a;--p5:#0891b2;--p6:#14b8a6;--p7:#0f766e;--p8:#2563eb;
+  --deco:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='120' viewBox='0 0 240 120'%3E%3Cg fill='%230e7480' fill-opacity='.16'%3E%3Cpath d='M30 120 30 104 8 104 26 82 14 82 30 58 22 58 40 30 58 58 50 58 66 82 54 82 72 104 50 104 50 120z'/%3E%3Cpath d='M120 120 120 108 102 108 116 90 106 90 120 70 113 70 128 46 143 70 136 70 150 90 140 90 154 108 136 108 136 120z'/%3E%3Cpath d='M196 120 196 106 178 106 193 86 183 86 198 64 191 64 207 38 223 64 216 64 231 86 221 86 236 106 218 106 218 120z'/%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* ---------- Espacio: negro con estrellas y piezas neón ---------- */
+[data-skin="espacio"]{
+  color-scheme:dark;
+  --fondo:#04030d;--fondo2:#0c0a22;--panel:#13103a;--celda:#1b1846;--celda-cierra:#3a3480;
+  --borde:#332d78;--sobre-borde:#f0edff;--tinta:#efecff;--tinta-suave:#a7a1e0;
+  --acento:#b18cff;--sobre-acento:#0b0820;--acento-sombra:#6a3fd6;
+  --velo:#04030dd8;--velo-fuerte:#04030df2;--hueco:#b18cff10;--hueco-fuerte:#b18cff24;--racha:#fff;
+  --p1:#ff5ea8;--p2:#4ff0d0;--p3:#ffd23f;--p4:#5aa9ff;--p5:#c77dff;--p6:#ff9a3c;--p7:#4ade80;--p8:#ff6b6b;
+  --deco:
+    radial-gradient(1px 1px at 20px 30px,#fff,transparent),
+    radial-gradient(1px 1px at 120px 80px,#fffb,transparent),
+    radial-gradient(1.5px 1.5px at 200px 20px,#fff,transparent),
+    radial-gradient(1px 1px at 260px 140px,#fff9,transparent),
+    radial-gradient(1.5px 1.5px at 60px 170px,#cfc4ff,transparent),
+    radial-gradient(1px 1px at 170px 200px,#fff,transparent),
+    radial-gradient(circle at 8% 88%,#5a3fd6 0 4%,#5a3fd622 5%,transparent 14%),
+    radial-gradient(100% 60% at 70% 0%,#1d1550 0%,transparent 60%);
+}
+[data-skin="espacio"][data-modo="claro"]{
+  color-scheme:light;
+  --fondo:#eef0ff;--fondo2:#dde0fc;--panel:#fff;--celda:#c2c6f0;--celda-cierra:#9ba1e6;
+  --borde:#4b3fb0;--sobre-borde:#fff;--tinta:#16133a;--tinta-suave:#5a5596;
+  --acento:#7048ff;--sobre-acento:#fff;--acento-sombra:#4523c4;
+  --velo:#eef0ffdd;--velo-fuerte:#eef0fff4;--hueco:#4b3fb010;--hueco-fuerte:#4b3fb020;--racha:#fff;
+  --p1:#e8338a;--p2:#0fb59a;--p3:#e0a800;--p4:#2a7de1;--p5:#9b4dea;--p6:#f07316;--p7:#16a34a;--p8:#e53e3e;
+  --deco:
+    radial-gradient(2px 2px at 20px 30px,#7048ff55,transparent),
+    radial-gradient(2px 2px at 160px 120px,#7048ff40,transparent),
+    radial-gradient(2px 2px at 240px 40px,#7048ff55,transparent),
+    radial-gradient(100% 60% at 70% 0%,#fff 0%,transparent 60%);
+}
+
+/* El fondo de Espacio repite las estrellas en mosaico; el resto, una sola vez. */
+body{background-size:auto}
+html[data-skin="espacio"]:not([data-modo="claro"]) body{background-size:280px 230px,280px 230px,280px 230px,280px 230px,280px 230px,280px 230px,auto,auto}
+html[data-skin="espacio"][data-modo="claro"] body{background-size:280px 230px,280px 230px,280px 230px,auto}
+html[data-skin="halloween"] body{background-repeat:no-repeat;background-position:top center,0 0,0 0}
+html[data-skin="forest"] body{background-repeat:repeat-x,no-repeat,no-repeat;background-position:bottom,0 0,0 0;background-size:240px 120px,auto,auto}
+html[data-skin="forest"][data-modo="claro"] body{background-repeat:repeat-x;background-position:bottom;background-size:240px 120px}

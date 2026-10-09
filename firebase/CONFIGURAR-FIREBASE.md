@@ -209,6 +209,13 @@ y están en el repositorio público, como cualquier archivo del sitio.
 > llega a 4 000 000 y `club-dosmil-ficha` a 1 000 000. Hay que volver a
 > publicar las reglas.
 
+> **Trigon (octubre de 2026):** `club-trigon-puntos` (el puntaje de la
+> partida, con tope de 1 000 000) es una categoría nueva de `soloRanks` y
+> `soloPruebas`, y `trigon` un juego nuevo de `clubJugadas`. La partida a
+> medias vive solo en el navegador, así que no usa `users/<uid>/club`.
+> Hasta volver a publicar las reglas se juega igual, pero las partidas no
+> entran en la clasificación y no pagan monedas.
+
 > **Metro Rush (octubre de 2026):** `club-metrorush-carrera` (los puntos de la
 > mejor carrera, con tope de 1 000 000 000, porque en el juego se llega a
 > millones) y `club-metrorush-distancia` (los metros de la carrera más larga,

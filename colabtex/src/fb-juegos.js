@@ -309,7 +309,7 @@ export async function leerPopularidad() {
   for (const [juego, filas] of Object.entries(r.val() || {}))
     n[juego] = Object.values(filas || {}).reduce((t, f) => t + (+(f && f.jugadas) || 0), 0);
   for (const [cat, filas] of Object.entries((s && s.val()) || {})) {
-    const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|dosmil|metrorush)-/.exec(cat);
+    const m = /^club-(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|metrorush)-/.exec(cat);
     if (m) {
       n["club-" + m[1]] = (n["club-" + m[1]] || 0) + Object.keys(filas || {}).length;
       n[cat] = Object.keys(filas || {}).length;

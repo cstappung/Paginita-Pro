@@ -15,7 +15,7 @@ export const MONEDA = '<svg class="jg-moneda" viewBox="0 0 20 20" aria-hidden="t
 
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const NOMBRES_CLUB = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", metrorush: "Metro Rush" };
+const NOMBRES_CLUB = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", trigon: "Trigon", metrorush: "Metro Rush" };
 const PARTES = [
   ["partidas", "🎮", "Partidas", `${TARIFA.partida} por partida de sala, por el peso del juego`],
   ["victorias", "🏆", "Victorias", `${TARIFA.victoria} por victoria y ${TARIFA.empate} por empate, por el peso`],
