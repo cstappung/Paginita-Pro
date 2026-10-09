@@ -3689,8 +3689,18 @@ Things that matter:
   are pale (mint, ice, lilac) with dark windows, and Óxido's are patina
   rather than an orange the fog swallowed. A new prop that you must dodge
   or pick up needs the `!`.
-- **Music is one chip theme per station** (`metrorush-*` in `temas.js`, all
-  original), its tempo rising with speed (×0.92 → ×1.15). Effects are
+- **Music is a playlist per station** (`LISTAS` in `audio.js`: the
+  station's own `metrorush-*` theme plus `-2`/`-3`, all original in
+  `temas.js`), its tempo rising with speed (×0.92 → ×1.15). A theme gives
+  way to the next one at the end of a loop (`Reproductor.vueltas`), after
+  two loops and 50 s, or 110 s whatever the loops: `nuevoRep` wraps the
+  player's `toca` so the cut lands exactly on that bar boundary and `rota`
+  starts the next theme at that instant, inheriting tempo and layers. The
+  position in each list survives pauses and runs. `tocaTema(id)` takes a
+  station id, a Subway City district (`city-sur`, `city-muelles`,
+  `city-bulevar`, `city-parque`, `city-bajo`, each with its own theme plus
+  two borrowed station ones) or a theme key (`estacion.musica`, which
+  brings its station's list). Effects are
   synthesised in `audio.js`, everything goes through `destination`, so
   `volumen.js` governs it; coins climb a semitone per coin in a streak.
 - **The menus are dressed like Subway Surfers' home screen**: the logo top

@@ -1,11 +1,14 @@
 /* Metro Rush — el sonido (música y efectos).
 
    QUÉ HACE, EN GLOBAL
-   - La MÚSICA: cada estación tiene su tema en el cancionero común
-     (juegos/audio/temas.js: "metrorush-barrio", "metrorush-ocaso"…) y lo toca
-     Chip.Reproductor, el mismo motor chiptune de toda la sala de juegos. El
-     tempo sube con la velocidad de la carrera (más rápido = más apuro) y al
-     cambiar de estación el tema se cambia con un fundido.
+   - La MÚSICA: cada estación tiene una LISTA de temas del cancionero común
+     (juegos/audio/temas.js: "metrorush-barrio", "metrorush-barrio-2"…) y
+     los toca Chip.Reproductor, el mismo motor chiptune de toda la sala de
+     juegos. Cuando el que suena ha dado sus vueltas, entra el siguiente de
+     la lista justo en el borde del compás (ver `LISTAS` y `rota`), así que
+     una carrera larga no repite la misma tonada. El tempo sube con la
+     velocidad de la carrera (más rápido = más apuro) y al cambiar de
+     estación la lista se cambia con un fundido.
    - Los EFECTOS: todos sintetizados aquí, sin archivos (moneda, salto,
      rodada, cambio de carril, choque, tropiezo, poderes, mochila cohete,
      túnel, boleto, reto cumplido…). La moneda sube de tono si encadenas
@@ -24,12 +27,51 @@ const Temas = window.Temas;                    // el cancionero (juegos/audio/te
 // la curva de velocidad del motor (motor.js se carga antes como script): de aquí sale el tempo, sin números escritos a mano
 const VEL = (window.MetroRushMotor && window.MetroRushMotor.VELOCIDAD) || { V0: 15, VMAX: 50 };
 
+/* Las listas de cada sitio, por su id: las siete estaciones de motor.js
+   (ESTACIONES[].id) y los cinco barrios de Subway City. El primer tema de
+   cada estación es el de siempre (el que motor.js nombra en `musica`), y
+   los otros dos son del mismo humor. Los barrios tienen un tema propio y
+   toman prestados dos de estación que se le parecen, para rotar igual. */
+export const LISTAS = {
+  barrio: ['metrorush-barrio', 'metrorush-barrio-2', 'metrorush-barrio-3'],
+  ocaso: ['metrorush-ocaso', 'metrorush-ocaso-2', 'metrorush-ocaso-3'],
+  neon: ['metrorush-neon', 'metrorush-neon-2', 'metrorush-neon-3'],
+  fantasma: ['metrorush-fantasma', 'metrorush-fantasma-2', 'metrorush-fantasma-3'],
+  invierno: ['metrorush-invierno', 'metrorush-invierno-2', 'metrorush-invierno-3'],
+  oxido: ['metrorush-oxido', 'metrorush-oxido-2', 'metrorush-oxido-3'],
+  fin: ['metrorush-fin', 'metrorush-fin-2', 'metrorush-fin-3'],
+  'city-sur': ['metrorush-city-sur', 'metrorush-barrio-2', 'metrorush-barrio-3'],            // soleado: el barrio
+  'city-muelles': ['metrorush-city-muelles', 'metrorush-oxido-3', 'metrorush-oxido-2'],      // industrial: el óxido
+  'city-bulevar': ['metrorush-city-bulevar', 'metrorush-neon-2', 'metrorush-neon-3'],        // de noche: el neón
+  'city-parque': ['metrorush-city-parque', 'metrorush-invierno-3', 'metrorush-barrio-3'],    // juguetón y tranquilo
+  'city-bajo': ['metrorush-city-bajo', 'metrorush-fantasma-2', 'metrorush-oxido-2']          // oscuro: el fantasma
+};
+/* Cuándo pasar al siguiente tema. Solo se mira al terminar una vuelta del
+   tema (el final de su `orden`, que siempre cae en borde de compás):
+   - con VUELTAS_TEMA vueltas y al menos SEG_MIN segundos sonando, se cambia
+     (dos vueltas de un tema son entre 55 y 100 s a velocidad de carrera);
+   - con SEG_MAX segundos se cambia aunque falten vueltas. */
+const VUELTAS_TEMA = 2, SEG_MIN = 50, SEG_MAX = 110;
+
+/** La lista que corresponde a `id`, que puede ser el id de una estación
+    ("barrio"), el de un barrio de Subway City ("city-sur") o la clave de un
+    tema ("metrorush-barrio", la que motor.js guarda en `musica`). Un tema
+    que encabeza una lista trae esa lista; uno suelto (o desconocido) es una
+    lista de uno, que se repite como antes. Devuelve {clave, temas}. */
+export function listaDe(id) {
+  if (LISTAS[id]) return { clave: id, temas: LISTAS[id] };                   // id de estación o de barrio
+  for (const k in LISTAS) if (LISTAS[k][0] === id) return { clave: k, temas: LISTAS[k] };   // el tema de cabecera de una estación
+  return { clave: id, temas: [id] };                                         // un tema suelto: se repite solo
+}
+
 export class Sonido {
   constructor() {
     this.ctx = null;                           // se crea con el primer gesto
     this.mudo = false;                         // el botón ♪ / la tecla M
     this.volMusica = 0.8; this.volEfectos = 0.9;
-    this.rep = null; this.tema = null;         // la canción que suena y su nombre
+    this.rep = null; this.tema = null;         // la canción que suena y su clave en el cancionero
+    this.lista = null;                         // la lista que suena: {clave, temas} (ver listaDe)
+    this.pos = {};                             // por clave de lista, el índice del tema que toca (se recuerda entre pausas y carreras)
     this.racha = 0; this.ultMoneda = 0;        // para que las monedas seguidas suban de tono
     this.voces = new Set();                    // las notas vivas (para poder callarlas)
     this.motor = null;                         // el ruido continuo de la mochila cohete
@@ -60,11 +102,25 @@ export class Sonido {
 
   /* ---------- música ---------- */
 
-  /** Cambia el tema (con un fundido corto). `id` es la clave en el cancionero. */
+  /** Pone la música de un sitio (con un fundido corto). LA API, entera:
+      `id` es el id de una estación ("barrio"… "fin"), el de un barrio de
+      Subway City ("city-sur", "city-muelles", "city-bulevar",
+      "city-parque", "city-bajo") o la clave de un tema del cancionero
+      ("metrorush-barrio", que es lo que juego.js pasa con
+      `estacion.musica` y trae la lista de esa estación). Desde ahí la
+      lista rota sola en `tick`. Si ya suena esa lista, no hace nada. */
   tocaTema(id) {
     if (!this.ctx) { this.temaPendiente = id; return; }        // todavía no hubo gesto: se toca después
     this.temaPendiente = null;
-    if (id === this.tema && this.rep) return;
+    const lista = listaDe(id);                                 // la lista del sitio pedido
+    if (this.rep && this.lista && this.lista.clave === lista.clave) return;   // ya suena: no se reinicia
+    this.lista = lista;
+    const i = (this.pos[lista.clave] || 0) % lista.temas.length;   // donde había quedado esa lista (0 la primera vez)
+    this.ponTema(lista.temas[i]);
+  }
+  /** Cambia a un tema concreto con un fundido corto (el viejo se apaga en
+      medio segundo, el nuevo entra en un cuarto). */
+  ponTema(id) {
     const cancion = Temas && Temas.temas[id];
     const viejo = this.rep, viejoGain = this.capaRep;
     if (viejo) {                                               // el tema viejo se apaga en medio segundo
@@ -76,13 +132,61 @@ export class Sonido {
     if (!cancion || !Chip || !Chip.Reproductor) return;
     this.capaRep = this.ctx.createGain(); this.capaRep.gain.value = 0; this.capaRep.connect(this.musica);
     this.capaRep.gain.setTargetAtTime(1, this.ctx.currentTime, 0.25);
-    this.rep = new Chip.Reproductor(this.ctx, this.capaRep, cancion);
+    this.rep = this.nuevoRep(cancion);
+  }
+  /** Un reproductor para `cancion` que avisa cuando toca rotar. Se le
+      envuelve `toca` (la función que hace sonar cada paso): al empezar una
+      vuelta nueva, si ya toca cambiar, apunta en `corte` el instante de ese
+      primer paso y desde ahí no suena nada más. Así el corte cae justo
+      donde termina la vuelta, y `tick` arranca el siguiente tema en ese
+      mismo instante: sin hueco y sin una nota del tema viejo de más. */
+  nuevoRep(cancion) {
+    const rep = new Chip.Reproductor(this.ctx, this.capaRep, cancion);
+    rep.inicio = rep.sig;                                      // cuándo suena su primer paso (para contar segundos)
+    rep.vistas = 0;                                            // las vueltas ya revisadas
+    rep.corte = null;                                          // el instante del corte, cuando toque
+    const toca = rep.toca.bind(rep);                           // el `toca` original del reproductor
+    rep.toca = (ent, k, t, d) => {
+      if (rep.corte == null && rep.vueltas > rep.vistas) {     // primer paso de una vuelta nueva
+        rep.vistas = rep.vueltas;
+        if (this.debeRotar(rep, t)) rep.corte = t;             // aquí empieza el siguiente tema
+      }
+      if (rep.corte != null) return;                           // pasado el corte, este tema ya no suena
+      toca(ent, k, t, d);
+    };
+    return rep;
+  }
+  /** ¿Toca pasar al siguiente tema en este borde de vuelta (instante `t`)? */
+  debeRotar(rep, t) {
+    if (!this.lista || this.lista.temas.length < 2) return false;   // una lista de uno se repite
+    const seg = t - rep.inicio;                                // segundos que lleva sonando
+    return (rep.vueltas >= VUELTAS_TEMA && seg >= SEG_MIN) || seg >= SEG_MAX;
+  }
+  /** Pasa al siguiente tema de la lista, que empieza en `corte` (el borde de
+      la vuelta del que sonaba). El tempo y las capas se heredan para que el
+      apuro no dé un salto; el viejo deja de agendar y se suelta cuando ya
+      se apagaron sus últimas notas (y su eco). */
+  rota(corte) {
+    const viejo = this.rep, viejoGain = this.capaRep, L = this.lista;
+    const i = ((this.pos[L.clave] || 0) + 1) % L.temas.length;     // el siguiente, y vuelta al primero tras el último
+    this.pos[L.clave] = i;
+    const id = L.temas[i], cancion = Temas && Temas.temas[id];
+    if (!cancion) { viejo.corte = null; return; }              // sin el tema (cancionero viejo en caché): sigue el que estaba
+    const t = this.ctx.currentTime;
+    viejoGain.gain.setTargetAtTime(0, Math.max(t, corte + .3), .25);   // lo que quede colgando del viejo se apaga tras el corte
+    setTimeout(() => { try { viejo.destruir(); viejoGain.disconnect(); } catch (e) {} }, Math.max(0, corte - t) * 1000 + 2500);
+    this.capaRep = this.ctx.createGain(); this.capaRep.gain.value = 1; this.capaRep.connect(this.musica);   // entra a todo volumen: el corte ya es limpio
+    const rep = this.nuevoRep(cancion);
+    rep.sig = Math.max(corte, t + .02);                        // su primer paso, justo en el borde del compás
+    rep.inicio = rep.sig;
+    rep.tempo = viejo.tempo; Object.assign(rep.capas, viejo.capas);   // el mismo apuro y las mismas capas
+    this.rep = rep; this.tema = id;
   }
   /** Calla la música (en la pausa y en el fin). */
   calla() {
     if (!this.rep) return;
     try { this.rep.destruir(); this.capaRep.disconnect(); } catch (e) {}
-    this.rep = null; this.tema = null;
+    this.rep = null; this.tema = null;                       // la lista y su posición se recuerdan: al volver sigue el mismo tema
   }
   /** Llamar en cada cuadro: agenda las notas que vienen y ajusta el tempo a la velocidad. */
   tick(velocidad, capas) {
@@ -92,6 +196,11 @@ export class Sonido {
     this.rep.tempo = 0.92 + 0.23 * Math.max(0, Math.min(1, k));
     if (capas) Object.assign(this.rep.capas, capas);
     this.rep.tick(0.25);
+    if (this.rep.corte != null) {                              // el tema terminó sus vueltas: entra el siguiente
+      this.rota(this.rep.corte);
+      this.rep.tempo = 0.92 + 0.23 * Math.max(0, Math.min(1, k));
+      this.rep.tick(0.25);                                     // y se agenda desde el corte en este mismo cuadro
+    }
   }
 
   /* ---------- efectos ---------- */
