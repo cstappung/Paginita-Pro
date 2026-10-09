@@ -3887,6 +3887,11 @@ html[data-tema=oscuro] .jg-drop-quien:hover>b{color:#fff}
 .jg-mn:is(:hover,:focus-within) .jg-sp-svg .a-sale,.jg-hoja-arte .jg-sp-svg .a-sale{animation:jgSpSale 2.6s cubic-bezier(.5,0,.4,1) infinite}
 .jg-mn:is(:hover,:focus-within) .jg-sp-svg .a-barrera,.jg-hoja-arte .jg-sp-svg .a-barrera{animation:jgSpBarrera 2.6s ease-in-out infinite}
 .jg-mn:is(:hover,:focus-within) .jg-sp-svg .a-lengua,.jg-hoja-arte .jg-sp-svg .a-lengua{animation:jgSpLate .5s steps(2) infinite}
+/* Metro Rush: los focos del tren titilan, el tren retumba al acercarse y
+   las rayas de velocidad se quedan atrás del corredor. */
+.jg-mn:is(:hover,:focus-within) .jg-sp-svg .a-foco,.jg-hoja-arte .jg-sp-svg .a-foco{animation:jgSpFoco 1.3s linear infinite}
+.jg-mn:is(:hover,:focus-within) .jg-sp-svg .a-tiembla,.jg-hoja-arte .jg-sp-svg .a-tiembla{animation:jgSpTiembla .16s steps(2) infinite}
+.jg-mn:is(:hover,:focus-within) .jg-sp-svg .a-raya,.jg-hoja-arte .jg-sp-svg .a-raya{animation:jgSpRaya .5s linear infinite}
 @keyframes jgSpLate{0%,100%{opacity:.45}50%{opacity:1}}
 @keyframes jgSpFlota{0%,100%{transform:translateY(3px)}50%{transform:translateY(-6px)}}
 @keyframes jgSpAla{from{transform:scaleY(1)}to{transform:scaleY(.35)}}
@@ -3895,6 +3900,9 @@ html[data-tema=oscuro] .jg-drop-quien:hover>b{color:#fff}
 @keyframes jgSpFlamea{from{transform:skewY(-6deg)}to{transform:skewY(6deg)}}
 @keyframes jgSpChispa{0%,100%{opacity:1}50%{opacity:.6}}
 @keyframes jgSpSale{0%,25%{transform:translateX(0)}60%,100%{transform:translateX(150px);opacity:0}}
+@keyframes jgSpFoco{0%,40%,56%,100%{opacity:1}44%{opacity:.5}50%{opacity:.85}53%{opacity:.6}}
+@keyframes jgSpTiembla{from{transform:translate(0,0)}to{transform:translate(.7px,-.7px)}}
+@keyframes jgSpRaya{from{transform:translateX(-8px);opacity:1}to{transform:translateX(22px);opacity:0}}
 @keyframes jgSpBarrera{0%,20%{transform:rotate(0)}40%,80%{transform:rotate(-80deg)}100%{transform:rotate(0)}}
 @media(prefers-reduced-motion:reduce){.jg-sp-svg [class^="a-"]{animation:none!important}}
 .jg-mn-txt{display:grid;gap:3px;padding:9px 12px 12px;min-width:0}
