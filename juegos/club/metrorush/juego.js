@@ -24,10 +24,10 @@
    - Se perdona el salto un poco antes de tocar el suelo y un poco después
      de dejarlo (búfer y "tiempo de coyote"): sin eso el salto se siente
      "comido" a toda velocidad. */
-import { crearMundo, PALETAS } from './mundo.js?v=metrorush-10';
-import { Sonido } from './audio.js?v=metrorush-10';
-import './mundo-city.js?v=metrorush-10';                        // CITY: el dibujo de City (se engancha a mundo.js por GANCHOS)
-import { crearCiudad } from './ciudad.js?v=metrorush-10';       // CITY: lo que la carrera hace distinto en City
+import { crearMundo, PALETAS } from './mundo.js?v=metrorush-11';
+import { Sonido } from './audio.js?v=metrorush-11';
+import './mundo-city.js?v=metrorush-11';                        // CITY: el dibujo de City (se engancha a mundo.js por GANCHOS)
+import { crearCiudad } from './ciudad.js?v=metrorush-11';       // CITY: lo que la carrera hace distinto en City
 
 const M = window.MetroRushMotor;                               // el motor (motor.js)
 const MP = window.MetroRushPrueba;                            // la prueba de la carrera, para el antitrampas (prueba.js)
@@ -1060,6 +1060,11 @@ const PISTAS = {
   alto: { ico: 'rueda', tactil: 'Desliza hacia abajo: ¡rueda!', teclas: '↓ o S: ¡rueda!' },
   tren: { ico: 'lados', tactil: 'Desliza a un lado: ¡esquiva!', teclas: '← o →: ¡esquiva!' }
 };
+/* Qué pista enseña cada cosa: en City no hay barreras (sus filas son de
+   cajones, que se saltan como la baja, y de drones, que se ruedan como la
+   alta), así que sin esto sus primeras carreras no enseñaban nada. La rampa
+   está para saber que no es un problema (se sube). */
+const PISTA_DE = { bajo: 'bajo', alto: 'alto', tren: 'tren', rampa: 'rampa', cajon: 'bajo', dron: 'alto' };
 let relojPista = 0;
 function ocultaPista() { if (c) c.pista = null; $('pista').hidden = true; }
 function pistas(dt) {
@@ -1077,17 +1082,18 @@ function pistas(dt) {
   // lo más cercano por delante en mi carril (una rampa no es un problema: se sube)
   let cerca = null, dz0 = Infinity;
   for (const o of c.activos) {
-    if (o.carril !== r.carril || !(o.tipo === 'bajo' || o.tipo === 'alto' || o.tipo === 'tren' || o.tipo === 'rampa')) continue;
+    if (o.carril !== r.carril || !PISTA_DE[o.tipo] || o.roto) continue;   // (un cajón ya pisado no enseña nada)
     const dz = (o.d != null ? o.d : o.d0) - c.D;
     if (dz > 0 && dz < dz0) { dz0 = dz; cerca = o; }
   }
-  if (!cerca || cerca.tipo === 'rampa' || c.tutorial[cerca.tipo] >= 2) return;
+  const k = cerca && PISTA_DE[cerca.tipo];                       // la pista que toca (un cajón enseña a saltar, como la barrera baja)
+  if (!cerca || k === 'rampa' || c.tutorial[k] >= 2) return;
   const cierre = c.V + (cerca.tipo === 'tren' && cerca.activo ? cerca.vel : 0);   // un tren que viene se acerca más rápido
   if (dz0 / Math.max(1, cierre) > 1.6) return;                   // todavía lejos: se avisa 1,6 s antes
-  c.tutorial[cerca.tipo]++;
-  c.pista = { tipo: cerca.tipo, o: cerca };
-  const P = PISTAS[cerca.tipo], el = $('pista');
-  el.dataset.tipo = cerca.tipo;
+  c.tutorial[k]++;
+  c.pista = { tipo: k, o: cerca };
+  const P = PISTAS[k], el = $('pista');
+  el.dataset.tipo = k;
   $('pistaIco').innerHTML = ICONOS[P.ico];
   $('pistaTxt').textContent = esTactil ? P.tactil : P.teclas;
   el.hidden = false;

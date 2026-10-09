@@ -1042,8 +1042,8 @@
         while (dSig < dLimite) {
           const dif = dificultad(dSig);
           if (tunel && dSig >= tunel.desde) { bloqueTunel(); continue; }
+          if (ext && ext.bloque && ext.bloque(api, dSig < 140 ? 0 : dif, ctx)) continue;   // un bloque propio del mundo, comienzo incluido (el clásico no tiene)
           if (dSig < 140) { bloqueFila(0, ctx); continue; }     // el comienzo, suave
-          if (ext && ext.bloque && ext.bloque(api, dif, ctx)) continue;   // un bloque propio del mundo (el clásico no tiene)
           const r = azar();
           if (r < lerp(0.08, 0.2, dif) && libre[camino] <= dSig) bloqueConvoy(dif, ctx);
           else if (r < lerp(0.08, 0.2, dif) + 0.07) bloqueRespiro();

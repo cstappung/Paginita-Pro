@@ -81,7 +81,7 @@ function cerrados(objs, hasta, curva) {
      o a media fila de vagones es chocar con su costado. Lo mismo meterse de
      lado a media baranda, o justo donde está un cajón, un dron o una
      barrera (no da tiempo de saltar o rodar). */
-  const entra = [0, 1, 2].map(() => new Uint8Array(N).fill(1));
+  const entra = [0, 1, 2].map(() => new Uint8Array(N).fill(1)), burbujas = objs.filter(o => o.tipo === 'burbujas');
   const cierra = (l, c, a, b) => { for (let d = Math.max(0, Math.floor(a)); d <= Math.min(N - 1, Math.ceil(b)); d++) l[c][d] = 0; };
   for (const t of trenes) {
     if (t.vel > 0) { cierra(libre, t.carril, t.dArribo - 1, t.dArribo + t.largo + 1); cierra(entra, t.carril, t.dArribo - 1, t.dArribo + t.largo + 1); }
@@ -95,7 +95,10 @@ function cerrados(objs, hasta, curva) {
     else if (['cajon', 'dron', 'bajo', 'alto'].includes(o.tipo)) cierra(entra, o.carril, o.d - 2, o.d + 1.5);
     /* Al carril de un seto se entra con tiempo de saltar flotando (el salto
        tiene que salir antes de 0,62 s): de lado y encima, ya no. */
-    else if (o.tipo === 'seto') cierra(entra, o.carril, o.d - curva.velocidadEn(o.d) * 0.7, o.d + 1.5);
+    else if (o.tipo === 'seto') {
+      if (burbujas.some(b => o.d >= b.d0 && o.d <= b.d0 + b.largo)) cierra(entra, o.carril, o.d - curva.velocidadEn(o.d) * 0.7, o.d + 1.5);
+      else cierra(libre, o.carril, o.d - 1, o.d + 1.5);          // fuera de las burbujas un seto es un muro: no se pasa (como un vagón)
+    }
     /* El cobertizo y la viga son la ruta de arriba (como la lona): su carril
        se da por cerrado hasta el final de sus vagones (esos ya los cierra el
        bucle de los trenes); el camino nunca depende de ellos. El conducto se
@@ -177,6 +180,7 @@ function robot(objs, modo, metros, { fps = 60, curva = M.velocidadDe(modo), P = 
          el aire y cayendo sin más no le pasaría por encima, usa el salto de
          más de las burbujas. */
       if (o.tipo === 'seto') {
+        if (!activos.some(b => b.tipo === 'burbujas' && o.d >= b.d0 && o.d <= b.d0 + b.largo)) continue;   // fuera de las burbujas es un muro: lo esquiva el plan
         const ventana = dz > V * 0.38 + 0.6 && dz < V * 0.62;
         if (ventana && !r.enAire) { salta(); setos++; }
         else if (ventana && r.enAire && enBurbuja && !doble && r.vy < 0) { const tz = (dz + 1.2) / V, g = F.gravedad * C.BURBUJAS.gravedad; if (r.y + r.vy * tz - g * tz * tz / 2 < C.SETO.alto + 0.3) { r.vy = M.impulso(F.alturaSalto); doble = true; setos++; } }
@@ -369,11 +373,15 @@ test('lo de Subway Surfers City: energía de la tabla, rejillas, contenedores qu
     assert.ok(city.some(o => o.tipo === 'poder' && o.clase === k), 'city: ' + k);
     assert.ok(!puro.some(o => o.tipo === 'poder' && o.clase === k), 'citypuro: sin ' + k);
   }
-  // rejillas en los dos modos (no son una ayuda: se ganan con un pisotón), espaciadas
+  // rejillas en los dos modos (no son una ayuda: se ganan con un pisotón), espaciadas según el distrito
+  // (el Barrio Sur las enseña cada 150 m o más; Bajo Vías, cada 200; los demás, cada 250)
   for (const l of [city, puro]) {
     const r = de(l, 'rejilla').map(o => o.d);
     assert.ok(r.length > 10, 'rejillas');
-    for (let i = 1; i < r.length; i++) assert.ok(r[i] - r[i - 1] >= 250 - 1e-9, 'una cada 250 m o más');
+    for (let i = 1; i < r.length; i++) {
+      const min = C.PERFIL[M.estacionDe(r[i - 1], 'city').distrito].rejilla[0];
+      assert.ok(r[i] - r[i - 1] >= min - 1e-9, `una cada ${min} m o más`);
+    }
   }
   // el parque trae tramos de burbujas, que ocupan los tres carriles; los otros distritos no
   const burb = de(city, 'burbujas');
@@ -653,6 +661,53 @@ test('cada distrito trae lo suyo, y solo el suyo', () => {
     for (const [t, min] of [['cobertizo', 3], ['viga', 4], ['zigzag', 5], ['conducto', 3], ['seto', 12]]) assert.ok((cuenta[t] || 0) >= min, `${modo} ${semilla}: pocos ${t} (${cuenta[t] || 0})`);
   }
   assert.deepEqual(C.PROPIO, { sur: 'cobertizo', muelles: 'viga', bulevar: 'zigzag', bajo: 'conducto' });
+});
+
+/* La mezcla de cada distrito: qué hay en su pista (sin monedas ni regalos),
+   en fracción. Una fila de vagones seguidos cuenta una vez (si no, los
+   trenes taparían todo) y los trenes que vienen de frente van aparte. */
+function mezclaDistritos(objs, modo) {
+  const cuenta = {}, fin = [-99, -99, -99];
+  const cosas = ['tren', 'cajon', 'dron', 'baranda', 'lona', 'cobertizo', 'viga', 'conducto', 'seto', 'bajo', 'alto', 'rampa'];
+  for (const o of objs.filter(o => cosas.includes(o.tipo)).sort((a, b) => (a.d ?? a.d0) - (b.d ?? b.d0))) {
+    let t = o.tipo;
+    if (t === 'tren' && o.vel > 0) t = 'frente';
+    else if (t === 'tren') { const sigue = Math.abs(fin[o.carril] - o.d0) < 1; fin[o.carril] = o.d0 + o.largo + 0.4; if (sigue) continue; }
+    const d = M.estacionDe(o.d ?? o.d0, modo).distrito;
+    (cuenta[d] ||= {})[t] = (cuenta[d][t] || 0) + 1;
+  }
+  const r = {};
+  for (const [d, c] of Object.entries(cuenta)) { const tot = Object.values(c).reduce((a, b) => a + b, 0); r[d] = {}; for (const [t, n] of Object.entries(c)) r[d][t] = n / tot; }
+  return r;
+}
+
+test('cada distrito se arma con su propia pista: sin filas clásicas, y ninguno se parece a otro', () => {
+  for (const modo of ['city', 'citypuro']) for (const semilla of [11, 2026, 90210]) {
+    const m = mezclaDistritos(pista(semilla, 13500, modo).objs, modo), q = `${modo} ${semilla}`;
+    const f = (d, ...ts) => ts.reduce((a, t) => a + (m[d][t] || 0), 0);
+    // ni una barrera baja, ni una alta, ni una rampa de la Línea 3: City arma toda su pista
+    for (const d of Object.keys(m)) for (const t of ['bajo', 'alto', 'rampa']) assert.equal(m[d][t] || 0, 0, `${q}: ${t} en ${d}`);
+    assert.deepEqual(Object.keys(m).sort(), ['bajo', 'bulevar', 'muelles', 'parque', 'sur'], `${q}: los cinco distritos`);
+    // lo que define a cada uno (medido: ver CLAUDE.md, con margen)
+    assert.ok(f('sur', 'cobertizo') >= 0.05, `${q}: el Barrio Sur sube por cobertizos (${f('sur', 'cobertizo').toFixed(2)})`);
+    assert.ok(f('muelles', 'cajon', 'viga') >= 0.5, `${q}: Los Muelles son cajones que caen y grúas (${f('muelles', 'cajon', 'viga').toFixed(2)})`);
+    assert.ok(f('bulevar', 'baranda') >= 0.28, `${q}: el Bulevar es de rieles (${f('bulevar', 'baranda').toFixed(2)})`);
+    assert.ok(f('parque', 'seto') >= 0.4, `${q}: el Parque es de setos (${f('parque', 'seto').toFixed(2)})`);
+    assert.ok(f('bajo', 'dron', 'conducto') >= 0.3, `${q}: Bajo Vías se rueda (${f('bajo', 'dron', 'conducto').toFixed(2)})`);
+    for (const d of ['bulevar', 'bajo']) assert.ok(f(d, 'frente') >= 0.06, `${q}: en ${d} vienen trenes de frente`);
+    assert.ok(f('sur', 'frente') < f('bulevar', 'frente'), `${q}: el Barrio Sur (el primero) tiene menos trenes de frente que el Bulevar`);
+    // y ningún par de distritos tiene la misma mezcla (distancia L1 entre sus fracciones)
+    const ds = Object.keys(m);
+    for (let i = 0; i < ds.length; i++) for (let j = i + 1; j < ds.length; j++) {
+      const ts = new Set([...Object.keys(m[ds[i]]), ...Object.keys(m[ds[j]])]);
+      let l1 = 0; for (const t of ts) l1 += Math.abs((m[ds[i]][t] || 0) - (m[ds[j]][t] || 0));
+      assert.ok(l1 >= 0.45, `${q}: ${ds[i]} y ${ds[j]} se parecen demasiado (${l1.toFixed(2)})`);
+    }
+  }
+  // cada distrito tiene su perfil, y uno no es la copia de otro
+  assert.deepEqual(Object.keys(C.PERFIL).sort(), ['bajo', 'bulevar', 'muelles', 'parque', 'sur']);
+  const firmas = Object.values(C.PERFIL).map(p => JSON.stringify(p.camino));
+  assert.equal(new Set(firmas).size, firmas.length, 'cada distrito pone cosas distintas en su camino');
 });
 
 /* ---------- el antitrampas ---------- */

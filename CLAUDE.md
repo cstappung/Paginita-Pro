@@ -4017,39 +4017,64 @@ Things that matter:
   robot test that runs every seed found that the hard way). Speed pads are
   left out on purpose: the anti-cheat recomputes speed from distance.
 
-  **Each district plays differently, it is not a reskin.** Each one has
-  its own piece (`PROPIO` in `city.js`) that shows up only there, on its
-  own rhythm (`st.propio`, 110–220 m after the last one ends). If it does
-  not fit, it is tried again 12 m later instead of waiting for the next
-  City block. Barrio Sur has the **cobertizo**: a 2 m shed glued to wagons
-  with no ramp, two jumps up, the upper route. Los Muelles has the
-  **viga**: a crane beam rising from 1.9 to 4.2 m that you jump onto about
-  0.35 s early. It drops you on the roofs, and `alturaViga` is its support.
-  Bulevar Aurora has the **zigzag**: two or three barandas that overlap by
-  0.35·V + 4 m across the lanes. Landing on a different rail without
-  touching the ground is a *transbordo*, and the rail's coins pay ×2, ×3,
-  ×4 (`ciudad.js`). Bajo Vías has the **conducto**: a duct from 1.0 to
-  3.35 m, longer than one roll and shorter than two. Its orange ring sits
-  halfway between where a new roll reaches the exit and where a roll
-  started at the mouth ends, and it can have a vapor vent beside it to the
-  roofs. Its mouth carries a lit frame and a down-arrow sign, not stretched
-  with the duct: head-on, in neon, a plain duct read as a solid wall. The park's **setos** (2.8 m hedges) are passable only with the
-  bubbles' floating jump. Burbujas therefore always come with their hedge
-  race (`setos()`, wall spacing 2·V + 6), never loose over ordinary rows,
-  and never cross into the next district. Before, a stray floating jump
-  carried you 60 m and dropped you on the next barrier. The common blocks
-  are a weighted draw per district (`PESOS`). Three generator rules came
-  out of a robot sweep over 80 seeds × 4 frame rates (zero crashes at 30
-  fps and up):
+  **Each district builds its own track, it is not a reskin.** After the
+  first 140 m nothing in City comes from the classic generator: no `bajo`,
+  no `alto`, no `rampa`. The City hook owns every block (the motor now asks
+  it from metre 0; classic has no hook, so its track did not move). Each
+  district has a `PERFIL` in `city.js`: what goes in the safe lane of its
+  rows (`camino`), what may sit in the next path lane (`sig`), how a lane is
+  really closed (`cerrado`: wagons, a lona/vapor *subida* to the roofs, a
+  hedge, an obstacle), its oncoming-train rate (`marcha`), its signature
+  block and spacing (`firma`, `cada`), its extra blocks and its grate
+  spacing. `filaDistrito` is the one row builder and never fails, so a
+  classic block can never slip in. Measured mix, wagon runs counted once:
+  - **Barrio Sur**: drones and crates, few oncoming trains, a **cobertizo**
+    every 60–100 m (a 2 m shed glued to wagons with no ramp, two jumps up),
+    grates every 150 m to teach the ground-pound.
+  - **Los Muelles**: ~60 % falling crates, the **escalera** (3–4 crates in a
+    corridor of wagons, V + 3 m apart: jump or stomp each one) and the
+    **viga**, a crane beam rising from 1.9 to 4.2 m that you jump onto about
+    0.35 s early and that drops you on the roofs (`alturaViga`).
+  - **Bulevar Aurora**: rails everywhere (single `baranda`s and the
+    **zigzag**: two or three barandas that overlap by 0.35·V + 4 m across
+    the lanes; changing rail mid-air is a *transbordo*, coins ×2, ×3, ×4 in
+    `ciudad.js`), drones, and 30–50 % oncoming trains.
+  - **Parque de los Lagos**: lanes are closed by **setos** (2.8 m: outside
+    the bubbles a hedge is a wall, like a wagon) and lonas; bubble stretches
+    with 3–4 hedge walls (`setos()`, spacing 2·V + 6) come every 90–160 m,
+    and the next row starts 0.4·V + 4 m after the bubbles end, so no hedge
+    sits on their edge.
+  - **Bajo Vías**: drones, walls of 2–3 wagons, vapor subidas, oncoming
+    trains and a **conducto** every 60–90 m (a duct from 1.0 to 3.35 m,
+    longer than one roll; its orange ring sits halfway between where a new
+    roll reaches the exit and where a roll started at the mouth ends; its
+    mouth carries a lit frame and a down-arrow sign, because head-on in neon
+    a plain duct read as a wall).
+  Generator rules that came out of robot sweeps (480 runs at 11 km and 240
+  at 16 km, 20–144 fps):
+  - `despejado`: a lona, vapor, cobertizo or viga goes only where its lane
+    has been free of wagons for 0.55·V and of anything jumpable (`st.obst`,
+    filled by wrapping `api.emite` once per generator) for 0.9·V + 2 m;
+    otherwise the jump over a crate carried you past the lona and into its
+    wagons;
+  - `bajada`: after a roof route its lane stays free 0.9·V m, the time to
+    drop off the roof and change lanes, or the next row could box in
+    whoever took the hard route;
   - after a wagon run, `trenes` reserves its lane for 0.4·V;
-  - a hedge lane cannot be entered without time to jump;
+  - a hedge lane inside bubbles cannot be entered without time to jump;
   - `M.activaTren` moves forward an oncoming train placed in the first
-    170 m. It used to start late and cross 30 m past its row, on the safe
-    path.
+    170 m;
+  - the escalera never starts if it would not end 240 m before the next
+    district (the tunnel).
+  The tutorial hints (`PISTA_DE` in `juego.js`) teach a crate like a low
+  barrier and a drone like a high one, since City has neither barrier.
 
   `tests/metrorush-city.test.cjs` checks each piece frame by frame (20–144
-  fps, 16–46 m/s), and that each one appears only in its district and
-  often.
+  fps, 16–46 m/s), that each one appears only in its district and often,
+  and the mix itself: zero classic pieces, each district's defining share
+  (cobertizo ≥ 5 %, crates + beams ≥ 50 %, rails ≥ 28 %, hedges ≥ 40 %,
+  drones + ducts ≥ 30 %) and an L1 distance ≥ 0.45 between any two
+  districts' mixes. Change a `PERFIL` and re-measure.
 - **Fullscreen**: ⛶ on the title screen and in the pause panel, or `F`,
   calls `requestFullscreen` on the document (webkit fallback; the button
   hides where the API is missing, i.e. iPhone). `html.mr-pc` (and
