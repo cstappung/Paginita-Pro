@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610100638"></script>
+<script src="i18n.js?v=202610100648"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Laboratorio</title>
@@ -3790,7 +3790,7 @@ html[data-tema=oscuro] .jg-drop-quien:hover>b{color:#fff}
 :root{--m-solo:#e59a00;--m-solo-bg:#ffcf5c;--m-solo-tx:#3d2a00;--m-multi:#7042df;--m-multi-bg:#7042df;--m-multi-tx:#fff}
 
 /* ---- La rejilla del salón: una columna en el móvil ---- */
-.jg-sal{display:grid;grid-template-columns:minmax(0,1fr);grid-template-areas:"nov" "intro" "modos" "avisos" "solo" "lado" "multi" "tops" "tira";align-items:start}
+.jg-sal{display:grid;grid-template-columns:minmax(0,1fr);grid-template-areas:"nov" "intro" "modos" "avisos" "solo" "lado" "multi" "tops" "tira" "tiram";align-items:start}
 .jg-sal-intro{grid-area:intro;margin-bottom:10px}
 .jg-sal-intro h1{font-size:26px;letter-spacing:-.8px;margin:8px 0 4px;line-height:1.1;color:var(--jg-ink)}
 .jg-sal-intro p{margin:0;font-size:13px;color:var(--jg-muted);line-height:1.5}
@@ -3801,6 +3801,7 @@ html[data-tema=oscuro] .jg-drop-quien:hover>b{color:#fff}
 .jg-sal-solo{grid-area:solo}.jg-sal-multi{grid-area:multi}
 .jg-sal .jg-ves-lado{grid-area:lado}
 .jg-sal .jg-tira{grid-area:tira;margin:8px 0 0}
+.jg-sal .jg-tira-m{grid-area:tiram;margin:16px 0 0}
 .jg-sal-sec{min-width:0;margin-bottom:26px}
 /* Un modo esconde la sección que sobra; las novedades no se van nunca. */
 /* La columna de salas (salas abiertas, top monedas, tus partidas) se queda
@@ -4168,9 +4169,9 @@ a.jg-hoja-ya{color:#fff!important}
   /* La columna baja hasta el final (tops y tira incluidos). Chrome sujeta
      un `sticky` a la rejilla entera, no a su área: cuando acababa en
      «Multijugador», al bajar se quedaba pegada encima de los drops. */
-  .jg-sal{grid-template-columns:minmax(0,1fr) 320px;column-gap:28px;grid-template-areas:"nov nov" "intro intro" "modos modos" "avisos avisos" "solo lado" "multi lado" "tops lado" "tira lado";grid-template-rows:auto auto auto auto auto auto auto 1fr}
-  .jg-sal[data-modo=solo]{grid-template-areas:"nov nov" "intro intro" "modos modos" "avisos avisos" "solo lado" "tops lado" "tira lado";grid-template-rows:auto auto auto auto auto auto 1fr}
-  .jg-sal[data-modo=multi]{grid-template-areas:"nov nov" "intro intro" "modos modos" "avisos avisos" "multi lado" "tops lado" "tira lado";grid-template-rows:auto auto auto auto auto auto 1fr}
+  .jg-sal{grid-template-columns:minmax(0,1fr) 320px;column-gap:28px;grid-template-areas:"nov nov" "intro intro" "modos modos" "avisos avisos" "solo lado" "multi lado" "tops lado" "tira lado" "tiram lado";grid-template-rows:auto auto auto auto auto auto auto auto 1fr}
+  .jg-sal[data-modo=solo]{grid-template-areas:"nov nov" "intro intro" "modos modos" "avisos avisos" "solo lado" "tops lado" "tira lado" "tiram lado";grid-template-rows:auto auto auto auto auto auto auto 1fr}
+  .jg-sal[data-modo=multi]{grid-template-areas:"nov nov" "intro intro" "modos modos" "avisos avisos" "multi lado" "tops lado" "tira lado" "tiram lado";grid-template-rows:auto auto auto auto auto auto auto 1fr}
   .jg-sal .jg-ves-lado{top:76px;max-height:calc(100vh - 96px)}
   .jg-modos-sel{flex:0 1 560px}
   .jg-modos{justify-content:space-between}
@@ -4592,6 +4593,40 @@ html[data-tema=oscuro] .jg-mk-p.caro{color:#ff8a80}
 html[data-tema=oscuro] .jg-masc-n{background:#1d1b2be6;color:var(--os-tx)}
 html[data-tema=oscuro] .jg-ped-baile{background:var(--os-sup2);border-color:var(--os-borde)}
 html[data-tema=oscuro] .jg-ped-baile.leg{background:linear-gradient(90deg,#3a3014,var(--os-sup2));border-color:#6b5520}
+
+/* La tira de legendarios de Mascotas (pintaDropsMascotas): la misma tira
+   que la de PRODROP, en los colores del juego (crema y naranja). */
+.jg-tira-m{background:linear-gradient(120deg,#5a2a0c,#a8501a 55%,#d9772b);border-color:#f0c79a}
+.jg-tira-m header small{color:#ffe2c2}
+.jg-tira-m .jg-drop-quien{color:#ffe9d2}.jg-tira-m .jg-drop-cuando{color:#ffd2a6}
+.jg-tira-m .jg-nada{color:#ffe2c2}
+.jg-dropm{flex-basis:112px}
+.jg-dropm-f{position:relative;display:grid;place-items:center;height:112px;border-radius:14px;background:#fff3dc center/84% no-repeat;box-shadow:inset 0 0 0 2px #ffcf6b,0 0 18px #ffcf6b66}
+.jg-dropm-f>i{font-style:normal;font-size:44px}
+.jg-dropm-f>em{position:absolute;top:5px;right:6px;padding:1px 6px;border-radius:99px;background:#ffcf3d;color:#5a2a0c;font:800 11px/1.4 inherit;font-style:normal;box-shadow:0 1px 3px #0003}
+.jg-dropm-n{font-size:12px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jg-tira-puerta{display:flex;align-items:center;gap:10px 16px;flex-wrap:wrap}
+.jg-tira-puerta p{flex:1 1 280px;margin:0;font-size:13px;color:#ffe2c2}.jg-tira-puerta b{color:#fff}
+html[data-tema=oscuro] .jg-tira-m{background:linear-gradient(120deg,#2a1406,#5c2c0e 55%,#7a3d14);border-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-dropm-f{background-color:#3a2a1c}
+
+/* Novedad de Mascotas: la pradera del juego, un huevo que se tambalea, la
+   gallina que baila, el regalo con su ★ y corazones que suben. */
+.jg-nov-arte-mc{position:absolute;inset:0;overflow:hidden;background:radial-gradient(ellipse 70% 40% at 50% 112%,#8fd16a 0 60%,#6fb84e 61% 100%,transparent 101%),radial-gradient(circle at 18% 22%,#fff8 0 7%,transparent 8%),linear-gradient(#ffe7b8,#ffd08a 70%)}
+.jg-nov-arte-mc>i{position:absolute;left:24%;bottom:26px;width:46px;height:58px;border-radius:50% 50% 46% 46%/60% 60% 40% 40%;background:radial-gradient(circle at 35% 30%,#fff 0 18%,#fff6e3 19%),#fff6e3;box-shadow:inset -5px -6px 0 #f1dcb6,0 4px 0 #3a2416;border:2.5px solid #3a2416;transform-origin:50% 100%;animation:jg-mc-huevo 2.4s ease-in-out infinite}
+.jg-nov-arte-mc>i::after{content:"";position:absolute;left:8px;right:8px;top:24px;height:8px;background:linear-gradient(135deg,transparent 45%,#3a2416 46% 54%,transparent 55%) 0 0/10px 8px repeat-x}
+.jg-nov-arte-mc>em{position:absolute;left:52%;bottom:22px;font-size:64px;line-height:1;font-style:normal;filter:drop-shadow(0 4px 0 #3a241633);transform-origin:50% 100%;animation:jg-mc-baile 1.1s ease-in-out infinite}
+.jg-nov-arte-mc>s{position:absolute;right:13%;top:36%;font-size:40px;line-height:1;text-decoration:none;transform:rotate(8deg)}
+.jg-nov-arte-mc>s>b{position:absolute;right:-8px;top:-8px;padding:0 5px;border-radius:99px;background:#ffcf3d;color:#5a2a0c;font:800 13px/1.5 system-ui,sans-serif;border:2px solid #3a2416}
+.jg-nov-arte-mc>u{position:absolute;text-decoration:none;color:#ff6b8a;font-size:18px;opacity:0;animation:jg-mc-corazon 2.6s ease-out infinite}
+.jg-nov-arte-mc>u:nth-of-type(1){left:66%;bottom:84px}.jg-nov-arte-mc>u:nth-of-type(2){left:74%;bottom:70px;animation-delay:-1.3s;font-size:14px}
+.jg-nov-arte-mc>b{position:absolute;left:0;right:0;top:12px;text-align:center;font:900 30px/1 Nunito,"Arial Rounded MT Bold",system-ui,sans-serif;letter-spacing:.03em;color:#fff;-webkit-text-stroke:2px #3a2416;paint-order:stroke fill;text-shadow:0 3px 0 #3a2416}
+@keyframes jg-mc-huevo{0%,60%,100%{transform:rotate(0)}68%{transform:rotate(-9deg)}76%{transform:rotate(8deg)}84%{transform:rotate(-5deg)}92%{transform:rotate(3deg)}}
+@keyframes jg-mc-baile{0%,100%{transform:translateY(0) rotate(-6deg)}50%{transform:translateY(-8px) rotate(6deg)}}
+@keyframes jg-mc-corazon{0%{opacity:0;transform:translateY(0) scale(.6)}20%{opacity:1}100%{opacity:0;transform:translateY(-46px) scale(1.1)}}
+@media (prefers-reduced-motion:reduce){.jg-nov-arte-mc>i,.jg-nov-arte-mc>em,.jg-nov-arte-mc>u{animation:none}.jg-nov-arte-mc>u{opacity:1}}
+/* En oscuro, la misma pradera de noche (como el juego con la luz apagada). */
+html[data-tema=oscuro] .jg-nov-arte-mc{background:radial-gradient(ellipse 70% 40% at 50% 112%,#3f6e34 0 60%,#2f5a28 61% 100%,transparent 101%),radial-gradient(circle at 18% 22%,#fff6d0 0 5%,transparent 6%),radial-gradient(circle at 40% 14%,#fff8 0 .6%,transparent 1%),radial-gradient(circle at 82% 30%,#fff8 0 .6%,transparent 1%),linear-gradient(#1c1838,#3a2a52 75%)}
 </style>
 </head>
 <body>
@@ -4635,6 +4670,6 @@ html[data-tema=oscuro] .jg-ped-baile.leg{background:linear-gradient(90deg,#3a301
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610100638"></script>
+<script src="juegos-app.js?v=202610100648"></script>
 </body>
 </html>

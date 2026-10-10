@@ -37,6 +37,8 @@
 
 **While listed in the market** a pet cannot be cared for, dressed or given the potion, and an item cannot be used. Listing a pet strips what it wears (it stays the seller's). Selling an item takes it off whoever wore it. `onlyUsable` drops worn items that were sold or listed.
 
+**In the salón.** A strip of the latest legendary gift items and a Novedades entry (`docs/claude/juegos/salon.md`).
+
 **In the profile.** A pet (and a dance) can be shown on the profile card and page, chosen in the profile editor's «Mascota» tab. Details in `docs/claude/juegos/perfiles-y-economia.md`. The live view asks the viewer for `cerca: true`, a closer camera for a small box.
 
 **Theme.** The postman forwards `data-tema`. `app.css` has an `html[data-tema='oscuro']` block: neutral surfaces go dark and the ink goes light, while coloured buttons keep dark ink on their pastel.

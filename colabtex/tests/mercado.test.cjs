@@ -7,12 +7,12 @@ const path = require('node:path');
 const esbuild = require('esbuild');
 
 const r = esbuild.buildSync({
-  stdin: { contents: `export * from './juegos/mercado-datos.js'; export { leeCopia } from './juegos/monedas.js';`, resolveDir: path.join(__dirname, '..', 'src'), loader: 'js' },
+  stdin: { contents: `export * from './juegos/mercado-datos.js'; export { leeCopia } from './juegos/monedas.js'; export { mejoresDropsMascotas } from './juegos/mascotas-datos.js';`, resolveDir: path.join(__dirname, '..', 'src'), loader: 'js' },
   bundle: true, write: false, format: 'cjs', platform: 'node', target: 'node20', logLevel: 'silent'
 });
 const M = { exports: {} };
 new Function('module', 'exports', 'require', r.outputFiles[0].text)(M, M.exports, require);
-const { ofertasMercado, filtra, misVentas, misCambios, intercambiables, gente, puedeComprar, puedeProponer, pendientesDe, FILTROS_INICIALES } = M.exports;
+const { mejoresDropsMascotas, ofertasMercado, filtra, misVentas, misCambios, intercambiables, gente, puedeComprar, puedeProponer, pendientesDe, FILTROS_INICIALES } = M.exports;
 
 const T = 1791700000000, V = 'vende0001', C = 'compra001';
 function base() {
@@ -87,4 +87,26 @@ test('intercambios: los tres tipos, el cupo y los pendientes', () => {
   assert.equal(pendientesDe(d, V), 1);
   assert.equal(pendientesDe(d, C), 0);
   assert.equal(misCambios(d, V, {})[0].posible, true);
+});
+
+test('los últimos drops legendarios de Mascotas (la tira del salón): solo legendarios, del más nuevo al más viejo', async () => {
+  const MM = require('../../juegos/mascotas/motor.js');
+  const d = base();
+  d.ajustes[V].a.n = 1e6;
+  /* Los regalos se derivan de la escritura: se buscan claves que den
+     legendario y otras que no. */
+  const legs = [], comunes = [];
+  for (let i = 0; legs.length < 3 || comunes.length < 2; i++) {
+    const k = '-Nbusca' + String(i).padStart(4, '0'), at = T + 100 + i;
+    const r = await MM.regalo(V, k, at);
+    if (r.leg && legs.length < 3) legs.push([k, at]);
+    else if (!r.leg && comunes.length < 2) comunes.push([k, at]);
+  }
+  for (const [k, at] of [...legs, ...comunes]) d.mascotas.r[V][k] = { at, p: 500 };
+  const l = mejoresDropsMascotas(d, 10);
+  assert.equal(l.length, 3);
+  assert.ok(l.every(x => x.item.leg && x.uid === V && x.ficha.nombre));
+  assert.deepEqual(l.map(x => x.at), legs.map(x => x[1]).sort((a, b) => b - a));
+  assert.equal(mejoresDropsMascotas(d, 2).length, 2);
+  assert.deepEqual(mejoresDropsMascotas({ completo: false }, 5), []);
 });

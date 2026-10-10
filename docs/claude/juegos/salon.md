@@ -9,10 +9,12 @@ bottom: the *Novedades* **banner**, a greeting, the **mode bar** (Todos ·
 1 jugador · Multijugador, sticky, remembered in `jg.modoSalon`), the guest
 notice, **«Para jugar solo» as a carousel right at the entrance** (it used
 to be a block at the very end that nobody reached), the rooms column, the
-**multiplayer** grid with its Todos/Duelos/En grupo filter, *Últimos tops*
-and the PRODROP drops strip. `.jg-sal` places them by grid areas; from
-901 px the rooms column (`aside.jg-ves-lado`, sticky) sits to the right and
-**spans every row down to the drops strip**: Chrome bounds a sticky grid
+**multiplayer** grid with its Todos/Duelos/En grupo filter, *Últimos tops*,
+the PRODROP drops strip and the Mascotas legendaries strip. `.jg-sal`
+places them by grid areas; from 901 px the rooms column
+(`aside.jg-ves-lado`, sticky) sits to the right and **spans every row down
+to the last strip** (`tiram`; a new strip must be added to the three
+`grid-template-areas` of the media query, with the `1fr` row moved to it): Chrome bounds a sticky grid
 item by the whole grid, not by its area, so when the column ended at
 «Multijugador» it stayed stuck on top of the strip below. A mode only hides
 the section that does not apply (`data-modo` on `.jg-sal`); *Novedades* and
@@ -29,6 +31,14 @@ the rooms column (open rooms, top coins, your games) are never hidden.
   is never a click. Each slide's art (`arteNovedad`) is drawn at the old
   card's size (380×165) and scaled whole with `transform` — `zoom` pushed
   px-placed pieces out of the box.
+- **Últimos drops legendarios · Mascotas** (`pintaDropsMascotas`, from
+  `mejoresDropsMascotas` in `mascotas-datos.js`): the legendary items of
+  valid gifts, newest first, with who and when (names `translate="no"`).
+  The photos come from the Mascotas viewer, requested only once the strip
+  is in view (`vigilaDropsMascotas`, an IntersectionObserver): the lobby
+  does not load three.js for someone who never scrolls there. Dances have
+  no photo and show their emoji. A guest gets the `MOTIVO_CUENTA.mascotas`
+  gate in the strip instead (the PRODROP strip is simply hidden).
 - **Últimos tops** (`topsLista`, from `ultimosPodios` in `monedas.js`) are
   the latest `podios` claims — the only club record with a date, since a
   `soloRanks` row has none — still valid by `podioValido`, newest first,
