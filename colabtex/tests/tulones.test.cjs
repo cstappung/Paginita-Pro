@@ -215,6 +215,7 @@ function partida(n, op = {}) {
   for (let i = 0; i < n; i++) jugadores['u' + i] = { nombre: 'J' + i, orden: i };
   const p = Object.assign({ juego: 'tulones', estado: 'jugando', cupo: n, semilla: 1, jugadores, jugadas: {} }, op);
   const pon = j => { p.jugadas[String(Object.keys(p.jugadas).length).padStart(4, '0')] = j; return sala.reducir(p); };
+  if (!op.sinListos) for (let i = 0; i < n; i++) pon({ t: 'listo', uid: 'u' + i, on: true });
   return { p, pon, est: () => sala.reducir(p) };
 }
 const T0 = 1e12;
@@ -304,4 +305,36 @@ test('sala: la pose y el aspecto sobreviven a la codificación', () => {
   assert.strictEqual(M.decodificaPose(pose(33).replace(/,[^,]*$/, '')), null, 'faltan coordenadas');
   for (const a of M.PRESETS) assert.deepStrictEqual(M.decodificaAspecto(M.codificaAspecto(a), a.nombre), M.limpia(a));
   assert.deepStrictEqual(M.decodificaAspecto('x.y', 'Z'), M.limpia({ nombre: 'Z' }));
+});
+
+test('sala: la torre espera a que todos den «Listo», y personalizar lo quita', () => {
+  const S = partida(3, { sinListos: true });
+  let e = S.est();
+  assert.strictEqual(e.fase, 'espera'); assert.strictEqual(e.turno, '');
+  S.pon({ t: 'listo', uid: 'u0', on: true });
+  S.pon({ t: 'listo', uid: 'u1', on: true });
+  e = S.pon({ t: 'listo', uid: 'u0', on: false });
+  assert.deepStrictEqual({ ...e.preparados }, { u0: false, u1: true });
+  assert.strictEqual(e.fase, 'espera');
+  S.pon({ t: 'listo', uid: 'u0', on: true, at: T0 - 5 });
+  e = S.pon({ t: 'listo', uid: 'u2', on: true, at: T0 });
+  assert.strictEqual(e.fase, 'jugando'); assert.strictEqual(e.turno, 'u0');
+  assert.strictEqual(e.inicio, T0, 'el último listo pone en marcha el reloj');
+  e = S.pon({ t: 'listo', uid: 'u0', on: false, at: T0 + 1 });
+  assert.strictEqual(e.fase, 'jugando', 'ya empezada, un listo no la para');
+});
+
+test('sala: con la sala abierta nada empieza aunque todos estén listos; al cerrarla sí', () => {
+  const S = partida(2, { estado: 'esperando', cupo: 4 });
+  assert.strictEqual(S.est().fase, 'espera');
+  S.p.estado = 'jugando';
+  assert.strictEqual(S.est().fase, 'jugando');
+  assert.strictEqual(S.est().inicio, 0, 'cerrada después: el reloj lo pone `reloj`');
+});
+
+test('sala: si se va uno antes de empezar y queda uno solo, gana por abandono', () => {
+  const S = partida(2, { sinListos: true });
+  S.pon({ t: 'listo', uid: 'u0', on: true });
+  const e = S.pon({ t: 'abandona', uid: 'u1' });
+  assert.strictEqual(e.fase, 'fin'); assert.strictEqual(e.ganador, 'u0'); assert.strictEqual(e.motivo, 'abandono');
 });

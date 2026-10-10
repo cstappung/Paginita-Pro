@@ -534,6 +534,8 @@
      La física no viaja: cada pantalla simula solo al que trepa en ella. Al registro de la sala va lo que decide
      la partida, y este reductor (lo usa `redTulones` de colabtex) lo vuelve a pasar en cada pantalla:
 
+     - `{t:"listo", uid, on}`: antes del primer turno, cada uno dice si está listo (personalizar lo quita). La torre
+       empieza cuando la sala está cerrada y todos los que siguen dentro (dos o más) lo están.
      - `{t:"sale", uid, n, at, a}`: el del turno n empieza a trepar (`a`, su aspecto). Fija el reloj del turno.
      - `{t:"congela", uid, n, at, p, b, a}`: su cuerpo al acabar, con las coordenadas en décimas (`codificaPose`).
        La altura y si supera la línea roja se recalculan aquí, no se cree lo que diga la pantalla.
@@ -621,13 +623,22 @@
       do { idx++; if (idx >= n0) { idx = 0; ronda++; } } while (!activo(idx));
       if (rondas && ronda > rondas) porRondas();
     }
-    if (n0) { while (idx < n0 && !activo(idx)) idx++; }
-    const listos = op.listos !== false && n0 > 0;
-    for (const j of listos ? jugadas || [] : []) {
+    // La torre empieza cuando la sala está cerrada (`op.listos`) y todos los que siguen dentro, dos o más, dieron «Listo».
+    const sala = op.listos !== false && n0 > 0, preparados = {};
+    let empezo = false;
+    const todosListos = () => { const q = ids.filter(u => !fuera[u]); return q.length >= 2 && q.every(u => preparados[u]); };
+    const arranca = at => { empezo = true; inicio = at > 0 ? at : 0; idx = 0; while (idx < n0 && !activo(idx)) idx++; };
+    for (const j of jugadas || []) {
       if (ganador !== null) break;
       const u = j && j.uid, i = ids.indexOf(u);
       if (i < 0) continue;
       const at = Number.isFinite(j.at) ? j.at : 0;
+      if (!empezo) {
+        if (j.t === 'abandona' && !fuera[u]) { fuera[u] = true; hist.push({ e: 'sale', uid: u }); }
+        else if (j.t === 'listo' && !fuera[u]) preparados[u] = j.on !== false;
+        if (sala && todosListos()) arranca(j.t === 'listo' ? at : 0);
+        continue;
+      }
       if (j.t === 'abandona') {
         if (fuera[u]) continue;
         fuera[u] = true; hist.push({ e: 'sale', uid: u });
@@ -670,14 +681,15 @@
       hist.push({ e: 'congela', uid: u, h, meta: m, ok, ronda });
       siguiente(at);
     }
-    if (ganador === null && listos) cierra();
+    if (!empezo && sala && todosListos()) arranca(0);
+    if (ganador === null && sala && (empezo || n0 > 1)) cierra();
     const fin = ganador !== null;
     const puntos = {};
     for (const u of ids) puntos[u] = Math.round(mejores[u] * 100);
     return {
-      fase: !listos ? 'espera' : fin ? 'fin' : 'jugando',
-      turno: !listos || fin ? '' : ids[idx], n, ronda, rondas, tiempo,
-      inicio, saleAt, plazo: !listos || fin ? 0 : plazoDe(), meta: meta(),
+      fase: fin ? 'fin' : !empezo ? 'espera' : 'jugando', empezo, preparados,
+      turno: !empezo || fin ? '' : ids[idx], n, ronda, rondas, tiempo,
+      inicio, saleAt, plazo: !empezo || fin ? 0 : plazoDe(), meta: meta(),
       torre, mejores, puntos, fuera, eliminados, vivos: enPie(), aspectos, hist: hist.slice(-40),
       ganador, motivo
     };

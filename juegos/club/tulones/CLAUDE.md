@@ -39,6 +39,20 @@ Club side: `juegos/club/CLAUDE.md`.
   `crearDirecto`, ~15 states/s, `ESTADO_MS`), never through RTDB. Receivers
   ease towards the last state (`cuadroRed`). Without a channel they just see
   the body appear when it freezes.
+- **Ready before the first turn.** `{t:"listo", on}` moves are reduced even
+  while the room is open (`redTulones` no longer waits for `listos`; the frame
+  gets `config` on every roster change and `sala` with each log). The tower
+  starts when the room is closed and every player still inside (≥2) is ready;
+  the last `listo` (with `at`) starts the clock. The host's postman closes the
+  room by itself (`fb.setEstado`) once everyone is ready. Opening the aspect
+  editor sends `listo:false`.
+- **Spawn is always on the floor** (`SITIOS` in `juego.js`: from the goat
+  leftwards, then right of the ruler, every 40 units; the first gap free both
+  standing and at drop height, else the one that overlaps least). The old 8
+  slots filled up with frozen bodies and spawned the player on top of the tower.
+- The mouse is captured on «¡A trepar!» and on the first limb key
+  (`capturaRaton`); without it the pointer left the iframe mid-climb.
+  `dibujaMiras` draws each held limb's target instead of the hidden cursor.
 - No pause online; a hidden tab keeps its clock (server time), so returning
   late freezes at once and is rejected if past the deadline.
 - End: last one standing (`ultimo`, or `abandono` if the rest left), all out

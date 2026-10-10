@@ -974,7 +974,7 @@ const REGLAS = {
       ])],
       ["La torre", "La línea roja marca la altura de la torre al empezar tu turno y tienes que superarla; la altura de un tulón se mide desde el suelo hasta su punto más alto. Si al congelarte no la pasas, quedas eliminado. Con varias personas gana el último en pie; jugando solo, sigues hasta que falles. Si eliges un límite de rondas (3, 5 o 10), la partida termina al cumplirlo. La torre completa se compara con tu récord, que se guarda en este navegador. Si un tulón sale del escenario, se pierde y queda eliminado."],
       ["En línea", lista([
-        "Desde el salón se abre una <b>sala de Tulones</b> para 2 a 8 personas, cada una en su casa. Quien la abre elige el tiempo de cada turno y las rondas; el anfitrión puede empezar con dos o más.",
+        "Desde el salón se abre una <b>sala de Tulones</b> para 2 a 8 personas, cada una en su casa. Quien la abre elige el tiempo de cada turno y las rondas. En el menú cada uno aprieta <b>Listo</b>: la torre empieza sola cuando todos (dos o más) lo están. Si te pones a personalizar tu tulón, vuelves a «esperando».",
         "Los turnos van en el orden de los asientos. En el tuyo tienes 15 segundos para darle a «¡A trepar!» (si no, sales solo) y después el tiempo del turno. Mientras tanto, los demás te ven trepar en directo.",
         "Al congelarte, tu cuerpo queda en la torre de todos. La altura y si superaste la línea roja las calcula la sala con tu cuerpo, igual en todas las pantallas.",
         "Si alguien cierra la pestaña o se queda sin internet en su turno, pasado el plazo (el tiempo del turno más unos segundos) la sala lo da por eliminado y sigue el siguiente. En línea no hay pausa.",
