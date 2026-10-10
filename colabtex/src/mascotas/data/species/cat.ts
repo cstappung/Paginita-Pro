@@ -26,7 +26,8 @@ export const cat: SpeciesDef = {
       care: { incubate: { label: 'Mimos', icon: '🤲', hint: 'Hazle cariño' }, clean: { label: 'Limpiar', hint: 'Sácale el polvo' } },
       needs: { happiness: 'quiere mimos', hygiene: 'está polvoriento' },
       start: { happiness: 50, hygiene: 70 },
-      growthToNext: 10,
+      // 1/3 de lo que pedía antes (10): nacer es tres veces más rápido.
+      growthToNext: 10 / 3,
     },
     {
       id: 'baby',

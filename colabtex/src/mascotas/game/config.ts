@@ -2,12 +2,12 @@ import type { StatId } from './types'
 
 // Ajustes de balance. Todo en un solo lugar para poder afinarlo sin tocar la lógica.
 
-/** Puntos que baja cada stat por hora (con la app abierta o cerrada). */
+/** Puntos que baja cada stat por hora (con la app abierta o cerrada). 2,5 veces el ritmo original (7/5/3/4). */
 export const DECAY_PER_HOUR: Record<StatId, number> = {
-  hunger: 7,
-  happiness: 5,
-  energy: 3,
-  hygiene: 4,
+  hunger: 17.5,
+  happiness: 12.5,
+  energy: 7.5,
+  hygiene: 10,
 }
 
 /** Tope de tiempo que se descuenta con la app cerrada: nunca se castiga de más. */
