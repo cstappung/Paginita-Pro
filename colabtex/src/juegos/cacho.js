@@ -565,7 +565,7 @@ export function crearCacho(ctx) {
         if (est.obligada === "abierto") notas.push("Ronda abierta: sin comodines y sin cambiar de pinta.");
         if (cerrada) notas.push(`Ronda cerrada: se apuesta «de esta», la pinta del dado de ${nombre(est.obliga)}, sin comodines.`);
         if (!ant && !est.obligada && (est.enVaso || {})[uid] === 1) notas.push("Con un dado puedes abrir a ases.");
-        if (est.dudaPaso) notas.push(`${Nombre(est.paso.uid)} pasó: puedes dudarle el paso o seguir sobre la apuesta de ${nombre(ant.uid)}.`);
+        if (est.dudaPaso) notas.push(`${Nombre(est.paso.uid)} pasó: puedes dudarle el paso (si de verdad tenía paso) o seguir sobre la apuesta de ${nombre(ant.uid)}.`);
         if (est.pasar) notas.push("Paso: todos iguales, todos distintos o full. Se puede pasar sin tenerlo, pero te lo pueden dudar.");
         if (!puede) notas.push("No se puede subir más: duda o calza.");
         cuerpo = `${pin ? `<div class="jg-cc-pintas">${pin}</div>` : ""}
@@ -580,10 +580,12 @@ export function crearCacho(ctx) {
           </div>`;
         const off = enviando ? " disabled" : "";
         botones = `<button class="jg-cc-boton jg-cc-apuesta" id="ccApuesta"${!puede || enviando ? " disabled" : ""}>Apostar ${puede ? esc(textoApuesta(sel.c, sel.p)) : ""}</button>
-          ${ant ? `<button class="jg-cc-boton jg-cc-dudo" id="ccDudo"${off}>Dudo${est.sicil && aps.length === 1 ? " (se juegan 2)" : ""}</button>` : ""}
+          ${est.dudaPaso
+            /* Tras un paso, dudar es dudarle el paso (¿tenía paso o no?), no la cuenta de la apuesta de antes. */
+            ? `<button class="jg-cc-boton jg-cc-dudo" id="ccDudaPaso"${off}>Dudo el paso</button>`
+            : ant ? `<button class="jg-cc-boton jg-cc-dudo" id="ccDudo"${off}>Dudo${est.sicil && aps.length === 1 ? " (se juegan 2)" : ""}</button>` : ""}
           ${est.calzo ? `<button class="jg-cc-boton jg-cc-calzo" id="ccCalzo"${off}>Calzo</button>` : ""}
-          ${est.pasar ? `<button class="jg-cc-boton jg-cc-pasa" id="ccPaso"${off}>Paso</button>` : ""}
-          ${est.dudaPaso ? `<button class="jg-cc-boton jg-cc-dudo" id="ccDudaPaso"${off}>Dudo el paso</button>` : ""}`;
+          ${est.pasar ? `<button class="jg-cc-boton jg-cc-pasa" id="ccPaso"${off}>Paso</button>` : ""}`;
         clave = ["ap", sel.firma, sel.p, sel.c, sel.s, puede, enviando, est.calzo, est.obligar, est.pasar, est.dudaPaso].join("|");
       }
       h = `<div class="jg-cc-panel">

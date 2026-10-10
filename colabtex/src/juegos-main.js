@@ -82,7 +82,7 @@ import { mejoresDropsMascotas, pedidoObjeto } from "./juegos/mascotas-datos.js";
 import { fotoDe, pideFotos } from "./juegos/visor-mascota.js";
 import { crearMercado } from "./juegos/mercado.js";
 import { mejoresDrops, miniCarta, cifras as cifrasCartas, MOTOR, rankingColeccion } from "./juegos/prodrop-cartas.js";
-import { mezcla, abrePerfil } from "./juegos/perfil.js";
+import { mezcla, abrePerfil, esFotoGoogle } from "./juegos/perfil.js";
 import { abreMini, cierraMini, miniAbierta, crearPaginaPerfil, avatarMarco, quien } from "./juegos/perfil-vista.js";
 import { estadisticas, nombreCategoria, marcoVisible, valorMarca } from "./juegos/perfil-tarjeta.js";
 import { fotoSana, colorSano } from "./juegos/sano.js";
@@ -327,6 +327,7 @@ function perfilDe(uid) {
        se pinta la ficha y ya, que es lo que había antes de esto. */
     oyendo.set(uid, fb.watchPerfil(uid, (p, err) => {
       if (err) { perfiles.set(uid, null); return; }
+      if (state.base && uid === state.base.uid) fotoGoogle(p);   // antes del «nada cambió»: sin perfil, también
       const antes = JSON.stringify(perfiles.get(uid) || null);
       if (JSON.stringify(p || null) === antes) return;
       perfiles.set(uid, p || null);
@@ -338,6 +339,7 @@ function perfilDe(uid) {
       if (monedasVista) monedasVista.refresca();
       if (prodropVista) prodropVista.refresca();
       if (mercadoVista) mercadoVista.refresca();
+      if (individual && individual.refresca) individual.refresca();
       const mini = miniAbierta();
       if (mini && mini.uid === uid) mini.refresca();
       render();
@@ -346,6 +348,12 @@ function perfilDe(uid) {
   }
   return perfiles.get(uid) || null;
 }
+
+/* El nombre que se ve de alguien en una fila congelada (una sala, un
+   mensaje, un récord): su apodo vivo si lo puso, y si no el que trae la
+   fila, que es el de su cuenta de Google al escribirla. Así el apodo sale
+   en todas partes, no solo donde la pantalla ya pasaba por `mezcla`. */
+const nombreVivo = (uid, n) => { const p = uid ? perfilDe(uid) : null; return (p && p.nick) || n || ""; };
 
 /* Se escribe **dentro** de cada ficha en vez de cambiarla por otra
    para no romper ninguna referencia que el reductor haya dejado
@@ -359,6 +367,22 @@ function vistePerfiles(est) {
        cada pantalla: si llega tarde (el perfil, o lo ganado), se repinta. */
     j.marco = marcoDeUid(j.uid);
   }
+}
+
+/* La foto de Google solo la conoce la sesión de cada uno: los demás la
+   veían únicamente donde una fila la había copiado (una sala, la tabla de
+   un juego de sala), así que en el top de monedas y en tantos otros
+   sitios salía la inicial. Quien no eligió foto (`foto` sin poner, o una
+   URL de Google vieja) publica la suya en `users/<uid>/perfil/foto`, que
+   cualquiera con sesión lee. Una foto subida o «sin foto» (`""`) no se
+   tocan. El editor sigue leyendo esa URL como «usa la de Google». */
+function fotoGoogle(p) {
+  const b = state.base, g = b && b.photo;
+  if (!g || !esFotoGoogle(g)) return;
+  const f = p ? p.foto : undefined;
+  const sinElegir = f === undefined || f === null || (esFotoGoogle(f) && f !== g);
+  if (!sinElegir) return;
+  fb.ponFotoPerfil(b.uid, g).catch(e => console.warn("[juegos] no se pudo publicar la foto de Google", e));
 }
 
 /* Lo propio se aplica sobre lo de Google, que es lo único que hay
@@ -1540,7 +1564,7 @@ function armazon() {
     const clave = juego === "tetris" ? "tetrisclub" : juego;
     /* Sin cuenta (`usuario: null`) el club juega en modo invitado: ni
        clasificación, ni partida a medias en la nube, ni logros. */
-    individual = crearSolo({ juego, usuario: u, guardar: guardaClub, reportaSospecha: sospechaClub, watch: fb.watchSolo, volver: () => ir(""),
+    individual = crearSolo({ juego, usuario: u, guardar: guardaClub, reportaSospecha: sospechaClub, watch: fb.watchSolo, volver: () => ir(""), nombreDe: nombreVivo,
       partida: u ? { leer: () => fb.leerPartidaClub(u.uid, juego), guardar: (d, at) => fb.guardarPartidaClub(u.uid, juego, d, at) } : null,
       /* El fantasma de Metro Rush: la tabla de la categoría y la prueba de su n.º 1, por clave (solo/club.js). */
       fantasma: u ? { leerTabla: cat => fb.leerSolo(cat), leerPrueba: (cat, uid, p) => fb.leerPruebaSolo(cat, uid, p) } : null,
@@ -2178,7 +2202,8 @@ const salon = crearSalon({
   invitado: () => state.invitado,
   esNuevo: id => nuevosVes.has(id),
   opciones: k => OPCIONES[k] || [],
-  salasDe: k => salasAbiertas().filter(s => s.juego === k).sort((x, y) => (x.at || 0) - (y.at || 0)),
+  salasDe: k => salasAbiertas().filter(s => s.juego === k).sort((x, y) => (x.at || 0) - (y.at || 0))
+    .map(s => Object.assign({}, s, { nombre: nombreVivo(s.anfitrion, s.nombre) })),
   podioDe: podioHtml,
   /* Desde la ficha, el manual abre en la versión elegida en sus opciones:
      es la que se va a jugar. */
@@ -2242,7 +2267,7 @@ function pintaVestibulo() {
   const primera = abiertas.slice().sort((x, y) => (x.at || 0) - (y.at || 0))[0];
   rapida.hidden = !primera;
   if (primera) {
-    rapida.innerHTML = `Unirme a <span translate="no">${escapeHtml(primera.nombre || "alguien")}</span> <small>${escapeHtml((JUEGOS[primera.juego] || {}).nombre || primera.juego)}</small>`;
+    rapida.innerHTML = `Unirme a <span translate="no">${escapeHtml(nombreVivo(primera.anfitrion, primera.nombre) || "alguien")}</span> <small>${escapeHtml((JUEGOS[primera.juego] || {}).nombre || primera.juego)}</small>`;
     rapida.onclick = () => entrar(primera.id);
   }
 
@@ -2253,7 +2278,7 @@ function pintaVestibulo() {
       <span class="jg-sala-ico" aria-hidden="true">${escapeHtml(ICONO[s.juego] || "●")}</span>
       <div class="jg-sala-txt">
         <b>${escapeHtml(j.nombre || s.juego)}</b>
-        <span>${escapeHtml(s.nombre || "Alguien")} · ${escapeHtml(timeAgo(s.at))}</span>
+        <span translate="no">${escapeHtml(nombreVivo(s.anfitrion, s.nombre) || "Alguien")} · ${escapeHtml(timeAgo(s.at))}</span>
         <span class="jg-sala-cupo" title="${n} de ${cupo} dentro"><i style="width:${Math.round(100 * n / cupo)}%"></i></span>
       </div>
       <div class="jg-sala-der"><small>${n}/${cupo}</small>
@@ -2755,7 +2780,8 @@ async function vota(contra) {
 function pintaChat() {
   const lista = $("jgChatLista");
   if (!lista) return;
-  const firma = chatMsgs.map(m => m.id).join(",");
+  /* Los nombres entran en la firma: un apodo que llega después repinta. */
+  const firma = chatMsgs.map(m => m.id + ":" + nombreVivo(m.uid, m.nombre)).join(",");
   if (lista.dataset.firma === firma && chatFirma === firma) return;
   lista.dataset.firma = firma;
   chatFirma = firma;
@@ -2764,7 +2790,7 @@ function pintaChat() {
   const ahora = fb.ahora();
   lista.innerHTML = chatMsgs.length ? chatMsgs.map(m => `
     <div class="jg-chat-msg${m.uid === yo ? " mio" : ""}" style="--c:${escapeHtml(colorForUid(m.uid || ""))};--edad:${Math.max(0, Math.round((ahora - (Number(m.at) || ahora)) / 100) / 10)}s">
-      <b data-perfil="${escapeHtml(m.uid || "")}" data-nombre="${escapeHtml(m.nombre || "")}">${escapeHtml(m.nombre || "Alguien")}${jugadores[m.uid] ? "" : ' <small>mirando</small>'}</b>
+      <b translate="no" data-perfil="${escapeHtml(m.uid || "")}" data-nombre="${escapeHtml(nombreVivo(m.uid, m.nombre))}">${escapeHtml(nombreVivo(m.uid, m.nombre) || "Alguien")}${jugadores[m.uid] ? "" : ' <small>mirando</small>'}</b>
       <span>${escapeHtml(m.t || "")}</span>
     </div>`).join("")
     : `<div class="vacio">Nadie ha escrito todavía.</div>`;
