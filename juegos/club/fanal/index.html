@@ -2,7 +2,7 @@
 <html lang="es" data-acto="1">
 <head>
 <meta charset="utf-8">
-<script src="../../../i18n.js?v=202610100021"></script>
+<script src="../../../i18n.js?v=202610100158"></script>
 <script src="../../audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#0b0a1c">
@@ -13,18 +13,18 @@
 <!-- Dos fuentes pixel: una bastarda gótica para los títulos (suena a bitácora vieja) y una sans legible para todo lo demás. -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Cinzel:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jacquarda+Bastarda+9&family=Pixelify+Sans:wght@400;600&display=swap">
 <!-- Lo común del Club (volver, ranking lateral, modo integrado) va antes del estilo propio, para que este gane. -->
 <link rel="stylesheet" href="../conexion.css?v=club-2">
-<link rel="stylesheet" href="estilo.css?v=fanal-6">
+<link rel="stylesheet" href="estilo.css?v=fanal-5">
 <script src="../../audio/volumen.js?v=vol-1"></script>
 <script src="../conexion.js?v=club-12"></script>
-<script src="relato.js?v=fanal-4" defer></script>
-<script src="motor.js?v=fanal-5" defer></script>
-<script src="prueba.js?v=fanal-5" defer></script>
-<script src="sprites.js?v=fanal-3" defer></script>
-<script src="musica.js?v=fanal-4" defer></script>
-<script src="juego.js?v=fanal-8" defer></script>
+<script src="relato.js?v=fanal-3" defer></script>
+<script src="motor.js?v=fanal-4" defer></script>
+<script src="prueba.js?v=fanal-4" defer></script>
+<script src="sprites.js?v=fanal-2" defer></script>
+<script src="musica.js?v=fanal-3" defer></script>
+<script src="juego.js?v=fanal-7" defer></script>
 </head>
 <body>
 <div class="shell"><div class="layout">
@@ -54,7 +54,7 @@
     <!-- El HUD de arriba: dónde estás, cuántas luces quedan, cuánto falta. -->
     <div class="hud-sup" id="hudSup" hidden>
       <span id="hudJornada">JORNADA 1 · EL ENJAMBRE</span>
-      <span class="der"><span id="hudBrasas" title="Brasas para el taller"></span><span id="hudLuces" title="Luces en el cielo">✦ 430</span><span id="hudAlba">AL ALBA · 8 JORNADAS</span></span>
+      <span class="der"><span id="hudBrasas" title="Brasas para el taller"></span><span id="hudLuces" title="Luces en el cielo">✦ 430</span><span id="hudAlba">AL ALBA · 13 JORNADAS</span></span>
     </div>
     <div class="jefe-barra" id="jefeBarra" hidden><b id="jefeNombre">LA NODRIZA</b><i><span id="jefeVida"></span></i></div>
     <div class="aviso" id="aviso" role="status" aria-live="polite"></div>
@@ -65,8 +65,9 @@
         <p class="pre">una travesía hacia el alba</p>
         <h2 class="titulo">FANAL</h2>
         <div class="menu" id="menuPortada">
-          <button type="button" class="opcion" data-accion="continuar" id="btnContinuar" hidden>Seguir la travesía</button>
-          <button type="button" class="opcion principal" data-accion="nueva" id="btnNueva">Empezar la travesía</button>
+          <button type="button" class="opcion principal" data-accion="nueva">Empezar la travesía</button>
+          <button type="button" class="opcion" data-accion="continuar" id="btnContinuar" hidden>Continuar</button>
+          <button type="button" class="opcion" data-accion="sinfin" id="btnSinFin">Travesía sin fin</button>
           <button type="button" class="opcion" data-accion="bitacora" id="btnBitacora">Bitácora</button>
           <button type="button" class="opcion" data-accion="ayuda">Cómo se juega</button>
           <button type="button" class="opcion" data-accion="opciones">Opciones</button>
@@ -118,8 +119,7 @@
           <button type="button" class="opcion principal" data-accion="seguir">Seguir remando</button>
           <button type="button" class="opcion" data-accion="opciones">Opciones</button>
           <button type="button" class="opcion" data-accion="ayuda">Cómo se juega</button>
-          <button type="button" class="opcion" data-accion="salir">Salir · la travesía queda guardada</button>
-          <button type="button" class="opcion" data-accion="terminar">Terminar la travesía</button>
+          <button type="button" class="opcion" data-accion="abandonar">Abandonar la travesía</button>
         </div>
       </div>
     </section>
@@ -130,7 +130,9 @@
         <p class="detalle" id="finLinea"></p>
         <dl class="estadisticas" id="finStats"></dl>
         <div class="menu">
-          <button type="button" class="opcion principal" data-accion="nueva" id="btnFinNueva">Nueva travesía</button>
+          <button type="button" class="opcion principal" data-accion="reencender" id="btnReencender">Volver a encender</button>
+          <button type="button" class="opcion" data-accion="nueva" id="btnFinNueva">Empezar de nuevo</button>
+          <button type="button" class="opcion" data-accion="sinfin" id="btnFinSinFin" hidden>Seguir: travesía sin fin</button>
           <button type="button" class="opcion" data-accion="portada">Portada</button>
         </div>
       </div>

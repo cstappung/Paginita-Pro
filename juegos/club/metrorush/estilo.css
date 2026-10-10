@@ -3,8 +3,8 @@
    La página se parece a las demás del Club (cabecera, marcador, la pantalla
    del juego y la clasificación al lado), pero la pantalla es siempre oscura y
    su marcador cambia con la estética de la estación: letras gordas con borde
-   (juguete), letras de cabina que brillan (neón) o letra pixel con marcos
-   escalonados (retro). El atributo data-estilo de #pantalla lo decide.
+   (juguete), letras de cabina que brillan (neón) o letras de historieta
+   con tinta negra y viñetas (cómic). El atributo data-estilo de #pantalla lo decide.
 
    Los tamaños del marcador van en unidades del contenedor (cqh, cqw): la
    pantalla es un contenedor de tamaño, así el marcador se ve igual de grande
@@ -46,12 +46,21 @@ main.vl { min-width: 0; }
 .pantalla { position: relative; width: 100%; aspect-ratio: 16 / 10; max-height: 82vh; background: #0b0d14; border-radius: 0 0 16px 16px; overflow: hidden; container-type: size; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 @media (max-width: 700px) and (orientation: portrait) { .pantalla { aspect-ratio: 3 / 4; max-height: 78svh; } }
 #lienzo { position: absolute; inset: 0; width: 100%; height: 100%; display: block; outline: none; }
-.pantalla[data-estilo="pixel"] #lienzo { image-rendering: pixelated; }
 .pie { margin: 8px 2px 0; color: var(--suave); font-size: 13px; text-align: center; }
 
 /* ---------- el marcador sobre la carrera ---------- */
 .hud { position: absolute; inset: 0; pointer-events: none; --u: 1cqh; }
-@container (max-aspect-ratio: 1/1) { .hud { --u: 0.8cqh; } }
+/* Vertical (celular): la unidad mira también el ancho, y las monedas bajan
+   debajo de la pausa. En una fila, un puntaje de 7 cifras se montaba sobre
+   las monedas (390 px de ancho no alcanzan para las dos cosas lado a lado);
+   en columna el puntaje solo comparte la fila con la pausa. */
+@container (max-aspect-ratio: 1/1) {
+  .hud { --u: min(0.8cqh, 1.45cqw); }
+  .hud-der { flex-direction: column-reverse; align-items: flex-end; }
+  /* Orbitron es mucho más ancha que las otras letras: en vertical un puntaje de 9 cifras
+     llegaba hasta la pausa, así que en neón se achica y se aprieta el espaciado. */
+  .pantalla[data-estilo="neon"] .hud .valor { font-size: calc(4.5 * var(--u)); letter-spacing: .1cqh; }
+}
 .hud-izq { position: absolute; left: calc(2.4 * var(--u)); top: calc(2.4 * var(--u)); display: grid; gap: calc(.8 * var(--u)); justify-items: start; }
 .hud-der { position: absolute; right: calc(2.4 * var(--u)); top: calc(2.4 * var(--u)); display: flex; gap: calc(1.4 * var(--u)); align-items: center; }
 .hud .fila { display: flex; align-items: center; gap: calc(1.2 * var(--u)); }
@@ -73,15 +82,42 @@ main.vl { min-width: 0; }
 .poderes li span i { display: block; height: 100%; width: calc(var(--k) * 100%); background: #ff6a3d; }
 .poderes .p-iman span i { background: #ff5a5a; } .poderes .p-mochila span i { background: #ffb02e; } .poderes .p-zapatillas span i { background: #3ad16a; } .poderes .p-doble span i { background: #5fb0ff; } .poderes .p-patineta span i { background: #b37bff; }
 .patinetas { position: absolute; right: calc(2.4 * var(--u)); bottom: calc(10 * var(--u)); display: flex; gap: calc(.8 * var(--u)); align-items: center; font-size: calc(3 * var(--u)); color: #fff; text-shadow: 0 2px 0 #000; }
+/* CITY: la energía de la tabla (una barra cian que se llena con las celdas) y el reloj de «monedas ×2», encima de las patinetas. */
+.hud-city { position: absolute; right: calc(2.4 * var(--u)); bottom: calc(15 * var(--u)); display: grid; justify-items: end; gap: calc(.8 * var(--u)); font-size: calc(2.6 * var(--u)); color: #fff; text-shadow: 0 2px 0 #000; pointer-events: none; }
+.hud-city[hidden], .hud-city [hidden] { display: none; }
+.hud-city .energia, .hud-city .mon2, .hud-city .burb { display: flex; align-items: center; gap: calc(.7 * var(--u)); }
+.hud-city .energia > i, .hud-city .mon2 > i, .hud-city .burb > i { width: calc(3 * var(--u)); height: calc(3 * var(--u)); display: inline-block; }
+.hud-city i svg { display: block; width: 100%; height: 100%; }
+.hud-city .barra { width: calc(14 * var(--u)); height: calc(1.6 * var(--u)); border-radius: 99px; background: rgba(0, 0, 0, .45); overflow: hidden; box-shadow: 0 0 0 calc(.25 * var(--u)) rgba(255, 255, 255, .5); }
+.hud-city .barra i { display: block; height: 100%; width: calc(var(--k, 0) * 100%); background: linear-gradient(90deg, #22c6ff, #5ff6ff); transition: width .2s; }
+.hud-city.lista .energia { animation: mrEnergia .7s ease-in-out infinite alternate; transform-origin: right center; }   /* late hacia la izquierda: crecer desde el centro lo sacaba por el borde */
+.hud-city.lista .barra i { background: linear-gradient(90deg, #ffd23f, #fff36a); }
+@keyframes mrEnergia { from { transform: scale(1); } to { transform: scale(1.12); } }
+/* El salto doble de las burbujas: una pastilla cian que flota mientras está listo; gastado, gris y quieta. */
+.hud-city .burb { padding: calc(.4 * var(--u)) calc(1.1 * var(--u)); border-radius: 99px; background: rgba(20, 120, 190, .72); box-shadow: 0 0 0 calc(.25 * var(--u)) #8fe3ff, 0 0 calc(1.6 * var(--u)) rgba(80, 200, 255, .7); animation: mrBurb 1.1s ease-in-out infinite alternate; }
+.hud-city .burb.usado { background: rgba(40, 46, 60, .7); box-shadow: 0 0 0 calc(.25 * var(--u)) rgba(255, 255, 255, .35); animation: none; opacity: .75; }
+@keyframes mrBurb { from { transform: translateY(0); } to { transform: translateY(calc(-.5 * var(--u))); } }
+@media (prefers-reduced-motion: reduce) { .hud-city.lista .energia, .hud-city .burb { animation: none; } }
 
 /* El letrero grande (estación nueva, récord, boleto) y el aviso corto. */
 .banner { position: absolute; left: 50%; top: 30%; transform: translate(-50%, -50%) scale(.9); text-align: center; color: #fff; opacity: 0; pointer-events: none; display: grid; gap: calc(.8cqh); width: 90%; transition: opacity .3s, transform .3s; }
 .banner.ver { opacity: 1; transform: translate(-50%, -50%) scale(1); animation: banner 3s forwards; }
 @keyframes banner { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.7); } 12% { opacity: 1; transform: translate(-50%, -50%) scale(1.06); } 20% { transform: translate(-50%, -50%) scale(1); } 85% { opacity: 1; } 100% { opacity: 0; } }
-.banner strong { font-size: 7.5cqh; line-height: 1.05; }
-.banner span { font-size: 3cqh; opacity: .9; }
-.aviso { position: absolute; left: 50%; bottom: 4cqh; transform: translate(-50%, 20px); max-width: 88%; padding: 1cqh 2.2cqh; border-radius: 99px; background: rgba(10, 12, 22, .78); color: #fff; font-size: 2.4cqh; text-align: center; opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none; }
-.aviso.ver { opacity: 1; transform: translate(-50%, 0); }
+.banner strong { font-size: min(7.5cqh, 11cqw); line-height: 1.05; }   /* en un celular vertical manda el ancho: «Boleto 6 de 10» en una línea */
+.banner > span { font-size: min(3cqh, 4.6cqw); opacity: .9; }   /* «>»: solo la segunda línea; sin él, la «Ó» de «Óxido» (un span dentro del título) salía chica y del color del subtítulo */
+/* El aviso se centra con left/right + margin:auto, NO con left:50% y una
+   traslación: una caja absoluta con left:50% solo tiene la mitad del ancho para
+   acomodarse, y en el celular un aviso largo se partía en seis renglones
+   angostos que, con el borde de 99px, quedaban como un círculo enorme en medio
+   de la vía. El radio es fijo (una píldora en una línea, una tarjeta en dos). */
+.aviso { position: absolute; left: 0; right: 0; margin: 0 auto; width: max-content; bottom: 4cqh; transform: translateY(20px); max-width: 88%; padding: 1cqh 2.2cqh; border-radius: 2.4cqh; background: rgba(10, 12, 22, .78); color: #fff; font-size: min(2.4cqh, 4.4cqw); text-align: center; opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none; }
+.aviso.ver { opacity: 1; transform: translateY(0); }
+/* En vertical el aviso va arriba, bajo el marcador, sobre el cielo: abajo a la
+   derecha están la barra de energía y la píldora «Salto doble ¡listo!», y un
+   aviso de 88 % de ancho las tapaba justo cuando dicen algo (al entrar a las
+   burbujas). Ejemplo: en un celular de 844 px de alto queda a ~177 px del borde
+   de arriba, debajo de la distancia y el distrito. Entra desde arriba. */
+@container (orientation: portrait) { .aviso { top: 21cqh; bottom: auto; transform: translateY(-20px); } .aviso.ver { transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { .banner.ver { animation: none; } }
 /* La pista de las primeras carreras: grande, abajo (más arriba tapaba al
    corredor), sobre el aviso chico, con la flecha moviéndose hacia donde hay
@@ -101,11 +137,36 @@ main.vl { min-width: 0; }
 @keyframes pista-lado { 25% { translate: -.9cqh 0; } 75% { translate: .9cqh 0; } }
 @container (max-aspect-ratio: 1/1) { .pista { font-size: 3.1cqh; gap: 1.2cqh; } .pista i { width: 5.2cqh; height: 5.2cqh; } }
 @media (prefers-reduced-motion: reduce) { .pista, .pista i { animation: none !important; } }
+/* ---------- el altavoz del andén ----------
+   La historia que se oye mientras se corre (juego.js: altavozDice). Se ve
+   como el letrero de destino de los trenes: letras ámbar sobre una placa
+   oscura. Va arriba al centro, entre el marcador de la izquierda y el de la
+   derecha, chico y en dos líneas como mucho: lejos de la vía y de las
+   pistas y avisos, que van abajo. Centrado con márgenes automáticos y no
+   con una traslación (así el saltito del cómic, que usa `rotate`, no se
+   suma a ninguna otra transformación). En vertical no cabe entre los dos marcadores: baja
+   bajo ellos y se aparta mientras se ve el letrero grande de la estación. */
+.altavoz { position: absolute; left: 0; right: 0; margin: 0 auto; width: fit-content; top: 2.4cqh; max-width: min(46%, 66cqh); display: flex; align-items: center; gap: 1.1cqh;
+  padding: .8cqh 1.8cqh .8cqh 1.1cqh; border-radius: 1cqh; background: rgba(18, 14, 10, .82); border: .25cqh solid rgba(255, 180, 58, .45);
+  color: #ffb43a; font: 700 2.1cqh/1.3 Arial, sans-serif; text-shadow: 0 0 .7cqh rgba(255, 160, 40, .55); opacity: 0; transition: opacity .35s; pointer-events: none; }
+.altavoz.ver { opacity: 1; }
+.altavoz i { flex: none; width: 2.8cqh; height: 2.8cqh; }
+.altavoz i svg { display: block; width: 100%; height: 100%; }
+@container (max-aspect-ratio: 1/1) {
+  .altavoz { top: 21cqh; max-width: 88%; font-size: 2.3cqh; }
+  .banner.ver ~ .altavoz { opacity: 0; }
+}
+/* En el cómic el altavoz es un globo de diálogo: crema, tinta negra y una colita que apunta hacia arriba (de donde sale la voz). */
+.pantalla[data-estilo="comic"] .altavoz { background: #fff4dc; border: .35cqh solid #1a1420; border-radius: 2.2cqh; color: #1a1420; text-shadow: none;
+  font: 400 2.4cqh/1.15 Bangers, "Arial Black", sans-serif; letter-spacing: .08cqh; box-shadow: .5cqh .5cqh 0 #1a1420; }
+.pantalla[data-estilo="comic"] .altavoz::after { content: ""; position: absolute; left: 18%; top: -1.3cqh; width: 2cqh; height: 2cqh; background: #fff4dc;
+  border-left: .35cqh solid #1a1420; border-top: .35cqh solid #1a1420; transform: rotate(45deg) skew(8deg, 8deg); }
+@media (prefers-reduced-motion: reduce) { .altavoz { transition: none; } }
 
 /* --- marcador: estética juguete (letras gordas con borde, como un juego de celular) --- */
 .pantalla[data-estilo="juguete"] { --borde: #1b2030; }
 .pantalla[data-estilo="juguete"] .hud, .pantalla[data-estilo="juguete"] .banner { font-family: "Lilita One", "Arial Black", sans-serif; color: #fff; }
-.pantalla[data-estilo="juguete"] :is(.valor, .chico, .estacion > span:first-child, .banner strong, .banner span) {
+.pantalla[data-estilo="juguete"] :is(.valor, .chico, .estacion > span:first-child, .banner strong, .banner > span) {
   text-shadow: 0 .45cqh 0 var(--borde), .28cqh .28cqh 0 var(--borde), -.28cqh .28cqh 0 var(--borde), .28cqh -.28cqh 0 var(--borde), -.28cqh -.28cqh 0 var(--borde), 0 -.28cqh 0 var(--borde), .28cqh 0 0 var(--borde), -.28cqh 0 0 var(--borde); }
 .pantalla[data-estilo="juguete"] .mult { background: #ffc62a; color: #1b2030; padding: .3cqh 1.2cqh .4cqh; border: .45cqh solid #1b2030; border-radius: 1.4cqh; transform: rotate(-7deg); box-shadow: 0 .5cqh 0 #1b2030; }
 .pantalla[data-estilo="juguete"] .moneda { border-radius: 50%; background: radial-gradient(circle at 38% 34%, #fff2a8 0 14%, #ffd23a 15% 58%, #f0a400 59%); border: .45cqh solid #1b2030; box-shadow: inset 0 0 0 .45cqh #ffdf6b, 0 .45cqh 0 #1b2030; }
@@ -114,23 +175,37 @@ main.vl { min-width: 0; }
 /* --- marcador: estética neón (letras de cabina que brillan) --- */
 .pantalla[data-estilo="neon"] .hud, .pantalla[data-estilo="neon"] .banner { font-family: Orbitron, "Arial", sans-serif; font-weight: 700; color: #e9fbff; }
 .pantalla[data-estilo="neon"] :is(.valor, .banner strong) { letter-spacing: .3cqh; text-shadow: 0 0 .6cqh #22e5ff, 0 0 1.8cqh #22e5ff; }
-.pantalla[data-estilo="neon"] :is(.chico, .estacion > span:first-child, .banner span) { color: #ffe9fb; text-shadow: 0 0 .6cqh #ff2bd6, 0 0 1.6cqh #ff2bd6; }
+.pantalla[data-estilo="neon"] :is(.chico, .estacion > span:first-child, .banner > span) { color: #ffe9fb; text-shadow: 0 0 .6cqh #ff2bd6, 0 0 1.6cqh #ff2bd6; }
 .pantalla[data-estilo="neon"] .mult { color: #ffe9fb; padding: .5cqh 1.2cqh; border: .3cqh solid #ff2bd6; border-radius: .6cqh; text-shadow: 0 0 .8cqh #ff2bd6; box-shadow: 0 0 1.4cqh #ff2bd6, inset 0 0 1.2cqh rgba(255, 43, 214, .5); }
 .pantalla[data-estilo="neon"] .moneda { border-radius: 50%; border: .4cqh solid #ffe14d; box-shadow: 0 0 1.2cqh #ffe14d, inset 0 0 0 .7cqh #0a0620, inset 0 0 0 1.1cqh #ffe14d; }
 .pantalla[data-estilo="neon"] .pausa { border: .3cqh solid #22e5ff; border-radius: .8cqh; color: #e9fbff; background: rgba(10, 6, 32, .55); box-shadow: 0 0 1.4cqh #22e5ff; }
 .pantalla[data-estilo="neon"] .poderes li b { background: rgba(10, 6, 32, .7); box-shadow: 0 0 1cqh #22e5ff; }
 .pantalla[data-estilo="neon"] .estacion .barra i { background: linear-gradient(90deg, #22e5ff, #ff2bd6); box-shadow: 0 0 1cqh #ff2bd6; }
 
-/* --- marcador: estética pixel (letra de 8 bits y marcos escalonados) --- */
-.pantalla[data-estilo="pixel"] .hud, .pantalla[data-estilo="pixel"] .banner { font-family: "Press Start 2P", monospace; color: #fff1d4; }
-.pantalla[data-estilo="pixel"] .hud .valor { font-size: calc(4.6 * var(--u)); }
-.pantalla[data-estilo="pixel"] .hud .chico, .pantalla[data-estilo="pixel"] .estacion { font-size: calc(2.2 * var(--u)); line-height: 1.5; }
-.pantalla[data-estilo="pixel"] :is(.valor, .chico, .estacion > span:first-child, .banner strong, .banner span) { text-shadow: .4cqh .4cqh 0 #2a1c18; }
-.pantalla[data-estilo="pixel"] .banner strong { font-size: 5cqh; line-height: 1.4; }   /* la letra pixel no trae aire entre líneas: con 1 las dos líneas se tocaban */
-.pantalla[data-estilo="pixel"] .mult { font-size: calc(2.6 * var(--u)); padding: 1cqh; background: #e2463a; box-shadow: 0 -.6cqh 0 #2a1c18, 0 .6cqh 0 #2a1c18, -.6cqh 0 0 #2a1c18, .6cqh 0 0 #2a1c18; }
-.pantalla[data-estilo="pixel"] .moneda { width: calc(3.4 * var(--u)); height: calc(4.2 * var(--u)); background: #ffd23f; box-shadow: inset -.8cqh 0 0 #e09a1a, inset .8cqh 0 0 #fff1a0, 0 -.6cqh 0 #2a1c18, 0 .6cqh 0 #2a1c18, -.6cqh 0 0 #2a1c18, .6cqh 0 0 #2a1c18; }
-.pantalla[data-estilo="pixel"] .pausa { background: #2a2232; color: #fff1d4; box-shadow: 0 -.6cqh 0 #fff1d4, 0 .6cqh 0 #fff1d4, -.6cqh 0 0 #fff1d4, .6cqh 0 0 #fff1d4; border: 0; }
-.pantalla[data-estilo="pixel"] .estacion .barra { border-radius: 0; } .pantalla[data-estilo="pixel"] .estacion .barra i { border-radius: 0; background: #2fb59a; }
+/* --- marcador: estética cómic (letras de historieta con tinta negra) ---
+   Bangers (mayúsculas altas y apretadas, la letra de los globos de una
+   historieta) en blanco con un contorno de tinta gruesa y una caída dura
+   hacia abajo y la derecha, como una viñeta impresa. Los paneles (pausa,
+   multiplicador) son recuadros crema o rojos con borde de tinta y su sombra
+   corrida sin desenfoque. Todo en cqh, como el juguete: no hace falta
+   ajustar nada a la cuadrícula del aparato. */
+.pantalla[data-estilo="comic"] { --tinta-c: #1a1420; }
+.pantalla[data-estilo="comic"] .hud, .pantalla[data-estilo="comic"] .banner { font-family: Bangers, "Arial Black", sans-serif; font-weight: 400; color: #fffaf0; letter-spacing: .12cqh; }
+.pantalla[data-estilo="comic"] :is(.valor, .chico, .estacion > span:first-child, .patinetas b, .banner strong, .banner > span) {
+  text-shadow: .3cqh .3cqh 0 var(--tinta-c), -.3cqh .3cqh 0 var(--tinta-c), .3cqh -.3cqh 0 var(--tinta-c), -.3cqh -.3cqh 0 var(--tinta-c),
+    0 .3cqh 0 var(--tinta-c), 0 -.3cqh 0 var(--tinta-c), .3cqh 0 0 var(--tinta-c), -.3cqh 0 0 var(--tinta-c), .6cqh .7cqh 0 var(--tinta-c); }
+/* Bangers es angosta, así que el puntaje va un 12 % más grande que la base (6.6u)
+   para ocupar lo mismo. Antes decía «1.12em»: eso es relativo al padre (15 px), y
+   puntos y monedas quedaban en 17 px frente a los 39 px de los otros estilos. */
+.pantalla[data-estilo="comic"] .hud .valor { font-size: calc(7.4 * var(--u)); }
+.pantalla[data-estilo="comic"] .mult { background: #ff4a3a; color: #fffaf0; padding: .3cqh 1.2cqh .2cqh; border: .4cqh solid var(--tinta-c); border-radius: .5cqh; transform: rotate(-6deg) skewX(-6deg);
+  box-shadow: .5cqh .5cqh 0 var(--tinta-c); text-shadow: .25cqh .25cqh 0 var(--tinta-c); }
+.pantalla[data-estilo="comic"] .moneda { border-radius: 50%; background: radial-gradient(circle at 36% 32%, #fff6c0 0 16%, #ffd21a 17%); border: .4cqh solid var(--tinta-c); box-shadow: .35cqh .35cqh 0 var(--tinta-c); }
+.pantalla[data-estilo="comic"] .pausa { background: #fff4dc; border: .4cqh solid var(--tinta-c); border-radius: .8cqh; color: var(--tinta-c); box-shadow: .5cqh .5cqh 0 var(--tinta-c); }
+.pantalla[data-estilo="comic"] .poderes li b { background: #fff4dc; border: .3cqh solid var(--tinta-c); color: var(--tinta-c); box-shadow: .3cqh .3cqh 0 var(--tinta-c); }
+.pantalla[data-estilo="comic"] .estacion .barra { background: #fff4dc; outline: .25cqh solid var(--tinta-c); }
+.pantalla[data-estilo="comic"] .estacion .barra i { background: #2fb8c8; }
+.pantalla[data-estilo="comic"] .banner strong { letter-spacing: .3cqh; }
 
 /* ---------- los menús, al estilo Subway Surfers ----------
    Todo el menú comparte un mismo idioma visual, sacado del inicio de Subway
@@ -205,6 +280,8 @@ main.vl { min-width: 0; }
   box-shadow: inset 0 calc(.5 * var(--mt)) 0 rgba(255, 255, 255, .55), 0 calc(.55 * var(--mt)) 0 #a86f00, 0 calc(1 * var(--mt)) calc(1 * var(--mt)) rgba(0, 0, 0, .3); }
 .p-mult-n { min-width: calc(7.4 * var(--mt)); height: calc(6.2 * var(--mt)); display: grid; place-items: center; padding: 0 calc(.9 * var(--mt)); border-radius: calc(1.4 * var(--mt));
   background: linear-gradient(#ff7a4a, #e8401f); border: calc(.3 * var(--mt)) solid #fff; font: 400 calc(3.8 * var(--mt))/1 var(--ss-letra); color: #fff; -webkit-text-stroke: .14em #6e1600; paint-order: stroke fill; text-shadow: 0 .08em 0 #6e1600; }
+/* Sin ayudas: el multiplicador es ×10 fijo para todos; la placa va en azul para que se note que no es el de las misiones */
+.p-mult.fijo .p-mult-n { background: linear-gradient(#4ad8ff, #1f7fe8); -webkit-text-stroke-color: #0b2f6e; text-shadow: 0 .08em 0 #0b2f6e; }
 .p-mult-txt { display: grid; gap: calc(.45 * var(--mt)); text-align: left; }
 .p-mult-txt small { color: #6b3f00; }
 .p-mult-barra { display: block; width: calc(16 * var(--mt)); height: calc(1.7 * var(--mt)); border-radius: 99px; background: rgba(107, 63, 0, .25); overflow: hidden; border: calc(.2 * var(--mt)) solid rgba(107, 63, 0, .45); }
@@ -468,6 +545,11 @@ main.vl { min-width: 0; }
 .t-traje em { position: absolute; top: calc(-1.3 * var(--m)); right: calc(-1.3 * var(--m)); width: calc(4.8 * var(--m)); height: calc(4.8 * var(--m)); padding: calc(.7 * var(--m)); border-radius: 50%; border: calc(.4 * var(--m)) solid var(--ss-t); }
 .t-traje em.ok { background: #36aa14; }
 .t-traje em.cerrado { background: #fff; padding: calc(.5 * var(--m)); }
+/* CITY: la insignia «City» de los personajes que solo se juegan en City
+   (arriba a la izquierda, para no tapar el visto bueno ni el candado). */
+.t-traje em.t-city { left: calc(-1.1 * var(--m)); right: auto; top: calc(-1.1 * var(--m)); width: auto; height: auto; padding: calc(.25 * var(--m)) calc(.9 * var(--m));
+  border-radius: calc(1.2 * var(--m)); border-width: calc(.3 * var(--m)); background: linear-gradient(180deg, #ff7ad9, #7b2ff7); color: #fff;
+  font-style: normal; font-size: calc(1.9 * var(--mt, var(--m))); line-height: 1.2; letter-spacing: .04em; transform: rotate(-8deg); }
 @container (orientation: portrait) {
   .t-personajes { left: calc(2 * var(--m)); right: calc(2 * var(--m)); width: auto; top: auto; height: 54%; bottom: calc(2 * var(--m)); }
   .capa.tienda[data-pestana="personajes"] { background: linear-gradient(180deg, rgba(10, 30, 90, .55) 0, rgba(10, 30, 90, 0) 22%); }
@@ -512,3 +594,125 @@ main.vl { min-width: 0; }
   .cab { display: none; }
   .pantalla { max-height: calc(100svh - 64px); }
 }
+
+/* ---------- los modos de juego (M.MODOS) ----------
+   En la portada, encima del botón de jugar: una fila de tarjetas de
+   «plástico», una por modo, con su ícono dibujado y su nombre corto, y
+   abajo la regla del modo elegido en una línea. La elegida va en amarillo
+   (como la tarjeta del multiplicador); las demás, azul oscuro translúcido
+   con borde blanco, como los contadores. Todo en --mt (con piso, porque se
+   toca con el dedo). En vertical la fila se parte en dos renglones. */
+.p-modos { --mt: max(calc(var(--m) * 1.05), 4.6px); position: absolute; left: calc(2 * var(--m)); right: calc(2 * var(--m)); bottom: calc(30 * var(--m)); display: grid; justify-items: center; gap: calc(1 * var(--mt)); cursor: default; pointer-events: none; }
+.p-modos > * { pointer-events: auto; }   /* la caja de la fila no tapa al botón de jugar: solo las tarjetas y la línea toman toques */
+.p-modos-fila { display: flex; flex-wrap: wrap; justify-content: center; gap: calc(1.1 * var(--mt)); }
+.p-modo { display: inline-flex; align-items: center; gap: calc(.8 * var(--mt)); height: calc(6.4 * var(--mt)); padding: 0 calc(1.8 * var(--mt)) 0 calc(.7 * var(--mt)); cursor: pointer;
+  background: rgba(8, 20, 60, .7); border: calc(.38 * var(--mt)) solid rgba(255, 255, 255, .9); border-radius: 999px; color: #fff;
+  font: 400 calc(2.5 * var(--mt))/1 var(--ss-letra); -webkit-text-stroke: .13em var(--ss-trazo); paint-order: stroke fill;
+  box-shadow: inset 0 calc(.4 * var(--mt)) 0 rgba(255, 255, 255, .14), 0 calc(.5 * var(--mt)) 0 rgba(0, 0, 0, .35); transition: transform .12s; }
+.p-modo i { flex: none; width: calc(4.8 * var(--mt)); height: calc(4.8 * var(--mt)); filter: drop-shadow(0 calc(.25 * var(--mt)) 0 rgba(0, 0, 0, .3)); }
+.p-modo i svg { display: block; width: 100%; height: 100%; }
+.p-modo:hover { transform: translateY(calc(-.35 * var(--mt))); }
+.p-modo:active { transform: translateY(calc(.35 * var(--mt))); }
+.p-modo.sel { background: linear-gradient(#fff07a, #ffbe2a); border-color: #fff; color: #fff; -webkit-text-stroke-color: #6e3a00;
+  box-shadow: inset 0 calc(.5 * var(--mt)) 0 rgba(255, 255, 255, .55), 0 calc(.55 * var(--mt)) 0 #a86f00, 0 0 0 calc(.5 * var(--mt)) rgba(255, 230, 100, .35); }
+.p-modo.sel[data-modo="sinmonedas"] { background: linear-gradient(#ff8a7a, #e8283c); -webkit-text-stroke-color: #5a0000; box-shadow: inset 0 calc(.5 * var(--mt)) 0 rgba(255, 255, 255, .4), 0 calc(.55 * var(--mt)) 0 #7a0010, 0 0 0 calc(.5 * var(--mt)) rgba(255, 80, 80, .35); }
+.p-modo-desc { margin: 0; max-width: min(100%, calc(110 * var(--mt))); padding: calc(.5 * var(--mt)) calc(1.6 * var(--mt)); border-radius: 999px; background: rgba(8, 20, 60, .55);
+  font: 700 calc(2.1 * var(--mt))/1.25 "IBM Plex Sans", sans-serif; color: #fff; text-align: center; text-shadow: 0 1px 2px rgba(0, 0, 0, .6); }
+@container (orientation: portrait) {
+  .p-modos { bottom: calc(23 * var(--m) + 12.5 * max(var(--m), 4.6px)); }   /* encima del botón de jugar, que en vertical es más grande (su alto va en --mt con piso) */
+  .p-modos-fila { max-width: calc(64 * var(--mt)); }
+  .p-modo { height: calc(5.6 * var(--mt)); font-size: calc(2.2 * var(--mt)); padding-right: calc(1.3 * var(--mt)); }
+  .p-modo i { width: calc(4.2 * var(--mt)); height: calc(4.2 * var(--mt)); }
+}
+@media (prefers-reduced-motion: reduce) { .p-modo { transition: none; } }
+
+/* La insignia del modo en el marcador de la carrera: chica, bajo la barra de
+   la estación. En «Sin monedas» va en rojo, para que no se olvide. */
+.hud-modo { display: inline-flex; align-items: center; gap: calc(.6 * var(--u)); padding: calc(.35 * var(--u)) calc(1.2 * var(--u)) calc(.35 * var(--u)) calc(.4 * var(--u));
+  border-radius: 999px; background: rgba(8, 20, 60, .62); border: calc(.25 * var(--u)) solid rgba(255, 255, 255, .85); font: 400 calc(2 * var(--u))/1 "Lilita One", "Arial Black", sans-serif; color: #fff; text-shadow: none; }
+.hud-modo:empty { display: none; }
+.hud-modo svg { display: block; width: calc(3 * var(--u)); height: calc(3 * var(--u)); }
+.hud-modo[data-modo="sinmonedas"] { background: rgba(160, 10, 20, .75); }
+.pantalla[data-estilo="comic"] .hud-modo { font-family: Bangers, "Arial Black", sans-serif; letter-spacing: .1cqh; background: #fff4dc; color: #1a1420; border-color: #1a1420; box-shadow: .3cqh .3cqh 0 #1a1420; }
+.pantalla[data-estilo="comic"] .hud-modo[data-modo="sinmonedas"] { background: #ff4a3a; color: #fffaf0; }
+.pantalla[data-estilo="neon"] .hud-modo { font-family: Orbitron, Arial, sans-serif; font-size: calc(1.6 * var(--u)); box-shadow: 0 0 1cqh #22e5ff; }
+
+/* En el resumen: a qué tabla fue la carrera. */
+.f-tabla { display: flex; align-items: center; justify-content: center; gap: 8px; margin: 10px 0 0; padding: 6px 12px; border-radius: 999px; background: rgba(9, 30, 90, .45); border: 2px solid rgba(255, 255, 255, .7); font: 700 14px/1.3 "IBM Plex Sans", sans-serif; color: #eaf4ff; }
+.f-tabla svg { flex: none; width: 24px; height: 24px; }
+.f-tabla b { font: 400 16px var(--ss-letra); color: #ffe86b; }
+.f-tabla[data-modo="sinmonedas"] b { color: #ffb3a8; }
+
+/* ---------- el fantasma (modos «Fantasma» y «City fantasma») ----------
+   Tres piezas, todas en el azul del corredor fantasma:
+   · en el marcador, bajo la insignia del modo, cuántos puntos y metros le
+     llevas (verde, +) o te lleva (rojo, −);
+   · en la portada, bajo la línea del modo, contra quién se corre (o por qué
+     no hay fantasma);
+   · en el resumen, quién ganó. */
+.hud-fan { display: inline-flex; align-items: center; gap: calc(.7 * var(--u)); padding: calc(.35 * var(--u)) calc(1.3 * var(--u)) calc(.35 * var(--u)) calc(.5 * var(--u));
+  border-radius: 999px; background: rgba(16, 44, 130, .62); border: calc(.25 * var(--u)) solid rgba(159, 208, 255, .9); color: #fff; font: 400 calc(2.6 * var(--u))/1 "Lilita One", "Arial Black", sans-serif; }
+.hud-fan[hidden] { display: none; }
+.hud-fan i svg { display: block; width: calc(3.2 * var(--u)); height: calc(3.2 * var(--u)); }
+.hud-fan b { font-weight: 400; min-width: 3ch; }
+.hud-fan small { font-size: .72em; opacity: .85; }
+.hud-fan[data-lado="1"] b { color: #7dff9a; }                 /* vas ganando */
+.hud-fan[data-lado="-1"] b { color: #ff9a9a; }                /* te va ganando */
+.pantalla[data-estilo="comic"] .hud-fan { font-family: Bangers, "Arial Black", sans-serif; letter-spacing: .1cqh; border-color: #1a1420; box-shadow: .3cqh .3cqh 0 #1a1420; }
+.pantalla[data-estilo="neon"] .hud-fan { font-family: Orbitron, Arial, sans-serif; font-weight: 700; font-size: calc(1.9 * var(--u)); background: rgba(4, 12, 40, .7); box-shadow: 0 0 1cqh #5aa8ff; }
+.p-fantasma { margin: 0; max-width: min(100%, calc(110 * var(--mt))); padding: calc(.45 * var(--mt)) calc(1.6 * var(--mt)); border-radius: 999px; background: rgba(16, 44, 130, .7);
+  border: calc(.3 * var(--mt)) solid rgba(159, 208, 255, .85); font: 700 calc(2 * var(--mt))/1.25 "IBM Plex Sans", sans-serif; color: #eaf4ff; text-align: center; text-shadow: 0 1px 2px rgba(0, 0, 0, .6); }
+.p-fantasma[hidden] { display: none; }
+.p-fantasma b { font: 400 1.12em var(--ss-letra); color: #bfe2ff; }
+.p-fantasma[data-estado="cargando"] { opacity: .8; }
+.p-fantasma[data-estado="error"], .p-fantasma[data-estado="malo"], .p-fantasma[data-estado="invitado"], .p-fantasma[data-estado="fuera"] { background: rgba(60, 30, 90, .7); border-color: rgba(255, 255, 255, .5); }
+.f-fantasma { margin: 8px 0 0; padding: 6px 12px; border-radius: 999px; background: rgba(16, 44, 130, .5); border: 2px solid rgba(159, 208, 255, .85); font: 700 14px/1.3 "IBM Plex Sans", sans-serif; color: #eaf4ff; text-align: center; }
+.f-fantasma[hidden] { display: none; }
+.f-fantasma b { font: 400 16px var(--ss-letra); color: #bfe2ff; }
+.f-fantasma[data-lado="1"] b { color: #7dff9a; }
+.f-fantasma[data-lado="-1"] b { color: #ff9a9a; }
+.opcion.con-ico i svg { display: block; width: 100%; height: 100%; }
+
+/* ---------- pantalla completa (⛶ o F) y modo celular ----------
+   html.mr-pc la pone juego.js con la pantalla completa del navegador;
+   html.club-inm, conexion.js mientras se corre en un teléfono vertical
+   (CLAUDE.md, «Modo celular»). En los dos queda el marcador de la página
+   como una franja fina arriba —con el sonido y el volumen del Club, que
+   tienen que verse donde se juega— y la pantalla del juego ocupa todo lo
+   demás, sin proporción fija (el mundo se ajusta solo con el
+   ResizeObserver de juego.js). Lo demás (título, pie, clasificación,
+   «volver») se esconde. */
+html.mr-pc, html.club-inm, html.mr-pc body, html.club-inm body { height: 100%; overflow: hidden; overscroll-behavior: none; background: #0b0d14; }
+html.club-inm { touch-action: none; user-select: none; -webkit-user-select: none; }
+html.mr-pc .shell, html.club-inm .shell { max-width: none; height: 100dvh; margin: 0; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); display: flex; flex-direction: column; overflow: hidden; }
+html.mr-pc .layout, html.club-inm .layout { display: flex; flex-direction: column; align-items: stretch; flex: 1; min-height: 0; gap: 0; }
+html.mr-pc main.vl, html.club-inm main.vl { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+html.mr-pc :is(.cab, .pie, .layout > aside, .club-volver, .club-ranking), html.club-inm :is(.cab, .pie, .layout > aside, .club-volver, .club-ranking) { display: none !important; }
+html.mr-pc .scorebar, html.club-inm .scorebar, html.mr-pc.club-integrado .scorebar, html.club-inm.club-integrado .scorebar, html.mr-pc.club-integrado[data-tema] .scorebar, html.club-inm.club-integrado[data-tema] .scorebar {
+  flex: none; flex-wrap: nowrap; gap: 12px; padding: 3px 10px; border: 0; border-radius: 0; background: #0b0d14; color: #e8ecf4; }
+html.mr-pc .scorebar small, html.club-inm .scorebar small { font-size: 8.5px; color: #8f9bb8; }
+html.mr-pc .scorebar strong, html.club-inm .scorebar strong { font-size: 15px; }
+html.mr-pc .scorebar .icono, html.club-inm .scorebar .icono { width: 32px; height: 32px; background: #1a1f30; color: #fff; border-color: #ffffff40; }
+html.club-inm .scorebar .vj-ctl input, html.club-inm .scorebar .vj-ctl output { display: none; }
+html.mr-pc .pantalla, html.club-inm .pantalla { flex: 1; min-height: 0; width: 100%; aspect-ratio: auto; max-height: none; border-radius: 0; }
+
+/* --- La persecución: el borde rojo de peligro (ronda 2) ---
+   Mientras Don Ramón te pisa los talones (los 8 s después de un tropiezo)
+   los bordes de la pantalla laten en rojo, como el aviso de peligro de
+   Subway Surfers. Es un div sobre el lienzo y debajo del HUD (juego.js lo
+   pone una vez, `pintaPeligro`); no atrapa toques. Con «reducir movimiento»
+   no late: se queda fijo y tenue. */
+.mr-peligro { position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity .3s;
+  box-shadow: inset 0 0 7cqh 2cqh rgba(230, 30, 40, .55);          /* el borde rojo, hacia adentro */
+  background: radial-gradient(ellipse at center, transparent 58%, rgba(200, 0, 20, .22) 100%); }   /* y las esquinas un poco teñidas */
+.mr-peligro.ver { opacity: 1; animation: mr-late 0.62s ease-in-out infinite alternate; }   /* late, como un corazón apurado */
+@keyframes mr-late { from { opacity: .45; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .mr-peligro.ver { animation: none; opacity: .7; } }
+
+/* --- La muestra de las corredoras (ronda 2) ---
+   Las corredoras se muestran con un SVG (su peinado, ver `muestraRasgos` en
+   juego.js) en vez del dibujo de CSS con gorra: el círculo y el borde son
+   los mismos, el fondo lo pinta el SVG. */
+.t-muestra.con-rasgos { background: #cfe3ff; }
+.t-muestra.con-rasgos svg { display: block; width: 100%; height: 100%; }
+.t-traje.secreto .t-muestra.con-rasgos { filter: grayscale(1) brightness(.55); }

@@ -15,8 +15,11 @@
      de espejo mojado y un sol synthwave; los trenes, barreras, rampas y
      poderes, en cambio, brillan en su propio color para que se lean sobre
      lo oscuro (ver "LEGIBILIDAD" en las paletas).
-   - "pixel": sombreado por escalones (toon) dibujado a baja resolución por
-     RenderPixelatedPass, que además marca los bordes con un píxel.
+   - "comic": la luz y los materiales del juguete, pero planos (luz pareja,
+     sin oclusión, sombras duras) y a resolución completa, con un contorno de
+     tinta que recorta cada objeto contra lo que tiene detrás (PasadaTinta).
+     Reemplazó al estilo pixelado, que dibujaba a baja resolución y no se
+     leía bien en ninguna pantalla.
    Un "kit" es todo lo que hace falta para una estación: materiales,
    texturas, modelos y sus reservas. Se arma una vez y se guarda.
 
@@ -43,12 +46,14 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
-import { RenderPixelatedPass } from 'three/addons/postprocessing/RenderPixelatedPass.js';
+import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
 import { Reflector } from 'three/addons/objects/Reflector.js';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
+// los escenarios nuevos y la historia que se ve en la vía (afiches, utilería, horizonte, sucesos): ver escenarios.js
+import * as ESC from './escenarios.js?v=metrorush-15';
 
 const MOTOR = window.MetroRushMotor;                // el motor (motor.js), cargado antes como script
 const CARRILES = MOTOR.CARRILES;                   // x de cada carril
@@ -57,12 +62,22 @@ const TECHO = MOTOR.ALTO_TECHO;                    // altura del techo de un tre
 /* La catenaria va alta, por encima de lo que pasa en los techos: de pie
    sobre un vagón la cabeza llega a 5,05 m y un salto desde ahí a 6,55, y la
    cámara de los techos va a 7,2 (7,9 con el celular en vertical). Con los
-   cables a 5,4 el corredor los atravesaba en cuanto subía a un vagón. Por
-   arriba, la mochila cohete vuela a 8,5: el brazo del poste queda justo
-   debajo de sus pies. */
-const ALTO_CABLE = 7.8;                            // los cables de la catenaria
-const ALTO_BRAZO = 8.3;                            // el brazo del poste que los sostiene
-const ALTO_POSTE = 8.6;                            // el poste entero
+   cables a 5,4 el corredor los atravesaba en cuanto subía a un vagón. (Las
+   alturas de hoy, con el salto nuevo, en el bloque de abajo.) */
+/* --- La catenaria, más alta para el salto nuevo (ronda 2) ---
+   Lo más alto del corredor es la coronilla: 1,8 m sobre sus pies (la cabeza
+   tiene el centro a 1,68 y 0,21 de radio, y el muñeco va a escala 0,95), y
+   los pies van 0,14 sobre el piso (la vía). Con el salto de Subway Surfers
+   (2,1 m; 4,4 con zapatillas) saltar desde un techo con zapatillas la lleva
+   a 3,35 + 4,4 + 0,14 + 1,8 ≈ 9,7 m; la mochila vuela a 8,5 (cabeza a
+   10,4) y el pogo sube a 8,3 con el corredor 0,55 más arriba (cabeza a
+   10,8). Con los cables a 7,8 todos los atravesaban; ahora van a 11,2, el
+   brazo justo encima y el poste un poco más arriba. Los tests
+   (metrorush-salto) leen estos números de aquí y lo comprueban. */
+const ALTO_CABLE = 11.2;                           // los cables de la catenaria (eran 7,8)
+const ALTO_BRAZO = 11.7;                           // el brazo del poste que los sostiene (era 8,3)
+const ALTO_POSTE = 12.0;                           // el poste entero (era 8,6)
+const ATERRIZA_PERRO = 0.45;                       // a los cuántos segundos de la atrapada cae el perro encima (lo mismo usa juego.js)
 const VISTA = 195;                                 // hasta cuántos metros por delante se dibujan las cosas
 const DETRAS = 16;                                 // cuántos metros por detrás siguen existiendo
 const SUELO = 0.14;                                // la vía (el balasto) está 14 cm sobre el piso: ahí pisa el corredor
@@ -161,12 +176,11 @@ class Arma {
    =================================================================== */
 
 function lienzo(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return [c, c.getContext('2d')]; }
-function aTextura(c, { repetir = true, pixel = false, rep = null } = {}) {
+function aTextura(c, { repetir = true, rep = null } = {}) {
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;                                         // los colores del canvas están en sRGB
   if (repetir) t.wrapS = t.wrapT = THREE.RepeatWrapping;
   if (rep) t.repeat.set(rep[0], rep[1]);
-  if (pixel) t.magFilter = THREE.NearestFilter;                                // en pixel, sin suavizar
   t.anisotropy = 4;
   return t;
 }
@@ -436,26 +450,34 @@ const BASE_JUGUETE = {
   // de día casi todo se lee bien; solo la niebla clara se comía los trenes lejanos (en Invierno, sobre todo)
   legible: { brillo: 0, niebla: 1.6 }
 };
-const BASE_PIXEL = {
-  estilo: 'pixel',
-  cielo: { arriba: 0x4b3474, horizonte: 0xffa070, sol: 0xffe7a8 }, niebla: [30, 160],
-  sol: [0xffc890, 2.6, [-16, 13, -46]], hemi: [0xffcfb0, 0x4a3355, 1.15], env: 0, exposicion: 1,
-  post: {},
+/* La base del estilo cómic es Ocaso, a la «hora dorada»: cielo ciruela que
+   baja a dorado, edificios en rosa viejo, terracota y azul pizarra. La luz es
+   pareja (la hemisférica pesa casi tanto como el sol) para que los colores se
+   lean planos, como pintados, y el volumen lo dé el contorno de tinta, no las
+   sombras. Los objetos del juego van en el tono opuesto al decorado: trenes
+   fríos y claros (turquesa, crema, azul) y barreras azules con blanco; el
+   rojo que tenían se perdía en lo anaranjado. `tinta` es el color del
+   contorno: un ciruela casi negro, no negro puro, que se funde con la paleta. */
+const BASE_COMIC = {
+  estilo: 'comic',
+  cielo: { arriba: 0x7a2e6a, horizonte: 0xffc65a, sol: 0xfff2c4 }, niebla: [40, 165],
+  sol: [0xffb24a, 2.0, [-16, 12, -40]], hemi: [0xffd6a8, 0x5a2a4a, 1.0], env: 0.15, exposicion: 0.95,
+  post: { vineta: 0.12, sat: 1.12 },
+  tinta: 0x2a1230, fuerzaTinta: 0.85,
   c: {
-    grava: 0x8d5f52, tierra: 0x6d4c4a, traviesa: 0x5a3b2c, riel: 0x9a8ea6, muro: 0xc9a48a, acera: 0xb08a78, bordillo: 0x8a6a5c,
-    trenes: [0x2f6fb6, 0xe2463a, 0xece3cc], acentos: [0xfff1d4, 0xfff1d4, 0x2a2442], bajo: 0x2a2232, vidrio: 0x2a2442, techoTren: 0x8a8090,
-    edificios: [0x6c4f7c, 0x8f5b8a, 0xb5677f, 0x4f5d8c, 0xa0606a], ladrillo: 0xb5677f, probLadrillo: 0,
-    marco: 0x3b2a40, vidrioEd: 0xffcf7a, cornisa: 0x4a3550, vitrina: 0x5a3f36,
+    grava: 0x7a4e48, tierra: 0x5e3a3a, traviesa: 0x4a2e2a, riel: 0xc8b8c8, muro: 0xd8a888, acera: 0xc89878, bordillo: 0x9a6a5a,
+    trenes: [0x2fb8c8, 0xf4f1e6, 0x3a4fd0], acentos: [0xffffff, 0xffd23f, 0x2a1230], bajo: 0x2a2232, vidrio: 0x22304a, techoTren: 0xe8e4dc,
+    edificios: [0x8a3a5a, 0xc8603a, 0x3f5a7a, 0xa8506a, 0xe0905a], ladrillo: 0xb5677f, probLadrillo: 0,
+    marco: 0x3b2040, vidrioEd: 0xffcf7a, cornisa: 0x4a2a4a, vitrina: 0x5a3f36,
     toldos: [[0xe2463a, 0xfff1d4], [0x2fb59a, 0xfff1d4], [0xffd23f, 0x5a3b2c]],
-    arboles: [0x3f7a4a, 0x4f8c4f, 0x2f6a40], tronco: 0x5a3b2c, poste: 0x3b2a40, farol: 0xffe3a0, catenaria: 0x3b2a40,
-    // la rampa era gris violeta (0x8a8090) y en la penumbra del atardecer se confundía con el balasto: acero claro
-    barrera: 0xe2463a, barrera2: 0xfff1d4, ambar: 0xffb020, rampa: 0xdfe4ea, oro: 0xffd23f, iman: 0xe2463a, cromo: 0xfff1d4, nube: 0xffd9c2, basurero: 0x3f7a4a
+    arboles: [0x2f5a3a, 0x3f6a40], tronco: 0x4a2e2a, poste: 0x3b2040, farol: 0xffe3a0, catenaria: 0x3b2040,
+    barrera: 0x2340b8, barrera2: 0xffffff, ambar: 0xffb020, rampa: 0xe8f4ff, oro: 0xffd23f, iman: 0xe2463a, cromo: 0xfff1d4, nube: 0xffd9c2, basurero: 0x2f5a3a
   },
   carteles: ['CAFÉ', 'PAN', 'ARCADE', 'LIBROS', 'DISCOS', 'FRUTAS'],
   grafitis: [['¡CORRE!', 0xffd23f, 0xe2463a], ['LAB', 0x2fb59a, 0x4f8c4f]],
   extras: { nubes: true, disco: true },
   // la luz del atardecer es cálida y pareja: un poco de brillo propio separa los objetos del fondo anaranjado
-  legible: { brillo: 0.06, niebla: 1.6 }
+  legible: { brillo: 0.05, niebla: 1.6 }
 };
 const BASE_NEON = {
   estilo: 'neon',
@@ -498,7 +520,7 @@ function variante(base, cambios) {
 }
 export const PALETAS = {
   barrio: BASE_JUGUETE,
-  ocaso: BASE_PIXEL,
+  ocaso: BASE_COMIC,
   neon: BASE_NEON,
   /* Estación Fantasma: el neón se vuelve verde espectral, con niebla verde y un tren fantasma en el cielo.
      Los trenes eran verde menta y cian, los mismos tonos de la ciudad, los
@@ -546,34 +568,34 @@ export const PALETAS = {
     grafitis: [['GRACIAS', 0xffd23f, 0xff5a8a], ['FIN?', 0x3fd0ff, 0x7a5cff]],
     extras: { nubes: true, solBajo: true }
   }),
-  /* Óxido: el atardecer pixelado se vuelve desierto oxidado, con polvo en el aire. */
-  oxido: variante(BASE_PIXEL, {
-    cielo: { arriba: 0x6a3a2a, horizonte: 0xffb070, sol: 0xfff0c0 }, niebla: [26, 140],
-    sol: [0xffb878, 2.8, [-16, 13, -46]], hemi: [0xffc8a0, 0x5a3020, 1.1],
-    /* Todo era óxido: trenes café y naranja sobre balasto naranja, con
-       niebla naranja; el tren naranja desaparecía a 60 m. Los trenes pasan
-       a pátina (el verde azulado del cobre oxidado, el opuesto del naranja),
-       hueso y azul desteñido, y las barreras a negro con amarillo de
-       peligro, que se lee sobre cualquier tono cálido. */
-    c: { grava: 0xc08a5a, tierra: 0xb07a4a, acera: 0xc89a6a, muro: 0xa0623a, riel: 0x8a5a3a, edificios: [0x8a4a2a, 0xa05a30, 0x7a3a22, 0xb87040], arboles: [0x6a7a3a, 0x7a8a4a],
-      trenes: [0x2f8f8a, 0xe8dcc0, 0x3f5f8f], barrera: 0x2a2420, barrera2: 0xffd23f },
+  /* Óxido: mediodía sobre una meseta roja. Cielo azul limpio arriba y tierra
+     roja abajo: frío arriba y caliente abajo, nada que ver con el atardecer
+     de Ocaso. Los trenes van en pátina (el verde azulado del cobre oxidado,
+     el opuesto del rojo), hueso y azul tinta, las barreras en negro con
+     amarillo de peligro y la rampa en cian: todo lo que se esquiva salta
+     sobre lo rojo. */
+  oxido: variante(BASE_COMIC, {
+    cielo: { arriba: 0x2a7ac8, horizonte: 0xf2d6b0, sol: 0xffffff }, niebla: [30, 140],
+    sol: [0xfff4e0, 2.6, [-16, 26, 14]], hemi: [0xbfe0ff, 0x8a3a1a, 0.75], tinta: 0x3a140a,
+    c: { grava: 0xb8603a, tierra: 0xa04a2a, acera: 0xc8784a, muro: 0xa0523a, bordillo: 0x8a3a1e, riel: 0x8a5a3a, traviesa: 0x5a2a1a,
+      edificios: [0x9a3a1e, 0xc8682e, 0xe0a060, 0x6a2a1a], marco: 0x4a1a0a, cornisa: 0x5a2010, vidrioEd: 0x2a3d58, arboles: [0x4a7a3a, 0x6a8a4a],
+      trenes: [0x1fa08a, 0xf2ece0, 0x2a3a6a], acentos: [0xffffff, 0xffe02a, 0x3a140a], barrera: 0x1a1a1a, barrera2: 0xffe02a, rampa: 0x3ad0e0, nube: 0xffffff },
     carteles: ['AGUA', 'TALLER', 'POSADA', 'ÚLTIMA BOMBA'],
-    extras: { nubes: false, disco: true, polvo: true }
+    extras: { nubes: false, disco: false, polvo: true }
   })
 };
+/* ---- Las estaciones nuevas y la historia (escenarios.js) ----
+   Se suman Mercado de Farolillos, Cocheras, Muelle y «fin» (el alba con la
+   historia; el «alba» queda limpio para City), y después cada paleta de la
+   Línea 3 recibe sus grafitis, letreros y afiches. Las bases no se tocan:
+   todo son copias hechas con `variante`. */
+Object.assign(PALETAS, ESC.paletasNuevas({ variante, BASE_JUGUETE, BASE_COMIC, BASE_NEON, PALETAS }));
+ESC.sumaHistoria(PALETAS, variante);
 
 /* ===================================================================
    4. EL KIT DE UNA ESTACIÓN (materiales, texturas, modelos y reservas)
    =================================================================== */
 
-let _gradToon = null;
-/** Los escalones de luz del sombreado toon (pixel). */
-function gradToon() {
-  if (_gradToon) return _gradToon;
-  _gradToon = new THREE.DataTexture(new Uint8Array([70, 130, 195, 255]), 4, 1, THREE.RedFormat);
-  _gradToon.minFilter = _gradToon.magFilter = THREE.NearestFilter; _gradToon.needsUpdate = true;
-  return _gradToon;
-}
 let _texBrillo = null;
 const texBrillo = () => (_texBrillo ||= aTextura(TEX.brillo(), { repetir: false }));
 
@@ -599,6 +621,68 @@ function realza(m, brillo, niebla) {
       THREE.ShaderChunk.fog_fragment.replace('fogColor, fogFactor', `fogColor, pow( fogFactor, ${n} )`));
   };
   m.customProgramCacheKey = () => `metrorush-realce-${b}-${n}`;
+}
+
+/* La pasada del estilo cómic: dibuja la escena en su propio lienzo (con su
+   profundidad) y oscurece hacia el color de tinta de la estación el borde de
+   cada silueta. Un píxel es borde cuando lo que tiene al lado, a `grosor`
+   píxeles, está bastante más lejos: el salto se mide en METROS y relativo a
+   la propia distancia (un vecino un 15 % más lejos ya cuenta). Medido en el
+   búfer de profundidad tal cual (que no es lineal) solo lo cercano tenía
+   contorno; en metros, un tren, una barrera o una rampa que vienen quedan
+   recortados a cualquier distancia, que es lo que más ayuda a leerlos a
+   60 m/s. El suelo visto de refilón no da bordes falsos (de un píxel al
+   siguiente se aleja mucho menos de un 15 %), y el contorno se apaga al
+   llegar a la niebla (`lejos`), para que lo que sale de la bruma no aparezca
+   con un trazo encima. La línea mide `grosor` píxeles del lienzo (1 en una
+   pantalla de 1×, 2 en una de 2× o 3×), así se ve igual de gruesa en todas.
+   Cuesta lo mismo que dibujar la escena más un cuadro a pantalla completa, y
+   por eso se usa también en calidad baja. */
+class PasadaTinta extends Pass {
+  constructor(escena, camara, { tinta = 0x1a1420, fuerza = 0.85, grosor = 1 } = {}) {
+    super();
+    this.escena = escena; this.camara = camara; this.grosor = grosor;        // qué se dibuja, desde dónde y qué tan gruesa va la línea
+    this.lienzo = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType });   // la escena, en luz lineal (el tono lo pone OutputPass)
+    this.lienzo.depthTexture = new THREE.DepthTexture(1, 1);                   // y su profundidad, para encontrar los bordes
+    this.cuadro = new FullScreenQuad(new THREE.ShaderMaterial({
+      uniforms: {
+        tDiffuse: { value: null }, tDepth: { value: null },                    // la escena y su profundidad
+        paso: { value: new THREE.Vector2() },                                  // cuánto es `grosor` píxeles en coordenadas de textura
+        cerca: { value: 0.1 }, fondo: { value: 240 }, lejos: { value: 1e4 },   // planos de la cámara y fin de la niebla
+        tinta: { value: new THREE.Color(tinta) }, fuerza: { value: fuerza }    // el color del contorno y cuánto tapa
+      },
+      vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: `uniform sampler2D tDiffuse, tDepth; uniform vec2 paso; uniform float cerca, fondo, lejos, fuerza; uniform vec3 tinta; varying vec2 vUv;
+        // del valor del búfer de profundidad (perspectiva) a metros desde la cámara
+        float metros(float d) { return cerca * fondo / (fondo - (fondo - cerca) * d); }
+        float prof(vec2 o) { return metros(texture2D(tDepth, vUv + o * paso).r); }
+        void main() {
+          vec4 c = texture2D(tDiffuse, vUv);
+          float z = prof(vec2(0.0)), d = 0.0;                                   // la distancia de este píxel…
+          d += clamp((prof(vec2(1.0, 0.0)) - z) / z, 0.0, 1.0);                 // …y cuánto más lejos están sus cuatro vecinos
+          d += clamp((prof(vec2(-1.0, 0.0)) - z) / z, 0.0, 1.0);
+          d += clamp((prof(vec2(0.0, 1.0)) - z) / z, 0.0, 1.0);
+          d += clamp((prof(vec2(0.0, -1.0)) - z) / z, 0.0, 1.0);
+          float borde = smoothstep(0.15, 0.3, d) * (1.0 - smoothstep(0.6 * lejos, lejos, z));
+          gl_FragColor = vec4(mix(c.rgb, tinta, borde * fuerza), c.a);
+        }`
+    }));
+  }
+  setSize(w, h) {
+    this.lienzo.setSize(w, h);                                                  // a la resolución del lienzo de verdad: nada pixelado
+    this.cuadro.material.uniforms.paso.value.set(this.grosor / w, this.grosor / h);
+  }
+  render(renderer, writeBuffer) {
+    const u = this.cuadro.material.uniforms, cam = this.camara, fog = this.escena.fog;
+    u.cerca.value = cam.near; u.fondo.value = cam.far; u.lejos.value = fog ? fog.far : 1e4;   // cada cuadro: la niebla cambia con la estación y la calidad
+    renderer.setRenderTarget(this.lienzo);
+    renderer.render(this.escena, this.camara);                                 // la escena, una sola vez, con su profundidad
+    u.tDiffuse.value = this.lienzo.texture; u.tDepth.value = this.lienzo.depthTexture;
+    renderer.setRenderTarget(this.renderToScreen ? null : writeBuffer);
+    if (!this.renderToScreen && this.clear) renderer.clear();
+    this.cuadro.render(renderer);                                              // la escena con su contorno
+  }
+  dispose() { this.lienzo.depthTexture?.dispose(); this.lienzo.dispose(); this.cuadro.material.dispose(); this.cuadro.dispose(); }
 }
 
 /** Lleva las coordenadas v de una geometría a la franja `i` de `n` de un atlas
@@ -633,7 +717,7 @@ class Serie {
 class Kit {
   constructor(mundo, clave, pal) {
     this.mundo = mundo; this.clave = clave; this.pal = pal; this.c = pal.c;
-    this.neon = pal.estilo === 'neon'; this.pixel = pal.estilo === 'pixel'; this.juguete = pal.estilo === 'juguete';
+    this.neon = pal.estilo === 'neon'; this.comic = pal.estilo === 'comic'; this.juguete = pal.estilo === 'juguete';
     this.az = azarDe(0xC17A + clave.length * 131 + clave.charCodeAt(0));   // la ciudad sale igual en cada visita
     this.mats = new Map(); this.texs = new Map(); this.lineasMat = new Map();
     this.reserva = new Map();          // tipo → objetos guardados para reusar
@@ -656,7 +740,6 @@ class Kit {
     const basico = tipo === 'luz' || tipo === 'texluz';
     let m;
     if (basico) m = new THREE.MeshBasicMaterial({ vertexColors: true, map, transparent: tipo === 'texluz' && !!tx && tx.startsWith('graf'), alphaTest: tx && tx.startsWith('graf') ? 0.02 : 0 });
-    else if (this.pixel) m = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: gradToon(), map, transparent: !!tx && tx.startsWith('graf'), alphaTest: tx && tx.startsWith('graf') ? 0.05 : 0 });
     else {
       const P = { plano: [.8, 0], pintura: [.34, .35], metal: [.28, .9], vidrio: [.06, .65], tex: [.9, 0], texmetal: [.5, .55] }[tipo] || [.8, 0];
       m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: P[0], metalness: P[1], map, envMapIntensity: this.pal.env,
@@ -679,47 +762,47 @@ class Kit {
   }
   /** El lienzo de un letrero de tienda (el color sale del texto, así es siempre el mismo). */
   lienzoCartel(texto) {
-    const c = this.c, px = this.pixel;
+    const c = this.c;
     const k = [...texto].reduce((s, ch) => s + ch.charCodeAt(0), 0);
     const fondo = this.neon ? '#0a0418' : hexCss([0x23304a, 0xfff6e6, 0x2a6df4, 0xe8463b][k % 4]);
     const tinta = this.neon ? hexCss([0xff2bd6, 0x22e5ff, 0xffe14d, ...(c.ventanas || [])][k % 3]) : (k % 4 === 1 ? '#23304a' : '#ffffff');
-    return TEX.cartel(texto, fondo, tinta, this.neon ? '700 80px Orbitron, sans-serif' : px ? '54px "Press Start 2P", monospace' : '86px "Lilita One", "Arial Black", sans-serif', this.neon);
+    return TEX.cartel(texto, fondo, tinta, this.neon ? '700 80px Orbitron, sans-serif' : this.comic ? '92px Bangers, "Arial Black", sans-serif' : '86px "Lilita One", "Arial Black", sans-serif', this.neon);
   }
   /* ---- texturas (se dibujan una vez y se reusan) ---- */
   tex(nombre) {
     if (this.texs.has(nombre)) return this.texs.get(nombre);
-    const c = this.c, az = this.az, px = this.pixel;
+    const c = this.c, az = this.az;
     const [tipo, ...arg] = nombre.split('|');
     let t;
     switch (tipo) {
-      case 'grava': t = aTextura(TEX.grava(az, c.grava), { pixel: px }); break;
-      case 'gravaSuelo': t = aTextura(TEX.grava(az, c.tierra), { pixel: px }); break;
-      case 'ladrillo': t = aTextura(TEX.ladrillo(az, c.ladrillo), { pixel: px }); break;
-      case 'ruido': t = aTextura(TEX.ruido(az), { pixel: px }); break;
-      case 'acera': t = aTextura(TEX.ruido(az), { pixel: px }); break;
-      case 'muro': t = aTextura(TEX.muro(az), { pixel: px }); break;
-      case 'rejilla': t = aTextura(TEX.rejilla(), { pixel: px, rep: [2.5, 2.5] }); break;
+      case 'grava': t = aTextura(TEX.grava(az, c.grava)); break;
+      case 'gravaSuelo': t = aTextura(TEX.grava(az, c.tierra)); break;
+      case 'ladrillo': t = aTextura(TEX.ladrillo(az, c.ladrillo)); break;
+      case 'ruido': t = aTextura(TEX.ruido(az)); break;
+      case 'acera': t = aTextura(TEX.ruido(az)); break;
+      case 'muro': t = aTextura(TEX.muro(az)); break;
+      case 'rejilla': t = aTextura(TEX.rejilla(), { rep: [2.5, 2.5] }); break;
       case 'rejillaNeon': t = aTextura(TEX.rejillaNeon(), { rep: [2.5, 2.5] }); break;
       // el marco del tablero: oscuro salvo que la paleta diga otro (o null, sin marco)
-      case 'rayasRB': t = aTextura(TEX.rayas(c.barrera, c.barrera2, 7, c.marcoBarrera === undefined ? 0x1d2233 : c.marcoBarrera), { pixel: px }); break;
-      case 'rayasRB8': t = aTextura(TEX.rayas(c.barrera, c.barrera2, 8, c.marcoBarrera === undefined ? 0x1d2233 : c.marcoBarrera), { pixel: px }); break;
-      case 'rayasNA': t = aTextura(TEX.rayas(0x1d1f26, 0xffd23f, 6), { pixel: px }); break;
-      case 'chevron': t = aTextura(TEX.rayas(0x1d1f26, 0xffd23f, 10), { pixel: px, rep: [1, 1] }); break;
-      case 'flecha': t = aTextura(TEX.flecha(this.neon), { repetir: false, pixel: px }); break;
-      case 'destino': t = aTextura(TEX.destino(), { repetir: false, pixel: px }); break;
-      case 'doble': t = aTextura(TEX.doble(), { repetir: false, pixel: px }); break;
-      case 'caja': t = aTextura(TEX.caja(), { repetir: false, pixel: px }); break;
-      case 'boleto': t = aTextura(TEX.boleto(), { repetir: false, pixel: px }); break;
-      case 'faro': t = aTextura(TEX.faro(), { repetir: false }); break;         // las luces de los trenes que vienen (suaves también en pixel)
-      case 'toldo': { const [c1, c2] = c.toldos[+arg[0] % c.toldos.length]; t = aTextura(TEX.toldo(c1, c2, this.neon ? 0.45 : 1), { pixel: px }); break; }
-      case 'cartel': t = aTextura(this.lienzoCartel(arg[0]), { repetir: false, pixel: px }); break;
+      case 'rayasRB': t = aTextura(TEX.rayas(c.barrera, c.barrera2, 7, c.marcoBarrera === undefined ? 0x1d2233 : c.marcoBarrera)); break;
+      case 'rayasRB8': t = aTextura(TEX.rayas(c.barrera, c.barrera2, 8, c.marcoBarrera === undefined ? 0x1d2233 : c.marcoBarrera)); break;
+      case 'rayasNA': t = aTextura(TEX.rayas(0x1d1f26, 0xffd23f, 6)); break;
+      case 'chevron': t = aTextura(TEX.rayas(0x1d1f26, 0xffd23f, 10), { rep: [1, 1] }); break;
+      case 'flecha': t = aTextura(TEX.flecha(this.neon), { repetir: false }); break;
+      case 'destino': t = aTextura(TEX.destino(), { repetir: false }); break;
+      case 'doble': t = aTextura(TEX.doble(), { repetir: false }); break;
+      case 'caja': t = aTextura(TEX.caja(), { repetir: false }); break;
+      case 'boleto': t = aTextura(TEX.boleto(), { repetir: false }); break;
+      case 'faro': t = aTextura(TEX.faro(), { repetir: false }); break;         // las luces de los trenes que vienen
+      case 'toldo': { const [c1, c2] = c.toldos[+arg[0] % c.toldos.length]; t = aTextura(TEX.toldo(c1, c2, this.neon ? 0.45 : 1)); break; }
+      case 'cartel': t = aTextura(this.lienzoCartel(arg[0]), { repetir: false }); break;
       case 'carteles': {                                                       // todos los letreros de la paleta en una textura, uno debajo del otro
         const lista = this.pal.carteles, [cv, x] = lienzo(512, 128 * lista.length);
         lista.forEach((texto, i) => x.drawImage(this.lienzoCartel(texto), 0, i * 128));
-        t = aTextura(cv, { repetir: false, pixel: px }); break;
+        t = aTextura(cv, { repetir: false }); break;
       }
-      case 'graf': { const g = this.pal.grafitis[+arg[0] % this.pal.grafitis.length]; t = aTextura(TEX.grafiti(az, g[0], g[1], g[2], this.neon ? 0.85 : 1), { repetir: false, pixel: px }); break; }
-      default: t = null;
+      case 'graf': { const g = this.pal.grafitis[+arg[0] % this.pal.grafitis.length]; t = aTextura(TEX.grafiti(az, g[0], g[1], g[2], this.neon ? 0.85 : 1), { repetir: false }); break; }
+      default: t = ESC.textura(this, tipo, arg, AYUDA);                      // los afiches y los grafitis de la historia (o null)
     }
     this.texs.set(nombre, t);
     return t;
@@ -739,7 +822,7 @@ class Kit {
     return l;
   }
   /** La clave del vidrio: reflectante de día, encendido de noche. */
-  get vid() { return this.neon ? 'luz' : this.pixel ? 'plano' : 'vidrio'; }
+  get vid() { return this.neon ? 'luz' : 'vidrio'; }
 
   /* ---- reservas: sacar y guardar objetos ---- */
   saca(tipo, fabrica) {
@@ -787,10 +870,12 @@ class Kit {
     for (const lado of [-1, 1]) {
       pre('edificio' + lado, () => this.edificio(lado), 7); pre('graf' + lado, () => this.grafiti(lado), 3);
     }
+    ESC.preparaKit(this, pre, AYUDA);                                         // los afiches y los grafitis de la historia (si la paleta tiene)
     pasos.push(() => {                                                         // árboles, faroles y postes: instancias
       const libres = []; const serie = (g, max) => { const s = new Serie(g, max); libres.push(s); return s; };
       this.series = {
-        arbol: this.neon ? [] : [0, 1, 2].map(() => { const g = this.arbol(); g.scale.setScalar(1); return serie(g, 40); }),   // tres árboles distintos, cada uno muchas veces (en neón no hay)
+        // en neón no hay árboles, salvo que la estación traiga su utilería (el Muelle: bitas, cajas, faroles)
+        arbol: this.neon && !this.pal.props && !this.pal.arbolesNeon ? [] : [0, 1, 2].map(() => { const g = this.arbol(); g.scale.setScalar(1); return serie(g, 40); }),   // tres árboles distintos, cada uno muchas veces (en neón no hay)
         farol: { [-1]: serie(this.farol(-1, true), 24), [1]: serie(this.farol(1, true), 24) },
         poste: { [-1]: serie(this.poste(-1, true), 14), [1]: serie(this.poste(1, true), 14) }
       };
@@ -799,6 +884,7 @@ class Kit {
     });
     for (const cl of ['iman', 'mochila', 'zapatillas', 'doble', 'caja']) pre('poder-' + cl, () => this.poder(cl), 1);
     pre('estrella', () => this.estrella(), 2); pre('boleto', () => this.boleto(), 1);
+    if (this.pasosCity) this.pasosCity(pre);                                   // CITY: las reservas de los objetos de City (mundo-city.js)
     pasos.push(() => { this.via = this.armaVia(); this.cielo = this.armaCielo(); this.monedas = this.armaMonedas(); this.via.name = 'via:' + this.clave; this.cielo.name = 'cielo:' + this.clave; this.listo = true; });
     return pasos;
   }
@@ -868,7 +954,7 @@ class Kit {
          `paso`). Sin niebla, a propósito: las luces atraviesan la niebla
          antes que el tren, que es justo lo que avisa de lejos. */
       // blanco frío de noche, cálido de día y al atardecer; de día más fuerte (una luz que se suma a un fondo claro se nota menos)
-      const luz = new THREE.Color(this.neon ? 0xdcefff : this.pixel ? 0xffe6b0 : 0xfff0c8).multiplyScalar(this.neon ? 0.85 : this.pixel ? 1.15 : 1.6);
+      const luz = new THREE.Color(this.neon ? 0xdcefff : 0xfff0c8).multiplyScalar(this.neon ? 0.85 : 1.6);
       const mat = new THREE.MeshBasicMaterial({ map: this.tex('faro'), color: luz, vertexColors: true, transparent: true, opacity: 0,
         blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.DoubleSide });
       const faro = new THREE.Mesh(this._geoFaro ||= geoFaro(zf), mat);
@@ -921,6 +1007,7 @@ class Kit {
       Como objetos del juego ("!"): en neón su cuerpo ya no queda casi negro
       dentro del halo, se ve el imán rojo, la mochila, las zapatillas. */
   poder(clase) {
+    if (this.poderCity) { const g = this.poderCity(clase); if (g) return g; }   // CITY: el chicle, la batería y las monedas ×2 (mundo-city.js)
     const c = this.c, a = new Arma(this), g0 = new THREE.Group();
     const anillo = { iman: 0xff5a5a, mochila: 0xffb02e, zapatillas: 0x6aff8a, doble: 0x5fb0ff, caja: 0xffd23f }[clase];
     if (clase === 'iman') {
@@ -977,6 +1064,7 @@ class Kit {
       edificio suelto eran ~7 llamadas al GPU, una por material; la cuadra
       entera usa casi los mismos materiales, así que cuesta lo de uno. */
   edificio(lado) {
+    if (this.pal.distrito && this.cuadraCity) return this.cuadraCity(lado);   // CITY: los distritos tienen sus propias cuadras (mundo-city.js)
     const az = this.az, a = new Arma(this), n = az() < 0.65 ? 3 : 2;
     const toldo = Math.floor(az() * this.c.toldos.length);
     const partes = [];
@@ -1002,9 +1090,9 @@ class Kit {
     const pisos = this.neon ? 3 + Math.floor(az() * 5) : 2 + Math.floor(az() * 4);
     const w = 5 + az() * 3, d = 6 + az() * 4.5, PISO = 3, h = pisos * PISO + 0.6;
     const fx = -lado * (w / 2);                                                // la fachada que mira a la vía
-    const ladrillo = !this.neon && !this.pixel && az() < c.probLadrillo;
+    const ladrillo = this.juguete && az() < c.probLadrillo;
     const cuerpo = uvMundo(new THREE.BoxGeometry(w, h, d), ladrillo ? 2.4 : 6, h / 2);
-    a.pon(cuerpo, ladrillo ? 'tex:ladrillo' : this.pixel || this.neon ? 'plano' : 'tex:ruido', ladrillo ? 0xffffff : c.edificios[Math.floor(az() * c.edificios.length)], [0, h / 2, 0], null, 1,
+    a.pon(cuerpo, ladrillo ? 'tex:ladrillo' : this.juguete ? 'tex:ruido' : 'plano', ladrillo ? 0xffffff : c.edificios[Math.floor(az() * c.edificios.length)], [0, h / 2, 0], null, 1,
       this.neon ? c.edificios[Math.floor(az() * c.edificios.length)] : null);
     a.pon(CAJA, this.neon ? 'luz' : 'plano', c.cornisa, [0, h + 0.05, 0], null, [w + 0.3, 0.35, d + 0.3]);
     a.pon(CAJA, 'plano', c.cornisa, [0, PISO + 0.35, 0], null, [w + 0.12, 0.25, d + 0.12]);
@@ -1041,10 +1129,12 @@ class Kit {
   }
   /** Un árbol low-poly: tronco y tres copas facetadas. */
   arbol() {
+    if (this.pal.distrito && this.arbolCity) { const g = this.arbolCity(); if (g) return g; }   // CITY: palmeras en el bulevar (mundo-city.js)
+    const prop = ESC.prop(this, AYUDA); if (prop) return prop;               // una estación nueva pone su utilería (puestos, bidones, bitas) en vez de árboles
     const c = this.c, az = this.az, a = new Arma(this);
     a.pon(new THREE.CylinderGeometry(0.11, 0.17, 1.7, 8), 'plano', c.tronco, [0, 0.85, 0]);
     for (let k = 0; k < 3; k++) {
-      const geo = new THREE.IcosahedronGeometry(0.85 + az() * 0.3, this.pixel ? 0 : 1);
+      const geo = new THREE.IcosahedronGeometry(0.85 + az() * 0.3, 1);
       const p = geo.attributes.position;
       for (let i = 0; i < p.count; i++) { const f = 0.96 + az() * 0.08; p.setXYZ(i, p.getX(i) * f, p.getY(i) * f, p.getZ(i) * f); }
       geo.computeVertexNormals();
@@ -1110,8 +1200,8 @@ class Kit {
       this.rejilla = new LineSegments2(lg, lm); this.rejilla.frustumCulled = false; g.add(this.rejilla);
       this.lineasMat.set('rejilla', lm);
     } else {
-      tira(uvMundo(new THREE.BoxGeometry(240, 0.02, LARGO), 2), this.pixel ? 'plano' : 'tex:gravaSuelo', this.pixel ? c.tierra : 0xffffff, [0, -0.01, ZC], 2, 'v');
-      for (const x of CARRILES) tira(uvMundo(new THREE.BoxGeometry(2.0, SUELO, LARGO), 2), this.pixel ? 'plano' : 'tex:grava', this.pixel ? c.grava : 0xffffff, [x, SUELO / 2, ZC], 2, 'v');
+      tira(uvMundo(new THREE.BoxGeometry(240, 0.02, LARGO), 2), 'tex:gravaSuelo', 0xffffff, [0, -0.01, ZC], 2, 'v');
+      for (const x of CARRILES) tira(uvMundo(new THREE.BoxGeometry(2.0, SUELO, LARGO), 2), 'tex:grava', 0xffffff, [x, SUELO / 2, ZC], 2, 'v');
     }
     /* durmientes: una sola InstancedMesh que se corre de a un paso.
        En neón no hay balasto: lo único que dice dónde está cada carril son
@@ -1138,11 +1228,11 @@ class Kit {
     // muros, bordillos y veredas
     for (const lado of [-1, 1]) {
       const xm = lado * 3.72;
-      tira(uvMundo(new THREE.BoxGeometry(0.3, 1.15, LARGO), 4, 0), this.juguete ? 'tex:muro' : 'plano', this.juguete ? c.muro : c.muro, [xm, 0.575, ZC], 4, 'u');
+      tira(uvMundo(new THREE.BoxGeometry(0.3, 1.15, LARGO), 4, 0), this.neon ? 'plano' : 'tex:muro', c.muro, [xm, 0.575, ZC], 4, 'u');
       tira(CAJA.clone().scale(0.42, 0.12, LARGO), this.neon ? 'luz' : 'plano', this.neon ? new THREE.Color(c.bordillo).multiplyScalar(0.45).getHex() : c.bordillo, [xm, 1.21, ZC]);
-      tira(uvMundo(new THREE.BoxGeometry(2.6, 0.14, LARGO), 3), this.juguete ? 'tex:acera' : 'plano', c.acera, [lado * 5.17, 0.07, ZC], 3, 'v');
+      tira(uvMundo(new THREE.BoxGeometry(2.6, 0.14, LARGO), 3), this.neon ? 'plano' : 'tex:acera', c.acera, [lado * 5.17, 0.07, ZC], 3, 'v');
     }
-    /* Cables de la catenaria (no en pixel: se verían como ruido). Van sobre
+    /* Cables de la catenaria. Van sobre
        los espacios ENTRE las vías, no sobre el centro de cada una: arriba de
        un tren la cámara sube por encima de los cables, y el que iba justo
        sobre tu carril cruzaba al corredor de arriba abajo, como una franja
@@ -1150,7 +1240,7 @@ class Kit {
        de cada vía (no tapan nada). */
     const entreVias = CARRILES[1] - CARRILES[0];                              // 2,2 m de un carril al otro
     const xCables = this.neon ? CARRILES : [-1.5 * entreVias, -0.5 * entreVias, 0.5 * entreVias, 1.5 * entreVias];
-    if (!this.pixel) for (const x of xCables) {
+    for (const x of xCables) {
       if (this.neon) {
         const lg = new LineSegmentsGeometry(); lg.setPositions([x, ALTO_CABLE, 30, x, ALTO_CABLE, -260]);
         const lm = new LineMaterial({ color: 0xff7ae0, linewidth: 1.1, worldUnits: false }); lm.resolution.copy(this.mundo.resolucion);
@@ -1168,13 +1258,13 @@ class Kit {
     this.durmientes.position.z = D % this.pasoDurmientes;
     if (this.rejilla) this.rejilla.position.z = D % 3;
   }
-  /** El cielo: un domo con degradado y brillo del sol, más nubes, sol pixel, sol synthwave o estrellas. */
+  /** El cielo: un domo con degradado y brillo del sol, más nubes, disco de sol, sol synthwave o estrellas. */
   armaCielo() {
     const pal = this.pal, g = new THREE.Group();
     const sd = pal.sol ? new THREE.Vector3(...pal.sol[2]).normalize() : new THREE.Vector3(0, 0.05, -1).normalize();
     const mat = new THREE.ShaderMaterial({
       side: THREE.BackSide, depthWrite: false, fog: false,
-      uniforms: { arriba: { value: color(pal.cielo.arriba) }, horizonte: { value: color(pal.cielo.horizonte) }, solCol: { value: color(pal.cielo.sol) }, solDir: { value: sd }, pasos: { value: this.pixel ? 7 : 0 } },
+      uniforms: { arriba: { value: color(pal.cielo.arriba) }, horizonte: { value: color(pal.cielo.horizonte) }, solCol: { value: color(pal.cielo.sol) }, solDir: { value: sd }, pasos: { value: 0 } },
       vertexShader: 'varying vec3 vDir; void main(){ vec4 w = modelMatrix * vec4(position,1.0); vDir = normalize(w.xyz - cameraPosition); gl_Position = projectionMatrix * viewMatrix * w; }',
       fragmentShader: `uniform vec3 arriba, horizonte, solCol, solDir; uniform float pasos; varying vec3 vDir;
         void main(){
@@ -1191,7 +1281,7 @@ class Kit {
     if (pal.extras.nubes) {                                                   // nubes esponjosas
       // las 49 bolitas de las siete nubes van fundidas en una sola malla (eran 49 llamadas al GPU)
       const mn = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, emissive: pal.c.nube, emissiveIntensity: 0.3, fog: false });
-      const geoN = this.pixel ? new THREE.IcosahedronGeometry(1, 0) : new THREE.SphereGeometry(1, 14, 10), bolitas = [];
+      const geoN = new THREE.SphereGeometry(1, 14, 10), bolitas = [];
       for (let i = 0; i < 7; i++) {
         const cx = -36 + i * 12 + az() * 6, cy = 15 + az() * 7, cz = -120 - az() * 25;
         for (let k = 0; k < 7; k++) bolitas.push(prepara(geoN, pal.c.nube, matriz([cx + (k - 3) * 1.3, cy + Math.sin(k * 1.3) * 0.5 + (k % 3 === 0 ? 0.8 : 0), cz + az()], null, 1.3 + az() * 1.1)));
@@ -1209,6 +1299,7 @@ class Kit {
       const ge = new THREE.BufferGeometry(); ge.setAttribute('position', new THREE.Float32BufferAttribute(est, 3)); normalesFijas(ge);
       g.add(new THREE.Points(ge, new THREE.PointsMaterial({ color: 0xffffff, size: 2, sizeAttenuation: false, fog: false, transparent: true, opacity: 0.8 })));
     }
+    ESC.cielo(this, g, AYUDA);                                                // el horizonte de las estaciones nuevas (tejados, galpones, grúas y faro)
     for (const m of g.children) m.frustumCulled = false;
     return g;
   }
@@ -1219,13 +1310,43 @@ class Kit {
       new THREE.Vector2(0.31, 0), new THREE.Vector2(0.3, 0.042), new THREE.Vector2(0.245, 0.048), new THREE.Vector2(0.21, 0.03), new THREE.Vector2(0, 0.03)
     ], 28).rotateX(Math.PI / 2);
     const mat = this.neon ? new THREE.MeshBasicMaterial({ color: this.c.oro })
-      : this.pixel ? new THREE.MeshToonMaterial({ color: this.c.oro, gradientMap: gradToon() })
         : new THREE.MeshStandardMaterial({ color: this.c.oro, roughness: 0.22, metalness: 1, emissive: 0x3a2500, envMapIntensity: 1.2 });
     realza(mat, 0, this.pal.legible?.niebla || 1);                             // las monedas también son del juego: la niebla les llega más tarde
     const im = new THREE.InstancedMesh(geo, mat, 400);
     im.count = 0; im.castShadow = true; im.frustumCulled = false;
     return im;
   }
+}
+
+/* ===================================================================
+   CITY: los ganchos del mundo City (mundo-city.js)
+   ===================================================================
+   El dibujo de City (los cinco distritos, sus objetos, los rasgos de sus
+   personajes, la burbuja del chicle) vive en mundo-city.js, que importa este
+   módulo, le agrega lo suyo a PALETAS y al Kit, y llena GANCHOS. Así este
+   archivo solo lleva unas pocas líneas marcadas «CITY:» en los lugares donde
+   se pregunta por un gancho, y sin City cargado nada cambia.
+   `piezas` son las herramientas internas que mundo-city.js necesita (no hay
+   otra forma de compartirlas entre módulos que exportarlas). */
+export const GANCHOS = {
+  paleta: null,      // (clave) → una paleta que no está en PALETAS (las de City con otro estilo: 'muelles@neon'), o null
+  objeto: null,      // (kit, o) → el dibujo de un objeto de la pista de City (cajón, dron…), o null si no es suyo
+  viste: null,       // (partes del corredor, kit, apariencia, pelo) → agrega los rasgos de un personaje de City
+  crea: null         // ({escena}) → los efectos de City en la escena (la burbuja, los trozos): {paso(e, corredor), …}
+};
+export const piezas = {
+  Kit, Arma, Serie, CAJA, CILINDRO, CILINDRO_CHICO, ESFERA, redonda, prepara, funde, matriz, uvMundo, franja, sprite, texBrillo,
+  variante, BASE_JUGUETE, BASE_COMIC, BASE_NEON, TEX, aTextura, lienzo, hexCss, azarDe, SUELO, CARRILES, TECHO, L_VAGON
+};
+
+/** Tiñe (o devuelve a su oro) el material de las monedas: en el modo «Sin
+    monedas» tocarlas mata, así que tienen que leerse como peligro de un
+    vistazo, rojas y con brillo propio (el neón no tiene `emissive`: con el
+    color basta, porque su material ya es plano y brillante). */
+function tiñeMonedas(mat, rojas) {
+  if (mat.userData.oro == null) { mat.userData.oro = mat.color.getHex(); mat.userData.emis = mat.emissive ? mat.emissive.getHex() : null; }
+  mat.color.setHex(rojas ? 0xff2b2b : mat.userData.oro);
+  if (mat.emissive) mat.emissive.setHex(rojas ? 0x8a0000 : mat.userData.emis);
 }
 
 /** El perfil de un vagón extruido a lo largo (se cachea por largo). */
@@ -1291,14 +1412,248 @@ function sprite(col, escala, pos, opacidad = 1) {
   return s;
 }
 
+/* Las ayudas de este archivo que usa escenarios.js (afiches, utilería,
+   horizonte, sucesos). Se le pasan en vez de copiarse allá: así una pieza
+   nueva se arma, se funde y se libera igual que las de aquí. */
+const AYUDA = { Arma, CAJA, CILINDRO, CILINDRO_CHICO, ESFERA, prepara, funde, matriz, lienzo, aTextura, TEX, sprite, normalesFijas, geoTren, azarDe, SUELO, L_VAGON };
+
 /* ===================================================================
    5. EL CORREDOR, EL INSPECTOR Y SU PERRO
    =================================================================== */
 
+/* --- Los rasgos de las corredoras (ronda 2) ---
+   Los aspectos de siempre son el mismo muñeco con otra ropa. Las corredoras
+   nuevas (Paloma, Trini, Luz, Maite y Kiara, en `MOTOR.ASPECTOS`) traen además
+   `rasgos`, que cambian la silueta, que es lo que se reconoce de espaldas
+   corriendo, que es como se las ve casi siempre:
+   - pelo: el color (las cejas lo siguen);
+   - peinado: 'coleta' (cola de caballo alta), 'trenzas' (dos, a los lados),
+     'larga' (melena hasta los omóplatos), 'monos' (dos moños) o
+     'afro' (una nube redonda alrededor de la cabeza: no cuelga ni se mece);
+   - piel: un tono de piel propio (opcional; sin él, el de siempre);
+   - tocado: 'cintillo' o 'boina', en el color `gorra` del aspecto (sin
+     tocado, `gorra` no se usa: no llevan gorra, llevan el pelo);
+   - falda: un color, o nada: una falda acampanada colgada de la cadera
+     (con el color de la sudadera es un vestido);
+   - lentes y aros: redondos y dorados.
+   Todo es de piezas fundidas como el resto del corredor (una llamada al GPU
+   por material). El pelo que cuelga (coleta, trenzas, melena) y la falda
+   cuelgan de articulaciones propias que `mueveRasgos` mece al correr, se
+   levantan al caer de un salto y se quedan quietas en el aire del pogo. */
+/** Agrega los rasgos de `asp.rasgos` a un corredor a medio armar. Devuelve sus articulaciones. */
+function armaRasgos(asp, pelo, piel, cab, pelvis, parte, art) {
+  const R = asp.rasgos, pelo2 = new THREE.Color(pelo).multiplyScalar(0.78).getHex();   // un tono más oscuro, para las mechas
+  const cuelgan = [];                                                         // las articulaciones que se mecen
+  // el pelo de arriba (donde iba la gorra) y el flequillo
+  parte(cab, a => {
+    a.pon(new THREE.SphereGeometry(0.214, 22, 12, 0, Math.PI * 2, 0, Math.PI * 0.36), 'personaje', pelo, [0, 0.022, 0]);   // la coronilla (deja libres cejas y ojos)
+    a.pon(ESFERA, 'personaje', pelo, [-0.05, 0.13, -0.15], [0, 0, 0.35], [0.26, 0.08, 0.1]);   // el flequillo, de lado
+    for (const s of [-1, 1]) {
+      a.pon(CAJA, 'personaje', 0x1d1a2a, [s * 0.105, 0.05, -0.172], [0, 0, s * 0.6], [0.035, 0.012, 0.012]);   // las pestañas, en la esquina de afuera de cada ojo
+    }
+    if (R.tocado === 'cintillo') a.pon(new THREE.TorusGeometry(0.218, 0.022, 6, 22, Math.PI), 'personaje', asp.gorra, [0, 0.04, 0.02], [-0.35, 0, 0]);   // de oreja a oreja por arriba
+    if (R.tocado === 'boina') {
+      a.pon(ESFERA, 'personaje', asp.gorra, [0.02, 0.19, 0.03], [0, 0, 0.22], [0.5, 0.13, 0.48]);   // la boina, chata y caída hacia un lado
+      a.pon(ESFERA, 'personaje', asp.gorra, [0.03, 0.26, 0.03], null, 0.04);                        // el piquito de arriba
+    }
+    if (R.lentes) {
+      for (const s of [-1, 1]) a.pon(new THREE.TorusGeometry(0.052, 0.009, 6, 16), 'personaje', 0x2b2d42, [s * 0.068, 0.02, -0.2]);   // los dos marcos redondos
+      a.pon(CAJA, 'personaje', 0x2b2d42, [0, 0.026, -0.205], null, [0.04, 0.01, 0.01]);             // el puente
+    }
+    if (R.aros) for (const s of [-1, 1]) a.pon(new THREE.TorusGeometry(0.04, 0.008, 6, 14), 'personaje', 0xffc63a, [s * 0.205, -0.1, 0.01], [0, Math.PI / 2, 0]);   // aros dorados
+    if (R.peinado === 'afro') {
+      a.pon(ESFERA, 'personaje', pelo, [0, 0.11, 0.13], null, [0.66, 0.58, 0.5]);                    // la nube: más ancha que la cabeza y corrida hacia atrás (la cara, en −z, queda libre)
+      for (const [x, y, z] of [[-0.2, 0.2, 0.14], [0.2, 0.2, 0.14], [0, 0.28, 0.14], [0, 0.12, 0.3]]) a.pon(ESFERA, 'personaje', pelo2, [x, y, z], null, 0.22);   // bultos más oscuros: le dan textura sin texturas
+    }
+    if (R.peinado === 'monos') for (const s of [-1, 1]) {
+      a.pon(ESFERA, 'personaje', pelo, [s * 0.14, 0.17, 0.05], null, 0.19);                         // los dos moños
+      a.pon(new THREE.TorusGeometry(0.06, 0.016, 6, 14), 'personaje', asp.gorra, [s * 0.12, 0.12, 0.04], [0.9, 0, -s * 0.6]);   // el elástico de cada uno
+    }
+  });
+  // lo que cuelga y se mece
+  if (R.peinado === 'coleta') {
+    const coleta = art(cab, [0, 0.17, 0.16]);                                 // nace arriba y atrás de la cabeza
+    parte(coleta, a => {
+      a.pon(new THREE.TorusGeometry(0.045, 0.018, 6, 14), 'personaje', asp.gorra, [0, 0, 0.01], [0.5, 0, 0]);   // el elástico
+      a.pon(new THREE.CapsuleGeometry(0.06, 0.24, 4, 10), 'personaje', pelo, [0, -0.17, 0.04]);    // la cola…
+      a.pon(ESFERA, 'personaje', pelo2, [0, -0.33, 0.05], null, [0.09, 0.12, 0.09]);               // …y su punta
+    });
+    cuelgan.push({ g: coleta, x0: 0.75, amp: 1 });                            // cae hacia atrás, y se mece mucho
+  }
+  if (R.peinado === 'trenzas') for (const s of [-1, 1]) {
+    const trenza = art(cab, [s * 0.16, -0.04, 0.09]);                          // detrás de cada oreja
+    parte(trenza, a => {
+      for (let i = 0; i < 4; i++) a.pon(ESFERA, 'personaje', i % 2 ? pelo2 : pelo, [0, -0.05 - i * 0.075, 0], null, [0.085, 0.1, 0.085]);   // los nudos de la trenza
+      a.pon(ESFERA, 'personaje', asp.gorra, [0, -0.35, 0], null, 0.05);                              // el lazo de la punta
+    });
+    cuelgan.push({ g: trenza, x0: 0.25, amp: 0.6, lado: s });
+  }
+  if (R.peinado === 'larga') {
+    const melena = art(cab, [0, 0.02, 0.1]);                                  // cuelga de la nuca
+    parte(melena, a => {
+      /* Hasta los omóplatos y no más: hasta la mitad de la espalda se metía
+         dentro de la mochila (que empieza en y = 0,51 del torso, a la altura de
+         la punta de esta melena), y por detrás se veía el pelo atravesándola. */
+      a.pon(redonda(0.44, 0.3, 0.12, 0.05), 'personaje', pelo, [0, -0.12, 0.04]);   // la melena, hasta los omóplatos
+      a.pon(redonda(0.38, 0.07, 0.11, 0.035), 'personaje', pelo2, [0, -0.27, 0.05]);   // las puntas, más oscuras
+    });
+    cuelgan.push({ g: melena, x0: 0.12, amp: 0.35 });                         // pesada: se mece poco
+  }
+  let falda = null;
+  if (R.falda != null) {
+    falda = art(pelvis, [0, 0.06, 0]);                                         // cuelga de la cintura
+    parte(falda, a => {
+      a.pon(new THREE.CylinderGeometry(0.18, 0.31, 0.34, 18), 'personaje', R.falda, [0, -0.15, 0]);   // acampanada
+      a.pon(new THREE.CylinderGeometry(0.315, 0.315, 0.035, 18), 'personaje', new THREE.Color(R.falda).multiplyScalar(0.75).getHex(), [0, -0.31, 0]);   // el ruedo, más oscuro
+    });
+  }
+  return { cuelgan, falda };
+}
+/** Mece el pelo y la falda según la pose `p` (la llama `posa` al final). */
+function mueveRasgos(r, p) {
+  const { cuelgan, falda } = r.rasgos;
+  const f = p.fase || 0, t = p.t || 0, vy = p.vy || 0;
+  // cuánto se levanta el pelo: cayendo (vy < 0) flota hacia arriba, subiendo se pega
+  const flota = p.modo === 'saltar' || p.modo === 'patinar' ? THREE.MathUtils.clamp(-vy / 10, -0.4, 1) : 0;
+  for (const c of cuelgan) {
+    let x = c.x0, z = 0;                                                       // x: hacia atrás; z: de lado
+    if (p.modo === 'correr') { x += 0.22 * c.amp * Math.sin(f * 2); z = 0.25 * c.amp * Math.sin(f); }   // rebota dos veces por zancada y se va de lado a lado
+    else if (p.modo === 'menu' || p.modo === 'quieto') z = 0.08 * c.amp * Math.sin(t * 1.6 + f);       // apenas se mece
+    else if (p.modo === 'volar') x += 0.9 * c.amp;                            // con la mochila el viento lo tira para atrás
+    else if (p.modo === 'rodar') x += 0.6 * c.amp;                            // hecha bolita, el pelo pegado
+    x += 1.1 * c.amp * flota;                                                  // al caer, el pelo sube
+    if (c.lado) z += c.lado * 0.12;                                            // las trenzas, un poco abiertas
+    c.g.rotation.set(-x, 0, z);                                                // negativo: atrás es +z (la cara mira a −z)
+  }
+  if (falda) {
+    // la falda se abre con las piernas al correr, y flota un poco al caer
+    falda.rotation.set(p.modo === 'correr' ? 0.08 * Math.sin(f * 2) : 0, 0, p.modo === 'correr' ? 0.06 * Math.sin(f) : 0);
+    falda.scale.set(1 + 0.12 * Math.max(0, flota), 1, 1 + 0.12 * Math.max(0, flota));   // al caer se infla
+  }
+}
+
+/* --- La identidad de los corredores (ronda 4) ---
+   Los cinco chicos (Tomás, Benja, Nacho, Mateo y Don Ramón) eran
+   el mismo muñeco con gorra y otra ropa. `asp.identidad` (motor.js) les da
+   una silueta propia, pensada como la de las corredoras: lo que se ve de
+   espaldas y a lo lejos es la cabeza y lo que cuelga, así que cada uno
+   cambia sobre todo eso:
+   - tocado 'gorra': la gorra al revés de siempre (con audífonos encima, el
+     Clásico); 'capucha': la capucha puesta, en el color de la sudadera, con
+     su borde alrededor de la cara y sus cordones; 'lana': gorro de lana con
+     doblez y pompón; 'corona': corona dorada de cinco puntas sobre el pelo;
+     'quepi': la gorra de uniforme del inspector, con banda y visera adelante;
+   - accesorios: pañuelo sobre nariz y boca (con su nudo atrás), franjas que
+     reflejan en las pantorrillas, un spray en el bolsillo de la mochila,
+     manchas de pintura en los jeans, lentes de sol, cadena con medalla,
+     capa (cuelga de los hombros y se mece como el pelo de las corredoras:
+     la mueve `mueveRasgos`), bigote y abrigo largo.
+   Todo en piezas fundidas, como el resto del muñeco. Devuelve lo mismo que
+   armaRasgos ({cuelgan, falda}), así `posa` lo mece con el mismo código. */
+function armaIdentidad(asp, pelo, piel, cab, torso, piernas, parte, art) {
+  const I = asp.identidad, cuelgan = [];
+  const oscuro = (c, k) => new THREE.Color(c).multiplyScalar(k).getHex();     // el mismo color, más oscuro
+  parte(cab, a => {
+    if (I.tocado === 'gorra') {                                               // la gorra al revés (la de siempre)
+      a.pon(new THREE.SphereGeometry(0.218, 22, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), 'personaje', asp.gorra, [0, 0.03, 0]);
+      a.pon(new THREE.CylinderGeometry(0.17, 0.17, 0.025, 20, 1, false, -Math.PI / 2, Math.PI), 'personaje', asp.gorra, [0, 0.04, 0.13], [-0.14, 0, 0]);
+      a.pon(ESFERA, 'personaje', asp.gorra, [0, 0.25, 0], null, 0.05);
+    }
+    if (I.audifonos) {
+      a.pon(new THREE.TorusGeometry(0.255, 0.022, 6, 22, Math.PI), 'personaje', 0x22262c, [0, 0.02, -0.01]);   // el arco, de oreja a oreja por encima de la gorra
+      for (const s of [-1, 1]) {
+        a.pon(CILINDRO_CHICO, 'personaje', 0x22262c, [s * 0.235, 0.0, -0.01], [0, 0, Math.PI / 2], [0.17, 0.07, 0.17]);   // cada copa
+        a.pon(CILINDRO_CHICO, 'personaje', asp.mochila2, [s * 0.272, 0.0, -0.01], [0, 0, Math.PI / 2], [0.11, 0.015, 0.11]);   // su tapa de color
+      }
+    }
+    if (I.tocado === 'capucha') {
+      const cap = asp.sudadera, borde = oscuro(cap, 0.75);
+      a.pon(new THREE.SphereGeometry(0.25, 22, 14, Math.PI * 11 / 6, Math.PI * 4 / 3, 0, Math.PI * 0.78), 'personaje', cap, [0, 0.02, 0.02]);   // atrás y a los lados, hasta la nuca
+      a.pon(new THREE.SphereGeometry(0.25, 22, 8, 0, Math.PI * 2, 0, Math.PI * 0.3), 'personaje', cap, [0, 0.02, 0.02]);   // y arriba, entera
+      a.pon(new THREE.TorusGeometry(0.19, 0.035, 6, 22), 'personaje', borde, [0, 0.0, -0.14], [0.12, 0, 0]);   // el borde que enmarca la cara
+      for (const s of [-1, 1]) a.pon(new THREE.CapsuleGeometry(0.012, 0.12, 3, 6), 'personaje', 0xedf2f4, [s * 0.06, -0.24, -0.15]);   // los cordones
+    }
+    if (I.panuelo != null) {
+      a.pon(new THREE.SphereGeometry(0.222, 18, 6, Math.PI * 1.08, Math.PI * 0.84, Math.PI * 0.53, Math.PI * 0.3), 'personaje', I.panuelo, [0, 0, 0]);   // sobre nariz y boca (la cara mira a −z)
+      /* El nudo y sus puntas van atrás, en la nuca. Con capucha quedan adentro
+         de ella, salvo las puntas, que asomaban bajo su borde como una «^» roja
+         sobre la mochila: con capucha no se dibujan (el nudo no se vería). */
+      if (I.tocado !== 'capucha') {
+        a.pon(ESFERA, 'personaje', oscuro(I.panuelo, 0.8), [0, -0.06, 0.215], null, [0.07, 0.06, 0.05]);   // el nudo, atrás
+        for (const s of [-1, 1]) a.pon(CAJA, 'personaje', I.panuelo, [s * 0.03, -0.13, 0.23], [0.3, 0, s * 0.3], [0.04, 0.12, 0.012]);   // las dos puntas que cuelgan
+      }
+    }
+    if (I.tocado === 'lana') {
+      a.pon(new THREE.SphereGeometry(0.228, 20, 10, 0, Math.PI * 2, 0, Math.PI * 0.5), 'personaje', asp.gorra, [0, 0.03, 0.02], null, [1, 1.22, 1]);   // el gorro, alto
+      a.pon(new THREE.CylinderGeometry(0.234, 0.234, 0.07, 20, 1, true), 'personaje', oscuro(asp.gorra, 0.8), [0, 0.05, 0.02]);   // el doblez
+      a.pon(ESFERA, 'personaje', asp.mochila2, [0, 0.33, 0.03], null, 0.12);   // el pompón
+    }
+    if (I.tocado === 'corona') {
+      a.pon(new THREE.SphereGeometry(0.214, 22, 12, 0, Math.PI * 2, 0, Math.PI * 0.36), 'personaje', pelo, [0, 0.022, 0]);   // el pelo de arriba
+      a.pon(new THREE.CylinderGeometry(0.135, 0.125, 0.07, 10, 1, true), 'personaje', 0xffc63a, [0, 0.24, 0.01]);   // el aro de la corona
+      for (let k = 0; k < 5; k++) {
+        const t = k / 5 * Math.PI * 2;
+        a.pon(new THREE.ConeGeometry(0.035, 0.09, 4), 'personaje', 0xffc63a, [Math.sin(t) * 0.13, 0.315, 0.01 + Math.cos(t) * 0.13]);   // las cinco puntas
+        a.pon(ESFERA, 'personaje', k % 2 ? 0x2a6df4 : 0xe8203a, [Math.sin(t) * 0.137, 0.24, 0.01 + Math.cos(t) * 0.137], null, 0.035);   // las piedras
+      }
+    }
+    if (I.lentesSol) {
+      for (const s of [-1, 1]) {
+        a.pon(redonda(0.085, 0.05, 0.02, 0.012), 'personaje', 0x111318, [s * 0.066, 0.02, -0.205]);   // cada vidrio, negro
+        a.pon(CAJA, 'personaje', 0x111318, [s * 0.15, 0.03, -0.11], [0, s * 0.5, 0], [0.012, 0.012, 0.16]);   // la patilla hacia la oreja
+      }
+      a.pon(CAJA, 'personaje', 0xffc63a, [0, 0.03, -0.21], null, [0.05, 0.012, 0.012]);   // el puente dorado
+    }
+    if (I.tocado === 'quepi') {
+      a.pon(new THREE.CylinderGeometry(0.235, 0.205, 0.15, 20), 'personaje', asp.gorra, [0, 0.19, 0.0], [-0.08, 0, 0]);   // la copa, más ancha arriba
+      a.pon(new THREE.CylinderGeometry(0.21, 0.21, 0.045, 20), 'personaje', 0xfca311, [0, 0.12, 0.0]);   // la banda dorada
+      a.pon(new THREE.CylinderGeometry(0.17, 0.17, 0.025, 20, 1, false, Math.PI / 2, Math.PI), 'personaje', 0x111111, [0, 0.1, -0.12], [0.14, 0, 0]);   // la visera, adelante
+      a.pon(CAJA, 'personaje', 0xffd23f, [0, 0.2, -0.235], [-0.08, 0, 0], [0.06, 0.06, 0.015]);   // la insignia
+    }
+    if (I.bigote) for (const s of [-1, 1]) a.pon(ESFERA, 'personaje', pelo, [s * 0.034, -0.058, -0.196], [0, 0, -s * 0.35], [0.065, 0.026, 0.03]);   // el bigote, en dos mitades
+  });
+  parte(torso, a => {
+    if (I.spray) {
+      a.pon(CILINDRO_CHICO, 'personaje', asp.mochila2, [0.2, 0.3, 0.22], null, [0.08, 0.2, 0.08]);   // la lata, en el bolsillo del costado
+      a.pon(CILINDRO_CHICO, 'personaje', 0xffffff, [0.2, 0.42, 0.22], null, [0.06, 0.05, 0.06]);    // su tapa
+    }
+    if (I.cadena) {
+      a.pon(new THREE.TorusGeometry(0.16, 0.02, 6, 22), 'personaje', 0xffc63a, [0, 0.5, -0.06], [1.1, 0, 0]);   // la cadena, caída sobre el pecho
+      a.pon(CILINDRO_CHICO, 'personaje', 0xffc63a, [0, 0.38, -0.16], [Math.PI / 2, 0, 0], [0.1, 0.02, 0.1]);   // la medalla
+    }
+    if (I.abrigo) {
+      a.pon(redonda(0.5, 0.78, 0.34, 0.1), 'personaje', asp.sudadera, [0, 0.2, 0.02]);   // el abrigo largo, tapa la mochila
+      for (let k = 0; k < 3; k++) a.pon(ESFERA, 'personaje', 0xfca311, [0, 0.42 - k * 0.14, -0.15], null, 0.03);   // los botones dorados
+      a.pon(CAJA, 'personaje', 0xfca311, [0.13, 0.46, -0.15], null, [0.06, 0.06, 0.015]);   // la placa en el pecho
+    }
+  });
+  if (I.capa != null) {
+    /* El manto de los hombros: une la capa al cuerpo. Sin él la capa colgaba
+       en z = 0,35 (por fuera de la mochila) y de perfil se veía como una tabla
+       roja flotando detrás, separada de la espalda. El manto va fijo al torso,
+       sobre los hombros, desde el pecho hasta la bisagra de la capa. */
+    parte(torso, a => a.pon(redonda(0.5, 0.07, 0.36, 0.03), 'personaje', I.capa, [0, 0.62, 0.2]));
+    const capa = art(torso, [0, 0.6, 0.35]);                                  // cuelga de los hombros, por fuera de la mochila (que llega hasta z = 0,33)
+    parte(capa, a => {
+      a.pon(redonda(0.5, 0.72, 0.035, 0.015), 'personaje', I.capa, [0, -0.36, 0.06]);   // la capa
+      a.pon(redonda(0.52, 0.05, 0.05, 0.02), 'personaje', 0xffc63a, [0, -0.01, 0.05]);  // el ribete dorado de los hombros
+    });
+    cuelgan.push({ g: capa, x0: 0.18, amp: 0.55 });                           // cae hacia atrás y flamea al correr
+  }
+  for (const pi of piernas) {
+    if (I.reflejos) parte(pi.rodilla, a => { for (const y of [-0.12, -0.22]) a.pon(new THREE.TorusGeometry(0.079, 0.012, 5, 16), 'luz', 0xd8f0ff, [0, y, 0], [Math.PI / 2, 0, 0]); });   // dos franjas que reflejan en cada pantorrilla
+    if (I.manchas) parte(pi.cadera, a => {
+      const cols = [asp.gorra, asp.mochila, asp.mochila2];
+      for (let k = 0; k < 3; k++) a.pon(ESFERA, 'personaje', cols[k], [0.05 * (k - 1), -0.1 - k * 0.07, k % 2 ? 0.08 : -0.08], null, [0.05, 0.04, 0.02]);   // tres manchas de pintura en cada muslo
+    });
+  }
+  return { cuelgan, falda: null };
+}
+
 /** Arma el corredor articulado con los colores de su aspecto.
     Devuelve las articulaciones para poder posarlo en cada cuadro. */
 function armaCorredor(kit, asp) {
-  const piel = 0xf1c19c, pelo = 0x3b2a20;
+  const piel = asp.piel ?? (asp.rasgos && asp.rasgos.piel) ?? 0xf1c19c, pelo = asp.pelo ?? ((asp.rasgos && asp.rasgos.pelo) || (asp.identidad && asp.identidad.pelo) || 0x3b2a20);   // CITY trae su piel y su pelo; las corredoras, su color de pelo (ver «Los rasgos»)
   const raiz = new THREE.Group(), cuerpo = new THREE.Group(); raiz.add(cuerpo);
   const parte = (padre, construir, pos = [0, 0, 0]) => {                   // una pieza rígida (fundida) colgada de una articulación
     const a = new Arma(kit); construir(a); const m = a.hecho(); m.position.set(pos[0], pos[1], pos[2]); padre.add(m); return m;
@@ -1362,10 +1717,14 @@ function armaCorredor(kit, asp) {
     }
     a.pon(ESFERA, 'personaje', new THREE.Color(piel).multiplyScalar(0.88).getHex(), [0, -0.03, -0.196], null, [0.04, 0.034, 0.03]);   // la nariz
     a.pon(new THREE.TorusGeometry(0.046, 0.011, 6, 14, Math.PI), 'personaje', 0x8a2a1e, [0, -0.072, -0.176], [0.25, 0, Math.PI]);    // la sonrisa
-    a.pon(new THREE.SphereGeometry(0.218, 22, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), 'personaje', asp.gorra, [0, 0.03, 0]);
-    a.pon(new THREE.CylinderGeometry(0.17, 0.17, 0.025, 20, 1, false, -Math.PI / 2, Math.PI), 'personaje', asp.gorra, [0, 0.04, 0.13], [-0.14, 0, 0]);
-    a.pon(ESFERA, 'personaje', asp.gorra, [0, 0.25, 0], null, 0.05);
+    if (!asp.rasgos && !asp.identidad) {                                       // la gorra (las corredoras van sin gorra; los corredores traen su tocado: ver «La identidad»)
+      a.pon(new THREE.SphereGeometry(0.218, 22, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), 'personaje', asp.gorra, [0, 0.03, 0]);
+      a.pon(new THREE.CylinderGeometry(0.17, 0.17, 0.025, 20, 1, false, -Math.PI / 2, Math.PI), 'personaje', asp.gorra, [0, 0.04, 0.13], [-0.14, 0, 0]);
+      a.pon(ESFERA, 'personaje', asp.gorra, [0, 0.25, 0], null, 0.05);
+    }
   });
+  const rasgos = asp.rasgos ? armaRasgos(asp, pelo, piel, cab, pelvis, parte, art)   // peinado, falda, lentes… (ver «Los rasgos»)
+    : asp.identidad ? armaIdentidad(asp, pelo, piel, cab, torso, piernas, parte, art) : null;   // tocado, capa, accesorios… (ver «La identidad»)
   const brazos = [-1, 1].map(s => {
     const hombro = art(torso, [s * 0.27, 0.5, 0]);
     parte(hombro, a => a.pon(new THREE.CapsuleGeometry(0.068, 0.2, 4, 10), 'personaje', asp.sudadera, [0, -0.15, 0]));
@@ -1397,8 +1756,9 @@ function armaCorredor(kit, asp) {
   const sombra = new THREE.Mesh(new THREE.CircleGeometry(0.45, 20), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.28, depthWrite: false }));
   sombra.material.userData.propio = true;                                      // es solo de este corredor: se suelta con él
   sombra.rotation.x = -Math.PI / 2; sombra.position.y = 0.01;
+  if (GANCHOS.viste && asp.peinado) GANCHOS.viste({ cab, torso, pelvis, piernas }, kit, asp, pelo);   // CITY: peinado y falda (mundo-city.js)
   raiz.scale.setScalar(0.95);
-  return { raiz, cuerpo, pelvis, torso, cab, piernas, brazos, cohete, llamas, tabla, pogo, resorte, aura, sombra };
+  return { raiz, cuerpo, pelvis, torso, cab, piernas, brazos, cohete, llamas, tabla, pogo, resorte, aura, sombra, rasgos };
 }
 
 /** Pone la pose del corredor según lo que está haciendo.
@@ -1513,6 +1873,32 @@ function posa(r, p) {
     bi.hombro.rotation.z = 0.12; bd.hombro.rotation.z = -0.12;
     r.pogo.rotation.z = (p.ladeo || 0) * 1.4;
     r.resorte.scale.y = 1 - 0.45 * k;
+    /* --- El pogo de la ronda 2: impulso, vuelta en la cima y caída ---
+       Como en Subway Surfers, el salto del pogo es un espectáculo:
+       - al despegar (los primeros 0,22 s, `t` = segundos en el pogo) el
+         resorte se aplasta y se suelta, y él se agacha y se estira con él;
+       - subiendo, el resorte va estirado (ya se soltó);
+       - en la cima, mientras la velocidad vertical cruza de +4 a −4 m/s, da
+         una vuelta entera sobre sí mismo con el pogo (sale de `vy`, no del
+         reloj: el pogo lanzado desde un techo sube menos y la vuelta igual
+         cae en la cima), y encoge las piernas como en un truco;
+       - bajando, se prepara para el golpe: rodillas dobladas, resorte suelto. */
+    const t = p.t || 0;                                                        // segundos desde que saltó con el pogo
+    const IMPULSO = 0.22;                                                      // lo que dura el impulso
+    if (t < IMPULSO) {
+      const u = t / IMPULSO;                                                   // 0 → 1 durante el impulso
+      const aplasta = Math.sin(u * Math.PI);                                   // se aplasta y vuelve: sube y baja una vez
+      r.resorte.scale.y = 1 - 0.55 * aplasta + 0.25 * u;                       // la goma contra el suelo, y después se estira
+      r.pelvis.position.y = 0.72 - 0.12 * aplasta;                             // él se agacha con el resorte…
+      for (const pp of [pi, pd]) { pp.cadera.rotation.x = 0.35 + 0.5 * aplasta; pp.rodilla.rotation.x = -0.6 - 0.8 * aplasta; }   // …doblando las rodillas
+    } else if (vy > 0) r.resorte.scale.y = 1 + 0.25 * k;                      // subiendo: el resorte suelto y estirado
+    const vuelta = THREE.MathUtils.smoothstep((4 - vy) / 8, 0, 1);             // 0 antes de la cima, 1 después (sin saltos)
+    if (t >= IMPULSO && vuelta > 0 && vuelta < 1) {
+      const truco = Math.sin(vuelta * Math.PI);                                // más encogido a mitad de la vuelta
+      for (const pp of [pi, pd]) { pp.cadera.rotation.x = 0.35 + 0.9 * truco; pp.rodilla.rotation.x = -0.6 - 1.3 * truco; }   // las rodillas al pecho
+    }
+    r.cuerpo.rotation.y = vuelta * Math.PI * 2;                                // la vuelta entera (2π = de espaldas otra vez)
+    r.pogo.rotation.y = vuelta * Math.PI * 2;                                  // el pogo gira con él: lo lleva de las manos
   } else if (p.modo === 'tropezar') {
     const k = Math.sin(Math.min(1, (p.t || 0) / 0.4) * Math.PI);
     r.cuerpo.rotation.x = -0.14 - 0.5 * k; r.cuerpo.rotation.z = (p.ladeo || 0) + 0.3 * k;
@@ -1545,6 +1931,7 @@ function posa(r, p) {
     bi.hombro.rotation.x = -2.2 * k; bd.hombro.rotation.x = -2.2 * k; bi.hombro.rotation.z = -1 * k; bd.hombro.rotation.z = 1 * k;
     pi.cadera.rotation.x = -0.9 * k; pd.cadera.rotation.x = -0.4 * k; pi.rodilla.rotation.x = -0.3; pd.rodilla.rotation.x = -0.6;
   }
+  if (r.rasgos) mueveRasgos(r, p);                                            // el pelo y la falda siguen al cuerpo (ver «Los rasgos»)
 }
 
 /** El inspector Don Ramón (uniforme y gorra con visera) y su perro Tornillo. */
@@ -1572,7 +1959,58 @@ function armaPerseguidor(kit) {
   }
   const cola = new THREE.Group(); cola.position.set(0, 0.6, 0.36);
   const ac = new Arma(kit); ac.pon(CAJA, 'personaje', cafe, [0, 0.12, 0.05], [0.6, 0, 0], [0.05, 0.28, 0.05]); cola.add(ac.hecho()); perro.add(cola);
-  return { r, perro, patas, cola };
+  /* --- La placa del inspector (ronda 2) ---
+     Una placa dorada de seis puntas en la mano derecha, que solo se ve
+     cuando grita «¡Alto!» o cuando te atrapa (`paso` la prende y levanta
+     el brazo). Es un prisma de seis lados (se ve igual de los dos lados) con
+     una estrella de luz al centro, colgada del codo a la altura de la mano. */
+  const placa = new THREE.Group(); placa.position.set(0, -0.36, -0.05); placa.visible = false;   // en la mano (la mano está a −0,31 del codo)
+  const ap = new Arma(kit);
+  ap.pon(new THREE.CylinderGeometry(0.11, 0.11, 0.03, 6), 'pintura!', 0xffc63a, [0, 0, 0], [Math.PI / 2, 0, 0]);   // el escudo: seis lados, de canto hacia los costados
+  ap.pon(new THREE.CylinderGeometry(0.05, 0.05, 0.045, 5), 'luz!', 0xfff3b0, [0, 0, 0], [Math.PI / 2, 0, 0]);      // el centro que brilla
+  placa.add(ap.hecho()); r.brazos[1].codo.add(placa);
+  return { r, perro, patas, cola, placa };
+}
+
+/* ===================================================================
+   5 bis. EL FANTASMA (modos «Fantasma» y «City fantasma»)
+   ===================================================================
+   El corredor de la mejor carrera de la tabla, que corre a tu lado: es el
+   mismo muñeco articulado (armaCorredor, así posa igual), pero de un azul
+   translúcido de un solo material propio, sin sombra (ni la de verdad ni la
+   redonda de calidad baja) y sin escribir profundidad, para que nunca tape
+   ni se coma lo que tiene detrás. Lleva un letrerito con el nombre de quien
+   lo corrió (en un lienzo: no pasa por la traducción ni por el HTML). No
+   choca con nada: solo se dibuja (lo mueve juego.js con su rastro).
+   La oclusión ambiental no lo ve (`sinAO`): redibujaría su cuerpo opaco en
+   el pase de normales y le pondría un halo oscuro a algo que es de aire. */
+function armaFantasma(kit, nombre) {
+  const r = armaCorredor(kit, MOTOR.ASPECTOS.clasico);                       // el mismo cuerpo de siempre…
+  const mat = new THREE.MeshLambertMaterial({ color: 0x9fd0ff, emissive: 0x2f6bff, emissiveIntensity: 0.55, vertexColors: true,
+    transparent: true, opacity: 0.45, depthWrite: false });                  // …teñido de azul, translúcido y con luz propia (se ve en la noche del neón)
+  mat.userData.propio = true;                                                // es solo de este fantasma: se suelta con él
+  r.raiz.traverse(o => {
+    if (o.isLine || o.isLineSegments2 || o.isLine2) { o.visible = false; return; }   // los bordes de neón quedarían opacos sobre un cuerpo de aire
+    if (!o.isMesh) return;
+    o.material = mat;                                                        // todas las piezas con el mismo material: una sola opacidad que bajar
+    o.castShadow = o.receiveShadow = false;                                  // sin sombra
+    o.renderOrder = 3;                                                       // después de lo opaco
+    o.userData.sinAO = true;                                                 // la oclusión ambiental no lo dibuja
+  });
+  for (const x of [r.cohete, r.tabla, r.pogo, r.aura]) x.visible = false;    // en estos modos no hay poderes
+  for (const pp of r.piernas) pp.brilloZap.visible = false;
+  // el letrero con el nombre, sobre la cabeza
+  const [cv, g] = lienzo(512, 96);
+  g.font = 'bold 54px "Lilita One", Arial, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  const txt = String(nombre || 'Fantasma').slice(0, 24);
+  const ancho = Math.min(500, g.measureText(txt).width + 70);
+  g.fillStyle = 'rgba(16, 40, 110, 0.72)'; g.beginPath(); g.roundRect((512 - ancho) / 2, 8, ancho, 80, 40); g.fill();
+  g.fillStyle = '#e8f3ff'; g.fillText(txt, 256, 50);
+  const tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace;
+  const cartel = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, opacity: 0.85 }));
+  cartel.scale.set(2.4, 0.45, 1); cartel.position.set(0, 2.45, 0); cartel.renderOrder = 4;
+  r.raiz.add(cartel);
+  return { r, mat, cartel, kit, nombre };
 }
 
 /** El túnel entre estaciones: un tubo oscuro con tiras de luz y un letrero en la entrada. */
@@ -1590,6 +2028,13 @@ function armaTunel() {
   for (const zz of [0, -largo]) {                                              // los dos portales
     const p = new THREE.Mesh(CAJA, borde); p.scale.set(9.4, 1.6, 1); p.position.set(0, 7.4, zz); g.add(p);
     for (const s of [-1, 1]) { const q = new THREE.Mesh(CAJA, borde); q.scale.set(0.9, 7.4, 1); q.position.set(s * 4.35, 3.7, zz); g.add(q); }
+    /* --- El frontón del portal (ronda 2) ---
+       Los cables de la catenaria subieron a 11,2 m (ver ALTO_CABLE): antes
+       entraban en el portal y desaparecían, ahora pasarían por encima del
+       túnel. Un frontón de hormigón sobre cada portal, hasta 12,4 m, los
+       recibe como antes y tapa lo que sigue detrás. */
+    const f = new THREE.Mesh(CAJA, hormigon); f.scale.set(9.4, 4.2, 1.6); f.position.set(0, 10.3, zz - 0.3); g.add(f);   // de 8,2 a 12,4 m, un poco más grueso que el portal
+    const corn = new THREE.Mesh(CAJA, borde); corn.scale.set(9.8, 0.35, 1.9); corn.position.set(0, 12.55, zz - 0.3); g.add(corn);   // la cornisa de arriba
   }
   const cartelMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
   const cartel = new THREE.Mesh(new THREE.PlaneGeometry(6.4, 1.2), cartelMat); cartel.position.set(0, 7.45, 0.52); g.add(cartel);
@@ -1633,10 +2078,131 @@ export function crearMundo(canvas) {
   const pasosPendientes = [];                                                 // trabajo de preparación repartido en cuadros
   let ancho = 1280, alto = 720;
   let corredor = null, perse = null, aspecto = MOTOR.ASPECTOS.clasico;
+  let fan = null;                                                             // el fantasma (armaFantasma), si se corre contra uno
   let sacudida = 0;
+
+  /* --- La persecución con más impacto (ronda 2) ---
+     Dibuja al inspector Don Ramón y a su perro Tornillo detrás del corredor
+     con lo que manda juego.js en `e.persecucion` ({amenaza, grito, ladra,
+     atrapa}; ver «La persecución» allá). Es solo imagen:
+     - después del primer tropiezo (amenaza) vienen más cerca, el inspector
+       corre inclinado y más rápido, y el perro se adelanta;
+     - con el grito, el inspector levanta la placa dorada y aparece un globo
+       «¡ALTO!» sobre su cabeza (crece de golpe y se desvanece);
+     - el perro, cuando ladra, levanta el hocico y da un saltito;
+     - al atraparte: el perro salta en arco y cae encima del corredor tendido
+       (mirando a la cámara, moviendo la cola), y el inspector se pone a su
+       lado, inclinado, con la placa en alto y el globo «¡TE PILLÉ!».
+     Los globos son planos con una textura de lienzo (con normales: el SAO
+     de la calidad alta redibuja todo lo que es malla), sin niebla y por
+     encima de todo; se arman la primera vez que hacen falta y no se sueltan
+     con los kits (son del mundo, no de una estación). */
+  const persigue = { am: 0, fase: 0, y: 0, perro0: null, inspector0: null, globos: {} };   // lo que dura de un cuadro al otro (y: el piso por el que corren)
+  /** Un globo de historieta con `texto`, armado una vez (plano de 1,9 × 0,95 m). */
+  function globo(texto) {
+    if (persigue.globos[texto]) return persigue.globos[texto];
+    const lz = document.createElement('canvas'); lz.width = 512; lz.height = 256;   // la textura
+    const g = lz.getContext('2d');
+    g.fillStyle = '#ffffff'; g.strokeStyle = '#141420'; g.lineWidth = 12;      // el globo blanco con borde de tinta
+    g.beginPath(); g.ellipse(256, 112, 236, 96, 0, 0, Math.PI * 2); g.fill(); g.stroke();
+    g.beginPath(); g.moveTo(200, 196); g.lineTo(150, 250); g.lineTo(262, 202); g.closePath(); g.fill(); g.stroke();   // la colita hacia abajo
+    g.beginPath(); g.ellipse(256, 112, 230, 90, 0, 0, Math.PI * 2); g.fill();    // tapa la raya donde la colita se une al globo
+    g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.font = `900 ${texto.length > 7 ? 92 : 118}px "Lilita One", Impact, "Arial Black", sans-serif`;   // los largos, más chicos
+    g.lineWidth = 10; g.strokeStyle = '#141420'; g.strokeText(texto, 256, 118);   // el contorno de las letras…
+    g.fillStyle = '#e8263b'; g.fillText(texto, 256, 118);                     // …y las letras rojas
+    const tex = new THREE.CanvasTexture(lz); tex.colorSpace = THREE.SRGBColorSpace;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(1.9, 0.95),
+      new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false, fog: false, toneMapped: false }));
+    m.renderOrder = 999; m.frustumCulled = false; m.visible = false;         // siempre encima, y no se esconde por estar al borde
+    escena.add(m);
+    return (persigue.globos[texto] = m);
+  }
+  /** Muestra (o esconde) un globo sobre la cabeza del inspector: crece de golpe y se desvanece al final. */
+  function ponGlobo(texto, ver, x, y, z, edad, resta) {
+    const m = ver || persigue.globos[texto] ? globo(texto) : null;            // no lo arma si nunca se mostró
+    if (!m) return;
+    m.visible = !!ver;
+    if (!ver) return;
+    const crece = Math.min(1, edad / 0.14), rebote = 1 + 0.25 * Math.sin(crece * Math.PI);   // de 0 al tamaño, pasándose un poco
+    m.scale.setScalar(Math.max(0.01, crece * rebote));
+    m.material.opacity = resta == null ? 1 : Math.min(1, resta / 0.25);       // se desvanece el último cuarto de segundo
+    m.position.set(x, y + 0.05 * Math.sin(edad * 9), z);                      // flota apenas
+    m.quaternion.copy(camara.quaternion);                                     // de frente a la cámara
+  }
+  /** Un cuadro de la persecución (ver el comentario de arriba). */
+  function pasoPersecucion(e, dt) {
+    const PE = e.persecucion || {}, k = e.perseguidor || 0;
+    const atrapa = PE.atrapa != null && PE.atrapa >= 0 ? PE.atrapa : -1;      // segundos desde la atrapada (−1: no)
+    const vis = k > 0.01 || atrapa >= 0;
+    perse.r.raiz.visible = perse.perro.visible = vis;
+    const insp = perse.r, perro = perse.perro, [, bd] = insp.brazos;          // bd: el brazo de la placa
+    if (!vis) { persigue.perro0 = persigue.inspector0 = null; ponGlobo('¡ALTO!', false); ponGlobo('¡TE PILLÉ!', false); return; }
+    persigue.am += ((PE.amenaza ? 1 : 0) - persigue.am) * (1 - Math.exp(-3 * dt));   // se acercan (y se van) en ~0,3 s
+    /* Corren por el mismo piso que el corredor: si él va por los techos, ellos
+       también (como el guardia de Subway Surfers, que se sube a los trenes).
+       Abajo, en la vía, un tren entre ellos y la cámara los tapaba enteros,
+       con globo y todo. Suben y bajan suavizado, en ~0,2 s. */
+    persigue.y += ((e.suelo || 0) - persigue.y) * (1 - Math.exp(-6 * dt));
+    const am = persigue.am, piso = SUELO + persigue.y;
+    if (atrapa < 0) {
+      // la carrera: detrás, más cerca y más rápido con la amenaza
+      persigue.perro0 = persigue.inspector0 = null;
+      persigue.fase += dt * (11 + 4 * am);                                    // las zancadas (acumuladas: cambiar el ritmo no salta)
+      const z = 2.2 - 0.8 * am + (1 - k) * 9;                                 // a 2,2 m, o a 1,4 con la amenaza
+      insp.raiz.position.set(e.x * 0.85 + 0.6, piso, z);
+      insp.raiz.rotation.y = 0;
+      posa(insp, { modo: 'correr', fase: persigue.fase });
+      insp.cuerpo.rotation.x -= 0.22 * am;                                    // inclinado hacia adelante: va con todo
+      const grita = (PE.grito || 0) > 0;
+      if (grita) { bd.hombro.rotation.set(2.7, 0, 0.25); bd.codo.rotation.x = 0.15; }   // el brazo arriba, mostrando la placa
+      perse.placa.visible = grita;
+      ponGlobo('¡ALTO!', grita, insp.raiz.position.x, piso + 2.55, z, 1.6 - (PE.grito || 0), PE.grito);
+      ponGlobo('¡TE PILLÉ!', false);
+      // el perro: adelante del inspector (más con la amenaza), saltando al ladrar
+      const ladra = Math.max(0, PE.ladra || 0), hop = ladra > 0 ? Math.sin(Math.min(1, 1 - ladra / 0.35) * Math.PI) : 0;
+      perro.position.set(e.x * 0.85 - 0.7, piso + 0.18 * hop, z - 0.9 - 0.6 * am);
+      perro.rotation.set(0.35 * hop, 0, 0);                                    // el hocico arriba cuando ladra
+      perse.patas.forEach((p, i) => { p.rotation.x = Math.sin(persigue.fase * 1.6 + (i % 2 ? Math.PI : 0) + (i > 1 ? 1 : 0)) * 0.8; });
+      perse.cola.rotation.z = Math.sin(e.t * 20) * 0.6;
+      return;
+    }
+    // la atrapada: dónde estaban al empezar (de ahí parten el salto y la caminata)
+    if (!persigue.perro0) persigue.perro0 = perro.position.clone();
+    if (!persigue.inspector0) persigue.inspector0 = insp.raiz.position.clone();
+    const sueloR = (e.suelo || 0) + SUELO;                                    // donde está tendido el corredor (la vía o un techo)
+    // el perro: un salto en arco hasta el pecho del corredor (que cayó de espaldas hacia la cámara)
+    const u = THREE.MathUtils.clamp((atrapa - 0.08) / (ATERRIZA_PERRO - 0.08), 0, 1);   // 0 → 1 durante el salto
+    const destino = _v.set(e.x + 0.05, sueloR + 0.3, 0.95);                   // sobre el pecho
+    perro.position.lerpVectors(persigue.perro0, destino, u);
+    perro.position.y += 1.3 * Math.sin(u * Math.PI);                          // el arco
+    perro.rotation.set(0.5 * (1 - 2 * u) * Math.sin(u * Math.PI), Math.PI * THREE.MathUtils.smoothstep(u, 0, 1), 0);   // se da vuelta en el aire y cae mirando a la cámara
+    if (u >= 1) {                                                             // ya encima: ladra moviendo la cabeza y la cola
+      const ladra = Math.max(0, PE.ladra || 0);
+      perro.position.y += 0.04 * Math.abs(Math.sin(atrapa * 7));              // respira agitado
+      perro.rotation.x = 0.3 * Math.sin(Math.min(1, 1 - ladra / 0.6) * Math.PI) * (ladra > 0 ? 1 : 0);
+      perse.patas.forEach(p => { p.rotation.x = 0.35; });                     // las patas firmes sobre el pecho
+      perse.cola.rotation.z = Math.sin(e.t * 28) * 0.8;                       // la cola, feliz
+    } else perse.patas.forEach((p, i) => { p.rotation.x = (i < 2 ? -1 : 1) * 0.9 * Math.sin(u * Math.PI); });   // estirado en el salto
+    // el inspector: camina hasta el costado del corredor, se inclina y muestra la placa
+    const w = THREE.MathUtils.smoothstep(atrapa / 0.5, 0, 1);
+    insp.raiz.position.lerpVectors(persigue.inspector0, _v.set(e.x + 1.05, sueloR, 0.35), w);   // al costado de la cadera (más cerca de la cámara quedaba fuera de cuadro)
+    insp.raiz.rotation.y = (Math.PI / 2) * w;                                 // se gira hacia el corredor tendido
+    posa(insp, { modo: w < 1 ? 'correr' : 'quieto', fase: e.t * 9, t: atrapa });
+    insp.torso.rotation.x = -0.6 * w;                                         // se agacha de la cintura sobre él (las piernas quedan derechas)
+    insp.cab.rotation.x = 0.12 + 0.3 * w;                                     // y lo mira
+    bd.hombro.rotation.set(2.3, 0, 0.2); bd.codo.rotation.x = 0.3;            // la placa en alto
+    perse.placa.visible = true;
+    ponGlobo('¡ALTO!', false);
+    ponGlobo('¡TE PILLÉ!', atrapa > 0.25, insp.raiz.position.x, insp.raiz.position.y + 2.4, insp.raiz.position.z, atrapa - 0.25, null);
+  }
   const chispas = [];                                                         // brillitos al tomar monedas
+  let monedasRojas = false;                                                   // ¿las monedas son un peligro? (modo «Sin monedas»)
   let particulas = null, trenFantasma = null, tiempoFantasma = 0;
+  let lore = true;                                                            // ¿se cuenta la historia de la Línea 3? (afiches, el 317): solo en su mundo, lo dice juego.js
+  let sucesos = null;                                                         // los sucesos de la estación (escenarios.js): farolillos, lluvia, el 317…
   const camPos = new THREE.Vector3(0, 4.7, 8.6), camMira = new THREE.Vector3(0, 0.4, -9);
+  const visCity = GANCHOS.crea ? GANCHOS.crea({ escena }) : null;             // CITY: los efectos de City (mundo-city.js), si está cargado
 
   /* ---- la sensación de velocidad (solo para el ojo) ----
      Nada de esto mueve al corredor: la velocidad de verdad, los metros y los
@@ -1659,7 +2225,7 @@ export function crearMundo(canvas) {
      `quieto` el ajuste del sistema «reducir movimiento»; sin sacudir no hay
      temblor, balanceo ni ladeo, y quieto además quita las líneas y achica
      el golpe de lente. */
-  const VEL = MOTOR.VELOCIDAD;                                                // {V0, VMAX}: la misma curva del juego y del antitrampas
+  let VEL = MOTOR.VELOCIDAD;                                                  // {V0, VMAX}: la misma curva del juego y del antitrampas (CITY: la cambia `curva`, City tiene la suya)
   const SENS = {
     FOV_VEL: 11,        // grados que se abre el lente a toda velocidad (k = 1)
     FOV_VUELO: 5,       // grados más mientras se vuela con la mochila
@@ -1790,12 +2356,17 @@ export function crearMundo(canvas) {
         frente.arbol[lado] = d + 9 + kit.az() * 8;
         if (enTunel(d - 2, d + 2)) continue;
         const v = kit.series.arbol[Math.floor(kit.az() * 3)];
-        paisaje.push({ serie: v, x: lado * (5.45 + kit.az() * 0.3), y: SUELO, rot: kit.az() * 6.28, esc: 0.9 + kit.az() * 0.35, d, largo: 1.5, k: kit });
+        // la utilería de una estación nueva va de frente a la vía (un árbol, girado al azar); el azar se pide igual en los dos casos
+        const x = lado * (5.45 + kit.az() * 0.3), giro = kit.az(), rot = kit.pal.props ? ESC.giroProp(lado, giro) : giro * 6.28;
+        paisaje.push({ serie: v, x, y: SUELO, rot, esc: 0.9 + kit.az() * 0.35, d, largo: 1.5, k: kit });
       }
       while (frente.graf[lado] < hasta) {                                     // grafitis en el muro
         const d = frente.graf[lado];
         frente.graf[lado] = d + 12 + kit.az() * 22;
         if (enTunel(d - 3, d + 3) || kit.az() < 0.35) continue;
+        // con la historia, algunos de estos lugares son un afiche de pie en la vereda o un grafiti de la historia (escenarios.js)
+        const deco = lore ? ESC.decoraMuro(kit, lado, AYUDA) : null;
+        if (deco) { deco.obj.position.set(...deco.pos); paisaje.push({ obj: deco.obj, d, largo: deco.largo, k: kit }); continue; }
         const o = kit.saca('graf' + lado, () => kit.grafiti(lado)); o.position.set(lado * 3.56, 0.6, 0);
         paisaje.push({ obj: o, d, largo: 1.8, k: kit });
       }
@@ -1845,6 +2416,8 @@ export function crearMundo(canvas) {
     if (o.tipo === 'moneda') { o.vis = { moneda: true }; monedas.add(o); return; }
     // el túnel se anota una sola vez (o.vis marcado): antes se volvía a pedir en cada cuadro y sinPaisaje crecía sin parar
     if (o.tipo === 'tunel') { if (tunelObj !== o) { tunelObj = o; sinPaisaje.push([o.d0, o.d0 + o.largo]); } o.vis = { tunel: true }; return; }
+    const objCity = GANCHOS.objeto ? GANCHOS.objeto(kit, o) : null;           // CITY: cajones, drones, barandas, lonas, estrellas secretas
+    if (objCity) { o.vis = { obj: objCity, kit }; dinamicos.add(o); return; }
     let obj;
     if (o.tipo === 'tren') {                                                  // uno que viene de frente (vel > 0) sale de otra reserva: la de los focos encendidos
       const i = (o.id || 0) % 3, marcha = o.vel > 0;
@@ -1880,13 +2453,11 @@ export function crearMundo(canvas) {
      blando, sin FXAA que lo disimule), la media va a 2,5 y la alta usa la de
      la pantalla entera. El lienzo de un celular es chico (el escenario 3:4,
      ~360×480 CSS), así que 2× son ~0,7 megapíxeles: lo aguanta. Si el aparato
-     no da abasto, «auto» baja de nivel.
-     El estilo pixelado en baja sigue siendo a propósito de píxeles grandes,
-     pero nítidos (se agranda sin suavizar). */
+     no da abasto, «auto» baja de nivel. */
   const AJUSTES = {
-    alta: { dpr: 3, sombras: 2048, ao: true, bloom: true, fxaa: true, espejo: true, pixel: 4 },
-    media: { dpr: 2.5, sombras: 1024, ao: false, bloom: true, fxaa: true, espejo: false, pixel: 4 },
-    baja: { dpr: 2, sombras: 0, ao: false, bloom: false, fxaa: false, espejo: false, pixel: 0 }
+    alta: { dpr: 3, sombras: 2048, ao: true, bloom: true, fxaa: true, espejo: true },
+    media: { dpr: 2.5, sombras: 1024, ao: false, bloom: true, fxaa: true, espejo: false },
+    baja: { dpr: 2, sombras: 0, ao: false, bloom: false, fxaa: false, espejo: false }
   };
   const SIN_NAN = {
     uniforms: { tDiffuse: { value: null } },
@@ -1915,27 +2486,27 @@ export function crearMundo(canvas) {
     if (composer) { for (const ps of composer.passes) ps.dispose?.(); composer.dispose?.(); composer = null; }
     if (!kit) return;
     const A = AJUSTES[calidad], pal = kit.pal;
-    renderer.toneMapping = kit.pixel ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = pal.exposicion;
-    /* En baja se dibuja directo, sin post-proceso. El estilo pixelado tampoco
-       usa su pasada (que dibuja la escena dos veces, una para los bordes): el
-       lienzo se dibuja a la resolución de los píxeles (pixelRatio < 1, ver
-       proporcion) y el navegador lo agranda sin suavizar. */
-    if (calidad === 'baja') return;
+    /* En baja se dibuja directo, sin post-proceso. El estilo cómic es la
+       excepción: su contorno de tinta va igual (cuesta lo mismo que dibujar
+       directo más un cuadro), porque es lo que recorta los obstáculos. */
+    if (calidad === 'baja' && !kit.comic) return;
     /* El suavizado de bordes es MSAA (el lienzo intermedio con 4 muestras por
        píxel), no FXAA: FXAA difumina la imagen ENTERA después de dibujarla
        (texturas, letreros, bordes finos) y era parte de lo «borroso». Con
        2× de densidad o más no hace falta ninguno: el escalón de un borde ya
        es más chico que lo que el ojo separa, y nos ahorramos el costo. */
     const pr = renderer.getPixelRatio();
-    const muestras = pr < 2 && renderer.capabilities.isWebGL2 ? 4 : 0;
-    const rt = new THREE.WebGLRenderTarget(Math.round(ancho * pr), Math.round(alto * pr), { type: THREE.HalfFloatType, samples: muestras });
+    const tam = renderer.getDrawingBufferSize(new THREE.Vector2());           // el lienzo de verdad, en píxeles
+    // el cómic dibuja la escena en su propio lienzo (necesita la profundidad), así que el MSAA de este no le sirve: lo suaviza FXAA
+    const muestras = !kit.comic && pr < 2 && renderer.capabilities.isWebGL2 ? 4 : 0;
+    const rt = new THREE.WebGLRenderTarget(tam.x, tam.y, { type: THREE.HalfFloatType, samples: muestras });
     const c = new EffectComposer(renderer, rt);
-    c.setPixelRatio(pr); c.setSize(ancho, alto);
-    if (kit.pixel) {
-      // el tamaño del píxel se elige para que la imagen tenga ~FILAS_PIXEL filas de alto, en cualquier pantalla
-      const px = Math.max(2, Math.round(alto * renderer.getPixelRatio() / FILAS_PIXEL));
-      c.addPass(new RenderPixelatedPass(px, escena, camara, { normalEdgeStrength: calidad === 'baja' ? 0.0001 : 0.45, depthEdgeStrength: calidad === 'baja' ? 0.0001 : 0.55 }));
+    c.setPixelRatio(1); c.setSize(tam.x, tam.y);                               // en píxeles del lienzo (CSS × densidad)
+    if (kit.comic) {
+      // la línea de tinta mide 1 píxel del lienzo en una pantalla de 1× y 2 desde 1,5×: así se ve igual de gruesa en todas
+      c.addPass(new PasadaTinta(escena, camara, { tinta: pal.tinta ?? 0x1a1420, fuerza: pal.fuerzaTinta ?? 0.85, grosor: pr >= 1.5 ? 2 : 1 }));
     } else c.addPass(new RenderPass(escena, camara));
     if (A.ao && kit.juguete) {
       try {
@@ -1953,7 +2524,7 @@ export function crearMundo(canvas) {
             cache.set(o, o.visible);
             const g = o.geometry;
             const sinNormales = g && g.isBufferGeometry && !g.attributes.normal;
-            if (o.isPoints || o.isLine || o.isSprite || o.isLineSegments2 || o.isLine2 || sinNormales) o.visible = false;
+            if (o.isPoints || o.isLine || o.isSprite || o.isLineSegments2 || o.isLine2 || sinNormales || o.userData.sinAO) o.visible = false;   // sinAO: el fantasma (es translúcido)
           });
         };
         ao.updateGtaoMaterial({ radius: 0.8, distanceExponent: 1.4, thickness: 2, scale: 1.3, samples: 12, distanceFallOff: 1 });
@@ -1968,12 +2539,12 @@ export function crearMundo(canvas) {
     if (A.bloom && pal.post.bloom) c.addPass(new UnrealBloomPass(new THREE.Vector2(ancho / 2, alto / 2), ...pal.post.bloom));
     c.addPass(new OutputPass());
     // FXAA solo si no hay MSAA (WebGL1) y la densidad es baja: es el último recurso, porque difumina
-    if (A.fxaa && !kit.pixel && !muestras && pr < 2) { const f = new ShaderPass(FXAAShader); f.uniforms.resolution.value.set(1 / (ancho * pr), 1 / (alto * pr)); c.addPass(f); }
+    if (A.fxaa && !muestras && pr < 2) { const f = new ShaderPass(FXAAShader); f.uniforms.resolution.value.set(1 / tam.x, 1 / tam.y); c.addPass(f); }
     if (pal.post.vineta) {
       const v = new ShaderPass(ACABADO);
       v.uniforms.vig.value = pal.post.vineta; v.uniforms.sat.value = pal.post.sat || 1;
       v.uniforms.aber.value = 0;                                             // sin aberración cromática: separaba los colores en los bordes y restaba nitidez
-      v.uniforms.scan.value = pal.post.lineas || 0; v.uniforms.alto.value = alto * renderer.getPixelRatio();
+      v.uniforms.scan.value = pal.post.lineas || 0; v.uniforms.alto.value = tam.y;
       c.addPass(v);
     }
     composer = c;
@@ -2004,7 +2575,7 @@ export function crearMundo(canvas) {
   function kitDe(estacion) {
     const clave = estacion.paleta;
     if (!kits.has(clave)) {
-      const k = new Kit(mundo, clave, PALETAS[clave] || PALETAS.barrio);
+      const k = new Kit(mundo, clave, PALETAS[clave] || (GANCHOS.paleta && GANCHOS.paleta(clave)) || PALETAS.barrio);   // CITY: 'muelles@neon' la arma mundo-city.js
       escena.add(k.almacen);
       kits.set(clave, k);
     }
@@ -2098,14 +2669,17 @@ export function crearMundo(canvas) {
       escena.add(particulas);
     }
     // las líneas de viento toman el tono de la estética: cian de noche, crema al atardecer, blancas de día
-    lineas.material.color.set(kit.neon ? 0xa8f2ff : kit.pixel ? 0xfff0d8 : 0xffffff);
+    lineas.material.color.set(kit.neon ? 0xa8f2ff : 0xffffff);
     if (trenFantasma) { escena.remove(trenFantasma); trenFantasma = null; }
     if (ex.trenFantasma) {
       trenFantasma = new THREE.Mesh(geoTren(L_VAGON * 3), new THREE.MeshBasicMaterial({ color: 0x7dffcf, transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
       trenFantasma.visible = false; escena.add(trenFantasma);
     }
+    // los sucesos de la estación nueva (farolillos, lluvia y relámpagos, focos, el 317 a lo lejos): escenarios.js
+    if (sucesos) { sucesos.quita(); sucesos = null; }
+    sucesos = ESC.ambiente(kit, escena, AYUDA, lore);
     aplicaSombras();
-    tamano(ancho, alto);                                                       // la proporción depende del estilo (pixelado en baja) y rearma el post-proceso
+    tamano(anchoCss, altoCss);                                                 // rearma el post-proceso (el cómic lleva su contorno de tinta)
     try { renderer.compile(escena, camara); } catch (e) { /* si no se puede compilar antes, se compila al dibujar */ }
   }
 
@@ -2125,6 +2699,7 @@ export function crearMundo(canvas) {
     // objetos del juego
     for (const o of dinamicos) {
       const obj = o.vis.obj;
+      if (obj.userData.colocar) { obj.userData.colocar(o, D, e.t); continue; }   // CITY: los objetos de City se colocan (y animan) solos
       if (o.tipo === 'tren') {
         obj.position.z = -(o.d0 + o.largo / 2 - D);
         const faro = obj.userData.faro;
@@ -2147,13 +2722,15 @@ export function crearMundo(canvas) {
     }
     // monedas: una InstancedMesh
     const im = kit.monedas; let n = 0;
+    if (im.userData.peligro !== monedasRojas) { tiñeMonedas(im.material, monedasRojas); im.userData.peligro = monedasRojas; }   // cada kit tiene su material: se tiñe al usarlo
+    const late = monedasRojas && !mov.quieto ? 1 + 0.14 * Math.sin(e.t * 9) : 1;   // en «Sin monedas» laten, como una alarma
     for (const o of monedas) {
       if (n >= 400) break;
       const z = -(o.d - D);
       if (z < -vista || z > DETRAS) continue;
       _p.set(o.x != null ? o.x : CARRILES[o.carril], o.y + SUELO, z);
       // una moneda que pasa pegada a la cámara (las del cielo, volando con el lente abierto) se achica: si no, tapa media pantalla
-      const dc = _p.distanceTo(camPos), esc = dc < 4 ? Math.max(0.05, dc / 4) : 1;
+      const dc = _p.distanceTo(camPos), esc = (dc < 4 ? Math.max(0.05, dc / 4) : 1) * late;
       _m.compose(_p, _q.setFromEuler(_e.set(0, e.t * 3 + o.d * 0.15, 0)), _s.set(esc, esc, esc));
       im.setMatrixAt(n++, _m);
     }
@@ -2178,6 +2755,16 @@ export function crearMundo(canvas) {
       if (vuela) { sens.pv += mov.quieto ? 4 : 9; sens.cae = false; }        // despegue: el lente se abre de golpe y vuelve
       else { sens.pv -= 1.5; sens.cae = true; }                              // se apagó: el lente se cierra un poco y empieza la caída
       sens.volaba = vuela;
+    }
+    /* --- El pogo también se siente (ronda 2) ---
+       Al saltar con el pogo el lente se abre de golpe (menos que con la
+       mochila) y al aterrizar la cámara cae un poco, como un golpe seco.
+       Solo mira el borde: el cuadro en que empieza y el que termina. */
+    const enPogo = corre && !!(e.poderes && e.poderes.pogo);                 // ¿va en el pogo este cuadro?
+    if (avanza && enPogo !== !!sens.pogoAntes) {                              // empezó o terminó en este cuadro
+      if (enPogo) sens.pv += mov.quieto ? 3 : 7;                              // el resorte se suelta: patada al lente
+      else { sens.cyv -= 3.5; if (mov.sacudir && !mov.quieto) sacudida = Math.max(sacudida, 0.22); }   // la goma toca el techo o la vía
+      sens.pogoAntes = enPogo;                                                // recuerda para el próximo cuadro
     }
     if (sens.cae && corre && (e.y || 0) - (e.suelo || 0) < 0.05) {          // tocó el suelo (o un techo) después de volar: el golpe
       sens.cae = false; sens.pv -= 2.5; sens.cyv -= 4.5;
@@ -2214,24 +2801,49 @@ export function crearMundo(canvas) {
       r.sombra.position.set(e.x, (e.suelo || 0) + SUELO + 0.01, 0);
       r.sombra.scale.setScalar(Math.max(0.4, 1 - (e.y - (e.suelo || 0)) * 0.15));
     }
+    if (visCity) visCity.paso(e, corredor);                                  // CITY: la burbuja del chicle y los trozos de lo que se pisó
     // el inspector y el perro (vienen detrás cuando tropiezas)
-    if (perse) {
-      const k = e.perseguidor || 0, vis = k > 0.01;
-      perse.r.raiz.visible = perse.perro.visible = vis;
-      if (vis) {
-        const z = 2.2 + (1 - k) * 9;
-        perse.r.raiz.position.set(e.x * 0.85 + 0.6, SUELO, z);
-        posa(perse.r, { modo: 'correr', fase: e.t * 11 });
-        perse.perro.position.set(e.x * 0.85 - 0.7, SUELO, z - 0.9);
-        perse.patas.forEach((p, i) => { p.rotation.x = Math.sin(e.t * 18 + (i % 2 ? Math.PI : 0) + (i > 1 ? 1 : 0)) * 0.8; });
-        perse.cola.rotation.z = Math.sin(e.t * 20) * 0.6;
-      }
+    if (perse) pasoPersecucion(e, dt);
+    /* El fantasma: e.fantasma = {x, y, z (metros por delante de ti; negativo,
+       detrás), pose, alfa (0 a 1), nombre} o null. Se arma con el kit de la
+       estación (sus geometrías salen del kit) y se rearma si el kit o el
+       nombre cambian. */
+    const ef = e.fantasma;
+    if (fan && (!ef || fan.kit !== kit || fan.nombre !== ef.nombre)) { escena.remove(fan.r.raiz); suelta3D(fan.r.raiz, fan.r.sombra); fan.cartel.material.map.dispose(); fan.cartel.material.dispose(); fan = null; }
+    if (ef && !fan) { fan = armaFantasma(kit, ef.nombre); escena.add(fan.r.raiz); }
+    if (fan) {
+      const a = THREE.MathUtils.clamp(ef.alfa == null ? 1 : ef.alfa, 0, 1);
+      fan.r.raiz.visible = a > 0.01 && -ef.z < DETRAS && ef.z < vista;          // fuera de lo que se dibuja, no se dibuja
+      fan.mat.opacity = 0.45 * a; fan.cartel.material.opacity = 0.85 * a;
+      fan.r.raiz.position.set(ef.x, ef.y + SUELO, -ef.z);
+      posa(fan.r, ef.pose || { modo: 'correr', fase: 0 });
+      fan.cartel.visible = !(ef.pose && ef.pose.modo === 'caer');             // caído, sin letrero
     }
     // la cámara: detrás y arriba, sigue al corredor con suavidad
     // en el suelo la cámara casi no sube con el salto (se ve el salto); en
     // los techos sube un poco menos que él (se ve la vía de abajo); volando
     // con la mochila lo sigue metro a metro, o el corredor se sale por arriba
-    const yC = e.y > 4.8 ? 3.6 + (e.y - 4.8) : e.y > 1 ? e.y * 0.75 : e.y * 0.4;
+    /* --- La altura de la cámara, continua (ronda 2) ---
+       Antes eran tres tramos con un salto en y = 1: con el salto nuevo de
+       2,1 m la cámara pegaba un tirón a mitad de cada salto. Ahora es el
+       mayor de tres pisos, y todos crecen sin saltos:
+       - lo de siempre: 0,75 de la altura del piso que pisa (en un techo, 2,51
+         como antes) más 0,4 de lo que salta sobre él (casi no se mueve: se ve
+         el salto);
+       - nunca más de 2 m por debajo del corredor, para que un salto con
+         zapatillas o el pogo no se salgan por arriba de la pantalla; en el
+         pogo, que sube a 13 m/s, se adelanta además lo que va a subir en el
+         suavizado de la cámara (0,17 s), o la cámara llegaba tarde;
+       - con la mochila, 1,2 m por debajo, como antes (a 8,5 m da 7,3);
+       - en las burbujas de City (baja gravedad, salto doble), 1,4 m por
+         debajo: con 2 m la cabeza tocaba el borde de arriba de la pantalla. */
+    const sueloC = e.suelo || 0, yR = e.y || 0;                                 // el piso que pisa y la altura del corredor
+    const vyPogo = e.pose && e.pose.modo === 'pogo' ? Math.max(0, e.pose.vy || 0) : 0;   // cuánto sube el pogo (m/s)
+    const yC = Math.max(
+      0.75 * sueloC + 0.4 * (yR - sueloC),                                    // pegada al piso, casi quieta en el salto
+      yR - 2.0 + vyPogo * 0.17,                                               // no lo deja salirse por arriba
+      e.poderes && e.poderes.mochila ? yR - 1.2 : -Infinity,                  // volando con la mochila, como antes
+      e.poderes && e.poderes.flota ? yR - 1.4 : -Infinity);                   // en las burbujas de City: el salto doble llega alto y se salía por arriba
     const k = 1 - Math.exp(-6 * dt);
     if (e.menu) {
       /* La cámara del menú, delante del corredor y a la altura del pecho.
@@ -2302,6 +2914,7 @@ export function crearMundo(canvas) {
       }
       a.needsUpdate = true;
     }
+    if (sucesos) sucesos.paso(e, dt, camara, mov);                           // los sucesos de la estación (escenarios.js)
     if (trenFantasma) {                                                       // el tren fantasma cruza el cielo de vez en cuando
       tiempoFantasma -= dt;
       if (tiempoFantasma <= 0 && !trenFantasma.visible) { trenFantasma.visible = true; trenFantasma.position.set(-80, 18, -90); trenFantasma.rotation.y = Math.PI / 2; tiempoFantasma = 22; }
@@ -2320,28 +2933,21 @@ export function crearMundo(canvas) {
   const matChispa = col => { if (!matsChispa.has(col)) matsChispa.set(col, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending })); return matsChispa.get(col); };
 
   /* ---- tamaño de la pantalla ---- */
-  /* Cuántas filas tiene la imagen en el estilo pixelado. Eran 270 y se veía
-     tosco: los píxeles medían 2 a 4 píxeles de pantalla y no se leía nada a lo
-     lejos. Con 420 sigue siendo pixel art (bordes en escalera, colores planos)
-     pero bastante más nítido. */
-  const FILAS_PIXEL = 420;
-  /** Cuántos píxeles del lienzo por píxel de la pantalla. En baja con estilo
-      pixelado, el lienzo mismo tiene ~FILAS_PIXEL filas y el navegador lo
-      agranda sin suavizar. En media y alta, el estilo pixelado dibuja al menos
-      a 2×: su pasada necesita píxeles de 2 o más, y en una pantalla de 1× eso
-      daba 300 filas como mucho. A 2× caben las 420, y no cuesta casi nada,
-      porque la pasada dibuja la escena a la resolución de sus píxeles. */
+  /** La densidad de la pantalla (píxeles del aparato por píxel CSS). */
+  const dprAparato = () => window.devicePixelRatio || 1;
+  /** Cuántos píxeles del lienzo por píxel CSS (nunca más que los del aparato). */
   function proporcion() {
-    if (calidad === 'baja' && kit && kit.pixel) return Math.min(1, FILAS_PIXEL / Math.max(1, alto));
-    const normal = Math.min(window.devicePixelRatio || 1, AJUSTES[calidad].dpr);
-    return kit && kit.pixel ? Math.max(2, normal) : normal;
+    return Math.min(dprAparato(), AJUSTES[calidad].dpr);
   }
+  let anchoCss = 1280, altoCss = 720;                                         // el tamaño CSS exacto (con decimales) de la pantalla
   const ajusteRetrato = { y: 0, z: 0 };
   function tamano(w, h) {
+    anchoCss = Math.max(1, w); altoCss = Math.max(1, h);                      // el tamaño CSS exacto, con decimales
     ancho = Math.max(1, w | 0); alto = Math.max(1, h | 0);
+    const asp = ancho / alto;
     renderer.setPixelRatio(proporcion());
     renderer.setSize(ancho, alto, false);
-    const asp = ancho / alto;
+    canvas.style.width = canvas.style.height = canvas.style.imageRendering = '';     // al 100 % de la hoja de estilos
     // el ángulo de visión se ajusta para que siempre quepan los tres carriles (en un celular vertical, más abierto)
     fovBase = THREE.MathUtils.clamp(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(33)) / asp) * 180 / Math.PI, 40, 74);
     camara.fov = fovBase + sens.extra;                                         // más lo que la velocidad le está sumando ahora (ver `paso`)
@@ -2369,7 +2975,7 @@ export function crearMundo(canvas) {
     dibuja() { renderer.info.reset(); if (composer) composer.render(); else renderer.render(escena, camara); },
     tamano,
     /** Cambia la calidad: 'alta' | 'media' | 'baja'. */
-    calidad(nivel) { if (!AJUSTES[nivel] || nivel === calidad) return; calidad = nivel; vista = nivel === 'baja' ? 125 : VISTA; ajustaNiebla(); tamano(ancho, alto); aplicaSombras(); },
+    calidad(nivel) { if (!AJUSTES[nivel] || nivel === calidad) return; calidad = nivel; vista = nivel === 'baja' ? 125 : VISTA; ajustaNiebla(); tamano(anchoCss, altoCss); aplicaSombras(); },
     /** Hasta cuántos metros por delante se dibuja (el juego no crea dibujos más allá). */
     get vista() { return vista; },
     get nivelCalidad() { return calidad; },
@@ -2380,6 +2986,15 @@ export function crearMundo(canvas) {
     /** Qué movimientos de cámara se permiten (ver «la sensación de velocidad»):
         `sacudir` = la opción del juego; `quieto` = el sistema pide reducir el movimiento. */
     movimiento(o) { Object.assign(mov, o); },
+    /** ¿Se cuenta la historia de la Línea 3 en la vía (afiches, grafitis de la historia, el 317)? Solo en su mundo: juego.js lo apaga en City. Vale para lo que se ponga desde ahora. */
+    lore(si) { lore = !!si; },
+    /** CITY: la curva de velocidad con que se mide la sensación de velocidad
+        ({V0, VMAX}): la del mundo de la carrera (City tiene la suya). */
+    curva(V) { if (V && V.VMAX > V.V0) VEL = V; },
+    /** CITY: los efectos de City (null sin mundo-city.js): chicle(si), rompe(o, col). */
+    city: visCity,
+    /** Pinta las monedas de rojo (y latiendo) si `si`: el modo «Sin monedas». */
+    monedasPeligro(si) { monedasRojas = !!si; },
     /** Un brillito donde se tomó una moneda o un poder. */
     chispa(x, y, z, col) {
       const m = new THREE.Mesh(geoChispa, matChispa(col || 0xfff3a0));

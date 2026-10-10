@@ -1069,9 +1069,20 @@ const REGLAS = {
         "Chocar de frente con cualquiera de ellos termina la carrera, salvo que pagues para <b>seguir corriendo</b>: tras el choque aparece 5 s un botón con el precio (500 monedas la primera vez, el doble cada vez en la misma carrera). Si lo dejas pasar, ves el resumen.",
         "Rozar un costado al cambiar de carril es un <b>tropiezo</b>: el inspector Don Ramón y su perro Tornillo te alcanzan un rato. Dos tropiezos seguidos (en menos de 8 s) y te atrapan."
       ])],
+      ["Modos", lista([
+        "En la portada eliges el modo antes de correr (se recuerda en ese aparato). Cada modo tiene su propia tabla en la Clasificación.",
+        "<b>Clásico</b>: el juego de siempre, con poderes, cajas, patineta, potenciadores y «seguir corriendo».",
+        "<b>Sin ayudas</b>: <b>todos corren a ×10 fijo</b>, sin importar el multiplicador de sus misiones, así que la tabla compara solo cuánto corres. No salen poderes ni cajas misteriosas, no hay patineta ni potenciadores, y chocar termina la carrera sin segunda oportunidad. Las estrellas no suben el multiplicador: pagan 50 monedas y cuentan para las misiones.",
+        "<b>Sin monedas</b>: las monedas están en la pista, pero brillan en rojo y <b>tocar una termina la carrera</b>, como chocar de frente. Tampoco hay poderes ni ayudas. Las monedas nunca tapan el único camino: siempre hay por dónde pasar.",
+        "<b>Fantasma</b>: sin poderes ni ayudas (con el multiplicador de tus misiones y tus estrellas), y corres contra el fantasma de la mejor carrera de su tabla, en su misma pista.",
+        "<b>City</b>: la carrera por la ciudad, con todos los poderes y ayudas.",
+        "<b>City sin ayudas</b>: la ciudad con las reglas de Sin ayudas, también a ×10 fijo para todos.",
+        "<b>City fantasma</b>: la ciudad sin ayudas, contra el fantasma de la mejor carrera de su tabla.",
+        "Las misiones, la tienda y el multiplicador base son los mismos en todos los modos, salvo que en los dos «sin ayudas» el multiplicador queda fijo en ×10."
+      ])],
       ["Puntos y multiplicador", lista([
         "Cada metro vale 10 puntos × el <b>multiplicador</b>.",
-        "El multiplicador es el base de tus misiones (de ×1 a ×30) más las <b>estrellas</b> que juntas en la carrera: +1 cada una, hasta +29, más el <b>Potenciador +5</b> si usaste uno.",
+        "El multiplicador es el base de tus misiones (de ×1 a ×30) más las <b>estrellas</b> que juntas en la carrera: +1 cada una, hasta +29, más el <b>Potenciador +5</b> si usaste uno. En <b>Sin ayudas</b> y <b>City sin ayudas</b> no: ahí es <b>×10 fijo</b> para todos.",
         "El poder <b>2×</b> lo duplica mientras dura.",
         "Las <b>monedas</b> no dan puntos: se gastan en la tienda."
       ])],
@@ -1096,16 +1107,33 @@ const REGLAS = {
         "Empiezas con un Despegue de regalo."
       ])],
       ["Estaciones", lista([
-        "El paisaje cambia con la distancia recorrida, siempre pasando por un túnel: <b>Barrio Estación</b> (desde el comienzo, la ciudad de día), <b>Ocaso</b> (a los 1 500 m, retro pixelado al atardecer), <b>Línea Neón</b> (3 500 m, noche synthwave), <b>Estación Fantasma</b> (6 000 m), <b>Invierno</b> (9 000 m), <b>Óxido</b> (12 500 m) y <b>Fin de la Línea</b> (17 000 m). Después vuelven a girar cada 4 km.",
-        "En cada estación hay un <b>boleto dorado</b> con un trozo de la historia. Los que encuentres se leen en la <b>Libreta</b>.",
+        "El paisaje cambia con la distancia recorrida, siempre pasando por un túnel: <b>Barrio Estación</b> (desde el comienzo, la ciudad de día), <b>Ocaso</b> (a los 1 200 m, retro pixelado al atardecer), <b>Mercado de Farolillos</b> (2 550 m), <b>Línea Neón</b> (4 200 m, noche synthwave), <b>Estación Fantasma</b> (6 150 m), <b>Cocheras</b> (8 400 m), <b>Invierno</b> (10 950 m), <b>Muelle</b> (13 700 m), <b>Óxido</b> (16 950 m) y <b>Fin de la Línea</b> (20 250 m). Después vuelven a girar cada 4 km.",
+        "En cada estación hay un <b>boleto dorado</b> con un capítulo de la historia: diez en total. Los que encuentres se leen en la <b>Libreta</b>. Mientras corres, la historia también está en los <b>afiches</b> de la vereda y en el <b>altavoz</b> del andén, que habla al entrar a cada túnel.",
         "En Opciones puedes fijar un estilo (juguete, neón o pixelado) en vez de que cambie con las estaciones, y bajar la calidad gráfica si el teléfono va lento."
+      ])],
+      ["City", lista([
+        "Los modos City corren por otra ciudad, con su propia velocidad y cinco <b>distritos</b>: <b>Barrio Sur</b> (desde el comienzo), <b>Los Muelles</b> (1 500 m), <b>Bulevar Aurora</b> (3 500 m), <b>Parque de los Lagos</b> (6 000 m) y <b>Bajo Vías</b> (9 000 m). En cada uno hay una <b>postal</b> que cuenta la historia de la ciudad.",
+        "<b>Cajones</b>: de frente chocan; se saltan, o se rompen cayéndoles encima (dan monedas). En Los Muelles caen desde las grúas mientras te acercas: su sombra marca el carril y ya están en el suelo antes de que llegues.",
+        "<b>Drones</b>: se pasan rodando por debajo. Pisados desde un techo o una lona se rompen y te lanzan hacia arriba.",
+        "<b>Barandas</b>: saltando te subes y te deslizas por el riel juntando monedas. <b>Lonas</b> (y el vapor de Bajo Vías): te mandan por encima de los vagones.",
+        "<b>Celdas de energía</b> (⚡): con 10 la <b>tabla eléctrica</b> se enciende gratis (H o dos toques) y dura 15 s, como una patineta. La <b>batería</b> la llena de una, y en City la caja misteriosa también. Es la única tabla de City: las patinetas compradas en la tienda no se usan ahí (quedan guardadas para la Línea 3).",
+        "<b>Rejillas</b> en el suelo que tiemblan: cáeles encima de golpe (rodar en el aire) y se abren con un chorro de monedas.",
+        "En City no hay barreras ni rampas de la Línea 3: <b>cada distrito arma su propia pista</b>, con sus obstáculos, sus trenes y su pieza propia, y se corre distinto:",
+        "<b>Barrio Sur · hacia arriba</b>: cajones y drones al ras, pocos trenes de frente, y cada tanto un <b>cobertizo</b>: una caseta de 2 m al pie de unos vagones sin rampa. Salta al techito y, de ahí, otra vez al techo del vagón. El camino de abajo sigue libre. Las rejillas salen seguido, para aprender el pisotón.",
+        "<b>Los Muelles · saltar y pisar</b>: casi todo son cajones que caen de las grúas. A veces una <b>escalera</b>: tres o cuatro pilas seguidas en un pasillo entre vagones, que se saltan una tras otra o se pisan y el rebote lleva a la siguiente. Y las <b>vigas de grúa</b>: una viga amarilla que sube sola de 1,9 a 4,2 m. Salta un poco antes de que empiece (las monedas marcan el arco) y te deja caer sobre los vagones.",
+        "<b>Bulevar Aurora · de lado</b>: rieles por todas partes, drones y muchos trenes que vienen de frente. Los <b>rieles en zigzag</b> son dos o tres barandas que cruzan los carriles: deslizándote, cámbiate al riel siguiente sin tocar el suelo, y cada <b>transbordo</b> multiplica las monedas del riel (×2, ×3, ×4).",
+        "<b>Parque de los Lagos · flotar</b>: los carriles se cierran con <b>setos</b> de 2,8 m, que un salto normal no pasa, y con lonas que rebotan a los techos. Seguido llegan las <b>burbujas</b>: ahí se flota y, en el aire, se puede saltar una vez más; es lo único que pasa por encima de los setos.",
+        "<b>Bajo Vías · rodar</b>: casi todo se pasa por abajo: drones, paredes largas de vagones, trenes de frente y, muy seguido, <b>conductos</b>: un ducto colgado sobre el carril, más largo que una rodada. Rueda al entrar y vuelve a rodar en el <b>anillo naranja</b> (cada «abajo» reinicia la rodada). El vapor te sube a los techos.",
+        "<b>Chicle</b> (15 s): una burbuja que te salva de un choque de frente y te hace saltar un poco más. Rodar en el aire es un <b>pisotón</b>: bajas de golpe (abre rejillas y rompe cajones y drones) y al caer la burbuja <b>rebota</b> y te lanza alto, lo justo para caer sobre un vagón. En el aire, además, atrae las monedas cercanas como el imán. <b>Monedas ×2</b> (15 s): cada moneda vale dos (no cambia los puntos).",
+        "Las <b>estrellas secretas</b> están escondidas en las rutas difíciles. Los <b>personajes de City</b> (Lía, Nico, Ámbar, Bruno, Sol y Dante) se compran en la tienda y cada uno trae una ventaja pequeña que no toca los puntos: más imán, más salto, más monedas al pisar o al deslizarte, más impulso en las lonas o energía que vale por dos."
       ])],
       ["Controles", lista([
         "Teclado: ← → o A D cambian de carril; ↑, W o Espacio saltan; ↓ o S ruedan (en el aire, bajan de golpe); H usa una patineta; P pausa; M apaga el sonido.",
         "Pantalla táctil: desliza el dedo a la izquierda, a la derecha, arriba o abajo; dos toques rápidos usan una patineta.",
-        "Mando: cruceta o stick para moverte, A salta, B rueda, X usa una patineta y Start pausa."
+        "Mando: cruceta o stick para moverte, A salta, B rueda, X usa una patineta y Start pausa.",
+        "Pantalla completa: el botón ⛶ de la portada o de la pausa, o la tecla F. En un teléfono vertical, la carrera además ocupa toda la pantalla mientras corres."
       ])],
-      ["Clasificación", "Hay dos tablas: <b>Mejor carrera</b>, por los puntos de tu mejor carrera, y <b>Distancia</b>, por los metros de tu carrera más larga. Cada carrera terminada cuenta como una partida del club. Subir al podio se anuncia en Discord."]
+      ["Clasificación", "Cada modo tiene su tabla por los puntos de tu mejor carrera: <b>Clásico</b>, <b>Sin ayudas</b>, <b>Sin monedas</b>, <b>Fantasma</b>, <b>City</b>, <b>City sin ayudas</b> y <b>City fantasma</b>. Además está <b>Distancia</b>, por los metros de tu carrera más larga en el modo clásico. Al terminar, el resumen dice a qué tabla fue la carrera. Cada carrera terminada cuenta como una partida del club. Subir al podio se anuncia en Discord."]
     ]
   },
   frontera: {

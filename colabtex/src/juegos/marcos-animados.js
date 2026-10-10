@@ -243,6 +243,24 @@ function dosmil() {
     chispas([[66, 40, 2, 1.7, 0], [66, 220, 1.8, 2.1, -.8]], "#fff3b0");
 }
 
+/* Trigon: un anillo de triángulos de la grilla, alternando punta arriba y
+   punta abajo en los colores de las piezas, que gira despacio, con un
+   hexágono (el tablero) latiendo arriba y dos destellos sueltos. */
+function trigon() {
+  // Los colores de las piezas, uno por triángulo, repetidos en el anillo.
+  const cols = ["#ff5d73", "#ffb84d", "#ffe45c", "#5ee38a", "#4dc3ff", "#a77bff"];
+  // Doce triángulos en el radio 60: los pares apuntan hacia afuera y los
+  // impares hacia adentro, como quedan en una grilla triangular.
+  const tri = i => `<path d="${i % 2 ? "M-7-6H7L0 6Z" : "M-7 6H7L0-6Z"}" fill="${cols[i % 6]}" stroke="#1d2340" stroke-width=".8" stroke-linejoin="round"/>`;
+  const anillo = cada(12, (i, a) => en(60, a, tri(i), a));
+  // El tablero: un hexágono con sus tres diagonales, que late arriba.
+  const hexa = `<path d="M0-8L7-4V4L0 8L-7 4V-4Z" fill="#1d2340" stroke="#ffe45c" stroke-width="1.2"/>` +
+    `<path d="M0-8V8M7-4L-7 4M-7-4L7 4" stroke="#ffe45c" stroke-width=".5" opacity=".7"/>`;
+  return gira(26, anillo) +                                              // el anillo gira despacio
+    en(60, 0, an("l", 1.6, hexa)) +                                      // el hexágono late arriba
+    chispas([[66, 50, 2, 1.7, 0], [66, 230, 1.8, 2.1, -.8]], "#fff3b0"); // dos destellos sueltos
+}
+
 /* Metro Rush: un anillo de vía (balasto, durmientes de madera y dos rieles
    de acero) por el que da vueltas un trencito naranja, visto desde arriba,
    con los focos encendidos, persiguiendo una moneda dorada que gira; un
@@ -569,7 +587,7 @@ const DIBUJOS = {
   tcuadritos: cuadritos, treversi: reversi, tgato: gato, torbita: orbita, tcadena: cadena, tflip: flip, tcacho: cacho,
   tuno: uno, tcatan: catan, tpresidente: presidente, tspicy: spicy, tworms: worms, tyemas: yemas,
   tzombis: zombis, tclue: clue, tajedrez: ajedrez, tmonedas: monedas, tprodrop: prodrop, tsudoku: sudoku, tfanal: fanal, tboxhead: boxhead, tatasco: atasco, taleteo: aleteo, tdosmil: dosmil,
-  tmetrorush: metrorush,
+  tmetrorush: metrorush, ttrigon: trigon,
   cometa, vortice, sakura, plasma, mariposas
 };
 

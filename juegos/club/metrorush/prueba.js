@@ -32,22 +32,49 @@
    Ejemplo: base ×3, sin estrellas, 100 m → 3 000 puntos; recoge una
    estrella (×4) y corre 50 m más → 2 000 puntos más: 5 000 en total.
 
+   LOS MODOS (M.MODOS)
+   La prueba lleva el modo en `m` (la clave de M.MODOS) cuando no es el
+   clásico; una prueba sin `m` es del clásico, así las de antes de que hubiera
+   modos siguen valiendo tal cual (y la del clásico no cambió ni un byte).
+   `rehace` vuelve a generar la pista con ese modo y su curva de velocidad,
+   y rechaza lo que el modo no permite: un 2× recogido o la cinta de la
+   mochila sin poderes, el +5 sin potenciadores, «seguir corriendo» sin
+   segunda oportunidad, un boleto que el mundo no tiene.
+
    UMD: `MetroRushPrueba` en la página, `module.exports` en Node y en el
    verificador del club (colabtex/src/juegos/solo/verifica/metrorush.js). */
 (function (raiz, fabrica) {
-  if (typeof module === "object" && module.exports) module.exports = fabrica(require("./motor.js"));
-  else raiz.MetroRushPrueba = fabrica(raiz.MetroRushMotor);
-})(typeof self !== "undefined" ? self : this, function (M) {
+  /* F = fantasma.js (el formato del rastro `g`); si la página no lo cargó, el rastro solo se mide por su largo. */
+  if (typeof module === "object" && module.exports) module.exports = fabrica(require("./motor.js"), require("./fantasma.js"));
+  else raiz.MetroRushPrueba = fabrica(raiz.MetroRushMotor, raiz.MetroRushFantasma);
+})(typeof self !== "undefined" ? self : this, function (M, F) {
   "use strict";
 
   /* La versión de la prueba. Sube cuando cambia algo que la pista o los
      metros dependen de él (la curva de velocidad, el generador): una prueba
      vieja ya no se puede rehacer con el motor nuevo. 2 = velocidad de 15 a
-     50 m/s, más trenes de frente y más dificultad. */
-  const VERSION = 2;
+     50 m/s, más trenes de frente y más dificultad; 3 = el tope sube a
+     60 m/s (clásico y City). Una prueba de la versión 2 se sigue rehaciendo
+     con su curva y su pista de entonces (`VERSIONES`): hasta el tope viejo
+     las dos pistas son idénticas, así que una carrera honesta de ayer no se
+     vuelve trampa por subir la velocidad hoy. Ejemplo: una carrera v2 de
+     14 km se rehace con el tope de 50 m/s, como se jugó. */
+  const VERSION = 4;
+  const VERSIONES = [2, 3, 4];    // las que todavía se pueden rehacer (la 4 solo cambió «sin monedas»: ver VERSION_PISTA en motor.js)
   const PASO_MUESTRA = 2;         // segundos de carrera entre dos muestras
   const MAX_EVENTOS = 60000;      // una carrera de una hora deja ~2 000: esto es un tope de seguridad
   const MAX_METROS = 1000000;     // el tope de la tabla de distancia
+  /* El rastro del fantasma (`g`, opcional): un texto compacto con una
+     muestra de carril, altura y estado cada 0,1 s de juego (el formato está
+     en fantasma.js). Solo lo anotan los modos «Fantasma», para que el que
+     venga después vea correr al n.º 1. No cuenta para los puntos: rehace solo
+     mira que se pueda leer y que no dure más que la carrera. La prueba entera
+     tiene además el tope del club, PRUEBA_MAX = 200 000 caracteres de JSON
+     (colabtex/src/juegos/solo/verifica.js, en verificaClub). Ejemplo: el peor
+     caso son 3 letras por muestra, 30 por segundo: 60 000 letras son 33 min
+     cambiando de carril sin parar; corriendo de verdad (con muestras
+     repetidas que se juntan) alcanza para horas. */
+  const MAX_FANTASMA = 60000;
 
   /* Tolerancias (en el lado de no castigar a nadie honesto):
      - los metros se suman cuadro a cuadro (V·dt) y aquí se integran exactos:
@@ -62,8 +89,10 @@
   const TOL_DOBLE = 0.15;
   const TOL_DOBLE_CHOQUE = 0.06;  // el cuadro del choque no gasta el 2×: cada choque con el 2× puesto lo alarga hasta un cuadro
   // metros que puede seguir resbalando el corredor al caer: de la velocidad tope a 0 con la frenada del
-  // juego (50 m/s → 20,8 m), más 2 m de holgura. Con un 12 fijo, caer atrapado a 50 m/s se rechazaba.
-  const DERIVA_MUERTE = M.VELOCIDAD.VMAX * M.VELOCIDAD.VMAX / (2 * M.FRENADA) + 2;
+  // juego (50 m/s → 20,8 m; 60 m/s → 30 m), más 2 m de holgura. Con un 12 fijo, caer atrapado a 50 m/s se rechazaba.
+  // Va por curva: un mundo con otro tope resbala otra cosa.
+  const derivaMuerte = curva => curva.VELOCIDAD.VMAX * curva.VELOCIDAD.VMAX / (2 * M.FRENADA) + 2;
+  const DERIVA_MUERTE = derivaMuerte(M.CURVA);                 // la del clásico (la de siempre)
 
   const r4 = x => Math.round(x * 1e4) / 1e4;   // tiempos y relojes: a la décima de milésima basta
 
@@ -73,9 +102,18 @@
 
   /* Una prueba nueva. `s`: la semilla de la pista; `b`: el multiplicador
      base con que empieza la carrera; `md`: el nivel de mejora del 2×
-     (0 a 5); `u`: la cuenta (para que la prueba de otra persona no valga). */
-  function nueva({ s, b, md, u }) {
-    return { v: VERSION, s: s >>> 0, b: b | 0, md: md | 0, u: String(u || ""), i: [], e: [] };
+     (0 a 5); `u`: la cuenta (para que la prueba de otra persona no valga);
+     `m`: el modo (la clave de M.MODOS). El clásico no lo anota: su prueba
+     queda igual que antes de que hubiera modos. `pm`: en un modo fantasma,
+     las reglas con que se corrió (las de la carrera del fantasma, ver
+     M.conReglas). `v`: la versión de la pista, si no es la de ahora (una
+     carrera contra un fantasma de la versión 2 corre su pista vieja). */
+  function nueva({ s, b, md, u, m, pm, v }) {
+    const p = { v: VERSIONES.includes(v) ? v : VERSION, s: s >>> 0, b: b | 0, md: md | 0, u: String(u || "") };
+    if (m && m !== "clasico") p.m = String(m);                 // solo los modos nuevos
+    if (pm) p.pm = String(pm);                                  // las reglas del fantasma
+    p.i = []; p.e = [];
+    return p;
   }
   /* Un pedido al generador, con el punto de la pista (`dSig`, el metro donde
      va el próximo bloque) en que se hizo. Tipos:
@@ -101,6 +139,8 @@
     if (x != null) ev.push(x);
     p.e.push(ev);
   }
+  /* Pone el rastro del fantasma (`g`) en la prueba, recortado a su tope. */
+  function ponFantasma(p, g) { if (p && typeof g === "string") p.g = g.slice(0, MAX_FANTASMA); }
   /* Cierra la prueba: `sn` cuántas entradas no las hizo una persona (teclas o
      toques despachados por un script; las del mando no cuentan). */
   function cierra(p, { sn = 0 } = {}) {
@@ -120,31 +160,62 @@
   const metrosEntre = M.metrosEntre;
 
   /* Rehace la carrera. Devuelve {motivo} si no cuadra, o
-     {puntos, metros, tiempo} (como los manda el juego). */
+     {puntos, metros, tiempo, modo} (como los manda el juego; `modo` es la
+     clave de M.MODOS, "clasico" si la prueba no trae `m`). */
   function rehace(p) {
     const mal = m => ({ motivo: m });
     if (!p || typeof p !== "object") return mal("no hay prueba");
-    if (p.v !== VERSION) return mal("la prueba es de otra versión del juego");
+    if (!VERSIONES.includes(p.v)) return mal("la prueba es de otra versión del juego");
     if (!Number.isInteger(p.s) || p.s < 0 || p.s > 0xffffffff) return mal("la semilla no es válida");
     if (!Number.isInteger(p.b) || p.b < 1 || p.b > M.MAX_BASE) return mal("el multiplicador base no es válido");
     if (!Number.isInteger(p.md) || p.md < 0 || p.md > M.MAX_MEJORA) return mal("el nivel del 2× no es válido");
     if (!Array.isArray(p.i) || !Array.isArray(p.e) || p.e.length > MAX_EVENTOS || p.i.length > MAX_EVENTOS) return mal("la prueba no tiene la forma esperada");
     if (p.sn > 0) return mal(p.sn + " entradas que no hizo una persona");
+    // el rastro del fantasma: opcional, texto y acotado; no entra en la cuenta de puntos
+    if (p.g !== undefined && (typeof p.g !== "string" || p.g.length > MAX_FANTASMA)) return mal("el rastro del fantasma no es válido o es demasiado largo");
+    // el modo: sin `m`, el clásico; una clave que no existe no vale
+    if (p.m !== undefined && typeof p.m !== "string") return mal("el modo de juego no es válido");
+    const modoBase = M.modoDe(p.m);
+    if (!modoBase) return mal("el modo de juego no existe");
+    /* Un modo fantasma corre con las reglas de la carrera del fantasma (`pm`):
+       con ellas se genera la pista y se mira qué se podía hacer (un 2×, el +5,
+       seguir corriendo). Una prueba fantasma de antes no trae `pm`: se corrió
+       con las reglas del propio modo (sin nada), y así se rehace. */
+    if (p.pm !== undefined && (!modoBase.fantasma || typeof p.pm !== "string")) return mal("las reglas del fantasma no son válidas");
+    const modo = p.pm !== undefined ? M.conReglas(modoBase, p.pm) : modoBase;
+    if (!modo) return mal("las reglas del fantasma no son de este modo");
+    const curva = M.velocidadDe(modo, p.v), mundo = M.mundoDe(modo);   // la curva de velocidad (la de la versión de la prueba) y el mundo del modo
+    const metrosEntre = curva.metrosEntre, DERIVA_MUERTE = derivaMuerte(curva);
     const fin = p.e[p.e.length - 1];
     if (!fin || fin[0] !== "f") return mal("la prueba no termina en el fin de la carrera");
     const Dfin = fin[2];
     if (!Number.isFinite(Dfin) || Dfin < 0 || Dfin > MAX_METROS) return mal("los metros finales no son válidos");
+    /* El rastro del fantasma, solo lo burdo (docs/antitrampas/metrorush.md):
+       que se pueda leer (fantasma.js) y que no dure más que la carrera, con
+       2 s de holgura (se anota una muestra cada 0,1 s mientras se corre, y
+       termina al chocar). No suma ni quita puntos: solo evita guardar un
+       rastro que no es de esta carrera. Ejemplo: una carrera que termina a
+       los 60 s no puede traer un rastro de 200 s. */
+    if (typeof p.g === "string" && F) {
+      const dur = F.duracion(p.g);                         // segundos que cubre el rastro (−1: no es un rastro)
+      if (dur < 0) return mal("el rastro del fantasma no se puede leer");
+      if (dur > fin[1] + 2) return mal("el rastro del fantasma dura más que la carrera");
+    }
 
     // 1) La pista: la misma semilla y los mismos pedidos, en el mismo punto.
     //    Solo hacen falta las estrellas y los 2× (lo que cambia el puntaje).
-    const gen = M.crearGenerador(p.s), objetos = new Map();
+    const gen = M.crearGenerador(p.s, { modo, version: p.v }), objetos = new Map();   // la pista de esa versión y esas reglas
     const guarda = lista => { for (const o of lista) if (o.tipo === "estrella" || (o.tipo === "poder" && o.clase === "doble")) objetos.set(o.id, o); };
     for (const q of p.i) {
       if (!Array.isArray(q) || !Number.isFinite(q[1]) || q[1] > MAX_METROS + 1000) return mal("un pedido a la pista no es válido");
       guarda(gen.generarHasta(q[1], { V: 20 }));
       if (gen.estado().dSig !== q[1]) return mal("la pista no es la de la semilla");
       if (q[0] === "T" && Number.isFinite(q[2])) gen.pedirTunel(q[2], q[3]);
-      else if (q[0] === "B" && Number.isInteger(q[2]) && Number.isFinite(q[3])) gen.pedirBoleto(q[2], q[3]);
+      else if (q[0] === "B" && Number.isInteger(q[2]) && Number.isFinite(q[3])) {
+        if (q[2] < 1 || !mundo.boletos[q[2]]) return mal("un boleto que este mundo no tiene");
+        gen.pedirBoleto(q[2], q[3]);
+      }
+      else if (q[0] === "C" && !modo.items && !modo.potenciadores) return mal("la mochila cohete no existe en el modo " + modo.nombre);
       else if (q[0] === "C" && Number.isFinite(q[2]) && Number.isFinite(q[3]) && q[3] - q[2] < 2000 && Number.isInteger(q[4])) guarda(gen.monedasCielo(q[2], q[3], q[4]));
       else return mal("un pedido a la pista no es válido");
     }
@@ -175,13 +246,14 @@
         // los puntos del tramo, con el multiplicador que había
         if (cod !== "w") {
           if (D < Dpuntos - 1e-9) return mal("los metros van hacia atrás");
-          puntos += M.puntosPorTramo(D - Dpuntos, M.multiplicador({ base: p.b, estrellas, doble, extra }));
+          puntos += M.puntosPorTramo(D - Dpuntos, M.multiplicador({ base: p.b, estrellas, doble, extra, fijo: modo.multFijo }));
           Dpuntos = D;
         }
       }
       switch (cod) {
         case "w": break;
         case "e": case "d": {
+          if (cod === "d" && !modo.items) return mal("un 2× en el modo " + modo.nombre + ", que no tiene poderes");
           if (!vivo) return mal("algo se recogió estando caído");
           const o = objetos.get(x);
           if (!o || (cod === "e" ? o.tipo !== "estrella" : o.clase !== "doble")) return mal(cod === "e" ? "una estrella que no está en la pista" : "un 2× que no está en la pista");
@@ -197,12 +269,14 @@
           if (dobleVivo < durDoble - TOL_DOBLE || dobleVivo > durDoble + TOL_DOBLE + holguraDoble) return mal("el 2× no duró lo que dura");
           doble = false; break;
         case "p":
+          if (!modo.potenciadores) return mal("un potenciador en el modo " + modo.nombre + ", que no tiene");
           if (usoPot || !vivo || t > 6.5) return mal("el Potenciador +5 no se usó al empezar");
           usoPot = true; extra = M.POTENCIADORES.puntos.extra; break;
         case "m":
           if (!vivo) return mal("dos choques sin seguir corriendo entre medio");
           vivo = false; Dmuerte = D; if (doble) holguraDoble += TOL_DOBLE_CHOQUE; break;
         case "s":
+          if (!modo.revivir) return mal("seguir corriendo en el modo " + modo.nombre + ", que no lo permite");
           if (vivo) return mal("seguir corriendo sin haber chocado");
           if (D < Dmuerte - 0.5 || D > Dmuerte + DERIVA_MUERTE) return mal("al seguir corriendo, los metros no cuadran");
           vivo = true; Dpuntos = D; base = { t, D }; break;
@@ -216,8 +290,10 @@
       if (vivo && cod !== "s") base = { t, D };
       ant = { t, D, r };
     }
-    return { puntos: Math.floor(puntos), metros: Math.floor(Dfin), tiempo: Math.max(1, Math.round(fin[1] * 1000)), eventos: p.e.length };
+    // `reglas`: con qué reglas se corrió (la clave del modo; en un fantasma, la de su `pm`, o la suya si no trae)
+    return { puntos: Math.floor(puntos), metros: Math.floor(Dfin), tiempo: Math.max(1, Math.round(fin[1] * 1000)), eventos: p.e.length, modo: modo.id, reglas: modo.reglas || modo.id };
   }
 
-  return { VERSION, PASO_MUESTRA, nueva, pedido, evento, cierra, rehace, metrosEntre };
+  return { VERSION, VERSIONES, PASO_MUESTRA, MAX_FANTASMA, ponFantasma, nueva, pedido, evento, cierra, rehace, metrosEntre,
+    MODOS: M.MODOS, DISTANCIA: M.DISTANCIA, modoDe: M.modoDe, modoDeCategoria: M.modoDeCategoria, velocidadDe: M.velocidadDe };   // para el verificador del club
 });

@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610100021"></script>
+<script src="i18n.js?v=202610100158"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Laboratorio</title>
@@ -3887,6 +3887,20 @@ html[data-tema=oscuro] .jg-drop-quien:hover>b{color:#fff}
 .jg-mn:is(:hover,:focus-within) .jg-sp-svg .a-sale,.jg-hoja-arte .jg-sp-svg .a-sale{animation:jgSpSale 2.6s cubic-bezier(.5,0,.4,1) infinite}
 .jg-mn:is(:hover,:focus-within) .jg-sp-svg .a-barrera,.jg-hoja-arte .jg-sp-svg .a-barrera{animation:jgSpBarrera 2.6s ease-in-out infinite}
 .jg-mn:is(:hover,:focus-within) .jg-sp-svg .a-lengua,.jg-hoja-arte .jg-sp-svg .a-lengua{animation:jgSpLate .5s steps(2) infinite}
+/* Metro Rush: los focos del tren laten (el tren se acerca), el tren retumba,
+   las rayas de velocidad se quedan atrás del corredor, las estelas de la
+   tabla se estiran desde la cola, una ola de brillo baja por los durmientes
+   y el corredor se inclina como al tallar mientras sube y baja; la sombra y
+   los focos van al mismo 1.6 s que él, así todo respira junto. */
+.jg-mn:is(:hover,:focus-within) .jg-sp-svg .a-foco,.jg-hoja-arte .jg-sp-svg .a-foco{animation:jgSpFoco 1.6s ease-in-out infinite}
+.jg-mn:is(:hover,:focus-within) .jg-sp-svg .a-tiembla,.jg-hoja-arte .jg-sp-svg .a-tiembla{animation:jgSpTiembla .12s steps(2) infinite}
+.jg-mn:is(:hover,:focus-within) .jg-sp-svg .a-raya,.jg-hoja-arte .jg-sp-svg .a-raya{animation:jgSpRaya .5s linear infinite}
+.jg-sp-svg .a-estela{transform-origin:right center}
+.jg-sp-svg .a-surfea{transform-origin:center bottom}
+.jg-mn:is(:hover,:focus-within) .jg-sp-svg .a-surfea,.jg-hoja-arte .jg-sp-svg .a-surfea{animation:jgSpSurfea 1.6s ease-in-out infinite}
+.jg-mn:is(:hover,:focus-within) .jg-sp-svg .a-durmiente,.jg-hoja-arte .jg-sp-svg .a-durmiente{animation:jgSpDurmiente 1.1s ease-in-out infinite}
+.jg-mn:is(:hover,:focus-within) .jg-sp-svg .a-estela,.jg-hoja-arte .jg-sp-svg .a-estela{animation:jgSpEstela .3s ease-in-out infinite alternate}
+.jg-mn:is(:hover,:focus-within) .jg-sp-svg .a-sombra,.jg-hoja-arte .jg-sp-svg .a-sombra{animation:jgSpSombra 1.6s ease-in-out infinite}
 @keyframes jgSpLate{0%,100%{opacity:.45}50%{opacity:1}}
 @keyframes jgSpFlota{0%,100%{transform:translateY(3px)}50%{transform:translateY(-6px)}}
 @keyframes jgSpAla{from{transform:scaleY(1)}to{transform:scaleY(.35)}}
@@ -3895,6 +3909,13 @@ html[data-tema=oscuro] .jg-drop-quien:hover>b{color:#fff}
 @keyframes jgSpFlamea{from{transform:skewY(-6deg)}to{transform:skewY(6deg)}}
 @keyframes jgSpChispa{0%,100%{opacity:1}50%{opacity:.6}}
 @keyframes jgSpSale{0%,25%{transform:translateX(0)}60%,100%{transform:translateX(150px);opacity:0}}
+@keyframes jgSpFoco{0%,100%{opacity:.75;transform:scale(.9)}50%{opacity:1;transform:scale(1.12)}}
+@keyframes jgSpTiembla{from{transform:translate(0,0)}to{transform:translate(1.4px,-1px)}}
+@keyframes jgSpSurfea{0%,100%{transform:translateY(3px) rotate(1.5deg)}50%{transform:translateY(-6px) rotate(-2.5deg)}}
+@keyframes jgSpDurmiente{0%,100%{opacity:.6}50%{opacity:1}}
+@keyframes jgSpEstela{from{transform:scaleX(.6)}to{transform:scaleX(1.25)}}
+@keyframes jgSpSombra{0%,100%{transform:scaleX(1);opacity:.32}50%{transform:scaleX(.78);opacity:.16}}
+@keyframes jgSpRaya{from{transform:translateX(-8px);opacity:1}to{transform:translateX(22px);opacity:0}}
 @keyframes jgSpBarrera{0%,20%{transform:rotate(0)}40%,80%{transform:rotate(-80deg)}100%{transform:rotate(0)}}
 @media(prefers-reduced-motion:reduce){.jg-sp-svg [class^="a-"]{animation:none!important}}
 .jg-mn-txt{display:grid;gap:3px;padding:9px 12px 12px;min-width:0}
@@ -4412,6 +4433,6 @@ html[data-tema=oscuro] .jg-adm-tabs .btn2.on{background:#ab8bff;color:#171522;bo
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610100021"></script>
+<script src="juegos-app.js?v=202610100158"></script>
 </body>
 </html>
