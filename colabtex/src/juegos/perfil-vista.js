@@ -107,13 +107,24 @@ export function abreMini(uid, ancla, ctx, pista) {
   };
   pinta();
   document.body.appendChild(caja);
+  /* La hoja de abajo es solo del celular. El ancla puede desaparecer con la
+     tarjeta abierta: la lista que la contiene (el Top monedas, la
+     clasificación) se repinta entera cada vez que llegan datos, y entonces
+     la tarjeta se queda donde estaba. Antes un ancla desconectada la volvía
+     hoja, y en el escritorio la hoja cruza la página de lado a lado. */
   const coloca = () => {
-    if (window.matchMedia("(max-width: 600px)").matches || !ancla || !ancla.isConnected) { caja.classList.add("hoja"); return; }
+    if (window.matchMedia("(max-width: 600px)").matches) { caja.classList.add("hoja"); return; }
     caja.classList.remove("hoja");
-    const r = ancla.getBoundingClientRect(), w = caja.offsetWidth, h = caja.offsetHeight;
-    let x = r.left + r.width / 2 - w / 2, y = r.bottom + 10;
-    if (y + h > innerHeight - 8) y = Math.max(8, r.top - h - 10);
+    const w = caja.offsetWidth, h = caja.offsetHeight;
+    let x, y;
+    if (ancla && ancla.isConnected) {
+      const r = ancla.getBoundingClientRect();
+      x = r.left + r.width / 2 - w / 2; y = r.bottom + 10;
+      if (y + h > innerHeight - 8) y = Math.max(8, r.top - h - 10);
+    } else if (caja.style.left) { x = parseFloat(caja.style.left); y = parseFloat(caja.style.top); }
+    else { x = (innerWidth - w) / 2; y = (innerHeight - h) / 2; }
     x = Math.max(8, Math.min(innerWidth - w - 8, x));
+    y = Math.max(8, Math.min(innerHeight - h - 8, y));
     caja.style.left = x + "px"; caja.style.top = y + "px";
   };
   coloca();
