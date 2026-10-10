@@ -33,7 +33,7 @@
 
 **Preferences** go to `users/<uid>/mascotas`: light, background, dance bar, and `usadas`, the rations eaten (a transaction +1 per handful). Food stock = rations bought (replay) − `usadas`. FPS and mute stay in `localStorage`.
 
-**Balance.** Growth was cut to 1/20 (`GROW_PER_ACTION` 0.05, `GROW_PER_POINT` 0.005). The «+N 🌱» shows hundredths. `sinPremio` is the old `unpaid`: dancing while already happy still raises stats but gets no per-action growth.
+**Balance.** Growth was cut to 1/20 (`GROW_PER_ACTION` 0.05, `GROW_PER_POINT` 0.005). Hatching (egg/box → baby) needs 10/3 growth, a third of the old 10. Stats drop at 2.5× the original rate (`DECAY_PER_HOUR` 17.5/12.5/7.5/10). The «+N 🌱» shows hundredths. `sinPremio` is the old `unpaid`: dancing while already happy still raises stats but gets no per-action growth.
 
 **While listed in the market** a pet cannot be cared for, dressed or given the potion, and an item cannot be used. Listing a pet strips what it wears (it stays the seller's). Selling an item takes it off whoever wore it. `onlyUsable` drops worn items that were sold or listed.
 

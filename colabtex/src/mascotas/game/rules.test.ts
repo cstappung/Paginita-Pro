@@ -70,9 +70,9 @@ describe('crecimiento por cuidados', () => {
       n++
     }
     expect(egg.stage).toBe('baby')
-    // Antes bastaban 2 cuidados así; con ÷20, unos 39.
-    expect(n).toBeGreaterThan(30)
-    expect(n).toBeLessThan(60)
+    // Antes bastaban 2 cuidados así; con ÷20, unos 39; con la eclosión a 1/3, unos 14.
+    expect(n).toBeGreaterThan(10)
+    expect(n).toBeLessThan(20)
   })
 
   it('alimentarla con hambre la hace crecer (centésimas por cuidado)', () => {
