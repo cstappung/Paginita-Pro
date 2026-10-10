@@ -196,7 +196,7 @@ export const JUEGOS = {
   },
   tulones: {
     nombre: "Tulones",
-    lema: "Por turnos, trepa sobre la cabra y sobre tus amigos congelados: quien no supera la torre queda fuera",
+    lema: "Por turnos, trepa sobre el pudú y sobre tus amigos congelados: quien no supera la torre queda fuera",
     color: "#63b8ee",
     minimo: 2,
     cupo: 8,
@@ -6836,14 +6836,15 @@ export function redBoxhead(p, js = jugadoresDe(p), listos = true) {
    archivo no puede importarlo (los tests lo cargan en un `vm` sin los
    `export`), así que lo lee de `globalThis.TulonesMotor`, que pone
    `juegos/tulones.js` al importar el UMD. Las opciones de la sala son
-   `tiempo` (segundos por turno) y `rondas` (0 es sin fin). */
+   `tiempo` (segundos por turno) y `rondas` (0 es sin fin). Se reduce
+   también con la sala abierta: los «Listo» se juntan antes de empezar. */
 export const TL_TIEMPOS = [30, 45, 60, 90];
 export const TL_RONDAS = [0, 3, 5, 10];
 export function redTulones(p, js = jugadoresDe(p), listos = true) {
   const TM = globalThis.TulonesMotor;
-  if (!listos || !TM) return { fase: "espera", turno: "", ganador: null, motivo: "" };
+  if (!TM) return { fase: "espera", turno: "", ganador: null, motivo: "" };
   return TM.reducirSala(jugadasDe(p), js.map(j => ({ uid: j.uid, nombre: j.nombre || "" })),
-    { tiempo: p.tiempo, rondas: p.rondas, listos });
+    { tiempo: p.tiempo, rondas: p.rondas, acumula: p.acumula, listos });
 }
 
 /* ---------- gato (tres en raya) y super gato ----------

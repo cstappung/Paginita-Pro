@@ -92,7 +92,7 @@ export const SOLOS = [
     modos: ["Carrera sin fin", "Siete estaciones", "Tienda y retos"] },
   { id: "tulonesclub", tipo: "club", nombre: "Tulones Club", genero: "Física", icono: "🩲", alta: "2026-10-09",
     ruta: "#solo/tulones", reglas: "tulones", popular: "club-tulones", ranking: false,
-    lema: "Trepa sobre una cabra y sobre tus amigos congelados en calzoncillos. La torre más alta gana. De 1 a 8 en el mismo teclado.",
+    lema: "Trepa sobre un pudú y sobre tus amigos congelados en calzoncillos. La torre más alta gana. De 1 a 8 en el mismo teclado.",
     modos: ["1 a 8 jugadores", "Torre sin fin"] },
   { id: "frontera", tipo: "club", nombre: "Frontera Batalla", genero: "Pokémon", icono: "🏰", alta: "2026-10-02",
     ruta: "#solo/frontera", reglas: "frontera", popular: "club-frontera", ranking: true,

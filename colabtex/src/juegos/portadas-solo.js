@@ -356,7 +356,7 @@ const ARTE = {
     <rect class="a-late" x="260" y="206" width="48" height="48" rx="5" fill="none" stroke="#fff3b0" stroke-width="3"/>`;
   },
 
-  /* Tulones: la cabra al fondo y la torre de amigos congelados en
+  /* Tulones: el pudú al fondo y la torre de amigos congelados en
      calzoncillos, con el de arriba trepando. */
   /* Trigon: el hexágono de triángulos con algunas piezas puestas y una
      pieza de la mano flotando encima, en los colores del tema Clásico. */
@@ -401,10 +401,13 @@ const ARTE = {
     <rect width="400" height="300" fill="url(#g${u})"/>
     <circle cx="340" cy="54" r="26" fill="#fff6c2"/>
     <path d="M0 250 Q120 236 220 246 T400 240 V300 H0Z" fill="#6cbf4a"/>
-    <g transform="translate(150 218)"><ellipse cx="0" cy="0" rx="44" ry="20" fill="#f1ece2" stroke="#2a1d18" stroke-width="3"/>
-      <path d="M-30 14 V38 M-12 16 V38 M14 16 V38 M30 14 V38" stroke="#2a1d18" stroke-width="5" stroke-linecap="round"/>
-      <circle cx="44" cy="-14" r="13" fill="#f1ece2" stroke="#2a1d18" stroke-width="3"/><path d="M40 -26 Q34 -40 26 -38 M50 -26 Q56 -40 64 -36" stroke="#8b6b45" stroke-width="4" fill="none"/>
-      <circle cx="48" cy="-16" r="2" fill="#2a1d18"/></g>
+    <g transform="translate(150 218)" stroke="#2a1d18" stroke-width="3"><path d="M-30 14 V38 M-12 16 V38 M14 16 V38 M30 14 V38" stroke="#c9743f" stroke-width="7" stroke-linecap="round"/>
+      <path d="M-30 38 h1 M-12 38 h1 M14 38 h1 M30 38 h1" stroke="#1a1a1a" stroke-width="8" stroke-linecap="round"/>
+      <ellipse cx="0" cy="0" rx="44" ry="20" fill="#b4622e"/><path d="M-32 10 Q0 22 32 10" stroke="#d98a52" stroke-width="6" fill="none"/>
+      <ellipse cx="34" cy="-32" rx="5" ry="11" fill="#b4622e" transform="rotate(-35 34 -32)"/><ellipse cx="54" cy="-32" rx="5" ry="11" fill="#b4622e" transform="rotate(30 54 -32)"/>
+      <path d="M41 -28 L38 -38 M48 -28 L50 -38" stroke="#efe4c8" stroke-width="3"/>
+      <ellipse cx="44" cy="-16" rx="14" ry="12" fill="#b4622e"/><ellipse cx="56" cy="-10" rx="7" ry="5" fill="#d98a52"/>
+      <circle cx="61" cy="-9" r="2.8" fill="#1a1a1a" stroke="none"/><circle cx="46" cy="-19" r="2.2" fill="#1a1a1a" stroke="none"/></g>
     ${tipo(214, 160, 70, "#f2c29b", "#3b2a1a", "#e8322f")}${tipo(246, 112, -20, "#8d5a3b", "#111", "#2f7de1")}
     <g class="a-mueve">${tipo(262, 50, 12, "#ffd9b8", "#e0a020", "#2fb36b")}</g>`;
   },

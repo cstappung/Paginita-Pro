@@ -121,8 +121,8 @@ export const atasco=etapa=>{
  cuerpo+=txt(272,90,textos[0],22,etapa===2?C.oro:C.blanco)+txt(272,122,textos[1],17)+txt(272,150,textos[2],17,etapa===2?C.oro:C.verde);
  return svg(nombre,cuerpo);
 };
-/* Tulones: un tulón en calzoncillos trepando. Etapa 0, sale al pie de la
-   cabra; 1, una mano agarrada a la cabra y el ratón abajo lo sube;
+/* Tulones: un tulón en calzoncillos trepando. Etapa 0, sale al pie del
+   pudú; 1, una mano agarrada al pudú y el ratón abajo lo sube;
    2, se congela y el siguiente trepa por encima. */
 const tulon=(x,y,piel,pelo,calzon,brazos,piernas,frio)=>{
  const tinta='#1a1a1a',p=frio?'#bfe6ff':piel;
@@ -135,11 +135,11 @@ const tulon=(x,y,piel,pelo,calzon,brazos,piernas,frio)=>{
  g+=`<circle cx="-4" cy="-54" r="1.8" fill="${tinta}"/><circle cx="5" cy="-54" r="1.8" fill="${tinta}"/><path d="M-4 -47 Q1 -44 6 -47" stroke="${tinta}" stroke-width="1.6" fill="none"/>`;
  return g+'</g>';
 };
-const cabra=(x,y)=>`<g transform="translate(${x} ${y})"><ellipse cx="0" cy="-42" rx="46" ry="24" fill="#f4efe4" stroke="#1a1a1a" stroke-width="2"/>`+[-32,-14,14,32].map(a=>`<path d="M${a} -24 L${a} 0" stroke="#1a1a1a" stroke-width="6" stroke-linecap="round"/>`).join('')+`<ellipse cx="50" cy="-66" rx="14" ry="11" fill="#f4efe4" stroke="#1a1a1a" stroke-width="2"/><path d="M46 -76 Q40 -92 30 -90 M54 -76 Q56 -92 46 -94" stroke="#8a7a62" stroke-width="3" fill="none"/><circle cx="54" cy="-68" r="1.8" fill="#1a1a1a"/><path d="M56 -56 L54 -46" stroke="#e7dccb" stroke-width="4"/></g>`;
+const pudu=(x,y)=>`<g transform="translate(${x} ${y})" stroke="#1a1a1a" stroke-width="2">`+[-32,-14,14,32].map(a=>`<path d="M${a} -24 L${a} 0" stroke="#c9743f" stroke-width="7" stroke-linecap="round"/><ellipse cx="${a}" cy="0" rx="4" ry="3" fill="#1a1a1a"/>`).join('')+`<ellipse cx="0" cy="-42" rx="46" ry="24" fill="#b4622e"/><path d="M-36 -30 Q0 -14 36 -30" stroke="#d98a52" stroke-width="6" fill="none"/><path d="M36 -52 L50 -68" stroke="#b4622e" stroke-width="16" stroke-linecap="round"/><ellipse cx="44" cy="-82" rx="5" ry="11" fill="#b4622e" transform="rotate(-35 44 -82)"/><ellipse cx="60" cy="-84" rx="5" ry="11" fill="#b4622e" transform="rotate(30 60 -84)"/><path d="M49 -78 L46 -88 M55 -78 L57 -88" stroke="#efe4c8" stroke-width="3"/><ellipse cx="52" cy="-68" rx="13" ry="11" fill="#b4622e"/><ellipse cx="63" cy="-63" rx="7" ry="5" fill="#d98a52"/><circle cx="68" cy="-62" r="2.6" fill="#1a1a1a" stroke="none"/><circle cx="53" cy="-71" r="2" fill="#1a1a1a" stroke="none"/></g>`;
 export const tulones=etapa=>{
- const nombre=['Al empezar el turno, el tulón aparece al pie de la cabra','La mano agarrada a la cabra y el ratón hacia abajo suben al tulón','El tulón se congela y el siguiente trepa por encima de él'][etapa];
+ const nombre=['Al empezar el turno, el tulón aparece al pie del pudú','La mano agarrada al pudú y el ratón hacia abajo suben al tulón','El tulón se congela y el siguiente trepa por encima de él'][etapa];
  let cuerpo=`<rect x="14" y="14" width="452" height="222" rx="10" fill="#8fd3ff"/>`+circle(420,48,20,'#ffe46b')+`<rect x="14" y="200" width="452" height="36" fill="#6fbf4a"/>`;
- cuerpo+=cabra(150,200);
+ cuerpo+=pudu(150,200);
  if(etapa===0){
   cuerpo+=tulon(290,186,'#f1c9a5','#5b3a22','#ffffff',[[-10,-36,-22,-14],[10,-36,22,-14]],[[-6,0,-8,14],[6,0,8,14]]);
   cuerpo+=txt(332,90,'Tu turno:',20,'#17243b')+txt(332,116,'45 s para',16,'#17243b')+txt(332,138,'trepar',16,'#17243b');

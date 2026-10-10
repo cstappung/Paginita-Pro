@@ -961,29 +961,30 @@ const REGLAS = {
   /* Tulones (juegos/club/tulones/): lo que dice aquí tiene que coincidir con
      motor.js (miembros, congelar) y juego.js (turnos, controles). */
   tulones: {
-    lema: "Tulones: cada turno sale un tulón nuevo que trepa por la cabra y por los que ya se congelaron. Hay que superar la torre o quedas fuera: gana el último en pie.",
+    lema: "Tulones: cada turno sale un tulón nuevo que trepa por el pudú y por los que ya se congelaron. Hay que superar la torre o quedas fuera: gana el último en pie.",
     secciones: [
       ["Cómo se juega", "Es para jugar por turnos en un mismo equipo, de 1 a 8 personas. En tu turno aparece tu tulón al pie de la torre y tienes el tiempo elegido (de 30 a 90 s) para trepar. Cuando se acaba, o cuando lo decides, tu tulón se <b>congela</b> donde está y pasa a ser parte de la torre: el siguiente puede pisarlo, colgarse de él y seguir subiendo."],
       ["Brazos y piernas", lista([
         "Cada brazo y cada pierna se mueve por separado: <b>A</b> el brazo izquierdo, <b>D</b> el derecho, <b>W</b> la pierna izquierda y <b>S</b> la derecha. Las teclas se cambian en ⌨ Controles.",
         "Mientras mantienes una tecla, ese miembro sigue al ratón. Los que no sostienes cuelgan con el peso del cuerpo.",
-        "Si la mano o el pie toca la cabra, el suelo o un tulón congelado, <b>se agarra</b>. Al soltar la tecla, se suelta.",
+        "Si la mano o el pie toca el pudú, el suelo o un tulón congelado, <b>se agarra</b>. Al soltar la tecla, se suelta.",
         "Con algo agarrado, llevar el ratón hacia abajo empuja el cuerpo hacia arriba: así se trepa.",
         "Agarrado de una mano, estirar la otra más allá de su alcance arrastra el cuerpo hacia allá.",
         "Tirado en el suelo, un tirón brusco del ratón despega el cuerpo hacia donde lo llevas."
       ])],
       ["La torre", "La línea roja marca la altura de la torre al empezar tu turno y tienes que superarla; la altura de un tulón se mide desde el suelo hasta su punto más alto. Si al congelarte no la pasas, quedas eliminado. Con varias personas gana el último en pie; jugando solo, sigues hasta que falles. Si eliges un límite de rondas (3, 5 o 10), la partida termina al cumplirlo. La torre completa se compara con tu récord, que se guarda en este navegador. Si un tulón sale del escenario, se pierde y queda eliminado."],
       ["En línea", lista([
-        "Desde el salón se abre una <b>sala de Tulones</b> para 2 a 8 personas, cada una en su casa. Quien la abre elige el tiempo de cada turno y las rondas; el anfitrión puede empezar con dos o más.",
+        "Desde el salón se abre una <b>sala de Tulones</b> para 2 a 8 personas, cada una en su casa. Quien la abre elige el tiempo de cada turno y las rondas. En el menú cada uno aprieta <b>Listo</b>: la torre empieza sola cuando todos (dos o más) lo están. Si te pones a personalizar tu tulón, vuelves a «esperando».",
         "Los turnos van en el orden de los asientos. En el tuyo tienes 15 segundos para darle a «¡A trepar!» (si no, sales solo) y después el tiempo del turno. Mientras tanto, los demás te ven trepar en directo.",
         "Al congelarte, tu cuerpo queda en la torre de todos. La altura y si superaste la línea roja las calcula la sala con tu cuerpo, igual en todas las pantallas.",
         "Si alguien cierra la pestaña o se queda sin internet en su turno, pasado el plazo (el tiempo del turno más unos segundos) la sala lo da por eliminado y sigue el siguiente. En línea no hay pausa.",
-        "Gana el último en pie; con rondas, al cumplirlas gana quien llegó más alto de los que siguen en pie."
+        "Gana el último en pie; con rondas, al cumplirlas gana quien llegó más alto de los que siguen en pie.",
+        "Con «Tiempo: se acumula cada ronda», cada ronda nueva suma un segundo al turno por cada otro jugador que sigue en pie. Por ejemplo, con cinco y 30 s, la segunda ronda tiene 34 s y la tercera 38 s; si en una ronda quedan tres, la siguiente suma solo 2."
       ])],
       ["Personajes", "Antes de jugar, cada jugador elige su tulón: nombre, color de piel, peinado y color del pelo, barba, color del slip (hay uno con la bandera chilena), sombrero (chupalla y de paja, entre otros), físico y tamaño, o uno de los personajes ya armados. Es solo de adorno: no cambia cómo se mueve ni cómo trepa."],
       ["Controles", lista([
         "Teclado y ratón: A, D, W o S para sostener un miembro, y el ratón (o las flechas) para llevarlo. Espacio congela antes de tiempo. P o Esc, pausa. F o ⛶, pantalla completa.",
-        "En el celular: los cuatro botones de los lados sostienen cada miembro, arrastrar el dedo por el escenario lo lleva y ❄ congela.",
+        "Solo en computador: en el teléfono no se puede jugar, porque mover cuatro miembros con los dedos no da.",
         "Con mando: LB y RB los brazos, LT y RT las piernas, el stick izquierdo lleva, A congela y Start pausa."
       ])],
       ["Clasificación", "Jugando en la misma pantalla, Tulones no tiene tabla ni paga monedas. Las salas en línea cuentan como cualquier juego de sala: victorias, logros y monedas."]

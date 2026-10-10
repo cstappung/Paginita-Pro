@@ -35,9 +35,9 @@ test('@controles en el código del juego manda sobre la lectura',()=>{
    `@controles:` en su código y se añade a esta lista. */
 const PROBADOS={
  movil:['orbita','escondite','cartas','cuadritos','worms','reversi','cadena','flip7','cacho','uno','catan','presidente','spicy','tetris','clue','ajedrez','pokemon',
-  'minas','snake','tetrisclub','bbtan','sopa','electro','sudoku','fanal','atasco','aleteo','dosmil','trigon','tulones','tulonesclub','frontera','bots-worms','bots-clue','mascotas'],
+  'minas','snake','tetrisclub','bbtan','sopa','electro','sudoku','fanal','atasco','aleteo','dosmil','trigon','frontera','bots-worms','bots-clue','mascotas'],
  teclado:['boxhead','bots-boxhead','sortem'],
- tecladoYRaton:['yemas','bots-yemas']
+ tecladoYRaton:['yemas','bots-yemas','tulones','tulonesclub']
 };
 
 test('acierta con los juegos que se probaron en un teléfono',()=>{

@@ -1,4 +1,4 @@
-// @controles: tactil raton teclado
+// @controles: raton teclado
 /* Tulones: la pantalla. La física vive en motor.js; aquí se dibuja, se oye y se juega por turnos. */
 (() => {
   'use strict';
@@ -11,6 +11,9 @@
   const TINTA = '#2a1e18';
   // Dentro de una sala de Juegos (colabtex/src/juegos/tulones.js): cada uno trepa en su pantalla y la torre llega por el registro.
   const ONLINE = /[?&]modo=online\b/.test(location.search);
+  // En el teléfono no se puede jugar (con los dedos no da para mover cuatro miembros): se avisa y no se monta nada.
+  const MOVIL = !!(navigator.userAgentData && navigator.userAgentData.mobile) || /Android|iPhone|iPad|iPod|Mobile|Silk|Kindle/i.test(navigator.userAgent) ||
+    (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
 
   /* ---------------- sonido ---------------- */
   let actx = null, mudo = lee('tulones.mudo', false);
@@ -38,7 +41,30 @@
     g.gain.setValueAtTime(vol || .2, t); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
     s.connect(bp).connect(g).connect(a.destination); s.start(t);
   }
+  // Un metal: dos sierras desafinadas por un pasabajos que se abre al atacar (trompeta) o un deslizamiento (trombón).
+  function metal(f, t0, dur, vol, f2) {
+    const a = audio(); if (!a) return;
+    const t = a.currentTime + (t0 || 0), g = a.createGain(), lp = a.createBiquadFilter();
+    lp.type = 'lowpass'; lp.Q.value = 2; lp.frequency.setValueAtTime(f * 1.5, t); lp.frequency.exponentialRampToValueAtTime(f * 6, t + .06);
+    lp.frequency.exponentialRampToValueAtTime(f * 3, t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(vol || .08, t + .03);
+    g.gain.setValueAtTime(vol || .08, t + dur * .8); g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    lp.connect(g).connect(a.destination);
+    for (const d of [-6, 6]) {
+      const o = a.createOscillator(); o.type = 'sawtooth'; o.detune.value = d; o.frequency.setValueAtTime(f, t);
+      if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+      o.connect(lp); o.start(t); o.stop(t + dur + .02);
+    }
+  }
   const sonido = {
+    // Ta-ta-ta-taaa, ta-ta-taaaa: las trompetas del ganador.
+    trompetas: () => {
+      [[392, 0, .14], [392, .16, .14], [392, .32, .14], [523, .48, .55], [440, 1.08, .14], [523, 1.24, .14], [659, 1.4, .9]]
+        .forEach(([f, t, d]) => { metal(f, t, d, .07); metal(f * 2, t, d, .025); });
+      ruido(1.4, .5, 7000, .04);
+    },
+    // Wa-wa-wa-waaa: el trombón triste del eliminado.
+    eliminado: () => { [[311, 0, .32], [294, .36, .32], [277, .72, .32], [262, 1.08, .9, 233]].forEach(([f, t, d, f2]) => metal(f, t, d, .08, f2)); },
     agarra: () => { tono(520, 0, .09, 'triangle', .14, 760); ruido(0, .05, 2400, .06); },
     congela: () => { [1320, 1760, 2093, 2637].forEach((f, i) => tono(f, i * .06, .35, 'sine', .08)); ruido(0, .3, 6000, .05); },
     fanfarria: () => { [523, 659, 784, 1047].forEach((f, i) => tono(f, i * .1, .22, 'square', .06)); },
@@ -442,7 +468,10 @@
   const escenario = $('escenario'), lienzo = $('lienzo'), ctx = lienzo.getContext('2d');
   let W = 0, H = 0, dpr = 1;
   function ajustaPantalla() {
-    try { const t = window.top; document.documentElement.style.setProperty('--alto-pantalla', t.innerHeight + 'px'); } catch (e) { document.documentElement.style.setProperty('--alto-pantalla', window.innerHeight + 'px'); }
+    // En la sala el marco tiene su propia altura; en el Club el iframe crece con la página y manda la ventana de arriba.
+    let alto = window.innerHeight;
+    if (!ONLINE) { try { alto = window.top.innerHeight; } catch (e) { /* otro origen */ } }
+    document.documentElement.style.setProperty('--alto-pantalla', alto + 'px');
     dpr = Math.min(window.devicePixelRatio || 1, 2);
     const r = escenario.getBoundingClientRect();
     W = Math.max(1, r.width); H = Math.max(1, r.height);
@@ -456,37 +485,40 @@
   const cam = { x: 0, y: -156 };
   const nubes = Array.from({ length: 7 }, (_, i) => ({ x: -900 + i * 330 + (i * 97) % 120, y: -380 - (i * 53) % 220, s: .7 + (i % 3) * .25 }));
 
-  function dibujaCabra(ctx) {
+  /* El pudú: el primer escalón. Se dibuja sobre las mismas cápsulas que usa la física (motor.js, PUDU): lomo,
+     cuello, cabeza y los cachitos; las orejas grandes y el hocico son solo dibujo. */
+  function dibujaPudu(ctx) {
     ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.strokeStyle = TINTA; ctx.lineWidth = 2.5;
-    const piel = '#e9e2d0', sombra = '#cfc5ad';
-    // Patas traseras de fondo.
-    for (const x of [-30, 30]) { ctx.fillStyle = sombra; huso(ctx, x, -70, x, -6, 7, 6.5, 5.5); ctx.fillStyle = '#3a2f28'; ctx.fillRect(x - 6, -8, 12, 8); ctx.strokeRect(x - 6, -8, 12, 8); }
-    // Cola.
-    ctx.fillStyle = piel; ctx.beginPath(); ctx.moveTo(-80, -112); ctx.quadraticCurveTo(-98, -124, -92, -104); ctx.quadraticCurveTo(-88, -98, -80, -100); ctx.fill(); ctx.stroke();
-    // Cuerpo.
-    elipse(ctx, -2, -92, 85, 32, 0, piel);
-    ctx.save(); ctx.beginPath(); ctx.ellipse(-2, -92, 85, 32, 0, 0, 7); ctx.clip();
-    ctx.fillStyle = sombra; ctx.beginPath(); ctx.ellipse(-2, -62, 90, 18, 0, 0, 7); ctx.fill();
+    const pelo = '#b4622e', claro = '#d98a52', sombra = '#93491f', oreja = '#e9a77a';
+    // Patas de atrás, en sombra.
+    for (const x of [-30, 30]) { ctx.fillStyle = sombra; huso(ctx, x, -76, x, -7, 8, 6.5, 5); ctx.fillStyle = TINTA; ctx.beginPath(); ctx.ellipse(x, -4, 6, 4.5, 0, 0, 7); ctx.fill(); }
+    // Colita.
+    ctx.fillStyle = sombra; elipse(ctx, -84, -106, 8, 5, -.5, null); ctx.fill(); ctx.stroke();
+    // Cuerpo, con la guata más clara y el lomo más oscuro.
+    elipse(ctx, -2, -92, 85, 33, 0, pelo);
+    ctx.save(); ctx.beginPath(); ctx.ellipse(-2, -92, 85, 33, 0, 0, 7); ctx.clip();
+    ctx.fillStyle = claro; ctx.beginPath(); ctx.ellipse(4, -60, 80, 16, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = sombra; ctx.globalAlpha = .35; ctx.beginPath(); ctx.ellipse(-10, -124, 78, 12, 0, 0, 7); ctx.fill();
     ctx.restore();
-    ctx.save(); ctx.lineWidth = 1.6; ctx.strokeStyle = '#a99d84';
-    for (const [x, y] of [[-50, -100], [-25, -108], [5, -104], [-40, -82], [-10, -86], [20, -90], [40, -100]]) { ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + 5, y + 5, x + 2, y + 10); ctx.stroke(); }
-    ctx.restore();
-    // Patas delanteras.
-    for (const x of [-48, 45]) { ctx.fillStyle = piel; huso(ctx, x, -70, x, -6, 7.5, 7, 5.5); ctx.fillStyle = '#3a2f28'; ctx.fillRect(x - 6.5, -8, 13, 8); ctx.strokeRect(x - 6.5, -8, 13, 8); }
-    // Cuello y cabeza.
-    ctx.fillStyle = piel; huso(ctx, 52, -100, 80, -138, 17, 16, 14);
-    ctx.beginPath(); ctx.moveTo(78, -158); ctx.quadraticCurveTo(100, -162, 113, -132); ctx.quadraticCurveTo(116, -122, 106, -120); ctx.quadraticCurveTo(90, -122, 76, -134); ctx.closePath(); ctx.fill(); ctx.stroke();
-    // Barba de chivo.
-    ctx.fillStyle = '#d6cbb1'; ctx.beginPath(); ctx.moveTo(98, -121); ctx.lineTo(106, -121); ctx.lineTo(101, -103); ctx.closePath(); ctx.fill(); ctx.stroke();
-    // Cuernos.
-    ctx.fillStyle = '#8b7a62'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(80, -156); ctx.quadraticCurveTo(68, -176, 58, -172); ctx.quadraticCurveTo(70, -168, 86, -152); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(90, -158); ctx.quadraticCurveTo(96, -182, 88, -186); ctx.quadraticCurveTo(102, -180, 96, -155); ctx.fill(); ctx.stroke();
-    // Oreja, ojo, hocico.
-    ctx.fillStyle = sombra; ctx.lineWidth = 2.5; elipse(ctx, 76, -146, 11, 5, .5, null); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#f5d76e'; elipse(ctx, 95, -144, 4.5, 4, 0, null); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = TINTA; ctx.fillRect(92.5, -145, 5, 2);
-    ctx.beginPath(); ctx.arc(110, -129, 1.5, 0, 7); ctx.fill();
+    // Patas de adelante, con pezuñas negras.
+    for (const x of [-48, 45]) { ctx.fillStyle = claro; huso(ctx, x, -72, x, -7, 9, 7, 5.5); ctx.fillStyle = TINTA; ctx.beginPath(); ctx.ellipse(x, -4, 6.5, 4.5, 0, 0, 7); ctx.fill(); }
+    // Cuello.
+    ctx.fillStyle = pelo; huso(ctx, 44, -98, 80, -136, 25, 21, 17);
+    // Orejas grandes, detrás de la cabeza.
+    for (const [x, y, r] of [[78, -158, -.75], [100, -160, .45]]) {
+      ctx.fillStyle = pelo; elipse(ctx, x, y, 9, 19, r, null); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = oreja; elipse(ctx, x, y + 2, 4.5, 12, r, null, false); ctx.fill();
+    }
+    // Cachitos.
+    ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(84, -158); ctx.lineTo(76, -176); ctx.moveTo(94, -158); ctx.lineTo(99, -177); ctx.stroke();
+    ctx.strokeStyle = '#efe4c8'; ctx.lineWidth = 3; ctx.stroke();
+    ctx.strokeStyle = TINTA; ctx.lineWidth = 2.5;
+    // Cabeza y hocico.
+    ctx.fillStyle = pelo; elipse(ctx, 94, -141, 23, 19, .35, null); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = claro; elipse(ctx, 111, -130, 11, 8.5, .45, null); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = TINTA; elipse(ctx, 119, -127, 4.5, 3.5, .45, null, false); ctx.fill();
+    ctx.beginPath(); ctx.arc(97, -146, 3.4, 0, 7); ctx.fill();
+    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(98.2, -147.2, 1.1, 0, 7); ctx.fill();
     ctx.restore();
   }
 
@@ -542,7 +574,7 @@
       ctx.restore();
     }
 
-    dibujaCabra(ctx);
+    dibujaPudu(ctx);
     if (mundoW) for (const f of mundoW.torre) dibujaTulon(ctx, f.p, f.bulto, f.aspecto, { helada: true, cara: 'helado' });
     if (red.foto) dibujaTulon(ctx, red.foto.p, red.foto.bulto, red.foto.aspecto, { helada: true, cara: 'helado' });
     if (!cuerpo && red.remoto && estado !== 'fin') {
@@ -557,13 +589,39 @@
       let mira = null; const k = cuerpo.held.findIndex(Boolean);
       if (k >= 0) { const e = M.MIEMBROS[k].ext; mira = [P[e * 2], P[e * 2 + 1]]; }
       dibujaTulon(ctx, P, cuerpo.bulto, cuerpo.aspecto, { held: cuerpo.held, pin: cuerpo.pin, cara, mira });
+      dibujaMiras(ctx, cuerpo);
     }
     if (traza.on) pintaTraza(ctx);
+  }
+
+  // Dónde quiere ir cada miembro sostenido (raíz + vector): el cursor cuando el ratón está capturado.
+  function dibujaMiras(ctx, c) {
+    ctx.save(); ctx.lineWidth = 2.5; ctx.strokeStyle = '#ffffff'; ctx.fillStyle = '#ff9a1f';
+    M.MIEMBROS.forEach((m, k) => {
+      if (!c.held[k]) return;
+      const x = c.p[m.raiz * 2] + c.vec[k][0], y = c.p[m.raiz * 2 + 1] + c.vec[k][1];
+      ctx.globalAlpha = c.pin[k] ? .45 : .9;
+      ctx.beginPath(); ctx.arc(x, y, 7, 0, 7); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x - 13, y); ctx.lineTo(x - 9, y); ctx.moveTo(x + 9, y); ctx.lineTo(x + 13, y);
+      ctx.moveTo(x, y - 13); ctx.lineTo(x, y - 9); ctx.moveTo(x, y + 9); ctx.lineTo(x, y + 13); ctx.stroke();
+    });
+    ctx.restore();
+  }
+  /* Eliminado: la pantalla se pone roja, el cartel dice quién y suena el trombón. */
+  let relojEliminado = 0;
+  function muestraEliminado(linea1, linea2) {
+    const el = $('eliminado');
+    el.querySelector('b').textContent = linea1; el.querySelector('span').textContent = linea2;
+    el.hidden = true; void el.offsetWidth; el.hidden = false;
+    clearTimeout(relojEliminado); relojEliminado = setTimeout(() => { el.hidden = true; }, 3200);
+    sonido.eliminado();
   }
 
   /* ---------------- jugadores ---------------- */
   let jugadores = (lee(clave('tulones.jugadores'), null) || [M.PRESETS[0], M.PRESETS[1]]).slice(0, 8).map(M.limpia);
   if (!jugadores.length) jugadores = [M.limpia(M.PRESETS[0])];
+  // Cada vez que se entra, una skin al azar (el nombre se queda).
+  jugadores = jugadores.map(j => M.aleatorio(Math.random, j.nombre));
   const guardaJug = () => guarda(clave('tulones.jugadores'), jugadores);
   let record = lee(clave('tulones.record'), 0);
   const fmt = m => (Number.isFinite(m) ? m : 0).toFixed(2).replace('.', ',') + ' m';
@@ -575,7 +633,7 @@
       const cv = document.createElement('canvas'); d.appendChild(cv);
       const b = document.createElement('b'); b.textContent = j.nombre; b.translate = false; b.setAttribute('translate', 'no'); d.appendChild(b);
       const acc = document.createElement('div'); acc.className = 'acc';
-      const ed = document.createElement('button'); ed.type = 'button'; ed.textContent = '✎'; ed.title = 'Cambiar aspecto'; ed.setAttribute('aria-label', 'Editar a ' + j.nombre);
+      const ed = document.createElement('button'); ed.type = 'button'; ed.className = 'cambiar-skin'; ed.textContent = '✎ Cambiar skin'; ed.title = 'Cambiar skin'; ed.setAttribute('aria-label', 'Editar a ' + j.nombre);
       ed.addEventListener('click', () => abreEditor(i));
       acc.appendChild(ed);
       if (jugadores.length > 1 && !ONLINE) {
@@ -643,6 +701,7 @@
     }
   }
   function abreEditor(i) {
+    if (ONLINE) quitaListo();
     editando = i; borrador = M.limpia(jugadores[i]);
     $('edNombre').value = borrador.nombre;
     const pr = $('edPresets'); pr.textContent = '';
@@ -670,9 +729,9 @@
   let turnoN = 0, ronda = 1, rondas = 5, segTurno = 45, quedan = 0, mejores = [], ultTic = -1;
   // Reglas: cada turno hay que pasar la línea roja (la torre al empezar el turno). Quien no la pasa queda
   // eliminado. Con varios jugadores gana el último en pie; jugando solo, se sigue hasta fallar. maxTurno es lo más alto del que trepa ahora (línea fantasma).
-  let vivos = [], meta = 0, maxTurno = 0, aviso = '';
+  let vivos = [], meta = 0, maxTurno = 0, aviso = '', acumula = false, extraT = 0;
   const SUPERA_MIN = .01;
-  const capas = { menu: $('menu'), turno: $('turno'), pausa: $('pausa'), fin: $('fin') };
+  const capas = { menu: $('menu'), turno: $('turno'), pausa: $('pausa'), fin: $('fin'), movil: $('movil') };
   function muestra(nombre) { for (const k in capas) capas[k].hidden = k !== nombre; }
   const tactil = $('tactil');
   const grueso = window.matchMedia ? window.matchMedia('(pointer:coarse)') : null;
@@ -680,6 +739,7 @@
 
   function empezar() {
     segTurno = +$('selTiempo').value || 45; rondas = +$('selRondas').value; if (!Number.isFinite(rondas)) rondas = 5;
+    acumula = $('selAcumula').value === '1'; extraT = 0;
     mundoW = M.mundo(); turnoN = 0; ronda = 1; mejores = jugadores.map(() => 0); cuerpo = null;
     vivos = jugadores.map(() => true); aviso = '';
     cam.x = 0; cam.y = -156;
@@ -696,7 +756,7 @@
     $('turnoFrase').textContent = (rondas ? 'Ronda ' + ronda + ' de ' + rondas : 'Ronda ' + ronda) + ' · supera ' + fmt(meta);
     $('turnoAviso').textContent = aviso; $('turnoAviso').hidden = !aviso;
     $('nQuien').textContent = j.nombre;
-    $('nTiempo').textContent = segTurno + ' s'; $('nTiempo').classList.remove('apura');
+    $('nTiempo').textContent = (segTurno + extraT) + ' s'; $('nTiempo').classList.remove('apura');
     $('nAltura').textContent = fmt(0);
     $('nTorre').textContent = fmt(M.alturaMundo(mundoW));
     muestra('turno');
@@ -707,31 +767,38 @@
     const dx = bx - ax, dy = by - ay, l2 = dx * dx + dy * dy || 1e-9, t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / l2));
     return Math.hypot(x - ax - dx * t, y - ay - dy * t);
   }
-  function choca(c) {
+  const CAIDA = 60;
+  /* Siempre en el piso, nunca encima de nadie: se prueba del pudú hacia la izquierda y después a la derecha de la
+     regla, cada 40 unidades, y gana el primer hueco libre (de pie y a la altura desde la que cae). Si el piso está
+     lleno, el sitio que menos choca. Antes, con cuatro o cinco caídos al pie de la torre, salía encima de la torre. */
+  const SITIOS = (() => { const l = []; for (let x = -200; x >= -1400; x -= 40) l.push(x); for (let x = 300; x <= 1400; x += 40) l.push(x); return l; })();
+  function cuantoChoca(c) {
+    let n = 0;
     for (let i = 0; i < M.N; i++) {
       const x = c.p[i * 2], y = c.p[i * 2 + 1];
-      for (const s of mundoW.caps) if (seg(s.ax, s.ay, s.bx, s.by, x, y) < s.r + M.RADIO[i]) return true;
+      for (const s of mundoW.caps) if (seg(s.ax, s.ay, s.bx, s.by, x, y) < s.r + M.RADIO[i] + 4) n++;
     }
-    return false;
+    return n;
   }
-  const CAIDA = 60;
   function saleTulon() {
-    let c = null;
-    for (let t = 0; t < 8; t++) { c = M.crea(-200 - t * 120, actual()); if (!choca(c)) break; c = null; }
-    if (c) for (let i = 0; i < M.N; i++) { c.p[i * 2 + 1] -= CAIDA; c.q[i * 2 + 1] -= CAIDA; }
-    if (!c) {
-      c = M.crea(-200, actual());
-      const sube = M.alturaMundo(mundoW) * 100 + 20;
-      for (let i = 0; i < M.N; i++) { c.p[i * 2 + 1] -= sube; c.q[i * 2 + 1] -= sube; }
+    const sube = (c, dy) => { for (let i = 0; i < M.N; i++) { c.p[i * 2 + 1] -= dy; c.q[i * 2 + 1] -= dy; } };
+    let mejor = null, menos = Infinity;
+    for (const x of SITIOS) {
+      const c = M.crea(x, actual());
+      let n = cuantoChoca(c);
+      sube(c, CAIDA); n += cuantoChoca(c);
+      if (n < menos) { mejor = c; menos = n; }
+      if (!n) break;
     }
-    c.alAgarrar = () => sonido.agarra();
-    return c;
+    mejor.alAgarrar = () => sonido.agarra();
+    return mejor;
   }
   function arranca() {
     if (ONLINE && !arrancaRed()) return;
-    cuerpo = saleTulon(); traza.puntos = []; traza.registro = []; if (traza.on) empiezaGrabacion(); quedan = segTurno; ultTic = -1; acum = 0;
+    cuerpo = saleTulon(); traza.puntos = []; traza.registro = []; if (traza.on) empiezaGrabacion(); quedan = segTurno + extraT; ultTic = -1; acum = 0;
     estado = 'jugando'; muestra(null); inmersivo(true);
     escenario.focus({ preventScroll: true });
+    capturaRaton();
   }
   function terminaTurno() {
     if (estado !== 'jugando') return;
@@ -746,11 +813,14 @@
     }
     cuerpo = null;
     if (h > meta + SUPERA_MIN) aviso = '';
-    else { vivos[i] = false; aviso = j.nombre + ' no superó ' + fmt(meta) + ': eliminado'; }
+    else { vivos[i] = false; aviso = j.nombre + ' no superó ' + fmt(meta) + ': eliminado'; muestraEliminado(j.nombre + ' no alcanzó a llegar', 'y fue eliminado'); }
     const enPie = vivos.filter(Boolean).length;
     if (!enPie) return terminaPartida({ nadie: true });
     if (jugadores.length > 1 && enPie === 1) return terminaPartida({ ganador: vivos.indexOf(true) });
+    const rondaAntes = ronda;
     do { turnoN++; if (turnoN % jugadores.length === 0) ronda++; } while (!vivos[turnoN % jugadores.length]);
+    // Tiempo acumulado: cada ronda nueva suma un segundo por cada otro jugador en pie (jugando solo, uno).
+    if (acumula && ronda > rondaAntes) extraT += Math.max(1, vivos.filter(Boolean).length - 1);
     if (rondas && ronda > rondas) return terminaPartida({});
     preparaTurno();
   }
@@ -776,7 +846,7 @@
       li.append(pos, cv, nom, alt); L.appendChild(li);
       retrato(cv, o.j, 44, 55);
     });
-    muestra('fin'); sonido.fin();
+    muestra('fin'); if (gana) sonido.trompetas(); else sonido.fin();
   }
   function pausa(on) {
     if (estado !== 'jugando' || ONLINE) return;
@@ -842,7 +912,7 @@
   window.addEventListener('keydown', e => {
     if (editor.open || dlgTeclas.open || dlgNovedades.open) return;
     const t = e.target; if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) return;
-    if (e.code in TECLA) { if (!e.repeat && jugando()) sostener(TECLA[e.code], 'tec', true); e.preventDefault(); return; }
+    if (e.code in TECLA) { if (!e.repeat && jugando()) { capturaRaton(); sostener(TECLA[e.code], 'tec', true); } e.preventDefault(); return; }
     if (e.code in flechas) { if (jugando()) { flechas[e.code] = true; e.preventDefault(); } return; }
     if (e.code === teclas.congela) { if (jugando()) { e.preventDefault(); if (!e.repeat) terminaTurno(); } return; }
     if (e.code === 'KeyF' && !Object.values(teclas).includes('KeyF')) { e.preventDefault(); pantallaCompleta(); return; }
@@ -882,11 +952,14 @@
     const s = escala();
     M.empujaMiembros(cuerpo, (e.movementX || 0) / s, (e.movementY || 0) / s);
   });
-  escenario.addEventListener('pointerdown', e => {
-    if (e.pointerType === 'mouse' && jugando() && !document.pointerLockElement && escenario.requestPointerLock) {
-      try { const r = escenario.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (er) { /* sin bloqueo */ }
-    }
-  });
+  /* El ratón se captura al salir a trepar (el clic de «¡A trepar!») y, si se soltó (Esc, otra ventana), con la primera
+     tecla de un miembro: sin captura el puntero se iba del escenario —del iframe, en la sala— y el miembro dejaba de
+     seguirlo. Con captura el cursor no se ve: lo reemplaza la mira que se dibuja en cada miembro sostenido. */
+  function capturaRaton() {
+    if (document.pointerLockElement || !escenario.requestPointerLock || (grueso && grueso.matches)) return;
+    try { const r = escenario.requestPointerLock(); if (r && r.catch) r.catch(() => {}); } catch (er) { /* sin bloqueo */ }
+  }
+  escenario.addEventListener('pointerdown', e => { if (e.pointerType === 'mouse' && jugando()) capturaRaton(); });
   // Táctil: los botones sostienen; arrastrar en el escenario lleva.
   for (const b of botones) {
     const k = +b.dataset.k;
@@ -904,7 +977,7 @@
   });
   const quitaDedo = e => dedos.delete(e.pointerId);
   lienzo.addEventListener('pointerup', quitaDedo); lienzo.addEventListener('pointercancel', quitaDedo);
-  function pintaTactil() { tactil.hidden = !(grueso && grueso.matches); }
+  function pintaTactil() { tactil.hidden = MOVIL || !(grueso && grueso.matches); }
   if (grueso && grueso.addEventListener) grueso.addEventListener('change', pintaTactil);
   pintaTactil();
 
@@ -1072,7 +1145,7 @@
      se reconstruye la torre y se decide qué se ve. Solo se escriben `sale` y `congela` (la sala los firma); el
      reloj y el plazo los vigila la sala. Mi cuerpo congelado se dibuja (`red.foto`) hasta que vuelve por el
      registro, ya cuantizado como lo verán todos. */
-  const red = { yo: '', mirando: true, js: [], tiempo: 45, rondas: 0, log: [], est: null, dif: 0, listo: false,
+  const red = { yo: '', mirando: true, js: [], tiempo: 45, rondas: 0, acumula: false, log: [], est: null, dif: 0, listo: false, sala: false, pidioListo: null,
     remoto: null, objetivo: null, foto: null, salido: -1, n: -1, finTurno: 0, ultEnvio: 0, torreN: -1 };
   const PADRE = 'tulones-padre', HIJO = 'tulones-hijo';
   const ESTADO_MS = 66;
@@ -1089,6 +1162,7 @@
     document.querySelector('.menu .opciones').hidden = true; document.querySelector('.menu .record').hidden = true;
     $('btnOtra').hidden = true; $('btnMenu').hidden = true;
     document.querySelector('.menu .frase').textContent = 'Partida en línea. Elige cómo se ve tu tulón mientras se llena la sala: cada uno trepa en su turno y todos lo ven en directo.';
+    $('btnPreparado').addEventListener('click', () => { audio(); pideListo(!(red.pidioListo === null ? preparado() : red.pidioListo)); });
     window.addEventListener('message', alMensajeRed);
     aSala('listo');
   }
@@ -1099,10 +1173,10 @@
     if (d.tipo === 'config') {
       red.yo = String(d.yo || ''); red.mirando = !!d.mirando;
       red.js = Array.isArray(d.jugadores) ? d.jugadores.map(j => ({ uid: String(j.uid), nombre: String(j.nombre || 'Jugador').slice(0, 40) })) : [];
-      red.tiempo = M.tiempoSala(d.tiempo); red.rondas = M.rondasSala(d.rondas); red.listo = true;
+      red.tiempo = M.tiempoSala(d.tiempo); red.rondas = M.rondasSala(d.rondas); red.acumula = +d.acumula === 1; red.listo = true;
       return aplicaRed();
     }
-    if (d.tipo === 'jugadas' && Array.isArray(d.lista)) { red.log = d.lista; if (red.listo) aplicaRed(); return; }
+    if (d.tipo === 'jugadas' && Array.isArray(d.lista)) { red.log = d.lista; red.sala = !!d.sala; if (red.listo) aplicaRed(); return; }
     if (d.tipo === 'vivo' && d.v && typeof d.v === 'object') recibeVivo(d.v);
   }
 
@@ -1111,8 +1185,9 @@
     for (const f of e.torre) { mundoW.caps.push(...M.capsulasDe({ p: f.p })); mundoW.torre.push(f); }
   }
   function aplicaRed() {
-    const e = red.est = M.reducirSala(red.log, red.js, { tiempo: red.tiempo, rondas: red.rondas });
-    segTurno = e.tiempo; rondas = e.rondas; ronda = e.ronda;
+    const e = red.est = M.reducirSala(red.log, red.js, { tiempo: red.tiempo, rondas: red.rondas, acumula: red.acumula, listos: red.sala });
+    if (e.fase === 'espera') return pintaSala(e);
+    segTurno = e.tiempoTurno; rondas = e.rondas; ronda = e.ronda;
     if (e.torre.length !== red.torreN) {
       if (red.torreN >= 0 && e.torre.length > red.torreN) sonido.congela();
       red.torreN = e.torre.length; reconstruyeTorre(e);
@@ -1133,8 +1208,47 @@
     let h = null;
     for (let i = e.hist.length - 1; i >= 0 && !h; i--) if (e.hist[i].e === 'congela' || e.hist[i].e === 'plazo') h = e.hist[i];
     aviso = '';
-    if (h && h.e === 'plazo') aviso = nombreDe(h.uid) + ' se quedó sin tiempo: eliminado';
-    else if (h && !h.ok) aviso = nombreDe(h.uid) + ' no superó ' + fmt(h.meta) + ': eliminado';
+    if (!h || (h.e === 'congela' && h.ok)) return;
+    const yo = h.uid === red.yo && !red.mirando, quien = nombreDe(h.uid);
+    if (h.e === 'plazo') {
+      aviso = quien + ' se quedó sin tiempo: eliminado';
+      muestraEliminado(yo ? 'Se te acabó el tiempo' : quien + ' se quedó sin tiempo', yo ? 'quedaste eliminado' : 'y fue eliminado');
+    } else {
+      aviso = quien + ' no superó ' + fmt(h.meta) + ': eliminado';
+      muestraEliminado(yo ? 'No alcanzaste a llegar' : quien + ' no alcanzó a llegar', yo ? 'quedaste eliminado' : 'y fue eliminado');
+    }
+  }
+  /* Antes del primer turno: el menú con quién está y quién dio «Listo». Personalizar el tulón quita el listo. */
+  const preparado = () => !!(red.est && red.est.preparados[red.yo]);
+  function pideListo(on) {
+    if (red.mirando || !red.est || red.est.fase !== 'espera') return;
+    red.pidioListo = on;
+    aSala('jugar', { j: { t: 'listo', on } });
+    pintaSala(red.est);
+  }
+  function quitaListo() { if (preparado() || red.pidioListo) pideListo(false); }
+  function pintaSala(e) {
+    estado = 'menu'; cuerpo = null;
+    if (capas.menu.hidden) muestra('menu');
+    const L = $('salaListos'); L.hidden = false; L.textContent = '';
+    for (const j of red.js) {
+      const ok = !!e.preparados[j.uid], fuera = !!e.fuera[j.uid];
+      if (fuera) continue;
+      const b = document.createElement('span'); b.className = 'bolita' + (ok ? ' ok' : '');
+      const n = document.createElement('b'); n.textContent = j.nombre + (j.uid === red.yo ? ' (tú)' : ''); n.setAttribute('translate', 'no');
+      const t = document.createElement('small'); t.textContent = ok ? 'listo' : 'esperando';
+      b.append(n, t); L.appendChild(b);
+    }
+    const yoListo = red.pidioListo === null ? preparado() : red.pidioListo;
+    if (red.pidioListo !== null && red.pidioListo === preparado()) red.pidioListo = null;
+    const btn = $('btnPreparado');
+    btn.hidden = red.mirando;
+    btn.textContent = yoListo ? '✕ Ya no estoy listo' : '✓ Listo';
+    btn.classList.toggle('hecho', yoListo);
+    const quedan = red.js.filter(j => !e.fuera[j.uid] && !e.preparados[j.uid]).length;
+    $('salaFrase').hidden = false;
+    $('salaFrase').textContent = red.js.length < 2 ? 'Esperando a que entre alguien más…'
+      : quedan ? 'Empieza cuando todos estén listos (faltan ' + quedan + ').' : 'Todos listos: ¡a trepar!';
   }
   function marcadorRed(e, quien) {
     $('nQuien').textContent = nombreDe(quien) || '—';
@@ -1156,15 +1270,15 @@
     $('turnoFrase').textContent = (e.rondas ? 'Ronda ' + e.ronda + ' de ' + e.rondas : 'Ronda ' + e.ronda) + ' · supera ' + fmt(e.meta) + fuera;
     $('turnoAviso').textContent = aviso; $('turnoAviso').hidden = !aviso;
     $('btnListo').hidden = !mio;
-    $('nTiempo').textContent = e.tiempo + ' s'; $('nTiempo').classList.remove('apura');
+    $('nTiempo').textContent = e.tiempoTurno + ' s'; $('nTiempo').classList.remove('apura');
     $('nAltura').textContent = fmt(0);
     if (capas.turno.hidden) { muestra('turno'); if (mio) { sonido.fanfarria(); setTimeout(() => $('btnListo').focus(), 50); } }
   }
   function arrancaRed() {
     const e = red.est;
     if (!e || e.fase !== 'jugando' || e.turno !== red.yo || red.mirando || red.salido === e.n) return false;
-    red.salido = e.n; segTurno = e.tiempo; meta = e.meta; maxTurno = 0;
-    red.finTurno = horaRed() + e.tiempo * 1000;
+    red.salido = e.n; segTurno = e.tiempoTurno; meta = e.meta; maxTurno = 0;
+    red.finTurno = horaRed() + e.tiempoTurno * 1000;
     $('btnListo').hidden = true;
     aSala('jugar', { j: { t: 'sale', n: e.n, a: M.codificaAspecto(miAspecto()) } });
     return true;
@@ -1216,7 +1330,7 @@
       maxTurno = Math.max(maxTurno, o.m);
     }
     if (estado === 'red' && e.fase === 'jugando' && e.turno !== red.yo) {
-      const quedanR = e.saleAt ? Math.max(0, Math.ceil((e.saleAt + e.tiempo * 1000 - horaRed()) / 1000)) : e.tiempo;
+      const quedanR = e.saleAt ? Math.max(0, Math.ceil((e.saleAt + e.tiempoTurno * 1000 - horaRed()) / 1000)) : e.tiempoTurno;
       $('nTiempo').textContent = quedanR + ' s'; $('nTiempo').classList.toggle('apura', !!e.saleAt && quedanR <= 5);
       $('nAltura').textContent = fmt(r ? M.alturaPose(r.p) : 0);
     }
@@ -1241,7 +1355,9 @@
         li.append(pos, cv, nom, alt); L.appendChild(li);
         retrato(cv, aspectoDe(o.j.uid), 44, 55);
       });
-    muestra('fin'); sonido.fin();
+    muestra('fin');
+    const tarde = $('eliminado').hidden ? 0 : 1400;
+    setTimeout(e.ganador ? sonido.trompetas : sonido.fin, tarde);
   }
 
   /* ---------------- bucle ---------------- */
@@ -1296,7 +1412,8 @@
 
   pintaLista();
   muestra('menu');
-  if (ONLINE) iniciaRed();
+  if (MOVIL) { muestra('movil'); $('tactil').hidden = true; }
+  else if (ONLINE) iniciaRed();
   document.querySelector('.logo').textContent = 'TULONES';
   requestAnimationFrame(cuadro);
 
