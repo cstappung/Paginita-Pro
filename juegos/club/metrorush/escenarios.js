@@ -46,10 +46,10 @@ const MOTOR = window.MetroRushMotor;                 // el motor (para el plano 
 
 /** Devuelve las paletas nuevas, armadas como `variante` de las bases de
     mundo.js (que no se tocan: se copian). `b` = {variante, BASE_JUGUETE,
-    BASE_PIXEL, BASE_NEON, PALETAS}. Cada una dice qué `escenario` dibuja
+    BASE_COMIC, BASE_NEON, PALETAS}. Cada una dice qué `escenario` dibuja
     (horizonte y sucesos) y qué `props` pone en la vereda en vez de árboles. */
 export function paletasNuevas(b) {
-  const { variante, BASE_JUGUETE, BASE_PIXEL, BASE_NEON, PALETAS } = b;
+  const { variante, BASE_JUGUETE, BASE_COMIC, BASE_NEON, PALETAS } = b;
   return {
     /* Mercado de Farolillos (juguete): un mercado nocturno de feria al
        final de la tarde, con toldos, guirnaldas y farolillos de papel. El
@@ -69,23 +69,25 @@ export function paletasNuevas(b) {
       extras: { nubes: true },
       escenario: 'mercado', props: 'mercado'
     }),
-    /* Cocheras (pixel): el patio de maniobras de noche, bajo focos de sodio.
-       Galpones, bidones y rieles apilados; los trenes van en amarillo de
-       obra, celeste y hueso, que se leen bajo la luz naranja. La luz es
-       baja, así que los objetos del juego llevan un poco más de brillo
-       propio que en Ocaso. */
-    cocheras: variante(BASE_PIXEL, {
-      cielo: { arriba: 0x141a33, horizonte: 0x6a4a5a, sol: 0xffc070 }, niebla: [30, 150],
-      sol: [0xffb060, 2.0, [-16, 14, -40]], hemi: [0xffc890, 0x2a2238, 1.15],
+    /* Cocheras (cómic): el patio de maniobras en el turno de la mañana,
+       con un smog amarillento que tapa el fondo. Galpones, bidones y rieles
+       apilados; los trenes van en amarillo de obra, rojo y azul (colores
+       primarios, como en una viñeta) y la tinta del contorno es casi negra
+       y fría, para que corte contra el ocre del aire. */
+    cocheras: variante(BASE_COMIC, {
+      cielo: { arriba: 0x5f7f8a, horizonte: 0xd8d2b8, sol: 0xfff0c8 }, niebla: [35, 150],
+      sol: [0xfff0d0, 1.8, [-14, 24, -30]], hemi: [0xe0e4d0, 0x4a4438, 0.95],
+      tinta: 0x1e2226,
       c: {
-        grava: 0x6a564c, tierra: 0x524444, muro: 0x8a7a7a, acera: 0x7a6a66, bordillo: 0x5a4c4c, traviesa: 0x4a3428,
-        edificios: [0x4a5068, 0x5a4a5a, 0x6a5040, 0x3f4a5f], cornisa: 0x2a2436, marco: 0x2a2436, vidrioEd: 0xffb040, vitrina: 0x6a4030,
-        trenes: [0xe8b030, 0x5ab4d8, 0xece3cc], acentos: [0x2a2442, 0xfff1d4, 0x2a2442],
-        arboles: [0x3f5a3a], tronco: 0x4a3428, bidones: [0x3a6aa0, 0xb04a30, 0x4a7a4a], oxido: 0x8a4a2a, senal: 0xff3a2a
+        grava: 0x6a645a, tierra: 0x5a5248, muro: 0xa89a88, acera: 0x9a8e7e, bordillo: 0x6a6258, traviesa: 0x3e3228,
+        edificios: [0x8a4a3a, 0x5a6a6a, 0x7a8a5a, 0xb8a888], cornisa: 0x2e3236, marco: 0x2e3236, vidrioEd: 0xcfe0e0, vitrina: 0x5a4a3a,
+        trenes: [0xffc21a, 0xe8402a, 0x1f7ad8], acentos: [0xffffff, 0x14161c, 0xffffff],
+        barrera: 0x14161c, barrera2: 0xffd21a, rampa: 0xff7a1a,
+        arboles: [0x5a6a3a], tronco: 0x3e3228, bidones: [0x2f6ab0, 0xc8402a, 0x4a8a3a], oxido: 0x9a4a22, senal: 0xff3a2a
       },
-      carteles: ['TALLER', 'VÍA 7', 'TURNO NOCHE', 'CASINO', 'BODEGA'],
-      extras: { nubes: false, disco: false },
-      legible: { brillo: 0.12, niebla: 1.8 },
+      carteles: ['TALLER', 'VÍA 7', 'TURNO MAÑANA', 'CASINO', 'BODEGA'],
+      extras: { nubes: true, disco: false },
+      legible: { brillo: 0.06, niebla: 1.6 },
       escenario: 'cocheras', props: 'cocheras'
     }),
     /* Muelle (neón): la estación del puerto adonde la línea nunca llegó,
@@ -226,9 +228,9 @@ const RETRATOS = {
 /** Dibuja un afiche en la celda que empieza en (ox, oy). `estilo` cambia el
     papel: en neón son cajas de luz (fondo oscuro, letras encendidas). */
 function dibujaAfiche(x, af, ox, oy, estilo) {
-  const neon = estilo === 'neon', pixel = estilo === 'pixel';
-  const titulo = pixel ? '#px "Press Start 2P", monospace' : neon ? '700 #px Orbitron, "Arial Black", sans-serif' : '#px "Lilita One", "Arial Black", sans-serif';
-  const texto = pixel ? '#px "Press Start 2P", monospace' : '700 #px Arial, sans-serif';
+  const neon = estilo === 'neon', comic = estilo === 'comic';
+  const titulo = comic ? '#px Bangers, "Arial Black", sans-serif' : neon ? '700 #px Orbitron, "Arial Black", sans-serif' : '#px "Lilita One", "Arial Black", sans-serif';
+  const texto = comic ? '#px Bangers, "Arial Black", sans-serif' : '700 #px Arial, sans-serif';
   const W = CEL_W, PH = 440;                                               // el panel ocupa 440 px de alto; abajo van las patas
   x.save(); x.translate(ox, oy);
   // las patas y el marco del mupi (oscuros, para que el afiche se recorte sobre cualquier fondo)
@@ -275,9 +277,9 @@ function dibujaAfiche(x, af, ox, oy, estilo) {
       const y = y0 + (y1 - y0) * (lista.length > 1 ? i / (lista.length - 1) : 0), aqui = e.paleta === af.aqui || e.id === af.aqui;
       x.fillStyle = aqui ? '#ffd23f' : '#ffffff'; x.beginPath(); x.arc(xl, y, aqui ? 11 : 7, 0, 7); x.fill();
       x.strokeStyle = '#16223a'; x.lineWidth = 3; x.stroke();
-      x.font = (aqui ? titulo : texto).replace('#', aqui ? (pixel ? 11 : 17) : (pixel ? 8 : 14)); x.textAlign = 'left'; x.textBaseline = 'middle';
+      x.font = (aqui ? titulo : texto).replace('#', aqui ? (comic ? 19 : 17) : (comic ? 15 : 14)); x.textAlign = 'left'; x.textBaseline = 'middle';
       x.fillStyle = aqui ? '#ffd23f' : '#c8d4ea'; x.fillText(e.nombre.toUpperCase(), xl + 18, y);
-      if (aqui) { x.font = texto.replace('#', pixel ? 7 : 12); x.fillStyle = '#ffffff'; x.fillText('◀ USTED ESTÁ AQUÍ', xl + 18, y + (pixel ? 14 : 17)); }
+      if (aqui) { x.font = texto.replace('#', comic ? 13 : 12); x.fillStyle = '#ffffff'; x.fillText('◀ USTED ESTÁ AQUÍ', xl + 18, y + 17); }
     });
   }
   // el papel se nota: un poco de luz arriba y sombra abajo (no en neón, donde es una caja de luz pareja)
@@ -301,13 +303,12 @@ function atlasAfiches(kit, h) {
     transparencia recortada (ver Kit.mat), y las patas del mupi no traen un
     rectángulo de fondo. Devuelve null si el nombre no es de aquí. */
 export function textura(kit, tipo, arg, h) {
-  const px = kit.pixel;
-  if (tipo === 'grafAfiches') return h.aTextura(atlasAfiches(kit, h), { repetir: false, pixel: px });
+  if (tipo === 'grafAfiches') return h.aTextura(atlasAfiches(kit, h), { repetir: false });
   if (tipo === 'grafL') {
     const lista = kit.pal.grafitisLore || [];
     if (!lista.length) return null;
     const g = lista[+arg[0] % lista.length];
-    return h.aTextura(h.TEX.grafiti(kit.az, g[0], g[1], g[2], kit.neon ? 0.85 : 1), { repetir: false, pixel: px });
+    return h.aTextura(h.TEX.grafiti(kit.az, g[0], g[1], g[2], kit.neon ? 0.85 : 1), { repetir: false });
   }
   return null;
 }
@@ -544,27 +545,29 @@ export function cielo(kit, g, h) {
     }
     g.add(fondo(h, piezas, false, -1), fondo(h, luces, true, -0.5));
   } else if (esc === 'cocheras') {
-    // galpones con techo de diente de sierra, un estanque de agua en patas y dos torres de focos
+    // galpones con techo de diente de sierra, un estanque de agua en patas y dos torres de focos.
+    // Es de mañana con smog: las siluetas se funden más con el horizonte (0.5) y las ventanas
+    // son vidrio que refleja el cielo, no luz encendida.
     let x = -130;
     while (x < 130) {
       const w = 14 + az() * 10, alto = 6 + az() * 5, z = -165 - az() * 8, y0 = -5;
-      piezas.push(P(h.CAJA, tono(0x2a2840, 0.3), [x + w / 2, y0 + alto / 2, z], null, [w, alto, 1]));
+      piezas.push(P(h.CAJA, tono(0x3a3a48, 0.5), [x + w / 2, y0 + alto / 2, z], null, [w, alto, 1]));
       for (let k = 0; k < Math.floor(w / 4); k++) {                         // los dientes del techo
         const d = new THREE.ConeGeometry(2.4, 2.6, 3, 1);                    // un triángulo (aplastado en z) inclinado: un diente
-        piezas.push(P(d, tono(0x2a2840, 0.3), [x + 2 + k * 4, y0 + alto + 1.2, z], [0, 0, 0.5], [1, 1, 0.1]));
-        luces.push(P(h.CAJA, 0xffb040, [x + 2.6 + k * 4, y0 + alto - 1.2, z + 0.6], null, [1.6, 0.6, 0.1]));   // una ventana encendida bajo cada diente
+        piezas.push(P(d, tono(0x3a3a48, 0.5), [x + 2 + k * 4, y0 + alto + 1.2, z], [0, 0, 0.5], [1, 1, 0.1]));
+        luces.push(P(h.CAJA, tono(0xb8ccd0, 0.3), [x + 2.6 + k * 4, y0 + alto - 1.2, z + 0.6], null, [1.6, 0.6, 0.1]));   // una ventana de vidrio bajo cada diente
       }
       x += w + 4 + az() * 6;
     }
     // el estanque de agua
-    piezas.push(P(h.CILINDRO, tono(0x3a3048, 0.3), [38, 14, -158], null, [7, 6, 7]));
-    for (const s of [-2.6, 2.6]) piezas.push(P(h.CAJA, tono(0x3a3048, 0.3), [38 + s, 3, -158], null, [0.5, 16, 0.5]));
+    piezas.push(P(h.CILINDRO, tono(0x4a4450, 0.5), [38, 14, -158], null, [7, 6, 7]));
+    for (const s of [-2.6, 2.6]) piezas.push(P(h.CAJA, tono(0x4a4450, 0.5), [38 + s, 3, -158], null, [0.5, 16, 0.5]));
     // las torres de focos: un mástil y un tablero de luces arriba (lo que parpadea es el halo, ver ambiente)
     const halos = [];
     for (const tx of [-48, 72]) {
-      piezas.push(P(h.CAJA, tono(0x1a1828, 0.3), [tx, 10, -150], null, [0.7, 30, 0.7]));
-      luces.push(P(h.CAJA, 0xffd890, [tx, 25, -149], null, [4, 1.6, 0.2]));
-      const s = h.sprite(0xffb050, 26, [tx, 25, -148], 0.55); s.material.fog = false; s.renderOrder = -0.4; halos.push(s); g.add(s);
+      piezas.push(P(h.CAJA, tono(0x2a2a34, 0.5), [tx, 10, -150], null, [0.7, 30, 0.7]));
+      luces.push(P(h.CAJA, 0xfff4d8, [tx, 25, -149], null, [4, 1.6, 0.2]));
+      const s = h.sprite(0xfff0c0, 14, [tx, 25, -148], 0.22); s.material.fog = false; s.renderOrder = -0.4; halos.push(s); g.add(s);
     }
     g.add(fondo(h, piezas, false, -1), fondo(h, luces, false, -0.5));
     g.userData.escenario.focos = halos;
@@ -671,7 +674,7 @@ export function ambiente(kit, escena, h, lore) {
           destello.position.set(camara.position.x, camara.position.y + 40, camara.position.z - 175);
         } else destello.visible = false;
       }
-      if (datos.focos) for (const [i, s] of datos.focos.entries()) {     // los focos del patio: de vez en cuando uno parpadea, como una ampolleta de sodio vieja
+      if (datos.focos) for (const [i, s] of datos.focos.entries()) {     // los focos del patio, todavía encendidos en la mañana: de vez en cuando uno parpadea
         const falla = !mov.quieto && Math.sin(reloj * 0.9 + i * 2.1) > 0.93;
         s.material.opacity = falla ? (Math.sin(reloj * 40) > 0 ? 0.15 : 0.55) : 0.55;
       }

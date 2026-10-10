@@ -68,6 +68,7 @@ export function crearCiudad({ M, sonido, aviso }) {
     energia(n) { sonido.nota(660 + n * 55, 0.07, 0.05, 'p25', { f1: 990 + n * 55 }); },   // una celda: un «tic» que sube con la carga
     llena() { for (const [k, f] of [[0, 523], [1, 659], [2, 784], [3, 1047]]) setTimeout(() => sonido.nota(f, 0.12, 0.06, 'p25'), k * 60); },   // tabla cargada: un arpegio
     rebote() { sonido.nota(260, 0.22, 0.09, 'tri', { f1: 620 }); },   // ¡boing! de la burbuja
+    burbujas() { sonido.nota(520, 0.12, 0.07, 'tri', { f1: 980 }); sonido.nota(780, 0.16, 0.05, 'tri', { f1: 1460, t: sonido.t + 0.07 }); },   // blup-blup al entrar a las burbujas
     pisoton() { sonido.soplo(0.1, 0.06, 2.4, { corto: true }); sonido.nota(520, 0.1, 0.05, 'tri', { f1: 160 }); },   // ¡fiuu!: el pisotón del chicle, un soplido que baja
     rejilla() { sonido.nota(180, 0.18, 0.09, 'p12', { f1: 90 }); sonido.soplo(0.2, 0.12, 1.2, { corto: true }); },   // la rejilla que cede
     transbordo(n) { sonido.nota(587 + n * 147, 0.1, 0.07, 'p25', { f1: 880 + n * 220 }); },   // saltar de riel a riel: más agudo con cada transbordo
@@ -172,7 +173,11 @@ export function crearCiudad({ M, sonido, aviso }) {
     /** Gasta la energía y devuelve lo que dura la tabla encendida. */
     usaTabla(c) { c.ciudad.energia = 0; return CITY.TABLA_SEG; },
     /** Lo que muestra el marcador de City: la energía y lo que le queda a «monedas ×2». */
-    hud: c => (c.ciudad ? { energia: c.ciudad.energia, llena: CITY.ENERGIA_LLENA, monedas2: c.ciudad.monedas2 } : null),
+    /** Lo que pinta el marcador de City. `burbuja`: null fuera del tramo;
+        dentro, 'listo' si aún puedes saltar en el aire y 'usado' si ya lo
+        gastaste en este salto (vuelve a 'listo' al tocar el suelo). */
+    hud: c => (c.ciudad ? { energia: c.ciudad.energia, llena: CITY.ENERGIA_LLENA, monedas2: c.ciudad.monedas2,
+      burbuja: c.ciudad.enBurbuja ? (c.ciudad.doble ? 'usado' : 'listo') : null } : null),
     /** Segundos de más que dura un poder (Lía: +3 s de imán). */
     extraPoder: (c, clase) => (c.ciudad && clase === 'iman' && c.ciudad.ventaja.iman) || 0,
     /** Al empezar la física del cuadro: dónde estaban los pies. */
@@ -201,8 +206,14 @@ export function crearCiudad({ M, sonido, aviso }) {
       }
       /* Al entrar, lo que hay que hacer: sin esto, los muros de setos de los
          tres carriles parecían imposibles (nada decía que ahí el salto flota).
-         Las dos primeras veces de cada carrera; después ya se sabe. */
-      if (C.enBurbuja && !antes && C.burbujasVistas++ < 2) aviso('¡Burbujas! Tus saltos flotan: salta los setos');
+         Se avisa SIEMPRE al entrar: las dos primeras veces de cada carrera,
+         la explicación entera; después, el recordatorio corto. Ejemplo: el
+         tercer tramo dice solo «Burbujas: salto doble». Además el marcador
+         muestra mientras estás adentro si el salto doble está listo. */
+      if (C.enBurbuja && !antes) {
+        son.burbujas();                                          // un «blup» al cruzar el arco
+        aviso(C.burbujasVistas++ < 2 ? '¡Burbujas! Saltas más alto y puedes saltar otra vez en el aire: salta los setos' : 'Burbujas: salto doble');
+      }
     },
 
     /** Después de mover al corredor (fisica en juego.js): las lonas, el

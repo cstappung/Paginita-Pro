@@ -202,8 +202,13 @@
       carrera contra él usa su misma curva. */
   const VELOCIDAD = { V0: 15, VMAX: 60, ACEL: 0.1 };      // m/s al empezar, m/s de tope y m/s² de aceleración (versión 3)
   const VELOCIDAD_V2 = { V0: 15, VMAX: 50, ACEL: 0.1 };   // la de la versión 2 de la prueba (tope 50), para rehacer carreras viejas
-  const VERSION_PISTA = 3;
-  const ID_CIELO = 1e8;                                   // desde aquí, los ids de las monedas de la mochila (versión 3): la pista nunca llega tan lejos                                 // la versión de pista/velocidad de las carreras nuevas (= VERSION de prueba.js)
+  /* La versión de pista de las carreras nuevas (= VERSION de prueba.js).
+     La 4 no cambia la velocidad (es la de la 3): cambia solo «sin monedas»,
+     que ahora llena de monedas los carriles libres (ver `retoMonedas` en
+     crearGenerador). Una prueba v3 de «sin monedas» se sigue rehaciendo con
+     la pista de antes; en los demás modos la 3 y la 4 dan la misma pista. */
+  const VERSION_PISTA = 4;
+  const ID_CIELO = 1e8;                                   // desde aquí, los ids de las monedas de la mochila (versión 3): la pista nunca llega tan lejos
 
   /** Arma una CURVA de velocidad a partir de {V0, VMAX, ACEL}: todo lo que
       sale de ella en un solo objeto, para que el juego, el generador y el
@@ -274,7 +279,7 @@
   const puntosPorTramo = (metros, mult) => metros * PUNTOS_POR_METRO * mult;
 
   /* ---------- Estaciones (cambian con la distancia) ----------
-     Cada estación tiene su estilo de dibujo (juguete, pixel o neón), su
+     Cada estación tiene su estilo de dibujo (juguete, cómic o neón), su
      paleta de colores, su música y un boleto dorado con un trozo de la
      historia. Se entra a cada una por un túnel. `desde` son METROS de la
      carrera: antes eran puntos, y como los puntos van × el multiplicador,
@@ -304,14 +309,14 @@
      que no dependan de su lugar en la lista. */
   const ESTACIONES = [
     { id: "barrio", nombre: "Barrio Estación", desde: 0, estilo: "juguete", paleta: "barrio", musica: "metrorush-barrio", lema: "Donde empieza la Línea 3", boleto: 1 },
-    { id: "ocaso", nombre: "Ocaso", desde: 1200, estilo: "pixel", paleta: "ocaso", musica: "metrorush-ocaso", lema: "El sol se pone entre los rieles", boleto: 2 },
+    { id: "ocaso", nombre: "Ocaso", desde: 1200, estilo: "comic", paleta: "ocaso", musica: "metrorush-ocaso", lema: "El sol se pone entre los rieles", boleto: 2 },
     { id: "mercado", nombre: "Mercado de Farolillos", desde: 2550, estilo: "juguete", paleta: "mercado", musica: "metrorush-mercado", lema: "Los puestos no cierran esta noche", boleto: 8 },
     { id: "neon", nombre: "Línea Neón", desde: 4200, estilo: "neon", paleta: "neon", musica: "metrorush-neon", lema: "De noche la vía se enciende sola", boleto: 3 },
     { id: "fantasma", nombre: "Estación Fantasma", desde: 6150, estilo: "neon", paleta: "fantasma", musica: "metrorush-fantasma", lema: "Aquí no para un tren desde 2006", boleto: 4 },
-    { id: "cocheras", nombre: "Cocheras", desde: 8400, estilo: "pixel", paleta: "cocheras", musica: "metrorush-cocheras", lema: "Donde duermen los trenes viejos", boleto: 9 },
+    { id: "cocheras", nombre: "Cocheras", desde: 8400, estilo: "comic", paleta: "cocheras", musica: "metrorush-cocheras", lema: "Donde duermen los trenes viejos", boleto: 9 },
     { id: "invierno", nombre: "Invierno", desde: 10950, estilo: "juguete", paleta: "invierno", musica: "metrorush-invierno", lema: "Nieva sobre los rieles", boleto: 5 },
     { id: "muelle", nombre: "Muelle", desde: 13700, estilo: "neon", paleta: "muelle", musica: "metrorush-muelle", lema: "La línea que iba a llegar al mar", boleto: 10 },
-    { id: "oxido", nombre: "Óxido", desde: 16950, estilo: "pixel", paleta: "oxido", musica: "metrorush-oxido", lema: "Más allá del mapa", boleto: 6 },
+    { id: "oxido", nombre: "Óxido", desde: 16950, estilo: "comic", paleta: "oxido", musica: "metrorush-oxido", lema: "Más allá del mapa", boleto: 6 },
     // la paleta "fin" es la del alba con la historia (afiches, grafitis): "alba" queda limpia para City, que la reusa
     { id: "fin", nombre: "Fin de la Línea", desde: 20250, estilo: "juguete", paleta: "fin", musica: "metrorush-fin", lema: "Aquí se acaban las vías… ¿o no?", boleto: 7 }
   ];
@@ -584,9 +589,30 @@
 
   /* Los aspectos del corredor: colores de la ropa. Dos son secretos. */
   const ASPECTOS = {
-    clasico: { nombre: "Clásico", precio: 0, sudadera: 0xff5a3c, gorra: 0x2a6df4, jeans: 0x3b5ba8, mochila: 0x1fb5a0, mochila2: 0xffd23f, suela: 0xe8463b },
-    nocturno: { nombre: "Nocturno", precio: 15000, sudadera: 0x2b2d42, gorra: 0x8d99ae, jeans: 0x1d1e2c, mochila: 0xef233c, mochila2: 0xedf2f4, suela: 0xef233c },
-    grafitero: { nombre: "Grafitero", precio: 30000, sudadera: 0x7b2ff7, gorra: 0x00f5d4, jeans: 0x22223b, mochila: 0xfee440, mochila2: 0xf15bb5, suela: 0x00f5d4 },
+    /* --- Los corredores (ronda 4) ---
+       Antes los cinco chicos eran el mismo muñeco con otra ropa (un cambio de
+       paleta). Ahora cada uno trae `identidad`: piezas que cambian su
+       silueta, lo que se reconoce de espaldas corriendo, como el peinado de
+       las corredoras (mundo.js, «La identidad de los corredores»). Va en
+       otra clave que `rasgos` a propósito: `rasgos` es lo de las corredoras
+       (sin gorra, pestañas, peinados largos) y el test de «cinco y cinco»
+       las cuenta por esa clave.
+       - tocado: 'gorra' (al revés, la de siempre), 'capucha', 'lana'
+         (gorro con pompón), 'corona' o 'quepi' (gorra de uniforme);
+       - pelo: el color (cejas y lo que asoma);
+       - el resto son accesorios: audifonos, panuelo (color), reflejos,
+         spray, manchas, lentesSol, cadena, capa (color), bigote, abrigo.
+       El `nombre` es de persona, como el de las corredoras (antes decía
+       «Clásico», «Nocturno»… que se confundía con los modos); la clave sigue
+       siendo la de siempre, así nadie pierde un aspecto ya comprado: Tomás
+       (clasico), Benja (nocturno), Nacho (grafitero), Mateo (dorado) y Don
+       Ramón (inspector: es su propio uniforme, con su bigote). */
+    clasico: { nombre: "Tomás", precio: 0, sudadera: 0xff5a3c, gorra: 0x2a6df4, jeans: 0x3b5ba8, mochila: 0x1fb5a0, mochila2: 0xffd23f, suela: 0xe8463b,
+      identidad: { tocado: "gorra", pelo: 0x3b2a20, audifonos: true } },                        // gorra al revés y audífonos: el de la portada
+    nocturno: { nombre: "Benja", precio: 15000, sudadera: 0x2b2d42, gorra: 0x8d99ae, jeans: 0x1d1e2c, mochila: 0xef233c, mochila2: 0xedf2f4, suela: 0xef233c,
+      identidad: { tocado: "capucha", pelo: 0x1a1418, panuelo: 0xef233c, reflejos: true } },   // capucha puesta, pañuelo en la cara y franjas que reflejan
+    grafitero: { nombre: "Nacho", precio: 30000, sudadera: 0x7b2ff7, gorra: 0x00f5d4, jeans: 0x22223b, mochila: 0xfee440, mochila2: 0xf15bb5, suela: 0x00f5d4,
+      identidad: { tocado: "lana", pelo: 0x2a1a12, spray: true, manchas: true } },              // gorro de lana con pompón, el spray en la mochila y manchas de pintura
     /* --- Las corredoras (ronda 2) ---
        Cinco personajes con silueta propia (Kiara llegó después): `rasgos` (peinado,
        tocado, falda, lentes, aros; mundo.js, «Los rasgos») cambia el
@@ -608,8 +634,10 @@
        piel propio (las demás usan el de siempre). Sin falda: calzas negras. */
     kiara: { nombre: "Kiara", precio: 55000, sudadera: 0x2ec27e, gorra: 0xff7a3d, jeans: 0x1d1e2c, mochila: 0xff7a3d, mochila2: 0x2ec27e, suela: 0xffffff,
       rasgos: { pelo: 0x1a100b, piel: 0x8d5a3b, peinado: "afro", tocado: "cintillo", aros: true } },   // afro con cintillo naranja y aros
-    dorado: { nombre: "Dorado", precio: null, secreto: "Teclea el código de siempre en la portada (↑ ↑ ↓ ↓ ← → ← → B A).", sudadera: 0xd4a017, gorra: 0xffe066, jeans: 0x8a6d1a, mochila: 0xffd23f, mochila2: 0xfff3b0, suela: 0xffe066 },
-    inspector: { nombre: "Inspector", precio: null, secreto: "Encuentra todos los boletos dorados de la Línea 3.", sudadera: 0x1f3a5f, gorra: 0x1f3a5f, jeans: 0x14213d, mochila: 0x8a5a35, mochila2: 0xfca311, suela: 0x111111 }
+    dorado: { nombre: "Mateo", precio: null, secreto: "Teclea el código de siempre en la portada (↑ ↑ ↓ ↓ ← → ← → B A).", sudadera: 0xd4a017, gorra: 0xffe066, jeans: 0x8a6d1a, mochila: 0xffd23f, mochila2: 0xfff3b0, suela: 0xffe066,
+      identidad: { tocado: "corona", pelo: 0x3a2412, lentesSol: true, cadena: true, capa: 0xb8161f } },   // corona, lentes de sol, cadena y capa roja: el rey de la Línea 3
+    inspector: { nombre: "Don Ramón", precio: null, secreto: "Encuentra todos los boletos dorados de la Línea 3.", sudadera: 0x1f3a5f, gorra: 0x1f3a5f, jeans: 0x14213d, mochila: 0x8a5a35, mochila2: 0xfca311, suela: 0x111111,
+      identidad: { tocado: "quepi", pelo: 0x8a8580, bigote: true, abrigo: true } }   // quepí con visera adelante, bigote canoso y abrigo largo: Don Ramón
   };
 
   /** La caja misteriosa: casi siempre monedas, a veces una patineta o un
@@ -919,8 +947,10 @@
          poderes ni cajas misteriosas; las estrellas y los boletos, sí;
        - con `monedasMatan` (Sin monedas): las monedas son un obstáculo, así
          que nunca van en el camino seguro (ni en el arco sobre una barrera
-         baja ni en los techos de un convoy): cierran carriles que ya estaban
-         cerrados, y en los respiros y túneles van fuera del camino;
+         baja ni en los techos de un convoy). Son el desafío del modo: cierran
+         casi todos los carriles cerrados de una fila, llenan los carriles
+         sin uso entre fila y fila (pasillo), el costado de un convoy, y los
+         respiros y túneles se vuelven un zigzag entre dos muros de monedas;
        - la velocidad con que se ponen los trenes de frente es la de la curva
          del modo (velocidadDe), para que la pista dependa solo de la semilla;
        - el mundo (o el modo) puede traer `generador.bloque(api, dif)`: se
@@ -934,6 +964,7 @@
     const conPoderes = modo.items !== false;     // ¿salen poderes y cajas?
     const peligro = !!modo.monedasMatan;         // ¿las monedas matan? (entonces nunca van en el camino)
     const version = (opciones && opciones.version) || VERSION_PISTA;   // la versión de la pista (la 2 es la vieja, la de las pruebas de antes)
+    const retoMonedas = peligro && version >= 4;  // «sin monedas» desafiante (v4): monedas también en los carriles libres; con v3, la pista de antes
     const curva = velocidadDe(modo, version);    // la curva de velocidad del modo (y de esa versión)
     const velocidadEn = curva.velocidadEn;       // con la que se ponen los trenes de frente (la clásica, en el clásico)
     const ext = modo.generador || mundoDe(modo).generador || null;   // los bloques propios del mundo, si tiene
@@ -1050,7 +1081,8 @@
           libre[c] = d0 + n * (LARGO_VAGON + 0.4) + 4;
           bloqueados++;
         } else if (r < 0.92) {                                  // una barrera (también cierra el carril si no saltas)
-          if (peligro && azar() < 0.5) filaMonedas(c, dr - 3, 6);   // en «sin monedas», a veces una fila de monedas: cierra el carril (no se salta)
+          if (retoMonedas) { if (azar() < lerp(0.6, 0.9, dif)) filaMonedas(c, dr - 3, lerp(6, 16, dif), 0.9, 2); }
+          else if (peligro && azar() < 0.5) filaMonedas(c, dr - 3, 6);   // (v3: la de antes, a veces una fila corta)   // en «sin monedas», casi siempre una fila de monedas (más larga con la dificultad): cierra el carril (no se salta)
           else emite({ tipo: azar() < 0.55 ? "bajo" : "alto", carril: c, d: dr });
           bloqueados++;
         }
@@ -1059,9 +1091,55 @@
         const c = [0, 1, 2].find(x => x !== camino && x !== sig && libre[x] <= dr);
         if (c != null) { emite({ tipo: "tren", carril: c, d0: dr, largo: LARGO_VAGON, vel: 0 }); libre[c] = dr + LARGO_VAGON + 4; }
       }
+      if (retoMonedas) pasillo(dr, esp, sig, dif);                   // en «sin monedas», paredes de monedas entre fila y fila
       regalos(camino, dr + esp * 0.5);                          // un regalo a mitad de camino, si toca
       camino = sig;                                             // la fila siguiente usa el camino nuevo
       dSig = dr + esp;
+    }
+
+    /* EL PASILLO DE «SIN MONEDAS»
+       Entre una fila y la siguiente, los carriles que no usa nadie (ni el
+       camino de esta fila ni el de la próxima) se llenan de monedas: el
+       corredor no puede quedarse paseando por un carril cerrado esperando la
+       próxima fila, tiene que ir por el camino. Las monedas empiezan 5 m
+       después de la fila (lo que ocupa una barrera y su fila de monedas) y
+       terminan 6 m antes de la siguiente, así que la próxima fila puede
+       elegir ese carril como camino y queda tiempo para entrar. Un carril
+       reservado (un tren largo o uno en marcha) no se toca: ya está cerrado. */
+    function pasillo(dr, esp, sig, dif) {
+      const desde = dr + 5, largo = esp - 11;                    // de 5 m después de esta fila a 6 m antes de la próxima
+      if (largo < 4) return;                                     // filas muy juntas: no cabe
+      for (let c = 0; c < 3; c++) {
+        if (c === camino || c === sig || libre[c] > desde) continue;   // el camino, el próximo camino y los carriles ya cerrados
+        if (azar() < lerp(0.45, 0.85, dif)) filaMonedas(c, desde, largo, 0.9, 2.4);
+      }
+    }
+
+    /* EL ZIGZAG DE «SIN MONEDAS»
+       Un tramo de `largo` metros donde el camino cambia de carril cada `seg`
+       metros y los otros dos carriles van llenos de monedas: hay que bailar
+       entre ellas. En cada cambio, el carril nuevo se abre `G` metros antes
+       de que se cierre el viejo (G crece con la velocidad: 0,45 s de
+       carrera, nunca menos de 12 m; cambiar de carril tarda 0,17 s, 10 m a
+       60 m/s), así que siempre hay un trecho con los dos libres para pasar.
+       Devuelve el carril en que termina el camino. */
+    function zigzag(d0, largo, seg) {
+      const G = Math.max(12, velocidadEn(d0) * 0.45);           // el trecho con los dos carriles libres en cada cambio
+      const caminos = [camino];                                  // el camino de cada segmento
+      for (let k = 1; k * seg <= largo + seg; k++) {
+        const prev = caminos[k - 1];
+        const op = [prev - 1, prev + 1].filter(c => c >= 0 && c <= 2 && libre[c] <= d0 + k * seg - G);   // libre desde que se abre
+        caminos.push(op.length && azar() < 0.8 ? op[Math.floor(azar() * op.length)] : prev);
+      }
+      for (let x = 0; x <= largo; x += 2.4) {
+        const k = Math.floor(x / seg), d = d0 + x;
+        for (let c = 0; c < 3; c++) {
+          if (c === caminos[k]) continue;                         // el camino de este segmento
+          if (c === caminos[k + 1] && x > (k + 1) * seg - G) continue;   // el próximo camino ya se abrió
+          if (libre[c] <= d) emite({ tipo: "moneda", carril: c, d, y: 0.9 });
+        }
+      }
+      return caminos[Math.floor(largo / seg)];
     }
 
     /** Un convoy: rampa y dos o tres vagones en el camino, con monedas en los techos. */
@@ -1087,7 +1165,7 @@
           const m = 1 + Math.floor(azar() * 3);
           for (let k = 0; k < m; k++) emite({ tipo: "tren", carril: o, d0: dr + 6 + k * (LARGO_VAGON + 0.4), largo: LARGO_VAGON, vel: 0 });
           libre[o] = dr + 6 + m * (LARGO_VAGON + 0.4) + 4;
-        }
+        } else if (retoMonedas) filaMonedas(o, dr + 6, fin - dr - 12, 0.9, 2.4);   // en «sin monedas», al lado del convoy un muro de monedas: se sube por la rampa o nada
       }
       mantener = 1;                                             // al bajar del convoy sigues en el mismo carril
       dSig = fin + Math.max(lerp(26, 18, dif), velocidadEn(fin) * FILA_MIN_S);
@@ -1110,10 +1188,20 @@
       dSig = dr + largo + 14;
     }
 
-    /** El respiro de «sin monedas»: la cinta de monedas es lo que hay que
-        esquivar, así que va por los dos carriles que NO son el camino (salta
-        de uno al otro cada 8 monedas) y el camino sigue limpio y donde estaba. */
+    /** El respiro de «sin monedas» ya no es un respiro: un zigzag de 72 m
+        con el camino cambiando de carril cada 24 m entre dos muros de
+        monedas (ver zigzag). */
     function respiroPeligro() {
+      if (!retoMonedas) return respiroPeligroV3();
+      const dr = dSig, largo = 72;
+      camino = zigzag(dr, largo, 24);                             // el camino termina donde terminó el zigzag
+      regalos(camino, dr + largo + 4);
+      dSig = dr + largo + 14;
+    }
+    /** El respiro de «sin monedas» de la versión 3, tal cual, para rehacer
+        sus pruebas: la cinta va por los dos carriles que NO son el camino
+        (salta de uno al otro cada 8 monedas) y el camino sigue limpio. */
+    function respiroPeligroV3() {
       const dr = dSig, largo = 60;
       const otros = [0, 1, 2].filter(k => k !== camino);          // los dos carriles fuera del camino
       let i = Math.floor(azar() * 2);                             // por cuál empieza
@@ -1131,7 +1219,8 @@
       const d0 = Math.max(dSig, Math.max(...libre)) + 12;      // empieza cuando todos los carriles están libres
       const largo = 150;
       emite({ tipo: "tunel", d0, largo, estacion: tunel.estacion });
-      filaMonedas(peligro ? (camino + 1) % 3 : camino, d0 + 8, largo - 30);   // en «sin monedas», fuera del camino
+      if (retoMonedas) camino = zigzag(d0 + 8, largo - 30, 30);  // en «sin monedas», el túnel es un zigzag entre monedas
+      else filaMonedas(peligro ? (camino + 1) % 3 : camino, d0 + 8, largo - 30);   // (v3 de «sin monedas»: fuera del camino)
       tunel = null;
       for (let c = 0; c < 3; c++) libre[c] = d0 + largo + 10;  // nada adentro ni a la salida
       dSig = d0 + largo + 22;
@@ -1163,7 +1252,7 @@
           if (dSig < 140) { bloqueFila(0, ctx); continue; }     // el comienzo, suave
           const r = azar();
           if (r < lerp(0.08, 0.2, dif) && libre[camino] <= dSig) bloqueConvoy(dif, ctx);
-          else if (r < lerp(0.08, 0.2, dif) + 0.07) bloqueRespiro();
+          else if (r < lerp(0.08, 0.2, dif) + (retoMonedas ? lerp(0.12, 0.22, dif) : 0.07)) bloqueRespiro();   // en «sin monedas» el respiro es un zigzag: sale más seguido
           else bloqueFila(dif, ctx);
         }
         return salida;

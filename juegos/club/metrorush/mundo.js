@@ -15,8 +15,11 @@
      de espejo mojado y un sol synthwave; los trenes, barreras, rampas y
      poderes, en cambio, brillan en su propio color para que se lean sobre
      lo oscuro (ver "LEGIBILIDAD" en las paletas).
-   - "pixel": sombreado por escalones (toon) dibujado a baja resolución por
-     RenderPixelatedPass, que además marca los bordes con un píxel.
+   - "comic": la luz y los materiales del juguete, pero planos (luz pareja,
+     sin oclusión, sombras duras) y a resolución completa, con un contorno de
+     tinta que recorta cada objeto contra lo que tiene detrás (PasadaTinta).
+     Reemplazó al estilo pixelado, que dibujaba a baja resolución y no se
+     leía bien en ninguna pantalla.
    Un "kit" es todo lo que hace falta para una estación: materiales,
    texturas, modelos y sus reservas. Se arma una vez y se guarda.
 
@@ -43,14 +46,14 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
-import { RenderPixelatedPass } from 'three/addons/postprocessing/RenderPixelatedPass.js';
+import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
 import { Reflector } from 'three/addons/objects/Reflector.js';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 // los escenarios nuevos y la historia que se ve en la vía (afiches, utilería, horizonte, sucesos): ver escenarios.js
-import * as ESC from './escenarios.js?v=metrorush-14';
+import * as ESC from './escenarios.js?v=metrorush-15';
 
 const MOTOR = window.MetroRushMotor;                // el motor (motor.js), cargado antes como script
 const CARRILES = MOTOR.CARRILES;                   // x de cada carril
@@ -173,12 +176,11 @@ class Arma {
    =================================================================== */
 
 function lienzo(w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; return [c, c.getContext('2d')]; }
-function aTextura(c, { repetir = true, pixel = false, rep = null } = {}) {
+function aTextura(c, { repetir = true, rep = null } = {}) {
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;                                         // los colores del canvas están en sRGB
   if (repetir) t.wrapS = t.wrapT = THREE.RepeatWrapping;
   if (rep) t.repeat.set(rep[0], rep[1]);
-  if (pixel) t.magFilter = THREE.NearestFilter;                                // en pixel, sin suavizar
   t.anisotropy = 4;
   return t;
 }
@@ -448,26 +450,34 @@ const BASE_JUGUETE = {
   // de día casi todo se lee bien; solo la niebla clara se comía los trenes lejanos (en Invierno, sobre todo)
   legible: { brillo: 0, niebla: 1.6 }
 };
-const BASE_PIXEL = {
-  estilo: 'pixel',
-  cielo: { arriba: 0x4b3474, horizonte: 0xffa070, sol: 0xffe7a8 }, niebla: [30, 160],
-  sol: [0xffc890, 2.6, [-16, 13, -46]], hemi: [0xffcfb0, 0x4a3355, 1.15], env: 0, exposicion: 1,
-  post: {},
+/* La base del estilo cómic es Ocaso, a la «hora dorada»: cielo ciruela que
+   baja a dorado, edificios en rosa viejo, terracota y azul pizarra. La luz es
+   pareja (la hemisférica pesa casi tanto como el sol) para que los colores se
+   lean planos, como pintados, y el volumen lo dé el contorno de tinta, no las
+   sombras. Los objetos del juego van en el tono opuesto al decorado: trenes
+   fríos y claros (turquesa, crema, azul) y barreras azules con blanco; el
+   rojo que tenían se perdía en lo anaranjado. `tinta` es el color del
+   contorno: un ciruela casi negro, no negro puro, que se funde con la paleta. */
+const BASE_COMIC = {
+  estilo: 'comic',
+  cielo: { arriba: 0x7a2e6a, horizonte: 0xffc65a, sol: 0xfff2c4 }, niebla: [40, 165],
+  sol: [0xffb24a, 2.0, [-16, 12, -40]], hemi: [0xffd6a8, 0x5a2a4a, 1.0], env: 0.15, exposicion: 0.95,
+  post: { vineta: 0.12, sat: 1.12 },
+  tinta: 0x2a1230, fuerzaTinta: 0.85,
   c: {
-    grava: 0x8d5f52, tierra: 0x6d4c4a, traviesa: 0x5a3b2c, riel: 0x9a8ea6, muro: 0xc9a48a, acera: 0xb08a78, bordillo: 0x8a6a5c,
-    trenes: [0x2f6fb6, 0xe2463a, 0xece3cc], acentos: [0xfff1d4, 0xfff1d4, 0x2a2442], bajo: 0x2a2232, vidrio: 0x2a2442, techoTren: 0x8a8090,
-    edificios: [0x6c4f7c, 0x8f5b8a, 0xb5677f, 0x4f5d8c, 0xa0606a], ladrillo: 0xb5677f, probLadrillo: 0,
-    marco: 0x3b2a40, vidrioEd: 0xffcf7a, cornisa: 0x4a3550, vitrina: 0x5a3f36,
+    grava: 0x7a4e48, tierra: 0x5e3a3a, traviesa: 0x4a2e2a, riel: 0xc8b8c8, muro: 0xd8a888, acera: 0xc89878, bordillo: 0x9a6a5a,
+    trenes: [0x2fb8c8, 0xf4f1e6, 0x3a4fd0], acentos: [0xffffff, 0xffd23f, 0x2a1230], bajo: 0x2a2232, vidrio: 0x22304a, techoTren: 0xe8e4dc,
+    edificios: [0x8a3a5a, 0xc8603a, 0x3f5a7a, 0xa8506a, 0xe0905a], ladrillo: 0xb5677f, probLadrillo: 0,
+    marco: 0x3b2040, vidrioEd: 0xffcf7a, cornisa: 0x4a2a4a, vitrina: 0x5a3f36,
     toldos: [[0xe2463a, 0xfff1d4], [0x2fb59a, 0xfff1d4], [0xffd23f, 0x5a3b2c]],
-    arboles: [0x3f7a4a, 0x4f8c4f, 0x2f6a40], tronco: 0x5a3b2c, poste: 0x3b2a40, farol: 0xffe3a0, catenaria: 0x3b2a40,
-    // la rampa era gris violeta (0x8a8090) y en la penumbra del atardecer se confundía con el balasto: acero claro
-    barrera: 0xe2463a, barrera2: 0xfff1d4, ambar: 0xffb020, rampa: 0xdfe4ea, oro: 0xffd23f, iman: 0xe2463a, cromo: 0xfff1d4, nube: 0xffd9c2, basurero: 0x3f7a4a
+    arboles: [0x2f5a3a, 0x3f6a40], tronco: 0x4a2e2a, poste: 0x3b2040, farol: 0xffe3a0, catenaria: 0x3b2040,
+    barrera: 0x2340b8, barrera2: 0xffffff, ambar: 0xffb020, rampa: 0xe8f4ff, oro: 0xffd23f, iman: 0xe2463a, cromo: 0xfff1d4, nube: 0xffd9c2, basurero: 0x2f5a3a
   },
   carteles: ['CAFÉ', 'PAN', 'ARCADE', 'LIBROS', 'DISCOS', 'FRUTAS'],
   grafitis: [['¡CORRE!', 0xffd23f, 0xe2463a], ['LAB', 0x2fb59a, 0x4f8c4f]],
   extras: { nubes: true, disco: true },
   // la luz del atardecer es cálida y pareja: un poco de brillo propio separa los objetos del fondo anaranjado
-  legible: { brillo: 0.06, niebla: 1.6 }
+  legible: { brillo: 0.05, niebla: 1.6 }
 };
 const BASE_NEON = {
   estilo: 'neon',
@@ -510,7 +520,7 @@ function variante(base, cambios) {
 }
 export const PALETAS = {
   barrio: BASE_JUGUETE,
-  ocaso: BASE_PIXEL,
+  ocaso: BASE_COMIC,
   neon: BASE_NEON,
   /* Estación Fantasma: el neón se vuelve verde espectral, con niebla verde y un tren fantasma en el cielo.
      Los trenes eran verde menta y cian, los mismos tonos de la ciudad, los
@@ -558,19 +568,20 @@ export const PALETAS = {
     grafitis: [['GRACIAS', 0xffd23f, 0xff5a8a], ['FIN?', 0x3fd0ff, 0x7a5cff]],
     extras: { nubes: true, solBajo: true }
   }),
-  /* Óxido: el atardecer pixelado se vuelve desierto oxidado, con polvo en el aire. */
-  oxido: variante(BASE_PIXEL, {
-    cielo: { arriba: 0x6a3a2a, horizonte: 0xffb070, sol: 0xfff0c0 }, niebla: [26, 140],
-    sol: [0xffb878, 2.8, [-16, 13, -46]], hemi: [0xffc8a0, 0x5a3020, 1.1],
-    /* Todo era óxido: trenes café y naranja sobre balasto naranja, con
-       niebla naranja; el tren naranja desaparecía a 60 m. Los trenes pasan
-       a pátina (el verde azulado del cobre oxidado, el opuesto del naranja),
-       hueso y azul desteñido, y las barreras a negro con amarillo de
-       peligro, que se lee sobre cualquier tono cálido. */
-    c: { grava: 0xc08a5a, tierra: 0xb07a4a, acera: 0xc89a6a, muro: 0xa0623a, riel: 0x8a5a3a, edificios: [0x8a4a2a, 0xa05a30, 0x7a3a22, 0xb87040], arboles: [0x6a7a3a, 0x7a8a4a],
-      trenes: [0x2f8f8a, 0xe8dcc0, 0x3f5f8f], barrera: 0x2a2420, barrera2: 0xffd23f },
+  /* Óxido: mediodía sobre una meseta roja. Cielo azul limpio arriba y tierra
+     roja abajo: frío arriba y caliente abajo, nada que ver con el atardecer
+     de Ocaso. Los trenes van en pátina (el verde azulado del cobre oxidado,
+     el opuesto del rojo), hueso y azul tinta, las barreras en negro con
+     amarillo de peligro y la rampa en cian: todo lo que se esquiva salta
+     sobre lo rojo. */
+  oxido: variante(BASE_COMIC, {
+    cielo: { arriba: 0x2a7ac8, horizonte: 0xf2d6b0, sol: 0xffffff }, niebla: [30, 140],
+    sol: [0xfff4e0, 2.6, [-16, 26, 14]], hemi: [0xbfe0ff, 0x8a3a1a, 0.75], tinta: 0x3a140a,
+    c: { grava: 0xb8603a, tierra: 0xa04a2a, acera: 0xc8784a, muro: 0xa0523a, bordillo: 0x8a3a1e, riel: 0x8a5a3a, traviesa: 0x5a2a1a,
+      edificios: [0x9a3a1e, 0xc8682e, 0xe0a060, 0x6a2a1a], marco: 0x4a1a0a, cornisa: 0x5a2010, vidrioEd: 0x2a3d58, arboles: [0x4a7a3a, 0x6a8a4a],
+      trenes: [0x1fa08a, 0xf2ece0, 0x2a3a6a], acentos: [0xffffff, 0xffe02a, 0x3a140a], barrera: 0x1a1a1a, barrera2: 0xffe02a, rampa: 0x3ad0e0, nube: 0xffffff },
     carteles: ['AGUA', 'TALLER', 'POSADA', 'ÚLTIMA BOMBA'],
-    extras: { nubes: false, disco: true, polvo: true }
+    extras: { nubes: false, disco: false, polvo: true }
   })
 };
 /* ---- Las estaciones nuevas y la historia (escenarios.js) ----
@@ -578,21 +589,13 @@ export const PALETAS = {
    historia; el «alba» queda limpio para City), y después cada paleta de la
    Línea 3 recibe sus grafitis, letreros y afiches. Las bases no se tocan:
    todo son copias hechas con `variante`. */
-Object.assign(PALETAS, ESC.paletasNuevas({ variante, BASE_JUGUETE, BASE_PIXEL, BASE_NEON, PALETAS }));
+Object.assign(PALETAS, ESC.paletasNuevas({ variante, BASE_JUGUETE, BASE_COMIC, BASE_NEON, PALETAS }));
 ESC.sumaHistoria(PALETAS, variante);
 
 /* ===================================================================
    4. EL KIT DE UNA ESTACIÓN (materiales, texturas, modelos y reservas)
    =================================================================== */
 
-let _gradToon = null;
-/** Los escalones de luz del sombreado toon (pixel). */
-function gradToon() {
-  if (_gradToon) return _gradToon;
-  _gradToon = new THREE.DataTexture(new Uint8Array([70, 130, 195, 255]), 4, 1, THREE.RedFormat);
-  _gradToon.minFilter = _gradToon.magFilter = THREE.NearestFilter; _gradToon.needsUpdate = true;
-  return _gradToon;
-}
 let _texBrillo = null;
 const texBrillo = () => (_texBrillo ||= aTextura(TEX.brillo(), { repetir: false }));
 
@@ -620,62 +623,66 @@ function realza(m, brillo, niebla) {
   m.customProgramCacheKey = () => `metrorush-realce-${b}-${n}`;
 }
 
-/* La pasada del estilo pixelado, con el contorno medido en metros. La de
-   three.js oscurece el borde de una silueta cuando la profundidad del vecino
-   salta más de 0,01 en el búfer de profundidad, que no es lineal: con la
-   cámara a 0,1 m del plano cercano eso solo pasa a menos de ~10 m, así que
-   solo el corredor tenía contorno y un tren a 40 m se fundía con la vía y
-   los edificios. Aquí el salto se mide en distancia de verdad y relativo a
-   la propia (un vecino un 15 % más lejos ya es borde): el tren, la barrera
-   o la rampa que vienen quedan recortados con un píxel oscuro a cualquier
-   distancia. El suelo visto de refilón no da bordes falsos (de una fila a la
-   siguiente se aleja menos de un 10 % hasta el final de la niebla), y el
-   contorno se apaga al llegar a ella (`lejos`), para que lo que sale de la
-   bruma no aparezca con un trazo negro encima. El resto (las aristas que
-   brillan, por la normal) queda como en three.js.
-   Con `soloSilueta` (calidad baja) no se dibuja la escena una segunda vez
-   para las normales: solo el contorno, que sale de la profundidad de la
-   misma pasada. Cuesta las mismas llamadas al GPU que dibujar directo, más
-   un cuadro a la resolución del arte, y así la calidad baja de un celular
-   también recorta los obstáculos. */
-class PasadaPixel extends RenderPixelatedPass {
-  constructor(lado, escena, camara, op = {}) {
-    super(lado, escena, camara, op);
-    this.soloSilueta = !!op.soloSilueta;                                      // sin la pasada de normales
-    if (this.soloSilueta) this.normalEdgeStrength = 0;                        // (el constructor de three cambia un 0 por 0,3)
-  }
-  createPixelatedMaterial() {
-    const m = super.createPixelatedMaterial();
-    Object.assign(m.uniforms, { cerca: { value: 0.1 }, fondo: { value: 240 }, lejos: { value: 1e4 } });   // planos de la cámara y fin de la niebla
-    m.fragmentShader = m.fragmentShader
-      .replace('uniform float depthEdgeStrength;', 'uniform float depthEdgeStrength;\nuniform float cerca, fondo, lejos;\n'
+/* La pasada del estilo cómic: dibuja la escena en su propio lienzo (con su
+   profundidad) y oscurece hacia el color de tinta de la estación el borde de
+   cada silueta. Un píxel es borde cuando lo que tiene al lado, a `grosor`
+   píxeles, está bastante más lejos: el salto se mide en METROS y relativo a
+   la propia distancia (un vecino un 15 % más lejos ya cuenta). Medido en el
+   búfer de profundidad tal cual (que no es lineal) solo lo cercano tenía
+   contorno; en metros, un tren, una barrera o una rampa que vienen quedan
+   recortados a cualquier distancia, que es lo que más ayuda a leerlos a
+   60 m/s. El suelo visto de refilón no da bordes falsos (de un píxel al
+   siguiente se aleja mucho menos de un 15 %), y el contorno se apaga al
+   llegar a la niebla (`lejos`), para que lo que sale de la bruma no aparezca
+   con un trazo encima. La línea mide `grosor` píxeles del lienzo (1 en una
+   pantalla de 1×, 2 en una de 2× o 3×), así se ve igual de gruesa en todas.
+   Cuesta lo mismo que dibujar la escena más un cuadro a pantalla completa, y
+   por eso se usa también en calidad baja. */
+class PasadaTinta extends Pass {
+  constructor(escena, camara, { tinta = 0x1a1420, fuerza = 0.85, grosor = 1 } = {}) {
+    super();
+    this.escena = escena; this.camara = camara; this.grosor = grosor;        // qué se dibuja, desde dónde y qué tan gruesa va la línea
+    this.lienzo = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType });   // la escena, en luz lineal (el tono lo pone OutputPass)
+    this.lienzo.depthTexture = new THREE.DepthTexture(1, 1);                   // y su profundidad, para encontrar los bordes
+    this.cuadro = new FullScreenQuad(new THREE.ShaderMaterial({
+      uniforms: {
+        tDiffuse: { value: null }, tDepth: { value: null },                    // la escena y su profundidad
+        paso: { value: new THREE.Vector2() },                                  // cuánto es `grosor` píxeles en coordenadas de textura
+        cerca: { value: 0.1 }, fondo: { value: 240 }, lejos: { value: 1e4 },   // planos de la cámara y fin de la niebla
+        tinta: { value: new THREE.Color(tinta) }, fuerza: { value: fuerza }    // el color del contorno y cuánto tapa
+      },
+      vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: `uniform sampler2D tDiffuse, tDepth; uniform vec2 paso; uniform float cerca, fondo, lejos, fuerza; uniform vec3 tinta; varying vec2 vUv;
         // del valor del búfer de profundidad (perspectiva) a metros desde la cámara
-        + 'float metros(float d) { return cerca * fondo / (fondo - (fondo - cerca) * d); }')
-      .replace(/float depthEdgeIndicator\(float depth, vec3 normal\) \{[\s\S]*?return floor\(smoothstep\(0\.01, 0\.02, diff\) \* 2\.\) \/ 2\.;\s*\}/,
-        `float depthEdgeIndicator(float depth, vec3 normal) {
-          float z = metros(depth), diff = 0.0;
-          diff += clamp((metros(getDepth(1, 0)) - z) / z, 0.0, 1.0);
-          diff += clamp((metros(getDepth(-1, 0)) - z) / z, 0.0, 1.0);
-          diff += clamp((metros(getDepth(0, 1)) - z) / z, 0.0, 1.0);
-          diff += clamp((metros(getDepth(0, -1)) - z) / z, 0.0, 1.0);
-          return floor(smoothstep(0.15, 0.3, diff) * 2.) / 2. * (1.0 - smoothstep(0.65 * lejos, lejos, z));
-        }`);
-    return m;
+        float metros(float d) { return cerca * fondo / (fondo - (fondo - cerca) * d); }
+        float prof(vec2 o) { return metros(texture2D(tDepth, vUv + o * paso).r); }
+        void main() {
+          vec4 c = texture2D(tDiffuse, vUv);
+          float z = prof(vec2(0.0)), d = 0.0;                                   // la distancia de este píxel…
+          d += clamp((prof(vec2(1.0, 0.0)) - z) / z, 0.0, 1.0);                 // …y cuánto más lejos están sus cuatro vecinos
+          d += clamp((prof(vec2(-1.0, 0.0)) - z) / z, 0.0, 1.0);
+          d += clamp((prof(vec2(0.0, 1.0)) - z) / z, 0.0, 1.0);
+          d += clamp((prof(vec2(0.0, -1.0)) - z) / z, 0.0, 1.0);
+          float borde = smoothstep(0.15, 0.3, d) * (1.0 - smoothstep(0.6 * lejos, lejos, z));
+          gl_FragColor = vec4(mix(c.rgb, tinta, borde * fuerza), c.a);
+        }`
+    }));
+  }
+  setSize(w, h) {
+    this.lienzo.setSize(w, h);                                                  // a la resolución del lienzo de verdad: nada pixelado
+    this.cuadro.material.uniforms.paso.value.set(this.grosor / w, this.grosor / h);
   }
   render(renderer, writeBuffer) {
-    const u = this.fsQuad.material.uniforms, cam = this.camera, fog = this.scene.fog;
-    u.cerca.value = cam.near; u.fondo.value = cam.far; u.lejos.value = fog ? fog.far : 1e4;   // se leen cada cuadro: la niebla cambia con la estación y la calidad
-    if (!this.soloSilueta) { super.render(renderer, writeBuffer); return; }
-    // lo mismo que la de three.js, sin dibujar las normales (normalEdgeStrength = 0: el sombreador no las lee)
-    u.normalEdgeStrength.value = 0; u.depthEdgeStrength.value = this.depthEdgeStrength;
-    renderer.setRenderTarget(this.beautyRenderTarget);                        // la escena, una sola vez, con su profundidad
-    renderer.render(this.scene, this.camera);
-    u.tDiffuse.value = this.beautyRenderTarget.texture; u.tDepth.value = this.beautyRenderTarget.depthTexture;
-    u.tNormal.value = this.normalRenderTarget.texture;                        // vacía: está declarada en el sombreador, pero no se usa
+    const u = this.cuadro.material.uniforms, cam = this.camara, fog = this.escena.fog;
+    u.cerca.value = cam.near; u.fondo.value = cam.far; u.lejos.value = fog ? fog.far : 1e4;   // cada cuadro: la niebla cambia con la estación y la calidad
+    renderer.setRenderTarget(this.lienzo);
+    renderer.render(this.escena, this.camara);                                 // la escena, una sola vez, con su profundidad
+    u.tDiffuse.value = this.lienzo.texture; u.tDepth.value = this.lienzo.depthTexture;
     renderer.setRenderTarget(this.renderToScreen ? null : writeBuffer);
     if (!this.renderToScreen && this.clear) renderer.clear();
-    this.fsQuad.render(renderer);                                             // el contorno, a la resolución del arte
+    this.cuadro.render(renderer);                                              // la escena con su contorno
   }
+  dispose() { this.lienzo.depthTexture?.dispose(); this.lienzo.dispose(); this.cuadro.material.dispose(); this.cuadro.dispose(); }
 }
 
 /** Lleva las coordenadas v de una geometría a la franja `i` de `n` de un atlas
@@ -710,7 +717,7 @@ class Serie {
 class Kit {
   constructor(mundo, clave, pal) {
     this.mundo = mundo; this.clave = clave; this.pal = pal; this.c = pal.c;
-    this.neon = pal.estilo === 'neon'; this.pixel = pal.estilo === 'pixel'; this.juguete = pal.estilo === 'juguete';
+    this.neon = pal.estilo === 'neon'; this.comic = pal.estilo === 'comic'; this.juguete = pal.estilo === 'juguete';
     this.az = azarDe(0xC17A + clave.length * 131 + clave.charCodeAt(0));   // la ciudad sale igual en cada visita
     this.mats = new Map(); this.texs = new Map(); this.lineasMat = new Map();
     this.reserva = new Map();          // tipo → objetos guardados para reusar
@@ -733,7 +740,6 @@ class Kit {
     const basico = tipo === 'luz' || tipo === 'texluz';
     let m;
     if (basico) m = new THREE.MeshBasicMaterial({ vertexColors: true, map, transparent: tipo === 'texluz' && !!tx && tx.startsWith('graf'), alphaTest: tx && tx.startsWith('graf') ? 0.02 : 0 });
-    else if (this.pixel) m = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: gradToon(), map, transparent: !!tx && tx.startsWith('graf'), alphaTest: tx && tx.startsWith('graf') ? 0.05 : 0 });
     else {
       const P = { plano: [.8, 0], pintura: [.34, .35], metal: [.28, .9], vidrio: [.06, .65], tex: [.9, 0], texmetal: [.5, .55] }[tipo] || [.8, 0];
       m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: P[0], metalness: P[1], map, envMapIntensity: this.pal.env,
@@ -756,46 +762,46 @@ class Kit {
   }
   /** El lienzo de un letrero de tienda (el color sale del texto, así es siempre el mismo). */
   lienzoCartel(texto) {
-    const c = this.c, px = this.pixel;
+    const c = this.c;
     const k = [...texto].reduce((s, ch) => s + ch.charCodeAt(0), 0);
     const fondo = this.neon ? '#0a0418' : hexCss([0x23304a, 0xfff6e6, 0x2a6df4, 0xe8463b][k % 4]);
     const tinta = this.neon ? hexCss([0xff2bd6, 0x22e5ff, 0xffe14d, ...(c.ventanas || [])][k % 3]) : (k % 4 === 1 ? '#23304a' : '#ffffff');
-    return TEX.cartel(texto, fondo, tinta, this.neon ? '700 80px Orbitron, sans-serif' : px ? '54px "Press Start 2P", monospace' : '86px "Lilita One", "Arial Black", sans-serif', this.neon);
+    return TEX.cartel(texto, fondo, tinta, this.neon ? '700 80px Orbitron, sans-serif' : this.comic ? '92px Bangers, "Arial Black", sans-serif' : '86px "Lilita One", "Arial Black", sans-serif', this.neon);
   }
   /* ---- texturas (se dibujan una vez y se reusan) ---- */
   tex(nombre) {
     if (this.texs.has(nombre)) return this.texs.get(nombre);
-    const c = this.c, az = this.az, px = this.pixel;
+    const c = this.c, az = this.az;
     const [tipo, ...arg] = nombre.split('|');
     let t;
     switch (tipo) {
-      case 'grava': t = aTextura(TEX.grava(az, c.grava), { pixel: px }); break;
-      case 'gravaSuelo': t = aTextura(TEX.grava(az, c.tierra), { pixel: px }); break;
-      case 'ladrillo': t = aTextura(TEX.ladrillo(az, c.ladrillo), { pixel: px }); break;
-      case 'ruido': t = aTextura(TEX.ruido(az), { pixel: px }); break;
-      case 'acera': t = aTextura(TEX.ruido(az), { pixel: px }); break;
-      case 'muro': t = aTextura(TEX.muro(az), { pixel: px }); break;
-      case 'rejilla': t = aTextura(TEX.rejilla(), { pixel: px, rep: [2.5, 2.5] }); break;
+      case 'grava': t = aTextura(TEX.grava(az, c.grava)); break;
+      case 'gravaSuelo': t = aTextura(TEX.grava(az, c.tierra)); break;
+      case 'ladrillo': t = aTextura(TEX.ladrillo(az, c.ladrillo)); break;
+      case 'ruido': t = aTextura(TEX.ruido(az)); break;
+      case 'acera': t = aTextura(TEX.ruido(az)); break;
+      case 'muro': t = aTextura(TEX.muro(az)); break;
+      case 'rejilla': t = aTextura(TEX.rejilla(), { rep: [2.5, 2.5] }); break;
       case 'rejillaNeon': t = aTextura(TEX.rejillaNeon(), { rep: [2.5, 2.5] }); break;
       // el marco del tablero: oscuro salvo que la paleta diga otro (o null, sin marco)
-      case 'rayasRB': t = aTextura(TEX.rayas(c.barrera, c.barrera2, 7, c.marcoBarrera === undefined ? 0x1d2233 : c.marcoBarrera), { pixel: px }); break;
-      case 'rayasRB8': t = aTextura(TEX.rayas(c.barrera, c.barrera2, 8, c.marcoBarrera === undefined ? 0x1d2233 : c.marcoBarrera), { pixel: px }); break;
-      case 'rayasNA': t = aTextura(TEX.rayas(0x1d1f26, 0xffd23f, 6), { pixel: px }); break;
-      case 'chevron': t = aTextura(TEX.rayas(0x1d1f26, 0xffd23f, 10), { pixel: px, rep: [1, 1] }); break;
-      case 'flecha': t = aTextura(TEX.flecha(this.neon), { repetir: false, pixel: px }); break;
-      case 'destino': t = aTextura(TEX.destino(), { repetir: false, pixel: px }); break;
-      case 'doble': t = aTextura(TEX.doble(), { repetir: false, pixel: px }); break;
-      case 'caja': t = aTextura(TEX.caja(), { repetir: false, pixel: px }); break;
-      case 'boleto': t = aTextura(TEX.boleto(), { repetir: false, pixel: px }); break;
-      case 'faro': t = aTextura(TEX.faro(), { repetir: false }); break;         // las luces de los trenes que vienen (suaves también en pixel)
-      case 'toldo': { const [c1, c2] = c.toldos[+arg[0] % c.toldos.length]; t = aTextura(TEX.toldo(c1, c2, this.neon ? 0.45 : 1), { pixel: px }); break; }
-      case 'cartel': t = aTextura(this.lienzoCartel(arg[0]), { repetir: false, pixel: px }); break;
+      case 'rayasRB': t = aTextura(TEX.rayas(c.barrera, c.barrera2, 7, c.marcoBarrera === undefined ? 0x1d2233 : c.marcoBarrera)); break;
+      case 'rayasRB8': t = aTextura(TEX.rayas(c.barrera, c.barrera2, 8, c.marcoBarrera === undefined ? 0x1d2233 : c.marcoBarrera)); break;
+      case 'rayasNA': t = aTextura(TEX.rayas(0x1d1f26, 0xffd23f, 6)); break;
+      case 'chevron': t = aTextura(TEX.rayas(0x1d1f26, 0xffd23f, 10), { rep: [1, 1] }); break;
+      case 'flecha': t = aTextura(TEX.flecha(this.neon), { repetir: false }); break;
+      case 'destino': t = aTextura(TEX.destino(), { repetir: false }); break;
+      case 'doble': t = aTextura(TEX.doble(), { repetir: false }); break;
+      case 'caja': t = aTextura(TEX.caja(), { repetir: false }); break;
+      case 'boleto': t = aTextura(TEX.boleto(), { repetir: false }); break;
+      case 'faro': t = aTextura(TEX.faro(), { repetir: false }); break;         // las luces de los trenes que vienen
+      case 'toldo': { const [c1, c2] = c.toldos[+arg[0] % c.toldos.length]; t = aTextura(TEX.toldo(c1, c2, this.neon ? 0.45 : 1)); break; }
+      case 'cartel': t = aTextura(this.lienzoCartel(arg[0]), { repetir: false }); break;
       case 'carteles': {                                                       // todos los letreros de la paleta en una textura, uno debajo del otro
         const lista = this.pal.carteles, [cv, x] = lienzo(512, 128 * lista.length);
         lista.forEach((texto, i) => x.drawImage(this.lienzoCartel(texto), 0, i * 128));
-        t = aTextura(cv, { repetir: false, pixel: px }); break;
+        t = aTextura(cv, { repetir: false }); break;
       }
-      case 'graf': { const g = this.pal.grafitis[+arg[0] % this.pal.grafitis.length]; t = aTextura(TEX.grafiti(az, g[0], g[1], g[2], this.neon ? 0.85 : 1), { repetir: false, pixel: px }); break; }
+      case 'graf': { const g = this.pal.grafitis[+arg[0] % this.pal.grafitis.length]; t = aTextura(TEX.grafiti(az, g[0], g[1], g[2], this.neon ? 0.85 : 1), { repetir: false }); break; }
       default: t = ESC.textura(this, tipo, arg, AYUDA);                      // los afiches y los grafitis de la historia (o null)
     }
     this.texs.set(nombre, t);
@@ -816,7 +822,7 @@ class Kit {
     return l;
   }
   /** La clave del vidrio: reflectante de día, encendido de noche. */
-  get vid() { return this.neon ? 'luz' : this.pixel ? 'plano' : 'vidrio'; }
+  get vid() { return this.neon ? 'luz' : 'vidrio'; }
 
   /* ---- reservas: sacar y guardar objetos ---- */
   saca(tipo, fabrica) {
@@ -948,7 +954,7 @@ class Kit {
          `paso`). Sin niebla, a propósito: las luces atraviesan la niebla
          antes que el tren, que es justo lo que avisa de lejos. */
       // blanco frío de noche, cálido de día y al atardecer; de día más fuerte (una luz que se suma a un fondo claro se nota menos)
-      const luz = new THREE.Color(this.neon ? 0xdcefff : this.pixel ? 0xffe6b0 : 0xfff0c8).multiplyScalar(this.neon ? 0.85 : this.pixel ? 1.15 : 1.6);
+      const luz = new THREE.Color(this.neon ? 0xdcefff : 0xfff0c8).multiplyScalar(this.neon ? 0.85 : 1.6);
       const mat = new THREE.MeshBasicMaterial({ map: this.tex('faro'), color: luz, vertexColors: true, transparent: true, opacity: 0,
         blending: THREE.AdditiveBlending, depthWrite: false, fog: false, side: THREE.DoubleSide });
       const faro = new THREE.Mesh(this._geoFaro ||= geoFaro(zf), mat);
@@ -1084,9 +1090,9 @@ class Kit {
     const pisos = this.neon ? 3 + Math.floor(az() * 5) : 2 + Math.floor(az() * 4);
     const w = 5 + az() * 3, d = 6 + az() * 4.5, PISO = 3, h = pisos * PISO + 0.6;
     const fx = -lado * (w / 2);                                                // la fachada que mira a la vía
-    const ladrillo = !this.neon && !this.pixel && az() < c.probLadrillo;
+    const ladrillo = this.juguete && az() < c.probLadrillo;
     const cuerpo = uvMundo(new THREE.BoxGeometry(w, h, d), ladrillo ? 2.4 : 6, h / 2);
-    a.pon(cuerpo, ladrillo ? 'tex:ladrillo' : this.pixel || this.neon ? 'plano' : 'tex:ruido', ladrillo ? 0xffffff : c.edificios[Math.floor(az() * c.edificios.length)], [0, h / 2, 0], null, 1,
+    a.pon(cuerpo, ladrillo ? 'tex:ladrillo' : this.juguete ? 'tex:ruido' : 'plano', ladrillo ? 0xffffff : c.edificios[Math.floor(az() * c.edificios.length)], [0, h / 2, 0], null, 1,
       this.neon ? c.edificios[Math.floor(az() * c.edificios.length)] : null);
     a.pon(CAJA, this.neon ? 'luz' : 'plano', c.cornisa, [0, h + 0.05, 0], null, [w + 0.3, 0.35, d + 0.3]);
     a.pon(CAJA, 'plano', c.cornisa, [0, PISO + 0.35, 0], null, [w + 0.12, 0.25, d + 0.12]);
@@ -1128,7 +1134,7 @@ class Kit {
     const c = this.c, az = this.az, a = new Arma(this);
     a.pon(new THREE.CylinderGeometry(0.11, 0.17, 1.7, 8), 'plano', c.tronco, [0, 0.85, 0]);
     for (let k = 0; k < 3; k++) {
-      const geo = new THREE.IcosahedronGeometry(0.85 + az() * 0.3, this.pixel ? 0 : 1);
+      const geo = new THREE.IcosahedronGeometry(0.85 + az() * 0.3, 1);
       const p = geo.attributes.position;
       for (let i = 0; i < p.count; i++) { const f = 0.96 + az() * 0.08; p.setXYZ(i, p.getX(i) * f, p.getY(i) * f, p.getZ(i) * f); }
       geo.computeVertexNormals();
@@ -1194,8 +1200,8 @@ class Kit {
       this.rejilla = new LineSegments2(lg, lm); this.rejilla.frustumCulled = false; g.add(this.rejilla);
       this.lineasMat.set('rejilla', lm);
     } else {
-      tira(uvMundo(new THREE.BoxGeometry(240, 0.02, LARGO), 2), this.pixel ? 'plano' : 'tex:gravaSuelo', this.pixel ? c.tierra : 0xffffff, [0, -0.01, ZC], 2, 'v');
-      for (const x of CARRILES) tira(uvMundo(new THREE.BoxGeometry(2.0, SUELO, LARGO), 2), this.pixel ? 'plano' : 'tex:grava', this.pixel ? c.grava : 0xffffff, [x, SUELO / 2, ZC], 2, 'v');
+      tira(uvMundo(new THREE.BoxGeometry(240, 0.02, LARGO), 2), 'tex:gravaSuelo', 0xffffff, [0, -0.01, ZC], 2, 'v');
+      for (const x of CARRILES) tira(uvMundo(new THREE.BoxGeometry(2.0, SUELO, LARGO), 2), 'tex:grava', 0xffffff, [x, SUELO / 2, ZC], 2, 'v');
     }
     /* durmientes: una sola InstancedMesh que se corre de a un paso.
        En neón no hay balasto: lo único que dice dónde está cada carril son
@@ -1222,11 +1228,11 @@ class Kit {
     // muros, bordillos y veredas
     for (const lado of [-1, 1]) {
       const xm = lado * 3.72;
-      tira(uvMundo(new THREE.BoxGeometry(0.3, 1.15, LARGO), 4, 0), this.juguete ? 'tex:muro' : 'plano', this.juguete ? c.muro : c.muro, [xm, 0.575, ZC], 4, 'u');
+      tira(uvMundo(new THREE.BoxGeometry(0.3, 1.15, LARGO), 4, 0), this.neon ? 'plano' : 'tex:muro', c.muro, [xm, 0.575, ZC], 4, 'u');
       tira(CAJA.clone().scale(0.42, 0.12, LARGO), this.neon ? 'luz' : 'plano', this.neon ? new THREE.Color(c.bordillo).multiplyScalar(0.45).getHex() : c.bordillo, [xm, 1.21, ZC]);
-      tira(uvMundo(new THREE.BoxGeometry(2.6, 0.14, LARGO), 3), this.juguete ? 'tex:acera' : 'plano', c.acera, [lado * 5.17, 0.07, ZC], 3, 'v');
+      tira(uvMundo(new THREE.BoxGeometry(2.6, 0.14, LARGO), 3), this.neon ? 'plano' : 'tex:acera', c.acera, [lado * 5.17, 0.07, ZC], 3, 'v');
     }
-    /* Cables de la catenaria (no en pixel: se verían como ruido). Van sobre
+    /* Cables de la catenaria. Van sobre
        los espacios ENTRE las vías, no sobre el centro de cada una: arriba de
        un tren la cámara sube por encima de los cables, y el que iba justo
        sobre tu carril cruzaba al corredor de arriba abajo, como una franja
@@ -1234,7 +1240,7 @@ class Kit {
        de cada vía (no tapan nada). */
     const entreVias = CARRILES[1] - CARRILES[0];                              // 2,2 m de un carril al otro
     const xCables = this.neon ? CARRILES : [-1.5 * entreVias, -0.5 * entreVias, 0.5 * entreVias, 1.5 * entreVias];
-    if (!this.pixel) for (const x of xCables) {
+    for (const x of xCables) {
       if (this.neon) {
         const lg = new LineSegmentsGeometry(); lg.setPositions([x, ALTO_CABLE, 30, x, ALTO_CABLE, -260]);
         const lm = new LineMaterial({ color: 0xff7ae0, linewidth: 1.1, worldUnits: false }); lm.resolution.copy(this.mundo.resolucion);
@@ -1252,13 +1258,13 @@ class Kit {
     this.durmientes.position.z = D % this.pasoDurmientes;
     if (this.rejilla) this.rejilla.position.z = D % 3;
   }
-  /** El cielo: un domo con degradado y brillo del sol, más nubes, sol pixel, sol synthwave o estrellas. */
+  /** El cielo: un domo con degradado y brillo del sol, más nubes, disco de sol, sol synthwave o estrellas. */
   armaCielo() {
     const pal = this.pal, g = new THREE.Group();
     const sd = pal.sol ? new THREE.Vector3(...pal.sol[2]).normalize() : new THREE.Vector3(0, 0.05, -1).normalize();
     const mat = new THREE.ShaderMaterial({
       side: THREE.BackSide, depthWrite: false, fog: false,
-      uniforms: { arriba: { value: color(pal.cielo.arriba) }, horizonte: { value: color(pal.cielo.horizonte) }, solCol: { value: color(pal.cielo.sol) }, solDir: { value: sd }, pasos: { value: this.pixel ? 7 : 0 } },
+      uniforms: { arriba: { value: color(pal.cielo.arriba) }, horizonte: { value: color(pal.cielo.horizonte) }, solCol: { value: color(pal.cielo.sol) }, solDir: { value: sd }, pasos: { value: 0 } },
       vertexShader: 'varying vec3 vDir; void main(){ vec4 w = modelMatrix * vec4(position,1.0); vDir = normalize(w.xyz - cameraPosition); gl_Position = projectionMatrix * viewMatrix * w; }',
       fragmentShader: `uniform vec3 arriba, horizonte, solCol, solDir; uniform float pasos; varying vec3 vDir;
         void main(){
@@ -1275,7 +1281,7 @@ class Kit {
     if (pal.extras.nubes) {                                                   // nubes esponjosas
       // las 49 bolitas de las siete nubes van fundidas en una sola malla (eran 49 llamadas al GPU)
       const mn = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, emissive: pal.c.nube, emissiveIntensity: 0.3, fog: false });
-      const geoN = this.pixel ? new THREE.IcosahedronGeometry(1, 0) : new THREE.SphereGeometry(1, 14, 10), bolitas = [];
+      const geoN = new THREE.SphereGeometry(1, 14, 10), bolitas = [];
       for (let i = 0; i < 7; i++) {
         const cx = -36 + i * 12 + az() * 6, cy = 15 + az() * 7, cz = -120 - az() * 25;
         for (let k = 0; k < 7; k++) bolitas.push(prepara(geoN, pal.c.nube, matriz([cx + (k - 3) * 1.3, cy + Math.sin(k * 1.3) * 0.5 + (k % 3 === 0 ? 0.8 : 0), cz + az()], null, 1.3 + az() * 1.1)));
@@ -1304,7 +1310,6 @@ class Kit {
       new THREE.Vector2(0.31, 0), new THREE.Vector2(0.3, 0.042), new THREE.Vector2(0.245, 0.048), new THREE.Vector2(0.21, 0.03), new THREE.Vector2(0, 0.03)
     ], 28).rotateX(Math.PI / 2);
     const mat = this.neon ? new THREE.MeshBasicMaterial({ color: this.c.oro })
-      : this.pixel ? new THREE.MeshToonMaterial({ color: this.c.oro, gradientMap: gradToon() })
         : new THREE.MeshStandardMaterial({ color: this.c.oro, roughness: 0.22, metalness: 1, emissive: 0x3a2500, envMapIntensity: 1.2 });
     realza(mat, 0, this.pal.legible?.niebla || 1);                             // las monedas también son del juego: la niebla les llega más tarde
     const im = new THREE.InstancedMesh(geo, mat, 400);
@@ -1331,7 +1336,7 @@ export const GANCHOS = {
 };
 export const piezas = {
   Kit, Arma, Serie, CAJA, CILINDRO, CILINDRO_CHICO, ESFERA, redonda, prepara, funde, matriz, uvMundo, franja, sprite, texBrillo,
-  variante, BASE_JUGUETE, BASE_PIXEL, BASE_NEON, TEX, aTextura, lienzo, hexCss, azarDe, SUELO, CARRILES, TECHO, L_VAGON
+  variante, BASE_JUGUETE, BASE_COMIC, BASE_NEON, TEX, aTextura, lienzo, hexCss, azarDe, SUELO, CARRILES, TECHO, L_VAGON
 };
 
 /** Tiñe (o devuelve a su oro) el material de las monedas: en el modo «Sin
@@ -1423,7 +1428,7 @@ const AYUDA = { Arma, CAJA, CILINDRO, CILINDRO_CHICO, ESFERA, prepara, funde, ma
    corriendo, que es como se las ve casi siempre:
    - pelo: el color (las cejas lo siguen);
    - peinado: 'coleta' (cola de caballo alta), 'trenzas' (dos, a los lados),
-     'larga' (melena hasta la mitad de la espalda), 'monos' (dos moños) o
+     'larga' (melena hasta los omóplatos), 'monos' (dos moños) o
      'afro' (una nube redonda alrededor de la cabeza: no cuelga ni se mece);
    - piel: un tono de piel propio (opcional; sin él, el de siempre);
    - tocado: 'cintillo' o 'boina', en el color `gorra` del aspecto (sin
@@ -1486,8 +1491,11 @@ function armaRasgos(asp, pelo, piel, cab, pelvis, parte, art) {
   if (R.peinado === 'larga') {
     const melena = art(cab, [0, 0.02, 0.1]);                                  // cuelga de la nuca
     parte(melena, a => {
-      a.pon(redonda(0.44, 0.46, 0.12, 0.05), 'personaje', pelo, [0, -0.2, 0.04]);   // la melena, hasta la mitad de la espalda
-      a.pon(redonda(0.36, 0.08, 0.1, 0.04), 'personaje', pelo2, [0, -0.43, 0.05]);   // las puntas, más oscuras
+      /* Hasta los omóplatos y no más: hasta la mitad de la espalda se metía
+         dentro de la mochila (que empieza en y = 0,51 del torso, a la altura de
+         la punta de esta melena), y por detrás se veía el pelo atravesándola. */
+      a.pon(redonda(0.44, 0.3, 0.12, 0.05), 'personaje', pelo, [0, -0.12, 0.04]);   // la melena, hasta los omóplatos
+      a.pon(redonda(0.38, 0.07, 0.11, 0.035), 'personaje', pelo2, [0, -0.27, 0.05]);   // las puntas, más oscuras
     });
     cuelgan.push({ g: melena, x0: 0.12, amp: 0.35 });                         // pesada: se mece poco
   }
@@ -1524,10 +1532,128 @@ function mueveRasgos(r, p) {
   }
 }
 
+/* --- La identidad de los corredores (ronda 4) ---
+   Los cinco chicos (Tomás, Benja, Nacho, Mateo y Don Ramón) eran
+   el mismo muñeco con gorra y otra ropa. `asp.identidad` (motor.js) les da
+   una silueta propia, pensada como la de las corredoras: lo que se ve de
+   espaldas y a lo lejos es la cabeza y lo que cuelga, así que cada uno
+   cambia sobre todo eso:
+   - tocado 'gorra': la gorra al revés de siempre (con audífonos encima, el
+     Clásico); 'capucha': la capucha puesta, en el color de la sudadera, con
+     su borde alrededor de la cara y sus cordones; 'lana': gorro de lana con
+     doblez y pompón; 'corona': corona dorada de cinco puntas sobre el pelo;
+     'quepi': la gorra de uniforme del inspector, con banda y visera adelante;
+   - accesorios: pañuelo sobre nariz y boca (con su nudo atrás), franjas que
+     reflejan en las pantorrillas, un spray en el bolsillo de la mochila,
+     manchas de pintura en los jeans, lentes de sol, cadena con medalla,
+     capa (cuelga de los hombros y se mece como el pelo de las corredoras:
+     la mueve `mueveRasgos`), bigote y abrigo largo.
+   Todo en piezas fundidas, como el resto del muñeco. Devuelve lo mismo que
+   armaRasgos ({cuelgan, falda}), así `posa` lo mece con el mismo código. */
+function armaIdentidad(asp, pelo, piel, cab, torso, piernas, parte, art) {
+  const I = asp.identidad, cuelgan = [];
+  const oscuro = (c, k) => new THREE.Color(c).multiplyScalar(k).getHex();     // el mismo color, más oscuro
+  parte(cab, a => {
+    if (I.tocado === 'gorra') {                                               // la gorra al revés (la de siempre)
+      a.pon(new THREE.SphereGeometry(0.218, 22, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), 'personaje', asp.gorra, [0, 0.03, 0]);
+      a.pon(new THREE.CylinderGeometry(0.17, 0.17, 0.025, 20, 1, false, -Math.PI / 2, Math.PI), 'personaje', asp.gorra, [0, 0.04, 0.13], [-0.14, 0, 0]);
+      a.pon(ESFERA, 'personaje', asp.gorra, [0, 0.25, 0], null, 0.05);
+    }
+    if (I.audifonos) {
+      a.pon(new THREE.TorusGeometry(0.255, 0.022, 6, 22, Math.PI), 'personaje', 0x22262c, [0, 0.02, -0.01]);   // el arco, de oreja a oreja por encima de la gorra
+      for (const s of [-1, 1]) {
+        a.pon(CILINDRO_CHICO, 'personaje', 0x22262c, [s * 0.235, 0.0, -0.01], [0, 0, Math.PI / 2], [0.17, 0.07, 0.17]);   // cada copa
+        a.pon(CILINDRO_CHICO, 'personaje', asp.mochila2, [s * 0.272, 0.0, -0.01], [0, 0, Math.PI / 2], [0.11, 0.015, 0.11]);   // su tapa de color
+      }
+    }
+    if (I.tocado === 'capucha') {
+      const cap = asp.sudadera, borde = oscuro(cap, 0.75);
+      a.pon(new THREE.SphereGeometry(0.25, 22, 14, Math.PI * 11 / 6, Math.PI * 4 / 3, 0, Math.PI * 0.78), 'personaje', cap, [0, 0.02, 0.02]);   // atrás y a los lados, hasta la nuca
+      a.pon(new THREE.SphereGeometry(0.25, 22, 8, 0, Math.PI * 2, 0, Math.PI * 0.3), 'personaje', cap, [0, 0.02, 0.02]);   // y arriba, entera
+      a.pon(new THREE.TorusGeometry(0.19, 0.035, 6, 22), 'personaje', borde, [0, 0.0, -0.14], [0.12, 0, 0]);   // el borde que enmarca la cara
+      for (const s of [-1, 1]) a.pon(new THREE.CapsuleGeometry(0.012, 0.12, 3, 6), 'personaje', 0xedf2f4, [s * 0.06, -0.24, -0.15]);   // los cordones
+    }
+    if (I.panuelo != null) {
+      a.pon(new THREE.SphereGeometry(0.222, 18, 6, Math.PI * 1.08, Math.PI * 0.84, Math.PI * 0.53, Math.PI * 0.3), 'personaje', I.panuelo, [0, 0, 0]);   // sobre nariz y boca (la cara mira a −z)
+      /* El nudo y sus puntas van atrás, en la nuca. Con capucha quedan adentro
+         de ella, salvo las puntas, que asomaban bajo su borde como una «^» roja
+         sobre la mochila: con capucha no se dibujan (el nudo no se vería). */
+      if (I.tocado !== 'capucha') {
+        a.pon(ESFERA, 'personaje', oscuro(I.panuelo, 0.8), [0, -0.06, 0.215], null, [0.07, 0.06, 0.05]);   // el nudo, atrás
+        for (const s of [-1, 1]) a.pon(CAJA, 'personaje', I.panuelo, [s * 0.03, -0.13, 0.23], [0.3, 0, s * 0.3], [0.04, 0.12, 0.012]);   // las dos puntas que cuelgan
+      }
+    }
+    if (I.tocado === 'lana') {
+      a.pon(new THREE.SphereGeometry(0.228, 20, 10, 0, Math.PI * 2, 0, Math.PI * 0.5), 'personaje', asp.gorra, [0, 0.03, 0.02], null, [1, 1.22, 1]);   // el gorro, alto
+      a.pon(new THREE.CylinderGeometry(0.234, 0.234, 0.07, 20, 1, true), 'personaje', oscuro(asp.gorra, 0.8), [0, 0.05, 0.02]);   // el doblez
+      a.pon(ESFERA, 'personaje', asp.mochila2, [0, 0.33, 0.03], null, 0.12);   // el pompón
+    }
+    if (I.tocado === 'corona') {
+      a.pon(new THREE.SphereGeometry(0.214, 22, 12, 0, Math.PI * 2, 0, Math.PI * 0.36), 'personaje', pelo, [0, 0.022, 0]);   // el pelo de arriba
+      a.pon(new THREE.CylinderGeometry(0.135, 0.125, 0.07, 10, 1, true), 'personaje', 0xffc63a, [0, 0.24, 0.01]);   // el aro de la corona
+      for (let k = 0; k < 5; k++) {
+        const t = k / 5 * Math.PI * 2;
+        a.pon(new THREE.ConeGeometry(0.035, 0.09, 4), 'personaje', 0xffc63a, [Math.sin(t) * 0.13, 0.315, 0.01 + Math.cos(t) * 0.13]);   // las cinco puntas
+        a.pon(ESFERA, 'personaje', k % 2 ? 0x2a6df4 : 0xe8203a, [Math.sin(t) * 0.137, 0.24, 0.01 + Math.cos(t) * 0.137], null, 0.035);   // las piedras
+      }
+    }
+    if (I.lentesSol) {
+      for (const s of [-1, 1]) {
+        a.pon(redonda(0.085, 0.05, 0.02, 0.012), 'personaje', 0x111318, [s * 0.066, 0.02, -0.205]);   // cada vidrio, negro
+        a.pon(CAJA, 'personaje', 0x111318, [s * 0.15, 0.03, -0.11], [0, s * 0.5, 0], [0.012, 0.012, 0.16]);   // la patilla hacia la oreja
+      }
+      a.pon(CAJA, 'personaje', 0xffc63a, [0, 0.03, -0.21], null, [0.05, 0.012, 0.012]);   // el puente dorado
+    }
+    if (I.tocado === 'quepi') {
+      a.pon(new THREE.CylinderGeometry(0.235, 0.205, 0.15, 20), 'personaje', asp.gorra, [0, 0.19, 0.0], [-0.08, 0, 0]);   // la copa, más ancha arriba
+      a.pon(new THREE.CylinderGeometry(0.21, 0.21, 0.045, 20), 'personaje', 0xfca311, [0, 0.12, 0.0]);   // la banda dorada
+      a.pon(new THREE.CylinderGeometry(0.17, 0.17, 0.025, 20, 1, false, Math.PI / 2, Math.PI), 'personaje', 0x111111, [0, 0.1, -0.12], [0.14, 0, 0]);   // la visera, adelante
+      a.pon(CAJA, 'personaje', 0xffd23f, [0, 0.2, -0.235], [-0.08, 0, 0], [0.06, 0.06, 0.015]);   // la insignia
+    }
+    if (I.bigote) for (const s of [-1, 1]) a.pon(ESFERA, 'personaje', pelo, [s * 0.034, -0.058, -0.196], [0, 0, -s * 0.35], [0.065, 0.026, 0.03]);   // el bigote, en dos mitades
+  });
+  parte(torso, a => {
+    if (I.spray) {
+      a.pon(CILINDRO_CHICO, 'personaje', asp.mochila2, [0.2, 0.3, 0.22], null, [0.08, 0.2, 0.08]);   // la lata, en el bolsillo del costado
+      a.pon(CILINDRO_CHICO, 'personaje', 0xffffff, [0.2, 0.42, 0.22], null, [0.06, 0.05, 0.06]);    // su tapa
+    }
+    if (I.cadena) {
+      a.pon(new THREE.TorusGeometry(0.16, 0.02, 6, 22), 'personaje', 0xffc63a, [0, 0.5, -0.06], [1.1, 0, 0]);   // la cadena, caída sobre el pecho
+      a.pon(CILINDRO_CHICO, 'personaje', 0xffc63a, [0, 0.38, -0.16], [Math.PI / 2, 0, 0], [0.1, 0.02, 0.1]);   // la medalla
+    }
+    if (I.abrigo) {
+      a.pon(redonda(0.5, 0.78, 0.34, 0.1), 'personaje', asp.sudadera, [0, 0.2, 0.02]);   // el abrigo largo, tapa la mochila
+      for (let k = 0; k < 3; k++) a.pon(ESFERA, 'personaje', 0xfca311, [0, 0.42 - k * 0.14, -0.15], null, 0.03);   // los botones dorados
+      a.pon(CAJA, 'personaje', 0xfca311, [0.13, 0.46, -0.15], null, [0.06, 0.06, 0.015]);   // la placa en el pecho
+    }
+  });
+  if (I.capa != null) {
+    /* El manto de los hombros: une la capa al cuerpo. Sin él la capa colgaba
+       en z = 0,35 (por fuera de la mochila) y de perfil se veía como una tabla
+       roja flotando detrás, separada de la espalda. El manto va fijo al torso,
+       sobre los hombros, desde el pecho hasta la bisagra de la capa. */
+    parte(torso, a => a.pon(redonda(0.5, 0.07, 0.36, 0.03), 'personaje', I.capa, [0, 0.62, 0.2]));
+    const capa = art(torso, [0, 0.6, 0.35]);                                  // cuelga de los hombros, por fuera de la mochila (que llega hasta z = 0,33)
+    parte(capa, a => {
+      a.pon(redonda(0.5, 0.72, 0.035, 0.015), 'personaje', I.capa, [0, -0.36, 0.06]);   // la capa
+      a.pon(redonda(0.52, 0.05, 0.05, 0.02), 'personaje', 0xffc63a, [0, -0.01, 0.05]);  // el ribete dorado de los hombros
+    });
+    cuelgan.push({ g: capa, x0: 0.18, amp: 0.55 });                           // cae hacia atrás y flamea al correr
+  }
+  for (const pi of piernas) {
+    if (I.reflejos) parte(pi.rodilla, a => { for (const y of [-0.12, -0.22]) a.pon(new THREE.TorusGeometry(0.079, 0.012, 5, 16), 'luz', 0xd8f0ff, [0, y, 0], [Math.PI / 2, 0, 0]); });   // dos franjas que reflejan en cada pantorrilla
+    if (I.manchas) parte(pi.cadera, a => {
+      const cols = [asp.gorra, asp.mochila, asp.mochila2];
+      for (let k = 0; k < 3; k++) a.pon(ESFERA, 'personaje', cols[k], [0.05 * (k - 1), -0.1 - k * 0.07, k % 2 ? 0.08 : -0.08], null, [0.05, 0.04, 0.02]);   // tres manchas de pintura en cada muslo
+    });
+  }
+  return { cuelgan, falda: null };
+}
+
 /** Arma el corredor articulado con los colores de su aspecto.
     Devuelve las articulaciones para poder posarlo en cada cuadro. */
 function armaCorredor(kit, asp) {
-  const piel = asp.piel ?? (asp.rasgos && asp.rasgos.piel) ?? 0xf1c19c, pelo = asp.pelo ?? ((asp.rasgos && asp.rasgos.pelo) || 0x3b2a20);   // CITY trae su piel y su pelo; las corredoras, su color de pelo (ver «Los rasgos»)
+  const piel = asp.piel ?? (asp.rasgos && asp.rasgos.piel) ?? 0xf1c19c, pelo = asp.pelo ?? ((asp.rasgos && asp.rasgos.pelo) || (asp.identidad && asp.identidad.pelo) || 0x3b2a20);   // CITY trae su piel y su pelo; las corredoras, su color de pelo (ver «Los rasgos»)
   const raiz = new THREE.Group(), cuerpo = new THREE.Group(); raiz.add(cuerpo);
   const parte = (padre, construir, pos = [0, 0, 0]) => {                   // una pieza rígida (fundida) colgada de una articulación
     const a = new Arma(kit); construir(a); const m = a.hecho(); m.position.set(pos[0], pos[1], pos[2]); padre.add(m); return m;
@@ -1591,13 +1717,14 @@ function armaCorredor(kit, asp) {
     }
     a.pon(ESFERA, 'personaje', new THREE.Color(piel).multiplyScalar(0.88).getHex(), [0, -0.03, -0.196], null, [0.04, 0.034, 0.03]);   // la nariz
     a.pon(new THREE.TorusGeometry(0.046, 0.011, 6, 14, Math.PI), 'personaje', 0x8a2a1e, [0, -0.072, -0.176], [0.25, 0, Math.PI]);    // la sonrisa
-    if (!asp.rasgos) {                                                         // la gorra (las corredoras van sin gorra: ver «Los rasgos»)
+    if (!asp.rasgos && !asp.identidad) {                                       // la gorra (las corredoras van sin gorra; los corredores traen su tocado: ver «La identidad»)
       a.pon(new THREE.SphereGeometry(0.218, 22, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), 'personaje', asp.gorra, [0, 0.03, 0]);
       a.pon(new THREE.CylinderGeometry(0.17, 0.17, 0.025, 20, 1, false, -Math.PI / 2, Math.PI), 'personaje', asp.gorra, [0, 0.04, 0.13], [-0.14, 0, 0]);
       a.pon(ESFERA, 'personaje', asp.gorra, [0, 0.25, 0], null, 0.05);
     }
   });
-  const rasgos = asp.rasgos ? armaRasgos(asp, pelo, piel, cab, pelvis, parte, art) : null;   // peinado, falda, lentes… (ver «Los rasgos»)
+  const rasgos = asp.rasgos ? armaRasgos(asp, pelo, piel, cab, pelvis, parte, art)   // peinado, falda, lentes… (ver «Los rasgos»)
+    : asp.identidad ? armaIdentidad(asp, pelo, piel, cab, torso, piernas, parte, art) : null;   // tocado, capa, accesorios… (ver «La identidad»)
   const brazos = [-1, 1].map(s => {
     const hombro = art(torso, [s * 0.27, 0.5, 0]);
     parte(hombro, a => a.pon(new THREE.CapsuleGeometry(0.068, 0.2, 4, 10), 'personaje', asp.sudadera, [0, -0.15, 0]));
@@ -2326,13 +2453,11 @@ export function crearMundo(canvas) {
      blando, sin FXAA que lo disimule), la media va a 2,5 y la alta usa la de
      la pantalla entera. El lienzo de un celular es chico (el escenario 3:4,
      ~360×480 CSS), así que 2× son ~0,7 megapíxeles: lo aguanta. Si el aparato
-     no da abasto, «auto» baja de nivel.
-     El estilo pixelado no usa este `dpr`: su lienzo mide un píxel por
-     píxel del arte y se agranda un número entero de veces (ver tamano). */
+     no da abasto, «auto» baja de nivel. */
   const AJUSTES = {
-    alta: { dpr: 3, sombras: 2048, ao: true, bloom: true, fxaa: true, espejo: true, pixel: 4 },
-    media: { dpr: 2.5, sombras: 1024, ao: false, bloom: true, fxaa: true, espejo: false, pixel: 4 },
-    baja: { dpr: 2, sombras: 0, ao: false, bloom: false, fxaa: false, espejo: false, pixel: 0 }
+    alta: { dpr: 3, sombras: 2048, ao: true, bloom: true, fxaa: true, espejo: true },
+    media: { dpr: 2.5, sombras: 1024, ao: false, bloom: true, fxaa: true, espejo: false },
+    baja: { dpr: 2, sombras: 0, ao: false, bloom: false, fxaa: false, espejo: false }
   };
   const SIN_NAN = {
     uniforms: { tDiffuse: { value: null } },
@@ -2361,32 +2486,27 @@ export function crearMundo(canvas) {
     if (composer) { for (const ps of composer.passes) ps.dispose?.(); composer.dispose?.(); composer = null; }
     if (!kit) return;
     const A = AJUSTES[calidad], pal = kit.pal;
-    renderer.toneMapping = kit.pixel ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = pal.exposicion;
-    /* En baja se dibuja directo, sin post-proceso. El estilo pixelado es la
-       excepción: su pasada va igual, pero sin la segunda escena para las
-       normales (soloSilueta), así cuesta lo mismo que dibujar directo y los
-       obstáculos siguen con su contorno. Su lienzo ya está a la resolución
-       del arte (ver tamano) y el navegador lo agranda sin suavizar. */
-    if (calidad === 'baja' && !kit.pixel) return;
+    /* En baja se dibuja directo, sin post-proceso. El estilo cómic es la
+       excepción: su contorno de tinta va igual (cuesta lo mismo que dibujar
+       directo más un cuadro), porque es lo que recorta los obstáculos. */
+    if (calidad === 'baja' && !kit.comic) return;
     /* El suavizado de bordes es MSAA (el lienzo intermedio con 4 muestras por
        píxel), no FXAA: FXAA difumina la imagen ENTERA después de dibujarla
        (texturas, letreros, bordes finos) y era parte de lo «borroso». Con
        2× de densidad o más no hace falta ninguno: el escalón de un borde ya
        es más chico que lo que el ojo separa, y nos ahorramos el costo. */
     const pr = renderer.getPixelRatio();
-    const tam = renderer.getDrawingBufferSize(new THREE.Vector2());           // el lienzo de verdad, en píxeles (en pixelado, los del arte)
-    // el pixelado no lleva MSAA: sus bordes en escalera son el estilo, y su pasada dibuja en su propio lienzo
-    const muestras = !kit.pixel && pr < 2 && renderer.capabilities.isWebGL2 ? 4 : 0;
+    const tam = renderer.getDrawingBufferSize(new THREE.Vector2());           // el lienzo de verdad, en píxeles
+    // el cómic dibuja la escena en su propio lienzo (necesita la profundidad), así que el MSAA de este no le sirve: lo suaviza FXAA
+    const muestras = !kit.comic && pr < 2 && renderer.capabilities.isWebGL2 ? 4 : 0;
     const rt = new THREE.WebGLRenderTarget(tam.x, tam.y, { type: THREE.HalfFloatType, samples: muestras });
     const c = new EffectComposer(renderer, rt);
-    c.setPixelRatio(1); c.setSize(tam.x, tam.y);                               // en píxeles del lienzo: igual que antes fuera del pixelado (CSS × densidad)
-    if (kit.pixel) {
-      /* Píxeles de 1: el lienzo ya mide un píxel por píxel del arte (ver
-         tamano). La pasada queda solo para marcar los bordes con un píxel y
-         su imagen sale 1:1, sin el estirón de una división que no da entera
-         (con 895 / 3 la última columna medía otra cosa). */
-      c.addPass(new PasadaPixel(1, escena, camara, { normalEdgeStrength: 0.45, depthEdgeStrength: 0.55, soloSilueta: calidad === 'baja' }));
+    c.setPixelRatio(1); c.setSize(tam.x, tam.y);                               // en píxeles del lienzo (CSS × densidad)
+    if (kit.comic) {
+      // la línea de tinta mide 1 píxel del lienzo en una pantalla de 1× y 2 desde 1,5×: así se ve igual de gruesa en todas
+      c.addPass(new PasadaTinta(escena, camara, { tinta: pal.tinta ?? 0x1a1420, fuerza: pal.fuerzaTinta ?? 0.85, grosor: pr >= 1.5 ? 2 : 1 }));
     } else c.addPass(new RenderPass(escena, camara));
     if (A.ao && kit.juguete) {
       try {
@@ -2419,7 +2539,7 @@ export function crearMundo(canvas) {
     if (A.bloom && pal.post.bloom) c.addPass(new UnrealBloomPass(new THREE.Vector2(ancho / 2, alto / 2), ...pal.post.bloom));
     c.addPass(new OutputPass());
     // FXAA solo si no hay MSAA (WebGL1) y la densidad es baja: es el último recurso, porque difumina
-    if (A.fxaa && !kit.pixel && !muestras && pr < 2) { const f = new ShaderPass(FXAAShader); f.uniforms.resolution.value.set(1 / tam.x, 1 / tam.y); c.addPass(f); }
+    if (A.fxaa && !muestras && pr < 2) { const f = new ShaderPass(FXAAShader); f.uniforms.resolution.value.set(1 / tam.x, 1 / tam.y); c.addPass(f); }
     if (pal.post.vineta) {
       const v = new ShaderPass(ACABADO);
       v.uniforms.vig.value = pal.post.vineta; v.uniforms.sat.value = pal.post.sat || 1;
@@ -2549,7 +2669,7 @@ export function crearMundo(canvas) {
       escena.add(particulas);
     }
     // las líneas de viento toman el tono de la estética: cian de noche, crema al atardecer, blancas de día
-    lineas.material.color.set(kit.neon ? 0xa8f2ff : kit.pixel ? 0xfff0d8 : 0xffffff);
+    lineas.material.color.set(kit.neon ? 0xa8f2ff : 0xffffff);
     if (trenFantasma) { escena.remove(trenFantasma); trenFantasma = null; }
     if (ex.trenFantasma) {
       trenFantasma = new THREE.Mesh(geoTren(L_VAGON * 3), new THREE.MeshBasicMaterial({ color: 0x7dffcf, transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
@@ -2559,7 +2679,7 @@ export function crearMundo(canvas) {
     if (sucesos) { sucesos.quita(); sucesos = null; }
     sucesos = ESC.ambiente(kit, escena, AYUDA, lore);
     aplicaSombras();
-    tamano(anchoCss, altoCss);                                                 // el lienzo depende del estilo (el pixelado mide el suyo en píxeles del arte) y rearma el post-proceso
+    tamano(anchoCss, altoCss);                                                 // rearma el post-proceso (el cómic lleva su contorno de tinta)
     try { renderer.compile(escena, camara); } catch (e) { /* si no se puede compilar antes, se compila al dibujar */ }
   }
 
@@ -2714,13 +2834,16 @@ export function crearMundo(canvas) {
          zapatillas o el pogo no se salgan por arriba de la pantalla; en el
          pogo, que sube a 13 m/s, se adelanta además lo que va a subir en el
          suavizado de la cámara (0,17 s), o la cámara llegaba tarde;
-       - con la mochila, 1,2 m por debajo, como antes (a 8,5 m da 7,3). */
+       - con la mochila, 1,2 m por debajo, como antes (a 8,5 m da 7,3);
+       - en las burbujas de City (baja gravedad, salto doble), 1,4 m por
+         debajo: con 2 m la cabeza tocaba el borde de arriba de la pantalla. */
     const sueloC = e.suelo || 0, yR = e.y || 0;                                 // el piso que pisa y la altura del corredor
     const vyPogo = e.pose && e.pose.modo === 'pogo' ? Math.max(0, e.pose.vy || 0) : 0;   // cuánto sube el pogo (m/s)
     const yC = Math.max(
       0.75 * sueloC + 0.4 * (yR - sueloC),                                    // pegada al piso, casi quieta en el salto
       yR - 2.0 + vyPogo * 0.17,                                               // no lo deja salirse por arriba
-      e.poderes && e.poderes.mochila ? yR - 1.2 : -Infinity);                 // volando con la mochila, como antes
+      e.poderes && e.poderes.mochila ? yR - 1.2 : -Infinity,                  // volando con la mochila, como antes
+      e.poderes && e.poderes.flota ? yR - 1.4 : -Infinity);                   // en las burbujas de City: el salto doble llega alto y se salía por arriba
     const k = 1 - Math.exp(-6 * dt);
     if (e.menu) {
       /* La cámara del menú, delante del corredor y a la altura del pecho.
@@ -2810,47 +2933,21 @@ export function crearMundo(canvas) {
   const matChispa = col => { if (!matsChispa.has(col)) matsChispa.set(col, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending })); return matsChispa.get(col); };
 
   /* ---- tamaño de la pantalla ---- */
-  /* El estilo pixelado tiene al menos FILAS_PIXEL filas, y cada píxel del
-     arte mide un número ENTERO de píxeles del aparato (ladoPixel). Antes el
-     lienzo iba a 2,5× en un celular de 3× y la pasada pixelada usaba píxeles
-     de 3 de ese lienzo: cada píxel del arte medía 3,6 píxeles de la pantalla,
-     el navegador lo estiraba ×1,2 suavizando, y salían columnas de 3 y de 4
-     mezcladas y borrosas. Ahora el lienzo tiene exactamente un píxel por
-     píxel del arte y el navegador lo agranda ×k sin suavizar
-     (image-rendering: pixelated), así cada píxel es un cuadrado nítido de
-     k×k. Con piso (floor) en vez de redondeo, nunca quedan menos de 400
-     filas: un celular de 3× queda en ~480 filas con píxeles de 3×3, un
-     monitor de 1× dibuja a su resolución (k = 1, solo bordes y luz por
-     escalones) y uno Full HD a píxeles de 2×2. */
-  const FILAS_PIXEL = 400;
   /** La densidad de la pantalla (píxeles del aparato por píxel CSS). */
   const dprAparato = () => window.devicePixelRatio || 1;
-  /** Cuántos píxeles del aparato mide un píxel del arte en el estilo pixelado (siempre entero, al menos 1). */
-  function ladoPixel() { return Math.max(1, Math.floor(altoCss * dprAparato() / FILAS_PIXEL)); }
-  /** Cuántos píxeles del lienzo por píxel CSS, fuera del estilo pixelado (que fija su lienzo aparte, ver tamano). */
+  /** Cuántos píxeles del lienzo por píxel CSS (nunca más que los del aparato). */
   function proporcion() {
     return Math.min(dprAparato(), AJUSTES[calidad].dpr);
   }
   let anchoCss = 1280, altoCss = 720;                                         // el tamaño CSS exacto (con decimales) de la pantalla
   const ajusteRetrato = { y: 0, z: 0 };
   function tamano(w, h) {
-    anchoCss = Math.max(1, w); altoCss = Math.max(1, h);                      // con decimales: el pixelado los necesita para cubrir justo la pantalla
+    anchoCss = Math.max(1, w); altoCss = Math.max(1, h);                      // el tamaño CSS exacto, con decimales
     ancho = Math.max(1, w | 0); alto = Math.max(1, h | 0);
-    let asp = ancho / alto;
-    if (kit && kit.pixel) {
-      const dpr = dprAparato(), k = ladoPixel();                              // k: píxeles del aparato por píxel del arte
-      const aw = Math.ceil(anchoCss * dpr / k), ah = Math.ceil(altoCss * dpr / k);   // hacia arriba: el lienzo cubre la pantalla entera (lo que sobra, < k píxeles, queda fuera)
-      renderer.setPixelRatio(1);                                              // el lienzo se mide directo en píxeles del arte
-      renderer.setSize(aw, ah, false);                                        // false: el tamaño CSS se pone aquí abajo, no el que pondría three
-      canvas.style.width = (aw * k / dpr) + 'px';                             // exactamente k píxeles del aparato por píxel del lienzo…
-      canvas.style.height = (ah * k / dpr) + 'px';
-      canvas.style.imageRendering = 'pixelated';                              // …y agrandado sin suavizar: cuadrados nítidos
-      asp = aw / ah;                                                          // la cámara, con la forma del lienzo de verdad
-    } else {
-      renderer.setPixelRatio(proporcion());
-      renderer.setSize(ancho, alto, false);
-      canvas.style.width = canvas.style.height = canvas.style.imageRendering = '';   // vuelve al 100 % de la hoja de estilos
-    }
+    const asp = ancho / alto;
+    renderer.setPixelRatio(proporcion());
+    renderer.setSize(ancho, alto, false);
+    canvas.style.width = canvas.style.height = canvas.style.imageRendering = '';     // al 100 % de la hoja de estilos
     // el ángulo de visión se ajusta para que siempre quepan los tres carriles (en un celular vertical, más abierto)
     fovBase = THREE.MathUtils.clamp(2 * Math.atan(Math.tan(THREE.MathUtils.degToRad(33)) / asp) * 180 / Math.PI, 40, 74);
     camara.fov = fovBase + sens.extra;                                         // más lo que la velocidad le está sumando ahora (ver `paso`)

@@ -124,23 +124,40 @@ function cerrados(objs,conMonedas){
  if(conMonedas)for(const o of objs)if(o.tipo==='moneda'&&o.y<3)porCarril[o.carril].push([o.d-1.3,o.d+1.3]);
  return porCarril;
 }
-test('«Sin monedas»: las monedas nunca tapan el camino (jugador simulado, 8 semillas × 10 km)',()=>{
+test('«Sin monedas»: muchas monedas, pero nunca tapan el camino (jugador simulado, 8 semillas × 10 km)',()=>{
  for(let k=1;k<=8;k++){
   const semilla=k*104729,objs=pista(semilla,10000,{modo:'sinmonedas'}),cer=cerrados(objs,true);
   // ni arcos sobre las barreras bajas ni monedas en los techos: arriba de 3 m no hay ninguna
   assert.equal(objs.filter(o=>o.tipo==='moneda'&&o.y>2.5&&o.y<8).length,0,'monedas en el aire o en los techos');
+  // es un desafío: al menos 150 monedas por km (antes del cambio eran ~51)
+  const nMon=objs.filter(o=>o.tipo==='moneda'&&o.d<9800).length;assert.ok(nMon/9.8>=150,'semilla '+semilla+': solo '+(nMon/9.8).toFixed(0)+' monedas por km');
   const libre=(c,d)=>!cer[c].some(([a,b])=>d>=a&&d<=b);
+  const curva=M.velocidadDe('sinmonedas');
   let alcanza=[false,true,false];
   for(let d=0;d<9800;d+=1){
-   const sig=[false,false,false];
+   const sig=[false,false,false],w=Math.ceil(curva.velocidadEn(d)*M.FISICA.cambioCarril)+2;   // cambiar de carril tarda 0,17 s a la velocidad de ese metro
    for(let c=0;c<3;c++){if(!alcanza[c])continue;if(libre(c,d+1))sig[c]=true;
-    for(const o of [c-1,c+1]){if(o<0||o>2)continue;let ok=true;for(let x=0;x<=6&&ok;x++)ok=libre(c,d+x)&&libre(o,d+x);if(ok)sig[o]=true;}}
+    for(const o of [c-1,c+1]){if(o<0||o>2)continue;let ok=true;for(let x=0;x<=w&&ok;x++)ok=libre(c,d+x)&&libre(o,d+x);if(ok)sig[o]=true;}}
    assert.ok(sig.some(Boolean),'semilla '+semilla+': no hay por dónde seguir en el metro '+d);
    alcanza=sig;
   }
  }
 });
 
+/* La pista v3 de «sin monedas» (la de antes de llenarla de monedas): sacadas
+   del motor anterior, 9 km sin la cinta de la mochila. Si cambian, los récords
+   de «sin monedas» ya guardados con prueba v3 dejan de verificar. */
+const HUELLAS_SINMONEDAS_V3={1:'eb89f2a739928cf4:1145',2026:'92f4dc8f8f602b93:1096',7919:'7248d59abb229729:1127'};
+test('«Sin monedas» v3 se rehace con su pista de antes; la v4 es otra',()=>{
+ assert.equal(M.VERSION_PISTA,MP.VERSION,'la versión de pista del motor es la de la prueba');
+ assert.ok(MP.VERSIONES.includes(3)&&MP.VERSIONES.includes(4),'la 3 y la 4 se pueden rehacer');
+ for(const [s,h] of Object.entries(HUELLAS_SINMONEDAS_V3)){
+  assert.equal(huella(pista(+s,9000,{modo:'sinmonedas',version:3},false)),h,'semilla '+s+' v3');
+  assert.notEqual(huella(pista(+s,9000,{modo:'sinmonedas',version:4},false)),h,'semilla '+s+' v4 debería ser la nueva');
+ }
+ // en los demás modos la 3 y la 4 dan la misma pista (la 4 solo cambió «sin monedas»)
+ for(const modo of ['clasico','puro','city'])assert.equal(huella(pista(7919,6000,{modo,version:3})),huella(pista(7919,6000,{modo,version:4})),modo);
+});
 test('el mundo City: sus distritos, su vuelta, su historia y sus ganchos',()=>{
  const e=M.estacionDe(0,'city');assert.equal(e.id,M.ESTACIONES_CITY[0].id);assert.equal(e.clave,e.id);
  // city.js lo llena: cinco distritos, y después de los 13 km dan la vuelta (como la Línea 3)

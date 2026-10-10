@@ -265,7 +265,7 @@ test('estaciones: los umbrales del manual (en metros) y las vueltas', () => {
     [6150, 'Estación Fantasma'], [8400, 'Cocheras'], [10950, 'Invierno'], [13700, 'Muelle'], [16950, 'Óxido'],
     [20250, 'Fin de la Línea'], [24249, 'Fin de la Línea']];
   for (const [p, n] of nombres) assert.equal(M.estacionDe(p).nombre, n, String(p));
-  assert.deepEqual(M.ESTACIONES.map(e => e.estilo), ['juguete', 'pixel', 'juguete', 'neon', 'neon', 'pixel', 'juguete', 'neon', 'pixel', 'juguete']);
+  assert.deepEqual(M.ESTACIONES.map(e => e.estilo), ['juguete', 'comic', 'juguete', 'neon', 'neon', 'comic', 'juguete', 'neon', 'comic', 'juguete']);
   const v = M.estacionDe(24250);
   assert.equal(v.id, 'barrio'); assert.equal(v.vuelta, 2); assert.equal(v.boleto, null);
   assert.equal(M.estacionDe(28250).id, 'ocaso'); assert.equal(M.estacionDe(32250).id, 'neon'); assert.equal(M.estacionDe(36250).vuelta, 3);

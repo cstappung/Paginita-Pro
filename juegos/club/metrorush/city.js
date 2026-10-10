@@ -105,7 +105,7 @@
      parque a los ~3:50 y a Bajo Vías a los ~5 min. */
   const DISTRITOS = [
     { id: "city-sur", nombre: "Barrio Sur", desde: 0, estilo: "juguete", paleta: "citysur", distrito: "sur", musica: "city-sur", lema: "Casas bajas, patios y la vía cruzando la calle", boleto: 1 },
-    { id: "city-muelles", nombre: "Los Muelles", desde: 1500, estilo: "pixel", paleta: "muelles", distrito: "muelles", musica: "city-muelles", lema: "Grúas, contenedores y el mar al lado de la vía", boleto: 2 },
+    { id: "city-muelles", nombre: "Los Muelles", desde: 1500, estilo: "comic", paleta: "muelles", distrito: "muelles", musica: "city-muelles", lema: "Grúas, contenedores y el mar al lado de la vía", boleto: 2 },
     { id: "city-bulevar", nombre: "Bulevar Aurora", desde: 3500, estilo: "neon", paleta: "bulevar", distrito: "bulevar", musica: "city-bulevar", lema: "Palmeras y letreros que no se apagan ni al amanecer", boleto: 3 },
     { id: "city-parque", nombre: "Parque de los Lagos", desde: 6000, estilo: "juguete", paleta: "parque", distrito: "parque", musica: "city-parque", lema: "Pasto, patos y lonas que te mandan a las nubes", boleto: 4 },
     { id: "city-bajo", nombre: "Bajo Vías", desde: 9000, estilo: "neon", paleta: "bajo", distrito: "bajo", musica: "city-bajo", lema: "La ciudad de abajo: vapor, drones y luces de obra", boleto: 5 }

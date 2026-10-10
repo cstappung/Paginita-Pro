@@ -3606,10 +3606,10 @@ Things that matter:
 - **The distance decides the scenery** (it used to be the score, so a
   player at ×30 went through every station thirty times faster than a
   newcomer). `ESTACIONES[].desde` is in metres, ten stations: Barrio
-  Estación (0, toy-like), Ocaso (1 200, pixel), Mercado de Farolillos
+  Estación (0, toy-like), Ocaso (1 200, comic), Mercado de Farolillos
   (2 550, toy), Línea Neón (4 200, neon), Estación Fantasma (6 150),
-  Cocheras (8 400, pixel), Invierno (10 950), Muelle (13 700, neon), Óxido
-  (16 450) and Fin de la Línea (19 200); from 23.2 km barrio, ocaso and neon
+  Cocheras (8 400, comic), Invierno (10 950), Muelle (13 700, neon), Óxido
+  (16 450, comic) and Fin de la Línea (19 200); from 23.2 km barrio, ocaso and neon
   come back every 4 km as «vuelta N» (`VUELTA_IDS`). With the speed ramp
   that is one every ~55 s from 1:06 to 8:27, and the test checks none comes
   before the first minute or less than 50 s after the previous one. Moving
@@ -3718,6 +3718,20 @@ Things that matter:
   braids, long hair and skirt. Hanging hair rotates *negative* x to go
   backwards (the face looks to −z). Their shop thumbnail is an SVG
   (`muestraRasgos` in `juego.js`), since what tells them apart is the hair.
+- **The male runners are not palette swaps either** (`identidad` in
+  `ASPECTOS` for `clasico`, `nocturno`, `grafitero`, `dorado`,
+  `inspector`; kept apart from `rasgos` so the «five and five» test still
+  counts girls by `rasgos`). Each has its own head piece and one more thing
+  (`armaIdentidad` in `mundo.js`): Tomás (`clasico`) a cap and headphones,
+  Benja (`nocturno`) a hood and reflective knee bands, Nacho (`grafitero`) a
+  bandana, paint stains and a spray can on the back, Mateo (`dorado`) a
+  crown, sunglasses, a chain and a cape, and Don Ramón (`inspector`) a kepi,
+  a moustache and a long coat. Only the `nombre` changed: the ids stay,
+  because they are saved in every player's progress. The cape is returned
+  in `cuelgan`, so `mueveRasgos` sways it like the girls' hair; Dorado's
+  hair is dark brown because gold hair vanished under the crown. The
+  default cap is only drawn when an aspect has neither `rasgos` nor
+  `identidad`, and the shop thumbnail is `muestraIdentidad`.
 - **Lore and secrets**: ten golden tickets, one per station, tell the
   story of the last night of Line 3 (`BOLETOS`, read in the Libreta).
   **A ticket's number is its name, not its order**: 1–7 are the original
@@ -3773,10 +3787,7 @@ Things that matter:
   catenary posts are **instanced** (`Serie`, written every frame like the
   coins; in neon, where edge lines and halo sprites cannot be instanced,
   the instanced pole is a glowing tube instead, `farol(lado, true)`);
-  the 49 cloud puffs are one mesh; and the pixel style in `baja` keeps its
-  pass but only for silhouettes (`soloSilueta`: no second render of the
-  scene for the normals, which is what doubled its draw calls), so the
-  outlines survive at the cost of one full-screen quad. **A station's kit is freed** when
+  the 49 cloud puffs are one mesh. **A station's kit is freed** when
   the next one takes over (`liberaKits` → `Kit.libera`, keeping the active
   one and the one being preloaded): each used to stay on the GPU, four by
   Óxido. The runner rebuilt for each kit or outfit frees its geometry too
@@ -3802,24 +3813,27 @@ Things that matter:
   `normal` attribute** (stock GTAO only hides points and lines, and the
   jetpack's glow sprite drew a black square on the backpack), and a
   `SIN_NAN` pass right before bloom (WebGL2 only, `isnan`/`isinf`) turns a
-  stray NaN into one black pixel instead of a square. **In the pixel style
-  every art pixel is a whole number of device pixels** (`ladoPixel` = ⌊device
-  height / `FILAS_PIXEL` (400)⌋, so 400–800 rows): the canvas is sized in art
-  pixels (`setPixelRatio(1)`, rounded up so it covers the stage), its CSS size
-  is set to exactly k device pixels per canvas pixel and it is upscaled with
-  `image-rendering: pixelated`, in every quality (the `dpr` caps do not apply).
-  It used to draw at 2.5× on a 3× phone with pass pixels of 3, i.e. 3.6 screen
-  pixels per art pixel, stretched ×1.2 with smoothing: mixed 3- and 4-wide
-  columns, blurred. The pass now runs with pixels of 1 (`PasadaPixel`, which
-  also measures the silhouette edge in metres, a neighbour 15 % farther, so
-  obstacles get a one-pixel outline at any distance; three.js's 0.01 on the
-  raw depth buffer only fired within ~10 m) and the composer works at the
-  canvas size (`getDrawingBufferSize`), no MSAA. A 1× monitor gets k = 1.
-  The pixel HUD font (Press Start 2P, an 8-px grid) is only crisp at a
-  multiple of 8 device pixels: `medidasPixel` in `juego.js` snaps the sizes
-  the sheet asked for (`--pf-*`, `--pp` = one glyph pixel, `--pm`), the shadow
-  is a one-glyph-pixel outline in `em`, and the banner neither scales nor
-  centres with a translation (both resample the text).
+  stray NaN into one black pixel instead of a square. **The pixel style is
+  gone; its stations are the comic style** (`BASE_COMIC` in `mundo.js`,
+  `estilo: "comic"` for Ocaso, Cocheras, Óxido and City's Los Muelles).
+  Pixel art at 400–800 rows never read well in motion (the owner gave up
+  on it), so `PasadaPixel`, `ladoPixel`, `FILAS_PIXEL` and `medidasPixel`
+  were removed. The comic look is flat, saturated colour plus a thick ink
+  outline drawn by `PasadaTinta` (one extra full-screen pass that finds
+  edges in the depth buffer; 2 px wide from a 1.5× pixel ratio, 1 px below), with its own
+  palettes: Ocaso is the sunset, Óxido the rust, Cocheras a smoggy morning
+  and Los Muelles a sunny sea noon. The HUD is skinned by
+  `.pantalla[data-estilo="comic"]` in Bangers (a hard offset shadow, a
+  tilted red multiplier, the loudspeaker as a speech bubble). Its score and
+  coins are `7.4 × --u`, 12 % over the base because Bangers is narrow: an
+  `em` there is relative to the 15 px parent and left them at half the size
+  of the other styles. The option
+  «Siempre cómic» locks it (`PALETA_FIJA.comic = 'ocaso'`), and a saved
+  `estilo: 'pixel'` is migrated to `'comic'` when the options load.
+  The short `.aviso` is centred with `left/right + margin:auto` (with
+  `left:50%` it only got half the width and became a tall bubble on a
+  phone), and in portrait it sits at `top: 21cqh`, over the sky: at the
+  bottom it covered the energy bar and the «Salto doble» pill.
 - **What you play against must read before the scenery** (`legible` in each
   palette, `realza()` in `mundo.js`). Trains, barriers, ramps, power-ups,
   stars and tickets use material keys ending in `!` (`'pintura!'`); those
@@ -4006,7 +4020,20 @@ Things that matter:
   they close lanes that were already closed (half the barrier slots of a
   closed lane become a coin row), and respiro/tunnel ribbons run off the
   path; a simulated player that treats each coin as a wall always finds a
-  way. In the game a coin touched within 0.7 m × 0.6 m is `muere('moneda')`
+  way. It is meant to be a challenge, so coins also **fill the lanes that
+  are open** (all only inside the `peligro` branches, so the classic track
+  hash did not move): `pasillo` sows coin rows in the lanes a row leaves
+  unused, convoys carry rows beside the wagons, closed lanes get a long row
+  most of the time, and respiros and tunnels become a **zigzag**
+  (`zigzag(d0, largo, seg)`): the safe lane moves every `seg` metres and
+  the next lane opens G = max(12, 0.45·V) metres before the old one closes,
+  enough for a lane change (0.17 s) at that metre's speed. That is ~220
+  coins per km against ~50 before, and `metrorush-modos.test.cjs` demands
+  ≥ 150 and checks every change window against `velocidadEn(d)`. That denser
+  track is **track version 4** (`VERSION_PISTA` in `motor.js`, `VERSION` in
+  `prueba.js`, `VERSIONES = [2, 3, 4]`): only sin monedas changed, so a v3
+  sin monedas proof is still rebuilt with the old, sparser track, and in
+  every other mode v3 and v4 give the same track. In the game a coin touched within 0.7 m × 0.6 m is `muere('moneda')`
   and the coins are tinted red and pulse (`mundo.monedasPeligro`). The
   proof gains `m` (absent for classic, so classic proofs did not change and
   `VERSION` stays 2); `rehace` regenerates with that mode and its speed
@@ -4091,7 +4118,38 @@ Things that matter:
     the bubbles a hedge is a wall, like a wagon) and lonas; bubble stretches
     with 3–4 hedge walls (`setos()`, spacing 2·V + 6) come every 90–160 m,
     and the next row starts 0.4·V + 4 m after the bubbles end, so no hedge
-    sits on their edge.
+    sits on their edge. **The bubbles say what they do** (they were faint
+    spheres and nobody knew the jump floated there): an entry gantry with a
+    «BAJA GRAVEDAD · SALTO DOBLE» sign, the same gantry without the sign
+    where the stretch ends, and a band of light on the floor (19 cm up,
+    above sleepers and rails, wall to wall) for its whole length
+    (`burbujasCity` in `mundo-city.js`). **Nothing on the gantry goes above
+    6.4 m**: a stretch often starts right out of the tunnel, whose ceiling
+    is 6.6 m, and the old half-ring arch (sign at 7–9 m, badge at 11 m) was
+    seen cut in half from inside the tunnel. The sign (4.4–6.05 m) is then
+    at the camera's height (~4.7 m, 8.6 m behind the runner), so it fades
+    out over the last 10 m before the runner passes under it; it is drawn
+    with `fog: false, toneMapped: false`, or the navy text came out light
+    grey. The 16 bubbles are **soap bubbles**: a `MeshStandardMaterial` with
+    a Fresnel term injected in `onBeforeCompile` (alpha 0.06 at the centre,
+    0.9 at the rim, an iridescent tint), because at a flat 50 % opacity they
+    read as grey smudges against the pale sky. They live in a 52 m window
+    that moves with the runner (a stretch can be 270 m long), spread evenly
+    rather than at random, only on the sides (|x| 3.3–5.1 m, never over the
+    lanes, where they hid the hedges and filled the view during the double
+    jump), growing in from the far end of the window and shrinking within
+    12 m of the camera. The hedges are a clipped topiary block, not a box
+    with balls stuck on it (that read as a polka-dot cactus): a 0.5 m stone
+    planter and a soft-cornered foliage block (`redonda`, r 0.3) up to
+    exactly `SETO.alto`, painted with a leaf texture drawn once per kit
+    (`texFollaje`, stored as `follaje` in `kit.texs`, lighter towards the
+    top; bigger inked leaves in comic, mint in neon). The park sky is
+    bluer with the fog pushed back (its near-white horizon washed the whole
+    district out). Inside the bubbles the camera keeps within 1.4 m below
+    the runner (`poderes.flota`), or the double jump left the frame. Every entry shows an aviso (the full
+    explanation the first two times, «Burbujas: salto doble» afterwards) and
+    a «blup», and the City HUD shows «Salto doble ¡listo!» / «usado» while
+    inside (`hud(c).burbuja`, `#hudBurb`).
   - **Bajo Vías**: drones, walls of 2–3 wagons, vapor subidas, oncoming
     trains and a **conducto** every 60–90 m (a duct from 1.0 to 3.35 m,
     longer than one roll; its orange ring sits halfway between where a new

@@ -302,7 +302,7 @@ test('los cinco distritos: en metros, con su música, su paleta, su escenografí
   assert.equal(E[0].desde, 0);
   const audio = lee('audio.js'), dibujo = lee('mundo-city.js');
   for (const e of E) {
-    assert.ok(['juguete', 'pixel', 'neon'].includes(e.estilo), e.id);
+    assert.ok(['juguete', 'comic', 'neon'].includes(e.estilo), e.id);
     assert.match(audio, new RegExp(`'${e.musica}': \\[`), e.id + ': su lista de temas');
     assert.match(dibujo, new RegExp(`\\n  ${e.paleta}: variante\\(`), e.id + ': su paleta en mundo-city.js');
     assert.equal(M.estacionDe(e.desde + 1, 'city').id, e.id);

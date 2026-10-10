@@ -44,19 +44,19 @@
    (ver `legible` y `realza` en mundo.js) y se lee de lejos en todos los
    estilos. La escenografía no lleva «!». */
 import * as THREE from 'three';
-import { PALETAS, GANCHOS, piezas } from './mundo.js?v=metrorush-14';
+import { PALETAS, GANCHOS, piezas } from './mundo.js?v=metrorush-15';
 
 const MOTOR = window.MetroRushMotor;                    // el motor (con City instalado por city.js)
 const CITY = MOTOR && MOTOR.CITY;                       // las medidas y los datos de City (city.js)
 const {
-  Kit, Arma, CAJA, CILINDRO, CILINDRO_CHICO, ESFERA, redonda, uvMundo, franja, sprite, texBrillo,
-  variante, BASE_JUGUETE, BASE_PIXEL, BASE_NEON, SUELO, CARRILES
+  Kit, Arma, CAJA, CILINDRO, CILINDRO_CHICO, ESFERA, redonda, uvMundo, franja, sprite, texBrillo, lienzo, aTextura,
+  variante, BASE_JUGUETE, BASE_COMIC, BASE_NEON, SUELO, CARRILES
 } = piezas;
 
 /* ===================================================================
    1. LAS PALETAS DE LOS DISTRITOS
    ===================================================================
-   Cada una es una variante de una base (juguete, pixel o neón), como las
+   Cada una es una variante de una base (juguete, cómic o neón), como las
    estaciones de la Línea 3, más `distrito` (qué escenografía va a los
    costados) y los colores propios de City en `c` (tejas, pasto, agua,
    contenedores, grúa, palmeras). Los trenes cambian de colores en cada
@@ -76,13 +76,19 @@ const PALETAS_CITY = {
     carteles: ['KIOSCO', 'DOMINÓ', 'EMPANADAS', 'BARBERÍA', 'VERDURAS'],
     grafitis: [['¡CORRE!', 0xff5a8a, 0xffd23f], ['CITY', 0x3fd0ff, 0x7a5cff], ['SUR', 0x8aff6a, 0x19b37a]]
   }),
-  /* Los Muelles: atardecer pixelado sobre el mar, grúas y contenedores. */
-  muelles: variante(BASE_PIXEL, {
+  /* Los Muelles (cómic): mediodía marino, cielo azul limpio, mar turquesa,
+     grúas amarillas y contenedores de colores. Los trenes van en blanco,
+     negro y amarillo, que es lo único que no aparece en el puerto. */
+  muelles: variante(BASE_COMIC, {
     distrito: 'muelles',
-    cielo: { arriba: 0x2a3a78, horizonte: 0xff9a6a, sol: 0xffe0a0 },
+    cielo: { arriba: 0x1e6fb0, horizonte: 0xbfeee8, sol: 0xfffbe8 }, niebla: [35, 150],
+    sol: [0xfff6e0, 2.4, [-16, 26, 14]], hemi: [0xddf4ff, 0x5a6a70, 0.85],
+    tinta: 0x14202e,
     c: {
-      edificios: [0x6a7f9a, 0x9a6a5a, 0x5f8a7a, 0x8a7a9a], contenedores: [0xd8452f, 0x2f7fd8, 0x2fb56a, 0xf0b030, 0x8a4ab0],
-      grua: 0xffb020, agua: 0x2f6aa0, muro: 0x9a8f88, trenes: [0x3fa0d8, 0xe2463a, 0xf0e0c0]
+      edificios: [0x6a7f9a, 0xb8b0a0, 0x5f8a7a, 0xd8c8a8], contenedores: [0xd8452f, 0x2f7fd8, 0x2fb56a, 0xf0b030, 0x8a4ab0],
+      grua: 0xffb020, agua: 0x1a8fa0, muro: 0xb0a89c, acera: 0xa89e90, grava: 0x8a8278, tierra: 0x6a625a,
+      trenes: [0xf6f4ee, 0x2a2e3a, 0xffcf2a], acentos: [0x14202e, 0xffcf2a, 0xffffff],
+      barrera: 0xff5a1a, barrera2: 0xffffff, rampa: 0x1a2a4a, marco: 0x2a3a4a, cornisa: 0x2a3a4a, vidrioEd: 0xcff4ff, nube: 0xffffff
     },
     carteles: ['LONJA', 'ADUANA', 'MUELLE 3', 'REDES', 'FARO']
   }),
@@ -104,7 +110,10 @@ const PALETAS_CITY = {
   /* Parque de los Lagos: de juguete, verde y con agua. */
   parque: variante(BASE_JUGUETE, {
     distrito: 'parque',
-    cielo: { arriba: 0x52a8f7, horizonte: 0xe4f6ff, sol: 0xfff6dc },
+    /* El horizonte casi blanco (0xe4f6ff) hacía una neblina lechosa: los árboles
+       del fondo y el túnel siguiente quedaban como manchas pálidas. Más azul y
+       la niebla más lejos, como un día despejado. */
+    cielo: { arriba: 0x3f9cf2, horizonte: 0xb9e1fb, sol: 0xfff6dc }, niebla: [70, 190],
     c: {
       cesped: 0x63bf55, agua: 0x48a8e0, arboles: [0x3fa34d, 0x5bbd5c, 0x2f8c45, 0x9fd65a], cerca: 0x8a5a3a, seto: 0x2f8c45,
       edificios: [0xffd23f, 0xff8fa3, 0x7fd6ff], trenes: [0xffc63a, 0xe2443a, 0x2c7be0]
@@ -135,7 +144,7 @@ if (CITY) Object.assign(PALETAS, PALETAS_CITY);
     vez y queda en PALETAS. Devuelve null si la clave no es de City. */
 function paletaCity(clave) {
   const [base, estilo] = String(clave).split('@');                // 'muelles@neon' → 'muelles', 'neon'
-  const orig = PALETAS_CITY[base], B = { juguete: BASE_JUGUETE, pixel: BASE_PIXEL, neon: BASE_NEON }[estilo];
+  const orig = PALETAS_CITY[base], B = { juguete: BASE_JUGUETE, comic: BASE_COMIC, neon: BASE_NEON }[estilo];
   if (!orig || !B) return null;                                   // no es una paleta de City
   if (orig.estilo === estilo) return orig;                        // el estilo es el suyo: la de siempre
   const extra = {};
@@ -195,7 +204,7 @@ Object.assign(Kit.prototype, {
     const lotes = []; let z = 0;
     for (let i = 0; i < n; i++) { const d = 7 + az() * 3; lotes.push({ z0: z, d }); z += d; }   // el frente de cada lote, a lo largo de la vía
     const L = z;
-    const pared = this.juguete ? 'tex:ruido' : 'plano', teja = this.pixel ? 'plano' : 'pintura';
+    const pared = this.juguete ? 'tex:ruido' : 'plano', teja = 'pintura';
     a.pon(CAJA, 'plano', c.cesped ?? 0x7cc96a, [X(7), 0.06, 0], null, [14, 0.12, L + 3.2]);   // el pasto de toda la cuadra (tapa el callejón con la vecina)
     for (const { z0, d } of lotes) {
       const zc = -L / 2 + z0 + d / 2, dc = d - 1.6;                // el centro del lote y el frente de la casa
@@ -236,7 +245,7 @@ Object.assign(Kit.prototype, {
     const w = 9 + az() * 5, h = 6 + az() * 3, col = deLista(az, c.edificios);
     a.pon(CAJA, 'plano', c.tierra, [X(9), 0.05, 0], null, [18, 0.1, L + 3.2]);   // el patio de asfalto
     a.pon(uvMundo(new THREE.BoxGeometry(w, h, lb), 6, h / 2), this.juguete ? 'tex:ruido' : 'plano', col, [X(w / 2 + 0.6), h / 2, zb], null, 1, this.neon ? col : null);
-    techo(a, this.pixel ? 'plano' : 'metal', 0x8a96a4, X(w / 2 + 0.6), h, zb, w + 0.4, 1.4, lb + 0.3);   // el techo, de lata
+    techo(a, 'metal', 0x8a96a4, X(w / 2 + 0.6), h, zb, w + 0.4, 1.4, lb + 0.3);   // el techo, de lata
     for (const s of [-1, 1]) a.pon(CAJA, 'plano', 0x55606c, [X(0.58), 2.2, zb + s * lb * 0.22], null, [0.06, 4.2, lb * 0.32]);   // dos portones
     const nc = this.pal.carteles.length;
     a.pon(franja(new THREE.PlaneGeometry(Math.min(lb * 0.6, 6), 1.1), Math.floor(az() * nc), nc), this.neon ? 'texluz:carteles' : 'tex:carteles', 0xffffff,
@@ -247,7 +256,7 @@ Object.assign(Kit.prototype, {
       const pila = 1 + Math.floor(az() * 3);
       for (let k = 0; k < pila; k++) {
         const cc = deLista(az, cont);
-        a.pon(CAJA, this.pixel ? 'plano' : 'pintura', cc, [X(u), 1.3 + k * 2.6, z + 3], null, [2.4, 2.55, 6]);
+        a.pon(CAJA, 'pintura', cc, [X(u), 1.3 + k * 2.6, z + 3], null, [2.4, 2.55, 6]);
         a.pon(CAJA, 'plano', new THREE.Color(cc).multiplyScalar(0.7).getHex(), [X(u - 1.21), 1.3 + k * 2.6, z + 3], null, [0.04, 2.1, 5.4]);   // las nervaduras del costado, más oscuras
       }
     }
@@ -267,7 +276,7 @@ Object.assign(Kit.prototype, {
     a.pon(CAJA, agua, colAgua, [X(34.4), -0.35, 0], null, [60, 0.2, LL]);              // el mar
     for (let k = 0; k < 3; k++) a.pon(CAJA, this.neon ? 'luz' : 'plano', this.neon ? 0x22e5ff : 0xcfe9ff, [X(7 + az() * 30), -0.24, (az() - 0.5) * L], null, [0.15, 0.02, 2 + az() * 4]);   // brillos de olas
     if (az() < 0.55) {                                             // la grúa de pórtico: cuatro patas, la viga hacia el mar y la cabina
-      const g = c.grua ?? 0xffb020, gm = this.pixel ? 'plano' : 'pintura';
+      const g = c.grua ?? 0xffb020, gm = 'pintura';
       for (const u of [1.2, 7.5]) for (const s of [-1, 1]) a.pon(CAJA, gm, g, [X(u), 7, s * 2.2], null, [0.45, 14, 0.45], this.neon ? g : null);
       for (const s of [-1, 1]) a.pon(CAJA, gm, g, [X(4.35), 9, s * 2.2], null, [6.8, 0.35, 0.35]);   // los travesaños
       a.pon(CAJA, gm, g, [X(13), 14.2, 0], null, [27, 0.9, 1.0], this.neon ? g : null);              // la viga (sobre el mar, nunca sobre la vía)
@@ -277,7 +286,7 @@ Object.assign(Kit.prototype, {
       a.pon(CAJA, 'pintura', deLista(az, c.contenedores || [0xd8452f]), [X(14), 5.6, 0], null, [2.4, 2.4, 5]);
     } else {                                                       // un barco amarrado: casco, cubierta, puente y su carga
       const lb = Math.min(L * 0.8, 26), casco = deLista(az, [0x8a2a2a, 0x23304a, 0x2f5a3a]);
-      a.pon(CAJA, this.pixel ? 'plano' : 'pintura', casco, [X(10.5), 0.6, 0], null, [8, 3.2, lb], this.neon ? 0xff4f8a : null);
+      a.pon(CAJA, 'pintura', casco, [X(10.5), 0.6, 0], null, [8, 3.2, lb], this.neon ? 0xff4f8a : null);
       a.pon(CAJA, 'plano', 0xe8e0d0, [X(10.5), 2.25, 0], null, [8.1, 0.25, lb + 0.1]);              // la línea de la cubierta
       a.pon(CAJA, 'plano', 0xf2f2f2, [X(11), 4.2, lb / 2 - 3], null, [5, 3.6, 4]);                  // el puente
       a.pon(CAJA, this.vid, c.vidrioEd, [X(8.45), 5.1, lb / 2 - 3], null, [0.06, 0.7, 3.4]);
@@ -334,7 +343,7 @@ Object.assign(Kit.prototype, {
       a.pon(CAJA, 'plano', 0x9a6a3a, [X(1.75), 0.8, zb], null, [0.06, 0.45, 1.7]);
       for (const s of [-1, 1]) a.pon(CAJA, 'plano', 0x2a2d33, [X(1.55), 0.24, zb + s * 0.7], null, [0.45, 0.48, 0.06]);
     }
-    const copa = new THREE.IcosahedronGeometry(1, this.pixel ? 0 : 1);
+    const copa = new THREE.IcosahedronGeometry(1, 1);
     for (let k = 0; k < 5; k++) a.pon(copa, 'plano', deLista(az, verde), [X(2.5 + az() * 12), 0.4, (az() - 0.5) * L], null, 0.5 + az() * 0.45);   // arbustos
     for (let k = 0; k < 3; k++) {                                  // árboles grandes al fondo
       const u = 14 + az() * 12, z = (az() - 0.5) * L, e = 1.3 + az() * 0.6;
@@ -412,7 +421,7 @@ Object.assign(Kit.prototype, {
   /** Una pila de cajones: dos cajas de madera abajo y una arriba, con
       flejes oscuros. Mide lo que su caja de choque: 1,8 × 1 × 1,2 m. */
   cajonCity() {
-    const a = new Arma(this), mad = this.pixel ? 'plano!' : 'pintura!', col = this.neon ? 0xffb020 : 0xc8873a;
+    const a = new Arma(this), mad = 'pintura!', col = this.neon ? 0xffb020 : 0xc8873a;
     for (const s of [-1, 1]) a.pon(CAJA, mad, col, [s * 0.45, 0.32, 0], null, [0.86, 0.62, 1.1], 0xffe14d);
     a.pon(CAJA, mad, new THREE.Color(col).multiplyScalar(1.12).getHex(), [0.12, 0.81, 0.05], null, [0.8, 0.38, 0.95], 0xffe14d);
     for (const s of [-1, 1]) for (const yf of [0.12, 0.52]) a.pon(CAJA, 'plano!', 0x3a2a1a, [s * 0.45, yf, 0.56], null, [0.88, 0.06, 0.02]);   // los flejes, del lado que se ve
@@ -467,7 +476,7 @@ Object.assign(Kit.prototype, {
       metal sobre postes, arriba en 1 m. Empieza en z = 0 y sigue hacia −z. */
   barandaCity() {
     const a = new Arma(this), c = this.c, B = CITY.BARANDA, alto = B.alto;
-    a.pon(CAJA, this.pixel ? 'plano!' : 'pintura!', this.neon ? 0x6a35c9 : 0xb8bcc4, [0, 0.275, -10], null, [0.9, 0.55, 20], 0xffffff);   // el bordillo
+    a.pon(CAJA, 'pintura!', this.neon ? 0x6a35c9 : 0xb8bcc4, [0, 0.275, -10], null, [0.9, 0.55, 20], 0xffffff);   // el bordillo
     for (const s of [-1, 1]) a.pon(uvMundo(new THREE.BoxGeometry(0.02, 0.14, 20), 1), this.neon ? 'texluz:rayasNA!' : 'tex:rayasNA!', 0xffffff, [s * 0.46, 0.45, -10], null, 1);
     a.pon(CILINDRO, this.neon ? 'luz!' : 'metal!', this.neon ? 0x22e5ff : (c.cromo ?? 0xf2f5f8), [0, alto - 0.07, -10], [Math.PI / 2, 0, 0], [0.14, 20, 0.14]);   // el riel
     for (let z = -0.6; z > -20; z -= 3.8) a.pon(CAJA, 'metal!', 0x55606c, [0, (0.55 + alto) / 2 - 0.05, z], null, [0.08, alto - 0.55, 0.08]);   // los postes
@@ -631,33 +640,142 @@ Object.assign(Kit.prototype, {
     };
     return g;
   },
-  /** El tramo de burbujas (baja gravedad, Parque de los Lagos): un arco de
-      entrada con su cartel redondo y burbujas grandes que flotan sobre los
-      tres carriles a lo largo del tramo. Las burbujas son una sola malla
-      instanciada (una llamada al GPU); son translúcidas, así que la
-      oclusión ambiental no las dibuja (`sinAO`). */
+  /** El tramo de burbujas (baja gravedad, Parque de los Lagos). Tiene que
+      decir de lejos DÓNDE empieza, DÓNDE termina y QUÉ hace, porque adentro
+      los setos son muros que solo se pasan con el salto que flota:
+      · un pórtico de entrada con un letrero «BAJA GRAVEDAD · SALTO DOBLE»,
+        todo por debajo de 6,4 m para que el techo del túnel no lo corte, y el
+        mismo pórtico sin letrero al final;
+      · una franja de luz en el piso a lo largo de todo el tramo (bordes
+        brillantes, centro casi transparente): mientras pisas la franja,
+        estás dentro;
+      · 16 pompas de jabón que flotan a los costados de la vía (transparentes
+        al centro, con el borde brillante y tornasolado, y un brillo blanco
+        arriba a la izquierda). No se reparten por todo el tramo, que llega a
+        medir 270 m (una cada 17 m: casi no se verían), sino en una ventana
+        de VENTANA metros que va delante del corredor: cada burbuja queda
+        quieta en el mundo y, cuando queda atrás, reaparece al fondo de la
+        ventana, creciendo desde cero.
+      Las burbujas y sus brillos son dos mallas instanciadas (dos llamadas al
+      GPU); todo lo translúcido lleva `sinAO` (la oclusión ambiental no lo
+      dibuja). Ejemplo: un tramo de 80 m estira la franja a 80 m y pone el
+      arco de salida 80 m más allá del de entrada. */
   burbujasCity() {
     const g = new THREE.Group();
-    const arco = new Arma(this), col = this.neon ? 0xff2bd6 : 0x6ad1ff;
-    for (const s of [-1, 1]) arco.pon(CILINDRO, 'pintura!', col, [s * 3.6, 3, 0], null, [0.22, 6, 0.22], 0xffffff);   // los postes, fuera de la vía
-    arco.pon(new THREE.TorusGeometry(3.6, 0.13, 8, 40, Math.PI), 'pintura!', col, [0, 6, 0], null, 1, 0xffffff);   // el arco
-    arco.pon(new THREE.CircleGeometry(0.75, 24), 'luz!', 0xffffff, [0, 9.6, 0.02]);                            // el cartel: una burbuja
-    arco.pon(new THREE.TorusGeometry(0.75, 0.08, 8, 30), 'luz!', col, [0, 9.6, 0.03]);
-    g.add(arco.hecho());
-    const N = 18, geo = new THREE.SphereGeometry(1, 18, 12);
-    const mat = new THREE.MeshStandardMaterial({ color: 0xbfefff, emissive: this.neon ? 0x6a2bff : 0x3fb0ff, emissiveIntensity: this.neon ? 0.6 : 0.25,
-      roughness: 0.1, metalness: 0, transparent: true, opacity: 0.28, depthWrite: false });
-    const im = new THREE.InstancedMesh(geo, mat, N); im.frustumCulled = false; im.userData.sinAO = true; im.renderOrder = 3; g.add(im);
+    const col = this.neon ? 0xff2bd6 : 0x37b8ff;                  // el color del tramo: cian de día, magenta en neón
+    const css = '#' + col.toString(16).padStart(6, '0');           // el mismo color para dibujar en lienzos
+    /* El arco de entrada es un PÓRTICO plano, no un medio aro: el tramo suele
+       empezar justo al salir del túnel, cuyo techo está a 6,6 m, y todo lo que
+       queda más alto que eso no se ve desde adentro hasta salir. El aro de
+       antes llegaba a 9,6 m con su cartel redondo a 11 m: desde el túnel se
+       veía el letrero cortado por la mitad. Ahora nada pasa de 6,4 m.
+       Ejemplo: con la cámara a 3 m, el borde del túnel tapa lo que está más
+       alto que 6,6 m justo en la boca, y más arriba cuanto más lejos; lo que
+       mide menos de 6,6 m se ve entero desde cualquier punto del túnel. */
+    const arco = new Arma(this);
+    for (const s of [-1, 1]) arco.pon(CILINDRO, 'pintura!', col, [s * 3.6, 3.2, 0], null, [0.26, 6.4, 0.26], 0xffffff);   // los postes, de 6,4 m
+    arco.pon(CAJA, 'pintura!', col, [0, 6.25, 0], null, [7.46, 0.3, 0.3], 0xffffff);                              // el travesaño de arriba
+    for (const s of [-1, 1]) arco.pon(ESFERA, 'luz!', 0xffffff, [s * 3.6, 6.4, 0], null, 0.28);                   // dos remates de luz arriba de los postes
+    const entrada = arco.hecho(); g.add(entrada);
+    // el letrero, colgado del travesaño: lo que pasa adentro, en dos líneas
+    const [cv, cx] = lienzo(512, 176);                             // un lienzo de 512×176 px
+    cx.fillStyle = this.neon ? 'rgba(20,6,40,.92)' : 'rgba(255,255,255,.96)';   // el fondo del letrero
+    cx.beginPath(); if (cx.roundRect) cx.roundRect(6, 6, 500, 164, 34); else cx.rect(6, 6, 500, 164); cx.fill();   // con las puntas redondas (si el navegador sabe)
+    cx.lineWidth = 10; cx.strokeStyle = css; cx.stroke();          // y el borde del color del tramo
+    cx.textAlign = 'center'; cx.textBaseline = 'middle';           // el texto, centrado
+    cx.fillStyle = this.neon ? '#ffffff' : '#0b3d66';              // azul oscuro de día, blanco en neón
+    const linea = (txt, px, y) => {                                // escribe una línea achicando la letra hasta que quepa en 460 px
+      for (; px > 20; px -= 2) { cx.font = `900 ${px}px "Arial Black", Arial, sans-serif`; if (cx.measureText(txt).width <= 460) break; }
+      cx.fillText(txt, 256, y);
+    };
+    linea('BAJA GRAVEDAD', 64, 62);                                // la primera línea, grande
+    cx.fillStyle = css; linea('⤒ SALTO DOBLE ⤒', 48, 128);         // la segunda, del color del tramo
+    const letrero = new THREE.Mesh(new THREE.PlaneGeometry(4.8, 1.65),   // 512:176 → 4,8 m × 1,65 m (cabe de sobra entre los postes, a ±3,6 m)
+      new THREE.MeshBasicMaterial({ map: aTextura(cv, { repetir: false }), transparent: true, depthWrite: false, fog: false, toneMapped: false }));   // sin niebla ni tono: con ellos el azul oscuro salía gris claro y no se leía
+    letrero.position.set(0, 5.22, 0.2); letrero.userData.sinAO = true; letrero.renderOrder = 3;   // de 4,4 a 6,05 m, colgado justo bajo el travesaño y un poco delante (a z 0 el travesaño lo tapaba)
+    g.add(letrero);
+    // el arco de salida: el mismo pórtico (misma geometría y material, sin el letrero), al final del tramo
+    const salida = entrada.clone(); g.add(salida);
+    // la franja del piso: bordes brillantes y el centro casi transparente
+    const [cf, xf] = lienzo(64, 4);                                // un degradado de lado a lado
+    const gr = xf.createLinearGradient(0, 0, 64, 0);
+    gr.addColorStop(0, css); gr.addColorStop(0.08, css); gr.addColorStop(0.16, 'rgba(255,255,255,0.15)');
+    gr.addColorStop(0.84, 'rgba(255,255,255,0.15)'); gr.addColorStop(0.92, css); gr.addColorStop(1, css);
+    xf.fillStyle = gr; xf.fillRect(0, 0, 64, 4);
+    const piso = new THREE.Mesh(new THREE.PlaneGeometry(7.2, 1),   // de muro a muro (±3,6 m), 1 m de largo: se estira con el tramo en `colocar`
+      new THREE.MeshBasicMaterial({ map: aTextura(cf, { repetir: false }), color: col, transparent: true, opacity: 0.55, depthWrite: false }));
+    piso.rotation.x = -Math.PI / 2; piso.position.y = 0.19;   // 19 cm sobre el balasto: por encima de durmientes y rieles (más abajo, la vía la tapaba)
+    piso.userData.sinAO = true; piso.renderOrder = 2;              // translúcida: sin oclusión ambiental, y dibujada antes que las burbujas
+    g.add(piso);
+    /* Las burbujas: pompas de jabón, no esferas lechosas. Con un material
+       estándar al 50 % cada una era un disco gris parejo que se perdía contra
+       el cielo claro. Una pompa de verdad es casi transparente al centro y
+       brilla en el borde, donde la película se ve de canto (efecto Fresnel), con
+       un tornasol de arcoíris. Eso se le agrega al material estándar al
+       compilarlo (`onBeforeCompile`): fr = 0 mirando la burbuja de frente,
+       fr = 1 en su borde. La opacidad va de 0,06 al centro a 0,9 en el borde. */
+    const N = 16, VENTANA = 52, ATRAS = 8, CERCA = 12, LEJOS = 36;  // cuántas, en cuántos metros, cuánto detrás empieza la ventana, desde cuánto se achican de cerca y desde cuánto se apagan de lejos
+    const geo = new THREE.SphereGeometry(1, 24, 16), geoB = new THREE.SphereGeometry(1, 8, 6);
+    const borde = new THREE.Color(this.neon ? 0xff7ae8 : 0xbff0ff);   // el color del borde: celeste de día, rosado en neón
+    const mat = new THREE.MeshStandardMaterial({ color: this.neon ? 0xffb0f4 : 0xdff6ff, emissive: this.neon ? 0x9a2bff : 0x3fb8ff,
+      emissiveIntensity: this.neon ? 0.6 : 0.25, roughness: 0.05, metalness: 0, transparent: true, depthWrite: false });
+    mat.onBeforeCompile = sh => {
+      sh.uniforms.uBorde = { value: borde };                       // el color del borde, para el shader
+      sh.fragmentShader = 'uniform vec3 uBorde;\n' + sh.fragmentShader.replace('#include <opaque_fragment>', `#include <opaque_fragment>
+        float fr = pow(1.0 - abs(dot(normalize(normal), normalize(vViewPosition))), 2.0);   // 0 de frente, 1 en el borde
+        vec3 iris = 0.55 + 0.45 * cos(6.2831 * (fr * 1.4 + vec3(0.0, 0.33, 0.67)));         // el tornasol: un arcoíris suave según el ángulo
+        gl_FragColor.rgb = mix(gl_FragColor.rgb, mix(uBorde, iris, 0.4) * 1.25, fr);          // el borde brilla con su color y un poco de arcoíris
+        gl_FragColor.a = mix(0.06, 0.9, fr);                                                  // casi transparente al centro, firme en el borde`);
+    };
+    mat.customProgramCacheKey = () => 'pompa';                     // que three no lo confunda con un estándar cualquiera al cachear el programa
+    const matB = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.95, depthWrite: false });   // el reflejo
+    const im = new THREE.InstancedMesh(geo, mat, N), imB = new THREE.InstancedMesh(geoB, matB, N);
+    for (const m of [im, imB]) { m.frustumCulled = false; m.userData.sinAO = true; m.renderOrder = 3; g.add(m); }
     const az = (k => () => ((k = (k * 1664525 + 1013904223) >>> 0) / 4294967296))(77);   // siempre las mismas burbujas
-    const B = Array.from({ length: N }, () => ({ f: az(), x: (az() - 0.5) * 7, y: 1.6 + az() * 5.5, r: 0.35 + az() * 0.7, w: az() * 6 }));
+    /* Van a los COSTADOS (x entre 3,1 y 5,6 m, sobre los muros y más allá),
+       nunca sobre los tres carriles: encima de la vía tapaban los setos, y
+       en el salto doble la cámara sube y mira hacia abajo, justo a través de
+       ellas. Ejemplo: una burbuja de k par va a la izquierda, x ≈ −4. */
+    /* La f no es al azar sino repartida (k/N más un poco de juego): al azar, a
+       veces se juntaban cinco en el mismo punto, justo donde está el arco. */
+    const B = Array.from({ length: N }, (_, k) => ({ f: (k + az() * 0.6) / N, x: (k % 2 ? 1 : -1) * (3.3 + az() * 1.8), y: 2.2 + az() * 3.8, r: 0.55 + az() * 0.6, w: az() * 6 }));
     const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3();
     g.userData.colocar = (o, D, t) => {
       g.position.set(0, SUELO, -(o.d0 - D));
-      B.forEach((b, k) => {                                       // a lo largo del tramo, subiendo y bajando despacio
-        p.set(b.x + Math.sin(t * 0.7 + b.w) * 0.3, b.y + Math.sin(t * 1.1 + b.w) * 0.4, -b.f * o.largo);
-        im.setMatrixAt(k, m4.compose(p, q, sc.setScalar(b.r * (1 + Math.sin(t * 2 + b.w) * 0.05))));
+      salida.position.z = -o.largo;                               // el arco de salida, donde termina
+      /* El letrero cuelga entre 4,4 y 6,05 m (bajo el techo del túnel) y la
+         cámara va a unos 4,7 m, 8,6 m detrás del corredor: lo atravesaría y
+         taparía media pantalla con un velo blanco. Se desvanece mientras el
+         corredor llega al arco. Ejemplo: a 10 m o más se ve entero; a 6 m, a
+         medias; desde 2 m antes, ya no está (la cámara aún va 10 m atrás). */
+      const falta = o.d0 - D;                                     // metros que le faltan al corredor para pasar el arco
+      letrero.material.opacity = Math.min(1, Math.max(0, (falta - 2) / 8));
+      letrero.visible = letrero.material.opacity > 0.01;
+      piso.scale.y = o.largo; piso.position.z = -o.largo / 2;     // la franja, de punta a punta
+      const desde = D - o.d0 - ATRAS;                             // dónde empieza la ventana, en metros desde la entrada del tramo
+      B.forEach((b, k) => {
+        /* La ventana: z (metros desde la entrada) queda fija mientras el
+           corredor avanza, y salta VENTANA metros adelante al quedar atrás.
+           Ejemplo: con desde = 10, una burbuja de f = 0,5 está en
+           10 + 38 = 48 m; con desde = 20, sigue en 20 + 28 = 48 m; con
+           desde = 50 ya quedó atrás y salta a 50 + 94 = 144 m. */
+        const z = desde + (((b.f * VENTANA - desde) % VENTANA) + VENTANA) % VENTANA;
+        const fuera = z < 0 || z > o.largo;                         // antes de la entrada o después de la salida: no se dibuja
+        /* Las que están a menos de CERCA metros delante del corredor se
+           achican hasta desaparecer al llegar a la cámara: una burbuja de
+           un metro pegada al lente tapaba media pantalla. */
+        const delante = z - (D - o.d0), cerca = Math.min(1, Math.max(0, (delante + 4) / CERCA));
+        /* Y las del fondo de la ventana crecen al acercarse en vez de aparecer de
+           golpe: amontonadas en el punto de fuga tapaban el arco y los setos.
+           Ejemplo: a 44 m del corredor no se ven, a 40 m miden la mitad y a 36 m o menos, enteras. */
+        const lejos = Math.min(1, Math.max(0, (VENTANA - ATRAS - delante) / (VENTANA - ATRAS - LEJOS)));
+        const r = fuera ? 0 : b.r * cerca * lejos * (1 + Math.sin(t * 2 + b.w) * 0.06);   // respirando un poco (radio 0: escondida)
+        p.set(b.x + Math.sin(t * 0.7 + b.w) * 0.3, b.y + Math.sin(t * 1.1 + b.w) * 0.4, -z);   // subiendo y bajando despacio
+        im.setMatrixAt(k, m4.compose(p, q, sc.setScalar(r)));
+        p.x -= r * 0.38; p.y += r * 0.42; p.z += r * 0.5;          // el brillo: arriba a la izquierda, hacia la cámara
+        imB.setMatrixAt(k, m4.compose(p, q, sc.set(r * 0.2, r * 0.13, r * 0.06)));
       });
-      im.instanceMatrix.needsUpdate = true;
+      im.instanceMatrix.needsUpdate = true; imB.instanceMatrix.needsUpdate = true;
     };
     return g;
   },
@@ -674,8 +792,8 @@ Object.assign(Kit.prototype, {
       flecha arriba («aquí se sube»). */
   cobertizoCity() {
     const a = new Arma(this), K = CITY.COBERTIZO, L = 10;
-    const madera = this.neon ? 0x3a2a6e : (this.pixel ? 0x9a5b34 : 0xb06a3c), calamina = this.neon ? 0x22e5ff : 0xc9ced6;
-    a.pon(CAJA, this.pixel ? 'plano!' : 'pintura!', madera, [0, (K.alto - 0.16) / 2, -L / 2], null, [1.84, K.alto - 0.16, L], 0xffffff);   // el cuerpo de tablas
+    const madera = this.neon ? 0x3a2a6e : 0xb06a3c, calamina = this.neon ? 0x22e5ff : 0xc9ced6;
+    a.pon(CAJA, 'pintura!', madera, [0, (K.alto - 0.16) / 2, -L / 2], null, [1.84, K.alto - 0.16, L], 0xffffff);   // el cuerpo de tablas
     for (let z = -0.8; z > -L; z -= 1.6) a.pon(CAJA, 'plano!', this.neon ? 0x6a35c9 : 0x6e3d22, [0, (K.alto - 0.16) / 2, z], null, [1.88, K.alto - 0.2, 0.08]);   // las tablas (vetas)
     a.pon(CAJA, this.neon ? 'luz!' : 'metal!', calamina, [0, K.alto - 0.08, -L / 2], null, [2.0, 0.16, L + 0.3]);   // el techo de calamina (donde se para)
     for (let x = -0.8; x <= 0.81; x += 0.4) a.pon(CAJA, 'metal!', this.neon ? 0x9a6bff : 0x8f969f, [x, K.alto + 0.01, -L / 2], null, [0.05, 0.03, L + 0.3]);   // sus ondas
@@ -695,7 +813,7 @@ Object.assign(Kit.prototype, {
     const amarillo = this.neon ? 0xffb020 : 0xffc21a;
     const pieza = () => {
       const a = new Arma(this);
-      a.pon(CAJA, this.pixel ? 'plano!' : 'pintura!', amarillo, [0, -alto / 2, -0.5], null, [1.5, alto, 1], 0xffffff);   // el alma de la viga (largo 1, hacia −z)
+      a.pon(CAJA, 'pintura!', amarillo, [0, -alto / 2, -0.5], null, [1.5, alto, 1], 0xffffff);   // el alma de la viga (largo 1, hacia −z)
       for (const s of [-1, 1]) a.pon(uvMundo(new THREE.BoxGeometry(0.04, 0.12, 1), 0.5), this.neon ? 'texluz:rayasNA!' : 'tex:rayasNA!', 0xffffff, [s * 0.76, -alto / 2, -0.5], null, 1);   // sus bordes de peligro
       a.pon(CAJA, 'metal!', 0x3a3f46, [0, 0.01, -0.5], null, [0.5, 0.02, 1]);   // la huella oscura de arriba (por dónde se corre)
       return a.hecho();
@@ -721,7 +839,7 @@ Object.assign(Kit.prototype, {
   conductoCity() {
     const K = CITY.CONDUCTO, L = 10, g = new THREE.Group(), alto = K.alto - K.y0;
     const a = new Arma(this), gris = this.neon ? 0x2b2f4a : 0x6f7782;
-    a.pon(CAJA, this.pixel ? 'plano!' : 'metal!', gris, [0, K.y0 + alto / 2, -L / 2], null, [1.9, alto, L], 0xffffff);   // el ducto
+    a.pon(CAJA, 'metal!', gris, [0, K.y0 + alto / 2, -L / 2], null, [1.9, alto, L], 0xffffff);   // el ducto
     for (let z = -1.2; z > -L; z -= 2.4) a.pon(CAJA, 'metal!', this.neon ? 0x6a35c9 : 0x4a525c, [0, K.y0 + alto / 2, z], null, [1.96, alto + 0.06, 0.12]);   // sus juntas
     a.pon(uvMundo(new THREE.BoxGeometry(1.92, 0.24, 0.04), 0.5), this.neon ? 'texluz:rayasNA!' : 'tex:rayasNA!', 0xffffff, [0, K.y0 + 0.12, 0.02], null, 1);   // la boca: peligro abajo
     a.pon(CAJA, 'luz!', this.neon ? 0x22e5ff : 0xfff3c0, [0, K.y0 - 0.02, -L / 2], null, [0.3, 0.03, L]);   // la luz del techo del hueco
@@ -739,7 +857,7 @@ Object.assign(Kit.prototype, {
     b.pon(CAJA, 'luz!', 0xff8a1e, [0, K.y0 + alto / 2, 0], null, [2.05, alto + 0.14, 0.35]);   // el anillo: «rueda otra vez aquí»
     b.pon(CAJA, 'luz!', 0xff8a1e, [0, 0.02, 0], null, [1.6, 0.03, 0.5]);                      // y su marca en el suelo
     const anillo = b.hecho(); g.add(anillo);
-    if (this.neon || this.pixel) anillo.add(sprite(0xff8a1e, 2.2, [0, 0.6, 0], 0.45));
+    if (this.neon) anillo.add(sprite(0xff8a1e, 2.2, [0, 0.6, 0], 0.45));
     g.userData.colocar = (o, D) => {
       g.position.set(CARRILES[o.carril], SUELO, -(o.d0 - D));
       cuerpo.scale.z = o.largo / L;                             // el ducto se estira; el anillo no (va en su metro)
@@ -747,20 +865,66 @@ Object.assign(Kit.prototype, {
     };
     return g;
   },
-  /** PARQUE · el seto: un muro de arbusto recortado de 2,8 m, que solo se
-      pasa con el salto que flota de las burbujas. Unas flores para que no
-      sea un bloque verde, y una franja clara arriba que marca su altura. */
+  /** PARQUE · el seto: un muro de arbusto podado de 2,8 m, que solo se
+      pasa con el salto que flota de las burbujas. Va en una jardinera de
+      piedra, como los setos de una plaza, y su follaje es una textura de
+      hojas que aclara hacia arriba (donde le da el sol). */
   setoCity() {
+    /* Por qué así: la versión anterior era una caja verde oscura con bultos
+       redondos pegados al frente y flores sueltas, y se leía como un cactus
+       con lunares, no como un arbusto. Un seto podado es un bloque de
+       esquinas blandas cubierto de hojitas; lo que lo hace parecer planta es
+       la textura y el redondeo, no las pelotas encima.
+       Medidas: la jardinera mide 0,5 m y el follaje va de 0,5 m a 2,8 m
+       (S.alto), justo donde se para el corredor: lo que se ve coincide con
+       lo que choca. Ejemplo: el follaje mide 2,8 − 0,5 = 2,3 m y se centra a
+       0,5 + 1,15 = 1,65 m. */
+    this.texFollaje();                                                          // la textura de hojas, antes del material que la usa
     const S = CITY.SETO, a = new Arma(this);
-    const verde = this.neon ? 0x1f8f6a : 0x2f9e44, claro = this.neon ? 0x6affc8 : 0x6ccf5a;
-    a.pon(CAJA, this.pixel ? 'plano!' : 'pintura!', verde, [0, S.alto / 2, 0], null, [1.86, S.alto, S.largo], 0xffffff);   // el arbusto
-    a.pon(CAJA, this.neon ? 'luz!' : 'pintura!', claro, [0, S.alto - 0.06, 0], null, [1.9, 0.12, S.largo + 0.04]);   // el borde de arriba, recortado
-    const az = (k => () => ((k = (k * 1664525 + 1013904223) >>> 0) / 4294967296))(31);   // siempre las mismas flores
-    for (let k = 0; k < 9; k++) a.pon(ESFERA, 'pintura!', [0xff6ec7, 0xffe14d, 0xffffff][k % 3], [(az() - 0.5) * 1.6, 0.4 + az() * (S.alto - 0.8), S.largo / 2 + 0.02], null, 0.09);   // flores en el frente
-    for (const s of [-1, 1]) a.pon(CAJA, 'plano!', 0x5a3a22, [s * 0.7, 0.12, 0], null, [0.12, 0.24, S.largo * 0.8]);   // la base de tierra
+    const base = 0.5, alto = S.alto - base;                                       // la jardinera y lo que queda para las hojas
+    const piedra = this.neon ? 0x3a2f5c : 0xe4d6b8, borde = this.neon ? 0x22e5ff : 0xcbb48a;   // en neón, la jardinera oscura con un filo que brilla
+    a.pon(redonda(1.92, base, S.largo + 0.1, 0.06), 'pintura!', piedra, [0, base / 2, 0]);                       // la jardinera de piedra
+    a.pon(redonda(1.98, 0.09, S.largo + 0.16, 0.035), this.neon ? 'luz!' : 'pintura!', borde, [0, base, 0]);       // su borde de arriba, un poco más ancho
+    a.pon(redonda(1.76, alto, S.largo - 0.02, 0.3, 4), 'tex:follaje!', this.neon ? 0x9fffe0 : 0xffffff, [0, base + alto / 2, 0]);   // el follaje podado, de esquinas blandas
     const g = a.hecho();
     g.userData.colocar = (o, D) => { g.position.set(CARRILES[o.carril], SUELO, -(o.d - D)); };
     return g;
+  },
+  /** La textura de hojas del seto (una vez por kit, guardada como 'follaje'
+      en las texturas del kit, así la clave 'tex:follaje!' la encuentra).
+      Se dibuja en un lienzo: un verde de fondo que aclara hacia arriba y
+      encima unas 2600 hojitas de cuatro verdes, cada una con su sombra abajo
+      y un brillo arriba. Las de arriba salen más claras, las de abajo más
+      oscuras. En cómic, hojas más grandes con borde de tinta (el trazo plano
+      del estilo); en neón, verdes azulados que el tinte vuelve menta. */
+  texFollaje() {
+    if (this.texs.has('follaje')) return;                                          // ya está hecha en este kit
+    const N = 512, cv = document.createElement('canvas'); cv.width = cv.height = N;
+    const x = cv.getContext('2d');
+    const k0 = 77; let k = k0; const az = () => ((k = (k * 1664525 + 1013904223) >>> 0) / 4294967296);   // siempre las mismas hojas
+    const fondo = x.createLinearGradient(0, 0, 0, N);                               // arriba (v = 1 en el cubo) claro, abajo oscuro
+    fondo.addColorStop(0, this.neon ? '#2f8f7a' : '#4fa83e'); fondo.addColorStop(1, this.neon ? '#123a3a' : '#1f5e2a');
+    x.fillStyle = fondo; x.fillRect(0, 0, N, N);
+    const tonos = this.neon ? ['#1d6b5e', '#2a9c80', '#3fc79c', '#7ff0c6'] : ['#2e7a32', '#3f9a3a', '#5cb848', '#8fd35a'];
+    const grande = this.comic ? 1.7 : 1, cuantas = this.comic ? 900 : 2600;          // en cómic, menos hojas y más grandes
+    for (let i = 0; i < cuantas; i++) {
+      const px = az() * N, py = az() * N, r = (7 + az() * 8) * grande, ang = az() * Math.PI;
+      const alto = 1 - py / N;                                                      // 1 arriba, 0 abajo
+      const t = Math.min(3, Math.floor(alto * 2.2 + az() * 1.8));                  // arriba, más hojas claras
+      for (const dx of [-N, 0, N]) {                                                // repetida a los lados: la costura no se nota
+        x.fillStyle = 'rgba(10,40,15,.35)';                                         // la sombra de la hoja, un poco más abajo
+        x.beginPath(); x.ellipse(px + dx + 1.5, py + 2.5, r, r * 0.55, ang, 0, 7); x.fill();
+        x.fillStyle = tonos[t];
+        x.beginPath(); x.ellipse(px + dx, py, r, r * 0.55, ang, 0, 7); x.fill();
+        if (this.comic) { x.strokeStyle = 'rgba(16,36,20,.85)'; x.lineWidth = 2.2; x.stroke(); }   // el borde de tinta del cómic
+        x.fillStyle = 'rgba(255,255,230,.18)';                                     // un brillo chico arriba de la hoja
+        x.beginPath(); x.ellipse(px + dx - r * 0.2, py - r * 0.18, r * 0.45, r * 0.2, ang, 0, 7); x.fill();
+      }
+    }
+    const t = new THREE.CanvasTexture(cv);
+    t.colorSpace = THREE.SRGBColorSpace;                                            // los colores del lienzo están en sRGB
+    t.wrapS = THREE.RepeatWrapping; t.anisotropy = 4;                               // a lo ancho se repite sin costura
+    this.texs.set('follaje', t);
   },
   /** Las reservas de City, preparadas de a poco con la ciudad (solo en los kits de City). */
   pasosCity(pre) {
@@ -822,7 +986,7 @@ function vistePersonaje(p, kit, asp, pelo) {
   });
   else if (asp.peinado === 'melena') parte(p.cab, a => {
     a.pon(new THREE.SphereGeometry(0.218, 22, 14, Math.PI * 11 / 6, Math.PI * 4 / 3, Math.PI * 0.3, Math.PI * 0.5), 'personaje', pelo, [0, 0, 0.01]);   // el pelo de los lados, más abajo
-    a.pon(redonda(0.4, 0.42, 0.12, 0.05), 'personaje', pelo, [0, -0.2, 0.13]);                             // la caída hasta los hombros
+    a.pon(redonda(0.4, 0.3, 0.12, 0.05), 'personaje', pelo, [0, -0.13, 0.13]);                             // la caída hasta los hombros (más larga, se metía en la mochila)
   });
   else if (asp.peinado === 'trenzas') parte(p.cab, a => {
     for (const s of [-1, 1]) for (let k = 0; k < 4; k++) a.pon(ESFERA, 'personaje', pelo, [s * 0.16, -0.08 - k * 0.085, 0.1 + k * 0.012], null, 0.095 - k * 0.008);

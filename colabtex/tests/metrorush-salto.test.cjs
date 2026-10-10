@@ -136,3 +136,24 @@ test('las corredoras: precio, rasgos y un peinado distinto cada una', () => {
   const p = M.limpiaProgreso({ aspectos: nuevas.map(([id]) => id), aspecto: nuevas[0][0] });
   assert.equal(p.aspecto, nuevas[0][0]);
 });
+
+/* Los corredores (ronda 4): los cinco chicos ya no son un cambio de paleta
+   del mismo muñeco; cada uno trae `identidad` con un tocado distinto (lo que
+   se ve de espaldas) y al menos un accesorio propio, y mundo.js y la tienda
+   saben dibujar cada pieza. */
+test('los corredores: cada chico tiene su identidad (tocado distinto y accesorios)', () => {
+  const chicos = Object.entries(M.ASPECTOS).filter(([, a]) => !a.rasgos);
+  const tocados = new Set();
+  const ACCESORIOS = ['audifonos', 'panuelo', 'reflejos', 'spray', 'manchas', 'lentesSol', 'cadena', 'capa', 'bigote', 'abrigo'];
+  for (const [id, a] of chicos) {
+    assert.ok(a.identidad, `${id}: tiene identidad`);
+    assert.ok(['gorra', 'capucha', 'lana', 'corona', 'quepi'].includes(a.identidad.tocado), `${id}: tocado ${a.identidad.tocado}`);
+    assert.ok(Number.isInteger(a.identidad.pelo), `${id}: color de pelo`);
+    assert.ok(ACCESORIOS.some(k => a.identidad[k] != null && a.identidad[k] !== false), `${id}: al menos un accesorio`);
+    tocados.add(a.identidad.tocado);
+  }
+  assert.equal(tocados.size, chicos.length, 'cada uno se reconoce de espaldas por lo que lleva en la cabeza');
+  const mundo = MUNDO, juego = fs.readFileSync(path.join(__dirname, '../../juegos/club/metrorush/juego.js'), 'utf8');
+  for (const t of tocados) { assert.match(mundo, new RegExp(`I\\.tocado === '${t}'`), `mundo.js dibuja ${t}`); assert.match(juego, new RegExp(`I\\.tocado === '${t}'`), `la tienda dibuja ${t}`); }
+  for (const k of ACCESORIOS) assert.match(mundo, new RegExp(`I\\.${k}\\b`), `mundo.js dibuja ${k}`);
+});

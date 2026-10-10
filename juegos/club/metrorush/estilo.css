@@ -3,8 +3,8 @@
    La página se parece a las demás del Club (cabecera, marcador, la pantalla
    del juego y la clasificación al lado), pero la pantalla es siempre oscura y
    su marcador cambia con la estética de la estación: letras gordas con borde
-   (juguete), letras de cabina que brillan (neón) o letra pixel con marcos
-   escalonados (retro). El atributo data-estilo de #pantalla lo decide.
+   (juguete), letras de cabina que brillan (neón) o letras de historieta
+   con tinta negra y viñetas (cómic). El atributo data-estilo de #pantalla lo decide.
 
    Los tamaños del marcador van en unidades del contenedor (cqh, cqw): la
    pantalla es un contenedor de tamaño, así el marcador se ve igual de grande
@@ -46,7 +46,6 @@ main.vl { min-width: 0; }
 .pantalla { position: relative; width: 100%; aspect-ratio: 16 / 10; max-height: 82vh; background: #0b0d14; border-radius: 0 0 16px 16px; overflow: hidden; container-type: size; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 @media (max-width: 700px) and (orientation: portrait) { .pantalla { aspect-ratio: 3 / 4; max-height: 78svh; } }
 #lienzo { position: absolute; inset: 0; width: 100%; height: 100%; display: block; outline: none; }
-.pantalla[data-estilo="pixel"] #lienzo { image-rendering: pixelated; }
 .pie { margin: 8px 2px 0; color: var(--suave); font-size: 13px; text-align: center; }
 
 /* ---------- el marcador sobre la carrera ---------- */
@@ -57,7 +56,7 @@ main.vl { min-width: 0; }
    en columna el puntaje solo comparte la fila con la pausa. */
 @container (max-aspect-ratio: 1/1) {
   .hud { --u: min(0.8cqh, 1.45cqw); }
-  .hud-der, .pantalla[data-estilo="pixel"] .hud-der { flex-direction: column-reverse; align-items: flex-end; }
+  .hud-der { flex-direction: column-reverse; align-items: flex-end; }
   /* Orbitron es mucho más ancha que las otras letras: en vertical un puntaje de 9 cifras
      llegaba hasta la pausa, así que en neón se achica y se aprieta el espaciado. */
   .pantalla[data-estilo="neon"] .hud .valor { font-size: calc(4.5 * var(--u)); letter-spacing: .1cqh; }
@@ -86,15 +85,19 @@ main.vl { min-width: 0; }
 /* CITY: la energía de la tabla (una barra cian que se llena con las celdas) y el reloj de «monedas ×2», encima de las patinetas. */
 .hud-city { position: absolute; right: calc(2.4 * var(--u)); bottom: calc(15 * var(--u)); display: grid; justify-items: end; gap: calc(.8 * var(--u)); font-size: calc(2.6 * var(--u)); color: #fff; text-shadow: 0 2px 0 #000; pointer-events: none; }
 .hud-city[hidden], .hud-city [hidden] { display: none; }
-.hud-city .energia, .hud-city .mon2 { display: flex; align-items: center; gap: calc(.7 * var(--u)); }
-.hud-city .energia > i, .hud-city .mon2 > i { width: calc(3 * var(--u)); height: calc(3 * var(--u)); display: inline-block; }
+.hud-city .energia, .hud-city .mon2, .hud-city .burb { display: flex; align-items: center; gap: calc(.7 * var(--u)); }
+.hud-city .energia > i, .hud-city .mon2 > i, .hud-city .burb > i { width: calc(3 * var(--u)); height: calc(3 * var(--u)); display: inline-block; }
 .hud-city i svg { display: block; width: 100%; height: 100%; }
 .hud-city .barra { width: calc(14 * var(--u)); height: calc(1.6 * var(--u)); border-radius: 99px; background: rgba(0, 0, 0, .45); overflow: hidden; box-shadow: 0 0 0 calc(.25 * var(--u)) rgba(255, 255, 255, .5); }
 .hud-city .barra i { display: block; height: 100%; width: calc(var(--k, 0) * 100%); background: linear-gradient(90deg, #22c6ff, #5ff6ff); transition: width .2s; }
 .hud-city.lista .energia { animation: mrEnergia .7s ease-in-out infinite alternate; transform-origin: right center; }   /* late hacia la izquierda: crecer desde el centro lo sacaba por el borde */
 .hud-city.lista .barra i { background: linear-gradient(90deg, #ffd23f, #fff36a); }
 @keyframes mrEnergia { from { transform: scale(1); } to { transform: scale(1.12); } }
-@media (prefers-reduced-motion: reduce) { .hud-city.lista .energia { animation: none; } }
+/* El salto doble de las burbujas: una pastilla cian que flota mientras está listo; gastado, gris y quieta. */
+.hud-city .burb { padding: calc(.4 * var(--u)) calc(1.1 * var(--u)); border-radius: 99px; background: rgba(20, 120, 190, .72); box-shadow: 0 0 0 calc(.25 * var(--u)) #8fe3ff, 0 0 calc(1.6 * var(--u)) rgba(80, 200, 255, .7); animation: mrBurb 1.1s ease-in-out infinite alternate; }
+.hud-city .burb.usado { background: rgba(40, 46, 60, .7); box-shadow: 0 0 0 calc(.25 * var(--u)) rgba(255, 255, 255, .35); animation: none; opacity: .75; }
+@keyframes mrBurb { from { transform: translateY(0); } to { transform: translateY(calc(-.5 * var(--u))); } }
+@media (prefers-reduced-motion: reduce) { .hud-city.lista .energia, .hud-city .burb { animation: none; } }
 
 /* El letrero grande (estación nueva, récord, boleto) y el aviso corto. */
 .banner { position: absolute; left: 50%; top: 30%; transform: translate(-50%, -50%) scale(.9); text-align: center; color: #fff; opacity: 0; pointer-events: none; display: grid; gap: calc(.8cqh); width: 90%; transition: opacity .3s, transform .3s; }
@@ -102,8 +105,19 @@ main.vl { min-width: 0; }
 @keyframes banner { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.7); } 12% { opacity: 1; transform: translate(-50%, -50%) scale(1.06); } 20% { transform: translate(-50%, -50%) scale(1); } 85% { opacity: 1; } 100% { opacity: 0; } }
 .banner strong { font-size: min(7.5cqh, 11cqw); line-height: 1.05; }   /* en un celular vertical manda el ancho: «Boleto 6 de 10» en una línea */
 .banner > span { font-size: min(3cqh, 4.6cqw); opacity: .9; }   /* «>»: solo la segunda línea; sin él, la «Ó» de «Óxido» (un span dentro del título) salía chica y del color del subtítulo */
-.aviso { position: absolute; left: 50%; bottom: 4cqh; transform: translate(-50%, 20px); max-width: 88%; padding: 1cqh 2.2cqh; border-radius: 99px; background: rgba(10, 12, 22, .78); color: #fff; font-size: 2.4cqh; text-align: center; opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none; }
-.aviso.ver { opacity: 1; transform: translate(-50%, 0); }
+/* El aviso se centra con left/right + margin:auto, NO con left:50% y una
+   traslación: una caja absoluta con left:50% solo tiene la mitad del ancho para
+   acomodarse, y en el celular un aviso largo se partía en seis renglones
+   angostos que, con el borde de 99px, quedaban como un círculo enorme en medio
+   de la vía. El radio es fijo (una píldora en una línea, una tarjeta en dos). */
+.aviso { position: absolute; left: 0; right: 0; margin: 0 auto; width: max-content; bottom: 4cqh; transform: translateY(20px); max-width: 88%; padding: 1cqh 2.2cqh; border-radius: 2.4cqh; background: rgba(10, 12, 22, .78); color: #fff; font-size: min(2.4cqh, 4.4cqw); text-align: center; opacity: 0; transition: opacity .25s, transform .25s; pointer-events: none; }
+.aviso.ver { opacity: 1; transform: translateY(0); }
+/* En vertical el aviso va arriba, bajo el marcador, sobre el cielo: abajo a la
+   derecha están la barra de energía y la píldora «Salto doble ¡listo!», y un
+   aviso de 88 % de ancho las tapaba justo cuando dicen algo (al entrar a las
+   burbujas). Ejemplo: en un celular de 844 px de alto queda a ~177 px del borde
+   de arriba, debajo de la distancia y el distrito. Entra desde arriba. */
+@container (orientation: portrait) { .aviso { top: 21cqh; bottom: auto; transform: translateY(-20px); } .aviso.ver { transform: translateY(0); } }
 @media (prefers-reduced-motion: reduce) { .banner.ver { animation: none; } }
 /* La pista de las primeras carreras: grande, abajo (más arriba tapaba al
    corredor), sobre el aviso chico, con la flecha moviéndose hacia donde hay
@@ -129,8 +143,8 @@ main.vl { min-width: 0; }
    oscura. Va arriba al centro, entre el marcador de la izquierda y el de la
    derecha, chico y en dos líneas como mucho: lejos de la vía y de las
    pistas y avisos, que van abajo. Centrado con márgenes automáticos y no
-   con una traslación (en el estilo pixelado, una traslación de medio píxel
-   emborrona la letra). En vertical no cabe entre los dos marcadores: baja
+   con una traslación (así el saltito del cómic, que usa `rotate`, no se
+   suma a ninguna otra transformación). En vertical no cabe entre los dos marcadores: baja
    bajo ellos y se aparta mientras se ve el letrero grande de la estación. */
 .altavoz { position: absolute; left: 0; right: 0; margin: 0 auto; width: fit-content; top: 2.4cqh; max-width: min(46%, 66cqh); display: flex; align-items: center; gap: 1.1cqh;
   padding: .8cqh 1.8cqh .8cqh 1.1cqh; border-radius: 1cqh; background: rgba(18, 14, 10, .82); border: .25cqh solid rgba(255, 180, 58, .45);
@@ -142,10 +156,11 @@ main.vl { min-width: 0; }
   .altavoz { top: 21cqh; max-width: 88%; font-size: 2.3cqh; }
   .banner.ver ~ .altavoz { opacity: 0; }
 }
-.pantalla[data-estilo="pixel"] .altavoz { font-family: "Press Start 2P", monospace; font-weight: 400; font-size: var(--pf-chico); line-height: 1.6; border-radius: 0; text-shadow: none;
-  -webkit-font-smoothing: none; border-width: var(--pp); max-width: min(52%, 110cqh); }
-/* la letra pixel es el doble de ancha: en horizontal la placa se ensancha (sin tocar los marcadores) para quedar en dos líneas */
-@container (max-aspect-ratio: 1/1) { .pantalla[data-estilo="pixel"] .altavoz { max-width: 88%; } }
+/* En el cómic el altavoz es un globo de diálogo: crema, tinta negra y una colita que apunta hacia arriba (de donde sale la voz). */
+.pantalla[data-estilo="comic"] .altavoz { background: #fff4dc; border: .35cqh solid #1a1420; border-radius: 2.2cqh; color: #1a1420; text-shadow: none;
+  font: 400 2.4cqh/1.15 Bangers, "Arial Black", sans-serif; letter-spacing: .08cqh; box-shadow: .5cqh .5cqh 0 #1a1420; }
+.pantalla[data-estilo="comic"] .altavoz::after { content: ""; position: absolute; left: 18%; top: -1.3cqh; width: 2cqh; height: 2cqh; background: #fff4dc;
+  border-left: .35cqh solid #1a1420; border-top: .35cqh solid #1a1420; transform: rotate(45deg) skew(8deg, 8deg); }
 @media (prefers-reduced-motion: reduce) { .altavoz { transition: none; } }
 
 /* --- marcador: estética juguete (letras gordas con borde, como un juego de celular) --- */
@@ -167,53 +182,30 @@ main.vl { min-width: 0; }
 .pantalla[data-estilo="neon"] .poderes li b { background: rgba(10, 6, 32, .7); box-shadow: 0 0 1cqh #22e5ff; }
 .pantalla[data-estilo="neon"] .estacion .barra i { background: linear-gradient(90deg, #22e5ff, #ff2bd6); box-shadow: 0 0 1cqh #ff2bd6; }
 
-/* --- marcador: estética pixel (letra de 8 bits y marcos escalonados) ---
-   Todo va en medidas que calcula juego.js (medidasPixel) y no en cqh: la
-   letra solo es nítida si mide un múltiplo de 8 píxeles del aparato
-   (--pf-*), y los marcos y sombras, píxeles enteros de esa letra (--pp). La
-   sombra es un contorno de un píxel de la letra (0,125 em, sea cual sea su
-   tamaño) más una caída: se lee sobre el cielo claro del atardecer y cae
-   justo en la cuadrícula, en vez de un corrimiento de 4,6 píxeles que la
-   duplicaba. Sin suavizado de letra ni transformaciones que la remuestreen. */
-.pantalla[data-estilo="pixel"] .hud, .pantalla[data-estilo="pixel"] .banner { font-family: "Press Start 2P", monospace; color: #fff1d4; -webkit-font-smoothing: none; font-smooth: never; text-rendering: optimizeSpeed; }
-.pantalla[data-estilo="pixel"] .hud-izq { left: var(--pm); top: var(--pm); gap: calc(2 * var(--pp)); }
-.pantalla[data-estilo="pixel"] .hud-der { right: var(--pm); top: var(--pm); gap: calc(3 * var(--pp)); }
-.pantalla[data-estilo="pixel"] .hud .fila { gap: calc(3 * var(--pp)); }
-.pantalla[data-estilo="pixel"] .hud .valor { font-size: var(--pf-valor); line-height: 1; }
-.pantalla[data-estilo="pixel"] .hud .chico, .pantalla[data-estilo="pixel"] .estacion { font-size: var(--pf-chico); line-height: 1.5; }
-.pantalla[data-estilo="pixel"] .estacion { gap: calc(2 * var(--pp)); }
-.pantalla[data-estilo="pixel"] :is(.valor, .chico, .estacion > span:first-child, .mult, .patinetas b, .banner strong, .banner > span) { --o: .125em; --c: #2a1c18;
-  text-shadow: var(--o) 0 0 var(--c), calc(-1 * var(--o)) 0 0 var(--c), 0 var(--o) 0 var(--c), 0 calc(-1 * var(--o)) 0 var(--c),
-    var(--o) var(--o) 0 var(--c), calc(-1 * var(--o)) var(--o) 0 var(--c), var(--o) calc(-1 * var(--o)) 0 var(--c), calc(-1 * var(--o)) calc(-1 * var(--o)) 0 var(--c), 0 calc(2 * var(--o)) 0 var(--c); }
-/* Las mayúsculas con tilde (juego.js, ponConTildes): la fuente pixel dibuja
-   «Ó» igual que «ó», así que en el estilo pixel va la O sin tilde y encima
-   una tilde de dos píxeles de letra (0,125 em cada uno) con el mismo borde
-   que el texto (las cuatro sombras encadenadas engordan el contorno un
-   píxel, también en diagonal). En juguete y neón, la letra tal cual. */
-.mr-tilde::after { content: attr(data-l); }
-.pantalla[data-estilo="pixel"] .mr-tilde { position: relative; }
-.pantalla[data-estilo="pixel"] .mr-tilde::after { content: attr(data-b); }
-.pantalla[data-estilo="pixel"] .mr-tilde::before { content: ""; position: absolute; left: .375em; top: -.25em; width: .125em; height: .125em;
-  background: currentColor; box-shadow: .125em -.125em 0 currentColor;
-  filter: drop-shadow(.125em 0 0 var(--c, #2a1c18)) drop-shadow(-.125em 0 0 var(--c, #2a1c18)) drop-shadow(0 .125em 0 var(--c, #2a1c18)) drop-shadow(0 -.125em 0 var(--c, #2a1c18)); }
-/* El letrero grande, sin escalar ni centrar con traslaciones (remuestrean la
-   letra): de lado a lado, centrado por el texto, y aparece por escalones. */
-.pantalla[data-estilo="pixel"] .banner { left: 0; right: 0; width: auto; top: 22%; transform: none; padding: 0 calc(4 * var(--pp)); gap: calc(3 * var(--pp)); }
-.pantalla[data-estilo="pixel"] .banner.ver { transform: none; animation: banner-px 3s steps(1, end) forwards; }
-@keyframes banner-px { 0% { opacity: 0; } 4% { opacity: .5; } 8% { opacity: 1; } 85% { opacity: 1; } 92% { opacity: .5; } 100% { opacity: 0; } }
-.pantalla[data-estilo="pixel"] .banner strong { font-size: var(--pf-banner); line-height: 1.5; }   /* la letra pixel no trae aire entre líneas: con 1 las dos líneas se tocaban */
-.pantalla[data-estilo="pixel"] .banner > span { font-size: var(--pf-banner2); line-height: 1.5; opacity: 1; }
-.pantalla[data-estilo="pixel"] .mult { font-size: var(--pf-chico); line-height: 1; padding: calc(2 * var(--pp)); margin: 0 calc(2 * var(--pp)); background: #e2463a; color: #fff1d4;
-  box-shadow: 0 calc(-2 * var(--pp)) 0 #2a1c18, 0 calc(2 * var(--pp)) 0 #2a1c18, calc(-2 * var(--pp)) 0 0 #2a1c18, calc(2 * var(--pp)) 0 0 #2a1c18; }
-.pantalla[data-estilo="pixel"] .moneda { width: calc(12 * var(--pp)); height: calc(16 * var(--pp)); margin: 0 calc(2 * var(--pp)); background: #ffd23f;
-  box-shadow: inset calc(-3 * var(--pp)) 0 0 #e09a1a, inset calc(3 * var(--pp)) 0 0 #fff1a0, 0 calc(-2 * var(--pp)) 0 #2a1c18, 0 calc(2 * var(--pp)) 0 #2a1c18, calc(-2 * var(--pp)) 0 0 #2a1c18, calc(2 * var(--pp)) 0 0 #2a1c18; }
-.pantalla[data-estilo="pixel"] .hud .pausa { width: calc(var(--pf-valor) + 8 * var(--pp)); height: calc(var(--pf-valor) + 8 * var(--pp)); background: #2a2232; color: #fff1d4; border: 0; border-radius: 0;
-  box-shadow: 0 calc(-2 * var(--pp)) 0 #fff1d4, 0 calc(2 * var(--pp)) 0 #fff1d4, calc(-2 * var(--pp)) 0 0 #fff1d4, calc(2 * var(--pp)) 0 0 #fff1d4; }
-.pantalla[data-estilo="pixel"] .hud .pausa b { gap: calc(3 * var(--pp)); }
-.pantalla[data-estilo="pixel"] .hud .pausa b::before, .pantalla[data-estilo="pixel"] .hud .pausa b::after { width: calc(3 * var(--pp)); height: calc(10 * var(--pp)); border-radius: 0; }
-.pantalla[data-estilo="pixel"] .patinetas { font-size: var(--pf-chico); right: var(--pm); }
-.pantalla[data-estilo="pixel"] .hud-city { font-size: var(--pf-chico); right: var(--pm); }
-.pantalla[data-estilo="pixel"] .estacion .barra { height: calc(2 * var(--pp)); border-radius: 0; } .pantalla[data-estilo="pixel"] .estacion .barra i { border-radius: 0; background: #2fb59a; }
+/* --- marcador: estética cómic (letras de historieta con tinta negra) ---
+   Bangers (mayúsculas altas y apretadas, la letra de los globos de una
+   historieta) en blanco con un contorno de tinta gruesa y una caída dura
+   hacia abajo y la derecha, como una viñeta impresa. Los paneles (pausa,
+   multiplicador) son recuadros crema o rojos con borde de tinta y su sombra
+   corrida sin desenfoque. Todo en cqh, como el juguete: no hace falta
+   ajustar nada a la cuadrícula del aparato. */
+.pantalla[data-estilo="comic"] { --tinta-c: #1a1420; }
+.pantalla[data-estilo="comic"] .hud, .pantalla[data-estilo="comic"] .banner { font-family: Bangers, "Arial Black", sans-serif; font-weight: 400; color: #fffaf0; letter-spacing: .12cqh; }
+.pantalla[data-estilo="comic"] :is(.valor, .chico, .estacion > span:first-child, .patinetas b, .banner strong, .banner > span) {
+  text-shadow: .3cqh .3cqh 0 var(--tinta-c), -.3cqh .3cqh 0 var(--tinta-c), .3cqh -.3cqh 0 var(--tinta-c), -.3cqh -.3cqh 0 var(--tinta-c),
+    0 .3cqh 0 var(--tinta-c), 0 -.3cqh 0 var(--tinta-c), .3cqh 0 0 var(--tinta-c), -.3cqh 0 0 var(--tinta-c), .6cqh .7cqh 0 var(--tinta-c); }
+/* Bangers es angosta, así que el puntaje va un 12 % más grande que la base (6.6u)
+   para ocupar lo mismo. Antes decía «1.12em»: eso es relativo al padre (15 px), y
+   puntos y monedas quedaban en 17 px frente a los 39 px de los otros estilos. */
+.pantalla[data-estilo="comic"] .hud .valor { font-size: calc(7.4 * var(--u)); }
+.pantalla[data-estilo="comic"] .mult { background: #ff4a3a; color: #fffaf0; padding: .3cqh 1.2cqh .2cqh; border: .4cqh solid var(--tinta-c); border-radius: .5cqh; transform: rotate(-6deg) skewX(-6deg);
+  box-shadow: .5cqh .5cqh 0 var(--tinta-c); text-shadow: .25cqh .25cqh 0 var(--tinta-c); }
+.pantalla[data-estilo="comic"] .moneda { border-radius: 50%; background: radial-gradient(circle at 36% 32%, #fff6c0 0 16%, #ffd21a 17%); border: .4cqh solid var(--tinta-c); box-shadow: .35cqh .35cqh 0 var(--tinta-c); }
+.pantalla[data-estilo="comic"] .pausa { background: #fff4dc; border: .4cqh solid var(--tinta-c); border-radius: .8cqh; color: var(--tinta-c); box-shadow: .5cqh .5cqh 0 var(--tinta-c); }
+.pantalla[data-estilo="comic"] .poderes li b { background: #fff4dc; border: .3cqh solid var(--tinta-c); color: var(--tinta-c); box-shadow: .3cqh .3cqh 0 var(--tinta-c); }
+.pantalla[data-estilo="comic"] .estacion .barra { background: #fff4dc; outline: .25cqh solid var(--tinta-c); }
+.pantalla[data-estilo="comic"] .estacion .barra i { background: #2fb8c8; }
+.pantalla[data-estilo="comic"] .banner strong { letter-spacing: .3cqh; }
 
 /* ---------- los menús, al estilo Subway Surfers ----------
    Todo el menú comparte un mismo idioma visual, sacado del inicio de Subway
@@ -641,7 +633,8 @@ main.vl { min-width: 0; }
 .hud-modo:empty { display: none; }
 .hud-modo svg { display: block; width: calc(3 * var(--u)); height: calc(3 * var(--u)); }
 .hud-modo[data-modo="sinmonedas"] { background: rgba(160, 10, 20, .75); }
-.pantalla[data-estilo="pixel"] .hud-modo { font-family: "Press Start 2P", monospace; font-size: calc(1.4 * var(--u)); border-radius: 0; }
+.pantalla[data-estilo="comic"] .hud-modo { font-family: Bangers, "Arial Black", sans-serif; letter-spacing: .1cqh; background: #fff4dc; color: #1a1420; border-color: #1a1420; box-shadow: .3cqh .3cqh 0 #1a1420; }
+.pantalla[data-estilo="comic"] .hud-modo[data-modo="sinmonedas"] { background: #ff4a3a; color: #fffaf0; }
 .pantalla[data-estilo="neon"] .hud-modo { font-family: Orbitron, Arial, sans-serif; font-size: calc(1.6 * var(--u)); box-shadow: 0 0 1cqh #22e5ff; }
 
 /* En el resumen: a qué tabla fue la carrera. */
@@ -665,7 +658,7 @@ main.vl { min-width: 0; }
 .hud-fan small { font-size: .72em; opacity: .85; }
 .hud-fan[data-lado="1"] b { color: #7dff9a; }                 /* vas ganando */
 .hud-fan[data-lado="-1"] b { color: #ff9a9a; }                /* te va ganando */
-.pantalla[data-estilo="pixel"] .hud-fan { font-family: "Press Start 2P", monospace; font-size: calc(1.5 * var(--u)); border-radius: 0; }
+.pantalla[data-estilo="comic"] .hud-fan { font-family: Bangers, "Arial Black", sans-serif; letter-spacing: .1cqh; border-color: #1a1420; box-shadow: .3cqh .3cqh 0 #1a1420; }
 .pantalla[data-estilo="neon"] .hud-fan { font-family: Orbitron, Arial, sans-serif; font-weight: 700; font-size: calc(1.9 * var(--u)); background: rgba(4, 12, 40, .7); box-shadow: 0 0 1cqh #5aa8ff; }
 .p-fantasma { margin: 0; max-width: min(100%, calc(110 * var(--mt))); padding: calc(.45 * var(--mt)) calc(1.6 * var(--mt)); border-radius: 999px; background: rgba(16, 44, 130, .7);
   border: calc(.3 * var(--mt)) solid rgba(159, 208, 255, .85); font: 700 calc(2 * var(--mt))/1.25 "IBM Plex Sans", sans-serif; color: #eaf4ff; text-align: center; text-shadow: 0 1px 2px rgba(0, 0, 0, .6); }

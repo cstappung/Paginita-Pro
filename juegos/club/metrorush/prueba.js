@@ -59,8 +59,8 @@
      las dos pistas son idénticas, así que una carrera honesta de ayer no se
      vuelve trampa por subir la velocidad hoy. Ejemplo: una carrera v2 de
      14 km se rehace con el tope de 50 m/s, como se jugó. */
-  const VERSION = 3;
-  const VERSIONES = [2, 3];       // las que todavía se pueden rehacer
+  const VERSION = 4;
+  const VERSIONES = [2, 3, 4];    // las que todavía se pueden rehacer (la 4 solo cambió «sin monedas»: ver VERSION_PISTA en motor.js)
   const PASO_MUESTRA = 2;         // segundos de carrera entre dos muestras
   const MAX_EVENTOS = 60000;      // una carrera de una hora deja ~2 000: esto es un tope de seguridad
   const MAX_METROS = 1000000;     // el tope de la tabla de distancia

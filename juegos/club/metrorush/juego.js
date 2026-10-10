@@ -24,10 +24,10 @@
    - Se perdona el salto un poco antes de tocar el suelo y un poco después
      de dejarlo (búfer y "tiempo de coyote"): sin eso el salto se siente
      "comido" a toda velocidad. */
-import { crearMundo, PALETAS } from './mundo.js?v=metrorush-14';
-import { Sonido } from './audio.js?v=metrorush-14';
-import './mundo-city.js?v=metrorush-14';                        // CITY: el dibujo de City (se engancha a mundo.js por GANCHOS)
-import { crearCiudad } from './ciudad.js?v=metrorush-14';       // CITY: lo que la carrera hace distinto en City
+import { crearMundo, PALETAS } from './mundo.js?v=metrorush-15';
+import { Sonido } from './audio.js?v=metrorush-15';
+import './mundo-city.js?v=metrorush-15';                        // CITY: el dibujo de City (se engancha a mundo.js por GANCHOS)
+import { crearCiudad } from './ciudad.js?v=metrorush-15';       // CITY: lo que la carrera hace distinto en City
 
 const M = window.MetroRushMotor;                               // el motor (motor.js)
 const MP = window.MetroRushPrueba;                            // la prueba de la carrera, para el antitrampas (prueba.js)
@@ -49,6 +49,11 @@ const opciones = Object.assign({ calidad: 'auto', estilo: 'auto', musica: 80, ef
    monedas, City, City sin ayudas). Se recuerda en este aparato, con las
    opciones; una clave que ya no existe vuelve al clásico. */
 if (!M.modoDe(opciones.modo) || !opciones.modo) opciones.modo = 'clasico';
+/* El estilo pixelado se reemplazó por el cómic (octubre de 2026): quien lo
+   tenía fijado en Opciones pasa al cómic, que ocupa su lugar en las mismas
+   estaciones; cualquier otro valor desconocido vuelve a «cambia con las estaciones». */
+if (opciones.estilo === 'pixel') opciones.estilo = 'comic';
+if (!['auto', 'juguete', 'neon', 'comic'].includes(opciones.estilo)) opciones.estilo = 'auto';
 let modoSel = M.modoDe(opciones.modo);                         // el modo con que empieza la próxima carrera
 /* La cuenta guarda `{d, at}` en users/<uid>/club/metrorush, y eso mismo es
    lo que llega al pedirla: un OBJETO con el progreso como texto en `d`.
@@ -111,7 +116,7 @@ function calidadInicial() {
   return esTactil || chico ? 'media' : 'alta';
 }
 /** La estación que se DIBUJA: la de los puntos, salvo que en Opciones se fijó un estilo. */
-const PALETA_FIJA = { juguete: 'barrio', neon: 'neon', pixel: 'ocaso' };
+const PALETA_FIJA = { juguete: 'barrio', neon: 'neon', comic: 'ocaso' };
 function estacionVisual(e) {
   if (opciones.estilo === 'auto' || e.estilo === opciones.estilo) return e;
   // CITY: un distrito conserva su ciudad con el estilo fijado («muelles@neon», la arma mundo-city.js)
@@ -205,7 +210,7 @@ document.addEventListener('keydown', e => {
   sonido.iniciar();
   if (e.target && /INPUT|SELECT|TEXTAREA/.test(e.target.tagName)) return;
   // el código secreto de siempre, en la portada: desbloquea el aspecto dorado
-  if (estado === 'portada' && !panel) { konami = e.code === KONAMI[konami] ? konami + 1 : (e.code === KONAMI[0] ? 1 : 0); if (konami === KONAMI.length) { konami = 0; desbloquea('dorado', '¡Código secreto! Aspecto Dorado desbloqueado'); } }
+  if (estado === 'portada' && !panel) { konami = e.code === KONAMI[konami] ? konami + 1 : (e.code === KONAMI[0] ? 1 : 0); if (konami === KONAMI.length) { konami = 0; desbloquea('dorado', '¡Código secreto! Desbloqueaste a Mateo, el rey dorado'); } }
   if (e.code === 'KeyM') { alternaSonido(); return; }
   if (e.code === 'KeyF' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) { alternaPantallaCompleta(); return; }   // F: pantalla completa (no en un campo de texto: eso ya se filtró arriba)
   // «¿Seguir corriendo?»: Intro paga y sigue, Escape (o P) lo deja pasar. Espacio y las flechas no hacen
@@ -564,10 +569,10 @@ function usaPatineta() {
     del marcador). Ejemplo: «⚡ 7/10»; llena, «⚡ ¡Lista! H». */
 function pintaHudCity() {
   const el = $('hudCity'), h = ciudad.hud(c);
-  const ver = !!h && (c.modo.patineta || h.monedas2 > 0);
+  const ver = !!h && (c.modo.patineta || h.monedas2 > 0 || !!h.burbuja);   // también dentro de las burbujas, aunque el modo no tenga patineta
   if (el.hidden === ver) el.hidden = !ver;
   if (!ver) return;
-  const lista = h.energia >= h.llena, txt = (c.modo.patineta ? (lista ? '¡Lista! H' : `${h.energia}/${h.llena}`) : '') + '|' + (h.monedas2 > 0 ? Math.ceil(h.monedas2) : '');
+  const lista = h.energia >= h.llena, txt = (c.modo.patineta ? (lista ? '¡Lista! H' : `${h.energia}/${h.llena}`) : '') + '|' + (h.monedas2 > 0 ? Math.ceil(h.monedas2) : '') + '|' + (h.burbuja || '');
   if (hudCache.city === txt) return;
   hudCache.city = txt;
   el.classList.toggle('lista', lista);
@@ -576,6 +581,13 @@ function pintaHudCity() {
   ponTexto('hudEnergiaTxt', lista ? '¡Lista!' : `${h.energia}/${h.llena}`);   // corto: el cómo (H o dos toques) ya lo dijo el aviso al llenarse
   $('hudMon2').hidden = !(h.monedas2 > 0);
   ponTexto('hudMon2Txt', `×2 ${Math.ceil(h.monedas2)} s`);
+  /* El salto doble de las burbujas: «Salto doble ¡listo!» mientras se pueda
+     saltar en el aire, «Salto doble usado» (apagado) después de gastarlo,
+     hasta volver a pisar. Fuera del tramo no se muestra. */
+  const bu = $('hudBurb');
+  bu.hidden = !h.burbuja;
+  bu.classList.toggle('usado', h.burbuja === 'usado');
+  ponTexto('hudBurbTxt', h.burbuja === 'usado' ? 'Salto doble usado' : 'Salto doble ¡listo!');
 }
 
 /* ---- monedas, poderes y regalos que se recogen ---- */
@@ -635,7 +647,7 @@ function recoge(dt) {
       // el número que se muestra es su lugar en la historia (el de la vía), no su número interno: «Boleto 3 de 10»
       const cap = M.capituloDe(o.n);
       sonido.boleto(); banner(`Boleto ${cap.n} de ${cap.de}`, `«${M.BOLETOS[o.n].titulo}» · Léelo en la Libreta`);
-      if (tieneTodosLosBoletos()) desbloquea('inspector', '¡Todos los boletos! Don Ramón terminó su último turno: te regala su gorra. Aspecto Inspector');
+      if (tieneTodosLosBoletos()) desbloquea('inspector', '¡Todos los boletos! Don Ramón terminó su último turno y ahora corre contigo: ya puedes elegirlo');
       guardar();
     }
   }
@@ -1568,7 +1580,7 @@ function cuadro(ahora) {
               : { modo: 'correr', fase: r.fase, ladeo: r.ladeo };
   mundo.paso({
     D: c ? c.D : 0, x: r ? r.x : 0, y: r ? r.y : 0, suelo: r ? r.suelo : 0, v: c ? c.V : 0, dt, t: tiempoTotal, pose,
-    poderes: c ? { iman: c.poderes.iman > 0, mochila: c.poderes.mochila > 0, zapatillas: c.poderes.zapatillas > 0, patineta: c.poderes.patineta > 0, pogo: !!c.pogo } : {},
+    poderes: c ? { iman: c.poderes.iman > 0, mochila: c.poderes.mochila > 0, zapatillas: c.poderes.zapatillas > 0, patineta: c.poderes.patineta > 0, pogo: !!c.pogo, flota: !!(c.ciudad && c.ciudad.enBurbuja) } : {},   // flota: dentro de las burbujas de City (la cámara sube con el salto doble)
     perseguidor: c && !menu ? c.perseguidor : 0, menu,
     persecucion: c && !menu ? datosPersecucion() : null,         // el grito, el ladrido y la atrapada (ver «La persecución»)
     fantasma: menu ? null : dibujoFantasma()                     // el corredor fantasma (null: no hay)
@@ -1594,34 +1606,12 @@ function autoCalidad(dtReal) {
    =================================================================== */
 const hudCache = {};
 const ponTexto = (id, txt) => { if (hudCache[id] !== txt) { hudCache[id] = txt; $(id).textContent = txt; } };
-/* La fuente pixel (Press Start 2P) dibuja cada mayúscula con tilde con la
-   misma figura que su minúscula: en una celda de 8×8 la tilde no le cabe
-   encima a una mayúscula, así que «Óxido» se leía «óxido». Los nombres que
-   van en esa fuente (la estación del marcador y el letrero grande) se
-   escriben con `ponConTildes`: cada mayúscula con tilde va en un
-   <span class="mr-tilde" data-l="Ó" data-b="O">. En los estilos juguete y
-   neón la hoja muestra la letra tal cual (data-l); en el pixel muestra la
-   letra sin tilde (data-b) y le dibuja encima la tilde de dos píxeles
-   (estilo.css, .mr-tilde). El texto de verdad sigue entero en
-   aria-label, para quien lee con un lector de pantalla. */
-const SIN_TILDE = { 'Á': 'A', 'É': 'E', 'Í': 'I', 'Ó': 'O', 'Ú': 'U' };
-function ponConTildes(el, txt) {
-  txt = String(txt || '');
-  if (!/[ÁÉÍÓÚ]/.test(txt)) { el.textContent = txt; el.removeAttribute('aria-label'); return; }   // lo normal: texto sin más
-  el.textContent = '';
-  for (const parte of txt.split(/([ÁÉÍÓÚ])/)) {
-    if (!parte) continue;
-    if (SIN_TILDE[parte]) {                                    // una mayúscula con tilde: su caja propia
-      const s = document.createElement('span');
-      s.className = 'mr-tilde'; s.dataset.l = parte; s.dataset.b = SIN_TILDE[parte];
-      s.setAttribute('aria-hidden', 'true');
-      el.appendChild(s);
-    } else el.appendChild(document.createTextNode(parte));      // el resto, tal cual
-  }
-  el.setAttribute('aria-label', txt);                          // el nombre entero, para el lector de pantalla
-}
-/** Como ponTexto (solo escribe si cambió), pero con las tildes de la fuente pixel. */
-const ponTextoTildes = (id, txt) => { if (hudCache[id] !== txt) { hudCache[id] = txt; ponConTildes($(id), txt); } };
+/* Los nombres de estación y el letrero grande se escriben con estas dos
+   (antes partían las mayúsculas con tilde para la fuente pixel, que no tenía
+   dónde dibujarlas; las tres fuentes de ahora sí las traen, así que basta el
+   texto tal cual). Se dejan con su nombre para no tocar a quien las llama. */
+function ponConTildes(el, txt) { el.textContent = String(txt || ''); }
+const ponTextoTildes = ponTexto;
 /* Un saltito (crece y vuelve) cuando cambia un número del marcador: el
    multiplicador al tomar una estrella, la moneda con cada moneda. Va con
    la propiedad `scale` (no `transform`), para no pisar la inclinación que
@@ -1650,7 +1640,7 @@ function pintaHud(dt) {
   const e = c.estacion, sig = M.siguienteUmbral(c.D, c.modo), desde = e.desde || 0;   // en metros, como las estaciones
   const cada = c.mundoJ.vuelta ? c.mundoJ.vuelta.cada : 0;       // lo que dura una vuelta en este mundo
   const k = Math.max(0, Math.min(1, (c.D - (e.vuelta > 1 ? sig - cada : desde)) / Math.max(1, sig - (e.vuelta > 1 ? sig - cada : desde))));
-  ponTextoTildes('hudEstacion', e.nombre);                     // con la tilde de «Óxido» bien puesta en la fuente pixel
+  ponTextoTildes('hudEstacion', e.nombre);                     // el nombre de la estación
   $('hudEstBarra').hidden = !Number.isFinite(sig);               // un mundo sin más estaciones no tiene barra hacia la siguiente
   $('hudEstBarra').style.setProperty('--k', k.toFixed(3));
   // los poderes activos, con su barra de tiempo
@@ -1674,7 +1664,7 @@ function aviso(txt) {
 }
 /** El letrero grande del centro (estación nueva, récord, boleto). */
 function banner(titulo, sub) {
-  ponConTildes($('bannerTitulo'), titulo); ponConTildes($('bannerSub'), sub || '');   // «Óxido» con su mayúscula también en la fuente pixel
+  ponConTildes($('bannerTitulo'), titulo); ponConTildes($('bannerSub'), sub || '');
   const b = $('banner'); b.classList.remove('ver'); void b.offsetWidth; b.classList.add('ver');
   if (c) c.banner = 3;
 }
@@ -1701,6 +1691,7 @@ const ICONOS = {
   boleto: svg(`<path d="M3.5 9.5h25v4.5a2.5 2.5 0 0 0 0 5v4.5h-25V19a2.5 2.5 0 0 0 0-5z" fill="#ffd23f" ${T}/><path d="M20.5 10.5v12" stroke="#142357" stroke-width="2" stroke-dasharray="2 2"/><path d="M8 14.5h8M8 18.5h5.5" stroke="#b37a00" stroke-width="2.3" stroke-linecap="round"/>`),
   atras: svg(`<path d="M19.5 6.5 10 16l9.5 9.5" fill="none" stroke="#142357" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>`),
   rayo: svg(`<path d="M18.5 3 7 18h7.5l-2 11L24 14h-7.5z" fill="#ffd23f" ${T}/>`),
+  burbuja: svg(`<circle cx="16" cy="16" r="12.5" fill="#8fe3ff" fill-opacity=".55" stroke="#37b8ff" stroke-width="2.5"/><ellipse cx="11.5" cy="10.5" rx="3.6" ry="2.3" fill="#fff" transform="rotate(-30 11.5 10.5)"/><circle cx="20.5" cy="20.5" r="1.6" fill="#fff" fill-opacity=".8"/>`),   // una burbuja con su brillo (City, parque)
   iman: svg(`<path d="M5.5 5h7.5v11a3 3 0 0 0 6 0V5h7.5v11a10.5 10.5 0 0 1-21 0z" fill="#ff3d4f" ${T}/><path d="M5.5 5H13v5.5H5.5zM19 5h7.5v5.5H19z" fill="#e6eef8" ${T}/>`),
   mochila: svg(`<path d="M9.5 24.5l2 5.5 2-5.5M18.5 24.5l2 5.5 2-5.5" fill="#ff8a1f" stroke="#ff8a1f" stroke-width="1.6" stroke-linejoin="round"/><rect x="6" y="5" width="9.5" height="20" rx="4.7" fill="#d5dfee" ${T}/><rect x="16.5" y="5" width="9.5" height="20" rx="4.7" fill="#d5dfee" ${T}/><path d="M6.5 12.5h8.5M17 12.5h8.5" stroke="#ff3d4f" stroke-width="2.8"/>`),
   zapatilla: svg(`<path d="M3 24.5v-10l6.5-3.5 3 4 6 1.5 6.5 2.3c2.6.9 4 2.6 4 5.2v.5z" fill="#4fd36b" ${T}/><path d="M3.5 22h25.5" stroke="#fff" stroke-width="2.6"/><path d="M12.5 15.8l-1.2 3M16.2 16.7l-1.2 3" stroke="#142357" stroke-width="1.8" stroke-linecap="round"/>`),
@@ -1853,6 +1844,40 @@ function muestraRasgos(a) {
     <path d="M45 56 Q50 60 55 56" fill="none" stroke="#8a2a1e" stroke-width="1.6" stroke-linecap="round"/>
     ${tocado}${lentes}${aros}<rect x="70" y="80" width="13" height="13" rx="3" fill="${hex(a.mochila)}" stroke="${tinta}" stroke-width="1.5"/></svg>`;
 }
+/* --- La muestra de los corredores (ronda 4) ---
+   Igual que la de las corredoras, pero con lo que les da identidad a los
+   chicos (`a.identidad` en motor.js): su tocado (gorra al revés, capucha,
+   gorro de lana, corona o quepí) y sus accesorios (audífonos, pañuelo,
+   lentes de sol, cadena, capa, bigote, abrigo, spray). Los mismos colores
+   que el modelo 3D; nada que el jugador escriba. */
+function muestraIdentidad(a) {
+  const I = a.identidad, hex = n => '#' + n.toString(16).padStart(6, '0');
+  const oscuro = n => hex(((((n >> 16) & 255) * 0.75) << 16) | ((((n >> 8) & 255) * 0.75) << 8) | ((n & 255) * 0.75) | 0);   // el borde de la capucha, un 25 % más oscuro
+  const piel = '#f1c19c', pelo = hex(I.pelo), toc = hex(a.gorra), ropa = hex(a.sudadera), tinta = '#0d2a63';
+  const capa = I.capa != null ? `<path d="M18 100 Q22 66 34 64 L66 64 Q78 66 82 100 Z" fill="${hex(I.capa)}"/>` : '';   // la capa, detrás de los hombros
+  const capucha = I.tocado === 'capucha' ? `<circle cx="50" cy="46" r="26" fill="${ropa}"/>` : '';   // la capucha, detrás de la cara
+  const tocado = I.tocado === 'gorra' ? `<path d="M30 42 Q30 24 50 24 Q70 24 70 42 Z" fill="${toc}"/><path d="M62 30 L82 30 Q78 36 68 38 Z" fill="${toc}"/>`   // gorra con la visera hacia atrás
+    : I.tocado === 'capucha' ? `<path d="M29 50 Q28 26 50 25 Q72 26 71 50" fill="none" stroke="${oscuro(a.sudadera)}" stroke-width="5"/><path d="M45 66 L45 76 M55 66 L55 76" stroke="#edf2f4" stroke-width="2" stroke-linecap="round"/>`
+      : I.tocado === 'lana' ? `<path d="M30 42 Q30 16 50 16 Q70 16 70 42 Z" fill="${toc}"/><rect x="29" y="36" width="42" height="8" rx="3" fill="${toc}" stroke="${tinta}" stroke-opacity=".25"/><circle cx="50" cy="15" r="6" fill="${hex(a.mochila2)}"/>`
+        : I.tocado === 'corona' ? `<path d="M36 31 L36 20 L42 26 L50 16 L58 26 L64 20 L64 31 Z" fill="#ffc63a" stroke="#b07a10" stroke-width="1.2"/><circle cx="50" cy="27" r="2.2" fill="#e8203a"/>`
+          : I.tocado === 'quepi' ? `<path d="M29 40 L27 24 Q50 18 73 24 L71 40 Z" fill="${toc}"/><rect x="29" y="34" width="42" height="5" fill="#fca311"/><path d="M28 40 Q50 48 72 40 L72 43 Q50 51 28 43 Z" fill="#111"/><rect x="47" y="26" width="6" height="6" fill="#ffd23f"/>` : '';
+  const audif = I.audifonos ? `<path d="M26 46 Q26 18 50 18 Q74 18 74 46" fill="none" stroke="#22262c" stroke-width="3.5"/><rect x="21" y="42" width="9" height="14" rx="4" fill="#22262c"/><rect x="70" y="42" width="9" height="14" rx="4" fill="#22262c"/><rect x="22.5" y="45" width="6" height="8" rx="3" fill="${hex(a.mochila2)}"/><rect x="71.5" y="45" width="6" height="8" rx="3" fill="${hex(a.mochila2)}"/>` : '';
+  const panuelo = I.panuelo != null ? `<path d="M31 52 Q50 50 69 52 Q66 66 50 68 Q34 66 31 52 Z" fill="${hex(I.panuelo)}"/>` : '';
+  const lentes = I.lentesSol ? `<rect x="36" y="44" width="12" height="8" rx="3" fill="#111318"/><rect x="52" y="44" width="12" height="8" rx="3" fill="#111318"/><path d="M48 47 L52 47" stroke="#ffc63a" stroke-width="1.6"/>` : '';
+  const bigote = I.bigote ? `<path d="M41 55 Q46 52 50 55 Q54 52 59 55 Q55 58 50 56.5 Q45 58 41 55 Z" fill="${pelo}"/>` : '';
+  const cadena = I.cadena ? `<path d="M38 70 Q50 84 62 70" fill="none" stroke="#ffc63a" stroke-width="2.4"/><circle cx="50" cy="80" r="4" fill="#ffc63a"/>` : '';
+  const abrigo = I.abrigo ? `<circle cx="50" cy="80" r="1.8" fill="#fca311"/><circle cx="50" cy="88" r="1.8" fill="#fca311"/><circle cx="50" cy="96" r="1.8" fill="#fca311"/>` : '';
+  const spray = I.spray ? `<rect x="73" y="70" width="7" height="13" rx="2" fill="${hex(a.mochila2)}" stroke="${tinta}" stroke-width="1.2"/><rect x="74.5" y="67" width="4" height="4" fill="#fff"/>` : '';
+  const boca = I.panuelo != null ? '' : `<path d="M45 ${I.bigote ? 59 : 56} Q50 ${I.bigote ? 62 : 60} 55 ${I.bigote ? 59 : 56}" fill="none" stroke="#8a2a1e" stroke-width="1.6" stroke-linecap="round"/>`;
+  const ojos = I.lentesSol ? '' : `<circle cx="43.5" cy="48" r="2.2" fill="#1d1a2a"/><circle cx="56.5" cy="48" r="2.2" fill="#1d1a2a"/>`;
+  return `<svg viewBox="0 0 100 100" aria-hidden="true">
+    <rect width="100" height="100" fill="#cfe3ff"/>${capa}${capucha}
+    <ellipse cx="50" cy="100" rx="38" ry="24" fill="${ropa}"/><rect x="45" y="62" width="10" height="10" fill="${piel}"/>
+    <circle cx="50" cy="48" r="19" fill="${piel}"/>
+    ${I.tocado === 'capucha' ? '' : `<path d="M31 46 Q31 30 50 30 Q69 30 69 46 Q64 38 50 37 Q36 38 31 46 Z" fill="${pelo}"/>`}
+    ${ojos}${boca}${bigote}${panuelo}${lentes}${tocado}${audif}${cadena}${abrigo}
+    ${I.abrigo ? '' : `<rect x="70" y="80" width="13" height="13" rx="3" fill="${hex(a.mochila)}" stroke="${tinta}" stroke-width="1.5"/>`}${spray}</svg>`;
+}
 /** Los personajes de City traen `piel`, `pelo` y `peinado` sueltos en su
     apariencia (y otros nombres de peinado): se traducen a `rasgos` para que
     `muestraRasgos` los dibuje con su cara de verdad. Ejemplo: Dante, de pelo
@@ -1937,7 +1962,8 @@ function pintaTienda() {
     const hex = n => '#' + n.toString(16).padStart(6, '0');
     const marca = puesto ? `<em class="ok">${ICONOS.check}</em>` : secreto ? `<em class="cerrado">${ICONOS.candado}</em>` : '';
     return `<li><button type="button" class="t-traje${k === tiendaVer ? ' sel' : ''}${secreto ? ' secreto' : ''}" data-ver="${k}" aria-pressed="${k === tiendaVer}">
-      ${a.rasgos || a.city ? `<span class="t-muestra con-rasgos">${muestraRasgos(a.rasgos ? a : conRasgosCity(a))}</span>`   /* las corredoras y los de City: su cabecita con peinado y piel (ver «La muestra de las corredoras») */
+      ${a.identidad ? `<span class="t-muestra con-rasgos">${muestraIdentidad(a)}</span>`   /* los corredores: su cabecita con tocado y accesorios (ver «La muestra de los corredores») */
+        : a.rasgos || a.city ? `<span class="t-muestra con-rasgos">${muestraRasgos(a.rasgos ? a : conRasgosCity(a))}</span>`   /* las corredoras y los de City: su cabecita con peinado y piel (ver «La muestra de las corredoras») */
         : `<span class="t-muestra" style="--a:${hex(a.sudadera)};--b:${hex(a.gorra)};--c:${hex(a.jeans)};--d:${hex(a.mochila)}"><i></i></span>`}<span class="t-n">${a.nombre}</span>${marca}${a.city ? '<em class="t-city">City</em>' : ''}</button></li>`;
   }).join('');
   const a = ciudad.aspecto(tiendaVer), tiene = ciudad.tiene(progreso, tiendaVer), puesto = puestoAhora === tiendaVer;
@@ -2078,37 +2104,9 @@ document.addEventListener('webkitfullscreenchange', pintaPantallaCompleta);
    =================================================================== */
 ponIconos();
 pintaPantallaCompleta();
-/* La letra del marcador pixelado (Press Start 2P) está dibujada en una
-   cuadrícula de 8: solo se ve nítida si su tamaño es un múltiplo de 8
-   píxeles del APARATO (cada píxel de la letra, un cuadrado entero de
-   píxeles). En unidades del contenedor salía a 25,3 píxeles en un celular de
-   3×, cada píxel de la letra medía 3,16 y los bordes se emborronaban; la
-   sombra (.4cqh = 4,6 píxeles) además caía corrida respecto de esa
-   cuadrícula y se veía doble. Aquí se calcula el tamaño que pedía la hoja de
-   estilos y se lleva al múltiplo de 8 más cercano; la sombra y los marcos van
-   en `--pp`, un píxel de la letra chica. Lo demás (márgenes) se ajusta a
-   píxeles enteros del aparato. Solo lo usa el estilo pixel (estilo.css). */
-function medidasPixel(r) {
-  const dpr = window.devicePixelRatio || 1;                                  // píxeles del aparato por píxel CSS
-  const u = (r.width <= r.height ? Math.min(0.8 * r.height, 1.45 * r.width) : r.height) / 100;   // la unidad del marcador (--u en estilo.css; en vertical mira también el ancho)
-  const ocho = v => Math.max(1, Math.round(v * dpr / 8)) * 8 / dpr;          // al múltiplo de 8 píxeles del aparato más cercano (en px CSS)
-  const entero = v => Math.max(1, Math.round(v * dpr)) / dpr;                // a píxeles enteros del aparato
-  const chico = ocho(2.2 * u), pp = chico / 8;                               // la letra chica y un píxel suyo
-  const fija = (k, v) => pantalla.style.setProperty(k, v + 'px');
-  fija('--pp', pp);                                                          // un píxel de la letra chica: sombras y marcos
-  fija('--pf-chico', chico);                                                 // metros, nombre de la estación, multiplicador
-  fija('--pf-valor', 2 * chico);                                             // los puntos y las monedas: el doble, la misma cuadrícula
-  /* El letrero va por el alto (5cqh y 3cqh), salvo en un celular vertical: ahí
-     5cqh son 42 px y la letra pixel es cuadrada, así que «Boleto 6 de 10» no
-     cabía en una línea y el letrero tapaba media pantalla. Con el ancho de
-     tope caben unas 16 letras grandes y unas 28 chicas por línea. */
-  fija('--pf-banner', ocho(Math.min(5 * r.height / 100, 0.9 * r.width / 16)));   // el letrero grande
-  fija('--pf-banner2', ocho(Math.min(3 * r.height / 100, 0.9 * r.width / 28)));  // su segunda línea
-  fija('--pm', entero(2.4 * u));                                             // el margen del marcador, en píxeles enteros
-}
 async function arranca() {
   // las fuentes del marcador y de los letreros (con un tope: si no llegan, se usa la de respaldo)
-  const fuentes = Promise.all(['100px "Lilita One"', '700 60px Orbitron', '20px "Press Start 2P"'].map(f => document.fonts.load(f).catch(() => null)));
+  const fuentes = Promise.all(['100px "Lilita One"', '700 60px Orbitron', '60px Bangers'].map(f => document.fonts.load(f).catch(() => null)));
   await Promise.race([fuentes, new Promise(r => setTimeout(r, 2500))]);
   try {
     mundo = crearMundo(lienzo);
@@ -2119,7 +2117,7 @@ async function arranca() {
   }
   mundo.calidad(calidadInicial());
   aplicaMovimiento();
-  const ajusta = () => { const r = pantalla.getBoundingClientRect(); mundo.tamano(r.width, r.height); medidasPixel(r); };
+  const ajusta = () => { const r = pantalla.getBoundingClientRect(); mundo.tamano(r.width, r.height); };
   new ResizeObserver(ajusta).observe(pantalla); ajusta();
   vistePuesto();                                                // CITY: lo puesto en el modo elegido (en City, su personaje)
   escenaPortada();                                              // la primera estación del modo elegido, con trenes a la vista
