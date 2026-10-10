@@ -67,7 +67,7 @@ export const MARCOS = [
     ["tworms", "worms", "Artillería"], ["tyemas", "yemas", "Huevos en guerra"], ["tzombis", "zombis", "Horda"],
     ["tclue", "clue", "Pistas"], ["tajedrez", "ajedrez", "Caballo de oro"], ["tmonedas", "monedas", "Tesoro"],
     ["tprodrop", "prodrop", "Coleccionista"], ["tsudoku", "sudoku", "Cuadrícula arcade"], ["tfanal", "fanal", "Última luz"], ["tboxhead", "boxhead", "Cabeza cuadrada"], ["ttulones", "tulones", "Torre de tulones"], ["tatasco", "atasco", "Luz verde"], ["taleteo", "aleteo", "Ala negra"], ["tdosmil", "dosmil", "Ficha dorada"],
-    ["tmetrorush", "metrorush", "Maquinista"]
+    ["tmetrorush", "metrorush", "Maquinista"], ["ttrigon", "trigon", "Triángulos"]
   ].map(([id, top, n]) => ({ id, n, anim: true, req: { top } }))
 ];
 
@@ -109,7 +109,8 @@ const PARTES = {
   experto: "Experto",  // la dificultad más alta del clásico de Sudoku Arcade
   travesia: "Travesía", sinfin: "Sin fin", jornadas: "Jornada más lejana",  // FANAL
   estrellas: "Estrellas",  // Atasco
-  carrera: "Mejor carrera", distancia: "Distancia"  // Metro Rush
+  carrera: "Mejor carrera", distancia: "Distancia",  // Metro Rush (el clásico)
+  puro: "Sin ayudas", sinmonedas: "Sin monedas", fantasma: "Fantasma", city: "City", citypuro: "City sin ayudas", cityfantasma: "City fantasma"  // Metro Rush (los otros modos)
 };
 export const juegoDeCategoria = c => Object.keys(SOLO_PREFIJO).find(k => String(c).startsWith(SOLO_PREFIJO[k])) || "";
 export function nombreCategoria(c) {
@@ -144,7 +145,7 @@ export function valorMarca(c, f) {
   if (c === "club-dosmil-ficha") return `ficha ${f.puntos || 0}`;
   if (c === "club-trigon-puntos") return `${f.puntos || 0} puntos`;
   // Metro Rush: la distancia es en metros (la mejor carrera sigue en puntos).
-  if (c === "club-metrorush-distancia") return `${(f.puntos || 0).toLocaleString("es-CL")} m`;
+  if (c === "club-metrorush-distancia" || c === "club-metrorush-citydistancia") return `${(f.puntos || 0).toLocaleString("es-CL")} m`;
   if (c === "club-sopa-racha" || c === "club-electro-racha" || c === "club-sudoku-racha") return `${f.puntos || 0} ${f.puntos === 1 ? "día" : "días"}`;
   return `${f.puntos || 0} pts`;
 }

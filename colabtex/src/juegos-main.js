@@ -1453,6 +1453,11 @@ function armazon() {
        clasificación, ni partida a medias en la nube, ni logros. */
     individual = crearSolo({ juego, usuario: u, guardar: guardaClub, reportaSospecha: sospechaClub, watch: fb.watchSolo, volver: () => ir(""),
       partida: u ? { leer: () => fb.leerPartidaClub(u.uid, juego), guardar: (d, at) => fb.guardarPartidaClub(u.uid, juego, d, at) } : null,
+      /* El fantasma de Metro Rush: la tabla de la categoría y la prueba de su n.º 1, por clave (solo/club.js). */
+      fantasma: u ? { leerTabla: cat => fb.leerSolo(cat), leerPrueba: (cat, uid, p) => fb.leerPruebaSolo(cat, uid, p) } : null,
+      /* Un logro que el juego detecta en vivo (Metro Rush: «Cazafantasmas»): una vez, como los de sala. */
+      logro: u ? id => misLogros(clave, u.uid).then(ya => { if (ya.has(id)) return; ya.add(id);
+        fb.otorgarLogro(clave, u.uid, id).then(() => celebra(clave, id), e => console.warn("[juegos] no se pudo guardar el logro", id, e)); }) : null,
       /* Un logro individual sale de la marca: se celebra el que esta
          partida da y la mejor marca guardada no daba ya. */
       alResultado: u ? (d, previa, prueba) => { marcaJugadaClub(clave); apuntaRepeticion(d, prueba); const antes = new Set(previa ? deMarca(clave, Object.assign({ categoria: d.categoria }, previa)) : []);

@@ -53,19 +53,148 @@ const ARTE = {
     <g class="a-mueve"><circle cx="338" cy="196" r="27" fill="#ffffff26" stroke="#c9d4ff" stroke-width="6"/><path d="M357 216 L382 242" stroke="#8a6a3a" stroke-width="10" stroke-linecap="round"/><path d="M325 184 a16 16 0 0 1 12 -6" stroke="#fff" stroke-width="4" fill="none" stroke-linecap="round" opacity=".7"/></g>`;
   },
 
+  /* Metro Rush, como la portada de un runner de tienda: de día y saturada,
+     para que salte a la vista entre las portadas oscuras del salón. Manda el
+     corredor: grande, cabezón (para que la cara se lea a 200 px), huyendo en
+     tabla voladora hacia quien mira, con un halo de luz detrás que lo
+     despega del fondo. Por la vía del medio viene un tren de frente con los
+     focos encendidos y, delante de él, la fila de monedas: hay que tomarlas
+     antes de que llegue. A la izquierda, un vagón con grafitis que se pierde
+     en el punto de fuga. El balasto es gris violeta, frío, para que lo
+     cálido (corredor, monedas, tren) resalte encima. Todo con el contorno
+     grueso de caricatura (`TINTA`).
+
+     Dónde va cada cosa, por lo que la tarjeta pone encima (medido en el
+     celular, donde tapa más): arriba a la izquierda (x < 290, y < 130) las
+     insignias, abajo a la izquierda (x < 240, y > 180) el nombre y abajo a
+     la derecha (x > 260, y > 240) el ▶; ahí solo hay fondo, oscuro o
+     apagado. Lo que importa está entre y = 62 e y = 238, que es lo que
+     muestra la ficha (16:7), y nada importante bajo su ✕ (x > 345, y < 115). */
   metrorush: u => {
-    const ciudad = [[0, 118, 30, 32], [26, 104, 22, 46], [46, 124, 34, 26], [78, 110, 26, 40], [102, 96, 20, 54], [232, 108, 26, 42], [256, 92, 22, 58], [276, 116, 34, 34], [308, 100, 24, 50], [330, 120, 36, 30], [364, 106, 36, 44]]
-      .map(([x, y, w, h]) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="#2a1838"/><rect x="${x + 5}" y="${y + 8}" width="3" height="4" fill="#ffd27a"/><rect x="${x + w - 9}" y="${y + 16}" width="3" height="4" fill="#ffd27a" opacity=".7"/>`).join("");
-    const riel = (a, b) => `<path d="M${a} 300 L${b} 150" stroke="#c9ccd4" stroke-width="2.5"/>`;
-    const durmientes = [160, 172, 188, 208, 234, 266].map((y, i) => `<path d="M${200 - (y - 150) * 1.35} ${y} H${200 + (y - 150) * 1.35}" stroke="#6b4a32" stroke-width="${1.5 + i}"/>`).join("");
-    return `<defs><linearGradient id="g${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1f1640"/><stop offset=".3" stop-color="#5b2a66"/><stop offset=".55" stop-color="#c4485a"/><stop offset=".75" stop-color="#ff7a45"/><stop offset=".95" stop-color="#ffb36b"/></linearGradient>
-    <radialGradient id="l${u}"><stop offset="0" stop-color="#fffbe6"/><stop offset=".35" stop-color="#ffd27a" stop-opacity=".9"/><stop offset="1" stop-color="#ffd27a" stop-opacity="0"/></radialGradient></defs>
-    <rect width="400" height="150" fill="url(#g${u})"/><circle cx="150" cy="122" r="40" fill="#ffe7b0" opacity=".25"/><circle cx="150" cy="122" r="22" fill="#ffe7b0"/>${ciudad}
-    <rect y="150" width="400" height="150" fill="#1d1820"/>${durmientes}
-    ${riel(30, 186)}${riel(110, 192)}${riel(158, 196)}${riel(242, 204)}${riel(290, 208)}${riel(370, 214)}
-    <g class="a-late"><rect x="172" y="104" width="56" height="64" rx="10" fill="#ff7a4d" stroke="#7a240c" stroke-width="3"/><rect x="179" y="112" width="42" height="24" rx="4" fill="#1b2638"/><rect x="172" y="148" width="56" height="5" fill="#ffe0c8"/>
-    <circle cx="183" cy="160" r="15" fill="url(#l${u})"/><circle cx="217" cy="160" r="15" fill="url(#l${u})"/><circle cx="183" cy="160" r="4" fill="#fff"/><circle cx="217" cy="160" r="4" fill="#fff"/></g>
-    <g class="a-gira"><circle cx="300" cy="196" r="8" fill="#ffc83d" stroke="#c98a12" stroke-width="2"/><circle cx="326" cy="232" r="11" fill="#ffc83d" stroke="#c98a12" stroke-width="2.5"/><circle cx="356" cy="278" r="14" fill="#ffc83d" stroke="#c98a12" stroke-width="3"/></g>`;
+    const TINTA = "#1b1035";                                      // el contorno de todo
+    const FX = 200, FY = 118;                                     // el punto de fuga, en el horizonte
+    // dónde cae, a la altura y, algo que abajo (y = 300) está en x0
+    const enX = (x0, y) => FX + (x0 - FX) * (y - FY) / (300 - FY);
+    // un trazo con contorno: primero el borde oscuro y grueso, encima el color
+    const trazo = (d, c, w) => `<path d="${d}" stroke="${TINTA}" stroke-width="${w + 4.5}" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="${d}" stroke="${c}" stroke-width="${w}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+    // una moneda de frente; `d` desfasa el giro para que no giren todas a la vez
+    const moneda = (x, y, r, d) => `<g class="a-gira" style="animation-delay:${d}s"><circle cx="${x}" cy="${y}" r="${r}" fill="url(#o${u})" stroke="${TINTA}" stroke-width="${Math.max(2.4, r / 4.5)}"/><circle cx="${x}" cy="${y}" r="${r * .56}" fill="none" stroke="#c07400" stroke-width="${r / 6}"/><path d="M${x - r * .5} ${y - r * .25} a${r * .6} ${r * .6} 0 0 1 ${r * .45} ${-r * .4}" stroke="#fff" stroke-width="${r / 5}" fill="none" stroke-linecap="round"/></g>`;
+    // un destello de cuatro puntas
+    const brillo = (x, y, r) => `<path d="M${x} ${y - r} Q${x + r * .18} ${y - r * .18} ${x + r} ${y} Q${x + r * .18} ${y + r * .18} ${x} ${y + r} Q${x - r * .18} ${y + r * .18} ${x - r} ${y} Q${x - r * .18} ${y - r * .18} ${x} ${y - r}Z" fill="#fff"/>`;
+
+    // La ciudad del fondo: dos capas, la lejana más pálida (la bruma del día).
+    const lejos = [[0, 74, 26], [24, 86, 22], [44, 66, 18], [60, 80, 28], [86, 92, 20], [104, 78, 24], [226, 84, 22], [246, 70, 18], [262, 88, 26], [286, 64, 20], [304, 82, 30], [332, 72, 22], [352, 90, 26], [376, 76, 24]]
+      .map(([x, y, w]) => `<rect x="${x}" y="${y}" width="${w}" height="${FY - y}" fill="#a6dcf2"/>`).join("");
+    const cerca = [[6, 92, 24, "#ffd84a"], [30, 100, 20, "#ff7ab8"], [118, 96, 22, "#ffd84a"], [140, 104, 18, "#7ff0ff"], [236, 100, 22, "#ff7ab8"], [258, 94, 18, "#ffd84a"], [320, 98, 24, "#7ff0ff"], [346, 104, 22, "#ffd84a"], [368, 92, 32, "#ff7ab8"]]
+      .map(([x, y, w, c]) => `<rect x="${x}" y="${y}" width="${w}" height="${FY - y}" fill="#5fa8d6"/><rect x="${x}" y="${y}" width="${w}" height="3" fill="${c}"/>` +
+        Array.from({ length: Math.floor((FY - y - 6) / 6) * 2 }, (_, k) => `<rect x="${x + 4 + (k % 2) * (w - 10)}" y="${y + 6 + Math.floor(k / 2) * 6}" width="2.6" height="2.6" fill="#e6f8ff" opacity=".9"/>`).join("")).join("");
+
+    // El halo detrás del corredor, con rayos suaves: lo despega del fondo.
+    const rayos = Array.from({ length: 10 }, (_, k) => {
+      const a = k * Math.PI / 5 + .2, b = a + .14;
+      return `<path d="M300 125 L${(300 + 260 * Math.cos(a)).toFixed(1)} ${(125 + 260 * Math.sin(a)).toFixed(1)} L${(300 + 260 * Math.cos(b)).toFixed(1)} ${(125 + 260 * Math.sin(b)).toFixed(1)}Z" fill="#fff"/>`;
+    }).join("");
+
+    // Tres vías: los rieles van al punto de fuga; los durmientes se juntan a lo lejos.
+    const VIAS = [-115, 155, 425];                               // el centro de cada vía, abajo
+    const rieles = VIAS.flatMap(c => [c - 55, c + 55]).map(x0 => `<path d="M${x0} 300 L${FX} ${FY}" stroke="#2c2840" stroke-width="4.5"/><path d="M${x0 - 1.5} 300 L${FX} ${FY}" stroke="#dfe6f4" stroke-width="1.8"/>`).join("");
+    // Al animarse, una ola de brillo recorre los durmientes desde el horizonte
+    // hacia quien mira (el lejano, k = 0, se adelanta más): la vía "corre".
+    const durmientes = VIAS.map(c => [123, 128, 135, 145, 158, 176, 201, 236, 286].map((y, k) =>
+      `<path class="a-durmiente" style="animation-delay:${(k * .12 - 1.1).toFixed(2)}s" d="M${enX(c - 68, y).toFixed(1)} ${y} H${enX(c + 68, y).toFixed(1)}" stroke="#4a3020" stroke-width="${1 + k * 1.4}"/>`).join("")).join("");
+
+    // El vagón de la izquierda, alejándose por su vía. Su costado fuga al
+    // punto de fuga y termina en x = 150, sin tocar al tren; no se le ve el
+    // techo (está por encima de los ojos). Más oscuro que el corredor, para
+    // que no le robe la vista.
+    const arr = x => 96 + 22 * (x - 54) / 146, aba = x => 252 - 134 * (x - 54) / 146;   // el borde de arriba y el de abajo del costado
+    const alto = (x, t) => arr(x) + (aba(x) - arr(x)) * t;                             // un punto a la fracción t de la altura
+    const ventanas = [[60, 80], [88, 104], [112, 124], [132, 142]].map(([a, b]) =>
+      `<path d="M${a} ${alto(a, .16).toFixed(1)} L${b} ${alto(b, .16).toFixed(1)} L${b} ${alto(b, .4).toFixed(1)} L${a} ${alto(a, .4).toFixed(1)}Z" fill="#1e3f73" stroke="${TINTA}" stroke-width="2"/><path d="M${a + 3} ${alto(a + 3, .36).toFixed(1)} L${a + 8} ${alto(a + 8, .2).toFixed(1)}" stroke="#fff" stroke-width="2.4" opacity=".3"/>`).join("");
+    const vagon = `<path d="M54 96 L150 ${arr(150).toFixed(1)} V${aba(150).toFixed(1)} L54 252Z" fill="url(#vg${u})" stroke="${TINTA}" stroke-width="3" stroke-linejoin="round"/>
+      ${ventanas}
+      <path d="M54 ${alto(54, .55)} L150 ${alto(150, .55).toFixed(1)}" stroke="#1f7ae0" stroke-width="7"/><path d="M54 ${alto(54, .6)} L150 ${alto(150, .6).toFixed(1)}" stroke="#ffe7a0" stroke-width="2.2"/>
+      <g transform="translate(80 150) skewY(-13)">${[[TINTA, 10], ["#ff3fa4", 6]].map(([c, w]) => `<path d="M2 20 V3 L10 13 L18 3 V20 M26 20 V3 h7 q7 0 7 7 q0 7 -7 7 h-7 M33 17 L40 20" stroke="${c}" stroke-width="${w}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`).join("")}
+      <path d="M3 5 l4 5 M27 4 h5" stroke="#fff" stroke-width="1.6" stroke-linecap="round" opacity=".8"/></g>
+      <path d="M54 232 L150 ${alto(150, .87).toFixed(1)} V${aba(150).toFixed(1)} L54 252Z" fill="#2a1a3a" opacity=".8"/>
+      <path d="M-120 96 H54 V252 H-120Z" fill="url(#vt${u})" stroke="${TINTA}" stroke-width="3"/>
+      <rect x="-20" y="118" width="56" height="44" rx="6" fill="#1e3f73" stroke="${TINTA}" stroke-width="2.5"/><path d="M-12 124 l-8 28 M2 124 l-10 34" stroke="#fff" stroke-width="3" opacity=".25"/>
+      <rect x="-120" y="232" width="174" height="20" fill="#2a1a3a" opacity=".8"/>`;
+
+    // El tren de frente por la vía del medio: pisa (sombra y bogies) y sus focos son lo que más brilla del fondo.
+    const tren = `<g class="a-tiembla"><path d="M171 168 L150 200 H218 L201 168Z" fill="url(#hz${u})"/>
+      <ellipse cx="190" cy="169" rx="36" ry="4" fill="#000" opacity=".45"/>
+      <path d="M160 164 V120 q0 -10 10 -10 h40 q10 0 10 10 V164Z" fill="#ff4646" stroke="${TINTA}" stroke-width="2.6"/>
+      <rect x="165" y="118" width="50" height="22" rx="3" fill="url(#vd${u})" stroke="${TINTA}" stroke-width="2"/><path d="M172 118 l-5 20 M182 118 l-6 22" stroke="#fff" stroke-width="2" opacity=".35"/>
+      <rect x="160" y="145" width="60" height="5" fill="#ffd23f" stroke="${TINTA}" stroke-width="1.6"/>
+      <rect x="162" y="164" width="56" height="6" fill="#22202e"/><rect x="157" y="160" width="66" height="5" rx="2" fill="#3a3f52" stroke="${TINTA}" stroke-width="2"/>
+      <rect x="181" y="112" width="18" height="5" rx="1" fill="${TINTA}"/><text x="190" y="116.3" text-anchor="middle" font-family="ui-monospace,Menlo,Consolas,monospace" font-weight="800" font-size="4.2" fill="#ffd23f">L3</text>
+      <circle cx="170" cy="155" r="4" fill="#fffbe0" stroke="${TINTA}" stroke-width="1.8"/><circle cx="210" cy="155" r="4" fill="#fffbe0" stroke="${TINTA}" stroke-width="1.8"/>
+      <g class="a-foco"><circle cx="170" cy="155" r="20" fill="url(#lz${u})"/><circle cx="210" cy="155" r="20" fill="url(#lz${u})"/></g></g>`;
+
+    // La tabla voladora, en coordenadas de la escena (no del corredor):
+    // casi horizontal, justo bajo las dos suelas (y ≈ 222–236), con dos
+    // estelas cian que salen de la cola hacia el fondo, no hacia el suelo.
+    const tabla = `<g transform="translate(300 223) rotate(-3)">
+      ${[-4, 4].map(dy => `<path d="M-50 ${dy} h-20" stroke="${TINTA}" stroke-width="8" stroke-linecap="round"/><path d="M-50 ${dy} h-20" stroke="#7ff0ff" stroke-width="4" stroke-linecap="round" class="a-estela" style="animation-delay:${dy > 0 ? -.15 : 0}s"/>`).join("")}
+      <rect x="-53" y="-7" width="106" height="14" rx="7" fill="#ff3fa4" stroke="${TINTA}" stroke-width="3"/>
+      <rect x="-48" y="1.5" width="96" height="4" rx="2" fill="#c4127a"/>
+      <path d="M-40 -2.5 h80" stroke="#ffd0ea" stroke-width="2.4" stroke-linecap="round"/>
+      <path d="M-18 -7 l5 14 M2 -7 l5 14" stroke="#ffe14d" stroke-width="3"/></g>`;
+    const zapa = (x, y, r) => `<g transform="translate(${x} ${y}) rotate(${r}) scale(1.12)"><path d="M-9 -4 q2 -6 9 -6 q8 0 10 6 q4 1 4 6 h-25z" fill="#fff" stroke="${TINTA}" stroke-width="2.4" stroke-linejoin="round"/><path d="M-10 2 h24" stroke="#ff4646" stroke-width="3"/><path d="M-2 -6 l3 4 M3 -7 l3 4" stroke="#ff4646" stroke-width="1.6"/></g>`;
+    const guante = (x, y) => `<circle cx="${x}" cy="${y}" r="7" fill="#fff" stroke="${TINTA}" stroke-width="2.6"/><path d="M${x - 3} ${y - 2} h5" stroke="#c9c9dd" stroke-width="1.6" stroke-linecap="round"/>`;
+    // El corredor, con el origen en la cadera: de frente, la cara girada un poco
+    // atrás (mira quién lo sigue), una rodilla arriba, los brazos abiertos para
+    // equilibrarse y la gorra al revés. La cabeza es grande a propósito.
+    const corredor = `
+      ${trazo("M10 2 L22 24 L26 44", "#2b59c3", 12)}${zapa(28, 46, -8)}
+      ${trazo("M-8 2 L-28 16 L-18 38", "#2b59c3", 12)}${zapa(-16, 42, 14)}
+      <path d="M-13 -4 Q-19 -24 -17 -40 Q0 -47 17 -40 Q19 -24 13 -4Z" fill="#ff8a1f" stroke="${TINTA}" stroke-width="3" stroke-linejoin="round"/>
+      <path d="M-9 -12 Q0 -8 9 -12" stroke="#c45a00" stroke-width="2.4" fill="none"/><path d="M-6 -42 Q0 -30 6 -42" stroke="#c45a00" stroke-width="2.2" fill="none"/>
+      <path d="M-14 -36 q-5 10 -2 24 M14 -36 q5 10 2 24" stroke="#2b2b55" stroke-width="2.6" fill="none"/>
+      ${trazo("M-14 -36 L-27 -22 L-34 -29", "#ff8a1f", 11)}${guante(-39, -31)}
+      ${trazo("M14 -36 L30 -39 L37 -29", "#ff8a1f", 11)}${guante(41, -26)}
+      <path d="M-10 -45 q10 8 20 0" stroke="#22d3ee" stroke-width="5" fill="none" stroke-linecap="round"/><circle cx="-11" cy="-45" r="4.2" fill="#22d3ee" stroke="${TINTA}" stroke-width="2"/><circle cx="11" cy="-45" r="4.2" fill="#22d3ee" stroke="${TINTA}" stroke-width="2"/>
+      <circle cx="0" cy="-64" r="19" fill="#f4c08f" stroke="${TINTA}" stroke-width="3"/>
+      <path d="M-19 -66 q0 -22 19 -22 q20 0 20 19 q-19 -5 -39 3z" fill="#e8322f" stroke="${TINTA}" stroke-width="2.8" stroke-linejoin="round"/>
+      <path d="M17 -72 q12 -5 19 3 q-8 5 -18 3" fill="#e8322f" stroke="${TINTA}" stroke-width="2.6" stroke-linejoin="round"/>
+      <path d="M-14 -80 q6 -4 12 -2" stroke="#ff8a8a" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+      <ellipse cx="-9" cy="-63" rx="3" ry="4.2" fill="${TINTA}"/><ellipse cx="5" cy="-63" rx="3" ry="4.2" fill="${TINTA}"/><circle cx="-10" cy="-64.6" r="1.1" fill="#fff"/><circle cx="4" cy="-64.6" r="1.1" fill="#fff"/>
+      <path d="M-15 -70 q5 -3 9 -1 M1 -71 q5 -2 9 1" stroke="${TINTA}" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <path d="M-11 -54 q9 10 18 0 z" fill="#fff" stroke="${TINTA}" stroke-width="2.2" stroke-linejoin="round"/>
+      <circle cx="-14" cy="-56" r="3" fill="#ff8aa0" opacity=".7"/><circle cx="11" cy="-56" r="3" fill="#ff8aa0" opacity=".7"/>`;
+
+    // Las rayas de velocidad: radiales desde el punto de fuga, solo en la
+    // periferia (el borde derecho y la franja alta), sin cruzar al corredor.
+    // Cada una lleva su propio desfase (3/14 de vuelta), así al animarse pasan
+    // en chorro continuo en vez de parpadear todas a la vez.
+    const rayas = [[.06, 175, 235], [.2, 180, 240], [.34, 175, 235], [.48, 185, 240], [-.06, 160, 215], [-.2, 150, 205], [-.34, 140, 190]]
+      .map(([a, r0, r1], k) => `<path class="a-raya" style="animation-delay:${(-k * 3 / 14 % .5).toFixed(2)}s" d="M${(FX + r0 * Math.cos(a)).toFixed(1)} ${(FY + r0 * Math.sin(a)).toFixed(1)} L${(FX + r1 * Math.cos(a)).toFixed(1)} ${(FY + r1 * Math.sin(a)).toFixed(1)}" stroke="#fff" stroke-width="2.6" stroke-linecap="round" opacity=".55"/>`).join("");
+
+    return `<defs><linearGradient id="g${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1279f0"/><stop offset=".25" stop-color="#36aef7"/><stop offset=".4" stop-color="#a8e6ff"/><stop offset=".4" stop-color="#8a8296"/><stop offset="1" stop-color="#3f364d"/></linearGradient>
+    <pattern id="gr${u}" width="9" height="7" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r=".8" fill="#b7afc2"/><circle cx="6.5" cy="5" r=".8" fill="#b7afc2"/></pattern>
+    <radialGradient id="ha${u}"><stop offset="0" stop-color="#fffbe0" stop-opacity=".55"/><stop offset=".55" stop-color="#fff3b0" stop-opacity=".22"/><stop offset="1" stop-color="#fff3b0" stop-opacity="0"/></radialGradient>
+    <linearGradient id="vg${u}" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#e8a50c"/><stop offset="1" stop-color="#b86a06"/></linearGradient>
+    <linearGradient id="vt${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d9930a"/><stop offset="1" stop-color="#8f5205"/></linearGradient>
+    <linearGradient id="vd${u}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#bff3ff"/><stop offset=".4" stop-color="#3a7bd5"/><stop offset="1" stop-color="#16306b"/></linearGradient>
+    <linearGradient id="hz${u}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fffbe0" stop-opacity=".35"/><stop offset="1" stop-color="#fffbe0" stop-opacity="0"/></linearGradient>
+    <radialGradient id="lz${u}"><stop offset="0" stop-color="#fff"/><stop offset=".3" stop-color="#fffbe0" stop-opacity=".9"/><stop offset="1" stop-color="#ffe86b" stop-opacity="0"/></radialGradient>
+    <radialGradient id="o${u}" cx=".35" cy=".3"><stop offset="0" stop-color="#fff6b0"/><stop offset=".5" stop-color="#ffcc1a"/><stop offset="1" stop-color="#f09000"/></radialGradient>
+    <clipPath id="ci${u}"><rect width="400" height="${FY}"/></clipPath></defs>
+    <rect width="400" height="300" fill="url(#g${u})"/>
+    <rect y="${FY}" width="400" height="${300 - FY}" fill="url(#gr${u})" opacity=".35"/>
+    <path d="M14 46 q-12 0 -10 -10 q2 -8 12 -7 q4 -13 18 -12 q12 2 13 12 q12 -3 15 7 q2 10 -10 10z" fill="#fff" opacity=".95"/>
+    <g clip-path="url(#ci${u})" opacity=".2">${rayos}</g>
+    ${lejos}${cerca}
+    <rect y="${FY}" width="400" height="4" fill="#5c5670"/>
+    ${durmientes}${rieles}
+    <circle cx="300" cy="125" r="90" fill="url(#ha${u})"/>
+    ${tren}${vagon}
+    ${[[247, 176, 11, 0], [237, 159, 9, -.25], [228, 145, 7, -.5]].map(c => moneda(...c)).join("")}
+    <g class="a-late">${brillo(263, 150, 7)}</g>
+    <ellipse cx="300" cy="232" rx="42" ry="4" fill="#000" opacity=".3" class="a-sombra"/>
+    ${rayas}
+    <g class="a-surfea">${tabla}<g transform="translate(298 166) rotate(-4) scale(1.05)">${corredor}</g></g>`;
   },
 
   tetrisclub: u => {

@@ -85,9 +85,11 @@ const SOLO = {
     cat: s => `club-dosmil-${s.n}` },
   trigon: { filas: [{ k: "n", t: "Tabla", ops: [["puntos", "Puntos"]] }],
     cat: s => `club-trigon-${s.n}` },
-  /* Metro Rush: la mejor carrera por puntos y la carrera más larga en
-     metros. Dos tablas, una fila. */
-  metrorush: { filas: [{ k: "m", t: "Tabla", ops: [["carrera", "Mejor carrera"], ["distancia", "Distancia"]] }],
+  /* Metro Rush: una fila «Modo» con la mejor carrera de cada modo normal
+     (carrera es el clásico) y la carrera más larga de cada mundo, en metros
+     (Distancia la Línea 3, City distancia City: ahí corren también los modos
+     fantasma, que no tienen tabla propia). */
+  metrorush: { filas: [{ k: "m", t: "Modo", ops: [["carrera", "Clásico"], ["distancia", "Distancia"], ["puro", "Sin ayudas"], ["sinmonedas", "Sin monedas"], ["city", "City"], ["citydistancia", "City distancia"], ["citypuro", "City sin ayudas"]] }],
     cat: s => `club-metrorush-${s.m}` },
   snake: { filas: [
       { k: "m", t: "Modo", ops: [["classic", "Clásico"], ["arcade", "Arcade"], ["portals", "Portales"], ["reloj", "Contrarreloj"], ["espejo", "Espejo"], ["laberinto", "Laberinto"]] },
@@ -364,7 +366,7 @@ export function crearRanks(ctx) {
     if (solo && categoriaSolo === "club-fanal-jornadas")
       return { valor: f => f.puntos || 0, txt: v => `jornada ${v}`, unidad: "", menor: false };
     /* La distancia de Metro Rush se dice en metros, con separador de miles. */
-    if (solo && categoriaSolo === "club-metrorush-distancia")
+    if (solo && /^club-metrorush-(city)?distancia$/.test(categoriaSolo))
       return { valor: f => f.puntos || 0, txt: v => `${v.toLocaleString("es-CL")} m`, unidad: "", menor: false };
     if (solo && categoriaSolo.startsWith("club-frontera-"))
       return { valor: f => f.puntos || 0, txt: v => `${v} ${v === 1 ? "victoria" : "victorias"}`, unidad: "", menor: false };

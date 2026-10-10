@@ -104,8 +104,8 @@ export const NIVEL = {
      p4k p6k p10k p20k. */
   trigon: "1122233344",
   /* Metro Rush, en el orden de LOGROS.metrorush: c50k c250k c1m c3m c10m ·
-     d1k d5k d10k d21k d42k. */
-  metrorush: "1233412334"
+     d1k d5k d10k d21k d42k · fan (Cazafantasmas: pasar al n.º 1 de la distancia). */
+  metrorush: "12334123344"
 };
 export function nivelDe(juego, id) {
   const l = LOGROS[juego] || [], i = l.findIndex(x => x.id === id);
@@ -186,8 +186,8 @@ function extraRecord(cat, f) {
   /* Metro Rush: la mejor carrera paga 1 moneda por cada 25 000 puntos
      (1 000 000 son 40, con tope en 200: en el juego se llega a millones) y
      la distancia, 1 por cada 500 m (10 km son 20, tope en 100). */
-  if (cat === "club-metrorush-carrera") return Math.floor(Math.min(f.puntos || 0, 5000000) / 25000);
-  if (cat === "club-metrorush-distancia") return Math.floor(Math.min(f.puntos || 0, 50000) / 500);
+  if (/^club-metrorush-(carrera|puro|sinmonedas|fantasma|city|citypuro|cityfantasma)$/.test(cat)) return Math.floor(Math.min(f.puntos || 0, 5000000) / 25000);   // la mejor carrera de cada modo paga igual
+  if (/^club-metrorush-(city)?distancia$/.test(cat)) return Math.floor(Math.min(f.puntos || 0, 50000) / 500);
   /* Un día perfecto de Electrodle son 700 puntos: 14 monedas. */
   if (cat === "club-electro-puntos") return Math.floor(Math.min(f.puntos || 0, 100000) / 50);
   return 0;

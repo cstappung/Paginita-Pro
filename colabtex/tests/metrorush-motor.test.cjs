@@ -227,25 +227,29 @@ test('la misma semilla da la misma pista', () => {
   assert.deepEqual(a, b);
 });
 
-test('velocidad: de 15 a 50 m/s, subiendo pareja hasta los 350 s, y una sola curva para todos', () => {
+test('velocidad: de 15 a 60 m/s, subiendo pareja hasta los 450 s, y una sola curva para todos', () => {
   assert.equal(M.velocidad(0), 15);
   assert.equal(M.velocidad(60), 21, 'al minuto, 21 m/s');
   assert.equal(M.velocidad(120), 27, 'a los 2 min, 27 m/s');
-  assert.equal(M.T_TOPE, 350, 'llega a 50 m/s a los 5 min 50 s');
-  assert.equal(Math.round(M.metrosEntre(0, M.T_TOPE)), 11375, '…a los 11,4 km');
-  assert.equal(M.velocidad(1e6), 50, 'y no pasa de 50');
+  assert.equal(M.T_TOPE, 450, 'llega a 60 m/s a los 7 min 30 s');
+  assert.equal(Math.round(M.metrosEntre(0, M.T_TOPE)), 16875, '…a los 16,9 km');
+  assert.equal(M.velocidad(1e6), 60, 'y no pasa de 60');
+  // la curva vieja (versión 2, tope 50) sigue para las pruebas de antes, y hasta su tope las dos son la misma
+  const v2 = M.velocidadDe(undefined, 2);
+  assert.equal(v2.velocidad(1e6), 50);
+  for (let t = 0; t <= 350; t += 5) assert.equal(v2.velocidad(t), M.velocidad(t));
   for (let t = 1; t < M.T_TOPE; t += 7) assert.ok(M.velocidad(t) > M.velocidad(t - 1), 'sube de a poco, sin escalones hacia atrás');
-  for (let t = M.T_TOPE; t < 900; t += 7) assert.equal(M.velocidad(t), 50, 'arriba del tope se queda');
+  for (let t = M.T_TOPE; t < 900; t += 7) assert.equal(M.velocidad(t), 60, 'arriba del tope se queda');
   // los metros (que recalcula el antitrampas) son la integral de esa misma velocidad
   let D = 0; for (let t = 0; t < 300; t += 0.001) D += M.velocidad(t + 0.0005) * 0.001;
   assert.ok(Math.abs(D - M.metrosEntre(0, 300)) < 0.5, 'metrosEntre es la integral de velocidad');
   // y la velocidad según los metros (la del generador) se le parece: menos de 1 m/s de diferencia
-  for (let t = 0; t <= 900; t += 15) assert.ok(Math.abs(M.velocidadEn(M.metrosEntre(0, t)) - M.velocidad(t)) <= 0.25 + 1e-9, 'velocidadEn a los ' + t + ' s (solo el redondeo)');
+  for (let t = 0; t <= 1000; t += 15) assert.ok(Math.abs(M.velocidadEn(M.metrosEntre(0, t)) - M.velocidad(t)) <= 0.25 + 1e-9, 'velocidadEn a los ' + t + ' s (solo el redondeo)');
   // a toda velocidad las filas no llegan más seguido que cada FILA_MIN_S
   // (se miden las barreras: van justo en su fila; los vagones de un mismo tren van a 11,7 m y no son filas)
-  const p = pista(4242, 16000).filter(o => o.tipo === 'bajo' || o.tipo === 'alto');
-  const filas = [...new Set(p.map(o => Math.round(o.d)))].filter(d => d > 12500).sort((a, b) => a - b);
-  for (let i = 1; i < filas.length; i++) assert.ok(filas[i] - filas[i - 1] >= 50 * M.FILA_MIN_S - 1 || filas[i] - filas[i - 1] < 2, 'a 50 m/s, filas a ' + (filas[i] - filas[i - 1]) + ' m');
+  const p = pista(4242, 20000).filter(o => o.tipo === 'bajo' || o.tipo === 'alto');
+  const filas = [...new Set(p.map(o => Math.round(o.d)))].filter(d => d > 17500).sort((a, b) => a - b);
+  for (let i = 1; i < filas.length; i++) assert.ok(filas[i] - filas[i - 1] >= 60 * M.FILA_MIN_S - 1 || filas[i] - filas[i - 1] < 2, 'a 60 m/s, filas a ' + (filas[i] - filas[i - 1]) + ' m');
 });
 
 test('puntos y multiplicador: lo que dice el manual', () => {
@@ -257,15 +261,16 @@ test('puntos y multiplicador: lo que dice el manual', () => {
 });
 
 test('estaciones: los umbrales del manual (en metros) y las vueltas', () => {
-  const nombres = [[0, 'Barrio Estación'], [1499, 'Barrio Estación'], [1500, 'Ocaso'], [3500, 'Línea Neón'], [6000, 'Estación Fantasma'],
-    [9000, 'Invierno'], [12500, 'Óxido'], [17000, 'Fin de la Línea'], [20999, 'Fin de la Línea']];
+  const nombres = [[0, 'Barrio Estación'], [1199, 'Barrio Estación'], [1200, 'Ocaso'], [2550, 'Mercado de Farolillos'], [4200, 'Línea Neón'],
+    [6150, 'Estación Fantasma'], [8400, 'Cocheras'], [10950, 'Invierno'], [13700, 'Muelle'], [16950, 'Óxido'],
+    [20250, 'Fin de la Línea'], [24249, 'Fin de la Línea']];
   for (const [p, n] of nombres) assert.equal(M.estacionDe(p).nombre, n, String(p));
-  assert.deepEqual(M.ESTACIONES.map(e => e.estilo), ['juguete', 'pixel', 'neon', 'neon', 'juguete', 'pixel', 'juguete']);
-  const v = M.estacionDe(21000);
+  assert.deepEqual(M.ESTACIONES.map(e => e.estilo), ['juguete', 'comic', 'juguete', 'neon', 'neon', 'comic', 'juguete', 'neon', 'comic', 'juguete']);
+  const v = M.estacionDe(24250);
   assert.equal(v.id, 'barrio'); assert.equal(v.vuelta, 2); assert.equal(v.boleto, null);
-  assert.equal(M.estacionDe(25000).id, 'ocaso'); assert.equal(M.estacionDe(29000).id, 'neon'); assert.equal(M.estacionDe(33000).vuelta, 3);
-  assert.notEqual(M.estacionDe(21000).clave, M.estacionDe(33000).clave, 'cada vuelta es un cambio');
-  assert.equal(M.siguienteUmbral(0), 1500); assert.equal(M.siguienteUmbral(17000), 21000); assert.equal(M.siguienteUmbral(22000), 25000);
+  assert.equal(M.estacionDe(28250).id, 'ocaso'); assert.equal(M.estacionDe(32250).id, 'neon'); assert.equal(M.estacionDe(36250).vuelta, 3);
+  assert.notEqual(M.estacionDe(24250).clave, M.estacionDe(36250).clave, 'cada vuelta es un cambio');
+  assert.equal(M.siguienteUmbral(0), 1200); assert.equal(M.siguienteUmbral(20250), 24250); assert.equal(M.siguienteUmbral(25000), 28250);
   // con la velocidad de la carrera, las estaciones van repartidas: ninguna llega antes del minuto ni dos en menos de 50 s
   const tDe = m => { let t = 0; while (M.metrosEntre(0, t) < m) t += 0.25; return t; };
   const tiempos = M.ESTACIONES.slice(1).map(e => tDe(e.desde));
@@ -323,18 +328,23 @@ test('retos: tres por nivel, iguales en dos aparatos, y cumplirlos sube el multi
 });
 
 test('progreso: limpiar lo que viene de afuera y mezclar dos aparatos', () => {
-  const sucio = M.limpiaProgreso({ monedas: -5, mejoras: { iman: 99, x: 3 }, boletos: [3, 3, 9, 'a', 1], aspectos: ['dorado', 'pirata'], aspecto: 'pirata', retos: { nivel: 77 } });
+  const sucio = M.limpiaProgreso({ monedas: -5, mejoras: { iman: 99, x: 3 }, boletos: [3, 3, 99, 'a', 1], aspectos: ['dorado', 'pirata'], aspecto: 'pirata', retos: { nivel: 77 } });
   assert.equal(sucio.monedas, 0); assert.equal(sucio.mejoras.iman, 5); assert.equal(sucio.mejoras.x, undefined);
   assert.deepEqual(sucio.boletos, [1, 3]); assert.deepEqual(sucio.aspectos, ['clasico', 'dorado']); assert.equal(sucio.aspecto, 'clasico');
   assert.equal(sucio.retos.nivel, 30);
-  const pc = Object.assign(M.progresoNuevo(), { at: 100, monedas: 900, boletos: [1], mejoras: { iman: 3, mochila: 0, zapatillas: 0, doble: 0 }, retos: { nivel: 4, avance: [5, 0, 0] }, records: { puntos: 50000, distancia: 900, monedas: 10 } });
-  const cel = Object.assign(M.progresoNuevo(), { at: 200, monedas: 120, boletos: [2], mejoras: { iman: 1, mochila: 2, zapatillas: 0, doble: 0 }, retos: { nivel: 3, avance: [9, 9, 9] }, records: { puntos: 70000, distancia: 400, monedas: 99 } });
+  const pc = Object.assign(M.progresoNuevo(), { at: 100, monedas: 900, boletos: [1], mejoras: { iman: 3, mochila: 0, zapatillas: 0, doble: 0 }, retos: { nivel: 4, avance: [5, 0, 0] }, records: { puntos: 50000, distancia: 900, distanciaCity: 2000, monedas: 10 } });
+  const cel = Object.assign(M.progresoNuevo(), { at: 200, monedas: 120, boletos: [2], mejoras: { iman: 1, mochila: 2, zapatillas: 0, doble: 0 }, retos: { nivel: 3, avance: [9, 9, 9] }, records: { puntos: 70000, distancia: 400, distanciaCity: 3100, monedas: 99 } });
   const m = M.mezclaProgreso(pc, cel);
   assert.equal(m.monedas, 120, 'lo gastable viene del más reciente');
   assert.deepEqual(m.boletos, [1, 2]);
   assert.deepEqual(m.mejoras, { iman: 3, mochila: 2, zapatillas: 0, doble: 0 }, 'las mejoras se quedan con lo mayor');
   assert.deepEqual(m.retos, { nivel: 4, avance: [5, 0, 0] }, 'el nivel de retos nunca baja');
-  assert.deepEqual(m.records, { puntos: 70000, distancia: 900, monedas: 99 });
+  assert.deepEqual(m.records, { puntos: 70000, distancia: 900, distanciaCity: 3100, monedas: 99 }, 'la distancia de cada mundo, la mayor');
+  // un progreso de antes (sin distanciaCity) se limpia con 0 y no rompe la mezcla
+  assert.equal(M.limpiaProgreso({ records: { puntos: 5, distancia: 7 } }).records.distanciaCity, 0);
+  // el récord de un modo fantasma es la distancia de su mundo
+  const q = M.progresoNuevo(); M.anotaRecord(q, 'cityfantasma', 1500); assert.equal(q.records.distanciaCity, 1500); assert.equal(M.recordDe(q, 'cityfantasma'), 1500);
+  assert.equal(M.recordDe(q, 'fantasma'), 0); M.anotaDistancia(q, 'puro', 800); assert.equal(M.recordDe(q, 'fantasma'), 800);
   assert.deepEqual(M.mezclaProgreso(cel, pc), m, 'da lo mismo el orden');
 });
 

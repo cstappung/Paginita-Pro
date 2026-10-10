@@ -23,7 +23,13 @@
  *   metrorush-*  uno por estación de Metro Rush: barrio (Sol mayor, 124),
  *              ocaso (Si menor, 132), neon (Do menor, 138), fantasma (Mi
  *              frigio, 126), invierno (La mayor, 136), oxido (Si bemol
- *              menor, 150) y fin (Fa mayor, 128).
+ *              menor, 150) y fin (Fa mayor, 128); y las tres estaciones
+ *              nuevas: mercado (Re mayor, 126 con swing), cocheras (Sol
+ *              menor, 140) y muelle (Mi menor, 116). Y dos más por estación
+ *              (`metrorush-barrio-2`, `-3`… hasta `metrorush-fin-3`) más
+ *              cinco de Subway City (`metrorush-city-sur`, `-muelles`,
+ *              `-bulevar`, `-parque`, `-bajo`), porque audio.js los hace
+ *              rotar en vez de repetir uno solo toda la carrera.
  *
  * Y los que no son de ningún juego, para el reproductor de la cabecera:
  *
@@ -1029,6 +1035,516 @@
         "R . O . F . O . R . O . F . O .", "k.hks.hkk.hks.hx", 2)
     },
     orden: "I A A B A B C"
+  };
+
+  /* ---------- Metro Rush: más de un tema por estación ----------
+     Una carrera larga pasa minutos en la misma estación, y un solo tema
+     de cuarenta segundos en bucle se vuelve un taladro. Así que cada
+     estación tiene una lista de tres (el suyo de siempre y dos más, con
+     su mismo humor), y audio.js pasa al siguiente cuando el que suena ha
+     dado dos vueltas, justo en el borde del compás. Siguen la misma regla
+     que los de arriba: melodías propias, escritas un pelo por debajo del
+     pulso que se quiere oír a media carrera. */
+
+  /* Barrio Estación · Recreo: Re mayor a 128 con swing. Palmas en el 2 y el
+     4 y una sección C de notas picadas, como un patio a la hora del
+     recreo: el mismo barrio, pero ya con todo el mundo en la calle. */
+  T["metrorush-barrio-2"] = {
+    bpm: 128, swing: .12,
+    lead: { onda: "p25", vol: .14, vib: .008, sus: .6, eco: { t: .12, fb: .2, mezcla: .18 } },
+    bajo: { onda: "tri", vol: .22 }, arp: { onda: "p12", vol: .045, oct: 5, paso: .03 }, bat: { vol: .32 },
+    secciones: {
+      I: sec("D A", "", "R . O . F . O . R . O . F . O .", "k.h.c.h.k.h.c.hh", 2),
+      A: sec("D Bm G A",
+        "A5*2 F#5*2 D5*2 F#5 A5 D6*4 C#6*2 A5*2  B5*2 D6*2 F#6*3 E6 D6*4 B5*4  " +
+        "G5*2 B5*2 D6*2 B5 D6 G6*4 F#6*2 E6*2  E6*2 C#6*2 A5*2 B5 C#6 A5*6 .*2",
+        "R . O . F . O . R . O . F . O .", "k.h.c.hkk.h.c.hh", 2),
+      B: sec("Em A F#m,Bm G,A",
+        "G6*3 F#6 E6*2 B5*2 G5*4 B5*2 E6*2  E6*3 D6 C#6*2 A5*2 E5*4 A5*2 C#6*2  " +
+        "F#6*2 C#6*2 A5*4 D6*2 B5*2 F#5*4  G5*2 B5*2 D6*4 C#6*4 E6*4",
+        "R . R F . R O . R . R F . R O .", "k.hkc.hkk.hkc.hx", 2),
+      C: sec("D G D A",
+        "D6 . D6 . A5 . F#5 . A5*2 D6*2 F#6*4  G6 . G6 . D6 . B5 . D6*2 G6*2 B6*4  " +
+        "A6*2 F#6*2 D6*2 A5*2 F#6*2 E6*2 D6*4  E6*2 F#6*2 E6*2 C#6*2 A5*8",
+        "R . O . R . O . R . O . R . O .", "k.c.k.c.k.c.k.cx", 2)
+    },
+    orden: "I A A B A C B A"
+  };
+
+  /* Barrio Estación · Bicicleta: Fa mayor a 132. El bajo rebota en
+     octavas como una rueda sobre adoquines y la melodía, de pulso fino,
+     sube y baja por el acorde: bajar la cuesta sin frenar. */
+  T["metrorush-barrio-3"] = {
+    bpm: 132, swing: .08,
+    lead: { onda: "p12", vol: .14, vib: .01, sus: .6, eco: { t: .11, fb: .18, mezcla: .16 } },
+    bajo: { onda: "tri", vol: .22 }, arp: { onda: "p25", vol: .04, oct: 5, paso: .035 }, bat: { vol: .3 },
+    secciones: {
+      I: sec("F C", "", "R . O . R . O . F . O . R . O .", "k.hhs.hhk.hhs.hk", 2),
+      A: sec("F Dm Bb C",
+        "C6*2 A5 C6 F6*4 E6*2 C6*2 A5*4  D6*2 F6 D6 A5*4 C6*2 D6*2 F5*4  " +
+        "Bb5*2 D6 F6 Bb6*4 A6*2 F6*2 D6*4  C6*2 E6 G6 E6*2 D6*2 C6*8",
+        "R . O . R . O . F . O . R . O .", "k.hhs.hkk.hhs.hh", 2),
+      B: sec("Bb F Gm C",
+        "D6 . F6 . D6 . Bb5*2 F5*4 Bb5*2 D6*2  C6 . A5 . C6 . F6*2 A6*4 G6*2 F6*2  " +
+        "G6*3 F6 D6*2 Bb5*2 G5*4 A5*2 Bb5*2  C6*4 E6*4 G6*4 E6*4",
+        "R O R O F O R O R O R O F O R O", "k.hks.hkk.hks.hx", 2)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* Ocaso · Arrebol: Mi menor a 128, cuadrado del 25 % de consola. Cada
+     frase arranca arriba y cae despacio, como el sol detrás de los
+     edificios, y B se va al Si mayor para que vuelva a amanecer A. */
+  T["metrorush-ocaso-2"] = {
+    bpm: 128,
+    lead: { onda: "p25", vol: .13, vib: .007, sus: .65, eco: { t: .15, fb: .28, mezcla: .22 } },
+    bajo: { onda: "tri", vol: .21 }, arp: { onda: "p50", vol: .04, oct: 4, paso: .04 }, bat: { vol: .3 },
+    secciones: {
+      I: sec("Em C", "", "R . R . F . R . O . R . F . R .", "k.h.s.h.k.h.s.hh", 2),
+      A: sec("Em C G D",
+        "B5*4 E6*2 G6*2 F#6*2 E6*2 B5*4  C6*2 E6*2 G6*4 F#6*2 E6*2 C6*4  " +
+        "D6*2 G6*2 B6*3 A6 G6*4 D6*4  F#6*2 E6*2 D6*2 A5*2 D6*8",
+        "R . R . F . R . O . R . F . R .", "k.h.s.hkk.h.s.hh", 2),
+      B: sec("Am Em C,D B7",
+        "A5*2 C6*2 E6*4 D6*2 C6*2 A5*4  G5*2 B5*2 E6*4 F#6*2 G6*2 B6*4  " +
+        "G6*4 E6*4 F#6*4 A6*4  F#6*4 D#6*4 B5*8",
+        "R . R R F . R . O . R R F . O .", "k.hks.hkk.hks.hx", 2)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* Ocaso · Última luz: La menor a 136, pulso fino y bajo en corcheas que
+     no suelta. Es la estación pixelada con prisa: corres para llegar
+     antes de que se haga de noche, y en B el Mi mayor tira hacia arriba. */
+  T["metrorush-ocaso-3"] = {
+    bpm: 136,
+    lead: { onda: "p12", vol: .13, vib: .006, sus: .6, eco: { t: .13, fb: .22, mezcla: .18 } },
+    bajo: { onda: "tri", vol: .21 }, arp: { onda: "p25", vol: .045, oct: 4, paso: .03 }, bat: { vol: .32 },
+    secciones: {
+      I: sec("Am F", "", "R R O R F R O R R R O R F R O R", "k.hhs.hhk.hhs.hh", 2),
+      A: sec("Am F C G",
+        "E6*2 A5*2 C6*2 E6*2 D6*2 C6*2 B5*2 C6*2  A5*2 F5*2 A5*2 C6*2 F6*4 E6*4  " +
+        "G5*2 C6*2 E6*2 G6*2 F6*2 E6*2 D6*2 E6*2  D6*4 B5*4 G5*4 B5*4",
+        "R R O R F R O R R R O R F R O R", "k.hhs.hkk.hhs.hh", 2),
+      B: sec("Dm Am F E",
+        "F6*3 E6 D6*2 A5*2 F5*4 A5*2 D6*2  E6*3 D6 C6*2 A5*2 E5*4 A5*2 C6*2  " +
+        "A6*4 G6*2 F6*2 C6*4 F6*4  G#6*4 E6*4 B5*4 G#5*4",
+        "R . R R F . R . O . R R F . O .", "k.hks.hkk.hks.hx", 2)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* Línea Neón · Retrovisor: Fa menor a 132, la sierra ancha con bombeo
+     fuerte, notas largas que se quedan flotando sobre el bajo de octavas:
+     las luces de la ciudad pasando en el retrovisor. */
+  T["metrorush-neon-2"] = {
+    bpm: 132, bombeo: .4,
+    lead: { onda: "saw", vol: .1, vib: .006, desafina: 9, filtro: 2400, eco: { fb: .4, mezcla: .32 } },
+    bajo: { onda: "saw", vol: .12, filtro: 520, q: 3 },
+    arp: { onda: "saw", vol: .045, oct: 4, paso: .07, desafina: 8, filtro: 1400, sus: .5 },
+    bat: { vol: .34 },
+    secciones: {
+      I: sec("Fm Db", "", "R O R O R O R O R O R O R O R O", "k...k...k...k..h", 4),
+      A: sec("Fm Db Ab Eb",
+        "C6*4 Ab5*2 F5*2 G5*2 Ab5*2 C6*4  Db6*4 F6*2 Ab5*2 Bb5*2 C6*2 Db6*4  " +
+        "Eb6*4 C6*2 Ab5*2 Bb5*2 C6*2 Eb6*4  G6*4 F6*4 Eb6*4 Bb5*4",
+        "R O R O R O R O R O R O R O R O", "k.h.s.hkk.h.s.hh", 4),
+      B: sec("Bbm Fm Db C",
+        "F6*6 Db6*2 Bb5*4 Db6*4  C6*6 Ab5*2 F5*4 Ab5*4  " +
+        "Ab5*2 Bb5*2 Db6*2 F6*2 Ab6*4 F6*4  G6*4 E6*4 C6*4 E6*4",
+        "R O R O R O R O R O R O R O R O", "k.hks.hkk.hks.hx", 4)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* Línea Neón · Autopista: Re menor a 140 con bombo 808, palmas y un bajo
+     senoidal que entra resbalando. Synthwave de carretera: la vía como
+     una autopista vacía a las tres de la mañana. */
+  T["metrorush-neon-3"] = {
+    bpm: 140, bombeo: .3,
+    lead: { onda: "saw", vol: .1, vib: .006, desafina: 7, filtro: 3000, eco: { fb: .34, mezcla: .28 } },
+    bajo: { onda: "sine", vol: .28, desliza: 1 },
+    arp: { onda: "saw", vol: .04, oct: 4, paso: .06, desafina: 6, filtro: 1600, sus: .5 },
+    bat: { vol: .34 },
+    secciones: {
+      I: sec("Dm Bb", "", "R - - - - - R - F - - - O - - -", "K...c...K...c..h", 4),
+      A: sec("Dm Bb F C",
+        "A5*2 D6*2 F6*2 E6 D6 E6*4 C6*2 A5*2  Bb5*2 D6*2 F6*3 E6 D6*4 Bb5*4  " +
+        "A5*2 C6*2 F6*2 G6 A6 G6*4 F6*2 C6*2  E6*2 D6*2 C6*2 G5 A5 G5*6 .*2",
+        "R - - - - - R - F - - - O - - -", "K.hhc.hKK.hhc.hh", 4),
+      B: sec("Gm Dm Bb,C A",
+        "Bb5*3 A5 G5*2 D5*2 G5*4 Bb5*2 D6*2  F6*3 D6 A5*2 F5*2 A5*4 D6*2 F6*2  " +
+        "D6*2 F6*2 Bb6*4 C7*4 G6*4  C#7*4 A6*4 E6*8",
+        "R - - - - - R - F - - - O - - -", "K.hhc.hKK.hKc.hx", 4)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* Estación Fantasma · Andén vacío: Re menor armónico a 118, una senoidal
+     con vibrato ancho y un eco que casi no se apaga. El Sib sobre el La7
+     es la nota que no debería estar ahí; los tambores suenan lejos. */
+  T["metrorush-fantasma-2"] = {
+    bpm: 118,
+    lead: { onda: "sine", vol: .17, vib: .025, sus: .75, eco: { fb: .55, mezcla: .45 } },
+    bajo: { onda: "tri", vol: .22 }, arp: { onda: "tri", vol: .055, oct: 4, paso: .12, sus: .5 }, bat: { vol: .3 },
+    secciones: {
+      I: sec("Dm Bb", "", "R - - - . . R - F - - - O - F -", "t.......T.......", 4),
+      A: sec("Dm Gm A7 Dm",
+        "D5*4 F5*4 A5*6 G#5*2  G5*4 Bb5*4 D6*6 C#6*2  " +
+        "E6*4 C#6*4 Bb5*4 A5*4  F5*2 E5*2 D5*12",
+        "R - . R F - . F O - . O F - R -", "k...t.h.k.h.T.h.", 4),
+      B: sec("Bb A Gm,A Dm",
+        "F6*4 D6*4 Bb5*8  E6*4 C#6*4 A5*8  " +
+        "D6*2 Bb5*2 G5*4 C#6*4 E6*4  D6*8 .*8",
+        "R - . R F - . F O - . O F - R -", "k..ht.h.k.htT.hx", 4)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* Estación Fantasma · Caja de música: Do# menor a 132. El arpegio es una
+     senoidal aguda, como una caja de música que alguien dejó dando cuerda
+     en el andén, y la melodía de pulso fino tiembla encima. */
+  T["metrorush-fantasma-3"] = {
+    bpm: 132,
+    lead: { onda: "p12", vol: .12, vib: .03, sus: .7, eco: { fb: .45, mezcla: .38 } },
+    bajo: { onda: "tri", vol: .22 }, arp: { onda: "sine", vol: .06, oct: 5, paso: .07, sus: .5 }, bat: { vol: .28 },
+    secciones: {
+      I: sec("C#m A", "", "R - - - F - - - O - - - F - - -", "....h.......h...", 2),
+      A: sec("C#m A F#m G#7",
+        "G#5*2 C#6*2 E6*2 G#6*2 F#6*2 E6*2 C#6*4  A5*2 C#6*2 E6*2 A6*2 G#6*2 E6*2 C#6*4  " +
+        "F#5*2 A5*2 C#6*2 F#6*2 E6*2 C#6*2 A5*4  G#5*2 C6*2 D#6*2 F#6*2 D#6*8",
+        "R - - - F - - - O - - - F - - -", "k...h...s...h..h", 2),
+      B: sec("A B E,G#7 C#m",
+        "E6*6 C#6*2 A5*8  F#6*6 D#6*2 B5*8  " +
+        "G#6*4 E6*4 F#6*4 D#6*4  E6*4 C#6*12",
+        "R - . R F - . F O - . O F - R -", "k..hs.h.k.h.s.hx", 2)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* Invierno · Trineo: Mi mayor a 140. El charles va en semicorcheas sin
+     parar (los cascabeles) y la melodía salta por el acorde; en B trepa
+     hasta el Do# más agudo, que suena a campanilla. */
+  T["metrorush-invierno-2"] = {
+    bpm: 140,
+    lead: { onda: "p25", vol: .13, vib: .01, sus: .6, eco: { t: .11, fb: .22, mezcla: .2 } },
+    bajo: { onda: "tri", vol: .21 }, arp: { onda: "p12", vol: .045, oct: 5, paso: .04 }, bat: { vol: .3 },
+    secciones: {
+      I: sec("E B", "", "R . F . O . F . R . F . O . F .", "khhhshhhkhhhshhh", 4),
+      A: sec("E C#m A B",
+        "B5*2 E6*2 G#6*2 F#6 E6 F#6*4 G#6*2 B5*2  C#6*2 E6*2 G#6*3 F#6 E6*4 C#6*4  " +
+        "A5*2 C#6*2 E6*2 F#6 G#6 A6*4 G#6*2 F#6*2  F#6*2 D#6*2 B5*2 C#6 D#6 B5*6 .*2",
+        "R . F . O . F . R . F . O . F .", "khhhshhhkhhhshhh", 4),
+      B: sec("A B G#m,C#m F#m,B",
+        "C#7*3 B6 A6*2 E6*2 C#6*4 E6*2 A6*2  B6*3 A6 F#6*2 D#6*2 B5*4 D#6*2 F#6*2  " +
+        "G#6*4 D#6*4 E6*4 G#6*4  A6*4 F#6*4 D#6*8",
+        "R . R F . R O . R . R F . R O .", "khhhshhkkhhhshhx", 4)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* Invierno · Nevada: Re mayor a 120, la más tranquila del juego. Una
+     senoidal con eco y un arpegio de celesta: la nieve cayendo sobre los
+     rieles mientras corres, sin viento. */
+  T["metrorush-invierno-3"] = {
+    bpm: 120, swing: .1,
+    lead: { onda: "sine", vol: .17, vib: .006, sus: .7, eco: { fb: .38, mezcla: .32 } },
+    bajo: { onda: "tri", vol: .21 }, arp: { onda: "p12", vol: .04, oct: 5, paso: .06 }, bat: { vol: .26 },
+    secciones: {
+      I: sec("D G", "", "R - - - F - - - O - - - F - - -", "k...h...s...h...", 4),
+      A: sec("D Bm Em7 A7",
+        "F#5*4 A5*4 D6*6 C#6*2  B5*4 F#5*4 D5*8  " +
+        "E5*2 G5*2 B5*4 D6*4 C#6*2 B5*2  A5*8 G5*4 E5*4",
+        "R - - - F - - - O - - - F - - -", "k...h.h.s...h..h", 4),
+      B: sec("G A F#m,Bm Em,A",
+        "B5*4 D6*4 G6*6 F#6*2  E6*4 C#6*4 A5*8  " +
+        "C#6*4 A5*4 D6*4 F#6*4  G6*4 E6*4 C#6*4 E6*4",
+        "R - - R F - - - O - - R F - - -", "k...h.h.s...h.hx", 4)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* Óxido · Fundición: Mi menor a 156. Bajo de sierra muy cerrado, toms
+     metálicos entre los golpes de caja y una melodía cuadrada que martilla
+     como una prensa: la fábrica abandonada sigue funcionando sola. */
+  T["metrorush-oxido-2"] = {
+    bpm: 156,
+    lead: { onda: "p50", vol: .12, vib: .002, sus: .45, eco: { t: .09, fb: .16, mezcla: .14 } },
+    bajo: { onda: "saw", vol: .12, filtro: 600, q: 5 },
+    arp: { onda: "p25", vol: .035, oct: 4, paso: .025 }, bat: { vol: .38 },
+    secciones: {
+      I: sec("Em Em", "", "R R O R . R O R R . O R R F O .", "k.k.s.t.k.kks.T.", 2),
+      A: sec("Em C D B",
+        "E5*2 G5*2 B5*2 E5*2 F#5*2 G5*2 B5*4  C6*2 B5*2 G5*2 E5*2 G5*2 C6*2 E6*4  " +
+        "D6*2 C6*2 A5*2 F#5*2 A5*2 D6*2 F#6*4  D#6*4 B5*4 F#5*4 D#5*4",
+        "R R O R . R O R R . O R R F O .", "k.k.s.tkk.kTs.ts", 2),
+      B: sec("Am Em C B7",
+        "A5 . A5 . C6*2 E6*2 A6*4 G6*2 E6*2  G6 . G6 . E6*2 B5*2 G5*4 B5*2 E6*2  " +
+        "E6*2 G6*2 C7*4 B6*4 G6*4  A6*4 F#6*4 D#6*4 B5*4",
+        "R R O R . R O R R . O R R F O .", "k.k.s.tkk.kTs.sx", 2)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* Óxido · Chatarra: Sol menor a 148, ritmo roto (bombo y caja fuera de
+     sitio, en grupos de tres) y una melodía de tresillos falsos que
+     tropieza a propósito, como un tren viejo sobre rieles torcidos. */
+  T["metrorush-oxido-3"] = {
+    bpm: 148,
+    lead: { onda: "p12", vol: .12, vib: .003, sus: .5, eco: { t: .1, fb: .2, mezcla: .16 } },
+    bajo: { onda: "saw", vol: .12, filtro: 700, q: 4 },
+    arp: { onda: "p50", vol: .035, oct: 4, paso: .025 }, bat: { vol: .38 },
+    secciones: {
+      I: sec("Gm Eb", "", "R . . R . . R . R . . R . O R .", "k..s..k.k.s..s..", 2),
+      A: sec("Gm Eb Cm D",
+        "G5*3 Bb5*3 D6*2 C6*3 Bb5*3 G5*2  Eb6*3 D6*3 Bb5*2 G5*3 Bb5*3 Eb6*2  " +
+        "C6*3 Eb6*3 G6*2 F6*3 Eb6*3 C6*2  F#6*4 D6*4 A5*4 F#5*4",
+        "R . . R . . R . R . . R . O R .", "k.hs.hk.k.hs.hsh", 2),
+      B: sec("Cm Gm Eb D",
+        "Eb6*2 D6*2 C6*4 G5*4 C6*4  Bb5*2 A5*2 G5*4 D5*4 G5*4  " +
+        "G6*2 F6*2 Eb6*4 Bb5*4 Eb6*4  A6*4 F#6*4 D6*8",
+        "R . . R . . R . R . . R . O R .", "k.hs.hk.k.hs.sxh", 2)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* Fin de la Línea · Amanecer: Do mayor a 132, sierra ancha y una C final
+     que sube hasta el Re más agudo: la luz entrando por el final del
+     túnel. Es el hermano del himno, en otra tonalidad para no repetirlo. */
+  T["metrorush-fin-2"] = {
+    bpm: 132,
+    lead: { onda: "saw", vol: .1, vib: .007, desafina: 11, filtro: 3200, eco: { fb: .3, mezcla: .25 } },
+    bajo: { onda: "tri", vol: .22 },
+    arp: { onda: "p12", vol: .045, oct: 5, paso: .035 }, bat: { vol: .34 },
+    secciones: {
+      I: sec("C G", "", "R . F . O . F . R . F R O . F .", "k...s...k.k.s..x", 2),
+      A: sec("C G Am F",
+        "G5*2 C6*2 E6*2 D6 C6 D6*4 E6*2 G6*2  G6*3 F6 E6*2 D6*2 B5*4 D6*4  " +
+        "A5*2 C6*2 E6*2 F6 G6 A6*4 G6*2 E6*2  F6*2 E6*2 D6*2 A5 B5 C6*6 .*2",
+        "R . F . O . F . R . F R O . F .", "k.h.s.hkk.h.s.hh", 2),
+      B: sec("F G Em Am,G",
+        "A6*3 G6 F6*2 C6*2 A5*4 C6*2 F6*2  B6*3 A6 G6*2 D6*2 B5*4 D6*2 G6*2  " +
+        "G6*2 B6*2 C7*4 B6*2 G6*2 E6*4  A6*4 E6*4 D6*4 B5*4",
+        "R . R F . R O . R . R F . R O .", "k.hks.hkk.hks.hx", 2),
+      C: sec("F G C C",
+        "C7*4 A6*4 F6*4 A6*4  B6*4 D7*4 G6*8  C7*8 G6*4 E6*4  C7*8 G6*4 .*4",
+        "R . O . F . O . R . O . F . O .", "k.hks.hkk.hks.hx", 2)
+    },
+    orden: "I A A B A B C"
+  };
+
+  /* Fin de la Línea · Última vuelta: Mi bemol mayor a 126, con palmas y
+     bombeo suave bajo un arpegio de sierra: el himno de estadio para quien
+     ya pasó los diez millones y sigue corriendo. */
+  T["metrorush-fin-3"] = {
+    bpm: 126, bombeo: .2,
+    lead: { onda: "p25", vol: .14, vib: .007, sus: .65, eco: { fb: .3, mezcla: .24 } },
+    bajo: { onda: "tri", vol: .22 },
+    arp: { onda: "saw", vol: .04, oct: 4, paso: .05, desafina: 8, filtro: 1800, sus: .5 }, bat: { vol: .34 },
+    secciones: {
+      I: sec("Eb Bb", "", "R . O . F . O . R . O . F . O .", "k...c...k...c..x", 2),
+      A: sec("Eb Cm Ab Bb",
+        "Bb5*4 Eb6*2 G6*2 F6*2 Eb6*2 Bb5*4  C6*2 Eb6*2 G6*4 F6*2 Eb6*2 C6*4  " +
+        "Ab5*2 C6*2 Eb6*2 F6 G6 Ab6*4 G6*2 F6*2  F6*4 D6*4 Bb5*8",
+        "R . O . F . O . R . O . F . O .", "k.h.c.hkk.h.c.hh", 2),
+      B: sec("Ab Bb Gm Cm,Bb",
+        "C7*3 Bb6 Ab6*2 Eb6*2 C6*4 Eb6*2 Ab6*2  D7*3 C7 Bb6*2 F6*2 D6*4 F6*2 Bb6*2  " +
+        "G6*4 Bb6*4 D7*4 Bb6*4  C7*4 G6*4 F6*4 D6*4",
+        "R . R F . R O . R . R F . R O .", "k.hkc.hkk.hkc.hx", 2)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* ---------- Metro Rush: Subway City ----------
+     Cinco barrios de la ciudad, un tema cada uno (audio.js los acompaña
+     de dos temas de estación con el mismo humor, para que también roten). */
+
+  /* Sur: Re mayor a 102 con swing, funk de hip-hop soleado. Bombo 808,
+     palmas, un bajo senoidal que resbala entre notas y acordes de séptima
+     mayor: la tarde de sábado en los barrios del sur. */
+  T["metrorush-city-sur"] = {
+    bpm: 102, swing: .14,
+    lead: { onda: "p25", vol: .15, vib: .005, sus: .6, eco: { t: .14, fb: .24, mezcla: .2 } },
+    bajo: { onda: "sine", vol: .3, desliza: 1 },
+    arp: { onda: "p12", vol: .045, oct: 5, paso: .05 }, bat: { vol: .34 },
+    secciones: {
+      I: sec("Dmaj7 Bm7", "", "R - - . . . R . F - . R . . O .", "K.h.c.hKh.K.c.hh", 4),
+      A: sec("Dmaj7 Bm7 Em7 A7",
+        "F#5*2 A5 . C#6*2 A5*2 B5*2 A5*2 F#5*4  D6*2 C#6 . B5*2 A5*2 F#5*2 A5*2 B5*4  " +
+        "G5*2 B5 . D6*2 E6*2 F#6*2 E6*2 D6*4  C#6*2 E6 . G6*2 E6*2 C#6*4 A5*4",
+        "R - - . . . R . F - . R . . O .", "K.hhc.hKh.K.c.hh", 4),
+      B: sec("Gmaj7 F#m7 Em7 A7",
+        "B5*3 D6 F#6*2 .*2 E6*2 D6*2 B5*4  A5*3 C#6 E6*2 .*2 D6*2 C#6*2 A5*4  " +
+        "G5*2 B5*2 D6*2 F#6*2 E6*4 D6*4  C#6*4 E6*4 G6*4 A6*4",
+        "R - - . . . R . F - . R . . O .", "K.hhc.hKh.K.c.hK", 4)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* Muelles: Do menor a 116, groove industrial. Un bajo de sierra gomoso
+     (filtro cerrado con mucha resonancia), toms que suenan a contenedor y
+     charles abiertos como vapor: grúas, cadenas y el puerto de noche. */
+  T["metrorush-city-muelles"] = {
+    bpm: 116,
+    lead: { onda: "p50", vol: .12, vib: .003, sus: .5, eco: { t: .16, fb: .26, mezcla: .2 } },
+    bajo: { onda: "saw", vol: .13, filtro: 480, q: 7 },
+    arp: { onda: "tri", vol: .05, oct: 4, paso: .09 }, bat: { vol: .36 },
+    secciones: {
+      I: sec("Cm Cm", "", "R . R O . R . R . O R . R . F .", "k..tk.o.k.t.s.o.", 2),
+      A: sec("Cm Ab Fm G",
+        "C5*2 .*2 Eb5*2 G5*2 .*2 Bb5 C6 G5*4  Ab5*2 .*2 C6*2 Eb6*2 .*2 D6 C6 Ab5*4  " +
+        "F5*2 .*2 Ab5*2 C6*2 .*2 Eb6 F6 C6*4  B5*4 D6*4 G5*8",
+        "R . R O . R . R . O R . R . F .", "k..ts.o.k.tks.o.", 2),
+      B: sec("Fm Cm Ab G",
+        "Ab5*3 G5 F5*2 C5*2 F5*4 Ab5*4  G5*3 F5 Eb5*2 C5*2 G5*4 C6*4  " +
+        "Eb6*3 D6 C6*2 Ab5*2 Eb5*4 Ab5*4  D6*4 B5*4 G5*4 F5*4",
+        "R . R O . R . R . O R . R . F .", "k..ts.oTk.tks.ox", 2)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* Bulevar: Re bemol a 116, synthpop con sabor a city-pop: séptimas
+     mayores, un Do7 que tira hacia el Fa menor, sierra ancha y bombeo.
+     El centro de noche, con los letreros encendidos y las vitrinas. */
+  T["metrorush-city-bulevar"] = {
+    bpm: 116, bombeo: .25,
+    lead: { onda: "saw", vol: .1, vib: .006, desafina: 8, filtro: 2800, eco: { fb: .34, mezcla: .28 } },
+    bajo: { onda: "saw", vol: .12, filtro: 700, q: 2 },
+    arp: { onda: "saw", vol: .045, oct: 4, paso: .07, desafina: 6, filtro: 1700, sus: .5 },
+    bat: { vol: .34 },
+    secciones: {
+      I: sec("Dbmaj7 C7", "", "R . O . F . O . R . O . F . O .", "k.h.s.h.k.h.s.hh", 4),
+      A: sec("Dbmaj7 C7 Fm7 Ebm7",
+        "F5*2 Ab5*2 C6*2 Db6 Eb6 F6*4 Eb6*2 C6*2  E6*2 G6*2 Bb6*2 Ab6 G6 E6*4 C6*4  " +
+        "Ab5*2 C6*2 Eb6*2 F6 G6 Ab6*4 G6*2 Eb6*2  Gb6*2 F6*2 Eb6*2 Db6 Bb5 Db6*6 .*2",
+        "R . O . F . O . R . O . F . O .", "k.hhs.hhk.hks.hh", 4),
+      B: sec("Bbm7 Eb7 Abmaj7 Dbmaj7,C7",
+        "Db6*3 C6 Bb5*2 F5*2 Ab5*4 Bb5*2 Db6*2  G6*3 F6 Eb6*2 Bb5*2 Db6*4 Eb6*2 G6*2  " +
+        "G6*2 Eb6*2 C6*4 Ab6*4 G6*4  F6*4 Ab6*4 G6*4 E6*4",
+        "R . O . F . O . R . O . F . O .", "k.hhs.hkk.hks.hx", 4)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* Parque: Do mayor a 134 con swing, el juguetón. Notas picadas que
+     saltan como una pelota, palmas y un arpegio de pulso: columpios,
+     palomas y alguien corriendo entre los árboles. */
+  T["metrorush-city-parque"] = {
+    bpm: 134, swing: .16,
+    lead: { onda: "p12", vol: .14, vib: .008, sus: .6, eco: { t: .1, fb: .18, mezcla: .16 } },
+    bajo: { onda: "tri", vol: .22 }, arp: { onda: "p25", vol: .04, oct: 5, paso: .03 }, bat: { vol: .3 },
+    secciones: {
+      I: sec("C G", "", "R . F . O . F . R . F . O . F .", "k.h.c.h.k.h.c.hh", 2),
+      A: sec("C Am F G",
+        "E6 . G6 . C7*2 G6*2 E6 . C6 . E6*4  A6 . E6 . C6*2 E6*2 A6 . G6 . E6*4  " +
+        "F6 . A6 . C7*2 A6*2 F6 . G6 . A6*4  G6*2 F6*2 E6*2 D6*2 B5*4 G5*4",
+        "R . F . O . F . R . F . O . F .", "k.h.c.hkk.h.c.hh", 2),
+      B: sec("F C Dm G",
+        "A5*2 C6*2 F6*2 E6 F6 A6*4 F6*4  G5*2 C6*2 E6*2 D6 E6 G6*4 E6*4  " +
+        "F6*2 E6*2 D6*2 A5*2 D6*2 E6*2 F6*4  G6*4 B6*4 D7*4 .*4",
+        "R . R F . R O . R . R F . R O .", "k.hkc.hkk.hkc.hx", 2)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* Bajo (los túneles bajo la ciudad): Fa menor a 172, drum'n'bass oscuro.
+     Bombo y caja partidos, bajo de sierra cerrado y resonante, y una
+     melodía corta que aparece y se va como las luces de servicio. */
+  T["metrorush-city-bajo"] = {
+    bpm: 172,
+    lead: { onda: "p25", vol: .12, vib: .004, sus: .55, eco: { fb: .3, mezcla: .24 } },
+    bajo: { onda: "saw", vol: .12, filtro: 520, q: 6 },
+    arp: { onda: "p12", vol: .04, oct: 4, paso: .025 }, bat: { vol: .38 },
+    secciones: {
+      I: sec("Fm Fm", "", "R - - - - - - - R - - - . . O -", "k.........k.....", 4),
+      A: sec("Fm Db Eb C",
+        "F5*4 Ab5*2 C6*2 .*2 Bb5*2 Ab5*4  Db6*4 C6*2 Ab5*2 .*2 F5*2 Ab5*4  " +
+        "Eb6*4 G6*2 Bb5*2 .*2 Ab5*2 G5*4  E6*4 C6*4 G5*4 Bb5*4",
+        "R . R . . R . . R . . R R . F .", "k.h.s.h..hk.s.h.", 4),
+      B: sec("Bbm Fm Db C",
+        "Db6*2 C6*2 Bb5*4 F5*4 Bb5*4  Ab5*2 G5*2 F5*4 C5*4 F5*4  " +
+        "F6*2 Eb6*2 Db6*4 Ab5*4 Db6*4  E6*4 G6*4 C7*4 Bb6*4",
+        "R . R . . R . . R . . R R . F .", "k.h.s.h..hk.s.sx", 4)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* ---------- Metro Rush: las tres estaciones nuevas ----------
+     Mercado de Farolillos, Cocheras y Muelle (ver ESTACIONES en
+     juegos/club/metrorush/motor.js). Como las demás: melodías propias, un
+     pelo por debajo del pulso que se quiere oír a media carrera (el juego
+     acelera el tempo con la velocidad). Cada una rota con dos temas
+     prestados de su mismo humor (LISTAS en metrorush/audio.js). */
+
+  /* Mercado de Farolillos: Re mayor a 126 con swing, de feria. Palmas en
+     cada tiempo débil como en una cumbia de puesto, la melodía que sube y
+     baja por el acorde como quien se pasea entre los toldos, y una sección
+     C de notas picadas, el pregón. */
+  T["metrorush-mercado"] = {
+    bpm: 126, swing: .14,
+    lead: { onda: "p25", vol: .13, vib: .009, sus: .6, eco: { t: .12, fb: .22, mezcla: .2 } },
+    bajo: { onda: "tri", vol: .22 }, arp: { onda: "p12", vol: .045, oct: 5, paso: .03 }, bat: { vol: .32 },
+    secciones: {
+      I: sec("D A", "", "R . F . R . F . R . F . O . F .", "k.hck.hck.hck.hc", 2),
+      A: sec("D G Bm A",
+        "A5*2 F#5*2 A5*2 D6*2 C#6 D6 E6*2 D6*4  B5*2 G5*2 B5*2 D6*2 E6*3 D6 B5*4  " +
+        "F#5*2 B5*2 D6*2 B5 C#6 D6*4 F#6*4  E6*2 C#6*2 A5*2 E5 F#5 E5*6 .*2",
+        "R . F . O . F . R . F . O . F .", "k.hcs.hkk.hcs.hh", 2),
+      B: sec("G A F#m,Bm Em,A",
+        "D6*3 B5 G5*2 B5*2 D6*4 G6*4  E6*3 C#6 A5*2 C#6*2 E6*4 A6*4  " +
+        "F#6*2 E6*2 C#6*4 D6*2 C#6*2 B5*4  G5*2 B5*2 E6*4 C#6*4 A5*4",
+        "R . R F . R O . R . R F . R O .", "k.hks.hkk.hks.hx", 2),
+      C: sec("D A G A",
+        "F#6 . F#6 . A6*2 F#6*2 D6 . D6 . F#6*2 D6*2  E6 . E6 . A6*2 E6*2 C#6 . C#6 . E6*2 A5*2  " +
+        "D6 . D6 . G6*2 D6*2 B5 . B5 . D6*2 B5*2  C#6*2 E6*2 A6*4 G6*2 E6*2 C#6*2 .*2",
+        "R . F . R . F . R . F . O . F .", "k.hcs.hck.hcs.hc", 2)
+    },
+    orden: "I A A B A C B A"
+  };
+
+  /* Cocheras: Sol menor a 140, de patio de maniobras de noche. El bajo va
+     en corcheas parejas, como las ruedas sobre las juntas de la vía, y la
+     melodía de cuadrado ancho deja huecos (los trenes que duermen); en B
+     sube hasta el Re mayor, el 317 que no está en su vía. */
+  T["metrorush-cocheras"] = {
+    bpm: 140,
+    lead: { onda: "p50", vol: .12, vib: .005, sus: .55, eco: { t: .13, fb: .3, mezcla: .24 } },
+    bajo: { onda: "tri", vol: .22 }, arp: { onda: "p25", vol: .04, oct: 4, paso: .03 }, bat: { vol: .34 },
+    secciones: {
+      I: sec("Gm Gm", "", "R . R . R . R . R . R . R . F .", "k.h.k.h.k.h.k.hs", 2),
+      A: sec("Gm Eb F D",
+        "G5*4 Bb5*2 D6*2 .*2 C6*2 Bb5*4  G5*4 Bb5*2 Eb6*2 .*2 D6*2 C6*4  " +
+        "A5*4 C6*2 F6*2 .*2 Eb6*2 D6*4  F#5*2 A5*2 D6*4 C6*2 A5*2 F#5*4",
+        "R . R . R . R . R . R . O . F .", "k.hhs.hhk.hhs.hh", 2),
+      B: sec("Cm Gm Eb D",
+        "Eb6*3 D6 C6*2 G5*2 C6*4 Eb6*4  D6*3 C6 Bb5*2 G5*2 D5*4 G5*4  " +
+        "G5*2 Bb5*2 Eb6*4 F6*2 Eb6*2 D6*4  D6*4 F#6*4 A6*4 F#6*4",
+        "R R . R R . R . R R . R R . F .", "k.hks.hkk.hks.tT", 2)
+    },
+    orden: "I A A B A B"
+  };
+
+  /* Muelle: Mi menor a 116, de puerto con lluvia. Sierra filtrada con un
+     eco largo (el agua), un arpegio agudo y rápido como gotas, el bajo que
+     se queda quieto y un pulso a medio tiempo: es la estación más lenta,
+     la de la línea que iba a llegar al mar. */
+  T["metrorush-muelle"] = {
+    bpm: 116, bombeo: .2,
+    lead: { onda: "saw", vol: .09, vib: .008, desafina: 8, filtro: 2200, eco: { fb: .45, mezcla: .36 } },
+    bajo: { onda: "saw", vol: .11, filtro: 480, q: 3 },
+    arp: { onda: "p12", vol: .045, oct: 5, paso: .06 }, bat: { vol: .3 },
+    secciones: {
+      I: sec("Em C", "", "R - - - - - - - F - - - O - - -", "k.......s.......", 2),
+      A: sec("Em C G D",
+        "B5*4 E6*2 G6*2 F#6*4 E6*2 B5*2  C6*4 E6*2 G6*2 E6*6 .*2  " +
+        "D6*4 G6*2 B6*2 A6*4 G6*2 D6*2  F#6*4 E6*2 D6*2 A5*8",
+        "R - - . R - F - R - - . O - F -", "k...h.h.s...h.hh", 2),
+      B: sec("Am Em C B",
+        "C6*2 E6*2 A6*4 G6*2 E6*2 C6*4  B5*2 E6*2 G6*4 F#6*2 E6*2 B5*4  " +
+        "E6*2 G6*2 C7*4 B6*4 G6*4  D#6*4 F#6*4 B6*8",
+        "R - - . R - F - R - - . O - F -", "k...h.hks...h.hx", 2)
+    },
+    orden: "I A A B A B"
   };
 
   const Temas = { temas: T, linea, arpegio, raiz };

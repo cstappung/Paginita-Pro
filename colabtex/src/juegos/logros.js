@@ -432,18 +432,22 @@ const SOLO = {
   /* Metro Rush. Los de puntos salen de club-metrorush-carrera (puntos de la
      mejor carrera: 1 000 000 es donde empieza la Estación Fantasma y
      10 000 000 el Fin de la Línea); los de distancia, de
-     club-metrorush-distancia (metros de la carrera más larga). */
+     las de distancia (metros de la carrera más larga: club-metrorush-distancia
+     la Línea 3, club-metrorush-citydistancia City). «Cazafantasmas» es el
+     único que se escribe en vivo: el juego lo pide (Club.logro) cuando una
+     carrera de un modo fantasma pasa al n.º 1 de la distancia. */
   metrorush: [
     { id: "c50k", n: "Primer andén", d: "Haz 50 000 puntos en una carrera.", i: "🚉", m: "Carrera", s: d => cat(/-carrera$/)(d) && d.puntos >= 50000 },
     { id: "c250k", n: "Hora punta", d: "Haz 250 000 puntos en una carrera.", i: "🚇", m: "Carrera", s: d => cat(/-carrera$/)(d) && d.puntos >= 250000 },
     { id: "c1m", n: "Estación Fantasma", d: "Haz 1 000 000 de puntos en una carrera.", i: "👻", m: "Carrera", s: d => cat(/-carrera$/)(d) && d.puntos >= 1000000 },
     { id: "c3m", n: "Expreso", d: "Haz 3 000 000 de puntos en una carrera.", i: "🚄", m: "Carrera", s: d => cat(/-carrera$/)(d) && d.puntos >= 3000000 },
     { id: "c10m", n: "Fin de la línea", d: "Haz 10 000 000 de puntos en una carrera.", i: "🛤️", m: "Carrera", s: d => cat(/-carrera$/)(d) && d.puntos >= 10000000 },
-    { id: "d1k", n: "Primer kilómetro", d: "Recorre 1 000 m en una carrera.", i: "👟", m: "Distancia", s: d => cat(/-distancia$/)(d) && d.puntos >= 1000 },
-    { id: "d5k", n: "Cinco mil", d: "Recorre 5 000 m en una carrera.", i: "🏃", m: "Distancia", s: d => cat(/-distancia$/)(d) && d.puntos >= 5000 },
-    { id: "d10k", n: "Diez mil", d: "Recorre 10 000 m en una carrera.", i: "🎽", m: "Distancia", s: d => cat(/-distancia$/)(d) && d.puntos >= 10000 },
-    { id: "d21k", n: "Media maratón", d: "Recorre 21 000 m en una carrera.", i: "🏅", m: "Distancia", s: d => cat(/-distancia$/)(d) && d.puntos >= 21000 },
-    { id: "d42k", n: "Maratón sobre rieles", d: "Recorre 42 000 m en una carrera.", i: "🏆", m: "Distancia", s: d => cat(/-distancia$/)(d) && d.puntos >= 42000 }
+    { id: "d1k", n: "Primer kilómetro", d: "Recorre 1 000 m en una carrera.", i: "👟", m: "Distancia", s: d => cat(/-(city)?distancia$/)(d) && d.puntos >= 1000 },
+    { id: "d5k", n: "Cinco mil", d: "Recorre 5 000 m en una carrera.", i: "🏃", m: "Distancia", s: d => cat(/-(city)?distancia$/)(d) && d.puntos >= 5000 },
+    { id: "d10k", n: "Diez mil", d: "Recorre 10 000 m en una carrera.", i: "🎽", m: "Distancia", s: d => cat(/-(city)?distancia$/)(d) && d.puntos >= 10000 },
+    { id: "d21k", n: "Media maratón", d: "Recorre 21 000 m en una carrera.", i: "🏅", m: "Distancia", s: d => cat(/-(city)?distancia$/)(d) && d.puntos >= 21000 },
+    { id: "d42k", n: "Maratón sobre rieles", d: "Recorre 42 000 m en una carrera.", i: "🏆", m: "Distancia", s: d => cat(/-(city)?distancia$/)(d) && d.puntos >= 42000 },
+    { id: "fan", n: "Cazafantasmas", d: "En un modo Fantasma, llega más lejos que el fantasma del récord.", i: "🔦", m: "Fantasma" }   // en vivo (sin `s`): lo escribe la página
   ]
 };
 

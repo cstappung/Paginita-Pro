@@ -126,7 +126,8 @@ const MODALIDADES = {
   experto: "Experto",  // la dificultad más alta del clásico de Sudoku Arcade
   travesia: "travesía", sinfin: "travesía sin fin", jornadas: "jornada más lejana",  // FANAL
   estrellas: "estrellas",  // Atasco
-  carrera: "mejor carrera", distancia: "distancia"  // Metro Rush
+  carrera: "mejor carrera", distancia: "distancia",  // Metro Rush (el clásico)
+  puro: "sin ayudas", sinmonedas: "sin monedas", fantasma: "fantasma", city: "City", citypuro: "City sin ayudas", cityfantasma: "City fantasma"  // Metro Rush (los otros modos)
 };
 const CLUBS = {
   minas: { nombre: "Mina Club", juego: "Buscaminas", icono: "💣", ruta: "minas" },
@@ -180,8 +181,8 @@ export function marcaSolo(cat, f) {
   if (cat === "club-dosmil-ficha") return `🟨 ficha ${f.puntos}`;
   if (cat === "club-trigon-puntos") return `🔺 ${Number(f.puntos).toLocaleString("es-CL")} puntos`;
   // Metro Rush: la distancia se dice en metros; la mejor carrera, en puntos.
-  if (cat === "club-metrorush-distancia") return `🚇 ${Number(f.puntos).toLocaleString("es-CL")} m`;
-  if (cat === "club-metrorush-carrera") return `🚇 ${Number(f.puntos).toLocaleString("es-CL")} pts`;
+  if (cat === "club-metrorush-distancia" || cat === "club-metrorush-citydistancia") return `🚇 ${Number(f.puntos).toLocaleString("es-CL")} m`;
+  if (/^club-metrorush-(carrera|puro|sinmonedas|fantasma|city|citypuro|cityfantasma)$/.test(cat)) return `🚇 ${Number(f.puntos).toLocaleString("es-CL")} pts`;   // la mejor carrera de cualquier modo
   return `${Number(f.puntos).toLocaleString("es-CL")} pts`;
 }
 

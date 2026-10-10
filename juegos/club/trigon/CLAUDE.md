@@ -23,7 +23,7 @@ in `users/<uid>/club`. One table, `club-trigon-puntos` (score, capped at
 move as `[piece, dx, dy, origin, Δms]`, and `solo/verifica/trigon.js`
 replays it (`docs/antitrampas/trigon.md`). Logros (score thresholds), coins
 (1 per 100 points + the per-game pay), the Discord podium, the cover and
-the illustrated manual are wired like 2048's (no champion frame and no
-replays yet); the `soloRanks`, `soloPruebas` and `clubJugadas` regexes
+the illustrated manual are wired like 2048's, plus the `ttrigon` champion
+frame (a turning ring of triangles; no replays yet); the `soloRanks`, `soloPruebas` and `clubJugadas` regexes
 were widened, so the rules must be re-published.
 `tests/trigon.test.cjs` covers geometry, motor and verifier.
