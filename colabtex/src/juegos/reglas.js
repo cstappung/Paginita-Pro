@@ -961,19 +961,21 @@ const REGLAS = {
   /* Tulones (juegos/club/tulones/): lo que dice aquí tiene que coincidir con
      motor.js (miembros, congelar) y juego.js (turnos, controles). */
   tulones: {
-    lema: "Tulones: cada turno sale un tulón nuevo que trepa por la cabra y por los que ya se congelaron. Gana quien deja su tulón más alto.",
+    lema: "Tulones: cada turno sale un tulón nuevo que trepa por la cabra y por los que ya se congelaron. Hay que superar la torre o quedas fuera: gana el último en pie.",
     secciones: [
       ["Cómo se juega", "Es para jugar por turnos en un mismo equipo, de 1 a 8 personas. En tu turno aparece tu tulón al pie de la torre y tienes el tiempo elegido (de 30 a 90 s) para trepar. Cuando se acaba, o cuando lo decides, tu tulón se <b>congela</b> donde está y pasa a ser parte de la torre: el siguiente puede pisarlo, colgarse de él y seguir subiendo."],
       ["Brazos y piernas", lista([
-        "Cada brazo y cada pierna se mueve por separado: <b>A</b> el brazo izquierdo, <b>S</b> el derecho, <b>K</b> la pierna izquierda y <b>L</b> la derecha.",
+        "Cada brazo y cada pierna se mueve por separado: <b>A</b> el brazo izquierdo, <b>D</b> el derecho, <b>W</b> la pierna izquierda y <b>S</b> la derecha. Las teclas se cambian en ⌨ Controles.",
         "Mientras mantienes una tecla, ese miembro sigue al ratón. Los que no sostienes cuelgan con el peso del cuerpo.",
         "Si la mano o el pie toca la cabra, el suelo o un tulón congelado, <b>se agarra</b>. Al soltar la tecla, se suelta.",
-        "Con algo agarrado, llevar el ratón hacia abajo empuja el cuerpo hacia arriba: así se trepa."
+        "Con algo agarrado, llevar el ratón hacia abajo empuja el cuerpo hacia arriba: así se trepa.",
+        "Agarrado de una mano, estirar la otra más allá de su alcance arrastra el cuerpo hacia allá.",
+        "Tirado en el suelo, un tirón brusco del ratón despega el cuerpo hacia donde lo llevas."
       ])],
-      ["La torre", "La altura de cada tulón se mide desde el suelo hasta su punto más alto. Al terminar las rondas elegidas (3, 5, 10 o sin fin) gana quien consiguió la mayor altura, y la torre completa se compara con tu récord, que se guarda en este navegador. Si un tulón sale del escenario, se pierde y el turno pasa."],
-      ["Personajes", "Antes de jugar, cada jugador elige su tulón: nombre, color de piel, físico, peinado y color del pelo, barba, calzoncillos y su color, calcetines y sombrero, o uno de los personajes ya armados. Todos andan en calzoncillos y calcetines, como en el original."],
+      ["La torre", "La línea roja marca la altura de la torre al empezar tu turno y tienes que superarla; la altura de un tulón se mide desde el suelo hasta su punto más alto. Si al congelarte no la pasas, quedas eliminado. Con varias personas gana el último en pie; jugando solo, sigues hasta que falles. Si eliges un límite de rondas (3, 5 o 10), la partida termina al cumplirlo. La torre completa se compara con tu récord, que se guarda en este navegador. Si un tulón sale del escenario, se pierde y queda eliminado."],
+      ["Personajes", "Antes de jugar, cada jugador elige su tulón: nombre, color de piel, peinado y color del pelo, barba, color del slip (hay uno con la bandera chilena), sombrero (chupalla y de paja, entre otros), físico y tamaño, o uno de los personajes ya armados. Es solo de adorno: no cambia cómo se mueve ni cómo trepa."],
       ["Controles", lista([
-        "Teclado y ratón: A, S, K o L para sostener un miembro, y el ratón (o las flechas) para llevarlo. Espacio congela antes de tiempo. P o Esc, pausa.",
+        "Teclado y ratón: A, D, W o S para sostener un miembro, y el ratón (o las flechas) para llevarlo. Espacio congela antes de tiempo. P o Esc, pausa. F o ⛶, pantalla completa.",
         "En el celular: los cuatro botones de los lados sostienen cada miembro, arrastrar el dedo por el escenario lo lleva y ❄ congela.",
         "Con mando: LB y RB los brazos, LT y RT las piernas, el stick izquierdo lleva, A congela y Start pausa."
       ])],
@@ -999,6 +1001,36 @@ const REGLAS = {
         "Mando: A, B o RB aletean y Start pausa."
       ])],
       ["Clasificación", "La tabla <b>Vuelo</b> ordena por tubos pasados; a igualdad, gana el vuelo más corto. Cada vuelo se rehace con su semilla y sus aleteos antes de guardarse, así que solo cuenta lo que de verdad se voló. Subir al podio se anuncia en Discord."]
+    ]
+  },
+  /* Trigon (juegos/club/trigon/): lo que dice aquí tiene que coincidir con
+     motor.js (líneas, puntos, reparto) y juego.js (controles, temas). */
+  trigon: {
+    lema: "Trigon: arrastra piezas de triángulos al tablero hexagonal y completa líneas en tres direcciones.",
+    secciones: [
+      ["Cómo se juega", "El tablero es un hexágono de 96 triángulos. Abajo (o al lado, en pantallas anchas) tienes una mano de <b>tres piezas</b>; arrastra cada una hasta el tablero. Las piezas no se giran: llegan ya orientadas. Cuando usas las tres, llega otra mano."],
+      ["Líneas", "Una línea es una franja de triángulos de borde a borde. Hay líneas en <b>tres direcciones</b>: horizontal y las dos diagonales. Cuando una se llena entera, se borra. Si una pieza llena varias a la vez, se borran todas juntas."],
+      ["Reglas finas", lista([
+        "Mientras arrastras, la sombra muestra dónde cae la pieza y las líneas que cerraría se iluminan.",
+        "Una pieza que no cabe en ningún lado se ve gris.",
+        "Si ninguna pieza de una mano nueva cabe, se reparte otra (hasta cuatro veces).",
+        "La partida termina cuando ninguna de las piezas que te quedan cabe en el tablero y ningún poder puede hacer sitio."
+      ])],
+      ["Puntos", "Cada triángulo que pones suma 1. Cerrar líneas da un bono de 20, 60, 120, 200… por 1, 2, 3, 4… líneas de una vez, y si cierras líneas en jugadas seguidas armas una <b>racha</b> que multiplica ese bono (×2, ×3…)."],
+      ["Poderes", "Cerrar líneas puede regalarte un poder, con más probabilidad cuantas más líneas cierres de una vez. Aparecen como botones junto al tablero y no suman puntos ni cortan la racha:" + lista([
+        "🔨 <b>Martillo</b> (hasta 3): rompe un triángulo ocupado.",
+        "🔄 <b>Girar</b> (hasta 3): gira 60° una pieza de tu mano.",
+        "🔀 <b>Cambiar mano</b> (hasta 2): descarta tus piezas y recibe tres nuevas.",
+        "💣 <b>Bomba</b> (hasta 2): rompe los triángulos alrededor de un punto del tablero.",
+        "💥 <b>Segunda oportunidad</b> (muy rara, 1): cuando ya no cabe nada, borra la mitad de abajo del tablero."
+      ]) + "Si ninguna pieza cabe pero algún poder puede salvarte, la partida sigue y ese botón late."],
+      ["Controles", lista([
+        "Arrastra con el ratón o con el dedo.",
+        "Teclado: 1, 2 y 3 eligen pieza, las flechas la mueven, Enter la suelta y Esc cancela. Poderes: H martillo, G girar, C cambiar, B bomba, V segunda oportunidad.",
+        "🎨 cambia el tema (Clásico, Halloween, Gris, Forest y Espacio), en modo oscuro o claro, sin perder la partida.",
+        "La partida a medias se guarda en este navegador y se retoma si vuelves antes de 24 horas."
+      ])],
+      ["Clasificación", "Una tabla de <b>Puntos</b> (a igualdad, la partida más corta). Cada partida se rehace con su semilla y sus jugadas antes de guardarse, así que solo cuenta lo que de verdad se jugó."]
     ]
   },
   /* 2048 (juegos/club/dosmil/): lo que dice aquí tiene que coincidir con
@@ -1142,7 +1174,7 @@ const REGLAS = {
   }
 };
 
-const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", metrorush: "Metro Rush", tulones: "Tulones" };
+const NOMBRES_SOLO = { minas: "Mina Club", snake: "Snake Club", tetrisclub: "Tetris Club", sortem: "sortEm", bbtan: "BBTAN", sopa: "Sopa de letras", electro: "Electrodle", frontera: "Frontera Batalla", sudoku: "Sudoku Arcade", fanal: "FANAL", atasco: "Atasco", aleteo: "ALETEO", dosmil: "2048", trigon: "Trigon", metrorush: "Metro Rush", tulones: "Tulones" };
 
 export const tieneReglas = juego => Object.prototype.hasOwnProperty.call(REGLAS, juego);
 

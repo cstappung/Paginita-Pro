@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+<script src="../../../i18n.js?v=202610100158"></script>
+<script src="../../audio/mando.js?v=mando-2"></script>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Trigon — junta los triángulos</title>
+  <meta name="description" content="Arrastra piezas de triángulos al hexágono y completa líneas en tres direcciones.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%233b2f3f'/%3E%3Cpath d='M16 5 28 26H4z' fill='%23f6d23c'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lilita+One&display=swap">
+  <link rel="stylesheet" href="../conexion.css?v=club-2">
+  <script src="../../audio/volumen.js?v=vol-1"></script>
+  <script src="../conexion.js?v=club-11"></script>
+  <link rel="stylesheet" href="estilo.css?v=trigon-11">
+  <link rel="stylesheet" href="temas.css?v=trigon-6">
+  <script>
+    /* El tema antes de pintar nada, para que no parpadee el Clásico al cargar otro. */
+    try { const t = JSON.parse(localStorage.getItem('trigon.tema') || 'null') || {};
+      document.documentElement.dataset.skin = t.skin || 'clasico'; document.documentElement.dataset.modo = t.modo === 'claro' ? 'claro' : 'oscuro'; } catch (_) { /* sin almacenamiento */ }
+  </script>
+</head>
+<body>
+  <div class="shell">
+    <div class="layout">
+      <main>
+        <!-- Cabecera: no es .shell>header ni .intro, porque conexion.css las oculta dentro de Juegos. -->
+        <div class="cab">
+          <h1 class="logo" translate="no">TRIGON</h1>
+          <p class="lema">Completa líneas en tres direcciones</p>
+        </div>
+
+        <div class="scorebar" role="group" aria-label="Marcador">
+          <div class="dato"><small>PUNTOS</small><strong id="nPuntos" translate="no">0</strong><b id="popSuma" class="pop-suma" translate="no" aria-hidden="true"></b></div>
+          <div class="dato"><small>👑 MEJOR</small><strong id="nMejor" translate="no">0</strong></div>
+          <div class="dato"><small>LÍNEAS</small><strong id="nLineas" translate="no">0</strong></div>
+          <button type="button" id="btnMenu" class="mini" title="Menú" aria-label="Abrir el menú">☰</button>
+          <button type="button" id="btnTema" class="mini" title="Cambiar tema" aria-label="Cambiar tema">🎨</button>
+          <button type="button" id="btnNueva" class="mini" title="Empezar de nuevo">↻ Nueva</button>
+          <button type="button" id="sound-button" aria-pressed="true" aria-label="Desactivar efectos" title="Efectos">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+              <path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor"/>
+              <path class="ondas" d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/>
+              <path class="cruz" d="m16 9 6 6m0-6-6 6"/>
+            </svg>
+          </button>
+        </div>
+
+        <div class="mesa">
+        <div id="escenario" class="escenario" role="application" aria-label="El tablero hexagonal. Arrastra las piezas de abajo hasta él.">
+          <svg id="tablero" class="tablero" aria-hidden="true"></svg>
+          <div id="efectos" class="efectos" aria-hidden="true"></div>
+          <b id="racha" class="racha" translate="no" aria-hidden="true"></b>
+          <b id="popPoder" class="pop-poder" aria-hidden="true"></b>
+          <p id="aviso" class="aviso" role="status" hidden>No cabe ninguna pieza: ¡usa un poder!</p>
+
+          <div id="fin" class="capa fin" role="dialog" aria-modal="false" aria-labelledby="finTitulo" hidden>
+            <p id="finTitulo" class="tit">SIN ESPACIO</p>
+            <div class="tarjeta">
+              <small>PUNTOS</small><strong id="finPuntos" translate="no">0</strong>
+              <small>LÍNEAS</small><strong id="finLineas" translate="no">0</strong>
+              <small>MEJOR RACHA</small><strong id="finRacha" translate="no">0</strong>
+              <em id="finNuevo" class="nuevo" hidden>¡NUEVO RÉCORD!</em>
+            </div>
+            <p id="finFrase" class="frase"></p>
+            <div class="menu-botones">
+              <button type="button" id="btnOtra" class="boton">↻ Otra partida</button>
+              <button type="button" id="btnMenuFin" class="boton secundario">☰ Menú</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="poderes" class="poderes" role="group" aria-label="Poderes"></div>
+        <div id="mano" class="mano" aria-label="Tus piezas"></div>
+
+          <div id="temas" class="capa menu temas" role="dialog" aria-modal="false" aria-labelledby="temasTitulo" hidden>
+            <p id="temasTitulo" class="tit">Temas</p>
+            <div class="modo" role="group" aria-label="Modo">
+              <button type="button" data-modo-boton="oscuro" aria-pressed="true">🌙 Oscuro</button>
+              <button type="button" data-modo-boton="claro" aria-pressed="false">☀️ Claro</button>
+            </div>
+            <div id="temasLista" class="temas-lista"></div>
+            <button type="button" id="btnTemasListo" class="boton">Listo</button>
+          </div>
+
+          <div id="menu" class="capa menu" role="dialog" aria-modal="false" aria-labelledby="menuTitulo" hidden>
+            <p id="menuTitulo" class="tit" translate="no">TRIGON</p>
+            <div class="menu-botones">
+              <button type="button" id="btnJugar" class="boton">▶ Jugar</button>
+              <button type="button" id="btnSeguirPartida" class="boton secundario" hidden>Volver a la partida</button>
+            </div>
+            <div class="menu-paneles">
+              <section class="panel" aria-labelledby="tuMejorTit">
+                <h2 id="tuMejorTit">Tu mejor puntaje</h2>
+                <p class="grande" id="menuMejor" translate="no">0</p>
+                <p class="chico" id="menuPartidas"></p>
+              </section>
+              <section class="panel" aria-labelledby="tablaTit">
+                <h2 id="tablaTit">🏆 Clasificación</h2>
+                <p class="chico" id="tablaRecord"></p>
+                <ol id="tabla" class="tabla"></ol>
+                <p class="chico" id="tablaEstado" role="status"></p>
+              </section>
+            </div>
+            <button type="button" id="btnComo" class="enlace" aria-expanded="false" aria-controls="comoSeJuega">¿Cómo se juega?</button>
+            <div id="comoSeJuega" class="como" hidden>
+              <p>Arrastra cada una de las tres piezas de la mano hasta el hexágono. No se pueden girar: llegan ya orientadas.</p>
+              <p>Completa una línea de triángulos —horizontal o en cualquiera de las dos diagonales— y se borra. Cerrar varias de una vez da más puntos, y cerrar líneas en jugadas seguidas arma una <b>racha</b> que multiplica el bono.</p>
+              <p>Al usar las tres piezas llega otra mano. La partida termina cuando ninguna pieza que te queda cabe en el tablero.</p>
+              <p><b>Poderes</b>: cerrar líneas puede regalarte uno (más probable si cierras varias a la vez). Aparecen sobre el tablero:</p>
+              <p>🔨 <b>Martillo</b> rompe un triángulo · 🔄 <b>Girar</b> gira 60° una pieza de tu mano · 🔀 <b>Cambiar mano</b> te da tres piezas nuevas · 💣 <b>Bomba</b> rompe los triángulos alrededor de un punto · 💥 <b>Segunda oportunidad</b> (muy rara) borra la mitad de abajo cuando ya no cabe nada.</p>
+              <p>Si ninguna pieza cabe pero algún poder puede salvarte, la partida sigue y ese poder late.</p>
+              <p class="chico">Teclado: <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> eligen pieza, flechas la mueven, <kbd>Enter</kbd> la suelta, <kbd>Esc</kbd> cancela. Poderes: <kbd>H</kbd> martillo, <kbd>G</kbd> girar, <kbd>C</kbd> cambiar, <kbd>B</kbd> bomba, <kbd>V</kbd> segunda oportunidad.</p>
+            </div>
+          </div>
+        </div>
+
+        <p class="nota" id="nota"></p>
+      </main>
+      <aside></aside>
+    </div>
+  </div>
+  <svg id="arrastre" class="arrastre" aria-hidden="true" hidden></svg>
+  <script src="motor.js?v=trigon-6"></script>
+  <script src="juego.js?v=trigon-12"></script>
+</body>
+</html>

@@ -38,6 +38,7 @@ export const CONTROLES = {
   "sudoku": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
   "tetris": {"movil":true,"pc":true,"pide":"","por":"escucha toques"},
   "tetrisclub": {"movil":true,"pc":true,"pide":"","por":"escucha toques"},
+  "trigon": {"movil":true,"pc":true,"pide":"","por":"escucha toques"},
   "tulones": {"movil":true,"pc":true,"pide":"","por":"@controles: tactil raton teclado"},
   "uno": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
   "worms": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},

@@ -29,6 +29,9 @@ export function categoriaClub(juego, categoria) {
     // 2048: el mejor puntaje y la ficha más alta.
     : juego === 'dosmil'
     ? /^club-dosmil-(puntos|ficha)$/.test(categoria)
+    // Trigon: una sola tabla, el puntaje de la partida.
+    : juego === 'trigon'
+    ? categoria === 'club-trigon-puntos'
     // Metro Rush: la mejor carrera de cada modo normal (carrera es el clásico; puro,
     // sinmonedas, city y citypuro, los otros) y la carrera más larga de cada mundo
     // (distancia la Línea 3, citydistancia City; ahí van también los modos fantasma,
@@ -72,6 +75,8 @@ export function resultadoClub(juego, dato) {
   /* 2048: el puntaje, hasta 4 000 000; la ficha, una potencia de 2 hasta 262 144. */
   if (dato.categoria === 'club-dosmil-puntos' && dato.puntos > 4000000) return null;
   if (dato.categoria === 'club-dosmil-ficha' && (dato.puntos > 262144 || (dato.puntos & (dato.puntos - 1)) !== 0)) return null;
+  /* Trigon: el puntaje, hasta 1 000 000 (la racha multiplica el bono). */
+  if (dato.categoria === 'club-trigon-puntos' && dato.puntos > 1000000) return null;
   /* Metro Rush: una carrera pasa del millón de puntos sin esfuerzo, así que
      su tope es el de la regla (1 000 000 000); la distancia son metros,
      hasta 1 000 000 (mil kilómetros en una carrera). */

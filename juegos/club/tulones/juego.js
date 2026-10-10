@@ -83,11 +83,13 @@
   const lerp = (a, b, t) => a + (b - a) * t;
 
   /* ---------------- el tulón ---------------- */
+  // El color del sombrero ya no se elige: cada uno trae el suyo.
+  const COLOR_SOMBRERO = { gorra: '#e2483d', vaquero: '#8b5a2b', vikingo: '#2a2a2a', lana: '#e2483d', chupalla: '#2a2a2a' };
   function colores(asp, helada) {
-    const f = c => helada ? mezcla(c, '#bfe8ff', .35) : c;
+    const f = c => helada ? mezcla(c, '#bfe8ff', .35) : c, cal = C.colorCalzon[asp.colorCalzon];
     return {
-      piel: f(C.piel[asp.piel]), pelo: f(C.colorPelo[asp.colorPelo]), calzon: f(C.colorCalzon[asp.colorCalzon]),
-      calcetin: f(C.colorCalcetin[asp.colorCalcetin]), sombrero: f(C.colorSombrero[asp.colorSombrero])
+      piel: f(C.piel[asp.piel]), pelo: f(C.colorPelo[asp.colorPelo]), calzon: f(cal === 'chilena' ? '#ffffff' : cal),
+      calcetin: f(C.colorCalcetin[asp.colorCalcetin]), sombrero: f(COLOR_SOMBRERO[C.sombrero[asp.sombrero]] || '#e2483d')
     };
   }
 
@@ -96,6 +98,7 @@
     asp = asp || M.PRESETS[0];
     const K = colores(asp, opts.helada), X = i => P[i * 2], Y = i => P[i * 2 + 1];
     const fis = C.fisico[asp.fisico], calzon = C.calzon[asp.calzon], calc = C.calcetines[asp.calcetines];
+    const chilena = C.colorCalzon[asp.colorCalzon] === 'chilena';
     const gb = fis === 'fornido' ? 1.2 : fis === 'flaco' ? .85 : 1;
     ctx.save();
     ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.strokeStyle = TINTA; ctx.lineWidth = 2.5;
@@ -191,6 +194,14 @@
     ctx.fill(); ctx.stroke();
     ctx.save(); ctx.clip();
     if (calzon === 'bañador') { ctx.fillStyle = claro(K.calzon, .6); ctx.fillRect(-19, -7, 5, 30); ctx.fillRect(14, -7, 5, 30); }
+    if (chilena) {
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(-20, -8, 40, 15);
+      ctx.fillStyle = '#d52b1e'; ctx.fillRect(-20, 7, 40, 16);
+      ctx.fillStyle = '#0039a6'; ctx.fillRect(-20, -8, 14, 15);
+      ctx.fillStyle = '#ffffff'; ctx.beginPath();
+      for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? 1.6 : 3.8; ctx.lineTo(-13 + Math.cos(a) * rr, -.5 + Math.sin(a) * rr); }
+      ctx.closePath(); ctx.fill();
+    }
     if (calzon === 'corazones') {
       ctx.fillStyle = '#e2304a';
       for (const [hx, hy] of [[-11, -1], [10, 0], [-2, 8], [12, 9], [-13, 9]]) {
@@ -198,20 +209,32 @@
         ctx.bezierCurveTo(hx + 2, hy - 5, hx + 5, hy - 1, hx, hy + 3); ctx.fill();
       }
     }
-    ctx.fillStyle = oscuro(K.calzon, .15); ctx.fillRect(-20, 9, 40, 14);
+    if (!chilena) { ctx.fillStyle = oscuro(K.calzon, .15); ctx.fillRect(-20, 9, 40, 14); }
     ctx.restore();
     // Cinturilla.
     ctx.fillStyle = calzon === 'slip' ? claro(K.calzon, .3) : oscuro(K.calzon, .2);
     ctx.beginPath(); ctx.rect(-18.5, -8, 37, 5); ctx.fill(); ctx.stroke();
-    // El bulto: dentro del calzón, se bambolea.
-    const bx = bul ? bul.x : 0, by = bul ? bul.y : 1.6;
-    ctx.fillStyle = oscuro(K.calzon, .05);
-    elipse(ctx, bx, 9 + by, 6, 5, 0, null); ctx.fill(); ctx.stroke();
-    ctx.save(); ctx.fillStyle = claro(K.calzon, .35); elipse(ctx, bx - 2, 7 + by, 2.2, 1.6, -.5, null, false); ctx.fill(); ctx.restore();
+    // El bulto: un péndulo de tela que cuelga de la entrepierna (ENGANCHE) hasta la punta que da el motor.
+    // El grosor va con el tamaño del aspecto; «chico» es un circulito sin péndulo.
+    const ENGANCHE = 4, largo = M.largoBulto(asp);
+    const bx = bul ? bul.x : 0, by = ENGANCHE + (bul ? bul.y : largo);
+    const tela = chilena ? '#d52b1e' : oscuro(K.calzon, .05);
+    ctx.save(); ctx.lineCap = 'round';
+    if (largo < 1) {
+      ctx.fillStyle = tela; elipse(ctx, 0, ENGANCHE + 3, 2.6, 2.6, 0, null); ctx.fill(); ctx.stroke();
+    } else {
+      const grosor = largo <= 6 ? 7 : largo <= 12 ? 8.5 : 10;
+      ctx.strokeStyle = TINTA; ctx.lineWidth = grosor + 3;
+      ctx.beginPath(); ctx.moveTo(0, ENGANCHE); ctx.lineTo(bx, by); ctx.stroke();
+      ctx.strokeStyle = tela; ctx.lineWidth = grosor;
+      ctx.beginPath(); ctx.moveTo(0, ENGANCHE); ctx.lineTo(bx, by); ctx.stroke();
+      ctx.fillStyle = '#ffffff55'; elipse(ctx, bx * .7 - 1.5, ENGANCHE + (by - ENGANCHE) * .7, 1.8, Math.min(2.6 + largo * .06, 7), -Math.atan2(bx, by - ENGANCHE), null, false); ctx.fill();
+    }
+    ctx.restore();
     // Costuras en Y.
     if (calzon === 'slip') {
       ctx.save(); ctx.lineWidth = 1.2; ctx.strokeStyle = oscuro(K.calzon, .35);
-      ctx.beginPath(); ctx.moveTo(-9, -3); ctx.quadraticCurveTo(-6, 6, bx - 5, 9 + by); ctx.moveTo(9, -3); ctx.quadraticCurveTo(6, 6, bx + 5, 9 + by); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-9, -3); ctx.quadraticCurveTo(-6, 4, -4, ENGANCHE); ctx.moveTo(9, -3); ctx.quadraticCurveTo(6, 4, 4, ENGANCHE); ctx.stroke();
       ctx.restore();
     }
     ctx.restore(); // fin marco torso
@@ -371,6 +394,19 @@
       ctx.fillStyle = '#9aa4ae'; ctx.beginPath(); ctx.moveTo(-16, -8); ctx.quadraticCurveTo(-16, -30, 0, -30); ctx.quadraticCurveTo(16, -30, 16, -8); ctx.closePath(); ctx.fill(); ctx.stroke();
       ctx.fillStyle = K.sombrero; ctx.fillRect(-16, -12, 32, 4); ctx.strokeRect(-16, -12, 32, 4);
       ctx.fillRect(-2, -30, 4, 18);
+    } else if (sombrero === 'chupalla' || sombrero === 'paja') {
+      // Chupalla: copa baja y plana con cinta del color elegido. Paja (Luffy): copa redonda con cinta roja.
+      const paja = '#e9c873', hebra = '#b8913f', cinta = sombrero === 'paja' ? '#d63a2f' : K.sombrero;
+      ctx.fillStyle = paja;
+      ctx.beginPath(); ctx.ellipse(0, -14, sombrero === 'paja' ? 30 : 33, 5.5, 0, 0, 7); ctx.fill(); ctx.stroke();
+      ctx.beginPath();
+      if (sombrero === 'paja') { ctx.moveTo(-14, -15); ctx.quadraticCurveTo(-15, -34, 0, -34); ctx.quadraticCurveTo(15, -34, 14, -15); }
+      else { ctx.moveTo(-13, -15); ctx.lineTo(-11.5, -29); ctx.quadraticCurveTo(0, -31, 11.5, -29); ctx.lineTo(13, -15); }
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = cinta; ctx.beginPath(); ctx.rect(-13.6, -21, 27.2, 5); ctx.fill(); ctx.stroke();
+      ctx.save(); ctx.lineWidth = 1; ctx.strokeStyle = hebra;
+      for (let x = -26; x <= 26; x += 6) { ctx.beginPath(); ctx.moveTo(x, -16); ctx.lineTo(x * 1.08, -12.5); ctx.stroke(); }
+      ctx.restore();
     } else if (sombrero === 'lana') {
       ctx.beginPath(); ctx.moveTo(-15, -10); ctx.quadraticCurveTo(-16, -33, 0, -33); ctx.quadraticCurveTo(16, -33, 15, -10); ctx.closePath(); ctx.fill(); ctx.stroke();
       ctx.fillStyle = oscuro(K.sombrero, .2); ctx.beginPath(); ctx.rect(-16.5, -14, 33, 7); ctx.fill(); ctx.stroke();
@@ -397,7 +433,7 @@
     x0 -= 40; x1 += 40; y0 -= 44; y1 += 10;
     const s = Math.min(w / (x1 - x0), h / (y1 - y0)) * dpr;
     ctx.setTransform(s, 0, 0, s, cv.width / 2 - (x0 + x1) / 2 * s, cv.height / 2 - (y0 + y1) / 2 * s);
-    dibujaTulon(ctx, P, bul || { x: 0, y: 1.6 }, asp, {});
+    dibujaTulon(ctx, P, bul || { x: 0, y: M.largoBulto(asp) }, asp, {});
   }
 
   /* ---------------- escenario ---------------- */
@@ -494,6 +530,15 @@
     // Línea del tope.
     ctx.save(); ctx.strokeStyle = '#e2483d'; ctx.lineWidth = 2.5; ctx.setLineDash([10, 8]);
     ctx.beginPath(); ctx.moveTo(-400, -tope * 100); ctx.lineTo(300, -tope * 100); ctx.stroke(); ctx.restore();
+    // Línea fantasma: lo más alto que llegó el que trepa, en cuanto pasa la roja.
+    if (cuerpo && maxTurno > tope) {
+      const yf = -maxTurno * 100;
+      ctx.save(); ctx.globalAlpha = .75; ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 2.5; ctx.setLineDash([4, 6]);
+      ctx.beginPath(); ctx.moveTo(-400, yf); ctx.lineTo(250, yf); ctx.stroke();
+      ctx.setLineDash([]); ctx.font = '15px "Lilita One", sans-serif'; ctx.fillStyle = '#ffffff'; ctx.strokeStyle = TINTA; ctx.lineWidth = 3;
+      ctx.strokeText('máx ' + fmt(maxTurno), 160, yf - 6); ctx.fillText('máx ' + fmt(maxTurno), 160, yf - 6);
+      ctx.restore();
+    }
 
     dibujaCabra(ctx);
     if (mundoW) for (const f of mundoW.torre) dibujaTulon(ctx, f.p, f.bulto, f.aspecto, { helada: true, cara: 'helado' });
@@ -506,6 +551,7 @@
       if (k >= 0) { const e = M.MIEMBROS[k].ext; mira = [P[e * 2], P[e * 2 + 1]]; }
       dibujaTulon(ctx, P, cuerpo.bulto, cuerpo.aspecto, { held: cuerpo.held, pin: cuerpo.pin, cara, mira });
     }
+    if (traza.on) pintaTraza(ctx);
   }
 
   /* ---------------- jugadores ---------------- */
@@ -548,22 +594,30 @@
   /* ---------------- editor ---------------- */
   const NOMBRES = {
     piel: 'Piel', pelo: 'Pelo', colorPelo: 'Color de pelo', barba: 'Barba', calzon: 'Calzón', colorCalzon: 'Color del calzón',
-    calcetines: 'Calcetines', colorCalcetin: 'Color de calcetines', sombrero: 'Sombrero', colorSombrero: 'Color del sombrero', fisico: 'Físico'
+    calcetines: 'Calcetines', colorCalcetin: 'Color de calcetines', sombrero: 'Sombrero', colorSombrero: 'Color del sombrero', fisico: 'Físico',
+    tamano: 'Tamaño'
   };
-  const BONITO = { tupe: 'tupé', boxer: 'bóxer', panzon: 'panzón', ninguna: 'sin barba', ninguno: 'nada', lana: 'gorro de lana' };
+  const BONITO = {
+    tupe: 'tupé', boxer: 'bóxer', flaco: 'flacuchento', panzon: 'guatón', fornido: 'mamado', ninguna: 'sin barba', ninguno: 'nada', lana: 'gorro chilote',
+    chupalla: 'chupalla', paja: 'de paja (Luffy)', chilena: 'bandera chilena', anaconda: 'Anaconda'
+  };
+  // Lo que el editor ya no muestra (queda fijo en M.FIJOS).
+  const EDITABLES = M.CAMPOS.filter(k => !(k in M.FIJOS));
   const editor = $('editor');
   let editando = -1, borrador = null;
   function pintaEditor() {
     retrato($('edLienzo'), borrador, 220, 300);
     const cont = $('edCampos'); cont.textContent = '';
-    for (const k of M.CAMPOS) {
+    for (const k of EDITABLES) {
       const fila = document.createElement('div'); fila.className = 'ed-campo';
       const et = document.createElement('span'); et.textContent = NOMBRES[k]; fila.appendChild(et);
       const lista = C[k];
       if (/^#/.test(lista[0])) {
         const m = document.createElement('div'); m.className = 'muestras'; m.setAttribute('role', 'group'); m.setAttribute('aria-label', NOMBRES[k]);
         lista.forEach((col, i) => {
-          const b = document.createElement('button'); b.type = 'button'; b.style.background = col;
+          const b = document.createElement('button'); b.type = 'button';
+          b.style.background = col === 'chilena' ? 'linear-gradient(#fff 50%, #d52b1e 50%)' : col;
+          if (col === 'chilena') b.title = 'Bandera chilena';
           b.setAttribute('aria-pressed', String(borrador[k] === i)); b.setAttribute('aria-label', NOMBRES[k] + ' ' + (i + 1));
           b.addEventListener('click', () => { borrador[k] = i; pintaEditor(); });
           m.appendChild(b);
@@ -607,6 +661,10 @@
   /* ---------------- partida ---------------- */
   let estado = 'menu', pausado = false, mundoW = null, cuerpo = null;
   let turnoN = 0, ronda = 1, rondas = 5, segTurno = 45, quedan = 0, mejores = [], ultTic = -1;
+  // Reglas: cada turno hay que pasar la línea roja (la torre al empezar el turno). Quien no la pasa queda
+  // eliminado. Con varios jugadores gana el último en pie; jugando solo, se sigue hasta fallar. maxTurno es lo más alto del que trepa ahora (línea fantasma).
+  let vivos = [], meta = 0, maxTurno = 0, aviso = '';
+  const SUPERA_MIN = .01;
   const capas = { menu: $('menu'), turno: $('turno'), pausa: $('pausa'), fin: $('fin') };
   function muestra(nombre) { for (const k in capas) capas[k].hidden = k !== nombre; }
   const tactil = $('tactil');
@@ -616,6 +674,7 @@
   function empezar() {
     segTurno = +$('selTiempo').value || 45; rondas = +$('selRondas').value; if (!Number.isFinite(rondas)) rondas = 5;
     mundoW = M.mundo(); turnoN = 0; ronda = 1; mejores = jugadores.map(() => 0); cuerpo = null;
+    vivos = jugadores.map(() => true); aviso = '';
     cam.x = 0; cam.y = -156;
     preparaTurno();
   }
@@ -626,7 +685,9 @@
     const j = actual();
     retrato($('retrato'), j, 160, 200);
     $('turnoNombre').textContent = j.nombre;
-    $('turnoFrase').textContent = rondas ? 'Ronda ' + ronda + ' de ' + rondas : 'Ronda ' + ronda;
+    meta = M.alturaMundo(mundoW); maxTurno = 0;
+    $('turnoFrase').textContent = (rondas ? 'Ronda ' + ronda + ' de ' + rondas : 'Ronda ' + ronda) + ' · supera ' + fmt(meta);
+    $('turnoAviso').textContent = aviso; $('turnoAviso').hidden = !aviso;
     $('nQuien').textContent = j.nombre;
     $('nTiempo').textContent = segTurno + ' s'; $('nTiempo').classList.remove('apura');
     $('nAltura').textContent = fmt(0);
@@ -646,9 +707,11 @@
     }
     return false;
   }
+  const CAIDA = 60;
   function saleTulon() {
     let c = null;
     for (let t = 0; t < 8; t++) { c = M.crea(-200 - t * 120, actual()); if (!choca(c)) break; c = null; }
+    if (c) for (let i = 0; i < M.N; i++) { c.p[i * 2 + 1] -= CAIDA; c.q[i * 2 + 1] -= CAIDA; }
     if (!c) {
       c = M.crea(-200, actual());
       const sube = M.alturaMundo(mundoW) * 100 + 20;
@@ -658,39 +721,49 @@
     return c;
   }
   function arranca() {
-    cuerpo = saleTulon(); quedan = segTurno; ultTic = -1; acum = 0;
+    cuerpo = saleTulon(); traza.puntos = []; traza.registro = []; if (traza.on) empiezaGrabacion(); quedan = segTurno; ultTic = -1; acum = 0;
     estado = 'jugando'; muestra(null); inmersivo(true);
     escenario.focus({ preventScroll: true });
   }
   function terminaTurno() {
     if (estado !== 'jugando') return;
     soltarTodo();
-    const i = turnoN % jugadores.length;
+    const i = turnoN % jugadores.length, j = jugadores[i];
+    const h = cuerpo && M.valido(cuerpo) ? M.altura(cuerpo) : 0;
     if (cuerpo && M.valido(cuerpo)) {
       M.congela(cuerpo, mundoW);
-      mejores[i] = Math.max(mejores[i], M.altura(cuerpo));
+      mejores[i] = Math.max(mejores[i], h);
       sonido.congela();
     }
     cuerpo = null;
-    turnoN++;
-    if (turnoN % jugadores.length === 0) ronda++;
-    if (rondas && ronda > rondas) return terminaPartida();
+    if (h > meta + SUPERA_MIN) aviso = '';
+    else { vivos[i] = false; aviso = j.nombre + ' no superó ' + fmt(meta) + ': eliminado'; }
+    const enPie = vivos.filter(Boolean).length;
+    if (!enPie) return terminaPartida({ nadie: true });
+    if (jugadores.length > 1 && enPie === 1) return terminaPartida({ ganador: vivos.indexOf(true) });
+    do { turnoN++; if (turnoN % jugadores.length === 0) ronda++; } while (!vivos[turnoN % jugadores.length]);
+    if (rondas && ronda > rondas) return terminaPartida({});
     preparaTurno();
   }
-  function terminaPartida() {
+  function terminaPartida(fin) {
+    fin = fin || {};
     estado = 'fin'; pausado = false; inmersivo(false); soltarTodo(); cuerpo = null;
     if (document.pointerLockElement) document.exitPointerLock();
     const torre = mundoW ? M.alturaMundo(mundoW) : 0;
     const nuevo = mundoW && mundoW.torre.length > 0 && torre > record;
     if (nuevo) { record = torre; guarda(clave('tulones.record'), record); }
     $('finTorre').textContent = fmt(torre); $('finNuevo').hidden = !nuevo;
+    const gana = fin.ganador != null ? jugadores[fin.ganador] : null;
+    $('finTitulo').textContent = gana ? '¡GANA ' + gana.nombre.toUpperCase() + '!' : fin.nadie ? 'NADIE SUPERÓ LA TORRE' : '¡TORRE TERMINADA!';
     const L = $('finLista'); L.textContent = '';
-    jugadores.map((j, i) => ({ j, h: mejores[i] || 0 })).sort((a, b) => b.h - a.h).forEach((o, n) => {
+    jugadores.map((j, i) => ({ j, h: mejores[i] || 0, fuera: vivos[i] === false, gana: i === fin.ganador }))
+      .sort((a, b) => (b.gana - a.gana) || (b.h - a.h)).forEach((o, n) => {
       const li = document.createElement('li');
       const pos = document.createElement('span'); pos.className = 'pos'; pos.textContent = (n + 1) + '.';
       const cv = document.createElement('canvas');
       const nom = document.createElement('span'); nom.className = 'nom'; nom.textContent = o.j.nombre; nom.setAttribute('translate', 'no');
-      const alt = document.createElement('span'); alt.className = 'alt'; alt.textContent = fmt(o.h); alt.setAttribute('translate', 'no');
+      const alt = document.createElement('span'); alt.className = 'alt'; alt.textContent = (o.gana ? '🏆 ' : '') + fmt(o.h) + (o.fuera ? ' ✕' : ''); alt.setAttribute('translate', 'no');
+      if (o.fuera) li.classList.add('fuera');
       li.append(pos, cv, nom, alt); L.appendChild(li);
       retrato(cv, o.j, 44, 55);
     });
@@ -718,7 +791,21 @@
   $('btnCongela').addEventListener('click', terminaTurno);
 
   /* ---------------- controles ---------------- */
-  const TECLA = { KeyA: 0, KeyS: 1, KeyK: 2, KeyL: 3 };
+  let teclas = M.limpiaTeclas(lee(clave('tulones.teclas'), null)), mapaTeclado = null, TECLA = {};
+  const NOMBRE_ACCION = { 0: 'Brazo izquierdo', 1: 'Brazo derecho', 2: 'Pierna izquierda', 3: 'Pierna derecha', congela: 'Congelar ya', pausa: 'Pausa' };
+  const nombre = code => M.nombreTecla(code, mapaTeclado);
+  function aplicaTeclas() {
+    TECLA = {};
+    for (let k = 0; k < 4; k++) TECLA[teclas[k]] = k;
+    document.querySelectorAll('.miembro').forEach(b => { b.querySelector('small').textContent = nombre(teclas[b.dataset.k]); });
+    const nota = $('nota'), kbd = t => { const e = document.createElement('kbd'); e.textContent = nombre(t); e.setAttribute('translate', 'no'); return e; };
+    nota.textContent = '';
+    nota.append('Mantén ', kbd(teclas[0]), ' ', kbd(teclas[1]), ' (brazos) o ', kbd(teclas[2]), ' ', kbd(teclas[3]),
+      ' (piernas) y mueve el ratón. Lo que toca algo se agarra; con todo agarrado, el ratón hacia abajo te sube. ',
+      kbd(teclas.congela), ' congela antes, ', kbd(teclas.pausa), ' pausa.');
+    escenario.setAttribute('aria-label', 'El escenario. Mantén ' + [0, 1, 2, 3].map(k => nombre(teclas[k])).join(', ') + ' para mover un brazo o una pierna y mueve el ratón para llevarlo.');
+    configuraMando();
+  }
   const flechas = { ArrowLeft: false, ArrowRight: false, ArrowUp: false, ArrowDown: false };
   const fuentes = [new Set(), new Set(), new Set(), new Set()]; // quién sostiene cada miembro
   function sostener(k, quien, on) {
@@ -744,18 +831,39 @@
   const jugando = () => estado === 'jugando' && !pausado;
 
   window.addEventListener('keydown', e => {
-    if (editor.open) return;
+    if (editor.open || dlgTeclas.open || dlgNovedades.open) return;
     const t = e.target; if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) return;
     if (e.code in TECLA) { if (!e.repeat && jugando()) sostener(TECLA[e.code], 'tec', true); e.preventDefault(); return; }
     if (e.code in flechas) { if (jugando()) { flechas[e.code] = true; e.preventDefault(); } return; }
-    if (e.code === 'Space') { if (jugando()) { e.preventDefault(); if (!e.repeat) terminaTurno(); } return; }
-    if (e.code === 'KeyP' || e.code === 'Escape') { if (estado === 'jugando') { e.preventDefault(); pausa(!pausado); } }
+    if (e.code === teclas.congela) { if (jugando()) { e.preventDefault(); if (!e.repeat) terminaTurno(); } return; }
+    if (e.code === 'KeyF' && !Object.values(teclas).includes('KeyF')) { e.preventDefault(); pantallaCompleta(); return; }
+    if (e.code === teclas.pausa || e.code === 'Escape') { if (estado === 'jugando') { e.preventDefault(); pausa(!pausado); } }
   });
   window.addEventListener('keyup', e => {
     if (e.code in TECLA) sostener(TECLA[e.code], 'tec', false);
     if (e.code in flechas) flechas[e.code] = false;
   });
   window.addEventListener('blur', () => { if (estado === 'jugando') soltarTodo(); });
+  // La rueda sobre el escenario no mueve la página.
+  escenario.addEventListener('wheel', e => e.preventDefault(), { passive: false });
+
+  /* ---------------- pantalla completa ---------------- */
+  async function pantallaCompleta() {
+    try {
+      // La página entera, no solo el escenario: así el marcador (tiempo, altura, pausa) sigue a la vista.
+      const raiz = document.documentElement;
+      if (document.fullscreenElement) await document.exitFullscreen();
+      else if (raiz.requestFullscreen) await raiz.requestFullscreen();
+      else if (raiz.webkitRequestFullscreen) raiz.webkitRequestFullscreen();
+    } catch (e) { /* el navegador no la deja */ }
+    escenario.focus({ preventScroll: true });
+  }
+  $('btnPantalla').addEventListener('click', pantallaCompleta);
+  document.addEventListener('fullscreenchange', () => {
+    const on = !!document.fullscreenElement;
+    $('btnPantalla').setAttribute('aria-label', on ? 'Salir de pantalla completa' : 'Pantalla completa');
+    $('btnPantalla').textContent = on ? '🗗' : '⛶';
+  });
   document.addEventListener('visibilitychange', () => { if (document.hidden && estado === 'jugando' && !pausado) pausa(true); });
 
   const escala = () => H / 520;
@@ -791,10 +899,11 @@
   if (grueso && grueso.addEventListener) grueso.addEventListener('change', pintaTactil);
   pintaTactil();
 
-  // Mando: botones como teclas, stick izquierdo para llevar.
-  if (window.Mando && window.Mando.configura) {
+  // Mando: botones como teclas, stick izquierdo para llevar. Sigue a las teclas que eligió el jugador.
+  function configuraMando() {
+    if (!window.Mando || !window.Mando.configura) return;
     window.Mando.configura({
-      botones: { a: 'Space', start: 'KeyP', lb: 'KeyA', rb: 'KeyS', lt: 'KeyK', rt: 'KeyL' },
+      botones: { a: teclas.congela, start: teclas.pausa, lb: teclas[0], rb: teclas[1], lt: teclas[2], rt: teclas[3] },
       objetivo: () => escenario,
       menu: () => estado !== 'jugando' || pausado,
       inicio: () => (estado === 'menu' ? $('btnJugar') : estado === 'turno' ? $('btnListo') : estado === 'fin' ? $('btnOtra') : $('btnSeguir')),
@@ -802,6 +911,151 @@
       zonas: [{ sel: '#nota' }]
     });
   }
+
+  /* ---------------- reasignar teclas ---------------- */
+  const dlgTeclas = $('teclas');
+  let esperando = null;
+  function pintaTeclas(foco) {
+    const L = $('tcLista'); L.textContent = '';
+    for (const a of M.ACCIONES) {
+      const fila = document.createElement('div'); fila.className = 'tc-fila';
+      const et = document.createElement('span'); et.textContent = NOMBRE_ACCION[a];
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'tc-tecla'; b.setAttribute('translate', 'no');
+      b.textContent = esperando === a ? '…' : nombre(teclas[a]);
+      b.setAttribute('aria-pressed', String(esperando === a));
+      b.setAttribute('aria-label', NOMBRE_ACCION[a] + ': ' + (esperando === a ? 'pulsa una tecla' : nombre(teclas[a])));
+      b.addEventListener('click', () => { esperando = esperando === a ? null : a; pintaTeclas(a); });
+      fila.append(et, b); L.appendChild(fila);
+      if (a === foco) b.focus();
+    }
+  }
+  function guardaTeclas(nuevas) { teclas = M.limpiaTeclas(nuevas); guarda(clave('tulones.teclas'), teclas); aplicaTeclas(); }
+  $('btnTeclas').addEventListener('click', () => {
+    esperando = null; pintaTeclas();
+    if (dlgTeclas.showModal) dlgTeclas.showModal(); else dlgTeclas.setAttribute('open', '');
+  });
+  $('tcFabrica').addEventListener('click', () => { esperando = null; guardaTeclas(M.TECLAS); pintaTeclas(); });
+  window.addEventListener('keydown', e => {
+    if (!dlgTeclas.open || esperando === null) return;
+    e.preventDefault(); e.stopPropagation();
+    const a = esperando;
+    if (e.code !== 'Escape' && M.teclaValida(e.code)) guardaTeclas(M.asignaTecla(teclas, a, e.code));
+    esperando = null; pintaTeclas(a);
+  }, true);
+  dlgTeclas.addEventListener('cancel', e => { if (esperando !== null) e.preventDefault(); });
+  dlgTeclas.addEventListener('close', () => { esperando = null; });
+  if (navigator.keyboard && navigator.keyboard.getLayoutMap) {
+    navigator.keyboard.getLayoutMap().then(m => { mapaTeclado = m; aplicaTeclas(); if (dlgTeclas.open) pintaTeclas(); }).catch(() => {});
+  }
+  aplicaTeclas();
+
+  /* ---------------- traza (depuración: ?traza en la URL) ---------------- */
+  const ZONA_X = 150, ZONA_Y = 70;
+  function centro(c) { let x = 0, y = 0; for (let i = 0; i < M.N; i++) { x += c.p[i * 2]; y += c.p[i * 2 + 1]; } return [x / M.N, y / M.N]; }
+  // Herramientas de desarrollo (traza, grabación de partidas, copiar/descargar). Apagadas: ponerlo en true y abrir
+  // la página con ?traza para usarlas.
+  const DESARROLLO = false;
+  const traza = { on: DESARROLLO && /[?&]traza\b/.test(location.search), puntos: [], registro: [], ultAviso: -1, partida: [], turno: null, pendiente: [] };
+  /* Grabación para repetir la partida en Node: el mundo y el cuerpo al empezar cada turno, y cada entrada
+     (tecla sostenida o soltada, movimiento de ratón/flechas) con el paso de física antes del que llegó. El motor
+     es determinista, así que con esto se reproduce exacto. */
+  function empiezaGrabacion() {
+    traza.turno = {
+      turno: turnoN, ronda,
+      caps: mundoW.caps.map(s => [s.ax, s.ay, s.bx, s.by, s.r]),
+      p: Array.from(cuerpo.p), q: Array.from(cuerpo.q), entradas: [], centro: []
+    };
+    traza.partida.push(traza.turno); traza.pendiente = [];
+  }
+  if (traza.on) {
+    const sostieneMotor = M.sostiene, empujaMotor = M.empujaMiembros;
+    M.sostiene = (c, k, on) => { if (c === cuerpo) traza.pendiente.push(['s', k, on ? 1 : 0]); return sostieneMotor(c, k, on); };
+    M.empujaMiembros = (c, dx, dy) => { if (c === cuerpo) traza.pendiente.push(['m', dx, dy]); return empujaMotor(c, dx, dy); };
+  }
+  // Una muestra por paso de física: centro, velocidad y qué hacía cada miembro. Avisa en consola de los saltos bruscos.
+  function anotaTraza() {
+    const c = cuerpo, [x, y] = centro(c), ant = traza.puntos[traza.puntos.length - 1];
+    const vx = ant ? (x - ant.x) / M.DT : 0, vy = ant ? (y - ant.y) / M.DT : 0;
+    traza.puntos.push({ x, y, v: Math.hypot(vx, vy) });
+    if (traza.puntos.length > 480) traza.puntos.shift();
+    const fila = {
+      t: +c.t.toFixed(3), x: Math.round(x), y: Math.round(y), vx: Math.round(vx), vy: Math.round(vy),
+      sostiene: c.held.map(Number).join(''), agarra: c.pin.map(p => (p ? 1 : 0)).join(''),
+      toca: c.contacto.map((n, i) => (n ? i : -1)).filter(i => i >= 0).join('.'),
+      vec: c.vec.map(v => v.map(Math.round).join(',')).join(' ')
+    };
+    traza.registro.push(fila);
+    if (traza.turno) {
+      const n = Math.round(c.t / M.DT) - 1;
+      if (traza.pendiente.length) { traza.turno.entradas.push([n, traza.pendiente]); traza.pendiente = []; }
+      if (n % 12 === 0) traza.turno.centro.push([n, Math.round(x), Math.round(y)]);
+    }
+    if (traza.registro.length > 6000) traza.registro.shift();
+    if (vy < -350 && c.t - traza.ultAviso > .5) {
+      traza.ultAviso = c.t;
+      fila.aviso = 'despegue';
+      console.warn('[tulones] despegue brusco ' + JSON.stringify(fila));
+    }
+  }
+  function pintaTraza(ctx) {
+    const pts = traza.puntos;
+    ctx.lineWidth = 3;
+    for (let i = 1; i < pts.length; i++) {
+      const v = Math.min(1, pts[i].v / 600);
+      ctx.strokeStyle = 'hsl(' + Math.round(120 - v * 120) + ',90%,45%)';
+      ctx.beginPath(); ctx.moveTo(pts[i - 1].x, pts[i - 1].y); ctx.lineTo(pts[i].x, pts[i].y); ctx.stroke();
+    }
+    if (!cuerpo) return;
+    const P = cuerpo.p, [x, y] = centro(cuerpo);
+    ctx.fillStyle = '#e2483d'; ctx.beginPath(); ctx.arc(x, y, 6, 0, 7); ctx.fill();
+    M.MIEMBROS.forEach((m, k) => {
+      const rx = P[m.raiz * 2], ry = P[m.raiz * 2 + 1], v = cuerpo.vec[k];
+      if (cuerpo.pin[k]) { ctx.strokeStyle = '#1b8a3a'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(cuerpo.pin[k][0], cuerpo.pin[k][1], 11, 0, 7); ctx.stroke(); }
+      if (!cuerpo.held[k]) return;
+      ctx.strokeStyle = '#7b2ff7'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.moveTo(rx, ry); ctx.lineTo(rx + v[0], ry + v[1]); ctx.stroke(); ctx.setLineDash([]);
+      ctx.beginPath(); ctx.moveTo(rx + v[0] - 6, ry + v[1] - 6); ctx.lineTo(rx + v[0] + 6, ry + v[1] + 6);
+      ctx.moveTo(rx + v[0] + 6, ry + v[1] - 6); ctx.lineTo(rx + v[0] - 6, ry + v[1] + 6); ctx.stroke();
+    });
+    ctx.strokeStyle = '#0006'; ctx.lineWidth = 1; ctx.setLineDash([6, 6]);
+    ctx.strokeRect(cam.x - ZONA_X, cam.y - ZONA_Y, ZONA_X * 2, ZONA_Y * 2); ctx.setLineDash([]);
+  }
+
+  if (traza.on) {
+    $('filaTraza').hidden = false;
+    $('btnTraza').addEventListener('click', async () => {
+      const b = $('btnTraza');
+      try { await navigator.clipboard.writeText(JSON.stringify(traza.registro)); b.dataset.ok = '1'; b.textContent = '✓ Copiada'; }
+      catch (e) { b.textContent = '✕ No se pudo: descárgala'; }
+      setTimeout(() => { b.textContent = '📋 Copiar traza'; }, 1800);
+    });
+    $('btnTrazaBaja').addEventListener('click', () => {
+      const a = document.createElement('a');
+      const datos = { motor: M.VERSION, partida: traza.partida, ultimoTurno: traza.registro };
+      a.href = URL.createObjectURL(new Blob([JSON.stringify(datos)], { type: 'application/json' }));
+      a.download = 'tulones-traza.json'; a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    });
+  }
+
+  /* ---------------- novedades ---------------- */
+  // Versión que ve el jugador (la del registro de cambios); M.VERSION es la de compilación, para la caché.
+  const VERSION_JUEGO = '0.2';
+  const dlgNovedades = $('novedades');
+  function pestanaNovedades(prox) {
+    $('nvTabCambios').setAttribute('aria-selected', String(!prox)); $('nvTabProx').setAttribute('aria-selected', String(prox));
+    $('nvCambios').hidden = prox; $('nvProx').hidden = !prox;
+  }
+  function abreNovedades() {
+    pestanaNovedades(false);
+    if (dlgNovedades.showModal) dlgNovedades.showModal(); else dlgNovedades.setAttribute('open', '');
+  }
+  $('nvTabCambios').addEventListener('click', () => pestanaNovedades(false));
+  $('nvTabProx').addEventListener('click', () => pestanaNovedades(true));
+  $('btnNovedades').addEventListener('click', abreNovedades);
+  dlgNovedades.addEventListener('close', () => guarda(clave('tulones.novedades'), VERSION_JUEGO));
+  // Se abre sola una vez por versión.
+  if (lee(clave('tulones.novedades'), null) !== VERSION_JUEGO) setTimeout(abreNovedades, 300);
 
   /* ---------------- bucle ---------------- */
   let acum = 0, antes = performance.now();
@@ -818,7 +1072,7 @@
       if (mx || my) M.empujaMiembros(cuerpo, mx * v, my * v);
       acum += dt;
       let n = 0;
-      while (acum >= M.DT && n < 14) { M.paso(cuerpo, mundoW); acum -= M.DT; n++; }
+      while (acum >= M.DT && n < 14) { M.paso(cuerpo, mundoW); if (traza.on) anotaTraza(); acum -= M.DT; n++; }
       if (n >= 14) acum = 0;
       if (!M.valido(cuerpo)) { cuerpo = null; terminaTurno(); }
       else {
@@ -828,15 +1082,20 @@
         $('nTiempo').textContent = s + ' s';
         $('nTiempo').classList.toggle('apura', quedan <= 5);
         if (quedan <= 5 && s !== ultTic && s > 0) { ultTic = s; sonido.tic(); }
-        $('nAltura').textContent = fmt(M.altura(cuerpo));
+        const alto = M.altura(cuerpo); maxTurno = Math.max(maxTurno, alto);
+        $('nAltura').textContent = fmt(alto); $('nAltura').classList.toggle('supera', alto > meta + SUPERA_MIN);
         if (quedan <= 0) terminaTurno();
       }
     }
-    // Cámara: sigue a la pelvis del que trepa.
+    // Cámara quieta mientras el tulón está en la zona central; solo se corre, suave, si se acerca al borde.
     if (cuerpo) {
-      const tx = cuerpo.p[I.pelvis * 2], ty = Math.min(cuerpo.p[I.pelvis * 2 + 1] - 20, -156);
-      const a = 1 - Math.exp(-dt * 4);
-      cam.x += (tx * .6 - cam.x) * a; cam.y += (ty - cam.y) * a;
+      const [cx, cy] = centro(cuerpo);
+      let tx = cam.x, ty = cam.y;
+      if (cx > tx + ZONA_X) tx = cx - ZONA_X; else if (cx < tx - ZONA_X) tx = cx + ZONA_X;
+      if (cy > ty + ZONA_Y) ty = cy - ZONA_Y; else if (cy < ty - ZONA_Y) ty = cy + ZONA_Y;
+      ty = Math.min(ty, -156);
+      const a = 1 - Math.exp(-dt * 3);
+      cam.x += (tx - cam.x) * a; cam.y += (ty - cam.y) * a;
     } else if (mundoW && estado !== 'menu') {
       const ty = Math.min(-M.alturaMundo(mundoW) * 100 * .6, -156), a = 1 - Math.exp(-dt * 2);
       cam.x += (0 - cam.x) * a; cam.y += (ty - cam.y) * a;
@@ -847,8 +1106,10 @@
 
   pintaLista();
   muestra('menu');
+  document.querySelector('.logo').textContent = 'TULONES v' + VERSION_JUEGO;
   requestAnimationFrame(cuadro);
 
   // Para pruebas desde la consola.
-  window.__tulones = { estado: () => ({ estado, pausado, turno: turnoN, ronda, torre: mundoW ? M.alturaMundo(mundoW) : 0, altura: cuerpo ? M.altura(cuerpo) : 0 }), retrato };
+  window.__tulones = { estado: () => ({ estado, pausado, turno: turnoN, ronda, torre: mundoW ? M.alturaMundo(mundoW) : 0, altura: cuerpo ? M.altura(cuerpo) : 0 }), retrato,
+    registro: () => JSON.stringify(traza.registro), grabacion: () => JSON.stringify({ motor: M.VERSION, partida: traza.partida }), traza: on => { traza.on = on !== false; } };
 })();

@@ -151,6 +151,7 @@ que se espera de cada uno:
 | Atasco | `club-atasco-estrellas` | los movimientos de cada nivel (motor y solver ya puros) | baja |
 | ALETEO | `club-aleteo-vuelo` | semilla + tick de cada aleteo (física determinista a 1/60 s) | baja |
 | 2048 | `club-dosmil-puntos`, `club-dosmil-ficha` | semilla + dirección y Δms de cada jugada | baja |
+| Trigon | `club-trigon-puntos` | semilla + pieza, traslación y Δms de cada jugada | baja |
 | Electrodle | `club-electro-*` | los intentos de cada modo; el blanco sale de la fecha | media |
 | sortEm | `club-sortem-*` (tiempo) | el reparto + cada movimiento | media |
 | BBTAN | `club-bbtan-rondas` | semilla + ángulo de cada tiro (física determinista) | alta |

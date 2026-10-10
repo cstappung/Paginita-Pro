@@ -103,7 +103,7 @@ const FABRICAS = {
 const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞", pokemon: "◓", boxhead: "▣", gato: "#" };
 /* Los clubes de un jugador, con sus claves de la clasificación y los
    mismos signos que llevan en su tarjeta del vestíbulo. */
-const ICONO_TODOS = { ...ICONO, general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", frontera: "🏰", sudoku: "🔢", fanal: "🪔", atasco: "🚗", aleteo: "🐦", dosmil: "🟨", metrorush: "🚇", tulones: "🩲", yzombis: "🧟" };
+const ICONO_TODOS = { ...ICONO, general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", frontera: "🏰", sudoku: "🔢", fanal: "🪔", atasco: "🚗", aleteo: "🐦", dosmil: "🟨", trigon: "🔺", metrorush: "🚇", tulones: "🩲", yzombis: "🧟" };
 
 /* Lo que puede elegir quien abre la sala, por juego. Vive aquí y no en
    `motor.js` porque son controles y no reglas: el motor ya recorta lo
@@ -255,7 +255,7 @@ function leePopular() {
 }
 /* Los de un jugador, con su clave de popularidad. Cuentan como juegos en
    la marquesina: el «18» fijo de antes se quedó atrás con cada club. */
-const CLUBES = ["club-minas", "club-snake", "club-tetris", "club-sortem", "club-bbtan", "club-sopa", "club-electro", "club-frontera", "club-sudoku", "club-fanal", "club-atasco", "club-aleteo", "club-dosmil", "club-metrorush", "club-tulones"];
+const CLUBES = ["club-minas", "club-snake", "club-tetris", "club-sortem", "club-bbtan", "club-sopa", "club-electro", "club-frontera", "club-sudoku", "club-fanal", "club-atasco", "club-aleteo", "club-dosmil", "club-trigon", "club-metrorush", "club-tulones"];
 function ordenPopular(claves) {
   const n = state.popular, pos = Object.fromEntries(claves.map((k, i) => [k, i]));
   return claves.slice().sort((a, b) => (n[b] || 0) - (n[a] || 0) || pos[a] - pos[b]);
@@ -851,7 +851,7 @@ function celebra(juego, id) {
    barra de direcciones. */
 function leerRuta() {
   const h = (location.hash || "").replace(/^#/, "");
-  if (/^solo\/(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|dosmil|metrorush|tulones)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
+  if (/^solo\/(minas|snake|tetris|sortem|bbtan|sopa|electro|frontera|sudoku|fanal|atasco|aleteo|dosmil|trigon|metrorush|tulones)$/.test(h)) return { vista: "solo-" + h.slice(5), pid: "" };
   if (h === "ranks") return { vista: "ranks", pid: "" };
   if (h === "logros") return { vista: "logros", pid: "" };
   if (h === "monedas") return { vista: "monedas", pid: "" };
@@ -1479,7 +1479,7 @@ function armazon() {
     h.innerHTML = "";
     logrosVista = crearLogros({ uid: state.user.uid, watchLogros: fb.watchLogros, perfil: perfilDe, icono: ICONO_TODOS,
       orden: () => ordenPopular([...Object.keys(JUEGOS), ...CLUBES])
-        .map(k => ({ "club-minas": "minas", "club-snake": "snake", "club-tetris": "tetrisclub", "club-sortem": "sortem", "club-bbtan": "bbtan", "club-sopa": "sopa", "club-electro": "electro", "club-frontera": "frontera", "club-sudoku": "sudoku", "club-fanal": "fanal", "club-atasco": "atasco", "club-aleteo": "aleteo", "club-dosmil": "dosmil", "club-metrorush": "metrorush", "club-tulones": "tulones" })[k] || k) });
+        .map(k => ({ "club-minas": "minas", "club-snake": "snake", "club-tetris": "tetrisclub", "club-sortem": "sortem", "club-bbtan": "bbtan", "club-sopa": "sopa", "club-electro": "electro", "club-frontera": "frontera", "club-sudoku": "sudoku", "club-fanal": "fanal", "club-atasco": "atasco", "club-aleteo": "aleteo", "club-dosmil": "dosmil", "club-trigon": "trigon", "club-metrorush": "metrorush", "club-tulones": "tulones" })[k] || k) });
     logrosVista.montar(h);
     return;
   }
@@ -1709,6 +1709,9 @@ const NOVEDADES = [
     lema: "El tres en raya de siempre, en tiza sobre la pizarra. O el Super Gato: nueve gatos dentro de uno, y la casilla donde juegas decide en qué gato juega el otro.",
     sub: "Duelo · dos modalidades", sala: { k: "gato", ops: { variante: "super" } }, reglas: ["gato", "super"],
     modo: "multi", jugadores: "2 jugadores", cuenta: true },
+  { id: "trigon", color: "#f6d23c", alta: "2026-10-10", titulo: "TRIGON",
+    lema: "Arrastra piezas hechas de triángulos al tablero hexagonal. Completa una línea —horizontal o en cualquiera de las dos diagonales— y se borra. Encadena líneas para multiplicar el bono.",
+    sub: "Un jugador · puzle de triángulos · 5 temas", ruta: "#solo/trigon", boton: "Jugar", reglas: ["trigon"], modo: "solo" },
   { id: "tulones", color: "#63b8ee", alta: "2026-10-09", titulo: "TULONES",
     lema: "Trepa sobre una cabra y sobre tus amigos congelados en calzoncillos. Cada brazo y cada pierna se agarra por separado y todo se bambolea. La torre más alta gana. De 1 a 8 en el mismo teclado.",
     sub: "1 a 8 jugadores en el mismo equipo · física de muñecos", ruta: "#solo/tulones", boton: "Trepar", reglas: ["tulones"], modo: "solo" },
@@ -1767,6 +1770,7 @@ function arteNovedad(n) {
   // FANAL: un farol que alumbra la noche y unas polillas que bajan hacia él.
   if (n.id === "fanal") return `<div class="jg-nov-arte-fn"><i></i><i></i><i></i><i></i><i></i><em></em><b>FANAL</b></div>`;
   // Tulones: la misma escena de la portada del club.
+  if (n.id === "trigon") return `<div class="jg-nov-arte-zb">${portadaSolo("trigon")}<b>TRIGON</b></div>`;
   if (n.id === "tulones") return `<div class="jg-nov-arte-zb">${portadaSolo("tulones")}<b>TULONES</b></div>`;
   if (n.id === "gato") return `<div class="jg-nov-arte-zb">${arteJuego("gato")}</div>`;
   if (n.id === "boxhead") return `<div class="jg-nov-arte-zb">${arteJuego("boxhead")}</div>`;

@@ -7,7 +7,7 @@ vm.runInContext(sin('src/juegos/motor.js')+'\n'+sin('src/juegos/logros.js')+'\n;
 const {LOGROS,detecta,deFila,deMarca,reparto,reducir,JUEGOS}=context.__L;
 
 test('diez logros por juego, con ids válidos y únicos',()=>{
- const juegos=[...Object.keys(JUEGOS),'minas','snake','tetrisclub','sortem','bbtan','sopa','electro','frontera','sudoku','fanal','atasco','metrorush','aleteo','dosmil'];
+ const juegos=[...Object.keys(JUEGOS),'minas','snake','tetrisclub','sortem','bbtan','sopa','electro','frontera','sudoku','fanal','atasco','metrorush','aleteo','dosmil','trigon'];
  for(const j of juegos){
   const n=j==='metrorush'?11:10;   // Metro Rush suma «Cazafantasmas», el único individual que se escribe en vivo
   assert.ok(LOGROS[j],j);assert.equal(LOGROS[j].length,n,j);

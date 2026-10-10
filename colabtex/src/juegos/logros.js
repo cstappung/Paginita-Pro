@@ -404,6 +404,21 @@ const SOLO = {
     { id: "p50k", n: "Constructor", d: "Haz 50 000 puntos en una partida.", i: "🏗️", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 50000 },
     { id: "p100k", n: "Arquitecto", d: "Haz 100 000 puntos en una partida.", i: "🏛️", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 100000 }
   ],
+  /* Trigon. Todos salen de club-trigon-puntos (el puntaje de la partida):
+     un jugador que solo busca la línea más cercana ronda los 300; los de
+     arriba piden planificar y encadenar rachas. */
+  trigon: [
+    { id: "p100", n: "Primer triángulo", d: "Haz 100 puntos en una partida.", i: "🔺", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 100 },
+    { id: "p250", n: "Ya le agarraste la mano", d: "Haz 250 puntos en una partida.", i: "🔻", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 250 },
+    { id: "p500", n: "Tres direcciones", d: "Haz 500 puntos en una partida.", i: "📐", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 500 },
+    { id: "p1k", n: "Mil", d: "Haz 1 000 puntos en una partida.", i: "🔷", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 1000 },
+    { id: "p1500", n: "Hexágono limpio", d: "Haz 1 500 puntos en una partida.", i: "⬡", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 1500 },
+    { id: "p2500", n: "Racha larga", d: "Haz 2 500 puntos en una partida.", i: "🔥", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 2500 },
+    { id: "p4k", n: "Geómetra", d: "Haz 4 000 puntos en una partida.", i: "📏", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 4000 },
+    { id: "p6k", n: "Teselado", d: "Haz 6 000 puntos en una partida.", i: "🧩", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 6000 },
+    { id: "p10k", n: "Diez mil triángulos", d: "Haz 10 000 puntos en una partida.", i: "💎", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 10000 },
+    { id: "p20k", n: "Maestro del hexágono", d: "Haz 20 000 puntos en una partida.", i: "👑", m: "Puntos", s: d => cat(/-puntos$/)(d) && d.puntos >= 20000 }
+  ],
   /* Metro Rush. Los de puntos salen de club-metrorush-carrera (puntos de la
      mejor carrera: 1 000 000 es donde empieza la Estación Fantasma y
      10 000 000 el Fin de la Línea); los de distancia, de
@@ -432,7 +447,7 @@ export const LOGROS = Object.fromEntries([
   ...Object.entries(SOLO)
 ]);
 /* Qué categorías de `soloRanks` alimentan cada juego individual. */
-export const SOLO_PREFIJO = { minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-", electro: "club-electro-", frontera: "club-frontera-", sudoku: "club-sudoku-", fanal: "club-fanal-", atasco: "club-atasco-", aleteo: "club-aleteo-", dosmil: "club-dosmil-", metrorush: "club-metrorush-" };
+export const SOLO_PREFIJO = { minas: "club-minas-", snake: "club-snake-", tetrisclub: "club-tetris-", sortem: "club-sortem-", bbtan: "club-bbtan-", sopa: "club-sopa-", electro: "club-electro-", frontera: "club-frontera-", sudoku: "club-sudoku-", fanal: "club-fanal-", atasco: "club-atasco-", aleteo: "club-aleteo-", dosmil: "club-dosmil-", trigon: "club-trigon-", metrorush: "club-metrorush-" };
 
 /* Los logros de partida que `uid` tiene ya en esta, según lo que se ve. */
 export function detecta(p, est, uid) {

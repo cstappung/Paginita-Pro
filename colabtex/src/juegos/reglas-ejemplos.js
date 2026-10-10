@@ -1,4 +1,4 @@
-import {cart, dados, tablero, orbes, reversi, cajas, paisaje, tiro, orbita, serpiente, tetris, isla, ajedrez, fanal, boxhead, atasco, metrorush, aleteo, dosmil, tulones} from './reglas-ilustraciones.js';
+import {cart, dados, tablero, orbes, reversi, cajas, paisaje, tiro, orbita, serpiente, tetris, isla, ajedrez, fanal, boxhead, atasco, metrorush, aleteo, dosmil, trigon, tulones} from './reglas-ilustraciones.js';
 const p=(titulo,texto,imagen)=>({titulo,texto,imagen});
 const e=(id,titulo,...pasos)=>({id,titulo,pasos});
 const fichas=(titulo,...cs)=>cart([titulo,cs]);
@@ -199,6 +199,13 @@ export const EJEMPLOS={
  e('tablas','Puntos y clasificación',
   p('Dos tablas','La tabla Puntos guarda la suma de todas las juntadas de la partida. La tabla Ficha guarda la ficha más alta a la que llegaste, y a igualdad gana quien llegó antes.',fichas('Una partida',['2048','oro','FICHA'],['20 312','verde','PUNTOS'],['4:12','azul','TIEMPO'])),
   p('Se puede seguir','Llegar al 2048 no termina la partida: puedes seguir hacia el 4096 y más allá. Cada partida se rehace jugada por jugada con su semilla antes de guardarse.',fichas('Más allá',['2048','oro','LOGRADO'],['4096','rojo','SIGUIENTE'],['8192','violeta','LEYENDA'])))],
+ trigon:[e('linea','Cerrar y borrar una línea',
+  p('Busca el hueco','A esta línea horizontal le falta un solo triángulo. Mientras arrastras una pieza, su sombra muestra dónde caería y la línea que cerraría se ilumina.',trigon(0)),
+  p('Suelta la pieza','La pieza encaja en el hueco y la línea queda llena de borde a borde. Si la pieza llena varias líneas a la vez, se borran todas juntas.',trigon(1)),
+  p('La línea se borra','Los triángulos de la línea desaparecen y dejan sitio libre. Sumas 1 punto por cada triángulo que pusiste y un bono de 20 por la línea.',trigon(2))),
+ e('direcciones','Tres direcciones y la racha',
+  p('Tres direcciones','Una línea puede ser horizontal o seguir cualquiera de las dos diagonales del hexágono. Cada triángulo está en una línea de cada dirección, así que una sola pieza puede cerrar varias.',trigon(3)),
+  p('La racha','Cerrar líneas en jugadas seguidas arma una racha que multiplica el bono: la segunda seguida paga el doble, la tercera el triple. Una jugada sin línea la corta.',fichas('Una racha',['×1','verde','1ª LÍNEA'],['×2','azul','SEGUIDA'],['×3','oro','SEGUIDA'],['×1','gris','SE CORTÓ'])))],
  aleteo:[e('volar','Pasar un par de tubos',
   p('Aletea para subir','Cada aleteo le da al pájaro un impulso hacia arriba. Aquí está bajo el hueco, así que un aleteo a tiempo lo pone a la altura justa para entrar.',aleteo(0)),
   p('Deja que caiga','Entre aleteo y aleteo la gravedad lo baja. Dentro del hueco conviene no aletear de más: el tubo de arriba está tan cerca como el de abajo.',aleteo(1)),
@@ -207,7 +214,7 @@ export const EJEMPLOS={
   p('Una medalla por vuelo','Al chocar recibes la medalla de lo lejos que llegaste. Las cuentas son siempre las mismas, porque la velocidad no cambia nunca.',fichas('Medallas',['10','oro','BRONCE'],['25','gris','PLATA'],['50','oro','ORO'],['100','violeta','PLATINO'])),
   p('La tabla Vuelo','Ordena por tubos pasados y, a igualdad, gana el vuelo más corto. Cada vuelo se rehace con su semilla y sus aleteos antes de guardarse.',fichas('Dos vuelos de 40',['40','verde','EN 52 s'],['40','azul','EN 53 s'],['1.º','oro','EL DE 52 s'])))],
  tulones:[e('trepar','Trepar por la cabra',
-  p('Sale tu tulón','En tu turno aparece tu tulón al pie de la torre, en calzoncillos y calcetines como todos. Tienes el tiempo del turno para subir lo más alto que puedas.',tulones(0)),
+  p('Sale tu tulón','En tu turno aparece tu tulón al pie de la torre, en slip como todos. Tienes el tiempo del turno para superar la línea roja de la torre.',tulones(0)),
   p('Agarra y empuja','Mantén A para llevar el brazo izquierdo hasta el lomo de la cabra: al tocarla, la mano se agarra. Con la mano agarrada, mover el ratón hacia abajo empuja el cuerpo hacia arriba.',tulones(1)),
   p('Congélate y deja torre','Cuando se acaba el tiempo, o al apretar Espacio, tu tulón se congela donde quedó. El siguiente jugador trepa por encima de él, y así la torre crece turno a turno.',tulones(2)))],
  atasco:[e('salida','Sacar el auto rojo en el mínimo',

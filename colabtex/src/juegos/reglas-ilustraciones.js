@@ -193,6 +193,36 @@ export const dosmil=etapa=>{
  if(etapa===2)cuerpo+=txt(250,70,'Ficha nueva',22,'#776e65')+txt(250,100,'casi siempre un 2,',16,'#776e65')+txt(250,122,'a veces un 4.',16,'#776e65');
  return svg(nombre,cuerpo);
 };
+/* Trigon: un hexágono chico (lado 2) de la misma red triangular que el
+   juego. `etapa`: 0 una línea horizontal a la que le falta un triángulo y la
+   pieza que la cierra; 1 la línea llena, iluminada; 2 la línea borrada y su
+   bono; 3 las tres direcciones de línea, una de cada color. */
+export const trigon=etapa=>{
+ const nombre=['Una línea horizontal a la que le falta un triángulo, y la pieza que la cierra','La pieza puesta: la línea queda llena y se ilumina','La línea se borra y suma su bono','Las tres direcciones en que se forma una línea'][etapa];
+ const L=2,S=46,H=Math.sqrt(3)/2,cx=150,cy=125;
+ const pt=(x,y)=>[cx+(x+y/2)*S,cy+y*H*S];
+ const tri=(x,y,d)=>d?[[x+1,y],[x,y+1],[x+1,y+1]]:[[x,y],[x+1,y],[x,y+1]];
+ const dentro=([x,y])=>Math.abs(x)<=L&&Math.abs(y)<=L&&Math.abs(x+y)<=L;
+ const poli=(v,fill,stroke='none',k=.86)=>{const q=v.map(([a,b])=>pt(a,b)),mx=(q[0][0]+q[1][0]+q[2][0])/3,my=(q[0][1]+q[1][1]+q[2][1])/3;
+  return `<polygon points="${q.map(([a,b])=>(mx+(a-mx)*k).toFixed(1)+','+(my+(b-my)*k).toFixed(1)).join(' ')}" fill="${fill}" stroke="${stroke}" stroke-width="3" stroke-linejoin="round"/>`;};
+ const celdas=[];
+ for(let y=-L;y<L;y++)for(let x=-L;x<=L;x++)for(const d of [0,1])if(tri(x,y,d).every(dentro))celdas.push([x,y,d]);
+ const enFila=c=>c[1]===0,hueco=c=>c[0]===1&&c[1]===0&&c[2]===0;
+ const enX=c=>c[0]===-1,enS=c=>c[0]+c[1]+c[2]===1;
+ let cuerpo=`<rect x="14" y="14" width="452" height="222" rx="10" fill="#2a2230"/>`;
+ for(const c of celdas){
+  let fill='#54465b',stroke='none';
+  if(etapa===0&&enFila(c)&&!hueco(c))fill=C.azul;
+  if(etapa===1&&enFila(c)){fill=hueco(c)?'#9b7fe6':C.azul;stroke=C.oro;}
+  if(etapa===3){if(enFila(c))fill=C.azul;else if(enX(c))fill=C.verde;else if(enS(c))fill=C.rojo;}
+  cuerpo+=poli(tri(...c),fill,stroke);
+ }
+ if(etapa===0)cuerpo+=txt(300,70,'Le falta uno.',20,C.blanco)+txt(300,98,'Esta pieza la cierra:',15,C.gris)+poli(tri(3.8,.35,0),'#9b7fe6')+txt(300,200,'Arrástrala al hueco.',15,C.oro);
+ if(etapa===1)cuerpo+=txt(300,80,'¡Línea llena!',22,C.oro)+txt(300,110,'Se ilumina antes',15,C.gris)+txt(300,130,'de borrarse.',15,C.gris);
+ if(etapa===2)cuerpo+=txt(300,80,'Se borró.',22,C.blanco)+txt(300,112,'+1 por el triángulo',15,C.gris)+txt(300,140,'+20 de bono',20,C.verde);
+ if(etapa===3)cuerpo+=txt(300,70,'Horizontal',18,C.azul)+txt(300,104,'Diagonal ↘',18,C.verde)+txt(300,138,'Diagonal ↗',18,C.rojo)+txt(300,190,'Cualquiera sirve.',15,C.gris);
+ return svg(nombre,cuerpo);
+};
 /* Metro Rush: el corredor visto de costado (salta la barrera baja, rueda
    bajo la alta, sube por la rampa y corre por los techos) y, de espaldas,
    las tres vías con un tren que viene de frente. `etapa`: 0 barrera baja,

@@ -358,6 +358,34 @@ const ARTE = {
 
   /* Tulones: la cabra al fondo y la torre de amigos congelados en
      calzoncillos, con el de arriba trepando. */
+  /* Trigon: el hexágono de triángulos con algunas piezas puestas y una
+     pieza de la mano flotando encima, en los colores del tema Clásico. */
+  trigon: u => {
+    const L = 3, S = 36, H = Math.sqrt(3) / 2, cx = 200, cy = 158;
+    const P = ["#f6d23c", "#5ccf7a", "#9b7fe6", "#4fc6e0", "#ef5b5b", "#f39c3d", "#5b8def", "#e97bc8"];
+    const llenos = { "-3,0,0": 4, "-3,1,0": 4, "-3,0,1": 4, "-2,1,0": 1, "-2,1,1": 1, "-1,1,0": 1, "0,-2,0": 2, "0,-2,1": 2, "1,-2,0": 2,
+      "1,-3,1": 0, "2,-3,0": 0, "2,-3,1": 0, "0,1,0": 7, "1,1,0": 7, "0,1,1": 7, "2,-1,0": 3, "2,-1,1": 3, "-1,-1,1": 5, "0,-1,0": 5 };
+    const dentro = (x, y) => Math.abs(x) <= L && Math.abs(y) <= L && Math.abs(x + y) <= L;
+    const pt = (x, y) => [cx + (x + y / 2) * S, cy + y * H * S];
+    const tri = (x, y, d) => d ? [[x + 1, y], [x, y + 1], [x + 1, y + 1]] : [[x, y], [x + 1, y], [x, y + 1]];
+    const poli = (v, k) => {
+      const q = v.map(([a, b]) => pt(a, b)), mx = (q[0][0] + q[1][0] + q[2][0]) / 3, my = (q[0][1] + q[1][1] + q[2][1]) / 3;
+      return q.map(([a, b]) => (mx + (a - mx) * k).toFixed(1) + "," + (my + (b - my) * k).toFixed(1)).join(" ");
+    };
+    let celdas = "";
+    for (let y = -L; y < L; y++) for (let x = -L; x <= L; x++) for (const d of [0, 1]) {
+      const v = tri(x, y, d);
+      if (!v.every(([a, b]) => dentro(a, b))) continue;
+      const c = llenos[x + "," + y + "," + d];
+      celdas += `<polygon points="${poli(v, .86)}" fill="${c === undefined ? "#54465b" : P[c]}"/>`;
+    }
+    const pieza = [[0, 0, 0], [0, 0, 1], [1, 0, 0]].map(([x, y, d]) => `<polygon points="${poli(tri(x + 4, y - 4, d), .86)}" fill="${P[2]}"/>`).join("");
+    return `<defs><radialGradient id="g${u}" cx=".5" cy=".2" r=".9"><stop offset="0" stop-color="#4b3a55"/><stop offset="1" stop-color="#2a2230"/></radialGradient></defs>
+    <rect width="400" height="300" fill="url(#g${u})"/>
+    <rect x="70" y="40" width="260" height="236" rx="16" fill="#3b2f3f"/>${celdas}
+    <g class="a-mueve" style="filter:drop-shadow(0 6px 6px #0008)">${pieza}</g>`;
+  },
+
   tulones: u => {
     const tipo = (x, y, r, piel, pelo, polera) => `<g transform="translate(${x} ${y}) rotate(${r})">
       <rect x="-9" y="-2" width="18" height="30" rx="7" fill="${piel}" stroke="#2a1d18" stroke-width="2"/>
