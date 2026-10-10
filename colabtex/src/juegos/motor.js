@@ -193,6 +193,14 @@ export const JUEGOS = {
     minimo: 2,
     cupo: 2,
     alta: "2026-10-06"
+  },
+  tulones: {
+    nombre: "Tulones",
+    lema: "Por turnos, trepa sobre la cabra y sobre tus amigos congelados: quien no supera la torre queda fuera",
+    color: "#63b8ee",
+    minimo: 2,
+    cupo: 8,
+    alta: "2026-10-10"
   }
 };
 
@@ -977,6 +985,7 @@ export function reducir(p) {
   if (p.juego === "pokemon") return { ...base, ...redPokemon(p, js, listos) };
   if (p.juego === "boxhead") return { ...base, ...redBoxhead(p, js, listos) };
   if (p.juego === "gato") return { ...base, ...redGato(p, js) };
+  if (p.juego === "tulones") return { ...base, ...redTulones(p, js, listos) };
   return base;
 }
 
@@ -1062,6 +1071,8 @@ export function progreso(est, juego) {
   if (juego === "ajedrez" && est.material) return c(1 - (est.material.w + est.material.b) / 78);
   /* En el gato, las casillas (o los gatos pequeños) ya decididos. */
   if (juego === "gato" && est.tab) return c(est.movs / (est.variante === "super" ? 81 : 9));
+  /* En Tulones, cuántos quedaron fuera de la torre. */
+  if (juego === "tulones" && est.vivos) return c(1 - est.vivos.length / Math.max(1, (est.jugadores || []).length));
   if (juego === "cartas" && est.ganadas) return c(Math.max(0, ...Object.values(est.ganadas).map(g => g.length)) / 5);
   return 0;
 }
@@ -6817,6 +6828,23 @@ export function redBoxhead(p, js = jugadoresDe(p), listos = true) {
   };
 }
 
+
+/* ---------- Tulones ----------
+   El juego corre en un iframe (`juegos/club/tulones/`, `?modo=online`) y su
+   motor UMD trae el reductor de la sala (`reducirSala`): turnos, plazos,
+   la torre de cuerpos congelados y quién queda en pie. Como en Clue, este
+   archivo no puede importarlo (los tests lo cargan en un `vm` sin los
+   `export`), así que lo lee de `globalThis.TulonesMotor`, que pone
+   `juegos/tulones.js` al importar el UMD. Las opciones de la sala son
+   `tiempo` (segundos por turno) y `rondas` (0 es sin fin). */
+export const TL_TIEMPOS = [30, 45, 60, 90];
+export const TL_RONDAS = [0, 3, 5, 10];
+export function redTulones(p, js = jugadoresDe(p), listos = true) {
+  const TM = globalThis.TulonesMotor;
+  if (!listos || !TM) return { fase: "espera", turno: "", ganador: null, motivo: "" };
+  return TM.reducirSala(jugadasDe(p), js.map(j => ({ uid: j.uid, nombre: j.nombre || "" })),
+    { tiempo: p.tiempo, rondas: p.rondas, listos });
+}
 
 /* ---------- gato (tres en raya) y super gato ----------
    Una jugada es `{t:"p", uid, i}`: en el clásico `i` es la casilla

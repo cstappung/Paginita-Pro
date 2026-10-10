@@ -295,6 +295,9 @@ const ARTE = {
 
 /* El SVG de la portada de un juego del club, o "" si no tiene (la tarjeta
    cae entonces en su fondo `.sp-e-<id>` de siempre). */
+/* La tarjeta del Club de Tulones (`tulonesclub`, la sala ya se llama `tulones`) usa la misma escena. */
+ARTE.tulonesclub = ARTE.tulones;
+
 export function portadaSolo(id) {
   const f = ARTE[id];
   if (!f) return "";

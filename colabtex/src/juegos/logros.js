@@ -117,6 +117,16 @@ const SALA = {
     { id: "equipo", n: "Pelotón", d: "Llega al nivel 3 con 4 jugadores o más.", i: "👥", m: "Cooperativo", x: c => c.est.variante === "coop" && c.n >= 4 && (c.est.nivel || 1) >= 3 },
     { id: "intacto", n: "Intocable", d: "Gana un versus sin morir ni una vez.", i: "🛡️", m: "Versus", x: c => c.gano && c.est.variante === "versus" && c.est.motivo === "meta" && !((c.est.muertes || {})[c.me]) }
   ],
+  /* Tulones: todo sale de la torre (`hist` trae cada congela con su altura
+     y la línea que tenía que superar) y de la mejor altura de cada uno. */
+  tulones: [
+    { id: "holgado", n: "Con holgura", d: "Supera la línea roja por un metro o más.", i: "🧗", x: c => c.ev("congela", h => h.uid === c.me && h.ok && h.h - h.meta >= 1) },
+    { id: "pelo", n: "Por un pelo", d: "Supera la línea roja por menos de 5 cm.", i: "🤏", x: c => c.ev("congela", h => h.uid === c.me && h.ok && h.h - h.meta < .05) },
+    { id: "cuatro", n: "Cuatro metros", d: "Llega a 4 m de altura.", i: "📏", x: c => ((c.est.mejores || {})[c.me] || 0) >= 4 },
+    { id: "rascacielos", n: "Rascacielos", d: "Juega una torre que pase de 8 m.", i: "🏙️", x: c => (c.est.meta || 0) >= 8 },
+    { id: "rondas", n: "Hasta el final", d: "Gana una partida a rondas.", i: "🏁", x: c => c.gano && c.est.motivo === "rondas" },
+    { id: "multitud", n: "Torre de amigos", d: "Gana con 6 jugadores o más.", i: "👥", x: c => c.gano && c.n >= 6 }
+  ],
   pokemon: [
     { id: "tera", n: "Teracristal", d: "Teracristaliza a uno de tus Pokémon.", i: "💎", x: c => pkDe(c).tera > 0 },
     { id: "critico", n: "Golpe crítico", d: "Asesta un golpe crítico.", i: "💥", x: c => pkDe(c).crit > 0 },

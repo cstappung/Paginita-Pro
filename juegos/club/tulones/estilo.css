@@ -187,3 +187,9 @@ html:fullscreen .scorebar{margin-bottom:8px}
 .nv-panel ul{margin:4px 0 10px;padding-left:20px;display:grid;gap:4px;font-size:14px;line-height:1.4}
 .nv-version{margin:6px 0 0;font:400 18px/1 var(--cartel);color:#e2483d}
 .ed-nota{margin:0;font-size:13px;line-height:1.4;opacity:.8;text-align:center}
+
+/* En una sala de Juegos (?modo=online): sin el «volver» ni la clasificación del Club, y el escenario a la altura del marco. */
+html.tl-online .club-volver, html.tl-online .club-ranking { display: none; }
+html.tl-online .layout { grid-template-columns: 1fr; }
+html.tl-online .layout > aside { display: none; }
+.nv-version small{font:600 13px/1 system-ui,sans-serif;color:#7a6a60}

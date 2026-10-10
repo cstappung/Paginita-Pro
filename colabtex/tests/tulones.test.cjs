@@ -196,3 +196,112 @@ test('tirado en el suelo, un tirón brusco del brazo lo despega hacia donde va e
   assert.ok(alto > y0 - 90, 'pero no sale volando: ' + y0 + ' → ' + alto);
   assert.ok(centroX(c) > x0 + 10, 'va hacia la derecha: ' + x0 + ' → ' + centroX(c));
 });
+
+/* ---------- en línea: el reductor de la sala ---------- */
+const fs = require('node:fs'), vm = require('node:vm');
+const sala = (() => {
+  const code = fs.readFileSync(__dirname + '/../src/juegos/motor.js', 'utf8').replace(/\bexport\s+/g, '');
+  const ctx = { crypto: require('node:crypto').webcrypto, TulonesMotor: M };
+  vm.createContext(ctx); vm.runInContext(code, ctx);
+  return ctx;
+})();
+
+// Un cuerpo de pie, subido `dy` (en unidades) y corrido `dx`: los huesos quedan de su largo.
+const POSE_PIE = (() => { const W = M.mundo(), c = M.crea(-200); deja(c, W, 600); return Float64Array.from(c.p); })();
+const pose = (dy, dx = 0) => M.codificaPose(POSE_PIE.map((v, i) => (i % 2 ? v - dy : v + dx)));
+
+function partida(n, op = {}) {
+  const jugadores = {};
+  for (let i = 0; i < n; i++) jugadores['u' + i] = { nombre: 'J' + i, orden: i };
+  const p = Object.assign({ juego: 'tulones', estado: 'jugando', cupo: n, semilla: 1, jugadores, jugadas: {} }, op);
+  const pon = j => { p.jugadas[String(Object.keys(p.jugadas).length).padStart(4, '0')] = j; return sala.reducir(p); };
+  return { p, pon, est: () => sala.reducir(p) };
+}
+const T0 = 1e12;
+
+test('sala: los turnos van por asiento y el que no supera la línea queda fuera', () => {
+  const S = partida(3, { tiempo: 30 });
+  let e = S.est();
+  assert.strictEqual(e.fase, 'jugando'); assert.strictEqual(e.turno, 'u0'); assert.strictEqual(e.inicio, 0);
+  assert.strictEqual(e.plazo, Infinity, 'sin hora de inicio no corre el plazo');
+  e = S.pon({ t: 'reloj', uid: 'u2', n: 0, at: T0 });
+  assert.strictEqual(e.inicio, T0);
+  e = S.pon({ t: 'sale', uid: 'u0', n: 0, at: T0 + 3000, a: M.codificaAspecto(M.PRESETS[3]) });
+  assert.strictEqual(e.saleAt, T0 + 3000);
+  e = S.pon({ t: 'congela', uid: 'u0', n: 0, at: T0 + 30000, p: pose(60) });
+  assert.strictEqual(e.turno, 'u1'); assert.strictEqual(e.torre.length, 1);
+  assert.ok(e.meta > 2.5, 'la torre sube con el cuerpo: ' + e.meta);
+  assert.strictEqual(e.torre[0].aspecto.pelo, M.PRESETS[3].pelo, 'el aspecto llega con el sale');
+  // u1 se congela en el suelo: no supera y queda fuera, pero su cuerpo queda en la torre.
+  e = S.pon({ t: 'sale', uid: 'u1', n: 1, at: T0 + 31000 });
+  e = S.pon({ t: 'congela', uid: 'u1', n: 1, at: T0 + 50000, p: pose(0, -500) });
+  assert.ok(e.eliminados.u1); assert.strictEqual(e.torre.length, 2); assert.strictEqual(e.turno, 'u2');
+  assert.deepStrictEqual([...e.vivos], ['u0', 'u2']);
+  assert.ok(e.hist.some(h => h.e === 'congela' && h.uid === 'u1' && !h.ok));
+});
+
+test('sala: fuera de turno, turno equivocado o pose inventada no cuentan', () => {
+  const S = partida(2);
+  S.pon({ t: 'reloj', uid: 'u1', n: 0, at: T0 });
+  let e = S.pon({ t: 'congela', uid: 'u1', n: 0, at: T0 + 1000, p: pose(60) });
+  assert.strictEqual(e.torre.length, 0, 'no era su turno');
+  e = S.pon({ t: 'congela', uid: 'u0', n: 3, at: T0 + 1000, p: pose(60) });
+  assert.strictEqual(e.torre.length, 0, 'otro número de turno');
+  const roto = POSE_PIE.slice(); roto[M.I.manoI * 2] += 200;
+  e = S.pon({ t: 'congela', uid: 'u0', n: 0, at: T0 + 1000, p: M.codificaPose(roto) });
+  assert.strictEqual(e.torre.length, 0, 'un brazo de tres metros no es un cuerpo');
+  e = S.pon({ t: 'congela', uid: 'u0', n: 0, at: T0 + 1000, p: pose(600) });
+  assert.strictEqual(e.torre.length, 0, 'flotando seis metros sobre la torre');
+  e = S.pon({ t: 'congela', uid: 'u0', n: 0, at: T0 + 1000, p: 'basura' });
+  assert.strictEqual(e.torre.length, 0);
+  e = S.pon({ t: 'congela', uid: 'u0', n: 0, at: T0 + 2000, p: pose(60) });
+  assert.strictEqual(e.torre.length, 1); assert.strictEqual(e.turno, 'u1');
+});
+
+test('sala: el plazo vence y ese turno acaba sin cuerpo; un plazo adelantado no vale', () => {
+  const S = partida(3, { tiempo: 45 });
+  S.pon({ t: 'reloj', uid: 'u1', n: 0, at: T0 });
+  const L = M.SALA.LISTO_MS, G = M.SALA.GRACIA_MS;
+  let e = S.pon({ t: 'plazo', uid: 'u1', n: 0, at: T0 + L + 45000 + G - 1 });
+  assert.strictEqual(e.turno, 'u0', 'todavía no');
+  assert.strictEqual(e.plazo, T0 + L + 45000 + G);
+  e = S.pon({ t: 'plazo', uid: 'u1', n: 0, at: T0 + L + 45000 + G + 1 });
+  assert.ok(e.eliminados.u0); assert.strictEqual(e.turno, 'u1'); assert.strictEqual(e.torre.length, 0);
+  // Con `sale`, el plazo cuenta desde ahí, y un sale tardío no lo alarga.
+  e = S.pon({ t: 'sale', uid: 'u1', n: 1, at: e.inicio + 60000 });
+  assert.strictEqual(e.saleAt, e.inicio + L);
+  e = S.pon({ t: 'congela', uid: 'u1', n: 1, at: e.saleAt + 45000 + G + 10, p: pose(60) });
+  assert.strictEqual(e.torre.length, 0, 'congela fuera de plazo');
+});
+
+test('sala: gana el último en pie, y a rondas el más alto de los que siguen', () => {
+  const S = partida(2);
+  S.pon({ t: 'reloj', uid: 'u1', n: 0, at: T0 });
+  S.pon({ t: 'congela', uid: 'u0', n: 0, at: T0 + 1000, p: pose(60) });
+  const e = S.pon({ t: 'congela', uid: 'u1', n: 1, at: T0 + 2000, p: pose(0, -500) });
+  assert.strictEqual(e.fase, 'fin'); assert.strictEqual(e.ganador, 'u0'); assert.strictEqual(e.motivo, 'ultimo');
+  assert.ok(e.puntos.u0 > e.puntos.u1);
+
+  const R = partida(2, { rondas: 3 });
+  let r = R.pon({ t: 'reloj', uid: 'u1', n: 0, at: T0 });
+  for (let k = 0; k < 6; k++) r = R.pon({ t: 'congela', uid: r.turno, n: k, at: T0 + (k + 1) * 1000, p: pose(60 + k * 70 + (k === 5 ? 40 : 0)) });
+  assert.strictEqual(r.fase, 'fin'); assert.strictEqual(r.motivo, 'rondas'); assert.strictEqual(r.ganador, 'u1');
+});
+
+test('sala: abandonar o ser expulsado en tu turno pasa al siguiente sin hora', () => {
+  const S = partida(3);
+  S.pon({ t: 'reloj', uid: 'u1', n: 0, at: T0 });
+  let e = S.pon({ t: 'abandona', uid: 'u0' });
+  assert.strictEqual(e.turno, 'u1'); assert.strictEqual(e.inicio, 0, 'el abandono no trae hora');
+  e = S.pon({ t: 'voto', uid: 'u2', contra: 'u1' });
+  assert.ok(e.fuera.u1, 'expulsado por mayoría: cuenta como abandono');
+  assert.strictEqual(e.fase, 'fin'); assert.strictEqual(e.ganador, 'u2'); assert.strictEqual(e.motivo, 'abandono');
+});
+
+test('sala: la pose y el aspecto sobreviven a la codificación', () => {
+  const P = M.decodificaPose(pose(33));
+  assert.ok(P && M.poseSana(P));
+  assert.strictEqual(M.decodificaPose(pose(33).replace(/,[^,]*$/, '')), null, 'faltan coordenadas');
+  for (const a of M.PRESETS) assert.deepStrictEqual(M.decodificaAspecto(M.codificaAspecto(a), a.nombre), M.limpia(a));
+  assert.deepStrictEqual(M.decodificaAspecto('x.y', 'Z'), M.limpia({ nombre: 'Z' }));
+});
