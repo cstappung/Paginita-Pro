@@ -27,6 +27,19 @@ fits a Google URL and no uploaded photo at all. Three consequences:
   validation — so this needed **no rules change**, which after Reversi is a
   feature in itself.
 
+- **The Google photo is published in the profile** (`fotoGoogle` in
+  `juegos-main.js`): only your own session knows it, so others saw it only
+  where a row had copied it (a room ficha, a room-game rank) and the coins
+  top showed initials. Whoever has `foto` unset, or an old Google URL,
+  writes the current one to `users/<uid>/perfil/foto`. An https `foto` still
+  means «use Google» in the editor (`esFotoGoogle`): uploads are data URLs
+  and «no photo» is `""`, neither is touched.
+- **Frozen rows show the live apodo** (`nombreVivo(uid, nombre)`): waiting
+  rooms, room chat and the Club iframe's ranking (`crearSolo({nombreDe})`,
+  re-sent by `refresca()` when a profile arrives) used to print the name
+  stored in the row, which is the Google name if it was written before the
+  apodo existed.
+
 **Everyone has a public profile: a card and a page** (`juegos/perfil-tarjeta.js`,
 pure, and `juegos/perfil-vista.js`, the DOM). Clicking any element with
 `data-perfil="<uid>"` opens the mini card. One document listener,

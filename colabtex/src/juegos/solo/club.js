@@ -21,7 +21,11 @@ import {verificaClub} from './verifica.js';
    prueba como cuarto argumento, para escribirla junto al récord, y
    `alResultado` como tercero, para la mejor partida del día del salón
    (rieles.js), que se guarda aunque no sea récord. */
-export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partida,reportaSospecha,fantasma,logro}) {
+/* `nombreDe(uid, nombre)`: el nombre que se ve de alguien (su apodo vivo, o el
+   de la fila). La fila guarda el nombre que tenía al batir el récord, y sin
+   esto el ranking del juego mostraba el de Google donde el resto del sitio
+   ya mostraba el apodo. Si el apodo llega después, `refresca()` repinta. */
+export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partida,reportaSospecha,fantasma,logro,nombreDe}) {
   let host,frame,off,temaObserver,categoria='',muerto=false,pendientes={},guardando=false,propios={};
   /* El fantasma (Metro Rush, modos «Fantasma»): la tabla ordenada que ya
      trae la escucha de cada categoría (`tablas`), quienes esperan a que
@@ -79,6 +83,13 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
     guardando=false;
     if(!muerto&&Object.entries(pendientes).some(([key,dato])=>revisados[key]!==dato.partida))sincronizar();
   }
+  let ultimoRanking=null;
+  const nombreVisto=f=>(nombreDe?nombreDe(f.uid,f.nombre):f.nombre)||f.nombre;
+  function mandaRanking(){
+    const r=ultimoRanking;if(!r||muerto||categoria!==r.key)return;
+    const propio=r.orden.find(f=>f.uid===usuario.uid)||null;
+    enviar({tipo:'ranking',categoria:r.key,filas:r.orden.slice(0,10).map(f=>({nombre:nombreVisto(f),puntos:f.puntos,tiempo:f.tiempo,yo:f.uid===usuario.uid})),propio:propio&&{...propio,nombre:nombreVisto(propio)},error:r.error});
+  }
   function escuchar(key){
     if(off)off();categoria=key;
     if(invitado){off=null;estado('Modo invitado: esta partida no se guarda ni entra en la clasificación. Inicia sesión en Juegos para competir.',key);return;}
@@ -88,7 +99,8 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
       propios[key]=orden.find(f=>f.uid===usuario.uid)||null;
       tablas[key]=orden;for(const f of esperanTabla[key]||[])f(orden);delete esperanTabla[key];   // el fantasma que esperaba esta tabla
       if(key in fantasmaVisto&&fantasmaVisto[key]!==firmaTop(orden[0]))mandaFantasma(key,orden);   // cambió el n.º 1: el juego recibe el fantasma nuevo sin pedirlo
-      enviar({tipo:'ranking',categoria:key,filas:orden.slice(0,10).map(f=>({nombre:f.nombre,puntos:f.puntos,tiempo:f.tiempo,yo:f.uid===usuario.uid})),propio:orden.find(f=>f.uid===usuario.uid)||null,error:!!error});
+      ultimoRanking={key,orden,error:!!error};
+      mandaRanking();
     });
     sincronizar();
   }
@@ -190,5 +202,5 @@ export function crearSolo({juego,usuario,guardar,watch,volver,alResultado,partid
     host.appendChild(frame);
   }
   function destruir(){muerto=true;document.documentElement.classList.remove('jg-club-inm');temaObserver?.disconnect();if(off)off();window.removeEventListener('message',mensaje);for(const [el,valor]of ocultos)el.style.display=valor;frame?.remove();host.innerHTML='';ambientar('');}
-  return {montar,destruir};
+  return {montar,destruir,refresca:mandaRanking};
 }

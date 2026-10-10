@@ -37,6 +37,12 @@ import { capaMascota, opcionMascotaHtml } from "./perfil-mascota.js";
 import { fotoDe, pideFotos } from "./visor-mascota.js";
 
 export const LARGO_NICK = 24;
+
+/* La foto de Google publicada en el perfil (`fotoGoogle` en juegos-main.js)
+   sigue queriendo decir «usa la de Google»: es una URL https que solo pudo
+   poner esa sincronización, porque el editor sube data URLs. Las reglas
+   piden https y nada de comillas, paréntesis, espacios ni «<>\\»; `fotoSana` (sano.js), además, hasta 2000 letras. */
+export const esFotoGoogle = f => typeof f === "string" && /^https:\/\/[^\s"'<>()\\]+$/.test(f) && f.length <= 2000;   // lo mismo que acepta `fotoSana` al leer
 const LADO_FOTO = 160;
 
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
@@ -110,7 +116,7 @@ export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar
   const p = perfil || {};
   /* `foto` puede ser tres cosas y hay que conservar cuál: sin poner
      (la de Google), una cadena vacía (ninguna) o una data URL. */
-  let foto = p.foto === undefined || p.foto === null ? null : p.foto;
+  let foto = p.foto === undefined || p.foto === null || esFotoGoogle(p.foto) ? null : p.foto;
   let color = p.color || (base && base.color) || COLORES[0];
   let nick = p.nick || "";
   let bio = p.bio || "";
@@ -379,6 +385,7 @@ export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar
     const salida = Object.assign({ nick: nick.trim().slice(0, LARGO_NICK), color },
       limpiaPerfil({ marco, fondo, bio, vitrina, mascota }));
     if (foto !== null) salida.foto = foto;
+    else if (base && esFotoGoogle(base.foto)) salida.foto = base.foto;   // «la de Google», a la vista de todos
     try { await onGuardar(salida); cierra(); }
     catch (err) {
       b.disabled = false;

@@ -502,6 +502,10 @@ const U = "users";
 export const leerPerfil = uid =>
   get(ref(db, `${U}/${uid}/perfil`)).then(s => sanea(s.val(), true));
 
+/* Solo la foto: la de Google, publicada para que los demás la vean
+   (juegos-main.js, `fotoGoogle`). No toca nada más del perfil. */
+export const ponFotoPerfil = (uid, foto) => set(ref(db, `${U}/${uid}/perfil/foto`), foto);
+
 export const guardarPerfil = (uid, p) =>
   set(ref(db, `${U}/${uid}/perfil`), Object.assign({}, p, { at: Date.now() }));
 

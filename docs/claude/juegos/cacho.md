@@ -45,7 +45,7 @@ choosing either. Points worth knowing:
   may pass instead of raising and the bet stands. A valid pass needs exactly
   five dice, with all dice
   equal, all different or a full house (faces as they are, no wild aces), but
-  it can be bluffed: only the **next** player may doubt it (`dudapaso`), and
+  it can be bluffed: only the **next** player may doubt it (`dudapaso`; their only «Dudo» button is then «Dudo el paso», never a doubt of the earlier bet's count), and
   once they raise it is accepted. Doubted, only the passer's cup is lifted
   and whoever was wrong loses one die. Not offered in an obligada round,
   where nobody knows their own dice.

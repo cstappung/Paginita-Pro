@@ -296,7 +296,7 @@ const REGLAS = {
         "<b>Calzo</b>: crees que hay <b>exactamente</b> esos. Si aciertas recuperas un dado (máximo cinco); si no, pierdes uno. Se puede calzar mientras quede en la mesa al menos la mitad de los dados iniciales.",
         "Abre la siguiente ronda quien perdió el dado (o quien calzó)."
       ])],
-      ["El paso", "Una vez por ronda, con una apuesta en la mesa, puedes <b>pasar</b> en vez de subir: dices que tienes <b>exactamente cinco dados</b>, todos iguales, todos distintos o un full. Puedes decir «paso» aunque tengas menos o no cumplas la combinación; si te dudan, pierdes un dado. El siguiente puede dudarte el paso: se mira solo tu vaso y pierde un dado quien se equivocó."],
+      ["El paso", "Una vez por ronda, con una apuesta en la mesa, puedes <b>pasar</b> en vez de subir: dices que tienes <b>exactamente cinco dados</b>, todos iguales, todos distintos o un full. Puedes decir «paso» aunque tengas menos o no cumplas la combinación; si te dudan, pierdes un dado. El siguiente puede dudarte el paso (si de verdad lo tienes, no la cuenta de la apuesta) o seguir apostando: se mira solo tu vaso y pierde un dado quien se equivocó."],
       ["Obligar", "Quien se queda con <b>un dado</b>, al abrir, puede obligar una vez por partida. <b>Torbellino también está permitido en 1 contra 1</b>; abierto y cerrado requieren tres o más. Los ases dejan de ser comodín y se elige un modo: <b>abierto</b> (ves los dados de los demás, no los tuyos), <b>cerrado</b> (nadie ve nada y se apuesta «X de esta», la pinta del dado de quien obligó) o <b>torbellino</b> (elige una pinta y cada uno pierde los dados que le salgan de ella)."],
       ["El final", "Quien pierde su último dado queda fuera. Gana el último con dados en el vaso."]
     ],
