@@ -313,6 +313,68 @@ console.log("— PRODROP: sobre gratis, mercado e intercambios —");
   await loginAs(A);
 }
 
+console.log("— Mascotas: adopciones, regalos, compras y estado —");
+{
+  const { serverTimestamp, push } = await import("firebase/database");
+  const ua = await loginAs(A);
+  const adopta = (uid, e, p, extra) => { const r = push(ref(db, `mascotas/a/${uid}`)); return set(r, Object.assign({ at: serverTimestamp(), e, p }, extra || {})).then(() => r.key); };
+  const compra = (uid, x) => set(push(ref(db, `mascotas/c/${uid}`)), Object.assign({ at: serverTimestamp() }, x));
+  await remove(ref(db, `mascotas/a/${ua.uid}`)).catch(() => {});
+  await denied("la primera adopción no se paga 1000", () => adopta(ua.uid, "chicken", 1000));
+  await denied("ni es de una especie inventada", () => adopta(ua.uid, "dragon", 0));
+  await denied("ni elige la hora", () => set(push(ref(db, `mascotas/a/${ua.uid}`)), { at: 1700000000000, e: "chicken", p: 0 }));
+  let k1 = null;
+  await allowed("A adopta la primera gratis", async () => { k1 = await adopta(ua.uid, "chicken", 0); });
+  await denied("la segunda gratis, no", () => adopta(ua.uid, "cat", 0));
+  await allowed("la segunda cuesta 1000", () => adopta(ua.uid, "cat", 1000));
+  /* La mascota del perfil: una copia ma: y un baile (ob: o inicial). Que sea
+     suya lo re-chequea quien pinta (no la regla: la economía no cabe en ella). */
+  const mc = `ma:${ua.uid}~${k1}`;
+  await allowed("A pone su mascota en el perfil, con un baile inicial", () => set(ref(db, `users/${ua.uid}/perfil/mascota`), { m: mc, b: "start-dance-salsa" }));
+  await allowed("o con un baile de regalo", () => set(ref(db, `users/${ua.uid}/perfil/mascota`), { m: mc, b: `ob:${ua.uid}~-Nregalo0001` }));
+  await denied("una carta no es una mascota del perfil", () => set(ref(db, `users/${ua.uid}/perfil/mascota`), { m: `${ua.uid}~p-Npack0001.0` }));
+  await denied("ni va sin mascota", () => set(ref(db, `users/${ua.uid}/perfil/mascota`), { b: "start-dance-salsa" }));
+  await denied("ni con un baile con HTML", () => set(ref(db, `users/${ua.uid}/perfil/mascota`), { m: mc, b: "<img>" }));
+  await denied("ni con campos inventados", () => set(ref(db, `users/${ua.uid}/perfil/mascota`), { m: mc, x: 1 }));
+  await denied("una adopción no se reescribe", () => set(ref(db, `mascotas/a/${ua.uid}/${k1}`), { at: serverTimestamp(), e: "cat", p: 0 }));
+  await denied("ni se borra (es gasto)", () => remove(ref(db, `mascotas/a/${ua.uid}/${k1}`)));
+  await denied("un regalo a menos de 500, no", () => set(push(ref(db, `mascotas/r/${ua.uid}`)), { at: serverTimestamp(), p: 100 }));
+  await allowed("A abre un regalo a 500", () => set(push(ref(db, `mascotas/r/${ua.uid}`)), { at: serverTimestamp(), p: 500 }));
+  const m1 = `ma:${ua.uid}~${k1}`;
+  await allowed("comida: 20 por ración", () => compra(ua.uid, { k: "comida", n: 5, p: 100 }));
+  await denied("comida más barata, no", () => compra(ua.uid, { k: "comida", n: 5, p: 20 }));
+  await denied("ni más de 50 raciones de una vez", () => compra(ua.uid, { k: "comida", n: 60, p: 1200 }));
+  await allowed("poción para una mascota: 1000", () => compra(ua.uid, { k: "pocion", p: 1000, m: m1 }));
+  await denied("poción sin decir para quién, no", () => compra(ua.uid, { k: "pocion", p: 1000 }));
+  await denied("ni más barata", () => compra(ua.uid, { k: "pocion", p: 300, m: m1 }));
+  await allowed("un fondo a su precio", () => compra(ua.uid, { k: "fondo-snow", p: 25 }));
+  await denied("un fondo más barato, no", () => compra(ua.uid, { k: "fondo-snow", p: 1 }));
+  await denied("ni uno que no existe", () => compra(ua.uid, { k: "fondo-espacio", p: 0 }));
+  await allowed("despedirse es gratis", () => compra(ua.uid, { k: "adios", p: 0, m: m1 }));
+  await denied("ni se cuela un campo", () => compra(ua.uid, { k: "comida", n: 1, p: 20, gratis: true }));
+  const est = { v: 1, n: "Pío", e: "baby", g: 3.5, s: { hunger: 80, happiness: 70, energy: 60, hygiene: 90 }, ls: Date.now(), w: { hat: "start-hat-beanie" } };
+  const ke = `${ua.uid}~${k1}`;
+  await allowed("A guarda el estado de su mascota", () => set(ref(db, `mascotasEstado/${ua.uid}/${ke}`), est));
+  await allowed("y lo actualiza", () => set(ref(db, `mascotasEstado/${ua.uid}/${ke}`), Object.assign({}, est, { e: "adult", g: 0 })));
+  await denied("la etapa no retrocede", () => set(ref(db, `mascotasEstado/${ua.uid}/${ke}`), Object.assign({}, est, { e: "egg" })));
+  await denied("ni los stats pasan de 100", () => set(ref(db, `mascotasEstado/${ua.uid}/${ke}`), Object.assign({}, est, { e: "adult", s: { hunger: 500, happiness: 70, energy: 60, hygiene: 90 } })));
+  await denied("ni se cuela un campo", () => set(ref(db, `mascotasEstado/${ua.uid}/${ke}`), Object.assign({}, est, { e: "adult", monedas: 1 })));
+  await denied("ni la hora va al futuro", () => set(ref(db, `mascotasEstado/${ua.uid}/${ke}`), Object.assign({}, est, { e: "adult", ls: Date.now() + 3600000 })));
+  const ub = await loginAs(B);
+  ok("B lee el estado de una mascota de A por su clave", (await get(ref(db, `mascotasEstado/${ua.uid}/${ke}/e`))).val() === "adult");
+  await denied("pero no todas las de A", () => get(ref(db, `mascotasEstado/${ua.uid}`)));
+  await denied("ni la colección entera", () => get(ref(db, "mascotasEstado")));
+  await denied("B no escribe el estado de A", () => set(ref(db, `mascotasEstado/${ua.uid}/${ke}`), est));
+  await denied("B no adopta a nombre de A", () => adopta(ua.uid, "chicken", 1000));
+  ok("B lee las adopciones (la economía las necesita)", !!(await get(ref(db, `mascotas/a/${ua.uid}`))).val());
+  const o = push(ref(db, "mercado/o"));
+  await denied("una copia con prefijo y número de carta no vale", () => set(o, { u: ub.uid, c: `ob:${ub.uid}~-Nabcdefgh.3`, p: 10, at: serverTimestamp() }));
+  await allowed("B pone a la venta un objeto (ob:)", () => set(o, { u: ub.uid, c: `ob:${ub.uid}~-Nabcdefgh`, p: 10, at: serverTimestamp() }));
+  await allowed("y una mascota (ma:)", () => set(push(ref(db, "mercado/o")), { u: ub.uid, c: `ma:${ub.uid}~-Nabcdefgh`, p: 10, at: serverTimestamp() }));
+  await allowed("un intercambio mezcla carta, objeto y mascota", () => set(push(ref(db, "mercado/t")), { de: ub.uid, para: ua.uid, dar: [`ob:${ub.uid}~-Nabcdefgh`, `${ub.uid}~-Nabcdefgh.1`], pedir: [m1], at: serverTimestamp() }));
+  await loginAs(A);
+}
+
 console.log("— Monedas: partidas del club y podios —");
 {
   const { registraJugadaClub, diaChile } = await import("./src/juegos/monedas.js");

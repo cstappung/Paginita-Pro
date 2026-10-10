@@ -30,7 +30,7 @@ function copia(e, o, k, i) {
   if (!c) return null;
   return { uid: o, o, k, i, at: so.at, c: cc, id: c.id, g: c.g, gr: !!e.graduada[cc], dios: !!(s && s.dios), rr: !!so.r, carta: PM.CARDS[c.id], dueno: e.dueno[cc] };
 }
-export const copiaDe = (cc, datos) => { const e = ecoDe(datos), q = leeCopia(cc); return e && q ? copia(e, q.o, q.k, q.i) : null; };
+export const copiaDe = (cc, datos) => { const e = ecoDe(datos), q = leeCopia(cc); return e && q && q.tipo === "carta" ? copia(e, q.o, q.k, q.i) : null; };
 
 /* Las que exhibe, en el orden que eligió, si todavía son suyas. Acepta la
    clave vieja `<sobre>.<i>` (de antes del mercado: el origen es el dueño). */
@@ -40,8 +40,8 @@ export function exhibidasDe(uid, perfil, datos) {
   const out = [];
   for (const key of (Array.isArray(l) ? l : Object.values(l)).slice(0, MAX_EXHIBIDAS)) {
     const vieja = /^([-_A-Za-z0-9]{8,24})\.([0-4])$/.exec(String(key));
-    const q = vieja ? { o: uid, k: vieja[1], i: +vieja[2] } : leeCopia(key);
-    if (!q) continue;
+    const q = vieja ? { o: uid, k: vieja[1], i: +vieja[2], tipo: "carta" } : leeCopia(key);
+    if (!q || q.tipo !== "carta") continue;
     const c = copia(e, q.o, q.k, q.i);
     if (c && c.dueno === uid) out.push(c);
   }
@@ -72,7 +72,7 @@ function copiasVivas(datos) {
   if (memoCopias.has(e)) return memoCopias.get(e);
   const out = [];
   for (const [cc, u] of Object.entries(e.dueno)) {
-    const q = leeCopia(cc), c = q && copia(e, q.o, q.k, q.i);
+    const q = leeCopia(cc), c = q && q.tipo === "carta" && copia(e, q.o, q.k, q.i);
     if (c && u) out.push(c);
   }
   memoCopias.set(e, out);

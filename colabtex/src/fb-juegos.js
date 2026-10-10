@@ -338,9 +338,9 @@ export const otorgarLogro = (juego, uid, id) => set(ref(db, `logros/${juego}/${u
 /* También escucha `diario`, la racha de días jugando: con las cuatro
    lecturas se calcula el saldo de monedas de cualquiera (juegos/monedas.js).
    Antes de publicar las reglas `diario` falla sola y el resto sigue. */
-const NODOS_MONEDAS = 10;
+const NODOS_MONEDAS = 11;
 export function watchLogros(cb) {
-  const d = { ranks: {}, solo: {}, logros: {}, diario: {}, cartas: {}, mercado: {}, clubJugadas: {}, podios: {}, tienda: {}, ajustes: {} }, err = {}, llegados = new Set();
+  const d = { ranks: {}, solo: {}, logros: {}, diario: {}, cartas: {}, mercado: {}, clubJugadas: {}, podios: {}, tienda: {}, ajustes: {}, mascotas: {} }, err = {}, llegados = new Set();
   /* `completo`: ya llegaron todas al menos una vez. Antes de eso el
      saldo sale de una suma a medias. */
   const oye = (nodo, k) => onValue(ref(db, nodo), s => {
@@ -348,7 +348,7 @@ export function watchLogros(cb) {
     d.completo = llegados.size === NODOS_MONEDAS; cb(d, err);
   }, e => { err[k] = e; llegados.add(k); d.completo = llegados.size === NODOS_MONEDAS; cb(d, err); });
   const offs = [oye(R, "ranks"), oye("soloRanks", "solo"), oye("logros", "logros"), oye("diario", "diario"), oye("cartas", "cartas"), oye("mercado", "mercado"),
-    oye("clubJugadas", "clubJugadas"), oye("podios", "podios"), oye("tienda", "tienda"), oye("ajustesMonedas", "ajustes")];
+    oye("clubJugadas", "clubJugadas"), oye("podios", "podios"), oye("tienda", "tienda"), oye("ajustesMonedas", "ajustes"), oye("mascotas", "mascotas")];
   return () => offs.forEach(f => f());
 }
 
@@ -422,6 +422,47 @@ export const aceptarCambio = id => set(ref(db, `mercado/t/${id}/ok`), serverTime
 export const cerrarCambio = id => set(ref(db, `mercado/t/${id}/x`), serverTimestamp());
 /* Las cartas que exhibe en su perfil: claves `<sobre>.<i>`. */
 export const exhibirCartas = (uid, lista) => set(ref(db, `${U}/${uid}/perfil/cartas`), lista.length ? lista : null);
+
+/* ---------- Mascotas ----------
+   Tres gastos de una sola escritura, como los sobres: `mascotas/a/<uid>/<k>`
+   = {at, e, p} (adopción: la primera gratis, las demás 1000; lo exige la
+   regla), `mascotas/r/<uid>/<k>` = {at, p: 500} (un regalo, cuyo contenido
+   sale del motor con `at`) y `mascotas/c/<uid>/<k>` = {at, k, p, n?, m?}
+   (comida, poción, fondo o despedirse). Quién tiene qué y si alcanzaba el
+   dinero lo decide `economia()`. */
+async function escribeYLee(r, valor) {
+  await set(r, valor);
+  const x = (await get(r)).val();
+  return Object.assign({ k: r.key }, x);
+}
+export const adoptarMascota = (uid, e, p) =>
+  escribeYLee(push(ref(db, `mascotas/a/${uid}`)), { at: serverTimestamp(), e, p });
+export const abrirRegaloMascota = uid =>
+  escribeYLee(push(ref(db, `mascotas/r/${uid}`)), { at: serverTimestamp(), p: 500 });
+export const compraMascotas = (uid, c) =>
+  escribeYLee(push(ref(db, `mascotas/c/${uid}`)), Object.assign({ at: serverTimestamp(), k: c.k, p: c.p },
+    Number.isInteger(c.n) ? { n: c.n } : {}, c.m ? { m: c.m } : {}));
+/* El estado de cada mascota (no es dinero): `mascotasEstado/<uid>/<origen~clave>`.
+   Lo escribe su dueño; los demás lo leen por clave (el perfil, el mercado,
+   quien compra la mascota), nunca la colección entera. */
+export const watchEstadosMascotas = (uid, cb) =>
+  onValue(ref(db, `mascotasEstado/${uid}`), s => cb(s.val() || {}, null), err => cb({}, err));
+/* Un error se lee como «sin estado», salvo con `crudo`, que lo deja
+   fallar (el perfil distingue «no tiene» de «no se pudo leer»). */
+export const leeEstadoMascota = (uid, k, crudo) => {
+  const p = get(ref(db, `mascotasEstado/${uid}/${k}`)).then(s => s.val());
+  return crudo ? p : p.catch(() => null);
+};
+export const guardaEstadoMascota = (uid, k, e) => set(ref(db, `mascotasEstado/${uid}/${k}`), e);
+export const borraEstadoMascota = (uid, k) => remove(ref(db, `mascotasEstado/${uid}/${k}`));
+/* Lo que solo le importa al dueño: la luz, el fondo elegido, la barra de
+   bailes y las raciones ya usadas (la comida que queda es la comprada menos
+   esas). Va bajo `users/<uid>`, que solo lee y escribe su dueño. */
+export const watchPrefsMascotas = (uid, cb) =>
+  onValue(ref(db, `${U}/${uid}/mascotas`), s => cb(s.val() || {}, null), err => cb({}, err));
+export const guardaPrefsMascotas = (uid, p) => update(ref(db, `${U}/${uid}/mascotas`), p);
+export const usaComidaMascota = (uid, n = 1) =>
+  runTransaction(ref(db, `${U}/${uid}/mascotas/usadas`), v => (Number.isFinite(v) ? v : 0) + n);
 
 /* ---------- días jugando ----------
    `diario/<uid>` = {dia, racha, mejor, dias, bono, at}. La regla exige que

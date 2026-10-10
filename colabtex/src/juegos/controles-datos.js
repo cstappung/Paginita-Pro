@@ -25,6 +25,7 @@ export const CONTROLES = {
   "flip7": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
   "frontera": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
   "gato": {"movil":true,"pc":true,"pide":"","por":"escucha clics"},
+  "mascotas": {"movil":true,"pc":true,"pide":"","por":"@controles: tactil raton"},
   "metrorush": {"movil":true,"pc":true,"pide":"","por":"escucha toques"},
   "minas": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},
   "orbita": {"movil":true,"pc":true,"pide":"","por":"escucha el puntero"},

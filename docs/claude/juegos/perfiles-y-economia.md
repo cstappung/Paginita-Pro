@@ -39,13 +39,14 @@ the first three pieces of the vitrina, plus **Ver perfil**, which opens
 `#perfil/<uid>`. The page holds the hero, five totals, the whole vitrina,
 every ranking table with its position, and the logros grouped by game.
 The header's **Perfil** goes to your own page, and **✎ Personalizar** opens
-`abrePerfil`. That editor has four tabs (datos, marco, fondo, vitrina) and a
-live preview of the card.
+`abrePerfil`. That editor has five tabs (datos, marco, fondo, vitrina,
+mascota) and a live preview of the card.
 
 Four decisions:
 
-- **No rules change.** The new fields `marco`, `fondo`, `bio` and `vitrina`
-  live in `users/<uid>/perfil` beside nick, foto and colour. Everything
+- **No rules change** for these four (the pet, below, did need one). The new
+  fields `marco`, `fondo`, `bio` and `vitrina` live in `users/<uid>/perfil`
+  beside nick, foto and colour. Everything
   else is computed from what Logros already reads (`fb.watchLogros`).
   There is one shared listener per session (`datosPerfil`), opened the
   first time someone touches a photo.
@@ -68,8 +69,30 @@ Four decisions:
   `limpiaPerfil` keeps only known ids, a bio of `LARGO_BIO` characters and
   up to `MAX_VITRINA` keys.
 
-`tests/perfil.test.cjs` covers the stats, the requirements, the vitrina
-and the cleaning.
+**The pet of the profile** (`perfil-mascota.js`). `users/<uid>/perfil/mascota`
+= `{m: "ma:…", b?: "ob:…" | "start-dance-<id>"}`; the rule checks only the
+shapes. It shows on the card's banner and in the page's hero, in 3D through
+the Mascotas viewer (`docs/claude/juegos/mercado.md`).
+- **Re-checked where it is seen**, like the frames: `mascotaVisible` hides a
+  pet the account no longer owns or has listed, and drops a dance it no
+  longer has. The stage, the name and what it wears (each piece re-checked
+  the same way) come from its `mascotasEstado`, read by key. A cached state
+  older than `FRESCO_MS` (2 min) is shown at once and re-read behind, so a
+  change of clothes arrives without reloading and without listening to the
+  node; what the game saves in this tab goes straight into the cache
+  (`alGuardar` → `pon`). Only adults dance, in a loop.
+- **The live view sits in its own layer** (`capaMascota`), outside the
+  card's `innerHTML`: the card repaints on every data arrival, and an iframe
+  that leaves the document reloads. The page's hero is rebuilt only when
+  its signature changes; then the layer moves to the new hero.
+- **One iframe at a time, in a stack** (`montaVisor`): the card opened over
+  a profile page takes the iframe, and closing it gives it back.
+- The editor offers your pets not on sale and your dances (starters plus
+  gift dances). Without the full economy it offers nothing and saves the
+  pet as it was; `editaPerfil` also keeps it, as it keeps `cartas`.
+
+`tests/perfil.test.cjs` covers the stats, the requirements, the vitrina,
+the cleaning and the pet re-check.
 
 **Champion frames, the shop and animated backgrounds.** Three more kinds of
 frame and background:
@@ -217,7 +240,7 @@ logros, the balance is derived from the same four reads the profile uses
   that covers UTC−3 and UTC−4. So a client can only record *today*, once,
   with the right streak and sum. Deleting the node only loses coins.
 
-Coins are spent in PRODROP (below), and that spending **is** stored:
+Coins are spent in PRODROP, in Mascotas and in the profile shop, and that spending **is** stored:
 `monedasDe` returns `total` (earned, `ganadoDe`), `gastadas`, `cobradas`
 (market sales) and `saldo`. **The header chip and the top both show
 `saldo`**: the top used to order by `total`, and the mismatch with the
@@ -232,3 +255,28 @@ same queue as the logros toast, also used for club plays and podiums).
 The `diario`, `clubJugadas` and `podios` nodes need the rules re-published.
 `test-rules.mjs` covers it: no invented streak, no tomorrow, no twice a day,
 and nobody writes someone else's.
+
+**Mascotas spends coins and pays none** (`juegos/mascotas/CLAUDE.md`).
+`economia()` replays three more nodes, between the re-roll and the
+listing at equal `at` (`ORDEN`: `ma` 2.1, `mr` 2.2, `mc` 2.3; the old
+events keep their order):
+
+- `mascotas/a` adoptions: the first one *written* by an account is free
+  (`intentos`, the same thing the rule can see), the rest cost 1000, and
+  none happens with 6 pets owned now.
+- `mascotas/r` gifts: 500, content from `MascotasMotor.regalo`.
+- `mascotas/c` purchases:
+  - food, 20 a ration;
+  - potion, 1000, only for an own pet that is not listed and not frozen
+    yet;
+  - a background, once;
+  - `adios`, free.
+
+An unfunded one stops the account like a pack. One that fails for another
+reason (cap, someone else's pet) does not happen and charges nothing.
+`ganadoDe` is unchanged: the only Mascotas income is market sales
+(`cobradas`). The replay also returns `mascotas`, `regalos`, `congelada`
+and `historial` (previous owners). `mascotasDe`/`objetosDe` list what an
+account owns now. `watchLogros` reads `mascotas` whole (11 nodes); the
+per-pet state (`mascotasEstado`) is read only by key.
+

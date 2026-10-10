@@ -13,12 +13,13 @@
    de quién es una carta: sin esta comprobación, un gasto sin fondos de
    este mismo navegador pararía la cuenta. */
 import { ambientar } from "./sonido.js";
-import { monedasDe, economia, copiasDe, proximoGratis, leeCopia, claveCopia } from "./monedas.js";
+import { monedasDe, economia, copiasDe, proximoGratis, leeCopia, claveCopia, esCarta } from "./monedas.js";
 import { MOTOR, MAX_EXHIBIDAS } from "./prodrop-cartas.js";
+import { pendientesDe } from "./mercado-datos.js";
 
 const MAX_PRECIO = 100000;
 
-export function crearProdrop({ usuario, datos, perfil, quien, fb, volver }) {
+export function crearProdrop({ usuario, datos, perfil, quien, fb, volver, ir }) {
   let host = null, frame = null, off = null, d = null, muerto = false, listo = false, ocupado = Promise.resolve();
   const uid = usuario.uid;
 
@@ -33,7 +34,7 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver }) {
   /* Una copia lista para el iframe: con la hora de su sobre, que es lo que
      hace falta para rehacerla. */
   function copia(e, c) {
-    const q = leeCopia(c), so = q && e.sobres[q.o + "~" + q.k];
+    const q = leeCopia(c), so = q && q.tipo === "carta" && e.sobres[q.o + "~" + q.k];
     if (!so || (so.r && q.i !== 0)) return null;
     // la de un re-roll no se rehace con un sobre: va con su carta, en `rr`
     // (no en `id`, que en el mercado es el de la oferta)
@@ -44,45 +45,21 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver }) {
     const e = eco(), m = cuenta(), gente = {};
     const persona = u => { if (!gente[u]) { const q = quien(u); gente[u] = { n: q.nombre, f: q.foto || "", c: q.color }; } return u; };
     const parada = u => !!(e.usuarios[u] && e.usuarios[u].parada);
-    /* El mercado: lo que está a la venta de verdad, menos lo de cuentas
-       paradas (sus ofertas siguen valiendo, pero no se le ofrecen a nadie:
-       comprarle a una cuenta parada sería mezclarse con sus gastos sin
-       fondos). */
-    const ofertas = [], mias = [];
+    /* Solo las ofertas de cartas que están a la venta: el abridor las usa
+       para decir «En el mercado por…» y para orientar el precio al vender.
+       Comprar e intercambiar se hace en la pestaña 🏪 Mercado. */
+    const ofertas = [];
     for (const o of Object.values(e.ofertas)) {
+      if (o.estado !== "activa" || (o.u !== uid && parada(o.u))) continue;
       const x = copia(e, o.c);
-      if (!x) continue;
-      const fila = Object.assign(x, { id: o.id, u: persona(o.u), p: o.p, t: o.at, estado: o.estado, fin: o.fin || 0, comprador: o.comprador ? persona(o.comprador) : "" });
-      if (o.estado === "activa" && (o.u === uid || !parada(o.u))) ofertas.push(fila);
-      if (o.u === uid && o.estado !== "nula") mias.push(fila);
-      else if (o.comprador === uid && o.estado === "vendida") mias.push(fila);
-    }
-    /* Los intercambios que me tocan, con su estado. */
-    const cambios = [];
-    for (const [id, t] of Object.entries(d.mercado && d.mercado.t || {})) {
-      if (!t || (t.de !== uid && t.para !== uid)) continue;
-      const hecho = e.cambios[id];
-      const estado = Number.isFinite(t.x) ? "cerrado" : hecho ? hecho.estado : "pendiente";
-      const dar = (Array.isArray(t.dar) ? t.dar : Object.values(t.dar || {})).map(c => copia(e, c)).filter(Boolean);
-      const pedir = (Array.isArray(t.pedir) ? t.pedir : Object.values(t.pedir || {})).map(c => copia(e, c)).filter(Boolean);
-      // ¿Sigue siendo posible? (las cartas siguen con sus dueños y no están a la venta)
-      const posible = dar.every(x => e.dueno[x.c] === t.de && !e.enVenta[x.c]) && pedir.every(x => e.dueno[x.c] === t.para && !e.enVenta[x.c]) && !parada(t.de) && !parada(t.para);
-      cambios.push({ id, de: persona(t.de), para: persona(t.para), dar, pedir, at: t.at, fin: t.ok || t.x || 0, estado, posible });
-    }
-    cambios.sort((a, b) => (b.fin || b.at) - (a.fin || a.at));
-    /* Con quién se puede cambiar: todo el que tenga cartas y no esté parado. */
-    const jugadores = {};
-    for (const [c, u] of Object.entries(e.dueno)) {
-      if (u === uid || parada(u) || e.enVenta[c]) continue;
-      const x = copia(e, c);
-      if (x) (jugadores[persona(u)] = jugadores[u] || []).push(x);
+      if (x) ofertas.push(Object.assign(x, { id: o.id, u: persona(o.u), p: o.p, t: o.at, estado: o.estado, fin: 0, comprador: "" }));
     }
     const mio = e.usuarios[uid];
     manda({ tipo: "datos", uid, saldo: m.saldo, parada: m.parada, falta: m.falta,
       mias: copiasDe(uid, d).map(x => Object.assign({ c: x.c, o: x.o, k: x.k, i: x.i, at: x.at, gr: x.gr, venta: x.venta },
         x.id != null ? { rr: { id: x.id, g: x.g, w: x.w } } : {})),
       sobres: (mio && mio.sobres) || {}, gratis: proximoGratis(uid, d, fb.ahora()),
-      ofertas, ventas: mias.sort((a, b) => (b.fin || b.t) - (a.fin || a.t)).slice(0, 40), cambios: cambios.slice(0, 40), jugadores, gente,
+      ofertas, pendientes: pendientesDe(d, uid), gente,
       exh: exhibidas(), desfase: fb.ahora() - Date.now() });
   }
 
@@ -119,7 +96,7 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver }) {
           responde(true, r);
         } else if (x.accion === "graduar") {
           const q = leeCopia(x.c);
-          if (!q || !mia(x.c)) throw new Error("Esa carta no está en tu colección.");
+          if (!esCarta(x.c) || !mia(x.c)) throw new Error("Esa carta no está en tu colección.");
           if (e.graduada[x.c]) throw new Error("Esa carta ya está graduada.");
           if (e.enVenta[x.c]) throw new Error("Retírala del mercado antes de graduarla.");
           pagable(MOTOR.PRECIO.gradua, "Graduar");
@@ -132,7 +109,7 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver }) {
              lee de la economía cuando llega lo escrito. */
           const cs = [...new Set((Array.isArray(x.c) ? x.c : []).map(String))];
           if (cs.length !== MOTOR.REROLL.n) throw new Error(`Elige ${MOTOR.REROLL.n} cartas distintas.`);
-          if (!cs.every(c => leeCopia(c) && mia(c))) throw new Error("Alguna de esas cartas ya no es tuya.");
+          if (!cs.every(c => esCarta(c) && mia(c))) throw new Error("Alguna de esas cartas ya no es tuya.");
           if (cs.some(c => e.enVenta[c])) throw new Error("Retira del mercado las cartas que quieras usar.");
           const fichas = cs.map(c => { const y = copia(e, c); return y && (y.rr ? y.rr : MOTOR.sobre(y.o, y.k, y.at).cartas[y.i]); });
           if (fichas.some(f => !f)) throw new Error("Alguna de esas cartas ya no existe.");
@@ -153,12 +130,12 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver }) {
           if (!so || !so.r) throw new Error("El re-roll no valió: alguna carta cambió de manos a la vez.");
           responde(true, { k: r.k, at: r.at, c: nueva, id: so.r.id, g: so.r.g, w: so.r.w, tier: MOTOR.CARDS[so.r.id].tier });
         } else if (x.accion === "exhibir") {
-          const lista = (Array.isArray(x.lista) ? x.lista : []).map(String).filter(c => leeCopia(c) && mia(c));
+          const lista = (Array.isArray(x.lista) ? x.lista : []).map(String).filter(c => esCarta(c) && mia(c));
           await fb.exhibirCartas(uid, [...new Set(lista)].slice(0, MAX_EXHIBIDAS));
           responde(true, null);
         } else if (x.accion === "vender") {
           const p = Math.round(+x.p);
-          if (!leeCopia(x.c) || !mia(x.c)) throw new Error("Esa carta no está en tu colección.");
+          if (!esCarta(x.c) || !mia(x.c)) throw new Error("Esa carta no está en tu colección.");
           if (e.enVenta[x.c]) throw new Error("Esa carta ya está a la venta.");
           if (!(p >= 1 && p <= MAX_PRECIO)) throw new Error(`El precio va de 1 a ${MAX_PRECIO.toLocaleString("es-CL")} monedas.`);
           if (cuenta().parada) throw new Error("Tu cuenta tiene una compra sin fondos: no puedes vender hasta ponerte al día.");
@@ -177,38 +154,6 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver }) {
           if (!o || o.u !== uid || o.estado !== "activa") throw new Error("Esa oferta ya no está a la venta.");
           await fb.retirarOferta(x.id);
           responde(true, null);
-        } else if (x.accion === "comprarCarta") {
-          const o = e.ofertas[x.id];
-          if (!o || o.estado !== "activa") throw new Error("Alguien se te adelantó: esa carta ya no está a la venta.");
-          if (o.u === uid) throw new Error("Es tu propia oferta.");
-          if (e.usuarios[o.u] && e.usuarios[o.u].parada) throw new Error("Esa cuenta no puede vender ahora.");
-          pagable(o.p, "Esa carta");
-          await fb.comprarOferta(uid, x.id);
-          const fin = economia(d).ofertas[x.id];
-          if (!fin || fin.estado !== "vendida" || fin.comprador !== uid) throw new Error("Alguien se te adelantó: esa carta ya no está a la venta.");
-          responde(true, null);
-        } else if (x.accion === "proponer") {
-          const dar = (x.dar || []).map(String), pedir = (x.pedir || []).map(String), para = String(x.para || "");
-          if (!para || para === uid) throw new Error("Elige con quién cambiar.");
-          if (!dar.length || dar.length > 3 || pedir.length > 3) throw new Error("Ofrece de 1 a 3 cartas y pide hasta 3.");
-          if (!dar.every(c => leeCopia(c) && mia(c) && !e.enVenta[c])) throw new Error("Alguna de tus cartas ya no es tuya o está a la venta.");
-          if (!pedir.every(c => leeCopia(c) && e.dueno[c] === para && !e.enVenta[c])) throw new Error("Alguna de las cartas que pides ya no es suya o está a la venta.");
-          if (cuenta().parada || (e.usuarios[para] && e.usuarios[para].parada)) throw new Error("Ahora no se puede proponer ese intercambio.");
-          responde(true, await fb.proponerCambio(uid, para, dar, pedir));
-        } else if (x.accion === "aceptar") {
-          const t = d.mercado && d.mercado.t && d.mercado.t[x.id];
-          if (!t || t.para !== uid || t.ok || t.x) throw new Error("Ese intercambio ya no está pendiente.");
-          const dar = Object.values(t.dar || {}), pedir = Object.values(t.pedir || {});
-          if (!dar.every(c => e.dueno[c] === t.de && !e.enVenta[c]) || !pedir.every(c => e.dueno[c] === uid && !e.enVenta[c]))
-            throw new Error("Ya no se puede: alguna carta cambió de dueño o está a la venta.");
-          if (cuenta().parada || (e.usuarios[t.de] && e.usuarios[t.de].parada)) throw new Error("Ahora no se puede aceptar ese intercambio.");
-          await fb.aceptarCambio(x.id);
-          responde(true, null);
-        } else if (x.accion === "cerrar") {
-          const t = d.mercado && d.mercado.t && d.mercado.t[x.id];
-          if (!t || (t.de !== uid && t.para !== uid) || t.ok || t.x) throw new Error("Ese intercambio ya no está pendiente.");
-          await fb.cerrarCambio(x.id);
-          responde(true, null);
         } else throw new Error("Petición desconocida.");
       } catch (e) {
         const permiso = /permission|denied/i.test((e && (e.code || e.message)) || "");
@@ -225,6 +170,7 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver }) {
     if (!x || x.canal !== "prodrop-child") return;
     if (x.tipo === "listo") { listo = true; enviaDatos(); return; }
     if (x.tipo === "volver") { volver(); return; }
+    if (x.tipo === "mercado") { ir("#mercado/prodrop"); return; }
     if (x.tipo === "pide") atiende(x);
   }
 
@@ -236,7 +182,7 @@ export function crearProdrop({ usuario, datos, perfil, quien, fb, volver }) {
       frame.title = "PRODROP — sobres y mercado de cartas";
       frame.allow = "fullscreen";
       window.addEventListener("message", mensaje);
-      frame.src = "juegos/prodrop/index.html?v=pd-16";
+      frame.src = "juegos/prodrop/index.html?v=pd-17";
       host.appendChild(frame);
       frame.addEventListener("load", () => frame.focus());
       off = datos(x => { d = x; enviaDatos(); });

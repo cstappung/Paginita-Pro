@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610100503"></script>
+<script src="i18n.js?v=202610101440"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Laboratorio</title>
@@ -2329,6 +2329,12 @@ html.jg-prodrop,html.jg-prodrop body{overflow:hidden;height:100%}
 html.jg-prodrop .head,html.jg-prodrop .bar,html.jg-prodrop .rp-fab{display:none!important}
 html.jg-prodrop #pantalla{position:fixed;inset:0;z-index:1;margin:0;max-width:none;padding:0;background:#0d0820}
 .jg-prodrop-frame{display:block;width:100%;height:100%;border:0;background:#0d0820}
+/* Mascotas: igual que PRODROP, su iframe ocupa la ventana y trae su barra (← Juegos). */
+html.jg-mascotas,html.jg-mascotas body{overflow:hidden;height:100%}
+html.jg-mascotas .head,html.jg-mascotas .bar,html.jg-mascotas .rp-fab{display:none!important}
+html.jg-mascotas #pantalla{position:fixed;inset:0;z-index:1;margin:0;max-width:none;padding:0;background:#fff8ee}
+.jg-mascotas-frame{display:block;width:100%;height:100%;border:0;background:#fff8ee}
+html[data-tema=oscuro].jg-mascotas #pantalla,html[data-tema=oscuro] .jg-mascotas-frame{background:#17131f}
 @media(max-width:1050px){.jg-partida-layout{grid-template-columns:minmax(0,1fr)}.jg-partida-layout>.jg-chat{position:static;height:300px}.jg-solo-barra nav{margin-left:0}}
 /* ---------- logros ---------- */
 .jg-lg{display:grid;gap:18px;max-width:980px;margin:0 auto}
@@ -2817,7 +2823,9 @@ html[data-tema=oscuro] .jg-ym-eq.azul.mio{color:#8cc2ff}
 }
 
 /* El editor del perfil */
-.jg-modal.jg-perfil-ed{width:880px}
+/* `max-width:100%` no frena a un hijo de una rejilla `auto`: en el celular el
+   editor medía 880 px y la mitad quedaba fuera de la pantalla. */
+.jg-modal.jg-perfil-ed{width:min(880px,calc(100vw - 36px))}
 .jg-ped{display:grid;grid-template-columns:304px 1fr;gap:20px;margin-top:14px;align-items:start}
 .jg-ped-prev{position:sticky;top:0}
 .jg-ped-prev>small{display:block;margin-bottom:6px;font:600 10.5px inherit;letter-spacing:.6px;text-transform:uppercase;color:#9b97ab}
@@ -2862,6 +2870,10 @@ html[data-tema=oscuro] .jg-ped-op .jg-ped-precio{color:#f4c542}
   .jg-ped{grid-template-columns:1fr}
   .jg-ped-prev{position:static}
   .jg-ped-vit{max-height:none}
+  /* Cinco pestañas no caben a 390 px: se desliza la fila. */
+  .jg-ped-tabs{overflow-x:auto;scrollbar-width:none}
+  .jg-ped-tabs::-webkit-scrollbar{display:none}
+  .jg-ped-tabs button{flex:1 0 auto;padding:7px 12px}
 }
 @media(prefers-reduced-motion:reduce){
   .jg-av::before,.jg-av::after,.jg-av>img,.jg-av>i,.jg-mini{animation:none!important}
@@ -3778,7 +3790,7 @@ html[data-tema=oscuro] .jg-drop-quien:hover>b{color:#fff}
 :root{--m-solo:#e59a00;--m-solo-bg:#ffcf5c;--m-solo-tx:#3d2a00;--m-multi:#7042df;--m-multi-bg:#7042df;--m-multi-tx:#fff}
 
 /* ---- La rejilla del salón: una columna en el móvil ---- */
-.jg-sal{display:grid;grid-template-columns:minmax(0,1fr);grid-template-areas:"nov" "intro" "modos" "avisos" "solo" "lado" "multi" "tops" "tira";align-items:start}
+.jg-sal{display:grid;grid-template-columns:minmax(0,1fr);grid-template-areas:"nov" "intro" "modos" "avisos" "solo" "lado" "multi" "tops" "tira" "tiram";align-items:start}
 .jg-sal-intro{grid-area:intro;margin-bottom:10px}
 .jg-sal-intro h1{font-size:26px;letter-spacing:-.8px;margin:8px 0 4px;line-height:1.1;color:var(--jg-ink)}
 .jg-sal-intro p{margin:0;font-size:13px;color:var(--jg-muted);line-height:1.5}
@@ -3789,6 +3801,7 @@ html[data-tema=oscuro] .jg-drop-quien:hover>b{color:#fff}
 .jg-sal-solo{grid-area:solo}.jg-sal-multi{grid-area:multi}
 .jg-sal .jg-ves-lado{grid-area:lado}
 .jg-sal .jg-tira{grid-area:tira;margin:8px 0 0}
+.jg-sal .jg-tira-m{grid-area:tiram;margin:16px 0 0}
 .jg-sal-sec{min-width:0;margin-bottom:26px}
 /* Un modo esconde la sección que sobra; las novedades no se van nunca. */
 /* La columna de salas (salas abiertas, top monedas, tus partidas) se queda
@@ -4095,16 +4108,16 @@ a.jg-hoja-ya{color:#fff!important}
   /* En las pantallas de menú las pestañas bajan al pie, fijas: el pulgar
      llega sin estirarse y quedan a la vista al hacer scroll. En una
      partida o un juego del club se van, que la pantalla es del juego. */
-  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas]) .bar{position:fixed;left:0;right:0;bottom:0;z-index:50;margin:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:2px;padding:6px 6px calc(6px + env(safe-area-inset-bottom));background:#fffffff2;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-top:1px solid #e4dfeb;box-shadow:0 -6px 22px #2a1e4414}
-  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas]) .bar .tab{position:relative;display:flex;flex-direction:column;justify-content:center;gap:3px;min-height:54px;padding:6px 2px;border-radius:14px;font-size:10.5px;font-weight:600;color:#6b6679;background:transparent;white-space:nowrap}
-  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas]) .bar .tab.on{background:#efe9fb;color:var(--jg-purple)}
-  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas]) .bar .tab-i,
-  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas]) .bar .tab .jg-moneda{width:23px;height:23px}
-  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas]) .bar .tab:has(.tab-c) .tab-l{display:none}
-  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas]) .bar .tab-c{display:inline}
-  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas]) .bar .tab.bloq:after{position:absolute;top:7px;left:calc(50% + 7px)}
-  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas]) main{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
-  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas]) .rp-fab{bottom:calc(78px + env(safe-area-inset-bottom))}
+  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas],[data-vista=mascotas],[data-vista=mercado]) .bar{position:fixed;left:0;right:0;bottom:0;z-index:50;margin:0;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:2px;padding:6px 6px calc(6px + env(safe-area-inset-bottom));background:#fffffff2;-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border-top:1px solid #e4dfeb;box-shadow:0 -6px 22px #2a1e4414}
+  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas],[data-vista=mascotas],[data-vista=mercado]) .bar .tab{position:relative;display:flex;flex-direction:column;justify-content:center;gap:3px;min-height:54px;padding:6px 2px;border-radius:14px;font-size:10.5px;font-weight:600;color:#6b6679;background:transparent;white-space:nowrap}
+  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas],[data-vista=mascotas],[data-vista=mercado]) .bar .tab.on{background:#efe9fb;color:var(--jg-purple)}
+  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas],[data-vista=mascotas],[data-vista=mercado]) .bar .tab-i,
+  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas],[data-vista=mascotas],[data-vista=mercado]) .bar .tab .jg-moneda{width:23px;height:23px}
+  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas],[data-vista=mascotas],[data-vista=mercado]) .bar .tab:has(.tab-c) .tab-l{display:none}
+  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas],[data-vista=mascotas],[data-vista=mercado]) .bar .tab-c{display:inline}
+  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas],[data-vista=mascotas],[data-vista=mercado]) .bar .tab.bloq:after{position:absolute;top:7px;left:calc(50% + 7px)}
+  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas],[data-vista=mascotas],[data-vista=mercado]) main{padding-bottom:calc(96px + env(safe-area-inset-bottom))}
+  html:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas],[data-vista=mascotas],[data-vista=mercado]) .rp-fab{bottom:calc(78px + env(safe-area-inset-bottom))}
   html:is([data-vista=partida],[data-vista=solo]) .bar{display:none}
 }
 
@@ -4156,9 +4169,9 @@ a.jg-hoja-ya{color:#fff!important}
   /* La columna baja hasta el final (tops y tira incluidos). Chrome sujeta
      un `sticky` a la rejilla entera, no a su área: cuando acababa en
      «Multijugador», al bajar se quedaba pegada encima de los drops. */
-  .jg-sal{grid-template-columns:minmax(0,1fr) 320px;column-gap:28px;grid-template-areas:"nov nov" "intro intro" "modos modos" "avisos avisos" "solo lado" "multi lado" "tops lado" "tira lado";grid-template-rows:auto auto auto auto auto auto auto 1fr}
-  .jg-sal[data-modo=solo]{grid-template-areas:"nov nov" "intro intro" "modos modos" "avisos avisos" "solo lado" "tops lado" "tira lado";grid-template-rows:auto auto auto auto auto auto 1fr}
-  .jg-sal[data-modo=multi]{grid-template-areas:"nov nov" "intro intro" "modos modos" "avisos avisos" "multi lado" "tops lado" "tira lado";grid-template-rows:auto auto auto auto auto auto 1fr}
+  .jg-sal{grid-template-columns:minmax(0,1fr) 320px;column-gap:28px;grid-template-areas:"nov nov" "intro intro" "modos modos" "avisos avisos" "solo lado" "multi lado" "tops lado" "tira lado" "tiram lado";grid-template-rows:auto auto auto auto auto auto auto auto 1fr}
+  .jg-sal[data-modo=solo]{grid-template-areas:"nov nov" "intro intro" "modos modos" "avisos avisos" "solo lado" "tops lado" "tira lado" "tiram lado";grid-template-rows:auto auto auto auto auto auto auto 1fr}
+  .jg-sal[data-modo=multi]{grid-template-areas:"nov nov" "intro intro" "modos modos" "avisos avisos" "multi lado" "tops lado" "tira lado" "tiram lado";grid-template-rows:auto auto auto auto auto auto auto 1fr}
   .jg-sal .jg-ves-lado{top:76px;max-height:calc(100vh - 96px)}
   .jg-modos-sel{flex:0 1 560px}
   .jg-modos{justify-content:space-between}
@@ -4207,9 +4220,9 @@ html[data-tema=oscuro] .jg-puerta{background:var(--os-sup);border-color:var(--os
 html[data-tema=oscuro] .jg-desliza{background:var(--os-sup);border-color:var(--os-borde2);color:var(--os-tx)}
 html[data-tema=oscuro] .jg-lado-cuenta>ul{color:var(--os-tx)}
 @media(max-width:720px){
-  html[data-tema=oscuro]:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas]) .bar{background:#15121df2;border-color:var(--os-borde);box-shadow:0 -6px 22px #0007}
-  html[data-tema=oscuro]:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas]) .bar .tab{color:var(--os-tx3)}
-  html[data-tema=oscuro]:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas]) .bar .tab.on{background:var(--os-sup3);color:#fff}
+  html[data-tema=oscuro]:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas],[data-vista=mascotas],[data-vista=mercado]) .bar{background:#15121df2;border-color:var(--os-borde);box-shadow:0 -6px 22px #0007}
+  html[data-tema=oscuro]:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas],[data-vista=mascotas],[data-vista=mercado]) .bar .tab{color:var(--os-tx3)}
+  html[data-tema=oscuro]:is([data-vista=vestibulo],[data-vista=ranks],[data-vista=logros],[data-vista=monedas],[data-vista=perfil],[data-vista=cartas],[data-vista=mascotas],[data-vista=mercado]) .bar .tab.on{background:var(--os-sup3);color:#fff}
 }
 
 /* ---- Los rieles del salón (juegos/rieles.js) ----
@@ -4396,6 +4409,226 @@ html[data-tema=oscuro] .jg-adm-pre{background:#00000033;color:var(--os-tx)}
 html[data-tema=oscuro] .jg-adm-motivos,html[data-tema=oscuro] .jg-adm-mal{color:#ff8a80}
 html[data-tema=oscuro] .jg-adm-bien{color:#7ddc9c}
 html[data-tema=oscuro] .jg-adm-tabs .btn2.on{background:#ab8bff;color:#171522;border-color:#ab8bff}
+
+/* ============================================================
+   🏪 El mercado (`#mercado`, juegos/mercado.js): cartas de PRODROP y
+   objetos, bailes y mascotas de Mascotas. Mobile first: una columna de
+   filtros que se desplazan de lado, y una grilla que crece con el ancho.
+   Las miniaturas de Mascotas son fotos del visor (`.jg-mk-foto`), con el
+   emoji mientras llegan. El detalle es una capa con el visor en vivo.
+   ============================================================ */
+.jg-mk{max-width:1100px;margin:0 auto;padding:4px 0 24px;display:flex;flex-direction:column;gap:12px}
+.jg-mk-cab{display:flex;align-items:flex-end;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.jg-mk-cab h1{margin:0;font-size:24px}
+.jg-mk-cab small{color:var(--jg-muted,#6b6679);font-size:13px}
+.jg-mk-cab small .jg-moneda{width:14px;height:14px;vertical-align:-2px}
+.jg-mk-ir{display:flex;gap:6px}
+.jg-mk-ir a{display:inline-flex;align-items:center;gap:4px;height:34px;padding:0 12px;text-decoration:none}
+.jg-mk-seg{display:flex;gap:4px;padding:4px;border-radius:14px;background:#f1edf8;overflow-x:auto;scrollbar-width:none}
+.jg-mk-seg button{flex:1;min-width:max-content;border:0;background:transparent;border-radius:10px;padding:8px 12px;font:600 14px inherit;color:#5b5670;cursor:pointer}
+.jg-mk-seg button[aria-pressed=true]{background:#fff;color:var(--jg-purple,#7042df);box-shadow:0 1px 4px #2a1e4422}
+.jg-mk-seg.chico button{padding:6px 10px;font-size:13px}
+.jg-mk-tabs{display:flex;gap:4px;border-bottom:1px solid #e6e1ee}
+.jg-mk-tabs button{border:0;background:transparent;padding:9px 12px;font:600 14px inherit;color:#6b6679;border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer}
+.jg-mk-tabs button[aria-selected=true]{color:var(--jg-purple,#7042df);border-bottom-color:var(--jg-purple,#7042df)}
+.jg-mk-tabs b{display:inline-grid;place-items:center;min-width:18px;height:18px;margin-left:4px;padding:0 5px;border-radius:9px;background:#e8453c;color:#fff;font-size:11px}
+.jg-mk-aviso{margin:0;padding:10px 12px;border-radius:12px;background:#fff4dc;border:1px solid #f1d28a;font-size:13px}
+.jg-mk-filtros{display:flex;flex-direction:column;gap:8px}
+.jg-mk-fila{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.jg-mk-chip{display:inline-flex;align-items:center;gap:5px;border:1px solid #e1dbea;background:#fff;border-radius:999px;padding:5px 11px;font:600 12.5px inherit;color:#4b4760;cursor:pointer}
+.jg-mk-chip i{font-style:normal;color:var(--c)}
+.jg-mk-chip.on{border-color:var(--c,var(--jg-purple,#7042df));background:color-mix(in srgb,var(--c,#7042df) 14%,#fff);color:#232137}
+.jg-mk-sel{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:#6b6679}
+.jg-mk-sel select{font:inherit;padding:5px 8px;border-radius:9px;border:1px solid #e1dbea;background:#fff;color:#232137}
+.jg-mk-q{flex:1 1 180px;min-width:0;font:inherit;font-size:14px;padding:7px 11px;border-radius:10px;border:1px solid #e1dbea;background:#fff;color:#232137}
+.jg-mk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.jg-mk-it{display:flex;flex-direction:column;gap:6px;padding:8px;border-radius:14px;border:1px solid #e5e0ee;background:#fff;text-align:left;cursor:pointer;color:inherit;font:inherit;transition:transform .15s,box-shadow .15s}
+.jg-mk-it:hover{transform:translateY(-2px);box-shadow:0 8px 20px #2a1e441a}
+.jg-mk-it.mia{border-color:#c9b6ff;background:#faf7ff}
+.jg-mk-img{display:grid;place-items:center;aspect-ratio:1;border-radius:10px;background:#f7f4fb;overflow:hidden;position:relative}
+.jg-mk-it.t-carta .jg-mk-img{aspect-ratio:5/7;background:transparent}
+.jg-mk-img .jg-pdc{width:100%}
+.jg-mk-img.chica{width:64px;flex:none}
+.jg-mk-img.chica .jg-pdc figcaption{display:none}
+.jg-mk-foto{position:relative;display:grid;place-items:center;width:100%;height:100%}
+.jg-mk-foto img{width:88%;height:88%;object-fit:contain}
+.jg-mk-emoji{font-size:44px;line-height:1}
+.jg-mk-img.chica .jg-mk-emoji{font-size:28px}
+.jg-mk-muestra{position:absolute;left:6px;bottom:6px;display:flex;gap:2px}
+.jg-mk-muestra i{width:10px;height:10px;border-radius:50%;border:1px solid #0003}
+.jg-mk-leg,.jg-mk-eterna{position:absolute;top:5px;right:6px;font-size:13px;color:#f2b00c;text-shadow:0 1px 2px #0004}
+.jg-mk-eterna{right:auto;left:6px}
+.jg-mk-tx{display:flex;flex-direction:column;min-width:0}
+.jg-mk-tx b{font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jg-mk-tx small{font-size:11.5px;color:#7a7590;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jg-mk-pie{display:flex;align-items:center;justify-content:space-between;gap:6px;min-width:0}
+.jg-mk-p{display:inline-flex;align-items:center;gap:4px;font-size:14px;white-space:nowrap}
+.jg-mk-p .jg-moneda{width:15px;height:15px}
+.jg-mk-p.caro{color:#b3412f}
+.jg-mk-tuya{font-size:11px;font-weight:700;color:var(--jg-purple,#7042df);background:#efe9fb;border-radius:99px;padding:2px 8px}
+.jg-mk-quien{display:inline-flex;align-items:center;gap:5px;min-width:0;font-size:12px}
+.jg-mk-quien b{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jg-mk-pie .jg-mk-quien{max-width:58%}
+.jg-mk-mas{align-self:center}
+.jg-mk-vacio{text-align:center;padding:30px 10px;color:#7a7590}
+.jg-mk-vacio b{display:block;font-size:34px}
+.jg-mk-nota{margin:0;font-size:12.5px;color:#7a7590}
+.jg-mk-nota.err{color:#b3412f}
+.jg-mk-lista{display:flex;flex-direction:column;gap:8px}
+.jg-mk-fv{display:flex;align-items:center;gap:10px;padding:8px;border-radius:12px;background:#fff;border:1px solid #e5e0ee}
+.jg-mk-fv-tx{display:flex;flex-direction:column;flex:1;min-width:0;font-size:13px}
+.jg-mk-fv-tx small{color:#7a7590;font-size:11.5px}
+.jg-mk-fv-p{display:inline-flex;align-items:center;gap:4px;font-weight:700;white-space:nowrap}
+.jg-mk-fv-p .jg-moneda{width:14px;height:14px}
+.jg-mk-est{align-self:flex-start;font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:99px;background:#eee;color:#555}
+.jg-mk-est.act{background:#e8f0ff;color:#2e5bd8}.jg-mk-est.ok{background:#e3f7e8;color:#23874f}.jg-mk-est.mal{background:#fde6e3;color:#b3412f}
+.jg-mk-mini{padding:5px 10px;font-size:12.5px}
+.jg-mk-trato{display:flex;flex-direction:column;gap:8px;padding:10px;border-radius:14px;background:#fff;border:1px solid #e5e0ee}
+.jg-mk-trato header{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.jg-mk-trato header small{color:#7a7590;font-size:12px}
+.jg-mk-trato-c{display:flex;align-items:center;gap:8px}
+.jg-mk-lado{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.jg-mk-lado>small{font-size:11.5px;color:#7a7590}
+.jg-mk-cosas{display:flex;gap:6px;flex-wrap:wrap}
+.jg-mk-cosas .jg-mk-img.chica{width:54px}
+.jg-mk-nada{font-size:12px;color:#9b97ab;font-style:italic}
+.jg-mk-flecha{font-size:20px;color:#9b97ab}
+.jg-mk-acc{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.jg-mk-capa{position:fixed;inset:0;z-index:72;background:#160f2499;display:flex;align-items:flex-end;justify-content:center;padding:0;animation:jgMkCapa .18s ease-out}
+.jg-mk-det{position:relative;width:100%;max-height:92vh;overflow:auto;background:#fff;color:var(--jg-ink,#232137);border-radius:20px 20px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom));display:grid;gap:14px;animation:jgHoja .24s ease-out}
+.jg-mk-x{position:absolute;top:10px;right:10px;z-index:2;width:32px;height:32px;border-radius:50%;border:0;background:#0000000f;font-size:14px;cursor:pointer;color:inherit}
+.jg-mk-det-vis{position:relative;display:grid;place-items:center;min-height:220px;border-radius:16px;background:radial-gradient(circle at 50% 40%,#fff8ee,#f1eaf9)}
+.jg-mk-det-vis.carta{background:transparent;min-height:0}
+.jg-mk-det-vis.carta .jg-pdc{width:min(220px,60vw)}
+.jg-mk-det-vis .jg-mk-foto.grande{width:200px;height:200px}
+.jg-mk-det-vis.vivo .jg-mk-foto{position:absolute;inset:0;margin:auto}
+.jg-mk-det-vis.vivo:has(.visor-listo) .jg-mk-foto{visibility:hidden}
+.jg-mk-vivo{position:absolute;inset:0}
+/* `color-scheme:normal`: con la página en oscuro y el visor en claro, el
+   navegador pinta el iframe opaco (blanco) en vez de transparente. */
+.jg-visor{display:block;width:100%;height:100%;border:0;background:transparent;color-scheme:normal}
+.jg-mk-det-tx{display:flex;flex-direction:column;gap:8px}
+.jg-mk-det-tx h2{margin:0;font-size:22px}
+.jg-mk-det-tx p{margin:0}
+.jg-mk-det-p{display:flex;align-items:center;gap:6px;font-size:22px}
+.jg-mk-det-p .jg-moneda{width:22px;height:22px}
+.jg-mk-tc{max-width:none}
+.jg-mk-tc-c h2{margin:0 0 10px;font-size:20px}
+.jg-mk-gente{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px}
+.jg-mk-persona{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:10px;border-radius:12px;border:1px solid #e5e0ee;background:#fff;cursor:pointer;font:inherit;color:inherit;text-align:left}
+.jg-mk-persona small{color:#7a7590;font-size:12px}
+.jg-mk-tc-cab{display:flex;align-items:center;gap:10px;margin:0 30px 10px 0}
+.jg-mk-tc-cols{display:grid;gap:12px}
+.jg-mk-tc-cols h3{margin:0 0 6px;font-size:15px}
+.jg-mk-tc-cols h3 small{color:#7a7590;font-weight:500}
+.jg-mk-rej{display:grid;grid-template-columns:repeat(auto-fill,minmax(72px,1fr));gap:6px;max-height:36vh;overflow:auto;padding:2px}
+.jg-mk-elige{display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px;border-radius:10px;border:2px solid transparent;background:#f7f4fb;cursor:pointer;font:inherit;color:inherit}
+.jg-mk-elige .jg-mk-img.chica{width:100%}
+.jg-mk-elige small{font-size:10.5px;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jg-mk-elige.on{border-color:var(--jg-purple,#7042df);background:#efe9fb}
+.jg-mk-toast{position:fixed;left:50%;bottom:calc(90px + env(safe-area-inset-bottom));transform:translateX(-50%);z-index:90;max-width:calc(100vw - 32px);padding:10px 16px;border-radius:12px;background:#232137;color:#fff;font-size:14px;box-shadow:0 10px 30px #0004;animation:jgMkCapa .2s ease-out}
+.jg-mk-toast.mal{background:#b3412f}
+@keyframes jgMkCapa{from{opacity:0}}
+@media(min-width:720px){
+  .jg-mk-capa{align-items:center;padding:24px}
+  .jg-mk-det{max-width:760px;border-radius:20px;grid-template-columns:minmax(0,300px) 1fr;align-items:start;padding:22px}
+  .jg-mk-det-vis{min-height:300px}
+  .jg-mk-tc{grid-template-columns:1fr;max-width:860px}
+  .jg-mk-tc-cols{grid-template-columns:1fr 1fr}
+  .jg-mk-toast{bottom:24px}
+}
+@media(prefers-reduced-motion:reduce){.jg-mk-capa,.jg-mk-det,.jg-mk-toast{animation:none}.jg-mk-it:hover{transform:none}}
+html[data-tema=oscuro] .jg-mk-seg{background:var(--os-sup2)}
+html[data-tema=oscuro] .jg-mk-seg button{color:var(--os-tx3)}
+html[data-tema=oscuro] .jg-mk-seg button[aria-pressed=true]{background:var(--os-sup3);color:#c9b6ff}
+html[data-tema=oscuro] .jg-mk-tabs{border-bottom-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-mk-tabs button{color:var(--os-tx3)}
+html[data-tema=oscuro] .jg-mk-tabs button[aria-selected=true]{color:#c9b6ff;border-bottom-color:#c9b6ff}
+html[data-tema=oscuro] :is(.jg-mk-chip,.jg-mk-sel select,.jg-mk-q,.jg-mk-it,.jg-mk-fv,.jg-mk-trato,.jg-mk-persona){background:var(--os-sup);border-color:var(--os-borde);color:var(--os-tx)}
+html[data-tema=oscuro] .jg-mk-chip.on{background:color-mix(in srgb,var(--c,#7042df) 26%,var(--os-sup));color:var(--os-tx)}
+html[data-tema=oscuro] .jg-mk-it.mia{background:#221b33;border-color:#4b3d73}
+html[data-tema=oscuro] :is(.jg-mk-img,.jg-mk-elige){background:var(--os-sup2)}
+html[data-tema=oscuro] .jg-mk-it.t-carta .jg-mk-img{background:transparent}
+html[data-tema=oscuro] .jg-mk-elige.on{background:#2c2440;border-color:#ab8bff}
+html[data-tema=oscuro] :is(.jg-mk-cab small,.jg-mk-tx small,.jg-mk-nota,.jg-mk-fv-tx small,.jg-mk-lado>small,.jg-mk-trato header small,.jg-mk-persona small,.jg-mk-vacio,.jg-mk-sel,.jg-mk-tc-cols h3 small){color:var(--os-tx3)}
+html[data-tema=oscuro] .jg-mk-tuya{background:#2c2440;color:#c9b6ff}
+html[data-tema=oscuro] .jg-mk-aviso{background:#3a2f12;border-color:#6b5520;color:var(--os-tx)}
+html[data-tema=oscuro] .jg-mk-det{background:var(--os-sup);color:var(--os-tx)}
+html[data-tema=oscuro] .jg-mk-det-vis{background:radial-gradient(circle at 50% 40%,#2c2539,#17131f)}
+html[data-tema=oscuro] .jg-mk-det-vis.carta{background:transparent}
+html[data-tema=oscuro] .jg-mk-x{background:#ffffff14}
+html[data-tema=oscuro] .jg-mk-est{background:#ffffff14;color:var(--os-tx2)}
+html[data-tema=oscuro] .jg-mk-est.act{background:#1f2c4d;color:#9cb8ff}
+html[data-tema=oscuro] .jg-mk-est.ok{background:#173323;color:#7ddc9c}
+html[data-tema=oscuro] .jg-mk-est.mal{background:#3a1a16;color:#ff8a80}
+html[data-tema=oscuro] .jg-mk-p.caro{color:#ff8a80}
+
+/* La mascota del perfil (perfil-mascota.js): una capa en vivo sobre el
+   banner de la tarjeta y sobre el hero del perfil. */
+.jg-masc{position:absolute;z-index:2;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:2px}
+.jg-masc[hidden]{display:none}
+.jg-masc-vis{position:relative;width:100%;flex:1;min-height:0;background:center/contain no-repeat}
+.jg-masc-vis::before{content:attr(data-emoji);position:absolute;inset:0;display:grid;place-items:center;font-size:34px}
+.jg-masc-vis.visor-listo{background-image:none!important}
+.jg-masc-vis.visor-listo::before{content:none}
+.jg-masc-vis>.jg-visor{position:absolute;inset:0}
+.jg-masc-n{max-width:100%;padding:1px 9px;border-radius:99px;background:#ffffffe6;color:#232137;font-size:10.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 1px 5px #1b123029}
+.jg-masc.en-mini{top:0;right:38px;width:112px;height:128px}
+.jg-mini.con-mascota .jg-mini-id{padding-right:118px}
+.jg-mini-quieta.con-mascota .jg-mini-id{padding-right:96px}
+.jg-masc.en-mini .jg-masc-n{font-size:9.5px;padding:0 7px}
+.jg-mini-quieta .jg-masc.en-mini{right:10px}
+.jg-masc.en-hero{right:16px;bottom:10px;width:190px;height:214px}
+.jg-pf-hero.con-mascota .jg-pf-hero-in{padding-right:196px}
+.jg-ped-masc{padding-top:10px}
+.jg-ped-masc-f{width:72px;height:72px;display:grid;place-items:center;font-size:36px;background:center/contain no-repeat}
+.jg-ped-bailes{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.jg-ped-baile{padding:6px 12px;border-radius:99px;border:2px solid #ece8f3;background:#fff;font:inherit;font-size:12px;font-weight:600;color:inherit;cursor:pointer}
+.jg-ped-baile:hover:not(:disabled){border-color:#cdbff1}
+.jg-ped-baile.on{border-color:var(--jg-purple,#7042df);box-shadow:0 0 0 3px #7042df22}
+.jg-ped-baile.leg{background:linear-gradient(90deg,#fff6d0,#fff);border-color:#f2d77a}
+.jg-ped-baile:disabled{opacity:.5;cursor:default}
+@media(max-width:760px){
+  .jg-masc.en-hero{top:6px;right:6px;bottom:auto;width:112px;height:128px}
+  .jg-pf-hero.con-mascota .jg-pf-hero-in{padding-right:0}
+}
+html[data-tema=oscuro] .jg-masc-n{background:#1d1b2be6;color:var(--os-tx)}
+html[data-tema=oscuro] .jg-ped-baile{background:var(--os-sup2);border-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-ped-baile.leg{background:linear-gradient(90deg,#3a3014,var(--os-sup2));border-color:#6b5520}
+
+/* La tira de legendarios de Mascotas (pintaDropsMascotas): la misma tira
+   que la de PRODROP, en los colores del juego (crema y naranja). */
+.jg-tira-m{background:linear-gradient(120deg,#5a2a0c,#a8501a 55%,#d9772b);border-color:#f0c79a}
+.jg-tira-m header small{color:#ffe2c2}
+.jg-tira-m .jg-drop-quien{color:#ffe9d2}.jg-tira-m .jg-drop-cuando{color:#ffd2a6}
+.jg-tira-m .jg-nada{color:#ffe2c2}
+.jg-dropm{flex-basis:112px}
+.jg-dropm-f{position:relative;display:grid;place-items:center;height:112px;border-radius:14px;background:#fff3dc center/84% no-repeat;box-shadow:inset 0 0 0 2px #ffcf6b,0 0 18px #ffcf6b66}
+.jg-dropm-f>i{font-style:normal;font-size:44px}
+.jg-dropm-f>em{position:absolute;top:5px;right:6px;padding:1px 6px;border-radius:99px;background:#ffcf3d;color:#5a2a0c;font:800 11px/1.4 inherit;font-style:normal;box-shadow:0 1px 3px #0003}
+.jg-dropm-n{font-size:12px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.jg-tira-puerta{display:flex;align-items:center;gap:10px 16px;flex-wrap:wrap}
+.jg-tira-puerta p{flex:1 1 280px;margin:0;font-size:13px;color:#ffe2c2}.jg-tira-puerta b{color:#fff}
+html[data-tema=oscuro] .jg-tira-m{background:linear-gradient(120deg,#2a1406,#5c2c0e 55%,#7a3d14);border-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-dropm-f{background-color:#3a2a1c}
+
+/* Novedad de Mascotas: la pradera del juego, un huevo que se tambalea, la
+   gallina que baila, el regalo con su ★ y corazones que suben. */
+.jg-nov-arte-mc{position:absolute;inset:0;overflow:hidden;background:radial-gradient(ellipse 70% 40% at 50% 112%,#8fd16a 0 60%,#6fb84e 61% 100%,transparent 101%),radial-gradient(circle at 18% 22%,#fff8 0 7%,transparent 8%),linear-gradient(#ffe7b8,#ffd08a 70%)}
+.jg-nov-arte-mc>i{position:absolute;left:24%;bottom:26px;width:46px;height:58px;border-radius:50% 50% 46% 46%/60% 60% 40% 40%;background:radial-gradient(circle at 35% 30%,#fff 0 18%,#fff6e3 19%),#fff6e3;box-shadow:inset -5px -6px 0 #f1dcb6,0 4px 0 #3a2416;border:2.5px solid #3a2416;transform-origin:50% 100%;animation:jg-mc-huevo 2.4s ease-in-out infinite}
+.jg-nov-arte-mc>i::after{content:"";position:absolute;left:8px;right:8px;top:24px;height:8px;background:linear-gradient(135deg,transparent 45%,#3a2416 46% 54%,transparent 55%) 0 0/10px 8px repeat-x}
+.jg-nov-arte-mc>em{position:absolute;left:52%;bottom:22px;font-size:64px;line-height:1;font-style:normal;filter:drop-shadow(0 4px 0 #3a241633);transform-origin:50% 100%;animation:jg-mc-baile 1.1s ease-in-out infinite}
+.jg-nov-arte-mc>s{position:absolute;right:13%;top:36%;font-size:40px;line-height:1;text-decoration:none;transform:rotate(8deg)}
+.jg-nov-arte-mc>s>b{position:absolute;right:-8px;top:-8px;padding:0 5px;border-radius:99px;background:#ffcf3d;color:#5a2a0c;font:800 13px/1.5 system-ui,sans-serif;border:2px solid #3a2416}
+.jg-nov-arte-mc>u{position:absolute;text-decoration:none;color:#ff6b8a;font-size:18px;opacity:0;animation:jg-mc-corazon 2.6s ease-out infinite}
+.jg-nov-arte-mc>u:nth-of-type(1){left:66%;bottom:84px}.jg-nov-arte-mc>u:nth-of-type(2){left:74%;bottom:70px;animation-delay:-1.3s;font-size:14px}
+.jg-nov-arte-mc>b{position:absolute;left:0;right:0;top:12px;text-align:center;font:900 30px/1 Nunito,"Arial Rounded MT Bold",system-ui,sans-serif;letter-spacing:.03em;color:#fff;-webkit-text-stroke:2px #3a2416;paint-order:stroke fill;text-shadow:0 3px 0 #3a2416}
+@keyframes jg-mc-huevo{0%,60%,100%{transform:rotate(0)}68%{transform:rotate(-9deg)}76%{transform:rotate(8deg)}84%{transform:rotate(-5deg)}92%{transform:rotate(3deg)}}
+@keyframes jg-mc-baile{0%,100%{transform:translateY(0) rotate(-6deg)}50%{transform:translateY(-8px) rotate(6deg)}}
+@keyframes jg-mc-corazon{0%{opacity:0;transform:translateY(0) scale(.6)}20%{opacity:1}100%{opacity:0;transform:translateY(-46px) scale(1.1)}}
+@media (prefers-reduced-motion:reduce){.jg-nov-arte-mc>i,.jg-nov-arte-mc>em,.jg-nov-arte-mc>u{animation:none}.jg-nov-arte-mc>u{opacity:1}}
+/* En oscuro, la misma pradera de noche (como el juego con la luz apagada). */
+html[data-tema=oscuro] .jg-nov-arte-mc{background:radial-gradient(ellipse 70% 40% at 50% 112%,#3f6e34 0 60%,#2f5a28 61% 100%,transparent 101%),radial-gradient(circle at 18% 22%,#fff6d0 0 5%,transparent 6%),radial-gradient(circle at 40% 14%,#fff8 0 .6%,transparent 1%),radial-gradient(circle at 82% 30%,#fff8 0 .6%,transparent 1%),linear-gradient(#1c1838,#3a2a52 75%)}
 </style>
 </head>
 <body>
@@ -4433,10 +4666,12 @@ html[data-tema=oscuro] .jg-adm-tabs .btn2.on{background:#ab8bff;color:#171522;bo
       <button class="tab" id="tabLogros"><svg class="tab-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2.5l2.6 5.2M16 2.5l-2.6 5.2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="14.5" r="5.8" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 11.6l1 2 2.2.3-1.6 1.5.4 2.2-2-1-2 1 .4-2.2-1.6-1.5 2.2-.3z" fill="currentColor"/></svg><span class="tab-l">Logros</span></button>
       <button class="tab" id="tabMonedas"><svg class="jg-moneda" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="#f5b819" stroke="#9a6a08" stroke-width="1.6"/><circle cx="10" cy="10" r="5.6" fill="#ffd54a" stroke="#c98d10" stroke-width="1.2"/><path d="M8.6 7.2v5.6M11.4 7.2v5.6" stroke="#9a6a08" stroke-width="1.4" stroke-linecap="round"/><path d="M5.2 6.4a6.2 6.2 0 0 1 3.6-2.5" stroke="#fff7d6" stroke-width="1.3" fill="none" stroke-linecap="round"/></svg><span class="tab-l">Monedas</span></button>
       <button class="tab jg-tab-cartas" id="tabCartas"><svg class="tab-i" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.6" y="5.6" width="10.5" height="14.5" rx="2" transform="rotate(-12 8.8 12.8)" fill="none" stroke="currentColor" stroke-width="1.8"/><rect x="9.6" y="4" width="10.5" height="14.5" rx="2" fill="currentColor"/><path d="M14.85 8.6l1.2 2.4 2.4.35-1.75 1.7.4 2.4-2.25-1.2-2.25 1.2.4-2.4-1.75-1.7 2.4-.35z" fill="#fff" opacity=".85"/></svg><span class="tab-l">Sobres</span></button>
+      <button class="tab" id="tabMascotas"><svg class="tab-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.2c-3.6 0-6.4 5-6.4 9.6 0 4.3 2.8 7.4 6.4 7.4s6.4-3.1 6.4-7.4c0-4.6-2.8-9.6-6.4-9.6z" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M6.4 11.6l2.4 1.6 2.1-1.9 2.2 1.9 2.1-1.9 2.4 1.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"/><circle cx="10.2" cy="15.6" r="1" fill="currentColor"/><circle cx="13.8" cy="15.6" r="1" fill="currentColor"/></svg><span class="tab-l">Mascotas</span></button>
+      <button class="tab" id="tabMercado"><svg class="tab-i" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9.5l1.4-4.6h13.2L20 9.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M4 9.5c0 1.3 1 2.3 2.3 2.3s2.3-1 2.3-2.3c0 1.3 1 2.3 2.3 2.3h.2c1.3 0 2.3-1 2.3-2.3 0 1.3 1 2.3 2.3 2.3S18 10.8 18 9.5h2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M5.6 12v7.3h12.8V12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M10 19.3v-4.2h4v4.2" fill="currentColor"/></svg><span class="tab-l">Mercado</span></button>
     </nav>
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610100503"></script>
+<script src="juegos-app.js?v=202610101440"></script>
 </body>
 </html>

@@ -77,7 +77,7 @@ test('el invitado solo juega Snake, Buscaminas, Tetris y sortEm',()=>{
  // Las rutas #solo/<x>: el Tetris del club va por «tetris».
  for(const r of ['snake','minas','tetris','sortem'])assert.ok(S.rutaLibre(r),r);
  for(const r of ['bbtan','sopa','electro','sudoku','fanal','atasco','aleteo','dosmil','trigon','frontera','tetrisclub-no'])assert.ok(!S.rutaLibre(r),r);
- for(const k of ['solo','partida','ranks','logros','monedas','cartas','perfil'])assert.ok(S.MOTIVO_CUENTA[k].t&&S.MOTIVO_CUENTA[k].d,k);
+ for(const k of ['solo','partida','ranks','logros','monedas','cartas','mascotas','mercado','perfil'])assert.ok(S.MOTIVO_CUENTA[k].t&&S.MOTIVO_CUENTA[k].d,k);
 });
 
 test('al empezar otra visita se borra solo lo del invitado',()=>{

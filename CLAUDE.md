@@ -15,7 +15,7 @@ runs client-side, and persistence for the collaborative tools lives in Firebase.
 - **ColabTeX** (`colabtex.html` + `colabtex-app.js`, source in `colabtex/src/`) — Overleaf-style collaborative LaTeX editor.
 - **ColabDraw** (`colabdraw.html` + `colabdraw-app.js`, source in `colabtex/src/draw/`) — Inkscape-style collaborative SVG editor.
 - **Informes** (`informes.html` + `informes-app.js`) — the shared bug tracker.
-- **Juegos** (`juegos.html` + `juegos-app.js`, source in `colabtex/src/juegos/`, iframe games in `juegos/`) — multiplayer room games, the Solo Club (single-player games with rankings), coins, logros, profiles and PRODROP.
+- **Juegos** (`juegos.html` + `juegos-app.js`, source in `colabtex/src/juegos/`, iframe games in `juegos/`) — multiplayer room games, the Solo Club (single-player games with rankings), coins, logros, profiles, PRODROP and Mascotas (3D pets, source in `colabtex/src/mascotas/`).
 
 ColabTeX, ColabDraw, FiltroLab, AjusteLab, Juegos and Informes are authored in
 **Spanish** — UI text, comments and identifiers alike. **CSV·Scope is the
@@ -51,6 +51,8 @@ before the first edit. Read only the docs the task needs.
 | Crear un juego nuevo, agregar un juego | `docs/claude/juegos/crear-un-juego.md` |
 | Panel de administración | `docs/claude/juegos/admin.md` |
 | PRODROP, sobres, cartas coleccionables, mercado | `juegos/prodrop/CLAUDE.md` |
+| Mascotas, crianza, mascota del perfil, regalos, comida, poción | `juegos/mascotas/CLAUDE.md` |
+| Mercado (comprar, vender, intercambiar cartas y mascotas), visor 3D | `docs/claude/juegos/mercado.md` |
 
 Room games (read `colabtex/src/juegos/CLAUDE.md` too):
 
@@ -128,11 +130,13 @@ npm run build        # bundle both apps + pdf worker, then stamp versions
 npm start            # static preview server at http://localhost:8123
 ```
 
-- `npm run build` runs esbuild six times (IIFE bundles of `src/main.js` →
+- `npm run build` runs esbuild several times (IIFE bundles of `src/main.js` →
   `../colabtex-app.js`, `src/draw-main.js` → `../colabdraw-app.js`,
   `src/reports-main.js` → `../informes-app.js`, `src/juegos-main.js` →
-  `../juegos-app.js` and `src/draw/math-engine.js` →
-  `../colabdraw-math.js` via `build:math`, plus the
+  `../juegos-app.js`, `src/draw/math-engine.js` →
+  `../colabdraw-math.js` via `build:math`, the Mascotas game
+  `src/mascotas/main.tsx` → `../juegos/mascotas/app.js` + `app.css` via
+  `build:mascotas` (React + three.js, TSX), plus the
   pdf.js worker), then `scripts/stamp-version.js` rewrites the `?v=…` query on
   the `<script>` tag of **each** page (its `PAGES` table) so GitHub
   Pages/browsers don't serve a stale cached bundle. The three `.dc.html`

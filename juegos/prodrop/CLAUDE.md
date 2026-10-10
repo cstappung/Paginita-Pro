@@ -100,22 +100,20 @@ other file of the site. Things that hold it together:
   `gratis` demands 6 h since the previous one and that the pack it names is
   this `p: 0` pack, and the rule on the pack demands that `gratis` names it.
   The replay re-checks the spacing (`proximoGratis`).
-- **The market** (`mercado/o/<id>` = `{u, c, p, at}`, price 1–100 000 set by
-  the seller). `x` (withdrawn, by the seller) and `v` (`{u, at}`, bought,
-  by anyone else) are each write-once and exclude each other in the rules,
-  so a listing has at most one buyer. The replay accepts a listing only if
-  the seller owns the copy and it is not already listed; a listed card
-  cannot be graded or traded. The frame's market (🏪 Mercado) has three
-  tabs: *Comprar* (filters: rarity, graded / ungraded, minimum grade only
-  when graded, sort by price or newest, search by name), *Mis ventas* (my
-  listings and purchases) and *Intercambios*. *Comprar* shows the seller's
-  own listings too, tagged «Tu oferta» (opening one offers Retirar): hiding
-  them made sellers think the listing never reached the store. A sale or a
-  withdrawal is marked in the frame at once (`marcaVenta`/`quitaVenta`)
-  rather than waiting for the next `datos`, so the card cannot be offered
-  for sale twice in between, and the postman withdraws a listing that the
-  replay does not accept as `activa` right after writing it.
-- **Trades** (`mercado/t/<id>` = `{de, para, dar[1–3], pedir[0–3], at}`):
+- **The market left the frame** (October 2026). It is the 🏪 Mercado tab
+  of Juegos, shared with Mascotas: `docs/claude/juegos/mercado.md`. The
+  frame's 🏪 button sends `{tipo: "mercado"}` and the postman goes to
+  `#mercado/prodrop`. Its badge counts trades waiting for you (`pendientes`,
+  from `pendientesDe`). What stays in the frame is selling or withdrawing a
+  card from its zoom (`vender`/`retirar`). The postman still sends the
+  active card listings (`ofertas`) only for «En el mercado por…» and the
+  reference price. `marcaVenta`/`quitaVenta` still mark a sale at once.
+  The listing node is the same: `mercado/o/<id>` = `{u, c, p, at}`, price
+  1–100 000. `x` (withdrawn) and `v` (bought) are write-once and exclusive.
+  The replay accepts a listing only if the seller owns the copy and it is
+  not already listed; a listed card cannot be graded or traded.
+- **Trades** (`mercado/t/<id>` = `{de, para, dar[1–3], pedir[0–3], at}`, now
+  any mix of cards, Mascotas objects and pets):
   `ok` (only `para`) and `x` (either) are write-once and exclusive, and the
   rules forbid creating one already accepted. The swap happens at `ok` if
   both still own their cards, none is listed and neither is stopped.

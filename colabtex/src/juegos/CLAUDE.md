@@ -402,8 +402,8 @@ overlay until midnight, when the page reloads itself. It is a client-side
 limit: a rewritten client or the REST API skips it. What the **server**
 enforces is that no whole collection can be read: `partidas` only through
 the lobby query (`orderByChild('estado')` + `equalTo('esperando')`) or by
-pid, and `vivo`, `chat`, `soloPruebas` only by key (`test-rules.mjs` pins
-it). A new node that clients read by key should get its `.read` at the key
+pid, and `vivo`, `chat`, `soloPruebas` and `mascotasEstado` only by key
+(`test-rules.mjs` pins it). A new node that clients read by key should get its `.read` at the key
 level, not on the collection.
 
 ## Every game can be muted and turned down (a rule, not a nicety)

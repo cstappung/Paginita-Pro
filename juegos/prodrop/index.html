@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="../../i18n.js?v=202610100503"></script>
+<script src="../../i18n.js?v=202610101440"></script>
 <script src="../audio/mando.js?v=mando-2"></script>
 <script src="../audio/volumen.js?v=vol-1"></script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -12,7 +12,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,500;0,600;0,700;0,800;1,600;1,800&family=Rubik:wght@500;700;800;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css?v=pd-16">
+<link rel="stylesheet" href="style.css?v=pd-17">
 </head>
 <body data-phase="pack">
 <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -34,7 +34,7 @@
   <div class="top-left"><button id="volverBtn" class="chip" hidden title="Volver a Juegos">←<span class="lg"> Juegos</span></button><div class="logo">PRO<span>DROP</span></div></div>
   <div class="top-actions">
     <span id="saldo" class="chip saldo" title="Tus monedas de Juegos"></span>
-    <button id="mktBtn" class="chip mkt" title="Mercado e intercambios"><span class="lg">Mercado</span><span class="sm" aria-hidden="true">🏪</span><b id="mktBadge" class="badge" hidden></b></button>
+    <button id="mktBtn" class="chip mkt" title="Mercado de Juegos (cartas y mascotas)"><span class="lg">Mercado</span><span class="sm" aria-hidden="true">🏪</span><b id="mktBadge" class="badge" hidden></b></button>
     <button id="colBtn" class="chip" title="Colección"><span class="lg">Colección</span><span class="sm" aria-hidden="true">🗂</span> <b id="colCount">0</b></button>
     <span class="vol-top" data-volumen></span>
     <button id="soundBtn" class="chip icon" aria-pressed="true" title="Sonido">♪</button>
@@ -111,32 +111,9 @@
     <button id="gradeBtn" class="btn grade" hidden>Enviar a graduar 🔍</button>
     <button id="showBtn" class="btn show" hidden>☆ Exhibir</button>
     <button id="sellBtn" class="btn show" hidden>💰 Vender</button>
-    <button id="buyCardBtn" class="btn primary" hidden>Comprar</button>
   </div>
   <div id="sellBox" class="sell" hidden></div>
   <button class="close" data-close aria-label="Cerrar">✕</button>
-</div>
-
-<div id="market" class="overlay mk" hidden>
-  <div class="mk-panel">
-    <div class="mk-head">
-      <div><h2>Mercado</h2><p id="mkSub"></p></div>
-      <button class="close" data-close aria-label="Cerrar">✕</button>
-    </div>
-    <div id="mkTabs" class="mk-tabs" role="tablist"></div>
-    <div id="mkFiltros" class="mk-filtros"></div>
-    <div id="mkGrid" class="mk-grid"></div>
-  </div>
-</div>
-
-<div id="trade" class="overlay mk" hidden>
-  <div class="mk-panel">
-    <div class="mk-head">
-      <div><h2>Proponer un intercambio</h2><p>De 1 a 3 cartas tuyas por hasta 3 de la otra persona.</p></div>
-      <button class="close" data-close aria-label="Cerrar">✕</button>
-    </div>
-    <div id="tradeBody" class="tc-body"></div>
-  </div>
 </div>
 
 <div id="reroll" class="overlay mk" hidden>
@@ -174,8 +151,8 @@
   </div>
 </div>
 
-<script src="motor.js?v=pd-16"></script>
-<script src="app.js?v=pd-16"></script>
-<script src="revela.js?v=pd-16"></script>
+<script src="motor.js?v=pd-17"></script>
+<script src="app.js?v=pd-17"></script>
+<script src="revela.js?v=pd-17"></script>
 </body>
 </html>

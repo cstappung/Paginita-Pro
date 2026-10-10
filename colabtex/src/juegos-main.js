@@ -76,6 +76,11 @@ import { monedasDe, formatoMonedas, valorLogro, registraDia, diaChile as diaMone
 import { PRECIO_TIENDA } from "./juegos/tienda.js";
 import { crearMonedas, topHtml, MONEDA } from "./juegos/monedas-vista.js";
 import { crearProdrop } from "./juegos/prodrop.js";
+import { crearMascotas } from "./juegos/mascotas.js";
+import { crearMascotasPerfil } from "./juegos/perfil-mascota.js";
+import { mejoresDropsMascotas, pedidoObjeto } from "./juegos/mascotas-datos.js";
+import { fotoDe, pideFotos } from "./juegos/visor-mascota.js";
+import { crearMercado } from "./juegos/mercado.js";
 import { mejoresDrops, miniCarta, cifras as cifrasCartas, MOTOR, rankingColeccion } from "./juegos/prodrop-cartas.js";
 import { mezcla, abrePerfil } from "./juegos/perfil.js";
 import { abreMini, cierraMini, miniAbierta, crearPaginaPerfil, avatarMarco, quien } from "./juegos/perfil-vista.js";
@@ -104,7 +109,7 @@ const FABRICAS = {
 const ICONO = { orbita: "✦", escondite: "🔍", cartas: "🔥", cuadritos: "▦", reversi: "⚫", worms: "💥", cadena: "⚛", flip7: "🃏", cacho: "🎲", uno: "🟥", catan: "⬢", presidente: "👑", spicy: "🌶", tetris: "▤", yemas: "🥚", clue: "🕵️", ajedrez: "♞", pokemon: "◓", boxhead: "▣", gato: "#", tulones: "🩲" };
 /* Los clubes de un jugador, con sus claves de la clasificación y los
    mismos signos que llevan en su tarjeta del vestíbulo. */
-const ICONO_TODOS = { ...ICONO, general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", frontera: "🏰", sudoku: "🔢", fanal: "🪔", atasco: "🚗", aleteo: "🐦", dosmil: "🟨", trigon: "🔺", metrorush: "🚇", tulones: "🩲", yzombis: "🧟" };
+const ICONO_TODOS = { ...ICONO, mascotas: "🐣", general: "★", minas: "✦", snake: "ϟ", tetrisclub: "▤", sortem: "↔", bbtan: "●", sopa: "🔤", electro: "⚡", frontera: "🏰", sudoku: "🔢", fanal: "🪔", atasco: "🚗", aleteo: "🐦", dosmil: "🟨", trigon: "🔺", metrorush: "🚇", tulones: "🩲", yzombis: "🧟" };
 
 /* Lo que puede elegir quien abre la sala, por juego. Vive aquí y no en
    `motor.js` porque son controles y no reglas: el motor ya recorta lo
@@ -285,6 +290,8 @@ let logrosVista = null;
 let paginaPerfil = null;
 let monedasVista = null;
 let prodropVista = null;
+let mascotasVista = null;
+let mercadoVista = null;
 let adminVista = null;
 let individual = null;
 let proximo = 0;          // el número de jugada que toca escribir
@@ -330,6 +337,7 @@ function perfilDe(uid) {
       if (paginaPerfil) paginaPerfil.refresca();
       if (monedasVista) monedasVista.refresca();
       if (prodropVista) prodropVista.refresca();
+      if (mercadoVista) mercadoVista.refresca();
       const mini = miniAbierta();
       if (mini && mini.uid === uid) mini.refresca();
       render();
@@ -421,8 +429,29 @@ function comprasDe(d) {
    perfil vivo, comprobado contra lo que esa persona tiene ganado. */
 const marcoDeUid = uid => uid ? marcoVisible(perfilDe(uid), datosP ? estadisticas(uid, datosP) : null) : "anillo";
 
+/* La mascota de cada perfil: su estado se lee por clave, y se relee por
+   detrás si tiene más de dos minutos (perfil-mascota.js). */
+const mascotasPerfil = crearMascotasPerfil((uid, k) => fb.leeEstadoMascota(uid, k, true));
+/* Lo que el editor ofrece de Mascotas: mis mascotas (no a la venta) y mis
+   bailes, con su vista. Sin la economía entera, nada (y se conserva la
+   elegida). */
+function mascotaEditor(uid, d) {
+  if (!d || !d.completo) return { opciones: null, vista: () => null };
+  const opciones = mascotasPerfil.opciones(uid, d);
+  return {
+    opciones,
+    vista(c, b, cb) {
+      const x = opciones.mascotas.find(y => y.c === c);
+      if (!x) return null;
+      const baile = b ? (opciones.bailes.find(y => y.b === b) || {}).id || null : null;
+      return mascotasPerfil.vista(uid, c, x.m, baile, d, cb);
+    }
+  };
+}
+
 const ctxPerfil = {
   yo: () => state.user && state.user.uid,
+  mascota: (uid, p, d, cb) => mascotasPerfil.deUid(uid, p, d, cb),
   perfil: uid => perfilDe(uid),
   colorDe: uid => colorForUid(uid || ""),
   datos: datosPerfil,
@@ -462,12 +491,17 @@ async function editaPerfil(pestana) {
     est: d ? estadisticas(b.uid, d) : null,
     uid: b.uid, colorDe: colorForUid, pestana,
     saldo: () => datosP && datosP.completo ? monedasDe(b.uid, datosP).saldo : null,
+    mascota: mascotaEditor(b.uid, d),
     onComprar: async id => { await fb.comprarTienda(b.uid, id, PRECIO_TIENDA); },
     onGuardar: async p => {
       /* El editor no conoce las cartas exhibidas (se eligen en PRODROP):
          sin esto, guardar el perfil las borraría. */
       const cartas = (perfiles.get(b.uid) || {}).cartas;
       if (cartas) p = Object.assign({}, p, { cartas });
+      /* La mascota la elige el editor; si no pudo ofrecerla (sin datos),
+         devuelve la que había. Nunca se pierde por guardar otra cosa. */
+      const mascota = (perfiles.get(b.uid) || {}).mascota;
+      if (mascota && !p.mascota && !(d && d.completo)) p = Object.assign({}, p, { mascota });
       await fb.guardarPerfil(b.uid, p);
       /* La escucha traerá lo mismo en un instante; adelantarlo aquí
          evita que el botón se cierre sobre el avatar de antes. */
@@ -724,6 +758,7 @@ function pintaMonedas() {
   if (drops && u && d && d.completo) drops.innerHTML = dropsHtml(d);
   const tops = $("vesTops");
   if (tops && u && d && d.completo) tops.innerHTML = topsLista(d);
+  pintaDropsMascotas();
 }
 /* El nombre que alguien dejó en sus filas, si no tiene perfil. */
 function nombreEnDatos(uid, d) {
@@ -747,6 +782,48 @@ function dropsHtml(d) {
     return `<div class="jg-drop">${miniCarta(c)}<span class="jg-drop-quien" data-perfil="${escapeHtml(c.uid)}" data-nombre="${escapeHtml(q.nombre)}">${avatarMarco(q.foto, q.nombre, q.color, marcoDeUid(c.uid), 18, c.uid)}<b>${escapeHtml(q.nombre)}</b></span><small class="jg-drop-cuando">${c.rr ? "♻ re-roll · " : ""}${haceCuanto(c.at)}</small></div>`;
   }).join("");
 }
+/* Los últimos legendarios de Mascotas (objetos y bailes de los regalos),
+   con quién los sacó y cuándo. Las fotos las saca el visor (three.js no
+   entra en este paquete), y solo cuando la tira se ve: el salón no carga
+   el juego entero para quien nunca baja hasta aquí. */
+let dropsMVista = false;
+function pintaDropsMascotas() {
+  const caja = $("vesDropsM"), u = state.user, d = datosMonedas;
+  if (!caja || !u || !d || !d.completo) return;
+  const l = mejoresDropsMascotas(d, 24);
+  const ped = x => x.item.kind === "dance" ? null : pedidoObjeto(x.item);
+  const firma = JSON.stringify([l.map(x => x.c), dropsMVista, l.map(x => { const p = ped(x); return !!(p && fotoDe(p.key)); })]);
+  if (caja.dataset.f === firma) return;
+  caja.dataset.f = firma;
+  if (!l.length) {
+    caja.innerHTML = `<p class="jg-nada">Nadie ha sacado todavía un legendario: cada regalo 🎁 trae uno con un 6 % de probabilidad. <a href="#mascotas">Abrir un regalo →</a></p>`;
+    return;
+  }
+  if (dropsMVista) pideFotos(l.map(ped).filter(p => p && !fotoDe(p.key)), () => pintaDropsMascotas());
+  caja.innerHTML = l.map(x => {
+    const q = quien(x.uid, perfilDe(x.uid), null, { nombre: nombreEnDatos(x.uid, d) }, colorForUid);
+    const p = ped(x), f = p && fotoDe(p.key);
+    return `<div class="jg-drop jg-dropm">
+      <span class="jg-dropm-f"${f && f.src ? ` style="background-image:url('${escapeHtml(f.src)}')"` : ""} title="${escapeHtml(x.ficha.nombre)}">${f && f.src ? "" : `<i>${escapeHtml(x.ficha.emoji)}</i>`}<em>★</em></span>
+      <b class="jg-dropm-n">${escapeHtml(x.ficha.nombre)}</b>
+      <span class="jg-drop-quien" data-perfil="${escapeHtml(x.uid)}" data-nombre="${escapeHtml(q.nombre)}">${avatarMarco(q.foto, q.nombre, q.color, marcoDeUid(x.uid), 18, x.uid)}<b translate="no">${escapeHtml(q.nombre)}</b></span>
+      <small class="jg-drop-cuando">${haceCuanto(x.at)}</small></div>`;
+  }).join("");
+}
+/* Pide las fotos cuando la tira entra en pantalla (una vez por salón). */
+function vigilaDropsMascotas(h) {
+  const caja = h.querySelector("#vesDropsM");
+  if (!caja || dropsMVista || typeof IntersectionObserver === "undefined") { if (caja) pintaDropsMascotas(); return; }
+  const io = new IntersectionObserver(es => {
+    if (!es.some(e => e.isIntersecting)) return;
+    io.disconnect();
+    dropsMVista = true;
+    pintaDropsMascotas();
+  }, { rootMargin: "200px" });
+  io.observe(caja);
+  pintaDropsMascotas();
+}
+
 /* La recompensa diaria se reclama con un clic (el botón de `rachaHtml`,
    sobre el top de monedas y en la pestaña #monedas). Lee el registro
    fresco, porque la caja puede estar pintada desde ayer, y escribe lo
@@ -866,6 +943,9 @@ function leerRuta() {
   if (h === "logros") return { vista: "logros", pid: "" };
   if (h === "monedas") return { vista: "monedas", pid: "" };
   if (h === "cartas") return { vista: "cartas", pid: "" };
+  if (h === "mascotas") return { vista: "mascotas", pid: "" };
+  const mk = h.match(/^mercado(?:\/(prodrop|mascotas))?$/);
+  if (mk) return { vista: "mercado", pid: "", uid: mk[1] || "" };
   if (h === "admin") return { vista: "admin", pid: "" };
   const pf = h.match(/^perfil\/([-\w]+)$/);
   if (pf) return { vista: "perfil", pid: "", uid: pf[1] };
@@ -1202,7 +1282,8 @@ function render() {
     return;
   }
   $("pantalla").style.display = "";
-  const clave = state.vista === "perfil" ? "perfil:" + state.perfilUid : state.vista;
+  /* El perfil y el mercado llevan un dato en la ruta (de quién, qué juego). */
+  const clave = state.vista === "perfil" || state.vista === "mercado" ? state.vista + ":" + state.perfilUid : state.vista;
   /* La barra de pestañas va abajo en el móvil solo en las pantallas de
      menú; en una partida o un juego del club se va (tienen su «volver»). */
   document.documentElement.dataset.vista = state.vista.startsWith("solo-") ? "solo" : state.vista;
@@ -1254,19 +1335,23 @@ function desmontaVista() {
   if (logrosVista) { logrosVista.destruir(); logrosVista = null; }
   if (monedasVista) { monedasVista.destruir(); monedasVista = null; }
   if (prodropVista) { prodropVista.destruir(); prodropVista = null; }
+  if (mascotasVista) { mascotasVista.destruir(); mascotasVista = null; }
+  if (mercadoVista) { mercadoVista.destruir(); mercadoVista = null; }
   if (adminVista) { adminVista.destruir(); adminVista = null; }
   if (paginaPerfil) { paginaPerfil.destruir(); paginaPerfil = null; }
 }
 
 function pintaTabs() {
-  $("tabJugar").classList.toggle("on", !["ranks", "logros", "perfil", "monedas", "cartas"].includes(state.vista));
+  $("tabJugar").classList.toggle("on", !["ranks", "logros", "perfil", "monedas", "cartas", "mascotas", "mercado"].includes(state.vista));
+  $("tabMercado").classList.toggle("on", state.vista === "mercado");
   $("tabCartas").classList.toggle("on", state.vista === "cartas");
+  $("tabMascotas").classList.toggle("on", state.vista === "mascotas");
   $("tabRanks").classList.toggle("on", state.vista === "ranks");
   $("tabLogros").classList.toggle("on", state.vista === "logros");
   $("tabMonedas").classList.toggle("on", state.vista === "monedas");
   /* Como invitado se ven todas, con candado: tocarlas lleva a la puerta
      que explica qué hay detrás, que es la mejor razón para la cuenta. */
-  for (const id of ["tabRanks", "tabLogros", "tabMonedas", "tabCartas"]) {
+  for (const id of ["tabRanks", "tabLogros", "tabMonedas", "tabCartas", "tabMascotas", "tabMercado"]) {
     $(id).classList.toggle("bloq", state.invitado);
     if (state.invitado) $(id).title = "Requiere cuenta"; else $(id).removeAttribute("title");
   }
@@ -1430,6 +1515,8 @@ function armazon() {
      del sitio ni la barra de juegos individuales. */
   document.documentElement.classList.toggle("jg-sortem", state.vista === "solo-sortem");
   document.documentElement.classList.toggle("jg-prodrop", state.vista === "cartas" && !motivo);
+  /* Mascotas también ocupa la ventana entera: su iframe trae su propia barra. */
+  document.documentElement.classList.toggle("jg-mascotas", state.vista === "mascotas" && !motivo);
   h.closest("main").classList.toggle("jg-ancho", !motivo && (state.vista === "partida" || state.vista.startsWith("solo-")));
   if (motivo) { h.innerHTML = puertaHtml(motivo); return; }
   const u = state.user;
@@ -1495,9 +1582,23 @@ function armazon() {
   }
   if (state.vista === "cartas") {
     h.innerHTML = "";
-    prodropVista = crearProdrop({ usuario: state.user, datos: datosPerfil, perfil: perfilDe, fb, volver: () => ir(""),
+    prodropVista = crearProdrop({ usuario: state.user, datos: datosPerfil, perfil: perfilDe, fb, volver: () => ir(""), ir,
       quien: u => quien(u, perfilDe(u), null, { nombre: nombreEnDatos(u, datosP || {}) }, colorForUid) });
     prodropVista.montar(h);
+    return;
+  }
+  if (state.vista === "mercado") {
+    h.innerHTML = "";
+    mercadoVista = crearMercado({ usuario: state.user, datos: datosPerfil, fb, ir, marcoDe: marcoDeUid, juego: state.perfilUid,
+      quien: u => quien(u, perfilDe(u), null, { nombre: nombreEnDatos(u, datosP || {}) }, colorForUid) });
+    mercadoVista.montar(h);
+    return;
+  }
+  if (state.vista === "mascotas") {
+    h.innerHTML = "";
+    mascotasVista = crearMascotas({ usuario: state.user, datos: datosPerfil, fb, volver: () => ir(""), ir,
+      alGuardar: (k, est) => mascotasPerfil.pon(state.user.uid, k, est) });
+    mascotasVista.montar(h);
     return;
   }
   if (state.vista === "admin") {
@@ -1684,6 +1785,7 @@ function armazon() {
       </section>
       ${inv ? "" : topsHtml()}
       ${inv ? "" : tiraHtml()}
+      ${tiraMascotasHtml(inv)}
     </div>`;
   vesFirma = "";
   for (const b of h.querySelectorAll("[data-filtro]")) {
@@ -1697,6 +1799,7 @@ function armazon() {
   }
   enganchaNovedades(h);
   enganchaBanner(h);
+  vigilaDropsMascotas(h);
   salon.enganchar($("vesSalon"));
 }
 
@@ -1715,6 +1818,10 @@ const porOmision = k => Object.fromEntries((OPCIONES[k] || []).map(o => [o.clave
    Yemas), así que la lista se escribe aquí en vez de salir de las fechas
    `alta` de JUEGOS. El primero lleva «★ Lo último». */
 const NOVEDADES = [
+  { id: "mascotas", color: "#ff8a3d", alta: "2026-10-10", titulo: "Mascotas",
+    lema: "Adopta una gallina o un gato en 3D, dale de comer, báñalo, hazlo dormir y míralo crecer de huevo a adulto. Vístelo con lo que salga de los regalos, enséñale bailes y lúcelo en tu perfil. La primera adopción es gratis.",
+    sub: "Crianza en 3D · regalos, ropa, muebles y bailes · mercado", ruta: "#mascotas", boton: "Adoptar", juego: "mascotas",
+    modo: "solo", cuenta: true },
   { id: "gato", color: "#2f6b4f", alta: "2026-10-06", titulo: "Gato y Super Gato",
     lema: "El tres en raya de siempre, en tiza sobre la pizarra. O el Super Gato: nueve gatos dentro de uno, y la casilla donde juegas decide en qué gato juega el otro.",
     sub: "Duelo · dos modalidades", sala: { k: "gato", ops: { variante: "super" } }, reglas: ["gato", "super"],
@@ -1761,6 +1868,8 @@ const NOVEDADES = [
     ruta: "#cartas", boton: "Abrir sobres", cuenta: true }
 ];
 function arteNovedad(n) {
+  // Mascotas: la pradera del juego, el huevo que se tambalea, la gallina que baila, el regalo con su ★ y unos corazones.
+  if (n.id === "mascotas") return `<div class="jg-nov-arte-mc"><i></i><em aria-hidden="true">🐔</em><s aria-hidden="true">🎁<b>★</b></s><u aria-hidden="true">♥</u><u aria-hidden="true">♥</u><b>MASCOTAS</b></div>`;
   // 2048: el tablero de 4×4 con sus fichas y la del 2048 que late.
   if (n.id === "dosmil") {
     const f = [2, 0, 4, 8, 0, 16, 2, 0, 32, 64, 0, 4, 128, 256, 512, 2048];
@@ -1858,6 +1967,15 @@ const tiraHtml = () => `
       <section class="jg-tira" aria-labelledby="vesTiraT">
         <header><h2 id="vesTiraT">🃏 Últimos drops</h2><small>épicas y legendarias de PRODROP, de la más reciente a la más antigua</small><a href="#cartas">Abrir sobres →</a></header>
         <div id="vesDrops" class="jg-tira-fila"><p class="jg-nada">Buscando cartas…</p></div>
+      </section>`;
+
+/* La de Mascotas: los objetos legendarios de los regalos. Al invitado le
+   sale la puerta (Mascotas necesita cuenta), no una tira vacía. */
+const tiraMascotasHtml = inv => `
+      <section class="jg-tira jg-tira-m" aria-labelledby="vesTiraMT">
+        <header><h2 id="vesTiraMT">🐣 Últimos drops legendarios · Mascotas</h2><small>los objetos y bailes legendarios de los regalos, del más reciente al más antiguo</small>${inv ? "" : `<a href="#mascotas">Abrir regalos →</a>`}</header>
+        ${inv ? `<div class="jg-tira-puerta"><p><b>${escapeHtml(MOTIVO_CUENTA.mascotas.t)}.</b> ${escapeHtml(MOTIVO_CUENTA.mascotas.d)}</p><button class="btn" type="button" data-login>Iniciar sesión</button></div>`
+          : `<div id="vesDropsM" class="jg-tira-fila"><p class="jg-nada">Buscando legendarios…</p></div>`}
       </section>`;
 
 function enganchaNovedades(h) {
@@ -2814,6 +2932,8 @@ function wire() {
   $("tabLogros").onclick = () => ir("#logros");
   $("tabMonedas").onclick = () => ir("#monedas");
   $("tabCartas").onclick = () => ir("#cartas");
+  $("tabMascotas").onclick = () => ir("#mascotas");
+  $("tabMercado").onclick = () => ir("#mercado");
   $("userMonedas").onclick = () => ir("#monedas");
   window.addEventListener("hashchange", aplicaRuta);
 }

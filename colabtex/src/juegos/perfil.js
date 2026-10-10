@@ -33,6 +33,8 @@ export const COLORES = [
 import { MARCOS, FONDOS, LARGO_BIO, MAX_VITRINA, requisito, marcoDe, fondoDe, opcionesVitrina, limpiaPerfil } from "./perfil-tarjeta.js";
 import { avatarMarco, tarjetaHtml, capaFondo } from "./perfil-vista.js";
 import { PRECIO_TIENDA } from "./tienda.js";
+import { capaMascota, opcionMascotaHtml } from "./perfil-mascota.js";
+import { fotoDe, pideFotos } from "./visor-mascota.js";
 
 export const LARGO_NICK = 24;
 const LADO_FOTO = 160;
@@ -97,8 +99,11 @@ function avatar(foto, nombre, color) {
    cerrarlo.
    La tienda vive aquí mismo: un marco o fondo de la tienda sin comprar se
    toca para comprarlo (`onComprar(id)`, que escribe la compra), y `saldo()`
-   dice cuánto hay (null mientras la economía no ha llegado entera). */
-export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar, onComprar, saldo }) {
+   dice cuánto hay (null mientras la economía no ha llegado entera).
+   `mascota` = {opciones: {mascotas, bailes} | null, vista(c, b, cb)}: lo que
+   se puede elegir de Mascotas y cómo se ve (perfil-mascota.js). Sin
+   opciones (la economía no llegó) la elegida se guarda tal como estaba. */
+export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar, onComprar, saldo, mascota: mp }) {
   const vieja = document.getElementById("jgPerfil");
   if (vieja) vieja.remove();
 
@@ -113,7 +118,12 @@ export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar
   let fondo = fondoDe(p.fondo) ? p.fondo : "color";
   const guardada = Array.isArray(p.vitrina) ? p.vitrina : p.vitrina && typeof p.vitrina === "object" ? Object.values(p.vitrina) : [];
   let vitrina = guardada.slice(0, MAX_VITRINA);
-  let tab = ["datos", "marco", "fondo", "vitrina"].includes(pestana) ? pestana : "datos";
+  const opM = mp && mp.opciones;
+  let mascota = p.mascota && typeof p.mascota.m === "string" ? { m: p.mascota.m, b: p.mascota.b || "" } : null;
+  /* Lo que ya no es suyo (la vendió, o vendió el baile) no se ofrece. */
+  if (opM && mascota && !opM.mascotas.some(x => x.c === mascota.m)) mascota = null;
+  if (opM && mascota && mascota.b && !opM.bailes.some(x => x.b === mascota.b)) mascota.b = "";
+  let tab = ["datos", "marco", "fondo", "vitrina", "mascota"].includes(pestana) ? pestana : "datos";
   let comprando = false;
   const miles = n => Math.round(n).toLocaleString("es-CL");
 
@@ -127,10 +137,10 @@ export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar
       <p class="jg-modal-s">Así te ven los demás al tocar tu foto. Se guarda en tu cuenta, así
         que cambia también en las partidas de ayer.</p>
       <div class="jg-ped">
-        <aside class="jg-ped-prev"><small>Vista previa</small><div class="jg-mini jg-mini-quieta" id="pfPrev"></div></aside>
+        <aside class="jg-ped-prev"><small>Vista previa</small><div class="jg-mini jg-mini-quieta" id="pfPrev"><div id="pfPrevC"></div></div></aside>
         <div class="jg-ped-main">
           <div class="jg-ped-tabs" role="tablist">
-            ${[["datos", "Datos"], ["marco", "Marco"], ["fondo", "Fondo"], ["vitrina", "Vitrina"]].map(([k, t]) =>
+            ${[["datos", "Datos"], ["marco", "Marco"], ["fondo", "Fondo"], ["vitrina", "Vitrina"], ["mascota", "Mascota"]].map(([k, t]) =>
               `<button role="tab" data-tab="${k}">${t}</button>`).join("")}
           </div>
           <div class="jg-ped-panel" data-panel="datos">
@@ -167,6 +177,12 @@ export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar
             <p class="jg-ped-nota" id="pfVitNota"></p>
             <div class="jg-ped-vit" id="pfVit"></div>
           </div>
+          <div class="jg-ped-panel" data-panel="mascota">
+            <p class="jg-ped-nota" id="pfMascNota"></p>
+            <div class="jg-ped-rejilla" id="pfMascotas"></div>
+            <h4 class="jg-ped-grupo">Baile · solo bailan los adultos</h4>
+            <div class="jg-ped-bailes" id="pfBailes"></div>
+          </div>
         </div>
       </div>
 
@@ -178,12 +194,49 @@ export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar
     </div>`;
 
   const $ = s => capa.querySelector(s);
-  const cierra = () => capa.remove();
+  const prevMasc = mp ? capaMascota($("#pfPrev"), "en-mini") : null;
+  let cerrado = false;
+  const cierra = () => { cerrado = true; if (prevMasc) prevMasc.cierra(); capa.remove(); };
   const borrador = () => Object.assign({ nick, color, bio, marco, fondo, vitrina }, foto !== null ? { foto } : {});
   const ops = opcionesVitrina(est);
+  const repinta = () => { if (!cerrado) pinta(); };
+  /* La vista de la mascota elegida (undefined mientras llega su estado). */
+  const vistaElegida = () => mascota && mp ? mp.vista(mascota.m, mascota.b, repinta) : null;
 
   function pintaPrevia() {
-    $("#pfPrev").innerHTML = tarjetaHtml({ uid, p: borrador(), est, pista: base, colorDe, yo: uid, editor: true });
+    $("#pfPrevC").innerHTML = tarjetaHtml({ uid, p: borrador(), est, pista: base, colorDe, yo: uid, editor: true });
+    if (prevMasc) {
+      const v = vistaElegida() || null;
+      $("#pfPrev").classList.toggle("con-mascota", !!v);
+      prevMasc.pon(v);
+    }
+  }
+
+  function pintaMascota() {
+    if (!mp) return;
+    const nota = $("#pfMascNota");
+    if (!opM) {
+      nota.textContent = "Cargando tus mascotas…";
+      $("#pfMascotas").innerHTML = $("#pfBailes").innerHTML = "";
+      return;
+    }
+    if (!opM.mascotas.length) {
+      nota.innerHTML = `Todavía no tienes mascotas. Adopta la primera (gratis) en <a href="#mascotas" data-ir-mascotas>🐣 Mascotas</a>.`;
+      $("#pfMascotas").innerHTML = $("#pfBailes").innerHTML = "";
+      return;
+    }
+    nota.textContent = "Sale en tu tarjeta y en tu perfil, en 3D. Las que están a la venta no se pueden elegir.";
+    const vistas = opM.mascotas.map(x => mp.vista(x.c, "", repinta)).filter(Boolean);
+    pideFotos(vistas.map(v => v.pedido).filter(q => !fotoDe(q.key)), repinta);
+    $("#pfMascotas").innerHTML = `<button type="button" class="jg-ped-op jg-ped-masc${mascota ? "" : " on"}" data-masc=""><span class="jg-ped-masc-f">—</span><b>Ninguna</b><small>sin mascota</small></button>` +
+      opM.mascotas.map(x => {
+        const v = mp.vista(x.c, "", repinta);
+        return v ? opcionMascotaHtml(v, mascota && mascota.m === x.c)
+          : `<button type="button" class="jg-ped-op jg-ped-masc${mascota && mascota.m === x.c ? " on" : ""}" data-masc="${esc(x.c)}"><span class="jg-ped-masc-f">…</span><b>…</b><small>cargando</small></button>`;
+      }).join("");
+    const b = mascota ? mascota.b : "";
+    $("#pfBailes").innerHTML = [`<button type="button" class="jg-ped-baile${b ? "" : " on"}" data-baile=""${mascota ? "" : " disabled"}>Sin baile</button>`,
+      ...opM.bailes.map(x => `<button type="button" class="jg-ped-baile${b === x.b ? " on" : ""}${x.leg ? " leg" : ""}" data-baile="${esc(x.b)}"${mascota ? "" : " disabled"}>${esc(x.ficha.emoji)} ${esc(x.ficha.nombre)}${x.leg ? " ★" : ""}</button>`)].join("");
   }
 
   function pinta() {
@@ -225,6 +278,7 @@ export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar
     }).join("");
     const auto = $("#pfVitAuto");
     if (auto) auto.onclick = e => { e.preventDefault(); vitrina = []; pinta(); };
+    pintaMascota();
     pintaPrevia();
   }
 
@@ -298,6 +352,23 @@ export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar
     pinta();
   };
 
+  if (mp) {
+    $("#pfMascotas").onclick = e => {
+      const b = e.target.closest("[data-masc]");
+      if (!b) return;
+      const c = b.getAttribute("data-masc");
+      mascota = c ? { m: c, b: (mascota && mascota.b) || "" } : null;
+      pinta();
+    };
+    $("#pfBailes").onclick = e => {
+      const b = e.target.closest("[data-baile]");
+      if (!b || !mascota) return;
+      mascota.b = b.getAttribute("data-baile");
+      pinta();
+    };
+    $("#pfMascNota").onclick = e => { if (e.target.closest("[data-ir-mascotas]")) cierra(); };
+  }
+
   $(".jg-fin-x").onclick = cierra;
   $("#pfCancelar").onclick = cierra;
   capa.onclick = e => { if (e.target === capa) cierra(); };
@@ -306,7 +377,7 @@ export function abrePerfil({ base, perfil, est, uid, colorDe, pestana, onGuardar
     const b = e.currentTarget;
     b.disabled = true; falla("");
     const salida = Object.assign({ nick: nick.trim().slice(0, LARGO_NICK), color },
-      limpiaPerfil({ marco, fondo, bio, vitrina }));
+      limpiaPerfil({ marco, fondo, bio, vitrina, mascota }));
     if (foto !== null) salida.foto = foto;
     try { await onGuardar(salida); cierra(); }
     catch (err) {

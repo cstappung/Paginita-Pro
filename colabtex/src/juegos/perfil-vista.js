@@ -16,6 +16,7 @@ import { exhibidasDe, miniCarta } from "./prodrop-cartas.js";
 import { estadisticas, marcoVisible, fondoVisible, vitrinaDe, nombreJuego, nombreCategoria, oscurece } from "./perfil-tarjeta.js";
 import { LOGROS } from "./logros.js";
 import { adorno, tieneAdorno } from "./marcos-animados.js";
+import { capaMascota } from "./perfil-mascota.js";
 
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -94,9 +95,15 @@ export function abreMini(uid, ancla, ctx, pista) {
   caja.className = "jg-mini";
   caja.setAttribute("role", "dialog");
   caja.tabIndex = -1;
-  let est = null, dat = null;
+  /* La tarjeta se rehace en `cuerpo`; la mascota va en su propia capa, al
+     lado, para que su iframe no se recargue con cada llegada de datos. */
+  const cuerpo = document.createElement("div");
+  caja.appendChild(cuerpo);
+  const masc = ctx.mascota ? capaMascota(caja, "en-mini") : null;
+  let est = null, dat = null, cerrada = false;
   const pinta = () => {
-    caja.innerHTML = `<button class="jg-mini-x" title="Cerrar" aria-label="Cerrar">✕</button>` +
+    if (cerrada) return;
+    cuerpo.innerHTML = `<button class="jg-mini-x" title="Cerrar" aria-label="Cerrar">✕</button>` +
       tarjetaHtml({ uid, p: ctx.perfil(uid), est, pista, colorDe: ctx.colorDe, yo: ctx.yo(), cartas: exhibidasDe(uid, ctx.perfil(uid), dat) });
     caja.setAttribute("aria-label", "Perfil de " + quien(uid, ctx.perfil(uid), est, pista).nombre);
     caja.querySelector(".jg-mini-x").onclick = cierraMini;
@@ -104,16 +111,32 @@ export function abreMini(uid, ancla, ctx, pista) {
     if (v) v.onclick = () => { cierraMini(); ctx.ir("#perfil/" + uid); };
     const e = caja.querySelector("[data-editar-perfil]");
     if (e) e.onclick = () => { cierraMini(); ctx.editar(); };
+    if (masc) {
+      const m = dat ? ctx.mascota(uid, ctx.perfil(uid), dat, pinta) : null;
+      caja.classList.toggle("con-mascota", !!m);
+      masc.pon(m || null);
+    }
   };
   pinta();
   document.body.appendChild(caja);
+  /* La hoja de abajo es solo del celular. El ancla puede desaparecer con la
+     tarjeta abierta: la lista que la contiene (el Top monedas, la
+     clasificación) se repinta entera cada vez que llegan datos, y entonces
+     la tarjeta se queda donde estaba. Antes un ancla desconectada la volvía
+     hoja, y en el escritorio la hoja cruza la página de lado a lado. */
   const coloca = () => {
-    if (window.matchMedia("(max-width: 600px)").matches || !ancla || !ancla.isConnected) { caja.classList.add("hoja"); return; }
+    if (window.matchMedia("(max-width: 600px)").matches) { caja.classList.add("hoja"); return; }
     caja.classList.remove("hoja");
-    const r = ancla.getBoundingClientRect(), w = caja.offsetWidth, h = caja.offsetHeight;
-    let x = r.left + r.width / 2 - w / 2, y = r.bottom + 10;
-    if (y + h > innerHeight - 8) y = Math.max(8, r.top - h - 10);
+    const w = caja.offsetWidth, h = caja.offsetHeight;
+    let x, y;
+    if (ancla && ancla.isConnected) {
+      const r = ancla.getBoundingClientRect();
+      x = r.left + r.width / 2 - w / 2; y = r.bottom + 10;
+      if (y + h > innerHeight - 8) y = Math.max(8, r.top - h - 10);
+    } else if (caja.style.left) { x = parseFloat(caja.style.left); y = parseFloat(caja.style.top); }
+    else { x = (innerWidth - w) / 2; y = (innerHeight - h) / 2; }
     x = Math.max(8, Math.min(innerWidth - w - 8, x));
+    y = Math.max(8, Math.min(innerHeight - h - 8, y));
     caja.style.left = x + "px"; caja.style.top = y + "px";
   };
   coloca();
@@ -125,6 +148,8 @@ export function abreMini(uid, ancla, ctx, pista) {
   abierta = {
     uid,
     cierra() {
+      cerrada = true;
+      if (masc) masc.cierra();
       off && off();
       document.removeEventListener("pointerdown", fuera, true);
       document.removeEventListener("keydown", tecla);
@@ -139,15 +164,16 @@ export const miniAbierta = () => abierta;
 
 /* ---------- La página ---------- */
 export function crearPaginaPerfil({ uid, ctx }) {
-  let host = null, est = null, off = null, firma = "", dat = null;
+  let host = null, est = null, off = null, firma = "", dat = null, masc = null;
 
   function pinta() {
     if (!host) return;
     const p = ctx.perfil(uid) || {}, yo = ctx.yo();
     const pista = uid === yo ? ctx.propio() : null;
     const cartas = exhibidasDe(uid, p, dat);
-    const f2 = JSON.stringify([p, est && [est.nLogros, est.tablas, est.victorias, est.tops, est.compras, est.parcial], yo, cartas.map(c => [c.k, c.i, c.gr])]);
-    if (f2 === firma) return;
+    const m = dat && ctx.mascota ? ctx.mascota(uid, p, dat, pinta) || null : null;
+    const f2 = JSON.stringify([p, est && [est.nLogros, est.tablas, est.victorias, est.tops, est.compras, est.parcial], yo, cartas.map(c => [c.k, c.i, c.gr]), !!m]);
+    if (f2 === firma) { if (masc) masc.pon(m); return; }
     firma = f2;
     const q = quien(uid, p, est, pista, ctx.colorDe);
     const fondo = fondoVisible(p, est), marco = marcoVisible(p, est);
@@ -164,7 +190,7 @@ export function crearPaginaPerfil({ uid, ctx }) {
         <span class="grow"></span>
         <button class="btn2" data-copiar>🔗 Copiar enlace</button>
         ${propio ? `<button class="btn" data-editar>✎ Personalizar</button>` : ""}</div>
-      <section class="jg-pf-hero${fondo.oscuro ? " oscuro" : ""}" style="background:${esc(fondo.css(q.color))}">${capaFondo(fondo)}
+      <section class="jg-pf-hero${fondo.oscuro ? " oscuro" : ""}${m ? " con-mascota" : ""}" style="background:${esc(fondo.css(q.color))}">${capaFondo(fondo)}
         <div class="jg-pf-hero-in">
           ${avatarMarco(q.foto, q.nombre, q.color, marco, 116)}
           <div class="jg-pf-id">
@@ -209,6 +235,13 @@ export function crearPaginaPerfil({ uid, ctx }) {
       else prompt("Copia el enlace:", url);
     };
     for (const b of host.querySelectorAll("[data-editar]")) b.onclick = () => ctx.editar(b.getAttribute("data-editar") || "");
+    /* La capa de la mascota sobrevive al repintado: se cambia al hero nuevo
+       (solo pasa cuando cambia la firma; el visor se recarga entonces). */
+    if (ctx.mascota) {
+      if (!masc) masc = capaMascota(host.querySelector(".jg-pf-hero"), "en-hero");
+      else masc.mueve(host.querySelector(".jg-pf-hero"));
+      masc.pon(m);
+    }
   }
 
   function logrosHtml(est) {
@@ -230,6 +263,6 @@ export function crearPaginaPerfil({ uid, ctx }) {
     },
     refresca() { firma = ""; pinta(); },
     estadisticas: () => est,
-    destruir() { off && off(); host = null; }
+    destruir() { off && off(); if (masc) masc.cierra(); masc = null; host = null; }
   };
 }

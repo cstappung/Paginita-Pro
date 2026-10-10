@@ -245,5 +245,7 @@ export const MOTIVO_CUENTA = {
   logros: { t: "Los logros se ganan con cuenta", d: "Se guardan en tu perfil y se ven en tu página pública. Como invitado juegas igual, pero no quedan registrados." },
   monedas: { t: "Las monedas viven en tu cuenta", d: "Se ganan jugando, con la recompensa diaria y con los récords, y se gastan en sobres de PRODROP. Sin cuenta no hay dónde guardarlas." },
   cartas: { t: "PRODROP necesita una cuenta", d: "Los sobres se pagan con monedas y las cartas quedan en tu colección. Inicia sesión para abrir el primero, que cada 6 horas es gratis." },
+  mercado: { t: "El mercado es entre cuentas", d: "Aquí se compran, se venden y se intercambian cartas de PRODROP, mascotas y sus cosas, con las monedas que ganas jugando. Inicia sesión para entrar." },
+  mascotas: { t: "Mascotas necesita una cuenta", d: "Tus mascotas, su ropa y sus muebles viven en tu cuenta, y se pagan con las monedas que ganas jugando. Inicia sesión y adopta la primera: es gratis." },
   perfil: { t: "Los perfiles son de quien tiene cuenta", d: "Inicia sesión para ver el perfil de los demás y armar el tuyo: foto, marco, fondo y vitrina." }
 };

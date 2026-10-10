@@ -34,7 +34,9 @@
    (`JUEGOS` en motor.js y `SOLOS` en salon-datos.js): el módulo
    `src/juegos/<id>.js` de un juego de sala más la carpeta que abra en un
    iframe (`juegos/<x>/index.html`), la carpeta `juegos/club/<x>/` de un juego
-   del Club, o la carpeta de la `url` de una práctica con bots. Nunca entra lo
+   del Club, o la carpeta de la `url` de una práctica con bots. Los juegos de
+   pestaña (`PESTANAS`: Mascotas) no están en esas tablas, pero tienen el
+   mismo par que una sala en iframe: su cartero y la carpeta que abre. Nunca entra lo
    compartido (`juegos/audio/mando.js` fabrica flechas para los mandos, y
    haría pasar a todos por juegos de teclado). */
 const fs = require("fs");
@@ -129,11 +131,15 @@ function clasifica(codigo) {
   return { movil: false, pc, pide: "teclado", por: "no escucha toques ni clics" };
 }
 
+/* Juegos con pestaña propia en Juegos (no salen en las tablas del salón,
+   pero sí en Novedades): su cartero es `src/juegos/<id>.js`. */
+const PESTANAS = ["mascotas"];
+
 /* Todas las entradas del salón, con su clasificación. */
 function detecta() {
   const { JUEGOS, SOLOS } = cargaTablas();
   const out = {};
-  for (const id of Object.keys(JUEGOS)) out[id] = Object.assign(clasifica(fuentesDe({ id, sala: true }).codigo), { fuentes: fuentesDe({ id, sala: true }).archivos });
+  for (const id of [...Object.keys(JUEGOS), ...PESTANAS]) out[id] = Object.assign(clasifica(fuentesDe({ id, sala: true }).codigo), { fuentes: fuentesDe({ id, sala: true }).archivos });
   for (const s of SOLOS) { const f = fuentesDe(s); out[s.id] = Object.assign(clasifica(f.codigo), { fuentes: f.archivos }); }
   return out;
 }
