@@ -13,13 +13,18 @@ globalThis.TulonesMotor = globalThis.TulonesMotor || TM;
    Club, con `?modo=online`) y entra aquí en un iframe. Este módulo no
    simula nada: traduce.
 
-   - **Hacia el marco**: una vez `config` (quién soy, los asientos, el
-     tiempo y las rondas); después, en cada cambio, el registro ya pasado
-     por `votacion`, que el marco reduce con el mismo `reducirSala`; y
+   - **Hacia el marco**: `config` (quién soy, los asientos, el tiempo y
+     las rondas) cada vez que cambia quién está, también con la sala
+     abierta, porque el menú enseña quién dio «Listo»; en cada cambio, el
+     registro ya pasado por `votacion` y si la sala ya se cerró (`sala`),
+     que el marco reduce con el mismo `reducirSala`; y
      cada segundo la hora del servidor (`hora`), porque el reloj del turno
      se cuenta con ella y no con el del equipo.
-   - **Hacia la base**: `sale` y `congela`, que el marco pide y aquí se
-     firman con el uid y la hora del servidor. Nada más pasa.
+   - **Hacia la base**: `listo`, `sale` y `congela`, que el marco pide y
+     aquí se firman con el uid y la hora del servidor. Nada más pasa.
+   - **Todos listos, empieza**: con dos o más dentro y todos listos, el
+     anfitrión cierra la sala (`estado = "jugando"`), así nadie tiene que
+     apretar «Empezar» y el que llegue tarde ya no entra.
    - **El plazo lo vigila la sala, no el marco**: si el turno no tiene
      hora de inicio se escribe `reloj`, y pasado el plazo sin congela,
      `plazo`. Lo puede escribir cualquiera de la sala (el primero vale), así
@@ -31,7 +36,7 @@ const VIGILA_MS = 1000;
 
 export function crearTulones({ uid, pid, jugar, terminar, mirando, ahora }) {
   let host, frame, aviso, redEl, muerto = false, listo = false, configurado = false;
-  let partida = null, est = null, ultimo = "", borrado = false;
+  let partida = null, est = null, ultimo = "", borrado = false, cierra = false;
   let malla = null, relojRed = null, relojPlazo = null, pendiente = null, parado = false, rosterFirma = "", sinMalla = false;
   const pedidos = new Set();
   const hora = () => (typeof ahora === "function" ? ahora() : Date.now());
@@ -52,21 +57,21 @@ export function crearTulones({ uid, pid, jugar, terminar, mirando, ahora }) {
 
   function reenvia() {
     if (!listo || !partida || !est) return;
-    if (!configurado) {
-      if (!est.listos) return;
-      configurado = true;
+    const asientos = est.jugadores.map(j => j.uid + "=" + (j.nombre || "")).join("|") + "|" + juego();
+    if (asientos !== configurado) {
+      configurado = asientos;
       enviar("config", {
-        yo: uid, mirando: !juego(), tiempo: partida.tiempo, rondas: partida.rondas,
+        yo: uid, mirando: !juego(), tiempo: partida.tiempo, rondas: partida.rondas, acumula: partida.acumula,
         jugadores: est.jugadores.map(j => ({ uid: j.uid, nombre: j.nombre || "Jugador" }))
       });
       enviar("hora", { t: hora() });
       ultimo = "";
     }
     const lista = jugadasDe(votacion(partida).p);
-    const firma = lista.length + ":" + (lista.length ? lista[lista.length - 1].k : "");
+    const firma = lista.length + ":" + (lista.length ? lista[lista.length - 1].k : "") + ":" + !!est.listos;
     if (firma === ultimo) return;
     ultimo = firma;
-    enviar("jugadas", { lista });
+    enviar("jugadas", { lista, sala: !!est.listos });
   }
 
   const texto = (v, max) => typeof v === "string" && v.length <= max ? v : "";
@@ -80,8 +85,10 @@ export function crearTulones({ uid, pid, jugar, terminar, mirando, ahora }) {
       malla?.envia(directo.sale(d.e));
       return;
     }
-    if (d.tipo !== "jugar" || !d.j || !Number.isInteger(d.j.n) || d.j.n < 0) return;
+    if (d.tipo !== "jugar" || !d.j) return;
     const j = d.j;
+    if (j.t === "listo") { anota({ t: "listo", on: !!j.on }); return; }
+    if (!Number.isInteger(j.n) || j.n < 0) return;
     let fila = null;
     if (j.t === "sale") fila = { t: "sale", n: j.n, a: texto(j.a, 60) };
     else if (j.t === "congela") fila = { t: "congela", n: j.n, p: texto(j.p, 400), b: texto(j.b, 20), a: texto(j.a, 60) };
@@ -170,7 +177,7 @@ export function crearTulones({ uid, pid, jugar, terminar, mirando, ahora }) {
     const n = est.jugadores.length, cupo = est.cupo || n;
     aviso.hidden = !!est.listos;
     aviso.textContent = est.listos ? "" : "Esperando tulones… " + n + " de " + cupo +
-      (n >= 2 ? " · el anfitrión puede empezar ya" : "");
+      (n >= 2 ? " · empieza cuando todos den «Listo»" : "");
   }
 
   function montar(el) {
@@ -189,14 +196,23 @@ export function crearTulones({ uid, pid, jugar, terminar, mirando, ahora }) {
     frame.allow = "fullscreen";
     frame.setAttribute("allowfullscreen", "");
     window.addEventListener("message", mensaje);
-    frame.src = "juegos/club/tulones/index.html?modo=online&v=tulones-19";
+    frame.src = "juegos/club/tulones/index.html?modo=online&v=tulones-21";
     host.append(aviso, redEl, frame);
     relojPlazo = setInterval(vigila, VIGILA_MS);
+  }
+
+  function empiezaSiTodos() {
+    if (cierra || partida.estado !== "esperando" || partida.anfitrion !== uid || !juego()) return;
+    const js = est.jugadores || [], pre = est.preparados || {};
+    if (js.length < 2 || !js.every(j => pre[j.uid])) return;
+    cierra = true;
+    fb.setEstado(pid, "jugando").catch(err => { cierra = false; console.warn("[tulones] no se pudo empezar", err); });
   }
 
   function actualizar(p, estado) {
     partida = p; est = estado;
     pintaAviso();
+    empiezaSiTodos();
     if (!p.fin && est.listos) {
       arrancaDirecto();
       const firma = est.jugadores.map(j => j.uid).join() + "|" + Object.keys(est.fuera || {}).join();

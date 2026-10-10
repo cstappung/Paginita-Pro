@@ -222,7 +222,9 @@ const OPCIONES = {
   tulones: [
     { clave: "cupo", etiqueta: "Jugadores", por: 4, valores: cupos("tulones") },
     { clave: "tiempo", etiqueta: "Turno", por: 45, valores: TL_TIEMPOS.map(v => ({ v, t: v + " s" })) },
-    { clave: "rondas", etiqueta: "Rondas", valores: TL_RONDAS.map(v => ({ v, t: v ? String(v) : "Sin fin" })) }
+    { clave: "rondas", etiqueta: "Rondas", valores: TL_RONDAS.map(v => ({ v, t: v ? String(v) : "Sin fin" })) },
+    /* Cada ronda nueva suma un segundo por cada otro jugador en pie. */
+    { clave: "acumula", etiqueta: "Tiempo", valores: [{ v: 0, t: "Fijo" }, { v: 1, t: "Se acumula cada ronda" }] }
   ],
   /* El formato decide qué equipos valen (el validador de Showdown); se
      guarda como `formato` y no como `modo`, que las reglas restringen. */
@@ -1725,7 +1727,7 @@ const NOVEDADES = [
     lema: "Arrastra piezas hechas de triángulos al tablero hexagonal. Completa una línea —horizontal o en cualquiera de las dos diagonales— y se borra. Encadena líneas para multiplicar el bono.",
     sub: "Un jugador · puzle de triángulos · 5 temas", ruta: "#solo/trigon", boton: "Jugar", reglas: ["trigon"], modo: "solo" },
   { id: "tulones", color: "#63b8ee", alta: "2026-10-09", titulo: "TULONES",
-    lema: "Trepa sobre una cabra y sobre tus amigos congelados en calzoncillos. Cada brazo y cada pierna se agarra por separado y todo se bambolea. La torre más alta gana. De 1 a 8 en el mismo teclado.",
+    lema: "Trepa sobre un pudú y sobre tus amigos congelados en calzoncillos. Cada brazo y cada pierna se agarra por separado y todo se bambolea. La torre más alta gana. De 1 a 8 en el mismo teclado.",
     sub: "1 a 8 jugadores en el mismo equipo · física de muñecos", ruta: "#solo/tulones", boton: "Trepar", reglas: ["tulones"], modo: "solo" },
   { id: "dosmil", color: "#edc22e", alta: "2026-10-07", titulo: "2048",
     lema: "Desliza las fichas hacia un lado: las iguales que chocan se juntan en una del doble. Cada jugada trae una ficha nueva. Llega al 2048… y sigue.",

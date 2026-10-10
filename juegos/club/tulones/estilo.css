@@ -1,6 +1,6 @@
 /* ================================================================
    Tulones — la piel.
-   Cielo, pasto y una cabra: lo de colores lo pinta juego.js en el
+   Cielo, pasto y un pudú: lo de colores lo pinta juego.js en el
    lienzo; aquí van el marco, el marcador, las capas, el editor de
    aspecto y los botones táctiles. Escenario apaisado (16:10), porque
    la torre crece hacia arriba pero se trepa de lado a lado.
@@ -16,7 +16,7 @@
 html,body{margin:0}
 html{-webkit-tap-highlight-color:transparent}
 body{background:var(--fondo);color:var(--tinta);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-.shell{max-width:1240px;margin:0 auto;padding:16px}
+.shell{max-width:2400px;margin:0 auto;padding:12px 16px}
 .layout{display:grid;grid-template-columns:minmax(0,1fr) 285px;gap:24px;align-items:start}
 .layout>aside:empty{display:none}
 .layout:has(>aside:empty){grid-template-columns:minmax(0,1fr)}
@@ -30,8 +30,9 @@ button,select,input{font:inherit;color:inherit;touch-action:manipulation;-webkit
 .club-volver{color:color-mix(in srgb,var(--tinta) 80%,transparent)}
 
 /* --- El tamaño del juego: apaisado, que quepa a lo alto --- */
-:root{--ancho-juego:min(100%,1200px,calc((var(--alto-pantalla) - 190px) * 1.6))}
-.club-integrado{--ancho-juego:min(100%,1200px,calc((var(--alto-pantalla) - 210px) * 1.6))}
+:root{--ancho-juego:min(100%,calc((var(--alto-pantalla) - 175px) * 1.6))}
+.club-integrado{--ancho-juego:min(100%,calc((var(--alto-pantalla) - 190px) * 1.6))}
+html.tl-online{--ancho-juego:min(100%,calc((var(--alto-pantalla) - 165px) * 1.6))}
 :root{--ancho-juego-min:300px}
 
 /* --- Cabecera --- */
@@ -76,7 +77,7 @@ button,select,input{font:inherit;color:inherit;touch-action:manipulation;-webkit
 .congela{pointer-events:auto;background:#7fd3ffcc;width:clamp(44px,9cqw,54px);height:clamp(44px,9cqw,54px)}
 
 /* Las capas sobre el escenario. */
-.capa{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:4%;text-align:center;
+.capa{position:absolute;inset:0;z-index:5;display:flex;flex-direction:column;align-items:center;justify-content:safe center;gap:10px;padding:4%;text-align:center;
   background:#dff1fbd8;animation:entra .4s ease both;overflow:auto}
 @keyframes entra{0%{opacity:0}100%{opacity:1}}
 .tit{margin:0;font:400 clamp(28px,7cqw,50px)/1 var(--cartel);color:#e2483d;text-shadow:0 3px 0 #fff}
@@ -193,3 +194,63 @@ html.tl-online .club-volver, html.tl-online .club-ranking { display: none; }
 html.tl-online .layout { grid-template-columns: 1fr; }
 html.tl-online .layout > aside { display: none; }
 .nv-version small{font:600 13px/1 system-ui,sans-serif;color:#7a6a60}
+
+/* --- El menú de «Listo» (en línea) --- */
+.sala-listos{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;width:100%}
+.bolita{display:inline-flex;align-items:center;gap:6px;padding:5px 12px 5px 8px;border-radius:999px;background:#ffffff26;border:2px solid #ffffff40;font-size:13px}
+.bolita::before{content:"";width:12px;height:12px;border-radius:50%;background:#9aa7b4;box-shadow:0 0 0 2px #0002}
+.bolita.ok{background:#43a35a33;border-color:#43a35a}
+.bolita.ok::before{background:#5be37a;box-shadow:0 0 8px #5be37a}
+.bolita b{font:400 15px/1 var(--cartel)}
+.bolita small{opacity:.75;font-weight:700}
+#btnPreparado.hecho{background:#43a35a;box-shadow:0 4px 0 #2b6d3b}
+
+/* --- Eliminado: la pantalla se pone roja y el cartel entra de golpe --- */
+.eliminado{position:absolute;inset:0;z-index:7;display:grid;place-items:center;pointer-events:none;
+  background:radial-gradient(ellipse at center,#e2483d55,#a0100bd9);animation:rojo 3.2s ease both}
+.eliminado p{margin:0;display:grid;gap:6px;justify-items:center;text-align:center;padding:0 6%;animation:golpe .5s cubic-bezier(.2,1.6,.4,1) both}
+.eliminado b{font:400 clamp(26px,6.5cqw,52px)/1.05 var(--cartel);color:#fff;text-shadow:0 4px 0 #6d0b07,0 0 24px #000a}
+.eliminado span{font:400 clamp(18px,3.6cqw,28px)/1 var(--cartel);color:#ffd5d0;text-shadow:0 3px 0 #6d0b07}
+@keyframes rojo{0%{opacity:0}8%{opacity:1}14%{opacity:.75}20%{opacity:1}80%{opacity:1}100%{opacity:0}}
+@keyframes golpe{0%{transform:scale(2.4);opacity:0}100%{transform:scale(1);opacity:1}}
+@media (prefers-reduced-motion:reduce){.eliminado,.eliminado p{animation:none}}
+
+/* --- Oscuro: en la sala (la página de Juegos es oscura) y en el Club con el tema oscuro --- */
+html.tl-online,html[data-tema=oscuro]{--fondo:#11131c;--tinta:#e8eef5;--panel:#1d3a55;--borde:#132a40;color-scheme:dark}
+:is(html.tl-online,html[data-tema=oscuro]) body{background:transparent}
+:is(html.tl-online,html[data-tema=oscuro]) .cab{background:#1a1d2b;border-radius:14px;padding:8px 10px;box-shadow:0 0 0 1px #ffffff14}
+:is(html.tl-online,html[data-tema=oscuro]) .lema{color:#c9d3df}
+:is(html.tl-online,html[data-tema=oscuro]) .capa{background:#0d1420e0;color:var(--tinta)}
+:is(html.tl-online,html[data-tema=oscuro]) .frase{color:#d7e1ec}
+:is(html.tl-online,html[data-tema=oscuro]) .tit{text-shadow:0 3px 0 #0008}
+:is(html.tl-online,html[data-tema=oscuro]) :is(.jug,.tarjeta,.podio li){background:#1f2636;color:var(--tinta);box-shadow:0 3px 0 #0006}
+:is(html.tl-online,html[data-tema=oscuro]) .podio li:first-child{background:#3a3220}
+:is(html.tl-online,html[data-tema=oscuro]) .jug .acc button{background:#2c3850;color:#e8eef5}
+:is(html.tl-online,html[data-tema=oscuro]) .jug .acc button:hover{background:#3a4866}
+:is(html.tl-online,html[data-tema=oscuro]) .nota{color:#b9c4d1}
+:is(html.tl-online,html[data-tema=oscuro]) kbd{background:#ffffff1a;border-color:#ffffff33;color:#e8eef5}
+:is(html.tl-online,html[data-tema=oscuro]) .editor{background:#1a1f2c;color:var(--tinta)}
+:is(html.tl-online,html[data-tema=oscuro]) .editor::backdrop{background:#000b}
+:is(html.tl-online,html[data-tema=oscuro]) :is(.ed-presets button,.ed-nombre input){background:#253049;color:#e8eef5;border-color:#3a4a6a}
+:is(html.tl-online,html[data-tema=oscuro]) .ed-campo{border-bottom-color:#ffffff12}
+:is(html.tl-online,html[data-tema=oscuro]) .ed-vista{background:linear-gradient(#26405a,#1d2c3d 70%,#2d4a26 70%)}
+:is(html.tl-online,html[data-tema=oscuro]) .club-volver{color:#b9c4d1}
+:is(html.tl-online,html[data-tema=oscuro]) .tc-tecla{background:#253049;color:#e8eef5;border-color:#3a4a6a}
+:is(html.tl-online,html[data-tema=oscuro]) .tc-fila{border-bottom-color:#ffffff12}
+:is(html.tl-online,html[data-tema=oscuro]) .nv-pestanas button:not([aria-selected=true]){background:#253049;color:#e8eef5}
+
+/* --- «Cambiar skin»: llamativo, brilla y palpita --- */
+html body .jug .acc button.cambiar-skin{background:linear-gradient(135deg,#ffb020,#ff6a3d);color:#fff;font:400 14px/1 var(--cartel);padding:7px 12px;border-radius:999px;
+  box-shadow:0 3px 0 #b8481f,0 0 0 0 #ffb02099;animation:palpita 1.4s ease-in-out infinite}
+html body .jug .acc button.cambiar-skin:hover{background:linear-gradient(135deg,#ffc24a,#ff7d55)}
+@keyframes palpita{0%,100%{transform:scale(1);box-shadow:0 3px 0 #b8481f,0 0 0 0 #ffb02099}50%{transform:scale(1.07);box-shadow:0 3px 0 #b8481f,0 0 16px 4px #ffb020aa}}
+@media (prefers-reduced-motion:reduce){.jug .acc button.cambiar-skin{animation:none}}
+.jug{min-width:150px}
+html body .jug .acc button.cambiar-skin{white-space:nowrap}
+.jugadores{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+
+/* --- En el teléfono: no compatible --- */
+html body .capa.movil{position:fixed;inset:0;z-index:60;background:#0d1420f5;padding:24px}
+.movil .tarjeta{max-width:420px;padding:28px 24px}
+.movil .carita{margin:0;font:400 clamp(56px,14cqw,110px)/1 var(--cartel);color:#e2483d;transform:rotate(90deg);text-shadow:0 4px 0 #0002}
+:is(html.tl-online,html[data-tema=oscuro]) .opciones select{background:#253049;color:#e8eef5;border-color:#3a4a6a}

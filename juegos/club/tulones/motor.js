@@ -114,12 +114,12 @@
   const px = (c, i) => c.p[i * 2], py = (c, i) => c.p[i * 2 + 1];
 
   /* ---------- el mundo: cápsulas estáticas ---------- */
-  // La cabra: el primer escalón, en x = 0 mirando a la derecha.
-  const CABRA = [
+  // El pudú: el primer escalón, en x = 0 mirando a la derecha (lomo, patas, cuello, cabeza y los cachitos).
+  const PUDU = [
     [-55, -92, 50, -92, 30], [52, -100, 78, -138, 16], [85, -145, 108, -128, 15], [82, -160, 70, -180, 4], [92, -160, 100, -181, 4],
     [-48, -70, -48, 0, 6.5], [-30, -70, -30, 0, 6.5], [30, -70, 30, 0, 6.5], [45, -70, 45, 0, 6.5]
   ];
-  function mundo() { return { caps: CABRA.map(c => capsula(c[0], c[1], c[2], c[3], c[4])), torre: [] }; }
+  function mundo() { return { caps: PUDU.map(c => capsula(c[0], c[1], c[2], c[3], c[4])), torre: [] }; }
   function capsula(ax, ay, bx, by, r) {
     return { ax, ay, bx, by, r, x0: Math.min(ax, bx) - r, x1: Math.max(ax, bx) + r, y0: Math.min(ay, by) - r, y1: Math.max(ay, by) + r };
   }
@@ -534,6 +534,8 @@
      La física no viaja: cada pantalla simula solo al que trepa en ella. Al registro de la sala va lo que decide
      la partida, y este reductor (lo usa `redTulones` de colabtex) lo vuelve a pasar en cada pantalla:
 
+     - `{t:"listo", uid, on}`: antes del primer turno, cada uno dice si está listo (personalizar lo quita). La torre
+       empieza cuando la sala está cerrada y todos los que siguen dentro (dos o más) lo están.
      - `{t:"sale", uid, n, at, a}`: el del turno n empieza a trepar (`a`, su aspecto). Fija el reloj del turno.
      - `{t:"congela", uid, n, at, p, b, a}`: su cuerpo al acabar, con las coordenadas en décimas (`codificaPose`).
        La altura y si supera la línea roja se recalculan aquí, no se cree lo que diga la pantalla.
@@ -583,11 +585,14 @@
   }
   function alturaPose(P) { let m = 0; for (let i = 0; i < N; i++) m = Math.max(m, -P[i * 2 + 1] + RADIO[i]); return m / 100; }
 
-  /* `jugadores`: [{uid, nombre}] en orden de asiento. `op`: {tiempo, rondas, listos}. Devuelve lo que pintan la
+  /* `jugadores`: [{uid, nombre}] en orden de asiento. `op`: {tiempo, rondas, acumula, listos}. Devuelve lo que pintan la
      sala y el marco. Sin hora de inicio (`inicio` 0) el plazo no corre hasta que alguien escribe `reloj`. */
   function reducirSala(jugadas, jugadores, op) {
     op = op || {};
-    const tiempo = tiempoSala(op.tiempo), rondas = rondasSala(op.rondas), ms = tiempo * 1000;
+    const tiempo = tiempoSala(op.tiempo), rondas = rondasSala(op.rondas), acumula = +op.acumula === 1;
+    // Tiempo acumulado (opción de la sala): cada ronda nueva suma un segundo por cada otro jugador en pie.
+    let extra = 0;
+    const msTurno = () => (tiempo + extra) * 1000;
     const js = jugadores || [], ids = js.map(j => j.uid), n0 = js.length;
     const fuera = {}, eliminados = {}, mejores = {}, aspectos = {};
     for (const u of ids) mejores[u] = 0;
@@ -596,7 +601,7 @@
     const activo = i => !fuera[ids[i]] && !eliminados[ids[i]];
     const enPie = () => ids.filter((u, i) => activo(i));
     const meta = () => alturaMundo(W);
-    const plazoDe = () => (saleAt ? saleAt + ms + SALA.GRACIA_MS : inicio ? inicio + SALA.LISTO_MS + ms + SALA.GRACIA_MS : Infinity);
+    const plazoDe = () => (saleAt ? saleAt + msTurno() + SALA.GRACIA_MS : inicio ? inicio + SALA.LISTO_MS + msTurno() + SALA.GRACIA_MS : Infinity);
     function cierra() {
       const q = enPie();
       if (!q.length) { ganador = ''; motivo = Object.keys(eliminados).length ? 'nadie' : 'abandono'; return true; }
@@ -618,16 +623,27 @@
       saleAt = 0; n++;
       inicio = Number.isFinite(at) && at > 0 ? at : 0;
       if (cierra()) return;
+      const antes = ronda;
       do { idx++; if (idx >= n0) { idx = 0; ronda++; } } while (!activo(idx));
+      if (acumula && ronda > antes) extra += Math.max(1, enPie().length - 1);
       if (rondas && ronda > rondas) porRondas();
     }
-    if (n0) { while (idx < n0 && !activo(idx)) idx++; }
-    const listos = op.listos !== false && n0 > 0;
-    for (const j of listos ? jugadas || [] : []) {
+    // La torre empieza cuando la sala está cerrada (`op.listos`) y todos los que siguen dentro, dos o más, dieron «Listo».
+    const sala = op.listos !== false && n0 > 0, preparados = {};
+    let empezo = false;
+    const todosListos = () => { const q = ids.filter(u => !fuera[u]); return q.length >= 2 && q.every(u => preparados[u]); };
+    const arranca = at => { empezo = true; inicio = at > 0 ? at : 0; idx = 0; while (idx < n0 && !activo(idx)) idx++; };
+    for (const j of jugadas || []) {
       if (ganador !== null) break;
       const u = j && j.uid, i = ids.indexOf(u);
       if (i < 0) continue;
       const at = Number.isFinite(j.at) ? j.at : 0;
+      if (!empezo) {
+        if (j.t === 'abandona' && !fuera[u]) { fuera[u] = true; hist.push({ e: 'sale', uid: u }); }
+        else if (j.t === 'listo' && !fuera[u]) preparados[u] = j.on !== false;
+        if (sala && todosListos()) arranca(j.t === 'listo' ? at : 0);
+        continue;
+      }
       if (j.t === 'abandona') {
         if (fuera[u]) continue;
         fuera[u] = true; hist.push({ e: 'sale', uid: u });
@@ -670,14 +686,15 @@
       hist.push({ e: 'congela', uid: u, h, meta: m, ok, ronda });
       siguiente(at);
     }
-    if (ganador === null && listos) cierra();
+    if (!empezo && sala && todosListos()) arranca(0);
+    if (ganador === null && sala && (empezo || n0 > 1)) cierra();
     const fin = ganador !== null;
     const puntos = {};
     for (const u of ids) puntos[u] = Math.round(mejores[u] * 100);
     return {
-      fase: !listos ? 'espera' : fin ? 'fin' : 'jugando',
-      turno: !listos || fin ? '' : ids[idx], n, ronda, rondas, tiempo,
-      inicio, saleAt, plazo: !listos || fin ? 0 : plazoDe(), meta: meta(),
+      fase: fin ? 'fin' : !empezo ? 'espera' : 'jugando', empezo, preparados,
+      turno: !empezo || fin ? '' : ids[idx], n, ronda, rondas, tiempo, acumula, extra, tiempoTurno: tiempo + extra,
+      inicio, saleAt, plazo: !empezo || fin ? 0 : plazoDe(), meta: meta(),
       torre, mejores, puntos, fuera, eliminados, vivos: enPie(), aspectos, hist: hist.slice(-40),
       ganador, motivo
     };
@@ -686,7 +703,7 @@
   // Versión visible en el título mientras se ajusta la física (quitar al terminar).
   const VERSION = 'tulones-18';
 
-  return { VERSION, largoBulto, FIJOS, G, DT, I, N, POSE, POSE_T, RADIO, MIEMBROS, LARGO_M, AGARRE_T, CABRA, CATALOGO, PRESETS, CAMPOS, ACCIONES, TECLAS, RESERVADAS,
+  return { VERSION, largoBulto, FIJOS, G, DT, I, N, POSE, POSE_T, RADIO, MIEMBROS, LARGO_M, AGARRE_T, PUDU, CATALOGO, PRESETS, CAMPOS, ACCIONES, TECLAS, RESERVADAS,
     crea, mundo, capsula, paso, mueve, empujaMiembros, sostiene, congela, capsulasDe, altura, alturaMundo, valido, marco, limpia, aleatorio,
     teclaValida, limpiaTeclas, asignaTecla, nombreTecla,
     SALA, tiempoSala, rondasSala, codificaPose, decodificaPose, poseSana, codificaBulto, decodificaBulto, codificaAspecto, decodificaAspecto,
