@@ -61,7 +61,7 @@ export function crearTulones({ uid, pid, jugar, terminar, mirando, ahora }) {
     if (asientos !== configurado) {
       configurado = asientos;
       enviar("config", {
-        yo: uid, mirando: !juego(), tiempo: partida.tiempo, rondas: partida.rondas,
+        yo: uid, mirando: !juego(), tiempo: partida.tiempo, rondas: partida.rondas, acumula: partida.acumula,
         jugadores: est.jugadores.map(j => ({ uid: j.uid, nombre: j.nombre || "Jugador" }))
       });
       enviar("hora", { t: hora() });
@@ -196,7 +196,7 @@ export function crearTulones({ uid, pid, jugar, terminar, mirando, ahora }) {
     frame.allow = "fullscreen";
     frame.setAttribute("allowfullscreen", "");
     window.addEventListener("message", mensaje);
-    frame.src = "juegos/club/tulones/index.html?modo=online&v=tulones-20";
+    frame.src = "juegos/club/tulones/index.html?modo=online&v=tulones-21";
     host.append(aviso, redEl, frame);
     relojPlazo = setInterval(vigila, VIGILA_MS);
   }

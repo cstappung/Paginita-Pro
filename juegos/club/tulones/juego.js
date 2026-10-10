@@ -1,4 +1,4 @@
-// @controles: tactil raton teclado
+// @controles: raton teclado
 /* Tulones: la pantalla. La física vive en motor.js; aquí se dibuja, se oye y se juega por turnos. */
 (() => {
   'use strict';
@@ -11,6 +11,9 @@
   const TINTA = '#2a1e18';
   // Dentro de una sala de Juegos (colabtex/src/juegos/tulones.js): cada uno trepa en su pantalla y la torre llega por el registro.
   const ONLINE = /[?&]modo=online\b/.test(location.search);
+  // En el teléfono no se puede jugar (con los dedos no da para mover cuatro miembros): se avisa y no se monta nada.
+  const MOVIL = !!(navigator.userAgentData && navigator.userAgentData.mobile) || /Android|iPhone|iPad|iPod|Mobile|Silk|Kindle/i.test(navigator.userAgent) ||
+    (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
 
   /* ---------------- sonido ---------------- */
   let actx = null, mudo = lee('tulones.mudo', false);
@@ -465,7 +468,10 @@
   const escenario = $('escenario'), lienzo = $('lienzo'), ctx = lienzo.getContext('2d');
   let W = 0, H = 0, dpr = 1;
   function ajustaPantalla() {
-    try { const t = window.top; document.documentElement.style.setProperty('--alto-pantalla', t.innerHeight + 'px'); } catch (e) { document.documentElement.style.setProperty('--alto-pantalla', window.innerHeight + 'px'); }
+    // En la sala el marco tiene su propia altura; en el Club el iframe crece con la página y manda la ventana de arriba.
+    let alto = window.innerHeight;
+    if (!ONLINE) { try { alto = window.top.innerHeight; } catch (e) { /* otro origen */ } }
+    document.documentElement.style.setProperty('--alto-pantalla', alto + 'px');
     dpr = Math.min(window.devicePixelRatio || 1, 2);
     const r = escenario.getBoundingClientRect();
     W = Math.max(1, r.width); H = Math.max(1, r.height);
@@ -479,37 +485,40 @@
   const cam = { x: 0, y: -156 };
   const nubes = Array.from({ length: 7 }, (_, i) => ({ x: -900 + i * 330 + (i * 97) % 120, y: -380 - (i * 53) % 220, s: .7 + (i % 3) * .25 }));
 
-  function dibujaCabra(ctx) {
+  /* El pudú: el primer escalón. Se dibuja sobre las mismas cápsulas que usa la física (motor.js, PUDU): lomo,
+     cuello, cabeza y los cachitos; las orejas grandes y el hocico son solo dibujo. */
+  function dibujaPudu(ctx) {
     ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.strokeStyle = TINTA; ctx.lineWidth = 2.5;
-    const piel = '#e9e2d0', sombra = '#cfc5ad';
-    // Patas traseras de fondo.
-    for (const x of [-30, 30]) { ctx.fillStyle = sombra; huso(ctx, x, -70, x, -6, 7, 6.5, 5.5); ctx.fillStyle = '#3a2f28'; ctx.fillRect(x - 6, -8, 12, 8); ctx.strokeRect(x - 6, -8, 12, 8); }
-    // Cola.
-    ctx.fillStyle = piel; ctx.beginPath(); ctx.moveTo(-80, -112); ctx.quadraticCurveTo(-98, -124, -92, -104); ctx.quadraticCurveTo(-88, -98, -80, -100); ctx.fill(); ctx.stroke();
-    // Cuerpo.
-    elipse(ctx, -2, -92, 85, 32, 0, piel);
-    ctx.save(); ctx.beginPath(); ctx.ellipse(-2, -92, 85, 32, 0, 0, 7); ctx.clip();
-    ctx.fillStyle = sombra; ctx.beginPath(); ctx.ellipse(-2, -62, 90, 18, 0, 0, 7); ctx.fill();
+    const pelo = '#b4622e', claro = '#d98a52', sombra = '#93491f', oreja = '#e9a77a';
+    // Patas de atrás, en sombra.
+    for (const x of [-30, 30]) { ctx.fillStyle = sombra; huso(ctx, x, -76, x, -7, 8, 6.5, 5); ctx.fillStyle = TINTA; ctx.beginPath(); ctx.ellipse(x, -4, 6, 4.5, 0, 0, 7); ctx.fill(); }
+    // Colita.
+    ctx.fillStyle = sombra; elipse(ctx, -84, -106, 8, 5, -.5, null); ctx.fill(); ctx.stroke();
+    // Cuerpo, con la guata más clara y el lomo más oscuro.
+    elipse(ctx, -2, -92, 85, 33, 0, pelo);
+    ctx.save(); ctx.beginPath(); ctx.ellipse(-2, -92, 85, 33, 0, 0, 7); ctx.clip();
+    ctx.fillStyle = claro; ctx.beginPath(); ctx.ellipse(4, -60, 80, 16, 0, 0, 7); ctx.fill();
+    ctx.fillStyle = sombra; ctx.globalAlpha = .35; ctx.beginPath(); ctx.ellipse(-10, -124, 78, 12, 0, 0, 7); ctx.fill();
     ctx.restore();
-    ctx.save(); ctx.lineWidth = 1.6; ctx.strokeStyle = '#a99d84';
-    for (const [x, y] of [[-50, -100], [-25, -108], [5, -104], [-40, -82], [-10, -86], [20, -90], [40, -100]]) { ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + 5, y + 5, x + 2, y + 10); ctx.stroke(); }
-    ctx.restore();
-    // Patas delanteras.
-    for (const x of [-48, 45]) { ctx.fillStyle = piel; huso(ctx, x, -70, x, -6, 7.5, 7, 5.5); ctx.fillStyle = '#3a2f28'; ctx.fillRect(x - 6.5, -8, 13, 8); ctx.strokeRect(x - 6.5, -8, 13, 8); }
-    // Cuello y cabeza.
-    ctx.fillStyle = piel; huso(ctx, 52, -100, 80, -138, 17, 16, 14);
-    ctx.beginPath(); ctx.moveTo(78, -158); ctx.quadraticCurveTo(100, -162, 113, -132); ctx.quadraticCurveTo(116, -122, 106, -120); ctx.quadraticCurveTo(90, -122, 76, -134); ctx.closePath(); ctx.fill(); ctx.stroke();
-    // Barba de chivo.
-    ctx.fillStyle = '#d6cbb1'; ctx.beginPath(); ctx.moveTo(98, -121); ctx.lineTo(106, -121); ctx.lineTo(101, -103); ctx.closePath(); ctx.fill(); ctx.stroke();
-    // Cuernos.
-    ctx.fillStyle = '#8b7a62'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(80, -156); ctx.quadraticCurveTo(68, -176, 58, -172); ctx.quadraticCurveTo(70, -168, 86, -152); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(90, -158); ctx.quadraticCurveTo(96, -182, 88, -186); ctx.quadraticCurveTo(102, -180, 96, -155); ctx.fill(); ctx.stroke();
-    // Oreja, ojo, hocico.
-    ctx.fillStyle = sombra; ctx.lineWidth = 2.5; elipse(ctx, 76, -146, 11, 5, .5, null); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = '#f5d76e'; elipse(ctx, 95, -144, 4.5, 4, 0, null); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = TINTA; ctx.fillRect(92.5, -145, 5, 2);
-    ctx.beginPath(); ctx.arc(110, -129, 1.5, 0, 7); ctx.fill();
+    // Patas de adelante, con pezuñas negras.
+    for (const x of [-48, 45]) { ctx.fillStyle = claro; huso(ctx, x, -72, x, -7, 9, 7, 5.5); ctx.fillStyle = TINTA; ctx.beginPath(); ctx.ellipse(x, -4, 6.5, 4.5, 0, 0, 7); ctx.fill(); }
+    // Cuello.
+    ctx.fillStyle = pelo; huso(ctx, 44, -98, 80, -136, 25, 21, 17);
+    // Orejas grandes, detrás de la cabeza.
+    for (const [x, y, r] of [[78, -158, -.75], [100, -160, .45]]) {
+      ctx.fillStyle = pelo; elipse(ctx, x, y, 9, 19, r, null); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = oreja; elipse(ctx, x, y + 2, 4.5, 12, r, null, false); ctx.fill();
+    }
+    // Cachitos.
+    ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(84, -158); ctx.lineTo(76, -176); ctx.moveTo(94, -158); ctx.lineTo(99, -177); ctx.stroke();
+    ctx.strokeStyle = '#efe4c8'; ctx.lineWidth = 3; ctx.stroke();
+    ctx.strokeStyle = TINTA; ctx.lineWidth = 2.5;
+    // Cabeza y hocico.
+    ctx.fillStyle = pelo; elipse(ctx, 94, -141, 23, 19, .35, null); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = claro; elipse(ctx, 111, -130, 11, 8.5, .45, null); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = TINTA; elipse(ctx, 119, -127, 4.5, 3.5, .45, null, false); ctx.fill();
+    ctx.beginPath(); ctx.arc(97, -146, 3.4, 0, 7); ctx.fill();
+    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(98.2, -147.2, 1.1, 0, 7); ctx.fill();
     ctx.restore();
   }
 
@@ -565,7 +574,7 @@
       ctx.restore();
     }
 
-    dibujaCabra(ctx);
+    dibujaPudu(ctx);
     if (mundoW) for (const f of mundoW.torre) dibujaTulon(ctx, f.p, f.bulto, f.aspecto, { helada: true, cara: 'helado' });
     if (red.foto) dibujaTulon(ctx, red.foto.p, red.foto.bulto, red.foto.aspecto, { helada: true, cara: 'helado' });
     if (!cuerpo && red.remoto && estado !== 'fin') {
@@ -611,6 +620,8 @@
   /* ---------------- jugadores ---------------- */
   let jugadores = (lee(clave('tulones.jugadores'), null) || [M.PRESETS[0], M.PRESETS[1]]).slice(0, 8).map(M.limpia);
   if (!jugadores.length) jugadores = [M.limpia(M.PRESETS[0])];
+  // Cada vez que se entra, una skin al azar (el nombre se queda).
+  jugadores = jugadores.map(j => M.aleatorio(Math.random, j.nombre));
   const guardaJug = () => guarda(clave('tulones.jugadores'), jugadores);
   let record = lee(clave('tulones.record'), 0);
   const fmt = m => (Number.isFinite(m) ? m : 0).toFixed(2).replace('.', ',') + ' m';
@@ -622,7 +633,7 @@
       const cv = document.createElement('canvas'); d.appendChild(cv);
       const b = document.createElement('b'); b.textContent = j.nombre; b.translate = false; b.setAttribute('translate', 'no'); d.appendChild(b);
       const acc = document.createElement('div'); acc.className = 'acc';
-      const ed = document.createElement('button'); ed.type = 'button'; ed.textContent = '✎'; ed.title = 'Cambiar aspecto'; ed.setAttribute('aria-label', 'Editar a ' + j.nombre);
+      const ed = document.createElement('button'); ed.type = 'button'; ed.className = 'cambiar-skin'; ed.textContent = '✎ Cambiar skin'; ed.title = 'Cambiar skin'; ed.setAttribute('aria-label', 'Editar a ' + j.nombre);
       ed.addEventListener('click', () => abreEditor(i));
       acc.appendChild(ed);
       if (jugadores.length > 1 && !ONLINE) {
@@ -718,9 +729,9 @@
   let turnoN = 0, ronda = 1, rondas = 5, segTurno = 45, quedan = 0, mejores = [], ultTic = -1;
   // Reglas: cada turno hay que pasar la línea roja (la torre al empezar el turno). Quien no la pasa queda
   // eliminado. Con varios jugadores gana el último en pie; jugando solo, se sigue hasta fallar. maxTurno es lo más alto del que trepa ahora (línea fantasma).
-  let vivos = [], meta = 0, maxTurno = 0, aviso = '';
+  let vivos = [], meta = 0, maxTurno = 0, aviso = '', acumula = false, extraT = 0;
   const SUPERA_MIN = .01;
-  const capas = { menu: $('menu'), turno: $('turno'), pausa: $('pausa'), fin: $('fin') };
+  const capas = { menu: $('menu'), turno: $('turno'), pausa: $('pausa'), fin: $('fin'), movil: $('movil') };
   function muestra(nombre) { for (const k in capas) capas[k].hidden = k !== nombre; }
   const tactil = $('tactil');
   const grueso = window.matchMedia ? window.matchMedia('(pointer:coarse)') : null;
@@ -728,6 +739,7 @@
 
   function empezar() {
     segTurno = +$('selTiempo').value || 45; rondas = +$('selRondas').value; if (!Number.isFinite(rondas)) rondas = 5;
+    acumula = $('selAcumula').value === '1'; extraT = 0;
     mundoW = M.mundo(); turnoN = 0; ronda = 1; mejores = jugadores.map(() => 0); cuerpo = null;
     vivos = jugadores.map(() => true); aviso = '';
     cam.x = 0; cam.y = -156;
@@ -744,7 +756,7 @@
     $('turnoFrase').textContent = (rondas ? 'Ronda ' + ronda + ' de ' + rondas : 'Ronda ' + ronda) + ' · supera ' + fmt(meta);
     $('turnoAviso').textContent = aviso; $('turnoAviso').hidden = !aviso;
     $('nQuien').textContent = j.nombre;
-    $('nTiempo').textContent = segTurno + ' s'; $('nTiempo').classList.remove('apura');
+    $('nTiempo').textContent = (segTurno + extraT) + ' s'; $('nTiempo').classList.remove('apura');
     $('nAltura').textContent = fmt(0);
     $('nTorre').textContent = fmt(M.alturaMundo(mundoW));
     muestra('turno');
@@ -756,7 +768,7 @@
     return Math.hypot(x - ax - dx * t, y - ay - dy * t);
   }
   const CAIDA = 60;
-  /* Siempre en el piso, nunca encima de nadie: se prueba de la cabra hacia la izquierda y después a la derecha de la
+  /* Siempre en el piso, nunca encima de nadie: se prueba del pudú hacia la izquierda y después a la derecha de la
      regla, cada 40 unidades, y gana el primer hueco libre (de pie y a la altura desde la que cae). Si el piso está
      lleno, el sitio que menos choca. Antes, con cuatro o cinco caídos al pie de la torre, salía encima de la torre. */
   const SITIOS = (() => { const l = []; for (let x = -200; x >= -1400; x -= 40) l.push(x); for (let x = 300; x <= 1400; x += 40) l.push(x); return l; })();
@@ -783,7 +795,7 @@
   }
   function arranca() {
     if (ONLINE && !arrancaRed()) return;
-    cuerpo = saleTulon(); traza.puntos = []; traza.registro = []; if (traza.on) empiezaGrabacion(); quedan = segTurno; ultTic = -1; acum = 0;
+    cuerpo = saleTulon(); traza.puntos = []; traza.registro = []; if (traza.on) empiezaGrabacion(); quedan = segTurno + extraT; ultTic = -1; acum = 0;
     estado = 'jugando'; muestra(null); inmersivo(true);
     escenario.focus({ preventScroll: true });
     capturaRaton();
@@ -805,7 +817,10 @@
     const enPie = vivos.filter(Boolean).length;
     if (!enPie) return terminaPartida({ nadie: true });
     if (jugadores.length > 1 && enPie === 1) return terminaPartida({ ganador: vivos.indexOf(true) });
+    const rondaAntes = ronda;
     do { turnoN++; if (turnoN % jugadores.length === 0) ronda++; } while (!vivos[turnoN % jugadores.length]);
+    // Tiempo acumulado: cada ronda nueva suma un segundo por cada otro jugador en pie (jugando solo, uno).
+    if (acumula && ronda > rondaAntes) extraT += Math.max(1, vivos.filter(Boolean).length - 1);
     if (rondas && ronda > rondas) return terminaPartida({});
     preparaTurno();
   }
@@ -962,7 +977,7 @@
   });
   const quitaDedo = e => dedos.delete(e.pointerId);
   lienzo.addEventListener('pointerup', quitaDedo); lienzo.addEventListener('pointercancel', quitaDedo);
-  function pintaTactil() { tactil.hidden = !(grueso && grueso.matches); }
+  function pintaTactil() { tactil.hidden = MOVIL || !(grueso && grueso.matches); }
   if (grueso && grueso.addEventListener) grueso.addEventListener('change', pintaTactil);
   pintaTactil();
 
@@ -1130,7 +1145,7 @@
      se reconstruye la torre y se decide qué se ve. Solo se escriben `sale` y `congela` (la sala los firma); el
      reloj y el plazo los vigila la sala. Mi cuerpo congelado se dibuja (`red.foto`) hasta que vuelve por el
      registro, ya cuantizado como lo verán todos. */
-  const red = { yo: '', mirando: true, js: [], tiempo: 45, rondas: 0, log: [], est: null, dif: 0, listo: false, sala: false, pidioListo: null,
+  const red = { yo: '', mirando: true, js: [], tiempo: 45, rondas: 0, acumula: false, log: [], est: null, dif: 0, listo: false, sala: false, pidioListo: null,
     remoto: null, objetivo: null, foto: null, salido: -1, n: -1, finTurno: 0, ultEnvio: 0, torreN: -1 };
   const PADRE = 'tulones-padre', HIJO = 'tulones-hijo';
   const ESTADO_MS = 66;
@@ -1158,7 +1173,7 @@
     if (d.tipo === 'config') {
       red.yo = String(d.yo || ''); red.mirando = !!d.mirando;
       red.js = Array.isArray(d.jugadores) ? d.jugadores.map(j => ({ uid: String(j.uid), nombre: String(j.nombre || 'Jugador').slice(0, 40) })) : [];
-      red.tiempo = M.tiempoSala(d.tiempo); red.rondas = M.rondasSala(d.rondas); red.listo = true;
+      red.tiempo = M.tiempoSala(d.tiempo); red.rondas = M.rondasSala(d.rondas); red.acumula = +d.acumula === 1; red.listo = true;
       return aplicaRed();
     }
     if (d.tipo === 'jugadas' && Array.isArray(d.lista)) { red.log = d.lista; red.sala = !!d.sala; if (red.listo) aplicaRed(); return; }
@@ -1170,9 +1185,9 @@
     for (const f of e.torre) { mundoW.caps.push(...M.capsulasDe({ p: f.p })); mundoW.torre.push(f); }
   }
   function aplicaRed() {
-    const e = red.est = M.reducirSala(red.log, red.js, { tiempo: red.tiempo, rondas: red.rondas, listos: red.sala });
+    const e = red.est = M.reducirSala(red.log, red.js, { tiempo: red.tiempo, rondas: red.rondas, acumula: red.acumula, listos: red.sala });
     if (e.fase === 'espera') return pintaSala(e);
-    segTurno = e.tiempo; rondas = e.rondas; ronda = e.ronda;
+    segTurno = e.tiempoTurno; rondas = e.rondas; ronda = e.ronda;
     if (e.torre.length !== red.torreN) {
       if (red.torreN >= 0 && e.torre.length > red.torreN) sonido.congela();
       red.torreN = e.torre.length; reconstruyeTorre(e);
@@ -1255,15 +1270,15 @@
     $('turnoFrase').textContent = (e.rondas ? 'Ronda ' + e.ronda + ' de ' + e.rondas : 'Ronda ' + e.ronda) + ' · supera ' + fmt(e.meta) + fuera;
     $('turnoAviso').textContent = aviso; $('turnoAviso').hidden = !aviso;
     $('btnListo').hidden = !mio;
-    $('nTiempo').textContent = e.tiempo + ' s'; $('nTiempo').classList.remove('apura');
+    $('nTiempo').textContent = e.tiempoTurno + ' s'; $('nTiempo').classList.remove('apura');
     $('nAltura').textContent = fmt(0);
     if (capas.turno.hidden) { muestra('turno'); if (mio) { sonido.fanfarria(); setTimeout(() => $('btnListo').focus(), 50); } }
   }
   function arrancaRed() {
     const e = red.est;
     if (!e || e.fase !== 'jugando' || e.turno !== red.yo || red.mirando || red.salido === e.n) return false;
-    red.salido = e.n; segTurno = e.tiempo; meta = e.meta; maxTurno = 0;
-    red.finTurno = horaRed() + e.tiempo * 1000;
+    red.salido = e.n; segTurno = e.tiempoTurno; meta = e.meta; maxTurno = 0;
+    red.finTurno = horaRed() + e.tiempoTurno * 1000;
     $('btnListo').hidden = true;
     aSala('jugar', { j: { t: 'sale', n: e.n, a: M.codificaAspecto(miAspecto()) } });
     return true;
@@ -1315,7 +1330,7 @@
       maxTurno = Math.max(maxTurno, o.m);
     }
     if (estado === 'red' && e.fase === 'jugando' && e.turno !== red.yo) {
-      const quedanR = e.saleAt ? Math.max(0, Math.ceil((e.saleAt + e.tiempo * 1000 - horaRed()) / 1000)) : e.tiempo;
+      const quedanR = e.saleAt ? Math.max(0, Math.ceil((e.saleAt + e.tiempoTurno * 1000 - horaRed()) / 1000)) : e.tiempoTurno;
       $('nTiempo').textContent = quedanR + ' s'; $('nTiempo').classList.toggle('apura', !!e.saleAt && quedanR <= 5);
       $('nAltura').textContent = fmt(r ? M.alturaPose(r.p) : 0);
     }
@@ -1397,7 +1412,8 @@
 
   pintaLista();
   muestra('menu');
-  if (ONLINE) iniciaRed();
+  if (MOVIL) { muestra('movil'); $('tactil').hidden = true; }
+  else if (ONLINE) iniciaRed();
   document.querySelector('.logo').textContent = 'TULONES';
   requestAnimationFrame(cuadro);
 

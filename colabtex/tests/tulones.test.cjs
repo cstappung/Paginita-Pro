@@ -338,3 +338,21 @@ test('sala: si se va uno antes de empezar y queda uno solo, gana por abandono', 
   const e = S.pon({ t: 'abandona', uid: 'u1' });
   assert.strictEqual(e.fase, 'fin'); assert.strictEqual(e.ganador, 'u0'); assert.strictEqual(e.motivo, 'abandono');
 });
+
+test('sala: con tiempo acumulado cada ronda suma un segundo por cada otro en pie', () => {
+  const S = partida(3, { tiempo: 30, acumula: 1 });
+  let e = S.pon({ t: 'reloj', uid: 'u1', n: 0, at: T0 });
+  assert.strictEqual(e.tiempoTurno, 30);
+  for (let k = 0; k < 3; k++) e = S.pon({ t: 'congela', uid: e.turno, n: k, at: T0 + (k + 1) * 1000, p: pose(60 + k * 70) });
+  assert.strictEqual(e.ronda, 2); assert.strictEqual(e.tiempoTurno, 32, 'dos más en pie');
+  assert.strictEqual(e.plazo, T0 + 3000 + M.SALA.LISTO_MS + 32000 + M.SALA.GRACIA_MS);
+  e = S.pon({ t: 'congela', uid: e.turno, n: 3, at: T0 + 4000, p: pose(0, -600) });
+  e = S.pon({ t: 'congela', uid: e.turno, n: 4, at: T0 + 5000, p: pose(300) });
+  e = S.pon({ t: 'congela', uid: e.turno, n: 5, at: T0 + 6000, p: pose(370) });
+  assert.strictEqual(e.ronda, 3); assert.strictEqual(e.tiempoTurno, 33, 'u0 cayó: ahora suma uno');
+  const F = partida(2, { tiempo: 30 });
+  F.pon({ t: 'reloj', uid: 'u1', n: 0, at: T0 });
+  F.pon({ t: 'congela', uid: 'u0', n: 0, at: T0 + 1000, p: pose(60) });
+  const f = F.pon({ t: 'congela', uid: 'u1', n: 1, at: T0 + 2000, p: pose(130) });
+  assert.strictEqual(f.tiempoTurno, 30, 'sin la opción, fijo');
+});

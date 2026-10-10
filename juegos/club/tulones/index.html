@@ -2,11 +2,11 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-<script src="../../../i18n.js?v=202610100436"></script>
+<script src="../../../i18n.js?v=202610100503"></script>
 <script src="../../audio/mando.js?v=mando-2"></script>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Tulones — la torre de amigos</title>
-  <meta name="description" content="Trepa sobre una cabra y sobre los tulones que ya se congelaron. Cada turno, un tulón más en la torre.">
+  <meta name="description" content="Trepa sobre un pudú y sobre los tulones que ya se congelaron. Cada turno, un tulón más en la torre.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2363b8ee'/%3E%3Cpath d='M6 11h20l-3 9c-2 4-5 6-7 6s-5-2-7-6z' fill='%23fff' stroke='%23234' stroke-width='2'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,7 +15,7 @@
   <link rel="stylesheet" href="../conexion.css?v=club-2">
   <script src="../../audio/volumen.js?v=vol-1"></script>
   <script src="../conexion.js?v=club-12"></script>
-  <link rel="stylesheet" href="estilo.css?v=tulones-21">
+  <link rel="stylesheet" href="estilo.css?v=tulones-25">
 </head>
 <body>
   <div class="shell">
@@ -68,7 +68,7 @@
           <div id="menu" class="capa menu">
             <div class="panel">
               <p class="tit" translate="no">TULONES</p>
-              <p class="frase">Cada turno sale un tulón nuevo. Trepa por la cabra y por los que ya se congelaron: cuando se acaba el tiempo, se queda ahí para siempre.</p>
+              <p class="frase">Cada turno sale un tulón nuevo. Trepa por el pudú y por los que ya se congelaron: cuando se acaba el tiempo, se queda ahí para siempre.</p>
               <div class="jugadores" id="listaJug"></div>
               <div class="fila-btn">
                 <button type="button" id="btnMas" class="mini">＋ Jugador</button>
@@ -76,6 +76,7 @@
               </div>
               <div class="opciones">
                 <label>Turno <select id="selTiempo"><option value="30">30 s</option><option value="45" selected>45 s</option><option value="60">60 s</option><option value="90">90 s</option></select></label>
+                <label>Tiempo <select id="selAcumula"><option value="0" selected>Fijo</option><option value="1">Se acumula cada ronda</option></select></label>
                 <label>Rondas <select id="selRondas"><option value="3">3</option><option value="5">5</option><option value="10">10</option><option value="0" selected>Sin fin</option></select></label>
               </div>
               <button type="button" id="btnJugar" class="boton">▶ Jugar</button>
@@ -122,6 +123,15 @@
     </div>
   </div>
 
+  <!-- En el teléfono no se juega. -->
+  <div id="movil" class="capa movil" hidden>
+    <div class="tarjeta">
+      <p class="carita" aria-hidden="true">: (</p>
+      <p class="tit">Solo en computador</p>
+      <p class="frase">Tulones todavía no se puede jugar en el teléfono: hacen falta teclado y ratón para mover los cuatro miembros. Ábrelo en un computador.</p>
+    </div>
+  </div>
+
   <!-- El editor de aspecto. -->
   <dialog id="editor" class="editor" aria-labelledby="edTitulo">
     <form method="dialog" class="ed-cuerpo">
@@ -165,6 +175,12 @@
           <li>El ratón se captura al salir a trepar y una mira marca dónde va cada brazo o pierna.</li>
           <li>Cada tulón sale siempre en el piso, en un hueco libre: ya no aparece encima de la torre.</li>
           <li>Al quedar eliminado, la pantalla se pone roja y avisa quién no alcanzó a llegar. El ganador sale con trompetas.</li>
+          <li>La cabra ahora es un pudú.</li>
+          <li>Opción de tiempo acumulado: cada ronda nueva suma un segundo por cada otro jugador que sigue en pie (jugando solo, uno). En línea la elige quien abre la sala.</li>
+          <li>Al entrar, tu tulón sale con una skin al azar; el botón «Cambiar skin» la cambia.</li>
+          <li>Juego más grande: ocupa casi toda la pantalla.</li>
+          <li>Instrucciones legibles con el tema oscuro del sitio.</li>
+          <li>Solo para computador: en el teléfono avisa que no es compatible.</li>
         </ul>
         <p class="nv-version">v0.2 <small>· 9 oct 2026</small></p>
         <ul>
@@ -182,6 +198,8 @@
           <li>Más mejoras a la física.</li>
           <li>Monedas, recompensas y logros jugando en la misma pantalla (en línea ya están).</li>
           <li>Que quedarse de pie junto a una torre baja no cuente como superarla.</li>
+          <li>Ponerle a tu tulón la cara de cualquier persona: caras listas para elegir o una foto tuya.</li>
+          <li>Mujeres?</li>
         </ul>
       </div>
       <div class="fila-btn">
@@ -203,7 +221,7 @@
     </form>
   </dialog>
 
-  <script src="motor.js?v=tulones-19"></script>
-  <script src="juego.js?v=tulones-20"></script>
+  <script src="motor.js?v=tulones-20"></script>
+  <script src="juego.js?v=tulones-22"></script>
 </body>
 </html>

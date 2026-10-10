@@ -53,6 +53,17 @@ Club side: `juegos/club/CLAUDE.md`.
 - The mouse is captured on «¡A trepar!» and on the first limb key
   (`capturaRaton`); without it the pointer left the iframe mid-climb.
   `dibujaMiras` draws each held limb's target instead of the hidden cursor.
+- **Accumulated time** (room option `acumula`, also a menu option offline):
+  each new round adds `max(1, players standing − 1)` seconds to the turn
+  (`extra` / `tiempoTurno` in `reducirSala`; `extraT` in `juego.js`). The
+  deadline uses the turn's own length.
+- **Desktop only.** `MOVIL` (UA / `userAgentData.mobile` / iPad) shows the
+  full-screen `#movil` notice and nothing else mounts; `@controles: raton
+  teclado` makes the salón tag it PC-only. The notice lives outside
+  `.escenario` because its `container-type` traps `position:fixed`.
+- The first step is a **pudú** (`PUDU` in `motor.js`, `dibujaPudu`), drawn
+  over the same capsules the goat had, so heights did not change.
+- Every load gives each saved player a random skin (names kept).
 - No pause online; a hidden tab keeps its clock (server time), so returning
   late freezes at once and is rejected if past the deadline.
 - End: last one standing (`ultimo`, or `abandono` if the rest left), all out

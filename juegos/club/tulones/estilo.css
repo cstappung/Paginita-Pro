@@ -1,6 +1,6 @@
 /* ================================================================
    Tulones — la piel.
-   Cielo, pasto y una cabra: lo de colores lo pinta juego.js en el
+   Cielo, pasto y un pudú: lo de colores lo pinta juego.js en el
    lienzo; aquí van el marco, el marcador, las capas, el editor de
    aspecto y los botones táctiles. Escenario apaisado (16:10), porque
    la torre crece hacia arriba pero se trepa de lado a lado.
@@ -16,7 +16,7 @@
 html,body{margin:0}
 html{-webkit-tap-highlight-color:transparent}
 body{background:var(--fondo);color:var(--tinta);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-.shell{max-width:1240px;margin:0 auto;padding:16px}
+.shell{max-width:2400px;margin:0 auto;padding:12px 16px}
 .layout{display:grid;grid-template-columns:minmax(0,1fr) 285px;gap:24px;align-items:start}
 .layout>aside:empty{display:none}
 .layout:has(>aside:empty){grid-template-columns:minmax(0,1fr)}
@@ -30,8 +30,9 @@ button,select,input{font:inherit;color:inherit;touch-action:manipulation;-webkit
 .club-volver{color:color-mix(in srgb,var(--tinta) 80%,transparent)}
 
 /* --- El tamaño del juego: apaisado, que quepa a lo alto --- */
-:root{--ancho-juego:min(100%,1200px,calc((var(--alto-pantalla) - 190px) * 1.6))}
-.club-integrado{--ancho-juego:min(100%,1200px,calc((var(--alto-pantalla) - 210px) * 1.6))}
+:root{--ancho-juego:min(100%,calc((var(--alto-pantalla) - 175px) * 1.6))}
+.club-integrado{--ancho-juego:min(100%,calc((var(--alto-pantalla) - 190px) * 1.6))}
+html.tl-online{--ancho-juego:min(100%,calc((var(--alto-pantalla) - 165px) * 1.6))}
 :root{--ancho-juego-min:300px}
 
 /* --- Cabecera --- */
@@ -237,3 +238,19 @@ html.tl-online,html[data-tema=oscuro]{--fondo:#11131c;--tinta:#e8eef5;--panel:#1
 :is(html.tl-online,html[data-tema=oscuro]) .tc-tecla{background:#253049;color:#e8eef5;border-color:#3a4a6a}
 :is(html.tl-online,html[data-tema=oscuro]) .tc-fila{border-bottom-color:#ffffff12}
 :is(html.tl-online,html[data-tema=oscuro]) .nv-pestanas button:not([aria-selected=true]){background:#253049;color:#e8eef5}
+
+/* --- «Cambiar skin»: llamativo, brilla y palpita --- */
+html body .jug .acc button.cambiar-skin{background:linear-gradient(135deg,#ffb020,#ff6a3d);color:#fff;font:400 14px/1 var(--cartel);padding:7px 12px;border-radius:999px;
+  box-shadow:0 3px 0 #b8481f,0 0 0 0 #ffb02099;animation:palpita 1.4s ease-in-out infinite}
+html body .jug .acc button.cambiar-skin:hover{background:linear-gradient(135deg,#ffc24a,#ff7d55)}
+@keyframes palpita{0%,100%{transform:scale(1);box-shadow:0 3px 0 #b8481f,0 0 0 0 #ffb02099}50%{transform:scale(1.07);box-shadow:0 3px 0 #b8481f,0 0 16px 4px #ffb020aa}}
+@media (prefers-reduced-motion:reduce){.jug .acc button.cambiar-skin{animation:none}}
+.jug{min-width:150px}
+html body .jug .acc button.cambiar-skin{white-space:nowrap}
+.jugadores{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+
+/* --- En el teléfono: no compatible --- */
+html body .capa.movil{position:fixed;inset:0;z-index:60;background:#0d1420f5;padding:24px}
+.movil .tarjeta{max-width:420px;padding:28px 24px}
+.movil .carita{margin:0;font:400 clamp(56px,14cqw,110px)/1 var(--cartel);color:#e2483d;transform:rotate(90deg);text-shadow:0 4px 0 #0002}
+:is(html.tl-online,html[data-tema=oscuro]) .opciones select{background:#253049;color:#e8eef5;border-color:#3a4a6a}

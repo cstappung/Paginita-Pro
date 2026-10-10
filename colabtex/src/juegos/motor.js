@@ -196,7 +196,7 @@ export const JUEGOS = {
   },
   tulones: {
     nombre: "Tulones",
-    lema: "Por turnos, trepa sobre la cabra y sobre tus amigos congelados: quien no supera la torre queda fuera",
+    lema: "Por turnos, trepa sobre el pudú y sobre tus amigos congelados: quien no supera la torre queda fuera",
     color: "#63b8ee",
     minimo: 2,
     cupo: 8,
@@ -6844,7 +6844,7 @@ export function redTulones(p, js = jugadoresDe(p), listos = true) {
   const TM = globalThis.TulonesMotor;
   if (!TM) return { fase: "espera", turno: "", ganador: null, motivo: "" };
   return TM.reducirSala(jugadasDe(p), js.map(j => ({ uid: j.uid, nombre: j.nombre || "" })),
-    { tiempo: p.tiempo, rondas: p.rondas, listos });
+    { tiempo: p.tiempo, rondas: p.rondas, acumula: p.acumula, listos });
 }
 
 /* ---------- gato (tres en raya) y super gato ----------
