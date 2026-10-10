@@ -75,9 +75,12 @@ shapes. It shows on the card's banner and in the page's hero, in 3D through
 the Mascotas viewer (`docs/claude/juegos/mercado.md`).
 - **Re-checked where it is seen**, like the frames: `mascotaVisible` hides a
   pet the account no longer owns or has listed, and drops a dance it no
-  longer has. The stage, the name and what it wears come from its
-  `mascotasEstado`, read by key once per session (the editor re-reads your
-  own). Only adults dance, in a loop.
+  longer has. The stage, the name and what it wears (each piece re-checked
+  the same way) come from its `mascotasEstado`, read by key. A cached state
+  older than `FRESCO_MS` (2 min) is shown at once and re-read behind, so a
+  change of clothes arrives without reloading and without listening to the
+  node; what the game saves in this tab goes straight into the cache
+  (`alGuardar` → `pon`). Only adults dance, in a loop.
 - **The live view sits in its own layer** (`capaMascota`), outside the
   card's `innerHTML`: the card repaints on every data arrival, and an iframe
   that leaves the document reloads. The page's hero is rebuilt only when

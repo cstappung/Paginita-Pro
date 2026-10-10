@@ -39,7 +39,7 @@
 
 **In the salón.** A strip of the latest legendary gift items and a Novedades entry (`docs/claude/juegos/salon.md`).
 
-**In the profile.** A pet (and a dance) can be shown on the profile card and page, chosen in the profile editor's «Mascota» tab. Details in `docs/claude/juegos/perfiles-y-economia.md`. The live view asks the viewer for `cerca: true`, a closer camera for a small box.
+**In the profile.** A pet (and a dance) can be shown on the profile card and page, chosen in the profile editor's «Mascota» tab. Details in `docs/claude/juegos/perfiles-y-economia.md`. The live view asks the viewer for `cerca` (1 the profile hero, 2 the mini card), a closer camera for a small box. The postman reports every state it saves (`alGuardar`), so your own card shows new clothes at once.
 
 **Theme.** The postman forwards `data-tema`. `app.css` has an `html[data-tema='oscuro']` block: neutral surfaces go dark and the ink goes light, while coloured buttons keep dark ink on their pastel.
 

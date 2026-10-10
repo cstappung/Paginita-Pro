@@ -447,8 +447,12 @@ export const compraMascotas = (uid, c) =>
    quien compra la mascota), nunca la colección entera. */
 export const watchEstadosMascotas = (uid, cb) =>
   onValue(ref(db, `mascotasEstado/${uid}`), s => cb(s.val() || {}, null), err => cb({}, err));
-export const leeEstadoMascota = (uid, k) =>
-  get(ref(db, `mascotasEstado/${uid}/${k}`)).then(s => s.val(), () => null);
+/* Un error se lee como «sin estado», salvo con `crudo`, que lo deja
+   fallar (el perfil distingue «no tiene» de «no se pudo leer»). */
+export const leeEstadoMascota = (uid, k, crudo) => {
+  const p = get(ref(db, `mascotasEstado/${uid}/${k}`)).then(s => s.val());
+  return crudo ? p : p.catch(() => null);
+};
 export const guardaEstadoMascota = (uid, k, e) => set(ref(db, `mascotasEstado/${uid}/${k}`), e);
 export const borraEstadoMascota = (uid, k) => remove(ref(db, `mascotasEstado/${uid}/${k}`));
 /* Lo que solo le importa al dueño: la luz, el fondo elegido, la barra de

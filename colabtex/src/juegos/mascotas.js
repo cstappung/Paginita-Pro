@@ -48,7 +48,9 @@ function limpiaEstado(e) {
   return out;
 }
 
-export function crearMascotas({ usuario, datos, fb, volver, ir }) {
+/* `alGuardar(k, estado)`: avisa lo que se acaba de guardar (null al
+   despedirse), para que la mascota del perfil lo muestre sin releer. */
+export function crearMascotas({ usuario, datos, fb, volver, ir, alGuardar }) {
   let host = null, frame = null, offs = [], d = null, estados = null, prefs = null, muerto = false, listo = false, ocupado = Promise.resolve();
   const uid = usuario.uid;
   const heredando = new Set();
@@ -72,6 +74,7 @@ export function crearMascotas({ usuario, datos, fb, volver, ir }) {
         if (!e) continue;
         delete e.w; delete e.d;
         await fb.guardaEstadoMascota(uid, k, e);
+        if (alGuardar) alGuardar(k, e);
         return;
       }
     } catch (err) { console.warn("[mascotas] no se pudo heredar el estado", k, err); }
@@ -162,6 +165,7 @@ export function crearMascotas({ usuario, datos, fb, volver, ir }) {
           if (cuenta().parada) throw new Error("Ahora no se puede: tu cuenta tiene una compra sin fondos.");
           await fb.compraMascotas(uid, { k: "adios", p: 0, m: x.m });
           await fb.borraEstadoMascota(uid, claveEstado(x.m)).catch(() => {});
+          if (alGuardar) alGuardar(claveEstado(x.m), null);
           responde(true, null);
         } else if (x.accion === "estado") {
           const k = String(x.k || ""), c = "ma:" + k;
@@ -170,6 +174,7 @@ export function crearMascotas({ usuario, datos, fb, volver, ir }) {
           const est = limpiaEstado(x.estado);
           if (!est) throw new Error("Estado inválido.");
           await fb.guardaEstadoMascota(uid, k, est);
+          if (alGuardar) alGuardar(k, est);
           responde(true, null);
         } else if (x.accion === "prefs") {
           const p = x.prefs || {};
@@ -231,7 +236,7 @@ export function crearMascotas({ usuario, datos, fb, volver, ir }) {
       frame.title = "Mascotas — cría tu mascota en 3D";
       frame.allow = "fullscreen";
       window.addEventListener("message", mensaje);
-      frame.src = "juegos/mascotas/index.html?v=mc-2";
+      frame.src = "juegos/mascotas/index.html?v=mc-3";
       host.appendChild(frame);
       frame.addEventListener("load", () => frame.focus());
       vigilaTema.observe(document.documentElement, { attributes: true, attributeFilter: ["data-tema"] });

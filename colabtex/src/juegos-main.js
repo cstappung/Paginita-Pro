@@ -427,16 +427,15 @@ function comprasDe(d) {
    perfil vivo, comprobado contra lo que esa persona tiene ganado. */
 const marcoDeUid = uid => uid ? marcoVisible(perfilDe(uid), datosP ? estadisticas(uid, datosP) : null) : "anillo";
 
-/* La mascota de cada perfil: su estado se lee por clave, una vez por sesión. */
-const mascotasPerfil = crearMascotasPerfil((uid, k) => fb.leeEstadoMascota(uid, k));
+/* La mascota de cada perfil: su estado se lee por clave, y se relee por
+   detrás si tiene más de dos minutos (perfil-mascota.js). */
+const mascotasPerfil = crearMascotasPerfil((uid, k) => fb.leeEstadoMascota(uid, k, true));
 /* Lo que el editor ofrece de Mascotas: mis mascotas (no a la venta) y mis
    bailes, con su vista. Sin la economía entera, nada (y se conserva la
    elegida). */
 function mascotaEditor(uid, d) {
   if (!d || !d.completo) return { opciones: null, vista: () => null };
   const opciones = mascotasPerfil.opciones(uid, d);
-  /* Las mías pueden haber cambiado desde que se leyeron (se juega). */
-  for (const x of opciones.mascotas) mascotasPerfil.olvida(uid, x.c.slice(3));
   return {
     opciones,
     vista(c, b, cb) {
@@ -1595,7 +1594,8 @@ function armazon() {
   }
   if (state.vista === "mascotas") {
     h.innerHTML = "";
-    mascotasVista = crearMascotas({ usuario: state.user, datos: datosPerfil, fb, volver: () => ir(""), ir });
+    mascotasVista = crearMascotas({ usuario: state.user, datos: datosPerfil, fb, volver: () => ir(""), ir,
+      alGuardar: (k, est) => mascotasPerfil.pon(state.user.uid, k, est) });
     mascotasVista.montar(h);
     return;
   }
