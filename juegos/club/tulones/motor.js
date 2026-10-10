@@ -14,11 +14,11 @@
    Unidades: 100 = 1 m, y hacia abajo, el suelo en y = 0. Paso fijo de
    1/120 s: el resultado no depende de los fotogramas.
 
-   El bulto del calzoncillo es un muelle amortiguado en el marco de la
-   pelvis, empujado por la gravedad menos la aceleración de la pelvis
-   (lo que un objeto suelto siente dentro de un cuerpo que se mueve).
-   Así cuelga hacia la entrepierna de pie, hacia la cintura cabeza
-   abajo, y se sacude con cada tirón. Nunca sale del slip: |o| ≤ 5.
+   El bulto del calzoncillo es un péndulo en el marco de la pelvis,
+   movido por la gravedad menos la aceleración de la pelvis (lo que un
+   objeto suelto siente dentro de un cuerpo que se mueve). Así cuelga
+   hacia los pies de pie, se va hacia la cintura cabeza abajo y se
+   bambolea con cada tirón. `bulto.x/y` es la punta respecto del enganche.
    ================================================================ */
 (function (raiz, fabrica) {
   if (typeof module === 'object' && module.exports) module.exports = fabrica();
@@ -34,8 +34,9 @@
     [-12, -94], [12, -94], [-13, -48], [13, -48], [-14, -3], [14, -3]];
   const RADIO = [17, 7, 16, 15, 9, 9, 6, 6, 6.5, 6.5, 10, 10, 7, 7, 6.5, 6.5];
   const MASA = [1.2, .6, 3, 3, 1, 1, .7, .7, .5, .5, 1.4, 1.4, 1, 1, .7, .7];
+  const MASA_TOTAL = MASA.reduce((a, b) => a + b, 0);
 
-  // Miembros: 0 brazo izq (A), 1 brazo der (S), 2 pierna izq (K), 3 pierna der (L).
+  // Miembros: 0 brazo izq, 1 brazo der, 2 pierna izq, 3 pierna der (las teclas, más abajo).
   const MIEMBROS = [
     { raiz: I.hombroI, med: I.codoI, ext: I.manoI, brazo: true },
     { raiz: I.hombroD, med: I.codoD, ext: I.manoD, brazo: true },
@@ -56,15 +57,57 @@
   for (const m of MIEMBROS) { HUESOS.push([m.raiz, m.med, largo(m.raiz, m.med)]); HUESOS.push([m.med, m.ext, largo(m.med, m.ext)]); }
   const MINIMAS = [[I.hombroI, I.manoI, 22], [I.hombroD, I.manoD, 22], [I.caderaI, I.pieI, 30], [I.caderaD, I.pieD, 30]];
   const LARGO_M = MIEMBROS.map(m => largo(m.raiz, m.med) + largo(m.med, m.ext));
+  // Tono muscular: un miembro que nadie sostiene vuelve suave a su largo de pie (las piernas sostienen la pelvis)
+  // y, si algo apoya, el torso se equilibra sobre la pelvis. Sin esto el muñeco se derrumba en cuclillas.
+  // Como en el original: aparece en pose T y en reposo los brazos bajan a BRAZO_REPOSO bajo la horizontal.
+  // POSE (brazos pegados al cuerpo) queda para los retratos.
+  const BRAZO_REPOSO = 40 * Math.PI / 180;
+  function brazosA(ang) {
+    const pose = POSE.map(v => v.slice());
+    MIEMBROS.forEach((m, k) => {
+      if (!m.brazo) return;
+      const lado = Math.sign(POSE[m.raiz][0]), [hx, hy] = POSE[m.raiz], cx = lado * Math.cos(ang), cy = Math.sin(ang);
+      pose[m.med] = [hx + cx * largo(m.raiz, m.med), hy + cy * largo(m.raiz, m.med)];
+      pose[m.ext] = [hx + cx * LARGO_M[k], hy + cy * LARGO_M[k]];
+    });
+    return pose;
+  }
+  const POSE_T = brazosA(0), POSE_REPOSO = brazosA(BRAZO_REPOSO);
+  // Pose de codo/rodilla y extremo respecto de la raíz, en el marco del torso (r a lo ancho, u hacia la cabeza).
+  const RESTO_M = MIEMBROS.map(m => [m.med, m.ext].map(i => [POSE_REPOSO[i][0] - POSE_REPOSO[m.raiz][0], POSE_REPOSO[m.raiz][1] - POSE_REPOSO[i][1]]));
+  const TONO_PIERNA = .1, TONO_BRAZO = .008, TONO_TORSO = .04, TONO_AMORT = .7, TONO_MAX = .15;
+  // Agarre: el extremo sostenido tiene que tocar este tiempo seguido, y si ya tocaba al apretar, despegarse antes.
+  const AGARRE_T = .12, ARMA_SEPARA = 12;
+  // Pierna que nadie sostiene: no se dobla por debajo de esta fracción de su largo de pie (no se arrodilla al caer).
+  // Recién soltada y doblada no se abre de golpe (patearía el suelo): queda firme cuando el tono ya la estiró.
+  const PIERNA_FIRME = .92;
+  // Miembro sostenido suelto: cuánto se acerca la punta a su objetivo en cada iteración del solver, con tope por iteración.
+  const GUIA = .3, GUIA_MAX = .3;
+  /* Alcanzar: con otro miembro agarrado, el suelto puede apuntar ALCANCE más allá de su largo. Entonces su punta es
+     un ancla que avanza ALC_VEL por paso hacia el objetivo y los huesos arrastran el cuerpo detrás (girando sobre el
+     agarre, con las piernas colgando). Si el cuerpo ya no da más, la punta vuelve a donde llega el brazo. */
+  // Empujar con lo agarrado: tope por paso, y qué parte se vuelve velocidad (con mucha, al soltar salía disparado).
+  const EMPUJE_VEL = 2.5, EMPUJE_INERCIA = .1;
+  /* Impulso (acción y reacción): mover rápido un miembro sostenido suelto empuja el cuerpo hacia donde va el ratón,
+     pero solo si el cuerpo toca algo contra lo que empujar y no está agarrado (colgado manda el alcance). Solo
+     cuenta lo brusco: lo movido por paso por encima de IMPULSO_UMBRAL; IMPULSO_K de eso se vuelve velocidad. Topes
+     de velocidad del centro distintos: de lado generoso (el cuerpo va hacia donde tiras) y hacia arriba chico
+     (se despega del suelo pero no rebota ni salta). */
+  const IMPULSO_K = .15, IMPULSO_VEL_X = 1, IMPULSO_VEL_Y = 1.2, IMPULSO_UMBRAL = 3.5;
+  const TORSO_ARRIBA = [I.cuello, I.cabeza, I.pecho], TORSO_ABAJO = [I.pelvis, I.caderaI, I.caderaD];
+  const ALCANCE = 120, ALC_VEL = 2, ALC_HOLGURA = 4;
+  // Red de seguridad: ninguna partícula pasa de esta velocidad (unidades por paso; 10 ≈ 12 m/s).
+  const VEL_MAX = 10;
   // Puntos de colisión a mitad de hueso, además de las partículas.
   const MUESTRAS = [[I.cabeza, I.cuello, 8], [I.pecho, I.pelvis, 15], [I.pecho, I.cuello, 12], ...HUESOS.map(h => [h[0], h[1], (RADIO[h[0]] + RADIO[h[1]]) / 2])];
 
   /* ---------- el cuerpo ---------- */
   function crea(x0, aspecto) {
     const p = new Float64Array(N * 2), q = new Float64Array(N * 2);
-    for (let i = 0; i < N; i++) { p[i * 2] = q[i * 2] = x0 + POSE[i][0]; p[i * 2 + 1] = q[i * 2 + 1] = POSE[i][1] - 1; }
+    for (let i = 0; i < N; i++) { p[i * 2] = q[i * 2] = x0 + POSE_T[i][0]; p[i * 2 + 1] = q[i * 2 + 1] = POSE_T[i][1] - 1; }
     const c = { p, q, pin: [null, null, null, null], held: [false, false, false, false], vec: [], contacto: new Array(N).fill(null),
-      bulto: { x: 0, y: 0, vx: 0, vy: 0 }, vp: [0, 0], ap: [0, 0], aspecto: aspecto || null, t: 0 };
+      bulto: { x: 0, y: largoBulto(aspecto), ang: 0, w: 0 }, vp: [0, 0], ap: [0, 0], aspecto: aspecto || null, t: 0,
+      armado: [true, true, true, true], roce: [0, 0, 0, 0], firme: [true, true, true, true], impulso: [0, 0] };
     c.vec = MIEMBROS.map(m => [p[m.ext * 2] - p[m.raiz * 2], p[m.ext * 2 + 1] - p[m.raiz * 2 + 1]]);
     return c;
   }
@@ -126,42 +169,137 @@
     const s = wa + wb; if (!s) return; wa /= s; wb /= s;
     P[a * 2] += dx * e * wa; P[a * 2 + 1] += dy * e * wa; P[b * 2] -= dx * e * wb; P[b * 2 + 1] -= dy * e * wb;
   }
+  /* Resorte hacia la pose: mueve rodilla/codo y extremo hacia su sitio y la raíz al revés, según las masas.
+     Solo con el cuerpo erguido (acostado queda flojo) y con el objetivo fuera de toda superficie: un objetivo
+     dentro del suelo empuja contra él en cada paso y lanza el cuerpo por los aires. */
+  function tono(c, f, W) {
+    const P = c.p, mc = marco(c), erguido = Math.max(0, -mc.u[1]) ** 2;
+    // Solo de pie: colgado las piernas cuelgan, y sentado empujaba las piernas contra el suelo y avanzaba como oruga.
+    if (erguido < .05 || !dePie(c)) return;
+    MIEMBROS.forEach((m, k) => {
+      if (c.held[k]) return;
+      const kt = (m.brazo ? TONO_BRAZO : TONO_PIERNA) * erguido, a = m.raiz;
+      [m.med, m.ext].forEach((b, j) => {
+        const rv = RESTO_M[k][j];
+        const obj = empuja(W, P[a * 2] + rv[0] * mc.r[0] + rv[1] * mc.u[0], P[a * 2 + 1] + rv[0] * mc.r[1] + rv[1] * mc.u[1], RADIO[b]);
+        let dx = obj[0] - P[b * 2], dy = obj[1] - P[b * 2 + 1];
+        // Tope: agachado lejos de la pose, el tono levanta en medio segundo en vez de dar un salto.
+        const dd = Math.hypot(dx, dy) * kt; if (dd > TONO_MAX) { dx *= TONO_MAX / dd; dy *= TONO_MAX / dd; }
+        let wa = f[a] ? 0 : 1 / MASA[a], wb = f[b] ? 0 : 1 / MASA[b];
+        const sw = wa + wb; if (!sw) return; wa /= sw; wb /= sw;
+        // P y Q a la vez: recoloca sin dar velocidad. Como resorte puro rebotaba al aterrizar (pogo).
+        const bx = dx * kt * wb, by = dy * kt * wb, ax = dx * kt * wa, ay = dy * kt * wa, Q = c.q;
+        P[b * 2] += bx; P[b * 2 + 1] += by; Q[b * 2] += bx * TONO_AMORT; Q[b * 2 + 1] += by * TONO_AMORT;
+        P[a * 2] -= ax; P[a * 2 + 1] -= ay; Q[a * 2] -= ax * TONO_AMORT; Q[a * 2 + 1] -= ay * TONO_AMORT;
+      });
+    });
+  }
+  /* La punta del miembro sostenido suelto va hacia raíz + vec dentro del solver, así los huesos no la devuelven al cuerpo.
+     Con apoyo solo se mueve la punta (la reacción la pone el suelo; dársela a la raíz la clavaba contra él y salía
+     disparado). En el aire, la reacción se reparte en todo el cuerpo: si no, agitar los miembros hace de hélice.
+     El objetivo se saca de toda superficie: empujar contra el suelo no debe bombear energía cada paso. */
+  function guia(c, f, W) {
+    const P = c.p;
+    let rx = 0, ry = 0;
+    MIEMBROS.forEach((m, k) => {
+      if (!c.held[k] || c.pin[k] || f[m.ext]) return;
+      const v = c.vec[k], a = m.raiz, b = m.ext;
+      const obj = empuja(W, P[a * 2] + v[0], P[a * 2 + 1] + v[1], RADIO[b]);
+      let dx = (obj[0] - P[b * 2]) * GUIA, dy = (obj[1] - P[b * 2 + 1]) * GUIA;
+      const d = Math.hypot(dx, dy); if (d > GUIA_MAX) { dx *= GUIA_MAX / d; dy *= GUIA_MAX / d; }
+      P[b * 2] += dx; P[b * 2 + 1] += dy;
+      rx += dx * MASA[b]; ry += dy * MASA[b];
+    });
+    // La reacción siempre al cuerpo entero: con un pie apoyado, sostener brazo y pierna también lo empujaba de lado.
+    if (rx || ry) { for (let i = 0; i < N; i++) if (!f[i]) { P[i * 2] -= rx / MASA_TOTAL; P[i * 2 + 1] -= ry / MASA_TOTAL; } }
+  }
+  // De pie de verdad: algún pie apoyado y nada del tronco ni las rodillas en el suelo (sentado o tirado no cuenta).
+  function dePie(c) {
+    if (!(c.contacto[I.pieI] || c.contacto[I.pieD])) return false;
+    for (const i of [I.pelvis, I.pecho, I.cabeza, I.rodillaI, I.rodillaD, I.caderaI, I.caderaD]) if (c.contacto[i]) return false;
+    return true;
+  }
+  function impulsa(c, f) {
+    const im = c.impulso, P = c.p, Q = c.q;
+    const apoyo = !c.pin.some(Boolean) && c.contacto.some(Boolean), l = Math.hypot(im[0], im[1]);
+    if (apoyo && l > IMPULSO_UMBRAL) {
+      const dv = (l - IMPULSO_UMBRAL) * IMPULSO_K;
+      let ax = im[0] / l * dv, ay = im[1] / l * dv, vx = 0, vy = 0, m = 0;
+      for (let i = 0; i < N; i++) if (!f[i]) { vx += (P[i * 2] - Q[i * 2]) * MASA[i]; vy += (P[i * 2 + 1] - Q[i * 2 + 1]) * MASA[i]; m += MASA[i]; }
+      vx /= m || 1; vy /= m || 1;
+      if (ax > 0) ax = Math.min(ax, Math.max(0, IMPULSO_VEL_X - vx)); else ax = Math.max(ax, Math.min(0, -IMPULSO_VEL_X - vx));
+      ay = ay < 0 ? Math.max(ay, Math.min(0, -IMPULSO_VEL_Y - vy)) : 0;
+      if (ax || ay) for (let i = 0; i < N; i++) if (!f[i]) { Q[i * 2] -= ax; Q[i * 2 + 1] -= ay; }
+    }
+    im[0] = im[1] = 0;
+  }
   function fijado(c) { const f = new Array(N).fill(false); MIEMBROS.forEach((m, k) => { if (c.pin[k]) f[m.ext] = true; }); return f; }
 
   /* ---------- un paso ---------- */
   function paso(c, W) {
     const P = c.p, Q = c.q, f = fijado(c);
+    const alcanza = MIEMBROS.map((m, k) => c.held[k] && !c.pin[k] && c.pin.some(Boolean) && Math.hypot(c.vec[k][0], c.vec[k][1]) > LARGO_M[k] * .97 + 1);
+    MIEMBROS.forEach((m, k) => { if (alcanza[k]) f[m.ext] = true; });
     const pv0 = [P[I.pelvis * 2] - Q[I.pelvis * 2], P[I.pelvis * 2 + 1] - Q[I.pelvis * 2 + 1]];
     // Verlet
     for (let i = 0; i < N; i++) {
       if (f[i]) continue;
       const x = P[i * 2], y = P[i * 2 + 1];
-      P[i * 2] += (x - Q[i * 2]) * AMORT; P[i * 2 + 1] += (y - Q[i * 2 + 1]) * AMORT + G * DT * DT;
+      let vx = (x - Q[i * 2]) * AMORT, vy = (y - Q[i * 2 + 1]) * AMORT;
+      const vv = Math.hypot(vx, vy); if (vv > VEL_MAX) { vx *= VEL_MAX / vv; vy *= VEL_MAX / vv; }
+      P[i * 2] += vx; P[i * 2 + 1] += vy + G * DT * DT;
       Q[i * 2] = x; Q[i * 2 + 1] = y;
     }
+    impulsa(c, f);
     // Conducir los miembros sostenidos.
     MIEMBROS.forEach((m, k) => {
       if (!c.held[k]) return;
       const v = c.vec[k];
       if (!c.pin[k]) {
-        const tx = P[m.raiz * 2] + v[0], ty = P[m.raiz * 2 + 1] + v[1];
-        let dx = tx - P[m.ext * 2], dy = ty - P[m.ext * 2 + 1]; const d = Math.hypot(dx, dy);
-        if (d > 3) { dx *= 3 / d; dy *= 3 / d; }
-        P[m.ext * 2] += dx; P[m.ext * 2 + 1] += dy;
+        if (!c.pin.some(Boolean)) { recorta(v, LARGO_M[k] * .97); return; }
+        if (!alcanza[k]) return;
+        const obj = empuja(W, P[m.raiz * 2] + v[0], P[m.raiz * 2 + 1] + v[1], RADIO[m.ext]);
+        const gx = obj[0] - P[m.ext * 2], gy = obj[1] - P[m.ext * 2 + 1], g = Math.hypot(gx, gy);
+        if (g > ALC_HOLGURA) { const a = Math.min(g, ALC_VEL) / g; P[m.ext * 2] += gx * a; P[m.ext * 2 + 1] += gy * a; }
+        Q[m.ext * 2] = P[m.ext * 2]; Q[m.ext * 2 + 1] = P[m.ext * 2 + 1];
       } else {
         const pin = c.pin[k];
         let dx = (pin[0] - v[0]) - P[m.raiz * 2], dy = (pin[1] - v[1]) - P[m.raiz * 2 + 1];
-        dx *= .35; dy *= .35; const d = Math.hypot(dx, dy); if (d > 1.5) { dx *= 1.5 / d; dy *= 1.5 / d; }
-        for (let i = 0; i < N; i++) if (!f[i]) { P[i * 2] += dx; P[i * 2 + 1] += dy; Q[i * 2] += dx * .2; Q[i * 2 + 1] += dy * .2; }
-        // El vector se reacomoda a lo que el cuerpo logró de verdad.
-        const rx = pin[0] - P[m.raiz * 2], ry = pin[1] - P[m.raiz * 2 + 1];
-        v[0] += (rx - v[0]) * .02; v[1] += (ry - v[1]) * .02;
+        dx *= .35; dy *= .35; const d = Math.hypot(dx, dy); if (d > EMPUJE_VEL) { dx *= EMPUJE_VEL / d; dy *= EMPUJE_VEL / d; }
+        // Casi sin velocidad: si el objetivo queda dentro del suelo, empujar cada paso no debe acumular energía.
+        for (let i = 0; i < N; i++) if (!f[i]) { P[i * 2] += dx; P[i * 2 + 1] += dy; Q[i * 2] += dx * (1 - EMPUJE_INERCIA); Q[i * 2 + 1] += dy * (1 - EMPUJE_INERCIA); }
+        // El vector se reacomoda a lo que el cuerpo logró de verdad; deprisa si va muy por delante.
+        const rx = pin[0] - P[m.raiz * 2], ry = pin[1] - P[m.raiz * 2 + 1], atraso = Math.hypot(rx - v[0], ry - v[1]);
+        const sigue = atraso > 25 ? .15 : .02;
+        v[0] += (rx - v[0]) * sigue; v[1] += (ry - v[1]) * sigue;
       }
     });
+    /* Equilibrio: de pie y con los pies apoyados, la parte de arriba se va sobre la pelvis y la de abajo al revés,
+       con el impulso total en cero. Acostado no actúa: antes empujaba siempre hacia el mismo lado y se deslizaba solo. */
+    const mcE = marco(c);
+    if (-mcE.u[1] > .5 && dePie(c)) {
+      const ex = (P[I.pelvis * 2] - P[I.cuello * 2]) * TONO_TORSO;
+      let mArriba = 0, mAbajo = 0;
+      for (const i of TORSO_ARRIBA) if (!f[i]) mArriba += MASA[i];
+      for (const i of TORSO_ABAJO) if (!f[i]) mAbajo += MASA[i];
+      if (mArriba && mAbajo) {
+        for (const i of TORSO_ARRIBA) if (!f[i]) P[i * 2] += ex;
+        for (const i of TORSO_ABAJO) if (!f[i]) P[i * 2] -= ex * mArriba / mAbajo;
+      }
+    }
     // Restricciones y choques.
     for (let it = 0; it < ITER; it++) {
+      tono(c, f, W);
+      guia(c, f, W);
       for (const r of RIGIDAS) distancia(c, r[0], r[1], r[2], r[3], f[r[0]], f[r[1]]);
       for (const h of HUESOS) distancia(c, h[0], h[1], h[2], 1, f[h[0]], f[h[1]]);
+      MIEMBROS.forEach((m, k) => {
+        if (m.brazo || c.held[k]) return;
+        const a = m.raiz, b = m.ext, min = Math.hypot(RESTO_M[k][1][0], RESTO_M[k][1][1]) * PIERNA_FIRME;
+        const d = Math.hypot(P[b * 2] - P[a * 2], P[b * 2 + 1] - P[a * 2 + 1]);
+        if (d >= min) c.firme[k] = true;
+        else if (c.firme[k]) distancia(c, a, b, min, .5, f[a], f[b]);
+      });
       for (const mn of MINIMAS) {
         const a = mn[0], b = mn[1], d = Math.hypot(P[b * 2] - P[a * 2], P[b * 2 + 1] - P[a * 2 + 1]);
         if (d < mn[2]) distancia(c, a, b, mn[2], 1, f[a], f[b]);
@@ -169,6 +307,12 @@
       MIEMBROS.forEach((m, k) => { if (c.pin[k]) { P[m.ext * 2] = c.pin[k][0]; P[m.ext * 2 + 1] = c.pin[k][1]; } });
       if (it >= ITER - 3) choques(c, W, f);
     }
+    // El ancla que alcanza no puede dejar el brazo más largo de lo que es: si el cuerpo no la siguió, vuelve.
+    MIEMBROS.forEach((m, k) => {
+      if (!alcanza[k]) return;
+      const dx = P[m.ext * 2] - P[m.raiz * 2], dy = P[m.ext * 2 + 1] - P[m.raiz * 2 + 1], d = Math.hypot(dx, dy) || 1e-6, L = LARGO_M[k];
+      if (d > L + 1) { P[m.ext * 2] = Q[m.ext * 2] = P[m.raiz * 2] + dx / d * L; P[m.ext * 2 + 1] = Q[m.ext * 2 + 1] = P[m.raiz * 2 + 1] + dy / d * L; }
+    });
     // Rozamiento en lo que toca.
     for (let i = 0; i < N; i++) {
       const n = c.contacto[i]; if (!n || f[i]) continue;
@@ -182,10 +326,17 @@
     const ax = (pv[0] - pv0[0]) / (DT * DT), ay = (pv[1] - pv0[1]) / (DT * DT);
     c.ap[0] += (ax - c.ap[0]) * .3; c.ap[1] += (ay - c.ap[1]) * .3;
     bulto(c, DT);
-    // Agarre automático: el extremo sostenido que toca algo se queda.
+    // Agarre automático: el extremo sostenido que toca algo un rato se queda.
     MIEMBROS.forEach((m, k) => {
       if (!c.held[k] || c.pin[k]) return;
-      if (toca(W, P[m.ext * 2], P[m.ext * 2 + 1], RADIO[m.ext] + 2.5)) {
+      if (!toca(W, P[m.ext * 2], P[m.ext * 2 + 1], RADIO[m.ext] + 2.5)) {
+        // Rearmar pide despegarse de verdad: un temblor de unas unidades no cuenta.
+        if (!toca(W, P[m.ext * 2], P[m.ext * 2 + 1], RADIO[m.ext] + ARMA_SEPARA)) c.armado[k] = true;
+        c.roce[k] = 0; return;
+      }
+      if (!c.armado[k]) return;
+      c.roce[k] += DT;
+      if (c.roce[k] >= AGARRE_T - 1e-9) {
         c.pin[k] = [P[m.ext * 2], P[m.ext * 2 + 1]];
         c.vec[k] = [c.pin[k][0] - P[m.raiz * 2], c.pin[k][1] - P[m.raiz * 2 + 1]];
         if (c.alAgarrar) c.alAgarrar(k);
@@ -212,8 +363,9 @@
     }
   }
 
-  /* El bulto: muelle en el marco de la pelvis. */
-  const BK = 900, BC = 9, BS = 1.5, BMAX = 5;
+  /* El bulto: péndulo colgado de la entrepierna, en el marco de la pelvis. BULTO_L es su largo físico (fija el
+     ritmo del vaivén para el tamaño «grande»; los demás escalan con su largo), y BULTO_MAX lo lejos que gira. */
+  const BULTO_L = 14, BULTO_AMORT = 1.6, BULTO_MAX = 2.4;
   function marco(c) {
     const P = c.p, ux = P[I.cuello * 2] - P[I.pelvis * 2], uy = P[I.cuello * 2 + 1] - P[I.pelvis * 2 + 1], l = Math.hypot(ux, uy) || 1;
     return { u: [ux / l, uy / l], r: [-uy / l, ux / l] };
@@ -223,31 +375,36 @@
     const fx = -c.ap[0], fy = G - c.ap[1];
     // Local: x a lo ancho (r), y hacia los pies (−u).
     const lx = fx * M.r[0] + fy * M.r[1], ly = -(fx * M.u[0] + fy * M.u[1]);
-    // Equilibrio de pie: BS·G/BK ≈ 1.6 hacia la entrepierna.
-    const axl = -BK * b.x - BC * b.vx + BS * lx, ayl = -BK * b.y - BC * b.vy + BS * ly;
-    b.vx += axl * dt; b.vy += ayl * dt;
-    b.x += b.vx * dt; b.y += b.vy * dt;
-    const d = Math.hypot(b.x, b.y);
-    if (d > BMAX) { b.x *= BMAX / d; b.y *= BMAX / d; const vn = (b.vx * b.x + b.vy * b.y) / (BMAX * BMAX); if (vn > 0) { b.vx -= vn * b.x * 1.5; b.vy -= vn * b.y * 1.5; } }
+    // Péndulo: θ = 0 cuelga hacia los pies; se acelera según la componente tangente de la gravedad sentida.
+    const s = Math.sin(b.ang), co = Math.cos(b.ang), largo = largoBulto(c.aspecto);
+    b.w += ((lx * co - ly * s) / (BULTO_L * Math.max(largo, 6) / 12) - BULTO_AMORT * b.w) * dt;
+    b.ang += b.w * dt;
+    if (b.ang > BULTO_MAX) { b.ang = BULTO_MAX; if (b.w > 0) b.w *= -.3; }
+    if (b.ang < -BULTO_MAX) { b.ang = -BULTO_MAX; if (b.w < 0) b.w *= -.3; }
+    b.x = largo * Math.sin(b.ang); b.y = largo * Math.cos(b.ang);
   }
 
+
   /* ---------- entrada ---------- */
+  function recorta(v, max) { const d = Math.hypot(v[0], v[1]); if (d > max) { v[0] *= max / d; v[1] *= max / d; } }
   function mueve(c, k, dx, dy) {
     const m = MIEMBROS[k], L = LARGO_M[k], v = c.vec[k];
     v[0] += dx; v[1] += dy;
-    const min = L * (m.brazo ? .3 : .35), max = L * .97, d = Math.hypot(v[0], v[1]) || 1e-6;
+    const otroAgarra = !c.pin[k] && c.pin.some((p, j) => p && j !== k);
+    const min = L * (m.brazo ? .3 : .35), max = L * .97 + (otroAgarra ? ALCANCE : 0), d = Math.hypot(v[0], v[1]) || 1e-6;
     if (d > max) { v[0] *= max / d; v[1] *= max / d; } else if (d < min) { v[0] *= min / d; v[1] *= min / d; }
   }
   // Delta del ratón o del stick: a los sostenidos sueltos; si todos los sostenidos agarran, a esos (trepar).
   function empujaMiembros(c, dx, dy) {
     const sueltos = [0, 1, 2, 3].filter(k => c.held[k] && !c.pin[k]);
     const destino = sueltos.length ? sueltos : [0, 1, 2, 3].filter(k => c.held[k]);
+    if (sueltos.length) { c.impulso[0] += dx; c.impulso[1] += dy; }
     // Un miembro agarrado empuja al revés: tirar hacia abajo sube el cuerpo.
     for (const k of destino) mueve(c, k, dx, dy);
     return destino.length;
   }
   function sostiene(c, k, on) {
-    c.held[k] = !!on;
+    c.held[k] = !!on; c.armado[k] = false; c.roce[k] = 0; c.firme[k] = false;
     if (!on) c.pin[k] = null;
     else { const m = MIEMBROS[k]; c.vec[k] = [px(c, m.ext) - px(c, m.raiz), py(c, m.ext) - py(c, m.raiz)]; }
   }
@@ -283,40 +440,100 @@
     colorPelo: ['#2b1d14', '#5a3a22', '#9a6a3a', '#d8b067', '#c9c2b8', '#b0451f', '#2a2a2a', '#3f6fd8'],
     barba: ['ninguna', 'bigote', 'perilla', 'barba', 'leñador', 'patillas'],
     calzon: ['slip', 'boxer', 'bañador', 'corazones'],
-    colorCalzon: ['#f4f2ec', '#e2483d', '#3a6fd8', '#2a2a2a', '#f2c230', '#43a35a', '#ff8fc1', '#7a4fd0'],
+    colorCalzon: ['#f4f2ec', '#e2483d', '#3a6fd8', '#2a2a2a', '#f2c230', '#43a35a', '#ff8fc1', '#7a4fd0', 'chilena'],
     calcetines: ['ninguno', 'cortos', 'rayas', 'altos'],
     colorCalcetin: ['#ffffff', '#2a2a2a', '#e2483d', '#3a6fd8', '#f2c230'],
-    sombrero: ['ninguno', 'gorra', 'vaquero', 'corona', 'vikingo', 'lana'],
+    sombrero: ['ninguno', 'gorra', 'vaquero', 'corona', 'vikingo', 'lana', 'chupalla', 'paja'],
     colorSombrero: ['#e2483d', '#3a6fd8', '#2a2a2a', '#8b5a2b', '#43a35a', '#f2c230'],
-    fisico: ['normal', 'flaco', 'panzon', 'fornido']
+    fisico: ['normal', 'flaco', 'panzon', 'fornido'],
+    tamano: ['chico', 'promedio', 'grande', 'anaconda']
   };
+  // Largo del bulto (unidades del dibujo del torso) para cada tamaño; 0 es un circulito sin péndulo.
+  const LARGO_BULTO = { chico: 0, promedio: 6, grande: 12, anaconda: 70 };
+  // Lo que falta en un aspecto guardado antes de que existiera el campo (el bulto de siempre es «grande»).
+  const DEFECTO = { tamano: 2 };
+  // Ya no se eligen: siempre slip, sin calcetines y el sombrero con su color propio. Se guardan fijos.
+  const FIJOS = { calzon: 0, calcetines: 0, colorCalcetin: 0, colorSombrero: 0 };
+  function largoBulto(aspecto) { return LARGO_BULTO[CATALOGO.tamano[aspecto && Number.isInteger(aspecto.tamano) ? aspecto.tamano : DEFECTO.tamano]] ?? 12; }
   const PRESETS = [
-    { nombre: 'Don Tulón', piel: 0, pelo: 1, colorPelo: 1, barba: 1, calzon: 0, colorCalzon: 0, calcetines: 0, colorCalcetin: 0, sombrero: 0, colorSombrero: 0, fisico: 0 },
-    { nombre: 'El Leñador', piel: 1, pelo: 2, colorPelo: 5, barba: 4, calzon: 1, colorCalzon: 1, calcetines: 3, colorCalcetin: 2, sombrero: 5, colorSombrero: 0, fisico: 3 },
-    { nombre: 'Vikingo', piel: 0, pelo: 4, colorPelo: 3, barba: 3, calzon: 0, colorCalzon: 3, calcetines: 0, colorCalcetin: 0, sombrero: 4, colorSombrero: 2, fisico: 3 },
-    { nombre: 'Surfista', piel: 2, pelo: 4, colorPelo: 3, barba: 0, calzon: 2, colorCalzon: 2, calcetines: 0, colorCalcetin: 0, sombrero: 0, colorSombrero: 0, fisico: 1 },
-    { nombre: 'Rey Tulón', piel: 3, pelo: 1, colorPelo: 0, barba: 2, calzon: 3, colorCalzon: 6, calcetines: 1, colorCalcetin: 0, sombrero: 3, colorSombrero: 5, fisico: 2 },
-    { nombre: 'Vaquero', piel: 4, pelo: 1, colorPelo: 0, barba: 5, calzon: 1, colorCalzon: 3, calcetines: 2, colorCalcetin: 2, sombrero: 2, colorSombrero: 3, fisico: 0 },
-    { nombre: 'Abuelo', piel: 1, pelo: 0, colorPelo: 4, barba: 1, calzon: 0, colorCalzon: 0, calcetines: 3, colorCalcetin: 0, sombrero: 0, colorSombrero: 0, fisico: 2 },
-    { nombre: 'Culturista', piel: 5, pelo: 7, colorPelo: 0, barba: 0, calzon: 0, colorCalzon: 5, calcetines: 1, colorCalcetin: 1, sombrero: 1, colorSombrero: 1, fisico: 3 }
+    { nombre: 'Don Tulón', piel: 0, pelo: 1, colorPelo: 1, barba: 1, calzon: 0, colorCalzon: 0, calcetines: 0, colorCalcetin: 0, sombrero: 0, colorSombrero: 0, fisico: 0, tamano: 2 },
+    { nombre: 'El Leñador', piel: 1, pelo: 2, colorPelo: 5, barba: 4, calzon: 1, colorCalzon: 1, calcetines: 3, colorCalcetin: 2, sombrero: 5, colorSombrero: 0, fisico: 3, tamano: 2 },
+    { nombre: 'Vikingo', piel: 0, pelo: 4, colorPelo: 3, barba: 3, calzon: 0, colorCalzon: 3, calcetines: 0, colorCalcetin: 0, sombrero: 4, colorSombrero: 2, fisico: 3, tamano: 2 },
+    { nombre: 'Surfista', piel: 2, pelo: 4, colorPelo: 3, barba: 0, calzon: 2, colorCalzon: 2, calcetines: 0, colorCalcetin: 0, sombrero: 0, colorSombrero: 0, fisico: 1, tamano: 2 },
+    { nombre: 'Rey Tulón', piel: 3, pelo: 1, colorPelo: 0, barba: 2, calzon: 3, colorCalzon: 6, calcetines: 1, colorCalcetin: 0, sombrero: 3, colorSombrero: 5, fisico: 2, tamano: 2 },
+    { nombre: 'Vaquero', piel: 4, pelo: 1, colorPelo: 0, barba: 5, calzon: 1, colorCalzon: 3, calcetines: 2, colorCalcetin: 2, sombrero: 2, colorSombrero: 3, fisico: 0, tamano: 2 },
+    { nombre: 'Abuelo', piel: 1, pelo: 0, colorPelo: 4, barba: 1, calzon: 0, colorCalzon: 0, calcetines: 3, colorCalcetin: 0, sombrero: 0, colorSombrero: 0, fisico: 2, tamano: 2 },
+    { nombre: 'Culturista', piel: 5, pelo: 7, colorPelo: 0, barba: 0, calzon: 0, colorCalzon: 5, calcetines: 1, colorCalcetin: 1, sombrero: 1, colorSombrero: 1, fisico: 3, tamano: 2 },
+    { nombre: 'El Huaso', piel: 2, pelo: 1, colorPelo: 0, barba: 1, calzon: 0, colorCalzon: 8, calcetines: 3, colorCalcetin: 0, sombrero: 6, colorSombrero: 0, fisico: 2, tamano: 2 },
+    { nombre: 'Pirata', piel: 1, pelo: 2, colorPelo: 6, barba: 0, calzon: 2, colorCalzon: 2, calcetines: 0, colorCalcetin: 0, sombrero: 7, colorSombrero: 0, fisico: 1, tamano: 1 }
   ];
-  const CAMPOS = ['piel', 'pelo', 'colorPelo', 'barba', 'calzon', 'colorCalzon', 'calcetines', 'colorCalcetin', 'sombrero', 'colorSombrero', 'fisico'];
+  const CAMPOS = ['piel', 'pelo', 'colorPelo', 'barba', 'calzon', 'colorCalzon', 'calcetines', 'colorCalcetin', 'sombrero', 'colorSombrero', 'fisico', 'tamano'];
   function limpia(a) {
     const o = { nombre: String((a && a.nombre) || 'Tulón').replace(/[<>]/g, '').slice(0, 16) || 'Tulón' };
     for (const k of CAMPOS) {
       const lista = CATALOGO[k === 'colorCalzon' ? 'colorCalzon' : k], v = a ? a[k] : 0;
-      o[k] = Number.isInteger(v) && v >= 0 && v < lista.length ? v : 0;
+      o[k] = Number.isInteger(v) && v >= 0 && v < lista.length ? v : (DEFECTO[k] ?? 0);
     }
-    return o;
+    return Object.assign(o, FIJOS);
   }
   function aleatorio(rnd, nombre) {
     rnd = rnd || Math.random;
     const o = { nombre: nombre || 'Tulón' };
     for (const k of CAMPOS) o[k] = Math.floor(rnd() * CATALOGO[k].length);
     if (rnd() < .5) o.sombrero = 0;
-    return o;
+    return limpia(o);
   }
 
-  return { G, DT, I, N, POSE, RADIO, MIEMBROS, LARGO_M, CABRA, CATALOGO, PRESETS, CAMPOS,
-    crea, mundo, capsula, paso, mueve, empujaMiembros, sostiene, congela, capsulasDe, altura, alturaMundo, valido, marco, limpia, aleatorio };
+  /* ---------------- teclas ---------------- */
+  // Acciones reasignables: los cuatro miembros (índice de MIEMBROS), congelar y pausa.
+  const ACCIONES = ['0', '1', '2', '3', 'congela', 'pausa'];
+  const TECLAS = { 0: 'KeyA', 1: 'KeyD', 2: 'KeyW', 3: 'KeyS', congela: 'Space', pausa: 'KeyP' };
+  // Fijas: Escape pausa y cancela, las flechas llevan los miembros, Tab mueve el foco.
+  const RESERVADAS = ['Escape', 'Tab', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
+  const teclaValida = c => typeof c === 'string' && /^[A-Za-z][A-Za-z0-9]{0,24}$/.test(c) && RESERVADAS.indexOf(c) < 0;
+  // Lo guardado se acepta acción por acción; una tecla repetida o rara vuelve a la de fábrica.
+  function limpiaTeclas(t) {
+    const o = {}, usadas = new Set();
+    for (const a of ACCIONES) {
+      const c = t && t[a];
+      if (teclaValida(c) && !usadas.has(c)) { o[a] = c; usadas.add(c); }
+    }
+    for (const a of ACCIONES) {
+      if (o[a]) continue;
+      const c = usadas.has(TECLAS[a]) ? ACCIONES.map(x => TECLAS[x]).find(x => !usadas.has(x)) : TECLAS[a];
+      o[a] = c; usadas.add(c);
+    }
+    return o;
+  }
+  // Asignar una tecla ya usada intercambia: la otra acción se queda con la anterior.
+  function asignaTecla(t, accion, code) {
+    const o = limpiaTeclas(t);
+    if (ACCIONES.indexOf(accion) < 0 || !teclaValida(code)) return o;
+    const otra = ACCIONES.find(a => a !== accion && o[a] === code);
+    if (otra) o[otra] = o[accion];
+    o[accion] = code;
+    return o;
+  }
+  const NOMBRE_TECLA = {
+    Space: 'Espacio', Enter: 'Enter', Backspace: '⌫', ShiftLeft: 'Shift izq.', ShiftRight: 'Shift der.',
+    ControlLeft: 'Ctrl izq.', ControlRight: 'Ctrl der.', AltLeft: 'Alt izq.', AltRight: 'Alt der.',
+    MetaLeft: '⌘ izq.', MetaRight: '⌘ der.', CapsLock: 'Bloq Mayús'
+  };
+  // `mapa` es el del teclado real (navigator.keyboard.getLayoutMap), para que Semicolon diga Ñ en un teclado español.
+  function nombreTecla(code, mapa) {
+    if (NOMBRE_TECLA[code]) return NOMBRE_TECLA[code];
+    const real = mapa && mapa.get && mapa.get(code);
+    if (real && real.trim()) return real.toUpperCase();
+    let m = /^Key([A-Z])$/.exec(code); if (m) return m[1];
+    m = /^Digit(\d)$/.exec(code); if (m) return m[1];
+    m = /^Numpad(.+)$/.exec(code); if (m) return 'Num ' + m[1];
+    return code;
+  }
+
+  // Versión visible en el título mientras se ajusta la física (quitar al terminar).
+  const VERSION = 'tulones-17';
+
+  return { VERSION, largoBulto, FIJOS, G, DT, I, N, POSE, POSE_T, RADIO, MIEMBROS, LARGO_M, AGARRE_T, CABRA, CATALOGO, PRESETS, CAMPOS, ACCIONES, TECLAS, RESERVADAS,
+    crea, mundo, capsula, paso, mueve, empujaMiembros, sostiene, congela, capsulasDe, altura, alturaMundo, valido, marco, limpia, aleatorio,
+    teclaValida, limpiaTeclas, asignaTecla, nombreTecla };
 }));

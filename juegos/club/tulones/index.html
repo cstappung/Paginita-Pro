@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="utf-8">
-<script src="../../../i18n.js?v=202610091623"></script>
+<script src="../../../i18n.js?v=202610100021"></script>
 <script src="../../audio/mando.js?v=mando-2"></script>
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Tulones — la torre de amigos</title>
@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="../conexion.css?v=club-2">
   <script src="../../audio/volumen.js?v=vol-1"></script>
   <script src="../conexion.js?v=club-12"></script>
-  <link rel="stylesheet" href="estilo.css?v=tulones-1">
+  <link rel="stylesheet" href="estilo.css?v=tulones-18">
 </head>
 <body>
   <div class="shell">
@@ -24,6 +24,11 @@
         <div class="cab">
           <h1 class="logo" translate="no">TULONES</h1>
           <p class="lema">Trepa sobre tus amigos y haz la torre más alta</p>
+          <button type="button" id="btnNovedades" class="novedades-btn" aria-label="Novedades" title="Novedades">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3.5 3.5v5h5"/><path d="M13 7.5 10.5 12h3.5L11.5 16.5"/>
+            </svg>
+          </button>
         </div>
 
         <div class="scorebar" role="group" aria-label="Marcador">
@@ -32,6 +37,7 @@
           <div class="dato"><small>ALTURA</small><strong id="nAltura" translate="no">0,00 m</strong></div>
           <div class="dato"><small>TORRE</small><strong id="nTorre" translate="no">1,81 m</strong></div>
           <button type="button" id="btnPausa" class="mini" title="Pausa (P)">❚❚</button>
+          <button type="button" id="btnPantalla" class="mini" title="Pantalla completa (F)" aria-label="Pantalla completa">⛶</button>
           <button type="button" id="sound-button" aria-pressed="true" aria-label="Desactivar efectos" title="Efectos">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
               <path d="M11 5 6 9H3v6h3l5 4z" fill="currentColor"/>
@@ -41,19 +47,19 @@
           </button>
         </div>
 
-        <div id="escenario" class="escenario" tabindex="0" role="application" aria-label="El escenario. Mantén A, S, K o L para mover un brazo o una pierna y mueve el ratón para llevarlo.">
+        <div id="escenario" class="escenario" tabindex="0" role="application" aria-label="El escenario. Mantén A, D, W o S para mover un brazo o una pierna y mueve el ratón para llevarlo.">
           <canvas id="lienzo" aria-hidden="true"></canvas>
 
           <!-- Botones táctiles: brazos a la izquierda, piernas a la derecha. -->
           <div id="tactil" class="tactil" hidden>
             <div class="lado izq">
               <button type="button" class="miembro" data-k="0" aria-label="Brazo izquierdo">✋<small>A</small></button>
-              <button type="button" class="miembro" data-k="1" aria-label="Brazo derecho">🤚<small>S</small></button>
+              <button type="button" class="miembro" data-k="1" aria-label="Brazo derecho">🤚<small>D</small></button>
             </div>
             <button type="button" id="btnCongela" class="congela" aria-label="Congelar ya">❄</button>
             <div class="lado der">
-              <button type="button" class="miembro" data-k="2" aria-label="Pierna izquierda">🦵<small>K</small></button>
-              <button type="button" class="miembro" data-k="3" aria-label="Pierna derecha">🦶<small>L</small></button>
+              <button type="button" class="miembro" data-k="2" aria-label="Pierna izquierda">🦵<small>W</small></button>
+              <button type="button" class="miembro" data-k="3" aria-label="Pierna derecha">🦶<small>S</small></button>
             </div>
           </div>
 
@@ -65,10 +71,11 @@
               <div class="jugadores" id="listaJug"></div>
               <div class="fila-btn">
                 <button type="button" id="btnMas" class="mini">＋ Jugador</button>
+                <button type="button" id="btnTeclas" class="mini">⌨ Controles</button>
               </div>
               <div class="opciones">
                 <label>Turno <select id="selTiempo"><option value="30">30 s</option><option value="45" selected>45 s</option><option value="60">60 s</option><option value="90">90 s</option></select></label>
-                <label>Rondas <select id="selRondas"><option value="3">3</option><option value="5" selected>5</option><option value="10">10</option><option value="0">Sin fin</option></select></label>
+                <label>Rondas <select id="selRondas"><option value="3">3</option><option value="5">5</option><option value="10">10</option><option value="0" selected>Sin fin</option></select></label>
               </div>
               <button type="button" id="btnJugar" class="boton">▶ Jugar</button>
               <p class="record">Récord de torre: <b id="nRecord" translate="no">—</b></p>
@@ -79,6 +86,7 @@
             <canvas id="retrato" width="160" height="200" aria-hidden="true"></canvas>
             <p class="tit" id="turnoNombre" translate="no">—</p>
             <p class="frase" id="turnoFrase">Ronda 1</p>
+            <p class="frase aviso" id="turnoAviso" hidden></p>
             <button type="button" id="btnListo" class="boton">¡A trepar!</button>
           </div>
 
@@ -101,7 +109,8 @@
           </div>
         </div>
 
-        <p class="nota" id="nota">Mantén <kbd>A</kbd> <kbd>S</kbd> (brazos) o <kbd>K</kbd> <kbd>L</kbd> (piernas) y mueve el ratón. Lo que toca algo se agarra; con todo agarrado, el ratón hacia abajo te sube. <kbd>Espacio</kbd> congela antes, <kbd>P</kbd> pausa.</p>
+        <p class="nota" id="nota">Mantén <kbd>A</kbd> <kbd>D</kbd> (brazos) o <kbd>W</kbd> <kbd>S</kbd> (piernas) y mueve el ratón. Lo que toca algo se agarra; con todo agarrado, el ratón hacia abajo te sube. <kbd>Espacio</kbd> congela antes, <kbd>P</kbd> pausa.</p>
+        <p class="fila-btn" id="filaTraza" hidden><button type="button" id="btnTraza" class="mini">📋 Copiar traza</button> <button type="button" id="btnTrazaBaja" class="mini">⬇ Descargar traza</button></p>
       </main>
       <aside></aside>
     </div>
@@ -122,13 +131,60 @@
           <div id="edCampos"></div>
         </div>
       </div>
+      <p class="ed-nota">El físico, el tamaño y la ropa son solo de adorno: no cambian cómo se mueve ni cómo trepa tu tulón.</p>
       <div class="fila-btn">
         <button value="ok" class="boton">✓ Listo</button>
       </div>
     </form>
   </dialog>
 
-  <script src="motor.js?v=tulones-1"></script>
-  <script src="juego.js?v=tulones-1"></script>
+  <!-- Novedades: lo nuevo de esta versión y lo que viene. -->
+  <dialog id="novedades" class="editor novedades" aria-labelledby="nvTitulo">
+    <form method="dialog" class="ed-cuerpo">
+      <p class="ed-tit" id="nvTitulo">Novedades</p>
+      <div class="nv-pestanas" role="tablist">
+        <button type="button" role="tab" id="nvTabCambios" aria-selected="true" aria-controls="nvCambios">Versión 0.2</button>
+        <button type="button" role="tab" id="nvTabProx" aria-selected="false" aria-controls="nvProx">Próximamente</button>
+      </div>
+      <div id="nvCambios" role="tabpanel" aria-labelledby="nvTabCambios" class="nv-panel">
+        <p class="nv-version">v0.2</p>
+        <ul>
+          <li>Física nueva: se queda de pie, no sale volando y con un tirón brusco te despegas del suelo.</li>
+          <li>Controles con A, D, W y S, y puedes cambiarlos.</li>
+          <li>Pantalla completa con el marcador a la vista.</li>
+          <li>Reglas: supera la línea roja o quedas eliminado; gana el último en pie.</li>
+          <li>Skins chilenas: chupalla, sombrero de paja, gorro chilote, calzón bandera, guatón, flacuchento y tamaños.</li>
+        </ul>
+        <p class="nv-version">v0.1</p>
+        <ul><li>Primera versión: trepa sobre la cabra y sobre tus amigos congelados.</li></ul>
+      </div>
+      <div id="nvProx" role="tabpanel" aria-labelledby="nvTabProx" class="nv-panel" hidden>
+        <ul>
+          <li>Multijugador en línea.</li>
+          <li>Más mejoras a la física.</li>
+          <li>Monedas, recompensas y logros.</li>
+        </ul>
+      </div>
+      <div class="fila-btn">
+        <button value="ok" class="boton">✓ Entendido</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Los controles: cada acción con su tecla. -->
+  <dialog id="teclas" class="editor teclas" aria-labelledby="tcTitulo">
+    <form method="dialog" class="ed-cuerpo">
+      <p class="ed-tit" id="tcTitulo">Controles</p>
+      <p class="tc-ayuda">Toca una acción y luego pulsa la tecla que quieras. <kbd>Esc</kbd> cancela. Las flechas siempre llevan los miembros.</p>
+      <div id="tcLista" class="tc-lista"></div>
+      <div class="fila-btn">
+        <button type="button" id="tcFabrica" class="mini">↺ Restablecer</button>
+        <button value="ok" class="boton">✓ Listo</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="motor.js?v=tulones-17"></script>
+  <script src="juego.js?v=tulones-17"></script>
 </body>
 </html>

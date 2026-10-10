@@ -16,9 +16,10 @@
 html,body{margin:0}
 html{-webkit-tap-highlight-color:transparent}
 body{background:var(--fondo);color:var(--tinta);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-.shell{max-width:1000px;margin:0 auto;padding:16px}
+.shell{max-width:1240px;margin:0 auto;padding:16px}
 .layout{display:grid;grid-template-columns:minmax(0,1fr) 285px;gap:24px;align-items:start}
 .layout>aside:empty{display:none}
+.layout:has(>aside:empty){grid-template-columns:minmax(0,1fr)}
 @media (max-width:850px){.layout{grid-template-columns:minmax(0,1fr)}}
 .club-integrado body{background:transparent}
 :focus-visible{outline:3px solid var(--acento);outline-offset:2px}
@@ -29,8 +30,8 @@ button,select,input{font:inherit;color:inherit;touch-action:manipulation;-webkit
 .club-volver{color:color-mix(in srgb,var(--tinta) 80%,transparent)}
 
 /* --- El tamaño del juego: apaisado, que quepa a lo alto --- */
-:root{--ancho-juego:min(100%,760px,calc((var(--alto-pantalla) - 230px) * 1.6))}
-.club-integrado{--ancho-juego:min(100%,780px,calc((var(--alto-pantalla) - 250px) * 1.6))}
+:root{--ancho-juego:min(100%,1200px,calc((var(--alto-pantalla) - 190px) * 1.6))}
+.club-integrado{--ancho-juego:min(100%,1200px,calc((var(--alto-pantalla) - 210px) * 1.6))}
 :root{--ancho-juego-min:300px}
 
 /* --- Cabecera --- */
@@ -127,7 +128,7 @@ kbd{font:700 12px/1 ui-monospace,monospace;padding:2px 5px;border-radius:5px;bor
 .ed-nombre{display:grid;gap:2px;font-weight:700;width:100%}
 .ed-nombre input{padding:6px 8px;border-radius:8px;border:2px solid var(--borde);font-weight:700}
 .ed-presets{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
-.ed-presets button{border:2px solid var(--borde);background:#e6f2fa;border-radius:999px;padding:4px 10px;cursor:pointer;font-weight:700;font-size:13px}
+.ed-presets button{border:2px solid var(--borde);background:#e6f2fa;color:var(--tinta);border-radius:999px;padding:4px 10px;cursor:pointer;font-weight:700;font-size:13px}
 .ed-presets button:hover{background:#cfe6f6}
 .ed-campo{display:grid;grid-template-columns:110px minmax(0,1fr);align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #0001}
 .ed-campo>span{font-weight:800;font-size:13px}
@@ -152,3 +153,37 @@ html.club-inm .dato strong{font-size:15px}
 @media (prefers-reduced-motion:reduce){
   .nuevo,.capa,.dato strong.apura{animation:none}
 }
+
+/* --- Los controles --- */
+.teclas{max-width:min(96vw,420px)}
+.tc-ayuda{margin:0;font-size:13px;line-height:1.4}
+.tc-lista{display:grid;gap:6px}
+.tc-fila{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid #0001;font-weight:800;font-size:14px}
+.tc-tecla{min-width:96px;padding:7px 10px;border-radius:9px;border:2px solid var(--borde);background:#e6f2fa;font:700 14px/1 ui-monospace,monospace;cursor:pointer;color:var(--tinta)}
+.tc-tecla:hover{background:#cfe6f6}
+.tc-tecla[aria-pressed="true"]{background:#ffe08a;border-color:#e2483d}
+
+/* --- Pantalla completa: marcador arriba y el escenario todo lo que quepa debajo --- */
+html:fullscreen{--ancho-juego:min(100%,calc((100vh - 96px) * 1.6))}
+html:fullscreen body{background:var(--fondo)}
+html:fullscreen .shell{max-width:none;padding:8px 12px}
+html:fullscreen .cab,html:fullscreen .nota,html:fullscreen .club-volver{display:none}
+html:fullscreen .scorebar{margin-bottom:8px}
+#btnPantalla{font-size:20px;padding:0 10px}
+
+/* --- Reglas: aviso de eliminado, altura que ya supera la línea, eliminados en el podio --- */
+.turno .aviso{color:#e2483d;font-weight:800}
+.dato strong.supera{color:#9dff8a}
+.podio li.fuera{opacity:.55}
+
+/* --- Novedades: botón con la flecha que vuelve y el rayo, y el modal con dos pestañas --- */
+.novedades-btn{display:grid;place-items:center;width:42px;height:42px;padding:0;border:none;border-radius:10px;background:var(--borde);color:#fff;cursor:pointer;box-shadow:0 3px 0 #0003}
+.novedades-btn svg{width:24px;height:24px}
+@media (hover:hover){.novedades-btn:hover{filter:brightness(1.12)}}
+.novedades{max-width:min(96vw,480px)}
+.nv-pestanas{display:flex;gap:6px;border-bottom:2px solid var(--borde)}
+.nv-pestanas button{flex:1;padding:8px 10px;border:2px solid var(--borde);border-bottom:none;border-radius:10px 10px 0 0;background:#e6f2fa;font:400 16px/1 var(--cartel);color:var(--tinta);cursor:pointer}
+.nv-pestanas button[aria-selected="true"]{background:var(--borde);color:#fff}
+.nv-panel ul{margin:4px 0 10px;padding-left:20px;display:grid;gap:4px;font-size:14px;line-height:1.4}
+.nv-version{margin:6px 0 0;font:400 18px/1 var(--cartel);color:#e2483d}
+.ed-nota{margin:0;font-size:13px;line-height:1.4;opacity:.8;text-align:center}
