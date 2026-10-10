@@ -327,6 +327,15 @@ console.log("— Mascotas: adopciones, regalos, compras y estado —");
   await allowed("A adopta la primera gratis", async () => { k1 = await adopta(ua.uid, "chicken", 0); });
   await denied("la segunda gratis, no", () => adopta(ua.uid, "cat", 0));
   await allowed("la segunda cuesta 1000", () => adopta(ua.uid, "cat", 1000));
+  /* La mascota del perfil: una copia ma: y un baile (ob: o inicial). Que sea
+     suya lo re-chequea quien pinta (no la regla: la economía no cabe en ella). */
+  const mc = `ma:${ua.uid}~${k1}`;
+  await allowed("A pone su mascota en el perfil, con un baile inicial", () => set(ref(db, `users/${ua.uid}/perfil/mascota`), { m: mc, b: "start-dance-salsa" }));
+  await allowed("o con un baile de regalo", () => set(ref(db, `users/${ua.uid}/perfil/mascota`), { m: mc, b: `ob:${ua.uid}~-Nregalo0001` }));
+  await denied("una carta no es una mascota del perfil", () => set(ref(db, `users/${ua.uid}/perfil/mascota`), { m: `${ua.uid}~p-Npack0001.0` }));
+  await denied("ni va sin mascota", () => set(ref(db, `users/${ua.uid}/perfil/mascota`), { b: "start-dance-salsa" }));
+  await denied("ni con un baile con HTML", () => set(ref(db, `users/${ua.uid}/perfil/mascota`), { m: mc, b: "<img>" }));
+  await denied("ni con campos inventados", () => set(ref(db, `users/${ua.uid}/perfil/mascota`), { m: mc, x: 1 }));
   await denied("una adopción no se reescribe", () => set(ref(db, `mascotas/a/${ua.uid}/${k1}`), { at: serverTimestamp(), e: "cat", p: 0 }));
   await denied("ni se borra (es gasto)", () => remove(ref(db, `mascotas/a/${ua.uid}/${k1}`)));
   await denied("un regalo a menos de 500, no", () => set(push(ref(db, `mascotas/r/${ua.uid}`)), { at: serverTimestamp(), p: 100 }));

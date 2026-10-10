@@ -7,11 +7,11 @@
    - **Fotos**: un iframe invisible, el fotógrafo, recibe pedidos y devuelve
      una imagen de cada uno. Se guardan en memoria y en sessionStorage, y el
      fotógrafo se cierra solo tras un rato sin pedidos (libera su WebGL).
-   - **En vivo**: una sola instancia a la vez (`montaVisor`): montar otra
-     cierra la anterior. Va a 12 fps, se pausa fuera de pantalla o con la
+   - **En vivo**: un solo iframe a la vez (`montaVisor`): montar otra
+     vista apaga la anterior, y cerrarla se la devuelve. Va a 12 fps, se pausa fuera de pantalla o con la
      pestaña oculta, y se libera al cerrarla. Con movimiento reducido la
      dibuja quieta el propio visor. */
-const RUTA = "juegos/mascotas/visor.html?v=mc-1";
+const RUTA = "juegos/mascotas/visor.html?v=mc-2";
 const CANAL_PADRE = "visor-parent", CANAL_HIJO = "visor-child";
 const ESPERA_CIERRE = 20000;
 
@@ -66,37 +66,64 @@ export function pideFotos(pedidos, cb) {
   if (fotografoListo) mandaA(fotografo, { tipo: "fotos", pedidos: nuevos });
 }
 
-/* ---------- en vivo ---------- */
-let vivo = null;
-export function cierraVisor() { if (vivo) { vivo.cierra(); vivo = null; } }
+/* ---------- en vivo ----------
+   Un solo iframe a la vez, pero varios montajes: la tarjeta abierta sobre
+   la página del perfil tapa a la de la página, y al cerrarla esta vuelve.
+   `montajes` va del más viejo al más nuevo; solo el último tiene iframe. */
+const montajes = [];
+let vivo = null;                  // {frame, m, listo}
 
-export function montaVisor(host, pedido) {
-  cierraVisor();
+function apaga() {
+  if (!vivo) return;
+  vivo.io.disconnect();
+  document.removeEventListener("visibilitychange", vivo.pausa);
+  vivo.frame.remove();
+  vivo = null;
+}
+function enciende() {
+  while (montajes.length && !montajes[montajes.length - 1].host.isConnected) montajes.pop();
+  const m = montajes[montajes.length - 1];
+  if (!m || (vivo && vivo.m === m)) return;
+  apaga();
   const frame = document.createElement("iframe");
   frame.className = "jg-visor";
   frame.title = "Vista 3D";
   frame.tabIndex = -1;
   frame.setAttribute("aria-hidden", "true");
   frame.src = RUTA;
-  host.appendChild(frame);
-  let listo = false, visible = true;
-  const pausa = () => { if (listo) mandaA(frame, { tipo: "pausa", on: !visible || document.hidden }); };
-  const io = new IntersectionObserver(es => {
-    for (const x of es) visible = x.isIntersecting;
-    if (!frame.isConnected) { if (vivo && vivo.frame === frame) cierraVisor(); return; }
-    pausa();
+  m.host.appendChild(frame);
+  const v = { frame, m, listo: false, visible: true };
+  v.pausa = () => { if (v.listo) mandaA(frame, { tipo: "pausa", on: !v.visible || document.hidden }); };
+  v.io = new IntersectionObserver(es => {
+    for (const x of es) v.visible = x.isIntersecting;
+    if (!m.host.isConnected) { m.cierra(); return; }
+    v.pausa();
   });
-  io.observe(host);
-  document.addEventListener("visibilitychange", pausa);
-  const yo = {
-    frame,
-    alListo() { listo = true; mandaA(frame, { tipo: "muestra", pedido }); pausa(); host.classList.add("visor-listo"); },
-    cambia(p) { pedido = p; if (listo) mandaA(frame, { tipo: "muestra", pedido }); },
-    cierra() { io.disconnect(); document.removeEventListener("visibilitychange", pausa); frame.remove(); }
-  };
-  vivo = yo;
-  return yo;
+  v.io.observe(m.host);
+  document.addEventListener("visibilitychange", v.pausa);
+  vivo = v;
 }
+
+/* El montaje más nuevo cierra el iframe de los anteriores (sin olvidarlos). */
+export function montaVisor(host, pedido) {
+  const m = {
+    host, pedido,
+    cambia(p) { m.pedido = p; if (vivo && vivo.m === m && vivo.listo) mandaA(vivo.frame, { tipo: "muestra", pedido: p }); },
+    cierra() {
+      const i = montajes.indexOf(m);
+      if (i < 0) return;
+      montajes.splice(i, 1);
+      host.classList.remove("visor-listo");
+      if (vivo && vivo.m === m) { apaga(); enciende(); }
+    }
+  };
+  montajes.push(m);
+  if (vivo) vivo.m.host.classList.remove("visor-listo");
+  enciende();
+  return m;
+}
+/* Cierra el montaje de arriba (el que se ve). */
+export function cierraVisor() { if (montajes.length) montajes[montajes.length - 1].cierra(); }
 
 /* ---------- mensajes ---------- */
 window.addEventListener("message", e => {
@@ -118,5 +145,10 @@ window.addEventListener("message", e => {
     }
     return;
   }
-  if (vivo && e.source === vivo.frame.contentWindow && x.tipo === "listo") vivo.alListo();
+  if (vivo && e.source === vivo.frame.contentWindow && x.tipo === "listo") {
+    vivo.listo = true;
+    mandaA(vivo.frame, { tipo: "muestra", pedido: vivo.m.pedido });
+    vivo.pausa();
+    vivo.m.host.classList.add("visor-listo");
+  }
 });

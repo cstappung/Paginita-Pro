@@ -301,6 +301,13 @@ export function limpiaPerfil(p) {
   if (p.fondo && fondoDe(p.fondo)) out.fondo = p.fondo;
   if (typeof p.bio === "string") out.bio = p.bio.replace(/\s+/g, " ").trim().slice(0, LARGO_BIO);
   if (Array.isArray(p.vitrina)) out.vitrina = [...new Set(p.vitrina.filter(k => /^(l:[a-z0-9]+:[a-z0-9]+|r:[a-z0-9]+|s:club-[a-z0-9-]+)$/.test(k)))].slice(0, MAX_VITRINA);
+  /* La mascota del perfil (de Mascotas): una copia `ma:` y, si quiere, un
+     baile (`ob:` o uno inicial). Si es suya se re-chequea al pintar. */
+  const m = p.mascota;
+  if (m && typeof m.m === "string" && /^ma:[A-Za-z0-9]{6,40}~[-_A-Za-z0-9]{8,24}$/.test(m.m)) {
+    out.mascota = { m: m.m };
+    if (typeof m.b === "string" && /^(ob:[A-Za-z0-9]{6,40}~[-_A-Za-z0-9]{8,24}|start-dance-[a-z]{1,20})$/.test(m.b)) out.mascota.b = m.b;
+  }
   return out;
 }
 

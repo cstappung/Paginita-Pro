@@ -39,13 +39,14 @@ the first three pieces of the vitrina, plus **Ver perfil**, which opens
 `#perfil/<uid>`. The page holds the hero, five totals, the whole vitrina,
 every ranking table with its position, and the logros grouped by game.
 The header's **Perfil** goes to your own page, and **✎ Personalizar** opens
-`abrePerfil`. That editor has four tabs (datos, marco, fondo, vitrina) and a
-live preview of the card.
+`abrePerfil`. That editor has five tabs (datos, marco, fondo, vitrina,
+mascota) and a live preview of the card.
 
 Four decisions:
 
-- **No rules change.** The new fields `marco`, `fondo`, `bio` and `vitrina`
-  live in `users/<uid>/perfil` beside nick, foto and colour. Everything
+- **No rules change** for these four (the pet, below, did need one). The new
+  fields `marco`, `fondo`, `bio` and `vitrina` live in `users/<uid>/perfil`
+  beside nick, foto and colour. Everything
   else is computed from what Logros already reads (`fb.watchLogros`).
   There is one shared listener per session (`datosPerfil`), opened the
   first time someone touches a photo.
@@ -68,8 +69,27 @@ Four decisions:
   `limpiaPerfil` keeps only known ids, a bio of `LARGO_BIO` characters and
   up to `MAX_VITRINA` keys.
 
-`tests/perfil.test.cjs` covers the stats, the requirements, the vitrina
-and the cleaning.
+**The pet of the profile** (`perfil-mascota.js`). `users/<uid>/perfil/mascota`
+= `{m: "ma:…", b?: "ob:…" | "start-dance-<id>"}`; the rule checks only the
+shapes. It shows on the card's banner and in the page's hero, in 3D through
+the Mascotas viewer (`docs/claude/juegos/mercado.md`).
+- **Re-checked where it is seen**, like the frames: `mascotaVisible` hides a
+  pet the account no longer owns or has listed, and drops a dance it no
+  longer has. The stage, the name and what it wears come from its
+  `mascotasEstado`, read by key once per session (the editor re-reads your
+  own). Only adults dance, in a loop.
+- **The live view sits in its own layer** (`capaMascota`), outside the
+  card's `innerHTML`: the card repaints on every data arrival, and an iframe
+  that leaves the document reloads. The page's hero is rebuilt only when
+  its signature changes; then the layer moves to the new hero.
+- **One iframe at a time, in a stack** (`montaVisor`): the card opened over
+  a profile page takes the iframe, and closing it gives it back.
+- The editor offers your pets not on sale and your dances (starters plus
+  gift dances). Without the full economy it offers nothing and saves the
+  pet as it was; `editaPerfil` also keeps it, as it keeps `cartas`.
+
+`tests/perfil.test.cjs` covers the stats, the requirements, the vitrina,
+the cleaning and the pet re-check.
 
 **Champion frames, the shop and animated backgrounds.** Three more kinds of
 frame and background:

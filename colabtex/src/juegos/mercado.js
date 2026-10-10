@@ -19,7 +19,7 @@ import {
   pendientesDe, puedeComprar, puedeProponer, fichaCopia
 } from "./mercado-datos.js";
 import { ESPACIOS, NOMBRE_ESPACIO, ESPECIES, ETAPAS, pedidoObjeto, pedidoMascota, puestoDe } from "./mascotas-datos.js";
-import { fotoDe, pideFotos, montaVisor, cierraVisor } from "./visor-mascota.js";
+import { fotoDe, pideFotos, montaVisor } from "./visor-mascota.js";
 import MM from "../../../juegos/mascotas/motor.js";
 
 const esc = t => String(t == null ? "" : t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -241,7 +241,7 @@ export function crearMercado({ usuario, datos, fb, quien, marcoDe, ir, juego }) 
     const vis = capa.querySelector(".jg-mk-det-vis");
     if (r.tipo !== "carta") {
       const p = pedidoDe(r);
-      if (p) { vis.classList.add("vivo"); const v = document.createElement("div"); v.className = "jg-mk-vivo"; vis.appendChild(v); montaVisor(v, p); }
+      if (p) { vis.classList.add("vivo"); const v = document.createElement("div"); v.className = "jg-mk-vivo"; vis.appendChild(v); detalle.visor = montaVisor(v, p); }
     }
     const b1 = capa.querySelector("[data-det-compra]"), b2 = capa.querySelector("[data-det-retira]");
     if (b1) b1.onclick = () => accion(b1, "comprar", { id: r.id }, r.tipo === "mascota" ? `¡${r.nombre} es tuya! Está en tu corral.` : "¡Comprado!").then(ok => ok && cierra());
@@ -250,7 +250,7 @@ export function crearMercado({ usuario, datos, fb, quien, marcoDe, ir, juego }) 
   }
   function cierraDetalle() {
     if (!detalle) return;
-    cierraVisor();
+    if (detalle.visor) detalle.visor.cierra();
     document.removeEventListener("keydown", detalle.tecla);
     detalle.capa.remove();
     detalle = null;

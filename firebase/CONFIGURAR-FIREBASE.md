@@ -549,7 +549,7 @@ sala de Tulones no se puede crear. El arreglo es el de siempre: pegar
 
 ### ⚠ Mascotas pide publicar otra vez (2026-10-10)
 
-Dos nodos nuevos y un cambio en el mercado:
+Dos nodos nuevos, un cambio en el mercado y un campo nuevo del perfil:
 
 - `mascotas/a`, `mascotas/r` y `mascotas/c`: las adopciones (la primera
   gratis, las demás 1000), los regalos (500) y las compras (comida a 20
@@ -561,6 +561,9 @@ Dos nodos nuevos y un cambio en el mercado:
 - `mercado/o/$id/c` y `mercado/t/$id/dar|pedir`: además de las cartas
   aceptan objetos (`ob:<uid>~<clave>`) y mascotas (`ma:<uid>~<clave>`). Las
   ofertas de cartas de antes siguen valiendo igual.
+- `users/<uid>/perfil/mascota`: la mascota del perfil (`{m, b}`). Sin
+  publicar, guardar el perfil con una mascota elegida da
+  `PERMISSION_DENIED` (el perfil entero, no solo la mascota).
 
 Sin publicar, Mascotas no puede adoptar ni comprar (el juego lo dice en vez
 de fallar mudo) y las ventas de mascotas u objetos dan `PERMISSION_DENIED`.

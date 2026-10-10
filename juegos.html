@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<script src="i18n.js?v=202610100607"></script>
+<script src="i18n.js?v=202610100638"></script>
 <script src="juegos/audio/mando.js?v=mando-2"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Juegos — Laboratorio</title>
@@ -2823,7 +2823,9 @@ html[data-tema=oscuro] .jg-ym-eq.azul.mio{color:#8cc2ff}
 }
 
 /* El editor del perfil */
-.jg-modal.jg-perfil-ed{width:880px}
+/* `max-width:100%` no frena a un hijo de una rejilla `auto`: en el celular el
+   editor medía 880 px y la mitad quedaba fuera de la pantalla. */
+.jg-modal.jg-perfil-ed{width:min(880px,calc(100vw - 36px))}
 .jg-ped{display:grid;grid-template-columns:304px 1fr;gap:20px;margin-top:14px;align-items:start}
 .jg-ped-prev{position:sticky;top:0}
 .jg-ped-prev>small{display:block;margin-bottom:6px;font:600 10.5px inherit;letter-spacing:.6px;text-transform:uppercase;color:#9b97ab}
@@ -2868,6 +2870,10 @@ html[data-tema=oscuro] .jg-ped-op .jg-ped-precio{color:#f4c542}
   .jg-ped{grid-template-columns:1fr}
   .jg-ped-prev{position:static}
   .jg-ped-vit{max-height:none}
+  /* Cinco pestañas no caben a 390 px: se desliza la fila. */
+  .jg-ped-tabs{overflow-x:auto;scrollbar-width:none}
+  .jg-ped-tabs::-webkit-scrollbar{display:none}
+  .jg-ped-tabs button{flex:1 0 auto;padding:7px 12px}
 }
 @media(prefers-reduced-motion:reduce){
   .jg-av::before,.jg-av::after,.jg-av>img,.jg-av>i,.jg-mini{animation:none!important}
@@ -4497,7 +4503,9 @@ html[data-tema=oscuro] .jg-adm-tabs .btn2.on{background:#ab8bff;color:#171522;bo
 .jg-mk-det-vis.vivo .jg-mk-foto{position:absolute;inset:0;margin:auto}
 .jg-mk-det-vis.vivo:has(.visor-listo) .jg-mk-foto{visibility:hidden}
 .jg-mk-vivo{position:absolute;inset:0}
-.jg-visor{display:block;width:100%;height:100%;border:0;background:transparent}
+/* `color-scheme:normal`: con la página en oscuro y el visor en claro, el
+   navegador pinta el iframe opaco (blanco) en vez de transparente. */
+.jg-visor{display:block;width:100%;height:100%;border:0;background:transparent;color-scheme:normal}
 .jg-mk-det-tx{display:flex;flex-direction:column;gap:8px}
 .jg-mk-det-tx h2{margin:0;font-size:22px}
 .jg-mk-det-tx p{margin:0}
@@ -4553,6 +4561,37 @@ html[data-tema=oscuro] .jg-mk-est.act{background:#1f2c4d;color:#9cb8ff}
 html[data-tema=oscuro] .jg-mk-est.ok{background:#173323;color:#7ddc9c}
 html[data-tema=oscuro] .jg-mk-est.mal{background:#3a1a16;color:#ff8a80}
 html[data-tema=oscuro] .jg-mk-p.caro{color:#ff8a80}
+
+/* La mascota del perfil (perfil-mascota.js): una capa en vivo sobre el
+   banner de la tarjeta y sobre el hero del perfil. */
+.jg-masc{position:absolute;z-index:2;pointer-events:none;display:flex;flex-direction:column;align-items:center;gap:2px}
+.jg-masc[hidden]{display:none}
+.jg-masc-vis{position:relative;width:100%;flex:1;min-height:0;background:center/contain no-repeat}
+.jg-masc-vis::before{content:attr(data-emoji);position:absolute;inset:0;display:grid;place-items:center;font-size:34px}
+.jg-masc-vis.visor-listo{background-image:none!important}
+.jg-masc-vis.visor-listo::before{content:none}
+.jg-masc-vis>.jg-visor{position:absolute;inset:0}
+.jg-masc-n{max-width:100%;padding:1px 9px;border-radius:99px;background:#ffffffe6;color:#232137;font-size:10.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 1px 5px #1b123029}
+.jg-masc.en-mini{top:2px;right:40px;width:96px;height:80px}
+.jg-masc.en-mini .jg-masc-n{font-size:9.5px;padding:0 7px}
+.jg-mini-quieta .jg-masc.en-mini{right:10px}
+.jg-masc.en-hero{right:16px;bottom:10px;width:190px;height:214px}
+.jg-pf-hero.con-mascota .jg-pf-hero-in{padding-right:196px}
+.jg-ped-masc{padding-top:10px}
+.jg-ped-masc-f{width:72px;height:72px;display:grid;place-items:center;font-size:36px;background:center/contain no-repeat}
+.jg-ped-bailes{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.jg-ped-baile{padding:6px 12px;border-radius:99px;border:2px solid #ece8f3;background:#fff;font:inherit;font-size:12px;font-weight:600;color:inherit;cursor:pointer}
+.jg-ped-baile:hover:not(:disabled){border-color:#cdbff1}
+.jg-ped-baile.on{border-color:var(--jg-purple,#7042df);box-shadow:0 0 0 3px #7042df22}
+.jg-ped-baile.leg{background:linear-gradient(90deg,#fff6d0,#fff);border-color:#f2d77a}
+.jg-ped-baile:disabled{opacity:.5;cursor:default}
+@media(max-width:760px){
+  .jg-masc.en-hero{top:6px;right:6px;bottom:auto;width:112px;height:128px}
+  .jg-pf-hero.con-mascota .jg-pf-hero-in{padding-right:0}
+}
+html[data-tema=oscuro] .jg-masc-n{background:#1d1b2be6;color:var(--os-tx)}
+html[data-tema=oscuro] .jg-ped-baile{background:var(--os-sup2);border-color:var(--os-borde)}
+html[data-tema=oscuro] .jg-ped-baile.leg{background:linear-gradient(90deg,#3a3014,var(--os-sup2));border-color:#6b5520}
 </style>
 </head>
 <body>
@@ -4596,6 +4635,6 @@ html[data-tema=oscuro] .jg-mk-p.caro{color:#ff8a80}
     <div id="pantalla"></div>
   </main>
 </div>
-<script src="juegos-app.js?v=202610100607"></script>
+<script src="juegos-app.js?v=202610100638"></script>
 </body>
 </html>

@@ -62,10 +62,14 @@ Starter items have no copy key and cannot be listed.
 - Photos are cached in memory and in `sessionStorage`. The iframe closes
   itself after 20 s idle.
 - Until a photo arrives, or without WebGL, the emoji and the ★ show.
-- The **live** view (`montaVisor`) is one instance at a time, at 12 fps.
+- The **live** view (`montaVisor`) is one iframe at a time, at 12 fps.
   It pauses off screen (IntersectionObserver) and in a hidden tab, and it
-  is still under `prefers-reduced-motion`. Mounting another one closes the
-  previous. An offer's detail shows the object spinning or the pet idling.
+  is still under `prefers-reduced-motion`. Mounts form a stack: a newer one
+  takes the iframe, and closing it gives the iframe back to the one below
+  (the profile card over the profile page). Close your own mount with the
+  handle `montaVisor` returns, not with `cierraVisor`.
+- The iframe needs `color-scheme:normal`: with the page dark and the viewer
+  light, Chromium paints the iframe opaque white. An offer's detail shows the object spinning or the pet idling.
   A dance offer shows a generic hen dancing it.
 
 Tests: `tests/mercado.test.cjs` (rows, filters, cap, trades of the three

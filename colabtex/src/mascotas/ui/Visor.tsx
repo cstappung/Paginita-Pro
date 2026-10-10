@@ -37,6 +37,8 @@ interface Pedido {
   key: string
   item?: Pick<Item, 'kind' | 'id' | 'tint'>
   mascota?: PedidoMascota
+  /** Encuadre cercano (la mascota del perfil). */
+  cerca?: boolean
 }
 
 const manda = (x: Record<string, unknown>) => window.parent !== window && window.parent.postMessage({ canal: CANAL_HIJO, ...x }, location.origin)
@@ -85,9 +87,16 @@ function Pacer({ pausa }: { pausa: boolean }) {
   return null
 }
 
-function Mira({ y }: { y: number }) {
+// `cerca`: el perfil quiere la mascota grande en una caja chica (el detalle del mercado deja aire para el baile).
+function Mira({ y, cerca }: { y: number; cerca: boolean }) {
   const camera = useThree((s) => s.camera)
-  useEffect(() => camera.lookAt(0, y, 0), [camera, y])
+  const invalidate = useThree((s) => s.invalidate)
+  useEffect(() => {
+    if (cerca) camera.position.set(0, 1.6, 4.6)
+    else camera.position.set(0, 2.2, 6.4)
+    camera.lookAt(0, y, 0)
+    invalidate()
+  }, [camera, y, cerca, invalidate])
   return null
 }
 
@@ -161,7 +170,7 @@ export function Visor() {
   return (
     <Canvas className="visor-lienzo" flat frameloop="demand" dpr={[1, 2]} camera={{ fov: 30, position: [0, 2.2, 6.4] }} gl={{ alpha: true, antialias: true }}>
       <Pacer pausa={pausa} />
-      <Mira y={muestra.mascota ? 0.55 : 0.7} />
+      <Mira y={muestra.mascota ? (muestra.cerca ? 0.62 : 0.55) : 0.7} cerca={!!muestra.cerca} />
       <ambientLight intensity={0.9} />
       <directionalLight position={[1.5, 4, 6]} intensity={2.4} />
       {muestra.mascota ? <MascotaViva key={muestra.key} m={muestra.mascota} k={muestra.key} /> : muestra.item ? <ObjetoVivo key={muestra.key} it={muestra.item} /> : null}

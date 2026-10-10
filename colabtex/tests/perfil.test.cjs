@@ -73,3 +73,41 @@ test('lo que se guarda va limpio',()=>{
  assert.equal(P.valorMarca('club-bbtan-rondas',{puntos:312}),'ronda 312');
  assert.equal(P.oscurece('#ffffff',.5),'#808080');assert.equal(P.oscurece('rojo',.5),'#1e293b');
 });
+
+test('la mascota del perfil: limpiaPerfil solo deja una copia ma: y un baile válido',()=>{
+ const M='ma:abcdef123~-Nadop00001';
+ assert.deepEqual({...P.limpiaPerfil({mascota:{m:M,b:'start-dance-salsa'}}).mascota},{m:M,b:'start-dance-salsa'});
+ assert.deepEqual({...P.limpiaPerfil({mascota:{m:M,b:'ob:abcdef123~-Nrega00001'}}).mascota},{m:M,b:'ob:abcdef123~-Nrega00001'});
+ assert.deepEqual({...P.limpiaPerfil({mascota:{m:M,b:'<script>'}}).mascota},{m:M},'un baile raro se cae, la mascota no');
+ assert.equal(P.limpiaPerfil({mascota:{m:'abcdef123~p-Npack0001.0'}}).mascota,undefined,'una carta no es una mascota');
+ assert.equal(P.limpiaPerfil({mascota:null}).mascota,undefined);
+});
+
+/* El re-chequeo al pintar (mascotas-datos.js, con la economía): se compila
+   con esbuild porque importa el catálogo .ts de Mascotas. */
+const esbuild=require('esbuild'),path=require('node:path');
+const rb=esbuild.buildSync({stdin:{contents:`export { mascotaVisible, opcionesMascotaPerfil } from './juegos/mascotas-datos.js';`,resolveDir:path.join(__dirname,'..','src'),loader:'js'},
+ bundle:true,write:false,format:'cjs',platform:'node',target:'node20',logLevel:'silent'});
+const MD={exports:{}};new Function('module','exports','require',rb.outputFiles[0].text)(MD,MD.exports,require);
+
+test('la mascota del perfil se re-chequea: dueño, a la venta y baile',()=>{
+ const T=1791700000000,A='duenia001',B='otraaa001';
+ const d={ranks:{},solo:{},logros:{},diario:{},cartas:{s:{}},mercado:{o:{},t:{}},clubJugadas:{},podios:{},tienda:{},completo:true,
+  ajustes:{[B]:{a:{n:9000,m:'x',por:'admin',at:T-1}}},
+  mascotas:{a:{[A]:{'-Nadop00001':{at:T,e:'cat',p:0}}},r:{[A]:{}},c:{}}};
+ const c=`ma:${A}~-Nadop00001`;
+ const v=MD.exports.mascotaVisible(A,{mascota:{m:c,b:'start-dance-salsa'}},d);
+ assert.equal(v.c,c);assert.equal(v.baile,'salsa');assert.equal(v.m.e,'cat');
+ assert.equal(MD.exports.mascotaVisible(B,{mascota:{m:c}},d),null,'una mascota ajena no sale');
+ assert.equal(MD.exports.mascotaVisible(A,{mascota:{m:c,b:`ob:${A}~-Nnoexiste1`}},d).baile,null,'un baile que no tiene no baila');
+ const op=MD.exports.opcionesMascotaPerfil(A,d);
+ assert.deepEqual(op.mascotas.map(x=>x.c),[c]);
+ assert.ok(op.bailes.some(x=>x.b==='start-dance-salsa'),'los bailes iniciales los tiene todo el mundo');
+ /* La economía se recuerda por lectura: cada cambio es una lectura nueva. */
+ const d2=structuredClone(d);d2.mercado.o['-Nof0000001']={u:A,c,p:300,at:T+5};
+ assert.equal(MD.exports.mascotaVisible(A,{mascota:{m:c}},d2),null,'a la venta no sale');
+ assert.equal(MD.exports.opcionesMascotaPerfil(A,d2).mascotas.length,0);
+ const d3=structuredClone(d2);d3.mercado.o['-Nof0000001'].v={u:B,at:T+6};
+ assert.equal(MD.exports.mascotaVisible(A,{mascota:{m:c}},d3),null,'vendida, tampoco');
+ assert.equal(MD.exports.mascotaVisible(B,{mascota:{m:c}},d3).c,c,'y sale en el perfil de quien la compró');
+});

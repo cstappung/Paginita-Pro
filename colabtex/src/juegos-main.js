@@ -77,6 +77,7 @@ import { PRECIO_TIENDA } from "./juegos/tienda.js";
 import { crearMonedas, topHtml, MONEDA } from "./juegos/monedas-vista.js";
 import { crearProdrop } from "./juegos/prodrop.js";
 import { crearMascotas } from "./juegos/mascotas.js";
+import { crearMascotasPerfil } from "./juegos/perfil-mascota.js";
 import { crearMercado } from "./juegos/mercado.js";
 import { mejoresDrops, miniCarta, cifras as cifrasCartas, MOTOR, rankingColeccion } from "./juegos/prodrop-cartas.js";
 import { mezcla, abrePerfil } from "./juegos/perfil.js";
@@ -424,8 +425,30 @@ function comprasDe(d) {
    perfil vivo, comprobado contra lo que esa persona tiene ganado. */
 const marcoDeUid = uid => uid ? marcoVisible(perfilDe(uid), datosP ? estadisticas(uid, datosP) : null) : "anillo";
 
+/* La mascota de cada perfil: su estado se lee por clave, una vez por sesión. */
+const mascotasPerfil = crearMascotasPerfil((uid, k) => fb.leeEstadoMascota(uid, k));
+/* Lo que el editor ofrece de Mascotas: mis mascotas (no a la venta) y mis
+   bailes, con su vista. Sin la economía entera, nada (y se conserva la
+   elegida). */
+function mascotaEditor(uid, d) {
+  if (!d || !d.completo) return { opciones: null, vista: () => null };
+  const opciones = mascotasPerfil.opciones(uid, d);
+  /* Las mías pueden haber cambiado desde que se leyeron (se juega). */
+  for (const x of opciones.mascotas) mascotasPerfil.olvida(uid, x.c.slice(3));
+  return {
+    opciones,
+    vista(c, b, cb) {
+      const x = opciones.mascotas.find(y => y.c === c);
+      if (!x) return null;
+      const baile = b ? (opciones.bailes.find(y => y.b === b) || {}).id || null : null;
+      return mascotasPerfil.vista(uid, c, x.m, baile, d, cb);
+    }
+  };
+}
+
 const ctxPerfil = {
   yo: () => state.user && state.user.uid,
+  mascota: (uid, p, d, cb) => mascotasPerfil.deUid(uid, p, d, cb),
   perfil: uid => perfilDe(uid),
   colorDe: uid => colorForUid(uid || ""),
   datos: datosPerfil,
@@ -465,12 +488,17 @@ async function editaPerfil(pestana) {
     est: d ? estadisticas(b.uid, d) : null,
     uid: b.uid, colorDe: colorForUid, pestana,
     saldo: () => datosP && datosP.completo ? monedasDe(b.uid, datosP).saldo : null,
+    mascota: mascotaEditor(b.uid, d),
     onComprar: async id => { await fb.comprarTienda(b.uid, id, PRECIO_TIENDA); },
     onGuardar: async p => {
       /* El editor no conoce las cartas exhibidas (se eligen en PRODROP):
          sin esto, guardar el perfil las borraría. */
       const cartas = (perfiles.get(b.uid) || {}).cartas;
       if (cartas) p = Object.assign({}, p, { cartas });
+      /* La mascota la elige el editor; si no pudo ofrecerla (sin datos),
+         devuelve la que había. Nunca se pierde por guardar otra cosa. */
+      const mascota = (perfiles.get(b.uid) || {}).mascota;
+      if (mascota && !p.mascota && !(d && d.completo)) p = Object.assign({}, p, { mascota });
       await fb.guardarPerfil(b.uid, p);
       /* La escucha traerá lo mismo en un instante; adelantarlo aquí
          evita que el botón se cierre sobre el avatar de antes. */

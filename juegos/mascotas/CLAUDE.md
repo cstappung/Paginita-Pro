@@ -6,7 +6,7 @@
 - The source is TSX in `colabtex/src/mascotas/`: React 19, React Three Fiber/drei, three.js and zustand. It came from the standalone «Mascota» project; its Vite, PWA, studio and dev buttons were dropped.
 - `npm run build:mascotas` (part of `npm run build`) bundles it with esbuild into `juegos/mascotas/app.js` + `app.css`. `stamp-version.js` stamps both in `index.html`.
 - The frame is loaded like PRODROP's: the postman `colabtex/src/juegos/mascotas.js` (`crearMascotas`) mounts it full-window (`html.jg-mascotas`). It sends `datos` and `tema`, and does every write the frame asks for (`pide`), one at a time, re-checked against the complete read.
-- **The frame never touches Firebase.** Bump `?v=mc-N` in the postman when `index.html` changes.
+- **The frame never touches Firebase.** Bump `?v=mc-N` in the postman (`mascotas.js`) and in `visor-mascota.js` when `app.js` changes: `index.html` and `visor.html` are restamped, but the iframe URL that loads them is not.
 - `index.html` loads `i18n.js`, `mando.js` and `volumen.js` before the bundle. The volume control is drawn by the `Volumen` component in the top bar through `VolumenJuego.control`. All audio is Web Audio on `ctx.destination`, which `volumen.js` wraps, so the site's mute and volume govern it.
 
 **The pure motor is `juegos/mascotas/motor.js`** (UMD, `MascotasMotor`), shared by the page, the frame and the tests, like `ProdropMotor`. It holds:
@@ -36,6 +36,8 @@
 **Balance.** Growth was cut to 1/20 (`GROW_PER_ACTION` 0.05, `GROW_PER_POINT` 0.005). The «+N 🌱» shows hundredths. `sinPremio` is the old `unpaid`: dancing while already happy still raises stats but gets no per-action growth.
 
 **While listed in the market** a pet cannot be cared for, dressed or given the potion, and an item cannot be used. Listing a pet strips what it wears (it stays the seller's). Selling an item takes it off whoever wore it. `onlyUsable` drops worn items that were sold or listed.
+
+**In the profile.** A pet (and a dance) can be shown on the profile card and page, chosen in the profile editor's «Mascota» tab. Details in `docs/claude/juegos/perfiles-y-economia.md`. The live view asks the viewer for `cerca: true`, a closer camera for a small box.
 
 **Theme.** The postman forwards `data-tema`. `app.css` has an `html[data-tema='oscuro']` block: neutral surfaces go dark and the ink goes light, while coloured buttons keep dark ink on their pastel.
 

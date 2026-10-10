@@ -7,7 +7,7 @@ import { CATALOG, DANCES, SLOT_LABEL } from "../mascotas/data/accessories.ts";
 import { DECOR } from "../mascotas/data/decor.ts";
 import { SPECIES } from "../mascotas/data/species/index.ts";
 import MM from "../../../juegos/mascotas/motor.js";
-import { economia } from "./monedas.js";
+import { economia, mascotasDe, objetosDe } from "./monedas.js";
 
 export const TIPO_OBJETO = Object.assign({}, SLOT_LABEL, { decor: "Para la casa", dance: "Baile" });
 /* Los espacios en el orden del filtro del mercado. */
@@ -73,4 +73,26 @@ export function mejoresDropsMascotas(datos, n = 24) {
   const e = economia(datos), out = [];
   for (const [c, r] of Object.entries(e.regalos)) if (r.item.leg) out.push({ c, uid: r.u, at: r.at, item: r.item, ficha: fichaObjeto(r.item.kind, r.item.id) });
   return out.sort((a, b) => b.at - a.at || (a.c < b.c ? -1 : 1)).slice(0, n);
+}
+
+/* La mascota que se ve en un perfil, re-chequeada contra la economía: que
+   esa cuenta siga siendo dueña de la mascota (y que no esté a la venta) y
+   del baile. Devuelve {c, m, baile} o null; el estado lo pone quien pinta. */
+export function mascotaVisible(uid, perfil, datos) {
+  const x = perfil && perfil.mascota;
+  if (!x || typeof x.m !== "string" || !datos || !datos.completo) return null;
+  const e = economia(datos), m = e.mascotas[x.m];
+  if (!m || e.dueno[x.m] !== uid || e.enVenta[x.m]) return null;
+  return { c: x.m, m, baile: baileDe(x.b, e, uid) };
+}
+
+/* Lo que se puede elegir para el perfil: mis mascotas que no están a la
+   venta y mis bailes (los iniciales y los regalos míos). */
+export function opcionesMascotaPerfil(uid, datos) {
+  if (!datos || !datos.completo) return { mascotas: [], bailes: [] };
+  const mascotas = mascotasDe(uid, datos).filter(x => !x.venta).map(x => ({ c: x.c, m: { u: x.o, k: x.k, at: x.at, e: x.e } }));
+  const bailes = MM.BAILES_INICIALES.map(id => ({ b: "start-dance-" + id, id, ficha: fichaObjeto("dance", id) }));
+  for (const x of objetosDe(uid, datos))
+    if (x.kind === "dance" && !x.venta) bailes.push({ b: x.c, id: x.id, leg: x.leg, ficha: fichaObjeto("dance", x.id) });
+  return { mascotas, bailes };
 }
