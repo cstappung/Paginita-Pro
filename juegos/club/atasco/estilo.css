@@ -97,6 +97,8 @@ button{font:inherit;color:inherit;touch-action:manipulation;-webkit-tap-highligh
 .puesto.perfecto{background:#5b4a1a}                   /* tres estrellas: dorado */
 .puesto.siguiente{outline:3px solid var(--amarillo);outline-offset:2px;animation:late 1.4s ease-in-out infinite}
 .puesto:disabled{cursor:default;background:var(--cerrado);color:#ffffffaa}
+/* Ganado, pero sin la partida que lo prueba: la tabla no lo cuenta hasta volver a ganarlo. */
+.puesto.sin-prueba::after{content:"⚠";position:absolute;top:3px;right:5px;font-size:11px;line-height:1;color:var(--amarillo)}
 .puesto:disabled b::after{content:"🔒";display:block;font-size:12px;margin-top:2px}
 @media (hover:hover){.puesto:not(:disabled):hover{transform:translateY(-2px)}}
 

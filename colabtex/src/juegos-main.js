@@ -789,6 +789,14 @@ function nombreEnDatos(uid, d) {
   for (const t of [...Object.values(d.ranks || {}), ...Object.values(d.solo || {})]) if (t && t[uid] && t[uid].nombre) return t[uid].nombre;
   return "";
 }
+/* La foto (de Google) que dejó en una tabla de juego de sala, para quien
+   todavía no la tiene en su perfil: es lo que ya hacía la mini tarjeta
+   (perfil-tarjeta.js), y sin esto el top mostraba la inicial al lado de
+   una tarjeta con foto. */
+function fotoEnDatos(uid, d) {
+  for (const t of Object.values((d && d.ranks) || {})) if (t && t[uid] && t[uid].foto) return t[uid].foto;
+  return "";
+}
 /* Los últimos drops de PRODROP, en orden de salida (la más reciente
    primero): solo épicas y legendarias, con quién las sacó y cuándo. */
 const haceCuanto = at => {
@@ -802,7 +810,7 @@ function dropsHtml(d) {
     return `<p class="jg-nada">Nadie ha sacado todavía una épica. ${n.sobres ? `Van ${n.sobres} sobres abiertos.` : "Estrena PRODROP."} <a href="#cartas">Abrir un sobre →</a></p>`;
   }
   return l.map(c => {
-    const q = quien(c.uid, perfilDe(c.uid), null, { nombre: nombreEnDatos(c.uid, d) }, colorForUid);
+    const q = quien(c.uid, perfilDe(c.uid), null, { nombre: nombreEnDatos(c.uid, d), foto: fotoEnDatos(c.uid, d) }, colorForUid);
     return `<div class="jg-drop">${miniCarta(c)}<span class="jg-drop-quien" data-perfil="${escapeHtml(c.uid)}" data-nombre="${escapeHtml(q.nombre)}">${avatarMarco(q.foto, q.nombre, q.color, marcoDeUid(c.uid), 18, c.uid)}<b>${escapeHtml(q.nombre)}</b></span><small class="jg-drop-cuando">${c.rr ? "♻ re-roll · " : ""}${haceCuanto(c.at)}</small></div>`;
   }).join("");
 }
@@ -825,7 +833,7 @@ function pintaDropsMascotas() {
   }
   if (dropsMVista) pideFotos(l.map(ped).filter(p => p && !fotoDe(p.key)), () => pintaDropsMascotas());
   caja.innerHTML = l.map(x => {
-    const q = quien(x.uid, perfilDe(x.uid), null, { nombre: nombreEnDatos(x.uid, d) }, colorForUid);
+    const q = quien(x.uid, perfilDe(x.uid), null, { nombre: nombreEnDatos(x.uid, d), foto: fotoEnDatos(x.uid, d) }, colorForUid);
     const p = ped(x), f = p && fotoDe(p.key);
     return `<div class="jg-drop jg-dropm">
       <span class="jg-dropm-f"${f && f.src ? ` style="background-image:url('${escapeHtml(f.src)}')"` : ""} title="${escapeHtml(x.ficha.nombre)}">${f && f.src ? "" : `<i>${escapeHtml(x.ficha.emoji)}</i>`}<em>★</em></span>
@@ -1607,14 +1615,14 @@ function armazon() {
   if (state.vista === "cartas") {
     h.innerHTML = "";
     prodropVista = crearProdrop({ usuario: state.user, datos: datosPerfil, perfil: perfilDe, fb, volver: () => ir(""), ir,
-      quien: u => quien(u, perfilDe(u), null, { nombre: nombreEnDatos(u, datosP || {}) }, colorForUid) });
+      quien: u => quien(u, perfilDe(u), null, { nombre: nombreEnDatos(u, datosP || {}), foto: fotoEnDatos(u, datosP) }, colorForUid) });
     prodropVista.montar(h);
     return;
   }
   if (state.vista === "mercado") {
     h.innerHTML = "";
     mercadoVista = crearMercado({ usuario: state.user, datos: datosPerfil, fb, ir, marcoDe: marcoDeUid, juego: state.perfilUid,
-      quien: u => quien(u, perfilDe(u), null, { nombre: nombreEnDatos(u, datosP || {}) }, colorForUid) });
+      quien: u => quien(u, perfilDe(u), null, { nombre: nombreEnDatos(u, datosP || {}), foto: fotoEnDatos(u, datosP) }, colorForUid) });
     mercadoVista.montar(h);
     return;
   }
@@ -1648,7 +1656,7 @@ function armazon() {
     h.innerHTML = "";
     ranks = crearRanks({ uid: state.user.uid, watchRanks: fb.watchRanks, watchSolo: fb.watchSolo, watchTodos: fb.watchRanksTodos,
       perfil: perfilDe, colorDe: colorForUid, icono: Object.assign({ prodrop: "🃏" }, ICONO_TODOS), orden: () => ordenPopular(Object.keys(JUEGOS)),
-      datos: datosPerfil, quien: u => quien(u, perfilDe(u), null, { nombre: datosP ? nombreEnDatos(u, datosP) : "" }, colorForUid),
+      datos: datosPerfil, quien: u => quien(u, perfilDe(u), null, { nombre: datosP ? nombreEnDatos(u, datosP) : "", foto: fotoEnDatos(u, datosP) }, colorForUid),
       /* Un administrador borra desde la propia tabla el récord que le
          parece sospechoso, sin pasar por la cola del panel. La regla
          vuelve a mirar que lo sea. */
@@ -2118,7 +2126,7 @@ function topsLista(d) {
   if (!l.length) return `<li class="jg-nada">Nadie le ha quitado todavía un puesto del podio a nadie. ¿Serás el primero? <a href="#ranks">Mira las tablas →</a></li>`;
   const nom = (uid, c) => {
     const f = d.solo && d.solo[c] && d.solo[c][uid];
-    return quien(uid, perfilDe(uid), null, { nombre: (f && f.nombre) || nombreEnDatos(uid, d) }, colorForUid);
+    return quien(uid, perfilDe(uid), null, { nombre: (f && f.nombre) || nombreEnDatos(uid, d), foto: fotoEnDatos(uid, d) }, colorForUid);
   };
   return l.map(x => {
     const q = nom(x.uid, x.c), o = nom(x.q, x.c);

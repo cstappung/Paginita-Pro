@@ -599,16 +599,19 @@ export function proximoGratis(uid, datos, ahora) {
 /* Todos los que aparecen en alguna lectura, con las monedas que tienen
    **ahora** (el saldo, lo mismo que dice la cabecera de cada uno), de más
    a menos (el uid desempata, para que el orden no baile). El
-   nombre sale de sus filas; la pantalla le superpone el perfil vivo. */
+   nombre y la foto salen de sus filas; la pantalla les superpone el perfil vivo. */
 export function topMonedas(datos) {
-  const d = datos || {}, nombres = {};
-  const mira = filas => { for (const [u, f] of Object.entries(filas || {})) if (f && f.nombre && !nombres[u]) nombres[u] = f.nombre; else if (!(u in nombres)) nombres[u] = ""; };
+  const d = datos || {}, nombres = {}, fotos = {};
+  const mira = filas => { for (const [u, f] of Object.entries(filas || {})) {
+    if (f && f.nombre && !nombres[u]) nombres[u] = f.nombre; else if (!(u in nombres)) nombres[u] = "";
+    if (f && f.foto && !fotos[u]) fotos[u] = f.foto;   // la de Google, de una tabla de sala: por si su perfil no tiene
+  } };
   for (const filas of Object.values(d.ranks || {})) mira(filas);
   for (const filas of Object.values(d.solo || {})) mira(filas);
   for (const porUid of Object.values(d.logros || {})) for (const u of Object.keys(porUid || {})) if (!(u in nombres)) nombres[u] = "";
   for (const nodo of [d.diario, d.clubJugadas, d.podios, (d.cartas || {}).s, d.tienda, d.ajustes, (d.mascotas || {}).a, (d.mascotas || {}).r]) for (const u of Object.keys(nodo || {})) if (!(u in nombres)) nombres[u] = "";
   return Object.keys(nombres)
-    .map(uid => Object.assign({ uid, nombre: nombres[uid] }, monedasDe(uid, d)))
+    .map(uid => Object.assign({ uid, nombre: nombres[uid], foto: fotos[uid] || "" }, monedasDe(uid, d)))
     .filter(x => x.saldo > 0)
     .sort((a, b) => b.saldo - a.saldo || b.total - a.total || a.uid.localeCompare(b.uid));
 }

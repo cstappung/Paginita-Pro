@@ -28,7 +28,7 @@ const PARTES = [
 ];
 
 function fila(f, i, uid, perfil, colorDe, chico, datos) {
-  const q = quien(f.uid, perfil(f.uid), null, { nombre: f.nombre }, colorDe);
+  const q = quien(f.uid, perfil(f.uid), null, { nombre: f.nombre, foto: f.foto }, colorDe);
   const med = i < 3 ? ["🥇", "🥈", "🥉"][i] : String(i + 1);
   return `<li class="${f.uid === uid ? "jg-yo" : ""}"><b class="jg-mo-pos">${med}</b>${avatarMarco(q.foto, q.nombre, q.color, marcoDeUid(f.uid, perfil(f.uid), datos), chico ? 26 : 34, f.uid)}
     <span class="jg-mo-nom" data-perfil="${esc(f.uid)}" data-nombre="${esc(q.nombre)}">${esc(q.nombre)}</span>
